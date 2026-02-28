@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>co.workstyle.ai-news-save</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python</string>
+        <string>/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save/gmail_ai_news_save.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>GMAIL_CREDENTIALS_PATH</key>
+        <string>/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/credentials.json</string>
+        <key>GMAIL_TOKEN_PATH</key>
+        <string>/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>0</integer>
+        <key>Hour</key>
+        <integer>12</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/matsunomasaharu/Library/Logs/ai-news-save.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/matsunomasaharu/Library/Logs/ai-news-save-error.log</string>
+</dict>
+</plist>

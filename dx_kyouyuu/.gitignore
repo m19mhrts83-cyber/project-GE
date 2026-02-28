@@ -1,0 +1,60 @@
+# =============================================
+# DX互助会_共有フォルダ - Git管理
+# MD・テキスト・プログラムコードを追跡
+# =============================================
+
+# --- システム・エディタ ---
+.DS_Store
+*~
+*.swp
+*.swo
+Thumbs.db
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+
+# --- 認証・機密 ---
+credentials.json
+token.pickle
+token*.json
+*.pem
+03_outputs/ai_news_save/token_for_github_secret_b64.txt
+03_outputs/ai_news_save/.github_token
+
+# --- バイナリ・大容量 ---
+*.pdf
+*.PDF
+*.xlsx
+*.xls
+*.doc
+*.docx
+*.pptx
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.mov
+*.mp4
+
+# --- サブフォルダ固有（mail_automation など） ---
+03_outputs/mail_automation/logs/
+03_outputs/mail_automation/テスト*.md
+03_outputs/mail_automation/テスト*.xlsx
+
+# --- 例外: いけともAIニュースの画像は追跡する（直下および日付・セクション別フォルダ内） ---
+!05_knowledge/いけともAIニュース/*.png
+!05_knowledge/いけともAIニュース/*.jpg
+!05_knowledge/いけともAIニュース/*.jpeg
+!05_knowledge/いけともAIニュース/*.gif
+!05_knowledge/いけともAIニュース/*.webp
+!05_knowledge/いけともAIニュース/**/*.png
+!05_knowledge/いけともAIニュース/**/*.jpg
+!05_knowledge/いけともAIニュース/**/*.jpeg
+!05_knowledge/いけともAIニュース/**/*.gif
+!05_knowledge/いけともAIニュース/**/*.webp

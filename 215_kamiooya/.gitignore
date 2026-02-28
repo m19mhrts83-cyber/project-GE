@@ -1,0 +1,51 @@
+# =============================================
+# .gitignore - 全体を除外し、コード系フォルダだけを管理
+# =============================================
+
+# --- まず全てを除外 ---
+/*
+
+# --- Git管理するフォルダだけを許可 ---
+!.gitignore
+!C1_cursor/
+!C2_ルーティン作業/
+!C3_プロンプト/
+!50_税金,確定申告/zaim_to_yayoi.py
+!50_税金,確定申告/確定申告マニュアル.md
+!50_税金,確定申告/資産計上と費用計上の実践ガイド.md
+
+# --- 許可したフォルダ内でも除外するもの ---
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+node_modules/
+.venv/
+.venv_*/
+**/.venv/
+C1_cursor/browser_automation/.venv/
+.venv_gmail/
+*.tmp
+~$*
+.env
+credentials.json
+token.json
+token*.json
+*.expired
+C1_cursor/1b_Cursorマニュアル/Gmail_MCP_エラー解消手順.md
+
+# --- バイナリ/メディアファイル ---
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mov
+*.mp4
+*.pdf
+*.PDF
+*.xlsx
+*.xls
+*.doc
+*.docx
+*.pptx

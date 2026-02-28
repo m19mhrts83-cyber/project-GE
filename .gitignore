@@ -1,0 +1,52 @@
+# =============================================
+# project-GE 一本化用 .gitignore（215 / DX / 500 / 300 共通）
+# =============================================
+
+# 退避した旧 .git（コミットしない）
+.git.bak.*/
+
+# --- 認証・秘密情報 ---
+.env
+.env.*
+!.env.example
+token.json
+token*.json
+*.expired
+credentials.json
+credentials_*.json
+**/token.json
+**/credentials.json
+**/token.pickle
+**/*.pem
+**/03_outputs/ai_news_save/token_for_github_secret_b64.txt
+**/03_outputs/ai_news_save/.github_token
+
+# --- 環境・キャッシュ（.venv は 100MB 超で GitHub 拒否のため必須） ---
+.venv/
+.venv_*/
+**/.venv/
+**/.venv_*/
+**/venv/
+__pycache__/
+node_modules/
+*.pyc
+.DS_Store
+
+# --- エディタ・ツール ---
+.cursor/
+.obsidian/
+.vscode/
+
+# --- ローカル設定 ---
+*.local.yaml
+config_nichinoken.yaml
+config_bank.yaml
+
+# --- 215 固有（手順書内 OAuth 等） ---
+215_kamiooya/C1_cursor/Gmail_MCP_エラー解消手順.md
+215_kamiooya/C1_cursor/browser_automation/.venv/
+
+# --- DX 固有（バイナリ・大容量は必要に応じて追跡） ---
+dx_kyouyuu/03_outputs/mail_automation/logs/
+dx_kyouyuu/03_outputs/mail_automation/テスト*.md
+dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DX互助会向け Gmail API 活用の取り組み紹介</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif; background: #1a1a2e; color: #eee; }
+    .slide {
+      min-height: 100vh;
+      padding: 2rem 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      scroll-snap-align: start;
+    }
+    .slide h1 { font-size: 1.75rem; margin: 0 0 1rem; border-bottom: 2px solid #4a9; padding-bottom: 0.5rem; }
+    .slide h2 { font-size: 1.35rem; margin: 1.5rem 0 0.75rem; color: #8cf; }
+    .slide h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
+    .slide ul { margin: 0.5rem 0; padding-left: 1.5rem; line-height: 1.7; }
+    .slide p { margin: 0.5rem 0; line-height: 1.6; }
+    .slide .mermaid { margin: 1rem 0; background: #16213e; padding: 1rem; border-radius: 8px; }
+    .slide a { color: #6cf; }
+    .slide table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+    .slide th, .slide td { border: 1px solid #4a9; padding: 0.5rem 0.75rem; text-align: left; }
+    .slide th { background: #16213e; color: #8cf; }
+    .metaphor-block { background: #16213e; border-left: 4px solid #4a9; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 8px 8px 0; }
+    .metaphor-block h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+    .metaphor-block p { margin: 0.35rem 0; }
+    .metaphor-block .place { margin-top: 0.5rem; font-size: 0.9rem; color: #8cf; }
+    .slide .note { background: #0f3460; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.95rem; margin-top: 1rem; }
+    .slide code { background: #0f3460; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+    .example-files { font-size: 0.95rem; color: #aaa; margin-top: 0.5rem; }
+    main { scroll-snap-type: y mandatory; }
+    .title-slide { text-align: center; }
+    .title-slide h1 { border: none; font-size: 2rem; }
+    .title-slide p { margin-top: 1rem; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <main>
+    <!-- タイトル -->
+    <section class="slide title-slide">
+      <h1>DX互助会向け「Gmail API 活用の取り組み」紹介</h1>
+      <p>図解とステップでまとめたスライドです</p>
+      <p style="margin-top: 1.5rem; font-size: 0.95rem; opacity: 0.95;">Gmail API を活用している主な取り組み（取り組み順）：<br>① 空室対策メール送信　② パートナーとのメールやり取り　③ いけともAIニュースの定期保存　④ トークン自動更新</p>
+      <p class="note" style="margin-top: 1.5rem;">※ いずれも<strong>Gmail API</strong>による実装です。Cursor の「Gmail MCP」接続は<strong>不要</strong>です（後述の「API と MCP の違い」を参照）。</p>
+    </section>
+
+    <!-- 1. 空室対策メール送信 -->
+    <section class="slide">
+      <h1>1. 空室対策メール送信（Gmail API 活用）</h1>
+      <p>物件の空室対策メールを、Markdown で用意した文面と Excel の宛先一覧をもとに、Gmail API で 1 社ずつ送信する仕組みです。215（神・大家さん倶楽部）の <code>mail_automation</code> で運用しています。</p>
+      <h2>フロー</h2>
+      <div class="mermaid" id="mermaid-vacancy">
+flowchart LR
+  MD[メール文面 .md]
+  Excel[宛先一覧 .xlsx]
+  Send[send_mail.py]
+  Gmail[Gmail API]
+  Mail[1社ずつ送信]
+  MD --> Send
+  Excel --> Send
+  Send --> Gmail
+  Gmail --> Mail
+      </div>
+      <p class="example-files">例：メール文面 <code>260221_G1_空室対策.md</code>、宛先一覧は Excel（例：管理会社一覧.xlsx のシート G1）を指定</p>
+      <h2>やったこと・ポイント</h2>
+      <ul>
+        <li>空室対策用のメール文面（Markdown）と送信先（Excel）を用意</li>
+        <li><code>send_mail.py</code> が Gmail API で認証し、1 社ずつ送信（レート制限対策で間隔を空けて送信可能）</li>
+        <li>認証はパートナー・いけともと同じ <strong>1b_Cursorマニュアル</strong> の <code>credentials.json</code> と <code>token.json</code> を使用（3日ごとのトークン自動更新の対象）</li>
+        <li>スクリプトの置き場所：OneDrive（神・大家さん倶楽部）の <code>C1_cursor/mail_automation/</code></li>
+      </ul>
+    </section>
+
+    <!-- 2. パートナーやり取り -->
+    <section class="slide">
+      <h1>2. パートナーとのメールやり取りをやりやすくする仕組み</h1>
+      <p>Cursor と Gmail API で、パートナー社からのメールを取得し、連絡先一覧と照合してパートナー別フォルダの「やり取り」メモに自動追記。同じ Gmail 認証を「いけともAIニュース」とも共有しています。</p>
+      <h2>フロー</h2>
+      <div class="mermaid" id="mermaid1">
+flowchart LR
+  Gmail[Gmail 未読・既読]
+  Script[Python スクリプト Gmail API]
+  List[連絡先一覧 YAML]
+  Docs[パートナー別 やり取り.md]
+  Cursor[Cursor から実行]
+  Gmail --> Script
+  List --> Script
+  Script --> Docs
+  Cursor -->|依頼で実行| Script
+      </div>
+      <h2>やったこと・ステップ</h2>
+      <ul>
+        <li>Google Cloud でプロジェクト作成・Gmail API 有効化・OAuth 認証情報（credentials.json）取得</li>
+        <li>連絡先一覧（YAML）にパートナー社のメールアドレスを登録</li>
+        <li>初回ブラウザ認証で token.json を取得</li>
+        <li>Cursor のルールで「パートナーからのメールを確認して」と依頼するとスクリプトが実行され、該当フォルダの 5.やり取り.md に追記</li>
+        <li>詳細は別途セットアップ手順を参照（215 側）</li>
+      </ul>
+    </section>
+
+    <!-- 3. いけとも 定期実行 -->
+    <section class="slide">
+      <h1>3. いけともAIニュースをナレッジに入れる仕組み</h1>
+      <h2>(a) Gmail API ＋ GitHub で定期自動実行</h2>
+      <p>毎週日曜 12:00（JST）に GitHub Actions で自動実行。</p>
+      <div class="mermaid" id="mermaid2a">
+flowchart LR
+  Mail[いけとも 注目AIニュース メール]
+  GHA[GitHub Actions 毎週日曜 12:00 JST]
+  Secrets[Secrets から credentials token 復元]
+  Run[gmail_ai_news_save.py]
+  Knowledge[05_knowledge いけともAIニュース]
+  Push[コミット push]
+  Mail --> GHA
+  GHA --> Secrets
+  Secrets --> Run
+  Run --> Knowledge
+  Knowledge --> Push
+      </div>
+      <ul>
+        <li>Gmail で「注目AIニュース」を特定差出人・転送ルールで受信</li>
+        <li>credentials.json / token.json を Base64 化し GitHub Secrets に登録</li>
+        <li>.github/workflows/ai-news-save.yml で毎週日曜・手動実行を定義</li>
+        <li>ワークフロー内で Python 環境構築 → 認証復元 → スクリプト実行 → コミット・push</li>
+      </ul>
+    </section>
+
+    <!-- 4. トークン自動更新 -->
+    <section class="slide">
+      <h1>4. トークン自動更新</h1>
+      <p>「事前対策」と「自動更新」の 2 段構えでトークン切れを防ぐ。</p>
+      <h2>対策の全体像</h2>
+      <div class="mermaid" id="mermaid2b">
+flowchart TB
+  subgraph before [事前対策]
+    OAuth[OAuth 同意画面を本番に]
+    LongToken[refresh token を長く持たせる]
+    OAuth --> LongToken
+  end
+  subgraph auto [自動更新]
+    LaunchD[Mac launchd 3日ごと]
+    Script[refresh_token_and_update_github_secret.py]
+    UpdateLocal[token.json 更新]
+    UpdateGH[GitHub Secret GMAIL_TOKEN_B64 更新]
+    LaunchD --> Script
+    Script --> UpdateLocal
+    Script --> UpdateGH
+  end
+  before --> auto
+  UpdateGH -->|毎週日曜 AI News Save で利用| GHA[GitHub Actions]
+      </div>
+      <h2>やったこと</h2>
+      <ul>
+        <li>Google OAuth 同意画面を「本番」にし refresh token を延ばす</li>
+        <li>スクリプトで Gmail token を更新し GitHub の GMAIL_TOKEN_B64 に API で反映</li>
+        <li>Fine-grained PAT（Secrets: Read and write）を発行し環境変数などで利用</li>
+        <li>launchd（plist）で 3 日ごとにスクリプトを実行</li>
+      </ul>
+    </section>
+
+    <!-- 2b 補足: launchd とは・いつ動くか -->
+    <section class="slide">
+      <h1>トークン自動更新：いつ・どこで動くか</h1>
+      <h2>launchd（ランチド）とは</h2>
+      <p>Mac に標準で入っている「<strong>いつ・何を実行するか</strong>」を担当する仕組みです。トークン更新は「3 日ごとにこのスクリプトを実行する」と launchd に登録してあります。</p>
+      <h2>トリガー（実行のきっかけ）</h2>
+      <p><strong>「Mac を開いたときに、前回の更新から 3 日以上経過していれば、そのタイミングで実行される」</strong>という動きです。</p>
+      <ul>
+        <li>実行される場所は <strong>あなたの Mac 上</strong>（GitHub 上ではありません）</li>
+        <li>3 日後のタイミングで Mac がスリープ中だった場合は、<strong>次に Mac を開いたとき</strong>にまとめて 1 回実行される</li>
+        <li>その実行が終わった時点から、また 3 日後に次が予定される</li>
+      </ul>
+    </section>
+
+    <!-- 2b 補足: 参照している箱の置き場所 -->
+    <section class="slide">
+      <h1>トークン自動更新：参照している「箱」の置き場所</h1>
+      <p>トークン自動更新で使うものは、次のいずれかにあります。</p>
+      <table>
+        <thead>
+          <tr><th>中身</th><th>どこにあるか</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>launchd の設定（plist）・GITHUB_TOKEN</td>
+            <td><strong>Mac 本体（ローカル）</strong></td>
+            <td>~/Library/LaunchAgents/ 内。OneDrive/Google Drive には置いていない</td>
+          </tr>
+          <tr>
+            <td>credentials.json / token.json<br>Python 実行環境（.venv_gmail）</td>
+            <td><strong>OneDrive（神・大家さん倶楽部）</strong></td>
+            <td>215 フォルダの C1_cursor/1b_Cursorマニュアル/ 内。パートナーやり取りといけともで共通</td>
+          </tr>
+          <tr>
+            <td>更新用スクリプト（refresh_token_and_update_github_secret.py）</td>
+            <td><strong>Google Drive（DX互助会）</strong></td>
+            <td>DX互助会_共有フォルダの 03_outputs/ai_news_save/ 内</td>
+          </tr>
+          <tr>
+            <td>GitHub の Secret（GMAIL_TOKEN_B64）</td>
+            <td><strong>GitHub（クラウド）</strong></td>
+            <td>Mac/OneDrive/Google Drive のどれでもなく、GitHub のリポジトリ設定上にある「秘密の値」。スクリプトが API でここを更新する</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 2b 補足: 流れの図（置き場所つき） -->
+    <section class="slide">
+      <h1>トークン自動更新：全体の流れ（置き場所つき）</h1>
+      <div class="mermaid" id="mermaid-boxes">
+flowchart LR
+  subgraph Mac [Mac 本体]
+    Plist[launchd plist\nGITHUB_TOKEN]
+  end
+  subgraph OneDrive [OneDrive 神・大家さん倶楽部]
+    Creds[credentials.json\ntoken.json]
+    Venv[.venv_gmail\nPython]
+  end
+  subgraph GDrive [Google Drive DX互助会]
+    Script[refresh_token_and_update_github_secret.py]
+  end
+  subgraph GitHub [GitHub]
+    Secret[GMAIL_TOKEN_B64]
+  end
+  Plist -->|"3日経過で起動"| Venv
+  Venv -->|"この Python で実行"| Script
+  Creds --> Script
+  Script -->|"token 更新"| Creds
+  Script -->|"API で更新"| Secret
+      </div>
+      <p>Mac を開いたタイミングで「3 日以上経過」していれば、<strong>launchd が OneDrive の Python（.venv_gmail）を起動</strong>し、その Python が Google Drive 上のスクリプトを 1 本のコマンドとして実行します。スクリプトは OneDrive の認証で Gmail を更新し、結果を GitHub の Secret に反映します。</p>
+    </section>
+
+    <!-- 舞台・台本の例えで理解する -->
+    <section class="slide">
+      <h1>🎭 舞台と台本の例えで理解する</h1>
+      <p>「どの Python で」「どのプログラムを」動かすかを、<strong>舞台</strong>と<strong>台本</strong>に例えて整理します。</p>
+
+      <div class="metaphor-block">
+        <h2>🎭 舞台 ＝ .venv_gmail（実行環境）</h2>
+        <p><strong>フォルダ</strong>の名前で、中に「Python 本体」と必要なライブラリが入っています。<br>
+        役割は<strong>「どこで・どんな環境で演じるか」</strong>。台本（.py）が別のフォルダにあっても、この舞台の Python に台本の<strong>場所を渡せば</strong>実行できます。</p>
+        <p class="place">📍 置き場所：OneDrive（神・大家さん倶楽部）</p>
+      </div>
+
+      <div class="metaphor-block">
+        <h2>📜 台本 ＝ .py ファイル（プログラム）</h2>
+        <p>「やること」が書かれた<strong>脚本</strong>。拡張子は <code>.py</code>。<br>
+        役割は<strong>「何をするか」</strong>。舞台の上で、この台本に書かれた通りに Python が動きます。</p>
+        <p class="place">📍 置き場所：Google Drive（DX互助会）の <code>refresh_token_and_update_github_secret.py</code> など</p>
+      </div>
+
+      <div class="metaphor-block">
+        <h2>🎬 実際の流れ</h2>
+        <p><strong>launchd</strong>（Mac）が「3 日経過したら」と判断 → <strong>舞台</strong>（.venv_gmail の Python）を起動 → その舞台に<strong>「この台本を演じて」</strong>と、別フォルダにある台本の<strong>パス</strong>を渡す → 舞台の上で台本が実行される。</p>
+        <p>だから「<strong>舞台は神・大家さん倶楽部、台本は DX互助会</strong>」のように、<strong>置き場所が違っていても 1 本のコマンドでつながります</strong>。</p>
+      </div>
+
+      <p class="note">💡 作業ディレクトリ（WorkingDirectory）は「舞台の上での作業場所」として、台本がある DX互助会のフォルダを指定しています。</p>
+    </section>
+
+    <!-- 3. 全体の関係 -->
+    <section class="slide">
+      <h1>3. 全体の関係（Gmail API 活用の全体像）</h1>
+      <div class="mermaid" id="mermaid3">
+flowchart TB
+  Creds[同一 Gmail 認証 credentials token.json 215 1b_Cursorマニュアル]
+  subgraph local [ローカル実行 215]
+    Partner[パートナーやり取り やり取り.md に追記]
+    Vacancy[空室対策メール送信 send_mail.py]
+  end
+  subgraph gh [GitHub]
+    Secret[Secrets GMAIL_TOKEN_B64]
+    Action[AI News Save ワークフロー 毎週日曜]
+    Knowledge[05_knowledge いけともAIニュース]
+    Secret --> Action
+    Action --> Knowledge
+  end
+  subgraph refresh [トークン自動更新]
+    LaunchD[launchd 3日ごと]
+    UpdateScript[refresh_token_and_update_github_secret.py]
+    LaunchD --> UpdateScript
+    UpdateScript -->|token 更新| Secret
+  end
+  Creds --> Partner
+  Creds --> Vacancy
+  Creds --> UpdateScript
+  UpdateScript -->|token.json 上書き| Creds
+      </div>
+      <ul>
+        <li><strong>パートナーやり取り</strong>: 同じ token.json をローカルで参照しやり取り.md に追記</li>
+        <li><strong>いけともAIニュース</strong>: GitHub Secrets の token を Actions で利用</li>
+        <li><strong>トークン自動更新</strong>: token.json を更新しつつ GitHub の GMAIL_TOKEN_B64 を API で更新</li>
+        <li><strong>空室対策メール送信</strong>: 215 の mail_automation で Gmail API を使用。認証は 1b_Cursorマニュアルの credentials.json / token.json（パートナー・いけともと同じ。3日ごとのトークン自動更新の対象）</li>
+      </ul>
+    </section>
+
+    <!-- 参照・注意 -->
+    <section class="slide">
+      <h1>参照・注意</h1>
+      <ul>
+        <li>各仕組みの詳細は、同フォルダ内のセットアップ手順（.md）を参照してください。</li>
+        <li>トークン更新時は「いけともAIニュース」「パートナーやり取り」「空室対策メール送信」の<strong>すべて</strong>に影響します。215 と DX 互助会の手順をまとめて確認することを推奨します。</li>
+        <li><strong>空室対策メール送信</strong>もパートナー・いけともと同じ 1b_Cursorマニュアルの token.json を使用しているため、トークン自動更新で<strong>パートナー・いけとも・空室対策のすべて</strong>がまとめてカバーされます。</li>
+      </ul>
+    </section>
+
+    <!-- 用語の補足（舞台・台本の例えにそろえる） -->
+    <section class="slide">
+      <h1>用語の補足（舞台・台本の例えにそろえて）</h1>
+      <p>前のスライドでは<strong>「舞台」「台本」</strong>の例えで説明しました。ここでは、同じ<strong>演劇の道具</strong>の観点で用語を説明します。</p>
+
+      <h2>token（トークン）</h2>
+      <p><strong>「Gmail を使っていいよ」と Google がくれた、期限付きの入場券</strong>です。初回だけ、ブラウザで「このアプリを許可する」を押すと発行されます。台本（スクリプト）はこの入場券を Gmail API に見せて、メールのやり取りをします。<strong>期限内ならそのまま入場（利用）でき、期限が切れていたらその入場券のままでは使えません。</strong>だから「トークン自動更新」が、切れる前に<strong>新しい入場券に取り替え</strong>て、同じファイル（token.json）に書き込んでおいてくれます。</p>
+
+      <h2>token.json（トークン・ジェイソン）</h2>
+      <p><strong>入場券に書かれている中身そのものを、1 つのファイルにしたもの</strong>です。「誰の許可か」「いつまで有効か」などがテキストで書いてあり、開けば読めます。パートナーやり取り・いけともAIニュース・空室対策メールは、<strong>全部この 1 つのファイルを見に行って</strong>、その中身（入場券の情報）を Gmail API に見せています。このファイルを 1 回更新すれば、みんなの仕組みがまとめて期限切れを防げます。</p>
+
+      <h2>入場券の流れ（図解）</h2>
+      <div class="mermaid" id="mermaid-token">
+flowchart LR
+  Ticket[token.json\n入場券の中身]
+  Ticket --> Show[Gmail API に\n見せる]
+  Show --> Check{期限内？}
+  Check -->|はい| OK[✅ 利用できる]
+  Check -->|いいえ| NG[❌ そのままでは\n使えない]
+  NG --> Update[自動更新で\n新しい入場券に取り替え]
+  Update --> Ticket
+      </div>
+
+      <h2>YAML（ヤムル）</h2>
+      <p><strong>配役表</strong>のように、「誰がどの役か」「どのメールアドレスがどのパートナーか」を、人間が読みやすい形で書く書き方です。テキストで「見出し: 中身」や「- 項目1」「- 項目2」のように書けます。本取り組みでは、<strong>パートナー社の連絡先</strong>をこの配役表（YAML）で管理し、台本（スクリプト）がそれを読んで「やり取り.md」に振り分けています。</p>
+    </section>
+
+    <!-- 他に説明しておくとよい用語（候補・まとめ案） -->
+    <section class="slide">
+      <h1>他に説明しておくとよい用語（候補・まとめ案）</h1>
+      <p>スライド本編では触れていませんが、非プログラマーの方に「聞いたことあるけどよく分からない」となりがちな用語の<strong>例えでの説明案</strong>です。必要に応じて補足や別資料に追記してください。</p>
+
+      <h2>credentials.json（クレデンシャルズ・ジェイソン）</h2>
+      <p><strong>入場券を発行してもらうための「申込書」</strong>のようなものです。Google に「このアプリから Gmail を使いたいです」と登録したときに渡されるファイルで、中身は「どのアプリか」を示す ID などです。初回だけ、この申込書を持ってブラウザで Google に許可をもらうと、入場券（token）が発行され、その内容が token.json に保存されます。入場券（token.json）は期限で取り替わりますが、申込書（credentials.json）は基本的に 1 回用意すればそのまま使います。</p>
+
+      <h2>API（エー・ピー・アイ）</h2>
+      <p><strong>「こうやって頼むと、向こうが決まった形で返してくれる窓口」</strong>です。Gmail API なら「この入場券で、未読メール一覧をください」と頼むと、Gmail 側が一覧を返してくれます。台本（スクリプト）はこの窓口に、入場券（token）を見せながら、メールの取得や送信をお願いしている、というイメージです。</p>
+
+      <h2>API と MCP の違い（Gmail MCP 接続は不要）</h2>
+      <p><strong>API</strong>は、プログラム（台本）が「Gmail にこうしてほしい」と<strong>直接お願いする窓口</strong>です。今回の取り組み（空室対策・パートナーやり取り・いけともAIニュース・トークン更新）は<strong>すべて Gmail API で実装</strong>しており、Python スクリプトが credentials.json / token.json を使って Gmail API を呼び出しています。</p>
+      <p><strong>MCP（Model Context Protocol）</strong>は、<strong>Cursor のチャットから「ツール」として外部サービス（例：Gmail）を触るための接続仕組み</strong>です。チャットで「メールを検索して」と言ったときに Cursor が Gmail に問い合わせる、といった用途向けで、認証やトークンの持ち方も API 実装とは別系統です。</p>
+      <p><strong>今回の 4 つの取り組みでは Gmail API だけで完結しているため、Cursor の「Gmail MCP」を有効にする必要はありません。</strong>MCP を増やすとツール数が増えて Cursor の制限に触れることもあるため、Gmail は API 実装のままで運用する形で問題ありません。</p>
+
+      <h2>Cursor の MCP：Installed と Plugin の登録方法・使い分け</h2>
+      <p>Cursor で MCP サーバーを接続する方法には、<strong>Installed MCP Servers</strong>（手動インストール）と<strong>Plugin MCP Servers</strong>（プラグイン経由）の 2 通りがあります。</p>
+      <ul>
+        <li><strong>Installed MCP Servers</strong>：<code>~/.cursor/mcp.json</code>（グローバル）またはプロジェクトの <code>.cursor/mcp.json</code> に、自分でコマンドやリモート URL を追記する方式。設定はテキストで管理され、全プロジェクト or そのプロジェクトだけで有効にできます。Tavily・NotebookLM など、公式に「mcp.json にこう書く」と案内されている MCP に向いています。</li>
+        <li><strong>Plugin MCP Servers</strong>：Cursor の拡張機能（プラグイン）として提供されている MCP。マーケットプレイスから「Notion」などをインストールすると、プラグイン側が MCP サーバーを登録します。設定画面で ON/OFF しやすく、更新もプラグインの更新に含まれることが多いです。</li>
+      </ul>
+      <p><strong>使い分けの目安</strong>：同じサービス（例：Notion）を<strong>Installed と Plugin の両方</strong>に入れると、同じツールが二重に登録され、ツール数が余分に増えて「ツールを減らせ」といったエラーの原因になりがちです。<strong>どちらか一方に統一</strong>するのがおすすめです。</p>
+      <p><strong>Notion を両方入れている場合</strong>：<strong>Plugin だけ</strong>にすると、Cursor の設定 UI で Notion MCP の有効/無効を切り替えやすく、運用しやすいです。<code>~/.cursor/mcp.json</code> の <code>"notion"</code> ブロックを削除し、Notion はプラグイン経由だけにすると、ツール数が重複分だけ減ります。逆に「Installed だけにしたい」場合は、Notion 用プラグインの MCP 機能を無効化するかアンインストールし、mcp.json の notion だけを残す形でもかまいません。</p>
+
+      <h2>GitHub / GitHub Actions</h2>
+      <p><strong>GitHub</strong>は、<strong>台本（プログラム）を預けておく「倉庫」</strong>のような場所です。複数人で同じ台本を共有したり、変更履歴を残したりするのに使います。<strong>GitHub Actions</strong>は、その倉庫に「毎週日曜の 12 時に、この台本を実行して」と予約しておける<strong>自動実行の仕掛け</strong>です。いけともAIニュースの定期保存は、この「毎週日曜に自動実行」で動いています。</p>
+
+      <h2>launchd（ランチド）</h2>
+      <p>Mac に元から入っている<strong>「いつ・何を実行するか」を覚えておいてくれる係</strong>です。トークン自動更新では「3 日ごとに、この台本を実行して」と launchd に頼んであり、Mac を開いたタイミングで「3 日経ってるから実行するね」と動きます。GitHub Actions が「クラウドの倉庫の上で、決まった時刻に実行」なのに対し、launchd は<strong>「あなたの Mac の上で、条件（日数など）が満たされたら実行」</strong>という違いがあります。</p>
+    </section>
+  </main>
+  <script>
+    mermaid.initialize({ theme: 'dark' });
+  </script>
+</body>
+</html>

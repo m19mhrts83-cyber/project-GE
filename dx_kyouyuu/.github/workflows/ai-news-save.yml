@@ -1,0 +1,63 @@
+# いけともAIニュース定期保存（毎週日曜 12:00 日本時間）
+name: AI News Save
+
+permissions:
+  contents: write  # コミット・push に必要
+
+on:
+  schedule:
+    # 日曜 03:00 UTC = 12:00 JST
+    - cron: "0 3 * * 0"
+  workflow_dispatch:  # 手動実行用
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r 03_outputs/ai_news_save/requirements.txt
+
+      - name: Create credentials
+        run: |
+          mkdir -p .credentials
+          echo "${{ secrets.GMAIL_CREDENTIALS_B64 }}" | base64 -d > .credentials/credentials.json
+          echo "${{ secrets.GMAIL_TOKEN_B64 }}" | base64 -d > .credentials/token.json
+
+      - name: Verify credentials
+        run: |
+          if [ ! -s .credentials/credentials.json ] || [ ! -s .credentials/token.json ]; then
+            echo "::error::Credentials が空または作成できていません。Settings → Secrets and variables → Actions で GMAIL_CREDENTIALS_B64 と GMAIL_TOKEN_B64 を確認し、credentials.json / token.json の Base64（改行なし）を登録してください。"
+            exit 1
+          fi
+
+      - name: Run AI News Save
+        env:
+          GMAIL_CREDENTIALS_PATH: ${{ github.workspace }}/.credentials/credentials.json
+          GMAIL_TOKEN_PATH: ${{ github.workspace }}/.credentials/token.json
+          AI_NEWS_SAVE_PATH: ${{ github.workspace }}/05_knowledge/いけともAIニュース
+        run: |
+          python 03_outputs/ai_news_save/gmail_ai_news_save.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 保存先が無い場合（該当メールなし）でもエラーにしない
+          git add 05_knowledge/いけともAIニュース/ 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "保存する新しいメールはありませんでした。"
+            exit 0
+          fi
+          git commit -m "chore: AIニュースを保存 ($(date '+%Y-%m-%d'))"
+          git push

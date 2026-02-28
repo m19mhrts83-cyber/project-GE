@@ -1,0 +1,36 @@
+# 認証・秘密情報（リポジトリに含めない）
+.env
+.env.*
+!.env.example
+token.json
+token*.json
+*.expired
+credentials.json
+credentials_*.json
+**/token.json
+**/credentials.json
+
+# 環境・キャッシュ（.venv は 100MB 超で GitHub 拒否になるため必ず除外）
+.venv/
+.venv_*/
+**/.venv/
+**/.venv_*/
+**/venv/
+C1_cursor/browser_automation/.venv/
+__pycache__/
+node_modules/
+*.pyc
+.DS_Store
+
+# エディタ・ツール（同期遅延でタイムアウトする場合あり）
+.cursor/
+.obsidian/
+.vscode/
+
+# ローカル設定（例）
+*.local.yaml
+config_nichinoken.yaml
+config_bank.yaml
+
+# 手順書内に OAuth 等の記載があるため push から除外（要約版で追加可）
+C1_cursor/Gmail_MCP_エラー解消手順.md
