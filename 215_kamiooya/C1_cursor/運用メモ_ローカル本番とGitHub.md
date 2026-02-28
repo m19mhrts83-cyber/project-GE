@@ -1,5 +1,10 @@
 # 215 リポジトリ運用メモ：ローカル本番・GitHub へバックアップ
 
+**※ Git 一本化（2025年3月〜）**  
+215 / DX / 500 / 300 は **1 つのリポジトリ（project-GE）** で管理しています。コミット・push は **`~/git-repos`** を開いて行います。全体の運用は `~/git-repos/README_運用.md` を参照してください。
+
+---
+
 ## 運用の前提：ファイルは OneDrive、Git はローカルで
 
 - **ファイルの追加・編集（「215」の管理）**  
@@ -16,7 +21,7 @@
 | 場所 | 役割 |
 |------|------|
 | **OneDrive「215_神・大家さん倶楽部」** | ファイルの追加・編集・日々の管理（ここが元）。Git はここでは動かない。 |
-| **ローカル `~/git-repos/215_kamiooya`** | OneDrive の内容を同期したうえで、ここで commit ・ push する。履歴は GitHub に残る。 |
+| **ローカル `~/git-repos/215_kamiooya`** | OneDrive の内容を同期したうえで、**`~/git-repos` で** commit ・ push する（project-GE 一本化）。履歴は GitHub に残る。 |
 
 ---
 
@@ -228,7 +233,7 @@ git push -u origin main --force
 1. **コミット**（メッセージ例に沿って自分でコミット）
 2. **push**  
    ```bash
-   cd ~/git-repos/215_kamiooya
+   cd ~/git-repos
    git add -A
    git commit -m "ここにメッセージ例を入れる"
    git push
