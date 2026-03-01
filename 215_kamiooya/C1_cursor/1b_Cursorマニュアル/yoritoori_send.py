@@ -1,0 +1,528 @@
+#!/usr/bin/env python3
+"""
+送信下書き.txt を読み取り、パートナーに送信する。
+- emails あり: Gmail 返信として送信（送信添付フォルダのファイルを添付可）
+- phones のみ: iMessage 送信（送信添付フォルダのファイルを添付可）
+
+送信前にやり取り.md へ送信内容を追記してから送信する（誤送信時も何を送ろうとしたか残る）。送信成功後、送信添付フォルダのファイルは「送信添付(過去)」へ移動する。
+
+前提:
+  - メール送信時: Gmail API 設定済み（credentials.json, token.json）、gmail.send スコープ
+  - iMessage 送信時: Mac で Messages が有効、自動化の許可が必要
+  - Mac の場合: 送信前に Cursor/VS Code で「すべて保存」を自動実行します。初回は「ターミナル（または Cursor）が Cursor を制御することを許可しますか？」と出たら「許可」が必要です（システム環境設定 → セキュリティとプライバシー → プライバシー → アクセシビリティ or 自動化）。
+
+使い方:
+  python yoritoori_send.py --partner 立木       # phones のみ → iMessage
+  python yoritoori_send.py --partner ミニテック  # emails あり → Gmail 返信
+  python yoritoori_send.py --partner 立木 --dry-run
+"""
+
+import argparse
+import base64
+import json
+import mimetypes
+import os
+import re
+import shutil
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import yaml
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email import encoders
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+
+from yoritoori_utils import (
+    DRAFT_FILENAME,
+    YORITOORI_FILENAME,
+    make_summary,
+    resolve_attach_dir,
+    resolve_past_attach_dir,
+)
+
+# 設定（gmail_to_yoritoori.py と共通）
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_DIR = SCRIPT_DIR.parent.parent / "C2_ルーティン作業" / "26_パートナー社への相談"
+CONTACT_YAML = BASE_DIR / "000_共通" / "連絡先一覧.yaml"
+CREDENTIALS_PATH = SCRIPT_DIR / "credentials.json"
+TOKEN_PATH = SCRIPT_DIR / "token.json"
+
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.send",
+]
+
+
+def trigger_editor_save_all():
+    """
+    Cursor / VS Code で「すべて保存」(Cmd+K → S) を実行し、未保存の送信下書きをディスクに書き込む。
+    Mac のみ。送信前に必ず呼び、黒丸（未保存）のまま送るミスを防ぐ。
+    """
+    if sys.platform != "darwin":
+        return
+    import time
+
+    script = """
+    tell application "System Events"
+        if (exists process "Cursor") then
+            tell process "Cursor" to set frontmost to true
+            delay 0.5
+            tell process "Cursor"
+                keystroke "k" using command down
+                delay 0.2
+                keystroke "s"
+            end tell
+        else if (exists process "Code") then
+            tell process "Code" to set frontmost to true
+            delay 0.5
+            tell process "Code"
+                keystroke "k" using command down
+                delay 0.2
+                keystroke "s"
+            end tell
+        end if
+    end tell
+    """
+    try:
+        subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            timeout=5,
+        )
+        time.sleep(0.8)
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        pass
+
+
+def load_env():
+    env_path = SCRIPT_DIR / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            m = re.match(r"^\s*([^#=]+)\s*=\s*(.+?)\s*$", line)
+            if m:
+                key = m.group(1).strip()
+                val = m.group(2).strip().strip("'\"")
+                if val:
+                    os.environ[key] = val
+
+
+load_env()
+
+credentials_path = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", CREDENTIALS_PATH))
+token_path = Path(os.environ.get("GMAIL_TOKEN_PATH", TOKEN_PATH))
+contact_path = Path(os.environ.get("CONTACT_LIST_PATH", CONTACT_YAML))
+base_path = Path(os.environ.get("YORITOORI_BASE_PATH", BASE_DIR))
+
+
+def parse_draft(draft_path):
+    """送信下書き.txt をパースして (subject, body) を返す。"""
+    content = draft_path.read_text(encoding="utf-8")
+    lines = content.strip().split("\n")
+    subject = ""
+    body_lines = []
+
+    for i, line in enumerate(lines):
+        if i == 0 and re.match(r"^件名[：:]\s*(.*)$", line):
+            m = re.match(r"^件名[：:]\s*(.*)$", line)
+            subject = (m.group(1) or "").strip()
+        else:
+            body_lines.append(line)
+
+    body = "\n".join(body_lines).strip()
+    return subject, body
+
+
+def phone_to_imessage_formats(phone):
+    """電話番号を Messages が受け付ける形式のリストに変換。複数形式を試す。"""
+    digits = re.sub(r"\D", "", phone)
+    if not digits:
+        return []
+    forms = [phone]
+    if digits.startswith("0") and len(digits) >= 10:
+        e164 = "+81" + digits.lstrip("0")
+        if e164 not in forms:
+            forms.append(e164)
+    elif digits.startswith("81") and len(digits) >= 11:
+        e164 = "+" + digits
+        if e164 not in forms:
+            forms.append(e164)
+    return forms
+
+
+def send_imessage(phone, body_text, attachment_paths=None):
+    """AppleScript で iMessage を送信。本文＋添付ファイル。成功で True。"""
+    if attachment_paths is None:
+        attachment_paths = []
+    phone_esc = phone.replace("\\", "\\\\").replace('"', '\\"')
+    # 改行を AppleScript の return で連結
+    parts = [p.replace("\\", "\\\\").replace('"', '\\"') for p in body_text.split("\n")]
+    msg_expr = " & return & ".join(f'"{p}"' for p in parts)
+
+    file_blocks = []
+    for path in attachment_paths:
+        posix_path = str(path.resolve())
+        path_esc = posix_path.replace("\\", "\\\\").replace('"', '\\"')
+        file_blocks.append(f'''        set theFile to POSIX file "{path_esc}"
+        send theFile to targetBuddy
+        delay 0.3''')
+
+    file_section = "\n".join(file_blocks) if file_blocks else ""
+
+    script = f'''tell application "Messages"
+        set targetService to 1st service whose service type = iMessage
+        set targetBuddy to buddy "{phone_esc}" of targetService
+        set msg to {msg_expr}
+        send msg to targetBuddy
+        delay 0.5
+{file_section}
+    end tell'''
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    return result.returncode == 0
+
+
+def find_partner(partners, name_or_folder):
+    """name または folder でパートナーを検索。"""
+    name_or_folder = (name_or_folder or "").strip()
+    for p in partners:
+        if p.get("name") == name_or_folder or p.get("folder") == name_or_folder:
+            return p
+    return None
+
+
+def get_latest_message_from_partner(service, partner_emails):
+    """パートナー宛の直近メールを1件取得。threadId, message_id, subject, message_id_header を返す。"""
+    if not partner_emails:
+        return None
+    from_query = " OR ".join(f"from:{e}" for e in partner_emails)
+    query = f"({from_query}) newer_than:90d"
+    result = service.users().messages().list(userId="me", q=query, maxResults=1).execute()
+    messages = result.get("messages", [])
+    if not messages:
+        return None
+
+    msg = messages[0]
+    full = service.users().messages().get(userId="me", id=msg["id"], format="full").execute()
+    headers = full.get("payload", {}).get("headers", [])
+
+    subject = next((h["value"] for h in headers if h["name"].lower() == "subject"), "")
+    msg_id_header = None
+    for h in headers:
+        if h["name"].lower() == "message-id":
+            msg_id_header = h["value"]
+            break
+
+    thread_id = full.get("threadId", "")
+    return {
+        "thread_id": thread_id,
+        "message_id": msg["id"],
+        "subject": subject,
+        "message_id_header": msg_id_header or f"<{msg['id']}@mail.gmail.com>",
+    }
+
+
+# 送信添付に含めないファイル（Git/OS用のプレースホルダ等）
+ATTACHMENT_EXCLUDE_NAMES = {".gitkeep", ".DS_Store"}
+
+
+def collect_attachment_files(attach_dir):
+    """送信添付フォルダ内のファイルを列挙。.gitkeep / .DS_Store は送信対象から除外する。"""
+    attach_dir.mkdir(parents=True, exist_ok=True)
+    return [
+        f
+        for f in attach_dir.iterdir()
+        if f.is_file() and f.name not in ATTACHMENT_EXCLUDE_NAMES
+    ]
+
+
+def build_reply_message(to_email, subject, body_text, ref_info, attachment_paths):
+    """返信用の MIME メッセージを構築。"""
+    msg = MIMEMultipart()
+    msg["To"] = to_email
+    msg["Subject"] = subject
+
+    if ref_info and ref_info.get("message_id_header"):
+        msg["In-Reply-To"] = ref_info["message_id_header"]
+        msg["References"] = ref_info["message_id_header"]
+
+    msg.attach(MIMEText(body_text, "plain", "utf-8"))
+
+    for path in attachment_paths:
+        ctype, _ = mimetypes.guess_type(str(path))
+        if ctype is None:
+            ctype = "application/octet-stream"
+        maintype, subtype = ctype.split("/", 1)
+        with open(path, "rb") as f:
+            part = MIMEBase(maintype, subtype)
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename=path.name)
+        msg.attach(part)
+
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+    return {"raw": raw}
+
+
+def append_sent_to_yoritoori(folder_path, partner_name, subject, body, attachment_names):
+    """やり取り.md に送信履歴を追記。"""
+    md_path = base_path / folder_path / YORITOORI_FILENAME
+    if not md_path.exists():
+        print(f"{YORITOORI_FILENAME} が見つかりません: {md_path}", file=sys.stderr)
+        return False
+
+    date_str = datetime.now().strftime("%Y/%m/%d %H:%M")
+    summary = subject if (subject and subject != "（件名を記入）") else make_summary(body)
+    subject_block = f"**件名**: {subject}\n" if subject else ""
+    attach_block = ""
+    if attachment_names:
+        attach_block = "\n**添付ファイル**: " + ", ".join(attachment_names) + "\n"
+
+    block = f"""
+
+### {date_str}｜{partner_name}｜自分から送信｜{summary}
+
+{subject_block}{body}{attach_block}
+
+---
+"""
+    content = md_path.read_text(encoding="utf-8")
+    # 新しいメッセージを上に表示（時系列で新しい順）
+    marker = "## やり取り（時系列）"
+    if marker in content:
+        after_marker = content[content.find(marker):]
+        m = re.search(r"\n\n### [12]\d{3}/\d{2}/\d{2}", after_marker)
+        if m:
+            pos = content.find(marker) + m.start() + 2
+            content = content[:pos] + block.strip() + "\n\n" + content[pos:]
+        else:
+            pos = content.find(marker) + len(marker)
+            content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
+    else:
+        content += block
+    md_path.write_text(content, encoding="utf-8")
+    return True
+
+
+def move_attachments_to_past(attach_dir, attachment_paths):
+    """送信添付フォルダ内のファイルを「送信添付(過去)」へ移動する。"""
+    if not attachment_paths:
+        return
+    past_dir = resolve_past_attach_dir(attach_dir.parent)
+    past_dir.mkdir(parents=True, exist_ok=True)
+    for path in attachment_paths:
+        if path.is_file():
+            dest = past_dir / path.name
+            if dest.exists():
+                stem, suffix = path.stem, path.suffix
+                for i in range(1, 100):
+                    dest = past_dir / f"{stem}_{i}{suffix}"
+                    if not dest.exists():
+                        break
+            shutil.move(str(path), str(dest))
+            print(f"  添付を移動: {path.name} → {past_dir.name}/")
+
+
+def run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text, dry_run):
+    """phones のみのパートナー向け iMessage 送信。送信添付フォルダ内のファイルも添付。"""
+    phones = [p.strip() for p in partner.get("phones", []) if p.strip()]
+    if not phones:
+        print(f"エラー: {partner_name} に電話番号が登録されていません。", file=sys.stderr)
+        sys.exit(1)
+
+    phone = phones[0]
+    formats = phone_to_imessage_formats(phone)
+
+    attach_dir = resolve_attach_dir(base_path / folder_path)
+    attachment_paths = collect_attachment_files(attach_dir)
+    attachment_names = [p.name for p in attachment_paths]
+
+    if dry_run:
+        print("【dry-run】iMessage 送信プレビュー")
+        print(f"  宛先: {phone}")
+        print(f"  本文（先頭200文字）:\n{body_text[:200]}...")
+        if attachment_names:
+            print(f"  添付: {attachment_names}")
+        print("  実際には送信しません。")
+        return
+
+    # 1. 送信下書きの保存：送信する内容をやり取り.md に記録する
+    append_sent_to_yoritoori(folder_path, partner_name, "（iMessage）", body_text, attachment_names)
+    print("送信下書きの内容をやり取りに保存しました。")
+
+    # 2. 送信
+    last_err = None
+    for fmt in formats:
+        if send_imessage(fmt, body_text, attachment_paths):
+            print(f"iMessage 送信しました: {partner_name} ({phone})")
+            if attachment_names:
+                print(f"  添付: {', '.join(attachment_names)}")
+            move_attachments_to_past(attach_dir, attachment_paths)
+            return
+        last_err = f"形式 {fmt} で送信失敗"
+    print(f"エラー: iMessage 送信に失敗しました。{last_err}", file=sys.stderr)
+    print("※やり取りには送信内容を追記済みです。送信のみ失敗しています。", file=sys.stderr)
+    sys.exit(1)
+
+
+def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, dry_run):
+    """emails ありのパートナー向け Gmail 返信送信。"""
+    emails = [e.lower().strip() for e in partner.get("emails", [])]
+    if not credentials_path.exists():
+        print("エラー: credentials.json が見つかりません", file=sys.stderr)
+        sys.exit(1)
+
+    use_subject = subject if subject and subject != "（件名を記入）" else None
+
+    # Gmail 認証
+    creds = None
+    if token_path.exists():
+        token_data = json.loads(token_path.read_text(encoding="utf-8"))
+        creds_data = dict(token_data)
+        if "client_id" not in creds_data and credentials_path.exists():
+            cred_data = json.loads(credentials_path.read_text(encoding="utf-8"))
+            client = cred_data.get("installed") or cred_data.get("web", {})
+            creds_data["client_id"] = client.get("client_id")
+            creds_data["client_secret"] = client.get("client_secret")
+            creds_data["token_uri"] = "https://oauth2.googleapis.com/token"
+            if "access_token" in creds_data and "token" not in creds_data:
+                creds_data["token"] = creds_data["access_token"]
+        try:
+            creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
+        except Exception:
+            creds = None
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open(token_path, "w", encoding="utf-8") as f:
+            f.write(creds.to_json())
+        print("token.json を保存しました。")
+
+    service = build("gmail", "v1", credentials=creds)
+
+    ref_info = get_latest_message_from_partner(service, emails)
+    if not ref_info:
+        print(f"エラー: {partner_name} 宛の直近90日以内のメールが見つかりません。返信先を特定できません。", file=sys.stderr)
+        sys.exit(1)
+
+    # 件名が未設定なら元メールの Re: を使用
+    if not use_subject:
+        orig_subject = ref_info.get("subject", "")
+        if orig_subject and not orig_subject.strip().upper().startswith("RE:"):
+            use_subject = f"Re: {orig_subject}"
+        else:
+            use_subject = orig_subject or "Re:"
+    if not use_subject:
+        use_subject = "Re:"
+
+    # 送信添付フォルダ
+    attach_dir = resolve_attach_dir(base_path / folder_path)
+    attachment_paths = collect_attachment_files(attach_dir)
+    attachment_names = [p.name for p in attachment_paths]
+
+    # メッセージ構築
+    to_email = emails[0]
+    message_dict = build_reply_message(to_email, use_subject, body_text, ref_info, attachment_paths)
+
+    # 送信 body に threadId を追加
+    send_body = {"raw": message_dict["raw"], "threadId": ref_info["thread_id"]}
+
+    if dry_run:
+        print("【dry-run】Gmail 送信プレビュー")
+        print(f"  宛先: {to_email}")
+        print(f"  件名: {use_subject}")
+        print(f"  本文（先頭200文字）:\n{body_text[:200]}...")
+        if attachment_names:
+            print(f"  添付: {attachment_names}")
+        print("  実際には送信しません。")
+        return
+
+    # 1. 送信下書きの保存：送信する内容をやり取り.md に記録する
+    append_sent_to_yoritoori(folder_path, partner_name, use_subject, body_text, attachment_names)
+    print("送信下書きの内容をやり取りに保存しました。")
+
+    # 2. 送信
+    try:
+        service.users().messages().send(userId="me", body=send_body).execute()
+        print(f"送信しました: {partner_name} ({to_email})")
+        if attachment_names:
+            print(f"  添付: {', '.join(attachment_names)}")
+        move_attachments_to_past(attach_dir, attachment_paths)
+    except Exception as e:
+        print(f"送信エラー: {e}", file=sys.stderr)
+        print("※やり取りには送信内容を追記済みです。送信のみ失敗しています。", file=sys.stderr)
+        sys.exit(1)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="送信下書きをパートナーに送信")
+    parser.add_argument("--partner", required=True, help="パートナー名またはフォルダ名（例: 立木, ミニテック）")
+    parser.add_argument("--dry-run", action="store_true", help="送信せずプレビューのみ表示")
+    parser.add_argument(
+        "--move-attachments-only",
+        action="store_true",
+        help="送信せず、送信添付フォルダのファイルを送信添付(過去)へ移動するだけ",
+    )
+    args = parser.parse_args()
+
+    config = yaml.safe_load(contact_path.read_text(encoding="utf-8"))
+    partners = config.get("partners", [])
+
+    partner = find_partner(partners, args.partner)
+    if not partner:
+        print(f"エラー: パートナー '{args.partner}' が見つかりません。", file=sys.stderr)
+        sys.exit(1)
+
+    emails = [e.lower().strip() for e in partner.get("emails", [])]
+    phones = [p.strip() for p in partner.get("phones", []) if p.strip()]
+
+    if not emails and not phones:
+        print(f"エラー: {partner.get('name', args.partner)} にメールアドレスも電話番号も登録されていません。", file=sys.stderr)
+        sys.exit(1)
+
+    folder_path = partner["folder"]
+    partner_name = partner["name"]
+    draft_path = base_path / folder_path / DRAFT_FILENAME
+
+    if args.move_attachments_only:
+        attach_dir = resolve_attach_dir(base_path / folder_path)
+        attachment_paths = collect_attachment_files(attach_dir)
+        if not attachment_paths:
+            print(f"送信添付フォルダにファイルがありません: {attach_dir}")
+            return
+        move_attachments_to_past(attach_dir, attachment_paths)
+        print(f"送信添付(過去)へ {len(attachment_paths)} 件移動しました。")
+        return
+
+    if not draft_path.exists():
+        print(f"エラー: {DRAFT_FILENAME} が見つかりません: {draft_path}", file=sys.stderr)
+        sys.exit(1)
+
+    # 送信前にエディタの「すべて保存」を実行（黒丸＝未保存のまま送るミスを防ぐ）
+    trigger_editor_save_all()
+    print("送信下書きを保存しました。（Cursor/VS Code で未保存だった変更をディスクに反映）")
+
+    subject, body_text = parse_draft(draft_path)
+    if not body_text.strip():
+        print("エラー: 送信下書きが空です。", file=sys.stderr)
+        sys.exit(1)
+
+    if emails:
+        run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, args.dry_run)
+    else:
+        run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text, args.dry_run)
+
+
+if __name__ == "__main__":
+    main()
