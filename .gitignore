@@ -33,7 +33,8 @@ node_modules/
 .DS_Store
 
 # --- エディタ・ツール ---
-.cursor/
+.cursor/projects/
+.cursor/rules/
 .obsidian/
 .vscode/
 
