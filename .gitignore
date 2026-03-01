@@ -50,3 +50,6 @@ config_bank.yaml
 dx_kyouyuu/03_outputs/mail_automation/logs/
 dx_kyouyuu/03_outputs/mail_automation/テスト*.md
 dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx
+
+# --- 500 固有（トークン・API Key） ---
+500_obsidian/99_token*/

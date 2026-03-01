@@ -1,0 +1,37 @@
+{
+	"folders": [
+		{
+			"name": "ProgramCode",
+			"path": "../../../../ProgramCode"
+		},
+		{
+			"name": "Downloads",
+			"path": "../../../../Downloads"
+		},
+		{
+			"name": "215_神・大家さん倶楽部",
+			"path": "../215_神・大家さん倶楽部"
+		},
+		{
+			"name": "DX互助会_共有フォルダ",
+			"path": "../../GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ"
+		},
+		{
+			"name": "500_Obsidian",
+			"path": "."
+		},
+		{
+			"name": "300_AIリスキリング講座(助成金活用）",
+			"path": "../300_AIリスキリング講座(助成金活用）"
+		},
+		{
+			"name": "260_所有不動産管理",
+			"path": "../260_所有不動産管理"
+		}
+	],
+	"settings": {
+		"terminal.integrated.defaultProfile.osx": "zsh",
+		"python.terminal.activateEnvironment": false,
+		"markdown.validate.enabled": true
+	}
+}
