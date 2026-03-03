@@ -65,9 +65,8 @@ python fetch_after_login.py nichinoken
 
 1. **認証情報**
    - `.env` に `TOKAIROKIN_USER` と `TOKAIROKIN_PASS` を追加
-   - `TOKAIROKIN_USER`: ログインID（6〜12桁）または 支店3桁+口座7桁 の10桁（例: `0006393610`）
-   - 10桁の数字の場合、自動で支店(先頭3桁)・口座(残り7桁)に分割されます
-   - 別々に指定する場合: `TOKAIROKIN_BRANCH`（支店3桁）、`TOKAIROKIN_ACCOUNT`（口座7桁）
+   - `TOKAIROKIN_USER`: ログインID（6〜12桁の半角英数字）
+   - `TOKAIROKIN_PASS`: パスワード
 
 2. **設定ファイル**
    - `config_tokairokin.example.yaml` をコピーして `config_tokairokin.yaml` にリネーム
@@ -75,8 +74,25 @@ python fetch_after_login.py nichinoken
    - `config_tokairokin.yaml` は .gitignore 済みなのでコミットされません
 
 3. **実行方法**
-   - `python fetch_after_login.py tokairokin` でログイン実行（振込は今後追加予定）
+   - `python fetch_after_login.py tokairokin` でログイン → 振込画面へ自動遷移
+   - **振込の自動入力**（オプション）:
+     ```bash
+     python fetch_after_login.py tokairokin --bank 0005 --branch 405 --account 0526519 --amount 100000
+     ```
+     - config_tokairokin.yaml の `transfer_form` に各入力欄のCSSセレクタを設定する必要あり
+     - 振込フォーム入力後、ワンタイムパスワード（OTP）の入力で一時停止 → 手動で OTP 入力・実行
    - 初回は `headless: false` のまま実行し、画面で動作を確認してください
+
+4. **パスワード変更画面が出る場合（自動化検知の回避）**
+   - プログラム起動のブラウザが自動操作と検知され、パスワード変更を促されることがあります
+   - **推奨：undetected-chromedriver**（代替手段）
+     - `config_tokairokin.yaml` で `use_undetected_chromedriver: true` に設定
+     - `pip install undetected-chromedriver selenium` でインストール（requirements.txt に含まれています）
+     - WebDriver の検知を回避する専用ライブラリで、CDP・stealth で効果がなかった場合に試してください
+   - その他の対策（config_tokairokin.yaml）:
+     - **CDP接続モード**: `use_connect_cdp: true` + `auto_start_chrome: true`（既存Chromeを終了→起動→接続）
+     - `use_chrome: true`（既定）: インストール済み Chrome を使用
+     - `human_like_input: true`: 1文字ずつ遅延入力（補助的な効果）
 
 ## 今後：その他銀行サイト用
 

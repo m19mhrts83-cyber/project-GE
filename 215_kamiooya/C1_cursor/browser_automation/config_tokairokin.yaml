@@ -18,3 +18,61 @@ wait_after_page: 2
 
 # 振込実行時の待機（確認画面→実行ボタンなど）
 wait_after_transfer_confirm: 2
+
+# インストール済みChromeを使用（自動化検知を回避）
+use_chrome: true
+
+# 代替手段：undetected-chromedriver（CDP・stealth で検知された場合に試す）
+use_undetected_chromedriver: true
+# ChromeDriver のバージョン不一致時、Chrome のメジャーバージョンを指定（例: 145）
+chrome_version_main: 145
+
+# CDP接続モード（use_undetected_chromedriver が false のときのみ有効）
+use_connect_cdp: false
+cdp_url: "http://localhost:9222"
+auto_start_chrome: true
+
+# 合言葉の自動入力（質問文に含まれるキーワードと .env の変数名の対応）
+# .env に TOKAIROKIN_SECRET_1=答え1 などを設定
+# match には、表示される質問文の一部（他と区別できるキーワード）を指定
+secret_phrase_auto:
+  - match: "誕生日"   # 実際の質問に合わせて編集
+    answer_env: TOKAIROKIN_SECRET_1
+  - match: "ペット"
+    answer_env: TOKAIROKIN_SECRET_2
+  - match: "活動"
+    answer_env: TOKAIROKIN_SECRET_3
+
+# ログイン後、合言葉の自動入力ができなかった場合に一時停止するか
+pause_for_secret_phrase: true
+
+# ログイン後に振込画面へ遷移
+go_to_transfer: true
+wait_before_transfer_menu: 5
+
+# 振込フォームの自動入力（--bank --branch --account --amount で指定時）
+# 振込画面のHTMLを確認し、各セレクタを設定してください（開発者ツールで要素を検証）
+transfer_form:
+  specify_destination_button_selector: "#btn001"
+  # 銀行コード入力後、検索ボタン
+  bank_confirm_button_selector: "#btn008"
+  # 検索結果の「選択」ボタン（金融機関）
+  bank_select_button_selector: ""
+  # 支店コード入力後、検索ボタン
+  branch_confirm_button_selector: "#btn001"
+  # 検索結果の「選択」ボタン（支店）
+  branch_select_button_selector: ""
+  bank_code_selector: "#txtBox001"
+  branch_code_selector: "#txtBox001"
+  account_number_selector: "/html/body/div[4]/div/div/form/div[2]/div[5]/table/tbody/tr[2]/td/input"
+  amount_selector: "/html/body/div[4]/div/div/form/div[2]/div[5]/table/tbody/tr[3]/td/input"
+  # 口座・金額入力後、確認画面から実行画面へ進むボタン（例: 実行画面へ、次へ）
+  execution_screen_button_selector: ""
+  # 実行画面の「確認しました」チェックボックス（OTP入力前にチェック必須）
+  confirmation_checkbox_selector: ""
+
+# ワンタイムパスワード入力のため一時停止（振込時は自動で有効）
+pause_for_otp: true
+
+# ブラウザを開いたままにする（パスワード変更画面などの対応を可能に）
+keep_browser_open: true
