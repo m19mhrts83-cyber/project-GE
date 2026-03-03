@@ -61,6 +61,23 @@ python fetch_after_login.py nichinoken
 - `fetch_after_login.py` 内の「ログインフォーム」コメント付近で、入力欄やボタンのセレクタを調整する必要がある場合があります。
 - まずは `config_nichinoken.yaml` で `headless: false` にし、画面を見ながら実行してどこで止まるか確認するとよいです。
 
-## 今後：銀行サイト用
+## 東海労金 インターネットバンキングの設定
 
-同じ仕組みで `config_bank.yaml` と `fetch_after_login.py` に `bank` 用の分岐を追加すれば、銀行ログイン後の情報抽出も自動化できます。その際も ID/パスワードは環境変数（例: `BANK_USER`, `BANK_PASS`）で管理してください。
+1. **認証情報**
+   - `.env` に `TOKAIROKIN_USER` と `TOKAIROKIN_PASS` を追加
+   - `TOKAIROKIN_USER`: ログインID（6〜12桁）または 支店3桁+口座7桁 の10桁（例: `0006393610`）
+   - 10桁の数字の場合、自動で支店(先頭3桁)・口座(残り7桁)に分割されます
+   - 別々に指定する場合: `TOKAIROKIN_BRANCH`（支店3桁）、`TOKAIROKIN_ACCOUNT`（口座7桁）
+
+2. **設定ファイル**
+   - `config_tokairokin.example.yaml` をコピーして `config_tokairokin.yaml` にリネーム
+   - ログインURLは既定で parasol.anser.ne.jp（実際のログインフォーム）
+   - `config_tokairokin.yaml` は .gitignore 済みなのでコミットされません
+
+3. **実行方法**
+   - `python fetch_after_login.py tokairokin` でログイン実行（振込は今後追加予定）
+   - 初回は `headless: false` のまま実行し、画面で動作を確認してください
+
+## 今後：その他銀行サイト用
+
+同じ仕組みで `config_bank.yaml` と `fetch_after_login.py` に `bank` 用の分岐を追加すれば、銀行ログイン後の情報抽出も自動化できます。その際も ID/パスワードは環境変数で管理してください。

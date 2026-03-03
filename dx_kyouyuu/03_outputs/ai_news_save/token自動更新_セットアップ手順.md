@@ -9,6 +9,8 @@
 
 1. **事前にエラーを防ぐ**: Google OAuth を「本番」にすると refresh token が長く持つ（数ヶ月〜）。
 2. **自動でトークンを更新**: Mac の launchd が **3 日ごと** に `refresh_token_and_update_github_secret.py` を実行。
+   - Mac がスリープ中は動かず、**起動してから 3 日経過したタイミング**で実行。
+   - スリープから復帰した場合も、**3 日経過していれば復帰時に実行**される（パソコンを開いたときがトリガー）。
 3. スクリプトが **Gmail token を更新** し、同じ内容を **GitHub の GMAIL_TOKEN_B64** に API で反映。  
    → 毎週日曜の AI News Save ワークフロー実行時には、常に新しい token が使われる想定です。
 

@@ -118,17 +118,11 @@ def append_to_yoritoori(folder_path, partner_name, date_str, body, source="SMS/i
 
 ---
 """
-    # 新しいメッセージを上に表示（時系列で新しい順）
+    # 新しいメッセージを冒頭に表示（時系列で新しい順）
     marker = "## やり取り（時系列）"
     if marker in content:
-        after_marker = content[content.find(marker):]
-        m = re.search(r"\n\n### [12]\d{3}/\d{2}/\d{2}", after_marker)
-        if m:
-            pos = content.find(marker) + m.start() + 2
-            content = content[:pos] + block.strip() + "\n\n" + content[pos:]
-        else:
-            pos = content.find(marker) + len(marker)
-            content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
+        pos = content.find(marker) + len(marker)
+        content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
     else:
         content += block
     md_path.write_text(content, encoding="utf-8")
@@ -213,6 +207,9 @@ def main():
         new_max_rowid = max(new_max_rowid, rowid)
 
         norm_handle = normalize_phone(handle_id)
+        # メールアドレス（数字なし）は電話番号と照合しない
+        if not norm_handle:
+            continue
         partner = phone_to_partner.get(norm_handle)
         if not partner:
             for norm_ph, p in phone_to_partner.items():
@@ -226,6 +223,9 @@ def main():
         if not body and attributed_body:
             body = try_parse_attributed_body(attributed_body) or ""
         if not body:
+            continue
+        # 文字化け（U+FFFD）のみの本文はスキップ
+        if body.replace("\uFFFD", "").strip() == "":
             continue
 
         date_str = format_date_from_apple_ns(date_ns)

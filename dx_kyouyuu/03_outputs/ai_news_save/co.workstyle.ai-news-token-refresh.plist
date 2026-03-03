@@ -18,7 +18,7 @@
         <key>GMAIL_TOKEN_PATH</key>
         <string>/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json</string>
     </dict>
-    <!-- 3日ごとに実行（259200秒）。Mac が起動しているときにトークンを更新し、GitHub Secret も更新する -->
+    <!-- 3日ごとに実行（259200秒）。Mac がスリープ中は動かず、起動してから3日経過したタイミングで実行。スリープから復帰した場合も、3日経過していれば復帰時に実行される -->
     <key>StartInterval</key>
     <integer>259200</integer>
     <key>StandardOutPath</key>
