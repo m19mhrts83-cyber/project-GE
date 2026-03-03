@@ -1,0 +1,4 @@
+tell application "Terminal"
+	activate
+	do script "cd '/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation' && PYTHONINSPECT= ./venv/bin/python send_mail.py --md-file '/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/24_空室対策メール履歴/260213_G2_空室対策.md' --excel-file '/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx' --sheet-name 'G2' --yes; echo ''; echo 'Enter キーを押すと閉じます...'; read"
+end tell

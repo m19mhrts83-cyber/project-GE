@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Obsidian / Notion 紹介 — DX互助会メンバー向け</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; background: #1a1a2e; color: #eee; }
+    section.slide {
+      min-height: 100vh;
+      padding: 2rem 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-bottom: 1px solid #333;
+    }
+    section.slide h1 { font-size: 1.75rem; margin: 0 0 1rem; color: #a8e6cf; }
+    section.slide h2 { font-size: 1.35rem; margin: 0 0 0.75rem; color: #dcedc1; }
+    section.slide h3 { font-size: 1.1rem; margin: 1rem 0 0.4rem; color: #ffd3b6; }
+    section.slide p, section.slide li { font-size: 1.05rem; line-height: 1.7; margin: 0.25rem 0; }
+    section.slide ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+    section.slide .sub { font-size: 0.95rem; color: #aaa; margin-top: 0.5rem; }
+    section.slide table { border-collapse: collapse; margin: 0.75rem 0; width: 100%; font-size: 0.95rem; }
+    section.slide th, section.slide td { border: 1px solid #444; padding: 0.4rem 0.7rem; text-align: left; }
+    section.slide th { background: #2a2a4a; color: #dcedc1; }
+    .title-slide { text-align: center; }
+    .title-slide h1 { font-size: 2rem; }
+    .title-slide .date { color: #888; margin-top: 1rem; }
+    .point { color: #ffd3b6; }
+    .landing { color: #a8e6cf; font-weight: bold; }
+    .free-tag { color: #a8e6cf; font-weight: bold; }
+    .paid-tag { color: #ffd3b6; font-weight: bold; }
+    nav { position: fixed; right: 1rem; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 0.5rem; z-index: 10; }
+    nav button { background: #333; color: #fff; border: 1px solid #555; padding: 0.5rem 0.75rem; cursor: pointer; border-radius: 4px; font-size: 0.9rem; }
+    nav button:hover { background: #444; }
+    nav .page-num { color: #888; font-size: 0.8rem; text-align: center; }
+  </style>
+</head>
+<body>
+
+<!-- スライド1: タイトル -->
+<section class="slide title-slide" id="s1">
+  <h1>Obsidian / Notion 紹介<br>DX互助会メンバー向け</h1>
+  <p>知識管理ツールの使い分けと始め方</p>
+  <p class="date">2026年2月 松野</p>
+</section>
+
+<!-- スライド2: Obsidianとは何か -->
+<section class="slide" id="s2">
+  <h1>Obsidianとは何か</h1>
+  <ul>
+    <li><span class="free-tag">無料</span>で使えるMarkdownノートアプリ</li>
+    <li>ローカルのフォルダをそのまま開いて閲覧・編集ができる</li>
+    <li>画像付きのMDファイルを<strong>きれいに表示</strong>できる（Cursorのプレビューより手軽）</li>
+    <li>プラグインで機能を自由に拡張できる</li>
+  </ul>
+  <p class="landing">Cursorが「AIで作業する」ツールなら、<br>Obsidianは「知識を見る・整理する」ツール</p>
+  <p class="sub">ダウンロード：https://obsidian.md</p>
+</section>
+
+<!-- スライド3: ツールの全体像と使い分け -->
+<section class="slide" id="s3">
+  <h1>ツールの全体像と使い分け</h1>
+  <table>
+    <tr><th>ツール</th><th>役割</th><th>特徴</th></tr>
+    <tr><td>Google Drive<br>共有フォルダ</td><td>全員の共通の場所（正本）</td><td>ブラウザで誰でもアクセス可能</td></tr>
+    <tr><td><strong>Cursor</strong></td><td>AIを使って作業する</td><td>編集・自動化・AI活用</td></tr>
+    <tr><td><strong>Obsidian</strong></td><td>知識を見る・つなげる・集める</td><td>閲覧・整理・収集（<span class="free-tag">無料</span>）</td></tr>
+    <tr><td><strong>Notion</strong></td><td>チームで管理する・共有する</td><td>タスク管理・議事録・外部共有（<span class="paid-tag">有料機能あり</span>）</td></tr>
+  </table>
+  <p class="landing">目的に応じて使い分ける。すべてを使う必要はありません。</p>
+</section>
+
+<!-- スライド4: Obsidianの始め方 -->
+<section class="slide" id="s4">
+  <h1>Obsidianの始め方（3ステップ）</h1>
+  <ul>
+    <li><strong>Step 1:</strong> https://obsidian.md からダウンロード・インストール</li>
+    <li><strong>Step 2:</strong> 起動 →「フォルダをVaultとして開く」→ 共有フォルダを指定</li>
+    <li><strong>Step 3:</strong> 画像付きMDファイルがそのまま閲覧できる！</li>
+  </ul>
+  <p class="landing">特別な設定は不要。開くだけで使えます。</p>
+</section>
+
+<!-- スライド5: 個人用Vault -->
+<section class="slide" id="s5">
+  <h1>個人用Vaultを作る（自分の学び用）</h1>
+  <ul>
+    <li>共有フォルダは他のメンバーにも見える</li>
+    <li><strong>自分だけの学びメモ</strong>は、別のVaultで管理するのがおすすめ</li>
+    <li>自分のPC上の任意のフォルダをVaultとして開くだけでOK</li>
+  </ul>
+  <h3>複数のVaultを切り替えて使える</h3>
+  <ul>
+    <li><strong>共有用Vault</strong>（DX互助会共有フォルダ）→ チームの情報を閲覧</li>
+    <li><strong>個人用Vault</strong>（自分のフォルダ）→ 日々の気づき・学びメモ・読書メモを蓄積</li>
+  </ul>
+  <p class="sub">左下のVault名をクリック → Vault一覧から切り替え</p>
+</section>
+
+<!-- スライド6: 外部情報の取り込み -->
+<section class="slide" id="s6">
+  <h1>Obsidianの強み (1): 外部情報の取り込み</h1>
+  <p><span class="point">Cursorにはない「情報収集の入り口」としての役割</span></p>
+  <h3>Web Clipper</h3>
+  <ul>
+    <li>ブラウザの拡張機能をインストール</li>
+    <li><strong>ボタン一つ</strong>でWebページの情報をObsidianに保存（画像付き）</li>
+  </ul>
+  <h3>Kindle連携</h3>
+  <ul>
+    <li>Kindleで読書中にハイライトした箇所が<strong>自動でObsidianに同期</strong></li>
+    <li>手で書き写す必要なし</li>
+  </ul>
+  <p class="landing">日々の学び + Webクリップ + 読書メモ → すべて1箇所に蓄積</p>
+</section>
+
+<!-- スライド7: 知識の可視化と整理 -->
+<section class="slide" id="s7">
+  <h1>Obsidianの強み (2): 知識の可視化と整理</h1>
+  <ul>
+    <li><strong>画像のインライン表示</strong> — MDファイルの画像がそのまま本文中に表示される（プレビュー切替不要）</li>
+    <li><strong>グラフビュー</strong> — ノート同士のつながりが一目で見える</li>
+    <li><strong>高速な検索</strong> — ローカルファイルを直接検索するので速い</li>
+    <li><strong>プラグインで拡張</strong> — 数千のコミュニティプラグインで自由にカスタマイズ</li>
+  </ul>
+</section>
+
+<!-- スライド8: Notionの強み -->
+<section class="slide" id="s8">
+  <h1>補足 — Notionの強み（知識管理以外の場面）</h1>
+  <ul>
+    <li><strong>タスク管理</strong>：データベース機能でタスクの一覧・フィルタ・進捗管理が容易</li>
+    <li><strong>ミーティングメモ</strong>：ボタン一つで構造化された議事録を作成。不動産業で「誰とどんな話をしたか」を振り返るのに強力</li>
+    <li><strong>外部共有</strong>：ブラウザで即座にパートナーと共有可能</li>
+    <li><strong>テンプレート共有</strong>：タスク管理DBをテンプレートとして渡せば、相手も<span class="free-tag">無料</span>で同じ構造からスタートできる</li>
+  </ul>
+  <h3>Notionの料金（注意事項）</h3>
+  <table>
+    <tr><th>プラン</th><th>月額（年払い）</th><th>主な特徴</th></tr>
+    <tr><td>フリー</td><td><span class="free-tag">無料</span></td><td>個人利用は制限なし。チーム利用は制限あり。AI不可</td></tr>
+    <tr><td>プラス</td><td>1,650円/人</td><td>ゲスト100名。チーム本格利用向け。AI不可</td></tr>
+    <tr><td>ビジネス</td><td>3,150円/人</td><td>Notion AI利用可（議事録自動作成・要約など）</td></tr>
+  </table>
+  <p class="sub">例: 3人でプラスプラン → 月額 約4,950円（年払い）</p>
+</section>
+
+<!-- スライド9: 結論 -->
+<section class="slide" id="s9">
+  <h1>結論 — どう使い分けるか</h1>
+  <ul>
+    <li><strong>知識の蓄積・個人学習</strong> → <span class="free-tag">Obsidian</span> が得意（ローカル、プラグイン、情報収集）</li>
+    <li><strong>タスク管理・議事録・外部共有</strong> → <span class="paid-tag">Notion</span> が得意（データベース、コラボレーション）<span class="paid-tag">※有料</span></li>
+    <li>どちらか一方に縛られる必要はない。<strong>目的に合わせて選ぶのが正解</strong></li>
+  </ul>
+  <p class="landing">まずはObsidianで共有フォルダを開くところから始めてみよう<br>（Obsidianは無料で使えます）</p>
+</section>
+
+<!-- スライド10: おすすめステップ -->
+<section class="slide" id="s10">
+  <h1>おすすめの使い方ステップ</h1>
+  <table>
+    <tr><th></th><th>やること</th><th>難易度</th></tr>
+    <tr><td><strong>Step 1</strong></td><td>共有フォルダをObsidianで開いて閲覧するだけでOK</td><td>★☆☆</td></tr>
+    <tr><td><strong>Step 2</strong></td><td>個人用Vaultを作って、自分の学びメモを書いてみる</td><td>★☆☆</td></tr>
+    <tr><td><strong>Step 3</strong></td><td>Web ClipperやKindle連携で外部情報も取り込む</td><td>★★☆</td></tr>
+    <tr><td><strong>Step 4</strong></td><td>タスク管理や議事録が必要ならNotionも検討する</td><td>★★☆</td></tr>
+    <tr><td><strong>Step 5</strong></td><td>Cursorを使える人はObsidian + Cursorで「第二の脳」を構築</td><td>★★★</td></tr>
+  </table>
+  <p class="landing">まずはStep 1から気軽に始めてみてください！</p>
+</section>
+
+<nav aria-label="スライド操作">
+  <button type="button" onclick="prev()">← 前</button>
+  <span class="page-num" id="pageNum">1 / 10</span>
+  <button type="button" onclick="next()">次 →</button>
+</nav>
+
+<script>
+  const slides = document.querySelectorAll('section.slide');
+  let current = 0;
+  const pageNum = document.getElementById('pageNum');
+  function updateNum() { pageNum.textContent = (current + 1) + ' / ' + slides.length; }
+  function go(i) {
+    current = Math.max(0, Math.min(i, slides.length - 1));
+    slides[current].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    updateNum();
+  }
+  function next() { go(current + 1); }
+  function prev() { go(current - 1); }
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  });
+  updateNum();
+</script>
+</body>
+</html>

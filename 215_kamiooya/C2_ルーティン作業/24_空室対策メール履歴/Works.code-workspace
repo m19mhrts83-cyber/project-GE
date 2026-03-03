@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../300_AIリスクリング講座(助成金活用）"
+		},
+		{
+			"path": "../../../500_Obsidian"
+		}
+	],
+	"settings": {
+		"terminal.integrated.defaultProfile.osx": "zsh",
+		"python.terminal.activateEnvironment": false
+	}
+}

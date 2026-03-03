@@ -1,0 +1,25 @@
+[2026-01-31 01:21:19] FAILED - 件名: N/A - 送信先: 0件 - エラー: MDファイルが見つかりません: ../C2_ルーティン作業/24_空室対策メール履歴/空室対策_Grandole志賀本通2_260129.md
+[2026-01-31 02:01:30] FAILED - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 1件 - エラー: <HttpError 400 when requesting https://gmail.googleapis.com/gmail/v1/users/me/messages/send?alt=json returned "Invalid To header". Details: "[{'message': 'Invalid To header', 'domain': 'global', 'reason': 'invalidArgument'}]">
+[2026-01-31 02:01:53] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 1件
+[2026-01-31 02:04:58] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 1件
+[2026-01-31 02:10:04] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 1件
+[2026-01-31 02:35:32] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 1件
+[2026-01-31 11:05:03] FAILED - 件名: N/A - 送信先: 0件 - エラー: メールアドレスの列が見つかりません。
+--email-column オプションで列名を指定してください。
+[2026-01-31 11:05:25] FAILED - 件名: N/A - 送信先: 0件 - エラー: 列 'メールアドレス' が見つかりません。
+利用可能な列: 管理会社一覧
+[2026-01-31 11:06:26] FAILED - 件名: N/A - 送信先: 0件 - エラー: 列 'mail' が見つかりません。
+利用可能な列: 管理会社一覧
+[2026-01-31 11:10:07] FAILED - 件名: N/A - 送信先: 0件 - エラー: EOF when reading a line
+[2026-01-31 11:11:39] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 15件
+[2026-02-01 23:44:02] FAILED - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 1件 - エラー: <HttpError 400 when requesting https://gmail.googleapis.com/gmail/v1/users/me/messages/send?alt=json returned "Invalid To header". Details: "[{'message': 'Invalid To header', 'domain': 'global', 'reason': 'invalidArgument'}]">
+[2026-02-01 23:44:43] FAILED - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 1件 - エラー: <HttpError 400 when requesting https://gmail.googleapis.com/gmail/v1/users/me/messages/send?alt=json returned "Invalid To header". Details: "[{'message': 'Invalid To header', 'domain': 'global', 'reason': 'invalidArgument'}]">
+[2026-02-01 23:45:01] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 1件
+[2026-02-07 20:51:21] FAILED - 件名: N/A - 送信先: 0件 - エラー: メールアドレスが1件も見つかりませんでした
+[2026-02-07 20:51:39] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(継続)入居募集のお願い - 送信先: 15件
+[2026-02-14 01:42:23] FAILED - 件名: N/A - 送信先: 0件 - エラー: メールアドレスが1件も見つかりませんでした
+[2026-02-14 18:47:25] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室(継続)入居募集のお願い - 送信先: 15件
+[2026-02-19 21:26:55] FAILED - 件名: N/A - 送信先: 0件 - エラー: メールアドレスが1件も見つかりませんでした
+[2026-02-19 21:32:21] SUCCESS - 件名: 【Grandole志賀本通II(名古屋市北区)】102号室 入居決定と御礼・募集終了のご報告 - 送信先: 14件
+[2026-02-21 15:59:19] SUCCESS - 件名: 【Grandole志賀本通I(名古屋市北区)】102号室(新規)入居募集のお願い - 送信先: 15件
+[2026-02-28 00:59:04] SUCCESS - 件名: RE: ZOOMの件（管理契約書のご提案について） - 送信先: 1件

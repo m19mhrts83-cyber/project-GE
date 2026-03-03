@@ -1,0 +1,1 @@
+/Users/matsunomasaharu/Documents/alfred_python/rosenka_final.py

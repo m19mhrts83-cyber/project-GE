@@ -1,0 +1,36 @@
+# 日能研 MY NICHINOKEN 用 設定例
+# コピーして config_nichinoken.yaml にリネームし、値を埋めてください。
+# config_nichinoken.yaml は .gitignore に入れてください。
+
+login_url: "https://login.mynichinoken.jp/auth/student/login"
+# 大人用: "https://login.mynichinoken.jp/auth/parent/login"
+
+# ログイン後の情報を取得するページ（複数可）。月間スケジュールのURLを入れるとPDFが取得される
+target_urls:
+  - "https://mynichinoken.jp/myn/student/students-schedule.html"
+
+# トップからキーワードに合うリンクをたどって追加取得
+explore_links: true
+link_keywords:
+  - お知らせ
+  - メッセージ
+  - 模試
+  - トピック
+  - 教室
+  - テスト
+  - 公開
+max_pages_to_follow: 10
+
+# 各ページで見つかった PDF（月間スケジュール等）のテキストも取得する
+fetch_pdfs: true
+max_pdfs_per_page: 5
+
+# 取得結果の保存先（未指定なら browser_automation/output/）。500_Obsidian に出す例：
+# output_dir: "/Users/あなたのユーザー名/Library/CloudStorage/OneDrive-個人用/500_Obsidian/02_Clippings/日能研"
+
+# ブラウザを表示するか（true: 表示 / false: 非表示で実行）
+headless: false
+
+# 待機時間（秒）。ログイン後やページ読み込み後の余裕
+wait_after_login: 3
+wait_after_page: 2

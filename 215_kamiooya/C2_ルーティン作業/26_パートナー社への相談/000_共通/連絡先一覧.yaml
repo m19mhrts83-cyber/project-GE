@@ -1,0 +1,37 @@
+# パートナー社連絡先一覧（gmail_to_yoritoori.py / imessage_to_yoritoori.py 用）
+# メールアドレスは小文字で統一。複数ある場合はすべて記載。
+# phones: iMessage/SMS 用。+819012345678 や 09012345678 など複数形式で登録可能。
+# 実際の連絡先に置き換えてください。
+
+# フォルダ番号：下1〜2桁＝やりとり開始順、100の位＝業種（仲介メイン/修繕メイン等）
+partners:
+  - folder: "101_ホームプランナー"
+    name: "ホームプランナー"
+    emails: ["suzuki@homeplanner.co.jp"]
+    phones: []
+    line: ""
+    contact: "鈴木"
+  - folder: "102_ミニテック"
+    name: "ミニテック"
+    emails: ["tomoki-hayashi@minitech.co.jp", "hayashi@minitech.co.jp"]
+    phones: []
+    line: ""
+    contact: "林"
+  - folder: "103_Tcell"
+    name: "Tcell"
+    emails: []
+    phones: []
+    line: ""
+    contact: ""
+  - folder: "104_LEAF"
+    name: "LEAF"
+    emails: ["ngy_fudousan@leaf-eco.com"]
+    phones: []
+    line: ""
+    contact: ""
+  - folder: "205_立木"
+    name: "立木"
+    emails: []
+    phones: ["080-4140-9026"]
+    line: ""
+    contact: ""
