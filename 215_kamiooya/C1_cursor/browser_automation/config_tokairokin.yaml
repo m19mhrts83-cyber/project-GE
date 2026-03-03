@@ -1,0 +1,20 @@
+# 東海労金 インターネットバンキング用 設定例
+# コピーして config_tokairokin.yaml にリネームし、必要に応じて編集してください。
+# config_tokairokin.yaml は .gitignore に入れてください。
+
+# ログインURL（東海労金インターネットバンキング）
+# ib.rokin.jp/nprotect は案内ページ。実際のログインフォームは parasol.anser.ne.jp
+login_url: "https://www.parasol.anser.ne.jp/ib/index.do?PT=BS&CCT0080=2972"
+
+# 認証情報は .env の TOKAIROKIN_USER / TOKAIROKIN_PASS を使用
+
+# ブラウザを表示するか（true: 表示 / false: 非表示で実行）
+# 初回・デバッグ時は false 推奨
+headless: false
+
+# 待機時間（秒）。ログイン後やページ読み込み後の余裕
+wait_after_login: 3
+wait_after_page: 2
+
+# 振込実行時の待機（確認画面→実行ボタンなど）
+wait_after_transfer_confirm: 2
