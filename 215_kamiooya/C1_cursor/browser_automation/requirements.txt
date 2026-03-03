@@ -1,0 +1,5 @@
+# ブラウザ自動操作（日能研・銀行などログイン後の情報取得）
+playwright>=1.40.0
+python-dotenv>=1.0.0
+PyYAML>=6.0
+pdfplumber>=0.10.0

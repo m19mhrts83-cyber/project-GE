@@ -81,7 +81,8 @@ if [ "${1:-}" = "--watch" ]; then
 
   fswatch -o --latency=10 \
     --exclude='\.git' --exclude='\.DS_Store' --exclude='\.venv' \
-    --exclude='\.cursor' --exclude='\.obsidian' --exclude='\.vscode' \
+    --exclude='\.cursor/projects' --exclude='\.cursor/rules' \
+    --exclude='\.obsidian' --exclude='\.vscode' \
     "${WATCH_DIRS[@]}" | while read -r _count; do
     sync_all
   done
