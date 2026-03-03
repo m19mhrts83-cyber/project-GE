@@ -9,6 +9,11 @@
 
   結果は output/ に 日能研_取得結果_YYYYMMDD_HHMMSS.md として保存される。
 
+  東海労金:
+  - .env に TOKAIROKIN_USER と TOKAIROKIN_PASS を設定
+  - config_tokairokin.yaml を config_tokairokin.example.yaml からコピーして編集
+  - python fetch_after_login.py tokairokin  # ログインのみ。振込は今後追加
+
 将来: python fetch_after_login.py bank で銀行用も同様に実行できるようにする想定。
 """
 
@@ -430,19 +435,85 @@ def run_nichinoken(headless: bool = False) -> str:
     return str(out_path)
 
 
+def run_tokairokin(headless: bool = False) -> str:
+    """東海労金インターネットバンキングにログインする。振込は今後追加予定。"""
+    from playwright.sync_api import sync_playwright
+    config = load_config("tokairokin")
+    user, password = get_credentials("tokairokin")
+
+    login_url = config.get("login_url", "https://www.parasol.anser.ne.jp/ib/index.do?PT=BS&CCT0080=2972")
+    wait_login = config.get("wait_after_login", 3)
+    headless = config.get("headless", headless)
+
+    # 支店番号(3桁)・口座番号(7桁)の分割。TOKAIROKIN_USER が10桁なら 000+6393610 のように分割
+    branch = config.get("branch") or os.environ.get("TOKAIROKIN_BRANCH")
+    account = config.get("account") or os.environ.get("TOKAIROKIN_ACCOUNT")
+    if not branch and not account and len(user) >= 10 and user.isdigit():
+        branch = user[:3]
+        account = user[3:10]  # 残り7桁
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=headless)
+        context = browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
+
+        try:
+            page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_load_state("networkidle", timeout=20000)
+            page.wait_for_timeout(2000)
+
+            # parasol.anser.ne.jp のログインフォーム（東海労金）
+            # ログインID: input#txtBox005 (name=BTX0010)
+            # 支店番号: input#txtBox022 (name=BTX0030) 3桁
+            # 口座番号: input#txtBox006 (name=BTX0040) 7桁
+            # パスワード: input#pswd010 (name=BPW0020)
+            page.locator("#txtBox005").fill(user)
+            if branch:
+                page.locator("#txtBox022").fill(branch)
+            if account:
+                page.locator("#txtBox006").fill(account)
+            page.locator("#pswd010").fill(password)
+
+            # 送信ボタン（parasol: #btn012）
+            submit = page.locator("#btn012, button:has-text('ログイン'), input[type='submit'][value*='ログイン']").first
+            submit.click()
+
+            page.wait_for_timeout(wait_login * 1000)
+
+            current_url = page.url
+            body_text = page.locator("body").inner_text()
+            if "エラー" in body_text or "認証に失敗" in body_text or "ログインに失敗" in body_text:
+                print("ログインに失敗した可能性があります。headless=false で実行して画面を確認してください。", file=sys.stderr)
+
+            print("東海労金へのログイン処理が完了しました。")
+            print("※ 振込機能は今後追加予定です。")
+            return ""
+
+        except Exception as e:
+            print(f"エラー: {e}", file=sys.stderr)
+            print("headless=false で実行し、ログインフォームの構造を確認してください。", file=sys.stderr)
+            raise
+        finally:
+            browser.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description="ログイン後にページ内容を取得して保存")
-    parser.add_argument("site", choices=["nichinoken"], help="サイト名（将来 bank を追加予定）")
+    parser.add_argument("site", choices=["nichinoken", "tokairokin"], help="サイト名")
     parser.add_argument("--headless", action="store_true", help="ブラウザを表示しない")
     args = parser.parse_args()
 
     if args.site == "nichinoken":
         path = run_nichinoken(headless=args.headless)
+        print(f"出力: {path}")
+    elif args.site == "tokairokin":
+        run_tokairokin(headless=args.headless)
     else:
         print(f"未対応のサイト: {args.site}", file=sys.stderr)
         sys.exit(1)
-
-    print(f"出力: {path}")
 
 
 if __name__ == "__main__":

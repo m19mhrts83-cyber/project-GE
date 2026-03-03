@@ -2,6 +2,32 @@
 
 **credentials.json** と **token.json** は、このフォルダ（`215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/`）に **1 組だけ** 置き、次の 2 系統で **共通利用** しています。
 
+---
+
+## API とトークンは別物（「やってみたら期限切れ」を防ぐために）
+
+| 種類 | 役割 | 期限 | 対策 |
+|------|------|------|------|
+| **Gmail API** | Google Cloud で有効化する機能。credentials.json の OAuth クライアント ID/シークレット | **期限なし** | 特になし |
+| **token.json** | ユーザー認可の結果（access token + refresh token）。Gmail にアクセスするための「鍵」 | **期限あり** | 下記の事前対策を実施 |
+
+**今回の「Token has been expired or revoked」は token.json の refresh token が失効したためです。** API の有効期限ではありません。
+
+### 事前対策チェックリスト（「やってみたら期限切れでした」を防ぐ）
+
+1. **OAuth 同意画面を「本番」にする**（最優先）  
+   「テスト」のままだと refresh token が約 7 日で失効します。  
+   → [Google Cloud Console](https://console.cloud.google.com/) → 該当プロジェクト（yaritori-gmail-487109）→ **API とサービス** → **OAuth 同意画面** → 公開ステータスを **「本番」** に。本人のみ利用なら「本番（未確認）」で可。
+
+2. **3 日ごとの自動更新を入れる**  
+   いけとも・パートナーは同じ token.json を共有しているため、**いけとも用の自動更新が動けばパートナー用も自動で更新**されます。  
+   → DX互助会 `03_outputs/ai_news_save/token自動更新_セットアップ手順.md` に従い、launchd で `refresh_token_and_update_github_secret.py` を 3 日ごとに実行。
+
+3. **定期的にログを確認する**  
+   自動更新の成否は `~/Library/Logs/ai-news-token-refresh-error.log` で確認。失敗していれば手元で再認証が必要。
+
+---
+
 | 用途 | 使うスクリプト・仕組み | token の置き場所 |
 |------|------------------------|------------------|
 | **パートナーとのやりとり** | `gmail_to_yoritoori.py`（215 内） | このフォルダの `token.json` をそのまま使用 |
@@ -59,7 +85,9 @@ Gmail の token 期限切れや **GMAIL_TOKEN_B64** の更新を扱うとき、W
 
 ## token の失効を減らす・更新作業を楽にする
 
-- **失効頻度を下げる**: Google Cloud の OAuth 同意画面が「テスト」のままだと refresh token が約 7 日で失効します。「本番」に公開すると長期間有効になります。  
-  → Google Cloud Console → API とサービス → OAuth 同意画面 → 公開ステータスを「本番」に。本人のみ利用なら「本番（未確認）」で可。
-- **更新作業をワンコマンドに**: いけとも用の token 更新と Base64 準備は、DX互助会の `03_outputs/ai_news_save/refresh_and_prepare_token.sh` を実行するだけで済みます。  
+上記「事前対策チェックリスト」を参照。要点は次のとおりです。
+
+- **失効頻度を下げる**: OAuth 同意画面を「本番」にする。
+- **自動で更新する**: いけとも用の 3 日ごと自動更新が、パートナー用の token.json も同時に更新する。
+- **手動で更新する場合**: DX互助会の `03_outputs/ai_news_save/refresh_and_prepare_token.sh` を実行すると、token の確認・更新と Base64 準備までまとめて行えます。  
   → 詳しくは `GitHub Actions用_token更新手順.md` の「効率化のヒント」を参照。
