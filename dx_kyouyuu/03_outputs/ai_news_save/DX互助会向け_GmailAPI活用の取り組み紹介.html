@@ -45,7 +45,7 @@
     <section class="slide title-slide">
       <h1>DX互助会向け「Gmail API 活用の取り組み」紹介</h1>
       <p>図解とステップでまとめたスライドです</p>
-      <p style="margin-top: 1.5rem; font-size: 0.95rem; opacity: 0.95;">Gmail API を活用している主な取り組み（取り組み順）：<br>① 空室対策メール送信　② パートナーとのメールやり取り　③ いけともAIニュースの定期保存　④ トークン自動更新</p>
+      <p style="margin-top: 1.5rem; font-size: 0.95rem; opacity: 0.95;">Gmail API を活用している主な取り組み（取り組み順）：<br>① 空室対策メール送信　② パートナーとのメールやり取り　③ いけともAIニュースの定期保存　④ トークン自動更新　⑤ トラブル発生時の対策まとめ</p>
       <p class="note" style="margin-top: 1.5rem;">※ いずれも<strong>Gmail API</strong>による実装です。Cursor の「Gmail MCP」接続は<strong>不要</strong>です（後述の「API と MCP の違い」を参照）。</p>
     </section>
 
@@ -298,6 +298,40 @@ flowchart TB
         <li><strong>いけともAIニュース</strong>: GitHub Secrets の token を Actions で利用</li>
         <li><strong>トークン自動更新</strong>: token.json を更新しつつ GitHub の GMAIL_TOKEN_B64 を API で更新</li>
         <li><strong>空室対策メール送信</strong>: 215 の mail_automation で Gmail API を使用。認証は 1b_Cursorマニュアルの credentials.json / token.json（パートナー・いけともと同じ。3日ごとのトークン自動更新の対象）</li>
+      </ul>
+    </section>
+
+    <!-- 4. トラブル発生時の対策まとめ -->
+    <section class="slide">
+      <h1>4. トラブル発生時の対策まとめ（トークン切れを防ぐために）</h1>
+      <p>パートナー・いけともで「Token has been expired or revoked」が発生した経験を踏まえ、<strong>元の設定の不足点</strong>と<strong>今回の改善内容</strong>をまとめました。</p>
+      <h2>4.1 元々の設定で何が不足していたのか</h2>
+      <ul>
+        <li><strong>OAuth 同意画面が「テスト」のまま</strong> → refresh token が約 7 日で失効</li>
+        <li><strong>自動更新が実質動いていなかった</strong> → パス・条件のずれでスクリプトが動いていなかった</li>
+        <li><strong>ログ確認の習慣がなかった</strong> → 失敗に気づかず期限切れに至った</li>
+        <li><strong>パートナー更新時の GMAIL_TOKEN_B64 更新漏れ</strong> → いけともだけが古い token のまま失敗</li>
+        <li><strong>「本番」にしたあとの再認証をしていなかった</strong> → 既存 token は「テスト」時代のまま</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>4.2 今回何を変更したことで、トークン切れを防げるようにしたのか</h1>
+      <ul>
+        <li><strong>OAuth 同意画面を「本番」に変更</strong> → refresh token の有効期限が大幅に延びる</li>
+        <li><strong>「本番」変更後に token を退避して再認証</strong> → 本番用の長寿命 refresh token を新規発行</li>
+        <li><strong>launchd の plist のパス・条件を見直し</strong> → 3 日ごとの自動更新が確実に動くようにした</li>
+        <li><strong>ログ確認のルーチンを追加</strong> → 失敗を早期に検知できるようにした</li>
+        <li><strong>パートナー更新時のチェックリスト整備</strong> → GMAIL_TOKEN_B64 更新を忘れない手順を明文化</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>4.3 今後の運用で気をつけること</h1>
+      <ul>
+        <li>トークン更新時は「いけとも」「パートナー」「空室対策」の<strong>3 系統すべてに影響</strong>する</li>
+        <li><strong>手動で token を更新したとき</strong>は、GitHub の <strong>GMAIL_TOKEN_B64</strong> も忘れずに更新する</li>
+        <li><strong>数週間〜数ヶ月に一度</strong>、<code>~/Library/Logs/ai-news-token-refresh-error.log</code> にエラーが出ていないか確認する</li>
       </ul>
     </section>
 
