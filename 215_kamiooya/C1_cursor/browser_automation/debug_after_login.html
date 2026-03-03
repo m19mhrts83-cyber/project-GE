@@ -1,0 +1,2111 @@
+<!DOCTYPE html><html lang="ja"><head>
+<meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="imagetoolbar" content="no">
+<meta http-equiv="cache-control" content="no-store">
+<meta http-equiv="expires" content="0">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<title>《 東海労働金庫 ろうきんダイレクト 》インターネットバンキング</title>
+
+
+<link rel="styleSheet" href="/docs/css/jquery-ui.theme.css" type="text/css">
+<link rel="styleSheet" href="/docs/css/jquery-ui.css" type="text/css">
+<link rel="styleSheet" href="/docs/css/jquery.qtip.min.css" type="text/css">
+<link rel="styleSheet" href="/docs/css/jquery.autocomplete.css" type="text/css"><link rel="styleSheet" href="/docs/css/jquery.ui.autocompleteEx.css" type="text/css"><link rel="styleSheet" href="/docs/css/jquery-ui.custom.css" type="text/css"><link rel="styleSheet" href="/docs/css/aaui001.css" type="text/css"><link rel="styleSheet" href="/docs/css/livevalidation_style.css" type="text/css"><link rel="styleSheet" href="/docs/css/2972/style.css" type="text/css"><link rel="styleSheet" href="/docs/css/2972/page.css" type="text/css"><link rel="styleSheet" href="/docs/css/aaui015.css" type="text/css"><link rel="styleSheet" href="/docs/css/2972/frame_topmenu.css" type="text/css"><link rel="styleSheet" href="/docs/css/2972/commonstyle.css" type="text/css"><link rel="styleSheet" href="/docs/css/2972/nav.css" type="text/css"><link rel="styleSheet" href="/docs/css/2972/printstyle.css" type="text/css">
+<link rel="styleSheet" href="/docs/css/jquery-ui.structure.css" type="text/css">
+<script language="JavaScript"></script>
+
+
+<script type="text/javascript" src="/docs/javascript/jquery.js"></script>
+<script type="text/javascript" src="/docs/javascript/jquery-ui.js"></script>
+<script type="text/javascript" src="/docs/javascript/jquery.ui.datepicker-ja.js"></script>
+<script type="text/javascript" src="/docs/javascript/jquery.qtip.js"></script>
+<script type="text/javascript" src="/docs/javascript/jquery.tablesorter.js"></script>
+<script type="text/javascript" src="/docs/javascript/jquery.bgiframe.min.js"></script>
+<script type="text/javascript" src="/docs/javascript/capslock.jquery.js"></script>
+<script type="text/javascript" src="/docs/javascript/livevalidation_standaloneEx.js"></script>
+<script type="text/javascript" src="/docs/javascript/TeraLibCore.js"></script>
+<script type="text/javascript" src="/docs/javascript/Calender.js"></script>
+<script type="text/javascript" src="/docs/javascript/Calender_Holidays.js"></script>
+<script type="text/javascript" src="/docs/javascript/clickfailure.js"></script>
+<script type="text/javascript" src="/docs/javascript/aaui.js" charset="shift_jis"></script>
+<script type="text/javascript" src="/docs/javascript/prefs.js"></script>
+<script type="text/javascript">
+	aaui001_CALENDAR_DEFALTS.nextText = '次の月＞＞';
+	aaui001_CALENDAR_DEFALTS.prevText = '＜＜前の月';
+	aaui001_CALENDAR_DEFALTS.buttonText = 'カレンダー';
+	aaui001_CALENDAR_DEFALTS.currentText = '今日：' + $.datepicker.formatDate('yy/mm/dd', new Date());
+	aaui001_CALENDAR_DEFALTS.dayNamesMin = ['日','月','火','水','木','金','土'];
+	aaui001_CALENDAR_DEFALTS.yearSuffix = '年';
+	aaui001_CALENDAR_DEFALTS.monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+	aaui002_alertMsg = 'CapsLockキーがオンになっています。';
+
+	aaui003_dialogTitle = '処理中';
+	aaui003_dialogMsg = '<br />ただ今処理中です。しばらくお待ちください。';
+	aaui003_dialogDispFlg = false;
+
+	aaui004_dialogTitle = '確認';
+	aaui004_dialogMsg = 'ページを移動すると入力中のデータは破棄されます。<br />移動する場合は「OK」を押してください。<br />「キャンセル」を押すと、移動を行わず元の画面に戻ります。';
+	aaui004_dialogOkBtnMsg = 'OK';
+	aaui004_dialogCancelBtnMsg = 'キャンセル';
+	aaui004_dialogTitleIborder = '確認';
+	aaui004_dialogMsgIborder = 'インターネットバンキングのお申込手続きについては、ログアウトが必要となります。よろしいですか？';
+	aaui004_dialogOkBtnMsgIborder = 'はい';
+	aaui004_dialogCancelBtnMsgIborder = 'いいえ';
+
+	aaui005_dialogTitle = '確認';
+	aaui005_dialogMsg = '処理を中止します。<br />中止してよろしければ「OK」を押してください。<br />「キャンセル」を押すと中止せず、元の画面に戻ります。';
+	aaui005_dialogOkBtnMsg = 'OK';
+	aaui005_dialogCancelBtnMsg = 'キャンセル';
+
+	aaui014_pageLinksPreBtnMsg = '前ページ';
+	aaui014_pageLinksNextBtnMsg = '次ページ';
+	aaui014_pageLinksNoPageNumPreBtnMsg = '前の{0}件';
+	aaui014_pageLinksNoPageNumNextBtnMsg = '次の{0}件';
+	
+	aaui015_checkboxMsg = 'ソフトウェアキーボードを使用';
+	aaui015_clearCharMsg = '1文字クリア';
+	aaui015_clearStrMsg = '全てクリア';
+	aaui015_smallAlphaBtnMsg = '小文字';
+	aaui015_bigAlphaBtnMsg = '大文字';
+	aaui015_numericBtnMsg = '数字';
+	aaui015_signBtnMsg = '記号';
+	aaui015_dialogMsg = 'より安全にご利用いただくために、ソフトウェアキーボードの使用をお勧めします。本当に閉じてよろしいですか？';
+	aaui015_dialogOkBtnMsg = 'OK';
+	aaui015_dialogCancelBtnMsg = 'キャンセル';
+	aaui015_dialogTitle = '確認';
+	aaui015_confirmedMsg = '入力確定';
+	aaui015_noDispUserAgent = 'iPhone,Android,iPad,Windows Phone,BlackBerry,Windows Mobile';
+	aaui015_keyArray32UseFlg = 'true';
+	aaui015_alphaNumericBtnMsg = '英数字';
+	aaui015_alphaNumericUseFlg = 'false';
+	aaui015_bigAlphaNumericSignBtnMsg = '大文字';
+	aaui015_bigAlphaNumericSignUseFlg = false;
+	aaui015_smallAlphaNumericSignBtnMsg = '小文字';
+	aaui015_smallAlphaNumericSignUseFlg = false;
+
+	aaui019_dialogTitle = '延長失敗';
+	aaui019_dialogMsg = 'ご利用時間の延長処理に失敗しました。<br />すでにログアウトされている可能性があります。';
+	aaui019_dialogOkBtnMsg = 'OK';	
+
+	aaui020_dialogNoticeTitle = 'お取引継続確認';
+	aaui020_dialogNoticeMsg = '一定時間お客様からの操作が行われませんでした。<br />引き続きご利用いただく場合は「OK」ボタンを押してください。<br /><br />自動的に切断するまでの時間　：<span id = "countdown">60</span>秒';
+	aaui020_dialogNoticeOkBtnMsg = 'OK';
+	aaui020_dialogTimeoutTitle = '切断通知';
+	aaui020_dialogTimeoutMsg = '一定時間お客様からの操作が行われなかったため、<br />自動的に切断させていただきました。<br />ご利用ありがとうございました。';
+	aaui020_dialogTimeoutOkBtnMsg = 'OK';
+
+	aaui023_ERR_MSG_PRESENCE = '必ず入力してください。';
+	aaui023_ERR_MSG_HANKAKU_NUM = '半角数字で入力してください。';
+	aaui023_ERR_MSG_HANKAKU_EISU_LARGE = '半角英数大文字で入力してください。';
+	aaui023_ERR_MSG_HANKAKU_EISU = '半角英数字で入力してください。';
+	aaui023_ERR_MSG_HANKAKU_EISU_SIGN = '半角英数字で入力してください。';
+	aaui023_ERR_MSG_HANKAKU_KANA_SIGN_LARGE = '半角カナ英数大文字で入力してください。';
+	aaui023_ERR_MSG_HANKAKU_KANA_SIGN = '半角カナ英数字で入力してください。';
+	aaui023_ERR_MSG_HANKAKU_KANA_LARGE = '半角カナ英数大文字で入力してください。';
+	aaui023_ERR_MSG_HANKAKU_KANA = '半角カナ英数字で入力してください。';
+	aaui023_ERR_MSG_HANKAKU = '半角文字で入力してください。';
+	aaui023_ERR_MSG_ZENKAKU_KANA = '全角カナで入力してください。';
+	aaui023_ERR_MSG_ZENKAKU_KANA_SP = '全角カナで入力してください。';
+	aaui023_ERR_MSG_ZENKAKU_TERE = '全角文字で入力してください。';
+	aaui023_ERR_MSG_ZENKAKU_FDS = '全角文字で入力してください。';
+	aaui023_ERR_MSG_ZENKAKU = '全角文字で入力してください。';
+	aaui023_ERR_MSG_EMAIL = '有効なメールアドレスではありません。';
+	aaui023_ERR_MSG_REGEXP = '使用できない文字が含まれています。';
+	aaui023_ERR_MSG_IS = '{0}桁で入力してください。';
+	aaui023_ERR_MSG_MIN_LENGTH = '{0}桁以上で入力してください。';
+	aaui023_ERR_MSG_MAX_LENGTH = '{0}桁以下で入力してください。';
+	aaui023_ERR_MSG_RANGE_LENGTH = '{0}から{1}桁で入力してください。';
+	aaui023_ERR_MSG_MIN_VAL = '{0}以上の値を入力してください。';
+	aaui023_ERR_MSG_MAX_VAL = '{0}以下の値を入力してください。';
+	aaui023_ERR_MSG_RANGE_VAL = '{0}以上{1}以下の値を入力してください。';
+	aaui023_ERR_MSG_RADIO = '選択してください。';
+	aaui023_ERR_MSG_CHECK_BOX = '{0}つ以上選択してください。';
+	aaui023_ERR_MSG_PULL_DOWN = '選択してください。';
+	aaui023_ERR_MSG_HEAD_ZERO = '先頭の0は除いて入力して下さい。';
+	
+	aaui026_dialogTitle = '確認';
+	aaui026_dialogOkBtnMsg = 'OK';
+	aaui026_dialogMsg = 'お使いのブラウザはバージョンが古く、<br />推奨するご利用環境ではありません。<br />お取引画面が正しく表示されない場合がありますので、<br />推奨環境のご確認、バージョンアップを行っていただいた上で<br />ご利用いただきますようお願いいたします。';
+
+	aaui027_useFlg = true;
+	
+	aaui028_passwordDialogTitle = 'パスワード登録の確認';
+	aaui028_passwordDialogMsg = 'パスワードを設定いたします。<br>お取引に必要なパスワードですので、お忘れにならないようにご注意ください。<br>OKボタンを押下すると、設定されたパスワードで登録します。';
+	aaui028_passwordDialogOkBtnMsg = 'OK';
+	aaui028_passwordDialogCancelBtnMsg = 'キャンセル';
+	aaui028_passwordUseFlg = false;
+	
+	aaui029_enterKeyDeterUseFlg = true;
+	
+	
+	aaui040.DEFAULT_ERROR_MESSAGE_EMPTY = '必ず入力してください。';
+	aaui040.DEFAULT_ERROR_MESSAGE_INVALID = '日付を正しく入力してください。';
+	aaui040.DEFAULT_ERROR_MESSAGE_INVALID_YM = '年月を正しく入力してください。';
+	
+	aaui041.DEFAULT_ERROR_MESSAGE = '期間を正しく入力してください。';
+	aaui041.DEFAULT_START_EMPTY_ERROR_MESSAGE = '開始日を必ず入力してください。';
+	aaui041.DEFAULT_START_ERROR_MESSAGE = '開始日を正しく入力してください。';
+	aaui041.DEFAULT_END_EMPTY_ERROR_MESSAGE = '終了日を必ず入力してください。';
+	aaui041.DEFAULT_END_ERROR_MESSAGE = '終了日を正しく入力してください。';
+
+	aaui043_useFlg = true;
+	
+	aaui045_dialogTitle = '確認';
+	aaui045_dialogMsg = 'お客様の入力したメールアドレスはセキュリティ上推奨しません。<br />その他のメールアドレスに変更する場合は「キャンセル」ボタンを押下して下さい。';
+	aaui045_dialogOkBtnMsg = 'OK';
+	aaui045_dialogCancelBtnMsg = 'キャンセル';
+	aaui045_domain = '';
+	
+	aaui045_checkMailAddr1 = 'false';
+	aaui045_checkMailAddr2 = 'false';
+	aaui045_checkMailAddr3 = 'false';
+	aaui045_checkMailAddr4 = 'false';
+	aaui045_isCkClsBlackList = true;
+	aaui045_isDispOkBtn = true;
+
+    aaui046_dialogTitle = '金利優遇サービス対象商品確認';
+    aaui046_dialogMsg = 'お客様が選択していただいた商品は金利優遇サービス対象外です。<br>よろしいでしょうか。';
+    aaui046_dialogOkBtnMsg = 'OK';
+    aaui046_dialogCancelBtnMsg = 'キャンセル';
+    aaui046_dialogCloseBtnMsg = '閉じる';
+    aaui046_dialogDspFlg = true;
+
+	aaui047_sendSwTokenTranAuthPopupTitle = '取引認証通知';
+	aaui047_sendSwTokenTranAuthPopupMsg = 'トークンアプリに取引認証通知を送信しました。トークンアプリにて振込通知内容をご確認の上、手続きを進めて下さい。';
+	aaui047_sendSwTokenTranAuthPopupOkBtnMsg = 'OK';
+	aaui047_sendSwTokenTranAuthPopupUseFlag = true;
+	aaui047_sendSwTokenTranInfPopupTitle = '取引内容送信';
+	aaui047_sendSwTokenTranInfPopupMsg = 'トークンアプリに取引内容を送信しました。トークンアプリにて取引内容をご確認の上、手続きを進めて下さい。';
+
+	aaui048_dialogTitle = 'トークンアプリ確認';
+	aaui048_dialogMsg = 'トークンアプリ上の取引確認開始タブを押すと「取引確認機能が有効になりました。」と表示されます。表示を確認できた方は「OK」を押して下さい。<br />トークンアプリの設定方法について再度確認される方は「キャンセル」を押して下さい。';
+	aaui048_dialogOkBtnMsg = 'OK';
+	aaui048_dialogCancelBtnMsg = 'キャンセル';
+	aaui048_dialogDspFlg = true;
+	aaui048_dialogAppTitle = 'トークンアプリ確認';
+	aaui048_dialogAppMsg = 'トークンアプリ上の取引確認開始タブを押すと「取引確認機能が有効になりました。」と表示されます。表示を確認できた方は「OK」を押して下さい。<br />トークンアプリの設定方法について再度確認される方は「キャンセル」を押して下さい。';
+
+	aaui049_dialogOkBtnMsg = 'OK';
+	aaui049_dialogCancelBtnMsg = 'キャンセル';
+	aaui049_dialogTitle_checkError_fileSize = '確認';
+	aaui049_dialogMsg_checkError_fileSize = 'ファイルサイズが規定範囲内ではありません。<BR>ご確認のうえ、再度アップロードをお願い致します。';
+	aaui049_dialogTitle_checkError_extension = '確認';
+	aaui049_dialogMsg_checkError_extension = 'アップロード可能な拡張子ではありません。<BR>再度確認のうえ、アップロードをお願い致します。';
+	aaui049_dialogTitle_checkError_fileCount = '確認';
+	aaui049_dialogMsg_checkError_fileCount = 'アップロード最大件数超過（5ファイルまで）のためアップロードできません。';
+	aaui049_dialogTitle_checkWarn_fileName = '確認';
+	aaui049_dialogMsg_checkWarn_fileName = '文字数上限を超えているため、一部切り取って受付ました。';
+	aaui049_dialogTitle_uploadConfirm = 'アップロード実行確認';
+	aaui049_dialogMsg_uploadConfirm = 'ファイルアップロードを実行しますか？<BR>よろしければ「OK」を押して下さい。';
+	aaui049_dialogTitle_uploadSuccess = 'アップロード正常終了';
+	aaui049_dialogMsg_uploadSuccess = 'ファイルアップロード処理が正常終了しました。';
+	aaui049_dialogTitle_uploadError = 'アップロード異常終了';
+	aaui049_dialogMsg_uploadError = 'ファイルアップロード処理が異常終了しました。';
+	aaui049_dialogTitle_deleteConfirm = 'ファイル削除実行確認';
+	aaui049_dialogMsg_deleteConfirm = 'ファイルを削除してもよろしいですか？<BR>よろしければ「OK」を押して下さい。';
+	aaui049_dialogTitle_deleteSuccess = 'ファイル削除正常終了';
+	aaui049_dialogMsg_deleteSuccess = 'ファイル削除処理が正常終了しました。';
+	aaui049_dialogTitle_deleteError = 'ファイル削除異常終了';
+	aaui049_dialogMsg_deleteError = 'ファイル削除処理が異常終了しました。';
+	aaui049_dialogTitle_fileOperationUpload = 'ファイルアップロード中';
+	aaui049_dialogMsg_fileOperationUpload = 'ただ今ファイルアップロード中です。<BR>しばらくお待ち下さい。';
+	aaui049_dialogTitle_fileOperationDelete = 'ファイル削除中';
+	aaui049_dialogMsg_fileOperationDelete = 'ただ今ファイル削除中です。<BR>しばらくお待ち下さい。';
+	aaui049_deleteBtnMsg = '削除';
+
+	aaui050_mailDeliveryConfirmPopupTitle = '確認';
+	aaui050_mailDeliveryConfirmPopupMsg = 'お客様のメールアドレスに《案内メール》を送信しました。案内メールには本画面で入力する「認証番号」が記載されています。';
+	aaui050_mailDeliveryConfirmPopupOkBtnMsg = 'OK';
+	aaui050_mailDeliveryConfirmPopupUseFlg = true;
+
+	aaui051_dialogTitle = '確認';
+	aaui051_dialogMsg_51 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogMsg_52 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogMsg_53 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogMsg_54 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogMsg_55 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogMsg_56 = '申込ページへ遷移します。よろしければ「OK」を押して下さい。';
+	aaui051_dialogMsg_57 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogMsg_58 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogMsg_59 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogMsg_60 = 'Webお知らせサービスの利用を開始します。「OK」ボタンを押してください。';
+	aaui051_dialogOkBtnMsg = 'OK';
+	aaui051_dialogCancelBtnMsg = 'キャンセル';
+	aaui051_dialogDspFlg = true;
+
+	aaui055_mailDeliveryConfirmPopupForFirstLoginMsg = 'メールアドレスに利用開始パスワードを送信しました。';
+	aaui055_mailDeliveryConfirmPopupForFirstLoginUseFlg = true;
+
+</script>
+<script type="text/javascript">
+$(
+	initTimeoutNotice(
+		300,
+		0,
+		false,
+		"/ib",
+		"S",
+		"9EE15D5264BBBF212C2AF24961F91775E45A8D08E05C7AD19B8E",
+		"ServerID",
+		"RSRA0206"
+	) 
+);
+</script>
+<script type="text/javascript">
+$(
+    HtmlInit()
+);
+</script>
+<meta name="format-detection" content="telephone=no">
+
+
+
+
+
+
+	<script src="/docs/javascript/acsionDetecker.js" defer=""></script>
+
+	
+	<script type="text/javascript" defer="">
+	<!--
+
+	var detecker_script = document.createElement('script');
+	$().ready(function() { 
+
+		
+		initDeteckerCheckItems();
+
+		
+		addDeteckerOnclickEvent(
+				"BLI001",
+				"AP2950",
+				"23431739-69f5-4aa4-b144-3477d9b12322"
+				);
+
+	});
+
+	// 読み込み後にacsionの処理の実行
+	window.addEventListener('load', function(){
+
+		//acsion接続先
+		detecker_script.src = "https://fp-js.detecker.com/v1/fp.js"
+		//JavaScriptの読み込み
+		document.head.appendChild(detecker_script);
+
+		
+		
+
+			var detecker_counter2 = 0;
+
+			let detecker_intervalId2 = setInterval(function() {
+
+				detecker_counter2++;
+
+				
+				var detecker_result2 = sendDetecker(
+						"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",
+						"AP2950",
+						"a3f21cbc-a949-4236-bdd2-385e1e0d6b68"
+						);
+
+				if (detecker_result2 || detecker_counter2 > 50) {
+					clearInterval(detecker_intervalId2);
+					return;
+				}
+
+			}, 200);
+
+		
+
+		
+		
+
+	});
+
+	-->
+	</script>
+
+
+
+<script src="https://distribute.cafisbrain.com/cafisbrainriskcollector.js"></script><script src="https://fp-js.detecker.com/v1/fp.js"></script></head>
+<body>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="frame-base noprint" id="frame-header">
+<div class="frame-content">
+<header>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+		
+	<!-- 金融機関ロゴエリア -->
+	<h1><img id="cs_globalImage002" src="/docs/images/2972/header_logo_02.png" alt=""></h1>
+	<div id="header-utility">
+		<div id="header-func">
+			<!-- ログアウトボタン -->
+			
+		<!-- /header-func --></div>
+		<!-- 外部ページリンクエリア -->
+		<ul>
+		
+			<li><span id="cs_externallink_01"><a target="_blank" href="http://ib.rokin.jp/helplink/help/help.html" style="text-decoration: none;"><img src="/docs/images/2972/link_info.gif" alt="" style="position:absolute;top:15px;"><p style="position:absolute;top:47px;margin-left: -4px;font-size: 10px;line-height: 9px;text-align: center;color:#000000;">操作方法は<br>こちらへ</p></a></span></li>
+		
+        
+			<li></li>
+        
+        
+			<li></li>
+        
+        
+        
+        
+        
+        
+        
+        
+		</ul>
+		
+		
+		<!-- 文字サイズ変更エリア -->
+		<div id="header-font-resize-function">
+			<span id="cs_fontresize_text" class="header-font-resize-guidance">文字サイズを<br>変更する</span>
+			<!-- 文字サイズ変更リンクエリア -->
+			<ul class="header-font-resize-list">
+				<li><button id="cs_fontresize_s" name="" type="button" class="header-font-resize-set-s header-font-resize-set-active" value="">小</button></li>
+				<li><button id="cs_fontresize_m" name="" type="button" class="header-font-resize-set-m font-size-l " value="">中</button></li>
+				<li><button id="cs_fontresize_l" name="" type="button" class="header-font-resize-set-l font-size-ll " value="">大</button></li>
+			</ul>
+		<!-- /header-font-resize --></div>
+		
+	<!-- /header-utilitylink --></div>
+</header>
+<!-- /frame-content --></div>
+<!-- /frame-header --></div>
+
+
+<div id="header-servicename" class="header-servicename noprint"><!-- /header-servicename --></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- トップメニューレイアウト -->
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="frame-base" id="frame-body">
+	<div class="frame-content">
+		
+
+
+
+
+
+
+
+
+
+
+<noscript><p><span class="noscript-msg">お客様がご利用のブラウザは、ＪａｖａＳｃｒｉｐｔが無効に設定されている、もしくは、ＪａｖａＳｃｒｉｐｔがサポートされていないため、一部機能が正常に動作しない可能性があります。<br>サービスをご利用になるためには、ＪａｖａＳｃｒｉｐｔを有効にする、また、ＪａｖａＳｃｒｉｐｔ対応ブラウザでのご利用をお願いいたします。</span></p></noscript>
+
+<script type="text/javascript">
+<!-- 
+
+$(document).ready(function()
+  {
+    var aaui026_checkFlag=true;
+    if(aaui026_checkFlag==true){
+        initBrowserCheck('false');
+    }
+  }
+);
+
+// -->
+</script>
+
+		<div id="body-pagecontent">
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <style>.loginA01 .private-section-user h2 {background: white; border-left: 10px solid #6091d3; width: 70%; padding-top:5px; padding-bottom:5px;}</style>
+  <p id="pgId" class="page-identifierA01">
+<span id="msgFix001" class="pageId">画面ID：BLI001</span>
+  </p><!-- pgId -->
+  
+  
+  
+  
+  <div id="blk002" class="heading-areaA01 heading-areaA01_ikou ">
+    <h1 id="ttlArea" class="headingA01">
+      <span id="ttlArea_heading" style="color:#095C9B;"><span style="font-size: 90%;">《 東海労働金庫 ろうきんダイレクト 》</span><br>インターネットバンキング</span>
+    </h1><!-- ttlArea -->
+</div>
+<!-- blk002 -->
+  
+  
+  
+  
+  <div id="swpBlkParent999">
+    <div id="swpBlkChild991">
+      
+    </div>
+
+
+
+
+
+
+    <div id="swpBlkChild999">
+      <div align="center">
+<a href="https://ib.rokin.jp/heads-up/?bid=22" target="_blank"><font size="+2" color="#ff0000">※インターネットによる金融犯罪にご注意ください</font></a>
+</div>
+<a hidden="">
+      <div id="blk003" class="attention-blockA02 ">
+        <div id="blk036" class="heading-areaA02 ">
+          <h2 id="h002" class="headingA02">
+            <span id="h002_heading">初めて利用するお客様、パスワード再登録・契約者カード再発行のお客様へ</span>
+          </h2><!-- h002 -->
+</div>
+<!-- blk036 -->
+        <ul id="ul010" class="listA01">
+          <li id="li012">
+            <p id="guidance001">
+              <span id="guidance001_guidance">ログインパスワード欄には<span style="color: blue; font-weight: 800;">「仮ログインパスワード」</span>を入力してください。</span>
+            </p><!-- guidance001 -->
+          </li><!-- li012 -->
+        </ul><!-- ul010 -->
+        <div class="rokin_box1">
+    <p><span style="color: black;">「仮ログインパスワード」とは、＜ろうきんダイレクト＞のお手続き時にお客様が指定した数字４桁の頭にRIB（ローマ字）を付けた７桁のパスワードです。<br>
+（例）お手続き時に「1234」を指定した場合、仮ログインパスワードは</span><font color="blue">RIB1234</font><span style="color: black;">になります。</span>
+</p>
+</div><style>
+.rokin_box1 {
+    padding: 0.5em 1em;
+    margin: 0.5em 0;
+    font-weight: bold;
+    color: #6091d3;/*文字色*/
+    background: #FFF;
+    border: solid 3px #6091d3;/*線*/
+    border-radius: 10px;/*角の丸み*/
+}
+.rokin_box1 p {
+    margin: 0;
+    padding: 0;
+}
+</style>
+</div>
+<!-- blk003 -->
+      </a>
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+    <div id="blk037" class="attention-blockA02 under-floatObject word-wrap ">
+      <div id="blk038" class="heading-areaA02 ">
+        <h2 id="h009" class="headingA02">
+          <span id="h009_heading">【重要】振込等のお取引をするお客様へ</span>
+        </h2><!-- h009 -->
+</div>
+<!-- blk038 -->
+      <p id="guidance007">
+        <span id="guidance007_guidance">＜ろうきんダイレクト＞で振込等のお取引をする場合には、ワンタイムパスワードが必要です。<br>お客様に安心してご利用いただくために、ワンタイムパスワードアプリのご利用をお願いいたします。<br>なお、ワンタイムパスワードの利用開始または再発行直後は、取引限度額の引き上げは即時反映されません。ワンタイムパスワード利用開始日（再発行日）の7日後（0時）から反映されますので、ご注意ください。<br><br>●　ワンタイムパスワード未利用のお客様<br>ワンタイムパスワードアプリの利用開始方法は、下部のリンクから「オンラインマニュアル」をご確認ください。<br><br>●　機種変更等でワンタイムパスワードアプリの再発行をご希望のお客様<br>本画面の「ワンタイムパスワードアプリの再発行」からお手続きください。<br>※　ワンタイムパスワードアプリの再発行には、ログインパスワードが必要です。ログインパスワードをお忘れの方は、書面手続きでワンタイムパスワードを解除する必要がありますので、ヘルプデスクまたはお取引店にお問い合わせください。</span>
+      </p><!-- guidance007 -->
+<span id="lnk007"><a href="https://ib.rokin.jp/helplink/manual_full/fbps0302.html" target="_blank">「オンラインマニュアル」はこちら</a></span>
+</div>
+<!-- blk037 -->
+    
+    
+    
+    
+    
+    
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="swpBlkChild998">
+      
+      
+      <div id="blk004" class="form-error-blockA01 ">
+        <ul id="ul001" class="form-error-listA01">
+          <li id="li001">
+<span id="svrErr">口座情報が誤っています。<br>正しい口座情報を入力してください。<br><br><br>理由コードはB27です。[B3977]<br><br></span>
+          </li><!-- li001 -->
+        </ul><!-- ul001 -->
+</div>
+<!-- blk004 -->
+      
+    </div>
+    <div id="swpBlkChild997">
+      
+      <div id="input-warning-presence" class="input-warning ">
+<span id="warn_presence_msg" class=" ">入力されていない項目があります。</span>
+</div>
+<!-- input-warning-presence -->
+      <div id="input-warning-exceptPresence" class="input-warning ">
+<span id="warn_exceptPresence_msg" class=" ">不正入力の項目があります。</span>
+</div>
+<!-- input-warning-exceptPresence -->
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="swpBlkChild996">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      
+      <div style="float: right;width: 260px;">
+<div style="width: 260px;" class="sidebar-leftcolumnB01">
+ <div style="background: white; border-style: solid; border-color: #6091d3; margin: 0px 0px -15px; padding: 10px; width: 230px; border-width: 0px 0px 0px 0px;">
+  <img src="/docs/images/2972/icon_beginner.gif"><span style="font-size: 150%; font-weight: 800;">初めてご利用の場合</span>
+ </div>
+ <hr size="3" color="#6091d3">
+ <span><font color="#ff0000">初めてご利用のお客様</font>は<br>初回利用登録のお手続きが必要です。<br></span>
+ <div class="button-groupD01 " style="margin-top: 0px;">
+  <div class="button-main-areaA01 ">
+   <div class="private-footer-login ">
+   <form action="https://ib.rokin.jp/direct_new/?bid=22" target="_blank" method="post">
+    <button type="submit" class="main-buttonA02 " value="">初回利用登録</button></form>
+   </div>
+  </div>
+ </div>
+</div>
+<div style="width: 260px;" class="sidebar-leftcolumnB01">
+ <div style="background: white; border-style: solid; border-color: #6091d3; margin: 0px 0px -15px; padding: 10px; width: 230px; border-width: 0px 0px 0px 0px;">
+  <span style="font-size: 150%; font-weight: 800;">アプリの再発行</span>
+ </div>
+ <hr size="3" color="#6091d3">
+ <span>機種変更などをした場合に、新しい端末にワンタイムパスワードアプリを引き継ぐことができます。<br></span>
+ <div class="button-groupD01 " style="margin-top: 0px;">
+  <div class="button-main-areaA01 ">
+   <div class="private-footer-login ">
+   <form action="/ib/index.do?PT=BS&amp;CCT0080=2972&amp;logintype=BTR001" method="post">
+    <button type="submit" class="main-buttonA02 ">ワンタイムパスワード<br>アプリの再発行</button></form>
+   </div>
+  </div>
+ </div>
+</div>
+<div style="width: 260px;" class="sidebar-leftcolumnB01">
+ <div style="background: white; border-style: solid; border-color: #6091d3; margin: 0px 0px -15px; padding: 10px; width: 230px; border-width: 0px 0px 0px 0px;">
+  <span style="font-size: 150%; font-weight: 800;">パスワード等の再登録</span>
+ </div>
+ <hr size="3" color="#6091d3">
+ <span>ログインパスワード・追加認証（合言葉）の回答を忘れた場合は、こちらからお手続きできます。<br></span>
+ <div class="button-groupD01 " style="margin-top: 0px;">
+  <div class="button-main-areaA01 ">
+   <div class="private-footer-login ">
+   <form action="/ib/index.do?PT=IM&amp;CCT0080=2972&amp;format=01" method="post">
+    <button type="submit" class="main-buttonA02 " style="font-size:18px;">ログインパスワードの再登録</button></form><br>
+ <form action="/ib/index.do?PT=IM&amp;CCT0080=2972&amp;format=03" method="post">
+    <button type="submit" class="main-buttonA02 " style="margin-top: -10px;">追加認証の初期化</button></form>
+   </div>
+  </div>
+ </div>
+</div>
+<div style="width: 260px;" class="sidebar-leftcolumnB01">
+ <div style="background: white; border-style: solid; border-color: #6091d3; margin: 0px 0px -15px; padding: 10px; width: 230px; border-width: 0px 0px 0px 0px;">
+  <span style="font-size: 150%; font-weight: 800;">ログインの緊急停止</span>
+ </div>
+ <hr size="3" color="#6091d3">
+ <span>お客様のインターネットバンキングのログイン機能を停止する場合は、こちらからお手続きください。<br></span>
+ <div class="button-groupD01 " style="margin-top: 0px;">
+  <div class="button-main-areaA01 ">
+   <div class="private-footer-login ">
+   <form action="/ib/index.do?PT=BS&amp;CCT0080=2972&amp;estop=on" method="post">
+    <button type="submit" class="main-buttonA02 ">緊急停止する</button></form>
+   </div>
+  </div>
+ </div>
+</div>
+</div>
+      
+      
+      <div id="blk005">
+        <div id="blk006" class="sidebar-leftcolumnB01 sidebar-underspace " style="width:700px;float:left;">
+          <div id="blk007" class="loginA01 ">
+            <div id="swpBlkParent998">
+              <div id="swpBlkChild995">
+                <form method="post" action="/ib/BLI001Dispatch?ServerID=RSRA0206&amp;B=2972&amp;PT=BS" class="" id="inputFrm002"><div id="backward_compatible_filler"></div>
+                  <input type="hidden" name="S" value="9EE15D5264BBBF212C2AF24961F91775E45A8D08E05C7AD19B8E">
+                  <input type="hidden" id="hide003" name="BHD0000" class="" tabindex="" value="BLI001" title="">
+                  <input type="hidden" id="hide004" name="BHD0001" class="" tabindex="" value="0" title="">
+                  <input type="hidden" id="hide005" name="BUTTON_NAME" class="" tabindex="" value="BSM2010" title="">
+                </form><!-- inputFrm002 -->
+              </div>
+              <div id="swpBlkChild994">
+                <form method="post" action="/ib/BLI001Dispatch?ServerID=RSRA0206&amp;B=2972&amp;PT=BS" class="" id="inputFrm013"><div id="backward_compatible_filler"></div>
+                  <input type="hidden" name="S" value="9EE15D5264BBBF212C2AF24961F91775E45A8D08E05C7AD19B8E">
+                  <div id="blk053" class="private-section-user ">
+                    <br>
+<div style="background: white; border-style: solid; border-color: #6091d3; margin: 0px 0px 10px; padding: 10px; width: 630px; border-width: 0px 0px 0px 10px;"><span style="font-size: 150%; font-weight: 800;">ログインIDまたは口座情報を入力</span></div>
+「ログインID」または「代表口座情報」を入力してください。<br><br>
+                    <span id="swpBlkParent996">
+                      <span id="swpBlkChild112">
+                        <div id="blk054" class="private-block-form-loginid-account " style="height:260px;float:left;">
+                          <div id="blk055" class="form-item ">
+                            <div id="blk056" class="form-label ">
+                              <label id="label004" for="txtBox005">
+<span id="msg455" class=" "></span><span id="msg005" class=" "><span style="font-weight: 800;">ログインID（またはご契約番号）</span></span>
+                              </label>
+                              <ul id="ul013" class="list-annotation">
+                                <li id="li017">
+<span id="msg010" class="list-annotation-marker "></span>
+                                </li><!-- li017 -->
+                              </ul><!-- ul013 -->
+</div>
+<!-- blk056 -->
+                            <div id="blk057" class="form-field ">
+                              <div id="chkErr014"><span id="chkErr014_inputerror"></span></div>
+                              <input type="text" id="txtBox005" name="BTX0010" class="input-id disabled-input" tabindex="-1" value="" autocomplete="off" maxlength="12">
+                              <br>
+（6～12桁の半角英数字）
+                              <script type="text/javascript"><!--
+$().ready(function() { $(initSoftwareKeyboard({"targetId":"txtBox005" ,"className":"" ,"visible":"false" ,"useKey":"1111" ,"random":"0000" ,"keyboardDisp":"false" ,"keyboardFirst":"0"})); });
+ // -->
+</script>
+</div>
+<!-- blk057 -->
+</div>
+<!-- blk055 -->
+</div>
+<!-- blk054 -->
+                      </span>
+                      <span id="swpBlkChild113">
+                        <div style="font-weight: 800;font-size: 20px;margin-top: 100px;margin-bottom: 20px;color: #095C9B;float: left;margin-right: 15px;margin-left: 15px;">または</div>
+                      </span>
+                      <span id="swpBlkChild114">
+                        <div id="blk058" class="private-block-form-loginid-account " style="height:260px;">
+                          <div id="blk059" class="form-item ">
+                            <div id="blk060" class="form-label ">
+                              <label id="label028" for="txtBox022">
+<span id="msg460" class=" "></span><span id="msg035" class=" "><span style="font-weight: 800;">支店番号</span></span>
+                              </label>
+                              <ul id="ul026" class="list-annotation">
+                                <li id="li026">
+<span id="msg036" class="list-annotation-marker "></span>
+                                </li><!-- li026 -->
+                              </ul><!-- ul026 -->
+</div>
+<!-- blk060 -->
+                            <div id="blk061" class="form-field ">
+                              <div id="chkErr015"><span id="chkErr015_inputerror"></span></div>
+                              <input type="text" id="txtBox022" name="BTX0030" class="input-id" tabindex="" value="000" autocomplete="off" maxlength="3">
+                              <br>
+（半角数字：3桁）
+</div>
+<!-- blk061 -->
+</div>
+<!-- blk059 -->
+                          <div id="blk062" class="form-item ">
+                            <div id="blk063" class="form-label ">
+                              <label id="label029" for="pulldown002">
+<span id="msg461" class=" "></span><span id="msg037" class=" "><br>
+<span style="font-weight: 800;">科目</span></span>
+                              </label>
+                              <ul id="ul027" class="list-annotation">
+                                <li id="li027">
+<span id="msg038" class="list-annotation-marker "></span>
+                                </li><!-- li027 -->
+                              </ul><!-- ul027 -->
+</div>
+<!-- blk063 -->
+                            <div id="blk221" class="form-field ">
+                              <div id="chkErr016"><span id="chkErr016_inputerror"></span></div>
+                              <span id="pulldown002" class="selectA01" title=""><span id="msg039-1">普通</span>
+                                </span><input type="hidden" name="BLB0010" value="02"><!-- pulldown002 -->
+</div>
+<!-- blk221 -->
+</div>
+<!-- blk062 -->
+                          <div id="blk222" class="form-item ">
+                            <div id="blk223" class="form-label ">
+                              <label id="label030" for="txtBox006">
+<span id="msg462" class=" "></span><span id="msg040" class=" "><br>
+<span style="font-weight: 800;">口座番号</span></span>
+                              </label>
+                              <ul id="ul028" class="list-annotation">
+                                <li id="li028">
+<span id="msg041" class="list-annotation-marker "></span>
+                                </li><!-- li028 -->
+                              </ul><!-- ul028 -->
+</div>
+<!-- blk223 -->
+                            <div id="blk224" class="form-field ">
+                              <div id="chkErr025"><span id="chkErr025_inputerror"></span></div>
+                              <input type="text" id="txtBox006" name="BTX0040" class="input-id" tabindex="" value="6393610" autocomplete="off" maxlength="7">
+                              <br>
+（半角数字：7桁）
+</div>
+<!-- blk224 -->
+</div>
+<!-- blk222 -->
+</div>
+<!-- blk058 -->
+                      </span>
+                    </span>
+                    <div id="blk225" class="loginid-account-arrow_down_position " style="height:55px;">
+                      <img id="img012" style="width:90px; height:35px; " class="" src="/docs/images/2972/bg_arrow_11.png" alt="">
+</div>
+<!-- blk225 -->
+                    <div id="blk226" class="private-block-form ">
+                      <div id="swpBlkParent995">
+                        <div id="swpBlkChild984">
+                          <div id="blk227" class="form-item ">
+                            <div id="blk228" class="form-label " style="bottom: 35px;position: relative;width: 195px;">
+                              <label id="label005" for="pswd010">
+<span id="msg456" class=" " style="margin-bottom:15px;display:block;"><h2 style="font-weight: 800; background: white; border-style: solid; border-color: #6091d3; margin: 0px 0px 10px; padding: 10px; width: 630px; border-width: 0px 0px 0px 10px;">パスワードを入力</h2></span><span id="msg006" class=" "><br>　<span style="font-weight: 800;">ログインパスワード</span></span>
+                              </label>
+                              <ul id="ul005" class="list-annotation">
+                                <li id="li014">
+<span id="msg007" class="list-annotation-marker "></span>
+                                </li><!-- li014 -->
+                              </ul><!-- ul005 -->
+</div>
+<!-- blk228 -->
+                            <div id="blk229" class="form-field " style="width: 468px;padding-top:30px;">
+                              <div id="chkErr026"><span id="chkErr026_inputerror"></span></div>
+                              <div id="pswd010_comment" class="keyboard_comment"><span><input type="checkbox" id="pswd010_check">        <label for="pswd010_check">                   ソフトウェアキーボードを使用</label>        </span></div><input type="password" id="pswd010" name="BPW0020" class="capslock input-password" tabindex="" value="" autocomplete="off" maxlength="12">
+                              <div>（6～12桁の半角英数字記号）</div>
+                              <script type="text/javascript"><!--
+$().ready(function() { $(initSoftwareKeyboard({"targetId":"pswd010" ,"className":"" ,"visible":"true" ,"useKey":"2222" ,"random":"0000" ,"keyboardDisp":"false" ,"keyboardFirst":"0"})); });
+ // -->
+</script>
+</div><div class="clearFloat" id="pswd010_outer" style="display: none;">            <div class="">            <div id="pswd010keyboard_parts" class="div_parts">            </div></div></div>
+<!-- blk229 -->
+</div>
+<!-- blk227 -->
+                        </div>
+                        <div id="swpBlkChild983">
+                        </div>
+                      </div>
+                      <div id="blk501" class="private-footer-login ">
+                        <button id="btn012" name="forward_BSM2010" type="submit" class=" " onclick="return executePrefsSubmit(this,'hide992')" value="">ログイン</button>
+                        <ul id="ul006">
+                          <li id="li015">
+<span id="lnk010" class=" "></span>
+                          </li><!-- li015 -->
+                        </ul><!-- ul006 -->
+</div>
+<!-- blk501 -->
+</div>
+<!-- blk226 -->
+</div>
+<!-- blk053 -->
+                  <input type="hidden" id="hide995" name="BHD0000" class="" tabindex="" value="BLI001" title="">
+                  <input type="hidden" id="hide994" name="BHD0001" class="" tabindex="" value="0" title="">
+                  <input type="hidden" id="hide993" name="BUTTON_NAME" class="" tabindex="" value="BSM2010" title="">
+                  <input type="hidden" id="hide992" name="USERPREFS" class="" tabindex="" value="v3:ArMbeLmzG3i5YlrJesHSFBge1y4mJIzK0mZVrb01Vbxvfvdlvp4iy9U301OzN7iOo0Cb2aqH5lMNloPD8MLqVS7om7KSYq4ouoPEaKKLS8ce6vCugN53Vc/MQ5+nqgcTrlSrJs7q546LZwqdK882tMT1PKD3h/lUgyRJnhWO2Flxmkv7qBmc8jRJiR4v992eXC9b2SagotGIV7p1f4Eyp9us3QPvDgfu1Ijw093ffALu7p88ID8gbTPoH8QQR4NiXJQFVwqMpBSPdNBgLMS+rAhDhq4pZVdiy0RXSX7VEfpIMv0ngG88Y6xPLgMZ8Qd7AETWDf2ldXuYxBYxcBXDQHn2oCsQOf1xd+n0cpH0Jl5AH9yAX7gBgXiFvLejnSCmTFVttvqqc/c9ZXe096e87113QEiDTmWGCtWEmGiSr76BGYJqVMevtuykjXlTlOP5OzRKrisBM6b+M+ERL+KxgP34Hh1x32D6vBaembOLjDqVZwb79K71ALNNtv6YmZmTjMD7Pek5wqXZczuRFYpHnjo61NUu8RuW1Yot9f7pwbiuS+mJXI70TtoSeejdyeT6o7wVJSFA8AeYwzdxyaR+yvCC/OBLhUR+hTZTGbiypa4J6KGvBIaprGK+wgBgaQZUKBkv/XOZbkOV9mi1nNvtI7UiyYzJ#0#WoiBBMUaEdm1KOGzqbQkwb7mGxOuP6GZx5oXACpKs+sqj8vyuFPkgxeX2i/Y5Vy/Pew64GIccHLKC9gvCvwHM6xzy2tnpS2fhJ+I7oIlB7xdCvdYjQ+4St+6cvDl2dTodMGeQR2IhsxT2y1Tr8VAkOa6fBcpcZD/01kNJKLAPPiaQxhdw41iKQv4K3j7uCfB5JEcWBXzBP38sHrbemVscBu+dgJAxgaWXw3y0Kjfs/GuLyUzEMQoBpiBVpkyMmxrLiXb16pto6qZatxBk5TZAsj19suiglPHisPlCu4yix1P6eC1FKsnv2v/8W2sffzDkOdJI/AzONBgfPFPsfSmAeWiay+rIAVazgSZaeNJ3j9mCZzjnK9kBok6A9ruZpzh" title="">
+                </form><!-- inputFrm013 -->
+              </div>
+            </div>
+</div>
+<!-- blk007 -->
+</div>
+<!-- blk006 -->
+        <div id="blk033" class="sidebar-rightcolumnB01 " style="float: none;width: 980px;position: relative;top: 145px;">
+          <div id="swpBlkParent001">
+            <div id="swpBlkChild002">
+              <form method="get" action="/ib/BLINBeforeExecuteDispatch?PT=BS" class="" id="inputFrm003"><div id="backward_compatible_filler"></div>
+                <input type="hidden" name="S" value="9EE15D5264BBBF212C2AF24961F91775E45A8D08E05C7AD19B8E">
+                <!-- blk034 -->
+                <input type="hidden" id="hide006" name="CCT0080" class="" tabindex="" value="2972" title="">
+                <input type="hidden" id="hide007" name="estop" class="" tabindex="" value="on" title="">
+                <input type="hidden" id="hide008" name="PT" class="" tabindex="" value="BS" title="">
+              </form><!-- inputFrm003 -->
+            </div>
+            <div id="swpBlkChild003">
+<form name="_blankForm" id="inputFrm004" method="get" action="https://www.parasol.anser.ne.jp/ib/BIMStartMenu">
+              <!-- blk035 -->
+              <input type="hidden" id="hide009" name="CCT0080" class="" tabindex="" value="2972" title="">
+              <input type="hidden" id="hide010" name="PT" class="" tabindex="" value="IM" title="">
+</form>
+            </div>
+          </div>
+</div>
+<!-- blk033 -->
+</div>
+<!-- blk005 -->
+
+
+
+
+    </div>
+
+  
+
+
+
+
+  </div>
+  <div id="blk999" class="sidebar-leftcolumnB01 " style="position: relative;top: 10px;width: 980px;">
+    <div class="rokin_box3">
+    <div class="box-title"><span style="color: black;">操作方法がわからないお客様へ</span></div>
+    <p><span style="font-weight: 800;">オンラインマニュアルまたは「ろうきんダイレクト」ホームページをご参考ください。</span><br><a target="_blank" href="https://ib.rokin.jp/helplink/manual_full/fbps0202.html"><span style="font-weight: 800; text-decoration: underline;">●「ろうきんダイレクト」オンラインマニュアル</span></a><br><a target="_blank" href="https://ib.rokin.jp/qa/?bid=22">
+<span style="font-weight: 800; text-decoration: underline;">●「ろうきんダイレクト」ホームページ（Q&amp;A）</span>
+</a>
+<br><a target="_blank" href="https://ib.rokin.jp/ibmanual/?bid=22">
+<span style="font-weight: 800; text-decoration: underline;">●「ろうきんダイレクト」ホームページ（ご利用の手引き）</span>
+</a>
+<br></p>
+</div><style>
+.rokin_box3 {
+    margin: 0em 0;
+    background: #dcefff;
+}
+.rokin_box3 .box-title {
+    font-size: 1.2em;
+    background: #5fb3f5;
+    padding: 4px;
+    text-align: center;
+    color: #FFF;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+}
+.rokin_box3 p {
+    padding: 15px 20px;
+    margin: 0px;
+}
+</style>
+    <ul id="ul999" class="helpnoteguide">
+      <li id="li997">
+      </li><!-- li997 -->
+      <li id="li998">
+      </li><!-- li998 -->
+      <li id="li999">
+      </li><!-- li999 -->
+    </ul><!-- ul999 -->
+</div>
+<!-- blk999 -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="/docs/javascript/cafisBrain.js"></script>
+
+
+<script type="text/javascript">
+	<!--
+
+	var cafisbrain_script = document.createElement('script');
+
+	$().ready(function() {
+
+		
+		cafisbrain_script.src = "https://distribute.cafisbrain.com/cafisbrainriskcollector.js"
+
+		
+		document.head.appendChild(cafisbrain_script);
+
+		var cafisbrain_counter = 0;
+
+		let cafisbrain_intervalId = setInterval(function() {
+
+			cafisbrain_counter++;
+
+			
+			var cafisbrain_result = getTokenInfo(
+					"ANSDMY",
+					cafisBrainIdList
+					);
+
+			if (cafisbrain_result || cafisbrain_counter > 50) {
+				clearInterval(cafisbrain_intervalId);
+				return;
+			}
+
+		}, 200);
+
+	});
+
+	-->
+	</script>
+
+
+
+
+<script type="text/javascript">
+<!--
+var cafisBrainIdList = [
+  'hide027',
+  'hide050',
+  'hide992',
+  'hide996'
+];
+//-->
+</script>
+
+
+<script type="text/javascript">
+<!--
+if (window.document.attachEvent) {
+    window.document.attachEvent("onkeydown", onKeyDownOMFunc);
+}
+else if(window.document.addEventListener) {
+    window.document.addEventListener("keydown", onKeyDownDOMFunc, false);
+}
+else {
+    window.document.onkeydown=onKeyDownOMFunc;
+}
+function onKeyDownOMFunc(EventInterfaceFromBrowser) {
+    keycode = window.event.keyCode;
+    if (keycode == 0x74) {
+        event.keyCode = 1;
+        event.returnValue = false;
+        event.cancelBubble = true;
+    }
+}
+function onKeyDownDOMFunc(EventInterfaceFromBrowser) {
+    keycode = EventInterfaceFromBrowser.keyCode;
+    if (keycode == 0x74) {
+        EventInterfaceFromBrowser.preventDefault();
+        EventInterfaceFromBrowser.stopPropagation();
+    }
+}
+//-->
+</script>
+
+
+
+<script type="text/javascript">
+<!-- クライアントチェックここから
+jQuery.event.add(window, "load", function(){
+initValidate([
+// txtBox003
+  {
+    "element":"txtBox003",
+    "msgOutputAreaId":"chkErr007_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn010"
+  }
+  ,
+// pswd005
+  {
+    "element":"pswd005",
+    "msgOutputAreaId":"chkErr008_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn010"
+  }
+  ,
+// pswd006
+  {
+    "element":"pswd006",
+    "msgOutputAreaId":"chkErr009_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn010"
+  }
+  ,
+// txtBox004
+  {
+    "element":"txtBox004",
+    "msgOutputAreaId":"chkErr010_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn011"
+  }
+  ,
+// pswd007
+  {
+    "element":"pswd007",
+    "msgOutputAreaId":"chkErr011_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn011"
+  }
+  ,
+// pswd008
+  {
+    "element":"pswd008",
+    "msgOutputAreaId":"chkErr012_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn011"
+  }
+  ,
+// txtBox022
+  {
+    "element":"txtBox022",
+    "msgOutputAreaId":"chkErr015_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn015",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox022",
+    "msgOutputAreaId":"chkErr015_inputerror",
+    "failureMsg":"",
+    "validationType": "17",
+    "is": "3",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn015",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox006
+  {
+    "element":"txtBox006",
+    "msgOutputAreaId":"chkErr025_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn015",
+    "onlyOnBlur":"true"
+  }
+  ,
+// pswd010
+  {
+    "element":"pswd010",
+    "msgOutputAreaId":"chkErr026_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn015"
+  }
+  ,
+// pswd011
+  {
+    "element":"pswd011",
+    "msgOutputAreaId":"chkErr027_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn015"
+  }
+  ,
+// txtBox023
+  {
+    "element":"txtBox023",
+    "msgOutputAreaId":"chkErr031_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn016",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox023",
+    "msgOutputAreaId":"chkErr031_inputerror",
+    "failureMsg":"",
+    "validationType": "17",
+    "is": "3",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn016",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox008
+  {
+    "element":"txtBox008",
+    "msgOutputAreaId":"chkErr033_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn016",
+    "onlyOnBlur":"true"
+  }
+  ,
+// pswd012
+  {
+    "element":"pswd012",
+    "msgOutputAreaId":"chkErr029_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn016"
+  }
+  ,
+// pswd013
+  {
+    "element":"pswd013",
+    "msgOutputAreaId":"chkErr030_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn016"
+  }
+  ]);
+});
+// クライアントチェックここまで -->
+</script>
+
+
+
+
+<script type="text/javascript">
+function executePrefsSubmit(event,id) {
+    return loading(event);
+}
+</script>
+
+
+  
+  
+  
+  
+  
+  
+  
+
+<script type="text/javascript">
+<!--
+//支店・科目・口座番号の入力エリア
+var kouzaTxtBoxIdList = [
+  'txtBox022',
+  'txtBox023',
+  
+  'txtBox006',
+  'txtBox008'
+];
+//ログインIDの入力エリア
+var idTxtBoxIdList = [
+  'txtBox005',
+  'txtBox007'];
+//エラー制御用変数
+var commonDefine = {
+ // 登録業務
+ // 入力エラー関連
+ // 不正な入力項目に設定するクラス。LiveValidation と共通
+ INVALID_FIELD_CLASS: 'LV_invalid_field',
+ // エラーメッセージに設定するクラス。LiveValidation と共通
+ INVALID_CLASS: 'LV_invalid'
+ // ログインID初期値
+};
+/**
+ * 個別エラー表示解除
+ * @param errField  エラーメッセージ表示領域
+ *        input     対象項目ID
+ *        errMsg    エラーメッセージ
+ */
+function kobetu_clearError(errField, input) {
+ // エラーメッセージの削除
+ var errFieldLen = errField.length;
+ for (var i = 0; i < errFieldLen; i++) {
+  var errSpan =$('#' + errField[i]).parent().find("span");
+  errSpan.each(function () {
+   if ($(this).hasClass(commonDefine.INVALID_CLASS)) {
+    $(this).remove();
+   }
+  });
+ }
+ // エラー表示クラスの削除
+ var inputLen = input.length;
+ for (var i = 0; i < inputLen; i++) {
+  $('#' + input[i]).removeClass(commonDefine.INVALID_FIELD_CLASS);
+ }
+};
+//値クリア処理
+function clearValue(idList) {
+ for (var i = 0; i < idList.length; i++) {
+  if (document.getElementById(idList[i]) != null) {
+  clearById(idList[i]);
+  }
+ }
+}
+//グレーアウト化処理（タブ遷移不可）
+function disableStyle(idList) {
+ for (var i = 0; i < idList.length; i++) {
+  if (document.getElementById(idList[i]) != null) {
+   changeClassById(idList[i],'disabled-input','0');
+   $('#'+idList[i]).attr('tabindex','-1');
+  }
+ }
+}
+//見た目活性化処理（タブ遷移可能）
+function enableStyle(idList) {
+ for (var i = 0; i < idList.length; i++) {
+  if (document.getElementById(idList[i]) != null) {
+   changeClassById(idList[i],'disabled-input','1');
+   $('#'+idList[i]).attr('tabindex','');
+  }
+ }
+}
+//未入力チェック
+function isBlankValue(idList) {
+ for (var i = 0; i < idList.length; i++) {
+  if (document.getElementById(idList[i]) != null) {
+   //テキストボックスの場合、空であること。
+   if ($('#' + idList[i]).attr('type') == "text") {
+    if ($('#' + idList[i]).val() == ''){
+     continue;
+    } else {
+     return false;
+    }
+   //上記以外（科目プルダウンの場合）
+   } else {
+    if ($('#' + idList[i]).val() == '02' ){
+     continue;
+    } else {
+     return false;
+    }
+   }
+  }
+ }
+ return true;
+}
+//入力対象エリア表示切替（本処理）
+function initChange(idList,idList2) {
+ for (var i = 0; i < idList.length; i++) {
+  //入力対象エリア
+  if (document.getElementById(idList[i]) != null) {
+   $('#'+idList[i]).on('keyup change',function() {
+   //全て未入力の場合
+   if (isBlankValue(idList) && isBlankValue(idList2)){
+    enableStyle(idList);
+    enableStyle(idList2);
+   //値の変動がある場合
+   } else {
+    clearValue(idList2);
+    disableStyle(idList2);
+    enableStyle(idList);
+    kobetu_clearError(idList2,idList2);
+   }
+   });
+  }
+  //ソフトウェアキーボード対応
+  if (document.getElementById(idList[i]) + '_outer'  != null) {
+   $('#'+idList[i] + '_outer').on('click',function() {
+   //全て未入力の場合
+   if (isBlankValue(idList) && isBlankValue(idList2)){
+    enableStyle(idList);
+    enableStyle(idList2);
+   //値の変動がある場合
+   } else {
+    clearValue(idList2);
+    disableStyle(idList2);
+    enableStyle(idList);
+    kobetu_clearError(idList2,idList2);
+   }
+   });
+  }
+ }
+}
+//画面表示時初期確認用
+function initChangeFirst(idList,idList2) {
+ for (var i = 0; i < idList.length; i++) {
+  //入力対象エリア
+  if (document.getElementById(idList[i]) != null) {
+   //入力済項目がある場合
+   if (!isBlankValue(idList)){
+    disableStyle(idList2);
+    enableStyle(idList);
+   }
+  }
+  //ソフトウェアキーボード対応
+  if (document.getElementById(idList[i]) + '_outer'  != null) {
+   //入力済項目がある場合
+   if (!isBlankValue(idList)){
+    disableStyle(idList2);
+    enableStyle(idList);
+   }
+  }
+ }
+}
+jQuery.event.add(window, "load", function(){
+ initChange(idTxtBoxIdList,kouzaTxtBoxIdList);
+ initChange(kouzaTxtBoxIdList,idTxtBoxIdList);
+ initChangeFirst(idTxtBoxIdList,kouzaTxtBoxIdList);
+ initChangeFirst(kouzaTxtBoxIdList,idTxtBoxIdList);
+});
+-->
+</script>
+
+  
+  
+  
+  
+  
+
+<script type="text/javascript">
+<!-- クライアントチェックここから
+jQuery.event.add(window, "load", function(){
+//0埋め機能提供ありの場合　start
+initValidate([
+  //txtBox010
+    {
+    "element":"txtBox010",
+    "msgOutputAreaId":"chkErr019_inputerror",
+    "failureMsg":"指定の桁数で入力して下さい。",
+    "validationType": "17",
+    //isの引数に運用管理情報から取得した桁数を設定する。
+    "is": "7",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }]);
+});
+//0埋め機能提供ありの場合　end
+// クライアントチェックここまで -->
+</script>
+
+  
+
+<noscript>
+ <style>
+  .switchpassword {
+   display: none;
+   }
+  input::-ms-reveal {
+   display: inline-block;
+  }
+ </style>
+</noscript>  
+
+
+
+<script type="text/javascript">
+<!-- クライアントチェックここから
+jQuery.event.add(window, "load", function(){
+initValidate([
+// txtBox001
+  {
+    "element":"txtBox001",
+    "msgOutputAreaId":"chkErr001_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn003"
+  }
+  ,
+// pswd001
+  {
+    "element":"pswd001",
+    "msgOutputAreaId":"chkErr002_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn003"
+  }
+  ,
+// pswd002
+  {
+    "element":"pswd002",
+    "msgOutputAreaId":"chkErr003_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn003"
+  }
+  ,
+// txtBox022
+  {
+    "element":"txtBox022",
+    "msgOutputAreaId":"chkErr015_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn012",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox022",
+    "msgOutputAreaId":"chkErr015_inputerror",
+    "failureMsg":"",
+    "validationType": "17",
+    "is": "3",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn012",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox006
+  {
+    "element":"txtBox006",
+    "msgOutputAreaId":"chkErr025_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn012",
+    "onlyOnBlur":"true"
+  }
+  ,
+// pswd010
+  {
+    "element":"pswd010",
+    "msgOutputAreaId":"chkErr026_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn012"
+  }
+  ,
+// pswd011
+  {
+    "element":"pswd011",
+    "msgOutputAreaId":"chkErr027_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn012"
+  }
+  ,
+// txtBox023
+  {
+    "element":"txtBox023",
+    "msgOutputAreaId":"chkErr031_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn013",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox023",
+    "msgOutputAreaId":"chkErr031_inputerror",
+    "failureMsg":"",
+    "validationType": "17",
+    "is": "3",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn013",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox008
+  {
+    "element":"txtBox008",
+    "msgOutputAreaId":"chkErr033_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn013",
+    "onlyOnBlur":"true"
+  }
+  ,
+// pswd012
+  {
+    "element":"pswd012",
+    "msgOutputAreaId":"chkErr029_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn013"
+  }
+  ,
+// pswd013
+  {
+    "element":"pswd013",
+    "msgOutputAreaId":"chkErr030_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn013"
+  }
+  ,
+// txtBox009
+  {
+    "element":"txtBox009",
+    "msgOutputAreaId":"chkErr017_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox009",
+    "msgOutputAreaId":"chkErr017_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+ ,
+  {
+    "element":"txtBox009",
+    "msgOutputAreaId":"chkErr017_inputerror",
+    "failureMsg":"",
+    "validationType": "17",
+    "is": "3",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox010
+  {
+    "element":"txtBox010",
+    "msgOutputAreaId":"chkErr019_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox010",
+    "msgOutputAreaId":"chkErr019_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+  ,
+// pswd016
+  {
+    "element":"pswd016",
+    "msgOutputAreaId":"chkErr034_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"pswd016",
+    "msgOutputAreaId":"chkErr034_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+ ,
+  {
+    "element":"pswd016",
+    "msgOutputAreaId":"chkErr034_inputerror",
+    "failureMsg":"",
+    "validationType": "17",
+    "is": "4",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox024
+  {
+    "element":"txtBox024",
+    "msgOutputAreaId":"chkErr035_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+  ,
+// txtBox025
+  {
+    "element":"txtBox025",
+    "msgOutputAreaId":"chkErr036_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+  ,
+// txtBox026
+  {
+    "element":"txtBox026",
+    "msgOutputAreaId":"chkErr037_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox026",
+    "msgOutputAreaId":"chkErr037_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+ ,
+  {
+    "element":"txtBox026",
+    "msgOutputAreaId":"chkErr037_inputerror",
+    "failureMsg":"",
+    "validationType": "17",
+    "is": "4",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox027
+  {
+    "element":"txtBox027",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox027",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+ ,
+  {
+    "element":"txtBox027",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "20",
+    "minimum": "1",
+    "maximum": "6",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox028
+  {
+    "element":"txtBox028",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox028",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+ ,
+  {
+    "element":"txtBox028",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "20",
+    "minimum": "1",
+    "maximum": "6",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+  ,
+// txtBox029
+  {
+    "element":"txtBox029",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "1",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+ ,
+  {
+    "element":"txtBox029",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "0",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014"
+  }
+ ,
+  {
+    "element":"txtBox029",
+    "msgOutputAreaId":"chkErr038_inputerror",
+    "failureMsg":"",
+    "validationType": "20",
+    "minimum": "1",
+    "maximum": "6",
+    "useCustomOnValid":"0",
+    "useCustomInvalid":"0", 
+    "trigger":"btn014",
+    "onlyOnBlur":"true"
+  }
+  ]);
+});
+// クライアントチェックここまで -->
+</script>
+
+
+		</div>
+	</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="noprint">
+<div class="frame-base" id="frame-infomation">
+ <div class="frame-content">
+  <section><h1><span>ろうきんダイレクトに関するお問い合わせ</span></h1>
+  <div class="information-multicol" style="background-color:#BDD5F4; padding:0px;">
+   <div class="information-column" style="background-color:#F0F0F0; height: 170px;">
+    <h2><span>ろうきんダイレクトヘルプデスク</span></h2>
+    <div class="information-text-tell"><p><span><img src="/docs/images/2972/icon_freehone_01.png" alt="フリーダイヤル" width="37" height="21">0120-690-506</span></p><!-- /information-text-tell --></div>
+    <dl class="information-deflist">
+     <dt><span>受付時間</span></dt>
+     <dd><span>全日 9：00 ～ 21：00<br></span><span style="font-size: 80%"><table><tbody><tr><td valign="top">※</td><td>投資信託の制度・商品に関するお問い合わせ<br>受付時間：平日 9:00～17:00（土日祝日・12月31日～1月3日を除く）</td></tr><tr><td valign="top">※</td><td>1月1日～1月3日、定期メンテナンス時はご利用いただけません。</td></tr></tbody></table></span></dd>
+    </dl><!-- /information-column --></div>
+   <div class="information-column" style="background-color:#F0F0F0; margin-right:0px; height:170px;width:475px; padding-left:10px;"><h2><span>よくあるご質問（Q&amp;A）</span></h2>
+    <div class="information-text"><p><span>ろうきんダイレクトの各種操作方法・お手続きに関するお問い合わせをまとめましたのでご確認ください。<br><br>
+     <a href="http://ib.rokin.jp/qa/?bid=22" target="_blank">よくあるお問い合わせ（Q&amp;A）はこちら</a></span></p><!-- /information-text --></div>
+   <!-- /information-column --></div>
+  <!-- /information-multicol --></div></section>
+ <!-- /frame-content --></div>
+<!-- /frame-info --></div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="noprint">
+<div class="frame-base" id="frame-footer"><div class="frame-content"><footer><p><small>Copyright ©  Rokin All rights reserved.</small></p></footer><!-- /frame-content --></div><!-- /frame-footer --></div>
+</div>
+
+
+
+
+
+
+
+
+</body></html>

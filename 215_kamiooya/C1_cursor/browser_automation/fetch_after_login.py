@@ -19,8 +19,11 @@
 
 import argparse
 import os
+import platform
 import re
+import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -57,6 +60,15 @@ def get_credentials(site: str):
         print("  .env に NICHINOKEN_USER=... NICHINOKEN_PASS=... を書くか、export で設定。", file=sys.stderr)
         sys.exit(1)
     return user, password
+
+
+def _get_secret_phrase_answer(mapping: dict):
+    """合言葉のマッピングから回答を取得。answer_env または answer を参照。"""
+    """合言葉のマッピングから回答を取得。answer_env または answer を参照。"""
+    env_key = mapping.get("answer_env")
+    if env_key:
+        return os.environ.get(env_key)
+    return mapping.get("answer")
 
 
 def extract_main_text(page) -> str:
@@ -435,30 +447,507 @@ def run_nichinoken(headless: bool = False) -> str:
     return str(out_path)
 
 
-def run_tokairokin(headless: bool = False) -> str:
-    """東海労金インターネットバンキングにログインする。振込は今後追加予定。"""
-    from playwright.sync_api import sync_playwright
+def _fill_human_like(page, selector: str, text: str, delay_ms: int = 80):
+    """人間らしく1文字ずつ入力する（自動化検知回避の補助）。"""
+    loc = page.locator(selector)
+    loc.click()
+    loc.fill("")  # クリア
+    loc.press_sequentially(text, delay=delay_ms)
+
+
+def _ensure_chrome_for_cdp(cdp_port: int = 9222, user_data_dir: str = None) -> subprocess.Popen:
+    """
+    Chrome をすべて終了し、デバッグポート付きで起動する。
+    戻り値: 起動した Chrome の Popen オブジェクト（終了時に kill する想定）
+    """
+    import socket
+    import tempfile
+    if user_data_dir is None:
+        base = tempfile.gettempdir()
+        user_data_dir = str(Path(base) / f"chrome-debug-{cdp_port}")
+    Path(user_data_dir).mkdir(parents=True, exist_ok=True)
+
+    system = platform.system()
+    if system == "Darwin":
+        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        kill_cmd = ["killall", "Google Chrome"]
+    elif system == "Windows":
+        chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+        kill_cmd = ["taskkill", "/F", "/IM", "chrome.exe"]
+    else:
+        chrome_path = "google-chrome"
+        kill_cmd = ["pkill", "-f", "chrome"]
+
+    # 既存の Chrome を終了
+    print("既存の Chrome を終了しています...", file=sys.stderr)
+    try:
+        subprocess.run(kill_cmd, capture_output=True, timeout=5)
+        time.sleep(2)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    # Chrome をデバッグモードで起動
+    if not Path(chrome_path).exists() and system != "Linux":
+        chrome_path = "chrome"  # フォールバック
+    chrome_args = [
+        chrome_path,
+        f"--remote-debugging-port={cdp_port}",
+        f"--user-data-dir={user_data_dir}",
+        "--no-first-run",
+    ]
+    print(f"Chrome をデバッグモードで起動しています（ポート {cdp_port}）...", file=sys.stderr)
+    proc = subprocess.Popen(
+        chrome_args,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+    # ポートが待機するまで待つ
+    for _ in range(30):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                s.connect(("127.0.0.1", cdp_port))
+            break
+        except (socket.error, OSError):
+            time.sleep(0.5)
+    else:
+        proc.kill()
+        raise RuntimeError(f"Chrome がポート {cdp_port} で起動しませんでした。")
+
+    time.sleep(1)
+    return proc
+
+
+def _run_tokairokin_undetected(config: dict, user: str, password: str, headless: bool, transfer: dict = None) -> str:
+    """
+    undetected-chromedriver（Selenium）で東海労金にログイン。
+    自動化検知を回避する代替手段。
+    """
+    import undetected_chromedriver as uc
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
+    login_url = config.get("login_url", "https://www.parasol.anser.ne.jp/ib/index.do?PT=BS&CCT0080=2972")
+    wait_login = config.get("wait_after_login", 3)
+    human_like = config.get("human_like_input", False)
+    human_delay = config.get("human_like_input_delay_ms", 80) / 1000.0
+
+    options = uc.ChromeOptions()
+    if headless:
+        options.add_argument("--headless=new")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--lang=ja-JP")
+
+    print("undetected-chromedriver で Chrome を起動しています...", file=sys.stderr)
+    # version_main: Chromeのメジャーバージョン。不一致エラー時は config の chrome_version_main で指定
+    version_main = config.get("chrome_version_main")
+    kwargs = {"options": options}
+    if version_main is not None:
+        kwargs["version_main"] = int(version_main)
+    # 他ツールの Chrome パスが優先されるのを防ぐため、標準パスを明示
+    chrome_path = config.get("chrome_path")
+    if not chrome_path:
+        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        if platform.system() == "Windows":
+            chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+    if Path(chrome_path).exists():
+        kwargs["browser_executable_path"] = chrome_path
+    driver = uc.Chrome(**kwargs)
+    driver.set_window_size(1280, 900)
+
+    try:
+        driver.get(login_url)
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#txtBox005")))
+        time.sleep(2)
+
+        # ログインID・パスワード入力
+        id_el = driver.find_element(By.CSS_SELECTOR, "#txtBox005")
+        pass_el = driver.find_element(By.CSS_SELECTOR, "#pswd010")
+        id_el.clear()
+        pass_el.clear()
+        if human_like:
+            for c in user:
+                id_el.send_keys(c)
+                time.sleep(human_delay)
+            for c in password:
+                pass_el.send_keys(c)
+                time.sleep(human_delay)
+        else:
+            id_el.send_keys(user)
+            pass_el.send_keys(password)
+
+        # 送信ボタン
+        submit = driver.find_element(By.CSS_SELECTOR, "#btn012")
+        submit.click()
+
+        time.sleep(wait_login)
+
+        body_text = driver.find_element(By.TAG_NAME, "body").text
+        if "エラー" in body_text or "認証に失敗" in body_text or "ログインに失敗" in body_text or "口座情報が誤っています" in body_text:
+            print("ログインに失敗した可能性があります。画面を確認してください。", file=sys.stderr)
+
+        print("東海労金へのログイン処理が完了しました。")
+
+        # 合言葉の自動入力（設定されている場合）
+        secret_phrase_filled = False
+        secret_phrase_auto = config.get("secret_phrase_auto") or []
+        if secret_phrase_auto and ("合言葉" in body_text or "合言葉" in driver.page_source):
+            for mapping in secret_phrase_auto:
+                match_kw = (mapping.get("match") or "").strip()
+                if not match_kw or match_kw not in body_text:
+                    continue
+                answer = _get_secret_phrase_answer(mapping)
+                if not answer:
+                    continue
+                # 合言葉入力欄を探す（複数セレクタを試行）
+                input_selectors = config.get("secret_phrase_input_selectors") or [
+                    "input[type='text']:not([readonly])",
+                    "input[name*='kotoba'], input[name*='answer'], input[id*='kotoba'], input[id*='answer']",
+                    "input.txtBox, input[id^='txtBox']",
+                ]
+                input_el = None
+                for sel in input_selectors:
+                    try:
+                        els = driver.find_elements(By.CSS_SELECTOR, sel)
+                        for el in els:
+                            if el.is_displayed() and el.is_enabled():
+                                input_el = el
+                                break
+                        if input_el:
+                            break
+                    except Exception:
+                        continue
+                if input_el:
+                    input_el.clear()
+                    input_el.send_keys(answer)
+                    # 送信ボタン（確認・送信・次へ など）
+                    for btn_text in ["確認", "送信", "次へ", "認証", "実行", "ログイン", "確認する", "送信する"]:
+                        try:
+                            btn = driver.find_element(By.XPATH, f"//input[@value='{btn_text}'] | //button[contains(text(),'{btn_text}')] | //a[contains(text(),'{btn_text}')]")
+                            if btn.is_displayed():
+                                btn.click()
+                                secret_phrase_filled = True
+                                print(f"合言葉を自動入力しました（キーワード: {match_kw[:20]}...）", file=sys.stderr)
+                                time.sleep(3)
+                                break
+                        except Exception:
+                            continue
+                if secret_phrase_filled:
+                    break
+            # 再ログインの案内が出た場合
+            if secret_phrase_filled:
+                time.sleep(2)
+                body_text = driver.find_element(By.TAG_NAME, "body").text
+                for relogin_kw in ["再ログイン", "サインイン", "ログイン"]:
+                    try:
+                        el = driver.find_element(By.XPATH, f"//a[contains(text(),'{relogin_kw}')] | //button[contains(text(),'{relogin_kw}')] | //input[@value='{relogin_kw}']")
+                        if el.is_displayed() and relogin_kw in body_text:
+                            el.click()
+                            print(f"「{relogin_kw}」をクリックしました。", file=sys.stderr)
+                            time.sleep(3)
+                            break
+                    except Exception:
+                        continue
+
+        # 合言葉・ワンタイムパスワード入力のため一時停止（自動入力できなかった場合）
+        if not secret_phrase_filled and config.get("pause_for_secret_phrase", True):
+            print("\n" + "=" * 60, file=sys.stderr)
+            print("【一時停止】合言葉やワンタイムパスワードの入力が必要な場合、", file=sys.stderr)
+            print("  ブラウザで入力して送信してください。", file=sys.stderr)
+            print("  完了したら、このターミナルで Enter キーを押してください。", file=sys.stderr)
+            print("=" * 60 + "\n", file=sys.stderr)
+            input()
+
+        # 振込画面への遷移
+        go_to_transfer = config.get("go_to_transfer", True)
+        if go_to_transfer:
+            wait_before = config.get("wait_before_transfer_menu", 5)
+            time.sleep(wait_before)
+            keywords = config.get("transfer_menu_keywords") or [
+                "振込振替・ペイジー", "振込振替", "振込", "振替", "お振込"
+            ]
+            clicked = False
+            for kw in keywords:
+                try:
+                    el = driver.find_element(By.XPATH, f"//a[contains(text(),'{kw}')] | //button[contains(text(),'{kw}')] | //input[contains(@value,'{kw}')]")
+                    el.click()
+                    time.sleep(config.get("wait_after_page", 2))
+                    print(f"振込メニュー（「{kw}」）をクリックしました。")
+                    clicked = True
+                    break
+                except Exception:
+                    continue
+            if not clicked:
+                # フレーム内を検索
+                for frame in driver.find_elements(By.TAG_NAME, "iframe"):
+                    try:
+                        driver.switch_to.frame(frame)
+                        for kw in keywords:
+                            try:
+                                el = driver.find_element(By.XPATH, f"//a[contains(text(),'{kw}')] | //button[contains(text(),'{kw}')]")
+                                el.click()
+                                time.sleep(config.get("wait_after_page", 2))
+                                print(f"振込メニュー（「{kw}」）をクリックしました。")
+                                clicked = True
+                                break
+                            except Exception:
+                                continue
+                        driver.switch_to.default_content()
+                        if clicked:
+                            break
+                    except Exception:
+                        driver.switch_to.default_content()
+                if not clicked:
+                    print("振込メニューへのリンク・ボタンが見つかりませんでした。", file=sys.stderr)
+
+        # 振込フォームの自動入力（transfer パラメータがある場合）
+        transfer_filled = False
+        has_bank = transfer.get("bank_code") or transfer.get("bank_name")
+        has_branch = transfer.get("branch_code") or transfer.get("branch_name")
+        if transfer and has_bank and has_branch and transfer.get("account_number") and transfer.get("amount"):
+            time.sleep(config.get("wait_after_page", 2))
+            tf = config.get("transfer_form") or {}
+
+            # 振込先選択画面で「振込先を指定」ボタンをクリック（金融機関選択画面へ遷移）
+            specify_clicked = False
+            specify_sel = tf.get("specify_destination_button_selector", "").strip()
+            if specify_sel:
+                try:
+                    el = driver.find_element(By.CSS_SELECTOR, specify_sel)
+                    if el.is_displayed():
+                        el.click()
+                        specify_clicked = True
+                        print("「振込先を指定」をクリックしました。", file=sys.stderr)
+                        time.sleep(config.get("wait_after_page", 2))
+                except Exception:
+                    pass
+            if not specify_clicked:
+                for btn_text in ["振込先を指定", "振込先を選択"]:
+                    try:
+                        el = driver.find_element(By.XPATH, f"//input[@value='{btn_text}'] | //button[contains(text(),'{btn_text}')] | //a[contains(text(),'{btn_text}')]")
+                        if el.is_displayed():
+                            el.click()
+                            specify_clicked = True
+                            print(f"「{btn_text}」をクリックしました。", file=sys.stderr)
+                            time.sleep(config.get("wait_after_page", 2))
+                            break
+                    except Exception:
+                        continue
+            if specify_clicked:
+                time.sleep(config.get("wait_after_page", 2))
+            # 金融機関・支店の入力: コードを優先（名前指定時のみ名前を使用）
+            bank_input = str(transfer.get("bank_code", "")).zfill(4) if transfer.get("bank_code") else (transfer.get("bank_name") or "").strip()
+            branch_input = str(transfer.get("branch_code", "")).zfill(3) if transfer.get("branch_code") else (transfer.get("branch_name") or "").strip()
+            account_number = str(transfer.get("account_number", "")).zfill(7)
+            amount = int(transfer.get("amount", 0))
+
+            def _find_element(sel: str):
+                """セレクタがXPath（/ または // で始まる）なら By.XPATH、それ以外は By.CSS_SELECTOR で検索。"""
+                sel = (sel or "").strip()
+                if not sel:
+                    return None
+                if sel.startswith("/") or sel.startswith("("):
+                    by, val = By.XPATH, sel
+                else:
+                    if not sel.startswith(("#", ".", "[", "input")):
+                        val = f"#{sel}"
+                    else:
+                        val = sel
+                    by, val = By.CSS_SELECTOR, val
+                try:
+                    return driver.find_element(by, val)
+                except Exception:
+                    return None
+
+            def _try_fill(selector_key: str, value: str):
+                sel = tf.get(selector_key)
+                if not sel or not value:
+                    return False
+                el = _find_element(sel)
+                if el and el.is_displayed():
+                    try:
+                        el.clear()
+                        el.send_keys(value)
+                        return True
+                    except Exception:
+                        pass
+                return False
+
+            def _click_confirm(selector_key: str, fallback_texts: list):
+                """指定セレクタのボタンをクリック。なければ fallback_texts のテキストで検索。"""
+                sel = (tf.get(selector_key) or "").strip()
+                if sel:
+                    el = _find_element(sel)
+                    if el and el.is_displayed():
+                        el.click()
+                        return True
+                for btn_text in fallback_texts:
+                    try:
+                        btn = driver.find_element(By.XPATH, f"//input[@value='{btn_text}'] | //button[contains(text(),'{btn_text}')] | //a[contains(text(),'{btn_text}')]")
+                        if btn.is_displayed():
+                            btn.click()
+                            return True
+                    except Exception:
+                        continue
+                return False
+
+            # 1. 銀行コード入力 → 検索 → 検索結果の「選択」クリック
+            if _try_fill("bank_code_selector", bank_input):
+                print(f"銀行コードを入力しました（{bank_input}）。", file=sys.stderr)
+                time.sleep(0.5)
+                if _click_confirm("bank_confirm_button_selector", ["検索", "次へ", "確認"]):
+                    print("検索ボタンをクリックしました。", file=sys.stderr)
+                    time.sleep(config.get("wait_after_page", 2))
+                    if _click_confirm("bank_select_button_selector", ["選択"]):
+                        print("検索結果の「選択」をクリックしました。", file=sys.stderr)
+                        transfer_filled = True
+                        time.sleep(config.get("wait_after_page", 2))
+                    else:
+                        transfer_filled = True  # 選択ボタンがなければ検索のみで進んだとみなす
+
+            # 2. 支店コード入力 → 検索 → 検索結果の「選択」クリック
+            if transfer_filled and _try_fill("branch_code_selector", branch_input):
+                print(f"支店コードを入力しました（{branch_input}）。", file=sys.stderr)
+                time.sleep(0.5)
+                if _click_confirm("branch_confirm_button_selector", ["検索", "次へ", "確認"]):
+                    print("検索ボタンをクリックしました。", file=sys.stderr)
+                    time.sleep(config.get("wait_after_page", 2))
+                    if _click_confirm("branch_select_button_selector", ["選択"]):
+                        print("検索結果の「選択」をクリックしました。", file=sys.stderr)
+                        time.sleep(config.get("wait_after_page", 2))
+
+            # 3. 口座番号・金額入力 → 確認
+            filled = 0
+            if _try_fill("account_number_selector", account_number):
+                filled += 1
+            if _try_fill("amount_selector", str(amount)):
+                filled += 1
+            if filled >= 2:
+                if _click_confirm(None, ["確認", "次へ", "入力する"]):
+                    print("振込フォームを入力し、確認ボタンをクリックしました。", file=sys.stderr)
+                    transfer_filled = True
+                    time.sleep(config.get("wait_after_transfer_confirm", 2))
+
+            # 4. 実行画面へボタンをクリック（確認画面→実行画面）
+            if transfer_filled and _click_confirm("execution_screen_button_selector", ["実行画面へ", "実行画面", "次へ"]):
+                print("実行画面へボタンをクリックしました。", file=sys.stderr)
+                time.sleep(config.get("wait_after_page", 2))
+
+            # 5. 「確認しました」チェックボックスにチェック
+            if transfer_filled:
+                cb_sel = (tf.get("confirmation_checkbox_selector") or "").strip()
+                if cb_sel:
+                    el = _find_element(cb_sel)
+                    if el and el.is_displayed():
+                        try:
+                            if not el.is_selected():
+                                el.click()
+                                print("「確認しました」にチェックを入れました。", file=sys.stderr)
+                                time.sleep(0.5)
+                        except Exception:
+                            pass
+                else:
+                    # フォールバック: 「確認しました」の横のチェックボックスをXPathで探す
+                    try:
+                        cb = driver.find_element(By.XPATH, "//label[contains(.,'確認しました')]/preceding-sibling::input[@type='checkbox'] | //label[contains(.,'確認しました')]/following-sibling::input[@type='checkbox'] | //input[@type='checkbox'][preceding::label[contains(.,'確認しました')]] | //input[@type='checkbox'][following::label[contains(.,'確認しました')]]")
+                        if cb.is_displayed() and not cb.is_selected():
+                            cb.click()
+                            print("「確認しました」にチェックを入れました。", file=sys.stderr)
+                            time.sleep(0.5)
+                    except Exception:
+                        pass
+
+        # ワンタイムパスワード入力のため一時停止（振込実行時は必ず OTP 入力が必要）
+        if transfer or transfer_filled:
+            print("\n" + "=" * 60, file=sys.stderr)
+            print("【一時停止】ワンタイムパスワードの入力が必要な場合、", file=sys.stderr)
+            print("  ブラウザで OTP を入力し、振込を実行してください。", file=sys.stderr)
+            print("  完了したら、このターミナルで Enter キーを押してください。", file=sys.stderr)
+            print("=" * 60 + "\n", file=sys.stderr)
+            input()
+
+        if config.get("keep_browser_open", True):
+            print("\n振込画面を開いたままにしています。", file=sys.stderr)
+            print("フォームの確認や振込をゆっくり行えます。画面を離れてもブラウザは開いたままです。", file=sys.stderr)
+            print("完了したら、このターミナルで Enter キーを押してください（スクリプト終了後もブラウザは残ります）。", file=sys.stderr)
+            input()
+
+        return ""
+    finally:
+        # keep_browser_open 時はブラウザを閉じない（ユーザーが手動で閉じる）
+        if not config.get("keep_browser_open", True):
+            driver.quit()
+
+
+def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
+    """東海労金インターネットバンキングにログインする。振込パラメータがあればフォーム入力まで自動化。"""
     config = load_config("tokairokin")
     user, password = get_credentials("tokairokin")
+    transfer = transfer or config.get("transfer")
+
+    # undetected-chromedriver を優先（CDP・stealth で検知された場合の代替）
+    if config.get("use_undetected_chromedriver", False):
+        return _run_tokairokin_undetected(config, user, password, headless or config.get("headless", False), transfer)
+
+    from playwright.sync_api import sync_playwright
+    from playwright_stealth import Stealth
 
     login_url = config.get("login_url", "https://www.parasol.anser.ne.jp/ib/index.do?PT=BS&CCT0080=2972")
     wait_login = config.get("wait_after_login", 3)
     headless = config.get("headless", headless)
+    use_connect_cdp = config.get("use_connect_cdp", False)
+    cdp_url = config.get("cdp_url", "http://localhost:9222")
+    human_like = config.get("human_like_input", False)
+    human_delay = config.get("human_like_input_delay_ms", 80)
 
-    # 支店番号(3桁)・口座番号(7桁)の分割。TOKAIROKIN_USER が10桁なら 000+6393610 のように分割
-    branch = config.get("branch") or os.environ.get("TOKAIROKIN_BRANCH")
-    account = config.get("account") or os.environ.get("TOKAIROKIN_ACCOUNT")
-    if not branch and not account and len(user) >= 10 and user.isdigit():
-        branch = user[:3]
-        account = user[3:10]  # 残り7桁
+    use_chrome = config.get("use_chrome", True)
+    use_stealth = config.get("use_stealth", True)
+    launch_args = ["--disable-blink-features=AutomationControlled"]
+
+    chrome_proc = None
+    if use_connect_cdp and config.get("auto_start_chrome", True):
+        # 既存のChromeを終了し、デバッグポート付きで起動
+        from urllib.parse import urlparse
+        parsed = urlparse(cdp_url)
+        cdp_port = parsed.port or 9222
+        chrome_proc = _ensure_chrome_for_cdp(cdp_port=cdp_port)
+        cdp_url = f"http://127.0.0.1:{cdp_port}"
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 900},
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        )
-        page = context.new_page()
+        if use_connect_cdp:
+            # 手動起動したChromeに接続（自動化検知を最も回避しやすい）
+            print(f"CDP接続モード: {cdp_url} に接続します...")
+            browser = p.chromium.connect_over_cdp(cdp_url)
+            context = browser.contexts[0] if browser.contexts else browser.new_context()
+            page = context.new_page()
+        else:
+            if use_chrome:
+                try:
+                    browser = p.chromium.launch(
+                        channel="chrome",
+                        headless=headless,
+                        args=launch_args,
+                    )
+                except Exception:
+                    browser = p.chromium.launch(headless=headless, args=launch_args)
+            else:
+                browser = p.chromium.launch(headless=headless, args=launch_args)
+
+            context = browser.new_context(
+                viewport={"width": 1280, "height": 900},
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                locale="ja-JP",
+            )
+            if use_stealth:
+                stealth = Stealth(
+                    navigator_languages_override=("ja-JP", "ja"),
+                    navigator_platform_override="MacIntel",
+                )
+                stealth.apply_stealth_sync(context)
+            page = context.new_page()
 
         try:
             page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
@@ -466,16 +955,14 @@ def run_tokairokin(headless: bool = False) -> str:
             page.wait_for_timeout(2000)
 
             # parasol.anser.ne.jp のログインフォーム（東海労金）
-            # ログインID: input#txtBox005 (name=BTX0010)
-            # 支店番号: input#txtBox022 (name=BTX0030) 3桁
-            # 口座番号: input#txtBox006 (name=BTX0040) 7桁
-            # パスワード: input#pswd010 (name=BPW0020)
-            page.locator("#txtBox005").fill(user)
-            if branch:
-                page.locator("#txtBox022").fill(branch)
-            if account:
-                page.locator("#txtBox006").fill(account)
-            page.locator("#pswd010").fill(password)
+            # ログインID: input#txtBox005 / パスワード: input#pswd010 のみ入力
+            # 支店番号・口座番号は入力しない
+            if human_like:
+                _fill_human_like(page, "#txtBox005", user, human_delay)
+                _fill_human_like(page, "#pswd010", password, human_delay)
+            else:
+                page.locator("#txtBox005").fill(user)
+                page.locator("#pswd010").fill(password)
 
             # 送信ボタン（parasol: #btn012）
             submit = page.locator("#btn012, button:has-text('ログイン'), input[type='submit'][value*='ログイン']").first
@@ -485,11 +972,114 @@ def run_tokairokin(headless: bool = False) -> str:
 
             current_url = page.url
             body_text = page.locator("body").inner_text()
-            if "エラー" in body_text or "認証に失敗" in body_text or "ログインに失敗" in body_text:
+            if "エラー" in body_text or "認証に失敗" in body_text or "ログインに失敗" in body_text or "口座情報が誤っています" in body_text:
                 print("ログインに失敗した可能性があります。headless=false で実行して画面を確認してください。", file=sys.stderr)
 
             print("東海労金へのログイン処理が完了しました。")
-            print("※ 振込機能は今後追加予定です。")
+
+            # 合言葉の自動入力（設定されている場合）
+            secret_phrase_filled = False
+            secret_phrase_auto = config.get("secret_phrase_auto") or []
+            body_text = page.locator("body").inner_text()
+            if secret_phrase_auto and ("合言葉" in body_text or "合言葉" in page.content()):
+                for mapping in secret_phrase_auto:
+                    match_kw = (mapping.get("match") or "").strip()
+                    if not match_kw or match_kw not in body_text:
+                        continue
+                    answer = _get_secret_phrase_answer(mapping)
+                    if not answer:
+                        continue
+                    input_selectors = config.get("secret_phrase_input_selectors") or [
+                        "input[type='text']:not([readonly])",
+                        "input[name*='kotoba'], input[name*='answer']",
+                        "input.txtBox, input[id^='txtBox']",
+                    ]
+                    input_loc = None
+                    for sel in input_selectors:
+                        try:
+                            loc = page.locator(sel).first
+                            loc.wait_for(state="visible", timeout=1000)
+                            input_loc = loc
+                            break
+                        except Exception:
+                            continue
+                    if input_loc:
+                        input_loc.fill("")
+                        input_loc.fill(answer)
+                        for btn_text in ["確認", "送信", "次へ", "認証", "実行", "ログイン", "確認する", "送信する"]:
+                            try:
+                                btn = page.locator(f"input[value='{btn_text}'], button:has-text('{btn_text}'), a:has-text('{btn_text}')").first
+                                if btn.is_visible():
+                                    btn.click()
+                                    secret_phrase_filled = True
+                                    print(f"合言葉を自動入力しました（キーワード: {match_kw[:20]}...）", file=sys.stderr)
+                                    page.wait_for_timeout(3000)
+                                    break
+                            except Exception:
+                                continue
+                    if secret_phrase_filled:
+                        break
+            if secret_phrase_filled:
+                page.wait_for_timeout(2000)
+                body_text = page.locator("body").inner_text()
+                for relogin_kw in ["再ログイン", "サインイン", "ログイン"]:
+                    try:
+                        el = page.locator(f"a:has-text('{relogin_kw}'), button:has-text('{relogin_kw}'), input[value='{relogin_kw}']").first
+                        if el.is_visible() and relogin_kw in body_text:
+                            el.click()
+                            print(f"「{relogin_kw}」をクリックしました。", file=sys.stderr)
+                            page.wait_for_timeout(3000)
+                            break
+                    except Exception:
+                        continue
+
+            # 合言葉・ワンタイムパスワード入力のため一時停止（自動入力できなかった場合）
+            if not secret_phrase_filled and config.get("pause_for_secret_phrase", True):
+                print("\n" + "=" * 60, file=sys.stderr)
+                print("【一時停止】合言葉やワンタイムパスワードの入力が必要な場合、", file=sys.stderr)
+                print("  ブラウザで入力して送信してください。", file=sys.stderr)
+                print("  完了したら、このターミナルで Enter キーを押してください。", file=sys.stderr)
+                print("=" * 60 + "\n", file=sys.stderr)
+                input()
+
+            # 振込画面への遷移（設定で有効な場合）
+            go_to_transfer = config.get("go_to_transfer", True)
+            if go_to_transfer:
+                wait_before = config.get("wait_before_transfer_menu", 5)
+                page.wait_for_timeout(int(wait_before * 1000))
+                wait_page = config.get("wait_after_page", 2)
+                keywords = config.get("transfer_menu_keywords") or [
+                    "振込振替・ペイジー", "振込振替", "振込", "振替", "お振込"
+                ]
+                clicked = False
+                # メインページと全フレーム内を検索（ログイン後メニューがフレーム内にある場合に対応）
+                frames_to_check = list(page.frames) if page.frames else [page]
+                for frame in frames_to_check:
+                    if clicked:
+                        break
+                    for kw in keywords:
+                        try:
+                            loc = frame.locator(
+                                f"a:has-text('{kw}'), button:has-text('{kw}'), input[value*='{kw}']"
+                            ).first
+                            loc.click(timeout=3000)
+                            page.wait_for_timeout(int(wait_page * 1000))
+                            print(f"振込メニュー（「{kw}」）をクリックし、振込画面へ遷移しました。")
+                            clicked = True
+                            break
+                        except Exception:
+                            continue
+                if not clicked:
+                    print("振込メニューへのリンク・ボタンが見つかりませんでした。", file=sys.stderr)
+                    print("  → ワンタイムパスワード入力後、またはログイン後のメニューから手動で振込を選択してください。", file=sys.stderr)
+            else:
+                print("※ 振込画面への遷移はスキップしました（go_to_transfer: false）")
+
+            # ブラウザを開いたままにする（パスワード変更画面などの対応を可能に）
+            if config.get("keep_browser_open", True):
+                print("\nブラウザを開いたままにしています。処理が終わったら Enter キーを押してください。")
+                input()
+
             return ""
 
         except Exception as e:
@@ -504,13 +1094,29 @@ def main():
     parser = argparse.ArgumentParser(description="ログイン後にページ内容を取得して保存")
     parser.add_argument("site", choices=["nichinoken", "tokairokin"], help="サイト名")
     parser.add_argument("--headless", action="store_true", help="ブラウザを表示しない")
+    parser.add_argument("--bank", help="振込先銀行コード（4桁、例: 0005）")
+    parser.add_argument("--branch", help="振込先支店コード（3桁、例: 405）")
+    parser.add_argument("--bank-name", dest="bank_name", help="金融機関名で入力する場合（例: 三菱UFJ銀行）")
+    parser.add_argument("--branch-name", dest="branch_name", help="支店名で入力する場合（例: 熱田支店）")
+    parser.add_argument("--account", help="振込先口座番号（7桁）")
+    parser.add_argument("--amount", type=int, help="振込金額（円）")
     args = parser.parse_args()
 
     if args.site == "nichinoken":
         path = run_nichinoken(headless=args.headless)
         print(f"出力: {path}")
     elif args.site == "tokairokin":
-        run_tokairokin(headless=args.headless)
+        transfer = None
+        if args.bank or args.branch or args.bank_name or args.branch_name or args.account or args.amount:
+            transfer = {
+                "bank_code": args.bank or "",
+                "branch_code": args.branch or "",
+                "bank_name": args.bank_name or "",
+                "branch_name": args.branch_name or "",
+                "account_number": args.account or "",
+                "amount": args.amount or 0,
+            }
+        run_tokairokin(headless=args.headless, transfer=transfer)
     else:
         print(f"未対応のサイト: {args.site}", file=sys.stderr)
         sys.exit(1)
