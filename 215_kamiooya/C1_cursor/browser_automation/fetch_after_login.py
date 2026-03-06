@@ -36,6 +36,37 @@ load_dotenv(ROOT_ENV)
 load_dotenv(SCRIPT_DIR / ".env")
 
 
+def _wait_enter(confirm_msg: str = "Enter を受け付けました。次へ進みます。"):
+    """Enter が押されるまで待ち、受け取ったら確認メッセージを表示。
+    Cursor の統合ターミナルでは stdin に Enter が届かないことがあるため、
+    まず /dev/tty（端末デバイス）から直接読みを試みる。
+    """
+    sys.stderr.flush()
+    entered = False
+    # /dev/tty から読む（統合ターミナルで stdin が効かない場合に有効）
+    if platform.system() != "Windows":
+        try:
+            with open("/dev/tty", "r", encoding="utf-8") as tty:
+                tty.readline()
+            entered = True
+        except (OSError, IOError):
+            pass
+    if not entered:
+        try:
+            sys.stdin.readline()
+            entered = True
+        except (EOFError, OSError):
+            pass
+    if not entered:
+        try:
+            input()
+        except (EOFError, OSError):
+            pass
+    if confirm_msg:
+        print(confirm_msg, file=sys.stderr)
+        sys.stderr.flush()
+
+
 def load_config(site: str) -> dict:
     """サイト名に応じた設定YAMLを読む。"""
     import yaml
@@ -520,6 +551,60 @@ def _ensure_chrome_for_cdp(cdp_port: int = 9222, user_data_dir: str = None) -> s
     return proc
 
 
+def _write_tokairokin_transfer_attempt_log(attempt_log: list, script_dir: Path) -> None:
+    """
+    振込画面遷移の試行結果をテキストログに書き出し、
+    東海労金_振込画面遷移_試行履歴.md に「直近実行結果」を追記する。
+    """
+    if not attempt_log:
+        return
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts_iso = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # 1) 実行ログをテキストで保存
+    log_path = script_dir / f"東海労金_振込_実行ログ_{ts}.txt"
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write(f"# 東海労金 振込画面遷移 実行ログ {ts_iso}\n\n")
+        f.write("| # | 試行内容 | 結果 | 備考 |\n")
+        f.write("|---|----------|------|------|\n")
+        for i, e in enumerate(attempt_log, 1):
+            step = e.get("step", "")
+            result = e.get("result", "")
+            detail = (e.get("detail") or "").replace("|", "｜").replace("\n", " ")
+            f.write(f"| {i} | {step} | {result} | {detail} |\n")
+    print(f"実行ログを保存しました: {log_path}", file=sys.stderr)
+
+    # 2) 試行履歴に「直近実行結果」を追記
+    history_path = script_dir / "東海労金_振込画面遷移_試行履歴.md"
+    if not history_path.exists():
+        return
+    with open(history_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    marker = "## 更新履歴"
+    if marker not in content:
+        return
+    table_lines = [
+        "",
+        "## 直近実行結果",
+        "",
+        f"**実行日時**: {ts_iso}",
+        "",
+        "| # | 試行内容 | 結果 | 備考 |",
+        "|---|----------|------|------|",
+    ]
+    for i, e in enumerate(attempt_log, 1):
+        step = e.get("step", "")
+        result = e.get("result", "")
+        detail = (e.get("detail") or "").replace("|", "｜").replace("\n", " ")
+        table_lines.append(f"| {i} | {step} | {result} | {detail} |")
+    table_lines.extend(["", "---", ""])
+    insert_block = "\n".join(table_lines)
+    new_content = content.replace(marker, insert_block + "\n" + marker)
+    with open(history_path, "w", encoding="utf-8") as f:
+        f.write(new_content)
+    print(f"試行履歴を更新しました: {history_path}", file=sys.stderr)
+
+
 def _run_tokairokin_undetected(config: dict, user: str, password: str, headless: bool, transfer: dict = None) -> str:
     """
     undetected-chromedriver（Selenium）で東海労金にログイン。
@@ -527,6 +612,7 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
     """
     import undetected_chromedriver as uc
     from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
 
@@ -637,7 +723,7 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                             continue
                 if secret_phrase_filled:
                     break
-            # 再ログインの案内が出た場合
+            # 再ログインの案内が出た場合（合言葉入力後）
             if secret_phrase_filled:
                 time.sleep(2)
                 body_text = driver.find_element(By.TAG_NAME, "body").text
@@ -652,56 +738,239 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                     except Exception:
                         continue
 
-        # 合言葉・ワンタイムパスワード入力のため一時停止（自動入力できなかった場合）
+        # 再ログイン画面が表示されている場合は必ず「再ログイン」をクリック（合言葉の有無にかかわらず）
+        time.sleep(2)
+        body_text = driver.find_element(By.TAG_NAME, "body").text
+        if "再ログイン" in body_text:
+            relogin_clicked = False
+            for relogin_kw in ["再ログイン", "サインイン"]:
+                try:
+                    el = driver.find_element(By.XPATH, f"//a[contains(text(),'{relogin_kw}')] | //button[contains(text(),'{relogin_kw}')] | //input[@value='{relogin_kw}']")
+                    if el.is_displayed():
+                        el.click()
+                        print(f"「{relogin_kw}」ボタンをクリックしました。", file=sys.stderr)
+                        time.sleep(3)
+                        relogin_clicked = True
+                        break
+                except Exception:
+                    continue
+            if not relogin_clicked:
+                print("「再ログイン」ボタンが見つかりませんでした。手動でクリックしてください。", file=sys.stderr)
+
+        # 合言葉は自動入力対応済み。自動入力できなかった場合のみここで一時停止（ワンタイムパスワードは手動入力）
         if not secret_phrase_filled and config.get("pause_for_secret_phrase", True):
             print("\n" + "=" * 60, file=sys.stderr)
-            print("【一時停止】合言葉やワンタイムパスワードの入力が必要な場合、", file=sys.stderr)
-            print("  ブラウザで入力して送信してください。", file=sys.stderr)
-            print("  完了したら、このターミナルで Enter キーを押してください。", file=sys.stderr)
+            print("【一時停止】合言葉は通常は自動入力で対応しています。", file=sys.stderr)
+            print("  自動入力が完了したら、このターミナルで Enter キーを押して次へ進んでください。", file=sys.stderr)
+            print("  ※ Enter を押しても次に進まない場合は、**Terminal.app** で同じコマンドを実行してください。", file=sys.stderr)
             print("=" * 60 + "\n", file=sys.stderr)
-            input()
+            _wait_enter()
 
-        # 振込画面への遷移
+        # 振込画面への遷移（各試行を記録し、試行履歴に反映する）
         go_to_transfer = config.get("go_to_transfer", True)
+        transfer_attempt_log = []  # [{ "step": "名前", "result": "success"|"failed"|"skipped", "detail": "..." }, ...]
+
         if go_to_transfer:
             wait_before = config.get("wait_before_transfer_menu", 5)
             time.sleep(wait_before)
-            keywords = config.get("transfer_menu_keywords") or [
-                "振込振替・ペイジー", "振込振替", "振込", "振替", "お振込"
-            ]
-            clicked = False
-            for kw in keywords:
+
+            # オーバーレイを閉じてから待機
+            try:
+                body = driver.find_element(By.TAG_NAME, "body")
+                body.send_keys(Keys.ESCAPE)
+                time.sleep(0.8)
+                body.send_keys(Keys.ESCAPE)
+                time.sleep(0.8)
+            except Exception:
+                pass
+
+            transfer_clicked = False
+            # 振込画面へ直接URLで遷移（クリック不要・確実）
+            transfer_direct_url = config.get("transfer_direct_url", "").strip()
+            transfer_direct_path = config.get("transfer_direct_path", "").strip()
+            if transfer_direct_url and transfer_direct_url.startswith("http"):
                 try:
-                    el = driver.find_element(By.XPATH, f"//a[contains(text(),'{kw}')] | //button[contains(text(),'{kw}')] | //input[contains(@value,'{kw}')]")
-                    el.click()
-                    time.sleep(config.get("wait_after_page", 2))
-                    print(f"振込メニュー（「{kw}」）をクリックしました。")
-                    clicked = True
-                    break
+                    driver.get(transfer_direct_url)
+                    time.sleep(config.get("wait_after_page", 2) or 3)
+                    print("振込画面へ直接URLで遷移しました。", file=sys.stderr)
+                    transfer_clicked = True
+                    transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "success", "detail": ""})
+                except Exception as e:
+                    transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "failed", "detail": str(e)})
+                    print(f"振込画面URLへの遷移に失敗しました: {e}", file=sys.stderr)
+            elif transfer_direct_path:
+                try:
+                    current = driver.current_url
+                    # 現在URLの /ib/XXXXDispatch を /ib/{transfer_direct_path} に置換（クエリは維持）
+                    if "/ib/" in current:
+                        new_url = re.sub(r"(/ib/)[^/?]+", r"\g<1>" + re.escape(transfer_direct_path), current, count=1)
+                        if new_url != current:
+                            driver.get(new_url)
+                            time.sleep(config.get("wait_after_page", 2) or 3)
+                            print(f"振込画面へ直接遷移しました（{transfer_direct_path}）。", file=sys.stderr)
+                            transfer_clicked = True
+                            transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path} へパス置換）", "result": "success", "detail": ""})
+                        else:
+                            transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": "URLが変化しなかった"})
+                    else:
+                        transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": "現在URLに /ib/ が含まれない"})
+                except Exception as e:
+                    transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": str(e)})
+                    print(f"振込画面への直接遷移に失敗しました: {e}", file=sys.stderr)
+            else:
+                if transfer_direct_path == "" and not (transfer_direct_url and transfer_direct_url.startswith("http")):
+                    transfer_attempt_log.append({"step": "transfer_direct_url / transfer_direct_path", "result": "skipped", "detail": "未設定のためスキップ"})
+
+            transfer_btn_selector = config.get("transfer_menu_button_selector", "").strip()
+            wait_timeout = 15
+            wait_driver = WebDriverWait(driver, wait_timeout)
+
+            def _click_el(el, msg="振込"):
+                """要素をスクロール表示してから JavaScript でクリック（上書き対策）"""
+                try:
+                    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+                    time.sleep(0.3)
+                    driver.execute_script("arguments[0].click();", el)
+                    return True
                 except Exception:
-                    continue
-            if not clicked:
-                # フレーム内を検索
+                    return False
+
+            # 1) セレクタ指定があれば明示待機してクリック（JSクリック）
+            if not transfer_clicked and transfer_btn_selector:
+                try:
+                    el = wait_driver.until(EC.element_to_be_clickable((By.CSS_SELECTOR, transfer_btn_selector)))
+                    if _click_el(el, transfer_btn_selector):
+                        time.sleep(config.get("wait_after_page", 2) or 3)
+                        print(f"振込メニュー（{transfer_btn_selector}）をクリックしました。", file=sys.stderr)
+                        transfer_clicked = True
+                        transfer_attempt_log.append({"step": f"セレクタクリック（{transfer_btn_selector}）", "result": "success", "detail": ""})
+                    else:
+                        transfer_attempt_log.append({"step": f"セレクタクリック（{transfer_btn_selector}）", "result": "failed", "detail": "JSクリックが実行できなかった"})
+                except Exception as e:
+                    transfer_attempt_log.append({"step": f"セレクタクリック（{transfer_btn_selector}）", "result": "failed", "detail": str(e)})
+                    print(f"振込ボタン（{transfer_btn_selector}）: {e}", file=sys.stderr)
+
+            # 2) iframe 内で「振込」を探してクリック（口座エリアが iframe のことがある）
+            if not transfer_clicked:
+                iframe_clicked = False
                 for frame in driver.find_elements(By.TAG_NAME, "iframe"):
                     try:
                         driver.switch_to.frame(frame)
-                        for kw in keywords:
-                            try:
-                                el = driver.find_element(By.XPATH, f"//a[contains(text(),'{kw}')] | //button[contains(text(),'{kw}')]")
-                                el.click()
-                                time.sleep(config.get("wait_after_page", 2))
-                                print(f"振込メニュー（「{kw}」）をクリックしました。")
-                                clicked = True
-                                break
-                            except Exception:
-                                continue
+                        try:
+                            el = wait_driver.until(EC.presence_of_element_located((By.LINK_TEXT, "振込")))
+                            if el.is_displayed() and _click_el(el):
+                                print("「振込」をクリックしました（iframe内・テキスト検出）。", file=sys.stderr)
+                                transfer_clicked = True
+                                iframe_clicked = True
+                                time.sleep(config.get("wait_after_page", 2) or 3)
+                        except Exception:
+                            pass
                         driver.switch_to.default_content()
-                        if clicked:
+                        if iframe_clicked:
                             break
                     except Exception:
-                        driver.switch_to.default_content()
-                if not clicked:
-                    print("振込メニューへのリンク・ボタンが見つかりませんでした。", file=sys.stderr)
+                        try:
+                            driver.switch_to.default_content()
+                        except Exception:
+                            pass
+                if iframe_clicked:
+                    transfer_attempt_log.append({"step": "iframe内で「振込」リンククリック", "result": "success", "detail": ""})
+                else:
+                    transfer_attempt_log.append({"step": "iframe内で「振込」リンククリック", "result": "failed", "detail": "全iframeで要素未検出またはクリック不可"})
+
+            # 3) メインコンテンツで「振込」リンク／ボタンを探して JS クリック
+            if not transfer_clicked:
+                driver.switch_to.default_content()
+                main_clicked = False
+                for by_method, selector in [
+                    (By.LINK_TEXT, "振込"),
+                    (By.XPATH, "//a[normalize-space(text())='振込']"),
+                    (By.XPATH, "//button[normalize-space(text())='振込']"),
+                    (By.XPATH, "//*[normalize-space(text())='振込' and (self::a or self::button)]"),
+                ]:
+                    try:
+                        el = wait_driver.until(EC.presence_of_element_located((by_method, selector)))
+                        if el.is_displayed() and _click_el(el):
+                            time.sleep(config.get("wait_after_page", 2) or 3)
+                            print("「振込」をクリックしました（テキストで検出）。", file=sys.stderr)
+                            transfer_clicked = True
+                            main_clicked = True
+                            break
+                    except Exception:
+                        continue
+                transfer_attempt_log.append({"step": "メインコンテンツで「振込」テキスト検出クリック", "result": "success" if main_clicked else "failed", "detail": "" if main_clicked else "4パターンいずれも未検出またはクリック不可"})
+
+            if not transfer_clicked:
+                if config.get("manual_click_transfer_menu", True):
+                    transfer_attempt_log.append({"step": "手動クリックの案内（Enter待ち）", "result": "success", "detail": "ユーザーに振込クリックを依頼"})
+                    print("\n" + "=" * 60, file=sys.stderr)
+                    print("【手動クリック】画面上で「この口座から」の「振込」をクリックしてください。", file=sys.stderr)
+                    print("  クリックしたら、ターミナルにフォーカスを移して Enter キーを押してください。", file=sys.stderr)
+                    print("=" * 60 + "\n", file=sys.stderr)
+                    _wait_enter()
+                    time.sleep(3)
+                else:
+                    # 自動クリック（従来どおり・キーワード検索）
+                    transfer_attempt_log.append({"step": "キーワード検索で振込クリック", "result": "pending", "detail": "試行中"})
+                    if config.get("pause_before_transfer_click", True):
+                        print("\n" + "=" * 60, file=sys.stderr)
+                        print("【振込画面へ進む前】「パスワードを保存しますか？」が出ている場合は、", file=sys.stderr)
+                        print("  「使用しない」または「保存」で閉じてください。閉じたら Enter キーを押してください。", file=sys.stderr)
+                        print("=" * 60 + "\n", file=sys.stderr)
+                        input()
+                    try:
+                        body = driver.find_element(By.TAG_NAME, "body")
+                        body.send_keys(Keys.ESCAPE)
+                        time.sleep(0.5)
+                        body.send_keys(Keys.ESCAPE)
+                        time.sleep(0.5)
+                    except Exception:
+                        pass
+                    keywords = config.get("transfer_menu_keywords") or [
+                        "振込振替・ペイジー", "振込振替", "振込", "振替", "お振込"
+                    ]
+                    clicked = False
+                    for kw in keywords:
+                        try:
+                            el = driver.find_element(By.XPATH, f"//a[contains(text(),'{kw}')] | //button[contains(text(),'{kw}')] | //input[contains(@value,'{kw}')]")
+                            el.click()
+                            time.sleep(config.get("wait_after_page", 2))
+                            print(f"振込メニュー（「{kw}」）をクリックしました。")
+                            clicked = True
+                            break
+                        except Exception:
+                            continue
+                    if not clicked:
+                        for frame in driver.find_elements(By.TAG_NAME, "iframe"):
+                            try:
+                                driver.switch_to.frame(frame)
+                                for kw in keywords:
+                                    try:
+                                        el = driver.find_element(By.XPATH, f"//a[contains(text(),'{kw}')] | //button[contains(text(),'{kw}')]")
+                                        el.click()
+                                        time.sleep(config.get("wait_after_page", 2))
+                                        print(f"振込メニュー（「{kw}」）をクリックしました。")
+                                        clicked = True
+                                        break
+                                    except Exception:
+                                        continue
+                                driver.switch_to.default_content()
+                                if clicked:
+                                    break
+                            except Exception:
+                                driver.switch_to.default_content()
+                        if not clicked:
+                            print("振込メニューへのリンク・ボタンが見つかりませんでした。", file=sys.stderr)
+                            print("  → 画面上の「振込」を手動でクリックし、クリック後に Enter を押してください。", file=sys.stderr)
+                    # pending のキーワード検索ログを結果で上書き
+                    for i, e in enumerate(transfer_attempt_log):
+                        if e.get("step") == "キーワード検索で振込クリック" and e.get("result") == "pending":
+                            transfer_attempt_log[i] = {"step": "キーワード検索で振込クリック", "result": "success" if clicked else "failed", "detail": "" if clicked else "キーワードに一致する要素なし"}
+                            break
+
+            # 振込遷移の試行結果をファイルと試行履歴に出力
+            if transfer_attempt_log:
+                _write_tokairokin_transfer_attempt_log(transfer_attempt_log, SCRIPT_DIR)
 
         # 振込フォームの自動入力（transfer パラメータがある場合）
         transfer_filled = False
@@ -710,6 +979,31 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
         if transfer and has_bank and has_branch and transfer.get("account_number") and transfer.get("amount"):
             time.sleep(config.get("wait_after_page", 2))
             tf = config.get("transfer_form") or {}
+
+            # 振込画面で「振込時間の案内」等が消え、振込先入力が使えるまで明示的に待つ
+            wait_form_ready = int(config.get("wait_for_transfer_form_ready", 30))
+            specify_sel = tf.get("specify_destination_button_selector", "").strip()
+            if wait_form_ready > 0 and specify_sel:
+                try:
+                    wait_driver = WebDriverWait(driver, wait_form_ready)
+                    wait_driver.until(EC.element_to_be_clickable((By.CSS_SELECTOR, specify_sel)))
+                    print(f"振込入力フォームの準備ができました（最大{wait_form_ready}秒待機）。", file=sys.stderr)
+                except Exception as e:
+                    print(f"「振込先を指定」が{wait_form_ready}秒以内に表示されませんでした: {e}", file=sys.stderr)
+            time.sleep(0.5)
+
+            # 日付振込ボタン（セレクタ指定時のみクリック試行）
+            dated_btn_sel = config.get("transfer_dated_transfer_button_selector", "").strip()
+            if dated_btn_sel:
+                try:
+                    by = By.XPATH if (dated_btn_sel.startswith("/") or dated_btn_sel.startswith("(")) else By.CSS_SELECTOR
+                    el = driver.find_element(by, dated_btn_sel)
+                    if el.is_displayed():
+                        el.click()
+                        print("「日付振込」をクリックしました。", file=sys.stderr)
+                        time.sleep(config.get("wait_after_page", 2))
+                except Exception as e:
+                    print(f"「日付振込」ボタンのクリックに失敗しました: {e}", file=sys.stderr)
 
             # 振込先選択画面で「振込先を指定」ボタンをクリック（金融機関選択画面へ遷移）
             specify_clicked = False
@@ -860,21 +1154,34 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                     except Exception:
                         pass
 
-        # ワンタイムパスワード入力のため一時停止（振込実行時は必ず OTP 入力が必要）
+        # ワンタイムパスワード（OTP）は手動入力。振込実行前に OTP 入力が必要な場合の待機
         if transfer or transfer_filled:
             print("\n" + "=" * 60, file=sys.stderr)
-            print("【一時停止】ワンタイムパスワードの入力が必要な場合、", file=sys.stderr)
-            print("  ブラウザで OTP を入力し、振込を実行してください。", file=sys.stderr)
-            print("  完了したら、このターミナルで Enter キーを押してください。", file=sys.stderr)
+            print("【一時停止】ワンタイムパスワード（OTP）を入力してください。", file=sys.stderr)
+            print("  スマホアプリ等で表示された OTP をブラウザに入力し、振込を実行してください。", file=sys.stderr)
+            print("  完了したら、このターミナルで Enter キーを押して次へ進んでください。", file=sys.stderr)
             print("=" * 60 + "\n", file=sys.stderr)
-            input()
+            _wait_enter()
 
         if config.get("keep_browser_open", True):
-            print("\n振込画面を開いたままにしています。", file=sys.stderr)
-            print("フォームの確認や振込をゆっくり行えます。画面を離れてもブラウザは開いたままです。", file=sys.stderr)
-            print("完了したら、このターミナルで Enter キーを押してください（スクリプト終了後もブラウザは残ります）。", file=sys.stderr)
-            input()
+            print("\n" + "=" * 60, file=sys.stderr)
+            print("振込画面を開いたままにしています。確認や振込をゆっくり行えます。", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("  ** ブラウザはスクリプトでは閉じません。**", file=sys.stderr)
+            print("  作業が終わったら、**ご自身でブラウザを閉じ**てください。", file=sys.stderr)
+            print("  ブラウザを閉じたあと、このターミナルで Enter を押すとスクリプトが終了します。", file=sys.stderr)
+            print("  （先に Enter を押すとスクリプト終了時にブラウザも閉じる場合があります）", file=sys.stderr)
+            print("=" * 60 + "\n", file=sys.stderr)
+            _wait_enter(confirm_msg="スクリプトを終了しました。")
 
+        return ""
+    except Exception as e:
+        # 途中でエラーが出ても Enter 待ちまで進め、ユーザーが操作できる間にブラウザを閉じない
+        print(f"エラーが発生しました: {e}", file=sys.stderr)
+        if config.get("keep_browser_open", True):
+            print("\n振込画面を開いたままにしています。確認や振込を続けてください。", file=sys.stderr)
+            print("作業が終わったらご自身でブラウザを閉じ、閉じたあとで Enter を押してください。", file=sys.stderr)
+            _wait_enter(confirm_msg="スクリプトを終了しました。")
         return ""
     finally:
         # keep_browser_open 時はブラウザを閉じない（ユーザーが手動で閉じる）
@@ -953,6 +1260,16 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
             page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
             page.wait_for_load_state("networkidle", timeout=20000)
             page.wait_for_timeout(2000)
+
+            # Chromeの「パスワードを保存しますか？」を出にくくするため、ログイン入力に autocomplete=off を付与
+            try:
+                page.evaluate("""() => {
+                    document.querySelectorAll('#txtBox005, #pswd010, input[type="password"]').forEach(el => {
+                        el.setAttribute('autocomplete', 'off');
+                    });
+                }""")
+            except Exception:
+                pass
 
             # parasol.anser.ne.jp のログインフォーム（東海労金）
             # ログインID: input#txtBox005 / パスワード: input#pswd010 のみ入力
@@ -1033,52 +1350,95 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
                     except Exception:
                         continue
 
-            # 合言葉・ワンタイムパスワード入力のため一時停止（自動入力できなかった場合）
+            # 再ログイン画面が表示されている場合は必ず「再ログイン」をクリック（合言葉の有無にかかわらず）
+            page.wait_for_timeout(2000)
+            body_text = page.locator("body").inner_text()
+            if "再ログイン" in body_text:
+                relogin_clicked = False
+                for relogin_kw in ["再ログイン", "サインイン"]:
+                    try:
+                        el = page.locator(f"a:has-text('{relogin_kw}'), button:has-text('{relogin_kw}'), input[value='{relogin_kw}']").first
+                        if el.is_visible():
+                            el.click()
+                            print(f"「{relogin_kw}」ボタンをクリックしました。", file=sys.stderr)
+                            page.wait_for_timeout(3000)
+                            relogin_clicked = True
+                            break
+                    except Exception:
+                        continue
+                if not relogin_clicked:
+                    print("「再ログイン」ボタンが見つかりませんでした。手動でクリックしてください。", file=sys.stderr)
+
+            # 合言葉は自動入力対応済み。自動入力できなかった場合のみここで一時停止（ワンタイムパスワードは手動入力）
             if not secret_phrase_filled and config.get("pause_for_secret_phrase", True):
                 print("\n" + "=" * 60, file=sys.stderr)
-                print("【一時停止】合言葉やワンタイムパスワードの入力が必要な場合、", file=sys.stderr)
-                print("  ブラウザで入力して送信してください。", file=sys.stderr)
-                print("  完了したら、このターミナルで Enter キーを押してください。", file=sys.stderr)
+                print("【一時停止】合言葉は通常は自動入力で対応しています。", file=sys.stderr)
+                print("  自動入力が完了したら、このターミナルで Enter キーを押して次へ進んでください。", file=sys.stderr)
                 print("=" * 60 + "\n", file=sys.stderr)
-                input()
+                _wait_enter()
 
             # 振込画面への遷移（設定で有効な場合）
             go_to_transfer = config.get("go_to_transfer", True)
             if go_to_transfer:
                 wait_before = config.get("wait_before_transfer_menu", 5)
                 page.wait_for_timeout(int(wait_before * 1000))
-                wait_page = config.get("wait_after_page", 2)
-                keywords = config.get("transfer_menu_keywords") or [
-                    "振込振替・ペイジー", "振込振替", "振込", "振替", "お振込"
-                ]
-                clicked = False
-                # メインページと全フレーム内を検索（ログイン後メニューがフレーム内にある場合に対応）
-                frames_to_check = list(page.frames) if page.frames else [page]
-                for frame in frames_to_check:
-                    if clicked:
-                        break
-                    for kw in keywords:
-                        try:
-                            loc = frame.locator(
-                                f"a:has-text('{kw}'), button:has-text('{kw}'), input[value*='{kw}']"
-                            ).first
-                            loc.click(timeout=3000)
-                            page.wait_for_timeout(int(wait_page * 1000))
-                            print(f"振込メニュー（「{kw}」）をクリックし、振込画面へ遷移しました。")
-                            clicked = True
+
+                # 手動クリックモード: こちらで「振込」をクリックしてもらい、クリック後に Enter で次の処理を自動実行
+                manual_click = config.get("manual_click_transfer_menu", True)
+                if manual_click:
+                    print("\n" + "=" * 60, file=sys.stderr)
+                    print("【手動クリック】画面上で「振込」または「振込振替 ペイジー」をクリックしてください。", file=sys.stderr)
+                    print("  クリックしたら、ターミナルにフォーカスを移して Enter キーを押してください。", file=sys.stderr)
+                    print("  ※ Enter が反応しない場合は、Terminal.app で同じコマンドを実行してください。", file=sys.stderr)
+                    print("=" * 60 + "\n", file=sys.stderr)
+                    _wait_enter()
+                    page.wait_for_timeout(3000)  # 画面遷移の待機
+                else:
+                    # 自動クリック（従来どおり）
+                    if config.get("pause_before_transfer_click", True):
+                        print("\n" + "=" * 60, file=sys.stderr)
+                        print("【振込画面へ進む前】「パスワードを保存しますか？」が出ている場合は、", file=sys.stderr)
+                        print("  「使用しない」または「保存」で閉じてください。閉じたら Enter キーを押してください。", file=sys.stderr)
+                        print("=" * 60 + "\n", file=sys.stderr)
+                        input()
+                    try:
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(500)
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(500)
+                    except Exception:
+                        pass
+                    wait_page = config.get("wait_after_page", 2)
+                    keywords = config.get("transfer_menu_keywords") or [
+                        "振込振替・ペイジー", "振込振替", "振込", "振替", "お振込"
+                    ]
+                    clicked = False
+                    frames_to_check = list(page.frames) if page.frames else [page]
+                    for frame in frames_to_check:
+                        if clicked:
                             break
-                        except Exception:
-                            continue
-                if not clicked:
-                    print("振込メニューへのリンク・ボタンが見つかりませんでした。", file=sys.stderr)
-                    print("  → ワンタイムパスワード入力後、またはログイン後のメニューから手動で振込を選択してください。", file=sys.stderr)
+                        for kw in keywords:
+                            try:
+                                loc = frame.locator(
+                                    f"a:has-text('{kw}'), button:has-text('{kw}'), input[value*='{kw}']"
+                                ).first
+                                loc.click(timeout=3000)
+                                page.wait_for_timeout(int(wait_page * 1000))
+                                print(f"振込メニュー（「{kw}」）をクリックし、振込画面へ遷移しました。")
+                                clicked = True
+                                break
+                            except Exception:
+                                continue
+                    if not clicked:
+                        print("振込メニューへのリンク・ボタンが見つかりませんでした。", file=sys.stderr)
+                        print("  → 画面上の「振込」を手動でクリックし、クリック後に Enter を押してください。", file=sys.stderr)
             else:
                 print("※ 振込画面への遷移はスキップしました（go_to_transfer: false）")
 
             # ブラウザを開いたままにする（パスワード変更画面などの対応を可能に）
             if config.get("keep_browser_open", True):
                 print("\nブラウザを開いたままにしています。処理が終わったら Enter キーを押してください。")
-                input()
+                _wait_enter(confirm_msg="")
 
             return ""
 
