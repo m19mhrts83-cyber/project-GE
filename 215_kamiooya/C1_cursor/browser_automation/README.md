@@ -74,7 +74,8 @@ python fetch_after_login.py nichinoken
    - `config_tokairokin.yaml` は .gitignore 済みなのでコミットされません
 
 3. **実行方法**
-   - `python fetch_after_login.py tokairokin` でログイン → 振込画面へ自動遷移
+   - `python fetch_after_login.py tokairokin` でログイン → 振込画面へ遷移
+   - **手動クリックモード**（既定: 有効）: トップページで「振込」が押せない場合、`manual_click_transfer_menu: true` のときは「画面上で振込をクリック → クリックしたら Enter」で次を自動実行。`false` にすると従来どおり自動で振込メニューをクリック
    - **振込の自動入力**（オプション）:
      ```bash
      python fetch_after_login.py tokairokin --bank 0005 --branch 405 --account 0526519 --amount 100000

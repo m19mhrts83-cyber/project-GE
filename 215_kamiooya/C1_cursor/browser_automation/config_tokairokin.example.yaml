@@ -43,6 +43,9 @@ wait_after_transfer_confirm: 2
 
 # ログイン後に振込画面へ遷移するか（true: 遷移する / false: ログインのみ）
 go_to_transfer: true
+# トップページの「この口座から→振込」ボタンのセレクタ（指定時は手動クリック不要で自動クリック）
+# 例: "#btn002-1"（開発者ツールで要素を検証して指定）
+# transfer_menu_button_selector: "#btn002-1"
 
 # ログイン後、ブラウザを開いたままにするか（true: Enter キーを押すまで閉じない）
 # パスワード変更画面などの対応を可能にする
@@ -65,7 +68,14 @@ pause_for_secret_phrase: true
 # ワンタイムパスワード入力が必要な場合は、入力する時間を考慮して増やす
 wait_before_transfer_menu: 5
 
-# 振込画面への遷移に使うキーワード（リンク・ボタンのテキスト）
+# 振込メニューを手動クリックするか（true: 画面上で「振込」をクリックしてもらい、クリック後に Enter で次を自動実行）
+# ダイアログで自動クリックが進まない場合に true 推奨
+manual_click_transfer_menu: true
+
+# 振込メニュー自動クリック時のみ: クリック前に一時停止するか
+pause_before_transfer_click: true
+
+# 振込画面への遷移に使うキーワード（リンク・ボタンのテキスト・manual_click_transfer_menu: false のとき）
 # 順に試し、最初に見つかったものをクリック
 transfer_menu_keywords:
   - "振込振替"
