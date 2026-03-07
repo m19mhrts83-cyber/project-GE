@@ -917,7 +917,7 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                         print("【振込画面へ進む前】「パスワードを保存しますか？」が出ている場合は、", file=sys.stderr)
                         print("  「使用しない」または「保存」で閉じてください。閉じたら Enter キーを押してください。", file=sys.stderr)
                         print("=" * 60 + "\n", file=sys.stderr)
-                        input()
+                        _wait_enter()
                     try:
                         body = driver.find_element(By.TAG_NAME, "body")
                         body.send_keys(Keys.ESCAPE)
@@ -1400,7 +1400,7 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
                         print("【振込画面へ進む前】「パスワードを保存しますか？」が出ている場合は、", file=sys.stderr)
                         print("  「使用しない」または「保存」で閉じてください。閉じたら Enter キーを押してください。", file=sys.stderr)
                         print("=" * 60 + "\n", file=sys.stderr)
-                        input()
+                        _wait_enter()
                     try:
                         page.keyboard.press("Escape")
                         page.wait_for_timeout(500)
