@@ -37,6 +37,10 @@
     .title-slide { text-align: center; }
     .title-slide h1 { border: none; font-size: 2rem; }
     .title-slide p { margin-top: 1rem; opacity: 0.9; }
+    nav { position: fixed; right: 1rem; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 0.5rem; z-index: 10; }
+    nav button { background: #333; color: #fff; border: 1px solid #555; padding: 0.5rem 0.75rem; cursor: pointer; border-radius: 4px; font-size: 0.9rem; }
+    nav button:hover { background: #444; }
+    nav .page-num { color: #8b949e; font-size: 0.8rem; text-align: center; }
   </style>
 </head>
 <body>
@@ -404,8 +408,29 @@ flowchart LR
       <p>Mac に元から入っている<strong>「いつ・何を実行するか」を覚えておいてくれる係</strong>です。トークン自動更新では「3 日ごとに、この台本を実行して」と launchd に頼んであり、Mac を開いたタイミングで「3 日経ってるから実行するね」と動きます。GitHub Actions が「クラウドの倉庫の上で、決まった時刻に実行」なのに対し、launchd は<strong>「あなたの Mac の上で、条件（日数など）が満たされたら実行」</strong>という違いがあります。</p>
     </section>
   </main>
+  <nav aria-label="スライド操作">
+    <button type="button" onclick="prev()">← 前</button>
+    <span class="page-num" id="pageNum">1 / 1</span>
+    <button type="button" onclick="next()">次 →</button>
+  </nav>
   <script>
     mermaid.initialize({ theme: 'dark' });
+    const slides = document.querySelectorAll('.slide');
+    let current = 0;
+    const pageNum = document.getElementById('pageNum');
+    function updateNum() { pageNum.textContent = (current + 1) + ' / ' + slides.length; }
+    function go(i) {
+      current = Math.max(0, Math.min(i, slides.length - 1));
+      slides[current].scrollIntoView({ behavior: 'smooth', block: 'start' });
+      updateNum();
+    }
+    function next() { go(current + 1); }
+    function prev() { go(current - 1); }
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+    });
+    updateNum();
   </script>
 </body>
 </html>
