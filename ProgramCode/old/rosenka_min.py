@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 import sys
 import time
 from selenium import webdriver
@@ -76,9 +77,9 @@ try:
     ok = False
     try:
         skw.clear()
-        skw.send_keys(ADDR)
+        skw.send_keys(address)
         ok = True
-        print(f"✅ 入力(send_keys): {ADDR}")
+        print(f"✅ 入力(send_keys): {address}")
     except Exception as e:
         print(f"⚠️ send_keys不可: {e}")
 
@@ -90,8 +91,8 @@ try:
             el.value = v;
             el.dispatchEvent(new Event('input', {bubbles:true}));
             el.dispatchEvent(new Event('change', {bubbles:true}));
-        """, skw, ADDR)
-        print(f"✅ 入力(JS): {ADDR}")
+        """, skw, address)
+        print(f"✅ 入力(JS): {address}")
 
     time.sleep(0.5)
 
