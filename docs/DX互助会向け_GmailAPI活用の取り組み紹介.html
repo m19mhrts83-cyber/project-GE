@@ -76,7 +76,7 @@ flowchart LR
         <li>空室対策用のメール文面（Markdown）と送信先（Excel）を用意</li>
         <li><code>send_mail.py</code> が Gmail API で認証し、1 社ずつ送信（レート制限対策で間隔を空けて送信可能）</li>
         <li>認証はパートナー・いけともと同じ <strong>1b_Cursorマニュアル</strong> の <code>credentials.json</code> と <code>token.json</code> を使用（3日ごとのトークン自動更新の対象）</li>
-        <li>スクリプトの置き場所：OneDrive（神・大家さん倶楽部）の <code>C1_cursor/mail_automation/</code></li>
+        <li>スクリプトの置き場所：<strong>ローカルを推奨</strong>（例：神・大家さん倶楽部フォルダをローカルに置いた <code>C1_cursor/mail_automation/</code>）</li>
       </ul>
     </section>
 
@@ -184,7 +184,7 @@ flowchart TB
     <!-- 2b 補足: 参照している箱の置き場所 -->
     <section class="slide">
       <h1>トークン自動更新：参照している「箱」の置き場所</h1>
-      <p>トークン自動更新で使うものは、次のいずれかにあります。</p>
+      <p>トークン自動更新で使うものは、次のいずれかにあります。<strong>実行環境（credentials / token / .venv_gmail）はローカル配置を推奨</strong>します。</p>
       <table>
         <thead>
           <tr><th>中身</th><th>どこにあるか</th><th>説明</th></tr>
@@ -193,12 +193,12 @@ flowchart TB
           <tr>
             <td>launchd の設定（plist）・GITHUB_TOKEN</td>
             <td><strong>Mac 本体（ローカル）</strong></td>
-            <td>~/Library/LaunchAgents/ 内。OneDrive/Google Drive には置いていない</td>
+            <td>~/Library/LaunchAgents/ 内。クラウド同期フォルダには置かない</td>
           </tr>
           <tr>
             <td>credentials.json / token.json<br>Python 実行環境（.venv_gmail）</td>
-            <td><strong>OneDrive（神・大家さん倶楽部）</strong></td>
-            <td>215 フォルダの C1_cursor/1b_Cursorマニュアル/ 内。パートナーやり取りといけともで共通</td>
+            <td><strong>ローカル（推奨）</strong></td>
+            <td>215 フォルダをローカルに置いた C1_cursor/1b_Cursorマニュアル/ 内。パートナーやり取りといけともで共通。OneDrive 上に置くと接続が切れて安定しない事例あり（後述）</td>
           </tr>
           <tr>
             <td>更新用スクリプト（refresh_token_and_update_github_secret.py）</td>
@@ -208,7 +208,7 @@ flowchart TB
           <tr>
             <td>GitHub の Secret（GMAIL_TOKEN_B64）</td>
             <td><strong>GitHub（クラウド）</strong></td>
-            <td>Mac/OneDrive/Google Drive のどれでもなく、GitHub のリポジトリ設定上にある「秘密の値」。スクリプトが API でここを更新する</td>
+            <td>GitHub のリポジトリ設定上にある「秘密の値」。スクリプトが API でここを更新する</td>
           </tr>
         </tbody>
       </table>
@@ -222,7 +222,7 @@ flowchart LR
   subgraph Mac [Mac 本体]
     Plist[launchd plist\nGITHUB_TOKEN]
   end
-  subgraph OneDrive [OneDrive 神・大家さん倶楽部]
+  subgraph Local [ローカル 推奨]
     Creds[credentials.json\ntoken.json]
     Venv[.venv_gmail\nPython]
   end
@@ -238,7 +238,7 @@ flowchart LR
   Script -->|"token 更新"| Creds
   Script -->|"API で更新"| Secret
       </div>
-      <p>Mac を開いたタイミングで「3 日以上経過」していれば、<strong>launchd が OneDrive の Python（.venv_gmail）を起動</strong>し、その Python が Google Drive 上のスクリプトを 1 本のコマンドとして実行します。スクリプトは OneDrive の認証で Gmail を更新し、結果を GitHub の Secret に反映します。</p>
+      <p>Mac を開いたタイミングで「3 日以上経過」していれば、<strong>launchd がローカルの Python（.venv_gmail）を起動</strong>し、その Python が Google Drive 上のスクリプトを 1 本のコマンドとして実行します。スクリプトはローカルの認証で Gmail を更新し、結果を GitHub の Secret に反映します。</p>
     </section>
 
     <!-- 舞台・台本の例えで理解する -->
@@ -250,7 +250,7 @@ flowchart LR
         <h2>🎭 舞台 ＝ .venv_gmail（実行環境）</h2>
         <p><strong>フォルダ</strong>の名前で、中に「Python 本体」と必要なライブラリが入っています。<br>
         役割は<strong>「どこで・どんな環境で演じるか」</strong>。台本（.py）が別のフォルダにあっても、この舞台の Python に台本の<strong>場所を渡せば</strong>実行できます。</p>
-        <p class="place">📍 置き場所：OneDrive（神・大家さん倶楽部）</p>
+        <p class="place">📍 置き場所：<strong>ローカルを推奨</strong>（神・大家さん倶楽部フォルダをローカルに置いたパス内など）</p>
       </div>
 
       <div class="metaphor-block">
@@ -263,10 +263,11 @@ flowchart LR
       <div class="metaphor-block">
         <h2>🎬 実際の流れ</h2>
         <p><strong>launchd</strong>（Mac）が「3 日経過したら」と判断 → <strong>舞台</strong>（.venv_gmail の Python）を起動 → その舞台に<strong>「この台本を演じて」</strong>と、別フォルダにある台本の<strong>パス</strong>を渡す → 舞台の上で台本が実行される。</p>
-        <p>だから「<strong>舞台は神・大家さん倶楽部、台本は DX互助会</strong>」のように、<strong>置き場所が違っていても 1 本のコマンドでつながります</strong>。</p>
+        <p>だから「<strong>舞台はローカル、台本は DX互助会</strong>」のように、<strong>置き場所が違っていても 1 本のコマンドでつながります</strong>。</p>
       </div>
 
       <p class="note">💡 作業ディレクトリ（WorkingDirectory）は「舞台の上での作業場所」として、台本がある DX互助会のフォルダを指定しています。</p>
+      <p class="note"><strong>補足（OneDrive のトラブル事例）：</strong>実行環境（.venv_gmail）や credentials / token を OneDrive 上に置いていたところ、<strong>接続が切れて安定しませんでした</strong>。そのため、これらは<strong>ローカルに置くことを推奨</strong>しています。</p>
     </section>
 
     <!-- 3. 全体の関係 -->
