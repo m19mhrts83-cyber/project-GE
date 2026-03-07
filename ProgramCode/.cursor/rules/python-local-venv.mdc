@@ -7,40 +7,41 @@ alwaysApply: true
 
 ## 方針
 
-- **Python スクリプトの実行は、OneDrive 上ではなくローカル（ProgramCode）の venv を使う。**
+- **Python スクリプトの実行は、OneDrive 上ではなくローカル（git-repos/ProgramCode）の venv を使う。**
 - OneDrive 上の `.venv_gmail` 等は起動が遅くタイムアウトすることがあるため、エージェントが Python を実行するときは下記のいずれかを指定する。
+- **ProgramCode は git-repos に統合済み**。パスは `~/git-repos/ProgramCode/` とする。
 
 ## 実行環境のバリエーション
 
 ### 共通環境（1つでよい場合）
 
-- **パス**: `~/ProgramCode/venv_gmail/bin/python`
+- **パス**: `~/git-repos/ProgramCode/venv_gmail/bin/python`
 - **用途**: やり取りメール送信（yoritoori_send.py）、Gmail 取得（gmail_to_yoritoori.py）、iMessage 連携（imessage_to_yoritoori.py）など、Gmail API や YAML を使うスクリプト全般。
 - 上記以外の 215 用 Python スクリプトも、依存が同じならこの環境で実行してよい。
 
 ### 別環境（分けたい場合）
 
-- **Gmail・やり取り用**: `~/ProgramCode/venv_gmail/bin/python`  
+- **Gmail・やり取り用**: `~/git-repos/ProgramCode/venv_gmail/bin/python`  
   （yoritoori_send.py, gmail_to_yoritoori.py, imessage_to_yoritoori.py）
-- **その他**: `~/ProgramCode/venv/bin/python`  
+- **その他**: `~/git-repos/ProgramCode/venv/bin/python`  
   （既存の excel_to_md.py, pdf_to_md.py 等で、venv_gmail と依存が違う場合）
 
 ## エージェントの振る舞い
 
 1. **パートナー宛メール送信**（yoritoori_send.py）  
    - 実行例:  
-     `~/ProgramCode/venv_gmail/bin/python yoritoori_send.py --partner LEAF`  
+     `~/git-repos/ProgramCode/venv_gmail/bin/python yoritoori_send.py --partner LEAF`  
    - カレント: スクリプトがあるフォルダ（例: 215 の `C1_cursor/1b_Cursorマニュアル`）。
 
 2. **パートナーからのメール・メッセージ確認**（gmail_to_yoritoori.py, imessage_to_yoritoori.py）  
    - 実行例:  
-     `~/ProgramCode/venv_gmail/bin/python gmail_to_yoritoori.py`  
-     `~/ProgramCode/venv_gmail/bin/python imessage_to_yoritoori.py`  
+     `~/git-repos/ProgramCode/venv_gmail/bin/python gmail_to_yoritoori.py`  
+     `~/git-repos/ProgramCode/venv_gmail/bin/python imessage_to_yoritoori.py`  
    - カレント: 同上。
 
 3. **その他の Python スクリプト**  
    - 215 や ProgramCode 内のスクリプトを実行するときは、依存に合わせて  
-     `~/ProgramCode/venv_gmail/bin/python` または `~/ProgramCode/venv/bin/python` を指定する。  
+     `~/git-repos/ProgramCode/venv_gmail/bin/python` または `~/git-repos/ProgramCode/venv/bin/python` を指定する。  
    - どちらを使うか不明な場合は、まず venv_gmail で試してよい。
 
 ## 禁止すること

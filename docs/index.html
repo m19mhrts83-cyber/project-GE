@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DX互助会 資料一覧</title>
+  <title>DX互助会 勉強会資料</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; padding: 2rem 3rem; }
@@ -16,31 +16,32 @@
     a strong { display: block; margin-bottom: 0.25rem; font-size: 1.05rem; }
     a span { font-size: 0.9rem; opacity: 0.9; }
     .note { background: #0f3460; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.9rem; margin-top: 2rem; color: #8b949e; }
+    .external::after { content: " ↗"; font-size: 0.85em; opacity: 0.8; }
   </style>
 </head>
 <body>
-  <h1>DX互助会 資料一覧</h1>
-  <p class="sub">HTMLで見やすい形式のスライドです。各リンクをクリックしてご覧ください。</p>
+  <h1>DX互助会 勉強会資料</h1>
+  <p class="sub">回を選ぶと、その回の資料一覧またはスライドに移動します。</p>
   <ul>
     <li>
-      <a href="DX互助会向け_ブラウジングオートメーションの取り組み紹介.html">
-        <strong>ブラウジングオートメーションの取り組み紹介</strong>
-        <span>Cursor × Python（Playwright）でログインが必要なサイトに自動アクセスする取り組み</span>
+      <a href="https://m19mhrts83-cyber.github.io/dx-slides/" target="_blank" rel="noopener noreferrer" class="external">
+        <strong>第1回</strong>
+        <span>Cursor × Markdown活用入門 〜不動産業務を効率化する第一歩〜（2026年1月31日）</span>
       </a>
     </li>
     <li>
-      <a href="DX互助会向け_GmailAPI活用の取り組み紹介.html">
-        <strong>Gmail API 活用の取り組み紹介</strong>
-        <span>空室対策メール・パートナーとのやり取り・いけともAIニュース保存など</span>
+      <a href="2kai.html">
+        <strong>第2回</strong>
+        <span>ブラウジングオートメーション・Gmail API・Obsidian/Notion の取り組み紹介（3本のスライド）</span>
       </a>
     </li>
     <li>
-      <a href="Obsidian紹介_DX互助会向け.html">
-        <strong>Obsidian / Notion 紹介</strong>
-        <span>知識管理ツールの使い分けと始め方</span>
+      <a href="#" style="pointer-events: none; opacity: 0.7;">
+        <strong>第3回</strong>
+        <span>準備中（資料ができたらここにリンクを追加します）</span>
       </a>
     </li>
   </ul>
-  <p class="note">※ 上下スクロールでスライドを切り替えられます。Notion からはこのページの URL を共有すると、メンバーが一覧から各資料を開けます。</p>
+  <p class="note">※ Notion からはこのトップページの URL を共有すると、第1回・第2回・第3回…とたどりやすくなります。<br>※ 第1回は別サイト（dx-slides）で公開しています。</p>
 </body>
 </html>
