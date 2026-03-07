@@ -27,6 +27,7 @@ credentials_*.json
 **/.venv/
 **/.venv_*/
 **/venv/
+**/venv_gmail/
 __pycache__/
 node_modules/
 *.pyc
