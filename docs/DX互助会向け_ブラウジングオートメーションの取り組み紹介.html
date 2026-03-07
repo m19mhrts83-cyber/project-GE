@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DX互助会向け ブラウジングオートメーションの取り組み紹介</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif; background: #1a1a2e; color: #eee; }
+    .slide {
+      min-height: 100vh;
+      padding: 2rem 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      scroll-snap-align: start;
+    }
+    .slide h1 { font-size: 1.75rem; margin: 0 0 1rem; border-bottom: 2px solid #4a9; padding-bottom: 0.5rem; }
+    .slide h2 { font-size: 1.35rem; margin: 1.5rem 0 0.75rem; color: #8cf; }
+    .slide h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
+    .slide ul { margin: 0.5rem 0; padding-left: 1.5rem; line-height: 1.7; }
+    .slide p { margin: 0.5rem 0; line-height: 1.6; }
+    .slide .mermaid { margin: 1rem 0; background: #16213e; padding: 1rem; border-radius: 8px; }
+    .slide a { color: #6cf; }
+    .slide table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+    .slide th, .slide td { border: 1px solid #4a9; padding: 0.5rem 0.75rem; text-align: left; }
+    .slide th { background: #16213e; color: #8cf; }
+    .slide .note { background: #0f3460; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.95rem; margin-top: 1rem; }
+    .slide code { background: #0f3460; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+    .chat-mockup { background: #0d1117; border: 1px solid #30363d; border-radius: 12px; padding: 1rem; margin: 1rem 0; font-size: 0.9rem; }
+    .chat-mockup .msg { margin: 0.75rem 0; padding: 0.6rem 1rem; border-radius: 8px; max-width: 90%; }
+    .chat-mockup .msg.user { background: #238636; margin-left: auto; margin-right: 0; }
+    .chat-mockup .msg.ai { background: #21262d; border: 1px solid #30363d; margin-left: 0; margin-right: auto; }
+    .chat-mockup .label { font-size: 0.75rem; color: #8b949e; margin-bottom: 0.25rem; }
+    main { scroll-snap-type: y mandatory; }
+    .title-slide { text-align: center; }
+    .title-slide h1 { border: none; font-size: 2rem; }
+    .title-slide p { margin-top: 1rem; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <main>
+    <!-- タイトル -->
+    <section class="slide title-slide">
+      <h1>DX互助会向け「ブラウジングオートメーション」の取り組み紹介</h1>
+      <p>図解とステップでまとめたスライドです</p>
+      <p style="margin-top: 1.5rem; font-size: 0.95rem; opacity: 0.95;">Cursor と Python（Playwright）を組み合わせ、<strong>ログインが必要な Web サイト</strong>に自動でアクセスし、情報取得やフォーム入力を行う取り組みです。</p>
+      <p class="note" style="margin-top: 1.5rem;">※ Gmail API とは別の「<strong>ブラウザ操作の自動化</strong>」として実施しています。上下スクロールでスライドを切り替えられます。</p>
+    </section>
+
+    <!-- 1. 実施内容 -->
+    <section class="slide">
+      <h1>1. 実施内容（コマンドで使用したもの）</h1>
+      <p>実施した内容は、<strong>Cursor のコマンド</strong>として登録した 2 種類です。</p>
+      <table>
+        <thead>
+          <tr><th>コマンド</th><th>対象サイト</th><th>主な用途</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>nichinoken-fetch</strong></td>
+            <td>日能研 MY NICHINOKEN</td>
+            <td>ログイン → お知らせ・スケジュール等を取得 → 知りたい内容に答える</td>
+          </tr>
+          <tr>
+            <td><strong>東海労金-振込</strong></td>
+            <td>東海労金インターネットバンキング</td>
+            <td>ログイン → 振込画面へ遷移 → フォーム自動入力 → OTP 入力で実行</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>いずれも <strong>Cursor のチャットでコマンドを実行</strong>すると、AI が手順に従って Python スクリプトを呼び出し、結果を返す流れです。</p>
+      <p class="note">💡 Cursor のコマンドは、<strong>Claude の Agent Skills（エージェントスキル）と同等のことができる</strong>仕組みです。特定のタスクの手順を事前に定義しておき、チャットで選択するだけで同じ流れで実行できます。</p>
+    </section>
+
+    <!-- 2. Claude Agent Skills とは -->
+    <section class="slide">
+      <h1>2. Claude の Agent Skills とは（参考）</h1>
+      <p>いけともワークショップ（Notion の記事メモ）の資料によると、<strong>Claude の Agent Skills</strong> は次のような仕組みです。</p>
+      <ul>
+        <li><strong>定義</strong>：特定のタスク（例：Excel VBA マクロ設計）を自動化するための「事前定義された手順」を AI に渡す機能</li>
+        <li><strong>登録方法</strong>：Claude で「カスタマイズ」→「スキル」→「プラス」ボタン → ZIP ファイルをアップロード → スキル名を入力して使用開始</li>
+        <li><strong>例</strong>：Claude Excel VBA Designer は、インプットとアウトプットの Excel ファイルを渡すだけで、自動的にマクロを設計・生成するスキル</li>
+        <li><strong>オープンフォーマット</strong>：Claude だけでなく、他の AI ツール（ChatGPT、Google Antigravity 等）でも利用可能</li>
+        <li><strong>エージェントチーム機能</strong>：複数 AI モデルの連携が可能（例：調査をエージェントに任せ、結果を NotebookLM に蓄積して図解する）</li>
+      </ul>
+      <p class="note">Cursor のコマンドは、「事前定義された手順を AI に渡し、選択するだけで同じ流れで実行する」点で、Claude の Agent Skills と同等の考え方です。違いは、Cursor では Markdown ファイル（<code>.cursor/commands/</code> 内）に手順を書き、スラッシュコマンド（<code>/</code>）で一覧から選ぶ形で使うことです。</p>
+    </section>
+
+    <!-- 3. コマンドの実行の仕方 -->
+    <section class="slide">
+      <h1>3. コマンドの実行の仕方（チャット画面のイメージ）</h1>
+      <h2>① 登録された選択肢の中から選ぶ</h2>
+      <p>入力欄に <code>/</code> を打つと、スラッシュコマンドとして登録したものが一覧で表示されます。言葉で直接入力するのではなく、<strong>あらかじめ登録された選択肢の中から選ぶ</strong>形です。</p>
+      <p>一覧から <strong>nichinoken-fetch</strong> や <strong>東海労金-振込</strong> を選んで送信すると、コマンドの手順が開始されます。</p>
+    </section>
+
+    <section class="slide">
+      <h1>② 選択後に質問が表示される</h1>
+      <p>コマンドを選択して送信すると、AI は <strong>いきなりスクリプトを動かさず</strong>、まず質問や確認を返します。</p>
+      <h2>日能研（nichinoken-fetch）を選択した場合</h2>
+      <div class="chat-mockup">
+        <div class="msg user"><span class="label">あなた</span>nichinoken-fetch を一覧から選択して送信</div>
+        <div class="msg ai"><span class="label">AI</span>知りたい内容は何ですか？（例：3月1日の公開模試、口座振替、個別面談の案内など）</div>
+      </div>
+      <h2>東海労金（東海労金-振込）を選択した場合</h2>
+      <div class="chat-mockup">
+        <div class="msg user"><span class="label">あなた</span>東海労金-振込 を一覧から選択して送信</div>
+        <div class="msg ai"><span class="label">AI</span>東海労金のログインIDとパスワードは .env に設定済みですか？未設定の場合は、このチャットで渡すか、browser_automation の .env に TOKAIROKIN_USER と TOKAIROKIN_PASS を追加してください。</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <h1>③ 質問に回答した後にどうなるか</h1>
+      <p>表示された質問に回答すると、AI がその内容を受け取り、スクリプトを実行して結果を返します。</p>
+      <h2>日能研の例</h2>
+      <div class="chat-mockup">
+        <div class="msg user"><span class="label">あなた</span>3月の公開模試について知りたい</div>
+        <div class="msg ai"><span class="label">AI</span>スクリプトを実行して取得しました。3月の公開模試について、取得したお知らせから該当箇所をまとめます…（日付・会場・申込方法などを返答）</div>
+      </div>
+      <h2>東海労金の例</h2>
+      <div class="chat-mockup">
+        <div class="msg user"><span class="label">あなた</span>三菱UFJ 熱田支店、口座 xxx、1万円</div>
+        <div class="msg ai"><span class="label">AI</span>振込内容を確認しました。スクリプトを実行します。ブラウザが起動し、フォーム入力まで自動で進みます。OTP 入力で一時停止したら、手動で OTP を入力して振込を実行してください。</div>
+      </div>
+      <p class="note">💡 <strong>一度コマンドを登録しておけば、毎回同じ流れで使える</strong>のがコマンドの便利さです。</p>
+    </section>
+
+    <!-- 4. 全体の流れ -->
+    <section class="slide">
+      <h1>4. 全体の流れ（Python とコマンドの結びつき）</h1>
+      <div class="mermaid" id="mermaid-flow">
+flowchart TB
+  subgraph Cursor [Cursor]
+    Cmd[コマンド実行]
+    Chat[チャットで対話]
+    Cmd --> Chat
+  end
+
+  subgraph Step [3ステップの流れ]
+    S1[ステップ1: 事前確認・質問]
+    S2[ステップ2: ユーザー回答]
+    S3[ステップ3: スクリプト実行 → 結果返却]
+    S1 --> S2 --> S3
+  end
+
+  subgraph Python [Python プログラム]
+    Script[fetch_after_login.py]
+    Config[config_*.yaml]
+    Env[.env 認証情報]
+    Config --> Script
+    Env --> Script
+  end
+
+  Chat --> Step
+  Step -->|nichinoken / tokairokin| Script
+  Script -->|取得結果 or 振込画面| Chat
+      </div>
+    </section>
+
+    <!-- 5. 日能研の事例 -->
+    <section class="slide">
+      <h1>5. 日能研の情報取得（nichinoken-fetch）</h1>
+      <p>コマンドが実行されると、AI はコマンド内の手順に従って動きます。</p>
+      <table>
+        <thead>
+          <tr><th>ステップ</th><th>コマンドの指示</th><th>実際の動き</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>いきなりスクリプトを動かさない</td>
+            <td>「知りたい内容は何ですか？（例：3月1日の公開模試、口座振替、個別面談の案内など）」と質問</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>ユーザーの回答を待つ</td>
+            <td>ユーザーが「〇〇について知りたい」と答える</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>スクリプト実行 → 取得 → 質問に答える形で返す</td>
+            <td><code>python fetch_after_login.py nichinoken</code> を実行し、出力ファイルを読み、該当箇所を抜き出して返答</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="slide">
+      <h1>日能研：Python プログラム側の動き</h1>
+      <ol>
+        <li><code>config_nichinoken.yaml</code> と <code>.env</code> から設定・認証を読み込む</li>
+        <li>Playwright でブラウザを起動し、日能研 MY NICHINOKEN にログイン</li>
+        <li>お知らせ・メッセージ・月間スケジュール（PDF）などを取得</li>
+        <li>結果を <code>500_Obsidian/02_Clippings/日能研/日能研_取得結果_YYYYMMDD_HHMMSS.md</code> に保存</li>
+      </ol>
+      <h2>コマンドとプログラムの結びつき</h2>
+      <ul>
+        <li>コマンド（nichinoken-fetch.md）が「いつ・何を聞くか」「どのパスで実行するか」「出力をどう読むか」を AI に指示</li>
+        <li>AI がその指示に従い、適切なタイミングで <code>fetch_after_login.py nichinoken</code> を実行</li>
+        <li>出力ファイルを読み、ユーザーが知りたいテーマに絞って返答</li>
+      </ul>
+    </section>
+
+    <!-- 6. 東海労金の事例 -->
+    <section class="slide">
+      <h1>6. 東海労金の振込（東海労金-振込）</h1>
+      <p>コマンドが実行されると、同様に 3 ステップで進みます。</p>
+      <table>
+        <thead>
+          <tr><th>ステップ</th><th>コマンドの指示</th><th>実際の動き</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>認証情報の確認</td>
+            <td>「東海労金のログインIDとパスワードは .env に設定済みですか？」と案内</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>振込内容の確認</td>
+            <td>「振込先（銀行・支店・口座番号）・振込金額を教えてください」と聞く</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>スクリプト実行</td>
+            <td><code>python fetch_after_login.py tokairokin --bank-name "三菱UFJ銀行" --branch-name "熱田支店" --account xxxxxxx --amount 10000</code> など、パラメータ付きで実行</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="slide">
+      <h1>東海労金：Python プログラム側の動き</h1>
+      <ol>
+        <li><code>config_tokairokin.yaml</code> と <code>.env</code> から設定・認証を読み込む</li>
+        <li>東海労金インターネットバンキングにログイン → 合言葉（自動）→ 振込画面へ遷移</li>
+        <li><code>--bank</code> <code>--branch</code> <code>--account</code> <code>--amount</code> が渡されていれば、<code>config_tokairokin.yaml</code> の <code>transfer_form</code> に従いフォームを自動入力</li>
+        <li>ワンタイムパスワード（OTP）入力で一時停止 → ユーザーが手動で OTP を入力し、振込を実行</li>
+      </ol>
+      <p class="note">※ 振込は金銭操作のため、実行前に必ず内容をユーザーに確認させる旨もコマンドに記載しています。</p>
+    </section>
+
+    <!-- 7. 共通の仕組み -->
+    <section class="slide">
+      <h1>7. 共通の仕組み</h1>
+      <table>
+        <thead>
+          <tr><th>要素</th><th>日能研</th><th>東海労金</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Python スクリプト</strong></td>
+            <td><code>fetch_after_login.py</code>（共通）</td>
+            <td>同上</td>
+          </tr>
+          <tr>
+            <td><strong>サイト指定</strong></td>
+            <td><code>nichinoken</code></td>
+            <td><code>tokairokin</code></td>
+          </tr>
+          <tr>
+            <td><strong>設定ファイル</strong></td>
+            <td><code>config_nichinoken.yaml</code></td>
+            <td><code>config_tokairokin.yaml</code></td>
+          </tr>
+          <tr>
+            <td><strong>認証</strong></td>
+            <td><code>.env</code> の <code>NICHINOKEN_USER</code> / <code>NICHINOKEN_PASS</code></td>
+            <td><code>.env</code> の <code>TOKAIROKIN_USER</code> / <code>TOKAIROKIN_PASS</code></td>
+          </tr>
+          <tr>
+            <td><strong>コマンド保存場所</strong></td>
+            <td colspan="2"><code>500_Obsidian/.cursor/commands/</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 8. ルールの使い方 -->
+    <section class="slide">
+      <h1>8. ルール（.cursor/rules）の使い方</h1>
+      <ul>
+        <li><strong>ルール</strong>は、AI が「どのワークスペースで何をすべきか」を判断するための指示です。</li>
+        <li>例：<code>command-location.mdc</code> では「コマンドを登録するときは <code>500_Obsidian/.cursor/commands/</code> に保存する」と指定しています。</li>
+        <li>これにより、<strong>どのフォルダで作業していても</strong>、コマンドの保存先が一貫します。</li>
+        <li>ルールは <code>alwaysApply: true</code> にすると、そのワークスペースを開いている間は常に適用されます。</li>
+      </ul>
+      <p class="note">「こういう依頼をされたらこう動く」というパターンをルールに書いておくと、AI が迷わず同じ手順で動いてくれます。</p>
+    </section>
+
+    <!-- 9. コマンドの使い方 -->
+    <section class="slide">
+      <h1>9. コマンド（.cursor/commands）の使い方</h1>
+      <p>コマンドは、<strong>具体的な手順を書いたプロンプト</strong>です。日能研・東海労金のコマンドは、いずれも <strong>3 ステップ</strong>で構成されています。</p>
+      <table>
+        <thead>
+          <tr><th>ポイント</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>いきなりスクリプトを動かさない</strong></td>
+            <td>日能研では「知りたい内容」、東海労金では「認証」「振込内容」を先に確認してから実行するよう、コマンドに明記しています。</td>
+          </tr>
+          <tr>
+            <td><strong>絶対パス・カレントの指定</strong></td>
+            <td>スクリプトの場所（<code>215_神・大家さん倶楽部/C1_cursor/browser_automation/</code>）と、仮想環境の有効化方法をコマンドに書いておくことで、AI が正しい場所で実行できます。</td>
+          </tr>
+          <tr>
+            <td><strong>出力の読み方</strong></td>
+            <td>日能研では「直近の取得結果ファイルを開き、ユーザーの質問に答える形で返す」と指定。AI がファイルを探して内容を解釈する手順が明確になります。</td>
+          </tr>
+          <tr>
+            <td><strong>セキュリティ・確認</strong></td>
+            <td>振込は金銭操作のため、「実行前に振込内容をユーザーに確認させる」とコマンドに書いてあります。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 10. ルールとコマンドの役割分担 -->
+    <section class="slide">
+      <h1>10. ルールとコマンドの役割分担</h1>
+      <table>
+        <thead>
+          <tr><th>種類</th><th>役割</th><th>例</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>ルール</strong></td>
+            <td>ワークスペース全体で守る方針・場所の指定</td>
+            <td>コマンドは <code>500_Obsidian/.cursor/commands/</code> に保存する</td>
+          </tr>
+          <tr>
+            <td><strong>コマンド</strong></td>
+            <td>特定のタスクの手順（いつ何を聞くか、どう実行するか）</td>
+            <td>日能研の情報取得、東海労金の振込</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>ルールで「どこに何を置くか」を決め、コマンドで「そのタスクをどう進めるか」を細かく指示する、という分担にすると運用しやすくなります。</p>
+    </section>
+
+    <!-- 11. まとめ -->
+    <section class="slide">
+      <h1>11. まとめ</h1>
+      <ul>
+        <li><strong>実施内容</strong>：日能研の情報取得と東海労金の振込を、Cursor のコマンドとして登録し、Python（Playwright）スクリプトと連携させました。</li>
+        <li><strong>結びつき</strong>：コマンドが「いつ・何を聞くか」「どのスクリプトをどう実行するか」「結果をどう返すか」を AI に指示し、AI がその通りに <code>fetch_after_login.py</code> を呼び出して結果を返します。</li>
+        <li><strong>ポイント</strong>：ルールで保存場所や方針を統一し、コマンドでタスクごとの手順を明確に書くことで、再現性の高い自動化が実現できます。</li>
+      </ul>
+    </section>
+
+    <!-- 12. 参照 -->
+    <section class="slide">
+      <h1>参照</h1>
+      <ul>
+        <li><strong>Claude Agent Skills の説明</strong>：Notion「神大家 東海DX互助会」内の「いけともワークショップ_google AI studio」「いけともワークショップ_Excel自動化」の記事メモ（添付資料含む）</li>
+        <li>コマンドファイル：<code>500_Obsidian/.cursor/commands/nichinoken-fetch.md</code>、<code>東海労金-振込.md</code></li>
+        <li>Python スクリプト：<code>215_神・大家さん倶楽部/C1_cursor/browser_automation/fetch_after_login.py</code></li>
+        <li>ルール（コマンド保存場所）：<code>215_神・大家さん倶楽部/.cursor/rules/command-location.mdc</code></li>
+        <li>Markdown 版：同じフォルダの <code>DX互助会向け_ブラウジングオートメーションの取り組み紹介.md</code></li>
+      </ul>
+    </section>
+  </main>
+  <script>
+    mermaid.initialize({ theme: 'dark' });
+  </script>
+</body>
+</html>
