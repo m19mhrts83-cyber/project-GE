@@ -64,7 +64,7 @@
             <td>ログイン → お知らせ・スケジュール等を取得 → 知りたい内容に答える</td>
           </tr>
           <tr>
-            <td><strong>tokairokin-transfer</strong></td>
+            <td><strong>東海労金-振込</strong></td>
             <td>東海労金インターネットバンキング</td>
             <td>ログイン → 振込画面へ遷移 → フォーム自動入力 → OTP 入力で実行</td>
           </tr>
@@ -93,7 +93,7 @@
       <h1>3. コマンドの実行の仕方（チャット画面のイメージ）</h1>
       <h2>① 登録された選択肢の中から選ぶ</h2>
       <p>入力欄に <code>/</code> を打つと、スラッシュコマンドとして登録したものが一覧で表示されます。言葉で直接入力するのではなく、<strong>あらかじめ登録された選択肢の中から選ぶ</strong>形です。</p>
-      <p>一覧から <strong>nichinoken-fetch</strong> や <strong>tokairokin-transfer</strong> を選んで送信すると、コマンドの手順が開始されます。</p>
+      <p>一覧から <strong>nichinoken-fetch</strong> や <strong>東海労金-振込</strong> を選んで送信すると、コマンドの手順が開始されます。</p>
     </section>
 
     <section class="slide">
@@ -104,9 +104,9 @@
         <div class="msg user"><span class="label">あなた</span>nichinoken-fetch を一覧から選択して送信</div>
         <div class="msg ai"><span class="label">AI</span>知りたい内容は何ですか？（例：3月1日の公開模試、口座振替、個別面談の案内など）</div>
       </div>
-      <h2>東海労金（tokairokin-transfer）を選択した場合</h2>
+      <h2>東海労金（東海労金-振込）を選択した場合</h2>
       <div class="chat-mockup">
-        <div class="msg user"><span class="label">あなた</span>tokairokin-transfer を一覧から選択して送信</div>
+        <div class="msg user"><span class="label">あなた</span>東海労金-振込 を一覧から選択して送信</div>
         <div class="msg ai"><span class="label">AI</span>東海労金のログインIDとパスワードは .env に設定済みですか？未設定の場合は、このチャットで渡すか、browser_automation の .env に TOKAIROKIN_USER と TOKAIROKIN_PASS を追加してください。</div>
       </div>
     </section>
@@ -205,7 +205,7 @@ flowchart TB
 
     <!-- 6. 東海労金の事例 -->
     <section class="slide">
-      <h1>6. 東海労金の振込（tokairokin-transfer）</h1>
+      <h1>6. 東海労金の振込（東海労金-振込）</h1>
       <p>コマンドが実行されると、同様に 3 ステップで進みます。</p>
       <table>
         <thead>
@@ -272,7 +272,7 @@ flowchart TB
           </tr>
           <tr>
             <td><strong>コマンド保存場所</strong></td>
-            <td colspan="2"><code>.cursor/commands/</code>（リポジトリルート）</td>
+            <td colspan="2"><code>500_Obsidian/.cursor/commands/</code></td>
           </tr>
         </tbody>
       </table>
@@ -283,7 +283,7 @@ flowchart TB
       <h1>8. ルール（.cursor/rules）の使い方</h1>
       <ul>
         <li><strong>ルール</strong>は、AI が「どのワークスペースで何をすべきか」を判断するための指示です。</li>
-        <li>例：コマンドはリポジトリルートの <code>.cursor/commands/</code> に保存します（OneDrive に依存しない運用）。</li>
+        <li>例：<code>command-location.mdc</code> では「コマンドを登録するときは <code>500_Obsidian/.cursor/commands/</code> に保存する」と指定しています。</li>
         <li>これにより、<strong>どのフォルダで作業していても</strong>、コマンドの保存先が一貫します。</li>
         <li>ルールは <code>alwaysApply: true</code> にすると、そのワークスペースを開いている間は常に適用されます。</li>
       </ul>
@@ -330,7 +330,7 @@ flowchart TB
           <tr>
             <td><strong>ルール</strong></td>
             <td>ワークスペース全体で守る方針・場所の指定</td>
-            <td>コマンドは <code>.cursor/commands/</code>（リポジトリルート）に保存する</td>
+            <td>コマンドは <code>500_Obsidian/.cursor/commands/</code> に保存する</td>
           </tr>
           <tr>
             <td><strong>コマンド</strong></td>
@@ -357,7 +357,7 @@ flowchart TB
       <h1>参照</h1>
       <ul>
         <li><strong>Claude Agent Skills の説明</strong>：Notion「神大家 東海DX互助会」内の「いけともワークショップ_google AI studio」「いけともワークショップ_Excel自動化」の記事メモ（添付資料含む）</li>
-        <li>コマンドファイル：<code>.cursor/commands/nichinoken-fetch.md</code>、<code>tokairokin-transfer.md</code>（リポジトリルート）</li>
+        <li>コマンドファイル：<code>500_Obsidian/.cursor/commands/nichinoken-fetch.md</code>、<code>東海労金-振込.md</code></li>
         <li>Python スクリプト：<code>215_神・大家さん倶楽部/C1_cursor/browser_automation/fetch_after_login.py</code></li>
         <li>ルール（コマンド保存場所）：<code>215_神・大家さん倶楽部/.cursor/rules/command-location.mdc</code></li>
         <li>Markdown 版：同じフォルダの <code>DX互助会向け_ブラウジングオートメーションの取り組み紹介.md</code></li>
