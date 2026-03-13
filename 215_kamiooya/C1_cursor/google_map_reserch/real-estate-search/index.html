@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>不動産賃貸管理会社検索</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏠 不動産賃貸管理会社検索</h1>
+            <p class="subtitle">駅名を入力して最寄りの不動産賃貸管理会社を検索</p>
+        </header>
+
+        <div class="search-section">
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    id="stationInput" 
+                    placeholder="例: 渋谷駅、新宿駅、東京駅"
+                    autocomplete="off"
+                >
+                <button id="searchButton" onclick="searchRealEstate()">
+                    <span class="button-text">検索</span>
+                    <span class="loading-spinner" style="display: none;">⏳</span>
+                </button>
+            </div>
+            <div class="api-key-section">
+                <label for="apiKeyInput">Google Maps API Key:</label>
+                <input 
+                    type="password" 
+                    id="apiKeyInput" 
+                    placeholder="APIキーを入力してください"
+                >
+                <small>※ APIキーはブラウザに保存されます（ローカルストレージ）</small>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        
+        <div id="resultsSection" style="display: none;">
+            <div class="results-header">
+                <h2 id="resultsTitle">検索結果</h2>
+                <p id="resultsCount"></p>
+            </div>
+            
+            <div id="mapContainer" class="map-container">
+                <div id="map"></div>
+            </div>
+
+            <div class="view-toggle">
+                <button id="cardViewBtn" class="view-btn active" onclick="switchView('card')">
+                    📋 カード表示
+                </button>
+                <button id="tableViewBtn" class="view-btn" onclick="switchView('table')">
+                    📊 表形式
+                </button>
+                <button id="copyTableBtn" class="copy-btn" onclick="copyTableToClipboard()" style="display: none;">
+                    📋 表をコピー
+                </button>
+            </div>
+
+            <div id="cardView" class="results-list"></div>
+            
+            <div id="tableView" style="display: none;">
+                <div class="table-container">
+                    <table id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>県</th>
+                                <th>市</th>
+                                <th>最寄り駅</th>
+                                <th>会社名</th>
+                                <th>会社URL</th>
+                                <th>問合せフォームURL</th>
+                                <th>TEL</th>
+                                <th>mail</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📖 使い方</h3>
+            <ol>
+                <li><strong>Google Maps API Keyを取得</strong>
+                    <ul class="sub-list">
+                        <li><a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>にアクセス</li>
+                        <li>プロジェクトを作成または選択</li>
+                        <li>「APIとサービス」→「ライブラリ」から以下を有効化：
+                            <ul class="sub-list">
+                                <li>Maps JavaScript API</li>
+                                <li>Places API</li>
+                                <li>Geocoding API</li>
+                            </ul>
+                        </li>
+                        <li>「APIとサービス」→「認証情報」からAPI Keyを作成</li>
+                        <li>（推奨）API Keyに制限を設定：
+                            <ul class="sub-list">
+                                <li>アプリケーションの制限: HTTPリファラー</li>
+                                <li>APIの制限: 上記3つのAPIのみ</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li><strong>API Keyを入力</strong>して保存（初回のみ）</li>
+                <li><strong>駅名を入力</strong>（例：渋谷駅、新宿駅、東京駅）</li>
+                <li><strong>検索ボタンをクリック</strong>して結果を表示</li>
+                <li><strong>表形式に切り替え</strong>て「📋 表をコピー」でExcelへ貼り付け</li>
+            </ol>
+
+            <h3>💰 使用料金補足</h3>
+            <div class="pricing-info">
+                <div class="pricing-section">
+                    <h4>🆓 無料枠（毎月自動リセット）</h4>
+                    <p class="highlight-box">Google Cloudは<strong>月額$200分（約3万円相当）</strong>の無料クレジットを提供しています。</p>
+                </div>
+
+                <div class="pricing-section">
+                    <h4>📊 1回の検索あたりのコスト</h4>
+                    <p>このアプリで1回検索すると、以下のAPIが呼び出されます：</p>
+                    <table class="pricing-table">
+                        <thead>
+                            <tr>
+                                <th>API名</th>
+                                <th>使用回数</th>
+                                <th>単価（1000回あたり）</th>
+                                <th>1検索あたりのコスト</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Geocoding API</td>
+                                <td>1回</td>
+                                <td>$5.00</td>
+                                <td>約<strong>$0.005</strong>（約0.7円）</td>
+                            </tr>
+                            <tr>
+                                <td>Places API Nearby Search</td>
+                                <td>1回</td>
+                                <td>$32.00</td>
+                                <td>約<strong>$0.032</strong>（約4.5円）</td>
+                            </tr>
+                            <tr>
+                                <td>Places API Details</td>
+                                <td>20回程度<br><small>（検索結果の件数による）</small></td>
+                                <td>$17.00</td>
+                                <td>約<strong>$0.340</strong>（約48円）</td>
+                            </tr>
+                            <tr>
+                                <td>Maps JavaScript API</td>
+                                <td>1回</td>
+                                <td>$7.00</td>
+                                <td>約<strong>$0.007</strong>（約1円）</td>
+                            </tr>
+                            <tr class="total-row">
+                                <td colspan="3"><strong>合計（1検索あたり）</strong></td>
+                                <td><strong>約$0.384</strong>（約<strong>54円</strong>）</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="note">※ 為替レート: 1ドル=140円で計算</p>
+                    <p class="note">※ 検索結果の件数により、実際のコストは変動します</p>
+                </div>
+
+                <div class="pricing-section">
+                    <h4>📈 月間使用量の目安</h4>
+                    <table class="usage-table">
+                        <thead>
+                            <tr>
+                                <th>月間検索回数</th>
+                                <th>概算コスト</th>
+                                <th>無料枠との比較</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>10回</td>
+                                <td>約$3.84（約540円）</td>
+                                <td class="free">✅ 無料枠内</td>
+                            </tr>
+                            <tr>
+                                <td>50回</td>
+                                <td>約$19.20（約2,700円）</td>
+                                <td class="free">✅ 無料枠内</td>
+                            </tr>
+                            <tr>
+                                <td>100回</td>
+                                <td>約$38.40（約5,400円）</td>
+                                <td class="free">✅ 無料枠内</td>
+                            </tr>
+                            <tr>
+                                <td>300回</td>
+                                <td>約$115.20（約16,100円）</td>
+                                <td class="free">✅ 無料枠内</td>
+                            </tr>
+                            <tr>
+                                <td>520回</td>
+                                <td>約$200（約28,000円）</td>
+                                <td class="warning">⚠️ 無料枠ギリギリ</td>
+                            </tr>
+                            <tr>
+                                <td>600回</td>
+                                <td>約$230（約32,200円）</td>
+                                <td class="paid">💳 課金発生（約$30/月）</td>
+                            </tr>
+                            <tr>
+                                <td>1000回</td>
+                                <td>約$384（約53,800円）</td>
+                                <td class="paid">💳 課金発生（約$184/月）</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pricing-section">
+                    <h4>💡 コスト削減のヒント</h4>
+                    <ul>
+                        <li>🔍 <strong>検索結果をメモ</strong>：同じ駅を何度も検索しない</li>
+                        <li>📋 <strong>表をコピー機能を活用</strong>：ExcelやGoogleスプレッドシートに保存して再利用</li>
+                        <li>📊 <strong>使用状況を定期的に確認</strong>：<a href="https://console.cloud.google.com/billing" target="_blank">Google Cloud Billing</a>で確認</li>
+                        <li>⚙️ <strong>予算アラートを設定</strong>：一定金額を超えたら通知を受け取る</li>
+                        <li>🔒 <strong>API Keyに制限を設定</strong>：不正利用を防止</li>
+                    </ul>
+                </div>
+
+                <div class="pricing-section warning-box">
+                    <h4>⚠️ 重要な注意事項</h4>
+                    <ul>
+                        <li>無料枠の<strong>$200は毎月自動的にリセット</strong>されます（繰り越しなし）</li>
+                        <li>無料枠を超えた場合、<strong>自動的に課金</strong>されます</li>
+                        <li>クレジットカード登録が必要です</li>
+                        <li><strong>予算アラートの設定を強く推奨</strong>します</li>
+                        <li>APIの料金は<a href="https://cloud.google.com/maps-platform/pricing" target="_blank">Google Maps Platform料金ページ</a>で最新情報を確認してください</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
