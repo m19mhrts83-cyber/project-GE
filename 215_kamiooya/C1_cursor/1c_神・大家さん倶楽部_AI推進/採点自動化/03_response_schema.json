@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ScoringResult",
+  "type": "object",
+  "required": [
+    "is_target",
+    "classification",
+    "subcategory",
+    "rule_id",
+    "score",
+    "reason",
+    "evidence",
+    "confidence"
+  ],
+  "properties": {
+    "is_target": {
+      "type": "boolean"
+    },
+    "classification": {
+      "type": "string"
+    },
+    "subcategory": {
+      "type": "string"
+    },
+    "rule_id": {
+      "type": "string"
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reason": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    }
+  },
+  "additionalProperties": false
+}
+
