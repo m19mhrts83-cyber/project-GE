@@ -13,7 +13,7 @@ Grandole志賀本通I などの空室対策メールを、指定した Markdown 
   - シート: `G2`
   - 場所: `/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部`
 - 実行用 Python スクリプト:
-  - `/Users/matsunomasaharu/git-repos/ProgramCode/C1_cursor/mail_automation/interactive_vacancy_send.py`
+  - `/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation/interactive_vacancy_send.py`
 - Python 実行環境:
   - `/Users/matsunomasaharu/git-repos/ProgramCode/venv_gmail/bin/python`
 
@@ -57,7 +57,7 @@ Grandole志賀本通I などの空室対策メールを、指定した Markdown 
 
 ```bash
 cd "/Users/matsunomasaharu/git-repos/ProgramCode" && \
-./venv_gmail/bin/python C1_cursor/mail_automation/interactive_vacancy_send.py
+./venv_gmail/bin/python "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation/interactive_vacancy_send.py"
 ```
 
 実行にあたってのルール:
