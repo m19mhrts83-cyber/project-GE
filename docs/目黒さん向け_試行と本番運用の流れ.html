@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>成果報告 AI 採点ツール 試行・本番運用の流れ（目黒さん向け）</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      line-height: 1.6;
+    }
+    .slide {
+      min-height: 100vh;
+      padding: 3rem 4rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .slide h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #a8dadc;
+      margin-bottom: 2rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #457b9d;
+    }
+    .slide h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #a8dadc;
+      margin: 1.5rem 0 0.75rem 0;
+    }
+    .slide p, .slide li {
+      font-size: 1.05rem;
+      margin: 0.5rem 0;
+    }
+    .slide ul {
+      margin: 0.5rem 0 1rem 0;
+      padding-left: 1.5rem;
+    }
+    .slide li {
+      margin: 0.4rem 0;
+    }
+    .slide.sub-list { padding-left: 1.5rem; }
+    .slide.sub-list li { margin: 0.3rem 0; }
+    .title-slide {
+      text-align: center;
+      justify-content: center;
+    }
+    .title-slide h1 {
+      font-size: 2rem;
+      border: none;
+      margin-bottom: 0.5rem;
+    }
+    .title-slide .sub {
+      font-size: 1.1rem;
+      color: #94a3b8;
+      margin-top: 1rem;
+    }
+    .note {
+      margin-top: 2rem;
+      padding: 1rem 1.25rem;
+      background: rgba(69, 123, 157, 0.2);
+      border-left: 4px solid #457b9d;
+      font-size: 0.95rem;
+      color: #cbd5e1;
+    }
+    .note strong { color: #a8dadc; }
+    .footer {
+      margin-top: auto;
+      padding-top: 2rem;
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+    .slide img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      margin: 0.75rem 0;
+    }
+    .slide .fig-wrap {
+      margin: 1rem 0 1.5rem 0;
+    }
+    .slide .fig-caption {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-top: 0.35rem;
+    }
+    .slide .img-highlight-wrap {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+    }
+    .slide .img-highlight-wrap img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+    .slide .highlight-row8-ab {
+      position: absolute;
+      border: 3px solid #e63946;
+      border-radius: 4px;
+      box-sizing: border-box;
+      pointer-events: none;
+      top: 64%;
+      left: 3%;
+      width: 38%;
+      height: 6.5%;
+    }
+    .slide .highlight-saiten-exec {
+      position: absolute;
+      border: 3px solid #e63946;
+      border-radius: 4px;
+      box-sizing: border-box;
+      pointer-events: none;
+      top: 41%;
+      left: 46%;
+      width: 8%;
+      height: 10%;
+    }
+    .slide .highlight-correction-add {
+      position: absolute;
+      border: 3px solid #e63946;
+      border-radius: 4px;
+      box-sizing: border-box;
+      pointer-events: none;
+      /* ⑧用：ドロップダウンの「補正学習データを追加」付近 */
+      top: 51%;
+      left: 46%;
+      width: 13%;
+      height: 12%;
+    }
+    /* 2-2用：採点自動化メニュー「CSV取込」を赤枠で囲む */
+    .slide .highlight-csv-import {
+      position: absolute;
+      border: 3px solid #e63946;
+      border-radius: 4px;
+      box-sizing: border-box;
+      pointer-events: none;
+      /* ドロップダウンの1番目「CSV取込 (Drive File ID)」付近 */
+      top: 30%;
+      left: 45%;
+      width: 16%;
+      height: 10%;
+    }
+    .slide .fig-annotation {
+      position: absolute;
+      top: 71%;
+      left: 3%;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 0 4px #000, 0 1px 3px #000;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .slide .step {
+      margin: 1.25rem 0;
+      padding-left: 0.5rem;
+    }
+    .slide .step-num {
+      color: #a8dadc;
+      font-weight: 600;
+      margin-right: 0.35rem;
+    }
+    .slide ol {
+      margin: 0.5rem 0 1rem 0;
+      padding-left: 1.5rem;
+    }
+    @media (max-width: 640px) {
+      .slide { padding: 2rem 1.5rem; }
+      .slide h1 { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <section class="slide title-slide">
+    <h1>成果報告 AI 採点ツール</h1>
+    <p class="sub">試行・本番運用の流れ</p>
+    <p class="sub" style="margin-top: 2rem;">目黒さん向け</p>
+  </section>
+
+  <section class="slide">
+    <h1>1. 試行の進め方</h1>
+    <p>今回お渡しする成果報告 AI 採点ツールを使って、次の流れで試行をお願いします。</p>
+    <h2>(a) 得点の算出</h2>
+    <ul>
+      <li><strong>今回受け取ったサンプルCSV</strong>で、まずは得点を算出してください。</li>
+    </ul>
+    <h2>(b) 結果の確認</h2>
+    <ul>
+      <li>元々の結果とズレがないか、<strong>サンプルレベルでよいので確認</strong>をお願いします。</li>
+    </ul>
+    <h2>(c) 設定で動かしてみる</h2>
+    <ul>
+      <li>設定画面で<strong>サンプル数や点数</strong>を選択し、実際に動かしてみてください。</li>
+    </ul>
+    <h2>(d) 結果が違った場合</h2>
+    <ul>
+      <li>採点欄で<strong>手動補正</strong>を行い、最終的な点数を出すような運用を想定しています。</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h1>試行の具体的な進め方</h1>
+
+    <h2>1-1. フォルダ構成</h2>
+    <p>お渡ししたフォルダ・ファイルの構成は次のとおりです。説明が必要な場合はお知らせください。</p>
+    <div class="fig-wrap">
+      <img src="採点自動化/image/ファイル表示.png" alt="フォルダ構成">
+      <p class="fig-caption">フォルダ構成</p>
+    </div>
+
+    <h2>1-2. CSVデータの扱い</h2>
+    <ul>
+      <li>現状のCSVは<strong>2月のデータをそのまま</strong>入れている形になります。</li>
+      <li>試行としては、<strong>まずその状態で進めて</strong>ください。</li>
+    </ul>
+
+    <h2>1-3. スプレッドシートの操作</h2>
+    <p>まず<strong>スプレッドシートを開いて</strong>ください。そのうえで、次の流れで操作します。</p>
+
+    <p class="step"><span class="step-num">①</span><strong>「設定」</strong>シートで確認します。8行目の<strong>MAX_ROWS_PER_RUN</strong>は<strong>5のまま</strong>で、一度動かしてみてください。</p>
+    <div class="fig-wrap">
+      <div class="img-highlight-wrap">
+        <img src="採点自動化/image/設定シート.png" alt="設定シート">
+        <span class="highlight-row8-ab" aria-hidden="true"></span>
+      </div>
+      <p class="fig-caption">設定シート（8行目・A-B列＝MAX_ROWS_PER_RUN）</p>
+    </div>
+    <ul>
+      <li>この数値を<strong>変えると、評価する件数が変わります</strong>。</li>
+      <li>全データを一度に採点する場合は、このセルを<strong>空白</strong>にすると全件採点されます。</li>
+      <li>ひとまず、<strong>まずは5件</strong>で実行されることを確認してください。</li>
+    </ul>
+
+    <p class="step"><span class="step-num">②</span>画面上部のメニューから<strong>「採点自動化」</strong>をクリックし、<strong>「採点実行」</strong>をクリックしてください。</p>
+    <div class="fig-wrap">
+      <div class="img-highlight-wrap">
+        <img src="採点自動化/image/採点自動化メニュー.png" alt="採点自動化メニュー">
+        <span class="highlight-saiten-exec" aria-hidden="true"></span>
+      </div>
+      <p class="fig-caption">採点自動化メニュー</p>
+    </div>
+
+    <p class="step"><span class="step-num">③</span>採点結果を確認します。下記のイメージのように、<strong>5件が表示されていること</strong>を確認してください。</p>
+    <div class="fig-wrap">
+      <img src="採点自動化/image/採点結果.png" alt="採点結果のイメージ">
+      <p class="fig-caption">採点結果のイメージ（5件）</p>
+    </div>
+
+    <p class="step"><span class="step-num">④</span>動きを確認できたら、<strong>「設定」シート</strong>に戻り、8行目の<strong>「5」を削除して空白</strong>にしてください。</p>
+    <div class="fig-wrap">
+      <div class="img-highlight-wrap">
+        <img src="採点自動化/image/設定シート.png" alt="設定シート">
+        <span class="highlight-row8-ab" aria-hidden="true"></span>
+        <span class="fig-annotation" aria-hidden="true">5を削除して空白に</span>
+      </div>
+      <p class="fig-caption">設定シート（8行目・B列を空白に）</p>
+    </div>
+
+    <p class="step"><span class="step-num">⑤</span>②と同じように、メニューから<strong>「採点自動化」</strong>をクリックし、<strong>「採点実行」</strong>をクリックしてください。</p>
+
+    <p class="step"><span class="step-num">⑥</span><strong>「採点結果」シート</strong>で、全件採点されていることを確認してください。</p>
+
+    <p class="step"><span class="step-num">⑦</span>Geminiが採点した結果が、元々の意図や最初にもらった採点結果と<strong>大筋合っていること</strong>を確認してください。</p>
+    <ol>
+      <li><strong>大筋合っていること</strong>を確認する</li>
+      <li>合っていない場合は、<strong>N列「手動補正点」</strong>に、得点から変更させたい差分を入力する</li>
+      <li>補正を加えた最終結果は、<strong>O列「最終点」</strong>として表示される</li>
+    </ol>
+    <div class="fig-wrap">
+      <img src="採点自動化/image/採点結果.png" alt="採点結果のイメージ（補正する列の確認用）">
+      <p class="fig-caption">採点結果シート（補正する列のイメージ）</p>
+    </div>
+
+    <p class="step"><span class="step-num">⑧</span>補正を行った場合は、<strong>「採点自動化」メニュー</strong>の<strong>「補正学習データを追加」</strong>をクリックすると、補正した点数を加味して次回から採点するようになります。<strong>（⑦でN列「手動補正点」に補正を入れた場合のみで大丈夫です）</strong></p>
+    <div class="fig-wrap">
+      <div class="img-highlight-wrap">
+        <img src="採点自動化/image/採点自動化メニュー.png" alt="採点自動化メニュー">
+        <span class="highlight-correction-add" aria-hidden="true"></span>
+      </div>
+      <p class="fig-caption">採点自動化メニュー（補正学習データを追加）</p>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h1>2. 3月の本番運用について</h1>
+    <p>試行で問題がなければ、3月の集計で本番利用をお願いします。</p>
+    <h2>(a) 本番利用</h2>
+    <ul>
+      <li>試行で問題がなければ、<strong>3月の集計結果</strong>で一度本番利用してみてください。</li>
+    </ul>
+    <h2>(b) 従来手法との比較</h2>
+    <ul>
+      <li>今回用意したものと<strong>通常の手法を併用</strong>し、どれだけ差が出るかを把握してほしいです。</li>
+    </ul>
+    <h2>(c) 差が出た場合</h2>
+    <ul>
+      <li>差が出たものについては<strong>手動で補正</strong>したうえで、まずは評価を行ってください。</li>
+      <li>これが<strong>直近で対応をお願いしたいこと</strong>です。</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h1>3月本番の具体的な進め方</h1>
+    <p>試行の具体的な進め方と同様に進めつつ、<strong>本番で追加・注意が必要な点</strong>を中心にまとめます。</p>
+
+    <h2>2-1. CSVデータの扱い</h2>
+    <p>本番では、<strong>3月のCSVを取得したうえで</strong>、試行時と同じフォルダ構成に従ってファイルを準備してください。下記の<strong>フォルダ構成の図</strong>を参照し、<strong>指定のドライブにCSVファイルを配置</strong>してください。</p>
+    <div class="fig-wrap">
+      <img src="採点自動化/image/ファイル表示.png" alt="フォルダ構成">
+      <p class="fig-caption">フォルダ構成</p>
+    </div>
+    <p>その際、次の2点をお願いします。</p>
+    <ul>
+      <li><strong>ファイル名を図示の通りに修正</strong>してください。</li>
+      <li>元々あったCSVファイルは<strong>削除</strong>してください。</li>
+    </ul>
+    <p>（試行の「1-2」に相当する、本番用のCSV準備です。）</p>
+
+    <h2>2-2. スプレッドシートの操作</h2>
+    <p>採点実行を行う前に、以下の2点を行ってください。</p>
+
+    <p><strong>1.</strong> 画面上のメニューから<strong>「採点自動化」</strong>をクリックし、<strong>「CSV取込 (Drive File ID)」</strong>を実行してください。</p>
+    <div class="fig-wrap">
+      <div class="img-highlight-wrap">
+        <img src="採点自動化/image/採点自動化メニュー.png" alt="採点自動化メニュー">
+        <span class="highlight-csv-import" aria-hidden="true"></span>
+      </div>
+      <p class="fig-caption">採点自動化メニュー</p>
+    </div>
+
+    <p><strong>2.</strong> <strong>「元データ」</strong>シートが3月のデータに更新されていることを確認してください。</p>
+    <div class="fig-wrap">
+      <img src="採点自動化/image/元データ.png" alt="元データシート">
+      <p class="fig-caption">元データシート</p>
+    </div>
+
+    <p>以降の作業は、<strong>試行の具体的な進め方</strong>の<strong>1-3（スプレッドシートの操作）</strong>と同じ流れです。</p>
+  </section>
+
+  <section class="slide">
+    <h1>3. 4月以降のステップ</h1>
+    <p>3月までに「従来手法」と「Geminiでの評価」の比較を完了していただく想定です。</p>
+    <h2>(a) 補正学習データへの追加</h2>
+    <ul>
+      <li>3月の補正内容を<strong>「補正学習データ」として追加</strong>します。</li>
+    </ul>
+    <h2>(b) 4月からの運用</h2>
+    <ul>
+      <li>4月からは、その補正を<strong>組み込んだうえで成果報告 AI 採点ツールで採点</strong>を行う形にする予定です。</li>
+    </ul>
+    <h2>(c) 3月までにお願いしたいこと</h2>
+    <ul>
+      <li><strong>一旦3月までは</strong>「従来の手法」と「Geminiでの評価」を<strong>比較するところまでを完遂</strong>してほしい、という意図でお願いします。</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h1>補足事項</h1>
+    <h2>今回の試行について</h2>
+    <ul>
+      <li>今のGemini APIは<strong>私の個人API</strong>を利用しており、まだうまくいかない部分もあるかと思いますが、<strong>そのままで構いません</strong>。</li>
+      <li>本資料でご案内している流れ（試行・3月本番）では、手動補正は行いますが、<strong>その補正がGeminiの採点に自動で反映される段階にはまだありません</strong>。補正を取り込む業務の説明は4月以降にあらためて行います。</li>
+    </ul>
+    <h2>4月以降の実運用について</h2>
+    <ul>
+      <li>4月以降の実運用では<strong>APIの切り替え</strong>をお願いしたいため、<strong>4月のタイミングで</strong>次の2点について改めてお伝えします。</li>
+      <ul class="sub-list">
+        <li>補正を取り込む業務（学習データの補正方法）</li>
+        <li>APIの変更</li>
+      </ul>
+    </ul>
+    <div class="footer">以上、試行と本番運用の流れでした。ご不明点があればお知らせください。</div>
+  </section>
+
+</body>
+</html>
