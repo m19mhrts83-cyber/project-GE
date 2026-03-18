@@ -14,7 +14,10 @@
 使い方:
   python yoritoori_send.py --partner 立木       # phones のみ → iMessage
   python yoritoori_send.py --partner ミニテック  # emails あり → Gmail 返信
+  python yoritoori_send.py --partner LEAF --via gmail
+  python yoritoori_send.py --partner LEAF --via imessage
   python yoritoori_send.py --partner 立木 --dry-run
+  python yoritoori_send.py --partner LEAF --via imessage --skip-confirm
 """
 
 import argparse
@@ -27,6 +30,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
+from hashlib import sha256
 from pathlib import Path
 
 import yaml
@@ -64,43 +68,55 @@ SCOPES = [
 
 def trigger_editor_save_all():
     """
-    Cursor / VS Code で「すべて保存」(Cmd+K → S) を実行し、未保存の送信下書きをディスクに書き込む。
+    Cursor / VS Code で「すべて保存」を実行し、未保存の送信下書きをディスクに書き込む。
     Mac のみ。送信前に必ず呼び、黒丸（未保存）のまま送るミスを防ぐ。
     """
     if sys.platform != "darwin":
-        return
+        return True
     import time
 
-    script = """
-    tell application "System Events"
-        if (exists process "Cursor") then
-            tell process "Cursor" to set frontmost to true
-            delay 0.5
-            tell process "Cursor"
-                keystroke "k" using command down
-                delay 0.2
-                keystroke "s"
+    # 可能な限り「メニューから Save All」を叩く（キー割り当て変更の影響を受けにくい）
+    # それが無理なら Cmd+Option+S（VS Code/Cursor のデフォルト Save All）を試す
+    script = r"""
+    on trySaveAll(appName)
+        tell application "System Events"
+            if not (exists process appName) then return false
+            tell process appName
+                set frontmost to true
+                delay 0.3
+                try
+                    click menu item "Save All" of menu "File" of menu bar 1
+                    return true
+                on error
+                end try
+                try
+                    click menu item "すべてを保存" of menu "ファイル" of menu bar 1
+                    return true
+                on error
+                end try
+                -- fallback: keystroke
+                try
+                    keystroke "s" using {command down, option down}
+                    return true
+                on error
+                    return false
+                end try
             end tell
-        else if (exists process "Code") then
-            tell process "Code" to set frontmost to true
-            delay 0.5
-            tell process "Code"
-                keystroke "k" using command down
-                delay 0.2
-                keystroke "s"
-            end tell
-        end if
-    end tell
+        end tell
+    end trySaveAll
+
+    set ok to my trySaveAll("Cursor")
+    if ok is false then
+        set ok to my trySaveAll("Code")
+    end if
+    return ok
     """
     try:
-        subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True,
-            timeout=5,
-        )
-        time.sleep(0.8)
+        result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=8)
+        time.sleep(1.0)
+        return result.returncode == 0 and (result.stdout or "").strip().lower() != "false"
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-        pass
+        return False
 
 
 def load_env():
@@ -141,6 +157,80 @@ def parse_draft(draft_path):
     return subject, body
 
 
+def _file_digest(path: Path) -> str:
+    return sha256(path.read_bytes()).hexdigest()
+
+
+def confirm_before_send(
+    partner_name: str,
+    via: str,
+    draft_path: Path,
+    subject: str,
+    body_text: str,
+    attachment_names: list,
+    skip_confirm: bool,
+    dry_run: bool,
+):
+    """
+    送信前に、実際にディスク上にある下書き内容をプレビューして確認を取る。
+    - dry-run: ここで終了（送信しない）
+    - skip_confirm: 何も聞かずに続行（軌道に乗ったら運用で使う）
+    """
+    try:
+        mtime = datetime.fromtimestamp(draft_path.stat().st_mtime).strftime("%Y/%m/%d %H:%M:%S")
+        digest = _file_digest(draft_path)[:12]
+    except Exception:
+        mtime = "不明"
+        digest = "不明"
+
+    preview_subject = subject if subject else ""
+    preview_head = body_text[:600]
+    if len(body_text) > 600:
+        preview_head += "\n...(以下省略)..."
+
+    print("")
+    print("========== 送信前プレビュー ==========")
+    print(f"  宛先: {partner_name}")
+    print(f"  手段: {via}")
+    print(f"  下書き: {draft_path}")
+    print(f"  更新日時: {mtime}")
+    print(f"  内容ハッシュ: {digest}")
+    if attachment_names:
+        print(f"  添付: {attachment_names}")
+    if preview_subject:
+        print(f"  件名: {preview_subject}")
+    print("  本文（先頭）:")
+    print("------------------------------------")
+    print(preview_head)
+    print("------------------------------------")
+
+    if dry_run:
+        print("【dry-run】送信しません。")
+        return False
+
+    if skip_confirm:
+        print("（--skip-confirm 指定のため確認なしで送信を継続します）")
+        return True
+
+    if sys.stdin is None or not sys.stdin.isatty():
+        print(
+            "エラー: 対話入力できない環境のため、送信前確認ができません。"
+            "誤送信防止のため送信を中止します。"
+            "（どうしても送る場合は --skip-confirm を指定）",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    while True:
+        ans = input("この内容で送信しますか？ (y/N): ").strip().lower()
+        if ans in ("y", "yes"):
+            return True
+        if ans in ("", "n", "no"):
+            print("送信を中止しました。")
+            return False
+        print("入力が不正です。y / N で入力してください。")
+
+
 def phone_to_imessage_formats(phone):
     """電話番号を Messages が受け付ける形式のリストに変換。複数形式を試す。"""
     digits = re.sub(r"\D", "", phone)
@@ -163,7 +253,6 @@ def send_imessage(phone, body_text, attachment_paths=None):
     if attachment_paths is None:
         attachment_paths = []
     phone_esc = phone.replace("\\", "\\\\").replace('"', '\\"')
-    # 改行を AppleScript の return で連結
     parts = [p.replace("\\", "\\\\").replace('"', '\\"') for p in body_text.split("\n")]
     msg_expr = " & return & ".join(f'"{p}"' for p in parts)
 
@@ -171,9 +260,11 @@ def send_imessage(phone, body_text, attachment_paths=None):
     for path in attachment_paths:
         posix_path = str(path.resolve())
         path_esc = posix_path.replace("\\", "\\\\").replace('"', '\\"')
-        file_blocks.append(f'''        set theFile to POSIX file "{path_esc}"
+        file_blocks.append(
+            f'''        set theFile to POSIX file "{path_esc}"
         send theFile to targetBuddy
-        delay 0.3''')
+        delay 0.3'''
+        )
 
     file_section = "\n".join(file_blocks) if file_blocks else ""
 
@@ -229,18 +320,13 @@ def get_latest_message_from_partner(service, partner_emails):
     }
 
 
-# 送信添付に含めないファイル（Git/OS用のプレースホルダ等）
 ATTACHMENT_EXCLUDE_NAMES = {".gitkeep", ".DS_Store"}
 
 
 def collect_attachment_files(attach_dir):
     """送信添付フォルダ内のファイルを列挙。.gitkeep / .DS_Store は送信対象から除外する。"""
     attach_dir.mkdir(parents=True, exist_ok=True)
-    return [
-        f
-        for f in attach_dir.iterdir()
-        if f.is_file() and f.name not in ATTACHMENT_EXCLUDE_NAMES
-    ]
+    return [f for f in attach_dir.iterdir() if f.is_file() and f.name not in ATTACHMENT_EXCLUDE_NAMES]
 
 
 def build_reply_message(to_email, subject, body_text, ref_info, attachment_paths):
@@ -294,10 +380,9 @@ def append_sent_to_yoritoori(folder_path, partner_name, subject, body, attachmen
 ---
 """
     content = md_path.read_text(encoding="utf-8")
-    # 新しいメッセージを上に表示（時系列で新しい順）
     marker = "## やり取り（時系列）"
     if marker in content:
-        after_marker = content[content.find(marker):]
+        after_marker = content[content.find(marker) :]
         m = re.search(r"\n\n### [12]\d{3}/\d{2}/\d{2}", after_marker)
         if m:
             pos = content.find(marker) + m.start() + 2
@@ -345,19 +430,11 @@ def run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text,
     attachment_names = [p.name for p in attachment_paths]
 
     if dry_run:
-        print("【dry-run】iMessage 送信プレビュー")
-        print(f"  宛先: {phone}")
-        print(f"  本文（先頭200文字）:\n{body_text[:200]}...")
-        if attachment_names:
-            print(f"  添付: {attachment_names}")
-        print("  実際には送信しません。")
         return
 
-    # 1. 送信下書きの保存：送信する内容をやり取り.md に記録する
     append_sent_to_yoritoori(folder_path, partner_name, "（iMessage）", body_text, attachment_names)
     print("送信下書きの内容をやり取りに保存しました。")
 
-    # 2. 送信
     last_err = None
     for fmt in formats:
         if send_imessage(fmt, body_text, attachment_paths):
@@ -381,7 +458,6 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
 
     use_subject = subject if subject and subject != "（件名を記入）" else None
 
-    # Gmail 認証
     creds = None
     if token_path.exists():
         token_data = json.loads(token_path.read_text(encoding="utf-8"))
@@ -416,7 +492,6 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
         print(f"エラー: {partner_name} 宛の直近90日以内のメールが見つかりません。返信先を特定できません。", file=sys.stderr)
         sys.exit(1)
 
-    # 件名が未設定なら元メールの Re: を使用
     if not use_subject:
         orig_subject = ref_info.get("subject", "")
         if orig_subject and not orig_subject.strip().upper().startswith("RE:"):
@@ -426,33 +501,20 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
     if not use_subject:
         use_subject = "Re:"
 
-    # 送信添付フォルダ
     attach_dir = resolve_attach_dir(base_path / folder_path)
     attachment_paths = collect_attachment_files(attach_dir)
     attachment_names = [p.name for p in attachment_paths]
 
-    # メッセージ構築
     to_email = emails[0]
     message_dict = build_reply_message(to_email, use_subject, body_text, ref_info, attachment_paths)
-
-    # 送信 body に threadId を追加
     send_body = {"raw": message_dict["raw"], "threadId": ref_info["thread_id"]}
 
     if dry_run:
-        print("【dry-run】Gmail 送信プレビュー")
-        print(f"  宛先: {to_email}")
-        print(f"  件名: {use_subject}")
-        print(f"  本文（先頭200文字）:\n{body_text[:200]}...")
-        if attachment_names:
-            print(f"  添付: {attachment_names}")
-        print("  実際には送信しません。")
         return
 
-    # 1. 送信下書きの保存：送信する内容をやり取り.md に記録する
     append_sent_to_yoritoori(folder_path, partner_name, use_subject, body_text, attachment_names)
     print("送信下書きの内容をやり取りに保存しました。")
 
-    # 2. 送信
     try:
         service.users().messages().send(userId="me", body=send_body).execute()
         print(f"送信しました: {partner_name} ({to_email})")
@@ -468,12 +530,10 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
 def main():
     parser = argparse.ArgumentParser(description="送信下書きをパートナーに送信")
     parser.add_argument("--partner", required=True, help="パートナー名またはフォルダ名（例: 立木, ミニテック）")
-    parser.add_argument("--dry-run", action="store_true", help="送信せずプレビューのみ表示")
-    parser.add_argument(
-        "--move-attachments-only",
-        action="store_true",
-        help="送信せず、送信添付フォルダのファイルを送信添付(過去)へ移動するだけ",
-    )
+    parser.add_argument("--via", choices=["auto", "gmail", "imessage"], default="auto")
+    parser.add_argument("--skip-confirm", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--move-attachments-only", action="store_true")
     args = parser.parse_args()
 
     config = yaml.safe_load(contact_path.read_text(encoding="utf-8"))
@@ -509,20 +569,65 @@ def main():
         print(f"エラー: {DRAFT_FILENAME} が見つかりません: {draft_path}", file=sys.stderr)
         sys.exit(1)
 
-    # 送信前にエディタの「すべて保存」を実行（黒丸＝未保存のまま送るミスを防ぐ）
-    trigger_editor_save_all()
-    print("送信下書きを保存しました。（Cursor/VS Code で未保存だった変更をディスクに反映）")
+    if not trigger_editor_save_all():
+        print(
+            "エラー: Cursor/VS Code の「すべて保存」に失敗しました。下書きが古いまま送信されるのを防ぐため、送信を中止します。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print("送信下書きを保存しました。（Cursor/VS Code の「すべて保存」を実行）")
 
     subject, body_text = parse_draft(draft_path)
     if not body_text.strip():
         print("エラー: 送信下書きが空です。", file=sys.stderr)
         sys.exit(1)
 
-    if emails:
+    chosen_via = args.via
+    if chosen_via == "auto" and emails and phones:
+        if sys.stdin is None or not sys.stdin.isatty():
+            print(
+                f"エラー: {partner_name} はメール/電話の両方が登録されています。非対話環境のため自動選択できません。 --via gmail または --via imessage を指定してください。",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        while True:
+            print(f"{partner_name} は送信手段を選べます。どちらで送りますか？")
+            print("  1) Gmail（メール返信）")
+            print("  2) iMessage")
+            choice = input("選択 (1/2): ").strip()
+            if choice == "1":
+                chosen_via = "gmail"
+                break
+            if choice == "2":
+                chosen_via = "imessage"
+                break
+            print("入力が不正です。1 または 2 を入力してください。")
+    elif chosen_via == "auto":
+        chosen_via = "gmail" if emails else "imessage"
+
+    attach_dir = resolve_attach_dir(base_path / folder_path)
+    attachment_paths = collect_attachment_files(attach_dir)
+    attachment_names = [p.name for p in attachment_paths]
+
+    via_label = "Gmail（メール返信）" if chosen_via == "gmail" else "iMessage"
+    if not confirm_before_send(
+        partner_name=partner_name,
+        via=via_label,
+        draft_path=draft_path,
+        subject=subject if chosen_via == "gmail" else "（iMessage）",
+        body_text=body_text,
+        attachment_names=attachment_names,
+        skip_confirm=args.skip_confirm,
+        dry_run=args.dry_run,
+    ):
+        return
+
+    if chosen_via == "gmail":
         run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, args.dry_run)
-    else:
-        run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text, args.dry_run)
+        return
+    run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text, args.dry_run)
 
 
 if __name__ == "__main__":
     main()
+
