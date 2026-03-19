@@ -9,6 +9,7 @@
 .env
 .env.*
 !.env.example
+!.env.home_address.example
 token.json
 token*.json
 *.expired
@@ -35,7 +36,9 @@ node_modules/
 
 # --- エディタ・ツール ---
 .cursor/projects/
-.cursor/rules/
+# ルールは原則コミットしない（例外: 地図・経路用の非秘密ルールのみ）
+.cursor/rules/*
+!.cursor/rules/home-address-maps.mdc
 .obsidian/
 .vscode/
 
