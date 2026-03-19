@@ -19,6 +19,7 @@
 ## 前提
 
 - 215 の `credentials.json` / `token.json` がすでにあり、いけともAIニュースまたはパートナーやりとりで一度でもブラウザ認証済みであること。
+- 2アカウント運用の場合は `token2.json`（または `GMAIL_TOKEN_PATHS` で指定した2本目のtoken）が存在し、ブラウザ認証済みであること。
 - **GitHub の Personal Access Token（PAT）** を発行し、リポジトリの **Secrets: Read and write** 権限を持つこと。
 
 ---
@@ -114,6 +115,7 @@ cd "/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.co
 
 - 「Gmail token を更新しました。」「GitHub Secret GMAIL_TOKEN_B64 を更新しました。」と出れば成功です。
 - `--refresh-only` を付けると Gmail の更新のみ（GitHub は触らない）。`--dry-run` は書き換えなしの確認だけ。
+- 2アカウント運用の場合、スクリプトは `token.json` と `token2.json` を自動検出して **両方更新**します（または `GMAIL_TOKEN_PATHS` で任意の2本を指定可能）。
 
 ---
 
@@ -125,6 +127,7 @@ cd "/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.co
    ```
 2. **PAT を plist に渡す場合**: plist を編集し、`<dict>` 内の `EnvironmentVariables` に  
    `<key>GITHUB_TOKEN</key><string>あなたのPAT</string>` を追加。
+   - 2アカウント運用の場合は、同じ場所に `GMAIL_TOKEN_PATHS` を追加/確認し、2本分のパスをカンマ区切りで指定します。
 3. 有効化  
    ```bash
    launchctl load ~/Library/LaunchAgents/co.workstyle.ai-news-token-refresh.plist
