@@ -28,6 +28,7 @@ DEFAULT_CREDENTIALS_DIR = Path(
 SCRIPT_DIR = Path(__file__).resolve().parent
 CREDENTIALS_PATH = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", str(DEFAULT_CREDENTIALS_DIR / "credentials.json")))
 TOKEN_PATH = Path(os.environ.get("GMAIL_TOKEN_PATH", str(DEFAULT_CREDENTIALS_DIR / "token.json")))
+GMAIL_TOKEN_PATHS_RAW = os.environ.get("GMAIL_TOKEN_PATHS", "").strip()
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.modify",
@@ -36,8 +37,28 @@ DEFAULT_GITHUB_REPO = "m19mhrts83-cyber/DX-_-"
 GITHUB_SECRET_NAME = "GMAIL_TOKEN_B64"
 
 
-def load_and_refresh_gmail_token():
-    """Gmail の token を読み込み、期限切れなら更新して保存する。"""
+def resolve_token_paths() -> list[Path]:
+    """
+    更新対象の token.json を複数解決する。
+    - GMAIL_TOKEN_PATHS: カンマ区切りで token のパスを指定
+    - 未指定なら、GMAIL_TOKEN_PATH（token.json）と同ディレクトリの token2.json を自動検出
+    """
+    if GMAIL_TOKEN_PATHS_RAW:
+        paths: list[Path] = []
+        for part in GMAIL_TOKEN_PATHS_RAW.split(","):
+            p = part.strip()
+            if p:
+                paths.append(Path(p))
+        return paths or [TOKEN_PATH]
+
+    token2 = TOKEN_PATH.parent / "token2.json"
+    if TOKEN_PATH.exists() and token2.exists():
+        return [TOKEN_PATH, token2]
+    return [TOKEN_PATH]
+
+
+def load_and_refresh_gmail_token(token_path: Path):
+    """Gmail の token を読み込み、期限切れなら更新して保存する（tokenファイル単位）。"""
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
@@ -47,9 +68,9 @@ def load_and_refresh_gmail_token():
         return None
 
     creds = None
-    if TOKEN_PATH.exists():
+    if token_path.exists():
         try:
-            token_data = json.loads(TOKEN_PATH.read_text(encoding="utf-8"))
+            token_data = json.loads(token_path.read_text(encoding="utf-8"))
             cred_data = dict(token_data)
             if "client_id" not in cred_data:
                 cred_file = json.loads(CREDENTIALS_PATH.read_text(encoding="utf-8"))
@@ -71,11 +92,15 @@ def load_and_refresh_gmail_token():
                 print(f"Gmail token の更新に失敗しました（ブラウザで再認証が必要かもしれません）: {e}", file=sys.stderr)
                 return None
         else:
-            print("Gmail のブラウザ認証が必要です。手元で gmail_ai_news_save.py --list を実行して認証してください。", file=sys.stderr)
+            print(
+                f"Gmail のブラウザ認証が必要です: {token_path}\n"
+                "手元で gmail_ai_news_save.py --list を実行して認証してください。",
+                file=sys.stderr,
+            )
             return None
 
     # 更新後の token を保存（refresh で中身が変わっている場合があるため）
-    TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
+    token_path.write_text(creds.to_json(), encoding="utf-8")
     return creds
 
 
@@ -165,18 +190,23 @@ def main():
 
     if args.dry_run:
         print("[dry-run] Gmail token と GitHub Secret の更新をスキップします。")
-        if not TOKEN_PATH.exists():
-            print("[dry-run] token.json がありません。")
-        else:
-            print(f"[dry-run] token.json: {TOKEN_PATH}")
+        token_paths = resolve_token_paths()
+        for p in token_paths:
+            print(f"[dry-run] token: {p} ({'あり' if p.exists() else 'なし'})")
         gh_token = get_github_token()
         print(f"[dry-run] GITHUB_TOKEN: {'設定済み' if gh_token else '未設定'}")
         return 0
 
     # 1. Gmail token を更新
+    token_paths = resolve_token_paths()
     print("Gmail token を確認・更新しています...")
-    creds = load_and_refresh_gmail_token()
-    if not creds:
+    any_failed = False
+    for idx, token_path in enumerate(token_paths, start=1):
+        print(f"- [{idx}/{len(token_paths)}] {token_path.name}")
+        creds = load_and_refresh_gmail_token(token_path)
+        if not creds:
+            any_failed = True
+    if any_failed:
         return 1
     print("Gmail token を更新しました。")
 
@@ -198,7 +228,9 @@ def main():
     owner, repo = repo_env.split("/", 1)
     repo = repo.replace(".git", "")
 
-    token_b64 = base64.b64encode(TOKEN_PATH.read_bytes()).decode("ascii").replace("\n", "")
+    # GitHub Actions 側が参照する token は従来通り「先頭のtoken」を使う（複数ある場合）
+    secret_token_path = token_paths[0] if token_paths else TOKEN_PATH
+    token_b64 = base64.b64encode(secret_token_path.read_bytes()).decode("ascii").replace("\n", "")
     if update_github_secret(owner, repo, GITHUB_SECRET_NAME, token_b64, gh_token):
         print("GitHub Secret GMAIL_TOKEN_B64 を更新しました。")
         return 0

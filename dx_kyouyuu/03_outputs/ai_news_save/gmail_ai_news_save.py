@@ -76,6 +76,7 @@ load_env()
 credentials_path = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", str(CREDENTIALS_PATH)))
 token_path = Path(os.environ.get("GMAIL_TOKEN_PATH", str(TOKEN_PATH)))
 save_path = Path(os.environ.get("AI_NEWS_SAVE_PATH", DEFAULT_SAVE_PATH))
+OAUTH_CONSOLE = os.environ.get("OAUTH_CONSOLE", "").strip().lower() in ("1", "true", "yes", "y")
 
 
 def get_html_body(payload):
@@ -466,7 +467,11 @@ def main():
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
-            creds = flow.run_local_server(port=0)
+            if OAUTH_CONSOLE:
+                print("OAUTH_CONSOLE=1 のため、コンソール認証を開始します。")
+                creds = flow.run_console()
+            else:
+                creds = flow.run_local_server(port=0)
         with open(token_path, "w", encoding="utf-8") as f:
             f.write(creds.to_json())
         print("token.json を保存しました。")

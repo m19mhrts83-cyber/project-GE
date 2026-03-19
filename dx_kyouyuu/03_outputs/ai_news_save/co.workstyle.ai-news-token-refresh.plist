@@ -17,6 +17,9 @@
         <string>/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/credentials.json</string>
         <key>GMAIL_TOKEN_PATH</key>
         <string>/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json</string>
+        <!-- 複数アカウント運用の場合は、こちらで複数 token を指定（カンマ区切り） -->
+        <key>GMAIL_TOKEN_PATHS</key>
+        <string>/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json,/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token2.json</string>
     </dict>
     <!-- 3日ごとに実行（259200秒）。Mac がスリープ中は動かず、起動してから3日経過したタイミングで実行。スリープから復帰した場合も、3日経過していれば復帰時に実行される -->
     <key>StartInterval</key>
