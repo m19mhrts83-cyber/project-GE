@@ -1,0 +1,96 @@
+line_unofficial_poc（Phase B）
+
+=== フェーズB と フェーズC の関係 ===
+
+・フェーズB（非公式クライアント: CHRLINE 等）と、フェーズC（LINE 公式アプリの
+  「トーク履歴のエクスポート／送信」＋ linelog2py 等のパーサ）は、
+  **つながりのある「前後の工程」ではありません。どちらか一方、または両方を
+  別ルートとして選ぶイメージ**です。
+
+・**B をやったから C が楽になる、ということは基本的にありません。**
+  C は公式機能だけで完結し、B の成否は不要です。
+
+・**C だけ**でも、トーク内を細かくドラッグコピーせず、ファイル／メール単位で
+  履歴を取り込めます（規約リスクは B より抑えめ）。
+
+・**B だけ**で API 的に取れるならエクスポートは不要になり得ますが、停止リスク・
+  メンテは B の方が大きいです。
+
+・実務のおすすめ: まず **C で運用できるか**を試し、足りなければ B を検討、
+  という順のことも多いです（B 必須ではない）。
+
+----------------------------------------
+
+0. macOS で CHRLINE を入れる（初回・venv を作り直すとき）
+   cd /Users/matsunomasaharu/git-repos/line_unofficial_poc
+   chmod +x setup_phase_b_mac.sh activate_and_test.sh
+   ./setup_phase_b_mac.sh
+   ./activate_and_test.sh
+   ※ Homebrew の python3.13 を推奨。別の python を使う場合は:
+     PYTHON_BIN=/path/to/python3 ./setup_phase_b_mac.sh
+
+1. ディレクトリへ移動
+   cd /Users/matsunomasaharu/git-repos/line_unofficial_poc
+
+2. 仮想環境を有効化
+   source .venv/bin/activate
+
+3. 追加の Python 依存（任意）
+   pip install -r requirements.txt
+
+4. .env を用意
+   cp .env.example .env
+   .env 内のパスを自分の環境に合わせて編集（YORITOORI_BASE_PATH 等）
+
+5. CHRLINE を試す場合
+   (A) Mac の .venv
+   - 上記ステップ0の setup_phase_b_mac.sh 済みなら import 可能。
+   - 素の pip install CHRLINE は macOS では curve25519 ビルドで失敗しやすい（パッチ必須）。
+
+   (A') QR ログインが 403 になるとき（PyPI CHRLINE 2.5.14 で失敗した場合）
+   - コミュニティ版 **CHRLINE-PatchV2**（GitHub: k4zum4-sk/CHRLINE-PatchV2）を試す。
+     README では **CHRLINE 2.6 系ベース**・`test/login_getToken_test.py` が
+     **device="DESKTOPWIN", useThrift=True** で QR ログインする例になっている。
+   - このフォルダでは:
+       chmod +x install_chrline_patchv2_mac.sh
+       ./install_chrline_patchv2_mac.sh
+     （`chrline-patchv2/` を clone し、上流欠落の `CHRLINE/utils/__init__.py` を補ってから pip インストール）
+   - QR 試行:
+       source .venv/bin/activate
+       set -a && source .env && set +a
+       python chrline_qr_login_poc.py
+   - GitHub Issues は件数が少ない（例: アカウント移行・送信エラーの報告）。403 が直る保証はない。
+   - PyPI 版に戻す: pip uninstall CHRLINE && pip install 'CHRLINE==2.5.14'
+
+   (B) Linux コンテナ（Docker / Colima / OrbStack 等が入っているマシン）
+   - このフォルダで:  docker build -t line-chrline-poc .
+   - 成功したら:     docker run --rm -it -v "$PWD:/wrk" -w /wrk line-chrline-poc bash
+   - コンテナ内の Python で CHRLINE のログイン・取得スクリプトを試す。
+   - Mac の OneDrive パスをマウントする場合は -v でホスト側の絶対パスを追加。
+
+   (C) フォーク
+   - CHRLINE-PatchV2 等の README に従い pip install git+https://...
+
+6. パターンB: トーク一覧 → メッセージ取得 → yoritoori（CHRLINE-PatchV2 想定）
+   前提: chrline_qr_login_poc.py で一度ログイン済み（.line_auth/.tokens に保存）。
+   標準出力にトークンは出さない。ターミナル全文をチャット等に貼らない。
+
+   (1) トーク一覧（chatMid と名前）
+       source .venv/bin/activate
+       set -a && source .env && set +a
+       python chrline_list_chats_poc.py
+       → 目的のグループの chatMid（左列）をメモする。
+
+   (2) 直近メッセージを標準出力（プレビュー）
+       python chrline_dump_messages_poc.py --chat-mid "（chatMid）" --count 80
+       または名前の部分一致（1件に限る）:
+       python chrline_dump_messages_poc.py --title-substring "キャラメル" --count 80
+
+   (3) 5.やり取り.md にパイプ追記
+       python chrline_dump_messages_poc.py --chat-mid "（chatMid）" --count 80 \
+         | python "$LINE_TO_YORITOORI_SCRIPT" --partner Tcell --group --group-label "キャラメル管理G"
+   （.env の LINE_TO_YORITOORI_SCRIPT・YORITOORI_BASE_PATH を設定済みであること）
+
+   補助モジュール: chrline_client_utils.py（保存トークン読み込み・クライアント生成）
+
+7. 秘密情報（トークン・QR 後のセッション）は .line_auth/ や .env のみに置き、コミットしない。

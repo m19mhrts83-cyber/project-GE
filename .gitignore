@@ -47,6 +47,9 @@ node_modules/
 config_nichinoken.yaml
 config_bank.yaml
 
+# --- line_unofficial_poc: フォークはクローンのみ（巨大・別リポジトリ） ---
+line_unofficial_poc/chrline-patchv2/
+
 # --- 215 固有（手順書内 OAuth 等） ---
 215_kamiooya/C1_cursor/Gmail_MCP_エラー解消手順.md
 215_kamiooya/C1_cursor/browser_automation/.venv/
