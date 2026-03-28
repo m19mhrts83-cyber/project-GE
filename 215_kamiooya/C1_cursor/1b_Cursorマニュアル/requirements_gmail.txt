@@ -6,3 +6,6 @@ PyYAML>=6.0
 
 # Notion タスク登録スクリプト用
 requests>=2.28.0
+
+# LINE 公式エクスポート .txt → 5.やり取り.md（line_export_to_yoritoori.py）
+linelog2py>=0.1.6
