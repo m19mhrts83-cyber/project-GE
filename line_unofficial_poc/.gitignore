@@ -1,0 +1,3 @@
+.line_auth/
+.line_clip_processed.json
+*.session

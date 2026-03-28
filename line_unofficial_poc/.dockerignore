@@ -1,0 +1,5 @@
+.venv
+.line_auth
+.env
+*.pyc
+__pycache__
