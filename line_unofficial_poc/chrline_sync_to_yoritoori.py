@@ -30,6 +30,11 @@ from pathlib import Path
 from CHRLINE.services.thrift.ttypes import OpType
 
 from chrline_client_utils import build_logged_in_client, save_root_from_env
+from chrline_md_utils import (
+    insert_block_after_timeline_header as md_insert_block_after_timeline_header,
+    make_summary as md_make_summary,
+    wrap_details as md_wrap_details,
+)
 from chrline_sync_delta_poc import (
     STATE_FILENAME,
     _MESSAGE_OP_TYPES,
@@ -551,7 +556,7 @@ def main() -> int:
         ts = _msg_time(cl, msg)
         when = _format_line_msg_when(ts)
         date_part = when.split()[0] if when and " " in when else when or "?"
-        summary = _make_summary(body_raw)
+        summary = md_make_summary(body_raw)
 
         wrote = False
         for route in routes:
@@ -569,7 +574,7 @@ def main() -> int:
 
 {heading}
 
-{_wrap_details(body_raw)}
+{md_wrap_details(body_raw)}
 
 ---
 """
@@ -579,7 +584,7 @@ def main() -> int:
             else:
                 content = route.yoritoori_md.read_text(encoding="utf-8")
                 route.yoritoori_md.write_text(
-                    insert_block_after_timeline_header(content, block),
+                    md_insert_block_after_timeline_header(content, block),
                     encoding="utf-8",
                 )
                 if dk:

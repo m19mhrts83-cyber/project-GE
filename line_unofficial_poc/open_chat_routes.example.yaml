@@ -1,0 +1,21 @@
+routes:
+  - id: kamiyama_openchat_sample
+    # どちらか必須:
+    # square_chat_mid: "mxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    title_substring: "神山さんクラブ"
+
+    # 追記先（絶対パス）
+    output_md: "/Users/yourname/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談/000_共通/open_chat_log.md"
+
+    # 見出し表示（任意）
+    org_label: "神山さん倶楽部"
+    heading_tag: "LINEオープンチャット"
+
+    # 同期対象
+    include_main: true
+    include_threads: true
+
+    # スレッド絞り込み（任意）
+    # thread_title_substring: "重要"
+    # thread_mids:
+    #   - "mxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
