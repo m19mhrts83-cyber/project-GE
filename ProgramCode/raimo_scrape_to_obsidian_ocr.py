@@ -491,7 +491,7 @@ def filter_ui_noise(text: str) -> str | None:
         return None
     if len(t) <= 6 and t.isascii():
         return None
-    return text
+    return t
 
 
 def main() -> None:
