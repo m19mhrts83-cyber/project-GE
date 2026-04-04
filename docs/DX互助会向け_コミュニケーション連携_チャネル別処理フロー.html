@@ -3,123 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>チャネル別 処理フロー概要 — コミュニケーション連携</title>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <title>リダイレクト — 取り組み紹介（付録・フロー）</title>
+  <meta http-equiv="refresh" content="0; url=DX互助会向け_コミュニケーション連携と一元管理の取り組み紹介.html#appendix-flows">
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif; background: #151b2b; color: #eef2ff; padding: 2rem 2rem 4rem; max-width: 56rem; margin-left: auto; margin-right: auto; }
-    h1 { margin: 0 0 0.5rem; border-bottom: 2px solid #4bd2b0; padding-bottom: 0.5rem; font-size: 1.5rem; }
-    .lead { color: #a8b4d9; line-height: 1.7; margin-bottom: 1.5rem; font-size: 0.95rem; }
-    .back { margin-bottom: 1.25rem; font-size: 0.95rem; }
-    .back a { color: #7fc9ff; }
-    .channel { margin: 2.5rem 0; padding-top: 1.5rem; border-top: 1px solid #2a3550; }
-    .channel h2 { margin: 0 0 0.75rem; font-size: 1.15rem; color: #8bc3ff; }
-    .channel .script { font-size: 0.82rem; color: #8b9dc4; margin-bottom: 0.75rem; }
-    .channel .script code { background: #0f2e4f; padding: 0.1rem 0.35rem; border-radius: 4px; }
-    .mermaid { background: #10182a; border-radius: 10px; padding: 1rem 0.75rem; margin: 0.5rem 0; overflow-x: auto; }
-    .note { background: #0f2e4f; border-left: 4px solid #4bd2b0; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin-top: 2rem; font-size: 0.9rem; color: #c5d0e8; line-height: 1.6; }
+    body { font-family: system-ui, sans-serif; background: #151b2b; color: #eee; padding: 2rem; max-width: 40rem; margin: auto; line-height: 1.6; }
+    a { color: #7fc9ff; }
   </style>
 </head>
 <body>
-  <p class="back"><a href="2kai.html">← 第2回 資料一覧へ</a> · <a href="DX互助会向け_コミュニケーション連携と一元管理の取り組み紹介.html">取り組み紹介スライドへ</a></p>
-  <h1>取り込み5 + 送信1 · 処理フロー概要（1ページ）</h1>
-  <p class="lead">各スクリプトの<strong>通常の成功パス</strong>だけを短いフローチャートにしたものです。分岐・エラー・再認証などは省略しています。実装の正は各 <code>.py</code> の docstring とソースを参照してください。</p>
-  <p class="lead" style="margin-top:-0.5rem;">※ 本ページと<strong>同一の図</strong>を、<a href="DX互助会向け_コミュニケーション連携と一元管理の取り組み紹介.html">取り組み紹介スライド</a>では <strong>1スクリプト1スライド</strong>として収録しています（共有・印刷用にこちらを使っても構いません）。</p>
-
-  <section class="channel" id="gmail">
-    <h2>1. Gmail API</h2>
-    <p class="script">主な実装: <code>215_kamiooya/C1_cursor/1b_Cursorマニュアル/gmail_to_yoritoori.py</code></p>
-    <div class="mermaid">
-flowchart TB
-  gm1["credentials.json / token（OAuth）"] --> gm2["Gmail API でメール検索・本文取得"]
-  gm2 --> gm3["連絡先一覧.yaml と送信元アドレス照合"]
-  gm3 --> gm4["日時・件名・本文を整形"]
-  gm4 --> gm5["該当フォルダの 5.やり取り.md に追記"]
-  gm4 --> gm6["添付はフォルダ内 添付/ へ保存"]
-    </div>
-  </section>
-
-  <section class="channel" id="chatwork">
-    <h2>2. ChatWork API</h2>
-    <p class="script">主な実装: <code>1b_Cursorマニュアル/chatwork_to_yoritoori.py</code>（リポジトリ外のみの場合あり）</p>
-    <div class="mermaid">
-flowchart TB
-  cw1[".env の CHATWORK_API_TOKEN"] --> cw2["ChatWork API でルーム・メッセージ取得"]
-  cw2 --> cw3["連絡先一覧の chatwork_room_id と照合"]
-  cw3 --> cw4["整形（日時・投稿者・本文）"]
-  cw4 --> cw5["該当フォルダの 5.やり取り.md に追記"]
-    </div>
-  </section>
-
-  <section class="channel" id="imessage">
-    <h2>3. iMessage（macOS）</h2>
-    <p class="script">主な実装: <code>215_kamiooya/C1_cursor/1b_Cursorマニュアル/imessage_to_yoritoori.py</code></p>
-    <div class="mermaid">
-flowchart TB
-  im1["~/Library/Messages/chat.db"] --> im2["SQLite で新着メッセージ取得"]
-  im2 --> im3["連絡先一覧 phones と電話番号照合"]
-  im3 --> im4["日時・本文を整形"]
-  im4 --> im5["該当フォルダの 5.やり取り.md に追記"]
-  im5 --> im6["処理済み ROWID を JSON に保存"]
-    </div>
-  </section>
-
-  <section class="channel" id="line-sync">
-    <h2>4. LINE（個人・グループ）</h2>
-    <p class="script">主な実装: <code>line_unofficial_poc/chrline_sync_to_yoritoori.py</code>（差分同期は <code>chrline_sync_delta_poc</code> 系）</p>
-    <div class="mermaid">
-flowchart TB
-  ln1["LINE_UNOFFICIAL_AUTH_DIR / .tokens"] --> ln2["build_logged_in_client で CHRLINE 起動"]
-  ln2 --> ln3["同期オペレーション（メッセージ系）を取得"]
-  ln3 --> ln4["プリセット・chatMid で対象トークに絞込"]
-  ln4 --> ln5["dedup（既追記 ID はスキップ）"]
-  ln5 --> ln6["103_Tcell / 104_LEAF 等の 5.やり取り.md に追記"]
-    </div>
-  </section>
-
-  <section class="channel" id="openchat">
-    <h2>5. LINE オープンチャット（Square）</h2>
-    <p class="script">主な実装: <code>line_unofficial_poc/chrline_open_chat_to_md.py</code></p>
-    <div class="mermaid">
-flowchart TB
-  oc1["open_chat_routes.yaml（ルート定義）"] --> oc2["build_logged_in_client（トーク同期と共有可）"]
-  oc2 --> oc3["Square でメイン・スレッドを取得"]
-  oc3 --> oc4["state.json で続きから / dedup で重複除外"]
-  oc4 --> oc5["各 output_md（例: 815 の 5.やり取り.md）へ追記"]
-    </div>
-  </section>
-
-  <section class="channel" id="send">
-    <h2>6. パートナー送信 — <code>yoritoori_send.py</code></h2>
-    <p class="script">主な実装: <code>215_kamiooya/C1_cursor/1b_Cursorマニュアル/yoritoori_send.py</code></p>
-    <div class="mermaid">
-flowchart TB
-  ys1["--partner と連絡先一覧.yaml で宛先解決"] --> ys2["Mac: エディタの Save All で下書き確定"]
-  ys2 --> ys3["4.送信下書き.txt から件名・本文を取得"]
-  ys3 --> ys4["5.やり取り.md に送信内容を先に追記"]
-  ys4 --> ys5{"経路"}
-  ys5 -->|emails あり| ys6["Gmail API で送信（送信添付があれば付与）"]
-  ys5 -->|phones のみ / --via| ys7["iMessage で送信（添付可）"]
-  ys6 --> ys8["成功後: 添付を 送信添付過去 へ移動"]
-  ys7 --> ys8
-    </div>
-  </section>
-
-  <p class="note">オープンチャット・CHRLINE は非公式 API のため、取得できない本文や再認証（QR）が発生し得ます。詳細は取り組み紹介スライドの「認証まわり」とハンドブックを参照してください。</p>
-
-  <script>
-    (function () {
-      function runMermaid() {
-        if (typeof mermaid === "undefined") return;
-        mermaid.initialize({ theme: "dark", startOnLoad: false });
-        mermaid.run({ querySelector: ".mermaid" });
-      }
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", runMermaid);
-      } else {
-        runMermaid();
-      }
-    })();
-  </script>
+  <p>チャネル別フローは <strong>取り組み紹介スライドのまとめの直後（付録）</strong>に統合済みです。</p>
+  <p><a href="DX互助会向け_コミュニケーション連携と一元管理の取り組み紹介.html#appendix-flows">取り組み紹介スライド（#appendix-flows）</a></p>
+  <p><a href="comm-channel-flows.html">英字URL（comm-channel-flows.html）</a> も同じ付録へ飛びます。</p>
 </body>
 </html>

@@ -42,7 +42,7 @@
         <li>LINE（オープンチャット）</li>
       </ul>
       <p class="note">実装手順版は <code>DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md</code> を参照。</p>
-      <p class="note">取り込み・送信スクリプトの<strong>処理フロー概要</strong>は、次ページの全体図のあと、<strong>1スクリプト1スライド</strong>で掲載（<a href="./comm-channel-flows.html">英字URLの一覧ページ</a>と同内容）。</p>
+      <p class="note">各スクリプトの<strong>処理フロー図（Mermaid）</strong>は、<strong>まとめスライドの直後の付録</strong>にあります（本ファイルで一本化）。</p>
     </section>
 
     <section class="slide">
@@ -82,9 +82,98 @@ flowchart TB
       </ul>
     </section>
 
-    <section class="slide flow-slide">
-      <h1>2. 受信取り込み — <code>gmail_to_yoritoori.py</code></h1>
-      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>215_kamiooya/C1_cursor/1b_Cursorマニュアル/</code>（成功パスのみ・簡略図）</p>
+    <section class="slide">
+      <h1>2. メインスクリプトと役割（テキスト）</h1>
+      <h2>Gmail</h2>
+      <ul>
+        <li>受信: <code>gmail_to_yoritoori.py</code> · 送信: <code>yoritoori_send.py</code></li>
+      </ul>
+      <h2>ChatWork</h2>
+      <ul>
+        <li>取り込み: <code>chatwork_to_yoritoori.py</code> · <code>CHATWORK_API_TOKEN</code> / <code>chatwork_room_id</code></li>
+      </ul>
+      <h2>iMessage</h2>
+      <ul>
+        <li>取り込み: <code>imessage_to_yoritoori.py</code> · macOS・フルディスクアクセス</li>
+      </ul>
+      <h2>LINE（個人・グループ）</h2>
+      <ul>
+        <li>取り込み: <code>chrline_sync_to_yoritoori.py</code> · <code>LINE_UNOFFICIAL_AUTH_DIR</code> · E2EE で本文が取れない場合あり</li>
+      </ul>
+      <h2>LINE オープンチャット</h2>
+      <ul>
+        <li>バッチ: <code>line_unofficial_poc/chrline_open_chat_to_md.py</code> · 常駐（任意）/ 手動補完スクリプトあり · Beta 運用</li>
+      </ul>
+      <h2>送信（パートナー宛）</h2>
+      <ul>
+        <li><code>yoritoori_send.py</code> · <code>4.送信下書き.txt</code> · メールと電話の両方がある相手は <code>--via</code>（ルールどおり）</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>3. オープンチャットの認証まわり（QR 負荷の低減）</h1>
+      <p class="note" style="margin-top:0">※本スライドは<strong>暫定</strong>です。全体の章立て・表現は、内容を精査したうえで改めて整えます。</p>
+      <h2>改善してきたこと（ねらい）</h2>
+      <ul>
+        <li><strong>認証の一本化</strong> … <code>LINE_UNOFFICIAL_AUTH_DIR</code> を、トーク同期（個人・グループ）とオープンチャット取得の<strong>両方</strong>で共有。同じ <code>chrline_client_utils.build_logged_in_client</code> 経由にすることで、「スクリプトごとに別ログイン → QR が連発」になりにくくした。</li>
+        <li><strong>ローカル既定の保存先</strong> … 未設定時は <code>line_unofficial_poc/.line_auth_local</code>。クラウド同期フォルダ配下に認証を置くと競合しやすく QR が増えやすいため、実行時に警告するようにした。</li>
+        <li><strong>保存トークンの順試行</strong> … <code>.tokens/</code> 内の複数ファイルを更新日時の新しい順に試し、有効なものがあれば QR なしで起動する。</li>
+        <li><strong>再認証後の永続化</strong> … QR で取り直したトークンを <code>.tokens</code> に保存し、次回以降の手間を減らす。</li>
+        <li><strong>失効の気づき</strong> … 例: <code>line_unofficial_poc/launchd/open_chat_healthcheck_runner.sh</code> で軽い疎通チェック＋通知し、気づかないまま連続失敗し続ける時間を減らす。</li>
+      </ul>
+      <h2>苦労した点（割り切り）</h2>
+      <ul>
+        <li>CHRLINE は<strong>非公式</strong>のため、LINE 側の変更でセッションが切れる。切れたあとの復旧に QR は<strong>技術的に省略できない</strong>（「回数を減らす」が現実的な上限）。</li>
+        <li>Square（オープンチャット）は取得できる範囲に依存し、スレッド本文が欠けることもある（付録の OpenChat フローと Beta 運用をセット）。</li>
+      </ul>
+      <h2>任意</h2>
+      <ul>
+        <li><code>LINE_CHRLINE_AUTO_OPEN_QR=1</code> … QR 画像を OS で自動表示（認証<strong>回数</strong>は減らないが、操作負荷は下げられる）。</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>4. ルール設計（再現性の中核）</h1>
+      <ul>
+        <li><code>partner-email-check.mdc</code>: Gmail / iMessage / ChatWork / LINE / オプチャ取り込みの導線を実行</li>
+        <li><code>partner-email-send.mdc</code>: 送信導線を <code>yoritoori_send.py</code> に統一</li>
+        <li><code>open-chat-archive.mdc</code>: OpenChat取り込み導線を固定</li>
+        <li><code>815-openchat-no-reply-proposal.mdc</code>: 返信提案と情報共有を分離</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>5. ローカル適用の入口</h1>
+      <ul>
+        <li>必要ファイル・設定一覧を先に揃える</li>
+        <li>Cursor依頼テンプレで再現確認する（参照用プロンプト集あり）</li>
+        <li>失敗時はチャネル別チェックリストで切り分ける</li>
+      </ul>
+      <p>詳細: <a href="./DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md">ローカル適用ハンドブック</a> / <a href="./DX互助会向け_パッケージ参照プロンプト一覧.md">パッケージ参照プロンプト一覧</a></p>
+      <p class="note">処理フロー図は<strong>このあとのまとめの直後（付録）</strong>にあります。旧「チャネル別フロー」専用URL（<code>comm-channel-flows.html</code> 等）も本ページへ誘導します。</p>
+    </section>
+
+    <section class="slide">
+      <h1>6. まとめ</h1>
+      <ul>
+        <li>価値は「手段を増やす」より「増えた手段を同じ運用に乗せる」こと</li>
+        <li>5チャネル連携 + 送信 + 1つの記録形式 + ルール設計で再現性を担保</li>
+        <li>OpenChatスレッドは制約前提で Beta 運用する</li>
+        <li>LINE 系は認証保存先を共有し、QR・手間の再発を抑える（スライド 3）</li>
+      </ul>
+      <p class="note">勉強会では「発表要点 + ハンドブック配布」の2段構成が最も移植しやすい。</p>
+      <p class="note" style="margin-top:1rem;"><strong>このあと</strong>、取り込み5本・送信1本の<strong>処理フロー（Mermaid・成功パスのみ）</strong>が続きます。</p>
+    </section>
+
+    <section class="slide" id="appendix-flows">
+      <h1>付録 · 各スクリプトの処理フロー（簡略図）</h1>
+      <p>通常の成功パスのみ。分岐・エラー・再認証は省略。実装の正は各 <code>.py</code> の docstring を参照。</p>
+      <p style="margin-top:0.75rem;"><a href="#appendix-flows">この付録へのリンク</a>（共有用・アンカー <code>#appendix-flows</code>）</p>
+    </section>
+
+    <section class="slide flow-slide" id="flow-gmail">
+      <h1>付録 A — <code>gmail_to_yoritoori.py</code></h1>
+      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>215_kamiooya/C1_cursor/1b_Cursorマニュアル/</code></p>
       <div class="mermaid">
 flowchart TB
   ga1["credentials.json / token（OAuth）"] --> ga2["Gmail API でメール検索・本文取得"]
@@ -94,12 +183,12 @@ flowchart TB
   ga4 --> ga6["添付はフォルダ内 添付/ へ保存"]
       </div>
       <ul>
-        <li>送信は <code>yoritoori_send.py</code>（スライド「7. 送信」・<code>partner-email-send.mdc</code>）</li>
+        <li>送信は付録 F <code>yoritoori_send.py</code></li>
       </ul>
     </section>
 
-    <section class="slide flow-slide">
-      <h1>3. 受信取り込み — <code>chatwork_to_yoritoori.py</code></h1>
+    <section class="slide flow-slide" id="flow-chatwork">
+      <h1>付録 B — <code>chatwork_to_yoritoori.py</code></h1>
       <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>1b_Cursorマニュアル/</code>（リポジトリに無い場合は OneDrive 同フォルダ）</p>
       <div class="mermaid">
 flowchart TB
@@ -113,8 +202,8 @@ flowchart TB
       </ul>
     </section>
 
-    <section class="slide flow-slide">
-      <h1>4. 受信取り込み — <code>imessage_to_yoritoori.py</code></h1>
+    <section class="slide flow-slide" id="flow-imessage">
+      <h1>付録 C — <code>imessage_to_yoritoori.py</code></h1>
       <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;">macOS · <code>1b_Cursorマニュアル/</code></p>
       <div class="mermaid">
 flowchart TB
@@ -129,9 +218,9 @@ flowchart TB
       </ul>
     </section>
 
-    <section class="slide flow-slide">
-      <h1>5. 取り込み — <code>chrline_sync_to_yoritoori.py</code></h1>
-      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>line_unofficial_poc/</code> · LINE 個人・グループ（差分は <code>chrline_sync_delta_poc</code> 系）</p>
+    <section class="slide flow-slide" id="flow-line-sync">
+      <h1>付録 D — <code>chrline_sync_to_yoritoori.py</code></h1>
+      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>line_unofficial_poc/</code> · 差分は <code>chrline_sync_delta_poc</code> 系</p>
       <div class="mermaid">
 flowchart TB
   lna1["LINE_UNOFFICIAL_AUTH_DIR / .tokens"] --> lna2["build_logged_in_client で CHRLINE 起動"]
@@ -142,14 +231,13 @@ flowchart TB
       </div>
       <ul>
         <li>対象: 1:1 + グループ（プリセットで固定）</li>
-        <li>依存: <code>LINE_UNOFFICIAL_AUTH_DIR</code> と CHRLINE 認証</li>
       </ul>
-      <p class="note">E2EE の影響で本文が取れないメッセージがあるため、「取れるものを確実に蓄積する」設計。</p>
+      <p class="note">E2EE で本文が取れないメッセージがある。</p>
     </section>
 
-    <section class="slide flow-slide">
-      <h1>6. 取り込み — <code>chrline_open_chat_to_md.py</code></h1>
-      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>line_unofficial_poc/</code> · Square（オープンチャット）</p>
+    <section class="slide flow-slide" id="flow-openchat">
+      <h1>付録 E — <code>chrline_open_chat_to_md.py</code></h1>
+      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>line_unofficial_poc/</code> · Square</p>
       <div class="mermaid">
 flowchart TB
   oca1["open_chat_routes.yaml（ルート定義）"] --> oca2["build_logged_in_client（トーク同期と共有可）"]
@@ -161,13 +249,12 @@ flowchart TB
         <li>常駐（任意）: <code>chrline_open_chat_realtime_watch.py</code></li>
         <li>手動補完: <code>1b_Cursorマニュアル/line_open_chat_thread_clip_to_yoritoori.py</code></li>
       </ul>
-      <p>OpenChat スレッドは API 制約があり、完全自動化できないケースあり。</p>
-      <p class="note">Beta 運用: 自動取得を基本にし、重要スレッドのみ手動補完。</p>
+      <p class="note">Beta 運用。API 制約で取り切れないスレッドあり。</p>
     </section>
 
-    <section class="slide flow-slide">
-      <h1>7. 送信 — <code>yoritoori_send.py</code></h1>
-      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>1b_Cursorマニュアル/</code> · <code>partner-email-send.mdc</code> 経由（成功パスのみ・簡略図）</p>
+    <section class="slide flow-slide" id="flow-send">
+      <h1>付録 F — <code>yoritoori_send.py</code></h1>
+      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>1b_Cursorマニュアル/</code> · <code>partner-email-send.mdc</code></p>
       <div class="mermaid">
 flowchart TB
   ys1["--partner と連絡先一覧.yaml で宛先解決"] --> ys2["Mac: エディタの Save All で下書き確定"]
@@ -180,62 +267,9 @@ flowchart TB
   ys7 --> ys8
       </div>
       <ul>
-        <li>メールと電話の両方がある相手は <code>--via gmail</code> / <code>--via imessage</code>（ルールどおり推測しない）</li>
-        <li>Gmail 送信時は <code>credentials.json</code> / token（<code>gmail.send</code> 等 215 スコープ）</li>
+        <li>メールと電話の両方がある相手は <code>--via gmail</code> / <code>--via imessage</code></li>
+        <li>Gmail 送信時は token（<code>gmail.send</code> 等 215 スコープ）</li>
       </ul>
-    </section>
-
-    <section class="slide">
-      <h1>8. オープンチャットの認証まわり（QR 負荷の低減）</h1>
-      <p class="note" style="margin-top:0">※本スライドは<strong>暫定</strong>です。全体の章立て・表現は、内容を精査したうえで改めて整えます。</p>
-      <h2>改善してきたこと（ねらい）</h2>
-      <ul>
-        <li><strong>認証の一本化</strong> … <code>LINE_UNOFFICIAL_AUTH_DIR</code> を、トーク同期（個人・グループ）とオープンチャット取得の<strong>両方</strong>で共有。同じ <code>chrline_client_utils.build_logged_in_client</code> 経由にすることで、「スクリプトごとに別ログイン → QR が連発」になりにくくした。</li>
-        <li><strong>ローカル既定の保存先</strong> … 未設定時は <code>line_unofficial_poc/.line_auth_local</code>。クラウド同期フォルダ配下に認証を置くと競合しやすく QR が増えやすいため、実行時に警告するようにした。</li>
-        <li><strong>保存トークンの順試行</strong> … <code>.tokens/</code> 内の複数ファイルを更新日時の新しい順に試し、有効なものがあれば QR なしで起動する。</li>
-        <li><strong>再認証後の永続化</strong> … QR で取り直したトークンを <code>.tokens</code> に保存し、次回以降の手間を減らす。</li>
-        <li><strong>失効の気づき</strong> … 例: <code>line_unofficial_poc/launchd/open_chat_healthcheck_runner.sh</code> で軽い疎通チェック＋通知し、気づかないまま連続失敗し続ける時間を減らす。</li>
-      </ul>
-      <h2>苦労した点（割り切り）</h2>
-      <ul>
-        <li>CHRLINE は<strong>非公式</strong>のため、LINE 側の変更でセッションが切れる。切れたあとの復旧に QR は<strong>技術的に省略できない</strong>（「回数を減らす」が現実的な上限）。</li>
-        <li>Square（オープンチャット）は取得できる範囲に依存し、スレッド本文が欠けることもある（<code>chrline_open_chat_to_md.py</code> スライドの Beta 運用とセット）。</li>
-      </ul>
-      <h2>任意</h2>
-      <ul>
-        <li><code>LINE_CHRLINE_AUTO_OPEN_QR=1</code> … QR 画像を OS で自動表示（認証<strong>回数</strong>は減らないが、操作負荷は下げられる）。</li>
-      </ul>
-    </section>
-
-    <section class="slide">
-      <h1>9. ルール設計（再現性の中核）</h1>
-      <ul>
-        <li><code>partner-email-check.mdc</code>: Gmail / iMessage / ChatWork / LINE / オプチャ取り込みの導線を実行</li>
-        <li><code>partner-email-send.mdc</code>: 送信導線を <code>yoritoori_send.py</code> に統一</li>
-        <li><code>open-chat-archive.mdc</code>: OpenChat取り込み導線を固定</li>
-        <li><code>815-openchat-no-reply-proposal.mdc</code>: 返信提案と情報共有を分離</li>
-      </ul>
-    </section>
-
-    <section class="slide">
-      <h1>10. ローカル適用の入口</h1>
-      <ul>
-        <li>必要ファイル・設定一覧を先に揃える</li>
-        <li>Cursor依頼テンプレで再現確認する（参照用プロンプト集あり）</li>
-        <li>失敗時はチャネル別チェックリストで切り分ける</li>
-      </ul>
-      <p>詳細: <a href="./DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md">ローカル適用ハンドブック</a> / <a href="./DX互助会向け_パッケージ参照プロンプト一覧.md">パッケージ参照プロンプト一覧</a> / <a href="./comm-channel-flows.html">チャネル別処理フロー（1ページ・英字URL）</a>（<a href="./DX互助会向け_コミュニケーション連携_チャネル別処理フロー.html">日本語ファイル名</a>）</p>
-    </section>
-
-    <section class="slide">
-      <h1>11. まとめ</h1>
-      <ul>
-        <li>価値は「手段を増やす」より「増えた手段を同じ運用に乗せる」こと</li>
-        <li>5チャネル連携 + 1つの記録形式 + ルール設計で再現性を担保</li>
-        <li>OpenChatスレッドは制約前提で Beta 運用する</li>
-        <li>LINE 系は認証保存先を共有し、QR・手間の再発を抑える（スライド 8）</li>
-      </ul>
-      <p class="note">勉強会では「発表要点 + ハンドブック配布」の2段構成が最も移植しやすい。</p>
     </section>
   </main>
   <script>
