@@ -4,7 +4,8 @@
 
 - **ビジュアルは NotebookLM**（**Nano Banana / Nano Banana Pro** 等が使える出力）を主軸にする。
 - **Cursor チャット**で **`slides_outline.md`・NotebookLM 用の貼り付け文・ソース一覧**までできるだけ固める。
-- **NotebookLM の画面操作・Google へのログイン・画像のダウンロード／スクショ保存**は、原則 **あなたの手**（エージェントがブラウザで NB を操作することは想定しない）。
+- **NotebookLM MCP** があれば、**ソースを入れたノート**に対して **`ask_question` で文案・プロンプト反復**がしやすい（下記「MCP 接続時」）。
+- **ソースの追加・Studio・スライド画像の保存**は引き続き **NotebookLM の Web 上での操作**が中心（MCP だけでは完結しない）。
 
 ---
 
@@ -18,16 +19,47 @@
 | レイアウト CSS | `docs/css/slides-cute.css` |
 | 公開 HTML | `docs/<タイトル>_cute.html` 等 |
 | 一覧 | `docs/2kai.html` |
+| **NotebookLM 手順の詳細メモ** | **`@docs/N1_NotebookLM`**（MCP インストール・できること一覧・ソースの貼り方） |
 
 ---
 
-## 全体の流れ（3 ブロック）
+## 参照: `N1_NotebookLM` フォルダ
+
+- **git-repos 内の正本**: `docs/N1_NotebookLM/`（`@docs/N1_NotebookLM` または個別に `@docs/N1_NotebookLM/NotebookLMとCursorでできること一覧.md`）
+- **215 ワークスペース側のコピー元**: `215_神・大家さん倶楽部/N1_NotebookLM/`（内容は同じ。片方を直したら必要ならもう一方へコピー）
+
+---
+
+## NotebookLM MCP 接続時の整理（いまのツール範囲）
+
+`notebooklm-mcp` を Cursor に入れている場合、**チャットから呼べるのは主に次の種類**です（ツール名は実装に依存）。
+
+| 区分 | MCP 経由でしやすいこと | まだブラウザで自分がやること |
+|------|------------------------|------------------------------|
+| **質問・調査** | **`ask_question`**: 登録済みノート（または URL 指定）の**ソースを前提に**回答を取得。スライドの**文案叩き台**、**図案の文言整理**、**Studio に渡す追いプロンプト案**などを Cursor 上で繰り返し取りにいける | ノートに **ソースを入れる**（ファイルアップロード・貼り付け）は **NotebookLM の Web**。[手順は N1 の「ソースにする方法」](docs/N1_NotebookLM/CursorのまとめをNotebookLMのソースにする方法.md) |
+| **ライブラリ** | **`add_notebook`**（共有リンク登録）、**`list_notebooks` / `select_notebook` / `get_notebook` / `update_notebook` / `search_notebooks` / `remove_notebook`** | ノートの **共有設定**（リンクを知っている人）を Web でオンにする |
+| **セッション** | **`list_sessions`** など、会話コンテキストの確認・リセット系 | — |
+| **認証・接続** | **`setup_auth` / `re_auth` / `get_health` / `cleanup_data`** など | 初回ログイン用ブラウザ操作 |
+
+**MCP だけでは足りない部分（スライド画像まで一気通貫ではない理由）**
+
+- **Studio** の起動、**Nano Banana / Pro** の UI 選択、**スライド画像のダウンロード／高解像スクショ**は、現状の MCP ツールセットからは **自動化されていない**想定。
+- 実務フローは **「MCP で文案・プロンプトを磨く → Web の Studio でビジュアル生成 → PNG を `docs/assets/` に保存 → Cursor で HTML 差し替え」** が現実的。
+
+**MCP を活かしたチャット例**
+
+- 「`select_notebook` で ○○ のノートをアクティブにしてから、`ask_question` で：アップロード済みソースだけを根拠に、slide_id ごとに見出し・箇条書き・図の説明文を Markdown で出して」
+- 「同じノートで、Studio 向けに Nano Banana Pro と水彩風を指定する短い指示文を日本語で3案」
+
+---
+
+## 全体の流れ（3 ブロック）— MCP ありのとき
 
 | ブロック | 主にどこで | あなたが触る？ |
 |----------|------------|----------------|
-| A. 下準備をチャットで作る | **Cursor** | チャットで指示 → ファイル保存は Cursor に任せる or 自分で貼る |
-| B. NotebookLM で出力する | **NotebookLM（ブラウザ）** | **必ず自分**（アップロード・Studio・保存） |
-| C. HTML に載せて公開 | **Cursor** ＋ **git** | PNG をフォルダに置いたあとはチャット依頼可。**push は自分**（または任せた環境なら指示） |
+| A. 下準備 | **Cursor**（ファイル生成）± **MCP `ask_question`**（ノートソース前提の文案・プロンプト反復） | ソースを **Web の NotebookLM に追加**、共有リンクを **ライブラリに登録**（`add_notebook` はチャットから依頼可） |
+| B. ビジュアル確定 | **NotebookLM（ブラウザ）** | **Studio・保存**は自分（PNG を `docs/assets/` へ） |
+| C. 公開 | **Cursor** ＋ **git** | PNG 配置後は HTML 差し替えをチャット依頼可。**push は自分**が基本 |
 
 ---
 
@@ -58,11 +90,15 @@
 - NotebookLM に **コピペする文章の一式**（上記パック）
 - 必要なら **補助用の短い MD**（用語集・FAQ）のドラフト生成
 
-**チャットではできないこと**
+**チャットだけでは完結しにくいこと（MCP ありでも）**
 
-- NotebookLM にログインしてファイルをアップロードすること
-- Studio のボタンを押して生成を開始すること
-- Google のアカウントで「エクスポート」ダイアログを完了すること
+- NotebookLM **Web 上でソースを追加**（アップロード・貼り付け）— 手元の `slides_outline.md` をドラッグ＆ドロップする等
+- **Studio** の操作と、**スライド画像のエクスポート／スクショ保存**
+- **git push**（認証は自分の環境）
+
+**MCP が増えるとチャットでできること**
+
+- ノート登録・選択の依頼、**`ask_question`** によるソース根拠の回答（上表参照）
 
 ---
 
