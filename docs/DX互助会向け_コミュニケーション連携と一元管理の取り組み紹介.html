@@ -42,7 +42,7 @@
         <li>LINE（オープンチャット）</li>
       </ul>
       <p class="note">実装手順版は <code>DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md</code> を参照。</p>
-      <p class="note">各取り込みスクリプトの<strong>処理フロー概要</strong>は、次ページの全体図のあと、<strong>1スクリプト1スライド</strong>で掲載（<a href="./comm-channel-flows.html">英字URLの一覧ページ</a>と同内容）。</p>
+      <p class="note">取り込み・送信スクリプトの<strong>処理フロー概要</strong>は、次ページの全体図のあと、<strong>1スクリプト1スライド</strong>で掲載（<a href="./comm-channel-flows.html">英字URLの一覧ページ</a>と同内容）。</p>
     </section>
 
     <section class="slide">
@@ -94,7 +94,7 @@ flowchart TB
   ga4 --> ga6["添付はフォルダ内 添付/ へ保存"]
       </div>
       <ul>
-        <li>送信は別スクリプト <code>yoritoori_send.py</code>（<code>partner-email-send.mdc</code> 経由）</li>
+        <li>送信は <code>yoritoori_send.py</code>（スライド「7. 送信」・<code>partner-email-send.mdc</code>）</li>
       </ul>
     </section>
 
@@ -165,8 +165,28 @@ flowchart TB
       <p class="note">Beta 運用: 自動取得を基本にし、重要スレッドのみ手動補完。</p>
     </section>
 
+    <section class="slide flow-slide">
+      <h1>7. 送信 — <code>yoritoori_send.py</code></h1>
+      <p style="margin:0 0 0.5rem; font-size:0.9rem; color:#a8b4d9;"><code>1b_Cursorマニュアル/</code> · <code>partner-email-send.mdc</code> 経由（成功パスのみ・簡略図）</p>
+      <div class="mermaid">
+flowchart TB
+  ys1["--partner と連絡先一覧.yaml で宛先解決"] --> ys2["Mac: エディタの Save All で下書き確定"]
+  ys2 --> ys3["4.送信下書き.txt から件名・本文を取得"]
+  ys3 --> ys4["5.やり取り.md に送信内容を先に追記"]
+  ys4 --> ys5{"経路"}
+  ys5 -->|emails あり| ys6["Gmail API で送信（送信添付フォルダがあれば添付）"]
+  ys5 -->|phones のみ / --via| ys7["iMessage で送信（添付可）"]
+  ys6 --> ys8["成功後: 添付を 送信添付過去 へ移動"]
+  ys7 --> ys8
+      </div>
+      <ul>
+        <li>メールと電話の両方がある相手は <code>--via gmail</code> / <code>--via imessage</code>（ルールどおり推測しない）</li>
+        <li>Gmail 送信時は <code>credentials.json</code> / token（<code>gmail.send</code> 等 215 スコープ）</li>
+      </ul>
+    </section>
+
     <section class="slide">
-      <h1>7. オープンチャットの認証まわり（QR 負荷の低減）</h1>
+      <h1>8. オープンチャットの認証まわり（QR 負荷の低減）</h1>
       <p class="note" style="margin-top:0">※本スライドは<strong>暫定</strong>です。全体の章立て・表現は、内容を精査したうえで改めて整えます。</p>
       <h2>改善してきたこと（ねらい）</h2>
       <ul>
@@ -188,7 +208,7 @@ flowchart TB
     </section>
 
     <section class="slide">
-      <h1>8. ルール設計（再現性の中核）</h1>
+      <h1>9. ルール設計（再現性の中核）</h1>
       <ul>
         <li><code>partner-email-check.mdc</code>: Gmail / iMessage / ChatWork / LINE / オプチャ取り込みの導線を実行</li>
         <li><code>partner-email-send.mdc</code>: 送信導線を <code>yoritoori_send.py</code> に統一</li>
@@ -198,7 +218,7 @@ flowchart TB
     </section>
 
     <section class="slide">
-      <h1>9. ローカル適用の入口</h1>
+      <h1>10. ローカル適用の入口</h1>
       <ul>
         <li>必要ファイル・設定一覧を先に揃える</li>
         <li>Cursor依頼テンプレで再現確認する（参照用プロンプト集あり）</li>
@@ -208,12 +228,12 @@ flowchart TB
     </section>
 
     <section class="slide">
-      <h1>10. まとめ</h1>
+      <h1>11. まとめ</h1>
       <ul>
         <li>価値は「手段を増やす」より「増えた手段を同じ運用に乗せる」こと</li>
         <li>5チャネル連携 + 1つの記録形式 + ルール設計で再現性を担保</li>
         <li>OpenChatスレッドは制約前提で Beta 運用する</li>
-        <li>LINE 系は認証保存先を共有し、QR・手間の再発を抑える（スライド 7）</li>
+        <li>LINE 系は認証保存先を共有し、QR・手間の再発を抑える（スライド 8）</li>
       </ul>
       <p class="note">勉強会では「発表要点 + ハンドブック配布」の2段構成が最も移植しやすい。</p>
     </section>

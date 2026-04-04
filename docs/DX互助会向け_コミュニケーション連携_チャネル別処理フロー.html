@@ -22,7 +22,7 @@
 </head>
 <body>
   <p class="back"><a href="2kai.html">← 第2回 資料一覧へ</a> · <a href="DX互助会向け_コミュニケーション連携と一元管理の取り組み紹介.html">取り組み紹介スライドへ</a></p>
-  <h1>5チャネル別 · 処理フロー概要（1ページ）</h1>
+  <h1>取り込み5 + 送信1 · 処理フロー概要（1ページ）</h1>
   <p class="lead">各スクリプトの<strong>通常の成功パス</strong>だけを短いフローチャートにしたものです。分岐・エラー・再認証などは省略しています。実装の正は各 <code>.py</code> の docstring とソースを参照してください。</p>
   <p class="lead" style="margin-top:-0.5rem;">※ 本ページと<strong>同一の図</strong>を、<a href="DX互助会向け_コミュニケーション連携と一元管理の取り組み紹介.html">取り組み紹介スライド</a>では <strong>1スクリプト1スライド</strong>として収録しています（共有・印刷用にこちらを使っても構いません）。</p>
 
@@ -86,6 +86,22 @@ flowchart TB
   oc2 --> oc3["Square でメイン・スレッドを取得"]
   oc3 --> oc4["state.json で続きから / dedup で重複除外"]
   oc4 --> oc5["各 output_md（例: 815 の 5.やり取り.md）へ追記"]
+    </div>
+  </section>
+
+  <section class="channel" id="send">
+    <h2>6. パートナー送信 — <code>yoritoori_send.py</code></h2>
+    <p class="script">主な実装: <code>215_kamiooya/C1_cursor/1b_Cursorマニュアル/yoritoori_send.py</code></p>
+    <div class="mermaid">
+flowchart TB
+  ys1["--partner と連絡先一覧.yaml で宛先解決"] --> ys2["Mac: エディタの Save All で下書き確定"]
+  ys2 --> ys3["4.送信下書き.txt から件名・本文を取得"]
+  ys3 --> ys4["5.やり取り.md に送信内容を先に追記"]
+  ys4 --> ys5{"経路"}
+  ys5 -->|emails あり| ys6["Gmail API で送信（送信添付があれば付与）"]
+  ys5 -->|phones のみ / --via| ys7["iMessage で送信（添付可）"]
+  ys6 --> ys8["成功後: 添付を 送信添付過去 へ移動"]
+  ys7 --> ys8
     </div>
   </section>
 
