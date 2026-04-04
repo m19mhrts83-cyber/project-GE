@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 280" width="400" height="280" role="img" aria-label="">
+  <rect width="400" height="280" fill="#ffffff"/>
+  <ellipse cx="200" cy="248" rx="120" ry="12" fill="#fde8d4" opacity="0.6"/>
+  <!-- PC -->
+  <rect x="118" y="140" width="164" height="100" rx="6" fill="#e8f4fc" stroke="#222" stroke-width="2.5"/>
+  <rect x="128" y="150" width="144" height="72" fill="#fff" stroke="#222" stroke-width="2"/>
+  <rect x="150" y="248" width="100" height="10" rx="2" fill="#c5d9e8" stroke="#222" stroke-width="2"/>
+  <!-- chibi -->
+  <circle cx="260" cy="88" r="36" fill="#ffe8cc" stroke="#222" stroke-width="2.5"/>
+  <circle cx="248" cy="82" r="4" fill="#222"/>
+  <circle cx="272" cy="82" r="4" fill="#222"/>
+  <path d="M252 98 Q260 104 268 98" fill="none" stroke="#222" stroke-width="2" stroke-linecap="round"/>
+  <ellipse cx="260" cy="70" rx="28" ry="22" fill="#4a5568" stroke="#222" stroke-width="2"/>
+  <rect x="232" y="124" width="56" height="48" rx="8" fill="#90cdf4" stroke="#222" stroke-width="2.5"/>
+  <path d="M232 140 L210 160" stroke="#222" stroke-width="3" stroke-linecap="round"/>
+  <!-- note -->
+  <rect x="40" y="100" width="56" height="72" rx="4" fill="#fffef0" stroke="#222" stroke-width="2" transform="rotate(-8 68 136)"/>
+  <line x1="52" y1="118" x2="84" y2="118" stroke="#222" stroke-width="1.5"/>
+  <line x1="52" y1="132" x2="80" y2="132" stroke="#222" stroke-width="1.5"/>
+</svg>

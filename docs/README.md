@@ -4,6 +4,7 @@
 HTML 資料を外部から閲覧・Notion でリンク共有するために使います。
 
 - **トップページ**（`index.html`）: 第1回・第2回・第3回…と分岐する一覧。第1回は外部サイト（dx-slides）、第2回は `2kai.html`（3本のスライド）、第3回は準備中。
+- **第2回・cute版スライド例**: `Obsidian紹介_DX互助会向け_cute.html` + 共通スタイル `css/slides-cute.css` + イラスト `assets/dx_obsidian_cute/*.svg`。正本の表は `_drafts/slides_outline_obsidian_cute.md`。
 - **神・大家さん倶楽部**: `260308_目黒さん面談_打ち合わせ用.html` — 目黒さん面談用の打ち合わせ資料（AI活用・法人サポートの選択肢など）。共有用に同じURLで公開可能。
 - **神・大家さん倶楽部（採点ツール）**: `saiten_trial_and_production_flow.html` — 成果報告 AI 採点ツールの試行・本番運用の流れ（目黒さん向け）。画像は `採点自動化/image/` を参照。
 - **今後の運用**: 第3回の資料ができたら、トップの「第3回」をリンクに差し替え、必要なら `3kai.html` を作成して同様にまとめる。
