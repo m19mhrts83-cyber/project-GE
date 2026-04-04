@@ -39,6 +39,7 @@ node_modules/
 # ルールは原則コミットしない（例外: 地図・経路用の非秘密ルールのみ）
 .cursor/rules/*
 !.cursor/rules/home-address-maps.mdc
+!.cursor/rules/n1-notebooklm-mirror.mdc
 .obsidian/
 .vscode/
 
