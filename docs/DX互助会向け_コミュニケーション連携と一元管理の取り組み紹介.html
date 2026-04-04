@@ -46,33 +46,36 @@
       <h1>1. 何を一元管理しているか</h1>
       <div class="mermaid">
 flowchart TB
-  subgraph inputs [入力チャネル]
+  subgraph step1 [① きっかけ・方針]
+    Cursor["Cursor 依頼 + ルール .mdc"]
+  end
+  subgraph step2 [② 実行]
+    Scripts["Python スクリプト群"]
+  end
+  subgraph step3 [③ 取り込み元]
     Gmail["Gmail API"]
     ChatWork["ChatWork API"]
     IMessage["iMessage"]
     LineTalk["LINE 個人/グループ"]
     LineOpenChat["LINE オープンチャット"]
   end
-  subgraph exec_layer [実行層]
-    Cursor["Cursor 依頼 + ルール"]
-    Scripts["Python スクリプト群"]
-  end
-  subgraph outputs [出力先]
+  subgraph step4 [④ 記録先]
     Yori["パートナー別 5.やり取り.md"]
     OpenChatLog["815_神大家オプチャ/5.やり取り.md"]
   end
-  Gmail --> Scripts
-  ChatWork --> Scripts
-  IMessage --> Scripts
-  LineTalk --> Scripts
-  LineOpenChat --> Scripts
   Cursor --> Scripts
+  Gmail -.->|取得| Scripts
+  ChatWork -.->|取得| Scripts
+  IMessage -.->|取得| Scripts
+  LineTalk -.->|取得| Scripts
+  LineOpenChat -.->|取得| Scripts
   Scripts --> Yori
   Scripts --> OpenChatLog
       </div>
       <ul>
+        <li><strong>流れ</strong>: ルールに沿ってスクリプトを起動 → 各スクリプトが担当チャネルから取得 → <code>5.やり取り.md</code> 等へ追記（点線は「API 等からの取得」）</li>
         <li>出力を <code>5.やり取り.md</code> に統一して、後で読む場所を固定</li>
-        <li>Cursorルールで実行導線を固定し、手順迷子を防止</li>
+        <li>Cursor ルールで実行導線を固定し、手順迷子を防止</li>
       </ul>
     </section>
 
