@@ -1,6 +1,10 @@
 # dx_obsidian_cute
 
-`Obsidian紹介_DX互助会向け_cute.html` 用の **手描き風 SVG イラスト**（白背景・細い線・淡色の塗り）。
+`Obsidian紹介_DX互助会向け_cute.html` 用アセット。
+
+**方針更新（2026）:** 出来栄え優先の場合は **NotebookLM（Nano Banana / Pro 等）で生成した PNG** を `sN.png` として置き、HTML の `<img src>` を **`.png` に差し替える**。以下の SVG は暫定・フォールバック用。
+
+現状の **手描き風 SVG**（白背景・細い線・淡色の塗り）:
 
 ## 差し替え
 
