@@ -18,7 +18,7 @@
       scroll-snap-align: start;
     }
     .slide h1 { margin: 0 0 1rem; border-bottom: 2px solid #4bd2b0; padding-bottom: 0.5rem; }
-    .slide h2 { margin: 1rem 0 0.5rem; color: #8bc3ff; }
+    .slide h2 { margin: 1rem 0 0.5rem; color: #8bc3ff; font-size: 1.05rem; }
     .slide p, .slide li { line-height: 1.7; }
     .slide ul { margin: 0.4rem 0; }
     .mermaid { background: #10182a; border-radius: 10px; padding: 0.75rem 1rem; margin-top: 0.5rem; flex: 0 1 auto; max-height: min(52vh, 28rem); overflow: auto; }
@@ -27,26 +27,38 @@
     .note { background: #0f2e4f; border-left: 4px solid #4bd2b0; padding: 0.7rem 1rem; border-radius: 0 8px 8px 0; margin-top: 1rem; }
     code { background: #0f2e4f; padding: 0.15rem 0.4rem; border-radius: 4px; }
     a { color: #7fc9ff; }
+    .slide pre.prompt {
+      background: #0c1828;
+      border: 1px solid #2a3550;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      margin: 0.5rem 0 0;
+    }
+    .slide table { border-collapse: collapse; font-size: 0.9rem; margin-top: 0.5rem; width: 100%; max-width: 42rem; }
+    .slide th, .slide td { border: 1px solid #2a3550; padding: 0.45rem 0.65rem; text-align: left; vertical-align: top; }
+    .slide th { background: #10182a; color: #8bc3ff; }
   </style>
 </head>
 <body>
   <main>
     <section class="slide">
       <h1>DX互助会向け コミュニケーション連携と一元管理</h1>
-      <p>Gmailだけでなく、複数チャネルを 1 つの運用に統合した実践事例。</p>
-      <ul>
-        <li>Gmail API</li>
-        <li>ChatWork API</li>
-        <li>iMessage</li>
-        <li>LINE（個人・グループ）</li>
-        <li>LINE（オープンチャット）</li>
-      </ul>
-      <p class="note">実装手順版は <code>DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md</code> を参照。</p>
-      <p class="note">各スクリプトの<strong>処理フロー図（Mermaid）</strong>は、<strong>まとめスライドの直後の付録</strong>にあります（本ファイルで一本化）。</p>
+      <p><strong>今日の約束</strong>: パートナーとのやり取りを「どこにどう残し」、Cursor で「どう再現するか」— 実例と、持ち帰れるパッケージまでを一本で見る。</p>
+      <p class="note">本編のあと<strong>付録</strong>に、取り込み 5 本・送信 1 本の処理フロー（Mermaid）とスクリプト索引があります（<code>#appendix-flows</code>）。</p>
+      <p class="note">ローカルにそのまま試す手順は <a href="./DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md">ローカル適用ハンドブック</a> が正本です（スライド 7–8 で要約）。</p>
     </section>
 
     <section class="slide">
-      <h1>1. 何を一元管理しているか</h1>
+      <h1>1. 概要 — 何をしているか</h1>
+      <p>Gmail に限らず、<strong>複数チャネル</strong>から届くパートナーとのやり取りを、主としてパートナー別の <code>5.やり取り.md</code> に<strong>時系列で蓄積</strong>する運用です。チャネルが増えても、<strong>読む場所</strong>と<strong>取り込みの型</strong>を揃えます。</p>
+      <ul>
+        <li>Gmail API / ChatWork API / iMessage / LINE（個人・グループ）/ LINE オープンチャット</li>
+        <li>オープンチャットの一部は別 MD（例: 情報収集枠）に分ける場合あり</li>
+      </ul>
       <div class="mermaid">
 flowchart TB
   subgraph step1 [① きっかけ・方針]
@@ -76,99 +88,149 @@ flowchart TB
   Scripts --> OpenChatLog
       </div>
       <ul>
-        <li><strong>流れ</strong>: ルールに沿ってスクリプトを起動 → 各スクリプトが担当チャネルから取得 → <code>5.やり取り.md</code> 等へ追記（点線は「API 等からの取得」）</li>
-        <li>出力を <code>5.やり取り.md</code> に統一して、後で読む場所を固定</li>
-        <li>Cursor ルールで実行導線を固定し、手順迷子を防止</li>
+        <li><strong>流れ</strong>: ルールに沿ってスクリプトを起動 → 各チャネルから取得 → <code>5.やり取り.md</code> 等へ追記（点線は「API 等からの取得」）</li>
       </ul>
     </section>
 
     <section class="slide">
-      <h1>2. メインスクリプトと役割（テキスト）</h1>
-      <h2>Gmail</h2>
-      <ul>
-        <li>受信: <code>gmail_to_yoritoori.py</code> · 送信: <code>yoritoori_send.py</code></li>
-      </ul>
-      <h2>ChatWork</h2>
-      <ul>
-        <li>取り込み: <code>chatwork_to_yoritoori.py</code> · <code>CHATWORK_API_TOKEN</code> / <code>chatwork_room_id</code></li>
-      </ul>
-      <h2>iMessage</h2>
-      <ul>
-        <li>取り込み: <code>imessage_to_yoritoori.py</code> · macOS・フルディスクアクセス</li>
-      </ul>
-      <h2>LINE（個人・グループ）</h2>
-      <ul>
-        <li>取り込み: <code>chrline_sync_to_yoritoori.py</code> · <code>LINE_UNOFFICIAL_AUTH_DIR</code> · E2EE で本文が取れない場合あり</li>
-      </ul>
-      <h2>LINE オープンチャット</h2>
-      <ul>
-        <li>バッチ: <code>line_unofficial_poc/chrline_open_chat_to_md.py</code> · 常駐（任意）/ 手動補完スクリプトあり · Beta 運用</li>
-      </ul>
-      <h2>送信（パートナー宛）</h2>
-      <ul>
-        <li><code>yoritoori_send.py</code> · <code>4.送信下書き.txt</code> · メールと電話の両方がある相手は <code>--via</code>（ルールどおり）</li>
-      </ul>
-    </section>
-
-    <section class="slide">
-      <h1>3. オープンチャットの認証まわり（QR 負荷の低減）</h1>
-      <p class="note" style="margin-top:0">※本スライドは<strong>暫定</strong>です。全体の章立て・表現は、内容を精査したうえで改めて整えます。</p>
+      <h1>2. 構築の苦労と工夫（例: LINE 周り）</h1>
       <h2>改善してきたこと（ねらい）</h2>
       <ul>
-        <li><strong>認証の一本化</strong> … <code>LINE_UNOFFICIAL_AUTH_DIR</code> を、トーク同期（個人・グループ）とオープンチャット取得の<strong>両方</strong>で共有。同じ <code>chrline_client_utils.build_logged_in_client</code> 経由にすることで、「スクリプトごとに別ログイン → QR が連発」になりにくくした。</li>
-        <li><strong>ローカル既定の保存先</strong> … 未設定時は <code>line_unofficial_poc/.line_auth_local</code>。クラウド同期フォルダ配下に認証を置くと競合しやすく QR が増えやすいため、実行時に警告するようにした。</li>
-        <li><strong>保存トークンの順試行</strong> … <code>.tokens/</code> 内の複数ファイルを更新日時の新しい順に試し、有効なものがあれば QR なしで起動する。</li>
-        <li><strong>再認証後の永続化</strong> … QR で取り直したトークンを <code>.tokens</code> に保存し、次回以降の手間を減らす。</li>
-        <li><strong>失効の気づき</strong> … 例: <code>line_unofficial_poc/launchd/open_chat_healthcheck_runner.sh</code> で軽い疎通チェック＋通知し、気づかないまま連続失敗し続ける時間を減らす。</li>
+        <li><strong>認証の一本化</strong> … <code>LINE_UNOFFICIAL_AUTH_DIR</code> を、トーク同期とオープンチャット取得の<strong>両方</strong>で共有。同じ <code>chrline_client_utils.build_logged_in_client</code> 経由にし、「スクリプトごとに別ログイン → QR が連発」になりにくくした。</li>
+        <li><strong>ローカル既定の保存先</strong> … 未設定時は <code>line_unofficial_poc/.line_auth_local</code>。クラウド同期直下は競合しやすく QR が増えやすいため、警告する。</li>
+        <li><strong>保存トークンの順試行</strong> … <code>.tokens/</code> 内を更新日時の新しい順に試し、有効なら QR なしで起動。</li>
+        <li><strong>再認証後の永続化</strong> … QR で得たトークンを保存し、次回の手間を減らす。</li>
+        <li><strong>失効の気づき</strong> … 例: <code>launchd/open_chat_healthcheck_runner.sh</code> で疎通チェック＋通知。</li>
       </ul>
       <h2>苦労した点（割り切り）</h2>
       <ul>
-        <li>CHRLINE は<strong>非公式</strong>のため、LINE 側の変更でセッションが切れる。切れたあとの復旧に QR は<strong>技術的に省略できない</strong>（「回数を減らす」が現実的な上限）。</li>
-        <li>Square（オープンチャット）は取得できる範囲に依存し、スレッド本文が欠けることもある（付録の OpenChat フローと Beta 運用をセット）。</li>
+        <li>CHRLINE は<strong>非公式</strong> … LINE 側の変更でセッションが切れる。復旧時の QR は「回数を減らす」が現実的な上限。</li>
+        <li>Square（オープンチャット）は取得範囲に依存し、スレッド本文が欠けることもある（付録フローと Beta 運用をセット）。</li>
       </ul>
-      <h2>任意</h2>
+      <p class="note">任意: <code>LINE_CHRLINE_AUTO_OPEN_QR=1</code> で QR 画像を自動表示（認証<strong>回数</strong>は減らないが操作負荷は下げられる）。</p>
+    </section>
+
+    <section class="slide">
+      <h1>3. メリット — なぜこの形にするか</h1>
       <ul>
-        <li><code>LINE_CHRLINE_AUTO_OPEN_QR=1</code> … QR 画像を OS で自動表示（認証<strong>回数</strong>は減らないが、操作負荷は下げられる）。</li>
+        <li><strong>記録の一元化</strong> … チャネルが分かれていても、後から読む場所がパートナー単位で固定される。</li>
+        <li><strong>送信導線の統一</strong> … パートナー宛は <code>yoritoori_send.py</code> に寄せ、下書き（<code>4.送信下書き.txt</code>）と履歴追記の型を揃える。</li>
+        <li><strong>ルールで手順を固定</strong> … 「取り込みはこの順」「送信はこのスクリプト」と Cursor 側に書いておき、依頼のぶれを減らす。</li>
+        <li><strong>Cursor と相性がよい</strong> … 蓄積したテキストをコンテキストに載せやすく、次のスライドのような<strong>実運用での効き</strong>につながる。</li>
+      </ul>
+      <p class="note">技術的な制約（非公式 API 等）はスライド 2 のとおり。それでも「探す・迷う時間」を減らす設計に価値がある、という整理。</p>
+    </section>
+
+    <section class="slide">
+      <h1>4. 運用で良かった点（実感）</h1>
+      <p>一元化してから、次のような<strong>日々の効き</strong>を感じています（発表者の感想として）。</p>
+      <ul>
+        <li><strong>チャット一言で状況が掴める</strong> … 複数チャネルをまたいでも、まとまったログがあるので、Cursor に依頼したときに<strong>全体の様子を短い会話で把握</strong>しやすくなった。</li>
+        <li><strong>返信メールの作成がしやすい</strong> … 蓄積したやり取りを読ませて、<strong>文面のたたき台を一緒に考えてもらう</strong>動きがやりやすくなった。</li>
+        <li><strong>返信が必要なものの整理</strong> … 「確認して」「優先度の高いものを教えて」と頼むと、<strong>先に手をつけるべき相手・件</strong>が立ち上がりやすい。</li>
+        <li><strong>クイックに着手できる</strong> … 重要なメール・やり取りに対して、<strong>あちこち探してから始める</strong>量が減り、会話の中で「今やること」が明確になる。</li>
+        <li><strong>探す・迷う時間が減った</strong> … 記録先と型が揃っていることで、<strong>検索や記憶頼みの負担</strong>がだいぶ少なくなった、という実感。</li>
       </ul>
     </section>
 
     <section class="slide">
-      <h1>4. ルール設計（再現性の中核）</h1>
+      <h1>5. ローカル適用パッケージの紹介</h1>
+      <p>同じ「型」を、<strong>各自の PC のワークスペース</strong>に載せて試せるよう、手順・プロンプト例・ルール案をまとめたパッケージ（MD・スクリプト・<code>.mdc</code>）を用意しています。フォルダ構成は人ごとに違ってよい前提です（ハンドブック §0-1）。</p>
+      <p class="note" style="margin-top:1rem;"><strong>誘い</strong>: このパッケージを<strong>そのまま真似（パクる）</strong>して、自分の環境で動かしてみませんか。完コピでなくても、<strong>導線とルールの型</strong>だけ持ち帰ってもらえれば十分です。</p>
+      <p>主な同梱・参照: <a href="./DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md">ローカル適用ハンドブック</a> · <a href="./DX互助会向け_パッケージ参照プロンプト一覧.md">パッケージ参照プロンプト一覧</a> · <a href="./運用コマンド一覧.md">運用コマンド一覧</a></p>
+    </section>
+
+    <section class="slide">
+      <h1>6. ルール（.mdc）— 再現性の中核</h1>
+      <p>Cursor のプロジェクトルールに置くと、依頼文と実際のスクリプト実行がつながりやすくなります。</p>
       <ul>
-        <li><code>partner-email-check.mdc</code>: Gmail / iMessage / ChatWork / LINE / オプチャ取り込みの導線を実行</li>
-        <li><code>partner-email-send.mdc</code>: 送信導線を <code>yoritoori_send.py</code> に統一</li>
-        <li><code>open-chat-archive.mdc</code>: OpenChat取り込み導線を固定</li>
-        <li><code>815-openchat-no-reply-proposal.mdc</code>: 返信提案と情報共有を分離</li>
+        <li><code>partner-email-check.mdc</code> … Gmail / iMessage / ChatWork / LINE / オプチャ取り込みの導線</li>
+        <li><code>partner-email-send.mdc</code> … 送信を <code>yoritoori_send.py</code> に統一</li>
+        <li><code>open-chat-archive.mdc</code> … オープンチャット取り込み導線</li>
+        <li><code>815-openchat-no-reply-proposal.mdc</code> … 返信提案と情報共有の分離（815 枠）</li>
       </ul>
     </section>
 
     <section class="slide">
-      <h1>5. ローカル適用の入口</h1>
-      <ul>
-        <li>必要ファイル・設定一覧を先に揃える</li>
-        <li>Cursor依頼テンプレで再現確認する（参照用プロンプト集あり）</li>
-        <li>失敗時はチャネル別チェックリストで切り分ける</li>
-      </ul>
-      <p>詳細: <a href="./DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md">ローカル適用ハンドブック</a> / <a href="./DX互助会向け_パッケージ参照プロンプト一覧.md">パッケージ参照プロンプト一覧</a></p>
-      <p class="note">処理フロー図は<strong>このあとのまとめの直後（付録）</strong>にあります。旧「チャネル別フロー」専用URL（<code>comm-channel-flows.html</code> 等）も本ページへ誘導します。</p>
+      <h1>7. 自分の環境での進め方（ハンドブック準拠）</h1>
+      <table>
+        <thead>
+          <tr><th>資料</th><th>役割</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ローカル適用ハンドブック</td><td>全体の地図・導入順・チェックリスト</td></tr>
+          <tr><td>パッケージ参照プロンプト一覧</td><td>Cursor に貼る<strong>依頼文</strong>のコピペ元</td></tr>
+          <tr><td>運用コマンド一覧</td><td><code>cd</code> とコマンドの<strong>正本</strong>（パスは自分用に読み替え）</td></tr>
+        </tbody>
+      </table>
+      <h2>流れ（3 ステップ）</h2>
+      <ol>
+        <li><strong>ローカルに置く</strong> … Cursor で開くフォルダをワークスペースのルートに。MD は <code>docs/</code> など分かりやすい場所へ。</li>
+        <li><strong>参照する</strong> … チャットで <code>@</code> + ハンドブック（ファイル名）を指定し、「この手順に沿ってセットアップして」と依頼。</li>
+        <li><strong>環境に合わせる</strong> … 運用コマンド一覧のパスを、自分のルート前提で書き換え（または Cursor に書き換え依頼）。</li>
+      </ol>
+      <p class="note">ルール <code>.mdc</code> が無い環境では、プロンプト一覧に書いた「期待する動き」とは一致しません。</p>
     </section>
 
     <section class="slide">
-      <h1>6. まとめ</h1>
+      <h1>8. Cursor での依頼の出し方（例）</h1>
+      <h2>導入時の最初の依頼文（ハンドブック §0-1 より）</h2>
+      <pre class="prompt">コミュニケーション連携パッケージを導入します。まず次を確認してください。
+1) いま Cursor で開いているワークスペースのルート（フォルダのフルパス）
+2) スクリプト・設定・メモを置く親フォルダ（1 と同じでよいか）
+
+その前提で、同梱の「DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック」に沿い、
+運用コマンド一覧の cd / パスを私の環境用に書き換えた手順を短く提示してください。</pre>
+      <h2>運用で使う依頼文の例（プロンプト一覧より）</h2>
+      <pre class="prompt">パートナーからのメールなどを確認して。</pre>
+      <p>ルール <code>partner-email-check.mdc</code> があると、Gmail / iMessage / ChatWork / LINE / オープンチャットの取り込みが定義どおり走る想定です。</p>
+      <p class="note">処理フロー図は<strong>このあとの付録</strong>（<code>#appendix-flows</code>）。旧 URL <code>comm-channel-flows.html</code> も付録へ誘導します。</p>
+    </section>
+
+    <section class="slide">
+      <h1>9. 今日の持ち帰り</h1>
       <ul>
-        <li>価値は「手段を増やす」より「増えた手段を同じ運用に乗せる」こと</li>
-        <li>5チャネル連携 + 送信 + 1つの記録形式 + ルール設計で再現性を担保</li>
-        <li>OpenChatスレッドは制約前提で Beta 運用する</li>
-        <li>LINE 系は認証保存先を共有し、QR・手間の再発を抑える（スライド 3）</li>
+        <li><strong>概要</strong>: 複数チャネル → パートナー別 <code>5.やり取り.md</code> への蓄積と、ルール＋スクリプトの型（スライド 1）。</li>
+        <li><strong>現実面</strong>: LINE 等は制約と割り切りつつ、認証まわりで手間を減らす工夫（スライド 2）。</li>
+        <li><strong>効き</strong>: 一元化と Cursor 併用で、「把握・下書き・優先・着手」が速くなった（スライド 4）。</li>
+        <li><strong>次の一歩</strong>: ハンドブック＋プロンプト一覧＋運用コマンドで、自分のパスに合わせて試す（スライド 7–8）。</li>
       </ul>
-      <p class="note">勉強会では「発表要点 + ハンドブック配布」の2段構成が最も移植しやすい。</p>
-      <p class="note" style="margin-top:1rem;"><strong>このあと</strong>、取り込み5本・送信1本の<strong>処理フロー（Mermaid・成功パスのみ）</strong>が続きます。</p>
+      <p class="note">勉強会では「発表（本スライド）＋ハンドブック配布」の二段が移植しやすいです。</p>
     </section>
 
     <section class="slide" id="appendix-flows">
       <h1>付録 · 各スクリプトの処理フロー（簡略図）</h1>
       <p>通常の成功パスのみ。分岐・エラー・再認証は省略。実装の正は各 <code>.py</code> の docstring を参照。</p>
       <p style="margin-top:0.75rem;"><a href="#appendix-flows">この付録へのリンク</a>（共有用・アンカー <code>#appendix-flows</code>）</p>
+    </section>
+
+    <section class="slide">
+      <h1>付録 · スクリプトとファイル名（索引）</h1>
+      <p>パスは環境により異なります。リポジトリ内の例では <code>215_kamiooya/C1_cursor/1b_Cursorマニュアル/</code> や <code>line_unofficial_poc/</code> 配下にあります。</p>
+      <h2>Gmail</h2>
+      <ul>
+        <li>受信: <code>gmail_to_yoritoori.py</code> · 送信: <code>yoritoori_send.py</code></li>
+      </ul>
+      <h2>ChatWork</h2>
+      <ul>
+        <li><code>chatwork_to_yoritoori.py</code> · <code>CHATWORK_API_TOKEN</code> / <code>chatwork_room_id</code></li>
+      </ul>
+      <h2>iMessage</h2>
+      <ul>
+        <li><code>imessage_to_yoritoori.py</code> · macOS・フルディスクアクセス</li>
+      </ul>
+      <h2>LINE（個人・グループ）</h2>
+      <ul>
+        <li><code>chrline_sync_to_yoritoori.py</code> · <code>LINE_UNOFFICIAL_AUTH_DIR</code> · E2EE で本文が取れない場合あり</li>
+      </ul>
+      <h2>LINE オープンチャット</h2>
+      <ul>
+        <li><code>chrline_open_chat_to_md.py</code> · 常駐（任意）/ 手動補完スクリプトあり · Beta</li>
+      </ul>
+      <h2>送信（パートナー宛）</h2>
+      <ul>
+        <li><code>yoritoori_send.py</code> · <code>4.送信下書き.txt</code> · メールと電話の両方がある相手は <code>--via</code></li>
+      </ul>
     </section>
 
     <section class="slide flow-slide" id="flow-gmail">
