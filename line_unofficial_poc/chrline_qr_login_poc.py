@@ -2,14 +2,14 @@
 """
 CHRLINE-PatchV2 向け QR ログイン PoC。
 
-install_chrline_patchv2_mac.sh 適用後、フォーク付属の test/login_getToken_test.py と同様に
-device=DESKTOPWIN, useThrift=True でセッションを張る（PyPI 2.5.14 の CHROMEOS 既定より通りやすい可能性）。
+install_chrline_patchv2_mac.sh 適用後、device=DESKTOPWIN, useThrift=True で
+セッションを張る（PyPI 2.5.14 の CHROMEOS 既定より通りやすい可能性）。
 
-.env の LINE_UNOFFICIAL_AUTH_DIR にセッション保存。authToken は標準出力に出さない。
+token が短時間で失効するケースに備え、requestSQR3（secure）を使って
+ログインし、取得 token を保存してから検証ログインまで行う。
 """
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -20,21 +20,33 @@ load_dotenv(ROOT / ".env")
 
 
 def main() -> int:
-    save = os.environ.get("LINE_UNOFFICIAL_AUTH_DIR", "").strip()
-    if not save:
-        print("エラー: .env に LINE_UNOFFICIAL_AUTH_DIR を設定してください。", file=sys.stderr)
-        return 1
-    p = Path(save)
-    p.mkdir(parents=True, exist_ok=True)
-
     from CHRLINE import CHRLINE
 
-    from chrline_client_utils import persist_auth_token
+    from chrline_client_utils import (
+        cleanup_chrline_qr_images,
+        persist_auth_token,
+        save_root_from_env,
+    )
 
-    cl = CHRLINE(device="DESKTOPWIN", useThrift=True, savePath=str(p))
+    p = save_root_from_env()
+    cleanup_chrline_qr_images(p)
+
+    # requestSQR2 経路では token が短命化するケースがあるため、secure フローを使う。
+    cl = CHRLINE(device="DESKTOPWIN", useThrift=True, savePath=str(p), noLogin=True)
+    try:
+        for chunk in cl.requestSQR3(isSelf=True):
+            text = str(chunk)
+            # URL / QR画像パス / PIN表示だけ標準出力に出す（token 本文は出さない）。
+            if text.startswith(("URL:", "IMG:", "請輸入pincode:")):
+                print(text)
+    finally:
+        cleanup_chrline_qr_images(p)
+
     tok = getattr(cl, "authToken", None) or ""
     if tok.strip():
         persist_auth_token(p, tok)
+        # 取得 token がそのまま利用可能かを直後に検証する。
+        CHRLINE(tok, device="DESKTOPWIN", useThrift=True, savePath=str(p))
     print("ログイン完了（セッションは LINE_UNOFFICIAL_AUTH_DIR に保存された想定です）。")
     if not tok.strip():
         print(

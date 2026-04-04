@@ -28,21 +28,12 @@ alwaysApply: true
 
 ## エージェントの振る舞い
 
-1. **パートナー宛メール送信**（yoritoori_send.py）  
-   - 実行例:  
-     `~/git-repos/ProgramCode/venv_gmail/bin/python yoritoori_send.py --partner LEAF`  
-   - カレント: スクリプトがあるフォルダ（例: 215 の `C1_cursor/1b_Cursorマニュアル`）。
-
-2. **パートナーからのメール・メッセージ確認**（gmail_to_yoritoori.py, imessage_to_yoritoori.py）  
-   - 実行例:  
-     `~/git-repos/ProgramCode/venv_gmail/bin/python gmail_to_yoritoori.py`  
-     `~/git-repos/ProgramCode/venv_gmail/bin/python imessage_to_yoritoori.py`  
-   - カレント: 同上。
-
-3. **その他の Python スクリプト**  
-   - 215 や ProgramCode 内のスクリプトを実行するときは、依存に合わせて  
-     `~/git-repos/ProgramCode/venv_gmail/bin/python` または `~/git-repos/ProgramCode/venv/bin/python` を指定する。  
-   - どちらを使うか不明な場合は、まず venv_gmail で試してよい。
+- **具体的な `cd` 行とスクリプト引数のセット**は、`~/git-repos/docs/運用コマンド一覧.md` を開いてそのまま用いる（正本）。
+- インタプリタだけ先に決める場合:
+  - Gmail・やり取り・パートナー連携まわり → `~/git-repos/ProgramCode/venv_gmail/bin/python`
+  - excel_to_md / pdf_to_md 等で依存が分かれているもの → `~/git-repos/ProgramCode/venv/bin/python`
+  - `line_unofficial_poc` → 当該リポジトリの `.venv/bin/python`
+  - どちらか不明なときはまず `venv_gmail` でよい。
 
 ## 禁止すること
 

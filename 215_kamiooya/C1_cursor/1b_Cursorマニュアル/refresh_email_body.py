@@ -20,6 +20,7 @@ CREDENTIALS_PATH = SCRIPT_DIR / "credentials.json"
 TOKEN_PATH = SCRIPT_DIR / "token.json"
 
 sys.path.insert(0, str(SCRIPT_DIR))
+from gmail_api_scopes import GMAIL_SCOPES_215 as SCOPES, resolve_single_token_path_215
 from yoritoori_utils import make_summary, YORITOORI_FILENAME
 from gmail_to_yoritoori import (
     load_env,
@@ -34,13 +35,14 @@ from googleapiclient.discovery import build
 
 load_env()
 credentials_path = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", CREDENTIALS_PATH))
-token_path = Path(os.environ.get("GMAIL_TOKEN_PATH", TOKEN_PATH))
+_rb = Path(os.environ.get("GMAIL_TOKEN_PATH", TOKEN_PATH))
+token_path = resolve_single_token_path_215(
+    SCRIPT_DIR,
+    _rb,
+    explicit_via_env=bool(os.environ.get("GMAIL_TOKEN_PATH")),
+)
 contact_path = Path(os.environ.get("CONTACT_LIST_PATH", CONTACT_YAML))
 base_path = Path(os.environ.get("YORITOORI_BASE_PATH", BASE_DIR))
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.modify",
-]
 
 
 def main():

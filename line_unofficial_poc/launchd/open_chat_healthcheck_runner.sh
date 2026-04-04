@@ -35,7 +35,7 @@ if [[ ! -x "$REPO_DIR/.venv/bin/python" ]]; then
 fi
 
 if [[ -z "${LINE_UNOFFICIAL_AUTH_DIR:-}" ]]; then
-  alert_and_exit "LINE_UNOFFICIAL_AUTH_DIR が未設定"
+  LINE_UNOFFICIAL_AUTH_DIR="$REPO_DIR/.line_auth_local"
 fi
 
 if [[ ! -d "$LINE_UNOFFICIAL_AUTH_DIR/.tokens" ]]; then

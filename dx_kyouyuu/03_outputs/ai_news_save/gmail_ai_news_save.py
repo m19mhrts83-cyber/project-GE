@@ -32,6 +32,21 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
+_GMAIL_SYNC = Path(__file__).resolve().parents[3] / "215_kamiooya/C1_cursor/mail_automation"
+if _GMAIL_SYNC.is_dir() and str(_GMAIL_SYNC) not in sys.path:
+    sys.path.insert(0, str(_GMAIL_SYNC))
+try:
+    from gmail_token_sync import save_token_json_and_sync
+except ImportError:
+    def save_token_json_and_sync(token_path, creds_json, *, log_prefix: str = "📎 Gmail token") -> None:
+        Path(token_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(token_path).write_text(creds_json, encoding="utf-8")
+
+_215_1B = Path(__file__).resolve().parents[3] / "215_kamiooya/C1_cursor/1b_Cursorマニュアル"
+if _215_1B.is_dir() and str(_215_1B) not in sys.path:
+    sys.path.insert(0, str(_215_1B))
+from gmail_api_scopes import GMAIL_SCOPES_215 as SCOPES, token_satisfies_215_scopes
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -49,11 +64,6 @@ DEFAULT_CREDENTIALS_DIR = Path(
 )
 CREDENTIALS_PATH = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", str(DEFAULT_CREDENTIALS_DIR / "credentials.json")))
 TOKEN_PATH = Path(os.environ.get("GMAIL_TOKEN_PATH", str(DEFAULT_CREDENTIALS_DIR / "token.json")))
-
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.modify",
-]
 
 AI_NEWS_FROM = "ikeda@workstyle-evolution.co.jp"
 AI_NEWS_SUBJECT = "注目AIニュース"
@@ -459,6 +469,8 @@ def main():
                 creds_data["token"] = creds_data["access_token"]
         try:
             creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
+            if creds and not token_satisfies_215_scopes(creds_data):
+                creds = None
         except Exception:
             creds = None
 
@@ -472,8 +484,7 @@ def main():
                 creds = flow.run_console()
             else:
                 creds = flow.run_local_server(port=0)
-        with open(token_path, "w", encoding="utf-8") as f:
-            f.write(creds.to_json())
+        save_token_json_and_sync(token_path, creds.to_json())
         print("token.json を保存しました。")
 
     service = build("gmail", "v1", credentials=creds)

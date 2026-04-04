@@ -16,10 +16,17 @@ Gmail token を更新し、必要なら GitHub Actions の Secret GMAIL_TOKEN_B6
 
 import argparse
 import base64
+import importlib.util
 import json
 import os
 import sys
 from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_215_1B_MANUAL = _REPO_ROOT / "215_kamiooya/C1_cursor/1b_Cursorマニュアル"
+if _215_1B_MANUAL.is_dir() and str(_215_1B_MANUAL) not in sys.path:
+    sys.path.insert(0, str(_215_1B_MANUAL))
+from gmail_api_scopes import GMAIL_SCOPES_215 as SCOPES, token_satisfies_215_scopes
 
 # 215 の credentials を参照（gmail_ai_news_save と同じ）
 DEFAULT_CREDENTIALS_DIR = Path(
@@ -29,12 +36,27 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 CREDENTIALS_PATH = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", str(DEFAULT_CREDENTIALS_DIR / "credentials.json")))
 TOKEN_PATH = Path(os.environ.get("GMAIL_TOKEN_PATH", str(DEFAULT_CREDENTIALS_DIR / "token.json")))
 GMAIL_TOKEN_PATHS_RAW = os.environ.get("GMAIL_TOKEN_PATHS", "").strip()
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.modify",
-]
 DEFAULT_GITHUB_REPO = "m19mhrts83-cyber/DX-_-"
 GITHUB_SECRET_NAME = "GMAIL_TOKEN_B64"
+
+
+def _sync_token_mirrors_no_github(token_path: Path) -> None:
+    """215 の token 保存後、git-repos ⇔ OneDrive をコピーのみ同期（GitHub は PAT 処理に任せる）。"""
+    sync_py = Path(__file__).resolve().parents[3] / "215_kamiooya/C1_cursor/mail_automation/gmail_token_sync.py"
+    if not sync_py.is_file():
+        return
+    try:
+        spec = importlib.util.spec_from_file_location("gmail_token_sync", sync_py)
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(mod)
+        mod.sync_token_mirrors(
+            token_path,
+            skip_github=True,
+            log_prefix="📎 Gmail token（refresh）",
+        )
+    except Exception as e:
+        print(f"警告: token ミラーをスキップしました: {e}", file=sys.stderr)
 
 
 def resolve_token_paths() -> list[Path]:
@@ -69,6 +91,7 @@ def load_and_refresh_gmail_token(token_path: Path):
 
     creds = None
     if token_path.exists():
+        cred_data = None
         try:
             token_data = json.loads(token_path.read_text(encoding="utf-8"))
             cred_data = dict(token_data)
@@ -82,6 +105,13 @@ def load_and_refresh_gmail_token(token_path: Path):
                     cred_data["token"] = cred_data["access_token"]
             creds = Credentials.from_authorized_user_info(cred_data, SCOPES)
         except Exception:
+            creds = None
+        if creds and cred_data is not None and not token_satisfies_215_scopes(cred_data):
+            print(
+                f"Gmail token のスコープが不足しています: {token_path}\n"
+                "215 共通は readonly / modify / send です。手元で gmail_to_yoritoori.py を実行し、再同意してください。",
+                file=sys.stderr,
+            )
             creds = None
 
     if not creds or not creds.valid:
@@ -101,6 +131,7 @@ def load_and_refresh_gmail_token(token_path: Path):
 
     # 更新後の token を保存（refresh で中身が変わっている場合があるため）
     token_path.write_text(creds.to_json(), encoding="utf-8")
+    _sync_token_mirrors_no_github(token_path)
     return creds
 
 

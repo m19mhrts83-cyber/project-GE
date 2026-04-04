@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DX互助会向け コミュニケーション連携と一元管理の取り組み紹介</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif; background: #151b2b; color: #eef2ff; }
+    main { scroll-snap-type: y mandatory; }
+    .slide {
+      min-height: 100vh;
+      padding: 2.2rem 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      scroll-snap-align: start;
+    }
+    .slide h1 { margin: 0 0 1rem; border-bottom: 2px solid #4bd2b0; padding-bottom: 0.5rem; }
+    .slide h2 { margin: 1rem 0 0.5rem; color: #8bc3ff; }
+    .slide p, .slide li { line-height: 1.7; }
+    .slide ul { margin: 0.4rem 0; }
+    .mermaid { background: #10182a; border-radius: 10px; padding: 1rem; margin-top: 0.8rem; }
+    .note { background: #0f2e4f; border-left: 4px solid #4bd2b0; padding: 0.7rem 1rem; border-radius: 0 8px 8px 0; margin-top: 1rem; }
+    code { background: #0f2e4f; padding: 0.15rem 0.4rem; border-radius: 4px; }
+    a { color: #7fc9ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="slide">
+      <h1>DX互助会向け コミュニケーション連携と一元管理</h1>
+      <p>Gmailだけでなく、複数チャネルを 1 つの運用に統合した実践事例。</p>
+      <ul>
+        <li>Gmail API</li>
+        <li>ChatWork API</li>
+        <li>iMessage</li>
+        <li>LINE（個人・グループ）</li>
+        <li>LINE（オープンチャット）</li>
+      </ul>
+      <p class="note">実装手順版は <code>DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md</code> を参照。</p>
+    </section>
+
+    <section class="slide">
+      <h1>1. 何を一元管理しているか</h1>
+      <div class="mermaid">
+flowchart TB
+  subgraph inputs [入力チャネル]
+    Gmail["Gmail API"]
+    ChatWork["ChatWork API"]
+    IMessage["iMessage"]
+    LineTalk["LINE 個人/グループ"]
+    LineOpenChat["LINE オープンチャット"]
+  end
+  subgraph engine [実行層]
+    Cursor["Cursor 依頼 + ルール"]
+    Scripts["Python スクリプト群"]
+  end
+  subgraph outputs [出力先]
+    Yori["パートナー別 5.やり取り.md"]
+    OpenChatLog["815_神大家オプチャ/5.やり取り.md"]
+  end
+  Gmail --> Scripts
+  ChatWork --> Scripts
+  IMessage --> Scripts
+  LineTalk --> Scripts
+  LineOpenChat --> Scripts
+  Cursor --> Scripts
+  Scripts --> Yori
+  Scripts --> OpenChatLog
+      </div>
+      <ul>
+        <li>出力を <code>5.やり取り.md</code> に統一して、後で読む場所を固定</li>
+        <li>Cursorルールで実行導線を固定し、手順迷子を防止</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>2. Gmail API / ChatWork API / iMessage</h1>
+      <h2>Gmail API</h2>
+      <ul>
+        <li>受信取り込み: <code>gmail_to_yoritoori.py</code></li>
+        <li>送信: <code>yoritoori_send.py</code></li>
+      </ul>
+      <h2>ChatWork API</h2>
+      <ul>
+        <li>取り込み: <code>chatwork_to_yoritoori.py</code></li>
+        <li>必要設定: <code>CHATWORK_API_TOKEN</code>, <code>chatwork_room_id</code></li>
+      </ul>
+      <h2>iMessage</h2>
+      <ul>
+        <li>取り込み: <code>imessage_to_yoritoori.py</code></li>
+        <li>macOS依存あり</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>3. LINE（個人・グループ）</h1>
+      <ul>
+        <li>取り込み: <code>chrline_sync_to_yoritoori.py</code></li>
+        <li>対象: 1:1 + グループチャット</li>
+        <li>依存: <code>LINE_UNOFFICIAL_AUTH_DIR</code> と CHRLINE 認証</li>
+      </ul>
+      <p class="note">E2EE の影響で本文が取れないメッセージがあるため、ログは「取れるものを確実に蓄積する」設計。</p>
+    </section>
+
+    <section class="slide">
+      <h1>4. LINE（オープンチャット）</h1>
+      <ul>
+        <li>バッチ: <code>chrline_open_chat_to_md.py</code></li>
+        <li>常駐: <code>chrline_open_chat_realtime_watch.py</code></li>
+        <li>手動補完: <code>line_open_chat_thread_clip_to_yoritoori.py</code></li>
+      </ul>
+      <p>OpenChatスレッドは API 制約があるため、完全自動化できないケースあり。</p>
+      <p class="note">Beta運用: 自動取得を基本にし、重要スレッドのみ手動補完。</p>
+    </section>
+
+    <section class="slide">
+      <h1>5. ルール設計（再現性の中核）</h1>
+      <ul>
+        <li><code>partner-email-check.mdc</code>: 4系統取り込みを実行</li>
+        <li><code>partner-email-send.mdc</code>: 送信導線を <code>yoritoori_send.py</code> に統一</li>
+        <li><code>open-chat-archive.mdc</code>: OpenChat取り込み導線を固定</li>
+        <li><code>815-openchat-no-reply-proposal.mdc</code>: 返信提案と情報共有を分離</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>6. ローカル適用の入口</h1>
+      <ul>
+        <li>必要ファイル・設定一覧を先に揃える</li>
+        <li>Cursor依頼テンプレで再現確認する</li>
+        <li>失敗時はチャネル別チェックリストで切り分ける</li>
+      </ul>
+      <p>詳細: <a href="./DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md">ローカル適用ハンドブック</a></p>
+    </section>
+
+    <section class="slide">
+      <h1>7. まとめ</h1>
+      <ul>
+        <li>価値は「手段を増やす」より「増えた手段を同じ運用に乗せる」こと</li>
+        <li>5チャネル連携 + 1つの記録形式 + ルール設計で再現性を担保</li>
+        <li>OpenChatスレッドは制約前提で Beta 運用する</li>
+      </ul>
+      <p class="note">勉強会では「発表要点 + ハンドブック配布」の2段構成が最も移植しやすい。</p>
+    </section>
+  </main>
+  <script>
+    mermaid.initialize({ theme: "dark" });
+  </script>
+</body>
+</html>
