@@ -108,16 +108,38 @@ flowchart TB
     <section class="slide">
       <h1>4. LINE（オープンチャット）</h1>
       <ul>
-        <li>バッチ: <code>chrline_open_chat_to_md.py</code></li>
-        <li>常駐: <code>chrline_open_chat_realtime_watch.py</code></li>
-        <li>手動補完: <code>line_open_chat_thread_clip_to_yoritoori.py</code></li>
+        <li>バッチ: <code>line_unofficial_poc/chrline_open_chat_to_md.py</code></li>
+        <li>常駐（任意）: <code>line_unofficial_poc/chrline_open_chat_realtime_watch.py</code></li>
+        <li>手動補完: <code>215_kamiooya/C1_cursor/1b_Cursorマニュアル/line_open_chat_thread_clip_to_yoritoori.py</code></li>
       </ul>
       <p>OpenChatスレッドは API 制約があるため、完全自動化できないケースあり。</p>
       <p class="note">Beta運用: 自動取得を基本にし、重要スレッドのみ手動補完。</p>
     </section>
 
     <section class="slide">
-      <h1>5. ルール設計（再現性の中核）</h1>
+      <h1>5. オープンチャットの認証まわり（QR 負荷の低減）</h1>
+      <p class="note" style="margin-top:0">※本スライドは<strong>暫定</strong>です。全体の章立て・表現は、内容を精査したうえで改めて整えます。</p>
+      <h2>改善してきたこと（ねらい）</h2>
+      <ul>
+        <li><strong>認証の一本化</strong> … <code>LINE_UNOFFICIAL_AUTH_DIR</code> を、トーク同期（個人・グループ）とオープンチャット取得の<strong>両方</strong>で共有。同じ <code>chrline_client_utils.build_logged_in_client</code> 経由にすることで、「スクリプトごとに別ログイン → QR が連発」になりにくくした。</li>
+        <li><strong>ローカル既定の保存先</strong> … 未設定時は <code>line_unofficial_poc/.line_auth_local</code>。クラウド同期フォルダ配下に認証を置くと競合しやすく QR が増えやすいため、実行時に警告するようにした。</li>
+        <li><strong>保存トークンの順試行</strong> … <code>.tokens/</code> 内の複数ファイルを更新日時の新しい順に試し、有効なものがあれば QR なしで起動する。</li>
+        <li><strong>再認証後の永続化</strong> … QR で取り直したトークンを <code>.tokens</code> に保存し、次回以降の手間を減らす。</li>
+        <li><strong>失効の気づき</strong> … 例: <code>line_unofficial_poc/launchd/open_chat_healthcheck_runner.sh</code> で軽い疎通チェック＋通知し、気づかないまま連続失敗し続ける時間を減らす。</li>
+      </ul>
+      <h2>苦労した点（割り切り）</h2>
+      <ul>
+        <li>CHRLINE は<strong>非公式</strong>のため、LINE 側の変更でセッションが切れる。切れたあとの復旧に QR は<strong>技術的に省略できない</strong>（「回数を減らす」が現実的な上限）。</li>
+        <li>Square（オープンチャット）は取得できる範囲に依存し、スレッド本文が欠けることもある（スライド 4 の Beta 運用とセット）。</li>
+      </ul>
+      <h2>任意</h2>
+      <ul>
+        <li><code>LINE_CHRLINE_AUTO_OPEN_QR=1</code> … QR 画像を OS で自動表示（認証<strong>回数</strong>は減らないが、操作負荷は下げられる）。</li>
+      </ul>
+    </section>
+
+    <section class="slide">
+      <h1>6. ルール設計（再現性の中核）</h1>
       <ul>
         <li><code>partner-email-check.mdc</code>: Gmail / iMessage / ChatWork / LINE / オプチャ取り込みの導線を実行</li>
         <li><code>partner-email-send.mdc</code>: 送信導線を <code>yoritoori_send.py</code> に統一</li>
@@ -127,21 +149,22 @@ flowchart TB
     </section>
 
     <section class="slide">
-      <h1>6. ローカル適用の入口</h1>
+      <h1>7. ローカル適用の入口</h1>
       <ul>
         <li>必要ファイル・設定一覧を先に揃える</li>
-        <li>Cursor依頼テンプレで再現確認する</li>
+        <li>Cursor依頼テンプレで再現確認する（参照用プロンプト集あり）</li>
         <li>失敗時はチャネル別チェックリストで切り分ける</li>
       </ul>
-      <p>詳細: <a href="./DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md">ローカル適用ハンドブック</a></p>
+      <p>詳細: <a href="./DX互助会向け_コミュニケーション連携_ローカル適用ハンドブック.md">ローカル適用ハンドブック</a> / <a href="./DX互助会向け_パッケージ参照プロンプト一覧.md">パッケージ参照プロンプト一覧</a></p>
     </section>
 
     <section class="slide">
-      <h1>7. まとめ</h1>
+      <h1>8. まとめ</h1>
       <ul>
         <li>価値は「手段を増やす」より「増えた手段を同じ運用に乗せる」こと</li>
         <li>5チャネル連携 + 1つの記録形式 + ルール設計で再現性を担保</li>
         <li>OpenChatスレッドは制約前提で Beta 運用する</li>
+        <li>LINE 系は認証保存先を共有し、QR・手間の再発を抑える（スライド 5）</li>
       </ul>
       <p class="note">勉強会では「発表要点 + ハンドブック配布」の2段構成が最も移植しやすい。</p>
     </section>
