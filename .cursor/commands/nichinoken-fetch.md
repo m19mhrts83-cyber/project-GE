@@ -25,9 +25,8 @@
 ユーザーから「知りたい内容」の回答を受けたら、次の順で実行する。
 
 1. **スクリプトの実行**
-   - スクリプトは **215_神・大家さん倶楽部** 側にある。次の絶対パスをカレントにして実行する。
-   - カレント: `.../OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/browser_automation/`（ユーザーの環境では `Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/browser_automation` が含まれるパス）
-   - 仮想環境を有効化してから `python fetch_after_login.py nichinoken` を実行する。
+   - **カレント**: `~/git-repos/215_kamiooya/C1_cursor/browser_automation`（貼り付け用の行は `~/git-repos/docs/運用コマンド一覧.md` の「ブラウザ自動化」も参照）
+   - `.venv/bin/python fetch_after_login.py nichinoken` を実行する。
    - 未セットアップの場合は、215 の README「セットアップ」「日能研 MY NICHINOKEN の設定」を案内する。
 
 2. **出力ファイルの読み取り**

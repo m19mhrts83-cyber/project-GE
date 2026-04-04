@@ -32,6 +32,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+_MAIL_AUTO = Path(__file__).resolve().parent.parent / "mail_automation"
+if _MAIL_AUTO.is_dir() and str(_MAIL_AUTO) not in sys.path:
+    sys.path.insert(0, str(_MAIL_AUTO))
+try:
+    from gmail_token_sync import save_token_json_and_sync
+except ImportError:
+    def save_token_json_and_sync(token_path, creds_json, *, log_prefix: str = "📎 Gmail token") -> None:
+        Path(token_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(token_path).write_text(creds_json, encoding="utf-8")
+
 # メール日付・表示・比較はすべて日本時間で統一（OSのタイムゾーンに依存しない）
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -48,11 +58,7 @@ CONTACT_YAML = BASE_DIR / "000_共通" / "連絡先一覧.yaml"
 CREDENTIALS_PATH = SCRIPT_DIR / "credentials.json"
 TOKEN_PATH = SCRIPT_DIR / "token.json"
 
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/gmail.send",
-]
+from gmail_api_scopes import GMAIL_SCOPES_215 as SCOPES, token_satisfies_215_scopes
 
 
 def load_env():
@@ -79,22 +85,28 @@ def resolve_token_paths():
     """
     Gmail の取得元アカウントを複数指定する。
     - GMAIL_TOKEN_PATHS: カンマ区切りで token.json のパスを指定（例: ".../token_estate.json,.../token_m19m.json"）
-    - 未指定なら、同一フォルダ内の token_estate.json / token_m19m.json を優先して2アカウント運用
-      （存在しない場合は従来通り GMAIL_TOKEN_PATH（=token.json）へフォールバック）
+    - 未指定なら、token_estate.json + token_m19m.json を token.json+token2.json より優先（後者が send のみ等の誤組を防ぐ）
+    - token.json+token2.json は両方とも 215 スコープを満たす場合のみ2アカウントとして採用
     """
     raw = os.environ.get("GMAIL_TOKEN_PATHS", "").strip()
     if not raw:
-        # よくある命名（token.json + token2.json）も自動検出
-        token2 = SCRIPT_DIR / "token2.json"
-        if token_path.exists() and token2.exists():
-            return [token_path, token2]
-
         default_multi = [
             SCRIPT_DIR / "token_estate.json",
             SCRIPT_DIR / "token_m19m.json",
         ]
         if all(p.exists() for p in default_multi):
             return default_multi
+
+        token2 = SCRIPT_DIR / "token2.json"
+        if token_path.exists() and token2.exists():
+            try:
+                d1 = json.loads(token_path.read_text(encoding="utf-8"))
+                d2 = json.loads(token2.read_text(encoding="utf-8"))
+                if token_satisfies_215_scopes(d1) and token_satisfies_215_scopes(d2):
+                    return [token_path, token2]
+            except Exception:
+                pass
+
         return [token_path]
     paths = []
     for part in raw.split(","):
@@ -120,6 +132,8 @@ def build_service_for_token(token_path_for_account: Path):
                 creds_data["token"] = creds_data["access_token"]
         try:
             creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
+            if creds and not token_satisfies_215_scopes(creds_data):
+                creds = None
         except Exception:
             creds = None
 
@@ -142,8 +156,7 @@ def build_service_for_token(token_path_for_account: Path):
         refreshed = True
 
     if refreshed:
-        token_path_for_account.parent.mkdir(parents=True, exist_ok=True)
-        token_path_for_account.write_text(creds.to_json(), encoding="utf-8")
+        save_token_json_and_sync(token_path_for_account, creds.to_json())
         if not getattr(creds, "refresh_token", None):
             print(
                 f"警告: refresh_token が取得できていません: {token_path_for_account.name}",

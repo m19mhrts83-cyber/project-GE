@@ -33,6 +33,16 @@ from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 
+_MAIL_AUTO = Path(__file__).resolve().parent.parent / "mail_automation"
+if _MAIL_AUTO.is_dir() and str(_MAIL_AUTO) not in sys.path:
+    sys.path.insert(0, str(_MAIL_AUTO))
+try:
+    from gmail_token_sync import save_token_json_and_sync
+except ImportError:
+    def save_token_json_and_sync(token_path, creds_json, *, log_prefix: str = "📎 Gmail token") -> None:
+        Path(token_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(token_path).write_text(creds_json, encoding="utf-8")
+
 import yaml
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
@@ -59,11 +69,11 @@ CONTACT_YAML = BASE_DIR / "000_共通" / "連絡先一覧.yaml"
 CREDENTIALS_PATH = SCRIPT_DIR / "credentials.json"
 TOKEN_PATH = SCRIPT_DIR / "token.json"
 
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/gmail.send",
-]
+from gmail_api_scopes import (
+    GMAIL_SCOPES_215 as SCOPES,
+    resolve_single_token_path_215,
+    token_satisfies_215_scopes,
+)
 
 
 def trigger_editor_save_all():
@@ -134,7 +144,12 @@ def load_env():
 load_env()
 
 credentials_path = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", CREDENTIALS_PATH))
-token_path = Path(os.environ.get("GMAIL_TOKEN_PATH", TOKEN_PATH))
+_token_default = Path(os.environ.get("GMAIL_TOKEN_PATH", TOKEN_PATH))
+token_path = resolve_single_token_path_215(
+    SCRIPT_DIR,
+    _token_default,
+    explicit_via_env=bool(os.environ.get("GMAIL_TOKEN_PATH")),
+)
 contact_path = Path(os.environ.get("CONTACT_LIST_PATH", CONTACT_YAML))
 base_path = Path(os.environ.get("YORITOORI_BASE_PATH", BASE_DIR))
 
@@ -472,6 +487,8 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
                 creds_data["token"] = creds_data["access_token"]
         try:
             creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
+            if creds and not token_satisfies_215_scopes(creds_data):
+                creds = None
         except Exception:
             creds = None
 
@@ -481,8 +498,7 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
         else:
             flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
             creds = flow.run_local_server(port=0)
-        with open(token_path, "w", encoding="utf-8") as f:
-            f.write(creds.to_json())
+        save_token_json_and_sync(token_path, creds.to_json())
         print("token.json を保存しました。")
 
     service = build("gmail", "v1", credentials=creds)

@@ -24,6 +24,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -104,6 +105,7 @@ _LEAF_GROUP_TITLE_DEFAULT = "Grandole志賀本通"
 _LEAF_GROUP_PEER_LABEL_DEFAULT = "Grandole志賀本通 I 管理"
 
 DEDUP_FILENAME = ".chrline_sync_yoritoori_dedup.json"
+DECODE_STATS_FILENAME = ".chrline_sync_decode_stats.jsonl"
 TIMELINE_MARKER = "## やり取り（時系列）"
 _PLACEHOLDER_PREFIX = "[本文なし"
 
@@ -205,6 +207,86 @@ class _YoritooriRoute:
     targets: list[_YoritooriTarget]
 
 
+def _decode_stats_path(save_root: Path) -> Path:
+    return save_root / DECODE_STATS_FILENAME
+
+
+def _is_textual_body(body: str) -> bool:
+    b = (body or "").strip()
+    if not b:
+        return False
+    if b.startswith(_PLACEHOLDER_PREFIX):
+        return False
+    if b in ("[メディア]", "[スタンプ]"):
+        return False
+    return True
+
+
+def _stats_key(route: _YoritooriRoute, target: _YoritooriTarget) -> str:
+    return f"{route.org_label}|{target.needle}|{target.recv_tag}"
+
+
+def _touch_stats_bucket(
+    stats: dict[str, dict],
+    route: _YoritooriRoute,
+    target: _YoritooriTarget,
+) -> dict:
+    key = _stats_key(route, target)
+    if key in stats:
+        return stats[key]
+    bucket = {
+        "org_label": route.org_label,
+        "yoritoori_md": str(route.yoritoori_md),
+        "target_mid": target.needle,
+        "target_label": target.recv_tag,
+        "is_personal_u_mid": target.needle.startswith("u"),
+        "seen": 0,
+        "textual": 0,
+        "media_or_stamp": 0,
+        "placeholder": 0,
+        "written": 0,
+        "dedup_skipped": 0,
+        "source_sync": 0,
+        "source_direct_backfill": 0,
+    }
+    stats[key] = bucket
+    return bucket
+
+
+def _observe_decode_stats(
+    stats: dict[str, dict],
+    route: _YoritooriRoute,
+    target: _YoritooriTarget,
+    body_raw: str,
+    *,
+    source: str,
+    wrote: bool = False,
+    dedup_skipped: bool = False,
+) -> None:
+    b = _touch_stats_bucket(stats, route, target)
+    b["seen"] += 1
+    if source == "sync":
+        b["source_sync"] += 1
+    elif source == "direct_backfill":
+        b["source_direct_backfill"] += 1
+    if body_raw.startswith(_PLACEHOLDER_PREFIX):
+        b["placeholder"] += 1
+    elif body_raw in ("[メディア]", "[スタンプ]"):
+        b["media_or_stamp"] += 1
+    elif _is_textual_body(body_raw):
+        b["textual"] += 1
+    if wrote:
+        b["written"] += 1
+    if dedup_skipped:
+        b["dedup_skipped"] += 1
+
+
+def _append_decode_stats_jsonl(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
 def _resolve_group_mid_by_title(cl, title_sub: str) -> str | None:
     """getChats 一覧から、チャット名に title_sub を含むグループの chatMid を返す。"""
     from chrline_list_chats_poc import (
@@ -262,6 +344,154 @@ def _message_dedup_key(cl, msg) -> str | None:
     if ts:
         return f"nts:{ts}"
     return None
+
+
+def _messages_from_response(cl, res) -> list:
+    """getRecentMessagesV2/getPreviousMessagesV2 応答から Message 配列を取り出す。"""
+    if res is None:
+        return []
+    if isinstance(res, (list, tuple)):
+        return list(res)
+    for fid in range(1, 20):
+        m = cl.checkAndGetValue(res, "messages", fid)
+        if isinstance(m, (list, tuple)):
+            return list(m)
+    if isinstance(res, dict):
+        for v in res.values():
+            if isinstance(v, (list, tuple)):
+                return list(v)
+    if hasattr(res, "dd"):
+        try:
+            dd = res.dd()
+            for v in dd.values():
+                if isinstance(v, (list, tuple)):
+                    return list(v)
+        except Exception:
+            pass
+    return []
+
+
+def _latest_heading_date_ts_ms(path: Path) -> int | None:
+    """やり取り見出しの最新日付（00:00）をミリ秒で返す。"""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    dates = re.findall(r"^### ([12]\d{3}/\d{2}/\d{2})", text, flags=re.MULTILINE)
+    if not dates:
+        return None
+    latest = max(dates)
+    try:
+        dt = datetime.strptime(latest, "%Y/%m/%d")
+    except ValueError:
+        return None
+    return int(dt.timestamp() * 1000)
+
+
+def _append_direct_backfill_for_1on1(
+    cl,
+    *,
+    route: _YoritooriRoute,
+    target: _YoritooriTarget,
+    receive_only: bool,
+    count: int,
+    seen_keys: set[str],
+    new_keys: set[str],
+    skip_e2ee_key_register: bool,
+    dry_run: bool,
+    verbose: bool,
+    decode_stats: dict[str, dict] | None = None,
+) -> int:
+    """
+    sync 差分に載らないときの補完。
+    1:1(u mid) の直近メッセージを直接取得し、最新見出し日付より新しい分だけ追記する。
+    """
+    if not target.needle.startswith("u"):
+        return 0
+    if count <= 0:
+        return 0
+    my_mid = (getattr(cl, "mid", None) or "").strip()
+    since_day = _latest_heading_date_ts_ms(route.yoritoori_md)
+    since_ts = (since_day + 24 * 60 * 60 * 1000) if since_day else None
+    try:
+        res = cl.getRecentMessagesV2(target.needle, max(1, min(count, 300)))
+    except Exception as e:
+        if verbose:
+            print(f"# 1:1直取得スキップ: getRecentMessagesV2 失敗 {e}", file=sys.stderr)
+        return 0
+    msgs = _messages_from_response(cl, res)
+    if not msgs:
+        return 0
+    msgs.sort(key=lambda m: _msg_time(cl, m))
+    e2ee_registered: set[str] = set()
+    appended = 0
+    for msg in msgs:
+        ts = _msg_time(cl, msg)
+        if since_ts is not None and ts and ts < since_ts:
+            continue
+        sender = (_msg_sender_mid(cl, msg) or "").strip()
+        is_send = bool(my_mid and sender and sender == my_mid)
+        if receive_only and is_send:
+            continue
+        body_raw = _msg_body_line_with_e2ee_register(
+            cl,
+            msg,
+            None,
+            e2ee_registered,
+            skip_register=skip_e2ee_key_register,
+        )
+        # sync 差分では未復号テキストを除外していたが、1:1補完では「やり取りがあった事実」を残す。
+        if not body_raw.strip():
+            continue
+        dk = _message_dedup_key(cl, msg)
+        if dk and dk in seen_keys:
+            if decode_stats is not None:
+                _observe_decode_stats(
+                    decode_stats,
+                    route,
+                    target,
+                    body_raw,
+                    source="direct_backfill",
+                    dedup_skipped=True,
+                )
+            continue
+        when = _format_line_msg_when(ts)
+        date_part = when.split()[0] if when and " " in when else when or "?"
+        summary = md_make_summary(body_raw)
+        tag = target.send_tag if is_send else target.recv_tag
+        heading = f"### {date_part}｜{route.org_label}｜{tag}｜{summary}"
+        block = f"""
+
+{heading}
+
+{md_wrap_details(body_raw)}
+
+---
+"""
+        if dry_run:
+            print(
+                f"[dry-run][1:1補完] 追記予定 → {route.yoritoori_md.name}:\n{heading}\n{body_raw[:200]!r}…\n"
+            )
+        else:
+            content = route.yoritoori_md.read_text(encoding="utf-8")
+            route.yoritoori_md.write_text(
+                md_insert_block_after_timeline_header(content, block),
+                encoding="utf-8",
+            )
+            if dk:
+                seen_keys.add(dk)
+                new_keys.add(dk)
+        if decode_stats is not None:
+            _observe_decode_stats(
+                decode_stats,
+                route,
+                target,
+                body_raw,
+                source="direct_backfill",
+                wrote=True,
+            )
+        appended += 1
+    return appended
 
 
 def main() -> int:
@@ -358,6 +588,17 @@ def main() -> int:
         "--verbose",
         action="store_true",
     )
+    parser.add_argument(
+        "--direct-backfill-count",
+        type=int,
+        default=120,
+        help="sync 差分が0件のとき、1:1(u mid) で直近メッセージを直接取得して補完する件数（0で無効）",
+    )
+    parser.add_argument(
+        "--decode-stats-file",
+        default="",
+        help=f"本文取得成功率の JSONL ログ（未指定時は LINE_UNOFFICIAL_AUTH_DIR/{DECODE_STATS_FILENAME}）",
+    )
     parser.add_argument("--skip-e2ee-key-register", action="store_true")
     args = parser.parse_args()
 
@@ -449,8 +690,14 @@ def main() -> int:
     receive_only = not args.include_send
 
     dedup_file = _dedup_path(save_root)
+    stats_file = (
+        Path(args.decode_stats_file).expanduser().resolve()
+        if args.decode_stats_file.strip()
+        else _decode_stats_path(save_root)
+    )
     seen_keys = _load_dedup(dedup_file)
     new_keys: set[str] = set()
+    decode_stats: dict[str, dict] = {}
 
     cl = build_logged_in_client(save_root)
 
@@ -540,17 +787,41 @@ def main() -> int:
             continue
 
         chat = _chat_hint_from_op(cl, op, msg)
+        matched: list[tuple[_YoritooriRoute, _YoritooriTarget]] = []
+        for route in routes:
+            tmeta = _pick_target(chat, route.targets)
+            if tmeta is not None:
+                matched.append((route, tmeta))
+        if not matched:
+            continue
 
         body_raw = _msg_body_line_with_e2ee_register(
             cl, msg, op, e2ee_registered, skip_register=args.skip_e2ee_key_register
         )
         if body_raw.startswith(_PLACEHOLDER_PREFIX):
+            for route, tmeta in matched:
+                _observe_decode_stats(
+                    decode_stats,
+                    route,
+                    tmeta,
+                    body_raw,
+                    source="sync",
+                )
             if args.verbose:
                 print(f"# スキップ（本文未取得）: {_op_type_name(ot_i)}", file=sys.stderr)
             continue
 
         dk = _message_dedup_key(cl, msg)
         if dk and dk in seen_keys:
+            for route, tmeta in matched:
+                _observe_decode_stats(
+                    decode_stats,
+                    route,
+                    tmeta,
+                    body_raw,
+                    source="sync",
+                    dedup_skipped=True,
+                )
             continue
 
         ts = _msg_time(cl, msg)
@@ -559,10 +830,7 @@ def main() -> int:
         summary = md_make_summary(body_raw)
 
         wrote = False
-        for route in routes:
-            tmeta = _pick_target(chat, route.targets)
-            if tmeta is None:
-                continue
+        for route, tmeta in matched:
 
             if ot_i == OpType.RECEIVE_MESSAGE:
                 tag = tmeta.recv_tag
@@ -590,10 +858,36 @@ def main() -> int:
                 if dk:
                     seen_keys.add(dk)
                     new_keys.add(dk)
+            _observe_decode_stats(
+                decode_stats,
+                route,
+                tmeta,
+                body_raw,
+                source="sync",
+                wrote=True,
+            )
             wrote = True
 
         if wrote:
             appended += 1
+
+    # 1:1（u mid）でのみ、sync 差分に載らなかった分を直接取得して補完する。
+    if appended == 0 and args.direct_backfill_count > 0:
+        for route in routes:
+            for tmeta in route.targets:
+                appended += _append_direct_backfill_for_1on1(
+                    cl,
+                    route=route,
+                    target=tmeta,
+                    receive_only=receive_only,
+                    count=args.direct_backfill_count,
+                    seen_keys=seen_keys,
+                    new_keys=new_keys,
+                    skip_e2ee_key_register=args.skip_e2ee_key_register,
+                    dry_run=args.dry_run,
+                    verbose=args.verbose,
+                    decode_stats=decode_stats,
+                )
 
     if new_keys and not args.dry_run:
         _save_dedup(dedup_file, seen_keys)
@@ -608,6 +902,38 @@ def main() -> int:
             },
         )
         print(f"# sync 状態更新: {state_path} last_operation_revision={max_seen}", file=sys.stderr)
+
+    personal_stats = [b for b in decode_stats.values() if b.get("is_personal_u_mid")]
+    if personal_stats:
+        for b in sorted(personal_stats, key=lambda x: (x["org_label"], x["target_mid"])):
+            seen = int(b.get("seen", 0))
+            textual = int(b.get("textual", 0))
+            pct = (textual / seen * 100.0) if seen else 0.0
+            print(
+                "# 本文取得率"
+                f" [{b['org_label']}:{b['target_mid'][:12]}...]"
+                f" seen={seen} textual={textual} placeholder={int(b.get('placeholder', 0))}"
+                f" media_or_stamp={int(b.get('media_or_stamp', 0))}"
+                f" written={int(b.get('written', 0))}"
+                f" rate={pct:.1f}%",
+                file=sys.stderr,
+            )
+        if not args.dry_run:
+            _append_decode_stats_jsonl(
+                stats_file,
+                {
+                    "ts": datetime.now().isoformat(timespec="seconds"),
+                    "preset": preset,
+                    "receive_only": receive_only,
+                    "count": int(args.count),
+                    "direct_backfill_count": int(args.direct_backfill_count),
+                    "stats": sorted(
+                        personal_stats,
+                        key=lambda x: (x["org_label"], x["target_mid"], x["target_label"]),
+                    ),
+                },
+            )
+            print(f"# 本文取得率ログ追記: {stats_file}", file=sys.stderr)
 
     out_paths = ", ".join(str(r.yoritoori_md) for r in routes)
     print(f"# やり取り追記: {appended} 件 → {out_paths}", file=sys.stderr)

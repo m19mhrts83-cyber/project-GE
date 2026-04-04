@@ -1,4 +1,5 @@
 .line_auth/
+.line_auth_local/
 .line_clip_processed.json
 *.session
 open_chat_routes.yaml

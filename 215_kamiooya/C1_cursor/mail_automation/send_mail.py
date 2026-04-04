@@ -40,12 +40,25 @@ except ImportError:
     print("  pip install openpyxl")
     sys.exit(1)
 
-# Gmail APIのスコープ
-SCOPES = ['https://www.googleapis.com/auth/gmail.send']
-
 # スクリプトのディレクトリパス
 SCRIPT_DIR = Path(__file__).parent
+# Gmail API スコープは 1b 共通定義（send のみだと token が狭くなり取得系が 403 になる）
+_1B_MANUAL = SCRIPT_DIR.parent / "1b_Cursorマニュアル"
+if _1B_MANUAL.is_dir() and str(_1B_MANUAL) not in sys.path:
+    sys.path.insert(0, str(_1B_MANUAL))
+from gmail_api_scopes import (
+    GMAIL_SCOPES_215 as SCOPES,
+    resolve_single_token_path_215,
+    token_satisfies_215_scopes,
+)
 LOG_DIR = SCRIPT_DIR / 'logs'
+
+try:
+    from gmail_token_sync import save_token_json_and_sync
+except ImportError:
+    def save_token_json_and_sync(token_path: Path, creds_json: str, *, log_prefix: str = "📎 Gmail token") -> None:
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text(creds_json, encoding="utf-8")
 
 # 認証ファイル（現在の設定: パートナー・いけともと同じ。3日ごとのトークン自動更新の対象）
 DEFAULT_CREDENTIALS_DIR = SCRIPT_DIR.parent / '1b_Cursorマニュアル'
@@ -62,7 +75,11 @@ TOKEN_FILE_LEGACY = SCRIPT_DIR / 'token.pickle'
 def authenticate_gmail():
     """Gmail APIの認証を行う（1b_Cursorマニュアルの token.json を使用。未設定時は旧 token.pickle にフォールバック）"""
     credentials_path = CREDENTIALS_FILE
-    token_path = TOKEN_FILE
+    token_path = resolve_single_token_path_215(
+        DEFAULT_CREDENTIALS_DIR,
+        TOKEN_FILE,
+        explicit_via_env=bool(os.environ.get("GMAIL_TOKEN_PATH")),
+    )
 
     # 現在の設定: token.json（1b_Cursorマニュアル）で認証
     creds = None
@@ -79,6 +96,8 @@ def authenticate_gmail():
                 if 'access_token' in creds_data and 'token' not in creds_data:
                     creds_data['token'] = creds_data['access_token']
             creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
+            if creds and not token_satisfies_215_scopes(creds_data):
+                creds = None
         except Exception:
             creds = None
 
@@ -88,8 +107,7 @@ def authenticate_gmail():
         print("認証情報を更新しています...")
         creds.refresh(Request())
         if token_path.suffix == '.json':
-            with open(token_path, 'w', encoding='utf-8') as f:
-                f.write(creds.to_json())
+            save_token_json_and_sync(token_path, creds.to_json())
         print("認証が完了しました。")
         return creds
     if credentials_path.exists():
@@ -98,8 +116,7 @@ def authenticate_gmail():
         flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
         creds = flow.run_local_server(port=0)
         if token_path.suffix == '.json':
-            with open(token_path, 'w', encoding='utf-8') as f:
-                f.write(creds.to_json())
+            save_token_json_and_sync(token_path, creds.to_json())
         print("認証が完了しました。")
         return creds
 
