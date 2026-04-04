@@ -2,11 +2,11 @@
 
 このフォルダは **Cursor の `@docs/N1_NotebookLM` で参照**できるように、`project-GE` の `docs/` 配下に置いています。
 
-## 同内容の原本（215 ワークスペース）
+## 同内容のミラー（215 ワークスペース）
 
-OneDrive 上の作業用フォルダにも同じ 3 ファイルがあります（そちらを編集したあと、必要ならこちらへコピーして同期してください）。
+OneDrive 上の **`215_神・大家さん倶楽部/N1_NotebookLM/`** と **常に同一内容**にする。
 
-- `215_神・大家さん倶楽部/N1_NotebookLM/`
+- **手動コピーは不要。** Cursor ルール [`.cursor/rules/n1-notebooklm-mirror.mdc`](../../.cursor/rules/n1-notebooklm-mirror.mdc) に従い、どちらかを編集したタスクの終わりにエージェントが `rsync` で双方向ミラーする。
 
 ## 含まれるファイル
 

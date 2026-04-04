@@ -1,0 +1,48 @@
+---
+description: N1_NotebookLM を git-repos と OneDrive(215) の両方に常に同一内容でミラーする
+globs: docs/N1_NotebookLM/**
+alwaysApply: false
+---
+
+# N1_NotebookLM 双方向ミラー（手動コピー禁止）
+
+## 対象パス（このユーザーの環境で固定）
+
+| 側 | 絶対パス |
+|----|----------|
+| **A（リポジトリ）** | `~/git-repos/docs/N1_NotebookLM/` |
+| **B（OneDrive・215）** | `~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/N1_NotebookLM/` |
+
+## 方針
+
+- `N1_NotebookLM` 配下の **`.md`（および README 等）をどちらかで編集・追加・削除したら、同一タスクの終わりに必ずもう一方へ反映する。**
+- **ユーザーに「コピーしてください」と任せない。** エージェントが `cp` または `rsync` で同期する。
+
+## 同期コマンド（編集した側 → もう片方）
+
+**A を編集した直後**（リポジトリ側が正）:
+
+```bash
+rsync -a --delete \
+  "/Users/matsunomasaharu/git-repos/docs/N1_NotebookLM/" \
+  "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/N1_NotebookLM/"
+```
+
+**B を編集した直後**（OneDrive 側が正）:
+
+```bash
+rsync -a --delete \
+  "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/N1_NotebookLM/" \
+  "/Users/matsunomasaharu/git-repos/docs/N1_NotebookLM/"
+```
+
+- `--delete` で **片方にしかないゴミファイルを削除**し、フォルダを真に一致させる。
+- パスはユーザーのホームに合わせてよいが、**215 と git-repos のペアは変えない**。
+
+## リポジトリへのコミット
+
+- **A を更新した場合**は、ミラー後に `git-repos` で `docs/N1_NotebookLM/` を通常どおり `git add` / `commit` する（ユーザー方針に従う）。
+
+## 他ワークスペースで 215 だけ開いているとき
+
+- 215 ルートの `.cursor/rules/n1-notebooklm-mirror.mdc` も同趣旨で参照する（`N1_NotebookLM/**` 用 globs）。

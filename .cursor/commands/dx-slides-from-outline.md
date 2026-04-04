@@ -25,8 +25,7 @@
 
 ## 参照: `N1_NotebookLM` フォルダ
 
-- **git-repos 内の正本**: `docs/N1_NotebookLM/`（`@docs/N1_NotebookLM` または個別に `@docs/N1_NotebookLM/NotebookLMとCursorでできること一覧.md`）
-- **215 ワークスペース側のコピー元**: `215_神・大家さん倶楽部/N1_NotebookLM/`（内容は同じ。片方を直したら必要ならもう一方へコピー）
+- **ミラー 2 箇所（常に同一）**: `docs/N1_NotebookLM/` と `215_神・大家さん倶楽部/N1_NotebookLM/`。**手動コピー禁止**—ルール [`.cursor/rules/n1-notebooklm-mirror.mdc`](../.cursor/rules/n1-notebooklm-mirror.mdc) で `rsync` 双方向同期。
 
 ---
 
