@@ -1,0 +1,240 @@
+/* cute-illustration 勉強会スライド共通 — 白背景・帯見出し・イラスト+本文グリッド */
+@import url("https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap");
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+  background: #ffffff;
+  color: #222;
+  line-height: 1.65;
+}
+
+section.slide {
+  min-height: 100vh;
+  padding: 2rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-bottom: 2px dashed #f0e6d8;
+}
+
+section.slide h1 {
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  background: #fffef8;
+  box-shadow: inset 0 -0.5em 0 #fff3bf;
+  border-left: 6px solid #ffb366;
+  color: #1a1a1a;
+}
+
+section.slide h2 {
+  font-size: 1.2rem;
+  margin: 0 0 0.6rem;
+  color: #2c5282;
+}
+
+section.slide h3 {
+  font-size: 1.05rem;
+  margin: 1rem 0 0.35rem;
+  color: #276749;
+}
+
+section.slide p,
+section.slide li {
+  font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+  margin: 0.35rem 0;
+}
+
+section.slide ul,
+section.slide ol {
+  margin: 0.5rem 0;
+  padding-left: 1.35rem;
+}
+
+section.slide .sub {
+  font-size: 0.9rem;
+  color: #555;
+  margin-top: 0.75rem;
+}
+
+section.slide table {
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  width: 100%;
+  font-size: clamp(0.8rem, 2vw, 0.95rem);
+}
+
+section.slide th,
+section.slide td {
+  border: 2px solid #333;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+section.slide th {
+  background: #fff9e6;
+  color: #1a1a1a;
+}
+
+section.slide td {
+  background: #fffef8;
+}
+
+.point {
+  color: #c05621;
+  font-weight: 500;
+}
+
+.landing {
+  color: #2b6cb0;
+  font-weight: 700;
+  margin-top: 0.75rem;
+}
+
+.free-tag {
+  color: #276749;
+  font-weight: 700;
+}
+
+.paid-tag {
+  color: #c05621;
+  font-weight: 700;
+}
+
+/* タイトル */
+.title-slide {
+  text-align: center;
+  align-items: center;
+}
+
+.title-slide h1 {
+  border-left: none;
+  background: none;
+  font-size: clamp(1.4rem, 5vw, 2rem);
+  padding: 0.75rem 1.5rem;
+  background: #fff3bf;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.title-slide .date {
+  color: #666;
+  margin-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.title-hero {
+  max-width: 320px;
+  width: 100%;
+  height: auto;
+  margin: 0 auto 1.5rem;
+  display: block;
+}
+
+/* イラスト + 本文 */
+.slide-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+@media (min-width: 800px) {
+  .slide-split .slide-inner {
+    grid-template-columns: minmax(260px, 38%) 1fr;
+    gap: 2rem;
+  }
+}
+
+.slide-figure {
+  margin: 0;
+  text-align: center;
+}
+
+.slide-figure img {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  border: 2px solid #333;
+  border-radius: 12px;
+  background: #fffef8;
+}
+
+.slide-copy {
+  min-width: 0;
+}
+
+.slide-full .slide-inner {
+  max-width: 960px;
+}
+
+.slide-full .slide-figure--corner {
+  max-width: 120px;
+  margin: 0 auto 1rem;
+}
+
+.slide-full .slide-figure--corner img {
+  border-width: 2px;
+}
+
+/* 表中心スライドの上にイラスト */
+.slide-top-illust .slide-figure {
+  max-width: 280px;
+  margin: 0 auto 1.25rem;
+}
+
+.slide-top-illust .slide-figure img {
+  border-radius: 12px;
+}
+
+/* ナビ */
+nav[aria-label="スライド操作"] {
+  position: fixed;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.5rem;
+  border-radius: 10px;
+  border: 2px solid #333;
+  box-shadow: 4px 4px 0 #ffb366;
+}
+
+nav[aria-label="スライド操作"] button {
+  background: #fff9e6;
+  color: #1a1a1a;
+  border: 2px solid #333;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+nav[aria-label="スライド操作"] button:hover {
+  background: #ffb366;
+}
+
+nav[aria-label="スライド操作"] .page-num {
+  color: #444;
+  font-size: 0.75rem;
+  text-align: center;
+}
