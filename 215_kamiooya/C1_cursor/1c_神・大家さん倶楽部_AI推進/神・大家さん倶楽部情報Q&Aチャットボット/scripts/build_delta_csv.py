@@ -21,7 +21,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-ADMIN_FIELDNAMES = [
+# convert_to_admin_csv.py と同一順（差分CSVも LIMO 取込でソース列を維持）
+REQUIRED_FIELDNAMES = [
     "コメントID",
     "投稿日時",
     "投稿者名",
@@ -31,6 +32,7 @@ ADMIN_FIELDNAMES = [
     "IP アドレス",
     "ユーザーエージェント",
 ]
+ADMIN_FIELDNAMES = REQUIRED_FIELDNAMES + ["ソース"]
 
 
 def load_state(path: Path) -> set[str]:
@@ -68,7 +70,7 @@ def read_full_rows(full_csv: Path) -> list[dict]:
     with full_csv.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames:
-            for h in ADMIN_FIELDNAMES:
+            for h in REQUIRED_FIELDNAMES:
                 if h not in reader.fieldnames:
                     print(
                         f"エラー: 全件CSVに列「{h}」がありません。convert_to_admin_csv.py の出力を渡してください。",
