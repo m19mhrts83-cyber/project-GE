@@ -128,10 +128,19 @@
           <!-- コメント一覧 -->
           <section id="commentsScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
             <div class="w-full">
-              <div class="flex gap-2 mb-3">
-                <input id="commentSearchInput" class="border rounded-md px-3 py-2 w-full" placeholder="コメント本文・投稿者で検索" />
+              <div class="flex flex-wrap gap-2 mb-3">
+                <input id="commentSearchInput" class="border rounded-md px-3 py-2 min-w-[240px] flex-1" placeholder="コメント本文・投稿者で検索" />
+                <select id="commentSourceFilter" class="border rounded-md px-3 py-2 min-w-[170px]">
+                  <option value="">全ソース</option>
+                </select>
+                <select id="commentDateFilter" class="border rounded-md px-3 py-2 min-w-[170px]">
+                  <option value="">日時: 全件</option>
+                  <option value="hasDate">日時ありのみ</option>
+                  <option value="missingDate">日時なしのみ</option>
+                </select>
                 <button id="reloadCommentsBtn" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
               </div>
+              <p id="commentListMeta" class="text-xs text-slate-500 mb-2"></p>
               <div class="overflow-auto bg-white rounded border">
                 <table class="min-w-full text-sm">
                   <thead class="bg-slate-100">
@@ -184,6 +193,22 @@
                 <button id="sampleCommentBtn" class="px-4 py-2 rounded bg-slate-700 text-white">サンプル1件登録</button>
               </div>
               <pre id="importResult" class="mt-4 text-xs bg-slate-100 p-3 rounded h-40 overflow-auto"></pre>
+            </div>
+            <div class="w-full max-w-3xl bg-white rounded border p-4 mt-4">
+              <h3 class="font-semibold mb-2 text-red-700">コメント削除（管理者）</h3>
+              <p class="text-sm text-slate-500 mb-3">
+                誤取り込みを整理するための削除機能です。対象ソースを選び、必要ならコメントID部分一致で絞って削除します。サーバー側は1件ずつ削除APIを呼び出します（件数が多いと数十秒かかることがあります）。API定義は WeStudy_API_secret_admin_upgrade.yaml の POST /admin/comments/&#123;id&#125;/delete をデプロイしてください。
+              </p>
+              <div class="flex flex-wrap gap-2 items-center">
+                <select id="deleteSourceTypeInput" class="border rounded-md px-3 py-2 min-w-[170px]">
+                  <option value="WeStudy">WeStudy</option>
+                  <option value="神大家コミュニティ">神大家コミュニティ</option>
+                  <option value="">全ソース（危険）</option>
+                </select>
+                <input id="deleteCommentIdLikeInput" class="border rounded-md px-3 py-2 min-w-[230px] flex-1" placeholder="comment_id 部分一致（任意） 例: 2026-" />
+                <button id="deleteCommentsBtn" class="px-4 py-2 rounded bg-red-600 text-white">削除実行</button>
+              </div>
+              <p class="text-xs text-slate-500 mt-2">※ 実行前に確認ダイアログを表示します。</p>
             </div>
           </section>
         </main>
