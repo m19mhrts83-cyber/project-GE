@@ -41,3 +41,12 @@
 - ドロップシャドウ
 - 複雑な背景
 - 3D表現
+
+---
+
+## NotebookLM / Nano Banana Pro でスライド全体に適用するとき
+
+1. **NotebookLM にソースとして追加する単体ファイル**: [`docs/N1_NotebookLM/NotebookLM_マスタースタイル_cute-illustration.md`](../docs/N1_NotebookLM/NotebookLM_マスタースタイル_cute-illustration.md)（ミラー: `215_神・大家さん倶楽部/N1_NotebookLM/`）。運用の文脈は [`運用まとめ_会話からの記録.md` の §3.5](../docs/N1_NotebookLM/運用まとめ_会話からの記録.md) を参照。
+2. **NotebookLM** でノートにソースを入れたあと、**チャットの最初**で「登録済みマスタースタイルに従うこと」「Studio で生成する**すべてのスライド画像**がこのスタイルに従うこと」と明示する（全文のコピペは上記 MD 内にも記載）。
+3. **Studio** を開き、画像モデルに **Nano Banana Pro**（利用可能なら）を選ぶ。スライドごとに §3.5 の短い「追い一文」を足してもよい。
+4. **公開 HTML** は `docs/css/slides-cute.css` を使うデッキ（例: `*_cute.html`）と見た目を揃える。全体フローは [`.cursor/commands/dx-slides-from-outline.md`](dx-slides-from-outline.md) を参照。
