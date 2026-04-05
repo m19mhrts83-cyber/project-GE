@@ -11,10 +11,15 @@ WeStudy フォーラム収集スクリプト（完全版）
 - 可視化: ハートビート JSON とログ、ウォッチドッグで停滞検知＆スクショ
 
 実行例（スリープ防止 & ヘッドレス）:
-  caffeinate -dimsu python3 ~/alfred_python/westudy_forum_all.py
+  caffeinate -dimsu python3 ~/git-repos/ProgramCode/alfred_python/westudy_forum_all.py
 
 画面表示したい時:
-  caffeinate -dimsu python3 ~/alfred_python/westudy_forum_all.py --show
+  caffeinate -dimsu python3 .../westudy_forum_all.py --show
+
+出力先:
+  既定はこのファイルから見た ProgramCode/outputs/westudy/<RUN_ID>/ 。
+  WESTUDY_OUTPUT_ROOT で1本のディレクトリを直接指定、または --output-root で上書き。
+  WESTUDY_STATE_DIR で完了フラグ・done_topics.json の場所（既定: ProgramCode/outputs/westudy_state）。
 """
 
 import os
@@ -56,18 +61,52 @@ from selenium.webdriver.support import expected_conditions as EC
 # -------------------------
 BASE_URL_FORUM = "https://westudy.co.jp/forum/"
 LOGIN_URL = "https://westudy.co.jp/wp-login.php"
-RUN_ID = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-# 出力ルート（必要に応じて変更してください）
-SCRIPT_DIR = Path.home() / "alfred_python"
-OUTPUT_ROOT = SCRIPT_DIR / "outputs" / "westudy" / RUN_ID
-OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+# このスクリプトの場所（ProgramCode/alfred_python）
+_SCRIPT_FILE = Path(__file__).resolve()
+_SCRIPT_DIR = _SCRIPT_FILE.parent
+_DEFAULT_CODE_BASE = _SCRIPT_FILE.parents[1]  # ProgramCode
 
-LOG_PATH = OUTPUT_ROOT / "westudy_run.log"
-HEARTBEAT_PATH = OUTPUT_ROOT / "westudy_heartbeat.json"
-STATE_DIR = SCRIPT_DIR / "outputs" / "westudy_state"
-STATE_DIR.mkdir(parents=True, exist_ok=True)
-DONE_TOPICS_PATH = STATE_DIR / "done_topics.json"  # 既取得トピックのURLを保持（スキップ用）
+RUN_ID: str | None = None
+OUTPUT_ROOT: Path | None = None
+LOG_PATH: Path | None = None
+HEARTBEAT_PATH: Path | None = None
+STATE_DIR: Path | None = None
+DONE_TOPICS_PATH: Path | None = None
+
+
+def configure_paths(output_root: str | Path | None = None, state_dir: str | Path | None = None, run_id: str | None = None):
+    """
+    実行開始時に1回呼ぶ。OUTPUT_ROOT / STATE_DIR / ログパスを確定する。
+    - output_root 未指定: WESTUDY_OUTPUT_ROOT があればそれをそのまま使用、なければ
+      ProgramCode/outputs/westudy/<RUN_ID>/
+    - state_dir 未指定: WESTUDY_STATE_DIR があればそれ、なければ ProgramCode/outputs/westudy_state
+    """
+    global RUN_ID, OUTPUT_ROOT, LOG_PATH, HEARTBEAT_PATH, STATE_DIR, DONE_TOPICS_PATH
+    rid = run_id or datetime.now().strftime("%Y%m%d-%H%M%S")
+    RUN_ID = rid
+    base = _DEFAULT_CODE_BASE
+
+    if output_root is not None:
+        OUTPUT_ROOT = Path(output_root).expanduser().resolve()
+    else:
+        env_out = os.environ.get("WESTUDY_OUTPUT_ROOT")
+        if env_out:
+            OUTPUT_ROOT = Path(env_out).expanduser().resolve()
+        else:
+            OUTPUT_ROOT = base / "outputs" / "westudy" / rid
+
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    LOG_PATH = OUTPUT_ROOT / "westudy_run.log"
+    HEARTBEAT_PATH = OUTPUT_ROOT / "westudy_heartbeat.json"
+
+    if state_dir is not None:
+        STATE_DIR = Path(state_dir).expanduser().resolve()
+    else:
+        env_st = os.environ.get("WESTUDY_STATE_DIR")
+        STATE_DIR = Path(env_st).expanduser().resolve() if env_st else base / "outputs" / "westudy_state"
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    DONE_TOPICS_PATH = STATE_DIR / "done_topics.json"
 
 # ウォッチドッグ設定
 WATCHDOG_INTERVAL_SEC = 30
@@ -93,6 +132,8 @@ _CLI_ARGS = None
 def log(msg: str):
     msg2 = f"{datetime.now().strftime('%H:%M:%S')} | {msg}"
     print(msg2, flush=True)
+    if not LOG_PATH:
+        return
     try:
         with LOG_PATH.open("a", encoding="utf-8") as f:
             f.write(msg2 + "\n")
@@ -272,6 +313,8 @@ def safe_js(code: str, *args, recover_url: str = None, retries: int = 1):
 # ハートビート＆ウォッチドッグ
 # -------------------------
 def mark_progress(current_topic: str = "", current_url: str = "", harvested: int = 0, note: str = ""):
+    if not HEARTBEAT_PATH:
+        return
     hb = {
         "ts": datetime.now().isoformat(timespec="seconds"),
         "topic": current_topic,
@@ -430,6 +473,25 @@ def get_comment_snapshot(current_url: str):
                     if (near) timeText = (near.textContent || "").trim();
                 }
 
+                let profileUrl = "";
+                const prof = el.querySelector(
+                    "a.user-profile[href], .comment-author a[href*='user-profile'], " +
+                    ".vcard a.url[href], .vcard .fn a[href], a[href*='/user-profile']"
+                );
+                if (prof) profileUrl = (prof.getAttribute("href") || "").trim();
+
+                let parentNum = "";
+                const cls = (el.getAttribute("class") || "");
+                const pr = cls.match(/comment-parent-(\d+)/);
+                if (pr) parentNum = pr[1];
+                if (!parentNum) {
+                    const metaA = el.querySelector(".comment-metadata a[href*='comment-'], .reply a[href*='comment-']");
+                    if (metaA) {
+                        const mh = (metaA.getAttribute("href") || "").match(/comment-(\d+)/);
+                        if (mh) parentNum = mh[1];
+                    }
+                }
+
                 const bSel = [".comment-content", ".bbp-reply-content", ".content", ".entry", ".text", ".message"];
                 for (const s of bSel) {
                     const b = el.querySelector(s);
@@ -443,7 +505,7 @@ def get_comment_snapshot(current_url: str):
                 }
 
                 if (id || body) {
-                    out.push({id, author, timeText, timeISO, body});
+                    out.push({id, author, timeText, timeISO, body, profileUrl, parentNum});
                 }
             } catch(e) {}
         }
@@ -458,6 +520,8 @@ def get_comment_snapshot(current_url: str):
             "time_text": (it.get("timeText") or "").strip(),
             "time_iso": (it.get("timeISO") or "").strip(),
             "body": (it.get("body") or "").strip(),
+            "profile_url": (it.get("profileUrl") or "").strip(),
+            "parent_comment_id": (it.get("parentNum") or "").strip(),
         })
     return cleaned
 
@@ -555,6 +619,20 @@ def click_load_more_until_done(expected_count: int | None, current_url: str):
 # -------------------------
 # 収集フロー
 # -------------------------
+def build_comment_url(topic_url: str, comment_id_attr: str) -> str:
+    """HTMLの id=comment-123 から WeStudy のコメントURLを組み立てる。"""
+    raw = (comment_id_attr or "").strip()
+    num = ""
+    if raw.startswith("comment-"):
+        num = raw[8:].strip()
+    else:
+        num = re.sub(r"\D", "", raw)
+    if not num:
+        return ""
+    base = (topic_url or "").split("#")[0].rstrip("/")
+    return f"{base}?comment={num}#comment-{num}"
+
+
 def harvest_topic(title: str, url: str, expected_count: int | None):
     """
     1トピック収集
@@ -587,6 +665,9 @@ def harvest_topic(title: str, url: str, expected_count: int | None):
             "topic_title": current_title,
             "topic_url": current_url,
             "comment_id": cid,
+            "comment_url": build_comment_url(current_url, cid),
+            "profile_url": s.get("profile_url", "") or "",
+            "parent_comment_id": s.get("parent_comment_id", "") or "",
             "author": s["author"],
             "time_text": s["time_text"],
             "time_iso": s["time_iso"],
@@ -601,7 +682,18 @@ def harvest_topic(title: str, url: str, expected_count: int | None):
 def write_topic_csv(csv_path: Path, rows: list[dict]):
     if not rows:
         return
-    headers = ["topic_title", "topic_url", "comment_id", "author", "time_text", "time_iso", "body"]
+    headers = [
+        "topic_title",
+        "topic_url",
+        "comment_id",
+        "comment_url",
+        "profile_url",
+        "parent_comment_id",
+        "author",
+        "time_text",
+        "time_iso",
+        "body",
+    ]
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=headers)
         w.writeheader()
@@ -640,6 +732,9 @@ def mark_topic_done(url: str, done_flag: Path, title: str, rows_count: int):
 # -------------------------
 def main():
     global driver, wait
+
+    if not OUTPUT_ROOT or not STATE_DIR:
+        raise RuntimeError("configure_paths() を先に呼び出してください")
 
     # 初期化
     os.environ.setdefault("TZ", "Asia/Tokyo")
@@ -713,7 +808,28 @@ if __name__ == "__main__":
     parser.set_defaults(headless=True)
 
     parser.add_argument("--force", action="store_true", help="完了済みトピックも再取得する")
+    parser.add_argument(
+        "--output-root",
+        default=None,
+        help="この実行のCSV出力先ディレクトリ（未指定時は WESTUDY_OUTPUT_ROOT または ProgramCode/outputs/westudy/<RUN_ID>/）",
+    )
+    parser.add_argument(
+        "--state-dir",
+        default=None,
+        help="完了フラグ・done_topics.json の保存先（未指定時は WESTUDY_STATE_DIR または ProgramCode/outputs/westudy_state）",
+    )
+    parser.add_argument(
+        "--run-id",
+        default=None,
+        help="出力フォルダ名に使う RUN_ID（--output-root 未指定かつ WESTUDY_OUTPUT_ROOT 未設定時のみ有効）",
+    )
     _CLI_ARGS = parser.parse_args()
+
+    configure_paths(
+        output_root=_CLI_ARGS.output_root,
+        state_dir=_CLI_ARGS.state_dir,
+        run_id=_CLI_ARGS.run_id,
+    )
 
     try:
         main()

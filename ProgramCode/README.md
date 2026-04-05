@@ -36,8 +36,10 @@ source ~/ProgramCode/venv/bin/activate && python3 ~/ProgramCode/excel_to_md.py <
 | chapro_population_only.py | 人口データ関連 |
 | merge_westudy_csv.py | WeStudy CSV結合 |
 | rosenka_final.py | 路線価関連 |
-| westudy_forum_all.py | WeStudyフォーラム関連 |
+| westudy_forum_all.py | WeStudyフォーラム全トピック収集（`WESTUDY_USER` / `WESTUDY_PASS`、`--output-root` / `WESTUDY_OUTPUT_ROOT` / `WESTUDY_STATE_DIR`） |
 | westudy_forum_test.py | WeStudyフォーラムテスト |
+
+**神大家 Q&A チャットボット向けパイプライン**（管理者CSV形式・差分）: OneDrive の `…/神・大家さん倶楽部情報Q&Aチャットボット/scripts/` と `運用手順_WeStudy差分CSV.md` を参照。
 
 ## 過去のスクリプト（old/）
 
