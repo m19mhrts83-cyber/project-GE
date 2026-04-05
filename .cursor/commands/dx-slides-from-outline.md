@@ -77,7 +77,7 @@
    イラスト付きは全体の8〜9割を目安。
 2) 同じ返答に「NotebookLM 用パック」を続けて出力:
    - 「アップロードするソース一覧」（ファイル名と役割の箇条書き）
-   - 「貼り付けソース用: スタイル指示」… cute-illustration の要約を1段落で
+   - 「貼り付けソース用: スタイル指示」… **cute（ゆるイラスト）デッキ**ならソース一覧に [`docs/N1_NotebookLM/NotebookLM_マスタースタイル_cute-illustration.md`](docs/N1_NotebookLM/NotebookLM_マスタースタイル_cute-illustration.md) を必ず含める（NotebookLM にそのままアップロード）。正本は [`.cursor/commands/cute-illustration.md`](cute-illustration.md)
    - 「NotebookLM チャットに最初に送るプロンプト」… ソースに基づきスライド（またはビジュアル付き説明）を作らせる指示全文
    - 「Studio を開いたあとに送る追いプロンプト」… Nano Banana Pro や水彩スタイルを指定する文（UIに合わせて調整する旨を1行で）
 3) 表の各行について「このスライド1枚分を強調したい場合の短い追い指示」があれば表の下に番号付きで。
