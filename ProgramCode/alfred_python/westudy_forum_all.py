@@ -22,6 +22,8 @@ WeStudy フォーラム収集スクリプト（完全版）
   WESTUDY_STATE_DIR で完了フラグ・done_topics.json の場所（既定: ProgramCode/outputs/westudy_state）。
 """
 
+from __future__ import annotations
+
 import os
 import re
 import csv
@@ -59,8 +61,71 @@ from selenium.webdriver.support import expected_conditions as EC
 # -------------------------
 # 定数・グローバル
 # -------------------------
-BASE_URL_FORUM = "https://westudy.co.jp/forum/"
-LOGIN_URL = "https://westudy.co.jp/wp-login.php"
+# 既定は会員向け /login（フォームは wp-login.php と同一の user_login / user_pass）。上書き: WESTUDY_LOGIN_URL
+_DEFAULT_MEMBER_LOGIN_URL = "https://westudy.co.jp/login"
+
+
+# 会員サイトでは /forum/ トップが404のことがあり、コース内のフォーラムタブが一覧になる
+_DEFAULT_FORUM_ENTRY_URL = "https://westudy.co.jp/course/kami-ooyasan-club?t=forums"
+_DEFAULT_TOPIC_HREF_PREFIX = "https://westudy.co.jp/forum/"
+
+
+def forum_base_url() -> str:
+    """フォーラム一覧ページのURL（完全な文字列）。上書き: WESTUDY_FORUM_URL"""
+    u = (os.environ.get("WESTUDY_FORUM_URL") or "").strip()
+    if u:
+        return u
+    return _DEFAULT_FORUM_ENTRY_URL
+
+
+def forum_topic_href_prefix() -> str:
+    """トピック詳細への a[href^=…] 用プレフィックス（末尾スラッシュ付き）。上書き: WESTUDY_TOPIC_HREF_PREFIX"""
+    u = (os.environ.get("WESTUDY_TOPIC_HREF_PREFIX") or "").strip().rstrip("/")
+    if u:
+        return u + "/"
+    return _DEFAULT_TOPIC_HREF_PREFIX
+
+
+def wait_for_forum_ready(reason: str = "") -> None:
+    """ログイン後など、フォーラム相当のページに到達したことを a[href*='forum'] で判定（厳密な CSS より寛容）。"""
+    global driver
+    deadline = time.time() + float(PAGELOAD_TIMEOUT)
+    note = f" ({reason})" if reason else ""
+    last_log = 0.0
+    while time.time() < deadline:
+        now = time.time()
+        try:
+            cur = driver.current_url or ""
+            is404 = driver.execute_script(
+                "return !!(document.body && document.body.classList.contains('error404'));"
+            )
+            n = int(
+                driver.execute_script(
+                    r"""
+                    return document.querySelectorAll(
+                        'a[href*="forum"], .section-item-title a[href]'
+                    ).length;
+                    """
+                )
+                or 0
+            )
+        except Exception:
+            cur, is404, n = "", False, 0
+        if n >= 1:
+            return
+        if now - last_log >= 30:
+            extra = " error404" if (is404 and "forum" in cur.lower()) else ""
+            log(f"… フォーラム到達待機{note} n={n}{extra} URL={cur[:120]}")
+            last_log = now
+        time.sleep(1.0)
+    cur = driver.current_url or ""
+    if OUTPUT_ROOT:
+        try:
+            driver.save_screenshot(str(OUTPUT_ROOT / "forum_ready_timeout.png"))
+            log(f"📸 スクリーンショット: {OUTPUT_ROOT / 'forum_ready_timeout.png'}")
+        except Exception as e:
+            log(f"⚠️ スクリーンショット保存失敗: {e}")
+    raise TimeoutException(f"フォーラム到達待機タイムアウト{note} URL={cur}")
 
 # このスクリプトの場所（ProgramCode/alfred_python）
 _SCRIPT_FILE = Path(__file__).resolve()
@@ -215,8 +280,24 @@ def create_driver() -> webdriver.Chrome:
     options.add_argument("--window-size=1366,900")
     options.add_argument("--lang=ja-JP")
     options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
+    # ヘッドレス検知で中身が空になるサイト向けの一般的緩和
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    try:
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
+    except Exception:
+        pass
 
     drv = webdriver.Chrome(options=options)
+    try:
+        drv.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});",
+            },
+        )
+    except Exception:
+        pass
     drv.set_page_load_timeout(PAGELOAD_TIMEOUT)
     drv.set_script_timeout(SCRIPT_TIMEOUT)
     drv.implicitly_wait(IMPLICIT_WAIT)
@@ -256,26 +337,115 @@ def restart_and_recover(recover_url: str = None):
 # -------------------------
 # ログイン
 # -------------------------
+def _westudy_login_url() -> str:
+    u = (os.environ.get("WESTUDY_LOGIN_URL") or "").strip()
+    if u:
+        return u
+    return _DEFAULT_MEMBER_LOGIN_URL
+
+
 def login_wordpress():
     user = get_env_or_raise("WESTUDY_USER")
     pw = get_env_or_raise("WESTUDY_PASS")
+    login_url = _westudy_login_url()
+    log(f"🔐 ログインURL: {login_url}")
 
-    driver.get(LOGIN_URL)
+    driver.get(login_url)
 
-    # WordPress標準ログイン
     try:
-        wait.until(EC.presence_of_element_located((By.ID, "user_login")))
-        driver.find_element(By.ID, "user_login").clear()
-        driver.find_element(By.ID, "user_login").send_keys(user)
-        driver.find_element(By.ID, "user_pass").clear()
-        driver.find_element(By.ID, "user_pass").send_keys(pw)
-        driver.find_element(By.ID, "wp-submit").click()
-    except Exception:
-        # 既にログイン済みのケースもあるので続行して確認
-        pass
+        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "user_login")))
+    except TimeoutException:
+        log("ℹ️ ログインフォームが見つかりません（既にログイン済みの可能性）。フォーラムで確認します。")
+        driver.get(forum_base_url())
+        wait_for_forum_ready("既存セッション")
+        log("✅ ログイン完了（既存セッション）")
+        return
 
-    # フォーラムリンクが見えるまで待機
-    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[href^='https://westudy.co.jp/forum/']")))
+    el_user = driver.find_element(By.ID, "user_login")
+    el_user.clear()
+    el_user.send_keys(user)
+    driver.find_element(By.ID, "user_pass").clear()
+    driver.find_element(By.ID, "user_pass").send_keys(pw)
+    try:
+        remember = driver.find_element(By.ID, "rememberme")
+        if remember.is_displayed() and not remember.is_selected():
+            remember.click()
+    except Exception:
+        pass
+    driver.find_element(By.ID, "wp-submit").click()
+
+    def _login_page_resolved(drv: webdriver.Chrome) -> bool:
+        """wp-login から遷移した、または画面上にログインエラーが出たら True（待機終了）。"""
+        u = (drv.current_url or "").lower()
+        if u and "wp-login.php" not in u:
+            return True
+        try:
+            for e in drv.find_elements(By.CSS_SELECTOR, "#login_error, #login_error_msg"):
+                if e.is_displayed() and (e.text or "").strip():
+                    return True
+        except Exception:
+            pass
+        return False
+
+    try:
+        WebDriverWait(driver, 90).until(_login_page_resolved)
+    except TimeoutException:
+        cur = driver.current_url or ""
+        log(f"💥 ログイン応答タイムアウト URL={cur}")
+        if OUTPUT_ROOT:
+            try:
+                driver.save_screenshot(str(OUTPUT_ROOT / "login_failed.png"))
+                log(f"📸 スクリーンショット: {OUTPUT_ROOT / 'login_failed.png'}")
+            except Exception as e:
+                log(f"⚠️ スクリーンショット保存失敗: {e}")
+        raise RuntimeError(
+            "WeStudy ログインがタイムアウトしました（ID/パスワード・ネットワークを確認）。"
+            f" URL={cur}"
+        )
+
+    time.sleep(1.0)
+    cur = driver.current_url or ""
+    log(f"🔁 ログインPOST後のURL: {cur}")
+    if "wp-login.php" in cur.lower():
+        try:
+            for sel in ("#login_error", "#login_error_msg"):
+                for e in driver.find_elements(By.CSS_SELECTOR, sel):
+                    if e.is_displayed() and (e.text or "").strip():
+                        log(f"📝 サイト側メッセージ: {(e.text or '').strip()[:800]}")
+                        break
+        except Exception:
+            pass
+        if OUTPUT_ROOT:
+            try:
+                driver.save_screenshot(str(OUTPUT_ROOT / "login_still_wplogin.png"))
+                log(f"📸 スクリーンショット: {OUTPUT_ROOT / 'login_still_wplogin.png'}")
+            except Exception:
+                pass
+        raise RuntimeError(
+            "ログインに失敗しています（パスワード誤り・会員停止・追加認証など）。"
+            " 画面上のメッセージを確認してください。"
+            f" URL={cur}"
+        )
+
+    cnames = sorted({(c.get("name") or "") for c in driver.get_cookies()})
+    wp_cookies = [n for n in cnames if "wordpress" in n.lower()]
+    log(f"🍪 WordPress系クッキー: {wp_cookies if wp_cookies else '（なし）'}")
+    if not wp_cookies:
+        if OUTPUT_ROOT:
+            try:
+                driver.save_screenshot(str(OUTPUT_ROOT / "login_no_wp_cookie.png"))
+            except Exception:
+                pass
+        raise RuntimeError(
+            "ログイン後に WordPress クッキーが付きませんでした（認証できていない可能性）。"
+            " --show または HEADLESS=0 で手元確認してください。"
+        )
+
+    # クッキーを westudy.co.jp 全体に馴染ませてからフォーラムへ
+    driver.get("https://westudy.co.jp/")
+    time.sleep(2.0)
+    driver.get(forum_base_url())
+    wait_for_forum_ready("ログイン直後")
     log("✅ ログイン完了")
 
 
@@ -363,19 +533,24 @@ def start_watchdog(stop_event: Event):
 # -------------------------
 def get_topics():
     """フォーラムトップからトピックの (title, url) を抽出"""
-    driver.get(BASE_URL_FORUM)
+    topic_base = forum_topic_href_prefix().rstrip("/")
+    prefix = forum_topic_href_prefix()
+    driver.get(forum_base_url())
     time.sleep(1.2)
 
-    # a[href^=forum/] のうち /page/ 等は除外
-    links = safe_js(r'''
-        const anchors = Array.from(document.querySelectorAll("a[href^='https://westudy.co.jp/forum/']"));
+    # 一覧はコース ?t=forums でも、トピックURLは /forum/… のことが多い
+    links = safe_js(
+        r'''
+        const prefix = arguments[0];
+        const anchors = Array.from(document.querySelectorAll("a[href^='" + prefix + "']"));
         const items = [];
         const seen = new Set();
+        const rootPath = prefix.replace(/\/+$/, "");
         for (const a of anchors) {
             const href = (a.getAttribute("href") || "").split("#")[0].replace(/\/+$/, "");
             if (!href) continue;
             if (href.includes("/page/")) continue;
-            if (href.endsWith("/forum")) continue; // ルート避け
+            if (href === rootPath || href.endsWith("/forum")) continue;
             const t = (a.textContent || "").trim();
             if (!t) continue;
             const key = href;
@@ -384,14 +559,18 @@ def get_topics():
             items.push({title: t, url: href});
         }
         return items;
-    ''', recover_url=BASE_URL_FORUM, retries=1)
+        ''',
+        prefix,
+        recover_url=forum_base_url(),
+        retries=1,
+    )
 
     # フォーラムには同一URLに複数のアンカーがある場合が多いので、URLでユニーク化
     uniq = {}
     for it in links:
         url = it.get("url") or ""
         title = (it.get("title") or "").strip()
-        if not url or BASE_URL_FORUM not in url:
+        if not url or topic_base not in url:
             continue
         # タイトルは長いときがあるので最初に見つかったものを採用
         if url not in uniq:
@@ -435,11 +614,21 @@ def get_comment_snapshot(current_url: str):
     items = safe_js(r'''
         const out = [];
         const roots = Array.from(document.querySelectorAll(
-            "[id^='comment-'], li.comment, article.comment, div.comment, div.bbp-reply, li.bbp-reply, .comment-item"
+            "[id^='comment-'], li.comment, article.comment, div.comment, div.bbp-reply, li.bbp-reply, .comment-item, li[id^='post-']"
         ));
         for (const el of roots) {
             try {
-                const id = (el.getAttribute("id") || "").trim();
+                let id = (el.getAttribute("id") || "").trim();
+                if (!id) {
+                    const idNode = el.querySelector("[id^='comment-'], [id^='post-']");
+                    if (idNode) id = (idNode.getAttribute("id") || "").trim();
+                }
+                if (id && /^(comment-trigger|comment-reply|comment-edit|comment-form|comment-content)-/i.test(id)) {
+                    continue;
+                }
+                if (id && id.startsWith("comment-") && !/^comment-\d+$/i.test(id)) {
+                    continue;
+                }
                 let author = "";
                 let timeText = "";
                 let timeISO = "";
@@ -458,7 +647,10 @@ def get_comment_snapshot(current_url: str):
                     if (cand && cand.textContent) author = cand.textContent.trim();
                 }
 
-                const tSel = ["time", "time[datetime]", ".time", ".date", "abbr.published", "span.published"];
+                const tSel = [
+                    "time", "time[datetime]", ".time", ".date", "abbr.published", "span.published",
+                    ".comment_date", ".comment-date", ".bbp-reply-post-date", ".reply-date", ".comment-date"
+                ];
                 for (const s of tSel) {
                     const t = el.querySelector(s);
                     if (t) {
@@ -469,8 +661,17 @@ def get_comment_snapshot(current_url: str):
                     }
                 }
                 if (!timeText) {
-                    const near = el.querySelector(".bbp-reply-post-date, .reply-date, .comment-date");
+                    const near = el.querySelector(".comment_date, .bbp-reply-post-date, .reply-date, .comment-date");
                     if (near) timeText = (near.textContent || "").trim();
+                }
+                if (!timeText) {
+                    // コメントmeta全体から日付らしい部分を抽出（class名変更への保険）
+                    const meta = el.querySelector(".comment-meta, .commentmetadata, .bbp-reply-header");
+                    const metaText = meta ? (meta.textContent || "").trim() : "";
+                    if (metaText) {
+                        const m = metaText.match(/(\d{4}年\d{1,2}月\d{1,2}日\\s*\\d{1,2}時\\d{1,2}分|\\d{4}[\\/-]\\d{1,2}[\\/-]\\d{1,2}(?:\\s+\\d{1,2}:\\d{1,2}(?::\\d{1,2})?)?)/);
+                        if (m) timeText = (m[1] || "").trim();
+                    }
                 }
 
                 let profileUrl = "";
@@ -839,3 +1040,4 @@ if __name__ == "__main__":
     except Exception as e:
         log(f"💥 異常終了: {e}\n{traceback.format_exc()}")
         cleanup()
+        sys.exit(1)

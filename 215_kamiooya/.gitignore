@@ -7,6 +7,9 @@
 
 # --- Git管理するフォルダだけを許可 ---
 !.gitignore
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
 !C1_cursor/
 !C2_ルーティン作業/
 !C3_プロンプト/
@@ -33,6 +36,9 @@ token.json
 token*.json
 *.expired
 C1_cursor/1b_Cursorマニュアル/Gmail_MCP_エラー解消手順.md
+
+# Q&Aチャットボット: 生成CSV・生ログはリポジトリに含めない（正本は OneDrive 想定）
+C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/exports/
 
 # --- バイナリ/メディアファイル ---
 *.svg
