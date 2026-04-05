@@ -87,7 +87,7 @@ def wait_import_finished(page, timeout_sec: int) -> str:
         if started and stable_rounds >= 3:
             return current
         page.wait_for_timeout(2000)
-    raise TimeoutError(f"CSV取込の完了待ちがタイムアウトしました（{timeout_sec}秒）")
+    raise PwTimeoutError(f"CSV取込の完了待ちがタイムアウトしました（{timeout_sec}秒）")
 
 
 def parse_result_stats(result_text: str) -> dict:
@@ -172,7 +172,17 @@ def main() -> int:
                 print("NG行があるため終了コード1を返します", file=sys.stderr)
                 return 1
             return 0
-        except (PwTimeoutError, Exception) as e:
+        except PwTimeoutError as e:
+            if shot_dir:
+                ng_shot = shot_dir / f"limo_import_ng_{int(time.time())}.png"
+                try:
+                    page.screenshot(path=str(ng_shot), full_page=True)
+                    print(f"失敗時スクリーンショット: {ng_shot}", file=sys.stderr)
+                except Exception:
+                    pass
+            print(f"LIMO取込失敗(タイムアウト): {e}", file=sys.stderr)
+            return 2
+        except Exception as e:
             if shot_dir:
                 ng_shot = shot_dir / f"limo_import_ng_{int(time.time())}.png"
                 try:
