@@ -1,0 +1,144 @@
+:root {
+  --main: #1e3a8a;
+  --accent: #3b82f6;
+  --bg: #f3f4f6;
+  --text: #1f2937;
+  --muted: #6b7280;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: "Noto Sans JP", sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  min-width: 240px;
+  max-width: 420px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: #fff;
+  z-index: 60;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.toast.success {
+  background: #166534;
+}
+
+.toast.error {
+  background: #b91c1c;
+}
+
+.toast.info {
+  background: #1e3a8a;
+}
+
+.chat-bubble {
+  max-width: 78%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-user {
+  margin-left: auto;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+}
+
+.chat-assistant {
+  margin-right: auto;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+.session-item.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+#loadingOverlay {
+  display: none;
+}
+
+#loadingOverlay.active {
+  display: flex;
+}
+
+@media (max-width: 767px) {
+  #sidebar.mobile-open {
+    display: flex;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    z-index: 40;
+    width: 86%;
+    max-width: 320px;
+    box-shadow: 8px 0 20px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* 改修: 画面端の目立たない管理者導線 */
+.admin-entry-btn {
+  position: fixed;
+  right: 10px;
+  bottom: 8px;
+  font-size: 10px;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  opacity: 0.35;
+  z-index: 30;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+
+.admin-entry-btn:hover,
+.admin-entry-btn:focus {
+  opacity: 0.65;
+  color: #64748b;
+  outline: none;
+}
+
+/* 改修: ログイン画面内の目立たない「管理者登録」 */
+.login-screen-admin-btn {
+  font-size: 11px;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  opacity: 0.75;
+}
+
+.login-screen-admin-btn:hover,
+.login-screen-admin-btn:focus {
+  color: #64748b;
+  opacity: 1;
+  outline: none;
+}
+
+/* 改修: 管理者ゲート（div オーバーレイ。ローディング z-50 より前面） */
+.admin-gate-overlay.hidden {
+  display: none !important;
+}
+
+.admin-gate-overlay:not(.hidden) {
+  display: flex;
+}
+
+.admin-gate-panel {
+  position: relative;
+  z-index: 1;
+}
