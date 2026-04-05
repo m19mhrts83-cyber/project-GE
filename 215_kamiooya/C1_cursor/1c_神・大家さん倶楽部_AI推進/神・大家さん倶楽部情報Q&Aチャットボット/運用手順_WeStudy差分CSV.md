@@ -137,7 +137,8 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 
 ## GitHub Actions での週次実行
 
-`215_kamiooya/.github/workflows/westudy-limo-weekly.yml` で、以下を**毎週 1 回**（日曜 06:30 JST 目安）自動実行します。
+**project-GE リポジトリ直下**の `.github/workflows/westudy-limo-weekly.yml` で、以下を**毎週 1 回**（日曜 06:30 JST 目安）自動実行します。  
+（`215_kamiooya/.github/` 配下に置いても GitHub は読み込みません。）
 
 1. WeStudy スクレイプ  
 2. 差分CSV生成  
