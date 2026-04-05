@@ -46,7 +46,10 @@ def load_state(path: Path) -> set[str]:
         return set()
 
 
-def save_state(path: Path, ids: set[str]) -> None:
+def save_state(path: Path, ids: set[str]) -> bool:
+    current = load_state(path)
+    if current == ids:
+        return False
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     payload = {
@@ -57,6 +60,7 @@ def save_state(path: Path, ids: set[str]) -> None:
     with tmp.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     tmp.replace(path)
+    return True
 
 
 def read_full_rows(full_csv: Path) -> list[dict]:
@@ -97,7 +101,19 @@ def main() -> int:
         action="store_true",
         help="全件のIDだけ state に記録し、差分CSVはヘッダのみ（初回DB登録済みのとき等）",
     )
+    ap.add_argument(
+        "--replace-state",
+        action="store_true",
+        help="--init-state-only と併用: state を全件CSVのコメントID集合に完全一致（既存 state との和集合にしない）",
+    )
     args = ap.parse_args()
+
+    if args.replace_state and not args.init_state_only:
+        print(
+            "エラー: --replace-state は --init-state-only と併用してください。",
+            file=sys.stderr,
+        )
+        return 2
 
     full_path = Path(args.full).expanduser().resolve()
     state_path = Path(args.state).expanduser().resolve()
@@ -112,7 +128,8 @@ def main() -> int:
     known = load_state(state_path)
 
     if args.init_state_only:
-        save_state(state_path, all_ids | known)
+        final_ids = all_ids if args.replace_state else (all_ids | known)
+        changed = save_state(state_path, final_ids)
         delta_path.parent.mkdir(parents=True, exist_ok=True)
         with delta_path.open("w", encoding="utf-8", newline="") as f:
             w = csv.DictWriter(
@@ -121,8 +138,10 @@ def main() -> int:
                 lineterminator="\n",
             )
             w.writeheader()
+        mode = "完全一致" if args.replace_state else "和集合マージ"
         print(
-            f"OK: state 初期化 {state_path} （{len(all_ids | known)} ID）差分は空: {delta_path}"
+            f"OK: state 初期化 ({mode}) {state_path} （{len(final_ids)} ID）差分は空: {delta_path}"
+            + (" | state 変更あり" if changed else " | state 変更なし")
         )
         return 0
 
@@ -141,13 +160,18 @@ def main() -> int:
         for r in delta_rows:
             w.writerow({k: r.get(k, "") for k in ADMIN_FIELDNAMES})
 
+    state_changed = False
     if args.update_state:
-        save_state(state_path, known | all_ids)
+        state_changed = save_state(state_path, known | all_ids)
 
     print(
         f"OK: 差分 {len(delta_rows)} 行 / 全件 {len(rows)} 行 / 新ID {len(new_ids)} "
         f"→ {delta_path}"
-        + (f" | state 更新済み ({len(known | all_ids)} ID)" if args.update_state else "")
+        + (
+            f" | state 更新済み ({len(known | all_ids)} ID)"
+            if (args.update_state and state_changed)
+            else (" | state 変更なし" if args.update_state else "")
+        )
     )
     return 0
 
