@@ -121,6 +121,38 @@ def load_latest_saved_token(save_root: Path) -> str | None:
     return tokens[0] if tokens else None
 
 
+def try_client_from_saved_tokens_only(save_root: Path):
+    """
+    保存済みトークンだけで CHRLINE を初期化・initAll まで成功させる。
+    いずれのトークンでも失敗したら None（QR は開始しない）。
+    """
+    from CHRLINE import CHRLINE
+    from CHRLINE.exceptions import LineServiceException
+
+    cleanup_chrline_qr_images(save_root)
+    for token in load_saved_tokens_newest_first(save_root):
+        try:
+            cl = CHRLINE(
+                token,
+                device="DESKTOPWIN",
+                useThrift=True,
+                savePath=str(save_root),
+            )
+            cl.initAll()
+            return cl
+        except LineServiceException:
+            continue
+    return None
+
+
+def chrline_session_ok(save_root: Path) -> bool:
+    """保存トークンが有効であれば True。ネットワーク不可などは False 扱い。"""
+    try:
+        return try_client_from_saved_tokens_only(save_root) is not None
+    except OSError:
+        return False
+
+
 def load_saved_tokens_newest_first(save_root: Path) -> list[str]:
     """`.tokens` 内の全ファイルを更新日時の新しい順に読み、有効な文字列のみ重複排除して返す。"""
     d = save_root / ".tokens"
@@ -141,35 +173,21 @@ def load_saved_tokens_newest_first(save_root: Path) -> list[str]:
     return out
 
 
-def build_logged_in_client(save_root: Path):
-    """保存済み authToken で CHRLINE を初期化。失効時はQR再認証で復旧する。"""
+def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = True):
+    """保存済み authToken で CHRLINE を初期化。失効時は必要なら QR 再認証で復旧する。"""
     from CHRLINE import CHRLINE
-    from CHRLINE.exceptions import LineServiceException
 
-    cleanup_chrline_qr_images(save_root)
-
-    def _is_logged_out(e: LineServiceException) -> bool:
-        return "V3_TOKEN_CLIENT_LOGGED_OUT" in str(e)
-
-    for token in load_saved_tokens_newest_first(save_root):
-        try:
-            cl = CHRLINE(
-                token,
-                device="DESKTOPWIN",
-                useThrift=True,
-                savePath=str(save_root),
-            )
-        except LineServiceException as e:
-            if not _is_logged_out(e):
-                raise
-            continue
-        try:
-            cl.initAll()
-        except LineServiceException as e:
-            if not _is_logged_out(e):
-                raise
-            continue
+    cl = try_client_from_saved_tokens_only(save_root)
+    if cl is not None:
         return cl
+
+    if not allow_qr_login:
+        print(
+            "保存トークンが無効です。QR再認証は許可されていないため終了します。"
+            "（明示実行時のみ allow_qr_login=True で再実行してください）",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
     print(
         "保存トークンが無効なため、QR再認証を開始します（LINEアプリで承認してください）。",

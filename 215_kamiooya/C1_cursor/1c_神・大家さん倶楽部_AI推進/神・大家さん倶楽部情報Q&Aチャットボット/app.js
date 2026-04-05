@@ -116,6 +116,9 @@ const App = {
     App.elements.suggestedQuestions = document.getElementById('suggestedQuestions');
     App.elements.commentTableBody = document.getElementById('commentTableBody');
     App.elements.commentSearchInput = document.getElementById('commentSearchInput');
+    App.elements.commentSourceFilter = document.getElementById('commentSourceFilter');
+    App.elements.commentDateFilter = document.getElementById('commentDateFilter');
+    App.elements.commentListMeta = document.getElementById('commentListMeta');
     App.elements.pendingUsersTableBody = document.getElementById('pendingUsersTableBody');
     App.elements.csvFileInput = document.getElementById('csvFileInput');
     App.elements.importResult = document.getElementById('importResult');
@@ -126,6 +129,9 @@ const App = {
     App.elements.confirmMessage = document.getElementById('confirmMessage');
     App.elements.confirmOkBtn = document.getElementById('confirmOkBtn');
     App.elements.confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    App.elements.deleteSourceTypeInput = document.getElementById('deleteSourceTypeInput');
+    App.elements.deleteCommentIdLikeInput = document.getElementById('deleteCommentIdLikeInput');
+    App.elements.deleteCommentsBtn = document.getElementById('deleteCommentsBtn');
   },
 
   /* 改修: 管理者登録クリックでパスワードモーダルを開く */
@@ -188,6 +194,15 @@ const App = {
     document.getElementById('importCsvBtn').addEventListener('click', App.importCsvComments);
     document.getElementById('sidebarToggleBtn').addEventListener('click', App.toggleSidebarMobile);
     document.getElementById('commentSearchInput').addEventListener('input', App.renderCommentTable);
+    if (App.elements.commentSourceFilter) {
+      App.elements.commentSourceFilter.addEventListener('change', App.renderCommentTable);
+    }
+    if (App.elements.commentDateFilter) {
+      App.elements.commentDateFilter.addEventListener('change', App.renderCommentTable);
+    }
+    if (App.elements.deleteCommentsBtn) {
+      App.elements.deleteCommentsBtn.addEventListener('click', App.deleteComments);
+    }
     document.getElementById('confirmCancelBtn').addEventListener('click', App.closeConfirmDialog);
     document.querySelectorAll('.screen-tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -530,6 +545,7 @@ const App = {
   loadComments: async () => {
     const res = await App.apiClient('GET', '/comments');
     App.state.comments = (res && res.comments) ? res.comments : [];
+    App.renderCommentSourceFilterOptions();
     App.renderCommentTable();
   },
 
@@ -624,18 +640,71 @@ const App = {
     });
   },
 
+  renderCommentSourceFilterOptions: () => {
+    const select = App.elements.commentSourceFilter;
+    if (!select) return;
+    const current = select.value || '';
+    const sources = Array.from(
+      new Set(
+        (App.state.comments || [])
+          .map(function (row) {
+            return String(App.commentField(row, 'source_type') || '').trim();
+          })
+          .filter(Boolean)
+      )
+    ).sort();
+    select.innerHTML = '<option value="">全ソース</option>';
+    sources.forEach(function (source) {
+      const opt = document.createElement('option');
+      opt.value = source;
+      opt.textContent = source;
+      select.appendChild(opt);
+    });
+    if (current && sources.indexOf(current) !== -1) {
+      select.value = current;
+    }
+  },
+
+  hasPostedAtValue: (row) => {
+    return String(App.commentField(row, 'posted_at') || '').trim() !== '';
+  },
+
   renderCommentTable: () => {
     const body = App.elements.commentTableBody;
     const keyword = (App.elements.commentSearchInput.value || '').toLowerCase();
+    const sourceFilter = (App.elements.commentSourceFilter && App.elements.commentSourceFilter.value) || '';
+    const dateFilter = (App.elements.commentDateFilter && App.elements.commentDateFilter.value) || '';
     body.innerHTML = '';
 
     const filtered = App.state.comments.filter(function (row) {
-      if (!keyword) return true;
       const t1 = String(App.commentField(row, 'content')).toLowerCase();
       const t2 = String(App.commentField(row, 'author_name')).toLowerCase();
       const t3 = String(App.commentField(row, 'source_type')).toLowerCase();
-      return t1.indexOf(keyword) !== -1 || t2.indexOf(keyword) !== -1 || t3.indexOf(keyword) !== -1;
+      const sourceType = String(App.commentField(row, 'source_type') || '').trim();
+      const hasDate = App.hasPostedAtValue(row);
+      const hitKeyword = !keyword || t1.indexOf(keyword) !== -1 || t2.indexOf(keyword) !== -1 || t3.indexOf(keyword) !== -1;
+      const hitSource = !sourceFilter || sourceType === sourceFilter;
+      const hitDate =
+        !dateFilter ||
+        (dateFilter === 'hasDate' && hasDate) ||
+        (dateFilter === 'missingDate' && !hasDate);
+      return hitKeyword && hitSource && hitDate;
     });
+
+    const totalCount = App.state.comments.length;
+    const missingDateCount = App.state.comments.reduce(function (n, row) {
+      return n + (App.hasPostedAtValue(row) ? 0 : 1);
+    }, 0);
+    if (App.elements.commentListMeta) {
+      App.elements.commentListMeta.textContent =
+        '表示 ' +
+        filtered.length +
+        ' / 全 ' +
+        totalCount +
+        ' 件（日時なし ' +
+        missingDateCount +
+        ' 件）';
+    }
 
     if (filtered.length === 0) {
       body.innerHTML = '<tr><td colspan="4" class="p-3 text-slate-500">該当データがありません</td></tr>';
@@ -645,8 +714,13 @@ const App = {
     filtered.forEach(function (r) {
       const tr = document.createElement('tr');
       tr.className = 'border-t';
+      const postedAt = String(App.commentField(r, 'posted_at') || '').trim();
+      const postedAtLabel = postedAt || '（日時なし）';
       tr.innerHTML =
-        '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'posted_at')) + '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(postedAtLabel) +
+        (postedAt ? '' : ' <span class="text-[10px] text-amber-700">missing</span>') +
+        '</td>' +
         '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'source_type')) + '</td>' +
         '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'author_name')) + '</td>' +
         '<td class="p-2">' + App.escapeHtml(String(App.commentField(r, 'content')).slice(0, 180)) + '</td>';
@@ -815,6 +889,86 @@ const App = {
     }
   },
 
+  deleteComments: async () => {
+    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') {
+      App.showToast('管理者のみ実行できます', 'error');
+      return;
+    }
+    const sourceType = (App.elements.deleteSourceTypeInput && App.elements.deleteSourceTypeInput.value) || '';
+    const commentIdLike =
+      (App.elements.deleteCommentIdLikeInput && App.elements.deleteCommentIdLikeInput.value.trim()) || '';
+    if (!sourceType && !commentIdLike) {
+      App.showToast('全削除防止のため、ソースまたはcomment_id条件を指定してください', 'error');
+      return;
+    }
+    await App.loadComments();
+    const candidates = (App.state.comments || []).filter(function (row) {
+      const sourceOk = !sourceType || String(App.commentField(row, 'source_type') || '').trim() === sourceType;
+      const cid = String(App.commentField(row, 'comment_id') || '').trim();
+      const idLikeOk = !commentIdLike || cid.indexOf(commentIdLike) !== -1;
+      return sourceOk && idLikeOk;
+    });
+    const withId = candidates.filter(function (row) {
+      return String(row.id || '').trim() !== '';
+    });
+    if (candidates.length === 0) {
+      App.showToast('削除対象が0件でした（条件を確認してください）', 'info');
+      return;
+    }
+    if (withId.length === 0) {
+      App.showToast('削除できません（該当行に内部 id がありません。再取得後に再試行してください）', 'error');
+      return;
+    }
+    const label =
+      'source=' +
+      (sourceType || 'ALL') +
+      (commentIdLike ? (' / comment_id like "' + commentIdLike + '"') : '') +
+      ' / 削除実行=' +
+      withId.length +
+      '件（一覧該当 ' +
+      candidates.length +
+      '件）';
+    const ok = await App.openConfirmDialog(
+      'コメント削除',
+      '以下条件のコメントを削除します。元に戻せません。\n' + label
+    );
+    if (!ok) return;
+
+    App.setButtonLoading(App.elements.deleteCommentsBtn, true, '削除中');
+    App.setLoading(true);
+    try {
+      let deletedCount = 0;
+      const concurrency = 5;
+      for (let i = 0; i < withId.length; i += concurrency) {
+        const slice = withId.slice(i, i + concurrency);
+        await Promise.all(
+          slice.map(function (row) {
+            const rowId = String(row.id || '').trim();
+            return App.apiClient('POST', '/admin/comments/' + rowId + '/delete');
+          })
+        );
+        deletedCount += slice.length;
+      }
+      await App.loadComments();
+      App.showToast('削除完了: ' + deletedCount + ' 件', 'success');
+      if (App.elements.importResult) {
+        App.elements.importResult.textContent +=
+          '[DELETE] source=' +
+          (sourceType || 'ALL') +
+          ' comment_id_like=' +
+          (commentIdLike || '-') +
+          ' deleted=' +
+          deletedCount +
+          '\n';
+      }
+    } catch (error) {
+      App.showToast(error.message || '削除に失敗しました', 'error');
+    } finally {
+      App.setButtonLoading(App.elements.deleteCommentsBtn, false);
+      App.setLoading(false);
+    }
+  },
+
   /* CSV 取り込み時の重複判定用（本文の空白正規化） */
   normalizeCommentBodyForDedupe: (text) => {
     return String(text || '')
@@ -921,7 +1075,11 @@ const App = {
             App.csvCell(row, 'author_name', 'authorName', '投稿者名', '投稿者', 'author') || null;
           const composite = App.commentImportCompositeKey(contentStr, postedAt, authorName);
 
-          if (dedupe.idSet.has(commentId) || dedupe.compositeSet.has(composite)) {
+          // comment_id が明示されているCSVは ID 優先で判定し、
+          // 本文重複（同文・同投稿者）で過去データを取りこぼさないようにする。
+          const isDupById = dedupe.idSet.has(commentId);
+          const isDupByComposite = !explicitId && dedupe.compositeSet.has(composite);
+          if (isDupById || isDupByComposite) {
             skipCount += 1;
             App.elements.importResult.textContent +=
               'SKIP dup row=' + (i + 1) + ' id=' + commentId + '\n';
@@ -1033,22 +1191,48 @@ const App = {
     return ',';
   },
 
+  /* 引用内改行を含む1レコードずつに分割（RFC 4180 風。単純な split('\\n') だと本文改行で行が分裂する） */
+  splitCsvRecordLines: (normalized) => {
+    const records = [];
+    let buf = '';
+    let inQuote = false;
+    for (let i = 0; i < normalized.length; i += 1) {
+      const c = normalized[i];
+      if (c === '"' && inQuote && normalized[i + 1] === '"') {
+        buf += '"';
+        i += 1;
+        continue;
+      }
+      if (c === '"') {
+        inQuote = !inQuote;
+        buf += c;
+        continue;
+      }
+      if (c === '\n' && !inQuote) {
+        if (buf.trim() !== '') records.push(buf);
+        buf = '';
+        continue;
+      }
+      buf += c;
+    }
+    if (buf.trim() !== '') records.push(buf);
+    return records;
+  },
+
   parseCsv: (text) => {
     const normalized = String(text || '')
       .replace(/^\uFEFF/, '')
       .replace(/\r/g, '');
-    const lines = normalized.split('\n').filter(function (line) {
-      return line.trim() !== '';
-    });
-    if (lines.length < 2) return [];
-    const delimiter = App.detectCsvDelimiter(lines[0]);
-    const headers = App.simpleCsvSplit(lines[0], delimiter).map(function (h) {
+    const recordLines = App.splitCsvRecordLines(normalized);
+    if (recordLines.length < 2) return [];
+    const delimiter = App.detectCsvDelimiter(recordLines[0]);
+    const headers = App.simpleCsvSplit(recordLines[0], delimiter).map(function (h) {
       return h.trim().replace(/^\uFEFF/, '');
     });
 
     const rows = [];
-    for (let i = 1; i < lines.length; i += 1) {
-      const values = App.simpleCsvSplit(lines[i], delimiter);
+    for (let i = 1; i < recordLines.length; i += 1) {
+      const values = App.simpleCsvSplit(recordLines[i], delimiter);
       const row = {};
       headers.forEach(function (key, idx) {
         row[key] = values[idx] !== undefined ? values[idx] : '';

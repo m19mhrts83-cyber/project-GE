@@ -18,6 +18,10 @@
   python yoritoori_send.py --partner LEAF --via imessage
   python yoritoori_send.py --partner 立木 --dry-run
   python yoritoori_send.py --partner LEAF --via imessage --skip-confirm
+  python yoritoori_send.py --partner ミニテック --skip-chrline   # 送信前の CHRLINE 確認を省略
+
+  送信が確定した直後（確認プロンプト承認後）、既定で CHRLINE のセッションを軽く確認する。
+  保存トークンが有効なら QR は出ない。切れているときだけこのタイミングで QR 再認証が始まる。
 """
 
 import argparse
@@ -32,6 +36,7 @@ import sys
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
+from typing import Optional
 
 _MAIL_AUTO = Path(__file__).resolve().parent.parent / "mail_automation"
 if _MAIL_AUTO.is_dir() and str(_MAIL_AUTO) not in sys.path:
@@ -142,6 +147,64 @@ def load_env():
 
 
 load_env()
+
+
+def _find_repo_root_with_line_poc() -> Optional[Path]:
+    """215 のマニュアルから git-repos 直下などをたどり、line_unofficial_poc があるルートを返す。"""
+    p = SCRIPT_DIR.resolve()
+    for _ in range(8):
+        cand = p / "line_unofficial_poc"
+        if cand.is_dir():
+            return p
+        if p.parent == p:
+            break
+        p = p.parent
+    return None
+
+
+def ensure_chrline_session_before_partner_send() -> None:
+    """
+    パートナー送信直前に CHRLINE セッションを確保する。
+    保存トークンが有効なら即戻る（QRなし）。切れているときだけ requestSQR3 が動く。
+    無効化: --skip-chrline または環境変数 YORITOORI_SKIP_CHRLINE=1
+    """
+    if os.environ.get("YORITOORI_SKIP_CHRLINE", "").strip().lower() in ("1", "true", "yes", "on"):
+        return
+    root = _find_repo_root_with_line_poc()
+    if not root:
+        print(
+            "（CHRLINE: リポジトリ内に line_unofficial_poc が見つからないため、セッション確認をスキップします）",
+            file=sys.stderr,
+        )
+        return
+    poc = root / "line_unofficial_poc"
+    venv_py = poc / ".venv" / "bin" / "python"
+    if not venv_py.is_file():
+        print(
+            "（CHRLINE: line_unofficial_poc/.venv が無いため、セッション確認をスキップします）",
+            file=sys.stderr,
+        )
+        return
+    code = (
+        "from chrline_client_utils import save_root_from_env, build_logged_in_client\n"
+        "p = save_root_from_env()\n"
+        "build_logged_in_client(p)\n"
+        "print('[CHRLINE] セッション利用可能')\n"
+    )
+    r = subprocess.run(
+        [str(venv_py), "-c", code],
+        cwd=str(poc),
+        text=True,
+    )
+    if r.returncode != 0:
+        print(
+            "エラー: CHRLINE（LINE 非公式）のログインに失敗しました。"
+            "ターミナルで line_unofficial_poc をカレントに chrline_qr_login_poc.py を実行し、"
+            "QR 認証後にもう一度お試しください。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
 
 credentials_path = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", CREDENTIALS_PATH))
 _token_default = Path(os.environ.get("GMAIL_TOKEN_PATH", TOKEN_PATH))
@@ -549,6 +612,11 @@ def main():
     parser.add_argument("--via", choices=["auto", "gmail", "imessage"], default="auto")
     parser.add_argument("--skip-confirm", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--skip-chrline",
+        action="store_true",
+        help="送信前の CHRLINE セッション確認・再ログインをしない（既定は実施）",
+    )
     parser.add_argument("--move-attachments-only", action="store_true")
     args = parser.parse_args()
 
@@ -637,6 +705,9 @@ def main():
         dry_run=args.dry_run,
     ):
         return
+
+    if not args.skip_chrline:
+        ensure_chrline_session_before_partner_send()
 
     if chosen_via == "gmail":
         run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, args.dry_run)

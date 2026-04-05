@@ -947,7 +947,7 @@ def main() -> int:
             if not res:
                 print(
                     "# debug: 空リスト — API は成功しているがメッセージ 0 件。"
-                    " E2EE・公式 PC 未ログイン・MessageBox 未同期のときに起きやすい。",
+                    " E2EE・MessageBox 未同期・CHRLINE 側の鍵/セッション不整合のときに起きやすい。",
                     file=sys.stderr,
                 )
             else:
@@ -967,10 +967,26 @@ def main() -> int:
     my_mid = getattr(cl, "mid", None)
     msgs.sort(key=lambda m: _msg_time(cl, m))
 
+    # sync_delta への遅延 import（相互 import 回避）。グループ取得時に to=u mid のままだと E2EE 復号が落ちるため fetch_chat_mid を渡す。
+    from chrline_sync_delta_poc import (
+        _looks_like_line_chat_mid,
+        _msg_body_line_with_e2ee_register,
+    )
+
+    e2ee_registered: set[str] = set()
+    fetch_chat_mid = mid if mid.startswith("c") and _looks_like_line_chat_mid(mid) else None
+
     shown = 0
     for msg in msgs:
         ts = _msg_time(cl, msg)
-        body = _msg_body_line(cl, msg)
+        body = _msg_body_line_with_e2ee_register(
+            cl,
+            msg,
+            None,
+            e2ee_registered,
+            skip_register=args.skip_e2ee_key_register,
+            fetch_chat_mid=fetch_chat_mid,
+        )
         if _is_compact_noise_row(cl, msg, mid, body):
             if args.debug_response:
                 print(
@@ -991,7 +1007,8 @@ def main() -> int:
 
     if shown == 0:
         print(
-            "# （表示できるメッセージはありませんでした。E2EE グループや PC 未同期の可能性があります）",
+            "# （表示できるメッセージはありませんでした。E2EE グループ・MessageBox 未同期・"
+            "CHRLINE セッションや鍵の不整合の可能性があります）",
             file=sys.stderr,
         )
 

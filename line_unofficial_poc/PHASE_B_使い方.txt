@@ -72,6 +72,8 @@ line_unofficial_poc（Phase B）
    - CHRLINE-PatchV2 等の README に従い pip install git+https://...
 
 6. パターンB: トーク一覧 → メッセージ取得 → yoritoori（CHRLINE-PatchV2 想定）
+   定常運用の sync 追記は chrline_sync_to_yoritoori.py（既定 line-default: Tcell はキャラメル管理G のみ＋LEAF 等）。
+   1:1 だけ取りたいときは --preset tcell-yuki（非推奨・互換）。
    前提: chrline_qr_login_poc.py で一度ログイン済み（.line_auth/.tokens に保存）。
    標準出力にトークンは出さない。ターミナル全文をチャット等に貼らない。
 
@@ -90,6 +92,13 @@ line_unofficial_poc（Phase B）
        python chrline_dump_messages_poc.py --chat-mid "（chatMid）" --count 80 \
          | python "$LINE_TO_YORITOORI_SCRIPT" --partner Tcell --group --group-label "キャラメル管理G"
    （.env の LINE_TO_YORITOORI_SCRIPT・YORITOORI_BASE_PATH を設定済みであること）
+
+   グループ（キャラメル管理G 等）の E2EE 本文が取れないとき:
+   - **グループを公式 LINE では扱わず CHRLINE のみで運用する場合**でも、取得・復号は非公式 API とローカル鍵に依存する（公式 PC 版を開くことが前提ではない）。
+   - 別ルート比較: Talk の「公式トーク履歴エクスポート → line_export_to_yoritoori.py」で取れた本文と、CHRLINE の取得は別物。以前「本文まで取れていた」が公式 TXT 経由なら仕様どおり。
+   - CHRLINE では getRecentMessagesV2 の Message が to=自分(u)のままだと復号に失敗しやすかったため、取得対象のグループ c mid で to を補正する処理を dump / chrline_sync_to_yoritoori に入れている。
+   - QR で再ログイン直後は端末の E2EE 鍵が新しくなり、**それ以前の keyId で配信されたメッセージ**は復号できないことがある（プレースホルダのまま）。
+   - 切り分け: python chrline_e2ee_key_check_poc.py（サーバー登録 keyId とローカルのずれ）
 
    補助モジュール: chrline_client_utils.py（保存トークン読み込み・クライアント生成）
 
