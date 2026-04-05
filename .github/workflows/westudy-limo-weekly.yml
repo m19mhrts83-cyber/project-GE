@@ -1,3 +1,4 @@
+# project-GE リポジトリ直下に置くこと（215_kamiooya/.github では GitHub に認識されない）
 name: WeStudy Delta Import Weekly
 
 permissions:
@@ -24,10 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      CHATBOT_DIR: C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット
+      CHATBOT_DIR: 215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット
       CHATBOT_OUTPUT_ROOT: ${{ github.workspace }}/_runtime/chatbot
-      CHATBOT_STATE_ROOT: ${{ github.workspace }}/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/state
-      # ランナーには ~/git-repos が無いため、リポジトリルートから明示する
+      CHATBOT_STATE_ROOT: ${{ github.workspace }}/215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/state
       WESTUDY_SCRAPER: ${{ github.workspace }}/ProgramCode/alfred_python/westudy_forum_all.py
       WESTUDY_USER: ${{ secrets.WESTUDY_USER }}
       WESTUDY_PASS: ${{ secrets.WESTUDY_PASS }}
@@ -38,7 +38,6 @@ jobs:
       LIMO_ADMIN_PASSWORD: ${{ secrets.LIMO_ADMIN_PASSWORD }}
       LIMO_APP_EMAIL: ${{ secrets.LIMO_APP_EMAIL }}
       LIMO_APP_PASSWORD: ${{ secrets.LIMO_APP_PASSWORD }}
-      # CI では通知不要
       LIMO_NOTIFY_MACOS: "0"
     steps:
       - name: Checkout
@@ -87,18 +86,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          latest_delta="$(ls -1t "$CHATBOT_OUTPUT_ROOT"/exports/delta_*.csv | head -n 1)"
-          rows="$(python -c "import csv,sys; p=sys.argv[1]; print(sum(1 for _ in csv.DictReader(open(p, newline='', encoding='utf-8-sig', errors='replace'))))" "$latest_delta")"
+          latest_delta=""
+          shopt -s nullglob
+          _deltas=( "$CHATBOT_OUTPUT_ROOT"/exports/delta_*.csv )
+          if ((${#_deltas[@]} > 0)); then
+            latest_delta="$(ls -1t "${_deltas[@]}" | head -n 1)"
+          fi
+          rows=0
+          if [[ -n "$latest_delta" && -f "$latest_delta" ]]; then
+            rows="$(python -c "import csv,sys; p=sys.argv[1]; print(sum(1 for _ in csv.DictReader(open(p, newline='', encoding='utf-8-sig', errors='replace'))))" "$latest_delta")"
+          fi
           echo "delta_file=$latest_delta" >> "$GITHUB_OUTPUT"
           echo "delta_rows=$rows" >> "$GITHUB_OUTPUT"
           {
             echo "### WeStudy weekly result"
-            echo "- delta: \`$latest_delta\`"
-            echo "- rows: \`$rows\`"
-            if [[ "$rows" -eq 0 ]]; then
-              echo "- upload: skipped (差分0件)"
+            if [[ -z "$latest_delta" ]]; then
+              echo "- delta: （ファイルなし・パイプライン未生成または失敗の可能性）"
+              echo "- rows: n/a"
+              echo "- upload: n/a"
             else
-              echo "- upload: executed"
+              echo "- delta: \`$latest_delta\`"
+              echo "- rows: \`$rows\`"
+              if [[ "$rows" -eq 0 ]]; then
+                echo "- upload: skipped (差分0件)"
+              else
+                echo "- upload: executed"
+              fi
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
