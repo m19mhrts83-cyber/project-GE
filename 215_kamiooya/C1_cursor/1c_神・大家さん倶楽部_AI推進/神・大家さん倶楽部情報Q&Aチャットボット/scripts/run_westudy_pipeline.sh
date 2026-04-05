@@ -20,7 +20,12 @@ STATE_DELTA="$CHATBOT_ROOT/state/westudy_comment_ids.json"
 mkdir -p "$RAW_ROOT" "$STATE_SCRAPE" "$CHATBOT_ROOT/state"
 
 SCRAPER="${WESTUDY_SCRAPER:-$HOME/git-repos/ProgramCode/alfred_python/westudy_forum_all.py}"
-PYTHON="${PYTHON:-python3}"
+DEFAULT_PY="$HOME/git-repos/ProgramCode/venv/bin/python"
+if [[ -x "$DEFAULT_PY" ]]; then
+  PYTHON="${PYTHON:-$DEFAULT_PY}"
+else
+  PYTHON="${PYTHON:-python3}"
+fi
 CONVERT="$SCRIPT_DIR/convert_to_admin_csv.py"
 DELTA="$SCRIPT_DIR/build_delta_csv.py"
 
