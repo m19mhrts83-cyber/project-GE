@@ -19,3 +19,6 @@ routes:
     # thread_title_substring: "重要"
     # thread_mids:
     #   - "mxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    # メインタイムラインに現れる threadMid を自動で追記する例:
+    #   chrline_open_chat_to_md.py --discover-thread-mids --auto-append-thread-mids
+    # （--dry-run で YAML 未変更のまま候補確認）
