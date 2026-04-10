@@ -168,10 +168,8 @@ def ensure_chrline_session_before_partner_send() -> None:
     """
     パートナー送信直前に CHRLINE セッションを確保する。
     保存トークンが有効なら即戻る（QRなし）。切れているときだけ requestSQR3 が動く。
-    無効化: --skip-chrline または環境変数 YORITOORI_SKIP_CHRLINE=1
+    呼び出しは main 側で --skip-chrline / YORITOORI_SKIP_CHRLINE を判定済みのときのみ行う。
     """
-    if os.environ.get("YORITOORI_SKIP_CHRLINE", "").strip().lower() in ("1", "true", "yes", "on"):
-        return
     root = _find_repo_root_with_line_poc()
     if not root:
         print(
@@ -718,9 +716,13 @@ def main():
         return
 
     # CHRLINE セッション確認は、Gmail 送信中に QR 認証が割り込むのを避けるため既定OFF。
-    # 必要なときだけ --check-chrline を付ける。強制スキップは --skip-chrline / YORITOORI_SKIP_CHRLINE=1。
-    effective_check_chrline = (not args.skip_chrline) and args.check_chrline
-    if effective_check_chrline:
+    # 必要なときだけ --check-chrline。強制スキップは --skip-chrline または YORITOORI_SKIP_CHRLINE=1（ここで判定）。
+    want_chrline_check = (
+        (not args.skip_chrline)
+        and args.check_chrline
+        and not _truthy_env("YORITOORI_SKIP_CHRLINE")
+    )
+    if want_chrline_check:
         ensure_chrline_session_before_partner_send()
 
     if chosen_via == "gmail":
