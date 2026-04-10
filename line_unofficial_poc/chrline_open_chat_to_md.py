@@ -6,6 +6,8 @@ LINE オープンチャット（Square）差分を Markdown に追記する。
 - 対応: メインタイムライン + 参加中スレッド
 - 状態: LINE_UNOFFICIAL_AUTH_DIR/.chrline_open_chat_state.json
 - 重複排除: LINE_UNOFFICIAL_AUTH_DIR/.chrline_open_chat_dedup.json
+- スレッド MID 補助: --discover-thread-mids でメインタイムラインのイベントから threadMid 候補を集計し、
+  --auto-append-thread-mids で open_chat_routes.yaml の thread_mids に追記（--dry-run 時は YAML も未変更）
 """
 from __future__ import annotations
 
@@ -14,6 +16,7 @@ import hashlib
 import json
 import os
 import sys
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -409,6 +412,90 @@ def _dedup_key(stream_key: str, msg_id: str, ts: int, body: str) -> str:
     return f"{stream_key}|ts:{ts}|h:{h}"
 
 
+def _is_chat_mid(s: str) -> bool:
+    """chrline_list_open_chats_poc と同基準（スレッド / チャット MID の粗い判定）。"""
+    return len(s) >= 24 and s[:1] in {"m", "c"}
+
+
+def _extract_thread_mids_from_event(ev: Any, square_chat_mid: str) -> set[str]:
+    """
+    メインタイムラインのイベントから、スレッド MID 候補を抽出する。
+    square_chat_mid 自身（メインチャット）と同一の値は除外。
+    """
+    out: set[str] = set()
+    sq = (square_chat_mid or "").strip()
+    for d in _iter_dicts(ev):
+        for key in (
+            "squareChatThreadMid",
+            "threadMid",
+            "chatThreadMid",
+            "squareThreadMid",
+        ):
+            v = d.get(key)
+            if isinstance(v, str):
+                t = v.strip()
+                if t and t != sq and _is_chat_mid(t):
+                    out.add(t)
+        # thrift フィールド番号（thread 系でよく使われる 1〜3）
+        for fid in (1, 2, 3):
+            if fid not in d:
+                continue
+            v = d.get(fid)
+            if not isinstance(v, str):
+                continue
+            t = v.strip()
+            if t and t != sq and _is_chat_mid(t) and len(t) <= 72:
+                out.add(t)
+    return out
+
+
+def _append_thread_mids_to_routes_yaml(
+    routes_yaml: Path,
+    route_id_to_new_mids: dict[str, list[str]],
+) -> int:
+    """
+    routes の各 id に対し thread_mids を重複なく追記する。
+    戻り値: 追記した MID の総数（ルート横断で重複する同一文字列は都度カウント）。
+    """
+    try:
+        import yaml
+    except Exception:
+        print("エラー: PyYAML が見つかりません。`pip install pyyaml` を実行してください。", file=sys.stderr)
+        raise SystemExit(1)
+
+    text = routes_yaml.read_text(encoding="utf-8")
+    data = yaml.safe_load(text)
+    if not isinstance(data, dict) or not isinstance(data.get("routes"), list):
+        print(f"エラー: YAML 形式が不正です: {routes_yaml}", file=sys.stderr)
+        raise SystemExit(1)
+
+    appended = 0
+    for row in data["routes"]:
+        if not isinstance(row, dict):
+            continue
+        rid = str(row.get("id") or "").strip()
+        if not rid or rid not in route_id_to_new_mids:
+            continue
+        new_list = route_id_to_new_mids[rid]
+        if not new_list:
+            continue
+        existing = [str(x).strip() for x in (row.get("thread_mids") or []) if str(x).strip()]
+        seen = set(existing)
+        for mid in new_list:
+            if mid in seen:
+                continue
+            existing.append(mid)
+            seen.add(mid)
+            appended += 1
+        row["thread_mids"] = existing
+
+    routes_yaml.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False),
+        encoding="utf-8",
+    )
+    return appended
+
+
 def _resolve_route_chat_mid(cl, route: Route) -> tuple[str, str]:
     if route.square_chat_mid:
         return route.square_chat_mid, ""
@@ -520,7 +607,27 @@ def main() -> int:
     parser.add_argument("--no-main", action="store_true", help="メイン（thread 無し）を同期しない")
     parser.add_argument("--no-threads", action="store_true", help="スレッドを同期しない")
     parser.add_argument("--include-empty", action="store_true", help="本文なしメッセージも追記する（既定はスキップ）")
+    parser.add_argument(
+        "--discover-thread-mids",
+        action="store_true",
+        help="メインタイムラインのイベントからスレッド MID 候補を集計する（--min-hit-count でしきい値）",
+    )
+    parser.add_argument(
+        "--auto-append-thread-mids",
+        action="store_true",
+        help="集計した新規 MID を routes YAML の thread_mids に追記する（--dry-run 時は YAML も未変更）",
+    )
+    parser.add_argument(
+        "--min-hit-count",
+        type=int,
+        default=1,
+        metavar="N",
+        help="候補 MID を採用する最小ヒット数（既定: 1）",
+    )
     args = parser.parse_args()
+    if args.min_hit_count < 1:
+        print("エラー: --min-hit-count は 1 以上である必要があります。", file=sys.stderr)
+        return 1
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -550,6 +657,7 @@ def main() -> int:
     streams_state = state.setdefault("streams", {})
     seen_dedup = _load_dedup(dedup_path)
     new_dedup: set[str] = set()
+    discover_counts: defaultdict[str, Counter[str]] = defaultdict(Counter)
 
     cl = build_logged_in_client(save_root)
     if not getattr(cl, "can_use_square", False):
@@ -596,6 +704,10 @@ def main() -> int:
             events = _extract_events(cl, res)
             before_appended = appended
             for ev in events:
+                if args.discover_thread_mids and not st.thread_mid:
+                    for tmid in _extract_thread_mids_from_event(ev, st.square_chat_mid):
+                        discover_counts[st.route.rid][tmid] += 1
+
                 msg = _best_message_from_event(cl, ev)
                 if msg is None:
                     continue
@@ -648,6 +760,49 @@ def main() -> int:
                 "sync_token": sync_token or "",
                 "continuation_token": cont_token or "",
             }
+
+    yaml_append_total = 0
+    if args.discover_thread_mids:
+        route_id_to_new: dict[str, list[str]] = {}
+        for route in routes:
+            cnt = discover_counts.get(route.rid) or Counter()
+            existing = set(route.thread_mids)
+            eligible = [
+                tmid
+                for tmid, c in cnt.items()
+                if c >= args.min_hit_count and tmid not in existing
+            ]
+            if eligible:
+                sorted_mids = sorted(eligible, key=lambda m: (-cnt[m], m))
+                route_id_to_new[route.rid] = sorted_mids
+
+        print("# --- thread MID 候補（メインタイムライン由来）---", file=sys.stderr)
+        if args.no_main:
+            print("# 注意: --no-main のためメインを取得しておらず、候補は通常ありません。", file=sys.stderr)
+        for route in routes:
+            cnt = discover_counts.get(route.rid) or Counter()
+            if not cnt:
+                continue
+            existing = set(route.thread_mids)
+            print(f"# route={route.rid} ({route.org_label})", file=sys.stderr)
+            for tmid, c in sorted(cnt.items(), key=lambda x: (-x[1], x[0])):
+                if c < args.min_hit_count:
+                    tag = f"hits={c}（min {args.min_hit_count} 未満）"
+                elif tmid in existing:
+                    tag = f"hits={c} 既登録"
+                else:
+                    tag = f"hits={c} 新規"
+                print(f"#   {tag} mid={tmid}", file=sys.stderr)
+
+        if args.auto_append_thread_mids:
+            if args.dry_run:
+                n = sum(len(v) for v in route_id_to_new.values())
+                print(f"# [dry-run] open_chat_routes.yaml に thread_mids を {n} 件追記する予定", file=sys.stderr)
+            elif route_id_to_new:
+                yaml_append_total = _append_thread_mids_to_routes_yaml(routes_yaml, route_id_to_new)
+                print(f"# open_chat_routes.yaml thread_mids 追記: {yaml_append_total} 件", file=sys.stderr)
+            else:
+                print("# open_chat_routes.yaml 追記: 新規 MID なし（既登録・しきい値・候補なし）", file=sys.stderr)
 
     if new_dedup and not args.dry_run:
         _save_dedup(dedup_path, seen_dedup)
