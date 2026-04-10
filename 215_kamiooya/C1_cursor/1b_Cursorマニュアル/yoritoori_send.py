@@ -18,10 +18,12 @@
   python yoritoori_send.py --partner LEAF --via imessage
   python yoritoori_send.py --partner 立木 --dry-run
   python yoritoori_send.py --partner LEAF --via imessage --skip-confirm
-  python yoritoori_send.py --partner ミニテック --skip-chrline   # 送信前の CHRLINE 確認を省略
+  python yoritoori_send.py --partner ミニテック --check-chrline   # 送信前の CHRLINE セッション確認を実施（必要時のみ）
 
-  送信が確定した直後（確認プロンプト承認後）、既定で CHRLINE のセッションを軽く確認する。
-  保存トークンが有効なら QR は出ない。切れているときだけこのタイミングで QR 再認証が始まる。
+  送信が確定した直後（確認プロンプト承認後）、既定では CHRLINE のセッション確認は行わない。
+  LINE の QR 認証が Gmail 送信中に割り込むのを避けるため、必要なときだけ --check-chrline を付ける。
+  （保存トークンが有効なら QR は出ないが、切れていると QR 再認証が始まるため）
+  無効化（常にスキップ）: --skip-chrline または環境変数 YORITOORI_SKIP_CHRLINE=1
 """
 
 import argparse
@@ -204,6 +206,10 @@ def ensure_chrline_session_before_partner_send() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 credentials_path = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", CREDENTIALS_PATH))
@@ -613,9 +619,14 @@ def main():
     parser.add_argument("--skip-confirm", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
+        "--check-chrline",
+        action="store_true",
+        help="送信前に CHRLINE セッションを確認する（保存トークン無効だと QR 認証が走るため、必要時のみ推奨）",
+    )
+    parser.add_argument(
         "--skip-chrline",
         action="store_true",
-        help="送信前の CHRLINE セッション確認・再ログインをしない（既定は実施）",
+        help="送信前の CHRLINE セッション確認・再ログインをしない（既定でも実施しないが、明示スキップしたい場合用）",
     )
     parser.add_argument("--move-attachments-only", action="store_true")
     args = parser.parse_args()
@@ -706,7 +717,10 @@ def main():
     ):
         return
 
-    if not args.skip_chrline:
+    # CHRLINE セッション確認は、Gmail 送信中に QR 認証が割り込むのを避けるため既定OFF。
+    # 必要なときだけ --check-chrline を付ける。強制スキップは --skip-chrline / YORITOORI_SKIP_CHRLINE=1。
+    effective_check_chrline = (not args.skip_chrline) and args.check_chrline
+    if effective_check_chrline:
         ensure_chrline_session_before_partner_send()
 
     if chosen_via == "gmail":
