@@ -1,0 +1,29 @@
+{
+  "_comment": "amex_himoku_rules.json のひな形。amex_7月 相当のパターンのみ例示。足すたびにここを正本に追記。",
+  "exclude_row_substrings": [
+    "前回分口座振替"
+  ],
+  "himoku_rules": [
+    { "contains": "富士山マガジン", "himoku": "08_新聞図書費" },
+    { "contains": "エキスパ", "himoku": "08_研修費" },
+    { "contains": "イケア", "himoku": "08_消耗品費" },
+    { "contains": "PAYPAL *SAQ LIFE", "himoku": "08_研修費" },
+    { "contains": "ニトリネット", "himoku": "08_消耗品費" },
+    { "contains": "ニトリ", "himoku": "08_消耗品費" },
+    { "contains": "TEMU", "himoku": "08_消耗品費" },
+    { "contains": "カインズ", "himoku": "08_消耗品費" },
+    { "contains": "WORKSTYLE EVOLUTION", "himoku": "08_研修費" },
+    { "contains": "Workstyle", "himoku": "08_研修費" },
+    { "contains": "ラクスル", "himoku": "08_消耗品費" },
+    { "contains": "LEMSQZY", "himoku": "08_諸会費" },
+    { "contains": "OPENAI *CHATGPT", "himoku": "08_諸会費" },
+    { "contains": "NOTION LABS", "himoku": "08_諸会費" },
+    { "contains": "CURSOR, AI POWERED", "himoku": "08_諸会費" },
+    { "contains": "CHATWORK BUSINESS PLAN", "himoku": "08_諸会費" },
+    { "contains": "基本カード年会費", "himoku": "08_諸会費" },
+    { "contains": "弥生株式会社", "himoku": "08_諸会費" },
+    { "contains": "TYPELESS", "himoku": "08_諸会費" },
+    { "contains": "CURSOR USAGE", "himoku": "08_諸会費" },
+    { "contains": "消費税", "himoku": "08_諸会費" }
+  ]
+}

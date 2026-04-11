@@ -1,0 +1,2 @@
+# tax_docs_tools（pip install -r requirements.txt）
+pypdf>=4.0
