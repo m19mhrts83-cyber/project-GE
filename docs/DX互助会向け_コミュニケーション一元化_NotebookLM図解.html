@@ -76,28 +76,16 @@
       border-radius: 8px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.45);
     }
-    .pdf-wrap {
-      width: min(100%, 1200px);
-      flex: 1;
-      min-height: min(75vh, 640px);
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .pdf-wrap iframe {
-      flex: 1;
-      min-height: min(70vh, 600px);
-      width: 100%;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      background: #161b22;
-    }
-    .pdf-links {
-      font-size: 0.88rem;
-      line-height: 1.6;
+    .pdf-note {
+      margin: 0.5rem 0 0;
+      font-size: 0.82rem;
+      line-height: 1.5;
       color: #8b949e;
+      align-self: flex-start;
+      max-width: min(100%, 1200px);
+      width: 100%;
     }
-    .pdf-links a { color: #58a6ff; }
+    .pdf-note a { color: #58a6ff; }
     .hint {
       position: fixed;
       z-index: 19;
@@ -115,7 +103,7 @@
 <body>
   <div class="toolbar">
     <span><a href="3kai.html">← 第3回一覧</a></span>
-    <span class="mid" id="indicator">1 / 3 · First</span>
+    <span class="mid" id="indicator">1 / ? · First</span>
     <div class="btns">
       <button type="button" id="btn-prev" aria-label="前へ">← 前へ</button>
       <button type="button" id="btn-next" aria-label="次へ">次へ →</button>
@@ -123,26 +111,74 @@
   </div>
   <main id="deck" tabindex="-1">
     <section class="slide" id="s1" data-label="First" aria-label="スライド1 First">
-      <h2>1 / 3 — First（全体像・導入）</h2>
+      <h2>First（全体像・導入）</h2>
       <img src="assets/nb_comm_unification/first.png" alt="コミュニケーション一元化の仕組み First（NotebookLM 出力）" width="1920" height="1080" loading="eager">
     </section>
-    <section class="slide" id="s2" data-label="Main（PDF）" aria-label="スライド2 Main">
-      <h2>2 / 3 — Main（PDF）</h2>
-      <div class="pdf-wrap">
-        <iframe
-          title="Main 資料（PDF）"
-          loading="lazy"
-          src="assets/nb_comm_unification/main.pdf#view=FitH">
-        </iframe>
-        <div class="pdf-links">
-          <a href="assets/nb_comm_unification/main.pdf" target="_blank" rel="noopener noreferrer">別タブで全画面表示</a>
-          ／
-          <a href="assets/nb_comm_unification/main.pdf" download>main.pdf をダウンロード</a>
-        </div>
-      </div>
+    <!-- NB_COMM_MAIN_SLIDES_START -->
+    <section class="slide" id="s-m01" data-label="Main 1/15" aria-label="スライド2 Main 1/15">
+      <h2>Main 資料（1 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-01.png" alt="Main 資料 1 ページ目" width="1920" height="1072" loading="lazy">
+      <p class="pdf-note">印刷・オフライン用: <a href="assets/nb_comm_unification/main.pdf" target="_blank" rel="noopener noreferrer">main.pdf を別タブで開く</a> ／ <a href="assets/nb_comm_unification/main.pdf" download>ダウンロード</a></p>
     </section>
-    <section class="slide" id="s3" data-label="Last" aria-label="スライド3 Last">
-      <h2>3 / 3 — Last（まとめ）</h2>
+    <section class="slide" id="s-m02" data-label="Main 2/15" aria-label="スライド3 Main 2/15">
+      <h2>Main 資料（2 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-02.png" alt="Main 資料 2 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m03" data-label="Main 3/15" aria-label="スライド4 Main 3/15">
+      <h2>Main 資料（3 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-03.png" alt="Main 資料 3 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m04" data-label="Main 4/15" aria-label="スライド5 Main 4/15">
+      <h2>Main 資料（4 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-04.png" alt="Main 資料 4 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m05" data-label="Main 5/15" aria-label="スライド6 Main 5/15">
+      <h2>Main 資料（5 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-05.png" alt="Main 資料 5 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m06" data-label="Main 6/15" aria-label="スライド7 Main 6/15">
+      <h2>Main 資料（6 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-06.png" alt="Main 資料 6 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m07" data-label="Main 7/15" aria-label="スライド8 Main 7/15">
+      <h2>Main 資料（7 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-07.png" alt="Main 資料 7 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m08" data-label="Main 8/15" aria-label="スライド9 Main 8/15">
+      <h2>Main 資料（8 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-08.png" alt="Main 資料 8 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m09" data-label="Main 9/15" aria-label="スライド10 Main 9/15">
+      <h2>Main 資料（9 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-09.png" alt="Main 資料 9 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m10" data-label="Main 10/15" aria-label="スライド11 Main 10/15">
+      <h2>Main 資料（10 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-10.png" alt="Main 資料 10 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m11" data-label="Main 11/15" aria-label="スライド12 Main 11/15">
+      <h2>Main 資料（11 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-11.png" alt="Main 資料 11 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m12" data-label="Main 12/15" aria-label="スライド13 Main 12/15">
+      <h2>Main 資料（12 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-12.png" alt="Main 資料 12 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m13" data-label="Main 13/15" aria-label="スライド14 Main 13/15">
+      <h2>Main 資料（13 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-13.png" alt="Main 資料 13 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m14" data-label="Main 14/15" aria-label="スライド15 Main 14/15">
+      <h2>Main 資料（14 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-14.png" alt="Main 資料 14 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <section class="slide" id="s-m15" data-label="Main 15/15" aria-label="スライド16 Main 15/15">
+      <h2>Main 資料（15 / 15）</h2>
+      <img src="assets/nb_comm_unification/main-15.png" alt="Main 資料 15 ページ目" width="1920" height="1072" loading="lazy">
+    </section>
+    <!-- NB_COMM_MAIN_SLIDES_END -->
+    <section class="slide" id="s-last" data-label="Last" aria-label="最終スライド Last">
+      <h2>Last（まとめ）</h2>
       <img src="assets/nb_comm_unification/last.png" alt="コミュニケーション一元化の仕組み Last（NotebookLM 出力）" width="1920" height="1080" loading="lazy">
     </section>
   </main>
