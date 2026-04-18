@@ -10,6 +10,9 @@ chrline_qr_login_poc 成功後に persist_auth_token を呼ぶ。
     未設定時は自動表示しない（ターミナルに IMG: パスが出るので、必要なら手動で開く）。
     LINE 側がセッションを切ったときの QR 認証そのものは非公式 API の制約で省略できない。
 
+  build_logged_in_client の allow_qr_login … 既定は False（バックグラウンド・ヘルスチェックで QR が頻発しないようにする）。
+    取り込み確認など対話で再ログインしたいときは、各スクリプトの --allow-qr-login を付ける。
+
   LINE_UNOFFICIAL_AUTH_DIR … 未設定時は line_unofficial_poc 直下の .line_auth_local（ローカル固定・Git 対象外）。
     クラウド同期パスを明示指定した場合は警告を出す。
 """
@@ -38,26 +41,34 @@ load_dotenv(ROOT / ".env")
 
 def cleanup_chrline_qr_images(save_root: Path) -> None:
     """
-    CHRLINE が savePath/.images に保存する qr_*.png を削除する（容量用）。
-    認証完了後・各実行の最初でも呼ぶ。
+    CHRLINE が savePath/.images に保存する qr_*.png を整理する（容量用）。
+    - 既定: 最新 1 枚だけ残し、古いものを削除
+    - 画像が 0 枚ならディレクトリも削除
     """
     d = save_root / ".images"
     if not d.is_dir():
         return
-    for f in d.glob("qr_*.png"):
+    files = [f for f in d.glob("qr_*.png") if f.is_file()]
+    if not files:
+        try:
+            next(d.iterdir())
+        except StopIteration:
+            try:
+                d.rmdir()
+            except OSError:
+                pass
+        except OSError:
+            pass
+        return
+
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    keep = files[0]
+    for f in files[1:]:
         try:
             f.unlink()
         except OSError:
             pass
-    try:
-        next(d.iterdir())
-    except StopIteration:
-        try:
-            d.rmdir()
-        except OSError:
-            pass
-    except OSError:
-        pass
+    # keep があるため .images は消さない（ユーザーが後で開けるように）
 
 
 def save_root_from_env() -> Path:
@@ -173,8 +184,8 @@ def load_saved_tokens_newest_first(save_root: Path) -> list[str]:
     return out
 
 
-def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = True):
-    """保存済み authToken で CHRLINE を初期化。失効時は必要なら QR 再認証で復旧する。"""
+def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
+    """保存済み authToken で CHRLINE を初期化。失効時、allow_qr_login=True のときだけ QR 再認証に進む。"""
     from CHRLINE import CHRLINE
 
     cl = try_client_from_saved_tokens_only(save_root)
@@ -184,7 +195,8 @@ def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = True):
     if not allow_qr_login:
         print(
             "保存トークンが無効です。QR再認証は許可されていないため終了します。"
-            "（明示実行時のみ allow_qr_login=True で再実行してください）",
+            "（取り込み確認などで再ログインするときは、当該スクリプトに --allow-qr-login を付けて実行するか、"
+            "chrline_qr_login_poc.py でトークンを保存してから再実行してください。）",
             file=sys.stderr,
         )
         sys.exit(2)

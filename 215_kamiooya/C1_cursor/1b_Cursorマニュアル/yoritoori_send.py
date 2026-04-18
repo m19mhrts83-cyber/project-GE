@@ -167,7 +167,7 @@ def _find_repo_root_with_line_poc() -> Optional[Path]:
 def ensure_chrline_session_before_partner_send() -> None:
     """
     パートナー送信直前に CHRLINE セッションを確保する。
-    保存トークンが有効なら即戻る（QRなし）。切れているときだけ requestSQR3 が動く。
+    保存トークンが有効なら即戻る。無効なら subprocess 内で終了（QR は出さない。chrline_qr_login_poc で別途ログイン）。
     呼び出しは main 側で --skip-chrline / YORITOORI_SKIP_CHRLINE を判定済みのときのみ行う。
     """
     root = _find_repo_root_with_line_poc()
@@ -188,7 +188,7 @@ def ensure_chrline_session_before_partner_send() -> None:
     code = (
         "from chrline_client_utils import save_root_from_env, build_logged_in_client\n"
         "p = save_root_from_env()\n"
-        "build_logged_in_client(p)\n"
+        "build_logged_in_client(p, allow_qr_login=False)\n"
         "print('[CHRLINE] セッション利用可能')\n"
     )
     r = subprocess.run(
@@ -619,7 +619,7 @@ def main():
     parser.add_argument(
         "--check-chrline",
         action="store_true",
-        help="送信前に CHRLINE セッションを確認する（保存トークン無効だと QR 認証が走るため、必要時のみ推奨）",
+        help="送信前に CHRLINE セッションを確認する（トークン無効時は失敗終了。QR は出さない）",
     )
     parser.add_argument(
         "--skip-chrline",

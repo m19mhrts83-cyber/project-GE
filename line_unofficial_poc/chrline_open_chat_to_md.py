@@ -8,6 +8,7 @@ LINE オープンチャット（Square）差分を Markdown に追記する。
 - 重複排除: LINE_UNOFFICIAL_AUTH_DIR/.chrline_open_chat_dedup.json
 - スレッド MID 補助: --discover-thread-mids でメインタイムラインのイベントから threadMid 候補を集計し、
   --auto-append-thread-mids で open_chat_routes.yaml の thread_mids に追記（--dry-run 時は YAML も未変更）
+- 再ログイン: 保存トークン失効時に QR を出すのは --allow-qr-login のときだけ（取り込み確認で意図したときに付与）
 """
 from __future__ import annotations
 
@@ -603,6 +604,11 @@ def main() -> int:
     parser.add_argument("--max-pages-per-stream", type=int, default=20, help="1ストリームあたりの最大ページ数")
     parser.add_argument("--init", action="store_true", help="保存済み sync_token/continuation を使わず初回取得として開始")
     parser.add_argument("--dry-run", action="store_true", help="MD/state/dedup を更新しない")
+    parser.add_argument(
+        "--allow-qr-login",
+        action="store_true",
+        help="保存トークン無効時に QR 再認証を許可する（取り込み確認で再ログインするときのみ推奨）",
+    )
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--no-main", action="store_true", help="メイン（thread 無し）を同期しない")
     parser.add_argument("--no-threads", action="store_true", help="スレッドを同期しない")
@@ -659,7 +665,7 @@ def main() -> int:
     new_dedup: set[str] = set()
     discover_counts: defaultdict[str, Counter[str]] = defaultdict(Counter)
 
-    cl = build_logged_in_client(save_root)
+    cl = build_logged_in_client(save_root, allow_qr_login=bool(args.allow_qr_login))
     if not getattr(cl, "can_use_square", False):
         print("エラー: Square(オープンチャット) API が利用できません。", file=sys.stderr)
         return 1

@@ -914,13 +914,18 @@ def main() -> int:
         action="store_true",
         help="tryRegisterE2EEGroupKey を呼ばない（サーバー側キー登録の副作用を避ける）",
     )
+    parser.add_argument(
+        "--allow-qr-login",
+        action="store_true",
+        help="保存トークン無効時に QR 再認証を許可する",
+    )
     args = parser.parse_args()
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
     save_root = save_root_from_env()
-    cl = build_logged_in_client(save_root)
+    cl = build_logged_in_client(save_root, allow_qr_login=bool(args.allow_qr_login))
 
     mid = _resolve_chat_mid(
         cl,

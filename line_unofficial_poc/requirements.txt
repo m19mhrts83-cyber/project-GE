@@ -5,5 +5,9 @@ PyYAML>=6.0
 httpx>=0.27.0
 python-dotenv>=1.0.0
 
+# QR 画像生成（URL しか出ないケースの救済）
+qrcode>=7.4.2
+Pillow>=10.0.0
+
 # CHRLINE は setup_phase_b_mac.sh で CHRLINE==2.5.14 を入れる（mac + curve25519 パッチ）。
 # QR ログインが 403 になる場合は ./install_chrline_patchv2_mac.sh（CHRLINE-PatchV2 / 2.6.x）を試す。
