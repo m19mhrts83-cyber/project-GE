@@ -83,13 +83,18 @@ def main() -> int:
         default=30,
         help="getChats 呼び出しごとの mid 数（既定 30）",
     )
+    parser.add_argument(
+        "--allow-qr-login",
+        action="store_true",
+        help="保存トークン無効時に QR 再認証を許可する",
+    )
     args = parser.parse_args()
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
     save_root = save_root_from_env()
-    cl = build_logged_in_client(save_root)
+    cl = build_logged_in_client(save_root, allow_qr_login=bool(args.allow_qr_login))
 
     mids = _iter_group_mids(cl)
     if not mids:

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.akatsuki.bond.balance.check</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/Users/matsunomasaharu/git-repos/ProgramCode/venv/bin/python</string>
+      <string>/Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/finance/run_scheduled_akatsuki_balance_check.py</string>
+      <string>--headless</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/finance</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Hour</key>
+      <integer>8</integer>
+      <key>Minute</key>
+      <integer>30</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/akatsuki_bond_balance.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/akatsuki_bond_balance.err.log</string>
+  </dict>
+</plist>

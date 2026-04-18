@@ -1,0 +1,694 @@
+<!DOCTYPE html><html lang="ja"><head>
+  <meta charset="utf-8">
+  <title>預り資産</title>
+
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="stylesheet" href="https://cts-akatsuki-sec.starmf.jp/mf_contents/web/css/rwd.css?ver=202602.0.9">
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/mf_contents/web/ico/apple-touch-icon-144-precomposed.png?ver=202602.0.9">
+<link rel="apple-touch-icon-precomposed" sizes="114x114" href="/mf_contents/web/ico/apple-touch-icon-114-precomposed.png?ver=202602.0.9">
+<link rel="apple-touch-icon-precomposed" sizes="72x72" href="/mf_contents/web/ico/apple-touch-icon-72-precomposed.png?ver=202602.0.9">
+<link rel="apple-touch-icon-precomposed" href="/mf_contents/web/ico/apple-touch-icon-57-precomposed.png?ver=202602.0.9">
+<link rel="shortcut icon" href="/mf_contents/web/ico/favicon.ico?ver=202602.0.9">
+
+
+
+
+
+
+</head>
+
+<body>
+  <noscript>
+    <div class="box-noscript"><p>JavaScriptを有効にしてください。</p></div>
+  </noscript>
+  <div class="container">
+    
+
+
+
+
+
+
+    <header role="banner">
+<div class="container">
+<div class="row">
+<div class="col-8 col-sd-20">
+<h1 class="siteid"><img src="https://cts-akatsuki-sec.starmf.jp/user_contents/cms/web/htmlparts/edd/logo.png?ver=1488_2026041520" width="306" height="70" alt="残高照会サービス"></h1>
+</div>
+<div class="col-16 col-sd-4 head-exp">
+<a href="#main" class="reading-hide">メインコンテンツにページ内を移動します。</a>
+<ul class="nav-sprt"><li><a href="rmfCmnCauSysLgoAction.do" class="btn btn-base btn-hd-logout" data-icon="">ログアウト</a></li>
+</ul>
+</div>
+</div>
+</div>
+</header>
+
+
+
+
+
+
+
+    <nav role="navigation" class="row mega" style="z-index: 200;">
+  <div class="container">
+    <ul class="nav nav-menu">
+      <li class="nav-main nav-home js-nav-link">
+        <p class="nav-tab">
+          <a href="rmfCmnEtcInvTopAction.do" class="  "><span class="reading-hide">トップ</span></a></p>
+        </li>
+      <li class="nav-main nav-assets">
+        <p class="nav-tab">
+          <a href="#nav-contents01" class="  nav-current">お預り資産</a></p>
+        <div class="nav-sub row" id="nav-contents01">
+            <p class="nav-close-btn-small">
+              <button type="button">閉じる</button></p>
+            <dl class="nav-sub-group col-24">
+              <dt>お預り資産</dt>
+              <dd>
+                <ul class="nav-list-outer">
+                  <li><a href="rmfAstAdpAdpLstSummaryAction.do" class="">預り資産</a></li>
+                  <li><a href="rmfAstInvTtrLstInitAction.do" class="">投資信託の運用損益</a></li>
+                  </ul>
+              </dd>
+              </dl>
+            <div class="col-24 nav-close-btn align-c">
+              <button type="button" class="btn-base grid-8 grid-sd-20">閉じる</button>
+            </div>
+            </div>
+        </li>
+      <li class="nav-main nav-trade">
+        <p class="nav-tab">
+          <a href="#nav-contents02" class="  ">過去の<br class="visible-sd">お取引</a></p>
+        <div class="nav-sub row" id="nav-contents02">
+            <p class="nav-close-btn-small">
+              <button type="button">閉じる</button></p>
+            <dl class="nav-sub-group col-24">
+              <dt>過去のお取引</dt>
+              <dd>
+                <ul class="nav-list-outer">
+                  <li><a href="rmfAstTrhTrhLstInitAction.do" class="">取引履歴</a></li>
+                  <li><a href="rmfAstTrhCpgHisInitAction.do" class="">特定口座譲渡益税</a></li>
+                  <li><a href="rmfAstTrhDvdHisInitAction.do" class="">特定口座配当等</a></li>
+                  </ul>
+              </dd>
+              </dl>
+            <div class="col-24 nav-close-btn align-c">
+              <button type="button" class="btn-base grid-8 grid-sd-20">閉じる</button>
+            </div>
+            </div>
+        </li>
+      <li class="nav-main nav-dashboard">
+        <p class="nav-tab">
+          <a href="#nav-contents03" class="  ">お客様情報</a></p>
+        <div class="nav-sub row" id="nav-contents03">
+            <p class="nav-close-btn-small">
+              <button type="button">閉じる</button></p>
+            <dl class="nav-sub-group col-24">
+              <dt>口座情報</dt>
+              <dd>
+                <ul class="nav-list-outer">
+                  <li><a href="rmfActCusRgiRefListAction.do" class="">登録情報照会</a></li>
+                  <li><a href="rmfActCusEmlRefAction.do" class="">Eメールアドレス登録照会</a></li>
+                  <li><a href="rmfActCusTpcLstAction.do" class="">お知らせ照会</a></li>
+                  <li><a href="rmfActCusMsgLstInitAction.do" class="">メッセージ照会</a></li>
+                  <li><a href="rmfCmnCauSsoEtdDpfAction.do" class="apl-js-showsubwindow data-windowname:mf_RmfCmnCauSsoEtdDpf_RmfCmnCauSsoEtdDpfAction,data-windowsize:880|700" target="_blank" title="新規ウィンドウを開く">電子交付<i class="ico-squares"></i></a></li>
+                  </ul>
+              </dd>
+              </dl>
+            <div class="col-24 nav-close-btn align-c">
+              <button type="button" class="btn-base grid-8 grid-sd-20">閉じる</button>
+            </div>
+            </div>
+        </li>
+      <li class="nav-main nav-document js-nav-link ">
+        <p class="nav-tab">
+          <a href="rmfCmnCauSsoEtdDpfAction.do" class=" apl-js-showsubwindow data-windowname:mf_RmfCmnCauSsoEtdDpf_RmfCmnCauSsoEtdDpfAction,data-windowsize:880|700 " target="_blank" title="新規ウィンドウを開く">電子交付</a></p>
+        </li>
+      </ul>
+  </div>
+<p class="megaModal"></p></nav>
+
+
+
+
+
+
+<div class="contents">
+      <main role="main" id="main">
+        <div class="container">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    <div class="row">
+  <div class="col-18">
+    <p class="customer">松野　真治<span>様</span></p>
+  </div>
+  <div class="col-6">
+      <p class="login-date align-r">2026/04/15</p>
+    </div>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div class="ttl-head-area ">
+<h1>預り資産</h1>
+<div class="ttl-head-extra">
+<p>
+<a href="https://cts-akatsuki-sec.starmf.jp/user_contents/user/web/html/rmfastadpadplst.html" title="ヘルプを見る" target="_blank" class="btn-base btn-small btn-help hidden-sd apl-popupwin" data-windowname="help_Rmf" data-windowsize="880|700"><i class="ico-help-circled"></i></a><a href="https://cts-akatsuki-sec.starmf.jp/user_contents/user/web/html/rmfastadpadplst.html" title="ヘルプを見る" target="_blank" class="btn-base btn-small btn-help visible-sd apl-popupwin" data-windowname="help_Rmf" data-windowsize="880|700"><i class="ico-help-circled"></i></a></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    <div id="tiles.RmfAstAdpAdpLstSummary">
+  <ul class="inline-btn align-r align-sd-c">
+        <li><a href="rmfAstAdpAdpLstSummaryPrintAction.do?kzKkKbn=" title="新規ウィンドウを開く" target="_blank" class="btn-base grid-6 grid-sd-19 apl-popupwin" data-windowname="mf_RmfAstAdpAdpLstSummary_RmfAstAdpAdpLstSummaryPrintAction" data-windowsize="880|700"><i class="ico-print-1"></i>印刷用画面を表示</a></li>
+        <li><a href="rmfAstAdpAdpLstSummaryCsvDownAction.do?kzKkKbn=" class="btn-base grid-6 grid-sd-19"><i class="ico-download"></i>CSVダウンロード</a></li>
+      </ul>
+    <h2 class="ttl-lvl-2">保有資産評価</h2>
+      <ul class="disc">
+       <li class="ico-disclaimer" data-icon="">保有資産合計は前営業日約定基準で表示されます。</li>
+            <li class="ico-disclaimer" data-icon="">信用建玉の評価損益は諸経費が含まれておりません。</li>
+            <li class="ico-disclaimer" data-icon="">一部評価できない銘柄があり、そのような銘柄は評価額に含まれておりません。</li>
+            </ul>
+      <div class="row">
+        <div class="col-12 col-sd-24">
+          <h3 class="ttl-lvl-3 ttl-m-top-non-ld">保有資産評価合計</h3>
+        </div>
+        <div class="col-12 col-sd-24 align-r">
+          <p>［2026/04/14基準］</p>
+        </div>
+      </div>
+      <div class="hidden-sd">
+        <table class="table grid-24 js-set-balloon" data-balloon="balloon_hysshkgoukei_block">
+          <caption class="reading-hide">保有資産の一覧表です。</caption>
+          <thead>
+            <tr>
+              <th scope="col" class="grid-8">商品分類</th>
+              <th scope="col" class="grid-8">評価額</th>
+              <th scope="col" class="grid-8">評価損益</th>
+            </tr>
+          </thead>
+          <tbody class="list">
+            <tr>
+              <th scope="row" class="ttl-row ttl-row-pt2 nav-anchor"><a href="#mrf"><i class="ico-down-open-mini"></i>MRF/お預り金等</a></th>
+              <td class="txt-num">0円</td>
+              <td class="txt-num">--</td>
+            </tr>
+            <tr>
+                <th scope="row" class="ttl-row ttl-row-pt2 nav-anchor"><a href="#domestic-stock"><i class="ico-down-open-mini"></i>国内株式</a></th>
+                <td class="txt-num">0円</td>
+                <td class="txt-num"><span class="">0</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="ttl-row ttl-row-pt2 nav-anchor"><a href="#domestic-bond"><i class="ico-down-open-mini"></i>国内債券</a></th>
+                <td class="txt-num">0円</td>
+                <td class="txt-num"><span class="">0</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="ttl-row ttl-row-pt2 nav-anchor"><a href="#domestic-trust"><i class="ico-down-open-mini"></i>国内投信</a></th>
+                <td class="txt-num">0円</td>
+                <td class="txt-num"><span class="">0</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="ttl-row ttl-row-pt2 nav-anchor"><a href="#foreign-stock"><i class="ico-down-open-mini"></i>外国株式</a></th>
+                <td class="txt-num">0円</td>
+                <td class="txt-num"><span class="">0</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="ttl-row ttl-row-pt2 nav-anchor"><a href="#foreign-bond"><i class="ico-down-open-mini"></i>外国債券</a></th>
+                <td class="txt-num">7,414,817円</td>
+                <td class="txt-num"><span class="up">+148,113</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="ttl-row ttl-row-pt2 nav-anchor"><a href="#foreign-trust"><i class="ico-down-open-mini"></i>外国投信</a></th>
+                <td class="txt-num">0円</td>
+                <td class="txt-num"><span class="">0</span>円</td>
+              </tr>
+            <tr class="cell-highlight-summary">
+              <th scope="row" class="ttl-row">合計</th>
+              <td class="txt-num">7,414,817円</td>
+              <td class="txt-num"><span class="up">+148,113</span>円</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="visible-sd">
+        <table class="table table-transform grid-24 js-set-balloon" data-balloon="balloon_hysshkgoukei_block">
+          <caption class="reading-hide">保有資産の一覧表です。</caption>
+          <thead>
+            <tr>
+              <th scope="col">商品分類</th>
+              <th scope="col">評価額</th>
+              <th scope="col">評価損益</th>
+            </tr>
+          </thead>
+          <tbody class="list">
+            <tr>
+              <th scope="row" class="col-head-sd nav-anchor"><a href="#mrf"><i class="ico-down-open-mini"></i>MRF/お預り金等</a></th>
+              <td class="txt-num" data-title="評価額">0円</td>
+              <td class="txt-num" data-title="評価損益">--</td>
+            </tr>
+            <tr>
+                <th scope="row" class="col-head-sd nav-anchor"><a href="#domestic-stock"><i class="ico-down-open-mini"></i>国内株式</a></th>
+                <td class="txt-num" data-title="評価額">0円</td>
+                <td class="txt-num" data-title="評価損益"><span class="">0</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="col-head-sd nav-anchor"><a href="#domestic-bond"><i class="ico-down-open-mini"></i>国内債券</a></th>
+                <td class="txt-num" data-title="評価額">0円</td>
+                <td class="txt-num" data-title="評価損益"><span class="">0</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="col-head-sd nav-anchor"><a href="#domestic-trust"><i class="ico-down-open-mini"></i>国内投信</a></th>
+                <td class="txt-num" data-title="評価額">0円</td>
+                <td class="txt-num" data-title="評価損益"><span class="">0</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="col-head-sd nav-anchor"><a href="#foreign-stock"><i class="ico-down-open-mini"></i>外国株式</a></th>
+                <td class="txt-num" data-title="評価額">0円</td>
+                <td class="txt-num" data-title="評価損益"><span class="">0</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="col-head-sd nav-anchor"><a href="#foreign-bond"><i class="ico-down-open-mini"></i>外国債券</a></th>
+                <td class="txt-num" data-title="評価額">7,414,817円</td>
+                <td class="txt-num" data-title="評価損益"><span class="up">+148,113</span>円</td>
+              </tr>
+            <tr>
+                <th scope="row" class="col-head-sd nav-anchor"><a href="#foreign-trust"><i class="ico-down-open-mini"></i>外国投信</a></th>
+                <td class="txt-num" data-title="評価額">0円</td>
+                <td class="txt-num" data-title="評価損益"><span class="">0</span>円</td>
+              </tr>
+            </tbody>
+        </table>
+        <table class="table grid-24 js-set-balloon" data-balloon="balloon_hysshkgoukeigoukei_block">
+          <caption class="reading-hide">保有資産の評価合計です。</caption>
+          <tbody>
+            <tr>
+              <th scope="row" class="ttl-row grid-8 grid-sd-10">評価額合計</th>
+              <td class="txt-num">7,414,817円</td>
+            </tr>
+            <tr>
+              <th scope="row" class="ttl-row">評価損益合計</th>
+              <td class="txt-num"><span class="up">+148,113</span>円</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="anchor-pt" id="tab-list">
+      <h2 class="ttl-lvl-2">預り金・預り証券</h2>
+      <ul class="tab-list">
+        <li><a class="tab-active">まとめて表示</a></li>
+        </ul>
+    </div>
+    <ul class="disc">
+       <li class="ico-disclaimer" data-icon="">現物は銘柄、預り区分で合計、建玉は銘柄、建区分、建市場で合計。</li>
+            <li class="ico-disclaimer" data-icon="">信用建玉の評価損益は諸経費が含まれておりません。</li>
+            <li class="ico-disclaimer" data-icon="">「参考時価」は、前営業日現在の参考時価を表示しています。</li>
+            <li class="ico-disclaimer" data-icon="">「参考時価」は、外貨建て商品の場合は外貨で表示されます。</li>
+            </ul>
+      <div class="box-useful">
+      <ul class="nav nav-anchor list-inline row">
+        <li class="col-6 col-sd-24"><a href="#mrf">MRF/お預り金等</a></li>
+        <li class="col-6 col-sd-12"><a href="#domestic-stock">国内株式</a></li>
+        <li class="col-6 col-sd-12"><a href="#domestic-bond">国内債券</a></li>
+        <li class="col-6 col-sd-12"><a href="#domestic-trust">国内投信</a></li>
+        <li class="col-6 col-sd-12"><a href="#foreign-stock">外国株式</a></li>
+        <li class="col-6 col-sd-12"><a href="#foreign-bond">外国債券</a></li>
+        <li class="col-6 col-sd-12"><a href="#foreign-trust">外国投信</a></li>
+        </ul>
+    </div>
+    <div class="row visible-sd">
+      <div class="col-24">
+        <button type="button" class="switch-toggle grid-6 grid-sd-10 float-r js-disp-switch js-switch-push" title="詳細の表示非表示" data-disp-range="js-disp-range1" data-txt-ishide="詳細を表示" data-txt-nothide="詳細を隠す">詳細を表示</button>
+      </div>
+    </div>
+    <div class="js-disp-range1">
+      <div class="anchor-pt" id="mrf">
+        <h3 class="ttl-lvl-3 ttl-m-top-non-sd">MRF/お預り金等</h3>
+        <div class="hidden-sd">
+          <table class="table grid-24 js-set-balloon" data-balloon="balloon_mrfoakto_block">
+            <caption class="reading-hide">MRF/お預り金等の一覧表です。</caption>
+            <thead class="cell-join">
+              <tr>
+                <th scope="col" rowspan="2" class="txt-nowrap" id="domestic-trad-th1">商品分類</th>
+                <th scope="col" class="ttl-kp-asst ttl-no-line-bottom txt-nowrap grid-6" id="domestic-trad-th2-1">残高</th>
+                <th scope="col" rowspan="2" class="txt-nowrap grid-6" id="domestic-trad-th3">評価額</th>
+                <th scope="col" rowspan="2" class="txt-nowrap grid-6" id="domestic-trad-th4">評価レート</th>
+              </tr>
+              <tr>
+                <th scope="col" class="ttl-kp-asst txt-nowrap" id="domestic-trad-th2-2">（うち未精算金）</th>
+              </tr>
+            </thead>
+            <tbody class="list cell-join">
+              <tr class="stripe-odd">
+                <td rowspan="2" headers="domestic-trad-th1">MRF（口）</td>
+                <td class="txt-num no-line-td-bottom" headers="domestic-trad-th2-1">0口</td>
+                <td rowspan="2" class="txt-num" headers="domestic-trad-th3">0円</td>
+                <td rowspan="2" class="txt-num" headers="domestic-trad-th4">--</td>
+              </tr>
+              <tr class="stripe-odd">
+                <td class="txt-num" headers="domestic-trad-th2-2"></td>
+              </tr>
+              <tr class="stripe-even">
+                <td rowspan="2" headers="domestic-trad-th1">お預り金</td>
+                <td class="txt-num no-line-td-bottom" headers="domestic-trad-th2-1">0円</td>
+                <td rowspan="2" class="txt-num" headers="domestic-trad-th3">0円</td>
+                <td rowspan="2" class="txt-num" headers="domestic-trad-th4">--</td>
+              </tr>
+              <tr class="stripe-even">
+                <td class="txt-num" headers="domestic-trad-th2-2"></td>
+              </tr>
+              </tbody>
+          </table>
+        </div>
+        <div class="visible-sd">
+          <table class="table table-transform grid-24 js-set-balloon" data-balloon="balloon_mrfoakto_block">
+            <caption class="reading-hide">MRF/お預り金等の一覧表です。</caption>
+            <thead>
+              <tr>
+                <th scope="col">商品分類</th>
+                <th scope="col" class="col-split">
+                <p>残高</p>
+                <p>（うち未精算金）</p>
+                </th>
+                <th scope="col">評価額</th>
+                <th scope="col">評価レート</th>
+              </tr>
+            </thead>
+            <tbody class="list">
+              <tr>
+                <th scope="row" class="col-head-sd">MRF（口）</th>
+                <td class="txt-num col-split">
+                  <p data-title="残高">0口</p>
+                  </td>
+                <td class="txt-num" data-title="評価額">0円</td>
+                <td class="txt-num hidden-sd item-initialy-hidden js-disp-item" data-title="評価レート">--</td>
+              </tr>
+              <tr>
+                <th scope="row" class="col-head-sd">お預り金</th>
+                <td class="txt-num col-split">
+                  <p data-title="残高">0円</p>
+                  </td>
+                <td class="txt-num" data-title="評価額">0円</td>
+                <td class="txt-num hidden-sd item-initialy-hidden js-disp-item" data-title="評価レート">--</td>
+              </tr>
+              </tbody>
+          </table>
+        </div>
+        <div class="row">
+          <div class="col-12 float-r">
+            <table class="table grid-24 js-set-balloon" data-balloon="balloon_mrfoaktogoukei_block">
+              <caption class="reading-hide">MRF/お預り金等の評価合計です。</caption>
+              <tbody>
+                <tr>
+                  <th scope="row" class="ttl-row grid-8 grid-sd-10">評価額合計</th>
+                  <td class="txt-num">0円</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        </div>
+      <div class="anchor-pt" id="domestic-stock">
+          <h3 class="ttl-lvl-3">国内株式</h3>
+          <div class="box-search-result">
+              <p>対象明細はありません。</p></div>
+          </div>
+        <div class="anchor-pt" id="domestic-bond">
+          <h3 class="ttl-lvl-3">国内債券</h3>
+          <div class="box-search-result">
+              <p>対象明細はありません。</p></div>
+          </div>
+        <div class="anchor-pt" id="domestic-trust">
+          <h3 class="ttl-lvl-3">国内投信</h3>
+          <div class="box-search-result">
+              <p>対象明細はありません。</p></div>
+          </div>
+        <div class="anchor-pt" id="foreign-stock">
+          <h3 class="ttl-lvl-3">外国株式</h3>
+          <div class="box-search-result">
+              <p>対象明細はありません。</p></div>
+          </div>
+        <div class="anchor-pt" id="foreign-bond">
+          <h3 class="ttl-lvl-3">外国債券</h3>
+          <div class="hidden-sd">
+                <div class="table-scrollable table-more-area">
+                  <table class="table grid-24 js-set-balloon" data-balloon="balloon_gksayikengayikanashi_block">
+                    <caption class="reading-hide">外国債券の一覧表です。</caption>
+                    <thead class="cell-join">
+                      <tr>
+                        <th scope="col" rowspan="3" class="txt-nowrap" id="foreign-bond1-th1">銘柄</th>
+                        <th scope="col" rowspan="3" class="txt-nowrap grid-2" id="foreign-bond1-th2">預り区分</th>
+                        <th scope="col" rowspan="3" class="txt-nowrap grid-3" id="foreign-bond1-th3">数量</th>
+                        <th scope="col" class="ttl-kp-asst ttl-no-line-bottom txt-nowrap grid-4" id="foreign-bond1-th4-1">取得コスト</th>
+                        <th scope="col" class="ttl-kp-asst ttl-no-line-bottom txt-nowrap grid-4" id="foreign-bond1-th5-1">取得金額</th>
+                        <th scope="col" rowspan="3" class="txt-nowrap grid-4" id="foreign-bond1-th6">評価損益</th>
+                        </tr>
+                      <tr>
+                        <th scope="col" class="ttl-kp-asst ttl-no-line-bottom txt-nowrap" id="foreign-bond1-th4-2">参考時価</th>
+                        <th scope="col" rowspan="2" class="ttl-kp-asst txt-nowrap valign-t" id="foreign-bond1-th5-2">評価額</th>
+                      </tr>
+                      <tr>
+                        <th scope="col" class="ttl-kp-asst txt-nowrap" id="foreign-bond1-th4-3">評価レート</th>
+                      </tr>
+                    </thead>
+                    <tbody class="list cell-join">
+                      <tr class="stripe-odd">
+                            <td rowspan="3" headers="foreign-bond1-th1"><span class="txt-code">L0354</span><br>ＧＳ劣後債　５．１５　ＵＳＤ　２０４５０５２２<ul class="list-inline txt-s">
+                                  <li>［利率］5.15%</li>
+                                  <li>［利払日］05/22・11/22</li>
+                                  <li>［償還日］2045/05/22</li>
+                                </ul>
+                                </td>
+                            <td rowspan="3" class="txt-lbl txt-nowrap" headers="foreign-bond1-th2">特定</td>
+                            <td rowspan="3" class="txt-num" headers="foreign-bond1-th3">51,000</td>
+                            <td class="txt-num no-line-td-bottom" headers="foreign-bond1-th4-1">14,248.44円</td>
+                            <td class="txt-num no-line-td-bottom" headers="foreign-bond1-th5-1">7,266,704円</td>
+                            <td rowspan="3" class="txt-num" headers="foreign-bond1-th6"><span class="up">+148,113</span>円</td></tr>
+                          <tr class="stripe-odd">
+                            <td class="txt-num no-line-td-bottom" headers="foreign-bond1-th4-2">91.318751米ドル</td>
+                            <td rowspan="2" class="txt-num" headers="foreign-bond1-th5-2">7,414,817円</td>
+                          </tr>
+                          <tr class="stripe-odd">
+                            <td class="txt-num" headers="foreign-bond1-th4-3">159.21円/米ドル</td>
+                          </tr>
+                        </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="visible-sd">
+                <table class="table table-transform grid-24 js-set-balloon" data-balloon="balloon_gksayikengayikanashi_block">
+                  <caption class="reading-hide">外国債券の一覧表です。</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">銘柄</th>
+                      <th scope="col">預り区分</th>
+                      <th scope="col">数量</th>
+                      <th scope="col" class="col-split">
+                        <p>取得コスト</p>
+                        <p>参考時価</p>
+                        <p>評価レート</p>
+                      </th>
+                      <th scope="col" class="col-split">
+                        <p>取得金額</p>
+                        <p>評価額</p>
+                      </th>
+                      <th scope="col">評価損益</th>
+                      </tr>
+                  </thead>
+                  <tbody class="list">
+                    <tr>
+                        <th scope="row" class="col-head-sd"><span class="txt-code">L0354</span><br>ＧＳ劣後債　５．１５　ＵＳＤ　２０４５０５２２<ul class="list-inline txt-s">
+                            <li>［利率］5.15%</li>
+                            <li>［利払日］05/22・11/22</li>
+                            <li>［償還日］2045/05/22</li>
+                          </ul>
+                          </th>
+                        <td class="txt-lbl" data-title="預り区分">特定</td>
+                        <td class="txt-num" data-title="数量">51,000</td>
+                        <td class="txt-num col-split">
+                          <p data-title="取得コスト">14,248.44円</p>
+                          <p data-title="参考時価">91.318751米ドル</p>
+                          <p class="hidden-sd item-initialy-hidden js-disp-item" data-title="評価レート">159.21円/米ドル</p>
+                        </td>
+                        <td class="txt-num col-split">
+                          <p class="hidden-sd item-initialy-hidden js-disp-item" data-title="取得金額">7,266,704円</p>
+                          <p data-title="評価額">7,414,817円</p>
+                        </td>
+                        <td class="txt-num" data-title="評価損益"><span class="up">+148,113</span>円</td></tr>
+                    </tbody>
+                </table>
+              </div>
+              <div class="row">
+              <div class="col-12 float-r">
+                <table class="table grid-24 js-set-balloon" data-balloon="balloon_gksayikengoukei_block">
+                  <caption class="reading-hide">外国債券の評価合計です。</caption>
+                  <tbody>
+                    <tr>
+                      <th scope="row" class="ttl-row grid-8 grid-sd-10">評価額合計</th>
+                      <td class="txt-num">7,414,817円</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class="ttl-row">評価損益合計</th>
+                        <td class="txt-num"><span class="up">+148,113</span>円</td>
+                      </tr>
+                    </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        <div class="anchor-pt" id="foreign-trust">
+          <h3 class="ttl-lvl-3">外国投信</h3>
+          <div class="box-search-result">
+              <p>対象明細はありません。</p></div>
+          </div>
+        </div>
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+      </main>
+      <div class="visible-ld">
+        <div class="sub-contents">
+          
+
+
+
+
+
+
+
+
+
+
+
+</div>
+      </div>
+    </div>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+    
+</div>
+  <script charset="UTF-8" src="/mf_contents/web/js/lib/jquery.min.js?ver=202602.0.9"></script>
+  <script charset="UTF-8" src="/mf_contents/web/js/lib/highcharts.js?ver=202602.0.9"></script>
+  <script charset="UTF-8" src="/mf_contents/web/js/lib/export-data.js?ver=202602.0.9"></script>
+  
+
+
+
+
+
+<script charset="UTF-8" src="/mf_contents/web/js/common.min.js?ver=202602.0.9"></script>
+  <script charset="UTF-8" src="/mf_contents/web/js/graph.js?ver=202602.0.9"></script>
+  <script charset="UTF-8" src="/mf_contents/web/js/graph_sec.js?ver=202602.0.9"></script>
+  <script charset="UTF-8" src="/mf_contents/web/js/apl.js?ver=202602.0.9"></script>
+  <script charset="UTF-8" src="/mf_contents/web/js/apl_sec.js?ver=202602.0.9"></script>
+  <script charset="UTF-8" src="/mf_contents/web/js/owx_all.min.js?ver=202602.0.9"></script>
+  
+
+
+
+
+
+
+
+
+
+
+
+<script>
+    window.onunload = function(){};
+    function GetCookie(name) {
+      var result = null;
+      var cookieName = name + '='
+      var allcookies = document.cookie;
+      var position = allcookies.indexOf(cookieName);
+      if (position != -1) {
+        var startIndex = position + cookieName.length;
+        var endIndex = allcookies.indexOf(';', startIndex);
+        if (endIndex == -1) {
+          endIndex = allcookies.length;
+        }
+        result = decodeURIComponent(allcookies.substring(startIndex, endIndex));
+      }
+      return result;
+    }
+    if (GetCookie("initFlg") != 2) {
+      var prefix = location.pathname.split("/");
+      location.href= "/" + prefix[1] + "/";
+    }
+  </script>
+<div class="apl-js-riyoshazokusei" data-devicekbn="PC"></div>
+
+
+
+
+
+
+
+<nav class="nav-following"><button type="button" class="nav-pagetop hide"><i class="ico-up-dir-1"></i><span>ページの先頭へ</span></button></nav></body></html>

@@ -256,6 +256,11 @@ def _append(route: RtRoute, heading: str, body: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="オープンチャットをリアルタイム監視して MD に追記")
     parser.add_argument("--routes-yaml", type=Path, default=None, help="open_chat_routes.yaml のパス")
+    parser.add_argument(
+        "--allow-qr-login",
+        action="store_true",
+        help="保存トークン無効時に QR 再認証を許可する",
+    )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -266,7 +271,7 @@ def main() -> int:
     dedup_path = save_root / DEDUP_FILENAME
     dedup = _load_dedup(dedup_path)
 
-    cl = build_logged_in_client(save_root)
+    cl = build_logged_in_client(save_root, allow_qr_login=bool(args.allow_qr_login))
     if not getattr(cl, "can_use_square", False):
         print("エラー: Square API が使えません。", file=sys.stderr)
         return 1

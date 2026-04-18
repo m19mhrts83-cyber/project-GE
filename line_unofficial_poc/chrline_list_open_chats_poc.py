@@ -323,13 +323,18 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=100, help="getJoinedSquareChats のページサイズ")
     parser.add_argument("--with-threads", action="store_true", help="各チャットの参加中スレッドも表示")
     parser.add_argument("--thread-limit", type=int, default=50, help="getJoinedSquareChatThreads のページサイズ")
+    parser.add_argument(
+        "--allow-qr-login",
+        action="store_true",
+        help="保存トークン無効時に QR 再認証を許可する（ヘルスチェック等の無人実行では付けない）",
+    )
     args = parser.parse_args()
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
     save_root = save_root_from_env()
-    cl = build_logged_in_client(save_root)
+    cl = build_logged_in_client(save_root, allow_qr_login=bool(args.allow_qr_login))
     if not getattr(cl, "can_use_square", False):
         print("Square(オープンチャット) API が利用できません。ログイン状態やアカウントを確認してください。", file=sys.stderr)
         return 1

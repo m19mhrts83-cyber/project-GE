@@ -440,6 +440,11 @@ def main() -> int:
         action="store_true",
         help="tryRegisterE2EEGroupKey を呼ばない（副作用を避ける）",
     )
+    parser.add_argument(
+        "--allow-qr-login",
+        action="store_true",
+        help="保存トークン無効時に QR 再認証を許可する",
+    )
     args = parser.parse_args()
 
     if hasattr(sys.stdout, "reconfigure"):
@@ -465,7 +470,7 @@ def main() -> int:
         local_rev = saved_rev_i if saved_rev_i is not None else 0
         reason = args.sync_reason if args.sync_reason is not None else 2
 
-    cl = build_logged_in_client(save_root)
+    cl = build_logged_in_client(save_root, allow_qr_login=bool(args.allow_qr_login))
     ops = _run_sync(cl, local_rev, max(1, min(args.count, 500)), reason)
 
     if not isinstance(ops, list):
