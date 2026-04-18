@@ -623,7 +623,7 @@ def _run_include_read(service, email_to_partner, existing=None):
     if not messages:
         print("直近30日にパートナーからのメールはありませんでした。")
         sys.stdout.flush()
-        return 0
+        return 0, existing
 
     appended = 0
     for msg in messages:
@@ -677,7 +677,7 @@ def _run_include_sent(service, email_to_partner, existing_sent=None):
     if not messages:
         print("直近30日にパートナーあての送信メールはありませんでした。")
         sys.stdout.flush()
-        return 0
+        return 0, existing_sent
 
     appended = 0
     for msg in messages:

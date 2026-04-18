@@ -293,6 +293,10 @@ def fetch_bond_balance(
             mode = f"holdings-summary:{picked_cat or target_category}"
             total = ev
         else:
+            # テーブルフォールバックの評価額は holdings summary の P/L と対応しないため、
+            # summary 試行で得た pl / category は使わない（将来 _pick_eval_and_pl が変わっても安全）
+            pl = None
+            picked_cat = ""
             tables = _extract_table_snapshot(page)
             amounts, mode = _extract_amounts_from_tables(tables)
             total = sum(amounts)
