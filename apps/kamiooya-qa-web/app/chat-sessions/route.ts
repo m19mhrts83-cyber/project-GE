@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { toDbId } from "@/lib/ids";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   const u = requireUser(req);
   const body = (await req.json().catch(() => null)) as { user_id?: string; initial_message?: string } | null;
-  const userId = String(body?.user_id ?? "");
-  if (!userId || userId !== u.id) {
+  const userIdRaw = String(body?.user_id ?? "");
+  if (!userIdRaw || userIdRaw !== u.id) {
     return NextResponse.json({ errorMessage: "user_id が不正です" }, { status: 400 });
   }
+  const userId = toDbId(userIdRaw);
   const initial = String(body?.initial_message ?? "").trim();
   const title = initial ? initial.slice(0, 24) : "無題";
   const sb = supabaseAdmin();

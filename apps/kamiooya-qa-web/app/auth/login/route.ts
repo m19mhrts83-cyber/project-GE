@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { buildSessionToken, SESSION_COOKIE_NAME } from "@/lib/session";
+import { toSessionIdString } from "@/lib/ids";
 
 export const runtime = "nodejs";
 
@@ -36,10 +37,10 @@ export async function POST(req: Request) {
   }
 
   const res = NextResponse.json({
-    user: { id: user.id, email: user.email, role: user.role, status: user.status }
+    user: { id: toSessionIdString(user.id), email: user.email, role: user.role, status: user.status }
   });
   res.cookies.set(SESSION_COOKIE_NAME, buildSessionToken({
-    id: user.id,
+    id: toSessionIdString(user.id),
     email: user.email,
     role: user.role,
     status: user.status
