@@ -1,0 +1,3 @@
+コメントID,投稿日時,投稿者名,投稿者メール,コメント内容,親コメントID,IP アドレス,ユーザーエージェント,ソース
+12345,2026-01-01 12:00:00,System,,WeStudy差分CSVは scripts/build_delta_csv.py で生成します。,,,,WeStudy
+
