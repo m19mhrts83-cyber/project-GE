@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>神・大家さんクラブ情報 Q&Aチャットボット</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/raimo/style.css" />
+  </head>
+  <body class="bg-slate-100 text-slate-800">
+    <div id="appRoot" class="min-h-screen">
+      <!-- 認証エリア -->
+      <section id="authView" class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
+          <h1 class="text-xl font-bold text-center text-blue-900 mb-2">
+            神・大家さんクラブ情報 Q&A
+          </h1>
+          <p class="text-sm text-slate-500 text-center mb-6">ログインまたは新規登録</p>
+
+          <div class="flex gap-2 mb-4">
+            <button
+              id="showLoginTabBtn"
+              class="w-1/2 py-2 rounded-md bg-blue-900 text-white"
+            >
+              ログイン
+            </button>
+            <button
+              id="showRegisterTabBtn"
+              class="w-1/2 py-2 rounded-md bg-slate-200 text-slate-700"
+            >
+              新規登録
+            </button>
+          </div>
+
+          <form id="loginForm" class="space-y-3">
+            <input
+              id="loginEmail"
+              type="email"
+              class="w-full border rounded-md px-3 py-2"
+              placeholder="メールアドレス"
+              required
+            />
+            <input
+              id="loginPassword"
+              type="password"
+              class="w-full border rounded-md px-3 py-2"
+              placeholder="パスワード"
+              required
+            />
+            <button
+              id="loginSubmitBtn"
+              type="submit"
+              class="w-full py-2 rounded-md bg-blue-900 text-white"
+            >
+              ログイン
+            </button>
+          </form>
+
+          <form id="registerForm" class="space-y-3 hidden">
+            <input
+              id="registerEmail"
+              type="email"
+              class="w-full border rounded-md px-3 py-2"
+              placeholder="メールアドレス"
+              required
+            />
+            <input
+              id="registerPassword"
+              type="password"
+              class="w-full border rounded-md px-3 py-2"
+              placeholder="パスワード"
+              required
+            />
+            <button
+              id="registerSubmitBtn"
+              type="submit"
+              class="w-full py-2 rounded-md bg-blue-600 text-white"
+            >
+              アカウント作成
+            </button>
+          </form>
+
+          <div class="text-center mt-4">
+            <button type="button" id="loginScreenAdminRegisterBtn" class="login-screen-admin-btn">
+              管理者登録
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- シークレットURL専用 管理者登録画面 -->
+      <section
+        id="secretAdminRegisterView"
+        class="hidden min-h-screen flex items-center justify-center p-4"
+      >
+        <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
+          <h1 class="text-xl font-bold text-center text-blue-900 mb-2">管理者登録</h1>
+          <p class="text-sm text-slate-500 text-center mb-6">シークレットキーによる限定登録</p>
+          <form id="secretAdminRegisterForm" class="space-y-3">
+            <input
+              id="secretAdminEmail"
+              type="email"
+              class="w-full border rounded-md px-3 py-2"
+              placeholder="管理者メールアドレス"
+              required
+            />
+            <input
+              id="secretAdminPassword"
+              type="password"
+              class="w-full border rounded-md px-3 py-2"
+              placeholder="ログインパスワード"
+              required
+            />
+            <input
+              id="secretAdminSecretKey"
+              type="password"
+              class="w-full border rounded-md px-3 py-2"
+              placeholder="登録許可シークレットキー"
+              required
+            />
+            <button
+              id="secretAdminRegisterSubmitBtn"
+              type="submit"
+              class="w-full py-2 rounded-md bg-blue-900 text-white"
+            >
+              管理者として登録
+            </button>
+          </form>
+          <div class="text-center mt-4">
+            <button
+              type="button"
+              id="secretAdminBackToLoginBtn"
+              class="text-sm text-slate-500 underline hover:text-slate-700"
+            >
+              ログイン画面に戻る
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- アプリ本体 -->
+      <section id="mainView" class="hidden min-h-screen">
+        <header class="bg-blue-900 text-white px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <button id="sidebarToggleBtn" class="md:hidden">
+              <i class="fa-solid fa-bars"></i>
+            </button>
+            <h2 class="font-bold">神・大家さんクラブ情報 Q&Aチャットボット</h2>
+          </div>
+          <div class="flex items-center gap-4">
+            <span id="currentUserLabel" class="text-sm"></span>
+            <button id="logoutBtn" class="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600">
+              ログアウト
+            </button>
+          </div>
+        </header>
+
+        <div class="flex h-[calc(100vh-56px)]">
+          <aside id="sidebar" class="w-80 bg-white border-r border-slate-200 hidden md:flex md:flex-col">
+            <div class="p-3 border-b border-slate-200">
+              <button id="newChatBtn" class="w-full py-2 rounded bg-blue-900 text-white text-sm">
+                <i class="fa-solid fa-plus mr-1"></i> 新規チャット
+              </button>
+            </div>
+            <nav class="p-3 border-b border-slate-200 space-y-2">
+              <button data-screen="chat" class="screen-tab w-full text-left px-3 py-2 rounded bg-slate-100">
+                チャット
+              </button>
+              <button data-screen="comments" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">
+                コメント一覧
+              </button>
+              <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">
+                ユーザー承認
+              </button>
+              <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">
+                CSV取込
+              </button>
+            </nav>
+            <div class="p-3 overflow-y-auto flex-1">
+              <h3 class="text-sm font-semibold text-slate-600 mb-2">チャット履歴</h3>
+              <ul id="sessionList" class="space-y-2"></ul>
+            </div>
+          </aside>
+
+          <main class="flex-1 flex flex-col">
+            <section id="chatScreen" class="screen-view flex-1 flex flex-col">
+              <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"></div>
+              <div class="border-t bg-white p-4">
+                <div>
+                  <p class="text-xs text-slate-500 mb-2">よくある質問</p>
+                  <div id="suggestedQuestions" class="flex flex-wrap gap-2 mb-3"></div>
+                </div>
+                <form id="messageForm" class="flex gap-2">
+                  <input id="messageInput" class="flex-1 border rounded-md px-3 py-2" placeholder="質問を入力してください" required />
+                  <button id="sendMessageBtn" type="submit" class="px-4 py-2 rounded-md bg-blue-600 text-white">送信</button>
+                </form>
+              </div>
+            </section>
+
+            <section id="commentsScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
+              <div class="w-full">
+                <div class="flex flex-wrap gap-2 mb-3">
+                  <input id="commentSearchInput" class="border rounded-md px-3 py-2 min-w-[240px] flex-1" placeholder="コメント本文・投稿者で検索" />
+                  <select id="commentSourceFilter" class="border rounded-md px-3 py-2 min-w-[170px]">
+                    <option value="">全ソース</option>
+                  </select>
+                  <select id="commentDateFilter" class="border rounded-md px-3 py-2 min-w-[170px]">
+                    <option value="">日時: 全件</option>
+                    <option value="hasDate">日時ありのみ</option>
+                    <option value="missingDate">日時なしのみ</option>
+                  </select>
+                  <button id="reloadCommentsBtn" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+                </div>
+                <p id="commentListMeta" class="text-xs text-slate-500 mb-2"></p>
+                <div class="overflow-auto bg-white rounded border">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-100">
+                      <tr>
+                        <th class="p-2 text-left">日時</th>
+                        <th class="p-2 text-left">ソース</th>
+                        <th class="p-2 text-left">投稿者</th>
+                        <th class="p-2 text-left">本文</th>
+                      </tr>
+                    </thead>
+                    <tbody id="commentTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section id="adminUsersScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
+              <div class="w-full max-w-4xl">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="font-semibold">承認待ちユーザー</h3>
+                  <button id="reloadPendingUsersBtn" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+                </div>
+                <div class="overflow-auto bg-white rounded border">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-100">
+                      <tr>
+                        <th class="p-2 text-left">ID</th>
+                        <th class="p-2 text-left">メール</th>
+                        <th class="p-2 text-left">状態</th>
+                        <th class="p-2 text-left">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pendingUsersTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section id="adminDataScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
+              <div class="w-full max-w-3xl bg-white rounded border p-4">
+                <h3 class="font-semibold mb-2">CSVコメント取込</h3>
+                <p class="text-sm text-slate-500 mb-3">
+                  1行目はヘッダー行（英語: source_type, comment_id, posted_at, author_name, author_email, content 等／WeStudyフォーラム出力の日本語ヘッダー「コメントID」「投稿日時」「コメント内容」等も可）。Excelは「CSV UTF-8（コンマ区切り）」推奨。セミコロン区切りにも自動対応します。
+                </p>
+                <input id="csvFileInput" type="file" accept=".csv,text/csv" class="mb-3" />
+                <div class="flex gap-2">
+                  <button id="importCsvBtn" class="px-4 py-2 rounded bg-blue-600 text-white">取り込み実行</button>
+                  <button id="sampleCommentBtn" class="px-4 py-2 rounded bg-slate-700 text-white">サンプル1件登録</button>
+                </div>
+                <pre id="importResult" class="mt-4 text-xs bg-slate-100 p-3 rounded h-40 overflow-auto"></pre>
+              </div>
+              <div class="w-full max-w-3xl bg-white rounded border p-4 mt-4">
+                <h3 class="font-semibold mb-2 text-red-700">コメント削除（管理者）</h3>
+                <div class="flex flex-wrap gap-2 items-center">
+                  <select id="deleteSourceTypeInput" class="border rounded-md px-3 py-2 min-w-[170px]">
+                    <option value="WeStudy">WeStudy</option>
+                    <option value="神大家コミュニティ">神大家コミュニティ</option>
+                    <option value="">全ソース（危険）</option>
+                  </select>
+                  <input id="deleteCommentIdLikeInput" class="border rounded-md px-3 py-2 min-w-[230px] flex-1" placeholder="comment_id 部分一致（任意） 例: 2026-" />
+                  <button id="deleteCommentsBtn" class="px-4 py-2 rounded bg-red-600 text-white">削除実行</button>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">※ 実行前に確認ダイアログを表示します。</p>
+              </div>
+            </section>
+          </main>
+        </div>
+      </section>
+    </div>
+
+    <dialog id="confirmDialog" class="rounded-lg p-0 w-full max-w-sm backdrop:bg-black/30">
+      <div class="p-4">
+        <h4 class="font-semibold mb-2" id="confirmTitle">確認</h4>
+        <p class="text-sm text-slate-700 mb-4" id="confirmMessage">実行しますか？</p>
+        <div class="flex justify-end gap-2">
+          <button id="confirmCancelBtn" class="px-3 py-1 rounded border">キャンセル</button>
+          <button id="confirmOkBtn" class="px-3 py-1 rounded bg-blue-900 text-white">OK</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/20 z-50 items-center justify-center">
+      <div class="bg-white rounded px-4 py-3 shadow flex items-center gap-2">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <span>処理中です...</span>
+      </div>
+    </div>
+
+    <button id="adminEntryBtn" class="admin-entry-btn" type="button" aria-label="管理者登録への導線">
+      管理者登録
+    </button>
+
+    <div
+      id="adminGateOverlay"
+      class="admin-gate-overlay hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="adminGateTitle"
+    >
+      <div class="admin-gate-panel bg-white w-full max-w-sm rounded-lg shadow-lg p-4">
+        <h4 class="font-semibold mb-2" id="adminGateTitle">管理者登録</h4>
+        <p class="text-sm text-slate-600 mb-3">アクセスパスワードを入力してください</p>
+        <input
+          id="adminGatePasswordInput"
+          type="password"
+          class="w-full border rounded-md px-3 py-2 mb-2"
+          placeholder="パスワード"
+          autocomplete="off"
+        />
+        <p id="adminGateError" class="text-xs text-red-600 min-h-[1rem]"></p>
+        <div class="flex justify-end gap-2 mt-3">
+          <button type="button" id="adminGateCancelBtn" class="px-3 py-1 rounded border">キャンセル</button>
+          <button type="button" id="adminGateOkBtn" class="px-3 py-1 rounded bg-blue-900 text-white">進む</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/raimo/app.js"></script>
+  </body>
+</html>
+
