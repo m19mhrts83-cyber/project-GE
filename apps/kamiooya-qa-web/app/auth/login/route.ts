@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { buildSessionToken, SESSION_COOKIE_NAME } from "@/lib/session";
 import { toSessionIdString } from "@/lib/ids";
+import { verifyPassword } from "@/lib/passwords";
 
 export const runtime = "nodejs";
 
@@ -10,8 +11,8 @@ export async function POST(req: Request) {
     | { email?: string; password_hash?: string }
     | null;
   const email = String(body?.email ?? "").trim().toLowerCase();
-  const passwordHash = String(body?.password_hash ?? "");
-  if (!email || !passwordHash) {
+  const password = String(body?.password_hash ?? "");
+  if (!email || !password) {
     return NextResponse.json({ errorMessage: "メールアドレスとパスワードは必須です" }, { status: 400 });
   }
 
@@ -20,10 +21,16 @@ export async function POST(req: Request) {
     .from("users")
     .select("id,email,role,status,password_hash")
     .eq("email", email)
-    .eq("password_hash", passwordHash)
     .maybeSingle();
 
   if (error || !user) {
+    return NextResponse.json(
+      { errorCode: "invalid_credentials", errorMessage: "メールアドレスまたはパスワードが間違っています" },
+      { status: 401 }
+    );
+  }
+  const ok = await verifyPassword(password, String(user.password_hash ?? ""));
+  if (!ok) {
     return NextResponse.json(
       { errorCode: "invalid_credentials", errorMessage: "メールアドレスまたはパスワードが間違っています" },
       { status: 401 }
