@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hashPasswordForStorage } from "@/lib/passwords";
 
 export const runtime = "nodejs";
 
@@ -8,11 +9,12 @@ export async function POST(req: Request) {
     | { email?: string; password_hash?: string }
     | null;
   const email = String(body?.email ?? "").trim().toLowerCase();
-  const passwordHash = String(body?.password_hash ?? "");
-  if (!email || !passwordHash) {
+  const password = String(body?.password_hash ?? "");
+  if (!email || !password) {
     return NextResponse.json({ errorMessage: "メールアドレスとパスワードは必須です" }, { status: 400 });
   }
 
+  const passwordHash = await hashPasswordForStorage(password);
   const sb = supabaseAdmin();
   const { data, error } = await sb
     .from("users")
