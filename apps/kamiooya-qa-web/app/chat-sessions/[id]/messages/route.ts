@@ -2,16 +2,15 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toDbId } from "@/lib/ids";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
 function extractKeyword(text: unknown): string {
   const s = String(text || "").trim();
   if (!s) return "";
-  // 超単純: 先頭から「それっぽい」語を拾う（日本語/英数字の連続）
   const m = s.match(/[0-9A-Za-zぁ-んァ-ン一-龥]{2,}/g);
   if (!m || m.length === 0) return s.slice(0, 6);
-  // よくある語は避ける
   const stop = new Set(["です", "ます", "こと", "方法", "教えて", "ください", "どこ", "なに", "何"]);
   for (const w of m) {
     if (!stop.has(w)) return w;
@@ -45,10 +44,7 @@ function buildAnswer(message: string, comments: CommentRow[]) {
   return lines.join("\n");
 }
 
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const POST = withErrorHandler(async (req, { params }) => {
   const u = requireUser(req);
   const { id: sessionId } = await params;
   const sessionDbId = toDbId(sessionId);
@@ -80,5 +76,4 @@ export async function POST(
   await sb.from("chat_messages").insert([{ session_id: sessionDbId, role: "assistant", content: answer }]);
 
   return NextResponse.json({ answer });
-}
-
+});

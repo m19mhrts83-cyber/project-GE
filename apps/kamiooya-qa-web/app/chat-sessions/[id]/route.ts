@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toDbId } from "@/lib/ids";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withErrorHandler(async (req, { params }) => {
   const u = requireUser(req);
   const { id } = await params;
   const sessionId = toDbId(id);
@@ -33,5 +34,4 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   return NextResponse.json({ session, messages: messages ?? [] });
-}
-
+});

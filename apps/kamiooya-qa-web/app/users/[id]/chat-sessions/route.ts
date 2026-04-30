@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toDbId } from "@/lib/ids";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withErrorHandler(async (req, { params }) => {
   const u = requireUser(req);
   const { id } = await params;
   if (id !== u.id) {
@@ -22,5 +23,4 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ errorMessage: error.message || "取得に失敗しました" }, { status: 500 });
   }
   return NextResponse.json({ sessions: data ?? [] });
-}
-
+});
