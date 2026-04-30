@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toDbId } from "@/lib/ids";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req) => {
   const u = requireUser(req);
   const body = (await req.json().catch(() => null)) as { user_id?: string; initial_message?: string } | null;
   const userIdRaw = String(body?.user_id ?? "");
@@ -25,5 +26,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ errorMessage: error.message || "作成に失敗しました" }, { status: 400 });
   }
   return NextResponse.json({ id: data.id, title: data.title, created_at: data.created_at });
-}
-
+});

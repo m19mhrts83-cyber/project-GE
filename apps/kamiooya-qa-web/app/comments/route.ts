@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req) => {
   requireUser(req);
   const sb = supabaseAdmin();
   const { data, error } = await sb
@@ -17,5 +18,4 @@ export async function GET(req: Request) {
     return NextResponse.json({ errorMessage: error.message || "取得に失敗しました" }, { status: 500 });
   }
   return NextResponse.json({ comments: data ?? [] });
-}
-
+});

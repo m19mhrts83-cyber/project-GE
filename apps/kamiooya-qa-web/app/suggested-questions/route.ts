@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req) => {
   requireUser(req);
   const sb = supabaseAdmin();
   const { data, error } = await sb
@@ -16,9 +17,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ errorMessage: error.message || "取得に失敗しました" }, { status: 500 });
   }
   return NextResponse.json({ questions: data ?? [] });
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req) => {
   requireUser(req);
   const body = (await req.json().catch(() => null)) as { question_text?: string } | null;
   const text = String(body?.question_text ?? "").trim();
@@ -30,9 +31,7 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (error) {
-    // unique等は無視してOK扱い
     return NextResponse.json({ errorMessage: error.message || "登録に失敗しました" }, { status: 400 });
   }
   return NextResponse.json({ id: data.id });
-}
-
+});
