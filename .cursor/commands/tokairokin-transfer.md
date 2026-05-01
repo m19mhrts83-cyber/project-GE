@@ -19,6 +19,10 @@
 1. **スクリプトの実行**
    - **カレント**: `~/git-repos/215_kamiooya/C1_cursor/browser_automation`（詳細は `~/git-repos/docs/運用コマンド一覧.md` の「ブラウザ自動化」）
    - **振込内容を指定して実行**（フォーム自動入力）:
+     - `.env` に `TOKAIROKIN_DEFAULT_BANK_CODE` 等の既定振込先があれば、**金額だけ**指定して実行できる:
+       ```
+       .venv/bin/python fetch_after_login.py tokairokin --amount 240000
+       ```
      - 金融機関名・支店名で入力する場合（東海労金の検索画面向け）:
        ```
        .venv/bin/python fetch_after_login.py tokairokin --bank-name "三菱UFJ銀行" --branch-name "熱田支店" --account 0526519 --amount 10000

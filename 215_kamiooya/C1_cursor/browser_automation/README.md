@@ -67,6 +67,7 @@ python fetch_after_login.py nichinoken
    - `.env` に `TOKAIROKIN_USER` と `TOKAIROKIN_PASS` を追加
    - `TOKAIROKIN_USER`: ログインID（6〜12桁の半角英数字）
    - `TOKAIROKIN_PASS`: パスワード
+   - （任意）よく振り込む先を `TOKAIROKIN_DEFAULT_BANK_CODE` / `TOKAIROKIN_DEFAULT_BRANCH_CODE` / `TOKAIROKIN_DEFAULT_ACCOUNT` などで設定すると、`--amount だけ` で既定先へ振込フォームを埋められる（`.env.example` 参照）
 
 2. **設定ファイル**
    - `config_tokairokin.example.yaml` をコピーして `config_tokairokin.yaml` にリネーム

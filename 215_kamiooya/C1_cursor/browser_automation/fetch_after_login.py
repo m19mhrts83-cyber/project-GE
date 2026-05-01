@@ -93,6 +93,35 @@ def get_credentials(site: str):
     return user, password
 
 
+def _tokairokin_default_transfer_env() -> dict:
+    """東海労金振込の既定先を .env から読む（金額は含めない）。"""
+    return {
+        "bank_code": (os.environ.get("TOKAIROKIN_DEFAULT_BANK_CODE") or "").strip(),
+        "branch_code": (os.environ.get("TOKAIROKIN_DEFAULT_BRANCH_CODE") or "").strip(),
+        "bank_name": (os.environ.get("TOKAIROKIN_DEFAULT_BANK_NAME") or "").strip(),
+        "branch_name": (os.environ.get("TOKAIROKIN_DEFAULT_BRANCH_NAME") or "").strip(),
+        "account_number": (os.environ.get("TOKAIROKIN_DEFAULT_ACCOUNT") or "").strip(),
+        "account_kind": (os.environ.get("TOKAIROKIN_DEFAULT_ACCOUNT_KIND") or "").strip(),
+    }
+
+
+def _apply_tokairokin_transfer_defaults(transfer: dict | None) -> dict | None:
+    """transfer があれば、未指定の銀行・支店・口座を TOKAIROKIN_DEFAULT_* で補う。"""
+    if transfer is None:
+        return None
+    d = _tokairokin_default_transfer_env()
+    out = dict(transfer)
+    if not (out.get("bank_code") or "").strip() and not (out.get("bank_name") or "").strip():
+        out["bank_code"] = d["bank_code"]
+        out["bank_name"] = d["bank_name"]
+    if not (out.get("branch_code") or "").strip() and not (out.get("branch_name") or "").strip():
+        out["branch_code"] = d["branch_code"]
+        out["branch_name"] = d["branch_name"]
+    if not (out.get("account_number") or "").strip():
+        out["account_number"] = d["account_number"]
+    return out
+
+
 def _get_secret_phrase_answer(mapping: dict):
     """合言葉のマッピングから回答を取得。answer_env または answer を参照。"""
     """合言葉のマッピングから回答を取得。answer_env または answer を参照。"""
@@ -974,9 +1003,15 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
 
         # 振込フォームの自動入力（transfer パラメータがある場合）
         transfer_filled = False
-        has_bank = transfer.get("bank_code") or transfer.get("bank_name")
-        has_branch = transfer.get("branch_code") or transfer.get("branch_name")
-        if transfer and has_bank and has_branch and transfer.get("account_number") and transfer.get("amount"):
+        if transfer:
+            has_bank = transfer.get("bank_code") or transfer.get("bank_name")
+            has_branch = transfer.get("branch_code") or transfer.get("branch_name")
+            form_ready = (
+                has_bank and has_branch and transfer.get("account_number") and transfer.get("amount")
+            )
+        else:
+            form_ready = False
+        if form_ready:
             time.sleep(config.get("wait_after_page", 2))
             tf = config.get("transfer_form") or {}
 
@@ -1194,6 +1229,7 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
     config = load_config("tokairokin")
     user, password = get_credentials("tokairokin")
     transfer = transfer or config.get("transfer")
+    transfer = _apply_tokairokin_transfer_defaults(transfer)
 
     # undetected-chromedriver を優先（CDP・stealth で検知された場合の代替）
     if config.get("use_undetected_chromedriver", False):
@@ -1467,14 +1503,21 @@ def main():
         print(f"出力: {path}")
     elif args.site == "tokairokin":
         transfer = None
-        if args.bank or args.branch or args.bank_name or args.branch_name or args.account or args.amount:
+        if (
+            args.bank
+            or args.branch
+            or args.bank_name
+            or args.branch_name
+            or args.account
+            or args.amount is not None
+        ):
             transfer = {
                 "bank_code": args.bank or "",
                 "branch_code": args.branch or "",
                 "bank_name": args.bank_name or "",
                 "branch_name": args.branch_name or "",
                 "account_number": args.account or "",
-                "amount": args.amount or 0,
+                "amount": args.amount if args.amount is not None else 0,
             }
         run_tokairokin(headless=args.headless, transfer=transfer)
     else:
