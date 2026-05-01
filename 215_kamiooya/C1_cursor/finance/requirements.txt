@@ -1,1 +1,7 @@
 playwright>=1.40.0
+pdfplumber>=0.11.0
+# Gmail OTP 取得（prudential_gmail_otp）用（215 の ProgramCode/venv に入れる想定）
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.22.0

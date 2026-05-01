@@ -69,7 +69,7 @@ def _mirror_targets_for_primary(primary: Path) -> list[Path]:
 
     gr_m = _manual_gitrepos()
     od_m = _manual_onedrive()
-    for name in ("token_estate.json", "token_m19m.json"):
+    for name in ("token_estate.json", "token_m19m.json", "token_chk59.json"):
         gr_f = (gr_m / name).resolve()
         od_f = (od_m / name).resolve()
         if primary == gr_f and od_m.is_dir():

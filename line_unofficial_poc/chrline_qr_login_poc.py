@@ -27,7 +27,11 @@ def _extract_login_url_from_chunk_text(text: str) -> str | None:
     - "URL: https://..." の形式
     - "{1: 'https://...'}" のような dict 表現
     """
-    m = re.search(r"(https://line\.me/R/au/lgn/sq/[A-Za-z0-9]+)", text)
+    # sq トークン直後のクエリ（?secret= 等）まで含める（末尾は chunk 文字列化に合わせて打ち切り）
+    m = re.search(
+        r"(https://line\.me/R/au/lgn/sq/[A-Za-z0-9_-]+(?:\?[^\s\"')}>]+)?)",
+        text,
+    )
     return m.group(1) if m else None
 
 

@@ -110,7 +110,7 @@ def _send_via_chrline(message: str, allow_qr_login: bool) -> bool:
         home_cand = Path.home() / "git-repos" / "line_unofficial_poc"
         if home_cand.is_dir():
             line_poc = home_cand
-    if not line_poc.is_dir():
+    if line_poc is None or not line_poc.is_dir():
         raise RuntimeError("line_unofficial_poc が見つかりません。")
 
     # CHRLINE は line_unofficial_poc 側の venv に依存がまとまっているため、

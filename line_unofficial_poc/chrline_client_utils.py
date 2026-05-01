@@ -19,8 +19,10 @@ chrline_qr_login_poc 成功後に persist_auth_token を呼ぶ。
 from __future__ import annotations
 
 import os
+import time
 import subprocess
 import sys
+from contextlib import contextmanager
 from hashlib import md5
 from pathlib import Path
 
@@ -184,9 +186,55 @@ def load_saved_tokens_newest_first(save_root: Path) -> list[str]:
     return out
 
 
+@contextmanager
+def _file_lock(lock_path: Path, *, poll_interval_s: float = 0.2):
+    """
+    Cross-process lock to serialize QR re-login.
+
+    Purpose:
+      - Avoid two scripts issuing QR at the same time (user can approve only one).
+      - Keep behavior deterministic even if callers run sync + open-chat concurrently.
+
+    Notes:
+      - Lock is best-effort on non-POSIX platforms, but this repo runs on macOS.
+      - Waits until the lock becomes available.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    f = lock_path.open("a+", encoding="utf-8")
+    try:
+        try:
+            import fcntl  # POSIX
+
+            while True:
+                try:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    time.sleep(poll_interval_s)
+        except Exception:
+            # Fallback: no real lock, but keep flow consistent.
+            pass
+        yield
+    finally:
+        try:
+            import fcntl  # POSIX
+
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        try:
+            f.close()
+        except Exception:
+            pass
+
+
 def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
     """保存済み authToken で CHRLINE を初期化。失効時、allow_qr_login=True のときだけ QR 再認証に進む。"""
     from CHRLINE import CHRLINE
+    from CHRLINE.exceptions import LineServiceException
 
     cl = try_client_from_saved_tokens_only(save_root)
     if cl is not None:
@@ -201,24 +249,45 @@ def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
         )
         sys.exit(2)
 
-    print(
-        "保存トークンが無効なため、QR再認証を開始します（LINEアプリで承認してください）。",
-        file=sys.stderr,
-    )
-    cl = CHRLINE(device="DESKTOPWIN", useThrift=True, savePath=str(save_root), noLogin=True)
-    try:
-        for chunk in cl.requestSQR3(isSelf=True):
-            text = str(chunk)
-            if text.startswith(("URL:", "IMG:", "請輸入pincode:")):
-                print(text)
-            if text.startswith("IMG:"):
-                _open_qr_image_if_possible(text.removeprefix("IMG:").strip())
-        refreshed = (getattr(cl, "authToken", None) or "").strip()
-        if not refreshed:
-            print("エラー: QR再認証でトークン取得に失敗しました。", file=sys.stderr)
-            sys.exit(1)
-        persist_auth_token(save_root, refreshed)
-        cl.initAll()
-        return cl
-    finally:
-        cleanup_chrline_qr_images(save_root)
+    lock_path = save_root / ".qr_login.lock"
+    with _file_lock(lock_path):
+        # Another process may have refreshed the token while we were waiting.
+        cl = try_client_from_saved_tokens_only(save_root)
+        if cl is not None:
+            return cl
+
+        print(
+            "保存トークンが無効なため、QR再認証を開始します（LINEアプリで承認してください）。",
+            file=sys.stderr,
+        )
+        # QR は短時間で失効することがある（Code:100）。再実行で2つQRが飛ぶのを避けるため、
+        # ロック内で同一プロセスが自動リトライし、常に最新の1枚だけ残す。
+        for attempt in range(1, 3):
+            cleanup_chrline_qr_images(save_root)
+            cl = CHRLINE(device="DESKTOPWIN", useThrift=True, savePath=str(save_root), noLogin=True)
+            try:
+                for chunk in cl.requestSQR3(isSelf=True):
+                    text = str(chunk)
+                    if text.startswith(("URL:", "IMG:", "請輸入pincode:")):
+                        print(text)
+                    if text.startswith("IMG:"):
+                        _open_qr_image_if_possible(text.removeprefix("IMG:").strip())
+                refreshed = (getattr(cl, "authToken", None) or "").strip()
+                if not refreshed:
+                    raise RuntimeError("QR再認証でトークン取得に失敗しました。")
+                persist_auth_token(save_root, refreshed)
+                cl.initAll()
+                return cl
+            except Exception as exc:
+                msg = str(exc)
+                # Code: 100 = 行動條碼過期（QR期限切れ）
+                if ("Code: 100" in msg) or ("行動條碼過期" in msg):
+                    if attempt < 2:
+                        print(
+                            "⚠ QR が期限切れになりました。新しい QR を再生成します（同一ログインの再試行）。",
+                            file=sys.stderr,
+                        )
+                        continue
+                raise
+            finally:
+                cleanup_chrline_qr_images(save_root)
