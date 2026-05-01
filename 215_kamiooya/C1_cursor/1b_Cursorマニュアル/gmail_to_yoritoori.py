@@ -53,7 +53,9 @@ from googleapiclient.discovery import build
 
 # 設定
 SCRIPT_DIR = Path(__file__).resolve().parent
-BASE_DIR = SCRIPT_DIR.parent.parent / "C2_ルーティン作業" / "26_パートナー社への相談"
+from yoritoori_utils import default_yoritoori_base_dir, mirror_yoritoori_md_to_gitrepos
+
+BASE_DIR = default_yoritoori_base_dir()
 CONTACT_YAML = BASE_DIR / "000_共通" / "連絡先一覧.yaml"
 CREDENTIALS_PATH = SCRIPT_DIR / "credentials.json"
 TOKEN_PATH = SCRIPT_DIR / "token.json"
@@ -90,11 +92,13 @@ def resolve_token_paths():
     """
     raw = os.environ.get("GMAIL_TOKEN_PATHS", "").strip()
     if not raw:
-        default_multi = [
-            SCRIPT_DIR / "token_estate.json",
-            SCRIPT_DIR / "token_m19m.json",
-        ]
-        if all(p.exists() for p in default_multi):
+        # 215 共通の複数アカウント運用（存在するものだけを採用）
+        default_multi = []
+        for name in ("token_estate.json", "token_m19m.json", "token_chk59.json"):
+            p = SCRIPT_DIR / name
+            if p.exists():
+                default_multi.append(p)
+        if len(default_multi) >= 2:
             return default_multi
 
         token2 = SCRIPT_DIR / "token2.json"
@@ -415,6 +419,7 @@ def append_sent_to_yoritoori(folder_path, partner_name, date_str, subject, body,
     else:
         content += block
     md_path.write_text(content, encoding="utf-8")
+    mirror_yoritoori_md_to_gitrepos(md_path)
     return True
 
 
@@ -455,6 +460,7 @@ def append_to_yoritoori(folder_path, partner_name, date_str, body, attachment_na
     else:
         content += block
     md_path.write_text(content, encoding="utf-8")
+    mirror_yoritoori_md_to_gitrepos(md_path)
     return True
 
 

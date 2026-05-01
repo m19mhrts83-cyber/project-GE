@@ -53,6 +53,11 @@ TARGETS: dict[str, ChatTarget] = {
         display_name="12東海北陸G【神大家】",
         group_label="12東海北陸G【神大家】 スレッド補完",
     ),
+    "34保険": ChatTarget(
+        folder="815_神大家オプチャ/34保険相談G",
+        display_name="34保険相談G【神大家】",
+        group_label="34保険相談G【神大家】 スレッド補完",
+    ),
 }
 
 

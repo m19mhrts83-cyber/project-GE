@@ -106,7 +106,7 @@ partners:
     contact: "水田先生"
   - folder: "311_グッドウィン"
     name: "グッドウィン"
-    emails: []
+    emails: ["RJS30_8080@aioinissaydowa.co.jp"]
     phones: ["09033005040", "090-3300-5040", "+819033005040"]
     line: ""
     line_group_chat_mid: ""

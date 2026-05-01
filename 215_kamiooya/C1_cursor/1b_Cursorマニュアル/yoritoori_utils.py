@@ -1,12 +1,70 @@
 # やり取り.md 用の共通ユーティリティ
 
+import os
 import re
+import shutil
+import sys
 from pathlib import Path
 
 # パートナー別フォルダ内のファイル名（全社統一）
 YORITOORI_FILENAME = "5.やり取り.md"
 DRAFT_FILENAME = "4.送信下書き.txt"
 
+
+def default_yoritoori_base_dir() -> Path:
+    """
+    書き込みの正本は OneDrive 側（業務データ）を優先する。
+    プログラム実行は git-repos 側で行うが、出力先（やり取り.md 等）は OneDrive を正とする運用。
+
+    例外的に OneDrive パスが存在しない場合のみ git-repos 側へフォールバックする。
+    """
+    od = (
+        Path.home()
+        / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談"
+    )
+    gr = Path.home() / "git-repos/215_kamiooya/C2_ルーティン作業/26_パートナー社への相談"
+    return od if od.is_dir() else gr
+
+
+def _truthy_env(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def mirror_yoritoori_md_to_gitrepos(md_path: Path) -> None:
+    """
+    OneDrive 正本の `5.やり取り.md` を、git-repos 側へバックアップとしてミラーする（best-effort）。
+    添付など容量が増えるものはミラーしない（md のみ）。
+    """
+    if not _truthy_env("YORITOORI_MIRROR_MD_TO_GITREPOS", default=True):
+        return
+    p = Path(md_path)
+    if not p.is_file():
+        return
+
+    od_base = (
+        Path.home()
+        / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談"
+    ).resolve()
+    gr_base = (Path.home() / "git-repos/215_kamiooya/C2_ルーティン作業/26_パートナー社への相談").resolve()
+
+    try:
+        rp = p.resolve()
+    except Exception:
+        return
+    if not str(rp).startswith(str(od_base) + os.sep):
+        # OneDrive 配下以外は対象外（正本ではない）
+        return
+
+    rel = rp.relative_to(od_base)
+    dest = gr_base / rel
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(rp, dest)
+    except OSError as e:
+        print(f"警告: やり取り.md の git-repos ミラーに失敗: {dest}: {e}", file=sys.stderr)
 
 def resolve_attach_dir(partner_folder):
     """
