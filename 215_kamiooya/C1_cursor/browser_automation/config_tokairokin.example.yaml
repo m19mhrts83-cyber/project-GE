@@ -40,6 +40,8 @@ wait_after_page: 2
 
 # 振込実行時の待機（確認画面→実行ボタンなど）
 wait_after_transfer_confirm: 2
+# 振込画面で specify_destination_button がクリック可能になるまでの最大待ち（秒）。案内オーバーレイがあると長めが必要
+wait_for_transfer_form_ready: 45
 
 # ログイン後に振込画面へ遷移するか（true: 遷移する / false: ログインのみ）
 go_to_transfer: true
@@ -53,6 +55,13 @@ keep_browser_open: true
 
 # 合言葉の自動入力（質問文に含まれるキーワードと .env の変数名の対応）
 # .env に TOKAIROKIN_SECRET_1=答え1 などを設定
+# 画面に「合言葉」という語が無いときは markers に実際の文言を追加（東海労金 BLI017 の例）
+# secret_phrase_page_markers:
+#   - "追加認証（合言葉認証）"
+#   - "母親の誕生日"
+# secret_phrase_input_selectors:
+#   - "#txtBox001"
+#   - "input[name='BPW0010']"
 secret_phrase_auto:
   - match: "質問1のキーワード"   # 例: 好きな食べ物、母親の旧姓
     answer_env: TOKAIROKIN_SECRET_1
@@ -60,13 +69,54 @@ secret_phrase_auto:
     answer_env: TOKAIROKIN_SECRET_2
   - match: "質問3のキーワード"
     answer_env: TOKAIROKIN_SECRET_3
+# 追加認証の文言・入力欄が iframe 内だけにある場合も検出する（false でメインフレームのみ）
+secret_phrase_check_iframes: true
+# ログイン後に質問文が DOM に現れるまで待つ最大秒（描画が遅い場合や「再ログイン」より後に質問が載る場合に利用）。0 でポーリングしない
+secret_phrase_dom_wait_seconds: 25
+secret_phrase_dom_poll_seconds: 0.5
+secret_phrase_dom_wait_seconds_after_relogin: 15
 
 # 合言葉の自動入力ができなかった場合に一時停止するか
 pause_for_secret_phrase: true
 
+# 合言葉なしで BLI001Dispatch トップへ入ったとき、Enter 待ちを省略するための検出（既定は fetch_after_login 内のデフォルト）
+# post_login_dashboard_detect:
+#   url_contains_any: ["BLI001Dispatch"]
+#   body_contains_any: ["トップページ", "振込振替", "残高照会", "口座情報"]
+
 # ログイン後、振込メニューをクリックするまでの待機（秒）
 # ワンタイムパスワード入力が必要な場合は、入力する時間を考慮して増やす
+# （長いほど無操作とみなされるため、必要最小限が無難）
 wait_before_transfer_menu: 5
+
+# 「一定時間操作がなかったため中断」対策: 待機中に軽くスクロール等する（false で無効）
+session_keepalive_enabled: true
+# キープアライブの実行間隔（秒）。wait_before_transfer_menu／振込フォーム待機で使用
+session_keepalive_interval_seconds: 5
+# 同一ページへの HEAD（サーバー側セッション延長の補助）。問題あれば false
+session_keepalive_fetch_head: true
+# HEAD を完了まで待つタイムアウト（秒）。fetch が途中で切れると無操作扱いになりやすい
+session_keepalive_fetch_timeout_seconds: 12
+# Enter 待ち中のキープアライブ間隔（秒）。B0470（無操作中断）対策
+wait_enter_keepalive_interval_seconds: 5
+# フォーム待機時のポーリング間隔（秒）
+session_keepalive_poll_seconds: 1.0
+# 振込フォーム待機ループで毎ポーリング軽スクロールする
+session_keepalive_every_poll_during_form_wait: true
+# transfer_direct_* で開いた直後・フォーム処理前に連続キープアライブする（短い無操作切断対策）
+transfer_page_keepalive_burst_count: 16
+transfer_page_keepalive_burst_interval_seconds: 0.3
+# 振込入力フォームが iframe 内にあるとき探索する（メインだけでは #btn002-1 が見えない場合あり）
+transfer_form_search_iframes: true
+transfer_form_iframe_max_depth: 6
+
+# 振込URL（transfer_direct_*）表示直後に Enter 待ちで止める（セレクタ検証用）。CLI は --inspect-transfer-screen
+pause_for_transfer_screen_inspect: false
+
+# 振込 Dispatch へ現在URLのクエリを維持してパスだけ差し替えて直行する場合（例: BPT001Dispatch）
+# transfer_direct_path: "BPT001Dispatch"
+# 直遷移直後に B0470 だけが出たとき、ログイン後トップへ戻してメニュークリックへフォールバックする（既定 true）
+# transfer_direct_fallback_to_menu_on_b0470: true
 
 # 振込メニューを手動クリックするか（true: 画面上で「振込」をクリックしてもらい、クリック後に Enter で次を自動実行）
 # ダイアログで自動クリックが進まない場合に true 推奨
@@ -85,7 +135,7 @@ transfer_menu_keywords:
 # 振込フォームの自動入力（コマンドで --bank --branch --account --amount 指定時）
 # 振込画面を開き、開発者ツールで各要素の id/name を確認してセレクタを設定
 transfer_form:
-  specify_destination_button_selector: ""  # 振込先選択画面の「振込先を指定」ボタン
+  specify_destination_button_selector: ""  # 振込画面で次に進むボタン（例: #btn002-1。画面で id を確認）
   bank_confirm_button_selector: ""         # 銀行コード入力後の検索ボタン
   bank_select_button_selector: ""          # 検索結果の「選択」ボタン（金融機関）
   branch_confirm_button_selector: ""      # 支店コード入力後の検索ボタン
@@ -96,6 +146,11 @@ transfer_form:
   amount_selector: ""
   execution_screen_button_selector: ""   # 確認画面→実行画面へ進むボタン
   confirmation_checkbox_selector: ""   # 「確認しました」チェックボックス
+  otp_input_selector: ""   # Gmail で取得した OTP を入力する欄（開発者ツールで検証）
+  otp_submit_selector: ""  # 任意: OTP 入力後の確定ボタン
+
+# Gmail API で OTP を取得して入力（無効化は false または TOKAIROKIN_FETCH_OTP_FROM_GMAIL=0）
+fetch_otp_from_gmail: true
 
 # ワンタイムパスワード入力のため一時停止
 pause_for_otp: true

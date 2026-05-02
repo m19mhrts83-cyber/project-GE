@@ -1,4 +1,6 @@
 # ブラウザ自動操作（日能研・銀行などログイン後の情報取得）
+# Python 3.12+ で stdlib の distutils が消えたため、undetected-chromedriver の import に必要
+setuptools>=69.0.0
 playwright>=1.40.0
 playwright-stealth>=2.0.0
 python-dotenv>=1.0.0
@@ -7,3 +9,8 @@ pdfplumber>=0.10.0
 # 東海労金用：自動化検知回避の代替手段（use_undetected_chromedriver: true 時）
 undetected-chromedriver>=3.5.0
 selenium>=4.0.0
+# 東海労金 OTP を Gmail API で取得（tokairokin_gmail_otp.py）— finance/prudential_gmail_otp と同系
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.2.0

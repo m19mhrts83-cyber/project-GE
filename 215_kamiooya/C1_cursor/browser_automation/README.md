@@ -82,10 +82,22 @@ python fetch_after_login.py nichinoken
      python fetch_after_login.py tokairokin --bank 0005 --branch 405 --account 0526519 --amount 100000
      ```
      - config_tokairokin.yaml の `transfer_form` に各入力欄のCSSセレクタを設定する必要あり
-     - 振込フォーム入力後、ワンタイムパスワード（OTP）の入力で一時停止 → 手動で OTP 入力・実行
+     - 振込フォーム入力後は OTP 処理へ（下記 5.）。`--amount` のみの既定振込先は `.env` の `TOKAIROKIN_DEFAULT_*` を参照
    - 初回は `headless: false` のまま実行し、画面で動作を確認してください
 
-4. **パスワード変更画面が出る場合（自動化検知の回避）**
+4. **無操作によるセッション中断（B0470 / BER020）**
+   - 東海労金側は **サーバー基準の無操作タイムアウト**があり、ブラウザ内だけのスクロールでは延びないことがあります。
+   - `session_keepalive_fetch_head: true`（既定）のとき、キープアライブ処理で **現在URLへの `fetch(..., HEAD)`** を実行し、セッション維持の補助とします（異常時は `false`）。
+   - **ターミナルで Enter 待ち**のあいだも別スレッドからキープアライブします（`wait_enter_keepalive_interval_seconds`、既定5秒）。
+   - 待機ループ用の間隔は `session_keepalive_interval_seconds`（既定8秒）。
+   - **セレクタ検証**だけしたいときは `--inspect-transfer-screen` で振込画面直後に Enter 待ちできます。
+
+5. **ワンタイムパスワード（Gmail API）**
+   - プルデンシャル生命の解約確認番号取得（`215_kamiooya/C1_cursor/finance/prudential_gmail_otp.py`）と同じく、215 の `1b_Cursorマニュアル` の Gmail トークンで `users.messages.list` し、OTP を読み取って `transfer_form.otp_input_selector` に入力する。
+   - 実装: `browser_automation/tokairokin_gmail_otp.py`。`pip install -r requirements.txt` で Google API 系を入れる。
+   - `fetch_otp_from_gmail: true`（既定）かつ **`otp_input_selector` を必ず設定**。届くメールの From / 件名が想定と違う場合は `.env` の `TOKAIROKIN_OTP_GMAIL_FROM` や `TOKAIROKIN_OTP_GMAIL_QUERY` で調整。
+
+6. **パスワード変更画面が出る場合（自動化検知の回避）**
    - プログラム起動のブラウザが自動操作と検知され、パスワード変更を促されることがあります
    - **推奨：undetected-chromedriver**（代替手段）
      - `config_tokairokin.yaml` で `use_undetected_chromedriver: true` に設定

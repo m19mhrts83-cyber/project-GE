@@ -17,12 +17,15 @@
 将来: python fetch_after_login.py bank で銀行用も同様に実行できるようにする想定。
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import platform
 import re
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -36,32 +39,121 @@ load_dotenv(ROOT_ENV)
 load_dotenv(SCRIPT_DIR / ".env")
 
 
-def _wait_enter(confirm_msg: str = "Enter を受け付けました。次へ進みます。"):
+def _tokairokin_non_interactive() -> bool:
+    """Jarvis・Cursor Agent・CI 等で Enter 待ちが破綻しないようにするフラグ。"""
+    v = os.environ.get("TOKAIROKIN_NON_INTERACTIVE", "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
+def _tokairokin_non_interactive_pause_ms() -> int:
+    """非対話時に Enter の代わりに待つ毫秒。ページ描画・キープアライブのため最低数百 ms は確保する。"""
+    raw = os.environ.get("TOKAIROKIN_NON_INTERACTIVE_PAUSE_MS", "1800").strip()
+    try:
+        return max(0, min(int(raw), 120000))
+    except ValueError:
+        return 1800
+
+
+def _wait_enter(
+    confirm_msg: str = "Enter を受け付けました。次へ進みます。",
+    *,
+    driver=None,
+    keepalive_config: dict | None = None,
+):
     """Enter が押されるまで待ち、受け取ったら確認メッセージを表示。
     Cursor の統合ターミナルでは stdin に Enter が届かないことがあるため、
     まず /dev/tty（端末デバイス）から直接読みを試みる。
+
+    driver を渡したときは別スレッドでキープアライブし、ネットバンクの無操作切断（B0470等）を抑える。
+
+    TOKAIROKIN_NON_INTERACTIVE=1（または CLI --non-interactive）のときは Enter を読まず、
+    短い固定待機で進む（Jarvis / 統合ターミナルで誤入力や無限待ちを避ける）。
     """
-    sys.stderr.flush()
-    entered = False
-    # /dev/tty から読む（統合ターミナルで stdin が効かない場合に有効）
-    if platform.system() != "Windows":
+    cfg = keepalive_config if keepalive_config is not None else {}
+    if _tokairokin_non_interactive():
+        pause_ms = _tokairokin_non_interactive_pause_ms()
+        stop_pulse = threading.Event()
+        pulse_thr = None
+        if driver is not None and cfg.get("session_keepalive_enabled", True):
+            iv = float(cfg.get("wait_enter_keepalive_interval_seconds", 5))
+            iv = max(2.0, min(iv, 120.0))
+
+            def _pulse_loop():
+                while not stop_pulse.wait(timeout=iv):
+                    try:
+                        _tokairokin_session_keepalive(driver, cfg)
+                    except Exception:
+                        pass
+
+            pulse_thr = threading.Thread(
+                target=_pulse_loop,
+                daemon=True,
+                name="tokairokin_non_interactive_keepalive",
+            )
+            pulse_thr.start()
         try:
-            with open("/dev/tty", "r", encoding="utf-8") as tty:
-                tty.readline()
-            entered = True
-        except (OSError, IOError):
-            pass
-    if not entered:
-        try:
-            sys.stdin.readline()
-            entered = True
-        except (EOFError, OSError):
-            pass
-    if not entered:
-        try:
-            input()
-        except (EOFError, OSError):
-            pass
+            time.sleep(pause_ms / 1000.0)
+        finally:
+            stop_pulse.set()
+            if pulse_thr is not None:
+                pulse_thr.join(timeout=3.0)
+        print(
+            f"(TOKAIROKIN_NON_INTERACTIVE) Enter 待ちをスキップし {pause_ms} ms 待機して続行しました。",
+            file=sys.stderr,
+        )
+        sys.stderr.flush()
+        if confirm_msg:
+            print(confirm_msg, file=sys.stderr)
+            sys.stderr.flush()
+        return
+
+    stop_pulse = threading.Event()
+    pulse_thr = None
+    if driver is not None and cfg.get("session_keepalive_enabled", True):
+        iv = float(cfg.get("wait_enter_keepalive_interval_seconds", 5))
+        iv = max(3.0, min(iv, 120.0))
+
+        def _pulse_loop():
+            while not stop_pulse.wait(timeout=iv):
+                try:
+                    _tokairokin_session_keepalive(driver, cfg)
+                except Exception:
+                    pass
+
+        pulse_thr = threading.Thread(
+            target=_pulse_loop,
+            daemon=True,
+            name="tokairokin_wait_enter_keepalive",
+        )
+        pulse_thr.start()
+
+    try:
+        sys.stderr.flush()
+        entered = False
+        # /dev/tty から読む（統合ターミナルで stdin が効かない場合に有効）
+        if platform.system() != "Windows":
+            try:
+                with open("/dev/tty", "r", encoding="utf-8") as tty:
+                    tty.readline()
+                entered = True
+            except (OSError, IOError):
+                pass
+        if not entered:
+            try:
+                sys.stdin.readline()
+                entered = True
+            except (EOFError, OSError):
+                pass
+        if not entered:
+            try:
+                input()
+            except (EOFError, OSError):
+                pass
+    finally:
+        stop_pulse.set()
+        if pulse_thr is not None:
+            pulse_thr.join(timeout=3.0)
+
     if confirm_msg:
         print(confirm_msg, file=sys.stderr)
         sys.stderr.flush()
@@ -122,13 +214,496 @@ def _apply_tokairokin_transfer_defaults(transfer: dict | None) -> dict | None:
     return out
 
 
+def _env_int_nonneg(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
+
+
+def _tokairokin_fetch_otp_from_gmail_enabled(config: dict) -> bool:
+    """Gmail API で OTP を取得するか。config と TOKAIROKIN_FETCH_OTP_FROM_GMAIL で制御。"""
+    v = config.get("fetch_otp_from_gmail")
+    if v is not None:
+        return bool(v)
+    return os.environ.get("TOKAIROKIN_FETCH_OTP_FROM_GMAIL", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def _tokairokin_session_keepalive(driver, config: dict | None = None) -> None:
+    """ネットバンクの「一定時間無操作で中断」（B0470等）対策。クライアント操作に加え、必要なら同一URLへのHEADでサーバーに触れる。"""
+    cfg = config if config is not None else {}
+    try:
+        driver.execute_script(
+            "try { window.scrollBy(0, 2); window.scrollBy(0, -2); "
+            "var b = document.body; if (b) { b.dispatchEvent(new Event('mousemove', {bubbles: true})); } "
+            "} catch (e) {}"
+        )
+    except Exception:
+        pass
+    if not cfg.get("session_keepalive_fetch_head", True):
+        return
+    try:
+        url = driver.current_url
+        if not url or not url.startswith("http"):
+            return
+        # execute_script が Promise を返すだけだと完了前に制御が戻る場合があるため async 版で確実に待つ
+        timeout_s = float(cfg.get("session_keepalive_fetch_timeout_seconds", 12))
+        timeout_s = max(3.0, min(timeout_s, 60.0))
+        driver.set_script_timeout(int(timeout_s) + 2)
+        driver.execute_async_script(
+            "var u=arguments[0], cb=arguments[arguments.length-1]; "
+            "try { fetch(u,{method:'HEAD',credentials:'same-origin',cache:'no-store'})"
+            ".then(function(){cb(true);}).catch(function(){cb(false);}); } catch(e) { cb(false); }",
+            url,
+        )
+    except Exception:
+        pass
+
+
+def _tokairokin_page_looks_like_session_timeout(driver) -> bool:
+    """画面ID BER020 / エラーコード B0470 など、無操作切断・取引中断ページのヒューリスティック。"""
+    from selenium.webdriver.common.by import By
+
+    try:
+        driver.switch_to.default_content()
+        src = driver.page_source or ""
+        body = ""
+        try:
+            body = driver.find_element(By.TAG_NAME, "body").text or ""
+        except Exception:
+            pass
+        hay = src + "\n" + body
+        if "B0470" in hay or "BER020" in hay:
+            return True
+        if "お取引を中断" in hay and ("一定時間" in hay or "自動的に" in hay):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _tokairokin_switch_to_frame_containing_selectors(driver, probes: list[str], max_depth: int) -> bool:
+    """いずれかのセレクタが見つかるフレームへ driver を切り替える。見つからなければ default_content のまま False。"""
+    driver.switch_to.default_content()
+    plist = [(p or "").strip() for p in probes if (p or "").strip()]
+    if not plist:
+        return True
+
+    def probe_here() -> bool:
+        for sel in plist:
+            try:
+                if _tokairokin_transfer_find(driver, sel) is not None:
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def dfs(depth: int) -> bool:
+        if probe_here():
+            return True
+        if depth >= max_depth:
+            return False
+        frames = driver.find_elements(By.TAG_NAME, "iframe")
+        for idx in range(len(frames)):
+            try:
+                frames_now = driver.find_elements(By.TAG_NAME, "iframe")
+                if idx >= len(frames_now):
+                    break
+                driver.switch_to.frame(frames_now[idx])
+                if dfs(depth + 1):
+                    return True
+                driver.switch_to.parent_frame()
+            except Exception:
+                try:
+                    driver.switch_to.parent_frame()
+                except Exception:
+                    try:
+                        driver.switch_to.default_content()
+                    except Exception:
+                        pass
+        return False
+
+    ok = dfs(0)
+    if not ok:
+        try:
+            driver.switch_to.default_content()
+        except Exception:
+            pass
+    return ok
+
+
+def _tokairokin_transfer_find(driver, sel: str):
+    """transfer_form 用セレクタで要素を1件取得（XPath は先頭 / または (）。"""
+    from selenium.webdriver.common.by import By
+
+    s = (sel or "").strip()
+    if not s:
+        return None
+    if s.startswith("/") or s.startswith("("):
+        by, val = By.XPATH, s
+    else:
+        val = s if s.startswith(("#", ".", "[", "input")) else f"#{s}"
+        by, val = By.CSS_SELECTOR, val
+    try:
+        return driver.find_element(by, val)
+    except Exception:
+        return None
+
+
+def _tokairokin_wait_clickable_with_keepalive(
+    driver,
+    config: dict,
+    selector: str,
+    timeout_s: int,
+    frame_probes: list[str] | None = None,
+):
+    """無操作切断を抑えつつ、要素が表示・有効になるまでポーリング。失敗時は None。
+
+    frame_probes にセレクタを渡すと default のほか iframe を深さ優先で探索し、
+    メインコンテンツだけでは見えない振込フォームに対応する。
+    """
+    if not (selector or "").strip():
+        return None
+    enabled = config.get("session_keepalive_enabled", True)
+    pulse = float(config.get("session_keepalive_interval_seconds", 8))
+    poll = float(config.get("session_keepalive_poll_seconds", 1.0))
+    poll = max(0.3, min(poll, 5.0))
+    pulse = max(3.0, pulse)
+    deadline = time.monotonic() + max(1, int(timeout_s))
+    last_pulse = 0.0
+    search_frames = bool(config.get("transfer_form_search_iframes", True))
+    probes = [p for p in (frame_probes or []) if (p or "").strip()]
+    max_depth = int(config.get("transfer_form_iframe_max_depth", 5))
+    max_depth = max(1, min(max_depth, 12))
+    every_poll_dom = bool(config.get("session_keepalive_every_poll_during_form_wait", True))
+
+    while time.monotonic() < deadline:
+        try:
+            if _tokairokin_page_looks_like_session_timeout(driver):
+                print(
+                    "無操作切断または取引中断画面を検知しました（B0470 / BER020 等）。セレクタ待機を中止します。",
+                    file=sys.stderr,
+                )
+                try:
+                    driver.switch_to.default_content()
+                except Exception:
+                    pass
+                return None
+            if search_frames and probes:
+                _tokairokin_switch_to_frame_containing_selectors(driver, probes, max_depth)
+            else:
+                driver.switch_to.default_content()
+
+            el = _tokairokin_transfer_find(driver, selector)
+            if el is not None and el.is_displayed() and el.is_enabled():
+                return el
+        except Exception:
+            pass
+        now = time.monotonic()
+        if every_poll_dom and enabled:
+            try:
+                driver.execute_script(
+                    "try { window.scrollBy(0, 1); window.scrollBy(0, -1); } catch (e) {}"
+                )
+            except Exception:
+                pass
+        if enabled and now - last_pulse >= pulse:
+            _tokairokin_session_keepalive(driver, config)
+            last_pulse = now
+        time.sleep(min(poll, max(0.1, deadline - time.monotonic())))
+    try:
+        driver.switch_to.default_content()
+    except Exception:
+        pass
+    return None
+
+
+def _tokairokin_js_scroll_click(driver, el) -> bool:
+    """オーバーレイや Selenium のクリック阻害があるとき向けにスクロールしてから JS クリック。"""
+    try:
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+        time.sleep(0.25)
+        driver.execute_script("arguments[0].click();", el)
+        return True
+    except Exception:
+        return False
+
+
+def _tokairokin_transfer_page_initial_pulse(driver, config: dict) -> bool:
+    """振込URL直後に短周期キープアライブし、無操作切断までの時間を稼ぐ。タイムアウト画面なら False。"""
+    burst = int(config.get("transfer_page_keepalive_burst_count", 12))
+    burst = max(0, min(burst, 40))
+    delay = float(config.get("transfer_page_keepalive_burst_interval_seconds", 0.35))
+    delay = max(0.1, min(delay, 2.0))
+    for _ in range(burst):
+        if _tokairokin_page_looks_like_session_timeout(driver):
+            print(
+                "振込画面への遷移直後に無操作切断画面（B0470 / BER020）が表示されています。",
+                file=sys.stderr,
+            )
+            return False
+        _tokairokin_session_keepalive(driver, config)
+        time.sleep(delay)
+    return True
+
+
+def _tokairokin_recover_top_after_direct_transfer_timeout(
+    driver,
+    config: dict,
+    pre_nav_url: str,
+) -> bool:
+    """振込Dispatchを URL 直叩きした直後に B0470 だけが出たとき、セッションは生きていることがある。
+    ログイン後トップへ戻り、メニュー／リンククリックのフォールバックへ渡す。
+    """
+    if not config.get("transfer_direct_fallback_to_menu_on_b0470", True):
+        return False
+    u = (pre_nav_url or "").strip()
+    if not u.startswith("http"):
+        return False
+    try:
+        driver.get(u)
+        time.sleep(float(config.get("wait_after_page", 2) or 2))
+        for _ in range(4):
+            if _tokairokin_page_looks_like_session_timeout(driver):
+                return False
+            _tokairokin_session_keepalive(driver, config)
+            time.sleep(0.45)
+        if _tokairokin_page_looks_like_session_timeout(driver):
+            return False
+        print(
+            "振込URLの直接遷移直後に無操作切断画面が出ました。"
+            " セッション維持のためログイン後トップへ戻り、画面上の「振込」等から遷移を試します。",
+            file=sys.stderr,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def _get_secret_phrase_answer(mapping: dict):
-    """合言葉のマッピングから回答を取得。answer_env または answer を参照。"""
     """合言葉のマッピングから回答を取得。answer_env または answer を参照。"""
     env_key = mapping.get("answer_env")
     if env_key:
         return os.environ.get(env_key)
     return mapping.get("answer")
+
+
+def _tokairokin_post_login_dashboard_detected(
+    current_url: str,
+    body_text: str,
+    html_snippet: str,
+    config: dict,
+) -> bool:
+    """ログイン後トップ（合言葉なしルート）か。URL と本文で判定し、合言葉画面と両立しないようにする。"""
+    if _tokairokin_secret_phrase_screen_detected(body_text, html_snippet, config):
+        return False
+    det = config.get("post_login_dashboard_detect") or {}
+    url_patterns = det.get("url_contains_any")
+    if url_patterns is None:
+        url_patterns = ["BLI001Dispatch"]
+    elif isinstance(url_patterns, str):
+        url_patterns = [url_patterns]
+    else:
+        url_patterns = list(url_patterns)
+    url = current_url or ""
+    if not any(str(p).strip() and str(p) in url for p in url_patterns):
+        return False
+    body_markers = det.get("body_contains_any")
+    if body_markers is None:
+        body_markers = ["トップページ", "振込振替", "残高照会", "口座情報"]
+    elif isinstance(body_markers, str):
+        body_markers = [body_markers]
+    else:
+        body_markers = list(body_markers)
+    hay = (body_text or "") + "\n" + (html_snippet or "")
+    return any(str(m).strip() and str(m) in hay for m in body_markers)
+
+
+def _tokairokin_secret_phrase_screen_detected(body_text: str, html_snippet: str, config: dict) -> bool:
+    """合言葉・あいことば等の追加認証画面かどうか。文言はサイトにより異なるため markers で拡張可能。"""
+    markers = config.get("secret_phrase_page_markers")
+    if markers is None:
+        markers = [
+            "追加認証（合言葉認証）",
+            "追加認証の入力",
+            "BLI017",
+            "母親の誕生日",
+            "[必須] 回答",
+            "合言葉",
+            "あいことば",
+            "秘密の質問",
+            "確認用の質問",
+            "質問にお答え",
+            "お答えください",
+            "追加認証",
+        ]
+    elif isinstance(markers, str):
+        markers = [markers]
+    else:
+        markers = list(markers)
+    hay = (body_text or "") + "\n" + (html_snippet or "")
+    return any((str(m).strip() and str(m) in hay) for m in markers)
+
+
+def _tokairokin_secret_phrase_haystack(driver, config: dict) -> tuple[str, str]:
+    """メインフレームおよび iframe 内の本文を結合。parasol 系で追加認証が iframe 内のみにある場合がある。"""
+    from selenium.webdriver.common.by import By
+
+    parts: list[str] = []
+    driver.switch_to.default_content()
+    try:
+        parts.append(driver.find_element(By.TAG_NAME, "body").text)
+    except Exception:
+        pass
+    html_root = driver.page_source or ""
+    if config.get("secret_phrase_check_iframes", True):
+        frames = driver.find_elements(By.TAG_NAME, "iframe")
+        for frame in frames:
+            try:
+                driver.switch_to.default_content()
+                driver.switch_to.frame(frame)
+                parts.append(driver.find_element(By.TAG_NAME, "body").text)
+            except Exception:
+                pass
+            finally:
+                try:
+                    driver.switch_to.default_content()
+                except Exception:
+                    pass
+    combined_body = "\n".join(parts)
+    return combined_body, html_root
+
+
+def _tokairokin_poll_secret_challenge_visible(
+    driver,
+    config: dict,
+    secret_phrase_auto: list,
+    *,
+    max_wait_override: int | None = None,
+) -> bool:
+    """ログイン送信後、質問・合言葉の文言が DOM に載るまで待つ。
+
+    描画が遅い SPA や、「再ログイン」が先に見えて質問が後から載る構成で、早押しすると
+    目視でも質問が出ないように見える／検出もできない問題を抑える。
+    """
+    max_wait = int(
+        max_wait_override
+        if max_wait_override is not None
+        else config.get("secret_phrase_dom_wait_seconds", 25)
+    )
+    if max_wait <= 0:
+        return False
+    poll = float(config.get("secret_phrase_dom_poll_seconds", 0.5))
+    poll = max(0.15, min(poll, 3.0))
+    deadline = time.monotonic() + max_wait
+    while time.monotonic() < deadline:
+        bt, hs = _tokairokin_secret_phrase_haystack(driver, config)
+        hay = (bt or "") + "\n" + (hs or "")
+        if _tokairokin_secret_phrase_screen_detected(bt, hs, config):
+            return True
+        for m in secret_phrase_auto:
+            mk = (m.get("match") or "").strip()
+            if mk and mk in hay:
+                return True
+        _tokairokin_session_keepalive(driver, config)
+        time.sleep(min(poll, max(0.05, deadline - time.monotonic())))
+    return False
+
+
+def _tokairokin_try_secret_phrase_autofill_one_context(driver, config: dict, hay_q: str, secret_phrase_auto: list) -> bool:
+    """現在の frame コンテキストで match に一致する質問があれば入力〜送信。"""
+    from selenium.webdriver.common.by import By
+
+    for mapping in secret_phrase_auto:
+        match_kw = (mapping.get("match") or "").strip()
+        if not match_kw or match_kw not in hay_q:
+            continue
+        answer = _get_secret_phrase_answer(mapping)
+        if not answer:
+            continue
+        input_selectors = config.get("secret_phrase_input_selectors") or [
+            "input[type='text']:not([readonly])",
+            "input[name*='kotoba'], input[name*='answer'], input[id*='kotoba'], input[id*='answer']",
+            "input.txtBox, input[id^='txtBox']",
+        ]
+        input_el = None
+        for sel in input_selectors:
+            try:
+                els = driver.find_elements(By.CSS_SELECTOR, sel)
+                for el in els:
+                    if el.is_displayed() and el.is_enabled():
+                        input_el = el
+                        break
+                if input_el:
+                    break
+            except Exception:
+                continue
+        if input_el:
+            input_el.clear()
+            input_el.send_keys(answer)
+            for btn_text in ["確認", "送信", "次へ", "認証", "実行", "ログイン", "確認する", "送信する"]:
+                try:
+                    btn = driver.find_element(
+                        By.XPATH,
+                        f"//input[@value='{btn_text}'] | //button[contains(text(),'{btn_text}')] | //a[contains(text(),'{btn_text}')]",
+                    )
+                    if btn.is_displayed():
+                        btn.click()
+                        print(f"合言葉を自動入力しました（キーワード: {match_kw[:20]}...）", file=sys.stderr)
+                        time.sleep(3)
+                        return True
+                except Exception:
+                    continue
+    return False
+
+
+def _tokairokin_try_secret_phrase_autofill_selenium(driver, config: dict) -> bool:
+    """合言葉画面を検出したときだけ入力〜送信まで試す。成功時 True。iframe 内も探索する。"""
+    from selenium.webdriver.common.by import By
+
+    secret_phrase_auto = config.get("secret_phrase_auto") or []
+    if not secret_phrase_auto:
+        return False
+    combined_body, html_src = _tokairokin_secret_phrase_haystack(driver, config)
+    hay_q = (combined_body or "") + "\n" + (html_src or "")
+    if not _tokairokin_secret_phrase_screen_detected(combined_body, html_src, config):
+        return False
+
+    driver.switch_to.default_content()
+    if _tokairokin_try_secret_phrase_autofill_one_context(driver, config, hay_q, secret_phrase_auto):
+        return True
+
+    if not config.get("secret_phrase_check_iframes", True):
+        return False
+    frames = driver.find_elements(By.TAG_NAME, "iframe")
+    for frame in frames:
+        try:
+            driver.switch_to.default_content()
+            driver.switch_to.frame(frame)
+            try:
+                sub_body = driver.find_element(By.TAG_NAME, "body").text
+            except Exception:
+                sub_body = ""
+            sub_hay = hay_q + "\n" + sub_body
+            if _tokairokin_try_secret_phrase_autofill_one_context(driver, config, sub_hay, secret_phrase_auto):
+                driver.switch_to.default_content()
+                return True
+        except Exception:
+            pass
+        finally:
+            try:
+                driver.switch_to.default_content()
+            except Exception:
+                pass
+    return False
 
 
 def extract_main_text(page) -> str:
@@ -634,7 +1209,14 @@ def _write_tokairokin_transfer_attempt_log(attempt_log: list, script_dir: Path) 
     print(f"試行履歴を更新しました: {history_path}", file=sys.stderr)
 
 
-def _run_tokairokin_undetected(config: dict, user: str, password: str, headless: bool, transfer: dict = None) -> str:
+def _run_tokairokin_undetected(
+    config: dict,
+    user: str,
+    password: str,
+    headless: bool,
+    transfer: dict = None,
+    inspect_transfer_screen: bool = False,
+) -> str:
     """
     undetected-chromedriver（Selenium）で東海労金にログイン。
     自動化検知を回避する代替手段。
@@ -673,6 +1255,24 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
     driver = uc.Chrome(**kwargs)
     driver.set_window_size(1280, 900)
 
+    inspect_pause = bool(inspect_transfer_screen or config.get("pause_for_transfer_screen_inspect"))
+
+    def _offer_transfer_screen_inspect(how: str) -> None:
+        """振込URL到達直後に DevTools でセレクタ検証できるよう一時停止。"""
+        if not inspect_pause or not transfer:
+            return
+        print("\n" + "=" * 60, file=sys.stderr)
+        print(f"【検証用一時停止】振込画面へ遷移しました（{how}）。", file=sys.stderr)
+        print(
+            "  この画面のまま開発者ツールでセレクタを確認してください。"
+            " 終わったらこのターミナルで Enter を押すと自動入力を続けます。",
+            file=sys.stderr,
+        )
+        print("=" * 60 + "\n", file=sys.stderr)
+        _tokairokin_session_keepalive(driver, config)
+        _wait_enter(driver=driver, keepalive_config=config)
+        _tokairokin_session_keepalive(driver, config)
+
     try:
         driver.get(login_url)
         WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#txtBox005")))
@@ -698,7 +1298,11 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
         submit = driver.find_element(By.CSS_SELECTOR, "#btn012")
         submit.click()
 
-        time.sleep(wait_login)
+        wl = max(1, int(wait_login))
+        for _ in range(wl):
+            time.sleep(1)
+            if config.get("session_keepalive_enabled", True):
+                _tokairokin_session_keepalive(driver, config)
 
         body_text = driver.find_element(By.TAG_NAME, "body").text
         if "エラー" in body_text or "認証に失敗" in body_text or "ログインに失敗" in body_text or "口座情報が誤っています" in body_text:
@@ -706,59 +1310,26 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
 
         print("東海労金へのログイン処理が完了しました。")
 
-        # 合言葉の自動入力（設定されている場合）
+        # 合言葉の自動入力（ログイン送信直後）
         secret_phrase_filled = False
         secret_phrase_auto = config.get("secret_phrase_auto") or []
-        if secret_phrase_auto and ("合言葉" in body_text or "合言葉" in driver.page_source):
-            for mapping in secret_phrase_auto:
-                match_kw = (mapping.get("match") or "").strip()
-                if not match_kw or match_kw not in body_text:
-                    continue
-                answer = _get_secret_phrase_answer(mapping)
-                if not answer:
-                    continue
-                # 合言葉入力欄を探す（複数セレクタを試行）
-                input_selectors = config.get("secret_phrase_input_selectors") or [
-                    "input[type='text']:not([readonly])",
-                    "input[name*='kotoba'], input[name*='answer'], input[id*='kotoba'], input[id*='answer']",
-                    "input.txtBox, input[id^='txtBox']",
-                ]
-                input_el = None
-                for sel in input_selectors:
-                    try:
-                        els = driver.find_elements(By.CSS_SELECTOR, sel)
-                        for el in els:
-                            if el.is_displayed() and el.is_enabled():
-                                input_el = el
-                                break
-                        if input_el:
-                            break
-                    except Exception:
-                        continue
-                if input_el:
-                    input_el.clear()
-                    input_el.send_keys(answer)
-                    # 送信ボタン（確認・送信・次へ など）
-                    for btn_text in ["確認", "送信", "次へ", "認証", "実行", "ログイン", "確認する", "送信する"]:
-                        try:
-                            btn = driver.find_element(By.XPATH, f"//input[@value='{btn_text}'] | //button[contains(text(),'{btn_text}')] | //a[contains(text(),'{btn_text}')]")
-                            if btn.is_displayed():
-                                btn.click()
-                                secret_phrase_filled = True
-                                print(f"合言葉を自動入力しました（キーワード: {match_kw[:20]}...）", file=sys.stderr)
-                                time.sleep(3)
-                                break
-                        except Exception:
-                            continue
-                if secret_phrase_filled:
-                    break
-            # 再ログインの案内が出た場合（合言葉入力後）
+        if secret_phrase_auto:
+            if _tokairokin_poll_secret_challenge_visible(driver, config, secret_phrase_auto):
+                print(
+                    "質問・合言葉の文言を DOM で検出しました（ログイン直後の待機ポーリング）。"
+                    " 自動入力を試みます。",
+                    file=sys.stderr,
+                )
+            secret_phrase_filled = _tokairokin_try_secret_phrase_autofill_selenium(driver, config)
             if secret_phrase_filled:
                 time.sleep(2)
                 body_text = driver.find_element(By.TAG_NAME, "body").text
                 for relogin_kw in ["再ログイン", "サインイン", "ログイン"]:
                     try:
-                        el = driver.find_element(By.XPATH, f"//a[contains(text(),'{relogin_kw}')] | //button[contains(text(),'{relogin_kw}')] | //input[@value='{relogin_kw}']")
+                        el = driver.find_element(
+                            By.XPATH,
+                            f"//a[contains(text(),'{relogin_kw}')] | //button[contains(text(),'{relogin_kw}')] | //input[@value='{relogin_kw}']",
+                        )
                         if el.is_displayed() and relogin_kw in body_text:
                             el.click()
                             print(f"「{relogin_kw}」をクリックしました。", file=sys.stderr)
@@ -786,22 +1357,99 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
             if not relogin_clicked:
                 print("「再ログイン」ボタンが見つかりませんでした。手動でクリックしてください。", file=sys.stderr)
 
+        # 「再ログイン」クリック後にだけ合言葉画面が出る場合があるため再試行
+        if secret_phrase_auto and not secret_phrase_filled:
+            aw2 = int(config.get("secret_phrase_dom_wait_seconds_after_relogin", 15))
+            if aw2 > 0:
+                _tokairokin_poll_secret_challenge_visible(
+                    driver,
+                    config,
+                    secret_phrase_auto,
+                    max_wait_override=aw2,
+                )
+            secret_phrase_filled = _tokairokin_try_secret_phrase_autofill_selenium(driver, config)
+            if secret_phrase_filled:
+                time.sleep(2)
+                body_text = driver.find_element(By.TAG_NAME, "body").text
+                for relogin_kw in ["再ログイン", "サインイン", "ログイン"]:
+                    try:
+                        el = driver.find_element(
+                            By.XPATH,
+                            f"//a[contains(text(),'{relogin_kw}')] | //button[contains(text(),'{relogin_kw}')] | //input[@value='{relogin_kw}']",
+                        )
+                        if el.is_displayed() and relogin_kw in body_text:
+                            el.click()
+                            print(f"「{relogin_kw}」をクリックしました。", file=sys.stderr)
+                            time.sleep(3)
+                            break
+                    except Exception:
+                        continue
+
+        skip_secret_phrase_pause_for_dashboard = False
+        if secret_phrase_auto and not secret_phrase_filled:
+            bt, hs = _tokairokin_secret_phrase_haystack(driver, config)
+            if not _tokairokin_secret_phrase_screen_detected(bt, hs, config):
+                try:
+                    curl = driver.current_url or ""
+                except Exception:
+                    curl = ""
+                if _tokairokin_post_login_dashboard_detected(curl, bt, hs, config):
+                    skip_secret_phrase_pause_for_dashboard = True
+                    print(
+                        "合言葉（追加認証）画面は検出されませんでした。"
+                        " ログイン後トップページ相当と判断し、合言葉の Enter 待ちをスキップして振込処理へ進みます。",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        "secret_phrase_auto は設定されていますが、合言葉系画面の検出キーワードが"
+                        " メイン・iframe 結合テキストおよび HTML に見つかりませんでした（ログイン直後・再ログイン後のいずれでもなし）。"
+                        " secret_phrase_page_markers に実画面の文言を追加するか、本当に合言葉なしルートか確認してください。",
+                        file=sys.stderr,
+                    )
+            else:
+                print(
+                    "合言葉系画面は検出できましたが自動入力に失敗しました。"
+                    " secret_phrase_auto の match が質問文に含まれるか、TOKAIROKIN_SECRET_*・入力欄セレクタを確認してください。",
+                    file=sys.stderr,
+                )
+
         # 合言葉は自動入力対応済み。自動入力できなかった場合のみここで一時停止（ワンタイムパスワードは手動入力）
-        if not secret_phrase_filled and config.get("pause_for_secret_phrase", True):
+        if (
+            not secret_phrase_filled
+            and not skip_secret_phrase_pause_for_dashboard
+            and config.get("pause_for_secret_phrase", True)
+        ):
+            if _tokairokin_non_interactive():
+                print(
+                    "警告: 非対話モードですが合言葉が自動入力されていません。"
+                    " secret_phrase_auto と TOKAIROKIN_SECRET_* を設定しないとログイン後に失敗しやすいです。",
+                    file=sys.stderr,
+                )
             print("\n" + "=" * 60, file=sys.stderr)
             print("【一時停止】合言葉は通常は自動入力で対応しています。", file=sys.stderr)
             print("  自動入力が完了したら、このターミナルで Enter キーを押して次へ進んでください。", file=sys.stderr)
             print("  ※ Enter を押しても次に進まない場合は、**Terminal.app** で同じコマンドを実行してください。", file=sys.stderr)
             print("=" * 60 + "\n", file=sys.stderr)
-            _wait_enter()
+            _wait_enter(driver=driver, keepalive_config=config)
 
         # 振込画面への遷移（各試行を記録し、試行履歴に反映する）
         go_to_transfer = config.get("go_to_transfer", True)
         transfer_attempt_log = []  # [{ "step": "名前", "result": "success"|"failed"|"skipped", "detail": "..." }, ...]
 
         if go_to_transfer:
-            wait_before = config.get("wait_before_transfer_menu", 5)
-            time.sleep(wait_before)
+            wait_before = int(config.get("wait_before_transfer_menu", 5))
+            # Jarvis 等では長い無操作が B0470 を誘発しやすいので上限をかける
+            if _tokairokin_non_interactive():
+                cap = _env_int_nonneg("TOKAIROKIN_NON_INTERACTIVE_TRANSFER_MENU_WAIT_CAP", 2)
+                wait_before = max(1, min(wait_before, max(1, cap)))
+            # ログイン直後〜振込遷移まで無操作だとネットバンク側でセッション切断されることがある
+            if config.get("session_keepalive_enabled", True):
+                for _ in range(max(1, int(wait_before))):
+                    time.sleep(1)
+                    _tokairokin_session_keepalive(driver, config)
+            else:
+                time.sleep(wait_before)
 
             # オーバーレイを閉じてから待機
             try:
@@ -814,16 +1462,51 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                 pass
 
             transfer_clicked = False
+            # transfer_direct で B0470 になったあとフォールバッククリックすると Selenium が長いスタックトレースを出すだけなので抑止する
+            xfer_nav_aborted = False
             # 振込画面へ直接URLで遷移（クリック不要・確実）
             transfer_direct_url = config.get("transfer_direct_url", "").strip()
             transfer_direct_path = config.get("transfer_direct_path", "").strip()
             if transfer_direct_url and transfer_direct_url.startswith("http"):
                 try:
+                    pre_nav_url = driver.current_url
                     driver.get(transfer_direct_url)
+                    _tokairokin_session_keepalive(driver, config)
                     time.sleep(config.get("wait_after_page", 2) or 3)
-                    print("振込画面へ直接URLで遷移しました。", file=sys.stderr)
-                    transfer_clicked = True
-                    transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "success", "detail": ""})
+                    pulse_ok = _tokairokin_transfer_page_initial_pulse(driver, config)
+                    xfer_dead = _tokairokin_page_looks_like_session_timeout(driver)
+                    if not pulse_ok or xfer_dead:
+                        recovered = _tokairokin_recover_top_after_direct_transfer_timeout(
+                            driver, config, pre_nav_url
+                        )
+                        if recovered:
+                            xfer_nav_aborted = False
+                            transfer_attempt_log.append(
+                                {
+                                    "step": "transfer_direct_url（フルURL直接遷移）",
+                                    "result": "failed",
+                                    "detail": "遷移直後に B0470 → トップへ復帰しメニュー遷移を試行",
+                                }
+                            )
+                        else:
+                            xfer_nav_aborted = True
+                            transfer_attempt_log.append(
+                                {
+                                    "step": "transfer_direct_url（フルURL直接遷移）",
+                                    "result": "failed",
+                                    "detail": "遷移直後に無操作切断画面（B0470 / BER020）を検知",
+                                }
+                            )
+                            print(
+                                "振込URL直後に無操作切断画面が表示されています。セッションが切れている可能性があります。"
+                                " やり直すか、ブラウザでホームから振込まで手動で進めてください。",
+                                file=sys.stderr,
+                            )
+                    else:
+                        print("振込画面へ直接URLで遷移しました。", file=sys.stderr)
+                        transfer_clicked = True
+                        transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "success", "detail": ""})
+                        _offer_transfer_screen_inspect("transfer_direct_url")
                 except Exception as e:
                     transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "failed", "detail": str(e)})
                     print(f"振込画面URLへの遷移に失敗しました: {e}", file=sys.stderr)
@@ -834,11 +1517,44 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                     if "/ib/" in current:
                         new_url = re.sub(r"(/ib/)[^/?]+", r"\g<1>" + re.escape(transfer_direct_path), current, count=1)
                         if new_url != current:
+                            pre_nav_url = current
                             driver.get(new_url)
+                            _tokairokin_session_keepalive(driver, config)
                             time.sleep(config.get("wait_after_page", 2) or 3)
-                            print(f"振込画面へ直接遷移しました（{transfer_direct_path}）。", file=sys.stderr)
-                            transfer_clicked = True
-                            transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path} へパス置換）", "result": "success", "detail": ""})
+                            pulse_ok = _tokairokin_transfer_page_initial_pulse(driver, config)
+                            xfer_dead = _tokairokin_page_looks_like_session_timeout(driver)
+                            if not pulse_ok or xfer_dead:
+                                recovered = _tokairokin_recover_top_after_direct_transfer_timeout(
+                                    driver, config, pre_nav_url
+                                )
+                                if recovered:
+                                    xfer_nav_aborted = False
+                                    transfer_attempt_log.append(
+                                        {
+                                            "step": f"transfer_direct_path（{transfer_direct_path} へパス置換）",
+                                            "result": "failed",
+                                            "detail": "遷移直後に B0470 → トップへ復帰しメニュー遷移を試行",
+                                        }
+                                    )
+                                else:
+                                    xfer_nav_aborted = True
+                                    transfer_attempt_log.append(
+                                        {
+                                            "step": f"transfer_direct_path（{transfer_direct_path} へパス置換）",
+                                            "result": "failed",
+                                            "detail": "遷移直後に無操作切断画面（B0470 / BER020）を検知",
+                                        }
+                                    )
+                                    print(
+                                        "振込URL直後に無操作切断画面が表示されています。セッションが切れている可能性があります。"
+                                        " やり直すか、ブラウザでホームから振込まで手動で進めてください。",
+                                        file=sys.stderr,
+                                    )
+                            else:
+                                print(f"振込画面へ直接遷移しました（{transfer_direct_path}）。", file=sys.stderr)
+                                transfer_clicked = True
+                                transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path} へパス置換）", "result": "success", "detail": ""})
+                                _offer_transfer_screen_inspect(f"path:{transfer_direct_path}")
                         else:
                             transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": "URLが変化しなかった"})
                     else:
@@ -865,7 +1581,12 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                     return False
 
             # 1) セレクタ指定があれば明示待機してクリック（JSクリック）
-            if not transfer_clicked and transfer_btn_selector:
+            if xfer_nav_aborted:
+                print(
+                    "無操作切断検知済みのため、振込メニューの自動クリック（フォールバック）はスキップします。",
+                    file=sys.stderr,
+                )
+            if not xfer_nav_aborted and not transfer_clicked and transfer_btn_selector:
                 try:
                     el = wait_driver.until(EC.element_to_be_clickable((By.CSS_SELECTOR, transfer_btn_selector)))
                     if _click_el(el, transfer_btn_selector):
@@ -880,7 +1601,7 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                     print(f"振込ボタン（{transfer_btn_selector}）: {e}", file=sys.stderr)
 
             # 2) iframe 内で「振込」を探してクリック（口座エリアが iframe のことがある）
-            if not transfer_clicked:
+            if not xfer_nav_aborted and not transfer_clicked:
                 iframe_clicked = False
                 for frame in driver.find_elements(By.TAG_NAME, "iframe"):
                     try:
@@ -908,7 +1629,7 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                     transfer_attempt_log.append({"step": "iframe内で「振込」リンククリック", "result": "failed", "detail": "全iframeで要素未検出またはクリック不可"})
 
             # 3) メインコンテンツで「振込」リンク／ボタンを探して JS クリック
-            if not transfer_clicked:
+            if not xfer_nav_aborted and not transfer_clicked:
                 driver.switch_to.default_content()
                 main_clicked = False
                 for by_method, selector in [
@@ -929,14 +1650,14 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                         continue
                 transfer_attempt_log.append({"step": "メインコンテンツで「振込」テキスト検出クリック", "result": "success" if main_clicked else "failed", "detail": "" if main_clicked else "4パターンいずれも未検出またはクリック不可"})
 
-            if not transfer_clicked:
+            if not xfer_nav_aborted and not transfer_clicked:
                 if config.get("manual_click_transfer_menu", True):
                     transfer_attempt_log.append({"step": "手動クリックの案内（Enter待ち）", "result": "success", "detail": "ユーザーに振込クリックを依頼"})
                     print("\n" + "=" * 60, file=sys.stderr)
                     print("【手動クリック】画面上で「この口座から」の「振込」をクリックしてください。", file=sys.stderr)
                     print("  クリックしたら、ターミナルにフォーカスを移して Enter キーを押してください。", file=sys.stderr)
                     print("=" * 60 + "\n", file=sys.stderr)
-                    _wait_enter()
+                    _wait_enter(driver=driver, keepalive_config=config)
                     time.sleep(3)
                 else:
                     # 自動クリック（従来どおり・キーワード検索）
@@ -946,7 +1667,7 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                         print("【振込画面へ進む前】「パスワードを保存しますか？」が出ている場合は、", file=sys.stderr)
                         print("  「使用しない」または「保存」で閉じてください。閉じたら Enter キーを押してください。", file=sys.stderr)
                         print("=" * 60 + "\n", file=sys.stderr)
-                        _wait_enter()
+                        _wait_enter(driver=driver, keepalive_config=config)
                     try:
                         body = driver.find_element(By.TAG_NAME, "body")
                         body.send_keys(Keys.ESCAPE)
@@ -1011,31 +1732,65 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
             )
         else:
             form_ready = False
+        transfer_form_dead = False
         if form_ready:
             time.sleep(config.get("wait_after_page", 2))
             tf = config.get("transfer_form") or {}
 
-            # 振込画面で「振込時間の案内」等が消え、振込先入力が使えるまで明示的に待つ
-            wait_form_ready = int(config.get("wait_for_transfer_form_ready", 30))
             specify_sel = tf.get("specify_destination_button_selector", "").strip()
-            if wait_form_ready > 0 and specify_sel:
-                try:
-                    wait_driver = WebDriverWait(driver, wait_form_ready)
-                    wait_driver.until(EC.element_to_be_clickable((By.CSS_SELECTOR, specify_sel)))
-                    print(f"振込入力フォームの準備ができました（最大{wait_form_ready}秒待機）。", file=sys.stderr)
-                except Exception as e:
-                    print(f"「振込先を指定」が{wait_form_ready}秒以内に表示されませんでした: {e}", file=sys.stderr)
+            bank_probe = (tf.get("bank_code_selector") or "").strip()
+            branch_probe = (tf.get("branch_code_selector") or "").strip()
+            frame_probes = [x for x in (specify_sel, bank_probe, branch_probe) if x]
+            iframe_depth = int(config.get("transfer_form_iframe_max_depth", 5))
+            iframe_depth = max(1, min(iframe_depth, 12))
+
+            _tokairokin_transfer_page_initial_pulse(driver, config)
+            transfer_form_dead = bool(_tokairokin_page_looks_like_session_timeout(driver))
+            if transfer_form_dead:
+                print(
+                    "振込フォーム処理の前に無操作切断画面（B0470 / BER020）を検知しました。"
+                    " タイマー起因でボタンが無効のままになることがあります。ログイン〜振込までをやり直してください。",
+                    file=sys.stderr,
+                )
+
+            # 振込画面で「振込時間の案内」等が消え、振込先入力が使えるまで明示的に待つ（iframe 内も探索）
+            wait_form_ready = int(config.get("wait_for_transfer_form_ready", 30))
+            if not transfer_form_dead and wait_form_ready > 0 and specify_sel:
+                _tokairokin_session_keepalive(driver, config)
+                el_form = _tokairokin_wait_clickable_with_keepalive(
+                    driver,
+                    config,
+                    specify_sel,
+                    wait_form_ready,
+                    frame_probes=frame_probes,
+                )
+                if el_form is not None:
+                    print(
+                        f"振込入力フォームの準備ができました（最大{wait_form_ready}秒・無操作対策のキープアライブあり）。",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"「振込先を指定」相当ボタンが{wait_form_ready}秒以内に操作可能になりませんでした（セレクタ: {specify_sel!r}）。"
+                        " iframe 外の別ボタンの可能性があります。--inspect-transfer-screen で DOM を確認してください。",
+                        file=sys.stderr,
+                    )
             time.sleep(0.5)
 
             # 日付振込ボタン（セレクタ指定時のみクリック試行）
             dated_btn_sel = config.get("transfer_dated_transfer_button_selector", "").strip()
-            if dated_btn_sel:
+            if not transfer_form_dead and dated_btn_sel:
                 try:
+                    if config.get("transfer_form_search_iframes", True) and frame_probes:
+                        _tokairokin_switch_to_frame_containing_selectors(driver, frame_probes, iframe_depth)
                     by = By.XPATH if (dated_btn_sel.startswith("/") or dated_btn_sel.startswith("(")) else By.CSS_SELECTOR
                     el = driver.find_element(by, dated_btn_sel)
                     if el.is_displayed():
-                        el.click()
-                        print("「日付振込」をクリックしました。", file=sys.stderr)
+                        if _tokairokin_js_scroll_click(driver, el):
+                            print("「日付振込」をクリックしました。", file=sys.stderr)
+                        else:
+                            el.click()
+                            print("「日付振込」をクリックしました。", file=sys.stderr)
                         time.sleep(config.get("wait_after_page", 2))
                 except Exception as e:
                     print(f"「日付振込」ボタンのクリックに失敗しました: {e}", file=sys.stderr)
@@ -1043,23 +1798,36 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
             # 振込先選択画面で「振込先を指定」ボタンをクリック（金融機関選択画面へ遷移）
             specify_clicked = False
             specify_sel = tf.get("specify_destination_button_selector", "").strip()
-            if specify_sel:
+            if not transfer_form_dead and specify_sel:
                 try:
-                    el = driver.find_element(By.CSS_SELECTOR, specify_sel)
-                    if el.is_displayed():
-                        el.click()
-                        specify_clicked = True
-                        print("「振込先を指定」をクリックしました。", file=sys.stderr)
-                        time.sleep(config.get("wait_after_page", 2))
+                    if config.get("transfer_form_search_iframes", True) and frame_probes:
+                        _tokairokin_switch_to_frame_containing_selectors(driver, frame_probes, iframe_depth)
+                    el = _tokairokin_transfer_find(driver, specify_sel)
+                    if el is not None and el.is_displayed():
+                        specify_clicked = _tokairokin_js_scroll_click(driver, el)
+                        if not specify_clicked:
+                            try:
+                                el.click()
+                                specify_clicked = True
+                            except Exception:
+                                specify_clicked = False
+                        if specify_clicked:
+                            print("「振込先を指定」をクリックしました。", file=sys.stderr)
+                            time.sleep(config.get("wait_after_page", 2))
                 except Exception:
                     pass
-            if not specify_clicked:
+            if not transfer_form_dead and not specify_clicked:
+                if config.get("transfer_form_search_iframes", True) and frame_probes:
+                    _tokairokin_switch_to_frame_containing_selectors(driver, frame_probes, iframe_depth)
                 for btn_text in ["振込先を指定", "振込先を選択"]:
                     try:
                         el = driver.find_element(By.XPATH, f"//input[@value='{btn_text}'] | //button[contains(text(),'{btn_text}')] | //a[contains(text(),'{btn_text}')]")
                         if el.is_displayed():
-                            el.click()
-                            specify_clicked = True
+                            if _tokairokin_js_scroll_click(driver, el):
+                                specify_clicked = True
+                            else:
+                                el.click()
+                                specify_clicked = True
                             print(f"「{btn_text}」をクリックしました。", file=sys.stderr)
                             time.sleep(config.get("wait_after_page", 2))
                             break
@@ -1067,6 +1835,13 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                         continue
             if specify_clicked:
                 time.sleep(config.get("wait_after_page", 2))
+
+            try:
+                driver.switch_to.default_content()
+            except Exception:
+                pass
+            if not transfer_form_dead and config.get("transfer_form_search_iframes", True) and frame_probes:
+                _tokairokin_switch_to_frame_containing_selectors(driver, frame_probes, iframe_depth)
             # 金融機関・支店の入力: コードを優先（名前指定時のみ名前を使用）
             bank_input = str(transfer.get("bank_code", "")).zfill(4) if transfer.get("bank_code") else (transfer.get("bank_name") or "").strip()
             branch_input = str(transfer.get("branch_code", "")).zfill(3) if transfer.get("branch_code") else (transfer.get("branch_name") or "").strip()
@@ -1123,8 +1898,14 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                         continue
                 return False
 
+            if transfer_form_dead:
+                print(
+                    "無操作切断画面のため、銀行・支店・金額の自動入力以降をスキップします。",
+                    file=sys.stderr,
+                )
+
             # 1. 銀行コード入力 → 検索 → 検索結果の「選択」クリック
-            if _try_fill("bank_code_selector", bank_input):
+            if not transfer_form_dead and _try_fill("bank_code_selector", bank_input):
                 print(f"銀行コードを入力しました（{bank_input}）。", file=sys.stderr)
                 time.sleep(0.5)
                 if _click_confirm("bank_confirm_button_selector", ["検索", "次へ", "確認"]):
@@ -1138,7 +1919,7 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                         transfer_filled = True  # 選択ボタンがなければ検索のみで進んだとみなす
 
             # 2. 支店コード入力 → 検索 → 検索結果の「選択」クリック
-            if transfer_filled and _try_fill("branch_code_selector", branch_input):
+            if not transfer_form_dead and transfer_filled and _try_fill("branch_code_selector", branch_input):
                 print(f"支店コードを入力しました（{branch_input}）。", file=sys.stderr)
                 time.sleep(0.5)
                 if _click_confirm("branch_confirm_button_selector", ["検索", "次へ", "確認"]):
@@ -1150,23 +1931,26 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
 
             # 3. 口座番号・金額入力 → 確認
             filled = 0
-            if _try_fill("account_number_selector", account_number):
-                filled += 1
-            if _try_fill("amount_selector", str(amount)):
-                filled += 1
-            if filled >= 2:
-                if _click_confirm(None, ["確認", "次へ", "入力する"]):
-                    print("振込フォームを入力し、確認ボタンをクリックしました。", file=sys.stderr)
-                    transfer_filled = True
-                    time.sleep(config.get("wait_after_transfer_confirm", 2))
+            if not transfer_form_dead:
+                if _try_fill("account_number_selector", account_number):
+                    filled += 1
+                if _try_fill("amount_selector", str(amount)):
+                    filled += 1
+                if filled >= 2:
+                    if _click_confirm(None, ["確認", "次へ", "入力する"]):
+                        print("振込フォームを入力し、確認ボタンをクリックしました。", file=sys.stderr)
+                        transfer_filled = True
+                        time.sleep(config.get("wait_after_transfer_confirm", 2))
 
             # 4. 実行画面へボタンをクリック（確認画面→実行画面）
-            if transfer_filled and _click_confirm("execution_screen_button_selector", ["実行画面へ", "実行画面", "次へ"]):
+            if not transfer_form_dead and transfer_filled and _click_confirm(
+                "execution_screen_button_selector", ["実行画面へ", "実行画面", "次へ"]
+            ):
                 print("実行画面へボタンをクリックしました。", file=sys.stderr)
                 time.sleep(config.get("wait_after_page", 2))
 
             # 5. 「確認しました」チェックボックスにチェック
-            if transfer_filled:
+            if not transfer_form_dead and transfer_filled:
                 cb_sel = (tf.get("confirmation_checkbox_selector") or "").strip()
                 if cb_sel:
                     el = _find_element(cb_sel)
@@ -1189,14 +1973,119 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
                     except Exception:
                         pass
 
-        # ワンタイムパスワード（OTP）は手動入力。振込実行前に OTP 入力が必要な場合の待機
-        if transfer or transfer_filled:
-            print("\n" + "=" * 60, file=sys.stderr)
-            print("【一時停止】ワンタイムパスワード（OTP）を入力してください。", file=sys.stderr)
-            print("  スマホアプリ等で表示された OTP をブラウザに入力し、振込を実行してください。", file=sys.stderr)
-            print("  完了したら、このターミナルで Enter キーを押して次へ進んでください。", file=sys.stderr)
-            print("=" * 60 + "\n", file=sys.stderr)
-            _wait_enter()
+        # ワンタイムパスワード（OTP）: Gmail API で取得して入力するか、手動入力
+        if (transfer or transfer_filled) and not transfer_form_dead:
+            tf_otp = config.get("transfer_form") or {}
+            otp_pause = config.get("pause_for_otp", True)
+            fetch_gmail = _tokairokin_fetch_otp_from_gmail_enabled(config)
+            otp_sel = (tf_otp.get("otp_input_selector") or "").strip()
+            gmail_filled = False
+
+            def _otp_find_el(sel: str):
+                sel = (sel or "").strip()
+                if not sel:
+                    return None
+                if sel.startswith("/") or sel.startswith("("):
+                    by, val = By.XPATH, sel
+                else:
+                    val = sel if sel.startswith(("#", ".", "[", "input")) else f"#{sel}"
+                    by, val = By.CSS_SELECTOR, val
+                try:
+                    el = driver.find_element(by, val)
+                    return el if el.is_displayed() else None
+                except Exception:
+                    return None
+
+            if fetch_gmail and otp_sel:
+                pause_ms = _env_int_nonneg("TOKAIROKIN_PAUSE_BEFORE_GMAIL_OTP_MS", 3000)
+                if pause_ms:
+                    print(
+                        f"⏳ OTP メールの届きを待つため {pause_ms} ms 待機します（TOKAIROKIN_PAUSE_BEFORE_GMAIL_OTP_MS）。",
+                        file=sys.stderr,
+                    )
+                    time.sleep(pause_ms / 1000.0)
+                marker_ms = int(time.time() * 1000)
+                base_lb = _env_int_nonneg("TOKAIROKIN_OTP_GMAIL_BASE_LOOKBACK_MS", 120000)
+                min_internal = max(0, marker_ms - base_lb)
+                to_email = os.environ.get(
+                    "TOKAIROKIN_GMAIL_EXPECT_EMAIL",
+                    "m19m.hrts83@gmail.com",
+                ).strip()
+                try:
+                    from tokairokin_gmail_otp import poll_tokairokin_otp_from_gmail
+
+                    otp_code = poll_tokairokin_otp_from_gmail(
+                        to_email=to_email,
+                        min_internal_date_ms=min_internal,
+                    )
+                    el_otp = _otp_find_el(otp_sel)
+                    if el_otp:
+                        try:
+                            el_otp.clear()
+                            el_otp.send_keys(otp_code)
+                            gmail_filled = True
+                            print(
+                                "ワンタイムパスワードを Gmail から取得し、入力欄へ反映しました（番号は表示しません）。",
+                                file=sys.stderr,
+                            )
+                        except Exception as ex:
+                            print(f"OTP の自動入力に失敗しました: {ex}", file=sys.stderr)
+                    else:
+                        print(
+                            f"OTP 入力欄が見つかりません（otp_input_selector）。手動で入力してください。",
+                            file=sys.stderr,
+                        )
+                    submit_sel = (tf_otp.get("otp_submit_selector") or "").strip()
+                    if gmail_filled and submit_sel:
+                        btn = _otp_find_el(submit_sel)
+                        if btn:
+                            try:
+                                btn.click()
+                                print(
+                                    "OTP 送信・確定ボタン（otp_submit_selector）をクリックしました。",
+                                    file=sys.stderr,
+                                )
+                                time.sleep(config.get("wait_after_page", 2))
+                            except Exception as ex:
+                                print(f"OTP 送信ボタンのクリックに失敗: {ex}", file=sys.stderr)
+                except ImportError as ie:
+                    print(
+                        "Gmail OTP 用ライブラリが未インストールです（google-api-python-client 等）。"
+                        f" browser_automation で pip install -r requirements.txt を実行してください: {ie}",
+                        file=sys.stderr,
+                    )
+                except Exception as e:
+                    print(f"Gmail から OTP を取得できませんでした: {e}", file=sys.stderr)
+            elif fetch_gmail and not otp_sel:
+                print(
+                    "fetch_otp_from_gmail は有効ですが transfer_form.otp_input_selector が空です。"
+                    " プルデンシャル生命の Gmail OTP と同様に使うにはセレクタを設定してください。"
+                    " 参照: finance/prudential_gmail_otp.py（poll_prudential_otp_from_gmail）、"
+                    "browser_automation/tokairokin_gmail_otp.py（poll_tokairokin_otp_from_gmail）。",
+                    file=sys.stderr,
+                )
+
+            if otp_pause:
+                print("\n" + "=" * 60, file=sys.stderr)
+                if gmail_filled:
+                    print(
+                        "【確認】画面上で OTP・振込実行を確認してください。"
+                        " 問題なければこのターミナルで Enter を押してください。",
+                        file=sys.stderr,
+                    )
+                else:
+                    print("【一時停止】ワンタイムパスワード（OTP）を入力してください。", file=sys.stderr)
+                    print(
+                        "  メール・アプリで OTP を確認しブラウザへ入力するか、"
+                        " Gmail 自動取得は TOKAIROKIN_OTP_GMAIL_* と otp_input_selector で調整してください。",
+                        file=sys.stderr,
+                    )
+                    print(
+                        "  完了したら、このターミナルで Enter キーを押して次へ進んでください。",
+                        file=sys.stderr,
+                    )
+                print("=" * 60 + "\n", file=sys.stderr)
+                _wait_enter(driver=driver, keepalive_config=config)
 
         if config.get("keep_browser_open", True):
             print("\n" + "=" * 60, file=sys.stderr)
@@ -1207,7 +2096,11 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
             print("  ブラウザを閉じたあと、このターミナルで Enter を押すとスクリプトが終了します。", file=sys.stderr)
             print("  （先に Enter を押すとスクリプト終了時にブラウザも閉じる場合があります）", file=sys.stderr)
             print("=" * 60 + "\n", file=sys.stderr)
-            _wait_enter(confirm_msg="スクリプトを終了しました。")
+            _wait_enter(
+                confirm_msg="スクリプトを終了しました。",
+                driver=driver,
+                keepalive_config=config,
+            )
 
         return ""
     except Exception as e:
@@ -1216,7 +2109,11 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
         if config.get("keep_browser_open", True):
             print("\n振込画面を開いたままにしています。確認や振込を続けてください。", file=sys.stderr)
             print("作業が終わったらご自身でブラウザを閉じ、閉じたあとで Enter を押してください。", file=sys.stderr)
-            _wait_enter(confirm_msg="スクリプトを終了しました。")
+            _wait_enter(
+                confirm_msg="スクリプトを終了しました。",
+                driver=driver,
+                keepalive_config=config,
+            )
         return ""
     finally:
         # keep_browser_open 時はブラウザを閉じない（ユーザーが手動で閉じる）
@@ -1224,7 +2121,11 @@ def _run_tokairokin_undetected(config: dict, user: str, password: str, headless:
             driver.quit()
 
 
-def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
+def run_tokairokin(
+    headless: bool = False,
+    transfer: dict = None,
+    inspect_transfer_screen: bool = False,
+) -> str:
     """東海労金インターネットバンキングにログインする。振込パラメータがあればフォーム入力まで自動化。"""
     config = load_config("tokairokin")
     user, password = get_credentials("tokairokin")
@@ -1233,7 +2134,14 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
 
     # undetected-chromedriver を優先（CDP・stealth で検知された場合の代替）
     if config.get("use_undetected_chromedriver", False):
-        return _run_tokairokin_undetected(config, user, password, headless or config.get("headless", False), transfer)
+        return _run_tokairokin_undetected(
+            config,
+            user,
+            password,
+            headless or config.get("headless", False),
+            transfer,
+            inspect_transfer_screen=inspect_transfer_screen,
+        )
 
     from playwright.sync_api import sync_playwright
     from playwright_stealth import Stealth
@@ -1323,7 +2231,6 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
 
             page.wait_for_timeout(wait_login * 1000)
 
-            current_url = page.url
             body_text = page.locator("body").inner_text()
             if "エラー" in body_text or "認証に失敗" in body_text or "ログインに失敗" in body_text or "口座情報が誤っています" in body_text:
                 print("ログインに失敗した可能性があります。headless=false で実行して画面を確認してください。", file=sys.stderr)
@@ -1334,10 +2241,17 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
             secret_phrase_filled = False
             secret_phrase_auto = config.get("secret_phrase_auto") or []
             body_text = page.locator("body").inner_text()
-            if secret_phrase_auto and ("合言葉" in body_text or "合言葉" in page.content()):
+            html_pw = page.content()
+            current_url = page.url
+            hay_pw = (body_text or "") + "\n" + (html_pw or "")
+            sp_screen_pw = bool(
+                secret_phrase_auto and _tokairokin_secret_phrase_screen_detected(body_text, html_pw, config)
+            )
+            dashboard_skip_secret_pause = False
+            if sp_screen_pw:
                 for mapping in secret_phrase_auto:
                     match_kw = (mapping.get("match") or "").strip()
-                    if not match_kw or match_kw not in body_text:
+                    if not match_kw or match_kw not in hay_pw:
                         continue
                     answer = _get_secret_phrase_answer(mapping)
                     if not answer:
@@ -1372,19 +2286,36 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
                                 continue
                     if secret_phrase_filled:
                         break
-            if secret_phrase_filled:
-                page.wait_for_timeout(2000)
-                body_text = page.locator("body").inner_text()
-                for relogin_kw in ["再ログイン", "サインイン", "ログイン"]:
-                    try:
-                        el = page.locator(f"a:has-text('{relogin_kw}'), button:has-text('{relogin_kw}'), input[value='{relogin_kw}']").first
-                        if el.is_visible() and relogin_kw in body_text:
-                            el.click()
-                            print(f"「{relogin_kw}」をクリックしました。", file=sys.stderr)
-                            page.wait_for_timeout(3000)
-                            break
-                    except Exception:
-                        continue
+                if secret_phrase_filled:
+                    page.wait_for_timeout(2000)
+                    body_text = page.locator("body").inner_text()
+                    for relogin_kw in ["再ログイン", "サインイン", "ログイン"]:
+                        try:
+                            el = page.locator(
+                                f"a:has-text('{relogin_kw}'), button:has-text('{relogin_kw}'), input[value='{relogin_kw}']"
+                            ).first
+                            if el.is_visible() and relogin_kw in body_text:
+                                el.click()
+                                print(f"「{relogin_kw}」をクリックしました。", file=sys.stderr)
+                                page.wait_for_timeout(3000)
+                                break
+                        except Exception:
+                            continue
+
+            elif secret_phrase_auto:
+                if _tokairokin_post_login_dashboard_detected(current_url, body_text, html_pw, config):
+                    dashboard_skip_secret_pause = True
+                    print(
+                        "合言葉（追加認証）画面は検出されませんでした。"
+                        " ログイン後トップページ相当と判断し、合言葉の Enter 待ちをスキップして次へ進みます。",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        "secret_phrase_auto は設定されていますが、合言葉系画面の検出キーワードが見つかりませんでした。"
+                        " secret_phrase_page_markers を実画面の文言で拡張してください。",
+                        file=sys.stderr,
+                    )
 
             # 再ログイン画面が表示されている場合は必ず「再ログイン」をクリック（合言葉の有無にかかわらず）
             page.wait_for_timeout(2000)
@@ -1406,7 +2337,11 @@ def run_tokairokin(headless: bool = False, transfer: dict = None) -> str:
                     print("「再ログイン」ボタンが見つかりませんでした。手動でクリックしてください。", file=sys.stderr)
 
             # 合言葉は自動入力対応済み。自動入力できなかった場合のみここで一時停止（ワンタイムパスワードは手動入力）
-            if not secret_phrase_filled and config.get("pause_for_secret_phrase", True):
+            if (
+                not secret_phrase_filled
+                and not dashboard_skip_secret_pause
+                and config.get("pause_for_secret_phrase", True)
+            ):
                 print("\n" + "=" * 60, file=sys.stderr)
                 print("【一時停止】合言葉は通常は自動入力で対応しています。", file=sys.stderr)
                 print("  自動入力が完了したら、このターミナルで Enter キーを押して次へ進んでください。", file=sys.stderr)
@@ -1496,12 +2431,24 @@ def main():
     parser.add_argument("--branch-name", dest="branch_name", help="支店名で入力する場合（例: 熱田支店）")
     parser.add_argument("--account", help="振込先口座番号（7桁）")
     parser.add_argument("--amount", type=int, help="振込金額（円）")
+    parser.add_argument(
+        "--inspect-transfer-screen",
+        action="store_true",
+        help="振込URL遷移直後に Enter 待ちで止め、セレクタ検証（pause_for_transfer_screen_inspect と同趣旨）",
+    )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="tokairokin のみ: Enter 待ちをスキップ（Jarvis・Cursor Agent・CI）。TOKAIROKIN_NON_INTERACTIVE=1 と同効",
+    )
     args = parser.parse_args()
 
     if args.site == "nichinoken":
         path = run_nichinoken(headless=args.headless)
         print(f"出力: {path}")
     elif args.site == "tokairokin":
+        if args.non_interactive:
+            os.environ["TOKAIROKIN_NON_INTERACTIVE"] = "1"
         transfer = None
         if (
             args.bank
@@ -1519,7 +2466,11 @@ def main():
                 "account_number": args.account or "",
                 "amount": args.amount if args.amount is not None else 0,
             }
-        run_tokairokin(headless=args.headless, transfer=transfer)
+        run_tokairokin(
+            headless=args.headless,
+            transfer=transfer,
+            inspect_transfer_screen=args.inspect_transfer_screen,
+        )
     else:
         print(f"未対応のサイト: {args.site}", file=sys.stderr)
         sys.exit(1)
