@@ -85,17 +85,16 @@ python fetch_after_login.py nichinoken
      - 振込フォーム入力後は OTP 処理へ（下記 5.）。`--amount` のみの既定振込先は `.env` の `TOKAIROKIN_DEFAULT_*` を参照
    - 初回は `headless: false` のまま実行し、画面で動作を確認してください
 
-4. **無操作によるセッション中断（B0470 / BER020）**
-   - 東海労金側は **サーバー基準の無操作タイムアウト**があり、ブラウザ内だけのスクロールでは延びないことがあります。
-   - `session_keepalive_fetch_head: true`（既定）のとき、キープアライブ処理で **現在URLへの `fetch(..., HEAD)`** を実行し、セッション維持の補助とします（異常時は `false`）。
-   - **ターミナルで Enter 待ち**のあいだも別スレッドからキープアライブします（`wait_enter_keepalive_interval_seconds`、既定5秒）。
-   - 待機ループ用の間隔は `session_keepalive_interval_seconds`（既定8秒）。
-   - **セレクタ検証**だけしたいときは `--inspect-transfer-screen` で振込画面直後に Enter 待ちできます。
+4. **B0470 / BER020（無操作中断・取引中断画面）**
+   - **無操作タイムアウト**のほか、**許可されていない振込 Dispatch への URL 直叩き**でも同種のエラーになることがあります。東海労金では **`transfer_direct_first: false`**（メニューから振込へ）が安全側です。
+   - 無操作対策として `session_keepalive_fetch_head: true` のとき **現在URLへの `fetch(..., HEAD)`** でセッション維持を補助します。
+   - **Enter 待ち**中も別スレッドからキープアライブします（`wait_enter_keepalive_interval_seconds`）。
+   - **セレクタ検証**だけしたいときは `--inspect-transfer-screen`。
 
-5. **ワンタイムパスワード（Gmail API）**
-   - プルデンシャル生命の解約確認番号取得（`215_kamiooya/C1_cursor/finance/prudential_gmail_otp.py`）と同じく、215 の `1b_Cursorマニュアル` の Gmail トークンで `users.messages.list` し、OTP を読み取って `transfer_form.otp_input_selector` に入力する。
-   - 実装: `browser_automation/tokairokin_gmail_otp.py`。`pip install -r requirements.txt` で Google API 系を入れる。
-   - `fetch_otp_from_gmail: true`（既定）かつ **`otp_input_selector` を必ず設定**。届くメールの From / 件名が想定と違う場合は `.env` の `TOKAIROKIN_OTP_GMAIL_FROM` や `TOKAIROKIN_OTP_GMAIL_QUERY` で調整。
+5. **ワンタイムパスワード（OTP）**
+   - 東海労金の OTP は **メールではなくスマホアプリ「ワンタイムPW」**で確認します。
+   - **既定運用**: `fetch_otp_from_gmail: false`。スクリプトは OTP 手前で一時停止し、**Cursor のチャットで「OTP 入力画面まで進んだ」と伝えたうえで**、アプリの番号を **`transfer_form.otp_input_selector`**（例 `#pswd002`）へ入力し、確認・実行まで手動で進めます。終わったらターミナルで Enter。
+   - **オプション**: メール経由で OTP を自動入力したい場合のみ `fetch_otp_from_gmail: true` とし、`tokairokin_gmail_otp.py`・`.env` の `TOKAIROKIN_OTP_GMAIL_*` を設定します。
 
 6. **パスワード変更画面が出る場合（自動化検知の回避）**
    - プログラム起動のブラウザが自動操作と検知され、パスワード変更を促されることがあります

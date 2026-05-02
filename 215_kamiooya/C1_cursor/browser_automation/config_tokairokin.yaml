@@ -92,6 +92,10 @@ pause_for_secret_phrase: true
 # ログイン後に振込画面へ遷移
 go_to_transfer: true
 wait_before_transfer_menu: 5
+# トップで振込ボタンクリック後、次ページ描画までの待ち（秒）。小さくすると遷移体感が速くなる場合あり
+wait_after_transfer_menu_click_seconds: 0.85
+# 振込メニュー要素の明示待ちタイムアウト（秒）
+transfer_menu_element_timeout_seconds: 11
 # 無操作切断対策（fetch_after_login が待機中に軽くページへアクセス）
 session_keepalive_enabled: true
 session_keepalive_interval_seconds: 5
@@ -145,11 +149,15 @@ transfer_form:
   execution_screen_button_selector: ""
   # 実行画面の「確認しました」チェックボックス（OTP入力前にチェック必須）
   confirmation_checkbox_selector: ""
-  # OTP 入力欄（Gmail API で取得したコードを自動入力）。画面を検証して id を設定すること
-  otp_input_selector: ""
+  # OTP 入力欄（ワンタイムPW アプリの番号を手入力）。東海労金では #pswd002
+  otp_input_selector: "#pswd002"
   otp_submit_selector: ""
 
-fetch_otp_from_gmail: true
+# OTP を Gmail API で自動入力するか（既定 false。東海労金 OTP はワンタイムPW アプリ由来）
+fetch_otp_from_gmail: false
+
+# OTP 入力欄が現れるまでの最大待ち秒（チャット連携・手入力モード時のみポーリング）
+otp_field_wait_seconds: 18
 
 # ワンタイムパスワード入力のため一時停止（振込時は自動で有効）
 pause_for_otp: true
