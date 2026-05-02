@@ -469,14 +469,38 @@ def _tokairokin_recover_top_after_direct_transfer_timeout(
     if not u.startswith("http"):
         return False
     try:
+        try:
+            driver.back()
+            time.sleep(float(config.get("transfer_recover_back_wait_seconds", 1.8)))
+            if not _tokairokin_page_looks_like_session_timeout(driver):
+                for _ in range(3):
+                    _tokairokin_session_keepalive(driver, config)
+                    time.sleep(0.5)
+                if not _tokairokin_page_looks_like_session_timeout(driver):
+                    print(
+                        "振込URLの直接遷移直後に無操作切断画面が出ました。"
+                        " ブラウザの「戻る」でログイン後トップへ復帰できました。"
+                        " 画面上の「振込」等から遷移を試します。",
+                        file=sys.stderr,
+                    )
+                    return True
+        except Exception:
+            pass
+
         driver.get(u)
         time.sleep(float(config.get("wait_after_page", 2) or 2))
-        for _ in range(4):
-            if _tokairokin_page_looks_like_session_timeout(driver):
-                return False
+        recovered_ok = False
+        for _ in range(14):
+            if not _tokairokin_page_looks_like_session_timeout(driver):
+                for _k in range(3):
+                    _tokairokin_session_keepalive(driver, config)
+                    time.sleep(0.45)
+                if not _tokairokin_page_looks_like_session_timeout(driver):
+                    recovered_ok = True
+                    break
+            time.sleep(0.55)
             _tokairokin_session_keepalive(driver, config)
-            time.sleep(0.45)
-        if _tokairokin_page_looks_like_session_timeout(driver):
+        if not recovered_ok:
             return False
         print(
             "振込URLの直接遷移直後に無操作切断画面が出ました。"
@@ -1464,114 +1488,12 @@ def _run_tokairokin_undetected(
             transfer_clicked = False
             # transfer_direct で B0470 になったあとフォールバッククリックすると Selenium が長いスタックトレースを出すだけなので抑止する
             xfer_nav_aborted = False
-            # 振込画面へ直接URLで遷移（クリック不要・確実）
-            transfer_direct_url = config.get("transfer_direct_url", "").strip()
-            transfer_direct_path = config.get("transfer_direct_path", "").strip()
-            if transfer_direct_url and transfer_direct_url.startswith("http"):
-                try:
-                    pre_nav_url = driver.current_url
-                    driver.get(transfer_direct_url)
-                    _tokairokin_session_keepalive(driver, config)
-                    time.sleep(config.get("wait_after_page", 2) or 3)
-                    pulse_ok = _tokairokin_transfer_page_initial_pulse(driver, config)
-                    xfer_dead = _tokairokin_page_looks_like_session_timeout(driver)
-                    if not pulse_ok or xfer_dead:
-                        recovered = _tokairokin_recover_top_after_direct_transfer_timeout(
-                            driver, config, pre_nav_url
-                        )
-                        if recovered:
-                            xfer_nav_aborted = False
-                            transfer_attempt_log.append(
-                                {
-                                    "step": "transfer_direct_url（フルURL直接遷移）",
-                                    "result": "failed",
-                                    "detail": "遷移直後に B0470 → トップへ復帰しメニュー遷移を試行",
-                                }
-                            )
-                        else:
-                            xfer_nav_aborted = True
-                            transfer_attempt_log.append(
-                                {
-                                    "step": "transfer_direct_url（フルURL直接遷移）",
-                                    "result": "failed",
-                                    "detail": "遷移直後に無操作切断画面（B0470 / BER020）を検知",
-                                }
-                            )
-                            print(
-                                "振込URL直後に無操作切断画面が表示されています。セッションが切れている可能性があります。"
-                                " やり直すか、ブラウザでホームから振込まで手動で進めてください。",
-                                file=sys.stderr,
-                            )
-                    else:
-                        print("振込画面へ直接URLで遷移しました。", file=sys.stderr)
-                        transfer_clicked = True
-                        transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "success", "detail": ""})
-                        _offer_transfer_screen_inspect("transfer_direct_url")
-                except Exception as e:
-                    transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "failed", "detail": str(e)})
-                    print(f"振込画面URLへの遷移に失敗しました: {e}", file=sys.stderr)
-            elif transfer_direct_path:
-                try:
-                    current = driver.current_url
-                    # 現在URLの /ib/XXXXDispatch を /ib/{transfer_direct_path} に置換（クエリは維持）
-                    if "/ib/" in current:
-                        new_url = re.sub(r"(/ib/)[^/?]+", r"\g<1>" + re.escape(transfer_direct_path), current, count=1)
-                        if new_url != current:
-                            pre_nav_url = current
-                            driver.get(new_url)
-                            _tokairokin_session_keepalive(driver, config)
-                            time.sleep(config.get("wait_after_page", 2) or 3)
-                            pulse_ok = _tokairokin_transfer_page_initial_pulse(driver, config)
-                            xfer_dead = _tokairokin_page_looks_like_session_timeout(driver)
-                            if not pulse_ok or xfer_dead:
-                                recovered = _tokairokin_recover_top_after_direct_transfer_timeout(
-                                    driver, config, pre_nav_url
-                                )
-                                if recovered:
-                                    xfer_nav_aborted = False
-                                    transfer_attempt_log.append(
-                                        {
-                                            "step": f"transfer_direct_path（{transfer_direct_path} へパス置換）",
-                                            "result": "failed",
-                                            "detail": "遷移直後に B0470 → トップへ復帰しメニュー遷移を試行",
-                                        }
-                                    )
-                                else:
-                                    xfer_nav_aborted = True
-                                    transfer_attempt_log.append(
-                                        {
-                                            "step": f"transfer_direct_path（{transfer_direct_path} へパス置換）",
-                                            "result": "failed",
-                                            "detail": "遷移直後に無操作切断画面（B0470 / BER020）を検知",
-                                        }
-                                    )
-                                    print(
-                                        "振込URL直後に無操作切断画面が表示されています。セッションが切れている可能性があります。"
-                                        " やり直すか、ブラウザでホームから振込まで手動で進めてください。",
-                                        file=sys.stderr,
-                                    )
-                            else:
-                                print(f"振込画面へ直接遷移しました（{transfer_direct_path}）。", file=sys.stderr)
-                                transfer_clicked = True
-                                transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path} へパス置換）", "result": "success", "detail": ""})
-                                _offer_transfer_screen_inspect(f"path:{transfer_direct_path}")
-                        else:
-                            transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": "URLが変化しなかった"})
-                    else:
-                        transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": "現在URLに /ib/ が含まれない"})
-                except Exception as e:
-                    transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": str(e)})
-                    print(f"振込画面への直接遷移に失敗しました: {e}", file=sys.stderr)
-            else:
-                if transfer_direct_path == "" and not (transfer_direct_url and transfer_direct_url.startswith("http")):
-                    transfer_attempt_log.append({"step": "transfer_direct_url / transfer_direct_path", "result": "skipped", "detail": "未設定のためスキップ"})
 
+            transfer_direct_first = bool(config.get("transfer_direct_first", False))
             transfer_btn_selector = config.get("transfer_menu_button_selector", "").strip()
-            wait_timeout = 15
-            wait_driver = WebDriverWait(driver, wait_timeout)
+            wait_driver = WebDriverWait(driver, 15)
 
-            def _click_el(el, msg="振込"):
-                """要素をスクロール表示してから JavaScript でクリック（上書き対策）"""
+            def _click_transfer_menu_el(el, msg="振込") -> bool:
                 try:
                     driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
                     time.sleep(0.3)
@@ -1580,37 +1502,47 @@ def _run_tokairokin_undetected(
                 except Exception:
                     return False
 
-            # 1) セレクタ指定があれば明示待機してクリック（JSクリック）
-            if xfer_nav_aborted:
-                print(
-                    "無操作切断検知済みのため、振込メニューの自動クリック（フォールバック）はスキップします。",
-                    file=sys.stderr,
-                )
-            if not xfer_nav_aborted and not transfer_clicked and transfer_btn_selector:
-                try:
-                    el = wait_driver.until(EC.element_to_be_clickable((By.CSS_SELECTOR, transfer_btn_selector)))
-                    if _click_el(el, transfer_btn_selector):
-                        time.sleep(config.get("wait_after_page", 2) or 3)
-                        print(f"振込メニュー（{transfer_btn_selector}）をクリックしました。", file=sys.stderr)
-                        transfer_clicked = True
-                        transfer_attempt_log.append({"step": f"セレクタクリック（{transfer_btn_selector}）", "result": "success", "detail": ""})
-                    else:
-                        transfer_attempt_log.append({"step": f"セレクタクリック（{transfer_btn_selector}）", "result": "failed", "detail": "JSクリックが実行できなかった"})
-                except Exception as e:
-                    transfer_attempt_log.append({"step": f"セレクタクリック（{transfer_btn_selector}）", "result": "failed", "detail": str(e)})
-                    print(f"振込ボタン（{transfer_btn_selector}）: {e}", file=sys.stderr)
+            def _try_transfer_menu_via_ui(retry_pass: bool = False) -> bool:
+                suffix = "（再試行）" if retry_pass else ""
+                if transfer_btn_selector:
+                    try:
+                        el = wait_driver.until(EC.element_to_be_clickable((By.CSS_SELECTOR, transfer_btn_selector)))
+                        if _click_transfer_menu_el(el, transfer_btn_selector):
+                            time.sleep(config.get("wait_after_page", 2) or 3)
+                            print(f"振込メニュー（{transfer_btn_selector}）をクリックしました。", file=sys.stderr)
+                            transfer_attempt_log.append(
+                                {
+                                    "step": f"セレクタクリック（{transfer_btn_selector}）{suffix}",
+                                    "result": "success",
+                                    "detail": "",
+                                }
+                            )
+                            return True
+                        transfer_attempt_log.append(
+                            {
+                                "step": f"セレクタクリック（{transfer_btn_selector}）{suffix}",
+                                "result": "failed",
+                                "detail": "JSクリックが実行できなかった",
+                            }
+                        )
+                    except Exception as e:
+                        transfer_attempt_log.append(
+                            {
+                                "step": f"セレクタクリック（{transfer_btn_selector}）{suffix}",
+                                "result": "failed",
+                                "detail": str(e),
+                            }
+                        )
+                        print(f"振込ボタン（{transfer_btn_selector}）: {e}", file=sys.stderr)
 
-            # 2) iframe 内で「振込」を探してクリック（口座エリアが iframe のことがある）
-            if not xfer_nav_aborted and not transfer_clicked:
                 iframe_clicked = False
                 for frame in driver.find_elements(By.TAG_NAME, "iframe"):
                     try:
                         driver.switch_to.frame(frame)
                         try:
                             el = wait_driver.until(EC.presence_of_element_located((By.LINK_TEXT, "振込")))
-                            if el.is_displayed() and _click_el(el):
+                            if el.is_displayed() and _click_transfer_menu_el(el):
                                 print("「振込」をクリックしました（iframe内・テキスト検出）。", file=sys.stderr)
-                                transfer_clicked = True
                                 iframe_clicked = True
                                 time.sleep(config.get("wait_after_page", 2) or 3)
                         except Exception:
@@ -1624,12 +1556,18 @@ def _run_tokairokin_undetected(
                         except Exception:
                             pass
                 if iframe_clicked:
-                    transfer_attempt_log.append({"step": "iframe内で「振込」リンククリック", "result": "success", "detail": ""})
-                else:
-                    transfer_attempt_log.append({"step": "iframe内で「振込」リンククリック", "result": "failed", "detail": "全iframeで要素未検出またはクリック不可"})
+                    transfer_attempt_log.append(
+                        {"step": f"iframe内で「振込」リンククリック{suffix}", "result": "success", "detail": ""}
+                    )
+                    return True
+                transfer_attempt_log.append(
+                    {
+                        "step": f"iframe内で「振込」リンククリック{suffix}",
+                        "result": "failed",
+                        "detail": "全iframeで要素未検出またはクリック不可",
+                    }
+                )
 
-            # 3) メインコンテンツで「振込」リンク／ボタンを探して JS クリック
-            if not xfer_nav_aborted and not transfer_clicked:
                 driver.switch_to.default_content()
                 main_clicked = False
                 for by_method, selector in [
@@ -1640,15 +1578,143 @@ def _run_tokairokin_undetected(
                 ]:
                     try:
                         el = wait_driver.until(EC.presence_of_element_located((by_method, selector)))
-                        if el.is_displayed() and _click_el(el):
+                        if el.is_displayed() and _click_transfer_menu_el(el):
                             time.sleep(config.get("wait_after_page", 2) or 3)
                             print("「振込」をクリックしました（テキストで検出）。", file=sys.stderr)
-                            transfer_clicked = True
                             main_clicked = True
                             break
                     except Exception:
                         continue
-                transfer_attempt_log.append({"step": "メインコンテンツで「振込」テキスト検出クリック", "result": "success" if main_clicked else "failed", "detail": "" if main_clicked else "4パターンいずれも未検出またはクリック不可"})
+                transfer_attempt_log.append(
+                    {
+                        "step": f"メインコンテンツで「振込」テキスト検出クリック{suffix}",
+                        "result": "success" if main_clicked else "failed",
+                        "detail": "" if main_clicked else "4パターンいずれも未検出またはクリック不可",
+                    }
+                )
+                return main_clicked
+
+            # Dispatch URL 直叩きが即 B0470 になるサイトではメニューを先に試す（transfer_direct_first: true で従来順）
+            if not transfer_direct_first:
+                if _try_transfer_menu_via_ui(False):
+                    transfer_clicked = True
+
+            transfer_direct_url = config.get("transfer_direct_url", "").strip()
+            transfer_direct_path = config.get("transfer_direct_path", "").strip()
+
+            if not transfer_clicked:
+                if transfer_direct_url and transfer_direct_url.startswith("http"):
+                    try:
+                        pre_nav_url = driver.current_url
+                        driver.get(transfer_direct_url)
+                        _tokairokin_session_keepalive(driver, config)
+                        time.sleep(config.get("wait_after_page", 2) or 3)
+                        pulse_ok = _tokairokin_transfer_page_initial_pulse(driver, config)
+                        xfer_dead = _tokairokin_page_looks_like_session_timeout(driver)
+                        if not pulse_ok or xfer_dead:
+                            recovered = _tokairokin_recover_top_after_direct_transfer_timeout(
+                                driver, config, pre_nav_url
+                            )
+                            if recovered:
+                                xfer_nav_aborted = False
+                                transfer_attempt_log.append(
+                                    {
+                                        "step": "transfer_direct_url（フルURL直接遷移）",
+                                        "result": "failed",
+                                        "detail": "遷移直後に B0470 → トップへ復帰しメニュー遷移を試行",
+                                    }
+                                )
+                            else:
+                                xfer_nav_aborted = True
+                                transfer_attempt_log.append(
+                                    {
+                                        "step": "transfer_direct_url（フルURL直接遷移）",
+                                        "result": "failed",
+                                        "detail": "遷移直後に無操作切断画面（B0470 / BER020）を検知",
+                                    }
+                                )
+                                print(
+                                    "振込URL直後に無操作切断画面が表示されています。セッションが切れている可能性があります。"
+                                    " やり直すか、ブラウザでホームから振込まで手動で進めてください。",
+                                    file=sys.stderr,
+                                )
+                        else:
+                            print("振込画面へ直接URLで遷移しました。", file=sys.stderr)
+                            transfer_clicked = True
+                            transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "success", "detail": ""})
+                            _offer_transfer_screen_inspect("transfer_direct_url")
+                    except Exception as e:
+                        transfer_attempt_log.append({"step": "transfer_direct_url（フルURL直接遷移）", "result": "failed", "detail": str(e)})
+                        print(f"振込画面URLへの遷移に失敗しました: {e}", file=sys.stderr)
+                elif transfer_direct_path:
+                    try:
+                        current = driver.current_url
+                        if "/ib/" in current:
+                            new_url = re.sub(r"(/ib/)[^/?]+", r"\g<1>" + re.escape(transfer_direct_path), current, count=1)
+                            if new_url != current:
+                                pre_nav_url = current
+                                driver.get(new_url)
+                                _tokairokin_session_keepalive(driver, config)
+                                time.sleep(config.get("wait_after_page", 2) or 3)
+                                pulse_ok = _tokairokin_transfer_page_initial_pulse(driver, config)
+                                xfer_dead = _tokairokin_page_looks_like_session_timeout(driver)
+                                if not pulse_ok or xfer_dead:
+                                    recovered = _tokairokin_recover_top_after_direct_transfer_timeout(
+                                        driver, config, pre_nav_url
+                                    )
+                                    if recovered:
+                                        xfer_nav_aborted = False
+                                        transfer_attempt_log.append(
+                                            {
+                                                "step": f"transfer_direct_path（{transfer_direct_path} へパス置換）",
+                                                "result": "failed",
+                                                "detail": "遷移直後に B0470 → トップへ復帰しメニュー遷移を試行",
+                                            }
+                                        )
+                                    else:
+                                        xfer_nav_aborted = True
+                                        transfer_attempt_log.append(
+                                            {
+                                                "step": f"transfer_direct_path（{transfer_direct_path} へパス置換）",
+                                                "result": "failed",
+                                                "detail": "遷移直後に無操作切断画面（B0470 / BER020）を検知",
+                                            }
+                                        )
+                                        print(
+                                            "振込URL直後に無操作切断画面が表示されています。セッションが切れている可能性があります。"
+                                            " やり直すか、ブラウザでホームから振込まで手動で進めてください。",
+                                            file=sys.stderr,
+                                        )
+                                else:
+                                    print(f"振込画面へ直接遷移しました（{transfer_direct_path}）。", file=sys.stderr)
+                                    transfer_clicked = True
+                                    transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path} へパス置換）", "result": "success", "detail": ""})
+                                    _offer_transfer_screen_inspect(f"path:{transfer_direct_path}")
+                            else:
+                                transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": "URLが変化しなかった"})
+                        else:
+                            transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": "現在URLに /ib/ が含まれない"})
+                    except Exception as e:
+                        transfer_attempt_log.append({"step": f"transfer_direct_path（{transfer_direct_path}）", "result": "failed", "detail": str(e)})
+                        print(f"振込画面への直接遷移に失敗しました: {e}", file=sys.stderr)
+                else:
+                    if transfer_direct_path == "" and not (
+                        transfer_direct_url and transfer_direct_url.startswith("http")
+                    ):
+                        transfer_attempt_log.append(
+                            {"step": "transfer_direct_url / transfer_direct_path", "result": "skipped", "detail": "未設定のためスキップ"}
+                        )
+
+            if xfer_nav_aborted:
+                print(
+                    "無操作切断検知済みのため、振込メニューの自動クリック（フォールバック）はスキップします。",
+                    file=sys.stderr,
+                )
+
+            # メニューを先行済みでも、URL直遷移失敗後の復帰などで未取得なら再試行（ログは （再試行） を付ける場合あり）
+            if not xfer_nav_aborted and not transfer_clicked:
+                if _try_transfer_menu_via_ui(not transfer_direct_first):
+                    transfer_clicked = True
 
             if not xfer_nav_aborted and not transfer_clicked:
                 if config.get("manual_click_transfer_menu", True):

@@ -117,6 +117,8 @@ pause_for_transfer_screen_inspect: false
 # transfer_direct_path: "BPT001Dispatch"
 # 直遷移直後に B0470 だけが出たとき、ログイン後トップへ戻してメニュークリックへフォールバックする（既定 true）
 # transfer_direct_fallback_to_menu_on_b0470: true
+# false なら先にメニュークリック、true なら従来どおり URL 直遷移を優先（サイトにより切り替え）
+# transfer_direct_first: false
 
 # 振込メニューを手動クリックするか（true: 画面上で「振込」をクリックしてもらい、クリック後に Enter で次を自動実行）
 # ダイアログで自動クリックが進まない場合に true 推奨
