@@ -114,6 +114,8 @@ pause_for_transfer_screen_inspect: false
 # 現在ページの ServerID を維持して遷移するため、パスだけ指定（推奨）
 # ※直遷移で即 B0470 になる場合がある（セッションは生きている）。そのときトップへ戻してメニュークリックへフォールバックする:
 transfer_direct_fallback_to_menu_on_b0470: true
+# false のとき先に画面上の振込メニューをクリックし、ダメなら transfer_direct_* を試す（東海労金向け推奨）
+transfer_direct_first: false
 transfer_direct_path: "BPT001Dispatch"
 # またはフルURLを指定（ServerID はセッションで変わる場合あり）
 # transfer_direct_url: "https://www.parasol.anser.ne.jp/ib/BPT001Dispatch?ServerID=RSRA0506&B=2972&PT=BS"
