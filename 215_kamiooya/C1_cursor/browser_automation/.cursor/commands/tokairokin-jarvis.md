@@ -30,9 +30,10 @@ PYTHONWARNINGS=ignore TOKAIROKIN_NON_INTERACTIVE=1 \
 
 4) ログで次を見て報告すること:
 ・「ログイン後トップページ相当と判断し、合言葉の Enter 待ちをスキップ」→ 合言葉なしルートで正常（BLI001Dispatch トップ到達済み）。
-・B0470 / BER020 → 無操作切断。再実行か、対話実行（--non-interactive なし・Terminal.app）を提案。
+・B0470 / BER020 → 無操作だけでなく **振込 Dispatch の URL 直叩き**でも出ることがある。transfer_direct_first: false（メニュー優先）を確認。再実行や対話実行も検討。
 ・合言葉・質問が検出できない（かつトップスキップメッセージも無い）→ config の secret_phrase_page_markers・secret_phrase_auto の match、secret_phrase_dom_wait_seconds を確認。
 ・iframe 関連は secret_phrase_check_iframes: true が既定。
+・OTP → 既定はワンタイムPW アプリ＋ユーザー手入力。ユーザーにチャットで OTP 画面に達したことを確認してから進める（fetch_otp_from_gmail は false）。
 ・distutils / setuptools → requirements に setuptools あり。.venv で pip install -r requirements.txt をやり直す。
 
 5) コード変更はユーザーが明示したときだけ。まずは設定・再実行で様子を見る。
@@ -50,6 +51,7 @@ PYTHONWARNINGS=ignore TOKAIROKIN_NON_INTERACTIVE=1 \
 | 警告抑制 | `PYTHONWARNINGS=ignore` |
 | トップ到達・合言葉なし | stderr にスキップメッセージが出れば Enter 待ちはしない（fetch_after_login の post_login_dashboard_detect） |
 | 合言葉が見えない／検出できない | BLI017 経路のみ該当。`secret_phrase_dom_wait_seconds`、`secret_phrase_page_markers`、`match` の見直し |
-| B0470 | セッション切れ・タイマー。再ログインや待機調整、`TOKAIROKIN_NON_INTERACTIVE_TRANSFER_MENU_WAIT_CAP` |
+| B0470 | 無操作に加え不正な URL 直遷移でも発生しうる。メニュー経由・`transfer_direct_first: false` を確認 |
+| OTP | 既定はワンタイムPW アプリ＋チャット連携・手入力（fetch_otp_from_gmail: false）。処理後ユーザーが Enter |
 
 詳細設定キーは `config_tokairokin.yaml` と `config_tokairokin.example.yaml` を参照。

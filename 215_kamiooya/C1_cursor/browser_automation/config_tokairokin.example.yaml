@@ -88,6 +88,9 @@ pause_for_secret_phrase: true
 # ワンタイムパスワード入力が必要な場合は、入力する時間を考慮して増やす
 # （長いほど無操作とみなされるため、必要最小限が無難）
 wait_before_transfer_menu: 5
+# トップで振込クリック後〜次ページまでの待ち（秒）。体感を速くしたいときは 0.6〜1.0 程度
+# wait_after_transfer_menu_click_seconds: 0.85
+# transfer_menu_element_timeout_seconds: 11
 
 # 「一定時間操作がなかったため中断」対策: 待機中に軽くスクロール等する（false で無効）
 session_keepalive_enabled: true
@@ -148,11 +151,14 @@ transfer_form:
   amount_selector: ""
   execution_screen_button_selector: ""   # 確認画面→実行画面へ進むボタン
   confirmation_checkbox_selector: ""   # 「確認しました」チェックボックス
-  otp_input_selector: ""   # Gmail で取得した OTP を入力する欄（開発者ツールで検証）
+  otp_input_selector: ""   # OTP 入力欄（東海労金の例: #pswd002）。ワンタイムPW アプリで確認→手入力が既定運用
   otp_submit_selector: ""  # 任意: OTP 入力後の確定ボタン
 
-# Gmail API で OTP を取得して入力（無効化は false または TOKAIROKIN_FETCH_OTP_FROM_GMAIL=0）
-fetch_otp_from_gmail: true
+# Gmail API で OTP を自動入力するか（東海労金はワンタイムPW アプリのため既定 false）
+fetch_otp_from_gmail: false
 
-# ワンタイムパスワード入力のため一時停止
+# OTP 欄検出までポーリングする最大秒（pause_for_otp かつ Gmail オフ時）
+# otp_field_wait_seconds: 18
+
+# ワンタイムパスワード入力のため一時停止（チャットで画面到達を共有→手入力）
 pause_for_otp: true

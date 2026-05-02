@@ -225,20 +225,27 @@ def _env_int_nonneg(name: str, default: int) -> int:
 
 
 def _tokairokin_fetch_otp_from_gmail_enabled(config: dict) -> bool:
-    """Gmail API で OTP を取得するか。config と TOKAIROKIN_FETCH_OTP_FROM_GMAIL で制御。"""
+    """Gmail API で OTP を取得するか。既定はオフ（東海労金 OTP はワンタイムPW アプリ由来のため）。
+
+    config の fetch_otp_from_gmail が無いときのみ環境変数 TOKAIROKIN_FETCH_OTP_FROM_GMAIL=1 でオプトイン。
+    """
     v = config.get("fetch_otp_from_gmail")
     if v is not None:
         return bool(v)
-    return os.environ.get("TOKAIROKIN_FETCH_OTP_FROM_GMAIL", "1").strip().lower() not in (
-        "0",
-        "false",
-        "no",
-        "off",
+    return os.environ.get("TOKAIROKIN_FETCH_OTP_FROM_GMAIL", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
     )
 
 
 def _tokairokin_session_keepalive(driver, config: dict | None = None) -> None:
-    """ネットバンクの「一定時間無操作で中断」（B0470等）対策。クライアント操作に加え、必要なら同一URLへのHEADでサーバーに触れる。"""
+    """ネットバンクの「一定時間無操作で中断」（B0470 / BER020）への補助。
+
+    無操作タイムアウトのほか、**許可されていない Dispatch への URL 直叩き**でも同種のエラー画面になることがあり、
+    その場合はセッション維持よりメニュー経由の遷移が必要。HEAD はサーバー側セッション延長の補助として使う。
+    """
     cfg = config if config is not None else {}
     try:
         driver.execute_script(
@@ -460,8 +467,10 @@ def _tokairokin_recover_top_after_direct_transfer_timeout(
     config: dict,
     pre_nav_url: str,
 ) -> bool:
-    """振込Dispatchを URL 直叩きした直後に B0470 だけが出たとき、セッションは生きていることがある。
-    ログイン後トップへ戻り、メニュー／リンククリックのフォールバックへ渡す。
+    """振込 Dispatch を URL 直叩きした直後に B0470 / BER020 だけが出たとき。
+
+    無操作切断だけでなく **許可されていない Dispatch への直行**でも同じ画面になることがある。
+    セッションが生きている場合はブラウザの戻るまたはトップ URL で復帰し、メニュークリックへ渡す。
     """
     if not config.get("transfer_direct_fallback_to_menu_on_b0470", True):
         return False
@@ -1438,7 +1447,7 @@ def _run_tokairokin_undetected(
                     file=sys.stderr,
                 )
 
-        # 合言葉は自動入力対応済み。自動入力できなかった場合のみここで一時停止（ワンタイムパスワードは手動入力）
+        # 合言葉は自動入力対応済み。自動入力できなかった場合のみここで一時停止（OTP は別ブロックでワンタイムPW 手入力）
         if (
             not secret_phrase_filled
             and not skip_secret_phrase_pause_for_dashboard
@@ -1491,7 +1500,9 @@ def _run_tokairokin_undetected(
 
             transfer_direct_first = bool(config.get("transfer_direct_first", False))
             transfer_btn_selector = config.get("transfer_menu_button_selector", "").strip()
-            wait_driver = WebDriverWait(driver, 15)
+            menu_el_timeout = int(config.get("transfer_menu_element_timeout_seconds", 11))
+            menu_el_timeout = max(5, min(menu_el_timeout, 45))
+            wait_driver = WebDriverWait(driver, menu_el_timeout)
 
             def _click_transfer_menu_el(el, msg="振込") -> bool:
                 try:
@@ -1504,11 +1515,13 @@ def _run_tokairokin_undetected(
 
             def _try_transfer_menu_via_ui(retry_pass: bool = False) -> bool:
                 suffix = "（再試行）" if retry_pass else ""
+                nav_sleep = float(config.get("wait_after_transfer_menu_click_seconds", 0.85))
+                nav_sleep = max(0.25, min(nav_sleep, 12.0))
                 if transfer_btn_selector:
                     try:
                         el = wait_driver.until(EC.element_to_be_clickable((By.CSS_SELECTOR, transfer_btn_selector)))
                         if _click_transfer_menu_el(el, transfer_btn_selector):
-                            time.sleep(config.get("wait_after_page", 2) or 3)
+                            time.sleep(nav_sleep)
                             print(f"振込メニュー（{transfer_btn_selector}）をクリックしました。", file=sys.stderr)
                             transfer_attempt_log.append(
                                 {
@@ -1544,7 +1557,7 @@ def _run_tokairokin_undetected(
                             if el.is_displayed() and _click_transfer_menu_el(el):
                                 print("「振込」をクリックしました（iframe内・テキスト検出）。", file=sys.stderr)
                                 iframe_clicked = True
-                                time.sleep(config.get("wait_after_page", 2) or 3)
+                                time.sleep(nav_sleep)
                         except Exception:
                             pass
                         driver.switch_to.default_content()
@@ -1579,7 +1592,7 @@ def _run_tokairokin_undetected(
                     try:
                         el = wait_driver.until(EC.presence_of_element_located((by_method, selector)))
                         if el.is_displayed() and _click_transfer_menu_el(el):
-                            time.sleep(config.get("wait_after_page", 2) or 3)
+                            time.sleep(nav_sleep)
                             print("「振込」をクリックしました（テキストで検出）。", file=sys.stderr)
                             main_clicked = True
                             break
@@ -2039,7 +2052,8 @@ def _run_tokairokin_undetected(
                     except Exception:
                         pass
 
-        # ワンタイムパスワード（OTP）: Gmail API で取得して入力するか、手動入力
+        # ワンタイムパスワード（OTP）: 既定はワンタイムPW アプリで確認→ブラウザ手入力（チャット連携）。
+        # fetch_otp_from_gmail: true のときのみ Gmail API で自動入力（オプション）。
         if (transfer or transfer_filled) and not transfer_form_dead:
             tf_otp = config.get("transfer_form") or {}
             otp_pause = config.get("pause_for_otp", True)
@@ -2057,6 +2071,7 @@ def _run_tokairokin_undetected(
                     val = sel if sel.startswith(("#", ".", "[", "input")) else f"#{sel}"
                     by, val = By.CSS_SELECTOR, val
                 try:
+                    driver.switch_to.default_content()
                     el = driver.find_element(by, val)
                     return el if el.is_displayed() else None
                 except Exception:
@@ -2125,31 +2140,67 @@ def _run_tokairokin_undetected(
             elif fetch_gmail and not otp_sel:
                 print(
                     "fetch_otp_from_gmail は有効ですが transfer_form.otp_input_selector が空です。"
-                    " プルデンシャル生命の Gmail OTP と同様に使うにはセレクタを設定してください。"
-                    " 参照: finance/prudential_gmail_otp.py（poll_prudential_otp_from_gmail）、"
-                    "browser_automation/tokairokin_gmail_otp.py（poll_tokairokin_otp_from_gmail）。",
+                    " Gmail 経由で自動入力する場合はセレクタを設定してください。"
+                    " 参照: browser_automation/tokairokin_gmail_otp.py",
                     file=sys.stderr,
                 )
 
             if otp_pause:
+                if otp_sel and not fetch_gmail:
+                    try:
+                        otp_deadline = time.monotonic() + float(config.get("otp_field_wait_seconds", 15))
+                        while time.monotonic() < otp_deadline:
+                            if _otp_find_el(otp_sel):
+                                print(
+                                    f"OTP 入力欄を検出しました（{otp_sel}）。"
+                                    " ワンタイムPW アプリの番号をブラウザへ入力してください。",
+                                    file=sys.stderr,
+                                )
+                                break
+                            time.sleep(0.4)
+                            _tokairokin_session_keepalive(driver, config)
+                    except Exception:
+                        pass
+
                 print("\n" + "=" * 60, file=sys.stderr)
                 if gmail_filled:
                     print(
-                        "【確認】画面上で OTP・振込実行を確認してください。"
-                        " 問題なければこのターミナルで Enter を押してください。",
+                        "【確認】Gmail から OTP を入力済みです。画面で実行まで問題ないか確認し、",
                         file=sys.stderr,
                     )
+                    print("  よければこのターミナルで Enter を押してください。", file=sys.stderr)
                 else:
-                    print("【一時停止】ワンタイムパスワード（OTP）を入力してください。", file=sys.stderr)
+                    print("【一時停止】ワンタイムパスワード（OTP）を運用してください。", file=sys.stderr)
                     print(
-                        "  メール・アプリで OTP を確認しブラウザへ入力するか、"
-                        " Gmail 自動取得は TOKAIROKIN_OTP_GMAIL_* と otp_input_selector で調整してください。",
+                        "  東海労金の OTP はメールではなく、スマホアプリ「ワンタイムPW」で確認します。",
                         file=sys.stderr,
                     )
                     print(
-                        "  完了したら、このターミナルで Enter キーを押して次へ進んでください。",
+                        "  Cursor・Jarvis でエージェントに依頼している場合:"
+                        " **チャットで「OTP 入力画面まで進んだ」と伝えてから**、アプリで番号を確認してください。",
                         file=sys.stderr,
                     )
+                    print(
+                        "  ブラウザの OTP 欄（transfer_form.otp_input_selector）へ入力し、確認・実行まで操作してください。",
+                        file=sys.stderr,
+                    )
+                    print(
+                        "  Gmail で OTP を自動取得する場合のみ config で fetch_otp_from_gmail: true にします（既定は false）。",
+                        file=sys.stderr,
+                    )
+                    if otp_sel:
+                        print(f"  （検証用: 入力欄セレクタ = {otp_sel}）", file=sys.stderr)
+                    print(
+                        "  完了したら、このターミナルで Enter キーを押してください。",
+                        file=sys.stderr,
+                    )
+                    if _tokairokin_non_interactive():
+                        print(
+                            "  （非対話モードのため Enter は読みません。"
+                            " OTP 操作の猶予が足りないときは TOKAIROKIN_NON_INTERACTIVE_PAUSE_MS を延ばすか、"
+                            " --non-interactive を外して対話実行してください。）",
+                            file=sys.stderr,
+                        )
                 print("=" * 60 + "\n", file=sys.stderr)
                 _wait_enter(driver=driver, keepalive_config=config)
 
@@ -2402,7 +2453,7 @@ def run_tokairokin(
                 if not relogin_clicked:
                     print("「再ログイン」ボタンが見つかりませんでした。手動でクリックしてください。", file=sys.stderr)
 
-            # 合言葉は自動入力対応済み。自動入力できなかった場合のみここで一時停止（ワンタイムパスワードは手動入力）
+            # 合言葉は自動入力対応済み。自動入力できなかった場合のみここで一時停止（OTP は別ブロックでワンタイムPW 手入力）
             if (
                 not secret_phrase_filled
                 and not dashboard_skip_secret_pause
