@@ -84,10 +84,13 @@ secret_phrase_dom_wait_seconds_after_relogin: 22
 
 # ログイン後、合言葉の自動入力ができなかった場合に一時停止するか
 pause_for_secret_phrase: true
-# 合言葉なしで BLI001Dispatch トップへ入ったとき Enter 待ちを省略するための検出（既定で URL + 本文キーワード）
-# post_login_dashboard_detect:
-#   url_contains_any: ["BLI001Dispatch"]
-#   body_contains_any: ["トップページ", "振込振替", "残高照会", "口座情報"]
+# 【主経路】合言葉画面が検出されず、ログイン後トップ相当なら合言葉の Enter 待ちをせず振込へ進む。
+# fetch_after_login 側の既定でも動くが、明示したいときは以下をアンコメントして調整する。
+post_login_dashboard_detect:
+  url_contains_any: ["BLI001Dispatch"]
+  # 本文に一致する語が無くても Dispatch URL のみでトップ相当とみなす（iframe で本文が薄いときの救済）。厳密にしたいときは false。
+  allow_dispatch_url_without_body_markers: true
+  # body_contains_any は省略可（コード側既定にフォールバック）。上記 relaxed と併用で十分なことが多い。
 
 # ログイン後に振込画面へ遷移
 go_to_transfer: true
@@ -161,6 +164,8 @@ otp_field_wait_seconds: 18
 
 # ワンタイムパスワード入力のため一時停止（振込時は自動で有効）
 pause_for_otp: true
+# OTP 画面で番号入力・実行確定の直前に一度ホールドし、チャット確認後ターミナル Enter（fetch_otp_from_gmail が false のとき）
+otp_hold_before_manual_entry: true
 
 # ブラウザを開いたままにする（パスワード変更画面などの対応を可能に）
 keep_browser_open: true

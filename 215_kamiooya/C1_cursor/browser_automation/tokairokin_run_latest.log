@@ -1,0 +1,44 @@
+/Users/matsunomasaharu/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+undetected-chromedriver で Chrome を起動しています...
+「再ログイン」ボタンをクリックしました。
+
+============================================================
+【一時停止】合言葉は通常は自動入力で対応しています。
+  自動入力が完了したら、このターミナルで Enter キーを押して次へ進んでください。
+  ※ Enter を押しても次に進まない場合は、**Terminal.app** で同じコマンドを実行してください。
+============================================================
+
+Enter を受け付けました。次へ進みます。
+振込画面へ直接遷移しました（BPT001Dispatch）。
+
+============================================================
+【検証用一時停止】振込画面へ遷移しました（path:BPT001Dispatch）。
+  この画面のまま開発者ツールでセレクタを確認してください。 終わったらこのターミナルで Enter を押すと自動入力を続けます。
+============================================================
+
+Enter を受け付けました。次へ進みます。
+実行ログを保存しました: /Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/browser_automation/東海労金_振込_実行ログ_20260502_214614.txt
+試行履歴を更新しました: /Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/browser_automation/東海労金_振込画面遷移_試行履歴.md
+「振込先を指定」が30秒以内に操作可能になりませんでした（セレクタ: '#btn001'）。
+fetch_otp_from_gmail は有効ですが transfer_form.otp_input_selector が空です。 プルデンシャル生命の Gmail OTP と同様に使うにはセレクタを設定してください。 参照: finance/prudential_gmail_otp.py（poll_prudential_otp_from_gmail）、browser_automation/tokairokin_gmail_otp.py（poll_tokairokin_otp_from_gmail）。
+
+============================================================
+【一時停止】ワンタイムパスワード（OTP）を入力してください。
+  メール・アプリで OTP を確認しブラウザへ入力するか、 Gmail 自動取得は TOKAIROKIN_OTP_GMAIL_* と otp_input_selector で調整してください。
+  完了したら、このターミナルで Enter キーを押して次へ進んでください。
+============================================================
+
+Enter を受け付けました。次へ進みます。
+
+============================================================
+振込画面を開いたままにしています。確認や振込をゆっくり行えます。
+
+  ** ブラウザはスクリプトでは閉じません。**
+  作業が終わったら、**ご自身でブラウザを閉じ**てください。
+  ブラウザを閉じたあと、このターミナルで Enter を押すとスクリプトが終了します。
+  （先に Enter を押すとスクリプト終了時にブラウザも閉じる場合があります）
+============================================================
+
+スクリプトを終了しました。
+東海労金へのログイン処理が完了しました。

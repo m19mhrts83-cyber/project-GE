@@ -299,6 +299,8 @@ def _tokairokin_page_looks_like_session_timeout(driver) -> bool:
 
 def _tokairokin_switch_to_frame_containing_selectors(driver, probes: list[str], max_depth: int) -> bool:
     """いずれかのセレクタが見つかるフレームへ driver を切り替える。見つからなければ default_content のまま False。"""
+    from selenium.webdriver.common.by import By
+
     driver.switch_to.default_content()
     plist = [(p or "").strip() for p in probes if (p or "").strip()]
     if not plist:
@@ -535,7 +537,18 @@ def _tokairokin_post_login_dashboard_detected(
     html_snippet: str,
     config: dict,
 ) -> bool:
-    """ログイン後トップ（合言葉なしルート）か。URL と本文で判定し、合言葉画面と両立しないようにする。"""
+    """ログイン後トップ（合言葉なし）相当か。
+
+    主経路（今回の検証に合わせた位置づけ）:
+    - 合言葉（追加認証）画面のマーカーが **見つからない**
+    - かつ URL がログイン後トップ系 Dispatch（既定: URL に BLI001Dispatch）を含む
+    → 合言葉用の Enter 待ちはせず振込処理へ進む。
+
+    本文キーワード（body_contains_any）が一致しない場合でも、
+    post_login_dashboard_detect.allow_dispatch_url_without_body_markers が true（既定）なら
+    「合言葉画面ではない + Dispatch URL 一致」だけでトップ相当とみなす（iframe により本文が取れにくい場合の救済）。
+    主経路から外れた挙動が続くときはこのフラグを false にし、body マーカーを実画面に合わせて調整する。
+    """
     if _tokairokin_secret_phrase_screen_detected(body_text, html_snippet, config):
         return False
     det = config.get("post_login_dashboard_detect") or {}
@@ -551,13 +564,26 @@ def _tokairokin_post_login_dashboard_detected(
         return False
     body_markers = det.get("body_contains_any")
     if body_markers is None:
-        body_markers = ["トップページ", "振込振替", "残高照会", "口座情報"]
+        body_markers = [
+            "トップページ",
+            "振込振替",
+            "残高照会",
+            "口座情報",
+            "この口座から",
+            "ろうきんダイレクト",
+            "ワンタイムパスワード",
+        ]
     elif isinstance(body_markers, str):
         body_markers = [body_markers]
     else:
         body_markers = list(body_markers)
     hay = (body_text or "") + "\n" + (html_snippet or "")
-    return any(str(m).strip() and str(m) in hay for m in body_markers)
+    if any(str(m).strip() and str(m) in hay for m in body_markers):
+        return True
+    relaxed = det.get("allow_dispatch_url_without_body_markers")
+    if relaxed is None:
+        relaxed = True
+    return bool(relaxed)
 
 
 def _tokairokin_secret_phrase_screen_detected(body_text: str, html_snippet: str, config: dict) -> bool:
@@ -1429,15 +1455,18 @@ def _run_tokairokin_undetected(
                 if _tokairokin_post_login_dashboard_detected(curl, bt, hs, config):
                     skip_secret_phrase_pause_for_dashboard = True
                     print(
-                        "合言葉（追加認証）画面は検出されませんでした。"
-                        " ログイン後トップページ相当と判断し、合言葉の Enter 待ちをスキップして振込処理へ進みます。",
+                        "【主経路】合言葉（追加認証）画面は検出されませんでした。"
+                        " ログイン後トップ相当（post_login_dashboard_detect）と判断し、"
+                        "合言葉の Enter 待ちをスキップして振込処理へ進みます。",
                         file=sys.stderr,
                     )
                 else:
                     print(
-                        "secret_phrase_auto は設定されていますが、合言葉系画面の検出キーワードが"
-                        " メイン・iframe 結合テキストおよび HTML に見つかりませんでした（ログイン直後・再ログイン後のいずれでもなし）。"
-                        " secret_phrase_page_markers に実画面の文言を追加するか、本当に合言葉なしルートか確認してください。",
+                        "【主経路から外れた可能性】合言葉画面でもログイン後トップ相当でもない状態です。"
+                        " ブラウザで実際の画面を確認してください。"
+                        " トップなのに止まる場合は config の post_login_dashboard_detect"
+                        "（url_contains_any / body_contains_any）を調整してください。"
+                        " 合言葉が表示されている場合は secret_phrase_page_markers と自動入力設定を見直してください。",
                         file=sys.stderr,
                     )
             else:
@@ -2145,23 +2174,55 @@ def _run_tokairokin_undetected(
                     file=sys.stderr,
                 )
 
-            if otp_pause:
-                if otp_sel and not fetch_gmail:
-                    try:
-                        otp_deadline = time.monotonic() + float(config.get("otp_field_wait_seconds", 15))
-                        while time.monotonic() < otp_deadline:
-                            if _otp_find_el(otp_sel):
-                                print(
-                                    f"OTP 入力欄を検出しました（{otp_sel}）。"
-                                    " ワンタイムPW アプリの番号をブラウザへ入力してください。",
-                                    file=sys.stderr,
-                                )
-                                break
-                            time.sleep(0.4)
-                            _tokairokin_session_keepalive(driver, config)
-                    except Exception:
-                        pass
+            otp_hold = bool(config.get("otp_hold_before_manual_entry", True))
 
+            # OTP 欄が見えるまで待つ（自動では入力しない）
+            otp_field_seen = False
+            if otp_pause and otp_sel and not fetch_gmail:
+                try:
+                    otp_deadline = time.monotonic() + float(config.get("otp_field_wait_seconds", 15))
+                    while time.monotonic() < otp_deadline:
+                        if _otp_find_el(otp_sel):
+                            otp_field_seen = True
+                            print(
+                                f"OTP 入力欄を検出しました（{otp_sel}）。"
+                                " （この後のホールドまでブラウザでは OTP を入力しないでください）",
+                                file=sys.stderr,
+                            )
+                            break
+                        time.sleep(0.4)
+                        _tokairokin_session_keepalive(driver, config)
+                    if not otp_field_seen:
+                        print(
+                            "OTP 入力欄が規定時間内に検出できませんでした。"
+                            " 実行画面まで進んでいるかブラウザで確認してください。",
+                            file=sys.stderr,
+                        )
+                except Exception:
+                    pass
+
+            # OTP 入力・振込実行の直前でホールド（チャットで最終確認してから続行）
+            if otp_pause and otp_hold and not fetch_gmail:
+                print("\n" + "=" * 60, file=sys.stderr)
+                print("【ホールド】ワンタイムパスワード（OTP）入力・実行ボタンはまだ操作しないでください。", file=sys.stderr)
+                print(
+                    "  自動処理は OTP を入力せず、実行確定もしません。"
+                    " チャットやブラウザで OTP 入力画面まで進んだことを確認したうえで、ターミナルで Enter を押してください。",
+                    file=sys.stderr,
+                )
+                print(
+                    "  （ブラウザではまだ番号を入れず、**入力・実行確定は次の Enter のあと手動で行います。**）",
+                    file=sys.stderr,
+                )
+                print(
+                    "  ※ Cursor の統合ターミナルでは Enter が自動で進むことがあります。"
+                    " ホールドを確実に止めたいときは Terminal.app で実行してください。",
+                    file=sys.stderr,
+                )
+                print("=" * 60 + "\n", file=sys.stderr)
+                _wait_enter(driver=driver, keepalive_config=config)
+
+            if otp_pause:
                 print("\n" + "=" * 60, file=sys.stderr)
                 if gmail_filled:
                     print(
@@ -2176,8 +2237,7 @@ def _run_tokairokin_undetected(
                         file=sys.stderr,
                     )
                     print(
-                        "  Cursor・Jarvis でエージェントに依頼している場合:"
-                        " **チャットで「OTP 入力画面まで進んだ」と伝えてから**、アプリで番号を確認してください。",
+                        "  ターミナルで先に Enter を済ませたうえで、アプリで番号を確認し、ブラウザへ入力してください。",
                         file=sys.stderr,
                     )
                     print(
@@ -2423,14 +2483,15 @@ def run_tokairokin(
                 if _tokairokin_post_login_dashboard_detected(current_url, body_text, html_pw, config):
                     dashboard_skip_secret_pause = True
                     print(
-                        "合言葉（追加認証）画面は検出されませんでした。"
-                        " ログイン後トップページ相当と判断し、合言葉の Enter 待ちをスキップして次へ進みます。",
+                        "【主経路】合言葉（追加認証）画面は検出されませんでした。"
+                        " ログイン後トップ相当（post_login_dashboard_detect）と判断し、"
+                        "合言葉の Enter 待ちをスキップして次へ進みます。",
                         file=sys.stderr,
                     )
                 else:
                     print(
-                        "secret_phrase_auto は設定されていますが、合言葉系画面の検出キーワードが見つかりませんでした。"
-                        " secret_phrase_page_markers を実画面の文言で拡張してください。",
+                        "【主経路から外れた可能性】合言葉画面でもログイン後トップ相当でもありません。"
+                        " ブラウザで画面を確認し、post_login_dashboard_detect または secret_phrase_* を調整してください。",
                         file=sys.stderr,
                     )
 

@@ -18,7 +18,6 @@
   python yoritoori_send.py --partner LEAF --via imessage
   python yoritoori_send.py --partner 立木 --dry-run
   python yoritoori_send.py --partner LEAF --via imessage --skip-confirm
-  python yoritoori_send.py --partner グッドウィン --via gmail --gmail-new-thread --skip-confirm  # 直近受信が無くても新規メールとして送信
   python yoritoori_send.py --partner ミニテック --check-chrline   # 送信前の CHRLINE セッション確認を実施（必要時のみ）
 
   送信が確定した直後（確認プロンプト承認後）、既定では CHRLINE のセッション確認は行わない。
@@ -82,59 +81,6 @@ from gmail_api_scopes import (
     resolve_single_token_path_215,
     token_satisfies_215_scopes,
 )
-
-def _signature_name() -> str:
-    # 送信前チェックでプレースホルダーが残る事故を避ける（既定は「松野」）
-    return (os.environ.get("YORITOORI_SIGNATURE_NAME", "").strip() or "松野").strip()
-
-
-_SIGNATURE_PLACEHOLDERS = (
-    "[あなたの名前]",
-    "［あなたの名前］",
-    "あなたの名前",
-    "[your name]",
-    "[Your Name]",
-)
-
-
-def _normalize_and_validate_body(body: str) -> str:
-    """
-    送信前の最終チェック。
-    - 署名プレースホルダーを既定名へ置換
-    - それでもプレースホルダーが残っていれば送信中止（未完成送信の防止）
-    """
-    b = body or ""
-    sig = _signature_name()
-    for ph in ("[あなたの名前]", "［あなたの名前］"):
-        b = b.replace(ph, sig)
-
-    if any(ph in b for ph in _SIGNATURE_PLACEHOLDERS):
-        raise RuntimeError(
-            "送信本文に署名のプレースホルダー（例: [あなたの名前]）が残っています。"
-            "誤送信防止のため送信を中止します。"
-        )
-    return b
-
-
-def _ensure_body_not_incomplete(body: str) -> None:
-    """
-    送信前の簡易な未完成チェック（明確な未確定表現が残っていないか）。
-    ※過剰に厳しくしないため、代表的なプレースホルダーのみ対象。
-    """
-    b = body or ""
-    needles = (
-        "[要確認]",
-        "（要確認）",
-        "[TODO]",
-        "TODO",
-        "未記入",
-    )
-    hit = [n for n in needles if n in b]
-    if hit:
-        raise RuntimeError(
-            f"送信本文に未完成の印（{', '.join(hit)}）が残っています。誤送信防止のため送信を中止します。"
-        )
-
 
 
 def trigger_editor_save_all():
@@ -221,7 +167,7 @@ def _find_repo_root_with_line_poc() -> Optional[Path]:
 def ensure_chrline_session_before_partner_send() -> None:
     """
     パートナー送信直前に CHRLINE セッションを確保する。
-    保存トークンが有効なら即戻る。無効なら subprocess 内で終了（QR は出さない。chrline_qr_login_poc で別途ログイン）。
+    保存トークンが有効なら即戻る（QRなし）。切れているときだけ requestSQR3 が動く。
     呼び出しは main 側で --skip-chrline / YORITOORI_SKIP_CHRLINE を判定済みのときのみ行う。
     """
     root = _find_repo_root_with_line_poc()
@@ -242,7 +188,7 @@ def ensure_chrline_session_before_partner_send() -> None:
     code = (
         "from chrline_client_utils import save_root_from_env, build_logged_in_client\n"
         "p = save_root_from_env()\n"
-        "build_logged_in_client(p, allow_qr_login=False)\n"
+        "build_logged_in_client(p)\n"
         "print('[CHRLINE] セッション利用可能')\n"
     )
     r = subprocess.run(
@@ -291,14 +237,6 @@ def parse_draft(draft_path):
 
     body = "\n".join(body_lines).strip()
     return subject, body
-
-
-def _rewrite_draft_if_body_changed(draft_path: Path, subject: str, old_body: str, new_body: str) -> None:
-    if (old_body or "") == (new_body or ""):
-        return
-    # 先頭行は件名行のままにして、本文だけ差し替える（署名置換などをディスクへ反映）
-    head = f"件名：{subject}".rstrip()
-    draft_path.write_text(head + "\n\n" + (new_body or "").strip() + "\n", encoding="utf-8")
 
 
 def _file_digest(path: Path) -> str:
@@ -593,22 +531,8 @@ def run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text,
     sys.exit(1)
 
 
-def run_gmail_flow(
-    partner,
-    folder_path,
-    partner_name,
-    draft_path,
-    subject,
-    body_text,
-    dry_run,
-    *,
-    compose_new: bool = False,
-):
-    """
-    emails ありのパートナー向け Gmail 送信。
-    compose_new=False: 直近90日以内の相手からの受信を検索し、そのスレッドへ返信。
-    compose_new=True: スレッドに紐づけず新規送信（件名は下書き必須に近い—未設定時はエラー）。
-    """
+def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, dry_run):
+    """emails ありのパートナー向け Gmail 返信送信。"""
     emails = [e.lower().strip() for e in partner.get("emails", [])]
     if not credentials_path.exists():
         print("エラー: credentials.json が見つかりません", file=sys.stderr)
@@ -646,25 +570,12 @@ def run_gmail_flow(
 
     service = build("gmail", "v1", credentials=creds)
 
-    ref_info = None
-    if not compose_new:
-        ref_info = get_latest_message_from_partner(service, emails)
-        if not ref_info:
-            print(f"エラー: {partner_name} 宛の直近90日以内のメールが見つかりません。返信先を特定できません。", file=sys.stderr)
-            print(
-                "ヒント: 新規メールとして送る場合は --gmail-new-thread を指定してください（件名は下書き先頭行で指定）。",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+    ref_info = get_latest_message_from_partner(service, emails)
+    if not ref_info:
+        print(f"エラー: {partner_name} 宛の直近90日以内のメールが見つかりません。返信先を特定できません。", file=sys.stderr)
+        sys.exit(1)
 
-    if compose_new:
-        if not use_subject or not use_subject.strip():
-            print(
-                "エラー: --gmail-new-thread では件名が必要です（送信下書きの先頭行「件名：…」を記入してください）。",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-    elif not use_subject:
+    if not use_subject:
         orig_subject = ref_info.get("subject", "")
         if orig_subject and not orig_subject.strip().upper().startswith("RE:"):
             use_subject = f"Re: {orig_subject}"
@@ -679,9 +590,7 @@ def run_gmail_flow(
 
     to_email = emails[0]
     message_dict = build_reply_message(to_email, use_subject, body_text, ref_info, attachment_paths)
-    send_body: dict = {"raw": message_dict["raw"]}
-    if ref_info and ref_info.get("thread_id"):
-        send_body["threadId"] = ref_info["thread_id"]
+    send_body = {"raw": message_dict["raw"], "threadId": ref_info["thread_id"]}
 
     if dry_run:
         return
@@ -710,7 +619,7 @@ def main():
     parser.add_argument(
         "--check-chrline",
         action="store_true",
-        help="送信前に CHRLINE セッションを確認する（トークン無効時は失敗終了。QR は出さない）",
+        help="送信前に CHRLINE セッションを確認する（保存トークン無効だと QR 認証が走るため、必要時のみ推奨）",
     )
     parser.add_argument(
         "--skip-chrline",
@@ -718,15 +627,7 @@ def main():
         help="送信前の CHRLINE セッション確認・再ログインをしない（既定でも実施しないが、明示スキップしたい場合用）",
     )
     parser.add_argument("--move-attachments-only", action="store_true")
-    parser.add_argument(
-        "--gmail-new-thread",
-        action="store_true",
-        help="Gmail 送信時、受信スレッドを検索せず新規メールとして送る（件名は下書き必須）",
-    )
     args = parser.parse_args()
-    if args.gmail_new_thread and args.via == "imessage":
-        print("エラー: --gmail-new-thread と --via imessage は同時に指定できません。", file=sys.stderr)
-        sys.exit(1)
 
     config = yaml.safe_load(contact_path.read_text(encoding="utf-8"))
     partners = config.get("partners", [])
@@ -774,16 +675,6 @@ def main():
         print("エラー: 送信下書きが空です。", file=sys.stderr)
         sys.exit(1)
 
-    # 送信前の品質チェック（署名プレースホルダー／未完成チェック）
-    try:
-        normalized_body = _normalize_and_validate_body(body_text)
-        _ensure_body_not_incomplete(normalized_body)
-    except RuntimeError as e:
-        print(f"エラー: {e}", file=sys.stderr)
-        sys.exit(1)
-    _rewrite_draft_if_body_changed(draft_path, subject, body_text, normalized_body)
-    body_text = normalized_body
-
     chosen_via = args.via
     if chosen_via == "auto" and emails and phones:
         if sys.stdin is None or not sys.stdin.isatty():
@@ -806,6 +697,19 @@ def main():
             print("入力が不正です。1 または 2 を入力してください。")
     elif chosen_via == "auto":
         chosen_via = "gmail" if emails else "imessage"
+
+    if chosen_via == "gmail" and not emails:
+        print(
+            f"エラー: {partner_name} にメールアドレスが登録されていません。Gmail 返信には emails が必要です。contacts を修正するか --via imessage を指定してください。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if chosen_via == "imessage" and not phones:
+        print(
+            f"エラー: {partner_name} に電話番号が登録されていません。iMessage には phones が必要です。contacts を修正するか --via gmail を指定してください。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     attach_dir = resolve_attach_dir(base_path / folder_path)
     attachment_paths = collect_attachment_files(attach_dir)
@@ -835,20 +739,10 @@ def main():
         ensure_chrline_session_before_partner_send()
 
     if chosen_via == "gmail":
-        run_gmail_flow(
-            partner,
-            folder_path,
-            partner_name,
-            draft_path,
-            subject,
-            body_text,
-            args.dry_run,
-            compose_new=args.gmail_new_thread,
-        )
+        run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, args.dry_run)
         return
     run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text, args.dry_run)
 
 
 if __name__ == "__main__":
     main()
-

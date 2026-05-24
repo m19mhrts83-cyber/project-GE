@@ -1,0 +1,51 @@
+# Mac メモリ診断スナップショット（自動取得）
+# 取得日時: 2026-05-03 — 作業手順: アクティビティモニタの代替として top/ps で記録
+
+## 再計測（vm.swapusage / memory_pressure）
+# 初回診断時（別セッション）: swap used ≈ 12217M / total 13312M / free ≈ 1095M
+# 本実装完了時点（2026-05-03）: swap used ≈ 12616M / total 13312M / free ≈ 696M
+# memory_pressure: System-wide memory free percentage ≈ 27%（変動あり）
+# ※ 設定追加直後はプロセス負荷でスワップ使用量が上がることもある。ログイン項目削減・常駐終了後に
+#   同じコマンドで再比較すると効果が見えやすい。
+
+## 上位プロセス（MEM 順 / top -l 1）
+# Cursor Helper (Renderer) ~1492M
+# node ~1080M
+# Notion Helper (Renderer) ~981M + ~842M など複数
+# WindowServer ~889M
+# Mail ~721M
+# Cursor Helper ~507M
+# Slack Helper ~507M
+# zoom.us ~381M
+# Chrome Helper 複数 ~290–329M
+# Chatwork, LINE, ChatGPT Atlas, Typeless など
+
+## ログイン項目（osascript）
+# Alfred 5, Cursor, Typeless, Google Drive, Spectacle, Notion
+
+## ログイン時起動（確認済み）
+# Alfred 5, Cursor, Typeless, Google Drive, Spectacle, Notion
+# ※ 8GB では「Cursor + Notion + Google Drive を同時にログイン起動」は重い。不要ならログイン項目から外し、
+#   使うときだけ起動するのが有効（特に Notion / Google Drive は二重に常駐しがち）。
+
+## クラウド同期（プロセス上の存在）
+# OneDrive（File Provider / アプリ）、Google ドライブ for desktop（複数プロセス）、iCloud Drive（File Provider）
+# 作業中だけ「同期の一時停止」や、同期対象フォルダの整理を検討。
+
+## 背景アプリの削減（実装メモ / 手動で実施）
+# 1. システム設定 → 一般 → ログイン項目: 上記のうち、起動時に必須でないもののトグルをオフ
+# 2. Chrome: タブ数・拡張を削減（このスナップショットでは Chrome Helper が複数並んでいた）
+# 3. Docker Desktop: 未インストールのため設定変更なし
+# 4. Zoom / Slack / Mail / LINE / Chatwork などコミュニケーション系は、集中時は終了してメモリを空ける
+
+## Cursor 拡張機能（インストール一覧・メモリが厳しいときの優先度）
+# 重めになりやすい例: GitLens, Markdown Preview Enhanced, Python / debugpy, Live Server
+# ドキュメント閲覧系（オフィス/PDF）: 必要なワークスペースでのみ有効化すると負荷が下がる
+# 一覧: better-comments, docx-viewer, cursorpyright, remote-ssh, vscode-office, gitlens,
+#       github-pull-request, gc-excelviewer, rainbow-csv, language-pack-ja, debugpy×2, python,
+#       live-server, muty-pptviewer, indent-rainbow, markdown-preview-enhanced, pdf, markdown-all-in-one
+# 実施: Cursor → 拡張機能 → 未使用を「ワークスペース無効」または無効化
+
+## メモ
+# - Docker: この環境では docker コマンドなし（Desktop 未使用または未インストール）
+# - ビルド時は再度「アクティビティモニタ」または top で node/tsc/webpack のピークを確認するとよい

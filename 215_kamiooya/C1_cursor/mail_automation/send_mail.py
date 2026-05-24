@@ -7,6 +7,8 @@ MDファイルから件名と本文を読み取り、
 Excelファイルからメールアドレス・会社名・担当者名を取得して、
 Gmail APIで1社ずつ個別にメールを送信するスクリプト
 
+Excel の正本パス（多くは OneDrive）は変更せず、一時ファイルへ複製してから読み込む（クラウド直読みより安定）。
+
 各メールの本文冒頭に「会社名　担当者名　様」を自動挿入します。
 
 --exclude "会社名,担当者名" で、送信しない宛先を指定可能（複数可）。
@@ -18,6 +20,8 @@ import sys
 import argparse
 import json
 import pickle
+import shutil
+import tempfile
 import time
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -184,10 +188,11 @@ def read_markdown_file(md_file_path):
 def read_recipients_from_excel(excel_file_path, sheet_name=None, email_column=None,
                                company_column=None, contact_column=None):
     """
-    Excelファイルからメールアドレス・会社名・担当者名を読み取る
+    Excelファイルからメールアドレス・会社名・担当者名を読み取る。
+    指定パスのファイルをローカル一時ファイルへ複製してから openpyxl で読む（元ファイルは書き換えない）。
     
     Args:
-        excel_file_path: Excelファイルのパス
+        excel_file_path: Excelファイルのパス（正本・通常は OneDrive 上）
         sheet_name: シート名（省略時は最初のシート）
         email_column: メールアドレス列の名前（省略時は自動検出）
         company_column: 会社名列の名前（省略時は自動検出）
@@ -196,119 +201,137 @@ def read_recipients_from_excel(excel_file_path, sheet_name=None, email_column=No
     Returns:
         list: 宛先情報の辞書リスト [{'email': ..., 'company': ..., 'contact': ...}, ...]
     """
-    excel_path = Path(excel_file_path)
-    
+    excel_path = Path(excel_file_path).expanduser().resolve()
+
     if not excel_path.exists():
         raise FileNotFoundError(f"Excelファイルが見つかりません: {excel_file_path}")
-    
-    # Excelファイルを読み込む
-    workbook = openpyxl.load_workbook(excel_path, data_only=True)
-    
-    # シートを選択
-    if sheet_name:
-        if sheet_name not in workbook.sheetnames:
-            raise ValueError(f"シート '{sheet_name}' が見つかりません。\n"
-                           f"利用可能なシート: {', '.join(workbook.sheetnames)}")
-        sheet = workbook[sheet_name]
-    else:
-        sheet = workbook.active
-        print(f"シート '{sheet.title}' を使用します")
-    
-    # ヘッダー行を取得（1行目）
-    headers = []
-    for cell in sheet[1]:
-        headers.append(cell.value)
-    
-    # --- メールアドレス列を特定 ---
-    # 「個別メール」より「mail」を優先（G2シート等で宛先が mail 列に入っているため）
-    email_col_idx = None
-    if email_column:
+
+    fd, tmp_name = tempfile.mkstemp(prefix="send_mail_excel_", suffix=".xlsx")
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+    try:
+        shutil.copy2(excel_path, tmp_path)
+    except OSError as e:
         try:
-            email_col_idx = headers.index(email_column)
-        except ValueError:
-            raise ValueError(f"列 '{email_column}' が見つかりません。\n"
-                           f"利用可能な列: {', '.join([str(h) for h in headers if h])}")
-    else:
-        # 優先: 列名が "mail" / "メールアドレス" / "email" のもの（完全一致）
-        preferred = ("mail", "メールアドレス", "email")
-        for idx, header in enumerate(headers):
-            if not header:
-                continue
-            h = str(header).strip().lower().replace("\n", "")
-            if h in preferred:
-                email_col_idx = idx
-                print(f"メールアドレス列として '{header}' を使用します")
-                break
-        # 見つからなければ従来どおり「メール」「mail」「email」を含む最初の列
-        if email_col_idx is None:
-            for idx, header in enumerate(headers):
-                if header and ('メール' in str(header).lower() or
-                              'email' in str(header).lower() or
-                              'mail' in str(header).lower()):
-                    email_col_idx = idx
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise RuntimeError(
+            "Excel をローカルへ複製できませんでした（通信不安定・OneDrive 未同期の可能性があります）。"
+            f"\n元ファイル: {excel_path}\n{e}"
+        ) from e
+
+    workbook = None
+    try:
+        workbook = openpyxl.load_workbook(tmp_path, read_only=True, data_only=True)
+        # シートを選択
+        if sheet_name:
+            if sheet_name not in workbook.sheetnames:
+                raise ValueError(f"シート '{sheet_name}' が見つかりません。\n"
+                               f"利用可能なシート: {', '.join(workbook.sheetnames)}")
+            sheet = workbook[sheet_name]
+        else:
+            sheet = workbook.active
+            print(f"シート '{sheet.title}' を使用します")
+
+        # ヘッダー行を取得（1行目）
+        headers = list(next(sheet.iter_rows(min_row=1, max_row=1, values_only=True)))
+
+        # --- メールアドレス列を特定 ---
+        # 「個別メール」より「mail」を優先（G2シート等で宛先が mail 列に入っているため）
+        email_col_idx = None
+        if email_column:
+            try:
+                email_col_idx = headers.index(email_column)
+            except ValueError:
+                raise ValueError(f"列 '{email_column}' が見つかりません。\n"
+                               f"利用可能な列: {', '.join([str(h) for h in headers if h])}")
+        else:
+            preferred = ("mail", "メールアドレス", "email")
+            for hi, header in enumerate(headers):
+                if not header:
+                    continue
+                h = str(header).strip().lower().replace("\n", "")
+                if h in preferred:
+                    email_col_idx = hi
                     print(f"メールアドレス列として '{header}' を使用します")
                     break
-    
-    if email_col_idx is None:
-        raise ValueError("メールアドレスの列が見つかりません。\n"
-                        "--email-column オプションで列名を指定してください。")
-    
-    # --- 会社名列を特定 ---
-    company_col_idx = None
-    if company_column:
+            if email_col_idx is None:
+                for hi, header in enumerate(headers):
+                    if header and ('メール' in str(header).lower() or
+                                  'email' in str(header).lower() or
+                                  'mail' in str(header).lower()):
+                        email_col_idx = hi
+                        print(f"メールアドレス列として '{header}' を使用します")
+                        break
+
+        if email_col_idx is None:
+            raise ValueError("メールアドレスの列が見つかりません。\n"
+                            "--email-column オプションで列名を指定してください。")
+
+        company_col_idx = None
+        if company_column:
+            try:
+                company_col_idx = headers.index(company_column)
+            except ValueError:
+                print(f"⚠️  会社名列 '{company_column}' が見つかりません。会社名なしで送信します。")
+        else:
+            for hi, header in enumerate(headers):
+                if header and '会社' in str(header):
+                    company_col_idx = hi
+                    print(f"会社名列として '{header}' を使用します")
+                    break
+
+        if company_col_idx is None:
+            print("⚠️  会社名列が見つかりません。会社名なしで送信します。")
+
+        contact_col_idx = None
+        if contact_column:
+            try:
+                contact_col_idx = headers.index(contact_column)
+            except ValueError:
+                print(f"⚠️  担当者名列 '{contact_column}' が見つかりません。担当者名なしで送信します。")
+        else:
+            for hi, header in enumerate(headers):
+                if header and '担当' in str(header):
+                    contact_col_idx = hi
+                    print(f"担当者名列として '{header}' を使用します")
+                    break
+
+        if contact_col_idx is None:
+            print("⚠️  担当者名列が見つかりません。担当者名なしで送信します。")
+
+        recipients = []
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            email = row[email_col_idx] if email_col_idx is not None and email_col_idx < len(row) else None
+            if email and '@' in str(email):
+                company = ''
+                contact = ''
+                if company_col_idx is not None and company_col_idx < len(row) and row[company_col_idx]:
+                    company = str(row[company_col_idx]).strip()
+                if contact_col_idx is not None and contact_col_idx < len(row) and row[contact_col_idx]:
+                    contact = str(row[contact_col_idx]).strip()
+
+                recipients.append({
+                    'email': str(email).strip(),
+                    'company': company,
+                    'contact': contact,
+                })
+
+        if not recipients:
+            raise ValueError("メールアドレスが1件も見つかりませんでした")
+
+        return recipients
+    finally:
+        if workbook is not None:
+            workbook.close()
         try:
-            company_col_idx = headers.index(company_column)
-        except ValueError:
-            print(f"⚠️  会社名列 '{company_column}' が見つかりません。会社名なしで送信します。")
-    else:
-        for idx, header in enumerate(headers):
-            if header and '会社' in str(header):
-                company_col_idx = idx
-                print(f"会社名列として '{header}' を使用します")
-                break
-    
-    if company_col_idx is None:
-        print("⚠️  会社名列が見つかりません。会社名なしで送信します。")
-    
-    # --- 担当者名列を特定 ---
-    contact_col_idx = None
-    if contact_column:
-        try:
-            contact_col_idx = headers.index(contact_column)
-        except ValueError:
-            print(f"⚠️  担当者名列 '{contact_column}' が見つかりません。担当者名なしで送信します。")
-    else:
-        for idx, header in enumerate(headers):
-            if header and '担当' in str(header):
-                contact_col_idx = idx
-                print(f"担当者名列として '{header}' を使用します")
-                break
-    
-    if contact_col_idx is None:
-        print("⚠️  担当者名列が見つかりません。担当者名なしで送信します。")
-    
-    # 宛先情報を抽出（2行目以降）
-    recipients = []
-    for row in sheet.iter_rows(min_row=2, values_only=True):
-        email = row[email_col_idx] if email_col_idx is not None and email_col_idx < len(row) else None
-        if email and '@' in str(email):
-            company = ''
-            contact = ''
-            if company_col_idx is not None and company_col_idx < len(row) and row[company_col_idx]:
-                company = str(row[company_col_idx]).strip()
-            if contact_col_idx is not None and contact_col_idx < len(row) and row[contact_col_idx]:
-                contact = str(row[contact_col_idx]).strip()
-            
-            recipients.append({
-                'email': str(email).strip(),
-                'company': company,
-                'contact': contact,
-            })
-    
-    if not recipients:
-        raise ValueError("メールアドレスが1件も見つかりませんでした")
-    
-    return recipients
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+
 
 
 def filter_excluded_recipients(recipients, exclude_list):
@@ -347,6 +370,22 @@ def filter_excluded_recipients(recipients, exclude_list):
     return kept, excluded
 
 
+def _remove_gozei_lines_when_company_in_body(body: str, company: str) -> str:
+    """
+    会社名が登録されている宛先では、宛名行に会社名を差し込むため MD 側の単独行「各位」が
+    その直下に続くと冗長になる。そこで単独行の「各位」を取り除く。
+
+    MD 原文に会社名が書かれている場合も同様に二重挨拶となりやすいので同じ扱いとする。
+    （会社名列が空で宛名に会社名が入らない場合は「各位」を残す）
+    """
+    c = (company or "").strip()
+    if not c:
+        return body or ""
+    lines = (body or "").split("\n")
+    kept = [ln for ln in lines if ln.strip() != "各位"]
+    return "\n".join(kept).strip("\n")
+
+
 def build_personalized_body(body, company, contact):
     """
     本文の先頭に会社名・担当者名の宛名を挿入する
@@ -359,6 +398,8 @@ def build_personalized_body(body, company, contact):
     Returns:
         str: 宛名付きの本文
     """
+    body = _remove_gozei_lines_when_company_in_body(body, company)
+
     # 宛名行を組み立てる（会社名と担当者名を別行に）
     if company and contact:
         greeting = f"{company}\n{contact} 様\n\n"

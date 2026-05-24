@@ -1,0 +1,35 @@
+#!/usr/bin/expect -f
+# OTP 関連の stderr が出るまで Enter 待ちを自動で抜ける（手動検証用）
+set timeout 900
+set enters 0
+set max_enters 40
+
+spawn bash -c {cd '/Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/browser_automation' && /usr/bin/python3 fetch_after_login.py tokairokin --amount 240000}
+
+expect {
+    -re {\【確認\】画面上で OTP|\【一時停止\】ワンタイムパスワード} {
+        puts "\n\n>>> OTP入力関連のメッセージを検出しました。\n"
+        exit 0
+    }
+    -re {otp_input_selector が空です} {
+        puts "\n\n>>> OTPフロー（セレクタ未設定メッセージ）を検出しました。\n"
+        exit 0
+    }
+    -re {Enter キーを押して|Enter を押してください|フォーカスを移して Enter} {
+        incr enters
+        if {$enters > $max_enters} {
+            puts "\n>>> Enter 自動送信が上限に達しました\n"
+            exit 1
+        }
+        send "\r"
+        exp_continue
+    }
+    eof {
+        puts "\n>>> Python が終了しました（eof）\n"
+        exit 0
+    }
+    timeout {
+        puts "\n>>> expect タイムアウト\n"
+        exit 2
+    }
+}
