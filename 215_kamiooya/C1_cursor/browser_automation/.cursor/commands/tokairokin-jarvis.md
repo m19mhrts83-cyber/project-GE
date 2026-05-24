@@ -29,11 +29,11 @@ PYTHONWARNINGS=ignore TOKAIROKIN_NON_INTERACTIVE=1 \
 3) 前提: browser_automation/.env に TOKAIROKIN_* が入っていること。振込先は TOKAIROKIN_DEFAULT_* か CLI で足りていること。
 
 4) ログで次を見て報告すること:
-・「ログイン後トップページ相当と判断し、合言葉の Enter 待ちをスキップ」→ 合言葉なしルートで正常（BLI001Dispatch トップ到達済み）。
+・「【主経路】…合言葉の Enter 待ちをスキップ」→ 合言葉画面なしでログイン後トップ相当と判定済み（post_login_dashboard_detect）。この経路が既定の想定。
+・「【主経路から外れた可能性】」→ ブラウザで実画面を確認。トップなら post_login_dashboard_detect を調整。合言葉が出ているなら secret_phrase_* を検討。
 ・B0470 / BER020 → 無操作だけでなく **振込 Dispatch の URL 直叩き**でも出ることがある。transfer_direct_first: false（メニュー優先）を確認。再実行や対話実行も検討。
-・合言葉・質問が検出できない（かつトップスキップメッセージも無い）→ config の secret_phrase_page_markers・secret_phrase_auto の match、secret_phrase_dom_wait_seconds を確認。
 ・iframe 関連は secret_phrase_check_iframes: true が既定。
-・OTP → 既定はワンタイムPW アプリ＋ユーザー手入力。ユーザーにチャットで OTP 画面に達したことを確認してから進める（fetch_otp_from_gmail は false）。
+・OTP → 既定は fetch_otp_from_gmail: false（ワンタイムPW アプリ＋ユーザーがブラウザで入力・実行確定）。**スクリプト終了だけでは振込完了と断定しない**。統合ターミナルで Enter が自動処理される問題があるので、OTP 時は Terminal.app 実行を推奨。**非対話実行では OTP ホールドを期待しない**（ブラウザ完了はユーザー確認）。
 ・distutils / setuptools → requirements に setuptools あり。.venv で pip install -r requirements.txt をやり直す。
 
 5) コード変更はユーザーが明示したときだけ。まずは設定・再実行で様子を見る。
@@ -49,9 +49,9 @@ PYTHONWARNINGS=ignore TOKAIROKIN_NON_INTERACTIVE=1 \
 | 初回 | `python3 -m venv .venv` → `pip install -r requirements.txt` → `playwright install chromium` |
 | 非対話 | `TOKAIROKIN_NON_INTERACTIVE=1` と `--non-interactive` がセット |
 | 警告抑制 | `PYTHONWARNINGS=ignore` |
-| トップ到達・合言葉なし | stderr にスキップメッセージが出れば Enter 待ちはしない（fetch_after_login の post_login_dashboard_detect） |
-| 合言葉が見えない／検出できない | BLI017 経路のみ該当。`secret_phrase_dom_wait_seconds`、`secret_phrase_page_markers`、`match` の見直し |
+| トップ到達・合言葉なし（主経路） | 「【主経路】…スキップ」が出れば合言葉 Enter 待ちなし（post_login_dashboard_detect・allow_dispatch_url_without_body_markers） |
+| 主経路から外れたログ | 「【主経路から外れた可能性】」→ 画面確認後に post_login_dashboard_detect または secret_phrase_* を調整 |
 | B0470 | 無操作に加え不正な URL 直遷移でも発生しうる。メニュー経由・`transfer_direct_first: false` を確認 |
-| OTP | 既定はワンタイムPW アプリ＋チャット連携・手入力（fetch_otp_from_gmail: false）。処理後ユーザーが Enter |
+| OTP | fetch_otp_from_gmail: false 既定。**ユーザーがブラウザで入力・実行確定しないと振込は完了しない**。Terminal.app 推奨 |
 
 詳細設定キーは `config_tokairokin.yaml` と `config_tokairokin.example.yaml` を参照。

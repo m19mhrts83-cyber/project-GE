@@ -76,6 +76,7 @@ python fetch_after_login.py nichinoken
 
 3. **実行方法**
    - `python fetch_after_login.py tokairokin` でログイン → 振込画面へ遷移
+   - **ログイン後の主経路（合言葉が出ない運用）**: 合言葉画面のマーカーが検出されず、かつ `post_login_dashboard_detect` でログイン後トップ相当と判定できる場合、**合言葉用の Enter 待ちをスキップ**して振込処理へ進む（URL・本文キーワード・`allow_dispatch_url_without_body_markers` の詳細は `fetch_after_login.py` の `_tokairokin_post_login_dashboard_detected` と `config_tokairokin.example.yaml` を参照）。主経路から外れたときは stderr の案内に従い、ブラウザ確認のうえ `post_login_dashboard_detect` または `secret_phrase_*` を調整する。
    - **手動クリックモード**（既定: 有効）: トップページで「振込」が押せない場合、`manual_click_transfer_menu: true` のときは「画面上で振込をクリック → クリックしたら Enter」で次を自動実行。`false` にすると従来どおり自動で振込メニューをクリック
    - **振込の自動入力**（オプション）:
      ```bash
@@ -93,7 +94,8 @@ python fetch_after_login.py nichinoken
 
 5. **ワンタイムパスワード（OTP）**
    - 東海労金の OTP は **メールではなくスマホアプリ「ワンタイムPW」**で確認します。
-   - **既定運用**: `fetch_otp_from_gmail: false`。スクリプトは OTP 手前で一時停止し、**Cursor のチャットで「OTP 入力画面まで進んだ」と伝えたうえで**、アプリの番号を **`transfer_form.otp_input_selector`**（例 `#pswd002`）へ入力し、確認・実行まで手動で進めます。終わったらターミナルで Enter。
+   - **既定運用**: `fetch_otp_from_gmail: false`。スクリプトは **OTP を自動入力せず、入力・実行確定の直前でホールド**します（`otp_hold_before_manual_entry`）。流れはおおむね「ホールドで止まる → チャット／ブラウザで OTP 画面を確認しターミナル Enter → 手動で OTP 入力・実行 → 案内どおり再度 Enter」。ユーザーがアプリで番号を確認し、**ブラウザで実行確定するまで振込は完了しません**。**Cursor の統合ターミナルでは Enter が意図せず処理されることがあるため、OTP が絡むときは Terminal.app での実行を推奨**します。
+   - **`--non-interactive`**: Enter 待ちを省略するため、**OTP をホールドで確実に止めたい運用には不向き**（Jarvis等ではブラウザ側の完了を別途確認する前提）。
    - **オプション**: メール経由で OTP を自動入力したい場合のみ `fetch_otp_from_gmail: true` とし、`tokairokin_gmail_otp.py`・`.env` の `TOKAIROKIN_OTP_GMAIL_*` を設定します。
 
 6. **パスワード変更画面が出る場合（自動化検知の回避）**
