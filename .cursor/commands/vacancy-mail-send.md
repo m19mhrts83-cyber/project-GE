@@ -6,18 +6,18 @@
 Grandole志賀本通I などの空室対策メールを、指定した Markdown と固定の管理会社一覧 Excel を使って、一括送信します。
 
 - 送信ロジック（Gmail API 連携・個別送信）は既存の `send_mail.py` を使います。
-- Python 実行環境は、**git-repos 側の `ProgramCode/venv_gmail`** を必ず使います。
+- Python 実行環境は、**`~/selenium_env/venv`** を必ず使います。
 - 実ユーザーとの対話はこのコマンド側で行い、実際の送信は Python スクリプトに任せます。
 
 # 前提
 - 管理会社一覧 Excel は次を標準とします：
   - ファイル: `20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx`
   - シート: `G2`
-  - 場所: `/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部`
+  - 場所: `/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部`
 - 実行用 Python スクリプト:
   - `~/git-repos/215_kamiooya/C1_cursor/mail_automation/interactive_vacancy_send.py`（OneDrive 本体と同内容の場合）
 - Python 実行環境:
-  - `/Users/matsunomasaharu/git-repos/ProgramCode/venv_gmail/bin/python`
+  - `/Users/matsunomasaharu2/selenium_env/venv/bin/python`
 
 # 振る舞い
 
@@ -28,7 +28,7 @@ Grandole志賀本通I などの空室対策メールを、指定した Markdown 
 ユーザーに、まず次のように確認してください。
 
 > 現在の管理会社一覧として、  
-> `/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx` の  
+> `/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx` の  
 > シート「G2」を使用します。  
 > この管理会社一覧で送信してよろしいですか？（はい / いいえ）
 
@@ -58,14 +58,14 @@ Grandole志賀本通I などの空室対策メールを、指定した Markdown 
 以下のコマンドで Python スクリプトを実行してください。
 
 ```bash
-cd ~/git-repos/ProgramCode && \
-./venv_gmail/bin/python ~/git-repos/215_kamiooya/C1_cursor/mail_automation/interactive_vacancy_send.py
+cd ~/git-repos/215_kamiooya/C1_cursor/mail_automation && \
+~/selenium_env/venv/bin/python interactive_vacancy_send.py
 ```
 
 実行にあたってのルール:
 
-- **必ず** 上記の `venv_gmail` を使います（OneDrive 側の venv は使わない）。
-- カレントディレクトリは `/Users/matsunomasaharu/git-repos/ProgramCode` にしてください。
+- **必ず** 上記の `~/selenium_env/venv/bin/python` を使います（OneDrive 側の venv は使わない）。
+- カレントディレクトリは `/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/mail_automation` にしてください。
 - スクリプト実行中に、Python 側でさらに対話（確認質問・MDパスの入力）が発生する可能性があります。
   - その場合は、ユーザーに「今ターミナル側で確認・入力が必要になっているかもしれません」と一言添える程度で構いません。
 

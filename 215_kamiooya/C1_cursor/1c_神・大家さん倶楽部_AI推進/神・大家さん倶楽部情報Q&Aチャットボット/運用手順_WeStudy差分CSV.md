@@ -192,7 +192,7 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 
 ```bash
 ./scripts/run_westudy_pipeline.sh
-ls -1t "${CHATBOT_OUTPUT_ROOT:-/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット}/exports/delta_"*.csv | head -n 1
+ls -1t "${CHATBOT_OUTPUT_ROOT:-/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット}/exports/delta_"*.csv | head -n 1
 ```
 
 差分がヘッダのみ（行数1）なら `run_update_and_import.sh` はアップロードをスキップして正常終了します。

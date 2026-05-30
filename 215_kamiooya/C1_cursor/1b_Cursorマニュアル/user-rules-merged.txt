@@ -7,7 +7,7 @@ Always respond in Japanese
 カレントディレクトリに関わらず、以下のディレクトリに保存すること。
 
 ## 保存先ディレクトリ
-`/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/500_Obsidian/.cursor/commands/`
+`/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/500_Obsidian/.cursor/commands/`
 
 ## 命名規則
 - ファイル名: `コマンド名.md` （例: `reserch-company.md`）

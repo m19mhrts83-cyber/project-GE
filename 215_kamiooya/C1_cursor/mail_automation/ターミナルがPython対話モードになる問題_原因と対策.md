@@ -156,7 +156,7 @@ chsh -s /bin/zsh
 
 **対策**（mail_automation ディレクトリで実行）:
 ```bash
-cd "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation"
+cd "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation"
 rm -rf venv
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt

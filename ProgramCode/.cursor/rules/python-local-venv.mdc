@@ -5,9 +5,11 @@ alwaysApply: true
 
 # Python 実行環境の指定
 
+**正本フォルダ**: `~/selenium_env`（README・`setup.sh`・`requirements*.txt`・`.vscode/settings.json`）
+
 ## 方針
 
-- **Python スクリプトの実行は、OneDrive 上ではなくローカル（git-repos/ProgramCode）の venv を使う。**
+- **Python スクリプトの実行は、OneDrive 上ではなくローカルの venv（`/Users/matsunomasaharu2/selenium_env/venv`）を使う。**
 - OneDrive 上の `.venv_gmail` 等は起動が遅くタイムアウトすることがあるため、エージェントが Python を実行するときは下記のいずれかを指定する。
 - **ProgramCode は git-repos に統合済み**。パスは `~/git-repos/ProgramCode/` とする。
 
@@ -15,25 +17,21 @@ alwaysApply: true
 
 ### 共通環境（1つでよい場合）
 
-- **パス**: `~/git-repos/ProgramCode/venv_gmail/bin/python`
-- **用途**: やり取りメール送信（yoritoori_send.py）、Gmail 取得（gmail_to_yoritoori.py）、iMessage 連携（imessage_to_yoritoori.py）など、Gmail API や YAML を使うスクリプト全般。
-- 上記以外の 215 用 Python スクリプトも、依存が同じならこの環境で実行してよい。
+- **パス**: `/Users/matsunomasaharu2/selenium_env/venv/bin/python`
+- **用途**: やり取りメール送信（yoritoori_send.py）、Gmail 取得（gmail_to_yoritoori.py）、iMessage 連携（imessage_to_yoritoori.py）、Excel/PDF変換など、スクリプト実行全般。
 
 ### 別環境（分けたい場合）
 
-- **Gmail・やり取り用**: `~/git-repos/ProgramCode/venv_gmail/bin/python`  
-  （yoritoori_send.py, gmail_to_yoritoori.py, imessage_to_yoritoori.py）
-- **その他**: `~/git-repos/ProgramCode/venv/bin/python`  
-  （既存の excel_to_md.py, pdf_to_md.py 等で、venv_gmail と依存が違う場合）
+- **Selenium・スクレイピング・通常用**: `/Users/matsunomasaharu2/selenium_env/venv/bin/python`
+- **その他（個別の依存関係がある場合）**: `~/git-repos/ProgramCode/venv_gmail/bin/python` または `~/git-repos/ProgramCode/venv/bin/python` を適宜作成して使用する。
 
 ## エージェントの振る舞い
 
 - **具体的な `cd` 行とスクリプト引数のセット**は、`~/git-repos/docs/運用コマンド一覧.md` を開いてそのまま用いる（正本）。
 - インタプリタだけ先に決める場合:
-  - Gmail・やり取り・パートナー連携まわり → `~/git-repos/ProgramCode/venv_gmail/bin/python`
-  - excel_to_md / pdf_to_md 等で依存が分かれているもの → `~/git-repos/ProgramCode/venv/bin/python`
+  - 基本・Selenium・通常処理 → `/Users/matsunomasaharu2/selenium_env/venv/bin/python`
   - `line_unofficial_poc` → 当該リポジトリの `.venv/bin/python`
-  - どちらか不明なときはまず `venv_gmail` でよい。
+  - どちらか不明なときはまず `/Users/matsunomasaharu2/selenium_env/venv/bin/python` でよい。
 
 ## 禁止すること
 

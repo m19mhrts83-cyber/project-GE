@@ -21,7 +21,7 @@ import openpyxl
 
 
 BASE = Path(
-    "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/"
+    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/"
     "C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化"
 )
 SRC = BASE / "月間MVP計算表_2026年2月15日 23：59_fix.xlsx"

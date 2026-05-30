@@ -11,7 +11,7 @@ description: Jarvis にそのまま貼る東海労金 tokairokin 実行・トラ
 
 1) 作業ディレクトリと Python 環境（Homebrew Python / PEP 668 ではグローバル pip が使えないため、必ずこのフォルダの venv を使う）
 
-cd /Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/browser_automation
+cd /Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/browser_automation
 
 初回または ModuleNotFoundError のときだけ（venv が無い・壊れている場合）:
 

@@ -4,7 +4,7 @@ import openpyxl
 from pathlib import Path
 
 # 送信スクリプトと同じパス
-EXCEL = Path("/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx")
+EXCEL = Path("/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx")
 
 if not EXCEL.exists():
     print(f"ファイルが見つかりません: {EXCEL}")

@@ -11,8 +11,8 @@
 
 使い方（例）:
   （推奨）git-repos 側の venv から実行
-  cd /Users/matsunomasaharu/git-repos/ProgramCode
-  ./venv_gmail/bin/python "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation/interactive_vacancy_send.py"
+  cd /Users/matsunomasaharu2/git-repos/ProgramCode
+  ./venv_gmail/bin/python "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation/interactive_vacancy_send.py"
 """
 
 import sys

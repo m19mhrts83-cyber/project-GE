@@ -55,12 +55,12 @@ from googleapiclient.discovery import build
 # 設定
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_SAVE_PATH = Path(
-    "/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com"
+    "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com"
     "/マイドライブ/DX互助会_共有フォルダ/05_knowledge/いけともAIニュース"
 )
 # credentials は 215 フォルダの gmail_to_yoritoori と共通
 DEFAULT_CREDENTIALS_DIR = Path(
-    "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル"
+    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル"
 )
 CREDENTIALS_PATH = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", str(DEFAULT_CREDENTIALS_DIR / "credentials.json")))
 TOKEN_PATH = Path(os.environ.get("GMAIL_TOKEN_PATH", str(DEFAULT_CREDENTIALS_DIR / "token.json")))

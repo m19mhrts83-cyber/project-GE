@@ -24,16 +24,16 @@ alwaysApply: false
 
 ```bash
 rsync -a --delete \
-  "/Users/matsunomasaharu/git-repos/docs/N1_NotebookLM/" \
-  "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/N1_NotebookLM/"
+  "/Users/matsunomasaharu2/git-repos/docs/N1_NotebookLM/" \
+  "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/N1_NotebookLM/"
 ```
 
 **B を編集した直後**（OneDrive 側が正）:
 
 ```bash
 rsync -a --delete \
-  "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/N1_NotebookLM/" \
-  "/Users/matsunomasaharu/git-repos/docs/N1_NotebookLM/"
+  "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/N1_NotebookLM/" \
+  "/Users/matsunomasaharu2/git-repos/docs/N1_NotebookLM/"
 ```
 
 - `--delete` で **片方にしかないゴミファイルを削除**し、フォルダを真に一致させる。
