@@ -14,7 +14,7 @@
 ```bash
 cd "03_outputs/ai_news_save"
 # 215 フォルダの venv を使用（credentials と同一）
-/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python gmail_ai_news_save.py
+/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python gmail_ai_news_save.py
 ```
 
 - `--output /path` で保存先を指定可能

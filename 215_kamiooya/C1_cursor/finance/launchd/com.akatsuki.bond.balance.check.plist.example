@@ -7,13 +7,13 @@
 
     <key>ProgramArguments</key>
     <array>
-      <string>/Users/matsunomasaharu/git-repos/ProgramCode/venv/bin/python</string>
-      <string>/Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/finance/run_scheduled_akatsuki_balance_check.py</string>
+      <string>/Users/matsunomasaharu2/git-repos/ProgramCode/venv/bin/python</string>
+      <string>/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/finance/run_scheduled_akatsuki_balance_check.py</string>
       <string>--headless</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/finance</string>
+    <string>/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/finance</string>
 
     <key>StartCalendarInterval</key>
     <dict>

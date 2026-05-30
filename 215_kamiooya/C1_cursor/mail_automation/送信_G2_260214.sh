@@ -2,9 +2,9 @@
 # 260214_G2_空室対策メールをG2シート宛に送信（自動承認）
 # 対話モード（>>>）回避: python -c でスクリプトを読み込み実行（ファイルパスを渡さない）
 set -e
-DIR="/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation"
-MD_FILE="/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/24_空室対策メール履歴/260214_G2_空室対策.md"
-EXCEL_FILE="/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx"
+DIR="/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/mail_automation"
+MD_FILE="/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/24_空室対策メール履歴/260214_G2_空室対策.md"
+EXCEL_FILE="/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx"
 
 cd "$DIR"
 # python -c で exec: スクリプトファイルを引数で渡さないため、対話モードの原因を回避

@@ -211,7 +211,7 @@ git push -u origin main --force
    rsync -av --timeout=120 --ignore-errors \
      --exclude='.git' --exclude='.gitignore' --exclude='.venv' --exclude='**/.venv' \
      --exclude='.cursor' --exclude='.obsidian' --exclude='.vscode' \
-     "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/" \
+    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/" \
      ~/git-repos/215_kamiooya/
    ```
    **重要:** `.gitignore` を除外しないと、OneDrive 側の .gitignore で 215_kamiooya の設定が上書きされ、`.venv` が再び add されて push エラーになります。
@@ -225,7 +225,7 @@ git push -u origin main --force
      --exclude='.git' --exclude='.gitignore' --exclude='.venv' --exclude='**/.venv' \
      --exclude='.cursor' --exclude='.obsidian' --exclude='.vscode' \
      --exclude='00_活動報告・成果報告・全般/231225_契約時の連絡_LINE 関連.md' \
-     "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/" \
+    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/" \
      ~/git-repos/215_kamiooya/
    ```
    （手動でコピーする場合は、215_kamiooya の `.git` と `.gitignore` を消さず、`.venv` はコピーしない。）

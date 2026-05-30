@@ -4,7 +4,7 @@ set timeout 900
 set enters 0
 set max_enters 40
 
-spawn bash -c {cd '/Users/matsunomasaharu/git-repos/215_kamiooya/C1_cursor/browser_automation' && /usr/bin/python3 fetch_after_login.py tokairokin --amount 240000}
+spawn bash -c {cd '/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/browser_automation' && /usr/bin/python3 fetch_after_login.py tokairokin --amount 240000}
 
 expect {
     -re {\【確認\】画面上で OTP|\【一時停止\】ワンタイムパスワード} {

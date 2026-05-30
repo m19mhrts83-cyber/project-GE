@@ -1,15 +1,13 @@
 ---
-description: Python 実行はローカル venv を使う（OneDrive 上の venv は使わない）
-alwaysApply: true
+name: python-local-venv
+description: Python 実行はローカル venv を使う（OneDrive 上の venv は使わない）。Use when executing Python scripts or recommending Python command lines.
 ---
 
 # Python 実行環境の指定
 
-**正本フォルダ**: `~/selenium_env`（README・`setup.sh`・`requirements*.txt`・`.vscode/settings.json`）
-
 ## 方針
 
-- **Python スクリプトの実行は、OneDrive 上ではなくローカルの venv（`/Users/matsunomasaharu2/selenium_env/venv`）を使う。**
+- **Python スクリプトの実行は、OneDrive 上ではなくローカルの venv（主に /Users/matsunomasaharu2/selenium_env/venv）を使う。**
 - OneDrive 上の `.venv_gmail` 等は起動が遅くタイムアウトすることがあるため、エージェントが Python を実行するときは下記のいずれかを指定する。
 - **ProgramCode は git-repos に統合済み**。パスは `~/git-repos/ProgramCode/` とする。
 

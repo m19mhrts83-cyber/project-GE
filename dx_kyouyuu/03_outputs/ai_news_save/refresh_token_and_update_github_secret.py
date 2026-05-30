@@ -30,7 +30,7 @@ from gmail_api_scopes import GMAIL_SCOPES_215 as SCOPES, token_satisfies_215_sco
 
 # 215 の credentials を参照（gmail_ai_news_save と同じ）
 DEFAULT_CREDENTIALS_DIR = Path(
-    "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル"
+    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル"
 )
 SCRIPT_DIR = Path(__file__).resolve().parent
 CREDENTIALS_PATH = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", str(DEFAULT_CREDENTIALS_DIR / "credentials.json")))

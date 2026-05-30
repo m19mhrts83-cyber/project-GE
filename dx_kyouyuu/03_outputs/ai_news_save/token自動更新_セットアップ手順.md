@@ -36,15 +36,15 @@ Refresh token の有効期限を延ばします。
    - **5-1. そのまま実行して確認**  
      ターミナルで次を実行する。  
      ```bash
-     cd "/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save"
-     /Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python gmail_ai_news_save.py --list
+     cd "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save"
+     /Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python gmail_ai_news_save.py --list
      ```
      - メール一覧や「該当メールはありませんでした」と出れば **成功**。この時点でステップ 1 は完了。
      - ブラウザが開いて「Google でログイン」と出た場合は、認証を完了すると新しい token が保存され、これも完了。
    - **5-2. 新しい refresh token を確実に取りたい場合（任意）**  
      「本番」にした直後に、長く持つ refresh token を新規発行したいときは、まず 215 の `token.json` をリネームして退避し、**そのあと** 上記のコマンドを**あなたのターミナルで**実行する。ブラウザが開くので **matsuno.estate@gmail.com** でログインして許可すると、新しい `token.json` が保存される。  
      ```bash
-     mv "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json" "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json.bak"
+     mv "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json" "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json.bak"
      # 続けて上記の gmail_ai_news_save.py --list を実行
      ```
 
@@ -55,7 +55,7 @@ Refresh token の有効期限を延ばします。
 token を GitHub API で暗号化するために必要です。
 
 ```bash
-/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/pip install PyNaCl
+/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/pip install PyNaCl
 ```
 
 ---
@@ -107,10 +107,10 @@ token を GitHub API で暗号化するために必要です。
   （PAT はターミナルに表示されないよう、貼り付けたら Enter で確定してから次の行を実行する）
 
 ```bash
-cd "/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save"
+cd "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save"
 # 方法 B の場合のみ: 次の 1 行を追加し、' ' の中にステップ 3 でコピーした PAT を貼り付ける
 # export GITHUB_TOKEN='ここにPATを貼る'
-/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python refresh_token_and_update_github_secret.py
+/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python refresh_token_and_update_github_secret.py
 ```
 
 - 「Gmail token を更新しました。」「GitHub Secret GMAIL_TOKEN_B64 を更新しました。」と出れば成功です。
@@ -123,7 +123,7 @@ cd "/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.co
 
 1. plist を LaunchAgents にコピー  
    ```bash
-   cp "/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save/co.workstyle.ai-news-token-refresh.plist" ~/Library/LaunchAgents/
+   cp "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save/co.workstyle.ai-news-token-refresh.plist" ~/Library/LaunchAgents/
    ```
 2. **PAT を plist に渡す場合**: plist を編集し、`<dict>` 内の `EnvironmentVariables` に  
    `<key>GITHUB_TOKEN</key><string>あなたのPAT</string>` を追加。

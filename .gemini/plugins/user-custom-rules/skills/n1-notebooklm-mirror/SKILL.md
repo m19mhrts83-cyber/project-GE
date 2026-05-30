@@ -1,7 +1,6 @@
 ---
-description: N1_NotebookLM を git-repos と OneDrive(215) の両方に常に同一内容でミラーする
-globs: docs/N1_NotebookLM/**
-alwaysApply: false
+name: n1-notebooklm-mirror
+description: N1_NotebookLM を git-repos と OneDrive(215) の両方に常に同一内容でミラーする。Use when editing, creating, or deleting files in docs/N1_NotebookLM or OneDrive-個人用/215_神・大家さん倶楽部/N1_NotebookLM folders.
 ---
 
 # N1_NotebookLM 双方向ミラー（手動コピー禁止）

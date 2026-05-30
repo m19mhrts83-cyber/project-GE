@@ -123,7 +123,7 @@ Excelファイルに複数のシートがある場合、特定のシートを指
 #### 本番送信用
 - `★管理会社一覧.xlsx`（不動産会社リスト）
 - シート「G2」
-- /Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx
+- /Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx
 
 ### Excelファイルのシート構成例
 

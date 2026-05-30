@@ -1,1 +1,1 @@
-/Users/matsunomasaharu/Documents/alfred_python/merge_westudy_csv.py
+/Users/matsunomasaharu2/Documents/alfred_python/merge_westudy_csv.py

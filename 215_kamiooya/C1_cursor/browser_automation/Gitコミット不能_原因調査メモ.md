@@ -62,7 +62,7 @@
 
 - **バックアップを取ったうえで**、現在の `.git`（59バイトのファイル）の**中身を確認**する。
   - ターミナルで:  
-    `cat "/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/.git"`
+    `cat "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/.git"`
   - タイムアウトせずに `gitdir: （パス）` のように出れば、そのパスが「本当の .git の場所」。
 - 参照先パスが分かった場合:
   - そのパスが OneDrive 内なら、**A（OneDrive 外へ移す）**を強く推奨。

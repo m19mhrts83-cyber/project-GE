@@ -22,7 +22,7 @@ from pathlib import Path
 # デフォルト: いけともAIニュースのパス（gmail_ai_news_save と同じ）
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_BASE = Path(
-    "/Users/matsunomasaharu/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com"
+    "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com"
     "/マイドライブ/DX互助会_共有フォルダ/05_knowledge/いけともAIニュース"
 )
 

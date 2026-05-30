@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHATBOT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ONEDRIVE_CHATBOT_ROOT="/Users/matsunomasaharu/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット"
+ONEDRIVE_CHATBOT_ROOT="/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット"
 OUTPUT_ROOT="${CHATBOT_OUTPUT_ROOT:-$ONEDRIVE_CHATBOT_ROOT}"
 if [[ ! -d "$OUTPUT_ROOT" ]]; then
   echo "出力先ディレクトリが見つかりません: $OUTPUT_ROOT" >&2

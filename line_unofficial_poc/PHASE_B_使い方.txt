@@ -22,7 +22,7 @@ line_unofficial_poc（Phase B）
 ----------------------------------------
 
 0. macOS で CHRLINE を入れる（初回・venv を作り直すとき）
-   cd /Users/matsunomasaharu/git-repos/line_unofficial_poc
+   cd /Users/matsunomasaharu2/git-repos/line_unofficial_poc
    chmod +x setup_phase_b_mac.sh activate_and_test.sh
    ./setup_phase_b_mac.sh
    ./activate_and_test.sh
@@ -30,7 +30,7 @@ line_unofficial_poc（Phase B）
      PYTHON_BIN=/path/to/python3 ./setup_phase_b_mac.sh
 
 1. ディレクトリへ移動
-   cd /Users/matsunomasaharu/git-repos/line_unofficial_poc
+   cd /Users/matsunomasaharu2/git-repos/line_unofficial_poc
 
 2. 仮想環境を有効化
    source .venv/bin/activate
