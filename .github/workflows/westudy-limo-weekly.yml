@@ -39,6 +39,8 @@ jobs:
       LIMO_APP_EMAIL: ${{ secrets.LIMO_APP_EMAIL }}
       LIMO_APP_PASSWORD: ${{ secrets.LIMO_APP_PASSWORD }}
       LIMO_NOTIFY_MACOS: "0"
+      # LIMO 側のUI変更/一時障害で全体停止しないよう、CSV生成までは成功扱いで継続
+      LIMO_FAIL_OPEN: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
