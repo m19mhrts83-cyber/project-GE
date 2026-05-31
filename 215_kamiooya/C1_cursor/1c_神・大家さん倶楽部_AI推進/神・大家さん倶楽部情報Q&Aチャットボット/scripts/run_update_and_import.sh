@@ -114,9 +114,16 @@ EOF
 fi
 
 echo "==> step2: LIMOへ差分CSVを自動取り込み"
-"$PYTHON" "$UPLOAD_SCRIPT" \
+if ! "$PYTHON" "$UPLOAD_SCRIPT" \
   --csv "$LATEST_DELTA" \
-  --screenshot-dir "$OUTPUT_ROOT/exports/logs"
+  --screenshot-dir "$OUTPUT_ROOT/exports/logs"; then
+  if [[ "${LIMO_FAIL_OPEN:-0}" == "1" ]]; then
+    echo "警告: LIMO取込に失敗しましたが、LIMO_FAIL_OPEN=1 のため処理を継続します。" >&2
+    echo "確認ログ: $LOG_FILE" >&2
+    exit 0
+  fi
+  exit 2
+fi
 
 echo "完了: 抽出〜LIMO取込まで実行しました"
 echo "delta: $LATEST_DELTA"

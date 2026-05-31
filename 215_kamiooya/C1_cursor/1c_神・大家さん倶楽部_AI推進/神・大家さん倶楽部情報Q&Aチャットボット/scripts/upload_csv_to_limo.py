@@ -111,6 +111,38 @@ def _login_error_markers() -> tuple[str, ...]:
     )
 
 
+def _email_selectors() -> list[str]:
+    return [
+        "#loginEmail",
+        'input[placeholder="メールアドレス"]',
+        'input[placeholder="ユーザー名"]',
+        "input[placeholder*='メール']",
+        "input[placeholder*='ユーザー']",
+        'input[type="email"]',
+        'input[name="email"]',
+        'input[name="username"]',
+        'input[name*="mail"]',
+        'input[id="username"]',
+        'input[id*="mail"]',
+        'input[id*="user"]',
+        'input[autocomplete="username"]',
+        'input[type="text"]',
+    ]
+
+
+def _password_selectors() -> list[str]:
+    return [
+        "#loginPassword",
+        'input[placeholder="パスワード"]',
+        'input[type="password"]',
+        'input[name="password"]',
+        'input[name="passwd"]',
+        'input[id="password"]',
+        'input[id="passwd"]',
+        'input[autocomplete="current-password"]',
+    ]
+
+
 def _all_frames(page):
     """メインフレーム優先。iframe 内のミニアプリにも対応。"""
     main = page.main_frame
@@ -142,13 +174,7 @@ def _main_view_visible(page) -> bool:
 
 
 def _login_email_field_visible_in_frame(fr) -> bool:
-    selectors = [
-        "#loginEmail",
-        'input[placeholder="メールアドレス"]',
-        "input[placeholder*='メール']",
-        'input[type="email"]',
-    ]
-    for sel in selectors:
+    for sel in _email_selectors():
         loc = fr.locator(sel).first
         try:
             if loc.is_visible():
@@ -183,18 +209,43 @@ def _fill_limo_login_on_frame(fr, email: str, password: str, timeout_ms: int) ->
 
     per = min(30000, max(5000, timeout_ms // 4))
     email_loc = _first_working_locator(
-        [
-            "#loginEmail",
-            'input[placeholder="メールアドレス"]',
-            "input[placeholder*='メール']",
-            'input[type="email"]',
-        ],
+        _email_selectors(),
         per_try_ms=per,
     )
+    if email_loc is None:
+        # 一部画面では「ログイン」導線を押して初めて入力欄が出る
+        for sel in (
+            "button:has-text('ログイン')",
+            "a:has-text('ログイン')",
+            "button:has-text('Sign in')",
+            "a:has-text('Sign in')",
+        ):
+            try:
+                btn = fr.locator(sel).first
+                if btn.count() and btn.is_visible():
+                    btn.click(timeout=5000)
+                    fr.wait_for_timeout(600)
+                    email_loc = _first_working_locator(_email_selectors(), per_try_ms=per)
+                    if email_loc is not None:
+                        break
+            except Exception:
+                continue
     if email_loc is None:
         try:
             email_loc = fr.get_by_placeholder("メールアドレス").first
             email_loc.wait_for(state="visible", timeout=per)
+        except Exception:
+            email_loc = None
+    if email_loc is None:
+        # パスワード欄だけ先に見つかるUIでは、可視な text/email をID欄として使う
+        try:
+            pw_probe = _first_working_locator(_password_selectors(), per_try_ms=1500)
+            if pw_probe is not None:
+                candidate = fr.locator(
+                    "input[type='text'],input[type='email'],input[autocomplete='username']"
+                ).first
+                if candidate.count() and candidate.is_visible():
+                    email_loc = candidate
         except Exception:
             email_loc = None
     if email_loc is None:
@@ -203,11 +254,7 @@ def _fill_limo_login_on_frame(fr, email: str, password: str, timeout_ms: int) ->
     email_loc.fill(email, timeout=timeout_ms)
 
     pw_loc = _first_working_locator(
-        [
-            "#loginPassword",
-            'input[placeholder="パスワード"]',
-            'input[type="password"]',
-        ],
+        _password_selectors(),
         per_try_ms=per,
     )
     if pw_loc is None:
@@ -242,6 +289,7 @@ def _fill_limo_login(page, email: str, password: str, timeout_ms: int) -> None:
     per = min(8000, max(2000, timeout_ms // 8))
     deadline = time.time() + timeout_ms / 1000.0
     last_err: Exception | None = None
+    login_surface_retry = 0
     while time.time() < deadline:
         for fr in _all_frames(page):
             if not _login_email_field_visible_in_frame(fr):
@@ -251,10 +299,47 @@ def _fill_limo_login(page, email: str, password: str, timeout_ms: int) -> None:
                 return
             except Exception as e:
                 last_err = e
+        # どのフレームにも入力欄が見えない場合、ログイン導線を押して再試行
+        login_surface_retry += 1
+        if login_surface_retry % 4 == 0:
+            for fr in _all_frames(page):
+                for sel in (
+                    "button:has-text('ログイン')",
+                    "a:has-text('ログイン')",
+                    "button:has-text('Sign in')",
+                    "a:has-text('Sign in')",
+                ):
+                    try:
+                        btn = fr.locator(sel).first
+                        if btn.count() and btn.is_visible():
+                            btn.click(timeout=3000)
+                            page.wait_for_timeout(500)
+                            break
+                    except Exception:
+                        continue
         page.wait_for_timeout(300)
     if last_err is not None:
         raise last_err
     raise PwTimeoutError("ログインフォーム（メール入力欄）がどのフレームにも見つかりません")
+
+
+def wait_initial_auth_state(page, timeout_ms: int) -> str:
+    """
+    初期表示で、以下のどれが先に出るかを判定する。
+    - main: すでに #mainView が表示されている
+    - login_form: ログインフォームが表示されている
+    """
+    deadline = time.time() + timeout_ms / 1000.0
+    while time.time() < deadline:
+        if _main_view_visible(page):
+            return "main"
+        if _app_login_form_visible(page):
+            return "login_form"
+        page.wait_for_timeout(300)
+    raise PwTimeoutError(
+        f"初期認証状態の判定がタイムアウトしました（{timeout_ms}ms）。"
+        "#mainView もログインフォームも確認できませんでした。"
+    )
 
 
 def _check_login_errors_in_page(body: str, stage_hint: str) -> None:
@@ -496,6 +581,11 @@ def main() -> int:
     app_password = os.environ.get("LIMO_APP_PASSWORD", "").strip()
     headless = get_env_bool("LIMO_HEADLESS", True)
     slow_mo = int(os.environ.get("LIMO_SLOW_MO_MS", "0"))
+    user_agent = os.environ.get(
+        "LIMO_USER_AGENT",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6_0) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    ).strip()
     shot_dir = (
         Path(args.screenshot_dir).expanduser().resolve()
         if args.screenshot_dir
@@ -513,34 +603,54 @@ def main() -> int:
     notify_detail = "処理が完了しませんでした。"
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless, slow_mo=slow_mo)
-        context = browser.new_context()
+        browser = p.chromium.launch(
+            headless=headless,
+            slow_mo=slow_mo,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        context = browser.new_context(
+            user_agent=user_agent,
+            locale="ja-JP",
+            viewport={"width": 1440, "height": 900},
+        )
+        context.add_init_script(
+            """
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            Object.defineProperty(navigator, 'platform', {get: () => 'MacIntel'});
+            Object.defineProperty(navigator, 'language', {get: () => 'ja-JP'});
+            Object.defineProperty(navigator, 'languages', {get: () => ['ja-JP', 'ja', 'en-US']});
+            """
+        )
         page = context.new_page()
         try:
             page.goto(app_url, wait_until="domcontentloaded", timeout=120000)
 
-            # 1段目: ライモBiz等のポータル（LIMO_PORTAL_* または LIMO_ADMIN_*）
-            print("1段目（ポータル）ログインを実行します", flush=True)
-            _fill_limo_login(page, portal_email, portal_password, login_wait_ms)
-            after_first = wait_until_main_or_app_login(
-                page,
-                post_login_wait_ms,
-                stage_hint="1段目（ポータル）",
-            )
-            if after_first == "app_login":
-                if not app_email or not app_password:
-                    raise RuntimeError(
-                        "2段目（ミニアプリ）のログイン画面が表示されましたが、"
-                        "LIMO_APP_EMAIL / LIMO_APP_PASSWORD が未設定です。"
-                        "scripts/.env にアプリ用のアカウントを追加してください。"
-                    )
-                print("2段目（ミニアプリ）ログインを実行します", flush=True)
-                _fill_limo_login(page, app_email, app_password, login_wait_ms)
-                wait_until_main_view_only(
+            initial_state = wait_initial_auth_state(page, login_wait_ms)
+            if initial_state == "main":
+                print("初期表示で #mainView を検出。ポータルログインをスキップします", flush=True)
+            else:
+                # 1段目: ライモBiz等のポータル（LIMO_PORTAL_* または LIMO_ADMIN_*）
+                print("1段目（ポータル）ログインを実行します", flush=True)
+                _fill_limo_login(page, portal_email, portal_password, login_wait_ms)
+                after_first = wait_until_main_or_app_login(
                     page,
                     post_login_wait_ms,
-                    stage_hint="2段目（ミニアプリ）",
+                    stage_hint="1段目（ポータル）",
                 )
+                if after_first == "app_login":
+                    if not app_email or not app_password:
+                        raise RuntimeError(
+                            "2段目（ミニアプリ）のログイン画面が表示されましたが、"
+                            "LIMO_APP_EMAIL / LIMO_APP_PASSWORD が未設定です。"
+                            "scripts/.env にアプリ用のアカウントを追加してください。"
+                        )
+                    print("2段目（ミニアプリ）ログインを実行します", flush=True)
+                    _fill_limo_login(page, app_email, app_password, login_wait_ms)
+                    wait_until_main_view_only(
+                        page,
+                        post_login_wait_ms,
+                        stage_hint="2段目（ミニアプリ）",
+                    )
 
             app_fr = resolve_app_frame(page, timeout_ms=120000)
 
