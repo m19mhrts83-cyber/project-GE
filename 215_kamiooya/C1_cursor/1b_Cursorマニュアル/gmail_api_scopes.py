@@ -68,6 +68,7 @@ def resolve_single_token_path_215(
         candidate,
         manual_dir / "token_estate.json",
         manual_dir / "token_m19m.json",
+        manual_dir / "token_livingsupport.json",
         manual_dir / "token_chk59.json",
     ]
     seen: set[Path] = set()

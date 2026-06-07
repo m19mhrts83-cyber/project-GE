@@ -94,7 +94,12 @@ def resolve_token_paths():
     if not raw:
         # 215 共通の複数アカウント運用（存在するものだけを採用）
         default_multi = []
-        for name in ("token_estate.json", "token_m19m.json", "token_chk59.json"):
+        for name in (
+            "token_estate.json",
+            "token_m19m.json",
+            "token_livingsupport.json",
+            "token_chk59.json",
+        ):
             p = SCRIPT_DIR / name
             if p.exists():
                 default_multi.append(p)

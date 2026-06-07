@@ -6,20 +6,23 @@
     <string>co.workstyle.ai-news-token-refresh</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python</string>
-        <string>/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save/refresh_token_and_update_github_secret.py</string>
+        <string>/Users/matsunomasaharu2/selenium_env/venv/bin/python</string>
+        <string>/Users/matsunomasaharu2/git-repos/dx_kyouyuu/03_outputs/ai_news_save/refresh_token_and_update_github_secret.py</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save</string>
+    <string>/Users/matsunomasaharu2/git-repos/dx_kyouyuu/03_outputs/ai_news_save</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>GMAIL_CREDENTIALS_PATH</key>
-        <string>/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/credentials.json</string>
+        <string>/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル/credentials.json</string>
         <key>GMAIL_TOKEN_PATH</key>
-        <string>/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json</string>
+        <string>/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル/token_m19m.json</string>
         <!-- 複数アカウント運用の場合は、こちらで複数 token を指定（カンマ区切り） -->
         <key>GMAIL_TOKEN_PATHS</key>
-        <string>/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token.json,/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/token2.json</string>
+        <string>/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル/token_m19m.json,/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル/token_estate.json,/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル/token_livingsupport.json</string>
+        <!-- launchd では CloudStorage 側コピーが権限エラーになりやすいため無効化 -->
+        <key>GMAIL_TOKEN_SYNC_DISABLE</key>
+        <string>1</string>
     </dict>
     <!-- 3日ごとに実行（259200秒）。Mac がスリープ中は動かず、起動してから3日経過したタイミングで実行。スリープから復帰した場合も、3日経過していれば復帰時に実行される -->
     <key>StartInterval</key>

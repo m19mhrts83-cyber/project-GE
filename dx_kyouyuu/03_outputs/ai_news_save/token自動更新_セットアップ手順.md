@@ -19,7 +19,7 @@
 ## 前提
 
 - 215 の `credentials.json` / `token.json` がすでにあり、いけともAIニュースまたはパートナーやりとりで一度でもブラウザ認証済みであること。
-- 2アカウント運用の場合は `token2.json`（または `GMAIL_TOKEN_PATHS` で指定した2本目のtoken）が存在し、ブラウザ認証済みであること。
+- 複数アカウント運用の場合は `token_m19m.json` / `token_estate.json` / `token_livingsupport.json`（法人 Workspace、必要なら `token_chk59.json`）が存在し、ブラウザ認証済みであること。
 - **GitHub の Personal Access Token（PAT）** を発行し、リポジトリの **Secrets: Read and write** 権限を持つこと。
 
 ---
@@ -36,8 +36,8 @@ Refresh token の有効期限を延ばします。
    - **5-1. そのまま実行して確認**  
      ターミナルで次を実行する。  
      ```bash
-     cd "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save"
-     /Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python gmail_ai_news_save.py --list
+    cd ~/git-repos/dx_kyouyuu/03_outputs/ai_news_save
+    ~/selenium_env/venv/bin/python gmail_ai_news_save.py --list
      ```
      - メール一覧や「該当メールはありませんでした」と出れば **成功**。この時点でステップ 1 は完了。
      - ブラウザが開いて「Google でログイン」と出た場合は、認証を完了すると新しい token が保存され、これも完了。
@@ -50,12 +50,12 @@ Refresh token の有効期限を延ばします。
 
 ---
 
-## ステップ 2: 215 の venv に PyNaCl を入れる
+## ステップ 2: selenium_env の venv に PyNaCl を入れる
 
 token を GitHub API で暗号化するために必要です。
 
 ```bash
-/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/pip install PyNaCl
+~/selenium_env/venv/bin/pip install PyNaCl
 ```
 
 ---
@@ -100,22 +100,22 @@ token を GitHub API で暗号化するために必要です。
 ## ステップ 5: 手動で 1 回実行して確認
 
 ターミナルで次を実行する。  
-**必ず 215 の `.venv_gmail` の Python を使うこと。** `python3` だと `google` モジュールが入っておらず `ModuleNotFoundError` になります。
+**必ず `~/selenium_env/venv/bin/python` を使うこと。** `python3` だと `google` モジュールが入っておらず `ModuleNotFoundError` になります。
 
 - **方法 A の人**: 下の「共通」と「Python 実行」の 2 行だけ実行（`.github_token` をスクリプトが読む）。
 - **方法 B の人**: 「共通」のあとに **`export GITHUB_TOKEN='...'`** の 1 行を入れ、PAT を貼り付けてから「Python 実行」を実行。  
   （PAT はターミナルに表示されないよう、貼り付けたら Enter で確定してから次の行を実行する）
 
 ```bash
-cd "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save"
+cd ~/git-repos/dx_kyouyuu/03_outputs/ai_news_save
 # 方法 B の場合のみ: 次の 1 行を追加し、' ' の中にステップ 3 でコピーした PAT を貼り付ける
 # export GITHUB_TOKEN='ここにPATを貼る'
-/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python refresh_token_and_update_github_secret.py
+~/selenium_env/venv/bin/python refresh_token_and_update_github_secret.py
 ```
 
 - 「Gmail token を更新しました。」「GitHub Secret GMAIL_TOKEN_B64 を更新しました。」と出れば成功です。
 - `--refresh-only` を付けると Gmail の更新のみ（GitHub は触らない）。`--dry-run` は書き換えなしの確認だけ。
-- 2アカウント運用の場合、スクリプトは `token.json` と `token2.json` を自動検出して **両方更新**します（または `GMAIL_TOKEN_PATHS` で任意の2本を指定可能）。
+- 複数アカウント運用の場合、スクリプトは `token_m19m.json` / `token_estate.json` / `token_chk59.json` を優先して自動検出し更新します（`GMAIL_TOKEN_PATHS` で任意指定も可能）。
 
 ---
 
@@ -123,7 +123,7 @@ cd "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.c
 
 1. plist を LaunchAgents にコピー  
    ```bash
-   cp "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save/co.workstyle.ai-news-token-refresh.plist" ~/Library/LaunchAgents/
+   cp ~/git-repos/dx_kyouyuu/03_outputs/ai_news_save/co.workstyle.ai-news-token-refresh.plist ~/Library/LaunchAgents/
    ```
 2. **PAT を plist に渡す場合**: plist を編集し、`<dict>` 内の `EnvironmentVariables` に  
    `<key>GITHUB_TOKEN</key><string>あなたのPAT</string>` を追加。

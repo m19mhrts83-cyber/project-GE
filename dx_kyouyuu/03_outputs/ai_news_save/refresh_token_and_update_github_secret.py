@@ -28,10 +28,8 @@ if _215_1B_MANUAL.is_dir() and str(_215_1B_MANUAL) not in sys.path:
     sys.path.insert(0, str(_215_1B_MANUAL))
 from gmail_api_scopes import GMAIL_SCOPES_215 as SCOPES, token_satisfies_215_scopes
 
-# 215 の credentials を参照（gmail_ai_news_save と同じ）
-DEFAULT_CREDENTIALS_DIR = Path(
-    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル"
-)
+# 既定は git-repos 側（gmail_token_sync で OneDrive 側と相互ミラーされる）
+DEFAULT_CREDENTIALS_DIR = Path.home() / "git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル"
 SCRIPT_DIR = Path(__file__).resolve().parent
 CREDENTIALS_PATH = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", str(DEFAULT_CREDENTIALS_DIR / "credentials.json")))
 TOKEN_PATH = Path(os.environ.get("GMAIL_TOKEN_PATH", str(DEFAULT_CREDENTIALS_DIR / "token.json")))
@@ -63,7 +61,8 @@ def resolve_token_paths() -> list[Path]:
     """
     更新対象の token.json を複数解決する。
     - GMAIL_TOKEN_PATHS: カンマ区切りで token のパスを指定
-    - 未指定なら、GMAIL_TOKEN_PATH（token.json）と同ディレクトリの token2.json を自動検出
+    - 未指定なら、同ディレクトリの token_m19m / token_estate / token_livingsupport / token_chk59 を優先して自動検出
+      （見つからない場合のみ token.json / token2.json の旧運用へフォールバック）
     """
     if GMAIL_TOKEN_PATHS_RAW:
         paths: list[Path] = []
@@ -73,10 +72,35 @@ def resolve_token_paths() -> list[Path]:
                 paths.append(Path(p))
         return paths or [TOKEN_PATH]
 
+    named_candidates = [
+        TOKEN_PATH.parent / "token_m19m.json",
+        TOKEN_PATH.parent / "token_estate.json",
+        TOKEN_PATH.parent / "token_livingsupport.json",
+        TOKEN_PATH.parent / "token_chk59.json",
+    ]
+    named_existing = [p for p in named_candidates if p.exists()]
+    if named_existing:
+        if TOKEN_PATH.exists() and TOKEN_PATH not in named_existing:
+            named_existing.append(TOKEN_PATH)
+        return named_existing
+
     token2 = TOKEN_PATH.parent / "token2.json"
     if TOKEN_PATH.exists() and token2.exists():
         return [TOKEN_PATH, token2]
     return [TOKEN_PATH]
+
+
+def pick_secret_token_path(token_paths: list[Path]) -> Path:
+    """
+    GitHub Secret へ反映する token を選ぶ。
+    いけとも運用は token_m19m.json を最優先。無ければ token.json、最後に先頭要素を使う。
+    """
+    preferred_names = ("token_m19m.json", "token.json")
+    for name in preferred_names:
+        for p in token_paths:
+            if p.name == name and p.exists():
+                return p
+    return token_paths[0] if token_paths else TOKEN_PATH
 
 
 def load_and_refresh_gmail_token(token_path: Path):
@@ -259,8 +283,7 @@ def main():
     owner, repo = repo_env.split("/", 1)
     repo = repo.replace(".git", "")
 
-    # GitHub Actions 側が参照する token は従来通り「先頭のtoken」を使う（複数ある場合）
-    secret_token_path = token_paths[0] if token_paths else TOKEN_PATH
+    secret_token_path = pick_secret_token_path(token_paths)
     token_b64 = base64.b64encode(secret_token_path.read_bytes()).decode("ascii").replace("\n", "")
     if update_github_secret(owner, repo, GITHUB_SECRET_NAME, token_b64, gh_token):
         print("GitHub Secret GMAIL_TOKEN_B64 を更新しました。")
