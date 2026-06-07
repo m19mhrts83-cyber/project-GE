@@ -33,6 +33,7 @@ __pycache__/
 node_modules/
 *.pyc
 .DS_Store
+_tmp/
 
 # --- エディタ・ツール ---
 .cursor/projects/
