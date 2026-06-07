@@ -3,7 +3,7 @@
 """
 Gmail のトークンファイル保存後、バックアップ先と GitHub Actions の Secret を自動で揃える。
 
-- token.json / token_estate.json / token_m19m.json について、git-repos の 1b と OneDrive 215 の同フォルダへ相互ミラー
+- token.json / token_estate.json / token_m19m.json / token_livingsupport.json 等について、git-repos の 1b と OneDrive 215 の同フォルダへ相互ミラー
 - GITHUB_GMAIL_SECRET_REPO と gh CLI が使えるとき、保存したファイルが token.json または token_m19m.json の場合のみ GMAIL_TOKEN_B64 を更新（estate 単体の更新で Secret を潰さない）
 
 無効化:
@@ -69,7 +69,7 @@ def _mirror_targets_for_primary(primary: Path) -> list[Path]:
 
     gr_m = _manual_gitrepos()
     od_m = _manual_onedrive()
-    for name in ("token_estate.json", "token_m19m.json", "token_chk59.json"):
+    for name in ("token_estate.json", "token_m19m.json", "token_livingsupport.json", "token_chk59.json"):
         gr_f = (gr_m / name).resolve()
         od_f = (od_m / name).resolve()
         if primary == gr_f and od_m.is_dir():

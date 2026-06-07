@@ -29,7 +29,7 @@ Mac 上で **3 日ごと** に Gmail token を更新し、**GitHub の GMAIL_TOK
 - **ワンコマンドで準備**: 次を実行すると、token の確認・更新と Base64 の準備までまとめて行えます。あとは GitHub で貼り付けるだけです。
 
 ```bash
-cd "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save"
+cd ~/git-repos/dx_kyouyuu/03_outputs/ai_news_save
 ./refresh_and_prepare_token.sh
 ```
 
@@ -65,9 +65,8 @@ Mac の「ターミナル」アプリを開きます。
 ### 1-2. 次のコマンドを実行する
 
 ```bash
-cd "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-m19m.hrts83@gmail.com/マイドライブ/DX互助会_共有フォルダ/03_outputs/ai_news_save"
-
-/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1b_Cursorマニュアル/.venv_gmail/bin/python gmail_ai_news_save.py --list
+cd ~/git-repos/dx_kyouyuu/03_outputs/ai_news_save
+~/selenium_env/venv/bin/python gmail_ai_news_save.py --list
 ```
 
 ### 1-3. 結果に応じて次へ
