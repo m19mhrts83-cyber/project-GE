@@ -107,6 +107,10 @@ if [[ "$DELTA_ROWS" -le 0 ]]; then
   exit 0
 fi
 
+LIMO_APP_OK=0
+if [[ -n "${LIMO_APP_EMAIL:-}" && -n "${LIMO_APP_PASSWORD:-}" ]]; then
+  LIMO_APP_OK=1
+fi
 LIMO_PORTAL_OK=0
 if [[ -n "${LIMO_PORTAL_EMAIL:-}" && -n "${LIMO_PORTAL_PASSWORD:-}" ]]; then
   LIMO_PORTAL_OK=1
@@ -119,15 +123,15 @@ else
   exit 2
 fi
 
-if [[ -z "${LIMO_APP_URL:-}" || "$LIMO_PORTAL_OK" -ne 1 ]]; then
+if [[ -z "${LIMO_APP_URL:-}" || ( "$LIMO_APP_OK" -ne 1 && "$LIMO_PORTAL_OK" -ne 1 ) ]]; then
   cat >&2 <<'EOF'
 LIMO用環境変数が不足しています。以下を設定してください:
   export LIMO_APP_URL="https://.../"
-  1段目（いずれかのペア）:
-    export LIMO_PORTAL_EMAIL="..."  と  LIMO_PORTAL_PASSWORD="..."
-    または（従来） LIMO_ADMIN_EMAIL / LIMO_ADMIN_PASSWORD
-  2段目（ミニアプリのログインが別の場合）:
+  公開URL（1段・推奨）:
     export LIMO_APP_EMAIL="..."  と  LIMO_APP_PASSWORD="..."
+  従来のポータル経由（2段）の場合のみ:
+    export LIMO_PORTAL_EMAIL="..."  と  LIMO_PORTAL_PASSWORD="..."
+    （必要なら LIMO_APP_EMAIL / LIMO_APP_PASSWORD も）
 EOF
   exit 2
 fi

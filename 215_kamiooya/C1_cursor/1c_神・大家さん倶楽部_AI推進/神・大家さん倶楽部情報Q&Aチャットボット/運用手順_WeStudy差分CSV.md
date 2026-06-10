@@ -27,9 +27,9 @@
 - 環境変数（`~/.zshrc` 等）:
   - `WESTUDY_USER` … WeStudy / WordPress ログインID  
   - `WESTUDY_PASS` … パスワード  
-  - `LIMO_APP_URL` … LIMO アプリURL  
-  - `LIMO_ADMIN_EMAIL` … 管理者ログインID  
-  - `LIMO_ADMIN_PASSWORD` … 管理者パスワード  
+  - `LIMO_APP_URL` … LIMO 公開URL（ミニアプリ）  
+  - `LIMO_APP_EMAIL` / `LIMO_APP_PASSWORD` … 公開URLの1段ログイン（推奨）  
+  - `LIMO_PORTAL_*` … 従来のポータル経由（2段）を使う場合のみ  
 
 スクレイパ本体の正本は `git-repos` 側です（既定パス）:
 
