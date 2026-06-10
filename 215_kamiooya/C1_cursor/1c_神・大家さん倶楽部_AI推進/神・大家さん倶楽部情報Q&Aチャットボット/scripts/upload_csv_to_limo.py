@@ -342,7 +342,13 @@ def wait_initial_auth_state(page, timeout_ms: int) -> str:
     )
 
 
+def _login_in_progress(body: str) -> bool:
+    return any(x in body for x in ("処理中です", "ログイン中", "読み込み中"))
+
+
 def _check_login_errors_in_page(body: str, stage_hint: str) -> None:
+    if _login_in_progress(body):
+        return
     for m in _login_error_markers():
         if m in body:
             raise RuntimeError(
@@ -402,7 +408,8 @@ def wait_until_main_view_only(page, timeout_ms: int, *, stage_hint: str) -> None
     )
 
 
-def resolve_portal_credentials() -> tuple[str, str]:
+def try_resolve_portal_credentials() -> tuple[str, str] | None:
+    """ポータル（1段目）認証。未設定なら None（公開URLの1段ログイン運用）。"""
     pe = os.environ.get("LIMO_PORTAL_EMAIL", "").strip()
     pp = os.environ.get("LIMO_PORTAL_PASSWORD", "").strip()
     if pe or pp:
@@ -412,7 +419,85 @@ def resolve_portal_credentials() -> tuple[str, str]:
                 "どちらも空にしてください（片方だけは不可）。"
             )
         return pe, pp
-    return get_required_env("LIMO_ADMIN_EMAIL"), get_required_env("LIMO_ADMIN_PASSWORD")
+    ae = os.environ.get("LIMO_ADMIN_EMAIL", "").strip()
+    ap = os.environ.get("LIMO_ADMIN_PASSWORD", "").strip()
+    if ae or ap:
+        if not ae or not ap:
+            raise RuntimeError(
+                "LIMO_ADMIN_EMAIL と LIMO_ADMIN_PASSWORD は、どちらも設定するか、"
+                "どちらも空にしてください（片方だけは不可）。"
+            )
+        return ae, ap
+    return None
+
+
+def resolve_portal_credentials() -> tuple[str, str]:
+    creds = try_resolve_portal_credentials()
+    if creds is None:
+        raise RuntimeError(
+            "ポータル認証が未設定です。"
+            "LIMO_PORTAL_* / LIMO_ADMIN_* を設定するか、"
+            "LIMO_APP_EMAIL / LIMO_APP_PASSWORD で公開URLに直接ログインしてください。"
+        )
+    return creds
+
+
+def authenticate_limo_page(
+    page,
+    *,
+    app_email: str,
+    app_password: str,
+    portal_creds: tuple[str, str] | None,
+    login_wait_ms: int,
+    post_login_wait_ms: int,
+) -> None:
+    """
+    公開URL（1段）とポータル経由（2段）の両方に対応する認証。
+    初期表示がミニアプリのログイン画面のときは LIMO_APP_* を優先する。
+    """
+    initial_state = wait_initial_auth_state(page, login_wait_ms)
+    if initial_state == "main":
+        print("初期表示で #mainView を検出。ログインをスキップします", flush=True)
+        return
+
+    if app_email and app_password:
+        print("1段（ミニアプリ公開URL）ログインを実行します", flush=True)
+        _fill_limo_login(page, app_email, app_password, login_wait_ms)
+        wait_until_main_view_only(
+            page,
+            post_login_wait_ms,
+            stage_hint="ミニアプリ",
+        )
+        return
+
+    if portal_creds is None:
+        raise RuntimeError(
+            "ログインが必要ですが、LIMO_APP_EMAIL / LIMO_APP_PASSWORD が未設定です。"
+            "公開URL用のアカウントを scripts/.env に設定してください。"
+        )
+
+    print("1段目（ポータル）ログインを実行します", flush=True)
+    portal_email, portal_password = portal_creds
+    _fill_limo_login(page, portal_email, portal_password, login_wait_ms)
+    after_first = wait_until_main_or_app_login(
+        page,
+        post_login_wait_ms,
+        stage_hint="1段目（ポータル）",
+    )
+    if after_first == "main":
+        return
+    if not app_email or not app_password:
+        raise RuntimeError(
+            "2段目（ミニアプリ）のログイン画面が表示されましたが、"
+            "LIMO_APP_EMAIL / LIMO_APP_PASSWORD が未設定です。"
+        )
+    print("2段目（ミニアプリ）ログインを実行します", flush=True)
+    _fill_limo_login(page, app_email, app_password, login_wait_ms)
+    wait_until_main_view_only(
+        page,
+        post_login_wait_ms,
+        stage_hint="2段目（ミニアプリ）",
+    )
 
 
 def ensure_csv_file(path: str) -> Path:
@@ -576,9 +661,15 @@ def main() -> int:
 
     csv_path = ensure_csv_file(args.csv)
     app_url = get_required_env("LIMO_APP_URL")
-    portal_email, portal_password = resolve_portal_credentials()
+    portal_creds = try_resolve_portal_credentials()
     app_email = os.environ.get("LIMO_APP_EMAIL", "").strip()
     app_password = os.environ.get("LIMO_APP_PASSWORD", "").strip()
+    if not ((app_email and app_password) or portal_creds):
+        raise RuntimeError(
+            "LIMO 認証情報が不足しています。"
+            "公開URL運用: LIMO_APP_EMAIL / LIMO_APP_PASSWORD。"
+            "従来の2段: LIMO_PORTAL_*（+ 必要なら LIMO_APP_*）。"
+        )
     headless = get_env_bool("LIMO_HEADLESS", True)
     slow_mo = int(os.environ.get("LIMO_SLOW_MO_MS", "0"))
     user_agent = os.environ.get(
@@ -625,32 +716,14 @@ def main() -> int:
         try:
             page.goto(app_url, wait_until="domcontentloaded", timeout=120000)
 
-            initial_state = wait_initial_auth_state(page, login_wait_ms)
-            if initial_state == "main":
-                print("初期表示で #mainView を検出。ポータルログインをスキップします", flush=True)
-            else:
-                # 1段目: ライモBiz等のポータル（LIMO_PORTAL_* または LIMO_ADMIN_*）
-                print("1段目（ポータル）ログインを実行します", flush=True)
-                _fill_limo_login(page, portal_email, portal_password, login_wait_ms)
-                after_first = wait_until_main_or_app_login(
-                    page,
-                    post_login_wait_ms,
-                    stage_hint="1段目（ポータル）",
-                )
-                if after_first == "app_login":
-                    if not app_email or not app_password:
-                        raise RuntimeError(
-                            "2段目（ミニアプリ）のログイン画面が表示されましたが、"
-                            "LIMO_APP_EMAIL / LIMO_APP_PASSWORD が未設定です。"
-                            "scripts/.env にアプリ用のアカウントを追加してください。"
-                        )
-                    print("2段目（ミニアプリ）ログインを実行します", flush=True)
-                    _fill_limo_login(page, app_email, app_password, login_wait_ms)
-                    wait_until_main_view_only(
-                        page,
-                        post_login_wait_ms,
-                        stage_hint="2段目（ミニアプリ）",
-                    )
+            authenticate_limo_page(
+                page,
+                app_email=app_email,
+                app_password=app_password,
+                portal_creds=portal_creds,
+                login_wait_ms=login_wait_ms,
+                post_login_wait_ms=post_login_wait_ms,
+            )
 
             app_fr = resolve_app_frame(page, timeout_ms=120000)
 
