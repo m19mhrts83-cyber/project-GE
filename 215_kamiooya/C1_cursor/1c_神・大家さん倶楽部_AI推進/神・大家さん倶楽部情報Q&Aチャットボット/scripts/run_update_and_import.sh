@@ -63,8 +63,11 @@ if [[ ! -f "$UPLOAD_SCRIPT" ]]; then
   exit 2
 fi
 
+BUILD_DELTA_SCRIPT="$SCRIPT_DIR/build_delta_csv.py"
+STATE_DELTA="${CHATBOT_STATE_ROOT:-$OUTPUT_ROOT/state}/westudy_comment_ids.json"
+
 echo "==> step1: WeStudy更新パイプライン"
-"$PIPELINE_SCRIPT" "$@"
+"$PIPELINE_SCRIPT" --defer-state-update "$@"
 
 LATEST_DELTA="$(ls -1t "$OUTPUT_ROOT"/exports/delta_*.csv 2>/dev/null | head -n 1 || true)"
 if [[ -z "${LATEST_DELTA}" ]]; then
@@ -82,8 +85,24 @@ PY
 )"
 DELTA_LINES="$(wc -l < "$LATEST_DELTA" | tr -d ' ')"
 echo "最新delta: $LATEST_DELTA (rows=$DELTA_ROWS, physical_lines=$DELTA_LINES)"
+LATEST_FULL="$(ls -1t "$OUTPUT_ROOT"/exports/full_*.csv 2>/dev/null | head -n 1 || true)"
+
+commit_state_after_success() {
+  if [[ -z "${LATEST_FULL:-}" || ! -f "$LATEST_FULL" ]]; then
+    echo "警告: 全件CSVが見つからないため state を更新できません。" >&2
+    return 1
+  fi
+  echo "==> state 更新（LIMO 取込成功または差分0件のため）"
+  "$PYTHON" "$BUILD_DELTA_SCRIPT" \
+    --full "$LATEST_FULL" \
+    --state "$STATE_DELTA" \
+    --delta "$LATEST_DELTA" \
+    --update-state
+}
+
 if [[ "$DELTA_ROWS" -le 0 ]]; then
   echo "差分0件（ヘッダのみ）のため、LIMO取込はスキップします。"
+  commit_state_after_success || true
   echo "log: $LOG_FILE"
   exit 0
 fi
@@ -124,6 +143,8 @@ if ! "$PYTHON" "$UPLOAD_SCRIPT" \
   fi
   exit 2
 fi
+
+commit_state_after_success
 
 echo "完了: 抽出〜LIMO取込まで実行しました"
 echo "delta: $LATEST_DELTA"

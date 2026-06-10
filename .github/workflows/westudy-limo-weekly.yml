@@ -39,8 +39,7 @@ jobs:
       LIMO_APP_EMAIL: ${{ secrets.LIMO_APP_EMAIL }}
       LIMO_APP_PASSWORD: ${{ secrets.LIMO_APP_PASSWORD }}
       LIMO_NOTIFY_MACOS: "0"
-      # LIMO 側のUI変更/一時障害で全体停止しないよう、CSV生成までは成功扱いで継続
-      LIMO_FAIL_OPEN: "1"
+      LIMO_FAIL_OPEN: "0"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,7 +74,14 @@ jobs:
         run: |
           set -euo pipefail
           cmd=( "./scripts/run_update_and_import.sh" )
-          if [[ "${{ github.event.inputs.force_scrape || 'false' }}" == "true" ]]; then
+          # 週次 cron は全トピック再取得（完了フラグ付きトピックも新規コメントを拾う）
+          force_scrape="false"
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            force_scrape="true"
+          elif [[ "${{ github.event.inputs.force_scrape || 'false' }}" == "true" ]]; then
+            force_scrape="true"
+          fi
+          if [[ "$force_scrape" == "true" ]]; then
             cmd+=( "--force" )
           fi
           (
@@ -100,6 +106,22 @@ jobs:
           fi
           echo "delta_file=$latest_delta" >> "$GITHUB_OUTPUT"
           echo "delta_rows=$rows" >> "$GITHUB_OUTPUT"
+          upload_note="n/a"
+          latest_log=""
+          shopt -s nullglob
+          _logs=( "$CHATBOT_OUTPUT_ROOT"/exports/logs/update_and_import_*.log )
+          if ((${#_logs[@]} > 0)); then
+            latest_log="$(ls -1t "${_logs[@]}" | head -n 1)"
+            if rg -q "LIMO取込完了:" "$latest_log" 2>/dev/null; then
+              upload_note="$(rg "LIMO取込完了:" "$latest_log" | tail -n 1)"
+            elif rg -q "差分0件（ヘッダのみ）" "$latest_log" 2>/dev/null; then
+              upload_note="skipped (差分0件)"
+            elif rg -q "LIMO取込失敗" "$latest_log" 2>/dev/null; then
+              upload_note="failed (ログ参照)"
+            elif [[ "$rows" -gt 0 ]]; then
+              upload_note="unknown (ログに完了行なし)"
+            fi
+          fi
           {
             echo "### WeStudy weekly result"
             if [[ -z "$latest_delta" ]]; then
@@ -109,11 +131,10 @@ jobs:
             else
               echo "- delta: \`$latest_delta\`"
               echo "- rows: \`$rows\`"
-              if [[ "$rows" -eq 0 ]]; then
-                echo "- upload: skipped (差分0件)"
-              else
-                echo "- upload: executed"
-              fi
+              echo "- upload: \`$upload_note\`"
+            fi
+            if [[ -n "$latest_log" ]]; then
+              echo "- log: \`$latest_log\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -129,6 +150,7 @@ jobs:
           retention-days: 14
 
       - name: Commit state updates
+        if: success()
         shell: bash
         run: |
           set -euo pipefail

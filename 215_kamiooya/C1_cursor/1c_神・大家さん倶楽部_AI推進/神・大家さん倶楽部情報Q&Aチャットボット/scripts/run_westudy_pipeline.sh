@@ -50,6 +50,12 @@ fi
 
 MODE="full"
 RAW_DIR=""
+DEFER_STATE_UPDATE=0
+
+if [[ "${1:-}" == "--defer-state-update" ]]; then
+  DEFER_STATE_UPDATE=1
+  shift
+fi
 
 if [[ "${1:-}" == "--convert-only" ]]; then
   MODE="convert_only"
@@ -99,7 +105,13 @@ echo "==> 管理者形式へ変換 → $FULL_CSV"
 "$PYTHON" "$CONVERT" --input-dir "$RAW_DIR" -o "$FULL_CSV" -v
 
 echo "==> 差分CSV → ${DELTA_CSV}（state: ${STATE_DELTA}）"
-"$PYTHON" "$BUILD_DELTA_SCRIPT" --full "$FULL_CSV" --state "$STATE_DELTA" --delta "$DELTA_CSV" --update-state
+_delta_args=( --full "$FULL_CSV" --state "$STATE_DELTA" --delta "$DELTA_CSV" )
+if [[ "$DEFER_STATE_UPDATE" -eq 0 ]]; then
+  _delta_args+=( --update-state )
+else
+  echo "（state 更新は LIMO 取込成功後に実行）"
+fi
+"$PYTHON" "$BUILD_DELTA_SCRIPT" "${_delta_args[@]}"
 
 echo ""
 echo "完了 RUN_ID=$RUN_ID"
