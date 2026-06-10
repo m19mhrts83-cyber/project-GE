@@ -140,8 +140,8 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 **project-GE リポジトリ直下**の `.github/workflows/westudy-limo-weekly.yml` で、以下を**毎週 1 回**（日曜 06:30 JST 目安）自動実行します。  
 （`215_kamiooya/.github/` 配下に置いても GitHub は読み込みません。）
 
-1. WeStudy スクレイプ  
-2. 差分CSV生成  
+1. WeStudy スクレイプ（**cron 週次は `--force` で全トピック再取得**。新規コメントは完了済みトピックにも付くため）  
+2. 差分CSV生成（**state 更新は LIMO 取込成功後**）  
 3. 差分が 1 件以上のときのみ LIMO 自動取込（0件ならスキップ）
 
 いつでも手動実行する場合は、GitHub の **Actions** タブで **WeStudy Delta Import Weekly** を選び **Run workflow** から実行できます。
