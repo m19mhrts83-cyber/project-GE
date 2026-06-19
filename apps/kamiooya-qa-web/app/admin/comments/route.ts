@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export const POST = withErrorHandler(async (req) => {
   requireAdmin(req);
   const body = (await req.json().catch(() => null)) as any;
   const sb = supabaseAdmin();
@@ -30,5 +31,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ errorMessage: error.message || "登録に失敗しました" }, { status: 400 });
   }
   return NextResponse.json({ id: data.id });
-}
-
+});
