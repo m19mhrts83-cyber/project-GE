@@ -1,1 +1,3 @@
 .env.tax_docs
+.amex_browser_profile/
+.amex_storage_state.json
