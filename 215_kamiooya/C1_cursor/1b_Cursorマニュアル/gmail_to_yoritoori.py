@@ -86,18 +86,27 @@ base_path = Path(os.environ.get("YORITOORI_BASE_PATH", BASE_DIR))
 def resolve_token_paths():
     """
     Gmail の取得元アカウントを複数指定する。
-    - GMAIL_TOKEN_PATHS: カンマ区切りで token.json のパスを指定（例: ".../token_estate.json,.../token_m19m.json"）
-    - 未指定なら、token_estate.json + token_m19m.json を token.json+token2.json より優先（後者が send のみ等の誤組を防ぐ）
-    - token.json+token2.json は両方とも 215 スコープを満たす場合のみ2アカウントとして採用
+    - GMAIL_TOKEN_PATHS: カンマ区切りで token.json のパスを指定
+    - 未指定かつ token_livingsupport.json あり: **admin@ 単独**（転送集約後の既定）
+    - GMAIL_LEGACY_MULTI_ACCOUNTS=1: 旧運用（estate + m19m + livingsupport 等をすべて走査）
     """
     raw = os.environ.get("GMAIL_TOKEN_PATHS", "").strip()
     if not raw:
+        livingsupport = SCRIPT_DIR / "token_livingsupport.json"
+        legacy = os.environ.get("GMAIL_LEGACY_MULTI_ACCOUNTS", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if livingsupport.exists() and not legacy:
+            return [livingsupport]
+
         # 215 共通の複数アカウント運用（存在するものだけを採用）
         default_multi = []
         for name in (
+            "token_livingsupport.json",
             "token_estate.json",
             "token_m19m.json",
-            "token_livingsupport.json",
             "token_chk59.json",
         ):
             p = SCRIPT_DIR / name
@@ -180,7 +189,7 @@ def build_service_for_token(token_path_for_account: Path):
     return service, email_addr
 
 
-from yoritoori_utils import YORITOORI_FILENAME, resolve_incoming_attach_dir
+from yoritoori_utils import YORITOORI_FILENAME, resolve_incoming_attach_date_dir, resolve_incoming_attach_dir, parse_received_date_folder
 
 
 def extract_email(from_header):
@@ -294,8 +303,8 @@ def save_attachments(service, message_id, payload, folder_path, date_str):
     if not attachment_parts:
         return []
 
-    attach_dir = resolve_incoming_attach_dir(base_path / folder_path)
-    attach_dir.mkdir(parents=True, exist_ok=True)
+    attach_dir = resolve_incoming_attach_date_dir(base_path / folder_path, date_str)
+    date_folder = parse_received_date_folder(date_str)
 
     date_prefix = date_str.replace("/", "").replace(" ", "_")
     saved = []
@@ -328,7 +337,7 @@ def save_attachments(service, message_id, payload, folder_path, date_str):
             dest_path = attach_dir / f"{stem}_{counter}{ext}"
 
         dest_path.write_bytes(buf)
-        saved.append(dest_path.name)
+        saved.append(f"{date_folder}/{dest_path.name}")
 
     return saved
 

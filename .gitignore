@@ -10,6 +10,7 @@
 .env.*
 !.env.example
 !.env.home_address.example
+!.env.jarvis_private.example
 token.json
 token*.json
 *.expired

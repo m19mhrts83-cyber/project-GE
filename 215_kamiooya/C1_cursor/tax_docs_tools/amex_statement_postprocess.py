@@ -28,12 +28,107 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None  # type: ignore
+
+SHEET_MAIN = "ご利用履歴"
+
 QUARTER_MONTH_LABEL: dict[int, str] = {
     1: "1月-3月",
     2: "4月-6月",
     3: "7月-9月",
     4: "10月-12月",
 }
+
+
+def materials_period_folder(
+    start_year: int,
+    start_month: int,
+    end_year: int,
+    end_month: int,
+) -> tuple[int, str]:
+    """OneDrive 側の (年ディレクトリ, 期間フォルダ名) を返す。"""
+    if start_year == end_year:
+        if start_month == end_month:
+            return start_year, f"{start_month}月"
+        return start_year, f"{start_month}月-{end_month}月"
+    return start_year, f"{start_month}月-{end_year}.{end_month}月"
+
+
+def _find_header_row(ws) -> int:
+    for r in range(1, min(ws.max_row, 50) + 1):
+        v = ws.cell(r, 1).value
+        if v is not None and str(v).strip() == "ご利用日":
+            return r
+    raise ValueError("「ご利用日」行が見つかりません")
+
+
+def merge_activity_workbooks(
+    input_paths: list[Path],
+    output_path: Path,
+) -> Path:
+    """複数 activity.xlsx の「ご利用履歴」を1ブックに結合する。"""
+    if openpyxl is None:
+        raise RuntimeError("openpyxl が必要です: pip install openpyxl")
+
+    paths = [p for p in input_paths if p.exists()]
+    if not paths:
+        raise FileNotFoundError("結合対象の activity ファイルがありません")
+
+    wb_out = openpyxl.Workbook()
+    wb_out.remove(wb_out.active)
+    ws_out = wb_out.create_sheet(SHEET_MAIN)
+
+    header_row: int | None = None
+    max_col = 0
+    out_row = 1
+
+    for src_path in paths:
+        wb_in = openpyxl.load_workbook(src_path, data_only=False)
+        if SHEET_MAIN not in wb_in.sheetnames:
+            wb_in.close()
+            continue
+        ws = wb_in[SHEET_MAIN]
+        hr = _find_header_row(ws)
+        mc = ws.max_column
+
+        if header_row is None:
+            header_row = hr
+            max_col = mc
+            for r in range(1, hr + 1):
+                for c in range(1, mc + 1):
+                    ws_out.cell(out_row, c).value = ws.cell(r, c).value
+                out_row += 1
+        else:
+            # 2枚目以降: ヘッダー行はスキップしデータ行のみ
+            pass
+
+        for r in range(hr + 1, ws.max_row + 1):
+            cells = [ws.cell(r, c).value for c in range(1, mc + 1)]
+            if not any(c is not None and str(c).strip() for c in cells[:6]):
+                continue
+            for c in range(1, min(mc, max_col) + 1):
+                ws_out.cell(out_row, c).value = ws.cell(r, c).value
+            out_row += 1
+        wb_in.close()
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb_out.save(output_path)
+    print(f"結合しました ({len(paths)} ファイル): {output_path}")
+    return output_path
+
+
+def merge_activity_cli(args: argparse.Namespace) -> int:
+    paths = [Path(p).expanduser().resolve() for p in args.inputs]
+    out = Path(args.output).expanduser().resolve()
+    try:
+        merge_activity_workbooks(paths, out)
+    except Exception as e:
+        print(f"エラー: {e}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def quarter_month_range_label(q: int) -> str:
