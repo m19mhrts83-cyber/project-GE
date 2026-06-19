@@ -35,6 +35,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
@@ -55,6 +56,7 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email import encoders
+from email.utils import getaddresses
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -81,6 +83,11 @@ from gmail_api_scopes import (
     resolve_single_token_path_215,
     token_satisfies_215_scopes,
 )
+from gmail_archive_bcc import apply_archive_bcc
+from gmail_to_yoritoori import build_service_for_token
+
+# パートナー送信で試す token（admin@ は相手の From が変わるため含めない）
+PARTNER_SEND_TOKEN_NAMES = ("token_estate.json", "token_m19m.json")
 
 
 def trigger_editor_save_all():
@@ -330,35 +337,64 @@ def phone_to_imessage_formats(phone):
     return forms
 
 
+def stage_imessage_attachments(attachment_paths: list[Path]) -> list[Path]:
+    """
+    iMessage 送信用に添付をローカルへステージする。
+    - ファイル名の ':' は Messages がパス区切りと誤解するため '-' に置換
+    - OneDrive 等のクラウドパスはサンドボックスで読めないことがあるため /tmp へコピー
+    """
+    if not attachment_paths:
+        return []
+    staging = Path(tempfile.gettempdir()) / "yoritoori_imessage_attach"
+    staging.mkdir(parents=True, exist_ok=True)
+    staged: list[Path] = []
+    for src in attachment_paths:
+        safe_name = src.name.replace(":", "-")
+        dest = staging / safe_name
+        shutil.copy2(src, dest)
+        staged.append(dest)
+    return staged
+
+
 def send_imessage(phone, body_text, attachment_paths=None):
     """AppleScript で iMessage を送信。本文＋添付ファイル。成功で True。"""
     if attachment_paths is None:
         attachment_paths = []
     phone_esc = phone.replace("\\", "\\\\").replace('"', '\\"')
     parts = [p.replace("\\", "\\\\").replace('"', '\\"') for p in body_text.split("\n")]
-    msg_expr = " & return & ".join(f'"{p}"' for p in parts)
+    msg_expr = " & return & ".join(f'"{p}"' for p in parts) if parts else '""'
+
+    staged_paths = stage_imessage_attachments(attachment_paths)
 
     file_blocks = []
-    for path in attachment_paths:
+    for path in staged_paths:
         posix_path = str(path.resolve())
         path_esc = posix_path.replace("\\", "\\\\").replace('"', '\\"')
         file_blocks.append(
-            f'''        set theFile to POSIX file "{path_esc}"
-        send theFile to targetBuddy
-        delay 0.3'''
+            f'''        set attachRef to (POSIX file "{path_esc}") as alias
+        send attachRef to targetBuddy
+        delay 1.0'''
         )
 
     file_section = "\n".join(file_blocks) if file_blocks else ""
 
+    text_block = ""
+    if body_text.strip():
+        text_block = f'''        set msg to {msg_expr}
+        send msg to targetBuddy
+        delay 1.0
+'''
+
     script = f'''tell application "Messages"
         set targetService to 1st service whose service type = iMessage
         set targetBuddy to buddy "{phone_esc}" of targetService
-        set msg to {msg_expr}
-        send msg to targetBuddy
-        delay 0.5
-{file_section}
+{text_block}{file_section}
     end tell'''
     result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        if err:
+            print(f"  iMessage AppleScript エラー: {err}", file=sys.stderr)
     return result.returncode == 0
 
 
@@ -369,6 +405,50 @@ def find_partner(partners, name_or_folder):
         if p.get("name") == name_or_folder or p.get("folder") == name_or_folder:
             return p
     return None
+
+
+def _partner_send_token_paths() -> list[Path]:
+    """パートナー返信に使う token（個人 Gmail のみ）。"""
+    explicit = os.environ.get("GMAIL_TOKEN_PATH", "").strip()
+    if explicit:
+        return [Path(explicit)]
+    paths = []
+    for name in PARTNER_SEND_TOKEN_NAMES:
+        p = SCRIPT_DIR / name
+        if p.is_file():
+            paths.append(p)
+    return paths
+
+
+def resolve_partner_gmail_service(partner_emails):
+    """
+    パートナーとの既存スレッドがある個人 Gmail を選び (service, sender_email, ref_info) を返す。
+    スレッドがなければ token_estate.json を優先（既定の matsuno.estate）。
+    """
+    if not credentials_path.exists():
+        print("エラー: credentials.json が見つかりません", file=sys.stderr)
+        sys.exit(1)
+
+    token_paths = _partner_send_token_paths()
+    if not token_paths:
+        print("エラー: パートナー送信用 token（token_estate.json 等）が見つかりません", file=sys.stderr)
+        sys.exit(1)
+
+    fallback_service = None
+    fallback_email = ""
+
+    for tpath in token_paths:
+        service, email_addr = build_service_for_token(tpath)
+        if not fallback_service:
+            fallback_service = service
+            fallback_email = email_addr
+        ref_info = get_latest_message_from_partner(service, partner_emails)
+        if ref_info:
+            print(f"  送信元 Gmail: {email_addr}（既存スレッドあり）")
+            return service, email_addr, ref_info
+
+    print(f"  送信元 Gmail: {fallback_email}（既定・新規またはスレッド未検出）")
+    return fallback_service, fallback_email, None
 
 
 def get_latest_message_from_partner(service, partner_emails):
@@ -387,6 +467,7 @@ def get_latest_message_from_partner(service, partner_emails):
     headers = full.get("payload", {}).get("headers", [])
 
     subject = next((h["value"] for h in headers if h["name"].lower() == "subject"), "")
+    cc = next((h["value"] for h in headers if h["name"].lower() == "cc"), "")
     msg_id_header = None
     for h in headers:
         if h["name"].lower() == "message-id":
@@ -398,6 +479,7 @@ def get_latest_message_from_partner(service, partner_emails):
         "thread_id": thread_id,
         "message_id": msg["id"],
         "subject": subject,
+        "cc": cc,
         "message_id_header": msg_id_header or f"<{msg['id']}@mail.gmail.com>",
     }
 
@@ -411,11 +493,31 @@ def collect_attachment_files(attach_dir):
     return [f for f in attach_dir.iterdir() if f.is_file() and f.name not in ATTACHMENT_EXCLUDE_NAMES]
 
 
-def build_reply_message(to_email, subject, body_text, ref_info, attachment_paths):
+def _normalize_mail_addresses(header_value: str) -> str:
+    """Gmail API 向けに Cc 等をアドレスのみへ正規化する。"""
+    if not (header_value or "").strip():
+        return ""
+    return ", ".join(addr for _, addr in getaddresses([header_value]) if addr)
+
+
+def build_reply_message(
+    to_email,
+    subject,
+    body_text,
+    ref_info,
+    attachment_paths,
+    *,
+    cc: str = "",
+    sender_email: str | None = None,
+):
     """返信用の MIME メッセージを構築。"""
     msg = MIMEMultipart()
     msg["To"] = to_email
     msg["Subject"] = subject
+    if cc:
+        msg["Cc"] = cc
+    if apply_archive_bcc(msg, sender_email):
+        pass  # Bcc 控え（個人 Gmail → admin@）
 
     if ref_info and ref_info.get("message_id_header"):
         msg["In-Reply-To"] = ref_info["message_id_header"]
@@ -436,7 +538,7 @@ def build_reply_message(to_email, subject, body_text, ref_info, attachment_paths
         msg.attach(part)
 
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
-    return {"raw": raw}
+    return {"raw": raw, "bcc": msg.get("Bcc") or ""}
 
 
 def append_sent_to_yoritoori(folder_path, partner_name, subject, body, attachment_names):
@@ -534,48 +636,21 @@ def run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text,
 def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, dry_run):
     """emails ありのパートナー向け Gmail 返信送信。"""
     emails = [e.lower().strip() for e in partner.get("emails", [])]
-    if not credentials_path.exists():
-        print("エラー: credentials.json が見つかりません", file=sys.stderr)
-        sys.exit(1)
 
     use_subject = subject if subject and subject != "（件名を記入）" else None
 
-    creds = None
-    if token_path.exists():
-        token_data = json.loads(token_path.read_text(encoding="utf-8"))
-        creds_data = dict(token_data)
-        if "client_id" not in creds_data and credentials_path.exists():
-            cred_data = json.loads(credentials_path.read_text(encoding="utf-8"))
-            client = cred_data.get("installed") or cred_data.get("web", {})
-            creds_data["client_id"] = client.get("client_id")
-            creds_data["client_secret"] = client.get("client_secret")
-            creds_data["token_uri"] = "https://oauth2.googleapis.com/token"
-            if "access_token" in creds_data and "token" not in creds_data:
-                creds_data["token"] = creds_data["access_token"]
-        try:
-            creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
-            if creds and not token_satisfies_215_scopes(creds_data):
-                creds = None
-        except Exception:
-            creds = None
+    service, sender_email, ref_info = resolve_partner_gmail_service(emails)
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
-            creds = flow.run_local_server(port=0)
-        save_token_json_and_sync(token_path, creds.to_json())
-        print("token.json を保存しました。")
-
-    service = build("gmail", "v1", credentials=creds)
-
-    ref_info = get_latest_message_from_partner(service, emails)
     if not ref_info:
-        print(f"エラー: {partner_name} 宛の直近90日以内のメールが見つかりません。返信先を特定できません。", file=sys.stderr)
-        sys.exit(1)
-
-    if not use_subject:
+        if not use_subject:
+            print(
+                f"エラー: {partner_name} 宛の直近90日以内のメールが見つかりません。"
+                " 送信下書きの1行目（件名）を記入してください。",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print("  ※直近90日以内の受信メールがないため、新規メールとして送信します。")
+    elif not use_subject:
         orig_subject = ref_info.get("subject", "")
         if orig_subject and not orig_subject.strip().upper().startswith("RE:"):
             use_subject = f"Re: {orig_subject}"
@@ -589,8 +664,19 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
     attachment_names = [p.name for p in attachment_paths]
 
     to_email = emails[0]
-    message_dict = build_reply_message(to_email, use_subject, body_text, ref_info, attachment_paths)
-    send_body = {"raw": message_dict["raw"], "threadId": ref_info["thread_id"]}
+    cc = _normalize_mail_addresses((ref_info.get("cc") or "").strip()) if ref_info else ""
+    message_dict = build_reply_message(
+        to_email,
+        use_subject,
+        body_text,
+        ref_info,
+        attachment_paths,
+        cc=cc,
+        sender_email=sender_email,
+    )
+    send_body = {"raw": message_dict["raw"]}
+    if ref_info:
+        send_body["threadId"] = ref_info["thread_id"]
 
     if dry_run:
         return
@@ -601,6 +687,11 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
     try:
         service.users().messages().send(userId="me", body=send_body).execute()
         print(f"送信しました: {partner_name} ({to_email})")
+        print(f"  From: {sender_email}")
+        if message_dict.get("bcc"):
+            print(f"  Bcc（admin@控え）: {message_dict['bcc']}")
+        if cc:
+            print(f"  Cc: {cc}")
         if attachment_names:
             print(f"  添付: {', '.join(attachment_names)}")
         move_attachments_to_past(attach_dir, attachment_paths)

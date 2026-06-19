@@ -51,26 +51,38 @@ def _token_file_satisfies_215(path: Path) -> bool:
     return token_satisfies_215_scopes(d)
 
 
-def resolve_single_token_path_215(
+def resolve_token_path_215(
     manual_dir: Path,
     candidate: Path,
     *,
     explicit_via_env: bool,
+    purpose: str = "send",
 ) -> Path:
     """
-    送信・税理士取得など単一 Gmail クライアント用の token パス。
-    GMAIL_TOKEN_PATH で明示していないとき、candidate（通常 token.json）が 215 未満なら
-    同フォルダの token_estate.json / token_m19m.json のうち、最初に 215 を満たすものを使う。
+    単一 Gmail クライアント用の token パス。
+
+    purpose:
+      - send: パートナー送信など。個人 Gmail（estate / m19m）を優先（相手に届く From を維持）
+      - receive: 取り込み。admin@（livingsupport）を優先
     """
     if explicit_via_env:
         return candidate
-    order = [
-        candidate,
-        manual_dir / "token_estate.json",
-        manual_dir / "token_m19m.json",
-        manual_dir / "token_livingsupport.json",
-        manual_dir / "token_chk59.json",
-    ]
+    if purpose == "receive":
+        order = [
+            manual_dir / "token_livingsupport.json",
+            candidate,
+            manual_dir / "token_estate.json",
+            manual_dir / "token_m19m.json",
+            manual_dir / "token_chk59.json",
+        ]
+    else:
+        order = [
+            candidate,
+            manual_dir / "token_estate.json",
+            manual_dir / "token_m19m.json",
+            manual_dir / "token_chk59.json",
+            manual_dir / "token_livingsupport.json",
+        ]
     seen: set[Path] = set()
     for p in order:
         try:
@@ -83,3 +95,33 @@ def resolve_single_token_path_215(
         if _token_file_satisfies_215(p):
             return p
     return candidate
+
+
+def resolve_single_token_path_215(
+    manual_dir: Path,
+    candidate: Path,
+    *,
+    explicit_via_env: bool,
+) -> Path:
+    """送信・単一クライアント用（個人 Gmail 優先）。後方互換の別名。"""
+    return resolve_token_path_215(
+        manual_dir,
+        candidate,
+        explicit_via_env=explicit_via_env,
+        purpose="send",
+    )
+
+
+def resolve_receive_token_path_215(
+    manual_dir: Path,
+    candidate: Path,
+    *,
+    explicit_via_env: bool,
+) -> Path:
+    """取り込み用（admin@ 優先）。"""
+    return resolve_token_path_215(
+        manual_dir,
+        candidate,
+        explicit_via_env=explicit_via_env,
+        purpose="receive",
+    )

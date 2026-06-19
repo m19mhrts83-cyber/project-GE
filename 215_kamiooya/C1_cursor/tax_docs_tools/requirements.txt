@@ -1,2 +1,9 @@
 # tax_docs_tools（pip install -r requirements.txt）
 pypdf>=4.0
+# PayPay銀行 / MyKomon ブラウザ自動化
+playwright>=1.40.0
+python-dotenv>=1.0.0
+# AMEX 2FA（Gmail API。215 共通 token は 1b_Cursorマニュアル）
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+google-api-python-client>=2.0.0

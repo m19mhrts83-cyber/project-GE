@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # パートナー別フォルダ内のファイル名（全社統一）
@@ -106,6 +107,30 @@ def resolve_incoming_attach_dir(partner_folder):
         if p.exists() and p.is_dir():
             return p
     return partner_folder / "添付"
+
+
+def parse_received_date_folder(date_str: str) -> str:
+    """受信日時文字列から日付フォルダ名 YYYY-MM-DD を返す。"""
+    if not date_str:
+        return datetime.now().strftime("%Y-%m-%d")
+    m = re.match(r"(\d{4})[/-](\d{2})[/-](\d{2})", date_str.strip())
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    m = re.match(r"(\d{4})(\d{2})(\d{2})", date_str.strip())
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def resolve_incoming_attach_date_dir(partner_folder, date_str: str) -> Path:
+    """
+    受信添付の日付サブフォルダ（1.受信添付(Stock)/YYYY-MM-DD/）を返す。
+    同一日に届いた添付をまとめて格納する。
+    """
+    base = resolve_incoming_attach_dir(partner_folder)
+    day_dir = base / parse_received_date_folder(date_str)
+    day_dir.mkdir(parents=True, exist_ok=True)
+    return day_dir
 
 
 def make_summary(body, max_len=50):

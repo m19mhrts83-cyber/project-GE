@@ -55,6 +55,7 @@ from gmail_api_scopes import (
     resolve_single_token_path_215,
     token_satisfies_215_scopes,
 )
+from gmail_archive_bcc import apply_archive_bcc
 
 DEFAULT_AIOI_SUBMIT_TO = "RJS30_8080@aioinissaydowa.co.jp"
 DEFAULT_LOG_PARTNER_NAME = "あいおいニッセイ同和損保"
@@ -99,10 +100,17 @@ def _resolve_partner_paths(args: argparse.Namespace) -> tuple[Path, str]:
     return root, folder_path
 
 
-def _build_new_message(to_email: str, subject: str, body_text: str, attachment_paths: list[Path]) -> str:
+def _build_new_message(
+    to_email: str,
+    subject: str,
+    body_text: str,
+    attachment_paths: list[Path],
+    sender_email: str | None = None,
+) -> str:
     msg = MIMEMultipart()
     msg["To"] = to_email
     msg["Subject"] = subject
+    apply_archive_bcc(msg, sender_email)
     msg.attach(MIMEText(body_text, "plain", "utf-8"))
 
     for path in attachment_paths:
@@ -257,8 +265,17 @@ def main() -> None:
     )
     print("5.やり取り.md に送信内容を追記しました。")
 
-    raw = _build_new_message(args.to, subject or "（件名なし）", body_text, attachment_paths)
     service = _gmail_service()
+    sender_email = (
+        service.users().getProfile(userId="me").execute().get("emailAddress") or ""
+    )
+    raw = _build_new_message(
+        args.to,
+        subject or "（件名なし）",
+        body_text,
+        attachment_paths,
+        sender_email=sender_email,
+    )
     service.users().messages().send(userId="me", body={"raw": raw}).execute()
     print(f"送信しました: {args.to}")
 

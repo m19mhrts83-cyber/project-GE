@@ -55,6 +55,7 @@ from gmail_api_scopes import (
     resolve_single_token_path_215,
     token_satisfies_215_scopes,
 )
+from gmail_archive_bcc import apply_archive_bcc
 LOG_DIR = SCRIPT_DIR / 'logs'
 
 try:
@@ -413,7 +414,7 @@ def build_personalized_body(body, company, contact):
     return greeting + body
 
 
-def create_message(subject, body, to_address):
+def create_message(subject, body, to_address, sender_email=None):
     """
     個別送信用のメールメッセージを作成する
     
@@ -421,6 +422,7 @@ def create_message(subject, body, to_address):
         subject: 件名
         body: 本文（宛名挿入済み）
         to_address: 送信先メールアドレス（1件）
+        sender_email: 送信元 Gmail（個人アカウント時 admin@ へ BCC 控え）
     
     Returns:
         dict: Gmail APIに送信するメッセージ
@@ -432,6 +434,7 @@ def create_message(subject, body, to_address):
     
     message['To'] = to_address
     message['Subject'] = subject
+    apply_archive_bcc(message, sender_email)
     
     # 本文を追加
     message.attach(MIMEText(body, 'plain', 'utf-8'))
@@ -777,6 +780,9 @@ def main():
         print("🔐 Gmail APIに接続しています...")
         creds = authenticate_gmail()
         service = build('gmail', 'v1', credentials=creds)
+        sender_email = (
+            service.users().getProfile(userId='me').execute().get('emailAddress') or ''
+        )
         print("✓ 接続しました")
         
         # 1社ずつ個別にメールを送信
@@ -802,7 +808,8 @@ def main():
                 message = create_message(
                     subject=subject,
                     body=personalized_body,
-                    to_address=email
+                    to_address=email,
+                    sender_email=sender_email,
                 )
                 
                 # メール送信

@@ -56,12 +56,12 @@ partners:
     name: "神大家AI推進"
     emails: []
     phones: []
-    line: ""
+    line: "目黒 啓太 / 【神大家】松野さん・スクール運営社員"
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "目黒"
-    chatwork_room_id: "422374412"
-    chatwork_account_name: "目黒"
+    chatwork_room_id: ["422374412", "439357504"]
+    chatwork_account_name: ""
   - folder: "809_神大家運営回答"
     name: "神大家運営回答"
     emails: ["kami.ooyasan-club@ooya.academy"]
@@ -128,3 +128,19 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "大石"
+  - folder: "516_名古屋銀行"
+    name: "名古屋銀行"
+    emails: ["koshino_masashi@ex.meigin.co.jp"]
+    phones: ["08096617311", "080-9661-7311", "+818096617311"]
+    line: ""
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "越野将志"
+  - folder: "617_日本総険"
+    name: "日本総険"
+    emails: ["ayanori.shimizu@iba-ns.co.jp"]
+    phones: []
+    line: ""
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "清水"
