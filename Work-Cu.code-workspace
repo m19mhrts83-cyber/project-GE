@@ -21,12 +21,12 @@
 			"path": "../Library/CloudStorage/OneDrive-個人用/300_AIリスキリング講座(助成金活用）"
 		},
 		{
-			"name": "マイドライブ",
-			"path": "../Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ"
-		},
-		{
 			"name": "215_神・大家さん倶楽部",
 			"path": "../Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+		},
+		{
+			"name": "マイドライブ",
+			"path": "../Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ"
 		}
 	],
 	"settings": {}
