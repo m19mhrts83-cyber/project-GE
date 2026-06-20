@@ -8,6 +8,7 @@ alwaysApply: true
 ## 保存場所（秘密はここだけ）
 
 - **正本**: `~/git-repos/.env.jarvis_private` の **`HOME_ADDRESS`**（`HOME_LAT` / `HOME_LON` 任意）
+- フォーム入力時は `HOME_ADDRESS_STREET` / `HOME_ADDRESS_BANTI`（番地は全角数字）も参照。表記ルールは `jarvis.mdc`。
 - **テンプレート**: `~/git-repos/.env.jarvis_private.example`
 - 詳細・他の個人情報: `jarvis.mdc` を参照
 
