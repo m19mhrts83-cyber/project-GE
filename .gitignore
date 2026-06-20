@@ -36,6 +36,9 @@ node_modules/
 .DS_Store
 _tmp/
 
+# Jarvis 月次状態（ローカルのみ）
+.jarvis_state/etc_monthly.json
+
 # --- エディタ・ツール ---
 .cursor/projects/
 # ルールは原則コミットしない（例外: 地図・経路用の非秘密ルールのみ）

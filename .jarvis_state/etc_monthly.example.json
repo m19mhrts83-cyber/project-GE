@@ -1,0 +1,20 @@
+{
+  "disabled": false,
+  "last_check_a": null,
+  "last_check_b": null,
+  "last_result_a": {
+    "at": null,
+    "ok": null,
+    "trips_prev_month": null,
+    "asayu_mark_count": null,
+    "note": ""
+  },
+  "last_result_b": {
+    "at": null,
+    "ok": null,
+    "rebate_yen": null,
+    "gmail_hits": null,
+    "note": ""
+  },
+  "zero_asayu_streak_months": 0
+}
