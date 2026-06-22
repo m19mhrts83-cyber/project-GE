@@ -27,6 +27,12 @@
 		{
 			"name": "マイドライブ",
 			"path": "../Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ"
+		},
+		{
+			"path": "../Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan"
+		},
+		{
+			"path": "../Library/Mobile Documents/iCloud~com~openplanetsoftware~just-press-record/Documents"
 		}
 	],
 	"settings": {}
