@@ -30,7 +30,7 @@ jobs:
       - name: Assemble site (docs/ under /docs URL path)
         run: |
           mkdir -p _site/docs
-          cp -r docs/. _site/docs/
+          rsync -a --exclude='.git*' --exclude='mac引き継ぎ.md' docs/ _site/docs/
           if [ -f index.html ]; then
             cp index.html _site/index.html
           fi
