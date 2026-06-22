@@ -1,0 +1,44 @@
+name: Deploy docs to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'index.html'
+      - '.github/workflows/pages-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble site (docs/ under /docs URL path)
+        run: |
+          mkdir -p _site/docs
+          cp -r docs/. _site/docs/
+          if [ -f index.html ]; then
+            cp index.html _site/index.html
+          fi
+          touch _site/.nojekyll _site/docs/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
