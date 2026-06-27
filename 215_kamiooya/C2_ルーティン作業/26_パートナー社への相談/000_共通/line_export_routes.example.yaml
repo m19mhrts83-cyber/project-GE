@@ -1,0 +1,30 @@
+routes:
+  - id: tcell_caramel_g
+    filename_hints: ["キャラメル", "キャラメル管理", "Tcell"]
+    folder: "103_Tcell"
+    display_name: "Tcell"
+    group: true
+    group_label: "キャラメル管理G"
+  - id: leaf_grandole
+    filename_hints: ["Grandole", "志賀本通", "LEAF"]
+    folder: "104_LEAF"
+    display_name: "LEAF"
+    group: true
+    group_label: "Grandole志賀本通 I 管理"
+  - id: kamiooya_kanji
+    filename_hints: ["東海飲み会", "飲み会幹事"]
+    folder: "815_神大家オプチャ/東海飲み会幹事やりとり"
+    display_name: "東海飲み会幹事やりとり"
+    group: true
+    group_label: "東海飲み会幹事やりとり"
+
+# 送信: iPhone EmailMe → matsuno.estate@gmail.com（admin@ 転送は控え用）
+gmail:
+  enabled: true
+  account: matsuno.estate@gmail.com
+  token_file: token_estate.json
+  days: 365
+  query: >-
+    has:attachment (filename:txt OR filename:zip OR filename:text)
+    (from:line.naver.jp OR from:notify.line.me OR from:line.me OR from:linecorp.com
+     OR subject:トーク履歴 OR subject:"Talk History" OR subject:"[LINE]" OR subject:"LINE トーク")

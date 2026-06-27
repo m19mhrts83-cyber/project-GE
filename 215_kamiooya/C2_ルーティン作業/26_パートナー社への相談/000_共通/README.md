@@ -27,12 +27,16 @@
 
 個人LINEに公式の送受信 API はないため、**まず公式のトーク履歴エクスポート .txt（推奨）**、短い抜粋は **コピペ**、の二段構えで `5.やり取り.md` に追記します。
 
-### おすすめ: 公式エクスポート .txt → `line_export_to_yoritoori.py`
+### おすすめ: 公式エクスポート → inbox 自動取り込み（Phase C）
 
-1. LINE アプリで **トーク履歴の送信／エクスポート**（機種でメニュー名が異なる）し `.txt` を保存。
-2. `pip install -r requirements_gmail.txt`（**linelog2py** 含む）済みの `./.venv_gmail/bin/python` で:  
-   `line_export_to_yoritoori.py --export-file （パス）.txt --partner Tcell --group --group-label "キャラメル管理G"`  
-   形式が合わないときは自動で全文プレーン。強制プレーンは `--plain`。
+ユーザー操作は **エクスポートして inbox に置く**（または **スマホから自分宛メール送信**）だけ。振り分け・プレースホルダー修復・追記・退避は Jarvis／定常ルーティンが担当。
+
+1. **スマホ（推奨）**: iPhone **EmailMe** で `matsuno.estate@gmail.com` へ送信（admin@ 転送あり）、またはファイル保存 → `000_共通/LINE公式エクスポート/inbox/` → `line_export_gmail_to_inbox.py`（段階3）
+2. **Mac LINE**: エクスポート → 同 inbox
+3. ファイル名にトーク名を含める — `line_export_routes.yaml` の `filename_hints` で自動判定
+4. `line_export_gmail_to_inbox.py` → `line_export_inbox_to_yoritoori.py`（段階2 プレースホルダー修復は既定 ON）
+
+手動で1件だけ取り込む場合: `line_export_to_yoritoori.py --export-file （パス）.txt --partner Tcell --group --group-label "キャラメル管理G"`（形式が合わないときは自動で全文プレーン。強制プレーンは `--plain`）。
 
 ### 補助: コピペ → `line_to_yoritoori_clip.py`
 

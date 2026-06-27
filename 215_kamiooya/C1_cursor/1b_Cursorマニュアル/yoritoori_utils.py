@@ -155,3 +155,29 @@ def make_summary(body, max_len=50):
     if len(text) <= max_len:
         return text
     return text[:max_len].rstrip() + "…"
+
+
+_LINE_HEADING_MARKERS = ("[本文なし", "[メディア]")
+
+
+def line_heading_tail(body: str) -> str:
+    """LINE 見出し第4欄。通常は空。プレースホルダー系のみ残す。"""
+    text = (body or "").strip().split("\n", 1)[0].strip()
+    if any(text.startswith(m) for m in _LINE_HEADING_MARKERS):
+        return text if len(text) <= 80 else text[:79] + "…"
+    return ""
+
+
+def format_line_heading(
+    date_str: str,
+    org: str,
+    tag: str,
+    *,
+    body_for_tail: str = "",
+    extra_suffix: str = "",
+) -> str:
+    """LINE 用 ### 見出し（要約なし。extra_suffix に <!-- chrline-dk:... --> 可）。"""
+    tail = line_heading_tail(body_for_tail)
+    if extra_suffix:
+        tail = f"{tail}{extra_suffix}"
+    return f"### {date_str}｜{org}｜{tag}｜{tail}"

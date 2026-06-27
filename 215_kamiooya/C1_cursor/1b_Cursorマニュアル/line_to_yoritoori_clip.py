@@ -47,7 +47,7 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
-from yoritoori_utils import DRAFT_FILENAME, YORITOORI_FILENAME, make_summary
+from yoritoori_utils import DRAFT_FILENAME, YORITOORI_FILENAME, format_line_heading
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 BASE_DIR = SCRIPT_DIR.parent.parent / "C2_ルーティン作業" / "26_パートナー社への相談"
@@ -213,10 +213,6 @@ def build_heading_line(
     group_label: str | None,
     body: str,
 ) -> str:
-    summary = make_summary(body)
-    if group_label:
-        summary = f"{group_label} — {summary}"
-
     if direction == "draft":
         tag = "LINE（送信予定・下書き）"
     elif direction == "send":
@@ -226,7 +222,7 @@ def build_heading_line(
     else:
         tag = "LINE（貼り付け・受信）"
 
-    return f"### {date_str}｜{display_name}｜{tag}｜{summary}"
+    return format_line_heading(date_str, display_name, tag, body_for_tail=body)
 
 
 def append_line_block(

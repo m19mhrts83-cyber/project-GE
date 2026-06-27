@@ -23,6 +23,30 @@ def make_summary(body: str, max_len: int = 50) -> str:
     return text if len(text) <= max_len else text[: max_len - 1] + "…"
 
 
+_LINE_HEADING_MARKERS = ("[本文なし", "[メディア]")
+
+
+def line_heading_tail(body: str) -> str:
+    text = (body or "").strip().split("\n", 1)[0].strip()
+    if any(text.startswith(m) for m in _LINE_HEADING_MARKERS):
+        return text if len(text) <= 80 else text[:79] + "…"
+    return ""
+
+
+def format_line_heading(
+    date_part: str,
+    org_label: str,
+    tag: str,
+    *,
+    body_for_tail: str = "",
+    extra_suffix: str = "",
+) -> str:
+    tail = line_heading_tail(body_for_tail)
+    if extra_suffix:
+        tail = f"{tail}{extra_suffix}"
+    return f"### {date_part}｜{org_label}｜{tag}｜{tail}"
+
+
 def flatten_notion_headings(body: str) -> str:
     if not body:
         return ""
