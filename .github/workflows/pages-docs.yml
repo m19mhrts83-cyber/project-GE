@@ -6,6 +6,8 @@ on:
     paths:
       - 'docs/**'
       - 'index.html'
+      - 'app.js'
+      - 'style.css'
       - '.github/workflows/pages-docs.yml'
   workflow_dispatch:
 
@@ -33,6 +35,12 @@ jobs:
           rsync -a --exclude='.git*' --exclude='mac引き継ぎ.md' docs/ _site/docs/
           if [ -f index.html ]; then
             cp index.html _site/index.html
+          fi
+          if [ -f app.js ]; then
+            cp app.js _site/app.js
+          fi
+          if [ -f style.css ]; then
+            cp style.css _site/style.css
           fi
           touch _site/.nojekyll _site/docs/.nojekyll
 
