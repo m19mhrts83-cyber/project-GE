@@ -371,10 +371,25 @@ function initializeMap(location) {
     markers = [];
 }
 
+// 評価順に並べ替え（未評価は末尾）
+function sortPlacesByRating(places) {
+    return [...places].sort((a, b) => {
+        const ratingA = typeof a.rating === 'number' ? a.rating : null;
+        const ratingB = typeof b.rating === 'number' ? b.rating : null;
+
+        if (ratingA === null && ratingB === null) return 0;
+        if (ratingA === null) return 1;
+        if (ratingB === null) return -1;
+        return ratingB - ratingA;
+    });
+}
+
 // 結果を表示
 function displayResults(stationName, places, centerLocation) {
+    const sortedPlaces = sortPlacesByRating(places);
+
     // 結果をグローバル変数に保存
-    currentPlaces = places.map(place => {
+    currentPlaces = sortedPlaces.map(place => {
         const { prefecture, city } = extractPrefectureAndCity(place.formatted_address);
         return {
             ...place,
@@ -388,7 +403,7 @@ function displayResults(stationName, places, centerLocation) {
     // 結果セクションを表示
     document.getElementById('resultsSection').style.display = 'block';
     document.getElementById('resultsTitle').textContent = `「${stationName}」周辺の不動産賃貸管理会社`;
-    document.getElementById('resultsCount').textContent = `${places.length}件の結果`;
+    document.getElementById('resultsCount').textContent = `${sortedPlaces.length}件の結果`;
     
     // カードビューを作成
     createCardView(currentPlaces);
@@ -397,7 +412,7 @@ function displayResults(stationName, places, centerLocation) {
     createTableView(currentPlaces);
     
     // 地図にマーカーを追加
-    places.forEach((place, index) => {
+    currentPlaces.forEach((place, index) => {
         addMarkerToMap(place, index + 1);
     });
     
