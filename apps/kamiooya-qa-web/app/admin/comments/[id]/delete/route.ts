@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withErrorHandler(async (req, { params }) => {
   requireAdmin(req);
   const { id } = await params;
   const sb = supabaseAdmin();
@@ -13,5 +14,4 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ errorMessage: error.message || "削除に失敗しました" }, { status: 500 });
   }
   return NextResponse.json({ success: true });
-}
-
+});

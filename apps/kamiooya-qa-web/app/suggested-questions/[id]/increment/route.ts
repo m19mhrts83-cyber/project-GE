@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const PUT = withErrorHandler(async (req, { params }) => {
   requireUser(req);
   const { id } = await params;
   const sb = supabaseAdmin();
@@ -22,5 +23,4 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ errorMessage: error.message || "更新に失敗しました" }, { status: 500 });
   }
   return NextResponse.json({ success: true });
-}
-
+});
