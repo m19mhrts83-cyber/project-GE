@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { withErrorHandler } from "@/lib/routeHandler";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+export const GET = withErrorHandler(async (req) => {
   requireAdmin(req);
   const sb = supabaseAdmin();
   const { data, error } = await sb.from("users").select("id,email,status").eq("status", "pending");
@@ -12,5 +13,4 @@ export async function GET(req: Request) {
     return NextResponse.json({ errorMessage: error.message || "取得に失敗しました" }, { status: 500 });
   }
   return NextResponse.json({ users: data ?? [] });
-}
-
+});
