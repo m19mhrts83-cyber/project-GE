@@ -52,6 +52,8 @@ C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情
 *.PDF
 *.xlsx
 *.xls
+# Notta 取込用 fixture（時刻付きサンプル）はリポジトリに含める
+!C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/fixtures/notta/*.xlsx
 *.doc
 *.docx
 *.pptx
