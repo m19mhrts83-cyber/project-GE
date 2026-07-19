@@ -125,6 +125,31 @@ DELTA_LINES="$(wc -l < "$LATEST_DELTA" | tr -d ' ')"
 echo "最新delta: $LATEST_DELTA (rows=$DELTA_ROWS, physical_lines=$DELTA_LINES)"
 LATEST_FULL="$(ls -1t "$OUTPUT_ROOT"/exports/full_*.csv 2>/dev/null | head -n 1 || true)"
 
+HEALTHCHECK_SCRIPT="$SCRIPT_DIR/supabase_healthcheck.py"
+
+run_supabase_healthcheck_touch() {
+  # Free 休止防止: 差分0件でも心拍を打つ（SUPABASE_URL があるとき）
+  if [[ -z "${SUPABASE_URL:-}" ]]; then
+    echo "Supabase環境変数未設定のため、疎通/心拍はスキップします。"
+    echo "SUMMARY: 疎通=skipped 心拍=skipped reason=no_url"
+    return 0
+  fi
+  if [[ ! -f "$HEALTHCHECK_SCRIPT" ]]; then
+    echo "警告: $HEALTHCHECK_SCRIPT がありません" >&2
+    return 0
+  fi
+  echo "==> step1.5: Supabase 疎通確認 + 心拍 (--touch)"
+  if ! "$PYTHON" "$HEALTHCHECK_SCRIPT" --touch --note "westudy-weekly:${RUN_ID}"; then
+    if [[ "${SUPABASE_FAIL_OPEN:-0}" == "1" ]]; then
+      echo "警告: Supabase疎通/心拍に失敗しましたが、SUPABASE_FAIL_OPEN=1 のため継続します。" >&2
+      return 0
+    fi
+    echo "Supabase疎通/心拍失敗。state は更新しません。" >&2
+    return 2
+  fi
+  return 0
+}
+
 commit_state_after_success() {
   if [[ -z "${LATEST_FULL:-}" || ! -f "$LATEST_FULL" ]]; then
     echo "警告: 全件CSVが見つからないため state を更新できません。" >&2
@@ -138,8 +163,11 @@ commit_state_after_success() {
     --update-state
 }
 
+# 差分0でも Free 休止防止のため心拍は必ず試みる
+run_supabase_healthcheck_touch || exit $?
+
 if [[ "$DELTA_ROWS" -le 0 ]]; then
-  echo "差分0件（ヘッダのみ）のため、Supabase/Raimo取込はスキップします。"
+  echo "差分0件（ヘッダのみ）のため、Supabase/Raimo取込はスキップします（心拍は実施済み）。"
   commit_state_after_success || true
   echo "log: $LOG_FILE"
   exit 0

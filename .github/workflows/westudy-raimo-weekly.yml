@@ -122,11 +122,17 @@ jobs:
           echo "delta_rows=$rows" >> "$GITHUB_OUTPUT"
           upload_note="n/a"
           supabase_note="n/a"
+          health_note="n/a"
           latest_log=""
           shopt -s nullglob
           _logs=( "$CHATBOT_OUTPUT_ROOT"/exports/logs/update_and_import_*.log )
           if ((${#_logs[@]} > 0)); then
             latest_log="$(ls -1t "${_logs[@]}" | head -n 1)"
+            if rg -q "SUMMARY: 疎通=" "$latest_log" 2>/dev/null; then
+              health_note="$(rg "SUMMARY: 疎通=" "$latest_log" | tail -n 1)"
+            elif rg -q "heartbeat touch:" "$latest_log" 2>/dev/null; then
+              health_note="$(rg "heartbeat touch:" "$latest_log" | tail -n 1)"
+            fi
             if rg -q "Supabase取込完了:" "$latest_log" 2>/dev/null; then
               supabase_note="$(rg "Supabase取込完了:" "$latest_log" | tail -n 1)"
             elif rg -q "Supabase環境変数未設定" "$latest_log" 2>/dev/null; then
@@ -140,7 +146,9 @@ jobs:
               upload_note="$(rg "LIMO取込完了:" "$latest_log" | tail -n 1)"
             elif rg -q "差分0件（ヘッダのみ）" "$latest_log" 2>/dev/null; then
               upload_note="skipped (差分0件)"
-              supabase_note="skipped (差分0件)"
+              if [[ "$supabase_note" == "n/a" ]]; then
+                supabase_note="skipped (差分0件・心拍は別記)"
+              fi
             elif rg -q "Raimo取込失敗|LIMO取込失敗" "$latest_log" 2>/dev/null; then
               upload_note="failed (ログ参照)"
             elif [[ "$rows" -gt 0 ]]; then
@@ -152,11 +160,13 @@ jobs:
             if [[ -z "$latest_delta" ]]; then
               echo "- delta: （ファイルなし・パイプライン未生成または失敗の可能性）"
               echo "- rows: n/a"
+              echo "- 疎通/心拍: \`$health_note\`"
               echo "- supabase: n/a"
               echo "- raimo: n/a"
             else
               echo "- delta: \`$latest_delta\`"
               echo "- rows: \`$rows\`"
+              echo "- 疎通/心拍: \`$health_note\`"
               echo "- supabase: \`$supabase_note\`"
               echo "- raimo: \`$upload_note\`"
             fi
