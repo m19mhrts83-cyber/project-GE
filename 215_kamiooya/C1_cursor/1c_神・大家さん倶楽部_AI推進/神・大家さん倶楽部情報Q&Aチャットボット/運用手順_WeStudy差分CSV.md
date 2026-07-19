@@ -5,7 +5,8 @@
 1. **スクレイプ**（`westudy_forum_all.py`）でフォーラム全トピックのコメントをトピック別 CSV に保存  
 2. **変換**（`scripts/convert_to_admin_csv.py`）で WeStudy **管理者CSV** と同じ列名・形式の全件 CSV を生成  
 3. **差分**（`scripts/build_delta_csv.py`）で「前回までに state に記録したコメントID以外」を差分 CSV に出力し、チャットボットの「CSV取込」に渡す  
-4. **自動取込**（`scripts/upload_csv_to_limo.py`）で LIMO アプリへ管理者ログインし、`delta_*.csv` を画面から取り込む  
+4. **自動取込**（`scripts/upload_csv_to_raimo.py`）で Raimo アプリへ管理者ログインし、`delta_*.csv` を画面から取り込む  
+5. **Supabase 取込**（`scripts/upload_csv_to_supabase.py`）で `delta_*.csv` を `comments` テーブルへ upsert（`SUPABASE_URL` 設定時。`run_update_and_import.sh` に統合済み）
 
 生成物の既定の保存先は **OneDrive 固定**です（`CHATBOT_OUTPUT_ROOT` 未設定時）。
 `CHATBOT_OUTPUT_ROOT` を設定した場合のみ、任意の保存先へ変更できます。
@@ -27,9 +28,10 @@
 - 環境変数（`~/.zshrc` 等）:
   - `WESTUDY_USER` … WeStudy / WordPress ログインID  
   - `WESTUDY_PASS` … パスワード  
-  - `LIMO_APP_URL` … LIMO 公開URL（ミニアプリ）  
-  - `LIMO_APP_EMAIL` / `LIMO_APP_PASSWORD` … 公開URLの1段ログイン（推奨）  
-  - `LIMO_PORTAL_*` … 従来のポータル経由（2段）を使う場合のみ  
+  - `RAIMO_APP_URL` … Raimo 公開URL（ミニアプリ）  
+  - `RAIMO_APP_EMAIL` / `RAIMO_APP_PASSWORD` … 公開URLの1段ログイン（推奨）  
+  - `RAIMO_PORTAL_*` … 従来のポータル経由（2段）を使う場合のみ  
+  - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` … Supabase へ差分 upsert（任意・並行運用時）  
 
 スクレイパ本体の正本は `git-repos` 側です（既定パス）:
 
@@ -45,7 +47,7 @@ chmod +x scripts/run_update_and_import.sh  # 初回のみ
 # フル: スクレイプ → 全件CSV → 差分CSV（state 更新）
 ./scripts/run_westudy_pipeline.sh
 
-# 一気通貫: スクレイプ → 差分生成 → LIMOへ自動取込（推奨）
+# 一気通貫: スクレイプ → 差分生成 → Supabase upsert → Raimoへ自動取込（推奨）
 ./scripts/run_update_and_import.sh
 
 # ブラウザ表示でスクレイプ（デバッグ時）
@@ -66,7 +68,7 @@ chmod +x scripts/run_update_and_import.sh  # 初回のみ
 
 `PYTHON` / `WESTUDY_SCRAPER` / `CHATBOT_OUTPUT_ROOT` / `CHATBOT_STATE_ROOT` を変えたい場合は実行前に export してください。
 
-LIMO ログイン情報は `scripts/.env.example` をもとに環境変数へ設定してください。
+Raimo ログイン情報は `scripts/.env.example` をもとに環境変数へ設定してください。
 
 ```bash
 set -a && source scripts/.env && set +a
@@ -137,12 +139,12 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 
 ## GitHub Actions での週次実行
 
-**project-GE リポジトリ直下**の `.github/workflows/westudy-limo-weekly.yml` で、以下を**毎週 1 回**（日曜 06:30 JST 目安）自動実行します。  
+**project-GE リポジトリ直下**の `.github/workflows/westudy-raimo-weekly.yml` で、以下を**毎週 1 回**（日曜 06:30 JST 目安）自動実行します。  
 （`215_kamiooya/.github/` 配下に置いても GitHub は読み込みません。）
 
 1. WeStudy スクレイプ（**cron 週次は `--force` で全トピック再取得**。新規コメントは完了済みトピックにも付くため）  
-2. 差分CSV生成（**state 更新は LIMO 取込成功後**）  
-3. 差分が 1 件以上のときのみ LIMO 自動取込（0件ならスキップ）
+2. 差分CSV生成（**state 更新は Raimo 取込成功後**）  
+3. 差分が 1 件以上のときのみ Raimo 自動取込（0件ならスキップ）
 
 いつでも手動実行する場合は、GitHub の **Actions** タブで **WeStudy Delta Import Weekly** を選び **Run workflow** から実行できます。
 
@@ -152,22 +154,22 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 
 - `WESTUDY_USER`
 - `WESTUDY_PASS`
-- `LIMO_APP_URL`
+- `RAIMO_APP_URL`
 
 推奨（1段目ログイン）:
 
-- `LIMO_PORTAL_EMAIL`
-- `LIMO_PORTAL_PASSWORD`
+- `RAIMO_PORTAL_EMAIL`
+- `RAIMO_PORTAL_PASSWORD`
 
 互換（PORTAL を使わない場合）:
 
-- `LIMO_ADMIN_EMAIL`
-- `LIMO_ADMIN_PASSWORD`
+- `RAIMO_ADMIN_EMAIL`
+- `RAIMO_ADMIN_PASSWORD`
 
 必要時のみ（2段目ログインが出る環境）:
 
-- `LIMO_APP_EMAIL`
-- `LIMO_APP_PASSWORD`
+- `RAIMO_APP_EMAIL`
+- `RAIMO_APP_PASSWORD`
 
 ### 補足
 
@@ -183,7 +185,8 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 | 変換0行 | `convert_to_admin_csv.py -v` の `files` / `rows_read`、入力ディレクトリに `*.csv` があるか |
 | 差分が常に全件 | `<CHATBOT_STATE_ROOT>/westudy_comment_ids.json` が消えていないか、`--update-state` 付きで一度流したか |
 | 取込エラー | Excel で「CSV UTF-8（コンマ区切り）」で保存し直す、1行目ヘッダが管理者形式と一致しているか |
-| 自動ログイン失敗 | `LIMO_APP_URL` / `LIMO_ADMIN_EMAIL` / `LIMO_ADMIN_PASSWORD` の値、`<CHATBOT_OUTPUT_ROOT>/exports/logs/limo_import_ng_*.png` を確認 |
+| 自動ログイン失敗 | `RAIMO_APP_URL` / `RAIMO_ADMIN_EMAIL` / `RAIMO_ADMIN_PASSWORD` の値、`<CHATBOT_OUTPUT_ROOT>/exports/logs/raimo_import_ng_*.png` を確認 |
+| Supabase 取込失敗 | `Supabase取込完了:` 行、プロジェクト Active、`SUPABASE_SERVICE_ROLE_KEY` |
 | playwright 未導入 | `pip install playwright` と `playwright install chromium` を実行 |
 
 ## 補足: dry-run 相当の確認
@@ -196,3 +199,46 @@ ls -1t "${CHATBOT_OUTPUT_ROOT:-/Users/matsunomasaharu2/Library/CloudStorage/OneD
 ```
 
 差分がヘッダのみ（行数1）なら `run_update_and_import.sh` はアップロードをスキップして正常終了します。
+
+## Supabase 初回ブートストラップ（全件取込）
+
+Raimo に既に取込済みの過去分を Supabase `comments` に揃える手順です。
+
+1. Supabase プロジェクト `kamiooya-qa` が **Active** であること（休止中は Dashboard で Restore）
+2. [`apps/kamiooya-qa-web/supabase/schema.sql`](../../../../apps/kamiooya-qa-web/supabase/schema.sql) が適用済みであること
+3. `scripts/.env` に `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` を設定
+4. WeStudy 全件再取得（4月以前の `full_*.csv` だけでは Raimo state より不足するため `--force` 推奨）:
+
+```bash
+set -a && source scripts/.env && set +a
+./scripts/run_westudy_pipeline.sh --force
+```
+
+5. 最新 `full_*.csv` を Supabase へ一括 upsert:
+
+```bash
+LATEST_FULL="$(ls -1t exports/full_*.csv | head -n 1)"
+python3 scripts/upload_csv_to_supabase.py --bootstrap --csv "$LATEST_FULL"
+```
+
+6. 件数確認（目安: `state/westudy_comment_ids.json` の ID 数と同程度）:
+
+```bash
+# Supabase SQL Editor または MCP
+# SELECT count(*) FROM public.comments;
+```
+
+初回ブートストラップでは **`westudy_comment_ids.json` は更新しません**（Raimo 週次と state を共有するため）。
+
+### Supabase 週次（Raimo 並行）
+
+`run_update_and_import.sh` 実行時、環境変数があれば **Supabase → Raimo** の順で `delta_*.csv` を取り込みます。GitHub Actions（`westudy-raimo-weekly.yml`）でも同様。Secrets に `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` を登録してください。
+
+### Supabase 障害時
+
+| 症状 | 確認先 |
+|------|--------|
+| `SUPABASE_URL が未設定` | `scripts/.env`、Actions Secrets |
+| upsert 失敗 | ログの `Supabase取込完了:` 行、プロジェクトが Active か |
+| 重複エラー | `comments_comment_id_unique` インデックスが適用されているか |
+| state が進まない | `SUPABASE_FAIL_OPEN=0` 時は Supabase 失敗で state 更新しない（意図どおり） |

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WeStudy抽出→差分CSV生成→LIMO取込まで一気通貫で実行
+# WeStudy抽出→差分CSV生成→Supabase upsert→Raimo取込まで一気通貫で実行
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +12,12 @@ if [[ ! -d "$OUTPUT_ROOT" ]]; then
   exit 2
 fi
 PIPELINE_SCRIPT="$SCRIPT_DIR/run_westudy_pipeline.sh"
-UPLOAD_SCRIPT="$SCRIPT_DIR/upload_csv_to_limo.py"
+UPLOAD_RAIMO_SCRIPT="$SCRIPT_DIR/upload_csv_to_raimo.py"
+# 旧名フォールバック
+if [[ ! -f "$UPLOAD_RAIMO_SCRIPT" && -f "$SCRIPT_DIR/upload_csv_to_limo.py" ]]; then
+  UPLOAD_RAIMO_SCRIPT="$SCRIPT_DIR/upload_csv_to_limo.py"
+fi
+UPLOAD_SUPABASE_SCRIPT="$SCRIPT_DIR/upload_csv_to_supabase.py"
 DEFAULT_PY="$HOME/git-repos/ProgramCode/venv/bin/python"
 if [[ -x "$DEFAULT_PY" ]]; then
   PYTHON="${PYTHON:-$DEFAULT_PY}"
@@ -24,6 +29,29 @@ LOG_DIR="$OUTPUT_ROOT/exports/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/update_and_import_${RUN_ID}.log"
 
+# RAIMO_* が正。未設定時は LIMO_*（後方互換）を使う
+apply_raimo_env_aliases() {
+  local pairs=(
+    RAIMO_APP_URL:LIMO_APP_URL
+    RAIMO_APP_EMAIL:LIMO_APP_EMAIL
+    RAIMO_APP_PASSWORD:LIMO_APP_PASSWORD
+    RAIMO_PORTAL_EMAIL:LIMO_PORTAL_EMAIL
+    RAIMO_PORTAL_PASSWORD:LIMO_PORTAL_PASSWORD
+    RAIMO_ADMIN_EMAIL:LIMO_ADMIN_EMAIL
+    RAIMO_ADMIN_PASSWORD:LIMO_ADMIN_PASSWORD
+    RAIMO_FAIL_OPEN:LIMO_FAIL_OPEN
+  )
+  local pair raimo limo
+  for pair in "${pairs[@]}"; do
+    raimo="${pair%%:*}"
+    limo="${pair##*:}"
+    if [[ -z "${!raimo:-}" && -n "${!limo:-}" ]]; then
+      printf -v "$raimo" '%s' "${!limo}"
+      export "$raimo"
+    fi
+  done
+}
+
 usage() {
   cat <<'EOF'
 使い方:
@@ -31,7 +59,8 @@ usage() {
 
 概要:
   1) WeStudyスクレイプ〜差分CSV生成（run_westudy_pipeline.sh）
-  2) 最新 delta_*.csv を LIMO 管理画面へ自動取込
+  2) 最新 delta_*.csv を Supabase へ upsert（SUPABASE_URL 設定時）
+  3) 最新 delta_*.csv を Raimo 管理画面へ自動取込
 
 例:
   ./scripts/run_update_and_import.sh
@@ -41,9 +70,12 @@ usage() {
 必要な環境変数:
   WESTUDY_USER, WESTUDY_PASS
   CHATBOT_OUTPUT_ROOT（任意。未設定時は OneDrive 固定パス）
-  LIMO_APP_URL
-  LIMO: LIMO_PORTAL_EMAIL/PASSWORD（推奨）または LIMO_ADMIN_EMAIL/PASSWORD（1段目）
-        2段ログイン時は LIMO_APP_EMAIL / LIMO_APP_PASSWORD も必須（scripts/.env.example 参照）
+  Supabase（任意・設定時は step2 実行）:
+    SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY（推奨）
+  Raimo（任意・設定時は step3 実行。RAIMO_* が正。LIMO_* も可）:
+    RAIMO_APP_URL
+    公開URL（1段・推奨）: RAIMO_APP_EMAIL / RAIMO_APP_PASSWORD
+    ポータル経由（2段）: RAIMO_PORTAL_* または RAIMO_ADMIN_*
 EOF
 }
 
@@ -52,14 +84,20 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
+apply_raimo_env_aliases
+
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 if [[ ! -x "$PIPELINE_SCRIPT" ]]; then
   echo "実行不可: $PIPELINE_SCRIPT" >&2
   exit 2
 fi
-if [[ ! -f "$UPLOAD_SCRIPT" ]]; then
-  echo "アップロードスクリプトがありません: $UPLOAD_SCRIPT" >&2
+if [[ ! -f "$UPLOAD_RAIMO_SCRIPT" ]]; then
+  echo "Raimoアップロードスクリプトがありません: $UPLOAD_RAIMO_SCRIPT" >&2
+  exit 2
+fi
+if [[ ! -f "$UPLOAD_SUPABASE_SCRIPT" ]]; then
+  echo "Supabaseアップロードスクリプトがありません: $UPLOAD_SUPABASE_SCRIPT" >&2
   exit 2
 fi
 
@@ -92,7 +130,7 @@ commit_state_after_success() {
     echo "警告: 全件CSVが見つからないため state を更新できません。" >&2
     return 1
   fi
-  echo "==> state 更新（LIMO 取込成功または差分0件のため）"
+  echo "==> state 更新（Raimo 取込成功または差分0件のため）"
   "$PYTHON" "$BUILD_DELTA_SCRIPT" \
     --full "$LATEST_FULL" \
     --state "$STATE_DELTA" \
@@ -101,47 +139,79 @@ commit_state_after_success() {
 }
 
 if [[ "$DELTA_ROWS" -le 0 ]]; then
-  echo "差分0件（ヘッダのみ）のため、LIMO取込はスキップします。"
+  echo "差分0件（ヘッダのみ）のため、Supabase/Raimo取込はスキップします。"
   commit_state_after_success || true
   echo "log: $LOG_FILE"
   exit 0
 fi
 
-LIMO_APP_OK=0
-if [[ -n "${LIMO_APP_EMAIL:-}" && -n "${LIMO_APP_PASSWORD:-}" ]]; then
-  LIMO_APP_OK=1
+SUPABASE_CONFIGURED=0
+if [[ -n "${SUPABASE_URL:-}" ]]; then
+  if [[ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" || -n "${SUPABASE_ANON_KEY:-}" ]]; then
+    SUPABASE_CONFIGURED=1
+  fi
 fi
-LIMO_PORTAL_OK=0
-if [[ -n "${LIMO_PORTAL_EMAIL:-}" && -n "${LIMO_PORTAL_PASSWORD:-}" ]]; then
-  LIMO_PORTAL_OK=1
-elif [[ -z "${LIMO_PORTAL_EMAIL:-}" && -z "${LIMO_PORTAL_PASSWORD:-}" ]]; then
-  if [[ -n "${LIMO_ADMIN_EMAIL:-}" && -n "${LIMO_ADMIN_PASSWORD:-}" ]]; then
-    LIMO_PORTAL_OK=1
+
+if [[ "$SUPABASE_CONFIGURED" -eq 1 ]]; then
+  echo "==> step2: Supabaseへ差分CSVを upsert"
+  if ! "$PYTHON" "$UPLOAD_SUPABASE_SCRIPT" --csv "$LATEST_DELTA"; then
+    if [[ "${SUPABASE_FAIL_OPEN:-0}" == "1" ]]; then
+      echo "警告: Supabase取込に失敗しましたが、SUPABASE_FAIL_OPEN=1 のため処理を継続します。" >&2
+    else
+      echo "Supabase取込失敗。state は更新しません。" >&2
+      exit 2
+    fi
   fi
 else
-  echo "LIMO_PORTAL_EMAIL と LIMO_PORTAL_PASSWORD は両方セットするか、両方空にしてください。" >&2
+  echo "Supabase環境変数未設定のため、Supabase取込はスキップします。"
+fi
+
+RAIMO_APP_OK=0
+if [[ -n "${RAIMO_APP_EMAIL:-}" && -n "${RAIMO_APP_PASSWORD:-}" ]]; then
+  RAIMO_APP_OK=1
+fi
+RAIMO_PORTAL_OK=0
+if [[ -n "${RAIMO_PORTAL_EMAIL:-}" && -n "${RAIMO_PORTAL_PASSWORD:-}" ]]; then
+  RAIMO_PORTAL_OK=1
+elif [[ -z "${RAIMO_PORTAL_EMAIL:-}" && -z "${RAIMO_PORTAL_PASSWORD:-}" ]]; then
+  if [[ -n "${RAIMO_ADMIN_EMAIL:-}" && -n "${RAIMO_ADMIN_PASSWORD:-}" ]]; then
+    RAIMO_PORTAL_OK=1
+  fi
+else
+  echo "RAIMO_PORTAL_EMAIL と RAIMO_PORTAL_PASSWORD は両方セットするか、両方空にしてください。" >&2
   exit 2
 fi
 
-if [[ -z "${LIMO_APP_URL:-}" || ( "$LIMO_APP_OK" -ne 1 && "$LIMO_PORTAL_OK" -ne 1 ) ]]; then
+if [[ -z "${RAIMO_APP_URL:-}" || ( "$RAIMO_APP_OK" -ne 1 && "$RAIMO_PORTAL_OK" -ne 1 ) ]]; then
+  if [[ "$SUPABASE_CONFIGURED" -eq 1 ]]; then
+    echo "Raimo用環境変数が不足のため Raimo 取込はスキップします（Supabase のみ実行）。"
+    commit_state_after_success
+    echo "完了: Supabase取込まで実行しました"
+    echo "delta: $LATEST_DELTA"
+    echo "log:   $LOG_FILE"
+    exit 0
+  fi
   cat >&2 <<'EOF'
-LIMO用環境変数が不足しています。以下を設定してください:
-  export LIMO_APP_URL="https://.../"
+Raimo用環境変数が不足しています。以下を設定してください:
+  export RAIMO_APP_URL="https://.../"
   公開URL（1段・推奨）:
-    export LIMO_APP_EMAIL="..."  と  LIMO_APP_PASSWORD="..."
+    export RAIMO_APP_EMAIL="..."  と  RAIMO_APP_PASSWORD="..."
   従来のポータル経由（2段）の場合のみ:
-    export LIMO_PORTAL_EMAIL="..."  と  LIMO_PORTAL_PASSWORD="..."
-    （必要なら LIMO_APP_EMAIL / LIMO_APP_PASSWORD も）
+    export RAIMO_PORTAL_EMAIL="..."  と  RAIMO_PORTAL_PASSWORD="..."
+    （必要なら RAIMO_APP_EMAIL / RAIMO_APP_PASSWORD も）
+
+（後方互換: LIMO_* でも可）
+Supabase のみ取込する場合は SUPABASE_URL と SUPABASE_SERVICE_ROLE_KEY を設定してください。
 EOF
   exit 2
 fi
 
-echo "==> step2: LIMOへ差分CSVを自動取り込み"
-if ! "$PYTHON" "$UPLOAD_SCRIPT" \
+echo "==> step3: Raimoへ差分CSVを自動取り込み"
+if ! "$PYTHON" "$UPLOAD_RAIMO_SCRIPT" \
   --csv "$LATEST_DELTA" \
   --screenshot-dir "$OUTPUT_ROOT/exports/logs"; then
-  if [[ "${LIMO_FAIL_OPEN:-0}" == "1" ]]; then
-    echo "警告: LIMO取込に失敗しましたが、LIMO_FAIL_OPEN=1 のため処理を継続します。" >&2
+  if [[ "${RAIMO_FAIL_OPEN:-0}" == "1" ]]; then
+    echo "警告: Raimo取込に失敗しましたが、RAIMO_FAIL_OPEN=1 のため処理を継続します。" >&2
     echo "確認ログ: $LOG_FILE" >&2
     exit 0
   fi
@@ -150,6 +220,6 @@ fi
 
 commit_state_after_success
 
-echo "完了: 抽出〜LIMO取込まで実行しました"
+echo "完了: 抽出〜Supabase/Raimo取込まで実行しました"
 echo "delta: $LATEST_DELTA"
 echo "log:   $LOG_FILE"
