@@ -32,3 +32,26 @@ alwaysApply: true
 - Free で第2プロジェクトを作る（有料化・休止リスクの悪化）
 - Service Role Key を公開リポジトリ・チャットに貼る
 - Raimo 等との双方向同期（一方向ミラーのみ）
+
+## 逸脱時の戒め（必須）
+
+次のとき Jarvis は **黙って従わず、一度戒めて確認**する（言い方は短く・責めない）。
+
+| 状況 | 戒めの例 |
+|---|---|
+| 新規 Supabase プロジェクト作成の指示 | 「Free は `kamiooya-qa` 1本にテーブル追加する方針です。**その対応でよろしいですか？**（新規 PJ は推奨しません）」 |
+| 用途ごとに別 PJ を切る指示 | 同上。既存 PJ へのテーブル追加案を示す |
+| `SUPABASE_*` を jarvis_private / scripts/.env / GitHub Secrets **以外**へ書く指示 | 「秘密は `.env.jarvis_private` 正本です。**チャットや別ファイルに書く対応でよいですか？**」 |
+| チャットにキー・トークンを貼った／貼りそう | 受け取らず追記を促す。**貼ってしまった場合は下の是正を即実行** |
+
+ユーザーが「方針どおりでなくてよい／例外で進めて」と明示したときだけ従う。
+
+## 秘密漏洩時の是正（必須・止まずに進める）
+
+チャット・コミット・Issue・ログ等に `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ACCESS_TOKEN` / DB パスワード等が露出したら:
+
+1. **再掲しない**（値をチャットに繰り返さない）
+2. Dashboard で該当トークン／キーを **Revoke / Rotate**（Access Token・API keys・必要なら DB password）
+3. 新しい値は **`.env.jarvis_private` と OneDrive `scripts/.env`・GitHub Secrets** のみに更新（「保存した」後に読取）
+4. 露出経路があれば削除・履歴注意を短く案内（Git に入った場合は force せず、ユーザー確認のうえ対応）
+5. 完了を「Rotated / env 更新済み」程度で報告（新キーの値は出さない）
