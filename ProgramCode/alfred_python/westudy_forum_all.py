@@ -634,17 +634,26 @@ def get_comment_snapshot(current_url: str):
                 let timeISO = "";
                 let body = "";
 
+                // WeStudy では .comment-author はアバター画像のみ（テキスト空）。
+                // 実際の投稿者名は .comment-meta 内の .fn.user-profile にある。
                 const aSel = [
+                    ".comment-meta .fn", ".fn.user-profile", ".comment-author .fn",
                     ".comment-author", ".bbp-author-name", ".author", "[rel='author']", ".user-name", ".poster-name"
                 ];
                 for (const s of aSel) {
                     const n = el.querySelector(s);
-                    if (n && n.textContent) { author = n.textContent.trim(); break; }
+                    if (n) {
+                        const t = (n.textContent || "").trim();
+                        if (t) { author = t; break; }
+                    }
                 }
                 if (!author) {
-                    // 近傍の strong/em などから推定
-                    const cand = el.querySelector("strong, b, .username, .vcard, .fn, .name");
-                    if (cand && cand.textContent) author = cand.textContent.trim();
+                    // 近傍の strong/em などから推定（空白のみは採用しない）
+                    const cands = el.querySelectorAll("strong, b, .username, .vcard .fn, .fn, .name");
+                    for (const cand of cands) {
+                        const t = (cand.textContent || "").trim();
+                        if (t) { author = t; break; }
+                    }
                 }
 
                 const tSel = [
@@ -693,16 +702,26 @@ def get_comment_snapshot(current_url: str):
                     }
                 }
 
+                // いいねウィジェット等を一時的に非表示にして本文から除外する
+                // （innerText は display:none を含めないため、改行を保ったまま除去できる）
+                const readTextWithoutJunk = (node) => {
+                    const junk = Array.from(node.querySelectorAll(".wpulike, script, style, .comment-content-grad-btn"));
+                    const saved = junk.map(x => x.style.display);
+                    junk.forEach(x => { x.style.display = "none"; });
+                    const t = (node.innerText || node.textContent || "").trim();
+                    junk.forEach((x, i) => { x.style.display = saved[i]; });
+                    return t;
+                };
                 const bSel = [".comment-content", ".bbp-reply-content", ".content", ".entry", ".text", ".message"];
                 for (const s of bSel) {
                     const b = el.querySelector(s);
                     if (b) {
-                        body = (b.innerText || b.textContent || "").trim();
+                        body = readTextWithoutJunk(b);
                         break;
                     }
                 }
                 if (!body) {
-                    body = (el.innerText || el.textContent || "").trim();
+                    body = readTextWithoutJunk(el);
                 }
 
                 if (id || body) {

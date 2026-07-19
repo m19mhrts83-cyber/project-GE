@@ -21,7 +21,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# convert_to_admin_csv.py と同一順（差分CSVも LIMO 取込でソース列を維持）
+# convert_to_admin_csv.py と同一順（差分CSVも Raimo 取込でソース列を維持）
 REQUIRED_FIELDNAMES = [
     "コメントID",
     "投稿日時",

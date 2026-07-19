@@ -17,7 +17,7 @@ on:
         default: false
 
 concurrency:
-  group: westudy-limo-weekly
+  group: westudy-raimo-weekly
   cancel-in-progress: false
 
 jobs:
@@ -31,6 +31,15 @@ jobs:
       WESTUDY_SCRAPER: ${{ github.workspace }}/ProgramCode/alfred_python/westudy_forum_all.py
       WESTUDY_USER: ${{ secrets.WESTUDY_USER }}
       WESTUDY_PASS: ${{ secrets.WESTUDY_PASS }}
+      # RAIMO_* が正。Secrets は RAIMO_* 優先、未設定時は従来の LIMO_* を使用
+      RAIMO_APP_URL: ${{ secrets.RAIMO_APP_URL || secrets.LIMO_APP_URL }}
+      RAIMO_PORTAL_EMAIL: ${{ secrets.RAIMO_PORTAL_EMAIL || secrets.LIMO_PORTAL_EMAIL }}
+      RAIMO_PORTAL_PASSWORD: ${{ secrets.RAIMO_PORTAL_PASSWORD || secrets.LIMO_PORTAL_PASSWORD }}
+      RAIMO_ADMIN_EMAIL: ${{ secrets.RAIMO_ADMIN_EMAIL || secrets.LIMO_ADMIN_EMAIL }}
+      RAIMO_ADMIN_PASSWORD: ${{ secrets.RAIMO_ADMIN_PASSWORD || secrets.LIMO_ADMIN_PASSWORD }}
+      RAIMO_APP_EMAIL: ${{ secrets.RAIMO_APP_EMAIL || secrets.LIMO_APP_EMAIL }}
+      RAIMO_APP_PASSWORD: ${{ secrets.RAIMO_APP_PASSWORD || secrets.LIMO_APP_PASSWORD }}
+      # 後方互換（エイリアス解決用）
       LIMO_APP_URL: ${{ secrets.LIMO_APP_URL }}
       LIMO_PORTAL_EMAIL: ${{ secrets.LIMO_PORTAL_EMAIL }}
       LIMO_PORTAL_PASSWORD: ${{ secrets.LIMO_PORTAL_PASSWORD }}
@@ -38,8 +47,10 @@ jobs:
       LIMO_ADMIN_PASSWORD: ${{ secrets.LIMO_ADMIN_PASSWORD }}
       LIMO_APP_EMAIL: ${{ secrets.LIMO_APP_EMAIL }}
       LIMO_APP_PASSWORD: ${{ secrets.LIMO_APP_PASSWORD }}
-      LIMO_NOTIFY_MACOS: "0"
-      LIMO_FAIL_OPEN: "0"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      RAIMO_NOTIFY_MACOS: "0"
+      RAIMO_FAIL_OPEN: "0"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,17 +67,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$CHATBOT_OUTPUT_ROOT" "$CHATBOT_STATE_ROOT"
-          for key in WESTUDY_USER WESTUDY_PASS LIMO_APP_URL; do
+          for key in WESTUDY_USER WESTUDY_PASS RAIMO_APP_URL; do
             if [[ -z "${!key:-}" ]]; then
               echo "::error::Missing required secret/env: $key"
               exit 1
             fi
           done
+          if [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+            echo "::warning::SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing; Supabase import will be skipped in run_update_and_import.sh"
+          fi
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install selenium playwright
+          python -m pip install selenium playwright supabase
           python -m playwright install --with-deps chromium
 
       - name: Run scrape + delta + auto import
@@ -107,16 +121,27 @@ jobs:
           echo "delta_file=$latest_delta" >> "$GITHUB_OUTPUT"
           echo "delta_rows=$rows" >> "$GITHUB_OUTPUT"
           upload_note="n/a"
+          supabase_note="n/a"
           latest_log=""
           shopt -s nullglob
           _logs=( "$CHATBOT_OUTPUT_ROOT"/exports/logs/update_and_import_*.log )
           if ((${#_logs[@]} > 0)); then
             latest_log="$(ls -1t "${_logs[@]}" | head -n 1)"
-            if rg -q "LIMO取込完了:" "$latest_log" 2>/dev/null; then
+            if rg -q "Supabase取込完了:" "$latest_log" 2>/dev/null; then
+              supabase_note="$(rg "Supabase取込完了:" "$latest_log" | tail -n 1)"
+            elif rg -q "Supabase環境変数未設定" "$latest_log" 2>/dev/null; then
+              supabase_note="skipped (env missing)"
+            elif rg -q "Supabase取込失敗" "$latest_log" 2>/dev/null; then
+              supabase_note="failed (ログ参照)"
+            fi
+            if rg -q "Raimo取込完了:" "$latest_log" 2>/dev/null; then
+              upload_note="$(rg "Raimo取込完了:" "$latest_log" | tail -n 1)"
+            elif rg -q "LIMO取込完了:" "$latest_log" 2>/dev/null; then
               upload_note="$(rg "LIMO取込完了:" "$latest_log" | tail -n 1)"
             elif rg -q "差分0件（ヘッダのみ）" "$latest_log" 2>/dev/null; then
               upload_note="skipped (差分0件)"
-            elif rg -q "LIMO取込失敗" "$latest_log" 2>/dev/null; then
+              supabase_note="skipped (差分0件)"
+            elif rg -q "Raimo取込失敗|LIMO取込失敗" "$latest_log" 2>/dev/null; then
               upload_note="failed (ログ参照)"
             elif [[ "$rows" -gt 0 ]]; then
               upload_note="unknown (ログに完了行なし)"
@@ -127,11 +152,13 @@ jobs:
             if [[ -z "$latest_delta" ]]; then
               echo "- delta: （ファイルなし・パイプライン未生成または失敗の可能性）"
               echo "- rows: n/a"
-              echo "- upload: n/a"
+              echo "- supabase: n/a"
+              echo "- raimo: n/a"
             else
               echo "- delta: \`$latest_delta\`"
               echo "- rows: \`$rows\`"
-              echo "- upload: \`$upload_note\`"
+              echo "- supabase: \`$supabase_note\`"
+              echo "- raimo: \`$upload_note\`"
             fi
             if [[ -n "$latest_log" ]]; then
               echo "- log: \`$latest_log\`"
@@ -142,7 +169,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: westudy-limo-logs-${{ github.run_id }}
+          name: westudy-raimo-logs-${{ github.run_id }}
           path: |
             ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/logs/
             ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/delta_*.csv

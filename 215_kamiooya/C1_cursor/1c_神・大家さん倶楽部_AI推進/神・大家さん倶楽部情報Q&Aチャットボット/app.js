@@ -1,3 +1,57 @@
+(function () {
+  var ENDPOINT = '/miniAppApi/errorReport';
+  var DEDUP_WINDOW_MS = 10000;
+  var DEDUP_MAX_SIZE = 100;
+  var lastSent = new Map();
+  var shouldSend = function (key) {
+    var now = Date.now();
+    var prev = lastSent.get(key);
+    if (prev !== undefined && now - prev < DEDUP_WINDOW_MS) return false;
+    lastSent.set(key, now);
+    if (lastSent.size > DEDUP_MAX_SIZE) {
+      var firstKey = lastSent.keys().next().value;
+      lastSent.delete(firstKey);
+    }
+    return true;
+  };
+  var send = function (payload) {
+    var key = [payload.errorType, payload.message, payload.filePath, payload.lineNo, payload.columnNo].join('|');
+    if (!shouldSend(key)) return;
+    try {
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch(function () {});
+    } catch (e) {}
+  };
+  window.addEventListener('error', function (ev) {
+    send({
+      errorType: ev.error && ev.error.name ? ev.error.name : 'Error',
+      message: ev.message || String(ev.error || ''),
+      stackTrace: ev.error && ev.error.stack ? ev.error.stack : null,
+      filePath: ev.filename || null,
+      lineNo: ev.lineno || null,
+      columnNo: ev.colno || null,
+      requestUrl: location.href,
+      occurredDatetime: new Date().toISOString(),
+    });
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    var reason = ev.reason;
+    send({
+      errorType: reason && reason.name ? reason.name : 'UnhandledRejection',
+      message: reason && reason.message ? reason.message : String(reason),
+      stackTrace: reason && reason.stack ? reason.stack : null,
+      filePath: null,
+      lineNo: null,
+      columnNo: null,
+      requestUrl: location.href,
+      occurredDatetime: new Date().toISOString(),
+    });
+  });
+})();
 const App = {
   state: {
     currentUser: null,
