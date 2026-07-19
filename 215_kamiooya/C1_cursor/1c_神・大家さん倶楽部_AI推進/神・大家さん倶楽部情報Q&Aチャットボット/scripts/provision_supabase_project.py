@@ -58,6 +58,8 @@ def api(method: str, path: str, token: str, body: dict | None = None, timeout: i
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
+        # Cloudflare がデフォルト Python-urllib UA を 1010 で拒否するため curl 相当にする
+        "User-Agent": "curl/8.7.1",
     }
     if body is not None:
         data = json.dumps(body).encode("utf-8")
