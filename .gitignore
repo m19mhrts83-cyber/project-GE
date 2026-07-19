@@ -45,6 +45,7 @@ _tmp/
 .cursor/rules/*
 !.cursor/rules/home-address-maps.mdc
 !.cursor/rules/n1-notebooklm-mirror.mdc
+!.cursor/rules/jarvis-supabase-free-one-project.mdc
 .obsidian/
 .vscode/
 
@@ -64,6 +65,10 @@ line_unofficial_poc/chrline-patchv2/
 dx_kyouyuu/03_outputs/mail_automation/logs/
 dx_kyouyuu/03_outputs/mail_automation/テスト*.md
 dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx
+
+# --- 空室対策メール: 出先用ミラー（宛先メール含む。Git に載せない） ---
+215_kamiooya/C1_cursor/mail_automation/data/
+215_kamiooya/C1_cursor/mail_automation/logs/
 
 # --- 500 固有（トークン・API Key） ---
 500_obsidian/99_token*/
