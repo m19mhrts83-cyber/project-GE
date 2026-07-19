@@ -62,7 +62,53 @@ SRT との突合:
 
 5. 動画チャンクを同様に再取込（`--skip-supabase` なし）
 
+## Supabase 新規プロジェクト（Jarvis 自動作成）
+
+Management API でプロジェクト作成 → schema 適用 → `.env` 書き込みまで自動化しています。
+
+1. [Access Tokens](https://supabase.com/dashboard/account/tokens) でトークン発行  
+   または Cursor 内ブラウザの GitHub ログイン完了後に Jarvis が Dashboard から進める
+2. `~/git-repos/.env.jarvis_private` に追記（**チャットに貼らない**）:
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_xxxxx
+```
+
+3. 「保存した」と一声 → Jarvis が次を実行:
+
+```bash
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/provision_supabase_project.py --reuse-if-exists
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/bootstrap_knowledge_mirror.py \
+  --csv exports/full_authors_bootstrap_20260720.csv
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/sample_notta_e2e.py --with-supabase
+```
+
+## サンプル Notta での接続確認
+
+全部の講義は不要。**サンプル 1本**で経路確認する想定です。
+
+```bash
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/sample_notta_e2e.py
+# Supabase 復旧後
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/sample_notta_e2e.py --with-supabase
+```
+
+届いたサンプルを inbox に置く場合:
+
+```text
+…/inbox/notta/YYYY-MM-DD/sample.xlsx
+…/inbox/notta/YYYY-MM-DD/sample.srt
+```
+
+```bash
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/accept_notta_inbox.py
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/accept_notta_inbox.py --apply --with-supabase
+```
+
+---
+
 ## 正本の整理
+
 
 | 役割 | 場所 |
 |---|---|
