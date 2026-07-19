@@ -50,8 +50,10 @@ SRT との突合:
 
 ## Supabase 復旧後
 
-1. Dashboard でプロジェクトを Active にする（旧 `mwubzgefkkjjbingrmqu` は DNS NXDOMAIN = 削除済みの可能性大 → 新規作成可）
-2. SQL Editor で `apps/kamiooya-qa-web/supabase/schema.sql` を実行
+**新規プロジェクトは作らない**（Free は `kamiooya-qa` 1本にテーブル追加。`.cursor/rules/jarvis-supabase-free-one-project.mdc`）。
+
+1. Dashboard でプロジェクトを Active にする（休止時は Resume。旧 URL が NXDOMAIN なら Restore）
+2. SQL Editor で `apps/kamiooya-qa-web/supabase/schema.sql` を実行（`jarvis_heartbeat` 含む）
 3. `scripts/.env` に `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` を設定（GitHub Secrets も同名）
 4. コメント全件ミラー:
 

@@ -112,8 +112,19 @@ create index if not exists knowledge_chunks_start_sec_idx
 create index if not exists knowledge_chunks_search_text_idx
   on public.knowledge_chunks (search_text);
 
+-- ---------------------------------------------------------------------------
+-- Free 枠の休止防止用心拍（週次 WeStudy 同期で --touch）
+-- ---------------------------------------------------------------------------
+create table if not exists public.jarvis_heartbeat (
+  id text primary key,                       -- 固定キー例: 'weekly'
+  source text not null default 'jarvis',
+  note text not null default '',
+  touched_at timestamptz not null default now()
+);
+
 -- PostgREST / supabase-js から comments / knowledge へ upsert するための権限（RLS 有効化前の開発用）
 grant select, insert, update, delete on table public.comments to anon, authenticated, service_role;
 grant select, insert, update, delete on table public.knowledge_sources to anon, authenticated, service_role;
 grant select, insert, update, delete on table public.knowledge_chunks to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.jarvis_heartbeat to anon, authenticated, service_role;
 grant usage, select on all sequences in schema public to anon, authenticated, service_role;
