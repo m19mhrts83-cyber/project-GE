@@ -242,3 +242,7 @@ python3 scripts/upload_csv_to_supabase.py --bootstrap --csv "$LATEST_FULL"
 | upsert 失敗 | ログの `Supabase取込完了:` 行、プロジェクトが Active か |
 | 重複エラー | `comments_comment_id_unique` インデックスが適用されているか |
 | state が進まない | `SUPABASE_FAIL_OPEN=0` 時は Supabase 失敗で state 更新しない（意図どおり） |
+
+## 関連: 動画文字起こし（Notta）
+
+詳細は `運用手順_Notta取込.md` を参照。

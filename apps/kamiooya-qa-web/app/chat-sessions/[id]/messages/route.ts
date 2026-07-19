@@ -3,46 +3,9 @@ import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toDbId } from "@/lib/ids";
 import { withErrorHandler } from "@/lib/routeHandler";
+import { buildAnswerWithCitations, searchKnowledge } from "@/lib/knowledgeSearch";
 
 export const runtime = "nodejs";
-
-function extractKeyword(text: unknown): string {
-  const s = String(text || "").trim();
-  if (!s) return "";
-  const m = s.match(/[0-9A-Za-zぁ-んァ-ン一-龥]{2,}/g);
-  if (!m || m.length === 0) return s.slice(0, 6);
-  const stop = new Set(["です", "ます", "こと", "方法", "教えて", "ください", "どこ", "なに", "何"]);
-  for (const w of m) {
-    if (!stop.has(w)) return w;
-  }
-  return m[0];
-}
-
-type CommentRow = {
-  id?: string;
-  source_type?: string | null;
-  comment_id?: string | null;
-  posted_at?: string | null;
-  author_name?: string | null;
-  content?: string | null;
-};
-
-function buildAnswer(message: string, comments: CommentRow[]) {
-  const lines = [];
-  lines.push("参照データから関連しそうな情報を見つけました。");
-  lines.push("");
-  if (!comments || comments.length === 0) {
-    lines.push("該当するコメントが見つかりませんでした。キーワードを変えて再度お試しください。");
-    return lines.join("\n");
-  }
-  lines.push("参考（上位）:");
-  for (const c of comments.slice(0, 5)) {
-    const meta = `[${c.source_type || "不明"}] ${c.posted_at || ""} ${c.author_name || ""} #${c.comment_id || c.id}`;
-    lines.push(`- ${meta}`);
-    lines.push(`  - ${(c.content || "").toString().replace(/\s+/g, " ").slice(0, 220)}`);
-  }
-  return lines.join("\n");
-}
 
 export const POST = withErrorHandler(async (req, { params }) => {
   const u = requireUser(req);
@@ -65,15 +28,16 @@ export const POST = withErrorHandler(async (req, { params }) => {
 
   await sb.from("chat_messages").insert([{ session_id: sessionDbId, role: "user", content }]);
 
-  const keyword = extractKeyword(content);
-  const { data: related } = await sb
-    .from("comments")
-    .select("*")
-    .ilike("content", `%${keyword}%`)
-    .limit(10);
+  let citations = [];
+  try {
+    citations = await searchKnowledge(content, 10);
+  } catch (e) {
+    console.error("searchKnowledge failed", e);
+    citations = [];
+  }
+  const { answer } = buildAnswerWithCitations(content, citations);
 
-  const answer = buildAnswer(content, related || []);
   await sb.from("chat_messages").insert([{ session_id: sessionDbId, role: "assistant", content: answer }]);
 
-  return NextResponse.json({ answer });
+  return NextResponse.json({ answer, citations });
 });

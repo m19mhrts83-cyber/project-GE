@@ -58,6 +58,7 @@ const App = {
     currentSessionId: null,
     chatSessions: [],
     chatMessages: [],
+    lastCitations: [],
     suggestedQuestions: [],
     comments: [],
     pendingUsers: [],
@@ -641,6 +642,51 @@ const App = {
     });
   },
 
+  formatAssistantHtml: (content) => {
+    const escaped = App.escapeHtml(content || '');
+    // 動画URL行をリンク化（回答本文内の "URL: https://..."）
+    return escaped.replace(
+      /(URL:\s*)(https?:\/\/[^\s<]+)/g,
+      '$1<a class="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer" href="$2">$2</a>'
+    ).replace(/\n/g, '<br>');
+  },
+
+  renderCitationsPanel: (citations) => {
+    if (!citations || !citations.length) return '';
+    const items = citations.slice(0, 5).map(function (c) {
+      if (c.kind === 'video_chunk') {
+        const when = c.startLabel
+          ? (c.startLabel + (c.startSec != null ? '（' + c.startSec + '秒）' : ''))
+          : '';
+        const link = c.videoUrl
+          ? (' <a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
+            App.escapeHtml(c.videoUrl) + '">動画を開く</a>')
+          : '';
+        return (
+          '<li class="mb-1">' +
+          '<span class="font-medium">[WeStudy動画]</span> ' +
+          App.escapeHtml(c.videoTitle || '（タイトル不明）') +
+          (when ? ' — ' + App.escapeHtml(when) : '') +
+          link +
+          '<div class="text-slate-600">' + App.escapeHtml(c.snippet || '') + '</div>' +
+          '</li>'
+        );
+      }
+      return (
+        '<li class="mb-1">' +
+        '<span class="font-medium">[' + App.escapeHtml(c.sourceType || 'WeStudy') + ']</span> ' +
+        App.escapeHtml(c.authorName || '') +
+        ' #' + App.escapeHtml(c.commentId || '') +
+        '<div class="text-slate-600">' + App.escapeHtml(c.snippet || '') + '</div>' +
+        '</li>'
+      );
+    }).join('');
+    return (
+      '<div class="mt-2 pt-2 border-t border-slate-200 text-xs">' +
+      '<div class="text-slate-500 mb-1">出典</div><ul class="list-disc pl-4">' + items + '</ul></div>'
+    );
+  },
+
   renderChatMessages: () => {
     const area = App.elements.chatMessages;
     area.innerHTML = '';
@@ -649,17 +695,30 @@ const App = {
       return;
     }
 
-    App.state.chatMessages.forEach(function (m) {
+    const lastAssistantIdx = (function () {
+      for (let i = App.state.chatMessages.length - 1; i >= 0; i -= 1) {
+        if (App.state.chatMessages[i].role === 'assistant') return i;
+      }
+      return -1;
+    })();
+
+    App.state.chatMessages.forEach(function (m, idx) {
       const wrap = document.createElement('div');
       const bubble = document.createElement('div');
       const role = m.role === 'user' ? 'chat-user' : 'chat-assistant';
 
       bubble.className = 'chat-bubble ' + role;
+      const bodyHtml = m.role === 'assistant'
+        ? App.formatAssistantHtml(m.content || '')
+        : App.escapeHtml(m.content || '').replace(/\n/g, '<br>');
+      const citeHtml = (m.role === 'assistant' && idx === lastAssistantIdx)
+        ? App.renderCitationsPanel(App.state.lastCitations || [])
+        : '';
       bubble.innerHTML =
         '<div class="text-[11px] text-slate-500 mb-1">' +
         App.escapeHtml(m.role) + ' ・ ' + App.escapeHtml(m.created_at || '') +
         '</div>' +
-        '<div>' + App.escapeHtml(m.content || '') + '</div>';
+        '<div>' + bodyHtml + '</div>' + citeHtml;
 
       wrap.appendChild(bubble);
       area.appendChild(wrap);
@@ -859,9 +918,10 @@ const App = {
         return;
       }
 
-      await App.apiClient('POST', '/chat-sessions/' + sessionId + '/messages', {
+      const msgRes = await App.apiClient('POST', '/chat-sessions/' + sessionId + '/messages', {
         content: questionText
       });
+      App.state.lastCitations = (msgRes && msgRes.citations) ? msgRes.citations : [];
 
       if (!fromSuggested) {
         await App.createSuggestedQuestionIfNeeded(questionText);
