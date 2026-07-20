@@ -1,18 +1,22 @@
 # Notta / WeStudy 動画文字起こしメタデータ雛形
-# notta_to_knowledge.py --meta meta/notta_lessons.yaml --video-id step3_mitsu
+# 正本は .srt。content_channel は通常 seminar_video
+# notta_to_knowledge.py --meta meta/notta_lessons.yaml --video-id step3_1_lf
 
 lessons:
+  step3_1_lf:
+    title: "神大家１.基礎 STEP3　神スキル【購入編】プランニング 【実践】三井住友トラスト（現L＆Fアセットファイナンス）は三段活用を取り入れろ！"
+    video_id: step3_1_lf
+    video_url: "https://westudy.co.jp/lesson/step3_1#LF"
+    instructor: "木村"
+    offset_sec: 0
+    content_channel: seminar_video
+    notes: "正本は SRT。xlsx は任意（時刻欠落に注意）"
+
   step3_mitsu:
     title: "神大家1.基礎 STEP3 三井住友信託銀行（サンプル）"
     video_id: step3_mitsu
-    video_url: ""   # 例: https://westudy.co.jp/... または配信URL
+    video_url: ""
     instructor: ""
-    offset_sec: 0   # 文字起こしが動画途中から始まる場合（秒）
-    notes: "旧 Notta文字起こし.xlsx は時刻なし。本番は timestamps+speakers 付き xlsx/srt を使用"
-
-  example_with_ts:
-    title: "サンプル講義（時刻付き）"
-    video_id: example_with_ts
-    video_url: "https://example.com/watch"
-    instructor: "講師名"
     offset_sec: 0
+    content_channel: seminar_video
+    notes: "開発用サンプル"

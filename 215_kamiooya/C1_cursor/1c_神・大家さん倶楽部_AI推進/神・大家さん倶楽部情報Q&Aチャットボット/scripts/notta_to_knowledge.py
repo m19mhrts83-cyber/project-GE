@@ -438,7 +438,7 @@ def main() -> int:
                         "speaker": ch.get("speaker") or "",
                         "content": ch["content"],
                         "video_url": video_url,
-                        "ソース": "WeStudy動画",
+                        "ソース": "WeStudyセミナー動画",
                     }
                 )
         print(f"csv: {out}")
@@ -458,7 +458,13 @@ def main() -> int:
             video_url=video_url or None,
             instructor=instructor or None,
             origin_path=str(path),
-            meta={"warnings": warnings, "offset_sec": offset},
+            meta={
+                "warnings": warnings,
+                "offset_sec": offset,
+                "origin_filename": path.name,
+                "brand": "WeStudy",
+            },
+            content_channel="seminar_video",
         )
         n = upsert_chunks(conn, sid, chunks)
         print(f"local upsert: source_id={sid} chunks={n} counts={counts(conn)}")
@@ -467,12 +473,18 @@ def main() -> int:
         src_row = {
             "source_key": source_key,
             "source_kind": "video",
+            "content_channel": "seminar_video",
             "title": title,
             "video_id": video_id,
             "video_url": video_url or None,
             "instructor": instructor or None,
             "origin_path": str(path),
-            "meta_json": {"warnings": warnings, "offset_sec": offset},
+            "meta_json": {
+                "warnings": warnings,
+                "offset_sec": offset,
+                "origin_filename": path.name,
+                "brand": "WeStudy",
+            },
             "ingest_status": "ready",
         }
         s_n, c_n = supabase_upsert(src_row, chunks)

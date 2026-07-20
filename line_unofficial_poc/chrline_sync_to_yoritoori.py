@@ -39,6 +39,7 @@ from CHRLINE.services.thrift.ttypes import OpType
 
 from chrline_client_utils import build_logged_in_client, save_root_from_env
 from chrline_md_block_utils import build_yoritoori_block, upsert_resolved_block
+from chrline_media_to_stock import attach_md_block, try_save_line_media
 from chrline_md_utils import (
     insert_block_after_timeline_header as md_insert_block_after_timeline_header,
     make_summary as md_make_summary,
@@ -321,19 +322,66 @@ def _decode_stats_path(save_root: Path) -> Path:
     return save_root / DECODE_STATS_FILENAME
 
 
+_MEDIA_OR_STAMP_BODIES = frozenset(
+    {"[メディア]", "[スタンプ]", "[画像]", "[動画]", "[音声]", "[ファイル]"}
+)
+
+
 def _is_textual_body(body: str) -> bool:
     b = (body or "").strip()
     if not b:
         return False
     if b.startswith(_PLACEHOLDER_PREFIX):
         return False
-    if b in ("[メディア]", "[スタンプ]"):
+    if b in _MEDIA_OR_STAMP_BODIES:
         return False
     return True
 
 
 def _is_placeholder_body(body: str) -> bool:
     return (body or "").lstrip().startswith(_PLACEHOLDER_PREFIX)
+
+
+def _compose_md_block(
+    *,
+    date_part: str,
+    org_label: str,
+    tag: str,
+    body_raw: str,
+    attachment_names: list[str] | None = None,
+) -> tuple[str, str]:
+    """heading と追記用 block 文字列を返す。"""
+    heading = md_format_line_heading(
+        date_part, org_label, tag, body_for_tail=body_raw
+    )
+    attach = attach_md_block(attachment_names)
+    block = f"""
+
+{heading}
+
+{md_wrap_details(body_raw)}
+{attach}
+---
+"""
+    return heading, block
+
+
+def _try_media_attachments(
+    cl,
+    msg,
+    op,
+    yoritoori_md: Path,
+    date_part: str,
+    *,
+    dry_run: bool = False,
+) -> list[str]:
+    try:
+        return try_save_line_media(
+            cl, msg, op, yoritoori_md, date_part, dry_run=dry_run
+        )
+    except Exception as e:
+        print(f"# LINE添付: 予期しないエラー {type(e).__name__}: {e}", file=sys.stderr)
+        return []
 
 
 def _stats_key(route: _YoritooriRoute, target: _YoritooriTarget) -> str:
@@ -385,7 +433,7 @@ def _observe_decode_stats(
         b["source_direct_backfill"] += 1
     if body_raw.startswith(_PLACEHOLDER_PREFIX):
         b["placeholder"] += 1
-    elif body_raw in ("[メディア]", "[スタンプ]"):
+    elif body_raw in _MEDIA_OR_STAMP_BODIES:
         b["media_or_stamp"] += 1
     elif _is_textual_body(body_raw):
         b["textual"] += 1
@@ -641,17 +689,21 @@ def _append_direct_backfill_from_recent(
         when = _format_line_msg_when(ts)
         date_part = when.split()[0] if when and " " in when else when or "?"
         tag = target.send_tag if is_send else target.recv_tag
-        heading = md_format_line_heading(
-            date_part, route.org_label, tag, body_for_tail=body_raw
+        attachment_names = _try_media_attachments(
+            cl,
+            msg,
+            None,
+            route.yoritoori_md,
+            date_part,
+            dry_run=dry_run,
         )
-        block = f"""
-
-{heading}
-
-{md_wrap_details(body_raw)}
-
----
-"""
+        heading, block = _compose_md_block(
+            date_part=date_part,
+            org_label=route.org_label,
+            tag=tag,
+            body_raw=body_raw,
+            attachment_names=attachment_names,
+        )
         if dry_run:
             print(
                 f"[dry-run][直近補完] 追記予定 → {route.yoritoori_md.name}:\n{heading}\n{body_raw[:200]!r}…\n"
@@ -1444,17 +1496,21 @@ def run(args: argparse.Namespace, *, client=None) -> int:
                         )
                     )
                 else:
-                    heading = md_format_line_heading(
-                        date_part, route.org_label, tag, body_for_tail=body_raw
+                    attachment_names = _try_media_attachments(
+                        cl,
+                        msg,
+                        op,
+                        route.yoritoori_md,
+                        date_part,
+                        dry_run=args.dry_run,
                     )
-                    block = f"""
-
-{heading}
-
-{md_wrap_details(body_raw)}
-
----
-"""
+                    heading, block = _compose_md_block(
+                        date_part=date_part,
+                        org_label=route.org_label,
+                        tag=tag,
+                        body_raw=body_raw,
+                        attachment_names=attachment_names,
+                    )
                     if args.dry_run:
                         print(
                             f"[dry-run] 追記予定 → {route.yoritoori_md.name}:\n"

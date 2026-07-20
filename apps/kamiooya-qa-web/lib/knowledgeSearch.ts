@@ -9,6 +9,7 @@ export type Citation = {
   postedAt?: string | null;
   videoTitle?: string | null;
   videoUrl?: string | null;
+  originPath?: string | null;
   startSec?: number | null;
   endSec?: number | null;
   startLabel?: string | null;
@@ -42,12 +43,31 @@ export function formatMmSs(sec: number | null | undefined): string {
   return `${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
 }
 
+/** WeStudy 内の表示ラベル（コミュニティ / セミナー動画） */
+export function labelCommunitySourceType(raw: unknown): string {
+  const s = String(raw || "").trim();
+  if (!s || s === "WeStudy" || s.toLowerCase() === "westudy") return "WeStudyコミュニティ";
+  if (s.includes("コミュニティ")) return s;
+  if (s.includes("セミナー")) return s;
+  return s;
+}
+
+export function labelSeminarSourceType(channel: unknown): string {
+  const c = String(channel || "seminar_video");
+  if (c === "community") return "WeStudyコミュニティ";
+  return "WeStudyセミナー動画";
+}
+
 function withVideoTimeUrl(url: string | null | undefined, startSec: number | null | undefined): string | null {
   if (!url) return null;
   if (startSec === null || startSec === undefined) return url;
   if (/[?&]t=/.test(url)) return url;
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}t=${Math.floor(startSec)}`;
+  // hash fragments (#LF) を保ったまま t= を付ける
+  const hashIdx = url.indexOf("#");
+  const base = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+  const hash = hashIdx >= 0 ? url.slice(hashIdx) : "";
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}t=${Math.floor(startSec)}${hash}`;
 }
 
 function scoreText(text: string, tokens: string[]): number {
@@ -76,7 +96,9 @@ export async function searchKnowledge(query: string, limit = 10): Promise<Citati
   try {
     const { data: chunks, error } = await sb
       .from("knowledge_chunks")
-      .select("chunk_key,start_sec,end_sec,speaker,content,knowledge_sources(title,video_url,video_id,source_key)")
+      .select(
+        "chunk_key,start_sec,end_sec,speaker,content,knowledge_sources(title,video_url,video_id,source_key,content_channel,origin_path)"
+      )
       .ilike("content", `%${primary}%`)
       .limit(40);
     if (!error && chunks) chunkRows = chunks as Array<Record<string, unknown>>;
@@ -92,7 +114,7 @@ export async function searchKnowledge(query: string, limit = 10): Promise<Citati
     if (score <= 0) continue;
     hits.push({
       kind: "comment",
-      sourceType: String(c.source_type || "WeStudy"),
+      sourceType: labelCommunitySourceType(c.source_type),
       commentId: c.comment_id,
       authorName: c.author_name,
       postedAt: c.posted_at,
@@ -105,21 +127,18 @@ export async function searchKnowledge(query: string, limit = 10): Promise<Citati
     const content = String(row.content || "");
     const score = scoreText(content, tokens) + 1;
     if (score <= 1 && tokens.length > 1) {
-      // primary matched via query; still keep if any token hits
       if (!tokens.some((t) => content.toLowerCase().includes(t.toLowerCase()))) continue;
     }
     const src = (row.knowledge_sources || {}) as Record<string, unknown>;
     const startSec = row.start_sec === null || row.start_sec === undefined ? null : Number(row.start_sec);
-    const videoUrl = withVideoTimeUrl(
-      (src.video_url as string) || null,
-      startSec
-    );
+    const videoUrl = withVideoTimeUrl((src.video_url as string) || null, startSec);
     hits.push({
       kind: "video_chunk",
-      sourceType: "WeStudy動画",
+      sourceType: labelSeminarSourceType(src.content_channel),
       chunkKey: String(row.chunk_key || ""),
       videoTitle: (src.title as string) || null,
       videoUrl,
+      originPath: (src.origin_path as string) || null,
       startSec,
       endSec: row.end_sec === null || row.end_sec === undefined ? null : Number(row.end_sec),
       startLabel: formatMmSs(startSec),
@@ -141,14 +160,14 @@ export function buildAnswerWithCitations(message: string, citations: Citation[])
   lines.push("参照データから関連しそうな情報を見つけました。");
   lines.push("");
   if (!citations.length) {
-    lines.push("該当する情報が見つかりませんでした。キーワードを変えて再度お試しください。");
+    lines.push("関連する情報が見つかりませんでした。キーワードを変えて再度お試しください。");
     return { answer: lines.join("\n"), citations };
   }
   lines.push("参考（上位）:");
   for (const c of citations.slice(0, 5)) {
     if (c.kind === "video_chunk") {
       const when = c.startLabel ? `${c.startLabel}（${c.startSec}秒）` : "";
-      lines.push(`- [WeStudy動画] ${c.videoTitle || "（タイトル不明）"} — ${when}`);
+      lines.push(`- [${c.sourceType}] ${c.videoTitle || "（タイトル不明）"} — ${when}`);
       if (c.videoUrl) lines.push(`  - URL: ${c.videoUrl}`);
       lines.push(`  - ${(c.authorName ? c.authorName + ": " : "") + c.snippet}`);
     } else {

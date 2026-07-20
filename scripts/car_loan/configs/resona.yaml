@@ -1,0 +1,54 @@
+id: resona_mycar
+lender: りそな銀行
+product: りそなマイカーローン
+
+cdp_port: 9224
+chrome_profile: ~/.jarvis_state/chrome_resona_mycar
+
+credentials:
+  receipt_env: RESONA_MYCAR_RECEIPT_NUMBER
+  password_env: RESONA_MYCAR_LOGIN_PASSWORD
+  state_app_id: resona_mycar
+
+entry:
+  type: salesforce_portal
+  portal_url: "https://loan-resona-gr.my.site.com"
+  case_detail_path: "/s/detail/a01fQ00000T1SHvQAN"
+  upload_url: "https://loan-resona-gr.my.site.com/apex/HonninKakuninUploadHonshinsa?id=a01fQ00000T1SHvQAN"
+  login:
+    username_env: RESONA_MYCAR_APPLICATION_EMAIL
+    fallback_username_env: PERSONAL_EMAIL
+    initial_password_pattern: "r{birth_yyyymmdd}{phone_digits}"
+
+default_submit_folder: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/800_車両購入検討/MINI_CountrymanD_りそな本審査提出_202606"
+
+implementation_status: portal_form
+
+notes: |
+  - 仮審査可決（2026-06-25メール）。案件番号 26-300487525 / 金利 2.550% / 549万円
+  - ログイン: メールアドレス + 初期パスワード r+生年月日+自宅電話（数字のみ）
+  - RESONA_MYCAR_LOGIN_PASSWORD は仮審査認証用でポータルログインとは別
+  - 本申込は Salesforce フォーム（MUFG型Webアップロードではない）
+  - 必須: お借入希望日、返済口座番号、ディーラー振込先、申込内容入力完了→保存
+  - 口座未所持: 仮審査・本申込入力は可能だが、返済口座番号入力と保存完了には口座開設が先（公式: ご契約までに口座必要）
+  - 口座開設: https://www.resonabank.co.jp/kojin/app/kouza/ （口座開設アプリ・来店不要）
+
+documents:
+  - key: license_front
+    option_keywords: ["運転免許証", "表"]
+    file_globs: ["01_運転免許証_表.*", "01_*免許*表*"]
+  - key: license_back
+    option_keywords: ["裏"]
+    file_globs: ["02_運転免許証_裏.*", "02_*免許*裏*"]
+  - key: gensen
+    option_keywords: ["源泉"]
+    file_globs: ["03_源泉*", "03_*源泉*"]
+  - key: estimate
+    option_keywords: ["見積", "資金使途"]
+    file_globs: ["04_見積*", "04_*見積*"]
+  - key: dealer_transfer
+    option_keywords: ["振込", "支払先"]
+    file_globs: ["05_ディーラー振込先*", "05_*振込*"]
+  - key: id_secondary
+    option_keywords: ["確認資料②"]
+    file_globs: ["06_本人確認資料②*", "06_*住民票*", "06_*公共料金*", "06_*課税*", "06_*住民税*"]

@@ -49,6 +49,7 @@ create table if not exists knowledge_sources (
   id integer primary key autoincrement,
   source_key text not null unique,
   source_kind text not null default 'video',
+  content_channel text not null default 'seminar_video',
   title text not null,
   video_id text,
   video_url text,
@@ -101,6 +102,13 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("pragma foreign_keys = on")
     conn.executescript(SCHEMA_SQL)
+    # existing DBs: add content_channel if missing
+    cols = {r[1] for r in conn.execute("pragma table_info(knowledge_sources)").fetchall()}
+    if "content_channel" not in cols:
+        conn.execute(
+            "alter table knowledge_sources add column content_channel text not null default 'seminar_video'"
+        )
+        conn.commit()
     return conn
 
 
@@ -167,16 +175,19 @@ def upsert_source(
     published_at: str | None = None,
     origin_path: str | None = None,
     meta: dict | None = None,
+    content_channel: str = "seminar_video",
 ) -> int:
     ts = now_iso()
     meta_json = json.dumps(meta or {}, ensure_ascii=False)
+    channel = content_channel or "seminar_video"
     conn.execute(
         """
         insert into knowledge_sources (
-          source_key, source_kind, title, video_id, video_url, instructor,
+          source_key, source_kind, content_channel, title, video_id, video_url, instructor,
           published_at, origin_path, meta_json, ingest_status, created_at, updated_at
-        ) values (?,?,?,?,?,?,?,?,?,'ready',?,?)
+        ) values (?,?,?,?,?,?,?,?,?,?,'ready',?,?)
         on conflict(source_key) do update set
+          content_channel=excluded.content_channel,
           title=excluded.title,
           video_id=excluded.video_id,
           video_url=excluded.video_url,
@@ -189,6 +200,7 @@ def upsert_source(
         (
             source_key,
             "video",
+            channel,
             title,
             video_id,
             video_url,
@@ -302,10 +314,13 @@ def search_all(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[di
         (*params, limit),
     ).fetchall()
     for r in rows:
+        st = r["source_type"] or "WeStudy"
+        if st in ("WeStudy", "westudy", ""):
+            st = "WeStudyコミュニティ"
         hits.append(
             {
                 "kind": "comment",
-                "source_type": r["source_type"] or "WeStudy",
+                "source_type": st,
                 "comment_id": r["comment_id"],
                 "posted_at": r["posted_at"],
                 "author_name": r["author_name"],
@@ -319,7 +334,8 @@ def search_all(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[di
     where2 = " and ".join(["c.search_text like ?" for _ in tokens])
     rows2 = conn.execute(
         f"""
-        select c.*, s.title as video_title, s.video_url, s.video_id as src_video_id, s.source_key
+        select c.*, s.title as video_title, s.video_url, s.video_id as src_video_id,
+               s.source_key, s.content_channel, s.origin_path
         from knowledge_chunks c
         join knowledge_sources s on s.id = c.source_id
         where {where2}
@@ -332,16 +348,23 @@ def search_all(conn: sqlite3.Connection, query: str, limit: int = 10) -> list[di
         start = int(r["start_sec"] or 0)
         url = r["video_url"] or ""
         if url and "t=" not in url:
-            sep = "&" if "?" in url else "?"
-            url = f"{url}{sep}t={start}"
+            # hash fragments (#LF) を保ったまま t= を付ける
+            hash_idx = url.find("#")
+            base = url[:hash_idx] if hash_idx >= 0 else url
+            hash_part = url[hash_idx:] if hash_idx >= 0 else ""
+            sep = "&" if "?" in base else "?"
+            url = f"{base}{sep}t={start}{hash_part}"
+        channel = (r["content_channel"] if "content_channel" in r.keys() else None) or "seminar_video"
+        label = "WeStudyセミナー動画" if channel == "seminar_video" else "WeStudyコミュニティ"
         hits.append(
             {
                 "kind": "video_chunk",
-                "source_type": "WeStudy動画",
+                "source_type": label,
                 "chunk_key": r["chunk_key"],
                 "video_title": r["video_title"],
                 "video_id": r["src_video_id"] or r["source_key"],
                 "video_url": url or None,
+                "origin_path": r["origin_path"] if "origin_path" in r.keys() else None,
                 "start_sec": start,
                 "end_sec": r["end_sec"],
                 "start_label": format_mmss(start),

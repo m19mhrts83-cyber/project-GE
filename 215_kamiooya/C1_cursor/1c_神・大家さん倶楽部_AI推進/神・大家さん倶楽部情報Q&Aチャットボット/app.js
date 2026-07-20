@@ -11,7 +11,8 @@ const App = {
     lastCitations: [],
     pendingUsers: [],
     loadingCount: 0,
-    resetPasswordEmail: ''
+    resetPasswordEmail: '',
+    resetPasswordToken: ''
   },
 
   elements: {},
@@ -81,12 +82,17 @@ const App = {
       .replace(/'/g, '&#039;');
   },
 
-  /* 改修: シークレットURL時は管理者登録画面を表示 */
+  /* 改修: シークレットURL時は管理者登録画面を表示。Phase4: #reset-password?token= */
   init: () => {
     App.cacheElements();
     App.bindEvents();
     if (App.isSecretAdminRoute()) {
       App.showSecretAdminRegisterView();
+      return;
+    }
+    const resetToken = App.parseResetPasswordTokenFromHash();
+    if (resetToken) {
+      App.openResetPasswordFromToken(resetToken);
       return;
     }
     App.showAuthView();
@@ -166,6 +172,8 @@ const App = {
     const forgotBackBtn = document.getElementById('forgotPasswordBackToLoginBtn');
     if (forgotBackBtn) {
       forgotBackBtn.addEventListener('click', function () {
+        App.state.resetPasswordEmail = '';
+        App.state.resetPasswordToken = '';
         App.showAuthView();
         App.showLoginTab();
       });
@@ -173,6 +181,9 @@ const App = {
     const resetBackBtn = document.getElementById('resetPasswordBackToLoginBtn');
     if (resetBackBtn) {
       resetBackBtn.addEventListener('click', function () {
+        App.state.resetPasswordEmail = '';
+        App.state.resetPasswordToken = '';
+        App.clearResetPasswordHash();
         App.showAuthView();
         App.showLoginTab();
       });
@@ -328,6 +339,7 @@ const App = {
 
   showForgotPasswordView: () => {
     App.state.resetPasswordEmail = '';
+    App.state.resetPasswordToken = '';
     App.elements.authView.classList.add('hidden');
     App.elements.mainView.classList.add('hidden');
     if (App.elements.secretAdminRegisterView) {
@@ -344,8 +356,9 @@ const App = {
     }
   },
 
-  showResetPasswordView: (email) => {
+  showResetPasswordView: (email, token) => {
     App.state.resetPasswordEmail = email || '';
+    App.state.resetPasswordToken = token || '';
     App.elements.authView.classList.add('hidden');
     App.elements.mainView.classList.add('hidden');
     if (App.elements.secretAdminRegisterView) {
@@ -366,6 +379,91 @@ const App = {
     }
   },
 
+  parseResetPasswordTokenFromHash: () => {
+    const hash = String(window.location.hash || '');
+    if (!hash) return '';
+    const body = hash.replace(/^#/, '');
+    if (!body) return '';
+    let path = body;
+    let query = '';
+    const qIdx = body.indexOf('?');
+    if (qIdx >= 0) {
+      path = body.slice(0, qIdx);
+      query = body.slice(qIdx + 1);
+    }
+    if (path !== 'reset-password') return '';
+    const params = new URLSearchParams(query);
+    return (params.get('token') || '').trim();
+  },
+
+  clearResetPasswordHash: () => {
+    if (!App.parseResetPasswordTokenFromHash()) return;
+    const url = window.location.pathname + window.location.search;
+    window.history.replaceState(null, '', url);
+  },
+
+  buildPasswordResetUrl: (token) => {
+    const base = (window.location.origin + window.location.pathname).replace(/\/+$/, '') + '/';
+    return base + '#reset-password?token=' + encodeURIComponent(token);
+  },
+
+  /** 日本時間のカレンダー日付部品を取得 */
+  jstYmdParts: (date) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date || new Date());
+    const pick = function (type) {
+      const hit = parts.find(function (p) {
+        return p.type === type;
+      });
+      return hit ? Number(hit.value) : 0;
+    };
+    return { y: pick('year'), m: pick('month'), d: pick('day') };
+  },
+
+  /**
+   * 有効期限: 日本時間で「今日＋7日」の 23:59 まで（その日いっぱい）。
+   * iso … DB保存用 / display … メール表記用
+   */
+  buildPasswordResetExpiry: () => {
+    const today = App.jstYmdParts(new Date());
+    const anchor = new Date(Date.UTC(today.y, today.m - 1, today.d));
+    anchor.setUTCDate(anchor.getUTCDate() + 7);
+    const y = anchor.getUTCFullYear();
+    const m = anchor.getUTCMonth() + 1;
+    const d = anchor.getUTCDate();
+    // 23:59:59.999 JST = 同日 14:59:59.999 UTC
+    const expires = new Date(Date.UTC(y, m - 1, d, 14, 59, 59, 999));
+    return {
+      iso: expires.toISOString(),
+      display: y + '年' + m + '月' + d + '日 23:59（日本時間）'
+    };
+  },
+
+  openResetPasswordFromToken: async (token) => {
+    App.setLoading(true);
+    try {
+      const res = await App.apiClient('POST', '/auth/forgot-password/validate', {
+        token: token
+      });
+      const email = (res && res.email) || '';
+      const expiresAt = (res && res.expires_at) || '';
+      if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
+        throw new Error('再設定リンクの有効期限が切れています。もう一度メールアドレスからやり直してください');
+      }
+      App.showResetPasswordView(email, token);
+    } catch (error) {
+      App.clearResetPasswordHash();
+      App.showAuthView();
+      App.showToast(error.message || '再設定リンクが無効です', 'error');
+    } finally {
+      App.setLoading(false);
+    }
+  },
+
   handleForgotPasswordEmail: async (event) => {
     event.preventDefault();
     const email = (document.getElementById('forgotPasswordEmail').value || '').trim();
@@ -373,12 +471,23 @@ const App = {
       App.showToast('メールアドレスは必須です', 'error');
       return;
     }
-    App.setButtonLoading(App.elements.forgotPasswordSubmitBtn, true, '確認中');
+    App.setButtonLoading(App.elements.forgotPasswordSubmitBtn, true, '送信中');
     App.setLoading(true);
     try {
-      const res = await App.apiClient('POST', '/auth/reset-password/check', { email: email });
-      const confirmed = (res && res.email) || email;
-      App.showResetPasswordView(confirmed);
+      await App.apiClient('POST', '/auth/reset-password/check', { email: email });
+      const token =
+        (window.crypto && typeof window.crypto.randomUUID === 'function'
+          ? window.crypto.randomUUID()
+          : 'rp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 12));
+      const expiry = App.buildPasswordResetExpiry();
+      await App.apiClient('POST', '/auth/forgot-password/issue', {
+        email: email,
+        token: token,
+        expires_at: expiry.iso
+      });
+      const resetUrl = App.buildPasswordResetUrl(token);
+      await App.notifyPasswordReset(email, resetUrl, expiry.display);
+      App.showToast('再設定用のURLをメールで送信しました', 'success');
     } catch (error) {
       App.showToast(error.message || 'メールアドレスの確認に失敗しました', 'error');
     } finally {
@@ -387,13 +496,27 @@ const App = {
     }
   },
 
+  /** Phase 4: 再設定メール。失敗しても throw しない（issue 済みは成功扱い）。 */
+  notifyPasswordReset: async (email, resetUrl, expiresAt) => {
+    try {
+      await App.apiClient('POST', '/notify/password-reset', {
+        email: email,
+        reset_url: resetUrl,
+        expires_at: expiresAt || ''
+      });
+    } catch (notifyErr) {
+      console.warn('password-reset notify failed (issue still OK):', notifyErr);
+    }
+  },
+
   handleResetPassword: async (event) => {
     event.preventDefault();
     const email = App.state.resetPasswordEmail || '';
+    const token = App.state.resetPasswordToken || '';
     const password = document.getElementById('resetPasswordNewPassword').value;
     const confirm = document.getElementById('resetPasswordConfirmPassword').value;
-    if (!email) {
-      App.showToast('メールアドレスが確認できません。最初からやり直してください', 'error');
+    if (!token) {
+      App.showToast('再設定リンクが無効です。メールのURLから開き直してください', 'error');
       App.showForgotPasswordView();
       return;
     }
@@ -412,17 +535,20 @@ const App = {
     App.setButtonLoading(App.elements.resetPasswordSubmitBtn, true, '再設定中');
     App.setLoading(true);
     try {
-      await App.apiClient('POST', '/auth/reset-password', {
-        email: email,
+      const res = await App.apiClient('POST', '/auth/reset-password', {
+        token: token,
         password_hash: password
       });
+      const confirmedEmail = (res && res.email) || email;
       App.state.resetPasswordEmail = '';
+      App.state.resetPasswordToken = '';
+      App.clearResetPasswordHash();
       App.showToast('パスワードを再設定しました。新しいパスワードでログインしてください', 'success');
       App.showAuthView();
       App.showLoginTab();
       const loginEmail = document.getElementById('loginEmail');
-      if (loginEmail) {
-        loginEmail.value = email;
+      if (loginEmail && confirmedEmail) {
+        loginEmail.value = confirmedEmail;
       }
       const loginPassword = document.getElementById('loginPassword');
       if (loginPassword) {

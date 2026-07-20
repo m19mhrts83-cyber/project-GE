@@ -1,0 +1,12 @@
+# Notta / WeStudy セミナー動画メタデータ（本番）
+# notta_to_knowledge.py --meta meta/notta_lessons.yaml --video-id step3_1_lf
+
+lessons:
+  step3_1_lf:
+    title: "神大家１.基礎 STEP3　神スキル【購入編】プランニング 【実践】三井住友トラスト（現L＆Fアセットファイナンス）は三段活用を取り入れろ！"
+    video_id: step3_1_lf
+    video_url: "https://westudy.co.jp/lesson/step3_1#LF"
+    instructor: "木村"
+    offset_sec: 0
+    content_channel: seminar_video
+    notes: "正本は SRT。origin 例: 806_神大家AI推進/1.受信添付(Stock)/2026-07-16/20260716_10:16_新規録音.srt"

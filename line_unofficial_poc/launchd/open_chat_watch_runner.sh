@@ -19,9 +19,22 @@ if [[ ! -f "$ROUTES_YAML" ]]; then
   exit 1
 fi
 
-if [[ ! -x "$REPO_DIR/.venv/bin/python" ]]; then
-  echo "[watch] Python 仮想環境が見つかりません: $REPO_DIR/.venv/bin/python" >&2
+if [[ ! -x "$REPO_DIR/run_patch.sh" ]]; then
+  echo "[watch] run_patch.sh が見つかりません: $REPO_DIR/run_patch.sh" >&2
   exit 1
 fi
 
-exec "$REPO_DIR/.venv/bin/python" "$REPO_DIR/chrline_open_chat_realtime_watch.py" --routes-yaml "$ROUTES_YAML"
+# 公式Mac版LINEとCHRLINEは同じデスクトップ認証枠を競合する。
+# Mac版が起動中はトークンを消費せず待機し、終了後に自動再開する。
+notified=0
+while /usr/bin/pgrep -f 'application\.jp\.naver\.line\.mac|/Applications/LINE\.app' > /dev/null 2>&1; do
+  if [[ "$notified" -eq 0 ]]; then
+    echo "[watch] Mac版LINEが起動中のため待機します（終了後に自動再開）。" >&2
+    /usr/bin/osascript -e 'display notification "Mac版LINEを終了すると監視を自動再開します" with title "LINE Open Chat" subtitle "デスクトップ認証の競合を防止中"' > /dev/null 2>&1 || true
+    notified=1
+  fi
+  sleep 30
+done
+
+# 常駐は QR 禁止。トークン切れ時は healthcheck が NEEDS_RELOGIN を出す。
+exec "$REPO_DIR/run_patch.sh" chrline_open_chat_realtime_watch.py --routes-yaml "$ROUTES_YAML" --verbose

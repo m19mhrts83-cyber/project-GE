@@ -794,11 +794,22 @@ def _msg_content_type(cl, msg) -> int | None:
 
 
 def _msg_plain_text(cl, msg) -> str | None:
-    t = cl.checkAndGetValue(msg, "text", 10)
+    try:
+        t = cl.checkAndGetValue(msg, "text", 10)
+    except EOFError:
+        # BuilderMessage.text が decrypt → sender 参照で落ちることがある
+        t = None
     if t is None and isinstance(msg, dict):
         t = msg.get(10) or msg.get("text")
     if isinstance(t, str) and t.strip():
         return t.strip()
+    # val_10 直接（ラップ済み Message で checkAndGetValue がプロパティ経由になる場合）
+    try:
+        t2 = getattr(msg, "val_10", None)
+        if isinstance(t2, str) and t2.strip():
+            return t2.strip()
+    except Exception:
+        pass
     return None
 
 
@@ -822,8 +833,14 @@ def _msg_body_line(cl, msg) -> str:
             pass
     if ct == 7:
         return "[スタンプ]"
-    if ct in (1, 2, 3, 14):
-        return "[メディア]"
+    if ct == 1:
+        return "[画像]"
+    if ct == 2:
+        return "[動画]"
+    if ct == 3:
+        return "[音声]"
+    if ct == 14:
+        return "[ファイル]"
     return "[本文なし · E2EE 未復号またはコンパクトプレビューのみ]"
 
 

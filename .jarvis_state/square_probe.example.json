@@ -1,0 +1,28 @@
+{
+  "structural_limit": true,
+  "structural_limit_note": "2026-07-05: QR直後の単発 probe は main OK / thread NG または batch 37件401。CHROMEOS/ANDROID は --all-presets で QR 要。PyPI CHRLINE 2.5.14 は fork 2.6.0b18 より旧。",
+  "last_ok": null,
+  "last_run_at": "2026-07-04T15:25:00+00:00",
+  "last_probe_at": "2026-07-04T15:25:00+00:00",
+  "last_probe": {
+    "ok": false,
+    "main_ok": true,
+    "thread_ok": false,
+    "can_use_square": true,
+    "talk_ok": true,
+    "square_chat_mid": "m82a451eb96a535983d9cd8d172820c19",
+    "thread_mid": "t03c8f5bc4f5c1738d3fb5625db1ae6ee",
+    "device": "DESKTOPWIN",
+    "app_version": "9.0.0.3360",
+    "error": "batch thread sync: 37件すべて401（warmup含む）",
+    "preset": "production_batch",
+    "chrline_package": "2.6.0b18"
+  },
+  "phase0_summary": {
+    "device_env": "LINE_CHRLINE_DEVICE 追加済（DESKTOPWIN/CHROMEOS/ANDROIDSECONDARY）",
+    "chrline_update": "PyPI 2.5.14 < installed 2.6.0b18 — 更新見送り",
+    "app_version": "14.0.0.3360 preset あり — 単発未成功",
+    "gate": "全滅 → 構造限界確定 → Phase1 運用切替"
+  },
+  "history": []
+}

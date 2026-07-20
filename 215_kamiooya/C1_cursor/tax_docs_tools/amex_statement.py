@@ -426,20 +426,26 @@ def _is_otp_entry_screen(page: Page) -> bool:
     return _find_otp_entry_ctx(page) is not None
 
 
-def _wait_for_2fa_method_selection(page: Page, *, timeout_sec: int = 120) -> bool:
-    """2FA 送信先選択画面が出るまでポーリング待機。"""
+def _wait_for_2fa_method_selection(page: Page, *, timeout_sec: int = 120) -> str:
+    """2FA 送信先選択 or 確認コード入力画面が出るまでポーリング待機。
+
+    Returns:
+        "method" … 送信先選択画面
+        "otp" … 確認コード入力画面（送信先選択スキップ）
+        "timeout" … どちらも未検出
+    """
     print(f"  [2FA] 送信先選択画面を待機（最大 {timeout_sec} 秒）…", flush=True)
     deadline = time.time() + timeout_sec
     while time.time() < deadline:
         if _is_2fa_method_selection(page):
             print("  [2FA] 送信先選択画面を検出", flush=True)
-            return True
+            return "method"
         if _is_otp_entry_screen(page):
             print("  [2FA] 確認コード入力画面を検出（送信先選択をスキップ）", flush=True)
-            return False
+            return "otp"
         page.wait_for_timeout(2000)
     print("  [2FA] 送信先選択画面がタイムアウト", file=sys.stderr)
-    return False
+    return "timeout"
 
 
 def _wait_for_otp_entry_screen(page: Page, *, timeout_sec: int = 45) -> bool:
@@ -627,9 +633,37 @@ def _run_2fa_email_flow(page: Page, *, not_before_epoch: float) -> bool:
     otp_ctx = _find_otp_entry_ctx(page)
     method_ctx = _find_method_selection_ctx(page) if not otp_ctx else None
     if not method_ctx and not otp_ctx:
-        if _wait_for_2fa_method_selection(page, timeout_sec=120):
+        state = _wait_for_2fa_method_selection(page, timeout_sec=120)
+        if state == "method":
             method_ctx = _find_method_selection_ctx(page)
             otp_ctx = _find_otp_entry_ctx(page)
+        elif state == "otp":
+            otp_ctx = _find_otp_entry_ctx(page)
+        elif _is_2fa_screen(page):
+            # 本文は 2FA だが UI 検出が遅い場合のフォールバック
+            print("  [2FA] UI 再検出（フォールバック）…", flush=True)
+            page.wait_for_timeout(5000)
+            method_ctx = _find_method_selection_ctx(page)
+            otp_ctx = _find_otp_entry_ctx(page)
+            if not method_ctx and not otp_ctx:
+                for ctx in _iter_ui_contexts(page):
+                    # 送信先選択らしい ctx（Eメール＋認証コードの文言あり）だけ操作する。
+                    # 無関係な iframe や SMS 経路で「次へ」を誤クリックしない。
+                    body = _ctx_body(ctx)
+                    if "Eメール" not in body or (
+                        "認証コード" not in body and "確認コード" not in body
+                    ):
+                        continue
+                    if _select_email_2fa_radio(ctx, page) and _click_2fa_next(ctx, page):
+                        mail_since = time.time() - 3
+                        if _wait_for_otp_entry_screen(page, timeout_sec=45):
+                            otp_ctx = _find_otp_entry_ctx(page)
+                        else:
+                            print(
+                                "  [2FA] フォールバック操作後もコード入力画面を検出できません。",
+                                file=sys.stderr,
+                            )
+                        break
 
     # Step 1 & 2: Eメール → 次へ（コード入力画面のときはスキップ）
     if method_ctx and not otp_ctx:
@@ -644,6 +678,17 @@ def _run_2fa_email_flow(page: Page, *, not_before_epoch: float) -> bool:
         mail_since = time.time() - 3
         _wait_for_otp_entry_screen(page, timeout_sec=45)
         otp_ctx = _find_otp_entry_ctx(page)
+
+    if not otp_ctx:
+        otp_ctx = _find_otp_entry_ctx(page)
+
+    if not otp_ctx:
+        print(
+            "  [2FA] 確認コード入力画面に未到達（Eメール未送信の可能性）。"
+            " Gmail 取得をスキップします。",
+            file=sys.stderr,
+        )
+        return False
 
     # Step 3: Gmail から確認コード取得
     print("  [Step 3] Gmail から確認コードを取得…", flush=True)

@@ -7,24 +7,85 @@
  * - 得点基準
  * - 採点結果
  * - ログ
+ * - 補正学習データ
  */
 
 function onOpen() {
+  buildMenu_();
+}
+
+function buildMenu_() {
   SpreadsheetApp.getUi()
     .createMenu("採点自動化")
-    .addItem("CSV取込（Drive File ID）", "importCsvByConfig")
+    .addItem("CSV取込", "importCsvByConfig")
     .addItem("採点実行", "runScoring")
+    .addItem("補正学習データを追加", "appendCorrectionLearningData")
     .addItem("ヘッダー初期化", "initializeSheets")
     .addToUi();
 }
 
+/**
+ * メニューが出ないときの初回セットアップ。
+ * Apps Script エディタでこの関数を1回実行 → スプレッドシートを再読込。
+ */
+function setupMenuTrigger() {
+  var ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === "buildMenu_" && t.getEventType() === ScriptApp.EventType.ON_OPEN) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger("buildMenu_")
+    .forSpreadsheet(ssId)
+    .onOpen()
+    .create();
+  Logger.log("採点自動化メニューのトリガーを登録しました。スプレッドシートを再読込してください。");
+}
+
+var DEFAULT_CSV_FILENAME_ = "WeStudy_for_scoring.csv";
+
 function importCsvByConfig() {
   var cfg = readConfig_();
-  var fileId = cfg.DRIVE_CSV_FILE_ID;
-  if (!fileId) {
-    throw new Error("設定シートに DRIVE_CSV_FILE_ID を設定してください。");
-  }
+  var fileId = resolveCsvFileId_(cfg);
   importCsvFromDrive_(fileId);
+}
+
+/**
+ * 設定シートのフォルダ ID + 固定ファイル名で CSV を特定する。
+ * DRIVE_CSV_FOLDER_ID が未設定のときのみ DRIVE_CSV_FILE_ID（旧方式）にフォールバック。
+ */
+function resolveCsvFileId_(cfg) {
+  var folderId = String(cfg.DRIVE_CSV_FOLDER_ID || "").trim();
+  var filename = String(cfg.DRIVE_CSV_FILENAME || DEFAULT_CSV_FILENAME_).trim();
+
+  if (folderId && filename) {
+    var folder;
+    try {
+      folder = DriveApp.getFolderById(folderId);
+    } catch (e) {
+      throw new Error("DRIVE_CSV_FOLDER_ID のフォルダにアクセスできません: " + folderId);
+    }
+    var files = folder.getFilesByName(filename);
+    if (files.hasNext()) {
+      return files.next().getId();
+    }
+    throw new Error(
+      'フォルダ内に "' +
+        filename +
+        '" がありません。WeStudy の CSV を同名で上書き配置してください。'
+    );
+  }
+
+  var legacyId = String(cfg.DRIVE_CSV_FILE_ID || "").trim();
+  if (legacyId) {
+    return legacyId;
+  }
+
+  throw new Error(
+    "設定シートに DRIVE_CSV_FOLDER_ID を設定してください（ファイル名は DRIVE_CSV_FILENAME、未設定時は " +
+      DEFAULT_CSV_FILENAME_ +
+      "）。"
+  );
 }
 
 function runScoring() {
@@ -46,20 +107,22 @@ function runScoring() {
 
   var headers = rows[0];
   var idx = buildIndex_(headers);
-  var resultIndex = buildResultIndex_(resultSheet);
   var rulesText = buildRulesText_(rulesSheet);
   var apiKey = cfg.GEMINI_API_KEY;
-  var model = cfg.GEMINI_MODEL || "gemini-2.0-flash";
-  var maxRows = Number(cfg.MAX_ROWS_PER_RUN || 50);
+  var model = cfg.GEMINI_MODEL || "gemini-2.5-flash";
+  var maxRows = parseMaxRows_(cfg.MAX_ROWS_PER_RUN, rows.length - 1);
   var includeReplies = String(cfg.INCLUDE_REPLIES || "FALSE").toUpperCase() === "TRUE";
 
   if (!apiKey) {
     throw new Error("設定シートに GEMINI_API_KEY を設定してください。");
   }
 
-  var processed = 0;
+  prepareResultSheetForRun_(resultSheet);
+  ss.toast("採点結果をクリアしました。最大 " + maxRows + " 件を採点します…", "採点自動化", 5);
+
+  var attempted = 0;
   for (var r = 1; r < rows.length; r++) {
-    if (processed >= maxRows) break;
+    if (attempted >= maxRows) break;
 
     var row = rows[r];
     var commentId = val_(row, idx["コメントID"]);
@@ -70,7 +133,8 @@ function runScoring() {
 
     if (!commentId || !commentBody) continue;
     if (!includeReplies && parentId) continue;
-    if (resultIndex[commentId]) continue; // すでに採点済み
+
+    attempted++;
 
     try {
       var prompt = buildPrompt_({
@@ -98,12 +162,10 @@ function runScoring() {
         evidence: (result.evidence || []).join(" | "),
         confidence: result.confidence,
         manualScore: "",
-        finalScore: result.score,
         version: "v1",
         scoredAt: new Date(),
         error: ""
       });
-      processed++;
       Utilities.sleep(200);
     } catch (err) {
       writeResult_(resultSheet, {
@@ -121,7 +183,6 @@ function runScoring() {
         evidence: "",
         confidence: "",
         manualScore: "",
-        finalScore: "",
         version: "v1",
         scoredAt: new Date(),
         error: String(err)
@@ -130,15 +191,13 @@ function runScoring() {
     }
   }
 
-  log_("INFO", "runScoring", "", "採点件数: " + processed);
+  log_("INFO", "runScoring", "", "採点試行件数: " + attempted);
+  var resultRows = Math.max(0, resultSheet.getLastRow() - 1);
+  ss.toast("採点完了: " + attempted + " 件処理（結果 " + resultRows + " 行）", "採点自動化", 10);
 }
 
-function initializeSheets() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  var resultSheet = ss.getSheetByName("採点結果") || ss.insertSheet("採点結果");
-  resultSheet.clearContents();
-  resultSheet.appendRow([
+function resultSheetHeaders_() {
+  return [
     "コメントID",
     "投稿日時",
     "投稿者名",
@@ -157,11 +216,144 @@ function initializeSheets() {
     "採点バージョン",
     "採点日時",
     "エラー"
-  ]);
+  ];
+}
+
+/** 採点実行のたびにヘッダーだけ残して採点結果を空にする */
+function prepareResultSheetForRun_(sheet) {
+  sheet.clearContents();
+  sheet.appendRow(resultSheetHeaders_());
+  SpreadsheetApp.flush();
+}
+
+function initializeSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var resultSheet = ss.getSheetByName("採点結果") || ss.insertSheet("採点結果");
+  prepareResultSheetForRun_(resultSheet);
 
   var logSheet = ss.getSheetByName("ログ") || ss.insertSheet("ログ");
   logSheet.clearContents();
   logSheet.appendRow(["時刻", "レベル", "関数名", "コメントID", "メッセージ"]);
+
+  var learnSheet = ss.getSheetByName("補正学習データ") || ss.insertSheet("補正学習データ");
+  learnSheet.clearContents();
+  learnSheet.appendRow([
+    "追加日時",
+    "コメントID",
+    "投稿者名",
+    "コメント内容",
+    "Gemini得点",
+    "手動補正点",
+    "点差",
+    "GeminiルールID",
+    "最終ルールID",
+    "補正理由メモ",
+    "採点バージョン"
+  ]);
+
+  initVersionHistorySheet_(ss);
+}
+
+/** バージョン履歴シート（提供起点 V1.0）。既存シートは消さない */
+function initVersionHistorySheet_(ss) {
+  var sh = ss.getSheetByName("バージョン履歴");
+  if (sh) return;
+  sh = ss.insertSheet("バージョン履歴");
+  sh.appendRow(["版", "日付", "変更内容", "備考"]);
+  sh.appendRow([
+    "",
+    "",
+    "※ V1.0 = 相手先への初回提供時に記載。以降 V1.1, V1.2 … で変更履歴を追記",
+    "提供前の開発・検証は記載しない"
+  ]);
+}
+
+function appendCorrectionLearningData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var resultSheet = ss.getSheetByName("採点結果");
+  var learnSheet = ss.getSheetByName("補正学習データ");
+
+  if (!resultSheet) throw new Error("採点結果シートがありません。");
+  if (!learnSheet) throw new Error("補正学習データシートがありません。");
+
+  var resultValues = resultSheet.getDataRange().getValues();
+  if (resultValues.length <= 1) {
+    SpreadsheetApp.getUi().alert("補正学習データに 0 件追加しました。");
+    return;
+  }
+
+  var headers = resultValues[0];
+  var idx = buildIndex_(headers);
+
+  var needCols = [
+    "コメントID", "投稿者名", "コメント内容", "得点", "手動補正点", "最終点", "ルールID", "採点バージョン"
+  ];
+  for (var n = 0; n < needCols.length; n++) {
+    if (idx[needCols[n]] === undefined) {
+      throw new Error("採点結果シートに必要列がありません: " + needCols[n]);
+    }
+  }
+
+  var existing = {};
+  var lv = learnSheet.getDataRange().getValues();
+  if (lv.length > 1) {
+    for (var r = 1; r < lv.length; r++) {
+      var cid = lv[r][1];
+      if (cid !== "" && cid !== null) existing[String(cid)] = true;
+    }
+  }
+
+  var appendRows = [];
+  for (var r2 = 1; r2 < resultValues.length; r2++) {
+    var row = resultValues[r2];
+    var commentId = row[idx["コメントID"]];
+    var authorName = row[idx["投稿者名"]];
+    var body = row[idx["コメント内容"]];
+    var aiScore = row[idx["得点"]];
+    var manualCorrection = row[idx["手動補正点"]];
+    var finalScore = row[idx["最終点"]];
+    var ruleId = row[idx["ルールID"]];
+    var version = row[idx["採点バージョン"]];
+
+    if (finalScore === "" || finalScore === null) continue;
+    if (
+      aiScore !== "" && aiScore !== null && !isNaN(aiScore) &&
+      !isNaN(finalScore) && Number(finalScore) === Number(aiScore)
+    ) {
+      continue;
+    }
+    if (!commentId) continue;
+    if (existing[String(commentId)]) continue;
+
+    var diff = "";
+    if (manualCorrection !== "" && manualCorrection !== null && !isNaN(manualCorrection)) {
+      diff = Number(manualCorrection);
+    }
+
+    appendRows.push([
+      new Date(),
+      commentId,
+      authorName,
+      body,
+      aiScore,
+      manualCorrection,
+      diff,
+      ruleId,
+      "",
+      "",
+      version
+    ]);
+  }
+
+  if (appendRows.length > 0) {
+    var startRow = learnSheet.getLastRow() + 1;
+    learnSheet
+      .getRange(startRow, 1, appendRows.length, appendRows[0].length)
+      .setValues(appendRows);
+  }
+
+  SpreadsheetApp.getUi().alert("補正学習データに " + appendRows.length + " 件追加しました。");
 }
 
 function importCsvFromDrive_(fileId) {
@@ -177,7 +369,13 @@ function importCsvFromDrive_(fileId) {
 
   sourceSheet.clearContents();
   sourceSheet.getRange(1, 1, csv.length, csv[0].length).setValues(csv);
-  log_("INFO", "importCsvFromDrive_", "", "CSV取り込み完了: " + file.getName());
+  var dataRows = Math.max(0, csv.length - 1);
+  log_("INFO", "importCsvFromDrive_", "", "CSV取り込み完了: " + file.getName() + " (" + dataRows + " 行)");
+  ss.toast(
+    file.getName() + " を取り込みました（データ " + dataRows + " 行）",
+    "CSV取込",
+    8
+  );
 }
 
 function buildPrompt_(ctx) {
@@ -289,6 +487,8 @@ function buildResultIndex_(resultSheet) {
 }
 
 function writeResult_(sheet, item) {
+  var initialFinal =
+    item.error === "" && item.score !== "" && item.score !== null ? item.score : "";
   sheet.appendRow([
     item.commentId,
     item.postedAt,
@@ -303,12 +503,28 @@ function writeResult_(sheet, item) {
     item.reason,
     item.evidence,
     item.confidence,
-    item.manualScore,
-    item.finalScore,
+    "",
+    initialFinal,
     item.version,
     item.scoredAt,
     item.error
   ]);
+  var rowNum = sheet.getLastRow();
+  sheet
+    .getRange(rowNum, 14)
+    .setFormula('=IF(OR(O' + rowNum + '="",J' + rowNum + '=""),"",O' + rowNum + '-J' + rowNum + ')');
+  SpreadsheetApp.flush();
+}
+
+function parseMaxRows_(raw, fallback) {
+  if (raw === "" || raw === null || raw === undefined) {
+    return fallback;
+  }
+  var n = Number(raw);
+  if (isNaN(n) || n <= 0) {
+    return fallback;
+  }
+  return n;
 }
 
 function readConfig_() {
@@ -354,4 +570,3 @@ function stripCodeFence_(txt) {
   }
   return s;
 }
-

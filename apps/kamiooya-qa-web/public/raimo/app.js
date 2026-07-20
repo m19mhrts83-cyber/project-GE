@@ -600,7 +600,9 @@ const App = {
             : "";
           return (
             '<li class="mb-1">' +
-            '<span class="font-medium">[WeStudy動画]</span> ' +
+            '<span class="font-medium">[' +
+            App.escapeHtml(c.sourceType || "WeStudyセミナー動画") +
+            "]</span> " +
             App.escapeHtml(c.videoTitle || "（タイトル不明）") +
             (when ? " — " + App.escapeHtml(when) : "") +
             link +
@@ -612,7 +614,7 @@ const App = {
         return (
           '<li class="mb-1">' +
           '<span class="font-medium">[' +
-          App.escapeHtml(c.sourceType || "WeStudy") +
+          App.escapeHtml(c.sourceType || "WeStudyコミュニティ") +
           "]</span> " +
           App.escapeHtml(c.authorName || "") +
           " #" +

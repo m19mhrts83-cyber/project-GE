@@ -88,7 +88,6 @@ body {
   }
 }
 
-/* 改修: 画面端の目立たない管理者導線 */
 .admin-entry-btn {
   position: fixed;
   right: 10px;
@@ -110,7 +109,6 @@ body {
   outline: none;
 }
 
-/* 改修: ログイン画面内の目立たない「管理者登録」 */
 .login-screen-admin-btn {
   font-size: 11px;
   color: #94a3b8;
@@ -129,7 +127,6 @@ body {
   outline: none;
 }
 
-/* 改修: 管理者ゲート（div オーバーレイ。ローディング z-50 より前面） */
 .admin-gate-overlay.hidden {
   display: none !important;
 }
