@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- RAIMO_KNOWLEDGE_UI_20260720 -->
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
@@ -9,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body class="bg-slate-100 text-slate-800">
   <div id="appRoot" class="min-h-screen">
@@ -30,6 +31,12 @@
           <button id="loginSubmitBtn" type="submit" class="w-full py-2 rounded-md bg-blue-900 text-white">
             ログイン
           </button>
+          <!-- 改修: パスワードリマインダー画面へのリンク -->
+          <div class="text-right mt-2">
+            <button type="button" id="toForgotPasswordBtn" class="text-xs text-blue-600 underline hover:text-blue-800">
+              パスワードを忘れた方はこちら
+            </button>
+          </div>
         </form>
 
         <form id="registerForm" class="space-y-3 hidden">
@@ -40,7 +47,7 @@
           </button>
         </form>
 
-        <!-- 改修: ログイン画面内の管理者登録導線（モーダル表示用クリック先） -->
+        <!-- 管理者登録導線 -->
         <div class="text-center mt-4">
           <button type="button" id="loginScreenAdminRegisterBtn" class="login-screen-admin-btn">
             管理者登録
@@ -49,7 +56,50 @@
       </div>
     </section>
 
-    <!-- 改修: シークレットURL専用 管理者登録画面 -->
+    <!-- パスワード再設定（1/2）: メール確認 -->
+    <section id="forgotPasswordView" class="hidden min-h-screen flex items-center justify-center p-4">
+      <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
+        <h1 class="text-xl font-bold text-center text-blue-900 mb-2">パスワードの再設定</h1>
+        <p class="text-sm text-slate-500 text-center mb-6">登録済みのメールアドレスを入力してください。アプリ内で新しいパスワードを設定できます。</p>
+
+        <form id="forgotPasswordForm" class="space-y-3">
+          <input id="forgotPasswordEmail" type="email" class="w-full border rounded-md px-3 py-2" placeholder="メールアドレス" required />
+          <button id="forgotPasswordSubmitBtn" type="submit" class="w-full py-2 rounded-md bg-blue-900 text-white">
+            次へ
+          </button>
+        </form>
+
+        <div class="text-center mt-4">
+          <button type="button" id="forgotPasswordBackToLoginBtn" class="text-sm text-slate-500 underline hover:text-slate-700">
+            ログイン画面に戻る
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- パスワード再設定（2/2）: 新パスワード入力 -->
+    <section id="resetPasswordView" class="hidden min-h-screen flex items-center justify-center p-4">
+      <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
+        <h1 class="text-xl font-bold text-center text-blue-900 mb-2">新しいパスワードの入力</h1>
+        <p class="text-sm text-slate-500 text-center mb-6">新しいパスワードを入力してください。<br><span id="resetPasswordEmailDisplay" class="font-semibold text-slate-700"></span></p>
+
+        <form id="resetPasswordForm" class="space-y-3">
+          <input id="resetPasswordNewPassword" type="password" class="w-full border rounded-md px-3 py-2" placeholder="新しいパスワード" required minlength="4" autocomplete="new-password" />
+          <input id="resetPasswordConfirmPassword" type="password" class="w-full border rounded-md px-3 py-2" placeholder="新しいパスワード（確認）" required minlength="4" autocomplete="new-password" />
+          <button id="resetPasswordSubmitBtn" type="submit" class="w-full py-2 rounded-md bg-blue-900 text-white">
+            再設定する
+          </button>
+        </form>
+
+        <div class="text-center mt-4">
+          <button type="button" id="resetPasswordBackToLoginBtn" class="text-sm text-slate-500 underline hover:text-slate-700">
+            ログイン画面に戻る
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- シークレットURL専用 管理者登録画面 -->
     <section id="secretAdminRegisterView" class="hidden min-h-screen flex items-center justify-center p-4">
       <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
         <h1 class="text-xl font-bold text-center text-blue-900 mb-2">管理者登録</h1>
@@ -96,6 +146,7 @@
           <nav class="p-3 border-b border-slate-200 space-y-2">
             <button data-screen="chat" class="screen-tab w-full text-left px-3 py-2 rounded bg-slate-100">チャット</button>
             <button data-screen="comments" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">コメント一覧</button>
+            <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">セミナー動画</button>
             <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー承認</button>
             <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">CSV取込</button>
           </nav>
@@ -105,7 +156,7 @@
           </div>
         </aside>
 
-        <!-- メイン -->
+        <!-- メインコンテンツ -->
         <main class="flex-1 flex flex-col">
           <!-- チャット画面 -->
           <section id="chatScreen" class="screen-view flex-1 flex flex-col">
@@ -157,6 +208,31 @@
             </div>
           </section>
 
+          <!-- セミナー動画一覧 -->
+          <section id="knowledgeScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
+            <div class="w-full">
+              <div class="flex flex-wrap gap-2 mb-3">
+                <input id="knowledgeSearchInput" class="border rounded-md px-3 py-2 min-w-[240px] flex-1" placeholder="タイトル・本文・chunk_key で検索" />
+                <button id="reloadKnowledgeBtn" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+              </div>
+              <p id="knowledgeListMeta" class="text-xs text-slate-500 mb-2"></p>
+              <div class="overflow-auto bg-white rounded border">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr>
+                      <th class="p-2 text-left">開始</th>
+                      <th class="p-2 text-left">ソース</th>
+                      <th class="p-2 text-left">タイトル</th>
+                      <th class="p-2 text-left">本文</th>
+                      <th class="p-2 text-left">動画</th>
+                    </tr>
+                  </thead>
+                  <tbody id="knowledgeTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <!-- 管理者: ユーザー承認 -->
           <section id="adminUsersScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
             <div class="w-full max-w-4xl">
@@ -185,7 +261,7 @@
             <div class="w-full max-w-3xl bg-white rounded border p-4">
               <h3 class="font-semibold mb-2">CSVコメント取込</h3>
               <p class="text-sm text-slate-500 mb-3">
-                1行目はヘッダー行（英語: source_type, comment_id, posted_at, author_name, author_email, content 等／WeStudyフォーラム出力の日本語ヘッダー「コメントID」「投稿日時」「コメント内容」等も可）。Excelは「CSV UTF-8（コンマ区切り）」推奨。セミコロン区切りにも自動対応します。既存と同じ comment_id、または同一本文＋投稿日時＋投稿者の行はスキップし、未登録分のみ追加します（DBからの物理削除は行いません）。
+                1行目はヘッダー行（英語: source_type, comment_id, posted_at, author_name, author_email, content 等／WeStudyフォーラム出力の日本語ヘッダー「コメントID」「投稿日時」「コメント内容」等も可）。Excelは「CSV UTF-8（コンマ区切り）」推奨。既存と同じ comment_id はスキップします。
               </p>
               <input id="csvFileInput" type="file" accept=".csv,text/csv" class="mb-3" />
               <div class="flex gap-2">
@@ -197,7 +273,7 @@
             <div class="w-full max-w-3xl bg-white rounded border p-4 mt-4">
               <h3 class="font-semibold mb-2 text-red-700">コメント削除（管理者）</h3>
               <p class="text-sm text-slate-500 mb-3">
-                誤取り込みを整理するための削除機能です。対象ソースを選び、必要ならコメントID部分一致で絞って削除します。サーバー側は1件ずつ削除APIを呼び出します（件数が多いと数十秒かかることがあります）。API定義は WeStudy_API_secret_admin_upgrade.yaml の POST /admin/comments/&#123;id&#125;/delete をデプロイしてください。
+                誤取り込みを整理するための削除機能です。
               </p>
               <div class="flex flex-wrap gap-2 items-center">
                 <select id="deleteSourceTypeInput" class="border rounded-md px-3 py-2 min-w-[170px]">
@@ -205,10 +281,9 @@
                   <option value="神大家コミュニティ">神大家コミュニティ</option>
                   <option value="">全ソース（危険）</option>
                 </select>
-                <input id="deleteCommentIdLikeInput" class="border rounded-md px-3 py-2 min-w-[230px] flex-1" placeholder="comment_id 部分一致（任意） 例: 2026-" />
+                <input id="deleteCommentIdLikeInput" class="border rounded-md px-3 py-2 min-w-[230px] flex-1" placeholder="comment_id 部分一致（任意）" />
                 <button id="deleteCommentsBtn" class="px-4 py-2 rounded bg-red-600 text-white">削除実行</button>
               </div>
-              <p class="text-xs text-slate-500 mt-2">※ 実行前に確認ダイアログを表示します。</p>
             </div>
           </section>
         </main>
@@ -235,29 +310,17 @@
     </div>
   </div>
 
-  <!-- 改修: 画面端の目立たない管理者導線 -->
+  <!-- 画面端の目立たない管理者導線 -->
   <button id="adminEntryBtn" class="admin-entry-btn" type="button" aria-label="管理者登録への導線">
     管理者登録
   </button>
 
-  <!-- 改修: 管理者導線用パスワード入力（dialog の showModal 非対応環境向けに div オーバーレイ） -->
-  <div
-    id="adminGateOverlay"
-    class="admin-gate-overlay hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="adminGateTitle"
-  >
+  <!-- 管理者導線用パスワード入力 -->
+  <div id="adminGateOverlay" class="admin-gate-overlay hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-labelledby="adminGateTitle">
     <div class="admin-gate-panel bg-white w-full max-w-sm rounded-lg shadow-lg p-4">
       <h4 class="font-semibold mb-2" id="adminGateTitle">管理者登録</h4>
       <p class="text-sm text-slate-600 mb-3">アクセスパスワードを入力してください</p>
-      <input
-        id="adminGatePasswordInput"
-        type="password"
-        class="w-full border rounded-md px-3 py-2 mb-2"
-        placeholder="パスワード"
-        autocomplete="off"
-      />
+      <input id="adminGatePasswordInput" type="password" class="w-full border rounded-md px-3 py-2 mb-2" placeholder="パスワード" autocomplete="off" />
       <p id="adminGateError" class="text-xs text-red-600 min-h-[1rem]"></p>
       <div class="flex justify-end gap-2 mt-3">
         <button type="button" id="adminGateCancelBtn" class="px-3 py-1 rounded border">キャンセル</button>
@@ -266,6 +329,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

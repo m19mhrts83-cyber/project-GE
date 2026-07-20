@@ -1,68 +1,17 @@
-(function () {
-  var ENDPOINT = '/miniAppApi/errorReport';
-  var DEDUP_WINDOW_MS = 10000;
-  var DEDUP_MAX_SIZE = 100;
-  var lastSent = new Map();
-  var shouldSend = function (key) {
-    var now = Date.now();
-    var prev = lastSent.get(key);
-    if (prev !== undefined && now - prev < DEDUP_WINDOW_MS) return false;
-    lastSent.set(key, now);
-    if (lastSent.size > DEDUP_MAX_SIZE) {
-      var firstKey = lastSent.keys().next().value;
-      lastSent.delete(firstKey);
-    }
-    return true;
-  };
-  var send = function (payload) {
-    var key = [payload.errorType, payload.message, payload.filePath, payload.lineNo, payload.columnNo].join('|');
-    if (!shouldSend(key)) return;
-    try {
-      fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        keepalive: true,
-      }).catch(function () {});
-    } catch (e) {}
-  };
-  window.addEventListener('error', function (ev) {
-    send({
-      errorType: ev.error && ev.error.name ? ev.error.name : 'Error',
-      message: ev.message || String(ev.error || ''),
-      stackTrace: ev.error && ev.error.stack ? ev.error.stack : null,
-      filePath: ev.filename || null,
-      lineNo: ev.lineno || null,
-      columnNo: ev.colno || null,
-      requestUrl: location.href,
-      occurredDatetime: new Date().toISOString(),
-    });
-  });
-  window.addEventListener('unhandledrejection', function (ev) {
-    var reason = ev.reason;
-    send({
-      errorType: reason && reason.name ? reason.name : 'UnhandledRejection',
-      message: reason && reason.message ? reason.message : String(reason),
-      stackTrace: reason && reason.stack ? reason.stack : null,
-      filePath: null,
-      lineNo: null,
-      columnNo: null,
-      requestUrl: location.href,
-      occurredDatetime: new Date().toISOString(),
-    });
-  });
-})();
 const App = {
   state: {
     currentUser: null,
     currentSessionId: null,
     chatSessions: [],
     chatMessages: [],
-    lastCitations: [],
     suggestedQuestions: [],
     comments: [],
+    knowledgeChunks: [],
+    knowledgeSources: {},
+    lastCitations: [],
     pendingUsers: [],
-    loadingCount: 0
+    loadingCount: 0,
+    resetPasswordEmail: ''
   },
 
   elements: {},
@@ -147,6 +96,12 @@ const App = {
   cacheElements: () => {
     App.elements.authView = document.getElementById('authView');
     App.elements.mainView = document.getElementById('mainView');
+    App.elements.forgotPasswordView = document.getElementById('forgotPasswordView');
+    App.elements.resetPasswordView = document.getElementById('resetPasswordView');
+    App.elements.forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    App.elements.resetPasswordForm = document.getElementById('resetPasswordForm');
+    App.elements.forgotPasswordSubmitBtn = document.getElementById('forgotPasswordSubmitBtn');
+    App.elements.resetPasswordSubmitBtn = document.getElementById('resetPasswordSubmitBtn');
     App.elements.secretAdminRegisterView = document.getElementById('secretAdminRegisterView');
     App.elements.secretAdminRegisterForm = document.getElementById('secretAdminRegisterForm');
     App.elements.secretAdminRegisterSubmitBtn = document.getElementById('secretAdminRegisterSubmitBtn');
@@ -174,6 +129,9 @@ const App = {
     App.elements.commentSourceFilter = document.getElementById('commentSourceFilter');
     App.elements.commentDateFilter = document.getElementById('commentDateFilter');
     App.elements.commentListMeta = document.getElementById('commentListMeta');
+    App.elements.knowledgeTableBody = document.getElementById('knowledgeTableBody');
+    App.elements.knowledgeSearchInput = document.getElementById('knowledgeSearchInput');
+    App.elements.knowledgeListMeta = document.getElementById('knowledgeListMeta');
     App.elements.pendingUsersTableBody = document.getElementById('pendingUsersTableBody');
     App.elements.csvFileInput = document.getElementById('csvFileInput');
     App.elements.importResult = document.getElementById('importResult');
@@ -195,6 +153,30 @@ const App = {
     document.getElementById('showRegisterTabBtn').addEventListener('click', App.showRegisterTab);
     App.elements.loginForm.addEventListener('submit', App.handleLogin);
     App.elements.registerForm.addEventListener('submit', App.handleRegister);
+    const toForgotBtn = document.getElementById('toForgotPasswordBtn');
+    if (toForgotBtn) {
+      toForgotBtn.addEventListener('click', App.showForgotPasswordView);
+    }
+    if (App.elements.forgotPasswordForm) {
+      App.elements.forgotPasswordForm.addEventListener('submit', App.handleForgotPasswordEmail);
+    }
+    if (App.elements.resetPasswordForm) {
+      App.elements.resetPasswordForm.addEventListener('submit', App.handleResetPassword);
+    }
+    const forgotBackBtn = document.getElementById('forgotPasswordBackToLoginBtn');
+    if (forgotBackBtn) {
+      forgotBackBtn.addEventListener('click', function () {
+        App.showAuthView();
+        App.showLoginTab();
+      });
+    }
+    const resetBackBtn = document.getElementById('resetPasswordBackToLoginBtn');
+    if (resetBackBtn) {
+      resetBackBtn.addEventListener('click', function () {
+        App.showAuthView();
+        App.showLoginTab();
+      });
+    }
     if (App.elements.secretAdminRegisterForm) {
       App.elements.secretAdminRegisterForm.addEventListener('submit', App.handleSecretAdminRegister);
     }
@@ -244,11 +226,16 @@ const App = {
     document.getElementById('newChatBtn').addEventListener('click', App.createNewChatPlaceholder);
     App.elements.messageForm.addEventListener('submit', App.handleSendMessage);
     document.getElementById('reloadCommentsBtn').addEventListener('click', App.loadComments);
+    const reloadKnowledgeBtn = document.getElementById('reloadKnowledgeBtn');
+    if (reloadKnowledgeBtn) reloadKnowledgeBtn.addEventListener('click', App.loadKnowledge);
     document.getElementById('reloadPendingUsersBtn').addEventListener('click', App.loadPendingUsers);
     document.getElementById('sampleCommentBtn').addEventListener('click', App.createSampleComment);
     document.getElementById('importCsvBtn').addEventListener('click', App.importCsvComments);
     document.getElementById('sidebarToggleBtn').addEventListener('click', App.toggleSidebarMobile);
     document.getElementById('commentSearchInput').addEventListener('input', App.renderCommentTable);
+    if (App.elements.knowledgeSearchInput) {
+      App.elements.knowledgeSearchInput.addEventListener('input', App.renderKnowledgeTable);
+    }
     if (App.elements.commentSourceFilter) {
       App.elements.commentSourceFilter.addEventListener('change', App.renderCommentTable);
     }
@@ -296,12 +283,18 @@ const App = {
     }, 2600);
   },
 
-  /* 改修: 認証画面表示時に管理者登録専用ビューを隠す */
+  /* 改修: 認証画面表示時に管理者登録・再設定ビューを隠す */
   showAuthView: () => {
     App.elements.authView.classList.remove('hidden');
     App.elements.mainView.classList.add('hidden');
     if (App.elements.secretAdminRegisterView) {
       App.elements.secretAdminRegisterView.classList.add('hidden');
+    }
+    if (App.elements.forgotPasswordView) {
+      App.elements.forgotPasswordView.classList.add('hidden');
+    }
+    if (App.elements.resetPasswordView) {
+      App.elements.resetPasswordView.classList.add('hidden');
     }
   },
 
@@ -311,13 +304,136 @@ const App = {
     if (App.elements.secretAdminRegisterView) {
       App.elements.secretAdminRegisterView.classList.add('hidden');
     }
+    if (App.elements.forgotPasswordView) {
+      App.elements.forgotPasswordView.classList.add('hidden');
+    }
+    if (App.elements.resetPasswordView) {
+      App.elements.resetPasswordView.classList.add('hidden');
+    }
   },
 
   showSecretAdminRegisterView: () => {
     App.elements.authView.classList.add('hidden');
     App.elements.mainView.classList.add('hidden');
+    if (App.elements.forgotPasswordView) {
+      App.elements.forgotPasswordView.classList.add('hidden');
+    }
+    if (App.elements.resetPasswordView) {
+      App.elements.resetPasswordView.classList.add('hidden');
+    }
     if (App.elements.secretAdminRegisterView) {
       App.elements.secretAdminRegisterView.classList.remove('hidden');
+    }
+  },
+
+  showForgotPasswordView: () => {
+    App.state.resetPasswordEmail = '';
+    App.elements.authView.classList.add('hidden');
+    App.elements.mainView.classList.add('hidden');
+    if (App.elements.secretAdminRegisterView) {
+      App.elements.secretAdminRegisterView.classList.add('hidden');
+    }
+    if (App.elements.resetPasswordView) {
+      App.elements.resetPasswordView.classList.add('hidden');
+    }
+    if (App.elements.forgotPasswordForm) {
+      App.elements.forgotPasswordForm.reset();
+    }
+    if (App.elements.forgotPasswordView) {
+      App.elements.forgotPasswordView.classList.remove('hidden');
+    }
+  },
+
+  showResetPasswordView: (email) => {
+    App.state.resetPasswordEmail = email || '';
+    App.elements.authView.classList.add('hidden');
+    App.elements.mainView.classList.add('hidden');
+    if (App.elements.secretAdminRegisterView) {
+      App.elements.secretAdminRegisterView.classList.add('hidden');
+    }
+    if (App.elements.forgotPasswordView) {
+      App.elements.forgotPasswordView.classList.add('hidden');
+    }
+    const display = document.getElementById('resetPasswordEmailDisplay');
+    if (display) {
+      display.textContent = App.state.resetPasswordEmail;
+    }
+    if (App.elements.resetPasswordForm) {
+      App.elements.resetPasswordForm.reset();
+    }
+    if (App.elements.resetPasswordView) {
+      App.elements.resetPasswordView.classList.remove('hidden');
+    }
+  },
+
+  handleForgotPasswordEmail: async (event) => {
+    event.preventDefault();
+    const email = (document.getElementById('forgotPasswordEmail').value || '').trim();
+    if (!email) {
+      App.showToast('メールアドレスは必須です', 'error');
+      return;
+    }
+    App.setButtonLoading(App.elements.forgotPasswordSubmitBtn, true, '確認中');
+    App.setLoading(true);
+    try {
+      const res = await App.apiClient('POST', '/auth/reset-password/check', { email: email });
+      const confirmed = (res && res.email) || email;
+      App.showResetPasswordView(confirmed);
+    } catch (error) {
+      App.showToast(error.message || 'メールアドレスの確認に失敗しました', 'error');
+    } finally {
+      App.setButtonLoading(App.elements.forgotPasswordSubmitBtn, false);
+      App.setLoading(false);
+    }
+  },
+
+  handleResetPassword: async (event) => {
+    event.preventDefault();
+    const email = App.state.resetPasswordEmail || '';
+    const password = document.getElementById('resetPasswordNewPassword').value;
+    const confirm = document.getElementById('resetPasswordConfirmPassword').value;
+    if (!email) {
+      App.showToast('メールアドレスが確認できません。最初からやり直してください', 'error');
+      App.showForgotPasswordView();
+      return;
+    }
+    if (!password || !confirm) {
+      App.showToast('新しいパスワードを入力してください', 'error');
+      return;
+    }
+    if (password !== confirm) {
+      App.showToast('パスワードが一致しません', 'error');
+      return;
+    }
+    if (password.length < 4) {
+      App.showToast('パスワードは4文字以上にしてください', 'error');
+      return;
+    }
+    App.setButtonLoading(App.elements.resetPasswordSubmitBtn, true, '再設定中');
+    App.setLoading(true);
+    try {
+      await App.apiClient('POST', '/auth/reset-password', {
+        email: email,
+        password_hash: password
+      });
+      App.state.resetPasswordEmail = '';
+      App.showToast('パスワードを再設定しました。新しいパスワードでログインしてください', 'success');
+      App.showAuthView();
+      App.showLoginTab();
+      const loginEmail = document.getElementById('loginEmail');
+      if (loginEmail) {
+        loginEmail.value = email;
+      }
+      const loginPassword = document.getElementById('loginPassword');
+      if (loginPassword) {
+        loginPassword.value = '';
+        loginPassword.focus();
+      }
+    } catch (error) {
+      App.showToast(error.message || 'パスワードの再設定に失敗しました', 'error');
+    } finally {
+      App.setButtonLoading(App.elements.resetPasswordSubmitBtn, false);
+      App.setLoading(false);
     }
   },
 
@@ -401,6 +517,8 @@ const App = {
         email: email,
         password_hash: password
       });
+      // 通知失敗でも登録は成功扱い（専用 API・分離）
+      await App.notifyRegistrationPending(email, '新規登録（アプリ）');
       App.showToast('登録申請を受け付けました（承認待ち）', 'success');
       App.showLoginTab();
       App.elements.registerForm.reset();
@@ -409,6 +527,21 @@ const App = {
     } finally {
       App.setButtonLoading(App.elements.registerSubmitBtn, false);
       App.setLoading(false);
+    }
+  },
+
+  /** Phase 2: 承認依頼メール。失敗しても throw しない。 */
+  notifyRegistrationPending: async (email, note) => {
+    try {
+      const registeredAt =
+        new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ' JST';
+      await App.apiClient('POST', '/notify/registration', {
+        email: email,
+        registered_at: registeredAt,
+        note: note || ''
+      });
+    } catch (notifyErr) {
+      console.warn('registration notify failed (registration still OK):', notifyErr);
     }
   },
 
@@ -507,7 +640,8 @@ const App = {
       await Promise.all([
         App.loadChatSessions(),
         App.loadSuggestedQuestions(),
-        App.loadComments()
+        App.loadComments(),
+        App.loadKnowledge()
       ]);
       if (App.state.currentUser.role === 'admin') {
         await App.loadPendingUsers();
@@ -541,6 +675,7 @@ const App = {
     const map = {
       chat: 'chatScreen',
       comments: 'commentsScreen',
+      knowledge: 'knowledgeScreen',
       adminUsers: 'adminUsersScreen',
       adminData: 'adminDataScreen'
     };
@@ -604,6 +739,202 @@ const App = {
     App.renderCommentTable();
   },
 
+  loadKnowledge: async () => {
+    try {
+      const [srcRes, chunkRes] = await Promise.all([
+        App.apiClient('GET', '/knowledge-sources'),
+        App.apiClient('GET', '/knowledge-chunks')
+      ]);
+      const sources = (srcRes && srcRes.sources) ? srcRes.sources : [];
+      const map = {};
+      sources.forEach(function (s) {
+        if (s && s.source_key) map[s.source_key] = s;
+      });
+      App.state.knowledgeSources = map;
+      App.state.knowledgeChunks = (chunkRes && chunkRes.chunks) ? chunkRes.chunks : [];
+    } catch (e) {
+      console.warn('knowledge load skipped', e);
+      App.state.knowledgeChunks = App.state.knowledgeChunks || [];
+      App.state.knowledgeSources = App.state.knowledgeSources || {};
+    }
+    App.renderKnowledgeTable();
+  },
+
+  formatMmSs: (sec) => {
+    const s = Math.max(0, Math.floor(Number(sec) || 0));
+    const m = Math.floor(s / 60);
+    const ss = s % 60;
+    return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+  },
+
+  withVideoTimeUrl: (url, startSec) => {
+    if (!url) return '';
+    if (/[?&]t=/.test(url)) return url;
+    const hashIdx = url.indexOf('#');
+    const base = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+    const hash = hashIdx >= 0 ? url.slice(hashIdx) : '';
+    const sep = base.indexOf('?') >= 0 ? '&' : '?';
+    return base + sep + 't=' + Math.floor(Number(startSec) || 0) + hash;
+  },
+
+  buildCitationsFromRelated: (relatedComments, relatedChunks) => {
+    const citations = [];
+    (relatedComments || []).forEach(function (c) {
+      citations.push({
+        kind: 'comment',
+        sourceType: 'WeStudyコミュニティ',
+        commentId: c.comment_id || c.commentId || '',
+        authorName: c.author_name || c.authorName || '',
+        postedAt: c.posted_at || c.postedAt || '',
+        snippet: String(c.content || '').replace(/\s+/g, ' ').slice(0, 220)
+      });
+    });
+    (relatedChunks || []).forEach(function (ch) {
+      const sk = ch.source_key || '';
+      const src = App.state.knowledgeSources[sk] || {};
+      const start = ch.start_sec != null ? Number(ch.start_sec) : 0;
+      citations.push({
+        kind: 'video_chunk',
+        sourceType: 'WeStudyセミナー動画',
+        chunkKey: ch.chunk_key || '',
+        videoTitle: src.title || sk || '（タイトル不明）',
+        videoUrl: App.withVideoTimeUrl(src.video_url || '', start),
+        startSec: start,
+        startLabel: App.formatMmSs(start),
+        snippet: String(ch.content || '').replace(/\s+/g, ' ').slice(0, 220)
+      });
+    });
+    return citations;
+  },
+
+  openCitationInDb: (citation) => {
+    if (!citation) return;
+    if (citation.kind === 'video_chunk') {
+      App.switchScreen('knowledge');
+      if (App.elements.knowledgeSearchInput) {
+        App.elements.knowledgeSearchInput.value = citation.chunkKey || citation.videoTitle || '';
+        App.renderKnowledgeTable();
+      }
+      return;
+    }
+    App.switchScreen('comments');
+    if (App.elements.commentSearchInput) {
+      App.elements.commentSearchInput.value = citation.commentId || citation.snippet || '';
+      App.renderCommentTable();
+    }
+  },
+
+  renderCitationsPanel: (citations) => {
+    if (!citations || !citations.length) return '';
+    const items = citations.slice(0, 8).map(function (c) {
+      if (c.kind === 'video_chunk') {
+        const when = c.startLabel ? (c.startLabel + '（' + c.startSec + '秒）') : '';
+        const openDb =
+          '<button type="button" class="citation-db-link text-blue-700 underline ml-1" data-kind="video_chunk" data-key="' +
+          App.escapeHtml(c.chunkKey || '') +
+          '">DBで見る</button>';
+        const openVideo = c.videoUrl
+          ? (' <a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
+            App.escapeHtml(c.videoUrl) +
+            '">動画を開く</a>')
+          : '';
+        return (
+          '<li class="mb-1">' +
+          '<span class="font-medium">[WeStudyセミナー動画]</span> ' +
+          App.escapeHtml(c.videoTitle || '') +
+          (when ? ' — ' + App.escapeHtml(when) : '') +
+          openDb +
+          openVideo +
+          '<div class="text-slate-600">' +
+          App.escapeHtml(c.snippet || '') +
+          '</div></li>'
+        );
+      }
+      return (
+        '<li class="mb-1">' +
+        '<span class="font-medium">[WeStudyコミュニティ]</span> ' +
+        App.escapeHtml(c.authorName || '') +
+        ' #' +
+        App.escapeHtml(c.commentId || '') +
+        ' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="comment" data-key="' +
+        App.escapeHtml(c.commentId || '') +
+        '">DBで見る</button>' +
+        '<div class="text-slate-600">' +
+        App.escapeHtml(c.snippet || '') +
+        '</div></li>'
+      );
+    }).join('');
+    return (
+      '<div class="mt-3 border-t pt-2 text-xs">' +
+      '<div class="font-semibold mb-1">準拠データ</div>' +
+      '<ul>' +
+      items +
+      '</ul></div>'
+    );
+  },
+
+  formatAssistantHtml: (text) => {
+    const escaped = App.escapeHtml(text || '').replace(/\n/g, '<br>');
+    return escaped.replace(
+      /(https?:\/\/[^\s<]+)/g,
+      '<a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="$1">$1</a>'
+    );
+  },
+
+  renderKnowledgeTable: () => {
+    const body = App.elements.knowledgeTableBody;
+    if (!body) return;
+    const keyword = String((App.elements.knowledgeSearchInput && App.elements.knowledgeSearchInput.value) || '')
+      .trim()
+      .toLowerCase();
+    const rows = (App.state.knowledgeChunks || []).filter(function (ch) {
+      if (!keyword) return true;
+      const src = App.state.knowledgeSources[ch.source_key] || {};
+      const hay = [
+        ch.chunk_key,
+        ch.content,
+        ch.search_text,
+        ch.source_key,
+        src.title,
+        src.video_id
+      ]
+        .join(' ')
+        .toLowerCase();
+      return hay.indexOf(keyword) !== -1;
+    });
+    body.innerHTML = '';
+    rows.slice(0, 500).forEach(function (ch) {
+      const src = App.state.knowledgeSources[ch.source_key] || {};
+      const start = ch.start_sec != null ? Number(ch.start_sec) : 0;
+      const url = App.withVideoTimeUrl(src.video_url || '', start);
+      const tr = document.createElement('tr');
+      tr.className = 'border-t align-top';
+      tr.innerHTML =
+        '<td class="p-2 whitespace-nowrap">' +
+        App.escapeHtml(App.formatMmSs(start)) +
+        '</td>' +
+        '<td class="p-2">WeStudyセミナー動画</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(src.title || ch.source_key || '') +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(String(ch.content || '').slice(0, 180)) +
+        '</td>' +
+        '<td class="p-2">' +
+        (url
+          ? '<a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
+            App.escapeHtml(url) +
+            '">開く</a>'
+          : '') +
+        '</td>';
+      body.appendChild(tr);
+    });
+    if (App.elements.knowledgeListMeta) {
+      App.elements.knowledgeListMeta.textContent =
+        '表示 ' + Math.min(rows.length, 500) + ' / 全 ' + (App.state.knowledgeChunks || []).length + ' チャンク';
+    }
+  },
+
   loadPendingUsers: async () => {
     if (!App.state.currentUser || App.state.currentUser.role !== 'admin') return;
     const res = await App.apiClient('GET', '/admin/users/pending');
@@ -642,51 +973,6 @@ const App = {
     });
   },
 
-  formatAssistantHtml: (content) => {
-    const escaped = App.escapeHtml(content || '');
-    // 動画URL行をリンク化（回答本文内の "URL: https://..."）
-    return escaped.replace(
-      /(URL:\s*)(https?:\/\/[^\s<]+)/g,
-      '$1<a class="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer" href="$2">$2</a>'
-    ).replace(/\n/g, '<br>');
-  },
-
-  renderCitationsPanel: (citations) => {
-    if (!citations || !citations.length) return '';
-    const items = citations.slice(0, 5).map(function (c) {
-      if (c.kind === 'video_chunk') {
-        const when = c.startLabel
-          ? (c.startLabel + (c.startSec != null ? '（' + c.startSec + '秒）' : ''))
-          : '';
-        const link = c.videoUrl
-          ? (' <a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
-            App.escapeHtml(c.videoUrl) + '">動画を開く</a>')
-          : '';
-        return (
-          '<li class="mb-1">' +
-          '<span class="font-medium">[WeStudy動画]</span> ' +
-          App.escapeHtml(c.videoTitle || '（タイトル不明）') +
-          (when ? ' — ' + App.escapeHtml(when) : '') +
-          link +
-          '<div class="text-slate-600">' + App.escapeHtml(c.snippet || '') + '</div>' +
-          '</li>'
-        );
-      }
-      return (
-        '<li class="mb-1">' +
-        '<span class="font-medium">[' + App.escapeHtml(c.sourceType || 'WeStudy') + ']</span> ' +
-        App.escapeHtml(c.authorName || '') +
-        ' #' + App.escapeHtml(c.commentId || '') +
-        '<div class="text-slate-600">' + App.escapeHtml(c.snippet || '') + '</div>' +
-        '</li>'
-      );
-    }).join('');
-    return (
-      '<div class="mt-2 pt-2 border-t border-slate-200 text-xs">' +
-      '<div class="text-slate-500 mb-1">出典</div><ul class="list-disc pl-4">' + items + '</ul></div>'
-    );
-  },
-
   renderChatMessages: () => {
     const area = App.elements.chatMessages;
     area.innerHTML = '';
@@ -695,33 +981,37 @@ const App = {
       return;
     }
 
-    const lastAssistantIdx = (function () {
-      for (let i = App.state.chatMessages.length - 1; i >= 0; i -= 1) {
-        if (App.state.chatMessages[i].role === 'assistant') return i;
-      }
-      return -1;
-    })();
-
     App.state.chatMessages.forEach(function (m, idx) {
       const wrap = document.createElement('div');
       const bubble = document.createElement('div');
       const role = m.role === 'user' ? 'chat-user' : 'chat-assistant';
+      const isLastAssistant =
+        m.role === 'assistant' && idx === App.state.chatMessages.length - 1;
 
       bubble.className = 'chat-bubble ' + role;
-      const bodyHtml = m.role === 'assistant'
-        ? App.formatAssistantHtml(m.content || '')
-        : App.escapeHtml(m.content || '').replace(/\n/g, '<br>');
-      const citeHtml = (m.role === 'assistant' && idx === lastAssistantIdx)
-        ? App.renderCitationsPanel(App.state.lastCitations || [])
-        : '';
       bubble.innerHTML =
         '<div class="text-[11px] text-slate-500 mb-1">' +
         App.escapeHtml(m.role) + ' ・ ' + App.escapeHtml(m.created_at || '') +
         '</div>' +
-        '<div>' + bodyHtml + '</div>' + citeHtml;
+        '<div>' +
+        (m.role === 'assistant' ? App.formatAssistantHtml(m.content || '') : App.escapeHtml(m.content || '')) +
+        '</div>' +
+        (isLastAssistant ? App.renderCitationsPanel(App.state.lastCitations || []) : '');
 
       wrap.appendChild(bubble);
       area.appendChild(wrap);
+    });
+
+    area.querySelectorAll('.citation-db-link').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const kind = btn.getAttribute('data-kind');
+        const key = btn.getAttribute('data-key') || '';
+        if (kind === 'video_chunk') {
+          App.openCitationInDb({ kind: 'video_chunk', chunkKey: key });
+        } else {
+          App.openCitationInDb({ kind: 'comment', commentId: key });
+        }
+      });
     });
 
     area.scrollTop = area.scrollHeight;
@@ -858,14 +1148,15 @@ const App = {
         '<td class="p-2">' + App.escapeHtml(u.id) + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.email || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.status || '') + '</td>' +
-        '<td class="p-2"><button class="approve-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' + App.escapeHtml(u.id) + '">承認</button></td>';
+        '<td class="p-2"><button class="approve-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' + App.escapeHtml(u.id) + '" data-email="' + App.escapeHtml(u.email || '') + '">承認</button></td>';
       body.appendChild(tr);
     });
 
     body.querySelectorAll('.approve-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const id = btn.getAttribute('data-id');
-        App.confirmApproveUser(id);
+        const email = btn.getAttribute('data-email') || '';
+        App.confirmApproveUser(id, email);
       });
     });
   },
@@ -921,7 +1212,13 @@ const App = {
       const msgRes = await App.apiClient('POST', '/chat-sessions/' + sessionId + '/messages', {
         content: questionText
       });
-      App.state.lastCitations = (msgRes && msgRes.citations) ? msgRes.citations : [];
+      App.state.lastCitations = App.buildCitationsFromRelated(
+        (msgRes && msgRes.relatedComments) || [],
+        (msgRes && msgRes.relatedChunks) || []
+      );
+      if (msgRes && Array.isArray(msgRes.citations) && msgRes.citations.length) {
+        App.state.lastCitations = msgRes.citations;
+      }
 
       if (!fromSuggested) {
         await App.createSuggestedQuestionIfNeeded(questionText);
@@ -956,10 +1253,17 @@ const App = {
     }
   },
 
-  confirmApproveUser: async (userId) => {
+  confirmApproveUser: async (userId, email) => {
     if (!userId) {
       App.showToast('承認対象IDが不正です', 'error');
       return;
+    }
+    let applicantEmail = (email || '').trim();
+    if (!applicantEmail && App.state.pendingUsers && App.state.pendingUsers.length) {
+      const found = App.state.pendingUsers.find(function (u) {
+        return String(u.id) === String(userId);
+      });
+      if (found && found.email) applicantEmail = String(found.email).trim();
     }
     const ok = await App.openConfirmDialog('ユーザー承認', 'ユーザーID ' + userId + ' を承認しますか？');
     if (!ok) return;
@@ -967,12 +1271,28 @@ const App = {
     App.setLoading(true);
     try {
       await App.apiClient('PUT', '/admin/users/' + userId + '/approve');
+      if (applicantEmail) {
+        await App.notifyApprovalCompleted(applicantEmail);
+      } else {
+        console.warn('approval notify skipped: applicant email missing');
+      }
       App.showToast('ユーザーを承認しました', 'success');
       await App.loadPendingUsers();
     } catch (error) {
       App.showToast(error.message || '承認に失敗しました', 'error');
     } finally {
       App.setLoading(false);
+    }
+  },
+
+  /** Phase 3: 申請者へ承認完了メール。失敗しても throw しない。 */
+  notifyApprovalCompleted: async (email) => {
+    try {
+      await App.apiClient('POST', '/notify/approval', {
+        email: email
+      });
+    } catch (notifyErr) {
+      console.warn('approval notify failed (approval still OK):', notifyErr);
     }
   },
 
@@ -1411,3 +1731,4 @@ const App = {
 };
 
 document.addEventListener('DOMContentLoaded', App.init);
+
