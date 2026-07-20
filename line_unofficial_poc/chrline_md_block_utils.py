@@ -118,15 +118,23 @@ def build_yoritoori_block(
     tag: str,
     body: str,
     dk: str | None = None,
+    attachment_names: list[str] | None = None,
 ) -> str:
     dk_line = f"<!-- chrline-dk:{dk} -->" if dk else ""
     heading = format_line_heading(
         date_part, org_label, tag, body_for_tail=body, extra_suffix=dk_line
     )
+    attach = ""
+    if attachment_names:
+        attach = (
+            "\n**添付ファイル**: "
+            + ", ".join(attachment_names)
+            + "（添付フォルダに保存）\n"
+        )
     return f"""{heading}
 
 {wrap_details(body)}
-
+{attach}
 ---
 """
 

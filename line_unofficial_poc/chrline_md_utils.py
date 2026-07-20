@@ -23,7 +23,7 @@ def make_summary(body: str, max_len: int = 50) -> str:
     return text if len(text) <= max_len else text[: max_len - 1] + "…"
 
 
-_LINE_HEADING_MARKERS = ("[本文なし", "[メディア]")
+_LINE_HEADING_MARKERS = ("[本文なし", "[メディア]", "[画像]", "[動画]", "[音声]", "[ファイル]")
 
 
 def line_heading_tail(body: str) -> str:

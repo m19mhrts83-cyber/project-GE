@@ -1,0 +1,29 @@
+{
+  "disabled": false,
+  "routes": {
+    "tcell_caramel_g": {
+      "route_id": "tcell_caramel_g",
+      "folder": "103_Tcell",
+      "interval_days": 30,
+      "last_import_at": "2026-06-27T09:28:47+09:00",
+      "last_import_source": "bootstrap",
+      "last_prompted_at": "2026-07-19T17:28:27+09:00"
+    },
+    "leaf_grandole": {
+      "route_id": "leaf_grandole",
+      "folder": "104_LEAF",
+      "interval_days": 30,
+      "last_import_at": "2026-06-27T09:34:42+09:00",
+      "last_import_source": "bootstrap",
+      "last_prompted_at": "2026-07-19T17:28:27+09:00"
+    },
+    "kamiooya_kanji": {
+      "route_id": "kamiooya_kanji",
+      "folder": "815_神大家オプチャ/東海飲み会幹事やりとり",
+      "interval_days": 30,
+      "last_import_at": "2026-06-27T09:34:41+09:00",
+      "last_import_source": "bootstrap",
+      "last_prompted_at": "2026-07-19T17:28:27+09:00"
+    }
+  }
+}

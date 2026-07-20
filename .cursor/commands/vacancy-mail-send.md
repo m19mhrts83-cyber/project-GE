@@ -14,6 +14,7 @@ Grandole志賀本通I などの空室対策メールを、指定した Markdown 
   - ファイル: `20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx`
   - シート: `G2`
   - 場所: `/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部`
+  - **出先（git-repos のみ）**: 事前に `mail_automation/sync_vacancy_mail_data.sh` でミラー。詳細は `docs/運用コマンド一覧.md` §5「出先」
 - 実行用 Python スクリプト:
   - `~/git-repos/215_kamiooya/C1_cursor/mail_automation/interactive_vacancy_send.py`（OneDrive 本体と同内容の場合）
 - Python 実行環境:

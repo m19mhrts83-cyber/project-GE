@@ -21,6 +21,10 @@ def _is_chat_mid(s: str) -> bool:
     return len(s) >= 24 and s[:1] in {"m", "c"}
 
 
+def _is_thread_mid(s: str) -> bool:
+    return len(s) >= 24 and s[:1] == "t"
+
+
 def _is_square_mid(s: str) -> bool:
     return len(s) >= 24 and s.startswith("s")
 
@@ -287,35 +291,52 @@ def iter_threads(cl, square_chat_mid: str, limit: int):
             seen_tokens.add(nxt)
             continuation = nxt
         return
-    except Exception:
-        pass
+    except Exception as e:
+        print(
+            f"# iter_threads API失敗 ({square_chat_mid}): {type(e).__name__}: {e} — メイン履歴フォールバックへ",
+            file=sys.stderr,
+        )
 
-    # フォールバック: fetchSquareChatEvents から thread mid らしき値を推定
-    try:
-        res = cl.fetchSquareChatEvents(square_chat_mid, limit=max(20, limit))
-    except Exception:
-        return
+    # フォールバック: fetchSquareChatEvents をページングし thread mid らしき値を推定
     seen_mid: set[str] = set()
-    for d in _iter_dictish(res):
-        for key in ("squareChatThreadMid", "threadMid", 2, 3):
-            v = d.get(key)
-            if not isinstance(v, str):
-                continue
-            s = v.strip()
-            if not _is_chat_mid(s):
-                continue
-            if s == square_chat_mid:
-                continue
-            if s in seen_mid:
-                continue
-            seen_mid.add(s)
-            title = ""
-            for nk in ("name", "title", 4, 6):
-                nv = d.get(nk)
-                if isinstance(nv, str) and nv.strip() and not _is_chat_mid(nv):
-                    title = nv.strip()
-                    break
-            yield (s, title or "(thread?)")
+    cont_token: str | None = None
+    seen_cont: set[str] = set()
+    page_limit = max(20, min(limit, 200))
+    for _ in range(200):
+        try:
+            res = cl.fetchSquareChatEvents(
+                square_chat_mid,
+                limit=page_limit,
+                continuationToken=cont_token,
+            )
+        except Exception as e:
+            print(f"# iter_threads フォールバック失敗: {type(e).__name__}: {e}", file=sys.stderr)
+            return
+        for d in _iter_dictish(res):
+            for key in ("squareChatThreadMid", "threadMid", 2, 3):
+                v = d.get(key)
+                if not isinstance(v, str):
+                    continue
+                s = v.strip()
+                if not (_is_chat_mid(s) or _is_thread_mid(s)):
+                    continue
+                if s == square_chat_mid:
+                    continue
+                if s in seen_mid:
+                    continue
+                seen_mid.add(s)
+                title = ""
+                for nk in ("name", "title", 4, 6):
+                    nv = d.get(nk)
+                    if isinstance(nv, str) and nv.strip() and not _is_chat_mid(nv):
+                        title = nv.strip()
+                        break
+                yield (s, title or "(thread?)")
+        nxt = _pick_continuation(cl, res)
+        if not nxt or nxt in seen_cont:
+            break
+        seen_cont.add(nxt)
+        cont_token = nxt
 
 
 def main() -> int:

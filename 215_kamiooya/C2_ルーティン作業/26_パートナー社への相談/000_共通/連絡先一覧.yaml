@@ -1,7 +1,8 @@
 # パートナー社連絡先一覧（gmail / imessage / chatwork / line_to_yoritoori_clip / CHRLINE 系 PoC 用）
 # メールアドレスは小文字で統一。複数ある場合はすべて記載。
 # phones: iMessage/SMS 用。+819012345678 や 09012345678 など複数形式で登録可能。
-# chatwork_room_id: Chatwork API 取得対象ルームID（数値文字列）
+# chatwork_room_id: Chatwork API 取得対象ルームID（数値文字列）。複数ある場合は配列で指定可。
+# chatwork_rooms: room_id → 表示名（やり取り見出しに Chatwork・表示名 として出す。任意）
 # chatwork_account_name: 取得対象の相手表示名（任意。空なら自分以外を取り込み）
 # line: 人間向けメモ。主に「LINE トーク一覧に出る表示名」（グループ名・公式名）。line_mac_open_chat_poc.py の --title やアプリ内検索でそのまま使える表記で書く。複数トークがある場合は「 / 」などで並記。自動照合には使わない。
 # line_group_chat_mid: グループトークの chatMid（非公式クライアント CHRLINE 等の送受信・一覧取得の宛先）。chrline_list_chats_poc.py の左列（タブ区切り）。未使用なら "" のまま。
@@ -61,6 +62,9 @@ partners:
     line_direct_chat_mid: ""
     contact: "目黒"
     chatwork_room_id: ["422374412", "439357504"]
+    chatwork_rooms:
+      "422374412": "目黒 啓太"
+      "439357504": "【神大家】松野さん・スクール運営社員"
     chatwork_account_name: ""
   - folder: "809_神大家運営回答"
     name: "神大家運営回答"
@@ -78,7 +82,7 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: ""
-    chatwork_room_id: "420522792"
+    chatwork_room_id: ["420522792", "425809560"]
     chatwork_account_name: ""
   - folder: "908_SHIFT AI代理店"
     name: "SHIFT AI代理店"
@@ -128,6 +132,14 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "大石"
+  - folder: "317_日本総険"
+    name: "日本総険"
+    emails: ["ayanori.shimizu@iba-ns.co.jp"]
+    phones: []
+    line: ""
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "清水"
   - folder: "516_名古屋銀行"
     name: "名古屋銀行"
     emails: ["koshino_masashi@ex.meigin.co.jp"]
@@ -136,11 +148,3 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "越野将志"
-  - folder: "617_日本総険"
-    name: "日本総険"
-    emails: ["ayanori.shimizu@iba-ns.co.jp"]
-    phones: []
-    line: ""
-    line_group_chat_mid: ""
-    line_direct_chat_mid: ""
-    contact: "清水"

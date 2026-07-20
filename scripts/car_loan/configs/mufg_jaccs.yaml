@@ -1,0 +1,102 @@
+id: mufg_jaccs
+lender: 三菱UFJ銀行
+product: ネットDEマイカーローン（JACCS経由・凸版印刷 mncollect）
+
+# Cursor 内蔵ブラウザ不可（window.open → _ESY0C020）。Google Chrome + CDP 必須。
+cdp_port: 9223
+chrome_profile: ~/.jarvis_state/chrome_mufg_jaccs
+
+credentials:
+  receipt_env: MUFG_JACCS_RECEIPT_NUMBER
+  password_env: MUFG_JACCS_LOGIN_PASSWORD
+  state_app_id: mufg_net_de_mycar
+
+entry:
+  # 正しい入口: JACCS 案内の uppage（B010 直アクセスは 400）
+  upload_url_template: "https://mncollect.bk.mufg.jp/honkaku/uppage.php?param1={receipt}&param4=40"
+  jaccs_login_url: "https://ecredit.jaccs.co.jp/bank/Service?_TRANID=BWFLoginDL"
+  guide_popup_js: "doTransactionForWin2NoMsg('JXMF020040_01M')"
+
+flow:
+  pre_pages: ["/honkaku/A010"]
+  upload_page: "/honkaku/B010"
+  confirm_page: "/honkaku/E010"
+  done_page: "/honkaku/F010"
+  done_success_text: "受付完了"
+
+selectors:
+  block: ".upLoad"
+  open_modal: ".fileBtn"
+  modal_file_button: "#mdlBtn"
+  confirm_image: 'button:has-text("この画像を使用する")'
+  next_button: "#btn-next"
+  consent_checkbox: "#checkConsent02"
+  submit_button: 'button:has-text("アップロードを完了する")'
+  pre_next_button: "button.next.nextBtn"
+
+documents:
+  - key: license_front
+    option_keywords: ["運転免許証（表）"]
+    file_globs: ["01_運転免許証_表.*", "01_*免許*表*"]
+  - key: license_back
+    option_keywords: ["運転免許証（裏）", "裏"]
+    file_globs: ["02_運転免許証_裏.*", "02_*免許*裏*"]
+  - key: gensen
+    option_keywords: ["源泉"]
+    file_globs: ["03_源泉*", "03_*源泉*"]
+  - key: estimate
+    option_keywords: ["資金使途", "見積"]
+    file_globs:
+      - "04_見積書_名鉄AUTOMINI緑.pdf"
+      - "04_見積書_*.pdf"
+      - "04_*見積*"
+
+# 本審査承認後の追加提出（本人確認・収入証明は提出不要、資金使途×2）
+post_approval:
+  entry:
+    jaccs_login_url: "https://ecredit.jaccs.co.jp/bank/Service?_TRANID=BWFLoginDL&MAILID=20"
+  documents:
+    - key: id_skip
+      skip: true
+      option_keywords: ["本人確認書類提出不要"]
+    - key: income_skip
+      skip: true
+      option_keywords: ["収入証明書類提出不要"]
+    - key: dealer_transfer
+      option_keywords: ["資金使途"]
+      file_globs: ["05_ディーラー振込先*", "05_*振込*"]
+    - key: order_or_contract
+      option_keywords: ["資金使途"]
+      file_globs:
+        - "06_新車注文書*"
+        - "06_注文書*"
+        - "06_売買契約書*"
+        - "04_見積書_ご購入プラン計算書*"
+        - "04_見積書_*.pdf"
+
+# 書類不備の再提出（免許証表のみ。他は「不要」）
+resubmit_deficiency:
+  entry:
+    jaccs_login_url: "https://ecredit.jaccs.co.jp/bank/Service?_TRANID=BWFLoginDL&MAILID=20"
+  documents:
+    - key: license_front
+      option_keywords: ["運転免許証（表）"]
+      file_globs: ["01_運転免許証_表.*", "01_*免許*表*"]
+    - key: license_back
+      option_keywords: ["運転免許証（裏）"]
+      file_globs: ["02_運転免許証_裏.*", "02_*免許*裏*"]
+    - key: gensen
+      skip: true
+      option_keywords: ["収入証明書類提出不要"]
+    - key: estimate
+      option_keywords: ["資金使途"]
+      file_globs:
+        - "04_見積書_名鉄AUTOMINI緑.pdf"
+        - "04_見積書_*.pdf"
+
+default_submit_folder: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/800_車両購入検討/MINI_CountrymanD_三菱UFJ本審査提出_202606"
+
+notes: |
+  - 見積は画面上「資金使途確認書類またはその他書類」を選択
+  - ブロックは ①表 → ②裏 → ③源泉 → ④資金使途 の順で1つずつ出現
+  - 問い合わせ: 三菱UFJ 無担保ローンデスク 0120-860-116

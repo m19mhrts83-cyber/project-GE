@@ -665,6 +665,31 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
 
     to_email = emails[0]
     cc = _normalize_mail_addresses((ref_info.get("cc") or "").strip()) if ref_info else ""
+    # YORITOORI_EXTRA_CC は YORITOORI_EXTRA_CC_PARTNER で対象パートナーを明示した
+    # ときだけ適用する（環境変数が残ったまま別パートナーへ CC される事故を防ぐ）。
+    extra_cc = os.environ.get("YORITOORI_EXTRA_CC", "").strip()
+    if extra_cc:
+        cc_partner = os.environ.get("YORITOORI_EXTRA_CC_PARTNER", "").strip()
+        if not cc_partner or (
+            cc_partner not in folder_path and cc_partner not in partner_name
+        ):
+            print(
+                "  ※YORITOORI_EXTRA_CC は無視しました"
+                f"（YORITOORI_EXTRA_CC_PARTNER='{cc_partner}' が"
+                f" 送信先 {partner_name} と一致しません）。",
+                file=sys.stderr,
+            )
+            extra_cc = ""
+    if extra_cc:
+        merged = ", ".join(x for x in (cc, extra_cc) if x)
+        parts = []
+        seen = set()
+        for addr in re.split(r"[,;]\s*", merged):
+            a = addr.strip()
+            if a and a.lower() not in seen:
+                seen.add(a.lower())
+                parts.append(a)
+        cc = _normalize_mail_addresses(", ".join(parts))
     message_dict = build_reply_message(
         to_email,
         use_subject,

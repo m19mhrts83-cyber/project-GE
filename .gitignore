@@ -72,3 +72,12 @@ dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx
 
 # --- 500 固有（トークン・API Key） ---
 500_obsidian/99_token*/
+
+# CHRLINE-Patch local venv (large)
+**/.venv-patch/
+.venv-patch/
+
+**/.jarvis_backup/
+
+**/knowledge_local.sqlite3
+**/state/knowledge_local.sqlite3

@@ -10,7 +10,7 @@
 1. Googleスプレッドシートを新規作成  
 2. 必要シートを作る  
 3. `得点基準` シートに `02_得点基準_seed.csv` を貼る  
-4. Apps Script に `04_gas_Code.gs` を貼る  
+4. Apps Script に `04_gas_Code_V2.1.gs` を貼る  
 5. `設定` シートに APIキーなどを入れる  
 6. `initializeSheets` → `importCsvByConfig` → `runScoring` の順で実行  
 
@@ -23,7 +23,7 @@
 - Googleアカウント（ログイン済み）
 - このフォルダ内ファイル
   - `02_得点基準_seed.csv`
-  - `04_gas_Code.gs`
+  - `04_gas_Code_V2.1.gs`
   - WeStudy CSVファイル（今回は `forum_comments_...csv`）
 - Gemini APIキー
 
@@ -76,7 +76,7 @@
 2. `Apps Script` をクリック
 3. 左側の `Code.gs` を開く
 4. 既存内容を全削除
-5. ローカル `04_gas_Code.gs` の中身を貼り付け
+5. ローカル `04_gas_Code_V2.1.gs` の中身を貼り付け
 6. 保存（フロッピーマーク）
 
 ---
@@ -89,8 +89,9 @@
 |---|---|
 | GEMINI_API_KEY | あなたのAPIキー |
 | GEMINI_MODEL | gemini-2.0-flash |
-| TARGET_MONTH | 2026-03 |
-| DRIVE_CSV_FILE_ID | 後で入力 |
+| TARGET_MONTH | （空白可・未使用） |
+| DRIVE_CSV_FOLDER_ID | 採点用フォルダ ID |
+| DRIVE_CSV_FILENAME | WeStudy_for_scoring.csv |
 | SOURCE_SHEET_NAME | 元データ |
 | RULES_SHEET_NAME | 得点基準 |
 | RESULT_SHEET_NAME | 採点結果 |
@@ -115,16 +116,14 @@
 
 これで `runScoring` を実行する準備が整います。
 
-## 7. CSVをDriveに置いて File ID を取得
+## 7. CSVをDriveに置く（毎月の上書き）
 
-1. WeStudyのCSVをGoogle Driveにアップロード  
-   - おすすめ: 毎月 **同じファイル** を上書き利用する  
-   - 例: フォルダ内に `WeStudy_for_scoring.csv` を1つだけ置き、毎月その中身を差し替える  
-   - この方法なら、**ファイルIDは変わらないので、`DRIVE_CSV_FILE_ID` は最初に1回設定すればOK**
-2. ファイルを開き、URLを確認  
-   例: `https://drive.google.com/file/d/FILE_ID/view`
-3. `FILE_ID` の部分をコピー
-4. `設定` シートの `DRIVE_CSV_FILE_ID` に貼り付け
+1. 採点用 Google Drive フォルダに **`WeStudy_for_scoring.csv`** を1つ置く（初回のみ）
+2. 毎月 WeStudy から CSV を出したら、**同じファイル名で上書き**（Drive の Replace）
+3. `設定` シートに初回だけ入力:
+   - `DRIVE_CSV_FOLDER_ID` … フォルダ URL の `/folders/` の後ろ
+   - `DRIVE_CSV_FILENAME` … `WeStudy_for_scoring.csv`（省略時も同じ名前で探す）
+4. メニュー **「CSV取込」** で `元データ` に読み込む（**File ID の貼り替えは不要**）
 
 ---
 

@@ -59,7 +59,7 @@ cat > "$HEALTH_PLIST" <<EOF
   <key>WorkingDirectory</key>
   <string>${REPO_DIR}</string>
   <key>RunAtLoad</key>
-  <true/>
+  <false/>
   <key>StartCalendarInterval</key>
   <dict>
     <key>Hour</key>
@@ -75,16 +75,21 @@ cat > "$HEALTH_PLIST" <<EOF
 </plist>
 EOF
 
-launchctl bootout "gui/${UID_VALUE}" "$WATCH_PLIST" > /dev/null 2>&1 || true
-launchctl bootout "gui/${UID_VALUE}" "$HEALTH_PLIST" > /dev/null 2>&1 || true
+launchctl bootout "gui/${UID_VALUE}/${WATCH_LABEL}" > /dev/null 2>&1 || true
+launchctl bootout "gui/${UID_VALUE}/${HEALTH_LABEL}" > /dev/null 2>&1 || true
+# bootout直後はlaunchd内部の解除が完了しておらずbootstrapがI/O errorになる場合がある。
+sleep 2
+
+# pause.sh による disabled 状態が残っていると bootstrap が I/O error になるため先に解除。
+launchctl enable "gui/${UID_VALUE}/${WATCH_LABEL}" || true
+launchctl enable "gui/${UID_VALUE}/${HEALTH_LABEL}" || true
 
 launchctl bootstrap "gui/${UID_VALUE}" "$WATCH_PLIST"
 launchctl bootstrap "gui/${UID_VALUE}" "$HEALTH_PLIST"
 
-launchctl enable "gui/${UID_VALUE}/${WATCH_LABEL}" || true
-launchctl enable "gui/${UID_VALUE}/${HEALTH_LABEL}" || true
-
 launchctl kickstart -k "gui/${UID_VALUE}/${WATCH_LABEL}" || true
+# watch の状態ファイル作成前に healthcheck が誤警告しないよう起動を待つ。
+sleep 10
 launchctl kickstart -k "gui/${UID_VALUE}/${HEALTH_LABEL}" || true
 
 echo "Installed launch agents:"

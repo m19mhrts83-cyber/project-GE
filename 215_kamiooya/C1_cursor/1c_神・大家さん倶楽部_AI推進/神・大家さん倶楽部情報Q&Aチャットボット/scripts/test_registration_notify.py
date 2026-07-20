@@ -3,8 +3,9 @@
 """POST test payload to registration-notify GAS webhook.
 
 Usage:
-  test_registration_notify.py [email]              # type=registration（管理者宛）
-  test_registration_notify.py --approval [email]   # type=approval（申請者宛）
+  test_registration_notify.py [email]                    # type=registration（管理者宛）
+  test_registration_notify.py --approval [email]         # type=approval（申請者宛）
+  test_registration_notify.py --password-reset [email]   # type=password_reset（申請者宛）
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 JST = timezone(timedelta(hours=9))
 
@@ -39,16 +41,25 @@ def load_env() -> None:
 def main() -> int:
     load_env()
     args = [a for a in sys.argv[1:] if a]
-    approval = False
+    mode = "registration"
     if args and args[0] in ("--approval", "-a"):
-        approval = True
+        mode = "approval"
+        args = args[1:]
+    elif args and args[0] in ("--password-reset", "--reset", "-p"):
+        mode = "password_reset"
         args = args[1:]
 
     url = (os.environ.get("NOTIFY_WEBHOOK_URL") or "").strip()
     secret = (os.environ.get("NOTIFY_SHARED_SECRET") or "").strip()
+    app_url = (
+        os.environ.get("NOTIFY_APP_URL")
+        or os.environ.get("RAIMO_APP_URL")
+        or "https://ma-54t2keqdelz3.raimo-app.buzz/"
+    ).rstrip("/") + "/"
+
     default_email = (
         (os.environ.get("NOTIFY_ADMIN_TO") or "").split(",")[0].strip()
-        if approval
+        if mode in ("approval", "password_reset")
         else "phase0-test@example.com"
     )
     email = (args[0] if args else "").strip() or default_email
@@ -60,16 +71,35 @@ def main() -> int:
         print("NOTIFY_SHARED_SECRET が未設定です。")
         return 1
     if not email:
-        print("送信先 email が未指定です（--approval 時は NOTIFY_ADMIN_TO か引数）。")
+        print("送信先 email が未指定です（--approval / --password-reset 時は NOTIFY_ADMIN_TO か引数）。")
         return 1
 
-    if approval:
+    if mode == "approval":
         payload = {
             "secret": secret,
             "type": "approval",
             "email": email,
         }
         print("mode approval →", email)
+    elif mode == "password_reset":
+        token = str(uuid4())
+        reset_url = f"{app_url}#reset-password?token={token}"
+        # 日本時間で「今日＋7日」の 23:59 表示（メール用）
+        now_jst = datetime.now(JST)
+        end = (now_jst + timedelta(days=7)).replace(
+            hour=23, minute=59, second=59, microsecond=999000
+        )
+        expires_display = f"{end.year}年{end.month}月{end.day}日 23:59（日本時間）"
+        payload = {
+            "secret": secret,
+            "type": "password_reset",
+            "email": email,
+            "reset_url": reset_url,
+            "expires_at": expires_display,
+        }
+        print("mode password_reset →", email)
+        print("reset_url", reset_url)
+        print("expires", expires_display)
     else:
         payload = {
             "secret": secret,

@@ -172,39 +172,106 @@ def _click_tree_path(page, *segments: str) -> None:
     print(f"  ツリー選択: {' → '.join(segments)}")
 
 
-def _click_inner_folder_link(page, name: str, *, retries: int = 5) -> None:
-    """右ペイン (#inner_right) のフォルダリンクを開く。"""
-    for attempt in range(retries):
-        found = page.evaluate(
-            """(name) => {
-                const link = [...document.querySelectorAll('#inner_right a.view_folder')]
-                    .find((el) => el.innerText.trim() === name);
-                if (!link) return false;
-                link.click();
-                return true;
-            }""",
-            name,
-        )
-        if found:
-            _wait_ready(page)
-            page.wait_for_timeout(800)
-            print(f"  フォルダを開く: {name}")
-            return
-        page.wait_for_timeout(1000)
-    raise RuntimeError(f"メイン一覧にフォルダが見つかりません: {name}")
+def _position_name(page) -> str:
+    return page.evaluate(
+        """() => {
+            const inner = document.querySelector('#inner_right');
+            if (!inner) return '';
+            const span = inner.querySelector('.title_area .position_name');
+            return span ? span.innerText.trim() : '';
+        }"""
+    )
+
+
+def _wait_position(page, expected: str, *, timeout_ms: int = 12000) -> bool:
+    import time
+
+    deadline = time.time() + timeout_ms / 1000
+    while time.time() < deadline:
+        if _position_name(page) == expected:
+            return True
+        page.wait_for_timeout(400)
+    return _position_name(page) == expected
+
+
+def _click_listing_folder(page, name: str) -> bool:
+    return page.evaluate(
+        """(name) => {
+            const inner = document.querySelector('#inner_right');
+            if (!inner) return false;
+            const link = [...inner.querySelectorAll('a.view_folder')]
+                .filter(a => !a.closest('.title_area'))
+                .find(a => a.innerText.trim() === name);
+            if (!link) return false;
+            link.click();
+            return true;
+        }""",
+        name,
+    )
+
+
+def _click_breadcrumb(page, name: str) -> bool:
+    return page.evaluate(
+        """(name) => {
+            const inner = document.querySelector('#inner_right');
+            if (!inner) return false;
+            const link = [...inner.querySelectorAll('.title_area a.view_folder')]
+                .find(a => a.innerText.trim() === name);
+            if (!link) return false;
+            link.click();
+            return true;
+        }""",
+        name,
+    )
+
+
+def _open_listing_folder(page, name: str, *, retries: int = 4) -> bool:
+    for _ in range(retries):
+        if _click_listing_folder(page, name):
+            if _wait_position(page, name, timeout_ms=8000):
+                return True
+        page.wait_for_timeout(800)
+    return False
+
+
+def _goto_year(page, year: str, *, retries: int = 3) -> bool:
+    for _ in range(retries):
+        try:
+            _open_shared_folder_tab(page)
+            _click_tree_path(page, "カラフルファイル（法人）", year)
+        except Exception:
+            pass
+        if _wait_position(page, year, timeout_ms=8000):
+            return True
+        page.wait_for_timeout(600)
+    return _position_name(page) == year
+
+
+def _goto_quarter_listing(page, year: str, quarter: str) -> bool:
+    if _click_breadcrumb(page, quarter) and _wait_position(page, quarter, timeout_ms=5000):
+        return True
+    if not _goto_year(page, year):
+        return False
+    return _open_listing_folder(page, quarter)
 
 
 def _navigate_to_folder(
     page, *, year: str, quarter: str, category: str, subfolder: str | None = None
 ) -> None:
     """共有フォルダ → カラフルファイル（法人）→ 年度 → 四半期 → 分類フォルダへ遷移。"""
-    _open_shared_folder_tab(page)
+    if not _goto_quarter_listing(page, year, quarter):
+        raise RuntimeError(f"四半期に到達できません: {year}/{quarter}")
+    print(f"  フォルダを開く: {quarter}")
 
-    _click_tree_path(page, "カラフルファイル（法人）", year)
-    _click_inner_folder_link(page, quarter)
-    _click_inner_folder_link(page, category)
+    if not _open_listing_folder(page, category):
+        if not (_goto_quarter_listing(page, year, quarter) and _open_listing_folder(page, category)):
+            raise RuntimeError(f"メイン一覧にフォルダが見つかりません: {category}")
+    print(f"  フォルダを開く: {category}")
+
     if subfolder:
-        _click_inner_folder_link(page, subfolder)
+        if not _open_listing_folder(page, subfolder):
+            raise RuntimeError(f"メイン一覧にフォルダが見つかりません: {subfolder}")
+        print(f"  フォルダを開く: {subfolder}")
     _wait_ready(page)
 
 

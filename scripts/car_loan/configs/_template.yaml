@@ -1,0 +1,56 @@
+# 新規銀行追加用テンプレート（コピーして banks/configs に配置）
+id: example_bank
+lender: 銀行名
+product: マイカーローン商品名
+
+cdp_port: 9225
+chrome_profile: ~/.jarvis_state/chrome_car_loan_example
+
+credentials:
+  receipt_env: EXAMPLE_RECEIPT_NUMBER
+  password_env: EXAMPLE_LOGIN_PASSWORD
+  state_app_id: example_mycar
+
+entry:
+  upload_url_template: "https://example.bank.jp/upload?ref={receipt}"
+  # または jaccs 型: jaccs_login_url + guide_popup_js
+
+flow:
+  pre_pages: []          # 例: ["/honkaku/A010"] — 同意画面のパス断片
+  upload_page: ""        # アップロード画面 URL に含まれる断片
+  confirm_page: ""
+  done_page: ""
+  done_success_text: "受付完了"
+
+selectors:
+  # MUFG 同型のときは mufg_jaccs.yaml と同じでよい
+  block: ".upLoad"
+  open_modal: ".fileBtn"
+  modal_file_button: "#mdlBtn"
+  confirm_image: 'button:has-text("この画像を使用する")'
+  next_button: "#btn-next"
+  consent_checkbox: "#checkConsent02"
+  submit_button: 'button:has-text("アップロードを完了する")'
+  pre_next_button: "button.next.nextBtn"
+
+documents:
+  - key: license_front
+    option_keywords: ["運転免許証（表）"]
+    file_globs: ["01_運転免許証_表.*"]
+  - key: license_back
+    option_keywords: ["裏"]
+    file_globs: ["02_運転免許証_裏.*"]
+  - key: gensen
+    option_keywords: ["源泉"]
+    file_globs: ["03_源泉*"]
+  - key: estimate
+    option_keywords: ["見積", "資金使途"]
+    file_globs: ["04_見積*"]
+
+default_submit_folder: ""
+
+# 実装チェックリスト:
+# 1. entry.upload_url_template がセッション付きか（直リンクは 400 になりやすい）
+# 2. file input 直操作 vs モーダル file chooser（400 ならモーダル必須）
+# 3. 書類枠が一括4枠か逐次出現か（逐次なら block index = documents 順）
+# 4. Cursor 内蔵ブラウザで window.open があるか → Chrome CDP 必須

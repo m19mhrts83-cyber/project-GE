@@ -1,5 +1,5 @@
 /**
- * 神・大家さん倶楽部 Q&A — 登録・承認まわりメール通知
+ * 神・大家さん倶楽部 Q&A — 登録・承認・パスワード再設定メール通知
  *
  * 配置: Google Apps Script プロジェクトに本ファイルを貼り付け
  * プロジェクト名案: kamiooya-qa-registration-notify
@@ -7,12 +7,13 @@
  * スクリプトのプロパティ（プロジェクト設定 → スクリプト プロパティ）:
  *   SHARED_SECRET  … 呼び出し元と共有する秘密（必須）
  *   ADMIN_TO       … 承認依頼の宛先（type=registration 時必須）。複数はカンマ区切り
- *   APP_URL        … アプリURL。type=approval では必須。registration では任意（本文掲載）
+ *   APP_URL        … アプリURL。type=approval では必須。registration / password_reset では任意
  *
  * POST JSON:
  *   { secret, email, type? }
  *   type 省略 / "registration" … 管理者へ承認依頼
  *   type "approval"           … 申請者（email）へ承認完了＋APP_URL
+ *   type "password_reset"     … 申請者へ再設定URL（reset_url 必須、または APP_URL+token）
  *
  * デプロイ: デプロイ → 新しいデプロイ → 種類「ウェブアプリ」
  *   実行ユーザー: 自分 / アクセスできるユーザー: 全員
@@ -45,7 +46,11 @@ function doPost(e) {
     }
 
     var notifyType = String(body.type || 'registration').trim().toLowerCase();
-    if (notifyType !== 'registration' && notifyType !== 'approval') {
+    if (
+      notifyType !== 'registration' &&
+      notifyType !== 'approval' &&
+      notifyType !== 'password_reset'
+    ) {
       return json_(400, { ok: false, error: 'INVALID_TYPE' });
     }
 
@@ -56,6 +61,9 @@ function doPost(e) {
 
     if (notifyType === 'approval') {
       return sendApprovalToApplicant_(email, appUrl);
+    }
+    if (notifyType === 'password_reset') {
+      return sendPasswordResetToApplicant_(email, appUrl, body);
     }
     return sendRegistrationToAdmin_(email, adminTo, appUrl, body);
   } catch (err) {
@@ -133,12 +141,56 @@ function sendApprovalToApplicant_(applicantEmail, appUrl) {
   return json_(200, { ok: true, type: 'approval' });
 }
 
+function sendPasswordResetToApplicant_(applicantEmail, appUrl, body) {
+  var resetUrl = String(body.reset_url || '').trim();
+  if (!resetUrl) {
+    var token = String(body.token || '').trim();
+    var base = String(appUrl || '').trim().replace(/\/+$/, '');
+    if (base && token) {
+      resetUrl = base + '/#reset-password?token=' + encodeURIComponent(token);
+    }
+  }
+  if (!resetUrl) {
+    return json_(400, {
+      ok: false,
+      error: 'RESET_URL_REQUIRED',
+      message: 'reset_url（または APP_URL + token）が必要です'
+    });
+  }
+
+  var expiresNote = String(body.expires_at || '').trim();
+  var subject = '【神大家Q&A】パスワード再設定のご案内';
+  var lines = [
+    '神・大家さん倶楽部 情報Q&Aチャットボットのパスワード再設定リクエストを受け付けました。',
+    '',
+    '以下のURLから、新しいパスワードを設定してください。',
+    '',
+    resetUrl,
+    '',
+    expiresNote
+      ? '有効期限: ' + expiresNote + 'まで（期限を過ぎるとリンクは使えません）'
+      : 'リンクの有効期限は、発行日の1週間後・日本時間23:59までです。',
+    '',
+    '心当たりがない場合は、このメールを無視してください。パスワードは変更されません。',
+    '',
+    '（このメールは自動送信です）'
+  ];
+
+  MailApp.sendEmail({
+    to: applicantEmail,
+    subject: subject,
+    body: lines.join('\n')
+  });
+
+  return json_(200, { ok: true, type: 'password_reset' });
+}
+
 /** ブラウザで開いたときの簡易ヘルスチェック */
 function doGet() {
   return json_(200, {
     ok: true,
     service: 'kamiooya-qa-registration-notify',
-    hint: 'POST JSON { secret, email, type?: registration|approval }'
+    hint: 'POST JSON { secret, email, type?: registration|approval|password_reset }'
   });
 }
 

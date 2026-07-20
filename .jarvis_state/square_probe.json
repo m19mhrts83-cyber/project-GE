@@ -1,0 +1,103 @@
+{
+  "structural_limit": false,
+  "structural_limit_note": "2026-07-05: CHRLINE-Patch 2.6.14 + スロットル + heal/reopen で815スレッド日常同期復旧。旧 join_denied 誤 closed は reopen で解消。30空室 archived57 再probeも全件OK。",
+  "resolution": {
+    "method": "CHRLINE-Patch 2.6.14 (WEDeach) を line_unofficial_poc/.venv-patch に導入",
+    "runner": "line_unofficial_poc/run_patch.sh（実LINEドメインを env で固定）",
+    "verified_at": "2026-07-05T03:30:00+00:00",
+    "verified": "main/thread fetchSquareChatEvents=OK。815 5ルート計503スレッド日常同期。誤 closed:join_denied は reopen+probe で復旧",
+    "pending": "01全体周知Gはメインのみ。新規スレッドはメイン discover → YAML 追記",
+    "batch401_mitigations": [
+      "401後 stale sync_token を state に残さない",
+      "LINE_CHRLINE_CALL_INTERVAL_MS スロットル（既定400ms、日常800ms推奨）",
+      "V3_TOKEN_CLIENT_LOGGED_OUT ミッドラン復旧（refreshToken/保存トークン）",
+      "chrline_square_thread_probe.py / chrline_archived_thread_probe.py でスレッド単位切り分け",
+      "誤 join_denied closed → _reopen_false_join_denied_threads + --heal-degraded-threads"
+    ],
+    "batch_verify_2026_07_05": {
+      "route": "30_kuushitsu_soudan_g",
+      "thread_probe_ok": 13,
+      "thread_probe_ng": 57,
+      "thread_probe_total": 70,
+      "note": "初回probe時は13/70。archived57は401扱いで退避。後日再probeで57/57 OK→YAML復帰"
+    },
+    "archived_reprobe_2026_07_05": {
+      "route": "30_kuushitsu_soudan_g",
+      "script": "chrline_archived_thread_probe.py",
+      "archived_count": 57,
+      "ok": 57,
+      "ng": 0,
+      "action": "thread_mids へ57件復帰（active 13→70）。catchup sync appended=2",
+      "note": "初回NGはバッチ/セッション/誤closedの影響。単体probe+reopenでは全件取得可"
+    },
+    "daily_ops_rollout_2026_07_05": {
+      "routes": {
+        "30_kuushitsu_soudan_g": {
+          "yaml_threads": 70,
+          "state_ok": 70,
+          "archived": 0,
+          "reopen_delta": "+57 archived復帰",
+          "prod_sync_appended": 2
+        },
+        "34_hoken_soudan_g": {
+          "yaml_threads": 34,
+          "state_ok": 34,
+          "probe_ok": 34,
+          "prod_sync_appended": 0
+        },
+        "33_yuushi_soudan_g": {
+          "yaml_threads": 190,
+          "state_ok": 190,
+          "reopen_delta": "+187",
+          "probe_ok": 190,
+          "prod_sync_appended": 8
+        },
+        "31_shuzen_soudan_g": {
+          "yaml_threads": 134,
+          "state_ok": 134,
+          "reopen_delta": "+134",
+          "probe_ok": 134,
+          "prod_sync_appended": 4
+        },
+        "12_toukai_hokuriku_g": {
+          "yaml_threads": 75,
+          "state_ok": 75,
+          "reopen_delta": "+75",
+          "probe_ok": 75,
+          "prod_sync_appended": 0
+        }
+      },
+      "total_yaml_threads": 503,
+      "total_state_ok": 503,
+      "method": "reopen false join_denied → probe → prod sync --heal-degraded-threads --thread-catchup-pages 8"
+    }
+  },
+  "last_ok": {
+    "ok": true,
+    "main_ok": true,
+    "thread_ok": true,
+    "device": "DESKTOPWIN",
+    "app_version": "9.0.0.3360",
+    "chrline_package": "2.6.14",
+    "at": "2026-07-05T03:30:00+00:00",
+    "note": "815 503スレッド日常同期 + 30 archived57 再probe OK"
+  },
+  "last_run_at": "2026-07-05T03:30:00+00:00",
+  "last_probe_at": "2026-07-05T03:28:00+00:00",
+  "last_probe": {
+    "ok": true,
+    "main_ok": true,
+    "thread_ok": true,
+    "chrline_package": "2.6.14",
+    "context": "30_kuushitsu archived57 re-probe ok=57 ng=0"
+  },
+  "history": [
+    {
+      "at": "2026-07-05T03:28:00+00:00",
+      "event": "30_kuushitsu archived_reprobe",
+      "ok": 57,
+      "ng": 0,
+      "total": 57
+    }
+  ]
+}

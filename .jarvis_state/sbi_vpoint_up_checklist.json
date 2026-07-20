@@ -1,0 +1,49 @@
+{
+  "updated_at": "2026-07-04",
+  "program": "SBI証券 Vポイントアッププログラム（Olive Infinite 6777）",
+  "checklist": {
+    "chuukai_smbc": {
+      "status": "ok_user_confirmed",
+      "note": "ユーザー確認: Olive（三井住友銀行）仲介。SBI WebはモバイルUIで銀行名未取得のことがある"
+    },
+    "main_point_v": {
+      "status": "ok",
+      "note": "メインポイント=Vポイント"
+    },
+    "vpoint_card": {
+      "status": "ok",
+      "note": "Vポイントカード登録済み"
+    },
+    "vpass_smbc_auth": {
+      "status": "ok",
+      "note": "三井住友カードVポイント認証済み"
+    },
+    "smbc_id_card_6777": {
+      "status": "ok",
+      "note": "VpassアプリでOlive INF下4桁6777・カード番号登録をユーザー確認"
+    },
+    "olive_asset_service": {
+      "status": "ok_user_confirmed",
+      "note": "三井住友銀行アプリで資産運用サービス申込済み・仲介管理口座Oliveをユーザー確認"
+    },
+    "vpoint_invest_10k": {
+      "status": "ordered",
+      "note": "2026-07-04: eMAXIS Slim先進国(03319172) 金額10,000pt Vポイント買付を発注。保有pt 22408→12408。今月利用履歴は約定後反映見込み"
+    },
+    "nisa_eval_100man": {
+      "status": "confirm",
+      "note": "つみたてNISA銘柄保有あり"
+    },
+    "nisa_eval_200man": {
+      "status": "confirm",
+      "note": "特典2は200万円以上で+0.5%"
+    }
+  },
+  "commands": {
+    "status": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --status",
+    "setup": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --setup",
+    "invest": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --invest --points 10000",
+    "chuukai": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_bank_chuukai.py --status",
+    "olive": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --open-olive"
+  }
+}

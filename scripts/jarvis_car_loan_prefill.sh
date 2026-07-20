@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# マイカーローン仮審査用：.env.jarvis_private から申込フィールドを表示（チャット貼付用に値のみ）
+set -euo pipefail
+cd "$(dirname "$0")/.."
+set -a
+# shellcheck source=/dev/null
+source .env.jarvis_private
+set +a
+
+# shellcheck source=jarvis_residence_years.sh
+source "$(dirname "$0")/jarvis_residence_years.sh"
+jarvis_export_residence_years
+jarvis_export_employment_years
+
+# shellcheck source=jarvis_tax_annual_income.sh
+source "$(dirname "$0")/jarvis_tax_annual_income.sh"
+if ! jarvis_export_annual_income; then
+  echo "⚠️  確定申告PDFから年収を算出できませんでした（TAX_RETURN_* を確認）" >&2
+fi
+
+vars=(
+  PERSONAL_NAME PERSONAL_NAME_KANA_FAMILY PERSONAL_NAME_KANA_GIVEN
+  PERSONAL_BIRTHDATE PERSONAL_PHONE PERSONAL_EMAIL
+  HOME_POSTAL_CODE HOME_PREF HOME_ADDRESS_STREET HOME_ADDRESS_BANTI
+  HOME_ADDRESS_KANA_STREET HOME_ADDRESS_KANA_BANTI
+  HOME_RESIDENCE_TYPE HOME_RESIDENCE_TYPE_CODE HOME_STRUCTURE
+  HOME_BUILT_YM HOME_OCCUPIED_SINCE RESIDENCE_YEARS
+  FAMILY_HOUSEHOLD_SIZE SPOUSE_HAS CHILDREN_COUNT DEPENDENTS_COUNT
+  EMPLOYMENT_OCCUPATION EMPLOYMENT_OCCUPATION_CODE EMPLOYER_NAME EMPLOYER_NAME_KANA
+  EMPLOYER_POSTAL_CODE EMPLOYER_PREF EMPLOYER_ADDRESS_STREET EMPLOYER_ADDRESS_BANTI
+  EMPLOYER_ADDRESS_KANA_STREET EMPLOYER_ADDRESS_KANA_BANTI EMPLOYER_PHONE EMPLOYER_JOB_TITLE
+  EMPLOYER_INDUSTRY_CODE EMPLOYER_WORK_TYPE_CODE EMPLOYER_EMPLOYEE_COUNT_CODE
+  EMPLOYMENT_START_YM EMPLOYMENT_TYPE EMPLOYMENT_YEARS
+  ANNUAL_INCOME ANNUAL_INCOME_MANYEN ANNUAL_INCOME_GROSS_YEN TAX_RETURN_PDF_PATH
+  ANNUAL_INCOME_TAX OTHER_ANNUAL_INCOME SPOUSE_INCOME
+  TAX_RETURN_ROOT TAX_RETURN_YEAR_DIR TAX_RETURN_PDF TAX_RETURN_USE_LATEST_YEAR_DIR
+  CAR_TARGET_MODEL CAR_DEALER_NAME CAR_LOAN_AMOUNT CAR_LOAN_DOWN_PAYMENT CAR_LOAN_TERM_YEARS
+  CURRENT_CAR_LOAN_BALANCE CURRENT_CAR_LOAN_LENDER CURRENT_CAR_LOAN_MATURITY
+  MUFG_ACCOUNT RESONA_ACCOUNT
+)
+
+echo "=== マイカーローン仮審査 入力値（正本: .env.jarvis_private + 算出値）==="
+for v in "${vars[@]}"; do
+  printf '%s=%s\n' "$v" "${!v-}"
+done
+
+if [[ -n "${HOME_BUILT_YM:-}" ]]; then
+  echo ""
+  echo "📎 居住年数: ${HOME_OCCUPIED_SINCE:-$HOME_BUILT_YM} 基準 → ${RESIDENCE_YEARS:-?} 年"
+fi
+
+if [[ -n "${EMPLOYMENT_START_YM:-}" ]]; then
+  echo "📎 勤続年数: ${EMPLOYMENT_START_YM} 入社 → ${EMPLOYMENT_YEARS:-?} 年"
+fi
+
+if [[ -n "${ANNUAL_INCOME_MANYEN:-}" ]]; then
+  echo "📎 前年度税込年収: 確定申告PDF → ${ANNUAL_INCOME_MANYEN} 万円（${ANNUAL_INCOME_GROSS_YEN:-?} 円・切り捨て）"
+  echo "   参照: ${TAX_RETURN_PDF_PATH:-—}"
+fi

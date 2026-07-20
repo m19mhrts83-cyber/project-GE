@@ -170,6 +170,24 @@ def save_inbox_state(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _record_jarvis_export_import(route: ExportRoute) -> None:
+    try:
+        repo = Path(__file__).resolve().parents[3]
+        scripts_dir = repo / "scripts"
+        if not scripts_dir.is_dir():
+            return
+        import sys
+
+        scripts_str = str(scripts_dir)
+        if scripts_str not in sys.path:
+            sys.path.insert(0, scripts_str)
+        from jarvis_line_export_state import record_import
+
+        record_import(route_id=route.id, folder=route.folder, source="inbox")
+    except Exception:
+        pass
+
+
 def file_content_hash(path: Path) -> str:
     return sha256(path.read_bytes()).hexdigest()
 
@@ -302,6 +320,7 @@ def process_file(
                 "ts": datetime.now().isoformat(timespec="seconds"),
             }
             save_inbox_state(state_path, state)
+            _record_jarvis_export_import(route)
         return
 
     if result.status == "imported":
@@ -323,6 +342,8 @@ def process_file(
                 "ts": datetime.now().isoformat(timespec="seconds"),
             }
             save_inbox_state(state_path, state)
+            _record_jarvis_export_import(route)
+        return
 
 
 def run_inbox(

@@ -1,11 +1,18 @@
 # Notta / WeStudy 動画文字起こし 取込手順
 
+## 正本形式と出典ラベル
+
+- **正本は `.srt`**（開始時刻が安定。Notta の xlsx は形式により時刻が欠けることがあるため主データにしない。xlsx は任意の補助）
+- WeStudy 内の引用表示:
+  - コミュニティコメント → `[WeStudyコミュニティ]`（`comments`）
+  - セミナー動画チャンク → `[WeStudyセミナー動画]`（`knowledge_*` / `content_channel=seminar_video`）
+
 ## エクスポート設定（依頼時）
 
 Notta から次をダウンロードしてください。
 
-1. **Excel (.xlsx)** — Include timestamps ON / Include speakers ON / Merge full text OFF
-2. **SRT (.srt)** — 同内容（照合用）
+1. **SRT (.srt)** — **必須（正本）**
+2. **Excel (.xlsx)** — 任意（照合用。Include timestamps ON / Include speakers ON / Merge full text OFF）
 
 保存先（推奨）:
 
@@ -18,28 +25,20 @@ Notta から次をダウンロードしてください。
 ```bash
 cd ~/git-repos/215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット
 
-# dry-run（件数・警告確認）
+# dry-run（件数・警告確認）— 正本は SRT
 /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/notta_to_knowledge.py \
-  --input inbox/notta/YYYY-MM-DD/xxx.xlsx \
+  --input inbox/notta/YYYY-MM-DD/xxx.srt \
   --meta meta/notta_lessons.yaml \
   --video-id your_video_id \
   --dry-run
 
-# ローカルミラーへ登録（Supabase 復旧後は --skip-supabase を外す）
+# ローカル＋Supabase へ登録（`--skip-supabase` は付けない）
 /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/notta_to_knowledge.py \
-  --input inbox/notta/YYYY-MM-DD/xxx.xlsx \
+  --input inbox/notta/YYYY-MM-DD/xxx.srt \
   --meta meta/notta_lessons.yaml \
   --video-id your_video_id \
   --title "講義タイトル" \
-  --video-url "https://..."
-```
-
-SRT との突合:
-
-```bash
-/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/notta_to_knowledge.py \
-  --input inbox/notta/YYYY-MM-DD/xxx.srt \
-  --video-id your_video_id --dry-run
+  --video-url "https://westudy.co.jp/lesson/..."
 ```
 
 ## テスト
@@ -117,7 +116,24 @@ SUPABASE_ACCESS_TOKEN=sbp_xxxxx
 | 原本（xlsx/srt） | OneDrive `inbox/notta/` |
 | ローカル検証DB | `state/knowledge_local.sqlite3` |
 | クラウド投影 | Supabase `comments` / `knowledge_*` |
-| 表示 | Raimo アプリ / kamiooya-qa-web |
+| 表示（ツール正本） | **Raimo miniApp 1346**（`ma-54t2keqdelz3`） |
+| 表示（任意） | kamiooya-qa-web |
+
+## Raimo 一方向ミラー（知識 → 本番）
+
+- **正本のコード**: Raimo 1346。ローカルは同期・改修用。公開は `scripts/publish_raimo_1346.py`（`save` → `PUT miniAppBackend/1046/api` → `deploy`）。
+- **知識データ**: ローカル / Supabase → Raimo テーブルへ **一方向**。逆流しない。
+- **Gemini**: アカウント共通 API キー＋各アプリ YAML の `llm` ステップ（`sendMessage`）。
+
+```bash
+# フロント+API を本番へ
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/publish_raimo_1346.py
+
+# step3_1_lf 等を Raimo knowledge_* へミラー（再実行は update + delete-by-source）
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/mirror_knowledge_to_raimo.py step3_1_lf
+```
+
+スモーク: 「三段活用」→ AI 要約＋出典パネルの「DBで見る」「動画を開く」。サイドバー「セミナー動画」にチャンク一覧。
 
 ## 実データ到着後の受入れチェック（1回で完了）
 
