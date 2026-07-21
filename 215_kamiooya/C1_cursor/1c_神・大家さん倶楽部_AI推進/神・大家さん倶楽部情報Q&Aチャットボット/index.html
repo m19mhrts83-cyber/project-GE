@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>神・大家さんクラブ情報 Q&Aチャットボット</title>
+  <title>神・大家さん倶楽部Q&Aチャットボット</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,7 +17,7 @@
     <!-- 認証エリア -->
     <section id="authView" class="min-h-screen flex items-center justify-center p-4">
       <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
-        <h1 class="text-xl font-bold text-center text-blue-900 mb-2">神・大家さんクラブ情報 Q&A</h1>
+        <h1 class="text-xl font-bold text-center text-blue-900 mb-2">神・大家さん倶楽部Q&A</h1>
         <p class="text-sm text-slate-500 text-center mb-6">ログインまたは新規登録</p>
 
         <div class="flex gap-2 mb-4">
@@ -127,7 +127,7 @@
           <button id="sidebarToggleBtn" class="md:hidden">
             <i class="fa-solid fa-bars"></i>
           </button>
-          <h2 class="font-bold">神・大家さんクラブ情報 Q&Aチャットボット</h2>
+          <h2 class="font-bold">神・大家さん倶楽部Q&Aチャットボット</h2>
         </div>
         <div class="flex items-center gap-4">
           <span id="currentUserLabel" class="text-sm"></span>
@@ -179,10 +179,18 @@
           <!-- コメント一覧 -->
           <section id="commentsScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
             <div class="w-full">
+              <div id="commentsBackBar" class="hidden mb-3">
+                <button type="button" id="commentsBackBtn" class="text-sm text-blue-700 hover:underline">
+                  <i class="fa-solid fa-arrow-left mr-1"></i><span id="commentsBackLabel">チャットに戻る</span>
+                </button>
+              </div>
               <div class="flex flex-wrap gap-2 mb-3">
-                <input id="commentSearchInput" class="border rounded-md px-3 py-2 min-w-[240px] flex-1" placeholder="コメント本文・投稿者で検索" />
+                <input id="commentSearchInput" class="border rounded-md px-3 py-2 min-w-[240px] flex-1" placeholder="コメントID・本文・投稿者で検索" />
                 <select id="commentSourceFilter" class="border rounded-md px-3 py-2 min-w-[170px]">
                   <option value="">全ソース</option>
+                </select>
+                <select id="commentCategoryFilter" class="border rounded-md px-3 py-2 min-w-[200px]">
+                  <option value="">全分類</option>
                 </select>
                 <select id="commentDateFilter" class="border rounded-md px-3 py-2 min-w-[170px]">
                   <option value="">日時: 全件</option>
@@ -196,6 +204,8 @@
                 <table class="min-w-full text-sm">
                   <thead class="bg-slate-100">
                     <tr>
+                      <th class="p-2 text-left">コメントID</th>
+                      <th class="p-2 text-left">分類</th>
                       <th class="p-2 text-left">日時</th>
                       <th class="p-2 text-left">ソース</th>
                       <th class="p-2 text-left">投稿者</th>
@@ -211,6 +221,11 @@
           <!-- セミナー動画一覧 -->
           <section id="knowledgeScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
             <div class="w-full">
+              <div id="knowledgeBackBar" class="hidden mb-3">
+                <button type="button" id="knowledgeBackBtn" class="text-sm text-blue-700 hover:underline">
+                  <i class="fa-solid fa-arrow-left mr-1"></i><span id="knowledgeBackLabel">チャットに戻る</span>
+                </button>
+              </div>
               <div class="flex flex-wrap gap-2 mb-3">
                 <input id="knowledgeSearchInput" class="border rounded-md px-3 py-2 min-w-[240px] flex-1" placeholder="タイトル・本文・chunk_key で検索" />
                 <button id="reloadKnowledgeBtn" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
@@ -236,14 +251,22 @@
           <!-- 管理者: ユーザー承認 -->
           <section id="adminUsersScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
             <div class="w-full max-w-4xl">
-              <div class="flex items-center justify-between mb-3">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 class="font-semibold">承認待ちユーザー</h3>
-                <button id="reloadPendingUsersBtn" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+                <div class="flex flex-wrap gap-2">
+                  <button id="bulkApprovePendingUsersBtn" type="button" class="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                    選択したユーザーを一括承認
+                  </button>
+                  <button id="reloadPendingUsersBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+                </div>
               </div>
               <div class="overflow-auto bg-white rounded border">
                 <table class="min-w-full text-sm">
                   <thead class="bg-slate-100">
                     <tr>
+                      <th class="p-2 text-left w-10">
+                        <input id="pendingUsersSelectAll" type="checkbox" title="全選択" aria-label="全選択" />
+                      </th>
                       <th class="p-2 text-left">ID</th>
                       <th class="p-2 text-left">メール</th>
                       <th class="p-2 text-left">状態</th>
@@ -329,6 +352,9 @@
     </div>
   </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="forum_category_lookup.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

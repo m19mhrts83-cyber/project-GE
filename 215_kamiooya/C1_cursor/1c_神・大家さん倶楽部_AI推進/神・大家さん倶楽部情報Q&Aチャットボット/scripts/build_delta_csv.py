@@ -21,7 +21,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# convert_to_admin_csv.py と同一順（差分CSVも Raimo 取込でソース列を維持）
+# convert と同一ヘッダ（分類・板タイトルを差分でも落とさない）
+from convert_to_admin_csv import ADMIN_FIELDNAMES  # noqa: E402
+
 REQUIRED_FIELDNAMES = [
     "コメントID",
     "投稿日時",
@@ -32,7 +34,6 @@ REQUIRED_FIELDNAMES = [
     "IP アドレス",
     "ユーザーエージェント",
 ]
-ADMIN_FIELDNAMES = REQUIRED_FIELDNAMES + ["ソース"]
 
 
 def load_state(path: Path) -> set[str]:

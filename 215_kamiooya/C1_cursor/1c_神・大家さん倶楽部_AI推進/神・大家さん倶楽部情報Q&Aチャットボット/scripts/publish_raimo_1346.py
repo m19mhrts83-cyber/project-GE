@@ -65,8 +65,18 @@ def main() -> int:
     app_url = (os.environ.get("RAIMO_APP_URL") or "").rstrip("/")
 
     html = (CHATBOT / "index.html").read_text(encoding="utf-8")
+    # ローカル用の別スクリプト参照は Raimo では不要（jsContent 先頭に注入済み）
+    html = html.replace(
+        '    <script src="forum_category_lookup.js"></script>\n',
+        "",
+    )
     css = (CHATBOT / "style.css").read_text(encoding="utf-8")
     js = (CHATBOT / "app.js").read_text(encoding="utf-8")
+    lookup_js = CHATBOT / "forum_category_lookup.js"
+    if lookup_js.exists():
+        # Raimo は jsContent 1本のため、分類ルックアップを先頭注入（DB列未追加でもUI分類可）
+        js = lookup_js.read_text(encoding="utf-8") + "\n" + js
+        print(f"forum_category_lookup: injected ({lookup_js.stat().st_size} bytes)")
     api = (CHATBOT / "WeStudy_API_secret_admin_upgrade.yaml").read_text(encoding="utf-8")
     api = inject_notify_placeholders(api)
 
@@ -93,7 +103,7 @@ def main() -> int:
 
         detail = page.request.get(f"{base}/gpt/api/miniApp/{APP_ID}", timeout=60000)
         assert detail.status == 200, detail.text()[:200]
-        title = (detail.json() or {}).get("title") or "神大家さん倶楽部AIチャットボット"
+        title = "神・大家さん倶楽部Q&Aチャットボット"
 
         save = page.request.post(
             f"{base}/gpt/api/miniApp/{APP_ID}/save",

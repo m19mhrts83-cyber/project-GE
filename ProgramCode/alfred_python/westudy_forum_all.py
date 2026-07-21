@@ -37,10 +37,13 @@ import signal
 import shutil
 import argparse
 import traceback
+import html as html_lib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from threading import Thread, Event, Lock
+
+import requests
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
@@ -228,22 +231,27 @@ def read_json(path: Path, default=None):
         return default
 
 
+import hashlib
+from urllib.parse import unquote
+
+
 def sanitize_filename(name: str, extra: str = "") -> str:
     base = re.sub(r"[\\/:*?\"<>|]", "_", name).strip()
     base = re.sub(r"\s+", " ", base)
     if extra:
         base = f"{base}__{extra}"
-    # 長過ぎると扱いにくいので短縮
+    # 長過ぎると扱いにくいので短縮（macOS NAME_MAX=255、URLエンコードslugはすぐ超える）
     return (base[:90]).rstrip("_ ")
 
 
 def topic_output_paths(title: str, url: str):
-    slug = url.rstrip("/").split("/")[-1]
-    safe = sanitize_filename(title, slug)
-    folder = OUTPUT_ROOT / safe
+    """出力フォルダ・CSV・done フラグ。done は URL の SHA1 短縮（ファイル名長制限対策）。"""
+    short = hashlib.sha1(url.strip().encode("utf-8")).hexdigest()[:12]
+    label = sanitize_filename(title)[:60] or short
+    folder = OUTPUT_ROOT / f"{label}__{short}"
     folder.mkdir(parents=True, exist_ok=True)
-    csv_path = folder / f"{safe}.csv"
-    done_flag = STATE_DIR / f"done__{slug}.json"  # スキップ判定にも使う
+    csv_path = folder / f"{label}.csv"
+    done_flag = STATE_DIR / f"done__{short}.json"
     return folder, csv_path, done_flag
 
 
@@ -532,25 +540,36 @@ def start_watchdog(stop_event: Event):
 # トピック一覧取得
 # -------------------------
 def get_topics():
-    """フォーラムトップからトピックの (title, url) を抽出"""
+    """フォーラムトップからトピックの (title, url) を抽出。既知URLもマージ。"""
     topic_base = forum_topic_href_prefix().rstrip("/")
     prefix = forum_topic_href_prefix()
     driver.get(forum_base_url())
     time.sleep(1.2)
+    # 遅延読み込み対策で下までスクロール
+    try:
+        for _ in range(8):
+            driver.execute_script("window.scrollBy(0, Math.floor(window.innerHeight*0.9));")
+            time.sleep(0.35)
+        driver.execute_script("window.scrollTo(0, 0);")
+    except Exception:
+        pass
 
     # 一覧はコース ?t=forums でも、トピックURLは /forum/… のことが多い
     links = safe_js(
         r'''
         const prefix = arguments[0];
-        const anchors = Array.from(document.querySelectorAll("a[href^='" + prefix + "']"));
+        const anchors = Array.from(document.querySelectorAll("a[href*='/forum/']"));
         const items = [];
         const seen = new Set();
         const rootPath = prefix.replace(/\/+$/, "");
         for (const a of anchors) {
-            const href = (a.getAttribute("href") || "").split("#")[0].replace(/\/+$/, "");
+            let href = (a.getAttribute("href") || "").split("#")[0].split("?")[0].replace(/\/+$/, "");
             if (!href) continue;
             if (href.includes("/page/")) continue;
             if (href === rootPath || href.endsWith("/forum")) continue;
+            if (!href.startsWith("http")) {
+                try { href = new URL(href, location.origin).href.replace(/\/+$/, ""); } catch(e) { continue; }
+            }
             const t = (a.textContent || "").trim();
             if (!t) continue;
             const key = href;
@@ -567,17 +586,50 @@ def get_topics():
 
     # フォーラムには同一URLに複数のアンカーがある場合が多いので、URLでユニーク化
     uniq = {}
-    for it in links:
-        url = it.get("url") or ""
+    for it in links or []:
+        url = (it.get("url") or "").strip()
         title = (it.get("title") or "").strip()
-        if not url or topic_base not in url:
+        if not url or "/forum/" not in url:
             continue
-        # タイトルは長いときがあるので最初に見つかったものを採用
         if url not in uniq:
             uniq[url] = title or url.split("/")[-1]
+
+    # 既知トピック（一覧に出ない板の取りこぼし防止）
+    for title, url in _SEED_TOPICS:
+        u = url.strip().rstrip("/")
+        if u and u not in uniq:
+            uniq[u] = title
+
+    # 環境変数 WESTUDY_EXTRA_TOPICS=title|url;title|url
+    extra = (os.environ.get("WESTUDY_EXTRA_TOPICS") or "").strip()
+    if extra:
+        for part in extra.split(";"):
+            part = part.strip()
+            if "|" not in part:
+                continue
+            title, url = part.split("|", 1)
+            u = url.strip().rstrip("/")
+            if u and u not in uniq:
+                uniq[u] = title.strip() or u.split("/")[-1]
+
     lst = [(v, k) for k, v in uniq.items()]
     log(f"📌 検出トピック: {len(lst)}件")
     return lst
+
+
+# 一覧DOMに出ないことがある板（過去スクレイプ実績URL）
+_SEED_TOPICS: list[tuple[str, str]] = [
+    ("成果報告【実践し、成果が出た内容を記載】", "https://westudy.co.jp/forum/results"),
+    ("月次活動報告 ＆ 来月への宣言【グルコン10日前まで】", "https://westudy.co.jp/forum/monthly_output"),
+    ("【その他テーマ】AI活用で業務改善", "https://westudy.co.jp/forum/%E3%80%90%E3%81%9D%E3%81%AE%E4%BB%96%E3%83%86%E3%83%BC%E3%83%9E%E3%80%91ai%E6%B4%BB%E7%94%A8%E3%81%A7%E6%A5%AD%E5%8B%99%E6%94%B9%E5%96%84"),
+    ("【神物件名】オリジナル物件名アイディア・キーワード集", "https://westudy.co.jp/forum/%E3%80%90%E7%A5%9E%E7%89%A9%E4%BB%B6%E5%90%8D%E3%80%91%E3%82%AA%E3%83%AA%E3%82%B8%E3%83%8A%E3%83%AB%E7%89%A9%E4%BB%B6%E5%90%8D%E3%82%A2%E3%82%A4%E3%83%87%E3%82%A3%E3%82%A2%E3%83%BB%E3%82%AD%E3%83%BC"),
+    ("【不動産】最新融資情報２ ※不動産会社提携ローン専用※", "https://westudy.co.jp/forum/%E3%80%90%E4%B8%8D%E5%8B%95%E7%94%A3%E3%80%91%E6%9C%80%E6%96%B0%E8%9E%8D%E8%B3%87%E6%83%85%E5%A0%B1%EF%BC%92-%E2%80%BB%E4%B8%8D%E5%8B%95%E7%94%A3%E4%BC%9A%E7%A4%BE%E6%8F%90%E6%90%BA%E3%83%AD%E3%83%BC"),
+    ("塾生相互支援板　【仕事依頼】【仕事手伝います！】（事業やお店の宣伝もOK）", "https://westudy.co.jp/forum/work-2"),
+    ("【その他テーマ】育児教育情報", "https://westudy.co.jp/forum/%E3%80%90%E3%81%9D%E3%81%AE%E4%BB%96%E3%83%86%E3%83%BC%E3%83%9E%E3%80%91%E8%82%B2%E5%85%90%E6%95%99%E8%82%B2%E6%83%85%E5%A0%B1"),
+    ("会計ソフト 使用感の共有", "https://westudy.co.jp/forum/%E4%BC%9A%E8%A8%88%E3%82%BD%E3%83%95%E3%83%88-%E4%BD%BF%E7%94%A8%E6%84%9F%E3%81%AE%E5%85%B1%E6%9C%89"),
+    ("【自由投稿】会員同士の質問などなんでもOK", "https://westudy.co.jp/forum/%E3%80%90%E8%87%AA%E7%94%B1%E6%8A%95%E7%A8%BF%E3%80%91%E4%BC%9A%E5%93%A1%E5%90%8C%E5%A3%AB%E3%81%AE%E8%B3%AA%E5%95%8F%E3%81%AA%E3%81%A9%E3%81%AA%E3%82%93%E3%81%A7%E3%82%82ok"),
+    ("【不動産】公庫融資を見込む創業セミナー系情報、士業紹介など", "https://westudy.co.jp/forum/%E3%80%90%E4%B8%8D%E5%8B%95%E7%94%A3%E3%80%91%E5%85%AC%E5%BA%AB%E8%9E%8D%E8%B3%87%E3%82%92%E8%A6%8B%E8%BE%BC%E3%82%80%E5%89%B5%E6%A5%AD%E3%82%BB%E3%83%9F%E3%83%8A%E3%83%BC%E7%B3%BB%E6%83%85%E5%A0%B1%E3%80%81%E5%A3%AB%E6%A5%AD%E7%B4%B9%E4%BB%8B%E3%81%AA%E3%81%A9"),
+]
 
 
 # -------------------------
@@ -746,94 +798,239 @@ def get_comment_snapshot(current_url: str):
     return cleaned
 
 
+def _more_comments_expected() -> int | None:
+    """WeStudy テーマの MORE_COMMENTS.comment_num（全件数）を読む。"""
+    try:
+        n = driver.execute_script(
+            "try {"
+            "  if (window.MORE_COMMENTS && MORE_COMMENTS.comment_num)"
+            "    return parseInt(MORE_COMMENTS.comment_num, 10);"
+            "  return null;"
+            "} catch (e) { return null; }"
+        )
+        if n is None:
+            return None
+        n = int(n)
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _count_top_level_comments() -> int:
+    try:
+        n = driver.execute_script(
+            "return document.querySelectorAll('.commentlist > .comment').length"
+            " || document.querySelectorAll(\"li.comment[id^='comment-']\").length"
+            " || 0;"
+        )
+        return int(n or 0)
+    except Exception:
+        return 0
+
+
 def click_load_more_once(current_url: str) -> bool:
-    """『もっと読む/次へ』などを1回だけクリック。押せたら True"""
-    clicked = safe_js(r'''
+    """『コメントを読み込む』/#show-more-comments、または次へ等を1回クリック。押せたら True"""
+    # WeStudy 正: div#show-more-comments（a/button ではない）
+    clicked = safe_js(
+        r'''
+        const show = document.querySelector("#show-more-comments");
+        const wrap = document.querySelector("#more-comments");
+        if (show) {
+            const wrapHidden = wrap && (
+                wrap.style.display === "none"
+                || window.getComputedStyle(wrap).display === "none"
+            );
+            if (!wrapHidden) {
+                try {
+                    show.scrollIntoView({behavior:"instant", block:"center"});
+                    show.click();
+                    return true;
+                } catch (e) {}
+            }
+        }
         const cand = [];
         const sels = [
             "button.load-more", "a.load-more", ".load-more",
-            ".pagination a.next", "a.next", "button.next",
+            ".pagination a.next", "a.next.page-numbers", "a.next", "button.next",
             "a[aria-label*='more' i]", "button[aria-label*='more' i]",
             "a[aria-label*='次' i]", "button[aria-label*='次' i]",
-            "#load_more_comments"
+            "#load_more_comments",
+            ".nav-links a.next", ".bbp-pagination-links a.next"
         ];
         for (const s of sels) document.querySelectorAll(s).forEach(x => cand.push(x));
-        // テキストで判定
-        document.querySelectorAll("a,button,[role='button']").forEach(x => {
+        document.querySelectorAll("a,button,[role='button'],div#show-more-comments,div#more-comments").forEach(x => {
             const t = (x.textContent || "").trim();
-            if (/[もﾓ]っと(見る|みる)|続きを読む|もっと読む|次へ|さらに読み込む|Load More|More|Next/i.test(t)) {
+            if (/コメントを読み込む|[もﾓ]っと(見る|みる)|続きを読む|もっと読む|次へ|さらに読み込む|Load More|More|Next/i.test(t)) {
                 cand.push(x);
             }
         });
-        // 画面下部にある要素から優先的に
+        const cur = document.querySelector(".pagination .current, .page-numbers.current, .bbp-pagination-links .current");
+        if (cur) {
+            const n = parseInt((cur.textContent || "").trim(), 10);
+            if (!isNaN(n)) {
+                document.querySelectorAll(".pagination a.page-numbers, a.page-numbers, .bbp-pagination-links a").forEach(a => {
+                    const t = (a.textContent || "").trim();
+                    if (t === String(n + 1)) cand.push(a);
+                });
+            }
+        }
         cand.sort((a,b)=> (a.getBoundingClientRect().top - b.getBoundingClientRect().top));
         for (const el of cand.reverse()) {
             try {
+                if (el.classList && el.classList.contains("current")) continue;
                 el.scrollIntoView({behavior:"instant",block:"center"});
                 el.click();
                 return true;
             } catch(e) {}
         }
         return false;
-    ''', recover_url=current_url, retries=1)
+        ''',
+        recover_url=current_url,
+        retries=1,
+    )
     return bool(clicked)
 
 
-def click_load_more_until_done(expected_count: int | None, current_url: str):
+def harvest_all_comment_snaps(expected_count: int | None, start_url: str) -> list[dict]:
     """
-    ページ全体を展開してコメントを最大までロード。
-    - スナップショットを前後比較し、新規IDが出なくなるまでループ
-    - 無限ループ対策: 進捗なしループが続いたら中断
+    WeStudy は #show-more-comments で DOM 追記（/page/N は無効）。
+    読み込み完了後に1回だけスナップショットする。
     """
-    force_expand_all_bodies(current_url)
-    seen_ids = set()
+    current_url = start_url
+    mc_expected = _more_comments_expected()
+    target = expected_count or mc_expected
+    if mc_expected:
+        log(f"  - MORE_COMMENTS 期待件数: {mc_expected}")
+
+    # show-more がある板: 件数だけ増やしてから最終スナップ
+    has_show_more = False
+    try:
+        has_show_more = bool(
+            driver.execute_script("return !!document.querySelector('#show-more-comments,#more-comments');")
+        )
+    except Exception:
+        pass
+
+    if has_show_more:
+        clicks = 0
+        no_progress = 0
+        max_clicks = 400
+        prev = _count_top_level_comments()
+        log(f"  - show-more 開始: {prev}件")
+        while clicks < max_clicks:
+            if target and prev >= target:
+                break
+            clicked = click_load_more_once(current_url)
+            if not clicked:
+                break
+            clicks += 1
+            # AJAX 待ち（件数増加 or タイムアウト）
+            grew = False
+            for _ in range(40):
+                time.sleep(0.25)
+                now = _count_top_level_comments()
+                if now > prev:
+                    prev = now
+                    grew = True
+                    no_progress = 0
+                    break
+            if not grew:
+                no_progress += 1
+                if no_progress >= 3:
+                    log("  ⚠️ show-more で件数が増えず打ち切り")
+                    break
+            if clicks == 1 or clicks % 10 == 0 or (target and prev >= target):
+                log(f"  - show-more click {clicks}: {prev}件" + (f" / {target}" if target else ""))
+            mark_progress(harvested=prev, current_topic="", current_url=current_url)
+
+        force_expand_all_bodies(current_url)
+        snap = get_comment_snapshot(current_url)
+        log(f"  - 最終スナップ: {len(snap)}件")
+        return snap
+
+    # フォールバック: 旧ページネーション想定（蓄積マージ）
+    by_id: dict[str, dict] = {}
+    page_num = 1
     no_progress_loops = 0
-    total_clicks = 0
+    max_pages = 250
 
-    while True:
-        snap1 = get_comment_snapshot(current_url)
-        new_ids = [s["id"] for s in snap1 if s["id"] and s["id"] not in seen_ids]
-        for cid in new_ids:
-            seen_ids.add(cid)
+    while page_num <= max_pages:
+        force_expand_all_bodies(current_url)
+        snap = get_comment_snapshot(current_url)
+        before = len(by_id)
+        for s in snap:
+            cid = (s.get("id") or "").strip()
+            if cid:
+                by_id[cid] = s
+        added = len(by_id) - before
+        log(f"  - page {page_num}: +{added} (total {len(by_id)})")
 
-        # 期待件数があって既に満たしたら終了
-        if expected_count and len(seen_ids) >= expected_count:
-            log(f"  - 吸い上げ件数: {len(seen_ids)}（期待件数に到達）")
+        if target and len(by_id) >= target:
             break
 
-        # もっと読む等をクリック
         clicked = click_load_more_once(current_url)
         if clicked:
-            total_clicks += 1
+            time.sleep(1.4)
+            current_url = driver.current_url or current_url
+            if len(by_id) > before:
+                no_progress_loops = 0
+            else:
+                no_progress_loops += 1
+            page_num += 1
+            if no_progress_loops < 2:
+                mark_progress(harvested=len(by_id), current_topic="", current_url=current_url)
+                continue
+
+        base = re.sub(r"/page/\d+/?$", "", start_url.split("?")[0].rstrip("/"))
+        next_url = f"{base}/page/{page_num + 1}/"
+        try:
+            driver.get(next_url)
             time.sleep(1.2)
-            force_expand_all_bodies(current_url)
-        else:
-            # ボタンがなく、増えなければ終わり
+            is404 = False
+            try:
+                is404 = bool(
+                    driver.execute_script(
+                        "return /404|見つかりません|Not\\s*Found/i.test(document.body.innerText||'');"
+                    )
+                )
+            except Exception:
+                pass
+            cur = driver.current_url or ""
+            if is404 or "/page/" not in cur:
+                if not clicked:
+                    break
+                no_progress_loops += 1
+                if no_progress_loops >= 3:
+                    break
+                page_num += 1
+                continue
+            current_url = cur
+            page_num += 1
             snap2 = get_comment_snapshot(current_url)
-            if len(snap2) <= len(snap1):
+            before2 = len(by_id)
+            for s in snap2:
+                cid = (s.get("id") or "").strip()
+                if cid:
+                    by_id[cid] = s
+            if len(by_id) == before2:
+                no_progress_loops += 1
+            else:
+                no_progress_loops = 0
+            if no_progress_loops >= 3:
+                log("  ⚠️ 新規コメントが増えないため打ち切り")
                 break
-
-        # 進捗確認
-        snap2 = get_comment_snapshot(current_url)
-        added = [s["id"] for s in snap2 if s["id"] and s["id"] not in seen_ids]
-        if not added and not clicked:
-            no_progress_loops += 1
-        else:
-            no_progress_loops = 0
-        for cid in added:
-            seen_ids.add(cid)
-
-        mark_progress(harvested=len(seen_ids), current_topic="", current_url=current_url)
-
-        # 無限ループ対策
-        if no_progress_loops >= 3:
-            log("  ⚠️ 進捗がないループを検知したため、ロードを打ち切ります。")
+        except Exception as e:
+            log(f"  ⚠️ page URL 遷移失敗: {e}")
             break
 
-        # 過剰クリック抑止
-        if total_clicks > 200:
-            log("  ⚠️ クリック回数が多すぎるため中断します。")
-            break
+        mark_progress(harvested=len(by_id), current_topic="", current_url=current_url)
+
+    return list(by_id.values())
+
+
+def click_load_more_until_done(expected_count: int | None, current_url: str):
+    """後方互換: 蓄積は harvest_all_comment_snaps に委譲。"""
+    harvest_all_comment_snaps(expected_count, current_url)
 
 
 # -------------------------
@@ -853,6 +1050,239 @@ def build_comment_url(topic_url: str, comment_id_attr: str) -> str:
     return f"{base}?comment={num}#comment-{num}"
 
 
+def _decode_ajax_html(raw: str) -> str:
+    """admin-ajax の more_comments は JSON 文字列で HTML を返す。"""
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    try:
+        decoded = json.loads(text)
+        if isinstance(decoded, str):
+            return decoded
+    except Exception:
+        pass
+    return text
+
+
+def _parse_comments_from_html(html: str) -> list[dict]:
+    """li.comment / #comment-N 断片からコメント辞書を抽出。"""
+    if not html:
+        return []
+    out: list[dict] = []
+    # depth-1 だけでなく返信も含め id=comment-N のブロックを拾う
+    for m in re.finditer(
+        r'<li[^>]*\bid=["\']comment-(\d+)["\'][^>]*>([\s\S]*?)(?=<li[^>]*\bid=["\']comment-\d+["\']|\Z)',
+        html,
+        flags=re.I,
+    ):
+        cid = m.group(1)
+        block = m.group(0)
+        author = ""
+        am = re.search(
+            r'class=["\'][^"\']*\bfn\b[^"\']*["\'][^>]*>([^<]+)',
+            block,
+            flags=re.I,
+        )
+        if am:
+            author = html_lib.unescape(am.group(1)).strip()
+        time_text = ""
+        time_iso = ""
+        tm = re.search(
+            r'<time[^>]*datetime=["\']([^"\']+)["\'][^>]*>([^<]*)',
+            block,
+            flags=re.I,
+        )
+        if tm:
+            time_iso = (tm.group(1) or "").strip()
+            time_text = html_lib.unescape(tm.group(2) or "").strip() or time_iso
+        if not time_text:
+            tm2 = re.search(
+                r'class=["\'][^"\']*comment-meta[^"\']*["\'][^>]*>[\s\S]*?<a[^>]*>([^<]+)</a>',
+                block,
+                flags=re.I,
+            )
+            if tm2:
+                time_text = html_lib.unescape(tm2.group(1)).strip()
+        body = ""
+        bm = re.search(
+            r'class=["\'][^"\']*comment-content[^"\']*["\'][^>]*>([\s\S]*?)</div>',
+            block,
+            flags=re.I,
+        )
+        if bm:
+            raw_body = bm.group(1)
+            raw_body = re.sub(r"<br\s*/?>", "\n", raw_body, flags=re.I)
+            raw_body = re.sub(r"</p\s*>", "\n", raw_body, flags=re.I)
+            raw_body = re.sub(r"<[^>]+>", "", raw_body)
+            body = html_lib.unescape(raw_body).strip()
+        parent = ""
+        pm = re.search(r'data-parent=["\'](\d+)["\']', block, flags=re.I)
+        if pm:
+            parent = pm.group(1)
+        profile = ""
+        pr = re.search(r'profile_href=["\']([^"\']+)["\']', block, flags=re.I)
+        if pr:
+            profile = pr.group(1).strip()
+        out.append(
+            {
+                "id": f"comment-{cid}",
+                "author": author,
+                "time_text": time_text,
+                "time_iso": time_iso,
+                "body": body,
+                "profile_url": profile,
+                "parent_comment_id": parent,
+            }
+        )
+    # fallback: id only
+    if not out:
+        for cid in re.findall(r'id=["\']comment-(\d+)["\']', html, flags=re.I):
+            out.append(
+                {
+                    "id": f"comment-{cid}",
+                    "author": "",
+                    "time_text": "",
+                    "time_iso": "",
+                    "body": "",
+                    "profile_url": "",
+                    "parent_comment_id": "",
+                }
+            )
+    # dedupe by id (keep first richer)
+    by_id: dict[str, dict] = {}
+    for s in out:
+        cid = s.get("id") or ""
+        if not cid:
+            continue
+        prev = by_id.get(cid)
+        if not prev or (len(s.get("body") or "") > len(prev.get("body") or "")):
+            by_id[cid] = s
+    return list(by_id.values())
+
+
+def _selenium_cookie_session() -> requests.Session:
+    sess = requests.Session()
+    for c in driver.get_cookies():
+        try:
+            sess.cookies.set(
+                c["name"],
+                c["value"],
+                domain=c.get("domain") or ".westudy.co.jp",
+                path=c.get("path") or "/",
+            )
+        except Exception:
+            sess.cookies.set(c["name"], c["value"])
+    return sess
+
+
+def harvest_via_more_comments_ajax(start_url: str) -> list[dict] | None:
+    """
+    WeStudy の more_comments_forum (admin-ajax) で全件取得。
+    DOM に数千件載せない（月次 ~1万件で Chrome が落ちるため）。
+    MORE_COMMENTS が無ければ None。
+    """
+    mc = None
+    try:
+        mc = driver.execute_script("return window.MORE_COMMENTS || null;")
+    except Exception:
+        mc = None
+    if not mc or not mc.get("endpoint") or not mc.get("post_id"):
+        return None
+
+    try:
+        max_n = int(mc.get("comment_num") or 0)
+    except Exception:
+        max_n = 0
+    action = mc.get("action") or "more_comments_forum"
+    endpoint = mc["endpoint"]
+    post_id = mc["post_id"]
+    course_id = ""
+    lesson = ""
+    try:
+        course_id = driver.execute_script(
+            'return (document.getElementById("comment_course_id")||{}).value || "";'
+        ) or ""
+        lesson = driver.execute_script(
+            'return (document.getElementById("comment_form_lesson")||{}).value || "";'
+        ) or ""
+    except Exception:
+        pass
+
+    top_num = _count_top_level_comments()
+    by_id: dict[str, dict] = {}
+    for s in _parse_comments_from_html(driver.page_source or ""):
+        cid = (s.get("id") or "").strip()
+        if cid:
+            by_id[cid] = s
+
+    log(f"  - AJAX more_comments: 期待top={max_n or '?'} 開始top={top_num} ids={len(by_id)}")
+    sess = _selenium_cookie_session()
+    rounds = 0
+    max_rounds = 600
+    no_progress = 0
+    while rounds < max_rounds:
+        if max_n and top_num >= max_n:
+            break
+        try:
+            r = sess.post(
+                endpoint,
+                data={
+                    "action": action,
+                    "num": top_num,
+                    "course_id": course_id,
+                    "comment_form_lesson": lesson,
+                    "post_id": post_id,
+                },
+                timeout=120,
+                headers={
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Referer": start_url,
+                },
+            )
+            frag = _decode_ajax_html(r.text)
+        except Exception as e:
+            log(f"  ⚠️ AJAX 失敗: {e}")
+            break
+        if not frag.strip():
+            no_progress += 1
+            if no_progress >= 2:
+                break
+            rounds += 1
+            continue
+        batch = _parse_comments_from_html(frag)
+        new_top = len(
+            re.findall(
+                r'<li[^>]*class="[^"]*\bcomment\b[^"]*\bdepth-1\b',
+                frag,
+                flags=re.I,
+            )
+        )
+        if new_top == 0:
+            # 返信を含まない top-level 断片想定: class に comment を持つ li
+            new_top = len(re.findall(r'<li[^>]*class="[^"]*\bcomment\b', frag, flags=re.I))
+        before = len(by_id)
+        for s in batch:
+            cid = (s.get("id") or "").strip()
+            if cid:
+                by_id[cid] = s
+        added = len(by_id) - before
+        if new_top <= 0 and added <= 0:
+            no_progress += 1
+            if no_progress >= 3:
+                break
+        else:
+            no_progress = 0
+            top_num += new_top if new_top > 0 else 50
+        rounds += 1
+        if rounds == 1 or rounds % 20 == 0 or (max_n and top_num >= max_n):
+            log(f"  - AJAX round {rounds}: top≈{top_num}/{max_n or '?'} ids={len(by_id)} (+{added})")
+            # OneDrive 上だと毎ラウンドの heartbeat 書き込みが詰まりやすい
+            mark_progress(harvested=len(by_id), current_topic="", current_url=start_url)
+
+    log(f"  - AJAX 完了: ids={len(by_id)} rounds={rounds}")
+    return list(by_id.values())
+
+
 def harvest_topic(title: str, url: str, expected_count: int | None):
     """
     1トピック収集
@@ -866,11 +1296,22 @@ def harvest_topic(title: str, url: str, expected_count: int | None):
 
     driver.get(current_url)
     time.sleep(1.0)
-    force_expand_all_bodies(current_url)
-    click_load_more_until_done(expected_count, current_url)
-
-    # 最終スナップショット
-    snap = get_comment_snapshot(current_url)
+    snap = harvest_via_more_comments_ajax(current_url)
+    if snap is None:
+        # MORE_COMMENTS 無しでも初回 DOM を試す（空板・別UI）
+        force_expand_all_bodies(current_url)
+        snap = get_comment_snapshot(current_url)
+        if not snap:
+            snap = harvest_all_comment_snaps(expected_count, current_url)
+        # harvest_all が空で /page/2 に迷走した場合に戻す
+        try:
+            if "/page/" in (driver.current_url or ""):
+                driver.get(current_url)
+                time.sleep(0.8)
+        except Exception:
+            pass
+    if not snap:
+        snap = []
 
     # 重複除去 & 安全化
     rows = []
