@@ -956,21 +956,49 @@ const App = {
 
   ensureForumCategoryLookup: () => {
     if (App.state.forumCategoryLookup) return App.state.forumCategoryLookup;
-    const fromWindow =
-      typeof window !== 'undefined' && window.__FORUM_CATEGORY_LOOKUP__
-        ? window.__FORUM_CATEGORY_LOOKUP__
-        : null;
+    let fromWindow = null;
+    if (typeof window !== 'undefined') {
+      // publish 注入は FORUM_CATEGORY_LOOKUP。旧名 __FORUM_CATEGORY_LOOKUP__ も許容
+      fromWindow =
+        window.FORUM_CATEGORY_LOOKUP ||
+        window.__FORUM_CATEGORY_LOOKUP__ ||
+        null;
+    }
     App.state.forumCategoryLookup = fromWindow && typeof fromWindow === 'object' ? fromWindow : {};
     return App.state.forumCategoryLookup;
+  },
+
+  normalizeCommentIdForLookup: (raw) => {
+    let cid = String(raw || '').trim();
+    if (!cid) return '';
+    if (cid.indexOf('comment-') === 0) cid = cid.slice(8).trim();
+    return cid;
+  },
+
+  lookupForumCategory: (commentId) => {
+    const lookup = App.ensureForumCategoryLookup();
+    const cid = App.normalizeCommentIdForLookup(commentId);
+    if (!cid) return '';
+    let hit = lookup[cid];
+    if (hit == null && lookup[commentId] != null) hit = lookup[commentId];
+    if (hit == null && lookup['comment-' + cid] != null) hit = lookup['comment-' + cid];
+    if (hit == null) return '';
+    if (typeof hit === 'string') return hit.trim();
+    if (typeof hit === 'object') {
+      return String(hit.forum_category || hit.forumCategory || '').trim();
+    }
+    return String(hit).trim();
   },
 
   enrichCommentCategory: (row) => {
     if (!row || typeof row !== 'object') return row;
     const existing = String(row.forum_category || row.forumCategory || '').trim();
-    if (existing && existing !== '未分類') return row;
-    const lookup = App.ensureForumCategoryLookup();
-    const cid = String(row.comment_id || row.commentId || '').trim();
-    const mapped = cid && lookup[cid] ? String(lookup[cid]).trim() : '';
+    if (existing && existing !== '未分類') {
+      row.forum_category = existing;
+      return row;
+    }
+    const cidRaw = row.comment_id || row.commentId || '';
+    const mapped = App.lookupForumCategory(cidRaw);
     if (!mapped) {
       if (!existing) {
         row.forum_category = '未分類';
