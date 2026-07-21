@@ -102,10 +102,13 @@ def main() -> int:
     )
     # compact client map: id -> category string only (smaller)
     compact = {cid: m["forum_category"] for cid, m in mapping.items() if m["forum_category"] != UNCLASSIFIED}
+    # app.js は FORUM_CATEGORY_LOOKUP を参照（旧名も併用）
+    payload = json.dumps(compact, ensure_ascii=False, separators=(",", ":"))
     out_js.write_text(
         "window.FORUM_CATEGORY_LOOKUP = "
-        + json.dumps(compact, ensure_ascii=False, separators=(",", ":"))
-        + ";\n",
+        + payload
+        + ";\n"
+        + "window.__FORUM_CATEGORY_LOOKUP__ = window.FORUM_CATEGORY_LOOKUP;\n",
         encoding="utf-8",
     )
     print(f"wrote {out_json} ({out_json.stat().st_size} bytes)")
