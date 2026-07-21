@@ -24,6 +24,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from forum_category_map import enrich_comment_meta  # noqa: E402
+
 ADMIN_FIELDNAMES = [
     "コメントID",
     "投稿日時",
@@ -34,6 +38,10 @@ ADMIN_FIELDNAMES = [
     "IP アドレス",
     "ユーザーエージェント",
     "ソース",
+    "ソース系統",
+    "ソース種別",
+    "分類",
+    "板タイトル",
 ]
 
 SKIP_NAME_PARTS = ("merged", "manifest", "topics_manifest", "summary", "failures")
@@ -122,6 +130,16 @@ def row_to_admin(row: dict) -> dict | None:
     if not src:
         src = "WeStudy"
 
+    topic_title = get_cell(row, "板タイトル", "topic_title", "topicTitle", "トピック名")
+    topic_url = get_cell(row, "topic_url", "topicUrl", "トピックURL")
+    meta = enrich_comment_meta(topic_title, topic_url)
+    # CSV に既に分類があれば優先
+    forum_category = get_cell(row, "分類", "forum_category", "forumCategory") or meta["forum_category"]
+    source_system = get_cell(row, "ソース系統", "source_system", "sourceSystem") or meta["source_system"]
+    source_kind = get_cell(row, "ソース種別", "source_kind", "sourceKind") or meta["source_kind"]
+    if not topic_title:
+        topic_title = meta["topic_title"]
+
     return {
         "コメントID": cid,
         "投稿日時": format_posted_at(row),
@@ -134,6 +152,10 @@ def row_to_admin(row: dict) -> dict | None:
             row, "ユーザーエージェント", "user_agent", "userAgent", "UA"
         ),
         "ソース": src,
+        "ソース系統": source_system,
+        "ソース種別": source_kind,
+        "分類": forum_category,
+        "板タイトル": topic_title,
     }
 
 

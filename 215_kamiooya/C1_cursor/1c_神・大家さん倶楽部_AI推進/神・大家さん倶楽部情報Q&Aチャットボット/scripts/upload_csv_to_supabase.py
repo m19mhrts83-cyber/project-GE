@@ -29,6 +29,12 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from forum_category_map import enrich_comment_meta
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from forum_category_map import enrich_comment_meta
+
+try:
     from supabase import Client, create_client
 except ImportError as e:  # pragma: no cover
     print(
@@ -54,6 +60,10 @@ CSV_CELL_ALIASES: dict[str, tuple[str, ...]] = {
     "ip_address": ("ip_address", "ipAddress", "IPアドレス", "IP アドレス", "IP"),
     "user_agent": ("user_agent", "userAgent", "ユーザーエージェント", "UA"),
     "source_type": ("source_type", "ソース", "sourceType", "データソース"),
+    "source_system": ("source_system", "ソース系統", "sourceSystem"),
+    "source_kind": ("source_kind", "ソース種別", "sourceKind"),
+    "forum_category": ("forum_category", "分類", "forumCategory", "カテゴリ"),
+    "topic_title": ("topic_title", "板タイトル", "topicTitle", "トピック名"),
 }
 
 
@@ -97,9 +107,19 @@ def row_to_record(row: dict[str, str], row_index: int, import_batch_ts: int) -> 
         v = csv_cell(row, field)
         return v or None
 
+    topic_title = opt("topic_title") or ""
+    meta = enrich_comment_meta(topic_title, "")
+    forum_category = opt("forum_category") or meta["forum_category"]
+    source_system = opt("source_system") or meta["source_system"]
+    source_kind = opt("source_kind") or meta["source_kind"]
+
     return {
         "comment_id": comment_id,
         "source_type": source_type,
+        "source_system": source_system,
+        "source_kind": source_kind,
+        "forum_category": forum_category,
+        "topic_title": topic_title or None,
         "posted_at": posted_at,
         "author_name": opt("author_name"),
         "author_email": opt("author_email"),
