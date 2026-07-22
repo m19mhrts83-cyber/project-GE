@@ -3,7 +3,11 @@ import { requireUser } from "@/lib/authz";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { toDbId } from "@/lib/ids";
 import { withErrorHandler } from "@/lib/routeHandler";
-import { buildAnswerWithCitations, searchKnowledge } from "@/lib/knowledgeSearch";
+import {
+  buildAnswerWithCitations,
+  searchKnowledge,
+  type Citation,
+} from "@/lib/knowledgeSearch";
 
 export const runtime = "nodejs";
 
@@ -28,7 +32,7 @@ export const POST = withErrorHandler(async (req, { params }) => {
 
   await sb.from("chat_messages").insert([{ session_id: sessionDbId, role: "user", content }]);
 
-  let citations = [];
+  let citations: Citation[] = [];
   try {
     citations = await searchKnowledge(content, 10);
   } catch (e) {

@@ -4,7 +4,7 @@ export type SessionUser = {
   id: string;
   email: string;
   role: "user" | "admin";
-  status: "pending" | "approved";
+  status: "pending" | "approved" | "rejected";
 };
 
 export const SESSION_COOKIE_NAME = "kamiooya_session";

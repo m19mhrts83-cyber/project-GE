@@ -2,6 +2,8 @@
 -- Raimo版のテーブル構成をNext.js側で再現するための最低限スキーマ
 -- + 動画文字起こし用 knowledge_sources / knowledge_chunks
 
+create extension if not exists vector with schema extensions;
+
 -- NOTE:
 -- Lyme(Raimo) 側のエクスポートCSVは id が数値のため、
 -- 移行を簡単にする目的で Supabase 側も bigint の ID を採用する。
@@ -33,6 +35,9 @@ create table if not exists public.comments (
   user_agent text,
   created_at timestamptz not null default now()
 );
+
+alter table public.comments
+  add column if not exists embedding extensions.vector(768);
 
 create index if not exists comments_posted_at_idx on public.comments (posted_at desc nulls last);
 create index if not exists comments_source_type_idx on public.comments (source_type);
@@ -114,12 +119,87 @@ create table if not exists public.knowledge_chunks (
   updated_at timestamptz not null default now()
 );
 
+alter table public.knowledge_chunks
+  add column if not exists embedding extensions.vector(768);
+
 create index if not exists knowledge_chunks_source_id_idx
   on public.knowledge_chunks (source_id, start_sec);
 create index if not exists knowledge_chunks_start_sec_idx
   on public.knowledge_chunks (start_sec);
 create index if not exists knowledge_chunks_search_text_idx
   on public.knowledge_chunks (search_text);
+
+create or replace function public.match_comments_semantic(
+  query_embedding extensions.vector(768),
+  match_threshold float default 0.55,
+  match_count int default 20
+)
+returns table (
+  source_type text,
+  comment_id text,
+  posted_at timestamptz,
+  author_name text,
+  content text,
+  similarity float
+)
+language sql
+stable
+set search_path = public, extensions
+as $$
+  select
+    c.source_type,
+    c.comment_id,
+    c.posted_at,
+    c.author_name,
+    c.content,
+    1 - (c.embedding <=> query_embedding) as similarity
+  from public.comments c
+  where c.embedding is not null
+    and 1 - (c.embedding <=> query_embedding) >= match_threshold
+  order by c.embedding <=> query_embedding
+  limit match_count;
+$$;
+
+create or replace function public.match_chunks_semantic(
+  query_embedding extensions.vector(768),
+  match_threshold float default 0.55,
+  match_count int default 12
+)
+returns table (
+  chunk_key text,
+  source_id bigint,
+  start_sec integer,
+  end_sec integer,
+  speaker text,
+  content text,
+  similarity float
+)
+language sql
+stable
+set search_path = public, extensions
+as $$
+  select
+    kc.chunk_key,
+    kc.source_id,
+    kc.start_sec,
+    kc.end_sec,
+    kc.speaker,
+    kc.content,
+    1 - (kc.embedding <=> query_embedding) as similarity
+  from public.knowledge_chunks kc
+  where kc.embedding is not null
+    and 1 - (kc.embedding <=> query_embedding) >= match_threshold
+  order by kc.embedding <=> query_embedding
+  limit match_count;
+$$;
+
+create index if not exists comments_embedding_ivfflat_idx
+  on public.comments using ivfflat (embedding extensions.vector_cosine_ops)
+  with (lists = 100);
+
+create index if not exists knowledge_chunks_embedding_ivfflat_idx
+  on public.knowledge_chunks using ivfflat (embedding extensions.vector_cosine_ops)
+  with (lists = 100);
 
 -- ---------------------------------------------------------------------------
 -- Free 枠の休止防止用心拍（週次 WeStudy 同期で --touch）
@@ -131,9 +211,62 @@ create table if not exists public.jarvis_heartbeat (
   touched_at timestamptz not null default now()
 );
 
--- PostgREST / supabase-js から comments / knowledge へ upsert するための権限（RLS 有効化前の開発用）
-grant select, insert, update, delete on table public.comments to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.knowledge_sources to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.knowledge_chunks to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.jarvis_heartbeat to anon, authenticated, service_role;
-grant usage, select on all sequences in schema public to anon, authenticated, service_role;
+-- Phase 13: Q&A 利用ログ（通常/意味検索の比率・質問傾向）
+create table if not exists public.app_qa_search_events (
+  id bigserial primary key,
+  created_at timestamptz not null default now(),
+  search_mode text not null check (search_mode in ('normal', 'semantic')),
+  query_text text not null default '',
+  session_id text,
+  user_id text,
+  comment_hit_count integer,
+  chunk_hit_count integer,
+  answer_comment_count integer,
+  answer_chunk_count integer,
+  match_threshold double precision,
+  used_sources jsonb,
+  meta jsonb not null default '{}'::jsonb
+);
+
+create index if not exists app_qa_search_events_created_at_idx
+  on public.app_qa_search_events (created_at desc);
+
+create index if not exists app_qa_search_events_mode_created_idx
+  on public.app_qa_search_events (search_mode, created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Security: public スキーマは RLS 必須（Security Advisor critical: rls_disabled_in_public）
+-- アプリ／取込／Edge は service_role のみ（RLS bypass）。anon / authenticated に CRUD を与えない。
+-- ---------------------------------------------------------------------------
+alter table if exists public.users enable row level security;
+alter table if exists public.comments enable row level security;
+alter table if exists public.suggested_questions enable row level security;
+alter table if exists public.chat_sessions enable row level security;
+alter table if exists public.chat_messages enable row level security;
+alter table if exists public.knowledge_sources enable row level security;
+alter table if exists public.knowledge_chunks enable row level security;
+alter table if exists public.jarvis_heartbeat enable row level security;
+alter table if exists public.app_qa_search_events enable row level security;
+
+revoke all on table public.users from anon, authenticated;
+revoke all on table public.comments from anon, authenticated;
+revoke all on table public.suggested_questions from anon, authenticated;
+revoke all on table public.chat_sessions from anon, authenticated;
+revoke all on table public.chat_messages from anon, authenticated;
+revoke all on table public.knowledge_sources from anon, authenticated;
+revoke all on table public.knowledge_chunks from anon, authenticated;
+revoke all on table public.jarvis_heartbeat from anon, authenticated;
+revoke all on table public.app_qa_search_events from anon, authenticated;
+revoke all on table public.app_qa_search_mode_daily from anon, authenticated;
+
+grant select, insert, update, delete on table public.users to service_role;
+grant select, insert, update, delete on table public.comments to service_role;
+grant select, insert, update, delete on table public.suggested_questions to service_role;
+grant select, insert, update, delete on table public.chat_sessions to service_role;
+grant select, insert, update, delete on table public.chat_messages to service_role;
+grant select, insert, update, delete on table public.knowledge_sources to service_role;
+grant select, insert, update, delete on table public.knowledge_chunks to service_role;
+grant select, insert, update, delete on table public.jarvis_heartbeat to service_role;
+grant select, insert, update, delete on table public.app_qa_search_events to service_role;
+grant select on table public.app_qa_search_mode_daily to service_role;
+grant usage, select on all sequences in schema public to service_role;
