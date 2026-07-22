@@ -131,9 +131,35 @@ create table if not exists public.jarvis_heartbeat (
   touched_at timestamptz not null default now()
 );
 
--- PostgREST / supabase-js から comments / knowledge へ upsert するための権限（RLS 有効化前の開発用）
-grant select, insert, update, delete on table public.comments to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.knowledge_sources to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.knowledge_chunks to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.jarvis_heartbeat to anon, authenticated, service_role;
-grant usage, select on all sequences in schema public to anon, authenticated, service_role;
+-- ---------------------------------------------------------------------------
+-- Security: public スキーマは RLS 必須（Security Advisor critical 対応）
+-- アプリ／取込スクリプトは service_role のみ使用（RLS を bypass）。
+-- anon / authenticated にはテーブル権限を与えない（Data API 経由の公開露出を防ぐ）。
+-- ---------------------------------------------------------------------------
+alter table public.users enable row level security;
+alter table public.comments enable row level security;
+alter table public.suggested_questions enable row level security;
+alter table public.chat_sessions enable row level security;
+alter table public.chat_messages enable row level security;
+alter table public.knowledge_sources enable row level security;
+alter table public.knowledge_chunks enable row level security;
+alter table public.jarvis_heartbeat enable row level security;
+
+revoke all on table public.users from anon, authenticated;
+revoke all on table public.comments from anon, authenticated;
+revoke all on table public.suggested_questions from anon, authenticated;
+revoke all on table public.chat_sessions from anon, authenticated;
+revoke all on table public.chat_messages from anon, authenticated;
+revoke all on table public.knowledge_sources from anon, authenticated;
+revoke all on table public.knowledge_chunks from anon, authenticated;
+revoke all on table public.jarvis_heartbeat from anon, authenticated;
+
+grant select, insert, update, delete on table public.users to service_role;
+grant select, insert, update, delete on table public.comments to service_role;
+grant select, insert, update, delete on table public.suggested_questions to service_role;
+grant select, insert, update, delete on table public.chat_sessions to service_role;
+grant select, insert, update, delete on table public.chat_messages to service_role;
+grant select, insert, update, delete on table public.knowledge_sources to service_role;
+grant select, insert, update, delete on table public.knowledge_chunks to service_role;
+grant select, insert, update, delete on table public.jarvis_heartbeat to service_role;
+grant usage, select on all sequences in schema public to service_role;

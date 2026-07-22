@@ -5,8 +5,9 @@ Supabase public.comments へ WeStudy 管理者形式 CSV を upsert する。
 
 必須環境変数:
   SUPABASE_URL
-  SUPABASE_SERVICE_ROLE_KEY（推奨）
-    未設定時は SUPABASE_ANON_KEY をフォールバック（RLS 無効時のみ）
+  SUPABASE_SERVICE_ROLE_KEY（必須・推奨）
+    未設定時は SUPABASE_ANON_KEY をフォールバックするが、
+    RLS 有効化後は anon では書けないため service_role を使うこと
 
 使い方:
   python3 upload_csv_to_supabase.py --csv exports/delta_*.csv
