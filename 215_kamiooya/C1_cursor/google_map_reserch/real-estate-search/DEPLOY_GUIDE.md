@@ -2,14 +2,17 @@
 
 このガイドに従って、不動産賃貸管理会社検索サイトをGitHub Pagesで公開できます。
 
-## 📦 必要なファイル
+## 必要なファイル
 
-以下の4つのファイルをGitHubリポジトリにアップロードしてください：
+以下を GitHub リポジトリ（project-GE）に含めてください：
 
-1. `index.html` - メインHTMLファイル
-2. `style.css` - スタイルシート
-3. `app.js` - JavaScript（検索ロジック）
-4. `README.md` - プロジェクト説明（オプション）
+1. `index.html` - 管理会社検索
+2. `style.css` - スタイル
+3. `app.js` - 管理会社検索ロジック
+4. `shuhen-map.html` / `shuhen-map.js` - **周辺MAP 番号ピン**（別ページ）
+5. `README.md` - プロジェクト説明（オプション）
+
+周辺MAP: 公開後 `https://m19mhrts83-cyber.github.io/project-GE/shuhen-map.html`
 
 ## 🔧 デプロイ手順
 
@@ -57,23 +60,24 @@
 https://m19mhrts83-cyber.github.io/project-GE/
 ```
 
-## 🔒 セキュリティ設定（重要！）
+## 🔒 セキュリティ設定（重要！）— 運営キー運用
 
-公開後、Google Maps API Keyに制限を設定してください：
+`shuhen-map` 公開版は **会員にキー入力させない**（GitHub Actions が `GOOGLE_MAPS_BROWSER_KEY` を注入）。  
+Maps JS のキーはページ上で見えるため、次の制限が必須です。詳細正本:
 
-1. **Google Cloud Consoleにアクセス**
-   - https://console.cloud.google.com/
+`215_kamiooya/.../AI×周辺MAP/運用手順_周辺MAP_MapsAPIキー_運営移管.md`
 
-2. **API Keyの制限を設定**
-   - 「APIとサービス」→「認証情報」
-   - API Keyを選択
-   - 「アプリケーションの制限」→「HTTPリファラー」を選択
-   - 「ウェブサイトの制限」に以下を追加：
-     ```
-     https://m19mhrts83-cyber.github.io/project-GE/*
-     ```
-   - 「保存」をクリック
+1. **Google Cloud Console** → API とサービス → 認証情報  
+2. **アプリケーションの制限** → HTTP リファラー:
+   ```
+   https://m19mhrts83-cyber.github.io/project-GE/*
+   ```
+3. **API の制限**: Maps JavaScript / Places / Geocoding / Directions（必要なら Static）のみ  
+4. **Directions API** を有効化（徒歩動線トグル用）  
+5. **予算アラート** 50% / 90% / 100%、日次クォータ上限  
+6. GitHub Secret `GOOGLE_MAPS_BROWSER_KEY` に制限済みキーを設定  
 
+戻し（キー入力 UI あり）: タグ `shuhen-map-before-ops-key`
 ## 📝 カスタムドメイン（オプション）
 
 独自ドメインを使用したい場合：
