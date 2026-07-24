@@ -59,17 +59,29 @@ http://127.0.0.1:*/*
 
 動線トグルを使う場合、対象プロジェクトで **Directions API** を有効化する。
 
-### 5. 予算アラート（Billing budgets）
+### 5. 予算アラート（Billing budgets）— デモ期の推奨値
 
-請求 → 予算とアラート例:
+請求 → [予算とアラート](https://console.cloud.google.com/billing/budgets?hl=ja) → **予算を作成**:
 
-- **デモ規模の目安（2026-07）**: 会員4〜5名・月5回程度なら無料枠内が想定。アラート用の月次予算は **USD 20**（約保険）
-- しきい値 **50% / 90% / 100%** でメール通知
-- 本番会員拡大後は実測を見て引き上げ
+| 項目 | デモ期の推奨 |
+|---|---|
+| 名前 | `project-GE-shuhen-map-demo` |
+| 期間 | 毎月 |
+| 対象 | 請求先アカウント全体、または Maps 利用プロジェクト |
+| **予算額** | **USD 20**（保険。4〜5人×月5回なら無料枠内想定） |
+| しきい値 | **50% / 90% / 100%** でメール |
+
+本番会員拡大後は実測を見て引き上げ。
 
 ### 6. クォータ上限
 
 API とサービス → 各 API → クォータで、日次／分あたりの上限を控えめに設定（異常利用時の請求上限）。デモ期は必須ではないが、予算アラートとセットで推奨。
+
+### すぐ開くリンク（プロジェクト `serch-property-management-co`）
+
+- Directions 有効化: https://console.cloud.google.com/apis/library/directions-backend.googleapis.com?project=serch-property-management-co&hl=ja  
+- 認証情報（リファラ／API制限）: https://console.cloud.google.com/apis/credentials?project=serch-property-management-co&hl=ja  
+- 予算とアラート: https://console.cloud.google.com/billing/budgets?hl=ja  
 
 ---
 
