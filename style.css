@@ -590,3 +590,139 @@ header h1 {
         padding: 15px;
     }
 }
+
+/* —— 周辺MAP 番号ピン（shuhen-map.html） —— */
+.shuhen-page .nav-links {
+    margin-top: 12px;
+    font-size: 0.95em;
+}
+
+.shuhen-page .nav-links a {
+    color: #fff;
+    text-decoration: underline;
+}
+
+.shuhen-page .form-row {
+    margin-bottom: 14px;
+}
+
+.shuhen-page .form-row label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #333;
+}
+
+.shuhen-page .form-row input[type="text"],
+.shuhen-page .form-row textarea {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 1em;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-family: inherit;
+}
+
+.shuhen-page .form-row textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9em;
+    line-height: 1.45;
+}
+
+.shuhen-page .shuhen-actions {
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.shuhen-page .shuhen-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    margin-bottom: 14px;
+}
+
+.shuhen-page .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #333;
+    cursor: pointer;
+}
+
+.shuhen-page .toggle-label input {
+    width: 18px;
+    height: 18px;
+}
+
+.shuhen-page .secondary-btn {
+    padding: 12px 18px;
+    font-size: 0.95em;
+    background: #fff;
+    color: #5a4fcf;
+    border: 2px solid #5a4fcf;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.shuhen-page .secondary-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.shuhen-page .map-container-tall {
+    height: 520px;
+}
+
+.shuhen-page .map-container-tall #map {
+    height: 100%;
+    min-height: 520px;
+}
+
+.shuhen-page .result-card-fail {
+    border-left: 4px solid #c0392b;
+    background: #fff5f5;
+}
+
+body.map-only-mode {
+    padding: 0;
+    background: #fff;
+}
+
+body.map-only-mode .container {
+    max-width: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+body.map-only-mode #controlsSection,
+body.map-only-mode header,
+body.map-only-mode #instructionsSection,
+body.map-only-mode #pinList,
+body.map-only-mode .results-header,
+body.map-only-mode #errorMessage {
+    display: none !important;
+}
+
+body.map-only-mode #resultsSection {
+    display: block !important;
+}
+
+body.map-only-mode .map-container-tall {
+    height: 100vh;
+}
+
+body.map-only-mode .map-container-tall #map {
+    min-height: 100vh;
+    height: 100vh;
+}
+
+.map-only-bar {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10000;
+    display: flex;
+    gap: 8px;
+}
