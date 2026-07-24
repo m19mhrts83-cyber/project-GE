@@ -67,15 +67,24 @@ jobs:
           fi
           python3 - <<'PY'
           import os
+          import re
           from pathlib import Path
           path = Path("_site/shuhen-map.js")
           key = os.environ["GOOGLE_MAPS_BROWSER_KEY"].strip()
           text = path.read_text(encoding="utf-8")
-          token = "__GOOGLE_MAPS_BROWSER_KEY__"
-          if token not in text:
-              raise SystemExit("placeholder not found in shuhen-map.js")
-          path.write_text(text.replace(token, key), encoding="utf-8")
-          print("injected maps browser key into shuhen-map.js")
+          # Replace only the const assignment value (keep MAPS_KEY_PLACEHOLDER intact)
+          new_text, n = re.subn(
+              r"(const EMBEDDED_MAPS_KEY = ')__GOOGLE_MAPS_BROWSER_KEY__(';)",
+              lambda m: m.group(1) + key + m.group(2),
+              text,
+              count=1,
+          )
+          if n != 1:
+              raise SystemExit(f"expected 1 EMBEDDED_MAPS_KEY replacement, got {n}")
+          if "const MAPS_KEY_PLACEHOLDER = '__GOOGLE_MAPS_BROWSER_KEY__';" not in new_text:
+              raise SystemExit("MAPS_KEY_PLACEHOLDER was altered; abort")
+          path.write_text(new_text, encoding="utf-8")
+          print("injected maps browser key into EMBEDDED_MAPS_KEY only")
           PY
 
       - uses: actions/upload-pages-artifact@v3
