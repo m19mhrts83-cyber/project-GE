@@ -1,6 +1,7 @@
 // 周辺MAP 番号ピン（project-GE 別ページ。管理会社検索 app.js とは独立）
-// Pages ビルド時に __GOOGLE_MAPS_BROWSER_KEY__ を運営キーへ置換する。
+// Pages ビルド時は「代入行の値だけ」を運営キーへ置換する（判定用プレースホルダ文字列は触らない）。
 const EMBEDDED_MAPS_KEY = '__GOOGLE_MAPS_BROWSER_KEY__';
+const MAPS_KEY_PLACEHOLDER = '__GOOGLE_MAPS_BROWSER_KEY__';
 
 let map;
 let markers = [];
@@ -49,7 +50,7 @@ const GRANDOLE_PRESET = {
 };
 
 function hasEmbeddedMapsKey() {
-    return Boolean(EMBEDDED_MAPS_KEY) && !EMBEDDED_MAPS_KEY.includes('__GOOGLE_MAPS_BROWSER_KEY__');
+    return Boolean(EMBEDDED_MAPS_KEY) && EMBEDDED_MAPS_KEY !== MAPS_KEY_PLACEHOLDER;
 }
 
 function resolveApiKey() {
