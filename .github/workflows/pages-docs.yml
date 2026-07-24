@@ -8,6 +8,8 @@ on:
       - 'index.html'
       - 'app.js'
       - 'style.css'
+      - 'shuhen-map.html'
+      - 'shuhen-map.js'
       - '.github/workflows/pages-docs.yml'
   workflow_dispatch:
 
@@ -41,6 +43,12 @@ jobs:
           fi
           if [ -f style.css ]; then
             cp style.css _site/style.css
+          fi
+          if [ -f shuhen-map.html ]; then
+            cp shuhen-map.html _site/shuhen-map.html
+          fi
+          if [ -f shuhen-map.js ]; then
+            cp shuhen-map.js _site/shuhen-map.js
           fi
           touch _site/.nojekyll _site/docs/.nojekyll
 
