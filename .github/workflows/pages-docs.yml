@@ -52,6 +52,32 @@ jobs:
           fi
           touch _site/.nojekyll _site/docs/.nojekyll
 
+      - name: Inject Maps browser key into shuhen-map.js
+        env:
+          GOOGLE_MAPS_BROWSER_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GOOGLE_MAPS_BROWSER_KEY:-}" ]; then
+            echo "Missing GitHub Actions secret: GOOGLE_MAPS_BROWSER_KEY" >&2
+            exit 1
+          fi
+          if [ ! -f _site/shuhen-map.js ]; then
+            echo "Missing _site/shuhen-map.js" >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          path = Path("_site/shuhen-map.js")
+          key = os.environ["GOOGLE_MAPS_BROWSER_KEY"].strip()
+          text = path.read_text(encoding="utf-8")
+          token = "__GOOGLE_MAPS_BROWSER_KEY__"
+          if token not in text:
+              raise SystemExit("placeholder not found in shuhen-map.js")
+          path.write_text(text.replace(token, key), encoding="utf-8")
+          print("injected maps browser key into shuhen-map.js")
+          PY
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

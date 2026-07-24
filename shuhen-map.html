@@ -17,10 +17,10 @@
         </header>
 
         <div class="search-section" id="controlsSection">
-            <div class="api-key-section" style="margin-bottom: 16px;">
-                <label for="apiKeyInput">Google Maps API Key:</label>
-                <input type="password" id="apiKeyInput" placeholder="APIキーを入力（管理会社検索と共有）">
-                <small>※ localStorage キー名は管理会社検索と同じ（googleMapsApiKey）</small>
+            <div class="api-key-section" id="apiKeySection" style="margin-bottom: 16px;">
+                <label for="apiKeyInput">Google Maps API Key（ローカル開発用）:</label>
+                <input type="password" id="apiKeyInput" placeholder="Pages公開時は運営キー注入のため不要">
+                <small>※ 公開版は運営キー埋め込み。この欄はプレースホルダ未置換時のみ表示</small>
             </div>
 
             <div class="form-row">
@@ -45,7 +45,12 @@
                     <input type="checkbox" id="hidePinsToggle">
                     ピンを隠す（下地スクショ用）
                 </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="walkRouteToggle">
+                    徒歩動線（最寄駅→物件 1本・赤線）
+                </label>
             </div>
+            <p id="routeSummary" class="subtitle" style="margin-top: 8px;"></p>
 
             <div class="search-box shuhen-actions">
                 <button type="button" id="presetButton" class="secondary-btn" onclick="loadGrandolePreset()">Grandoleプリセット</button>
@@ -75,16 +80,17 @@
         <div class="instructions" id="instructionsSection">
             <h3>使い方</h3>
             <ol>
-                <li>API Key を入力（Maps JavaScript / Places / Geocoding / Maps Static）</li>
+                <li>公開版はAPIキー入力不要。ローカルのみキー欄を使う</li>
                 <li>「Grandoleプリセット」でサキ向け店リストを読み込む（または手編集）</li>
                 <li>「ピンを表示」→ 東西・近接を目視確認し、<strong>ビュー範囲を確定</strong></li>
+                <li>任意で<strong>徒歩動線</strong>（最寄駅1本・赤線）。駅候補はリスト名に「駅」を含む行</li>
                 <li>既定で<strong>クリーン表示</strong>（丁目・店名・道名オフ。道路・線路の線だけ残す）</li>
                 <li>下地用:「ピンを隠す」→「表示を更新」→「マップのみ表示」→ スクショを <code>試走出力/基準_下地_Grandole_クリーン.png</code> へ</li>
                 <li><strong>ベージュ／イラスト寄せ（Phase C）はアプリの外</strong> — 書き出し直後に Raimo MyPrompt「C1」（<a href="https://raimo.buzz/prompt/474296">474296</a>／<code>11</code>）を Gemini へ → 任意でピン再合成</li>
                 <li>Canva で Access・タイトル・吹き出し（ピンは動かさない）</li>
             </ol>
             <p>公開URL: <a href="https://m19mhrts83-cyber.github.io/project-GE/shuhen-map.html">Pages shuhen-map</a> ／ Raimo入口: <a href="https://ma-8cfk63x74bh5.raimo-app.buzz">マイミニアプリ</a> ／ 手順: <code>11</code>・<code>12</code>・<code>10c</code></p>
-            <p>APIキー正本: <code>.env.jarvis_private</code> の <code>GOOGLE_MAPS_API_KEY</code>（<code>scripts/jarvis_maps_key_clipboard.sh</code> でクリップボードへ）</p>
+            <p>公開版のAPIキーは運営負担（入力不要）。制限・移管手順: <code>運用手順_周辺MAP_MapsAPIキー_運営移管.md</code></p>
         </div>
     </div>
 

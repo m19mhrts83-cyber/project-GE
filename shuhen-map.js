@@ -1,32 +1,33 @@
 // 周辺MAP 番号ピン（project-GE 別ページ。管理会社検索 app.js とは独立）
+// Pages ビルド時に __GOOGLE_MAPS_BROWSER_KEY__ を運営キーへ置換する。
+const EMBEDDED_MAPS_KEY = '__GOOGLE_MAPS_BROWSER_KEY__';
+
 let map;
 let markers = [];
 let infoWindow;
 let apiKey = '';
 let lastCoords = [];
+let lastRoute = null;
+let routePolyline = null;
+let routeInfoMarker = null;
 let mapOnly = false;
 let lastPropertyCenter = null;
 let lastMapBounds = null;
 
 /** POI・丁目・道名・駅名など文字を抑えたスタイル（道路・線路の線は残す＝下地寄り） */
 const CLEAN_MAP_STYLES = [
-    // 店・施設アイコン
     { featureType: 'poi', stylers: [{ visibility: 'off' }] },
     { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
     { featureType: 'poi.attraction', stylers: [{ visibility: 'off' }] },
     { featureType: 'poi.park', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    // 丁目・町名・区画などの行政ラベル（1丁目・2丁目など）
     { featureType: 'administrative', elementType: 'labels', stylers: [{ visibility: 'off' }] },
     { featureType: 'administrative.neighborhood', elementType: 'labels', stylers: [{ visibility: 'off' }] },
     { featureType: 'administrative.land_parcel', elementType: 'labels', stylers: [{ visibility: 'off' }] },
     { featureType: 'administrative.locality', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    // 地形・水系の文字
     { featureType: 'landscape', elementType: 'labels', stylers: [{ visibility: 'off' }] },
     { featureType: 'water', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    // 道路名（環状線など）も下地ではオフ。線そのものは残す
     { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'off' }] },
     { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-    // 駅名・路線名ラベルはオフ（線路・駅の形は残す）
     { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
     { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
     { featureType: 'transit.station', elementType: 'labels', stylers: [{ visibility: 'off' }] },
@@ -47,18 +48,45 @@ const GRANDOLE_PRESET = {
     ],
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    const savedApiKey = localStorage.getItem('googleMapsApiKey');
-    if (savedApiKey) {
-        document.getElementById('apiKeyInput').value = savedApiKey;
-        apiKey = savedApiKey;
+function hasEmbeddedMapsKey() {
+    return Boolean(EMBEDDED_MAPS_KEY) && !EMBEDDED_MAPS_KEY.includes('__GOOGLE_MAPS_BROWSER_KEY__');
+}
+
+function resolveApiKey() {
+    if (hasEmbeddedMapsKey()) return EMBEDDED_MAPS_KEY.trim();
+    const input = document.getElementById('apiKeyInput');
+    if (input && input.value.trim()) return input.value.trim();
+    return (localStorage.getItem('googleMapsApiKey') || '').trim();
+}
+
+function syncApiKeyUi() {
+    const section = document.getElementById('apiKeySection');
+    const input = document.getElementById('apiKeyInput');
+    if (hasEmbeddedMapsKey()) {
+        if (section) section.style.display = 'none';
+        apiKey = EMBEDDED_MAPS_KEY.trim();
+        return;
     }
-    document.getElementById('apiKeyInput').addEventListener('change', (e) => {
-        apiKey = e.target.value.trim();
-        localStorage.setItem('googleMapsApiKey', apiKey);
-    });
+    if (section) section.style.display = '';
+    const saved = localStorage.getItem('googleMapsApiKey');
+    if (saved && input) {
+        input.value = saved;
+        apiKey = saved;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    syncApiKeyUi();
+    const input = document.getElementById('apiKeyInput');
+    if (input && !hasEmbeddedMapsKey()) {
+        input.addEventListener('change', (e) => {
+            apiKey = e.target.value.trim();
+            localStorage.setItem('googleMapsApiKey', apiKey);
+        });
+    }
     const cleanToggle = document.getElementById('cleanStyleToggle');
     const hidePinsToggle = document.getElementById('hidePinsToggle');
+    const routeToggle = document.getElementById('walkRouteToggle');
     if (cleanToggle) {
         const savedClean = localStorage.getItem('shuhenCleanStyle');
         if (savedClean !== null) cleanToggle.checked = savedClean === '1';
@@ -69,6 +97,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (hidePinsToggle) {
         hidePinsToggle.addEventListener('change', () => applyMapDisplayOptions());
+    }
+    if (routeToggle) {
+        const savedRoute = localStorage.getItem('shuhenWalkRoute');
+        if (savedRoute !== null) routeToggle.checked = savedRoute === '1';
+        routeToggle.addEventListener('change', () => {
+            localStorage.setItem('shuhenWalkRoute', routeToggle.checked ? '1' : '0');
+            if (lastCoords.length && map) {
+                updateWalkRoute(lastCoords).catch((err) => console.error(err));
+            }
+        });
     }
     loadGrandolePreset();
 });
@@ -83,11 +121,18 @@ function isHidePinsOn() {
     return el ? el.checked : false;
 }
 
+function isWalkRouteOn() {
+    const el = document.getElementById('walkRouteToggle');
+    return el ? el.checked : false;
+}
+
 function applyMapDisplayOptions() {
     if (!map) return;
     map.setOptions({ styles: isCleanStyleOn() ? CLEAN_MAP_STYLES : [] });
     const hide = isHidePinsOn();
     markers.forEach((m) => m.setMap(hide ? null : map));
+    if (routePolyline) routePolyline.setMap(map);
+    if (routeInfoMarker) routeInfoMarker.setMap(hide ? null : map);
 }
 
 function loadGrandolePreset() {
@@ -151,7 +196,7 @@ function loadGoogleMapsScript(callback) {
     script.defer = true;
     script.onload = callback;
     script.onerror = () => {
-        showError('Google Maps APIの読み込みに失敗しました。APIキーを確認してください。');
+        showError('Google Maps APIの読み込みに失敗しました。APIキー／制限設定を確認してください。');
     };
     document.head.appendChild(script);
 }
@@ -159,6 +204,20 @@ function loadGoogleMapsScript(callback) {
 function clearMarkers() {
     markers.forEach((m) => m.setMap(null));
     markers = [];
+}
+
+function clearRouteOverlay() {
+    if (routePolyline) {
+        routePolyline.setMap(null);
+        routePolyline = null;
+    }
+    if (routeInfoMarker) {
+        routeInfoMarker.setMap(null);
+        routeInfoMarker = null;
+    }
+    lastRoute = null;
+    const el = document.getElementById('routeSummary');
+    if (el) el.textContent = '';
 }
 
 function numberedIcon(label, isProperty) {
@@ -222,14 +281,145 @@ function findPlace(query, biasLatLng) {
     });
 }
 
+function looksLikeStation(row) {
+    if (!row || row.isProperty) return false;
+    const blob = `${row.id || ''} ${row.name || ''} ${row.query || ''} ${row.resolvedName || ''}`;
+    return /駅/.test(blob);
+}
+
+function requestWalkingRoute(origin, destination) {
+    return new Promise((resolve) => {
+        const service = new google.maps.DirectionsService();
+        service.route(
+            {
+                origin,
+                destination,
+                travelMode: google.maps.TravelMode.WALKING,
+                language: 'ja',
+                region: 'jp',
+            },
+            (result, status) => {
+                if (status === 'OK' && result && result.routes && result.routes[0]) {
+                    resolve(result);
+                } else {
+                    resolve(null);
+                }
+            }
+        );
+    });
+}
+
+function pathToLatLngLiteral(overviewPath) {
+    return overviewPath.map((p) => ({ lat: p.lat(), lng: p.lng() }));
+}
+
+async function updateWalkRoute(rows) {
+    clearRouteOverlay();
+    const summary = document.getElementById('routeSummary');
+    if (!isWalkRouteOn()) {
+        if (summary) summary.textContent = '徒歩動線: OFF';
+        return;
+    }
+    if (!map || !google || !google.maps) return;
+
+    const property = rows.find((r) => r.isProperty && r.ok && r.lat != null);
+    const stations = rows.filter((r) => r.ok && r.lat != null && looksLikeStation(r));
+    if (!property) {
+        if (summary) summary.textContent = '徒歩動線: 物件ピンがありません';
+        return;
+    }
+    if (!stations.length) {
+        if (summary) summary.textContent = '徒歩動線: 駅候補がリストにありません（名称に「駅」を含めてください）';
+        return;
+    }
+
+    const origin = { lat: property.lat, lng: property.lng };
+    let best = null;
+    for (const st of stations) {
+        const dest = { lat: st.lat, lng: st.lng };
+        const result = await requestWalkingRoute(dest, origin);
+        if (!result) continue;
+        const leg = result.routes[0].legs[0];
+        const meters = leg.distance ? leg.distance.value : Number.POSITIVE_INFINITY;
+        const seconds = leg.duration ? leg.duration.value : Number.POSITIVE_INFINITY;
+        if (!best || meters < best.meters) {
+            best = {
+                station: st,
+                result,
+                meters,
+                seconds,
+                distanceText: leg.distance ? leg.distance.text : '',
+                durationText: leg.duration ? leg.duration.text : '',
+            };
+        }
+    }
+
+    if (!best) {
+        if (summary) summary.textContent = '徒歩動線: Directions 取得に失敗（API有効化を確認）';
+        return;
+    }
+
+    const path = pathToLatLngLiteral(best.result.routes[0].overview_path);
+    routePolyline = new google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: '#c0392b',
+        strokeOpacity: 0.95,
+        strokeWeight: 5,
+        map,
+        zIndex: 50,
+    });
+
+    const mid = path[Math.floor(path.length / 2)] || origin;
+    routeInfoMarker = new google.maps.Marker({
+        map: isHidePinsOn() ? null : map,
+        position: mid,
+        label: {
+            text: best.durationText || '徒歩',
+            color: '#fff',
+            fontSize: '11px',
+            fontWeight: '700',
+        },
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 18,
+            fillColor: '#c0392b',
+            fillOpacity: 0.95,
+            strokeColor: '#fff',
+            strokeWeight: 2,
+        },
+        zIndex: 60,
+    });
+
+    lastRoute = {
+        mode: 'WALKING',
+        fromStationId: best.station.id,
+        fromStationName: best.station.name,
+        toPropertyId: 'P0',
+        distanceText: best.distanceText,
+        durationText: best.durationText,
+        meters: best.meters,
+        seconds: best.seconds,
+        path,
+    };
+
+    if (summary) {
+        summary.textContent = `徒歩動線: ${best.station.id} ${best.station.name} → 物件（約${best.durationText} / ${best.distanceText}）`;
+    }
+}
+
 async function runNumberedPins() {
-    const currentApiKey = document.getElementById('apiKeyInput').value.trim();
+    const currentApiKey = resolveApiKey();
     const address = document.getElementById('propertyAddress').value.trim();
     const propertyLabel = document.getElementById('propertyLabel').value.trim() || '物件';
     const places = parsePlacesList(document.getElementById('placesList').value);
 
     if (!currentApiKey) {
-        showError('Google Maps API Keyを入力してください。');
+        showError(
+            hasEmbeddedMapsKey()
+                ? '運営キーの注入に失敗しています。Pages の Secret を確認してください。'
+                : 'Google Maps API Keyを入力してください（ローカル開発用）。'
+        );
         return;
     }
     if (!address) {
@@ -242,7 +432,9 @@ async function runNumberedPins() {
     }
 
     apiKey = currentApiKey;
-    localStorage.setItem('googleMapsApiKey', apiKey);
+    if (!hasEmbeddedMapsKey()) {
+        localStorage.setItem('googleMapsApiKey', apiKey);
+    }
     hideError();
     setPinButtonLoading(true);
 
@@ -287,6 +479,7 @@ async function runNumberedPins() {
             lastCoords = rows;
             lastPropertyCenter = property;
             renderMapAndList(property, rows);
+            await updateWalkRoute(rows);
             document.getElementById('mapOnlyButton').disabled = false;
             document.getElementById('copyJsonButton').disabled = false;
             const applyBtn = document.getElementById('applyStyleButton');
@@ -301,6 +494,7 @@ async function runNumberedPins() {
 
 function renderMapAndList(property, rows) {
     clearMarkers();
+    clearRouteOverlay();
     infoWindow = new google.maps.InfoWindow();
 
     const clean = isCleanStyleOn();
@@ -340,7 +534,6 @@ function renderMapAndList(property, rows) {
         map.fitBounds(bounds, 64);
         lastMapBounds = bounds;
         google.maps.event.addListenerOnce(map, 'idle', () => {
-            // 周辺MAP用: 広がりすぎ防止（試走のスクショが市域全体になるのを防ぐ）
             const z = map.getZoom();
             if (typeof z === 'number' && z < 14) map.setZoom(14);
             if (typeof z === 'number' && z > 16) map.setZoom(16);
@@ -390,6 +583,7 @@ function copyCoordsJson() {
         generatedAt: new Date().toISOString(),
         property: lastCoords.find((r) => r.id === 'P0') || null,
         pins: lastCoords,
+        walkRoute: lastRoute,
     };
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(
         () => {
