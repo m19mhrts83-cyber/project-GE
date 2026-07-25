@@ -34,21 +34,6 @@ const CLEAN_MAP_STYLES = [
     { featureType: 'transit.station', elementType: 'labels', stylers: [{ visibility: 'off' }] },
 ];
 
-const GRANDOLE_PRESET = {
-    address: '愛知県名古屋市北区長田町4丁目69番地5',
-    label: 'Grandole志賀本通',
-    places: [
-        { id: 'P1', query: '地下鉄 志賀本通駅 名古屋', name: '志賀本通駅' },
-        { id: 'P2', query: '名鉄 尼ケ坂駅', name: '尼ケ坂駅／SAKUMACHI' },
-        { id: 'P3', query: 'ナフコトミダ 杉栄店', name: 'ナフコトミダ杉栄店' },
-        { id: 'P4', query: 'ドラッグスギヤマ 杉栄店', name: 'ドラッグスギヤマ杉栄店' },
-        { id: 'P5', query: 'つばめパン＆Milk 尼ケ坂', name: 'つばめパン＆Milk' },
-        { id: 'P6', query: 'Cafe de Lyon Palette 尼ケ坂', name: 'Cafe de Lyon Palette' },
-        { id: 'P7', query: 'つけそば 神宮寺 志賀本通', name: 'つけそば 神宮寺' },
-        { id: 'P8', query: 'コノズコーヒー 志賀本通', name: 'コノズコーヒー' },
-    ],
-};
-
 function hasEmbeddedMapsKey() {
     return Boolean(EMBEDDED_MAPS_KEY) && EMBEDDED_MAPS_KEY !== MAPS_KEY_PLACEHOLDER;
 }
@@ -109,7 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    loadGrandolePreset();
 });
 
 function isCleanStyleOn() {
@@ -134,14 +118,6 @@ function applyMapDisplayOptions() {
     markers.forEach((m) => m.setMap(hide ? null : map));
     if (routePolyline) routePolyline.setMap(map);
     if (routeInfoMarker) routeInfoMarker.setMap(hide ? null : map);
-}
-
-function loadGrandolePreset() {
-    document.getElementById('propertyAddress').value = GRANDOLE_PRESET.address;
-    document.getElementById('propertyLabel').value = GRANDOLE_PRESET.label;
-    document.getElementById('placesList').value = GRANDOLE_PRESET.places
-        .map((p) => `${p.id} | ${p.query} | ${p.name}`)
-        .join('\n');
 }
 
 function parsePlacesList(text) {
