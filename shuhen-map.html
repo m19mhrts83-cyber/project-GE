@@ -3,17 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>周辺MAP 番号ピン — project-GE</title>
+    <title>【周辺MAP_Step2】背景地図・施設位置取得</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="shuhen-page">
     <div class="container" id="appContainer">
         <header>
-            <h1>周辺MAP 番号ピン（ステップ2）</h1>
-            <p class="subtitle">ステップ1の出力を貼る → 地図に P0〜P8＋徒歩動線（管理会社検索とは別ページ）</p>
-            <p class="nav-links">
-                <a href="index.html">← 管理会社検索</a>
-            </p>
+            <h1>【周辺MAP_Step2】背景地図・施設位置取得</h1>
+            <p class="subtitle">Step1.2の出力を貼る → 地図に P0〜P8＋徒歩動線</p>
         </header>
 
         <div class="search-section" id="controlsSection">
@@ -26,17 +23,17 @@
             <div class="form-row">
                 <label for="propertyAddress">物件住所</label>
                 <input type="text" id="propertyAddress" placeholder="例: ○○県○○市○○町1-2-3">
-                <small>ステップ1（周辺MAP_Step1基本洗い出し）の出力「地図アプリ投入用 → 物件住所」をコピーして貼り付けてください。</small>
+                <small>Step1.2（実在検証・評判店リサーチ）の出力「## E → 物件住所」のコードブロックをコピーして貼り付けてください。</small>
             </div>
             <div class="form-row">
                 <label for="propertyLabel">物件ラベル（P0）</label>
                 <input type="text" id="propertyLabel" placeholder="例: ○○マンション（物件名）">
-                <small>ステップ1の「地図アプリ投入用 → 物件ラベル(P0)」（＝物件名）を貼り付けてください。</small>
+                <small>Step1.2の「## E → 物件ラベル(P0)」（＝物件名）のコードブロックを貼り付けてください。</small>
             </div>
             <div class="form-row">
                 <label for="placesList">店・施設リスト（1行1件：ID | 検索クエリ | 表示名）</label>
-                <textarea id="placesList" rows="10" spellcheck="false" placeholder="ステップ1の「地図アプリ投入用 → 店・施設リスト」をそのまま貼り付け（1行1件）&#10;P1 | 地下鉄 ○○駅 市名 | ○○駅&#10;P2 | スーパー△△店 市名 | △△スーパー&#10;P3 | ドラッグ□□店 | □□ドラッグ"></textarea>
-                <small>ステップ1（周辺MAP_Step1基本洗い出し）の出力「地図アプリ投入用 → 店・施設リスト」をコピーして貼り付けてください。物件はここに入れず、上の「物件住所」「物件ラベル（P0）」へ入れます。表示名に「駅」を含む行が1件以上あると徒歩動線が引けます。</small>
+                <textarea id="placesList" rows="10" spellcheck="false" placeholder="Step1.2の「## E → 店・施設リスト」をそのまま貼り付け（1行1件）&#10;P1 | 地下鉄 ○○駅 市名 | ○○駅&#10;P2 | スーパー△△店 市名 | △△スーパー&#10;P3 | ドラッグ□□店 | □□ドラッグ"></textarea>
+                <small>Step1.2の出力「## E → 店・施設リスト」のコードブロックをコピーして貼り付けてください。物件はここに入れず、上の「物件住所」「物件ラベル（P0）」へ入れます。表示名に「駅」を含む行が1件以上あると徒歩動線が引けます。</small>
             </div>
 
             <div class="form-row shuhen-toggles">
@@ -83,12 +80,12 @@
             <h3>使い方</h3>
             <ol>
                 <li>公開版はAPIキー入力不要。ローカルのみキー欄を使う</li>
-                <li><strong>ステップ1</strong>（周辺MAP_Step1基本洗い出し）の出力「地図アプリ投入用」を、物件住所・物件ラベル・店・施設リストの各欄へ貼り付ける</li>
+                <li><strong>Step1.2</strong>（実在検証・評判店リサーチ）の出力「## E Step2投入用」を、物件住所・物件ラベル・店・施設リストの各欄へ貼り付ける（それぞれコードブロック）</li>
                 <li>「ピンを表示」→ 東西・近接を目視確認し、<strong>ビュー範囲を確定</strong></li>
                 <li>任意で<strong>徒歩動線</strong>（最寄駅1本・赤線）。駅候補はリスト名に「駅」を含む行</li>
                 <li>既定で<strong>クリーン表示</strong>（丁目・店名・道名オフ。道路・線路の線だけ残す）</li>
                 <li>下地用:「ピンを隠す」→「表示を更新」→「マップのみ表示」→ スクショを <code>試走出力/基準_下地_（物件名）_クリーン.png</code> へ</li>
-                <li><strong>ベージュ／イラスト寄せ（Phase C）はアプリの外</strong> — 書き出し直後に Raimo MyPrompt「C1」（<a href="https://raimo.buzz/prompt/474296">474296</a>／<code>11</code>）を Gemini へ → 任意でピン再合成</li>
+                <li><strong>Step3 下地色味寄せ → Step4 紙面仕上げ</strong> はアプリの外 — 書き出し後に Raimo「Step3」（<a href="https://raimo.buzz/prompt/474296">474296</a>）→ 骨格PNG後「Step4 紙面仕上げ」（<a href="https://raimo.buzz/prompt/474298">474298</a>）。文言は Step1.2 の ## H を使う</li>
                 <li>Canva で Access・タイトル・吹き出し（ピンは動かさない）</li>
             </ol>
             <p>公開URL: <a href="https://m19mhrts83-cyber.github.io/project-GE/shuhen-map.html">Pages shuhen-map</a> ／ Raimo入口: <a href="https://ma-8cfk63x74bh5.raimo-app.buzz">マイミニアプリ</a> ／ 手順: <code>11</code>・<code>12</code>・<code>10c</code></p>
