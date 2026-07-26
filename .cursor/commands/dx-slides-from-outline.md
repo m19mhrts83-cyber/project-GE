@@ -20,6 +20,7 @@
 | 公開 HTML | `docs/<タイトル>_cute.html` 等 |
 | 一覧 | `docs/2kai.html` |
 | **NotebookLM 手順の詳細メモ** | **`@docs/N1_NotebookLM`**（MCP インストール・できること一覧・ソースの貼り方） |
+| **客先提出・編集可能 PPTX** | **`@docs/N1_NotebookLM/AI説明資料_後から直しやすい作り方.md`**（画像デッキではなく Plus AI 等。本コマンドの HTML 公開フローとは別） |
 
 ---
 

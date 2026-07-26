@@ -17,7 +17,15 @@ OneDrive 上の **`215_神・大家さん倶楽部/N1_NotebookLM/`** と **常�
 | [NotebookLMとCursorでできること一覧.md](NotebookLMとCursorでできること一覧.md) | MCP 連携後にチャットで何ができるか |
 | [CursorのまとめをNotebookLMのソースにする方法.md](CursorのまとめをNotebookLMのソースにする方法.md) | 貼り付け・アップロードでソース化 |
 | [NotebookLM_マスタースタイル_cute-illustration.md](NotebookLM_マスタースタイル_cute-illustration.md) | **ゆるイラスト（cute）のマスター全文**—NotebookLM のソースにそのまま追加 |
+| [いけともゆるキャラプロンプト.md](いけともゆるキャラプロンプト.md) | **いけとも用クイック参照**—cute-illustration 全文＋NotebookLM コピペ用プロンプト |
+| [AI説明資料_後から直しやすい作り方.md](AI説明資料_後から直しやすい作り方.md) | **客先提出向け**—画像1枚スライドの限界と、オブジェクト型（Plus AI 等）への切り替え方針 |
+| [Plus_AI_導入手順.md](Plus_AI_導入手順.md) | Plus AI のインストール・ブランドテンプレ・日常フロー |
+| [プロンプト雛形_ブランドテンプレ前提.md](プロンプト雛形_ブランドテンプレ前提.md) | ワンスライドワンメッセージの表＋Plus AI／校正用プロンプト |
+| [NotebookLM_編集可能PPTX変換手順.md](NotebookLM_編集可能PPTX変換手順.md) | NotebookLM PDF→編集可能 PPTX（系統B・つなぎ） |
 
 ## DX 勉強会スライド手順との関係
 
 全体フローは [`.cursor/commands/dx-slides-from-outline.md`](../../.cursor/commands/dx-slides-from-outline.md) を正とし、本フォルダは **MCP・ソース登録の詳細**の参照先です。
+
+- **公開 HTML・ゆるイラスト中心**（DX勉強会など）: 従来どおり NotebookLM Studio → PNG → `*_cute.html`
+- **客先提出であとから直したい PPTX**: [AI説明資料_後から直しやすい作り方.md](AI説明資料_後から直しやすい作り方.md)（構成は NotebookLM、本番は Plus AI 等）
