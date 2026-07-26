@@ -1,0 +1,5 @@
+# WeStudy 週次 CI（westudy-raimo-weekly.yml）用
+selenium
+playwright
+supabase
+requests
