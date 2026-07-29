@@ -1,0 +1,121 @@
+{
+    "generatedAt": "2026-07-24T11:45:49.470Z",
+    "property": {
+      "id": "P0",
+      "query": "愛知県名古屋市北区長田町4丁目69番地5",
+      "name": "Grandole志賀本通",
+      "lat": 35.1912938,
+      "lng": 136.9229688,
+      "formatted": "日本、〒462-0834 愛知県名古屋市北区長田町４丁目６９",
+      "ok": true,
+      "isProperty": true
+    },
+    "pins": [
+      {
+        "id": "P0",
+        "query": "愛知県名古屋市北区長田町4丁目69番地5",
+        "name": "Grandole志賀本通",
+        "lat": 35.1912938,
+        "lng": 136.9229688,
+        "formatted": "日本、〒462-0834 愛知県名古屋市北区長田町４丁目６９",
+        "ok": true,
+        "isProperty": true
+      },
+      {
+        "id": "P1",
+        "query": "地下鉄 志賀本通駅 名古屋",
+        "name": "志賀本通駅",
+        "lat": 35.1962927,
+        "lng": 136.9212505,
+        "formatted": "日本、〒462-0853 愛知県名古屋市北区志賀本通２丁目",
+        "resolvedName": "志賀本通駅",
+        "ok": true,
+        "status": "",
+        "isProperty": false
+      },
+      {
+        "id": "P2",
+        "query": "名鉄 尼ケ坂駅",
+        "name": "尼ケ坂駅／SAKUMACHI",
+        "lat": 35.1878906,
+        "lng": 136.9192182,
+        "formatted": "日本、〒462-0837 愛知県名古屋市北区大杉１丁目２０",
+        "resolvedName": "尼ヶ坂駅",
+        "ok": true,
+        "status": "",
+        "isProperty": false
+      },
+      {
+        "id": "P3",
+        "query": "ナフコトミダ 杉栄店",
+        "name": "ナフコトミダ杉栄店",
+        "lat": 35.1912162,
+        "lng": 136.9244367,
+        "formatted": "日本、〒462-0829 愛知県名古屋市北区杉栄町２丁目４８",
+        "resolvedName": "ナフコトミダ 杉栄店",
+        "ok": true,
+        "status": "",
+        "isProperty": false
+      },
+      {
+        "id": "P4",
+        "query": "ドラッグスギヤマ 杉栄店",
+        "name": "ドラッグスギヤマ杉栄店",
+        "lat": 35.1912209,
+        "lng": 136.9241023,
+        "formatted": "日本、〒462-0829 愛知県名古屋市北区杉栄町２丁目３８ ドラッグスギヤマ 杉栄店",
+        "resolvedName": "ドラッグスギヤマ 杉栄店",
+        "ok": true,
+        "status": "",
+        "isProperty": false
+      },
+      {
+        "id": "P5",
+        "query": "つばめパン＆Milk 尼ケ坂",
+        "name": "つばめパン＆Milk",
+        "lat": 35.18727790000001,
+        "lng": 136.9175487,
+        "formatted": "日本、〒462-0837 愛知県名古屋市北区大杉１丁目１８−２１ SAKUMACHI商店街",
+        "resolvedName": "天然酵母の食パン専門店つばめパン＆Milk 尼ヶ坂本店",
+        "ok": true,
+        "status": "",
+        "isProperty": false
+      },
+      {
+        "id": "P6",
+        "query": "Cafe de Lyon Palette 尼ケ坂",
+        "name": "Cafe de Lyon Palette",
+        "lat": 35.1876365,
+        "lng": 136.918581,
+        "formatted": "日本、〒462-0837 愛知県名古屋市北区大杉１丁目１９−１９０１",
+        "resolvedName": "Cafe de Lyon Palette",
+        "ok": true,
+        "status": "",
+        "isProperty": false
+      },
+      {
+        "id": "P7",
+        "query": "つけそば 神宮寺 志賀本通",
+        "name": "つけそば 神宮寺",
+        "lat": 35.196467,
+        "lng": 136.9226685,
+        "formatted": "日本、〒462-0854 愛知県名古屋市北区若葉通１丁目２５",
+        "resolvedName": "つけそば神宮寺",
+        "ok": true,
+        "status": "",
+        "isProperty": false
+      },
+      {
+        "id": "P8",
+        "query": "コノズコーヒー 志賀本通",
+        "name": "コノズコーヒー",
+        "lat": 35.1961456,
+        "lng": 136.9206125,
+        "formatted": "日本、〒462-0853 愛知県名古屋市北区志賀本通２丁目１2",
+        "resolvedName": "コノズコーヒー",
+        "ok": true,
+        "status": "",
+        "isProperty": false
+      }
+    ]
+  }

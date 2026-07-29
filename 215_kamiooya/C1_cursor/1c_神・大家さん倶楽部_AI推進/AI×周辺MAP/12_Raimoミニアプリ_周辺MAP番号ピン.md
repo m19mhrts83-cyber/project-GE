@@ -1,6 +1,6 @@
 # Raimo マイミニアプリ：周辺MAP 番号ピン
 
-- **用途**: クリーン表示の番号ピン地図（`shuhen-map`）を Raimo Tools から開き、スクショして C1 に渡す
+- **用途**: クリーン表示の番号ピン地図（`shuhen-map`＝Step2）を Raimo Tools から開き、スクショして Step3（旧C1）に渡す
 - **コード正本**: GitHub Pages 上の HTML／JS／CSS（ビルダに Maps を丸ごと貼らない）
 - **公開URL（Pages）**: `https://m19mhrts83-cyber.github.io/project-GE/shuhen-map.html`
 - **Raimo ミニアプリURL**: https://ma-8cfk63x74bh5.raimo-app.buzz（編集: https://raimo.buzz/miniApp/4155/edit）
@@ -27,7 +27,7 @@ APIキーは画面で入力（localStorage。管理会社検索と同じキー�
 1. Raimo でマイミニアプリ新規作成  
 2. 名称: `周辺MAP_番号ピン`  
 3. 公開URL（上記 Pages）を開く／リンクとして配置。短い使い方テキストを添える  
-4. Tools 上で Step1・C1 MyPrompt と並べて説明できるようにする  
+4. Tools 上で Step1.1〜1.2・Step3（旧C1）MyPrompt と並べて説明できるようにする  
 5. 登録後のミニアプリ URL を本ファイル先頭に追記  
 
 ### ミニアプリ内の短い使い方（貼付用）

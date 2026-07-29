@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<title>Path A — Grandole志賀本通 周辺MAP（アイコン＋ペルソナイラスト）</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    width: 1400px; height: 990px;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: linear-gradient(165deg, #fbf6ea 0%, #f3e8d4 55%, #efe2cc 100%);
+    color: #3a2f22;
+    display: grid;
+    grid-template-columns: 268px 1fr 300px;
+    grid-template-rows: 70px 1fr 150px;
+    gap: 12px;
+    padding: 18px;
+  }
+  .title {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 3px solid #d4b483;
+    padding-bottom: 8px;
+  }
+  .title h1 { margin: 0; font-size: 32px; letter-spacing: 0.03em; color: #5a4018; }
+  .title .tag { font-size: 12px; color: #8a7350; background: #fff8ea; border: 1px solid #e4d2ae; border-radius: 999px; padding: 6px 12px; }
+
+  .access, .bubbles, .persona-bar, .mapwrap, .footer {
+    background: rgba(255,252,246,0.92);
+    border: 1px solid #e2d2b4;
+    border-radius: 14px;
+  }
+  .access { padding: 14px 14px 10px; }
+  .access h2 {
+    margin: 0 0 10px; font-size: 18px; color: #fff;
+    background: #c8923a; display: inline-block; padding: 4px 14px; border-radius: 999px;
+  }
+  .access ul { list-style: none; margin: 0; padding: 0; }
+  .access li {
+    display: grid; grid-template-columns: 34px 1fr auto;
+    gap: 8px; align-items: center;
+    padding: 8px 4px; border-bottom: 1px dashed #ead9ba;
+    font-size: 13px; line-height: 1.35;
+  }
+  .access li:last-child { border-bottom: 0; }
+  .access .min { color: #9a6b1a; font-weight: 700; white-space: nowrap; }
+  .ico {
+    width: 30px; height: 30px; border-radius: 10px;
+    display: grid; place-items: center; font-size: 16px;
+    background: #fff4df; border: 1px solid #ecd7ad;
+  }
+
+  .mapwrap {
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; padding: 8px; position: relative;
+  }
+  .mapwrap img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+
+  .bubbles { padding: 10px; display: flex; flex-direction: column; gap: 7px; overflow: hidden; }
+  .bubble {
+    display: grid; grid-template-columns: 32px 1fr; gap: 8px; align-items: start;
+    background: #fff; border: 1px solid #e0cfaa; border-radius: 12px;
+    padding: 7px 9px; font-size: 11.5px; line-height: 1.35;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+  }
+  .bubble strong { display: block; color: #9a6b1a; font-size: 11px; margin-bottom: 2px; }
+
+  .persona-bar {
+    grid-column: 1 / -1;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    padding: 10px 12px;
+  }
+  .persona {
+    display: grid; grid-template-columns: 78px 1fr; gap: 10px; align-items: center;
+    background: #fffdf8; border: 1px dashed #dcc7a0; border-radius: 12px; padding: 8px 10px;
+  }
+  .persona .speech {
+    font-size: 12.5px; line-height: 1.4; position: relative;
+    background: #fff; border: 2px solid #c8923a; border-radius: 14px; padding: 8px 10px;
+  }
+  .persona .speech::before {
+    content: ""; position: absolute; left: -10px; top: 18px;
+    border: 6px solid transparent; border-right-color: #c8923a;
+  }
+  .persona .speech::after {
+    content: ""; position: absolute; left: -6px; top: 20px;
+    border: 5px solid transparent; border-right-color: #fff;
+  }
+  .persona .who { font-size: 10px; color: #8a7350; margin-top: 4px; }
+  .char { width: 78px; height: 90px; }
+</style>
+</head>
+<body>
+  <div class="title">
+    <h1>Grandole志賀本通 周辺MAP</h1>
+    <div class="tag">Path A 手組＋施設アイコン＋サキ（ペルソナ）コメント</div>
+  </div>
+
+  <aside class="access">
+    <h2>Access</h2>
+    <ul>
+      <li><span class="ico" title="駅">🚇</span><span>地下鉄名城線「志賀本通駅」</span><span class="min">約7分</span></li>
+      <li><span class="ico" title="駅">🚆</span><span>名鉄瀬戸線「尼ケ坂駅」</span><span class="min">約8分</span></li>
+      <li><span class="ico" title="スーパー">🛒</span><span>ナフコトミダ杉栄店（生鮮スーパー）</span><span class="min">約3分</span></li>
+      <li><span class="ico" title="ドラッグストア">💊</span><span>ドラッグスギヤマ杉栄店</span><span class="min">約3分</span></li>
+      <li><span class="ico" title="区役所">🏛️</span><span>名古屋市北区役所</span><span class="min">約18分</span></li>
+      <li><span class="ico" title="レンタル">💿</span><span>ゲオ辻本通店</span><span class="min">約14分</span></li>
+    </ul>
+  </aside>
+
+  <div class="mapwrap">
+    <img id="map" alt="骨格地図 PhaseC" src="基準_骨格図_Grandole_PhaseC.png"/>
+  </div>
+
+  <aside class="bubbles">
+    <div class="bubble"><span class="ico">🚇</span><div><strong>P1 志賀本通駅</strong>栄まで地下鉄で直通。通勤に使いやすい駅です</div></div>
+    <div class="bubble"><span class="ico">🛍️</span><div><strong>P2 尼ケ坂／SAKUMACHI</strong>高架下におしゃれな店が並ぶ休日の散策スポットです</div></div>
+    <div class="bubble"><span class="ico">🛒</span><div><strong>P3 ナフコトミダ杉栄店</strong>徒歩3分で大抵の買い物が済みます</div></div>
+    <div class="bubble"><span class="ico">💊</span><div><strong>P4 ドラッグスギヤマ杉栄店</strong>日用品やコスメがすぐ揃います</div></div>
+    <div class="bubble"><span class="ico">🍞</span><div><strong>P5 つばめパン＆Milk</strong>ふわもち食パンのモーニングが人気です</div></div>
+    <div class="bubble"><span class="ico">🍮</span><div><strong>P6 Cafe de Lyon Palette</strong>旬のフルーツを使ったパフェが楽しめます</div></div>
+    <div class="bubble"><span class="ico">🍜</span><div><strong>P7 つけそば 神宮寺</strong>仕事帰りに寄れる、評判のつけそば店です</div></div>
+    <div class="bubble"><span class="ico">☕</span><div><strong>P8 コノズコーヒー</strong>駅前でモーニングやランチが取れます</div></div>
+  </aside>
+
+  <section class="persona-bar" aria-label="ペルソナコメント">
+    <div class="persona">
+      <svg class="char" viewBox="0 0 80 96" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="40" cy="90" rx="22" ry="4" fill="#d9c4a0" opacity=".45"/>
+        <rect x="28" y="48" width="24" height="30" rx="8" fill="#6bb3d9"/>
+        <rect x="22" y="52" width="10" height="22" rx="5" fill="#f2c7a8"/>
+        <rect x="48" y="52" width="10" height="22" rx="5" fill="#f2c7a8"/>
+        <circle cx="40" cy="30" r="16" fill="#f2c7a8"/>
+        <path d="M22 28c2-14 34-14 36 0 0 8-6 12-18 12S22 36 22 28z" fill="#4a3728"/>
+        <circle cx="34" cy="30" r="1.6" fill="#3a2f22"/>
+        <circle cx="46" cy="30" r="1.6" fill="#3a2f22"/>
+        <path d="M35 36c2.5 2 7.5 2 10 0" stroke="#c47a6a" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        <rect x="50" y="58" width="14" height="18" rx="2" fill="#2c3e50"/>
+      </svg>
+      <div>
+        <div class="speech">平日は駅が近くて助かる…栄まで直通ならタイパ良し！</div>
+        <div class="who">サキ（想定）・通勤シーン</div>
+      </div>
+    </div>
+    <div class="persona">
+      <svg class="char" viewBox="0 0 80 96" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="40" cy="90" rx="22" ry="4" fill="#d9c4a0" opacity=".45"/>
+        <rect x="27" y="48" width="26" height="32" rx="10" fill="#e8a0b8"/>
+        <rect x="21" y="54" width="10" height="20" rx="5" fill="#f2c7a8"/>
+        <rect x="49" y="54" width="10" height="20" rx="5" fill="#f2c7a8"/>
+        <circle cx="40" cy="30" r="16" fill="#f2c7a8"/>
+        <path d="M20 30c4-16 36-16 40 0-2 10-10 14-20 14S22 40 20 30z" fill="#6b3f2a"/>
+        <circle cx="34" cy="30" r="1.6" fill="#3a2f22"/>
+        <circle cx="46" cy="30" r="1.6" fill="#3a2f22"/>
+        <path d="M35 36c2.5 2.2 7.5 2.2 10 0" stroke="#c47a6a" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        <circle cx="58" cy="62" r="7" fill="#f7d6a3"/>
+        <circle cx="58" cy="62" r="3.5" fill="#f08a7a"/>
+      </svg>
+      <div>
+        <div class="speech">休日はSAKUMACHIでカフェ巡りしたい。パフェも気になる…</div>
+        <div class="who">サキ（想定）・休日シーン</div>
+      </div>
+    </div>
+    <div class="persona">
+      <svg class="char" viewBox="0 0 80 96" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="40" cy="90" rx="22" ry="4" fill="#d9c4a0" opacity=".45"/>
+        <rect x="28" y="48" width="24" height="30" rx="8" fill="#7bc47a"/>
+        <rect x="22" y="52" width="10" height="22" rx="5" fill="#f2c7a8"/>
+        <rect x="48" y="52" width="10" height="22" rx="5" fill="#f2c7a8"/>
+        <circle cx="40" cy="30" r="16" fill="#f2c7a8"/>
+        <path d="M23 26c3-12 31-12 34 0 1 9-7 14-17 14S22 35 23 26z" fill="#3f2a1d"/>
+        <circle cx="34" cy="30" r="1.6" fill="#3a2f22"/>
+        <circle cx="46" cy="30" r="1.6" fill="#3a2f22"/>
+        <path d="M35 36c2.5 2 7.5 2 10 0" stroke="#c47a6a" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        <rect x="52" y="60" width="16" height="12" rx="2" fill="#c8923a"/>
+        <rect x="54" y="56" width="12" height="5" rx="1" fill="#e6b35c"/>
+      </svg>
+      <div>
+        <div class="speech">帰りにスーパーと薬局が近いの、地味にコスパ高い…！</div>
+        <div class="who">サキ（想定）・日常シーン</div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>
