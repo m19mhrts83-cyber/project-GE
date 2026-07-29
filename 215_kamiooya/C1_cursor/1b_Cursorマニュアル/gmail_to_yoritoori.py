@@ -9,9 +9,17 @@ Gmail の未読メールを取得し、送信元メールアドレスで連絡�
 --include-sent 指定時は、送信トレイ（SENT）からパートナーあてのメールを取得し、
 やり取り.md に「自分から送信」として追記する（受信と同様の仕様で送信履歴を残す）。
 
+照合（先勝ち）:
+  1. From ∈ emails
+  2. From のドメイン ∈ email_domains（例: leaf-eco.com）
+  3. To/Cc に to_name_hints（例: LEAF / リーフ / leaf-eco）
+
+email_domains で拾った新規 From は、既定で連絡先一覧.yaml の emails へ自動追記
+（無効化: --no-learn-emails または YORITOORI_LEARN_EMAILS=0）。
+
 前提:
   - Gmail API 設定済み（credentials.json, token.json）
-  - 連絡先一覧.yaml にメールアドレスを登録済み
+  - 連絡先一覧.yaml にメールアドレスまたは email_domains / to_name_hints を登録済み
   - pip install -r requirements_gmail.txt 済み
 
 使い方:
@@ -19,6 +27,7 @@ Gmail の未読メールを取得し、送信元メールアドレスで連絡�
   python gmail_to_yoritoori.py --include-read    # 漏れのみ（既読で未登録を追加）
   python gmail_to_yoritoori.py --include-sent    # 送信トレイをやり取りに追記（漏れのみ追加）
   python gmail_to_yoritoori.py --add-at "2026-02-11 14:30"  # 指定時刻（日本時間）のメールを追加
+  python gmail_to_yoritoori.py --no-learn-emails # ドメイン新規アドレスの YAML 追記をしない
 """
 
 import argparse
@@ -27,6 +36,7 @@ import email.utils as email_utils
 import json
 import os
 import re
+import shutil
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -214,6 +224,176 @@ def extract_emails_from_header(to_header):
         elif re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", part):
             emails.append(part.lower())
     return emails
+
+
+def _normalize_domain(domain: str) -> str:
+    return (domain or "").strip().lower().lstrip("@")
+
+
+def _contact_yaml_mirror_paths(primary: Path) -> list[Path]:
+    """学習時に更新する連絡先 YAML（正本＋存在すれば git-repos / OneDrive のミラー）。"""
+    od = (
+        Path.home()
+        / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+        / "C2_ルーティン作業/26_パートナー社への相談/000_共通/連絡先一覧.yaml"
+    )
+    gr = Path.home() / "git-repos/215_kamiooya/C2_ルーティン作業/26_パートナー社への相談/000_共通/連絡先一覧.yaml"
+    out: list[Path] = []
+    seen: set[Path] = set()
+    for p in (Path(primary), gr, od):
+        try:
+            rp = p.resolve()
+        except OSError:
+            continue
+        if rp in seen or not rp.is_file():
+            continue
+        seen.add(rp)
+        out.append(rp)
+    return out
+
+
+def _append_email_in_yaml_text(raw: str, folder: str, new_email: str) -> str | None:
+    """
+    指定 folder の emails: [...] 行にアドレスを追記した新テキストを返す。
+    既にある／見つからない場合は None。
+    """
+    lines = raw.splitlines(keepends=True)
+    folder_re = re.compile(rf'^(\s*)- folder:\s*["\']?{re.escape(folder)}["\']?\s*$')
+    emails_re = re.compile(r'^(\s*emails:\s*)\[(.*)\](\s*(?:#.*)?)$')
+    in_partner = False
+    for i, line in enumerate(lines):
+        if folder_re.match(line.rstrip("\n")):
+            in_partner = True
+            continue
+        if in_partner and re.match(r"^\s*- folder:", line):
+            break
+        if not in_partner:
+            continue
+        m = emails_re.match(line.rstrip("\n"))
+        if not m:
+            continue
+        prefix, inner, suffix = m.group(1), m.group(2).strip(), m.group(3) or ""
+        existing = []
+        if inner:
+            for tok in re.findall(r'["\']([^"\']+)["\']', inner):
+                existing.append(tok.strip().lower())
+        if new_email in existing:
+            return None
+        if inner:
+            new_inner = f'{inner}, "{new_email}"'
+        else:
+            new_inner = f'"{new_email}"'
+        nl = "\n" if line.endswith("\n") else ""
+        lines[i] = f"{prefix}[{new_inner}]{suffix}{nl}"
+        return "".join(lines)
+    return None
+
+
+def learn_partner_email(contact_path: Path, partner: dict, from_email: str) -> bool:
+    """
+    From が partner.email_domains かつ emails 未登録なら YAML に追記（.bak 付き）。
+    OneDrive / git-repos の両方にあれば両方更新。成功で True。
+    """
+    from_email = (from_email or "").strip().lower()
+    if not from_email or "@" not in from_email:
+        return False
+    domains = {_normalize_domain(d) for d in (partner.get("email_domains") or []) if d}
+    if not domains:
+        return False
+    if _normalize_domain(from_email.rsplit("@", 1)[-1]) not in domains:
+        return False
+    emails = [e.lower().strip() for e in (partner.get("emails") or [])]
+    if from_email in emails:
+        return False
+
+    folder = partner.get("folder") or ""
+    if not folder:
+        return False
+
+    stamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
+    learned_any = False
+    for path in _contact_yaml_mirror_paths(contact_path):
+        raw = path.read_text(encoding="utf-8")
+        updated = _append_email_in_yaml_text(raw, folder, from_email)
+        if updated is None:
+            continue
+        bak = path.with_name(f"{path.name}.bak.{stamp}")
+        shutil.copy2(path, bak)
+        path.write_text(updated, encoding="utf-8")
+        print(f"  📎 emails 学習: {from_email} → {path.name}（bak: {bak.name}）")
+        learned_any = True
+
+    if learned_any:
+        emails_list = partner.setdefault("emails", [])
+        if from_email not in [e.lower().strip() for e in emails_list]:
+            emails_list.append(from_email)
+    return learned_any
+
+
+class PartnerResolver:
+    """連絡先一覧からの受信マッチ（email → domain → to_name_hints）。"""
+
+    def __init__(self, partners, contact_path: Path, learn_emails: bool = True):
+        self.partners = partners
+        self.contact_path = Path(contact_path)
+        self.learn_emails = learn_emails
+        self.email_to_partner = {}
+        self.domain_to_partner = {}
+        self.hint_partners = []  # (hints_lower, partner)
+
+        for p in partners:
+            for e in p.get("emails") or []:
+                key = e.lower().strip()
+                if key:
+                    self.email_to_partner[key] = p
+            for d in p.get("email_domains") or []:
+                nd = _normalize_domain(d)
+                if nd and nd not in self.domain_to_partner:
+                    self.domain_to_partner[nd] = p
+            hints = [str(h).strip() for h in (p.get("to_name_hints") or []) if str(h).strip()]
+            if hints:
+                self.hint_partners.append(([h.lower() for h in hints], p))
+
+    def has_match_config(self) -> bool:
+        return bool(self.email_to_partner or self.domain_to_partner or self.hint_partners)
+
+    def resolve(self, from_email, to_header="", cc_header="") -> tuple:
+        """(partner, match_kind) 。不一致は (None, None)。kind: email|domain|to_hint"""
+        email = (from_email or "").strip().lower()
+        if email and email in self.email_to_partner:
+            return self.email_to_partner[email], "email"
+        if email and "@" in email:
+            domain = _normalize_domain(email.rsplit("@", 1)[-1])
+            if domain in self.domain_to_partner:
+                return self.domain_to_partner[domain], "domain"
+        blob = f"{to_header or ''} {cc_header or ''}".lower()
+        if blob.strip():
+            for hints, p in self.hint_partners:
+                for h in hints:
+                    if h in blob:
+                        return p, "to_hint"
+        return None, None
+
+    def maybe_learn(self, partner, from_email: str) -> bool:
+        if not self.learn_emails:
+            return False
+        learned = learn_partner_email(self.contact_path, partner, from_email)
+        if learned and from_email:
+            fe = from_email.strip().lower()
+            self.email_to_partner[fe] = partner
+        return learned
+
+    def gmail_from_query_parts(self) -> list[str]:
+        parts = [f"from:{e}" for e in self.email_to_partner]
+        for d in self.domain_to_partner:
+            parts.append(f"from:@{d}")
+        return parts
+
+    def gmail_to_query_parts(self) -> list[str]:
+        parts = [f"to:{e}" for e in self.email_to_partner]
+        for d in self.domain_to_partner:
+            parts.append(f"to:@{d}")
+        return parts
 
 
 def parse_email_body(payload):
@@ -478,20 +658,22 @@ def append_to_yoritoori(folder_path, partner_name, date_str, body, attachment_na
     return True
 
 
-def process_message(service, msg, email_to_partner, mark_read=True):
+def process_message(service, msg, resolver, mark_read=True):
     """1件のメールを処理し、やり取りに追記。追記したら True。"""
     full = service.users().messages().get(userId="me", id=msg["id"], format="full").execute()
     headers = full.get("payload", {}).get("headers", [])
 
     from_val = next((h["value"] for h in headers if h["name"].lower() == "from"), None)
+    to_val = next((h["value"] for h in headers if h["name"].lower() == "to"), "")
+    cc_val = next((h["value"] for h in headers if h["name"].lower() == "cc"), "")
     from_date = next((h["value"] for h in headers if h["name"].lower() == "date"), None)
     subject = next((h["value"] for h in headers if h["name"].lower() == "subject"), "")
 
     email = extract_email(from_val)
-    if not email:
+    if not email and not (to_val or cc_val):
         return False
 
-    partner = email_to_partner.get(email)
+    partner, match_kind = resolver.resolve(email, to_header=to_val or "", cc_header=cc_val or "")
     if not partner:
         return False
 
@@ -515,7 +697,11 @@ def process_message(service, msg, email_to_partner, mark_read=True):
 
     ok = append_to_yoritoori(partner["folder"], partner["name"], date_str, body, attachment_names, subject)
     if ok:
-        log_msg = f"追記: {partner['name']} ({email}) - {subject[:40]}..."
+        learned = resolver.maybe_learn(partner, email) if email else False
+        log_msg = (
+            f"追記: {partner['name']} ({email or '—'}) match={match_kind}"
+            f" learned={'yes' if learned else 'no'} - {subject[:40]}..."
+        )
         if attachment_names:
             log_msg += f" [添付{len(attachment_names)}件]"
         print(log_msg)
@@ -545,6 +731,11 @@ def main():
         metavar="PARTNER",
         help="指定差出人（from）の直近メールを、指定パートナーのフォルダへ強制取り込み（初回用途）",
     )
+    parser.add_argument(
+        "--no-learn-emails",
+        action="store_true",
+        help="email_domains で拾った新規 From を連絡先一覧.yaml へ追記しない",
+    )
     args = parser.parse_args()
 
     if not credentials_path.exists():
@@ -556,14 +747,13 @@ def main():
     config = yaml.safe_load(contact_path.read_text(encoding="utf-8"))
     partners = config.get("partners", [])
 
-    email_to_partner = {}
-    for p in partners:
-        for e in p.get("emails", []):
-            email_to_partner[e.lower().strip()] = p
+    learn_env = os.environ.get("YORITOORI_LEARN_EMAILS", "1").strip().lower()
+    learn_emails = (not args.no_learn_emails) and learn_env not in ("0", "false", "no", "off")
+    resolver = PartnerResolver(partners, contact_path, learn_emails=learn_emails)
 
-    if not email_to_partner:
-        print("警告: 連絡先一覧.yaml にメールアドレスが1件も登録されていません。", file=sys.stderr)
-        print("emails に実際のアドレスを追加してください。", file=sys.stderr)
+    if not resolver.has_match_config():
+        print("警告: 連絡先一覧.yaml にメール照合設定がありません。", file=sys.stderr)
+        print("emails / email_domains / to_name_hints を追加してください。", file=sys.stderr)
         sys.exit(1)
 
     token_paths = resolve_token_paths()
@@ -577,36 +767,36 @@ def main():
         sys.stdout.flush()
 
         if args.add_at:
-            _run_add_at(service, email_to_partner, args.add_at)
+            _run_add_at(service, resolver, args.add_at)
         elif args.import_from_to_partner:
             _run_import_from_to_partner(service, partners, args.import_from_to_partner, args.import_from, args.days)
         elif args.import_from:
-            _run_import_from(service, email_to_partner, args.import_from, args.days)
+            _run_import_from(service, resolver, args.import_from, args.days)
         elif args.include_read:
-            _, existing = _run_include_read(service, email_to_partner, existing=existing)
+            _, existing = _run_include_read(service, resolver, existing=existing)
         elif args.include_sent:
             print("送信トレイを確認しています...")
             sys.stdout.flush()
-            _, existing_sent = _run_include_sent(service, email_to_partner, existing_sent=existing_sent)
+            _, existing_sent = _run_include_sent(service, resolver, existing_sent=existing_sent)
         else:
             # 通常: 漏れ確認（既読含む）→ 未読処理 → 送信トレイの漏れ確認
             print("漏れメールを確認しています（既読含む）...")
             sys.stdout.flush()
-            _, existing = _run_include_read(service, email_to_partner, existing=existing)
+            _, existing = _run_include_read(service, resolver, existing=existing)
             print()
             print("未読メールを確認しています...")
             sys.stdout.flush()
-            _run_unread_only(service, email_to_partner)
+            _run_unread_only(service, resolver)
             print()
             print("送信トレイを確認しています...")
             sys.stdout.flush()
-            _, existing_sent = _run_include_sent(service, email_to_partner, existing_sent=existing_sent)
+            _, existing_sent = _run_include_sent(service, resolver, existing_sent=existing_sent)
 
     print("\n完了しました。")
     sys.stdout.flush()
 
 
-def _run_unread_only(service, email_to_partner):
+def _run_unread_only(service, resolver):
     """未読メールを処理し、やり取りに追記して既読にする。"""
     result = service.users().messages().list(userId="me", q="is:unread", maxResults=50).execute()
     messages = result.get("messages", [])
@@ -618,7 +808,7 @@ def _run_unread_only(service, email_to_partner):
 
     appended = 0
     for msg in messages:
-        if process_message(service, msg, email_to_partner, mark_read=True):
+        if process_message(service, msg, resolver, mark_read=True):
             appended += 1
 
     if appended > 0:
@@ -629,13 +819,18 @@ def _run_unread_only(service, email_to_partner):
     return appended
 
 
-def _run_include_read(service, email_to_partner, existing=None):
+def _run_include_read(service, resolver, existing=None):
     """既読含む。やり取りの漏れを検出して追加。"""
     if existing is None:
         existing = parse_yoritoori_existing()
 
-    partner_emails = list(email_to_partner.keys())
-    from_query = " OR ".join(f"from:{e}" for e in partner_emails)
+    parts = resolver.gmail_from_query_parts()
+    if not parts:
+        print("直近30日にパートナーからのメールはありませんでした。（from 照合設定なし）")
+        sys.stdout.flush()
+        return 0, existing
+
+    from_query = " OR ".join(parts)
     query = f"({from_query}) newer_than:30d"
     result = service.users().messages().list(userId="me", q=query, maxResults=100).execute()
     messages = result.get("messages", [])
@@ -650,11 +845,13 @@ def _run_include_read(service, email_to_partner, existing=None):
         full = service.users().messages().get(userId="me", id=msg["id"], format="full").execute()
         headers = full.get("payload", {}).get("headers", [])
         from_val = next((h["value"] for h in headers if h["name"].lower() == "from"), None)
+        to_val = next((h["value"] for h in headers if h["name"].lower() == "to"), "")
+        cc_val = next((h["value"] for h in headers if h["name"].lower() == "cc"), "")
         from_date = next((h["value"] for h in headers if h["name"].lower() == "date"), None)
         subject = next((h["value"] for h in headers if h["name"].lower() == "subject"), "")
 
         email = extract_email(from_val)
-        partner = email_to_partner.get(email) if email else None
+        partner, _kind = resolver.resolve(email, to_header=to_val or "", cc_header=cc_val or "")
         if not partner:
             continue
 
@@ -672,7 +869,7 @@ def _run_include_read(service, email_to_partner, existing=None):
         if key in existing:
             continue
 
-        if process_message(service, msg, email_to_partner, mark_read=False):
+        if process_message(service, msg, resolver, mark_read=False):
             appended += 1
             existing.add(key)
 
@@ -684,12 +881,16 @@ def _run_include_read(service, email_to_partner, existing=None):
     return appended, existing
 
 
-def _run_include_sent(service, email_to_partner, existing_sent=None):
+def _run_include_sent(service, resolver, existing_sent=None):
     """送信トレイ（SENT）からパートナーあてのメールを取得し、やり取りに「自分から送信」として追記。"""
     if existing_sent is None:
         existing_sent = parse_yoritoori_existing_sent()
-    partner_emails = list(email_to_partner.keys())
-    to_query = " OR ".join(f"to:{e}" for e in partner_emails)
+    parts = resolver.gmail_to_query_parts()
+    if not parts:
+        print("送信トレイにパートナーあてのメールはありませんでした。（to 照合設定なし）")
+        sys.stdout.flush()
+        return 0, existing_sent
+    to_query = " OR ".join(parts)
     query = f"in:sent ({to_query}) newer_than:30d"
     result = service.users().messages().list(userId="me", q=query, maxResults=100).execute()
     messages = result.get("messages", [])
@@ -710,9 +911,16 @@ def _run_include_sent(service, email_to_partner, existing_sent=None):
         to_emails = extract_emails_from_header(to_val)
         partner = None
         for e in to_emails:
-            if e in email_to_partner:
-                partner = email_to_partner[e]
+            p, _kind = resolver.resolve(e)
+            if p:
+                partner = p
                 break
+            # ドメインのみ一致も resolve で拾える（From 扱いだがアドレス文字列は同じ）
+        if not partner and to_val:
+            # To 表示名ヒント（LEAF 等）
+            p, kind = resolver.resolve("", to_header=to_val or "", cc_header="")
+            if p and kind == "to_hint":
+                partner = p
         if not partner:
             continue
 
@@ -747,7 +955,7 @@ def _run_include_sent(service, email_to_partner, existing_sent=None):
     return appended, existing_sent
 
 
-def _run_add_at(service, email_to_partner, add_at_str):
+def _run_add_at(service, resolver, add_at_str):
     """指定時刻（日本時間）±30分 のメールを追加。日付・比較はすべて JST で行う。"""
     try:
         target_dt = datetime.strptime(add_at_str.strip(), "%Y-%m-%d %H:%M")
@@ -767,8 +975,11 @@ def _run_add_at(service, email_to_partner, add_at_str):
     end_dt = target_dt + timedelta(minutes=30)
 
     # 指定時刻は日本時間として解釈。Gmail の after/before は PST 等で解釈されるため、前後1日広めに取得してから日本時間でフィルタする
-    partner_emails = list(email_to_partner.keys())
-    from_query = " OR ".join(f"from:{e}" for e in partner_emails)
+    parts = resolver.gmail_from_query_parts()
+    if not parts:
+        print("エラー: from 照合設定がありません。", file=sys.stderr)
+        sys.exit(1)
+    from_query = " OR ".join(parts)
     after_date = (target_dt - timedelta(days=1)).strftime("%Y/%m/%d")
     before_date = (target_dt + timedelta(days=2)).strftime("%Y/%m/%d")
     query = f"({from_query}) after:{after_date} before:{before_date}"
@@ -801,7 +1012,7 @@ def _run_add_at(service, email_to_partner, add_at_str):
         if (subject.strip(), date_key) in existing:
             continue
 
-        if process_message(service, msg, email_to_partner, mark_read=False):
+        if process_message(service, msg, resolver, mark_read=False):
             appended += 1
             existing.add((subject.strip(), date_key))
 
@@ -811,16 +1022,17 @@ def _run_add_at(service, email_to_partner, add_at_str):
         print(f"{add_at_str} 前後30分に該当するメールは見つかりませんでした。")
 
 
-def _run_import_from(service, email_to_partner, from_email, days):
+def _run_import_from(service, resolver, from_email, days):
     """指定 from の直近days日分を全件取り込み（初回用途）。"""
     from_email = (from_email or "").strip().lower()
     if not from_email:
         print("エラー: --import-from の EMAIL が空です。", file=sys.stderr)
         sys.exit(1)
-    partner = email_to_partner.get(from_email)
+    partner, _kind = resolver.resolve(from_email)
     if not partner:
         print(
-            f"エラー: {from_email} が 連絡先一覧.yaml に登録されていません。（emails に追加してから実行してください）",
+            f"エラー: {from_email} が 連絡先一覧.yaml に照合できません。"
+            "（emails または email_domains に追加してから実行してください）",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -856,7 +1068,7 @@ def _run_import_from(service, email_to_partner, from_email, days):
         if key in existing:
             continue
 
-        if process_message(service, msg, email_to_partner, mark_read=False):
+        if process_message(service, msg, resolver, mark_read=False):
             appended += 1
             existing.add(key)
 

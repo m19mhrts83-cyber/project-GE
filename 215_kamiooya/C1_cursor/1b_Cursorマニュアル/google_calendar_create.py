@@ -3,7 +3,9 @@
 """
 Google カレンダーに予定を1件登録する。
 
+登録先アカウント（正）: admin@livingsupport-matsu.co.jp
 認証: credentials.json + token_calendar.json（Gmail 用 token.json とは分離）
+既定 login-hint: admin@livingsupport-matsu.co.jp
 
 使い方:
   python google_calendar_create.py --title "テスト" --start "2026-06-15 10:00"
@@ -123,7 +125,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="登録せず内容だけ表示")
     parser.add_argument(
         "--login-hint",
-        help="OAuth 時に使う Google アカウント（例: personal@gmail.com）。会社アカウントに引っ張られるときに指定",
+        default="admin@livingsupport-matsu.co.jp",
+        help="OAuth 時に使う Google アカウント（既定: admin@ = カレンダー正）。別アカウントで再認証したいときだけ上書き",
     )
     parser.add_argument(
         "--auth-console",

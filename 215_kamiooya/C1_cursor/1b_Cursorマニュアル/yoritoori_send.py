@@ -84,7 +84,11 @@ from gmail_api_scopes import (
     token_satisfies_215_scopes,
 )
 from gmail_archive_bcc import apply_archive_bcc
-from gmail_to_yoritoori import build_service_for_token
+from gmail_to_yoritoori import (
+    build_service_for_token,
+    extract_email,
+    extract_emails_from_header,
+)
 
 # パートナー送信で試す token（admin@ は相手の From が変わるため含めない）
 PARTNER_SEND_TOKEN_NAMES = ("token_estate.json", "token_m19m.json")
@@ -259,6 +263,10 @@ def confirm_before_send(
     attachment_names: list,
     skip_confirm: bool,
     dry_run: bool,
+    *,
+    to_email: str = "",
+    cc: str = "",
+    sender_email: str = "",
 ):
     """
     送信前に、実際にディスク上にある下書き内容をプレビューして確認を取る。
@@ -281,6 +289,12 @@ def confirm_before_send(
     print("========== 送信前プレビュー ==========")
     print(f"  宛先: {partner_name}")
     print(f"  手段: {via}")
+    if to_email:
+        print(f"  To: {to_email}")
+    if cc:
+        print(f"  Cc: {cc}")
+    if sender_email:
+        print(f"  From: {sender_email}")
     print(f"  下書き: {draft_path}")
     print(f"  更新日時: {mtime}")
     print(f"  内容ハッシュ: {digest}")
@@ -420,7 +434,7 @@ def _partner_send_token_paths() -> list[Path]:
     return paths
 
 
-def resolve_partner_gmail_service(partner_emails):
+def resolve_partner_gmail_service(partner_emails, email_domains=None, prefer_subject=None):
     """
     パートナーとの既存スレッドがある個人 Gmail を選び (service, sender_email, ref_info) を返す。
     スレッドがなければ token_estate.json を優先（既定の matsuno.estate）。
@@ -442,7 +456,12 @@ def resolve_partner_gmail_service(partner_emails):
         if not fallback_service:
             fallback_service = service
             fallback_email = email_addr
-        ref_info = get_latest_message_from_partner(service, partner_emails)
+        ref_info = get_latest_message_from_partner(
+            service,
+            partner_emails,
+            email_domains=email_domains,
+            prefer_subject=prefer_subject,
+        )
         if ref_info:
             print(f"  送信元 Gmail: {email_addr}（既存スレッドあり）")
             return service, email_addr, ref_info
@@ -451,37 +470,95 @@ def resolve_partner_gmail_service(partner_emails):
     return fallback_service, fallback_email, None
 
 
-def get_latest_message_from_partner(service, partner_emails):
-    """パートナー宛の直近メールを1件取得。threadId, message_id, subject, message_id_header を返す。"""
-    if not partner_emails:
+def _normalize_subject_for_match(subject: str) -> str:
+    s = (subject or "").strip()
+    while True:
+        n = re.sub(r"^(re|fwd|fw)\s*:\s*", "", s, flags=re.IGNORECASE).strip()
+        if n == s:
+            break
+        s = n
+    return s.lower()
+
+
+def get_latest_message_from_partner(service, partner_emails, email_domains=None, prefer_subject=None):
+    """
+    パートナーからの直近メールを取得。
+    threadId, message_id, subject, from/to/cc, message_id_header を返す。
+    prefer_subject があれば件名一致を優先（Re: 除去して比較）。
+    """
+    parts = [f"from:{e}" for e in (partner_emails or []) if e]
+    for d in email_domains or []:
+        nd = (d or "").strip().lower().lstrip("@")
+        if nd:
+            parts.append(f"from:@{nd}")
+    if not parts:
         return None
-    from_query = " OR ".join(f"from:{e}" for e in partner_emails)
+    from_query = " OR ".join(parts)
     query = f"({from_query}) newer_than:90d"
-    result = service.users().messages().list(userId="me", q=query, maxResults=1).execute()
+    max_results = 25 if prefer_subject else 1
+    result = service.users().messages().list(userId="me", q=query, maxResults=max_results).execute()
     messages = result.get("messages", [])
     if not messages:
         return None
 
-    msg = messages[0]
-    full = service.users().messages().get(userId="me", id=msg["id"], format="full").execute()
-    headers = full.get("payload", {}).get("headers", [])
+    want = _normalize_subject_for_match(prefer_subject) if prefer_subject else ""
 
-    subject = next((h["value"] for h in headers if h["name"].lower() == "subject"), "")
-    cc = next((h["value"] for h in headers if h["name"].lower() == "cc"), "")
-    msg_id_header = None
-    for h in headers:
-        if h["name"].lower() == "message-id":
-            msg_id_header = h["value"]
-            break
+    def _load_ref(msg_meta):
+        full = service.users().messages().get(userId="me", id=msg_meta["id"], format="full").execute()
+        headers = full.get("payload", {}).get("headers", [])
+        subject = next((h["value"] for h in headers if h["name"].lower() == "subject"), "")
+        from_h = next((h["value"] for h in headers if h["name"].lower() == "from"), "")
+        to_h = next((h["value"] for h in headers if h["name"].lower() == "to"), "")
+        cc_h = next((h["value"] for h in headers if h["name"].lower() == "cc"), "")
+        msg_id_header = None
+        for h in headers:
+            if h["name"].lower() == "message-id":
+                msg_id_header = h["value"]
+                break
+        return {
+            "thread_id": full.get("threadId", ""),
+            "message_id": msg_meta["id"],
+            "subject": subject,
+            "from": from_h,
+            "to": to_h,
+            "cc": cc_h,
+            "message_id_header": msg_id_header or f"<{msg_meta['id']}@mail.gmail.com>",
+        }
 
-    thread_id = full.get("threadId", "")
-    return {
-        "thread_id": thread_id,
-        "message_id": msg["id"],
-        "subject": subject,
-        "cc": cc,
-        "message_id_header": msg_id_header or f"<{msg['id']}@mail.gmail.com>",
-    }
+    if want:
+        for msg in messages:
+            ref = _load_ref(msg)
+            if _normalize_subject_for_match(ref.get("subject", "")) == want:
+                return ref
+
+    return _load_ref(messages[0])
+
+
+def build_reply_all_recipients(ref_info, sender_email: str, fallback_to: str) -> tuple[str, str]:
+    """
+    Reply-All 風: To = 相手 From、Cc = 元 To+Cc から自分と To を除いた残り。
+    スレッド未検出時は fallback_to のみ。
+    """
+    if not ref_info:
+        return (fallback_to or "").strip().lower(), ""
+
+    to_email = extract_email(ref_info.get("from") or "") or (fallback_to or "").strip().lower()
+    our = set()
+    if sender_email:
+        our.add(sender_email.strip().lower())
+
+    participants = []
+    for addr in extract_emails_from_header(ref_info.get("to") or "") + extract_emails_from_header(
+        ref_info.get("cc") or ""
+    ):
+        al = addr.strip().lower()
+        if not al or al in our or al == to_email:
+            continue
+        if al not in participants:
+            participants.append(al)
+
+    cc = ", ".join(participants)
+    return to_email, cc
 
 
 ATTACHMENT_EXCLUDE_NAMES = {".gitkeep", ".DS_Store"}
@@ -633,18 +710,25 @@ def run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text,
     sys.exit(1)
 
 
-def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, dry_run):
-    """emails ありのパートナー向け Gmail 返信送信。"""
-    emails = [e.lower().strip() for e in partner.get("emails", [])]
+def prepare_gmail_reply(partner, draft_subject: str):
+    """
+    送信先 To/Cc・件名・Gmail サービスを解決する（確認プレビュー用にも使う）。
+    戻り値: dict(service, sender_email, ref_info, to_email, cc, use_subject)
+    """
+    emails = [e.lower().strip() for e in partner.get("emails", []) if e]
+    domains = [(d or "").strip().lower().lstrip("@") for d in (partner.get("email_domains") or []) if d]
+    use_subject = draft_subject if draft_subject and draft_subject != "（件名を記入）" else None
 
-    use_subject = subject if subject and subject != "（件名を記入）" else None
-
-    service, sender_email, ref_info = resolve_partner_gmail_service(emails)
+    service, sender_email, ref_info = resolve_partner_gmail_service(
+        emails,
+        email_domains=domains,
+        prefer_subject=use_subject,
+    )
 
     if not ref_info:
         if not use_subject:
             print(
-                f"エラー: {partner_name} 宛の直近90日以内のメールが見つかりません。"
+                f"エラー: {partner.get('name')} 宛の直近90日以内のメールが見つかりません。"
                 " 送信下書きの1行目（件名）を記入してください。",
                 file=sys.stderr,
             )
@@ -659,12 +743,39 @@ def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body
     if not use_subject:
         use_subject = "Re:"
 
+    fallback_to = emails[0] if emails else ""
+    to_email, cc = build_reply_all_recipients(ref_info, sender_email, fallback_to)
+    if not to_email:
+        print(f"エラー: {partner.get('name')} の送信 To を解決できません。emails を確認してください。", file=sys.stderr)
+        sys.exit(1)
+
+    cc = _normalize_mail_addresses(cc) if cc else ""
+    return {
+        "service": service,
+        "sender_email": sender_email,
+        "ref_info": ref_info,
+        "to_email": to_email,
+        "cc": cc,
+        "use_subject": use_subject,
+    }
+
+
+def run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, dry_run, prep=None):
+    """emails ありのパートナー向け Gmail 返信送信。"""
+    if prep is None:
+        prep = prepare_gmail_reply(partner, subject)
+
+    service = prep["service"]
+    sender_email = prep["sender_email"]
+    ref_info = prep["ref_info"]
+    to_email = prep["to_email"]
+    cc = prep["cc"]
+    use_subject = prep["use_subject"]
+
     attach_dir = resolve_attach_dir(base_path / folder_path)
     attachment_paths = collect_attachment_files(attach_dir)
     attachment_names = [p.name for p in attachment_paths]
 
-    to_email = emails[0]
-    cc = _normalize_mail_addresses((ref_info.get("cc") or "").strip()) if ref_info else ""
     # YORITOORI_EXTRA_CC は YORITOORI_EXTRA_CC_PARTNER で対象パートナーを明示した
     # ときだけ適用する（環境変数が残ったまま別パートナーへ CC される事故を防ぐ）。
     extra_cc = os.environ.get("YORITOORI_EXTRA_CC", "").strip()
@@ -755,8 +866,9 @@ def main():
 
     emails = [e.lower().strip() for e in partner.get("emails", [])]
     phones = [p.strip() for p in partner.get("phones", []) if p.strip()]
+    email_domains = [d for d in (partner.get("email_domains") or []) if d]
 
-    if not emails and not phones:
+    if not emails and not phones and not email_domains:
         print(f"エラー: {partner.get('name', args.partner)} にメールアドレスも電話番号も登録されていません。", file=sys.stderr)
         sys.exit(1)
 
@@ -792,7 +904,7 @@ def main():
         sys.exit(1)
 
     chosen_via = args.via
-    if chosen_via == "auto" and emails and phones:
+    if chosen_via == "auto" and (emails or email_domains) and phones:
         if sys.stdin is None or not sys.stdin.isatty():
             print(
                 f"エラー: {partner_name} はメール/電話の両方が登録されています。非対話環境のため自動選択できません。 --via gmail または --via imessage を指定してください。",
@@ -812,11 +924,11 @@ def main():
                 break
             print("入力が不正です。1 または 2 を入力してください。")
     elif chosen_via == "auto":
-        chosen_via = "gmail" if emails else "imessage"
+        chosen_via = "gmail" if (emails or email_domains) else "imessage"
 
-    if chosen_via == "gmail" and not emails:
+    if chosen_via == "gmail" and not emails and not email_domains:
         print(
-            f"エラー: {partner_name} にメールアドレスが登録されていません。Gmail 返信には emails が必要です。contacts を修正するか --via imessage を指定してください。",
+            f"エラー: {partner_name} にメールアドレスが登録されていません。Gmail 返信には emails または email_domains が必要です。contacts を修正するか --via imessage を指定してください。",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -831,16 +943,31 @@ def main():
     attachment_paths = collect_attachment_files(attach_dir)
     attachment_names = [p.name for p in attachment_paths]
 
+    gmail_prep = None
+    confirm_subject = subject if chosen_via == "gmail" else "（iMessage）"
+    confirm_to = ""
+    confirm_cc = ""
+    confirm_from = ""
+    if chosen_via == "gmail":
+        gmail_prep = prepare_gmail_reply(partner, subject)
+        confirm_subject = gmail_prep["use_subject"]
+        confirm_to = gmail_prep["to_email"]
+        confirm_cc = gmail_prep["cc"]
+        confirm_from = gmail_prep["sender_email"]
+
     via_label = "Gmail（メール返信）" if chosen_via == "gmail" else "iMessage"
     if not confirm_before_send(
         partner_name=partner_name,
         via=via_label,
         draft_path=draft_path,
-        subject=subject if chosen_via == "gmail" else "（iMessage）",
+        subject=confirm_subject,
         body_text=body_text,
         attachment_names=attachment_names,
         skip_confirm=args.skip_confirm,
         dry_run=args.dry_run,
+        to_email=confirm_to,
+        cc=confirm_cc,
+        sender_email=confirm_from,
     ):
         return
 
@@ -855,7 +982,9 @@ def main():
         ensure_chrline_session_before_partner_send()
 
     if chosen_via == "gmail":
-        run_gmail_flow(partner, folder_path, partner_name, draft_path, subject, body_text, args.dry_run)
+        run_gmail_flow(
+            partner, folder_path, partner_name, draft_path, subject, body_text, args.dry_run, prep=gmail_prep
+        )
         return
     run_imessage_flow(partner, folder_path, partner_name, draft_path, body_text, args.dry_run)
 
