@@ -33,6 +33,10 @@ SCHEMA_SQL = """
 create table if not exists comments (
   id integer primary key autoincrement,
   source_type text,
+  source_system text,
+  source_kind text,
+  forum_category text,
+  topic_title text,
   comment_id text not null unique,
   posted_at text,
   author_name text,
@@ -109,6 +113,11 @@ def connect(path: str | Path | None = None) -> sqlite3.Connection:
             "alter table knowledge_sources add column content_channel text not null default 'seminar_video'"
         )
         conn.commit()
+    comment_cols = {r[1] for r in conn.execute("pragma table_info(comments)").fetchall()}
+    for col in ("source_system", "source_kind", "forum_category", "topic_title"):
+        if col not in comment_cols:
+            conn.execute(f"alter table comments add column {col} text")
+            conn.commit()
     return conn
 
 
@@ -131,11 +140,16 @@ def upsert_comments(conn: sqlite3.Connection, records: list[dict[str, Any]]) -> 
         conn.execute(
             """
             insert into comments (
-              source_type, comment_id, posted_at, author_name, author_email,
+              source_type, source_system, source_kind, forum_category, topic_title,
+              comment_id, posted_at, author_name, author_email,
               content, parent_comment_id, ip_address, user_agent, created_at, updated_at
-            ) values (?,?,?,?,?,?,?,?,?,?,?)
+            ) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             on conflict(comment_id) do update set
               source_type=excluded.source_type,
+              source_system=excluded.source_system,
+              source_kind=excluded.source_kind,
+              forum_category=excluded.forum_category,
+              topic_title=excluded.topic_title,
               posted_at=excluded.posted_at,
               author_name=excluded.author_name,
               author_email=excluded.author_email,
@@ -147,6 +161,10 @@ def upsert_comments(conn: sqlite3.Connection, records: list[dict[str, Any]]) -> 
             """,
             (
                 r.get("source_type") or "WeStudy",
+                r.get("source_system") or "WeStudy",
+                r.get("source_kind") or "コミュニティ情報",
+                r.get("forum_category") or "未分類",
+                r.get("topic_title"),
                 cid,
                 r.get("posted_at"),
                 r.get("author_name"),

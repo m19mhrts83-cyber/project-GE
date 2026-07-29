@@ -18,7 +18,8 @@ body {
 
 .toast {
   position: fixed;
-  right: 16px;
+  left: 16px;
+  right: auto;
   bottom: 16px;
   min-width: 240px;
   max-width: 420px;
@@ -27,6 +28,8 @@ body {
   color: #fff;
   z-index: 60;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  /* 送信ボタン等のクリックを邪魔しない */
+  pointer-events: none;
 }
 
 .toast.success {
@@ -163,6 +166,27 @@ body {
 
 #loadingOverlay.active {
   display: flex;
+}
+
+#mainView {
+  height: 100vh;
+  overflow: hidden;
+}
+
+#sidebar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  align-self: stretch;
+}
+
+@media (min-width: 768px) {
+  #sidebar {
+    width: 20rem;
+    min-width: 20rem;
+    max-width: 20rem;
+    height: 100%;
+  }
 }
 
 @media (max-width: 767px) {

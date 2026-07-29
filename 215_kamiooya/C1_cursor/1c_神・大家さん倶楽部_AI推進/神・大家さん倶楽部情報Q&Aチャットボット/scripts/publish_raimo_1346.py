@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 import urllib.request
 from pathlib import Path
@@ -40,22 +41,65 @@ def load_env() -> None:
             os.environ[a] = os.environ[b]
 
 
-def inject_notify_placeholders(api_yaml: str) -> str:
-    """Replace __NOTIFY_*__ in API YAML with values from env (not left as placeholders)."""
-    if "__NOTIFY_WEBHOOK_URL__" not in api_yaml and "__NOTIFY_SHARED_SECRET__" not in api_yaml:
-        return api_yaml
-    url = (os.environ.get("NOTIFY_WEBHOOK_URL") or "").strip()
-    secret = (os.environ.get("NOTIFY_SHARED_SECRET") or "").strip()
-    if not url or url.startswith("https://script.google.com/macros/s/PASTE"):
-        raise SystemExit(
-            "NOTIFY_WEBHOOK_URL が未設定です。.env.jarvis_private を確認してください。"
-        )
-    if not secret:
-        raise SystemExit("NOTIFY_SHARED_SECRET が未設定です。")
-    out = api_yaml.replace("__NOTIFY_WEBHOOK_URL__", url)
-    out = out.replace("__NOTIFY_SHARED_SECRET__", secret)
-    print("notify placeholders: injected (webhook+secret)")
+def inject_runtime_placeholders(api_yaml: str) -> str:
+    """Replace runtime placeholders in API YAML with values from env."""
+    out = api_yaml
+
+    if "__NOTIFY_WEBHOOK_URL__" in out or "__NOTIFY_SHARED_SECRET__" in out:
+        url = (os.environ.get("NOTIFY_WEBHOOK_URL") or "").strip()
+        secret = (os.environ.get("NOTIFY_SHARED_SECRET") or "").strip()
+        if not url or url.startswith("https://script.google.com/macros/s/PASTE"):
+            raise SystemExit(
+                "NOTIFY_WEBHOOK_URL が未設定です。.env.jarvis_private を確認してください。"
+            )
+        if not secret:
+            raise SystemExit("NOTIFY_SHARED_SECRET が未設定です。")
+        out = out.replace("__NOTIFY_WEBHOOK_URL__", url)
+        out = out.replace("__NOTIFY_SHARED_SECRET__", secret)
+        print("notify placeholders: injected (webhook+secret)")
+
+    if "__SEMANTIC_SEARCH_URL__" in out or "__SEMANTIC_SEARCH_SHARED_SECRET__" in out:
+        semantic_url = (os.environ.get("SEMANTIC_SEARCH_URL") or "").strip()
+        semantic_secret = (os.environ.get("SEMANTIC_SEARCH_SHARED_SECRET") or "").strip()
+        if not semantic_url:
+            raise SystemExit("SEMANTIC_SEARCH_URL が未設定です。.env.jarvis_private を確認してください。")
+        if not semantic_secret:
+            raise SystemExit("SEMANTIC_SEARCH_SHARED_SECRET が未設定です。")
+        out = out.replace("__SEMANTIC_SEARCH_URL__", semantic_url)
+        out = out.replace("__SEMANTIC_SEARCH_SHARED_SECRET__", semantic_secret)
+        print("semantic placeholders: injected (url+secret)")
+
     return out
+
+
+def inject_js_placeholders(js: str) -> str:
+    """Front JS にシークレットを埋め込まない（Raimo /semantic-search プロキシへ移行）。"""
+    if "__SEMANTIC_SEARCH_URL__" in js or "__SEMANTIC_SEARCH_SHARED_SECRET__" in js:
+        raise SystemExit(
+            "app.js に SEMANTIC_SEARCH プレースホルダが残っています。"
+            "ブラウザ直呼びは廃止済みです。プレースホルダを削除してください。"
+        )
+    return js
+
+
+def prepare_html_for_raimo(html: str) -> str:
+    """Raimo は jsContent を app.js として自動挿入するため、HTML 側の二重読込を除去する。"""
+    # 旧 bootstrap / ローカル script を除去（シークレット露出・二重 const App を防ぐ）
+    html = re.sub(
+        r"<script>\s*window\.__JARVIS_SEMANTIC__\s*=\s*\{.*?\}\s*;?\s*</script>\s*",
+        "",
+        html,
+        flags=re.S,
+    )
+    html = html.replace("    <!-- __JARVIS_SEMANTIC_BOOTSTRAP__ -->\n", "")
+    html = html.replace("<!-- __JARVIS_SEMANTIC_BOOTSTRAP__ -->\n", "")
+    html = html.replace('    <script src="forum_category_lookup.js"></script>\n', "")
+    html = html.replace('<script src="forum_category_lookup.js"></script>\n', "")
+    html = html.replace('    <script src="app.js"></script>\n', "")
+    html = html.replace('<script src="app.js"></script>\n', "")
+    html = re.sub(r'\s*<script src="app\.js(\?v=[^"]*)?"></script>\s*', "\n", html)
+    print("html: stripped app.js/bootstrap (Raimo jsContent single load)")
+    return html
 
 
 def main() -> int:
@@ -65,11 +109,6 @@ def main() -> int:
     app_url = (os.environ.get("RAIMO_APP_URL") or "").rstrip("/")
 
     html = (CHATBOT / "index.html").read_text(encoding="utf-8")
-    # ローカル用の別スクリプト参照は Raimo では不要（jsContent 先頭に注入済み）
-    html = html.replace(
-        '    <script src="forum_category_lookup.js"></script>\n',
-        "",
-    )
     css = (CHATBOT / "style.css").read_text(encoding="utf-8")
     js = (CHATBOT / "app.js").read_text(encoding="utf-8")
     lookup_js = CHATBOT / "forum_category_lookup.js"
@@ -77,8 +116,10 @@ def main() -> int:
         # Raimo は jsContent 1本のため、分類ルックアップを先頭注入（DB列未追加でもUI分類可）
         js = lookup_js.read_text(encoding="utf-8") + "\n" + js
         print(f"forum_category_lookup: injected ({lookup_js.stat().st_size} bytes)")
+    js = inject_js_placeholders(js)
+    html = prepare_html_for_raimo(html)
     api = (CHATBOT / "WeStudy_API_secret_admin_upgrade.yaml").read_text(encoding="utf-8")
-    api = inject_notify_placeholders(api)
+    api = inject_runtime_placeholders(api)
 
     marker = "<!-- RAIMO_KNOWLEDGE_UI_20260720 -->"
     if marker not in html:
@@ -169,7 +210,7 @@ def main() -> int:
             "live",
             {
                 "marker": marker in live,
-                "seminar": "セミナー動画" in live,
+                "seminar": "セミナー動画文字起こし" in live,
                 "citations": "buildCitationsFromRelated" in js_live,
                 "html_len": len(live),
                 "js_len": len(js_live),

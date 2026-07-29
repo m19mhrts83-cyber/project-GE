@@ -13,11 +13,14 @@
  *   { secret, email, type? }
  *   type 省略 / "registration" … 管理者へ承認依頼
  *   type "approval"           … 申請者（email）へ承認完了＋APP_URL
+ *   type "rejection"          … 申請者へ却下通知（固定文）
  *   type "password_reset"     … 申請者へ再設定URL（reset_url 必須、または APP_URL+token）
  *
  * デプロイ: デプロイ → 新しいデプロイ → 種類「ウェブアプリ」
  *   実行ユーザー: 自分 / アクセスできるユーザー: 全員
  * → ウェブアプリ URL を NOTIFY_WEBHOOK_URL に保存
+ *
+ * メールは plain + htmlBody の両方を送る（Gmail の狭い幅での不自然な折り返しを抑える）
  */
 
 function doPost(e) {
@@ -49,6 +52,7 @@ function doPost(e) {
     if (
       notifyType !== 'registration' &&
       notifyType !== 'approval' &&
+      notifyType !== 'rejection' &&
       notifyType !== 'password_reset'
     ) {
       return json_(400, { ok: false, error: 'INVALID_TYPE' });
@@ -61,6 +65,9 @@ function doPost(e) {
 
     if (notifyType === 'approval') {
       return sendApprovalToApplicant_(email, appUrl);
+    }
+    if (notifyType === 'rejection') {
+      return sendRejectionToApplicant_(email);
     }
     if (notifyType === 'password_reset') {
       return sendPasswordResetToApplicant_(email, appUrl, body);
@@ -86,29 +93,34 @@ function sendRegistrationToAdmin_(registrantEmail, adminTo, appUrl, body) {
 
   var registeredAt = String(body.registered_at || '').trim();
   var note = String(body.note || '').trim();
-
   var subject = '【神大家Q&A】新規登録の承認をお願いします';
-  var lines = [
-    '神・大家さん倶楽部 情報Q&Aチャットボットに新規登録がありました。',
-    '',
-    '登録メール: ' + registrantEmail,
-    registeredAt ? '受付時刻: ' + registeredAt : '',
-    note ? 'メモ: ' + note : '',
-    '',
-    'アプリに管理者でログインし、「ユーザー承認」から承認してください。',
-    appUrl ? 'アプリURL: ' + appUrl : '',
-    '',
-    '（このメールは自動送信です）'
-  ].filter(function (x) {
-    return x !== '';
-  });
 
-  MailApp.sendEmail({
-    to: adminTo,
-    subject: subject,
-    body: lines.join('\n')
+  var parts = [];
+  parts.push({
+    lines: [
+      '神・大家さん倶楽部 Q&Aチャットボットに',
+      '新規登録がありました。'
+    ]
   });
+  parts.push({ lines: ['登録メール: ' + registrantEmail] });
+  if (registeredAt) {
+    parts.push({ lines: ['受付時刻: ' + registeredAt] });
+  }
+  if (note) {
+    parts.push({ lines: ['メモ: ' + note] });
+  }
+  parts.push({
+    lines: [
+      'アプリに管理者でログインし、',
+      '「ユーザー承認」から承認してください。'
+    ]
+  });
+  if (appUrl) {
+    parts.push({ lines: ['アプリURL:'], linkUrl: appUrl, linkLabel: appUrl });
+  }
+  parts.push({ lines: ['（このメールは自動送信です）'] });
 
+  sendMail_(adminTo, subject, parts);
   return json_(200, { ok: true, type: 'registration' });
 }
 
@@ -122,23 +134,50 @@ function sendApprovalToApplicant_(applicantEmail, appUrl) {
   }
 
   var subject = '【神大家Q&A】登録が承認されました';
-  var lines = [
-    '神・大家さん倶楽部 情報Q&Aチャットボットへのご登録が承認されました。',
-    '',
-    '承認が完了しました。以下のURLからアクセス（ログイン）して確認してください。',
-    '',
-    appUrl,
-    '',
-    '（このメールは自動送信です）'
+  var parts = [
+    {
+      lines: [
+        '神・大家さん倶楽部 Q&Aチャットボットへの',
+        'ご登録が承認されました。'
+      ]
+    },
+    {
+      lines: [
+        '承認が完了しました。',
+        '以下のURLからアクセス（ログイン）して確認してください。'
+      ]
+    },
+    { lines: [], linkUrl: appUrl, linkLabel: appUrl },
+    { lines: ['（このメールは自動送信です）'] }
   ];
 
-  MailApp.sendEmail({
-    to: applicantEmail,
-    subject: subject,
-    body: lines.join('\n')
-  });
-
+  sendMail_(applicantEmail, subject, parts);
   return json_(200, { ok: true, type: 'approval' });
+}
+
+function sendRejectionToApplicant_(applicantEmail) {
+  var subject = '【神大家Q&A】登録申請が却下されました';
+  // 狭い画面でも「ご登録申請は却下されました。」が途中で切れないよう、
+  // こちらで自然な位置に改行を固定する。
+  var parts = [
+    {
+      lines: [
+        '神・大家さん倶楽部 Q&Aチャットボットへの',
+        'ご登録申請は却下されました。'
+      ]
+    },
+    {
+      lines: [
+        '神・大家さん倶楽部へ申請した',
+        'メールアドレスで申請しているか、',
+        '確認してください。'
+      ]
+    },
+    { lines: ['（このメールは自動送信です）'] }
+  ];
+
+  sendMail_(applicantEmail, subject, parts);
+  return json_(200, { ok: true, type: 'rejection' });
 }
 
 function sendPasswordResetToApplicant_(applicantEmail, appUrl, body) {
@@ -160,29 +199,112 @@ function sendPasswordResetToApplicant_(applicantEmail, appUrl, body) {
 
   var expiresNote = String(body.expires_at || '').trim();
   var subject = '【神大家Q&A】パスワード再設定のご案内';
-  var lines = [
-    '神・大家さん倶楽部 情報Q&Aチャットボットのパスワード再設定リクエストを受け付けました。',
-    '',
-    '以下のURLから、新しいパスワードを設定してください。',
-    '',
-    resetUrl,
-    '',
-    expiresNote
-      ? '有効期限: ' + expiresNote + 'まで（期限を過ぎるとリンクは使えません）'
-      : 'リンクの有効期限は、発行日の1週間後・日本時間23:59までです。',
-    '',
-    '心当たりがない場合は、このメールを無視してください。パスワードは変更されません。',
-    '',
-    '（このメールは自動送信です）'
+  var parts = [
+    {
+      lines: [
+        '神・大家さん倶楽部 Q&Aチャットボットの',
+        'パスワード再設定リクエストを受け付けました。'
+      ]
+    },
+    {
+      lines: ['以下のURLから、新しいパスワードを設定してください。']
+    },
+    { lines: [], linkUrl: resetUrl, linkLabel: resetUrl }
   ];
+  if (expiresNote) {
+    parts.push({
+      lines: [
+        '有効期限: ' + expiresNote + 'まで',
+        '（期限を過ぎるとリンクは使えません）'
+      ]
+    });
+  } else {
+    parts.push({
+      lines: [
+        'リンクの有効期限は、',
+        '発行日の1週間後・日本時間23:59までです。'
+      ]
+    });
+  }
+  parts.push({
+    lines: [
+      '心当たりがない場合は、このメールを無視してください。',
+      'パスワードは変更されません。'
+    ]
+  });
+  parts.push({ lines: ['（このメールは自動送信です）'] });
+
+  sendMail_(applicantEmail, subject, parts);
+  return json_(200, { ok: true, type: 'password_reset' });
+}
+
+/**
+ * plain + HTML の両方で送信。
+ * parts: [{ lines: string[], linkUrl?: string, linkLabel?: string }]
+ * lines の区切りは <br> / 改行で固定（Gmail の自動折り返し位置を制御するため）
+ */
+function sendMail_(to, subject, parts) {
+  var plainBlocks = [];
+  var htmlBlocks = [];
+
+  for (var i = 0; i < parts.length; i++) {
+    var part = parts[i] || {};
+    var lines = part.lines || [];
+    if (!lines.length && part.text) {
+      lines = [String(part.text)];
+    }
+
+    var plainText = lines.join('\n');
+    var htmlText = '';
+    for (var j = 0; j < lines.length; j++) {
+      if (j > 0) htmlText += '<br>';
+      htmlText += escapeHtml_(lines[j]);
+    }
+
+    if (part.linkUrl) {
+      var href = String(part.linkUrl);
+      var label = String(part.linkLabel || part.linkUrl);
+      if (plainText) {
+        plainBlocks.push(plainText + '\n' + href);
+      } else {
+        plainBlocks.push(href);
+      }
+      htmlBlocks.push(
+        '<p style="margin:0 0 16px 0;line-height:1.75;">' +
+          (htmlText ? htmlText + '<br>' : '') +
+          '<a href="' +
+          escapeHtml_(href) +
+          '" style="word-break:break-all;">' +
+          escapeHtml_(label) +
+          '</a></p>'
+      );
+    } else {
+      plainBlocks.push(plainText);
+      htmlBlocks.push(
+        '<p style="margin:0 0 16px 0;line-height:1.75;">' + htmlText + '</p>'
+      );
+    }
+  }
+
+  var htmlBody =
+    '<div style="font-family:sans-serif;font-size:15px;color:#222;line-height:1.75;">' +
+    htmlBlocks.join('') +
+    '</div>';
 
   MailApp.sendEmail({
-    to: applicantEmail,
+    to: to,
     subject: subject,
-    body: lines.join('\n')
+    body: plainBlocks.join('\n\n'),
+    htmlBody: htmlBody
   });
+}
 
-  return json_(200, { ok: true, type: 'password_reset' });
+function escapeHtml_(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /** ブラウザで開いたときの簡易ヘルスチェック */
@@ -190,7 +312,7 @@ function doGet() {
   return json_(200, {
     ok: true,
     service: 'kamiooya-qa-registration-notify',
-    hint: 'POST JSON { secret, email, type?: registration|approval|password_reset }'
+    hint: 'POST JSON { secret, email, type?: registration|approval|rejection|password_reset }'
   });
 }
 
