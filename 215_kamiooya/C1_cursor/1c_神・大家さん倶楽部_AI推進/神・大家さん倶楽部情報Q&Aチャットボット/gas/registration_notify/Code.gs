@@ -10,8 +10,8 @@
  *   APP_URL        … アプリURL。type=approval では必須。registration / password_reset では任意
  *
  * POST JSON:
- *   { secret, email, type? }
- *   type 省略 / "registration" … 管理者へ承認依頼
+ *   { secret, email, type?, member_no?, registered_at?, note?, ... }
+ *   type 省略 / "registration" … 管理者へ承認依頼（member_no 任意・あれば本文に記載）
  *   type "approval"           … 申請者（email）へ承認完了＋APP_URL
  *   type "rejection"          … 申請者へ却下通知（固定文）
  *   type "password_reset"     … 申請者へ再設定URL（reset_url 必須、または APP_URL+token）
@@ -93,6 +93,7 @@ function sendRegistrationToAdmin_(registrantEmail, adminTo, appUrl, body) {
 
   var registeredAt = String(body.registered_at || '').trim();
   var note = String(body.note || '').trim();
+  var memberNo = String(body.member_no || body.memberNo || '').trim();
   var subject = '【神大家Q&A】新規登録の承認をお願いします';
 
   var parts = [];
@@ -103,6 +104,9 @@ function sendRegistrationToAdmin_(registrantEmail, adminTo, appUrl, body) {
     ]
   });
   parts.push({ lines: ['登録メール: ' + registrantEmail] });
+  if (memberNo) {
+    parts.push({ lines: ['会員番号: ' + memberNo] });
+  }
   if (registeredAt) {
     parts.push({ lines: ['受付時刻: ' + registeredAt] });
   }

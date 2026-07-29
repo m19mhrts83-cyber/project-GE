@@ -744,9 +744,14 @@ const App = {
   handleRegister: async (event) => {
     event.preventDefault();
     const email = document.getElementById('registerEmail').value.trim();
+    const memberNo = (document.getElementById('registerMemberNo').value || '').trim();
     const password = document.getElementById('registerPassword').value;
     if (!email || !password) {
       App.showToast('メールアドレスとパスワードは必須です', 'error');
+      return;
+    }
+    if (!memberNo) {
+      App.showToast('会員番号は必須です', 'error');
       return;
     }
 
@@ -755,10 +760,11 @@ const App = {
     try {
       await App.apiClient('POST', '/auth/register', {
         email: email,
-        password_hash: password
+        password_hash: password,
+        member_no: memberNo
       });
       // 通知失敗でも登録は成功扱い（専用 API・分離）
-      await App.notifyRegistrationPending(email, '新規登録（アプリ）');
+      await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo);
       App.showToast('登録申請を受け付けました（承認待ち）', 'success');
       App.showLoginTab();
       App.elements.registerForm.reset();
@@ -771,12 +777,13 @@ const App = {
   },
 
   /** Phase 2: 承認依頼メール。失敗しても throw しない。 */
-  notifyRegistrationPending: async (email, note) => {
+  notifyRegistrationPending: async (email, note, memberNo) => {
     try {
       const registeredAt =
         new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ' JST';
       await App.apiClient('POST', '/notify/registration', {
         email: email,
+        member_no: memberNo || '',
         registered_at: registeredAt,
         note: note || ''
       });
@@ -2138,7 +2145,7 @@ const App = {
     }
 
     if (App.state.pendingUsers.length === 0) {
-      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">承認待ちユーザーはいません</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">承認待ちユーザーはいません</td></tr>';
       App.updateBulkApproveButtonState();
       return;
     }
@@ -2156,6 +2163,7 @@ const App = {
         '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.id) + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.email || '') + '</td>' +
+        '<td class="p-2">' + App.escapeHtml(u.member_no || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.status || '') + '</td>' +
         '<td class="p-2">' +
         '<div class="flex flex-wrap gap-2">' +
