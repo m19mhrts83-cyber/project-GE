@@ -651,7 +651,8 @@ def force_expand_all_bodies(current_url: str):
             document.querySelectorAll(sel).forEach(el => {
                 const txt = (el.textContent || "").trim();
                 // 日本語/英語の代表的な「展開」文言
-                if (/[もﾓ]っと(見る|みる)|続きを読む|Read\s*More|More|Show\s*More|Expand/i.test(txt)) {
+                // WeStudy UI は「続きを見る」（読むではない）が多い
+                if (/[もﾓ]っと(見る|みる)|続きを(見る|みる|読む)|Read\s*More|More|Show\s*More|Expand/i.test(txt)) {
                     // 既に展開済みっぽい文言は除外
                     if (/閉じる|折りたたむ|Less|Hide/i.test(txt)) return;
                     try { el.click(); } catch(e) {}
@@ -708,29 +709,46 @@ def get_comment_snapshot(current_url: str):
                     }
                 }
 
+                const looksLikeDate = (t) => {
+                    if (!t) return false;
+                    const s = String(t).trim();
+                    if (!s || s === "返信") return false;
+                    if (s.startsWith("http://") || s.startsWith("https://")) return false;
+                    return /(\d{4}年|\d{4}[\/-]\d{1,2}|\d{1,2}:\d{2})/.test(s);
+                };
+
                 const tSel = [
-                    "time", "time[datetime]", ".time", ".date", "abbr.published", "span.published",
+                    "time[datetime]", "time", ".time", ".date", "abbr.published", "span.published",
                     ".comment_date", ".comment-date", ".bbp-reply-post-date", ".reply-date", ".comment-date"
                 ];
                 for (const s of tSel) {
                     const t = el.querySelector(s);
-                    if (t) {
-                        timeText = (t.textContent || "").trim();
-                        const dt = t.getAttribute("datetime");
-                        if (dt) timeISO = dt;
+                    if (!t) continue;
+                    const dt = t.getAttribute("datetime");
+                    if (dt) {
+                        timeISO = dt;
+                        timeText = (t.textContent || "").trim() || dt;
+                        break;
+                    }
+                    const txt = (t.textContent || "").trim();
+                    if (looksLikeDate(txt)) {
+                        timeText = txt;
                         break;
                     }
                 }
                 if (!timeText) {
                     const near = el.querySelector(".comment_date, .bbp-reply-post-date, .reply-date, .comment-date");
-                    if (near) timeText = (near.textContent || "").trim();
+                    if (near) {
+                        const txt = (near.textContent || "").trim();
+                        if (looksLikeDate(txt)) timeText = txt;
+                    }
                 }
                 if (!timeText) {
                     // コメントmeta全体から日付らしい部分を抽出（class名変更への保険）
                     const meta = el.querySelector(".comment-meta, .commentmetadata, .bbp-reply-header");
                     const metaText = meta ? (meta.textContent || "").trim() : "";
                     if (metaText) {
-                        const m = metaText.match(/(\d{4}年\d{1,2}月\d{1,2}日\\s*\\d{1,2}時\\d{1,2}分|\\d{4}[\\/-]\\d{1,2}[\\/-]\\d{1,2}(?:\\s+\\d{1,2}:\\d{1,2}(?::\\d{1,2})?)?)/);
+                        const m = metaText.match(/(\d{4}年\d{1,2}月\d{1,2}日\s*\d{1,2}時\d{1,2}分|\d{4}[\/-]\d{1,2}[\/-]\d{1,2}(?:\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)?)/);
                         if (m) timeText = (m[1] || "").trim();
                     }
                 }
@@ -786,12 +804,15 @@ def get_comment_snapshot(current_url: str):
     # JS -> Python で安全に扱える構造のみ返す
     cleaned = []
     for it in items or []:
+        body = (it.get("body") or "").strip()
+        # 未展開ボタン文言が本文先頭に残ることがある
+        body = re.sub(r"^(続きを(見る|みる|読む)|もっと(見る|みる))\s*", "", body).strip()
         cleaned.append({
             "id": (it.get("id") or "").strip(),
             "author": (it.get("author") or "").strip(),
             "time_text": (it.get("timeText") or "").strip(),
             "time_iso": (it.get("timeISO") or "").strip(),
-            "body": (it.get("body") or "").strip(),
+            "body": body,
             "profile_url": (it.get("profileUrl") or "").strip(),
             "parent_comment_id": (it.get("parentNum") or "").strip(),
         })
@@ -1064,6 +1085,58 @@ def _decode_ajax_html(raw: str) -> str:
     return text
 
 
+_META_DATE_SPAN = re.compile(
+    r'<span[^>]*class=["\'][^"\']*\bcomment_date\b[^"\']*["\'][^>]*>([^<]+)</span>',
+    flags=re.I,
+)
+_META_DATE_TEXT = re.compile(
+    r"(\d{4}年\d{1,2}月\d{1,2}日\s*\d{1,2}時\d{1,2}分|"
+    r"\d{4}[/-]\d{1,2}[/-]\d{1,2}(?:\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)?)"
+)
+
+
+def _looks_like_date_text(s: str) -> bool:
+    t = (s or "").strip()
+    if not t or t.lower() in ("返信", "reply", "re"):
+        return False
+    if t.startswith("http://") or t.startswith("https://"):
+        return False
+    return bool(_META_DATE_TEXT.search(t))
+
+
+def _extract_time_from_block(block: str) -> tuple[str, str]:
+    """WeStudy コメント HTML 断片から time_text / time_iso を抽出。"""
+    time_text = ""
+    time_iso = ""
+    tm = re.search(
+        r'<time[^>]*datetime=["\']([^"\']+)["\'][^>]*>([^<]*)',
+        block,
+        flags=re.I,
+    )
+    if tm:
+        time_iso = (tm.group(1) or "").strip()
+        time_text = html_lib.unescape(tm.group(2) or "").strip() or time_iso
+        return time_text, time_iso
+    m = _META_DATE_SPAN.search(block)
+    if m:
+        time_text = html_lib.unescape(m.group(1)).strip()
+        if _looks_like_date_text(time_text):
+            return time_text, time_iso
+        time_text = ""
+    meta_m = re.search(
+        r'class=["\'][^"\']*comment-meta[^"\']*["\'][^>]*>([\s\S]*?)</div>',
+        block,
+        flags=re.I,
+    )
+    if meta_m:
+        meta_text = re.sub(r"<[^>]+>", " ", meta_m.group(1))
+        meta_text = html_lib.unescape(re.sub(r"\s+", " ", meta_text)).strip()
+        dm = _META_DATE_TEXT.search(meta_text)
+        if dm:
+            time_text = dm.group(1).strip()
+    return time_text, time_iso
+
+
 def _parse_comments_from_html(html: str) -> list[dict]:
     """li.comment / #comment-N 断片からコメント辞書を抽出。"""
     if not html:
@@ -1085,24 +1158,7 @@ def _parse_comments_from_html(html: str) -> list[dict]:
         )
         if am:
             author = html_lib.unescape(am.group(1)).strip()
-        time_text = ""
-        time_iso = ""
-        tm = re.search(
-            r'<time[^>]*datetime=["\']([^"\']+)["\'][^>]*>([^<]*)',
-            block,
-            flags=re.I,
-        )
-        if tm:
-            time_iso = (tm.group(1) or "").strip()
-            time_text = html_lib.unescape(tm.group(2) or "").strip() or time_iso
-        if not time_text:
-            tm2 = re.search(
-                r'class=["\'][^"\']*comment-meta[^"\']*["\'][^>]*>[\s\S]*?<a[^>]*>([^<]+)</a>',
-                block,
-                flags=re.I,
-            )
-            if tm2:
-                time_text = html_lib.unescape(tm2.group(1)).strip()
+        time_text, time_iso = _extract_time_from_block(block)
         body = ""
         bm = re.search(
             r'class=["\'][^"\']*comment-content[^"\']*["\'][^>]*>([\s\S]*?)</div>',
