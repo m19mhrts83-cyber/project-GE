@@ -68,6 +68,28 @@ def normalize_comment_id(raw: str) -> str:
     return s
 
 
+def is_numeric_comment_id(cid: str) -> bool:
+    return bool(cid) and cid.isdigit()
+
+
+_BODY_EXPAND_PREFIX = re.compile(
+    r"^(続きを(見る|みる|読む)|もっと(見る|みる))(\s|\n|\r|\t)*",
+    re.MULTILINE,
+)
+
+
+def clean_comment_body(body: str) -> str:
+    """未展開ボタン文言や前後空白を除去する。"""
+    s = (body or "").strip()
+    # 先頭行に残った「続きを見る」を繰り返し除去
+    while True:
+        cleaned = _BODY_EXPAND_PREFIX.sub("", s, count=1).strip()
+        if cleaned == s:
+            break
+        s = cleaned
+    return s
+
+
 def normalize_parent_id(raw: str) -> str:
     s = (raw or "").strip().strip('"')
     if s.startswith("comment-"):
@@ -80,12 +102,38 @@ _JP_DT = re.compile(
 )
 
 
+_GARBAGE_TIME_TEXT = re.compile(
+    r"^(返信|reply|re)$",
+    re.I,
+)
+
+
+def is_plausible_posted_text(s: str) -> bool:
+    t = (s or "").strip()
+    if not t or len(t) < 6:
+        return False
+    if _GARBAGE_TIME_TEXT.match(t):
+        return False
+    if t.startswith("http://") or t.startswith("https://"):
+        return False
+    if _JP_DT.match(t):
+        return True
+    if re.match(r"^\d{4}-\d{2}-\d{2}", t):
+        return True
+    if re.search(r"\d{4}年\d{1,2}月", t):
+        return True
+    return False
+
+
 def format_posted_at(row: dict) -> str:
     """管理者CSVの「投稿日時」形式 YYYY-MM-DD HH:MM:SS に寄せる。"""
     time_iso = get_cell(row, "time_iso", "timeISO")
     time_text = get_cell(row, "time_text", "timeText")
     date_legacy = get_cell(row, "date", "投稿日時", "posted_at", "postedAt")
-    for candidate in (time_iso, date_legacy, time_text):
+    candidates = [time_iso, date_legacy]
+    if is_plausible_posted_text(time_text):
+        candidates.append(time_text)
+    for candidate in candidates:
         if not candidate:
             continue
         s = candidate.strip()
@@ -113,14 +161,19 @@ def format_posted_at(row: dict) -> str:
     return ""
 
 
-def row_to_admin(row: dict) -> dict | None:
+def row_to_admin(row: dict, *, numeric_ids_only: bool = True) -> dict | None:
     cid = normalize_comment_id(
         get_cell(row, "コメントID", "comment_id", "commentId")
     )
-    body = get_cell(row, "コメント内容", "content", "body")
+    body = clean_comment_body(get_cell(row, "コメント内容", "content", "body"))
     if not cid and not body:
         return None
     if not cid:
+        return None
+    # trigger-/edit-/reply- 等の DOM ゴミIDは取り込まない
+    if numeric_ids_only and not is_numeric_comment_id(cid):
+        return None
+    if not body:
         return None
 
     parent_raw = get_cell(row, "親コメントID", "parent_comment_id", "parentCommentId")

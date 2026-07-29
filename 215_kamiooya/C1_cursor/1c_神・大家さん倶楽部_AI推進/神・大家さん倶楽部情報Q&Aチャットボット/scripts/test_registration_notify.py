@@ -5,6 +5,7 @@
 Usage:
   test_registration_notify.py [email]                    # type=registration（管理者宛）
   test_registration_notify.py --approval [email]         # type=approval（申請者宛）
+  test_registration_notify.py --rejection [email]        # type=rejection（申請者宛）
   test_registration_notify.py --password-reset [email]   # type=password_reset（申請者宛）
 """
 
@@ -45,6 +46,9 @@ def main() -> int:
     if args and args[0] in ("--approval", "-a"):
         mode = "approval"
         args = args[1:]
+    elif args and args[0] in ("--rejection", "--reject", "-r"):
+        mode = "rejection"
+        args = args[1:]
     elif args and args[0] in ("--password-reset", "--reset", "-p"):
         mode = "password_reset"
         args = args[1:]
@@ -59,7 +63,7 @@ def main() -> int:
 
     default_email = (
         (os.environ.get("NOTIFY_ADMIN_TO") or "").split(",")[0].strip()
-        if mode in ("approval", "password_reset")
+        if mode in ("approval", "rejection", "password_reset")
         else "phase0-test@example.com"
     )
     email = (args[0] if args else "").strip() or default_email
@@ -71,7 +75,7 @@ def main() -> int:
         print("NOTIFY_SHARED_SECRET が未設定です。")
         return 1
     if not email:
-        print("送信先 email が未指定です（--approval / --password-reset 時は NOTIFY_ADMIN_TO か引数）。")
+        print("送信先 email が未指定です（--approval / --rejection / --password-reset 時は NOTIFY_ADMIN_TO か引数）。")
         return 1
 
     if mode == "approval":
@@ -81,6 +85,13 @@ def main() -> int:
             "email": email,
         }
         print("mode approval →", email)
+    elif mode == "rejection":
+        payload = {
+            "secret": secret,
+            "type": "rejection",
+            "email": email,
+        }
+        print("mode rejection →", email)
     elif mode == "password_reset":
         token = str(uuid4())
         reset_url = f"{app_url}#reset-password?token={token}"

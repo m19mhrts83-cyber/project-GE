@@ -120,9 +120,9 @@
       </div>
     </section>
 
-    <!-- アプリ本体 -->
-    <section id="mainView" class="hidden min-h-screen">
-      <header class="bg-blue-900 text-white px-4 py-3 flex items-center justify-between">
+    <!-- アプリ本体（高さ固定でページ全体スクロールを防ぎ、左サイドバーを常時表示） -->
+    <section id="mainView" class="hidden h-screen overflow-hidden flex flex-col">
+      <header class="shrink-0 bg-blue-900 text-white px-4 py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <button id="sidebarToggleBtn" class="md:hidden">
             <i class="fa-solid fa-bars"></i>
@@ -135,9 +135,9 @@
         </div>
       </header>
 
-      <div class="flex h-[calc(100vh-56px)]">
+      <div class="flex flex-1 min-h-0 overflow-hidden">
         <!-- サイドバー -->
-        <aside id="sidebar" class="w-80 bg-white border-r border-slate-200 hidden md:flex md:flex-col">
+        <aside id="sidebar" class="w-80 min-w-[20rem] shrink-0 bg-white border-r border-slate-200 hidden md:flex md:flex-col h-full overflow-hidden">
           <div class="p-3 border-b border-slate-200">
             <button id="newChatBtn" class="w-full py-2 rounded bg-blue-900 text-white text-sm">
               <i class="fa-solid fa-plus mr-1"></i> 新規チャット
@@ -146,9 +146,10 @@
           <nav class="p-3 border-b border-slate-200 space-y-2">
             <button data-screen="chat" class="screen-tab w-full text-left px-3 py-2 rounded bg-slate-100">チャット</button>
             <button data-screen="comments" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">コメント一覧</button>
-            <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">セミナー動画</button>
+            <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">セミナー動画文字起こし</button>
             <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー承認</button>
             <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">CSV取込</button>
+            <button id="adminAnalyticsTabBtn" data-screen="adminAnalytics" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">運営分析</button>
           </nav>
           <div class="p-3 overflow-y-auto flex-1">
             <h3 class="text-sm font-semibold text-slate-600 mb-2">チャット履歴</h3>
@@ -157,15 +158,27 @@
         </aside>
 
         <!-- メインコンテンツ -->
-        <main class="flex-1 flex flex-col">
+        <main class="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           <!-- チャット画面 -->
-          <section id="chatScreen" class="screen-view flex-1 flex flex-col">
-            <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"></div>
+          <section id="chatScreen" class="screen-view flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div id="chatMessages" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-50"></div>
 
-            <div class="border-t bg-white p-4">
+            <div class="shrink-0 border-t bg-white p-4">
               <div>
                 <p class="text-xs text-slate-500 mb-2">よくある質問</p>
                 <div id="suggestedQuestions" class="flex flex-wrap gap-2 mb-3"></div>
+              </div>
+              <div class="flex items-center justify-between gap-3 mb-3 text-xs">
+                <div class="text-slate-500">
+                  通常検索はキーワード一致（比較的短い）。意味検索は言い換えも含め網羅的に探します（時間がかかることがあります）。
+                </div>
+                <button
+                  id="semanticModeToggle"
+                  type="button"
+                  class="shrink-0 px-3 py-1 rounded-full border border-slate-300 text-slate-700 hover:bg-slate-50"
+                >
+                  意味検索モード: OFF
+                </button>
               </div>
               <form id="messageForm" class="flex gap-2">
                 <input id="messageInput" class="flex-1 border rounded-md px-3 py-2" placeholder="質問を入力してください" required />
@@ -177,7 +190,7 @@
           </section>
 
           <!-- コメント一覧 -->
-          <section id="commentsScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
+          <section id="commentsScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
             <div class="w-full">
               <div id="commentsBackBar" class="hidden mb-3">
                 <button type="button" id="commentsBackBtn" class="text-sm text-blue-700 hover:underline">
@@ -218,8 +231,8 @@
             </div>
           </section>
 
-          <!-- セミナー動画一覧 -->
-          <section id="knowledgeScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
+          <!-- セミナー動画文字起こし一覧 -->
+          <section id="knowledgeScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
             <div class="w-full">
               <div id="knowledgeBackBar" class="hidden mb-3">
                 <button type="button" id="knowledgeBackBtn" class="text-sm text-blue-700 hover:underline">
@@ -249,7 +262,7 @@
           </section>
 
           <!-- 管理者: ユーザー承認 -->
-          <section id="adminUsersScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
+          <section id="adminUsersScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
             <div class="w-full max-w-4xl">
               <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 class="font-semibold">承認待ちユーザー</h3>
@@ -280,7 +293,7 @@
           </section>
 
           <!-- 管理者: CSV取込 -->
-          <section id="adminDataScreen" class="screen-view hidden flex-1 p-4 overflow-auto">
+          <section id="adminDataScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
             <div class="w-full max-w-3xl bg-white rounded border p-4">
               <h3 class="font-semibold mb-2">CSVコメント取込</h3>
               <p class="text-sm text-slate-500 mb-3">
@@ -309,6 +322,71 @@
               </div>
             </div>
           </section>
+
+          <!-- 管理者: 運営分析（Phase 13） -->
+          <section id="adminAnalyticsScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
+            <div class="w-full max-w-5xl space-y-4">
+              <div class="bg-white rounded border p-4">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h3 class="font-semibold mb-1">運営分析ダッシュボード</h3>
+                    <p class="text-sm text-slate-500">通常検索と意味検索の利用比率・日次推移・質問傾向（直近）</p>
+                  </div>
+                  <div class="flex flex-wrap gap-2 items-end">
+                    <label class="text-xs text-slate-500">
+                      期間
+                      <select id="analyticsDaysSelect" class="ml-1 border rounded-md px-2 py-1.5 text-sm">
+                        <option value="7">7日</option>
+                        <option value="14" selected>14日</option>
+                        <option value="30">30日</option>
+                        <option value="60">60日</option>
+                      </select>
+                    </label>
+                    <button id="reloadAnalyticsBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white text-sm">再取得</button>
+                  </div>
+                </div>
+                <p id="analyticsStatus" class="text-xs text-slate-500 mt-2"></p>
+              </div>
+
+              <div id="analyticsSummaryCards" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
+
+              <div class="bg-white rounded border p-4">
+                <h4 class="font-semibold mb-3 text-sm">日次推移</h4>
+                <div id="analyticsDailyBars" class="space-y-2"></div>
+              </div>
+
+              <div class="bg-white rounded border p-4 overflow-auto">
+                <h4 class="font-semibold mb-3 text-sm">よくある質問</h4>
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr>
+                      <th class="p-2 text-left">質問</th>
+                      <th class="p-2 text-left">合計</th>
+                      <th class="p-2 text-left">通常</th>
+                      <th class="p-2 text-left">意味</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analyticsTopQueriesBody"></tbody>
+                </table>
+              </div>
+
+              <div class="bg-white rounded border p-4 overflow-auto">
+                <h4 class="font-semibold mb-3 text-sm">直近イベント</h4>
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr>
+                      <th class="p-2 text-left">日時</th>
+                      <th class="p-2 text-left">モード</th>
+                      <th class="p-2 text-left">結果</th>
+                      <th class="p-2 text-left">質問</th>
+                      <th class="p-2 text-left">hit</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analyticsRecentBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
         </main>
       </div>
     </section>
@@ -325,11 +403,88 @@
     </div>
   </dialog>
 
+  <dialog id="commentDetailDialog" class="rounded-lg p-0 w-full max-w-2xl backdrop:bg-black/30">
+    <div class="p-4 max-h-[85vh] flex flex-col">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <h4 class="font-semibold" id="commentDetailTitle">コメント全文</h4>
+        <button type="button" id="commentDetailCloseBtn" class="px-2 py-1 rounded border text-sm">閉じる</button>
+      </div>
+      <p id="commentDetailMeta" class="text-xs text-slate-500 mb-3 whitespace-pre-wrap"></p>
+      <pre id="commentDetailBody" class="text-sm whitespace-pre-wrap break-words bg-slate-50 border rounded p-3 overflow-auto flex-1 min-h-[12rem]"></pre>
+    </div>
+  </dialog>
+
+  <dialog id="semanticSearchWarningDialog" class="rounded-lg p-0 w-full max-w-2xl backdrop:bg-black/30">
+    <div class="p-5">
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <h4 class="font-semibold text-base">意味検索モードについて</h4>
+        <button type="button" id="semanticWarningCloseBtn" class="px-2 py-1 rounded border text-sm">閉じる</button>
+      </div>
+      <div class="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <p class="font-semibold mb-1">網羅的に調べるため、時間がかかることがあります</p>
+        <p>
+          意味検索はベクトル検索と要約を行うため、<span class="font-semibold">1回あたり数十秒〜1分以上</span>かかることがあります（混雑時はそれ以上）。すぐ答えが欲しいときは通常検索（OFF）を使ってください。
+        </p>
+        <p class="mt-2 text-xs">
+          デフォルトはOFFです。有効化はこのタブのあいだだけ有効で、ページ再読込や再ログイン後はOFFに戻ります。
+        </p>
+      </div>
+      <p class="text-sm text-slate-700 mb-3">
+        意味検索モードは、キーワードが完全一致しなくても近い内容を広く探し、新しい具体事例も混ぜて要約します。便利な反面、関係が薄い情報を拾うことがあります。
+      </p>
+      <div class="overflow-auto border rounded mb-3">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="p-2 text-left">項目</th>
+              <th class="p-2 text-left">通常検索</th>
+              <th class="p-2 text-left">意味検索モード</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-t">
+              <td class="p-2 font-medium">探し方</td>
+              <td class="p-2">キーワード一致を優先</td>
+              <td class="p-2">意味の近さで関連候補を探す</td>
+            </tr>
+            <tr class="border-t">
+              <td class="p-2 font-medium">所要時間</td>
+              <td class="p-2">比較的短い（目安 10〜30秒）</td>
+              <td class="p-2 font-semibold text-amber-900">長い（数十秒〜1分以上のことも）</td>
+            </tr>
+            <tr class="border-t">
+              <td class="p-2 font-medium">向いている質問</td>
+              <td class="p-2">用語がはっきり分かっている質問</td>
+              <td class="p-2">言い換え・類似事例・最新の具体例まで広く拾いたい質問</td>
+            </tr>
+            <tr class="border-t">
+              <td class="p-2 font-medium">注意点</td>
+              <td class="p-2">取りこぼしが起きやすい</td>
+              <td class="p-2">無関係に近い候補が混ざることがある</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500 mb-4">
+        参考候補は必ずしも正解ではありません。回答を見るときは、下に表示される関連コミュニティ投稿・関連セミナー動画も併せて確認してください。
+      </p>
+      <div class="flex justify-end gap-2">
+        <button id="semanticWarningCancelBtn" class="px-3 py-1 rounded border">キャンセル</button>
+        <button id="semanticWarningOkBtn" class="px-3 py-1 rounded bg-blue-900 text-white">了承して有効化</button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="toast" class="toast hidden"></div>
   <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/20 z-50 items-center justify-center">
-    <div class="bg-white rounded px-4 py-3 shadow flex items-center gap-2">
-      <i class="fa-solid fa-spinner fa-spin"></i>
-      <span>処理中です...</span>
+    <div class="bg-white rounded px-4 py-3 shadow flex flex-col items-center gap-2 max-w-sm text-center">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <span>処理中です...</span>
+      </div>
+      <button id="fastSummaryLink" type="button" class="hidden text-xs text-blue-800 underline hover:text-blue-950">
+        準拠なしで早く要約する
+      </button>
     </div>
   </div>
 
@@ -354,7 +509,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="forum_category_lookup.js"></script>
-    <script src="app.js"></script>
+    <!-- Raimo 公開時は jsContent が app.js として自動挿入される（ローカル検証時のみ下を有効化） -->
+    <!-- <script src="forum_category_lookup.js"></script> -->
+    <!-- <script src="app.js"></script> -->
 </body>
 </html>
