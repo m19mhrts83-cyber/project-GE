@@ -176,6 +176,34 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 - Actions はランナー上の一時ディレクトリに `exports` を出力し、`state` だけをリポジトリへコミットして次回実行に引き継ぎます。
 - 実行ログと差分CSVは Actions Artifact（14日保持）に保存されます。
 - 手動実行（`workflow_dispatch`）では `force_scrape=true` を指定すると `--force` で再取得できます。
+- CI 依存パッケージは `scripts/requirements-ci.txt`（`selenium` / `playwright` / `supabase` / `requests`）。workflow の Install はこのファイルを参照する。
+
+### 日曜結果の見方
+
+```bash
+cd ~/git-repos
+gh run list --workflow=westudy-raimo-weekly.yml --limit 5
+# 失敗時
+gh run view <run_id> --log-failed
+# 成功時の要約は Actions の Job Summary（delta rows / supabase / raimo）
+```
+
+Jarvis 定型確認（安定ウォッチ中）:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_westudy_weekly_check.py --mark-checked
+```
+
+### Fail 時の一手
+
+| 症状 | まずやること |
+|------|--------------|
+| `No module named 'requests'` 等 | `requirements-ci.txt` と workflow Install を確認 → push 後に再実行 |
+| WeStudy ログイン失敗 | Secrets `WESTUDY_USER` / `WESTUDY_PASS` |
+| Raimo 取込失敗 | Artifact の `raimo_import_ng_*.png` とログ。Secrets `RAIMO_*` |
+| 再実行 | `gh workflow run westudy-raimo-weekly.yml -f force_scrape=true` |
+
+Gmail の「Fail」はワークフロー内メールではなく **GitHub Actions 失敗通知**であることが多い。
 
 ## 障害時の確認
 

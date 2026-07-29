@@ -234,6 +234,11 @@ create index if not exists app_qa_search_events_created_at_idx
 create index if not exists app_qa_search_events_mode_created_idx
   on public.app_qa_search_events (search_mode, created_at desc);
 
+alter table public.app_qa_search_events
+  add column if not exists result_status text not null default 'ok';
+alter table public.app_qa_search_events
+  add column if not exists error_message text;
+
 -- ---------------------------------------------------------------------------
 -- Security: public スキーマは RLS 必須（Security Advisor critical: rls_disabled_in_public）
 -- アプリ／取込／Edge は service_role のみ（RLS bypass）。anon / authenticated に CRUD を与えない。
@@ -270,3 +275,14 @@ grant select, insert, update, delete on table public.jarvis_heartbeat to service
 grant select, insert, update, delete on table public.app_qa_search_events to service_role;
 grant select on table public.app_qa_search_mode_daily to service_role;
 grant usage, select on all sequences in schema public to service_role;
+
+-- lesson 説明テキスト用の列追加（Phase 7 データ拡充）
+alter table public.comments add column if not exists course_tab text;
+alter table public.comments add column if not exists section_name text;
+alter table public.comments add column if not exists lesson_title text;
+alter table public.comments add column if not exists lesson_url text;
+alter table public.comments add column if not exists content_hash text;
+alter table public.comments add column if not exists is_deleted boolean not null default false;
+
+create index if not exists comments_source_system_idx on public.comments (source_system);
+create index if not exists comments_course_tab_idx on public.comments (course_tab);
