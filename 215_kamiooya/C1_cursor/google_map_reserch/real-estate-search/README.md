@@ -2,6 +2,8 @@
 
 駅名を入力すると、Google Maps APIを使用して最寄りの不動産賃貸管理会社を検索・表示するWebアプリケーションです。
 
+**周辺MAP（番号ピン）**: 同リポジトリの [`shuhen-map.html`](shuhen-map.html)（物件＋店リスト → P0〜P8）。管理会社検索とは別ページで、APIキーは共有（localStorage）。
+
 ## 機能
 
 - 📍 **駅名検索**: 駅名を入力して周辺の不動産賃貸管理会社を検索
@@ -9,6 +11,7 @@
 - 📋 **詳細情報**: 会社名、住所、電話番号、評価、営業時間などを一覧表示
 - 💾 **APIキー保存**: Google Maps API Keyをブラウザに安全に保存
 - 📱 **レスポンシブデザイン**: スマートフォンやタブレットでも快適に利用可能
+- 📌 **周辺MAP番号ピン**（`shuhen-map.html`）: Grandoleプリセット等で骨格スクショ用
 
 ## 必要なもの
 
@@ -60,15 +63,27 @@ npx http-server -p 8000
    - カードをクリックすると地図上の該当位置にジャンプします
    - 「Google Mapで見る」ボタンで詳細情報を確認できます
 
-## ファイル構成
+## リポジトリ構成
 
 ```
-/home/user/webapp/
-├── index.html      # メインHTMLファイル
-├── style.css       # スタイルシート
-├── app.js          # JavaScript（検索ロジック）
-└── README.md       # このファイル
+.
+├── index.html        # ルート直下の不動産賃貸管理会社検索サイト
+├── style.css         # ルートアプリのスタイルシート
+├── app.js            # ルートアプリの検索ロジック
+├── apps/             # 公開・運用向けのWebアプリ群
+├── docs/             # GitHub Pagesで公開する資料・スライド
+├── 215_kamiooya/     # 神・大家さん倶楽部関連の業務資料・自動化スクリプト
+├── 300_ai/           # AI活用に関する資料・検証メモ
+├── 500_obsidian/     # Obsidian運用に関する資料
+├── dx_kyouyuu/       # DX互助会の共有資料・ナレッジ
+├── line_unofficial_poc/ # LINE連携の検証コード
+├── scripts/          # リポジトリ運用用の補助スクリプト
+└── README.md         # このファイル
 ```
+
+このREADMEの起動手順は、リポジトリルート直下の `index.html` / `style.css` / `app.js` で構成される静的Webアプリを対象にしています。
+
+`apps/kamiooya-qa-web/` など個別アプリの詳細は、各ディレクトリ内のREADMEを参照してください。
 
 ## 技術スタック
 
