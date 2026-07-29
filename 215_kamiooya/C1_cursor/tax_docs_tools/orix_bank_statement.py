@@ -29,6 +29,8 @@ import re
 import sys
 from pathlib import Path
 
+from tax_docs_env import load_tax_credentials
+
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
@@ -37,19 +39,6 @@ DEFAULT_ENV_PATH = SCRIPT_DIR / ".env.tax_docs"
 
 ORIX_LOGIN_URL = "https://bk.orixbank.co.jp/login/login_ft.htm"
 
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip("'\"")
-        if key and value and key not in os.environ:
-            os.environ[key] = value
 
 
 def _wait_ready(page, *, timeout_ms: int = 15000) -> None:
@@ -449,7 +438,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    _load_env_file(Path(args.env_file))
+    load_tax_credentials(args.env_file)
 
     sy = sm = ey = em = 0
     if args.start_month:

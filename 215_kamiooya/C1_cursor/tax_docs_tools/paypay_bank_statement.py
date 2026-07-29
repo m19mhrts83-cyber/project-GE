@@ -23,6 +23,8 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
+from tax_docs_env import load_tax_credentials
+
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
@@ -34,20 +36,6 @@ PAYPAY_LOGIN_URL = (
     "https://login.japannetbank.co.jp/wctx/AF.do?SikibetuId=2015000"
 )
 
-
-def _load_env_file(path: Path) -> None:
-    """dotenv 風に .env ファイルを読み込む（os.environ に未設定の変数のみ）。"""
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip("'\"")
-        if key and value and key not in os.environ:
-            os.environ[key] = value
 
 
 def _wait_ready(page, *, timeout_ms: int = 15000) -> None:
@@ -514,7 +502,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    _load_env_file(Path(args.env_file))
+    load_tax_credentials(args.env_file)
 
     start = date.fromisoformat(args.start_date)
     end = date.fromisoformat(args.end_date)

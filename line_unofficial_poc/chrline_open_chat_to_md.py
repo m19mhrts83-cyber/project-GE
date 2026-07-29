@@ -655,11 +655,16 @@ def _ensure_thread_joined(
     join_threads: bool,
     join_confirm_file: Path | None,
     join_auto_yes: bool,
-) -> bool:
+) -> str:
+    """
+    スレッド参加を試みる。戻り値:
+      joined / already / skipped / deleted / failed
+    deleted は 404「討論串已被刪除」等。YAML に残しつつ state で日常スキップする。
+    """
     if thread_mid in joined_cache:
-        return True
+        return "already"
     if not join_threads and not join_confirm_file and not join_auto_yes:
-        return False
+        return "skipped"
 
     title = ""
     try:
@@ -667,34 +672,52 @@ def _ensure_thread_joined(
     except Exception:
         title = ""
 
-    approved = join_auto_yes
+    # 優先順: confirm-file（明示リスト） > --join-threads-yes > --join-threads（対話）
+    # 旧実装は --join-threads と --join-threads-yes 併用時に yes を上書きし、非対話で全スキップしていた
     if join_confirm_file is not None:
         approved = thread_mid in _load_join_confirm_mids(join_confirm_file)
+    elif join_auto_yes:
+        approved = True
     elif join_threads:
         approved = _confirm_join_thread(thread_mid, title, auto_yes=False)
+    else:
+        approved = False
 
     if not approved:
         print(f"# join 未承認のためスキップ: {thread_mid}", file=sys.stderr)
-        return False
+        return "skipped"
 
     try:
         cl.joinSquareThread(square_chat_mid, thread_mid)
         joined_cache.add(thread_mid)
         print(f"# joinSquareThread OK: {thread_mid} ({title or '?'})", file=sys.stderr)
-        return True
+        return "joined"
     except Exception as e1:
+        if _is_thread_deleted_error(e1):
+            print(
+                f"# join 削除済み ({thread_mid}): {type(e1).__name__}:{getattr(e1, 'code', '')}:{e1}"[:240],
+                file=sys.stderr,
+            )
+            return "deleted"
         try:
             cl.joinSquareChatThread(square_chat_mid, thread_mid)
             joined_cache.add(thread_mid)
             print(f"# joinSquareChatThread OK: {thread_mid} ({title or '?'})", file=sys.stderr)
-            return True
+            return "joined"
         except Exception as e2:
+            if _is_thread_deleted_error(e2):
+                print(
+                    f"# join 削除済み ({thread_mid}): {type(e2).__name__}:{getattr(e2, 'code', '')}:{e2}"[:240],
+                    file=sys.stderr,
+                )
+                return "deleted"
             print(
-                f"# join 失敗 ({thread_mid}): joinSquareThread={type(e1).__name__}, "
-                f"joinSquareChatThread={type(e2).__name__}",
+                f"# join 失敗 ({thread_mid}): "
+                f"joinSquareThread={type(e1).__name__}:{getattr(e1, 'code', '')}:{str(e1)[:120]} / "
+                f"joinSquareChatThread={type(e2).__name__}:{getattr(e2, 'code', '')}:{str(e2)[:120]}",
                 file=sys.stderr,
             )
-            return False
+            return "failed"
 
 
 def _is_fetch_permission_error(exc: BaseException) -> bool:
@@ -1555,7 +1578,7 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
         if st.thread_mid and need_join:
             joined = joined_by_chat.setdefault(st.square_chat_mid, set())
             if st.thread_mid not in joined:
-                ok = _ensure_thread_joined(
+                join_status = _ensure_thread_joined(
                     cl,
                     st.square_chat_mid,
                     st.thread_mid,
@@ -1564,7 +1587,23 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
                     join_confirm_file=args.join_threads_confirm_file,
                     join_auto_yes=bool(args.join_threads_yes),
                 )
-                if not ok:
+                if join_status == "deleted":
+                    # relatedMessageId 由来でも本体スレが削除済みのことがある（物件紹介の締切等）
+                    if not skip_md_state:
+                        h = _health_on_error(
+                            sdata,
+                            RuntimeError("joinSquareThread:404:此討論串已被刪除。"),
+                        )
+                        streams_state[st.stream_key] = {
+                            "sync_token": str(sdata.get("sync_token") or ""),
+                            "continuation_token": str(sdata.get("continuation_token") or ""),
+                            "health": h,
+                        }
+                        thread_stats.deleted += 1
+                    if args.verbose:
+                        print(f"# stream skip (deleted via join): {st.stream_key}", file=sys.stderr)
+                    continue
+                if join_status in {"failed", "skipped"}:
                     join_failed = True
                     if args.verbose:
                         print(f"# join 失敗・fetch を試行: {st.stream_key}", file=sys.stderr)

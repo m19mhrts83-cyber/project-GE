@@ -32,6 +32,8 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
+from tax_docs_env import load_tax_credentials
+
 from playwright.sync_api import Frame, TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import Page, sync_playwright
 
@@ -54,19 +56,6 @@ _CARD_LABEL_HINT = re.compile(
     re.I,
 )
 
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip("'\"")
-        if key and value and key not in os.environ:
-            os.environ[key] = value
 
 
 def _wait_ready(page: Page, *, timeout_ms: int = 15000) -> None:
@@ -1215,7 +1204,7 @@ def main() -> None:
     parser.add_argument("--no-pause", action="store_true")
     args = parser.parse_args()
 
-    _load_env_file(Path(args.env_file))
+    load_tax_credentials(args.env_file)
 
     start = datetime.strptime(args.start_date, "%Y-%m-%d").date()
     end = datetime.strptime(args.end_date, "%Y-%m-%d").date()

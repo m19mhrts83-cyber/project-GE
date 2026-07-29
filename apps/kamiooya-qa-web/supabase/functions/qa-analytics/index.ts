@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
   const { data: events, error } = await sb
     .from("app_qa_search_events")
     .select(
-      "id,created_at,search_mode,query_text,session_id,user_id,comment_hit_count,chunk_hit_count,answer_comment_count,answer_chunk_count"
+      "id,created_at,search_mode,query_text,session_id,user_id,comment_hit_count,chunk_hit_count,answer_comment_count,answer_chunk_count,result_status,error_message"
     )
     .gte("created_at", since)
     .order("created_at", { ascending: false })
@@ -88,11 +88,16 @@ Deno.serve(async (req) => {
   const rows = events || [];
   let normal = 0;
   let semantic = 0;
+  let failed = 0;
+  let disabled = 0;
   const byDay: Record<string, { normal: number; semantic: number }> = {};
   const queryCounts: Record<string, { count: number; semantic: number; normal: number }> = {};
 
   for (const row of rows) {
     const mode = asString(row.search_mode);
+    const status = asString(row.result_status) || "ok";
+    if (status !== "ok") failed += 1;
+    if (status === "disabled") disabled += 1;
     if (mode === "semantic") semantic += 1;
     else if (mode === "normal") normal += 1;
 
@@ -134,6 +139,8 @@ Deno.serve(async (req) => {
     chunk_hit_count: row.chunk_hit_count,
     answer_comment_count: row.answer_comment_count,
     session_id: row.session_id,
+    result_status: asString(row.result_status) || "ok",
+    error_message: asString(row.error_message) || null,
   }));
 
   return json({
@@ -144,6 +151,8 @@ Deno.serve(async (req) => {
       total,
       normal,
       semantic,
+      failed,
+      disabled,
       semantic_ratio: total > 0 ? Number((semantic / total).toFixed(4)) : 0,
       normal_ratio: total > 0 ? Number((normal / total).toFixed(4)) : 0,
     },

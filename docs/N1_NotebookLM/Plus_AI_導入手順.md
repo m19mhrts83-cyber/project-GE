@@ -97,7 +97,12 @@ NotebookLM / Cursor
 
 1. [プロンプト雛形](プロンプト雛形_ブランドテンプレ前提.md) の「アウトライン表」を埋める
 2. Plus AI の「New presentation / Generate」に貼る（または PDF／Word／テキストをアップロード）
-3. **スライド枚数・言語（日本語）・トーン**を明示する
+3. **モードは必ず「Slides」（Fully editable）**。`Images` は見た目重視で **全面画像になりやすく、編集性検証で失敗する**（2026-07-27 確認）
+4. **スライド枚数・言語（日本語）・トーン**を明示する
+
+> **検証メモ**: Web の `Images` → Export は各スライドが全面 JPEG。`Slides` → Download .pptx は Title／本文がテキスト箱。PowerPoint アドインでも同様に Slides 側を選ぶ。
+>
+> **ゆるキャラ／cute-illustration との両立（2026-07-27）**: Slides に水彩・ゆるキャラ指示を書いてもテンプレ優位で NotebookLM トーンにはほぼならない。Images（Friendly Illustrated 等）はイラスト寄りだが全面画像。いけとも向けは「見た目＝NotebookLM／直し＝Plus Slides（イラストは枠差し込み）」のハイブリッドが現実解。詳細: `200_NoteBookLM/99_PlusAI検証_20260727/05_ゆるキャラテイスト検証/`
 
 ### 6.2 生成後の必須確認（客先提出前）
 

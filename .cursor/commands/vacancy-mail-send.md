@@ -3,90 +3,74 @@
 **ターミナルに貼り付ける一行の形は `~/git-repos/docs/運用コマンド一覧.md` の「空室対策メール一括送信」と揃える（そちらを優先）。**
 
 # 目的
-Grandole志賀本通I などの空室対策メールを、指定した Markdown と固定の管理会社一覧 Excel を使って、一括送信します。
+Grandole志賀本通I などの空室対策メールを、指定した Markdown と管理会社一覧 Excel を使って一括送信します。
 
-- 送信ロジック（Gmail API 連携・個別送信）は既存の `send_mail.py` を使います。
-- Python 実行環境は、**`~/selenium_env/venv`** を必ず使います。
-- 実ユーザーとの対話はこのコマンド側で行い、実際の送信は Python スクリプトに任せます。
+- 送信ロジックは既存の `send_mail.py`。
+- Python は **`~/selenium_env/venv`** を使う。
 
-# 前提
-- 管理会社一覧 Excel は次を標準とします：
-  - ファイル: `20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx`
-  - シート: `G2`
-  - 場所: `/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部`
-  - **出先（git-repos のみ）**: 事前に `mail_automation/sync_vacancy_mail_data.sh` でミラー。詳細は `docs/運用コマンド一覧.md` §5「出先」
-- 実行用 Python スクリプト:
-  - `~/git-repos/215_kamiooya/C1_cursor/mail_automation/interactive_vacancy_send.py`（OneDrive 本体と同内容の場合）
-- Python 実行環境:
-  - `/Users/matsunomasaharu2/selenium_env/venv/bin/python`
+# データ方針（必須）
+
+| 役割 | 場所 |
+|---|---|
+| **正本（編集）** | OneDrive `★管理会社一覧.xlsx` / `24_空室対策メール履歴/*.md` |
+| **送信時の読み取り** | git-repos ローカルミラー（**OneDrive 直読みで送らない**） |
+
+**送信の直前に必ず** `sync_vacancy_mail_data.sh` で OneDrive → ローカルへコピーし、スクリプトの `cmp OK` を確認してから送る。  
+（一覧は更新されやすい。古いミラーのまま送らない。）
+
+- OneDrive 正本例:  
+  `/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx`
+- シート既定: `G2`
+- 同期: `~/git-repos/215_kamiooya/C1_cursor/mail_automation/sync_vacancy_mail_data.sh`
+- ローカル Excel: `mail_automation/data/管理会社一覧.xlsx`
 
 # 振る舞い
 
-このコマンドが呼ばれたとき、あなたは次の手順で動きます。
+## ステップ1: 方針の確認
 
-## ステップ1: 管理会社一覧の確認質問
+ユーザーに次を確認する。
 
-ユーザーに、まず次のように確認してください。
+> 宛先は OneDrive の `★管理会社一覧.xlsx`（シート G2）を正本とし、  
+> 送信直前にローカルへ同期してから送ります。よろしいですか？（はい / いいえ）
 
-> 現在の管理会社一覧として、  
-> `/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/20_【空室対策】【修繕】【売却】/21_【空室対策】募集,ステージング,物件管理/★管理会社一覧.xlsx` の  
-> シート「G2」を使用します。  
-> この管理会社一覧で送信してよろしいですか？（はい / いいえ）
+- **いいえ** → 送信しない。
+- **はい** → ステップ2へ。
 
-- ユーザーが **「いいえ」** と答えた場合:
-  - その時点で送信処理は行わず、「では今回は送信を実行しません。」と伝えて終了します。
-- ユーザーが **「はい」** と答えた場合:
-  - ステップ2へ進みます。
+## ステップ2: 送信 MD の指定
 
-## ステップ2: 送信に使用するMDファイルの指定を依頼
+> 送信に使う Markdown を指定してください（OneDrive の `24_空室対策メール履歴` 正本）。  
+> 例: `@…/260721_G1&G2_空室対策.md`
 
-次に、送信する本文が書かれた Markdown ファイルをユーザーに指定してもらいます。
+## ステップ3: 同期 → dry-run → 送信承認 → 送信
 
-- 質問文の例:
-
-> 送信に使用するMarkdownファイルを指定してください。  
-> 例: `@215_神・大家さん倶楽部/C2_ルーティン作業/24_空室対策メール履歴/260313_G1_空室対策.md`
-
-- ユーザーからは、基本的に **@プレフィックス付きのパス** が返ってくる想定です。
-  - 例: `@215_神・大家さん倶楽部/C2_ルーティン作業/24_空室対策メール履歴/260313_G1_空室対策.md`
-
-受け取ったパスは「そのまま Python 側に渡す」前提でよいです。  
-（実際のファイル解決は Python スクリプト側で行います）
-
-## ステップ3: Python スクリプトによる送信を実行
-
-ユーザーから「管理会社一覧 OK」「送信MDファイル」の2つが確認できたら、  
-以下のコマンドで Python スクリプトを実行してください。
+1. **同期**（必須）
 
 ```bash
-cd ~/git-repos/215_kamiooya/C1_cursor/mail_automation && \
-~/selenium_env/venv/bin/python interactive_vacancy_send.py
+bash ~/git-repos/215_kamiooya/C1_cursor/mail_automation/sync_vacancy_mail_data.sh \
+  --md '<ファイル名.md>'
 ```
 
-実行にあたってのルール:
+`cmp OK` が出ない／エラーなら送信しない。OneDrive 未同期の可能性を報告する。
 
-- **必ず** 上記の `~/selenium_env/venv/bin/python` を使います（OneDrive 側の venv は使わない）。
-- カレントディレクトリは `/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/mail_automation` にしてください。
-- スクリプト実行中に、Python 側でさらに対話（確認質問・MDパスの入力）が発生する可能性があります。
-  - その場合は、ユーザーに「今ターミナル側で確認・入力が必要になっているかもしれません」と一言添える程度で構いません。
+2. **dry-run** で件数・宛先サンプルを確認し、ユーザーへ提示。
 
-## ステップ4: 結果の要約を返す
+3. **対外送信前の確認**（件名・件数）で承認を得てから本番送信。
 
-Python スクリプト実行後、ターミナル出力を確認し、ユーザーに結果を簡潔に伝えます。
+```bash
+cd ~/git-repos/215_kamiooya/C1_cursor/mail_automation
+~/selenium_env/venv/bin/python send_mail.py \
+  --md-file ~/git-repos/215_kamiooya/C2_ルーティン作業/24_空室対策メール履歴/<ファイル>.md \
+  --excel-file ~/git-repos/215_kamiooya/C1_cursor/mail_automation/data/管理会社一覧.xlsx \
+  --sheet-name G2 --yes
+```
 
-- 最低限、次は含めてください：
-  - 使用したMDファイル名（わかる範囲で）
-  - 送信件数（ログに「全X件」「成功: X件」などがあれば）
-  - エラーがあった場合は、その件数と「どの宛先で失敗したか」の概要
-- 例:
+## ステップ4: 結果要約
 
-> `260313_G1_空室対策.md` を使って、G2シートの16件へ送信しました（全件成功）。  
-> 送信ログは mail_automation/logs/send_history.log に記録されています。
+- 使用 MD・成功件数・失敗があれば宛先概要。
+- ログ: `mail_automation/logs/`（あれば）。
 
-# 注意事項
+# 注意
 
-- **新しいスクリプトやフォルダは勝手に増やさない**こと。  
-  既存の構成（ProgramCode + 215_神・大家さん倶楽部）を前提に動作させてください。
-- ExcelファイルやMDファイルのパスは、ユーザーが運用中のものを前提とし、  
-  こちらから書き換えたり移動したりしないでください。
-
+- 新しいスクリプトやフォルダを勝手に増やさない。
+- Excel / MD の正本を git-repos 側だけで書き換えない（正本は OneDrive）。
+- 通信／OneDrive が不安定そうなときは `send-mail-excel-network-confirm.mdc` に従い、送る前に一文確認する。

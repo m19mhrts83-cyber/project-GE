@@ -45,6 +45,7 @@ from chrline_square_sender_names import SquareSenderNameResolver
 
 RT_DEDUP_FILENAME = ".chrline_open_chat_realtime_dedup.json"
 WATCH_STATUS_FILENAME = ".chrline_open_chat_watch_status.json"
+WRITE_SPOOL_FILENAME = ".chrline_open_chat_write_spool.jsonl"
 DEDUP_FLUSH_EVERY = 25
 DEDUP_FLUSH_SECONDS = 60.0
 HEARTBEAT_SECONDS = 30.0
@@ -315,6 +316,7 @@ def _msg_text(msg: Any) -> str:
 
 
 def _append(route: RtRoute, heading: str, body: str) -> None:
+    """OneDrive 上の MD へ追記。同期ロック等の一時的な EPERM は短いリトライで吸収する。"""
     block = f"""
 
 {heading}
@@ -323,8 +325,99 @@ def _append(route: RtRoute, heading: str, body: str) -> None:
 
 ---
 """
-    content = route.output_md.read_text(encoding="utf-8")
-    route.output_md.write_text(insert_block_after_timeline_header(content, block), encoding="utf-8")
+    path = route.output_md
+    last_err: Exception | None = None
+    for attempt in range(1, 6):
+        tmp: Path | None = None
+        try:
+            raw = path.read_bytes()
+            st_size = path.stat().st_size
+            # クラウドプレースホルダの部分読みを拒否（上書きで Truncate する事故防止）
+            if len(raw) != st_size:
+                raise OSError(35, f"partial read {len(raw)}/{st_size}: {path}")
+            content = raw.decode("utf-8")
+            new_content = insert_block_after_timeline_header(content, block)
+            new_raw = new_content.encode("utf-8")
+            if len(new_raw) <= len(raw):
+                raise RuntimeError(f"append would not grow file: {path}")
+            tmp = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
+            tmp.write_bytes(new_raw)
+            os.replace(tmp, path)
+            return
+        except PermissionError as exc:
+            last_err = exc
+            if tmp is not None:
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            # CloudStorage / OneDrive の一時ロック（launchd から EPERM になりやすい）
+            time.sleep(0.4 * attempt)
+        except OSError as exc:
+            last_err = exc
+            if tmp is not None:
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            if getattr(exc, "errno", None) not in {1, 13, 16, 35}:  # EPERM/EACCES/EBUSY/EAGAIN
+                raise
+            time.sleep(0.4 * attempt)
+    assert last_err is not None
+    raise last_err
+
+
+def _spool_enqueue(spool_path: Path, item: dict[str, Any]) -> None:
+    spool_path.parent.mkdir(parents=True, exist_ok=True)
+    with spool_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+
+def _flush_write_spool(spool_path: Path) -> tuple[int, int]:
+    """ローカル退避した追記を OneDrive へ再試行。戻り値: (ok, remain)。"""
+    if not spool_path.is_file():
+        return 0, 0
+    try:
+        lines = spool_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return 0, 0
+    if not lines:
+        return 0, 0
+    remain: list[str] = []
+    ok = 0
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        output_md = Path(str(item.get("output_md") or "")).expanduser()
+        heading = str(item.get("heading") or "")
+        body = str(item.get("body") or "")
+        if not output_md.is_file() or not heading or not body:
+            continue
+        route = RtRoute(
+            rid=str(item.get("route_id") or "spool"),
+            chat_mid=str(item.get("chat_mid") or "m" + "0" * 32),
+            output_md=output_md,
+            org_label=str(item.get("org_label") or ""),
+            heading_tag="",
+        )
+        try:
+            _append(route, heading, body)
+            ok += 1
+        except OSError:
+            remain.append(json.dumps(item, ensure_ascii=False))
+    if remain:
+        spool_path.write_text("\n".join(remain) + "\n", encoding="utf-8")
+    else:
+        try:
+            spool_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return ok, len(remain)
 
 
 def _extract_thread_notification(event: Any) -> tuple[str, str, Any] | None:
@@ -362,6 +455,7 @@ def main() -> int:
     rt_dedup_path = save_root / RT_DEDUP_FILENAME
     batch_dedup_path = save_root / BATCH_DEDUP_FILENAME
     watch_status_path = save_root / WATCH_STATUS_FILENAME
+    write_spool_path = save_root / WRITE_SPOOL_FILENAME
     dedup = _load_dedup(rt_dedup_path)
     batch_msg_ids = _message_ids_from_batch_dedup(batch_dedup_path)
     flush_state = {"count": 0, "last": time.time()}
@@ -516,7 +610,41 @@ def main() -> int:
             if related:
                 body += f"[relatedMessageId] {related}\n"
             body += f"\n{text}"
-            _append(route, heading, body)
+            try:
+                _append(route, heading, body)
+            except OSError as exc:
+                # イベントは再送されないため、ローカルへ退避して heartbeat で再試行する
+                _spool_enqueue(
+                    write_spool_path,
+                    {
+                        "output_md": str(route.output_md),
+                        "heading": heading,
+                        "body": body,
+                        "route_id": route.rid,
+                        "chat_mid": route.chat_mid,
+                        "org_label": route.org_label,
+                        "dedup_key": key,
+                        "message_id": message_id,
+                        "spooled_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                    },
+                )
+                dedup.add(key)
+                batch_msg_ids.add(message_id)
+                flush_state["count"] += 1
+                _maybe_flush()
+                _status(
+                    state="running",
+                    last_write_error=f"{type(exc).__name__}: {exc}",
+                    last_write_error_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                    last_write_error_route=route.rid,
+                    write_spool_pending=True,
+                )
+                print(
+                    f"# append spooled {route.rid} kind={kind} msg={message_id} "
+                    f"err={type(exc).__name__}: {exc}",
+                    file=sys.stderr,
+                )
+                return
             dedup.add(key)
             batch_msg_ids.add(message_id)
             msgid_to_route[message_id] = route
@@ -527,6 +655,7 @@ def main() -> int:
                 last_append_at=datetime.now().astimezone().isoformat(timespec="seconds"),
                 last_append_route=route.rid,
                 last_append_kind=kind,
+                last_write_error="",
             )
             if len(msgid_to_route) > 5000:
                 for k in list(msgid_to_route.keys())[:1000]:
@@ -633,9 +762,22 @@ def main() -> int:
             )
 
         def _register_square_handler(event_code: int):
+            # CHRLINE SquareEvent は __check 経由で
+            #   func(hooks_self, event, cl, *attr)
+            # を呼ぶ。旧版・環境差で 2 引数想定のハンドラだと
+            # TypeError で Thread 全体が死に、heartbeat だけ残る。
+            # *args で吸収し、例外はログして監視を継続する。
             @tracer.SquareEvent(event_code)
-            def _handler(event, _cl):
-                _process_square_event(event, event_code)
+            def _handler(*args, **_kwargs):
+                try:
+                    if len(args) < 2:
+                        return
+                    _process_square_event(args[1], event_code)
+                except Exception as exc:
+                    print(
+                        f"# square handler error ev={event_code}: {type(exc).__name__}: {exc}",
+                        file=sys.stderr,
+                    )
 
         # 29=NOTIFICATION_MESSAGE, 54=専用スレッド。周辺コードも保険で購読
         for ev_code in (29, 30, 31, 32, 33, 34, 35, 36, 54):
@@ -675,9 +817,21 @@ def main() -> int:
                 # プロセス生存の確認用。PUSH障害は tracer.run が例外終了してlaunchdが再起動する。
                 now = time.time()
                 if now - last_heartbeat >= HEARTBEAT_SECONDS:
+                    spool_ok, spool_remain = _flush_write_spool(write_spool_path)
+                    if spool_ok or spool_remain:
+                        print(
+                            f"# write spool flush ok={spool_ok} remain={spool_remain}",
+                            file=sys.stderr,
+                        )
                     _status(
                         state="running",
                         heartbeat_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+                        write_spool_pending=bool(spool_remain),
+                        **(
+                            {"last_write_error": "", "last_spool_flush_ok": spool_ok}
+                            if spool_ok
+                            else {}
+                        ),
                     )
                     last_heartbeat = now
 

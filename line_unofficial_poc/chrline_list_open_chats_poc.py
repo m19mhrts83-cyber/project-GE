@@ -356,6 +356,11 @@ def main() -> int:
 
     save_root = save_root_from_env()
     cl = build_logged_in_client(save_root, allow_qr_login=bool(args.allow_qr_login))
+    # can_use_square は getJoinedSquares（cl.squares）後に立つ遅延フラグ
+    try:
+        _ = cl.squares
+    except Exception as e:
+        print(f"# squares enable skip: {type(e).__name__}: {e}", file=sys.stderr)
     if not getattr(cl, "can_use_square", False):
         print("Square(オープンチャット) API が利用できません。ログイン状態やアカウントを確認してください。", file=sys.stderr)
         return 1

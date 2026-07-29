@@ -29,25 +29,14 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from tax_docs_env import load_tax_credentials
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_ENV_PATH = SCRIPT_DIR / ".env.tax_docs"
 
 FISCAL_YEAR_START_MONTH = 7
 MYKOMON_CATEGORY_ORIX = "05_借入金・保険・固定資産税"
 
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip("'\"")
-        if key and value and key not in os.environ:
-            os.environ[key] = value
 
 
 def _fiscal_year(month_date: date) -> int:
@@ -230,7 +219,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    _load_env_file(Path(args.env_file))
+    load_tax_credentials(args.env_file)
 
     sy, sm = args.start_month.split("-")
     ey, em = args.end_month.split("-")

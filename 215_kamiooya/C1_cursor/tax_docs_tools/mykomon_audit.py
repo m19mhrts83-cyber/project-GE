@@ -29,6 +29,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from tax_docs_env import load_tax_credentials
+
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
@@ -783,7 +785,7 @@ def main() -> None:
     parser.add_argument("--no-save", action="store_true", help="レポートをファイル保存しない")
     args = parser.parse_args()
 
-    mk._load_env_file(Path(args.env_file))
+    load_tax_credentials(args.env_file)
 
     start = _parse_month(args.start_month)
     end = _parse_month(args.end_month)
