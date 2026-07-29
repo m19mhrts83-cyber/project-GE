@@ -3104,7 +3104,7 @@ const App = {
           if (commentId.indexOf('comment-') === 0) {
             commentId = commentId.slice(8).trim();
           }
-          if (explicitId && !/^\d+$/.test(commentId)) {
+          if (explicitId && !/^\d+$/.test(commentId) && !/^lesson_desc_/.test(commentId)) {
             junkSkipCount += 1;
             App.elements.importResult.textContent +=
               'SKIP junk_id row=' + (i + 1) + ' id=' + commentId + '\n';

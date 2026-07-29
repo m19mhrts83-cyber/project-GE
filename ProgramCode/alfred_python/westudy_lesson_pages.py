@@ -48,23 +48,23 @@ _DEFAULT_LOGIN_URL = "https://westudy.co.jp/login"
 COURSE_TABS = [
     {
         "label": "神大家0.はじめに",
-        "url": "https://westudy.co.jp/course/kami-ooyasan-club",
+        "url": "https://westudy.co.jp/course/kami-ooyasan-club-start",
     },
     {
         "label": "神大家1.基礎",
-        "url": "https://westudy.co.jp/course/kami-ooyasan-club?t=lessons",
+        "url": "https://westudy.co.jp/course/kami-ooyasan-club",
     },
     {
         "label": "神大家2.応用",
-        "url": "https://westudy.co.jp/course/kami-ooyasan-club-advanced",
+        "url": "https://westudy.co.jp/course/level-up",
     },
     {
         "label": "神大家3.継承",
-        "url": "https://westudy.co.jp/course/kami-ooyasan-club-keisho",
+        "url": "https://westudy.co.jp/course/keisho",
     },
     {
         "label": "神大家4.グルコン",
-        "url": "https://westudy.co.jp/course/kami-ooyasan-club-groupcon",
+        "url": "https://westudy.co.jp/course/group-consulting",
     },
 ]
 
@@ -239,8 +239,8 @@ def extract_lesson_description(lesson_url: str) -> str:
 
     desc = safe_js(r"""
         // WeStudy lesson ページの説明テキスト取得
-        // 複数のセレクタ候補を試す
         const selectors = [
+            '.content-body',
             '.lesson-content',
             '.lesson-description',
             '.entry-content',
