@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周辺MAP 番号ピン — project-GE</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="shuhen-page">
+    <div class="container" id="appContainer">
+        <header>
+            <h1>周辺MAP 番号ピン</h1>
+            <p class="subtitle">物件＋店名リスト → 地図に P0〜P8（管理会社検索とは別ページ）</p>
+            <p class="nav-links">
+                <a href="index.html">← 管理会社検索</a>
+            </p>
+        </header>
+
+        <div class="search-section" id="controlsSection">
+            <div class="api-key-section" style="margin-bottom: 16px;">
+                <label for="apiKeyInput">Google Maps API Key:</label>
+                <input type="password" id="apiKeyInput" placeholder="APIキーを入力（管理会社検索と共有）">
+                <small>※ localStorage キー名は管理会社検索と同じ（googleMapsApiKey）</small>
+            </div>
+
+            <div class="form-row">
+                <label for="propertyAddress">物件住所</label>
+                <input type="text" id="propertyAddress" placeholder="物件の住所">
+            </div>
+            <div class="form-row">
+                <label for="propertyLabel">物件ラベル（P0）</label>
+                <input type="text" id="propertyLabel" placeholder="例: Grandole志賀本通">
+            </div>
+            <div class="form-row">
+                <label for="placesList">店・施設リスト（1行1件：ID | 検索クエリ | 表示名）</label>
+                <textarea id="placesList" rows="10" spellcheck="false"></textarea>
+            </div>
+
+            <div class="form-row shuhen-toggles">
+                <label class="toggle-label">
+                    <input type="checkbox" id="cleanStyleToggle" checked>
+                    クリーン表示（丁目・店名・道名オフ／道路線は残す）
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="hidePinsToggle">
+                    ピンを隠す（下地スクショ用）
+                </label>
+            </div>
+
+            <div class="search-box shuhen-actions">
+                <button type="button" id="presetButton" class="secondary-btn" onclick="loadGrandolePreset()">Grandoleプリセット</button>
+                <button type="button" id="pinButton" onclick="runNumberedPins()">
+                    <span class="button-text">ピンを表示</span>
+                    <span class="loading-spinner" style="display: none;">⏳</span>
+                </button>
+                <button type="button" id="mapOnlyButton" class="secondary-btn" onclick="toggleMapOnly()" disabled>マップのみ表示</button>
+                <button type="button" id="copyJsonButton" class="secondary-btn" onclick="copyCoordsJson()" disabled>座標JSONをコピー</button>
+                <button type="button" id="applyStyleButton" class="secondary-btn" onclick="applyMapDisplayOptions()" disabled>表示を更新</button>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <div id="resultsSection" style="display: none;">
+            <div class="results-header">
+                <h2 id="resultsTitle">番号ピン結果</h2>
+                <p id="resultsCount"></p>
+            </div>
+            <div id="mapContainer" class="map-container map-container-tall">
+                <div id="map"></div>
+            </div>
+            <div id="pinList" class="results-list"></div>
+        </div>
+
+        <div class="instructions" id="instructionsSection">
+            <h3>使い方</h3>
+            <ol>
+                <li>API Key を入力（Maps JavaScript / Places / Geocoding / Maps Static）</li>
+                <li>「Grandoleプリセット」でサキ向け店リストを読み込む（または手編集）</li>
+                <li>「ピンを表示」→ 東西・近接を目視確認し、<strong>ビュー範囲を確定</strong></li>
+                <li>既定で<strong>クリーン表示</strong>（丁目・店名・道名オフ。道路・線路の線だけ残す）</li>
+                <li>下地用:「ピンを隠す」→「表示を更新」→「マップのみ表示」→ スクショを <code>試走出力/基準_下地_Grandole_クリーン.png</code> へ</li>
+                <li><strong>ベージュ／イラスト寄せ（Phase C）はアプリの外</strong> — 書き出し直後に <code>10c</code>（C0: <code>jarvis_shuhen_recompose_decor.py</code> → 任意で Gemini／ChatGPT）→ ピン再合成</li>
+                <li>Canva で Access・タイトル・吹き出し（ピンは動かさない）</li>
+            </ol>
+            <p>手順正本: AI×周辺MAP <code>10_フェーズAtoC_ハイブリッド方針.md</code> / <code>10c_PhaseC_Gemini色味寄せ.md</code></p>
+            <p>APIキー正本: <code>.env.jarvis_private</code> の <code>GOOGLE_MAPS_API_KEY</code>（<code>scripts/jarvis_maps_key_clipboard.sh</code> でクリップボードへ）</p>
+        </div>
+    </div>
+
+    <div id="mapOnlyBar" class="map-only-bar" style="display: none;">
+        <button type="button" class="secondary-btn" onclick="toggleMapOnly()">通常表示に戻す</button>
+    </div>
+
+    <script src="shuhen-map.js"></script>
+</body>
+</html>
