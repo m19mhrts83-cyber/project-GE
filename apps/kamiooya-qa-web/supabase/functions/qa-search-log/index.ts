@@ -13,6 +13,8 @@ type LogBody = {
   chunk_hit_count?: number;
   used_sources?: unknown;
   meta?: Record<string, unknown>;
+  result_status?: string;
+  error_message?: string;
   secret?: string;
 };
 
@@ -77,6 +79,11 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  const statusRaw = asString(body?.result_status).trim() || "ok";
+  const resultStatus = ["ok", "error", "disabled", "rate_limited"].includes(statusRaw)
+    ? statusRaw
+    : "ok";
+
   const { error } = await sb.from("app_qa_search_events").insert({
     search_mode: mode,
     query_text: queryText,
@@ -87,6 +94,8 @@ Deno.serve(async (req) => {
     chunk_hit_count: body?.chunk_hit_count == null ? null : Number(body.chunk_hit_count),
     used_sources: body?.used_sources ?? null,
     meta: body?.meta && typeof body.meta === "object" ? body.meta : {},
+    result_status: resultStatus,
+    error_message: asString(body?.error_message).slice(0, 500) || null,
   });
 
   if (error) {

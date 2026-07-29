@@ -20,12 +20,13 @@ import os
 import sys
 from pathlib import Path
 
+from tax_docs_env import load_tax_credentials
+
 from playwright.sync_api import sync_playwright
 
 from amex_statement import (
     AMEX_LOGIN_URL,
     DEFAULT_ENV_PATH,
-    _load_env_file,
     _login,
     _login_verified,
     _open_login_page,
@@ -57,7 +58,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    _load_env_file(Path(args.env_file))
+    load_tax_credentials(args.env_file)
     login_id = os.environ.get("AMEX_LOGIN_ID", "")
     password = os.environ.get("AMEX_PASSWORD", "")
     manual_credentials = not args.auto_login

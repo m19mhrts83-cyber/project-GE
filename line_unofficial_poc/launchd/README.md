@@ -19,6 +19,13 @@
 - launchdがrunnerを再起動し、Mac版LINEが終了するまで待機する
 - 保存トークンでのQRなし再起動は2026-07-20に実証済み
 
+## OneDrive 書き込み（PermissionError）
+- `output_md` は OneDrive（`Library/CloudStorage/...`）上。同期ロック中に launchd から `PermissionError: Operation not permitted` が出ることがある
+- 監視側は短いリトライ＋原子的置換で吸収する。失敗時は `.line_auth/.chrline_open_chat_write_spool.jsonl` に退避し、heartbeat で再フラッシュする
+- 再現が続くとき: システム設定 → プライバシーとセキュリティ → **フルディスクアクセス** に  
+  `Python`（`/Library/Developer/CommandLineTools/.../Python.app`）を追加し、監視を再起動
+- 切り分け: 対話シェルでは書ける／launchd だけ失敗 → TCC または OneDrive 一時ロック
+
 ## インストール
 `line_unofficial_poc` 直下で実行します。
 

@@ -1,0 +1,10 @@
+{
+  "disabled": false,
+  "consecutive_successes": 0,
+  "last_checked_at": null,
+  "last_run_id": null,
+  "last_conclusion": null,
+  "last_result_note": "",
+  "success_needed": 2,
+  "note": "安定確認まで Jarvis が週次 CI を確認。連続成功2回＋ユーザー合意、または disabled:true で解除"
+}

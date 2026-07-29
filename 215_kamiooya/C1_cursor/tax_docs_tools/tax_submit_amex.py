@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from tax_docs_env import load_tax_credentials
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_ENV_PATH = SCRIPT_DIR / ".env.tax_docs"
 DEFAULT_RULES = SCRIPT_DIR / "amex_himoku_rules.json"
@@ -50,19 +52,6 @@ class AmexPeriod:
     mykomon_year_label: str
     mykomon_quarter: str
 
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip("'\"")
-        if key and value and key not in os.environ:
-            os.environ[key] = value
 
 
 def _year_label(calendar_year: int) -> str:
@@ -515,7 +504,7 @@ def main() -> None:
 
     os.environ["AMEX_AUTH_TIMEOUT_SEC"] = str(args.login_timeout)
 
-    _load_env_file(Path(args.env_file))
+    load_tax_credentials(args.env_file)
 
     if args.periods != MISSING_PERIODS_PRESET:
         print(f"エラー: 未対応の --periods: {args.periods}", file=sys.stderr)

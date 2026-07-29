@@ -35,9 +35,11 @@
 ~/selenium_env/venv/bin/pip install -r requirements.txt
 ~/selenium_env/venv/bin/playwright install chromium
 
-# 認証情報を設定
+# 認証情報の正本は ~/git-repos/.env.jarvis_private
+# （PayPay / MyKomon / ミニテック / オリックス / AMEX / くらさぽ）
+# 互換フォールバックが必要なときだけ:
 cp .env.tax_docs.example .env.tax_docs
-# .env.tax_docs を編集して PayPay / MyKomon / ミニテック / オリックス / AMEX の認証情報を入力
+# .env.tax_docs を編集（変更時は jarvis_private を先に更新）
 ```
 
 ### 使い方

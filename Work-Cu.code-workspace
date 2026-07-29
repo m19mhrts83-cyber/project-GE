@@ -1,12 +1,12 @@
 {
 	"folders": [
 		{
-			"name": "git-repos",
-			"path": "."
-		},
-		{
 			"name": "Downloads",
 			"path": "../Downloads"
+		},
+		{
+			"name": "git-repos",
+			"path": "."
 		},
 		{
 			"name": "500_Obsidian_r1",
@@ -29,12 +29,15 @@
 			"path": "../Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ"
 		},
 		{
+			"name": "Life Plan",
 			"path": "../Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan"
 		},
 		{
+			"name": "Documents",
 			"path": "../Library/Mobile Documents/iCloud~com~openplanetsoftware~just-press-record/Documents"
 		},
 		{
+			"name": "240_融資",
 			"path": "../Library/CloudStorage/OneDrive-個人用/240_融資"
 		}
 	],

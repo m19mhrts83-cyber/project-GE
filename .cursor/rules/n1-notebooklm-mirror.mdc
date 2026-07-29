@@ -43,6 +43,18 @@ rsync -a --delete \
 
 - **A を更新した場合**は、ミラー後に `git-repos` で `docs/N1_NotebookLM/` を通常どおり `git add` / `commit` する（ユーザー方針に従う）。
 
+## ゼロイチ（Drive 共通スタイル）への反映
+
+`NotebookLM_マスタースタイル_cute-illustration.md` または `いけともゆるキャラプロンプト.md` を更新したら、ミラー後に次へもコピーする（NotebookLM 添付の正）:
+
+```bash
+NB0="/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/00_ゼロイチマスタースタイル"
+cp "/Users/matsunomasaharu2/git-repos/docs/N1_NotebookLM/NotebookLM_マスタースタイル_cute-illustration.md" "$NB0/"
+cp "/Users/matsunomasaharu2/git-repos/docs/N1_NotebookLM/いけともゆるキャラプロンプト.md" "$NB0/"
+```
+
+詳細: `jarvis-notebooklm-drive-sources.mdc`
+
 ## 他ワークスペースで 215 だけ開いているとき
 
 - 215 ルートの `.cursor/rules/n1-notebooklm-mirror.mdc` も同趣旨で参照する（`N1_NotebookLM/**` 用 globs）。

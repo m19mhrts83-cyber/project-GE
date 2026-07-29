@@ -6,8 +6,9 @@ LEAF（くらさぽコネクト）オーナーサイトから送金明細書 PDF
   https://owner.kurasapo-connect.com/login
   → ログイン後「報告書」→ 送金明細書（支払明細書）を PDF 保存
 
-認証情報: .env.tax_docs（同ディレクトリ）に
-  KURASAPO_OWNER_LOGIN_ID / KURASAPO_OWNER_PASSWORD を設定する。
+認証情報（優先順）:
+  1. ~/git-repos/.env.jarvis_private の KURASAPO_OWNER_LOGIN_ID / KURASAPO_OWNER_PASSWORD
+  2. 互換: tax_docs_tools/.env.tax_docs（同キー）
   （LEAF 案内メール添付「オーナーIDパスワード（…）.pdf」参照。初回ログイン後に変更済みの場合は現行 PW を設定）
 
 使い方:
@@ -31,10 +32,13 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+
 from typing import Any
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
+
+from tax_docs_env import JARVIS_PRIVATE_ENV, load_tax_credentials
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_ENV_PATH = SCRIPT_DIR / ".env.tax_docs"
@@ -47,19 +51,6 @@ KURASAPO_BASE_URL = os.environ.get(
 )
 DEFAULT_BUNSYO_FILTER = "送金明細"
 
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip("'\"")
-        if key and value and key not in os.environ:
-            os.environ[key] = value
 
 
 def _wait_ready(page, *, timeout_ms: int = 15000) -> None:
@@ -84,7 +75,8 @@ def _login(page, login_id: str, password: str) -> None:
         if "間違っています" in body:
             raise RuntimeError(
                 "くらさぽコネクトのログインに失敗しました。"
-                " .env.tax_docs の KURASAPO_OWNER_LOGIN_ID / KURASAPO_OWNER_PASSWORD を確認してください。"
+                " .env.jarvis_private（または .env.tax_docs）の"
+                " KURASAPO_OWNER_LOGIN_ID / KURASAPO_OWNER_PASSWORD を確認してください。"
                 " 初回パスワード変更済みの場合は現行パスワードを設定するか、--manual-login を使ってください。"
             )
         if "ログイン試行回数が多すぎます" in body:
@@ -139,16 +131,34 @@ def _item_text(item: dict[str, Any]) -> str:
 
 
 def _parse_item_date(item: dict[str, Any]) -> datetime:
-    for key in ("torihiki_ymd", "soushin_ymd", "send_ymd", "created_at", "updated_at"):
+    for key in (
+        "torihiki_ymd",
+        "soushin_ymd",
+        "send_ymd",
+        "public_at",
+        "created_at",
+        "updated_at",
+    ):
         raw = item.get(key)
         if not raw:
             continue
-        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%dT%H:%M:%S", "%Y/%m/%d %H:%M:%S"):
+        for fmt in (
+            "%Y-%m-%d",
+            "%Y/%m/%d",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y/%m/%d %H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+        ):
             try:
                 return datetime.strptime(str(raw)[:19], fmt)
             except ValueError:
                 continue
-    m = re.search(r"(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})", _item_text(item))
+    text = _item_text(item)
+    # 例: Grandole… 2026/07月分 送金明細書
+    m = re.search(r"(\d{4})[/-](\d{1,2})\s*月分", text)
+    if m:
+        return datetime(int(m.group(1)), int(m.group(2)), 1)
+    m = re.search(r"(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})", text)
     if m:
         return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
     return datetime.min
@@ -158,12 +168,27 @@ def _is_soukin_meisai(item: dict[str, Any], bunsyo_filter: str) -> bool:
     text = _item_text(item)
     if bunsyo_filter and bunsyo_filter in text:
         return True
-    keywords = ("送金明細", "支払明細", "送金のご案内")
+    keywords = ("送金明細", "支払明細", "送金のご案内", "物件別送金")
     return any(k in text for k in keywords)
 
 
-def _collect_pdf_targets(item: dict[str, Any]) -> list[dict[str, Any]]:
+def _collect_pdf_targets(page, item: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    PDF 取得候補を返す。優先順:
+      1. files[].file_url（S3 直）
+      2. files[].id → /file/pdf/{id}
+      3. information/show 内の owapp_reportdata/{uuid}（閲覧用 PDF・6/7月で有効）
+      4. 報告書 id → /api/file/pdf/{id}（空応答のことがある）
+    """
     targets: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add(*, key: str, **kwargs: Any) -> None:
+        if key in seen:
+            return
+        seen.add(key)
+        targets.append(kwargs)
+
     files = item.get("files") or []
     if isinstance(files, list):
         for f in files:
@@ -171,39 +196,118 @@ def _collect_pdf_targets(item: dict[str, Any]) -> list[dict[str, Any]]:
                 continue
             if f.get("is_image") == 1:
                 continue
+            name = str(f.get("name") or f.get("file_name") or "")
+            file_url = f.get("file_url") or f.get("url") or f.get("download_url")
+            if file_url:
+                add(key=f"url:{file_url}", url=str(file_url), name=name, id=None)
             file_id = f.get("id")
             if file_id is not None:
-                targets.append({"id": file_id, "name": f.get("name") or f.get("file_name") or ""})
-    file_id = item.get("file_id") or item.get("id")
-    if file_id is not None and not targets:
-        targets.append({"id": file_id, "name": item.get("bunsyo") or item.get("torihiki_name") or ""})
+                add(
+                    key=f"file:{file_id}",
+                    url=f"{KURASAPO_BASE_URL}/file/pdf/{file_id}",
+                    name=name,
+                    id=file_id,
+                )
+
+    report_id = item.get("id")
+    if report_id is not None:
+        try:
+            html = page.request.get(
+                f"{KURASAPO_BASE_URL}/information/show/{report_id}"
+            ).text()
+        except Exception:
+            html = ""
+        for uuid in re.findall(
+            r"owapp_reportdata/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+            r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+            html,
+        ):
+            url = f"{KURASAPO_BASE_URL}/owapp_reportdata/{uuid}"
+            add(key=f"owapp:{uuid}", url=url, name="", id=None)
+        # title / 月分 を item に補完（年月判定用）
+        if not item.get("title"):
+            m = re.search(
+                r"(Grandole[^<\n]{0,80}\d{4}/\d{1,2}\s*月分[^<\n]{0,40})",
+                html,
+            )
+            if m:
+                item["title"] = m.group(1)
+        add(
+            key=f"api:{report_id}",
+            url=f"{KURASAPO_BASE_URL}/api/file/pdf/{report_id}",
+            name=str(item.get("title") or item.get("bunsyo") or ""),
+            id=report_id,
+        )
+
+    file_id = item.get("file_id")
+    if file_id is not None:
+        add(
+            key=f"file:{file_id}",
+            url=f"{KURASAPO_BASE_URL}/file/pdf/{file_id}",
+            name=str(item.get("bunsyo") or item.get("torihiki_name") or ""),
+            id=file_id,
+        )
     return targets
 
 
-def _output_name(item: dict[str, Any], file_hint: str = "") -> str:
+def _item_year_month(item: dict[str, Any], file_hint: str = "") -> tuple[int, int] | None:
+    """報告書の対象年月。(year, month) または不明なら None。"""
+    for text in (file_hint, str(item.get("title") or ""), _item_text(item)):
+        if not text:
+            continue
+        m = re.search(r"(\d{4})[/-](\d{1,2})\s*月分", text)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+        m = re.search(r"(\d{4})[年.](\d{1,2})", text)
+        if m:
+            return int(m.group(1)), int(m.group(2))
     dt = _parse_item_date(item)
     if dt != datetime.min:
-        label = f"{dt.year}年{dt.month}月"
+        return dt.year, dt.month
+    return None
+
+
+def _ym_key(ym: tuple[int, int] | None) -> str:
+    if not ym:
+        return "unknown"
+    return f"{ym[0]:04d}-{ym[1]:02d}"
+
+
+def _output_name(item: dict[str, Any], file_hint: str = "") -> str:
+    ym = _item_year_month(item, file_hint)
+    if ym:
+        label = f"{ym[0]}年{ym[1]}月"
     else:
-        label = datetime.now().strftime("%Y年%m月")
-    suffix = ""
-    if file_hint:
-        m = re.search(r"(\d{4})[年.](\d{1,2})", file_hint)
-        if m:
-            label = f"{m.group(1)}年{int(m.group(2))}月"
+        now = datetime.now()
+        label = f"{now.year}年{now.month}月"
     return f"LEAF_送金明細書_{label}.pdf"
 
 
-def _download_pdf(page, file_id: Any, dest: Path) -> None:
-    url = f"{KURASAPO_BASE_URL}/file/pdf/{file_id}"
+def _download_pdf_from_url(page, url: str, dest: Path) -> None:
     resp = page.request.get(url)
     if not resp.ok:
         raise RuntimeError(f"PDF ダウンロード失敗: {url} (HTTP {resp.status})")
     body = resp.body()
-    if not body.startswith(b"%PDF"):
-        raise RuntimeError(f"PDF ではない応答: {url}")
+    if not body or not body.startswith(b"%PDF"):
+        raise RuntimeError(f"PDF ではない応答: {url} (len={len(body or b'')})")
     dest.write_bytes(body)
-    print(f"  ✅ ダウンロード完了: {dest.name} ({len(body) // 1024}KB)")
+    print(f"  ✅ ダウンロード完了: {dest.name} ({len(body) // 1024}KB) ← {url.split('/')[-1]}")
+
+
+def _download_pdf(page, file_id: Any, dest: Path) -> None:
+    """互換: file_id 指定時は /file/pdf と /api/file/pdf を順に試す。"""
+    urls = [
+        f"{KURASAPO_BASE_URL}/file/pdf/{file_id}",
+        f"{KURASAPO_BASE_URL}/api/file/pdf/{file_id}",
+    ]
+    errors: list[str] = []
+    for url in urls:
+        try:
+            _download_pdf_from_url(page, url, dest)
+            return
+        except Exception as e:
+            errors.append(str(e))
+    raise RuntimeError(" / ".join(errors))
 
 
 def _select_items(
@@ -222,10 +326,11 @@ def _select_items(
         wanted = set(months)
         month_filtered = []
         for it in filtered:
-            dt = _parse_item_date(it)
-            if dt != datetime.min and (dt.year, dt.month) in wanted:
+            ym = _item_year_month(it)
+            if ym and ym in wanted:
                 month_filtered.append(it)
-        filtered = month_filtered or filtered
+        # 月指定時はフォールバックしない（別月を誤取得しない）
+        filtered = month_filtered
 
     filtered.sort(key=_parse_item_date, reverse=True)
 
@@ -254,7 +359,9 @@ def run(
     if not manual_login and not all([login_id, password]):
         print(
             "エラー: KURASAPO_OWNER_LOGIN_ID / KURASAPO_OWNER_PASSWORD が未設定です。\n"
-            f"  → {DEFAULT_ENV_PATH} を編集するか、--manual-login を指定してください。",
+            f"  → 正本: {JARVIS_PRIVATE_ENV}\n"
+            f"  → 互換: {DEFAULT_ENV_PATH}\n"
+            "  または --manual-login を指定してください。",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -290,27 +397,92 @@ def run(
 
             print(f"[3/3] PDF ダウンロード ({len(selected)} 件)...")
             for item in selected:
-                targets = _collect_pdf_targets(item)
+                targets = _collect_pdf_targets(page, item)
+                ym = _item_year_month(item)
+                ym_s = _ym_key(ym)
                 if not targets:
-                    print(f"  ⚠ PDF 添付なし: {_item_text(item)[:80]}")
-                    results.append({"status": "no_pdf", "item": item})
+                    print(f"  ⚠ PDF 添付なし ({ym_s}): {_item_text(item)[:80]}")
+                    results.append(
+                        {"status": "no_pdf", "year_month": ym_s, "item": item}
+                    )
                     continue
+                # 同一報告書は1ファイル保存できれば十分（候補 URL を順に試す）
+                hint = str(targets[0].get("name") or item.get("title") or "")
+                ym_t = _item_year_month(item, hint) or ym
+                ym_ts = _ym_key(ym_t)
+                dest = output_dir / _output_name(item, hint)
+                if dest.exists():
+                    print(f"  ⚠ 既に存在 → スキップ: {dest.name}")
+                    results.append(
+                        {
+                            "status": "skipped",
+                            "year_month": ym_ts,
+                            "path": str(dest),
+                        }
+                    )
+                    continue
+                if dry_run:
+                    print(
+                        f"  [dry-run] {dest.name} candidates={len(targets)} "
+                        f"first={targets[0].get('url')}"
+                    )
+                    results.append(
+                        {
+                            "status": "dry-run",
+                            "year_month": ym_ts,
+                            "path": str(dest),
+                        }
+                    )
+                    continue
+                last_err: Exception | None = None
+                saved = False
                 for tgt in targets:
-                    dest = output_dir / _output_name(item, str(tgt.get("name") or ""))
-                    if dest.exists():
-                        print(f"  ⚠ 既に存在 → スキップ: {dest.name}")
-                        results.append({"status": "skipped", "path": dest})
-                        continue
-                    if dry_run:
-                        print(f"  [dry-run] {dest.name} (file_id={tgt['id']})")
-                        results.append({"status": "dry-run", "path": dest})
+                    url = str(tgt.get("url") or "")
+                    if not url and tgt.get("id") is not None:
+                        url = f"{KURASAPO_BASE_URL}/file/pdf/{tgt['id']}"
+                    if not url:
                         continue
                     try:
-                        _download_pdf(page, tgt["id"], dest)
-                        results.append({"status": "ok", "path": dest})
+                        _download_pdf_from_url(page, url, dest)
+                        results.append(
+                            {"status": "ok", "year_month": ym_ts, "path": str(dest)}
+                        )
+                        saved = True
+                        break
                     except Exception as e:
-                        print(f"  ❌ {dest.name}: {e}", file=sys.stderr)
-                        results.append({"status": "failed", "path": dest, "error": str(e)})
+                        last_err = e
+                        continue
+                if not saved:
+                    err = str(last_err) if last_err else "no_candidate"
+                    print(f"  ❌ {dest.name} ({ym_ts}): {err}", file=sys.stderr)
+                    results.append(
+                        {
+                            "status": "failed",
+                            "year_month": ym_ts,
+                            "path": str(dest),
+                            "error": err,
+                        }
+                    )
+
+            if months:
+                covered = {
+                    r.get("year_month")
+                    for r in results
+                    if r.get("year_month")
+                    and r.get("status")
+                    in ("ok", "skipped", "dry-run", "failed", "no_pdf")
+                }
+                for y, m in months:
+                    key = f"{y:04d}-{m:02d}"
+                    if key not in covered:
+                        print(f"  ❌ 対象月が一覧にありません: {key}", file=sys.stderr)
+                        results.append(
+                            {
+                                "status": "failed",
+                                "year_month": key,
+                                "error": "not_in_list",
+                            }
+                        )
 
         except PlaywrightTimeoutError as e:
             print(f"タイムアウト: {e}", file=sys.stderr)
@@ -361,7 +533,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--env-file", default=str(DEFAULT_ENV_PATH),
-        help=f"認証情報 .env ファイル（既定: {DEFAULT_ENV_PATH}）",
+        help=(
+            "追加で読む .env（既定: .env.tax_docs）。"
+            "正本の jarvis_private は常に先に読み込む。"
+        ),
     )
     parser.add_argument("--headless", action="store_true", help="ヘッドレス実行")
     parser.add_argument("--dry-run", action="store_true", help="一覧のみ（DL なし）")
@@ -372,7 +547,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    _load_env_file(Path(args.env_file))
+    load_tax_credentials(args.env_file)
 
     months: list[tuple[int, int]] | None = None
     if args.months:
@@ -404,7 +579,25 @@ def main() -> None:
 
     ok = sum(1 for r in results if r.get("status") == "ok")
     fail = sum(1 for r in results if r.get("status") == "failed")
+    failed_months = sorted(
+        {
+            str(r.get("year_month"))
+            for r in results
+            if r.get("status") == "failed" and r.get("year_month")
+        }
+    )
     print(f"\n完了: {ok} 件成功, {fail} 件失敗")
+    if failed_months:
+        details = []
+        for ym in failed_months:
+            errs = [
+                str(r.get("error") or "")
+                for r in results
+                if r.get("status") == "failed" and r.get("year_month") == ym
+            ]
+            err = errs[0] if errs else ""
+            details.append(f"{ym}({err})" if err else ym)
+        print(f"# leaf_kurasapo_failed_months: {', '.join(details)}")
     sys.exit(1 if fail else 0)
 
 

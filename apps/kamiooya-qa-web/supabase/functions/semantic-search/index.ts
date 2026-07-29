@@ -325,6 +325,41 @@ Deno.serve(async (req) => {
     });
   }
 
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim();
+  const serviceKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
+  if (!supabaseUrl || !serviceKey) {
+    return json({ errorMessage: "Missing env: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }, 500);
+  }
+  const sb = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const sessionId = asString(body?.session_id) || null;
+  const userId = asString(body?.user_id) || null;
+  const baseEvent = {
+    search_mode: "semantic",
+    query_text: query.slice(0, 2000),
+    session_id: sessionId,
+    user_id: userId,
+  };
+
+  // Phase 14-1: emergency kill switch (no redeploy needed)
+  if ((Deno.env.get("SEMANTIC_SEARCH_DISABLED") || "").trim() === "1") {
+    await logSearchEvent(sb, {
+      ...baseEvent,
+      result_status: "disabled",
+      error_message: "SEMANTIC_SEARCH_DISABLED=1",
+    });
+    return json(
+      {
+        errorMessage:
+          "意味検索は一時停止中です。通常検索（意味検索モードOFF）をご利用ください",
+        code: "semantic_disabled",
+      },
+      503
+    );
+  }
+
   try {
     const commentLimit = Math.max(
       1,
@@ -340,14 +375,6 @@ Deno.serve(async (req) => {
     const skipAnswer = body?.skip_answer === true;
 
     const embedding = await embedQuery(query);
-    const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim();
-    const serviceKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
-    if (!supabaseUrl || !serviceKey) {
-      throw new Error("Missing env: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-    }
-    const sb = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
 
     const [commentsRpc, chunksRpc] = await Promise.all([
       sb.rpc("match_comments_semantic", {
@@ -455,18 +482,15 @@ Deno.serve(async (req) => {
       content: buildSnippet(row.content, 240),
     }));
 
-    // Phase 13: analytics event (best-effort)
     await logSearchEvent(sb, {
-      search_mode: "semantic",
-      query_text: query.slice(0, 2000),
-      session_id: asString(body?.session_id) || null,
-      user_id: asString(body?.user_id) || null,
+      ...baseEvent,
       comment_hit_count: commentRows.length,
       chunk_hit_count: relatedChunks.length,
       answer_comment_count: commentsForAnswer.length,
       answer_chunk_count: chunksForAnswer.length,
       match_threshold: matchThreshold,
       used_sources: usedSources,
+      result_status: "ok",
     });
 
     return json({
@@ -486,6 +510,11 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "semantic_search_failed";
+    await logSearchEvent(sb, {
+      ...baseEvent,
+      result_status: "error",
+      error_message: String(message).slice(0, 500),
+    });
     return json({ errorMessage: message }, 500);
   }
 });
