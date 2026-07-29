@@ -65,6 +65,11 @@ CSV_CELL_ALIASES: dict[str, tuple[str, ...]] = {
     "source_kind": ("source_kind", "ソース種別", "sourceKind"),
     "forum_category": ("forum_category", "分類", "forumCategory", "カテゴリ"),
     "topic_title": ("topic_title", "板タイトル", "topicTitle", "トピック名"),
+    "course_tab": ("course_tab", "コースタブ"),
+    "section_name": ("section_name", "目次セクション"),
+    "lesson_title": ("lesson_title", "レッスンタイトル"),
+    "lesson_url": ("lesson_url", "レッスンURL"),
+    "content_hash": ("content_hash", "コンテンツハッシュ"),
 }
 
 
@@ -128,6 +133,11 @@ def row_to_record(row: dict[str, str], row_index: int, import_batch_ts: int) -> 
         "parent_comment_id": opt("parent_comment_id"),
         "ip_address": opt("ip_address"),
         "user_agent": opt("user_agent"),
+        "course_tab": opt("course_tab"),
+        "section_name": opt("section_name"),
+        "lesson_title": opt("lesson_title"),
+        "lesson_url": opt("lesson_url"),
+        "content_hash": opt("content_hash"),
     }
 
 

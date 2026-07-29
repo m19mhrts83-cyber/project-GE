@@ -104,8 +104,39 @@ fi
 BUILD_DELTA_SCRIPT="$SCRIPT_DIR/build_delta_csv.py"
 STATE_DELTA="${CHATBOT_STATE_ROOT:-$OUTPUT_ROOT/state}/westudy_comment_ids.json"
 
-echo "==> step1: WeStudy更新パイプライン"
+echo "==> step1: WeStudy更新パイプライン（フォーラム）"
 "$PIPELINE_SCRIPT" --defer-state-update "$@"
+
+# --- lesson 説明テキストのスクレイプ＆差分 ---
+LESSON_SCRAPER="${WESTUDY_LESSON_SCRAPER:-$HOME/git-repos/ProgramCode/alfred_python/westudy_lesson_pages.py}"
+LESSON_DELTA_SCRIPT="$SCRIPT_DIR/build_lesson_delta_csv.py"
+LESSON_STATE="${CHATBOT_STATE_ROOT:-$OUTPUT_ROOT/state}/westudy_lesson_ids.json"
+LESSON_OUTPUT_DIR="$OUTPUT_ROOT/exports/lessons"
+mkdir -p "$LESSON_OUTPUT_DIR"
+
+if [[ -f "$LESSON_SCRAPER" && -f "$LESSON_DELTA_SCRIPT" ]]; then
+  echo "==> step1b: WeStudy lesson 説明テキスト収集"
+  LESSON_FULL="$LESSON_OUTPUT_DIR/lesson_full_${RUN_ID}.csv"
+  if "$PYTHON" "$LESSON_SCRAPER" --output-root "$LESSON_OUTPUT_DIR"; then
+    # lesson_full_*.csv の最新を探す
+    LESSON_FULL="$(ls -1t "$LESSON_OUTPUT_DIR"/lesson_full_*.csv 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$LESSON_FULL" && -f "$LESSON_FULL" ]]; then
+      LESSON_DELTA="$LESSON_OUTPUT_DIR/lesson_delta_${RUN_ID}.csv"
+      echo "==> step1c: lesson 差分CSV生成"
+      "$PYTHON" "$LESSON_DELTA_SCRIPT" \
+        --full "$LESSON_FULL" \
+        --state "$LESSON_STATE" \
+        --delta "$LESSON_DELTA" \
+        --update-state
+    else
+      echo "lesson full CSV が見つかりません。lesson 差分はスキップします。"
+    fi
+  else
+    echo "⚠️ lesson スクレイプ失敗。lesson 差分はスキップします。" >&2
+  fi
+else
+  echo "lesson スクレイパーまたは差分スクリプトが見つかりません。lesson はスキップします。"
+fi
 
 LATEST_DELTA="$(ls -1t "$OUTPUT_ROOT"/exports/delta_*.csv 2>/dev/null | head -n 1 || true)"
 if [[ -z "${LATEST_DELTA}" ]]; then
@@ -248,6 +279,34 @@ fi
 
 commit_state_after_success
 
+# --- lesson delta の Supabase 取込（フォーラム取込成功後） ---
+LESSON_DELTA_FILE="${LESSON_DELTA:-}"
+if [[ -z "$LESSON_DELTA_FILE" ]]; then
+  LESSON_DELTA_FILE="$(ls -1t "$OUTPUT_ROOT"/exports/lessons/lesson_delta_*.csv 2>/dev/null | head -n 1 || true)"
+fi
+if [[ -n "$LESSON_DELTA_FILE" && -f "$LESSON_DELTA_FILE" ]]; then
+  LESSON_DELTA_ROWS="$("$PYTHON" - <<'PY' "$LESSON_DELTA_FILE"
+import csv, sys
+path = sys.argv[1]
+with open(path, newline='', encoding='utf-8-sig', errors='replace') as f:
+    print(sum(1 for _ in csv.DictReader(f)))
+PY
+  )"
+  if [[ "$LESSON_DELTA_ROWS" -gt 0 ]]; then
+    echo "==> step4: lesson delta を Supabase へ upsert ($LESSON_DELTA_ROWS 件)"
+    if [[ "$SUPABASE_CONFIGURED" -eq 1 ]]; then
+      "$PYTHON" "$UPLOAD_SUPABASE_SCRIPT" --csv "$LESSON_DELTA_FILE" || echo "⚠️ lesson Supabase取込失敗" >&2
+    fi
+    echo "==> step5: lesson delta を Raimo へ取込"
+    "$PYTHON" "$UPLOAD_RAIMO_SCRIPT" \
+      --csv "$LESSON_DELTA_FILE" \
+      --screenshot-dir "$OUTPUT_ROOT/exports/logs" || echo "⚠️ lesson Raimo取込失敗" >&2
+  else
+    echo "lesson 差分0件。lesson 取込はスキップします。"
+  fi
+fi
+
 echo "完了: 抽出〜Supabase/Raimo取込まで実行しました"
-echo "delta: $LATEST_DELTA"
+echo "delta(forum): $LATEST_DELTA"
+echo "delta(lesson): ${LESSON_DELTA_FILE:-なし}"
 echo "log:   $LOG_FILE"

@@ -1,4 +1,8 @@
 const App = {
+  // 公開 Edge URL（シークレットは /semantic-search-config から取得）
+  semanticEdgeUrl: 'https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/semantic-search',
+  _semanticSecret: null,
+
   state: {
     currentUser: null,
     currentSessionId: null,
@@ -9,24 +13,31 @@ const App = {
     knowledgeChunks: [],
     knowledgeSources: {},
     lastCitations: [],
+    citationsByMessageId: {},
     forumCategoryLookup: null,
     pendingUsers: [],
+    analyticsOverview: null,
     currentScreen: 'chat',
     returnScreen: null,
+    semanticMode: false,
     loadingCount: 0,
+    sendAbortController: null,
+    pendingQuestionText: '',
+    preferFastSummary: false,
     resetPasswordEmail: '',
     resetPasswordToken: ''
   },
 
   elements: {},
 
-  apiClient: async (method, endpoint, body = null) => {
+  apiClient: async (method, endpoint, body = null, fetchOptions = null) => {
     const url = '/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0' + endpoint;
     const options = {
       method: method,
       headers: { 'Content-Type': 'application/json' },
     };
     if (body) options.body = JSON.stringify(body);
+    if (fetchOptions && fetchOptions.signal) options.signal = fetchOptions.signal;
     try {
       const response = await fetch(url, options);
       if (!response.ok) {
@@ -56,6 +67,7 @@ const App = {
       if (response.status === 204) return null;
       return await response.json();
     } catch (error) {
+      if (error && error.name === 'AbortError') throw error;
       console.error('API Error:', error);
       throw error;
     }
@@ -89,6 +101,7 @@ const App = {
   init: () => {
     App.cacheElements();
     App.bindEvents();
+    App.hydrateSemanticMode();
     if (App.isSecretAdminRoute()) {
       App.showSecretAdminRegisterView();
       return;
@@ -132,6 +145,11 @@ const App = {
     App.elements.messageForm = document.getElementById('messageForm');
     App.elements.messageInput = document.getElementById('messageInput');
     App.elements.sendMessageBtn = document.getElementById('sendMessageBtn');
+    App.elements.semanticModeToggle = document.getElementById('semanticModeToggle');
+    App.elements.semanticSearchWarningDialog = document.getElementById('semanticSearchWarningDialog');
+    App.elements.semanticWarningOkBtn = document.getElementById('semanticWarningOkBtn');
+    App.elements.semanticWarningCancelBtn = document.getElementById('semanticWarningCancelBtn');
+    App.elements.semanticWarningCloseBtn = document.getElementById('semanticWarningCloseBtn');
     App.elements.suggestedQuestions = document.getElementById('suggestedQuestions');
     App.elements.commentTableBody = document.getElementById('commentTableBody');
     App.elements.commentSearchInput = document.getElementById('commentSearchInput');
@@ -149,11 +167,17 @@ const App = {
     App.elements.importResult = document.getElementById('importResult');
     App.elements.toast = document.getElementById('toast');
     App.elements.loadingOverlay = document.getElementById('loadingOverlay');
+    App.elements.fastSummaryLink = document.getElementById('fastSummaryLink');
     App.elements.confirmDialog = document.getElementById('confirmDialog');
     App.elements.confirmTitle = document.getElementById('confirmTitle');
     App.elements.confirmMessage = document.getElementById('confirmMessage');
     App.elements.confirmOkBtn = document.getElementById('confirmOkBtn');
     App.elements.confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    App.elements.commentDetailDialog = document.getElementById('commentDetailDialog');
+    App.elements.commentDetailTitle = document.getElementById('commentDetailTitle');
+    App.elements.commentDetailMeta = document.getElementById('commentDetailMeta');
+    App.elements.commentDetailBody = document.getElementById('commentDetailBody');
+    App.elements.commentDetailCloseBtn = document.getElementById('commentDetailCloseBtn');
     App.elements.deleteSourceTypeInput = document.getElementById('deleteSourceTypeInput');
     App.elements.deleteCommentIdLikeInput = document.getElementById('deleteCommentIdLikeInput');
     App.elements.deleteCommentsBtn = document.getElementById('deleteCommentsBtn');
@@ -248,6 +272,28 @@ const App = {
     document.getElementById('logoutBtn').addEventListener('click', App.logout);
     document.getElementById('newChatBtn').addEventListener('click', App.createNewChatPlaceholder);
     App.elements.messageForm.addEventListener('submit', App.handleSendMessage);
+    if (App.elements.semanticModeToggle) {
+      App.elements.semanticModeToggle.addEventListener('click', App.handleSemanticModeToggle);
+    }
+    if (App.elements.fastSummaryLink) {
+      App.elements.fastSummaryLink.addEventListener('click', App.handleFastSummaryClick);
+    }
+    if (App.elements.semanticWarningOkBtn) {
+      App.elements.semanticWarningOkBtn.addEventListener('click', App.confirmSemanticModeWarning);
+    }
+    if (App.elements.semanticWarningCancelBtn) {
+      App.elements.semanticWarningCancelBtn.addEventListener('click', App.closeSemanticSearchWarningDialog);
+    }
+    if (App.elements.semanticWarningCloseBtn) {
+      App.elements.semanticWarningCloseBtn.addEventListener('click', App.closeSemanticSearchWarningDialog);
+    }
+    if (App.elements.semanticSearchWarningDialog) {
+      App.elements.semanticSearchWarningDialog.addEventListener('click', function (ev) {
+        if (ev.target === App.elements.semanticSearchWarningDialog) {
+          App.closeSemanticSearchWarningDialog();
+        }
+      });
+    }
     document.getElementById('reloadCommentsBtn').addEventListener('click', App.loadComments);
     const reloadKnowledgeBtn = document.getElementById('reloadKnowledgeBtn');
     if (reloadKnowledgeBtn) reloadKnowledgeBtn.addEventListener('click', App.loadKnowledge);
@@ -266,6 +312,18 @@ const App = {
     }
     document.getElementById('sampleCommentBtn').addEventListener('click', App.createSampleComment);
     document.getElementById('importCsvBtn').addEventListener('click', App.importCsvComments);
+    const reloadAnalyticsBtn = document.getElementById('reloadAnalyticsBtn');
+    if (reloadAnalyticsBtn) {
+      reloadAnalyticsBtn.addEventListener('click', function () {
+        App.loadAnalytics();
+      });
+    }
+    const analyticsDaysSelect = document.getElementById('analyticsDaysSelect');
+    if (analyticsDaysSelect) {
+      analyticsDaysSelect.addEventListener('change', function () {
+        App.loadAnalytics();
+      });
+    }
     document.getElementById('sidebarToggleBtn').addEventListener('click', App.toggleSidebarMobile);
     document.getElementById('commentSearchInput').addEventListener('input', App.renderCommentTable);
     if (App.elements.knowledgeSearchInput) {
@@ -284,6 +342,14 @@ const App = {
       App.elements.deleteCommentsBtn.addEventListener('click', App.deleteComments);
     }
     document.getElementById('confirmCancelBtn').addEventListener('click', App.closeConfirmDialog);
+    if (App.elements.commentDetailCloseBtn) {
+      App.elements.commentDetailCloseBtn.addEventListener('click', App.closeCommentDetailDialog);
+    }
+    if (App.elements.commentDetailDialog) {
+      App.elements.commentDetailDialog.addEventListener('click', function (ev) {
+        if (ev.target === App.elements.commentDetailDialog) App.closeCommentDetailDialog();
+      });
+    }
     document.querySelectorAll('.screen-tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
         App.switchScreen(btn.getAttribute('data-screen'), { fromNav: true });
@@ -302,6 +368,13 @@ const App = {
     if (!isLoading) App.state.loadingCount = Math.max(0, App.state.loadingCount - 1);
     if (App.state.loadingCount > 0) App.elements.loadingOverlay.classList.add('active');
     if (App.state.loadingCount === 0) App.elements.loadingOverlay.classList.remove('active');
+    if (App.elements.fastSummaryLink) {
+      if (App.state.loadingCount > 0 && App.state.pendingQuestionText) {
+        App.elements.fastSummaryLink.classList.remove('hidden');
+      } else {
+        App.elements.fastSummaryLink.classList.add('hidden');
+      }
+    }
   },
 
   setButtonLoading: (buttonEl, isLoading, loadingText) => {
@@ -319,12 +392,20 @@ const App = {
   },
 
   showToast: (message, type) => {
+    const kind = type || 'info';
     App.elements.toast.textContent = message || '';
-    App.elements.toast.className = 'toast ' + (type || 'info');
+    App.elements.toast.className = 'toast ' + kind;
     App.elements.toast.classList.remove('hidden');
-    window.setTimeout(function () {
+    if (App._toastHideTimer) {
+      window.clearTimeout(App._toastHideTimer);
+      App._toastHideTimer = null;
+    }
+    // エラーはスクショしやすいよう長め、それ以外は従来どおり短め
+    const ms = kind === 'error' ? 10000 : 2600;
+    App._toastHideTimer = window.setTimeout(function () {
       App.elements.toast.classList.add('hidden');
-    }, 2600);
+      App._toastHideTimer = null;
+    }, ms);
   },
 
   /* 改修: 認証画面表示時に管理者登録・再設定ビューを隠す */
@@ -788,6 +869,8 @@ const App = {
     const isAdmin = App.state.currentUser.role === 'admin';
     document.getElementById('adminUsersTabBtn').classList.toggle('hidden', !isAdmin);
     document.getElementById('adminDataTabBtn').classList.toggle('hidden', !isAdmin);
+    const analyticsTab = document.getElementById('adminAnalyticsTabBtn');
+    if (analyticsTab) analyticsTab.classList.toggle('hidden', !isAdmin);
 
     App.switchScreen('chat');
     await App.refreshInitialData();
@@ -837,7 +920,8 @@ const App = {
       comments: 'commentsScreen',
       knowledge: 'knowledgeScreen',
       adminUsers: 'adminUsersScreen',
-      adminData: 'adminDataScreen'
+      adminData: 'adminDataScreen',
+      adminAnalytics: 'adminAnalyticsScreen'
     };
     const targetId = map[screenName];
     if (targetId) {
@@ -857,15 +941,21 @@ const App = {
     if (opts.fromNav || opts.fromBack) {
       App.clearDbReturnBar();
     }
+    if (screenName === 'adminAnalytics') {
+      App.loadAnalytics().catch(function (err) {
+        App.showToast((err && err.message) || '分析データの取得に失敗しました', 'error');
+      });
+    }
   },
 
   screenLabel: (screenName) => {
     const labels = {
       chat: 'チャット',
       comments: 'コメント一覧',
-      knowledge: 'セミナー動画',
+      knowledge: 'セミナー動画文字起こし',
       adminUsers: 'ユーザー承認',
-      adminData: 'CSV取込'
+      adminData: 'CSV取込',
+      adminAnalytics: '運営分析'
     };
     return labels[screenName] || '前の画面';
   },
@@ -914,7 +1004,7 @@ const App = {
   loadChatSessions: async () => {
     if (!App.state.currentUser || !App.state.currentUser.id) return;
     const res = await App.apiClient('GET', '/users/' + App.state.currentUser.id + '/chat-sessions');
-    App.state.chatSessions = (res && res.sessions) ? res.sessions : [];
+    App.state.chatSessions = App.sortSessionsForDisplay((res && res.sessions) ? res.sessions : []);
     App.renderSessionList();
 
     if (!App.state.currentSessionId && App.state.chatSessions.length > 0) {
@@ -925,6 +1015,61 @@ const App = {
       App.state.chatMessages = [];
       App.renderChatMessages();
     }
+  },
+
+  sessionOrderStorageKey: 'qa_session_order_v1',
+
+  loadSessionOrder: () => {
+    try {
+      const raw = localStorage.getItem(App.sessionOrderStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  bumpSessionToTop: async (sessionId) => {
+    const id = String(sessionId || '').trim();
+    if (!id) return;
+    const order = App.loadSessionOrder().filter(function (x) {
+      return x !== id;
+    });
+    order.unshift(id);
+    try {
+      localStorage.setItem(App.sessionOrderStorageKey, JSON.stringify(order.slice(0, 200)));
+    } catch (e) {
+      /* ignore */
+    }
+    try {
+      await App.apiClient('PUT', '/chat-sessions/' + id + '/touch', {});
+    } catch (e) {
+      console.warn('session touch skipped', e);
+    }
+    App.state.chatSessions = App.sortSessionsForDisplay(App.state.chatSessions || []);
+    App.renderSessionList();
+  },
+
+  sortSessionsForDisplay: (sessions) => {
+    const list = Array.isArray(sessions) ? sessions.slice() : [];
+    const order = App.loadSessionOrder();
+    const rank = {};
+    order.forEach(function (sid, i) {
+      rank[sid] = i;
+    });
+    list.sort(function (a, b) {
+      const aid = String((a && a.id) || '');
+      const bid = String((b && b.id) || '');
+      const ra = Object.prototype.hasOwnProperty.call(rank, aid) ? rank[aid] : null;
+      const rb = Object.prototype.hasOwnProperty.call(rank, bid) ? rank[bid] : null;
+      if (ra != null && rb != null) return ra - rb;
+      if (ra != null) return -1;
+      if (rb != null) return 1;
+      const aUp = String((a && (a.updated_at || a.created_at)) || '');
+      const bUp = String((b && (b.updated_at || b.created_at)) || '');
+      return bUp.localeCompare(aUp);
+    });
+    return list;
   },
 
   loadSessionDetails: async (sessionId) => {
@@ -1011,6 +1156,18 @@ const App = {
     return row;
   },
 
+  resolveCommentPostedAt: (row) => {
+    if (!row) return '';
+    const direct = String(row.posted_at || row.postedAt || '').trim();
+    if (direct) return direct;
+    const cid = String(row.comment_id || row.commentId || '').trim();
+    if (!cid) return '';
+    const hit = (App.state.comments || []).find(function (c) {
+      return String(App.commentField(c, 'comment_id') || '').trim() === cid;
+    });
+    return hit ? String(App.commentField(hit, 'posted_at') || '').trim() : '';
+  },
+
   loadKnowledge: async () => {
     try {
       const [srcRes, chunkRes] = await Promise.all([
@@ -1063,39 +1220,201 @@ const App = {
     return [];
   },
 
+  citationsStorageRootKey: 'qa_citations_v1',
+  // 意味検索はデフォルトOFF。ログイン／再読込でONを引き継がない（必要なときだけ手動ON）
+  semanticModeStorageKey: 'qa_semantic_mode_v1',
+
+  loadBooleanStorage: (key) => {
+    try {
+      return localStorage.getItem(key) === '1';
+    } catch (e) {
+      return false;
+    }
+  },
+
+  saveBooleanStorage: (key, value) => {
+    try {
+      localStorage.setItem(key, value ? '1' : '0');
+    } catch (e) {
+      /* ignore */
+    }
+  },
+
+  hydrateSemanticMode: () => {
+    App.state.semanticMode = false;
+    try {
+      localStorage.removeItem(App.semanticModeStorageKey);
+    } catch (e) {
+      /* ignore */
+    }
+    App.updateSemanticModeButton();
+  },
+
+  updateSemanticModeButton: () => {
+    const btn = App.elements.semanticModeToggle;
+    if (!btn) return;
+    const on = !!App.state.semanticMode;
+    btn.textContent = '意味検索モード: ' + (on ? 'ON' : 'OFF');
+    btn.className =
+      'shrink-0 px-3 py-1 rounded-full border ' +
+      (on
+        ? 'border-blue-900 bg-blue-900 text-white'
+        : 'border-slate-300 text-slate-700 hover:bg-slate-50');
+  },
+
+  openSemanticSearchWarningDialog: () => {
+    if (!App.elements.semanticSearchWarningDialog) return;
+    if (typeof App.elements.semanticSearchWarningDialog.showModal === 'function') {
+      App.elements.semanticSearchWarningDialog.showModal();
+    } else {
+      App.elements.semanticSearchWarningDialog.setAttribute('open', 'open');
+    }
+  },
+
+  closeSemanticSearchWarningDialog: () => {
+    if (!App.elements.semanticSearchWarningDialog) return;
+    if (typeof App.elements.semanticSearchWarningDialog.close === 'function') {
+      App.elements.semanticSearchWarningDialog.close();
+    } else {
+      App.elements.semanticSearchWarningDialog.removeAttribute('open');
+    }
+  },
+
+  confirmSemanticModeWarning: () => {
+    App.state.semanticMode = true;
+    App.updateSemanticModeButton();
+    App.closeSemanticSearchWarningDialog();
+    App.showToast('意味検索モードを有効化しました（このタブのみ・再読込でOFF）', 'success');
+  },
+
+  handleSemanticModeToggle: () => {
+    const nextValue = !App.state.semanticMode;
+    // オンにするたびに注意ダイアログを表示（了承後に有効化）
+    if (nextValue) {
+      App.openSemanticSearchWarningDialog();
+      return;
+    }
+    App.state.semanticMode = false;
+    App.updateSemanticModeButton();
+    App.showToast('意味検索モードを無効にしました', 'info');
+  },
+
+  loadCitationsStore: () => {
+    try {
+      const raw = localStorage.getItem(App.citationsStorageRootKey);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  },
+
+  saveCitationsStore: (store) => {
+    try {
+      localStorage.setItem(App.citationsStorageRootKey, JSON.stringify(store || {}));
+    } catch (e) {
+      console.warn('citations store save skipped', e);
+    }
+  },
+
   citationsStorageKey: (sessionId) => 'qa_citations_' + String(sessionId || ''),
 
-  saveCitationsForSession: (sessionId, citations) => {
-    if (!sessionId) return;
-    try {
-      sessionStorage.setItem(
-        App.citationsStorageKey(sessionId),
-        JSON.stringify(citations || [])
-      );
-    } catch (e) {
-      console.warn('citations save skipped', e);
+  loadCitationsMapForSession: (sessionId) => {
+    const sid = String(sessionId || '').trim();
+    if (!sid) return {};
+    const store = App.loadCitationsStore();
+    const map = store[sid];
+    return map && typeof map === 'object' ? map : {};
+  },
+
+  saveCitationsForMessage: (sessionId, messageId, citations) => {
+    const sid = String(sessionId || '').trim();
+    const mid = String(messageId || '').trim();
+    if (!sid || !mid) return;
+    const store = App.loadCitationsStore();
+    const sessionMap = store[sid] && typeof store[sid] === 'object' ? store[sid] : {};
+    sessionMap[mid] = citations || [];
+    store[sid] = sessionMap;
+    App.saveCitationsStore(store);
+    if (String(App.state.currentSessionId || '') === sid) {
+      App.state.citationsByMessageId = Object.assign({}, sessionMap);
+      const lastId = App.findLastAssistantMessageId(App.state.chatMessages || []);
+      App.state.lastCitations =
+        lastId && sessionMap[lastId] ? sessionMap[lastId] : App.state.lastCitations || [];
     }
+  },
+
+  findLastAssistantMessageId: (messages) => {
+    const list = Array.isArray(messages) ? messages : [];
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      if (list[i] && list[i].role === 'assistant') {
+        const id = list[i].id != null ? String(list[i].id).trim() : '';
+        if (id) return id;
+      }
+    }
+    return '';
+  },
+
+  migrateLegacySessionCitations: (sessionId, messages) => {
+    const sid = String(sessionId || '').trim();
+    if (!sid) return;
+    const existing = App.loadCitationsMapForSession(sid);
+    if (Object.keys(existing).length > 0) return;
+    let legacy = [];
+    try {
+      const raw = sessionStorage.getItem(App.citationsStorageKey(sid));
+      legacy = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(legacy)) legacy = [];
+    } catch (e) {
+      legacy = [];
+    }
+    if (!legacy.length) return;
+    const msgId = App.findLastAssistantMessageId(messages);
+    if (!msgId) return;
+    App.saveCitationsForMessage(sid, msgId, legacy);
+    try {
+      sessionStorage.removeItem(App.citationsStorageKey(sid));
+    } catch (e) {
+      /* ignore */
+    }
+  },
+
+  saveCitationsForSession: (sessionId, citations) => {
+    const sid = String(sessionId || '').trim();
+    if (!sid) return;
+    const msgId = App.findLastAssistantMessageId(App.state.chatMessages || []);
+    if (!msgId) {
+      App.state.lastCitations = citations || [];
+      return;
+    }
+    App.saveCitationsForMessage(sid, msgId, citations);
   },
 
   restoreCitationsForSession: (sessionId) => {
     if (!sessionId) {
+      App.state.citationsByMessageId = {};
       App.state.lastCitations = [];
       return;
     }
-    try {
-      const raw = sessionStorage.getItem(App.citationsStorageKey(sessionId));
-      App.state.lastCitations = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(App.state.lastCitations)) App.state.lastCitations = [];
-    } catch (e) {
-      App.state.lastCitations = [];
-    }
+    App.migrateLegacySessionCitations(sessionId, App.state.chatMessages || []);
+    const map = App.loadCitationsMapForSession(sessionId);
+    App.state.citationsByMessageId = Object.assign({}, map);
+    const lastId = App.findLastAssistantMessageId(App.state.chatMessages || []);
+    App.state.lastCitations =
+      lastId && map[lastId] ? map[lastId] : [];
   },
 
   buildCitationsFromRelated: (relatedComments, relatedChunks, relatedSources, usedFilter) => {
     const citations = [];
     const sourcesMap = Object.assign({}, App.state.knowledgeSources || {});
+    const sourcesById = {};
+    Object.keys(sourcesMap).forEach(function (k) {
+      const s = sourcesMap[k];
+      if (s && s.id != null) sourcesById[String(s.id)] = s;
+    });
     App.normalizeRelatedList(relatedSources).forEach(function (s) {
       if (s && s.source_key) sourcesMap[s.source_key] = s;
+      if (s && s.id != null) sourcesById[String(s.id)] = s;
     });
 
     const filter = usedFilter || null;
@@ -1109,16 +1428,21 @@ const App = {
       if (strict && commentIdSet) {
         if (!cid || !commentIdSet[cid]) return;
       }
+      const srcSystem = String(enriched.source_system || enriched.sourceSystem || '').trim();
+      const isLesson = srcSystem === 'lesson' || String(cid).startsWith('lesson_desc_');
       citations.push({
         kind: 'comment',
-        sourceType: 'WeStudyコミュニティ',
+        sourceType: isLesson ? 'WeStudy基礎動画' : 'WeStudyコミュニティ',
         commentId: cid,
         authorName: enriched.author_name || enriched.authorName || '',
-        postedAt: enriched.posted_at || enriched.postedAt || '',
+        postedAt: App.resolveCommentPostedAt(enriched),
         forumCategory:
           String(enriched.forum_category || enriched.forumCategory || '').trim() || '未分類',
         topicTitle: String(enriched.topic_title || enriched.topicTitle || '').trim(),
-        sourceKind: String(enriched.source_kind || enriched.sourceKind || 'コミュニティ情報').trim(),
+        sourceKind: isLesson
+          ? String(enriched.course_tab || enriched.courseTab || '基礎動画').trim()
+          : String(enriched.source_kind || enriched.sourceKind || 'コミュニティ情報').trim(),
+        lessonUrl: isLesson ? String(enriched.lesson_url || enriched.lessonUrl || '').trim() : '',
         snippet: String(enriched.content || '').replace(/\s+/g, ' ').slice(0, 220)
       });
     });
@@ -1128,7 +1452,10 @@ const App = {
         if (!chunkKey || !chunkKeySet[chunkKey]) return;
       }
       const sk = ch.source_key || '';
-      const src = sourcesMap[sk] || {};
+      let src = sourcesMap[sk] || {};
+      if (!src.title && ch.source_id != null) {
+        src = sourcesById[String(ch.source_id)] || src;
+      }
       const start = ch.start_sec != null ? Number(ch.start_sec) : 0;
       citations.push({
         kind: 'video_chunk',
@@ -1509,18 +1836,21 @@ const App = {
       return;
     }
 
-    const lastAssistantIdx = (function () {
-      for (let i = App.state.chatMessages.length - 1; i >= 0; i -= 1) {
-        if (App.state.chatMessages[i].role === 'assistant') return i;
-      }
-      return -1;
-    })();
-
-    App.state.chatMessages.forEach(function (m, idx) {
+    App.state.chatMessages.forEach(function (m) {
       const wrap = document.createElement('div');
       const bubble = document.createElement('div');
       const role = m.role === 'user' ? 'chat-user' : 'chat-assistant';
-      const isLastAssistant = m.role === 'assistant' && idx === lastAssistantIdx;
+      const msgId = m.id != null ? String(m.id).trim() : '';
+      const messageCitations = (function () {
+        if (m.role !== 'assistant' || !msgId) return [];
+        const raw = (App.state.citationsByMessageId || {})[msgId] || [];
+        return raw.map(function (c) {
+          if (!c || c.kind !== 'comment' || c.postedAt) return c;
+          const pa = App.resolveCommentPostedAt({ comment_id: c.commentId });
+          if (!pa) return c;
+          return Object.assign({}, c, { postedAt: pa });
+        });
+      })();
 
       bubble.className = 'chat-bubble ' + role;
       bubble.innerHTML =
@@ -1532,7 +1862,7 @@ const App = {
           ? '<div class="md-body">' + App.formatAssistantHtml(m.content || '') + '</div>'
           : App.escapeHtml(m.content || '')) +
         '</div>' +
-        (isLastAssistant ? App.renderCitationsPanel(App.state.lastCitations || []) : '');
+        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations) : '');
 
       wrap.appendChild(bubble);
       area.appendChild(wrap);
@@ -1713,6 +2043,30 @@ const App = {
       const postedAtLabel = postedAt || '（日時なし）';
       const forumCategory =
         String(App.commentField(r, 'forum_category') || '').trim() || '未分類';
+      const fullContent = String(App.commentField(r, 'content') || '');
+      const previewLen = 180;
+      const isTruncated = fullContent.length > previewLen;
+      const preview = isTruncated ? fullContent.slice(0, previewLen) : fullContent;
+      const contentTd = document.createElement('td');
+      contentTd.className = 'p-2';
+      contentTd.appendChild(document.createTextNode(preview));
+      if (isTruncated) {
+        const note = document.createElement('span');
+        note.className = 'text-slate-400';
+        note.textContent = '…（全文 ' + fullContent.length + ' 文字）';
+        contentTd.appendChild(note);
+      }
+      const openBtn = document.createElement('button');
+      openBtn.type = 'button';
+      openBtn.className = 'ml-2 text-xs text-blue-700 hover:underline whitespace-nowrap';
+      openBtn.textContent = '全文';
+      openBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        App.openCommentDetailDialog(r);
+      });
+      contentTd.appendChild(openBtn);
+
       tr.innerHTML =
         '<td class="p-2 whitespace-nowrap">' +
         App.escapeHtml(String(App.commentField(r, 'comment_id') || '')) +
@@ -1725,10 +2079,51 @@ const App = {
         (postedAt ? '' : ' <span class="text-[10px] text-amber-700">missing</span>') +
         '</td>' +
         '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'source_type')) + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'author_name')) + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(String(App.commentField(r, 'content')).slice(0, 180)) + '</td>';
+        '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'author_name')) + '</td>';
+      tr.appendChild(contentTd);
       body.appendChild(tr);
     });
+  },
+
+  openCommentDetailDialog: (row) => {
+    if (!App.elements.commentDetailDialog) return;
+    const cid = String(App.commentField(row, 'comment_id') || '').trim();
+    const author = String(App.commentField(row, 'author_name') || '').trim();
+    const postedAt = String(App.commentField(row, 'posted_at') || '').trim();
+    const category =
+      String(App.commentField(row, 'forum_category') || '').trim() || '未分類';
+    const content = String(App.commentField(row, 'content') || '');
+    if (App.elements.commentDetailTitle) {
+      App.elements.commentDetailTitle.textContent = 'コメント全文' + (cid ? '（ID ' + cid + '）' : '');
+    }
+    if (App.elements.commentDetailMeta) {
+      App.elements.commentDetailMeta.textContent =
+        '投稿者: ' +
+        (author || '—') +
+        '\n日時: ' +
+        (postedAt || '—') +
+        '\n分類: ' +
+        category +
+        '\n文字数: ' +
+        content.length;
+    }
+    if (App.elements.commentDetailBody) {
+      App.elements.commentDetailBody.textContent = content;
+    }
+    if (typeof App.elements.commentDetailDialog.showModal === 'function') {
+      App.elements.commentDetailDialog.showModal();
+    } else {
+      App.elements.commentDetailDialog.setAttribute('open', 'open');
+    }
+  },
+
+  closeCommentDetailDialog: () => {
+    if (!App.elements.commentDetailDialog) return;
+    if (typeof App.elements.commentDetailDialog.close === 'function') {
+      App.elements.commentDetailDialog.close();
+    } else {
+      App.elements.commentDetailDialog.removeAttribute('open');
+    }
   },
 
   renderPendingUsers: () => {
@@ -1848,6 +2243,369 @@ const App = {
     await App.sendQuestion(text, false);
   },
 
+  handleFastSummaryClick: (event) => {
+    if (event) event.preventDefault();
+    if (!App.state.pendingQuestionText) return;
+    App.state.preferFastSummary = true;
+    if (App.state.sendAbortController) {
+      try {
+        App.state.sendAbortController.abort();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+  },
+
+  messageEndpointForMode: (sessionId, fast) => {
+    const base = '/chat-sessions/' + sessionId;
+    // 意味検索は Edge 直呼び（設定は /semantic-search-config）。messages-semantic は使わない
+    return base + (fast ? '/messages-fast' : '/messages');
+  },
+
+  resolveSemanticConfig: async () => {
+    let url = String(App.semanticEdgeUrl || '').trim();
+    let secret = String(App._semanticSecret || '').trim();
+    if (secret && url.indexOf('http') === 0) {
+      return { url: url, secret: secret };
+    }
+    const cfg = await App.apiClient('POST', '/semantic-search-config', {});
+    const cfgUrl = String((cfg && cfg.url) || '').trim();
+    const cfgSecret = String((cfg && cfg.secret) || '').trim();
+    if (cfgUrl.indexOf('http') === 0) {
+      url = cfgUrl;
+      App.semanticEdgeUrl = cfgUrl;
+    }
+    if (cfgSecret) {
+      secret = cfgSecret;
+      App._semanticSecret = cfgSecret;
+    }
+    if (!url || url.indexOf('http') !== 0 || !secret) {
+      throw new Error(
+        '意味検索の接続情報を取得できませんでした。再読み込み後に再試行してください'
+      );
+    }
+    return { url: url, secret: secret };
+  },
+
+  // Phase 13: 通常検索の利用ログ（意味検索は Edge 側でも記録）
+  logQaSearchEvent: async (payload) => {
+    try {
+      const cfg = await App.resolveSemanticConfig();
+      const logUrl = String(cfg.url || '').replace(/semantic-search\/?$/, 'qa-search-log');
+      if (!logUrl || logUrl === cfg.url) return;
+      await fetch(logUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Semantic-Shared-Secret': cfg.secret
+        },
+        body: JSON.stringify({
+          search_mode: payload.search_mode || 'normal',
+          query_text: String(payload.query || '').slice(0, 2000),
+          session_id: App.state.currentSessionId || null,
+          user_id: (App.state.currentUser && App.state.currentUser.id) || null,
+          comment_hit_count: payload.comment_hit_count,
+          chunk_hit_count: payload.chunk_hit_count,
+          used_sources: payload.used_sources || null,
+          meta: payload.meta || {},
+          result_status: payload.result_status || 'ok',
+          error_message: payload.error_message || null
+        })
+      });
+    } catch (e) {
+      /* analytics must not break chat */
+    }
+  },
+
+  // Phase 13: 運営分析ダッシュボード（qa-analytics Edge）
+  loadAnalytics: async () => {
+    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') return;
+    const statusEl = document.getElementById('analyticsStatus');
+    const daysSelect = document.getElementById('analyticsDaysSelect');
+    const days = daysSelect ? Number(daysSelect.value) || 14 : 14;
+    if (statusEl) statusEl.textContent = '読み込み中…';
+    try {
+      const cfg = await App.resolveSemanticConfig();
+      const analyticsUrl = String(cfg.url || '').replace(/semantic-search\/?$/, 'qa-analytics');
+      if (!analyticsUrl || analyticsUrl === cfg.url) {
+        throw new Error('分析APIのURLを解決できませんでした');
+      }
+      const response = await fetch(analyticsUrl + '?days=' + encodeURIComponent(String(days)), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Semantic-Shared-Secret': cfg.secret
+        },
+        body: JSON.stringify({ days: days })
+      });
+      const text = await response.text();
+      let data = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = { errorMessage: text.slice(0, 200) };
+        }
+      }
+      if (!response.ok) {
+        throw new Error(data.errorMessage || data.message || '分析APIエラー HTTP ' + response.status);
+      }
+      App.state.analyticsOverview = data;
+      App.renderAnalytics();
+      if (statusEl) {
+        statusEl.textContent =
+          '更新: ' +
+          new Date().toLocaleString('ja-JP') +
+          ' ／ 集計 ' +
+          (data.range_days || days) +
+          '日 ／ 合計 ' +
+          ((data.totals && data.totals.total) || 0) +
+          ' 件';
+      }
+    } catch (err) {
+      App.state.analyticsOverview = null;
+      App.renderAnalytics();
+      if (statusEl) statusEl.textContent = '取得失敗: ' + ((err && err.message) || String(err));
+      throw err;
+    }
+  },
+
+  renderAnalytics: () => {
+    const data = App.state.analyticsOverview;
+    const cards = document.getElementById('analyticsSummaryCards');
+    const dailyEl = document.getElementById('analyticsDailyBars');
+    const topBody = document.getElementById('analyticsTopQueriesBody');
+    const recentBody = document.getElementById('analyticsRecentBody');
+    if (!cards || !dailyEl || !topBody || !recentBody) return;
+
+    if (!data || !data.totals) {
+      cards.innerHTML = '<p class="text-sm text-slate-500 col-span-full">データがありません</p>';
+      dailyEl.innerHTML = '';
+      topBody.innerHTML = '';
+      recentBody.innerHTML = '';
+      return;
+    }
+
+    const t = data.totals;
+    const pct = function (r) {
+      return ((Number(r) || 0) * 100).toFixed(1) + '%';
+    };
+    cards.innerHTML =
+      '<div class="bg-white rounded border p-3"><div class="text-xs text-slate-500">合計</div><div class="text-2xl font-semibold">' +
+      App.escapeHtml(String(t.total || 0)) +
+      '</div></div>' +
+      '<div class="bg-white rounded border p-3"><div class="text-xs text-slate-500">通常検索</div><div class="text-2xl font-semibold">' +
+      App.escapeHtml(String(t.normal || 0)) +
+      '</div><div class="text-xs text-slate-500 mt-1">' +
+      App.escapeHtml(pct(t.normal_ratio)) +
+      '</div></div>' +
+      '<div class="bg-white rounded border p-3 border-blue-200"><div class="text-xs text-blue-700">意味検索</div><div class="text-2xl font-semibold text-blue-900">' +
+      App.escapeHtml(String(t.semantic || 0)) +
+      '</div><div class="text-xs text-blue-600 mt-1">' +
+      App.escapeHtml(pct(t.semantic_ratio)) +
+      '</div></div>' +
+      '<div class="bg-white rounded border p-3 ' +
+      (Number(t.failed) > 0 ? 'border-amber-300' : '') +
+      '"><div class="text-xs text-amber-700">失敗・停止</div><div class="text-2xl font-semibold">' +
+      App.escapeHtml(String(t.failed || 0)) +
+      '</div><div class="text-xs text-slate-500 mt-1">disabled ' +
+      App.escapeHtml(String(t.disabled || 0)) +
+      '</div></div>' +
+      '<div class="bg-white rounded border p-3"><div class="text-xs text-slate-500">集計日数</div><div class="text-2xl font-semibold">' +
+      App.escapeHtml(String(data.range_days || 0)) +
+      '</div></div>';
+
+    const daily = data.daily || [];
+    const maxDaily = Math.max(1, ...daily.map(function (d) {
+      return Number(d.total) || 0;
+    }));
+    if (daily.length === 0) {
+      dailyEl.innerHTML = '<p class="text-sm text-slate-500">この期間のデータはありません</p>';
+    } else {
+      dailyEl.innerHTML = daily
+        .map(function (d) {
+          const n = Number(d.normal) || 0;
+          const s = Number(d.semantic) || 0;
+          const nw = ((n / maxDaily) * 100).toFixed(1);
+          const sw = ((s / maxDaily) * 100).toFixed(1);
+          return (
+            '<div>' +
+            '<div class="flex justify-between text-xs text-slate-500 mb-1">' +
+            '<span>' +
+            App.escapeHtml(d.day || '') +
+            '</span>' +
+            '<span>通常 ' +
+            n +
+            ' / 意味 ' +
+            s +
+            '（計 ' +
+            (Number(d.total) || n + s) +
+            '）</span>' +
+            '</div>' +
+            '<div class="flex h-3 rounded-full overflow-hidden bg-slate-100 border">' +
+            '<div class="bg-slate-400" style="width:' +
+            nw +
+            '%" title="通常 ' +
+            n +
+            '"></div>' +
+            '<div class="bg-blue-600" style="width:' +
+            sw +
+            '%" title="意味 ' +
+            s +
+            '"></div>' +
+            '</div></div>'
+          );
+        })
+        .join('');
+    }
+
+    const top = data.top_queries || [];
+    topBody.innerHTML =
+      top.length === 0
+        ? '<tr><td class="p-2 text-slate-500" colspan="4">なし</td></tr>'
+        : top
+            .map(function (q) {
+              return (
+                '<tr class="border-t">' +
+                '<td class="p-2 max-w-md truncate" title="' +
+                App.escapeHtml(q.query || '') +
+                '">' +
+                App.escapeHtml(q.query || '') +
+                '</td>' +
+                '<td class="p-2">' +
+                App.escapeHtml(String(q.count || 0)) +
+                '</td>' +
+                '<td class="p-2">' +
+                App.escapeHtml(String(q.normal || 0)) +
+                '</td>' +
+                '<td class="p-2">' +
+                App.escapeHtml(String(q.semantic || 0)) +
+                '</td></tr>'
+              );
+            })
+            .join('');
+
+    const recent = data.recent_events || [];
+    recentBody.innerHTML =
+      recent.length === 0
+        ? '<tr><td class="p-2 text-slate-500" colspan="5">なし</td></tr>'
+        : recent
+            .map(function (ev) {
+              const mode = String(ev.search_mode || '');
+              const modeLabel = mode === 'semantic' ? '意味' : mode === 'normal' ? '通常' : mode;
+              const st = String(ev.result_status || 'ok');
+              const stLabel =
+                st === 'ok'
+                  ? 'OK'
+                  : st === 'disabled'
+                    ? '停止'
+                    : st === 'rate_limited'
+                      ? '上限'
+                      : st === 'error'
+                        ? 'エラー'
+                        : st;
+              const hits =
+                (ev.comment_hit_count != null ? 'c:' + ev.comment_hit_count : '') +
+                (ev.chunk_hit_count != null ? ' k:' + ev.chunk_hit_count : '');
+              const dt = String(ev.created_at || '').replace('T', ' ').slice(0, 19);
+              return (
+                '<tr class="border-t">' +
+                '<td class="p-2 whitespace-nowrap text-xs">' +
+                App.escapeHtml(dt) +
+                '</td>' +
+                '<td class="p-2">' +
+                App.escapeHtml(modeLabel) +
+                '</td>' +
+                '<td class="p-2 text-xs" title="' +
+                App.escapeHtml(ev.error_message || '') +
+                '">' +
+                App.escapeHtml(stLabel) +
+                '</td>' +
+                '<td class="p-2 max-w-md truncate" title="' +
+                App.escapeHtml(ev.query_text || '') +
+                '">' +
+                App.escapeHtml(ev.query_text || '') +
+                '</td>' +
+                '<td class="p-2 text-xs text-slate-500">' +
+                App.escapeHtml(hits || '—') +
+                '</td></tr>'
+              );
+            })
+            .join('');
+  },
+
+  callSemanticSearch: async (query, fetchOptions) => {
+    const cfg = await App.resolveSemanticConfig();
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Semantic-Shared-Secret': cfg.secret
+      },
+      body: JSON.stringify({
+        query: query,
+        comment_limit: 100,
+        chunk_limit: 50,
+        match_threshold: 0.22,
+        session_id: App.state.currentSessionId || undefined,
+        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
+      })
+    };
+    if (fetchOptions && fetchOptions.signal) options.signal = fetchOptions.signal;
+    const response = await fetch(cfg.url, options);
+    const text = await response.text();
+    let data = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        data = { _rawBody: text };
+      }
+    }
+    if (!response.ok) {
+      const msg =
+        data.errorMessage ||
+        data.message ||
+        data.error ||
+        (data._rawBody ? String(data._rawBody).slice(0, 200) : '') ||
+        '意味検索APIエラー';
+      const err = new Error(msg);
+      err.httpStatus = response.status;
+      err.code = data.code || '';
+      throw err;
+    }
+    if (data && data.errorMessage) {
+      throw new Error(String(data.errorMessage));
+    }
+    return data;
+  },
+
+  sendQuestionSemantic: async (sessionId, questionText, signal) => {
+    await App.apiClient(
+      'POST',
+      '/chat-sessions/' + sessionId + '/messages-append',
+      { role: 'user', content: questionText },
+      { signal: signal }
+    );
+    const sem = await App.callSemanticSearch(questionText, { signal: signal });
+    const answer =
+      String((sem && sem.answer) || '').trim() ||
+      '参照内で確証が取れないため、お答えすることができません。';
+    await App.apiClient(
+      'POST',
+      '/chat-sessions/' + sessionId + '/messages-append',
+      { role: 'assistant', content: answer },
+      { signal: signal }
+    );
+    return {
+      answer: answer,
+      usedSources: (sem && sem.usedSources) || '',
+      relatedComments: (sem && sem.relatedComments) || [],
+      relatedChunks: (sem && sem.relatedChunks) || [],
+      relatedSources: (sem && sem.relatedSources) || []
+    };
+  },
+
   sendQuestion: async (questionText, fromSuggested) => {
     if (!questionText) {
       App.showToast('質問内容が空です', 'error');
@@ -1857,16 +2615,28 @@ const App = {
       App.showToast('ユーザー情報が取得できません', 'error');
       return;
     }
+    // Phase 14-1: 二重送信ガード（意味検索の長時間中に連打しない）
+    if (App.state.loadingCount > 0 || App.state.sendAbortController) {
+      App.showToast('回答生成中です。完了までお待ちください', 'info');
+      return;
+    }
 
+    App.state.pendingQuestionText = questionText;
+    App.state.preferFastSummary = false;
     App.setButtonLoading(App.elements.sendMessageBtn, true, '送信中');
     App.setLoading(true);
     try {
       let sessionId = App.state.currentSessionId;
 
       if (!sessionId) {
+        const title =
+          String(questionText || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 40) || '新しいチャット';
         const sessionRes = await App.apiClient('POST', '/chat-sessions', {
           user_id: App.state.currentUser.id,
-          initial_message: questionText
+          initial_message: title
         });
         sessionId = sessionRes.id;
         if (!sessionId) {
@@ -1881,13 +2651,48 @@ const App = {
         return;
       }
 
-      const msgRes = await App.apiClient('POST', '/chat-sessions/' + sessionId + '/messages', {
-        content: questionText
-      });
+      let msgRes = null;
+      let usedFast = false;
+      while (!msgRes) {
+        const fast = !!App.state.preferFastSummary;
+        usedFast = fast;
+        const controller = new AbortController();
+        App.state.sendAbortController = controller;
+        try {
+          if (App.state.semanticMode && !fast) {
+            // 意味検索: Raimo api ネスト障害を避け、Edge をブラウザから直接呼ぶ
+            msgRes = await App.sendQuestionSemantic(
+              sessionId,
+              questionText,
+              controller.signal
+            );
+          } else {
+            msgRes = await App.apiClient(
+              'POST',
+              App.messageEndpointForMode(sessionId, fast),
+              { content: questionText },
+              { signal: controller.signal }
+            );
+          }
+        } catch (error) {
+          if (error && error.name === 'AbortError') {
+            if (App.state.preferFastSummary && !fast) {
+              continue;
+            }
+            throw error;
+          }
+          throw error;
+        } finally {
+          if (App.state.sendAbortController === controller) {
+            App.state.sendAbortController = null;
+          }
+        }
+      }
+
       const used = App.parseUsedSources(
         (msgRes && (msgRes.usedSources || msgRes.used_sources)) || ''
       );
-      App.state.lastCitations = App.buildCitationsFromRelated(
+      let pendingCitations = App.buildCitationsFromRelated(
         (msgRes && msgRes.relatedComments) || [],
         (msgRes && msgRes.relatedChunks) || [],
         (msgRes && msgRes.relatedSources) || [],
@@ -1896,22 +2701,58 @@ const App = {
           : null
       );
       if (msgRes && Array.isArray(msgRes.citations) && msgRes.citations.length) {
-        App.state.lastCitations = msgRes.citations;
+        pendingCitations = msgRes.citations;
       }
-      App.saveCitationsForSession(sessionId, App.state.lastCitations);
+      App.state.lastCitations = pendingCitations;
 
       if (!fromSuggested) {
         await App.createSuggestedQuestionIfNeeded(questionText);
       }
 
       await App.loadSessionDetails(sessionId);
+      const assistantMsgId = App.findLastAssistantMessageId(App.state.chatMessages || []);
+      if (assistantMsgId) {
+        App.saveCitationsForMessage(sessionId, assistantMsgId, pendingCitations);
+      }
+      App.renderChatMessages();
       await App.loadSuggestedQuestions();
 
       App.elements.messageInput.value = '';
-      App.showToast('送信しました', 'success');
+      await App.bumpSessionToTop(sessionId);
+      await App.loadChatSessions();
+      App.state.currentSessionId = sessionId;
+      App.renderSessionList();
+      App.showToast(usedFast ? '送信しました（準拠省略）' : '送信しました', 'success');
+      if (!(App.state.semanticMode && !usedFast)) {
+        const relatedComments = (msgRes && msgRes.relatedComments) || [];
+        const relatedChunks = (msgRes && msgRes.relatedChunks) || [];
+        App.logQaSearchEvent({
+          search_mode: usedFast ? 'normal' : 'normal',
+          query: questionText,
+          comment_hit_count: Array.isArray(relatedComments) ? relatedComments.length : null,
+          chunk_hit_count: Array.isArray(relatedChunks) ? relatedChunks.length : null,
+          used_sources: (msgRes && (msgRes.usedSources || msgRes.used_sources)) || null,
+          meta: { fast: !!usedFast }
+        });
+      }
     } catch (error) {
-      App.showToast(error.message || '送信に失敗しました', 'error');
+      if (!(error && error.name === 'AbortError')) {
+        const st = error && error.httpStatus;
+        let msg = (error && error.message) || '送信に失敗しました';
+        if (st === 503 || (error && error.code === 'semantic_disabled')) {
+          msg =
+            msg.indexOf('一時停止') >= 0
+              ? msg
+              : '意味検索は一時停止中です。通常検索（意味検索モードOFF）をご利用ください';
+        } else if (st) {
+          msg = msg + '（HTTP ' + st + '）';
+        }
+        App.showToast(msg, 'error');
+      }
     } finally {
+      App.state.pendingQuestionText = '';
+      App.state.preferFastSummary = false;
+      App.state.sendAbortController = null;
       App.setButtonLoading(App.elements.sendMessageBtn, false);
       App.setLoading(false);
     }
@@ -2249,30 +3090,116 @@ const App = {
 
       let successCount = 0;
       let skipCount = 0;
+      let updateCount = 0;
       let failCount = 0;
+      let junkSkipCount = 0;
 
       for (let i = 0; i < rows.length; i += 1) {
         const row = rows[i];
         try {
           const explicitId = App.csvCell(row, 'comment_id', 'commentId', 'コメントID', 'コメントid');
-          const commentId = explicitId
+          let commentId = explicitId
             ? String(explicitId).trim()
             : 'csv-' + importBatchTs + '-' + i;
+          if (commentId.indexOf('comment-') === 0) {
+            commentId = commentId.slice(8).trim();
+          }
+          if (explicitId && !/^\d+$/.test(commentId)) {
+            junkSkipCount += 1;
+            App.elements.importResult.textContent +=
+              'SKIP junk_id row=' + (i + 1) + ' id=' + commentId + '\n';
+            continue;
+          }
 
-          const contentStr = String(
+          let contentStr = String(
             App.csvCell(row, 'content', '本文', 'Content', 'コメント内容', 'comment_body') || ''
-          );
+          ).trim();
+          contentStr = contentStr.replace(/^(続きを(見る|みる|読む)|もっと(見る|みる))\s*/g, '').trim();
+          if (!contentStr) {
+            skipCount += 1;
+            App.elements.importResult.textContent +=
+              'SKIP empty_body row=' + (i + 1) + ' id=' + commentId + '\n';
+            continue;
+          }
           const postedAt =
             App.csvCell(row, 'posted_at', 'postedAt', '日時', '投稿日時', '投稿日') || null;
           const authorName =
             App.csvCell(row, 'author_name', 'authorName', '投稿者名', '投稿者', 'author') || null;
           const composite = App.commentImportCompositeKey(contentStr, postedAt, authorName);
+          const sourceType =
+            App.csvCell(row, 'source_type', 'ソース', 'sourceType', 'データソース') ||
+            (Object.prototype.hasOwnProperty.call(row, 'コメントID') &&
+            Object.prototype.hasOwnProperty.call(row, 'コメント内容')
+              ? '神大家コミュニティ'
+              : 'WeStudy');
+          const sourceSystem =
+            App.csvCell(row, 'source_system', 'ソース系統', 'sourceSystem') || 'WeStudy';
+          const sourceKind =
+            App.csvCell(row, 'source_kind', 'ソース種別', 'sourceKind') || 'コミュニティ情報';
+          const forumCategory =
+            App.csvCell(row, 'forum_category', '分類', 'forumCategory', 'カテゴリ') || '未分類';
+          const topicTitle =
+            App.csvCell(row, 'topic_title', '板タイトル', 'topicTitle', 'トピック名') || null;
+          const authorEmail =
+            App.csvCell(row, 'author_email', 'authorEmail', '投稿者メール', 'メール') || null;
+          const parentCommentId =
+            App.csvCell(row, 'parent_comment_id', 'parentCommentId', '親コメントID', '親コメントid') ||
+            null;
+          const courseTab =
+            App.csvCell(row, 'course_tab', 'コースタブ', 'courseTab') || null;
+          const sectionName =
+            App.csvCell(row, 'section_name', '目次セクション', 'sectionName') || null;
+          const lessonTitle =
+            App.csvCell(row, 'lesson_title', 'レッスンタイトル', 'lessonTitle') || null;
+          const lessonUrl =
+            App.csvCell(row, 'lesson_url', 'レッスンURL', 'lessonUrl') || null;
+          const contentHash =
+            App.csvCell(row, 'content_hash', 'コンテンツハッシュ', 'contentHash') || null;
 
           // comment_id が明示されているCSVは ID 優先で判定し、
-          // 本文重複（同文・同投稿者）で過去データを取りこぼさないようにする。
+          // 本文が短い既存行は長い本文で上書きする。
           const isDupById = dedupe.idSet.has(commentId);
           const isDupByComposite = !explicitId && dedupe.compositeSet.has(composite);
-          if (isDupById || isDupByComposite) {
+          if (isDupById) {
+            const existing = (App.state.comments || []).find(function (c) {
+              return String(c.comment_id || c.commentId || '').trim() === commentId;
+            });
+            const existingLen = existing
+              ? String(App.commentField(existing, 'content') || '').trim().length
+              : 0;
+            if (contentStr.length > existingLen + 20) {
+              await App.apiClient('POST', '/admin/comments/update-content', {
+                comment_id: commentId,
+                content: contentStr,
+                posted_at: postedAt,
+                author_name: authorName,
+                author_email: authorEmail,
+                source_type: sourceType,
+                source_system: sourceSystem,
+                source_kind: sourceKind,
+                forum_category: forumCategory,
+                topic_title: topicTitle,
+                parent_comment_id: parentCommentId
+              });
+              updateCount += 1;
+              App.elements.importResult.textContent +=
+                'UPDATE longer row=' +
+                (i + 1) +
+                ' id=' +
+                commentId +
+                ' ' +
+                existingLen +
+                '→' +
+                contentStr.length +
+                '\n';
+              continue;
+            }
+            skipCount += 1;
+            App.elements.importResult.textContent +=
+              'SKIP dup row=' + (i + 1) + ' id=' + commentId + '\n';
+            continue;
+          }
+          if (isDupByComposite) {
             skipCount += 1;
             App.elements.importResult.textContent +=
               'SKIP dup row=' + (i + 1) + ' id=' + commentId + '\n';
@@ -2280,33 +3207,26 @@ const App = {
           }
 
           await App.apiClient('POST', '/admin/comments', {
-            source_type:
-              App.csvCell(row, 'source_type', 'ソース', 'sourceType', 'データソース') ||
-              (Object.prototype.hasOwnProperty.call(row, 'コメントID') &&
-              Object.prototype.hasOwnProperty.call(row, 'コメント内容')
-                ? '神大家コミュニティ'
-                : 'WeStudy'),
-            source_system:
-              App.csvCell(row, 'source_system', 'ソース系統', 'sourceSystem') || 'WeStudy',
-            source_kind:
-              App.csvCell(row, 'source_kind', 'ソース種別', 'sourceKind') || 'コミュニティ情報',
-            forum_category:
-              App.csvCell(row, 'forum_category', '分類', 'forumCategory', 'カテゴリ') || '未分類',
-            topic_title:
-              App.csvCell(row, 'topic_title', '板タイトル', 'topicTitle', 'トピック名') || null,
+            source_type: sourceType,
+            source_system: sourceSystem,
+            source_kind: sourceKind,
+            forum_category: forumCategory,
+            topic_title: topicTitle,
             comment_id: commentId,
             posted_at: postedAt,
             author_name: authorName,
-            author_email:
-              App.csvCell(row, 'author_email', 'authorEmail', '投稿者メール', 'メール') || null,
+            author_email: authorEmail,
             content: contentStr,
-            parent_comment_id:
-              App.csvCell(row, 'parent_comment_id', 'parentCommentId', '親コメントID', '親コメントid') ||
-              null,
+            parent_comment_id: parentCommentId,
             ip_address:
               App.csvCell(row, 'ip_address', 'ipAddress', 'IPアドレス', 'IP アドレス', 'IP') || null,
             user_agent:
-              App.csvCell(row, 'user_agent', 'userAgent', 'ユーザーエージェント', 'UA') || null
+              App.csvCell(row, 'user_agent', 'userAgent', 'ユーザーエージェント', 'UA') || null,
+            course_tab: courseTab,
+            section_name: sectionName,
+            lesson_title: lessonTitle,
+            lesson_url: lessonUrl,
+            content_hash: contentHash
           });
           successCount += 1;
           dedupe.idSet.add(commentId);
@@ -2322,8 +3242,12 @@ const App = {
       const summary =
         '新規 ' +
         successCount +
+        ' / 更新 ' +
+        updateCount +
         ' / スキップ(重複) ' +
         skipCount +
+        ' / ゴミID ' +
+        junkSkipCount +
         ' / 失敗 ' +
         failCount;
       App.showToast(
