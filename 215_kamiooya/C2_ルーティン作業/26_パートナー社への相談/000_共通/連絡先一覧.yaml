@@ -14,7 +14,7 @@
 # 実際の連絡先に置き換えてください。
 
 # フォルダ番号：下1〜2桁＝やりとり開始順、100の位＝業種（仲介メイン/修繕メイン等）
-# 600番台＝物件・入居者（大家↔入居者の直接連絡）
+# 400番台＝税理士・会計／500番台＝銀行／600番台＝物件・入居者（大家↔入居者の直接連絡）
 partners:
   - folder: "101_ホームプランナー"
     name: "ホームプランナー"
@@ -147,6 +147,16 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "清水"
+  - folder: "419_Kneesbee税理士法人"
+    name: "Kneesbee税理士法人"
+    emails: ["t.ohno@knees-bee.jp", "t.ohno.sogou@gmail.com"]
+    email_domains: ["knees-bee.jp"]
+    to_name_hints: ["Kneesbee", "Knees bee", "ニーズビー", "knees-bee"]
+    phones: []
+    line: "Knees bee税理士法人"
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "大野晃男"
   - folder: "516_名古屋銀行"
     name: "名古屋銀行"
     emails: ["koshino_masashi@ex.meigin.co.jp"]

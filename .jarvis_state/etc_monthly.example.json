@@ -12,7 +12,11 @@
   "last_result_b": {
     "at": null,
     "ok": null,
+    "target_month": null,
     "rebate_yen": null,
+    "asayu_trip_count": null,
+    "asayu_rate_pct": null,
+    "savings_yen": null,
     "gmail_hits": null,
     "note": ""
   },
