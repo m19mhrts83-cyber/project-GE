@@ -5,14 +5,15 @@ Jarvis 月次 ETC 確認 — Gmail・jarvis_private・状態ファイルを読�
 使い方:
   python scripts/jarvis_etc_monthly_check.py
   python scripts/jarvis_etc_monthly_check.py --mark-done --window a
-  python scripts/jarvis_etc_monthly_check.py --mark-done --window b
+  python scripts/jarvis_etc_monthly_check.py --mark-done --window b \\
+    --target-month 2026-06 --rebate-yen 5190 --asayu-trip-count 12 --asayu-rate-pct 50 \\
+    --savings-yen 5190 --ok --note 'smile-etc 確認済み'
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 from datetime import datetime
@@ -24,7 +25,6 @@ REPO = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO / ".jarvis_state" / "etc_monthly.json"
 PRIVATE_ENV = REPO / ".env.jarvis_private"
 GMAIL_DIR = REPO / "215_kamiooya" / "C1_cursor" / "1b_Cursorマニュアル"
-VENV_PYTHON = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
 
 
 def load_dotenv(path: Path) -> dict[str, str]:
@@ -34,7 +34,7 @@ def load_dotenv(path: Path) -> dict[str, str]:
     for line in path.read_text(encoding="utf-8").splitlines():
         m = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$", line)
         if m and not line.lstrip().startswith("#"):
-            out[m.group(1)] = m.group(2).strip().strip('"\'')
+            out[m.group(1)] = m.group(2).strip().strip("\"'")
     return out
 
 
@@ -93,6 +93,17 @@ def card_expiry_warning(expiry: str) -> str | None:
     return None
 
 
+def rate_from_trip_count(count: int | None) -> int | None:
+    """公式: 1〜4=0 / 5〜9=30 / 10+=50。"""
+    if count is None:
+        return None
+    if count <= 4:
+        return 0
+    if count <= 9:
+        return 30
+    return 50
+
+
 def gmail_etc_search(days: int = 45) -> list[dict]:
     cred = GMAIL_DIR / "credentials.json"
     token = GMAIL_DIR / "token.json"
@@ -131,6 +142,28 @@ def main() -> int:
     parser.add_argument("--window", choices=("a", "b"), help="mark-done 時に必須")
     parser.add_argument("--note", default="", help="mark-done 時のメモ")
     parser.add_argument("--ok", action="store_true", help="mark-done 時に OK と記録")
+    parser.add_argument(
+        "--target-month",
+        default="",
+        help="B: 対象走行月 YYYY-MM（未指定時は前月）",
+    )
+    parser.add_argument("--rebate-yen", type=int, default=None, help="B: 還元額（円）")
+    parser.add_argument("--asayu-trip-count", type=int, default=None, help="B: 平日朝夕対象回数")
+    parser.add_argument(
+        "--asayu-rate-pct",
+        type=int,
+        default=None,
+        choices=(0, 30, 50),
+        help="B: 還元率%%（未指定なら回数から推定）",
+    )
+    parser.add_argument(
+        "--savings-yen",
+        type=int,
+        default=None,
+        help="B: お得額（未指定なら rebate-yen と同額）",
+    )
+    parser.add_argument("--trips-prev-month", type=int, default=None, help="A: 前月走行件数")
+    parser.add_argument("--asayu-mark-count", type=int, default=None, help="A: （朝夕）件数")
     args = parser.parse_args()
 
     now = datetime.now(JST)
@@ -176,13 +209,38 @@ def main() -> int:
         key = f"last_check_{args.window}"
         state[key] = mk
         rk = f"last_result_{args.window}"
-        state[rk] = {
+        result: dict = {
             "at": now.isoformat(),
             "ok": args.ok,
             "note": args.note,
         }
+        if args.window == "a":
+            if args.trips_prev_month is not None:
+                result["trips_prev_month"] = args.trips_prev_month
+            if args.asayu_mark_count is not None:
+                result["asayu_mark_count"] = args.asayu_mark_count
+        elif args.window == "b":
+            target = args.target_month.strip() or prev_month_key(now)
+            rebate = args.rebate_yen
+            trips = args.asayu_trip_count
+            rate = args.asayu_rate_pct
+            if rate is None:
+                rate = rate_from_trip_count(trips)
+            savings = args.savings_yen if args.savings_yen is not None else rebate
+            result.update(
+                {
+                    "target_month": target,
+                    "rebate_yen": rebate,
+                    "asayu_trip_count": trips,
+                    "asayu_rate_pct": rate,
+                    "savings_yen": savings,
+                    "gmail_hits": len(report.get("gmail_etc") or []),
+                }
+            )
+        state[rk] = result
         save_state(state)
         report["marked"] = args.window
+        report["last_result"] = result
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

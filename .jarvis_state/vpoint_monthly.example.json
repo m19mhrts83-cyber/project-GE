@@ -1,0 +1,14 @@
+{
+  "disabled": false,
+  "last_check_c": null,
+  "last_result_c": {
+    "at": null,
+    "ok": null,
+    "tsumitate_yen": null,
+    "vpoint_balance": null,
+    "id_rail_note": "",
+    "tsite_status": "pending_user",
+    "note": ""
+  },
+  "notes": "ウィンドウC: 毎月25〜月末（深い突合）。日常は vpoint_cadence（前半ついで・必須手順外）。詳細は jarvis-vpoint-audit.mdc / Literature Note §6.6"
+}

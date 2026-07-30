@@ -47,10 +47,16 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
-from yoritoori_utils import DRAFT_FILENAME, YORITOORI_FILENAME, format_line_heading
+from yoritoori_utils import (
+    DRAFT_FILENAME,
+    YORITOORI_FILENAME,
+    default_yoritoori_base_dir,
+    format_line_heading,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-BASE_DIR = SCRIPT_DIR.parent.parent / "C2_ルーティン作業" / "26_パートナー社への相談"
+# 正本は OneDrive（default_yoritoori_base_dir）。旧: SCRIPT_DIR 相対の git-repos 側。
+BASE_DIR = default_yoritoori_base_dir()
 CONTACT_YAML = BASE_DIR / "000_共通" / "連絡先一覧.yaml"
 DEFAULT_PROCESSED_JSON = Path.home() / ".cursor" / "line_clip_processed.json"
 
