@@ -147,6 +147,7 @@
           <nav class="p-3 border-b border-slate-200 space-y-2">
             <button data-screen="chat" class="screen-tab w-full text-left px-3 py-2 rounded bg-slate-100">チャット</button>
             <button data-screen="comments" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">コメント一覧</button>
+            <button data-screen="lessons" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">学習ページ説明テキスト</button>
             <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">セミナー動画文字起こし</button>
             <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー承認</button>
             <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">CSV取込</button>
@@ -227,6 +228,39 @@
                     </tr>
                   </thead>
                   <tbody id="commentTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- 学習ページ説明テキスト一覧（WeStudy lesson / source_system=lesson） -->
+          <section id="lessonsScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
+            <div class="w-full">
+              <div id="lessonsBackBar" class="hidden mb-3">
+                <button type="button" id="lessonsBackBtn" class="text-sm text-blue-700 hover:underline">
+                  <i class="fa-solid fa-arrow-left mr-1"></i><span id="lessonsBackLabel">チャットに戻る</span>
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <input id="lessonSearchInput" class="border rounded-md px-3 py-2 min-w-[240px] flex-1" placeholder="コースタブ・目次・タイトル・本文で検索" />
+                <select id="lessonCourseTabFilter" class="border rounded-md px-3 py-2 min-w-[180px]">
+                  <option value="">全コースタブ</option>
+                </select>
+                <button id="reloadLessonsBtn" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+              </div>
+              <p id="lessonListMeta" class="text-xs text-slate-500 mb-2"></p>
+              <div class="overflow-auto bg-white rounded border">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr>
+                      <th class="p-2 text-left">コースタブ</th>
+                      <th class="p-2 text-left">目次</th>
+                      <th class="p-2 text-left">レッスン</th>
+                      <th class="p-2 text-left">本文</th>
+                      <th class="p-2 text-left">URL</th>
+                    </tr>
+                  </thead>
+                  <tbody id="lessonTableBody"></tbody>
                 </table>
               </div>
             </div>
@@ -468,7 +502,7 @@
         </table>
       </div>
       <p class="text-xs text-slate-500 mb-4">
-        参考候補は必ずしも正解ではありません。回答を見るときは、下に表示される関連コミュニティ投稿・関連セミナー動画も併せて確認してください。
+        参考候補は必ずしも正解ではありません。回答を見るときは、下に表示される関連コミュニティ投稿・関連学習ページ説明・関連セミナー動画も併せて確認してください。
       </p>
       <div class="flex justify-end gap-2">
         <button id="semanticWarningCancelBtn" class="px-3 py-1 rounded border">キャンセル</button>

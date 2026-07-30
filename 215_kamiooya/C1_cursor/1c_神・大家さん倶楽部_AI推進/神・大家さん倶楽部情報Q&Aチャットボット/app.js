@@ -157,6 +157,13 @@ const App = {
     App.elements.commentCategoryFilter = document.getElementById('commentCategoryFilter');
     App.elements.commentDateFilter = document.getElementById('commentDateFilter');
     App.elements.commentListMeta = document.getElementById('commentListMeta');
+    App.elements.lessonTableBody = document.getElementById('lessonTableBody');
+    App.elements.lessonSearchInput = document.getElementById('lessonSearchInput');
+    App.elements.lessonCourseTabFilter = document.getElementById('lessonCourseTabFilter');
+    App.elements.lessonListMeta = document.getElementById('lessonListMeta');
+    App.elements.lessonsBackBar = document.getElementById('lessonsBackBar');
+    App.elements.lessonsBackBtn = document.getElementById('lessonsBackBtn');
+    App.elements.lessonsBackLabel = document.getElementById('lessonsBackLabel');
     App.elements.knowledgeTableBody = document.getElementById('knowledgeTableBody');
     App.elements.knowledgeSearchInput = document.getElementById('knowledgeSearchInput');
     App.elements.knowledgeListMeta = document.getElementById('knowledgeListMeta');
@@ -295,6 +302,8 @@ const App = {
       });
     }
     document.getElementById('reloadCommentsBtn').addEventListener('click', App.loadComments);
+    const reloadLessonsBtn = document.getElementById('reloadLessonsBtn');
+    if (reloadLessonsBtn) reloadLessonsBtn.addEventListener('click', App.loadComments);
     const reloadKnowledgeBtn = document.getElementById('reloadKnowledgeBtn');
     if (reloadKnowledgeBtn) reloadKnowledgeBtn.addEventListener('click', App.loadKnowledge);
     document.getElementById('reloadPendingUsersBtn').addEventListener('click', App.loadPendingUsers);
@@ -326,6 +335,12 @@ const App = {
     }
     document.getElementById('sidebarToggleBtn').addEventListener('click', App.toggleSidebarMobile);
     document.getElementById('commentSearchInput').addEventListener('input', App.renderCommentTable);
+    if (App.elements.lessonSearchInput) {
+      App.elements.lessonSearchInput.addEventListener('input', App.renderLessonTable);
+    }
+    if (App.elements.lessonCourseTabFilter) {
+      App.elements.lessonCourseTabFilter.addEventListener('change', App.renderLessonTable);
+    }
     if (App.elements.knowledgeSearchInput) {
       App.elements.knowledgeSearchInput.addEventListener('input', App.renderKnowledgeTable);
     }
@@ -358,9 +373,27 @@ const App = {
     if (App.elements.commentsBackBtn) {
       App.elements.commentsBackBtn.addEventListener('click', App.goBackFromDbScreen);
     }
+    if (App.elements.lessonsBackBtn) {
+      App.elements.lessonsBackBtn.addEventListener('click', App.goBackFromDbScreen);
+    }
     if (App.elements.knowledgeBackBtn) {
       App.elements.knowledgeBackBtn.addEventListener('click', App.goBackFromDbScreen);
     }
+  },
+
+  isLessonCommentRow: (row) => {
+    if (!row || typeof row !== 'object') return false;
+    const src = String(
+      App.commentField
+        ? App.commentField(row, 'source_system')
+        : row.source_system || row.sourceSystem || ''
+    ).trim();
+    const cid = String(
+      App.commentField
+        ? App.commentField(row, 'comment_id')
+        : row.comment_id || row.commentId || ''
+    ).trim();
+    return src === 'lesson' || cid.indexOf('lesson_desc_') === 0;
   },
 
   setLoading: (isLoading) => {
@@ -925,6 +958,7 @@ const App = {
     const map = {
       chat: 'chatScreen',
       comments: 'commentsScreen',
+      lessons: 'lessonsScreen',
       knowledge: 'knowledgeScreen',
       adminUsers: 'adminUsersScreen',
       adminData: 'adminDataScreen',
@@ -959,6 +993,7 @@ const App = {
     const labels = {
       chat: 'チャット',
       comments: 'コメント一覧',
+      lessons: '学習ページ説明テキスト',
       knowledge: 'セミナー動画文字起こし',
       adminUsers: 'ユーザー承認',
       adminData: 'CSV取込',
@@ -972,6 +1007,9 @@ const App = {
     if (App.elements.commentsBackBar) {
       App.elements.commentsBackBar.classList.add('hidden');
     }
+    if (App.elements.lessonsBackBar) {
+      App.elements.lessonsBackBar.classList.add('hidden');
+    }
     if (App.elements.knowledgeBackBar) {
       App.elements.knowledgeBackBar.classList.add('hidden');
     }
@@ -980,22 +1018,27 @@ const App = {
   showDbReturnBar: (targetScreen) => {
     const returnTo = App.state.returnScreen || 'chat';
     const label = App.screenLabel(returnTo) + 'に戻る';
+    const hideAll = function () {
+      if (App.elements.commentsBackBar) App.elements.commentsBackBar.classList.add('hidden');
+      if (App.elements.lessonsBackBar) App.elements.lessonsBackBar.classList.add('hidden');
+      if (App.elements.knowledgeBackBar) App.elements.knowledgeBackBar.classList.add('hidden');
+    };
+    hideAll();
     if (targetScreen === 'comments' && App.elements.commentsBackBar) {
       if (App.elements.commentsBackLabel) {
         App.elements.commentsBackLabel.textContent = label;
       }
       App.elements.commentsBackBar.classList.remove('hidden');
-      if (App.elements.knowledgeBackBar) {
-        App.elements.knowledgeBackBar.classList.add('hidden');
+    } else if (targetScreen === 'lessons' && App.elements.lessonsBackBar) {
+      if (App.elements.lessonsBackLabel) {
+        App.elements.lessonsBackLabel.textContent = label;
       }
+      App.elements.lessonsBackBar.classList.remove('hidden');
     } else if (targetScreen === 'knowledge' && App.elements.knowledgeBackBar) {
       if (App.elements.knowledgeBackLabel) {
         App.elements.knowledgeBackLabel.textContent = label;
       }
       App.elements.knowledgeBackBar.classList.remove('hidden');
-      if (App.elements.commentsBackBar) {
-        App.elements.commentsBackBar.classList.add('hidden');
-      }
     }
   },
 
@@ -1104,6 +1147,8 @@ const App = {
     App.state.comments = rows.map(App.enrichCommentCategory);
     App.renderCommentSourceFilterOptions();
     App.renderCommentTable();
+    App.renderLessonCourseTabFilterOptions();
+    App.renderLessonTable();
   },
 
   ensureForumCategoryLookup: () => {
@@ -1438,7 +1483,7 @@ const App = {
       const srcSystem = String(enriched.source_system || enriched.sourceSystem || '').trim();
       const isLesson = srcSystem === 'lesson' || String(cid).startsWith('lesson_desc_');
       citations.push({
-        kind: 'comment',
+        kind: isLesson ? 'lesson' : 'comment',
         sourceType: isLesson ? 'WeStudy基礎動画' : 'WeStudyコミュニティ',
         commentId: cid,
         authorName: enriched.author_name || enriched.authorName || '',
@@ -1449,6 +1494,9 @@ const App = {
         sourceKind: isLesson
           ? String(enriched.course_tab || enriched.courseTab || '基礎動画').trim()
           : String(enriched.source_kind || enriched.sourceKind || 'コミュニティ情報').trim(),
+        lessonTitle: isLesson
+          ? String(enriched.lesson_title || enriched.lessonTitle || '').trim()
+          : '',
         lessonUrl: isLesson ? String(enriched.lesson_url || enriched.lessonUrl || '').trim() : '',
         snippet: String(enriched.content || '').replace(/\s+/g, ' ').slice(0, 220)
       });
@@ -1519,7 +1567,9 @@ const App = {
     if (!citation) return;
     const fromScreen = App.state.currentScreen || 'chat';
     App.state.returnScreen =
-      fromScreen === 'comments' || fromScreen === 'knowledge' ? 'chat' : fromScreen;
+      fromScreen === 'comments' || fromScreen === 'lessons' || fromScreen === 'knowledge'
+        ? 'chat'
+        : fromScreen;
     if (citation.kind === 'video_chunk') {
       App.switchScreen('knowledge');
       App.showDbReturnBar('knowledge');
@@ -1530,9 +1580,22 @@ const App = {
       }
       return;
     }
+    const commentId = String(citation.commentId || '').trim();
+    const isLesson =
+      citation.kind === 'lesson' ||
+      citation.sourceType === 'WeStudy学習動画' ||
+      commentId.indexOf('lesson_desc_') === 0;
+    if (isLesson) {
+      App.switchScreen('lessons');
+      App.showDbReturnBar('lessons');
+      if (App.elements.lessonSearchInput) {
+        App.elements.lessonSearchInput.value = commentId;
+        App.renderLessonTable({ exactCommentId: commentId });
+      }
+      return;
+    }
     App.switchScreen('comments');
     App.showDbReturnBar('comments');
-    const commentId = String(citation.commentId || '').trim();
     if (App.elements.commentSearchInput) {
       App.elements.commentSearchInput.value = commentId;
       App.renderCommentTable({ exactCommentId: commentId });
@@ -1540,16 +1603,27 @@ const App = {
   },
 
   /**
-   * 関連セミナー動画（タイトル単位で集約）＋関連コミュニティ投稿
+   * 関連セミナー動画（タイトル単位で集約）＋関連コミュニティ投稿＋関連学習ページ説明
    */
   renderCitationsPanel: (citations) => {
     if (!citations || !citations.length) return '';
 
     const videoList = [];
     const commentList = [];
+    const lessonList = [];
     citations.forEach(function (c) {
-      if (c && c.kind === 'video_chunk') videoList.push(c);
-      else if (c) commentList.push(c);
+      if (!c) return;
+      if (c.kind === 'video_chunk') {
+        videoList.push(c);
+        return;
+      }
+      const cid = String(c.commentId || '').trim();
+      const isLesson =
+        c.kind === 'lesson' ||
+        c.sourceType === 'WeStudy学習動画' ||
+        cid.indexOf('lesson_desc_') === 0;
+      if (isLesson) lessonList.push(c);
+      else commentList.push(c);
     });
 
     const groups = {};
@@ -1634,6 +1708,32 @@ const App = {
       );
     };
 
+    const lessonItemHtml = function (c) {
+      const title =
+        String(c.lessonTitle || '').trim() ||
+        String(c.topicTitle || '').trim() ||
+        String(c.commentId || '').trim();
+      const tab = String(c.sourceKind || '').trim();
+      const openUrl = String(c.lessonUrl || '').trim();
+      const openLesson = openUrl
+        ? (' <a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
+          App.escapeHtml(openUrl) +
+          '">ページを開く</a>')
+        : '';
+      return (
+        '<li class="mb-1">' +
+        (tab ? App.escapeHtml(tab) + ' / ' : '') +
+        App.escapeHtml(title) +
+        ' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="lesson" data-key="' +
+        App.escapeHtml(c.commentId || '') +
+        '">DBで見る</button>' +
+        openLesson +
+        '<div class="text-slate-600">' +
+        App.escapeHtml(c.snippet || '') +
+        '</div></li>'
+      );
+    };
+
     // 分類 → 年（新しい年優先）→ 投稿（新しい順）。参照分は全件
     const sortedComments = commentList.slice().sort(function (a, b) {
       const ta = App.postedAtSortKey(a.postedAt);
@@ -1693,6 +1793,16 @@ const App = {
     if (commentBlock) {
       parts.push(
         '<div class="font-semibold mb-1">関連コミュニティ投稿</div>' + commentBlock
+      );
+    }
+
+    if (lessonList.length) {
+      const lessonLis = lessonList.map(lessonItemHtml).join('');
+      parts.push(
+        '<div class="font-semibold mb-1">関連学習ページ説明</div>' +
+          '<ul class="citations-list mb-2">' +
+          lessonLis +
+          '</ul>'
       );
     }
 
@@ -1809,6 +1919,7 @@ const App = {
     App.renderChatMessages();
     App.renderSuggestedQuestions();
     App.renderCommentTable();
+    App.renderLessonTable();
     App.renderPendingUsers();
   },
 
@@ -1881,6 +1992,8 @@ const App = {
         const key = btn.getAttribute('data-key') || '';
         if (kind === 'video_chunk') {
           App.openCitationInDb({ kind: 'video_chunk', videoTitle: key, chunkKey: key });
+        } else if (kind === 'lesson') {
+          App.openCitationInDb({ kind: 'lesson', commentId: key });
         } else {
           App.openCitationInDb({ kind: 'comment', commentId: key });
         }
@@ -1923,6 +2036,9 @@ const App = {
     const sources = Array.from(
       new Set(
         (App.state.comments || [])
+          .filter(function (row) {
+            return !App.isLessonCommentRow(row);
+          })
           .map(function (row) {
             return String(App.commentField(row, 'source_type') || '').trim();
           })
@@ -1949,6 +2065,9 @@ const App = {
     const cats = Array.from(
       new Set(
         (App.state.comments || [])
+          .filter(function (row) {
+            return !App.isLessonCommentRow(row);
+          })
           .map(function (row) {
             return (
               String(App.commentField(row, 'forum_category') || '').trim() || '未分類'
@@ -1977,6 +2096,147 @@ const App = {
     return String(App.commentField(row, 'posted_at') || '').trim() !== '';
   },
 
+  communityCommentRows: () => {
+    return (App.state.comments || []).filter(function (row) {
+      return !App.isLessonCommentRow(row);
+    });
+  },
+
+  lessonCommentRows: () => {
+    return (App.state.comments || []).filter(function (row) {
+      return App.isLessonCommentRow(row);
+    });
+  },
+
+  renderLessonCourseTabFilterOptions: () => {
+    const select = App.elements.lessonCourseTabFilter;
+    if (!select) return;
+    const current = select.value || '';
+    const tabs = Array.from(
+      new Set(
+        App.lessonCommentRows()
+          .map(function (row) {
+            return String(App.commentField(row, 'course_tab') || '').trim();
+          })
+          .filter(Boolean)
+      )
+    ).sort(function (a, b) {
+      return a.localeCompare(b, 'ja');
+    });
+    select.innerHTML = '<option value="">全コースタブ</option>';
+    tabs.forEach(function (tab) {
+      const opt = document.createElement('option');
+      opt.value = tab;
+      opt.textContent = tab;
+      select.appendChild(opt);
+    });
+    if (current && tabs.indexOf(current) !== -1) {
+      select.value = current;
+    }
+  },
+
+  renderLessonTable: (opts) => {
+    opts = opts || {};
+    const body = App.elements.lessonTableBody;
+    if (!body) return;
+    const keywordRaw = String(
+      (App.elements.lessonSearchInput && App.elements.lessonSearchInput.value) || ''
+    ).trim();
+    const keyword = keywordRaw.toLowerCase();
+    const exactFromOpts = String(opts.exactCommentId || '').trim();
+    const exactCommentId =
+      exactFromOpts ||
+      (keywordRaw.indexOf('lesson_desc_') === 0 ? keywordRaw : '');
+    const tabFilter =
+      (App.elements.lessonCourseTabFilter && App.elements.lessonCourseTabFilter.value) || '';
+    body.innerHTML = '';
+
+    const lessonRows = App.lessonCommentRows();
+    const filtered = lessonRows.filter(function (row) {
+      const cid = String(App.commentField(row, 'comment_id') || '').trim();
+      const courseTab = String(App.commentField(row, 'course_tab') || '').trim();
+      const sectionName = String(App.commentField(row, 'section_name') || '').trim();
+      const lessonTitle = String(
+        App.commentField(row, 'lesson_title') || App.commentField(row, 'topic_title') || ''
+      ).trim();
+      let hitKeyword = true;
+      if (exactCommentId) {
+        hitKeyword = cid === exactCommentId;
+      } else if (keyword) {
+        const hay = [
+          cid,
+          courseTab,
+          sectionName,
+          lessonTitle,
+          String(App.commentField(row, 'content') || ''),
+          String(App.commentField(row, 'lesson_url') || '')
+        ]
+          .join(' ')
+          .toLowerCase();
+        hitKeyword = hay.indexOf(keyword) !== -1;
+      }
+      const hitTab = !tabFilter || courseTab === tabFilter;
+      return hitKeyword && hitTab;
+    });
+
+    if (App.elements.lessonListMeta) {
+      App.elements.lessonListMeta.textContent =
+        '表示 ' + filtered.length + ' / 全 ' + lessonRows.length + ' 件';
+    }
+
+    if (filtered.length === 0) {
+      body.innerHTML =
+        '<tr><td colspan="5" class="p-3 text-slate-500">該当データがありません</td></tr>';
+      return;
+    }
+
+    filtered.forEach(function (r) {
+      const tr = document.createElement('tr');
+      tr.className = 'border-t align-top';
+      const courseTab = String(App.commentField(r, 'course_tab') || '').trim();
+      const sectionName = String(App.commentField(r, 'section_name') || '').trim();
+      const lessonTitle = String(
+        App.commentField(r, 'lesson_title') || App.commentField(r, 'topic_title') || ''
+      ).trim();
+      const url = String(App.commentField(r, 'lesson_url') || '').trim();
+      const fullContent = String(App.commentField(r, 'content') || '');
+      const previewLen = 160;
+      const isTruncated = fullContent.length > previewLen;
+      const preview = isTruncated ? fullContent.slice(0, previewLen) + '…' : fullContent;
+      tr.innerHTML =
+        '<td class="p-2 whitespace-nowrap">' +
+        App.escapeHtml(courseTab) +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(sectionName) +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(lessonTitle) +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(preview) +
+        (isTruncated
+          ? ' <button type="button" class="lesson-full-btn text-xs text-blue-700 hover:underline">全文</button>'
+          : '') +
+        '</td>' +
+        '<td class="p-2">' +
+        (url
+          ? '<a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
+            App.escapeHtml(url) +
+            '">開く</a>'
+          : '') +
+        '</td>';
+      const fullBtn = tr.querySelector('.lesson-full-btn');
+      if (fullBtn) {
+        fullBtn.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          App.openCommentDetailDialog(r);
+        });
+      }
+      body.appendChild(tr);
+    });
+  },
+
   renderCommentTable: (opts) => {
     opts = opts || {};
     const body = App.elements.commentTableBody;
@@ -1992,7 +2252,10 @@ const App = {
     const dateFilter = (App.elements.commentDateFilter && App.elements.commentDateFilter.value) || '';
     body.innerHTML = '';
 
-    const filtered = App.state.comments.filter(function (row) {
+    const communityRows = (App.state.comments || []).filter(function (row) {
+      return !App.isLessonCommentRow(row);
+    });
+    const filtered = communityRows.filter(function (row) {
       const cid = String(App.commentField(row, 'comment_id') || '').trim();
       const sourceType = String(App.commentField(row, 'source_type') || '').trim();
       const forumCategory =
@@ -2023,8 +2286,8 @@ const App = {
       return hitKeyword && hitSource && hitCategory && hitDate;
     });
 
-    const totalCount = App.state.comments.length;
-    const missingDateCount = App.state.comments.reduce(function (n, row) {
+    const totalCount = communityRows.length;
+    const missingDateCount = communityRows.reduce(function (n, row) {
       return n + (App.hasPostedAtValue(row) ? 0 : 1);
     }, 0);
     if (App.elements.commentListMeta) {
@@ -2700,8 +2963,11 @@ const App = {
       const used = App.parseUsedSources(
         (msgRes && (msgRes.usedSources || msgRes.used_sources)) || ''
       );
+      const relatedCommentsMerged = []
+        .concat(App.normalizeRelatedList((msgRes && msgRes.relatedComments) || []))
+        .concat(App.normalizeRelatedList((msgRes && msgRes.relatedLessonComments) || []));
       let pendingCitations = App.buildCitationsFromRelated(
-        (msgRes && msgRes.relatedComments) || [],
+        relatedCommentsMerged,
         (msgRes && msgRes.relatedChunks) || [],
         (msgRes && msgRes.relatedSources) || [],
         used.ok
@@ -2732,7 +2998,7 @@ const App = {
       App.renderSessionList();
       App.showToast(usedFast ? '送信しました（準拠省略）' : '送信しました', 'success');
       if (!(App.state.semanticMode && !usedFast)) {
-        const relatedComments = (msgRes && msgRes.relatedComments) || [];
+        const relatedComments = relatedCommentsMerged;
         const relatedChunks = (msgRes && msgRes.relatedChunks) || [];
         App.logQaSearchEvent({
           search_mode: usedFast ? 'normal' : 'normal',
@@ -3187,7 +3453,12 @@ const App = {
                 source_kind: sourceKind,
                 forum_category: forumCategory,
                 topic_title: topicTitle,
-                parent_comment_id: parentCommentId
+                parent_comment_id: parentCommentId,
+                course_tab: courseTab,
+                section_name: sectionName,
+                lesson_title: lessonTitle,
+                lesson_url: lessonUrl,
+                content_hash: contentHash
               });
               updateCount += 1;
               App.elements.importResult.textContent +=
