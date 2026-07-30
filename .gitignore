@@ -38,6 +38,9 @@ _tmp/
 
 # Jarvis 月次状態（ローカルのみ）
 .jarvis_state/etc_monthly.json
+.jarvis_state/night_triage/queue.json
+.jarvis_state/night_triage/dashboard.html
+.jarvis_state/night_triage/config.json
 
 # --- エディタ・ツール ---
 .cursor/projects/
@@ -46,6 +49,7 @@ _tmp/
 !.cursor/rules/home-address-maps.mdc
 !.cursor/rules/n1-notebooklm-mirror.mdc
 !.cursor/rules/jarvis-supabase-free-one-project.mdc
+!.cursor/rules/jarvis-night-triage.mdc
 .obsidian/
 .vscode/
 

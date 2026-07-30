@@ -1,0 +1,8 @@
+{
+  "engine": "gemini",
+  "gemini_model": "gemini-flash-lite-latest",
+  "disabled": false,
+  "max_drafts_per_run": 15,
+  "lookback_days": 90,
+  "_comment": "Copy to config.json. engine=gemini|cursor. disabled=true で夜間バッチ停止。モデルは AI Studio で generateContent 可能な flash-lite 系を指定。"
+}
