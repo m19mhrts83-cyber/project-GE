@@ -1,0 +1,44 @@
+# Jarvis 夜間メールトリアージ
+
+## 方針
+
+- 夜間（launchd 05:00）にパートナー Gmail を取り込み、要返信を判定し、**下書きだけ**作る。
+- **自動送信はしない**。朝にダッシュボードで確認し、Cursor で「夜間下書き #N を送って」→ 従来どおりプレビュー承認 → `yoritoori_send.py`。
+- 下書きエンジン既定は Gemini API 無料枠（`.jarvis_state/night_triage/config.json` の `engine`）。品質比較後に変更可。
+
+## トリガー（ウェイクワード）
+
+- 「夜間トリアージ」「夜間下書き」「トリアージダッシュボード」
+- 「夜間下書き #N を送って」「#N を送って」（トリアージ文脈）
+
+## Jarvis の動作
+
+### ダッシュボードを開く
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_triage_dashboard.py --serve
+# または静的 HTML
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_triage_dashboard.py --open
+```
+
+### 「夜間下書き #N を送って」
+
+1. `jarvis_night_triage.py --apply-draft N` で該当パートナーの `4.送信下書き.txt` に書き出す
+2. 件名・本文をチャットにプレビューし「これで送っていいですか？」と確認（`jarvis-outbound-confirm.mdc`）
+3. 承認後 `yoritoori_send.py --partner <folder> --via gmail`（経路が曖昧なら確認）
+4. 成功後 `jarvis_night_triage.py --mark-sent N`
+
+### 手動で夜間バッチを回す
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_night_triage.py --skip-fetch
+# 取込込み: 引数なし（gmail_to_yoritoori も実行）
+```
+
+## 関連
+
+- スクリプト: `scripts/jarvis_night_triage.py` / `scripts/jarvis_triage_dashboard.py`
+- state: `~/git-repos/.jarvis_state/night_triage/`
+- launchd: `launchd/install_night_triage_launchd.sh`
+- コマンド正本: `docs/運用コマンド一覧.md`「夜間メールトリアージ」
+- パートナー確認（日中手動）: `partner-email-check.mdc`
