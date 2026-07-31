@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Jarvis: 夜間メールトリアージ（パートナー Gmail）
+Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
 
-1. gmail_to_yoritoori.py で取込
-2. 5.やり取り.md から未返信候補を抽出
-3. Gemini / Cursor Agent で要返信判定・下書き生成（--engine / --compare-engines）
-4. .jarvis_state/night_triage/queue.json を更新し、ダッシュボードを再生成
+1. gmail_to_yoritoori.py で取込（パートナー）
+2. 5.やり取り.md / admin INBOX から未返信候補を抽出
+3. Gemini / Cursor Agent で要返信判定・下書き生成
+4. .jarvis_state/night_triage/queue.json を更新（lane=partner|general）
 
 使い方:
   python scripts/jarvis_night_triage.py --dry-run
-  python scripts/jarvis_night_triage.py --skip-fetch --engine gemini
-  python scripts/jarvis_night_triage.py --compare-engines --limit 5 --skip-fetch
-  python scripts/jarvis_night_triage.py --mark-sent 12
+  python scripts/jarvis_night_triage.py --skip-fetch --lane all
+  python scripts/jarvis_night_triage.py --lane general --skip-fetch --limit 5
+  python scripts/jarvis_night_triage.py --apply-draft 12
+  python scripts/jarvis_night_triage.py --send-gmail 12   # general のみ・承認後
 """
 from __future__ import annotations
 
@@ -243,6 +244,7 @@ def find_unreplied(entries: list[dict[str, Any]], lookback_days: int) -> list[di
         candidates.append(
             {
                 **last,
+                "lane": "partner",
                 "context": ctx,
                 "id": entry_id(last["folder"], last["received_at"], last["subject"]),
             }
@@ -342,9 +344,9 @@ def build_judge_prompt(c: dict[str, Any]) -> str:
     for e in c.get("context") or []:
         role = "相手" if e["inbound"] else "自分"
         ctx_lines.append(f"[{e['received_at']}|{role}] {e['subject']}\n{(e['body'] or '')[:1200]}")
-    return f"""あなたは不動産オーナー（松野）の秘書です。パートナーとのメールについて、返信が必要か判定してください。
+    return f"""あなたは不動産オーナー（松野）の秘書です。メールについて返信が必要か判定してください。
 
-パートナー: {c['partner_name']}（フォルダ {c['folder']}）
+相手: {c['partner_name']}（{c.get('folder') or c.get('from_email') or c.get('lane') or ''}）
 最新件名: {c['subject']}
 最新受信: {c['received_at']}
 
@@ -356,7 +358,7 @@ def build_judge_prompt(c: dict[str, Any]) -> str:
 次の JSON のみを返してください（Markdown不可）:
 {{"needs_reply": true/false, "priority": "high"|"medium"|"low", "summary": "1行要約", "reason": "短い理由"}}
 
-返信不要の例: 単なる承知の連絡、自動通知、パスワード通知、既に完結している御礼のみ、配信メール。
+返信不要の例: 単なる承知の連絡、自動通知、パスワード通知、既に完結している御礼のみ、配信メール、広告。
 返信要の例: 質問・依頼・署名依頼・確認待ち・期限あり・意思決定が必要。
 """
 
@@ -425,7 +427,34 @@ def load_queue() -> dict[str, Any]:
     data = load_json(QUEUE_PATH, {"version": 1, "items": [], "updated_at": None})
     if "items" not in data:
         data["items"] = []
+    changed = False
+    for it in data["items"]:
+        if not it.get("lane"):
+            it["lane"] = "partner"
+            changed = True
+    if changed:
+        save_json(QUEUE_PATH, data)
     return data
+
+
+def queue_item_fields(c: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    """候補 dict から queue 保存用フィールドを組み立てる。"""
+    base = {
+        "id": c["id"],
+        "lane": c.get("lane") or "partner",
+        "partner": c.get("partner_name") or c.get("partner") or "",
+        "folder": c.get("folder") or "",
+        "subject": c.get("subject") or "",
+        "received_at": c.get("received_at") or "",
+        "account": c.get("account") or "",
+        "gmail_thread_id": c.get("gmail_thread_id") or "",
+        "gmail_message_id": c.get("gmail_message_id") or "",
+        "from_email": c.get("from_email") or "",
+        "message_id_header": c.get("message_id_header") or "",
+        "updated_at": now_iso(),
+    }
+    base.update(extra)
+    return base
 
 
 def upsert_item(queue: dict[str, Any], item: dict[str, Any]) -> None:
@@ -497,7 +526,9 @@ def process_candidates(
     sleep_s = 4.5 if engine == "gemini" else 1.0
 
     for c in candidates[:limit]:
-        print(f"# candidate [{c['folder']}] {c['received_at']} {c['subject'][:60]}")
+        lane = c.get("lane") or "partner"
+        label = c.get("folder") or c.get("from_email") or lane
+        print(f"# candidate [{lane}/{label}] {c['received_at']} {c['subject'][:60]}")
         judge_prompt = build_judge_prompt(c)
         if dry_run:
             print("  (dry-run) skip LLM")
@@ -513,23 +544,20 @@ def process_candidates(
         if not needs:
             upsert_item(
                 queue,
-                {
-                    "id": c["id"],
-                    "seq": None,
-                    "partner": c["partner_name"],
-                    "folder": c["folder"],
-                    "subject": c["subject"],
-                    "received_at": c["received_at"],
-                    "priority": judge.get("priority") or "low",
-                    "summary": judge.get("summary") or c["summary"],
-                    "reason": judge.get("reason") or "",
-                    "draft_text": "",
-                    "draft_gemini": "",
-                    "draft_cursor": "",
-                    "status": "skipped",
-                    "engine": engine,
-                    "updated_at": now_iso(),
-                },
+                queue_item_fields(
+                    c,
+                    {
+                        "seq": None,
+                        "priority": judge.get("priority") or "low",
+                        "summary": judge.get("summary") or c.get("summary") or "",
+                        "reason": judge.get("reason") or "",
+                        "draft_text": "",
+                        "draft_gemini": "",
+                        "draft_cursor": "",
+                        "status": "skipped",
+                        "engine": engine,
+                    },
+                ),
             )
             time.sleep(sleep_s)
             continue
@@ -538,20 +566,17 @@ def process_candidates(
         if judge_only:
             upsert_item(
                 queue,
-                {
-                    "id": c["id"],
-                    "partner": c["partner_name"],
-                    "folder": c["folder"],
-                    "subject": c["subject"],
-                    "received_at": c["received_at"],
-                    "priority": judge.get("priority") or "medium",
-                    "summary": judge.get("summary") or "",
-                    "reason": judge.get("reason") or "",
-                    "draft_text": "",
-                    "status": "pending",
-                    "engine": engine,
-                    "updated_at": now_iso(),
-                },
+                queue_item_fields(
+                    c,
+                    {
+                        "priority": judge.get("priority") or "medium",
+                        "summary": judge.get("summary") or "",
+                        "reason": judge.get("reason") or "",
+                        "draft_text": "",
+                        "status": "pending",
+                        "engine": engine,
+                    },
+                ),
             )
             time.sleep(sleep_s)
             continue
@@ -568,7 +593,7 @@ def process_candidates(
                     draft_cursor = generate_with_engine("cursor", draft_prompt, model, api_key)
                 except Exception as e:
                     draft_cursor = f"（Cursor Agent 失敗: {e}）"
-                draft_text = draft_gemini  # 暫定既定は Gemini
+                draft_text = draft_gemini
             else:
                 time.sleep(sleep_s)
                 draft_text = generate_with_engine(engine, draft_prompt, model, api_key)
@@ -582,22 +607,19 @@ def process_candidates(
 
         upsert_item(
             queue,
-            {
-                "id": c["id"],
-                "partner": c["partner_name"],
-                "folder": c["folder"],
-                "subject": c["subject"],
-                "received_at": c["received_at"],
-                "priority": judge.get("priority") or "medium",
-                "summary": judge.get("summary") or "",
-                "reason": judge.get("reason") or "",
-                "draft_text": draft_text,
-                "draft_gemini": draft_gemini,
-                "draft_cursor": draft_cursor,
-                "status": "pending",
-                "engine": "compare" if compare else engine,
-                "updated_at": now_iso(),
-            },
+            queue_item_fields(
+                c,
+                {
+                    "priority": judge.get("priority") or "medium",
+                    "summary": judge.get("summary") or "",
+                    "reason": judge.get("reason") or "",
+                    "draft_text": draft_text,
+                    "draft_gemini": draft_gemini,
+                    "draft_cursor": draft_cursor,
+                    "status": "pending",
+                    "engine": "compare" if compare else engine,
+                },
+            ),
         )
         drafted += 1
         time.sleep(sleep_s)
@@ -610,7 +632,7 @@ def process_candidates(
     return judged_need, drafted
 
 
-def apply_draft_to_partner(seq_or_id: str) -> Path:
+def apply_draft_to_partner(seq_or_id: str) -> Path | None:
     queue = load_queue()
     item = None
     for it in queue["items"]:
@@ -619,13 +641,24 @@ def apply_draft_to_partner(seq_or_id: str) -> Path:
             break
     if not item:
         raise SystemExit(f"item not found: {seq_or_id}")
-    folder = item["folder"]
     draft = (item.get("draft_text") or "").strip()
     if not draft:
         raise SystemExit("draft_text empty")
+    lane = item.get("lane") or "partner"
+    subject = item.get("subject") or ""
+    if lane == "general":
+        print(f"# lane=general (Gmail Reply)")
+        print(f"# to: {item.get('from_email')}")
+        print(f"# thread: {item.get('gmail_thread_id')}")
+        print(f"# subject: {subject}")
+        print("---DRAFT---")
+        print(draft)
+        print("---")
+        print("# 承認後: python scripts/jarvis_night_triage.py --send-gmail " + str(seq_or_id))
+        return None
+    folder = item["folder"]
     partner_dir = partner_base() / folder
     draft_path = partner_dir / "4.送信下書き.txt"
-    subject = item.get("subject") or ""
     if not subject.lower().startswith("re:"):
         subject_line = f"件名：Re: {subject}"
     else:
@@ -638,6 +671,32 @@ def apply_draft_to_partner(seq_or_id: str) -> Path:
     return draft_path
 
 
+def send_general_gmail(seq_or_id: str) -> None:
+    from jarvis_night_triage_general import send_general_reply
+
+    queue = load_queue()
+    item = None
+    for it in queue["items"]:
+        if str(it.get("seq")) == str(seq_or_id) or str(it.get("id")) == str(seq_or_id):
+            item = it
+            break
+    if not item:
+        raise SystemExit(f"item not found: {seq_or_id}")
+    if (item.get("lane") or "partner") != "general":
+        raise SystemExit("lane is not general — use yoritoori_send for partners")
+    draft = (item.get("draft_text") or "").strip()
+    if not draft:
+        raise SystemExit("draft_text empty")
+    result = send_general_reply(item, draft)
+    print(f"# sent gmail id={result.get('id')} to={result.get('to')}")
+    mark_status(str(item.get("seq") or item.get("id")), "sent")
+    regenerate_dashboard()
+
+
+def contact_yaml_path() -> Path:
+    return partner_base() / "000_共通" / "連絡先一覧.yaml"
+
+
 def main() -> int:
     load_dotenv_private()
     ap = argparse.ArgumentParser(description="Jarvis night email triage")
@@ -646,12 +705,14 @@ def main() -> int:
     ap.add_argument("--engine", choices=("gemini", "cursor"), default=None)
     ap.add_argument("--compare-engines", action="store_true")
     ap.add_argument("--judge-only", action="store_true")
+    ap.add_argument("--lane", choices=("partner", "general", "all"), default="all")
     ap.add_argument("--limit", type=int, default=0, help="処理する候補の上限（0=config）")
     ap.add_argument("--lookback-days", type=int, default=0)
     ap.add_argument("--mark-sent", metavar="ID")
     ap.add_argument("--mark-skipped", metavar="ID")
     ap.add_argument("--mark-snoozed", metavar="ID")
-    ap.add_argument("--apply-draft", metavar="ID", help="4.送信下書き.txt に書き出す")
+    ap.add_argument("--apply-draft", metavar="ID", help="partner: 4.送信下書きへ / general: プレビュー表示")
+    ap.add_argument("--send-gmail", metavar="ID", help="general のみ・承認後に Gmail Reply 送信")
     ap.add_argument("--list", action="store_true")
     args = ap.parse_args()
 
@@ -673,13 +734,17 @@ def main() -> int:
     if args.apply_draft:
         apply_draft_to_partner(args.apply_draft)
         return 0
+    if args.send_gmail:
+        send_general_gmail(args.send_gmail)
+        return 0
     if args.list:
         q = load_queue()
         for it in q.get("items", []):
             if it.get("status") != "pending":
                 continue
             print(
-                f"#{it.get('seq')} [{it.get('priority')}] {it.get('folder')} | "
+                f"#{it.get('seq')} [{it.get('lane') or 'partner'}][{it.get('priority')}] "
+                f"{it.get('folder') or it.get('from_email')} | "
                 f"{it.get('received_at')} | {it.get('subject', '')[:50]}"
             )
         return 0
@@ -694,28 +759,46 @@ def main() -> int:
     api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
     limit = args.limit or int(cfg.get("max_drafts_per_run") or 15)
     lookback = args.lookback_days or int(cfg.get("lookback_days") or 90)
+    general_lookback = int(cfg.get("general_lookback_days") or 14)
 
-    if not args.skip_fetch:
+    do_partner = args.lane in ("partner", "all")
+    do_general = args.lane in ("general", "all")
+
+    if do_partner and not args.skip_fetch:
         rc = run_gmail_fetch(args.dry_run)
         if rc != 0:
             print(f"# fetch failed rc={rc}", file=sys.stderr)
-            # 取込失敗でも既存 MD で続行
 
     base = partner_base()
     print(f"# partner base: {base}")
-    print(f"# engine: {'compare' if args.compare_engines else engine} model={model}")
+    print(f"# engine: {'compare' if args.compare_engines else engine} model={model} lane={args.lane}")
 
     all_cands: list[dict[str, Any]] = []
-    for folder, md in list_partner_mds(base):
-        name = folder.split("_", 1)[-1] if "_" in folder else folder
-        entries = parse_yoritoori(md, folder, name)
-        cands = find_unreplied(entries, lookback)
-        all_cands.extend(cands)
+    if do_partner:
+        for folder, md in list_partner_mds(base):
+            name = folder.split("_", 1)[-1] if "_" in folder else folder
+            entries = parse_yoritoori(md, folder, name)
+            cands = find_unreplied(entries, lookback)
+            all_cands.extend(cands)
+        print(f"# partner unreplied candidates: {sum(1 for c in all_cands if c.get('lane')=='partner')}")
 
-    all_cands.sort(key=lambda x: x["received_at"], reverse=True)
-    print(f"# unreplied candidates: {len(all_cands)}")
+    if do_general:
+        try:
+            from jarvis_night_triage_general import find_general_unreplied
 
-    # 既存 pending/sent で同じ id は再処理スキップ（compare 時は再生成）
+            g_cands = find_general_unreplied(
+                contact_yaml=contact_yaml_path(),
+                lookback_days=general_lookback,
+                max_threads=int(cfg.get("general_max_threads") or 40),
+            )
+            print(f"# general unreplied candidates: {len(g_cands)}")
+            all_cands.extend(g_cands)
+        except Exception as e:
+            print(f"# general fetch failed: {e}", file=sys.stderr)
+
+    all_cands.sort(key=lambda x: x.get("received_at") or "", reverse=True)
+    print(f"# unreplied candidates total: {len(all_cands)}")
+
     queue = load_queue()
     existing = {it["id"]: it for it in queue.get("items", []) if it.get("id")}
     todo = []
@@ -743,13 +826,13 @@ def main() -> int:
     print(f"# done: {msg}")
     if not args.dry_run:
         macos_notify("Jarvis 夜間トリアージ", msg)
-        # 実行ログ
         logf = LOG_DIR / f"run_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.log"
         logf.write_text(
             json.dumps(
                 {
                     "at": now_iso(),
                     "engine": "compare" if args.compare_engines else engine,
+                    "lane": args.lane,
                     "candidates": len(all_cands),
                     "need": need,
                     "drafted": drafted,

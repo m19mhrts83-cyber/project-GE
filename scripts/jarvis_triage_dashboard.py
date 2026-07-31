@@ -128,12 +128,31 @@ def cursor_login_status() -> tuple[bool, str]:
         return False, f"Cursor Agent 確認失敗: {e}"
 
 
-def render_html(q: dict, *, serve_mode: bool | None = None) -> str:
+def render_html(q: dict, *, serve_mode: bool | None = None, lane: str = "partner") -> str:
     serve = _SERVE_MODE if serve_mode is None else serve_mode
-    items = list(q.get("items") or [])
+    if lane not in ("partner", "general"):
+        lane = "partner"
+    items_all = list(q.get("items") or [])
+    for it in items_all:
+        if not it.get("lane"):
+            it["lane"] = "partner"
+    pending_partner = sum(1 for i in items_all if i.get("status") == "pending" and (i.get("lane") or "partner") == "partner")
+    pending_general = sum(1 for i in items_all if i.get("status") == "pending" and i.get("lane") == "general")
+    if serve:
+        items = [i for i in items_all if (i.get("lane") or "partner") == lane]
+    else:
+        # 静的 HTML は両レーンを埋め込み、JS で切替
+        items = items_all
     pending = [i for i in items if i.get("status") == "pending"]
+    if serve:
+        pending = [i for i in pending if (i.get("lane") or "partner") == lane]
+    else:
+        # 初期表示は partner。general は data-lane で隠す
+        pass
     pending.sort(key=lambda x: x.get("received_at") or "")
     others = [i for i in items if i.get("status") != "pending"]
+    if serve:
+        others = [i for i in others if (i.get("lane") or "partner") == lane]
     others.sort(key=lambda x: x.get("updated_at") or "", reverse=True)
     updated = html.escape(str(q.get("updated_at") or "—"))
     engine = prefer_engine(q)
@@ -150,45 +169,54 @@ def render_html(q: dict, *, serve_mode: bool | None = None) -> str:
         </div>
         """
 
+    tab_partner_cls = "tab active" if lane == "partner" else "tab"
+    tab_general_cls = "tab active" if lane == "general" else "tab"
     if serve:
+        tabs = f"""
+        <nav class="tabs">
+          <a class="{tab_partner_cls}" href="/?lane=partner">パートナー <span class="badge">{pending_partner}</span></a>
+          <a class="{tab_general_cls}" href="/?lane=general">それ以外 <span class="badge">{pending_general}</span></a>
+        </nav>
+        """
         engine_panel = f"""
         <div class="engine-panel">
           <span class="engine-label">下書きエンジン（次回バッチから反映）</span>
           <label class="engine-opt"><input type="radio" name="engine" value="gemini" {gemini_checked}
-            onchange="location.href='/api/engine?engine=gemini'"/> Gemini（無料枠）</label>
+            onchange="location.href='/api/engine?engine=gemini&lane={lane}'"/> Gemini（無料枠）</label>
           <label class="engine-opt"><input type="radio" name="engine" value="cursor" {cursor_checked}
-            onchange="location.href='/api/engine?engine=cursor'"/> Cursor Agent</label>
+            onchange="location.href='/api/engine?engine=cursor&lane={lane}'"/> Cursor Agent</label>
           <span class="engine-hint">現在: <strong>{html.escape(engine)}</strong></span>
         </div>
         {warn_block}
         """
         howto = """
         <ol class="howto">
-          <li>pending を上から確認（古い順）。不要なら「スキップ」「後で」</li>
-          <li>送る件は「送信指示をコピー」→ Cursor に貼る（例: 夜間下書き #1 を送って）</li>
-          <li>Jarvis が下書きをプレビュー → 承認後に送信（自動送信なし）</li>
+          <li>タブで「パートナー」「それ以外」を切替。pending は古い順</li>
+          <li>不要なら「スキップ」「後で」。送る件は「送信指示をコピー」→ Cursor に貼る</li>
+          <li>Jarvis がプレビュー → 承認後に送信（自動送信なし）</li>
         </ol>
         """
     else:
+        tabs = f"""
+        <nav class="tabs">
+          <a class="{tab_partner_cls}" href="#" onclick="showLane('partner');return false;">パートナー <span class="badge">{pending_partner}</span></a>
+          <a class="{tab_general_cls}" href="#" onclick="showLane('general');return false;">それ以外 <span class="badge">{pending_general}</span></a>
+        </nav>
+        <p class="sub">静的表示。操作・エンジン切替は <a href="http://127.0.0.1:8765/">http://127.0.0.1:8765/</a>（常時起動）で。</p>
+        """
         engine_panel = f"""
         <div class="engine-panel static">
           <span class="engine-label">既定エンジン: <strong>{html.escape(engine)}</strong></span>
-          <p class="engine-hint">エンジン切替・スキップ等の操作は
-            <code>python scripts/jarvis_triage_dashboard.py --serve</code>
-            → <a href="http://127.0.0.1:8765/">http://127.0.0.1:8765/</a> で開いてください（この静的 HTML では書き戻せません）。
-          </p>
         </div>
         """
-        howto = """
-        <p class="sub">閲覧専用。操作する場合は <code>--serve</code> で開いてください。</p>
-        """
+        howto = ""
 
     def card(it: dict, show_ab: bool) -> str:
         seq = it.get("seq") or "—"
         st = it.get("status") or ""
         pri = it.get("priority") or ""
         partner = html.escape(str(it.get("partner") or ""))
-        folder = html.escape(str(it.get("folder") or ""))
+        folder = html.escape(str(it.get("folder") or it.get("from_email") or ""))
         subject = html.escape(str(it.get("subject") or ""))
         received = html.escape(str(it.get("received_at") or ""))
         summary = html.escape(str(it.get("summary") or ""))
@@ -197,6 +225,7 @@ def render_html(q: dict, *, serve_mode: bool | None = None) -> str:
         dg = html.escape(str(it.get("draft_gemini") or ""))
         dc = html.escape(str(it.get("draft_cursor") or ""))
         iid = html.escape(str(it.get("id") or ""))
+        item_lane = html.escape(str(it.get("lane") or "partner"))
         ab = ""
         if show_ab and (dg or dc):
             ab = f"""
@@ -210,19 +239,18 @@ def render_html(q: dict, *, serve_mode: bool | None = None) -> str:
             actions = f"""
             <div class="actions">
               <button type="button" onclick="copyCmd({json.dumps(f'夜間下書き #{seq} を送って')})">送信指示をコピー</button>
-              <a class="btn" href="/api/status?id={iid}&status=snoozed">後で</a>
-              <a class="btn" href="/api/status?id={iid}&status=skipped">スキップ</a>
+              <a class="btn" href="/api/status?id={iid}&status=snoozed&lane={lane}">後で</a>
+              <a class="btn" href="/api/status?id={iid}&status=skipped&lane={lane}">スキップ</a>
             </div>
             """
         elif st == "pending" and not serve:
             actions = f"""
             <div class="actions">
               <button type="button" onclick="copyCmd({json.dumps(f'夜間下書き #{seq} を送って')})">送信指示をコピー</button>
-              <span class="meta">スキップ等は --serve で</span>
             </div>
             """
         return f"""
-        <article class="card pri-{html.escape(pri)} status-{html.escape(st)}">
+        <article class="card lane-{item_lane} pri-{html.escape(pri)} status-{html.escape(st)}" data-lane="{item_lane}" style="{'' if serve or item_lane == 'partner' else 'display:none'}">
           <header>
             <span class="seq">#{seq}</span>
             <span class="pri">{html.escape(pri)}</span>
@@ -244,6 +272,7 @@ def render_html(q: dict, *, serve_mode: bool | None = None) -> str:
 
     cards_p = "\n".join(card(i, True) for i in pending) or "<p>pending なし</p>"
     cards_o = "\n".join(card(i, False) for i in others[:40])
+    lane_label = "パートナー" if lane == "partner" else "それ以外（admin Gmail）"
 
     return f"""<!DOCTYPE html>
 <html lang="ja">
@@ -268,7 +297,16 @@ def render_html(q: dict, *, serve_mode: bool | None = None) -> str:
   h1 {{ font-size: 1.45rem; margin: 0 0 4px; letter-spacing: 0.02em; }}
   .sub {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }}
   .howto {{ margin: 0 0 16px; padding-left: 1.2rem; font-size: 0.9rem; color: var(--muted); }}
-  .howto li {{ margin: 2px 0; }}
+  .tabs {{ display: flex; gap: 8px; margin: 12px 0 16px; flex-wrap: wrap; }}
+  .tab {{
+    text-decoration: none; color: var(--ink); background: var(--card);
+    border: 1px solid var(--line); padding: 8px 14px; border-radius: 999px; font-size: 0.9rem;
+  }}
+  .tab.active {{ border-color: var(--accent); color: var(--accent); font-weight: 600; }}
+  .badge {{
+    display: inline-block; min-width: 1.2em; text-align: center;
+    background: #ecfdf5; color: var(--accent); border-radius: 6px; padding: 0 5px; font-size: 0.8rem;
+  }}
   .engine-panel {{
     background: var(--card); border: 1px solid var(--line); border-radius: 10px;
     padding: 12px 14px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
@@ -322,12 +360,13 @@ def render_html(q: dict, *, serve_mode: bool | None = None) -> str:
 <body>
 <main>
   <h1>夜間メールトリアージ</h1>
-  <p class="sub">更新: {updated} · 送信は Cursor で「夜間下書き #N を送って」（自動送信なし）</p>
+  <p class="sub">更新: {updated} · 表示中: {lane_label} · 送信は Cursor 経由（自動送信なし）</p>
+  {tabs}
   {engine_panel}
   {howto}
   <div class="stats">
-    <div class="stat">pending <strong>{len(pending)}</strong></div>
-    <div class="stat">その他表示 <strong>{min(len(others), 40)}</strong></div>
+    <div class="stat">このタブ pending <strong>{len(pending)}</strong></div>
+    <div class="stat">パートナー全体 {pending_partner} / それ以外 {pending_general}</div>
   </div>
   <h2>要対応（古い順）</h2>
   {cards_p}
@@ -344,17 +383,25 @@ function copyCmd(t) {{
     setTimeout(() => el.style.display = 'none', 2200);
   }});
 }}
+function showLane(lane) {{
+  document.querySelectorAll('.card').forEach(el => {{
+    el.style.display = (el.dataset.lane === lane) ? '' : 'none';
+  }});
+  document.querySelectorAll('.tab').forEach((el, i) => {{
+    el.classList.toggle('active', (i === 0 && lane === 'partner') || (i === 1 && lane === 'general'));
+  }});
+}}
 </script>
 </body>
 </html>
 """
 
 
-def write_html(*, serve_mode: bool | None = None) -> Path:
+def write_html(*, serve_mode: bool | None = None, lane: str = "partner") -> Path:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    html_text = render_html(load_queue(), serve_mode=serve_mode)
+    html_text = render_html(load_queue(), serve_mode=serve_mode, lane=lane)
     HTML_PATH.write_text(html_text, encoding="utf-8")
-    print(f"# wrote {HTML_PATH}")
+    print(f"# wrote {HTML_PATH} lane={lane}")
     return HTML_PATH
 
 
@@ -369,25 +416,27 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        lane = (qs.get("lane") or ["partner"])[0]
+        if lane not in ("partner", "general"):
+            lane = "partner"
         if parsed.path == "/api/status":
-            qs = parse_qs(parsed.query)
             iid = (qs.get("id") or [""])[0]
             status = (qs.get("status") or [""])[0]
             if iid and status in ("skipped", "snoozed", "pending", "sent"):
                 set_status(iid, status)
-                write_html(serve_mode=True)
-            self._redirect("/")
+                write_html(serve_mode=True, lane=lane)
+            self._redirect(f"/?lane={lane}")
             return
         if parsed.path == "/api/engine":
-            qs = parse_qs(parsed.query)
             engine = (qs.get("engine") or [""])[0]
             if set_engine(engine):
-                write_html(serve_mode=True)
+                write_html(serve_mode=True, lane=lane)
                 print(f"# engine -> {engine}")
-            self._redirect("/")
+            self._redirect(f"/?lane={lane}")
             return
         if parsed.path in ("/", "/index.html", "/dashboard.html"):
-            write_html(serve_mode=True)
+            write_html(serve_mode=True, lane=lane)
             data = HTML_PATH.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
