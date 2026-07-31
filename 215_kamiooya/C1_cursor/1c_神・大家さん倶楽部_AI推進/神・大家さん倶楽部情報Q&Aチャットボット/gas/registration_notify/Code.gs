@@ -15,6 +15,7 @@
  *   type "approval"           … 申請者（email）へ承認完了＋APP_URL
  *   type "rejection"          … 申請者へ却下通知（固定文）
  *   type "password_reset"     … 申請者へ再設定URL（reset_url 必須、または APP_URL+token）
+ *   type "master_transfer"    … 指名管理者へマスター移譲の承認依頼（approval_url 必須）
  *
  * デプロイ: デプロイ → 新しいデプロイ → 種類「ウェブアプリ」
  *   実行ユーザー: 自分 / アクセスできるユーザー: 全員
@@ -53,7 +54,8 @@ function doPost(e) {
       notifyType !== 'registration' &&
       notifyType !== 'approval' &&
       notifyType !== 'rejection' &&
-      notifyType !== 'password_reset'
+      notifyType !== 'password_reset' &&
+      notifyType !== 'master_transfer'
     ) {
       return json_(400, { ok: false, error: 'INVALID_TYPE' });
     }
@@ -71,6 +73,9 @@ function doPost(e) {
     }
     if (notifyType === 'password_reset') {
       return sendPasswordResetToApplicant_(email, appUrl, body);
+    }
+    if (notifyType === 'master_transfer') {
+      return sendMasterTransferToNominee_(email, appUrl, body);
     }
     return sendRegistrationToAdmin_(email, adminTo, appUrl, body);
   } catch (err) {
@@ -242,6 +247,65 @@ function sendPasswordResetToApplicant_(applicantEmail, appUrl, body) {
   return json_(200, { ok: true, type: 'password_reset' });
 }
 
+function sendMasterTransferToNominee_(nomineeEmail, appUrl, body) {
+  var approvalUrl = String(body.approval_url || '').trim();
+  if (!approvalUrl) {
+    var token = String(body.token || '').trim();
+    var base = String(appUrl || '').trim().replace(/\/+$/, '');
+    if (base && token) {
+      approvalUrl = base + '/#master-transfer?token=' + encodeURIComponent(token);
+    }
+  }
+  if (!approvalUrl) {
+    return json_(400, {
+      ok: false,
+      error: 'APPROVAL_URL_REQUIRED',
+      message: 'approval_url（または APP_URL + token）が必要です'
+    });
+  }
+
+  var fromEmail = String(body.from_email || '').trim();
+  var expiresNote = String(body.expires_at || '').trim();
+  var subject = '【神大家Q&A】マスター管理者承認をしてください';
+  var parts = [
+    {
+      lines: [
+        '神・大家さん倶楽部 Q&Aチャットボットの',
+        'マスター管理者権限の移譲が依頼されています。'
+      ]
+    }
+  ];
+  if (fromEmail) {
+    parts.push({ lines: ['現マスター: ' + fromEmail] });
+  }
+  parts.push({
+    lines: [
+      'マスター管理者承認をしてください。',
+      '以下のURLを開き、指名されたアカウントで',
+      'ログインしたうえで承認してください。'
+    ]
+  });
+  parts.push({ lines: [], linkUrl: approvalUrl, linkLabel: approvalUrl });
+  if (expiresNote) {
+    parts.push({
+      lines: [
+        '有効期限: ' + expiresNote + 'まで',
+        '（期限を過ぎるとリンクは使えません）'
+      ]
+    });
+  }
+  parts.push({
+    lines: [
+      '心当たりがない場合は、このメールを無視してください。',
+      '権限は変更されません。'
+    ]
+  });
+  parts.push({ lines: ['（このメールは自動送信です）'] });
+
+  sendMail_(nomineeEmail, subject, parts);
+  return json_(200, { ok: true, type: 'master_transfer' });
+}
+
 /**
  * plain + HTML の両方で送信。
  * parts: [{ lines: string[], linkUrl?: string, linkLabel?: string }]
@@ -316,7 +380,7 @@ function doGet() {
   return json_(200, {
     ok: true,
     service: 'kamiooya-qa-registration-notify',
-    hint: 'POST JSON { secret, email, type?: registration|approval|rejection|password_reset }'
+    hint: 'POST JSON { secret, email, type?: registration|approval|rejection|password_reset|master_transfer }'
   });
 }
 

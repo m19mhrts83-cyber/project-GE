@@ -48,13 +48,6 @@
             アカウント作成
           </button>
         </form>
-
-        <!-- 管理者登録導線 -->
-        <div class="text-center mt-4">
-          <button type="button" id="loginScreenAdminRegisterBtn" class="login-screen-admin-btn">
-            管理者登録
-          </button>
-        </div>
       </div>
     </section>
 
@@ -101,22 +94,26 @@
       </div>
     </section>
 
-    <!-- シークレットURL専用 管理者登録画面 -->
-    <section id="secretAdminRegisterView" class="hidden min-h-screen flex items-center justify-center p-4">
-      <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
-        <h1 class="text-xl font-bold text-center text-blue-900 mb-2">管理者登録</h1>
-        <p class="text-sm text-slate-500 text-center mb-6">シークレットキーによる限定登録</p>
-        <form id="secretAdminRegisterForm" class="space-y-3">
-          <input id="secretAdminEmail" type="email" class="w-full border rounded-md px-3 py-2" placeholder="管理者メールアドレス" required />
-          <input id="secretAdminPassword" type="password" class="w-full border rounded-md px-3 py-2" placeholder="ログインパスワード" required />
-          <input id="secretAdminSecretKey" type="password" class="w-full border rounded-md px-3 py-2" placeholder="登録許可シークレットキー" required />
-          <button id="secretAdminRegisterSubmitBtn" type="submit" class="w-full py-2 rounded-md bg-blue-900 text-white">
-            管理者として登録
-          </button>
-        </form>
-        <div class="text-center mt-4">
-          <button type="button" id="secretAdminBackToLoginBtn" class="text-sm text-slate-500 underline hover:text-slate-700">
-            ログイン画面に戻る
+    <section id="masterTransferView" class="hidden min-h-screen flex items-center justify-center p-4">
+      <div class="w-full max-w-md bg-white rounded-xl shadow p-6">
+        <h1 class="text-xl font-bold text-center mb-2">マスター管理者の移譲承認</h1>
+        <p class="text-sm text-slate-500 text-center mb-4" id="masterTransferMessage">
+          マスター管理者承認をしてください。
+        </p>
+        <div class="text-sm bg-slate-50 rounded border p-3 mb-4 space-y-1">
+          <div>現マスター: <span id="masterTransferFromEmail" class="font-semibold text-slate-800">—</span></div>
+          <div>指名先: <span id="masterTransferToEmail" class="font-semibold text-slate-800">—</span></div>
+          <div>有効期限: <span id="masterTransferExpires" class="font-semibold text-slate-800">—</span></div>
+        </div>
+        <p id="masterTransferLoginHint" class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3 mb-4 hidden">
+          指名されたメールアドレスでログインしてから、再度この画面で承認してください。
+        </p>
+        <button id="masterTransferAcceptBtn" type="button" class="w-full py-2 rounded-md bg-blue-900 text-white disabled:opacity-50" disabled>
+          マスター管理者として承認する
+        </button>
+        <div class="mt-4 text-center">
+          <button type="button" id="masterTransferBackToLoginBtn" class="text-sm text-slate-500 underline hover:text-slate-700">
+            ログイン画面へ
           </button>
         </div>
       </div>
@@ -151,6 +148,8 @@
             <button data-screen="lessons" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">学習ページ説明テキスト</button>
             <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">セミナー動画文字起こし</button>
             <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー承認</button>
+            <button id="adminUserListTabBtn" data-screen="adminUserList" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー一覧</button>
+            <button id="adminAdminListTabBtn" data-screen="adminAdminList" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">管理者一覧</button>
             <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">データ取込</button>
             <button id="adminAnalyticsTabBtn" data-screen="adminAnalytics" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">運営分析</button>
           </nav>
@@ -325,6 +324,83 @@
                   </thead>
                   <tbody id="pendingUsersTableBody"></tbody>
                 </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- 管理者: ユーザー一覧（一般） -->
+          <section id="adminUserListScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
+            <div class="w-full max-w-5xl">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                  <h3 class="font-semibold">ユーザー一覧</h3>
+                  <p class="text-sm text-slate-500">承認済みの一般ユーザー。管理者への昇格・退会処理はここから行います。</p>
+                </div>
+                <button id="reloadApprovedUsersBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+              </div>
+              <div class="overflow-auto bg-white rounded border">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr>
+                      <th class="p-2 text-left">ID</th>
+                      <th class="p-2 text-left">メール</th>
+                      <th class="p-2 text-left">会員番号</th>
+                      <th class="p-2 text-left">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="approvedUsersTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- 管理者: 管理者一覧 -->
+          <section id="adminAdminListScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
+            <div class="w-full max-w-5xl space-y-6">
+              <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h3 class="font-semibold">管理者一覧</h3>
+                    <p class="text-sm text-slate-500">管理者・マスター管理者。権限の剥奪申請／即時変更、マスター移譲はここから行います。</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button id="cancelMasterTransferBtn" type="button" class="px-4 py-2 rounded bg-slate-600 text-white hidden">移譲をキャンセル</button>
+                    <button id="reloadAdminsBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+                  </div>
+                </div>
+                <p id="masterTransferPendingNote" class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3 mb-3 hidden"></p>
+                <div class="overflow-auto bg-white rounded border">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-100">
+                      <tr>
+                        <th class="p-2 text-left">ID</th>
+                        <th class="p-2 text-left">メール</th>
+                        <th class="p-2 text-left">会員番号</th>
+                        <th class="p-2 text-left">権限</th>
+                        <th class="p-2 text-left">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="adminsTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div>
+                <h3 class="font-semibold mb-2">権限申請（承認待ち）</h3>
+                <p class="text-sm text-slate-500 mb-3">通常管理者からの昇格・剥奪申請。マスター管理者のみ承認／却下できます。</p>
+                <div class="overflow-auto bg-white rounded border">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-100">
+                      <tr>
+                        <th class="p-2 text-left">対象</th>
+                        <th class="p-2 text-left">申請内容</th>
+                        <th class="p-2 text-left">申請者ID</th>
+                        <th class="p-2 text-left">申請日時</th>
+                        <th class="p-2 text-left">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="roleRequestsTableBody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </section>
@@ -545,25 +621,6 @@
       <button id="fastSummaryLink" type="button" class="hidden text-xs text-blue-800 underline hover:text-blue-950">
         準拠なしで早く要約する
       </button>
-    </div>
-  </div>
-
-  <!-- 画面端の目立たない管理者導線 -->
-  <button id="adminEntryBtn" class="admin-entry-btn" type="button" aria-label="管理者登録への導線">
-    管理者登録
-  </button>
-
-  <!-- 管理者導線用パスワード入力 -->
-  <div id="adminGateOverlay" class="admin-gate-overlay hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-labelledby="adminGateTitle">
-    <div class="admin-gate-panel bg-white w-full max-w-sm rounded-lg shadow-lg p-4">
-      <h4 class="font-semibold mb-2" id="adminGateTitle">管理者登録</h4>
-      <p class="text-sm text-slate-600 mb-3">アクセスパスワードを入力してください</p>
-      <input id="adminGatePasswordInput" type="password" class="w-full border rounded-md px-3 py-2 mb-2" placeholder="パスワード" autocomplete="off" />
-      <p id="adminGateError" class="text-xs text-red-600 min-h-[1rem]"></p>
-      <div class="flex justify-end gap-2 mt-3">
-        <button type="button" id="adminGateCancelBtn" class="px-3 py-1 rounded border">キャンセル</button>
-        <button type="button" id="adminGateOkBtn" class="px-3 py-1 rounded bg-blue-900 text-white">進む</button>
-      </div>
     </div>
   </div>
 
