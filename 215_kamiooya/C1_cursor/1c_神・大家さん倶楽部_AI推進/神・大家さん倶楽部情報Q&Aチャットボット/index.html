@@ -26,6 +26,7 @@
         </div>
 
         <form id="loginForm" class="space-y-3">
+          <div id="registerSuccessNotice" class="hidden rounded-md border border-blue-200 bg-blue-50 text-blue-900 text-sm p-3"></div>
           <input id="loginEmail" type="email" class="w-full border rounded-md px-3 py-2" placeholder="メールアドレス" required />
           <input id="loginPassword" type="password" class="w-full border rounded-md px-3 py-2" placeholder="パスワード" required />
           <button id="loginSubmitBtn" type="submit" class="w-full py-2 rounded-md bg-blue-900 text-white">
@@ -150,7 +151,7 @@
             <button data-screen="lessons" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">学習ページ説明テキスト</button>
             <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">セミナー動画文字起こし</button>
             <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー承認</button>
-            <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">CSV取込</button>
+            <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">データ取込</button>
             <button id="adminAnalyticsTabBtn" data-screen="adminAnalytics" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">運営分析</button>
           </nav>
           <div class="p-3 overflow-y-auto flex-1">
@@ -342,6 +343,23 @@
               </div>
               <pre id="importResult" class="mt-4 text-xs bg-slate-100 p-3 rounded h-40 overflow-auto"></pre>
             </div>
+
+            <div class="w-full max-w-3xl bg-white rounded border p-4 mt-4">
+              <h3 class="font-semibold mb-2">セミナー動画 SRT 取込</h3>
+              <p class="text-sm text-slate-500 mb-3">
+                Notta 等で出力した <code>.srt</code> をアップロードします。Supabase（意味検索）へ取り込み、続けて Raimo のセミナー動画文字起こし一覧にも反映します。
+              </p>
+              <div class="space-y-2 mb-3">
+                <input id="srtTitleInput" class="w-full border rounded-md px-3 py-2" placeholder="動画タイトル（必須）" />
+                <input id="srtVideoIdInput" class="w-full border rounded-md px-3 py-2" placeholder="video_id（必須・安定した英数字ID）" />
+                <input id="srtVideoUrlInput" class="w-full border rounded-md px-3 py-2" placeholder="動画URL（任意）" />
+                <input id="srtInstructorInput" class="w-full border rounded-md px-3 py-2" placeholder="講師名（任意）" />
+                <input id="srtFileInput" type="file" accept=".srt,text/plain,application/x-subrip" />
+              </div>
+              <button id="importSrtBtn" type="button" class="px-4 py-2 rounded bg-blue-600 text-white">SRTを取り込む</button>
+              <pre id="srtImportResult" class="mt-4 text-xs bg-slate-100 p-3 rounded h-40 overflow-auto"></pre>
+            </div>
+
             <div class="w-full max-w-3xl bg-white rounded border p-4 mt-4">
               <h3 class="font-semibold mb-2 text-red-700">コメント削除（管理者）</h3>
               <p class="text-sm text-slate-500 mb-3">
