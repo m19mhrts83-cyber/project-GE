@@ -7,6 +7,7 @@ Usage:
   test_registration_notify.py --approval [email]         # type=approval（申請者宛）
   test_registration_notify.py --rejection [email]        # type=rejection（申請者宛）
   test_registration_notify.py --password-reset [email]   # type=password_reset（申請者宛）
+  test_registration_notify.py --master-transfer [email]  # type=master_transfer（指名管理者宛）
 """
 
 from __future__ import annotations
@@ -52,6 +53,9 @@ def main() -> int:
     elif args and args[0] in ("--password-reset", "--reset", "-p"):
         mode = "password_reset"
         args = args[1:]
+    elif args and args[0] in ("--master-transfer", "--master-xfer", "-m"):
+        mode = "master_transfer"
+        args = args[1:]
 
     url = (os.environ.get("NOTIFY_WEBHOOK_URL") or "").strip()
     secret = (os.environ.get("NOTIFY_SHARED_SECRET") or "").strip()
@@ -63,7 +67,7 @@ def main() -> int:
 
     default_email = (
         (os.environ.get("NOTIFY_ADMIN_TO") or "").split(",")[0].strip()
-        if mode in ("approval", "rejection", "password_reset")
+        if mode in ("approval", "rejection", "password_reset", "master_transfer")
         else "phase0-test@example.com"
     )
     email = (args[0] if args else "").strip() or default_email
@@ -75,7 +79,7 @@ def main() -> int:
         print("NOTIFY_SHARED_SECRET が未設定です。")
         return 1
     if not email:
-        print("送信先 email が未指定です（--approval / --rejection / --password-reset 時は NOTIFY_ADMIN_TO か引数）。")
+        print("送信先 email が未指定です（--approval / --rejection / --password-reset / --master-transfer 時は NOTIFY_ADMIN_TO か引数）。")
         return 1
 
     if mode == "approval":
@@ -110,6 +114,25 @@ def main() -> int:
         }
         print("mode password_reset →", email)
         print("reset_url", reset_url)
+        print("expires", expires_display)
+    elif mode == "master_transfer":
+        token = str(uuid4())
+        approval_url = f"{app_url}#master-transfer?token={token}"
+        now_jst = datetime.now(JST)
+        end = (now_jst + timedelta(days=7)).replace(
+            hour=23, minute=59, second=59, microsecond=999000
+        )
+        expires_display = f"{end.year}年{end.month}月{end.day}日 23:59（日本時間）"
+        payload = {
+            "secret": secret,
+            "type": "master_transfer",
+            "email": email,
+            "approval_url": approval_url,
+            "from_email": "master-test@example.com",
+            "expires_at": expires_display,
+        }
+        print("mode master_transfer →", email)
+        print("approval_url", approval_url)
         print("expires", expires_display)
     else:
         payload = {

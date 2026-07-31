@@ -16,6 +16,8 @@ const App = {
     citationsByMessageId: {},
     forumCategoryLookup: null,
     pendingUsers: [],
+    approvedUsers: [],
+    roleRequestUsers: [],
     analyticsOverview: null,
     currentScreen: 'chat',
     returnScreen: null,
@@ -25,7 +27,9 @@ const App = {
     pendingQuestionText: '',
     preferFastSummary: false,
     resetPasswordEmail: '',
-    resetPasswordToken: ''
+    resetPasswordToken: '',
+    masterTransferToken: '',
+    masterTransferInfo: null
   },
 
   elements: {},
@@ -97,24 +101,42 @@ const App = {
       .replace(/'/g, '&#039;');
   },
 
-  /* 改修: シークレットURL時は管理者登録画面を表示。Phase4: #reset-password?token= */
+  /* Phase4: #reset-password?token= / マスター移譲: #master-transfer?token= */
   init: () => {
     App.cacheElements();
     App.bindEvents();
     App.hydrateSemanticMode();
-    if (App.isSecretAdminRoute()) {
-      App.showSecretAdminRegisterView();
-      return;
-    }
     const resetToken = App.parseResetPasswordTokenFromHash();
     if (resetToken) {
       App.openResetPasswordFromToken(resetToken);
       return;
     }
+    const xferToken = App.parseMasterTransferTokenFromHash();
+    if (xferToken) {
+      App.openMasterTransferFromToken(xferToken);
+      return;
+    }
+    try {
+      const saved = sessionStorage.getItem('master_xfer_token') || '';
+      if (saved) {
+        App.openMasterTransferFromToken(saved);
+        return;
+      }
+    } catch (e) {
+      /* ignore */
+    }
     App.showAuthView();
   },
 
-  /* 改修: 管理者ゲート用 dialog 等の要素参照 */
+  isStaffAdmin: () => {
+    const role = App.state.currentUser && App.state.currentUser.role;
+    return role === 'admin' || role === 'master_admin';
+  },
+
+  isMasterAdmin: () => {
+    return !!(App.state.currentUser && App.state.currentUser.role === 'master_admin');
+  },
+
   cacheElements: () => {
     App.elements.authView = document.getElementById('authView');
     App.elements.mainView = document.getElementById('mainView');
@@ -124,16 +146,8 @@ const App = {
     App.elements.resetPasswordForm = document.getElementById('resetPasswordForm');
     App.elements.forgotPasswordSubmitBtn = document.getElementById('forgotPasswordSubmitBtn');
     App.elements.resetPasswordSubmitBtn = document.getElementById('resetPasswordSubmitBtn');
-    App.elements.secretAdminRegisterView = document.getElementById('secretAdminRegisterView');
-    App.elements.secretAdminRegisterForm = document.getElementById('secretAdminRegisterForm');
-    App.elements.secretAdminRegisterSubmitBtn = document.getElementById('secretAdminRegisterSubmitBtn');
-    App.elements.adminEntryBtn = document.getElementById('adminEntryBtn');
-    App.elements.loginScreenAdminRegisterBtn = document.getElementById('loginScreenAdminRegisterBtn');
-    App.elements.adminGateOverlay = document.getElementById('adminGateOverlay');
-    App.elements.adminGatePasswordInput = document.getElementById('adminGatePasswordInput');
-    App.elements.adminGateError = document.getElementById('adminGateError');
-    App.elements.adminGateCancelBtn = document.getElementById('adminGateCancelBtn');
-    App.elements.adminGateOkBtn = document.getElementById('adminGateOkBtn');
+    App.elements.masterTransferView = document.getElementById('masterTransferView');
+    App.elements.masterTransferAcceptBtn = document.getElementById('masterTransferAcceptBtn');
     App.elements.loginForm = document.getElementById('loginForm');
     App.elements.registerForm = document.getElementById('registerForm');
     App.elements.loginSubmitBtn = document.getElementById('loginSubmitBtn');
@@ -170,6 +184,9 @@ const App = {
     App.elements.pendingUsersTableBody = document.getElementById('pendingUsersTableBody');
     App.elements.pendingUsersSelectAll = document.getElementById('pendingUsersSelectAll');
     App.elements.bulkApprovePendingUsersBtn = document.getElementById('bulkApprovePendingUsersBtn');
+    App.elements.approvedUsersTableBody = document.getElementById('approvedUsersTableBody');
+    App.elements.adminsTableBody = document.getElementById('adminsTableBody');
+    App.elements.roleRequestsTableBody = document.getElementById('roleRequestsTableBody');
     App.elements.csvFileInput = document.getElementById('csvFileInput');
     App.elements.importResult = document.getElementById('importResult');
     App.elements.toast = document.getElementById('toast');
@@ -196,7 +213,6 @@ const App = {
     App.elements.knowledgeBackLabel = document.getElementById('knowledgeBackLabel');
   },
 
-  /* 改修: 管理者登録クリックでパスワードモーダルを開く */
   bindEvents: () => {
     document.getElementById('showLoginTabBtn').addEventListener('click', App.showLoginTab);
     document.getElementById('showRegisterTabBtn').addEventListener('click', App.showRegisterTab);
@@ -231,51 +247,22 @@ const App = {
         App.showLoginTab();
       });
     }
-    if (App.elements.secretAdminRegisterForm) {
-      App.elements.secretAdminRegisterForm.addEventListener('submit', App.handleSecretAdminRegister);
+    if (App.elements.masterTransferAcceptBtn) {
+      App.elements.masterTransferAcceptBtn.addEventListener('click', App.acceptMasterTransfer);
     }
-    const secretBackBtn = document.getElementById('secretAdminBackToLoginBtn');
-    if (secretBackBtn) {
-      secretBackBtn.addEventListener('click', function () {
+    const xferBackBtn = document.getElementById('masterTransferBackToLoginBtn');
+    if (xferBackBtn) {
+      xferBackBtn.addEventListener('click', function () {
+        App.persistMasterTransferToken(App.state.masterTransferToken || '');
+        App.clearMasterTransferHash();
         App.showAuthView();
         App.showLoginTab();
       });
     }
-    /* 改修: キャプチャ段階で委譲し、他要素の stopPropagation や古いバインドでも確実に発火 */
-    document.addEventListener(
-      'click',
-      function (ev) {
-        const t = ev.target;
-        if (!t || typeof t.closest !== 'function') return;
-        if (t.closest('#adminEntryBtn') || t.closest('#loginScreenAdminRegisterBtn')) {
-          ev.preventDefault();
-          App.openAdminGateDialog();
-        }
-      },
-      true
-    );
-    if (App.elements.adminGateOverlay) {
-      App.elements.adminGateOverlay.addEventListener('click', function (e) {
-        if (e.target === App.elements.adminGateOverlay) {
-          App.closeAdminGateDialog();
-        }
-      });
+    const cancelXferBtn = document.getElementById('cancelMasterTransferBtn');
+    if (cancelXferBtn) {
+      cancelXferBtn.addEventListener('click', App.cancelMasterTransfer);
     }
-    if (App.elements.adminGateCancelBtn) {
-      App.elements.adminGateCancelBtn.addEventListener('click', App.closeAdminGateDialog);
-    }
-    if (App.elements.adminGateOkBtn) {
-      App.elements.adminGateOkBtn.addEventListener('click', App.handleAdminGateSubmit);
-    }
-    if (App.elements.adminGatePasswordInput) {
-      App.elements.adminGatePasswordInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          App.handleAdminGateSubmit();
-        }
-      });
-    }
-    document.addEventListener('keydown', App.onAdminGateEscape, true);
     document.getElementById('logoutBtn').addEventListener('click', App.logout);
     document.getElementById('newChatBtn').addEventListener('click', App.createNewChatPlaceholder);
     App.elements.messageForm.addEventListener('submit', App.handleSendMessage);
@@ -307,6 +294,10 @@ const App = {
     const reloadKnowledgeBtn = document.getElementById('reloadKnowledgeBtn');
     if (reloadKnowledgeBtn) reloadKnowledgeBtn.addEventListener('click', App.loadKnowledge);
     document.getElementById('reloadPendingUsersBtn').addEventListener('click', App.loadPendingUsers);
+    const reloadApprovedUsersBtn = document.getElementById('reloadApprovedUsersBtn');
+    if (reloadApprovedUsersBtn) reloadApprovedUsersBtn.addEventListener('click', App.loadApprovedUsers);
+    const reloadAdminsBtn = document.getElementById('reloadAdminsBtn');
+    if (reloadAdminsBtn) reloadAdminsBtn.addEventListener('click', App.loadAdminLists);
     if (App.elements.bulkApprovePendingUsersBtn) {
       App.elements.bulkApprovePendingUsersBtn.addEventListener('click', App.confirmBulkApproveUsers);
     }
@@ -461,53 +452,37 @@ const App = {
   showAuthView: () => {
     App.elements.authView.classList.remove('hidden');
     App.elements.mainView.classList.add('hidden');
-    if (App.elements.secretAdminRegisterView) {
-      App.elements.secretAdminRegisterView.classList.add('hidden');
-    }
     if (App.elements.forgotPasswordView) {
       App.elements.forgotPasswordView.classList.add('hidden');
     }
     if (App.elements.resetPasswordView) {
       App.elements.resetPasswordView.classList.add('hidden');
+    }
+    if (App.elements.masterTransferView) {
+      App.elements.masterTransferView.classList.add('hidden');
     }
   },
 
   showMainView: () => {
     App.elements.authView.classList.add('hidden');
     App.elements.mainView.classList.remove('hidden');
-    if (App.elements.secretAdminRegisterView) {
-      App.elements.secretAdminRegisterView.classList.add('hidden');
-    }
     if (App.elements.forgotPasswordView) {
       App.elements.forgotPasswordView.classList.add('hidden');
     }
     if (App.elements.resetPasswordView) {
       App.elements.resetPasswordView.classList.add('hidden');
+    }
+    if (App.elements.masterTransferView) {
+      App.elements.masterTransferView.classList.add('hidden');
     }
   },
 
-  showSecretAdminRegisterView: () => {
-    App.elements.authView.classList.add('hidden');
-    App.elements.mainView.classList.add('hidden');
-    if (App.elements.forgotPasswordView) {
-      App.elements.forgotPasswordView.classList.add('hidden');
-    }
-    if (App.elements.resetPasswordView) {
-      App.elements.resetPasswordView.classList.add('hidden');
-    }
-    if (App.elements.secretAdminRegisterView) {
-      App.elements.secretAdminRegisterView.classList.remove('hidden');
-    }
-  },
 
   showForgotPasswordView: () => {
     App.state.resetPasswordEmail = '';
     App.state.resetPasswordToken = '';
     App.elements.authView.classList.add('hidden');
     App.elements.mainView.classList.add('hidden');
-    if (App.elements.secretAdminRegisterView) {
-      App.elements.secretAdminRegisterView.classList.add('hidden');
-    }
     if (App.elements.resetPasswordView) {
       App.elements.resetPasswordView.classList.add('hidden');
     }
@@ -524,9 +499,6 @@ const App = {
     App.state.resetPasswordToken = token || '';
     App.elements.authView.classList.add('hidden');
     App.elements.mainView.classList.add('hidden');
-    if (App.elements.secretAdminRegisterView) {
-      App.elements.secretAdminRegisterView.classList.add('hidden');
-    }
     if (App.elements.forgotPasswordView) {
       App.elements.forgotPasswordView.classList.add('hidden');
     }
@@ -570,6 +542,239 @@ const App = {
     return base + '#reset-password?token=' + encodeURIComponent(token);
   },
 
+  parseMasterTransferTokenFromHash: () => {
+    const hash = String(window.location.hash || '');
+    if (!hash) return '';
+    const body = hash.replace(/^#/, '');
+    if (!body) return '';
+    let path = body;
+    let query = '';
+    const qIdx = body.indexOf('?');
+    if (qIdx >= 0) {
+      path = body.slice(0, qIdx);
+      query = body.slice(qIdx + 1);
+    }
+    if (path !== 'master-transfer') return '';
+    const params = new URLSearchParams(query);
+    return (params.get('token') || '').trim();
+  },
+
+  clearMasterTransferHash: () => {
+    if (!App.parseMasterTransferTokenFromHash()) return;
+    const url = window.location.pathname + window.location.search;
+    window.history.replaceState(null, '', url);
+  },
+
+  buildMasterTransferUrl: (token) => {
+    const base = (window.location.origin + window.location.pathname).replace(/\/+$/, '') + '/';
+    return base + '#master-transfer?token=' + encodeURIComponent(token);
+  },
+
+  persistMasterTransferToken: (token) => {
+    try {
+      if (token) sessionStorage.setItem('master_xfer_token', token);
+      else sessionStorage.removeItem('master_xfer_token');
+    } catch (e) {
+      /* ignore */
+    }
+  },
+
+  showMasterTransferView: () => {
+    if (App.elements.authView) App.elements.authView.classList.add('hidden');
+    if (App.elements.mainView) App.elements.mainView.classList.add('hidden');
+    if (App.elements.forgotPasswordView) App.elements.forgotPasswordView.classList.add('hidden');
+    if (App.elements.resetPasswordView) App.elements.resetPasswordView.classList.add('hidden');
+    if (App.elements.masterTransferView) App.elements.masterTransferView.classList.remove('hidden');
+  },
+
+  openMasterTransferFromToken: async (token) => {
+    App.state.masterTransferToken = String(token || '').trim();
+    App.persistMasterTransferToken(App.state.masterTransferToken);
+    App.setLoading(true);
+    try {
+      const res = await App.apiClient('POST', '/admin/master-transfer/validate', {
+        token: App.state.masterTransferToken
+      });
+      const expiresAt = (res && res.expires_at) || '';
+      if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
+        throw new Error('移譲リンクの有効期限が切れています。現マスターに再依頼してください');
+      }
+      App.state.masterTransferInfo = res || null;
+      App.showMasterTransferView();
+      const fromEl = document.getElementById('masterTransferFromEmail');
+      const toEl = document.getElementById('masterTransferToEmail');
+      const expEl = document.getElementById('masterTransferExpires');
+      if (fromEl) fromEl.textContent = (res && res.from_email) || '—';
+      if (toEl) toEl.textContent = (res && (res.to_email || res.to_user_email)) || '—';
+      if (expEl) expEl.textContent = expiresAt || '—';
+      const hint = document.getElementById('masterTransferLoginHint');
+      const btn = App.elements.masterTransferAcceptBtn;
+      const user = App.state.currentUser;
+      const toId = String((res && res.to_user_id) || '');
+      const isNominee = !!(user && String(user.id) === toId);
+      if (hint) hint.classList.toggle('hidden', isNominee);
+      if (btn) {
+        btn.disabled = !isNominee;
+        btn.textContent = isNominee
+          ? 'マスター管理者として承認する'
+          : '指名アカウントでログインが必要です';
+      }
+    } catch (error) {
+      App.persistMasterTransferToken('');
+      App.state.masterTransferToken = '';
+      App.state.masterTransferInfo = null;
+      App.clearMasterTransferHash();
+      App.showAuthView();
+      App.showToast((error && error.message) || '移譲リンクが無効です', 'error');
+    } finally {
+      App.setLoading(false);
+    }
+  },
+
+  startMasterTransfer: async (userId, email) => {
+    if (!App.isMasterAdmin()) {
+      App.showToast('マスター管理者のみ移譲できます', 'error');
+      return;
+    }
+    if (String(userId) === String(App.state.currentUser.id)) {
+      App.showToast('自分自身への移譲はできません', 'error');
+      return;
+    }
+    const ok = await App.openConfirmDialog(
+      'マスターを移譲する',
+      (email || 'この管理者') +
+        ' にマスター管理者の移譲依頼メールを送ります。相手が承認するまで、あなたがマスターのままです。よろしいですか？'
+    );
+    if (!ok) return;
+    App.setLoading(true);
+    try {
+      const token =
+        window.crypto && typeof window.crypto.randomUUID === 'function'
+          ? window.crypto.randomUUID()
+          : 'mx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 12);
+      const expiry = App.buildPasswordResetExpiry();
+      await App.apiClient('POST', '/admin/master-transfer/cancel', {
+        actor_user_id: String(App.state.currentUser.id)
+      }).catch(function () { /* 未作成でも続行 */ });
+      await App.apiClient('POST', '/admin/master-transfer/start', {
+        actor_user_id: String(App.state.currentUser.id),
+        target_user_id: String(userId),
+        target_email: email || '',
+        from_email: App.state.currentUser.email || '',
+        token: token,
+        expires_at: expiry.commentsAt,
+        comment_id: 'admin_master_xfer_pending'
+      });
+      const approvalUrl = App.buildMasterTransferUrl(token);
+      try {
+        await App.apiClient('POST', '/notify/master-transfer', {
+          email: email,
+          approval_url: approvalUrl,
+          from_email: App.state.currentUser.email || '',
+          expires_at: expiry.display
+        });
+      } catch (notifyErr) {
+        console.warn('master-transfer notify failed', notifyErr);
+        App.showToast(
+          '移譲依頼は作成しましたが、メール送信に失敗しました。URLを手動共有してください: ' + approvalUrl,
+          'error'
+        );
+        await App.loadAdminLists();
+        return;
+      }
+      App.showToast('マスター移譲の承認依頼メールを送信しました', 'success');
+      await App.loadAdminLists();
+    } catch (error) {
+      App.showToast((error && error.message) || '移譲の開始に失敗しました', 'error');
+    } finally {
+      App.setLoading(false);
+    }
+  },
+
+  acceptMasterTransfer: async () => {
+    const info = App.state.masterTransferInfo;
+    const token = App.state.masterTransferToken;
+    if (!info || !token || !App.state.currentUser) {
+      App.showToast('移譲情報が不足しています。リンクから開き直してください', 'error');
+      return;
+    }
+    if (String(App.state.currentUser.id) !== String(info.to_user_id)) {
+      App.showToast('指名された管理者アカウントでログインしてください', 'error');
+      return;
+    }
+    const ok = await App.openConfirmDialog(
+      'マスター管理者の承認',
+      '承認すると、あなたが新しいマスター管理者になり、現マスターは一般の管理者になります。よろしいですか？'
+    );
+    if (!ok) return;
+    App.setLoading(true);
+    try {
+      await App.apiClient('POST', '/admin/master-transfer/accept', {
+        actor_user_id: String(App.state.currentUser.id),
+        from_user_id: String(info.from_user_id),
+        token: token
+      });
+      App.state.currentUser.role = 'master_admin';
+      App.persistMasterTransferToken('');
+      App.state.masterTransferToken = '';
+      App.state.masterTransferInfo = null;
+      App.clearMasterTransferHash();
+      App.showToast('マスター管理者への移譲が完了しました', 'success');
+      App.afterLogin();
+    } catch (error) {
+      App.showToast((error && error.message) || '承認に失敗しました', 'error');
+    } finally {
+      App.setLoading(false);
+    }
+  },
+
+  cancelMasterTransfer: async () => {
+    if (!App.isMasterAdmin()) return;
+    const ok = await App.openConfirmDialog('移譲をキャンセル', '進行中のマスター移譲依頼を取り消します。よろしいですか？');
+    if (!ok) return;
+    try {
+      await App.apiClient('POST', '/admin/master-transfer/cancel', {
+        actor_user_id: String(App.state.currentUser.id)
+      });
+      App.showToast('マスター移譲をキャンセルしました', 'info');
+      await App.loadAdminLists();
+    } catch (error) {
+      App.showToast((error && error.message) || 'キャンセルに失敗しました', 'error');
+    }
+  },
+
+  loadPendingMasterTransfer: async () => {
+    const note = document.getElementById('masterTransferPendingNote');
+    const cancelBtn = document.getElementById('cancelMasterTransferBtn');
+    if (!App.isMasterAdmin()) {
+      if (note) note.classList.add('hidden');
+      if (cancelBtn) cancelBtn.classList.add('hidden');
+      App.state.pendingMasterTransfer = null;
+      return;
+    }
+    try {
+      const res = await App.apiClient('GET', '/admin/master-transfer/pending');
+      const req = res && res.request ? res.request : null;
+      App.state.pendingMasterTransfer = req;
+      if (req && note) {
+        note.textContent =
+          'マスター移譲の承認待ち: ' +
+          (req.author_email || req.parent_comment_id || '') +
+          '（有効期限: ' +
+          (req.posted_at || '—') +
+          '）';
+        note.classList.remove('hidden');
+      } else if (note) {
+        note.classList.add('hidden');
+      }
+      if (cancelBtn) cancelBtn.classList.toggle('hidden', !req);
+    } catch (e) {
+      App.state.pendingMasterTransfer = null;
+      if (note) note.classList.add('hidden');
+      if (cancelBtn) cancelBtn.classList.add('hidden');
+    }
+  },
+
   /** 日本時間のカレンダー日付部品を取得 */
   jstYmdParts: (date) => {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -589,7 +794,9 @@ const App = {
 
   /**
    * 有効期限: 日本時間で「今日＋7日」の 23:59 まで（その日いっぱい）。
-   * iso … DB保存用 / display … メール表記用
+   * iso … users.reset_expires_at 用（Z可）
+   * commentsAt … comments.posted_at 用（Z不可。+09:00）
+   * display … メール表記用
    */
   buildPasswordResetExpiry: () => {
     const today = App.jstYmdParts(new Date());
@@ -600,8 +807,11 @@ const App = {
     const d = anchor.getUTCDate();
     // 23:59:59.999 JST = 同日 14:59:59.999 UTC
     const expires = new Date(Date.UTC(y, m - 1, d, 14, 59, 59, 999));
+    const mm = m < 10 ? '0' + m : String(m);
+    const dd = d < 10 ? '0' + d : String(d);
     return {
       iso: expires.toISOString(),
+      commentsAt: y + '-' + mm + '-' + dd + 'T23:59:59+09:00',
       display: y + '年' + m + '月' + d + '日 23:59（日本時間）'
     };
   },
@@ -726,56 +936,6 @@ const App = {
     }
   },
 
-  isSecretAdminRoute: () => {
-    const p = window.location.pathname.replace(/\/+$/, '') || '/';
-    return /(^|\/)secret-admin-register$/.test(p);
-  },
-
-  onAdminGateEscape: (e) => {
-    if (e.key !== 'Escape') return;
-    if (!App.elements.adminGateOverlay || App.elements.adminGateOverlay.classList.contains('hidden')) return;
-    e.preventDefault();
-    App.closeAdminGateDialog();
-  },
-
-  openAdminGateDialog: () => {
-    if (!App.elements.adminGateOverlay) {
-      App.showToast('パスワード入力画面を表示できません', 'error');
-      return;
-    }
-    if (App.elements.adminGatePasswordInput) {
-      App.elements.adminGatePasswordInput.value = '';
-    }
-    if (App.elements.adminGateError) {
-      App.elements.adminGateError.textContent = '';
-    }
-    App.elements.adminGateOverlay.classList.remove('hidden');
-    window.setTimeout(function () {
-      if (App.elements.adminGatePasswordInput) {
-        App.elements.adminGatePasswordInput.focus();
-      }
-    }, 0);
-  },
-
-  closeAdminGateDialog: () => {
-    if (!App.elements.adminGateOverlay) return;
-    App.elements.adminGateOverlay.classList.add('hidden');
-  },
-
-  handleAdminGateSubmit: () => {
-    if (!App.elements.adminGatePasswordInput) return;
-    const value = (App.elements.adminGatePasswordInput.value || '').trim();
-    if (value !== '1162') {
-      if (App.elements.adminGateError) {
-        App.elements.adminGateError.textContent = 'パスワードが一致しません';
-      }
-      return;
-    }
-    App.closeAdminGateDialog();
-    /* サーバーに /secret-admin-register が無い環境でも 404 にならないよう、同一ページ内で表示 */
-    App.showSecretAdminRegisterView();
-  },
-
   showLoginTab: () => {
     document.getElementById('showLoginTabBtn').className = 'w-1/2 py-2 rounded-md bg-blue-900 text-white';
     document.getElementById('showRegisterTabBtn').className = 'w-1/2 py-2 rounded-md bg-slate-200 text-slate-700';
@@ -845,56 +1005,6 @@ const App = {
     }
   },
 
-  handleSecretAdminRegister: async (event) => {
-    event.preventDefault();
-    const email = document.getElementById('secretAdminEmail').value.trim();
-    const password = document.getElementById('secretAdminPassword').value;
-    const secretKey = document.getElementById('secretAdminSecretKey').value.trim();
-
-    if (!email || !password || !secretKey) {
-      App.showToast('メール・パスワード・シークレットキーは必須です', 'error');
-      return;
-    }
-
-    App.setButtonLoading(App.elements.secretAdminRegisterSubmitBtn, true, '登録中');
-    App.setLoading(true);
-    const adminBody = {
-      email: email,
-      password_hash: password,
-      secret_key: secretKey
-    };
-    try {
-      /* 既存メール（一般登録済み等）は INSERT で重複エラーになるため、先に昇格APIを試す */
-      try {
-        await App.apiClient('POST', '/auth/secret-admin-upgrade', adminBody);
-      } catch (upgradeErr) {
-        const msg = upgradeErr.message || '';
-        const isUnregistered =
-          upgradeErr.errorCode === 'user_not_found' ||
-          msg.indexOf('未登録') !== -1;
-        /* 未デプロイ・エンジン不整合で upgrade が 404/500 のときも新規登録を試す（既存メールは register が失敗し得る） */
-        const tryRegisterFallback =
-          isUnregistered ||
-          msg.indexOf('HTTP 404') !== -1 ||
-          msg.indexOf('HTTP 500') !== -1 ||
-          msg.indexOf('HTTP 502') !== -1;
-        if (!tryRegisterFallback) {
-          throw upgradeErr;
-        }
-        await App.apiClient('POST', '/auth/secret-admin-register', adminBody);
-      }
-      App.showToast('管理者登録が完了しました', 'success');
-      App.elements.secretAdminRegisterForm.reset();
-      App.showAuthView();
-      App.showLoginTab();
-    } catch (error) {
-      App.showToast(error.message || '管理者登録に失敗しました', 'error');
-    } finally {
-      App.setButtonLoading(App.elements.secretAdminRegisterSubmitBtn, false);
-      App.setLoading(false);
-    }
-  },
-
   handleLogin: async (event) => {
     event.preventDefault();
     const email = document.getElementById('loginEmail').value.trim();
@@ -923,11 +1033,26 @@ const App = {
   },
 
   afterLogin: async () => {
+    const pendingXfer = App.state.masterTransferToken || (function () {
+      try {
+        return sessionStorage.getItem('master_xfer_token') || '';
+      } catch (e) {
+        return '';
+      }
+    })();
+    if (pendingXfer) {
+      await App.openMasterTransferFromToken(pendingXfer);
+      return;
+    }
     App.showMainView();
     App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + App.state.currentUser.role + ')';
 
-    const isAdmin = App.state.currentUser.role === 'admin';
+    const isAdmin = App.isStaffAdmin();
     document.getElementById('adminUsersTabBtn').classList.toggle('hidden', !isAdmin);
+    const userListTab = document.getElementById('adminUserListTabBtn');
+    if (userListTab) userListTab.classList.toggle('hidden', !isAdmin);
+    const adminListTab = document.getElementById('adminAdminListTabBtn');
+    if (adminListTab) adminListTab.classList.toggle('hidden', !isAdmin);
     document.getElementById('adminDataTabBtn').classList.toggle('hidden', !isAdmin);
     const analyticsTab = document.getElementById('adminAnalyticsTabBtn');
     if (analyticsTab) analyticsTab.classList.toggle('hidden', !isAdmin);
@@ -945,8 +1070,10 @@ const App = {
         App.loadComments(),
         App.loadKnowledge()
       ]);
-      if (App.state.currentUser.role === 'admin') {
+      if (App.isStaffAdmin()) {
         await App.loadPendingUsers();
+        await App.loadApprovedUsers();
+        await App.loadRoleRequests();
       }
       App.renderAll();
     } catch (error) {
@@ -964,6 +1091,8 @@ const App = {
     App.state.suggestedQuestions = [];
     App.state.comments = [];
     App.state.pendingUsers = [];
+    App.state.approvedUsers = [];
+    App.state.roleRequestUsers = [];
     App.elements.loginForm.reset();
     App.elements.registerForm.reset();
     App.showAuthView();
@@ -981,6 +1110,8 @@ const App = {
       lessons: 'lessonsScreen',
       knowledge: 'knowledgeScreen',
       adminUsers: 'adminUsersScreen',
+      adminUserList: 'adminUserListScreen',
+      adminAdminList: 'adminAdminListScreen',
       adminData: 'adminDataScreen',
       adminAnalytics: 'adminAnalyticsScreen'
     };
@@ -1002,6 +1133,16 @@ const App = {
     if (opts.fromNav || opts.fromBack) {
       App.clearDbReturnBar();
     }
+    if (screenName === 'adminUserList') {
+      App.loadApprovedUsers().catch(function (err) {
+        App.showToast((err && err.message) || 'ユーザー一覧の取得に失敗しました', 'error');
+      });
+    }
+    if (screenName === 'adminAdminList') {
+      App.loadAdminLists().catch(function (err) {
+        App.showToast((err && err.message) || '管理者一覧の取得に失敗しました', 'error');
+      });
+    }
     if (screenName === 'adminAnalytics') {
       App.loadAnalytics().catch(function (err) {
         App.showToast((err && err.message) || '分析データの取得に失敗しました', 'error');
@@ -1016,6 +1157,8 @@ const App = {
       lessons: '学習ページ説明テキスト',
       knowledge: 'セミナー動画文字起こし',
       adminUsers: 'ユーザー承認',
+      adminUserList: 'ユーザー一覧',
+      adminAdminList: '管理者一覧',
       adminData: 'データ取込',
       adminAnalytics: '運営分析'
     };
@@ -1927,8 +2070,391 @@ const App = {
     }
   },
 
-  loadPendingUsers: async () => {
-    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') return;
+
+  loadApprovedUsers: async () => {
+    if (!App.isStaffAdmin()) return;
+    const res = await App.apiClient('GET', '/admin/users');
+    App.state.approvedUsers = (res && res.users) ? res.users : [];
+    App.renderApprovedUsers();
+    App.renderAdmins();
+  },
+
+  loadRoleRequests: async () => {
+    if (!App.isStaffAdmin()) return;
+    try {
+      const res = await App.apiClient('GET', '/admin/role-requests/pending');
+      App.state.roleRequestUsers = (res && res.requests) ? res.requests : [];
+    } catch (e) {
+      App.state.roleRequestUsers = [];
+      console.warn('role requests load failed', e);
+    }
+    App.renderRoleRequests();
+  },
+
+  loadAdminLists: async () => {
+    await Promise.all([App.loadApprovedUsers(), App.loadRoleRequests(), App.loadPendingMasterTransfer()]);
+  },
+
+
+  pendingActionForUser: (userId) => {
+    const want = 'admin_role_req_' + String(userId || '');
+    const list = App.state.roleRequestUsers || [];
+    for (let i = 0; i < list.length; i += 1) {
+      if (String(list[i].comment_id || '') === want) {
+        return String(list[i].parent_comment_id || list[i].topic_title || '').trim();
+      }
+    }
+    return '';
+  },
+
+  generalUsers: () => {
+    return (App.state.approvedUsers || []).filter(function (u) {
+      return (u.role || 'user') === 'user';
+    });
+  },
+
+  adminUsersOnly: () => {
+    return (App.state.approvedUsers || []).filter(function (u) {
+      const r = u.role || '';
+      return r === 'admin' || r === 'master_admin';
+    });
+  },
+
+  renderApprovedUsers: () => {
+    const body = App.elements.approvedUsersTableBody;
+    if (!body) return;
+    body.innerHTML = '';
+    if (!App.isStaffAdmin()) return;
+    const list = App.generalUsers();
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="4" class="p-3 text-slate-500">一般ユーザーはいません</td></tr>';
+      return;
+    }
+    const isMaster = App.isMasterAdmin();
+    list.forEach(function (u) {
+      const tr = document.createElement('tr');
+      tr.className = 'border-t';
+      const req = App.pendingActionForUser(u.id);
+      const reqNote = req ? '<div class="text-xs text-amber-700 mt-1">申請中: ' + App.escapeHtml(req) + '</div>' : '';
+      let actions = '';
+      if (isMaster) {
+        actions +=
+          '<button type="button" class="grant-admin-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
+          App.escapeHtml(u.id) +
+          '">管理者にする</button>';
+      } else {
+        actions +=
+          '<button type="button" class="request-grant-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
+          App.escapeHtml(u.id) +
+          '"' +
+          (req ? ' disabled' : '') +
+          '>管理者申請</button>';
+      }
+      actions +=
+        '<button type="button" class="withdraw-user-btn px-3 py-1 rounded bg-red-600 text-white text-xs" data-id="' +
+        App.escapeHtml(u.id) +
+        '" data-email="' +
+        App.escapeHtml(u.email || '') +
+        '">退会削除</button>';
+      tr.innerHTML =
+        '<td class="p-2">' +
+        App.escapeHtml(u.id) +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(u.email || '') +
+        reqNote +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(u.member_no || '') +
+        '</td>' +
+        '<td class="p-2"><div class="flex flex-wrap gap-2">' +
+        actions +
+        '</div></td>';
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('.grant-admin-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.setUserRoleInstant(btn.getAttribute('data-id'), 'admin');
+      });
+    });
+    body.querySelectorAll('.request-grant-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.createRoleRequest(btn.getAttribute('data-id'), 'grant');
+      });
+    });
+    body.querySelectorAll('.withdraw-user-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.confirmWithdrawUser(btn.getAttribute('data-id'), btn.getAttribute('data-email'));
+      });
+    });
+  },
+
+  renderAdmins: () => {
+    const body = App.elements.adminsTableBody;
+    if (!body) return;
+    body.innerHTML = '';
+    if (!App.isStaffAdmin()) return;
+    const list = App.adminUsersOnly();
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">管理者はいません</td></tr>';
+      return;
+    }
+    const isMaster = App.isMasterAdmin();
+    const selfId = String((App.state.currentUser && App.state.currentUser.id) || '');
+    list.forEach(function (u) {
+      const tr = document.createElement('tr');
+      tr.className = 'border-t';
+      const role = u.role || '';
+      const roleLabel =
+        role === 'master_admin'
+          ? '<span class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-xs">マスター</span>'
+          : '<span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">管理者</span>';
+      const req = App.pendingActionForUser(u.id);
+      const reqNote = req ? '<div class="text-xs text-amber-700 mt-1">申請中: ' + App.escapeHtml(req) + '</div>' : '';
+      let actions = '—';
+      if (role !== 'master_admin' && String(u.id) !== selfId) {
+        if (isMaster) {
+          actions =
+            '<button type="button" class="transfer-master-btn px-3 py-1 rounded bg-amber-700 text-white text-xs" data-id="' +
+            App.escapeHtml(u.id) +
+            '" data-email="' +
+            App.escapeHtml(u.email || '') +
+            '">マスターを移譲する</button>';
+          actions +=
+            '<button type="button" class="revoke-admin-btn ml-2 px-3 py-1 rounded bg-slate-700 text-white text-xs" data-id="' +
+            App.escapeHtml(u.id) +
+            '">管理者から外す</button>';
+          actions +=
+            '<button type="button" class="withdraw-admin-btn ml-2 px-3 py-1 rounded bg-red-600 text-white text-xs" data-id="' +
+            App.escapeHtml(u.id) +
+            '" data-email="' +
+            App.escapeHtml(u.email || '') +
+            '">退会削除</button>';
+        } else {
+          actions =
+            '<button type="button" class="request-revoke-btn px-3 py-1 rounded bg-slate-700 text-white text-xs" data-id="' +
+            App.escapeHtml(u.id) +
+            '"' +
+            (req ? ' disabled' : '') +
+            '>除外申請</button>';
+        }
+      }
+      tr.innerHTML =
+        '<td class="p-2">' +
+        App.escapeHtml(u.id) +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(u.email || '') +
+        reqNote +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(u.member_no || '') +
+        '</td>' +
+        '<td class="p-2">' +
+        roleLabel +
+        '</td>' +
+        '<td class="p-2">' +
+        actions +
+        '</td>';
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('.transfer-master-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.startMasterTransfer(btn.getAttribute('data-id'), btn.getAttribute('data-email'));
+      });
+    });
+    body.querySelectorAll('.revoke-admin-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.setUserRoleInstant(btn.getAttribute('data-id'), 'user');
+      });
+    });
+    body.querySelectorAll('.request-revoke-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.createRoleRequest(btn.getAttribute('data-id'), 'revoke');
+      });
+    });
+    body.querySelectorAll('.withdraw-admin-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.confirmWithdrawUser(btn.getAttribute('data-id'), btn.getAttribute('data-email'));
+      });
+    });
+  },
+
+  renderRoleRequests: () => {
+    const body = App.elements.roleRequestsTableBody;
+    if (!body) return;
+    body.innerHTML = '';
+    const list = App.state.roleRequestUsers || [];
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">承認待ちの権限申請はありません</td></tr>';
+      return;
+    }
+    const isMaster = App.isMasterAdmin();
+    const usersById = {};
+    (App.state.approvedUsers || []).forEach(function (u) {
+      usersById[String(u.id)] = u;
+    });
+    list.forEach(function (req) {
+      const cid = String(req.comment_id || '');
+      const targetId = cid.indexOf('admin_role_req_') === 0 ? cid.slice('admin_role_req_'.length) : '';
+      const target = usersById[targetId] || {};
+      const action = String(req.parent_comment_id || req.topic_title || '').trim();
+      const actionLabel = action === 'grant' ? '管理者に昇格' : action === 'revoke' ? '管理者から除外' : action;
+      let ops = '—';
+      if (isMaster && targetId) {
+        ops =
+          '<button type="button" class="approve-role-req-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
+          App.escapeHtml(targetId) +
+          '" data-action="' +
+          App.escapeHtml(action) +
+          '">承認</button>' +
+          '<button type="button" class="reject-role-req-btn ml-2 px-3 py-1 rounded bg-slate-500 text-white text-xs" data-id="' +
+          App.escapeHtml(targetId) +
+          '">却下</button>';
+      }
+      const tr = document.createElement('tr');
+      tr.className = 'border-t';
+      tr.innerHTML =
+        '<td class="p-2">' +
+        App.escapeHtml(target.email || req.content || '') +
+        ' <span class="text-xs text-slate-400">#' +
+        App.escapeHtml(targetId) +
+        '</span></td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(actionLabel) +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(req.author_name || '') +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(req.posted_at || '') +
+        '</td>' +
+        '<td class="p-2">' +
+        ops +
+        '</td>';
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('.approve-role-req-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.approveRoleRequest(btn.getAttribute('data-id'), btn.getAttribute('data-action'));
+      });
+    });
+    body.querySelectorAll('.reject-role-req-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.rejectRoleRequest(btn.getAttribute('data-id'));
+      });
+    });
+  },
+
+  createRoleRequest: async (userId, action) => {
+    if (!App.isStaffAdmin()) return;
+    if (String(userId) === String(App.state.currentUser.id)) {
+      App.showToast('自分自身の権限は変更できません', 'error');
+      return;
+    }
+    try {
+      const commentId = 'admin_role_req_' + String(userId);
+      await App.apiClient('POST', '/admin/users/' + userId + '/role-requests', {
+        actor_user_id: App.state.currentUser.id,
+        actor_email: App.state.currentUser.email || '',
+        action: action,
+        requested_at: new Date().toISOString(),
+        comment_id: commentId,
+        content: 'role_request ' + action + ' target=' + String(userId)
+      });
+      App.showToast(action === 'grant' ? '管理者への昇格を申請しました' : '管理者除外を申請しました', 'success');
+      await App.loadAdminLists();
+    } catch (error) {
+      App.showToast((error && error.message) || '申請に失敗しました', 'error');
+    }
+  },
+
+  setUserRoleInstant: async (userId, role) => {
+    if (!App.isMasterAdmin()) {
+      App.showToast('マスター管理者のみ即時変更できます', 'error');
+      return;
+    }
+    if (String(userId) === String(App.state.currentUser.id)) {
+      App.showToast('自分自身の権限は変更できません', 'error');
+      return;
+    }
+    const ok = await App.openConfirmDialog(
+      role === 'admin' ? '管理者に設定' : '管理者から外す',
+      role === 'admin'
+        ? 'このユーザーを管理者に設定します。よろしいですか？'
+        : 'このユーザーの管理者権限を外します。よろしいですか？'
+    );
+    if (!ok) return;
+    try {
+      await App.apiClient('POST', '/admin/users/' + userId + '/set-role', {
+        actor_user_id: App.state.currentUser.id,
+        role: role
+      });
+      App.showToast('権限を更新しました', 'success');
+      await App.loadAdminLists();
+    } catch (error) {
+      App.showToast((error && error.message) || '権限更新に失敗しました', 'error');
+    }
+  },
+
+  approveRoleRequest: async (userId, action) => {
+    if (!App.isMasterAdmin()) return;
+    const newRole = action === 'grant' ? 'admin' : 'user';
+    try {
+      await App.apiClient('PUT', '/admin/role-requests/' + userId + '/approve', {
+        actor_user_id: App.state.currentUser.id,
+        new_role: newRole,
+        comment_id: 'admin_role_req_' + String(userId)
+      });
+      App.showToast('権限申請を承認しました', 'success');
+      await App.loadAdminLists();
+    } catch (error) {
+      App.showToast((error && error.message) || '承認に失敗しました', 'error');
+    }
+  },
+
+  rejectRoleRequest: async (userId) => {
+    if (!App.isMasterAdmin()) return;
+    try {
+      await App.apiClient('PUT', '/admin/role-requests/' + userId + '/reject', {
+        actor_user_id: App.state.currentUser.id,
+        comment_id: 'admin_role_req_' + String(userId)
+      });
+      App.showToast('権限申請を却下しました', 'info');
+      await App.loadAdminLists();
+    } catch (error) {
+      App.showToast((error && error.message) || '却下に失敗しました', 'error');
+    }
+  },
+
+  confirmWithdrawUser: async (userId, email) => {
+    const target = (App.state.approvedUsers || []).find(function (u) {
+      return String(u.id) === String(userId);
+    });
+    if (!App.isMasterAdmin() && target && (target.role === 'admin' || target.role === 'master_admin')) {
+      App.showToast('管理者の退会はマスター管理者のみ実行できます', 'error');
+      return;
+    }
+    const ok = await App.openConfirmDialog(
+      '退会削除',
+      (email || 'このユーザー') +
+        ' を退会（ログイン不可）にします。チャット履歴は残ります。よろしいですか？'
+    );
+    if (!ok) return;
+    try {
+      await App.apiClient('PUT', '/admin/users/' + userId + '/withdraw', {
+        actor_user_id: App.state.currentUser.id
+      });
+      App.showToast('退会処理しました', 'success');
+      await App.loadAdminLists();
+    } catch (error) {
+      App.showToast((error && error.message) || '退会処理に失敗しました', 'error');
+    }
+  },
+
+
+    loadPendingUsers: async () => {
+    if (!App.isStaffAdmin()) return;
     const res = await App.apiClient('GET', '/admin/users/pending');
     App.state.pendingUsers = (res && res.users) ? res.users : [];
     App.renderPendingUsers();
@@ -1941,6 +2467,9 @@ const App = {
     App.renderCommentTable();
     App.renderLessonTable();
     App.renderPendingUsers();
+    App.renderApprovedUsers();
+    App.renderAdmins();
+    App.renderRoleRequests();
   },
 
   renderSessionList: () => {
@@ -2422,7 +2951,7 @@ const App = {
     if (App.elements.pendingUsersSelectAll) {
       App.elements.pendingUsersSelectAll.checked = false;
     }
-    if (App.state.currentUser && App.state.currentUser.role !== 'admin') {
+    if (!App.isStaffAdmin()) {
       App.updateBulkApproveButtonState();
       return;
     }
@@ -2610,7 +3139,7 @@ const App = {
 
   // Phase 13: 運営分析ダッシュボード（qa-analytics Edge）
   loadAnalytics: async () => {
-    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') return;
+    if (!App.isStaffAdmin()) return;
     const statusEl = document.getElementById('analyticsStatus');
     const daysSelect = document.getElementById('analyticsDaysSelect');
     const days = daysSelect ? Number(daysSelect.value) || 14 : 14;
@@ -3243,7 +3772,7 @@ const App = {
   },
 
   createSampleComment: async () => {
-    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') {
+    if (!App.isStaffAdmin()) {
       App.showToast('管理者のみ実行できます', 'error');
       return;
     }
@@ -3274,7 +3803,7 @@ const App = {
   },
 
   deleteComments: async () => {
-    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') {
+    if (!App.isStaffAdmin()) {
       App.showToast('管理者のみ実行できます', 'error');
       return;
     }
@@ -3391,7 +3920,7 @@ const App = {
   },
 
   importSrtTranscript: async () => {
-    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') {
+    if (!App.isStaffAdmin()) {
       App.showToast('管理者のみ実行できます', 'error');
       return;
     }
@@ -3558,7 +4087,7 @@ const App = {
   },
 
   importCsvComments: async () => {
-    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') {
+    if (!App.isStaffAdmin()) {
       App.showToast('管理者のみ実行できます', 'error');
       return;
     }
