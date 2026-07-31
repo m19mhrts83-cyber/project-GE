@@ -90,6 +90,8 @@ Deno.serve(async (req) => {
   let semantic = 0;
   let failed = 0;
   let disabled = 0;
+  let billableNormal = 0;
+  let billableSemantic = 0;
   const byDay: Record<string, { normal: number; semantic: number }> = {};
   const queryCounts: Record<string, { count: number; semantic: number; normal: number }> = {};
 
@@ -100,6 +102,10 @@ Deno.serve(async (req) => {
     if (status === "disabled") disabled += 1;
     if (mode === "semantic") semantic += 1;
     else if (mode === "normal") normal += 1;
+    if (status === "ok") {
+      if (mode === "semantic") billableSemantic += 1;
+      else if (mode === "normal") billableNormal += 1;
+    }
 
     const day = asString(row.created_at).slice(0, 10) || "unknown";
     if (!byDay[day]) byDay[day] = { normal: 0, semantic: 0 };
@@ -143,6 +149,33 @@ Deno.serve(async (req) => {
     error_message: asString(row.error_message) || null,
   }));
 
+  // Gemini 想定課金（試算）。単価は ランニングコスト試算_会員規模.md 準拠。
+  const UNIT_NORMAL_LOW = 0.02;
+  const UNIT_NORMAL_HIGH = 0.04;
+  const UNIT_SEMANTIC_LOW = 0.01;
+  const UNIT_SEMANTIC_HIGH = 0.025;
+  const USD_PER_JPY = 150;
+  const usdLow = billableNormal * UNIT_NORMAL_LOW + billableSemantic * UNIT_SEMANTIC_LOW;
+  const usdHigh = billableNormal * UNIT_NORMAL_HIGH + billableSemantic * UNIT_SEMANTIC_HIGH;
+  const roundUsd = (n: number) => Math.round(n * 100) / 100;
+  const geminiEstimate = {
+    billable_normal: billableNormal,
+    billable_semantic: billableSemantic,
+    billable_total: billableNormal + billableSemantic,
+    usd_low: roundUsd(usdLow),
+    usd_high: roundUsd(usdHigh),
+    jpy_low: Math.round(usdLow * USD_PER_JPY),
+    jpy_high: Math.round(usdHigh * USD_PER_JPY),
+    usd_per_jpy: USD_PER_JPY,
+    unit_usd: {
+      normal_low: UNIT_NORMAL_LOW,
+      normal_high: UNIT_NORMAL_HIGH,
+      semantic_low: UNIT_SEMANTIC_LOW,
+      semantic_high: UNIT_SEMANTIC_HIGH,
+    },
+    note: "想定レンジ。Google請求額そのものではありません。",
+  };
+
   return json({
     ok: true,
     range_days: days,
@@ -156,6 +189,7 @@ Deno.serve(async (req) => {
       semantic_ratio: total > 0 ? Number((semantic / total).toFixed(4)) : 0,
       normal_ratio: total > 0 ? Number((normal / total).toFixed(4)) : 0,
     },
+    gemini_estimate: geminiEstimate,
     daily,
     top_queries: topQueries,
     recent_events: recent,

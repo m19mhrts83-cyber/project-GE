@@ -2644,6 +2644,7 @@ const App = {
   renderAnalytics: () => {
     const data = App.state.analyticsOverview;
     const cards = document.getElementById('analyticsSummaryCards');
+    const geminiEl = document.getElementById('analyticsGeminiEstimate');
     const dailyEl = document.getElementById('analyticsDailyBars');
     const topBody = document.getElementById('analyticsTopQueriesBody');
     const recentBody = document.getElementById('analyticsRecentBody');
@@ -2651,6 +2652,7 @@ const App = {
 
     if (!data || !data.totals) {
       cards.innerHTML = '<p class="text-sm text-slate-500 col-span-full">データがありません</p>';
+      if (geminiEl) geminiEl.innerHTML = '';
       dailyEl.innerHTML = '';
       topBody.innerHTML = '';
       recentBody.innerHTML = '';
@@ -2685,6 +2687,60 @@ const App = {
       '<div class="bg-white rounded border p-3"><div class="text-xs text-slate-500">集計日数</div><div class="text-2xl font-semibold">' +
       App.escapeHtml(String(data.range_days || 0)) +
       '</div></div>';
+
+    if (geminiEl) {
+      const g = data.gemini_estimate;
+      if (!g) {
+        geminiEl.innerHTML =
+          '<p class="text-slate-500">試算API未更新（qa-analytics を再デプロイしてください）</p>';
+      } else {
+        const billableTotal =
+          Number(g.billable_total) ||
+          Number(g.billable_normal || 0) + Number(g.billable_semantic || 0);
+        const fmtUsd = function (n) {
+          return '$' + Number(n || 0).toFixed(2);
+        };
+        const fmtJpy = function (n) {
+          return '約 ' + Number(n || 0).toLocaleString('ja-JP') + ' 円';
+        };
+        const unit = g.unit_usd || {};
+        geminiEl.innerHTML =
+          '<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">' +
+          '<div class="rounded border p-3 bg-slate-50">' +
+          '<div class="text-xs text-slate-500">課金対象質問（成功のみ）</div>' +
+          '<div class="text-xl font-semibold mt-1">' +
+          App.escapeHtml(String(billableTotal)) +
+          '</div>' +
+          '<div class="text-xs text-slate-500 mt-1">通常 ' +
+          App.escapeHtml(String(g.billable_normal || 0)) +
+          ' / 意味 ' +
+          App.escapeHtml(String(g.billable_semantic || 0)) +
+          '</div></div>' +
+          '<div class="rounded border p-3 bg-slate-50">' +
+          '<div class="text-xs text-slate-500">想定課金（USD）</div>' +
+          '<div class="text-xl font-semibold mt-1">' +
+          App.escapeHtml(fmtUsd(g.usd_low) + ' 〜 ' + fmtUsd(g.usd_high)) +
+          '</div></div>' +
+          '<div class="rounded border p-3 bg-slate-50">' +
+          '<div class="text-xs text-slate-500">想定課金（円）</div>' +
+          '<div class="text-xl font-semibold mt-1">' +
+          App.escapeHtml(fmtJpy(g.jpy_low) + ' 〜 ' + fmtJpy(g.jpy_high)) +
+          '</div></div></div>' +
+          '<p class="text-xs text-slate-500">' +
+          App.escapeHtml(g.note || '想定レンジ。Google請求額そのものではありません。') +
+          ' 単価目安: 通常 $' +
+          App.escapeHtml(String(unit.normal_low != null ? unit.normal_low : 0.02)) +
+          '〜$' +
+          App.escapeHtml(String(unit.normal_high != null ? unit.normal_high : 0.04)) +
+          '／問、意味 $' +
+          App.escapeHtml(String(unit.semantic_low != null ? unit.semantic_low : 0.01)) +
+          '〜$' +
+          App.escapeHtml(String(unit.semantic_high != null ? unit.semantic_high : 0.025)) +
+          '／問。為替 1USD≒' +
+          App.escapeHtml(String(g.usd_per_jpy || 150)) +
+          '円。</p>';
+      }
+    }
 
     const daily = data.daily || [];
     const maxDaily = Math.max(1, ...daily.map(function (d) {
