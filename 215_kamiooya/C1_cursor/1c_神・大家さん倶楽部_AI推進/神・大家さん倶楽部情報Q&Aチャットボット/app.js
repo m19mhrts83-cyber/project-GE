@@ -321,6 +321,8 @@ const App = {
     }
     document.getElementById('sampleCommentBtn').addEventListener('click', App.createSampleComment);
     document.getElementById('importCsvBtn').addEventListener('click', App.importCsvComments);
+    const importSrtBtn = document.getElementById('importSrtBtn');
+    if (importSrtBtn) importSrtBtn.addEventListener('click', App.importSrtTranscript);
     const reloadAnalyticsBtn = document.getElementById('reloadAnalyticsBtn');
     if (reloadAnalyticsBtn) {
       reloadAnalyticsBtn.addEventListener('click', function () {
@@ -427,18 +429,32 @@ const App = {
   showToast: (message, type) => {
     const kind = type || 'info';
     App.elements.toast.textContent = message || '';
-    App.elements.toast.className = 'toast ' + kind;
+    App.elements.toast.className = 'toast ' + (kind === 'success_long' ? 'success' : kind);
     App.elements.toast.classList.remove('hidden');
     if (App._toastHideTimer) {
       window.clearTimeout(App._toastHideTimer);
       App._toastHideTimer = null;
     }
-    // エラーはスクショしやすいよう長め、それ以外は従来どおり短め
-    const ms = kind === 'error' ? 10000 : 2600;
+    // エラー／登録成功案内は長め、それ以外は従来どおり短め
+    const ms = kind === 'error' || kind === 'success_long' ? 10000 : 2600;
     App._toastHideTimer = window.setTimeout(function () {
       App.elements.toast.classList.add('hidden');
       App._toastHideTimer = null;
     }, ms);
+  },
+
+  showRegisterSuccessNotice: (message) => {
+    const el = document.getElementById('registerSuccessNotice');
+    if (!el) return;
+    el.textContent = message || '';
+    el.classList.remove('hidden');
+  },
+
+  clearRegisterSuccessNotice: () => {
+    const el = document.getElementById('registerSuccessNotice');
+    if (!el) return;
+    el.textContent = '';
+    el.classList.add('hidden');
   },
 
   /* 改修: 認証画面表示時に管理者登録・再設定ビューを隠す */
@@ -768,6 +784,7 @@ const App = {
   },
 
   showRegisterTab: () => {
+    App.clearRegisterSuccessNotice();
     document.getElementById('showRegisterTabBtn').className = 'w-1/2 py-2 rounded-md bg-blue-900 text-white';
     document.getElementById('showLoginTabBtn').className = 'w-1/2 py-2 rounded-md bg-slate-200 text-slate-700';
     App.elements.registerForm.classList.remove('hidden');
@@ -798,8 +815,11 @@ const App = {
       });
       // 通知失敗でも登録は成功扱い（専用 API・分離）
       await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo);
-      App.showToast('登録申請を受け付けました（承認待ち）', 'success');
+      const notice =
+        '管理者にメールを送信しました。管理者承認後にメールが届くので、しばらくお待ちください';
+      App.showToast(notice, 'success_long');
       App.showLoginTab();
+      App.showRegisterSuccessNotice(notice);
       App.elements.registerForm.reset();
     } catch (error) {
       App.showToast(error.message || '登録に失敗しました', 'error');
@@ -996,7 +1016,7 @@ const App = {
       lessons: '学習ページ説明テキスト',
       knowledge: 'セミナー動画文字起こし',
       adminUsers: 'ユーザー承認',
-      adminData: 'CSV取込',
+      adminData: 'データ取込',
       adminAnalytics: '運営分析'
     };
     return labels[screenName] || '前の画面';
@@ -3368,6 +3388,173 @@ const App = {
       );
     });
     return { idSet, compositeSet };
+  },
+
+  importSrtTranscript: async () => {
+    if (!App.state.currentUser || App.state.currentUser.role !== 'admin') {
+      App.showToast('管理者のみ実行できます', 'error');
+      return;
+    }
+    const title = String((document.getElementById('srtTitleInput') || {}).value || '').trim();
+    const videoId = String((document.getElementById('srtVideoIdInput') || {}).value || '').trim();
+    const videoUrl = String((document.getElementById('srtVideoUrlInput') || {}).value || '').trim();
+    const instructor = String((document.getElementById('srtInstructorInput') || {}).value || '').trim();
+    const fileInput = document.getElementById('srtFileInput');
+    const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    const resultEl = document.getElementById('srtImportResult');
+    if (!title || !videoId) {
+      App.showToast('タイトルと video_id は必須です', 'error');
+      return;
+    }
+    if (!file) {
+      App.showToast('SRTファイルを選択してください', 'error');
+      return;
+    }
+
+    App.setLoading(true);
+    if (resultEl) resultEl.textContent = '読み込み中…\n';
+    try {
+      const srtText = await file.text();
+      if (!String(srtText || '').trim()) {
+        throw new Error('SRTの内容が空です');
+      }
+      const cfg = await App.resolveSemanticConfig();
+      const ingestUrl = String(cfg.url || '').replace(/semantic-search\/?$/, 'srt-ingest');
+      if (!ingestUrl || ingestUrl === cfg.url) {
+        throw new Error('SRT取込APIのURLを解決できませんでした');
+      }
+      if (resultEl) resultEl.textContent += 'Supabase へ送信中…\n';
+      const response = await fetch(ingestUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Semantic-Shared-Secret': cfg.secret
+        },
+        body: JSON.stringify({
+          title: title,
+          video_id: videoId,
+          video_url: videoUrl,
+          instructor: instructor,
+          srt_text: srtText
+        })
+      });
+      const text = await response.text();
+      let data = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = { errorMessage: text.slice(0, 300) };
+        }
+      }
+      if (!response.ok) {
+        throw new Error(data.errorMessage || data.message || 'SRT取込失敗 HTTP ' + response.status);
+      }
+
+      const sourceKey = data.source_key || 'notta:' + videoId;
+      const chunks = Array.isArray(data.chunks) ? data.chunks : [];
+      if (resultEl) {
+        resultEl.textContent +=
+          'Supabase OK source_key=' +
+          sourceKey +
+          ' cues=' +
+          (data.cue_count || 0) +
+          ' chunks=' +
+          (data.chunk_count || 0) +
+          ' embedded=' +
+          (data.embedded_count || 0) +
+          '\n';
+        if (data.embed_error) {
+          resultEl.textContent += 'embed警告: ' + data.embed_error + '\n';
+        }
+        if (data.note) resultEl.textContent += data.note + '\n';
+        resultEl.textContent += 'Raimo へ反映中…\n';
+      }
+
+      // Raimo knowledge（通常検索・一覧用）
+      try {
+        await App.apiClient('POST', '/admin/knowledge-sources/update', {
+          source_key: sourceKey,
+          source_kind: 'video',
+          content_channel: 'seminar_video',
+          title: title,
+          video_id: videoId,
+          video_url: videoUrl || '',
+          instructor: instructor || '',
+          origin_path: 'admin-upload:' + videoId + '.srt',
+          meta_json: JSON.stringify({ ingest_via: 'srt-ingest' }),
+          ingest_status: 'ready'
+        });
+      } catch (updateErr) {
+        await App.apiClient('POST', '/admin/knowledge-sources', {
+          source_key: sourceKey,
+          source_kind: 'video',
+          content_channel: 'seminar_video',
+          title: title,
+          video_id: videoId,
+          video_url: videoUrl || '',
+          instructor: instructor || '',
+          origin_path: 'admin-upload:' + videoId + '.srt',
+          meta_json: JSON.stringify({ ingest_via: 'srt-ingest' }),
+          ingest_status: 'ready'
+        });
+      }
+      try {
+        await App.apiClient('POST', '/admin/knowledge-chunks/delete-by-source', {
+          source_key: sourceKey
+        });
+      } catch (delErr) {
+        if (resultEl) {
+          resultEl.textContent +=
+            'Raimo旧チャンク削除スキップ: ' + ((delErr && delErr.message) || delErr) + '\n';
+        }
+      }
+      let raimoOk = 0;
+      let raimoNg = 0;
+      for (let i = 0; i < chunks.length; i += 1) {
+        const c = chunks[i];
+        try {
+          await App.apiClient('POST', '/admin/knowledge-chunks', {
+            chunk_key: c.chunk_key,
+            source_key: sourceKey,
+            start_sec: c.start_sec,
+            end_sec: c.end_sec,
+            speaker: c.speaker || '',
+            content: c.content,
+            search_text: c.search_text || c.content
+          });
+          raimoOk += 1;
+        } catch (chunkErr) {
+          raimoNg += 1;
+          if (resultEl && raimoNg <= 5) {
+            resultEl.textContent +=
+              'Raimo chunk NG ' +
+              (c.chunk_key || '') +
+              ': ' +
+              ((chunkErr && chunkErr.message) || chunkErr) +
+              '\n';
+          }
+        }
+      }
+      if (resultEl) {
+        resultEl.textContent +=
+          'Raimo chunks OK=' + raimoOk + ' NG=' + raimoNg + '\n完了\n';
+      }
+      try {
+        await App.loadKnowledge();
+      } catch (e) {
+        /* ignore */
+      }
+      App.showToast(
+        'SRT取込完了（チャンク ' + (data.chunk_count || chunks.length) + '）',
+        raimoNg === 0 ? 'success' : 'info'
+      );
+    } catch (error) {
+      if (resultEl) resultEl.textContent += 'ERROR: ' + ((error && error.message) || error) + '\n';
+      App.showToast((error && error.message) || 'SRT取込に失敗しました', 'error');
+    } finally {
+      App.setLoading(false);
+    }
   },
 
   importCsvComments: async () => {
