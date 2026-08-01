@@ -88,8 +88,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="sub" style={{ marginTop: 16 }}>
-          パスワードは <code>.env.jarvis_private</code> の{" "}
-          <code>JARVIS_DASHBOARD_PASSWORD</code>（Jarvis が設定済み）
+          パスワードは Jarvis が設定したログイン用です（手元の正本を参照）。
         </p>
         <button
           type="button"

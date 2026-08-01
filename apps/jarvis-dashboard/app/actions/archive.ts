@@ -35,3 +35,18 @@ export async function setWatchStatus(
   if (error) throw new Error(error.message);
   revalidatePath(path);
 }
+
+export async function setTriageStatus(
+  id: string,
+  next: "pending" | "done",
+  path: string
+) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("triage_items")
+    .update({ status: next, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath(path);
+  revalidatePath("/");
+}

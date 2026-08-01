@@ -1,0 +1,42 @@
+name: Jarvis Dashboard heartbeat
+
+# jarvis-dashboard（自分用 Supabase）の 7 日休止回避用。
+# 実データ push は Mac（夜間トリアージ／日次 launchd）が正。
+# この GHA は sync_meta に heartbeat を書くだけ。
+
+on:
+  schedule:
+    - cron: "30 21 * * *" # 06:30 JST
+  workflow_dispatch:
+
+concurrency:
+  group: jarvis-dashboard-heartbeat
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Touch sync_meta
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${JARVIS_SUPABASE_URL:-}" || -z "${JARVIS_SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+            echo "Secrets missing: JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          BODY=$(printf '{"key":"gha_heartbeat_at","value":"%s","updated_at":"%s"}' "$NOW" "$NOW")
+          curl -sS -X POST \
+            "${JARVIS_SUPABASE_URL}/rest/v1/sync_meta?on_conflict=key" \
+            -H "apikey: ${JARVIS_SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${JARVIS_SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates" \
+            -d "$BODY" >/tmp/hb.json
+          echo "heartbeat ok at $NOW"
+          head -c 200 /tmp/hb.json || true
+          echo

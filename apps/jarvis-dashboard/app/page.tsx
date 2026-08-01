@@ -36,6 +36,9 @@ export default async function HomePage() {
         <div className="stat">
           watch sync {metaMap.watch_pushed_at ?? "未push"}
         </div>
+        <div className="stat">
+          GHA心拍 {metaMap.gha_heartbeat_at ?? "—"}
+        </div>
       </div>
       <p className="empty">
         左のサイドバーからレーンを開いてください。データは Mac の{" "}
