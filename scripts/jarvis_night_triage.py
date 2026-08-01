@@ -689,9 +689,21 @@ def macos_notify(title: str, body: str) -> None:
         pass
 
 
-DASHBOARD_URL = "http://127.0.0.1:8765/"
+LOCAL_DASHBOARD_URL = "http://127.0.0.1:8765/"
 LAST_AUTO_OPEN_PATH = STATE_DIR / "last_auto_open_date"
 DASHBOARD_LABEL = "com.matsunoma.jarvis.triage-dashboard"
+
+
+def resolve_dashboard_url() -> str:
+    """本番 Vercel URL（JARVIS_DASHBOARD_URL）があれば優先。なければローカル 8765。"""
+    cloud = (os.environ.get("JARVIS_DASHBOARD_URL") or "").strip().rstrip("/")
+    if cloud:
+        return cloud + "/"
+    return LOCAL_DASHBOARD_URL
+
+
+# 後方互換
+DASHBOARD_URL = LOCAL_DASHBOARD_URL
 
 
 def pending_items(queue: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -776,16 +788,19 @@ def open_dashboard_browser(
     hour = datetime.now(JST).hour
     if require_daytime and not (5 <= hour <= 22):
         return False, f"pending={n} だが表示時間外（hour={hour}）"
+    url = resolve_dashboard_url()
     if dry_run:
-        return True, f"dry-run: pending={n} なら open する"
-    if not wait_dashboard_ready():
-        return False, "ダッシュボード未応答（8765）"
+        return True, f"dry-run: pending={n} なら open する ({url})"
+    # ローカル 8765 のときだけ起動待ち。クラウドは常に到達可想定。
+    if url.startswith("http://127.0.0.1") or url.startswith("http://localhost"):
+        if not wait_dashboard_ready():
+            return False, "ダッシュボード未応答（8765）"
     try:
-        subprocess.run(["open", DASHBOARD_URL], check=False, capture_output=True)
+        subprocess.run(["open", url], check=False, capture_output=True)
     except Exception as e:
         return False, f"open 失敗: {e}"
     mark_auto_opened_today()
-    return True, f"opened pending={n}"
+    return True, f"opened pending={n} url={url}"
 
 
 def load_queue() -> dict[str, Any]:

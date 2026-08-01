@@ -21,6 +21,12 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 夜間トリアージ後にも自動 push（`JARVIS_SUPABASE_SERVICE_ROLE_KEY` があるとき）。
 
+## 本番 URL
+
+https://jarvis-dashboard-amber.vercel.app/
+
+朝の自動オープンは `JARVIS_DASHBOARD_URL`（`.env.jarvis_private`）を優先。
+
 ## Vercel デプロイ（Phase 3・iPhone 閲覧）
 
 1. Vercel にログインし、ルートを `apps/jarvis-dashboard` にして import
