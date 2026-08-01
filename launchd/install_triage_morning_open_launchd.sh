@@ -12,7 +12,8 @@ PLIST="${LAUNCH_AGENTS_DIR}/${LABEL}.plist"
 mkdir -p "$LAUNCH_AGENTS_DIR" "$LOG_DIR"
 chmod +x "${SCRIPT_DIR}/triage_morning_open_runner.sh"
 
-# StartCalendarInterval は複数時刻を配列で指定（ログイン時 RunAtLoad ＋ 7:00 / 8:00）
+# ログイン時 + 起床後も拾うため短周期ポーリング（1日1回オープンは Python 側で抑制）
+# スリープ中はタイマーが止まり、Mac を開いたあとに最初の実行で表示される想定
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -30,21 +31,8 @@ cat > "$PLIST" <<EOF
   <string>${REPO_DIR}</string>
   <key>RunAtLoad</key>
   <true/>
-  <key>StartCalendarInterval</key>
-  <array>
-    <dict>
-      <key>Hour</key>
-      <integer>7</integer>
-      <key>Minute</key>
-      <integer>0</integer>
-    </dict>
-    <dict>
-      <key>Hour</key>
-      <integer>8</integer>
-      <key>Minute</key>
-      <integer>0</integer>
-    </dict>
-  </array>
+  <key>StartInterval</key>
+  <integer>120</integer>
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/morning_open.out.log</string>
   <key>StandardErrorPath</key>
@@ -59,6 +47,6 @@ launchctl enable "gui/${UID_VALUE}/${LABEL}" || true
 launchctl bootstrap "gui/${UID_VALUE}" "$PLIST"
 
 echo "Installed: ${LABEL}"
-echo "Triggers: RunAtLoad (login) + 07:00 + 08:00"
+echo "Triggers: RunAtLoad (login) + every 120s (sleep 中は停止 → 開いた後の最初で表示)"
 echo "Logs: ${LOG_DIR}/morning_open.*.log"
 launchctl print "gui/${UID_VALUE}/${LABEL}" | /usr/bin/awk '/state =|last exit code|runs =/'

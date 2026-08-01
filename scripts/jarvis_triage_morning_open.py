@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-朝・ログイン時: pending があればトリアージダッシュボードをブラウザで開く（1日1回）。
+Mac を開いた最初のタイミングで、pending があればトリアージダッシュボードを開く（1日1回）。
+
+夜間バッチは判定・下書きのみ。表示はこのスクリプト側。
 
   python scripts/jarvis_triage_morning_open.py
   python scripts/jarvis_triage_morning_open.py --dry-run
@@ -15,7 +17,7 @@ from jarvis_night_triage import open_dashboard_browser, pending_items, pending_p
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Morning open for night triage dashboard")
+    ap = argparse.ArgumentParser(description="First-open-of-day dashboard for night triage")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument(
         "--force",
@@ -29,7 +31,8 @@ def main() -> int:
     print(f"# pending={n}" + (f" ({hint})" if hint else ""))
     opened, msg = open_dashboard_browser(force=args.force, dry_run=args.dry_run)
     print(f"# {msg}")
-    return 0 if (opened or n == 0 or "既に自動オープン" in msg) else 1
+    # スキップは正常（0件・本日済・時間外）
+    return 0
 
 
 if __name__ == "__main__":

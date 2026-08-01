@@ -489,10 +489,16 @@ def wait_dashboard_ready(*, timeout_s: float = 25.0) -> bool:
     return False
 
 
-def open_dashboard_browser(*, force: bool = False, dry_run: bool = False) -> tuple[bool, str]:
+def open_dashboard_browser(
+    *,
+    force: bool = False,
+    dry_run: bool = False,
+    require_daytime: bool = True,
+) -> tuple[bool, str]:
     """
     pending≥1 のときダッシュボードをブラウザで開く。
     force=False なら同一日の再オープンをスキップ。
+    require_daytime=True なら 5:00–22:59 のみ（夜間の無人オープン防止）。
     戻り値: (opened_or_would_open, message)
     """
     items = pending_items()
@@ -501,6 +507,9 @@ def open_dashboard_browser(*, force: bool = False, dry_run: bool = False) -> tup
         return False, "pending=0（オープン不要）"
     if not force and already_auto_opened_today():
         return False, f"pending={n} だが本日は既に自動オープン済み"
+    hour = datetime.now(JST).hour
+    if require_daytime and not (5 <= hour <= 22):
+        return False, f"pending={n} だが表示時間外（hour={hour}）"
     if dry_run:
         return True, f"dry-run: pending={n} なら open する"
     if not wait_dashboard_ready():
@@ -928,9 +937,8 @@ def main() -> int:
             elif need:
                 notify_body = f"要返信 {need} / 下書き {drafted} — pending {len(pending)}"
         macos_notify("Jarvis 夜間トリアージ", notify_body)
-        if pending:
-            opened, open_msg = open_dashboard_browser(force=True)
-            print(f"# dashboard open: {open_msg}")
+        # ブラウザは夜間に開かない（ユーザーが開いた最初のタイミングは morning-open 側）
+        print("# dashboard open: skipped at batch (morning-open handles first open of day)")
         logf = LOG_DIR / f"run_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.log"
         logf.write_text(
             json.dumps(
