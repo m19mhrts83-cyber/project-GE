@@ -4,8 +4,9 @@ Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
 
 1. gmail_to_yoritoori.py で取込（パートナー）
 2. 5.やり取り.md / admin INBOX から未返信候補を抽出
-3. Gemini / Cursor Agent で要返信判定・下書き生成
-4. .jarvis_state/night_triage/queue.json を更新（lane=partner|general）
+3. Gemini / Cursor Agent で要返信判定・下書き生成（メールのみ）
+4. Chatwork／LINE／iMessage・815神大家オプチャの直近更新概要を queue に載せる
+5. .jarvis_state/night_triage/queue.json を更新（lane=partner|general|openchat）
 
 使い方:
   python scripts/jarvis_night_triage.py --dry-run
@@ -70,6 +71,13 @@ SKIP_FOLDERS = {
     "815_神大家オプチャ",
     "809_神大家運営回答",  # 一斉配信中心・返信義務なし
 }
+
+OPENCHAT_ROOT_NAME = "815_神大家オプチャ"
+PLACEHOLDER_BODY_RE = re.compile(r"(\[本文なし|E2EE|復号でき|プレースホルダ)", re.I)
+ACTIVITY_LOOKBACK_DEFAULT = 7
+ACTIVITY_PER_PARTNER = 3
+ACTIVITY_PARTNER_MAX = 30
+ACTIVITY_OPENCHAT_MAX = 40
 
 DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest"
 DEFAULT_ENGINE = "gemini"
@@ -154,6 +162,264 @@ def is_gmail_channel(channel: str) -> bool:
 
 def is_inbound(channel: str) -> bool:
     return "相手から返信" in (channel or "") and "自分から送信" not in (channel or "")
+
+
+def chat_channel_kind(channel: str) -> str | None:
+    """Chatwork / LINE / iMessage ならラベル、メール等なら None。"""
+    ch = channel or ""
+    if "Chatwork" in ch:
+        return "Chatwork"
+    if "iMessage" in ch or "/SMS" in ch or "（SMS" in ch or "SMS/" in ch:
+        return "iMessage"
+    if "LINE" in ch or "CHRLINE" in ch or "公式エクスポート" in ch:
+        return "LINE"
+    return None
+
+
+def is_chat_inbound(channel: str) -> bool:
+    ch = channel or ""
+    if "自分から送信" in ch:
+        return False
+    if "相手から返信" in ch:
+        return True
+    # LINE グループ見出し: …（…受信）
+    if "受信" in ch and "送信" not in ch:
+        return True
+    if "公式エクスポート" in ch:
+        return True
+    return False
+
+
+def parse_received_at(s: str) -> datetime | None:
+    s = (s or "").strip()
+    for fmt, n in (("%Y/%m/%d %H:%M", 16), ("%Y/%m/%d", 10)):
+        try:
+            return datetime.strptime(s[:n], fmt).replace(tzinfo=JST)
+        except ValueError:
+            continue
+    return None
+
+
+def activity_id(lane: str, folder: str, received_at: str, channel: str, summary: str) -> str:
+    raw = f"{lane}|{folder}|{received_at}|{channel}|{(summary or '')[:80]}"
+    return "a" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:11]
+
+
+def summarize_activity_text(summary: str, body: str) -> str:
+    text = (summary or "").strip() or (body or "").strip().replace("\n", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    if PLACEHOLDER_BODY_RE.search(text) or PLACEHOLDER_BODY_RE.search(body or ""):
+        base = text[:120] if text and not PLACEHOLDER_BODY_RE.search(text[:40]) else ""
+        return (base + " （本文未取得）").strip() if base else "（本文未取得）"
+    return text[:180] if text else "（要約なし）"
+
+
+def find_recent_chat_activity(
+    entries: list[dict[str, Any]],
+    lookback_days: int,
+    *,
+    per_partner: int = ACTIVITY_PER_PARTNER,
+) -> list[dict[str, Any]]:
+    """パートナー MD から Chatwork/LINE/iMessage の直近受信を抽出。"""
+    cutoff = None
+    if lookback_days > 0:
+        from datetime import timedelta
+
+        cutoff = datetime.now(JST) - timedelta(days=lookback_days)
+    picked: list[dict[str, Any]] = []
+    # 新しい順に走査し、フォルダごとに上限
+    ordered = sorted(entries, key=lambda x: x.get("received_at") or "", reverse=True)
+    per_folder: dict[str, int] = {}
+    for e in ordered:
+        kind = chat_channel_kind(e.get("channel") or "")
+        if not kind:
+            continue
+        if not is_chat_inbound(e.get("channel") or ""):
+            continue
+        if NOISE_SUBJECT_RE.search(e.get("summary") or "") or NOISE_SUBJECT_RE.search(e.get("subject") or ""):
+            continue
+        if cutoff:
+            dt = parse_received_at(e.get("received_at") or "")
+            if dt and dt < cutoff:
+                continue
+        folder = e.get("folder") or ""
+        if per_folder.get(folder, 0) >= per_partner:
+            continue
+        per_folder[folder] = per_folder.get(folder, 0) + 1
+        summary = summarize_activity_text(e.get("summary") or "", e.get("body") or "")
+        subject = e.get("subject") or summary
+        if subject == e.get("summary") or not e.get("subject"):
+            subject = f"[{kind}] {summary[:80]}"
+        picked.append(
+            {
+                "id": activity_id("partner", folder, e.get("received_at") or "", e.get("channel") or "", summary),
+                "lane": "partner",
+                "kind": "activity",
+                "status": "info",
+                "channel": kind,
+                "channel_raw": e.get("channel") or "",
+                "partner_name": e.get("partner_name") or "",
+                "folder": folder,
+                "received_at": e.get("received_at") or "",
+                "subject": subject[:120],
+                "summary": summary,
+                "body": (e.get("body") or "")[:2000],
+                "priority": "",
+                "draft_text": "",
+            }
+        )
+    return picked
+
+
+def list_openchat_mds(base: Path) -> list[tuple[str, Path]]:
+    root = base / OPENCHAT_ROOT_NAME
+    out: list[tuple[str, Path]] = []
+    if not root.is_dir():
+        return out
+    for p in sorted(root.iterdir()):
+        if not p.is_dir() or p.name.startswith(".") or p.name.startswith("000_"):
+            continue
+        md = p / "5.やり取り.md"
+        if md.is_file():
+            out.append((p.name, md))
+    return out
+
+
+def parse_openchat_md(md_path: Path, group_folder: str) -> list[dict[str, Any]]:
+    """815 オプチャの見出しをパース（欄数が可変）。"""
+    text = md_path.read_text(encoding="utf-8", errors="replace")
+    entries: list[dict[str, Any]] = []
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if not line.startswith("### "):
+            i += 1
+            continue
+        parts = [p.strip() for p in line[4:].split("｜")]
+        if len(parts) < 5:
+            i += 1
+            continue
+        received_at = parts[0]
+        stream = parts[1] if len(parts) > 1 else ""
+        group = parts[2] if len(parts) > 2 else group_folder
+        # スレッドタイトル有無で位置がずれる
+        direction = ""
+        sender = ""
+        summary = ""
+        if len(parts) >= 6 and parts[3] in ("受信", "送信"):
+            direction, sender, summary = parts[3], parts[4], "｜".join(parts[5:])
+        elif len(parts) >= 7 and parts[4] in ("受信", "送信"):
+            direction, sender, summary = parts[4], parts[5], "｜".join(parts[6:])
+        else:
+            # 末尾付近から 受信/送信 を探す
+            for j, p in enumerate(parts):
+                if p in ("受信", "送信"):
+                    direction = p
+                    sender = parts[j + 1] if j + 1 < len(parts) else ""
+                    summary = "｜".join(parts[j + 2 :]) if j + 2 < len(parts) else ""
+                    break
+        body_lines: list[str] = []
+        i += 1
+        while i < len(lines) and not lines[i].startswith("### "):
+            body_lines.append(lines[i])
+            i += 1
+        body = "\n".join(body_lines).strip()
+        entries.append(
+            {
+                "folder": group_folder,
+                "partner_name": group or group_folder,
+                "received_at": received_at,
+                "stream": stream,
+                "direction": direction,
+                "sender": sender,
+                "summary": (summary or "")[:200],
+                "body": body[:4000],
+                "inbound": direction == "受信",
+            }
+        )
+    return entries
+
+
+def find_recent_openchat_activity(
+    entries: list[dict[str, Any]],
+    lookback_days: int,
+) -> list[dict[str, Any]]:
+    cutoff = None
+    if lookback_days > 0:
+        from datetime import timedelta
+
+        cutoff = datetime.now(JST) - timedelta(days=lookback_days)
+    picked: list[dict[str, Any]] = []
+    ordered = sorted(entries, key=lambda x: x.get("received_at") or "", reverse=True)
+    for e in ordered:
+        if not e.get("inbound"):
+            continue
+        if cutoff:
+            dt = parse_received_at(e.get("received_at") or "")
+            if dt and dt < cutoff:
+                continue
+        summary = summarize_activity_text(e.get("summary") or "", e.get("body") or "")
+        stream = e.get("stream") or "【メイン】"
+        sender = e.get("sender") or ""
+        subject = f"{stream} {sender}".strip()
+        ch_label = stream.replace("【", "").replace("】", "") or "オープンチャット"
+        folder = e.get("folder") or ""
+        picked.append(
+            {
+                "id": activity_id(
+                    "openchat",
+                    folder,
+                    e.get("received_at") or "",
+                    f"{stream}|{sender}",
+                    summary,
+                ),
+                "lane": "openchat",
+                "kind": "activity",
+                "status": "info",
+                "channel": ch_label,
+                "partner_name": e.get("partner_name") or folder,
+                "folder": folder,
+                "received_at": e.get("received_at") or "",
+                "subject": subject[:120],
+                "summary": summary,
+                "body": (e.get("body") or "")[:2000],
+                "priority": "",
+                "draft_text": "",
+            }
+        )
+    return picked
+
+
+def replace_activity_items(queue: dict[str, Any], activities: list[dict[str, Any]]) -> int:
+    """kind=activity を一括差し替え。"""
+    kept = [it for it in queue.get("items") or [] if it.get("kind") != "activity"]
+    stamped = []
+    for a in activities:
+        item = queue_item_fields(
+            {
+                "id": a["id"],
+                "lane": a.get("lane") or "partner",
+                "partner_name": a.get("partner_name") or "",
+                "folder": a.get("folder") or "",
+                "subject": a.get("subject") or "",
+                "received_at": a.get("received_at") or "",
+                "body": a.get("body") or "",
+            },
+            {
+                "kind": "activity",
+                "status": "info",
+                "channel": a.get("channel") or "",
+                "summary": a.get("summary") or "",
+                "priority": "",
+                "draft_text": "",
+                "reason": "",
+            },
+        )
+        stamped.append(item)
+    queue["items"] = kept + stamped
+    queue["updated_at"] = now_iso()
+    return len(stamped)
 
 
 def entry_id(folder: str, received_at: str, subject: str) -> str:
@@ -875,13 +1141,29 @@ def main() -> int:
     print(f"# engine: {'compare' if args.compare_engines else engine} model={model} lane={args.lane}")
 
     all_cands: list[dict[str, Any]] = []
+    activities: list[dict[str, Any]] = []
+    activity_lookback = int(cfg.get("activity_lookback_days") or ACTIVITY_LOOKBACK_DEFAULT)
     if do_partner:
         for folder, md in list_partner_mds(base):
             name = folder.split("_", 1)[-1] if "_" in folder else folder
             entries = parse_yoritoori(md, folder, name)
             cands = find_unreplied(entries, lookback)
             all_cands.extend(cands)
+            activities.extend(find_recent_chat_activity(entries, activity_lookback))
+        # パートナー活動: 全体上限
+        activities.sort(key=lambda x: x.get("received_at") or "", reverse=True)
+        activities = activities[:ACTIVITY_PARTNER_MAX]
         print(f"# partner unreplied candidates: {sum(1 for c in all_cands if c.get('lane')=='partner')}")
+        print(f"# partner chat activity: {len(activities)}")
+
+        oc_acts: list[dict[str, Any]] = []
+        for group, md in list_openchat_mds(base):
+            entries = parse_openchat_md(md, group)
+            oc_acts.extend(find_recent_openchat_activity(entries, activity_lookback))
+        oc_acts.sort(key=lambda x: x.get("received_at") or "", reverse=True)
+        oc_acts = oc_acts[:ACTIVITY_OPENCHAT_MAX]
+        print(f"# openchat activity: {len(oc_acts)}")
+        activities.extend(oc_acts)
 
     if do_general:
         try:
@@ -922,6 +1204,15 @@ def main() -> int:
         limit=limit,
         judge_only=args.judge_only,
     )
+
+    if do_partner and not args.dry_run:
+        queue = load_queue()
+        n_act = replace_activity_items(queue, activities)
+        assign_seqs(queue)
+        save_json(QUEUE_PATH, queue)
+        print(f"# activity items saved: {n_act}")
+    elif do_partner and args.dry_run:
+        print(f"# dry-run: would save {len(activities)} activity items")
 
     msg = f"要返信 {need} / 下書き {drafted} / 候補 {len(all_cands)}"
     print(f"# done: {msg}")
