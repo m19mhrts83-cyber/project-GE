@@ -1,0 +1,81 @@
+# Jarvis 電力・太陽光キャッシュフロー設定
+# 収集: scripts/jarvis_energy_cf_collect.py → .jarvis_state/energy_cf.json
+# 発見メモ（2026-08-01）:
+#   小売: サイサン／エネワンでんき（ポータルワン請求メールあり。カテエネは現行請求なし）
+#   売電: 中部電力パワーグリッド（Zaim カテゴリ 0.7太陽光発電 / 再エネ実績メール）
+#   ローン: オリコ月額 OTHER_LOAN_SOLAR_MONTHLY（Zaim「クレカ オリコカード」8165円）
+
+version: 1
+
+retail:
+  provider: saisan_eneone
+  label: エネワンでんき（サイサン）
+  portal_url: https://app.members-portalone.net/
+  login_hint_url: https://www.gasone.jp/
+  billing_email_from: no-reply@portal-one.net
+  # Playwright 用（未設定なら Zaim バックフィルのみ）
+  env_user: PORTALONE_USER
+  env_password: PORTALONE_PASSWORD
+
+sell:
+  provider: chuden_powergrid
+  label: 中部電力パワーグリッド（FIT売電）
+  portal_url: https://saienezisseki.powergrid.chuden.co.jp/Contract
+  billing_email_from: SaieneJisseki.info@chuden.co.jp
+  # Zaim 突合
+  zaim_category_contains: "0.7太陽光発電"
+  zaim_item_contains:
+    - チユウブデンリヨクパワーグリツド
+    - パワーグリッド
+  # kWh が取れないときの単価推定（実績金額が16円で割り切れる）
+  fit_yen_per_kwh: 16.0
+
+fit:
+  # 手更新。改定が近づいたら situation watch が attention
+  current_yen_per_kwh: 16.0
+  start_ym: ""          # 例: 2016-08（分かったら記入）
+  stepdown_ym: ""       # 10年後改定月（分かったら記入）
+  note: "Zaim売電額が16円/kWhで整合。正式なFIT契約単価・開始日は契約書で確認して更新"
+
+loan:
+  lender: オリコ
+  monthly_env: OTHER_LOAN_SOLAR_MONTHLY
+  balance_env: OTHER_LOAN_SOLAR_BALANCE
+  zaim_category_contains: "β.3C.水道/光熱"
+  zaim_item_contains:
+    - オリコ
+
+zaim:
+  # OneDrive 215 配下の年度CSV
+  base_dir: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/50_税金,確定申告"
+  years_back: 3
+  buy_item_contains:
+    - エネワン
+  # 切替前の自宅買電（賃貸の中部電力 δ.19F は除外）
+  buy_legacy_item_contains:
+    - 中部電力
+  buy_legacy_category_contains: "β.3C.水道/光熱"
+  buy_exclude_category_contains:
+    - δ.19F
+  # 「エネワンでんき 12月分」→ 利用月。無い場合は支払日の月
+  buy_month_regex: "([0-9０-９]{1,2})\\s*月分"
+
+thresholds:
+  # 消費kWhが前年同月比でこの倍率を超えたら warn（kWhがある月のみ）
+  buy_kwh_yoy_warn_ratio: 1.25
+  # 前月レコード欠落 → attention
+  missing_prev_month_attention: true
+  # FIT改定の orth 何ヶ月前から attention
+  fit_stepdown_attention_months: 6
+
+metrics:
+  entity: home
+  names:
+    buy_yen: energy_buy_yen
+    buy_kwh: energy_buy_kwh
+    buy_unit: energy_buy_unit
+    sell_yen: energy_sell_yen
+    sell_kwh: energy_sell_kwh
+    sell_unit: energy_sell_unit
+    loan_yen: energy_solar_loan_yen
+    net_cf: energy_net_cf

@@ -151,6 +151,39 @@ def card(
     }
 
 
+def eval_energy_cf(meta: dict, data: dict | None) -> dict[str, Any]:
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="attention",
+            summary="state なし — scripts/jarvis_energy_cf_collect.py を実行",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    summary = str(data.get("summary") or "データあり")
+    detail = str(data.get("detail") or "")
+    portal = data.get("portal") or {}
+    if portal.get("portalone_credentials") == "missing" and level == "ok":
+        # kWh 本収集は未配線でも円ベースなら ok のまま。detail に追記
+        detail = (detail + " / " if detail else "") + "ポータルワン認証未設定（円は Zaim）"
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level if level in ("ok", "info", "warn", "attention") else "ok",
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+    )
+
+
 def eval_etc(meta: dict, data: dict | None) -> dict[str, Any]:
     title = meta["title"]
     prompt = meta.get("cursor_prompt") or ""
@@ -597,6 +630,7 @@ EVALUATORS = {
     "etc_mileage": lambda m: eval_etc(m, load_json(STATE / "etc_monthly.json")),
     "vpoint": lambda m: eval_vpoint(m),
     "line_export": lambda m: eval_line_export(m, load_json(STATE / "line_export_reminder.json")),
+    "energy_cf": lambda m: eval_energy_cf(m, load_json(STATE / "energy_cf.json")),
     "westudy_weekly": lambda m: eval_westudy(m, load_json(STATE / "westudy_weekly_watch.json")),
     "openchat_threads": lambda m: eval_openchat(m),
     "square_probe": lambda m: eval_square(m, load_json(STATE / "square_probe.json")),

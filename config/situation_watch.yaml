@@ -10,6 +10,16 @@ popup_levels:
   - warn
 
 items:
+  - id: energy_cf
+    title: 電力・太陽光キャッシュフロー
+    category: finance
+    enabled: true
+    source: .jarvis_state/energy_cf.json
+    cursor_prompt: |
+      電力・太陽光の収支を確認して。state は ~/git-repos/.jarvis_state/energy_cf.json。
+      設定: config/energy_cf.yaml。収集: scripts/jarvis_energy_cf_collect.py [--push]。
+      買電=エネワン（サイサン）、売電=中部電力PG、ローン=オリコ。kWh 欠落や FIT 改定注意があれば報告して。
+
   - id: etc_mileage
     title: ETC月次（明細・還元）
     category: finance
