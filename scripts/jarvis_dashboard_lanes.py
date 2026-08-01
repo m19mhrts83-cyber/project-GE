@@ -122,9 +122,24 @@ def parse_journal_dir(path: Path, take: int) -> list[dict[str, str]]:
 def collect() -> dict[str, Any]:
     reg = yaml.safe_load(YAML_PATH.read_text(encoding="utf-8")) or {}
     ctx = {
-        "partner_base": str(Path(reg.get("partner_base", "")).expanduser()),
-        "obsidian_journal": str(Path(reg.get("obsidian_journal", "")).expanduser()),
-        "kodate_actions": str(Path(reg.get("kodate_actions", "")).expanduser()),
+        "partner_base": str(
+            Path(
+                os.environ.get("JARVIS_LANES_PARTNER_BASE")
+                or reg.get("partner_base", "")
+            ).expanduser()
+        ),
+        "obsidian_journal": str(
+            Path(
+                os.environ.get("JARVIS_LANES_OBSIDIAN_JOURNAL")
+                or reg.get("obsidian_journal", "")
+            ).expanduser()
+        ),
+        "kodate_actions": str(
+            Path(
+                os.environ.get("JARVIS_LANES_KODATE_ACTIONS")
+                or reg.get("kodate_actions", "")
+            ).expanduser()
+        ),
     }
     cards: list[dict[str, Any]] = []
     for lane in reg.get("lanes") or []:

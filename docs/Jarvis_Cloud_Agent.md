@@ -35,7 +35,21 @@
 2. **送れない／制限で止まったらローカル** — 従来どおり Mac の Cursor／`yoritoori_send.py`  
 3. **Web ダッシュボードからのワンクリック送信はしない**（誤送信防止。表示・対応済み操作のみ）
 
-技術メモ: 「メールはクラウドでは絶対送れない」わけではない。Gmail API＋token（Secrets）があれば Cloud Agent から送信可能。未配線の間はフォールバックで Mac 送信。実装は後続（対外送信前確認・`--via` 確認は同じ）。
+技術メモ: Gmail API＋token（Secrets）があれば Cloud Agent から送信可能。対外送信前確認・`--via` 確認は Mac と同じ。
+
+### Cloud 送信コマンド（実装済み）
+
+```bash
+# 1) プレビュー（チャットに出して「これで送っていいですか？」）
+python scripts/jarvis_cloud_gmail_send.py --from-triage <triage_items.id> --preview
+
+# 2) ユーザー承認後のみ実送信
+python scripts/jarvis_cloud_gmail_send.py --from-triage <triage_items.id> --i-confirm-send
+```
+
+Secrets（Cloud My Secrets 推奨）: `GMAIL_CREDENTIALS_B64` ＋ `GMAIL_ESTATE_TOKEN_B64`（なければ `GMAIL_M19M_TOKEN_B64`）。  
+生成: `python scripts/jarvis_cloud_secrets_prepare.py --include-gmail-send`  
+失敗・未配線時は Mac の `yoritoori_send.py`。**admin token では送らない**（対外 From は estate／m19m）。
 
 ## Cloud MCP（ローカル mcp.json は継承されない）
 
@@ -56,7 +70,7 @@
 ローカル疎通済み: `notion-search` で同 DB を確認済み（2026-08-01）。  
 切断時: agents の MCP で Re-authenticate。ルール: `notion-mcp-reauth.mdc`
 
-### 2. NotebookLM
+### 2. NotebookLM（Cloud 初回はユーザー操作あり）
 
 | 項目 | 値 |
 |---|---|
@@ -64,9 +78,16 @@
 | command | `npx` |
 | args | `-y` `notebooklm-mcp@latest` |
 
-初回は Cloud run 内で Google ログイン／cookie（`setup_auth`）。ローカル現状は `authenticated=false` のことがあり、同じく `setup_auth` が必要。  
-ソース正本は Drive `200_NoteBookLM`（`jarvis-notebooklm-drive-sources`）。  
-疎通: 「登録ノートを list して1問聞いて」
+**登録場所**: [cursor.com/agents](https://cursor.com/agents) → MCP（ローカル `mcp.json` は継承されない）。
+
+**初回配線（Cloud run 内）**:
+
+1. MCP 追加後、Cloud Agent で「NotebookLM の `get_health` を実行して」
+2. `authenticated=false` なら **`setup_auth`**（ブラウザで Google ログイン。アカウントは **m19m** 想定／Drive `200_NoteBookLM` の所有者に合わせる）
+3. `add_notebook` で共有 URL を登録 → `list_notebooks` → `ask_question` で1問
+4. 切れたら `re_auth` または再度 `setup_auth`
+
+ソース正本は Drive `200_NoteBookLM`（`jarvis-notebooklm-drive-sources`）。ローカル MCP も同様に `setup_auth` が必要なことがある。
 
 ### 3. やらない MCP
 
@@ -81,15 +102,19 @@ Environment: リポジトリ `m19mhrts83-cyber/project-GE`（Dashboard に Activ
 | Secret | 用途 |
 |---|---|
 | `JARVIS_SUPABASE_URL` | 投影 DB |
-| `JARVIS_SUPABASE_SERVICE_ROLE_KEY` | 読取／必要時 upsert（最小権限運用を意識） |
+| `JARVIS_SUPABASE_SERVICE_ROLE_KEY` / `JARVIS_SUPABASE_SECRET_KEY` | 読取／upsert（**`sb_secret_` 新形式**） |
 | `GEMINI_API_KEY` | リサーチ（`scripts/jarvis_gemini_research.py`） |
-| `GMAIL_CREDENTIALS_B64` / `GMAIL_ADMIN_TOKEN_B64` | admin Gmail（既存 GHA と同系。必要時のみ） |
+| `GMAIL_CREDENTIALS_B64` / `GMAIL_ADMIN_TOKEN_B64` | admin 取込（既存 GHA と同系） |
+| `GMAIL_ESTATE_TOKEN_B64`（または `GMAIL_M19M_TOKEN_B64`） | **Cloud 対外送信**（`jarvis_cloud_gmail_send.py`） |
+| `MS_GRAPH_*` | OneDrive レーン収集（GHA／Cloud）。未設定時は Mac ローカル |
 
 ### 登録手順（手動・約1分）
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 python scripts/jarvis_cloud_secrets_prepare.py
+# Cloud 送信も載せる場合:
+python scripts/jarvis_cloud_secrets_prepare.py --include-gmail-send
 # 生成: ~/.jarvis_state/cloud_agent_secrets.env
 open https://cursor.com/dashboard/cloud-agents
 # → My Secrets → Add Secrets → ファイル内容を貼る → Save（Runtime Secret 推奨）
@@ -97,6 +122,15 @@ rm -f ~/.jarvis_state/cloud_agent_secrets.env
 ```
 
 自動化ブラウザからの貼り付けはフォーカス／クリップボード制約で失敗しやすい。**手元貼り付けを正とする。**
+
+## OneDrive Graph（レーン GHA）
+
+```bash
+python scripts/jarvis_ms_graph_setup_check.py   # 未設定なら Azure 手順を表示
+python scripts/jarvis_onedrive_graph.py --dry-run
+```
+
+未設定の間、`jarvis-dashboard-lanes.yml` はスキップ。Mac の `jarvis_dashboard_lanes.py --push` が正本。
 
 ## admin Gmail と Gemini
 
@@ -130,13 +164,15 @@ PY
 ## Mac に残すもの（当面）
 
 CHRLINE／オプチャ、Zaim Playwright、パートナー MD 全文取込、OneDrive ローカル path 依存（Graph 未設定時）。  
-**対外送信**は理想では Cloud 完結を目指すが、未配線・失敗時は Mac の yoritoori。
+**対外送信**は Cloud スクリプト優先。未配線・失敗時は Mac の yoritoori。
 
 ## チェックリスト（初回配線）
 
 1. [ ] Cloud environment を project-GE に接続
-2. [ ] Secrets を上表どおり登録（値は private／Dashboard のみ）
+2. [ ] Secrets を上表どおり登録（`sb_secret_` ＋ 必要なら Gmail send B64）
 3. [ ] Notion MCP（HTTP）追加 → OAuth 完了 → 1 検索成功
-4. [ ] NotebookLM MCP（stdio）追加 → list／1 問成功
+4. [ ] NotebookLM MCP（stdio）追加 → `setup_auth` → list／1 問成功
 5. [ ] Supabase `sync_meta` を Cloud から読めることを確認
-6. [ ] on-demand 利用の要否を Dashboard Usage で確認（枠切れ対策）
+6. [ ] （任意）`jarvis_cloud_gmail_send.py --preview` が Cloud で動く
+7. [ ] （任意）`MS_GRAPH_*` → lanes GHA がスキップせず収集
+8. [ ] on-demand 利用の要否を Dashboard Usage で確認（枠切れ対策）
