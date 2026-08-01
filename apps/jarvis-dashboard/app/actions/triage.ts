@@ -33,7 +33,34 @@ export async function setTriageStatus(
   revalidatePath(path);
   revalidatePath("/");
   revalidatePath("/partner");
+  revalidatePath("/general");
   return { ok: true };
+}
+
+/** パートナー以外（general / openchat 等）の pending を一括スキップ。activity は除外。 */
+export async function skipAllNonPartnerPending(
+  path: string,
+): Promise<TriageActionResult & { count?: number }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("triage_items")
+    .update({ status: "skipped", updated_at: new Date().toISOString() })
+    .eq("status", "pending")
+    .neq("lane", "partner")
+    .neq("kind", "activity")
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  const count = data?.length ?? 0;
+  revalidatePath(path);
+  revalidatePath("/");
+  revalidatePath("/general");
+  revalidatePath("/partner");
+  revalidatePath("/openchat");
+  return {
+    ok: true,
+    count,
+    message: count ? `${count} 件をスキップしました` : "スキップ対象の未読はありません",
+  };
 }
 
 export async function saveTriageDraft(

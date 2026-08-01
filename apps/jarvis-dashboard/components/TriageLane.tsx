@@ -1,8 +1,10 @@
 import Shell from "@/components/Shell";
+import BulkSkipNonPartnerButton from "@/components/BulkSkipNonPartnerButton";
 import DraftWorkbench from "@/components/DraftWorkbench";
 import TriageStatusActions from "@/components/TriageStatusActions";
 import LaneViewTabs from "@/components/LaneViewTabs";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
+import { LEVEL_LABEL, mailPriorityToLevel } from "@/lib/homeLevels";
 import {
   VIEW_LABEL,
   laneViewHref,
@@ -61,6 +63,7 @@ type TriageRow = {
   draft_text: string | null;
   payload: unknown;
   channel: string | null;
+  priority?: string | null;
 };
 
 export default async function TriageLanePage({
@@ -167,6 +170,7 @@ export default async function TriageLanePage({
 
   const unreadHref = (i: number) => laneViewHref(active, "unread", i);
   const viewPath = laneViewHref(active, view);
+  const skimUnread = lane !== "partner";
 
   const stats = [
     { view: "unread" as const, count: unreadN },
@@ -179,11 +183,75 @@ export default async function TriageLanePage({
   return (
     <Shell active={active}>
       <h1>{title}</h1>
-      {subtitle ? <p className="sub">{subtitle}</p> : null}
+      {subtitle ? (
+        <p className="sub">{subtitle}</p>
+      ) : skimUnread ? (
+        <p className="sub">
+          ざざっと見て必要なものだけ開く。終わったら一括スキップ。
+        </p>
+      ) : null}
       <LaneViewTabs basePath={active} current={view} stats={stats} />
 
       <div key={view} id="lane-view-panel">
-        {view === "unread" ? (
+        {view === "unread" && skimUnread ? (
+          <>
+            <div className="other-mail-toolbar" style={{ marginBottom: 12 }}>
+              <h2 style={{ margin: 0, fontSize: "1.05rem" }}>
+                未読（一覧）
+              </h2>
+              <BulkSkipNonPartnerButton
+                path={viewPath}
+                pendingCount={unread.length}
+              />
+            </div>
+            {!unread.length ? (
+              <p className="empty">未読なし</p>
+            ) : (
+              <ul className="mail-skim">
+                {unread.map((it) => {
+                  const level = mailPriorityToLevel(it.priority);
+                  const who = it.partner || it.from_email || "—";
+                  const oneLine = (it.summary || "")
+                    .replace(/\s+/g, " ")
+                    .trim();
+                  return (
+                    <li key={it.id}>
+                      <a
+                        href={`/mail/${encodeURIComponent(it.id)}`}
+                        className={`mail-row level-${level}`}
+                      >
+                        <span className="lvl">{LEVEL_LABEL[level]}</span>
+                        <span className="mail-row-main">
+                          <span className="mail-row-top">
+                            <strong>{who}</strong>
+                            <span className="meta">
+                              {it.received_at || ""}
+                            </span>
+                          </span>
+                          <span className="mail-subject">
+                            {it.subject || "（件名なし）"}
+                          </span>
+                          {oneLine &&
+                          !isTruncatedBodyPreview(
+                            it.summary,
+                            it.original_body,
+                          ) ? (
+                            <span className="mail-preview">{oneLine}</span>
+                          ) : null}
+                        </span>
+                        <span className="mail-chevron" aria-hidden>
+                          ›
+                        </span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        ) : null}
+
+        {view === "unread" && !skimUnread ? (
           <>
             <h2>未読（1通ずつ）</h2>
             {!focus || !focusTo ? (

@@ -223,6 +223,30 @@ def push_watch(sb) -> int:
     return len(rows)
 
 
+def push_other_mail_digest(sb=None) -> int:
+    """パートナー以外メールのダイジェストを sync_meta へ。失敗しても 0。"""
+    import subprocess
+
+    py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+    exe = str(py) if py.is_file() else sys.executable
+    try:
+        r = subprocess.run(
+            [exe, str(REPO / "scripts" / "jarvis_other_mail_digest.py"), "--push"],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=os.environ.copy(),
+        )
+        print(r.stderr or "", file=sys.stderr, end="")
+        if r.returncode == 0:
+            return 1
+        print(f"# other_mail_digest failed rc={r.returncode}", file=sys.stderr)
+    except Exception as e:
+        print(f"# other_mail_digest failed: {e}", file=sys.stderr)
+    return 0
+
+
 def push_lanes_finance_subscriptions() -> tuple[int, int, int]:
     """サブプロセスで lanes / finance / subscriptions を集約＋push。失敗しても 0。"""
     import subprocess
@@ -280,9 +304,10 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     sb = client()
-    t = w = 0
+    t = w = digest = 0
     if not args.watch_only:
         t = push_triage(sb)
+        digest = push_other_mail_digest(sb)
     if not args.triage_only:
         w = push_watch(sb)
     cards = finance = subscriptions = 0
@@ -293,6 +318,7 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "triage": t,
                 "watch": w,
+                "other_mail_digest": digest,
                 "lanes": cards,
                 "finance": finance,
                 "subscriptions": subscriptions,

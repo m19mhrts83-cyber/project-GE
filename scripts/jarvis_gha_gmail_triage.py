@@ -199,6 +199,14 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"count": len(rows), "dry_run": True}, ensure_ascii=False))
         return 0
     n = push_rows(rows)
+    # ダイジェスト更新（失敗しても triage push は成功扱い）
+    try:
+        sys.path.insert(0, str(REPO / "scripts"))
+        from jarvis_other_mail_digest import build_and_maybe_push
+
+        build_and_maybe_push(do_push=True, use_llm=True)
+    except Exception as e:
+        print(f"# other_mail_digest skipped: {e}", file=sys.stderr)
     print(json.dumps({"upserted": n, "source": "gha"}, ensure_ascii=False))
     return 0
 
