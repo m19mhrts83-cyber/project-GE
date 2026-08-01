@@ -426,9 +426,11 @@
                   または
                   <code>会員番号,氏名,メール</code>。
                   会員番号＋メールが名簿と一致する新規登録は管理者承認なしで完了します。Excelは「CSV UTF-8（コンマ区切り）」推奨。
+                  下の「フォーマットをダウンロード」から雛形CSVを取得できます。
                 </p>
                 <input id="membersCsvFileInput" type="file" accept=".csv,text/csv" class="mb-3" />
                 <div class="flex flex-wrap gap-2">
+                  <button id="downloadMembersCsvTemplateBtn" type="button" class="px-4 py-2 rounded bg-slate-700 text-white">フォーマットをダウンロード</button>
                   <button id="importMembersCsvBtn" type="button" class="px-4 py-2 rounded bg-blue-600 text-white">名簿を取り込む</button>
                   <button id="reloadMembersBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
                 </div>
