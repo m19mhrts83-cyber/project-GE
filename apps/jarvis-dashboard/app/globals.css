@@ -421,6 +421,34 @@ h1 {
   font-weight: 600;
 }
 
+.home-sync {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  color: var(--muted);
+  font-size: 0.82rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+
+.home-sync strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.home-sync-sep {
+  opacity: 0.5;
+}
+
+.home-sync-warn {
+  color: #b45309;
+  margin-left: 4px;
+}
+
 .home-meta {
   margin-top: 36px;
   color: var(--muted);
