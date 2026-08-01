@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Shell from "@/components/Shell";
 import StatusToggle from "@/components/StatusToggle";
 import { LEVEL_LABEL, HomeLevel, watchSortKey } from "@/lib/homeLevels";
@@ -11,7 +12,7 @@ export default async function SituationPage() {
     .order("updated_at", { ascending: false });
 
   const active = (items || []).filter((i) => i.status === "active");
-  const archived = (items || []).filter((i) => i.status === "archived");
+  const archivedCount = (items || []).filter((i) => i.status === "archived").length;
   active.sort((a, b) => watchSortKey(a.level) - watchSortKey(b.level));
 
   return (
@@ -19,7 +20,25 @@ export default async function SituationPage() {
       <h1>状況ウォッチ</h1>
       <p className="sub">
         気にしている項目（3段階: 要確認／注意／参考）。不要になったらアーカイブ。
+        復元は{" "}
+        <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
+          アーカイブ
+        </Link>
+        メニューから。
       </p>
+      <div className="stats">
+        <div className="stat">
+          アクティブ <strong>{active.length}</strong>
+        </div>
+        <div className="stat">
+          アーカイブ{" "}
+          <strong>
+            <Link href="/archive" style={{ color: "inherit" }}>
+              {archivedCount}
+            </Link>
+          </strong>
+        </div>
+      </div>
       <h2>アクティブ</h2>
       {active.length === 0 ? (
         <p className="empty">まだ push されていません</p>
@@ -56,6 +75,7 @@ export default async function SituationPage() {
                     padding: 10,
                     borderRadius: 8,
                     border: "1px solid var(--line)",
+                    color: "var(--ink)",
                   }}
                 >
                   {it.cursor_prompt}
@@ -65,26 +85,11 @@ export default async function SituationPage() {
           );
         })
       )}
-      <h2>アーカイブ</h2>
-      {archived.length === 0 ? (
-        <p className="empty">なし</p>
-      ) : (
-        archived.map((it) => (
-          <article key={it.id} className="card">
-            <header>
-              <strong>{it.title}</strong>
-              <span className="meta">archived</span>
-              <StatusToggle
-                table="watch_status"
-                id={it.id}
-                status={it.status}
-                path="/situation"
-              />
-            </header>
-            <p className="sum">{it.summary}</p>
-          </article>
-        ))
-      )}
+      <p className="sub" style={{ marginTop: 24 }}>
+        <Link href="/archive" className="btn">
+          アーカイブを見る →
+        </Link>
+      </p>
     </Shell>
   );
 }

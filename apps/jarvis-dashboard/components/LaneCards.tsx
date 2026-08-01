@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Shell from "@/components/Shell";
 import StatusToggle from "@/components/StatusToggle";
 import { createClient } from "@/lib/supabase/server";
@@ -26,14 +27,23 @@ export default async function LaneCardsPage({
     <Shell active={active}>
       <h1>{title}</h1>
       <p className="sub">
-        Mac のやり取り・Journal から集約。不要なカードはアーカイブできます。
+        Mac のやり取り・Journal から集約。不要なカードはアーカイブできます。復元は{" "}
+        <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
+          アーカイブ
+        </Link>
+        メニューから。
       </p>
       <div className="stats">
         <div className="stat">
           アクティブ <strong>{activeCards.length}</strong>
         </div>
         <div className="stat">
-          アーカイブ <strong>{archivedCards.length}</strong>
+          アーカイブ{" "}
+          <strong>
+            <Link href="/archive" style={{ color: "inherit" }}>
+              {archivedCards.length}
+            </Link>
+          </strong>
         </div>
       </div>
       <h2>アクティブ</h2>
@@ -65,6 +75,7 @@ export default async function LaneCardsPage({
                     background: "#fafaf9",
                     padding: 10,
                     borderRadius: 8,
+                    color: "var(--ink)",
                   }}
                 >
                   {c.cursor_prompt}
@@ -74,25 +85,14 @@ export default async function LaneCardsPage({
           </article>
         ))
       )}
-      <h2>アーカイブ</h2>
-      {!archivedCards.length ? (
-        <p className="empty">なし</p>
-      ) : (
-        archivedCards.map((c) => (
-          <article key={c.id} className="card">
-            <header>
-              <strong>{c.title}</strong>
-              <StatusToggle
-                table="cards"
-                id={c.id}
-                status={c.status}
-                path={active}
-              />
-            </header>
-            <p className="sum">{c.summary}</p>
-          </article>
-        ))
-      )}
+      {archivedCards.length > 0 ? (
+        <p className="sub" style={{ marginTop: 24 }}>
+          このレーンのアーカイブ {archivedCards.length}件 →{" "}
+          <Link href="/archive" className="btn">
+            アーカイブを見る
+          </Link>
+        </p>
+      ) : null}
     </Shell>
   );
 }
