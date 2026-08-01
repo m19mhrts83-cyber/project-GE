@@ -41,7 +41,12 @@ export default async function Shell({
           <Link
             key={n.href}
             href={n.href}
-            className={`side-link${active === n.href ? " active" : ""}`}
+            className={`side-link${
+              active === n.href ||
+              (n.href !== "/" && active.startsWith(n.href))
+                ? " active"
+                : ""
+            }`}
           >
             {n.label}
           </Link>
