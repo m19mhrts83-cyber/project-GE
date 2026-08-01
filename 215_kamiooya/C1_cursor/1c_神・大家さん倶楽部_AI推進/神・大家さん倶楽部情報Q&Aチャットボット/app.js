@@ -319,6 +319,10 @@ const App = {
     document.getElementById('importCsvBtn').addEventListener('click', App.importCsvComments);
     const importMembersCsvBtn = document.getElementById('importMembersCsvBtn');
     if (importMembersCsvBtn) importMembersCsvBtn.addEventListener('click', App.importMembersCsv);
+    const downloadMembersCsvTemplateBtn = document.getElementById('downloadMembersCsvTemplateBtn');
+    if (downloadMembersCsvTemplateBtn) {
+      downloadMembersCsvTemplateBtn.addEventListener('click', App.downloadMembersCsvTemplate);
+    }
     const reloadMembersBtn = document.getElementById('reloadMembersBtn');
     if (reloadMembersBtn) reloadMembersBtn.addEventListener('click', App.loadMembers);
     const importSrtBtn = document.getElementById('importSrtBtn');
@@ -2579,6 +2583,27 @@ const App = {
     await App.apiClient('POST', '/admin/members', payload);
     existingByNo[memberNo] = { member_no: memberNo, name: name, email: email, status: status };
     return 'created';
+  },
+
+  downloadMembersCsvTemplate: () => {
+    // Excel 向けに UTF-8 BOM 付き。1行目=ヘッダー、2行目=記入例（取込前に差し替え可）
+    const lines = [
+      'member_no,name,email',
+      'A12345,山田太郎,taro.yamada@example.com'
+    ];
+    const csv = '\uFEFF' + lines.join('\r\n') + '\r\n';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'members_import_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 1000);
+    App.showToast('名簿CSVフォーマットをダウンロードしました', 'success');
   },
 
   importMembersCsv: async () => {
