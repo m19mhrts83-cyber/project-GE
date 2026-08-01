@@ -1,5 +1,6 @@
 #!/bin/zsh
-# Jarvis: Zaim CSV 金曜週次エクスポート → finance / energy metrics push
+# Jarvis: Zaim CSV 土曜 05:00 週次エクスポート → finance / energy metrics push
+# （Mac 朝オープン時の取りこぼしフォールバックからも呼ばれる）
 # ログ: ~/Library/Logs/jarvis_zaim/
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"

@@ -1,6 +1,7 @@
 {
   "disabled": false,
-  "schedule": "Friday 12:00 JST",
+  "schedule": "Saturday 05:00 JST",
   "label": "com.matsunoma.jarvis.zaim-csv-weekly",
-  "note": "runner が last_success_at / last_error を更新。ログイン切れ時は zaim_budget_apply.py --login"
+  "fallback": "morning_mac_refresh if last_success older than 6 days or last_ok=false",
+  "note": "runner が last_success_at / last_error を更新。ログイン切れ時は zaim_budget_apply.py --login。GHA 不可（Mac 専用）"
 }

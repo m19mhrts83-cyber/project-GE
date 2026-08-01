@@ -42,6 +42,9 @@ CATCHUP = REPO / "scripts" / "jarvis_triage_yoritoori_catchup.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
+ZAIM_WEEKLY_STATE = REPO / ".jarvis_state" / "zaim_csv_weekly.json"
+ZAIM_WEEKLY_RUNNER = REPO / "launchd" / "zaim_csv_weekly_runner.sh"
+ZAIM_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_zaim"
 
 
 def now_iso() -> str:
@@ -116,6 +119,59 @@ def mac_line_running() -> bool:
         return r.returncode == 0
     except Exception:
         return False
+
+
+def zaim_csv_needs_catchup(*, max_age_days: int = 6) -> bool:
+    """土曜 05:00 の週次を取りこぼした／失敗したとき True。"""
+    if not ZAIM_WEEKLY_STATE.is_file():
+        return True
+    try:
+        data = json.loads(ZAIM_WEEKLY_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("last_ok") is False:
+        return True
+    raw = str(data.get("last_success_at") or "").strip()
+    if not raw:
+        return True
+    try:
+        # 2026-08-01T23:48:04+0900
+        ts = datetime.strptime(raw[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=JST)
+    except ValueError:
+        return True
+    age = datetime.now(JST) - ts
+    return age.total_seconds() >= max_age_days * 86400
+
+
+def spawn_zaim_csv_weekly(*, dry_run: bool) -> str:
+    """週次 CSV をバックグラウンド起動（朝バンドルをブロックしない）。"""
+    if not ZAIM_WEEKLY_RUNNER.is_file():
+        print(f"# zaim_csv: missing {ZAIM_WEEKLY_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn zaim_csv_weekly_runner.sh", flush=True)
+        return "dry_run"
+    ZAIM_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(ZAIM_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(ZAIM_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(ZAIM_WEEKLY_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# zaim_csv: spawned weekly runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# zaim_csv spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
 
 
 def upsert_sync_meta(results: dict[str, Any]) -> None:
@@ -299,6 +355,13 @@ def main() -> int:
             failures += 1
     else:
         results["steps"]["line"] = "skipped"
+
+    # 6. Zaim CSV 週次の取りこぼし（土曜 05:00 失敗／Mac スリープ時のフォールバック）
+    if zaim_csv_needs_catchup():
+        results["steps"]["zaim_csv_weekly"] = spawn_zaim_csv_weekly(dry_run=args.dry_run)
+    else:
+        results["steps"]["zaim_csv_weekly"] = "fresh"
+        print("# zaim_csv: skip (success within 6 days)", flush=True)
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()
