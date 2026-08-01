@@ -64,7 +64,22 @@ export default async function HomePage() {
         気になる行をタップすると詳細へ。
       </p>
 
-      <div className="stats">
+      <div className="home-legend" aria-label="優先度の凡例">
+        <span className="home-legend-item">
+          <span className="home-legend-swatch attention" />
+          要確認
+        </span>
+        <span className="home-legend-item">
+          <span className="home-legend-swatch warn" />
+          注意
+        </span>
+        <span className="home-legend-item">
+          <span className="home-legend-swatch info" />
+          参考
+        </span>
+      </div>
+
+      <div className="stats home-stats">
         <div className="stat level-attention">
           要確認 <strong>{counts.attention + mailCounts.attention}</strong>
         </div>
@@ -87,15 +102,17 @@ export default async function HomePage() {
           </Link>
         </div>
         {watchNeed.length === 0 ? (
-          <p className="empty" style={{ padding: "12px 0" }}>
+          <p className="empty">
             いま要注意の項目はありません（ok のみ、または未 push）
           </p>
         ) : (
           <div className="watch-grid">
             {watchNeed.map((it) => {
-              const level = (["attention", "warn", "info"].includes(it.level)
-                ? it.level
-                : "info") as HomeLevel;
+              const level = (
+                ["attention", "warn", "info"].includes(it.level)
+                  ? it.level
+                  : "info"
+              ) as HomeLevel;
               return (
                 <Link
                   key={it.id}
@@ -104,12 +121,10 @@ export default async function HomePage() {
                 >
                   <header>
                     <span className="lvl">{LEVEL_LABEL[level]}</span>
-                    <strong>{it.title}</strong>
+                    <strong title={it.title}>{it.title}</strong>
                   </header>
                   <p className="sum">{it.summary}</p>
-                  {it.source ? (
-                    <p className="meta">{it.source}</p>
-                  ) : null}
+                  {it.source ? <p className="meta">{it.source}</p> : null}
                 </Link>
               );
             })}
@@ -123,9 +138,7 @@ export default async function HomePage() {
           <span className="meta">クリックで詳細</span>
         </div>
         {mails.length === 0 ? (
-          <p className="empty" style={{ padding: "12px 0" }}>
-            pending のメールはありません
-          </p>
+          <p className="empty">pending のメールはありません</p>
         ) : (
           <ul className="mail-skim">
             {mails.map((it) => {
@@ -182,9 +195,7 @@ export default async function HomePage() {
           <div className="stat">
             watch {metaMap.watch_pushed_at ?? "未push"}
           </div>
-          <div className="stat">
-            経路 {metaMap.triage_source ?? "—"}
-          </div>
+          <div className="stat">経路 {metaMap.triage_source ?? "—"}</div>
           <div className="stat">
             Mac {metaMap.mac_triage_pushed_at ?? "—"}
           </div>
