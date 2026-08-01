@@ -6,7 +6,7 @@ export const maxDuration = 120;
 export default async function PartnerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ i?: string }>;
+  searchParams: Promise<{ i?: string; view?: string }>;
 }) {
   return await TriageLanePage({
     lane: "partner",
