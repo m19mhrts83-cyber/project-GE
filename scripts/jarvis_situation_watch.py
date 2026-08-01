@@ -712,19 +712,30 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
     title = meta["title"]
     prompt = meta.get("cursor_prompt") or ""
     src = meta.get("source") or ""
+    weekly = load_json(STATE / "zaim_csv_weekly.json")
+    weekly_note = ""
+    if weekly and weekly.get("last_ok") is False and weekly.get("last_error"):
+        weekly_note = (
+            f"／CSV週次失敗: {str(weekly.get('last_error'))[:80]} "
+            "→ zaim_budget_apply.py --login のち zaim_csv_weekly_runner.sh"
+        )
+    elif weekly and weekly.get("last_success_at"):
+        weekly_note = f"／CSV週次成功 {str(weekly.get('last_success_at'))[:16]}"
     if not data:
         return card(
             item_id=meta["id"],
             title=title,
             category=meta.get("category") or "",
             level="warn",
-            summary="state なし — jarvis_zaim_quality_check.py を実行",
+            summary="state なし — jarvis_zaim_quality_check.py を実行" + weekly_note,
             cursor_prompt=prompt,
             source=src,
         )
     level = str(data.get("level") or "ok")
     if level not in ("ok", "info", "warn", "attention"):
         level = "ok"
+    if weekly and weekly.get("last_ok") is False and level == "ok":
+        level = "warn"
     action_items = data.get("action_items") or []
     if not action_items and data.get("samples"):
         # 旧 state 互換: samples から both_include 等を拾う
@@ -770,12 +781,13 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
         "actions": action_items[:30],
         "action_lines": action_lines[:30],
     }
+    summary = str(data.get("summary") or "データあり") + weekly_note
     return card(
         item_id=meta["id"],
         title=title,
         category=meta.get("category") or "",
         level=level,
-        summary=str(data.get("summary") or "データあり"),
+        summary=summary,
         detail=detail,
         cursor_prompt=prompt,
         source=src,

@@ -1,0 +1,6 @@
+{
+  "disabled": false,
+  "schedule": "Friday 12:00 JST",
+  "label": "com.matsunoma.jarvis.zaim-csv-weekly",
+  "note": "runner が last_success_at / last_error を更新。ログイン切れ時は zaim_budget_apply.py --login"
+}
