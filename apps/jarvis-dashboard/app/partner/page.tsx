@@ -1,5 +1,8 @@
 import TriageLanePage from "@/components/TriageLane";
 
+/** Cursor Cloud Agent 見直しの待ち時間用 */
+export const maxDuration = 120;
+
 export default async function PartnerPage({
   searchParams,
 }: {

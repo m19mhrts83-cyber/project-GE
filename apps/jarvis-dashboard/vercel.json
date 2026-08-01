@@ -1,4 +1,9 @@
 {
   "framework": "nextjs",
-  "regions": ["hnd1"]
+  "regions": ["hnd1"],
+  "functions": {
+    "app/**/*": {
+      "maxDuration": 120
+    }
+  }
 }

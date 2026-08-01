@@ -118,10 +118,12 @@ export default function DraftWorkbench({
         return;
       }
       if (st === "queued" || st === "running") {
+        const via =
+          r.revise?.via === "mac_fallback" ? "（Mac フォールバック）" : "";
         setMsg(
           st === "running"
-            ? "Cursor Agent 見直し中…"
-            : "Cursor Agent キュー待ち（Mac ワーカー）…",
+            ? `Cursor Agent 見直し中…${via}`
+            : `Cursor Agent キュー待ち…${via}`,
         );
       }
     };
@@ -253,8 +255,8 @@ export default function DraftWorkbench({
       </fieldset>
       {engine === "cursor" ? (
         <p className="draft-hint">
-          Cursor Agent は Mac 上の agent CLI（夜間トリアージと同じ）で処理します。Mac
-          がスリープだと待ちます。
+          Cursor Agent は Cloud 本線です。失敗・未キー・タイムアウト時のみ Mac
+          ワーカーが処理します。
         </p>
       ) : null}
 
