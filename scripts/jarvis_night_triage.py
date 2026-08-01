@@ -1230,6 +1230,22 @@ def main() -> int:
         macos_notify("Jarvis 夜間トリアージ", notify_body)
         # ブラウザは夜間に開かない（ユーザーが開いた最初のタイミングは morning-open 側）
         print("# dashboard open: skipped at batch (morning-open handles first open of day)")
+        # 自分用 Supabase（jarvis-dashboard）へ push（SERVICE_ROLE 未設定ならスキップ）
+        try:
+            push = REPO / "scripts" / "jarvis_dashboard_push.py"
+            if push.is_file() and (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip():
+                r = subprocess.run(
+                    [sys.executable, str(push)],
+                    cwd=str(REPO),
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                print(f"# supabase push: exit={r.returncode} {(r.stderr or r.stdout or '')[-200:]}")
+            else:
+                print("# supabase push: skipped (JARVIS_SUPABASE_SERVICE_ROLE_KEY unset)")
+        except Exception as e:
+            print(f"# supabase push failed: {e}")
         logf = LOG_DIR / f"run_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.log"
         logf.write_text(
             json.dumps(

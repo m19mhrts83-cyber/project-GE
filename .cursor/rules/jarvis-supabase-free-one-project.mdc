@@ -1,57 +1,63 @@
 ---
-description: Supabase Free はプロジェクト1つ（kamiooya-qa）にテーブル集約。新規PJ禁止・週次心拍。
+description: Supabase Free は2プロジェクト固定（提供用 kamiooya-qa／自分用 jarvis-dashboard）。3つ目禁止。
 alwaysApply: true
 ---
 
-# Supabase Free・1プロジェクト運用（Jarvis）
+# Supabase Free・2プロジェクト運用（Jarvis）
 
-## 方針（いけとも 2026-07-04 講習）
+## 方針（いけとも 2026-07-04 講習 ＋ 引き渡し分離 2026-08-01）
 
-個人の自前 AI / エージェント用 DB は **Free 枠のプロジェクトを1つだけ**使い、用途ごとに **テーブルを増やす**。  
-テーマごとにプロジェクトを分けない（テーブル数に制限はない）。
+Free 枠は **アクティブ2プロジェクトまで無料**。用途を次の2本に固定し、**3つ目は作らない**。
+
+| プロジェクト | ref | 役割 |
+|---|---|---|
+| **`kamiooya-qa`** | `mwubzgefkkjjbingrmqu` | **運営提供・引き渡し対象**。神大家アプリ関連のみ（`comments` / `knowledge_*` / `chat_*` / `app_qa_*`） |
+| **`jarvis-dashboard`** | `idkdqneutpvkhxhpjtgc` | **自分用・引き渡さない**。トリアージ／状況ウォッチ／カード／メトリクス |
 
 | 項目 | 正 |
 |---|---|
-| プラン | Free |
-| 唯一のプロジェクト | `kamiooya-qa`（ref `mwubzgefkkjjbingrmqu`） |
-| 新機能 | **同一 PJ にテーブル追加**。新規プロジェクト作成は禁止 |
-| スキーマ正本 | `apps/kamiooya-qa-web/supabase/schema.sql` に追記してから適用 |
-| 秘密 | `SUPABASE_*` は `.env.jarvis_private` / OneDrive `scripts/.env` / GitHub Secrets のみ。チャット・Git に出さない |
-| データ流 | WeStudy / Notta 原本 → CSV・inbox → **Supabase は投影**（逆同期しない） |
+| プラン | Free（2アクティブ） |
+| 神大家向け新機能 | **`kamiooya-qa` にテーブル追加**（自分用テーブルは足さない） |
+| Jarvis ダッシュボード | **`jarvis-dashboard` にテーブル追加** |
+| スキーマ正本（提供） | `apps/kamiooya-qa-web/supabase/schema.sql` |
+| スキーマ正本（自分用） | `apps/jarvis-dashboard/supabase/schema.sql` |
+| 秘密（提供） | `SUPABASE_*` → `.env.jarvis_private` / scripts/.env / GitHub Secrets |
+| 秘密（自分用） | `JARVIS_SUPABASE_*` → `.env.jarvis_private` のみ（チャット・Git に出さない） |
+| データ流（提供） | WeStudy / Notta → CSV・inbox → Supabase は投影 |
+| 休止対策 | 週次 WeStudy で kamiooya-qa 心拍。jarvis-dashboard は夜間トリアージ push で実質回避 |
 
 復習: https://claude-code-supabase-fukushu.vercel.app/
 
 ## トリガー時の動作
 
-- 「DB作って」「Supabase新規」「別プロジェクト」→ **既存 kamiooya-qa にテーブル追加**で進める
-- 命名: 既存 `comments` / `knowledge_*` / `chat_*`。今後は `app_<用途>_...` 等のプレフィックス
-- 休止対策: 週次 WeStudy（`run_update_and_import.sh` / `westudy-raimo-weekly.yml`）で **差分0でも** `supabase_healthcheck.py --touch`（`jarvis_heartbeat`）
+- 「DB作って」「神大家用テーブル」→ **`kamiooya-qa` に追加**
+- 「ダッシュボード用」「自分用ウォッチ／トリアージ」→ **`jarvis-dashboard` に追加**
+- 「第3プロジェクト」→ **拒否して確認**（Free 枠超過・有料化）
 
 ## 禁止
 
-- Free で第2プロジェクトを作る（有料化・休止リスクの悪化）
+- Free で **3つ目**のプロジェクトを作る
+- `kamiooya-qa` に Jarvis 個人ダッシュボード用テーブルを混在させる（引き渡し境界を壊す）
 - Service Role Key を公開リポジトリ・チャットに貼る
 - Raimo 等との双方向同期（一方向ミラーのみ）
 
 ## 逸脱時の戒め（必須）
 
-次のとき Jarvis は **黙って従わず、一度戒めて確認**する（言い方は短く・責めない）。
-
 | 状況 | 戒めの例 |
 |---|---|
-| 新規 Supabase プロジェクト作成の指示 | 「Free は `kamiooya-qa` 1本にテーブル追加する方針です。**その対応でよろしいですか？**（新規 PJ は推奨しません）」 |
-| 用途ごとに別 PJ を切る指示 | 同上。既存 PJ へのテーブル追加案を示す |
-| `SUPABASE_*` を jarvis_private / scripts/.env / GitHub Secrets **以外**へ書く指示 | 「秘密は `.env.jarvis_private` 正本です。**チャットや別ファイルに書く対応でよいですか？**」 |
+| 第3 Supabase プロジェクト作成の指示 | 「Free は `kamiooya-qa` と `jarvis-dashboard` の2本までです。**3つ目は推奨しません。その対応でよろしいですか？**」 |
+| 提供用 PJ に自分用テーブルを足す指示 | 「引き渡し境界のため自分用は `jarvis-dashboard` です。**混在でよいですか？**」 |
+| `SUPABASE_*` / `JARVIS_SUPABASE_*` を jarvis_private 以外へ書く指示 | 「秘密は `.env.jarvis_private` 正本です。**チャットや別ファイルに書く対応でよいですか？**」 |
 | チャットにキー・トークンを貼った／貼りそう | 受け取らず追記を促す。**貼ってしまった場合は下の是正を即実行** |
 
 ユーザーが「方針どおりでなくてよい／例外で進めて」と明示したときだけ従う。
 
 ## 秘密漏洩時の是正（必須・止まずに進める）
 
-チャット・コミット・Issue・ログ等に `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ACCESS_TOKEN` / DB パスワード等が露出したら:
+チャット・コミット・Issue・ログ等に `SUPABASE_SERVICE_ROLE_KEY` / `JARVIS_SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ACCESS_TOKEN` / DB パスワード等が露出したら:
 
 1. **再掲しない**（値をチャットに繰り返さない）
-2. Dashboard で該当トークン／キーを **Revoke / Rotate**（Access Token・API keys・必要なら DB password）
-3. 新しい値は **`.env.jarvis_private` と OneDrive `scripts/.env`・GitHub Secrets** のみに更新（「保存した」後に読取）
+2. Dashboard で該当トークン／キーを **Revoke / Rotate**
+3. 新しい値は **`.env.jarvis_private` と（提供側なら）OneDrive `scripts/.env`・GitHub Secrets** のみに更新
 4. 露出経路があれば削除・履歴注意を短く案内（Git に入った場合は force せず、ユーザー確認のうえ対応）
 5. 完了を「Rotated / env 更新済み」程度で報告（新キーの値は出さない）
