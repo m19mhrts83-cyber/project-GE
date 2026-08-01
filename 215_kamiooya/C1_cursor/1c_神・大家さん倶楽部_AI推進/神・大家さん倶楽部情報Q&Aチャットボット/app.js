@@ -953,11 +953,16 @@ const App = {
 
   handleRegister: async (event) => {
     event.preventDefault();
+    const name = (document.getElementById('registerName').value || '').trim();
     const email = document.getElementById('registerEmail').value.trim();
     const memberNo = (document.getElementById('registerMemberNo').value || '').trim();
     const password = document.getElementById('registerPassword').value;
     if (!email || !password) {
       App.showToast('メールアドレスとパスワードは必須です', 'error');
+      return;
+    }
+    if (!name) {
+      App.showToast('氏名は必須です', 'error');
       return;
     }
     if (!memberNo) {
@@ -971,10 +976,11 @@ const App = {
       await App.apiClient('POST', '/auth/register', {
         email: email,
         password_hash: password,
-        member_no: memberNo
+        member_no: memberNo,
+        name: name
       });
       // 通知失敗でも登録は成功扱い（専用 API・分離）
-      await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo);
+      await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo, name);
       const notice =
         '管理者にメールを送信しました。管理者承認後にメールが届くので、しばらくお待ちください';
       App.showToast(notice, 'success_long');
@@ -990,15 +996,18 @@ const App = {
   },
 
   /** Phase 2: 承認依頼メール。失敗しても throw しない。 */
-  notifyRegistrationPending: async (email, note, memberNo) => {
+  notifyRegistrationPending: async (email, note, memberNo, name) => {
     try {
       const registeredAt =
         new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ' JST';
+      const noteWithName = name
+        ? (note || '') + (note ? ' / ' : '') + '氏名: ' + name
+        : note || '';
       await App.apiClient('POST', '/notify/registration', {
         email: email,
         member_no: memberNo || '',
         registered_at: registeredAt,
-        note: note || ''
+        note: noteWithName
       });
     } catch (notifyErr) {
       console.warn('registration notify failed (registration still OK):', notifyErr);
@@ -2127,7 +2136,7 @@ const App = {
     if (!App.isStaffAdmin()) return;
     const list = App.generalUsers();
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="4" class="p-3 text-slate-500">一般ユーザーはいません</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">一般ユーザーはいません</td></tr>';
       return;
     }
     const isMaster = App.isMasterAdmin();
@@ -2159,6 +2168,9 @@ const App = {
       tr.innerHTML =
         '<td class="p-2">' +
         App.escapeHtml(u.id) +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(u.name || '') +
         '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(u.email || '') +
@@ -2196,7 +2208,7 @@ const App = {
     if (!App.isStaffAdmin()) return;
     const list = App.adminUsersOnly();
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">管理者はいません</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">管理者はいません</td></tr>';
       return;
     }
     const isMaster = App.isMasterAdmin();
@@ -2242,6 +2254,9 @@ const App = {
       tr.innerHTML =
         '<td class="p-2">' +
         App.escapeHtml(u.id) +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(u.name || '') +
         '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(u.email || '') +
@@ -2314,9 +2329,12 @@ const App = {
       }
       const tr = document.createElement('tr');
       tr.className = 'border-t';
+      const targetLabel = target.name
+        ? target.name + '（' + (target.email || '') + '）'
+        : target.email || req.content || '';
       tr.innerHTML =
         '<td class="p-2">' +
-        App.escapeHtml(target.email || req.content || '') +
+        App.escapeHtml(targetLabel) +
         ' <span class="text-xs text-slate-400">#' +
         App.escapeHtml(targetId) +
         '</span></td>' +
@@ -2957,7 +2975,7 @@ const App = {
     }
 
     if (App.state.pendingUsers.length === 0) {
-      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">承認待ちユーザーはいません</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="p-3 text-slate-500">承認待ちユーザーはいません</td></tr>';
       App.updateBulkApproveButtonState();
       return;
     }
@@ -2974,6 +2992,7 @@ const App = {
         '" aria-label="選択" />' +
         '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.id) + '</td>' +
+        '<td class="p-2">' + App.escapeHtml(u.name || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.email || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.member_no || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.status || '') + '</td>' +
