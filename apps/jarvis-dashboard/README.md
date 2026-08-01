@@ -27,6 +27,19 @@ https://jarvis-dashboard-amber.vercel.app/
 
 朝の自動オープンは `JARVIS_DASHBOARD_URL`（`.env.jarvis_private`）を優先。
 
+### Cursor Agent 見直し（パートナー画面）
+
+Web では **Gemini / Cursor Agent** を選べます。Cursor Agent は Vercel 上では動かないため、Mac の `agent` CLI（夜間トリアージと同じ）へキューします。
+
+```bash
+~/git-repos/launchd/install_cursor_revise_worker_launchd.sh
+# 手動1回:
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_triage_cursor_revise_worker.py
+```
+
+ログ: `~/Library/Logs/jarvis_night_triage/cursor_revise.*.log`
+
 ### NotebookLM 作業セット
 
 サイドバー **NotebookLM** → `/notebooklm`。Mac で localhost ヘルパー（`127.0.0.1:8766`）が動いていれば Finder（`200_NoteBookLM`）＋ NotebookLM を一括オープン。未起動時は Web リンクのみ。

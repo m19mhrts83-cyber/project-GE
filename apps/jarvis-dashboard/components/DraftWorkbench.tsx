@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  reviseTriageDraftWithGemini,
+  getCursorReviseStatus,
+  reviseTriageDraft,
   saveTriageDraft,
   sendTriageAfterConfirm,
+  type CursorReviseState,
+  type ReviseEngine,
 } from "@/app/actions/triage";
 
 type Payload = {
@@ -13,6 +16,7 @@ type Payload = {
   draft_cursor?: string;
   yoritoori_appended?: boolean;
   sent_at?: string;
+  cursor_revise?: CursorReviseState;
 };
 
 type Props = {
@@ -31,6 +35,13 @@ type Props = {
 };
 
 type Tab = "edit" | "gemini" | "cursor";
+
+function readCursorRevise(payload: Payload | null | unknown): CursorReviseState | null {
+  const pl = (payload && typeof payload === "object" ? payload : {}) as Payload;
+  const cr = pl.cursor_revise;
+  if (!cr || typeof cr !== "object") return null;
+  return cr;
+}
 
 export default function DraftWorkbench({
   id,
@@ -56,15 +67,73 @@ export default function DraftWorkbench({
   const [draft, setDraft] = useState(draftText || "");
   const [to, setTo] = useState(initialTo);
   const [instruction, setInstruction] = useState("");
+  const [engine, setEngine] = useState<ReviseEngine>("gemini");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, start] = useTransition();
+  const [polling, setPolling] = useState(() => {
+    const cr = readCursorRevise(payload);
+    return cr?.status === "queued" || cr?.status === "running";
+  });
 
   const previewSubject = useMemo(() => {
     const s = (subject || "").trim() || "（件名なし）";
     return /^re:/i.test(s) ? s : `Re: ${s}`;
   }, [subject]);
+
+  useEffect(() => {
+    if (!polling) return;
+    let cancelled = false;
+    let ticks = 0;
+    const tick = async () => {
+      ticks += 1;
+      const r = await getCursorReviseStatus(id);
+      if (cancelled) return;
+      if (!r.ok) {
+        setErr(r.error);
+        return;
+      }
+      const st = r.revise?.status;
+      if (st === "done") {
+        if (r.draft) setDraft(r.draft);
+        setMsg("Cursor Agent で見直し完了");
+        setErr(null);
+        setPolling(false);
+        setTab("cursor");
+        router.refresh();
+        return;
+      }
+      if (st === "error") {
+        setErr(r.revise?.error || "Cursor Agent 見直しに失敗しました");
+        setPolling(false);
+        router.refresh();
+        return;
+      }
+      if (ticks >= 80) {
+        setErr(
+          "Cursor Agent 見直しがタイムアウトしました。Mac が起動中か、launchd ワーカーを確認してください。",
+        );
+        setPolling(false);
+        return;
+      }
+      if (st === "queued" || st === "running") {
+        setMsg(
+          st === "running"
+            ? "Cursor Agent 見直し中…"
+            : "Cursor Agent キュー待ち（Mac ワーカー）…",
+        );
+      }
+    };
+    void tick();
+    const t = setInterval(() => {
+      void tick();
+    }, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [polling, id, router]);
 
   function applyTab(t: Tab) {
     setTab(t);
@@ -159,11 +228,41 @@ export default function DraftWorkbench({
         />
       </label>
 
+      <fieldset className="draft-engine">
+        <legend>見直しエンジン</legend>
+        <label className="draft-engine-opt">
+          <input
+            type="radio"
+            name={`revise-engine-${id}`}
+            checked={engine === "gemini"}
+            onChange={() => setEngine("gemini")}
+            disabled={pending || polling}
+          />
+          Gemini
+        </label>
+        <label className="draft-engine-opt">
+          <input
+            type="radio"
+            name={`revise-engine-${id}`}
+            checked={engine === "cursor"}
+            onChange={() => setEngine("cursor")}
+            disabled={pending || polling}
+          />
+          Cursor Agent
+        </label>
+      </fieldset>
+      {engine === "cursor" ? (
+        <p className="draft-hint">
+          Cursor Agent は Mac 上の agent CLI（夜間トリアージと同じ）で処理します。Mac
+          がスリープだと待ちます。
+        </p>
+      ) : null}
+
       <div className="draft-toolbar">
         <button
           type="button"
           className="btn"
-          disabled={pending}
+          disabled={pending || polling}
           onClick={() =>
             start(async () => {
               setErr(null);
@@ -180,27 +279,39 @@ export default function DraftWorkbench({
         </button>
         <button
           type="button"
-          className="btn"
-          disabled={pending}
+          className="btn primary"
+          disabled={pending || polling || !draft.trim()}
           onClick={() =>
             start(async () => {
               setErr(null);
-              const r = await reviseTriageDraftWithGemini(
+              const r = await reviseTriageDraft(
                 id,
                 instruction,
                 draft,
                 path,
+                engine,
               );
-              if (!r.ok) setErr(r.error);
-              else {
-                if (r.draft) setDraft(r.draft);
-                setMsg(r.message || "見直し完了");
-                router.refresh();
+              if (!r.ok) {
+                setErr(r.error);
+                return;
               }
+              if (engine === "cursor" && r.queued) {
+                setMsg(r.message || "Cursor Agent キューしました");
+                setPolling(true);
+                router.refresh();
+                return;
+              }
+              if (r.draft) setDraft(r.draft);
+              setMsg(r.message || "見直し完了");
+              router.refresh();
             })
           }
         >
-          Geminiで見直し
+          {polling
+            ? "見直し中…"
+            : engine === "cursor"
+              ? "Cursor Agentで見直し"
+              : "Geminiで見直し"}
         </button>
         <button type="button" className="btn" onClick={localCursorCopy}>
           ローカルCursor用コピー
@@ -209,7 +320,7 @@ export default function DraftWorkbench({
           <button
             type="button"
             className="btn primary"
-            disabled={pending || !draft.trim() || !to.trim()}
+            disabled={pending || polling || !draft.trim() || !to.trim()}
             onClick={() => {
               setConfirmOpen(true);
               setErr(null);
