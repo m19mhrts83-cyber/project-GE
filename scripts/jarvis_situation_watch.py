@@ -137,8 +137,9 @@ def card(
     cursor_prompt: str,
     detail: str = "",
     source: str = "",
+    payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "id": item_id,
         "title": title,
         "category": category,
@@ -149,6 +150,9 @@ def card(
         "cursor_prompt": cursor_prompt.strip(),
         "checked_at": now_iso(),
     }
+    if payload:
+        out["payload"] = payload
+    return out
 
 
 def eval_energy_cf(meta: dict, data: dict | None) -> dict[str, Any]:
@@ -643,15 +647,61 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
     level = str(data.get("level") or "ok")
     if level not in ("ok", "info", "warn", "attention"):
         level = "ok"
+    action_items = data.get("action_items") or []
+    if not action_items and data.get("samples"):
+        # 旧 state 互換: samples から both_include 等を拾う
+        for s in data.get("samples") or []:
+            if not (s.get("both_include") or s.get("action") or s.get("viewpoint") in (
+                "both_include",
+                "both_exclude",
+                "amazon",
+                "must_include",
+            )):
+                continue
+            act = s.get("action") if isinstance(s.get("action"), dict) else {}
+            date = str(act.get("date") or s.get("date") or "")
+            shop = str(act.get("shop") or s.get("shop") or "")
+            try:
+                amount = float(act.get("amount") or s.get("smart_yen") or s.get("card_yen") or 0)
+            except (TypeError, ValueError):
+                amount = 0.0
+            proposal = str(s.get("proposal") or "").strip()
+            line = f"{date} / {shop} / ¥{amount:,.0f}"
+            if proposal:
+                line = f"{line} / {proposal}"
+            action_items.append(
+                {
+                    "date": date,
+                    "shop": shop,
+                    "amount": amount,
+                    "proposal": proposal,
+                    "kind": s.get("viewpoint") or "",
+                    "line": line,
+                    "action": act or None,
+                }
+            )
+    action_lines = data.get("action_lines") or [a.get("line") for a in action_items if a.get("line")]
+    detail = str(data.get("detail") or "")
+    if action_lines and "要対応:" not in detail:
+        detail = (
+            "要対応:\n"
+            + "\n".join(f"- {ln}" for ln in action_lines[:20])
+            + (("\n" + detail) if detail else "")
+        )
+    payload: dict[str, Any] = {
+        "actions": action_items[:30],
+        "action_lines": action_lines[:30],
+    }
     return card(
         item_id=meta["id"],
         title=title,
         category=meta.get("category") or "",
         level=level,
         summary=str(data.get("summary") or "データあり"),
-        detail=str(data.get("detail") or ""),
+        detail=detail,
         cursor_prompt=prompt,
         source=src,
+        payload=payload,
     )
 
 

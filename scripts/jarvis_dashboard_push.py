@@ -203,7 +203,9 @@ def push_watch(sb) -> int:
                 "status": st,
                 "archived_at": arch_at,
                 "checked_at": it.get("checked_at"),
-                "payload": {},
+                "payload": it.get("payload")
+                if isinstance(it.get("payload"), dict)
+                else {},
                 "updated_at": now_iso(),
             }
         )

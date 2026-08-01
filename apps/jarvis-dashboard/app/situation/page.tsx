@@ -1,8 +1,31 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import StatusToggle from "@/components/StatusToggle";
+import WatchCommentThread, {
+  type WatchCommentRow,
+} from "@/components/WatchCommentThread";
 import { LEVEL_LABEL, HomeLevel, watchSortKey } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
+
+type ActionItem = {
+  date?: string;
+  shop?: string;
+  amount?: number;
+  proposal?: string;
+  line?: string;
+};
+
+function readActions(payload: unknown): ActionItem[] {
+  if (!payload || typeof payload !== "object") return [];
+  const actions = (payload as { actions?: unknown }).actions;
+  if (!Array.isArray(actions)) return [];
+  return actions.filter((a) => a && typeof a === "object") as ActionItem[];
+}
+
+function yen(n: number | undefined) {
+  if (n == null || Number.isNaN(n)) return "—";
+  return `¥${Math.round(n).toLocaleString("ja-JP")}`;
+}
 
 export default async function SituationPage() {
   const supabase = await createClient();
@@ -15,16 +38,36 @@ export default async function SituationPage() {
   const archivedCount = (items || []).filter((i) => i.status === "archived").length;
   active.sort((a, b) => watchSortKey(a.level) - watchSortKey(b.level));
 
+  const ids = active.map((i) => i.id);
+  const commentsByWatch = new Map<string, WatchCommentRow[]>();
+  if (ids.length) {
+    const { data: comments } = await supabase
+      .from("watch_comments")
+      .select("id,watch_id,role,body,created_at")
+      .in("watch_id", ids)
+      .order("created_at", { ascending: true });
+    for (const c of comments || []) {
+      const list = commentsByWatch.get(c.watch_id) || [];
+      list.push({
+        id: c.id,
+        role: c.role,
+        body: c.body,
+        created_at: c.created_at,
+      });
+      commentsByWatch.set(c.watch_id, list);
+    }
+  }
+
   return (
     <Shell active="/situation">
       <h1>状況ウォッチ</h1>
       <p className="sub">
-        気にしている項目（3段階: 要確認／注意／参考）。不要になったらアーカイブ。
-        復元は{" "}
+        気にしている項目（3段階: 要確認／注意／参考）。要対応は日付・店・金額まで表示。
+        各項目で Jarvis に詳しく聞けます。復元は{" "}
         <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
           アーカイブ
         </Link>
-        メニューから。
+        から。
       </p>
       <div className="stats">
         <div className="stat">
@@ -51,6 +94,7 @@ export default async function SituationPage() {
           ) as HomeLevel | "ok";
           const label =
             level === "ok" ? "OK" : LEVEL_LABEL[level as HomeLevel] || it.level;
+          const actions = readActions(it.payload);
           return (
             <article key={it.id} className={`card level-${it.level}`}>
               <header>
@@ -65,22 +109,39 @@ export default async function SituationPage() {
                 />
               </header>
               <p className="sum">{it.summary}</p>
-              {it.detail ? <p className="meta">{it.detail}</p> : null}
-              {it.cursor_prompt ? (
-                <pre
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    fontSize: "0.8rem",
-                    background: "#fafaf9",
-                    padding: 10,
-                    borderRadius: 8,
-                    border: "1px solid var(--line)",
-                    color: "var(--ink)",
-                  }}
-                >
-                  {it.cursor_prompt}
-                </pre>
+              {actions.length > 0 ? (
+                <div className="watch-actions">
+                  <p className="watch-actions-title">要対応（具体）</p>
+                  <ul>
+                    {actions.map((a, idx) => (
+                      <li key={`${a.date}-${a.shop}-${a.amount}-${idx}`}>
+                        <span className="watch-action-date">{a.date || "—"}</span>
+                        <span className="watch-action-shop">{a.shop || "—"}</span>
+                        <span className="watch-action-yen">{yen(a.amount)}</span>
+                        <span className="watch-action-proposal">
+                          {a.proposal || a.line || "—"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : it.detail ? (
+                <pre className="watch-detail">{it.detail}</pre>
               ) : null}
+              {actions.length > 0 && it.detail && !String(it.detail).includes("要対応:") ? (
+                <pre className="watch-detail">{it.detail}</pre>
+              ) : null}
+              {it.cursor_prompt ? (
+                <details className="watch-prompt-details">
+                  <summary>Cursor用メモ</summary>
+                  <pre className="watch-detail">{it.cursor_prompt}</pre>
+                </details>
+              ) : null}
+              <WatchCommentThread
+                watchId={it.id}
+                comments={commentsByWatch.get(it.id) || []}
+                path="/situation"
+              />
             </article>
           );
         })

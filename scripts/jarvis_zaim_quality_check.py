@@ -408,7 +408,62 @@ def build_result(
 
     actions = [s["action"] for s in samples if s.get("action")]
 
+    def _yen(s: dict) -> float:
+        act = s.get("action") if isinstance(s.get("action"), dict) else {}
+        for k in ("amount", "smart_yen", "card_yen", "yen"):
+            if act.get(k) is not None:
+                try:
+                    return float(act[k])
+                except (TypeError, ValueError):
+                    pass
+            if s.get(k) is not None:
+                try:
+                    return float(s[k])
+                except (TypeError, ValueError):
+                    pass
+        return 0.0
+
+    def _action_row(s: dict) -> dict:
+        act = s.get("action") if isinstance(s.get("action"), dict) else {}
+        date = str(act.get("date") or s.get("date") or s.get("card_date") or "")
+        shop = str(act.get("shop") or s.get("shop") or s.get("card_shop") or "")
+        amount = _yen(s)
+        proposal = str(s.get("proposal") or "").strip()
+        kind = str(s.get("severity") or "")
+        line = f"{date} / {shop} / ¥{amount:,.0f}"
+        if proposal:
+            line = f"{line} / {proposal}"
+        return {
+            "date": date,
+            "shop": shop,
+            "amount": amount,
+            "proposal": proposal,
+            "kind": kind,
+            "line": line,
+            "action": act or None,
+        }
+
+    # 要対応だけをアクション一覧に（OK例は含めない）
+    # both_include を優先、重複日付+店+金額は1行に
+    seen: set[str] = set()
+    action_items: list[dict] = []
+    action_lines: list[str] = []
+    for s in both_inc + both_exc + amazon + must:
+        row = _action_row({**s, "viewpoint": s.get("viewpoint") or (
+            "both_include" if s.get("both_include") else
+            "both_exclude" if s.get("both_exclude") else
+            s.get("kind") or ""
+        )})
+        key = f"{row['date']}|{row['shop']}|{row['amount']}"
+        if key in seen or not row["date"]:
+            continue
+        seen.add(key)
+        action_items.append(row)
+        action_lines.append(row["line"])
+
     detail_bits = []
+    if action_lines:
+        detail_bits.append("要対応:\n" + "\n".join(f"- {ln}" for ln in action_lines[:20]))
     if shop_c:
         detail_bits.append(
             "両方含める店: "
@@ -424,7 +479,9 @@ def build_result(
         "csv": str(csv_path),
         "level": level,
         "summary": " · ".join(parts),
-        "detail": " / ".join(x for x in detail_bits if x),
+        "detail": "\n".join(x for x in detail_bits if x),
+        "action_lines": action_lines,
+        "action_items": action_items,
         "pair_count": len(pairs),
         "rule_ok_count": len(ok_pairs),
         "both_include_count": len(both_inc),

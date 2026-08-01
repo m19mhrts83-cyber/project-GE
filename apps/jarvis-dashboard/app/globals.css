@@ -471,6 +471,173 @@ h1 {
   font-weight: 600;
 }
 
+.watch-actions {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--high) 25%, var(--line));
+  background: color-mix(in srgb, var(--high) 6%, #fff);
+}
+
+.watch-actions-title {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--high);
+}
+
+.watch-actions ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.watch-actions li {
+  display: grid;
+  grid-template-columns: 6.2rem 1fr auto;
+  grid-template-areas:
+    "date shop yen"
+    "prop prop prop";
+  gap: 2px 10px;
+  font-size: 0.82rem;
+  color: var(--ink);
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.watch-actions li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.watch-action-date {
+  grid-area: date;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.watch-action-shop {
+  grid-area: shop;
+}
+
+.watch-action-yen {
+  grid-area: yen;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.watch-action-proposal {
+  grid-area: prop;
+  color: #44403c;
+  line-height: 1.4;
+}
+
+.watch-detail {
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  background: #fafaf9;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  margin: 8px 0 0;
+  overflow-x: auto;
+}
+
+.watch-prompt-details {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.watch-prompt-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.watch-comments {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.watch-comments-title {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.watch-comment-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.watch-comment {
+  border-radius: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+
+.watch-comment.jarvis {
+  background: color-mix(in srgb, var(--accent) 8%, #fff);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+}
+
+.watch-comment header {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.watch-comment p {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.watch-comment-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+}
+
+.watch-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (max-width: 800px) {
+  .watch-actions li {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "date yen"
+      "shop shop"
+      "prop prop";
+  }
+}
+
 .btn {
   display: inline-block;
   border: 1px solid var(--line);
