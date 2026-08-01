@@ -1,0 +1,59 @@
+# Zaim 品質ウォッチ（二重取込・集計設定）
+# 検知: scripts/jarvis_zaim_quality_check.py → .jarvis_state/zaim_quality_watch.json
+# 直し: scripts/jarvis_zaim_money_apply.py（ユーザー承認後）
+
+version: 1
+
+csv_base_dir: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/50_税金,確定申告"
+
+include_label: "常に集計に含める"
+exclude_label: "集計に含めない"
+
+# 日常買い物（スマートレシート×クレカ突合の店）
+daily_shop_keywords:
+  - アオキ
+  - ミニストップ
+  - ファミリーマート
+  - ファミマ
+  - セブン
+  - ローソン
+  - ハロー
+  - hallo
+  - オークワ
+  - イオン
+  - ダイソー
+  - 無印
+  - マツモトキヨシ
+  - スギ薬局
+  - ウエルシア
+
+exclude_shop_keywords:
+  - ETC
+  - 高速
+
+card_pay_keywords:
+  - アメリカン・エキスプレス
+  - 三井住友
+  - PayPayカード
+  - 楽天カード
+  - Olive
+
+attention_dup_yen: 50000
+
+dual_source_rules:
+  - id: smart_vs_card_daily
+    description: "日常店はスマートレシートを含め、同額クレカは含めない"
+    include_side: smart
+    exclude_side: card
+  - id: amazon_site_vs_card
+    description: "Amazon はサイト連携（支払元 Amazon.co.jp）を含め、店が Amazon のクレカは含めない"
+    include_side: amazon_site
+    exclude_side: amazon_card
+
+must_include:
+  - id: orico_solar
+    description: "オリコ（太陽光ローン）は実績に含める"
+    shop_keywords:
+      - オリコ
+      - ORICO
+    pay_keywords: []

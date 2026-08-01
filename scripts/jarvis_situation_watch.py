@@ -626,6 +626,57 @@ def eval_night_triage(meta: dict, data: dict | None) -> dict[str, Any]:
     )
 
 
+def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="warn",
+            summary="state なし — jarvis_zaim_quality_check.py を実行",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    if level not in ("ok", "info", "warn", "attention"):
+        level = "ok"
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=str(data.get("summary") or "データあり"),
+        detail=str(data.get("detail") or ""),
+        cursor_prompt=prompt,
+        source=src,
+    )
+
+
+def refresh_zaim_quality() -> None:
+    """評価前に CSV から再検知（ログイン不要）。"""
+    import subprocess
+
+    py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+    exe = str(py) if py.is_file() else sys.executable
+    script = REPO / "scripts" / "jarvis_zaim_quality_check.py"
+    if not script.is_file():
+        return
+    try:
+        subprocess.run(
+            [exe, str(script)],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except Exception as e:
+        print(f"# zaim_quality refresh failed: {e}", file=sys.stderr)
+
+
 EVALUATORS = {
     "etc_mileage": lambda m: eval_etc(m, load_json(STATE / "etc_monthly.json")),
     "vpoint": lambda m: eval_vpoint(m),
@@ -638,6 +689,10 @@ EVALUATORS = {
     "car_loan": lambda m: eval_car_loan(m, load_json(STATE / "car_loan.json")),
     "sbi_vpoint_up": lambda m: eval_sbi(m, load_json(STATE / "sbi_vpoint_up_checklist.json")),
     "night_triage": lambda m: eval_night_triage(m, load_json(STATE / "night_triage" / "queue.json")),
+    "zaim_quality": lambda m: (
+        refresh_zaim_quality(),
+        eval_zaim_quality(m, load_json(STATE / "zaim_quality_watch.json")),
+    )[1],
 }
 
 

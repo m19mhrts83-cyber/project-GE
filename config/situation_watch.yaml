@@ -116,3 +116,15 @@ items:
       夜間トリアージの queue を確認して。pending 件数・最終更新・エンジン設定を報告して。
       ダッシュボード: http://127.0.0.1:8765/
       ルール: jarvis-night-triage.mdc
+
+  - id: zaim_quality
+    title: Zaim集計・二重取込
+    category: finance
+    enabled: true
+    source: .jarvis_state/zaim_quality_watch.json
+    cursor_prompt: |
+      Zaim の日常買い物二重取込と「集計に含める／含めない」の食い違いを確認して。
+      state: .jarvis_state/zaim_quality_watch.json
+      検知: scripts/jarvis_zaim_quality_check.py
+      直し（承認後）: scripts/jarvis_zaim_money_apply.py --from-watch --dry-run → --apply
+      ETC 同額は対象外。提案どおり直すときはユーザー確認後に Web Zaim で apply。
