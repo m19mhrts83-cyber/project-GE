@@ -1,0 +1,49 @@
+name: Jarvis Dashboard Situation Watch (cloud)
+
+# API だけで完結する状況ウォッチ（収集鮮度・WeStudy CI）→ watch_status
+# Mac の jarvis_situation_watch（.jarvis_state）はフォールバック。
+
+on:
+  schedule:
+    - cron: "15 21 * * *" # 06:15 JST（心拍の少し前）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Supabase へ書かず判定だけ"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: jarvis-dashboard-situation-watch
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -q supabase
+
+      - name: Run cloud situation watch
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run)
+          else
+            ARGS+=(--push)
+          fi
+          python scripts/jarvis_gha_situation_watch.py "${ARGS[@]}"

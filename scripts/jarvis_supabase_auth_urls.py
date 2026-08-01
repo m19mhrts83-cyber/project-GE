@@ -46,11 +46,15 @@ def main(argv: list[str] | None = None) -> int:
         with urllib.request.urlopen(req) as r:
             cur = json.load(r)
     except urllib.error.HTTPError as e:
-        print(f"# GET failed: {e.code} {e.read()[:200]!r}", file=sys.stderr)
+        body = e.read()[:300]
+        print(f"# GET failed: {e.code} {body!r}", file=sys.stderr)
         print(
             "Dashboard で手動: Authentication → URL Configuration\n"
             f"  Site URL = {site}\n"
-            f"  Redirect URLs に {site}/auth/callback と localhost:3001 を追加",
+            f"  Redirect URLs に {site}/auth/callback と localhost:3001 を追加\n"
+            "ヒント: 403 / Cloudflare 1010 は SUPABASE_ACCESS_TOKEN 期限切れか無効のことが多い。\n"
+            "  Dashboard → Account → Access Tokens で新規発行し .env.jarvis_private を更新して再実行。\n"
+            "  パスワードログインは Site URL 未変更でも動作する（本設定は OAuth／マジックリンク向け）。",
             file=sys.stderr,
         )
         return 2

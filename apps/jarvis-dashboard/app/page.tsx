@@ -46,6 +46,9 @@ export default async function HomePage() {
           watch sync {metaMap.watch_pushed_at ?? "未push"}
         </div>
         <div className="stat">
+          GHA watch {metaMap.gha_watch_pushed_at ?? "—"}
+        </div>
+        <div className="stat">
           GHA心拍 {metaMap.gha_heartbeat_at ?? "—"}
         </div>
       </div>
