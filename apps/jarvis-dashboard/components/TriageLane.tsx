@@ -2,25 +2,20 @@ import Link from "next/link";
 import Shell from "@/components/Shell";
 import DraftWorkbench from "@/components/DraftWorkbench";
 import TriageStatusActions from "@/components/TriageStatusActions";
+import LaneViewTabs, {
+  VIEW_LABEL,
+  type LaneView,
+} from "@/components/LaneViewTabs";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
 import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
 import { createClient } from "@/lib/supabase/server";
 
-type LaneView = "unread" | "sent" | "skipped" | "snoozed" | "activity";
-
-const VIEW_LABEL: Record<LaneView, string> = {
-  unread: "未読",
-  sent: "送信済み",
-  skipped: "スキップ",
-  snoozed: "後で",
-  activity: "活動概要",
-};
-
-function parseView(raw: string | undefined): LaneView {
-  const v = (raw || "").trim();
-  if (v === "sent" || v === "skipped" || v === "snoozed" || v === "activity") {
-    return v;
+function parseView(raw: string | string[] | undefined): LaneView {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  const s = (v || "").trim();
+  if (s === "sent" || s === "skipped" || s === "snoozed" || s === "activity") {
+    return s;
   }
   return "unread";
 }
@@ -142,12 +137,11 @@ export default async function TriageLanePage({
       .limit(80);
     activities = (data || []) as TriageRow[];
   } else {
-    const status = view;
     const { data } = await supabase
       .from("triage_items")
       .select("*")
       .eq("lane", lane)
-      .eq("status", status)
+      .eq("status", view)
       .neq("kind", "activity")
       .order("updated_at", { ascending: false })
       .limit(80);
@@ -176,200 +170,191 @@ export default async function TriageLanePage({
       })
     : null;
 
-  const viewHref = (v: LaneView) =>
-    v === "unread" ? active : `${active}?view=${v}`;
   const unreadHref = (i: number) =>
-    i <= 0 ? active : `${active}?view=unread&i=${i}`;
+    i <= 0
+      ? `${active}?view=unread`
+      : `${active}?view=unread&i=${i}`;
 
-  const stats: { view: LaneView; count: number }[] = [
-    { view: "unread", count: unreadN },
-    { view: "sent", count: sentN },
-    { view: "skipped", count: skipN },
-    { view: "snoozed", count: snoozeN },
-    { view: "activity", count: activityN },
+  const stats = [
+    { view: "unread" as const, count: unreadN },
+    { view: "sent" as const, count: sentN },
+    { view: "skipped" as const, count: skipN },
+    { view: "snoozed" as const, count: snoozeN },
+    { view: "activity" as const, count: activityN },
   ];
 
   return (
     <Shell active={active}>
       <h1>{title}</h1>
       {subtitle ? <p className="sub">{subtitle}</p> : null}
-      <p className="meta" style={{ marginTop: -8, marginBottom: 12 }}>
-        上の数字をタップすると、その一覧だけ表示します（いま: {VIEW_LABEL[view]}
-        ）。
-      </p>
-      <div className="stats" role="tablist" aria-label="表示の切り替え">
-        {stats.map((s) => (
-          <Link
-            key={s.view}
-            href={viewHref(s.view)}
-            className={`stat stat-link${view === s.view ? " on" : ""}`}
-            role="tab"
-            aria-selected={view === s.view}
-          >
-            {VIEW_LABEL[s.view]} <strong>{s.count}</strong>
-          </Link>
-        ))}
-      </div>
+      <LaneViewTabs basePath={active} current={view} stats={stats} />
 
-      {view === "unread" ? (
-        <>
-          <h2>未読（1通ずつ）</h2>
-          {!focus || !focusTo ? (
-            <p className="empty">未読なし</p>
-          ) : (
-            <>
-              <div className="focus-nav">
-                <span className="meta">
-                  {idx + 1} / {unread.length}
-                </span>
-                {idx > 0 ? (
-                  <Link className="btn" href={unreadHref(idx - 1)}>
-                    ← 前
-                  </Link>
-                ) : (
-                  <span className="btn" style={{ opacity: 0.4 }}>
-                    ← 前
-                  </span>
-                )}
-                {idx < unread.length - 1 ? (
-                  <Link className="btn" href={unreadHref(idx + 1)}>
-                    次 →
-                  </Link>
-                ) : (
-                  <span className="btn" style={{ opacity: 0.4 }}>
-                    次 →
-                  </span>
-                )}
-              </div>
-              <article className="card focus-card">
-                <header>
-                  <strong>{focus.partner || focus.from_email || "—"}</strong>
+      <div key={view} id="lane-view-panel">
+        {view === "unread" ? (
+          <>
+            <h2>未読（1通ずつ）</h2>
+            {!focus || !focusTo ? (
+              <p className="empty">未読なし</p>
+            ) : (
+              <>
+                <div className="focus-nav">
                   <span className="meta">
-                    {focus.folder} · {focus.received_at}
+                    {idx + 1} / {unread.length}
                   </span>
-                  <TriageStatusActions
-                    id={focus.id}
-                    status={focus.status}
-                    path={active}
-                    mode="unread"
-                  />
-                </header>
-                <h3 style={{ fontSize: "1.05rem", margin: "8px 0 6px" }}>
-                  {focus.subject}
-                </h3>
-                {focusTo.to ? <p className="meta">To: {focusTo.to}</p> : null}
-                {Boolean(focus.summary) &&
-                !isTruncatedBodyPreview(focus.summary, focus.original_body) ? (
-                  <p className="sum">
-                    <span className="sum-label">要点</span>
-                    {focus.summary}
-                  </p>
-                ) : null}
-                <OriginalBodyBlock body={focus.original_body} open />
-                <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>
-                  返信下書き
-                </h3>
-                <DraftWorkbench
-                  id={focus.id}
-                  path={active}
-                  subject={focus.subject}
-                  toEmail={focus.from_email}
-                  partner={focus.partner}
-                  folder={focus.folder}
-                  lane={lane}
-                  draftText={focus.draft_text}
-                  payload={focus.payload}
-                  status={focus.status}
-                  gmailReady={gmailReady}
-                  resolvedTo={focusTo.to}
-                  toSource={focusTo.source}
-                />
-              </article>
-            </>
-          )}
-        </>
-      ) : null}
-
-      {view === "sent" || view === "skipped" || view === "snoozed" ? (
-        <>
-          <h2>{VIEW_LABEL[view]}</h2>
-          {!closedList.length ? (
-            <p className="empty">なし</p>
-          ) : (
-            closedList.map((it) => {
-              const st = it.status as TriageStatus;
-              const appended = Boolean(
-                it.payload &&
-                  typeof it.payload === "object" &&
-                  (it.payload as { yoritoori_appended?: boolean })
-                    .yoritoori_appended,
-              );
-              return (
-                <article key={it.id} className="card">
-                  <header>
-                    <span className={`status-badge status-${st}`}>
-                      {STATUS_LABEL[st] || st}
+                  {idx > 0 ? (
+                    <Link className="btn" href={unreadHref(idx - 1)}>
+                      ← 前
+                    </Link>
+                  ) : (
+                    <span className="btn" style={{ opacity: 0.4 }}>
+                      ← 前
                     </span>
-                    <strong>
-                      {it.partner || it.from_email || it.subject}
-                    </strong>
-                    <span className="meta">{it.received_at}</span>
+                  )}
+                  {idx < unread.length - 1 ? (
+                    <Link className="btn" href={unreadHref(idx + 1)}>
+                      次 →
+                    </Link>
+                  ) : (
+                    <span className="btn" style={{ opacity: 0.4 }}>
+                      次 →
+                    </span>
+                  )}
+                </div>
+                <article className="card focus-card">
+                  <header>
+                    <strong>{focus.partner || focus.from_email || "—"}</strong>
+                    <span className="meta">
+                      {focus.folder} · {focus.received_at}
+                    </span>
                     <TriageStatusActions
-                      id={it.id}
-                      status={it.status}
-                      path={`${active}?view=${view}`}
-                      mode="closed"
+                      id={focus.id}
+                      status={focus.status}
+                      path={`${active}?view=unread`}
+                      mode="unread"
                     />
                   </header>
-                  <p className="mail-subject" style={{ margin: "6px 0" }}>
-                    <Link
-                      href={`/mail/${encodeURIComponent(it.id)}`}
-                      style={{ color: "var(--accent)", fontWeight: 600 }}
-                    >
-                      {it.subject || "（件名なし）"}
-                    </Link>
-                  </p>
-                  {st === "sent" ? (
-                    <p className="meta">
-                      {appended
-                        ? "送信済み・やり取り反映済"
-                        : "送信済み（やり取り追記は Mac 同期後）"}
+                  <h3 style={{ fontSize: "1.05rem", margin: "8px 0 6px" }}>
+                    {focus.subject}
+                  </h3>
+                  {focusTo.to ? (
+                    <p className="meta">To: {focusTo.to}</p>
+                  ) : null}
+                  {Boolean(focus.summary) &&
+                  !isTruncatedBodyPreview(
+                    focus.summary,
+                    focus.original_body,
+                  ) ? (
+                    <p className="sum">
+                      <span className="sum-label">要点</span>
+                      {focus.summary}
                     </p>
                   ) : null}
-                  {it.summary &&
-                  !isTruncatedBodyPreview(it.summary, it.original_body) ? (
-                    <p className="sum">{it.summary}</p>
-                  ) : null}
-                  <OriginalBodyBlock body={it.original_body} open={false} />
+                  <OriginalBodyBlock body={focus.original_body} open />
+                  <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>
+                    返信下書き
+                  </h3>
+                  <DraftWorkbench
+                    id={focus.id}
+                    path={`${active}?view=unread`}
+                    subject={focus.subject}
+                    toEmail={focus.from_email}
+                    partner={focus.partner}
+                    folder={focus.folder}
+                    lane={lane}
+                    draftText={focus.draft_text}
+                    payload={focus.payload}
+                    status={focus.status}
+                    gmailReady={gmailReady}
+                    resolvedTo={focusTo.to}
+                    toSource={focusTo.source}
+                  />
                 </article>
-              );
-            })
-          )}
-        </>
-      ) : null}
+              </>
+            )}
+          </>
+        ) : null}
 
-      {view === "activity" ? (
-        <>
-          <h2>活動概要</h2>
-          {!activities.length ? (
-            <p className="empty">なし</p>
-          ) : (
-            activities.map((it) => (
-              <article key={it.id} className="card">
-                <header>
-                  <span className="lvl">{it.channel || "更新"}</span>
-                  <strong>{it.partner}</strong>
-                  <span className="meta">{it.received_at}</span>
-                </header>
-                <p className="sum">{it.summary || it.subject}</p>
-                {it.original_body ? (
-                  <OriginalBodyBlock body={it.original_body} open={false} />
-                ) : null}
-              </article>
-            ))
-          )}
-        </>
-      ) : null}
+        {view === "sent" || view === "skipped" || view === "snoozed" ? (
+          <>
+            <h2>{VIEW_LABEL[view]}</h2>
+            {!closedList.length ? (
+              <p className="empty">なし</p>
+            ) : (
+              closedList.map((it) => {
+                const st = it.status as TriageStatus;
+                const appended = Boolean(
+                  it.payload &&
+                    typeof it.payload === "object" &&
+                    (it.payload as { yoritoori_appended?: boolean })
+                      .yoritoori_appended,
+                );
+                return (
+                  <article key={it.id} className="card">
+                    <header>
+                      <span className={`status-badge status-${st}`}>
+                        {STATUS_LABEL[st] || st}
+                      </span>
+                      <strong>
+                        {it.partner || it.from_email || it.subject}
+                      </strong>
+                      <span className="meta">{it.received_at}</span>
+                      <TriageStatusActions
+                        id={it.id}
+                        status={it.status}
+                        path={`${active}?view=${view}`}
+                        mode="closed"
+                      />
+                    </header>
+                    <p className="mail-subject" style={{ margin: "6px 0" }}>
+                      <Link
+                        href={`/mail/${encodeURIComponent(it.id)}`}
+                        style={{ color: "var(--accent)", fontWeight: 600 }}
+                      >
+                        {it.subject || "（件名なし）"}
+                      </Link>
+                    </p>
+                    {st === "sent" ? (
+                      <p className="meta">
+                        {appended
+                          ? "送信済み・やり取り反映済"
+                          : "送信済み（やり取り追記は Mac 同期後）"}
+                      </p>
+                    ) : null}
+                    {it.summary &&
+                    !isTruncatedBodyPreview(it.summary, it.original_body) ? (
+                      <p className="sum">{it.summary}</p>
+                    ) : null}
+                    <OriginalBodyBlock body={it.original_body} open={false} />
+                  </article>
+                );
+              })
+            )}
+          </>
+        ) : null}
+
+        {view === "activity" ? (
+          <>
+            <h2>活動概要</h2>
+            {!activities.length ? (
+              <p className="empty">なし</p>
+            ) : (
+              activities.map((it) => (
+                <article key={it.id} className="card">
+                  <header>
+                    <span className="lvl">{it.channel || "更新"}</span>
+                    <strong>{it.partner}</strong>
+                    <span className="meta">{it.received_at}</span>
+                  </header>
+                  <p className="sum">{it.summary || it.subject}</p>
+                  {it.original_body ? (
+                    <OriginalBodyBlock body={it.original_body} open={false} />
+                  ) : null}
+                </article>
+              ))
+            )}
+          </>
+        ) : null}
+      </div>
     </Shell>
   );
 }
