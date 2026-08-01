@@ -42,7 +42,7 @@ export default function TriageStatusActions({
         <button
           type="button"
           className="btn"
-          style={{ padding: "4px 10px", fontSize: "0.78rem" }}
+          style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
           disabled={pending}
           onClick={() => go("pending")}
         >
@@ -57,7 +57,7 @@ export default function TriageStatusActions({
       <button
         type="button"
         className="btn"
-        style={{ padding: "4px 10px", fontSize: "0.78rem" }}
+        style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
         disabled={pending}
         onClick={() => go("skipped")}
       >
@@ -66,7 +66,7 @@ export default function TriageStatusActions({
       <button
         type="button"
         className="btn"
-        style={{ padding: "4px 10px", fontSize: "0.78rem" }}
+        style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
         disabled={pending}
         onClick={() => go("snoozed")}
       >

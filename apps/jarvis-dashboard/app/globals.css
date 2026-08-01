@@ -1,6 +1,7 @@
 :root {
   --bg: #f7f5f1;
   --ink: #1c1917;
+  --text: #1c1917;
   --muted: #78716c;
   --line: #e8e4de;
   --card: #fffdf9;
@@ -474,16 +475,68 @@ h1 {
   display: inline-block;
   border: 1px solid var(--line);
   background: #fff;
+  color: var(--ink);
   padding: 8px 14px;
   border-radius: 8px;
   font-size: 0.9rem;
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn.primary {
   background: var(--accent);
   color: #ecfdf5;
   border-color: var(--accent);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+/* 暗いサイドバー上でも白地＋濃い文字で読める */
+.sidebar .btn {
+  background: #fff;
+  color: var(--ink);
+  border-color: #d6d3d1;
+}
+
+.card.archived {
+  background: #f5f5f4;
+  border-style: dashed;
+  opacity: 1;
+}
+
+.card.archived header strong,
+.card.archived .sum {
+  color: var(--ink);
+}
+
+.card.archived .meta {
+  color: var(--muted);
+}
+
+.archive-group {
+  margin-bottom: 28px;
+}
+
+.archive-group h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.archive-group h2 .meta {
+  font-size: 0.85rem;
+  font-weight: 400;
 }
 
 .triage-actions {

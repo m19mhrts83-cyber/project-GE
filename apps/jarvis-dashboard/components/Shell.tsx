@@ -7,6 +7,7 @@ const NAV = [
   { href: "/openchat", label: "オプチャ" },
   { href: "/general", label: "それ以外" },
   { href: "/situation", label: "状況ウォッチ" },
+  { href: "/archive", label: "アーカイブ" },
   { href: "/kamiooya", label: "神大家運営" },
   { href: "/properties", label: "3棟・物件" },
   { href: "/kodate", label: "戸建て" },

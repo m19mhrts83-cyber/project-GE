@@ -18,7 +18,11 @@ export default function StatusToggle({ table, id, status, path }: Props) {
 
   return (
     <form action={action} style={{ marginLeft: "auto" }}>
-      <button type="submit" className="btn" style={{ padding: "4px 10px", fontSize: "0.78rem" }}>
+      <button
+        type="submit"
+        className="btn"
+        style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
+      >
         {label}
       </button>
     </form>

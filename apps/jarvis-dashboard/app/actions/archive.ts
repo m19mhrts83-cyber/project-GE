@@ -16,6 +16,8 @@ export async function setCardStatus(
   const { error } = await supabase.from("cards").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath(path);
+  revalidatePath("/archive");
+  revalidatePath("/");
 }
 
 export async function setWatchStatus(
@@ -34,6 +36,9 @@ export async function setWatchStatus(
     .eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath(path);
+  revalidatePath("/archive");
+  revalidatePath("/situation");
+  revalidatePath("/");
 }
 
 /** @deprecated use app/actions/triage.ts — 互換のため残す */
