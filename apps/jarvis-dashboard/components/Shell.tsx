@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 const NAV = [
@@ -38,7 +37,7 @@ export default async function Shell({
       <aside className="sidebar">
         <div className="side-brand">Jarvis</div>
         {NAV.map((n) => (
-          <Link
+          <a
             key={n.href}
             href={n.href}
             className={`side-link${
@@ -49,7 +48,7 @@ export default async function Shell({
             }`}
           >
             {n.label}
-          </Link>
+          </a>
         ))}
         {EXTERNAL.length > 0 ? (
           <>

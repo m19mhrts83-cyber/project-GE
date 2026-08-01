@@ -23,11 +23,8 @@ export default function LaneViewTabs({
     <>
       <p className="meta" style={{ marginTop: -8, marginBottom: 12 }}>
         上の数字をタップすると、その一覧だけ表示します（いま: {VIEW_LABEL[current]}
-        ）。URL が{" "}
-        <code style={{ fontSize: "0.85em" }}>
-          {laneViewHref(basePath, current)}
-        </code>{" "}
-        に変わります。
+        ）。例: 送信済み →{" "}
+        <code style={{ fontSize: "0.85em" }}>{basePath}/sent</code>
       </p>
       <div className="stats" role="navigation" aria-label="表示の切り替え">
         {stats.map((s) => {

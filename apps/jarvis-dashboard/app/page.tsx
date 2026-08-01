@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Shell from "@/components/Shell";
 import {
   LEVEL_LABEL,
@@ -128,9 +127,9 @@ export default async function HomePage() {
       <section className="home-section">
         <div className="home-section-head">
           <h2>要確認（状況ウォッチ）</h2>
-          <Link href="/situation" className="home-more">
+          <a href="/situation" className="home-more">
             すべて →
-          </Link>
+          </a>
         </div>
         {watchNeed.length === 0 ? (
           <p className="empty">
@@ -145,7 +144,7 @@ export default async function HomePage() {
                   : "info"
               ) as HomeLevel;
               return (
-                <Link
+                <a
                   key={it.id}
                   href="/situation"
                   className={`card watch-card level-${level}`}
@@ -156,7 +155,7 @@ export default async function HomePage() {
                   </header>
                   <p className="sum">{it.summary}</p>
                   {it.source ? <p className="meta">{it.source}</p> : null}
-                </Link>
+                </a>
               );
             })}
           </div>
@@ -178,7 +177,7 @@ export default async function HomePage() {
               const oneLine = (it.summary || "").replace(/\s+/g, " ").trim();
               return (
                 <li key={it.id}>
-                  <Link
+                  <a
                     href={`/mail/${encodeURIComponent(it.id)}`}
                     className={`mail-row level-${level}`}
                   >
@@ -201,7 +200,7 @@ export default async function HomePage() {
                     <span className="mail-chevron" aria-hidden>
                       ›
                     </span>
-                  </Link>
+                  </a>
                 </li>
               );
             })}
@@ -209,11 +208,11 @@ export default async function HomePage() {
         )}
         <p className="home-lane-links">
           レーン別:{" "}
-          <Link href="/partner">パートナー</Link>
+          <a href="/partner">パートナー</a>
           {" · "}
-          <Link href="/openchat">オプチャ</Link>
+          <a href="/openchat">オプチャ</a>
           {" · "}
-          <Link href="/general">それ以外</Link>
+          <a href="/general">それ以外</a>
         </p>
       </section>
 
