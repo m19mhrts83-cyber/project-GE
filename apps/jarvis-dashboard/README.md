@@ -41,6 +41,12 @@ https://jarvis-dashboard-amber.vercel.app/
 
 サイドバー **課金**。正本 `config/subscriptions.yaml` → `jarvis_subscriptions_push.py --push`（`jarvis_dashboard_push.py` にも同梱）。
 
+### 設計メモ・引き継ぎ
+
+- 本体: [`docs/Jarvis_Dashboard_設計メモ_20260801.md`](../../docs/Jarvis_Dashboard_設計メモ_20260801.md)
+- NotebookLM 投入: [`docs/Jarvis_Dashboard_NotebookLM投入_20260801.md`](../../docs/Jarvis_Dashboard_NotebookLM投入_20260801.md)
+- Drive: `200_NoteBookLM/05_Jarvisダッシュボード_設計と引き継ぎ/`
+
 ### 収集の役割分担
 
 | 経路 | 内容 |
