@@ -7,8 +7,7 @@ Supabase プロジェクト **`jarvis-dashboard`**（ref `idkdqneutpvkhxhpjtgc`�
 
 1. `.env.jarvis_private` に `JARVIS_SUPABASE_*`（特に **SERVICE_ROLE_KEY**）を設定
 2. このフォルダの `.env.local` を作成（`.env.example` 参照）。`NEXT_PUBLIC_SUPABASE_ANON_KEY` は private の `JARVIS_SUPABASE_ANON_KEY`
-3. Supabase Dashboard → Authentication → Providers → **Google** を有効化  
-   Redirect URLs: `http://localhost:3001/auth/callback`（本番は Vercel URL）
+3. ログインは **メール＋パスワード**（`PERSONAL_EMAIL` + `JARVIS_DASHBOARD_PASSWORD`）。Jarvis が Auth ユーザ作成済み。Google OAuth は任意（要 GCP クライアント）
 4. データ push:
 
 ```bash
