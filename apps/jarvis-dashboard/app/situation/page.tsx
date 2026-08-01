@@ -115,9 +115,13 @@ export default async function SituationPage() {
                   <ul>
                     {actions.map((a, idx) => (
                       <li key={`${a.date}-${a.shop}-${a.amount}-${idx}`}>
-                        <span className="watch-action-date">{a.date || "—"}</span>
+                        {a.date ? (
+                          <span className="watch-action-date">{a.date}</span>
+                        ) : null}
                         <span className="watch-action-shop">{a.shop || "—"}</span>
-                        <span className="watch-action-yen">{yen(a.amount)}</span>
+                        {a.amount != null && !Number.isNaN(a.amount) ? (
+                          <span className="watch-action-yen">{yen(a.amount)}</span>
+                        ) : null}
                         <span className="watch-action-proposal">
                           {a.proposal || a.line || "—"}
                         </span>
