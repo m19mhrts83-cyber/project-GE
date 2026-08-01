@@ -25,6 +25,21 @@
     .shuhen-auto .secondary-btn { margin-left: 8px; }
     .shuhen-auto .api-hint { font-size: 0.85rem; color: #666; margin-top: 8px; }
     .shuhen-auto .c1-box { margin-top: 20px; padding: 16px; background: #fff8ef; border-radius: 12px; border: 1px dashed #d4a373; }
+    .shuhen-auto .research-box {
+      margin-top: 18px; padding: 16px 18px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+    .shuhen-auto .research-box details { margin-top: 10px; }
+    .shuhen-auto .research-box summary { cursor: pointer; font-weight: 600; }
+    .shuhen-auto .research-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 8px; }
+    .shuhen-auto .research-table th, .shuhen-auto .research-table td {
+      border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top;
+    }
+    .shuhen-auto .band-prefer { color: #047857; }
+    .shuhen-auto .band-soft { color: #b45309; }
+    .shuhen-auto .band-hard { color: #b91c1c; }
+    .shuhen-auto .band-far { color: #6b7280; }
+    .shuhen-auto .exclude-row { display: flex; align-items: flex-start; gap: 10px; }
+    .shuhen-auto .exclude-row input { margin-top: 4px; }
   </style>
 </head>
 <body class="shuhen-page shuhen-auto">
@@ -75,9 +90,36 @@
       <h2 id="resultsTitle">作成結果</h2>
       <p id="areaBlurb" class="subtitle"></p>
 
+      <div class="research-box" id="researchBox" style="display:none;">
+        <h3 style="margin:0 0 6px;">調査・検証（見直し用）</h3>
+        <p class="subtitle" id="researchPolicy" style="margin:0;"></p>
+        <details open>
+          <summary>採用施設の根拠・徒歩圏</summary>
+          <div id="researchAdopted"></div>
+        </details>
+        <details>
+          <summary>洗い出し候補（wash）</summary>
+          <div id="researchWash"></div>
+        </details>
+        <details>
+          <summary>検証で落とした候補（verify）</summary>
+          <div id="researchRejected"></div>
+        </details>
+        <details>
+          <summary>距離・Placesで除外／未確定</summary>
+          <div id="researchDropped"></div>
+        </details>
+      </div>
+
       <h3 style="margin-top:18px;">周辺施設</h3>
       <p id="facilityIntro"></p>
       <div id="facilityList"></div>
+      <div style="margin-top:10px;">
+        <button type="button" class="secondary-btn" id="rebuildButton" onclick="rebuildWithExclusions()" disabled>
+          除外を反映して地図・下地を更新
+        </button>
+        <span class="api-hint" id="rebuildHint"></span>
+      </div>
 
       <h3 style="margin-top:18px;">地図（番号ピン）</h3>
       <div class="form-row shuhen-toggles" style="margin-bottom:8px;">
@@ -112,7 +154,8 @@
       <h3>使い方</h3>
       <ol>
         <li>物件名と住所を入力して「周辺MAPを作成」</li>
-        <li>周辺施設リストと地図、色付き下地が出たら完了（検証のゴール）</li>
+        <li>調査パネルで候補・除外理由を確認し、不要ならチェックして更新</li>
+        <li>周辺施設リストと地図、色付き下地（A4横）が出たら完了</li>
         <li>必要なら C1 で色味を試し、採用／破棄</li>
         <li>印刷用の仕上げは Canva（任意）</li>
       </ol>

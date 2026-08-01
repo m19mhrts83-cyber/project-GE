@@ -111,8 +111,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (lastCoords.length && map) updateWalkRoute(lastCoords).catch(console.error);
     });
   }
-  document.getElementById('dlC0Base').addEventListener('click', () => downloadB64('c0_base.png', lastResult?.images?.c0_base_png_b64));
-  document.getElementById('dlC0Pins').addEventListener('click', () => downloadB64('c0_with_pins.png', lastResult?.images?.c0_with_pins_png_b64));
+  document.getElementById('dlC0Base').addEventListener('click', () => {
+    const w = lastResult?.images?.width || 3508;
+    const h = lastResult?.images?.height || 2480;
+    downloadB64(`c0_base_A4_${w}x${h}.png`, lastResult?.images?.c0_base_png_b64);
+  });
+  document.getElementById('dlC0Pins').addEventListener('click', () => {
+    const w = lastResult?.images?.width || 3508;
+    const h = lastResult?.images?.height || 2480;
+    downloadB64(`c0_with_pins_A4_${w}x${h}.png`, lastResult?.images?.c0_with_pins_png_b64);
+  });
 
   // Prefill: ?name=&address=&target=&count=  / demo=1 (Grandole)
   applyPrefillFromQuery();
@@ -302,37 +310,206 @@ async function updateWalkRoute(rows) {
   }
 }
 
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function walkBandLabel(band, walkMin) {
+  const m = walkMin != null ? `約${walkMin}分` : '—';
+  const cls = `band-${band || 'far'}`;
+  const tip =
+    band === 'prefer' ? '優先圏（〜7分）' :
+    band === 'soft' ? '推奨圏（〜20分）' :
+    band === 'hard' ? '上限圏（〜30分）' :
+    band === 'far' ? '遠い' : '不明';
+  return `<span class="${cls}">${escapeHtml(m)}（${tip}）</span>`;
+}
+
+function renderResearch(result) {
+  const box = document.getElementById('researchBox');
+  const research = result.research;
+  if (!box) return;
+  if (!research) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = 'block';
+  const pol = research.policy || {};
+  const policyEl = document.getElementById('researchPolicy');
+  if (policyEl) {
+    policyEl.textContent =
+      `徒歩の目安: 優先〜${pol.walk_prefer_min ?? 7}分 / 推奨〜${pol.walk_soft_max_min ?? 20}分 / 上限〜${pol.walk_hard_max_min ?? 30}分` +
+      `｜保存サイズ: ${(pol.output_size_px || []).join('×') || 'A4横'} px` +
+      `｜${pol.distance_note || '直線換算'}`;
+  }
+
+  const adopted = document.getElementById('researchAdopted');
+  const rows = result.facilities || [];
+  adopted.innerHTML = rows.length
+    ? `<table class="research-table"><thead><tr><th>ID</th><th>名称</th><th>徒歩概算</th><th>理由</th><th>確認</th></tr></thead><tbody>${
+        rows.map((f) => `<tr>
+          <td>${escapeHtml(f.id)}</td>
+          <td>${escapeHtml(f.resolvedName || f.name)}${f.ok ? '' : '（未確定）'}</td>
+          <td>${walkBandLabel(f.walk_band, f.walk_min_approx)}</td>
+          <td>${escapeHtml(f.why || f.blurb || '')}</td>
+          <td>${f.needs_check ? '要確認' : '—'}</td>
+        </tr>`).join('')
+      }</tbody></table>`
+    : '<p class="subtitle">採用施設なし</p>';
+
+  const wash = research.wash || {};
+  const washEl = document.getElementById('researchWash');
+  const cands = wash.candidates || [];
+  washEl.innerHTML = cands.length
+    ? `<table class="research-table"><thead><tr><th>優先</th><th>名称</th><th>種別</th><th>理由</th></tr></thead><tbody>${
+        cands.map((c) => `<tr>
+          <td>${escapeHtml(c.priority || '')}</td>
+          <td>${escapeHtml(c.name)}</td>
+          <td>${escapeHtml(c.category || '')}</td>
+          <td>${escapeHtml(c.why || c.blurb || '')}</td>
+        </tr>`).join('')
+      }</tbody></table>`
+    : '<p class="subtitle">候補なし</p>';
+
+  const rejected = (research.verify || {}).rejected || [];
+  const rejEl = document.getElementById('researchRejected');
+  rejEl.innerHTML = rejected.length
+    ? `<table class="research-table"><thead><tr><th>名称</th><th>落とした理由</th></tr></thead><tbody>${
+        rejected.map((r) => `<tr>
+          <td>${escapeHtml(r.name || r.query || '')}</td>
+          <td>${escapeHtml(r.reason || '')}</td>
+        </tr>`).join('')
+      }</tbody></table>`
+    : '<p class="subtitle">検証段階での除外なし（または未返却）</p>';
+
+  const dropped = [
+    ...(research.walk_dropped || []),
+    ...(research.user_excluded || []).map((u) => ({ ...u, drop_reason: u.drop_reason || 'ユーザー除外' })),
+  ];
+  const dropEl = document.getElementById('researchDropped');
+  dropEl.innerHTML = dropped.length
+    ? `<table class="research-table"><thead><tr><th>名称</th><th>徒歩</th><th>理由</th></tr></thead><tbody>${
+        dropped.map((d) => `<tr>
+          <td>${escapeHtml(d.name || '')}</td>
+          <td>${d.walk_min_approx != null ? escapeHtml(`約${d.walk_min_approx}分`) : '—'}</td>
+          <td>${escapeHtml(d.drop_reason || '')}</td>
+        </tr>`).join('')
+      }</tbody></table>`
+    : '<p class="subtitle">距離・Places除外なし</p>';
+}
+
 function renderFacilityList(result) {
   const intro = document.getElementById('facilityIntro');
   const list = document.getElementById('facilityList');
   const ok = (result.facilities || []).filter((f) => f.ok);
-  intro.textContent = `周辺施設には、次のようなものがあります（確定 ${ok.length} 件。要確認は徒歩分などをマップで最終確認してください）。`;
+  intro.textContent =
+    `周辺施設（確定 ${ok.length} 件）。チェックした施設を除外して下のボタンで地図・下地を更新できます。徒歩分は直線概算です。`;
   list.innerHTML = (result.facilities || [])
     .map((f) => {
       const check = f.needs_check || !f.ok
         ? `<div class="needs-check">${f.ok ? '要確認（徒歩・評判）' : '地図上で未確定'}</div>`
         : '';
-      return `<div class="facility-card"><span class="id">${f.id}</span><strong>${f.name}</strong>
-        <div>${f.blurb || ''}</div>
-        <div style="font-size:0.85rem;color:#666">${f.category || ''} / ${f.query || ''}</div>
-        ${check}</div>`;
+      const walk = f.walk_min_approx != null
+        ? `<div style="font-size:0.85rem;">徒歩概算: ${walkBandLabel(f.walk_band, f.walk_min_approx)}</div>`
+        : '';
+      return `<div class="facility-card">
+        <div class="exclude-row">
+          <input type="checkbox" class="exclude-facility" data-id="${escapeHtml(f.id)}" title="除外する">
+          <div style="flex:1">
+            <span class="id">${escapeHtml(f.id)}</span><strong>${escapeHtml(f.name)}</strong>
+            <div>${escapeHtml(f.blurb || '')}</div>
+            <div style="font-size:0.85rem;color:#666">${escapeHtml(f.category || '')} / ${escapeHtml(f.query || '')}</div>
+            ${walk}
+            ${f.why ? `<div style="font-size:0.85rem;color:#334155">理由: ${escapeHtml(f.why)}</div>` : ''}
+            ${check}
+          </div>
+        </div>
+      </div>`;
     })
     .join('');
+  const rebuildBtn = document.getElementById('rebuildButton');
+  if (rebuildBtn) rebuildBtn.disabled = !(result.facilities || []).length;
 }
 
 function renderC0(result) {
   const box = document.getElementById('c0Preview');
   const base = result.images?.c0_base_png_b64;
   const pins = result.images?.c0_with_pins_png_b64;
+  const w = result.images?.width || 3508;
+  const h = result.images?.height || 2480;
   box.innerHTML = '';
   if (base) {
-    box.innerHTML += `<figure><img alt="C0下地" src="data:image/png;base64,${base}"><figcaption>ピンなし下地（C0）</figcaption></figure>`;
+    box.innerHTML += `<figure><img alt="C0下地" src="data:image/png;base64,${base}"><figcaption>ピンなし下地（C0・A4横 ${w}×${h}）</figcaption></figure>`;
   }
   if (pins) {
-    box.innerHTML += `<figure><img alt="C0骨格" src="data:image/png;base64,${pins}"><figcaption>ピン付き骨格（C0）</figcaption></figure>`;
+    box.innerHTML += `<figure><img alt="C0骨格" src="data:image/png;base64,${pins}"><figcaption>ピン付き骨格（C0・A4横）</figcaption></figure>`;
   }
   document.getElementById('dlC0Base').disabled = !base;
   document.getElementById('dlC0Pins').disabled = !pins;
+}
+
+function applyPipelineResult(result) {
+  lastResult = result;
+  const steps = (lastResult.steps || []).map((s) => `${s.ok ? '✓' : '×'} ${s.id}: ${s.detail || ''}`);
+  setProgress(steps);
+  document.getElementById('resultsTitle').textContent = `${lastResult.property_name} 周辺MAP`;
+  document.getElementById('areaBlurb').textContent = lastResult.area_blurb || '';
+  renderResearch(lastResult);
+  renderFacilityList(lastResult);
+  renderC0(lastResult);
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('c1Button').disabled = false;
+  const hint = document.getElementById('rebuildHint');
+  if (hint) hint.textContent = '';
+
+  apiKey = resolveApiKey();
+  if (!apiKey) {
+    showError('地図表示用の Maps API Key がありません（下地画像は取得済みです）。');
+  } else {
+    if (!hasEmbeddedMapsKey()) localStorage.setItem('googleMapsApiKey', apiKey);
+    loadGoogleMapsScript(() => renderMapFromResult(lastResult));
+  }
+}
+
+function getExcludedIds() {
+  return Array.from(document.querySelectorAll('.exclude-facility:checked'))
+    .map((el) => el.getAttribute('data-id'))
+    .filter(Boolean);
+}
+
+async function rebuildWithExclusions() {
+  if (!lastResult?.job_id) return;
+  const base = apiBase();
+  if (!base) return;
+  const exclude_ids = getExcludedIds();
+  if (!exclude_ids.length) {
+    showError('除外する施設にチェックを入れてください。');
+    return;
+  }
+  hideError();
+  const btn = document.getElementById('rebuildButton');
+  const hint = document.getElementById('rebuildHint');
+  btn.disabled = true;
+  if (hint) hint.textContent = '更新中…';
+  try {
+    const res = await fetch(`${base}/api/rebuild`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ job_id: lastResult.job_id, exclude_ids }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    applyPipelineResult(data.result);
+    if (hint) hint.textContent = `除外 ${exclude_ids.length} 件を反映しました`;
+  } catch (err) {
+    showError(`更新に失敗しました: ${err.message || err}`);
+    if (hint) hint.textContent = '';
+    btn.disabled = false;
+  }
 }
 
 function renderMapFromResult(result) {
@@ -406,32 +583,24 @@ async function runAutoPipeline() {
   adoptedC1 = null;
 
   try {
-    const res = await fetch(`${base}/api/run`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ property_name, address, target, facility_count }),
-    });
+    let res;
+    try {
+      res = await fetch(`${base}/api/run`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ property_name, address, target, facility_count }),
+      });
+    } catch (netErr) {
+      throw new Error(
+        `APIに接続できません（${base}）。./scripts/shuhen_auto_open.sh でサーバを起動し直してください。詳細: ${netErr.message || netErr}`
+      );
+    }
     const data = await res.json();
     if (!res.ok || !data.ok) {
       throw new Error(data.error || `HTTP ${res.status}`);
     }
     lastResult = data.result;
-    const steps = (lastResult.steps || []).map((s) => `${s.ok ? '✓' : '×'} ${s.id}: ${s.detail || ''}`);
-    setProgress(steps);
-    document.getElementById('resultsTitle').textContent = `${lastResult.property_name} 周辺MAP`;
-    document.getElementById('areaBlurb').textContent = lastResult.area_blurb || '';
-    renderFacilityList(lastResult);
-    renderC0(lastResult);
-    document.getElementById('resultsSection').style.display = 'block';
-    document.getElementById('c1Button').disabled = false;
-
-    apiKey = resolveApiKey();
-    if (!apiKey) {
-      showError('地図表示用の Maps API Key がありません（下地画像は取得済みです）。');
-    } else {
-      if (!hasEmbeddedMapsKey()) localStorage.setItem('googleMapsApiKey', apiKey);
-      loadGoogleMapsScript(() => renderMapFromResult(lastResult));
-    }
+    applyPipelineResult(lastResult);
     if (lastResult.errors?.length) {
       console.warn('pipeline warnings', lastResult.errors);
     }

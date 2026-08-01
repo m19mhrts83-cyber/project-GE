@@ -28,7 +28,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from shuhen_auto_pipeline import run_c1, run_pipeline  # noqa: E402
+from shuhen_auto_pipeline import rebuild_from_exclusions, run_c1, run_pipeline  # noqa: E402
 
 PORT = int(os.environ.get("SHUHEN_AUTO_PORT") or "8770")
 TOKEN = (os.environ.get("SHUHEN_AUTO_TOKEN") or "").strip()
@@ -140,7 +140,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if path not in ("/api/run", "/api/c1"):
+        if path not in ("/api/run", "/api/c1", "/api/rebuild"):
             self._json(404, {"ok": False, "error": "not found"})
             return
         if not _auth_ok(self):
@@ -182,6 +182,24 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 c1 = run_c1(job_id, timeout_sec=int(data.get("timeout_sec") or 120))
                 self._json(200, {"ok": c1.get("status") == "ready", "c1": c1})
+            except Exception as e:
+                self._json(500, {"ok": False, "error": str(e)})
+            return
+
+        if path == "/api/rebuild":
+            job_id = (data.get("job_id") or "").strip()
+            if not job_id:
+                self._json(400, {"ok": False, "error": "job_id 必須"})
+                return
+            exclude_ids = data.get("exclude_ids") or []
+            if not isinstance(exclude_ids, list):
+                self._json(400, {"ok": False, "error": "exclude_ids は配列です"})
+                return
+            try:
+                result = rebuild_from_exclusions(
+                    job_id, exclude_ids=[str(x) for x in exclude_ids]
+                )
+                self._json(200, {"ok": True, "result": result})
             except Exception as e:
                 self._json(500, {"ok": False, "error": str(e)})
             return
