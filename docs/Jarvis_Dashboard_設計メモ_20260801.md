@@ -1,0 +1,217 @@
+# Jarvis ダッシュボード — 設計メモ・引き継ぎベース（2026-08-01）
+
+**目的**: 自分の理解の整理／DX50・神大家メンバーへ機能を渡すときのベース。  
+**更新サイクル**: 使う → 検証 → 変更が溜まったら本資料を更新。  
+**本番**: https://jarvis-dashboard-amber.vercel.app/  
+**コード**: `~/git-repos/apps/jarvis-dashboard/`  
+**NotebookLM ソース置き場**: Drive `200_NoteBookLM/05_Jarvisダッシュボード_設計と引き継ぎ/`
+
+---
+
+## 1. ダッシュボードの概要
+
+Jarvis ダッシュボードは、**個人の秘書 AI（Jarvis）が集めた情報を、スマホでもパッと見るための画面**である。
+
+| レイヤ | 役割 |
+|---|---|
+| **表示** | Vercel 上の Next.js（ログイン必須）。iPhone／Mac 共通 |
+| **投影 DB** | Supabase プロジェクト `jarvis-dashboard`（運営の `kamiooya-qa` とは分離） |
+| **収集** | 主に Mac（launchd・スクリプト）。一部は GitHub Actions |
+| **対話・直し** | Cursor ローカル／Cloud Agent。ダッシュボード自体からは対外送信しない |
+
+**設計思想（短く）**
+
+1. **見る場所はクラウド、重い収集は Mac**（CHRLINE・Playwright・ローカル Drive）
+2. **気になることは「状況ウォッチ」に寄せる**（レベル: ok / info / warn / attention）
+3. **勝手に外へ出さない**（メール送信・Zaim 設定変更はユーザー承認後）
+4. **正本はファイル／YAML、DB は投影**（再構築可能）
+
+```mermaid
+flowchart TB
+  mac[Mac_scripts_launchd]
+  gha[GitHub_Actions]
+  sb[(Supabase_jarvis-dashboard)]
+  web[Vercel_Dashboard]
+  cursor[Cursor_Jarvis]
+  mac --> sb
+  gha --> sb
+  sb --> web
+  web -->|"気になる・直し依頼"| cursor
+  cursor -->|"承認後 apply"| mac
+```
+
+### サイドバー構成（2026-08-01 時点）
+
+| ナビ | パス | 一言 |
+|---|---|---|
+| メール・概要 | `/` | 夜間トリアージ／レーンの入口 |
+| パートナー | `/partner` | 要返信・下書き |
+| オプチャ | `/openchat` | 815 情報収集（返信提案なし） |
+| それ以外 | `/general` | admin Gmail 等 |
+| 状況ウォッチ | `/situation` | **気になる項目**の本丸 |
+| 神大家運営 | `/kamiooya` | レーンカード |
+| 3棟・物件 | `/properties` | 同上 |
+| 戸建て | `/kodate` | 同上 |
+| AI・Raimo | `/ai-raimo` | 同上 |
+| 数値 | `/metrics` | Zaim CF・電力・Vポイント等 |
+| 課金 | `/billing` | SaaS／定額・従量の注視 |
+| NotebookLM | `/notebooklm` | Drive ソース作業セット |
+
+---
+
+## 2. 各項目の仕様・設計思想
+
+### 2.1 状況ウォッチ（`/situation`）
+
+- **思想**: 「今フォローすべきか」をレベル付きカードで並べる。詳細修正は Jarvis に任せる。
+- **データ**: `watch_status` ＋ `.jarvis_state/situation_watch.json`
+- **集約**: `scripts/jarvis_situation_watch.py` ← `config/situation_watch.yaml`
+- **主なカード例**: 電力 CF、ETC 月次、Vポイント、LINE 公式エクスポート、815 監視、Zaim 集計・二重取込、夜間トリアージ 等
+
+### 2.2 数値（`/metrics`）
+
+- **思想**: モチベーション用のキャッシュフロー（法人／個人）と自宅エネルギー。SaaS 課金はここではなく `/billing`。
+- **正本**: Zaim 年度 CSV → `jarvis_finance_metrics.py`／`jarvis_energy_cf_collect.py`
+
+### 2.3 課金／SaaS（`/billing`）— 今回追加
+
+- **思想**: 「定額をやめられるか」「無料→有料・従量を見失わないか」を一覧する。
+- **正本**: `config/subscriptions.yaml`（監査メモは OneDrive サブスク一覧 MD）
+- **投影**: `subscription_services` テーブル ← `jarvis_subscriptions_push.py`
+- **分類**: AI / 生活 / 通信 / 教育 / コミュニティ / インフラ（Free 注視）
+- **やらない**: 請求 API 自動取得（Phase 2）
+
+### 2.4 NotebookLM 作業セット（`/notebooklm`）— 今回追加
+
+- **思想**: ソース正本は admin Drive `200_NoteBookLM`。D&D は Mac Finder＋NotebookLM。
+- **Mac**: localhost `8766` ヘルパーが Finder＋ブラウザを開く
+- **Vercel／iPhone**: Web リンクのみ（Finder 不可）
+
+### 2.5 Zaim 集計・二重取込（状況ウォッチ）— 今回追加
+
+- **思想**: 家計精度の「ズレを直す」前に、**ズレが見える**こと。直すのは承認後に Web Zaim。
+- **検知**: `jarvis_zaim_quality_check.py` ← `config/zaim_quality_watch.yaml`
+- **対象**: 日常買い物（食費・雑貨店）のスマートレシート × クレカ同額
+- **対象外**: ETC（往復の同額は正常）
+- **集計フラグ**: `常に集計に含める` / `集計に含めない` のルール違反・must_include（オリコ等）
+- **直し**: `jarvis_zaim_money_apply.py`（Playwright・承認後）
+
+### 2.6 トリアージ／レーン（既存）
+
+- 夜間バッチで pending を用意 → 朝ダッシュボード表示
+- 815 は情報収集枠（返信提案しない）
+
+---
+
+## 3. 実際の動かし方（挙動）
+
+### 朝〜日常
+
+1. Mac 起床後、必要なら本番 URL またはローカルが開く
+2. `/situation` で attention／warn を眺める
+3. パートナー返信は Cursor に「下書きを送って」（ダッシュボードから直接送らない）
+
+### データの流れ（典型）
+
+```text
+Zaim CSV / サブスク YAML / 各種 state JSON
+        ↓ Mac スクリプト
+   Supabase（投影）
+        ↓
+   Vercel ダッシュボード
+        ↓ ユーザーが「直して」
+   Jarvis → dry-run → 承認 → Playwright / yoritoori 等
+```
+
+### 今回の機能のコマンド（要約）
+
+```bash
+# 課金一覧を DB へ
+python scripts/jarvis_subscriptions_push.py --push
+
+# Zaim 品質検知 → 状況ウォッチ
+python scripts/jarvis_zaim_quality_check.py
+python scripts/jarvis_situation_watch.py
+python scripts/jarvis_dashboard_push.py --watch-only
+
+# Zaim 直し案の確認／適用（承認後）
+python scripts/jarvis_zaim_money_apply.py --from-watch --dry-run
+python scripts/jarvis_zaim_money_apply.py --from-watch --apply --yes --limit 3
+
+# NotebookLM 作業セット（Mac）
+python scripts/jarvis_notebooklm_workbench_open.py
+# ヘルパー常駐: launchd/install_notebooklm_workbench_launchd.sh
+```
+
+詳細は `docs/運用コマンド一覧.md`。
+
+---
+
+## 4. 今回決めたこと（2026-08-01 セッション）
+
+| 決定 | 内容 |
+|---|---|
+| 課金の正本 | `config/subscriptions.yaml`。OneDrive サブスク一覧は監査メモ |
+| 課金の表示 | 専用 `/billing`（`/metrics` に混ぜない） |
+| NotebookLM 導線 | `/notebooklm`＋Mac ヘルパー。朝の自動オープンには載せない |
+| Zaim 重複 | **日常買い物のみ**検出。ETC は検出しない |
+| Zaim 集計 | 「含める／含めない」のルール違反も検知。アオキはクレカ除外が正と判明 |
+| Zaim 修正 | アプリではなく **Web＋Playwright**。ユーザーが「こう直して」＋承認後のみ |
+| 資料更新 | 検証→変更蓄積→本 MD／NotebookLM ソースを更新するサイクル |
+
+### 実装コミット（参考）
+
+- `ed70b47` NotebookLM 作業セット
+- `2915142` 課金／SaaS `/billing`
+- `f9c9a07` Zaim 品質ウォッチ＋Web 直し導線
+
+---
+
+## 5. 今後の調整・見るべきポイント
+
+### 検証しながら直す候補
+
+1. **Zaim Web apply のセレクタ** — 初回実適用で UI 差分が出やすい。スクショは `zaim_budget_sync/screenshots/money_edit/`
+2. **Zaim CSV 鮮度** — 現状エクスポートが 2026-06-27 まで。再取得後に検知件数が変わる
+3. **Amazon 二重経路** — ルールは YAML 済み。実データでのヒット頻度を見る
+4. **オリコ must_include** — 「含めない」になった月を見逃さないか
+5. **課金 YAML の金額** — Cursor Usage・年額換算の手メンテ負荷
+6. **Vercel／Supabase 実額** — 今は Free 注視のみ。請求が出たら YAML を更新
+
+### アプリ化・引き継ぎで考える軸（DX50／神大家向け）
+
+| 観点 | 自分用 Jarvis | 他者向けアプリ化で問うこと |
+|---|---|---|
+| 正本 | 個人 YAML／OneDrive | マルチテナントの設定 UI？ |
+| 収集 | Mac 前提 | クラウドのみで足りるか／何を諦めるか |
+| 承認 | チャットで確認 | アプリ内の確認画面・権限 |
+| 秘密 | `.env.jarvis_private` | Secrets／Vault |
+| 815 方針 | 情報収集のみ | プロダクトごとに返信ポリシーを切る |
+| NotebookLM | Drive フォルダ規約 | ソース置き場の標準パッケージ |
+
+### 思考プロセスのチェックリスト（変更前に見る）
+
+- [ ] これは「見る」か「直す」か。「直す」なら承認は誰が・どこで？
+- [ ] 正本はファイルか DB か。二重正本になっていないか
+- [ ] Mac 依存を増やすか。増やすなら launchd／ドキュメントは？
+- [ ] 状況ウォッチに載せるなら、うるささ（毎日 attention）にならないか
+- [ ] 神大家／DX に出すとき、個人アカウント前提が残っていないか
+
+---
+
+## 関連パス早見
+
+| 用途 | パス |
+|---|---|
+| ダッシュボードアプリ | `apps/jarvis-dashboard/` |
+| スキーマ | `apps/jarvis-dashboard/supabase/schema.sql` |
+| 課金 YAML | `config/subscriptions.yaml` |
+| Zaim 品質 YAML | `config/zaim_quality_watch.yaml` |
+| 状況ウォッチ YAML | `config/situation_watch.yaml` |
+| 運用コマンド | `docs/運用コマンド一覧.md` |
+| Cloud Agent | `docs/Jarvis_Cloud_Agent.md` |
+| NotebookLM Drive | `200_NoteBookLM/`（admin） |
+
+---
+
+*初版: 2026-08-01。変更が溜まったら版を上げ、NotebookLM ソースも同じフォルダで更新する。*

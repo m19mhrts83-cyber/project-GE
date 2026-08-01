@@ -18,6 +18,10 @@ const SUBFOLDERS: { name: string; note: string }[] = [
     name: "04_神・大家さん俱楽部Q&Aチャットボットアプリ",
     note: "",
   },
+  {
+    name: "05_Jarvisダッシュボード_設計と引き継ぎ",
+    note: "設計メモ・NotebookLM説明用",
+  },
   { name: "99_PlusAI検証_20260727", note: "検証用" },
   { name: "★アウトプット", note: "生成スライド等" },
 ];
