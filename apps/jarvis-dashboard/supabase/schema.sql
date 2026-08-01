@@ -95,12 +95,38 @@ create table if not exists public.sync_meta (
   updated_at timestamptz not null default now()
 );
 
+-- subscription_services: 課金／SaaS 一覧（config/subscriptions.yaml から push）
+create table if not exists public.subscription_services (
+  id text primary key,
+  name text not null,
+  category text not null default 'lifestyle',
+  status text not null default 'unknown',
+  billing text not null default 'none',
+  amount_yen double precision not null default 0,
+  monthly_yen double precision not null default 0,
+  next_bill text,
+  watch boolean not null default false,
+  watch_reason text,
+  usage_note text,
+  cancel_candidate boolean not null default false,
+  billing_url text,
+  note text,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists subscription_services_category_idx
+  on public.subscription_services (category);
+create index if not exists subscription_services_watch_idx
+  on public.subscription_services (watch)
+  where watch = true;
+
 -- RLS: 本人（authenticated）のみ。Service Role はバイパス。
 alter table public.triage_items enable row level security;
 alter table public.watch_status enable row level security;
 alter table public.cards enable row level security;
 alter table public.metrics enable row level security;
 alter table public.sync_meta enable row level security;
+alter table public.subscription_services enable row level security;
 
 -- 単一ユーザー想定: ログイン済みなら全行可。将来 multi-user なら owner_id を追加。
 drop policy if exists triage_items_auth_all on public.triage_items;
@@ -129,6 +155,12 @@ create policy metrics_auth_all on public.metrics
 
 drop policy if exists sync_meta_auth_all on public.sync_meta;
 create policy sync_meta_auth_all on public.sync_meta
+  for all to authenticated
+  using (true)
+  with check (true);
+
+drop policy if exists subscription_services_auth_all on public.subscription_services;
+create policy subscription_services_auth_all on public.subscription_services
   for all to authenticated
   using (true)
   with check (true);

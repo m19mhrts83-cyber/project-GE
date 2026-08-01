@@ -1,0 +1,267 @@
+# Jarvis 課金／SaaS 一覧（ダッシュボード /billing 正本）
+# 監査メモ: OneDrive 215/50_税金,確定申告/サブスク一覧_更新日と金額_20260727.md
+# 更新したら: python scripts/jarvis_subscriptions_push.py --push
+#
+# category: ai | lifestyle | telecom | education | domain_soft | community | infra
+# status:   active | ending | ended | free | unknown
+# billing:  monthly | yearly | usage | none
+
+version: 1
+as_of: "2026-07-27"
+
+services:
+  # --- AI ---
+  - id: cursor
+    name: Cursor
+    category: ai
+    status: active
+    billing: monthly
+    amount_yen: 3239
+    usage_note: "Usage 従量あり（定額＋従量）"
+    next_bill: "毎月25日前後"
+    watch: true
+    watch_reason: "定額＋Usage。従量急増に注意"
+    cancel_candidate: false
+    billing_url: "https://www.cursor.com/settings"
+
+  - id: notion
+    name: Notion Business
+    category: ai
+    status: active
+    billing: yearly
+    amount_yen: 37800
+    next_bill: "2026-09-28"
+    watch: false
+    cancel_candidate: false
+    billing_url: "https://www.notion.so/profile/integrations"
+
+  - id: typeless
+    name: Typeless
+    category: ai
+    status: active
+    billing: yearly
+    amount_yen: 23426
+    next_bill: "~2027-02-09"
+    watch: false
+    cancel_candidate: false
+    note: "年額推定・確度中"
+
+  - id: genspark
+    name: Genspark Plus
+    category: ai
+    status: active
+    billing: yearly
+    amount_yen: 25101
+    next_bill: "2027-01-09"
+    watch: false
+    cancel_candidate: false
+
+  - id: chatwork
+    name: Chatwork Business
+    category: ai
+    status: active
+    billing: monthly
+    amount_yen: 924
+    next_bill: "月末"
+    watch: false
+    cancel_candidate: false
+
+  - id: chatgpt_plus
+    name: ChatGPT Plus
+    category: ai
+    status: ending
+    billing: none
+    amount_yen: 0
+    next_bill: "2026-08-26 期間終了・以降更新なし"
+    watch: false
+    cancel_candidate: false
+    note: "解約済・期間残"
+
+  # --- community ---
+  - id: kamiooya_platinum
+    name: 神大家継続プラチナサポート
+    category: community
+    status: active
+    billing: monthly
+    amount_yen: 12870
+    next_bill: "2026-08-04"
+    watch: false
+    cancel_candidate: false
+
+  # --- education ---
+  - id: sorotouch
+    name: そろタッチ
+    category: education
+    status: active
+    billing: monthly
+    amount_yen: 3960
+    next_bill: "毎月1日"
+    watch: false
+    cancel_candidate: false
+
+  - id: speakbuddy
+    name: SpeakBuddy プレミアム
+    category: education
+    status: active
+    billing: yearly
+    amount_yen: 0
+    next_bill: "有効期限 2027-07-20"
+    watch: false
+    cancel_candidate: true
+    note: "App Store・自動更新オフの可能性高（要確認）"
+
+  # --- lifestyle ---
+  - id: amazon_prime
+    name: Amazon プライム
+    category: lifestyle
+    status: active
+    billing: monthly
+    amount_yen: 600
+    next_bill: "毎月1日"
+    watch: false
+    cancel_candidate: false
+
+  - id: fujisan
+    name: 富士山マガジン（新聞ダイジェスト）
+    category: lifestyle
+    status: active
+    billing: monthly
+    amount_yen: 1200
+    next_bill: "中旬"
+    watch: false
+    cancel_candidate: false
+
+  - id: microsoft365
+    name: Microsoft 365 Personal
+    category: lifestyle
+    status: active
+    billing: yearly
+    amount_yen: 21300
+    next_bill: "2027-04-14"
+    watch: false
+    cancel_candidate: false
+
+  - id: cleanmymac
+    name: CleanMyMac
+    category: lifestyle
+    status: active
+    billing: yearly
+    amount_yen: 4448
+    next_bill: "2027-05-09"
+    watch: false
+    cancel_candidate: false
+
+  # --- telecom ---
+  - id: commufa
+    name: コミュファ光
+    category: telecom
+    status: active
+    billing: monthly
+    amount_yen: 6383
+    next_bill: "毎月11日"
+    watch: false
+    cancel_candidate: false
+    note: "概算"
+
+  # --- domain_soft ---
+  - id: muumuu
+    name: ムームードメイン
+    category: domain_soft
+    status: active
+    billing: yearly
+    amount_yen: 15840
+    next_bill: "~2027-05"
+    watch: false
+    cancel_candidate: false
+
+  # --- infra（無料・注視）---
+  - id: vercel
+    name: Vercel
+    category: infra
+    status: free
+    billing: none
+    amount_yen: 0
+    watch: true
+    watch_reason: "Hobby→Pro・帯域／ビルド超過が典型。現状無料想定"
+    cancel_candidate: false
+    billing_url: "https://vercel.com/account/billing"
+
+  - id: supabase_jarvis
+    name: Supabase（jarvis-dashboard）
+    category: infra
+    status: free
+    billing: none
+    amount_yen: 0
+    watch: true
+    watch_reason: "Free→Pro。休止回避は心拍。第2プロジェクト禁止方針"
+    cancel_candidate: false
+    billing_url: "https://supabase.com/dashboard/org/_/billing"
+
+  - id: supabase_kamiooya
+    name: Supabase（kamiooya-qa）
+    category: infra
+    status: free
+    billing: none
+    amount_yen: 0
+    watch: true
+    watch_reason: "運営向け Free 1本。用途増はテーブル追加で賄う"
+    cancel_candidate: false
+
+  - id: github_actions
+    name: GitHub Actions
+    category: infra
+    status: free
+    billing: usage
+    amount_yen: 0
+    usage_note: "無料枠内想定。超過時は従量"
+    watch: true
+    watch_reason: "無料枠超過・従量課金の監視"
+    cancel_candidate: false
+    billing_url: "https://github.com/settings/billing"
+
+  # --- ended（再開防止メモ）---
+  - id: plus_ai
+    name: Plus AI
+    category: ai
+    status: ended
+    billing: none
+    amount_yen: 0
+    note: "2026-07-27 解約済"
+
+  - id: aqua_voice
+    name: Aqua Voice Pro
+    category: ai
+    status: ended
+    billing: none
+    amount_yen: 0
+
+  - id: canva_pro
+    name: Canva Pro
+    category: lifestyle
+    status: ended
+    billing: none
+    amount_yen: 0
+    note: "未課金・開始予定のみ"
+
+  - id: youtube_premium
+    name: YouTube Premium
+    category: lifestyle
+    status: ended
+    billing: none
+    amount_yen: 0
+
+  - id: mainichi_mame
+    name: 毎日まめ
+    category: lifestyle
+    status: ending
+    billing: none
+    amount_yen: 0
+    next_bill: "有効期限〜2026-08-26 見込み"
+    note: "解約済・期間残"
+
+  - id: notionsender
+    name: NotionSender
+    category: ai
+    status: ended
+    billing: none
+    amount_yen: 0

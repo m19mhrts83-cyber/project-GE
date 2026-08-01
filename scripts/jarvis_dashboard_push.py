@@ -198,13 +198,13 @@ def push_watch(sb) -> int:
     return len(rows)
 
 
-def push_lanes_and_finance() -> tuple[int, int]:
-    """サブプロセスで lanes / finance を集約＋push。失敗しても 0 を返す。"""
+def push_lanes_finance_subscriptions() -> tuple[int, int, int]:
+    """サブプロセスで lanes / finance / subscriptions を集約＋push。失敗しても 0。"""
     import subprocess
 
     py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
     exe = str(py) if py.is_file() else sys.executable
-    cards_n = fin_n = 0
+    cards_n = fin_n = sub_n = 0
     try:
         r = subprocess.run(
             [exe, str(REPO / "scripts" / "jarvis_dashboard_lanes.py"), "--push"],
@@ -231,14 +231,27 @@ def push_lanes_and_finance() -> tuple[int, int]:
             fin_n = 1
     except Exception as e:
         print(f"# finance push failed: {e}", file=sys.stderr)
-    return cards_n, fin_n
+    try:
+        r = subprocess.run(
+            [exe, str(REPO / "scripts" / "jarvis_subscriptions_push.py"), "--push"],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        print(r.stderr or "", file=sys.stderr, end="")
+        if r.returncode == 0:
+            sub_n = 1
+    except Exception as e:
+        print(f"# subscriptions push failed: {e}", file=sys.stderr)
+    return cards_n, fin_n, sub_n
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--triage-only", action="store_true")
     ap.add_argument("--watch-only", action="store_true")
-    ap.add_argument("--full", action="store_true", help="lanes/finance も含めて push")
+    ap.add_argument("--full", action="store_true", help="lanes/finance/subscriptions も含めて push")
     args = ap.parse_args(argv)
 
     sb = client()
@@ -247,11 +260,21 @@ def main(argv: list[str] | None = None) -> int:
         t = push_triage(sb)
     if not args.triage_only:
         w = push_watch(sb)
-    cards = finance = 0
+    cards = finance = subscriptions = 0
     if args.full or (not args.triage_only and not args.watch_only):
-        # 既定で lanes/finance も回す（軽量）。--triage-only/--watch-only のときはスキップ
-        cards, finance = push_lanes_and_finance()
-    print(json.dumps({"triage": t, "watch": w, "lanes": cards, "finance": finance}, ensure_ascii=False))
+        cards, finance, subscriptions = push_lanes_finance_subscriptions()
+    print(
+        json.dumps(
+            {
+                "triage": t,
+                "watch": w,
+                "lanes": cards,
+                "finance": finance,
+                "subscriptions": subscriptions,
+            },
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 
