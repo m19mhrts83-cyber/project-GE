@@ -79,6 +79,27 @@ def main(argv: list[str] | None = None) -> int:
         else:
             missing.append("GMAIL_ESTATE_TOKEN_B64|token_estate.json")
 
+    # OneDrive Graph（Cloud／GHA と同名）
+    for gk in (
+        "MS_GRAPH_CLIENT_ID",
+        "MS_GRAPH_AUTHORITY",
+        "MS_GRAPH_REFRESH_TOKEN",
+        "MS_GRAPH_CLIENT_SECRET",
+        "MS_GRAPH_TENANT_ID",
+        "MS_GRAPH_USER_UPN",
+        "MS_GRAPH_DRIVE_ID",
+    ):
+        gv = (os.environ.get(gk) or "").strip()
+        if gv:
+            lines.append(f"{gk}={gv}")
+    if not (os.environ.get("MS_GRAPH_CLIENT_ID") or "").strip():
+        # Graph は任意だが、レーン Cloud 実行には必要
+        pass
+    if not (os.environ.get("MS_GRAPH_AUTHORITY") or "").strip() and (
+        os.environ.get("MS_GRAPH_CLIENT_ID") or ""
+    ).strip():
+        lines.append("MS_GRAPH_AUTHORITY=consumers")
+
     if missing:
         print(f"missing: {', '.join(missing)}", file=sys.stderr)
         return 1
