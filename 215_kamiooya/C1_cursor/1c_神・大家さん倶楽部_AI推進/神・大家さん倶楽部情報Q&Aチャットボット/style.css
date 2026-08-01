@@ -18,9 +18,10 @@ body {
 
 .toast {
   position: fixed;
-  left: 16px;
-  right: auto;
-  bottom: 16px;
+  top: 16px;
+  right: 16px;
+  left: auto;
+  bottom: auto;
   min-width: 240px;
   max-width: 420px;
   padding: 12px 14px;
