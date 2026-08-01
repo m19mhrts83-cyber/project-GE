@@ -140,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
         ok_payload["cursor_revise"] = ok_cr
         ok_payload["draft_cursor"] = new_draft
         ok_payload["web_draft_saved_at"] = now_iso()
+        if not isinstance(ok_cr.get("via"), str) or not ok_cr.get("via"):
+            ok_cr["via"] = "mac_fallback"
         sb.table("triage_items").update(
             {
                 "draft_text": new_draft,

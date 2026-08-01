@@ -17,7 +17,7 @@ Jarvis ダッシュボードは、**個人の秘書 AI（Jarvis）が集めた�
 | **表示** | Vercel 上の Next.js（ログイン必須）。iPhone／Mac 共通 |
 | **投影 DB** | Supabase プロジェクト `jarvis-dashboard`（運営の `kamiooya-qa` とは分離） |
 | **収集** | 主に Mac（launchd・スクリプト）。一部は GitHub Actions |
-| **対話・直し** | Cursor ローカル／Cloud Agent。ダッシュボード自体からは対外送信しない |
+| **対話・直し** | Cursor **Cloud Agent 本線**（失敗時ローカル／Mac）。パートナー画面は確認モーダル後に送信可（無確認送信はしない） |
 
 **設計思想（短く）**
 

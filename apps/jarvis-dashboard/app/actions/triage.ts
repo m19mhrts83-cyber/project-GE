@@ -88,6 +88,11 @@ export type CursorReviseState = {
   started_at?: string;
   finished_at?: string;
   error?: string;
+  /** cloud = Cloud Agent 成功 / mac_fallback = Mac Worker */
+  via?: "cloud" | "mac_fallback";
+  fallback_reason?: string;
+  cloud_agent_id?: string;
+  cloud_run_id?: string;
 };
 
 export async function reviseTriageDraftWithGemini(
@@ -160,19 +165,59 @@ export async function reviseTriageDraftWithGemini(
   }
 }
 
+async function enqueueMacCursorRevise(args: {
+  id: string;
+  path: string;
+  body: string;
+  instr: string;
+  payload: Record<string, unknown>;
+  fallbackReason: string;
+}): Promise<TriageActionResult & { queued?: boolean }> {
+  const supabase = await createClient();
+  const next = { ...args.payload };
+  next.cursor_revise = {
+    status: "queued",
+    instruction: args.instr,
+    draft: args.body,
+    requested_at: new Date().toISOString(),
+    via: "mac_fallback",
+    fallback_reason: args.fallbackReason.slice(0, 300),
+  } satisfies CursorReviseState;
+  next.web_draft_saved_at = new Date().toISOString();
+
+  const { error } = await supabase
+    .from("triage_items")
+    .update({
+      draft_text: args.body,
+      payload: next,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", args.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(args.path);
+  revalidatePath("/");
+  revalidatePath("/partner");
+  return {
+    ok: true,
+    queued: true,
+    message: `Cloud 不可のため Mac ワーカーへキューしました（${args.fallbackReason.slice(0, 80)}）`,
+  };
+}
+
 /**
- * Cursor Agent 見直しを Mac ワーカーへキューする（夜間トリアージと同じ agent CLI）。
- * Vercel 上では agent が動かないため、launchd の worker が処理する。
+ * Cursor Agent 見直し: Cloud 本線 → 失敗時 Mac Worker キュー。
  */
 export async function reviseTriageDraftWithCursor(
   id: string,
   instruction: string,
   currentDraft: string,
   path: string,
-): Promise<TriageActionResult & { queued?: boolean }> {
+): Promise<TriageActionResult & { draft?: string; queued?: boolean }> {
   const body = currentDraft.trim();
   if (!body) return { ok: false, error: "下書きが空です" };
 
+  const instr = instruction.trim() || "（丁寧に整えて）";
   const supabase = await createClient();
   const { data: row, error: fetchErr } = await supabase
     .from("triage_items")
@@ -191,33 +236,65 @@ export async function reviseTriageDraftWithCursor(
     };
   }
 
-  payload.cursor_revise = {
-    status: "queued",
-    instruction: instruction.trim() || "（丁寧に整えて）",
-    draft: body,
-    requested_at: new Date().toISOString(),
-  } satisfies CursorReviseState;
-  payload.web_draft_saved_at = new Date().toISOString();
-
-  const { error } = await supabase
-    .from("triage_items")
-    .update({
-      draft_text: body,
+  const apiKey = (process.env.CURSOR_API_KEY || "").trim();
+  if (apiKey) {
+    const { reviseDraftWithCloudAgent } = await import("@/lib/cursor/cloudRevise");
+    const cloud = await reviseDraftWithCloudAgent({
+      apiKey,
+      instruction: instr,
+      draft: body,
+      repoUrl: (process.env.CURSOR_CLOUD_REPO_URL || "").trim() || undefined,
+      timeoutMs: 75_000,
+    });
+    if (cloud.ok) {
+      const nextPayload = asPayload(payload);
+      nextPayload.draft_cursor = cloud.draft;
+      nextPayload.web_draft_saved_at = new Date().toISOString();
+      nextPayload.cursor_revise = {
+        status: "done",
+        instruction: instr,
+        requested_at: new Date().toISOString(),
+        finished_at: new Date().toISOString(),
+        via: "cloud",
+        cloud_agent_id: cloud.agentId,
+        cloud_run_id: cloud.runId,
+      } satisfies CursorReviseState;
+      const { error } = await supabase
+        .from("triage_items")
+        .update({
+          draft_text: cloud.draft,
+          payload: nextPayload,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      if (error) return { ok: false, error: error.message };
+      revalidatePath(path);
+      revalidatePath("/");
+      revalidatePath("/partner");
+      return {
+        ok: true,
+        draft: cloud.draft,
+        message: "下書きを更新しました（Cursor Cloud Agent）",
+      };
+    }
+    return enqueueMacCursorRevise({
+      id,
+      path,
+      body,
+      instr,
       payload,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-  if (error) return { ok: false, error: error.message };
+      fallbackReason: cloud.error,
+    });
+  }
 
-  revalidatePath(path);
-  revalidatePath("/");
-  revalidatePath("/partner");
-  return {
-    ok: true,
-    queued: true,
-    message:
-      "Cursor Agent 見直しをキューしました。Mac のワーカーが処理します（通常数十秒）。",
-  };
+  return enqueueMacCursorRevise({
+    id,
+    path,
+    body,
+    instr,
+    payload,
+    fallbackReason: "CURSOR_API_KEY 未設定",
+  });
 }
 
 export async function reviseTriageDraft(

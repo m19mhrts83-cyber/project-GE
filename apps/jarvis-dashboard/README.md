@@ -29,16 +29,21 @@ https://jarvis-dashboard-amber.vercel.app/
 
 ### Cursor Agent 見直し（パートナー画面）
 
-Web では **Gemini / Cursor Agent** を選べます。Cursor Agent は Vercel 上では動かないため、Mac の `agent` CLI（夜間トリアージと同じ）へキューします。
+Web では **Gemini / Cursor Agent** を選べます。
+
+1. **本線**: Vercel → Cursor Cloud Agent（`CURSOR_API_KEY`）
+2. **フォールバック**: 未キー／失敗／タイムアウト時 → Mac `agent` CLI キュー（夜間トリアージと同じ）
 
 ```bash
+# Mac フォールバック用 Worker（一度だけ）
 ~/git-repos/launchd/install_cursor_revise_worker_launchd.sh
 # 手動1回:
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_triage_cursor_revise_worker.py
 ```
 
-ログ: `~/Library/Logs/jarvis_night_triage/cursor_revise.*.log`
+ログ: `~/Library/Logs/jarvis_night_triage/cursor_revise.*.log`  
+キー発行: https://cursor.com/dashboard/api → `.env.jarvis_private` と Vercel に `CURSOR_API_KEY`
 
 ### NotebookLM 作業セット
 

@@ -14,6 +14,9 @@ import {
 import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
 import { createClient } from "@/lib/supabase/server";
 
+/** Cursor Cloud Agent 見直しの待ち時間用 */
+export const maxDuration = 120;
+
 export default async function MailDetailPage({
   params,
 }: {
