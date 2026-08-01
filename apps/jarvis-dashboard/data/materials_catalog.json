@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "updated": "2026-08-02",
+  "pages_base": "https://m19mhrts83-cyber.github.io/project-GE/docs",
+  "lanes": [
+    {
+      "id": "self",
+      "title": "自分の理解用",
+      "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/",
+      "note": "NotebookLM確認後 → Downloads → ingest → Pages"
+    },
+    {
+      "id": "dx",
+      "title": "DX互助会",
+      "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/",
+      "note": "勉強会資料のトップ（第1〜3回・相互リンク）"
+    },
+    {
+      "id": "kamiooya",
+      "title": "神大家運営",
+      "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html",
+      "note": "運営向け説明資料一覧"
+    }
+  ],
+  "items": [
+    {
+      "id": "jarvis-dashboard-handover",
+      "lane": "self",
+      "title": "Jarvis Dashboard 引き継ぎ",
+      "filename": "Jarvis_Dashboard_Handover.pdf",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/Jarvis_Dashboard_Handover.pdf",
+      "note": "ダッシュボード全体の引き継ぎ（PDF）"
+    },
+    {
+      "id": "jarvis-dashboard-overview",
+      "lane": "self",
+      "title": "Jarvis ダッシュボードの全体構成",
+      "filename": "Jarvisダッシュボードの全体構成.png",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/Jarvisダッシュボードの全体構成.png",
+      "note": "構成図（PNG）"
+    },
+    {
+      "id": "shuhen-auto-guide",
+      "lane": "self",
+      "title": "周辺MAP 自動化ガイド",
+      "filename": "周辺MAP自動化ガイド.pdf",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/周辺MAP自動化ガイド.pdf",
+      "note": "周辺MAP自動作成の理解用ガイド（PDF）"
+    },
+    {
+      "id": "member-list-proposal",
+      "lane": "self",
+      "title": "会員名簿データ活用の提案",
+      "filename": "会員名簿データ活用の提案.png",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/会員名簿データ活用の提案.png",
+      "note": "提案サマリー（PNG）"
+    },
+    {
+      "id": "fudosan-automation",
+      "lane": "self",
+      "title": "不動産業務自動化 説明資料",
+      "filename": "不動産業務自動化_説明資料.pdf",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/不動産業務自動化_説明資料.pdf",
+      "note": "業務自動化の説明（PDF）"
+    },
+    {
+      "id": "dx-hub",
+      "lane": "dx",
+      "title": "DX互助会 勉強会資料トップ",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/",
+      "note": "回別一覧への入口"
+    },
+    {
+      "id": "dx-slides-1",
+      "lane": "dx",
+      "title": "第1回スライド（dx-slides）",
+      "url": "https://m19mhrts83-cyber.github.io/dx-slides/",
+      "note": "Cursor × Markdown 活用入門"
+    },
+    {
+      "id": "kamiooya-hub",
+      "lane": "kamiooya",
+      "title": "神大家 AI推進相談 資料一覧",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html",
+      "note": "運営向け・回ごとの PDF/PNG"
+    },
+    {
+      "id": "shuhen-map-pages",
+      "lane": "kamiooya",
+      "title": "周辺MAP Step2（公開デモ）",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/shuhen-map.html",
+      "note": "番号ピン地図"
+    },
+    {
+      "id": "shuhen-auto-pages",
+      "lane": "kamiooya",
+      "title": "周辺MAP 自動（公開 UI）",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/shuhen-auto.html",
+      "note": "Pages 版（API なし）"
+    }
+  ]
+}
