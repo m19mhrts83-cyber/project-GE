@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Jarvis トリアージ: 朝・ログイン時にダッシュボードを自動オープン
+# Jarvis トリアージ: Mac を開いた最初のタイミングでダッシュボードを自動オープン（1日1回）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY="${HOME}/selenium_env/venv/bin/python"
@@ -12,6 +12,4 @@ if [[ -f "${REPO_DIR}/.env.jarvis_private" ]]; then
   source "${REPO_DIR}/.env.jarvis_private"
   set +a
 fi
-# dashboard KeepAlive が立ち上がるまで少し待つ（ログイン直後）
-sleep 3
 exec "$PY" -u "${REPO_DIR}/scripts/jarvis_triage_morning_open.py" "$@"
