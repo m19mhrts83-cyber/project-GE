@@ -64,6 +64,32 @@ export async function saveTriageDraft(
   return { ok: true };
 }
 
+function revisePrompt(instruction: string, currentDraft: string): string {
+  return [
+    "あなたはビジネス日本語のメール下書き校正アシスタントです。",
+    "意味は変えず、指示に従って返信下書きを書き直してください。",
+    "出力は本文のみ（挨拶から結びまで）。前置きやコードフェンスは付けない。",
+    "",
+    "【見直し指示】",
+    instruction.trim() || "（丁寧に整えて）",
+    "",
+    "【現在の下書き】",
+    currentDraft,
+  ].join("\n");
+}
+
+export type ReviseEngine = "gemini" | "cursor";
+
+export type CursorReviseState = {
+  status: "queued" | "running" | "done" | "error";
+  instruction?: string;
+  draft?: string;
+  requested_at?: string;
+  started_at?: string;
+  finished_at?: string;
+  error?: string;
+};
+
 export async function reviseTriageDraftWithGemini(
   id: string,
   instruction: string,
@@ -75,20 +101,10 @@ export async function reviseTriageDraftWithGemini(
     return {
       ok: false,
       error:
-        "GEMINI_API_KEY 未設定。ローカル Cursor 用に下書きをコピーして見直してください。",
+        "GEMINI_API_KEY 未設定。Cursor Agent 見直しを選ぶか、ローカル Cursor 用に下書きをコピーしてください。",
     };
   }
-  const prompt = [
-    "あなたはビジネス日本語のメール下書き校正アシスタントです。",
-    "意味は変えず、指示に従って返信下書きを書き直してください。",
-    "出力は本文のみ（挨拶から結びまで）。前置きやコードフェンスは付けない。",
-    "",
-    "【見直し指示】",
-    instruction.trim() || "（丁寧に整えて）",
-    "",
-    "【現在の下書き】",
-    currentDraft,
-  ].join("\n");
+  const prompt = revisePrompt(instruction, currentDraft);
 
   // gemini-2.5-flash は新ユーザー向けに 404。night_triage / GHA と同様に latest 系を使う。
   const models = [
@@ -134,14 +150,114 @@ export async function reviseTriageDraftWithGemini(
     }
     return {
       ok: false,
-      error: `Gemini 失敗: ${lastErr || "利用可能なモデルなし"}。ローカル Cursor で見直してください。`,
+      error: `Gemini 失敗: ${lastErr || "利用可能なモデルなし"}。Cursor Agent 見直しを試してください。`,
     };
   } catch (e) {
     return {
       ok: false,
-      error: `${e instanceof Error ? e.message : String(e)}。ローカル Cursor で見直してください。`,
+      error: `${e instanceof Error ? e.message : String(e)}。Cursor Agent 見直しを試してください。`,
     };
   }
+}
+
+/**
+ * Cursor Agent 見直しを Mac ワーカーへキューする（夜間トリアージと同じ agent CLI）。
+ * Vercel 上では agent が動かないため、launchd の worker が処理する。
+ */
+export async function reviseTriageDraftWithCursor(
+  id: string,
+  instruction: string,
+  currentDraft: string,
+  path: string,
+): Promise<TriageActionResult & { queued?: boolean }> {
+  const body = currentDraft.trim();
+  if (!body) return { ok: false, error: "下書きが空です" };
+
+  const supabase = await createClient();
+  const { data: row, error: fetchErr } = await supabase
+    .from("triage_items")
+    .select("payload")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+
+  const payload = asPayload(row?.payload);
+  const prev = payload.cursor_revise as CursorReviseState | undefined;
+  if (prev?.status === "queued" || prev?.status === "running") {
+    return {
+      ok: true,
+      queued: true,
+      message: "Cursor Agent 見直しは処理中です。完了までお待ちください。",
+    };
+  }
+
+  payload.cursor_revise = {
+    status: "queued",
+    instruction: instruction.trim() || "（丁寧に整えて）",
+    draft: body,
+    requested_at: new Date().toISOString(),
+  } satisfies CursorReviseState;
+  payload.web_draft_saved_at = new Date().toISOString();
+
+  const { error } = await supabase
+    .from("triage_items")
+    .update({
+      draft_text: body,
+      payload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(path);
+  revalidatePath("/");
+  revalidatePath("/partner");
+  return {
+    ok: true,
+    queued: true,
+    message:
+      "Cursor Agent 見直しをキューしました。Mac のワーカーが処理します（通常数十秒）。",
+  };
+}
+
+export async function reviseTriageDraft(
+  id: string,
+  instruction: string,
+  currentDraft: string,
+  path: string,
+  engine: ReviseEngine,
+): Promise<TriageActionResult & { draft?: string; queued?: boolean }> {
+  if (engine === "cursor") {
+    return reviseTriageDraftWithCursor(id, instruction, currentDraft, path);
+  }
+  return reviseTriageDraftWithGemini(id, instruction, currentDraft, path);
+}
+
+export async function getCursorReviseStatus(
+  id: string,
+): Promise<
+  TriageActionResult & {
+    revise?: CursorReviseState | null;
+    draft?: string;
+  }
+> {
+  const supabase = await createClient();
+  const { data: row, error } = await supabase
+    .from("triage_items")
+    .select("payload, draft_text")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  const payload = asPayload(row?.payload);
+  const revise =
+    payload.cursor_revise && typeof payload.cursor_revise === "object"
+      ? (payload.cursor_revise as CursorReviseState)
+      : null;
+  return {
+    ok: true,
+    revise,
+    draft: String(row?.draft_text || ""),
+  };
 }
 
 /**
