@@ -1,29 +1,40 @@
 # Jarvis Dashboard（自分用）
 
-Supabase プロジェクト **`jarvis-dashboard`**（ref `idkdqneutpvkhxhpjtgc`）上の認証付き閲覧 UI。  
-運営提供の `kamiooya-qa` とは **分離**（引き渡さない）。
+Next.js + Supabase Auth（メール／パスワード）。プロジェクト `jarvis-dashboard`。
 
-## ローカル起動
+## ローカル
 
-1. `.env.jarvis_private` に `JARVIS_SUPABASE_*`（特に **SERVICE_ROLE_KEY**）を設定
-2. このフォルダの `.env.local` を作成（`.env.example` 参照）。`NEXT_PUBLIC_SUPABASE_ANON_KEY` は private の `JARVIS_SUPABASE_ANON_KEY`
-3. ログインは **メール＋パスワード**（`PERSONAL_EMAIL` + `JARVIS_DASHBOARD_PASSWORD`）。Jarvis が Auth ユーザ作成済み。Google OAuth は任意（要 GCP クライアント）
-4. データ push:
+```bash
+cd ~/git-repos/apps/jarvis-dashboard
+# .env.local は .env.example を参考に JARVIS_SUPABASE_* から埋める
+npm run dev   # http://localhost:3001
+```
+
+ログイン: `.env.jarvis_private` の `PERSONAL_EMAIL` / `JARVIS_DASHBOARD_PASSWORD`
+
+## Mac → Supabase push
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_dashboard_push.py
 ```
 
-5. Web:
+夜間トリアージ後にも自動 push（`JARVIS_SUPABASE_SERVICE_ROLE_KEY` があるとき）。
+
+## Vercel デプロイ（Phase 3・iPhone 閲覧）
+
+1. Vercel にログインし、ルートを `apps/jarvis-dashboard` にして import
+2. Environment Variables:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SITE_URL` = 本番 URL（例 `https://….vercel.app`）
+3. Supabase Auth → URL Configuration:
+   - Site URL = 本番 URL
+   - Redirect URLs に `https://….vercel.app/auth/callback` を追加（ローカルも残す）
+4. service_role は Vercel に載せない（Mac push 専用）
 
 ```bash
+# CLI がある場合
 cd ~/git-repos/apps/jarvis-dashboard
-npm install
-npm run dev
-# http://localhost:3001
+npx vercel --prod
 ```
-
-## スキーマ
-
-`supabase/schema.sql`（適用済み: triage_items / watch_status / cards / metrics / sync_meta）

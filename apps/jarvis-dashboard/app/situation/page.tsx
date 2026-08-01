@@ -1,4 +1,5 @@
 import Shell from "@/components/Shell";
+import StatusToggle from "@/components/StatusToggle";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SituationPage() {
@@ -23,7 +24,9 @@ export default async function SituationPage() {
   return (
     <Shell active="/situation">
       <h1>状況ウォッチ</h1>
-      <p className="sub">気にしている項目。Cursor 調査用プロンプトは各カードからコピー（ローカル版と同期）。</p>
+      <p className="sub">
+        気にしている項目。不要になったらアーカイブ（Mac push でも維持）。
+      </p>
       <h2>アクティブ</h2>
       {active.length === 0 ? (
         <p className="empty">まだ push されていません</p>
@@ -34,6 +37,12 @@ export default async function SituationPage() {
               <span className="lvl">{it.level}</span>
               <strong>{it.title}</strong>
               <span className="meta">{it.source}</span>
+              <StatusToggle
+                table="watch_status"
+                id={it.id}
+                status={it.status}
+                path="/situation"
+              />
             </header>
             <p className="sum">{it.summary}</p>
             {it.detail ? <p className="meta">{it.detail}</p> : null}
@@ -63,6 +72,12 @@ export default async function SituationPage() {
             <header>
               <strong>{it.title}</strong>
               <span className="meta">archived</span>
+              <StatusToggle
+                table="watch_status"
+                id={it.id}
+                status={it.status}
+                path="/situation"
+              />
             </header>
             <p className="sum">{it.summary}</p>
           </article>

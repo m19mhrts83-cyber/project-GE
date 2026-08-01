@@ -1239,7 +1239,7 @@ def main() -> int:
                     cwd=str(REPO),
                     capture_output=True,
                     text=True,
-                    timeout=120,
+                    timeout=300,
                 )
                 print(f"# supabase push: exit={r.returncode} {(r.stderr or r.stdout or '')[-200:]}")
             else:

@@ -190,23 +190,42 @@ def push_supabase(result: dict[str, Any]) -> int:
     if not url or not key:
         raise SystemExit("JARVIS_SUPABASE_* 未設定")
     sb = create_client(url, key)
+    # Web でアーカイブ済みの id は上書きで active に戻さない
+    remote_arch: dict[str, Any] = {}
+    try:
+        r = (
+            sb.table("cards")
+            .select("id,status,archived_at")
+            .eq("status", "archived")
+            .execute()
+        )
+        remote_arch = {x["id"]: x for x in (r.data or [])}
+    except Exception as e:
+        print(f"# cards archive merge skipped: {e}", file=sys.stderr)
+
     rows = []
     for c in result.get("cards") or []:
-        rows.append(
-            {
-                "id": c["id"],
-                "lane": c["lane"],
-                "kind": c.get("kind") or "note",
-                "title": c["title"],
-                "summary": c.get("summary"),
-                "status": c.get("status") or "active",
-                "source_path": c.get("source_path"),
-                "cursor_prompt": c.get("cursor_prompt"),
-                "payload": c.get("payload") or {},
-                "sort_key": c.get("sort_key"),
-                "updated_at": c.get("updated_at") or now_iso(),
-            }
-        )
+        st = c.get("status") or "active"
+        arch_at = c.get("archived_at")
+        if st != "archived" and c["id"] in remote_arch:
+            st = "archived"
+            arch_at = remote_arch[c["id"]].get("archived_at")
+        row = {
+            "id": c["id"],
+            "lane": c["lane"],
+            "kind": c.get("kind") or "note",
+            "title": c["title"],
+            "summary": c.get("summary"),
+            "status": st,
+            "source_path": c.get("source_path"),
+            "cursor_prompt": c.get("cursor_prompt"),
+            "payload": c.get("payload") or {},
+            "sort_key": c.get("sort_key"),
+            "updated_at": c.get("updated_at") or now_iso(),
+        }
+        if arch_at:
+            row["archived_at"] = arch_at
+        rows.append(row)
     n = 0
     for i in range(0, len(rows), 40):
         chunk = rows[i : i + 40]
