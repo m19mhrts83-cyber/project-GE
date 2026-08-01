@@ -7,14 +7,11 @@ const NAV = [
   { href: "/openchat", label: "オプチャ" },
   { href: "/general", label: "それ以外" },
   { href: "/situation", label: "状況ウォッチ" },
-];
-
-const PLACEHOLDERS = [
-  "神大家運営",
-  "3棟・物件",
-  "戸建て",
-  "AI・Raimo",
-  "数値",
+  { href: "/kamiooya", label: "神大家運営" },
+  { href: "/properties", label: "3棟・物件" },
+  { href: "/kodate", label: "戸建て" },
+  { href: "/ai-raimo", label: "AI・Raimo" },
+  { href: "/metrics", label: "数値" },
 ];
 
 export default async function Shell({
@@ -41,12 +38,6 @@ export default async function Shell({
           >
             {n.label}
           </Link>
-        ))}
-        {PLACEHOLDERS.map((p) => (
-          <div key={p} className="side-link disabled">
-            {p}
-            <div className="side-note">Phase 2</div>
-          </div>
         ))}
         <div className="side-note">
           {user?.email ?? "—"}

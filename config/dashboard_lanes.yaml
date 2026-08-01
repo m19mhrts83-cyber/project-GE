@@ -1,0 +1,53 @@
+# Jarvis ダッシュボード — コンテンツレーン定義（Phase 2）
+version: 1
+
+partner_base: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談"
+obsidian_journal: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1/01_Journaling/★Journal"
+kodate_actions: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/10_【購入】物件購入,融資/戸建てアクション.md"
+
+lanes:
+  - id: kamiooya
+    title: 神大家運営
+    sources:
+      - path: "{partner_base}/806_神大家AI推進/5.やり取り.md"
+        take: 12
+      - path: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/フェーズ管理.md"
+        take: 5
+        kind: note
+
+  - id: properties
+    title: 3棟・物件
+    sources:
+      - path: "{partner_base}/102_ミニテック/5.やり取り.md"
+        take: 6
+        tag: GrandoleⅠ・ミニテック
+      - path: "{partner_base}/103_Tcell/5.やり取り.md"
+        take: 6
+        tag: Tcell・キャラメル
+      - path: "{partner_base}/104_LEAF/5.やり取り.md"
+        take: 6
+        tag: LEAF
+      - path: "{partner_base}/101_ホームプランナー/5.やり取り.md"
+        take: 6
+        tag: GrandoleⅡ・HP
+      - path: "{partner_base}/000_共通/Grandole志賀本通_号室×管理会社_整理.md"
+        take: 3
+        kind: note
+
+  - id: kodate
+    title: 戸建て
+    sources:
+      - path: "{kodate_actions}"
+        take: 30
+        kind: checklist
+
+  - id: ai_raimo
+    title: AI・Raimo
+    sources:
+      - path: "{partner_base}/907_Raimo代理店/5.やり取り.md"
+        take: 10
+        tag: Raimo
+      - path: "{obsidian_journal}"
+        take: 7
+        kind: journal_recent
+        tag: Journal
