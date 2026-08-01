@@ -77,6 +77,17 @@ services:
     cancel_candidate: false
     note: "解約済・期間残"
 
+  - id: muumuu
+    name: ムームードメイン
+    category: ai
+    status: active
+    billing: yearly
+    amount_yen: 15840
+    next_bill: "~2027-05"
+    watch: false
+    cancel_candidate: false
+    note: "AI活用関連ドメイン費用として計上"
+
   # --- community ---
   - id: kamiooya_platinum
     name: 神大家継続プラチナサポート
@@ -164,15 +175,7 @@ services:
     note: "概算"
 
   # --- domain_soft ---
-  - id: muumuu
-    name: ムームードメイン
-    category: domain_soft
-    status: active
-    billing: yearly
-    amount_yen: 15840
-    next_bill: "~2027-05"
-    watch: false
-    cancel_candidate: false
+  # （ムームードメインは AI 活用費用へ移動）
 
   # --- infra（無料・注視）---
   - id: vercel
