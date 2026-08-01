@@ -37,12 +37,23 @@ export async function middleware(request: NextRequest) {
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();
+    const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
     url.pathname = "/login";
+    url.search = "";
+    if (next && next !== "/") {
+      url.searchParams.set("next", next);
+    }
     return NextResponse.redirect(url);
   }
   if (user && path === "/login") {
+    const next = request.nextUrl.searchParams.get("next") || "/";
     const url = request.nextUrl.clone();
+    // open redirect 防止: 同一オリジンの相対パスのみ
+    if (next.startsWith("/") && !next.startsWith("//")) {
+      return NextResponse.redirect(new URL(next, request.url));
+    }
     url.pathname = "/";
+    url.search = "";
     return NextResponse.redirect(url);
   }
   return response;
