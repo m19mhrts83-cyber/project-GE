@@ -10,6 +10,8 @@ on:
       - 'style.css'
       - 'shuhen-map.html'
       - 'shuhen-map.js'
+      - 'shuhen-auto.html'
+      - 'shuhen-auto.js'
       - '.github/workflows/pages-docs.yml'
   workflow_dispatch:
 
@@ -50,9 +52,15 @@ jobs:
           if [ -f shuhen-map.js ]; then
             cp shuhen-map.js _site/shuhen-map.js
           fi
+          if [ -f shuhen-auto.html ]; then
+            cp shuhen-auto.html _site/shuhen-auto.html
+          fi
+          if [ -f shuhen-auto.js ]; then
+            cp shuhen-auto.js _site/shuhen-auto.js
+          fi
           touch _site/.nojekyll _site/docs/.nojekyll
 
-      - name: Inject Maps browser key into shuhen-map.js
+      - name: Inject Maps browser key into shuhen-map.js / shuhen-auto.js
         env:
           GOOGLE_MAPS_BROWSER_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_KEY }}
         run: |
@@ -61,30 +69,31 @@ jobs:
             echo "Missing GitHub Actions secret: GOOGLE_MAPS_BROWSER_KEY" >&2
             exit 1
           fi
-          if [ ! -f _site/shuhen-map.js ]; then
-            echo "Missing _site/shuhen-map.js" >&2
-            exit 1
-          fi
           python3 - <<'PY'
           import os
           import re
           from pathlib import Path
-          path = Path("_site/shuhen-map.js")
           key = os.environ["GOOGLE_MAPS_BROWSER_KEY"].strip()
-          text = path.read_text(encoding="utf-8")
-          # Replace only the const assignment value (keep MAPS_KEY_PLACEHOLDER intact)
-          new_text, n = re.subn(
-              r"(const EMBEDDED_MAPS_KEY = ')__GOOGLE_MAPS_BROWSER_KEY__(';)",
-              lambda m: m.group(1) + key + m.group(2),
-              text,
-              count=1,
-          )
-          if n != 1:
-              raise SystemExit(f"expected 1 EMBEDDED_MAPS_KEY replacement, got {n}")
-          if "const MAPS_KEY_PLACEHOLDER = '__GOOGLE_MAPS_BROWSER_KEY__';" not in new_text:
-              raise SystemExit("MAPS_KEY_PLACEHOLDER was altered; abort")
-          path.write_text(new_text, encoding="utf-8")
-          print("injected maps browser key into EMBEDDED_MAPS_KEY only")
+          for rel in ("_site/shuhen-map.js", "_site/shuhen-auto.js"):
+              path = Path(rel)
+              if not path.exists():
+                  if "shuhen-map" in rel:
+                      raise SystemExit(f"Missing {rel}")
+                  print(f"skip missing {rel}")
+                  continue
+              text = path.read_text(encoding="utf-8")
+              new_text, n = re.subn(
+                  r"(const EMBEDDED_MAPS_KEY = ')__GOOGLE_MAPS_BROWSER_KEY__(';)",
+                  lambda m: m.group(1) + key + m.group(2),
+                  text,
+                  count=1,
+              )
+              if n != 1:
+                  raise SystemExit(f"{rel}: expected 1 EMBEDDED_MAPS_KEY replacement, got {n}")
+              if "const MAPS_KEY_PLACEHOLDER = '__GOOGLE_MAPS_BROWSER_KEY__';" not in new_text:
+                  raise SystemExit(f"{rel}: MAPS_KEY_PLACEHOLDER was altered; abort")
+              path.write_text(new_text, encoding="utf-8")
+              print(f"injected maps browser key into {rel}")
           PY
 
       - uses: actions/upload-pages-artifact@v3

@@ -39,6 +39,7 @@ _tmp/
 
 # Jarvis 月次状態（ローカルのみ）
 .jarvis_state/etc_monthly.json
+.jarvis_state/shuhen_auto_jobs/
 .jarvis_state/night_triage/queue.json
 .jarvis_state/night_triage/dashboard.html
 .jarvis_state/night_triage/config.json
