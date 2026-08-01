@@ -41,7 +41,16 @@ def main(argv: list[str] | None = None) -> int:
         "http://localhost:3001/auth/callback",
     ]
     url = f"https://api.supabase.com/v1/projects/{args.ref}/config/auth"
-    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    # Cloudflare がデフォルト UA を弾くことがあるためブラウザ相当にする
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+    }
+    req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req) as r:
             cur = json.load(r)
@@ -73,14 +82,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     data = json.dumps(body).encode()
+    patch_headers = dict(headers)
+    patch_headers["Content-Type"] = "application/json"
     req2 = urllib.request.Request(
         url,
         data=data,
         method="PATCH",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
+        headers=patch_headers,
     )
     try:
         with urllib.request.urlopen(req2) as r:

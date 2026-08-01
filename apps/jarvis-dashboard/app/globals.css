@@ -138,6 +138,41 @@ h1 {
   margin: 6px 0;
 }
 
+.sum-label {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.orig-details,
+.draft-details {
+  margin-top: 10px;
+}
+
+.orig-details > summary,
+.draft-details > summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.orig-body,
+.draft-body {
+  white-space: pre-wrap;
+  font-size: 0.82rem;
+  background: #fafaf9;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  max-height: 28rem;
+  overflow: auto;
+  margin: 8px 0 0;
+}
+
 .lvl {
   font-size: 0.72rem;
   font-weight: 700;

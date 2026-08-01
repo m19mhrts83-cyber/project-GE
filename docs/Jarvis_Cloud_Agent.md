@@ -23,8 +23,19 @@
 | 原本 | OneDrive（215 等）／Gmail／Notion |
 | 投影 | Supabase `jarvis-dashboard`（トリアージ・ウォッチ・カード） |
 | 見る | https://jarvis-dashboard-amber.vercel.app/ |
-| 対話 | Cloud Agent（下記 MCP＋Secrets） |
-| 送信 | Mac の yoritoori（対外送信前確認）。Web から送らない |
+| 対話・推敲 | Cloud Agent（本線）。会話で下書きを直す |
+| 送信（理想） | **Cloud 上で確認後に送る**（Gmail API／yoritoori 相当。対外送信前確認は維持） |
+| 送信（当面・フォールバック） | 未配線や失敗時は **Mac の yoritoori**。**Vercel Web 画面からは送らない** |
+
+## 下書き〜送信の理想フロー（2026-08 追記）
+
+ユーザー方針（確定）:
+
+1. **基本はクラウドで完結** — 下書きを Cloud Agent と会話しながら見直し、その場で送れるなら送る  
+2. **送れない／制限で止まったらローカル** — 従来どおり Mac の Cursor／`yoritoori_send.py`  
+3. **Web ダッシュボードからのワンクリック送信はしない**（誤送信防止。表示・対応済み操作のみ）
+
+技術メモ: 「メールはクラウドでは絶対送れない」わけではない。Gmail API＋token（Secrets）があれば Cloud Agent から送信可能。未配線の間はフォールバックで Mac 送信。実装は後続（対外送信前確認・`--via` 確認は同じ）。
 
 ## Cloud MCP（ローカル mcp.json は継承されない）
 
@@ -116,9 +127,10 @@ for row in r.data or []:
 PY
 ```
 
-## Mac に残すもの
+## Mac に残すもの（当面）
 
-CHRLINE／オプチャ、Zaim Playwright、パートナー MD 全文取込、対外送信、OneDrive ローカル path 依存ジョブ（Graph 未設定時）。
+CHRLINE／オプチャ、Zaim Playwright、パートナー MD 全文取込、OneDrive ローカル path 依存（Graph 未設定時）。  
+**対外送信**は理想では Cloud 完結を目指すが、未配線・失敗時は Mac の yoritoori。
 
 ## チェックリスト（初回配線）
 

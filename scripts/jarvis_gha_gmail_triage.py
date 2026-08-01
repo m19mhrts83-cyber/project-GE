@@ -97,7 +97,9 @@ def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
             c.get("body") or "",
             c.get("from_email") or "",
         )
-        summary = (c.get("body") or "")[:240].replace("\n", " ")
+        # カード上の「要約」にはしない。全文は original_body。短いメモのみ。
+        body_full = c.get("body") or ""
+        summary = f"（本文 {len(body_full)} 文字・全文はカード内）" if body_full else ""
         rows.append(
             {
                 "id": f"gha-{c['id']}",

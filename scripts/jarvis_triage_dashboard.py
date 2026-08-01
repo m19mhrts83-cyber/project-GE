@@ -554,7 +554,7 @@ def render_html(
         folder = html.escape(str(it.get("folder") or it.get("from_email") or ""))
         subject = html.escape(str(it.get("subject") or ""))
         received = html.escape(str(it.get("received_at") or ""))
-        summary = html.escape(str(it.get("summary") or ""))
+        summary_raw = str(it.get("summary") or "").strip()
         reason = html.escape(str(it.get("reason") or ""))
         draft = html.escape(str(it.get("draft_text") or ""))
         original = resolve_original_body(it)
@@ -565,6 +565,22 @@ def render_html(
                 original_esc = "（原文未保存。次回夜間バッチ以降で保存されます）"
             else:
                 original_esc = "（原文を取得できませんでした）"
+        # 原文先頭の切り出しだけならカード上の「要点」は出さない
+        sum_norm = summary_raw.replace("\n", " ").replace("\r", "")
+        orig_norm = original.replace("\n", " ").replace("\r", "")
+        is_body_clip = bool(
+            summary_raw
+            and original
+            and (
+                orig_norm.startswith(sum_norm[: min(100, len(sum_norm))])
+                or sum_norm.startswith("（本文 ")
+            )
+        )
+        summary_html = (
+            f'<p class="sum"><span class="sum-label">要点</span>{html.escape(summary_raw)}</p>'
+            if summary_raw and not is_body_clip
+            else ""
+        )
         dg = html.escape(str(it.get("draft_gemini") or ""))
         dc = html.escape(str(it.get("draft_cursor") or ""))
         iid = html.escape(str(it.get("id") or ""))
@@ -603,13 +619,14 @@ def render_html(
             <span class="meta">{folder} · {received}</span>
           </header>
           <h3>{subject}</h3>
-          <p class="sum">{summary}</p>
+          {summary_html}
           {f'<p class="reason">{reason}</p>' if reason else ''}
-          <details>
-            <summary>下書きを見る</summary>
-            <h4>受信原文</h4>
+          <details open>
+            <summary>元メール全文</summary>
             <pre class="original">{original_esc}</pre>
-            <h4>返信下書き</h4>
+          </details>
+          <details>
+            <summary>返信下書きを見る</summary>
             <pre>{draft or '（未生成）'}</pre>
             {ab}
           </details>
@@ -905,7 +922,10 @@ def render_html(
   }}
   details h4 {{ font-size: 0.9rem; margin: 12px 0 6px; color: var(--muted); font-weight: 600; }}
   details h4:first-of-type {{ margin-top: 8px; }}
-  pre.original {{ max-height: 28rem; overflow-y: auto; }}
+  details {{ margin-top: 10px; }}
+  details > summary {{ cursor: pointer; font-weight: 600; color: var(--accent, #0f766e); }}
+  .sum-label {{ font-size: 0.7rem; font-weight: 700; color: var(--muted); margin-right: 8px; }}
+  pre.original {{ max-height: 28rem; overflow-y: auto; white-space: pre-wrap; }}
   .ab {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }}
   @media (max-width: 800px) {{ .ab {{ grid-template-columns: 1fr; }} }}
   .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }}
