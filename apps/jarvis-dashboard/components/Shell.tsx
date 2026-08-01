@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 const NAV = [
-  { href: "/", label: "メール · 概要" },
+  { href: "/", label: "ホーム" },
   { href: "/partner", label: "パートナー" },
   { href: "/openchat", label: "オプチャ" },
   { href: "/general", label: "それ以外" },
