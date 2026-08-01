@@ -194,6 +194,7 @@ export default async function TriageLanePage({
               toEmail={focus.from_email}
               partner={focus.partner}
               folder={focus.folder}
+              lane={lane}
               draftText={focus.draft_text}
               payload={focus.payload}
               status={focus.status}

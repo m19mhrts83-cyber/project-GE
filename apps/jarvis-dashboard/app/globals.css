@@ -592,6 +592,45 @@ h1 {
   margin-top: 8px;
 }
 
+.draft-positioning {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  background: color-mix(in srgb, var(--accent) 7%, #fff);
+  color: var(--ink);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.draft-positioning-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: var(--accent);
+}
+
+.draft-positioning ul {
+  margin: 0;
+  padding-left: 1.1em;
+}
+
+.draft-positioning li {
+  margin: 0 0 4px;
+}
+
+.draft-positioning li:last-child {
+  margin-bottom: 0;
+}
+
+.draft-positioning code {
+  font-size: 0.78rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
 .draft-tabs {
   display: flex;
   gap: 6px;
@@ -601,10 +640,13 @@ h1 {
 .draft-tab {
   border: 1px solid var(--line);
   background: #fff;
+  color: var(--ink);
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 0.8rem;
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .draft-tab.on {
