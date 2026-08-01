@@ -1220,7 +1220,7 @@ const App = {
     }
     if (screenName === 'adminUserList') {
       App.loadApprovedUsers().catch(function (err) {
-        App.showToast((err && err.message) || 'ユーザー一覧の取得に失敗しました', 'error');
+        App.showToast((err && err.message) || 'ユーザ一覧の取得に失敗しました', 'error');
       });
     }
     if (screenName === 'adminAdminList') {
@@ -1246,8 +1246,8 @@ const App = {
       comments: 'コメント一覧',
       lessons: '動画ページ説明テキスト',
       knowledge: 'セミナー動画文字起こし',
-      adminUsers: 'ユーザー承認',
-      adminUserList: 'ユーザー一覧',
+      adminUsers: 'ユーザ承認',
+      adminUserList: 'ユーザ一覧',
       adminAdminList: '管理者一覧',
       adminMembers: '会員名簿',
       adminData: 'データ取込',
@@ -2218,7 +2218,7 @@ const App = {
     if (!App.isStaffAdmin()) return;
     const list = App.generalUsers();
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">一般ユーザーはいません</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">一般ユーザはいません</td></tr>';
       return;
     }
     const isMaster = App.isMasterAdmin();
@@ -2481,8 +2481,8 @@ const App = {
     const ok = await App.openConfirmDialog(
       role === 'admin' ? '管理者に設定' : '管理者から外す',
       role === 'admin'
-        ? 'このユーザーを管理者に設定します。よろしいですか？'
-        : 'このユーザーの管理者権限を外します。よろしいですか？'
+        ? 'このユーザを管理者に設定します。よろしいですか？'
+        : 'このユーザの管理者権限を外します。よろしいですか？'
     );
     if (!ok) return;
     try {
@@ -2537,7 +2537,7 @@ const App = {
     }
     const ok = await App.openConfirmDialog(
       '退会削除',
-      (email || 'このユーザー') +
+      (email || 'このユーザ') +
         ' を退会（ログイン不可）にします。チャット履歴は残ります。よろしいですか？'
     );
     if (!ok) return;
@@ -3233,7 +3233,7 @@ const App = {
     }
 
     if (App.state.pendingUsers.length === 0) {
-      body.innerHTML = '<tr><td colspan="7" class="p-3 text-slate-500">承認待ちユーザーはいません</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="p-3 text-slate-500">承認待ちユーザはいません</td></tr>';
       App.updateBulkApproveButtonState();
       return;
     }
@@ -3297,8 +3297,8 @@ const App = {
     btn.disabled = selected.length === 0;
     btn.textContent =
       selected.length > 0
-        ? '選択したユーザーを一括承認（' + selected.length + '件）'
-        : '選択したユーザーを一括承認';
+        ? '選択したユーザを一括承認（' + selected.length + '件）'
+        : '選択したユーザを一括承認';
   },
 
   getSelectedPendingUsers: () => {
@@ -3765,7 +3765,7 @@ const App = {
       return;
     }
     if (!App.state.currentUser || !App.state.currentUser.id) {
-      App.showToast('ユーザー情報が取得できません', 'error');
+      App.showToast('ユーザ情報が取得できません', 'error');
       return;
     }
     // Phase 14-1: 二重送信ガード（意味検索の長時間中に連打しない）
@@ -3936,7 +3936,7 @@ const App = {
       return;
     }
     const applicantEmail = App.resolveApplicantEmail(userId, email);
-    const ok = await App.openConfirmDialog('ユーザー承認', 'ユーザーID ' + userId + ' を承認しますか？');
+    const ok = await App.openConfirmDialog('ユーザ承認', 'ユーザID ' + userId + ' を承認しますか？');
     if (!ok) return;
 
     App.setLoading(true);
@@ -3947,7 +3947,7 @@ const App = {
       } else {
         console.warn('approval notify skipped: applicant email missing');
       }
-      App.showToast('ユーザーを承認しました', 'success');
+      App.showToast('ユーザを承認しました', 'success');
       await App.loadPendingUsers();
     } catch (error) {
       App.showToast(error.message || '承認に失敗しました', 'error');
@@ -3963,8 +3963,8 @@ const App = {
     }
     const applicantEmail = App.resolveApplicantEmail(userId, email);
     const ok = await App.openConfirmDialog(
-      'ユーザー却下',
-      'ユーザーID ' + userId + ' を却下しますか？申請者へ却下メールを送信します。'
+      'ユーザ却下',
+      'ユーザID ' + userId + ' を却下しますか？申請者へ却下メールを送信します。'
     );
     if (!ok) return;
 
@@ -3976,7 +3976,7 @@ const App = {
       } else {
         console.warn('rejection notify skipped: applicant email missing');
       }
-      App.showToast('ユーザーを却下しました', 'success');
+      App.showToast('ユーザを却下しました', 'success');
       await App.loadPendingUsers();
     } catch (error) {
       App.showToast(error.message || '却下に失敗しました', 'error');
@@ -3988,7 +3988,7 @@ const App = {
   confirmBulkApproveUsers: async () => {
     const selected = App.getSelectedPendingUsers();
     if (!selected.length) {
-      App.showToast('承認するユーザーを選択してください', 'error');
+      App.showToast('承認するユーザを選択してください', 'error');
       return;
     }
     const ok = await App.openConfirmDialog(
