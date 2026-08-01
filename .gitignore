@@ -101,3 +101,6 @@ dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx
 **/knowledge_local.sqlite3
 **/state/knowledge_local.sqlite3
 .cache/
+.jarvis_state/ms_graph_token_cache.json
+.jarvis_state/ms_graph_device_login.env
+.jarvis_state/ms_graph_new_refresh.env

@@ -33,6 +33,8 @@ jobs:
           MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
           MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
           MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
+          MS_GRAPH_REFRESH_TOKEN: ${{ secrets.MS_GRAPH_REFRESH_TOKEN }}
+          MS_GRAPH_AUTHORITY: ${{ secrets.MS_GRAPH_AUTHORITY }}
           MS_GRAPH_USER_UPN: ${{ secrets.MS_GRAPH_USER_UPN }}
           MS_GRAPH_DRIVE_ID: ${{ secrets.MS_GRAPH_DRIVE_ID }}
         run: python scripts/jarvis_gha_lanes.py --push

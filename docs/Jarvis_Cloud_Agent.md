@@ -125,9 +125,14 @@ rm -f ~/.jarvis_state/cloud_agent_secrets.env
 
 ## OneDrive Graph（レーン GHA）
 
+個人用 OneDrive は **委任＋デバイスコード**（アプリ専用は使わない）。正本: [`Jarvis_OneDrive_Graph.md`](Jarvis_OneDrive_Graph.md)
+
 ```bash
-python scripts/jarvis_ms_graph_setup_check.py   # 未設定なら Azure 手順を表示
-python scripts/jarvis_onedrive_graph.py --dry-run
+python scripts/jarvis_ms_graph_setup_check.py
+# CLIENT_ID 設定後:
+python scripts/jarvis_ms_graph_device_login.py
+python scripts/jarvis_onedrive_graph.py --probe
+python scripts/jarvis_ms_graph_secrets_to_gha.py
 ```
 
 未設定の間、`jarvis-dashboard-lanes.yml` はスキップ。Mac の `jarvis_dashboard_lanes.py --push` が正本。

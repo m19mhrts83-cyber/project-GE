@@ -1,17 +1,18 @@
 # OneDrive / Microsoft Graph（jarvis_onedrive_graph.py）
 # 秘密は .env.jarvis_private のみ。この YAML はパス・メモ用。
+# 手順の正本: docs/Jarvis_OneDrive_Graph.md
 
 provider: onedrive
-# 読取のルート相当（個人用 OneDrive）
-# Azure Portal 手順（要約）:
-# 1. Azure Active Directory → アプリの登録 → 新規
-# 2. 証明書とシークレット → 新しいクライアント シークレット
-# 3. API のアクセス許可 → Microsoft Graph → アプリケーションの許可 → Files.Read.All
-# 4. 「管理者の同意を与えます」
-# 5. ディレクトリ(テナント)ID・アプリケーション(クライアント)ID・シークレット値を
-#    .env.jarvis_private の MS_GRAPH_* へ（チャットに貼らない）
-# 6. 読取対象ユーザーの UPN（例: xxx@outlook.jp）を MS_GRAPH_USER_UPN に
-# 確認: python scripts/jarvis_onedrive_graph.py --dry-run
+
+# 個人用 OneDrive（推奨）:
+# 1. Azure アプリ登録（個人アカウント対応・パブリッククライアント）
+# 2. 委任: Files.Read / Files.Read.All / offline_access / User.Read
+# 3. MS_GRAPH_CLIENT_ID + MS_GRAPH_AUTHORITY=consumers
+# 4. python scripts/jarvis_ms_graph_device_login.py
+# 5. refresh を private へ → secrets_to_gha → probe
+
+# 職場テナントのみアプリ専用:
+# MS_GRAPH_TENANT_ID / CLIENT_SECRET / USER_UPN + Application Files.Read.All
 
 sample_paths:
   - "215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談/000_共通/連絡先一覧.yaml"
