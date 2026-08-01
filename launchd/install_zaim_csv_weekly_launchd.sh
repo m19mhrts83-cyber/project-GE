@@ -1,5 +1,5 @@
 #!/bin/zsh
-# install: Zaim CSV 金曜 12:00 JST 週次エクスポート
+# install: Zaim CSV 土曜 05:00 JST 週次エクスポート（夜間トリアージと同刻）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.zaim-csv-weekly"
@@ -9,6 +9,7 @@ LOG_DIR="${HOME}/Library/Logs/jarvis_zaim"
 mkdir -p "$LOG_DIR"
 chmod +x "$RUNNER"
 
+# Apple Weekday: 0=Sun … 6=Sat
 cat >"$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -23,9 +24,9 @@ cat >"$PLIST" <<EOF
   <key>StartCalendarInterval</key>
   <dict>
     <key>Weekday</key>
-    <integer>5</integer>
+    <integer>6</integer>
     <key>Hour</key>
-    <integer>12</integer>
+    <integer>5</integer>
     <key>Minute</key>
     <integer>0</integer>
   </dict>
@@ -42,6 +43,7 @@ EOF
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
-echo "installed ${LABEL} (Friday 12:00 JST) → ${PLIST}"
+echo "installed ${LABEL} (Saturday 05:00 JST) → ${PLIST}"
 echo "manual: ${RUNNER}"
+echo "fallback: Mac 朝オープン時に 6 日以上古い／未成功なら裏実行"
 echo "logs: ${LOG_DIR}/"
