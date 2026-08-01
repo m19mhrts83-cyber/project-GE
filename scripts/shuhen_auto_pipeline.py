@@ -777,7 +777,18 @@ def _name_key(s: str) -> str:
 def run_deep_research(
     job_id: str, *, apply: bool = False, timeout_sec: int = 240
 ) -> dict[str, Any]:
-    """Step1.2 相当の深掘り。apply=True なら施設・C0まで反映。"""
+    """Step1.2 相当の深掘り（API近似）。
+
+    2026-08-01 方針: 公式 Gemini Deep Research を本線とするため **既定で停止**。
+    再開するときだけ環境変数 SHUHEN_AUTO_DEEP_API=1 を付ける。
+    """
+    if (os.environ.get("SHUHEN_AUTO_DEEP_API") or "").strip() not in ("1", "true", "TRUE", "yes"):
+        raise RuntimeError(
+            "アプリ内 Deep Research（API近似）は停止中です。"
+            "公式 Gemini の Deep Research（Step1.2）を使い、"
+            "UIの「Step1.2渡す用をコピー」から進めてください。"
+            "（実験再開: SHUHEN_AUTO_DEEP_API=1）"
+        )
     gemini_key = _env("GEMINI_API_KEY")
     maps_key = _env("GOOGLE_MAPS_API_KEY")
     if not gemini_key:

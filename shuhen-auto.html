@@ -110,15 +110,25 @@
           <div id="researchDropped"></div>
         </details>
         <details id="researchDeepDetails">
-          <summary>Deep Research 相当（評判・実在の深掘り）</summary>
-          <p class="subtitle" style="margin:8px 0;">Step1.2 相当。Google検索グラウンディング付きで調査します（1〜3分かかることがあります）。</p>
+          <summary>Deep Research（本線は公式 Gemini）</summary>
+          <p class="subtitle" style="margin:8px 0;">
+            評判・実在の本確認は <strong>公式 Gemini の Deep Research</strong>（Step1.2）を推奨します。
+            API 近似の深掘りは精度・コスト面で悩みやすいため、<strong>一旦停止</strong>しています。
+          </p>
           <div style="margin-bottom:8px;">
-            <button type="button" class="secondary-btn" id="deepButton" onclick="runDeepResearch(false)">評判・実在を深掘り</button>
-            <button type="button" class="secondary-btn" id="deepApplyButton" onclick="runDeepResearch(true)" disabled>深掘り結果を施設・地図に反映</button>
             <button type="button" class="secondary-btn" id="deepCopyHandoff" onclick="copyDeepHandoff()" disabled>Step1.2渡す用をコピー</button>
             <span class="api-hint" id="deepHint"></span>
           </div>
-          <div id="researchDeep"></div>
+          <ol class="subtitle" style="margin:0;padding-left:1.2em;">
+            <li>上のボタンで「Step1.2へ渡す用」をコピー</li>
+            <li>Raimo の Step1.2 MyPrompt に貼る（または `02_DeepResearchプロンプト`）</li>
+            <li><strong>新しいチャット</strong>で Deep Research をオンにして実行</li>
+            <li>確定リストを見て、アプリ側は除外チェック／再作成で反映</li>
+          </ol>
+          <p class="subtitle" style="margin-top:10px;">（参考）API 近似は実験停止中。再開する場合は開発側でフラグを戻します。</p>
+          <div id="researchDeep" style="display:none;"></div>
+          <button type="button" id="deepButton" style="display:none;" onclick="runDeepResearch(false)"></button>
+          <button type="button" id="deepApplyButton" style="display:none;" onclick="runDeepResearch(true)"></button>
         </details>
       </div>
 
