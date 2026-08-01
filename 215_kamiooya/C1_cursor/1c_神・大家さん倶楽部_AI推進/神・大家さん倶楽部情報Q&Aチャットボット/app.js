@@ -18,6 +18,7 @@ const App = {
     pendingUsers: [],
     approvedUsers: [],
     roleRequestUsers: [],
+    members: [],
     analyticsOverview: null,
     currentScreen: 'chat',
     returnScreen: null,
@@ -187,6 +188,10 @@ const App = {
     App.elements.approvedUsersTableBody = document.getElementById('approvedUsersTableBody');
     App.elements.adminsTableBody = document.getElementById('adminsTableBody');
     App.elements.roleRequestsTableBody = document.getElementById('roleRequestsTableBody');
+    App.elements.membersTableBody = document.getElementById('membersTableBody');
+    App.elements.membersListMeta = document.getElementById('membersListMeta');
+    App.elements.membersCsvFileInput = document.getElementById('membersCsvFileInput');
+    App.elements.membersImportResult = document.getElementById('membersImportResult');
     App.elements.csvFileInput = document.getElementById('csvFileInput');
     App.elements.importResult = document.getElementById('importResult');
     App.elements.toast = document.getElementById('toast');
@@ -312,6 +317,10 @@ const App = {
     }
     document.getElementById('sampleCommentBtn').addEventListener('click', App.createSampleComment);
     document.getElementById('importCsvBtn').addEventListener('click', App.importCsvComments);
+    const importMembersCsvBtn = document.getElementById('importMembersCsvBtn');
+    if (importMembersCsvBtn) importMembersCsvBtn.addEventListener('click', App.importMembersCsv);
+    const reloadMembersBtn = document.getElementById('reloadMembersBtn');
+    if (reloadMembersBtn) reloadMembersBtn.addEventListener('click', App.loadMembers);
     const importSrtBtn = document.getElementById('importSrtBtn');
     if (importSrtBtn) importSrtBtn.addEventListener('click', App.importSrtTranscript);
     const reloadAnalyticsBtn = document.getElementById('reloadAnalyticsBtn');
@@ -954,7 +963,7 @@ const App = {
   handleRegister: async (event) => {
     event.preventDefault();
     const name = (document.getElementById('registerName').value || '').trim();
-    const email = document.getElementById('registerEmail').value.trim();
+    const email = document.getElementById('registerEmail').value.trim().toLowerCase();
     const memberNo = (document.getElementById('registerMemberNo').value || '').trim();
     const password = document.getElementById('registerPassword').value;
     if (!email || !password) {
@@ -973,16 +982,33 @@ const App = {
     App.setButtonLoading(App.elements.registerSubmitBtn, true, '登録中');
     App.setLoading(true);
     try {
-      await App.apiClient('POST', '/auth/register', {
+      const payload = {
         email: email,
         password_hash: password,
         member_no: memberNo,
         name: name
-      });
-      // 通知失敗でも登録は成功扱い（専用 API・分離）
-      await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo, name);
-      const notice =
-        '管理者にメールを送信しました。管理者承認後にメールが届くので、しばらくお待ちください';
+      };
+      let autoApproved = false;
+      try {
+        await App.apiClient('POST', '/auth/register-roster', payload);
+        autoApproved = true;
+      } catch (rosterErr) {
+        const code = rosterErr && rosterErr.errorCode;
+        const msg = String((rosterErr && rosterErr.message) || '');
+        const isNotOnRoster =
+          code === 'not_on_roster' ||
+          msg.indexOf('名簿に一致') !== -1 ||
+          msg.indexOf('not_on_roster') !== -1;
+        if (isNotOnRoster) {
+          await App.apiClient('POST', '/auth/register', payload);
+          await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo, name);
+        } else {
+          throw rosterErr;
+        }
+      }
+      const notice = autoApproved
+        ? '新規登録が完了しました。ログイン画面からメールアドレスとパスワードでログインしてください。'
+        : '管理者にメールを送信しました。管理者承認後にメールが届くので、しばらくお待ちください';
       App.showToast(notice, 'success_long');
       App.showLoginTab();
       App.showRegisterSuccessNotice(notice);
@@ -1063,6 +1089,8 @@ const App = {
     const adminListTab = document.getElementById('adminAdminListTabBtn');
     if (adminListTab) adminListTab.classList.toggle('hidden', !isAdmin);
     document.getElementById('adminDataTabBtn').classList.toggle('hidden', !isAdmin);
+    const membersTab = document.getElementById('adminMembersTabBtn');
+    if (membersTab) membersTab.classList.toggle('hidden', !isAdmin);
     const analyticsTab = document.getElementById('adminAnalyticsTabBtn');
     if (analyticsTab) analyticsTab.classList.toggle('hidden', !isAdmin);
 
@@ -1102,6 +1130,7 @@ const App = {
     App.state.pendingUsers = [];
     App.state.approvedUsers = [];
     App.state.roleRequestUsers = [];
+    App.state.members = [];
     App.elements.loginForm.reset();
     App.elements.registerForm.reset();
     App.showAuthView();
@@ -1121,6 +1150,7 @@ const App = {
       adminUsers: 'adminUsersScreen',
       adminUserList: 'adminUserListScreen',
       adminAdminList: 'adminAdminListScreen',
+      adminMembers: 'adminMembersScreen',
       adminData: 'adminDataScreen',
       adminAnalytics: 'adminAnalyticsScreen'
     };
@@ -1152,6 +1182,11 @@ const App = {
         App.showToast((err && err.message) || '管理者一覧の取得に失敗しました', 'error');
       });
     }
+    if (screenName === 'adminMembers') {
+      App.loadMembers().catch(function (err) {
+        App.showToast((err && err.message) || '会員名簿の取得に失敗しました', 'error');
+      });
+    }
     if (screenName === 'adminAnalytics') {
       App.loadAnalytics().catch(function (err) {
         App.showToast((err && err.message) || '分析データの取得に失敗しました', 'error');
@@ -1168,6 +1203,7 @@ const App = {
       adminUsers: 'ユーザー承認',
       adminUserList: 'ユーザー一覧',
       adminAdminList: '管理者一覧',
+      adminMembers: '会員名簿',
       adminData: 'データ取込',
       adminAnalytics: '運営分析'
     };
@@ -2471,7 +2507,183 @@ const App = {
   },
 
 
-    loadPendingUsers: async () => {
+  loadMembers: async () => {
+    if (!App.isStaffAdmin()) return;
+    const res = await App.apiClient('GET', '/admin/members');
+    App.state.members = (res && res.members) ? res.members : [];
+    App.renderMembers();
+  },
+
+  renderMembers: () => {
+    const body = App.elements.membersTableBody;
+    if (!body) return;
+    body.innerHTML = '';
+    const list = App.state.members || [];
+    const activeCount = list.filter(function (m) {
+      return (m.status || '') === 'active';
+    }).length;
+    const registeredCount = list.filter(function (m) {
+      return (m.status || '') === 'registered';
+    }).length;
+    if (App.elements.membersListMeta) {
+      App.elements.membersListMeta.textContent =
+        '全 ' + list.length + ' 件（未登録 ' + activeCount + ' / 登録済 ' + registeredCount + '）';
+    }
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="4" class="p-3 text-slate-500">名簿は空です。CSVを取り込んでください。</td></tr>';
+      return;
+    }
+    const sorted = list.slice().sort(function (a, b) {
+      return String(a.member_no || '').localeCompare(String(b.member_no || ''), 'ja');
+    });
+    sorted.forEach(function (m) {
+      const tr = document.createElement('tr');
+      tr.className = 'border-t';
+      const status = m.status || '';
+      const statusLabel =
+        status === 'registered'
+          ? '<span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs">登録済</span>'
+          : '<span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">未登録</span>';
+      tr.innerHTML =
+        '<td class="p-2">' +
+        App.escapeHtml(m.member_no || '') +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(m.name || '') +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(m.email || '') +
+        '</td>' +
+        '<td class="p-2">' +
+        statusLabel +
+        '</td>';
+      body.appendChild(tr);
+    });
+  },
+
+  upsertMemberRow: async (memberNo, name, email, existingByNo) => {
+    const existing = existingByNo[memberNo];
+    const status = existing && existing.status === 'registered' ? 'registered' : 'active';
+    const payload = {
+      member_no: memberNo,
+      name: name || '',
+      email: email,
+      status: status
+    };
+    if (existing) {
+      await App.apiClient('POST', '/admin/members/update', payload);
+      return 'updated';
+    }
+    await App.apiClient('POST', '/admin/members', payload);
+    existingByNo[memberNo] = { member_no: memberNo, name: name, email: email, status: status };
+    return 'created';
+  },
+
+  importMembersCsv: async () => {
+    if (!App.isStaffAdmin()) {
+      App.showToast('管理者のみ実行できます', 'error');
+      return;
+    }
+    const file = App.elements.membersCsvFileInput && App.elements.membersCsvFileInput.files[0];
+    if (!file) {
+      App.showToast('CSVファイルを選択してください', 'error');
+      return;
+    }
+    App.setLoading(true);
+    if (App.elements.membersImportResult) {
+      App.elements.membersImportResult.textContent = '';
+    }
+    try {
+      const text = await file.text();
+      const rows = App.parseCsv(text);
+      if (!rows.length) {
+        App.showToast('CSVデータが空です', 'error');
+        return;
+      }
+      const headerKeys = Object.keys(rows[0] || {});
+      const looksLikeOneColumn =
+        headerKeys.length === 1 &&
+        (headerKeys[0].indexOf('member') !== -1 ||
+          headerKeys[0].indexOf('会員') !== -1 ||
+          headerKeys[0].indexOf('email') !== -1) &&
+        (headerKeys[0].indexOf(',') !== -1 || headerKeys[0].indexOf(';') !== -1);
+      if (looksLikeOneColumn) {
+        App.showToast(
+          'CSVの列が分割されていません。Excelは「CSV UTF-8（コンマ区切り）」で保存してください。',
+          'error'
+        );
+        return;
+      }
+
+      await App.loadMembers();
+      const existingByNo = {};
+      (App.state.members || []).forEach(function (m) {
+        if (m && m.member_no) existingByNo[String(m.member_no)] = m;
+      });
+
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      let failed = 0;
+
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i];
+        const memberNo = String(
+          App.csvCell(row, 'member_no', '会員番号', 'MemberNo', 'memberNo') || ''
+        ).trim();
+        const name = String(App.csvCell(row, 'name', '氏名', '名前', 'Name') || '').trim();
+        const email = String(
+          App.csvCell(row, 'email', 'メール', 'メールアドレス', 'Email') || ''
+        )
+          .trim()
+          .toLowerCase();
+        if (!memberNo || !email) {
+          skipped += 1;
+          if (App.elements.membersImportResult) {
+            App.elements.membersImportResult.textContent +=
+              'SKIP row=' + (i + 2) + ' member_no/email 不足\n';
+          }
+          continue;
+        }
+        try {
+          const result = await App.upsertMemberRow(memberNo, name, email, existingByNo);
+          if (result === 'updated') updated += 1;
+          else created += 1;
+          if ((i + 1) % 50 === 0 && App.elements.membersImportResult) {
+            App.elements.membersImportResult.textContent =
+              '進捗 ' + (i + 1) + '/' + rows.length + ' …\n' + App.elements.membersImportResult.textContent;
+          }
+        } catch (rowErr) {
+          failed += 1;
+          if (App.elements.membersImportResult) {
+            App.elements.membersImportResult.textContent +=
+              'FAIL row=' +
+              (i + 2) +
+              ' ' +
+              memberNo +
+              ' ' +
+              ((rowErr && rowErr.message) || 'error') +
+              '\n';
+          }
+        }
+      }
+
+      await App.loadMembers();
+      const summary =
+        '新規 ' + created + ' / 更新 ' + updated + ' / スキップ ' + skipped + ' / 失敗 ' + failed;
+      if (App.elements.membersImportResult) {
+        App.elements.membersImportResult.textContent =
+          '完了: ' + summary + '\n' + (App.elements.membersImportResult.textContent || '');
+      }
+      App.showToast('名簿取込完了 ' + summary, failed === 0 ? 'success' : 'info');
+    } catch (error) {
+      App.showToast((error && error.message) || '名簿CSV取込に失敗しました', 'error');
+    } finally {
+      App.setLoading(false);
+    }
+  },
+
+  loadPendingUsers: async () => {
     if (!App.isStaffAdmin()) return;
     const res = await App.apiClient('GET', '/admin/users/pending');
     App.state.pendingUsers = (res && res.users) ? res.users : [];

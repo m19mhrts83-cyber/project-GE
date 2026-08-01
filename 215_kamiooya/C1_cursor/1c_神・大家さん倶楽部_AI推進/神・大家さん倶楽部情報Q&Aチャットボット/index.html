@@ -151,6 +151,7 @@
             <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー承認</button>
             <button id="adminUserListTabBtn" data-screen="adminUserList" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー一覧</button>
             <button id="adminAdminListTabBtn" data-screen="adminAdminList" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">管理者一覧</button>
+            <button id="adminMembersTabBtn" data-screen="adminMembers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">会員名簿</button>
             <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">データ取込</button>
             <button id="adminAnalyticsTabBtn" data-screen="adminAnalytics" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">運営分析</button>
           </nav>
@@ -403,6 +404,49 @@
                       </tr>
                     </thead>
                     <tbody id="roleRequestsTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 管理者: 会員名簿 -->
+          <section id="adminMembersScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
+            <div class="w-full max-w-5xl space-y-4">
+              <div class="bg-white rounded border p-4">
+                <h3 class="font-semibold mb-2">会員名簿（CSV取込）</h3>
+                <p class="text-sm text-slate-500 mb-3">
+                  標準フォーマット（1行目ヘッダー）:
+                  <code>member_no,name,email</code>
+                  または
+                  <code>会員番号,氏名,メール</code>。
+                  会員番号＋メールが名簿と一致する新規登録は管理者承認なしで完了します。Excelは「CSV UTF-8（コンマ区切り）」推奨。
+                </p>
+                <input id="membersCsvFileInput" type="file" accept=".csv,text/csv" class="mb-3" />
+                <div class="flex flex-wrap gap-2">
+                  <button id="importMembersCsvBtn" type="button" class="px-4 py-2 rounded bg-blue-600 text-white">名簿を取り込む</button>
+                  <button id="reloadMembersBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
+                </div>
+                <pre id="membersImportResult" class="mt-4 text-xs bg-slate-100 p-3 rounded h-40 overflow-auto"></pre>
+              </div>
+              <div class="bg-white rounded border p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h3 class="font-semibold">名簿一覧</h3>
+                    <p id="membersListMeta" class="text-sm text-slate-500">—</p>
+                  </div>
+                </div>
+                <div class="overflow-auto border rounded">
+                  <table class="min-w-full text-sm">
+                    <thead class="bg-slate-100">
+                      <tr>
+                        <th class="p-2 text-left">会員番号</th>
+                        <th class="p-2 text-left">氏名</th>
+                        <th class="p-2 text-left">メール</th>
+                        <th class="p-2 text-left">状態</th>
+                      </tr>
+                    </thead>
+                    <tbody id="membersTableBody"></tbody>
                   </table>
                 </div>
               </div>
