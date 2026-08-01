@@ -193,7 +193,7 @@ def parse_yoritoori(md_path: Path, partner_folder: str, partner_name: str) -> li
                 "summary": summary[:200],
                 "subject": subject,
                 "subject_norm": normalize_subject(subject),
-                "body": body_main[:4000],
+                "body": body_main[:8000],
                 "inbound": is_inbound(channel),
                 "gmail": is_gmail_channel(channel),
             }
@@ -439,6 +439,7 @@ def load_queue() -> dict[str, Any]:
 
 def queue_item_fields(c: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
     """候補 dict から queue 保存用フィールドを組み立てる。"""
+    body = str(c.get("body") or "")
     base = {
         "id": c["id"],
         "lane": c.get("lane") or "partner",
@@ -451,6 +452,7 @@ def queue_item_fields(c: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any
         "gmail_message_id": c.get("gmail_message_id") or "",
         "from_email": c.get("from_email") or "",
         "message_id_header": c.get("message_id_header") or "",
+        "original_body": body[:8000],
         "updated_at": now_iso(),
     }
     base.update(extra)

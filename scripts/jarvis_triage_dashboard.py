@@ -17,7 +17,7 @@ import sys
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 from zoneinfo import ZoneInfo
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -66,6 +66,81 @@ def set_engine(engine: str) -> bool:
     cfg["engine"] = engine
     save_config(cfg)
     return True
+
+
+def _applescript_string(s: str) -> str:
+    """AppleScript 用に二重引用符で囲む（内部の \" は \"\"）。"""
+    return '"' + s.replace('"', '""') + '"'
+
+
+def launch_agent_login_in_terminal() -> tuple[bool, str]:
+    """未ログイン時に Terminal.app で agent login を起動。戻り値: (ok, message)"""
+    exe = find_cursor_agent()
+    if not exe:
+        return False, "Cursor Agent CLI が見つかりません（~/.local/bin/agent）"
+    # 複雑なシェルは AppleScript に埋め込まず、一時スクリプト経由（引用符エラー防止）
+    # ログイン完了後は当該ウィンドウを自動クローズ（read 待ちで残さない）
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    sh_path = STATE_DIR / "_agent_login.sh"
+    sh_body = f"""#!/bin/bash
+export PATH="$HOME/.local/bin:$PATH"
+cd "$HOME/git-repos" || true
+echo "Cursor Agent ログインを開始します…"
+"{exe}" login
+status=$?
+# このセッションの Terminal ウィンドウだけ閉じる
+tty_name="$(basename "$(tty 2>/dev/null)" 2>/dev/null || true)"
+if [[ -n "$tty_name" ]]; then
+  osascript >/dev/null 2>&1 <<EOF || true
+tell application "Terminal"
+  repeat with w in windows
+    repeat with t in tabs of w
+      try
+        if tty of t contains "$tty_name" then
+          close w
+          return
+        end if
+      end try
+    end repeat
+  end repeat
+end tell
+EOF
+fi
+exit "$status"
+"""
+    sh_path.write_text(sh_body, encoding="utf-8")
+    sh_path.chmod(0o755)
+    as_path = _applescript_string(str(sh_path))
+    script = (
+        'tell application "Terminal"\n'
+        "  activate\n"
+        f"  do script {as_path}\n"
+        "end tell"
+    )
+    try:
+        r = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if r.returncode != 0:
+            err = (r.stderr or r.stdout or "").strip()
+            return False, f"Terminal 起動に失敗: {err[:200] or r.returncode}"
+        return True, "ログイン画面を起動しました。ブラウザで完了してください"
+    except Exception as e:
+        return False, f"Terminal 起動に失敗: {e}"
+
+
+def maybe_start_cursor_login() -> str | None:
+    """cursor 未ログインなら login を起動し、ユーザー向けメッセージを返す。"""
+    ok, msg = cursor_login_status()
+    if ok:
+        return None
+    launched, launch_msg = launch_agent_login_in_terminal()
+    if launched:
+        return launch_msg
+    return f"{msg}。自動起動失敗: {launch_msg}。手動で agent login を実行してください。"
 
 
 def set_status(item_key: str, status: str) -> bool:
@@ -128,7 +203,84 @@ def cursor_login_status() -> tuple[bool, str]:
         return False, f"Cursor Agent 確認失敗: {e}"
 
 
-def render_html(q: dict, *, serve_mode: bool | None = None, lane: str = "partner") -> str:
+def _load_night_triage():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("jarvis_night_triage", TRIAGE)
+    if spec is None or spec.loader is None:
+        return None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def lookup_partner_original_body(it: dict) -> str:
+    """pending partner で original_body が空のとき、5.やり取り.md からベストエフォート再取得。"""
+    folder = str(it.get("folder") or "").strip()
+    received = str(it.get("received_at") or "").strip()
+    subject = str(it.get("subject") or "").strip()
+    if not folder or not received:
+        return ""
+    try:
+        mod = _load_night_triage()
+        if mod is None:
+            return ""
+        base = mod.partner_base()
+        md = base / folder / "5.やり取り.md"
+        if not md.is_file():
+            return ""
+        entries = mod.parse_yoritoori(md, folder, str(it.get("partner") or ""))
+        # 日時一致を優先、なければ件名一致
+        for e in entries:
+            if e.get("received_at") == received:
+                if not subject or e.get("subject") == subject:
+                    return str(e.get("body") or "")[:8000]
+        subj_norm = mod.normalize_subject(subject) if subject else ""
+        for e in entries:
+            if subj_norm and e.get("subject_norm") == subj_norm:
+                if e.get("received_at") == received or not received:
+                    return str(e.get("body") or "")[:8000]
+        for e in entries:
+            if e.get("received_at") == received:
+                return str(e.get("body") or "")[:8000]
+    except Exception as e:
+        print(f"# original_body lookup failed folder={folder}: {e}")
+    return ""
+
+
+def resolve_original_body(it: dict) -> str:
+    body = str(it.get("original_body") or "").strip()
+    if body:
+        return body
+    if (it.get("lane") or "partner") != "partner":
+        return ""
+    return lookup_partner_original_body(it)
+
+
+def backfill_original_bodies(q: dict) -> int:
+    """queue 内の partner で original_body 空のものを埋め、変更数を返す。"""
+    n = 0
+    for it in q.get("items") or []:
+        if (it.get("lane") or "partner") != "partner":
+            continue
+        if str(it.get("original_body") or "").strip():
+            continue
+        body = lookup_partner_original_body(it)
+        if body:
+            it["original_body"] = body
+            n += 1
+    if n:
+        save_queue(q)
+    return n
+
+
+def render_html(
+    q: dict,
+    *,
+    serve_mode: bool | None = None,
+    lane: str = "partner",
+    flash_notice: str | None = None,
+) -> str:
     serve = _SERVE_MODE if serve_mode is None else serve_mode
     if lane not in ("partner", "general"):
         lane = "partner"
@@ -161,11 +313,17 @@ def render_html(q: dict, *, serve_mode: bool | None = None, lane: str = "partner
 
     cursor_ok, cursor_msg = cursor_login_status() if serve else (True, "")
     warn_block = ""
-    if serve and engine == "cursor" and not cursor_ok:
+    if flash_notice:
+        warn_block = f"""
+        <div class="warn">
+          {html.escape(flash_notice)}
+        </div>
+        """
+    elif serve and engine == "cursor" and not cursor_ok:
         warn_block = f"""
         <div class="warn">
           注意: {html.escape(cursor_msg)}。未ログインのままだと夜間バッチの下書き生成が失敗します。
-          ターミナルで <code>agent login</code> を実行してください。
+          Cursor Agent を選び直すと Terminal でログイン画面を起動します。
         </div>
         """
 
@@ -222,10 +380,18 @@ def render_html(q: dict, *, serve_mode: bool | None = None, lane: str = "partner
         summary = html.escape(str(it.get("summary") or ""))
         reason = html.escape(str(it.get("reason") or ""))
         draft = html.escape(str(it.get("draft_text") or ""))
+        original = resolve_original_body(it)
+        original_esc = html.escape(original) if original else ""
+        item_lane_raw = str(it.get("lane") or "partner")
+        if not original_esc:
+            if item_lane_raw == "general":
+                original_esc = "（原文未保存。次回夜間バッチ以降で保存されます）"
+            else:
+                original_esc = "（原文を取得できませんでした）"
         dg = html.escape(str(it.get("draft_gemini") or ""))
         dc = html.escape(str(it.get("draft_cursor") or ""))
         iid = html.escape(str(it.get("id") or ""))
-        item_lane = html.escape(str(it.get("lane") or "partner"))
+        item_lane = html.escape(item_lane_raw)
         ab = ""
         if show_ab and (dg or dc):
             ab = f"""
@@ -263,6 +429,9 @@ def render_html(q: dict, *, serve_mode: bool | None = None, lane: str = "partner
           {f'<p class="reason">{reason}</p>' if reason else ''}
           <details>
             <summary>下書きを見る</summary>
+            <h4>受信原文</h4>
+            <pre class="original">{original_esc}</pre>
+            <h4>返信下書き</h4>
             <pre>{draft or '（未生成）'}</pre>
             {ab}
           </details>
@@ -341,6 +510,9 @@ def render_html(q: dict, *, serve_mode: bool | None = None, lane: str = "partner
     white-space: pre-wrap; background: #fafaf9; border: 1px solid var(--line);
     padding: 12px; border-radius: 8px; font-size: 0.88rem; overflow-x: auto;
   }}
+  details h4 {{ font-size: 0.9rem; margin: 12px 0 6px; color: var(--muted); font-weight: 600; }}
+  details h4:first-of-type {{ margin-top: 8px; }}
+  pre.original {{ max-height: 28rem; overflow-y: auto; }}
   .ab {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }}
   @media (max-width: 800px) {{ .ab {{ grid-template-columns: 1fr; }} }}
   .actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }}
@@ -397,9 +569,18 @@ function showLane(lane) {{
 """
 
 
-def write_html(*, serve_mode: bool | None = None, lane: str = "partner") -> Path:
+def write_html(
+    *,
+    serve_mode: bool | None = None,
+    lane: str = "partner",
+    flash_notice: str | None = None,
+) -> Path:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    html_text = render_html(load_queue(), serve_mode=serve_mode, lane=lane)
+    q = load_queue()
+    n = backfill_original_bodies(q)
+    if n:
+        print(f"# backfilled original_body for {n} partner item(s)")
+    html_text = render_html(q, serve_mode=serve_mode, lane=lane, flash_notice=flash_notice)
     HTML_PATH.write_text(html_text, encoding="utf-8")
     print(f"# wrote {HTML_PATH} lane={lane}")
     return HTML_PATH
@@ -430,13 +611,21 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/engine":
             engine = (qs.get("engine") or [""])[0]
+            flash = None
             if set_engine(engine):
-                write_html(serve_mode=True, lane=lane)
+                if engine == "cursor":
+                    flash = maybe_start_cursor_login()
+                    if flash:
+                        print(f"# cursor login: {flash}")
                 print(f"# engine -> {engine}")
-            self._redirect(f"/?lane={lane}")
+            if flash:
+                self._redirect(f"/?lane={lane}&notice={quote(flash)}")
+            else:
+                self._redirect(f"/?lane={lane}")
             return
         if parsed.path in ("/", "/index.html", "/dashboard.html"):
-            write_html(serve_mode=True, lane=lane)
+            notice = (qs.get("notice") or [None])[0]
+            write_html(serve_mode=True, lane=lane, flash_notice=notice)
             data = HTML_PATH.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

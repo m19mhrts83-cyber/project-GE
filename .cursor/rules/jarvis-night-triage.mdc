@@ -5,7 +5,7 @@
 - 夜間（launchd 05:00）にパートナー Gmail と **admin 受信箱のパートナー以外** を判定し、**下書きだけ**作る。
 - **自動送信はしない**。朝にダッシュボードで確認 → Cursor で「夜間下書き #N を送って」。
 - ダッシュボードは **launchd 常時起動**（`http://127.0.0.1:8765/`）。ターミナル不要。
-- エンジンはページ上部または `config.json` の `engine`（`gemini` / `cursor`）。
+- エンジンはページ上部または `config.json` の `engine`（`gemini` / `cursor`）。Cursor 切替で未ログインなら Terminal で `agent login` が起動する。
 
 ## 朝の使い方
 
