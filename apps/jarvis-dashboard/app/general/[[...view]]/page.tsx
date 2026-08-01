@@ -19,6 +19,7 @@ export default async function GeneralPage({
     lane: "general",
     title: "それ以外（admin Gmail）",
     active: "/general",
+    subtitle: "ざざっと見て必要なものだけ開く。終わったら一括スキップ。",
     view,
     searchParams: Promise.resolve(sp),
   });
