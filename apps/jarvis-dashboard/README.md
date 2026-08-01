@@ -36,6 +36,16 @@ https://jarvis-dashboard-amber.vercel.app/
 | GHA Watch | 収集鮮度・WeStudy CI など API 完結項目 → `watch_status`（`jarvis-dashboard-situation-watch.yml`） |
 | Cloud Agent | 対話本線。Notion／NotebookLM は Cloud MCP。手順: `docs/Jarvis_Cloud_Agent.md` |
 | 表示 | 本 Vercel アプリ（取得経路・Mac/GHA 時刻を概要に表示） |
+| Mac 電力CF | `jarvis_energy_cf_collect.py` → `energy_cf.json`＋`metrics`（エネワン／売電／オリコ） |
+
+### 電力・太陽光 CF
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+python scripts/jarvis_energy_cf_collect.py --push
+```
+
+設定: `config/energy_cf.yaml`。状況ウォッチ＋`/metrics` に表示。
 
 ### OneDrive Graph（レーン GHA・委任）
 

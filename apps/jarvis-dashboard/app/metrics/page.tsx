@@ -6,6 +6,14 @@ function fmt(n: number | null | undefined) {
   return `${Math.round(n).toLocaleString("ja-JP")}円`;
 }
 
+function fmtNum(n: number | null | undefined, unit = "") {
+  if (n == null) return "—";
+  const s = Number.isInteger(n)
+    ? Math.round(n).toLocaleString("ja-JP")
+    : n.toLocaleString("ja-JP", { maximumFractionDigits: 2 });
+  return unit ? `${s}${unit}` : s;
+}
+
 export default async function MetricsPage() {
   const supabase = await createClient();
   const { data: rows } = await supabase
@@ -19,9 +27,17 @@ export default async function MetricsPage() {
       "income_total",
       "vpoint_balance",
       "etc_rebate_last",
+      "energy_buy_yen",
+      "energy_buy_kwh",
+      "energy_buy_unit",
+      "energy_sell_yen",
+      "energy_sell_kwh",
+      "energy_sell_unit",
+      "energy_solar_loan_yen",
+      "energy_net_cf",
     ])
     .order("recorded_at", { ascending: false })
-    .limit(240);
+    .limit(800);
 
   // latest month per entity+metric
   const latest = new Map<string, number>();
@@ -37,6 +53,17 @@ export default async function MetricsPage() {
 
   const pick = (ent: string, metric: string, ym = cur) =>
     ym ? latest.get(`${ym}|${ent}|${metric}`) : undefined;
+
+  const energyMonths = [
+    ...new Set(
+      (rows || [])
+        .filter((r) => String(r.metric).startsWith("energy_"))
+        .map((r) => String(r.recorded_at).slice(0, 7)),
+    ),
+  ]
+    .sort()
+    .reverse()
+    .slice(0, 36);
 
   const { data: meta } = await supabase.from("sync_meta").select("key,value");
   const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
@@ -93,6 +120,43 @@ export default async function MetricsPage() {
         <p className="sum">支出合計 {fmt(pick("personal", "expense_total"))}</p>
         <p className="sum">手残り（CF） {fmt(pick("personal", "cashflow"))}</p>
       </article>
+
+      <h2>電力・太陽光キャッシュフロー（自宅）</h2>
+      <p className="sub">
+        買電=エネワン（サイサン）／売電=中部電力PG／ローン=オリコ。energy sync{" "}
+        {metaMap.energy_cf_pushed_at ?? "未"}。消費kWhはポータルワン連携後に埋まります（売電kWhはFIT推定あり）。
+      </p>
+      {!energyMonths.length ? (
+        <p className="empty">energy metrics 未 push（jarvis_energy_cf_collect.py --push）</p>
+      ) : (
+        energyMonths.map((ym) => (
+          <article key={`e-${ym}`} className="card">
+            <header>
+              <strong>{ym}</strong>
+            </header>
+            <p className="sum">
+              買電 {fmt(pick("home", "energy_buy_yen", ym))}
+              {pick("home", "energy_buy_kwh", ym) != null
+                ? `（${fmtNum(pick("home", "energy_buy_kwh", ym), "kWh")}）`
+                : ""}
+              {" · "}
+              単価 {fmtNum(pick("home", "energy_buy_unit", ym), "円/kWh")}
+            </p>
+            <p className="sum">
+              売電 {fmt(pick("home", "energy_sell_yen", ym))}
+              {pick("home", "energy_sell_kwh", ym) != null
+                ? `（${fmtNum(pick("home", "energy_sell_kwh", ym), "kWh")}）`
+                : ""}
+              {" · "}
+              単価 {fmtNum(pick("home", "energy_sell_unit", ym), "円/kWh")}
+            </p>
+            <p className="meta">
+              ローン {fmt(pick("home", "energy_solar_loan_yen", ym))} ／ ネット CF{" "}
+              {fmt(pick("home", "energy_net_cf", ym))}
+            </p>
+          </article>
+        ))
+      )}
 
       <h2>月次トレンド（手残り）</h2>
       {!ymList.length ? (
