@@ -55,6 +55,10 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 設定: `config/notebooklm_workbench.yaml`／任意 `NOTEBOOKLM_DRIVE_FOLDER_URL`。
 
+### アプリ・プロンプト集（`/apps`）
+
+サイドバー **アプリ・プロンプト集**。自作アプリ・MyPrompt・NotebookLM の入口一覧。正本 `config/apps_prompts_catalog.yaml`（表示用 JSON と同期）。周辺MAP自動作成の Raimo 入口: https://ma-qr4gudwmgqtg.raimo-app.buzz
+
 ### 課金／SaaS（`/billing`）
 
 サイドバー **課金**。正本 `config/subscriptions.yaml` → `jarvis_subscriptions_push.py --push`（`jarvis_dashboard_push.py` にも同梱）。

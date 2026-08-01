@@ -83,6 +83,7 @@ ok はホームに出さず、`/situation` で全体確認。
 | 3棟・物件 | `/properties` | 同上 |
 | 戸建て | `/kodate` | 同上 |
 | AI・Raimo | `/ai-raimo` | 同上 |
+| **アプリ・プロンプト集** | `/apps` | 自作アプリ・MyPrompt・NotebookLM 入口一覧 |
 | 数値 | `/metrics` | Zaim CF・電力・Vポイント等 |
 | 課金 | `/billing` | SaaS／定額・従量の注視 |
 | NotebookLM | `/notebooklm` | Drive ソース作業セット |
@@ -123,6 +124,13 @@ ok はホームに出さず、`/situation` で全体確認。
 - **思想**: ソース正本は admin Drive `200_NoteBookLM`。D&D は Mac Finder＋NotebookLM。
 - **Mac**: localhost `8766` ヘルパーが Finder＋ブラウザを開く
 - **Vercel／iPhone**: Web リンクのみ（Finder 不可）
+
+### 2.4b アプリ・プロンプト集（`/apps`）— 2026-08-01 追加
+
+- **思想**: 自作アプリ・MyPrompt・NotebookLM ノートの入口を1画面で辿る（「どこから開くか」迷子防止）。
+- **正本**: `config/apps_prompts_catalog.yaml`（表示は `apps/jarvis-dashboard/data/apps_prompts_catalog.json` と同期）
+- **含む例**: 周辺MAP 自動作成／番号ピン、神大家Q&A、Raimo MyPrompt、NotebookLM 周辺MAP自動化ノート
+- **Raimo**: 周辺MAP自動は miniApp **4344**（https://ma-qr4gudwmgqtg.raimo-app.buzz）
 
 ### 2.5 Zaim 集計・二重取込（状況ウォッチ）— 今回追加
 
