@@ -1,0 +1,43 @@
+---
+description: NotebookLM確認後の資料を Downloads→OneDrive正本→Pages へ取り込む（「資料取り込んで」）
+alwaysApply: true
+---
+
+# 資料取込（NotebookLM → Downloads → OneDrive＋Pages）
+
+## トリガー
+
+次のいずれかに近い依頼のとき:
+
+- 「資料取り込んで」「NotebookLM 終わった」「Downloads の資料を整理して」
+- NotebookLM 確認後の PDF/PNG を資料ハブへ載せたいとき
+
+## 動作（止まず実行）
+
+1. `docs/運用コマンド一覧.md` の「資料ハブ」節どおり、次を実行する:
+
+```bash
+cd ~/git-repos
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_materials_ingest_downloads.py
+```
+
+2. 既定は **Downloads から移動**（消える）→ OneDrive 正本 `215/N1_NotebookLM/jarvis-self/assets/` → `docs/jarvis-self/assets/` へ写し。
+3. カタログ（`config/materials_catalog.yaml`）と Pages 用 `index.html` を更新。
+4. 変更を短く報告する。
+   - 同一依頼で「プッシュして」「プッシュで大丈夫」等があれば **その場で commit ＋ push**（再確認不要）。
+   - なければ「コミット＆ push しますか？」と聞く（無断 push しない）。Pages 反映には push が必要。
+
+## 置き場所
+
+| 役割 | 場所 |
+|---|---|
+| 容量正本 | OneDrive `215_神・大家さん倶楽部/N1_NotebookLM/jarvis-self/` |
+| 公開写し | `git-repos/docs/jarvis-self/`（GitHub Pages） |
+| ダッシュボード入口 | `/materials` |
+
+## 注意
+
+- Downloads に残したいときだけ `--copy`。
+- 無関係な Downloads ファイルは触らない（既知ファイル名＋カタログ登録分／新規は PDF・画像・HTML のみ）。
+- DX互助会・神大家レーンの既存 Pages 資料は別経路（本スクリプトは主に `self` レーン）。
+- コマンド正本: `docs/運用コマンド一覧.md`「資料ハブ」

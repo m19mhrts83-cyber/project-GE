@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-Downloads → docs/jarvis-self/assets へ資料を取り込み、index.html とカタログを更新する。
+Downloads → OneDrive 正本 → docs/jarvis-self（Pages）へ資料を取り込み、
+index.html とカタログを更新する。
 
-  cd ~/git-repos && set -a && source .env.jarvis_private && set +a
-  python scripts/jarvis_materials_ingest_downloads.py
-  python scripts/jarvis_materials_ingest_downloads.py --copy   # 移動せずコピー
+  cd ~/git-repos
+  python scripts/jarvis_materials_ingest_downloads.py          # Downloads から移動（消える）
+  python scripts/jarvis_materials_ingest_downloads.py --copy   # Downloads に残す
   python scripts/jarvis_materials_ingest_downloads.py --dry-run
-  python scripts/jarvis_materials_ingest_downloads.py --sync-only  # カタログ→JSON/HTML のみ
+  python scripts/jarvis_materials_ingest_downloads.py --sync-only
 
-運用: NotebookLM 確認 → Downloads 保存 → 本スクリプト → git push（Pages 反映）
+運用: NotebookLM 確認 → Downloads 保存 → 「Jarvis、資料取り込んで」→ 本スクリプト → git push
+正本（容量）: OneDrive 215/N1_NotebookLM/jarvis-self/assets/
+公開用写し: docs/jarvis-self/assets/（GitHub Pages）
 """
 from __future__ import annotations
 
@@ -23,6 +26,13 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 DOWNLOADS = Path.home() / "Downloads"
+ONEDRIVE_SELF = (
+    Path.home()
+    / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+    / "N1_NotebookLM"
+    / "jarvis-self"
+)
+ONEDRIVE_ASSETS = ONEDRIVE_SELF / "assets"
 SELF_DIR = REPO / "docs" / "jarvis-self"
 ASSETS = SELF_DIR / "assets"
 INDEX_HTML = SELF_DIR / "index.html"
@@ -32,10 +42,8 @@ PAGES_ASSET_BASE = (
     "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets"
 )
 
-# Downloads 直下で取り込む拡張子（未知ファイルも候補に）
 INGEST_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".html", ".htm"}
 
-# ファイル名ヒント → 表示タイトル（部分一致）
 TITLE_HINTS: list[tuple[str, str]] = [
     ("Jarvis_Dashboard_Handover", "Jarvis Dashboard 引き継ぎ"),
     ("Jarvisダッシュボードの全体構成", "Jarvis ダッシュボードの全体構成"),
@@ -49,7 +57,6 @@ def load_yaml(path: Path) -> dict[str, Any]:
     try:
         import yaml  # type: ignore
     except ImportError:
-        # 最小フォールバック: JSON 互換ではないので必須
         raise SystemExit("PyYAML が必要です（selenium_env の venv を使ってください）")
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
@@ -92,6 +99,7 @@ def ingest_from_downloads(
     copy: bool,
     dry_run: bool,
 ) -> list[str]:
+    ONEDRIVE_ASSETS.mkdir(parents=True, exist_ok=True)
     ASSETS.mkdir(parents=True, exist_ok=True)
     moved: list[str] = []
     known = known_filenames(catalog)
@@ -115,14 +123,15 @@ def ingest_from_downloads(
         src = downloads / name
         if not src.is_file():
             continue
-        dest = ASSETS / name
-        action = "copy" if copy else "move"
-        print(f"# {action}: {src} → {dest}")
+        od_dest = ONEDRIVE_ASSETS / name
+        pages_dest = ASSETS / name
+        print(f"# ingest: {src.name} → OneDrive + Pages assets")
         if not dry_run:
             if copy:
-                shutil.copy2(src, dest)
+                shutil.copy2(src, od_dest)
             else:
-                shutil.move(str(src), str(dest))
+                shutil.move(str(src), str(od_dest))
+            shutil.copy2(od_dest, pages_dest)
         moved.append(name)
 
         url = f"{PAGES_ASSET_BASE}/{name}"
@@ -136,6 +145,7 @@ def ingest_from_downloads(
             "filename": name,
             "url": url,
             "note": f"Downloads から取込（{date.today().isoformat()}）",
+            "onedrive_rel": f"N1_NotebookLM/jarvis-self/assets/{name}",
         }
         catalog.setdefault("items", []).append(new_item)
         items_by_fn[name] = new_item
@@ -150,7 +160,6 @@ def write_index_html(catalog: dict[str, Any]) -> None:
         for it in (catalog.get("items") or [])
         if it.get("lane") == "self" and it.get("filename")
     ]
-    # assets にある順で安定化
     self_items.sort(key=lambda x: str(x.get("title") or ""))
 
     lis = []
@@ -197,13 +206,13 @@ def write_index_html(catalog: dict[str, Any]) -> None:
     · <a href="https://jarvis-dashboard-amber.vercel.app/materials">ダッシュボード資料</a>
   </p>
   <h1>自分の理解用（Jarvis）</h1>
-  <p class="sub">NotebookLM 等で確認したあとに Downloads へ置き、取込スクリプトでここへ集約した資料です。対外配布ではなく自分用の正本リンクです。</p>
+  <p class="sub">正本は OneDrive <code>N1_NotebookLM/jarvis-self/</code>。ここは GitHub Pages 用の写しです。</p>
   <ul>
 {body_list}
   </ul>
   <p class="note">
-    追加手順: NotebookLM で確認 → Downloads に保存 →<br>
-    <code>python scripts/jarvis_materials_ingest_downloads.py</code> → git push（GitHub Pages 反映）
+    追加: NotebookLM 確認 → Downloads 保存 → Jarvis に「資料取り込んで」→ git push<br>
+    <code>python scripts/jarvis_materials_ingest_downloads.py</code>（Downloads から移動し OneDrive＋Pages へ）
   </p>
 </body>
 </html>
@@ -211,6 +220,27 @@ def write_index_html(catalog: dict[str, Any]) -> None:
     SELF_DIR.mkdir(parents=True, exist_ok=True)
     INDEX_HTML.write_text(html, encoding="utf-8")
     print(f"# wrote {INDEX_HTML}")
+
+
+def write_onedrive_readme() -> None:
+    ONEDRIVE_SELF.mkdir(parents=True, exist_ok=True)
+    readme = ONEDRIVE_SELF / "README.md"
+    readme.write_text(
+        "\n".join(
+            [
+                "# jarvis-self（自分の理解用資料）",
+                "",
+                "- **正本（容量）**: このフォルダの `assets/`",
+                "- **公開写し**: `git-repos/docs/jarvis-self/`（GitHub Pages）",
+                "- **ダッシュボード**: https://jarvis-dashboard-amber.vercel.app/materials",
+                "- **取込**: Downloads へ保存後、Jarvis に「資料取り込んで」",
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    print(f"# wrote {readme}")
 
 
 def sync_json(catalog: dict[str, Any]) -> None:
@@ -221,6 +251,7 @@ def sync_json(catalog: dict[str, Any]) -> None:
         "pages_base": catalog.get("pages_base"),
         "lanes": catalog.get("lanes") or [],
         "items": catalog.get("items") or [],
+        "onedrive_self": "N1_NotebookLM/jarvis-self/",
     }
     CATALOG_JSON.write_text(
         json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -229,8 +260,10 @@ def sync_json(catalog: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="資料 Downloads 取込 → jarvis-self / catalog")
-    ap.add_argument("--copy", action="store_true", help="移動せずコピー")
+    ap = argparse.ArgumentParser(
+        description="資料 Downloads → OneDrive 正本 + Pages 写し"
+    )
+    ap.add_argument("--copy", action="store_true", help="Downloads に残す（既定は移動）")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--sync-only", action="store_true", help="取込せず HTML/JSON 再生成のみ")
     ap.add_argument("--downloads", type=Path, default=DOWNLOADS)
@@ -254,10 +287,22 @@ def main(argv: list[str] | None = None) -> int:
         dump_yaml(CATALOG_YAML, catalog)
         write_index_html(catalog)
         sync_json(catalog)
+        write_onedrive_readme()
     else:
         print(f"# dry-run: would touch {len(moved)} files")
 
-    print(json.dumps({"ingested": moved, "self_items": sum(1 for i in catalog.get("items") or [] if i.get("lane") == "self")}, ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                "ingested": moved,
+                "onedrive": str(ONEDRIVE_ASSETS),
+                "self_items": sum(
+                    1 for i in catalog.get("items") or [] if i.get("lane") == "self"
+                ),
+            },
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 
