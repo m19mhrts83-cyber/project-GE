@@ -1,4 +1,7 @@
 import Shell from "@/components/Shell";
+import EnergyCfChart, {
+  type EnergyPoint,
+} from "@/components/EnergyCfChart";
 import { createClient } from "@/lib/supabase/server";
 
 function fmt(n: number | null | undefined) {
@@ -14,8 +17,24 @@ function fmtNum(n: number | null | undefined, unit = "") {
   return unit ? `${s}${unit}` : s;
 }
 
+/** 先月（JST・カレンダー月） */
+function previousYmJst(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const y = Number(parts.find((p) => p.type === "year")?.value);
+  const m = Number(parts.find((p) => p.type === "month")?.value);
+  if (m === 1) return `${y - 1}-12`;
+  return `${y}-${String(m - 1).padStart(2, "0")}`;
+}
+
 export default async function MetricsPage() {
   const supabase = await createClient();
+  const targetYm = previousYmJst();
+
   const { data: rows } = await supabase
     .from("metrics")
     .select("*")
@@ -39,7 +58,6 @@ export default async function MetricsPage() {
     .order("recorded_at", { ascending: false })
     .limit(800);
 
-  // latest month per entity+metric
   const latest = new Map<string, number>();
   const months = new Set<string>();
   for (const r of rows || []) {
@@ -48,10 +66,15 @@ export default async function MetricsPage() {
     const key = `${ym}|${r.entity}|${r.metric}`;
     if (!latest.has(key)) latest.set(key, Number(r.value));
   }
-  const ymList = [...months].sort().reverse().slice(0, 6);
-  const cur = ymList[0];
+  const ymList = [...months].sort().reverse().slice(0, 8);
+  const financeYm = months.has(targetYm)
+    ? targetYm
+    : ymList.find((ym) =>
+        latest.has(`${ym}|corporate|cashflow`) ||
+        latest.has(`${ym}|personal|cashflow`),
+      ) || ymList[0];
 
-  const pick = (ent: string, metric: string, ym = cur) =>
+  const pick = (ent: string, metric: string, ym = financeYm) =>
     ym ? latest.get(`${ym}|${ent}|${metric}`) : undefined;
 
   const energyMonths = [
@@ -62,8 +85,21 @@ export default async function MetricsPage() {
     ),
   ]
     .sort()
-    .reverse()
-    .slice(0, 36);
+    .reverse();
+
+  const energyAsc = [...energyMonths].reverse();
+  const chartPoints: EnergyPoint[] = energyAsc.map((ym) => ({
+    ym,
+    buy: latest.get(`${ym}|home|energy_buy_yen`) ?? null,
+    sell: latest.get(`${ym}|home|energy_sell_yen`) ?? null,
+    loan: latest.get(`${ym}|home|energy_solar_loan_yen`) ?? null,
+    net: latest.get(`${ym}|home|energy_net_cf`) ?? null,
+  }));
+
+  const hasTargetFinance =
+    latest.has(`${targetYm}|corporate|cashflow`) ||
+    latest.has(`${targetYm}|personal|cashflow`);
+  const hasTargetEnergy = energyMonths.includes(targetYm);
 
   const { data: meta } = await supabase.from("sync_meta").select("key,value");
   const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
@@ -79,11 +115,28 @@ export default async function MetricsPage() {
     <Shell active="/metrics">
       <h1>モチベーション数値</h1>
       <p className="sub">
-        Zaim CSV から法人／個人別に集計。部屋単位の修繕引き当てはせず法人単位で見ます。
+        表示の基準は<strong>先月（{targetYm}）</strong>。Zaim
+        CSVから法人／個人別に集計。部屋単位の修繕引き当てはせず法人単位で見ます。
       </p>
+
+      {!hasTargetFinance ? (
+        <p className="empty metrics-callout">
+          {targetYm}{" "}
+          の家計・家賃CFがまだありません。Zaim の「2026年度」CSVを再エクスポートして
+          OneDrive{" "}
+          <code>50_税金,確定申告/2026年度/Zaim.2026年度.csv</code>{" "}
+          を上書き後、「Zaim取込して」と一声ください（現状CSVは6月分まで）。
+          {financeYm ? ` いま表示している直近月は ${financeYm} です。` : ""}
+        </p>
+      ) : null}
+
       <div className="stats">
         <div className="stat">
-          対象月 <strong>{cur || "—"}</strong>
+          対象月（先月） <strong>{targetYm}</strong>
+        </div>
+        <div className="stat">
+          表示中 <strong>{financeYm || "—"}</strong>
+          {financeYm && financeYm !== targetYm ? "（直近あり）" : ""}
         </div>
         <div className="stat">
           法人 手残り <strong>{fmt(pick("corporate", "cashflow"))}</strong>
@@ -92,7 +145,10 @@ export default async function MetricsPage() {
           個人 手残り <strong>{fmt(pick("personal", "cashflow"))}</strong>
         </div>
         <div className="stat">
-          Vポイント <strong>{vpt != null ? `${Math.round(vpt).toLocaleString("ja-JP")}pt` : "—"}</strong>
+          Vポイント{" "}
+          <strong>
+            {vpt != null ? `${Math.round(vpt).toLocaleString("ja-JP")}pt` : "—"}
+          </strong>
         </div>
         <div className="stat">
           ETC還元（直近） <strong>{fmt(etc)}</strong>
@@ -102,7 +158,10 @@ export default async function MetricsPage() {
         </div>
       </div>
 
-      <h2>{cur || "—"} の内訳</h2>
+      <h2>
+        {financeYm || "—"} の内訳
+        {financeYm === targetYm ? "（先月）" : "（先月データなし → 直近）"}
+      </h2>
       <article className="card">
         <header>
           <strong>法人</strong>
@@ -124,38 +183,56 @@ export default async function MetricsPage() {
       <h2>電力・太陽光キャッシュフロー（自宅）</h2>
       <p className="sub">
         買電=エネワン（サイサン）／売電=中部電力PG／ローン=オリコ。energy sync{" "}
-        {metaMap.energy_cf_pushed_at ?? "未"}。消費kWhはポータルワン連携後に埋まります（売電kWhはFIT推定あり）。
+        {metaMap.energy_cf_pushed_at ?? "未"}。先月 {targetYm} の電力は
+        {hasTargetEnergy
+          ? "反映済み"
+          : "未反映（ポータルの7月請求は利用月6月分。7月利用は8月請求で埋まります／Zaim再エクスポートでも可）"}
+        。
       </p>
-      {!energyMonths.length ? (
-        <p className="empty">energy metrics 未 push（jarvis_energy_cf_collect.py --push）</p>
+
+      {!chartPoints.length ? (
+        <p className="empty">
+          energy metrics 未 push（jarvis_energy_cf_collect.py --push）
+        </p>
       ) : (
-        energyMonths.map((ym) => (
-          <article key={`e-${ym}`} className="card">
+        <>
+          <article className="card">
             <header>
-              <strong>{ym}</strong>
+              <strong>推移グラフ</strong>
             </header>
-            <p className="sum">
-              買電 {fmt(pick("home", "energy_buy_yen", ym))}
-              {pick("home", "energy_buy_kwh", ym) != null
-                ? `（${fmtNum(pick("home", "energy_buy_kwh", ym), "kWh")}）`
-                : ""}
-              {" · "}
-              単価 {fmtNum(pick("home", "energy_buy_unit", ym), "円/kWh")}
-            </p>
-            <p className="sum">
-              売電 {fmt(pick("home", "energy_sell_yen", ym))}
-              {pick("home", "energy_sell_kwh", ym) != null
-                ? `（${fmtNum(pick("home", "energy_sell_kwh", ym), "kWh")}）`
-                : ""}
-              {" · "}
-              単価 {fmtNum(pick("home", "energy_sell_unit", ym), "円/kWh")}
-            </p>
-            <p className="meta">
-              ローン {fmt(pick("home", "energy_solar_loan_yen", ym))} ／ ネット CF{" "}
-              {fmt(pick("home", "energy_net_cf", ym))}
-            </p>
+            <EnergyCfChart points={chartPoints} />
           </article>
-        ))
+          {energyMonths.slice(0, 6).map((ym) => (
+            <article key={`e-${ym}`} className="card">
+              <header>
+                <strong>
+                  {ym}
+                  {ym === targetYm ? "（先月）" : ""}
+                </strong>
+              </header>
+              <p className="sum">
+                買電 {fmt(pick("home", "energy_buy_yen", ym))}
+                {pick("home", "energy_buy_kwh", ym) != null
+                  ? `（${fmtNum(pick("home", "energy_buy_kwh", ym), "kWh")}）`
+                  : ""}
+                {" · "}
+                単価 {fmtNum(pick("home", "energy_buy_unit", ym), "円/kWh")}
+              </p>
+              <p className="sum">
+                売電 {fmt(pick("home", "energy_sell_yen", ym))}
+                {pick("home", "energy_sell_kwh", ym) != null
+                  ? `（${fmtNum(pick("home", "energy_sell_kwh", ym), "kWh")}）`
+                  : ""}
+                {" · "}
+                単価 {fmtNum(pick("home", "energy_sell_unit", ym), "円/kWh")}
+              </p>
+              <p className="meta">
+                ローン {fmt(pick("home", "energy_solar_loan_yen", ym))} ／ ネット
+                CF {fmt(pick("home", "energy_net_cf", ym))}
+              </p>
+            </article>
+          ))}
+        </>
       )}
 
       <h2>月次トレンド（手残り）</h2>
@@ -165,7 +242,10 @@ export default async function MetricsPage() {
         ymList.map((ym) => (
           <article key={ym} className="card">
             <header>
-              <strong>{ym}</strong>
+              <strong>
+                {ym}
+                {ym === targetYm ? "（先月）" : ""}
+              </strong>
             </header>
             <p className="sum">
               法人 {fmt(pick("corporate", "cashflow", ym))} ／ 個人{" "}
