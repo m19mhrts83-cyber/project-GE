@@ -121,8 +121,13 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  align-items: baseline;
+  align-items: center;
   font-size: 0.85rem;
+}
+
+.card header strong {
+  flex: 1 1 auto;
+  min-width: 8rem;
 }
 
 .meta {

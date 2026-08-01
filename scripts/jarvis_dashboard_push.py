@@ -123,11 +123,28 @@ def push_watch(sb) -> int:
         return 0
     data = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
     items = data.get("items") or []
+    # Web アーカイブを Mac push で潰さない（ローカル archived は優先）
+    remote_arch: dict[str, Any] = {}
+    try:
+        r = (
+            sb.table("watch_status")
+            .select("id,status,archived_at")
+            .eq("status", "archived")
+            .execute()
+        )
+        remote_arch = {x["id"]: x for x in (r.data or [])}
+    except Exception as e:
+        print(f"# watch archive merge skipped: {e}", file=sys.stderr)
     rows = []
     for it in items:
         iid = str(it.get("id") or "").strip()
         if not iid:
             continue
+        st = it.get("status") or "active"
+        arch_at = it.get("archived_at")
+        if st != "archived" and iid in remote_arch:
+            st = "archived"
+            arch_at = remote_arch[iid].get("archived_at")
         rows.append(
             {
                 "id": iid,
@@ -138,8 +155,8 @@ def push_watch(sb) -> int:
                 "detail": it.get("detail") or None,
                 "source": it.get("source") or None,
                 "cursor_prompt": it.get("cursor_prompt") or None,
-                "status": it.get("status") or "active",
-                "archived_at": it.get("archived_at"),
+                "status": st,
+                "archived_at": arch_at,
                 "checked_at": it.get("checked_at"),
                 "payload": {},
                 "updated_at": now_iso(),
