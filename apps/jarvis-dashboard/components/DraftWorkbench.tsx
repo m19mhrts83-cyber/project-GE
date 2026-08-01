@@ -26,6 +26,8 @@ type Props = {
   toEmail: string | null;
   partner?: string | null;
   folder?: string | null;
+  /** partner のとき OneDrive やり取りの位置づけを表示 */
+  lane?: string | null;
   draftText: string | null;
   payload: Payload | null | unknown;
   status: string;
@@ -50,6 +52,7 @@ export default function DraftWorkbench({
   toEmail,
   partner,
   folder,
+  lane,
   draftText,
   payload,
   status,
@@ -167,6 +170,44 @@ export default function DraftWorkbench({
 
   return (
     <div className="draft-workbench">
+      <aside className="draft-positioning" aria-label="下書きの位置づけ">
+        {lane === "partner" ? (
+          <>
+            <p className="draft-positioning-title">パートナー返信の位置づけ</p>
+            <ul>
+              <li>
+                <strong>初稿</strong>
+                … OneDrive の <code>5.やり取り.md</code>{" "}
+                直近を踏まえて夜間トリアージが作成
+              </li>
+              <li>
+                <strong>見直し</strong>
+                … いまの下書き＋下の指示のみ。やり取り MD
+                は再読しません
+              </li>
+              <li>
+                <strong>経緯を足すとき</strong>
+                … 指示に要点を書くか、下書きを手で追記
+              </li>
+            </ul>
+          </>
+        ) : (
+          <>
+            <p className="draft-positioning-title">返信下書きの位置づけ</p>
+            <ul>
+              <li>
+                <strong>初稿</strong>
+                … 受信メール／スレッド文脈から作成
+              </li>
+              <li>
+                <strong>見直し</strong>
+                … いまの下書き＋下の指示のみ（元メールは再読しません）
+              </li>
+            </ul>
+          </>
+        )}
+      </aside>
+
       <div className="draft-tabs">
         <button
           type="button"
@@ -226,9 +267,19 @@ export default function DraftWorkbench({
           className="draft-instruction"
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
-          placeholder="例: もう少し短く、丁寧に"
+          placeholder={
+            lane === "partner"
+              ? "例: もう少し短く／署名依頼の件も一文入れて"
+              : "例: もう少し短く、丁寧に"
+          }
         />
       </label>
+      <p className="draft-hint">
+        「見直しを実行」は、上の下書きとこの指示だけを見ます（{lane === "partner"
+          ? "やり取り.md は開き直さない"
+          : "元メール全文は再読しない"}
+        ）。
+      </p>
 
       <fieldset className="draft-engine">
         <legend>見直しエンジン</legend>

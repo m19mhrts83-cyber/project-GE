@@ -97,6 +97,7 @@ export default async function MailDetailPage({
           toEmail={it.from_email}
           partner={it.partner}
           folder={it.folder}
+          lane={it.lane}
           draftText={it.draft_text}
           payload={it.payload}
           status={it.status}
