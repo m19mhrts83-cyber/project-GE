@@ -44,16 +44,18 @@ def apply_rotated_refresh(*, push_gha: bool = False, from_env: bool = False) -> 
         raise SystemExit(f"missing {PRIVATE}")
 
     text = PRIVATE.read_text(encoding="utf-8")
+    # bash source で $ ! * が展開されないよう単一引用符で保存
+    qtoken = "'" + token.replace("'", "'\\''") + "'"
     if re.search(r"^MS_GRAPH_REFRESH_TOKEN=", text, re.M):
         text = re.sub(
             r"^MS_GRAPH_REFRESH_TOKEN=.*$",
-            f"MS_GRAPH_REFRESH_TOKEN={token}",
+            f"MS_GRAPH_REFRESH_TOKEN={qtoken}",
             text,
             count=1,
             flags=re.M,
         )
     else:
-        text = text.rstrip() + f"\nMS_GRAPH_REFRESH_TOKEN={token}\n"
+        text = text.rstrip() + f"\nMS_GRAPH_REFRESH_TOKEN={qtoken}\n"
     PRIVATE.write_text(text, encoding="utf-8")
     os.environ["MS_GRAPH_REFRESH_TOKEN"] = token
     if NEW_REFRESH.is_file():
