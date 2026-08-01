@@ -1,0 +1,36 @@
+#!/bin/zsh
+# Zaim 銀行連携ウォッチ（金曜）。CSV 鮮度チェック → 状況ウォッチ push（任意）
+set -euo pipefail
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+LOG_DIR="${HOME}/Library/Logs/jarvis_zaim"
+mkdir -p "$LOG_DIR"
+PY="${HOME}/selenium_env/venv/bin/python"
+STATE_DIR="${REPO_DIR}/.jarvis_state"
+ENV_FILE="${REPO_DIR}/.env.jarvis_private"
+
+ts="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+echo "[$ts] zaim_bank_sync_friday start" >>"${LOG_DIR}/bank_sync.out.log"
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+if [[ "${JARVIS_ZAIM_BANK_SYNC_DISABLE:-}" == "1" ]]; then
+  echo "[$ts] disabled via JARVIS_ZAIM_BANK_SYNC_DISABLE" >>"${LOG_DIR}/bank_sync.out.log"
+  exit 0
+fi
+
+cd "$REPO_DIR"
+"$PY" scripts/jarvis_zaim_bank_sync_check.py --force-prompt --mark-prompted \
+  >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
+
+# ダッシュボード反映
+"$PY" scripts/jarvis_situation_watch.py --write \
+  >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
+"$PY" scripts/jarvis_dashboard_push.py \
+  >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
+
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] zaim_bank_sync_friday done" >>"${LOG_DIR}/bank_sync.out.log"

@@ -124,7 +124,10 @@ items:
     source: .jarvis_state/zaim_quality_watch.json
     cursor_prompt: |
       Zaim の日常買い物二重取込と「集計に含める／含めない」の食い違いを確認して。
-      state: .jarvis_state/zaim_quality_watch.json
-      検知: scripts/jarvis_zaim_quality_check.py
-      直し（承認後）: scripts/jarvis_zaim_money_apply.py --from-watch --dry-run → --apply
+      あわせて銀行・カード連携の鮮度（.jarvis_state/zaim_bank_sync.json）を見て、
+      止まっている口座があれば Phase1 手動更新（Zaim 口座一覧で更新）を案内して。
+      state: .jarvis_state/zaim_quality_watch.json / zaim_bank_sync.json
+      検知: scripts/jarvis_zaim_quality_check.py / jarvis_zaim_bank_sync_check.py
+      直し（承認後・二重取込）: scripts/jarvis_zaim_money_apply.py --from-watch --dry-run → --apply
+      銀行更新: Zaim Web 口座一覧。OTP は .env.jarvis_private（値はチャットに出さない）
       ETC 同額は対象外。提案どおり直すときはユーザー確認後に Web Zaim で apply。
