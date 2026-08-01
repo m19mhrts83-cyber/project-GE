@@ -261,12 +261,26 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         )
     bal = cad.get("last_balance_pt")
     actions = [a for a in (cad.get("open_actions") or []) if a.get("status") == "open"]
-    rc = (mon.get("last_result_c") or {})
-    parts = []
+    rc = mon.get("last_result_c") or {}
+    parts: list[str] = []
     if bal is not None:
         parts.append(f"残高 {bal:,}pt" if isinstance(bal, int) else f"残高 {bal}")
     if actions:
-        parts.append(f"open_actions {len(actions)}件")
+        short = []
+        for a in actions[:4]:
+            t = str(a.get("title") or a.get("id") or "").strip()
+            aid = str(a.get("id") or "")
+            if aid == "eraberu_tokuten" or "選べる特典" in t:
+                short.append("選べる特典")
+            elif aid == "nisa_eval_band" or "NISA" in t or "評価額" in t:
+                short.append("NISA評価額")
+            elif aid == "visa_touch_not_id" or "Visa" in t or "iD" in t or "タッチ" in t:
+                short.append("Visaタッチ")
+            elif aid == "tsumitate_rate_band" or "積立" in t:
+                short.append("積立還元帯")
+            else:
+                short.append((t[:12] + "…") if len(t) > 12 else t or aid or "?")
+        parts.append(f"要対応{len(actions)}: " + " / ".join(short))
     note = str(rc.get("note") or "")
     if note:
         parts.append(note[:80])
@@ -278,15 +292,45 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
     if not parts:
         parts.append("データなし")
         level = "warn"
+
+    detail_lines: list[str] = []
+    action_items: list[dict[str, Any]] = []
+    for a in actions:
+        aid = str(a.get("id") or "")
+        atitle = str(a.get("title") or aid)
+        why = str(a.get("why") or "").strip()
+        how = str(a.get("how") or "").strip()
+        evidence = str(a.get("evidence") or "").strip()
+        detail_lines.append(
+            f"- [{aid}] {atitle}\n"
+            f"  なぜ: {why}\n"
+            f"  次: {how}"
+            + (f"\n  根拠: {evidence}" if evidence else "")
+        )
+        action_items.append(
+            {
+                "date": aid,
+                "shop": atitle,
+                "proposal": how or why,
+                "line": f"{atitle} — {how or why}",
+                "kind": "vpoint_open_action",
+                "why": why,
+                "how": how,
+                "evidence": evidence,
+            }
+        )
+
+    payload = {"actions": action_items} if action_items else None
     return card(
         item_id=meta["id"],
         title=title,
         category=meta.get("category") or "",
         level=level,
         summary=" · ".join(parts),
-        detail="; ".join(a.get("title") or "" for a in actions[:4]),
+        detail="\n".join(detail_lines),
         cursor_prompt=prompt,
         source=src,
+        payload=payload,
     )
 
 
@@ -568,24 +612,58 @@ def eval_sbi(meta: dict, data: dict | None) -> dict[str, Any]:
             source=src,
         )
     cl = data.get("checklist") or {}
-    follow = []
+    labels = {
+        "nisa_eval_100man": "NISA評価額100万帯",
+        "nisa_eval_200man": "NISA評価額200万帯（資産特典+0.5%）",
+        "credit_tsumitate_rate_actual": "クレカ積立還元（実績1%／6%未達）",
+        "cvs_rail_note": "コンビニ等の決済レール（iD優勢＝高還元対象外）",
+    }
+    follow: list[tuple[str, str, str]] = []
     for k, v in cl.items():
         st = str((v or {}).get("status") or "")
         if st in ("ok", "ok_user_confirmed", "ordered"):
             continue
-        follow.append(f"{k}={st}")
+        note = str((v or {}).get("note") or "")
+        follow.append((k, st, note))
     level = "ok" if not follow else "warn"
-    if any("id_dominant" in f or "1pct" in f or "confirm" in f for f in follow):
+    if any(
+        "id_dominant" in st or "1pct" in st or st == "confirm"
+        for _, st, _ in follow
+    ):
         level = "warn"
+
+    action_items: list[dict[str, Any]] = []
+    detail_lines: list[str] = []
+    short: list[str] = []
+    for k, st, note in follow:
+        label = labels.get(k, k)
+        short.append(label.split("（")[0][:14])
+        detail_lines.append(f"- [{k}] {label}\n  状態: {st}\n  メモ: {note}")
+        action_items.append(
+            {
+                "date": k,
+                "shop": label,
+                "proposal": note or st,
+                "line": f"{label} — {note or st}",
+                "kind": "sbi_vpoint_follow",
+            }
+        )
+
+    summary = (
+        f"要フォロー {len(follow)}/{len(cl)}: " + " / ".join(short[:4])
+        if follow
+        else f"チェック {len(cl)} 項目OK寄り"
+    )
     return card(
         item_id=meta["id"],
         title=title,
         category=meta.get("category") or "",
         level=level,
-        summary=f"要フォロー {len(follow)}/{len(cl)}" if follow else f"チェック {len(cl)} 項目OK寄り",
-        detail="; ".join(follow[:8]),
+        summary=summary,
+        detail="\n".join(detail_lines),
         cursor_prompt=prompt,
         source=src,
+        payload={"actions": action_items} if action_items else None,
     )
 
 
