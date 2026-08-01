@@ -1,0 +1,55 @@
+# Jarvis ダッシュボード ↔ Notion タスク看板
+# Vercel / ローカルとも NOTION_API_TOKEN（Internal Integration）が必要。
+# MCP は作成・確認用。本番の読み書きは REST API。
+# 対象DBは Integration の「接続」で共有すること。
+
+version: 1
+lanes:
+  properties:
+    title: 所有物件
+    database_id: 25ef6bbe-5a76-80ad-bdd1-e5c378572cac
+    data_source_id: 25ef6bbe-5a76-80bb-92ea-000b6bf56668
+    board_url: https://app.notion.com/p/25ef6bbe5a7680adbdd1e5c378572cac?v=25ef6bbe5a768040870d000c89e6f889
+    title_prop: プロジェクト名
+    status_prop: ステータス
+    due_prop: 終了日
+    start_prop: 開始日
+    initial_status: 未着手
+    open_statuses: ["未着手", "メンバー_進行中", "オーナー_進行中"]
+    done_statuses: ["完了(アーカイブ)", "完了(オーナー確認)"]
+  ai_raimo:
+    title: AI・Raimo
+    database_id: 394f6bbe-5a76-800d-9cef-c97abea7941e
+    data_source_id: 394f6bbe-5a76-8044-b42c-000be7ee6bde
+    board_url: https://app.notion.com/p/394f6bbe5a76800d9cefc97abea7941e?v=394f6bbe5a7680ac9e6f000cb554aa73
+    title_prop: 名前
+    status_prop: ステータス
+    due_prop: null
+    start_prop: null
+    initial_status: 未着手
+    open_statuses: ["未着手", "エージェント待ち", "進行中"]
+    done_statuses: ["完了"]
+  kodate:
+    title: 戸建て
+    database_id: 656aa175-2371-4b14-a704-3aa965b2619a
+    data_source_id: 07abf776-6863-4d10-820a-e62e1b2afc62
+    board_url: https://app.notion.com/p/656aa17523714b14a7043aa965b2619a
+    title_prop: プロジェクト名
+    status_prop: ステータス
+    due_prop: 終了日
+    start_prop: 開始日
+    initial_status: 未着手
+    open_statuses: ["未着手", "進行中"]
+    done_statuses: ["完了"]
+  kamiooya:
+    title: 神大家運営
+    database_id: 03628f50-047d-4308-8c3a-6cb763ceecca
+    data_source_id: b95b5bd1-256a-4e87-9269-430f8ce098ae
+    board_url: https://app.notion.com/p/03628f50047d43088c3a6cb763ceecca
+    title_prop: プロジェクト名
+    status_prop: ステータス
+    due_prop: 終了日
+    start_prop: 開始日
+    initial_status: 未着手
+    open_statuses: ["未着手", "進行中"]
+    done_statuses: ["完了"]

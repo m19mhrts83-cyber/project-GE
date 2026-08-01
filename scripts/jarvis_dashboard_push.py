@@ -247,13 +247,38 @@ def push_other_mail_digest(sb=None) -> int:
     return 0
 
 
-def push_lanes_finance_subscriptions() -> tuple[int, int, int]:
-    """サブプロセスで lanes / finance / subscriptions を集約＋push。失敗しても 0。"""
+def push_openchat_digest() -> int:
+    """815 オプチャ有益ダイジェスト。失敗しても 0。"""
     import subprocess
 
     py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
     exe = str(py) if py.is_file() else sys.executable
-    cards_n = fin_n = sub_n = 0
+    try:
+        r = subprocess.run(
+            [exe, str(REPO / "scripts" / "jarvis_openchat_digest.py"), "--push"],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=180,
+            env=os.environ.copy(),
+        )
+        print(r.stderr or "", file=sys.stderr, end="")
+        print(r.stdout or "", file=sys.stderr, end="")
+        if r.returncode == 0:
+            return 1
+        print(f"# openchat_digest failed rc={r.returncode}", file=sys.stderr)
+    except Exception as e:
+        print(f"# openchat_digest failed: {e}", file=sys.stderr)
+    return 0
+
+
+def push_lanes_finance_subscriptions() -> tuple[int, int, int, int]:
+    """サブプロセスで lanes / finance / subscriptions / occupancy を集約＋push。失敗しても 0。"""
+    import subprocess
+
+    py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+    exe = str(py) if py.is_file() else sys.executable
+    cards_n = fin_n = sub_n = occ_n = 0
     try:
         r = subprocess.run(
             [exe, str(REPO / "scripts" / "jarvis_dashboard_lanes.py"), "--push"],
@@ -293,7 +318,25 @@ def push_lanes_finance_subscriptions() -> tuple[int, int, int]:
             sub_n = 1
     except Exception as e:
         print(f"# subscriptions push failed: {e}", file=sys.stderr)
-    return cards_n, fin_n, sub_n
+    try:
+        r = subprocess.run(
+            [
+                exe,
+                str(REPO / "scripts" / "jarvis_property_occupancy_from_mail.py"),
+                "--push",
+            ],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        print(r.stderr or "", file=sys.stderr, end="")
+        if r.returncode == 0:
+            occ_n = 1
+            print(r.stdout or "", file=sys.stderr, end="")
+    except Exception as e:
+        print(f"# occupancy mail failed: {e}", file=sys.stderr)
+    return cards_n, fin_n, sub_n, occ_n
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -304,24 +347,27 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     sb = client()
-    t = w = digest = 0
+    t = w = digest = oc_digest = 0
     if not args.watch_only:
         t = push_triage(sb)
         digest = push_other_mail_digest(sb)
+        oc_digest = push_openchat_digest()
     if not args.triage_only:
         w = push_watch(sb)
-    cards = finance = subscriptions = 0
+    cards = finance = subscriptions = occupancy = 0
     if args.full or (not args.triage_only and not args.watch_only):
-        cards, finance, subscriptions = push_lanes_finance_subscriptions()
+        cards, finance, subscriptions, occupancy = push_lanes_finance_subscriptions()
     print(
         json.dumps(
             {
                 "triage": t,
                 "watch": w,
                 "other_mail_digest": digest,
+                "openchat_digest": oc_digest,
                 "lanes": cards,
                 "finance": finance,
                 "subscriptions": subscriptions,
+                "occupancy_mail": occupancy,
             },
             ensure_ascii=False,
         )
