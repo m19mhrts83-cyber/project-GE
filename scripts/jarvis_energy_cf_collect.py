@@ -2,12 +2,13 @@
 """
 Jarvis: 電力・太陽光キャッシュフロー収集
 
-  買電: エネワンでんき（サイサン／ポータルワン）— 当面 Zaim バックフィル主
+  買電: エネワンでんき（サイサン／ポータルワン）— Zaim 円＋任意でポータルワン kWh
   売電: 中部電力パワーグリッド（Zaim 0.7太陽光発電、kWh は FIT 単価で推定可）
   ローン: OTHER_LOAN_SOLAR_MONTHLY / Zaim オリコ
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_energy_cf_collect.py
+  python scripts/jarvis_energy_cf_collect.py --fetch-portalone  # 要 PORTALONE_*
   python scripts/jarvis_energy_cf_collect.py --push
   python scripts/jarvis_energy_cf_collect.py --dry-run
 """
@@ -247,21 +248,85 @@ def collect_from_zaim(cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return months
 
 
-def try_portalone_note(cfg: dict[str, Any]) -> dict[str, Any]:
-    """ポータルワン Playwright は認証があるときのみ将来拡張。現状は状態メモのみ。"""
+PORTALONE_STATE = STATE / "energy_portalone.json"
+
+
+def merge_portalone_kwh(months: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """`.jarvis_state/energy_portalone.json` があれば buy_kwh / buy_yen を上書きマージ。"""
+    info: dict[str, Any] = {"merged_months": 0, "path": str(PORTALONE_STATE)}
+    if not PORTALONE_STATE.is_file():
+        info["status"] = "no_cache"
+        return info
+    try:
+        data = json.loads(PORTALONE_STATE.read_text(encoding="utf-8"))
+    except Exception as e:
+        info["status"] = "read_error"
+        info["error"] = str(e)
+        return info
+    portal_months = data.get("months") or {}
+    n = 0
+    for ym, pm in portal_months.items():
+        if not isinstance(pm, dict):
+            continue
+        m = months.setdefault(ym, empty_month())
+        if "sources" not in m or m["sources"] is None:
+            m["sources"] = []
+        if pm.get("buy_kwh") is not None:
+            m["buy_kwh"] = float(pm["buy_kwh"])
+            m["buy_kwh_source"] = "portalone"
+            if "portalone_kwh" not in m["sources"]:
+                m["sources"].append("portalone_kwh")
+            n += 1
+        if pm.get("buy_yen") is not None and m.get("buy_yen") is None:
+            m["buy_yen"] = float(pm["buy_yen"])
+            m["buy_yen_source"] = "portalone"
+            if "portalone_yen" not in m["sources"]:
+                m["sources"].append("portalone_yen")
+        months[ym] = finalize_month(m)
+    info["status"] = "merged" if n else "empty_cache"
+    info["merged_months"] = n
+    info["fetched_at"] = data.get("fetched_at")
+    info["ok"] = data.get("ok")
+    return info
+
+
+def try_portalone_note(cfg: dict[str, Any], merge_info: dict[str, Any] | None = None) -> dict[str, Any]:
+    """ポータルワン: 認証があれば fetch 可。キャッシュがあれば kWh マージ済み。"""
     retail = cfg.get("retail") or {}
     user_k = retail.get("env_user") or "PORTALONE_USER"
     pass_k = retail.get("env_password") or "PORTALONE_PASSWORD"
     has = bool(os.environ.get(user_k) and os.environ.get(pass_k))
+    mi = merge_info or {}
+    if not has:
+        fetch = "skipped_no_credentials"
+        note = (
+            "kWh は PORTALONE_USER/PASSWORD 追記後に "
+            "`jarvis_energy_portalone_fetch.py` → collect で埋める。"
+            "当面 Zaim で円のみ（売電 kWh は FIT 推定）"
+        )
+    elif mi.get("merged_months"):
+        fetch = "merged_from_cache"
+        note = f"ポータルワンキャッシュから {mi['merged_months']}ヶ月の buy_kwh を反映"
+    elif PORTALONE_STATE.is_file():
+        fetch = "cache_present_no_kwh"
+        note = "ポータルワンキャッシュありだが kWh なし（画面パース要調整の可能性）"
+    else:
+        fetch = "ready_run_fetch"
+        note = "認証あり。`python scripts/jarvis_energy_portalone_fetch.py` を実行してから collect"
     return {
         "portalone_credentials": "present" if has else "missing",
-        "portalone_fetch": "skipped_no_credentials" if not has else "not_implemented_yet",
-        "note": "kWh はポータルワン実装後に埋める。当面 Zaim で円のみ（売電 kWh は FIT 推定）",
+        "portalone_fetch": fetch,
+        "portalone_merge": mi,
+        "note": note,
     }
 
 
-def build_state(cfg: dict[str, Any], months: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    portal = try_portalone_note(cfg)
+def build_state(
+    cfg: dict[str, Any],
+    months: dict[str, dict[str, Any]],
+    merge_info: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    portal = try_portalone_note(cfg, merge_info)
     fit = cfg.get("fit") or {}
     thr = cfg.get("thresholds") or {}
     # level
@@ -339,7 +404,7 @@ def build_state(cfg: dict[str, Any], months: dict[str, dict[str, Any]]) -> dict[
         },
         "portal": portal,
         "last_fetch_at": now_iso(),
-        "source": "zaim+env",
+        "source": "zaim+env+portalone_cache",
         "months": {k: months[k] for k in sorted(months)},
     }
 
@@ -414,19 +479,52 @@ def refresh_situation_watch() -> None:
     )
 
 
+def run_portalone_fetch(*, headed: bool = False) -> int:
+    cmd = [sys.executable, str(REPO / "scripts" / "jarvis_energy_portalone_fetch.py")]
+    if headed:
+        cmd.append("--headed")
+    return subprocess.run(cmd, cwd=str(REPO), check=False).returncode
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--push", action="store_true", help="Supabase metrics upsert")
     ap.add_argument("--no-watch", action="store_true")
+    ap.add_argument(
+        "--fetch-portalone",
+        action="store_true",
+        help="Playwright でポータルワン取得してから Zaim とマージ（要 PORTALONE_*）",
+    )
+    ap.add_argument("--headed", action="store_true", help="--fetch-portalone 時にブラウザ表示")
     args = ap.parse_args(argv)
+
+    if args.fetch_portalone:
+        rc = run_portalone_fetch(headed=args.headed)
+        if rc == 2:
+            print("# portalone: credentials missing — Zaim のみ続行", file=sys.stderr)
+        elif rc != 0:
+            print(f"# portalone fetch rc={rc} — キャッシュがあればマージ継続", file=sys.stderr)
 
     cfg = load_cfg()
     months = collect_from_zaim(cfg)
-    state = build_state(cfg, months)
+    merge_info = merge_portalone_kwh(months)
+    state = build_state(cfg, months, merge_info)
 
     if args.dry_run:
-        print(json.dumps({"summary": state.get("summary"), "months": len(months), "level": state.get("level")}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {
+                    "summary": state.get("summary"),
+                    "months": len(months),
+                    "level": state.get("level"),
+                    "portal": state.get("portal"),
+                    "fit": state.get("fit"),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         print(json.dumps({k: months[k] for k in sorted(months)[-3:]}, ensure_ascii=False, indent=2))
         return 0
 

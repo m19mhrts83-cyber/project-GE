@@ -31,11 +31,11 @@ sell:
   fit_yen_per_kwh: 16.0
 
 fit:
-  # 手更新。改定が近づいたら situation watch が attention
+  # 住宅用FIT 10年。改定が近づいたら situation watch が attention
   current_yen_per_kwh: 16.0
-  start_ym: ""          # 例: 2016-08（分かったら記入）
-  stepdown_ym: ""       # 10年後改定月（分かったら記入）
-  note: "Zaim売電額が16円/kWhで整合。正式なFIT契約単価・開始日は契約書で確認して更新"
+  start_ym: "2024-07"     # 売電開始日 2024-07-22（ヒラソル案内／設置費用報告の運転開始日）
+  stepdown_ym: "2034-07"  # 受給開始から約10年後（要・契約書で最終確認）
+  note: "ヒラソル8.16kW。売電開始2024-07-22。Zaim売電額が16円/kWhで整合。単価の正は設備認定・特定契約"
 
 loan:
   lender: オリコ
