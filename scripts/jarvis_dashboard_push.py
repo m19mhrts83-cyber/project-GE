@@ -128,11 +128,10 @@ def push_triage(sb) -> int:
         on_conflict="key",
     ).execute()
     sb.table("sync_meta").upsert(
-        {"key": "mac_triage_pushed_at", "value": now_iso(), "updated_at": now_iso()},
-        on_conflict="key",
-    ).execute()
-    sb.table("sync_meta").upsert(
-        {"key": "triage_source", "value": "mac", "updated_at": now_iso()},
+        [
+            {"key": "mac_triage_pushed_at", "value": now_iso(), "updated_at": now_iso()},
+            {"key": "triage_source", "value": "mac", "updated_at": now_iso()},
+        ],
         on_conflict="key",
     ).execute()
     print(f"# triage upserted {n}", file=sys.stderr)
@@ -189,7 +188,10 @@ def push_watch(sb) -> int:
         return 0
     sb.table("watch_status").upsert(rows, on_conflict="id").execute()
     sb.table("sync_meta").upsert(
-        {"key": "watch_pushed_at", "value": now_iso(), "updated_at": now_iso()},
+        [
+            {"key": "watch_pushed_at", "value": now_iso(), "updated_at": now_iso()},
+            {"key": "watch_source", "value": "mac", "updated_at": now_iso()},
+        ],
         on_conflict="key",
     ).execute()
     print(f"# watch upserted {len(rows)}", file=sys.stderr)

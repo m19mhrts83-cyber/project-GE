@@ -31,9 +31,35 @@ https://jarvis-dashboard-amber.vercel.app/
 
 | 経路 | 内容 |
 |---|---|
-| Mac | パートナー MD・CHRLINE・フル夜間トリアージ → push |
-| GHA | admin Gmail 未返信候補 → `triage_items`（`jarvis-dashboard-gmail-triage.yml`） |
+| Mac | パートナー MD・CHRLINE・フル夜間トリアージ・状況ウォッチ全文 → push |
+| GHA Gmail | admin INBOX 未返信候補 → `triage_items`（`jarvis-dashboard-gmail-triage.yml`） |
+| GHA Watch | 収集鮮度・WeStudy CI など API 完結項目 → `watch_status`（`jarvis-dashboard-situation-watch.yml`） |
 | 表示 | 本 Vercel アプリ（取得経路・Mac/GHA 時刻を概要に表示） |
+
+### OneDrive Graph（Phase 3c・骨格）
+
+原本は OneDrive。クラウド収集・エージェントは `scripts/jarvis_onedrive_graph.py` 経由で読む想定。
+
+1. Azure Portal でアプリ登録（クライアント資格情報）
+2. API アクセス許可: `Files.Read.All`（Application）＋管理者同意
+3. `.env.jarvis_private` に `MS_GRAPH_TENANT_ID` / `CLIENT_ID` / `CLIENT_SECRET` / `USER_UPN`（または `DRIVE_ID`）
+4. 確認: `python scripts/jarvis_onedrive_graph.py --dry-run` → `graph_configured: true`
+5. パス例は `config/onedrive_graph.example.yaml`
+
+未設定時は Mac のローカル CloudStorage パスへフォールバック（クラウドでは読めない）。
+
+### Auth Site URL
+
+パスワードログインは現状どおり可。OAuth／マジックリンク用に揃えるなら:
+
+```bash
+# Access Token（Dashboard → Account → Access Tokens）を jarvis_private の SUPABASE_ACCESS_TOKEN へ
+python scripts/jarvis_supabase_auth_urls.py
+```
+
+403 のときは手動: [URL Configuration](https://supabase.com/dashboard/project/idkdqneutpvkhxhpjtgc/auth/url-configuration)  
+Site URL = `https://jarvis-dashboard-amber.vercel.app`、Redirect に `/auth/callback` と localhost:3001。
+
 
 ## Vercel デプロイ（Phase 3・iPhone 閲覧）
 
