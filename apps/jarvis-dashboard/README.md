@@ -98,8 +98,9 @@ Site URL = `https://jarvis-dashboard-amber.vercel.app`、Redirect に `/auth/cal
 1. Vercel にログインし、ルートを `apps/jarvis-dashboard` にして import
 2. Environment Variables:
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`（**`sb_publishable_…`**。Legacy anon JWT は disabled → `Legacy API keys are disabled`）
    - `NEXT_PUBLIC_SITE_URL` = 本番 URL（例 `https://….vercel.app`）
+   - （送信・見直し）`GMAIL_CREDENTIALS_B64` / `GMAIL_ESTATE_TOKEN_B64` / 任意 `GEMINI_API_KEY`（サーバー専用）
 3. Supabase Auth → URL Configuration:
    - Site URL = 本番 URL
    - Redirect URLs に `https://….vercel.app/auth/callback` を追加（ローカルも残す）

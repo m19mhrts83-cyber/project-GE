@@ -3,6 +3,9 @@
 -- 適用: Supabase MCP apply_migration / SQL Editor
 
 -- triage_items: 夜間トリアージ queue 相当
+-- status: pending(未読) / sent(送信済み) / skipped / snoozed(後で) / done(旧・互換)
+-- payload 例: draft_gemini, draft_cursor, sent_at, gmail_sent_id,
+--   yoritoori_appended, web_draft_saved_at
 create table if not exists public.triage_items (
   id text primary key,
   lane text not null default 'partner',

@@ -138,7 +138,7 @@ ok はホームに出さず、`/situation` で全体確認。
 
 1. Mac 起床後、必要なら本番 URL またはローカルが開く
 2. `/situation` で attention／warn を眺める
-3. パートナー返信は Cursor に「下書きを送って」（ダッシュボードから直接送らない）
+3. パートナー返信は画面上で下書き編集→確認後送信（または Cursor に依頼）。送信後は `sent`、やり取りは OneDrive 正本
 
 ### データの流れ（典型）
 
@@ -187,13 +187,16 @@ python scripts/jarvis_notebooklm_workbench_open.py
 | Zaim 集計 | 「含める／含めない」のルール違反も検知。アオキはクレカ除外が正と判明 |
 | Zaim 修正 | アプリではなく **Web＋Playwright**。ユーザーが「こう直して」＋承認後のみ |
 | 資料更新 | 検証→変更蓄積→本 MD／NotebookLM ソースを更新するサイクル |
-| ホーム | PC起動でパッと見る。要確認3色＋メールざっと見→クリックで詳細 |
+| ホーム | PC起動でパッと見る。要確認3色＋メールざっと見→`/mail/[id]` 詳細 |
+| ホーム見た目 | **Soft Card**（余白・角丸・左ボーダー）。BI風巨大KPIは不採用 |
 
 ### 実装コミット（参考）
 
 - `ed70b47` NotebookLM 作業セット
 - `2915142` 課金／SaaS `/billing`
 - `f9c9a07` Zaim 品質ウォッチ＋Web 直し導線
+- `5aa5cee` ホーム＝要確認3色＋メールざっと見→詳細
+- `0c54388` Soft Card トーン磨き
 
 ---
 
@@ -201,12 +204,13 @@ python scripts/jarvis_notebooklm_workbench_open.py
 
 ### 検証しながら直す候補
 
-1. **Zaim Web apply のセレクタ** — 初回実適用で UI 差分が出やすい。スクショは `zaim_budget_sync/screenshots/money_edit/`
-2. **Zaim CSV 鮮度** — 現状エクスポートが 2026-06-27 まで。再取得後に検知件数が変わる
-3. **Amazon 二重経路** — ルールは YAML 済み。実データでのヒット頻度を見る
-4. **オリコ must_include** — 「含めない」になった月を見逃さないか
-5. **課金 YAML の金額** — Cursor Usage・年額換算の手メンテ負荷
-6. **Vercel／Supabase 実額** — 今は Free 注視のみ。請求が出たら YAML を更新
+1. **ホーム Soft Card** — 実利用で余白・色の強さ・メール並びを微調整
+2. **Zaim Web apply のセレクタ** — 初回実適用で UI 差分が出やすい。スクショは `zaim_budget_sync/screenshots/money_edit/`
+3. **Zaim CSV 鮮度** — 現状エクスポートが 2026-06-27 まで。再取得後に検知件数が変わる
+4. **Amazon 二重経路** — ルールは YAML 済み。実データでのヒット頻度を見る
+5. **オリコ must_include** — 「含めない」になった月を見逃さないか
+6. **課金 YAML の金額** — Cursor Usage・年額換算の手メンテ負荷
+7. **Vercel／Supabase 実額** — 今は Free 注視のみ。請求が出たら YAML を更新
 
 ### アプリ化・引き継ぎで考える軸（DX50／神大家向け）
 

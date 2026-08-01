@@ -36,17 +36,13 @@ export async function setWatchStatus(
   revalidatePath(path);
 }
 
+/** @deprecated use app/actions/triage.ts — 互換のため残す */
 export async function setTriageStatus(
   id: string,
-  next: "pending" | "done",
+  next: "pending" | "done" | "sent" | "skipped" | "snoozed",
   path: string
 ) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("triage_items")
-    .update({ status: next, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-  revalidatePath(path);
-  revalidatePath("/");
+  const { setTriageStatus: setStatus } = await import("./triage");
+  const r = await setStatus(id, next, path);
+  if (!r.ok) throw new Error(r.error);
 }

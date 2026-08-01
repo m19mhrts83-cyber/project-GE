@@ -31,6 +31,20 @@ def main() -> int:
     print(f"# pending={n}" + (f" ({hint})" if hint else ""))
     opened, msg = open_dashboard_browser(force=args.force, dry_run=args.dry_run)
     print(f"# {msg}")
+    # Web 送信済み → OneDrive やり取り追記（未処理分）
+    if not args.dry_run:
+        try:
+            from pathlib import Path
+            import subprocess
+
+            catchup = Path(__file__).resolve().parent / "jarvis_triage_yoritoori_catchup.py"
+            if catchup.is_file():
+                subprocess.run(
+                    [sys.executable, str(catchup)],
+                    check=False,
+                )
+        except Exception as e:
+            print(f"# yoritoori catchup skipped: {e}", file=sys.stderr)
     # スキップは正常（0件・本日済・時間外）
     return 0
 

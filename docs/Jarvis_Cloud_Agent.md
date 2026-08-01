@@ -25,7 +25,7 @@
 | 見る | https://jarvis-dashboard-amber.vercel.app/ |
 | 対話・推敲 | Cloud Agent（本線）。会話で下書きを直す |
 | 送信（理想） | **Cloud 上で確認後に送る**（Gmail API／yoritoori 相当。対外送信前確認は維持） |
-| 送信（当面・フォールバック） | 未配線や失敗時は **Mac の yoritoori**。**Vercel Web 画面からは送らない** |
+| 送信（当面） | **Vercel パートナー画面**（確認後）／Cloud `jarvis_cloud_gmail_send.py`。失敗・未配線時は **Mac の yoritoori**。無確認の自動送信はしない |
 
 ## 下書き〜送信の理想フロー（2026-08 追記）
 
@@ -33,7 +33,7 @@
 
 1. **基本はクラウドで完結** — 下書きを Cloud Agent と会話しながら見直し、その場で送れるなら送る  
 2. **送れない／制限で止まったらローカル** — 従来どおり Mac の Cursor／`yoritoori_send.py`  
-3. **Web ダッシュボードからのワンクリック送信はしない**（誤送信防止。表示・対応済み操作のみ）
+3. **Web ダッシュボードは確認モーダル後のみ送信可**（無確認のワンクリック送信はしない。正本ログは OneDrive `5.やり取り.md`）
 
 技術メモ: Gmail API＋token（Secrets）があれば Cloud Agent から送信可能。対外送信前確認・`--via` 確認は Mac と同じ。
 

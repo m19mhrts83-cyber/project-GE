@@ -17,7 +17,8 @@ Jarvis: Cloud Agent / CI 向け Gmail 送信（対外送信前確認必須）
   GMAIL_CREDENTIALS_B64 + GMAIL_ESTATE_TOKEN_B64 または GMAIL_M19M_TOKEN_B64
   なければ 215 マニュアルの credentials.json + token_estate.json / token_m19m.json
 
-※ Vercel Web からは呼ばない。admin token では送らない（対外 From は estate/m19m）。
+※ 対外送信は **確認後のみ**（Vercel パートナー画面の確認モーダル、または本スクリプトの `--i-confirm-send`）。admin token では送らない（対外 From は estate/m19m）。
+送信後は triage status=`sent`。OneDrive 追記は `jarvis_triage_yoritoori_catchup.py`。
 """
 from __future__ import annotations
 
@@ -213,6 +214,32 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(json.dumps({"ok": True, **result}, ensure_ascii=False))
     print("# sent", file=sys.stderr)
+    if args.from_triage:
+        try:
+            from supabase import create_client
+
+            url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
+            key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+            if url and key:
+                sb = create_client(url, key)
+                it = load_triage(args.from_triage)
+                payload = dict(it.get("payload") or {}) if isinstance(it.get("payload"), dict) else {}
+                from datetime import datetime, timezone
+
+                payload["sent_at"] = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+                payload["gmail_sent_id"] = result.get("id")
+                payload["yoritoori_appended"] = False
+                sb.table("triage_items").update(
+                    {
+                        "status": "sent",
+                        "draft_text": body,
+                        "payload": payload,
+                        "updated_at": payload["sent_at"],
+                    }
+                ).eq("id", args.from_triage).execute()
+                print("# triage status=sent", file=sys.stderr)
+        except Exception as e:
+            print(f"# triage status update skipped: {e}", file=sys.stderr)
     return 0
 
 
