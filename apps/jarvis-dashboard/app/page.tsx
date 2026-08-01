@@ -69,16 +69,11 @@ export default async function HomePage() {
   const partnerMails = mails.filter((m) => m.lane === "partner");
   const otherMails = mails.filter((m) => m.lane !== "partner");
 
-  const mailCounts = { attention: 0, warn: 0, info: 0 };
-  for (const m of mails) {
-    mailCounts[mailPriorityToLevel(m.priority)] += 1;
-  }
-
   return (
     <Shell active="/">
       <h1>ホーム</h1>
       <p className="sub">
-        PC起動時にパッと見る画面。まずパートナー未読、次に状況ウォッチ、下でその他メール。
+        メール（返信・確認）と状況ウォッチ（仕組みの健康診断）を分けて表示します。
         カードや行をタップすると詳細へ。
       </p>
 
@@ -112,152 +107,166 @@ export default async function HomePage() {
         </span>
       </div>
 
-      <div className="stats home-stats">
-        <div className="stat level-attention">
-          パートナー未読 <strong>{partnerMails.length}</strong>
+      <div className="home-band home-band-mail">
+        <div className="home-band-head">
+          <h2 className="home-band-title">メール</h2>
+          <p className="home-band-sub">
+            パートナー未読 {partnerMails.length} · その他{" "}
+            {otherMails.length}
+          </p>
         </div>
-        <div className="stat level-attention">
-          要確認 <strong>{counts.attention + mailCounts.attention}</strong>
-        </div>
-        <div className="stat level-warn">
-          注意 <strong>{counts.warn + mailCounts.warn}</strong>
-        </div>
-        <div className="stat">
-          メール pending <strong>{mails.length}</strong>
-        </div>
+
+        <section className="home-section">
+          <div className="home-section-head">
+            <h3>パートナー（未読）</h3>
+            <a href="/partner" className="home-more">
+              レーンへ →
+            </a>
+          </div>
+          {partnerMails.length === 0 ? (
+            <p className="empty">パートナーの未読はありません</p>
+          ) : (
+            <div className="watch-grid">
+              {partnerMails.map((it) => {
+                const level = mailPriorityToLevel(it.priority);
+                const who = it.partner || it.from_email || "—";
+                const oneLine = (it.summary || "").replace(/\s+/g, " ").trim();
+                return (
+                  <a
+                    key={it.id}
+                    href={`/mail/${encodeURIComponent(it.id)}`}
+                    className={`card watch-card home-partner-card level-${level}`}
+                  >
+                    <header>
+                      <span className="lvl">{LEVEL_LABEL[level]}</span>
+                      <strong title={who}>{who}</strong>
+                      {it.received_at ? (
+                        <span className="meta">{it.received_at}</span>
+                      ) : null}
+                    </header>
+                    <p className="mail-subject home-partner-subject">
+                      {it.subject || "（件名なし）"}
+                    </p>
+                    {oneLine ? <p className="sum">{oneLine}</p> : null}
+                    {it.folder ? <p className="meta">{it.folder}</p> : null}
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="home-section">
+          <div className="home-section-head">
+            <h3>その他メール</h3>
+            <span className="meta">クリックで詳細</span>
+          </div>
+          {otherMails.length === 0 ? (
+            <p className="empty">パートナー以外の未読はありません</p>
+          ) : (
+            <ul className="mail-skim">
+              {otherMails.map((it) => {
+                const level = mailPriorityToLevel(it.priority);
+                const who = it.partner || it.from_email || "—";
+                const oneLine = (it.summary || "").replace(/\s+/g, " ").trim();
+                return (
+                  <li key={it.id}>
+                    <a
+                      href={`/mail/${encodeURIComponent(it.id)}`}
+                      className={`mail-row level-${level}`}
+                    >
+                      <span className="lvl">{LEVEL_LABEL[level]}</span>
+                      <span className="mail-row-main">
+                        <span className="mail-row-top">
+                          <strong>{who}</strong>
+                          <span className="meta">
+                            {laneLabel(it.lane)}
+                            {it.received_at ? ` · ${it.received_at}` : ""}
+                          </span>
+                        </span>
+                        <span className="mail-subject">
+                          {it.subject || "（件名なし）"}
+                        </span>
+                        {oneLine ? (
+                          <span className="mail-preview">{oneLine}</span>
+                        ) : null}
+                      </span>
+                      <span className="mail-chevron" aria-hidden>
+                        ›
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="home-lane-links">
+            レーン別:{" "}
+            <a href="/partner">パートナー</a>
+            {" · "}
+            <a href="/openchat">オプチャ</a>
+            {" · "}
+            <a href="/general">それ以外</a>
+          </p>
+        </section>
       </div>
 
-      <section className="home-section">
-        <div className="home-section-head">
-          <h2>パートナー（未読）</h2>
-          <a href="/partner" className="home-more">
-            レーンへ →
-          </a>
+      <div className="home-band home-band-watch">
+        <div className="home-band-head">
+          <h2 className="home-band-title">状況ウォッチ</h2>
+          <p className="home-band-sub">仕組み・還元・同期などの健康診断</p>
         </div>
-        {partnerMails.length === 0 ? (
-          <p className="empty">パートナーの未読はありません</p>
-        ) : (
-          <div className="watch-grid">
-            {partnerMails.map((it) => {
-              const level = mailPriorityToLevel(it.priority);
-              const who = it.partner || it.from_email || "—";
-              const oneLine = (it.summary || "").replace(/\s+/g, " ").trim();
-              return (
-                <a
-                  key={it.id}
-                  href={`/mail/${encodeURIComponent(it.id)}`}
-                  className={`card watch-card home-partner-card level-${level}`}
-                >
-                  <header>
-                    <span className="lvl">{LEVEL_LABEL[level]}</span>
-                    <strong title={who}>{who}</strong>
-                    {it.received_at ? (
-                      <span className="meta">{it.received_at}</span>
-                    ) : null}
-                  </header>
-                  <p className="mail-subject home-partner-subject">
-                    {it.subject || "（件名なし）"}
-                  </p>
-                  {oneLine ? <p className="sum">{oneLine}</p> : null}
-                  {it.folder ? <p className="meta">{it.folder}</p> : null}
-                </a>
-              );
-            })}
-          </div>
-        )}
-      </section>
 
-      <section className="home-section">
-        <div className="home-section-head">
-          <h2>要確認（状況ウォッチ）</h2>
-          <a href="/situation" className="home-more">
-            すべて →
-          </a>
-        </div>
-        {watchNeed.length === 0 ? (
-          <p className="empty">
-            いま要注意の項目はありません（ok のみ、または未 push）
-          </p>
-        ) : (
-          <div className="watch-grid">
-            {watchNeed.map((it) => {
-              const level = (
-                ["attention", "warn", "info"].includes(it.level)
-                  ? it.level
-                  : "info"
-              ) as HomeLevel;
-              return (
-                <a
-                  key={it.id}
-                  href="/situation"
-                  className={`card watch-card level-${level}`}
-                >
-                  <header>
-                    <span className="lvl">{LEVEL_LABEL[level]}</span>
-                    <strong title={it.title}>{it.title}</strong>
-                  </header>
-                  <p className="sum">{it.summary}</p>
-                  {it.source ? <p className="meta">{it.source}</p> : null}
-                </a>
-              );
-            })}
+        <div className="stats home-stats">
+          <div className="stat level-attention">
+            要確認 <strong>{counts.attention}</strong>
           </div>
-        )}
-      </section>
-
-      <section className="home-section">
-        <div className="home-section-head">
-          <h2>その他メール（ざっと見る）</h2>
-          <span className="meta">クリックで詳細</span>
+          <div className="stat level-warn">
+            注意 <strong>{counts.warn}</strong>
+          </div>
+          <div className="stat level-info">
+            参考 <strong>{counts.info}</strong>
+          </div>
         </div>
-        {otherMails.length === 0 ? (
-          <p className="empty">パートナー以外の pending はありません</p>
-        ) : (
-          <ul className="mail-skim">
-            {otherMails.map((it) => {
-              const level = mailPriorityToLevel(it.priority);
-              const who = it.partner || it.from_email || "—";
-              const oneLine = (it.summary || "").replace(/\s+/g, " ").trim();
-              return (
-                <li key={it.id}>
+
+        <section className="home-section">
+          <div className="home-section-head">
+            <h3>要フォロー</h3>
+            <a href="/situation" className="home-more">
+              すべて →
+            </a>
+          </div>
+          {watchNeed.length === 0 ? (
+            <p className="empty">
+              いま要注意の項目はありません（ok のみ、または未 push）
+            </p>
+          ) : (
+            <div className="watch-grid">
+              {watchNeed.map((it) => {
+                const level = (
+                  ["attention", "warn", "info"].includes(it.level)
+                    ? it.level
+                    : "info"
+                ) as HomeLevel;
+                return (
                   <a
-                    href={`/mail/${encodeURIComponent(it.id)}`}
-                    className={`mail-row level-${level}`}
+                    key={it.id}
+                    href="/situation"
+                    className={`card watch-card level-${level}`}
                   >
-                    <span className="lvl">{LEVEL_LABEL[level]}</span>
-                    <span className="mail-row-main">
-                      <span className="mail-row-top">
-                        <strong>{who}</strong>
-                        <span className="meta">
-                          {laneLabel(it.lane)}
-                          {it.received_at ? ` · ${it.received_at}` : ""}
-                        </span>
-                      </span>
-                      <span className="mail-subject">
-                        {it.subject || "（件名なし）"}
-                      </span>
-                      {oneLine ? (
-                        <span className="mail-preview">{oneLine}</span>
-                      ) : null}
-                    </span>
-                    <span className="mail-chevron" aria-hidden>
-                      ›
-                    </span>
+                    <header>
+                      <span className="lvl">{LEVEL_LABEL[level]}</span>
+                      <strong title={it.title}>{it.title}</strong>
+                    </header>
+                    <p className="sum">{it.summary}</p>
+                    {it.source ? <p className="meta">{it.source}</p> : null}
                   </a>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <p className="home-lane-links">
-          レーン別:{" "}
-          <a href="/partner">パートナー</a>
-          {" · "}
-          <a href="/openchat">オプチャ</a>
-          {" · "}
-          <a href="/general">それ以外</a>
-        </p>
-      </section>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
 
       <details className="home-meta">
         <summary>同期情報（詳細）</summary>
