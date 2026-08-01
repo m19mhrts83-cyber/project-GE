@@ -4,6 +4,7 @@ import Shell from "@/components/Shell";
 import DraftWorkbench from "@/components/DraftWorkbench";
 import TriageStatusActions from "@/components/TriageStatusActions";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
+import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import {
   LEVEL_LABEL,
   laneHref,
@@ -34,6 +35,15 @@ export default async function MailDetailPage({
   const path = `/mail/${it.id}`;
   const gmailReady = gmailSendConfigured();
   const st = it.status as TriageStatus;
+  const resolved = resolvePartnerToEmail({
+    fromEmail: it.from_email,
+    partner: it.partner,
+    folder: it.folder,
+    payload:
+      it.payload && typeof it.payload === "object"
+        ? (it.payload as Record<string, unknown>)
+        : null,
+  });
 
   return (
     <Shell active="/">
@@ -82,10 +92,14 @@ export default async function MailDetailPage({
           path={path}
           subject={it.subject}
           toEmail={it.from_email}
+          partner={it.partner}
+          folder={it.folder}
           draftText={it.draft_text}
           payload={it.payload}
           status={it.status}
           gmailReady={gmailReady}
+          resolvedTo={resolved.to}
+          toSource={resolved.source}
         />
       </article>
     </Shell>

@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "partners": [
+    {
+      "name": "ホームプランナー",
+      "folder": "101_ホームプランナー",
+      "emails": [
+        "suzuki@homeplanner.co.jp"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "ミニテック",
+      "folder": "102_ミニテック",
+      "emails": [
+        "tomoki-hayashi@minitech.co.jp",
+        "hayashi@minitech.co.jp"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "LEAF",
+      "folder": "104_LEAF",
+      "emails": [
+        "ngy_fudousan@leaf-eco.com",
+        "ngy_kanri@leaf-eco.com"
+      ],
+      "phones": [
+        "09083228551",
+        "090-8322-8551",
+        "+819083228551"
+      ],
+      "via_ambiguous": true
+    },
+    {
+      "name": "立木",
+      "folder": "205_立木",
+      "emails": [],
+      "phones": [
+        "080-4140-9026"
+      ],
+      "via_ambiguous": false
+    },
+    {
+      "name": "神大家運営回答",
+      "folder": "809_神大家運営回答",
+      "emails": [
+        "kami.ooyasan-club@ooya.academy"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "SHIFT AI代理店",
+      "folder": "908_SHIFT AI代理店",
+      "emails": [
+        "yitagaki@shift-ai.co.jp"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "Workstyle-evolution代理店",
+      "folder": "914_Workstyle-evolution代理店",
+      "emails": [
+        "k.miyamoto@g.workstyle-evolution.co.jp"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "水田塾",
+      "folder": "710_水田塾",
+      "emails": [],
+      "phones": [
+        "09014188136",
+        "090-1418-8136",
+        "+819014188136"
+      ],
+      "via_ambiguous": false
+    },
+    {
+      "name": "グッドウィン",
+      "folder": "311_グッドウィン",
+      "emails": [
+        "RJS30_8080@aioinissaydowa.co.jp"
+      ],
+      "phones": [
+        "09033005040",
+        "090-3300-5040",
+        "+819033005040"
+      ],
+      "via_ambiguous": true
+    },
+    {
+      "name": "Newtus",
+      "folder": "312_Newtus",
+      "emails": [
+        "t-naito@newtus.com"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "アイリック",
+      "folder": "313_アイリック",
+      "emails": [
+        "tomohito_oishi@irrc.co.jp"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "日本総険",
+      "folder": "317_日本総険",
+      "emails": [
+        "ayanori.shimizu@iba-ns.co.jp"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "Kneesbee税理士法人",
+      "folder": "419_Kneesbee税理士法人",
+      "emails": [
+        "t.ohno@knees-bee.jp",
+        "t.ohno.sogou@gmail.com"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    },
+    {
+      "name": "名古屋銀行",
+      "folder": "516_名古屋銀行",
+      "emails": [
+        "koshino_masashi@ex.meigin.co.jp"
+      ],
+      "phones": [
+        "08096617311",
+        "080-9661-7311",
+        "+818096617311"
+      ],
+      "via_ambiguous": true
+    },
+    {
+      "name": "Grandole志賀本通I入居者",
+      "folder": "618_Grandole志賀本通I_入居者",
+      "emails": [
+        "yuumee.jee@gmail.com"
+      ],
+      "phones": [],
+      "via_ambiguous": false
+    }
+  ]
+}

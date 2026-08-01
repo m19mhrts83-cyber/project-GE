@@ -153,6 +153,7 @@ export async function sendTriageAfterConfirm(
   draftText: string,
   path: string,
   confirmed: boolean,
+  toOverride?: string,
 ): Promise<TriageActionResult & { from?: string }> {
   if (confirmed !== true) {
     return { ok: false, error: "送信確認が必要です" };
@@ -176,11 +177,20 @@ export async function sendTriageAfterConfirm(
   if (fetchErr) return { ok: false, error: fetchErr.message };
   if (!it) return { ok: false, error: "対象が見つかりません" };
 
-  const to = String(it.from_email || "").trim();
+  const { resolvePartnerToEmail } = await import("@/lib/partnerContacts");
+  const override = String(toOverride || "").trim();
+  const resolved = resolvePartnerToEmail({
+    fromEmail: override || it.from_email,
+    partner: it.partner,
+    folder: it.folder,
+    payload: asPayload(it.payload),
+  });
+  const to = override || resolved.to;
   if (!to) {
     return {
       ok: false,
-      error: "宛先（from_email）が空です。Mac 側で連絡先を確認してください。",
+      error:
+        "宛先が未設定です。連絡先一覧にメールが無いか、チャットで宛先を指定してください（従来どおり yoritoori でも可）。",
     };
   }
   let subject = String(it.subject || "").trim() || "（件名なし）";
@@ -199,12 +209,15 @@ export async function sendTriageAfterConfirm(
     payload.gmail_sent_thread_id = sent.threadId || it.gmail_thread_id;
     payload.yoritoori_appended = false;
     payload.web_draft_saved_at = new Date().toISOString();
+    payload.sent_to = to;
+    payload.to_source = resolved.source;
 
     const { error } = await supabase
       .from("triage_items")
       .update({
         status: "sent",
         draft_text: body,
+        from_email: it.from_email || to,
         payload,
         updated_at: new Date().toISOString(),
       })

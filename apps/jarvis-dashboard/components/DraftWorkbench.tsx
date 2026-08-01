@@ -20,10 +20,14 @@ type Props = {
   path: string;
   subject: string | null;
   toEmail: string | null;
+  partner?: string | null;
+  folder?: string | null;
   draftText: string | null;
   payload: Payload | null | unknown;
   status: string;
   gmailReady: boolean;
+  resolvedTo?: string;
+  toSource?: string;
 };
 
 type Tab = "edit" | "gemini" | "cursor";
@@ -33,18 +37,24 @@ export default function DraftWorkbench({
   path,
   subject,
   toEmail,
+  partner,
+  folder,
   draftText,
   payload,
   status,
   gmailReady,
+  resolvedTo,
+  toSource,
 }: Props) {
   const router = useRouter();
   const pl = (payload && typeof payload === "object" ? payload : {}) as Payload;
   const gemini = (pl.draft_gemini || "").trim();
   const cursor = (pl.draft_cursor || "").trim();
 
+  const initialTo = (resolvedTo || toEmail || "").trim();
   const [tab, setTab] = useState<Tab>("edit");
   const [draft, setDraft] = useState(draftText || "");
+  const [to, setTo] = useState(initialTo);
   const [instruction, setInstruction] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -67,8 +77,10 @@ export default function DraftWorkbench({
     const block = [
       "【ローカル Cursor 用】パートナー返信の見直し",
       `id: ${id}`,
-      `To: ${toEmail || "（未設定）"}`,
+      `To: ${to || toEmail || "（未設定）"}`,
       `Subject: ${previewSubject}`,
+      partner ? `partner: ${partner}` : "",
+      folder ? `folder: ${folder}` : "",
       instruction.trim() ? `見直し指示: ${instruction.trim()}` : "",
       "----- 下書き -----",
       draft,
@@ -119,6 +131,23 @@ export default function DraftWorkbench({
         rows={12}
         placeholder="返信下書き"
       />
+
+      <label className="draft-instruction-label">
+        宛先 To
+        <input
+          className="draft-instruction"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="例: suzuki@homeplanner.co.jp"
+        />
+      </label>
+      {!initialTo ? (
+        <p className="draft-err">
+          宛先が未設定でした。連絡先から補完できない場合は手入力するか、チャットで送付先を指定してください。
+        </p>
+      ) : toSource === "contacts" ? (
+        <p className="draft-hint">宛先は連絡先一覧から補完（{partner || folder || "—"}）</p>
+      ) : null}
 
       <label className="draft-instruction-label">
         見直し指示（任意）
@@ -180,7 +209,7 @@ export default function DraftWorkbench({
           <button
             type="button"
             className="btn primary"
-            disabled={pending || !draft.trim()}
+            disabled={pending || !draft.trim() || !to.trim()}
             onClick={() => {
               setConfirmOpen(true);
               setErr(null);
@@ -207,7 +236,7 @@ export default function DraftWorkbench({
             <h3>送信確認</h3>
             <p className="meta">まだ送っていません。内容を確認してください。</p>
             <p>
-              <strong>To:</strong> {toEmail || "（未設定）"}
+              <strong>To:</strong> {to || "（未設定）"}
             </p>
             <p>
               <strong>Subject:</strong> {previewSubject}
@@ -224,15 +253,18 @@ export default function DraftWorkbench({
               <button
                 type="button"
                 className="btn primary"
-                disabled={pending || !toEmail}
+                disabled={pending || !to.trim()}
                 onClick={() =>
                   start(async () => {
                     setErr(null);
+                    // 手入力 To を先に下書き保存メタへ（from_email 更新は send 側でも実施）
+                    await saveTriageDraft(id, draft, path);
                     const r = await sendTriageAfterConfirm(
                       id,
                       draft,
                       path,
                       true,
+                      to.trim(),
                     );
                     if (!r.ok) {
                       setErr(r.error);
