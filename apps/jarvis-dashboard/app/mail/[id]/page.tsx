@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Shell from "@/components/Shell";
-import TriageDoneToggle from "@/components/TriageDoneToggle";
+import DraftWorkbench from "@/components/DraftWorkbench";
+import TriageStatusActions from "@/components/TriageStatusActions";
+import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
 import {
   LEVEL_LABEL,
   laneHref,
   laneLabel,
   mailPriorityToLevel,
 } from "@/lib/homeLevels";
+import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function MailDetailPage({
@@ -28,6 +31,9 @@ export default async function MailDetailPage({
   const level = mailPriorityToLevel(it.priority);
   const body = (it.original_body || "").trim();
   const lanePath = laneHref(it.lane);
+  const path = `/mail/${it.id}`;
+  const gmailReady = gmailSendConfigured();
+  const st = it.status as TriageStatus;
 
   return (
     <Shell active="/">
@@ -39,13 +45,16 @@ export default async function MailDetailPage({
       <article className={`card level-${level}`}>
         <header>
           <span className="lvl">{LEVEL_LABEL[level]}</span>
+          <span className={`status-badge status-${st}`}>
+            {STATUS_LABEL[st] || st}
+          </span>
           <strong>{it.partner || it.from_email || "—"}</strong>
           <span className="meta">
             {laneLabel(it.lane)}
             {it.folder ? ` · ${it.folder}` : ""}
             {it.received_at ? ` · ${it.received_at}` : ""}
           </span>
-          <TriageDoneToggle id={it.id} status={it.status} path={`/mail/${it.id}`} />
+          <TriageStatusActions id={it.id} status={it.status} path={path} />
         </header>
         <h1 style={{ fontSize: "1.25rem", margin: "10px 0 8px" }}>
           {it.subject || "（件名なし）"}
@@ -67,12 +76,17 @@ export default async function MailDetailPage({
             （元メール本文は未保存。次回の Mac 夜間バッチ／GHA 取得後に表示されます）
           </p>
         )}
-        {it.draft_text ? (
-          <details className="draft-details" open>
-            <summary>返信下書き</summary>
-            <pre className="draft-body">{it.draft_text}</pre>
-          </details>
-        ) : null}
+        <h2 style={{ fontSize: "1rem", marginTop: 16 }}>返信下書き</h2>
+        <DraftWorkbench
+          id={it.id}
+          path={path}
+          subject={it.subject}
+          toEmail={it.from_email}
+          draftText={it.draft_text}
+          payload={it.payload}
+          status={it.status}
+          gmailReady={gmailReady}
+        />
       </article>
     </Shell>
   );

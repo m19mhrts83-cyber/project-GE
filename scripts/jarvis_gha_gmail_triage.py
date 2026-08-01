@@ -137,16 +137,23 @@ def push_rows(rows: list[dict[str, Any]]) -> int:
     if not url or not key:
         raise SystemExit("JARVIS_SUPABASE_* 未設定")
     sb = create_client(url, key)
-    # Web で done にした id は pending に戻さない
-    remote_done: set[str] = set()
+    # Web で閉じた行は pending に戻さない
+    PROTECTED = {"sent", "skipped", "snoozed", "done"}
+    remote_map: dict[str, str] = {}
     try:
-        r = sb.table("triage_items").select("id,status").eq("status", "done").execute()
-        remote_done = {str(x["id"]) for x in (r.data or [])}
+        r = (
+            sb.table("triage_items")
+            .select("id,status")
+            .in_("status", list(PROTECTED))
+            .execute()
+        )
+        remote_map = {str(x["id"]): str(x["status"]) for x in (r.data or [])}
     except Exception as e:
-        print(f"# done merge skipped: {e}", file=sys.stderr)
+        print(f"# protected merge skipped: {e}", file=sys.stderr)
     for row in rows:
-        if row["id"] in remote_done and row.get("status") == "pending":
-            row["status"] = "done"
+        rid = row["id"]
+        if rid in remote_map and row.get("status") == "pending":
+            row["status"] = remote_map[rid]
     n = 0
     for i in range(0, len(rows), 40):
         chunk = rows[i : i + 40]

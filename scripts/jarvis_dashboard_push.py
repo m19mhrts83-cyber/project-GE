@@ -59,26 +59,42 @@ def push_triage(sb) -> int:
         return 0
     data = json.loads(QUEUE_PATH.read_text(encoding="utf-8"))
     items = data.get("items") or []
-    # Web で「対応済み」にした行を Mac push で pending に戻さない
-    remote_done: set[str] = set()
+    # Web で閉じた行（sent/skipped/snoozed/done）を Mac push で pending に戻さない。
+    # Web で保存した draft_text / payload メタも潰さない。
+    PROTECTED = {"sent", "skipped", "snoozed", "done"}
+    KEEP_PAYLOAD = (
+        "sent_at",
+        "gmail_sent_id",
+        "gmail_sent_thread_id",
+        "yoritoori_appended",
+        "yoritoori_appended_at",
+        "web_draft_saved_at",
+    )
+    remote_by_id: dict[str, dict[str, Any]] = {}
+    ids = [str(it.get("id") or "").strip() for it in items if str(it.get("id") or "").strip()]
     try:
-        r = (
-            sb.table("triage_items")
-            .select("id,status")
-            .eq("status", "done")
-            .execute()
-        )
-        remote_done = {str(x["id"]) for x in (r.data or [])}
+        for i in range(0, len(ids), 80):
+            chunk_ids = ids[i : i + 80]
+            r = (
+                sb.table("triage_items")
+                .select("id,status,draft_text,payload,updated_at")
+                .in_("id", chunk_ids)
+                .execute()
+            )
+            for x in r.data or []:
+                remote_by_id[str(x["id"])] = x
     except Exception as e:
-        print(f"# triage done merge skipped: {e}", file=sys.stderr)
+        print(f"# triage protected merge skipped: {e}", file=sys.stderr)
     rows: list[dict[str, Any]] = []
     for it in items:
         iid = str(it.get("id") or "").strip()
         if not iid:
             continue
         st = it.get("status") or "pending"
-        if st == "pending" and iid in remote_done:
-            st = "done"
+        remote = remote_by_id.get(iid) or {}
+        remote_st = str(remote.get("status") or "")
+        if st == "pending" and remote_st in PROTECTED:
+            st = remote_st
         payload = {
             k: it.get(k)
             for k in (
@@ -90,6 +106,13 @@ def push_triage(sb) -> int:
             )
             if it.get(k) is not None
         }
+        remote_payload = remote.get("payload") if isinstance(remote.get("payload"), dict) else {}
+        for k in KEEP_PAYLOAD:
+            if remote_payload.get(k) is not None:
+                payload[k] = remote_payload[k]
+        draft_text = it.get("draft_text") or None
+        if remote_payload.get("web_draft_saved_at") and remote.get("draft_text"):
+            draft_text = remote.get("draft_text")
         rows.append(
             {
                 "id": iid,
@@ -101,7 +124,7 @@ def push_triage(sb) -> int:
                 "subject": it.get("subject") or None,
                 "received_at": it.get("received_at") or None,
                 "summary": it.get("summary") or None,
-                "draft_text": it.get("draft_text") or None,
+                "draft_text": draft_text,
                 "original_body": (str(it.get("original_body") or ""))[:8000] or None,
                 "priority": it.get("priority") or None,
                 "channel": it.get("channel") or None,

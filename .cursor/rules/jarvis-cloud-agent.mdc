@@ -12,7 +12,8 @@ alwaysApply: true
 - **下書き**: Cloud 上で会話しながら見直すのが理想。
 - **送信**: 理想は Cloud で確認後に送る（`scripts/jarvis_cloud_gmail_send.py`）。  
   手順: `--preview` → チャットで承認 → `--i-confirm-send`。未配線・失敗時は Mac の `yoritoori`。  
-  **Vercel Web 画面からの自動送信はしない。** 対外送信前確認（`jarvis-outbound-confirm`）は経路を問わず維持。
+  **Vercel パートナー画面からも、プレビュー確認後に送信可**（自動・ワンクリック無確認は禁止）。  
+  対外送信前確認（`jarvis-outbound-confirm`）は経路を問わず維持。正本ログは OneDrive `5.やり取り.md`（Web 送信後は Mac catchup で追記）。
 - 手順正本: `~/git-repos/docs/Jarvis_Cloud_Agent.md`
 
 ## データの読み方
@@ -43,7 +44,7 @@ alwaysApply: true
 
 ## やらない
 
-- Web ダッシュボードからのメール自動送信
+- Web ダッシュボードからの **無確認** メール自動送信（確認モーダルなし）
 - Workspace **Gemini アプリ会話履歴**の自動フル同期（対象外。API リサーチは `GEMINI_API_KEY`）
 - 秘密をチャットや Git に貼る
 - ユーザー確認なしの対外送信

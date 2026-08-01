@@ -1,5 +1,13 @@
+import Link from "next/link";
 import Shell from "@/components/Shell";
-import TriageDoneToggle from "@/components/TriageDoneToggle";
+import DraftWorkbench from "@/components/DraftWorkbench";
+import TriageStatusActions from "@/components/TriageStatusActions";
+import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
+import {
+  CLOSED_STATUSES,
+  STATUS_LABEL,
+  type TriageStatus,
+} from "@/lib/triageStatus";
 import { createClient } from "@/lib/supabase/server";
 
 /** summary が原文の先頭切り出しだけなら、カード上では出さない（全文側に寄せる） */
@@ -43,12 +51,15 @@ export default async function TriageLanePage({
   title,
   active,
   subtitle,
+  searchParams,
 }: {
   lane: string;
   title: string;
   active: string;
   subtitle?: string;
+  searchParams?: Promise<{ i?: string }>;
 }) {
+  const sp = searchParams ? await searchParams : {};
   const supabase = await createClient();
   const { data: pending } = await supabase
     .from("triage_items")
@@ -57,14 +68,16 @@ export default async function TriageLanePage({
     .eq("status", "pending")
     .neq("kind", "activity")
     .order("received_at", { ascending: true });
-  const { data: done } = await supabase
+
+  const { data: closed } = await supabase
     .from("triage_items")
     .select("*")
     .eq("lane", lane)
-    .eq("status", "done")
+    .in("status", CLOSED_STATUSES)
     .neq("kind", "activity")
     .order("updated_at", { ascending: false })
-    .limit(30);
+    .limit(40);
+
   const { data: activities } = await supabase
     .from("triage_items")
     .select("*")
@@ -73,77 +86,154 @@ export default async function TriageLanePage({
     .order("received_at", { ascending: false })
     .limit(40);
 
+  const unread = pending || [];
+  const idxRaw = Number.parseInt(String(sp.i || "0"), 10);
+  const idx =
+    unread.length === 0
+      ? 0
+      : Math.min(Math.max(Number.isFinite(idxRaw) ? idxRaw : 0, 0), unread.length - 1);
+  const focus = unread[idx];
+  const gmailReady = gmailSendConfigured();
+
+  const sentN = closed?.filter((x) => x.status === "sent").length ?? 0;
+  const skipN = closed?.filter((x) => x.status === "skipped").length ?? 0;
+  const snoozeN = closed?.filter((x) => x.status === "snoozed").length ?? 0;
+
   return (
     <Shell active={active}>
       <h1>{title}</h1>
       {subtitle ? <p className="sub">{subtitle}</p> : null}
       <div className="stats">
         <div className="stat">
-          pending <strong>{pending?.length ?? 0}</strong>
+          未読 <strong>{unread.length}</strong>
         </div>
         <div className="stat">
-          対応済み <strong>{done?.length ?? 0}</strong>
+          送信済み <strong>{sentN}</strong>
+        </div>
+        <div className="stat">
+          スキップ <strong>{skipN}</strong>
+        </div>
+        <div className="stat">
+          後で <strong>{snoozeN}</strong>
         </div>
         <div className="stat">
           活動概要 <strong>{activities?.length ?? 0}</strong>
         </div>
       </div>
-      <h2>要返信・要対応</h2>
-      {!pending?.length ? (
+
+      <h2>未読（1通ずつ）</h2>
+      {!focus ? (
+        <p className="empty">未読なし</p>
+      ) : (
+        <>
+          <div className="focus-nav">
+            <span className="meta">
+              {idx + 1} / {unread.length}
+            </span>
+            {idx > 0 ? (
+              <Link className="btn" href={`${active}?i=${idx - 1}`}>
+                ← 前
+              </Link>
+            ) : (
+              <span className="btn" style={{ opacity: 0.4 }}>
+                ← 前
+              </span>
+            )}
+            {idx < unread.length - 1 ? (
+              <Link className="btn" href={`${active}?i=${idx + 1}`}>
+                次 →
+              </Link>
+            ) : (
+              <span className="btn" style={{ opacity: 0.4 }}>
+                次 →
+              </span>
+            )}
+          </div>
+          <article className="card focus-card">
+            <header>
+              <strong>{focus.partner || focus.from_email || "—"}</strong>
+              <span className="meta">
+                {focus.folder} · {focus.received_at}
+              </span>
+              <TriageStatusActions
+                id={focus.id}
+                status={focus.status}
+                path={active}
+                mode="unread"
+              />
+            </header>
+            <h3 style={{ fontSize: "1.05rem", margin: "8px 0 6px" }}>
+              {focus.subject}
+            </h3>
+            {focus.from_email ? (
+              <p className="meta">From: {focus.from_email}</p>
+            ) : null}
+            {Boolean(focus.summary) &&
+            !isTruncatedBodyPreview(focus.summary, focus.original_body) ? (
+              <p className="sum">
+                <span className="sum-label">要点</span>
+                {focus.summary}
+              </p>
+            ) : null}
+            <OriginalBodyBlock body={focus.original_body} open />
+            <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>返信下書き</h3>
+            <DraftWorkbench
+              id={focus.id}
+              path={active}
+              subject={focus.subject}
+              toEmail={focus.from_email}
+              draftText={focus.draft_text}
+              payload={focus.payload}
+              status={focus.status}
+              gmailReady={gmailReady}
+            />
+          </article>
+        </>
+      )}
+
+      <h2>処理済み</h2>
+      {!closed?.length ? (
         <p className="empty">なし</p>
       ) : (
-        pending.map((it) => {
-          const showAiSummary =
-            Boolean(it.summary) &&
-            !isTruncatedBodyPreview(it.summary, it.original_body);
+        closed.map((it) => {
+          const st = it.status as TriageStatus;
+          const appended = Boolean(
+            it.payload &&
+              typeof it.payload === "object" &&
+              (it.payload as { yoritoori_appended?: boolean }).yoritoori_appended,
+          );
           return (
             <article key={it.id} className="card">
               <header>
-                <strong>{it.partner || it.from_email || "—"}</strong>
-                <span className="meta">
-                  {it.folder} · {it.received_at}
+                <span className={`status-badge status-${st}`}>
+                  {STATUS_LABEL[st] || st}
                 </span>
-                <TriageDoneToggle id={it.id} status={it.status} path={active} />
+                <strong>{it.partner || it.from_email || it.subject}</strong>
+                <span className="meta">{it.received_at}</span>
+                <TriageStatusActions
+                  id={it.id}
+                  status={it.status}
+                  path={active}
+                  mode="closed"
+                />
               </header>
-              <h3 style={{ fontSize: "1.05rem", margin: "8px 0 6px" }}>
-                {it.subject}
-              </h3>
-              {showAiSummary ? (
-                <p className="sum">
-                  <span className="sum-label">要点</span>
-                  {it.summary}
+              {st === "sent" ? (
+                <p className="meta">
+                  {appended
+                    ? "送信済み・やり取り反映済"
+                    : "送信済み（やり取り追記は Mac 同期後）"}
                 </p>
               ) : null}
-              <OriginalBodyBlock body={it.original_body} open />
-              {it.draft_text ? (
-                <details className="draft-details">
-                  <summary>返信下書き</summary>
-                  <pre className="draft-body">{it.draft_text}</pre>
-                </details>
+              {it.summary &&
+              !isTruncatedBodyPreview(it.summary, it.original_body) ? (
+                <p className="sum">{it.summary}</p>
               ) : null}
+              <OriginalBodyBlock body={it.original_body} open={false} />
             </article>
           );
         })
       )}
-      <h2>対応済み</h2>
-      {!done?.length ? (
-        <p className="empty">なし</p>
-      ) : (
-        done.map((it) => (
-          <article key={it.id} className="card">
-            <header>
-              <strong>{it.partner || it.from_email || it.subject}</strong>
-              <span className="meta">{it.received_at}</span>
-              <TriageDoneToggle id={it.id} status={it.status} path={active} />
-            </header>
-            {it.summary &&
-            !isTruncatedBodyPreview(it.summary, it.original_body) ? (
-              <p className="sum">{it.summary}</p>
-            ) : null}
-            <OriginalBodyBlock body={it.original_body} open={false} />
-          </article>
-        ))
-      )}
+
       <h2>更新概要</h2>
       {!activities?.length ? (
         <p className="empty">なし</p>

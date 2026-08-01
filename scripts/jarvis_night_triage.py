@@ -1257,6 +1257,19 @@ def main() -> int:
                     timeout=300,
                 )
                 print(f"# supabase push: exit={r.returncode} {(r.stderr or r.stdout or '')[-200:]}")
+                catchup = REPO / "scripts" / "jarvis_triage_yoritoori_catchup.py"
+                if catchup.is_file():
+                    c = subprocess.run(
+                        [sys.executable, str(catchup)],
+                        cwd=str(REPO),
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                    )
+                    print(
+                        f"# yoritoori catchup: exit={c.returncode} "
+                        f"{(c.stderr or c.stdout or '')[-200:]}"
+                    )
             else:
                 print("# supabase push: skipped (JARVIS_SUPABASE_SERVICE_ROLE_KEY unset)")
         except Exception as e:
