@@ -3,6 +3,7 @@ import Shell from "@/components/Shell";
 import DraftWorkbench from "@/components/DraftWorkbench";
 import TriageStatusActions from "@/components/TriageStatusActions";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
+import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import {
   CLOSED_STATUSES,
   STATUS_LABEL,
@@ -94,6 +95,17 @@ export default async function TriageLanePage({
       : Math.min(Math.max(Number.isFinite(idxRaw) ? idxRaw : 0, 0), unread.length - 1);
   const focus = unread[idx];
   const gmailReady = gmailSendConfigured();
+  const focusTo = focus
+    ? resolvePartnerToEmail({
+        fromEmail: focus.from_email,
+        partner: focus.partner,
+        folder: focus.folder,
+        payload:
+          focus.payload && typeof focus.payload === "object"
+            ? (focus.payload as Record<string, unknown>)
+            : null,
+      })
+    : null;
 
   const sentN = closed?.filter((x) => x.status === "sent").length ?? 0;
   const skipN = closed?.filter((x) => x.status === "skipped").length ?? 0;
@@ -122,7 +134,7 @@ export default async function TriageLanePage({
       </div>
 
       <h2>未読（1通ずつ）</h2>
-      {!focus ? (
+      {!focus || !focusTo ? (
         <p className="empty">未読なし</p>
       ) : (
         <>
@@ -165,9 +177,7 @@ export default async function TriageLanePage({
             <h3 style={{ fontSize: "1.05rem", margin: "8px 0 6px" }}>
               {focus.subject}
             </h3>
-            {focus.from_email ? (
-              <p className="meta">From: {focus.from_email}</p>
-            ) : null}
+            {focusTo.to ? <p className="meta">To: {focusTo.to}</p> : null}
             {Boolean(focus.summary) &&
             !isTruncatedBodyPreview(focus.summary, focus.original_body) ? (
               <p className="sum">
@@ -182,10 +192,14 @@ export default async function TriageLanePage({
               path={active}
               subject={focus.subject}
               toEmail={focus.from_email}
+              partner={focus.partner}
+              folder={focus.folder}
               draftText={focus.draft_text}
               payload={focus.payload}
               status={focus.status}
               gmailReady={gmailReady}
+              resolvedTo={focusTo.to}
+              toSource={focusTo.source}
             />
           </article>
         </>

@@ -817,9 +817,63 @@ def load_queue() -> dict[str, Any]:
     return data
 
 
+def load_partner_emails() -> dict[str, list[str]]:
+    """folder → emails。Dashboard ミラー JSON を読む。"""
+    import unicodedata
+
+    out: dict[str, list[str]] = {}
+    mirror = REPO / "apps/jarvis-dashboard/config/partner_contacts.json"
+    if not mirror.is_file():
+        return out
+    try:
+        data = json.loads(mirror.read_text(encoding="utf-8"))
+        for p in data.get("partners") or []:
+            folder = str(p.get("folder") or "").strip()
+            emails = [str(e).strip() for e in (p.get("emails") or []) if str(e).strip()]
+            if not folder or not emails:
+                continue
+            for key in (
+                folder,
+                unicodedata.normalize("NFC", folder),
+                unicodedata.normalize("NFD", folder),
+            ):
+                out[key] = emails
+    except Exception:
+        return out
+    return out
+
+
+_PARTNER_EMAILS: dict[str, list[str]] | None = None
+
+
+def partner_emails_for(folder: str, partner_name: str = "") -> list[str]:
+    global _PARTNER_EMAILS
+    import unicodedata
+
+    if _PARTNER_EMAILS is None:
+        _PARTNER_EMAILS = load_partner_emails()
+    for key in (
+        folder,
+        unicodedata.normalize("NFC", folder or ""),
+        unicodedata.normalize("NFD", folder or ""),
+    ):
+        if key and key in _PARTNER_EMAILS:
+            return _PARTNER_EMAILS[key]
+    # name fallback
+    for k, emails in (_PARTNER_EMAILS or {}).items():
+        if partner_name and partner_name in k:
+            return emails
+    return []
+
+
 def queue_item_fields(c: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
     """候補 dict から queue 保存用フィールドを組み立てる。"""
     body = str(c.get("body") or "")
+    from_email = str(c.get("from_email") or "").strip()
+    if not from_email:
+        emails = partner_emails_for(str(c.get("folder") or ""), str(c.get("partner_name") or c.get("partner") or ""))
+        if emails:
+            from_email = emails[0]
     base = {
         "id": c["id"],
         "lane": c.get("lane") or "partner",
@@ -830,7 +884,7 @@ def queue_item_fields(c: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any
         "account": c.get("account") or "",
         "gmail_thread_id": c.get("gmail_thread_id") or "",
         "gmail_message_id": c.get("gmail_message_id") or "",
-        "from_email": c.get("from_email") or "",
+        "from_email": from_email,
         "message_id_header": c.get("message_id_header") or "",
         "original_body": body[:8000],
         "updated_at": now_iso(),
