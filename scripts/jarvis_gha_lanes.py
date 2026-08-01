@@ -99,8 +99,8 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
     elif on_gha and not args.force_local:
         print(
-            "# skip: MS_GRAPH_* 未設定。レーン要約のクラウド収集は Graph 配線後。"
-            " Mac の jarvis_dashboard_lanes.py --push が当面の正本。",
+            "# skip: MS_GRAPH_* 未設定（個人用は REFRESH_TOKEN）。"
+            " 手順: docs/Jarvis_OneDrive_Graph.md / Mac の jarvis_dashboard_lanes.py --push が当面の正本。",
             file=sys.stderr,
         )
         return 0
