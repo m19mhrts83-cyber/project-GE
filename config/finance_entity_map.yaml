@@ -1,0 +1,81 @@
+# Zaim CSV → 法人 / 個人 判定（Jarvis ダッシュボード財務メトリクス）
+# 支払元・入金先・カテゴリの部分一致で判定。先にマッチしたルールが優先。
+
+version: 1
+
+# entity: corporate | personal | skip
+account_rules:
+  # 法人寄り口座
+  - match: "★PayPay銀行"
+    entity: corporate
+  - match: "★MUFG(アパート経営)"
+    entity: corporate
+  - match: "★滋賀銀行"
+    entity: corporate
+  # 個人生活・給与系
+  - match: "★名古屋銀行"
+    entity: personal
+  - match: "★大垣共立銀行"
+    entity: personal
+  - match: "★東海労金"
+    entity: personal
+  - match: "★住信SBI"
+    entity: personal
+  - match: "★住信 SBI"
+    entity: personal
+  - match: "三井住友カード"
+    entity: personal
+  - match: "アメリカン・エキスプレス"
+    entity: personal
+  - match: "スマートレシート"
+    entity: personal
+  - match: "お財布"
+    entity: personal
+  - match: "au PAY"
+    entity: personal
+  - match: "Amazon"
+    entity: personal
+  - match: "楽天銀行"
+    entity: personal
+  - match: "Suica"
+    entity: personal
+  - match: "PayPayカード"
+    entity: personal
+
+category_rules:
+  - match: "家賃収入(法人)"
+    entity: corporate
+    kind: rent_income
+  - match: "家賃収入(個人)"
+    entity: personal
+    kind: rent_income
+  - match: "賃貸経営(法人)"
+    entity: corporate
+    kind: rental_expense
+  - match: "賃貸経営(個人"
+    entity: personal
+    kind: rental_expense
+  - match: "会社費用"
+    entity: corporate
+    kind: other_expense
+  - match: "修繕"
+    entity: corporate
+    kind: repair
+  - match: "給与所得"
+    entity: personal
+    kind: salary
+  - match: "賞与"
+    entity: personal
+    kind: salary
+  - match: "利息"
+    entity: personal
+    kind: interest
+
+# カテゴリ kind が未設定のときの収入/支出の既定
+defaults:
+  income_kind: other_income
+  expense_kind: other_expense
+
+# 振替はキャッシュフロー手残りから除外
+exclude_methods:
+  - transfer
