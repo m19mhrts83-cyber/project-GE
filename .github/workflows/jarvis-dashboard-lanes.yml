@@ -1,7 +1,9 @@
 name: Jarvis Dashboard Lanes
 
 # コンテンツレーン（神大家／3棟／戸建て／AI・Raimo）→ cards
-# MS_GRAPH_* が GitHub Secrets に無い間はスキップ（Mac push が正本）。
+# 委任 Graph（MS_GRAPH_CLIENT_ID + REFRESH_TOKEN + AUTHORITY=consumers）必須。
+# refresh 回転後は Mac で: python scripts/jarvis_ms_graph_sync_refresh.py --push-gha
+
 
 on:
   schedule:
@@ -26,7 +28,7 @@ jobs:
       - name: Install deps
         run: pip install -q supabase pyyaml
 
-      - name: Run lanes (skip without Graph)
+      - name: Run lanes (Graph required)
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}

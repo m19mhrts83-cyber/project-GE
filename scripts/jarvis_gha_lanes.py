@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Jarvis GHA: コンテンツレーン要約 → cards upsert（Graph 未設定時はスキップ）
+Jarvis GHA: コンテンツレーン要約 → cards upsert
 
-  # ローカル（OneDrive マウントあり）
+  # ローカル（OneDrive マウントあり）または Graph 設定あり
   python scripts/jarvis_gha_lanes.py --push
 
-  # GHA: MS_GRAPH_* があるとき OneDrive から必要ファイルをキャッシュして収集
+  # GHA: MS_GRAPH_CLIENT_ID + REFRESH_TOKEN（委任）で materialize → 収集
 """
 from __future__ import annotations
 

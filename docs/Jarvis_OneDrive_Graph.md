@@ -68,14 +68,22 @@ python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/
 |---|---|
 | `jarvis_ms_graph_setup_check.py` | 未設定時の手順表示 |
 | `jarvis_ms_graph_device_login.py` | 初回デバイスコード |
-| `jarvis_onedrive_graph.py` | refresh / app / ローカル読取 |
+| `jarvis_onedrive_graph.py` | refresh / app / ローカル読取（downloadUrl） |
+| `jarvis_ms_graph_sync_refresh.py` | 回転 refresh → private（任意で GHA） |
 | `jarvis_ms_graph_secrets_to_gha.py` | GitHub Secrets 反映 |
 | `jarvis_gha_lanes.py` | GHA でレーン要約 → `cards` |
 
 ## 制限
 
 - Obsidian Journal（Google Drive）は Graph 対象外 → GHA では `journal_recent` をスキップ（Mac push で補完）
-- refresh_token が回転したら `~/.jarvis_state/ms_graph_new_refresh.env` を private に反映
+- 個人 OneDrive のファイル本体は `@microsoft.graph.downloadUrl`（認証なし CDN）で取得する。`/content` を Authorization 付きで 302 追従すると 401 になる
+- refresh_token が回転したら:
+
+```bash
+python scripts/jarvis_ms_graph_sync_refresh.py --push-gha
+```
+
+（`~/.jarvis_state/ms_graph_new_refresh.env` → `.env.jarvis_private` → GitHub Secrets）
 - 秘密は `.env.jarvis_private` と GitHub / Cloud Secrets のみ。チャット・Git 禁止
 
 ## 関連

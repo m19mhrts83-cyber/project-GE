@@ -106,7 +106,7 @@ Environment: リポジトリ `m19mhrts83-cyber/project-GE`（Dashboard に Activ
 | `GEMINI_API_KEY` | リサーチ（`scripts/jarvis_gemini_research.py`） |
 | `GMAIL_CREDENTIALS_B64` / `GMAIL_ADMIN_TOKEN_B64` | admin 取込（既存 GHA と同系） |
 | `GMAIL_ESTATE_TOKEN_B64`（または `GMAIL_M19M_TOKEN_B64`） | **Cloud 対外送信**（`jarvis_cloud_gmail_send.py`） |
-| `MS_GRAPH_*` | OneDrive レーン収集（GHA／Cloud）。未設定時は Mac ローカル |
+| `MS_GRAPH_*` | OneDrive レーン収集（GHA／Cloud）。**委任＋REFRESH_TOKEN**（`AUTHORITY=consumers`）
 
 ### 登録手順（手動・約1分）
 
@@ -132,10 +132,14 @@ python scripts/jarvis_ms_graph_setup_check.py
 # CLIENT_ID 設定後:
 python scripts/jarvis_ms_graph_device_login.py
 python scripts/jarvis_onedrive_graph.py --probe
+python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/…"
 python scripts/jarvis_ms_graph_secrets_to_gha.py
+# refresh 回転時:
+python scripts/jarvis_ms_graph_sync_refresh.py --push-gha
+gh workflow run jarvis-dashboard-lanes.yml
 ```
 
-未設定の間、`jarvis-dashboard-lanes.yml` はスキップ。Mac の `jarvis_dashboard_lanes.py --push` が正本。
+配線後は `jarvis-dashboard-lanes.yml` が Graph で materialize → `cards` upsert。Journal（Google Drive）だけ GHA スキップで Mac push 補完。
 
 ## admin Gmail と Gemini
 
@@ -179,5 +183,5 @@ CHRLINE／オプチャ、Zaim Playwright、パートナー MD 全文取込、One
 4. [ ] NotebookLM MCP（stdio）追加 → `setup_auth` → list／1 問成功
 5. [ ] Supabase `sync_meta` を Cloud から読めることを確認
 6. [ ] （任意）`jarvis_cloud_gmail_send.py --preview` が Cloud で動く
-7. [ ] （任意）`MS_GRAPH_*` → lanes GHA がスキップせず収集
+7. [x] `MS_GRAPH_*`（委任）→ lanes GHA 収集（downloadUrl 修正・Secrets 反映後に緑化確認）
 8. [ ] on-demand 利用の要否を Dashboard Usage で確認（枠切れ対策）
