@@ -318,12 +318,160 @@ a.stat-link:active {
   border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
 }
 
+.home-band-metrics {
+  border-color: color-mix(in srgb, #2a9d8f 28%, var(--line));
+}
+
 .home-band-watch {
   border-color: color-mix(in srgb, var(--med) 22%, var(--line));
 }
 
+.home-occupancy-one-liner {
+  margin: 10px 0 4px;
+  font-size: 0.95rem;
+}
+
+.home-vacant-line {
+  margin: 8px 0 12px;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.home-vacant-chip {
+  display: inline-block;
+  margin: 0 6px 4px 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--warn) 22%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line));
+}
+
+.home-unit-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 8px;
+}
+
+.home-unit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.home-unit-table th,
+.home-unit-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.home-unit-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.home-unit-table tr.is-vacant td {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  font-weight: 600;
+}
+
+.home-event-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.home-event-list li {
+  margin: 4px 0;
+}
+
 .home-band-other {
   border-color: color-mix(in srgb, var(--info) 28%, var(--line));
+}
+
+.home-band-openchat {
+  border-color: color-mix(in srgb, #e9c46a 35%, var(--line));
+}
+
+.openchat-health {
+  margin: 0 0 1.25rem;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 80%, transparent);
+}
+
+.openchat-health-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.openchat-health-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.openchat-health-status {
+  margin: 0 0 6px;
+}
+
+.openchat-digest-overview {
+  margin: 0 0 12px;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.openchat-group-lines {
+  margin: 6px 0 10px;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.openchat-group-lines li {
+  margin: 3px 0;
+}
+
+.openchat-group-actions {
+  margin: 8px 0 4px;
+  font-size: 0.88rem;
+}
+
+.openchat-path-hint {
+  word-break: break-all;
+  font-size: 0.75rem;
+}
+
+.copy-path-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.copy-path-btn:hover {
+  border-color: var(--accent);
+}
+
+.home-openchat-card {
+  text-decoration: none;
+  color: inherit;
+}
+
+.p.back,
+p.back {
+  margin: 0 0 12px;
 }
 
 .other-mail-hint {
@@ -813,6 +961,19 @@ a.stat-link:active {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--ink);
+}
+
+.card-triage {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #e7e5e4;
+}
+
+.card-triage-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .watch-comment-list {

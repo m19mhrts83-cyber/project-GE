@@ -1,0 +1,31 @@
+# Excel に無い物件の号室補完（キャラメル等）
+# 家賃は管理契約書（2026-02 改訂）の賃料月額。現状はユーザー確認どおり満室。
+units:
+  - property_id: caramel
+    property_name: キャラメル
+    short: C
+    room: "101"
+    status: occupied
+    rent: 61000
+    note: 契約賃料（共益費別）/ 税務・契約資料
+  - property_id: caramel
+    property_name: キャラメル
+    short: C
+    room: "102"
+    status: occupied
+    rent: 62000
+    note: 契約賃料（共益費別）/ 税務・契約資料
+  - property_id: caramel
+    property_name: キャラメル
+    short: C
+    room: "201"
+    status: occupied
+    rent: 64000
+    note: 契約賃料（共益費別）/ 税務・契約資料
+  - property_id: caramel
+    property_name: キャラメル
+    short: C
+    room: "202"
+    status: occupied
+    rent: 63000
+    note: 契約賃料（共益費別）/ 税務・契約資料
