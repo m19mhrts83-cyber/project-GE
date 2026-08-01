@@ -418,6 +418,7 @@ function renderDeepPanel(deep) {
     if (applyBtn) applyBtn.disabled = true;
     return;
   }
+  if (applyBtn) applyBtn.disabled = !!deep.applied;
 
   const findings = deep.findings || [];
   const adds = deep.suggested_additions || [];
