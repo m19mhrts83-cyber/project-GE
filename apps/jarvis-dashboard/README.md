@@ -27,6 +27,16 @@ https://jarvis-dashboard-amber.vercel.app/
 
 朝の自動オープンは `JARVIS_DASHBOARD_URL`（`.env.jarvis_private`）を優先。
 
+### NotebookLM 作業セット
+
+サイドバー **NotebookLM** → `/notebooklm`。Mac で localhost ヘルパー（`127.0.0.1:8766`）が動いていれば Finder（`200_NoteBookLM`）＋ NotebookLM を一括オープン。未起動時は Web リンクのみ。
+
+```bash
+~/git-repos/launchd/install_notebooklm_workbench_launchd.sh
+```
+
+設定: `config/notebooklm_workbench.yaml`／任意 `NOTEBOOKLM_DRIVE_FOLDER_URL`。
+
 ### 収集の役割分担
 
 | 経路 | 内容 |

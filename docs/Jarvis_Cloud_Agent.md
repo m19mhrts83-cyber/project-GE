@@ -91,6 +91,18 @@ Secrets（Cloud My Secrets 推奨）: `GMAIL_CREDENTIALS_B64` ＋ `GMAIL_ESTATE_
 
 ソース正本は Drive `200_NoteBookLM`（`jarvis-notebooklm-drive-sources`）。ローカル MCP も同様に `setup_auth` が必要なことがある。
 
+**Mac 作業セット（Finder＋NotebookLM）**:
+
+```bash
+# 一度だけ: localhost ヘルパー常駐
+~/git-repos/launchd/install_notebooklm_workbench_launchd.sh
+# 手動で開く
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_notebooklm_workbench_open.py
+```
+
+ダッシュボード `/notebooklm`（本番・`:3001`）を開くと、ヘルパー起動中なら Finder＋NLM を一括オープン。未起動時は Web リンクのみ。設定: `config/notebooklm_workbench.yaml`／任意で `NOTEBOOKLM_DRIVE_FOLDER_URL`。
+
 ### 3. やらない MCP
 
 - ローカル専用パス前提の stdio を無検証で増やさない
