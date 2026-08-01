@@ -992,24 +992,68 @@ const App = {
         member_no: memberNo,
         name: name
       };
+      const isNotOnRoster = function (err) {
+        const code = err && err.errorCode;
+        const msg = String((err && err.message) || '');
+        return (
+          code === 'not_on_roster' ||
+          msg.indexOf('名簿に一致') !== -1 ||
+          msg.indexOf('not_on_roster') !== -1
+        );
+      };
+      const isReregisterCandidate = function (err) {
+        const code = err && err.errorCode;
+        const msg = String((err && err.message) || '');
+        return (
+          code === 'email_taken' ||
+          msg.indexOf('既に登録') !== -1 ||
+          msg.indexOf('退会') !== -1 ||
+          msg.indexOf('処理中にエラー') !== -1
+        );
+      };
+
       let autoApproved = false;
+      let registered = false;
+
       try {
         await App.apiClient('POST', '/auth/register-roster', payload);
         autoApproved = true;
+        registered = true;
       } catch (rosterErr) {
-        const code = rosterErr && rosterErr.errorCode;
-        const msg = String((rosterErr && rosterErr.message) || '');
-        const isNotOnRoster =
-          code === 'not_on_roster' ||
-          msg.indexOf('名簿に一致') !== -1 ||
-          msg.indexOf('not_on_roster') !== -1;
-        if (isNotOnRoster) {
-          await App.apiClient('POST', '/auth/register', payload);
-          await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo, name);
+        if (isNotOnRoster(rosterErr)) {
+          try {
+            await App.apiClient('POST', '/auth/register', payload);
+            registered = true;
+          } catch (regErr) {
+            if (isReregisterCandidate(regErr)) {
+              await App.apiClient('POST', '/auth/reregister', payload);
+              registered = true;
+            } else {
+              throw regErr;
+            }
+          }
+          if (registered && !autoApproved) {
+            await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo, name);
+          }
+        } else if (isReregisterCandidate(rosterErr)) {
+          try {
+            await App.apiClient('POST', '/auth/reregister-roster', payload);
+            autoApproved = true;
+            registered = true;
+          } catch (rrErr) {
+            if (isNotOnRoster(rrErr)) {
+              await App.apiClient('POST', '/auth/reregister', payload);
+              registered = true;
+              await App.notifyRegistrationPending(email, '再登録（アプリ）', memberNo, name);
+            } else {
+              throw rrErr;
+            }
+          }
         } else {
           throw rosterErr;
         }
       }
+
       const notice = autoApproved
         ? '新規登録が完了しました。ログイン画面からメールアドレスとパスワードでログインしてください。'
         : '管理者にメールを送信しました。管理者承認後にメールが届くので、しばらくお待ちください';
@@ -1204,7 +1248,7 @@ const App = {
     const labels = {
       chat: 'チャット',
       comments: 'コメント一覧',
-      lessons: '学習ページ説明テキスト',
+      lessons: '動画ページ説明テキスト',
       knowledge: 'セミナー動画文字起こし',
       adminUsers: 'ユーザー承認',
       adminUserList: 'ユーザー一覧',
@@ -1817,7 +1861,7 @@ const App = {
   },
 
   /**
-   * 関連セミナー動画（タイトル単位で集約）＋関連コミュニティ投稿＋関連学習ページ説明
+   * 関連セミナー動画（タイトル単位で集約）＋関連コミュニティ投稿＋関連動画ページ説明
    */
   renderCitationsPanel: (citations) => {
     if (!citations || !citations.length) return '';
@@ -2013,7 +2057,7 @@ const App = {
     if (lessonList.length) {
       const lessonLis = lessonList.map(lessonItemHtml).join('');
       parts.push(
-        '<div class="font-semibold mb-1">関連学習ページ説明</div>' +
+        '<div class="font-semibold mb-1">関連動画ページ説明</div>' +
           '<ul class="citations-list mb-2">' +
           lessonLis +
           '</ul>'
@@ -4471,7 +4515,17 @@ const App = {
             const existingLen = existing
               ? String(App.commentField(existing, 'content') || '').trim().length
               : 0;
-            if (contentStr.length > existingLen + 20) {
+            const isLessonRow = /^lesson_desc_/.test(commentId) || sourceSystem === 'lesson';
+            const existingCourseTab = existing
+              ? String(App.commentField(existing, 'course_tab') || '').trim()
+              : '';
+            const needsMetaFill =
+              isLessonRow &&
+              (!existingCourseTab ||
+                !String(App.commentField(existing, 'lesson_title') || '').trim()) &&
+              !!(courseTab || sectionName || lessonTitle || lessonUrl);
+            const longerBody = contentStr.length > existingLen + 20;
+            if (longerBody || needsMetaFill) {
               await App.apiClient('POST', '/admin/comments/update-content', {
                 comment_id: commentId,
                 content: contentStr,
@@ -4492,14 +4546,12 @@ const App = {
               });
               updateCount += 1;
               App.elements.importResult.textContent +=
-                'UPDATE longer row=' +
+                (longerBody ? 'UPDATE longer ' : 'UPDATE meta ') +
+                'row=' +
                 (i + 1) +
                 ' id=' +
                 commentId +
-                ' ' +
-                existingLen +
-                '→' +
-                contentStr.length +
+                (longerBody ? ' ' + existingLen + '→' + contentStr.length : '') +
                 '\n';
               continue;
             }

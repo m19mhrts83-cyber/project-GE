@@ -231,6 +231,22 @@ def collect_sections_and_lessons(tab: dict) -> list[dict]:
     return deduped
 
 
+def strip_mokuji_prefix(text: str) -> str:
+    """本文先頭の「目次 [非表示]…」を除去（コース目次の混入対策）。"""
+    t = (text or "").strip()
+    if not t.startswith("目次"):
+        return t
+    lines = t.split("\n")
+    # 先頭行（または連続する目次行）を落とす
+    i = 0
+    while i < len(lines) and (
+        lines[i].strip().startswith("目次")
+        or (i == 0 and "目次" in lines[i][:20] and "[非表示]" in lines[i])
+    ):
+        i += 1
+    return "\n".join(lines[i:]).strip() or t
+
+
 def extract_lesson_description(lesson_url: str) -> str:
     """lesson ページにアクセスし、動画下の説明テキストを取得。"""
     global driver
@@ -238,7 +254,21 @@ def extract_lesson_description(lesson_url: str) -> str:
     time.sleep(2)
 
     desc = safe_js(r"""
-        // WeStudy lesson ページの説明テキスト取得
+        // 目次・ナビを除外して説明本文だけ取る
+        const stripMokuji = (el) => {
+            if (!el) return '';
+            const clone = el.cloneNode(true);
+            clone.querySelectorAll(
+                '.lesson-sidebar, .course-navigation, .ld-topic-list, .ld-lesson-list,' +
+                '[class*="curriculum"], [class*="toc"], [class*="mokuji"], nav, aside'
+            ).forEach(n => n.remove());
+            let t = (clone.textContent || '').trim();
+            if (t.startsWith('目次')) {
+                const nl = t.indexOf('\n');
+                if (nl > 0) t = t.slice(nl + 1).trim();
+            }
+            return t;
+        };
         const selectors = [
             '.content-body',
             '.lesson-content',
@@ -252,9 +282,8 @@ def extract_lesson_description(lesson_url: str) -> str:
         ];
         for (const sel of selectors) {
             const el = document.querySelector(sel);
-            if (el && el.textContent.trim().length > 10) {
-                return el.textContent.trim();
-            }
+            const t = stripMokuji(el);
+            if (t.length > 10) return t;
         }
         // フォールバック: 動画の下のテキスト要素
         const video = document.querySelector('video, iframe[src*="youtube"], iframe[src*="vimeo"], .video-container, .presto-player');
@@ -262,18 +291,18 @@ def extract_lesson_description(lesson_url: str) -> str:
             let sibling = video.parentElement;
             while (sibling) {
                 sibling = sibling.nextElementSibling;
-                if (sibling && sibling.textContent.trim().length > 20) {
-                    return sibling.textContent.trim();
+                if (sibling) {
+                    const t = stripMokuji(sibling);
+                    if (t.length > 20) return t;
                 }
             }
         }
         // 最終フォールバック: ページ本文からヘッダー/ナビを除く
         const main = document.querySelector('main, #main, .site-content, article');
-        if (main) return main.textContent.trim();
-        return '';
+        return stripMokuji(main);
     """, "")
 
-    return (desc or "").strip()
+    return strip_mokuji_prefix((desc or "").strip())
 
 
 def content_hash(text: str) -> str:
