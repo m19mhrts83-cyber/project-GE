@@ -400,6 +400,127 @@ function renderResearch(result) {
         </tr>`).join('')
       }</tbody></table>`
     : '<p class="subtitle">距離・Places除外なし</p>';
+
+  renderDeepPanel(research.deep);
+  const deepBtn = document.getElementById('deepButton');
+  const copyBtn = document.getElementById('deepCopyHandoff');
+  if (deepBtn) deepBtn.disabled = !result.job_id;
+  if (copyBtn) copyBtn.disabled = !result.job_id;
+}
+
+function renderDeepPanel(deep) {
+  const el = document.getElementById('researchDeep');
+  const applyBtn = document.getElementById('deepApplyButton');
+  const copyBtn = document.getElementById('deepCopyHandoff');
+  if (!el) return;
+  if (!deep || deep.status !== 'ready') {
+    el.innerHTML = '<p class="subtitle">まだ深掘りしていません。「評判・実在を深掘り」を押してください。公式 Gemini Deep Research を使う場合は「Step1.2渡す用をコピー」も利用できます。</p>';
+    if (applyBtn) applyBtn.disabled = true;
+    return;
+  }
+
+  const findings = deep.findings || [];
+  const adds = deep.suggested_additions || [];
+  const excludes = deep.exclude_names || [];
+  el.innerHTML = `
+    <p><strong>サマリー</strong></p>
+    <p class="subtitle" style="white-space:pre-wrap">${escapeHtml(deep.summary || '')}</p>
+    ${deep.notes ? `<p class="subtitle">注意: ${escapeHtml(deep.notes)}</p>` : ''}
+    <p><strong>調査結果</strong>${deep.applied ? '（施設へ反映済み）' : ''}</p>
+    ${findings.length ? `<table class="research-table"><thead><tr><th>判定</th><th>店名</th><th>推奨</th><th>実在</th><th>評判</th><th>吹き出し</th></tr></thead><tbody>${
+      findings.map((f) => `<tr>
+        <td>${escapeHtml(f.status || '')}</td>
+        <td>${escapeHtml(f.name || '')}${f.match_id ? ` <small>(${escapeHtml(f.match_id)})</small>` : ''}</td>
+        <td>${escapeHtml(f.grade || '')}</td>
+        <td>${escapeHtml(f.existence || '')}</td>
+        <td>${escapeHtml(f.reputation || '')}</td>
+        <td>${escapeHtml(f.blurb || '')}</td>
+      </tr>`).join('')
+    }</tbody></table>` : '<p class="subtitle">findings なし</p>'}
+    <p><strong>追加提案</strong></p>
+    ${adds.length ? `<ul>${adds.map((a) => `<li>${escapeHtml(a.name)}（${escapeHtml(a.grade || '')}）: ${escapeHtml(a.why || a.blurb || '')}</li>`).join('')}</ul>` : '<p class="subtitle">なし</p>'}
+    <p><strong>除外提案</strong></p>
+    <p class="subtitle">${excludes.length ? escapeHtml(excludes.join('、')) : 'なし'}</p>
+  `;
+}
+
+async function runDeepResearch(apply) {
+  if (!lastResult?.job_id) return;
+  const base = apiBase();
+  if (!base) return;
+  hideError();
+  const hint = document.getElementById('deepHint');
+  const deepBtn = document.getElementById('deepButton');
+  const applyBtn = document.getElementById('deepApplyButton');
+  if (deepBtn) deepBtn.disabled = true;
+  if (applyBtn) applyBtn.disabled = true;
+  if (hint) hint.textContent = apply ? '深掘り結果を反映中…' : '深掘り調査中…（最大数分）';
+  try {
+    const res = await fetch(`${base}/api/deep`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        job_id: lastResult.job_id,
+        apply: !!apply,
+        timeout_sec: 240,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    if (apply && data.result) {
+      applyPipelineResult(data.result);
+      if (hint) hint.textContent = '深掘り結果を施設・地図・下地に反映しました';
+    } else {
+      lastResult.research = data.research || lastResult.research || {};
+      if (data.deep) lastResult.research.deep = data.deep;
+      renderResearch(lastResult);
+      const details = document.getElementById('researchDeepDetails');
+      if (details) details.open = true;
+      if (hint) {
+        hint.textContent = apply
+          ? '反映レスポンスが空でした'
+          : '深掘り完了。内容を確認し、よければ「施設・地図に反映」を押してください';
+      }
+      if (deepBtn) deepBtn.disabled = false;
+      if (applyBtn) applyBtn.disabled = !(data.deep && data.deep.status === 'ready' && !data.deep.applied);
+    }
+  } catch (err) {
+    showError(`深掘りに失敗しました: ${err.message || err}`);
+    if (hint) hint.textContent = '';
+    if (deepBtn) deepBtn.disabled = false;
+    if (applyBtn) applyBtn.disabled = false;
+  }
+}
+
+function copyDeepHandoff() {
+  const block = lastResult?.research?.deep?.handoff_block
+    || (lastResult ? buildClientHandoff(lastResult) : '');
+  if (!block) {
+    showError('コピーする渡す用ブロックがありません');
+    return;
+  }
+  navigator.clipboard.writeText(block).then(
+    () => {
+      const hint = document.getElementById('deepHint');
+      if (hint) hint.textContent = 'Step1.2渡す用をコピーしました（Gemini Deep Research に貼れます）';
+    },
+    () => showError('クリップボードへのコピーに失敗しました')
+  );
+}
+
+function buildClientHandoff(result) {
+  const lines = [
+    `物件名: ${result.property_name || ''}`,
+    `住所: ${result.address || ''}`,
+    `ターゲット: ${result.target || ''}`,
+    '施設候補:',
+  ];
+  const cands = result.research?.wash?.candidates || result.facilities || [];
+  cands.forEach((c) => {
+    lines.push(`- ${c.category || ''} | ${c.query || ''} | ${c.name || ''}`);
+  });
+  return lines.join('\n');
 }
 
 function renderFacilityList(result) {

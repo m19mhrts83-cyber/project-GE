@@ -70,23 +70,47 @@ def _env(name: str) -> str:
     return (os.environ.get(name) or "").strip()
 
 
-def gemini_text(prompt: str, *, api_key: str, model: str = DEFAULT_MODEL) -> str:
+def gemini_text(
+    prompt: str,
+    *,
+    api_key: str,
+    model: str = DEFAULT_MODEL,
+    timeout_sec: int = 180,
+    use_google_search: bool = False,
+) -> str:
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:generateContent?key={api_key}"
     )
-    body = {
+    body: dict[str, Any] = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.3},
     }
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=180) as r:
-        data = json.load(r)
+    if use_google_search:
+        # Gemini API の Google 検索グラウンディング（Deep Research UI の近似）
+        body["tools"] = [{"google_search": {}}]
+
+    def _post(payload: dict[str, Any]) -> dict[str, Any]:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout_sec) as r:
+            return json.load(r)
+
+    try:
+        data = _post(body)
+    except urllib.error.HTTPError as e:
+        # 検索ツール非対応モデル等 → ツールなしで再試行
+        if use_google_search:
+            body.pop("tools", None)
+            data = _post(body)
+        else:
+            err = e.read()[:400].decode("utf-8", errors="replace")
+            raise RuntimeError(f"Gemini HTTP {e.code}: {err}") from e
+
     parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts") or []
     texts = [p.get("text") or "" for p in parts if isinstance(p, dict)]
     out = "\n".join(t for t in texts if t).strip()
@@ -95,12 +119,21 @@ def gemini_text(prompt: str, *, api_key: str, model: str = DEFAULT_MODEL) -> str
     return out
 
 
-def gemini_json(prompt: str, *, api_key: str, model: str = DEFAULT_MODEL) -> dict[str, Any]:
+def gemini_json(
+    prompt: str,
+    *,
+    api_key: str,
+    model: str = DEFAULT_MODEL,
+    timeout_sec: int = 180,
+    use_google_search: bool = False,
+) -> dict[str, Any]:
     raw = gemini_text(
         prompt
         + "\n\n重要: 返答は JSON オブジェクトのみ。前後に説明文や ``` を付けない。",
         api_key=api_key,
         model=model,
+        timeout_sec=timeout_sec,
+        use_google_search=use_google_search,
     )
     raw = raw.strip()
     if raw.startswith("```"):
@@ -641,6 +674,269 @@ def run_pipeline(
     # keep images path refs for C1
     meta = {
         "property_name": property_name,
+        "clean_base": str(job_dir / "clean_base.png"),
+        "c0_base": str(job_dir / "c0_base.png"),
+    }
+    (job_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    return result
+
+
+def build_step12_handoff_block(prev: dict[str, Any]) -> str:
+    """既存 Step1.2（Deep Research）へ渡す用のテキストブロック。"""
+    lines = [
+        f"物件名: {prev.get('property_name') or ''}",
+        f"住所: {prev.get('address') or ''}",
+        f"ターゲット: {prev.get('target') or ''}",
+        "施設候補:",
+    ]
+    research = prev.get("research") or {}
+    cands = (research.get("wash") or {}).get("candidates") or []
+    if cands:
+        for c in cands:
+            lines.append(
+                f"- {c.get('category') or ''} | {c.get('query') or ''} | {c.get('name') or ''}"
+            )
+    else:
+        for f in prev.get("facilities") or []:
+            lines.append(
+                f"- {f.get('category') or ''} | {f.get('query') or ''} | {f.get('name') or ''}"
+            )
+    return "\n".join(lines)
+
+
+def build_deep_research_prompt(prev: dict[str, Any]) -> str:
+    handoff = build_step12_handoff_block(prev)
+    facilities = prev.get("facilities") or []
+    current = [
+        {
+            "id": f.get("id"),
+            "name": f.get("name"),
+            "query": f.get("query"),
+            "category": f.get("category"),
+            "walk_min_approx": f.get("walk_min_approx"),
+            "blurb": f.get("blurb"),
+        }
+        for f in facilities
+    ]
+    return f"""あなたは賃貸物件の周辺MAP向けリサーチャーです（Step1.2 Deep Research 相当）。
+Web検索ができる場合は、食べログ・ホットペッパー・Googleマップ等を参照して実在と評判を確認する。
+存在しない店名を作らない。誇大表現（絶品・No.1等）禁止。徒歩分は断定せず「約N分（要実測）」とする。
+
+【物件】
+{handoff}
+
+【現在アプリで採用中の施設】
+{json.dumps(current, ensure_ascii=False)}
+
+【徒歩圏ポリシー】
+優先〜{WALK_PREFER_MIN}分、推奨〜{WALK_SOFT_MAX_MIN}分、上限〜{WALK_HARD_MAX_MIN}分（直線換算の目安）。
+
+【やること】
+1. 採用中施設の実在・営業・評判の要点を確認
+2. 載せるべき評判店・公園・名所を補完提案（徒歩圏内）
+3. 除外すべき候補を理由付きで列挙
+4. エリア傾向の短いサマリー
+
+次の JSON だけを返す:
+{{
+  "summary": "エリア傾向と選定方針 3〜6行",
+  "findings": [
+    {{
+      "name": "店名",
+      "match_id": "P1または空文字",
+      "status": "採用|保留|除外",
+      "grade": "S|A|B",
+      "existence": "実在確認の要点",
+      "reputation": "口コミ根拠（点数帯・件数目安・支持点）",
+      "blurb": "吹き出し20字前後",
+      "category": "駅|スーパー|ドラッグ|飲食|カフェ|公園|名所|娯楽|行政|その他",
+      "query": "Googleマップ検索クエリ",
+      "sources": ["URL"],
+      "walk_note": "約N分（要実測）または距離要実測"
+    }}
+  ],
+  "suggested_additions": [
+    {{"category":"...","query":"...","name":"...","blurb":"...","why":"...","grade":"S|A|B"}}
+  ],
+  "exclude_names": ["除外すべき店名"],
+  "notes": "残課題・要実測の注意"
+}}
+
+制約:
+- findings は現採用＋主要な補完候補を含めてよい（目安8〜12）
+- suggested_additions は新規のみ（現採用と重複させない）。最大5件
+- 徒歩{WALK_HARD_MAX_MIN}分超は suggested_additions に入れない
+- sources は分かる範囲で。無ければ空配列
+"""
+
+
+def _name_key(s: str) -> str:
+    return re.sub(r"\s+", "", (s or "")).lower()
+
+
+def run_deep_research(
+    job_id: str, *, apply: bool = False, timeout_sec: int = 240
+) -> dict[str, Any]:
+    """Step1.2 相当の深掘り。apply=True なら施設・C0まで反映。"""
+    gemini_key = _env("GEMINI_API_KEY")
+    maps_key = _env("GOOGLE_MAPS_API_KEY")
+    if not gemini_key:
+        raise RuntimeError("GEMINI_API_KEY 未設定")
+    job_dir = JOBS_DIR / job_id
+    result_path = job_dir / "result.json"
+    if not result_path.exists():
+        raise RuntimeError("job が見つかりません。先に周辺MAPを作成してください")
+    prev = json.loads(result_path.read_text(encoding="utf-8"))
+
+    deep_raw = gemini_json(
+        build_deep_research_prompt(prev),
+        api_key=gemini_key,
+        timeout_sec=timeout_sec,
+        use_google_search=True,
+    )
+    deep = {
+        "status": "ready",
+        "summary": deep_raw.get("summary") or "",
+        "findings": deep_raw.get("findings") or [],
+        "suggested_additions": deep_raw.get("suggested_additions") or [],
+        "exclude_names": deep_raw.get("exclude_names") or [],
+        "notes": deep_raw.get("notes") or "",
+        "handoff_block": build_step12_handoff_block(prev),
+        "applied": False,
+    }
+
+    research = dict(prev.get("research") or {})
+    research["deep"] = deep
+    prev["research"] = research
+    prev["steps"] = list(prev.get("steps") or []) + [
+        {
+            "id": "deep",
+            "ok": True,
+            "detail": f"findings={len(deep['findings'])} add={len(deep['suggested_additions'])}",
+        }
+    ]
+
+    # 画像なしで一旦保存（深掘り結果の永続化）
+    (job_dir / "result.json").write_text(
+        json.dumps({k: v for k, v in prev.items() if k != "images"}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (job_dir / "deep.json").write_text(
+        json.dumps(deep, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    if not apply:
+        return {**prev, "images": prev.get("images") or {}}
+
+    if not maps_key:
+        raise RuntimeError("GOOGLE_MAPS_API_KEY 未設定（反映には必要）")
+
+    property_pin = prev.get("property_pin")
+    if not property_pin:
+        raise RuntimeError("物件ピンがありません")
+
+    exclude_keys = {_name_key(x) for x in (deep.get("exclude_names") or [])}
+    facilities = [dict(f) for f in (prev.get("facilities") or [])]
+
+    # findings で blurb / reputation を更新
+    by_id = {str(f.get("id")): f for f in facilities}
+    for finding in deep.get("findings") or []:
+        if (finding.get("status") or "") == "除外":
+            exclude_keys.add(_name_key(finding.get("name") or ""))
+            continue
+        mid = str(finding.get("match_id") or "")
+        target = by_id.get(mid)
+        if not target:
+            for f in facilities:
+                if _name_key(f.get("name") or "") == _name_key(finding.get("name") or ""):
+                    target = f
+                    break
+        if not target:
+            continue
+        if finding.get("blurb"):
+            target["blurb"] = finding["blurb"]
+        if finding.get("reputation"):
+            target["reputation"] = finding["reputation"]
+        if finding.get("existence"):
+            target["existence"] = finding["existence"]
+        why_bits = [finding.get("grade") and f"推奨{finding['grade']}", finding.get("reputation")]
+        target["why"] = " / ".join(x for x in why_bits if x) or target.get("why") or ""
+        # 評判が取れたら needs_check を緩められるが、徒歩は要実測のまま
+        if finding.get("reputation") and finding.get("existence"):
+            target["needs_check"] = True  # 徒歩実測は残す
+
+    facilities = [f for f in facilities if _name_key(f.get("name") or "") not in exclude_keys]
+
+    # 追加候補を Places 確定
+    for add in (deep.get("suggested_additions") or [])[:5]:
+        found = find_place(
+            add.get("query") or add.get("name") or "",
+            lat=float(property_pin["lat"]),
+            lng=float(property_pin["lng"]),
+            maps_key=maps_key,
+        )
+        row = {
+            "id": f"Ptmp{len(facilities)+1}",
+            "query": add.get("query") or "",
+            "name": add.get("name") or "",
+            "blurb": add.get("blurb") or "",
+            "category": add.get("category") or "",
+            "why": add.get("why") or f"Deep補完 {add.get('grade') or ''}",
+            "needs_check": True,
+            "ok": bool(found.get("ok")),
+            "lat": found.get("lat"),
+            "lng": found.get("lng"),
+            "formatted": found.get("formatted") or "",
+            "resolvedName": found.get("name") or "",
+            "isProperty": False,
+            "from_deep": True,
+        }
+        if row["ok"]:
+            facilities.append(row)
+
+    facilities = annotate_distance(
+        facilities,
+        prop_lat=float(property_pin["lat"]),
+        prop_lng=float(property_pin["lng"]),
+    )
+    kept, walk_dropped = filter_by_walk_radius(facilities, max_keep=8)
+    if not any(r.get("ok") for r in kept):
+        raise RuntimeError("深掘り反映後に掲載施設が0件になりました")
+
+    pins_for_map = [property_pin] + kept
+    clean_img, c0, c0_pins = render_c0_pair(pins_for_map, maps_key=maps_key)
+
+    deep["applied"] = True
+    research["deep"] = deep
+    research["walk_dropped"] = list(research.get("walk_dropped") or []) + walk_dropped
+
+    result = {
+        **prev,
+        "facilities": kept,
+        "places_list_text": places_list_text(kept),
+        "research": research,
+        "images": {
+            "c0_base_png_b64": png_b64(c0),
+            "c0_with_pins_png_b64": png_b64(c0_pins),
+            "width": A4_LANDSCAPE_PX[0],
+            "height": A4_LANDSCAPE_PX[1],
+        },
+        "c1": {"status": "idle", "png_b64": None, "message": ""},
+        "steps": list(prev.get("steps") or [])
+        + [{"id": "deep_apply", "ok": True, "detail": f"kept={len(kept)}"}],
+    }
+    (job_dir / "result.json").write_text(
+        json.dumps({k: v for k, v in result.items() if k != "images"}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    c0.save(job_dir / "c0_base.png")
+    c0_pins.save(job_dir / "c0_with_pins.png")
+    clean_img.save(job_dir / "clean_base.png")
+    (job_dir / "deep.json").write_text(
+        json.dumps(deep, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    meta = {
+        "property_name": prev.get("property_name") or "",
         "clean_base": str(job_dir / "clean_base.png"),
         "c0_base": str(job_dir / "c0_base.png"),
     }

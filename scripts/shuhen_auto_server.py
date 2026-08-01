@@ -28,7 +28,12 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from shuhen_auto_pipeline import rebuild_from_exclusions, run_c1, run_pipeline  # noqa: E402
+from shuhen_auto_pipeline import (  # noqa: E402
+    rebuild_from_exclusions,
+    run_c1,
+    run_deep_research,
+    run_pipeline,
+)
 
 PORT = int(os.environ.get("SHUHEN_AUTO_PORT") or "8770")
 TOKEN = (os.environ.get("SHUHEN_AUTO_TOKEN") or "").strip()
@@ -140,7 +145,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if path not in ("/api/run", "/api/c1", "/api/rebuild"):
+        if path not in ("/api/run", "/api/c1", "/api/rebuild", "/api/deep"):
             self._json(404, {"ok": False, "error": "not found"})
             return
         if not _auth_ok(self):
@@ -200,6 +205,33 @@ class Handler(SimpleHTTPRequestHandler):
                     job_id, exclude_ids=[str(x) for x in exclude_ids]
                 )
                 self._json(200, {"ok": True, "result": result})
+            except Exception as e:
+                self._json(500, {"ok": False, "error": str(e)})
+            return
+
+        if path == "/api/deep":
+            job_id = (data.get("job_id") or "").strip()
+            if not job_id:
+                self._json(400, {"ok": False, "error": "job_id 必須"})
+                return
+            apply = bool(data.get("apply"))
+            try:
+                result = run_deep_research(
+                    job_id,
+                    apply=apply,
+                    timeout_sec=int(data.get("timeout_sec") or 240),
+                )
+                deep = ((result.get("research") or {}).get("deep")) or {}
+                self._json(
+                    200,
+                    {
+                        "ok": True,
+                        "applied": apply,
+                        "deep": deep,
+                        "result": result if apply else None,
+                        "research": result.get("research"),
+                    },
+                )
             except Exception as e:
                 self._json(500, {"ok": False, "error": str(e)})
             return
