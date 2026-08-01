@@ -109,6 +109,17 @@
           <summary>距離・Placesで除外／未確定</summary>
           <div id="researchDropped"></div>
         </details>
+        <details id="researchDeepDetails">
+          <summary>Deep Research 相当（評判・実在の深掘り）</summary>
+          <p class="subtitle" style="margin:8px 0;">Step1.2 相当。Google検索グラウンディング付きで調査します（1〜3分かかることがあります）。</p>
+          <div style="margin-bottom:8px;">
+            <button type="button" class="secondary-btn" id="deepButton" onclick="runDeepResearch(false)">評判・実在を深掘り</button>
+            <button type="button" class="secondary-btn" id="deepApplyButton" onclick="runDeepResearch(true)" disabled>深掘り結果を施設・地図に反映</button>
+            <button type="button" class="secondary-btn" id="deepCopyHandoff" onclick="copyDeepHandoff()" disabled>Step1.2渡す用をコピー</button>
+            <span class="api-hint" id="deepHint"></span>
+          </div>
+          <div id="researchDeep"></div>
+        </details>
       </div>
 
       <h3 style="margin-top:18px;">周辺施設</h3>
