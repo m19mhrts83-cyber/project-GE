@@ -1948,9 +1948,10 @@ const App = {
     }
 
     const commentItemHtml = function (c) {
+      const authorLabel = App.formatAuthorForDisplay(c.authorName || '');
       return (
         '<li class="mb-1">' +
-        App.escapeHtml(c.authorName || '') +
+        App.escapeHtml(authorLabel) +
         ' #' +
         App.escapeHtml(c.commentId || '') +
         ' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="comment" data-key="' +
@@ -3059,9 +3060,10 @@ const App = {
     const keywordRaw = String((App.elements.commentSearchInput && App.elements.commentSearchInput.value) || '').trim();
     const keyword = keywordRaw.toLowerCase();
     const exactFromOpts = String(opts.exactCommentId || '').trim();
-    // 「DBで見る」または検索欄が数字のみ → comment_id 完全一致
+    // 「DBで見る」または検索欄が数字のみかつ5桁以上 → comment_id 完全一致（4桁は会員番号検索）
     const exactCommentId =
-      exactFromOpts || (/^\d+$/.test(keywordRaw) ? keywordRaw : '');
+      exactFromOpts ||
+      (/^\d{5,}$/.test(keywordRaw) ? keywordRaw : '');
     const categoryFilter =
       (App.elements.commentCategoryFilter && App.elements.commentCategoryFilter.value) || '';
     const dateFilter = (App.elements.commentDateFilter && App.elements.commentDateFilter.value) || '';
@@ -3075,17 +3077,22 @@ const App = {
       const forumCategory =
         String(App.commentField(row, 'forum_category') || '').trim() || '未分類';
       const hasDate = App.hasPostedAtValue(row);
+      const authorParsed = App.parseWeStudyAuthorName(App.commentField(row, 'author_name'));
       let hitKeyword = true;
       if (exactCommentId) {
         hitKeyword = cid === exactCommentId;
       } else if (keyword) {
         const t1 = String(App.commentField(row, 'content')).toLowerCase();
-        const t2 = String(App.commentField(row, 'author_name')).toLowerCase();
+        const t2 = String(authorParsed.raw || '').toLowerCase();
+        const t2m = String(authorParsed.memberNo || '').toLowerCase();
+        const t2n = String(authorParsed.authorName || '').toLowerCase();
         const t4 = cid.toLowerCase();
         const t5 = forumCategory.toLowerCase();
         hitKeyword =
           t1.indexOf(keyword) !== -1 ||
           t2.indexOf(keyword) !== -1 ||
+          t2m.indexOf(keyword) !== -1 ||
+          t2n.indexOf(keyword) !== -1 ||
           t4.indexOf(keyword) !== -1 ||
           t5.indexOf(keyword) !== -1;
       }
@@ -3113,7 +3120,7 @@ const App = {
     }
 
     if (filtered.length === 0) {
-      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">該当データがありません</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">該当データがありません</td></tr>';
       return;
     }
 
@@ -3124,6 +3131,7 @@ const App = {
       const postedAtLabel = postedAt || '（日時なし）';
       const forumCategory =
         String(App.commentField(r, 'forum_category') || '').trim() || '未分類';
+      const authorParsed = App.parseWeStudyAuthorName(App.commentField(r, 'author_name'));
       const fullContent = String(App.commentField(r, 'content') || '');
       const previewLen = 180;
       const isTruncated = fullContent.length > previewLen;
@@ -3159,7 +3167,12 @@ const App = {
         App.escapeHtml(postedAtLabel) +
         (postedAt ? '' : ' <span class="text-[10px] text-amber-700">missing</span>') +
         '</td>' +
-        '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'author_name')) + '</td>';
+        '<td class="p-2 whitespace-nowrap font-mono text-xs">' +
+        App.escapeHtml(authorParsed.memberNo || '—') +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(authorParsed.authorName || (authorParsed.memberNo ? '' : authorParsed.raw) || '—') +
+        '</td>';
       tr.appendChild(contentTd);
       body.appendChild(tr);
     });
@@ -3168,7 +3181,7 @@ const App = {
   openCommentDetailDialog: (row) => {
     if (!App.elements.commentDetailDialog) return;
     const cid = String(App.commentField(row, 'comment_id') || '').trim();
-    const author = String(App.commentField(row, 'author_name') || '').trim();
+    const authorParsed = App.parseWeStudyAuthorName(App.commentField(row, 'author_name'));
     const postedAt = String(App.commentField(row, 'posted_at') || '').trim();
     const category =
       String(App.commentField(row, 'forum_category') || '').trim() || '未分類';
@@ -3178,8 +3191,10 @@ const App = {
     }
     if (App.elements.commentDetailMeta) {
       App.elements.commentDetailMeta.textContent =
-        '投稿者: ' +
-        (author || '—') +
+        '会員番号: ' +
+        (authorParsed.memberNo || '—') +
+        '\n投稿者: ' +
+        (authorParsed.authorName || authorParsed.raw || '—') +
         '\n日時: ' +
         (postedAt || '—') +
         '\n分類: ' +
@@ -4607,6 +4622,31 @@ const App = {
     const b = row[camel];
     if (b !== undefined && b !== null) return b;
     return '';
+  },
+
+  /**
+   * WeStudy 投稿者名「0089前田 行」「1345 佐伯澄人」→ 会員番号(4桁)と氏名に分離。
+   * 先頭が4桁以外の数字のとき（例: 88 バンティング）は会員番号なし・全文を氏名側。
+   */
+  parseWeStudyAuthorName: (raw) => {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s) return { memberNo: '', authorName: '', raw: '' };
+    const m = /^(\d{4})\s*(.*)$/.exec(s);
+    if (m) {
+      return {
+        memberNo: m[1],
+        authorName: String(m[2] || '').trim(),
+        raw: s,
+      };
+    }
+    return { memberNo: '', authorName: s, raw: s };
+  },
+
+  formatAuthorForDisplay: (raw) => {
+    const p = App.parseWeStudyAuthorName(raw);
+    if (p.memberNo && p.authorName) return p.memberNo + ' ' + p.authorName;
+    if (p.memberNo) return p.memberNo;
+    return p.authorName || p.raw || '';
   },
 
   countDelimiterOutsideQuotes: (line, delim) => {
