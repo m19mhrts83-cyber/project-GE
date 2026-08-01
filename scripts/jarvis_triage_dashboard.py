@@ -23,14 +23,28 @@ from zoneinfo import ZoneInfo
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE_DIR = REPO / ".jarvis_state" / "night_triage"
+JARVIS_STATE = REPO / ".jarvis_state"
 QUEUE_PATH = STATE_DIR / "queue.json"
 CONFIG_PATH = STATE_DIR / "config.json"
 HTML_PATH = STATE_DIR / "dashboard.html"
+WATCH_OUT = JARVIS_STATE / "situation_watch.json"
+WATCH_POPUP_DISMISS = JARVIS_STATE / "situation_watch_popup_dismiss.json"
+WATCH_SCRIPT = REPO / "scripts" / "jarvis_situation_watch.py"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 TRIAGE = REPO / "scripts" / "jarvis_night_triage.py"
 
 # --serve で生成した HTML だけ操作リンクを有効にする
 _SERVE_MODE = False
+
+MAIL_LANES = ("partner", "openchat", "general")
+ALL_LANES = ("partner", "openchat", "general", "situation")
+SIDEBAR_PLACEHOLDERS = (
+    ("kamiooya", "神大家運営", "Phase 2"),
+    ("properties", "3棟・物件", "Phase 2"),
+    ("kodate", "戸建て", "Phase 2"),
+    ("ai_raimo", "AI・Raimo", "Phase 2"),
+    ("metrics", "数値", "Phase 2"),
+)
 
 
 def load_queue() -> dict:
@@ -57,6 +71,76 @@ def load_config() -> dict:
 def save_config(cfg: dict) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def refresh_situation_watch() -> dict:
+    """集約スクリプトを実行して最新 JSON を返す。失敗時は既存ファイルまたは空。"""
+    py = str(PY) if PY.is_file() else sys.executable
+    try:
+        subprocess.run(
+            [py, str(WATCH_SCRIPT)],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except Exception as e:
+        print(f"# situation watch refresh failed: {e}")
+    if WATCH_OUT.is_file():
+        try:
+            return json.loads(WATCH_OUT.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+    return {"items": [], "counts": {}, "popup_item_ids": [], "updated_at": None}
+
+
+def load_situation_watch(*, refresh: bool = False) -> dict:
+    if refresh or not WATCH_OUT.is_file():
+        return refresh_situation_watch()
+    try:
+        return json.loads(WATCH_OUT.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return refresh_situation_watch()
+
+
+def archive_watch_item(item_id: str, *, unarchive: bool = False) -> bool:
+    py = str(PY) if PY.is_file() else sys.executable
+    flag = "--unarchive" if unarchive else "--archive"
+    try:
+        r = subprocess.run(
+            [py, str(WATCH_SCRIPT), flag, item_id],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        return r.returncode == 0
+    except Exception as e:
+        print(f"# watch archive failed: {e}")
+        return False
+
+
+def popup_dismissed_today() -> bool:
+    if not WATCH_POPUP_DISMISS.is_file():
+        return False
+    try:
+        data = json.loads(WATCH_POPUP_DISMISS.read_text(encoding="utf-8"))
+        return data.get("date") == datetime.now(JST).strftime("%Y-%m-%d")
+    except (json.JSONDecodeError, OSError):
+        return False
+
+
+def dismiss_popup_today() -> None:
+    JARVIS_STATE.mkdir(parents=True, exist_ok=True)
+    WATCH_POPUP_DISMISS.write_text(
+        json.dumps(
+            {"date": datetime.now(JST).strftime("%Y-%m-%d"), "at": datetime.now(JST).isoformat()},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def set_engine(engine: str) -> bool:
@@ -261,6 +345,8 @@ def backfill_original_bodies(q: dict) -> int:
     """queue 内の partner で original_body 空のものを埋め、変更数を返す。"""
     n = 0
     for it in q.get("items") or []:
+        if it.get("kind") == "activity":
+            continue
         if (it.get("lane") or "partner") != "partner":
             continue
         if str(it.get("original_body") or "").strip():
@@ -273,36 +359,75 @@ def backfill_original_bodies(q: dict) -> int:
         save_queue(q)
     return n
 
-
 def render_html(
     q: dict,
     *,
     serve_mode: bool | None = None,
     lane: str = "partner",
     flash_notice: str | None = None,
+    watch: dict | None = None,
 ) -> str:
     serve = _SERVE_MODE if serve_mode is None else serve_mode
-    if lane not in ("partner", "general"):
+    if lane not in ALL_LANES:
         lane = "partner"
+    watch = watch if watch is not None else load_situation_watch(refresh=False)
+    watch_items = list(watch.get("items") or [])
+    watch_counts = watch.get("counts") or {}
+    watch_popup_n = int(watch_counts.get("popup") or 0)
+    watch_attn = int(watch_counts.get("attention") or 0) + int(watch_counts.get("warn") or 0)
+
     items_all = list(q.get("items") or [])
     for it in items_all:
         if not it.get("lane"):
             it["lane"] = "partner"
-    pending_partner = sum(1 for i in items_all if i.get("status") == "pending" and (i.get("lane") or "partner") == "partner")
-    pending_general = sum(1 for i in items_all if i.get("status") == "pending" and i.get("lane") == "general")
-    if serve:
+        if not it.get("kind"):
+            it["kind"] = (
+                "mail"
+                if it.get("status") in ("pending", "sent", "skipped", "snoozed")
+                else (it.get("kind") or "mail")
+            )
+
+    def _is_mail_pending(i: dict) -> bool:
+        return i.get("status") == "pending" and i.get("kind") != "activity"
+
+    def _is_activity(i: dict, lane_name: str) -> bool:
+        return i.get("kind") == "activity" and (i.get("lane") or "") == lane_name
+
+    pending_partner = sum(
+        1 for i in items_all if _is_mail_pending(i) and (i.get("lane") or "partner") == "partner"
+    )
+    pending_general = sum(1 for i in items_all if _is_mail_pending(i) and i.get("lane") == "general")
+    openchat_n = sum(1 for i in items_all if _is_activity(i, "openchat"))
+    partner_act_n = sum(1 for i in items_all if _is_activity(i, "partner"))
+    mail_pending_total = pending_partner + pending_general
+
+    if serve and lane in MAIL_LANES:
         items = [i for i in items_all if (i.get("lane") or "partner") == lane]
-    else:
-        # 静的 HTML は両レーンを埋め込み、JS で切替
+    elif lane in MAIL_LANES:
         items = items_all
-    pending = [i for i in items if i.get("status") == "pending"]
-    if serve:
-        pending = [i for i in pending if (i.get("lane") or "partner") == lane]
     else:
-        # 初期表示は partner。general は data-lane で隠す
-        pass
+        items = []
+
+    pending = [
+        i
+        for i in items
+        if _is_mail_pending(i) and (not serve or (i.get("lane") or "partner") == lane)
+    ]
     pending.sort(key=lambda x: x.get("received_at") or "")
-    others = [i for i in items if i.get("status") != "pending"]
+
+    if lane == "partner":
+        activities = [i for i in items_all if _is_activity(i, "partner")]
+    elif lane == "openchat":
+        activities = [i for i in items_all if _is_activity(i, "openchat")]
+    else:
+        activities = []
+    activities.sort(key=lambda x: x.get("received_at") or "", reverse=True)
+
+    others = [
+        i
+        for i in items
+        if i.get("status") in ("sent", "skipped", "snoozed") and i.get("kind") != "activity"
+    ]
     if serve:
         others = [i for i in others if (i.get("lane") or "partner") == lane]
     others.sort(key=lambda x: x.get("updated_at") or "", reverse=True)
@@ -319,7 +444,7 @@ def render_html(
           {html.escape(flash_notice)}
         </div>
         """
-    elif serve and engine == "cursor" and not cursor_ok:
+    elif serve and engine == "cursor" and not cursor_ok and lane in MAIL_LANES:
         warn_block = f"""
         <div class="warn">
           注意: {html.escape(cursor_msg)}。未ログインのままだと夜間バッチの下書き生成が失敗します。
@@ -327,18 +452,62 @@ def render_html(
         </div>
         """
 
+    def side_link(
+        href_lane: str,
+        label: str,
+        badge: int | str | None = None,
+        *,
+        active: bool = False,
+        disabled: bool = False,
+        note: str = "",
+    ) -> str:
+        cls = "side-link"
+        if active:
+            cls += " active"
+        if disabled:
+            cls += " disabled"
+        b = f'<span class="badge">{badge}</span>' if badge not in (None, "", 0) else ""
+        n = f'<span class="side-note">{html.escape(note)}</span>' if note else ""
+        if disabled:
+            return f'<div class="{cls}"><span>{html.escape(label)}</span>{b}{n}</div>'
+        if serve:
+            return (
+                f'<a class="{cls}" href="/?lane={href_lane}">'
+                f"<span>{html.escape(label)}</span>{b}{n}</a>"
+            )
+        return (
+            f'<a class="{cls}" href="#" onclick="showLane({json.dumps(href_lane)});return false;">'
+            f"<span>{html.escape(label)}</span>{b}{n}</a>"
+        )
+
+    sidebar_links = [
+        side_link("partner", "メール · パートナー", pending_partner, active=lane == "partner"),
+        side_link("openchat", "メール · オプチャ", openchat_n, active=lane == "openchat"),
+        side_link("general", "メール · それ以外", pending_general, active=lane == "general"),
+        side_link("situation", "状況ウォッチ", watch_attn or None, active=lane == "situation"),
+    ]
+    for _pid, plabel, pnote in SIDEBAR_PLACEHOLDERS:
+        sidebar_links.append(side_link(_pid, plabel, None, disabled=True, note=pnote))
+    sidebar_html = "\n".join(sidebar_links)
+
     tab_partner_cls = "tab active" if lane == "partner" else "tab"
+    tab_openchat_cls = "tab active" if lane == "openchat" else "tab"
     tab_general_cls = "tab active" if lane == "general" else "tab"
+    tab_situation_cls = "tab active" if lane == "situation" else "tab"
     if serve:
         tabs = f"""
         <nav class="tabs">
           <a class="{tab_partner_cls}" href="/?lane=partner">パートナー <span class="badge">{pending_partner}</span></a>
+          <a class="{tab_openchat_cls}" href="/?lane=openchat">神大家オプチャ <span class="badge">{openchat_n}</span></a>
           <a class="{tab_general_cls}" href="/?lane=general">それ以外 <span class="badge">{pending_general}</span></a>
+          <a class="{tab_situation_cls}" href="/?lane=situation">状況 <span class="badge">{watch_attn}</span></a>
         </nav>
         """
-        engine_panel = f"""
+        engine_panel = ""
+        if lane in MAIL_LANES:
+            engine_panel = f"""
         <div class="engine-panel">
-          <span class="engine-label">下書きエンジン（次回バッチから反映）</span>
+          <span class="engine-label">下書きエンジン（次回バッチから反映・メールのみ）</span>
           <label class="engine-opt"><input type="radio" name="engine" value="gemini" {gemini_checked}
             onchange="location.href='/api/engine?engine=gemini&lane={lane}'"/> Gemini（無料枠）</label>
           <label class="engine-opt"><input type="radio" name="engine" value="cursor" {cursor_checked}
@@ -347,20 +516,25 @@ def render_html(
         </div>
         {warn_block}
         """
+        elif warn_block:
+            engine_panel = warn_block
         howto = """
         <ol class="howto">
-          <li>タブで「パートナー」「それ以外」を切替。pending は古い順</li>
-          <li>不要なら「スキップ」「後で」。送る件は「送信指示をコピー」→ Cursor に貼る</li>
-          <li>Jarvis がプレビュー → 承認後に送信（自動送信なし）</li>
+          <li>パートナー: メール要返信（下書き）＋ Chatwork/LINE/メッセージの更新概要</li>
+          <li>神大家オプチャ: 直近更新の概要のみ（返信提案・スキップなし）</li>
+          <li>状況: 気にしている項目の判定。不要ならアーカイブ、「Cursorで調べる」で調査プロンプトをコピー</li>
+          <li>メールを送る件は「送信指示をコピー」→ Cursor に貼る（自動送信なし）</li>
         </ol>
         """
     else:
         tabs = f"""
         <nav class="tabs">
           <a class="{tab_partner_cls}" href="#" onclick="showLane('partner');return false;">パートナー <span class="badge">{pending_partner}</span></a>
+          <a class="{tab_openchat_cls}" href="#" onclick="showLane('openchat');return false;">神大家オプチャ <span class="badge">{openchat_n}</span></a>
           <a class="{tab_general_cls}" href="#" onclick="showLane('general');return false;">それ以外 <span class="badge">{pending_general}</span></a>
+          <a class="{tab_situation_cls}" href="#" onclick="showLane('situation');return false;">状況 <span class="badge">{watch_attn}</span></a>
         </nav>
-        <p class="sub">静的表示。操作・エンジン切替は <a href="http://127.0.0.1:8765/">http://127.0.0.1:8765/</a>（常時起動）で。</p>
+        <p class="sub">静的表示。操作は <a href="http://127.0.0.1:8765/">http://127.0.0.1:8765/</a>（常時起動）で。</p>
         """
         engine_panel = f"""
         <div class="engine-panel static">
@@ -370,6 +544,9 @@ def render_html(
         howto = ""
 
     def card(it: dict, show_ab: bool) -> str:
+        kind = it.get("kind") or "mail"
+        if kind == "activity":
+            return activity_card(it)
         seq = it.get("seq") or "—"
         st = it.get("status") or ""
         pri = it.get("priority") or ""
@@ -415,8 +592,9 @@ def render_html(
               <button type="button" onclick="copyCmd({json.dumps(f'夜間下書き #{seq} を送って')})">送信指示をコピー</button>
             </div>
             """
+        show = "" if serve or item_lane_raw == "partner" else "display:none"
         return f"""
-        <article class="card lane-{item_lane} pri-{html.escape(pri)} status-{html.escape(st)}" data-lane="{item_lane}" style="{'' if serve or item_lane == 'partner' else 'display:none'}">
+        <article class="card lane-{item_lane} pri-{html.escape(pri)} status-{html.escape(st)}" data-lane="{item_lane}" style="{show}">
           <header>
             <span class="seq">#{seq}</span>
             <span class="pri">{html.escape(pri)}</span>
@@ -439,16 +617,191 @@ def render_html(
         </article>
         """
 
-    cards_p = "\n".join(card(i, True) for i in pending) or "<p>pending なし</p>"
+    def activity_card(it: dict) -> str:
+        partner = html.escape(str(it.get("partner") or ""))
+        folder = html.escape(str(it.get("folder") or ""))
+        channel = html.escape(str(it.get("channel") or "更新"))
+        received = html.escape(str(it.get("received_at") or ""))
+        summary = html.escape(str(it.get("summary") or ""))
+        subject = html.escape(str(it.get("subject") or ""))
+        item_lane = html.escape(str(it.get("lane") or "partner"))
+        body = html.escape(str(it.get("original_body") or it.get("body") or "")[:1500])
+        show_style = "" if serve or item_lane == "partner" else "display:none"
+        details = ""
+        if body.strip():
+            details = f"""
+            <details>
+              <summary>本文メモ</summary>
+              <pre class="original">{body}</pre>
+            </details>
+            """
+        return f"""
+        <article class="card activity lane-{item_lane}" data-lane="{item_lane}" style="{show_style}">
+          <header>
+            <span class="ch">{channel}</span>
+            <strong>{partner}</strong>
+            <span class="meta">{folder} · {received}</span>
+          </header>
+          <p class="sum">{summary or subject}</p>
+          {details}
+        </article>
+        """
+
+    def watch_card(it: dict, *, archived_section: bool = False) -> str:
+        iid = str(it.get("id") or "")
+        level = str(it.get("level") or "info")
+        title = html.escape(str(it.get("title") or ""))
+        summary = html.escape(str(it.get("summary") or ""))
+        detail = html.escape(str(it.get("detail") or ""))
+        src = html.escape(str(it.get("source") or ""))
+        prompt = str(it.get("cursor_prompt") or "").strip()
+        prompt_js = json.dumps(prompt)
+        if serve:
+            if archived_section:
+                actions = f"""
+            <div class="actions">
+              <button type="button" onclick='copyCmd({prompt_js})'>Cursorで調べる</button>
+              <a class="btn" href="/api/watch?id={html.escape(iid)}&action=unarchive&lane=situation">再表示</a>
+            </div>
+            """
+            else:
+                actions = f"""
+            <div class="actions">
+              <button type="button" onclick='copyCmd({prompt_js})'>Cursorで調べる</button>
+              <a class="btn" href="/api/watch?id={html.escape(iid)}&action=archive&lane=situation">アーカイブ</a>
+            </div>
+            """
+        else:
+            actions = f"""
+            <div class="actions">
+              <button type="button" onclick='copyCmd({prompt_js})'>Cursorで調べる</button>
+            </div>
+            """
+        return f"""
+        <article class="card watch level-{html.escape(level)}" data-lane="situation">
+          <header>
+            <span class="lvl">{html.escape(level)}</span>
+            <strong>{title}</strong>
+            <span class="meta">{src}</span>
+          </header>
+          <p class="sum">{summary}</p>
+          {f'<p class="reason">{detail}</p>' if detail else ''}
+          {actions}
+        </article>
+        """
+
+    cards_p = "\n".join(card(i, True) for i in pending) or (
+        "<p>メールの要返信なし</p>"
+        if lane == "partner"
+        else ("<p>pending なし</p>" if lane == "general" else "")
+    )
+    cards_act = "\n".join(activity_card(i) for i in activities) or "<p>直近の更新なし</p>"
     cards_o = "\n".join(card(i, False) for i in others[:40])
-    lane_label = "パートナー" if lane == "partner" else "それ以外（admin Gmail）"
+
+    if lane == "partner":
+        lane_label = "パートナー"
+        main_sections = f"""
+  <div class="stats">
+    <div class="stat">メール要返信 <strong>{len(pending)}</strong></div>
+    <div class="stat">他チャネル更新 <strong>{partner_act_n}</strong></div>
+    <div class="stat">状況要注意 <strong>{watch_attn}</strong></div>
+  </div>
+  <h2>メール要返信（古い順）</h2>
+  {cards_p}
+  <h2>他チャネルの更新（Chatwork / LINE / メッセージ）</h2>
+  <p class="sec-note">概要のみ（スキップ・下書きなし）。取込はパートナー確認側の MD が正本。</p>
+  {cards_act}
+  <h2>処理済み・スキップ（直近）</h2>
+  {cards_o}
+"""
+    elif lane == "openchat":
+        lane_label = "神大家オプチャ"
+        main_sections = f"""
+  <div class="stats">
+    <div class="stat">直近更新 <strong>{openchat_n}</strong></div>
+  </div>
+  <h2>直近の更新概要</h2>
+  <p class="sec-note">情報収集枠。返信提案・スキップ操作はありません。</p>
+  {cards_act}
+"""
+    elif lane == "situation":
+        lane_label = "状況ウォッチ"
+        active_w = [i for i in watch_items if i.get("status") != "archived"]
+        arch_w = [i for i in watch_items if i.get("status") == "archived"]
+        order = {"attention": 0, "warn": 1, "info": 2, "ok": 3}
+        active_w.sort(key=lambda x: (order.get(str(x.get("level")), 9), str(x.get("title") or "")))
+        cards_w = "\n".join(watch_card(i) for i in active_w) or "<p>ウォッチ項目なし</p>"
+        cards_wa = "\n".join(watch_card(i, archived_section=True) for i in arch_w) or "<p>アーカイブなし</p>"
+        wupd = html.escape(str(watch.get("updated_at") or "—"))
+        refresh_btn = (
+            "<a class='btn' href='/api/watch?action=refresh&lane=situation'>再集約</a>" if serve else ""
+        )
+        main_sections = f"""
+  <div class="stats">
+    <div class="stat">要注意 <strong>{watch_attn}</strong></div>
+    <div class="stat">OK <strong>{int(watch_counts.get('ok') or 0)}</strong></div>
+    <div class="stat">アーカイブ <strong>{int(watch_counts.get('archived') or 0)}</strong></div>
+    <div class="stat">集約 {wupd}</div>
+  </div>
+  <p class="sec-note">既存 state から判定。不要な項目はアーカイブ。「Cursorで調べる」で調査プロンプトをコピー。</p>
+  <div class="actions" style="margin-bottom:12px">{refresh_btn}</div>
+  <h2>アクティブ</h2>
+  {cards_w}
+  <h2>アーカイブ</h2>
+  {cards_wa}
+"""
+    else:
+        lane_label = "それ以外（admin Gmail）"
+        main_sections = f"""
+  <div class="stats">
+    <div class="stat">このタブ pending <strong>{len(pending)}</strong></div>
+    <div class="stat">パートナー {pending_partner} / オプチャ {openchat_n} / それ以外 {pending_general}</div>
+  </div>
+  <h2>要対応（古い順）</h2>
+  {cards_p}
+  <h2>処理済み・スキップ（直近）</h2>
+  {cards_o}
+"""
+
+    popup_html = ""
+    popup_items = [
+        i
+        for i in watch_items
+        if i.get("status") != "archived" and i.get("id") in (watch.get("popup_item_ids") or [])
+    ]
+    show_popup = bool(
+        serve and lane != "situation" and watch_popup_n > 0 and not popup_dismissed_today() and popup_items
+    )
+    if show_popup:
+        rows = []
+        for i in popup_items[:8]:
+            rows.append(
+                f"<li><strong>{html.escape(str(i.get('title') or ''))}</strong>"
+                f' <span class="lvl mini">{html.escape(str(i.get("level") or ""))}</span>'
+                f'<br/><span class="muted">{html.escape(str(i.get("summary") or ""))}</span></li>'
+            )
+        popup_html = f"""
+<div class="modal-backdrop" id="watchModal">
+  <div class="modal" role="dialog" aria-labelledby="watchModalTitle">
+    <h2 id="watchModalTitle">気にしている状況</h2>
+    <p class="sec-note">要注意 {watch_popup_n} 件（今日1回表示）</p>
+    <ul class="popup-list">
+      {''.join(rows)}
+    </ul>
+    <div class="actions">
+      <a class="btn primary" href="/?lane=situation">状況タブを開く</a>
+      <a class="btn" href="/api/watch?action=dismiss_popup&lane={lane}">今日は閉じる</a>
+    </div>
+  </div>
+</div>
+"""
 
     return f"""<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Jarvis 夜間トリアージ</title>
+<title>Jarvis ダッシュボード</title>
 <style>
   :root {{
     --bg: #f6f3ee; --ink: #1c1917; --muted: #78716c; --line: #e7e5e4;
@@ -462,7 +815,29 @@ def render_html(
                 radial-gradient(900px 500px at 100% 0%, #fde68a44, transparent), var(--bg);
     color: var(--ink); line-height: 1.5;
   }}
-  main {{ max-width: 960px; margin: 0 auto; padding: 28px 18px 80px; }}
+  .layout {{ display: flex; min-height: 100vh; align-items: stretch; }}
+  .sidebar {{
+    width: 220px; flex-shrink: 0; background: #1c1917; color: #fafaf9;
+    padding: 20px 12px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }}
+  .side-brand {{ font-size: 0.95rem; font-weight: 700; letter-spacing: 0.04em; margin: 0 8px 16px; }}
+  .side-link {{
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+    color: #e7e5e4; text-decoration: none; padding: 8px 10px; border-radius: 8px;
+    font-size: 0.88rem; margin-bottom: 4px;
+  }}
+  .side-link:hover {{ background: #292524; }}
+  .side-link.active {{ background: #0f766e; color: #ecfdf5; }}
+  .side-link.disabled {{ opacity: 0.45; cursor: default; }}
+  .side-note {{ font-size: 0.7rem; color: #a8a29e; width: 100%; }}
+  .side-link .badge {{ background: #134e4a; color: #99f6e4; }}
+  .side-link.active .badge {{ background: #ecfdf5; color: #0f766e; }}
+  main {{ flex: 1; max-width: 960px; margin: 0 auto; padding: 28px 18px 80px; width: 100%; }}
+  @media (max-width: 800px) {{
+    .layout {{ flex-direction: column; }}
+    .sidebar {{ width: 100%; height: auto; position: relative; display: flex; flex-wrap: wrap; gap: 4px; }}
+    .side-brand {{ width: 100%; }}
+  }}
   h1 {{ font-size: 1.45rem; margin: 0 0 4px; letter-spacing: 0.02em; }}
   .sub {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }}
   .howto {{ margin: 0 0 16px; padding-left: 1.2rem; font-size: 0.9rem; color: var(--muted); }}
@@ -488,7 +863,6 @@ def render_html(
     background: var(--warn-bg); color: var(--warn-ink); border: 1px solid #fed7aa;
     border-radius: 8px; padding: 10px 12px; margin: -6px 0 14px; font-size: 0.88rem;
   }}
-  .warn code {{ background: #ffedd5; padding: 1px 4px; border-radius: 3px; }}
   .stats {{ display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }}
   .stat {{ background: var(--card); border: 1px solid var(--line); padding: 10px 14px; border-radius: 10px; }}
   .card {{
@@ -503,6 +877,25 @@ def render_html(
   .pri-low .pri {{ background: #f5f5f4; color: var(--low); }}
   .st {{ color: var(--muted); }}
   .meta {{ color: var(--muted); }}
+  .ch {{
+    font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+    background: #ecfeff; color: #0e7490;
+  }}
+  .lvl {{
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 999px; background: #f5f5f4; color: var(--low);
+  }}
+  .lvl.mini {{ font-size: 0.65rem; }}
+  .level-attention .lvl {{ background: #fee2e2; color: var(--high); }}
+  .level-warn .lvl {{ background: #ffedd5; color: var(--med); }}
+  .level-ok .lvl {{ background: #d1fae5; color: #065f46; }}
+  .level-info .lvl {{ background: #e0e7ff; color: #3730a3; }}
+  .card.watch {{ border-left: 3px solid var(--line); }}
+  .level-attention.card.watch {{ border-left-color: var(--high); }}
+  .level-warn.card.watch {{ border-left-color: var(--med); }}
+  .card.activity {{ border-style: dashed; }}
+  .sec-note {{ color: var(--muted); font-size: 0.85rem; margin: -4px 0 10px; }}
+  .muted {{ color: var(--muted); font-size: 0.88rem; }}
   h3 {{ font-size: 1.05rem; margin: 8px 0 6px; font-weight: 600; }}
   .sum {{ margin: 0 0 6px; }}
   .reason {{ color: var(--muted); font-size: 0.9rem; margin: 0 0 8px; }}
@@ -521,36 +914,49 @@ def render_html(
     padding: 6px 12px; border-radius: 8px; cursor: pointer; text-decoration: none; font-size: 0.88rem;
   }}
   button:hover, .btn:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .btn.primary {{ background: var(--accent); color: #ecfdf5; border-color: var(--accent); }}
+  .btn.primary:hover {{ filter: brightness(1.05); color: #fff; }}
   h2 {{ font-size: 1.1rem; margin: 28px 0 8px; }}
   .toast {{
     position: fixed; bottom: 18px; right: 18px; background: #134e4a; color: #ecfdf5;
-    padding: 10px 14px; border-radius: 8px; display: none; max-width: 90vw;
+    padding: 10px 14px; border-radius: 8px; display: none; max-width: 90vw; z-index: 40;
   }}
-  code {{ font-size: 0.85em; }}
+  .modal-backdrop {{
+    position: fixed; inset: 0; background: #00000066; display: flex; align-items: center;
+    justify-content: center; z-index: 30; padding: 16px;
+  }}
+  .modal {{
+    background: var(--card); border-radius: 14px; padding: 20px 22px; max-width: 520px; width: 100%;
+    box-shadow: 0 20px 50px #00000033; max-height: 85vh; overflow-y: auto;
+  }}
+  .modal h2 {{ margin-top: 0; }}
+  .popup-list {{ margin: 0 0 12px; padding-left: 1.1rem; }}
+  .popup-list li {{ margin-bottom: 10px; }}
 </style>
 </head>
 <body>
+<div class="layout">
+<aside class="sidebar">
+  <div class="side-brand">Jarvis</div>
+  {sidebar_html}
+  <div class="side-note" style="margin:12px 10px 0;opacity:0.7">メール起点 · 状況ほかはサイドから</div>
+</aside>
 <main>
-  <h1>夜間メールトリアージ</h1>
-  <p class="sub">更新: {updated} · 表示中: {lane_label} · 送信は Cursor 経由（自動送信なし）</p>
+  <h1>Jarvis ダッシュボード</h1>
+  <p class="sub">更新: {updated} · 表示中: {lane_label} · メールpending {mail_pending_total} · 送信は Cursor 経由（自動送信なし）</p>
   {tabs}
   {engine_panel}
   {howto}
-  <div class="stats">
-    <div class="stat">このタブ pending <strong>{len(pending)}</strong></div>
-    <div class="stat">パートナー全体 {pending_partner} / それ以外 {pending_general}</div>
-  </div>
-  <h2>要対応（古い順）</h2>
-  {cards_p}
-  <h2>処理済み・スキップ（直近）</h2>
-  {cards_o}
+  {main_sections}
 </main>
+</div>
+{popup_html}
 <div class="toast" id="toast"></div>
 <script>
 function copyCmd(t) {{
   navigator.clipboard.writeText(t).then(() => {{
     const el = document.getElementById('toast');
-    el.textContent = 'コピーしました: ' + t;
+    el.textContent = 'コピーしました';
     el.style.display = 'block';
     setTimeout(() => el.style.display = 'none', 2200);
   }});
@@ -559,8 +965,9 @@ function showLane(lane) {{
   document.querySelectorAll('.card').forEach(el => {{
     el.style.display = (el.dataset.lane === lane) ? '' : 'none';
   }});
+  const order = ['partner', 'openchat', 'general', 'situation'];
   document.querySelectorAll('.tab').forEach((el, i) => {{
-    el.classList.toggle('active', (i === 0 && lane === 'partner') || (i === 1 && lane === 'general'));
+    el.classList.toggle('active', order[i] === lane);
   }});
 }}
 </script>
@@ -574,13 +981,17 @@ def write_html(
     serve_mode: bool | None = None,
     lane: str = "partner",
     flash_notice: str | None = None,
+    refresh_watch: bool = False,
 ) -> Path:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     q = load_queue()
     n = backfill_original_bodies(q)
     if n:
         print(f"# backfilled original_body for {n} partner item(s)")
-    html_text = render_html(q, serve_mode=serve_mode, lane=lane, flash_notice=flash_notice)
+    watch = load_situation_watch(refresh=refresh_watch)
+    html_text = render_html(
+        q, serve_mode=serve_mode, lane=lane, flash_notice=flash_notice, watch=watch
+    )
     HTML_PATH.write_text(html_text, encoding="utf-8")
     print(f"# wrote {HTML_PATH} lane={lane}")
     return HTML_PATH
@@ -599,7 +1010,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         qs = parse_qs(parsed.query)
         lane = (qs.get("lane") or ["partner"])[0]
-        if lane not in ("partner", "general"):
+        if lane not in ALL_LANES:
             lane = "partner"
         if parsed.path == "/api/status":
             iid = (qs.get("id") or [""])[0]
@@ -623,6 +1034,29 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._redirect(f"/?lane={lane}")
             return
+        if parsed.path == "/api/watch":
+            action = (qs.get("action") or [""])[0]
+            iid = (qs.get("id") or [""])[0]
+            if action == "dismiss_popup":
+                dismiss_popup_today()
+                self._redirect(f"/?lane={lane}")
+                return
+            if action == "archive" and iid:
+                archive_watch_item(iid, unarchive=False)
+                write_html(serve_mode=True, lane="situation", refresh_watch=True)
+                self._redirect("/?lane=situation")
+                return
+            if action == "unarchive" and iid:
+                archive_watch_item(iid, unarchive=True)
+                write_html(serve_mode=True, lane="situation", refresh_watch=True)
+                self._redirect("/?lane=situation")
+                return
+            if action == "refresh":
+                write_html(serve_mode=True, lane="situation", refresh_watch=True)
+                self._redirect("/?lane=situation")
+                return
+            self._redirect(f"/?lane={lane}")
+            return
         if parsed.path in ("/", "/index.html", "/dashboard.html"):
             notice = (qs.get("notice") or [None])[0]
             write_html(serve_mode=True, lane=lane, flash_notice=notice)
@@ -639,7 +1073,7 @@ class Handler(BaseHTTPRequestHandler):
 def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
     global _SERVE_MODE
     _SERVE_MODE = True
-    write_html(serve_mode=True)
+    write_html(serve_mode=True, refresh_watch=True)
     httpd = ThreadingHTTPServer((host, port), Handler)
     print(f"# serving http://{host}:{port}/  (Ctrl+C to stop)")
     try:
@@ -656,13 +1090,14 @@ def main() -> int:
     ap.add_argument("--serve", action="store_true")
     ap.add_argument("--open", action="store_true")
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--lane", default="partner", choices=list(ALL_LANES))
     args = ap.parse_args()
 
     if args.serve:
         serve(port=args.port)
         return 0
 
-    path = write_html(serve_mode=False)
+    path = write_html(serve_mode=False, lane=args.lane, refresh_watch=True)
     if args.open or not args.write:
         subprocess.run(["open", str(path)], check=False)
     return 0

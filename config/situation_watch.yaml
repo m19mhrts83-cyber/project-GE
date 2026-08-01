@@ -1,0 +1,108 @@
+# Jarvis 状況ウォッチ — レジストリ（Phase 0）
+# 集約: scripts/jarvis_situation_watch.py → .jarvis_state/situation_watch.json
+# 判定は既存 state JSON を読むのみ（新規ログインなし）
+
+version: 1
+
+# popup_levels: 起動時ポップアップに含める判定レベル
+popup_levels:
+  - attention
+  - warn
+
+items:
+  - id: etc_mileage
+    title: ETC月次（明細・還元）
+    category: finance
+    enabled: true
+    source: .jarvis_state/etc_monthly.json
+    cursor_prompt: |
+      ETC月次の状況を確認して。state は ~/git-repos/.jarvis_state/etc_monthly.json。
+      ルール: jarvis-monthly-routine.mdc / etc-discount-jarvis.mdc。
+      ウィンドウA（1〜8日）・B（19〜26日）の未実施があれば実行して報告して。
+
+  - id: vpoint
+    title: Vポイント（cadence・月次）
+    category: finance
+    enabled: true
+    source: .jarvis_state/vpoint_cadence.json
+    cursor_prompt: |
+      Vポイントの状況を確認して。cadence・月次・監査結果を見て、
+      open_actions の次の一手があれば提案して。
+      ルール: jarvis-vpoint-audit.mdc。state: .jarvis_state/vpoint_*.json
+
+  - id: line_export
+    title: LINE公式エクスポート経過
+    category: line
+    enabled: true
+    source: .jarvis_state/line_export_reminder.json
+    cursor_prompt: |
+      LINE公式エクスポートの経過日数を確認して。促しレベルが ask/suggest のルートがあれば報告して。
+      コマンド: scripts/jarvis_line_export_check.py
+      ルール: jarvis-line-export-reminder.mdc
+
+  - id: westudy_weekly
+    title: WeStudy週次CI
+    category: ops
+    enabled: true
+    source: .jarvis_state/westudy_weekly_watch.json
+    cursor_prompt: |
+      WeStudy週次 GitHub Actions の結果を確認して。失敗ならログ要約と再実行案を。
+      コマンド: scripts/jarvis_westudy_weekly_check.py
+      ルール: jarvis-westudy-weekly-watch.mdc
+
+  - id: openchat_threads
+    title: 815スレッド健全性（常時監視）
+    category: line
+    enabled: true
+    source: line_unofficial_poc/.line_auth/.chrline_open_chat_watch_status.json
+    cursor_prompt: |
+      815オープンチャットの常時監視とスレッド健全性を確認して。
+      status JSON・watch.err.log・今日の【スレッド】追記を見て報告して。
+      ルール: jarvis-openchat-thread-health.mdc
+
+  - id: square_probe
+    title: Square API復活監視
+    category: line
+    enabled: true
+    source: .jarvis_state/square_probe.json
+    cursor_prompt: |
+      Square API プローブの状態を確認して。structural_limit や最終OK日を見て、
+      必要なら scripts/jarvis_square_probe_check.py --probe --allow-qr-login を案内して。
+
+  - id: chrline_version
+    title: CHRLINE版
+    category: ops
+    enabled: true
+    source: .jarvis_state/chrline_version.json
+    cursor_prompt: |
+      CHRLINE-Patch の版を確認して。update_available なら更新手順を案内して。
+      コマンド: scripts/jarvis_chrline_version_check.py
+
+  - id: car_loan
+    title: マイカーローン進捗
+    category: finance
+    enabled: true
+    source: .jarvis_state/car_loan.json
+    cursor_prompt: |
+      マイカーローン（MINI）の進捗を car_loan.json から確認して。
+      funding_setup や期限・未完了があれば次の一手を提案して。
+
+  - id: sbi_vpoint_up
+    title: SBI Vポイントアップ設定
+    category: finance
+    enabled: true
+    source: .jarvis_state/sbi_vpoint_up_checklist.json
+    cursor_prompt: |
+      SBI Vポイントアップのチェックリストを確認して。
+      confirm / id_dominant / 1pct など要フォロー項目があれば整理して。
+      コマンド: scripts/jarvis_sbi_vpoint_up_setup.py --status
+
+  - id: night_triage
+    title: 夜間トリアージ
+    category: ops
+    enabled: true
+    source: .jarvis_state/night_triage/queue.json
+    cursor_prompt: |
+      夜間トリアージの queue を確認して。pending 件数・最終更新・エンジン設定を報告して。
+      ダッシュボード: http://127.0.0.1:8765/
+      ルール: jarvis-night-triage.mdc
