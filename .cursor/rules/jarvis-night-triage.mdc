@@ -6,10 +6,21 @@
 - **自動送信はしない**。朝にダッシュボードで確認 → Cursor で「夜間下書き #N を送って」。
 - ダッシュボードは **launchd 常時起動**（`http://127.0.0.1:8765/`）。ターミナル不要。
 - エンジンはページ上部または `config.json` の `engine`（`gemini` / `cursor`）。Cursor 切替で未ログインなら Terminal で `agent login` が起動する。
+- **パッと表示**: バッチ完了時（pending≥1）と朝のログイン／7–8時に、ブラウザでダッシュボードを自動オープン（1日1回マークで重複抑制）。
+
+## Mac 休止時の挙動
+
+| 状態 | 夜間バッチ（05:00） | ダッシュボード（8765） |
+|---|---|---|
+| スリープ／ふた閉じ | 05:00ちょうどには動かない。**起床後に launchd が遅延実行**するのが普通 | スリープ中は停止。起床後に KeepAlive で再開 |
+| シャットダウン | 動かない（次の05:00または手動） | ログイン後に `RunAtLoad` で再起動 |
+| 電源オン＋ログイン済み | 05:00に実行 | 常時利用可 |
+
+スリープ中に画面表示はできない。通知・自動オープンは起床・解除後に見える。
 
 ## 朝の使い方
 
-1. ブラウザで開く: **http://127.0.0.1:8765/**  
+1. バッチ完了や朝の自動オープンで **http://127.0.0.1:8765/** が開く（手動なら webloc でも可）  
    （ブックマーク: `~/git-repos/.jarvis_state/night_triage/夜間トリアージ.webloc`）
 2. タブ「パートナー」「それ以外」を切替。pending は古い順
 3. 不要なら「スキップ」「後で」。送る件は「送信指示をコピー」→ Cursor に貼る
@@ -35,6 +46,9 @@
 # ダッシュボード常時起動の再インストール
 ~/git-repos/launchd/install_triage_dashboard_launchd.sh
 
+# 朝の自動オープン（ログイン時＋7:00/8:00）
+~/git-repos/launchd/install_triage_morning_open_launchd.sh
+
 # 手動バッチ
 cd ~/git-repos
 ~/selenium_env/venv/bin/python scripts/jarvis_night_triage.py --lane all
@@ -44,4 +58,5 @@ cd ~/git-repos
 - state: `~/git-repos/.jarvis_state/night_triage/`
 - 夜間バッチ: `launchd/install_night_triage_launchd.sh`（05:00）
 - ダッシュボード常時: `launchd/install_triage_dashboard_launchd.sh`
+- 朝の自動オープン: `launchd/install_triage_morning_open_launchd.sh`
 - 正本: `docs/運用コマンド一覧.md` §2.2
