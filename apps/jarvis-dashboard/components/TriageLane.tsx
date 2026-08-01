@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Shell from "@/components/Shell";
 import DraftWorkbench from "@/components/DraftWorkbench";
 import TriageStatusActions from "@/components/TriageStatusActions";
@@ -196,18 +195,18 @@ export default async function TriageLanePage({
                     {idx + 1} / {unread.length}
                   </span>
                   {idx > 0 ? (
-                    <Link className="btn" href={unreadHref(idx - 1)}>
+                    <a className="btn" href={unreadHref(idx - 1)}>
                       ← 前
-                    </Link>
+                    </a>
                   ) : (
                     <span className="btn" style={{ opacity: 0.4 }}>
                       ← 前
                     </span>
                   )}
                   {idx < unread.length - 1 ? (
-                    <Link className="btn" href={unreadHref(idx + 1)}>
+                    <a className="btn" href={unreadHref(idx + 1)}>
                       次 →
-                    </Link>
+                    </a>
                   ) : (
                     <span className="btn" style={{ opacity: 0.4 }}>
                       次 →
@@ -228,7 +227,12 @@ export default async function TriageLanePage({
                     />
                   </header>
                   <h3 style={{ fontSize: "1.05rem", margin: "8px 0 6px" }}>
-                    {focus.subject}
+                    <a
+                      href={`/mail/${encodeURIComponent(focus.id)}`}
+                      style={{ color: "var(--accent)", fontWeight: 600 }}
+                    >
+                      {focus.subject || "（件名なし）"}
+                    </a>
                   </h3>
                   {focusTo.to ? (
                     <p className="meta">To: {focusTo.to}</p>
@@ -300,12 +304,12 @@ export default async function TriageLanePage({
                       />
                     </header>
                     <p className="mail-subject" style={{ margin: "6px 0" }}>
-                      <Link
+                      <a
                         href={`/mail/${encodeURIComponent(it.id)}`}
                         style={{ color: "var(--accent)", fontWeight: 600 }}
                       >
                         {it.subject || "（件名なし）"}
-                      </Link>
+                      </a>
                     </p>
                     {st === "sent" ? (
                       <p className="meta">
