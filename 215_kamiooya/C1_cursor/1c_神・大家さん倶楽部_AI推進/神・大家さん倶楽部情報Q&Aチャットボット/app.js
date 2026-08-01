@@ -168,7 +168,6 @@ const App = {
     App.elements.suggestedQuestions = document.getElementById('suggestedQuestions');
     App.elements.commentTableBody = document.getElementById('commentTableBody');
     App.elements.commentSearchInput = document.getElementById('commentSearchInput');
-    App.elements.commentSourceFilter = document.getElementById('commentSourceFilter');
     App.elements.commentCategoryFilter = document.getElementById('commentCategoryFilter');
     App.elements.commentDateFilter = document.getElementById('commentDateFilter');
     App.elements.commentListMeta = document.getElementById('commentListMeta');
@@ -349,9 +348,6 @@ const App = {
     }
     if (App.elements.knowledgeSearchInput) {
       App.elements.knowledgeSearchInput.addEventListener('input', App.renderKnowledgeTable);
-    }
-    if (App.elements.commentSourceFilter) {
-      App.elements.commentSourceFilter.addEventListener('change', App.renderCommentTable);
     }
     if (App.elements.commentCategoryFilter) {
       App.elements.commentCategoryFilter.addEventListener('change', App.renderCommentTable);
@@ -1403,7 +1399,7 @@ const App = {
     const res = await App.apiClient('GET', '/comments');
     const rows = (res && res.comments) ? res.comments : [];
     App.state.comments = rows.map(App.enrichCommentCategory);
-    App.renderCommentSourceFilterOptions();
+    App.renderCommentCategoryFilterOptions();
     App.renderCommentTable();
     App.renderLessonCourseTabFilterOptions();
     App.renderLessonTable();
@@ -2143,7 +2139,6 @@ const App = {
         '<td class="p-2 whitespace-nowrap">' +
         App.escapeHtml(App.formatMmSs(start)) +
         '</td>' +
-        '<td class="p-2">WeStudyセミナー動画</td>' +
         '<td class="p-2">' +
         App.escapeHtml(src.title || ch.source_key || '') +
         '</td>' +
@@ -2879,35 +2874,6 @@ const App = {
     });
   },
 
-  renderCommentSourceFilterOptions: () => {
-    const select = App.elements.commentSourceFilter;
-    if (!select) return;
-    const current = select.value || '';
-    const sources = Array.from(
-      new Set(
-        (App.state.comments || [])
-          .filter(function (row) {
-            return !App.isLessonCommentRow(row);
-          })
-          .map(function (row) {
-            return String(App.commentField(row, 'source_type') || '').trim();
-          })
-          .filter(Boolean)
-      )
-    ).sort();
-    select.innerHTML = '<option value="">全ソース</option>';
-    sources.forEach(function (source) {
-      const opt = document.createElement('option');
-      opt.value = source;
-      opt.textContent = source;
-      select.appendChild(opt);
-    });
-    if (current && sources.indexOf(current) !== -1) {
-      select.value = current;
-    }
-    App.renderCommentCategoryFilterOptions();
-  },
-
   renderCommentCategoryFilterOptions: () => {
     const select = App.elements.commentCategoryFilter;
     if (!select) return;
@@ -3096,7 +3062,6 @@ const App = {
     // 「DBで見る」または検索欄が数字のみ → comment_id 完全一致
     const exactCommentId =
       exactFromOpts || (/^\d+$/.test(keywordRaw) ? keywordRaw : '');
-    const sourceFilter = (App.elements.commentSourceFilter && App.elements.commentSourceFilter.value) || '';
     const categoryFilter =
       (App.elements.commentCategoryFilter && App.elements.commentCategoryFilter.value) || '';
     const dateFilter = (App.elements.commentDateFilter && App.elements.commentDateFilter.value) || '';
@@ -3107,7 +3072,6 @@ const App = {
     });
     const filtered = communityRows.filter(function (row) {
       const cid = String(App.commentField(row, 'comment_id') || '').trim();
-      const sourceType = String(App.commentField(row, 'source_type') || '').trim();
       const forumCategory =
         String(App.commentField(row, 'forum_category') || '').trim() || '未分類';
       const hasDate = App.hasPostedAtValue(row);
@@ -3117,23 +3081,20 @@ const App = {
       } else if (keyword) {
         const t1 = String(App.commentField(row, 'content')).toLowerCase();
         const t2 = String(App.commentField(row, 'author_name')).toLowerCase();
-        const t3 = String(App.commentField(row, 'source_type')).toLowerCase();
         const t4 = cid.toLowerCase();
         const t5 = forumCategory.toLowerCase();
         hitKeyword =
           t1.indexOf(keyword) !== -1 ||
           t2.indexOf(keyword) !== -1 ||
-          t3.indexOf(keyword) !== -1 ||
           t4.indexOf(keyword) !== -1 ||
           t5.indexOf(keyword) !== -1;
       }
-      const hitSource = !sourceFilter || sourceType === sourceFilter;
       const hitCategory = !categoryFilter || forumCategory === categoryFilter;
       const hitDate =
         !dateFilter ||
         (dateFilter === 'hasDate' && hasDate) ||
         (dateFilter === 'missingDate' && !hasDate);
-      return hitKeyword && hitSource && hitCategory && hitDate;
+      return hitKeyword && hitCategory && hitDate;
     });
 
     const totalCount = communityRows.length;
@@ -3152,7 +3113,7 @@ const App = {
     }
 
     if (filtered.length === 0) {
-      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">該当データがありません</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">該当データがありません</td></tr>';
       return;
     }
 
@@ -3198,7 +3159,6 @@ const App = {
         App.escapeHtml(postedAtLabel) +
         (postedAt ? '' : ' <span class="text-[10px] text-amber-700">missing</span>') +
         '</td>' +
-        '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'source_type')) + '</td>' +
         '<td class="p-2">' + App.escapeHtml(App.commentField(r, 'author_name')) + '</td>';
       tr.appendChild(contentTd);
       body.appendChild(tr);
