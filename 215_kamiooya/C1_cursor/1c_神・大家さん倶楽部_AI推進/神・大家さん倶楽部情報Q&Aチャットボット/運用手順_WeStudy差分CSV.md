@@ -271,7 +271,7 @@ python3 scripts/upload_csv_to_supabase.py --bootstrap --csv "$LATEST_FULL"
 | 重複エラー | `comments_comment_id_unique` インデックスが適用されているか |
 | state が進まない | `SUPABASE_FAIL_OPEN=0` 時は Supabase 失敗で state 更新しない（意図どおり） |
 
-## 学習ページ説明テキスト（lesson）差分
+## 動画ページ説明テキスト（lesson）差分
 
 フォーラムコメントとは別スクレイプ（`westudy_lesson_pages.py`）で、レッスンページの説明本文を取ります。
 
@@ -281,16 +281,14 @@ python3 scripts/upload_csv_to_supabase.py --bootstrap --csv "$LATEST_FULL"
 | 差分 | `scripts/build_lesson_delta_csv.py` → `lesson_delta_*.csv` + `state/westudy_lesson_ids.json` |
 | 行き先テーブル | **`comments`**（`knowledge_*` には載せない） |
 | 識別 | `ソース系統=lesson` / `comment_id=lesson_desc_*` |
-| UI | サイドバー **「学習ページ説明テキスト」**（コメント一覧からは除外） |
+| UI | サイドバー **「動画ページ説明テキスト」**（コメント一覧からは除外） |
 | 週次 | `run_update_and_import.sh` および `westudy-raimo-weekly.yml` に組込済 |
 
 ### Raimo `comments` に必要な列（lesson メタ永続化）
 
-週次 CSV 取込でコースタブ等が落ちないよう、Raimo の `comments` に次があれば望ましい（無ければ MyPrompt / DB 画面で text 列を追加）:
+**2026-08-01 適用済み**: `source_system`, `source_kind`, `forum_category`, `topic_title`, `course_tab`, `section_name`, `lesson_title`, `lesson_url`, `content_hash`
 
-`source_system`, `source_kind`, `forum_category`, `topic_title`, `course_tab`, `section_name`, `lesson_title`, `lesson_url`, `content_hash`
-
-API（`POST /admin/comments`）は上記を insert する。チャット検索の分離は `comment_id LIKE 'lesson_desc_%'` でも動作する。
+API（`POST /admin/comments` / `update-content`）は上記を insert/update する。既存行のメタ埋め直しは `scripts/backfill_lesson_meta_to_raimo.py`。チャット検索の分離は `comment_id LIKE 'lesson_desc_%'` でも動作する。
 
 ## 関連: 動画文字起こし（Notta）
 
