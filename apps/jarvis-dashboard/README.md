@@ -37,6 +37,10 @@ https://jarvis-dashboard-amber.vercel.app/
 
 設定: `config/notebooklm_workbench.yaml`／任意 `NOTEBOOKLM_DRIVE_FOLDER_URL`。
 
+### 課金／SaaS（`/billing`）
+
+サイドバー **課金**。正本 `config/subscriptions.yaml` → `jarvis_subscriptions_push.py --push`（`jarvis_dashboard_push.py` にも同梱）。
+
 ### 収集の役割分担
 
 | 経路 | 内容 |
