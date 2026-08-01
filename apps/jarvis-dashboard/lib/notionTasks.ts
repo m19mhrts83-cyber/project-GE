@@ -16,6 +16,8 @@ export type NotionBoardSummary = {
   reason?: string;
   boardUrl?: string;
   byStatus: Record<string, number>;
+  /** ステータス別タスク（完了以外を最大12件/列）。埋め込みプレビュー用 */
+  columns: Record<string, NotionTask[]>;
   overdue: NotionTask[];
   openSample: NotionTask[];
 };
@@ -72,7 +74,14 @@ function todayJst(): string {
 export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> {
   const cfg = loadNotionLaneConfig(lane);
   if (!cfg) {
-    return { connected: false, reason: "YAML未登録", byStatus: {}, overdue: [], openSample: [] };
+    return {
+      connected: false,
+      reason: "YAML未登録",
+      byStatus: {},
+      columns: {},
+      overdue: [],
+      openSample: [],
+    };
   }
   if (!notionTokenConfigured()) {
     return {
@@ -80,17 +89,24 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
       reason: "NOTION_API_TOKEN 未設定",
       boardUrl: cfg.board_url,
       byStatus: {},
+      columns: {},
       overdue: [],
       openSample: [],
     };
   }
 
   const byStatus: Record<string, number> = {};
+  const columns: Record<string, NotionTask[]> = {};
   const overdue: NotionTask[] = [];
   const openSample: NotionTask[] = [];
   const today = todayJst();
   let cursor: string | undefined;
   let pages = 0;
+
+  const columnOrder = [
+    ...cfg.open_statuses,
+    ...cfg.done_statuses.filter((s) => !cfg.open_statuses.includes(s)),
+  ];
 
   try {
     do {
@@ -116,6 +132,7 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
           reason: `Notion API ${res.status}: ${text.slice(0, 160)}`,
           boardUrl: cfg.board_url,
           byStatus: {},
+          columns: {},
           overdue: [],
           openSample: [],
         };
@@ -144,15 +161,23 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
         };
         if (task.overdue) overdue.push(task);
         if (!done && openSample.length < 8) openSample.push(task);
+        const col = columns[status] || (columns[status] = []);
+        if (col.length < 12) col.push(task);
       }
       cursor = data.has_more ? data.next_cursor || undefined : undefined;
       pages += 1;
     } while (cursor && pages < 5);
 
+    // 空列も表示順を保つ
+    for (const s of columnOrder) {
+      if (!columns[s]) columns[s] = [];
+    }
+
     return {
       connected: true,
       boardUrl: cfg.board_url,
       byStatus,
+      columns,
       overdue,
       openSample,
     };
@@ -162,6 +187,7 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
       reason: e instanceof Error ? e.message : String(e),
       boardUrl: cfg.board_url,
       byStatus: {},
+      columns: {},
       overdue: [],
       openSample: [],
     };

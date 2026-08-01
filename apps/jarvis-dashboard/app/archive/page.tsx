@@ -14,6 +14,7 @@ const LANE_LABEL: Record<string, string> = {
   properties: "所有物件",
   kodate: "戸建て",
   "ai-raimo": "AI・Raimo",
+  kazoku: "家族",
 };
 
 function fmtAt(v: string | null | undefined) {
