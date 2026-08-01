@@ -592,10 +592,12 @@ a.stat-link:active {
   grid-area: date;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .watch-action-shop {
   grid-area: shop;
+  min-width: 0;
 }
 
 .watch-action-yen {
@@ -608,6 +610,20 @@ a.stat-link:active {
   grid-area: prop;
   color: #44403c;
   line-height: 1.4;
+  min-width: 0;
+}
+
+.watch-actions li.watch-action-stack {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "shop"
+    "prop";
+  gap: 4px;
+}
+
+.watch-actions li.watch-action-stack .watch-action-shop {
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .watch-detail {
