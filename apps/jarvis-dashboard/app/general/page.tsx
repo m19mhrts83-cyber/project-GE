@@ -3,7 +3,7 @@ import TriageLanePage from "@/components/TriageLane";
 export default async function GeneralPage({
   searchParams,
 }: {
-  searchParams: Promise<{ i?: string }>;
+  searchParams: Promise<{ i?: string; view?: string }>;
 }) {
   return await TriageLanePage({
     lane: "general",

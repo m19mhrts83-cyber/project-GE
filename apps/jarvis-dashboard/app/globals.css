@@ -120,6 +120,24 @@ h1 {
   min-width: 7.5rem;
 }
 
+a.stat-link {
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+a.stat-link:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: var(--shadow-hover);
+}
+
+a.stat-link.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+  box-shadow: var(--shadow-soft);
+}
+
 .stat strong {
   display: inline-block;
   font-size: 1.35rem;
