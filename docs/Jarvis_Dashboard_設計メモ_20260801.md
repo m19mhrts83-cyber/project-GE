@@ -199,6 +199,39 @@ python scripts/jarvis_notebooklm_workbench_open.py
 
 ---
 
+## 6. 今後の置き場（コード／Supabase／OneDrive）
+
+方針は変えない: **コードは git-repos、業務・検討の厚みは OneDrive、投影データは Supabase**。容量大は OneDrive。
+
+| 何 | どこに置く | メモ |
+|---|---|---|
+| **アプリ・スクリプト・YAML・スキーマ** | `~/git-repos/`（`apps/jarvis-dashboard/`・`scripts/`・`config/`） | Git で版管理。秘密は `.env.jarvis_private` のみ |
+| **Supabase 投影** | プロジェクト `jarvis-dashboard`（運営の `kamiooya-qa` とは別） | テーブル追加で機能増やす。正本は YAML/CSV。DB だけ増やし続けて正本にしない |
+| **検討メモ・検証スクショ・下書き PDF** | OneDrive `215_…/C1_cursor/1c_…/Jarvisダッシュボード/` | 検討を溜めるスタイルを継続 |
+| **NotebookLM ソース／スライド成果** | admin Drive `200_NoteBookLM/05_…` と `★アウトプット/` | 説明用。コード正本ではない |
+| **家計・税の生データ** | OneDrive `50_税金,確定申告/` 等 | Zaim CSV・サブスク監査メモ |
+
+```text
+[考える・溜める] OneDrive 検討メモ
+        ↓ 仕様が固まったら
+[実装] git-repos（コード + schema.sql + YAML）
+        ↓ push
+[投影] Supabase jarvis-dashboard
+        ↓
+[見る] Vercel ダッシュボード
+        ↓ 説明が必要なら
+[伝える] Drive 200_NoteBookLM → NotebookLM
+```
+
+### Supabase が溜まるとき
+
+- **残してよい**: `watch_status`・メトリクス・カードなど、ダッシュボード表示用の投影
+- **増やし方**: 新機能は **テーブル追加**（用途ごとにプロジェクトを増やさない）
+- **掃除候補**: 一時実験テーブル・古いトリアージ残骸。正本が YAML/CSV にあるなら投影は作り直せる
+- **スキーマ正本**: 必ず `apps/jarvis-dashboard/supabase/schema.sql` に追記してから適用
+
+---
+
 ## 関連パス早見
 
 | 用途 | パス |
@@ -211,6 +244,7 @@ python scripts/jarvis_notebooklm_workbench_open.py
 | 運用コマンド | `docs/運用コマンド一覧.md` |
 | Cloud Agent | `docs/Jarvis_Cloud_Agent.md` |
 | NotebookLM Drive | `200_NoteBookLM/`（admin） |
+| OneDrive 検討 | `215_…/C1_cursor/1c_…/Jarvisダッシュボード/` |
 
 ---
 
