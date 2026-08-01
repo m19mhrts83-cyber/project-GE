@@ -1,0 +1,41 @@
+# Jarvis NotebookLM 作業導線（ダッシュボード /notebooklm ＋ Mac ヘルパー）
+# ソース正本: admin Drive 200_NoteBookLM（jarvis-notebooklm-drive-sources）
+
+version: 1
+
+notebooklm_url: "https://notebooklm.google.com/"
+
+# Mac ローカル（Google Drive for desktop 同期）
+local_folder: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM"
+
+# Drive Web（任意。NOTEBOOKLM_DRIVE_FOLDER_URL があればそちら優先）
+drive_folder_url: ""
+
+# localhost ヘルパー
+helper_host: "127.0.0.1"
+helper_port: 8766
+helper_path: "/notebooklm-workbench"
+
+# ダッシュボードに出すサブフォルダ（表示用）
+subfolders:
+  - id: "00"
+    name: "00_共通(デザイントーン）"
+    note: "ゼロイチ／いけとも共通スタイル"
+  - id: "01"
+    name: "01_セサミ使用方法説明"
+    note: ""
+  - id: "02"
+    name: "02_Grandole周辺MAP試作"
+    note: ""
+  - id: "03"
+    name: "03_周辺MAP作成手順説明"
+    note: ""
+  - id: "04"
+    name: "04_神・大家さん俱楽部Q&Aチャットボットアプリ"
+    note: ""
+  - id: "99"
+    name: "99_PlusAI検証_20260727"
+    note: "検証用"
+  - id: "out"
+    name: "★アウトプット"
+    note: "生成スライド等"

@@ -12,15 +12,11 @@ const NAV = [
   { href: "/kodate", label: "戸建て" },
   { href: "/ai-raimo", label: "AI・Raimo" },
   { href: "/metrics", label: "数値" },
+  { href: "/notebooklm", label: "NotebookLM" },
 ];
 
 /** 外部動線（レイアウト整理は後で相談可） */
-const EXTERNAL = [
-  {
-    href: "https://notebooklm.google.com/",
-    label: "NotebookLM",
-  },
-];
+const EXTERNAL: { href: string; label: string }[] = [];
 
 export default async function Shell({
   children,
@@ -47,20 +43,27 @@ export default async function Shell({
             {n.label}
           </Link>
         ))}
-        <div className="side-brand" style={{ marginTop: 16, fontSize: 12, opacity: 0.7 }}>
-          外部
-        </div>
-        {EXTERNAL.map((n) => (
-          <a
-            key={n.href}
-            href={n.href}
-            className="side-link"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {n.label} ↗
-          </a>
-        ))}
+        {EXTERNAL.length > 0 ? (
+          <>
+            <div
+              className="side-brand"
+              style={{ marginTop: 16, fontSize: 12, opacity: 0.7 }}
+            >
+              外部
+            </div>
+            {EXTERNAL.map((n) => (
+              <a
+                key={n.href}
+                href={n.href}
+                className="side-link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {n.label} ↗
+              </a>
+            ))}
+          </>
+        ) : null}
         <div className="side-note">
           {user?.email ?? "—"}
           <br />
