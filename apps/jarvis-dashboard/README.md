@@ -37,17 +37,18 @@ https://jarvis-dashboard-amber.vercel.app/
 | Cloud Agent | 対話本線。Notion／NotebookLM は Cloud MCP。手順: `docs/Jarvis_Cloud_Agent.md` |
 | 表示 | 本 Vercel アプリ（取得経路・Mac/GHA 時刻を概要に表示） |
 
-### OneDrive Graph（Phase 3c・骨格）
+### OneDrive Graph（レーン GHA・委任）
 
-原本は OneDrive。クラウド収集・エージェントは `scripts/jarvis_onedrive_graph.py` 経由で読む想定。
+原本は個人用 OneDrive。GHA／Cloud は **委任＋refresh**（手順正本: `docs/Jarvis_OneDrive_Graph.md`）。
 
-1. Azure Portal でアプリ登録（クライアント資格情報）
-2. API アクセス許可: `Files.Read.All`（Application）＋管理者同意
-3. `.env.jarvis_private` に `MS_GRAPH_TENANT_ID` / `CLIENT_ID` / `CLIENT_SECRET` / `USER_UPN`（または `DRIVE_ID`）
-4. 確認: `python scripts/jarvis_onedrive_graph.py --dry-run` → `graph_configured: true`
-5. パス例は `config/onedrive_graph.example.yaml`
+1. Azure でアプリ登録（個人 Microsoft アカウント・パブリッククライアント）
+2. 委任: `Files.Read` / `Files.Read.All` / `offline_access` / `User.Read`
+3. `.env.jarvis_private` に `MS_GRAPH_CLIENT_ID` / `MS_GRAPH_AUTHORITY=consumers` / `MS_GRAPH_REFRESH_TOKEN`
+4. `python scripts/jarvis_ms_graph_device_login.py` → `python scripts/jarvis_onedrive_graph.py --probe`
+5. `python scripts/jarvis_ms_graph_secrets_to_gha.py` → `gh workflow run jarvis-dashboard-lanes.yml`
+6. refresh 回転: `python scripts/jarvis_ms_graph_sync_refresh.py --push-gha`
 
-未設定時は Mac のローカル CloudStorage パスへフォールバック（クラウドでは読めない）。
+Mac のみ: Graph 未設定時はローカル CloudStorage へフォールバック。Journal（Google Drive）は GHA スキップ。
 
 ### Auth Site URL
 

@@ -116,17 +116,18 @@ def refresh_access_token() -> str:
     )
     TOKEN_CACHE.chmod(0o600)
     if new_refresh and new_refresh != refresh:
-        # 回転された refresh は stderr で案内のみ（自動で .env は書き換えない）
-        print(
-            "# note: refresh_token が回転しました。"
-            " 新しい値を MS_GRAPH_REFRESH_TOKEN に反映してください"
-            "（scripts/jarvis_ms_graph_device_login.py --print-refresh）。",
-            file=sys.stderr,
-        )
+        # プロセス内はすぐ新トークンを使う。永続化は state ＋任意で private / GHA
+        os.environ["MS_GRAPH_REFRESH_TOKEN"] = new_refresh
         rot = Path.home() / ".jarvis_state" / "ms_graph_new_refresh.env"
+        rot.parent.mkdir(parents=True, exist_ok=True)
         rot.write_text(f"MS_GRAPH_REFRESH_TOKEN={new_refresh}\n", encoding="utf-8")
         rot.chmod(0o600)
-        print(f"# wrote {rot}（反映後に削除）", file=sys.stderr)
+        print(
+            "# note: refresh_token が回転しました。"
+            f" wrote {rot} → python scripts/jarvis_ms_graph_sync_refresh.py"
+            " [--push-gha]",
+            file=sys.stderr,
+        )
     return access
 
 
@@ -161,30 +162,71 @@ def read_file_local(rel_path: str) -> bytes:
     return p.read_bytes()
 
 
-def read_file_graph(rel_path: str) -> bytes:
-    token = get_access_token()
+def _graph_item_api(rel_path: str) -> str:
+    """メタデータ用 URL（:/content ではない）。個人 OneDrive の content は 302+CDN で
+    Authorization 付き追従が 401 になるため、downloadUrl を使う。"""
     drive_id = _env("MS_GRAPH_DRIVE_ID")
     upn = _env("MS_GRAPH_USER_UPN")
     encoded = "/".join(urllib.parse.quote(seg) for seg in rel_path.strip("/").split("/"))
     if drive_id:
-        api = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{encoded}:/content"
-    elif has_refresh_auth() and not upn:
-        # 委任: サインインユーザー自身の drive
-        api = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded}:/content"
-    elif upn:
-        api = (
+        return f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{encoded}"
+    if upn:
+        return (
             f"https://graph.microsoft.com/v1.0/users/{urllib.parse.quote(upn)}"
-            f"/drive/root:/{encoded}:/content"
+            f"/drive/root:/{encoded}"
         )
-    else:
-        api = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded}:/content"
-    req = urllib.request.Request(api, headers={"Authorization": f"Bearer {token}"})
+    return f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded}"
+
+
+def _http_get_bytes(url: str, headers: dict[str, str] | None = None, timeout: int = 90) -> bytes:
+    req = urllib.request.Request(url, headers=headers or {})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read()
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")[:500]
-        raise RuntimeError(f"graph read HTTP {e.code}: {detail}") from e
+        raise RuntimeError(f"HTTP {e.code}: {detail}") from e
+
+
+def read_file_graph(rel_path: str) -> bytes:
+    token = get_access_token()
+    meta_url = (
+        _graph_item_api(rel_path)
+        + "?$select=id,name,size,@microsoft.graph.downloadUrl"
+    )
+    req = urllib.request.Request(meta_url, headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=45) as r:
+            meta = json.load(r)
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"graph meta HTTP {e.code}: {detail}") from e
+
+    download_url = meta.get("@microsoft.graph.downloadUrl") or ""
+    if download_url:
+        # pre-authenticated CDN URL — do NOT send Bearer (breaks with 401)
+        return _http_get_bytes(download_url)
+
+    # fallback: /content（職場テナント等で downloadUrl が無い場合）
+    # 302 先へ Authorization を付けないよう手動追従
+    content_url = _graph_item_api(rel_path) + ":/content"
+
+    class _NoAuthRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+            return urllib.request.Request(newurl)
+
+    opener = urllib.request.build_opener(_NoAuthRedirect)
+    try:
+        with opener.open(
+            urllib.request.Request(
+                content_url, headers={"Authorization": f"Bearer {token}"}
+            ),
+            timeout=90,
+        ) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"graph content HTTP {e.code}: {detail}") from e
 
 
 def read_file(provider: str, path: str) -> bytes:
