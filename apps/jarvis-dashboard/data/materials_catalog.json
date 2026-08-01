@@ -7,7 +7,7 @@
       "id": "self",
       "title": "自分の理解用",
       "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/",
-      "note": "NotebookLM確認後 → Downloads → ingest → Pages"
+      "note": "NotebookLM確認後 → Downloads → 「資料取り込んで」→ OneDrive正本＋Pages"
     },
     {
       "id": "dx",
@@ -29,7 +29,8 @@
       "title": "Jarvis Dashboard 引き継ぎ",
       "filename": "Jarvis_Dashboard_Handover.pdf",
       "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/Jarvis_Dashboard_Handover.pdf",
-      "note": "ダッシュボード全体の引き継ぎ（PDF）"
+      "note": "ダッシュボード全体の引き継ぎ（PDF）",
+      "onedrive_rel": "N1_NotebookLM/jarvis-self/assets/Jarvis_Dashboard_Handover.pdf"
     },
     {
       "id": "jarvis-dashboard-overview",
@@ -37,7 +38,8 @@
       "title": "Jarvis ダッシュボードの全体構成",
       "filename": "Jarvisダッシュボードの全体構成.png",
       "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/Jarvisダッシュボードの全体構成.png",
-      "note": "構成図（PNG）"
+      "note": "構成図（PNG）",
+      "onedrive_rel": "N1_NotebookLM/jarvis-self/assets/Jarvisダッシュボードの全体構成.png"
     },
     {
       "id": "shuhen-auto-guide",
@@ -45,7 +47,8 @@
       "title": "周辺MAP 自動化ガイド",
       "filename": "周辺MAP自動化ガイド.pdf",
       "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/周辺MAP自動化ガイド.pdf",
-      "note": "周辺MAP自動作成の理解用ガイド（PDF）"
+      "note": "周辺MAP自動作成の理解用ガイド（PDF）",
+      "onedrive_rel": "N1_NotebookLM/jarvis-self/assets/周辺MAP自動化ガイド.pdf"
     },
     {
       "id": "member-list-proposal",
@@ -53,7 +56,8 @@
       "title": "会員名簿データ活用の提案",
       "filename": "会員名簿データ活用の提案.png",
       "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/会員名簿データ活用の提案.png",
-      "note": "提案サマリー（PNG）"
+      "note": "提案サマリー（PNG）",
+      "onedrive_rel": "N1_NotebookLM/jarvis-self/assets/会員名簿データ活用の提案.png"
     },
     {
       "id": "fudosan-automation",
@@ -61,7 +65,8 @@
       "title": "不動産業務自動化 説明資料",
       "filename": "不動産業務自動化_説明資料.pdf",
       "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/不動産業務自動化_説明資料.pdf",
-      "note": "業務自動化の説明（PDF）"
+      "note": "業務自動化の説明（PDF）",
+      "onedrive_rel": "N1_NotebookLM/jarvis-self/assets/不動産業務自動化_説明資料.pdf"
     },
     {
       "id": "dx-hub",
@@ -98,5 +103,6 @@
       "url": "https://m19mhrts83-cyber.github.io/project-GE/shuhen-auto.html",
       "note": "Pages 版（API なし）"
     }
-  ]
+  ],
+  "onedrive_self": "N1_NotebookLM/jarvis-self/"
 }

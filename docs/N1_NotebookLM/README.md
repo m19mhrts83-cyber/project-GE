@@ -37,6 +37,7 @@ admin Drive の **`200_NoteBookLM/`** が添付の正本。
 | [Plus_AI_導入手順.md](Plus_AI_導入手順.md) | Plus AI のインストール・ブランドテンプレ・日常フロー |
 | [プロンプト雛形_ブランドテンプレ前提.md](プロンプト雛形_ブランドテンプレ前提.md) | ワンスライドワンメッセージの表＋Plus AI／校正用プロンプト |
 | [NotebookLM_編集可能PPTX変換手順.md](NotebookLM_編集可能PPTX変換手順.md) | NotebookLM PDF→編集可能 PPTX（系統B・つなぎ） |
+| **`jarvis-self/`（OneDrive のみ・容量正本）** | 自分理解用 PDF/PNG。公開写しは `docs/jarvis-self/`。取込は `jarvis_materials_ingest_downloads.py` |
 
 ## DX 勉強会スライド手順との関係
 
