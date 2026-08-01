@@ -88,3 +88,17 @@ set -a && source .env.jarvis_private && set +a
 
 要: `GEMINI_API_KEY` / `GOOGLE_MAPS_API_KEY`（Static・Places・Geocoding）  
 任意: `GEMINI_IMAGE_MODEL`（既定 `gemini-2.5-flash-image`）、`SHUHEN_AUTO_TOKEN`、`SHUHEN_AUTO_RATE_PER_HOUR`
+
+既定ポート: **8770**（8765 は Jarvis ダッシュボードと競合）
+
+---
+
+## 回収要望（試走フィードバック）
+
+詳細・状態管理は [`19_単独Web検証_パイロットメモ.md`](19_単独Web検証_パイロットメモ.md) の「回収要望」表を正とする。
+
+| ID | 要約 | 状態 |
+|---|---|---|
+| R1 | 保存画像サイズを **A4横**前提に（目安 3508×2480 / 同比率） | 対応済 |
+| R2 | 施設選定・地図範囲を **徒歩〜7／〜20／上限〜30分圏** に寄せる | 対応済 |
+| R3 | **調査・検証過程**をアプリ表示し、除外→地図・C0更新まで可能に（Deep Research深掘りは後続） | 段階1+2 対応済 |
