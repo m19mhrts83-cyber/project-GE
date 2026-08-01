@@ -6,6 +6,7 @@ import CardTriageActions, {
 import {
   queryLaneBoard,
   type NotionBoardSummary,
+  type NotionTask,
 } from "@/lib/notionTasks";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,23 +20,69 @@ type CardRow = {
   payload: Record<string, unknown> | null;
 };
 
+function BoardColumns({ columns }: { columns: Record<string, NotionTask[]> }) {
+  const entries = Object.entries(columns);
+  if (!entries.length) return null;
+  return (
+    <div className="notion-board">
+      {entries.map(([status, tasks]) => (
+        <div className="notion-col" key={status}>
+          <div className="notion-col-head">
+            {status}{" "}
+            <span className="notion-col-count">{tasks.length}</span>
+          </div>
+          <ul className="notion-col-list">
+            {tasks.length === 0 ? (
+              <li className="notion-col-empty">—</li>
+            ) : (
+              tasks.map((t) => (
+                <li key={t.id} className={t.overdue ? "overdue" : undefined}>
+                  <a href={t.url} target="_blank" rel="noreferrer">
+                    {t.title}
+                  </a>
+                  {t.due ? (
+                    <span className="notion-col-due">
+                      {t.overdue ? "期限切れ " : ""}
+                      {t.due}
+                    </span>
+                  ) : null}
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BoardSection({ board }: { board: NotionBoardSummary }) {
   return (
     <section className="home-section" style={{ marginTop: 28 }}>
-      <h2>Notion 看板</h2>
-      {board.boardUrl ? (
-        <p className="sub">
-          <a href={board.boardUrl} target="_blank" rel="noreferrer" className="btn">
-            Notion で開く
+      <div className="notion-board-head">
+        <h2 style={{ margin: 0 }}>Notion 看板</h2>
+        {board.boardUrl ? (
+          <a
+            href={board.boardUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn primary"
+          >
+            Notion で開く ↗
           </a>
-        </p>
-      ) : null}
+        ) : null}
+      </div>
+      <p className="sub" style={{ marginTop: 8 }}>
+        タスク名をクリックすると Notion の該当ページへ。プライベート DB
+        は iframe 埋め込み不可のため、API で看板を再現しています（編集・ドラッグは
+        Notion 側）。
+      </p>
       {!board.connected ? (
         <p className="empty">
           未接続
           {board.reason ? `（${board.reason}）` : ""}
           。`.env.jarvis_private` と Vercel に NOTION_API_TOKEN を設定し、対象 DB を
-          Integration に接続してください。
+          Integration「Jarvisダッシュボード」に接続してください。
         </p>
       ) : (
         <>
@@ -46,29 +93,14 @@ function BoardSection({ board }: { board: NotionBoardSummary }) {
               </div>
             ))}
           </div>
-          <h3 style={{ fontSize: "1rem", marginTop: 16 }}>期限切れ</h3>
-          {board.overdue.length === 0 ? (
-            <p className="empty">期限切れはありません</p>
-          ) : (
-            <ul className="home-event-list">
-              {board.overdue.map((t) => (
-                <li key={t.id}>
-                  <strong>{t.due}</strong> {t.status}{" "}
-                  <a href={t.url} target="_blank" rel="noreferrer">
-                    {t.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-          {board.openSample.length > 0 ? (
+          <BoardColumns columns={board.columns || {}} />
+          {board.overdue.length > 0 ? (
             <>
-              <h3 style={{ fontSize: "1rem", marginTop: 16 }}>進行中サンプル</h3>
+              <h3 style={{ fontSize: "1rem", marginTop: 16 }}>期限切れ</h3>
               <ul className="home-event-list">
-                {board.openSample.map((t) => (
+                {board.overdue.map((t) => (
                   <li key={t.id}>
-                    {t.status}
-                    {t.due ? ` · 期限 ${t.due}` : ""}{" "}
+                    <strong>{t.due}</strong> {t.status}{" "}
                     <a href={t.url} target="_blank" rel="noreferrer">
                       {t.title}
                     </a>
@@ -129,7 +161,19 @@ export default async function TriageKanbanLane({
 
   return (
     <Shell active={active}>
-      <h1>{title}</h1>
+      <div className="page-title-row">
+        <h1 style={{ margin: 0 }}>{title}</h1>
+        {board.boardUrl ? (
+          <a
+            href={board.boardUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn"
+          >
+            Notion ↗
+          </a>
+        ) : null}
+      </div>
       <p className="sub">
         {subtitle ||
           "メール／メモから処置候補を要約 → スキップ or Notion 看板へ。以降のステータスは Notion で管理。"}{" "}

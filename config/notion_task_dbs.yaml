@@ -53,3 +53,15 @@ lanes:
     initial_status: 未着手
     open_statuses: ["未着手", "進行中"]
     done_statuses: ["完了"]
+  kazoku:
+    title: 家族
+    database_id: 9a5b4921-5835-49f8-b8c4-22e8caf8621a
+    data_source_id: 017c5f6b-61c0-4f63-871c-2072e15014e5
+    board_url: https://app.notion.com/p/9a5b4921583549f8b8c422e8caf8621a
+    title_prop: プロジェクト名
+    status_prop: ステータス
+    due_prop: 終了日
+    start_prop: 開始日
+    initial_status: 未着手
+    open_statuses: ["未着手", "進行中"]
+    done_statuses: ["完了"]

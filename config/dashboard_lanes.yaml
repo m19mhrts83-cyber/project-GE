@@ -51,3 +51,8 @@ lanes:
         take: 7
         kind: journal_recent
         tag: Journal
+
+  # 処置候補の自動要約は当面なし。Notion「家族タスク」への昇格はダッシュボードから手動可。
+  - id: kazoku
+    title: 家族
+    sources: []
