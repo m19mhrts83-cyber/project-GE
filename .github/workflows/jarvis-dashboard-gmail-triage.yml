@@ -1,0 +1,77 @@
+name: Jarvis Dashboard Gmail Triage
+
+# admin INBOX の未返信候補 → jarvis-dashboard triage_items（Mac 非依存）
+# パートナー MD / CHRLINE は対象外。
+
+on:
+  schedule:
+    - cron: "0 20 * * *" # 05:00 JST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Supabase へ書かず候補数だけ出す"
+        required: false
+        type: boolean
+        default: false
+      limit:
+        description: "最大スレッド数"
+        required: false
+        default: "20"
+
+concurrency:
+  group: jarvis-dashboard-gmail-triage
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          pip install -q google-api-python-client google-auth-httplib2 google-auth-oauthlib supabase pyyaml
+
+      - name: Materialize Gmail credentials
+        env:
+          GMAIL_CREDENTIALS_B64: ${{ secrets.GMAIL_CREDENTIALS_B64 }}
+          GMAIL_ADMIN_TOKEN_B64: ${{ secrets.GMAIL_ADMIN_TOKEN_B64 }}
+        run: |
+          set -euo pipefail
+          CRED_DIR="${{ github.workspace }}/.credentials"
+          MANUAL="${{ github.workspace }}/215_kamiooya/C1_cursor/1b_Cursorマニュアル"
+          mkdir -p "$CRED_DIR"
+          if [[ -z "${GMAIL_CREDENTIALS_B64:-}" || -z "${GMAIL_ADMIN_TOKEN_B64:-}" ]]; then
+            echo "::error::Need GMAIL_CREDENTIALS_B64 and GMAIL_ADMIN_TOKEN_B64"
+            exit 1
+          fi
+          echo "$GMAIL_CREDENTIALS_B64" | base64 -d > "$CRED_DIR/credentials.json"
+          echo "$GMAIL_ADMIN_TOKEN_B64" | base64 -d > "$CRED_DIR/token_admin.json"
+          cp "$CRED_DIR/credentials.json" "$MANUAL/credentials.json"
+          cp "$CRED_DIR/token_admin.json" "$MANUAL/token_livingsupport.json"
+          test -s "$CRED_DIR/credentials.json"
+          test -s "$CRED_DIR/token_admin.json"
+
+      - name: Run Gmail triage
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GMAIL_CREDENTIALS_PATH: ${{ github.workspace }}/.credentials/credentials.json
+          GMAIL_ADMIN_TOKEN_PATH: ${{ github.workspace }}/.credentials/token_admin.json
+          LIMIT: ${{ github.event.inputs.limit || '20' }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          ARGS=(--limit "$LIMIT")
+          if [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run)
+          else
+            ARGS+=(--push)
+          fi
+          python scripts/jarvis_gha_gmail_triage.py "${ARGS[@]}"

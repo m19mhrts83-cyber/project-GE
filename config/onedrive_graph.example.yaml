@@ -1,0 +1,16 @@
+# OneDrive / Microsoft Graph（jarvis_onedrive_graph.py）
+# 秘密は .env.jarvis_private のみ。この YAML はパス・メモ用。
+
+provider: onedrive
+# 読取のルート相当（個人用 OneDrive）
+notes: |
+  Azure Portal でアプリ登録（クライアント資格情報）。
+  API アクセス許可: Files.Read.All（Application）＋管理者同意。
+  .env.jarvis_private:
+    MS_GRAPH_TENANT_ID=
+    MS_GRAPH_CLIENT_ID=
+    MS_GRAPH_CLIENT_SECRET=
+    MS_GRAPH_USER_UPN=  # または MS_GRAPH_DRIVE_ID=
+
+sample_paths:
+  - "215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談/000_共通/連絡先一覧.yaml"

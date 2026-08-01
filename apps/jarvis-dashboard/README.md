@@ -27,6 +27,14 @@ https://jarvis-dashboard-amber.vercel.app/
 
 朝の自動オープンは `JARVIS_DASHBOARD_URL`（`.env.jarvis_private`）を優先。
 
+### 収集の役割分担
+
+| 経路 | 内容 |
+|---|---|
+| Mac | パートナー MD・CHRLINE・フル夜間トリアージ → push |
+| GHA | admin Gmail 未返信候補 → `triage_items`（`jarvis-dashboard-gmail-triage.yml`） |
+| 表示 | 本 Vercel アプリ（取得経路・Mac/GHA 時刻を概要に表示） |
+
 ## Vercel デプロイ（Phase 3・iPhone 閲覧）
 
 1. Vercel にログインし、ルートを `apps/jarvis-dashboard` にして import

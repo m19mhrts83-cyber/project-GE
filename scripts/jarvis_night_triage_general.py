@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 import re
 import sys
 from datetime import datetime, timedelta
@@ -72,11 +73,17 @@ def is_partner_address(addr: str, emails: set[str], domains: set[str]) -> bool:
 
 
 def build_admin_gmail_service():
-    """Returns (service, my_email)."""
+    """Returns (service, my_email).
+
+    GHA / 明示パス:
+      GMAIL_ADMIN_TOKEN_PATH … admin token JSON
+      GMAIL_CREDENTIALS_PATH … credentials.json（gmail_to_yoritoori 側で参照）
+    """
     _ensure_manual_path()
     from gmail_to_yoritoori import build_service_for_token  # type: ignore
 
-    token = MANUAL_DIR / "token_livingsupport.json"
+    token_env = (os.environ.get("GMAIL_ADMIN_TOKEN_PATH") or "").strip()
+    token = Path(token_env) if token_env else (MANUAL_DIR / "token_livingsupport.json")
     if not token.is_file():
         raise RuntimeError(f"admin token missing: {token}")
     service, email = build_service_for_token(token)
