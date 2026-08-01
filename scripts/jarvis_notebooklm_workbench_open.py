@@ -38,7 +38,23 @@ def open_target(target: str, *, dry_run: bool) -> None:
 def open_workbench(*, dry_run: bool = False, skip_browser: bool = False) -> int:
     cfg = load_cfg()
     local = expand_path(str(cfg.get("local_folder") or ""))
-    nlm = (os.environ.get("NOTEBOOKLM_URL") or cfg.get("notebooklm_url") or "").strip()
+    # Always prefer admin AccountChooser so estate/m19m sessions don't stick
+    email = (
+        (os.environ.get("NOTEBOOKLM_EMAIL") or "").strip()
+        or (os.environ.get("COMPANY_EMAIL") or "").strip()
+        or "admin@livingsupport-matsu.co.jp"
+    )
+    nlm_cfg = (os.environ.get("NOTEBOOKLM_URL") or cfg.get("notebooklm_url") or "").strip()
+    if "AccountChooser" in nlm_cfg or "authuser=" in nlm_cfg:
+        nlm = nlm_cfg
+    else:
+        from urllib.parse import quote
+
+        cont = quote(nlm_cfg or "https://notebooklm.google.com/", safe="")
+        nlm = (
+            "https://accounts.google.com/AccountChooser"
+            f"?Email={quote(email)}&continue={cont}"
+        )
     drive = (
         (os.environ.get("NOTEBOOKLM_DRIVE_FOLDER_URL") or "").strip()
         or str(cfg.get("drive_folder_url") or "").strip()
@@ -49,6 +65,7 @@ def open_workbench(*, dry_run: bool = False, skip_browser: bool = False) -> int:
         return 1
 
     print(f"# finder {local}")
+    print(f"# account {email}")
     open_target(str(local), dry_run=dry_run)
 
     if not skip_browser and nlm:
