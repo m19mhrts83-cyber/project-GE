@@ -1,0 +1,44 @@
+---
+description: Zaim銀行・カード連携の週次確認（金曜）。止まっている口座の特定と Phase1 手動更新。
+alwaysApply: false
+---
+
+# Zaim 銀行連携ウォッチ（金曜・Phase1）
+
+## トリガー
+
+- 「銀行連携」「Zaim 口座が更新されない」「財務の連携確認」
+- **金曜**の Jarvis セッション（未実施なら週次チェックを実行）
+- 状況ウォッチ「Zaim集計・二重取込」に銀行連携の注意が出ているとき
+
+## 方針
+
+- **Phase1（現在）**: CSV 最終日とのラグで「止まっていそう」を特定 → Zaim Web で**手動更新**。OTP 等は `.env.jarvis_private` を読んで Jarvis が回答（値はチャットに貼らない）
+- **Phase2（後続）**: 手順が安定したら Playwright 等で定期自動更新
+
+アラート表示先は **数値タブではなく** 状況ウォッチの **「Zaim集計・二重取込」**（財務集計の注意事項に合流）。
+
+## コマンド
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_zaim_bank_sync_check.py --force-prompt
+# 金曜促し記録
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_zaim_bank_sync_check.py --mark-prompted
+# ダッシュボード反映
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_situation_watch.py --write
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_dashboard_push.py
+```
+
+設定: `config/zaim_bank_sync_watch.yaml`  
+state: `.jarvis_state/zaim_bank_sync.json`  
+launchd: `launchd/install_zaim_bank_sync_friday_launchd.sh`（金曜 09:00）
+
+## 手動更新の型（Phase1）
+
+1. チェック結果の stale / missing をユーザーに短く提示
+2. Zaim → 口座一覧（`zaim_accounts_url`）で対象を「更新」
+3. 認証が必要なら env_hint の変数を private から読んで入力（チャットに再掲しない）
+4. 更新後 CSV 再取得（`zaim_csv_weekly_runner.sh`）→ チェック再実行で lag 解消を確認
+
+連携できない事情がある口座は YAML で `unlinkable: true` または `unlinkable_notes` に載せ、注意事項として残す（stale 警告にはしない）。

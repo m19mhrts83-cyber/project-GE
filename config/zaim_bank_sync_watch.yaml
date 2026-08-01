@@ -1,0 +1,106 @@
+# Zaim 銀行・カード連携ウォッチ（週次・金曜）
+# 検知: scripts/jarvis_zaim_bank_sync_check.py → .jarvis_state/zaim_bank_sync.json
+# 状況ウォッチ「Zaim集計・二重取込」に銀行連携の注意を合流（jarvis_situation_watch）
+#
+# Phase1: CSV の最終日付ラグで「更新が止まっていそう」を特定 → 手動更新を Jarvis と一緒に
+# Phase2: 手動手順が固まってから Playwright 等で定期自動更新（未実装）
+
+version: 1
+
+csv_base_dir: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/50_税金,確定申告"
+
+# CSV 上の最新日付から何日以上止まっていたら要確認か（口座ごと上書き可）
+default_stale_days: 12
+
+# 金曜ウィンドウ（JST）で Jarvis がセッション中に促す / launchd も金曜
+friday_weekday: 5  # mon=0 … fri=5
+prompt_interval_days: 6
+
+# Zaim Web（手動更新の入口）
+zaim_accounts_url: "https://zaim.net/online_accounts"
+zaim_home_url: "https://zaim.net/"
+
+# match: CSV の 支払元 / 入金先 に部分一致（先に長い match を置く）
+# env_hint: .env.jarvis_private の変数名（値は出さない）。手動 OTP 時に Jarvis が読む
+# unlinkable: true → 事情で連携できない想定。注意事項に「連携不可（既知）」として出すが stale 警告にはしない
+accounts:
+  - id: paypay_corp
+    label: "PayPay銀行（法人）"
+    match: "★PayPay銀行"
+    stale_days: 10
+    env_hint: ["PAYPAY_STORE_NO", "PAYPAY_ACCOUNT_NO", "PAYPAY_PASSWORD"]
+    note: "法人。Zaim 口座一覧で手動更新"
+  - id: mufg_ap
+    label: "MUFG アパート経営"
+    match: "★MUFG(アパート経営)"
+    stale_days: 14
+    env_hint: []
+    note: "家賃入金系。止まっていたら要確認"
+  - id: shiga
+    label: "滋賀銀行"
+    match: "★滋賀銀行"
+    stale_days: 14
+    env_hint: []
+  - id: nagoya
+    label: "名古屋銀行（生活）"
+    match: "★名古屋銀行"
+    stale_days: 10
+    env_hint: ["COMPANY_BANK_NAME", "COMPANY_BANK_BRANCH"]
+    note: "個人生活。法人口座1とは別名義の可能性あり"
+  - id: ogaki
+    label: "大垣共立銀行"
+    match: "★大垣共立銀行"
+    stale_days: 12
+    env_hint: []
+  - id: tokai_rokin
+    label: "東海労金"
+    match: "★東海労金"
+    stale_days: 12
+    env_hint: []
+  - id: sbi
+    label: "住信SBI（その他出費）"
+    match: "★住信SBIネット銀行"
+    stale_days: 10
+    env_hint: []
+  - id: sbi_hybrid
+    label: "住信SBI ハイブリッド"
+    match: "★住信 SBI ネット銀行 SBIハイブリッド"
+    stale_days: 21
+    env_hint: []
+    note: "低頻度でも可。長期停止だけ見る"
+  - id: smbc_kariya
+    label: "三井住友銀行 刈谷"
+    match: "★三井住友銀行"
+    stale_days: 21
+    env_hint: []
+  - id: kyoto
+    label: "京都銀行"
+    match: "★京都銀行"
+    stale_days: 21
+    env_hint: []
+  - id: olive
+    label: "三井住友 Olive"
+    match: "Olive INF"
+    stale_days: 10
+    env_hint: []
+  - id: amex_marriott
+    label: "AMEX Marriott"
+    match: "MARRIOTT BONVOY"
+    stale_days: 10
+    env_hint: ["AMEX_LOGIN_ID", "AMEX_PASSWORD"]
+  - id: paypay_card
+    label: "PayPayカード"
+    match: "PayPayカード"
+    stale_days: 14
+    env_hint: []
+  - id: orix
+    label: "オリックス銀行（ローン）"
+    match: "オリックス"
+    stale_days: 45
+    env_hint: ["ORIX_LOGIN_ID", "ORIX_PASSWORD"]
+    note: "引き落としは他銀行経由のため Zaim 連携不要"
+    unlinkable: true
+
+# 事情で Zaim 連携しない口座（注意事項に常時載せる）
+unlinkable_notes:
+  - "オリックス銀行ローンは他銀行引き落としのため Zaim 未連携でOK"

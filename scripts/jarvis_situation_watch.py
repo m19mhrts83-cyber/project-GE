@@ -713,6 +713,7 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
     prompt = meta.get("cursor_prompt") or ""
     src = meta.get("source") or ""
     weekly = load_json(STATE / "zaim_csv_weekly.json")
+    bank = load_json(STATE / "zaim_bank_sync.json")
     weekly_note = ""
     if weekly and weekly.get("last_ok") is False and weekly.get("last_error"):
         weekly_note = (
@@ -721,24 +722,47 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
         )
     elif weekly and weekly.get("last_success_at"):
         weekly_note = f"／CSV週次成功 {str(weekly.get('last_success_at'))[:16]}"
+
+    bank_note = ""
+    bank_detail = ""
+    bank_level = "ok"
+    if bank:
+        bank_level = str(bank.get("level") or "ok")
+        bank_note = f"／銀行連携: {str(bank.get('summary') or '')[:100]}"
+        parts = []
+        if bank.get("detail"):
+            parts.append("【銀行・カード連携】\n" + str(bank.get("detail")))
+        steps = bank.get("phase1_steps") or []
+        if steps and bank_level in ("attention", "warn"):
+            parts.append("【手動更新 Phase1】\n" + "\n".join(f"- {s}" for s in steps[:8]))
+        bank_detail = "\n\n".join(parts)
+
     if not data:
+        level = "warn"
+        if bank_level in ("attention", "warn"):
+            level = "warn" if bank_level == "warn" else "attention"
         return card(
             item_id=meta["id"],
             title=title,
             category=meta.get("category") or "",
-            level="warn",
-            summary="state なし — jarvis_zaim_quality_check.py を実行" + weekly_note,
+            level=level,
+            summary="state なし — jarvis_zaim_quality_check.py を実行" + weekly_note + bank_note,
+            detail=bank_detail or None,
             cursor_prompt=prompt,
             source=src,
+            payload={"bank_sync": bank} if bank else {},
         )
     level = str(data.get("level") or "ok")
     if level not in ("ok", "info", "warn", "attention"):
         level = "ok"
     if weekly and weekly.get("last_ok") is False and level == "ok":
         level = "warn"
+    if bank_level == "warn" and level in ("ok", "info"):
+        level = "warn"
+    elif bank_level == "attention" and level in ("ok", "info"):
+        level = "attention"
     action_items = data.get("action_items") or []
     if not action_items and data.get("samples"):
-        # 旧 state 互換: samples から both_include 等を拾う
         for s in data.get("samples") or []:
             if not (s.get("both_include") or s.get("action") or s.get("viewpoint") in (
                 "both_include",
@@ -777,11 +801,19 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
             + "\n".join(f"- {ln}" for ln in action_lines[:20])
             + (("\n" + detail) if detail else "")
         )
+    if bank_detail:
+        detail = (detail + "\n\n" + bank_detail).strip() if detail else bank_detail
     payload: dict[str, Any] = {
         "actions": action_items[:30],
         "action_lines": action_lines[:30],
+        "bank_sync": {
+            "level": bank.get("level") if bank else None,
+            "summary": bank.get("summary") if bank else None,
+            "stale": (bank.get("stale") or [])[:20] if bank else [],
+            "missing": (bank.get("missing") or [])[:20] if bank else [],
+        },
     }
-    summary = str(data.get("summary") or "データあり") + weekly_note
+    summary = str(data.get("summary") or "データあり") + weekly_note + bank_note
     return card(
         item_id=meta["id"],
         title=title,
@@ -796,25 +828,26 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
 
 
 def refresh_zaim_quality() -> None:
-    """評価前に CSV から再検知（ログイン不要）。"""
+    """評価前に CSV から再検知（ログイン不要）＋銀行連携鮮度。"""
     import subprocess
 
     py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
     exe = str(py) if py.is_file() else sys.executable
-    script = REPO / "scripts" / "jarvis_zaim_quality_check.py"
-    if not script.is_file():
-        return
-    try:
-        subprocess.run(
-            [exe, str(script)],
-            cwd=str(REPO),
-            capture_output=True,
-            text=True,
-            timeout=120,
-            check=False,
-        )
-    except Exception as e:
-        print(f"# zaim_quality refresh failed: {e}", file=sys.stderr)
+    for script_name in ("jarvis_zaim_quality_check.py", "jarvis_zaim_bank_sync_check.py"):
+        script = REPO / "scripts" / script_name
+        if not script.is_file():
+            continue
+        try:
+            subprocess.run(
+                [exe, str(script)],
+                cwd=str(REPO),
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+        except Exception as e:
+            print(f"# {script_name} refresh failed: {e}", file=sys.stderr)
 
 
 EVALUATORS = {
