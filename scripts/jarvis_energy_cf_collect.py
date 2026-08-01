@@ -342,8 +342,16 @@ def build_state(
     if thr.get("missing_prev_month_attention", True):
         pm = months.get(prev_ym) or {}
         if pm.get("buy_yen") is None and pm.get("sell_yen") is None:
-            level = "attention"
-            details.append(f"{prev_ym} の買電/売電なし（Zaim未反映 or 未収集）")
+            # 月初〜中旬は請求／Zaim未反映が普通。15日未満は info に留める
+            if today.day < 15:
+                details.append(
+                    f"{prev_ym} の買電/売電は未反映（請求・Zaim待ち。月初は正常）"
+                )
+                if level == "ok":
+                    level = "info"
+            else:
+                level = "attention"
+                details.append(f"{prev_ym} の買電/売電なし（Zaim未反映 or 未収集）")
 
     # YoY kWh
     ratio = float(thr.get("buy_kwh_yoy_warn_ratio") or 1.25)

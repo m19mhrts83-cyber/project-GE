@@ -424,6 +424,60 @@ a.stat-link:active {
   overflow: hidden;
 }
 
+.energy-chart-wrap {
+  margin: 8px 0 4px;
+}
+
+.energy-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #fffdf9;
+  border-radius: 10px;
+}
+
+.energy-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.energy-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.energy-chart-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.metrics-callout {
+  border: 1px solid color-mix(in srgb, var(--med) 35%, var(--line));
+  background: color-mix(in srgb, var(--med) 8%, #fff);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--ink);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .mail-skim {
   list-style: none;
   margin: 0;
