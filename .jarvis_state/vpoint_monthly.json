@@ -1,0 +1,14 @@
+{
+  "disabled": false,
+  "last_check_c": "2026-07",
+  "last_result_c": {
+    "at": "2026-07-30T21:21:34+09:00",
+    "ok": false,
+    "tsumitate_yen": 90000,
+    "vpoint_balance": 28204,
+    "id_rail_note": "積立特典900pt=1%。マクド/サイゼ+6%あり。iD高還元なし",
+    "tsite_status": "ok_email_otp",
+    "note": "6%未達（1%実績）"
+  },
+  "notes": "ウィンドウC: 毎月25〜月末（深い突合）。日常は vpoint_cadence（前半ついで・必須手順外）。詳細は jarvis-vpoint-audit.mdc / Literature Note §6.6"
+}

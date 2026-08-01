@@ -1,0 +1,53 @@
+{
+  "disabled": false,
+  "interval_days": 2,
+  "last_check_at": "2026-07-30T21:21:34+09:00",
+  "last_prompted_at": "2026-07-30T21:21:34+09:00",
+  "last_balance_pt": 28204,
+  "last_key_hashes": [
+    "2026-07-10|ＳＢＩ証券 投信積立カード決済特典 プラチナプリファード|900",
+    "2026-06-08|ＳＢＩ証券 投信積立カード決済特典 プラチナプリファード|900",
+    "2026-05-05|ＳＢＩ証券 投信積立カード決済特典 プラチナプリファード|900",
+    "2026-07-24|マクドナルド ＋６％ご利用特典（プラチナプリファード）|270",
+    "2026-07-24|サイゼリヤ ＋６％ご利用特典（プラチナプリファード）|234",
+    "2026-07-10|カードご利用分 Ｏｌｉｖｅ ＩＮＦ|61",
+    "2026-07-13|ＳＢＩ証券 投資信託マイレージ|56"
+  ],
+  "last_tsumitate_bonus_pt": 900,
+  "last_tsumitate_label": "プラチナプリファード",
+  "open_actions": [
+    {
+      "id": "tsumitate_rate_band",
+      "title": "クレカ積立の実効還元を1%から上げる",
+      "why": "Tサイト履歴で投信積立カード決済特典が毎月900pt（9万円の1%）。表記もまだプラチナプリファード。最大6%は年間カード利用帯＋Olive資産特典の条件付き",
+      "how": "年間カード利用額の帯を確認／資産運用特典条件を満たす。次の付与行が900以外またはInfinite表記になったら報告",
+      "status": "open",
+      "evidence": "tsite 2026-07-10: 900pt / PP label"
+    },
+    {
+      "id": "visa_touch_not_id",
+      "title": "対象店はVisaタッチ／モバイルオーダー（iD回避）",
+      "why": "Vpass明細のOlive INFはほぼ／ｉＤ。iDは高還元対象外。マクド／サイゼの＋6%はモバイルオーダー等の正しいレール",
+      "how": "セブン等でスマホVisaタッチを1回試す→「試した」と一声。次回明細に／ｉＤが無い／Tサイトに＋特典行が出るか検証",
+      "status": "open",
+      "evidence": "meisai 202608 sample id_dominant; tsite McD/Saizeriya +6% exists"
+    },
+    {
+      "id": "eraberu_tokuten",
+      "title": "選べる特典を給与200＋還元×2に設定",
+      "why": "Literature Note §6.5 の正。給料振込はOlive確認済。アプリ側の特典選択が未完なら還元が伸びない",
+      "how": "Olive／Vpassアプリで選べる特典を変更→「設定した」と一声→checklist更新",
+      "status": "open",
+      "evidence": "§6.5 recommended; CARD_MIG_SALARY_OLIVE ok"
+    },
+    {
+      "id": "nisa_eval_band",
+      "title": "NISA等の評価額帯を確認（資産特典）",
+      "why": "Olive資産運用特典は評価額帯で+0.5/+1等。積立6%帯の一部",
+      "how": "SBIマイページでつみたてNISA等の評価額を確認→Jarvisに金額帯だけ共有（詳細は任意）",
+      "status": "open",
+      "evidence": "checklist nisa_eval_100man/200man=confirm"
+    }
+  ],
+  "notes": "日常 cadence: パートナー確認・前半末尾ついで（必須手順外）。間隔2日。重大差分は間隔無視。詳細は jarvis-vpoint-audit.mdc"
+}

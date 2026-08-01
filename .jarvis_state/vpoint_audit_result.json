@@ -1,0 +1,134 @@
+{
+  "audited_at": "2026-07-30",
+  "sources": [
+    "Vpass meisai 202608 (CDP)",
+    "Gmail API m19m (SBI積立発注・利用通知・特典達成状況)",
+    "Zaim CSV 20260628",
+    "sbi_vpoint_up_checklist.json",
+    "公式: Olive Infinite クレカ積立最大6% / 対象店はVisaタッチ・モバイルオーダー（iD対象外）"
+  ],
+  "credit_tsumitate": {
+    "monthly_yen_confirmed": 90000,
+    "evidence": [
+      "Gmail 2026-02〜07: 〈投信積立発注結果通知〉70,000+10,000+10,000",
+      "Vpass明細 26/07/13 ＳＢＩ証券投信積立サービス 90,000円（8月支払）"
+    ],
+    "olive_inf_start": "2026-06-28頃（ランク切替・クレジットモード審査完了メール）",
+    "vpoint_balance_2026_07_29": 16377,
+    "prior_note": "2026-07-04 Vポイント投資10,000pt後 残高12,408（checklist）→ 現在16,377（+約3,969だが内訳未分解）",
+    "point_history": {
+      "vsite_tsite": "ok_email_otp_2026-07-30",
+      "balance_pt": 28204,
+      "tsumitate_bonus_recent": [
+        {
+          "date": "2026-07-10",
+          "pt": 900,
+          "rate_vs_90k": 0.01,
+          "label": "プラチナプリファード"
+        },
+        {
+          "date": "2026-06-08",
+          "pt": 900,
+          "rate_vs_90k": 0.01
+        },
+        {
+          "date": "2026-05-05",
+          "pt": 900,
+          "rate_vs_90k": 0.01
+        }
+      ]
+    },
+    "effective_rate": {
+      "status": "confirmed_1pct_not_6pct",
+      "reason": [
+        "Tサイト履歴で投信積立カード決済特典が毎月900pt（9万円の1%）",
+        "履歴表記はプラチナプリファードのまま。Infinite最大6%の条件付与は未確認"
+      ],
+      "expected_band_now_pct": "実績1%",
+      "at_90k_yen": {
+        "actual_pts": 900,
+        "actual_pct": 1.0,
+        "if_6pct_pts": 5400
+      },
+      "verdict": "積立稼働OKだが付与は1%。6%には未到達"
+    }
+  },
+  "merchant_high_rate": {
+    "user_claim": "クレジットオンリー＋iDで+10%",
+    "official": "対象店高還元はスマホVisaタッチ／モバイルオーダー限定。iDは対象外",
+    "meisai_202608_sample": {
+      "correct_rail": [
+        {
+          "date": "26/07/25",
+          "merchant": "マクドナルドモバイルオーダー／ＡＰ",
+          "yen": 2990
+        },
+        {
+          "date": "26/07/29",
+          "merchant": "マクドナルドモバイルオーダー／ＡＰ",
+          "yen": 2990,
+          "source": "Gmail利用通知"
+        }
+      ],
+      "id_rail_including_target_cvs": [
+        {
+          "date": "26/07/17",
+          "merchant": "セブン－イレブン／ｉＤ",
+          "yen": 288
+        },
+        {
+          "date": "26/07/28",
+          "merchant": "ミンツストア名誘１号店／ｉＤ",
+          "yen": 516
+        },
+        {
+          "date": "26/07/16",
+          "merchant": "和食さと 豊明南店／ｉＤ",
+          "yen": 3619
+        }
+      ],
+      "note": "8月支払明細のOlive INF利用はほぼ全て『／ｉＤ』表記。セブンもiD"
+    },
+    "v_coupon_plus_10": "マイページの『ポイント最大+10%』はVクーポン（しゃぶ葉・ガスト等）であり、対象コンビニの基本高還元スタックとは別",
+    "verdict": "iD決済では高還元（ユーザー期待の+10%）は付かない仕様。実績としてもセブン等がiDで計上されており、高還元未達の主因は決済手段",
+    "tsite_evidence": {
+      "mcdonalds_plus6pct_20260724": 270,
+      "saizeriya_plus6pct_20260724": 234,
+      "note": "対象店＋6%特典はPP名義で付与あり。セブン等iDの高還元行は履歴上なし"
+    }
+  },
+  "recommendations": [
+    "月次で明細の／ｉＤ比率を見る（Wallet設定は強制変更しない）",
+    "マクドナルド等はモバイルオーダー継続（正しいレール）",
+    "クレカ積立6%は付与後にTサイト履歴で実効率（認証後）",
+    "Tサイト資格は .env.jarvis_private に VPOINT_TSITE_* で追記後に再監査",
+    "Jarvis: jarvis-vpoint-audit / 月次ウィンドウC"
+  ],
+  "alignment_2026_07_30": {
+    "visa_vs_id": {
+      "high_rate_requires": [
+        "credit_mode",
+        "visa_touch_or_mobile_order"
+      ],
+      "id_ineligible": true,
+      "olive_id_often_debit": true,
+      "judge_by_meisai_suffix_id": true,
+      "wallet_display_line_pay_credit": "表示名とOlive INF本体は別。明細が／ｉＤなら高還元対象外",
+      "do_not_force_wallet_change": true,
+      "next_check": "月次で／ｉＤ比率の改善有無のみ"
+    },
+    "tsite": {
+      "status": "ok_email_otp",
+      "note": "パスワード不要。VPOINT_TSITE_ID＋メール認証（estate宛）。VPOINT_TSITE_PASSWORDは未使用可",
+      "env_keys": [
+        "VPOINT_TSITE_ID"
+      ]
+    },
+    "ops": {
+      "cadence": "vpoint_cadence.json / jarvis_vpoint_cadence_check.py",
+      "partner_side": "前半末尾ついで（必須手順外・間隔2日）",
+      "monthly_window_c": "25-EOM deep audit",
+      "tsite_login": "VPOINT_TSITE_ID + email OTP (estate); password optional"
+    }
+  }
+}

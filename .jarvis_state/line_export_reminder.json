@@ -24,6 +24,12 @@
       "last_import_at": "2026-06-27T09:34:41+09:00",
       "last_import_source": "bootstrap",
       "last_prompted_at": "2026-07-19T17:28:27+09:00"
+    },
+    "kneesbee_oa": {
+      "route_id": "kneesbee_oa",
+      "folder": "419_Kneesbee税理士法人",
+      "last_import_at": "2026-07-30T21:33:11+09:00",
+      "last_import_source": "inbox"
     }
   }
 }

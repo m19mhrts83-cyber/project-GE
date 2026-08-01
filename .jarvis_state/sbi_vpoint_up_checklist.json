@@ -1,6 +1,6 @@
 {
-  "updated_at": "2026-07-04",
-  "program": "SBI証券 Vポイントアッププログラム（Olive Infinite 6777）",
+  "updated_at": "2026-07-30",
+  "program": "SBI証券 Vポイントアッププログラム（Olive Infinite）",
   "checklist": {
     "chuukai_smbc": {
       "status": "ok_user_confirmed",
@@ -37,6 +37,14 @@
     "nisa_eval_200man": {
       "status": "confirm",
       "note": "特典2は200万円以上で+0.5%"
+    },
+    "credit_tsumitate_rate_actual": {
+      "status": "confirmed_1pct_not_6pct",
+      "note": "Tサイト 2026-07-10: 投信積立カード決済特典900pt（9万の1%）。PP表記。cadence open_actions で帯上げ監視"
+    },
+    "cvs_rail_note": {
+      "status": "id_dominant_high_rate_ineligible",
+      "note": "2026-07-29: Vpass 8月支払明細でセブン等を含む多数が『／ｉＤ』。高還元対象外。マクドナルドモバイルオーダーは正しいレール。是正=Visaタッチ"
     }
   },
   "commands": {
@@ -44,6 +52,7 @@
     "setup": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --setup",
     "invest": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --invest --points 10000",
     "chuukai": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_bank_chuukai.py --status",
-    "olive": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --open-olive"
+    "olive": "cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --open-olive",
+    "audit_result": "cat ~/git-repos/.jarvis_state/vpoint_audit_result.json"
   }
 }
