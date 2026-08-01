@@ -132,10 +132,13 @@ def main(argv: list[str] | None = None) -> int:
     if not refresh:
         raise SystemExit("refresh_token が返りませんでした（offline_access を確認）")
 
+    def _q(v: str) -> str:
+        return "'" + v.replace("'", "'\\''") + "'"
+
     lines = [
         f"MS_GRAPH_CLIENT_ID={args.client_id}",
         f"MS_GRAPH_AUTHORITY={args.authority}",
-        f"MS_GRAPH_REFRESH_TOKEN={refresh}",
+        f"MS_GRAPH_REFRESH_TOKEN={_q(refresh)}",
     ]
     if args.client_secret:
         lines.append(f"MS_GRAPH_CLIENT_SECRET={args.client_secret}")
