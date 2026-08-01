@@ -90,36 +90,52 @@ export async function reviseTriageDraftWithGemini(
     currentDraft,
   ].join("\n");
 
-  try {
-    const url =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" +
-      encodeURIComponent(key);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      }),
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      return {
-        ok: false,
-        error: `Gemini 失敗 (${res.status}): ${t.slice(0, 200)}。ローカル Cursor で見直してください。`,
-      };
-    }
-    const data = (await res.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-    };
-    const text =
-      data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ||
-      "";
-    const draft = text.trim();
-    if (!draft) return { ok: false, error: "Gemini の応答が空でした" };
+  // gemini-2.5-flash は新ユーザー向けに 404。night_triage / GHA と同様に latest 系を使う。
+  const models = [
+    (process.env.GEMINI_MODEL || "").trim(),
+    "gemini-flash-latest",
+    "gemini-3.6-flash",
+    "gemini-flash-lite-latest",
+  ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
-    const save = await saveTriageDraft(id, draft, path);
-    if (!save.ok) return save;
-    return { ok: true, draft, message: "下書きを更新しました" };
+  let lastErr = "";
+  try {
+    for (const model of models) {
+      const url =
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=` +
+        encodeURIComponent(key);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        lastErr = `${model} (${res.status}): ${t.slice(0, 160)}`;
+        continue;
+      }
+      const data = (await res.json()) as {
+        candidates?: { content?: { parts?: { text?: string }[] } }[];
+      };
+      const text =
+        data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ||
+        "";
+      const draft = text.trim();
+      if (!draft) {
+        lastErr = `${model}: 応答が空`;
+        continue;
+      }
+
+      const save = await saveTriageDraft(id, draft, path);
+      if (!save.ok) return save;
+      return { ok: true, draft, message: `下書きを更新しました（${model}）` };
+    }
+    return {
+      ok: false,
+      error: `Gemini 失敗: ${lastErr || "利用可能なモデルなし"}。ローカル Cursor で見直してください。`,
+    };
   } catch (e) {
     return {
       ok: false,
