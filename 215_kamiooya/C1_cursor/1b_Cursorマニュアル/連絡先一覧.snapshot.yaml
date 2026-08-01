@@ -1,0 +1,73 @@
+partners:
+- email_domains: []
+  emails:
+  - suzuki@homeplanner.co.jp
+  name: ホームプランナー
+- email_domains: []
+  emails:
+  - tomoki-hayashi@minitech.co.jp
+  - hayashi@minitech.co.jp
+  name: ミニテック
+- email_domains: []
+  emails: []
+  name: Tcell
+- email_domains:
+  - leaf-eco.com
+  emails:
+  - ngy_fudousan@leaf-eco.com
+  - ngy_kanri@leaf-eco.com
+  name: LEAF
+- email_domains: []
+  emails: []
+  name: 立木
+- email_domains: []
+  emails: []
+  name: 神大家AI推進
+- email_domains: []
+  emails:
+  - kami.ooyasan-club@ooya.academy
+  name: 神大家運営回答
+- email_domains: []
+  emails: []
+  name: Raimo代理店
+- email_domains: []
+  emails:
+  - yitagaki@shift-ai.co.jp
+  name: SHIFT AI代理店
+- email_domains: []
+  emails:
+  - k.miyamoto@g.workstyle-evolution.co.jp
+  name: Workstyle-evolution代理店
+- email_domains: []
+  emails: []
+  name: 水田塾
+- email_domains: []
+  emails:
+  - RJS30_8080@aioinissaydowa.co.jp
+  name: グッドウィン
+- email_domains: []
+  emails:
+  - t-naito@newtus.com
+  name: Newtus
+- email_domains: []
+  emails:
+  - tomohito_oishi@irrc.co.jp
+  name: アイリック
+- email_domains: []
+  emails:
+  - ayanori.shimizu@iba-ns.co.jp
+  name: 日本総険
+- email_domains:
+  - knees-bee.jp
+  emails:
+  - t.ohno@knees-bee.jp
+  - t.ohno.sogou@gmail.com
+  name: Kneesbee税理士法人
+- email_domains: []
+  emails:
+  - koshino_masashi@ex.meigin.co.jp
+  name: 名古屋銀行
+- email_domains: []
+  emails:
+  - yuumee.jee@gmail.com
+  name: Grandole志賀本通I入居者

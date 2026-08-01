@@ -127,6 +127,14 @@ def push_triage(sb) -> int:
         {"key": "triage_pushed_at", "value": now_iso(), "updated_at": now_iso()},
         on_conflict="key",
     ).execute()
+    sb.table("sync_meta").upsert(
+        {"key": "mac_triage_pushed_at", "value": now_iso(), "updated_at": now_iso()},
+        on_conflict="key",
+    ).execute()
+    sb.table("sync_meta").upsert(
+        {"key": "triage_source", "value": "mac", "updated_at": now_iso()},
+        on_conflict="key",
+    ).execute()
     print(f"# triage upserted {n}", file=sys.stderr)
     return n
 

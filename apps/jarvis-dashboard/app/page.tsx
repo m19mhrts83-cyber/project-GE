@@ -34,6 +34,15 @@ export default async function HomePage() {
           triage sync {metaMap.triage_pushed_at ?? "未push"}
         </div>
         <div className="stat">
+          取得経路 <strong>{metaMap.triage_source ?? "—"}</strong>
+        </div>
+        <div className="stat">
+          Mac取得 {metaMap.mac_triage_pushed_at ?? "—"}
+        </div>
+        <div className="stat">
+          GHA取得 {metaMap.gha_triage_pushed_at ?? "—"}
+        </div>
+        <div className="stat">
           watch sync {metaMap.watch_pushed_at ?? "未push"}
         </div>
         <div className="stat">
@@ -41,8 +50,8 @@ export default async function HomePage() {
         </div>
       </div>
       <p className="empty">
-        左のサイドバーからレーンを開いてください。データは Mac の{" "}
-        <code>jarvis_dashboard_push.py</code> で Supabase に送ります。
+        左のサイドバーからレーンを開いてください。収集は Mac 夜間バッチまたは GHA
+        （Gmail general）→ Supabase。下書きの推敲・送信は Cursor／yoritoori。
       </p>
     </Shell>
   );
