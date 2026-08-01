@@ -12,8 +12,9 @@ PLIST="${LAUNCH_AGENTS_DIR}/${LABEL}.plist"
 mkdir -p "$LAUNCH_AGENTS_DIR" "$LOG_DIR"
 chmod +x "${SCRIPT_DIR}/triage_morning_open_runner.sh"
 
-# ログイン時 + 起床後も拾うため短周期ポーリング（1日1回オープンは Python 側で抑制）
-# スリープ中はタイマーが止まり、Mac を開いたあとに最初の実行で表示される想定
+# ログイン時 + 起床後も拾うため短周期ポーリング（1日1回オープン／Mac refresh は Python 側で抑制）
+# スリープ中はタイマーが止まり、Mac を開いたあとに最初の実行で表示＋裏更新される想定
+# LINE 込みは .env.jarvis_private の JARVIS_MORNING_WITH_LINE=1（既定オフ）
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,6 +48,7 @@ launchctl enable "gui/${UID_VALUE}/${LABEL}" || true
 launchctl bootstrap "gui/${UID_VALUE}" "$PLIST"
 
 echo "Installed: ${LABEL}"
-echo "Triggers: RunAtLoad (login) + every 120s (sleep 中は停止 → 開いた後の最初で表示)"
-echo "Logs: ${LOG_DIR}/morning_open.*.log"
+echo "Triggers: RunAtLoad (login) + every 120s (sleep 中は停止 → 開いた後の最初で表示＋Mac refresh)"
+echo "Logs: ${LOG_DIR}/morning_open.*.log / mac_morning_refresh.*.log"
+echo "LINE opt-in: JARVIS_MORNING_WITH_LINE=1 in .env.jarvis_private"
 launchctl print "gui/${UID_VALUE}/${LABEL}" | /usr/bin/awk '/state =|last exit code|runs =/'

@@ -30,6 +30,22 @@ export default async function HomePage() {
   const { data: meta } = await supabase.from("sync_meta").select("key,value");
   const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
 
+  const fmtSync = (v: string | undefined) => {
+    if (!v) return "—";
+    // 2026-08-01T09:12:00+0900 → 08/01 09:12
+    const m = v.match(
+      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/
+    );
+    if (m) return `${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
+    return v.length > 16 ? v.slice(0, 16) : v;
+  };
+  const cloudAt =
+    metaMap.gha_triage_pushed_at ||
+    metaMap.gha_watch_pushed_at ||
+    metaMap.gha_heartbeat_at;
+  const macMorningAt = metaMap.mac_morning_refreshed_at;
+  const macMorningOk = metaMap.mac_morning_refresh_ok;
+
   const watchNeed = (watchRows || [])
     .filter((w) => w.level !== "ok")
     .sort(
@@ -62,6 +78,21 @@ export default async function HomePage() {
       <p className="sub">
         PC起動時にパッと見る画面。上で「見なきゃあかん」項目、下でメールをざっと確認。
         気になる行をタップすると詳細へ。
+      </p>
+
+      <p className="home-sync" aria-label="最終同期">
+        <span>
+          最終同期 cloud{" "}
+          <strong>{fmtSync(cloudAt)}</strong>
+        </span>
+        <span className="home-sync-sep">·</span>
+        <span>
+          mac_morning{" "}
+          <strong>{fmtSync(macMorningAt)}</strong>
+          {macMorningAt && macMorningOk === "0" ? (
+            <span className="home-sync-warn">（一部失敗）</span>
+          ) : null}
+        </span>
       </p>
 
       <div className="home-legend" aria-label="優先度の凡例">
@@ -187,8 +218,14 @@ export default async function HomePage() {
       </section>
 
       <details className="home-meta">
-        <summary>同期情報</summary>
+        <summary>同期情報（詳細）</summary>
         <div className="stats" style={{ marginTop: 10 }}>
+          <div className="stat">
+            cloud {fmtSync(cloudAt)}
+          </div>
+          <div className="stat">
+            mac_morning {fmtSync(macMorningAt)}
+          </div>
           <div className="stat">
             triage {metaMap.triage_pushed_at ?? "未push"}
           </div>
@@ -197,10 +234,10 @@ export default async function HomePage() {
           </div>
           <div className="stat">経路 {metaMap.triage_source ?? "—"}</div>
           <div className="stat">
-            Mac {metaMap.mac_triage_pushed_at ?? "—"}
+            Mac push {metaMap.mac_triage_pushed_at ?? "—"}
           </div>
           <div className="stat">
-            GHA {metaMap.gha_triage_pushed_at ?? "—"}
+            GHA triage {metaMap.gha_triage_pushed_at ?? "—"}
           </div>
         </div>
       </details>

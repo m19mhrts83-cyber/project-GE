@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+"""
+Mac 必須の最新化バンドル（朝オープン裏実行・1日1回）。
+
+夜間フルクラウド化はしない。クラウドできるものは GHA 任せ、
+OneDrive path／ローカル依存は Mac 起床後にまとめて追従する。
+
+  python scripts/jarvis_morning_mac_refresh.py
+  python scripts/jarvis_morning_mac_refresh.py --dry-run
+  python scripts/jarvis_morning_mac_refresh.py --force
+  python scripts/jarvis_morning_mac_refresh.py --with-line   # CHRLINE／オプチャ（重い・任意）
+
+環境変数:
+  JARVIS_MORNING_WITH_LINE=1 … --with-line 相当（launchd からオプトイン）
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+JST = ZoneInfo("Asia/Tokyo")
+REPO = Path(__file__).resolve().parents[1]
+STATE = REPO / ".jarvis_state" / "night_triage"
+LAST_REFRESH_PATH = STATE / "last_mac_morning_refresh_date"
+LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_night_triage"
+PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+MANUAL_DIR = (
+    REPO
+    / "215_kamiooya"
+    / "C1_cursor"
+    / "1b_Cursorマニュアル"
+)
+GMAIL_SCRIPT = MANUAL_DIR / "gmail_to_yoritoori.py"
+CATCHUP = REPO / "scripts" / "jarvis_triage_yoritoori_catchup.py"
+PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
+POC = REPO / "line_unofficial_poc"
+RUN_PATCH = POC / "run_patch.sh"
+
+
+def now_iso() -> str:
+    return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def today_jst() -> str:
+    return datetime.now(JST).strftime("%Y-%m-%d")
+
+
+def py_exe() -> str:
+    return str(PY) if PY.is_file() else sys.executable
+
+
+def already_refreshed_today() -> bool:
+    if not LAST_REFRESH_PATH.is_file():
+        return False
+    try:
+        return LAST_REFRESH_PATH.read_text(encoding="utf-8").strip() == today_jst()
+    except OSError:
+        return False
+
+
+def mark_refreshed_today() -> None:
+    STATE.mkdir(parents=True, exist_ok=True)
+    LAST_REFRESH_PATH.write_text(today_jst() + "\n", encoding="utf-8")
+
+
+def run_step(
+    name: str,
+    cmd: list[str],
+    *,
+    cwd: Path | None = None,
+    timeout: int = 600,
+    dry_run: bool = False,
+    env: dict[str, str] | None = None,
+) -> int:
+    print(f"# step:{name}: {' '.join(cmd)}", flush=True)
+    if dry_run:
+        print(f"# dry-run: skip {name}", flush=True)
+        return 0
+    try:
+        r = subprocess.run(
+            cmd,
+            cwd=str(cwd or REPO),
+            env=env,
+            timeout=timeout,
+            check=False,
+        )
+        print(f"# step:{name}: exit={r.returncode}", flush=True)
+        return int(r.returncode)
+    except subprocess.TimeoutExpired:
+        print(f"# step:{name}: TIMEOUT ({timeout}s)", file=sys.stderr, flush=True)
+        return 124
+    except Exception as e:
+        print(f"# step:{name}: error {e}", file=sys.stderr, flush=True)
+        return 1
+
+
+def mac_line_running() -> bool:
+    """Mac版LINE が起動中なら True（CHRLINE と競合）。"""
+    try:
+        r = subprocess.run(
+            [
+                "pgrep",
+                "-f",
+                r"application\.jp\.naver\.line\.mac|/Applications/LINE\.app",
+            ],
+            capture_output=True,
+            check=False,
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def upsert_sync_meta(results: dict[str, Any]) -> None:
+    """mac_morning_refreshed_at 等を sync_meta へ。"""
+    try:
+        from supabase import create_client
+    except ImportError:
+        print("# sync_meta: supabase package missing", file=sys.stderr)
+        return
+    url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
+    key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    if not url or not key:
+        print("# sync_meta: JARVIS_SUPABASE_* 未設定", file=sys.stderr)
+        return
+    ts = now_iso()
+    rows = [
+        {"key": "mac_morning_refreshed_at", "value": ts, "updated_at": ts},
+        {
+            "key": "mac_morning_refresh_ok",
+            "value": "1" if results.get("ok") else "0",
+            "updated_at": ts,
+        },
+        {
+            "key": "mac_morning_refresh_summary",
+            "value": json.dumps(results, ensure_ascii=False)[:1800],
+            "updated_at": ts,
+        },
+    ]
+    try:
+        sb = create_client(url, key)
+        sb.table("sync_meta").upsert(rows, on_conflict="key").execute()
+        print(f"# sync_meta: mac_morning_refreshed_at={ts}", flush=True)
+    except Exception as e:
+        print(f"# sync_meta upsert failed: {e}", file=sys.stderr)
+
+
+def partner_base() -> Path:
+    raw = (os.environ.get("YORITOORI_BASE_PATH") or "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    return (
+        Path.home()
+        / "Library"
+        / "CloudStorage"
+        / "OneDrive-個人用"
+        / "215_神・大家さん倶楽部"
+        / "C2_ルーティン作業"
+        / "26_パートナー社への相談"
+    )
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Morning Mac-required refresh bundle")
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--force", action="store_true", help="同一日の再実行抑制を無視")
+    ap.add_argument(
+        "--with-line",
+        action="store_true",
+        help="CHRLINE／オプチャ同期を含める（重い・認証注意）",
+    )
+    ap.add_argument(
+        "--skip-fetch",
+        action="store_true",
+        help="gmail_to_yoritoori をスキップ",
+    )
+    ap.add_argument(
+        "--skip-push",
+        action="store_true",
+        help="dashboard_push をスキップ",
+    )
+    args = ap.parse_args()
+
+    with_line = args.with_line or (
+        (os.environ.get("JARVIS_MORNING_WITH_LINE") or "").strip() in ("1", "true", "yes")
+    )
+
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    if not args.force and already_refreshed_today():
+        print(f"# skip: already refreshed today ({today_jst()})")
+        return 0
+
+    hour = datetime.now(JST).hour
+    if not args.force and not (5 <= hour <= 22):
+        print(f"# skip: outside daytime window (hour={hour})")
+        return 0
+
+    print(f"# morning_mac_refresh start {now_iso()} with_line={with_line}")
+    results: dict[str, Any] = {
+        "started_at": now_iso(),
+        "with_line": with_line,
+        "steps": {},
+    }
+    exe = py_exe()
+    failures = 0
+
+    # 1. Web 送信済み → やり取り追記
+    rc = run_step(
+        "catchup",
+        [exe, str(CATCHUP)],
+        timeout=180,
+        dry_run=args.dry_run,
+    )
+    results["steps"]["catchup"] = rc
+    if rc != 0:
+        failures += 1
+
+    # 2. パートナー Gmail → OneDrive（軽量=通常差分。フル夜トリアージはしない）
+    if not args.skip_fetch:
+        if GMAIL_SCRIPT.is_file():
+            env = os.environ.copy()
+            env.setdefault("YORITOORI_BASE_PATH", str(partner_base()))
+            rc = run_step(
+                "gmail_fetch",
+                [exe, str(GMAIL_SCRIPT)],
+                cwd=MANUAL_DIR,
+                timeout=900,
+                dry_run=args.dry_run,
+                env=env,
+            )
+            results["steps"]["gmail_fetch"] = rc
+            if rc != 0:
+                failures += 1
+        else:
+            print(f"# gmail_fetch: missing {GMAIL_SCRIPT}", file=sys.stderr)
+            results["steps"]["gmail_fetch"] = -1
+            failures += 1
+    else:
+        results["steps"]["gmail_fetch"] = "skipped"
+
+    # 3–4. 状況ウォッチ再集約込みの投影 push（push 内で situation_watch 実行）
+    if not args.skip_push:
+        rc = run_step(
+            "dashboard_push",
+            [exe, str(PUSH)],
+            timeout=600,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["dashboard_push"] = rc
+        if rc != 0:
+            failures += 1
+    else:
+        results["steps"]["dashboard_push"] = "skipped"
+
+    # 5. 任意: CHRLINE／オプチャ
+    if with_line:
+        if mac_line_running():
+            print(
+                "# line: Mac版LINE 起動中のためスキップ（トークン保護）",
+                file=sys.stderr,
+            )
+            results["steps"]["line"] = "skipped_mac_line"
+        elif RUN_PATCH.is_file():
+            rc = run_step(
+                "line",
+                [
+                    str(RUN_PATCH),
+                    "chrline_yoritoori_inbox_fetch.py",
+                    "--allow-qr-login",
+                    "--discover-thread-mids-dry-run",
+                ],
+                cwd=POC,
+                timeout=1800,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["line"] = rc
+            if rc != 0:
+                failures += 1
+            # LINE 後にもう一度投影を揃える
+            if not args.skip_push and not args.dry_run and rc == 0:
+                rc2 = run_step(
+                    "dashboard_push_after_line",
+                    [exe, str(PUSH), "--triage-only"],
+                    timeout=300,
+                    dry_run=False,
+                )
+                results["steps"]["dashboard_push_after_line"] = rc2
+        else:
+            print(f"# line: missing {RUN_PATCH}", file=sys.stderr)
+            results["steps"]["line"] = -1
+            failures += 1
+    else:
+        results["steps"]["line"] = "skipped"
+
+    results["ok"] = failures == 0
+    results["finished_at"] = now_iso()
+    results["failures"] = failures
+
+    if not args.dry_run:
+        mark_refreshed_today()
+        upsert_sync_meta(results)
+
+    print(
+        f"# morning_mac_refresh done ok={results['ok']} failures={failures}",
+        flush=True,
+    )
+    return 0 if failures == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
