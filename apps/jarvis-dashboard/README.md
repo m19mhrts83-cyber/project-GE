@@ -34,6 +34,7 @@ https://jarvis-dashboard-amber.vercel.app/
 | Mac | パートナー MD・CHRLINE・フル夜間トリアージ・状況ウォッチ全文 → push |
 | GHA Gmail | admin INBOX 未返信候補 → `triage_items`（`jarvis-dashboard-gmail-triage.yml`） |
 | GHA Watch | 収集鮮度・WeStudy CI など API 完結項目 → `watch_status`（`jarvis-dashboard-situation-watch.yml`） |
+| Cloud Agent | 対話本線。Notion／NotebookLM は Cloud MCP。手順: `docs/Jarvis_Cloud_Agent.md` |
 | 表示 | 本 Vercel アプリ（取得経路・Mac/GHA 時刻を概要に表示） |
 
 ### OneDrive Graph（Phase 3c・骨格）

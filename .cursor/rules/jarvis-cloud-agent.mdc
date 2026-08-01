@@ -1,0 +1,42 @@
+---
+description: Jarvis 対話は Cursor Cloud Agent 本線。Notion/NotebookLM は Cloud MCP。枠切れはローカルへ。
+alwaysApply: true
+---
+
+# Jarvis × Cloud Agent（本線）
+
+## 方針
+
+- **対話・調査の本線**は Cursor **Cloud Agent**（同一 Pro 等プラン。別契約ではない）。
+- **基本はクラウドで進められることはクラウド**。止まるときだけローカル／Mac。
+- 手順正本: `~/git-repos/docs/Jarvis_Cloud_Agent.md`
+
+## データの読み方
+
+| 優先 | 内容 |
+|---|---|
+| 1 | Supabase `jarvis-dashboard`（投影: triage / watch / cards / sync_meta） |
+| 2 | **Notion MCP**（物件タスク等の原本。Cloud では cursor.com/agents の MCP） |
+| 3 | **NotebookLM MCP**（調査ノート。Drive `200_NoteBookLM` がソース正本） |
+| 4 | admin Gmail → 既に `triage_items` にあるもの、または Gmail API（Secrets） |
+| 5 | OneDrive は Graph 後続。未設定時は Mac ローカル path |
+
+## フォールバック（ローカルへ）
+
+次のときローカル Agent／Mac に切り替えてよい:
+
+- 利用枠切れで Cloud が止まる（on-demand 未設定）
+- Cloud 同時起動上限
+- CHRLINE／オプチャ／対外送信／Zaim Playwright など **Mac 専用**
+- Cloud MCP 未配線で Notion 等が使えない（先に配線を試みる）
+
+## やらない
+
+- Web ダッシュボードからのメール自動送信
+- Workspace **Gemini アプリ会話履歴**の自動フル同期（対象外。API リサーチは `GEMINI_API_KEY`）
+- 秘密をチャットや Git に貼る
+
+## Notion 切断時
+
+ローカル: `notion-mcp-reauth.mdc`（`mcp_auth`）。  
+Cloud: [cursor.com/agents](https://cursor.com/agents) の MCP で Notion を Re-authenticate。貼り付け回避は同じ。
