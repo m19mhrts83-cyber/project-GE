@@ -423,6 +423,96 @@ def macos_notify(title: str, body: str) -> None:
         pass
 
 
+DASHBOARD_URL = "http://127.0.0.1:8765/"
+LAST_AUTO_OPEN_PATH = STATE_DIR / "last_auto_open_date"
+DASHBOARD_LABEL = "com.matsunoma.jarvis.triage-dashboard"
+
+
+def pending_items(queue: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    q = queue if queue is not None else load_queue()
+    return [it for it in (q.get("items") or []) if it.get("status") == "pending"]
+
+
+def pending_partner_hint(items: list[dict[str, Any]], *, limit: int = 3) -> str:
+    names: list[str] = []
+    seen: set[str] = set()
+    for it in items:
+        name = str(it.get("partner") or it.get("folder") or it.get("from_email") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        names.append(name)
+        if len(names) >= limit:
+            break
+    return "・".join(names)
+
+
+def today_jst() -> str:
+    return datetime.now(JST).strftime("%Y-%m-%d")
+
+
+def already_auto_opened_today() -> bool:
+    if not LAST_AUTO_OPEN_PATH.is_file():
+        return False
+    try:
+        return LAST_AUTO_OPEN_PATH.read_text(encoding="utf-8").strip() == today_jst()
+    except OSError:
+        return False
+
+
+def mark_auto_opened_today() -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    LAST_AUTO_OPEN_PATH.write_text(today_jst() + "\n", encoding="utf-8")
+
+
+def wait_dashboard_ready(*, timeout_s: float = 25.0) -> bool:
+    """localhost:8765 が応答するまで待つ。必要なら launchd kickstart。"""
+    deadline = time.time() + timeout_s
+    kicked = False
+    while time.time() < deadline:
+        try:
+            urllib.request.urlopen(DASHBOARD_URL, timeout=2)
+            return True
+        except Exception:
+            if not kicked and time.time() + 10 < deadline:
+                try:
+                    uid = os.getuid()
+                    subprocess.run(
+                        ["launchctl", "kickstart", "-k", f"gui/{uid}/{DASHBOARD_LABEL}"],
+                        capture_output=True,
+                        timeout=10,
+                    )
+                except Exception:
+                    pass
+                kicked = True
+            time.sleep(1.0)
+    return False
+
+
+def open_dashboard_browser(*, force: bool = False, dry_run: bool = False) -> tuple[bool, str]:
+    """
+    pending≥1 のときダッシュボードをブラウザで開く。
+    force=False なら同一日の再オープンをスキップ。
+    戻り値: (opened_or_would_open, message)
+    """
+    items = pending_items()
+    n = len(items)
+    if n < 1:
+        return False, "pending=0（オープン不要）"
+    if not force and already_auto_opened_today():
+        return False, f"pending={n} だが本日は既に自動オープン済み"
+    if dry_run:
+        return True, f"dry-run: pending={n} なら open する"
+    if not wait_dashboard_ready():
+        return False, "ダッシュボード未応答（8765）"
+    try:
+        subprocess.run(["open", DASHBOARD_URL], check=False, capture_output=True)
+    except Exception as e:
+        return False, f"open 失敗: {e}"
+    mark_auto_opened_today()
+    return True, f"opened pending={n}"
+
+
 def load_queue() -> dict[str, Any]:
     data = load_json(QUEUE_PATH, {"version": 1, "items": [], "updated_at": None})
     if "items" not in data:
@@ -827,7 +917,20 @@ def main() -> int:
     msg = f"要返信 {need} / 下書き {drafted} / 候補 {len(all_cands)}"
     print(f"# done: {msg}")
     if not args.dry_run:
-        macos_notify("Jarvis 夜間トリアージ", msg)
+        queue_after = load_queue()
+        pending = pending_items(queue_after)
+        hint = pending_partner_hint(pending)
+        notify_body = msg
+        if pending:
+            notify_body = f"{msg}"
+            if hint:
+                notify_body = f"要返信 {len(pending)} 件 — {hint}"
+            elif need:
+                notify_body = f"要返信 {need} / 下書き {drafted} — pending {len(pending)}"
+        macos_notify("Jarvis 夜間トリアージ", notify_body)
+        if pending:
+            opened, open_msg = open_dashboard_browser(force=True)
+            print(f"# dashboard open: {open_msg}")
         logf = LOG_DIR / f"run_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.log"
         logf.write_text(
             json.dumps(
@@ -838,6 +941,7 @@ def main() -> int:
                     "candidates": len(all_cands),
                     "need": need,
                     "drafted": drafted,
+                    "pending": len(pending),
                 },
                 ensure_ascii=False,
                 indent=2,
