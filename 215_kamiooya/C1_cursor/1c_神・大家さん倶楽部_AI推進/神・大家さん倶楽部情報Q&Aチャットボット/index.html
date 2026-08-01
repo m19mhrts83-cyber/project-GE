@@ -41,6 +41,7 @@
         </form>
 
         <form id="registerForm" class="space-y-3 hidden">
+          <input id="registerName" type="text" class="w-full border rounded-md px-3 py-2" placeholder="氏名" required autocomplete="name" />
           <input id="registerMemberNo" type="text" class="w-full border rounded-md px-3 py-2" placeholder="会員番号" required autocomplete="off" />
           <input id="registerEmail" type="email" class="w-full border rounded-md px-3 py-2" placeholder="メールアドレス" required />
           <input id="registerPassword" type="password" class="w-full border rounded-md px-3 py-2" placeholder="パスワード" required />
@@ -316,6 +317,7 @@
                         <input id="pendingUsersSelectAll" type="checkbox" title="全選択" aria-label="全選択" />
                       </th>
                       <th class="p-2 text-left">ID</th>
+                      <th class="p-2 text-left">氏名</th>
                       <th class="p-2 text-left">メール</th>
                       <th class="p-2 text-left">会員番号</th>
                       <th class="p-2 text-left">状態</th>
@@ -343,6 +345,7 @@
                   <thead class="bg-slate-100">
                     <tr>
                       <th class="p-2 text-left">ID</th>
+                      <th class="p-2 text-left">氏名</th>
                       <th class="p-2 text-left">メール</th>
                       <th class="p-2 text-left">会員番号</th>
                       <th class="p-2 text-left">操作</th>
@@ -374,6 +377,7 @@
                     <thead class="bg-slate-100">
                       <tr>
                         <th class="p-2 text-left">ID</th>
+                        <th class="p-2 text-left">氏名</th>
                         <th class="p-2 text-left">メール</th>
                         <th class="p-2 text-left">会員番号</th>
                         <th class="p-2 text-left">権限</th>
