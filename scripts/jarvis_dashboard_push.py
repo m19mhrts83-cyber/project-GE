@@ -59,11 +59,26 @@ def push_triage(sb) -> int:
         return 0
     data = json.loads(QUEUE_PATH.read_text(encoding="utf-8"))
     items = data.get("items") or []
+    # Web で「対応済み」にした行を Mac push で pending に戻さない
+    remote_done: set[str] = set()
+    try:
+        r = (
+            sb.table("triage_items")
+            .select("id,status")
+            .eq("status", "done")
+            .execute()
+        )
+        remote_done = {str(x["id"]) for x in (r.data or [])}
+    except Exception as e:
+        print(f"# triage done merge skipped: {e}", file=sys.stderr)
     rows: list[dict[str, Any]] = []
     for it in items:
         iid = str(it.get("id") or "").strip()
         if not iid:
             continue
+        st = it.get("status") or "pending"
+        if st == "pending" and iid in remote_done:
+            st = "done"
         payload = {
             k: it.get(k)
             for k in (
@@ -80,7 +95,7 @@ def push_triage(sb) -> int:
                 "id": iid,
                 "lane": it.get("lane") or "partner",
                 "kind": it.get("kind") or "mail",
-                "status": it.get("status") or "pending",
+                "status": st,
                 "partner": it.get("partner") or None,
                 "folder": it.get("folder") or None,
                 "subject": it.get("subject") or None,
