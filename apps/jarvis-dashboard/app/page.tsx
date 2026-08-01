@@ -66,6 +66,9 @@ export default async function HomePage() {
     return order[la] - order[lb];
   });
 
+  const partnerMails = mails.filter((m) => m.lane === "partner");
+  const otherMails = mails.filter((m) => m.lane !== "partner");
+
   const mailCounts = { attention: 0, warn: 0, info: 0 };
   for (const m of mails) {
     mailCounts[mailPriorityToLevel(m.priority)] += 1;
@@ -75,8 +78,8 @@ export default async function HomePage() {
     <Shell active="/">
       <h1>ホーム</h1>
       <p className="sub">
-        PC起動時にパッと見る画面。上で「見なきゃあかん」項目、下でメールをざっと確認。
-        気になる行をタップすると詳細へ。
+        PC起動時にパッと見る画面。まずパートナー未読、次に状況ウォッチ、下でその他メール。
+        カードや行をタップすると詳細へ。
       </p>
 
       <p className="home-sync" aria-label="最終同期">
@@ -111,18 +114,58 @@ export default async function HomePage() {
 
       <div className="stats home-stats">
         <div className="stat level-attention">
+          パートナー未読 <strong>{partnerMails.length}</strong>
+        </div>
+        <div className="stat level-attention">
           要確認 <strong>{counts.attention + mailCounts.attention}</strong>
         </div>
         <div className="stat level-warn">
           注意 <strong>{counts.warn + mailCounts.warn}</strong>
         </div>
-        <div className="stat level-info">
-          参考 <strong>{counts.info + mailCounts.info}</strong>
-        </div>
         <div className="stat">
           メール pending <strong>{mails.length}</strong>
         </div>
       </div>
+
+      <section className="home-section">
+        <div className="home-section-head">
+          <h2>パートナー（未読）</h2>
+          <a href="/partner" className="home-more">
+            レーンへ →
+          </a>
+        </div>
+        {partnerMails.length === 0 ? (
+          <p className="empty">パートナーの未読はありません</p>
+        ) : (
+          <div className="watch-grid">
+            {partnerMails.map((it) => {
+              const level = mailPriorityToLevel(it.priority);
+              const who = it.partner || it.from_email || "—";
+              const oneLine = (it.summary || "").replace(/\s+/g, " ").trim();
+              return (
+                <a
+                  key={it.id}
+                  href={`/mail/${encodeURIComponent(it.id)}`}
+                  className={`card watch-card home-partner-card level-${level}`}
+                >
+                  <header>
+                    <span className="lvl">{LEVEL_LABEL[level]}</span>
+                    <strong title={who}>{who}</strong>
+                    {it.received_at ? (
+                      <span className="meta">{it.received_at}</span>
+                    ) : null}
+                  </header>
+                  <p className="mail-subject home-partner-subject">
+                    {it.subject || "（件名なし）"}
+                  </p>
+                  {oneLine ? <p className="sum">{oneLine}</p> : null}
+                  {it.folder ? <p className="meta">{it.folder}</p> : null}
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <section className="home-section">
         <div className="home-section-head">
@@ -164,14 +207,14 @@ export default async function HomePage() {
 
       <section className="home-section">
         <div className="home-section-head">
-          <h2>メール（ざっと見る）</h2>
+          <h2>その他メール（ざっと見る）</h2>
           <span className="meta">クリックで詳細</span>
         </div>
-        {mails.length === 0 ? (
-          <p className="empty">pending のメールはありません</p>
+        {otherMails.length === 0 ? (
+          <p className="empty">パートナー以外の pending はありません</p>
         ) : (
           <ul className="mail-skim">
-            {mails.map((it) => {
+            {otherMails.map((it) => {
               const level = mailPriorityToLevel(it.priority);
               const who = it.partner || it.from_email || "—";
               const oneLine = (it.summary || "").replace(/\s+/g, " ").trim();

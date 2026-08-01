@@ -374,6 +374,17 @@ a.stat-link:active {
   font-size: 0.75rem;
 }
 
+.home-partner-card .home-partner-subject {
+  margin: 6px 0 4px;
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.95rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .mail-skim {
   list-style: none;
   margin: 0;
