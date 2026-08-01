@@ -33,6 +33,7 @@ credentials_*.json
 __pycache__/
 node_modules/
 *.pyc
+*.log
 .DS_Store
 _tmp/
 
@@ -41,6 +42,18 @@ _tmp/
 .jarvis_state/night_triage/queue.json
 .jarvis_state/night_triage/dashboard.html
 .jarvis_state/night_triage/config.json
+.jarvis_state/night_triage/_agent_login.sh
+# Vポイント調査の生ダンプ（Gmail本文・スクショ等）。要約は vpoint_audit_result.json のみ追跡
+.jarvis_state/vpoint_audit_*.json
+.jarvis_state/vpoint_audit_*.html
+.jarvis_state/vpoint_audit_*.png
+.jarvis_state/vpoint_tsite_history_*.json
+# 例外: 運用サマリー結果はコミット対象
+!.jarvis_state/vpoint_audit_result.json
+
+# --- Q&Aチャットボット／ProgramCode の実行成果物（容量大） ---
+**/神・大家さん倶楽部情報Q&Aチャットボット/state/exports/
+ProgramCode/outputs/
 
 # --- エディタ・ツール ---
 .cursor/projects/
