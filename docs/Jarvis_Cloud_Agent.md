@@ -83,7 +83,9 @@ Secrets（Cloud My Secrets 推奨）: `GMAIL_CREDENTIALS_B64` ＋ `GMAIL_ESTATE_
 **初回配線（Cloud run 内）**:
 
 1. MCP 追加後、Cloud Agent で「NotebookLM の `get_health` を実行して」
-2. `authenticated=false` なら **`setup_auth`**（ブラウザで Google ログイン。アカウントは **m19m** 想定／Drive `200_NoteBookLM` の所有者に合わせる）
+2. `authenticated=false` なら **`setup_auth`**、または Mac で  
+   `python scripts/jarvis_notebooklm_mcp_login.py`（`.env.jarvis_private` の `NOTEBOOKLM_EMAIL` / `NOTEBOOKLM_PASSWORD`。アカウントは **admin**）  
+   → `browser_state/state.json` を書き、`get_health` で `authenticated=true` を確認
 3. `add_notebook` で共有 URL を登録 → `list_notebooks` → `ask_question` で1問
 4. 切れたら `re_auth` または再度 `setup_auth`
 
