@@ -1,0 +1,38 @@
+name: Jarvis Dashboard Lanes
+
+# コンテンツレーン（神大家／3棟／戸建て／AI・Raimo）→ cards
+# MS_GRAPH_* が GitHub Secrets に無い間はスキップ（Mac push が正本）。
+
+on:
+  schedule:
+    - cron: "30 21 * * *" # 06:30 JST
+  workflow_dispatch:
+
+concurrency:
+  group: jarvis-dashboard-lanes
+  cancel-in-progress: true
+
+jobs:
+  lanes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -q supabase pyyaml
+
+      - name: Run lanes (skip without Graph)
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
+          MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
+          MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
+          MS_GRAPH_USER_UPN: ${{ secrets.MS_GRAPH_USER_UPN }}
+          MS_GRAPH_DRIVE_ID: ${{ secrets.MS_GRAPH_DRIVE_ID }}
+        run: python scripts/jarvis_gha_lanes.py --push

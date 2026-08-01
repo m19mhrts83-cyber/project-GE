@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 OUT = Path.home() / ".jarvis_state" / "cloud_agent_secrets.env"
-KEYS = (
+REQUIRED = (
     "JARVIS_SUPABASE_URL",
     "JARVIS_SUPABASE_SERVICE_ROLE_KEY",
     "GEMINI_API_KEY",
@@ -27,12 +27,17 @@ KEYS = (
 def main() -> int:
     lines: list[str] = []
     missing: list[str] = []
-    for k in KEYS:
+    for k in REQUIRED:
         v = (os.environ.get(k) or "").strip()
         if not v:
             missing.append(k)
             continue
         lines.append(f"{k}={v}")
+    # 新形式キー名（SERVICE_ROLE と同値でよい）
+    sr = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    secret = (os.environ.get("JARVIS_SUPABASE_SECRET_KEY") or "").strip() or sr
+    if secret:
+        lines.append(f"JARVIS_SUPABASE_SECRET_KEY={secret}")
     if missing:
         print(f"missing: {', '.join(missing)}", file=sys.stderr)
         return 1
@@ -40,6 +45,10 @@ def main() -> int:
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     OUT.chmod(0o600)
     print(f"wrote {OUT} ({len(lines)} keys). Paste into Cloud Agents → My Secrets, then delete the file.")
+    print(
+        "Note: jarvis-dashboard uses sb_secret_; legacy JWT service_role is disabled.",
+        file=sys.stderr,
+    )
     return 0
 
 

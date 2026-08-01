@@ -51,6 +51,9 @@ export default async function HomePage() {
         <div className="stat">
           GHA心拍 {metaMap.gha_heartbeat_at ?? "—"}
         </div>
+        <div className="stat">
+          cards sync {metaMap.cards_pushed_at ?? "—"}
+        </div>
       </div>
       <p className="empty">
         左のサイドバーからレーンを開いてください。収集は Mac 夜間バッチまたは GHA
