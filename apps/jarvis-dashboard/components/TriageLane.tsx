@@ -2,23 +2,16 @@ import Link from "next/link";
 import Shell from "@/components/Shell";
 import DraftWorkbench from "@/components/DraftWorkbench";
 import TriageStatusActions from "@/components/TriageStatusActions";
-import LaneViewTabs, {
-  VIEW_LABEL,
-  type LaneView,
-} from "@/components/LaneViewTabs";
+import LaneViewTabs from "@/components/LaneViewTabs";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
+import {
+  VIEW_LABEL,
+  laneViewHref,
+  type LaneView,
+} from "@/lib/laneView";
 import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
 import { createClient } from "@/lib/supabase/server";
-
-function parseView(raw: string | string[] | undefined): LaneView {
-  const v = Array.isArray(raw) ? raw[0] : raw;
-  const s = (v || "").trim();
-  if (s === "sent" || s === "skipped" || s === "snoozed" || s === "activity") {
-    return s;
-  }
-  return "unread";
-}
 
 /** summary が原文の先頭切り出しだけなら、カード上では出さない（全文側に寄せる） */
 function isTruncatedBodyPreview(
@@ -76,16 +69,19 @@ export default async function TriageLanePage({
   title,
   active,
   subtitle,
+  view: viewProp,
   searchParams,
 }: {
   lane: string;
   title: string;
   active: string;
   subtitle?: string;
+  /** パス /partner/sent から渡す。未指定時は unread */
+  view?: LaneView;
   searchParams?: Promise<{ i?: string; view?: string }>;
 }) {
   const sp = searchParams ? await searchParams : {};
-  const view = parseView(sp.view);
+  const view: LaneView = viewProp || "unread";
   const supabase = await createClient();
 
   const countFor = async (opts: {
@@ -170,10 +166,8 @@ export default async function TriageLanePage({
       })
     : null;
 
-  const unreadHref = (i: number) =>
-    i <= 0
-      ? `${active}?view=unread`
-      : `${active}?view=unread&i=${i}`;
+  const unreadHref = (i: number) => laneViewHref(active, "unread", i);
+  const viewPath = laneViewHref(active, view);
 
   const stats = [
     { view: "unread" as const, count: unreadN },
@@ -229,7 +223,7 @@ export default async function TriageLanePage({
                     <TriageStatusActions
                       id={focus.id}
                       status={focus.status}
-                      path={`${active}?view=unread`}
+                      path={viewPath}
                       mode="unread"
                     />
                   </header>
@@ -255,7 +249,7 @@ export default async function TriageLanePage({
                   </h3>
                   <DraftWorkbench
                     id={focus.id}
-                    path={`${active}?view=unread`}
+                    path={viewPath}
                     subject={focus.subject}
                     toEmail={focus.from_email}
                     partner={focus.partner}
@@ -301,7 +295,7 @@ export default async function TriageLanePage({
                       <TriageStatusActions
                         id={it.id}
                         status={it.status}
-                        path={`${active}?view=${view}`}
+                        path={viewPath}
                         mode="closed"
                       />
                     </header>
