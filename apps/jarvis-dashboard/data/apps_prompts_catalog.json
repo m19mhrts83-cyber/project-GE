@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "updated": "2026-08-01",
+  "items": [
+    {
+      "id": "shuhen-auto",
+      "kind": "app",
+      "title": "周辺MAP 自動作成（単独Web）",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/shuhen-auto.html",
+      "note": "物件名・住所→洗い出し→地図→C0色付き下地。生成APIはローカルまたは ?api= 付き",
+      "tags": ["周辺MAP", "C0", "shuhen-auto"],
+      "raimo_miniapp_url": "https://ma-qr4gudwmgqtg.raimo-app.buzz",
+      "raimo_edit_url": "https://raimo.buzz/miniApp/4344/edit"
+    },
+    {
+      "id": "shuhen-map",
+      "kind": "app",
+      "title": "周辺MAP 番号ピン（Step2）",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/shuhen-map.html",
+      "note": "クリーン番号ピン地図。スクショして色味寄せへ",
+      "tags": ["周辺MAP", "Step2"],
+      "raimo_miniapp_url": "https://ma-8cfk63x74bh5.raimo-app.buzz",
+      "raimo_edit_url": "https://raimo.buzz/miniApp/4155/edit"
+    },
+    {
+      "id": "kamiooya-qa",
+      "kind": "app",
+      "title": "神大家 Q&A チャットボット",
+      "url": "https://ma-54t2keqdelz3.raimo-app.buzz/",
+      "note": "Raimo miniApp 1346（提供用）",
+      "tags": ["神大家", "Q&A"]
+    },
+    {
+      "id": "jarvis-dashboard",
+      "kind": "app",
+      "title": "Jarvis ダッシュボード",
+      "url": "/",
+      "note": "この画面。トリアージ・ウォッチ・課金など",
+      "tags": ["Jarvis"],
+      "internal": true
+    },
+    {
+      "id": "notebooklm-shuhen",
+      "kind": "notebook",
+      "title": "NotebookLM — 周辺MAP自動化",
+      "url": "https://notebooklm.google.com/notebook/100e18b3-30e0-4569-b69b-ef4a0805e815",
+      "note": "単独Web自動化の概要・Studio用。ソースは Drive 06_",
+      "tags": ["NotebookLM", "周辺MAP"]
+    },
+    {
+      "id": "notebooklm-workbench",
+      "kind": "notebook",
+      "title": "NotebookLM 作業セット",
+      "url": "/notebooklm",
+      "note": "Drive 200_NoteBookLM を開く導線",
+      "tags": ["NotebookLM"],
+      "internal": true
+    },
+    {
+      "id": "prompt-step1-basic",
+      "kind": "prompt",
+      "title": "【周辺MAP】Step1 基本洗い出し",
+      "url": "https://raimo.buzz/prompt/473911",
+      "note": "MyPrompt",
+      "tags": ["周辺MAP", "MyPrompt"]
+    },
+    {
+      "id": "prompt-step1-2-deep",
+      "kind": "prompt",
+      "title": "【周辺MAP】Step1.2 実在検証・評判店",
+      "url": "https://raimo.buzz/prompt/473910",
+      "note": "Deep Research",
+      "tags": ["周辺MAP", "MyPrompt"]
+    },
+    {
+      "id": "prompt-persona",
+      "kind": "prompt",
+      "title": "【周辺MAP】アドバンス ペルソナ",
+      "url": "https://raimo.buzz/prompt/473915",
+      "note": "MyPrompt",
+      "tags": ["周辺MAP", "MyPrompt"]
+    },
+    {
+      "id": "prompt-advance-map",
+      "kind": "prompt",
+      "title": "【周辺MAP】アドバンス洗い出し",
+      "url": "https://raimo.buzz/prompt/473916",
+      "note": "MyPrompt",
+      "tags": ["周辺MAP", "MyPrompt"]
+    },
+    {
+      "id": "prompt-c1",
+      "kind": "prompt",
+      "title": "【周辺MAP】C1 下地色味寄せ",
+      "url": "https://raimo.buzz/prompt/474296",
+      "note": "Step3 / 旧C1",
+      "tags": ["周辺MAP", "MyPrompt", "C1"]
+    },
+    {
+      "id": "prompt-c2",
+      "kind": "prompt",
+      "title": "【周辺MAP】印刷用仕上げ",
+      "url": "https://raimo.buzz/prompt/474298",
+      "note": "Step4.1",
+      "tags": ["周辺MAP", "MyPrompt"]
+    },
+    {
+      "id": "prompt-step4-2",
+      "kind": "prompt",
+      "title": "【周辺MAP】Step4.2 画像検証",
+      "url": "https://raimo.buzz/prompt/474383",
+      "note": "MyPrompt",
+      "tags": ["周辺MAP", "MyPrompt"]
+    }
+  ]
+}

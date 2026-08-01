@@ -12,6 +12,7 @@ const NAV = [
   { href: "/properties", label: "3棟・物件" },
   { href: "/kodate", label: "戸建て" },
   { href: "/ai-raimo", label: "AI・Raimo" },
+  { href: "/apps", label: "アプリ・プロンプト集" },
   { href: "/metrics", label: "数値" },
   { href: "/billing", label: "課金" },
   { href: "/notebooklm", label: "NotebookLM" },
