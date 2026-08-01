@@ -13,6 +13,7 @@ type ActionItem = {
   amount?: number;
   proposal?: string;
   line?: string;
+  kind?: string;
 };
 
 function readActions(payload: unknown): ActionItem[] {
@@ -25,6 +26,11 @@ function readActions(payload: unknown): ActionItem[] {
 function yen(n: number | undefined) {
   if (n == null || Number.isNaN(n)) return "—";
   return `¥${Math.round(n).toLocaleString("ja-JP")}`;
+}
+
+/** Zaim 用の YYYY-MM-DD。それ以外（アクションID等）は日付列に出さない */
+function isYmdDate(raw: string | undefined): boolean {
+  return Boolean(raw && /^\d{4}-\d{2}-\d{2}$/.test(raw));
 }
 
 export default async function SituationPage() {
@@ -113,20 +119,33 @@ export default async function SituationPage() {
                 <div className="watch-actions">
                   <p className="watch-actions-title">要対応（具体）</p>
                   <ul>
-                    {actions.map((a, idx) => (
-                      <li key={`${a.date}-${a.shop}-${a.amount}-${idx}`}>
-                        {a.date ? (
-                          <span className="watch-action-date">{a.date}</span>
-                        ) : null}
-                        <span className="watch-action-shop">{a.shop || "—"}</span>
-                        {a.amount != null && !Number.isNaN(a.amount) ? (
-                          <span className="watch-action-yen">{yen(a.amount)}</span>
-                        ) : null}
-                        <span className="watch-action-proposal">
-                          {a.proposal || a.line || "—"}
-                        </span>
-                      </li>
-                    ))}
+                    {actions.map((a, idx) => {
+                      const showDate = isYmdDate(a.date);
+                      const showYen =
+                        a.amount != null && !Number.isNaN(a.amount);
+                      const stacked = !showDate || !showYen;
+                      return (
+                        <li
+                          key={`${a.date}-${a.shop}-${a.amount}-${idx}`}
+                          className={stacked ? "watch-action-stack" : undefined}
+                        >
+                          {showDate ? (
+                            <span className="watch-action-date">{a.date}</span>
+                          ) : null}
+                          <span className="watch-action-shop">
+                            {a.shop || "—"}
+                          </span>
+                          {showYen ? (
+                            <span className="watch-action-yen">
+                              {yen(a.amount)}
+                            </span>
+                          ) : null}
+                          <span className="watch-action-proposal">
+                            {a.proposal || a.line || "—"}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ) : it.detail ? (
