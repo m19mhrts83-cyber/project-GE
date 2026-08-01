@@ -10,7 +10,8 @@ alwaysApply: true
 - **対話・調査の本線**は Cursor **Cloud Agent**（同一 Pro 等プラン。別契約ではない）。
 - **基本はクラウドで進められることはクラウド**。止まるときだけローカル／Mac。
 - **下書き**: Cloud 上で会話しながら見直すのが理想。
-- **送信**: 理想は Cloud で確認後に送る。未配線・制限・失敗時は Mac の `yoritoori`。  
+- **送信**: 理想は Cloud で確認後に送る（`scripts/jarvis_cloud_gmail_send.py`）。  
+  手順: `--preview` → チャットで承認 → `--i-confirm-send`。未配線・失敗時は Mac の `yoritoori`。  
   **Vercel Web 画面からの自動送信はしない。** 対外送信前確認（`jarvis-outbound-confirm`）は経路を問わず維持。
 - 手順正本: `~/git-repos/docs/Jarvis_Cloud_Agent.md`
 
@@ -33,6 +34,12 @@ alwaysApply: true
 - CHRLINE／オプチャ／Zaim Playwright など **Mac 専用**
 - **メール送信が Cloud 未配線または失敗** → `yoritoori_send.py`（従来どおり）
 - Cloud MCP 未配線で Notion 等が使えない（先に配線を試みる）
+
+## Cloud 送信（エージェント動作）
+
+1. 下書き確定後、`jarvis_cloud_gmail_send.py --from-triage ID --preview` の出力をチャットに出す
+2. **「これで送っていいですか？」** と聞き、承認後だけ `--i-confirm-send`
+3. Secrets に `GMAIL_ESTATE_TOKEN_B64` 等が無い／失敗 → Mac `yoritoori_send.py` へフォールバックを明示
 
 ## やらない
 
