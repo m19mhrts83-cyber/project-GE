@@ -8,11 +8,12 @@ items:
   - id: shuhen-auto
     kind: app
     title: 周辺MAP 自動作成（単独Web）
-    url: "https://m19mhrts83-cyber.github.io/project-GE/shuhen-auto.html"
-    note: "物件名・住所→洗い出し→地図→C0色付き下地。生成APIはローカルまたは ?api= 付き"
+    url: "http://127.0.0.1:8770/shuhen-auto.html"
+    note: "自分用フル自動（要 shuhen_auto_open.sh）。Pages/RaimoはUIのみAPIなし"
     tags: [周辺MAP, C0, shuhen-auto]
     raimo_miniapp_url: "https://ma-qr4gudwmgqtg.raimo-app.buzz"
     raimo_edit_url: "https://raimo.buzz/miniApp/4344/edit"
+    pages_url: "https://m19mhrts83-cyber.github.io/project-GE/shuhen-auto.html"
 
   - id: shuhen-map
     kind: app

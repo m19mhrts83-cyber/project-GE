@@ -114,15 +114,32 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('dlC0Base').addEventListener('click', () => downloadB64('c0_base.png', lastResult?.images?.c0_base_png_b64));
   document.getElementById('dlC0Pins').addEventListener('click', () => downloadB64('c0_with_pins.png', lastResult?.images?.c0_with_pins_png_b64));
 
-  // Grandole quick fill for local verify
-  if (paramsHasDemo()) {
-    document.getElementById('propertyName').value = 'Grandole志賀本通';
-    document.getElementById('propertyAddress').value = '愛知県名古屋市北区杉栄町';
-  }
+  // Prefill: ?name=&address=&target=&count=  / demo=1 (Grandole)
+  applyPrefillFromQuery();
 });
 
 function paramsHasDemo() {
   return new URLSearchParams(location.search).get('demo') === '1';
+}
+
+function applyPrefillFromQuery() {
+  const params = new URLSearchParams(location.search);
+  const nameEl = document.getElementById('propertyName');
+  const addrEl = document.getElementById('propertyAddress');
+  const targetEl = document.getElementById('targetInput');
+  const countEl = document.getElementById('facilityCount');
+  if (paramsHasDemo()) {
+    if (nameEl) nameEl.value = 'Grandole志賀本通';
+    if (addrEl) addrEl.value = '愛知県名古屋市北区杉栄町';
+  }
+  const name = params.get('name');
+  const address = params.get('address');
+  const target = params.get('target');
+  const count = params.get('count');
+  if (name && nameEl) nameEl.value = name;
+  if (address && addrEl) addrEl.value = address;
+  if (target && targetEl) targetEl.value = target;
+  if (count && countEl) countEl.value = count;
 }
 
 function showError(message) {
