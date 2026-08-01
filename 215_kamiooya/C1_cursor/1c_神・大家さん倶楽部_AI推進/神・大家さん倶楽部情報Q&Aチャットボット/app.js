@@ -1083,6 +1083,8 @@ const App = {
     App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + App.state.currentUser.role + ')';
 
     const isAdmin = App.isStaffAdmin();
+    const adminNav = document.getElementById('adminNavSection');
+    if (adminNav) adminNav.classList.toggle('hidden', !isAdmin);
     document.getElementById('adminUsersTabBtn').classList.toggle('hidden', !isAdmin);
     const userListTab = document.getElementById('adminUserListTabBtn');
     if (userListTab) userListTab.classList.toggle('hidden', !isAdmin);

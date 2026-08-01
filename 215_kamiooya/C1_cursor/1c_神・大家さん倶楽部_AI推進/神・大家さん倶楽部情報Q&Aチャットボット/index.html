@@ -143,17 +143,22 @@
               <i class="fa-solid fa-plus mr-1"></i> 新規チャット
             </button>
           </div>
-          <nav class="p-3 border-b border-slate-200 space-y-2">
+          <nav class="p-3 border-b border-slate-200 space-y-1">
+            <p class="px-3 pt-1 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide">ユーザーメニュー</p>
             <button data-screen="chat" class="screen-tab w-full text-left px-3 py-2 rounded bg-slate-100">チャット</button>
             <button data-screen="comments" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">コメント一覧</button>
             <button data-screen="lessons" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">学習ページ説明テキスト</button>
             <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">セミナー動画文字起こし</button>
-            <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー承認</button>
-            <button id="adminUserListTabBtn" data-screen="adminUserList" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">ユーザー一覧</button>
-            <button id="adminAdminListTabBtn" data-screen="adminAdminList" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">管理者一覧</button>
-            <button id="adminMembersTabBtn" data-screen="adminMembers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">会員名簿</button>
-            <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">データ取込</button>
-            <button id="adminAnalyticsTabBtn" data-screen="adminAnalytics" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100 hidden">運営分析</button>
+
+            <div id="adminNavSection" class="hidden pt-3 mt-2 border-t border-slate-200 space-y-1">
+              <p class="px-3 pt-1 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide">管理者メニュー</p>
+              <button id="adminUsersTabBtn" data-screen="adminUsers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">ユーザー承認</button>
+              <button id="adminUserListTabBtn" data-screen="adminUserList" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">ユーザー一覧</button>
+              <button id="adminAdminListTabBtn" data-screen="adminAdminList" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">管理者一覧</button>
+              <button id="adminMembersTabBtn" data-screen="adminMembers" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">会員名簿</button>
+              <button id="adminDataTabBtn" data-screen="adminData" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">データ取込</button>
+              <button id="adminAnalyticsTabBtn" data-screen="adminAnalytics" class="screen-tab w-full text-left px-3 py-2 rounded hover:bg-slate-100">運営分析</button>
+            </div>
           </nav>
           <div class="p-3 overflow-y-auto flex-1">
             <h3 class="text-sm font-semibold text-slate-600 mb-2">チャット履歴</h3>
