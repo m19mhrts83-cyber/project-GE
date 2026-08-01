@@ -62,7 +62,9 @@ export default function NotebooklmWorkbench() {
       <h1>NotebookLM 作業セット</h1>
       <p className="sub">
         ソース正本は admin Drive の <strong>200_NoteBookLM</strong>。Mac では
-        Finder の MD を NotebookLM のソースへドラッグ＆ドロップします。
+        Finder の MD を NotebookLM のソースへドラッグ＆ドロップします。確認後の成果物は{" "}
+        <a href="/materials">資料</a>
+        （自分の理解用）へ取り込みます。
       </p>
 
       <p className="meta" style={{ marginBottom: 16 }}>
