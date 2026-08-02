@@ -15,6 +15,10 @@ import {
 } from "@/lib/localHandoff";
 import { retrieveKamiooyaForAsk } from "@/lib/kamiooya/retrieveForAsk";
 import { defaultUseKamiooyaKnowledge } from "@/lib/kamiooya/lanes";
+import {
+  defaultUseOnedriveYoritoori,
+  retrieveYoritooriForAsk,
+} from "@/lib/onedrive/retrieveYoritoori";
 export type CardActionResult = {
   ok: boolean;
   error?: string;
@@ -199,7 +203,10 @@ export async function askJarvisOnCard(
   body: string,
   path: string,
   engine: AskEngine = "cursor",
-  opts?: { useKamiooyaKnowledge?: boolean },
+  opts?: {
+    useKamiooyaKnowledge?: boolean;
+    useOnedriveYoritoori?: boolean;
+  },
 ): Promise<CardActionResult> {
   const text = body.trim();
   if (!text) return { ok: false, error: "質問を入力してください" };
@@ -241,8 +248,10 @@ export async function askJarvisOnCard(
   const isDigest = card.kind === "digest";
   const useKamiooya =
     opts?.useKamiooyaKnowledge ?? defaultUseKamiooyaKnowledge(card.lane);
+  const useOnedrive =
+    opts?.useOnedriveYoritoori ?? defaultUseOnedriveYoritoori(card.lane);
   const knowledgeNotices: string[] = [];
-  let knowledgeBlock = "";
+  const knowledgeParts: string[] = [];
   if (useKamiooya) {
     const q = [text, card.title, question, ...bullets.slice(0, 5)]
       .filter(Boolean)
@@ -250,8 +259,19 @@ export async function askJarvisOnCard(
       .slice(0, 1200);
     const kr = await retrieveKamiooyaForAsk(q);
     knowledgeNotices.push(kr.notice);
-    if (kr.promptBlock) knowledgeBlock = kr.promptBlock;
+    if (kr.promptBlock) knowledgeParts.push(kr.promptBlock);
   }
+  if (useOnedrive) {
+    const yr = await retrieveYoritooriForAsk({
+      lane: card.lane,
+      title: card.title,
+      summary: card.summary,
+      payload,
+    });
+    knowledgeNotices.push(yr.notice);
+    if (yr.promptBlock) knowledgeParts.push(yr.promptBlock);
+  }
+  const knowledgeBlock = knowledgeParts.join("\n\n");
 
   const prompt = [
     "あなたは Jarvis（秘書 AI）です。ダッシュボードの確認テーマ／処置カードについて、ユーザーと日本語で具体的に相談してください。",
@@ -261,7 +281,7 @@ export async function askJarvisOnCard(
       : "処置候補として助言し、次の一手を1つ提案する。",
     "返信は要点から。8行以内を目安。定型の『承知して Notion へ』だけで終わらない。",
     knowledgeBlock
-      ? "神大家ナレッジ根拠がある場合はそれを優先し、無いことは推測しない。"
+      ? "外部根拠（神大家DB／OneDriveやり取り）がある場合はそれを優先し、無いことは推測しない。"
       : "",
     "",
     `【レーン】${card.lane}`,

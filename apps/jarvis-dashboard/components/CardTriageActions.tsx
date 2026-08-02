@@ -15,6 +15,7 @@ import {
   buildLocalHandoffPrompt,
 } from "@/lib/localHandoff";
 import { defaultUseKamiooyaKnowledge } from "@/lib/kamiooya/lanes";
+import { defaultUseOnedriveYoritoori } from "@/lib/onedrive/retrieveYoritoori";
 import { formatJstMmDdHm } from "@/lib/formatJst";
 import LocalHandoffBar from "@/components/LocalHandoffBar";
 
@@ -72,6 +73,9 @@ export default function CardTriageActions({
   const [engine, setEngine] = useState<AskEngine>("cursor");
   const [useKamiooya, setUseKamiooya] = useState(() =>
     defaultUseKamiooyaKnowledge(lane),
+  );
+  const [useOnedrive, setUseOnedrive] = useState(() =>
+    defaultUseOnedriveYoritoori(lane),
   );
   const [pending, start] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -203,6 +207,7 @@ export default function CardTriageActions({
 
       const r = await askJarvisOnCard(card.id, text, path, engine, {
         useKamiooyaKnowledge: useKamiooya,
+        useOnedriveYoritoori: useOnedrive,
       });
       setNotices(r.fallbackNotices || []);
       if (r.localPrompt) setLocalPrompt(r.localPrompt);
@@ -368,6 +373,18 @@ export default function CardTriageActions({
             disabled={pending || macPolling}
           />
           神大家ナレッジを参照（コメント・動画／kamiooya-qa）
+        </label>
+        <label
+          className="draft-engine-opt"
+          style={{ display: "flex", marginTop: 6, gap: 8 }}
+        >
+          <input
+            type="checkbox"
+            checked={useOnedrive}
+            onChange={(e) => setUseOnedrive(e.target.checked)}
+            disabled={pending || macPolling}
+          />
+          OneDriveやり取り末尾を参照（5.やり取り.md／Graph）
         </label>
         <textarea
           value={text}
