@@ -1730,6 +1730,52 @@ p.back {
   color: var(--muted);
 }
 
+.fallback-notices {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #f59e0b55;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.84rem;
+  display: grid;
+  gap: 4px;
+}
+
+.local-handoff {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 88%, #94a3b8);
+}
+
+.local-handoff.is-forced {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.local-handoff-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.local-handoff-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.local-handoff-fallback-text {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .send-confirm-backdrop {
   position: fixed;
   inset: 0;

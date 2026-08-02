@@ -1,11 +1,16 @@
 "use client";
 
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import {
   askJarvisOnWatch,
+  enqueueWatchCursorAsk,
+  getWatchCursorAskStatus,
   postWatchComment,
 } from "@/app/actions/watchComments";
+import type { AskEngine } from "@/lib/askEngineTypes";
+import { buildLocalHandoffPrompt } from "@/lib/localHandoff";
+import LocalHandoffBar from "@/components/LocalHandoffBar";
 
 export type WatchCommentRow = {
   id: number;
@@ -22,10 +27,20 @@ function fmtAt(v: string) {
 
 export default function WatchCommentThread({
   watchId,
+  title = "",
+  summary = null,
+  detail = null,
+  cursorPrompt = null,
+  payload = null,
   comments,
   path = "/situation",
 }: {
   watchId: string;
+  title?: string;
+  summary?: string | null;
+  detail?: string | null;
+  cursorPrompt?: string | null;
+  payload?: Record<string, unknown> | null;
   comments: WatchCommentRow[];
   path?: string;
 }) {
@@ -33,7 +48,74 @@ export default function WatchCommentThread({
   const [text, setText] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [notices, setNotices] = useState<string[]>([]);
+  const [localPrompt, setLocalPrompt] = useState("");
+  const [needLocal, setNeedLocal] = useState(false);
+  const [engine, setEngine] = useState<AskEngine>("cursor");
   const [pending, start] = useTransition();
+  const [macPolling, setMacPolling] = useState(() => {
+    const ask = payload?.cursor_ask;
+    if (ask && typeof ask === "object") {
+      const st = (ask as { status?: string }).status;
+      return st === "queued" || st === "running";
+    }
+    return false;
+  });
+
+  const defaultHandoff = useMemo(() => {
+    const pl = payload || {};
+    const actions = Array.isArray(pl.actions) ? pl.actions : [];
+    const actionLines = actions
+      .slice(0, 20)
+      .map((a) => {
+        if (!a || typeof a !== "object") return "";
+        const row = a as Record<string, unknown>;
+        return String(row.line || `${row.date} / ${row.shop} / ¥${row.amount}`);
+      })
+      .filter(Boolean);
+    return buildLocalHandoffPrompt({
+      kind: "watch",
+      id: watchId,
+      title: title || watchId,
+      summary,
+      detail,
+      bullets: actionLines,
+      cursorPrompt,
+      comments: comments.map((c) => ({ role: c.role, body: c.body })),
+      lastUserMessage: text.trim() || null,
+    });
+  }, [watchId, title, summary, detail, cursorPrompt, payload, comments, text]);
+
+  useEffect(() => {
+    if (!macPolling) return;
+    let cancelled = false;
+    const tick = async () => {
+      const r = await getWatchCursorAskStatus(watchId);
+      if (cancelled || !r.ok) return;
+      const st = r.ask?.status;
+      if (st === "done") {
+        setMacPolling(false);
+        setMsg("Mac のローカル Cursor から返答が付きました");
+        setNotices(["Mac のローカル Cursor から返答が付きました"]);
+        router.refresh();
+        return;
+      }
+      if (st === "error") {
+        setMacPolling(false);
+        setErr(r.ask?.error || "Mac Worker が失敗しました");
+        setNeedLocal(true);
+        setNotices([
+          "Mac Worker が失敗したため、ローカル用コピーで引き継げます",
+        ]);
+      }
+    };
+    const id = window.setInterval(() => void tick(), 4000);
+    void tick();
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [macPolling, watchId, router]);
 
   function run(kind: "post" | "ask") {
     const body = text.trim();
@@ -43,15 +125,30 @@ export default function WatchCommentThread({
     }
     setErr(null);
     setMsg(null);
+    if (kind !== "ask") setNotices([]);
     start(async () => {
-      const r =
-        kind === "ask"
-          ? await askJarvisOnWatch(watchId, body, path)
-          : await postWatchComment(watchId, body, path);
-      if (!r.ok) {
-        setErr(r.error || "失敗しました");
+      if (kind === "post") {
+        const r = await postWatchComment(watchId, body, path);
+        if (!r.ok) {
+          setErr(r.error || "失敗しました");
+          return;
+        }
+        setMsg(r.message || "完了");
+        setText("");
+        router.refresh();
         return;
       }
+      const r = await askJarvisOnWatch(watchId, body, path, engine);
+      setNotices(r.fallbackNotices || []);
+      if (r.localPrompt) setLocalPrompt(r.localPrompt);
+      if (!r.ok) {
+        setNeedLocal(Boolean(r.needLocal));
+        setErr(r.error || "失敗しました");
+        setMsg(r.message || null);
+        router.refresh();
+        return;
+      }
+      setNeedLocal(false);
       setMsg(r.message || "完了");
       setText("");
       router.refresh();
@@ -60,7 +157,7 @@ export default function WatchCommentThread({
 
   return (
     <div className="watch-comments">
-      <p className="watch-comments-title">コメント（Jarvisに聞ける）</p>
+      <p className="watch-comments-title">コメント（エンジンを選んで聞ける）</p>
       {comments.length === 0 ? (
         <p className="meta" style={{ margin: "0 0 8px" }}>
           まだコメントはありません。要対応の日付や直し方について聞けます。
@@ -81,6 +178,29 @@ export default function WatchCommentThread({
           ))}
         </ul>
       )}
+      <fieldset className="draft-engine" style={{ marginTop: 10 }}>
+        <legend>聞くエンジン</legend>
+        <label className="draft-engine-opt">
+          <input
+            type="radio"
+            name={`watch-ask-engine-${watchId}`}
+            checked={engine === "cursor"}
+            onChange={() => setEngine("cursor")}
+            disabled={pending || macPolling}
+          />
+          Jarvis Cloud
+        </label>
+        <label className="draft-engine-opt">
+          <input
+            type="radio"
+            name={`watch-ask-engine-${watchId}`}
+            checked={engine === "gemini"}
+            onChange={() => setEngine("gemini")}
+            disabled={pending || macPolling}
+          />
+          Gemini
+        </label>
+      </fieldset>
       <textarea
         className="watch-comment-input"
         rows={3}
@@ -102,12 +222,35 @@ export default function WatchCommentThread({
         <button
           type="button"
           className="btn primary"
-          disabled={pending}
+          disabled={pending || macPolling || !text.trim()}
           onClick={() => run("ask")}
         >
-          {pending ? "返答中…" : "Jarvisに聞く"}
+          {pending
+            ? "返答中…"
+            : engine === "cursor"
+              ? "Jarvis Cloud に聞く"
+              : "Gemini に聞く"}
         </button>
       </div>
+
+      <LocalHandoffBar
+        localPrompt={localPrompt || defaultHandoff}
+        notices={notices}
+        forceOpen={needLocal}
+        macPending={macPolling}
+        onEnqueueMac={async (extraNote) => {
+          const r = await enqueueWatchCursorAsk(watchId, path, {
+            extraNote,
+            question: text.trim() || undefined,
+          });
+          if (r.ok && r.queued) setMacPolling(true);
+          if (r.fallbackNotices?.length) setNotices(r.fallbackNotices);
+          if (r.localPrompt) setLocalPrompt(r.localPrompt);
+          router.refresh();
+          return r;
+        }}
+      />
+
       {err ? <p className="draft-err">{err}</p> : null}
       {msg ? <p className="draft-hint">{msg}</p> : null}
     </div>

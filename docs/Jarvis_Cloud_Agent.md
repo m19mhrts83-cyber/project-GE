@@ -35,16 +35,27 @@
 2. **送れない／制限で止まったらローカル** — 従来どおり Mac の Cursor／`yoritoori_send.py`  
 3. **Web ダッシュボードは確認モーダル後のみ送信可**（無確認のワンクリック送信はしない。正本ログは OneDrive `5.やり取り.md`）
 
-### Web パートナー画面の「Cursor Agent で見直し」（2026-08 追記）
+### Web パートナー／タスクの Cloud 本線（2026-08）
+
+#### パートナー下書き見直し
 
 | 順 | 経路 | 条件 |
 |---|---|---|
-| 1（本線） | Vercel → Cursor Cloud Agent（`CURSOR_API_KEY` + `@cursor/sdk`） | キーあり・成功 |
-| 2（フォールバック） | `payload.cursor_revise` キュー → Mac `jarvis_triage_cursor_revise_worker.py` | 未キー／失敗／タイムアウト |
+| 1（本線） | Vercel → Jarvis Cloud（Cloud Agent・`CURSOR_API_KEY`） | キーあり・成功 |
+| 2（フォールバック） | `payload.cursor_revise` キュー → Mac `jarvis_triage_cursor_revise_worker.py` | 未キー／失敗／タイムアウト（**必ず通知**） |
+
+#### タスク／ウォッチ「聞く」
+
+| 順 | 経路 | 条件 |
+|---|---|---|
+| 1（既定） | Vercel → Jarvis Cloud | UI で Cloud 選択 |
+| 2 | Gemini API | Cloud 失敗時の自動切替、または UI で Gemini 選択。**切替時はバナー通知** |
+| 3a | ローカル用コピー | 失敗時・不満時。文脈パッケージをクリップボードへ |
+| 3b | Mac `jarvis_card_cursor_ask_worker.py` | 「Mac Cursor に依頼」。`payload.cursor_ask` キュー → コメント追記 |
 
 - 秘密: `.env.jarvis_private` の `CURSOR_API_KEY`（Vercel にも同名）。発行: [Cursor Dashboard → API Keys](https://cursor.com/dashboard/api)
-- 任意: `CURSOR_CLOUD_REPO_URL`（**空推奨**= no-repo agent。リポ clone なしで本文のみ）
-- Mac Worker インストール: `launchd/install_cursor_revise_worker_launchd.sh`
+- 任意: `CURSOR_CLOUD_REPO_URL`（**空推奨**= no-repo agent）
+- Mac Worker: `launchd/install_cursor_revise_worker_launchd.sh`（revise と ask を同じ runner）
 
 技術メモ: Gmail API＋token（Secrets）があれば Cloud Agent から送信可能。対外送信前確認・`--via` 確認は Mac と同じ。
 

@@ -4,13 +4,31 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createNotionTask } from "@/lib/notionTasks";
 import { queueLaneActionLog } from "@/lib/laneActionLog";
+import {
+  formatAskReplyBody,
+  resolveAskReply,
+  type AskEngine,
+} from "@/lib/askEngine";
+import {
+  buildLocalHandoffPrompt,
+  type CursorAskState,
+} from "@/lib/localHandoff";
 
 export type CardActionResult = {
   ok: boolean;
   error?: string;
   message?: string;
   notionUrl?: string;
+  fallbackNotices?: string[];
+  localPrompt?: string;
+  needLocal?: boolean;
+  via?: string;
+  queued?: boolean;
 };
+
+function asPayload(v: unknown): Record<string, unknown> {
+  return v && typeof v === "object" ? ({ ...v } as Record<string, unknown>) : {};
+}
 
 export async function skipCard(
   cardId: string,
@@ -141,10 +159,45 @@ export async function postCardComment(
   return { ok: true, message: "コメントを保存しました" };
 }
 
+function cardHandoffFromRow(
+  card: {
+    id: string;
+    title: string;
+    summary: string | null;
+    lane: string | null;
+    payload: unknown;
+    cursor_prompt: string | null;
+  },
+  comments: { role: string; body: string }[],
+  lastUserMessage: string,
+  extraNote?: string,
+): string {
+  const payload = asPayload(card.payload);
+  const question =
+    typeof payload.question === "string" ? payload.question : "";
+  const bullets = Array.isArray(payload.bullets)
+    ? (payload.bullets as unknown[]).map((b) => String(b)).slice(0, 20)
+    : [];
+  return buildLocalHandoffPrompt({
+    kind: "card",
+    id: card.id,
+    title: card.title,
+    summary: card.summary,
+    question,
+    bullets,
+    lane: card.lane,
+    cursorPrompt: card.cursor_prompt,
+    comments,
+    lastUserMessage,
+    extraNote,
+  });
+}
+
 export async function askJarvisOnCard(
   cardId: string,
   body: string,
   path: string,
+  engine: AskEngine = "cursor",
 ): Promise<CardActionResult> {
   const text = body.trim();
   if (!text) return { ok: false, error: "質問を入力してください" };
@@ -172,18 +225,14 @@ export async function askJarvisOnCard(
     .order("created_at", { ascending: false })
     .limit(16);
 
-  const payload =
-    card.payload && typeof card.payload === "object"
-      ? (card.payload as Record<string, unknown>)
-      : {};
+  const payload = asPayload(card.payload);
   const question =
     typeof payload.question === "string" ? payload.question : "";
   const bullets = Array.isArray(payload.bullets)
     ? (payload.bullets as unknown[]).map((b) => String(b)).slice(0, 20)
     : [];
-  const thread = (recent || [])
-    .slice()
-    .reverse()
+  const threadRows = (recent || []).slice().reverse();
+  const thread = threadRows
     .map((c) => `[${c.role}] ${c.body}`)
     .join("\n");
 
@@ -204,7 +253,9 @@ export async function askJarvisOnCard(
     bullets.length
       ? `【候補メモ】\n${bullets.map((l) => (l.startsWith("-") ? l : `- ${l}`)).join("\n")}`
       : "",
-    card.cursor_prompt ? `【参考メモ】\n${String(card.cursor_prompt).slice(0, 800)}` : "",
+    card.cursor_prompt
+      ? `【参考メモ】\n${String(card.cursor_prompt).slice(0, 800)}`
+      : "",
     `【直近のやり取り】\n${thread || "（なし）"}`,
     "",
     `【今回のメッセージ】\n${text}`,
@@ -212,23 +263,30 @@ export async function askJarvisOnCard(
     .filter(Boolean)
     .join("\n");
 
-  const { geminiReply } = await import("@/lib/geminiReply");
-  const ai = await geminiReply(prompt);
-  let reply: string;
-  if (ai.ok) {
-    reply = ai.text.slice(0, 2000);
-  } else {
-    reply = isDigest
-      ? [
-          "（自動応答が一時的に使えませんでした）",
-          "この確認テーマでは、下のコメントで方針を相談したあと、納得したら「タスク化する」→ 内容確認 → Notion 登録、の流れです。",
-          `いまのテーマ: ${card.title.replace(/^\[確認\]\s*/, "")}`,
-          ai.error ? `詳細: ${ai.error}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n")
-      : `（自動応答が使えませんでした）${ai.error || ""}「処置として進める」で Notion に載せられます。`;
+  const localPrompt = cardHandoffFromRow(
+    card,
+    threadRows.map((c) => ({ role: c.role, body: c.body })),
+    text,
+  );
+
+  const resolved = await resolveAskReply({ engine, prompt });
+  if (!resolved.ok) {
+    revalidatePath(path);
+    return {
+      ok: false,
+      needLocal: true,
+      error: resolved.error,
+      fallbackNotices: resolved.fallbackNotices,
+      localPrompt,
+      message: resolved.fallbackNotices.join(" / "),
+    };
   }
+
+  const reply = formatAskReplyBody(
+    resolved.text,
+    resolved.via,
+    resolved.fallbackNotices,
+  );
 
   const { error: jErr } = await supabase.from("card_comments").insert({
     card_id: cardId,
@@ -241,11 +299,115 @@ export async function askJarvisOnCard(
     await queueLaneActionLog({
       lane: card.lane,
       event: "Jarvis相談",
-      body: `- ${card.title || cardId}\n- Q: ${text.slice(0, 300)}\n- A: ${reply.slice(0, 500)}`,
+      body: `- ${card.title || cardId}\n- via: ${resolved.via}\n- Q: ${text.slice(0, 300)}\n- A: ${reply.slice(0, 500)}`,
       cardId,
     });
   }
 
   revalidatePath(path);
-  return { ok: true, message: "Jarvis が返信しました" };
+  const noticeMsg =
+    resolved.fallbackNotices.length > 0
+      ? resolved.fallbackNotices.join(" → ")
+      : resolved.via === "cloud"
+        ? "Jarvis Cloud が返信しました"
+        : "Gemini が返信しました";
+  return {
+    ok: true,
+    message: noticeMsg,
+    fallbackNotices: resolved.fallbackNotices,
+    via: resolved.via,
+    localPrompt,
+  };
+}
+
+export async function enqueueCardCursorAsk(
+  cardId: string,
+  path: string,
+  opts?: { extraNote?: string; question?: string },
+): Promise<CardActionResult> {
+  const supabase = await createClient();
+  const { data: card, error: cErr } = await supabase
+    .from("cards")
+    .select("id,title,summary,lane,payload,cursor_prompt")
+    .eq("id", cardId)
+    .maybeSingle();
+  if (cErr) return { ok: false, error: cErr.message };
+  if (!card) return { ok: false, error: "カードが見つかりません" };
+
+  const payload = asPayload(card.payload);
+  const prev = payload.cursor_ask as CursorAskState | undefined;
+  if (prev?.status === "queued" || prev?.status === "running") {
+    return {
+      ok: true,
+      queued: true,
+      message: "Mac のローカル Cursor への依頼は処理中です",
+      fallbackNotices: ["すでに Mac へ依頼済みです。完了までお待ちください"],
+    };
+  }
+
+  const { data: recent } = await supabase
+    .from("card_comments")
+    .select("role,body")
+    .eq("card_id", cardId)
+    .order("created_at", { ascending: false })
+    .limit(16);
+  const comments = (recent || []).slice().reverse();
+  const question =
+    (opts?.question || "").trim() ||
+    [...comments].reverse().find((c) => c.role === "user")?.body ||
+    "";
+
+  const prompt = cardHandoffFromRow(
+    card,
+    comments,
+    question,
+    opts?.extraNote,
+  );
+
+  const cursorAsk: CursorAskState = {
+    status: "queued",
+    prompt,
+    question,
+    requested_at: new Date().toISOString(),
+    via: "local_worker",
+  };
+  const nextPayload = { ...payload, cursor_ask: cursorAsk };
+  const { error } = await supabase
+    .from("cards")
+    .update({
+      payload: nextPayload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", cardId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(path);
+  return {
+    ok: true,
+    queued: true,
+    message:
+      "Mac のローカル Cursor に依頼しました（Mac 起動後に返答が付きます）",
+    fallbackNotices: [
+      "Mac のローカル Cursor に依頼しました（起動後に返答が付きます）",
+    ],
+    localPrompt: prompt,
+  };
+}
+
+export async function getCardCursorAskStatus(
+  cardId: string,
+): Promise<CardActionResult & { ask?: CursorAskState | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cards")
+    .select("payload")
+    .eq("id", cardId)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  const payload = asPayload(data?.payload);
+  const ask =
+    payload.cursor_ask && typeof payload.cursor_ask === "object"
+      ? (payload.cursor_ask as CursorAskState)
+      : null;
+  return { ok: true, ask };
 }

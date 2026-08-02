@@ -12,4 +12,8 @@ set -a
 # shellcheck disable=SC1091
 source "${REPO_DIR}/.env.jarvis_private"
 set +a
-exec "$PY" -u "${REPO_DIR}/scripts/jarvis_triage_cursor_revise_worker.py" "$@"
+
+# 下書き見直しキュー
+"$PY" -u "${REPO_DIR}/scripts/jarvis_triage_cursor_revise_worker.py" "$@" || true
+# タスク／ウォッチ「聞く」の Mac キュー
+"$PY" -u "${REPO_DIR}/scripts/jarvis_card_cursor_ask_worker.py" "$@" || true

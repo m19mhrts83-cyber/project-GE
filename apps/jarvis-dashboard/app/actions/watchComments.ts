@@ -2,59 +2,29 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  formatAskReplyBody,
+  resolveAskReply,
+  type AskEngine,
+} from "@/lib/askEngine";
+import {
+  buildLocalHandoffPrompt,
+  type CursorAskState,
+} from "@/lib/localHandoff";
 
 export type WatchCommentActionResult = {
   ok: boolean;
   error?: string;
   message?: string;
+  fallbackNotices?: string[];
+  localPrompt?: string;
+  needLocal?: boolean;
+  via?: string;
+  queued?: boolean;
 };
 
-async function geminiReply(prompt: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
-  const key = (process.env.GEMINI_API_KEY || "").trim();
-  if (!key) {
-    return {
-      ok: false,
-      error: "GEMINI_API_KEY 未設定。Vercel の環境変数に設定してください。",
-    };
-  }
-  const models = [
-    (process.env.GEMINI_MODEL || "").trim(),
-    "gemini-flash-latest",
-    "gemini-3.6-flash",
-    "gemini-flash-lite-latest",
-  ].filter((m, i, arr) => m && arr.indexOf(m) === i);
-
-  let lastErr = "";
-  for (const model of models) {
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=` +
-      encodeURIComponent(key);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      }),
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      lastErr = `${model} (${res.status}): ${t.slice(0, 160)}`;
-      continue;
-    }
-    const data = (await res.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-    };
-    const text =
-      data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ||
-      "";
-    const out = text.trim();
-    if (!out) {
-      lastErr = `${model}: 応答が空`;
-      continue;
-    }
-    return { ok: true, text: out };
-  }
-  return { ok: false, error: `Gemini 失敗: ${lastErr || "利用可能なモデルなし"}` };
+function asPayload(v: unknown): Record<string, unknown> {
+  return v && typeof v === "object" ? ({ ...v } as Record<string, unknown>) : {};
 }
 
 export async function postWatchComment(
@@ -80,6 +50,7 @@ export async function askJarvisOnWatch(
   watchId: string,
   body: string,
   path = "/situation",
+  engine: AskEngine = "cursor",
 ): Promise<WatchCommentActionResult> {
   const question = body.trim();
   if (!question) return { ok: false, error: "質問が空です" };
@@ -108,23 +79,22 @@ export async function askJarvisOnWatch(
     .order("created_at", { ascending: false })
     .limit(12);
 
-  const payload =
-    watch.payload && typeof watch.payload === "object"
-      ? (watch.payload as Record<string, unknown>)
-      : {};
+  const payload = asPayload(watch.payload);
   const actions = Array.isArray(payload.actions) ? payload.actions : [];
   const actionLines = actions
     .slice(0, 20)
     .map((a) => {
       if (!a || typeof a !== "object") return "";
       const row = a as Record<string, unknown>;
-      return String(row.line || `${row.date} / ${row.shop} / ¥${row.amount} / ${row.proposal || ""}`);
+      return String(
+        row.line ||
+          `${row.date} / ${row.shop} / ¥${row.amount} / ${row.proposal || ""}`,
+      );
     })
     .filter(Boolean);
 
-  const thread = (recent || [])
-    .slice()
-    .reverse()
+  const threadRows = (recent || []).slice().reverse();
+  const thread = threadRows
     .map((c) => `[${c.role}] ${c.body}`)
     .join("\n");
 
@@ -148,20 +118,166 @@ export async function askJarvisOnWatch(
     .filter(Boolean)
     .join("\n");
 
-  const reply = await geminiReply(prompt);
-  if (!reply.ok) {
+  const localPrompt = buildLocalHandoffPrompt({
+    kind: "watch",
+    id: watch.id,
+    title: watch.title,
+    summary: watch.summary,
+    detail: watch.detail,
+    bullets: actionLines,
+    cursorPrompt: watch.cursor_prompt,
+    comments: threadRows.map((c) => ({ role: c.role, body: c.body })),
+    lastUserMessage: question,
+  });
+
+  const resolved = await resolveAskReply({ engine, prompt });
+  if (!resolved.ok) {
     revalidatePath(path);
-    return { ok: false, error: reply.error };
+    revalidatePath("/");
+    return {
+      ok: false,
+      needLocal: true,
+      error: resolved.error,
+      fallbackNotices: resolved.fallbackNotices,
+      localPrompt,
+      message: resolved.fallbackNotices.join(" / "),
+    };
   }
+
+  const reply = formatAskReplyBody(
+    resolved.text,
+    resolved.via,
+    resolved.fallbackNotices,
+  );
 
   const { error: jErr } = await supabase.from("watch_comments").insert({
     watch_id: watchId,
     role: "jarvis",
-    body: reply.text,
+    body: reply,
   });
   if (jErr) return { ok: false, error: jErr.message };
 
   revalidatePath(path);
   revalidatePath("/");
-  return { ok: true, message: "Jarvis が返答しました" };
+  const noticeMsg =
+    resolved.fallbackNotices.length > 0
+      ? resolved.fallbackNotices.join(" → ")
+      : resolved.via === "cloud"
+        ? "Jarvis Cloud が返答しました"
+        : "Gemini が返答しました";
+  return {
+    ok: true,
+    message: noticeMsg,
+    fallbackNotices: resolved.fallbackNotices,
+    via: resolved.via,
+    localPrompt,
+  };
+}
+
+export async function enqueueWatchCursorAsk(
+  watchId: string,
+  path = "/situation",
+  opts?: { extraNote?: string; question?: string },
+): Promise<WatchCommentActionResult> {
+  const supabase = await createClient();
+  const { data: watch, error: wErr } = await supabase
+    .from("watch_status")
+    .select("id,title,summary,detail,payload,cursor_prompt")
+    .eq("id", watchId)
+    .maybeSingle();
+  if (wErr) return { ok: false, error: wErr.message };
+  if (!watch) return { ok: false, error: "ウォッチ項目が見つかりません" };
+
+  const payload = asPayload(watch.payload);
+  const prev = payload.cursor_ask as CursorAskState | undefined;
+  if (prev?.status === "queued" || prev?.status === "running") {
+    return {
+      ok: true,
+      queued: true,
+      message: "Mac のローカル Cursor への依頼は処理中です",
+      fallbackNotices: ["すでに Mac へ依頼済みです。完了までお待ちください"],
+    };
+  }
+
+  const { data: recent } = await supabase
+    .from("watch_comments")
+    .select("role,body")
+    .eq("watch_id", watchId)
+    .order("created_at", { ascending: false })
+    .limit(12);
+  const comments = (recent || []).slice().reverse();
+  const question =
+    (opts?.question || "").trim() ||
+    [...comments].reverse().find((c) => c.role === "user")?.body ||
+    "";
+
+  const actions = Array.isArray(payload.actions) ? payload.actions : [];
+  const actionLines = actions
+    .slice(0, 20)
+    .map((a) => {
+      if (!a || typeof a !== "object") return "";
+      const row = a as Record<string, unknown>;
+      return String(row.line || `${row.date} / ${row.shop} / ¥${row.amount}`);
+    })
+    .filter(Boolean);
+
+  const prompt = buildLocalHandoffPrompt({
+    kind: "watch",
+    id: watch.id,
+    title: watch.title,
+    summary: watch.summary,
+    detail: watch.detail,
+    bullets: actionLines,
+    cursorPrompt: watch.cursor_prompt,
+    comments,
+    lastUserMessage: question,
+    extraNote: opts?.extraNote,
+  });
+
+  const cursorAsk: CursorAskState = {
+    status: "queued",
+    prompt,
+    question,
+    requested_at: new Date().toISOString(),
+    via: "local_worker",
+  };
+  const { error } = await supabase
+    .from("watch_status")
+    .update({
+      payload: { ...payload, cursor_ask: cursorAsk },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", watchId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(path);
+  revalidatePath("/");
+  return {
+    ok: true,
+    queued: true,
+    message:
+      "Mac のローカル Cursor に依頼しました（Mac 起動後に返答が付きます）",
+    fallbackNotices: [
+      "Mac のローカル Cursor に依頼しました（起動後に返答が付きます）",
+    ],
+    localPrompt: prompt,
+  };
+}
+
+export async function getWatchCursorAskStatus(
+  watchId: string,
+): Promise<WatchCommentActionResult & { ask?: CursorAskState | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("watch_status")
+    .select("payload")
+    .eq("id", watchId)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  const payload = asPayload(data?.payload);
+  const ask =
+    payload.cursor_ask && typeof payload.cursor_ask === "object"
+      ? (payload.cursor_ask as CursorAskState)
+      : null;
+  return { ok: true, ask };
 }
