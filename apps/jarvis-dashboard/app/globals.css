@@ -614,6 +614,55 @@ a.stat-link:active {
   margin: 4px 0;
 }
 
+.prop-event-table-wrap {
+  max-height: min(420px, 55vh);
+  overflow: auto;
+  margin: 0 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--card) 92%, var(--line));
+}
+
+.prop-event-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.prop-event-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: color-mix(in srgb, var(--card) 88%, var(--line));
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.prop-event-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.prop-event-type {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.prop-event-type.is-vacant {
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+}
+
+.prop-event-type.is-occupied {
+  background: color-mix(in srgb, var(--ok, #2a9d6a) 18%, transparent);
+}
+
 .home-band-other {
   border-color: color-mix(in srgb, var(--info) 28%, var(--line));
 }

@@ -222,17 +222,44 @@ export default async function Page() {
       {eventList.length === 0 ? (
         <p className="empty">履歴はまだありません（メール検知後に増えます）</p>
       ) : (
-        <ul className="home-event-list">
-          {eventList.map((ev) => (
-            <li key={ev.id}>
-              <strong>{ev.occurred_on}</strong>{" "}
-              {ev.event_type === "vacant" ? "空室" : "入居"}{" "}
-              {ev.property_name || ev.property_id}-{ev.room}
-              {ev.source ? ` · ${ev.source}` : ""}
-              {ev.ref ? ` · ${ev.ref}` : ""}
-            </li>
-          ))}
-        </ul>
+        <div className="prop-event-table-wrap" role="region" aria-label="空室入居履歴">
+          <table className="prop-event-table">
+            <thead>
+              <tr>
+                <th>日付</th>
+                <th>区分</th>
+                <th>物件</th>
+                <th>号室</th>
+                <th>ソース</th>
+                <th>参照</th>
+                <th>メモ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eventList.map((ev) => (
+                <tr key={ev.id}>
+                  <td>{ev.occurred_on}</td>
+                  <td>
+                    <span
+                      className={
+                        ev.event_type === "vacant"
+                          ? "prop-event-type is-vacant"
+                          : "prop-event-type is-occupied"
+                      }
+                    >
+                      {ev.event_type === "vacant" ? "空室" : "入居"}
+                    </span>
+                  </td>
+                  <td>{ev.property_name || ev.property_id}</td>
+                  <td>{ev.room}</td>
+                  <td className="meta">{ev.source || "—"}</td>
+                  <td className="meta">{ev.ref || "—"}</td>
+                  <td className="prop-note">{ev.note || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <p className="sub" style={{ marginTop: 8 }}>
