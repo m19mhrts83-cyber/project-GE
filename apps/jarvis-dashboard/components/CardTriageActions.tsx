@@ -17,6 +17,10 @@ import {
 import { defaultUseKamiooyaKnowledge } from "@/lib/kamiooya/lanes";
 import { defaultUseOnedriveYoritoori } from "@/lib/onedrive/retrieveYoritoori";
 import { formatJstMmDdHm } from "@/lib/formatJst";
+import { NOTION_TASK_LANES, guessPropertyName } from "@/lib/notionTaskDbs";
+import {
+  fetchPropertySelectOptionsAction,
+} from "@/app/actions/notionBoard";
 import LocalHandoffBar from "@/components/LocalHandoffBar";
 
 export type CardCommentRow = {
@@ -83,6 +87,9 @@ export default function CardTriageActions({
   const [promoSummary, setPromoSummary] = useState(() =>
     defaultPromoteSummary(card),
   );
+  const [propertyOptions, setPropertyOptions] = useState<string[]>([]);
+  const [promoProperty, setPromoProperty] = useState("");
+  const needsProperty = Boolean(NOTION_TASK_LANES[lane]?.property_prop);
   const [macPolling, setMacPolling] = useState(() => {
     const ask = card.payload?.cursor_ask;
     if (ask && typeof ask === "object") {
@@ -162,6 +169,23 @@ export default function CardTriageActions({
     setPromoTitle(defaultPromoteTitle(card));
     setPromoSummary(defaultPromoteSummary(card));
     setConfirmOpen(true);
+    if (needsProperty) {
+      void (async () => {
+        const r = await fetchPropertySelectOptionsAction(lane);
+        const opts = r.ok ? r.options : [];
+        setPropertyOptions(opts);
+        const guessed = guessPropertyName(
+          [card.title, card.summary || "", defaultPromoteTitle(card)].join(
+            "\n",
+          ),
+          opts,
+        );
+        setPromoProperty(guessed);
+      })();
+    } else {
+      setPromoProperty("");
+      setPropertyOptions([]);
+    }
   }
 
   function run(kind: "skip" | "promote" | "post" | "ask") {
@@ -180,9 +204,14 @@ export default function CardTriageActions({
         return;
       }
       if (kind === "promote") {
+        if (needsProperty && !promoProperty.trim()) {
+          setErr("物件名（サブグループ）を選択してください");
+          return;
+        }
         const r = await promoteCardToNotion(card.id, lane, path, {
           title: promoTitle.trim() || defaultPromoteTitle(card),
           summary: promoSummary.trim(),
+          propertyName: promoProperty.trim() || undefined,
         });
         if (!r.ok) {
           setErr(r.error || "失敗しました");
@@ -268,6 +297,27 @@ export default function CardTriageActions({
               disabled={pending}
             />
           </label>
+          {needsProperty ? (
+            <label className="promote-label">
+              物件名（Notion サブグループ）
+              <select
+                value={promoProperty}
+                onChange={(e) => setPromoProperty(e.target.value)}
+                disabled={pending}
+              >
+                <option value="">選択してください</option>
+                {propertyOptions.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+                {promoProperty &&
+                !propertyOptions.includes(promoProperty) ? (
+                  <option value={promoProperty}>{promoProperty}</option>
+                ) : null}
+              </select>
+            </label>
+          ) : null}
           <label className="promote-label">
             本文（Notion の説明）
             <textarea
@@ -289,7 +339,11 @@ export default function CardTriageActions({
             <button
               type="button"
               className="btn primary"
-              disabled={pending || !promoTitle.trim()}
+              disabled={
+                pending ||
+                !promoTitle.trim() ||
+                (needsProperty && !promoProperty.trim())
+              }
               onClick={() => run("promote")}
             >
               この内容で Notion に登録

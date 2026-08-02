@@ -4,10 +4,10 @@ import CardSummaryBody from "@/components/CardSummaryBody";
 import CardTriageActions, {
   type CardCommentRow,
 } from "@/components/CardTriageActions";
+import NotionBoardClient from "@/components/NotionBoardClient";
 import {
   queryLaneBoard,
   type NotionBoardSummary,
-  type NotionTask,
 } from "@/lib/notionTasks";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,43 +21,15 @@ type CardRow = {
   payload: Record<string, unknown> | null;
 };
 
-function BoardColumns({ columns }: { columns: Record<string, NotionTask[]> }) {
-  const entries = Object.entries(columns);
-  if (!entries.length) return null;
-  return (
-    <div className="notion-board">
-      {entries.map(([status, tasks]) => (
-        <div className="notion-col" key={status}>
-          <div className="notion-col-head">
-            {status}{" "}
-            <span className="notion-col-count">{tasks.length}</span>
-          </div>
-          <ul className="notion-col-list">
-            {tasks.length === 0 ? (
-              <li className="notion-col-empty">—</li>
-            ) : (
-              tasks.map((t) => (
-                <li key={t.id} className={t.overdue ? "overdue" : undefined}>
-                  <a href={t.url} target="_blank" rel="noreferrer">
-                    {t.title}
-                  </a>
-                  {t.due ? (
-                    <span className="notion-col-due">
-                      {t.overdue ? "期限切れ " : ""}
-                      {t.due}
-                    </span>
-                  ) : null}
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function BoardSection({ board }: { board: NotionBoardSummary }) {
+function BoardSection({
+  board,
+  lane,
+  path,
+}: {
+  board: NotionBoardSummary;
+  lane: string;
+  path: string;
+}) {
   return (
     <section className="home-section" style={{ marginTop: 28 }}>
       <div className="notion-board-head">
@@ -74,9 +46,8 @@ function BoardSection({ board }: { board: NotionBoardSummary }) {
         ) : null}
       </div>
       <p className="sub" style={{ marginTop: 8 }}>
-        タスク名をクリックすると Notion の該当ページへ。プライベート DB
-        は iframe 埋め込み不可のため、API で看板を再現しています（編集・ドラッグは
-        Notion 側）。
+        タスク名で Notion を開きます。列の「移動」でステータスを変えられます（Notion
+        に反映）。プライベート DB は iframe 不可のため API で再現しています。
       </p>
       {!board.connected ? (
         <p className="empty">
@@ -94,7 +65,12 @@ function BoardSection({ board }: { board: NotionBoardSummary }) {
               </div>
             ))}
           </div>
-          <BoardColumns columns={board.columns || {}} />
+          <NotionBoardClient
+            lane={lane}
+            path={path}
+            openStatuses={board.openStatuses || []}
+            columns={board.columns || {}}
+          />
           {board.overdue.length > 0 ? (
             <>
               <h3 style={{ fontSize: "1rem", marginTop: 16 }}>期限切れ</h3>
@@ -141,6 +117,7 @@ export default async function TriageKanbanLane({
   const activeCards = list.filter((c) => c.status === "active");
   const promotedCards = list.filter((c) => c.status === "promoted");
   const archivedCount = list.filter((c) => c.status === "archived").length;
+  const hideSkipStat = lane === "properties";
 
   const ids = [...activeCards, ...promotedCards].map((c) => c.id);
   const commentsByCard = new Map<string, CardCommentRow[]>();
@@ -178,11 +155,18 @@ export default async function TriageKanbanLane({
       <p className="sub">
         {subtitle ||
           "ソースを要約した確認テーマです。コメントで方針を相談し、納得したら「タスク化する…」で内容確認のうえ Notion に1件登録。履歴は OneDrive「Jarvis処置ログ/{レーン}/5.処置ログ.md」。"}{" "}
-        アーカイブは{" "}
-        <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
-          こちら
-        </Link>
-        。
+        {hideSkipStat ? null : (
+          <>
+            アーカイブは{" "}
+            <Link
+              href="/archive"
+              style={{ color: "var(--accent)", fontWeight: 600 }}
+            >
+              こちら
+            </Link>
+            。
+          </>
+        )}
       </p>
 
       {children}
@@ -194,14 +178,16 @@ export default async function TriageKanbanLane({
         <div className="stat">
           Notion進行中 <strong>{promotedCards.length}</strong>
         </div>
-        <div className="stat">
-          スキップ済{" "}
-          <strong>
-            <Link href="/archive" style={{ color: "inherit" }}>
-              {archivedCount}
-            </Link>
-          </strong>
-        </div>
+        {hideSkipStat ? null : (
+          <div className="stat">
+            スキップ済{" "}
+            <strong>
+              <Link href="/archive" style={{ color: "inherit" }}>
+                {archivedCount}
+              </Link>
+            </strong>
+          </div>
+        )}
       </div>
 
       <h2>確認テーマ</h2>
@@ -241,7 +227,11 @@ export default async function TriageKanbanLane({
         <>
           <h2>進行中（Notion管理）</h2>
           {promotedCards.map((c) => (
-            <article key={c.id} className="card digest-card" style={{ opacity: 0.92 }}>
+            <article
+              key={c.id}
+              className="card digest-card"
+              style={{ opacity: 0.92 }}
+            >
               <header>
                 <span className="lvl">進行中</span>
                 <strong>{c.title.replace(/^\[確認\]\s*/, "")}</strong>
@@ -262,7 +252,7 @@ export default async function TriageKanbanLane({
         </>
       ) : null}
 
-      <BoardSection board={board} />
+      <BoardSection board={board} lane={lane} path={active} />
     </Shell>
   );
 }

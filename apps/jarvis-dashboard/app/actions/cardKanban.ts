@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createNotionTask } from "@/lib/notionTasks";
+import { createNotionTask, loadNotionLaneConfig } from "@/lib/notionTasks";
 import { queueLaneActionLog } from "@/lib/laneActionLog";
 import {
   formatAskReplyBody,
@@ -70,7 +70,7 @@ export async function promoteCardToNotion(
   cardId: string,
   lane: string,
   path: string,
-  opts?: { title?: string; summary?: string },
+  opts?: { title?: string; summary?: string; propertyName?: string },
 ): Promise<CardActionResult> {
   const supabase = await createClient();
   const { data: card, error: gErr } = await supabase
@@ -94,10 +94,17 @@ export async function promoteCardToNotion(
       .slice(0, 1800);
   }
 
+  const propertyName = (opts?.propertyName || "").trim() || null;
+  const cfg = loadNotionLaneConfig(lane);
+  if (cfg?.property_prop && !propertyName) {
+    return { ok: false, error: "物件名（サブグループ）を選択してください" };
+  }
+
   const created = await createNotionTask(lane, {
     title,
     summary: summary || undefined,
     due,
+    propertyName,
   });
   if (!created.ok) return { ok: false, error: created.error };
 
@@ -107,6 +114,7 @@ export async function promoteCardToNotion(
     notion_page_id: created.id,
     promoted_at: new Date().toISOString(),
     promoted_title: title,
+    notion_property_name: propertyName,
   };
   const { error: uErr } = await supabase
     .from("cards")
@@ -121,7 +129,7 @@ export async function promoteCardToNotion(
   await queueLaneActionLog({
     lane,
     event: "タスク登録",
-    body: `- ${title}\n- Notion: ${created.url}`,
+    body: `- ${title}\n- 物件名: ${propertyName || "—"}\n- Notion: ${created.url}`,
     cardId,
   });
 

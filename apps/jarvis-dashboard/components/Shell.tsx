@@ -3,12 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 type NavItem = { href: string; label: string };
 type NavGroup = { title: string; items: NavItem[] };
 
-/** B+A: グループ見出し＋分かりやすい名前 */
+/** B+A: グループ見出し＋分かりやすい名前。ホームは「見る」の上に独立配置 */
 const NAV_GROUPS: NavGroup[] = [
   {
     title: "見る",
     items: [
-      { href: "/", label: "ホーム" },
       { href: "/partner", label: "パートナー" },
       { href: "/general", label: "その他メール" },
       { href: "/openchat", label: "神大家オプチャ" },
@@ -56,10 +55,18 @@ export default async function Shell({
     data: { user },
   } = await supabase.auth.getUser();
 
+  const homeActive = active === "/";
+
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="side-brand">Jarvis</div>
+        <a
+          href="/"
+          className={`side-link side-link-home${homeActive ? " active" : ""}`}
+        >
+          ホーム
+        </a>
         {NAV_GROUPS.map((g) => (
           <div key={g.title} className="side-group">
             <div className="side-group-title">{g.title}</div>

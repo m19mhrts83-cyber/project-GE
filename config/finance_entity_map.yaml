@@ -79,3 +79,7 @@ defaults:
 # 振替はキャッシュフロー手残りから除外
 exclude_methods:
   - transfer
+
+# Zaim「集計の設定」列（品質ウォッチの exclude_label と同系）
+exclude_aggregation_labels:
+  - 集計に含めない
