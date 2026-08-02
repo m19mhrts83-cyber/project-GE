@@ -21,10 +21,11 @@ properties:
       - "Grandole志賀本通I"
       - "02_Grandole志賀本通I"
       - "Grandole志賀本通Ⅰ"
-    # 棟: LEAF + Tcell（号室によりミニテックもあり）
+    # 棟: LEAF + Tcell（号室未指定の既定はミニテック）
     managers:
       - LEAF
       - Tcell
+    default_manager: ミニテック
     key_number: 2842
     rooms:
       "102":
