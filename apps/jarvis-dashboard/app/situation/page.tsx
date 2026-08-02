@@ -121,6 +121,11 @@ export default async function SituationPage() {
                 />
               </header>
               <p className="sum">{it.summary}</p>
+              {it.id === "etc_mileage" ? (
+                <p className="meta">
+                  <Link href="/etc">ETCページ（還元サマリ・申請案内）→</Link>
+                </p>
+              ) : null}
               {actions.length > 0 ? (
                 <div className="watch-actions">
                   <p className="watch-actions-title">要対応（具体）</p>

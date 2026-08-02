@@ -258,6 +258,32 @@ def push_watch(sb) -> int:
             except Exception as e:
                 print(f"# changelog sync skipped: {e}", file=sys.stderr)
 
+        # ETC: ダッシュボードの「確認しました」を Mac push で潰さない
+        if iid == "etc_mileage":
+            remote_ack = remote_pl.get("dashboard_ack_target_month")
+            local_ack = payload.get("dashboard_ack_target_month")
+            ack = remote_ack or local_ack
+            if ack:
+                payload["dashboard_ack_target_month"] = ack
+            rs = payload.get("rebate_summary") if isinstance(payload.get("rebate_summary"), dict) else {}
+            target = rs.get("target_month")
+            payload["show_banner"] = bool(
+                target and rs.get("rebate_yen") is not None and ack != target
+            )
+            # Mac state にも ack を寄せる（次回 eval 用）
+            try:
+                etc_path = STATE / "etc_monthly.json"
+                if etc_path.is_file() and ack:
+                    etc = json.loads(etc_path.read_text(encoding="utf-8"))
+                    if etc.get("dashboard_ack_target_month") != ack:
+                        etc["dashboard_ack_target_month"] = ack
+                        etc_path.write_text(
+                            json.dumps(etc, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
+            except Exception as e:
+                print(f"# etc ack sync skipped: {e}", file=sys.stderr)
+
         st = it.get("status") or "active"
         arch_at = it.get("archived_at")
         if never_archive:
