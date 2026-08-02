@@ -25,6 +25,12 @@ export type OccupancyEvent = {
   note: string | null;
 };
 
+export type PropertyRentBreakdown = {
+  rent: number | null;
+  management_fee: number | null;
+  total_rent: number | null;
+};
+
 export type OccupancySummary = {
   total: number;
   occupied: number;
@@ -39,6 +45,9 @@ export type OccupancySummary = {
     vacant: number;
     vacant_rooms: string[];
     rate_pct: number;
+    rent_sum: number;
+    mgmt_sum: number;
+    total_rent_sum: number;
   }[];
 };
 
@@ -57,37 +66,110 @@ export function shortLabel(unit: PropertyUnit): string {
   return `${short}-${unit.room}`;
 }
 
-export function summarizeUnits(units: PropertyUnit[]): OccupancySummary {
-  const byProp = new Map<
+export function unitRentBreakdown(unit: PropertyUnit): PropertyRentBreakdown {
+  const rent = unit.rent != null ? Number(unit.rent) : null;
+  const mgmtRaw = unit.payload?.management_fee;
+  const management_fee =
+    typeof mgmtRaw === "number"
+      ? mgmtRaw
+      : typeof mgmtRaw === "string" && mgmtRaw !== ""
+        ? Number(mgmtRaw)
+        : null;
+  const totalRaw = unit.payload?.total_rent;
+  let total_rent =
+    typeof totalRaw === "number"
+      ? totalRaw
+      : typeof totalRaw === "string" && totalRaw !== ""
+        ? Number(totalRaw)
+        : null;
+  if (total_rent == null && rent != null) {
+    total_rent = rent + (management_fee != null && !Number.isNaN(management_fee) ? management_fee : 0);
+  }
+  return {
+    rent: rent != null && !Number.isNaN(rent) ? rent : null,
+    management_fee:
+      management_fee != null && !Number.isNaN(management_fee)
+        ? management_fee
+        : null,
+    total_rent: total_rent != null && !Number.isNaN(total_rent) ? total_rent : null,
+  };
+}
+
+export function groupUnitsByProperty(units: PropertyUnit[]): {
+  property_id: string;
+  property_name: string;
+  units: PropertyUnit[];
+  rent_sum: number;
+  mgmt_sum: number;
+  total_rent_sum: number;
+  occupied: number;
+  vacant: number;
+}[] {
+  const order: string[] = [];
+  const map = new Map<
     string,
-    OccupancySummary["by_property"][number]
+    {
+      property_id: string;
+      property_name: string;
+      units: PropertyUnit[];
+      rent_sum: number;
+      mgmt_sum: number;
+      total_rent_sum: number;
+      occupied: number;
+      vacant: number;
+    }
   >();
+  for (const u of units) {
+    let g = map.get(u.property_id);
+    if (!g) {
+      g = {
+        property_id: u.property_id,
+        property_name: u.property_name,
+        units: [],
+        rent_sum: 0,
+        mgmt_sum: 0,
+        total_rent_sum: 0,
+        occupied: 0,
+        vacant: 0,
+      };
+      map.set(u.property_id, g);
+      order.push(u.property_id);
+    }
+    g.units.push(u);
+    const b = unitRentBreakdown(u);
+    if (b.rent != null) g.rent_sum += b.rent;
+    if (b.management_fee != null) g.mgmt_sum += b.management_fee;
+    if (b.total_rent != null) g.total_rent_sum += b.total_rent;
+    if (u.status === "vacant") g.vacant += 1;
+    else g.occupied += 1;
+  }
+  for (const g of map.values()) {
+    g.units.sort((a, b) => a.room.localeCompare(b.room, "ja"));
+  }
+  return order.map((id) => map.get(id)!);
+}
+
+export function summarizeUnits(units: PropertyUnit[]): OccupancySummary {
+  const groups = groupUnitsByProperty(units);
   const vacant_labels: string[] = [];
   let occupied = 0;
   for (const u of units) {
-    const b = byProp.get(u.property_id) || {
-      property_id: u.property_id,
-      property_name: u.property_name,
-      total: 0,
-      occupied: 0,
-      vacant: 0,
-      vacant_rooms: [] as string[],
-      rate_pct: 0,
-    };
-    b.total += 1;
-    if (u.status === "vacant") {
-      b.vacant += 1;
-      b.vacant_rooms.push(u.room);
-      vacant_labels.push(shortLabel(u));
-    } else {
-      b.occupied += 1;
-      occupied += 1;
-    }
-    byProp.set(u.property_id, b);
+    if (u.status === "vacant") vacant_labels.push(shortLabel(u));
+    else occupied += 1;
   }
-  const by_property = [...byProp.values()].map((b) => ({
-    ...b,
-    rate_pct: b.total ? Math.round((1000 * b.occupied) / b.total) / 10 : 0,
+  const by_property = groups.map((g) => ({
+    property_id: g.property_id,
+    property_name: g.property_name,
+    total: g.units.length,
+    occupied: g.occupied,
+    vacant: g.vacant,
+    vacant_rooms: g.units.filter((u) => u.status === "vacant").map((u) => u.room),
+    rate_pct: g.units.length
+      ? Math.round((1000 * g.occupied) / g.units.length) / 10
+      : 0,
+    rent_sum: g.rent_sum,
+    mgmt_sum: g.mgmt_sum,
+    total_rent_sum: g.total_rent_sum,
   }));
   const total = units.length;
   return {

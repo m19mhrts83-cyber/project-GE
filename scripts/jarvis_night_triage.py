@@ -767,6 +767,20 @@ def wait_dashboard_ready(*, timeout_s: float = 25.0) -> bool:
     return False
 
 
+def morning_open_require_pending() -> bool:
+    """True なら pending≥1 のときだけ開く。既定は毎日開く（習慣化フェーズ）。
+
+    軌道に乗ったら `.env.jarvis_private` に
+    `JARVIS_MORNING_OPEN_REQUIRE_PENDING=1` を付ける。
+    """
+    return (os.environ.get("JARVIS_MORNING_OPEN_REQUIRE_PENDING") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def open_dashboard_browser(
     *,
     force: bool = False,
@@ -774,23 +788,27 @@ def open_dashboard_browser(
     require_daytime: bool = True,
 ) -> tuple[bool, str]:
     """
-    pending≥1 のときダッシュボードをブラウザで開く。
+    ダッシュボードをブラウザで開く（1日1回）。
+    既定: pending がなくても開く。
+    JARVIS_MORNING_OPEN_REQUIRE_PENDING=1 のときだけ pending≥1 必須。
     force=False なら同一日の再オープンをスキップ。
     require_daytime=True なら 5:00–22:59 のみ（夜間の無人オープン防止）。
     戻り値: (opened_or_would_open, message)
     """
     items = pending_items()
     n = len(items)
-    if n < 1:
-        return False, "pending=0（オープン不要）"
+    require_pending = morning_open_require_pending()
+    if require_pending and n < 1:
+        return False, "pending=0（オープン不要・REQUIRE_PENDING）"
     if not force and already_auto_opened_today():
         return False, f"pending={n} だが本日は既に自動オープン済み"
     hour = datetime.now(JST).hour
     if require_daytime and not (5 <= hour <= 22):
         return False, f"pending={n} だが表示時間外（hour={hour}）"
     url = resolve_dashboard_url()
+    mode = "require_pending" if require_pending else "always"
     if dry_run:
-        return True, f"dry-run: pending={n} なら open する ({url})"
+        return True, f"dry-run: open する ({url}) mode={mode} pending={n}"
     # ローカル 8765 のときだけ起動待ち。クラウドは常に到達可想定。
     if url.startswith("http://127.0.0.1") or url.startswith("http://localhost"):
         if not wait_dashboard_ready():
@@ -800,7 +818,7 @@ def open_dashboard_browser(
     except Exception as e:
         return False, f"open 失敗: {e}"
     mark_auto_opened_today()
-    return True, f"opened pending={n} url={url}"
+    return True, f"opened pending={n} mode={mode} url={url}"
 
 
 def load_queue() -> dict[str, Any]:

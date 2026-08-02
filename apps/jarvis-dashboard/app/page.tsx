@@ -14,12 +14,20 @@ import {
   summarizeUnits,
   type PropertyUnit,
 } from "@/lib/occupancy";
+import { buildCashflowInsight } from "@/lib/cashflowInsight";
 import { parseOpenchatDigest } from "@/lib/openchatDigest";
 import {
   parseOtherMailDigest,
   type OtherMailDigest,
 } from "@/lib/otherMailDigest";
 import { createClient } from "@/lib/supabase/server";
+
+function fmtYenSigned(n: number | null | undefined, sign: "+" | "-"): string {
+  if (n == null) return "—";
+  const abs = `${Math.round(Math.abs(n)).toLocaleString("ja-JP")}円`;
+  if (n === 0) return abs;
+  return sign === "-" ? `−${abs}` : `＋${abs}`;
+}
 
 function fallbackDigest(
   otherMails: {
@@ -94,9 +102,19 @@ export default async function HomePage() {
   const { data: metricRows } = await supabase
     .from("metrics")
     .select("metric,entity,value,recorded_at")
-    .in("metric", ["cashflow", "rent_income"])
+    .in("metric", [
+      "cashflow",
+      "rent_income",
+      "rental_expense",
+      "expense_total",
+      "income_total",
+      "other_expense",
+      "other_income",
+      "salary",
+      "repair_expense",
+    ])
     .order("recorded_at", { ascending: false })
-    .limit(200);
+    .limit(400);
 
   const metricLatest = new Map<string, number>();
   const metricMonths = new Set<string>();
@@ -113,8 +131,34 @@ export default async function HomePage() {
           metricLatest.has(`${ym}|corporate|cashflow`) ||
           metricLatest.has(`${ym}|personal|cashflow`),
       ) || targetYm;
-  const pickMetric = (ent: string, metric: string) =>
-    metricLatest.get(`${financeYm}|${ent}|${metric}`);
+  const pickMetric = (ent: string, metric: string, ym = financeYm) =>
+    metricLatest.get(`${ym}|${ent}|${metric}`);
+
+  const prevYmForFinance = (() => {
+    const [y, m] = financeYm.split("-").map(Number);
+    if (!y || !m) return null;
+    if (m === 1) return `${y - 1}-12`;
+    return `${y}-${String(m - 1).padStart(2, "0")}`;
+  })();
+
+  const sliceFor = (ent: "corporate" | "personal", ym: string) => ({
+    cashflow: pickMetric(ent, "cashflow", ym),
+    rent_income: pickMetric(ent, "rent_income", ym),
+    rental_expense: pickMetric(ent, "rental_expense", ym),
+    expense_total: pickMetric(ent, "expense_total", ym),
+    income_total: pickMetric(ent, "income_total", ym),
+    other_expense: pickMetric(ent, "other_expense", ym),
+    other_income: pickMetric(ent, "other_income", ym),
+    salary: pickMetric(ent, "salary", ym),
+    repair_expense: pickMetric(ent, "repair_expense", ym),
+  });
+
+  const corpCur = sliceFor("corporate", financeYm);
+  const persCur = sliceFor("personal", financeYm);
+  const corpPrev = prevYmForFinance ? sliceFor("corporate", prevYmForFinance) : null;
+  const persPrev = prevYmForFinance ? sliceFor("personal", prevYmForFinance) : null;
+  const corpInsight = buildCashflowInsight("corporate", corpCur, corpPrev);
+  const persInsight = buildCashflowInsight("personal", persCur, persPrev);
 
   const { data: unitRows } = await supabase
     .from("property_units")
@@ -261,26 +305,96 @@ export default async function HomePage() {
           <p className="home-band-sub">
             表示月 {financeYm}
             {financeYm !== targetYm ? `（先月 ${targetYm} は未取込）` : ""}
+            {" · 手残り＝収入合計−支出合計（振替除く）"}
           </p>
         </div>
-        <div className="stats home-stats">
-          <div className="stat">
-            法人 手残り{" "}
-            <strong>{fmtYen(pickMetric("corporate", "cashflow"))}</strong>
-          </div>
-          <div className="stat">
-            個人 手残り{" "}
-            <strong>{fmtYen(pickMetric("personal", "cashflow"))}</strong>
-          </div>
-          <div className="stat">
-            法人 家賃{" "}
-            <strong>{fmtYen(pickMetric("corporate", "rent_income"))}</strong>
-          </div>
-          <div className="stat">
-            個人 家賃{" "}
-            <strong>{fmtYen(pickMetric("personal", "rent_income"))}</strong>
-          </div>
+
+        <div className="cf-panels">
+          {(
+            [
+              {
+                key: "corporate",
+                title: "法人",
+                cur: corpCur,
+                insight: corpInsight,
+                showSalary: false,
+              },
+              {
+                key: "personal",
+                title: "個人",
+                cur: persCur,
+                insight: persInsight,
+                showSalary: true,
+              },
+            ] as const
+          ).map((panel) => {
+            const cf = panel.cur.cashflow;
+            const cfClass =
+              cf == null ? "" : cf >= 0 ? "is-plus" : "is-minus";
+            return (
+              <article key={panel.key} className={`cf-panel ${cfClass}`}>
+                <header className="cf-panel-head">
+                  <h3>{panel.title}</h3>
+                </header>
+
+                <div className="cf-hero">
+                  <span className="cf-hero-label">手残り</span>
+                  <strong className="cf-hero-value">{fmtYen(cf)}</strong>
+                </div>
+
+                <div className="cf-stack" aria-label="家賃と支出の関係">
+                  <div className="cf-row is-in">
+                    <span>家賃</span>
+                    <strong>{fmtYen(panel.cur.rent_income)}</strong>
+                  </div>
+                  {panel.showSalary ? (
+                    <div className="cf-row is-in">
+                      <span>給与・賞与</span>
+                      <strong>{fmtYen(panel.cur.salary)}</strong>
+                    </div>
+                  ) : null}
+                  {(panel.cur.other_income ?? 0) > 0 ? (
+                    <div className="cf-row is-in">
+                      <span>その他収入</span>
+                      <strong>{fmtYen(panel.cur.other_income)}</strong>
+                    </div>
+                  ) : null}
+                  <div className="cf-row is-out">
+                    <span>賃貸支出（ローン・管理など）</span>
+                    <strong>
+                      {fmtYenSigned(panel.cur.rental_expense, "-")}
+                    </strong>
+                  </div>
+                  {(panel.cur.repair_expense ?? 0) > 0 ? (
+                    <div className="cf-row is-out">
+                      <span>修繕</span>
+                      <strong>
+                        {fmtYenSigned(panel.cur.repair_expense, "-")}
+                      </strong>
+                    </div>
+                  ) : null}
+                  <div className="cf-row is-out">
+                    <span>その他支出（固定費など）</span>
+                    <strong>
+                      {fmtYenSigned(panel.cur.other_expense, "-")}
+                    </strong>
+                  </div>
+                  <div className="cf-row is-result">
+                    <span>→ 手残り</span>
+                    <strong>{fmtYen(cf)}</strong>
+                  </div>
+                </div>
+
+                <div className={`cf-insight tone-${panel.insight.tone}`}>
+                  <p className="cf-insight-head">{panel.insight.headline}</p>
+                  <p className="cf-insight-body">{panel.insight.body}</p>
+                  <p className="cf-insight-path">{panel.insight.path}</p>
+                </div>
+              </article>
+            );
+          })}
         </div>
+
         <p className="home-occupancy-one-liner">
           全体満室率{" "}
           <strong>
@@ -296,7 +410,7 @@ export default async function HomePage() {
         </p>
         <p className="home-metrics-more">
           <a href="/metrics" className="home-more">
-            数値の詳細 →
+            収支・数値の詳細 →
           </a>
         </p>
       </div>

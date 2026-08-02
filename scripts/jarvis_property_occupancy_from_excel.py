@@ -73,6 +73,11 @@ def _as_rent(v: Any) -> float | None:
 
 
 def parse_rent_map(path: Path) -> list[dict[str, Any]]:
+    """★家賃マップ.xlsx を号室単位で読む。
+
+    Excel は号室列ごとに「状態」「（合計）」「家賃」「管理費」＋メモ行が並ぶ。
+    rent=家賃、payload.management_fee=管理費、payload.total_rent=合計（家賃+管理費）。
+    """
     import openpyxl
 
     wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
@@ -90,6 +95,13 @@ def parse_rent_map(path: Path) -> list[dict[str, Any]]:
         if "志賀本通I" in b1 and "II" not in b1:
             return "grandole-i", PROPERTY_META["grandole-i"]["name"]
         return None
+
+    def row_label(row: list[Any]) -> str:
+        """B列（index 1）の行ラベルのみ使う（J列は右側の合計欄用）。"""
+        s = _cell_str(row[1] if len(row) > 1 else None)
+        if s in ("家賃", "管理費", "合計"):
+            return s
+        return ""
 
     units: list[dict[str, Any]] = []
     current: tuple[str, str] | None = None
@@ -113,35 +125,99 @@ def parse_rent_map(path: Path) -> list[dict[str, Any]]:
 
         prop_id, prop_name = current
         status_row = rows[j + 1] if j + 1 < len(rows) else []
-        for col, room in rooms:
-            status_text = _cell_str(status_row[col] if col < len(status_row) else None)
-            note_parts = [status_text] if status_text else []
-            rent: float | None = None
-            for k in range(j + 2, min(j + 8, len(rows))):
-                # stop if next room header or property title
-                peek = rows[k]
-                if detect_property(peek):
+
+        # 号室ブロック終端（次の号室ヘッダ or 物件タイトル or 空行が続く）
+        end = min(j + 12, len(rows))
+        for k in range(j + 2, end):
+            peek = rows[k]
+            if detect_property(peek):
+                end = k
+                break
+            peek_rooms = sum(1 for v in peek if ROOM_RE.match(_cell_str(v)))
+            if peek_rooms >= 2:
+                end = k
+                break
+            # 別表（G2 / 日付 など）に入ったら止める
+            b0 = _cell_str(peek[0] if peek else None)
+            b2 = _cell_str(peek[2] if len(peek) > 2 else None)
+            if re.fullmatch(r"G\d+", b2) or isinstance(peek[3] if len(peek) > 3 else None, datetime):
+                end = k
+                break
+            # 部屋列がすべて空ならメモ収集を打ち切り（ただし家賃/管理費ラベル行は残す）
+            room_vals = [
+                peek[c] if c < len(peek) else None for c, _ in rooms
+            ]
+            if all(v is None or _cell_str(v) == "" for v in room_vals) and row_label(peek) == "":
+                # 連続空はブロック終端候補だが、直後に家賃行がある場合があるので1行先も見る
+                nxt = rows[k + 1] if k + 1 < len(rows) else []
+                if row_label(nxt) not in ("家賃", "管理費", "合計"):
+                    end = k
                     break
-                peek_rooms = sum(
-                    1 for v in peek if ROOM_RE.match(_cell_str(v))
-                )
-                if peek_rooms >= 2:
-                    break
+
+        # ラベル行を優先して家賃／管理費を取る
+        rent_by_col: dict[int, float] = {}
+        mgmt_by_col: dict[int, float] = {}
+        total_by_col: dict[int, float] = {}
+        memo_by_col: dict[int, list[str]] = {col: [] for col, _ in rooms}
+
+        for k in range(j + 2, end):
+            peek = rows[k]
+            label = row_label(peek)
+            for col, _room in rooms:
                 cell = peek[col] if col < len(peek) else None
                 r = _as_rent(cell)
-                if r is not None:
-                    rent = r
-                else:
-                    cs = _cell_str(cell)
-                    if (
-                        cs
-                        and "管理" not in cs
-                        and "号室" not in cs
-                        and cs not in note_parts
-                        and len(cs) < 80
-                    ):
-                        note_parts.append(cs)
+                cs = _cell_str(cell)
+                if label == "家賃" and r is not None:
+                    rent_by_col[col] = r
+                elif label == "管理費" and r is not None:
+                    mgmt_by_col[col] = r
+                elif label == "合計" and r is not None:
+                    total_by_col[col] = r
+                elif r is not None and label == "":
+                    # ラベル無しの数値: 小さい値は管理費候補、大きい値は合計候補
+                    # （家賃・管理費のラベル行がある場合はそちらを優先）
+                    if r <= 8000 and col not in mgmt_by_col:
+                        mgmt_by_col[col] = r
+                    elif col not in total_by_col:
+                        total_by_col[col] = r
+                elif (
+                    cs
+                    and label == ""
+                    and "号室" not in cs
+                    and len(cs) < 120
+                    and not re.fullmatch(r"G\d+", cs)
+                ):
+                    memo_by_col[col].append(cs)
+
+        for col, room in rooms:
+            status_text = _cell_str(status_row[col] if col < len(status_row) else None)
+            rent = rent_by_col.get(col)
+            mgmt = mgmt_by_col.get(col)
+            labeled_total = total_by_col.get(col)
+            # 賃料合計は家賃+管理費を正とする（Excelの先頭合計行は割引前のことがある）
+            if rent is not None:
+                total = float(rent) + (float(mgmt) if mgmt is not None else 0.0)
+            elif labeled_total is not None and mgmt is not None:
+                total = float(labeled_total)
+                rent = total - float(mgmt)
+            elif labeled_total is not None:
+                total = float(labeled_total)
+                rent = total
+            else:
+                total = None
+            note_parts = [status_text] if status_text else []
+            for m in memo_by_col.get(col) or []:
+                if m and m not in note_parts:
+                    note_parts.append(m)
             status = classify_status(status_text)
+            payload: dict[str, Any] = {
+                "status_raw": status_text,
+                "short": PROPERTY_META[prop_id]["short"],
+            }
+            if mgmt is not None:
+                payload["management_fee"] = mgmt
+            if total is not None:
+                payload["total_rent"] = total
             units.append(
                 {
                     "id": f"{prop_id}-{room}",
@@ -152,10 +228,7 @@ def parse_rent_map(path: Path) -> list[dict[str, Any]]:
                     "rent": rent,
                     "note": " / ".join(p for p in note_parts if p)[:500] or None,
                     "source": "excel",
-                    "payload": {
-                        "status_raw": status_text,
-                        "short": PROPERTY_META[prop_id]["short"],
-                    },
+                    "payload": payload,
                 }
             )
 
@@ -181,6 +254,16 @@ def load_extra_units() -> list[dict[str, Any]]:
             continue
         name = str(u.get("property_name") or PROPERTY_META.get(pid, {}).get("name") or pid)
         short = str(u.get("short") or PROPERTY_META.get(pid, {}).get("short") or pid)
+        rent = float(u["rent"]) if u.get("rent") is not None else None
+        mgmt = float(u["management_fee"]) if u.get("management_fee") is not None else None
+        total = float(u["total_rent"]) if u.get("total_rent") is not None else None
+        if total is None and rent is not None:
+            total = rent + (mgmt or 0.0)
+        payload: dict[str, Any] = {"short": short, "status_raw": u.get("note") or ""}
+        if mgmt is not None:
+            payload["management_fee"] = mgmt
+        if total is not None:
+            payload["total_rent"] = total
         out.append(
             {
                 "id": f"{pid}-{room}",
@@ -188,10 +271,10 @@ def load_extra_units() -> list[dict[str, Any]]:
                 "property_name": name,
                 "room": room,
                 "status": str(u.get("status") or "occupied"),
-                "rent": float(u["rent"]) if u.get("rent") is not None else None,
+                "rent": rent,
                 "note": u.get("note"),
                 "source": "config",
-                "payload": {"short": short, "status_raw": u.get("note") or ""},
+                "payload": payload,
             }
         )
     return out
@@ -211,9 +294,23 @@ def summarize(units: list[dict[str, Any]]) -> dict[str, Any]:
                 "occupied": 0,
                 "vacant": 0,
                 "vacant_rooms": [],
+                "rent_sum": 0.0,
+                "mgmt_sum": 0.0,
+                "total_rent_sum": 0.0,
             },
         )
         bucket["total"] += 1
+        rent = u.get("rent")
+        mgmt = (u.get("payload") or {}).get("management_fee")
+        total_rent = (u.get("payload") or {}).get("total_rent")
+        if total_rent is None and rent is not None:
+            total_rent = float(rent) + (float(mgmt) if mgmt is not None else 0.0)
+        if rent is not None:
+            bucket["rent_sum"] += float(rent)
+        if mgmt is not None:
+            bucket["mgmt_sum"] += float(mgmt)
+        if total_rent is not None:
+            bucket["total_rent_sum"] += float(total_rent)
         if u["status"] == "vacant":
             bucket["vacant"] += 1
             short = (u.get("payload") or {}).get("short") or pid

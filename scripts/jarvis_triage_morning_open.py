@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Mac を開いた最初のタイミングで、pending があればトリアージダッシュボードを開く（1日1回）。
+Mac を開いた最初のタイミングで、トリアージダッシュボードを開く（1日1回）。
+既定は pending がなくても開く（習慣化）。軌道後は
+JARVIS_MORNING_OPEN_REQUIRE_PENDING=1 で pending≥1 のみに戻せる。
 並行して Mac 必須の最新化バンドル（catchup・Gmail 差分・push）を裏実行する。
 
 夜間バッチは判定・下書きのみ。表示はこのスクリプト側。
