@@ -176,7 +176,7 @@ export default async function TriageKanbanLane({
       </div>
       <p className="sub">
         {subtitle ||
-          "メール／メモから処置候補を要約 → スキップ or Notion 看板へ。以降のステータスは Notion で管理。"}{" "}
+          "ソースを要約した確認テーマ → 見送り or Notion タスク化。コメント可。履歴は OneDrive「Jarvis処置ログ/{レーン}/5.処置ログ.md」。"}{" "}
         アーカイブは{" "}
         <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
           こちら
@@ -188,7 +188,7 @@ export default async function TriageKanbanLane({
 
       <div className="stats">
         <div className="stat">
-          処置候補 <strong>{activeCards.length}</strong>
+          確認テーマ <strong>{activeCards.length}</strong>
         </div>
         <div className="stat">
           Notion進行中 <strong>{promotedCards.length}</strong>
@@ -203,10 +203,10 @@ export default async function TriageKanbanLane({
         </div>
       </div>
 
-      <h2>処置候補</h2>
+      <h2>確認テーマ</h2>
       {!activeCards.length ? (
         <p className="empty">
-          まだありません（`jarvis_dashboard_lanes.py --push` で要約生成）
+          まだありません（`jarvis_lane_digest.py --push` で要約生成）
         </p>
       ) : (
         activeCards.map((c) => (
