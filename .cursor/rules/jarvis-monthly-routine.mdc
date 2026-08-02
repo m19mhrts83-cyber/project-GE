@@ -1,0 +1,170 @@
+---
+description: Jarvis 月次ルーティン。ユーザーが話しかけたタイミングで月次ウィンドウ内なら ETC／Vポイント等を確認し短く報告する。
+alwaysApply: true
+---
+
+# Jarvis 月次ルーティン
+
+ユーザーは **Jarvis と基本的に毎日対話**する。月始・還元付与日付近に、**本題の依頼とは別枠**で「設定が切れていないか」「割引・ポイントが効いているか」を確認し、結果を **ついでに1ブロック報告**する（ユーザーが「月次ルーティン不要」と言うまで継続）。
+
+## ETC 運用フェーズ（確定）
+
+- **検証フェーズは終了**（新車＋カードの動作確認済み）。
+- **深い随時チェックはしない**（マイページ巡回・随時ログイン確認は、ユーザーが明示したときだけ）。
+- **月1の本報告はウィンドウB**（還元額・還元率・お得額）。ウィンドウAは生存・走行の軽い確認のみ。
+
+## 無効化
+
+### ETC
+
+次のいずれかで **月次 ETC ルーティンを止める**:
+
+- `~/git-repos/.jarvis_state/etc_monthly.json` に `"disabled": true`
+- または `~/git-repos/.env.jarvis_private` に `JARVIS_ETC_MONTHLY_DISABLE=1`
+
+### Vポイント
+
+次のいずれかで **月次 Vポイント ルーティンを止める**:
+
+- `~/git-repos/.jarvis_state/vpoint_monthly.json` に `"disabled": true`
+- または `~/git-repos/.env.jarvis_private` に `JARVIS_VPOINT_MONTHLY_DISABLE=1`
+
+## いつ動くか（トリガー）
+
+**ユーザーが Jarvis に何か話しかけたセッション**のうち、当日が下記 **月次ウィンドウ** に入り、**当該ウィンドウの当月チェックが未実施** なら、本題に答える **前または後** に月次確認を実行する。
+
+| ウィンドウ | 日付（JST） | 目的 |
+|------------|-------------|------|
+| **A 明細**（ETC） | 毎月 **1〜8日** | 生存・前月走行の軽い確認のみ（割引サマリーは出さない） |
+| **B 還元**（ETC） | 毎月 **19〜26日** | **月1本報告**: 前月分の還元額・還元率・お得額（20日付与後） |
+| **C Vポイント** | 毎月 **25〜月末** | クレカ積立稼働・明細の `／ｉＤ` 比率・残高。Tサイトは認証後のみ |
+| **D 課金** | 毎月 **1〜8日** | `/billing` 先頭サマリー。新規・金額変更・注視。YAML 更新後 push |
+
+重なったら **A → B → C → D** の順で未実施分だけ行う。同一セッションで済ませてよい。
+
+**Vポイントの月次（ウィンドウC）は必須手順に載せない。** 日常の軽い差分は **パートナー確認・前半末尾のついで**（`jarvis_vpoint_cadence_check.py`・間隔2日）でよい。
+
+**課金（ウィンドウD）**:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_billing_monthly_check.py
+# 確認後
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_billing_monthly_check.py --mark-done
+```
+
+無効化: `.jarvis_state/billing_monthly.json` の `"disabled": true` または `JARVIS_BILLING_MONTHLY_DISABLE=1`。
+
+## 実施手順（ETC・必須）
+
+1. **無効化**を確認（上記）。無効ならスキップ。
+2. **状態**を読む: `~/git-repos/.jarvis_state/etc_monthly.json`（無ければ example 参照して新規作成可）
+3. **正本**を読む: `~/git-repos/.env.jarvis_private`（`ETC_MILEAGE_ID`・カード有効期限・利用照会 ID）
+4. **サマリー**（判断の文脈）: Literature Note `ETC割引確認_Phase1サマリー.md`（パスは `etc-discount-jarvis.mdc`）
+5. **自動チェック**（可能な範囲）を実行:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_etc_monthly_check.py
+```
+
+`--mark-done` は **確認が完了したときだけ**付ける（Gmail・利用照会・smile-etc のいずれかで判定できた、またはユーザーとハイブリッドで確認済み）。
+
+6. **ウィンドウ A（軽い確認）**: 前月の走行有無・朝夕件数の目安（利用照会 or smile-etc 未確定一覧）。CAPTCHA 等で止まったら **ユーザーに協力依頼**し、結果だけ記録。**割引サマリーは出さない**。
+7. **ウィンドウ B（月1本報告）**: [smile-etc.jp](https://www.smile-etc.jp/) で **前月分**を確認:
+   - 還元額明細の「特典／平日朝夕割引」行 → **還元額**
+   - 平日朝夕対象回数 → **還元率**（1〜4回: 0%／5〜9回: 約30%／10回以上: 約50%）
+   - **お得額** = 還元額（事後還元のため同額）。ポイント残高は参考行可
+   - 取得不可なら **要確認** と明記
+8. 状態 JSON を更新（`last_check_a` / `last_check_b` を `YYYY-MM`、結果サマリーを `last_result_*`）。B は `rebate_yen` / `asayu_trip_count` / `asayu_rate_pct` / `savings_yen` を保存。
+9. ユーザー向けに **短い報告ブロック**を出す（下記フォーマット）
+
+## 実施手順（Vポイント・ウィンドウC）
+
+1. **無効化**を確認（上記 Vポイント）。無効ならスキップ。
+2. **状態**を読む: `~/git-repos/.jarvis_state/vpoint_monthly.json`
+3. 要約スクリプトを実行:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_vpoint_monthly_check.py
+```
+
+4. 軽い確認（可能な範囲）: Vpass 明細で積立9万行・`／ｉＤ` サンプル・残高（詳細は `jarvis-vpoint-audit.mdc`）。Wallet 設定は勝手に変えない。
+5. Tサイト履歴は `VPOINT_TSITE_ID` があるとき（番号＋メールOTP。PW任意）。無ければ「認証待ち」と明記。
+6. 確認完了時のみ `--mark-done`。
+7. 報告ブロック（下記 Vポイント）を本題末尾に付ける。
+8. 日常の差分・処置提案は cadence（`vpoint_cadence.json`）を正とし、月次は深い突合に寄せる。
+
+## 報告フォーマット（ユーザー向け）
+
+### ETC・ウィンドウ B（月1本報告）
+
+本題の回答の **末尾**に付ける:
+
+```
+---
+📎 ETC月次サマリー — {YYYY-MM}分 / 確認日 {YYYY-MM-DD}
+- 平日朝夕 対象回数: {N}回 → 還元率 約{0|30|50}%
+- 還元額（付与）: {X,XXX}円
+- お得額: {X,XXX}円（還元額＝実質割引）
+- ポイント残高: NEXCO {…}（参考｜省略可）
+- 判定: {✅ 問題なし｜⚠️ 要フォロー: …}
+---
+```
+
+### ETC・ウィンドウ A（軽い確認）
+
+割引サマリーは出さない。短く1ブロックでよい:
+
+```
+---
+📎 月次確認（ETC）— A 明細 / {YYYY-MM}
+- マイレージ登録: {OK｜要確認}（ID末尾 …）
+- カード有効期限: {MM/YY｜—}
+- 前月走行・（朝夕）件数: {…}
+- 判定: {✅ 問題なし｜⚠️ 要フォロー: …}
+---
+```
+
+**⚠️ を付ける例（ETC）**:
+
+- `ETC_MILEAGE_ID` 未設定・ログイン失敗
+- 通勤継続なのに **（朝夕）0件が2ヶ月連続**
+- 還元ウィンドウ B で **還元0・通知なし**（マイレージ解約・未登録カードの疑い）
+- カード有効期限 **3ヶ月以内**
+
+### Vポイント
+
+```
+---
+📎 月次確認（Vポイント）— ウィンドウC / {YYYY-MM}
+- クレカ積立: {円/月｜—}
+- Vポイント残高: {pt｜—}
+- 決済レール: {／ｉＤ比率メモ｜—}
+- Tサイト: {pending_auth｜ready}
+- 判定: {✅ 問題なし｜⚠️ 要フォロー: …}
+---
+```
+
+**⚠️ を付ける例（Vポイント）**:
+
+- 明細で対象店がほぼ `／ｉＤ`（高還元対象外）
+- クレカ積立6%付与が長期未確認
+- Tサイト認証待ちで実効率が取れない（重い確認が必要な回）
+
+## 解約・設定切れの防止（730日教訓）
+
+- 旧マイレージは **730日無利用で自動解約**（事前通知なし）。**毎月 B で還元 or 生存シグナ**を確認する。
+- ウィンドウ A で前月 **走行0** は休暇月なら可。**2ヶ月連続0＋通勤あり**なら警告。
+- 車載器・ナンバー・カード変更後は、マイレージ登録の一致を B の確認に含める。
+
+## ユーザーからの明示依頼
+
+- 「ETC月次確認して」「還元チェック」等 → **ウィンドウ外でも即実行**（可能なら B フォーマットで還元額・率・お得額）
+- 「Vポイント確認して」「Vポイント月次確認して」等 → **ウィンドウ外でも即実行**（`jarvis-vpoint-audit` / cadence・月次スクリプト）
+
+## 関連
+
+- ETC 詳細・帰省: `etc-discount-jarvis.mdc`
+- Vポイント監査: `jarvis-vpoint-audit.mdc` / Literature Note §6.6
+- 日常 cadence: `scripts/jarvis_vpoint_cadence_check.py` / `.jarvis_state/vpoint_cadence.json`
+- 秘密: `jarvis.mdc` → `.env.jarvis_private`
+- 状態例: `~/git-repos/.jarvis_state/etc_monthly.example.json` / `vpoint_monthly.example.json` / `vpoint_cadence.example.json`
