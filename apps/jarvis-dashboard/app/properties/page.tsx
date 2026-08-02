@@ -62,7 +62,7 @@ export default async function Page() {
     >
       <div className="stats">
         <div className="stat">
-          全体満室率{" "}
+          入居率{" "}
           <strong>{summary.total ? `${summary.rate_pct}%` : "—"}</strong>
         </div>
         <div className="stat">

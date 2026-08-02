@@ -488,6 +488,105 @@ a.stat-link:active {
   font-size: 0.95rem;
 }
 
+.home-occupancy-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin: 4px 0 14px;
+  padding: 18px 20px;
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 12%, #fff) 0%,
+    color-mix(in srgb, var(--accent) 4%, var(--card)) 100%
+  );
+}
+
+.home-occupancy-hero.is-full {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 18%, #fff) 0%,
+    color-mix(in srgb, var(--accent) 6%, var(--card)) 100%
+  );
+}
+
+.home-occupancy-hero.is-gap {
+  border-color: color-mix(in srgb, var(--med) 45%, var(--line));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--med) 14%, #fff) 0%,
+    color-mix(in srgb, var(--med) 4%, var(--card)) 100%
+  );
+}
+
+.home-occupancy-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.home-occupancy-hero-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.home-occupancy-hero-value {
+  font-size: clamp(2.6rem, 6vw, 3.6rem);
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.home-occupancy-hero.is-full .home-occupancy-hero-value {
+  color: var(--accent);
+}
+
+.home-occupancy-hero.is-gap .home-occupancy-hero-value {
+  color: var(--med);
+}
+
+.home-occupancy-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+  min-width: 0;
+}
+
+.home-occupancy-hero-count {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.home-occupancy-hero-msg {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  max-width: 28rem;
+}
+
+@media (max-width: 640px) {
+  .home-occupancy-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .home-occupancy-hero-side {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
 .home-rent-summary {
   margin: 8px 0 12px;
   padding: 10px 12px;
