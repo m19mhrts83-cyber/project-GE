@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
+import CardSummaryBody from "@/components/CardSummaryBody";
 import CardTriageActions, {
   type CardCommentRow,
 } from "@/components/CardTriageActions";
@@ -210,26 +211,20 @@ export default async function TriageKanbanLane({
         </p>
       ) : (
         activeCards.map((c) => (
-          <article key={c.id} className="card">
+          <article key={c.id} className="card digest-card">
             <header>
-              <span className="lvl">{c.kind}</span>
-              <strong>{c.title}</strong>
+              <span className="lvl">確認</span>
+              <strong>{c.title.replace(/^\[確認\]\s*/, "")}</strong>
             </header>
-            <p className="sum">{c.summary}</p>
+            <CardSummaryBody
+              kind={c.kind}
+              summary={c.summary}
+              payload={c.payload}
+            />
             {c.cursor_prompt ? (
-              <details>
+              <details className="digest-cursor">
                 <summary>Cursorで調べる</summary>
-                <pre
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    fontSize: "0.8rem",
-                    background: "#fafaf9",
-                    padding: 10,
-                    borderRadius: 8,
-                  }}
-                >
-                  {c.cursor_prompt}
-                </pre>
+                <pre className="digest-cursor-pre">{c.cursor_prompt}</pre>
               </details>
             ) : null}
             <CardTriageActions
@@ -246,12 +241,16 @@ export default async function TriageKanbanLane({
         <>
           <h2>進行中（Notion管理）</h2>
           {promotedCards.map((c) => (
-            <article key={c.id} className="card" style={{ opacity: 0.92 }}>
+            <article key={c.id} className="card digest-card" style={{ opacity: 0.92 }}>
               <header>
-                <span className="lvl">promoted</span>
-                <strong>{c.title}</strong>
+                <span className="lvl">進行中</span>
+                <strong>{c.title.replace(/^\[確認\]\s*/, "")}</strong>
               </header>
-              <p className="sum">{c.summary}</p>
+              <CardSummaryBody
+                kind={c.kind === "digest" ? "digest" : c.kind}
+                summary={c.summary}
+                payload={c.payload}
+              />
               <CardTriageActions
                 card={c}
                 lane={lane}

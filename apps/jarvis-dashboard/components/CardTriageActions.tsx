@@ -76,9 +76,9 @@ export default function CardTriageActions({
   }
 
   return (
-    <div className="card-triage">
+    <div className={`card-triage${card.kind === "digest" ? " is-digest" : ""}`}>
       {card.status === "active" ? (
-        <div className="card-triage-btns">
+        <div className="card-triage-btns digest-actions">
           <button
             type="button"
             className="btn"
@@ -89,10 +89,9 @@ export default function CardTriageActions({
           </button>
           <button
             type="button"
-            className="btn"
+            className="btn primary"
             disabled={pending}
             onClick={() => run("promote")}
-            style={{ fontWeight: 700 }}
           >
             {card.kind === "digest" ? "タスク化する" : "処置として進める"}
           </button>

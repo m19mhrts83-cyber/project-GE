@@ -88,19 +88,29 @@ def cluster_items(items: list[dict[str, str]], max_themes: int) -> list[dict[str
     for key, group in ordered:
         samples = group[-4:]
         bullets: list[str] = []
+        bullet_objs: list[dict[str, str | None]] = []
         for g in samples:
             s = (g.get("summary") or "").strip()
-            line = f"- {g['title'][:80]}"
+            title = g["title"][:80]
+            line = f"- {title}"
             if s:
-                line += f"（{s[:100]}）"
+                line += f"（{s[:160]}）"
             bullets.append(line)
+            bullet_objs.append(
+                {
+                    "title": title,
+                    "detail": (s[:400] if s else None),
+                }
+            )
+        question = f"「{key}」まわりで、いまタスク化すべきことはありますか？"
         themes.append(
             {
                 "theme": key,
                 "count": len(group),
-                "question": f"「{key}」まわりで、いまタスク化すべきことはありますか？",
+                "question": question,
                 "bullets": bullets,
-                "summary": "\n".join(bullets)[:500],
+                "bullet_objs": bullet_objs,
+                "summary": "\n".join([question, *bullets])[:1800],
             }
         )
     return themes
@@ -173,7 +183,7 @@ def build_digest(max_themes: int, only_lane: str | None) -> dict[str, Any]:
                     "lane": lane_id,
                     "kind": "digest",
                     "title": title[:200],
-                    "summary": th["question"] + "\n" + th["summary"],
+                    "summary": th["summary"],
                     "status": "active",
                     "source_path": None,
                     "cursor_prompt": (
@@ -186,6 +196,7 @@ def build_digest(max_themes: int, only_lane: str | None) -> dict[str, Any]:
                         "digest": True,
                         "theme": th["theme"],
                         "question": th["question"],
+                        "bullets": th.get("bullet_objs") or [],
                     },
                     "updated_at": now_iso(),
                 }

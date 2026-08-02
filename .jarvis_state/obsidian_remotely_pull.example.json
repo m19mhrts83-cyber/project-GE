@@ -1,0 +1,8 @@
+{
+  "disabled": true,
+  "disabled_reason": "Google Drive Sync 本線。Remotely Save 橋は廃止",
+  "last_pull_at": null,
+  "last_result": null,
+  "broker_path": "~/Library/CloudStorage/OneDrive-個人用/Apps/remotely-save/500_Obsidian",
+  "vault_path": "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1"
+}
