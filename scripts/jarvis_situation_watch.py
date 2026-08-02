@@ -326,7 +326,28 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
     bal = cad.get("last_balance_pt")
     actions = [a for a in (cad.get("open_actions") or []) if a.get("status") == "open"]
     rc = mon.get("last_result_c") or {}
+    grant = rc.get("grant_summary") if isinstance(rc.get("grant_summary"), dict) else {}
+    if not grant and isinstance(mon.get("grant_history"), list) and mon["grant_history"]:
+        first = mon["grant_history"][0]
+        grant = first if isinstance(first, dict) else {}
+
+    target = str(grant.get("target_month") or rc.get("target_month") or "")
+    total_pt = grant.get("total_pt")
+    ack = mon.get("dashboard_ack_target_month")
+    has_grant = bool(target) and total_pt is not None
+    show_banner = has_grant and ack != target
+    bc = grant.get("by_cadence") if isinstance(grant.get("by_cadence"), dict) else {}
+
     parts: list[str] = []
+    if has_grant and show_banner:
+        part = f"{target}分 +{total_pt:,}pt" if isinstance(total_pt, int) else f"{target}分 +{total_pt}pt"
+        if bc:
+            part += f" · 月次条件 {bc.get('monthly', 0)}pt · 日次 {bc.get('daily', 0)}pt"
+        parts.append(part)
+        if grant.get("condition_grants_ok") is False or grant.get("shop_up_ok") is False:
+            parts.append("要確認あり")
+    elif has_grant and not show_banner:
+        parts.append(f"{target}分 確認済 · 次はウィンドウC更新後")
     if bal is not None:
         parts.append(f"残高 {bal:,}pt" if isinstance(bal, int) else f"残高 {bal}")
     if actions:
@@ -346,18 +367,24 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
                 short.append((t[:12] + "…") if len(t) > 12 else t or aid or "?")
         parts.append(f"要対応{len(actions)}: " + " / ".join(short))
     note = str(rc.get("note") or "")
-    if note:
+    if note and not has_grant:
         parts.append(note[:80])
     level = "ok"
+    if show_banner:
+        level = "info"
     if actions:
         level = "warn"
-    if rc.get("ok") is False:
+    if rc.get("ok") is False or grant.get("condition_grants_ok") is False:
         level = "attention"
     if not parts:
         parts.append("データなし")
         level = "warn"
 
     detail_lines: list[str] = []
+    if show_banner:
+        detail_lines.append("ダッシュボード /vpoint で付与サマリ（％別・考察）を確認できます。")
+        for ins in (grant.get("insights") or [])[:4]:
+            detail_lines.append(f"· {ins}")
     action_items: list[dict[str, Any]] = []
     for a in actions:
         aid = str(a.get("id") or "")
@@ -384,7 +411,16 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
             }
         )
 
-    payload = {"actions": action_items} if action_items else None
+    hist = [h for h in (mon.get("grant_history") or []) if isinstance(h, dict)][:12]
+    payload: dict[str, Any] = {
+        "grant_summary": grant or None,
+        "grant_history": hist,
+        "dashboard_ack_target_month": ack,
+        "show_banner": show_banner,
+        "href": "/vpoint",
+    }
+    if action_items:
+        payload["actions"] = action_items
     return card(
         item_id=meta["id"],
         title=title,

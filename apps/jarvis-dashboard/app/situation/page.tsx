@@ -126,6 +126,11 @@ export default async function SituationPage() {
                   <Link href="/etc">ETCページ（還元サマリ・申請案内）→</Link>
                 </p>
               ) : null}
+              {it.id === "vpoint" ? (
+                <p className="meta">
+                  <Link href="/vpoint">Vポイントページ（付与サマリ・考察）→</Link>
+                </p>
+              ) : null}
               {actions.length > 0 ? (
                 <div className="watch-actions">
                   <p className="watch-actions-title">要対応（具体）</p>

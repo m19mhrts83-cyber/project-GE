@@ -2044,6 +2044,38 @@ p.back {
   line-height: 1.55;
 }
 
+.vpoint-subh {
+  font-size: 0.95rem;
+  margin: 14px 0 6px;
+}
+
+.vpoint-rate-table-wrap {
+  margin: 8px 0 4px;
+  overflow-x: auto;
+}
+
+.vpoint-rate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.vpoint-rate-table th,
+.vpoint-rate-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vpoint-rate-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.vpoint-insights {
+  margin: 4px 0 8px;
+}
+
 @media (max-width: 800px) {
   .layout {
     flex-direction: column;
