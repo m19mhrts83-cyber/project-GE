@@ -1,6 +1,8 @@
 import TriageLanePage from "@/components/TriageLane";
 import { parseLaneView } from "@/lib/laneView";
 
+/** Cursor Cloud / Gemini 見直し・聞くの待ち時間用（vercel.json の functions 一括指定は使わない） */
+export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 export default async function GeneralPage({
