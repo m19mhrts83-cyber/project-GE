@@ -143,8 +143,18 @@ export default async function HomePage() {
   const macMorningAt = metaMap.mac_morning_refreshed_at;
   const macMorningOk = metaMap.mac_morning_refresh_ok;
 
+  /** ETC / Vポイントの月次サマリは show_banner（未確認）のあいだ必ずホーム掲載。確認後は level に従う */
   const watchNeed = (watchRows || [])
-    .filter((w) => w.level !== "ok")
+    .filter((w) => {
+      const pl =
+        w.payload && typeof w.payload === "object"
+          ? (w.payload as Record<string, unknown>)
+          : {};
+      if (w.id === "etc_mileage" || w.id === "vpoint") {
+        if (pl.show_banner === true) return true;
+      }
+      return w.level !== "ok";
+    })
     .sort(
       (a, b) =>
         watchSortKey(a.level) - watchSortKey(b.level) ||
@@ -446,10 +456,22 @@ export default async function HomePage() {
                     ? it.level
                     : "info"
                 ) as HomeLevel;
+                const pl =
+                  it.payload && typeof it.payload === "object"
+                    ? (it.payload as Record<string, unknown>)
+                    : {};
+                const href =
+                  typeof pl.href === "string" && pl.href.startsWith("/")
+                    ? pl.href
+                    : it.id === "etc_mileage"
+                      ? "/etc"
+                      : it.id === "vpoint"
+                        ? "/vpoint"
+                        : "/situation";
                 return (
                   <a
                     key={it.id}
-                    href="/situation"
+                    href={href}
                     className={`card watch-card level-${level}`}
                   >
                     <header>

@@ -371,11 +371,18 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         parts.append(note[:80])
     level = "ok"
     if show_banner:
+        # 未確認の月次サマリはホーム掲載（info 以上）。考察の要確認もこの期間だけ attention
         level = "info"
+        if (
+            grant.get("condition_grants_ok") is False
+            or grant.get("shop_up_ok") is False
+            or rc.get("ok") is False
+        ):
+            level = "attention"
     if actions:
-        level = "warn"
-    if rc.get("ok") is False or grant.get("condition_grants_ok") is False:
-        level = "attention"
+        # cadence の未対応は確認後も状況ウォッチ／ホームに残してよい
+        if level in ("ok", "info"):
+            level = "warn"
     if not parts:
         parts.append("データなし")
         level = "warn"
