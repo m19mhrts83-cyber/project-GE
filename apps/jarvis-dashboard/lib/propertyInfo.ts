@@ -9,6 +9,8 @@ export type PropertyInfo = {
   short?: string;
   match_names: string[];
   managers: string[];
+  /** 号室・メモで特定できないときの既定管理会社 */
+  default_manager?: string;
   key_number: number | null;
   rooms: Record<string, PropertyRoomInfo>;
 };
@@ -44,6 +46,7 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
         "Grandole志賀本通Ⅰ",
       ],
       managers: ["LEAF", "Tcell"],
+      default_manager: "ミニテック",
       key_number: 2842,
       rooms: {
         "102": { manager: "Tcell" },
@@ -90,7 +93,7 @@ export function getPropertyInfo(propertyId: string): PropertyInfo | null {
 }
 
 /** 号室メモや YAML から管理会社を解決。
- * 号室未設定時: 棟の管理が1社だけならそれを使い、複数社の棟はメモから推定（無ければ null）。
+ * 優先: 号室指定 → メモ推定 → default_manager → 棟が1社のみならその社。
  */
 export function resolveRoomManager(
   propertyId: string,
@@ -102,6 +105,7 @@ export function resolveRoomManager(
   if (fromYaml) return fromYaml;
   const m = (note || "").match(NOTE_MANAGER_RE);
   if (m?.[1]) return normalizeManager(m[1]);
+  if (info?.default_manager) return info.default_manager;
   if (info?.managers?.length === 1) return info.managers[0];
   return null;
 }
@@ -113,6 +117,7 @@ export function managersForProperty(
 ): string[] {
   const info = getPropertyInfo(propertyId);
   const set = new Set<string>(info?.managers || []);
+  if (info?.default_manager) set.add(info.default_manager);
   for (const r of roomNotes) {
     const m = resolveRoomManager(propertyId, r.room, r.note);
     if (m) set.add(m);
