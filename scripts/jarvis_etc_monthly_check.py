@@ -136,6 +136,27 @@ def gmail_etc_search(days: int = 45) -> list[dict]:
     return hits
 
 
+def upsert_rebate_history(state: dict, result: dict) -> None:
+    """last_result_b を rebate_history に反映（同 target_month は上書き）。ack は触らない。"""
+    target = result.get("target_month")
+    if not target:
+        return
+    entry = {
+        "target_month": target,
+        "rebate_yen": result.get("rebate_yen"),
+        "asayu_trip_count": result.get("asayu_trip_count"),
+        "asayu_rate_pct": result.get("asayu_rate_pct"),
+        "savings_yen": result.get("savings_yen"),
+        "at": result.get("at"),
+        "note": result.get("note") or "",
+    }
+    hist = [h for h in (state.get("rebate_history") or []) if isinstance(h, dict)]
+    hist = [h for h in hist if h.get("target_month") != target]
+    hist.append(entry)
+    hist.sort(key=lambda h: str(h.get("target_month") or ""), reverse=True)
+    state["rebate_history"] = hist[:24]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mark-done", action="store_true")
@@ -238,9 +259,14 @@ def main() -> int:
                 }
             )
         state[rk] = result
+        if args.window == "b":
+            upsert_rebate_history(state, result)
+            # 月次更新は ack と独立（確認しなくても履歴・最新は更新）
         save_state(state)
         report["marked"] = args.window
         report["last_result"] = result
+        if args.window == "b":
+            report["rebate_history_len"] = len(state.get("rebate_history") or [])
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

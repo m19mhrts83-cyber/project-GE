@@ -219,10 +219,61 @@ def eval_etc(meta: dict, data: dict | None) -> dict[str, Any]:
     rb = data.get("last_result_b") or {}
     rebate = rb.get("rebate_yen")
     target = rb.get("target_month") or ""
-    parts = []
-    if rebate is not None:
-        parts.append(f"{target or '前月'}分還元 {rebate:,}円" if isinstance(rebate, int) else f"還元 {rebate}")
+    trips = rb.get("asayu_trip_count")
+    rate = rb.get("asayu_rate_pct")
+    savings = rb.get("savings_yen")
+    ack = data.get("dashboard_ack_target_month")
+    has_rebate = rebate is not None and bool(target)
+    show_banner = has_rebate and ack != target
+
+    approx_days = None
+    if isinstance(trips, int) and trips > 0:
+        approx_days = (trips + 1) // 2
+
+    rebate_summary = {
+        "target_month": target or None,
+        "rebate_yen": rebate,
+        "asayu_trip_count": trips,
+        "asayu_rate_pct": rate,
+        "savings_yen": savings if savings is not None else rebate,
+        "approx_days": approx_days,
+        "at": rb.get("at"),
+        "note": rb.get("note") or "",
+        "grant_rule": "利用月の翌月20日にETCマイレージへ還元額付与",
+    }
+    history = []
+    for h in data.get("rebate_history") or []:
+        if not isinstance(h, dict):
+            continue
+        history.append(
+            {
+                "target_month": h.get("target_month"),
+                "rebate_yen": h.get("rebate_yen"),
+                "asayu_trip_count": h.get("asayu_trip_count"),
+                "asayu_rate_pct": h.get("asayu_rate_pct"),
+                "savings_yen": h.get("savings_yen"),
+                "at": h.get("at"),
+                "note": h.get("note") or "",
+            }
+        )
+
+    parts: list[str] = []
+    if has_rebate and show_banner:
+        part = f"{target}分 還元 {rebate:,}円" if isinstance(rebate, int) else f"{target}分 還元 {rebate}"
+        if isinstance(trips, int):
+            part += f" · 対象 {trips}回"
+            if isinstance(rate, int):
+                part += f"（約{rate}%）"
+            if approx_days is not None:
+                part += f" · 目安{approx_days}日分"
+        else:
+            part += " · 対象回数未取得"
+        parts.append(part)
+    elif has_rebate and not show_banner:
+        parts.append(f"{target}分 確認済 · 次は翌月20日後")
     level = "ok"
+    if show_banner and has_rebate:
+        level = "info"
     if 1 <= day <= 8 and a != ym:
         level = "warn"
         parts.append(f"ウィンドウA未実施（{ym}）")
@@ -231,15 +282,28 @@ def eval_etc(meta: dict, data: dict | None) -> dict[str, Any]:
         parts.append(f"ウィンドウB未実施（{ym}）")
     if not parts:
         parts.append(f"B最終 {b or '—'} / A最終 {a or '—'}")
+
+    detail_bits = [str(rb.get("note") or "").strip()]
+    if show_banner:
+        detail_bits.insert(0, "ダッシュボード /etc で還元サマリを確認できます。")
+    detail = "\n".join(x for x in detail_bits if x)[:500]
+
     return card(
         item_id=meta["id"],
         title=title,
         category=meta.get("category") or "",
         level=level,
         summary=" · ".join(parts),
-        detail=str(rb.get("note") or "")[:400],
+        detail=detail,
         cursor_prompt=prompt,
         source=src,
+        payload={
+            "rebate_summary": rebate_summary,
+            "rebate_history": history[:12],
+            "dashboard_ack_target_month": ack,
+            "show_banner": show_banner,
+            "href": "/etc",
+        },
     )
 
 

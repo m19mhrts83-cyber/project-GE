@@ -20,5 +20,7 @@
     "gmail_hits": null,
     "note": ""
   },
+  "dashboard_ack_target_month": null,
+  "rebate_history": [],
   "zero_asayu_streak_months": 0
 }

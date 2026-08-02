@@ -1,0 +1,88 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+
+const WATCH_ID = "etc_mileage";
+
+export type EtcAckResult = { ok: boolean; error?: string };
+
+/** 還元サマリを確認済みにしてバナーを消す（当該 target_month のみ） */
+export async function acknowledgeEtcRebate(
+  targetMonth: string,
+): Promise<EtcAckResult> {
+  const ym = (targetMonth || "").trim();
+  if (!/^\d{4}-\d{2}$/.test(ym)) {
+    return { ok: false, error: "対象月が不正です" };
+  }
+
+  const supabase = await createClient();
+  const { data: row, error: fetchErr } = await supabase
+    .from("watch_status")
+    .select("id,payload,summary,detail,level")
+    .eq("id", WATCH_ID)
+    .maybeSingle();
+
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+
+  const prev =
+    row?.payload && typeof row.payload === "object"
+      ? ({ ...(row.payload as Record<string, unknown>) } as Record<
+          string,
+          unknown
+        >)
+      : {};
+
+  const rs =
+    prev.rebate_summary && typeof prev.rebate_summary === "object"
+      ? ({ ...(prev.rebate_summary as Record<string, unknown>) } as Record<
+          string,
+          unknown
+        >)
+      : {};
+
+  const payload = {
+    ...prev,
+    dashboard_ack_target_month: ym,
+    show_banner: false,
+    rebate_summary: rs,
+  };
+
+  const summary = `${ym}分 確認済 · 次は翌月20日後`;
+  const now = new Date().toISOString();
+
+  if (!row) {
+    const { error } = await supabase.from("watch_status").upsert(
+      {
+        id: WATCH_ID,
+        title: "ETC月次（明細・還元）",
+        category: "生活インフラ",
+        level: "ok",
+        summary,
+        detail: "ダッシュボードで確認済み",
+        status: "active",
+        payload,
+        checked_at: now,
+        updated_at: now,
+      },
+      { onConflict: "id" },
+    );
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { error } = await supabase
+      .from("watch_status")
+      .update({
+        payload,
+        summary,
+        level: "ok",
+        updated_at: now,
+      })
+      .eq("id", WATCH_ID);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/etc");
+  revalidatePath("/situation");
+  revalidatePath("/");
+  return { ok: true };
+}
