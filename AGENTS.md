@@ -33,10 +33,11 @@
 ### apps/jarvis-dashboard（自分用ダッシュボード）
 
 - 起動には `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY`（新形式 `sb_publishable_…`）が必要（`middleware.ts` が全リクエストで `supabase.auth.getUser()` を呼ぶ）。値が空だと `createServerClient` が throw します。
-- クラウド Secrets には `JARVIS_SUPABASE_URL`（＝このプロジェクトの URL）と `JARVIS_SUPABASE_SERVICE_ROLE_KEY` はありますが、**ブラウザ用の publishable anon key と ログインアカウントは未注入**です。service_role キーを `NEXT_PUBLIC_` に載せてはいけません（`jarvis-supabase-free-one-project.mdc` 参照）。
-- 起動だけなら URL を渡し anon はプレースホルダでも `/login` はレンダリングされます（`GET /` は 307 で `/login` にリダイレクト）:
-  `NEXT_PUBLIC_SUPABASE_URL="$JARVIS_SUPABASE_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="placeholder" NEXT_PUBLIC_SITE_URL="http://localhost:3001" npm run dev`
-- 実ログインまで通すには Secrets に publishable anon key とログイン用アカウント（メール/パスワード）を追加してください。
+- クラウド Secrets に次が注入済み: `JARVIS_SUPABASE_URL`（このプロジェクトの URL）、`JARVIS_SUPABASE_SERVICE_ROLE_KEY`（サーバー専用）、`NEXT_PUBLIC_SUPABASE_ANON_KEY`（publishable `sb_publishable_…`）。**service_role キーを `NEXT_PUBLIC_` に載せない**こと（`jarvis-supabase-free-one-project.mdc` 参照）。
+- dev 起動（注入済み env を利用。`NEXT_PUBLIC_SUPABASE_ANON_KEY` はそのまま、URL は `JARVIS_SUPABASE_URL` を割当）:
+  `NEXT_PUBLIC_SUPABASE_URL="$JARVIS_SUPABASE_URL" NEXT_PUBLIC_SITE_URL="http://localhost:3001" npm run dev`
+  → `GET /` は 307 で `/login` にリダイレクト、ログイン後は `/` に認証済みダッシュボードが表示されます。
+- ログイン検証（Secrets にアカウントが無い場合）: service_role で使い捨てユーザーを作り、検証後に削除する。作成は `POST $JARVIS_SUPABASE_URL/auth/v1/admin/users`（`{"email":…,"password":…,"email_confirm":true}`、apikey/Authorization=service_role）、ログイン確認は `POST /auth/v1/token?grant_type=password`（apikey=anon）、削除は `DELETE /auth/v1/admin/users/{id}`。自分用DBへの書き込みなので検証後は必ず削除する。
 - `.env.local` は `.gitignore` 済み（ルート `.env.*`）。秘密はコミットしないこと。
 
 ### ルート静的サイト（不動産賃貸管理会社検索）
