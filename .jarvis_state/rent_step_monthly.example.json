@@ -1,0 +1,17 @@
+{
+  "disabled": false,
+  "last_check": null,
+  "last_result": {
+    "at": null,
+    "ok": null,
+    "target_month": null,
+    "summary": null,
+    "units": [],
+    "zaim_hint": null,
+    "note": ""
+  },
+  "dashboard_ack_target_month": null,
+  "change_history": [],
+  "prev_rent_snapshot": {},
+  "notes": "Grandole 入居1年で家賃+4,000。月次で帳簿家賃と入居日起算を突合。ダッシュボード /rent-step。"
+}

@@ -313,6 +313,38 @@ def push_watch(sb) -> int:
             except Exception as e:
                 print(f"# vpoint ack sync skipped: {e}", file=sys.stderr)
 
+        # Grandole 家賃ステップ: ack を保持
+        if iid == "rent_step":
+            remote_ack = remote_pl.get("dashboard_ack_target_month")
+            local_ack = payload.get("dashboard_ack_target_month")
+            ack = remote_ack or local_ack
+            if ack:
+                payload["dashboard_ack_target_month"] = ack
+            rs = (
+                payload.get("rent_summary")
+                if isinstance(payload.get("rent_summary"), dict)
+                else {}
+            )
+            target = payload.get("target_month") or rs.get("target_month")
+            actionable = bool(
+                rs.get("actionable")
+                or int(rs.get("overdue_count") or 0) > 0
+                or int(rs.get("changed_count") or 0) > 0
+            )
+            payload["show_banner"] = bool(target and actionable and ack != target)
+            try:
+                rs_path = STATE / "rent_step_monthly.json"
+                if rs_path.is_file() and ack:
+                    rst = json.loads(rs_path.read_text(encoding="utf-8"))
+                    if rst.get("dashboard_ack_target_month") != ack:
+                        rst["dashboard_ack_target_month"] = ack
+                        rs_path.write_text(
+                            json.dumps(rst, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
+            except Exception as e:
+                print(f"# rent_step ack sync skipped: {e}", file=sys.stderr)
+
         st = it.get("status") or "active"
         arch_at = it.get("archived_at")
         if never_archive:

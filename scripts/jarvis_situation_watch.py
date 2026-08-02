@@ -441,6 +441,125 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
     )
 
 
+def eval_rent_step(meta: dict) -> dict[str, Any]:
+    """Grandole 入居1年 +4,000 の月次確認（ETC/Vポイント同型バナー）。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    # 当月未実行なら自動ビルド
+    st0 = load_json(STATE / "rent_step_monthly.json") or {}
+    if not st0.get("disabled"):
+        ym_now = datetime.now(JST).strftime("%Y-%m")
+        if st0.get("last_check") != ym_now:
+            script = REPO / "scripts" / "jarvis_rent_step_monthly_check.py"
+            py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+            exe = str(py) if py.is_file() else sys.executable
+            try:
+                import subprocess
+
+                subprocess.run(
+                    [exe, str(script), "--build-only"],
+                    cwd=str(REPO),
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    check=False,
+                )
+            except Exception as e:
+                print(f"# rent_step auto-build skipped: {e}", file=sys.stderr)
+
+    mon = load_json(STATE / "rent_step_monthly.json") or {}
+    if mon.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    lr = mon.get("last_result") or {}
+    summary = lr.get("summary") if isinstance(lr.get("summary"), dict) else {}
+    target = str(lr.get("target_month") or "")
+    ack = mon.get("dashboard_ack_target_month")
+    actionable = bool(summary.get("actionable"))
+    has = bool(target) and (
+        actionable
+        or int(summary.get("overdue_count") or 0) > 0
+        or int(summary.get("changed_count") or 0) > 0
+    )
+    show_banner = has and ack != target
+
+    parts: list[str] = []
+    if show_banner:
+        parts.append(
+            f"{target} · 未反映{summary.get('overdue_count', 0)}"
+            f" · 変動{summary.get('changed_count', 0)}"
+            f" · まもなく{summary.get('upcoming_count', 0)}"
+        )
+        for row in (summary.get("changed") or [])[:3]:
+            parts.append(f"変動 {row.get('label')}")
+        for row in (summary.get("overdue") or [])[:2]:
+            parts.append(f"未反映 {row.get('label')}")
+    elif has and not show_banner:
+        parts.append(f"{target}分 確認済 · 次は翌月更新後")
+    else:
+        parts.append(
+            f"OK {summary.get('ok_count', 0)} · 不明 {summary.get('unknown_count', 0)}"
+            if summary
+            else "データなし"
+        )
+
+    level = "ok"
+    if show_banner:
+        level = "info"
+        if int(summary.get("overdue_count") or 0) > 0 or int(
+            summary.get("changed_count") or 0
+        ) > 0:
+            level = "attention"
+        elif int(summary.get("upcoming_count") or 0) > 0:
+            level = "warn"
+    if not parts:
+        parts.append("データなし")
+        level = "warn"
+
+    detail_lines: list[str] = []
+    if show_banner:
+        detail_lines.append("ダッシュボード /rent-step で号室別の期待家賃と変動を確認できます。")
+        for row in (summary.get("overdue") or [])[:5]:
+            detail_lines.append(f"· 未反映 {row.get('label')}: {row.get('reason')}")
+        for row in (summary.get("changed") or [])[:5]:
+            detail_lines.append(f"· 変動 {row.get('label')}: {row.get('reason')}")
+        for row in (summary.get("upcoming") or [])[:5]:
+            detail_lines.append(f"· まもなく {row.get('label')}: {row.get('reason')}")
+
+    hist = [h for h in (mon.get("change_history") or []) if isinstance(h, dict)][:20]
+    payload = {
+        "rent_summary": summary,
+        "units": lr.get("units") or [],
+        "change_history": hist,
+        "dashboard_ack_target_month": ack,
+        "show_banner": show_banner,
+        "href": "/rent-step",
+        "target_month": target,
+        "zaim_hint": lr.get("zaim_hint"),
+        "grant_rule": lr.get("grant_rule"),
+        "delta_yen": lr.get("delta_yen") or 4000,
+    }
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=" · ".join(parts),
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload=payload,
+    )
+
+
 def eval_line_export(meta: dict, data: dict | None) -> dict[str, Any]:
     title = meta["title"]
     prompt = meta.get("cursor_prompt") or ""
@@ -977,6 +1096,7 @@ def refresh_zaim_quality() -> None:
 EVALUATORS = {
     "etc_mileage": lambda m: eval_etc(m, load_json(STATE / "etc_monthly.json")),
     "vpoint": lambda m: eval_vpoint(m),
+    "rent_step": lambda m: eval_rent_step(m),
     "line_export": lambda m: eval_line_export(m, load_json(STATE / "line_export_reminder.json")),
     "energy_cf": lambda m: eval_energy_cf(m, load_json(STATE / "energy_cf.json")),
     "westudy_weekly": lambda m: eval_westudy(m, load_json(STATE / "westudy_weekly_watch.json")),

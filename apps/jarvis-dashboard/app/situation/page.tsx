@@ -131,6 +131,11 @@ export default async function SituationPage() {
                   <Link href="/vpoint">Vポイントページ（付与サマリ・考察）→</Link>
                 </p>
               ) : null}
+              {it.id === "rent_step" ? (
+                <p className="meta">
+                  <Link href="/rent-step">家賃ステップ（+4,000・変動）→</Link>
+                </p>
+              ) : null}
               {actions.length > 0 ? (
                 <div className="watch-actions">
                   <p className="watch-actions-title">要対応（具体）</p>
