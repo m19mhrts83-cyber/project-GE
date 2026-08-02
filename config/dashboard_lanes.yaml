@@ -5,9 +5,14 @@ partner_base: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん�
 obsidian_journal: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1/01_Journaling/★Journal"
 kodate_actions: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/10_【購入】物件購入,融資/戸建てアクション.md"
 
+# 自動カード上限（0＝機械生成しない。要約確認は jarvis_lane_digest.py）
+default_max_auto_cards: 0
+
 lanes:
   - id: kamiooya
     title: 神大家運営
+    max_auto_cards: 0
+    digest_themes: 5
     sources:
       - path: "{partner_base}/806_神大家AI推進/5.やり取り.md"
         take: 12
@@ -17,6 +22,8 @@ lanes:
 
   - id: properties
     title: 3棟・物件
+    max_auto_cards: 0
+    digest_themes: 5
     sources:
       - path: "{partner_base}/102_ミニテック/5.やり取り.md"
         take: 6
@@ -36,6 +43,8 @@ lanes:
 
   - id: kodate
     title: 戸建て
+    max_auto_cards: 0
+    digest_themes: 5
     sources:
       - path: "{kodate_actions}"
         take: 30
@@ -43,6 +52,8 @@ lanes:
 
   - id: ai_raimo
     title: AI・Raimo
+    max_auto_cards: 0
+    digest_themes: 5
     sources:
       - path: "{partner_base}/907_Raimo代理店/5.やり取り.md"
         take: 10
@@ -52,7 +63,8 @@ lanes:
         kind: journal_recent
         tag: Journal
 
-  # 処置候補の自動要約は当面なし。Notion「家族タスク」への昇格はダッシュボードから手動可。
   - id: kazoku
     title: 家族
+    max_auto_cards: 0
+    digest_themes: 3
     sources: []

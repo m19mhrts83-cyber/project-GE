@@ -85,7 +85,7 @@ export default function CardTriageActions({
             disabled={pending}
             onClick={() => run("skip")}
           >
-            スキップ
+            {card.kind === "digest" ? "見送り" : "スキップ"}
           </button>
           <button
             type="button"
@@ -94,7 +94,7 @@ export default function CardTriageActions({
             onClick={() => run("promote")}
             style={{ fontWeight: 700 }}
           >
-            処置として進める
+            {card.kind === "digest" ? "タスク化する" : "処置として進める"}
           </button>
         </div>
       ) : null}

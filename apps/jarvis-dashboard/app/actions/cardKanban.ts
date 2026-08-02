@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createNotionTask } from "@/lib/notionTasks";
+import { queueLaneActionLog } from "@/lib/laneActionLog";
 
 export type CardActionResult = {
   ok: boolean;
@@ -16,6 +17,11 @@ export async function skipCard(
   path: string,
 ): Promise<CardActionResult> {
   const supabase = await createClient();
+  const { data: card } = await supabase
+    .from("cards")
+    .select("id,lane,title")
+    .eq("id", cardId)
+    .maybeSingle();
   const { error } = await supabase
     .from("cards")
     .update({
@@ -25,6 +31,14 @@ export async function skipCard(
     })
     .eq("id", cardId);
   if (error) return { ok: false, error: error.message };
+  if (card?.lane) {
+    await queueLaneActionLog({
+      lane: card.lane,
+      event: "見送り",
+      body: `- ${card.title || cardId}`,
+      cardId,
+    });
+  }
   revalidatePath(path);
   return { ok: true, message: "スキップしました" };
 }
@@ -70,6 +84,13 @@ export async function promoteCardToNotion(
     .eq("id", cardId);
   if (uErr) return { ok: false, error: uErr.message };
 
+  await queueLaneActionLog({
+    lane,
+    event: "タスク登録",
+    body: `- ${card.title}\n- Notion: ${created.url}`,
+    cardId,
+  });
+
   revalidatePath(path);
   return {
     ok: true,
@@ -86,12 +107,25 @@ export async function postCardComment(
   const text = body.trim();
   if (!text) return { ok: false, error: "コメントを入力してください" };
   const supabase = await createClient();
+  const { data: card } = await supabase
+    .from("cards")
+    .select("lane,title")
+    .eq("id", cardId)
+    .maybeSingle();
   const { error } = await supabase.from("card_comments").insert({
     card_id: cardId,
     role: "user",
     body: text,
   });
   if (error) return { ok: false, error: error.message };
+  if (card?.lane) {
+    await queueLaneActionLog({
+      lane: card.lane,
+      event: "コメント",
+      body: `- ${card.title || cardId}\n- ${text.slice(0, 500)}`,
+      cardId,
+    });
+  }
   revalidatePath(path);
   return { ok: true, message: "コメントを保存しました" };
 }
@@ -142,7 +176,9 @@ export async function askJarvisOnCard(
       );
       if (res.ok) {
         const j = (await res.json()) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+          candidates?: Array<{
+            content?: { parts?: Array<{ text?: string }> };
+          }>;
         };
         const t = j.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (t) reply = t.slice(0, 1200);
@@ -158,6 +194,16 @@ export async function askJarvisOnCard(
     body: reply,
   });
   if (jErr) return { ok: false, error: jErr.message };
+
+  if (card?.lane) {
+    await queueLaneActionLog({
+      lane: card.lane,
+      event: "Jarvis相談",
+      body: `- ${card.title || cardId}\n- Q: ${text.slice(0, 300)}\n- A: ${reply.slice(0, 500)}`,
+      cardId,
+    });
+  }
+
   revalidatePath(path);
   return { ok: true, message: "Jarvis が返信しました" };
 }

@@ -119,7 +119,14 @@ def parse_journal_dir(path: Path, take: int) -> list[dict[str, str]]:
     return out
 
 
-def collect() -> dict[str, Any]:
+def collect(max_per_lane: int | None = None) -> dict[str, Any]:
+    """Collect candidate cards from sources.
+
+    max_per_lane:
+      None → YAML lane.max_auto_cards（未設定時 0＝自動カードなし）
+      0 → ソースからの自動カードを作らない（digest 専用運用）
+      N → レーンあたり最大 N 件
+    """
     reg = yaml.safe_load(YAML_PATH.read_text(encoding="utf-8")) or {}
     ctx = {
         "partner_base": str(
@@ -144,6 +151,18 @@ def collect() -> dict[str, Any]:
     cards: list[dict[str, Any]] = []
     for lane in reg.get("lanes") or []:
         lane_id = lane.get("id") or "misc"
+        if max_per_lane is None:
+            lim = int(
+                lane.get(
+                    "max_auto_cards",
+                    reg.get("default_max_auto_cards", 0),
+                )
+            )
+        else:
+            lim = int(max_per_lane)
+        if lim <= 0:
+            continue
+        lane_cards: list[dict[str, Any]] = []
         for src in lane.get("sources") or []:
             path = expand(str(src.get("path") or ""), ctx)
             take = int(src.get("take") or 8)
@@ -164,7 +183,7 @@ def collect() -> dict[str, Any]:
                     f"- {title}\n- 出典: {path}\n"
                     f"要約: {it.get('summary') or ''}"
                 )
-                cards.append(
+                lane_cards.append(
                     {
                         "id": card_id(lane_id, str(path), title),
                         "lane": lane_id,
@@ -179,6 +198,7 @@ def collect() -> dict[str, Any]:
                         "updated_at": now_iso(),
                     }
                 )
+        cards.extend(lane_cards[-lim:])
     # upsert 同一バッチ内の id 重複を除去（後勝ち）
     dedup: dict[str, dict[str, Any]] = {}
     for c in cards:
@@ -257,9 +277,15 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--push", action="store_true")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument(
+        "--max-per-lane",
+        type=int,
+        default=None,
+        help="レーンあたり自動カード上限（省略時は YAML max_auto_cards、既定0）",
+    )
     args = ap.parse_args(argv)
 
-    result = collect()
+    result = collect(max_per_lane=args.max_per_lane)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"# wrote {OUT_PATH} total={result['counts']['total']}", file=sys.stderr)
