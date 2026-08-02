@@ -1,4 +1,4 @@
-/** Home / properties 用の満室・物件ヘルパ */
+/** Home / properties 用の入居率・物件ヘルパ */
 
 export type PropertyUnit = {
   id: string;
