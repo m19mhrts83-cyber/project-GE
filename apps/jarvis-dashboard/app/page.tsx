@@ -9,17 +9,23 @@ import {
 } from "@/lib/homeLevels";
 import {
   fmtYen,
+  groupUnitsByProperty,
   parseOccupancySummary,
   previousYmJst,
   summarizeUnits,
   type PropertyUnit,
 } from "@/lib/occupancy";
 import { buildCashflowInsight } from "@/lib/cashflowInsight";
+import { fetchPropertyKeyNumbers } from "@/lib/notionPropertyKeys";
 import { parseOpenchatDigest } from "@/lib/openchatDigest";
 import {
   fallbackOtherMailDigest,
   parseOtherMailDigest,
 } from "@/lib/otherMailDigest";
+import {
+  fmtKeyNumber,
+  managersForProperty,
+} from "@/lib/propertyInfo";
 import { createClient } from "@/lib/supabase/server";
 import { formatJstMmDdHm } from "@/lib/formatJst";
 
@@ -126,6 +132,8 @@ export default async function HomePage() {
     fromUnits.total > 0
       ? fromUnits
       : parseOccupancySummary(metaMap.occupancy_summary) || fromUnits;
+  const unitGroups = groupUnitsByProperty(units);
+  const propertyKeys = await fetchPropertyKeyNumbers();
 
   const fmtSync = (v: string | undefined) => formatJstMmDdHm(v, "—");
   const cloudAt =
@@ -168,7 +176,7 @@ export default async function HomePage() {
     <Shell active="/">
       <h1>ホーム</h1>
       <p className="sub">
-        パートナー → モチベーション／満室 → 状況ウォッチ → その他メール → 神大家オプチャまとめの順。
+        パートナー → モチベーション／満室 → 状況ウォッチ → 神大家オプチャまとめ → その他メールの順。
       </p>
 
       <p className="home-sync" aria-label="最終同期">
@@ -356,6 +364,43 @@ export default async function HomePage() {
             所有物件へ →
           </a>
         </p>
+        {unitGroups.length > 0 ? (
+          <div className="home-rent-summary" aria-label="物件別賃料・管理会社">
+            <p className="home-rent-summary-title">賃料まとめ（管理会社・空室時鍵番号）</p>
+            <ul className="home-rent-summary-list">
+              {unitGroups.map((g) => {
+                const mgrs = managersForProperty(
+                  g.property_id,
+                  g.units.map((u) => ({ room: u.room, note: u.note })),
+                );
+                const key = propertyKeys.keys[g.property_id];
+                return (
+                  <li key={g.property_id}>
+                    <strong>{g.property_name}</strong>
+                    {" · 賃料合計 "}
+                    <strong>{fmtYen(g.total_rent_sum || null)}</strong>
+                    {" （家賃 "}
+                    {fmtYen(g.rent_sum || null)}
+                    {" ＋ 管理費 "}
+                    {fmtYen(g.mgmt_sum || null)}
+                    {"）"}
+                    <span className="meta">
+                      {" · 管理 "}
+                      {mgrs.length ? mgrs.join(" / ") : "—"}
+                      {" · 鍵番号 "}
+                      {fmtKeyNumber(key)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {propertyKeys.source === "yaml_cache" && propertyKeys.reason ? (
+              <p className="meta home-rent-summary-hint">
+                鍵番号はキャッシュ表示（{propertyKeys.reason}）
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <p className="home-metrics-more">
           <a href="/metrics" className="home-more">
             収支・数値の詳細 →
@@ -421,7 +466,64 @@ export default async function HomePage() {
         </section>
       </div>
 
-      {/* 3. その他メール */}
+      {/* 4. 神大家オプチャまとめ（状況ウォッチの直下） */}
+      <div className="home-band home-band-openchat">
+        <div className="home-band-head">
+          <h2 className="home-band-title">神大家オプチャまとめ</h2>
+          <p className="home-band-sub">大家業に役立ちそうな直近情報（返信提案なし）</p>
+        </div>
+        {(() => {
+          const oc = parseOpenchatDigest(metaMap.openchat_digest);
+          const groups = oc?.groups || [];
+          return (
+            <>
+              {oc?.overview ? (
+                <p className="openchat-digest-overview">{oc.overview}</p>
+              ) : null}
+              {groups.length === 0 ? (
+                <p className="empty">
+                  直近の有益情報はありません。{" "}
+                  <a href="/openchat" className="home-more">
+                    オプチャ一覧 →
+                  </a>
+                </p>
+              ) : (
+                <div className="watch-grid">
+                  {groups.map((g) => (
+                    <a
+                      key={g.slug || g.name}
+                      href={`/openchat/${g.slug || encodeURIComponent(g.name.replace(/\s+/g, "_"))}`}
+                      className="card watch-card home-openchat-card"
+                    >
+                      <header>
+                        <span className="lvl">有益</span>
+                        <strong>{g.name}</strong>
+                        {g.updated_at ? (
+                          <span className="meta">{g.updated_at}</span>
+                        ) : null}
+                      </header>
+                      <ul className="openchat-group-lines">
+                        {(g.lines || []).slice(0, 3).map((ln, i) => (
+                          <li key={i}>{ln}</li>
+                        ))}
+                      </ul>
+                    </a>
+                  ))}
+                </div>
+              )}
+              {groups.length > 0 ? (
+                <p className="home-metrics-more">
+                  <a href="/openchat" className="home-more">
+                    オプチャ一覧 →
+                  </a>
+                </p>
+              ) : null}
+            </>
+          );
+        })()}
+      </div>
+
+      {/* 5. その他メール */}
       <div className="home-band home-band-other">
         <div className="home-band-head">
           <h2 className="home-band-title">その他メール</h2>
@@ -537,63 +639,6 @@ export default async function HomePage() {
             <a href="/openchat">オプチャ</a>
           </p>
         </section>
-      </div>
-
-      {/* 5. 神大家オプチャまとめ */}
-      <div className="home-band home-band-openchat">
-        <div className="home-band-head">
-          <h2 className="home-band-title">神大家オプチャまとめ</h2>
-          <p className="home-band-sub">大家業に役立ちそうな直近情報（返信提案なし）</p>
-        </div>
-        {(() => {
-          const oc = parseOpenchatDigest(metaMap.openchat_digest);
-          const groups = oc?.groups || [];
-          return (
-            <>
-              {oc?.overview ? (
-                <p className="openchat-digest-overview">{oc.overview}</p>
-              ) : null}
-              {groups.length === 0 ? (
-                <p className="empty">
-                  直近の有益情報はありません。{" "}
-                  <a href="/openchat" className="home-more">
-                    オプチャ一覧 →
-                  </a>
-                </p>
-              ) : (
-                <div className="watch-grid">
-                  {groups.map((g) => (
-                    <a
-                      key={g.slug || g.name}
-                      href={`/openchat/${g.slug || encodeURIComponent(g.name.replace(/\s+/g, "_"))}`}
-                      className="card watch-card home-openchat-card"
-                    >
-                      <header>
-                        <span className="lvl">有益</span>
-                        <strong>{g.name}</strong>
-                        {g.updated_at ? (
-                          <span className="meta">{g.updated_at}</span>
-                        ) : null}
-                      </header>
-                      <ul className="openchat-group-lines">
-                        {(g.lines || []).slice(0, 3).map((ln, i) => (
-                          <li key={i}>{ln}</li>
-                        ))}
-                      </ul>
-                    </a>
-                  ))}
-                </div>
-              )}
-              {groups.length > 0 ? (
-                <p className="home-metrics-more">
-                  <a href="/openchat" className="home-more">
-                    オプチャ一覧 →
-                  </a>
-                </p>
-              ) : null}
-            </>
-          );
-        })()}
       </div>
 
       <details className="home-meta">
