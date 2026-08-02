@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   askJarvisOnCard,
   postCardComment,
@@ -32,6 +32,21 @@ function fmtAt(v: string) {
   return String(v).slice(0, 16);
 }
 
+function defaultPromoteTitle(card: CardRow): string {
+  return card.title.replace(/^\[確認\]\s*/, "").trim() || card.title;
+}
+
+function defaultPromoteSummary(card: CardRow): string {
+  const payload = card.payload || {};
+  if (typeof payload.question === "string" && payload.question.trim()) {
+    const bullets = Array.isArray(payload.bullets)
+      ? (payload.bullets as unknown[]).map((b) => String(b)).join("\n")
+      : "";
+    return [payload.question.trim(), bullets].filter(Boolean).join("\n").slice(0, 1800);
+  }
+  return (card.summary || "").slice(0, 1800);
+}
+
 export default function CardTriageActions({
   card,
   lane,
@@ -44,14 +59,36 @@ export default function CardTriageActions({
   comments: CardCommentRow[];
 }) {
   const router = useRouter();
+  const isDigest = card.kind === "digest";
   const [text, setText] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [promoTitle, setPromoTitle] = useState(() => defaultPromoteTitle(card));
+  const [promoSummary, setPromoSummary] = useState(() =>
+    defaultPromoteSummary(card),
+  );
+
   const notionUrl =
     typeof card.payload?.notion_url === "string"
       ? card.payload.notion_url
       : null;
+
+  const explain = useMemo(() => {
+    if (isDigest) {
+      return "流れ: コメントで方針を相談 → 納得したら「タスク化する」で内容確認 → Notion 看板に1件登録。押した瞬間に作られることはありません。";
+    }
+    return "「処置として進める」は Notion にタスクを1件作ります。先に内容確認画面が出ます。";
+  }, [isDigest]);
+
+  function openConfirm() {
+    setErr(null);
+    setMsg(null);
+    setPromoTitle(defaultPromoteTitle(card));
+    setPromoSummary(defaultPromoteSummary(card));
+    setConfirmOpen(true);
+  }
 
   function run(
     kind: "skip" | "promote" | "post" | "ask",
@@ -61,9 +98,12 @@ export default function CardTriageActions({
     start(async () => {
       let r;
       if (kind === "skip") r = await skipCard(card.id, path);
-      else if (kind === "promote")
-        r = await promoteCardToNotion(card.id, lane, path);
-      else if (kind === "ask") r = await askJarvisOnCard(card.id, text, path);
+      else if (kind === "promote") {
+        r = await promoteCardToNotion(card.id, lane, path, {
+          title: promoTitle.trim() || defaultPromoteTitle(card),
+          summary: promoSummary.trim(),
+        });
+      } else if (kind === "ask") r = await askJarvisOnCard(card.id, text, path);
       else r = await postCardComment(card.id, text, path);
       if (!r.ok) {
         setErr(r.error || "失敗しました");
@@ -71,12 +111,14 @@ export default function CardTriageActions({
       }
       setMsg(r.message || "完了");
       if (kind === "post" || kind === "ask") setText("");
+      if (kind === "promote") setConfirmOpen(false);
       router.refresh();
     });
   }
 
   return (
-    <div className={`card-triage${card.kind === "digest" ? " is-digest" : ""}`}>
+    <div className={`card-triage${isDigest ? " is-digest" : ""}`}>
+      <p className="meta digest-flow-hint">{explain}</p>
       {card.status === "active" ? (
         <div className="card-triage-btns digest-actions">
           <button
@@ -85,18 +127,66 @@ export default function CardTriageActions({
             disabled={pending}
             onClick={() => run("skip")}
           >
-            {card.kind === "digest" ? "見送り" : "スキップ"}
+            {isDigest ? "見送り" : "スキップ"}
           </button>
           <button
             type="button"
             className="btn primary"
             disabled={pending}
-            onClick={() => run("promote")}
+            onClick={openConfirm}
           >
-            {card.kind === "digest" ? "タスク化する" : "処置として進める"}
+            {isDigest ? "タスク化する…" : "処置として進める…"}
           </button>
         </div>
       ) : null}
+
+      {confirmOpen && card.status === "active" ? (
+        <div className="promote-confirm">
+          <p className="promote-confirm-title">
+            Notion に登録する内容（まだ作成していません）
+          </p>
+          <p className="meta" style={{ margin: "0 0 8px" }}>
+            レーン「{lane}」の看板に<strong>未着手</strong>で1件追加します。タイトルは編集できます。
+          </p>
+          <label className="promote-label">
+            タスク名
+            <input
+              type="text"
+              value={promoTitle}
+              onChange={(e) => setPromoTitle(e.target.value)}
+              disabled={pending}
+            />
+          </label>
+          <label className="promote-label">
+            本文（Notion の説明）
+            <textarea
+              value={promoSummary}
+              onChange={(e) => setPromoSummary(e.target.value)}
+              rows={5}
+              disabled={pending}
+            />
+          </label>
+          <div className="card-triage-btns" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn"
+              disabled={pending}
+              onClick={() => setConfirmOpen(false)}
+            >
+              やめる
+            </button>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={pending || !promoTitle.trim()}
+              onClick={() => run("promote")}
+            >
+              この内容で Notion に登録
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {notionUrl ? (
         <p className="meta">
           Notion:{" "}
@@ -106,10 +196,14 @@ export default function CardTriageActions({
         </p>
       ) : null}
       <div className="watch-comments">
-        <p className="watch-comments-title">コメント（Jarvisに聞ける）</p>
+        <p className="watch-comments-title">
+          {isDigest ? "相談（過去のやり取りを踏まえて Jarvis が返答）" : "コメント（Jarvisに聞ける）"}
+        </p>
         {comments.length === 0 ? (
           <p className="meta" style={{ margin: "0 0 8px" }}>
-            方針や期限の相談ができます。
+            {isDigest
+              ? "「何をタスクにするか」をここで相談できます。先にやり取りしてからタスク化してください。"
+              : "方針や期限の相談ができます。"}
           </p>
         ) : (
           <ul className="watch-comment-list">
@@ -131,26 +225,54 @@ export default function CardTriageActions({
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={2}
-          placeholder="コメント or Jarvisへの質問"
+          placeholder={
+            isDigest
+              ? "例: これは見送りで、〇〇だけタスクにしたい"
+              : "コメント or Jarvisへの質問"
+          }
           style={{ width: "100%", marginTop: 8 }}
         />
         <div className="card-triage-btns" style={{ marginTop: 6 }}>
-          <button
-            type="button"
-            className="btn"
-            disabled={pending}
-            onClick={() => run("post")}
-          >
-            コメント
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={pending}
-            onClick={() => run("ask")}
-          >
-            Jarvisに聞く
-          </button>
+          {isDigest ? (
+            <button
+              type="button"
+              className="btn primary"
+              disabled={pending || !text.trim()}
+              onClick={() => run("ask")}
+            >
+              送って Jarvis に聞く
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn"
+                disabled={pending}
+                onClick={() => run("post")}
+              >
+                コメント
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={pending}
+                onClick={() => run("ask")}
+              >
+                Jarvisに聞く
+              </button>
+            </>
+          )}
+          {isDigest ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={pending || !text.trim()}
+              onClick={() => run("post")}
+              title="Jarvis 返答なしでメモだけ残す"
+            >
+              メモのみ
+            </button>
+          ) : null}
         </div>
       </div>
       {err ? <p className="err">{err}</p> : null}
