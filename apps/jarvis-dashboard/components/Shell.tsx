@@ -38,6 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/zaim", label: "Zaim Watch" },
       { href: "/etc", label: "ETC" },
+      { href: "/vpoint", label: "Vポイント" },
       { href: "/metrics", label: "収支・数値" },
       { href: "/billing", label: "サブスク・課金" },
     ],
