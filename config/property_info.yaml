@@ -21,20 +21,11 @@ properties:
       - "Grandole志賀本通I"
       - "02_Grandole志賀本通I"
       - "Grandole志賀本通Ⅰ"
-    # 棟としての主管理（ユーザー確認: LEAF + Tcell）
+    # 棟管理: ミニテック（2026-08 確認）
     managers:
-      - LEAF
-      - Tcell
+      - ミニテック
     key_number: 2842
-    rooms:
-      "102":
-        manager: Tcell
-      "105":
-        manager: LEAF
-      "201":
-        manager: ミニテック
-      "202":
-        manager: LEAF
+    rooms: {}
   grandole-ii:
     name: Grandole志賀本通II
     short: II
@@ -42,20 +33,18 @@ properties:
       - "Grandole志賀本通II"
       - "01_Grandole志賀本通II"
       - "Grandole志賀本通Ⅱ"
+    # 棟管理: ホームプランナー
     managers:
       - ホームプランナー
     key_number: 1555
-    rooms:
-      "102":
-        manager: ホームプランナー
-      "205":
-        manager: ホームプランナー
+    rooms: {}
   caramel:
     name: キャラメル
     short: C
     match_names:
       - "キャラメル"
       - "03_キャラメル"
+    # 棟管理: Tcell
     managers:
       - Tcell
     key_number: null
