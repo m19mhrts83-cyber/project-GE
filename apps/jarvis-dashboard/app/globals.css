@@ -1297,6 +1297,32 @@ p.back {
   margin-top: 8px;
 }
 
+.zaim-annual-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.zaim-annual-col {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--accent) 12%);
+  border: 1px solid var(--line);
+}
+
+.zaim-annual-label {
+  font-weight: 700;
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 800px) {
+  .zaim-annual-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 800px) {
   .watch-actions li {
     grid-template-columns: 1fr auto;

@@ -97,8 +97,16 @@ CSV_OUT="${HOME}/Library/CloudStorage/OneDrive-個人用/215_神・大家さん�
   fi
 
   echo "# export ok → ${CSV_OUT}"
-  "$PY" "${REPO_DIR}/scripts/jarvis_finance_metrics.py" --push
+  "$PY" "${REPO_DIR}/scripts/jarvis_finance_metrics.py" --year "$YEAR" --push
+  # 前年CSVがあれば年間比較用に push（無ければ非0でも続行）
+  set +e
+  "$PY" "${REPO_DIR}/scripts/jarvis_finance_metrics.py" --year "$((YEAR - 1))" --push
+  set -e
   "$PY" "${REPO_DIR}/scripts/jarvis_energy_cf_collect.py" --push
+  # Zaim Watch: 二重取込の安全自動適用 → 状況ウォッチ push
+  set +e
+  "$PY" "${REPO_DIR}/scripts/jarvis_zaim_watch_runner.py" --skip-finance
+  set -e
 
   write_state "1" "export+push ok" "$CSV_OUT"
   echo "# end ok $(date '+%Y-%m-%d %H:%M:%S %z')"

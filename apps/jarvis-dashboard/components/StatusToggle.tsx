@@ -5,9 +5,26 @@ type Props = {
   id: string;
   status: string;
   path: string;
+  neverArchive?: boolean;
 };
 
-export default function StatusToggle({ table, id, status, path }: Props) {
+export default function StatusToggle({
+  table,
+  id,
+  status,
+  path,
+  neverArchive,
+}: Props) {
+  if (neverArchive) {
+    return (
+      <span
+        className="meta"
+        style={{ marginLeft: "auto", fontSize: "0.78rem" }}
+      >
+        常駐
+      </span>
+    );
+  }
   const archived = status === "archived";
   const next = archived ? ("active" as const) : ("archived" as const);
   const label = archived ? "再表示" : "アーカイブ";

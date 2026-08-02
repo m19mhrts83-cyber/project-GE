@@ -272,6 +272,7 @@ def run_apply(actions: list[dict[str, Any]], args: argparse.Namespace) -> int:
     from playwright.sync_api import sync_playwright
 
     ok_n = fail_n = 0
+    results: list[dict[str, Any]] = []
     with sync_playwright() as pw:
         browser, ctx, _ = zaim.open_browser_context(
             pw,
@@ -293,6 +294,7 @@ def run_apply(actions: list[dict[str, Any]], args: argparse.Namespace) -> int:
             print(f"▶ {i+1}/{limit} {action.get('date')} ¥{action.get('amount')} → {action.get('value')}")
             ok, msg = apply_one(page, action, shot_prefix=f"{i+1:02d}")
             print(f"  {'OK' if ok else 'NG'}: {msg}")
+            results.append({**action, "ok": ok, "message": msg})
             if ok:
                 ok_n += 1
             else:
@@ -301,6 +303,17 @@ def run_apply(actions: list[dict[str, Any]], args: argparse.Namespace) -> int:
         zaim.save_storage_state(ctx)
         if browser and not args.connect_cdp:
             browser.close()
+    out_path = REPO / ".jarvis_state" / "zaim_money_apply_last.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(
+            {"ok_n": ok_n, "fail_n": fail_n, "results": results},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     print(f"# done ok={ok_n} fail={fail_n} shots={SCREENSHOT_DIR}")
     return 0 if fail_n == 0 else 2
 

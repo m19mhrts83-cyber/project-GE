@@ -26,6 +26,20 @@ export async function setWatchStatus(
   path = "/situation"
 ) {
   const supabase = await createClient();
+  if (next === "archived") {
+    const { data } = await supabase
+      .from("watch_status")
+      .select("payload")
+      .eq("id", id)
+      .maybeSingle();
+    const payload =
+      data?.payload && typeof data.payload === "object"
+        ? (data.payload as Record<string, unknown>)
+        : {};
+    if (payload.never_archive) {
+      throw new Error("この項目は常駐のためアーカイブできません");
+    }
+  }
   const patch =
     next === "archived"
       ? { status: "archived", archived_at: new Date().toISOString() }
@@ -38,6 +52,7 @@ export async function setWatchStatus(
   revalidatePath(path);
   revalidatePath("/archive");
   revalidatePath("/situation");
+  revalidatePath("/zaim");
   revalidatePath("/");
 }
 
