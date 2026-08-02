@@ -168,7 +168,8 @@ export default async function ZaimWatchPage() {
       <h1>Zaim Watch</h1>
       <p className="sub">
         財務の年間収支と、集計設定・二重取込の直し確認。アーカイブせず常駐します。
-        詳細な月次は{" "}
+        年間収支は Zaim の「集計に含めない」を除外した合計です（当年は1〜当月の
+        YTD）。詳細な月次は{" "}
         <Link href="/metrics" style={{ color: "var(--accent)", fontWeight: 600 }}>
           収支・数値
         </Link>

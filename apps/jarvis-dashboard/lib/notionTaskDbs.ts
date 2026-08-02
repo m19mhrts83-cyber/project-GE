@@ -8,9 +8,13 @@ export type NotionLaneConfig = {
   status_prop: string;
   due_prop: string | null;
   start_prop: string | null;
+  /** 所有物件のサブグループ（select）。例: 物件名 */
+  property_prop: string | null;
   initial_status: string;
   open_statuses: string[];
   done_statuses: string[];
+  /** true なら看板に完了列を出さない */
+  hide_done_on_board?: boolean;
 };
 
 export const NOTION_TASK_LANES: Record<string, NotionLaneConfig> = {
@@ -24,9 +28,11 @@ export const NOTION_TASK_LANES: Record<string, NotionLaneConfig> = {
     status_prop: "ステータス",
     due_prop: "終了日",
     start_prop: "開始日",
+    property_prop: "物件名",
     initial_status: "未着手",
     open_statuses: ["未着手", "メンバー_進行中", "オーナー_進行中"],
     done_statuses: ["完了(アーカイブ)", "完了(オーナー確認)"],
+    hide_done_on_board: true,
   },
   ai_raimo: {
     title: "AI・Raimo",
@@ -38,9 +44,11 @@ export const NOTION_TASK_LANES: Record<string, NotionLaneConfig> = {
     status_prop: "ステータス",
     due_prop: null,
     start_prop: null,
+    property_prop: null,
     initial_status: "未着手",
     open_statuses: ["未着手", "エージェント待ち", "進行中"],
     done_statuses: ["完了"],
+    hide_done_on_board: false,
   },
   kodate: {
     title: "戸建て",
@@ -51,9 +59,11 @@ export const NOTION_TASK_LANES: Record<string, NotionLaneConfig> = {
     status_prop: "ステータス",
     due_prop: "終了日",
     start_prop: "開始日",
+    property_prop: null,
     initial_status: "未着手",
     open_statuses: ["未着手", "進行中"],
     done_statuses: ["完了"],
+    hide_done_on_board: false,
   },
   kamiooya: {
     title: "神大家運営",
@@ -64,9 +74,11 @@ export const NOTION_TASK_LANES: Record<string, NotionLaneConfig> = {
     status_prop: "ステータス",
     due_prop: "終了日",
     start_prop: "開始日",
+    property_prop: null,
     initial_status: "未着手",
     open_statuses: ["未着手", "進行中"],
     done_statuses: ["完了"],
+    hide_done_on_board: false,
   },
   kazoku: {
     title: "家族",
@@ -77,8 +89,42 @@ export const NOTION_TASK_LANES: Record<string, NotionLaneConfig> = {
     status_prop: "ステータス",
     due_prop: "終了日",
     start_prop: "開始日",
+    property_prop: null,
     initial_status: "未着手",
     open_statuses: ["未着手", "進行中"],
     done_statuses: ["完了"],
+    hide_done_on_board: false,
   },
 };
+
+/** カードタイトル等から物件名 select を推定するヒント */
+export const PROPERTY_NAME_HINTS: { match: RegExp; prefer: string }[] = [
+  { match: /Grandole\s*[ⅡI2]|志賀本通\s*[ⅡI2]|GrandoleⅡ/i, prefer: "01_Grandole志賀本通II" },
+  { match: /Grandole\s*[ⅠI1]|志賀本通\s*[ⅠI1]|GrandoleⅠ/i, prefer: "01_Grandole志賀本通I" },
+  { match: /LEAF/i, prefer: "LEAF" },
+  { match: /ミニテック|ミニミニ/i, prefer: "ミニテック" },
+  { match: /Tcell|T-cell|キャラメル/i, prefer: "Tcell" },
+  { match: /ホームプランナー|HP/i, prefer: "ホームプランナー" },
+];
+
+export function guessPropertyName(
+  haystack: string,
+  options: string[],
+): string {
+  const hay = haystack || "";
+  for (const hint of PROPERTY_NAME_HINTS) {
+    if (!hint.match.test(hay)) continue;
+    const found = options.find(
+      (o) =>
+        o === hint.prefer ||
+        o.includes(hint.prefer) ||
+        hint.prefer.includes(o),
+    );
+    if (found) return found;
+    if (!options.length) return hint.prefer;
+  }
+  for (const o of options) {
+    if (o && hay.includes(o)) return o;
+  }
+  return options[0] || "";
+}

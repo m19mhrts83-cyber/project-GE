@@ -1,4 +1,7 @@
-import { NOTION_TASK_LANES, type NotionLaneConfig } from "@/lib/notionTaskDbs";
+import {
+  NOTION_TASK_LANES,
+  type NotionLaneConfig,
+} from "@/lib/notionTaskDbs";
 
 export type { NotionLaneConfig };
 
@@ -15,6 +18,8 @@ export type NotionBoardSummary = {
   connected: boolean;
   reason?: string;
   boardUrl?: string;
+  lane?: string;
+  openStatuses: string[];
   byStatus: Record<string, number>;
   /** ステータス別タスク（完了以外を最大12件/列）。埋め込みプレビュー用 */
   columns: Record<string, NotionTask[]>;
@@ -71,28 +76,31 @@ function todayJst(): string {
   }).format(new Date());
 }
 
+function emptyBoard(
+  partial: Partial<NotionBoardSummary> & { reason?: string },
+): NotionBoardSummary {
+  return {
+    connected: false,
+    openStatuses: [],
+    byStatus: {},
+    columns: {},
+    overdue: [],
+    openSample: [],
+    ...partial,
+  };
+}
+
 export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> {
   const cfg = loadNotionLaneConfig(lane);
   if (!cfg) {
-    return {
-      connected: false,
-      reason: "YAML未登録",
-      byStatus: {},
-      columns: {},
-      overdue: [],
-      openSample: [],
-    };
+    return emptyBoard({ reason: "YAML未登録" });
   }
   if (!notionTokenConfigured()) {
-    return {
-      connected: false,
+    return emptyBoard({
       reason: "NOTION_API_TOKEN 未設定",
       boardUrl: cfg.board_url,
-      byStatus: {},
-      columns: {},
-      overdue: [],
-      openSample: [],
-    };
+      openStatuses: cfg.open_statuses,
+    });
   }
 
   const byStatus: Record<string, number> = {};
@@ -103,10 +111,13 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
   let cursor: string | undefined;
   let pages = 0;
 
-  const columnOrder = [
-    ...cfg.open_statuses,
-    ...cfg.done_statuses.filter((s) => !cfg.open_statuses.includes(s)),
-  ];
+  const hideDone = Boolean(cfg.hide_done_on_board);
+  const columnOrder = hideDone
+    ? [...cfg.open_statuses]
+    : [
+        ...cfg.open_statuses,
+        ...cfg.done_statuses.filter((s) => !cfg.open_statuses.includes(s)),
+      ];
 
   try {
     do {
@@ -127,15 +138,11 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
       );
       if (!res.ok) {
         const text = await res.text();
-        return {
-          connected: false,
+        return emptyBoard({
           reason: `Notion API ${res.status}: ${text.slice(0, 160)}`,
           boardUrl: cfg.board_url,
-          byStatus: {},
-          columns: {},
-          overdue: [],
-          openSample: [],
-        };
+          openStatuses: cfg.open_statuses,
+        });
       }
       const data = (await res.json()) as {
         results: Array<{
@@ -161,6 +168,8 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
         };
         if (task.overdue) overdue.push(task);
         if (!done && openSample.length < 8) openSample.push(task);
+        if (hideDone && done) continue;
+        if (!columnOrder.includes(status) && hideDone) continue;
         const col = columns[status] || (columns[status] = []);
         if (col.length < 12) col.push(task);
       }
@@ -168,35 +177,74 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
       pages += 1;
     } while (cursor && pages < 5);
 
-    // 空列も表示順を保つ
     for (const s of columnOrder) {
       if (!columns[s]) columns[s] = [];
+    }
+
+    const boardByStatus: Record<string, number> = {};
+    for (const s of columnOrder) {
+      boardByStatus[s] = (columns[s] || []).length;
     }
 
     return {
       connected: true,
       boardUrl: cfg.board_url,
-      byStatus,
+      lane,
+      openStatuses: cfg.open_statuses,
+      byStatus: hideDone ? boardByStatus : byStatus,
       columns,
       overdue,
       openSample,
     };
   } catch (e) {
-    return {
-      connected: false,
+    return emptyBoard({
       reason: e instanceof Error ? e.message : String(e),
       boardUrl: cfg.board_url,
-      byStatus: {},
-      columns: {},
-      overdue: [],
-      openSample: [],
-    };
+      openStatuses: cfg.open_statuses,
+    });
   }
+}
+
+/** Notion DB の物件名 select 選択肢を取得 */
+export async function listPropertySelectOptions(
+  lane: string,
+): Promise<{ ok: true; options: string[] } | { ok: false; error: string }> {
+  const cfg = loadNotionLaneConfig(lane);
+  if (!cfg?.property_prop) {
+    return { ok: true, options: [] };
+  }
+  if (!notionTokenConfigured()) {
+    return { ok: false, error: "NOTION_API_TOKEN 未設定" };
+  }
+  const res = await fetch(
+    `https://api.notion.com/v1/databases/${cfg.database_id}`,
+    { headers: headers(), next: { revalidate: 600 } },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    return { ok: false, error: `${res.status}: ${text.slice(0, 200)}` };
+  }
+  const data = (await res.json()) as {
+    properties?: Record<
+      string,
+      { type?: string; select?: { options?: { name?: string }[] } }
+    >;
+  };
+  const prop = data.properties?.[cfg.property_prop];
+  const options = (prop?.select?.options || [])
+    .map((o) => (o.name || "").trim())
+    .filter(Boolean);
+  return { ok: true, options };
 }
 
 export async function createNotionTask(
   lane: string,
-  input: { title: string; summary?: string; due?: string | null },
+  input: {
+    title: string;
+    summary?: string;
+    due?: string | null;
+    propertyName?: string | null;
+  },
 ): Promise<{ ok: true; url: string; id: string } | { ok: false; error: string }> {
   const cfg = loadNotionLaneConfig(lane);
   if (!cfg) return { ok: false, error: "YAML未登録" };
@@ -217,6 +265,11 @@ export async function createNotionTask(
   }
   if (cfg.start_prop) {
     properties[cfg.start_prop] = { date: { start: todayJst() } };
+  }
+  if (cfg.property_prop && input.propertyName?.trim()) {
+    properties[cfg.property_prop] = {
+      select: { name: input.propertyName.trim() },
+    };
   }
 
   const children = input.summary
@@ -251,4 +304,35 @@ export async function createNotionTask(
   }
   const data = (await res.json()) as { id: string; url: string };
   return { ok: true, id: data.id, url: data.url };
+}
+
+/** 看板から Notion ステータスを更新（片方向） */
+export async function updateNotionTaskStatus(
+  lane: string,
+  pageId: string,
+  status: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const cfg = loadNotionLaneConfig(lane);
+  if (!cfg) return { ok: false, error: "YAML未登録" };
+  if (!notionTokenConfigured()) {
+    return { ok: false, error: "NOTION_API_TOKEN 未設定" };
+  }
+  const allowed = [...cfg.open_statuses, ...cfg.done_statuses];
+  if (!allowed.includes(status)) {
+    return { ok: false, error: `未対応のステータス: ${status}` };
+  }
+  const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    method: "PATCH",
+    headers: headers(),
+    body: JSON.stringify({
+      properties: {
+        [cfg.status_prop]: { status: { name: status } },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    return { ok: false, error: `${res.status}: ${text.slice(0, 240)}` };
+  }
+  return { ok: true };
 }

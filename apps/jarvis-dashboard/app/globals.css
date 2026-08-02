@@ -51,8 +51,15 @@ a {
 
 .side-brand {
   font-weight: 700;
-  margin: 0 8px 16px;
+  margin: 0 8px 12px;
   letter-spacing: 0.04em;
+}
+
+.side-link-home {
+  font-size: 1.05rem;
+  font-weight: 650;
+  padding: 12px 12px;
+  margin: 0 0 14px;
 }
 
 .side-group {
@@ -1482,6 +1489,21 @@ p.back {
   color: var(--muted);
 }
 
+.notion-status-move {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 0.75rem;
+}
+
+.notion-status-move select {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+}
+
 .notion-col-empty {
   background: transparent !important;
   border: none !important;
@@ -1778,7 +1800,97 @@ p.back {
 
 .billing-monthly-summary {
   margin: 0 0 20px;
-  padding: 14px 16px;
+  padding: 18px 20px;
+}
+
+.billing-summary-kicker {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted, #78716c);
+}
+
+.billing-summary-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.billing-hero-label {
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+  color: var(--muted, #78716c);
+}
+
+.billing-hero-value {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.billing-delta-badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.billing-delta-up {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.billing-delta-down {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.billing-delta-neutral {
+  background: #f5f5f4;
+  color: #57534e;
+}
+
+.billing-summary-quiet {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+}
+
+.billing-summary-sections {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.billing-summary-sec h3 {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--muted, #78716c);
+}
+
+.billing-summary-sec ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 4px;
+  font-size: 0.95rem;
+}
+
+.billing-summary-watch {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, #e7e5e4);
+}
+
+.billing-summary-foot {
+  margin: 12px 0 0;
 }
 
 .billing-summary-list {

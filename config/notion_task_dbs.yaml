@@ -14,9 +14,13 @@ lanes:
     status_prop: ステータス
     due_prop: 終了日
     start_prop: 開始日
+    # Notion ボードのサブグループ（select）
+    property_prop: 物件名
     initial_status: 未着手
     open_statuses: ["未着手", "メンバー_進行中", "オーナー_進行中"]
     done_statuses: ["完了(アーカイブ)", "完了(オーナー確認)"]
+    # ダッシュボード看板では完了列を出さない
+    hide_done_on_board: true
   ai_raimo:
     title: AI・Raimo
     database_id: 394f6bbe-5a76-800d-9cef-c97abea7941e
@@ -26,9 +30,11 @@ lanes:
     status_prop: ステータス
     due_prop: null
     start_prop: null
+    property_prop: null
     initial_status: 未着手
     open_statuses: ["未着手", "エージェント待ち", "進行中"]
     done_statuses: ["完了"]
+    hide_done_on_board: false
   kodate:
     title: 戸建て
     database_id: 656aa175-2371-4b14-a704-3aa965b2619a
@@ -38,9 +44,11 @@ lanes:
     status_prop: ステータス
     due_prop: 終了日
     start_prop: 開始日
+    property_prop: null
     initial_status: 未着手
     open_statuses: ["未着手", "進行中"]
     done_statuses: ["完了"]
+    hide_done_on_board: false
   kamiooya:
     title: 神大家運営
     database_id: 03628f50-047d-4308-8c3a-6cb763ceecca
@@ -50,9 +58,11 @@ lanes:
     status_prop: ステータス
     due_prop: 終了日
     start_prop: 開始日
+    property_prop: null
     initial_status: 未着手
     open_statuses: ["未着手", "進行中"]
     done_statuses: ["完了"]
+    hide_done_on_board: false
   kazoku:
     title: 家族
     database_id: 9a5b4921-5835-49f8-b8c4-22e8caf8621a
@@ -62,6 +72,8 @@ lanes:
     status_prop: ステータス
     due_prop: 終了日
     start_prop: 開始日
+    property_prop: null
     initial_status: 未着手
     open_statuses: ["未着手", "進行中"]
     done_statuses: ["完了"]
+    hide_done_on_board: false

@@ -54,6 +54,11 @@ def classify_row(row: dict[str, str], cfg: dict[str, Any]) -> tuple[str, str]:
     method = (row.get("方法") or "").strip()
     if method in (cfg.get("exclude_methods") or []):
         return "skip", "transfer"
+    # Zaim「集計の設定」— 画面の年間収支と揃える
+    agg = (row.get("集計の設定") or "").strip()
+    exclude_labels = cfg.get("exclude_aggregation_labels") or ["集計に含めない"]
+    if agg in exclude_labels:
+        return "skip", "aggregation_exclude"
     cat = (row.get("カテゴリ") or "").strip()
     pay = (row.get("支払元") or "").strip()
     dep = (row.get("入金先") or "").strip()

@@ -119,10 +119,21 @@ function MonthlySummaryBlock({ s }: { s: MonthlySummary }) {
   const ym = s.as_of_ym || "—";
   const prev = s.prev_ym || "—";
   const delta = s.delta_monthly;
-  const deltaLabel =
+  const hasPrev = Boolean(s.prev_ym);
+  const deltaBadge =
     delta == null
-      ? "前月スナップなし"
-      : `前月比 ${delta >= 0 ? "+" : ""}${fmtYen(delta)}`;
+      ? { text: "前月比なし", cls: "billing-delta-neutral" }
+      : delta > 0
+        ? {
+            text: `前月比 +${fmtYen(delta)}`,
+            cls: "billing-delta-up",
+          }
+        : delta < 0
+          ? {
+              text: `前月比 ${fmtYen(delta)}`,
+              cls: "billing-delta-down",
+            }
+          : { text: "前月比 ±0", cls: "billing-delta-neutral" };
   const added = s.added || [];
   const removed = s.removed || [];
   const amount = s.amount_changed || [];
@@ -130,7 +141,7 @@ function MonthlySummaryBlock({ s }: { s: MonthlySummary }) {
   const alerts = s.watch_alerts || [];
   const watch = s.watch_active || [];
   const noChange =
-    Boolean(s.prev_ym) &&
+    hasPrev &&
     !added.length &&
     !removed.length &&
     !amount.length &&
@@ -139,72 +150,119 @@ function MonthlySummaryBlock({ s }: { s: MonthlySummary }) {
 
   return (
     <section className="billing-monthly-summary card">
-      <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>
-        確認サマリー（{ym} / 対比 {prev}）
-      </h2>
-      <ul className="billing-summary-list">
-        <li>
-          月額換算: <strong>{fmtYen(s.active_monthly_total)}</strong>
-          <span className="meta"> · {deltaLabel}</span>
-        </li>
-        {noChange ? <li>変更: なし</li> : null}
-        {added.length > 0 ? (
-          <li>
-            新規:{" "}
-            {added
-              .map((x) => `${x.name || x.id}（${fmtYen(x.monthly_yen)}）`)
-              .join("、")}
-          </li>
-        ) : null}
-        {removed.length > 0 ? (
-          <li>
-            削除・除外: {removed.map((x) => x.name || x.id).join("、")}
-          </li>
-        ) : null}
-        {amount.length > 0 ? (
-          <li>
-            金額変更:{" "}
-            {amount
-              .map(
-                (x) =>
-                  `${x.name}: ${fmtYen(x.from_monthly)}→${fmtYen(x.to_monthly)}`,
-              )
-              .join("、")}
-          </li>
-        ) : null}
-        {status.length > 0 ? (
-          <li>
-            ステータス変更:{" "}
-            {status
-              .map((x) => `${x.name}: ${x.from}→${x.to}`)
-              .join("、")}
-          </li>
-        ) : null}
-        {alerts.length > 0 ? (
-          <li>
-            注視・新規:{" "}
-            {alerts
-              .map((x) => `${x.name}（${x.reason || "—"}）`)
-              .join("、")}
-          </li>
-        ) : null}
-        {watch.length > 0 ? (
-          <li>
-            注視中: {watch.map((x) => x.name).filter(Boolean).join("、")}
-          </li>
-        ) : null}
-        <li>
-          最終確認:{" "}
-          {s.confirmed_at
-            ? formatJstYmdHm(s.confirmed_at)
-            : "未確認（要確認）"}
-        </li>
-      </ul>
-      {s.compared_at ? (
-        <p className="meta" style={{ marginBottom: 0 }}>
-          差分計算: {formatJstYmdHm(s.compared_at)}
-        </p>
+      <p className="billing-summary-kicker">
+        確認サマリー · {ym}
+        {hasPrev ? `（対比 ${prev}）` : ""}
+      </p>
+      <div className="billing-summary-hero">
+        <div>
+          <p className="billing-hero-label">月額換算（継続中）</p>
+          <p className="billing-hero-value">
+            {fmtYen(s.active_monthly_total)}
+          </p>
+        </div>
+        <span className={`billing-delta-badge ${deltaBadge.cls}`}>
+          {deltaBadge.text}
+        </span>
+      </div>
+
+      {noChange ? (
+        <p className="billing-summary-quiet">今月の変更はありません。</p>
+      ) : (
+        <div className="billing-summary-sections">
+          {added.length > 0 ? (
+            <div className="billing-summary-sec">
+              <h3>新規</h3>
+              <ul>
+                {added.map((x) => (
+                  <li key={String(x.id || x.name)}>
+                    {x.name || x.id}
+                    <span className="meta"> · {fmtYen(x.monthly_yen)}/月</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {removed.length > 0 ? (
+            <div className="billing-summary-sec">
+              <h3>削除・除外</h3>
+              <ul>
+                {removed.map((x) => (
+                  <li key={String(x.id || x.name)}>{x.name || x.id}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {amount.length > 0 ? (
+            <div className="billing-summary-sec">
+              <h3>金額変更</h3>
+              <ul>
+                {amount.map((x) => (
+                  <li key={String(x.name)}>
+                    {x.name}
+                    <span className="meta">
+                      {" "}
+                      · {fmtYen(x.from_monthly)} → {fmtYen(x.to_monthly)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {status.length > 0 ? (
+            <div className="billing-summary-sec">
+              <h3>ステータス変更</h3>
+              <ul>
+                {status.map((x) => (
+                  <li key={String(x.name)}>
+                    {x.name}
+                    <span className="meta">
+                      {" "}
+                      · {STATUS_LABEL[x.from || ""] || x.from} →{" "}
+                      {STATUS_LABEL[x.to || ""] || x.to}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {alerts.length > 0 ? (
+            <div className="billing-summary-sec">
+              <h3>注視・新規アラート</h3>
+              <ul>
+                {alerts.map((x) => (
+                  <li key={String(x.name)}>
+                    {x.name}
+                    <span className="meta"> · {x.reason || "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {watch.length > 0 ? (
+        <div className="billing-summary-sec billing-summary-watch">
+          <h3>注視中</h3>
+          <ul>
+            {watch.map((x) => (
+              <li key={String(x.name)}>
+                {x.name}
+                {x.reason ? (
+                  <span className="meta"> · {x.reason}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
+
+      <p className="meta billing-summary-foot">
+        最終確認:{" "}
+        {s.confirmed_at ? formatJstYmdHm(s.confirmed_at) : "未確認（要確認）"}
+        {s.compared_at ? ` · 差分計算 ${formatJstYmdHm(s.compared_at)}` : ""}
+      </p>
     </section>
   );
 }
@@ -226,9 +284,10 @@ export default async function BillingPage() {
   const ending = list.filter((r) => r.status === "ending");
   const ended = list.filter((r) => r.status === "ended");
 
-  const totalMonthly = active.reduce((a, r) => a + Number(r.monthly_yen || 0), 0);
   const aiMonthly = ai.reduce((a, r) => a + Number(r.monthly_yen || 0), 0);
-  const otherMonthly = totalMonthly - aiMonthly;
+  const otherMonthly = active
+    .filter((r) => r.category !== "ai")
+    .reduce((a, r) => a + Number(r.monthly_yen || 0), 0);
 
   const { data: meta } = await supabase
     .from("sync_meta")
@@ -256,9 +315,6 @@ export default async function BillingPage() {
       )}
 
       <div className="stats">
-        <div className="stat">
-          月額換算合計 <strong>{fmtYen(totalMonthly)}</strong>
-        </div>
         <div className="stat">
           AI 系 <strong>{fmtYen(aiMonthly)}</strong>
         </div>
