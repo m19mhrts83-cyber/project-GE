@@ -143,14 +143,18 @@ export default async function HomePage() {
   const macMorningAt = metaMap.mac_morning_refreshed_at;
   const macMorningOk = metaMap.mac_morning_refresh_ok;
 
-  /** ETC / Vポイントの月次サマリは show_banner（未確認）のあいだ必ずホーム掲載。確認後は level に従う */
+  /** ETC / Vポイント / 家賃ステップの月次サマリは show_banner（未確認）のあいだ必ずホーム掲載 */
   const watchNeed = (watchRows || [])
     .filter((w) => {
       const pl =
         w.payload && typeof w.payload === "object"
           ? (w.payload as Record<string, unknown>)
           : {};
-      if (w.id === "etc_mileage" || w.id === "vpoint") {
+      if (
+        w.id === "etc_mileage" ||
+        w.id === "vpoint" ||
+        w.id === "rent_step"
+      ) {
         if (pl.show_banner === true) return true;
       }
       return w.level !== "ok";
@@ -467,6 +471,8 @@ export default async function HomePage() {
                       ? "/etc"
                       : it.id === "vpoint"
                         ? "/vpoint"
+                        : it.id === "rent_step"
+                          ? "/rent-step"
                         : "/situation";
                 return (
                   <a

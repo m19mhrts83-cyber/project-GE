@@ -1,0 +1,29 @@
+# Grandole 家賃ステップアップ（入居1年で +4,000円）
+# 月次確認: scripts/jarvis_rent_step_monthly_check.py
+# ダッシュボード: /rent-step（ETC/Vポイント同型の確認バナー）
+
+version: 1
+
+defaults:
+  delta_yen: 4000
+  upcoming_days: 45
+  # 対象物件
+  property_ids:
+    - grandole-i
+    - grandole-ii
+
+# 号室ごとの上書き（入居日がメモから曖昧なとき）
+# move_in: YYYY-MM-DD / year1_rent・year2_rent 任意
+units:
+  # I-103: 8/11〜入居・＊26/7まで▲4,000 → 入居 2025-08-11、2年目は 2026-08〜
+  - property_id: grandole-i
+    room: "103"
+    move_in: "2025-08-11"
+    year1_rent: 49000
+    year2_rent: 53000
+  # II-203: 〜8月まで1年目 49,000（帳簿はまだ 56800 の可能性あり）
+  - property_id: grandole-ii
+    room: "203"
+    campaign_end_ym: "2026-08"
+    year1_rent: 49000
+    year2_rent: 53000
