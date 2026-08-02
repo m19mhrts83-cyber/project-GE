@@ -228,7 +228,7 @@ async function enqueueMacCursorRevise(args: {
   return {
     ok: true,
     queued: true,
-    message: `Cloud 不可のため Mac ワーカーへキューしました（${args.fallbackReason.slice(0, 80)}）`,
+    message: `Jarvis Cloud が使えなかったため、Mac のローカル Cursor へ移ります（${args.fallbackReason.slice(0, 80)}）`,
   };
 }
 
@@ -301,7 +301,7 @@ export async function reviseTriageDraftWithCursor(
       return {
         ok: true,
         draft: cloud.draft,
-        message: "下書きを更新しました（Cursor Cloud Agent）",
+        message: "下書きを更新しました（Jarvis Cloud）",
       };
     }
     return enqueueMacCursorRevise({

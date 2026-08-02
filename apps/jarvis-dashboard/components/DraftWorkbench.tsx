@@ -70,7 +70,7 @@ export default function DraftWorkbench({
   const [draft, setDraft] = useState(draftText || "");
   const [to, setTo] = useState(initialTo);
   const [instruction, setInstruction] = useState("");
-  const [engine, setEngine] = useState<ReviseEngine>("gemini");
+  const [engine, setEngine] = useState<ReviseEngine>("cursor");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -100,7 +100,7 @@ export default function DraftWorkbench({
       const st = r.revise?.status;
       if (st === "done") {
         if (r.draft) setDraft(r.draft);
-        setMsg("Cursor Agent で見直し完了");
+        setMsg("Jarvis Cloud／Mac で見直し完了");
         setErr(null);
         setPolling(false);
         setTab("cursor");
@@ -108,25 +108,27 @@ export default function DraftWorkbench({
         return;
       }
       if (st === "error") {
-        setErr(r.revise?.error || "Cursor Agent 見直しに失敗しました");
+        setErr(r.revise?.error || "Jarvis Cloud 見直しに失敗しました");
         setPolling(false);
         router.refresh();
         return;
       }
       if (ticks >= 80) {
         setErr(
-          "Cursor Agent 見直しがタイムアウトしました。Mac が起動中か、launchd ワーカーを確認してください。",
+          "見直しがタイムアウトしました。Mac が起動中か、launchd ワーカーを確認してください。",
         );
         setPolling(false);
         return;
       }
       if (st === "queued" || st === "running") {
         const via =
-          r.revise?.via === "mac_fallback" ? "（Mac フォールバック）" : "";
+          r.revise?.via === "mac_fallback"
+            ? "（Jarvis Cloud 不可のためローカル Mac へ移行）"
+            : "";
         setMsg(
           st === "running"
-            ? `Cursor Agent 見直し中…${via}`
-            : `Cursor Agent キュー待ち…${via}`,
+            ? `見直し中…${via}`
+            : `Mac キュー待ち…${via}`,
         );
       }
     };
@@ -287,27 +289,27 @@ export default function DraftWorkbench({
           <input
             type="radio"
             name={`revise-engine-${id}`}
+            checked={engine === "cursor"}
+            onChange={() => setEngine("cursor")}
+            disabled={pending || polling}
+          />
+          Jarvis Cloud
+        </label>
+        <label className="draft-engine-opt">
+          <input
+            type="radio"
+            name={`revise-engine-${id}`}
             checked={engine === "gemini"}
             onChange={() => setEngine("gemini")}
             disabled={pending || polling}
           />
           Gemini
         </label>
-        <label className="draft-engine-opt">
-          <input
-            type="radio"
-            name={`revise-engine-${id}`}
-            checked={engine === "cursor"}
-            onChange={() => setEngine("cursor")}
-            disabled={pending || polling}
-          />
-          Cursor Agent
-        </label>
       </fieldset>
       {engine === "cursor" ? (
         <p className="draft-hint">
-          Cursor Agent は Cloud 本線です。失敗・未キー・タイムアウト時のみ Mac
-          ワーカーが処理します。
+          Jarvis Cloud（Cursor Cloud Agent）が本線です。失敗・未キー・タイムアウト時は
+          Mac ワーカーへ自動フォールバックし、その旨を表示します。
         </p>
       ) : null}
 
@@ -349,7 +351,7 @@ export default function DraftWorkbench({
                 return;
               }
               if (engine === "cursor" && r.queued) {
-                setMsg(r.message || "Cursor Agent キューしました");
+                setMsg(r.message || "Jarvis Cloud／Mac にキューしました");
                 setPolling(true);
                 router.refresh();
                 return;
@@ -363,7 +365,7 @@ export default function DraftWorkbench({
           {polling
             ? "見直し中…"
             : engine === "cursor"
-              ? "Cursor Agentで見直し"
+              ? "Jarvis Cloudで見直し"
               : "Geminiで見直し"}
         </button>
         <button type="button" className="btn" onClick={localCursorCopy}>

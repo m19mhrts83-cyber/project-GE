@@ -45,6 +45,7 @@ launchctl enable "gui/${UID_VALUE}/${LABEL}" || true
 launchctl bootstrap "gui/${UID_VALUE}" "$PLIST"
 
 echo "Installed: ${LABEL}"
-echo "Schedule: every 45s (queued Cursor Agent revise from dashboard)"
+echo "Schedule: every 45s (queued Cursor revise + card/watch ask from dashboard)"
 echo "Logs: ${LOG_DIR}/cursor_revise.*.log"
+echo "Also runs: scripts/jarvis_card_cursor_ask_worker.py"
 launchctl print "gui/${UID_VALUE}/${LABEL}" | /usr/bin/awk '/state =|last exit code|runs =/'

@@ -312,6 +312,15 @@ export default async function ZaimWatchPage() {
 
         <WatchCommentThread
           watchId={WATCH_ID}
+          title={watch?.title || "Zaim Watch"}
+          summary={watch?.summary}
+          detail={watch?.detail}
+          cursorPrompt={watch?.cursor_prompt}
+          payload={
+            watch?.payload && typeof watch.payload === "object"
+              ? (watch.payload as Record<string, unknown>)
+              : null
+          }
           comments={commentRows}
           path="/zaim"
         />

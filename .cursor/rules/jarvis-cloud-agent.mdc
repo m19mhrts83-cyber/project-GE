@@ -10,7 +10,8 @@ alwaysApply: true
 - **対話・調査の本線**は Cursor **Cloud Agent**（同一 Pro 等プラン。別契約ではない）。
 - **基本はクラウドで進められることはクラウド**。止まるときだけローカル／Mac。
 - **下書き**: Cloud 上で会話しながら見直すのが理想。
-- **Web 見直し（パートナー画面）**: Cursor Agent は **Cloud 本線**（`CURSOR_API_KEY`）。失敗・未キー・タイムアウト時のみ Mac Worker（`jarvis_triage_cursor_revise_worker.py`）。
+- **Web 見直し（パートナー画面）**: Cursor Agent は **Cloud 本線**（`CURSOR_API_KEY`）。失敗・未キー・タイムアウト時のみ Mac Worker（`jarvis_triage_cursor_revise_worker.py`）。**フォールバック時は必ずユーザーへ通知**。
+- **Web「聞く」（タスク／ウォッチ）**: 既定 **Jarvis Cloud**。UI で Gemini も選択可。Cloud 失敗時は Gemini へ自動切替（通知付き）。両方ダメ／不満時は **ローカル用コピー** または **Mac `jarvis_card_cursor_ask_worker.py` キュー**。
 - **送信**: 理想は Cloud で確認後に送る（`scripts/jarvis_cloud_gmail_send.py`）。  
   手順: `--preview` → チャットで承認 → `--i-confirm-send`。未配線・失敗時は Mac の `yoritoori`。  
   **Vercel パートナー画面からも、プレビュー確認後に送信可**（自動・ワンクリック無確認は禁止）。  

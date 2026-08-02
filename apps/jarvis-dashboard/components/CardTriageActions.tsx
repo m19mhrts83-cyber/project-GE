@@ -1,13 +1,20 @@
 "use client";
 
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
 import {
   askJarvisOnCard,
+  enqueueCardCursorAsk,
+  getCardCursorAskStatus,
   postCardComment,
   promoteCardToNotion,
   skipCard,
 } from "@/app/actions/cardKanban";
+import type { AskEngine } from "@/lib/askEngineTypes";
+import {
+  buildLocalHandoffPrompt,
+} from "@/lib/localHandoff";
+import LocalHandoffBar from "@/components/LocalHandoffBar";
 
 export type CardCommentRow = {
   id: number;
@@ -63,17 +70,50 @@ export default function CardTriageActions({
   const [text, setText] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [notices, setNotices] = useState<string[]>([]);
+  const [localPrompt, setLocalPrompt] = useState<string>("");
+  const [needLocal, setNeedLocal] = useState(false);
+  const [engine, setEngine] = useState<AskEngine>("cursor");
   const [pending, start] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [promoTitle, setPromoTitle] = useState(() => defaultPromoteTitle(card));
   const [promoSummary, setPromoSummary] = useState(() =>
     defaultPromoteSummary(card),
   );
+  const [macPolling, setMacPolling] = useState(() => {
+    const ask = card.payload?.cursor_ask;
+    if (ask && typeof ask === "object") {
+      const st = (ask as { status?: string }).status;
+      return st === "queued" || st === "running";
+    }
+    return false;
+  });
 
   const notionUrl =
     typeof card.payload?.notion_url === "string"
       ? card.payload.notion_url
       : null;
+
+  const defaultHandoff = useMemo(() => {
+    const payload = card.payload || {};
+    const question =
+      typeof payload.question === "string" ? payload.question : "";
+    const bullets = Array.isArray(payload.bullets)
+      ? (payload.bullets as unknown[]).map((b) => String(b)).slice(0, 20)
+      : [];
+    return buildLocalHandoffPrompt({
+      kind: "card",
+      id: card.id,
+      title: card.title,
+      summary: card.summary,
+      question,
+      bullets,
+      lane,
+      cursorPrompt: card.cursor_prompt,
+      comments: comments.map((c) => ({ role: c.role, body: c.body })),
+      lastUserMessage: text.trim() || null,
+    });
+  }, [card, comments, lane, text]);
 
   const explain = useMemo(() => {
     if (isDigest) {
@@ -81,6 +121,37 @@ export default function CardTriageActions({
     }
     return "「処置として進める」は Notion にタスクを1件作ります。先に内容確認画面が出ます。";
   }, [isDigest]);
+
+  useEffect(() => {
+    if (!macPolling) return;
+    let cancelled = false;
+    const tick = async () => {
+      const r = await getCardCursorAskStatus(card.id);
+      if (cancelled || !r.ok) return;
+      const st = r.ask?.status;
+      if (st === "done") {
+        setMacPolling(false);
+        setMsg("Mac のローカル Cursor から返答が付きました");
+        setNotices(["Mac のローカル Cursor から返答が付きました"]);
+        router.refresh();
+        return;
+      }
+      if (st === "error") {
+        setMacPolling(false);
+        setErr(r.ask?.error || "Mac Worker が失敗しました");
+        setNeedLocal(true);
+        setNotices([
+          "Mac Worker が失敗したため、ローカル用コピーで引き継げます",
+        ]);
+      }
+    };
+    const id = window.setInterval(() => void tick(), 4000);
+    void tick();
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [macPolling, card.id, router]);
 
   function openConfirm() {
     setErr(null);
@@ -90,31 +161,65 @@ export default function CardTriageActions({
     setConfirmOpen(true);
   }
 
-  function run(
-    kind: "skip" | "promote" | "post" | "ask",
-  ) {
+  function run(kind: "skip" | "promote" | "post" | "ask") {
     setErr(null);
     setMsg(null);
+    if (kind !== "ask") setNotices([]);
     start(async () => {
-      let r;
-      if (kind === "skip") r = await skipCard(card.id, path);
-      else if (kind === "promote") {
-        r = await promoteCardToNotion(card.id, lane, path, {
+      if (kind === "skip") {
+        const r = await skipCard(card.id, path);
+        if (!r.ok) {
+          setErr(r.error || "失敗しました");
+          return;
+        }
+        setMsg(r.message || "完了");
+        router.refresh();
+        return;
+      }
+      if (kind === "promote") {
+        const r = await promoteCardToNotion(card.id, lane, path, {
           title: promoTitle.trim() || defaultPromoteTitle(card),
           summary: promoSummary.trim(),
         });
-      } else if (kind === "ask") r = await askJarvisOnCard(card.id, text, path);
-      else r = await postCardComment(card.id, text, path);
-      if (!r.ok) {
-        setErr(r.error || "失敗しました");
+        if (!r.ok) {
+          setErr(r.error || "失敗しました");
+          return;
+        }
+        setMsg(r.message || "完了");
+        setConfirmOpen(false);
+        router.refresh();
         return;
       }
+      if (kind === "post") {
+        const r = await postCardComment(card.id, text, path);
+        if (!r.ok) {
+          setErr(r.error || "失敗しました");
+          return;
+        }
+        setMsg(r.message || "完了");
+        setText("");
+        router.refresh();
+        return;
+      }
+
+      const r = await askJarvisOnCard(card.id, text, path, engine);
+      setNotices(r.fallbackNotices || []);
+      if (r.localPrompt) setLocalPrompt(r.localPrompt);
+      if (!r.ok) {
+        setNeedLocal(Boolean(r.needLocal));
+        setErr(r.error || "失敗しました");
+        setMsg(r.message || null);
+        router.refresh();
+        return;
+      }
+      setNeedLocal(false);
       setMsg(r.message || "完了");
-      if (kind === "post" || kind === "ask") setText("");
-      if (kind === "promote") setConfirmOpen(false);
+      setText("");
       router.refresh();
     });
   }
+
+  const handoffPrompt = localPrompt || defaultHandoff;
 
   return (
     <div className={`card-triage${isDigest ? " is-digest" : ""}`}>
@@ -197,7 +302,9 @@ export default function CardTriageActions({
       ) : null}
       <div className="watch-comments">
         <p className="watch-comments-title">
-          {isDigest ? "相談（過去のやり取りを踏まえて Jarvis が返答）" : "コメント（Jarvisに聞ける）"}
+          {isDigest
+            ? "相談（過去のやり取りを踏まえて返答）"
+            : "コメント（エンジンを選んで聞ける）"}
         </p>
         {comments.length === 0 ? (
           <p className="meta" style={{ margin: "0 0 8px" }}>
@@ -221,6 +328,34 @@ export default function CardTriageActions({
             ))}
           </ul>
         )}
+        <fieldset className="draft-engine" style={{ marginTop: 10 }}>
+          <legend>聞くエンジン</legend>
+          <label className="draft-engine-opt">
+            <input
+              type="radio"
+              name={`ask-engine-${card.id}`}
+              checked={engine === "cursor"}
+              onChange={() => setEngine("cursor")}
+              disabled={pending || macPolling}
+            />
+            Jarvis Cloud
+          </label>
+          <label className="draft-engine-opt">
+            <input
+              type="radio"
+              name={`ask-engine-${card.id}`}
+              checked={engine === "gemini"}
+              onChange={() => setEngine("gemini")}
+              disabled={pending || macPolling}
+            />
+            Gemini
+          </label>
+        </fieldset>
+        {engine === "cursor" ? (
+          <p className="meta" style={{ margin: "6px 0 0" }}>
+            既定は Jarvis Cloud。失敗時は Gemini に自動切替し、その旨を表示します。
+          </p>
+        ) : null}
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -228,7 +363,7 @@ export default function CardTriageActions({
           placeholder={
             isDigest
               ? "例: これは見送りで、〇〇だけタスクにしたい"
-              : "コメント or Jarvisへの質問"
+              : "コメント or 質問"
           }
           style={{ width: "100%", marginTop: 8 }}
         />
@@ -237,10 +372,14 @@ export default function CardTriageActions({
             <button
               type="button"
               className="btn primary"
-              disabled={pending || !text.trim()}
+              disabled={pending || macPolling || !text.trim()}
               onClick={() => run("ask")}
             >
-              送って Jarvis に聞く
+              {pending
+                ? "返答中…"
+                : engine === "cursor"
+                  ? "送って Jarvis Cloud に聞く"
+                  : "送って Gemini に聞く"}
             </button>
           ) : (
             <>
@@ -254,11 +393,15 @@ export default function CardTriageActions({
               </button>
               <button
                 type="button"
-                className="btn"
-                disabled={pending}
+                className="btn primary"
+                disabled={pending || macPolling || !text.trim()}
                 onClick={() => run("ask")}
               >
-                Jarvisに聞く
+                {pending
+                  ? "返答中…"
+                  : engine === "cursor"
+                    ? "Jarvis Cloud に聞く"
+                    : "Gemini に聞く"}
               </button>
             </>
           )}
@@ -268,12 +411,30 @@ export default function CardTriageActions({
               className="btn"
               disabled={pending || !text.trim()}
               onClick={() => run("post")}
-              title="Jarvis 返答なしでメモだけ残す"
+              title="返答なしでメモだけ残す"
             >
               メモのみ
             </button>
           ) : null}
         </div>
+
+        <LocalHandoffBar
+          localPrompt={handoffPrompt}
+          notices={notices}
+          forceOpen={needLocal}
+          macPending={macPolling}
+          onEnqueueMac={async (extraNote) => {
+            const r = await enqueueCardCursorAsk(card.id, path, {
+              extraNote,
+              question: text.trim() || undefined,
+            });
+            if (r.ok && r.queued) setMacPolling(true);
+            if (r.fallbackNotices?.length) setNotices(r.fallbackNotices);
+            if (r.localPrompt) setLocalPrompt(r.localPrompt);
+            router.refresh();
+            return r;
+          }}
+        />
       </div>
       {err ? <p className="err">{err}</p> : null}
       {msg ? <p className="meta">{msg}</p> : null}

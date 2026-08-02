@@ -168,6 +168,15 @@ export default async function SituationPage() {
               ) : null}
               <WatchCommentThread
                 watchId={it.id}
+                title={it.title}
+                summary={it.summary}
+                detail={it.detail}
+                cursorPrompt={it.cursor_prompt}
+                payload={
+                  it.payload && typeof it.payload === "object"
+                    ? (it.payload as Record<string, unknown>)
+                    : null
+                }
                 comments={commentsByWatch.get(it.id) || []}
                 path="/situation"
               />

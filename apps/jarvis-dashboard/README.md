@@ -27,19 +27,24 @@ https://jarvis-dashboard-amber.vercel.app/
 
 朝の自動オープンは `JARVIS_DASHBOARD_URL`（`.env.jarvis_private`）を優先。
 
-### Cursor Agent 見直し（パートナー画面）
+### Jarvis Cloud / Gemini（見直し・聞く）
 
-Web では **Gemini / Cursor Agent** を選べます。
+UI で **Jarvis Cloud**（既定）／ **Gemini** を明示選択。
 
-1. **本線**: Vercel → Cursor Cloud Agent（`CURSOR_API_KEY`）
-2. **フォールバック**: 未キー／失敗／タイムアウト時 → Mac `agent` CLI キュー（夜間トリアージと同じ）
+| 画面 | 本線 | フォールバック |
+|---|---|---|
+| パートナー下書き見直し | Cloud Agent | Mac `jarvis_triage_cursor_revise_worker.py`（通知付き） |
+| タスク／ウォッチ「聞く」 | Cloud →（失敗時）Gemini | ローカル用コピー ＋ Mac `jarvis_card_cursor_ask_worker.py` |
+
+切替時はバナーで「Cloud が失敗したため Gemini に…」等を必ず表示。
 
 ```bash
-# Mac フォールバック用 Worker（一度だけ）
+# Mac Worker（一度だけ・revise と ask を同じ runner）
 ~/git-repos/launchd/install_cursor_revise_worker_launchd.sh
-# 手動1回:
+# 手動:
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_triage_cursor_revise_worker.py
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_card_cursor_ask_worker.py
 ```
 
 ログ: `~/Library/Logs/jarvis_night_triage/cursor_revise.*.log`  
