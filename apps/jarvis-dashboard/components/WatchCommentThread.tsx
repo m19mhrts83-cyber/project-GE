@@ -11,6 +11,7 @@ import {
 import type { AskEngine } from "@/lib/askEngineTypes";
 import { buildLocalHandoffPrompt } from "@/lib/localHandoff";
 import LocalHandoffBar from "@/components/LocalHandoffBar";
+import { formatJstMmDdHm } from "@/lib/formatJst";
 
 export type WatchCommentRow = {
   id: number;
@@ -18,12 +19,6 @@ export type WatchCommentRow = {
   body: string;
   created_at: string;
 };
-
-function fmtAt(v: string) {
-  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if (m) return `${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
-  return String(v).slice(0, 16);
-}
 
 export default function WatchCommentThread({
   watchId,
@@ -171,7 +166,7 @@ export default function WatchCommentThread({
             >
               <header>
                 <strong>{c.role === "jarvis" ? "Jarvis" : "あなた"}</strong>
-                <span className="meta">{fmtAt(c.created_at)}</span>
+                <span className="meta">{formatJstMmDdHm(c.created_at)}</span>
               </header>
               <p>{c.body}</p>
             </li>

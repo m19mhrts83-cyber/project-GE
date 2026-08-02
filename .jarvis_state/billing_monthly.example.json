@@ -1,0 +1,16 @@
+{
+  "disabled": false,
+  "as_of_ym": null,
+  "prev_ym": null,
+  "confirmed_at": null,
+  "last_check": null,
+  "active_monthly_total": null,
+  "delta_monthly": null,
+  "added": [],
+  "removed": [],
+  "amount_changed": [],
+  "status_changed": [],
+  "watch_alerts": [],
+  "watch_active": [],
+  "has_changes": false
+}

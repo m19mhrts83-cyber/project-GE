@@ -14,6 +14,8 @@ import type { AskEngine } from "@/lib/askEngineTypes";
 import {
   buildLocalHandoffPrompt,
 } from "@/lib/localHandoff";
+import { defaultUseKamiooyaKnowledge } from "@/lib/kamiooya/lanes";
+import { formatJstMmDdHm } from "@/lib/formatJst";
 import LocalHandoffBar from "@/components/LocalHandoffBar";
 
 export type CardCommentRow = {
@@ -32,12 +34,6 @@ type CardRow = {
   cursor_prompt: string | null;
   payload: Record<string, unknown> | null;
 };
-
-function fmtAt(v: string) {
-  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if (m) return `${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
-  return String(v).slice(0, 16);
-}
 
 function defaultPromoteTitle(card: CardRow): string {
   return card.title.replace(/^\[確認\]\s*/, "").trim() || card.title;
@@ -74,6 +70,9 @@ export default function CardTriageActions({
   const [localPrompt, setLocalPrompt] = useState<string>("");
   const [needLocal, setNeedLocal] = useState(false);
   const [engine, setEngine] = useState<AskEngine>("cursor");
+  const [useKamiooya, setUseKamiooya] = useState(() =>
+    defaultUseKamiooyaKnowledge(lane),
+  );
   const [pending, start] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [promoTitle, setPromoTitle] = useState(() => defaultPromoteTitle(card));
@@ -202,7 +201,9 @@ export default function CardTriageActions({
         return;
       }
 
-      const r = await askJarvisOnCard(card.id, text, path, engine);
+      const r = await askJarvisOnCard(card.id, text, path, engine, {
+        useKamiooyaKnowledge: useKamiooya,
+      });
       setNotices(r.fallbackNotices || []);
       if (r.localPrompt) setLocalPrompt(r.localPrompt);
       if (!r.ok) {
@@ -321,7 +322,7 @@ export default function CardTriageActions({
               >
                 <header>
                   <strong>{c.role === "jarvis" ? "Jarvis" : "あなた"}</strong>
-                  <span className="meta">{fmtAt(c.created_at)}</span>
+                  <span className="meta">{formatJstMmDdHm(c.created_at)}</span>
                 </header>
                 <p>{c.body}</p>
               </li>
@@ -356,6 +357,18 @@ export default function CardTriageActions({
             既定は Jarvis Cloud。失敗時は Gemini に自動切替し、その旨を表示します。
           </p>
         ) : null}
+        <label
+          className="draft-engine-opt"
+          style={{ display: "flex", marginTop: 8, gap: 8 }}
+        >
+          <input
+            type="checkbox"
+            checked={useKamiooya}
+            onChange={(e) => setUseKamiooya(e.target.checked)}
+            disabled={pending || macPolling}
+          />
+          神大家ナレッジを参照（コメント・動画／kamiooya-qa）
+        </label>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}

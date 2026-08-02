@@ -1,5 +1,6 @@
 import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
+import { formatJstYmdHm } from "@/lib/formatJst";
 
 type SubRow = {
   id: string;
@@ -16,6 +17,27 @@ type SubRow = {
   cancel_candidate: boolean;
   billing_url: string | null;
   note: string | null;
+};
+
+type MonthlySummary = {
+  as_of_ym?: string;
+  prev_ym?: string | null;
+  compared_at?: string;
+  confirmed_at?: string | null;
+  active_monthly_total?: number;
+  prev_active_monthly_total?: number | null;
+  delta_monthly?: number | null;
+  added?: { id?: string; name?: string; monthly_yen?: number }[];
+  removed?: { id?: string; name?: string }[];
+  amount_changed?: {
+    name?: string;
+    from_monthly?: number;
+    to_monthly?: number;
+  }[];
+  status_changed?: { name?: string; from?: string; to?: string }[];
+  watch_alerts?: { name?: string; reason?: string }[];
+  watch_active?: { name?: string; reason?: string }[];
+  has_changes?: boolean;
 };
 
 const CAT_LABEL: Record<string, string> = {
@@ -47,6 +69,16 @@ const OTHER_ORDER = [
 function fmtYen(n: number | null | undefined) {
   if (n == null) return "—";
   return `${Math.round(n).toLocaleString("ja-JP")}円`;
+}
+
+function parseMonthly(raw: string | undefined): MonthlySummary | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as MonthlySummary;
+    return v && typeof v === "object" ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 function ServiceCard({ s }: { s: SubRow }) {
@@ -83,6 +115,100 @@ function ServiceCard({ s }: { s: SubRow }) {
   );
 }
 
+function MonthlySummaryBlock({ s }: { s: MonthlySummary }) {
+  const ym = s.as_of_ym || "—";
+  const prev = s.prev_ym || "—";
+  const delta = s.delta_monthly;
+  const deltaLabel =
+    delta == null
+      ? "前月スナップなし"
+      : `前月比 ${delta >= 0 ? "+" : ""}${fmtYen(delta)}`;
+  const added = s.added || [];
+  const removed = s.removed || [];
+  const amount = s.amount_changed || [];
+  const status = s.status_changed || [];
+  const alerts = s.watch_alerts || [];
+  const watch = s.watch_active || [];
+  const noChange =
+    Boolean(s.prev_ym) &&
+    !added.length &&
+    !removed.length &&
+    !amount.length &&
+    !status.length &&
+    !alerts.length;
+
+  return (
+    <section className="billing-monthly-summary card">
+      <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>
+        確認サマリー（{ym} / 対比 {prev}）
+      </h2>
+      <ul className="billing-summary-list">
+        <li>
+          月額換算: <strong>{fmtYen(s.active_monthly_total)}</strong>
+          <span className="meta"> · {deltaLabel}</span>
+        </li>
+        {noChange ? <li>変更: なし</li> : null}
+        {added.length > 0 ? (
+          <li>
+            新規:{" "}
+            {added
+              .map((x) => `${x.name || x.id}（${fmtYen(x.monthly_yen)}）`)
+              .join("、")}
+          </li>
+        ) : null}
+        {removed.length > 0 ? (
+          <li>
+            削除・除外: {removed.map((x) => x.name || x.id).join("、")}
+          </li>
+        ) : null}
+        {amount.length > 0 ? (
+          <li>
+            金額変更:{" "}
+            {amount
+              .map(
+                (x) =>
+                  `${x.name}: ${fmtYen(x.from_monthly)}→${fmtYen(x.to_monthly)}`,
+              )
+              .join("、")}
+          </li>
+        ) : null}
+        {status.length > 0 ? (
+          <li>
+            ステータス変更:{" "}
+            {status
+              .map((x) => `${x.name}: ${x.from}→${x.to}`)
+              .join("、")}
+          </li>
+        ) : null}
+        {alerts.length > 0 ? (
+          <li>
+            注視・新規:{" "}
+            {alerts
+              .map((x) => `${x.name}（${x.reason || "—"}）`)
+              .join("、")}
+          </li>
+        ) : null}
+        {watch.length > 0 ? (
+          <li>
+            注視中: {watch.map((x) => x.name).filter(Boolean).join("、")}
+          </li>
+        ) : null}
+        <li>
+          最終確認:{" "}
+          {s.confirmed_at
+            ? formatJstYmdHm(s.confirmed_at)
+            : "未確認（要確認）"}
+        </li>
+      </ul>
+      {s.compared_at ? (
+        <p className="meta" style={{ marginBottom: 0 }}>
+          差分計算: {formatJstYmdHm(s.compared_at)}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export default async function BillingPage() {
   const supabase = await createClient();
   const { data: rows } = await supabase
@@ -107,16 +233,27 @@ export default async function BillingPage() {
   const { data: meta } = await supabase
     .from("sync_meta")
     .select("key,value")
-    .eq("key", "subscriptions_pushed_at");
-  const pushedAt = meta?.[0]?.value;
+    .in("key", ["subscriptions_pushed_at", "subscriptions_monthly_summary"]);
+  const metaMap = Object.fromEntries(
+    (meta || []).map((m) => [m.key, m.value as string]),
+  );
+  const pushedAt = metaMap.subscriptions_pushed_at;
+  const monthly = parseMonthly(metaMap.subscriptions_monthly_summary);
 
   return (
     <Shell active="/billing">
       <h1>課金／SaaS</h1>
       <p className="sub">
         定額・従量の見える化。正本は{" "}
-        <code>config/subscriptions.yaml</code>（Mac push）。不要なら解約候補を検討。
+        <code>config/subscriptions.yaml</code>（Mac push）。月次で変更点を先頭に表示。
       </p>
+
+      {monthly ? <MonthlySummaryBlock s={monthly} /> : (
+        <p className="meta" style={{ marginBottom: 16 }}>
+          月次サマリーはまだありません。Mac で{" "}
+          <code>jarvis_subscriptions_push.py --push</code> を実行してください。
+        </p>
+      )}
 
       <div className="stats">
         <div className="stat">
@@ -134,7 +271,7 @@ export default async function BillingPage() {
       </div>
       {pushedAt ? (
         <p className="meta" style={{ marginBottom: 20 }}>
-          最終 push: {pushedAt}
+          最終 push: {formatJstYmdHm(pushedAt)}
         </p>
       ) : (
         <p className="meta" style={{ marginBottom: 20 }}>

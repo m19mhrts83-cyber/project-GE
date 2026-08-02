@@ -53,7 +53,19 @@
 | 3a | ローカル用コピー | 失敗時・不満時。文脈パッケージをクリップボードへ |
 | 3b | Mac `jarvis_card_cursor_ask_worker.py` | 「Mac Cursor に依頼」。`payload.cursor_ask` キュー → コメント追記 |
 
+#### 文脈ソース（注入型・重要）
+
+Web／no-repo Cloud は **OneDrive・Google Drive を直接見ない**。Server が読んでプロンプトに載せる。
+
+| ソース | 現状 |
+|---|---|
+| カード／スレ（jarvis-dashboard） | 常に注入 |
+| 神大家コメント・動画（kamiooya-qa） | Phase1 実装。運営／戸建／物件レーン既定オン。`SUPABASE_*` 読取専用 |
+| OneDrive `5.やり取り.md` | Phase2（Graph 注入）予定 |
+| admin Google Drive / NotebookLM | Phase3。Cloud 対話は MCP、ダッシュボード ask は後続 |
+
 - 秘密: `.env.jarvis_private` の `CURSOR_API_KEY`（Vercel にも同名）。発行: [Cursor Dashboard → API Keys](https://cursor.com/dashboard/api)
+- 神大家読取: Vercel に `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（kamiooya-qa。JARVIS_SUPABASE_* とは別）
 - 任意: `CURSOR_CLOUD_REPO_URL`（**空推奨**= no-repo agent）
 - Mac Worker: `launchd/install_cursor_revise_worker_launchd.sh`（revise と ask を同じ runner）
 

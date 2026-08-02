@@ -13,7 +13,8 @@ import {
   buildLocalHandoffPrompt,
   type CursorAskState,
 } from "@/lib/localHandoff";
-
+import { retrieveKamiooyaForAsk } from "@/lib/kamiooya/retrieveForAsk";
+import { defaultUseKamiooyaKnowledge } from "@/lib/kamiooya/lanes";
 export type CardActionResult = {
   ok: boolean;
   error?: string;
@@ -198,6 +199,7 @@ export async function askJarvisOnCard(
   body: string,
   path: string,
   engine: AskEngine = "cursor",
+  opts?: { useKamiooyaKnowledge?: boolean },
 ): Promise<CardActionResult> {
   const text = body.trim();
   if (!text) return { ok: false, error: "質問を入力してください" };
@@ -237,6 +239,20 @@ export async function askJarvisOnCard(
     .join("\n");
 
   const isDigest = card.kind === "digest";
+  const useKamiooya =
+    opts?.useKamiooyaKnowledge ?? defaultUseKamiooyaKnowledge(card.lane);
+  const knowledgeNotices: string[] = [];
+  let knowledgeBlock = "";
+  if (useKamiooya) {
+    const q = [text, card.title, question, ...bullets.slice(0, 5)]
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, 1200);
+    const kr = await retrieveKamiooyaForAsk(q);
+    knowledgeNotices.push(kr.notice);
+    if (kr.promptBlock) knowledgeBlock = kr.promptBlock;
+  }
+
   const prompt = [
     "あなたは Jarvis（秘書 AI）です。ダッシュボードの確認テーマ／処置カードについて、ユーザーと日本語で具体的に相談してください。",
     "推測で事実を捏造しない。過去コメントの文脈を踏まえる。",
@@ -244,6 +260,9 @@ export async function askJarvisOnCard(
       ? "これは確認テーマです。いきなり Notion 登録を急かさない。内容を整理し、タスクにするなら「案のタイトル・やること1〜3点・期限の目安」を提案する。ユーザーが納得したら「タスク化する」ボタンで Notion に載せる旨を伝える。"
       : "処置候補として助言し、次の一手を1つ提案する。",
     "返信は要点から。8行以内を目安。定型の『承知して Notion へ』だけで終わらない。",
+    knowledgeBlock
+      ? "神大家ナレッジ根拠がある場合はそれを優先し、無いことは推測しない。"
+      : "",
     "",
     `【レーン】${card.lane}`,
     `【種類】${card.kind}`,
@@ -256,6 +275,7 @@ export async function askJarvisOnCard(
     card.cursor_prompt
       ? `【参考メモ】\n${String(card.cursor_prompt).slice(0, 800)}`
       : "",
+    knowledgeBlock,
     `【直近のやり取り】\n${thread || "（なし）"}`,
     "",
     `【今回のメッセージ】\n${text}`,
@@ -263,11 +283,16 @@ export async function askJarvisOnCard(
     .filter(Boolean)
     .join("\n");
 
-  const localPrompt = cardHandoffFromRow(
-    card,
-    threadRows.map((c) => ({ role: c.role, body: c.body })),
-    text,
-  );
+  const localPrompt = [
+    cardHandoffFromRow(
+      card,
+      threadRows.map((c) => ({ role: c.role, body: c.body })),
+      text,
+    ),
+    knowledgeBlock,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const resolved = await resolveAskReply({ engine, prompt });
   if (!resolved.ok) {
@@ -276,9 +301,9 @@ export async function askJarvisOnCard(
       ok: false,
       needLocal: true,
       error: resolved.error,
-      fallbackNotices: resolved.fallbackNotices,
+      fallbackNotices: [...knowledgeNotices, ...resolved.fallbackNotices],
       localPrompt,
-      message: resolved.fallbackNotices.join(" / "),
+      message: [...knowledgeNotices, ...resolved.fallbackNotices].join(" / "),
     };
   }
 
@@ -305,16 +330,17 @@ export async function askJarvisOnCard(
   }
 
   revalidatePath(path);
+  const allNotices = [...knowledgeNotices, ...resolved.fallbackNotices];
   const noticeMsg =
-    resolved.fallbackNotices.length > 0
-      ? resolved.fallbackNotices.join(" → ")
+    allNotices.length > 0
+      ? allNotices.join(" → ")
       : resolved.via === "cloud"
         ? "Jarvis Cloud が返信しました"
         : "Gemini が返信しました";
   return {
     ok: true,
     message: noticeMsg,
-    fallbackNotices: resolved.fallbackNotices,
+    fallbackNotices: allNotices,
     via: resolved.via,
     localPrompt,
   };

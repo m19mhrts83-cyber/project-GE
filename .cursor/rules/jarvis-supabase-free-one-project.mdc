@@ -14,6 +14,8 @@ Free 枠は **アクティブ2プロジェクトまで無料**。用途を次の
 | **`kamiooya-qa`** | `mwubzgefkkjjbingrmqu` | **運営提供・引き渡し対象**。神大家アプリ関連のみ（`comments` / `knowledge_*` / `chat_*` / `app_qa_*`） |
 | **`jarvis-dashboard`** | `idkdqneutpvkhxhpjtgc` | **自分用・引き渡さない**。トリアージ／状況ウォッチ／カード／メトリクス |
 
+**クロス読取（可）**: Jarvis ダッシュボード Server から `kamiooya-qa` を **読み取り専用**で参照してよい（タスク「聞く」のナレッジ注入）。**書込は禁止**（運営 DB に自分用テーブルを足さない方針と両立）。
+
 | 項目 | 正 |
 |---|---|
 | プラン | Free（2アクティブ） |

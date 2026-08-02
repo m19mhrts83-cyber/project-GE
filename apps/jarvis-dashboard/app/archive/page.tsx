@@ -5,6 +5,7 @@ import TriageStatusActions from "@/components/TriageStatusActions";
 import { LEVEL_LABEL, HomeLevel } from "@/lib/homeLevels";
 import { CLOSED_STATUSES, STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
 import { createClient } from "@/lib/supabase/server";
+import { formatJstYmdHm } from "@/lib/formatJst";
 
 const LANE_LABEL: Record<string, string> = {
   partner: "パートナー",
@@ -16,13 +17,6 @@ const LANE_LABEL: Record<string, string> = {
   "ai-raimo": "AI・Raimo",
   kazoku: "家族",
 };
-
-function fmtAt(v: string | null | undefined) {
-  if (!v) return "";
-  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if (m) return `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
-  return String(v).slice(0, 16);
-}
 
 export default async function ArchivePage() {
   const supabase = await createClient();
@@ -97,7 +91,7 @@ export default async function ArchivePage() {
                   <span className="lvl">{label}</span>
                   <strong>{it.title}</strong>
                   <span className="meta">
-                    {fmtAt(it.archived_at || it.updated_at)}
+                    {formatJstYmdHm(it.archived_at || it.updated_at)}
                   </span>
                   <StatusToggle
                     table="watch_status"
@@ -130,7 +124,7 @@ export default async function ArchivePage() {
                 </span>
                 <strong>{c.title}</strong>
                 <span className="meta">
-                  {fmtAt(c.archived_at || c.updated_at)}
+                  {formatJstYmdHm(c.archived_at || c.updated_at)}
                 </span>
                 <StatusToggle
                   table="cards"
@@ -173,7 +167,7 @@ export default async function ArchivePage() {
                   <strong>{who}</strong>
                   <span className="meta">
                     {LANE_LABEL[it.lane] || it.lane}
-                    {it.updated_at ? ` · ${fmtAt(it.updated_at)}` : ""}
+                    {it.updated_at ? ` · ${formatJstYmdHm(it.updated_at)}` : ""}
                   </span>
                   <TriageStatusActions
                     id={it.id}

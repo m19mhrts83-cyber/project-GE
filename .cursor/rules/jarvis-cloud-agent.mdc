@@ -12,6 +12,7 @@ alwaysApply: true
 - **下書き**: Cloud 上で会話しながら見直すのが理想。
 - **Web 見直し（パートナー画面）**: Cursor Agent は **Cloud 本線**（`CURSOR_API_KEY`）。失敗・未キー・タイムアウト時のみ Mac Worker（`jarvis_triage_cursor_revise_worker.py`）。**フォールバック時は必ずユーザーへ通知**。
 - **Web「聞く」（タスク／ウォッチ）**: 既定 **Jarvis Cloud**。UI で Gemini も選択可。Cloud 失敗時は Gemini へ自動切替（通知付き）。両方ダメ／不満時は **ローカル用コピー** または **Mac `jarvis_card_cursor_ask_worker.py` キュー**。
+- **文脈ソース（注入型）**: Web／no-repo Cloud は OneDrive・Drive を**直接マウントしない**。Server が読んでプロンプトに載せる。Phase1=運営 `kamiooya-qa` 読取（神大家レーン既定オン）。OneDrive やり取りは Graph 注入を後続。深いファイル操作はローカル Cursor。
 - **送信**: 理想は Cloud で確認後に送る（`scripts/jarvis_cloud_gmail_send.py`）。  
   手順: `--preview` → チャットで承認 → `--i-confirm-send`。未配線・失敗時は Mac の `yoritoori`。  
   **Vercel パートナー画面からも、プレビュー確認後に送信可**（自動・ワンクリック無確認は禁止）。  
@@ -26,7 +27,7 @@ alwaysApply: true
 | 2 | **Notion MCP**（物件タスク等の原本。Cloud では cursor.com/agents の MCP） |
 | 3 | **NotebookLM MCP**（調査ノート。Drive `200_NoteBookLM` がソース正本） |
 | 4 | admin Gmail → 既に `triage_items` にあるもの、または Gmail API（Secrets） |
-| 5 | OneDrive は Graph 後続。未設定時は Mac ローカル path |
+| 5 | OneDrive は Graph 後続（Server 注入）。未設定時は Mac ローカル path。**Web Cloud はディスク非参照** |
 
 ## フォールバック（ローカルへ）
 
