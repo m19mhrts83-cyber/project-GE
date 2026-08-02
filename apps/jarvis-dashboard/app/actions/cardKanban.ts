@@ -47,11 +47,12 @@ export async function promoteCardToNotion(
   cardId: string,
   lane: string,
   path: string,
+  opts?: { title?: string; summary?: string },
 ): Promise<CardActionResult> {
   const supabase = await createClient();
   const { data: card, error: gErr } = await supabase
     .from("cards")
-    .select("id,title,summary,payload,status")
+    .select("id,title,summary,payload,status,kind")
     .eq("id", cardId)
     .maybeSingle();
   if (gErr) return { ok: false, error: gErr.message };
@@ -61,9 +62,18 @@ export async function promoteCardToNotion(
   const due =
     typeof payload.suggested_due === "string" ? payload.suggested_due : null;
 
+  const title = (opts?.title || card.title || "").trim() || card.title;
+  let summary = (opts?.summary ?? card.summary ?? "").trim();
+  if (!summary && Array.isArray(payload.bullets)) {
+    summary = (payload.bullets as unknown[])
+      .map((b) => String(b))
+      .join("\n")
+      .slice(0, 1800);
+  }
+
   const created = await createNotionTask(lane, {
-    title: card.title,
-    summary: card.summary || undefined,
+    title,
+    summary: summary || undefined,
     due,
   });
   if (!created.ok) return { ok: false, error: created.error };
@@ -73,6 +83,7 @@ export async function promoteCardToNotion(
     notion_url: created.url,
     notion_page_id: created.id,
     promoted_at: new Date().toISOString(),
+    promoted_title: title,
   };
   const { error: uErr } = await supabase
     .from("cards")
@@ -87,14 +98,14 @@ export async function promoteCardToNotion(
   await queueLaneActionLog({
     lane,
     event: "タスク登録",
-    body: `- ${card.title}\n- Notion: ${created.url}`,
+    body: `- ${title}\n- Notion: ${created.url}`,
     cardId,
   });
 
   revalidatePath(path);
   return {
     ok: true,
-    message: "Notion に追加しました",
+    message: "Notion にタスクを登録しました",
     notionUrl: created.url,
   };
 }
@@ -138,6 +149,15 @@ export async function askJarvisOnCard(
   const text = body.trim();
   if (!text) return { ok: false, error: "質問を入力してください" };
   const supabase = await createClient();
+
+  const { data: card, error: cErr } = await supabase
+    .from("cards")
+    .select("id,title,summary,lane,payload,kind,cursor_prompt")
+    .eq("id", cardId)
+    .maybeSingle();
+  if (cErr) return { ok: false, error: cErr.message };
+  if (!card) return { ok: false, error: "カードが見つかりません" };
+
   const { error: uErr } = await supabase.from("card_comments").insert({
     card_id: cardId,
     role: "user",
@@ -145,47 +165,69 @@ export async function askJarvisOnCard(
   });
   if (uErr) return { ok: false, error: uErr.message };
 
-  const { data: card } = await supabase
-    .from("cards")
-    .select("title,summary,lane,payload")
-    .eq("id", cardId)
-    .maybeSingle();
+  const { data: recent } = await supabase
+    .from("card_comments")
+    .select("role,body,created_at")
+    .eq("card_id", cardId)
+    .order("created_at", { ascending: false })
+    .limit(16);
 
-  let reply =
-    "（メモ）処置候補として保持されています。「処置として進める」で Notion 看板に載せられます。";
-  const key = (process.env.GEMINI_API_KEY || "").trim();
-  if (key && card) {
-    try {
-      const prompt = [
-        "あなたは Jarvis。ダッシュボードの処置候補カードについて短く日本語で助言してください。",
-        `レーン: ${card.lane}`,
-        `タイトル: ${card.title}`,
-        `要約: ${card.summary || ""}`,
-        `ユーザー: ${text}`,
-        "返信は5行以内。次の一手を1つ提案。",
-      ].join("\n");
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
-        },
-      );
-      if (res.ok) {
-        const j = (await res.json()) as {
-          candidates?: Array<{
-            content?: { parts?: Array<{ text?: string }> };
-          }>;
-        };
-        const t = j.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (t) reply = t.slice(0, 1200);
-      }
-    } catch {
-      /* keep fallback */
-    }
+  const payload =
+    card.payload && typeof card.payload === "object"
+      ? (card.payload as Record<string, unknown>)
+      : {};
+  const question =
+    typeof payload.question === "string" ? payload.question : "";
+  const bullets = Array.isArray(payload.bullets)
+    ? (payload.bullets as unknown[]).map((b) => String(b)).slice(0, 20)
+    : [];
+  const thread = (recent || [])
+    .slice()
+    .reverse()
+    .map((c) => `[${c.role}] ${c.body}`)
+    .join("\n");
+
+  const isDigest = card.kind === "digest";
+  const prompt = [
+    "あなたは Jarvis（秘書 AI）です。ダッシュボードの確認テーマ／処置カードについて、ユーザーと日本語で具体的に相談してください。",
+    "推測で事実を捏造しない。過去コメントの文脈を踏まえる。",
+    isDigest
+      ? "これは確認テーマです。いきなり Notion 登録を急かさない。内容を整理し、タスクにするなら「案のタイトル・やること1〜3点・期限の目安」を提案する。ユーザーが納得したら「タスク化する」ボタンで Notion に載せる旨を伝える。"
+      : "処置候補として助言し、次の一手を1つ提案する。",
+    "返信は要点から。8行以内を目安。定型の『承知して Notion へ』だけで終わらない。",
+    "",
+    `【レーン】${card.lane}`,
+    `【種類】${card.kind}`,
+    `【タイトル】${card.title}`,
+    question ? `【問い】${question}` : "",
+    `【要約】\n${card.summary || "—"}`,
+    bullets.length
+      ? `【候補メモ】\n${bullets.map((l) => (l.startsWith("-") ? l : `- ${l}`)).join("\n")}`
+      : "",
+    card.cursor_prompt ? `【参考メモ】\n${String(card.cursor_prompt).slice(0, 800)}` : "",
+    `【直近のやり取り】\n${thread || "（なし）"}`,
+    "",
+    `【今回のメッセージ】\n${text}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const { geminiReply } = await import("@/lib/geminiReply");
+  const ai = await geminiReply(prompt);
+  let reply: string;
+  if (ai.ok) {
+    reply = ai.text.slice(0, 2000);
+  } else {
+    reply = isDigest
+      ? [
+          "（自動応答が一時的に使えませんでした）",
+          "この確認テーマでは、下のコメントで方針を相談したあと、納得したら「タスク化する」→ 内容確認 → Notion 登録、の流れです。",
+          `いまのテーマ: ${card.title.replace(/^\[確認\]\s*/, "")}`,
+          ai.error ? `詳細: ${ai.error}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : `（自動応答が使えませんでした）${ai.error || ""}「処置として進める」で Notion に載せられます。`;
   }
 
   const { error: jErr } = await supabase.from("card_comments").insert({
@@ -195,7 +237,7 @@ export async function askJarvisOnCard(
   });
   if (jErr) return { ok: false, error: jErr.message };
 
-  if (card?.lane) {
+  if (card.lane) {
     await queueLaneActionLog({
       lane: card.lane,
       event: "Jarvis相談",

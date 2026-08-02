@@ -177,7 +177,7 @@ export default async function TriageKanbanLane({
       </div>
       <p className="sub">
         {subtitle ||
-          "ソースを要約した確認テーマ → 見送り or Notion タスク化。コメント可。履歴は OneDrive「Jarvis処置ログ/{レーン}/5.処置ログ.md」。"}{" "}
+          "ソースを要約した確認テーマです。コメントで方針を相談し、納得したら「タスク化する…」で内容確認のうえ Notion に1件登録。履歴は OneDrive「Jarvis処置ログ/{レーン}/5.処置ログ.md」。"}{" "}
         アーカイブは{" "}
         <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
           こちら

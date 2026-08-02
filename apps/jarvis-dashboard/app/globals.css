@@ -1170,6 +1170,49 @@ p.back {
   margin-bottom: 12px;
 }
 
+.digest-flow-hint {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.promote-confirm {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 90%, var(--accent) 10%);
+}
+
+.promote-confirm-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.promote-label {
+  display: block;
+  margin: 8px 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.promote-label input,
+.promote-label textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--ink);
+  background: #fff;
+}
+
 .digest-card header {
   margin-bottom: 4px;
 }
