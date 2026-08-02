@@ -1,6 +1,28 @@
-# Excel に無い物件の号室補完（キャラメル等）
+# Excel に無い物件の号室補完（キャラメル等）／家賃マップ空欄の補完
 # 家賃は管理契約書（2026-02 改訂）の賃料月額。現状はユーザー確認どおり満室。
+#
+# fill_missing: true の行は、Excel に同 ID があるとき rent が空欄なら上書きする
+# （既存の status / note は Excel 側を維持）。
 units:
+  # Grandole I — 家賃マップで 101・201 が空欄。棟の1年目帯（49,000+管理費4,000）で補完
+  - property_id: grandole-i
+    property_name: Grandole志賀本通I
+    short: I
+    room: "101"
+    status: occupied
+    rent: 49000
+    management_fee: 4000
+    fill_missing: true
+    note: 家賃マップ空欄のため1年目帯で補完
+  - property_id: grandole-i
+    property_name: Grandole志賀本通I
+    short: I
+    room: "201"
+    status: occupied
+    rent: 49000
+    management_fee: 4000
+    fill_missing: true
+    note: 家賃マップ空欄のため1年目帯で補完
   - property_id: caramel
     property_name: キャラメル
     short: C

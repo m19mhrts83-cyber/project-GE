@@ -275,9 +275,50 @@ def load_extra_units() -> list[dict[str, Any]]:
                 "note": u.get("note"),
                 "source": "config",
                 "payload": payload,
+                "fill_missing": bool(u.get("fill_missing")),
             }
         )
     return out
+
+
+def merge_extra_units(
+    excel_units: list[dict[str, Any]],
+    extra_units: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Excel 結果に config 補完をマージ。
+
+    - 新規 ID: そのまま追加
+    - 既存 ID + fill_missing: Excel の rent が空のときだけ家賃・管理費を埋める
+    - 既存 ID（fill_missing なし）: 従来どおり config で置換（キャラメル等）
+    """
+    by_id = {u["id"]: u for u in excel_units}
+    for eu in extra_units:
+        eid = eu["id"]
+        existing = by_id.get(eid)
+        if existing is None:
+            nu = {k: v for k, v in eu.items() if k != "fill_missing"}
+            by_id[eid] = nu
+            continue
+        if eu.get("fill_missing"):
+            if existing.get("rent") is not None:
+                continue
+            existing["rent"] = eu.get("rent")
+            payload = dict(existing.get("payload") or {})
+            ep = eu.get("payload") or {}
+            if ep.get("management_fee") is not None:
+                payload["management_fee"] = ep["management_fee"]
+            if ep.get("total_rent") is not None:
+                payload["total_rent"] = ep["total_rent"]
+            existing["payload"] = payload
+            note_add = eu.get("note")
+            if note_add:
+                base = (existing.get("note") or "").strip()
+                if note_add not in base:
+                    existing["note"] = f"{base} / {note_add}".strip(" /")
+            existing["source"] = f"{existing.get('source') or 'excel'}+config"
+            continue
+        by_id[eid] = {k: v for k, v in eu.items() if k != "fill_missing"}
+    return list(by_id.values())
 
 
 def summarize(units: list[dict[str, Any]]) -> dict[str, Any]:
@@ -452,11 +493,8 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"xlsx missing: {path}")
 
     units = parse_rent_map(path)
-    # Excel に無い補完（キャラメル等）
-    by_id = {u["id"]: u for u in units}
-    for eu in load_extra_units():
-        by_id[eu["id"]] = eu
-    units = list(by_id.values())
+    # Excel に無い補完（キャラメル等）／家賃空欄の fill_missing
+    units = merge_extra_units(units, load_extra_units())
     if args.force_all_occupied:
         units = force_all_occupied(units)
     summary = summarize(units)
