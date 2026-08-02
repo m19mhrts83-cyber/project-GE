@@ -21,11 +21,20 @@ properties:
       - "Grandole志賀本通I"
       - "02_Grandole志賀本通I"
       - "Grandole志賀本通Ⅰ"
-    # 棟管理: ミニテック（2026-08 確認）
+    # 棟: LEAF + Tcell（号室によりミニテックもあり）
     managers:
-      - ミニテック
+      - LEAF
+      - Tcell
     key_number: 2842
-    rooms: {}
+    rooms:
+      "102":
+        manager: Tcell
+      "105":
+        manager: LEAF
+      "201":
+        manager: ミニテック
+      "202":
+        manager: LEAF
   grandole-ii:
     name: Grandole志賀本通II
     short: II

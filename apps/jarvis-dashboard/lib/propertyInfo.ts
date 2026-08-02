@@ -43,9 +43,14 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
         "02_Grandole志賀本通I",
         "Grandole志賀本通Ⅰ",
       ],
-      managers: ["ミニテック"],
+      managers: ["LEAF", "Tcell"],
       key_number: 2842,
-      rooms: {},
+      rooms: {
+        "102": { manager: "Tcell" },
+        "105": { manager: "LEAF" },
+        "201": { manager: "ミニテック" },
+        "202": { manager: "LEAF" },
+      },
     },
     "grandole-ii": {
       name: "Grandole志賀本通II",
@@ -84,7 +89,9 @@ export function getPropertyInfo(propertyId: string): PropertyInfo | null {
   return PROPERTY_INFO.properties[propertyId] || null;
 }
 
-/** 号室メモや YAML から管理会社を解決（号室未設定時は棟の管理会社） */
+/** 号室メモや YAML から管理会社を解決。
+ * 号室未設定時: 棟の管理が1社だけならそれを使い、複数社の棟はメモから推定（無ければ null）。
+ */
 export function resolveRoomManager(
   propertyId: string,
   room: string,
@@ -93,9 +100,9 @@ export function resolveRoomManager(
   const info = getPropertyInfo(propertyId);
   const fromYaml = info?.rooms?.[room]?.manager;
   if (fromYaml) return fromYaml;
-  if (info?.managers?.length) return info.managers[0];
   const m = (note || "").match(NOTE_MANAGER_RE);
   if (m?.[1]) return normalizeManager(m[1]);
+  if (info?.managers?.length === 1) return info.managers[0];
   return null;
 }
 
