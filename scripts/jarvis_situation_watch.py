@@ -806,6 +806,7 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "actions": action_items[:30],
         "action_lines": action_lines[:30],
+        "never_archive": bool(meta.get("never_archive")),
         "bank_sync": {
             "level": bank.get("level") if bank else None,
             "summary": bank.get("summary") if bank else None,
@@ -813,7 +814,23 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
             "missing": (bank.get("missing") or [])[:20] if bank else [],
         },
     }
+    pending_n = 0
+    try:
+        cl_path = STATE / "zaim_watch_changelog.json"
+        if cl_path.is_file():
+            cl = json.loads(cl_path.read_text(encoding="utf-8"))
+            entries = list(cl.get("entries") or [])
+            pending = [e for e in entries if e.get("status") == "pending_confirm"]
+            pending_n = len(pending)
+            payload["recent_fixes"] = entries[-30:]
+            payload["pending_confirm_count"] = pending_n
+            if pending_n and level in ("ok", "info"):
+                level = "attention"
+    except Exception:
+        pass
     summary = str(data.get("summary") or "データあり") + weekly_note + bank_note
+    if pending_n:
+        summary = f"直し確認待ち {pending_n}件 · " + summary
     return card(
         item_id=meta["id"],
         title=title,
@@ -905,12 +922,24 @@ def collect() -> dict[str, Any]:
                 cursor_prompt=meta.get("cursor_prompt") or "",
                 source=meta.get("source") or "",
             )
-        arch = archived_map.get(iid)
-        if arch:
-            c["status"] = "archived"
-            c["archived_at"] = arch.get("archived_at")
-        else:
+        if meta.get("never_archive"):
             c["status"] = "active"
+            c.pop("archived_at", None)
+            pl = c.get("payload") if isinstance(c.get("payload"), dict) else {}
+            pl = dict(pl)
+            pl["never_archive"] = True
+            c["payload"] = pl
+            if iid in archived_map:
+                del archived_map[iid]
+                archive["archived"] = archived_map
+                save_archive(archive)
+        else:
+            arch = archived_map.get(iid)
+            if arch:
+                c["status"] = "archived"
+                c["archived_at"] = arch.get("archived_at")
+            else:
+                c["status"] = "active"
         items_out.append(c)
 
     active = [i for i in items_out if i.get("status") == "active"]
@@ -932,7 +961,18 @@ def collect() -> dict[str, Any]:
     }
 
 
+def registry_meta_by_id(item_id: str) -> dict[str, Any] | None:
+    for meta in (load_registry().get("items") or []):
+        if meta.get("id") == item_id:
+            return meta
+    return None
+
+
 def archive_item(item_id: str) -> bool:
+    meta = registry_meta_by_id(item_id)
+    if meta and meta.get("never_archive"):
+        print(f"# refuse archive (never_archive): {item_id}", file=sys.stderr)
+        return False
     data = load_archive()
     data.setdefault("archived", {})[item_id] = {"archived_at": now_iso()}
     save_archive(data)

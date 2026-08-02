@@ -101,6 +101,11 @@ export default async function SituationPage() {
           const label =
             level === "ok" ? "OK" : LEVEL_LABEL[level as HomeLevel] || it.level;
           const actions = readActions(it.payload);
+          const neverArchive = Boolean(
+            it.payload &&
+              typeof it.payload === "object" &&
+              (it.payload as { never_archive?: boolean }).never_archive,
+          );
           return (
             <article key={it.id} className={`card level-${it.level}`}>
               <header>
@@ -112,6 +117,7 @@ export default async function SituationPage() {
                   id={it.id}
                   status={it.status}
                   path="/situation"
+                  neverArchive={neverArchive}
                 />
               </header>
               <p className="sum">{it.summary}</p>

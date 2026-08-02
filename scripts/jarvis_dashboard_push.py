@@ -169,27 +169,103 @@ def push_watch(sb) -> int:
     data = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
     items = data.get("items") or []
     # Web アーカイブを Mac push で潰さない（ローカル archived は優先）
-    remote_arch: dict[str, Any] = {}
+    # never_archive / recent_fixes の確認状態は remote を優先マージ
+    remote_by_id: dict[str, Any] = {}
     try:
         r = (
             sb.table("watch_status")
-            .select("id,status,archived_at")
-            .eq("status", "archived")
+            .select("id,status,archived_at,payload")
             .execute()
         )
-        remote_arch = {x["id"]: x for x in (r.data or [])}
+        remote_by_id = {x["id"]: x for x in (r.data or [])}
     except Exception as e:
-        print(f"# watch archive merge skipped: {e}", file=sys.stderr)
+        print(f"# watch remote merge skipped: {e}", file=sys.stderr)
     rows = []
     for it in items:
         iid = str(it.get("id") or "").strip()
         if not iid:
             continue
+        payload = it.get("payload") if isinstance(it.get("payload"), dict) else {}
+        payload = dict(payload)
+        remote = remote_by_id.get(iid) or {}
+        remote_pl = remote.get("payload") if isinstance(remote.get("payload"), dict) else {}
+        never_archive = bool(payload.get("never_archive") or remote_pl.get("never_archive"))
+        if never_archive:
+            payload["never_archive"] = True
+
+        # merge confirm statuses from remote recent_fixes
+        local_fixes = list(payload.get("recent_fixes") or [])
+        remote_fixes = list(remote_pl.get("recent_fixes") or [])
+        remote_status = {
+            str(f.get("id")): f
+            for f in remote_fixes
+            if isinstance(f, dict) and f.get("id")
+        }
+        merged_fixes = []
+        seen_ids: set[str] = set()
+        for f in local_fixes:
+            if not isinstance(f, dict):
+                continue
+            fid = str(f.get("id") or "")
+            row = dict(f)
+            if fid and fid in remote_status:
+                rs = remote_status[fid]
+                if rs.get("status") in ("confirmed", "disputed"):
+                    row["status"] = rs.get("status")
+                    if rs.get("confirmed_at"):
+                        row["confirmed_at"] = rs.get("confirmed_at")
+            merged_fixes.append(row)
+            if fid:
+                seen_ids.add(fid)
+        for fid, rf in remote_status.items():
+            if fid not in seen_ids and rf.get("status") in ("confirmed", "disputed"):
+                merged_fixes.append(rf)
+        if merged_fixes:
+            payload["recent_fixes"] = merged_fixes[-40:]
+            payload["pending_confirm_count"] = sum(
+                1
+                for f in merged_fixes
+                if isinstance(f, dict) and f.get("status") == "pending_confirm"
+            )
+            # ローカル changelog にも確認状態を反映（再適用・pending 表示のずれ防止）
+            try:
+                cl_path = STATE / "zaim_watch_changelog.json"
+                if cl_path.is_file():
+                    cl = json.loads(cl_path.read_text(encoding="utf-8"))
+                    by_id = {
+                        str(f.get("id")): f
+                        for f in merged_fixes
+                        if isinstance(f, dict) and f.get("id")
+                    }
+                    changed = False
+                    for e in cl.get("entries") or []:
+                        fid = str(e.get("id") or "")
+                        if fid in by_id and by_id[fid].get("status") in (
+                            "confirmed",
+                            "disputed",
+                        ):
+                            if e.get("status") != by_id[fid].get("status"):
+                                e["status"] = by_id[fid].get("status")
+                                if by_id[fid].get("confirmed_at"):
+                                    e["confirmed_at"] = by_id[fid].get("confirmed_at")
+                                changed = True
+                    if changed:
+                        cl["updated_at"] = now_iso()
+                        cl_path.write_text(
+                            json.dumps(cl, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
+            except Exception as e:
+                print(f"# changelog sync skipped: {e}", file=sys.stderr)
+
         st = it.get("status") or "active"
         arch_at = it.get("archived_at")
-        if st != "archived" and iid in remote_arch:
+        if never_archive:
+            st = "active"
+            arch_at = None
+        elif st != "archived" and remote.get("status") == "archived":
             st = "archived"
-            arch_at = remote_arch[iid].get("archived_at")
+            arch_at = remote.get("archived_at")
         rows.append(
             {
                 "id": iid,
@@ -203,9 +279,7 @@ def push_watch(sb) -> int:
                 "status": st,
                 "archived_at": arch_at,
                 "checked_at": it.get("checked_at"),
-                "payload": it.get("payload")
-                if isinstance(it.get("payload"), dict)
-                else {},
+                "payload": payload,
                 "updated_at": now_iso(),
             }
         )

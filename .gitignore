@@ -67,6 +67,7 @@ ProgramCode/outputs/
 !.cursor/rules/jarvis-cloud-agent.mdc
 !.cursor/rules/jarvis-materials-ingest.mdc
 !.cursor/rules/notion-mcp-reauth.mdc
+!.cursor/rules/jarvis-zaim-watch.mdc
 .obsidian/
 .vscode/
 
