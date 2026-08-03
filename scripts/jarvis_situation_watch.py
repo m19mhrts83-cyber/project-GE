@@ -488,18 +488,29 @@ def eval_rent_step(meta: dict) -> dict[str, Any]:
         actionable
         or int(summary.get("overdue_count") or 0) > 0
         or int(summary.get("changed_count") or 0) > 0
+        or int(summary.get("deposit_mismatch_count") or 0) > 0
+        or int(summary.get("aggregate_need_count") or 0) > 0
+        or int(summary.get("follow_count") or 0) > 0
+        or int((lr.get("follow_drafts") or {}).get("follow_count") or 0) > 0
     )
     show_banner = has and ack != target
 
     parts: list[str] = []
+    follow = lr.get("follow_drafts") if isinstance(lr.get("follow_drafts"), dict) else {}
     if show_banner:
         parts.append(
             f"{target} · 未反映{summary.get('overdue_count', 0)}"
-            f" · 変動{summary.get('changed_count', 0)}"
-            f" · まもなく{summary.get('upcoming_count', 0)}"
+            f" · 様子見{summary.get('grace_count', 0)}"
+            f" · 入金差{summary.get('deposit_mismatch_count', 0)}"
+            f" · 入金様子見{follow.get('watch_count', summary.get('follow_watch_count', 0))}"
+            f" · フォロー下書き{follow.get('draft_count', summary.get('follow_draft_count', 0))}"
         )
-        for row in (summary.get("changed") or [])[:3]:
-            parts.append(f"変動 {row.get('label')}")
+        for d in (follow.get("drafts") or [])[:2]:
+            parts.append(f"下書き {d.get('manager')} {d.get('item_count')}件")
+        for row in (summary.get("grace") or [])[:2]:
+            parts.append(f"様子見 {row.get('label')}")
+        for row in (summary.get("deposit_mismatch") or [])[:2]:
+            parts.append(f"入金差 {row.get('label')}")
         for row in (summary.get("overdue") or [])[:2]:
             parts.append(f"未反映 {row.get('label')}")
     elif has and not show_banner:
@@ -514,9 +525,13 @@ def eval_rent_step(meta: dict) -> dict[str, Any]:
     level = "ok"
     if show_banner:
         level = "info"
-        if int(summary.get("overdue_count") or 0) > 0 or int(
-            summary.get("changed_count") or 0
-        ) > 0:
+        if (
+            int(summary.get("overdue_count") or 0) > 0
+            or int(summary.get("changed_count") or 0) > 0
+            or int(summary.get("deposit_mismatch_count") or 0) > 0
+            or int(summary.get("aggregate_need_count") or 0) > 0
+            or int(follow.get("follow_count") or 0) > 0
+        ):
             level = "attention"
         elif int(summary.get("upcoming_count") or 0) > 0:
             level = "warn"
@@ -526,25 +541,37 @@ def eval_rent_step(meta: dict) -> dict[str, Any]:
 
     detail_lines: list[str] = []
     if show_banner:
-        detail_lines.append("ダッシュボード /rent-step で号室別の期待家賃と変動を確認できます。")
-        for row in (summary.get("overdue") or [])[:5]:
+        detail_lines.append(
+            "ダッシュボード /rent-step で号室入金・フォロー下書きを確認できます。"
+        )
+        for d in (follow.get("drafts") or [])[:5]:
+            detail_lines.append(
+                f"· 下書き {d.get('manager')}: {d.get('subject')}（{d.get('item_count')}件）"
+            )
+        for row in (summary.get("overdue") or [])[:4]:
             detail_lines.append(f"· 未反映 {row.get('label')}: {row.get('reason')}")
-        for row in (summary.get("changed") or [])[:5]:
-            detail_lines.append(f"· 変動 {row.get('label')}: {row.get('reason')}")
-        for row in (summary.get("upcoming") or [])[:5]:
+        for row in (summary.get("deposit_mismatch") or [])[:4]:
+            detail_lines.append(f"· 入金差 {row.get('label')}: {row.get('reason')}")
+        for row in (summary.get("aggregates_need") or [])[:4]:
+            detail_lines.append(
+                f"· 合算 {row.get('title')}: gap={row.get('gap_yen')} → {row.get('memo_key')}"
+            )
+        for row in (summary.get("upcoming") or [])[:3]:
             detail_lines.append(f"· まもなく {row.get('label')}: {row.get('reason')}")
 
     hist = [h for h in (mon.get("change_history") or []) if isinstance(h, dict)][:20]
     payload = {
         "rent_summary": summary,
         "units": lr.get("units") or [],
+        "aggregates": lr.get("aggregates") or [],
+        "follow_drafts": follow,
         "change_history": hist,
         "dashboard_ack_target_month": ack,
         "show_banner": show_banner,
         "href": "/rent-step",
         "target_month": target,
-        "zaim_hint": lr.get("zaim_hint"),
         "grant_rule": lr.get("grant_rule"),
+        "note": lr.get("note"),
         "delta_yen": lr.get("delta_yen") or 4000,
     }
     return card(
