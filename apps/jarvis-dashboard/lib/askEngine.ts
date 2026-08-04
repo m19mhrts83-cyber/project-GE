@@ -1,6 +1,9 @@
 /** タスク／ウォッチ「聞く」エンジン解決（Cloud → Gemini → ローカル） */
 
-import { askWithCloudAgent } from "@/lib/cursor/cloudAsk";
+import {
+  askWithCloudAgent,
+  CLOUD_ASK_TIMEOUT_MS,
+} from "@/lib/cursor/cloudAsk";
 import { geminiReply } from "@/lib/geminiReply";
 import type { AskEngine, AskVia } from "@/lib/askEngineTypes";
 
@@ -46,11 +49,11 @@ export async function resolveAskReply(opts: {
         "Jarvis Cloud が使えなかったため（CURSOR_API_KEY 未設定）、Gemini に切り替えます",
       );
     } else {
+      // 聞くは no-repo（CURSOR_CLOUD_REPO_URL があっても渡さない）
       const cloud = await askWithCloudAgent({
         apiKey,
         prompt,
-        repoUrl: (process.env.CURSOR_CLOUD_REPO_URL || "").trim() || undefined,
-        timeoutMs: 75_000,
+        timeoutMs: CLOUD_ASK_TIMEOUT_MS,
       });
       if (cloud.ok) {
         return {

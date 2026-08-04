@@ -4,6 +4,7 @@ import StatusToggle from "@/components/StatusToggle";
 import WatchCommentThread, {
   type WatchCommentRow,
 } from "@/components/WatchCommentThread";
+import WatchHashFocus from "@/components/WatchHashFocus";
 import { LEVEL_LABEL, HomeLevel, watchSortKey } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
 
@@ -66,6 +67,7 @@ export default async function SituationPage() {
 
   return (
     <Shell active="/situation">
+      <WatchHashFocus />
       <h1>状況ウォッチ</h1>
       <p className="sub">
         気にしている項目（3段階: 要確認／注意／参考）。要対応は日付・店・金額まで表示。
@@ -107,7 +109,12 @@ export default async function SituationPage() {
               (it.payload as { never_archive?: boolean }).never_archive,
           );
           return (
-            <article key={it.id} className={`card level-${it.level}`}>
+            <article
+              key={it.id}
+              id={`watch-${it.id}`}
+              data-watch-id={it.id}
+              className={`card level-${it.level}`}
+            >
               <header>
                 <span className="lvl">{label}</span>
                 <strong>{it.title}</strong>
