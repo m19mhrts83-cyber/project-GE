@@ -14,8 +14,7 @@ import type { AskEngine } from "@/lib/askEngineTypes";
 import {
   buildLocalHandoffPrompt,
 } from "@/lib/localHandoff";
-import { defaultUseKamiooyaKnowledge } from "@/lib/kamiooya/lanes";
-import { defaultUseOnedriveYoritoori } from "@/lib/onedrive/retrieveYoritoori";
+import { defaultAskContextSources } from "@/lib/askContextBundle";
 import { formatJstMmDdHm } from "@/lib/formatJst";
 import { NOTION_TASK_LANES, guessPropertyName } from "@/lib/notionTaskDbs";
 import {
@@ -75,11 +74,11 @@ export default function CardTriageActions({
   const [localPrompt, setLocalPrompt] = useState<string>("");
   const [needLocal, setNeedLocal] = useState(false);
   const [engine, setEngine] = useState<AskEngine>("cursor");
-  const [useKamiooya, setUseKamiooya] = useState(() =>
-    defaultUseKamiooyaKnowledge(lane),
+  const [useKamiooya, setUseKamiooya] = useState(
+    () => defaultAskContextSources(lane).kamiooya,
   );
-  const [useOnedrive, setUseOnedrive] = useState(() =>
-    defaultUseOnedriveYoritoori(lane),
+  const [useOnedrive, setUseOnedrive] = useState(
+    () => defaultAskContextSources(lane).onedriveYoritoori,
   );
   const [pending, start] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -439,6 +438,19 @@ export default function CardTriageActions({
             disabled={pending || macPolling}
           />
           OneDriveやり取り末尾を参照（5.やり取り.md／Graph）
+        </label>
+        <label
+          className="draft-engine-opt"
+          style={{
+            display: "flex",
+            marginTop: 6,
+            gap: 8,
+            opacity: 0.65,
+          }}
+          title="Phase3。Cloud 対話は NotebookLM MCP、ダッシュボード ask は後続"
+        >
+          <input type="checkbox" checked={false} disabled />
+          Google Drive／NotebookLM（Phase3・未実装）
         </label>
         <textarea
           value={text}

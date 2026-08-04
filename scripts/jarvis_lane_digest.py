@@ -242,22 +242,22 @@ def push_cards(cards: list[dict[str, Any]]) -> int:
         raise SystemExit("JARVIS_SUPABASE_* 未設定")
     sb = create_client(url, key)
 
-    # Don't revive archived digest ids
-    remote_arch: set[str] = set()
+    # Don't revive archived / promoted digest ids
+    remote_locked: set[str] = set()
     try:
         r = (
             sb.table("cards")
             .select("id")
-            .eq("status", "archived")
+            .in_("status", ["archived", "promoted"])
             .execute()
         )
-        remote_arch = {x["id"] for x in (r.data or [])}
+        remote_locked = {x["id"] for x in (r.data or [])}
     except Exception as e:
-        print(f"# archive merge skipped: {e}", file=sys.stderr)
+        print(f"# archive/promoted merge skipped: {e}", file=sys.stderr)
 
     rows = []
     for c in cards:
-        if c["id"] in remote_arch:
+        if c["id"] in remote_locked:
             continue
         rows.append(
             {
