@@ -1,0 +1,36 @@
+{
+  "updated_at": null,
+  "disabled": false,
+  "policy": {
+    "default_cancel_mode": "即時退会",
+    "cancel_at_expiry_requires_explicit_consent": true,
+    "dual_fee_bearing_cards": "warn",
+    "rule": "jarvis-card-fee-guard.mdc"
+  },
+  "lessons": {
+    "date": null,
+    "summary": "有効期限退会≠解約済み。二重会員は両方に年会費。支払先切替だけでは防げない。"
+  },
+  "cards": [
+    {
+      "id": "olive_infinite",
+      "label": "Olive フレキシブルペイ Visa Infinite",
+      "product": "Olive INF",
+      "annual_fee_yen": 99000,
+      "status": "active",
+      "join_month": "YYYY-MM",
+      "last_fee_date": null,
+      "last_fee_yen": null,
+      "next_fee_date": null,
+      "cancel_deadline_to_skip_next": null,
+      "cancel_mode": null,
+      "evidence": [],
+      "waiver_notes": "",
+      "actions": []
+    }
+  ],
+  "investigation": {
+    "date": null,
+    "verdict": null
+  }
+}

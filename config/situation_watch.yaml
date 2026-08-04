@@ -51,6 +51,19 @@ items:
       コマンド: scripts/jarvis_rent_step_monthly_check.py --mark-done
       未反映・変動があれば /rent-step と家賃マップ更新を案内して。
 
+  - id: card_annual_fee
+    title: カード年会費（Olive / PP）
+    category: finance
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/card_annual_fee.json
+    cursor_prompt: |
+      カード年会費の状況を確認して。state: .jarvis_state/card_annual_fee.json
+      ルール: jarvis-card-fee-guard.mdc（有効期限退会≠完了、二重会員は両方に年会費）。
+      Olive Infinite（99,000）と単体PP（退会済みなら追加なし）を分けて報告。
+      次回引落日・解約期限・退会モード・資産運用特典を整理。期限が近いなら先に警告。
+      秘密は .env.jarvis_private（PP_CANCEL_* / OLIVE_INF_*_FEE_*）。値は出さない。
+
   - id: line_export
     title: LINE公式エクスポート経過
     category: line

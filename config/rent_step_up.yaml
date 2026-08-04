@@ -1,27 +1,90 @@
-# Grandole 家賃ステップアップ（入居1年で +4,000円）
-# 月次確認: scripts/jarvis_rent_step_monthly_check.py
-# ダッシュボード: /rent-step（ETC/Vポイント同型の確認バナー）
+# Grandole 家賃ステップアップ（入居1年で +4,000円）＋入金突合
+# 月次: scripts/jarvis_rent_step_monthly_check.py
+# 入金: scripts/jarvis_rent_deposit_ingest.py → .jarvis_state/rent_deposits.json
+# ダッシュボード: /rent-step
 
 version: 1
 
 defaults:
   delta_yen: 4000
   upcoming_days: 45
-  # 対象物件
+  # 1年後 = 入居日ズバリ（空室対策メール「入居から1年間」）
+  anniversary_mode: exact_day
+  # 記念日直後は様子見。+30日以降に未反映を overdue
+  overdue_grace_days: 30
+  # +60日以降に増額未反映のフォロー下書き候補を強く出す
+  follow_draft_grace_days: 60
+  # 入金未確認は送金月ベースで1ヶ月様子見してから下書き
+  deposit_follow_grace_months: 1
+  deposit_mismatch_yen: 500
+  # 合算突合で「差」とみなす下限（管理費差引後のため大きめ）
+  aggregate_gap_alert_yen: 30000
   property_ids:
     - grandole-i
     - grandole-ii
+  # 想定家賃の優先: vacancy_mail → yaml units → occupancy note
+  rent_source_priority:
+    - vacancy_mail
+    - yaml_override
+    - occupancy_note
+
+# 物件ごとの入金口座（Zaim 入金先マッチ）
+# LEAF は現行・京都銀行（変更予定）。ミニテック送金は PayPay に着金することが多い。
+deposit_accounts:
+  grandole-i:
+    bank_id: paypay
+    zaim_match: "★PayPay銀行"
+    note: "Grandole I の主口座。Tcell(I-102)・ミニテック送金もここに着金しやすい"
+  grandole-ii:
+    bank_id: mufg
+    zaim_match: "★MUFG(アパート経営)"
+    note: "ホームプランナー紙明細。号室内訳なし → 合算＋メモ運用"
+  caramel:
+    bank_id: shiga
+    zaim_match: "★滋賀銀行"
+    note: "Tcell・キャラメル送金先"
+  # LEAF 現行（Grandole I の LEAF 号室）。変更予定のためメモ必須になりやすい
+  leaf_legacy:
+    bank_id: kyoto
+    zaim_match: "★京都銀行"
+    note: "LEAF 現行振込先。コミュニケーション後に変更予定"
+
+# 管理会社 → 明細ソース
+managers:
+  LEAF:
+    mode: pdf
+    partner: leaf
+    bank_fallback: leaf_legacy
+  ミニテック:
+    mode: pdf
+    partner: minitech
+    bank_fallback: null  # 号室PDF優先。口座は grandole-i(PayPay)
+  Tcell:
+    mode: pdf_or_aggregate
+    partner: tcell
+    # LINE明細PDFが無いとき → ホームプランナーと同型（物件口座合算＋メモ）
+    # I → PayPay / キャラメル → 滋賀（Tcellは両口座へ振込）
+    aggregate_by_property: true
+  ホームプランナー:
+    mode: aggregate
+    partner: homeplanner
+    # 紙明細のみ。II → MUFG 合算＋メモ
+    aggregate_by_property: true
+
+# 合算差のメモ（キー: "{group}:{YYYY-MM}"）
+# group 例: hp:grandole-ii / tcell:grandole-i / tcell:caramel / leaf:kyoto
+aggregate_memos: {}
+# 例:
+#   "hp:grandole-ii:2026-07": "管理費・振込手数料差引のため△約4万は想定内"
+#   "tcell:grandole-i:2026-07": "LINE明細未着。PayPay着金を目視済み"
 
 # 号室ごとの上書き（入居日がメモから曖昧なとき）
-# move_in: YYYY-MM-DD / year1_rent・year2_rent 任意
 units:
-  # I-103: 8/11〜入居・＊26/7まで▲4,000 → 入居 2025-08-11、2年目は 2026-08〜
   - property_id: grandole-i
     room: "103"
     move_in: "2025-08-11"
-    year1_rent: 49000
-    year2_rent: 53000
-  # II-203: 〜8月まで1年目 49,000（帳簿はまだ 56800 の可能性あり）
+    year1_rent: 45000
+    year2_rent: 49000
   - property_id: grandole-ii
     room: "203"
     campaign_end_ym: "2026-08"
