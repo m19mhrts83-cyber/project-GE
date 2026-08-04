@@ -441,6 +441,223 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
     )
 
 
+def _parse_ymd(s: str) -> date | None:
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def eval_card_annual_fee(meta: dict, data: dict | None) -> dict[str, Any]:
+    """Olive / 単体PP の年会費ウォッチ（二重会員・有効期限退会・期限前を強調）。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="未設定または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+
+    cards = [c for c in (data.get("cards") or []) if isinstance(c, dict)]
+    inv = data.get("investigation") if isinstance(data.get("investigation"), dict) else {}
+    lessons = data.get("lessons") if isinstance(data.get("lessons"), dict) else {}
+    today = datetime.now(JST).date()
+
+    parts: list[str] = []
+    detail_lines: list[str] = []
+    actions: list[dict[str, Any]] = []
+    level = "info"
+    attention = False
+    fee_bearing_active = 0
+    risk_flags: list[str] = []
+
+    cancelled_prefixes = ("cancelled", "cancel_done", "closed")
+
+    for c in cards:
+        label = str(c.get("label") or c.get("id") or "カード")
+        status = str(c.get("status") or "")
+        cancel_mode = str(c.get("cancel_mode") or "")
+        fee = c.get("annual_fee_yen")
+        last_d = str(c.get("last_fee_date") or "") or "—"
+        next_d = str(c.get("next_fee_date") or "") or "—"
+        deadline = str(c.get("cancel_deadline_to_skip_next") or "") or "—"
+        last_yen = c.get("last_fee_yen")
+        is_cancelled = status.lower().startswith(cancelled_prefixes)
+        parts.append(f"{label}: {status}")
+        fee_line = (
+            f"- 年会費: {fee:,}円"
+            if isinstance(fee, int)
+            else f"- 年会費: {fee}"
+        )
+        last_line = f"- 直近請求: {last_d}"
+        if isinstance(last_yen, int):
+            last_line += f" / {last_yen:,}円"
+        detail_lines.append(
+            "\n".join(
+                [
+                    f"【{label}】",
+                    f"- 状態: {status}",
+                    fee_line,
+                    last_line,
+                    f"- 次回見込み: {next_d}",
+                    f"- 次回回避の解約期限: {deadline}",
+                ]
+            )
+        )
+        if cancel_mode:
+            detail_lines.append(f"- 退会モード: {cancel_mode}")
+        if c.get("waiver_notes"):
+            detail_lines.append(f"- 無料化メモ: {c.get('waiver_notes')}")
+        for ev in (c.get("evidence") or [])[:4]:
+            detail_lines.append(f"  · {ev}")
+        for a in c.get("actions") or []:
+            actions.append(
+                {
+                    "date": str(c.get("id") or ""),
+                    "shop": label,
+                    "proposal": str(a),
+                    "line": f"{label} — {a}",
+                    "kind": "card_annual_fee_action",
+                }
+            )
+
+        # 課金対象として残っているか
+        if not is_cancelled and isinstance(fee, int) and fee >= 10000:
+            if "有効期限" in cancel_mode or status in (
+                "active",
+                "active_charged",
+                "cancel_at_expiry_pending",
+                "fee_notice_aug2_zaim_pending",
+            ):
+                fee_bearing_active += 1
+
+        # 有効期限退会＝まだ会員（完了扱いしない）
+        if (not is_cancelled) and (
+            "有効期限" in cancel_mode or status == "cancel_at_expiry_pending"
+        ):
+            attention = True
+            level = "warn"
+            risk_flags.append(f"{label}: 有効期限退会中＝年会費リスク継続")
+            actions.append(
+                {
+                    "date": str(c.get("id") or ""),
+                    "shop": label,
+                    "proposal": "即時退会へ切り替え（有効期限退会のままでは年会費がかかりうる）",
+                    "line": f"{label} — 即時退会へ切り替え（有効期限退会のままでは年会費がかかりうる）",
+                    "kind": "card_annual_fee_guard",
+                }
+            )
+
+        # 解約期限・次回請求のカウントダウン（高額は早めに）
+        fee_yen = fee if isinstance(fee, int) else 0
+        warn_days = 180 if fee_yen >= 30000 else 120
+        atten_days = 90 if fee_yen >= 30000 else 60
+        try:
+            if last_d and last_d != "—":
+                ld = _parse_ymd(last_d)
+                if ld and 0 <= (today - ld).days <= 90 and not is_cancelled:
+                    attention = True
+            if next_d and next_d != "—":
+                nd = _parse_ymd(next_d)
+                if nd:
+                    days = (nd - today).days
+                    if 0 <= days <= atten_days:
+                        attention = True
+                        level = "warn"
+                        risk_flags.append(f"{label}: 次回年会費まであと{days}日")
+                    elif 0 <= days <= warn_days:
+                        attention = True
+                        risk_flags.append(f"{label}: 次回年会費まであと{days}日")
+            if deadline and deadline != "—":
+                dd = _parse_ymd(deadline)
+                if dd:
+                    days = (dd - today).days
+                    if 0 <= days <= atten_days:
+                        attention = True
+                        level = "warn"
+                        risk_flags.append(f"{label}: 次回回避の解約期限まであと{days}日")
+                    elif 0 <= days <= warn_days:
+                        attention = True
+                        risk_flags.append(f"{label}: 次回回避の解約期限まであと{days}日")
+                    elif days < 0 and not is_cancelled:
+                        attention = True
+                        level = "warn"
+                        risk_flags.append(f"{label}: 解約期限超過（次回年会費確定の可能性）")
+        except Exception:
+            pass
+
+        if status in ("active_charged", "cancel_at_expiry_pending"):
+            attention = True
+
+    # 二重会員（高額年会費が2枚以上アクティブ）
+    if fee_bearing_active >= 2:
+        attention = True
+        level = "warn"
+        risk_flags.append(
+            f"高額年会費カードが{fee_bearing_active}枚並行（二重課金リスク）"
+        )
+        actions.insert(
+            0,
+            {
+                "date": "dual",
+                "shop": "カード年会費ガード",
+                "proposal": "捨てるカードは即時退会。有効期限退会は明示同意があるときだけ",
+                "line": "カード年会費ガード — 捨てるカードは即時退会。有効期限退会は明示同意があるときだけ",
+                "kind": "card_annual_fee_guard",
+            },
+        )
+
+    if risk_flags:
+        detail_lines.append("\n【リスク】\n" + "\n".join(f"- {x}" for x in risk_flags))
+
+    if lessons.get("summary"):
+        detail_lines.append(f"\n【教訓】\n{lessons.get('summary')}")
+
+    if inv.get("verdict"):
+        detail_lines.append(f"\n【調査結論】\n{inv.get('verdict')}")
+    for w in (inv.get("why_charged") or [])[:5]:
+        detail_lines.append(f"- 原因: {w}")
+    for a in (inv.get("avoidance") or [])[:5]:
+        detail_lines.append(f"- 回避策: {a}")
+
+    if attention and level == "info":
+        level = "attention"
+
+    summary = " · ".join(parts) if parts else "カード情報なし"
+    if risk_flags:
+        summary = "⚠️ " + " / ".join(risk_flags[:2])
+    elif inv.get("verdict"):
+        summary = str(inv["verdict"])[:160]
+
+    payload: dict[str, Any] = {
+        "cards": cards,
+        "investigation": inv or None,
+        "lessons": lessons or None,
+        "risk_flags": risk_flags,
+        "href": "/situation#watch-card_annual_fee",
+    }
+    if actions:
+        payload["actions"] = actions
+
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=summary,
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload=payload,
+    )
+
+
 def eval_rent_step(meta: dict) -> dict[str, Any]:
     """Grandole 入居1年 +4,000 の月次確認（ETC/Vポイント同型バナー）。"""
     title = meta["title"]
@@ -1124,6 +1341,9 @@ EVALUATORS = {
     "etc_mileage": lambda m: eval_etc(m, load_json(STATE / "etc_monthly.json")),
     "vpoint": lambda m: eval_vpoint(m),
     "rent_step": lambda m: eval_rent_step(m),
+    "card_annual_fee": lambda m: eval_card_annual_fee(
+        m, load_json(STATE / "card_annual_fee.json")
+    ),
     "line_export": lambda m: eval_line_export(m, load_json(STATE / "line_export_reminder.json")),
     "energy_cf": lambda m: eval_energy_cf(m, load_json(STATE / "energy_cf.json")),
     "westudy_weekly": lambda m: eval_westudy(m, load_json(STATE / "westudy_weekly_watch.json")),

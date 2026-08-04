@@ -1,0 +1,96 @@
+{
+  "updated_at": "2026-08-04T22:45:00+09:00",
+  "disabled": false,
+  "policy": {
+    "default_cancel_mode": "即時退会",
+    "cancel_at_expiry_requires_explicit_consent": true,
+    "dual_fee_bearing_cards": "warn",
+    "rule": "jarvis-card-fee-guard.mdc"
+  },
+  "lessons": {
+    "date": "2026-08-04",
+    "summary": "有効期限をもって退会＝解約済みではない。移行中の二重会員は両方に年会費がかかりうる。支払先切替（CARD_MIG_*）だけでは年会費を防げない。既払年会費は返金不可。会話では先にカレンダー（次回日・解約期限・退会モード）を出す。",
+    "incident": "単体PPを2026-06-28に有効期限退会申込のまま放置→2026-07-31に33,000円。同期間Olive INFで99,000円。2026-08-04にPP即時退会完了。"
+  },
+  "cards": [
+    {
+      "id": "olive_infinite",
+      "label": "Olive フレキシブルペイ Visa Infinite",
+      "product": "Olive INF",
+      "annual_fee_yen": 99000,
+      "status": "fee_notice_aug2_zaim_pending",
+      "join_month": "2026-06",
+      "last_fee_date": "2026-08-02",
+      "last_fee_yen": 99000,
+      "last_fee_channel": "debit_mode_olive_account",
+      "last_fee_zaim": null,
+      "next_fee_date": "2027-08-02",
+      "cancel_deadline_to_skip_next": "2027-06-30",
+      "evidence": [
+        "Gmail 2026-07-21/31: 年会費99,000円・引落日2026-08-02（デビット）",
+        "Gmail 2026-08-02: Oliveデビット利用通知（年会費発生ケース含む）",
+        "Zaim 2026-08-04再取得時点では99,000円行は未同期（口座デビットのためカード明細に出にくい）"
+      ],
+      "waiver_notes": "Olive資産運用特典: 円普通≥500万 かつ SBI≥500万 かつ 合算≥5,000万で年会費無料（要公式確認）。",
+      "actions": [
+        "三井住友銀行アプリで2026-08-02の99,000円引落を確認しZaimへ反映",
+        "資産運用特典の残高条件を試算",
+        "不要なら2027-06-30までにランク変更または解約（有効期限退会にしない）"
+      ]
+    },
+    {
+      "id": "smcc_pp_standalone",
+      "label": "三井住友カード プラチナプリファード（単体）",
+      "product": "PP standalone",
+      "annual_fee_yen": 33000,
+      "status": "cancelled_2026-08-04",
+      "cancel_applied_at": "2026-06-28",
+      "cancel_completed_at": "2026-08-04",
+      "cancel_mode": "即時退会（完了）",
+      "expiry": null,
+      "last_fee_date": "2026-07-31",
+      "last_fee_yen": 33000,
+      "last_fee_channel": "zaim_card_meisai",
+      "last_fee_zaim": {
+        "date": "2026-07-31",
+        "pay": "三井住友カード プラチナ プラチナプリファード",
+        "item": "プラチナプリファード年会費",
+        "category": "カード年会費 AMEX/JRE",
+        "amount": 33000,
+        "note": "カテゴリ名はAMEX/JREだが品目・支払元はPP年会費"
+      },
+      "next_fee_date": null,
+      "cancel_deadline_to_skip_next": null,
+      "evidence": [
+        "Zaim 2026-08-04再取得: 2026-07-31 / ¥33,000 / 品目=プラチナプリファード年会費 / 支払元=プラチナプリファード",
+        "Gmail 2026-08-01: 選べる無料保険メール宛名が『プラチナプリファード会員』→退会完了前",
+        "Gmail 2026-07-26: ご利用カード=プラチナプリファード（利用継続）",
+        "PP_CANCEL_MODE 当初=有効期限をもって退会 → 期限内に年会費発生",
+        "Vpass 2026-08-04: プラチナプリファード「解約お手続きを完了しました」。返金不可。Olive INFは維持。"
+      ],
+      "actions": [
+        "プラスチックを裁断して破棄",
+        "Wallet / 定期支払い / ETC / PiTaPa が旧PPに紐づいていないか確認",
+        "完了メール（登録アドレス）を確認"
+      ]
+    }
+  ],
+  "investigation": {
+    "date": "2026-08-04",
+    "user_report": "財務で33,000円が引かれた。PPだと思う。加えて99,000円もかかる理解。",
+    "verdict": "単体PPは2026-08-04にVpass退会完了。既払33,000は返金不可。Olive INF（99,000）は継続。次回INF回避期限は2027-06-30。",
+    "why_charged": [
+      "単体PPは『有効期限をもって退会』のため、退会完了前に年会費33,000が計上された",
+      "並行してOlive Infinite入会により99,000も請求（別契約）",
+      "支払先移行（CARD_MIG_*）を優先し、年会費カレンダー・即時退会を会話の中心に置けなかった",
+      "2026-07-26時点でもPPカード利用通知あり＝PPは稼働継続"
+    ],
+    "avoidance": [
+      "単体PP: 2026-08-04 Vpass即時退会完了（追加年会費は原則発生しない）",
+      "Olive INF: 資産運用特典で無料化、または下位ランクへ変更、次回は2027-06-30までに解約（即時）",
+      "今後の切替: 新カード利用開始後は旧カードを即時退会。有効期限退会は明示同意＋金額リスク提示後のみ",
+      "33,000円の既払年会費は公式注意どおり返金不可"
+    ],
+    "zaim_export": "Zaim.20260804221403.csv / OneDrive 2026年度/Zaim.2026年度.csv"
+  }
+}

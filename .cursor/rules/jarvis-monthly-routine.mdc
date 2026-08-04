@@ -54,6 +54,8 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 
 無効化: `.jarvis_state/billing_monthly.json` の `"disabled": true` または `JARVIS_BILLING_MONTHLY_DISABLE=1`。
 
+**カード年会費（ついで）**: ウィンドウ A/D のとき、`card_annual_fee.json` または `OLIVE_INF_CANCEL_DEADLINE_TO_SKIP_NEXT` まで **60日以内**なら末尾に1行（ルール: `jarvis-card-fee-guard.mdc`）。有効期限退会のままのカードがあれば即警告。
+
 ## 実施手順（ETC・必須）
 
 1. **無効化**を確認（上記）。無効ならスキップ。
