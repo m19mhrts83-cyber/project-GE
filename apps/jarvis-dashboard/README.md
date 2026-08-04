@@ -38,6 +38,20 @@ UI で **Jarvis Cloud**（既定）／ **Gemini** を明示選択。
 
 切替時はバナーで「Cloud が失敗したため Gemini に…」等を必ず表示。
 
+### 聞くの文脈ソース（注入型）
+
+**Web／no-repo Cloud は OneDrive・Google Drive・ローカル path を直接見ない。**  
+Server Action が読んでプロンプトに注入する（`lib/askContextBundle.ts`）。
+
+| ソース | 既定オン | Vercel 秘密 |
+|---|---|---|
+| カード／コメントスレ | 常時 | `JARVIS_SUPABASE_*`（既存） |
+| 神大家 kamiooya-qa | 運営／戸建／物件レーン | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（**運営 PJ・読取のみ**） |
+| OneDrive `5.やり取り.md` | partner／物件レーン | `MS_GRAPH_CLIENT_ID` / `REFRESH_TOKEN` / `AUTHORITY` |
+| admin Drive／NotebookLM | Phase3・UI は無効 | Cloud 対話は NotebookLM MCP。ダッシュボード ask は後続 |
+
+失敗したソースは notice のみで聞く自体は続行。同じ根拠ブロックをローカルコピー／Mac キューに同梱する。
+
 ```bash
 # Mac Worker（一度だけ・revise と ask を同じ runner）
 ~/git-repos/launchd/install_cursor_revise_worker_launchd.sh
@@ -66,7 +80,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ### 課金／SaaS（`/billing`）
 
-サイドバー **課金**。正本 `config/subscriptions.yaml` → `jarvis_subscriptions_push.py --push`（`jarvis_dashboard_push.py` にも同梱）。
+サイドバー **サブスク・課金**。正本 `config/subscriptions.yaml` → `jarvis_subscriptions_push.py --push`（`jarvis_dashboard_push.py` にも同梱）。
+
+- push 時に `.jarvis_state/subscriptions_snapshots/YYYY-MM.json` と `sync_meta.subscriptions_monthly_summary` を更新
+- `/billing` 先頭に確認サマリー（新規・金額変更・注視・前月比）
+- 月次促し（1〜8日）: `jarvis_billing_monthly_check.py` / `--mark-done`
 
 ### 設計メモ・引き継ぎ
 
@@ -124,14 +142,15 @@ Site URL = `https://jarvis-dashboard-amber.vercel.app`、Redirect に `/auth/cal
 
 1. Vercel にログインし、ルートを `apps/jarvis-dashboard` にして import
 2. Environment Variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`（**`sb_publishable_…`**。Legacy anon JWT は disabled → `Legacy API keys are disabled`）
-   - `NEXT_PUBLIC_SITE_URL` = 本番 URL（例 `https://….vercel.app`）
-   - （送信・見直し）`GMAIL_CREDENTIALS_B64` / `GMAIL_ESTATE_TOKEN_B64` / 任意 `GEMINI_API_KEY`（サーバー専用）
+   - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`（**jarvis-dashboard**・`sb_publishable_…`）
+   - `NEXT_PUBLIC_SITE_URL` = 本番 URL
+   - （送信・見直し・聞く）`CURSOR_API_KEY` / 任意 `GEMINI_API_KEY` / `GMAIL_*`
+   - （聞く・神大家注入）`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（**kamiooya-qa 読取のみ**。JARVIS_SUPABASE_* とは別）
+   - （聞く・OneDrive 注入）`MS_GRAPH_CLIENT_ID` / `MS_GRAPH_REFRESH_TOKEN` / `MS_GRAPH_AUTHORITY=consumers`
 3. Supabase Auth → URL Configuration:
    - Site URL = 本番 URL
    - Redirect URLs に `https://….vercel.app/auth/callback` を追加（ローカルも残す）
-4. service_role は Vercel に載せない（Mac push 専用）
+4. **jarvis-dashboard** の `JARVIS_SUPABASE_SERVICE_ROLE_KEY` は Mac push 専用（Vercel のブラウザ向けには載せない）。運営 `SUPABASE_SERVICE_ROLE_KEY` は Server Action 読取用のみ Vercel 可
 
 ```bash
 # CLI がある場合
