@@ -441,7 +441,7 @@ def push_lanes_finance_subscriptions() -> tuple[int, int, int, int]:
     exe = str(py) if py.is_file() else sys.executable
     cards_n = fin_n = sub_n = occ_n = 0
     try:
-        # 機械的大量カードは出さない。要約確認テーマのみ push
+        # 機械的大量カードは出さない。要約確認テーマ + Gemini 処置要約
         r = subprocess.run(
             [exe, str(REPO / "scripts" / "jarvis_lane_digest.py"), "--push"],
             cwd=str(REPO),
@@ -452,8 +452,24 @@ def push_lanes_finance_subscriptions() -> tuple[int, int, int, int]:
         print(r.stderr or "", file=sys.stderr, end="")
         if r.returncode == 0:
             cards_n = 1
+        r2 = subprocess.run(
+            [
+                exe,
+                str(REPO / "scripts" / "jarvis_dashboard_lanes.py"),
+                "--action-summary",
+                "--push",
+            ],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=os.environ.copy(),
+        )
+        print(r2.stderr or "", file=sys.stderr, end="")
+        if r2.returncode == 0:
+            cards_n = max(cards_n, 1)
     except Exception as e:
-        print(f"# lane digest push failed: {e}", file=sys.stderr)
+        print(f"# lane digest / action_summary push failed: {e}", file=sys.stderr)
     try:
         r = subprocess.run(
             [exe, str(REPO / "scripts" / "jarvis_lane_log_flush.py")],
