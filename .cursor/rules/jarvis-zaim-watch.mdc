@@ -1,11 +1,17 @@
+---
+description: Zaim Watch（財務常駐）。二重取込／集計設定の自動直し＋/zaim 確認。CSV週次・金曜・Zaim言及時。
+alwaysApply: true
+---
+
 # Zaim Watch（Jarvis）
 
 財務の集計・二重取込・連携鮮度を常駐で見る。ダッシュボード「お金 → Zaim Watch」（`/zaim`）。
 
 ## トリガー
 
-- 土曜 CSV 週次 runner の後（自動）
-- ユーザーが Zaim／財務／二重取込／集計設定に言及したとき
+- 金曜 CSV 週次 runner の後（自動）
+- 金曜 銀行連携 runner の後（自動・`--skip-finance`）
+- ユーザーが Zaim／財務／二重取込／集計設定に言及したとき → 同 runner を実行してよい
 - 状況ウォッチ評価時（検知のみ。自動 apply は runner）
 
 ## コマンド
@@ -20,5 +26,6 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ## 方針
 
 - 確信度が高い集計設定直しは自動適用 → `/zaim` で「確認OK／おかしい」
-- アーカイブしない（`never_archive`）
+- アーカイブしない（`never_archive`、id は `zaim_quality` のまま）
 - Suica 画像認証・ANA／NRK は対象外または手動
+- ナビ本線はお金グループ。状況ウォッチからも `/zaim` へ誘導
