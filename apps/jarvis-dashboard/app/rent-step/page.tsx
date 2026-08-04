@@ -9,14 +9,48 @@ type UnitRow = {
   id?: string;
   label?: string;
   flag?: string;
+  manager?: string | null;
   book_rent?: number | null;
   expected_rent?: number | null;
   year1_rent?: number | null;
   year2_rent?: number | null;
+  observed_deposit?: number | null;
+  deposit_source?: string | null;
+  deposit_ym?: string | null;
+  deposit_gap_yen?: number | null;
+  deposit_flag?: string | null;
   move_in?: string | null;
   anniversary?: string | null;
   reason?: string;
-  phase?: string;
+};
+
+type AggregateRow = {
+  group?: string;
+  title?: string;
+  bank_label?: string;
+  bank_note?: string;
+  book_rent_sum?: number | null;
+  observed_yen?: number | null;
+  observed_ym?: string | null;
+  gap_yen?: number | null;
+  memo?: string | null;
+  memo_key?: string;
+  needs_memo?: boolean;
+  missing_bank?: boolean;
+  rooms?: string[];
+  flag?: string;
+};
+
+type FollowDraft = {
+  manager?: string;
+  channel?: string;
+  subject?: string;
+  item_count?: number;
+  draft_path?: string | null;
+  send_path?: string | null;
+  promote_hint?: string;
+  preview?: string;
+  items?: { label?: string; kind?: string; reason?: string; gap_yen?: number | null }[];
 };
 
 type ChangeRow = {
@@ -24,9 +58,7 @@ type ChangeRow = {
   label?: string;
   from?: number | null;
   to?: number | null;
-  at?: string;
   target_month?: string;
-  reason?: string;
 };
 
 function fmtYen(n: number | null | undefined) {
@@ -42,6 +74,10 @@ function flagLabel(flag: string | undefined) {
       return "変動";
     case "upcoming":
       return "まもなく";
+    case "grace":
+      return "様子見";
+    case "deposit_mismatch":
+      return "入金差";
     case "unknown":
       return "不明";
     case "skip":
@@ -72,6 +108,16 @@ export default async function RentStepPage() {
   const units = Array.isArray(payload.units)
     ? (payload.units as UnitRow[])
     : [];
+  const aggregates = Array.isArray(payload.aggregates)
+    ? (payload.aggregates as AggregateRow[])
+    : [];
+  const followPayload =
+    payload.follow_drafts && typeof payload.follow_drafts === "object"
+      ? (payload.follow_drafts as Record<string, unknown>)
+      : {};
+  const followDrafts = Array.isArray(followPayload.drafts)
+    ? (followPayload.drafts as FollowDraft[])
+    : [];
   const history = Array.isArray(payload.change_history)
     ? (payload.change_history as ChangeRow[])
     : [];
@@ -87,7 +133,11 @@ export default async function RentStepPage() {
     target != null &&
     (actionable ||
       Number(summary.overdue_count || 0) > 0 ||
-      Number(summary.changed_count || 0) > 0);
+      Number(summary.changed_count || 0) > 0 ||
+      Number(summary.deposit_mismatch_count || 0) > 0 ||
+      Number(summary.aggregate_need_count || 0) > 0 ||
+      Number(followPayload.follow_count || 0) > 0 ||
+      followDrafts.length > 0);
   const showBanner =
     typeof payload.show_banner === "boolean"
       ? payload.show_banner
@@ -95,28 +145,26 @@ export default async function RentStepPage() {
 
   const delta =
     typeof payload.delta_yen === "number" ? payload.delta_yen : 4000;
-  const zaim =
-    payload.zaim_hint && typeof payload.zaim_hint === "object"
-      ? (payload.zaim_hint as Record<string, unknown>)
-      : null;
 
   const focusUnits = units.filter((u) =>
-    ["overdue", "changed", "upcoming"].includes(u.flag || ""),
+    ["overdue", "changed", "upcoming", "deposit_mismatch", "grace"].includes(
+      u.flag || "",
+    ),
   );
 
   return (
     <Shell active="/rent-step">
       <h1>Grandole 家賃ステップ</h1>
       <p className="sub">
-        入居から1年で家賃 +{delta.toLocaleString("ja-JP")}
-        円。月次で帳簿家賃と入居日起算を突合し、変動・未反映を確認します。
+        入居1年で +{delta.toLocaleString("ja-JP")}
+        円（空室対策メール正本・入居日ズバリ）。未反映は記念日+30日以降。入金フォローは様子見後に下書き。
       </p>
 
       {showBanner && has && target ? (
         <article className="card level-info etc-rebate-banner">
           <header>
             <span className="lvl">確認</span>
-            <strong>{target}分の家賃チェック</strong>
+            <strong>{target}分の家賃・入金チェック</strong>
           </header>
           <div className="etc-rebate-hero">
             <div>
@@ -126,29 +174,43 @@ export default async function RentStepPage() {
               </strong>
             </div>
             <div>
-              <span className="meta">変動</span>
-              <strong>{Number(summary.changed_count || 0)}件</strong>
+              <span className="meta">様子見</span>
+              <strong>{Number(summary.grace_count || 0)}件</strong>
             </div>
             <div>
-              <span className="meta">まもなく2年目</span>
-              <strong>{Number(summary.upcoming_count || 0)}件</strong>
+              <span className="meta">入金差</span>
+              <strong>{Number(summary.deposit_mismatch_count || 0)}件</strong>
             </div>
             <div>
-              <span className="meta">OK</span>
-              <strong>{Number(summary.ok_count || 0)}件</strong>
+              <span className="meta">入金様子見</span>
+              <strong>
+                {Number(
+                  followPayload.watch_count ||
+                    summary.follow_watch_count ||
+                    0,
+                )}
+                件
+              </strong>
+            </div>
+            <div>
+              <span className="meta">フォロー下書き</span>
+              <strong>
+                {Number(
+                  followPayload.draft_count ||
+                    followDrafts.length ||
+                    summary.follow_draft_count ||
+                    0,
+                )}
+                件
+              </strong>
             </div>
           </div>
           <p className="sum">
             {(payload.grant_rule as string) ||
-              "Grandole は入居1年で +4,000円。Excel／入金と突合して更新してください。"}
+              "I=PayPay / II=MUFG / キャラメル=滋賀 / LEAF現行=京都（変更予定）"}
           </p>
-          {zaim ? (
-            <p className="meta">
-              Zaim家賃収入ヒント: {String(zaim.previous_ym)}→
-              {String(zaim.current_ym)}{" "}
-              {fmtYen(Number(zaim.delta_yen))}
-              （号室別ではない弱シグナル）
-            </p>
+          {payload.note ? (
+            <p className="meta">{String(payload.note)}</p>
           ) : null}
           <RentStepAckButton targetMonth={target} />
         </article>
@@ -162,31 +224,142 @@ export default async function RentStepPage() {
         </article>
       ) : (
         <article className="card">
-          <p className="sum">
-            いま要確認の家賃ステップはありません。毎月の situation watch / push
-            で自動更新されます。
-          </p>
+          <p className="sum">いま要確認の家賃・入金はありません。</p>
         </article>
       )}
 
-      <section className="etc-guide" aria-label="凡例">
-        <h2>判定の見方</h2>
+      <section className="etc-guide" aria-label="口座とソース">
+        <h2>入金ソース・口座</h2>
         <ul className="etc-guide-list">
           <li>
-            <strong>未反映</strong> — 2年目に入ったが帳簿がまだ1年目帯（+{delta}
-            未反映の疑い）
+            <strong>LEAF</strong> — くらさぽ PDF。現行振込先は京都銀行（変更予定）
           </li>
           <li>
-            <strong>変動</strong> — 前回スナップショットから帳簿家賃が変わった
+            <strong>ミニテック</strong> — オーナーサイト送金案内 PDF（号室別）
           </li>
           <li>
-            <strong>まもなく</strong> — 入居1年の切替まで45日以内
+            <strong>Tcell</strong> — LINE 明細 PDF。無いときは物件口座合算＋メモ（I→PayPay／キャラメル→滋賀）
           </li>
           <li>
-            入金の号室別突合は未連携。くらさぽ／管理会社明細のパースは今後。当面は
-            Excel 帳簿＋Zaim 家賃収入を参考にします。
+            <strong>ホームプランナー</strong> — 紙明細のため MUFG 合算＋メモ（
+            <code>config/rent_step_up.yaml</code> の <code>aggregate_memos</code>）
           </li>
         </ul>
+      </section>
+
+      <section>
+        <h2>入金フォロー（様子見 → 下書き）</h2>
+        <p className="meta">
+          想定入金が確認できない場合も、すぐ催促しません（送金月ベースで約1ヶ月様子見）。
+          経過後に <code>4.送信下書き_家賃入金フォロー.txt</code>{" "}
+          を作成。正本の想定家賃は空室対策メールです。
+        </p>
+        {Array.isArray(followPayload.watching) &&
+        (followPayload.watching as { label?: string }[]).length > 0 ? (
+          <div className="card" style={{ marginBottom: 12 }}>
+            <header>
+              <span className="lvl">様子見</span>
+              <strong>入金フォロー待ち</strong>
+            </header>
+            <ul className="etc-guide-list">
+              {(
+                followPayload.watching as {
+                  manager?: string;
+                  label?: string;
+                  reason?: string;
+                }[]
+              ).map((w, i) => (
+                <li key={`${w.label}-${i}`}>
+                  {w.manager} {w.label}: {w.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {followDrafts.length === 0 ? (
+          <p className="empty">いま送信可能な下書きはありません</p>
+        ) : (
+          <div className="card-list">
+            {followDrafts.map((d) => (
+              <article className="card" key={`${d.manager}-${d.subject}`}>
+                <header>
+                  <span className="lvl">
+                    {d.channel === "email" ? "メール" : "LINEメモ"}
+                  </span>
+                  <strong>{d.manager}</strong>
+                  <span className="meta"> · {d.item_count || 0}件</span>
+                </header>
+                <p className="sum">{d.subject}</p>
+                <ul className="etc-guide-list">
+                  {(d.items || []).map((it, i) => (
+                    <li key={`${it.label}-${i}`}>
+                      {it.label}: {it.reason}
+                    </li>
+                  ))}
+                </ul>
+                {d.preview ? (
+                  <pre className="meta" style={{ whiteSpace: "pre-wrap" }}>
+                    {d.preview}
+                  </pre>
+                ) : null}
+                {d.draft_path ? (
+                  <p className="meta">保存先: {d.draft_path}</p>
+                ) : null}
+                {d.promote_hint ? (
+                  <p className="meta">送信準備: {d.promote_hint}</p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2>口座合算（HP / Tcell明細なし / LEAF欠落）</h2>
+        {aggregates.length === 0 ? (
+          <p className="empty">該当なし</p>
+        ) : (
+          <div className="prop-event-table-wrap" style={{ maxHeight: "min(320px, 45vh)" }}>
+            <table className="prop-event-table">
+              <thead>
+                <tr>
+                  <th>区分</th>
+                  <th>口座</th>
+                  <th>帳簿合計</th>
+                  <th>入金合算</th>
+                  <th>差</th>
+                  <th>メモ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aggregates.map((a) => (
+                  <tr key={`${a.group}-${a.title}`}>
+                    <td>
+                      <strong>{a.title}</strong>
+                      <div className="meta">{(a.rooms || []).join(", ")}</div>
+                    </td>
+                    <td className="meta">
+                      {a.bank_label}
+                      {a.observed_ym ? ` · ${a.observed_ym}` : ""}
+                    </td>
+                    <td>{fmtYen(a.book_rent_sum)}</td>
+                    <td>{fmtYen(a.observed_yen)}</td>
+                    <td>{fmtYen(a.gap_yen)}</td>
+                    <td className="prop-note">
+                      {a.needs_memo ? (
+                        <>
+                          要メモ: <code>{a.memo_key}</code>
+                        </>
+                      ) : (
+                        a.memo || a.bank_note || "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section>
@@ -200,10 +373,9 @@ export default async function RentStepPage() {
                 <tr>
                   <th>区分</th>
                   <th>号室</th>
+                  <th>管理</th>
                   <th>帳簿</th>
-                  <th>期待</th>
-                  <th>入居</th>
-                  <th>1年後</th>
+                  <th>入金</th>
                   <th>理由</th>
                 </tr>
               </thead>
@@ -214,10 +386,14 @@ export default async function RentStepPage() {
                     <td>
                       <strong>{u.label}</strong>
                     </td>
+                    <td className="meta">{u.manager || "—"}</td>
                     <td>{fmtYen(u.book_rent)}</td>
-                    <td>{fmtYen(u.expected_rent)}</td>
-                    <td className="meta">{u.move_in || "—"}</td>
-                    <td className="meta">{u.anniversary || "—"}</td>
+                    <td>
+                      {fmtYen(u.observed_deposit)}
+                      {u.deposit_ym ? (
+                        <span className="meta"> · {u.deposit_ym}</span>
+                      ) : null}
+                    </td>
                     <td className="prop-note">{u.reason || "—"}</td>
                   </tr>
                 ))}
@@ -235,11 +411,11 @@ export default async function RentStepPage() {
               <tr>
                 <th>区分</th>
                 <th>号室</th>
+                <th>管理</th>
                 <th>帳簿</th>
-                <th>1年目</th>
-                <th>2年目</th>
+                <th>入金観測</th>
+                <th>ソース</th>
                 <th>入居</th>
-                <th>理由</th>
               </tr>
             </thead>
             <tbody>
@@ -247,11 +423,23 @@ export default async function RentStepPage() {
                 <tr key={u.id || u.label}>
                   <td>{flagLabel(u.flag)}</td>
                   <td>{u.label}</td>
+                  <td className="meta">{u.manager || "—"}</td>
                   <td>{fmtYen(u.book_rent)}</td>
-                  <td>{fmtYen(u.year1_rent)}</td>
-                  <td>{fmtYen(u.year2_rent)}</td>
+                  <td>
+                    {fmtYen(u.observed_deposit)}
+                    {u.deposit_gap_yen != null ? (
+                      <span className="meta">
+                        {" "}
+                        ({u.deposit_gap_yen >= 0 ? "+" : ""}
+                        {u.deposit_gap_yen.toLocaleString("ja-JP")})
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="meta">
+                    {u.deposit_source || u.deposit_flag || "—"}
+                    {u.deposit_ym ? ` ${u.deposit_ym}` : ""}
+                  </td>
                   <td className="meta">{u.move_in || "—"}</td>
-                  <td className="prop-note">{u.reason || "—"}</td>
                 </tr>
               ))}
             </tbody>
