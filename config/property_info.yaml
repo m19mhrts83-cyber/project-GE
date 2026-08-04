@@ -21,6 +21,7 @@ properties:
       - "Grandole志賀本通I"
       - "02_Grandole志賀本通I"
       - "Grandole志賀本通Ⅰ"
+    # 所有: 法人（リビングサポート松）／税務: knees bee 法人資料
     # 棟: LEAF + Tcell（号室未指定の既定はミニテック）
     managers:
       - LEAF
@@ -43,6 +44,7 @@ properties:
       - "Grandole志賀本通II"
       - "01_Grandole志賀本通II"
       - "Grandole志賀本通Ⅱ"
+    # 所有: 個人／税務: knees bee 個人レントロール
     # 棟管理: ホームプランナー
     managers:
       - ホームプランナー
@@ -55,6 +57,7 @@ properties:
       - "キャラメル"
       - "03_キャラメル"
     # 棟管理: Tcell
+    # 所有: 個人（税務: knees bee / 個人レントロール）
     managers:
       - Tcell
     key_number: null
