@@ -1,5 +1,7 @@
 # Excel に無い物件の号室補完（キャラメル等）／家賃マップ空欄の補完
-# 家賃は管理契約書（2026-02 改訂）の賃料月額。現状はユーザー確認どおり満室。
+# キャラメル家賃・共益費: 管理契約書（2026-02 改訂）頭書の住戸一覧。
+# Grandole I の 101/201: 家賃マップ空欄のため1年目帯で補完。
+# 現状はユーザー確認どおり満室。
 #
 # fill_missing: true の行は、Excel に同 ID があるとき rent が空欄なら上書きする
 # （既存の status / note は Excel 側を維持）。
@@ -23,31 +25,36 @@ units:
     management_fee: 4000
     fill_missing: true
     note: 家賃マップ空欄のため1年目帯で補完
+  # キャラメル（個人・Tcell）— Excel に無い。契約書の賃料＋共益費
   - property_id: caramel
     property_name: キャラメル
     short: C
     room: "101"
     status: occupied
     rent: 61000
-    note: 契約賃料（共益費別）/ 税務・契約資料
+    management_fee: 3000
+    note: 管理契約書2026-02（賃料61,000＋共益費3,000）
   - property_id: caramel
     property_name: キャラメル
     short: C
     room: "102"
     status: occupied
     rent: 62000
-    note: 契約賃料（共益費別）/ 税務・契約資料
+    management_fee: 3000
+    note: 管理契約書2026-02（賃料62,000＋共益費3,000）
   - property_id: caramel
     property_name: キャラメル
     short: C
     room: "201"
     status: occupied
     rent: 64000
-    note: 契約賃料（共益費別）/ 税務・契約資料
+    management_fee: 3000
+    note: 管理契約書2026-02（賃料64,000＋共益費3,000）
   - property_id: caramel
     property_name: キャラメル
     short: C
     room: "202"
     status: occupied
     rent: 63000
-    note: 契約賃料（共益費別）/ 税務・契約資料
+    management_fee: 3000
+    note: 管理契約書2026-02（賃料63,000＋共益費3,000）
