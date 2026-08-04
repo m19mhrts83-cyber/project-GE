@@ -13,12 +13,7 @@ import {
   buildLocalHandoffPrompt,
   type CursorAskState,
 } from "@/lib/localHandoff";
-import { retrieveKamiooyaForAsk } from "@/lib/kamiooya/retrieveForAsk";
-import { defaultUseKamiooyaKnowledge } from "@/lib/kamiooya/lanes";
-import {
-  defaultUseOnedriveYoritoori,
-  retrieveYoritooriForAsk,
-} from "@/lib/onedrive/retrieveYoritoori";
+import { buildAskContextBundle } from "@/lib/askContextBundle";
 export type CardActionResult = {
   ok: boolean;
   error?: string;
@@ -254,32 +249,23 @@ export async function askJarvisOnCard(
     .join("\n");
 
   const isDigest = card.kind === "digest";
-  const useKamiooya =
-    opts?.useKamiooyaKnowledge ?? defaultUseKamiooyaKnowledge(card.lane);
-  const useOnedrive =
-    opts?.useOnedriveYoritoori ?? defaultUseOnedriveYoritoori(card.lane);
-  const knowledgeNotices: string[] = [];
-  const knowledgeParts: string[] = [];
-  if (useKamiooya) {
-    const q = [text, card.title, question, ...bullets.slice(0, 5)]
-      .filter(Boolean)
-      .join("\n")
-      .slice(0, 1200);
-    const kr = await retrieveKamiooyaForAsk(q);
-    knowledgeNotices.push(kr.notice);
-    if (kr.promptBlock) knowledgeParts.push(kr.promptBlock);
-  }
-  if (useOnedrive) {
-    const yr = await retrieveYoritooriForAsk({
-      lane: card.lane,
-      title: card.title,
-      summary: card.summary,
-      payload,
-    });
-    knowledgeNotices.push(yr.notice);
-    if (yr.promptBlock) knowledgeParts.push(yr.promptBlock);
-  }
-  const knowledgeBlock = knowledgeParts.join("\n\n");
+  const ctxQuery = [text, card.title, question, ...bullets.slice(0, 5)]
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 1200);
+  const ctx = await buildAskContextBundle({
+    lane: card.lane,
+    title: card.title,
+    summary: card.summary,
+    payload,
+    query: ctxQuery,
+    sources: {
+      kamiooya: opts?.useKamiooyaKnowledge,
+      onedriveYoritoori: opts?.useOnedriveYoritoori,
+    },
+  });
+  const knowledgeNotices = ctx.notices;
+  const knowledgeBlock = ctx.promptBlock;
 
   const prompt = [
     "あなたは Jarvis（秘書 AI）です。ダッシュボードの確認テーマ／処置カードについて、ユーザーと日本語で具体的に相談してください。",

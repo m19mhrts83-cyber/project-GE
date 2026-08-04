@@ -193,7 +193,8 @@ export default async function TriageKanbanLane({
       <h2>確認テーマ</h2>
       {!activeCards.length ? (
         <p className="empty">
-          まだありません（`jarvis_lane_digest.py --push` で要約生成）
+          まだありません（`jarvis_lane_digest.py --push` または
+          `jarvis_dashboard_lanes.py --action-summary --push`）
         </p>
       ) : (
         activeCards.map((c) => (

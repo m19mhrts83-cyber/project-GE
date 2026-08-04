@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Jarvis GHA: コンテンツレーン要約 → cards upsert
+Jarvis GHA: レーン要約確認（digest）→ cards upsert
 
-  # ローカル（OneDrive マウントあり）または Graph 設定あり
+機械的な大量カードは作らない（config/dashboard_lanes.yaml の max_auto_cards=0）。
+正本フローは jarvis_lane_digest.py（Mac の dashboard push と同じ）。
+
   python scripts/jarvis_gha_lanes.py --push
-
-  # GHA: MS_GRAPH_CLIENT_ID + REFRESH_TOKEN（委任）で materialize → 収集
 """
 from __future__ import annotations
 
@@ -19,7 +19,8 @@ import yaml
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-from jarvis_dashboard_lanes import YAML_PATH, collect, push_supabase  # noqa: E402
+from jarvis_dashboard_lanes import YAML_PATH  # noqa: E402
+from jarvis_lane_digest import main as digest_main  # noqa: E402
 from jarvis_onedrive_graph import LOCAL_ONEDRIVE, graph_configured, read_file  # noqa: E402
 
 CACHE = REPO / ".cache" / "onedrive_lanes"
@@ -34,7 +35,6 @@ def _rel_from_onedrive(path: Path) -> str | None:
         if marker in s:
             return s.split(marker, 1)[1]
         if s.startswith("215_") or "/215_" in s:
-            # already relative-ish
             idx = s.find("215_")
             return s[idx:]
         return None
@@ -45,14 +45,15 @@ def materialize_via_graph() -> dict[str, str]:
     reg = yaml.safe_load(YAML_PATH.read_text(encoding="utf-8")) or {}
     partner = Path(reg.get("partner_base", "")).expanduser()
     kodate = Path(reg.get("kodate_actions", "")).expanduser()
-    # partner_base 相当を CACHE 配下に作る
     partner_rel = _rel_from_onedrive(partner)
     if not partner_rel:
         raise SystemExit("partner_base を OneDrive 相対パスにできません")
     cache_partner = CACHE / partner_rel
     overrides = {
         "JARVIS_LANES_PARTNER_BASE": str(cache_partner),
-        "JARVIS_LANES_KODATE_ACTIONS": str(CACHE / (_rel_from_onedrive(kodate) or "kodate.md")),
+        "JARVIS_LANES_KODATE_ACTIONS": str(
+            CACHE / (_rel_from_onedrive(kodate) or "kodate.md")
+        ),
     }
 
     paths: list[Path] = []
@@ -62,7 +63,10 @@ def materialize_via_graph() -> dict[str, str]:
             p = Path(
                 raw.replace("{partner_base}", str(partner))
                 .replace("{kodate_actions}", str(kodate))
-                .replace("{obsidian_journal}", str(Path(reg.get("obsidian_journal", "")).expanduser()))
+                .replace(
+                    "{obsidian_journal}",
+                    str(Path(reg.get("obsidian_journal", "")).expanduser()),
+                )
             ).expanduser()
             if src.get("kind") == "journal_recent":
                 print(f"# skip journal_recent on GHA for now: {p}", file=sys.stderr)
@@ -85,7 +89,12 @@ def materialize_via_graph() -> dict[str, str]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--push", action="store_true")
-    ap.add_argument("--force-local", action="store_true", help="Graph無しでもローカル収集を試す")
+    ap.add_argument(
+        "--force-local",
+        action="store_true",
+        help="Graph無しでもローカル収集を試す",
+    )
+    ap.add_argument("--lane", default="", help="digest を1レーンに限定")
     args = ap.parse_args(argv)
 
     on_gha = bool(os.environ.get("GITHUB_ACTIONS"))
@@ -100,21 +109,18 @@ def main(argv: list[str] | None = None) -> int:
     elif on_gha and not args.force_local:
         print(
             "# skip: MS_GRAPH_* 未設定（個人用は REFRESH_TOKEN）。"
-            " 手順: docs/Jarvis_OneDrive_Graph.md / Mac の jarvis_dashboard_lanes.py --push が当面の正本。",
+            " 手順: docs/Jarvis_OneDrive_Graph.md / Mac の jarvis_lane_digest.py --push が正本。",
             file=sys.stderr,
         )
         return 0
 
-    result = collect()
-    total = int((result.get("counts") or {}).get("total") or 0)
-    print(f"# lanes collected total={total}", file=sys.stderr)
-    if total == 0 and on_gha:
-        print("# warn: 0 cards（パス未解決の可能性）", file=sys.stderr)
-        return 0
+    digest_argv = ["--no-log"]  # GHA は OneDrive MD に書けない
     if args.push:
-        n = push_supabase(result)
-        print(f"# pushed {n}", file=sys.stderr)
-    return 0
+        digest_argv.append("--push")
+    if args.lane.strip():
+        digest_argv.extend(["--lane", args.lane.strip()])
+    print("# digest via jarvis_lane_digest (max_auto_cards=0)", file=sys.stderr)
+    return digest_main(digest_argv)
 
 
 if __name__ == "__main__":
