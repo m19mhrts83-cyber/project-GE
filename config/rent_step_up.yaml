@@ -71,8 +71,9 @@ managers:
     # 紙明細のみ。II → MUFG 合算＋メモ
     aggregate_by_property: true
 
-# 合算差のメモ（キー: "{group}:{YYYY-MM}"）
+# 合算差のメモ（キー: "{group}:{property_id}:{YYYY-MM}" または "{group}:{YYYY-MM}"）
 # group 例: hp:grandole-ii / tcell:grandole-i / tcell:caramel / leaf:kyoto
+# ※ plan 上の homeplanner_memos は本キー（aggregate_memos）に統合
 aggregate_memos: {}
 # 例:
 #   "hp:grandole-ii:2026-07": "管理費・振込手数料差引のため△約4万は想定内"

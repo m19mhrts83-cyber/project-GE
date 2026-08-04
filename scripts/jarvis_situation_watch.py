@@ -302,7 +302,8 @@ def eval_etc(meta: dict, data: dict | None) -> dict[str, Any]:
             "rebate_history": history[:12],
             "dashboard_ack_target_month": ack,
             "show_banner": show_banner,
-            "href": "/etc",
+            # ホーム着地は状況レーンの当該カード（専用 /etc はカード内リンク）
+            "href": "/situation?watch=etc_mileage#watch-etc_mileage",
         },
     )
 
@@ -424,7 +425,7 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         "grant_history": hist,
         "dashboard_ack_target_month": ack,
         "show_banner": show_banner,
-        "href": "/vpoint",
+        "href": "/situation?watch=vpoint#watch-vpoint",
     }
     if action_items:
         payload["actions"] = action_items
@@ -640,7 +641,7 @@ def eval_card_annual_fee(meta: dict, data: dict | None) -> dict[str, Any]:
         "investigation": inv or None,
         "lessons": lessons or None,
         "risk_flags": risk_flags,
-        "href": "/situation#watch-card_annual_fee",
+        "href": "/situation?watch=card_annual_fee#watch-card_annual_fee",
     }
     if actions:
         payload["actions"] = actions
@@ -785,7 +786,7 @@ def eval_rent_step(meta: dict) -> dict[str, Any]:
         "change_history": hist,
         "dashboard_ack_target_month": ack,
         "show_banner": show_banner,
-        "href": "/rent-step",
+        "href": "/situation?watch=rent_step#watch-rent_step",
         "target_month": target,
         "grant_rule": lr.get("grant_rule"),
         "note": lr.get("note"),
