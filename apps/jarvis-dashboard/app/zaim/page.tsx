@@ -276,7 +276,9 @@ export default async function ZaimWatchPage() {
                       {f.proposal || "—"}
                     </div>
                   </div>
-                  {f.id ? <ZaimFixActions fixId={String(f.id)} /> : null}
+                  {f.id ? (
+                    <ZaimFixActions fixId={String(f.id)} path="/zaim" />
+                  ) : null}
                 </li>
               ))}
             </ul>

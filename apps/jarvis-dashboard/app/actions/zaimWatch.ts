@@ -11,6 +11,7 @@ export async function confirmZaimFix(
   fixId: string,
   next: "confirmed" | "disputed",
   path = "/zaim",
+  comment?: string,
 ): Promise<FixConfirmResult> {
   const id = fixId.trim();
   if (!id) return { ok: false, error: "id が空です" };
@@ -64,10 +65,13 @@ export async function confirmZaimFix(
   if (uErr) return { ok: false, error: uErr.message };
 
   if (next === "disputed") {
+    const note = (comment || "").trim();
     await supabase.from("watch_comments").insert({
       watch_id: WATCH_ID,
       role: "user",
-      body: `直しがおかしい: ${id}`,
+      body: note
+        ? `直しがおかしい: ${id}\n${note.slice(0, 800)}`
+        : `直しがおかしい: ${id}`,
     });
   }
 
