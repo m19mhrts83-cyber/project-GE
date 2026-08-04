@@ -147,12 +147,13 @@ function MonthlySummaryBlock({ s }: { s: MonthlySummary }) {
     !amount.length &&
     !status.length &&
     !alerts.length;
+  const baselineOnly = !hasPrev;
 
   return (
     <section className="billing-monthly-summary card">
       <p className="billing-summary-kicker">
         確認サマリー · {ym}
-        {hasPrev ? `（対比 ${prev}）` : ""}
+        {hasPrev ? `（対比 ${prev}）` : "（ベースライン）"}
       </p>
       <div className="billing-summary-hero">
         <div>
@@ -162,12 +163,16 @@ function MonthlySummaryBlock({ s }: { s: MonthlySummary }) {
           </p>
         </div>
         <span className={`billing-delta-badge ${deltaBadge.cls}`}>
-          {deltaBadge.text}
+          {baselineOnly ? "前月比なし（初回）" : deltaBadge.text}
         </span>
       </div>
 
-      {noChange ? (
-        <p className="billing-summary-quiet">今月の変更はありません。</p>
+      {baselineOnly ? (
+        <p className="billing-summary-quiet">
+          初回スナップショットです。来月以降に前月比・新規・金額変更が出ます。
+        </p>
+      ) : noChange ? (
+        <p className="billing-summary-quiet">前月比なし（変化なし）。</p>
       ) : (
         <div className="billing-summary-sections">
           {added.length > 0 ? (

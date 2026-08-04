@@ -127,7 +127,40 @@ def compute_diff(
     prev_ym: str | None,
 ) -> dict[str, Any]:
     cur = _svc_index(current)
-    prev = _svc_index(previous or [])
+    watch_active = [
+        {
+            "id": s["id"],
+            "name": s.get("name"),
+            "reason": s.get("watch_reason") or "watch",
+        }
+        for s in current
+        if s.get("watch")
+    ]
+    cur_total = round(
+        sum(float(s.get("monthly_yen") or 0) for s in current if s.get("status") == "active"),
+        2,
+    )
+
+    # 前月スナップなし = ベースラインのみ（全件を「新規」にしない）
+    if previous is None:
+        return {
+            "as_of_ym": ym,
+            "prev_ym": None,
+            "compared_at": now_iso(),
+            "active_monthly_total": cur_total,
+            "prev_active_monthly_total": None,
+            "delta_monthly": None,
+            "added": [],
+            "removed": [],
+            "amount_changed": [],
+            "status_changed": [],
+            "watch_alerts": [],
+            "watch_active": watch_active,
+            "has_changes": False,
+            "confirmed_at": None,
+        }
+
+    prev = _svc_index(previous)
     added: list[dict[str, Any]] = []
     removed: list[dict[str, Any]] = []
     amount_changed: list[dict[str, Any]] = []
@@ -197,26 +230,10 @@ def compute_diff(
                 }
             )
 
-    # 新規・注視オン変化のみ（継続ウォッチは watch_active 側）
-    watch_new_or_flagged = list(watch_alerts)
-    watch_active = [
-        {
-            "id": s["id"],
-            "name": s.get("name"),
-            "reason": s.get("watch_reason") or "watch",
-        }
-        for s in current
-        if s.get("watch")
-    ]
-
-    cur_total = round(
-        sum(float(s.get("monthly_yen") or 0) for s in current if s.get("status") == "active"),
-        2,
-    )
     prev_total = round(
         sum(
             float(s.get("monthly_yen") or 0)
-            for s in (previous or [])
+            for s in previous
             if s.get("status") == "active"
         ),
         2,
@@ -226,19 +243,17 @@ def compute_diff(
         "prev_ym": prev_ym,
         "compared_at": now_iso(),
         "active_monthly_total": cur_total,
-        "prev_active_monthly_total": prev_total if previous is not None else None,
-        "delta_monthly": round(cur_total - prev_total, 2) if previous is not None else None,
+        "prev_active_monthly_total": prev_total,
+        "delta_monthly": round(cur_total - prev_total, 2),
         "added": added,
         "removed": removed,
         "amount_changed": amount_changed,
         "status_changed": status_changed,
-        "watch_alerts": watch_new_or_flagged,
+        "watch_alerts": watch_alerts,
         "watch_active": watch_active,
         "has_changes": bool(
-            added or removed or amount_changed or status_changed or watch_new_or_flagged
-        )
-        if previous is not None
-        else bool(added or watch_active),
+            added or removed or amount_changed or status_changed or watch_alerts
+        ),
         "confirmed_at": None,
     }
 
