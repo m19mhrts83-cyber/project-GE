@@ -37,20 +37,41 @@ node_modules/
 .DS_Store
 _tmp/
 
-# Jarvis 月次状態（ローカルのみ）
-.jarvis_state/etc_monthly.json
+# Jarvis 実行時 state（ローカルのみ）
+# 残渣ファイルの削除は後でよい。ここは git status / コミットに上がらないための除外。
+# 方針: .jarvis_state 直下の *.json は原則無視し、*.example.json と運用で追跡したい実体だけ ! で戻す。
+.jarvis_state/*.json
+!.jarvis_state/*.example.json
+!.jarvis_state/vpoint_audit_result.json
+!.jarvis_state/card_annual_fee.json
+!.jarvis_state/car_loan.json
+!.jarvis_state/chrline_version.json
+!.jarvis_state/line_export_reminder.json
+!.jarvis_state/sbi_vpoint_up_checklist.json
+!.jarvis_state/square_probe.json
+!.jarvis_state/vpoint_cadence.json
+!.jarvis_state/westudy_weekly_watch.json
+.jarvis_state/*.png
+.jarvis_state/*.txt
+.jarvis_state/nlm*
+.jarvis_state/raimo*
+.jarvis_state/notebooklm*
+.jarvis_state/slide_*
+.jarvis_state/subscriptions_snapshots/
 .jarvis_state/shuhen_auto_jobs/
+.jarvis_state/vpass_pp_cancel/
 .jarvis_state/night_triage/queue.json
 .jarvis_state/night_triage/dashboard.html
 .jarvis_state/night_triage/config.json
 .jarvis_state/night_triage/_agent_login.sh
-# Vポイント調査の生ダンプ（Gmail本文・スクショ等）。要約は vpoint_audit_result.json のみ追跡
-.jarvis_state/vpoint_audit_*.json
+.jarvis_state/night_triage/last_*
+.jarvis_state/night_triage/*.json
+!.jarvis_state/night_triage/config.example.json
 .jarvis_state/vpoint_audit_*.html
 .jarvis_state/vpoint_audit_*.png
-.jarvis_state/vpoint_tsite_history_*.json
-# 例外: 運用サマリー結果はコミット対象
-!.jarvis_state/vpoint_audit_result.json
+
+# Zaim 明細 CSV（個人データ・容量大。ダウンロード残はローカルのみ）
+215_kamiooya/C1_cursor/finance/zaim_budget_sync/downloads/*.csv
 
 # --- Q&Aチャットボット／ProgramCode の実行成果物（容量大） ---
 **/神・大家さん倶楽部情報Q&Aチャットボット/state/exports/
