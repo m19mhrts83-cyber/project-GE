@@ -73,25 +73,20 @@ def push_meta(summary: dict) -> None:
 
 def print_block(s: dict) -> None:
     ym = s.get("as_of_ym") or ym_now()
-    prev = s.get("prev_ym") or "—"
+    prev = s.get("prev_ym")
     delta = s.get("delta_monthly")
     confirmed = s.get("confirmed_at")
-    lines = [
-        f"📎 課金月次サマリー — {ym} / 対比 {prev}",
-        f"- 月額換算: {fmt_yen(s.get('active_monthly_total'))}"
-        + (
-            f"（前月比 {fmt_yen(delta) if delta is not None and delta >= 0 else ''}"
-            f"{fmt_yen(delta) if delta is not None and delta < 0 else ('' if delta is None else '')}）"
-            if delta is not None
-            else "（前月スナップなし）"
-        ),
-    ]
-    # cleaner delta line
+    lines = [f"📎 課金月次サマリー — {ym}" + (f" / 対比 {prev}" if prev else " / ベースライン")]
+
     if delta is not None:
         sign = "+" if delta >= 0 else ""
-        lines[1] = (
+        lines.append(
             f"- 月額換算: {fmt_yen(s.get('active_monthly_total'))}"
             f"（前月比 {sign}{fmt_yen(delta)}）"
+        )
+    else:
+        lines.append(
+            f"- 月額換算: {fmt_yen(s.get('active_monthly_total'))}（前月比なし）"
         )
 
     added = s.get("added") or []
@@ -101,12 +96,10 @@ def print_block(s: dict) -> None:
     alerts = s.get("watch_alerts") or []
     watch = s.get("watch_active") or []
 
-    if not s.get("prev_ym"):
+    if not prev:
         lines.append("- 変更: 初回スナップショット（前月比なし）")
-    elif not (
-        added or removed or amount or status or [a for a in alerts if a.get("reason") != "注視継続"]
-    ):
-        lines.append("- 変更: なし")
+    elif not (added or removed or amount or status or alerts):
+        lines.append("- 変更: なし（前月比なし・変化なし）")
     else:
         if added:
             names = ", ".join(str(x.get("name") or x.get("id")) for x in added[:8])
@@ -133,10 +126,11 @@ def print_block(s: dict) -> None:
             f"- 注視中: {', '.join(str(w.get('name')) for w in watch[:10])}"
             + ("…" if len(watch) > 10 else "")
         )
+    lines.append(f"- 最終確認: {confirmed or '未確認（要確認）'}")
     lines.append(
-        f"- 最終確認: {confirmed or '未確認（要確認）'}"
+        "- 判定: "
+        + ("✅ 確認済" if confirmed else "⚠️ 要フォロー: 月次で金額・新規を確認")
     )
-    lines.append("- 判定: " + ("✅ 確認済" if confirmed else "⚠️ 要フォロー: 月次で金額・新規を確認"))
     print("\n".join(lines))
 
 
