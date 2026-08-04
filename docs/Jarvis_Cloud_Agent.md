@@ -48,10 +48,12 @@
 
 | 順 | 経路 | 条件 |
 |---|---|---|
-| 1（既定） | Vercel → Jarvis Cloud | UI で Cloud 選択 |
+| 1（既定） | Vercel → Jarvis Cloud（**agent + no-repo**） | UI で Cloud 選択 |
 | 2 | Gemini API | Cloud 失敗時の自動切替、または UI で Gemini 選択。**切替時はバナー通知** |
 | 3a | ローカル用コピー | 失敗時・不満時。文脈パッケージをクリップボードへ |
 | 3b | Mac `jarvis_card_cursor_ask_worker.py` | 「Mac Cursor に依頼」。`payload.cursor_ask` キュー → コメント追記 |
+
+※ 2026-08: `plan`＋`CURSOR_CLOUD_REPO_URL` 付きだと VM／探索で 75s 超タイムアウトしやすかったため、聞くは **常に no-repo・agent**（リポ URL は見直し用途のみ）。
 
 #### 文脈ソース（注入型・重要）
 
@@ -67,7 +69,7 @@ Web／no-repo Cloud は **OneDrive・Google Drive を直接見ない**。Server 
 - 秘密: `.env.jarvis_private` の `CURSOR_API_KEY`（Vercel にも同名）。発行: [Cursor Dashboard → API Keys](https://cursor.com/dashboard/api)
 - 神大家読取: Vercel に `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（kamiooya-qa。JARVIS_SUPABASE_* とは別）
 - OneDrive 読取: Vercel に `MS_GRAPH_CLIENT_ID` / `MS_GRAPH_REFRESH_TOKEN` / `MS_GRAPH_AUTHORITY`（回転時は `sync_meta.ms_graph_refresh_token`）。Mac では `jarvis_ms_graph_sync_refresh.py` 後に Vercel へ再 push
-- 任意: `CURSOR_CLOUD_REPO_URL`（**空推奨**= no-repo agent）
+- 任意: `CURSOR_CLOUD_REPO_URL`（**空推奨**= no-repo agent。下書き見直し用。**「聞く」はコード側で常に no-repo** のため、設定があっても無視する）
 - Mac Worker: `launchd/install_cursor_revise_worker_launchd.sh`（revise と ask を同じ runner）
 
 技術メモ: Gmail API＋token（Secrets）があれば Cloud Agent から送信可能。対外送信前確認・`--via` 確認は Mac と同じ。

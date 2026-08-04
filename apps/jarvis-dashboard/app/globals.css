@@ -1034,6 +1034,18 @@ p.back {
   font-size: 0.75rem;
 }
 
+/* ホーム → /situation#watch-<id> の着地 */
+[id^="watch-"] {
+  scroll-margin-top: 5.5rem;
+}
+
+.card.is-watch-focus {
+  outline: 2px solid var(--accent, #0f766e);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #0f766e) 22%, transparent);
+  transition: outline-color 0.3s ease, box-shadow 0.3s ease;
+}
+
 .home-partner-card .home-partner-subject {
   margin: 6px 0 4px;
   font-weight: 600;

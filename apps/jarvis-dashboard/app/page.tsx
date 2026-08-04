@@ -496,20 +496,9 @@ export default async function HomePage() {
                     ? it.level
                     : "info"
                 ) as HomeLevel;
-                const pl =
-                  it.payload && typeof it.payload === "object"
-                    ? (it.payload as Record<string, unknown>)
-                    : {};
-                const href =
-                  typeof pl.href === "string" && pl.href.startsWith("/")
-                    ? pl.href
-                    : it.id === "etc_mileage"
-                      ? "/etc"
-                      : it.id === "vpoint"
-                        ? "/vpoint"
-                        : it.id === "rent_step"
-                          ? "/rent-step"
-                        : "/situation";
+                // 状況レーンの該当カードへ（専用 /etc /vpoint ではなく）。query+hash で着地を安定化
+                const wid = encodeURIComponent(String(it.id));
+                const href = `/situation?watch=${wid}#watch-${wid}`;
                 return (
                   <a
                     key={it.id}
