@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 type NavItem = { href: string; label: string };
 type NavGroup = { title: string; items: NavItem[] };
 
-/** B+A: グループ見出し＋分かりやすい名前。ホームは「見る」の上に独立配置 */
+/**
+ * B+A: グループ見出し＋分かりやすい名前。
+ * ホームはサイドバー最上段に固定（「見る」より前。他項目をホームより上に差し込まない）。
+ * お金グループ先頭は Zaim Watch（収支・数値と同列の確認入口）。
+ */
 const NAV_GROUPS: NavGroup[] = [
   {
     title: "見る",
