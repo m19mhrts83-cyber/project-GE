@@ -5,6 +5,7 @@ import { LEVEL_LABEL, type HomeLevel } from "@/lib/homeLevels";
 import {
   bundleByGroup,
   parseOpenchatDigest,
+  yoritooriCursorPrompt,
   yoritooriRelPath,
   type ActivityRow,
 } from "@/lib/openchatDigest";
@@ -24,7 +25,7 @@ export default async function OpenchatPage() {
 
   const { data: watchRows } = await supabase
     .from("watch_status")
-    .select("id,title,level,summary,detail,status,updated_at")
+    .select("id,title,level,summary,detail,status,updated_at,payload")
     .in("id", ["openchat_threads", "square_probe"]);
 
   const { data: meta } = await supabase.from("sync_meta").select("key,value");
@@ -40,11 +41,19 @@ export default async function OpenchatPage() {
     healthLevel === "ok"
       ? "level-info"
       : `level-${(healthLevel as HomeLevel) || "info"}`;
+  const healthPayload =
+    health?.payload && typeof health.payload === "object"
+      ? (health.payload as Record<string, unknown>)
+      : {};
 
   return (
     <Shell active="/openchat">
       <h1>神大家オプチャ</h1>
-      <p className="sub">情報収集枠。返信提案なし。詳細はグループから。</p>
+      <p className="sub">
+        情報収集枠。返信提案なし。詳細はグループから。Web
+        からローカル OneDrive は直接開けません（パスコピー／Cursor
+        プロンプト、またはこの詳細ページで確認）。
+      </p>
 
       <section className={`openchat-health ${levelClass}`} aria-label="スレッド健全性">
         <div className="openchat-health-head">
@@ -66,6 +75,21 @@ export default async function OpenchatPage() {
             <p className="sum">{health.summary}</p>
             {health.detail ? (
               <p className="meta">{String(health.detail).slice(0, 200)}</p>
+            ) : null}
+            {healthPayload.threads_today != null ||
+            healthPayload.heartbeat_at != null ? (
+              <p className="meta">
+                {healthPayload.threads_today != null
+                  ? `今日【スレッド】 ${String(healthPayload.threads_today)}件`
+                  : null}
+                {healthPayload.threads_today != null &&
+                healthPayload.heartbeat_at != null
+                  ? " · "
+                  : null}
+                {healthPayload.heartbeat_at != null
+                  ? `heartbeat ${String(healthPayload.heartbeat_at)}`
+                  : null}
+              </p>
             ) : null}
           </>
         ) : (
@@ -89,6 +113,7 @@ export default async function OpenchatPage() {
         <div className="watch-grid">
           {groups.map((g) => {
             const path = yoritooriRelPath(g.name);
+            const prompt = yoritooriCursorPrompt(g.name);
             const lines = g.digestLines?.length ? g.digestLines : g.lines;
             return (
               <article key={g.slug} className="card watch-card openchat-group-card">
@@ -110,6 +135,8 @@ export default async function OpenchatPage() {
                   <Link href={`/openchat/${g.slug}`}>詳細 →</Link>
                   <span className="meta"> · </span>
                   <CopyPathButton path={path} label="やり取りパス" />
+                  <span className="meta"> · </span>
+                  <CopyPathButton path={prompt} label="Cursorプロンプト" />
                 </p>
                 <p className="meta openchat-path-hint">{path}</p>
               </article>

@@ -143,6 +143,11 @@ export default async function SituationPage() {
                   <Link href="/rent-step">家賃ステップ（+4,000・変動）→</Link>
                 </p>
               ) : null}
+              {it.id === "zaim_quality" ? (
+                <p className="meta">
+                  <Link href="/zaim">Zaim Watch（年間収支・直し確認）→</Link>
+                </p>
+              ) : null}
               {actions.length > 0 ? (
                 <div className="watch-actions">
                   <p className="watch-actions-title">要対応（具体）</p>

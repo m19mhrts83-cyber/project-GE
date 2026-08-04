@@ -2,7 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Shell from "@/components/Shell";
 import CopyPathButton from "@/components/CopyPathButton";
-import { yoritooriRelPath } from "@/lib/openchatDigest";
+import {
+  parseOpenchatDigest,
+  yoritooriCursorPrompt,
+  yoritooriRelPath,
+} from "@/lib/openchatDigest";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function OpenchatGroupPage({
@@ -17,7 +21,6 @@ export default async function OpenchatGroupPage({
   } catch {
     name = raw;
   }
-  // slug used encodeURIComponent of name with spaces→_ ; try both
   const candidates = [
     name,
     decodeURIComponent(raw),
@@ -33,21 +36,34 @@ export default async function OpenchatGroupPage({
     .order("received_at", { ascending: false })
     .limit(200);
 
+  const { data: meta } = await supabase.from("sync_meta").select("key,value");
+  const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
+  const digest = parseOpenchatDigest(metaMap.openchat_digest);
+  const digestGroup = (digest?.groups || []).find(
+    (g) =>
+      g.slug === raw ||
+      encodeURIComponent(g.name.replace(/\s+/g, "_")) === raw ||
+      candidates.includes(g.name),
+  );
+
   const matched = (activities || []).filter((a) => {
     const p = (a.partner || "").trim();
-    return candidates.some((c) => c === p || encodeURIComponent(p.replace(/\s+/g, "_")) === raw);
+    return candidates.some(
+      (c) =>
+        c === p || encodeURIComponent(p.replace(/\s+/g, "_")) === raw,
+    );
   });
 
-  // If URL slug is exact partner with underscores as spaces
   const bySlug = (activities || []).filter((a) => {
     const p = (a.partner || "").trim();
     return encodeURIComponent(p.replace(/\s+/g, "_")) === raw;
   });
   const rows = bySlug.length ? bySlug : matched;
-  const displayName = rows[0]?.partner || name;
-  if (!rows.length && !displayName) notFound();
+  const displayName = rows[0]?.partner || digestGroup?.name || name;
+  if (!rows.length && !digestGroup && !displayName) notFound();
 
   const path = yoritooriRelPath(displayName);
+  const prompt = yoritooriCursorPrompt(displayName);
 
   return (
     <Shell active="/openchat">
@@ -56,13 +72,29 @@ export default async function OpenchatGroupPage({
       </p>
       <h1>{displayName}</h1>
       <p className="sub">
-        情報収集枠。返信提案なし。全文は OneDrive のやり取り MD。
+        情報収集枠。返信提案なし。iPhone／Web
+        ではこのページが本文確認の正。Mac ではパスコピーか Cursor
+        プロンプトで OneDrive のやり取り MD を開く。
       </p>
       <p className="openchat-group-actions">
         <CopyPathButton path={path} label="やり取りパスをコピー" />
-        <span className="meta"> · {path}</span>
+        <span className="meta"> · </span>
+        <CopyPathButton path={prompt} label="Cursorプロンプト" />
       </p>
+      <p className="meta openchat-path-hint">{path}</p>
 
+      {digestGroup?.lines?.length ? (
+        <section className="openchat-health level-info" aria-label="有益要約">
+          <h2 style={{ margin: "0 0 8px", fontSize: "1.05rem" }}>有益要約</h2>
+          <ul className="openchat-group-lines">
+            {digestGroup.lines.slice(0, 3).map((ln, i) => (
+              <li key={i}>{ln}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <h2>直近更新</h2>
       {!rows.length ? (
         <p className="empty">このグループの直近 activity はありません</p>
       ) : (

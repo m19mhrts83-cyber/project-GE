@@ -111,3 +111,9 @@ export function bundleByGroup(
 export function yoritooriRelPath(groupName: string): string {
   return `815_神大家オプチャ/${groupName}/5.やり取り.md`;
 }
+
+/** Mac／Cursor 向け。Web から OneDrive は直接開けない */
+export function yoritooriCursorPrompt(groupName: string): string {
+  const rel = yoritooriRelPath(groupName);
+  return `OneDrive 215 の次のファイルを開いて内容を確認して: C2_ルーティン作業/26_パートナー社への相談/${rel}`;
+}
