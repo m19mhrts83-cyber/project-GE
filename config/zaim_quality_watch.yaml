@@ -57,3 +57,22 @@ must_include:
       - オリコ
       - ORICO
     pay_keywords: []
+
+# 費目見直し（自動変更はせず、火・金の Watch で検知→ホームお知らせ）
+category_review:
+  lookback_days: 14
+  max_items: 25
+  suspicious_substrings:
+    - その他
+    - 使途不明
+    - 未分類
+  # 品目・店名からの提案（Zaim のカテゴリ名そのまま）
+  suggest_rules:
+    - suggest: "β.2C.食費"
+      keywords: [野菜, トマト, パン, ヨーグルト, 牛乳, 卵, 肉, 魚, 米, 弁当, アオキ, イオン, オークワ]
+    - suggest: "β.5C.日用雑貨"
+      keywords: [ダイソー, 無印, 洗剤, ティッシュ, 日用]
+    - suggest: "β.8C.交通"
+      keywords: [Suica, 交通, バス, 電車, タクシー]
+    - suggest: "β.7C.医療費"
+      keywords: [薬局, 病院, クリニック, マツモトキヨシ, スギ薬局, ウエルシア]

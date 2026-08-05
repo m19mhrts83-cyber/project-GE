@@ -1,5 +1,5 @@
 #!/bin/zsh
-# install: Zaim 銀行連携ウォッチ 金曜 09:00 JST
+# install: Zaim 銀行連携＋Watch 火・金 09:00 JST
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.zaim-bank-sync-friday"
@@ -9,7 +9,7 @@ LOG_DIR="${HOME}/Library/Logs/jarvis_zaim"
 mkdir -p "$LOG_DIR"
 chmod +x "$RUNNER"
 
-# Apple Weekday: 0=Sun … 5=Fri … 6=Sat
+# Apple Weekday: 0=Sun … 2=Tue … 5=Fri
 cat >"$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -22,14 +22,24 @@ cat >"$PLIST" <<EOF
     <string>${RUNNER}</string>
   </array>
   <key>StartCalendarInterval</key>
-  <dict>
-    <key>Weekday</key>
-    <integer>5</integer>
-    <key>Hour</key>
-    <integer>9</integer>
-    <key>Minute</key>
-    <integer>0</integer>
-  </dict>
+  <array>
+    <dict>
+      <key>Weekday</key>
+      <integer>2</integer>
+      <key>Hour</key>
+      <integer>9</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key>
+      <integer>5</integer>
+      <key>Hour</key>
+      <integer>9</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+  </array>
   <key>RunAtLoad</key>
   <false/>
   <key>StandardOutPath</key>
@@ -43,7 +53,7 @@ EOF
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
-echo "installed ${LABEL} (Friday 09:00 JST) → ${PLIST}"
+echo "installed ${LABEL} (Tue+Fri 09:00 JST) → ${PLIST}"
 echo "manual: ${RUNNER}"
 echo "disable: JARVIS_ZAIM_BANK_SYNC_DISABLE=1 or state disabled"
 echo "logs: ${LOG_DIR}/"

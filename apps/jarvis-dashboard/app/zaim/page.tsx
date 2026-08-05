@@ -5,6 +5,7 @@ import WatchCommentThread, {
   type WatchCommentRow,
 } from "@/components/WatchCommentThread";
 import ZaimFixActions from "@/components/ZaimFixActions";
+import ZaimReviewAckButton from "@/components/ZaimReviewAckButton";
 import { LEVEL_LABEL, HomeLevel } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
 
@@ -147,6 +148,21 @@ export default async function ZaimWatchPage() {
   const otherFixes = fixes.filter(
     (f) => f.status && f.status !== "pending_confirm",
   );
+  const showBanner = payload.show_banner === true;
+  const reviewBatchId = String(payload.review_batch_id || "");
+  const reviewLines = Array.isArray(payload.review_lines)
+    ? (payload.review_lines as string[])
+    : [];
+  const categoryReviews = Array.isArray(payload.category_reviews)
+    ? (payload.category_reviews as {
+        date?: string;
+        shop?: string;
+        amount?: number;
+        proposal?: string;
+        category?: string;
+        suggest?: string;
+      }[])
+    : [];
   const neverArchive = Boolean(payload.never_archive);
   const level = (
     ["attention", "warn", "info", "ok"].includes(watch?.level || "")
@@ -167,14 +183,34 @@ export default async function ZaimWatchPage() {
     <Shell active="/zaim">
       <h1>Zaim Watch</h1>
       <p className="sub">
-        財務の年間収支と、集計設定・二重取込の直し確認。アーカイブせず常駐します。
-        年間収支は Zaim の「集計に含めない」を除外した合計です（当年は1〜当月の
+        財務の年間収支と、集計設定・二重取込・費目見直しの確認。アーカイブせず常駐します。
+        火・金に見直し（CSV は同曜日）。年間収支は Zaim の「集計に含めない」を除外した合計です（当年は1〜当月の
         YTD）。詳細な月次は{" "}
         <Link href="/metrics" style={{ color: "var(--accent)", fontWeight: 600 }}>
           収支・数値
         </Link>
         。
       </p>
+
+      {showBanner && reviewBatchId ? (
+        <section className="card level-attention" style={{ marginBottom: 16 }}>
+          <header>
+            <span className="lvl">お知らせ</span>
+            <strong>Zaim を見直しました</strong>
+          </header>
+          <ul className="openchat-group-lines">
+            {(reviewLines.length ? reviewLines : ["見直し結果があります"]).map(
+              (ln, i) => (
+                <li key={i}>{ln}</li>
+              ),
+            )}
+          </ul>
+          <p className="meta" style={{ marginBottom: 8 }}>
+            内容を見たら「確認しました」でホームから消えます（ETC 還元と同じ型）。
+          </p>
+          <ZaimReviewAckButton batchId={reviewBatchId} />
+        </section>
+      ) : null}
 
       <section className="card" style={{ marginBottom: 16 }}>
         <header>
@@ -244,6 +280,28 @@ export default async function ZaimWatchPage() {
                   ) : null}
                   <span className="watch-action-proposal">
                     {a.proposal || a.line || "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {categoryReviews.length > 0 ? (
+          <div className="watch-actions">
+            <p className="watch-actions-title">費目見直し（提案・未自動変更）</p>
+            <ul>
+              {categoryReviews.slice(0, 20).map((c, idx) => (
+                <li key={`${c.date}-${c.shop}-${idx}`}>
+                  {isYmdDate(c.date) ? (
+                    <span className="watch-action-date">{c.date}</span>
+                  ) : null}
+                  <span className="watch-action-shop">{c.shop || "—"}</span>
+                  {c.amount != null ? (
+                    <span className="watch-action-yen">{fmtYen(c.amount)}</span>
+                  ) : null}
+                  <span className="watch-action-proposal">
+                    {c.proposal || c.category || "—"}
                   </span>
                 </li>
               ))}

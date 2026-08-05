@@ -135,7 +135,7 @@ export default async function HomePage() {
   const macMorningAt = metaMap.mac_morning_refreshed_at;
   const macMorningOk = metaMap.mac_morning_refresh_ok;
 
-  /** ETC / Vポイント / 家賃ステップの月次サマリは show_banner（未確認）のあいだ必ずホーム掲載 */
+  /** ETC / Vポイント / 家賃ステップ / Zaim見直し は show_banner（未確認）のあいだ必ずホーム掲載 */
   const watchNeed = (watchRows || [])
     .filter((w) => {
       const pl =
@@ -145,7 +145,8 @@ export default async function HomePage() {
       if (
         w.id === "etc_mileage" ||
         w.id === "vpoint" ||
-        w.id === "rent_step"
+        w.id === "rent_step" ||
+        w.id === "zaim_quality"
       ) {
         if (pl.show_banner === true) return true;
       }
@@ -428,9 +429,11 @@ export default async function HomePage() {
                     ? it.level
                     : "info"
                 ) as HomeLevel;
-                // 状況レーンの該当カードへ（専用 /etc /vpoint ではなく）。query+hash で着地を安定化
-                const wid = encodeURIComponent(String(it.id));
-                const href = `/situation?watch=${wid}#watch-${wid}`;
+                // Zaim 見直しは /zaim で「確認しました」。他は状況レーンへ
+                const href =
+                  it.id === "zaim_quality"
+                    ? "/zaim"
+                    : `/situation?watch=${encodeURIComponent(String(it.id))}#watch-${encodeURIComponent(String(it.id))}`;
                 return (
                   <a
                     key={it.id}
