@@ -209,6 +209,7 @@ export async function askJarvisOnCard(
   opts?: {
     useKamiooyaKnowledge?: boolean;
     useOnedriveYoritoori?: boolean;
+    useGdrive?: boolean;
   },
 ): Promise<CardActionResult> {
   const text = body.trim();
@@ -262,6 +263,7 @@ export async function askJarvisOnCard(
     sources: {
       kamiooya: opts?.useKamiooyaKnowledge,
       onedriveYoritoori: opts?.useOnedriveYoritoori,
+      gdrive: opts?.useGdrive,
     },
   });
   const knowledgeNotices = ctx.notices;
@@ -275,7 +277,7 @@ export async function askJarvisOnCard(
       : "処置候補として助言し、次の一手を1つ提案する。",
     "返信は要点から。8行以内を目安。定型の『承知して Notion へ』だけで終わらない。",
     knowledgeBlock
-      ? "外部根拠（神大家DB／OneDriveやり取り）がある場合はそれを優先し、無いことは推測しない。"
+      ? "外部根拠（神大家DB／OneDriveやり取り／Drive NotebookLM）がある場合はそれを優先し、無いことは推測しない。"
       : "",
     "",
     `【レーン】${card.lane}`,

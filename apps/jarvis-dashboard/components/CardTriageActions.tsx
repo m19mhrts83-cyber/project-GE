@@ -80,6 +80,9 @@ export default function CardTriageActions({
   const [useOnedrive, setUseOnedrive] = useState(
     () => defaultAskContextSources(lane).onedriveYoritoori,
   );
+  const [useGdrive, setUseGdrive] = useState(
+    () => defaultAskContextSources(lane).gdrive,
+  );
   const [pending, start] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [promoTitle, setPromoTitle] = useState(() => defaultPromoteTitle(card));
@@ -236,6 +239,7 @@ export default function CardTriageActions({
       const r = await askJarvisOnCard(card.id, text, path, engine, {
         useKamiooyaKnowledge: useKamiooya,
         useOnedriveYoritoori: useOnedrive,
+        useGdrive,
       });
       setNotices(r.fallbackNotices || []);
       if (r.localPrompt) setLocalPrompt(r.localPrompt);
@@ -441,16 +445,16 @@ export default function CardTriageActions({
         </label>
         <label
           className="draft-engine-opt"
-          style={{
-            display: "flex",
-            marginTop: 6,
-            gap: 8,
-            opacity: 0.65,
-          }}
-          title="Phase3。Cloud 対話は NotebookLM MCP、ダッシュボード ask は後続"
+          style={{ display: "flex", marginTop: 6, gap: 8 }}
+          title="admin Drive の 200_NoteBookLM を検索して注入（手動オン）"
         >
-          <input type="checkbox" checked={false} disabled />
-          Google Drive／NotebookLM（Phase3・未実装）
+          <input
+            type="checkbox"
+            checked={useGdrive}
+            onChange={(e) => setUseGdrive(e.target.checked)}
+            disabled={pending || macPolling}
+          />
+          Google Drive／NotebookLM を参照（200_NoteBookLM）
         </label>
         <textarea
           value={text}

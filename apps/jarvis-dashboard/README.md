@@ -48,7 +48,7 @@ Server Action が読んでプロンプトに注入する（`lib/askContextBundle
 | カード／コメントスレ | 常時 | `JARVIS_SUPABASE_*`（既存） |
 | 神大家 kamiooya-qa | 運営／戸建／物件レーン | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（**運営 PJ・読取のみ**） |
 | OneDrive `5.やり取り.md` | partner／物件レーン | `MS_GRAPH_CLIENT_ID` / `REFRESH_TOKEN` / `AUTHORITY` |
-| admin Drive／NotebookLM | Phase3・UI は無効 | Cloud 対話は NotebookLM MCP。ダッシュボード ask は後続 |
+| admin Drive／NotebookLM | 手動オン | `GDRIVE_CLIENT_ID` / `SECRET` / `REFRESH_TOKEN` / `NOTEBOOKLM_FOLDER_ID`（`jarvis_gdrive_admin_login.py`） |
 
 失敗したソースは notice のみで聞く自体は続行。同じ根拠ブロックをローカルコピー／Mac キューに同梱する。
 
@@ -147,6 +147,7 @@ Site URL = `https://jarvis-dashboard-amber.vercel.app`、Redirect に `/auth/cal
    - （送信・見直し・聞く）`CURSOR_API_KEY` / 任意 `GEMINI_API_KEY` / `GMAIL_*`
    - （聞く・神大家注入）`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（**kamiooya-qa 読取のみ**。JARVIS_SUPABASE_* とは別）
    - （聞く・OneDrive 注入）`MS_GRAPH_CLIENT_ID` / `MS_GRAPH_REFRESH_TOKEN` / `MS_GRAPH_AUTHORITY=consumers`
+   - （聞く・Drive／NotebookLM）`GDRIVE_CLIENT_ID` / `GDRIVE_CLIENT_SECRET` / `GDRIVE_REFRESH_TOKEN` / `GDRIVE_NOTEBOOKLM_FOLDER_ID`
 3. Supabase Auth → URL Configuration:
    - Site URL = 本番 URL
    - Redirect URLs に `https://….vercel.app/auth/callback` を追加（ローカルも残す）
