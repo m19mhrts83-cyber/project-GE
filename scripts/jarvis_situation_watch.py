@@ -367,6 +367,14 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         last_draw = teiki.get("last_draw") if isinstance(teiki.get("last_draw"), dict) else None
         if last_draw and last_draw.get("results_summary"):
             teiki_bits.append(f"抽選済 {str(last_draw.get('results_summary'))[:20]}")
+        awaiting = [
+            s
+            for s in (teiki.get("services") or [])
+            if isinstance(s, dict) and s.get("status") == "awaiting_first_charge"
+        ]
+        if awaiting:
+            titles = "・".join(str(s.get("title") or s.get("id")) for s in awaiting[:2])
+            teiki_bits.append(f"課金待ち:{titles}")
         parts.append(" ".join(teiki_bits))
 
     if actions:
@@ -413,6 +421,16 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
     ):
         level = "warn"
         parts.append("抽選未実施")
+    # Olive 実課金待ち（水道など）もホームで気づけるよう warn
+    if (
+        not teiki_disabled
+        and any(
+            isinstance(s, dict) and s.get("status") == "awaiting_first_charge"
+            for s in (teiki.get("services") or [])
+        )
+        and level in ("ok", "info")
+    ):
+        level = "warn"
     if not parts:
         parts.append("データなし")
         level = "warn"
