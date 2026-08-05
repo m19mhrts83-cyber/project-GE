@@ -1259,6 +1259,50 @@ p.back {
   cursor: pointer;
 }
 
+.home-data-locations {
+  margin-top: 12px;
+  padding-top: 4px;
+}
+
+.home-data-locations-body {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 92%, var(--text));
+  line-height: 1.55;
+}
+
+.home-data-locations-body > p {
+  margin: 0 0 12px;
+}
+
+.home-data-locations-list {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.home-data-locations-list dt {
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+
+.home-data-locations-list dd {
+  margin: 0;
+}
+
+.home-data-locations-list a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.home-data-locations-list code {
+  font-size: 0.8em;
+  word-break: break-all;
+}
+
 .home-crumb {
   font-size: 0.85rem;
   color: var(--muted);
