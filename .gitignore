@@ -63,6 +63,7 @@ _tmp/
 .jarvis_state/subscriptions_snapshots/
 .jarvis_state/shuhen_auto_jobs/
 .jarvis_state/vpass_pp_cancel/
+.jarvis_state/teiki_barai_chance/
 .jarvis_state/night_triage/queue.json
 .jarvis_state/night_triage/dashboard.html
 .jarvis_state/night_triage/config.json
