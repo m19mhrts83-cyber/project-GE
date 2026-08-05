@@ -20,8 +20,12 @@ export type NotionBoardSummary = {
   boardUrl?: string;
   lane?: string;
   openStatuses: string[];
+  /** open + done（完了は末尾）。UI 列順の正 */
+  columnOrder: string[];
+  /** 移動セレクト用（open + done） */
+  moveStatuses: string[];
   byStatus: Record<string, number>;
-  /** ステータス別タスク（完了以外を最大12件/列）。埋め込みプレビュー用 */
+  /** ステータス別タスク（列内スクロール前提で多めに保持） */
   columns: Record<string, NotionTask[]>;
   overdue: NotionTask[];
   openSample: NotionTask[];
@@ -82,6 +86,8 @@ function emptyBoard(
   return {
     connected: false,
     openStatuses: [],
+    columnOrder: [],
+    moveStatuses: [],
     byStatus: {},
     columns: {},
     overdue: [],
@@ -90,16 +96,32 @@ function emptyBoard(
   };
 }
 
+const MAX_TASKS_PER_COL = 40;
+
 export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> {
   const cfg = loadNotionLaneConfig(lane);
   if (!cfg) {
     return emptyBoard({ reason: "YAML未登録" });
   }
+  const hideDone = Boolean(cfg.hide_done_on_board);
+  const columnOrder = hideDone
+    ? [...cfg.open_statuses]
+    : [
+        ...cfg.open_statuses,
+        ...cfg.done_statuses.filter((s) => !cfg.open_statuses.includes(s)),
+      ];
+  const moveStatuses = [
+    ...cfg.open_statuses,
+    ...cfg.done_statuses.filter((s) => !cfg.open_statuses.includes(s)),
+  ];
+
   if (!notionTokenConfigured()) {
     return emptyBoard({
       reason: "NOTION_API_TOKEN 未設定",
       boardUrl: cfg.board_url,
       openStatuses: cfg.open_statuses,
+      columnOrder,
+      moveStatuses,
     });
   }
 
@@ -110,14 +132,6 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
   const today = todayJst();
   let cursor: string | undefined;
   let pages = 0;
-
-  const hideDone = Boolean(cfg.hide_done_on_board);
-  const columnOrder = hideDone
-    ? [...cfg.open_statuses]
-    : [
-        ...cfg.open_statuses,
-        ...cfg.done_statuses.filter((s) => !cfg.open_statuses.includes(s)),
-      ];
 
   try {
     do {
@@ -142,6 +156,8 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
           reason: `Notion API ${res.status}: ${text.slice(0, 160)}`,
           boardUrl: cfg.board_url,
           openStatuses: cfg.open_statuses,
+          columnOrder,
+          moveStatuses,
         });
       }
       const data = (await res.json()) as {
@@ -171,19 +187,23 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
         if (hideDone && done) continue;
         if (!columnOrder.includes(status) && hideDone) continue;
         const col = columns[status] || (columns[status] = []);
-        if (col.length < 12) col.push(task);
+        if (col.length < MAX_TASKS_PER_COL) col.push(task);
       }
       cursor = data.has_more ? data.next_cursor || undefined : undefined;
       pages += 1;
     } while (cursor && pages < 5);
 
+    const orderedColumns: Record<string, NotionTask[]> = {};
     for (const s of columnOrder) {
-      if (!columns[s]) columns[s] = [];
+      orderedColumns[s] = columns[s] || [];
+    }
+    for (const [k, v] of Object.entries(columns)) {
+      if (!(k in orderedColumns)) orderedColumns[k] = v;
     }
 
     const boardByStatus: Record<string, number> = {};
     for (const s of columnOrder) {
-      boardByStatus[s] = (columns[s] || []).length;
+      boardByStatus[s] = (orderedColumns[s] || []).length;
     }
 
     return {
@@ -191,8 +211,10 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
       boardUrl: cfg.board_url,
       lane,
       openStatuses: cfg.open_statuses,
+      columnOrder,
+      moveStatuses,
       byStatus: hideDone ? boardByStatus : byStatus,
-      columns,
+      columns: orderedColumns,
       overdue,
       openSample,
     };
@@ -201,6 +223,8 @@ export async function queryLaneBoard(lane: string): Promise<NotionBoardSummary> 
       reason: e instanceof Error ? e.message : String(e),
       boardUrl: cfg.board_url,
       openStatuses: cfg.open_statuses,
+      columnOrder,
+      moveStatuses,
     });
   }
 }

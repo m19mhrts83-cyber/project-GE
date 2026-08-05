@@ -1637,23 +1637,50 @@ p.back {
   flex-wrap: wrap;
 }
 
+.notion-kanban-section {
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+/* 1画面に収まる高さ。列が増えたら横スクロール、カードが多い列は縦スクロール */
+.notion-board-frame {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 14px);
+  background: color-mix(in srgb, var(--card) 88%, #e8e4dc);
+  padding: 10px;
+  max-width: 100%;
+}
+
 .notion-board {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  display: flex;
   gap: 12px;
-  margin-top: 14px;
+  align-items: stretch;
   overflow-x: auto;
+  overflow-y: hidden;
+  height: min(52vh, 480px);
+  max-height: 480px;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .notion-col {
+  flex: 0 0 min(220px, 72vw);
+  width: min(220px, 72vw);
+  max-width: 240px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
   background: #f5f3ef;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px;
-  min-height: 120px;
+  box-sizing: border-box;
 }
 
 .notion-col-head {
+  flex: 0 0 auto;
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--muted);
@@ -1668,10 +1695,14 @@ p.back {
 .notion-col-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 2px 4px 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .notion-col-list li {
@@ -1681,6 +1712,7 @@ p.back {
   padding: 8px 10px;
   font-size: 0.86rem;
   box-shadow: var(--shadow-soft);
+  flex: 0 0 auto;
 }
 
 .notion-col-list li.overdue {
