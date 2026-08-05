@@ -1,8 +1,9 @@
-# 物件メタ（管理会社・空室時鍵番号）
+# 物件メタ（管理会社・空室時鍵番号・住所）
 # 鍵番号の正本: Notion DB_物件情報(アパート)
 #   https://app.notion.com/p/2e5f6bbe5a76801595f2c1bb8a5d23e7
 # Jarvis ダッシュボード Integration に当該 DB を「接続」すると API で上書き取得する。
 # 未共有時はこの YAML の key_number を表示用キャッシュとして使う。
+# 住所は棟単位。ダッシュボード /properties の各棟ヘッダ下に表示。
 
 version: 1
 
@@ -17,6 +18,7 @@ properties:
   grandole-i:
     name: Grandole志賀本通I
     short: I
+    address: 愛知県名古屋市北区長田町4丁目69番地5
     match_names:
       - "Grandole志賀本通I"
       - "02_Grandole志賀本通I"
@@ -40,6 +42,8 @@ properties:
   grandole-ii:
     name: Grandole志賀本通II
     short: II
+    # I と同敷地・周辺MAP正本と同じ住所
+    address: 愛知県名古屋市北区長田町4丁目69番地5
     match_names:
       - "Grandole志賀本通II"
       - "01_Grandole志賀本通II"
@@ -53,6 +57,8 @@ properties:
   caramel:
     name: キャラメル
     short: C
+    # 管理契約書・Notion 物件住所
+    address: 愛知県名古屋市緑区文久山418
     match_names:
       - "キャラメル"
       - "03_キャラメル"

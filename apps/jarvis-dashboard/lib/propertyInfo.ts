@@ -7,6 +7,8 @@ export type PropertyRoomInfo = {
 export type PropertyInfo = {
   name: string;
   short?: string;
+  /** 物件所在地（棟単位） */
+  address?: string;
   match_names: string[];
   managers: string[];
   /** 号室・メモで特定できないときの既定管理会社 */
@@ -40,6 +42,7 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
     "grandole-i": {
       name: "Grandole志賀本通I",
       short: "I",
+      address: "愛知県名古屋市北区長田町4丁目69番地5",
       match_names: [
         "Grandole志賀本通I",
         "02_Grandole志賀本通I",
@@ -58,6 +61,7 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
     "grandole-ii": {
       name: "Grandole志賀本通II",
       short: "II",
+      address: "愛知県名古屋市北区長田町4丁目69番地5",
       match_names: [
         "Grandole志賀本通II",
         "01_Grandole志賀本通II",
@@ -70,6 +74,7 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
     caramel: {
       name: "キャラメル",
       short: "C",
+      address: "愛知県名古屋市緑区文久山418",
       match_names: ["キャラメル", "03_キャラメル"],
       managers: ["Tcell"],
       key_number: null,

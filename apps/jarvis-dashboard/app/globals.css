@@ -707,6 +707,13 @@ a.stat-link:active {
   font-size: 0.85rem;
 }
 
+.prop-block-address {
+  margin: -2px 0 10px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .prop-note {
   white-space: pre-wrap;
   max-width: 28rem;

@@ -12,6 +12,7 @@ import {
 import { fetchPropertyKeyNumbers } from "@/lib/notionPropertyKeys";
 import {
   fmtKeyNumber,
+  getPropertyInfo,
   managersForProperty,
   resolveRoomManager,
 } from "@/lib/propertyInfo";
@@ -58,7 +59,7 @@ export default async function Page() {
       lane="properties"
       title="所有物件"
       active="/properties"
-      subtitle="号室ごとに家賃・管理費・管理会社・空室時鍵番号。建物ごとの合計も表示。"
+      subtitle="号室ごとに家賃・管理費・管理会社・空室時鍵番号。建物ごとの住所・合計も表示。"
     >
       <div className="stats">
         <div className="stat">
@@ -120,6 +121,8 @@ export default async function Page() {
             g.units.map((u) => ({ room: u.room, note: u.note })),
           );
           const key = propertyKeys.keys[g.property_id];
+          const info = getPropertyInfo(g.property_id);
+          const address = info?.address;
           return (
             <section key={g.property_id} className="prop-block">
               <div className="prop-block-head">
@@ -139,6 +142,9 @@ export default async function Page() {
                   <strong>{fmtKeyNumber(key)}</strong>
                 </div>
               </div>
+              {address ? (
+                <p className="prop-block-address">{address}</p>
+              ) : null}
               <div className="home-unit-table-wrap">
                 <table className="home-unit-table">
                   <thead>
