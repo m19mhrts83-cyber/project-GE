@@ -30,10 +30,15 @@ function BoardSection({
   lane: string;
   path: string;
 }) {
+  const statusOrder =
+    board.columnOrder?.length > 0
+      ? board.columnOrder
+      : Object.keys(board.byStatus || {});
+
   return (
-    <section className="home-section" style={{ marginTop: 28 }}>
+    <section className="home-section notion-kanban-section">
       <div className="notion-board-head">
-        <h2 style={{ margin: 0 }}>Notion 看板</h2>
+        <h2 style={{ margin: 0 }}>Kanban</h2>
         {board.boardUrl ? (
           <a
             href={board.boardUrl}
@@ -46,8 +51,8 @@ function BoardSection({
         ) : null}
       </div>
       <p className="sub" style={{ marginTop: 8 }}>
-        タスク名で Notion を開きます。列の「移動」でステータスを変えられます（Notion
-        に反映）。プライベート DB は iframe 不可のため API で再現しています。
+        枠内で縦・横スクロールします（ページ全体を伸ばしません）。タスク名で
+        Notion を開き、列の「移動」でステータスを変えられます。
       </p>
       {!board.connected ? (
         <p className="empty">
@@ -59,9 +64,9 @@ function BoardSection({
       ) : (
         <>
           <div className="stats">
-            {Object.entries(board.byStatus).map(([k, n]) => (
+            {statusOrder.map((k) => (
               <div className="stat" key={k}>
-                {k} <strong>{n}</strong>
+                {k} <strong>{board.byStatus[k] ?? 0}</strong>
               </div>
             ))}
           </div>
@@ -69,6 +74,8 @@ function BoardSection({
             lane={lane}
             path={path}
             openStatuses={board.openStatuses || []}
+            columnOrder={board.columnOrder || []}
+            moveStatuses={board.moveStatuses || []}
             columns={board.columns || {}}
           />
           {board.overdue.length > 0 ? (
@@ -169,6 +176,8 @@ export default async function TriageKanbanLane({
         )}
       </p>
 
+      <BoardSection board={board} lane={lane} path={active} />
+
       {children}
 
       <div className="stats">
@@ -252,8 +261,6 @@ export default async function TriageKanbanLane({
           ))}
         </>
       ) : null}
-
-      <BoardSection board={board} lane={lane} path={active} />
     </Shell>
   );
 }
