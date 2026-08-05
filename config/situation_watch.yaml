@@ -158,3 +158,16 @@ items:
       週次ランナー: scripts/jarvis_zaim_watch_runner.py（安全な集計設定は自動適用→確認）
       銀行更新: Zaim Web 口座一覧。Suica 画像認証は手動。OTP は .env.jarvis_private（値は出さない）
       ETC 同額は対象外。
+
+  # 2026-08 一時 Pro Plus → 9月前に Pro へ戻す（意図しない継続課金防止）
+  - id: cursor_pro_plus_downgrade
+    title: Cursor Pro Plus → Pro に戻す
+    category: ops
+    enabled: true
+    never_archive: true
+    source: "deadline 2026-08-24 / cursor.com/settings"
+    cursor_prompt: |
+      Cursor を Pro Plus から Pro へダウングレードする期限は 2026-08-24。
+      設定: https://www.cursor.com/settings → Schedule Downgrade（またはプラン変更）。
+      9月請求で Pro Plus が続かないよう、24日までに手続きを確認して。
+      ダッシュボード課金: /billing（Cursor 行）。

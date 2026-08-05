@@ -17,10 +17,10 @@ services:
     status: active
     billing: monthly
     amount_yen: 3239
-    usage_note: "Usage 従量あり（定額＋従量）"
+    usage_note: "2026-08 は Pro Plus（一時）。2026-08-24 までに Pro へ戻す。Usage 従量あり"
     next_bill: "毎月25日前後"
     watch: true
-    watch_reason: "定額＋Usage。従量急増に注意"
+    watch_reason: "8月 Pro Plus → 9月前に Pro。意図しない継続課金防止（〜8/24）"
     cancel_candidate: false
     billing_url: "https://www.cursor.com/settings"
 

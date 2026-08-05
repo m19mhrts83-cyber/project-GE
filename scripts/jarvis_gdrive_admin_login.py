@@ -34,16 +34,16 @@ DEFAULT_LOGIN_HINT = "admin@livingsupport-matsu.co.jp"
 FOLDER_NAME = "200_NoteBookLM"
 
 
-def _oauth_flow_kwargs(login_hint: str | None) -> dict:
+def _oauth_url_kwargs(login_hint: str | None) -> dict:
+    """run_local_server / authorization_url に渡す kwargs。"""
+    kw: dict = {
+        "access_type": "offline",
+        "prompt": "consent",
+        # Drive 専用。true だと既存 Gmail/Calendar 権限が同意画面に混ざる
+    }
     if login_hint:
-        return {
-            "authorization_url_kwargs": {
-                "login_hint": login_hint,
-                "prompt": "consent",
-                "access_type": "offline",
-            }
-        }
-    return {"prompt": "consent", "access_type": "offline"}
+        kw["login_hint"] = login_hint
+    return kw
 
 
 def _client_bits() -> tuple[str, str]:
@@ -59,6 +59,7 @@ def load_credentials(
     *,
     login_hint: str | None = DEFAULT_LOGIN_HINT,
     auth_console: bool = False,
+    port: int = 8099,
 ) -> Credentials:
     if not CREDENTIALS_PATH.is_file():
         raise FileNotFoundError(f"credentials.json がありません: {CREDENTIALS_PATH}")
@@ -79,15 +80,29 @@ def load_credentials(
 
     if not creds or not creds.valid:
         flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_PATH), SCOPES)
-        kwargs = _oauth_flow_kwargs(login_hint)
+        url_kw = _oauth_url_kwargs(login_hint)
         if auth_console:
             print(
                 "認証 URL をシークレットウィンドウで開き、admin で同意後にコードを貼ってください。",
                 file=sys.stderr,
             )
-            creds = flow.run_console(**kwargs)
+            # run_console は非推奨気味だがフォールバックとして残す
+            creds = flow.run_console(**url_kw)
         else:
-            creds = flow.run_local_server(port=0, **kwargs)
+            print(
+                f"ローカル待ち受け: http://127.0.0.1:{port}/ "
+                f"（同意後に Connection failed なら、このプロセスが生きているか確認）",
+                file=sys.stderr,
+            )
+            print(f"使用アカウント: {login_hint}", file=sys.stderr)
+            # open_browser=True で正しい redirect_uri の URL を開く（手動 open でポートずれしない）
+            creds = flow.run_local_server(
+                host="127.0.0.1",
+                port=port,
+                open_browser=True,
+                bind_addr="127.0.0.1",
+                **url_kw,
+            )
         TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
         print(f"token を保存しました: {TOKEN_PATH}", file=sys.stderr)
 
@@ -167,12 +182,19 @@ def main() -> int:
         default="",
         help="NOTEBOOKLM_DRIVE_FOLDER_URL があれば ID 抽出に使う",
     )
+    ap.add_argument(
+        "--port",
+        type=int,
+        default=8099,
+        help="run_local_server の固定ポート（既定 8099。Connection failed 対策）",
+    )
     args = ap.parse_args()
 
     print(f"使用アカウント: {args.login_hint}", file=sys.stderr)
     creds = load_credentials(
         login_hint=args.login_hint or None,
         auth_console=args.auth_console,
+        port=args.port,
     )
     if not creds.refresh_token:
         print(

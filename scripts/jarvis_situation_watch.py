@@ -1425,6 +1425,65 @@ def refresh_zaim_quality() -> None:
             print(f"# {script_name} refresh failed: {e}", file=sys.stderr)
 
 
+def eval_cursor_pro_plus_downgrade(meta: dict) -> dict[str, Any]:
+    """8月一時 Pro Plus → 9月前に Pro へ戻す催促（〜2026-08-24 まで attention）。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    until = date(2026, 8, 24)
+    d = today()
+    href = "https://www.cursor.com/settings"
+    if d <= until:
+        days = (until - d).days
+        if days == 0:
+            summary = "今日が期限 — Pro Plus → Pro の Schedule Downgrade を実行"
+            level = "attention"
+        elif days <= 3:
+            summary = f"残り{days}日（期限 {until.isoformat()}）— 意図しない Pro Plus 継続を防ぐ"
+            level = "attention"
+        else:
+            summary = (
+                f"8月は Pro Plus。期限 {until.isoformat()} までに Pro へ戻す"
+                f"（あと{days}日）"
+            )
+            level = "attention"
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "ops",
+            level=level,
+            summary=summary,
+            detail=(
+                "Cursor Settings → Billing / Plan で Schedule Downgrade。"
+                "ホーム最上段にも同内容を固定表示（期限後は自動で消える）。"
+            ),
+            cursor_prompt=prompt,
+            source=src,
+            payload={
+                "show_until": until.isoformat(),
+                "href": href,
+                "pin_home_top": True,
+                "show_banner": True,
+            },
+        )
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "ops",
+        level="ok",
+        summary=f"期限（{until.isoformat()}）経過 — 表示オフ（完了扱い）",
+        detail="ダウングレード済みか要確認。未実施なら /billing と Cursor Settings を確認。",
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "show_until": until.isoformat(),
+            "href": href,
+            "pin_home_top": False,
+            "show_banner": False,
+        },
+    )
+
+
 EVALUATORS = {
     "etc_mileage": lambda m: eval_etc(m, load_json(STATE / "etc_monthly.json")),
     "vpoint": lambda m: eval_vpoint(m),
@@ -1445,6 +1504,7 @@ EVALUATORS = {
         refresh_zaim_quality(),
         eval_zaim_quality(m, load_json(STATE / "zaim_quality_watch.json")),
     )[1],
+    "cursor_pro_plus_downgrade": lambda m: eval_cursor_pro_plus_downgrade(m),
 }
 
 

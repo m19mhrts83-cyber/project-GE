@@ -135,7 +135,7 @@ export default async function HomePage() {
   const macMorningAt = metaMap.mac_morning_refreshed_at;
   const macMorningOk = metaMap.mac_morning_refresh_ok;
 
-  /** ETC / Vポイント / 家賃ステップ / Zaim見直し は show_banner（未確認）のあいだ必ずホーム掲載 */
+  /** ETC / Vポイント / 家賃ステップ / Zaim見直し / Cursor Pro Plus戻し は show_banner のあいだ必ずホーム掲載 */
   const watchNeed = (watchRows || [])
     .filter((w) => {
       const pl =
@@ -146,17 +146,26 @@ export default async function HomePage() {
         w.id === "etc_mileage" ||
         w.id === "vpoint" ||
         w.id === "rent_step" ||
-        w.id === "zaim_quality"
+        w.id === "zaim_quality" ||
+        w.id === "cursor_pro_plus_downgrade"
       ) {
         if (pl.show_banner === true) return true;
       }
       return w.level !== "ok";
     })
-    .sort(
-      (a, b) =>
+    .sort((a, b) => {
+      // Cursor Pro Plus 戻しは期限まで常に先頭
+      if (a.id === "cursor_pro_plus_downgrade") return -1;
+      if (b.id === "cursor_pro_plus_downgrade") return 1;
+      return (
         watchSortKey(a.level) - watchSortKey(b.level) ||
         String(b.updated_at || "").localeCompare(String(a.updated_at || ""))
-    );
+      );
+    });
+
+  const cursorDowngradePin = watchNeed.find(
+    (w) => w.id === "cursor_pro_plus_downgrade"
+  );
 
   const counts = { attention: 0, warn: 0, info: 0 };
   for (const w of watchNeed) {
@@ -190,6 +199,24 @@ export default async function HomePage() {
         </a>
         。
       </p>
+
+      {cursorDowngradePin ? (
+        <a
+          href="https://www.cursor.com/settings"
+          className="card watch-card level-attention home-pin-banner"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <header>
+            <span className="lvl">{LEVEL_LABEL.attention}</span>
+            <strong>{cursorDowngradePin.title}</strong>
+          </header>
+          <p className="sum">{cursorDowngradePin.summary}</p>
+          <p className="meta">
+            期限 2026-08-24 · Cursor Settings で Schedule Downgrade · 状況ウォッチにも掲載
+          </p>
+        </a>
+      ) : null}
 
       <p className="home-sync" aria-label="最終同期">
         <span>
@@ -461,12 +488,18 @@ export default async function HomePage() {
                 const href =
                   it.id === "zaim_quality"
                     ? "/zaim"
-                    : `/situation?watch=${encodeURIComponent(String(it.id))}#watch-${encodeURIComponent(String(it.id))}`;
+                    : it.id === "cursor_pro_plus_downgrade"
+                      ? "https://www.cursor.com/settings"
+                      : `/situation?watch=${encodeURIComponent(String(it.id))}#watch-${encodeURIComponent(String(it.id))}`;
+                const external = it.id === "cursor_pro_plus_downgrade";
                 return (
                   <a
                     key={it.id}
                     href={href}
                     className={`card watch-card level-${level}`}
+                    {...(external
+                      ? { target: "_blank", rel: "noopener noreferrer" }
+                      : {})}
                   >
                     <header>
                       <span className="lvl">{LEVEL_LABEL[level]}</span>

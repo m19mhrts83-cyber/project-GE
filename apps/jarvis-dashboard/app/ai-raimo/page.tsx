@@ -6,7 +6,7 @@ export default async function Page() {
       lane="ai_raimo"
       title="AI・Raimo"
       active="/ai-raimo"
-      subtitle="処置候補 → Notion「Cursorタスク」看板へ。Cursor に依頼する流れ。"
+      subtitle="処置候補 → Notion「Cursorタスク」Kanban へ。Cursor に依頼する流れ。"
     />
   );
 }
