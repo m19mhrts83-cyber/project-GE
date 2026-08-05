@@ -9,16 +9,14 @@ import {
   defaultUseOnedriveYoritoori,
   retrieveYoritooriForAsk,
 } from "@/lib/onedrive/retrieveYoritoori";
+import { retrieveNotebookLmForAsk } from "@/lib/gdrive/retrieveNotebookLmForAsk";
 
 export type AskContextSources = {
   /** 運営 kamiooya-qa（読取のみ） */
   kamiooya?: boolean;
   /** OneDrive パートナー 5.やり取り.md（Graph） */
   onedriveYoritoori?: boolean;
-  /**
-   * admin Google Drive / NotebookLM（Phase3・未実装）
-   * 現状は常に無視。Cloud 対話は NotebookLM MCP、ダッシュボード ask は後続。
-   */
+  /** admin Google Drive `200_NoteBookLM`（Phase3） */
   gdrive?: boolean;
 };
 
@@ -38,6 +36,7 @@ export function defaultAskContextSources(
   return {
     kamiooya: defaultUseKamiooyaKnowledge(lane),
     onedriveYoritoori: defaultUseOnedriveYoritoori(lane),
+    /** 手動オン既定（誤爆・トークン消費を抑える） */
     gdrive: false,
   };
 }
@@ -59,7 +58,7 @@ export async function buildAskContextBundle(opts: {
     kamiooya: opts.sources?.kamiooya ?? defaults.kamiooya,
     onedriveYoritoori:
       opts.sources?.onedriveYoritoori ?? defaults.onedriveYoritoori,
-    gdrive: false, // Phase3: ダッシュボード ask では常にオフ
+    gdrive: opts.sources?.gdrive ?? defaults.gdrive,
   };
 
   const notices: string[] = [];
@@ -84,10 +83,10 @@ export async function buildAskContextBundle(opts: {
     if (yr.promptBlock) blocks.push(yr.promptBlock);
   }
 
-  if (opts.sources?.gdrive) {
-    notices.push(
-      "Google Drive／NotebookLM 参照は Phase3（未実装）。Cloud 対話は NotebookLM MCP、深い参照はローカル Cursor",
-    );
+  if (sources.gdrive) {
+    const gr = await retrieveNotebookLmForAsk(opts.query);
+    notices.push(gr.notice);
+    if (gr.promptBlock) blocks.push(gr.promptBlock);
   }
 
   const promptBlock = blocks.join("\n\n");

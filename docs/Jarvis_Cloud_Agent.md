@@ -64,15 +64,18 @@ Web／no-repo Cloud は **OneDrive・Google Drive を直接見ない**。Server 
 | カード／スレ（jarvis-dashboard） | 常に注入 |
 | 神大家コメント・動画（kamiooya-qa） | Phase1 実装。運営／戸建／物件レーン既定オン。`SUPABASE_*` 読取専用 |
 | OneDrive `5.やり取り.md` | Phase2 実装。パートナー／物件レーン既定オン。`MS_GRAPH_*`（回転 refresh は sync_meta に保存） |
-| admin Google Drive / NotebookLM | **Phase3（方針固定・未実装）**。Cloud **対話**は NotebookLM MCP（admin）。ダッシュボード「聞く」への注入は Drive API 検索 or 事前投影を後続。神大家共有 Drive は **estate**、NotebookLM ソースは **admin**（混同しない） |
+| admin Google Drive / NotebookLM | **Phase3 実装**。ダッシュボード「聞く」で手動オン → Drive API が `200_NoteBookLM` を検索しスニペット注入。Cloud **対話**は引き続き NotebookLM MCP（admin）。神大家共有 Drive は **estate**、NotebookLM ソースは **admin**（混同しない） |
 
 #### Phase3（Google Drive）でやること／やらないこと
 
-| やること（後続） | やらないこと（今回） |
+| やること（実装済み） | やらないこと |
 |---|---|
-| Drive API または投影テーブルからスニペット注入 | Cloud Agent に Drive／OneDrive を FUSE マウント |
-| UI チェック「Google Drive／NotebookLM」を有効化 | Phase1–2 と同時の巨大実装 |
-| アカウント: NotebookLM=admin、神大家運営共有=estate | 第3 Supabase プロジェクト |
+| Drive API からスニペット注入（`lib/gdrive/*`） | Cloud Agent に Drive／OneDrive を FUSE マウント |
+| UI チェック「Google Drive／NotebookLM」を有効化（手動オン既定） | 投影テーブル／第3 Supabase |
+| アカウント: NotebookLM=admin（`GDRIVE_*`） | estate 共有 Drive を ask に混ぜる |
+
+- 発行: `scripts/jarvis_gdrive_admin_login.py --print-env` → `.env.jarvis_private` と Vercel に `GDRIVE_CLIENT_ID` / `GDRIVE_CLIENT_SECRET` / `GDRIVE_REFRESH_TOKEN` / `GDRIVE_NOTEBOOKLM_FOLDER_ID`
+- refresh 回転は任意で `sync_meta.gdrive_refresh_token`
 
 - 秘密: `.env.jarvis_private` の `CURSOR_API_KEY`（Vercel にも同名）。発行: [Cursor Dashboard → API Keys](https://cursor.com/dashboard/api)
 - 神大家読取: Vercel に `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（kamiooya-qa。JARVIS_SUPABASE_* とは別）
