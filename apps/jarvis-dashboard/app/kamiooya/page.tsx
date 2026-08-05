@@ -6,7 +6,7 @@ export default async function Page() {
       lane="kamiooya"
       title="神大家運営"
       active="/kamiooya"
-      subtitle="やり取り／Journal からの処置候補 → Notion「神大家運営タスク」看板へ。"
+      subtitle="やり取り／Journal からの処置候補 → Notion「神大家運営タスク」Kanban へ。"
     />
   );
 }

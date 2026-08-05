@@ -1027,6 +1027,18 @@ p.back {
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 
+.home-pin-banner {
+  display: block;
+  margin: 0 0 18px;
+  border: 2px solid #dc2626;
+  box-shadow: 0 4px 18px rgba(220, 38, 38, 0.18);
+}
+
+.home-pin-banner .sum {
+  -webkit-line-clamp: 3;
+  font-weight: 600;
+}
+
 .watch-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-hover);

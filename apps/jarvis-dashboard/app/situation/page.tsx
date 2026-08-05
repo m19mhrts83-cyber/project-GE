@@ -43,7 +43,11 @@ export default async function SituationPage() {
 
   const active = (items || []).filter((i) => i.status === "active");
   const archivedCount = (items || []).filter((i) => i.status === "archived").length;
-  active.sort((a, b) => watchSortKey(a.level) - watchSortKey(b.level));
+  active.sort((a, b) => {
+    if (a.id === "cursor_pro_plus_downgrade" && a.level !== "ok") return -1;
+    if (b.id === "cursor_pro_plus_downgrade" && b.level !== "ok") return 1;
+    return watchSortKey(a.level) - watchSortKey(b.level);
+  });
 
   const ids = active.map((i) => i.id);
   const commentsByWatch = new Map<string, WatchCommentRow[]>();

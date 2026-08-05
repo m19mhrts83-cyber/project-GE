@@ -129,7 +129,7 @@ export default function CardTriageActions({
 
   const explain = useMemo(() => {
     if (isDigest) {
-      return "流れ: コメントで方針を相談 → 納得したら「タスク化する」で内容確認 → Notion 看板に1件登録。押した瞬間に作られることはありません。";
+      return "流れ: コメントで方針を相談 → 納得したら「タスク化する」で内容確認 → Kanban に1件登録。押した瞬間に作られることはありません。";
     }
     return "「処置として進める」は Notion にタスクを1件作ります。先に内容確認画面が出ます。";
   }, [isDigest]);
@@ -289,7 +289,7 @@ export default function CardTriageActions({
             Notion に登録する内容（まだ作成していません）
           </p>
           <p className="meta" style={{ margin: "0 0 8px" }}>
-            レーン「{lane}」の看板に<strong>未着手</strong>で1件追加します。タイトルは編集できます。
+            レーン「{lane}」の Kanban に<strong>未着手</strong>で1件追加します。タイトルは編集できます。
           </p>
           <label className="promote-label">
             タスク名
