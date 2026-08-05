@@ -42,6 +42,36 @@ type HistoryRow = {
   source_note?: string | null;
 };
 
+type TeikiService = {
+  id?: string;
+  title?: string;
+  status?: string;
+  note?: string;
+  payment_on_olive?: boolean;
+  counts?: boolean | string;
+};
+
+type TeikiDraw = {
+  at?: string | null;
+  tickets_before?: number | null;
+  tickets_after?: number | null;
+  results_summary?: string | null;
+  ok?: boolean;
+};
+
+type TeikiBarai = {
+  enrolled?: string | null;
+  service_count?: number | null;
+  ticket_count?: number | null;
+  w_chance_tickets?: number | null;
+  last_check_at?: string | null;
+  last_draw_at?: string | null;
+  last_draw?: TeikiDraw | null;
+  draw_history?: TeikiDraw[];
+  services?: TeikiService[];
+  interval_days?: number | null;
+};
+
 function fmtPt(n: number | null | undefined) {
   if (n == null || Number.isNaN(n)) return "—";
   return `${Math.round(n).toLocaleString("ja-JP")}pt`;
@@ -50,6 +80,25 @@ function fmtPt(n: number | null | undefined) {
 function fmtRate(n: number | null | undefined) {
   if (n == null) return "不明";
   return `${n}%`;
+}
+
+function statusLabel(s: string | undefined) {
+  switch (s) {
+    case "done":
+      return "済";
+    case "excluded_keep_paypay":
+      return "除外（PayPay維持）";
+    case "confirm_needed":
+      return "要確認";
+    case "candidate":
+      return "候補";
+    case "confirm":
+      return "確認中";
+    case "in_progress":
+      return "進行中";
+    default:
+      return s || "—";
+  }
 }
 
 export default async function VpointPage() {
@@ -75,6 +124,11 @@ export default async function VpointPage() {
     ? (payload.grant_history as HistoryRow[])
     : [];
 
+  const teiki =
+    payload.teiki_barai && typeof payload.teiki_barai === "object"
+      ? (payload.teiki_barai as TeikiBarai)
+      : null;
+
   const ack =
     typeof payload.dashboard_ack_target_month === "string"
       ? payload.dashboard_ack_target_month
@@ -89,12 +143,14 @@ export default async function VpointPage() {
   const bc = summary.by_cadence || {};
   const byRate = Array.isArray(summary.by_rate) ? summary.by_rate : [];
   const insights = Array.isArray(summary.insights) ? summary.insights : [];
+  const teikiServices = Array.isArray(teiki?.services) ? teiki!.services! : [];
 
   return (
     <Shell active="/vpoint">
       <h1>Vポイント</h1>
       <p className="sub">
         月次付与サマリ（日次利用／月次条件・％別）と考察。ウィンドウC（25日〜月末）に更新。
+        定期払いチャンス（テイチャン）の進捗・抽選もここに載せます。
       </p>
 
       {showBanner && hasGrant ? (
@@ -196,21 +252,96 @@ export default async function VpointPage() {
         </article>
       )}
 
+      <section id="teiki-barai" className="etc-guide" aria-label="定期払いチャンス">
+        <h2>定期払いチャンス（テイチャン）</h2>
+        {!teiki ? (
+          <p className="empty">
+            まだテイチャン state がダッシュボードに載っていません。Mac で
+            <code> jarvis_teiki_barai_chance.py --run </code>
+            のあと situation_watch → push してください。
+          </p>
+        ) : (
+          <>
+            <div className="etc-rebate-hero">
+              <div>
+                <span className="meta">規約同意</span>
+                <strong>{teiki.enrolled || "—"}</strong>
+              </div>
+              <div>
+                <span className="meta">対象サービス</span>
+                <strong>
+                  {teiki.service_count != null ? `${teiki.service_count}件` : "—"}
+                </strong>
+              </div>
+              <div>
+                <span className="meta">抽選券</span>
+                <strong>
+                  {teiki.ticket_count != null ? `${teiki.ticket_count}枚` : "—"}
+                </strong>
+              </div>
+              <div>
+                <span className="meta">Wチャンス</span>
+                <strong>
+                  {teiki.w_chance_tickets != null
+                    ? `${teiki.w_chance_tickets}枚`
+                    : "—"}
+                </strong>
+              </div>
+            </div>
+            <p className="meta">
+              確認間隔 {teiki.interval_days ?? 7}日
+              {teiki.last_check_at
+                ? ` · 最終確認 ${String(teiki.last_check_at).slice(0, 16)}`
+                : ""}
+              {teiki.last_draw_at
+                ? ` · 最終抽選 ${String(teiki.last_draw_at).slice(0, 16)}`
+                : ""}
+            </p>
+            {teiki.last_draw?.results_summary ? (
+              <article className="card level-ok" style={{ marginTop: 12 }}>
+                <header>
+                  <span className="lvl">抽選したよ</span>
+                  <strong>直近の抽選結果</strong>
+                </header>
+                <p className="sum">{teiki.last_draw.results_summary}</p>
+                <p className="meta">
+                  before {teiki.last_draw.tickets_before ?? "—"} → after{" "}
+                  {teiki.last_draw.tickets_after ?? "—"}
+                </p>
+              </article>
+            ) : null}
+            {teikiServices.length > 0 ? (
+              <ul className="etc-guide-list" style={{ marginTop: 12 }}>
+                {teikiServices.map((s) => (
+                  <li key={s.id || s.title}>
+                    <strong>{s.title || s.id}</strong>
+                    {" · "}
+                    {statusLabel(s.status)}
+                    {s.note ? <span className="meta"> — {s.note}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
+        )}
+      </section>
+
       <section className="etc-guide" aria-label="凡例">
         <h2>日次 vs 月次条件</h2>
         <ul className="etc-guide-list">
           <li>
-            <strong>月次条件系</strong> — 投信積立カード決済特典、選べる特典／給与特典、資産運用特典など（条件達成で月1回前後）
+            <strong>月次条件系</strong> —
+            投信積立カード決済特典、選べる特典／給与特典、資産運用特典など（条件達成で月1回前後）
           </li>
           <li>
             <strong>日次・利用連動</strong> — 店名＋「＋N%」などの利用ポイント
           </li>
           <li>
-            <strong>％の見方</strong> — desc の＋N% 優先。積立は pt÷積立円。yen があれば pt÷yen
+            <strong>％の見方</strong> — desc の＋N% 優先。積立は pt÷積立円。yen があれば
+            pt÷yen
           </li>
           <li>
-            詳細突合: Literature Note §6.6 /{" "}
-            <code>jarvis-vpoint-audit.mdc</code>
+            詳細突合: Literature Note §6.6 / <code>jarvis-vpoint-audit.mdc</code>
           </li>
         </ul>
       </section>

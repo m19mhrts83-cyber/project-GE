@@ -371,6 +371,26 @@ def main() -> int:
         save_state(state)
         print(f"\n✅ marked last_prompted_at={state['last_prompted_at']}")
 
+    # テイチャン: 間隔 due のときだけ軽く status を添える（ブラウザは起動しない）
+    try:
+        from jarvis_teiki_barai_chance import (  # type: ignore
+            is_due as teiki_is_due,
+            load_state as teiki_load_state,
+        )
+
+        teiki = teiki_load_state()
+        if not teiki.get("disabled") and env.get("JARVIS_TEIKI_BARAI_DISABLE") != "1":
+            t_due, t_reason = teiki_is_due(teiki)
+            if t_due or (isinstance(teiki.get("ticket_count"), int) and teiki["ticket_count"] > 0):
+                tc = teiki.get("ticket_count")
+                print(
+                    "\n📎 テイチャン: "
+                    f"due={t_due} ({t_reason}) · 抽選券={tc if tc is not None else '—'} · "
+                    "券があれば `scripts/jarvis_teiki_barai_chance.py --run`"
+                )
+    except Exception:
+        pass
+
     return 0
 
 

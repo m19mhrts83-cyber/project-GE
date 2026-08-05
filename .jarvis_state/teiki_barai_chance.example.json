@@ -1,0 +1,15 @@
+{
+  "disabled": false,
+  "interval_days": 7,
+  "enrolled": "unknown",
+  "last_check_at": null,
+  "last_draw_at": null,
+  "last_notified_at": null,
+  "service_count": null,
+  "ticket_count": null,
+  "w_chance_tickets": null,
+  "last_draw": null,
+  "draw_history": [],
+  "services": [],
+  "notes": "定期払いチャンス（テイチャン）。規約同意＋対象サービス数＋抽選券。ワイモバは PayPay維持で除外。AICITY（名古屋水道）は済。"
+}
