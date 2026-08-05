@@ -312,6 +312,80 @@ def check_amazon(
     return issues
 
 
+def suggest_category(shop: str, item: str, rules: list[dict[str, Any]]) -> str | None:
+    blob = f"{shop or ''}{item or ''}"
+    for rule in rules or []:
+        suggest = str(rule.get("suggest") or "").strip()
+        if not suggest:
+            continue
+        for kw in rule.get("keywords") or []:
+            if kw and kw in blob:
+                return suggest
+    return None
+
+
+def check_category_reviews(
+    payments: list[dict[str, str]],
+    cfg: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """費目が『その他／使途不明』等の直近行を見直し候補として列挙（Web変更はしない）。"""
+    cr = cfg.get("category_review") or {}
+    days = int(cr.get("lookback_days") or 14)
+    max_items = int(cr.get("max_items") or 25)
+    suspicious = list(cr.get("suspicious_substrings") or ["その他", "使途不明"])
+    rules = list(cr.get("suggest_rules") or [])
+    since = date.today() - timedelta(days=days)
+    out: list[dict[str, Any]] = []
+    for r in payments:
+        raw_d = (r.get("日付") or "").strip()[:10]
+        try:
+            d = date.fromisoformat(raw_d.replace("/", "-"))
+        except ValueError:
+            continue
+        if d < since:
+            continue
+        cat = (r.get("カテゴリ") or "").strip()
+        if not any(s in cat for s in suspicious):
+            continue
+        amount = yen(r)
+        if amount == 0:
+            continue
+        shop = (r.get("お店") or "").strip()
+        item = (r.get("品目") or "").strip()
+        suggest = suggest_category(shop, item, rules)
+        proposal = (
+            f"費目見直し: {cat} → {suggest}"
+            if suggest
+            else f"費目見直し: {cat}（提案なし・要目視）"
+        )
+        out.append(
+            {
+                "kind": "category_review",
+                "date": d.isoformat(),
+                "shop": shop or item or "—",
+                "item": item,
+                "amount": amount,
+                "category": cat,
+                "suggest": suggest,
+                "pay": (r.get("支払元") or "")[:40],
+                "proposal": proposal,
+                "action": {
+                    "action": "category_review",
+                    "target": "category",
+                    "value": suggest or "review",
+                    "date": d.isoformat(),
+                    "shop": shop or item,
+                    "amount": amount,
+                    "category": cat,
+                    "suggest": suggest,
+                },
+            }
+        )
+    # 新しい日付優先・件数上限
+    out.sort(key=lambda x: x.get("date") or "", reverse=True)
+    return out[:max_items]
+
+
 def check_must_include(
     payments: list[dict[str, str]], cfg: dict[str, Any]
 ) -> list[dict[str, Any]]:
@@ -365,11 +439,13 @@ def build_result(
     must: list[dict[str, Any]],
     cfg: dict[str, Any],
     csv_path: Path,
+    category_reviews: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     thr = float(cfg.get("attention_dup_yen") or 50000)
     both_inc = [p for p in pairs if p.get("both_include")]
     both_exc = [p for p in pairs if p.get("both_exclude")]
     ok_pairs = [p for p in pairs if p.get("rule_ok")]
+    cats = list(category_reviews or [])
     dup_yen = sum(p["card_yen"] for p in both_inc)
     shop_c = Counter(shop_key(p["shop"]) for p in both_inc)
 
@@ -378,7 +454,9 @@ def build_result(
         level = "warn"
     if both_inc or must or dup_yen >= thr:
         level = "attention"
-    if not pairs and not amazon and not must:
+    if cats and level == "ok":
+        level = "info"
+    if not pairs and not amazon and not must and not cats:
         level = "ok"
 
     parts = [
@@ -392,19 +470,20 @@ def build_result(
         parts.append(f"must含めない {len(must)}")
     if amazon:
         parts.append(f"Amazon二重疑い {len(amazon)}")
+    if cats:
+        parts.append(f"費目見直し {len(cats)}")
 
     samples = []
     for p in both_inc[:8]:
-        samples.append({**p, "severity": "both_include"})
+        samples.append({**p, "viewpoint": "both_include"})
     for p in both_exc[:3]:
-        samples.append({**p, "severity": "both_exclude"})
+        samples.append({**p, "viewpoint": "both_exclude"})
     for a in amazon[:5]:
         samples.append(a)
     for m in must[:5]:
         samples.append(m)
-    # also show a few OK for context
     for p in ok_pairs[:3]:
-        samples.append({**p, "severity": "rule_ok"})
+        samples.append({**p, "viewpoint": "rule_ok"})
 
     actions = [s["action"] for s in samples if s.get("action")]
 
@@ -429,7 +508,7 @@ def build_result(
         shop = str(act.get("shop") or s.get("shop") or s.get("card_shop") or "")
         amount = _yen(s)
         proposal = str(s.get("proposal") or "").strip()
-        kind = str(s.get("severity") or "")
+        kind = str(s.get("viewpoint") or s.get("kind") or "")
         line = f"{date} / {shop} / ¥{amount:,.0f}"
         if proposal:
             line = f"{line} / {proposal}"
@@ -443,8 +522,6 @@ def build_result(
             "action": act or None,
         }
 
-    # 要対応だけをアクション一覧に（OK例は含めない）
-    # both_include を優先、重複日付+店+金額は1行に
     seen: set[str] = set()
     action_items: list[dict] = []
     action_lines: list[str] = []
@@ -464,6 +541,14 @@ def build_result(
     detail_bits = []
     if action_lines:
         detail_bits.append("要対応:\n" + "\n".join(f"- {ln}" for ln in action_lines[:20]))
+    if cats:
+        detail_bits.append(
+            "費目見直し:\n"
+            + "\n".join(
+                f"- {c.get('date')} / {c.get('shop')} / ¥{float(c.get('amount') or 0):,.0f} / {c.get('proposal')}"
+                for c in cats[:15]
+            )
+        )
     if shop_c:
         detail_bits.append(
             "両方含める店: "
@@ -492,6 +577,8 @@ def build_result(
         "top_shops_both_include": dict(shop_c.most_common(8)),
         "samples": samples,
         "proposed_actions": actions,
+        "category_reviews": cats,
+        "category_review_count": len(cats),
     }
 
 
@@ -500,7 +587,6 @@ def run(year: int | None = None) -> dict[str, Any]:
     y = year or datetime.now(JST).year
     csv_path = resolve_csv(cfg, y)
     if not csv_path.is_file():
-        # fallback previous year
         csv_path = resolve_csv(cfg, y - 1)
     if not csv_path.is_file():
         return {
@@ -510,6 +596,8 @@ def run(year: int | None = None) -> dict[str, Any]:
             "detail": str(resolve_csv(cfg, y)),
             "samples": [],
             "proposed_actions": [],
+            "category_reviews": [],
+            "category_review_count": 0,
         }
 
     rows = list(csv.DictReader(csv_path.open(encoding="utf-8-sig")))
@@ -517,7 +605,8 @@ def run(year: int | None = None) -> dict[str, Any]:
     pairs = find_pairs(payments, cfg)
     amazon = check_amazon(payments, cfg)
     must = check_must_include(payments, cfg)
-    return build_result(pairs, amazon, must, cfg, csv_path)
+    cats = check_category_reviews(payments, cfg)
+    return build_result(pairs, amazon, must, cfg, csv_path, cats)
 
 
 def main(argv: list[str] | None = None) -> int:

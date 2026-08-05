@@ -1286,6 +1286,7 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
         },
     }
     pending_n = 0
+    review_batch: dict[str, Any] = {}
     try:
         cl_path = STATE / "zaim_watch_changelog.json"
         if cl_path.is_file():
@@ -1293,15 +1294,45 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
             entries = list(cl.get("entries") or [])
             pending = [e for e in entries if e.get("status") == "pending_confirm"]
             pending_n = len(pending)
-            payload["recent_fixes"] = entries[-30:]
+            payload["recent_fixes"] = entries[-40:]
             payload["pending_confirm_count"] = pending_n
             if pending_n and level in ("ok", "info"):
                 level = "attention"
+        rb_path = STATE / "zaim_review_batch.json"
+        if rb_path.is_file():
+            review_batch = json.loads(rb_path.read_text(encoding="utf-8"))
     except Exception:
         pass
+
+    # ホーム「見直したよ」バナー（確認済み batch は出さない）
+    batch_id = str(review_batch.get("batch_id") or "")
+    ack = str(review_batch.get("dashboard_ack_batch_id") or "")
+    show_banner = bool(
+        review_batch.get("show_banner")
+        and batch_id
+        and ack != batch_id
+    )
+    if show_banner and level in ("ok", "info"):
+        level = "attention"
+    payload["review_batch_id"] = batch_id or None
+    payload["dashboard_ack_batch_id"] = ack or None
+    payload["show_banner"] = show_banner
+    payload["review_lines"] = list(review_batch.get("lines") or [])[:5]
+    payload["category_review_count"] = int(
+        review_batch.get("category_total")
+        or (data.get("category_review_count") or 0)
+    )
+    # quality JSON の費目候補も載せる
+    try:
+        payload["category_reviews"] = list(data.get("category_reviews") or [])[:25]
+    except Exception:
+        payload["category_reviews"] = []
+
     summary = str(data.get("summary") or "データあり") + weekly_note + bank_note
     if pending_n:
         summary = f"直し確認待ち {pending_n}件 · " + summary
+    if show_banner and payload.get("review_lines"):
+        summary = "見直したよ · " + " / ".join(payload["review_lines"]) + " · " + summary
     return card(
         item_id=meta["id"],
         title=title,

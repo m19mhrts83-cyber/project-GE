@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Zaim 銀行連携ウォッチ（金曜）→ Zaim Watch runner（安全自動適用＋watch push）
+# Zaim 銀行連携ウォッチ（火・金）→ Zaim Watch runner（安全自動適用＋費目見直し通知＋watch push）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${HOME}/Library/Logs/jarvis_zaim"
@@ -28,7 +28,7 @@ cd "$REPO_DIR"
   >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
 
 # Zaim Watch: 品質検知 → 安全な集計設定の自動適用 → changelog → watch push
-# （finance は土曜 CSV 週次が本線。金曜は二重取込直し中心）
+# （finance は火・金 CSV 12:00 が本線。09:00 は二重取込直し＋費目見直し通知）
 "$PY" scripts/jarvis_zaim_watch_runner.py --skip-finance \
   >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
 

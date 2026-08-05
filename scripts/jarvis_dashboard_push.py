@@ -258,6 +258,38 @@ def push_watch(sb) -> int:
             except Exception as e:
                 print(f"# changelog sync skipped: {e}", file=sys.stderr)
 
+        # Zaim: ホーム「見直したよ」の確認済みを Mac push で潰さない
+        if iid == "zaim_quality":
+            remote_ack = remote_pl.get("dashboard_ack_batch_id")
+            local_ack = payload.get("dashboard_ack_batch_id")
+            batch = payload.get("review_batch_id") or remote_pl.get("review_batch_id")
+            ack = remote_ack or local_ack
+            if ack:
+                payload["dashboard_ack_batch_id"] = ack
+            if batch:
+                payload["review_batch_id"] = batch
+            # remote が確認済みならバナーを落とす（ローカルに新しい batch が無いとき）
+            if ack and batch and str(ack) == str(batch):
+                payload["show_banner"] = False
+            elif remote_pl.get("show_banner") is False and str(remote_ack or "") == str(
+                batch or ""
+            ):
+                payload["show_banner"] = False
+            try:
+                rb_path = STATE / "zaim_review_batch.json"
+                if rb_path.is_file() and ack:
+                    rb = json.loads(rb_path.read_text(encoding="utf-8"))
+                    if rb.get("dashboard_ack_batch_id") != ack:
+                        rb["dashboard_ack_batch_id"] = ack
+                        if str(rb.get("batch_id") or "") == str(ack):
+                            rb["show_banner"] = False
+                        rb_path.write_text(
+                            json.dumps(rb, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
+            except Exception as e:
+                print(f"# zaim review batch ack sync skipped: {e}", file=sys.stderr)
+
         # ETC: ダッシュボードの「確認しました」を Mac push で潰さない
         if iid == "etc_mileage":
             remote_ack = remote_pl.get("dashboard_ack_target_month")

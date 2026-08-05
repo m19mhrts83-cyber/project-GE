@@ -9,9 +9,9 @@ alwaysApply: true
 
 ## トリガー
 
-- 金曜 CSV 週次 runner の後（自動）
-- 金曜 銀行連携 runner の後（自動・`--skip-finance`）
-- ユーザーが Zaim／財務／二重取込／集計設定に言及したとき → 同 runner を実行してよい
+- 火・金 CSV runner の後（自動・12:00）
+- 火・金 銀行連携／Watch runner の後（自動・09:00・`--skip-finance`）
+- ユーザーが Zaim／財務／二重取込／集計設定／費目に言及したとき → 同 runner を実行してよい
 - 状況ウォッチ評価時（検知のみ。自動 apply は runner）
 
 ## コマンド
@@ -26,6 +26,8 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ## 方針
 
 - 確信度が高い集計設定直しは自動適用 → `/zaim` で「確認OK／おかしい」
+- 費目「その他／使途不明」等は見直し候補を列挙（Web 自動変更はしない）→ ホームに「見直したよ」→ `/zaim` で「確認しました」
 - アーカイブしない（`never_archive`、id は `zaim_quality` のまま）
 - Suica 画像認証・ANA／NRK は対象外または手動
 - ナビ本線はお金グループ。状況ウォッチからも `/zaim` へ誘導
+- launchd: 火・金 09:00（銀行+Watch）／火・金 12:00（CSV+Watch）

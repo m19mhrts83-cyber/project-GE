@@ -122,7 +122,7 @@ def mac_line_running() -> bool:
 
 
 def zaim_csv_needs_catchup(*, max_age_days: int = 6) -> bool:
-    """金曜 12:00 の週次を取りこぼした／失敗したとき True。"""
+    """火・金 12:00 の CSV を取りこぼした／失敗したとき True。"""
     if not ZAIM_WEEKLY_STATE.is_file():
         return True
     try:
@@ -356,7 +356,7 @@ def main() -> int:
     else:
         results["steps"]["line"] = "skipped"
 
-    # 6. Zaim CSV 週次の取りこぼし（金曜 12:00 失敗／Mac スリープ時のフォールバック）
+    # 6. Zaim CSV の取りこぼし（火・金 12:00 失敗／Mac スリープ時のフォールバック）
     if zaim_csv_needs_catchup():
         results["steps"]["zaim_csv_weekly"] = spawn_zaim_csv_weekly(dry_run=args.dry_run)
     else:

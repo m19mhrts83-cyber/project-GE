@@ -80,3 +80,64 @@ export async function confirmZaimFix(
   revalidatePath("/");
   return { ok: true };
 }
+
+/** 火・金の見直しお知らせを確認済みにしてホームバナーを消す */
+export async function acknowledgeZaimReview(
+  batchId: string,
+): Promise<FixConfirmResult> {
+  const bid = (batchId || "").trim();
+  if (!bid) return { ok: false, error: "batch が空です" };
+
+  const supabase = await createClient();
+  const { data: watch, error } = await supabase
+    .from("watch_status")
+    .select("id,payload,summary,level")
+    .eq("id", WATCH_ID)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!watch) return { ok: false, error: "Zaim Watch が未 push です" };
+
+  const prev =
+    watch.payload && typeof watch.payload === "object"
+      ? ({ ...(watch.payload as Record<string, unknown>) } as Record<
+          string,
+          unknown
+        >)
+      : {};
+
+  const fixes = Array.isArray(prev.recent_fixes)
+    ? (prev.recent_fixes as Record<string, unknown>[]).map((f) => {
+        const row = { ...f };
+        if (row.status === "pending_confirm" || !row.status) {
+          row.status = "confirmed";
+          row.confirmed_at = new Date().toISOString();
+        }
+        return row;
+      })
+    : [];
+
+  const payload = {
+    ...prev,
+    recent_fixes: fixes,
+    pending_confirm_count: 0,
+    dashboard_ack_batch_id: bid,
+    review_batch_id: prev.review_batch_id || bid,
+    show_banner: false,
+  };
+
+  const { error: uErr } = await supabase
+    .from("watch_status")
+    .update({
+      payload,
+      level: "ok",
+      summary: `見直し確認済 · ${String(watch.summary || "").replace(/^見直したよ[·・]\s*/, "").slice(0, 180)}`,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", WATCH_ID);
+  if (uErr) return { ok: false, error: uErr.message };
+
+  revalidatePath("/zaim");
+  revalidatePath("/situation");
+  revalidatePath("/");
+  return { ok: true };
+}

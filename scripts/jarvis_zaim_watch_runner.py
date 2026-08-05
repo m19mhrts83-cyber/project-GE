@@ -26,6 +26,7 @@ REPO = Path(__file__).resolve().parents[1]
 STATE = REPO / ".jarvis_state"
 WATCH_PATH = STATE / "zaim_quality_watch.json"
 CHANGELOG_PATH = STATE / "zaim_watch_changelog.json"
+REVIEW_BATCH_PATH = STATE / "zaim_review_batch.json"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 EXE = str(PY) if PY.is_file() else sys.executable
 
@@ -34,6 +35,105 @@ SAFE_TARGETS = {"card", "smart", "must_include", "amazon_card", "amazon_site"}
 
 def now_iso() -> str:
     return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def category_review_id(row: dict[str, Any]) -> str:
+    return "|".join(
+        [
+            "cat",
+            str(row.get("date") or ""),
+            str(row.get("shop") or "")[:40],
+            str(int(round(float(row.get("amount") or 0)))),
+            str(row.get("category") or "")[:40],
+        ]
+    )
+
+
+def load_review_batch() -> dict[str, Any]:
+    if REVIEW_BATCH_PATH.is_file():
+        try:
+            return json.loads(REVIEW_BATCH_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def save_review_batch(data: dict[str, Any]) -> None:
+    REVIEW_BATCH_PATH.parent.mkdir(parents=True, exist_ok=True)
+    data["updated_at"] = now_iso()
+    REVIEW_BATCH_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def sync_category_reviews_to_changelog(cl: dict[str, Any]) -> tuple[int, list[dict[str, Any]]]:
+    """品質検知の費目見直しを changelog に pending で載せる（Web 自動変更なし）。"""
+    if not WATCH_PATH.is_file():
+        return 0, []
+    data = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
+    cats = list(data.get("category_reviews") or [])
+    existing = {e.get("id") for e in cl.get("entries") or []}
+    added: list[dict[str, Any]] = []
+    for c in cats:
+        eid = category_review_id(c)
+        if eid in existing:
+            continue
+        entry = {
+            "id": eid,
+            "kind": "category_review",
+            "date": c.get("date"),
+            "shop": c.get("shop"),
+            "amount": c.get("amount"),
+            "category": c.get("category"),
+            "suggest": c.get("suggest"),
+            "proposal": c.get("proposal"),
+            "applied_at": now_iso(),
+            "ok": True,
+            "status": "pending_confirm",
+            "message": "reviewed_notice",
+        }
+        cl.setdefault("entries", []).append(entry)
+        added.append(entry)
+        existing.add(eid)
+    return len(added), added
+
+
+def open_review_batch(
+    *,
+    aggregate_applied: int,
+    category_added: int,
+    category_total: int,
+) -> None:
+    """ホームお知らせ用バッチ。新規直し／費目見直しがあれば未確認バナーを立てる。"""
+    prev = load_review_batch()
+    something_new = aggregate_applied > 0 or category_added > 0
+    if not something_new:
+        if category_total > 0 and not prev.get("batch_id"):
+            something_new = True
+        else:
+            return
+    batch_id = now_iso()
+    lines = []
+    if aggregate_applied:
+        lines.append(f"集計設定を {aggregate_applied} 件直しました")
+    if category_total:
+        lines.append(f"費目（その他等）を {category_total} 件見直しました")
+    if not lines:
+        lines.append("Zaim を見直しました")
+    save_review_batch(
+        {
+            **{k: v for k, v in prev.items() if k.startswith("history") is False},
+            "batch_id": batch_id,
+            "reviewed_at": batch_id,
+            "aggregate_applied": aggregate_applied,
+            "category_added": category_added,
+            "category_total": category_total,
+            "lines": lines,
+            "dashboard_ack_batch_id": None,
+            "show_banner": True,
+        }
+    )
+    print(f"# review batch {batch_id} lines={lines}", flush=True)
 
 
 def fix_id(action: dict[str, Any]) -> str:
@@ -259,6 +359,7 @@ def main(argv: list[str] | None = None) -> int:
     # 3) safe apply
     cl = load_changelog()
     new_entries: list[dict[str, Any]] = []
+    applied_ok = 0
     if not args.skip_apply:
         actions = [
             a for a in safe_actions_from_watch() if not already_applied(cl, a)
@@ -268,6 +369,8 @@ def main(argv: list[str] | None = None) -> int:
         if new_entries and not args.dry_run:
             existing_ids = {e.get("id") for e in cl.get("entries") or []}
             for e in new_entries:
+                if e.get("ok"):
+                    applied_ok += 1
                 if e.get("id") in existing_ids and e.get("ok"):
                     for old in cl["entries"]:
                         if old.get("id") == e.get("id"):
@@ -276,17 +379,36 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     cl.setdefault("entries", []).append(e)
             save_changelog(cl)
-            # 適用後に再検知（CSVは古い可能性あり。Web反映後の提案残りを減らす）
             run_script("jarvis_zaim_quality_check.py")
         elif new_entries and args.dry_run:
             print(json.dumps(new_entries, ensure_ascii=False, indent=2))
+
+    # 3b) 費目見直しを changelog / ホームお知らせバッチへ
+    cat_added = 0
+    cat_total = 0
+    if not args.dry_run:
+        cl = load_changelog()
+        cat_added, _ = sync_category_reviews_to_changelog(cl)
+        if cat_added:
+            save_changelog(cl)
+        if WATCH_PATH.is_file():
+            try:
+                w = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
+                cat_total = int(w.get("category_review_count") or 0)
+            except Exception:
+                cat_total = 0
+        open_review_batch(
+            aggregate_applied=applied_ok,
+            category_added=cat_added,
+            category_total=cat_total,
+        )
 
     # 4) push watch (+ merge happens in dashboard_push)
     if not args.skip_push and not args.dry_run:
         run_script("jarvis_dashboard_push.py", ["--watch-only"], timeout=180)
 
     print(
-        f"# Zaim Watch runner done applied={len([e for e in new_entries if e.get('ok')])}",
+        f"# Zaim Watch runner done applied={applied_ok} category_added={cat_added}",
         flush=True,
     )
     return 0
