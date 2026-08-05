@@ -206,7 +206,7 @@ export default async function ZaimWatchPage() {
             )}
           </ul>
           <p className="meta" style={{ marginBottom: 8 }}>
-            内容を見たら「確認しました」でホームから消えます（ETC 還元と同じ型）。
+            「確認しました」でホームのお知らせだけ消え、直し履歴は下に残ります（削除しません）。
           </p>
           <ZaimReviewAckButton batchId={reviewBatchId} />
         </section>
@@ -349,7 +349,7 @@ export default async function ZaimWatchPage() {
 
         {otherFixes.length > 0 ? (
           <details className="watch-prompt-details">
-            <summary>確認済み・失敗の履歴（{otherFixes.length}）</summary>
+            <summary>確認後の履歴（confirmed / failed など・{otherFixes.length}）</summary>
             <ul className="watch-actions" style={{ listStyle: "none", padding: 0 }}>
               {otherFixes
                 .slice()

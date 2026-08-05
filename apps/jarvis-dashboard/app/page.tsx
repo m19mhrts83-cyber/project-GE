@@ -183,8 +183,8 @@ export default async function HomePage() {
     <Shell active="/">
       <h1>ホーム</h1>
       <p className="sub">
-        パートナー → モチベーション（手残りCF） → 状況ウォッチ → その他メール → 神大家オプチャまとめの順。
-        入居率・号室表は{" "}
+        パートナー → モチベーション（入居率ヒーロー＋手残りCF） → 状況ウォッチ → その他メール → 神大家オプチャまとめの順。
+        号室表・履歴は{" "}
         <a href="/properties" style={{ color: "var(--accent)", fontWeight: 600 }}>
           所有物件
         </a>
@@ -266,12 +266,12 @@ export default async function HomePage() {
         </section>
       </div>
 
-      {/* 2. モチベーション数値（手残りCF。入居率の詳細は /properties） */}
+      {/* 2. モチベーション数値（入居率ヒーロー → 手残り。号室詳細は /properties） */}
       <div className="home-band home-band-metrics">
         <div className="home-band-head">
           <h2 className="home-band-title">モチベーション数値</h2>
           <p className="home-band-sub">
-            法人／個人の手残り（CF）。
+            いちばん上は入居率。減っていたら埋めていく。
             {" · 表示月 "}
             {financeYm}
             {financeYm !== targetYm ? `（先月 ${targetYm} は未取込）` : ""}
@@ -279,24 +279,52 @@ export default async function HomePage() {
           </p>
         </div>
 
-        <p className="home-occupancy-strip" aria-label="入居率（詳細は所有物件）">
-          <span>
-            全体入居率{" "}
-            <strong>
+        <div
+          className={
+            occupancy.total && occupancy.rate_pct >= 100
+              ? "home-occupancy-hero is-full"
+              : occupancy.total
+                ? "home-occupancy-hero is-gap"
+                : "home-occupancy-hero"
+          }
+          aria-label="入居率"
+        >
+          <div className="home-occupancy-hero-main">
+            <span className="home-occupancy-hero-label">入居率</span>
+            <strong className="home-occupancy-hero-value">
               {occupancy.total ? `${occupancy.rate_pct}%` : "—"}
             </strong>
-            {occupancy.total
-              ? `（${occupancy.occupied}/${occupancy.total}戸${
-                  occupancy.vacant > 0
-                    ? ` · 空室 ${occupancy.vacant_labels?.join("、") || occupancy.vacant}`
-                    : " · 満室"
-                }）`
-              : ""}
-          </span>
-          <a href="/properties" className="home-more">
-            所有物件へ →
-          </a>
-        </p>
+          </div>
+          <div className="home-occupancy-hero-side">
+            {occupancy.total ? (
+              <>
+                <p className="home-occupancy-hero-count">
+                  {occupancy.occupied}/{occupancy.total}戸
+                  {occupancy.vacant > 0
+                    ? ` · 空室 ${occupancy.vacant}戸`
+                    : " · 満室"}
+                </p>
+                {occupancy.rate_pct >= 100 ? (
+                  <p className="home-occupancy-hero-msg">
+                    100%。この状態を守る。
+                  </p>
+                ) : (
+                  <p className="home-occupancy-hero-msg">
+                    100%まで埋めていく。
+                    {occupancy.vacant_labels?.length
+                      ? ` 空室: ${occupancy.vacant_labels.join("、")}`
+                      : ""}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="home-occupancy-hero-msg">号室データ未取込</p>
+            )}
+            <a href="/properties" className="home-more">
+              所有物件へ →
+            </a>
+          </div>
+        </div>
 
         <div className="cf-panels">
           {(
