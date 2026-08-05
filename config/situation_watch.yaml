@@ -38,7 +38,9 @@ items:
     cursor_prompt: |
       Vポイントの状況を確認して。cadence・月次・監査結果を見て、
       open_actions の次の一手があれば提案して。
-      ルール: jarvis-vpoint-audit.mdc。state: .jarvis_state/vpoint_*.json
+      定期払いチャンス（テイチャン）も .jarvis_state/teiki_barai_chance.json を見て、
+      抽選券があれば scripts/jarvis_teiki_barai_chance.py --run で回して通知して。
+      ルール: jarvis-vpoint-audit.mdc。state: .jarvis_state/vpoint_*.json / teiki_barai_chance.json
 
   - id: rent_step
     title: Grandole家賃ステップ（+4,000）

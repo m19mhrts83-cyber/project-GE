@@ -314,6 +314,7 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
     src = meta.get("source") or ""
     cad = load_json(STATE / "vpoint_cadence.json") or {}
     mon = load_json(STATE / "vpoint_monthly.json") or {}
+    teiki = load_json(STATE / "teiki_barai_chance.json") or {}
     if cad.get("disabled") and mon.get("disabled"):
         return card(
             item_id=meta["id"],
@@ -351,6 +352,23 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         parts.append(f"{target}分 確認済 · 次はウィンドウC更新後")
     if bal is not None:
         parts.append(f"残高 {bal:,}pt" if isinstance(bal, int) else f"残高 {bal}")
+
+    teiki_tickets = teiki.get("ticket_count")
+    teiki_services = teiki.get("service_count")
+    teiki_disabled = bool(teiki.get("disabled"))
+    if teiki and not teiki_disabled:
+        teiki_bits: list[str] = ["テイチャン"]
+        if teiki_services is not None:
+            teiki_bits.append(f"{teiki_services}件")
+        if teiki_tickets is not None:
+            teiki_bits.append(f"抽選券{teiki_tickets}")
+        elif teiki.get("enrolled") == "unknown":
+            teiki_bits.append("未確認")
+        last_draw = teiki.get("last_draw") if isinstance(teiki.get("last_draw"), dict) else None
+        if last_draw and last_draw.get("results_summary"):
+            teiki_bits.append(f"抽選済 {str(last_draw.get('results_summary'))[:20]}")
+        parts.append(" ".join(teiki_bits))
+
     if actions:
         short = []
         for a in actions[:4]:
@@ -364,6 +382,8 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
                 short.append("Visaタッチ")
             elif aid == "tsumitate_rate_band" or "積立" in t:
                 short.append("積立還元帯")
+            elif aid == "teiki_barai_chance" or "テイチャン" in t or "定期払い" in t:
+                short.append("定期払いチャンス")
             else:
                 short.append((t[:12] + "…") if len(t) > 12 else t or aid or "?")
         parts.append(f"要対応{len(actions)}: " + " / ".join(short))
@@ -384,6 +404,15 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         # cadence の未対応は確認後も状況ウォッチ／ホームに残してよい
         if level in ("ok", "info"):
             level = "warn"
+    # 抽選券残は warn（未実施）
+    if (
+        not teiki_disabled
+        and isinstance(teiki_tickets, int)
+        and teiki_tickets > 0
+        and level in ("ok", "info")
+    ):
+        level = "warn"
+        parts.append("抽選未実施")
     if not parts:
         parts.append("データなし")
         level = "warn"
@@ -393,6 +422,17 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         detail_lines.append("ダッシュボード /vpoint で付与サマリ（％別・考察）を確認できます。")
         for ins in (grant.get("insights") or [])[:4]:
             detail_lines.append(f"· {ins}")
+    if teiki and not teiki_disabled:
+        detail_lines.append(
+            "テイチャン: "
+            f"同意={teiki.get('enrolled')} · サービス={teiki_services} · "
+            f"抽選券={teiki_tickets} · 最終確認={teiki.get('last_check_at') or '—'}"
+        )
+        if isinstance(teiki.get("last_draw"), dict):
+            ld = teiki["last_draw"]
+            detail_lines.append(
+                f"直近抽選: {ld.get('at') or '—'} — {ld.get('results_summary') or ''}"
+            )
     action_items: list[dict[str, Any]] = []
     for a in actions:
         aid = str(a.get("id") or "")
@@ -420,12 +460,28 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         )
 
     hist = [h for h in (mon.get("grant_history") or []) if isinstance(h, dict)][:12]
+    teiki_payload = None
+    if teiki and not teiki_disabled:
+        teiki_payload = {
+            "enrolled": teiki.get("enrolled"),
+            "service_count": teiki.get("service_count"),
+            "ticket_count": teiki.get("ticket_count"),
+            "w_chance_tickets": teiki.get("w_chance_tickets"),
+            "last_check_at": teiki.get("last_check_at"),
+            "last_draw_at": teiki.get("last_draw_at"),
+            "last_draw": teiki.get("last_draw"),
+            "draw_history": (teiki.get("draw_history") or [])[:6],
+            "services": teiki.get("services") or [],
+            "interval_days": teiki.get("interval_days"),
+            "href": "/vpoint#teiki-barai",
+        }
     payload: dict[str, Any] = {
         "grant_summary": grant or None,
         "grant_history": hist,
         "dashboard_ack_target_month": ack,
         "show_banner": show_banner,
         "href": "/situation?watch=vpoint#watch-vpoint",
+        "teiki_barai": teiki_payload,
     }
     if action_items:
         payload["actions"] = action_items
