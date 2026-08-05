@@ -56,6 +56,7 @@ SKIP_DRAW_STATUSES = {
     "done",
     "excluded_keep_paypay",
     "confirm_needed",
+    "awaiting_first_charge",
     "n/a",
 }
 
@@ -137,14 +138,18 @@ def step1_actionables(state: dict[str, Any], env: dict[str, str]) -> list[dict[s
     out: list[dict[str, str]] = []
     for svc in state.get("services") or []:
         st = str(svc.get("status") or "")
-        if st in ("confirm_needed", "confirm", "candidate", "in_progress"):
+        if st in ("confirm_needed", "confirm", "candidate", "in_progress", "awaiting_first_charge"):
             out.append(
                 {
                     "id": str(svc.get("id") or ""),
                     "title": str(svc.get("title") or ""),
                     "status": st,
                     "note": str(svc.get("note") or ""),
-                    "action": "confirm" if st == "confirm_needed" else "review",
+                    "action": (
+                        "verify_charge"
+                        if st == "awaiting_first_charge"
+                        else ("confirm" if st == "confirm_needed" else "review")
+                    ),
                 }
             )
     actionable_statuses = {
@@ -535,7 +540,14 @@ def format_report(
         if svc.get("id") == "ymobile":
             lines.append(f"- 除外: ワイモバイル（{svc.get('status')}）")
         if svc.get("id") == "aicity_water":
-            lines.append(f"- 済: 名古屋水道 AICITY（{svc.get('status')}）")
+            st = svc.get("status")
+            if st == "awaiting_first_charge":
+                lines.append(
+                    "- 水道: AICITYカード変更報告済だが Olive 実課金未検出"
+                    "（Zaimは大垣共立引落）。次請求／AICITY登録カード確認"
+                )
+            else:
+                lines.append(f"- 水道 AICITY: {st}")
     return "\n".join(lines)
 
 

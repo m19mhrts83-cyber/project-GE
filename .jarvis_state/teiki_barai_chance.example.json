@@ -11,5 +11,5 @@
   "last_draw": null,
   "draw_history": [],
   "services": [],
-  "notes": "定期払いチャンス（テイチャン）。規約同意＋対象サービス数＋抽選券。ワイモバは PayPay維持で除外。AICITY（名古屋水道）は済。"
+  "notes": "定期払いチャンス（テイチャン）。規約同意＋対象カードへの実課金（金額＞0）で計上。対象一覧だけでは紐づかない。ワイモバは PayPay維持で除外。AICITY（名古屋水道）はカード変更後も Olive 実課金確認まで awaiting_first_charge。"
 }

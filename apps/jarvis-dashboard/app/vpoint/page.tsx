@@ -90,6 +90,8 @@ function statusLabel(s: string | undefined) {
       return "除外（PayPay維持）";
     case "confirm_needed":
       return "要確認";
+    case "awaiting_first_charge":
+      return "Olive課金待ち";
     case "candidate":
       return "候補";
     case "confirm":
@@ -254,6 +256,11 @@ export default async function VpointPage() {
 
       <section id="teiki-barai" className="etc-guide" aria-label="定期払いチャンス">
         <h2>定期払いチャンス（テイチャン）</h2>
+        <p className="sub" style={{ marginTop: 4 }}>
+          対象一覧に載るだけでは紐づきません。規約同意のあと、各サービスの公式サイトで
+          Olive 等へ支払い変更し、<strong>明細に金額＞0が載ってから</strong>
+          お支払い履歴・抽選券に反映されます（請求確定ごろ）。
+        </p>
         {!teiki ? (
           <p className="empty">
             まだテイチャン state がダッシュボードに載っていません。Mac で
