@@ -41,6 +41,7 @@ export default function StatusToggle({
   const label = archived ? "再表示" : "アーカイブ";
 
   function onClick() {
+    const prev = optimisticStatus;
     start(async () => {
       setOptimistic(next);
       try {
@@ -49,8 +50,19 @@ export default function StatusToggle({
         } else {
           await setWatchStatus(id, next, path);
         }
-        toast.push(archived ? "再表示しました" : "アーカイブしました");
+        toast.push(archived ? "再表示しました" : "アーカイブしました", {
+          undo: async () => {
+            setOptimistic(prev);
+            if (table === "cards") {
+              await setCardStatus(id, prev as "active" | "archived", path);
+            } else {
+              await setWatchStatus(id, prev as "active" | "archived", path);
+            }
+            router.refresh();
+          },
+        });
       } catch (e) {
+        setOptimistic(prev);
         toast.push(e instanceof Error ? e.message : "更新に失敗しました", "err");
       }
       router.refresh();

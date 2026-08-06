@@ -5,6 +5,7 @@ import {
   watchSortKey,
 } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
+import { wakeDueSnoozes } from "@/app/actions/triage";
 import { watchHref } from "./homeHelpers";
 
 type QueueItem = {
@@ -18,6 +19,7 @@ type QueueItem = {
 
 /** ホーム最上段: 今やるべき件数の要約 */
 export default async function HomeTodayQueue() {
+  await wakeDueSnoozes();
   const supabase = await createClient();
 
   const [{ data: watchRows }, { data: mailRows }] = await Promise.all([
@@ -138,6 +140,9 @@ export default async function HomeTodayQueue() {
         </ul>
       )}
       <div className="today-queue-links">
+        <a href="/queue" className="home-more">
+          処理キュー →
+        </a>
         <a href="/partner" className="home-more">
           パートナー →
         </a>

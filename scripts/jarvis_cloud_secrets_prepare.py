@@ -58,6 +58,11 @@ def main(argv: list[str] | None = None) -> int:
     if secret:
         lines.append(f"JARVIS_SUPABASE_SECRET_KEY={secret}")
 
+    # Tavily（ローカル MCP と同キー。Cloud では env 経由で REST / 将来 MCP 配線）
+    tavily = (os.environ.get("TAVILY_API_KEY") or "").strip()
+    if tavily:
+        lines.append(f"TAVILY_API_KEY={tavily}")
+
     if args.include_gmail_send:
         cred_b64 = (os.environ.get("GMAIL_CREDENTIALS_B64") or "").strip() or _file_b64(
             MANUAL / "credentials.json"

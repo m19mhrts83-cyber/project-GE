@@ -2493,6 +2493,26 @@ p.back {
   font-size: 0.88rem;
   box-shadow: var(--shadow-hover);
   animation: toast-in 0.18s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast-msg {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-undo {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: #fde68a;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
 }
 
 .toast-err {
@@ -2783,4 +2803,126 @@ p.back {
     transition: none;
   }
 }
+
+/* —— Phase3: undo / snooze / cmdk groups / queue / tavily —— */
+.snooze-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.snooze-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  min-width: 148px;
+  background: var(--card, #fff);
+  border: 1px solid var(--line, #e7e5e4);
+  border-radius: 10px;
+  box-shadow: var(--shadow-hover);
+}
+
+.snooze-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.snooze-menu-item:hover {
+  background: var(--bg-soft, #f5f5f4);
+}
+
+.cmdk-group {
+  padding: 8px 12px 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted, #78716c);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.tavily-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin: 8px 0 4px;
+  flex-wrap: wrap;
+}
+
+.queue-panel {
+  margin-top: 12px;
+}
+
+.queue-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.queue-remain {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.queue-list-mini {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.queue-mini-item {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.queue-mini-item.is-active,
+.queue-mini-item:hover {
+  background: var(--bg-soft, #f5f5f4);
+  border-color: var(--line, #e7e5e4);
+}
+
+.queue-done {
+  margin-top: 24px;
+  padding: 28px 20px;
+  border-radius: 16px;
+  background: var(--bg-soft, #f5f5f4);
+  text-align: center;
+}
+
+.queue-done h2 {
+  margin: 0 0 8px;
+}
+
 
