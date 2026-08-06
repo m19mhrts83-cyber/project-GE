@@ -140,6 +140,16 @@ def push_triage(sb) -> int:
     if not rows:
         print("# triage: 0 rows", file=sys.stderr)
         return 0
+    # 同一 id が chunk 内に複数あると Postgres upsert が 21000 になる
+    deduped: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        deduped[str(row["id"])] = row
+    if len(deduped) < len(rows):
+        print(
+            f"# triage: deduped {len(rows) - len(deduped)} duplicate id(s)",
+            file=sys.stderr,
+        )
+    rows = list(deduped.values())
     # chunk upsert
     n = 0
     for i in range(0, len(rows), 50):

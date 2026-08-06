@@ -67,6 +67,11 @@ VACANT_STRONG = re.compile(
 OCCUPIED_STRONG = re.compile(
     r"(入居決定|入居が決ま|契約を締結|満室とな|満室になり|入居者様と賃貸借契約)"
 )
+# 退去後の精算・折衝フォロー（件名に古い「退去」が残る）は空室イベントにしない
+SETTLEMENT_FOLLOWUP = re.compile(
+    r"(精算確定|退去者との折衝|退去精算|原状回復.*完了|クリーニング.*完了)"
+)
+VACANT_INTENT = re.compile(r"(退去予告|退去届|空室にな|募集を開始|募集開始|空室が出)")
 # Ambiguous
 VACANT_WEAK = re.compile(r"空室|募集|内覧")
 OCCUPIED_WEAK = re.compile(r"入居|申込|審査")
@@ -163,6 +168,9 @@ def classify_event(subject: str, body: str) -> tuple[str | None, str]:
     blob = f"{subject}\n{body}"
     if OCCUPIED_STRONG.search(blob):
         return "occupied", "strong"
+    # 精算フォロー等は件名の「退去」だけで vacant にしない
+    if SETTLEMENT_FOLLOWUP.search(blob) and not VACANT_INTENT.search(blob):
+        return None, "weak"
     if VACANT_STRONG.search(blob):
         return "vacant", "strong"
     # both weak → ambiguous

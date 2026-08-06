@@ -2,7 +2,7 @@
 """
 Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
 
-1. gmail_to_yoritoori.py で取込（パートナー）
+1. gmail_to_yoritoori.py / chatwork_to_yoritoori.py で取込（パートナー）
 2. 5.やり取り.md / admin INBOX から未返信候補を抽出
 3. Gemini / Cursor Agent で要返信判定・下書き生成（メールのみ）
 4. Chatwork／LINE／iMessage・815神大家オプチャの直近更新概要を queue に載せる
@@ -58,6 +58,11 @@ RE_PREFIX_RE = re.compile(r"^((re|fw|fwd|返信|転送)\s*[:：]\s*)+", re.I)
 NOISE_SUBJECT_RE = re.compile(
     r"(password|パスワード|MailGates|mgc-filelink|配信漏れ|"
     r"アーカイブ動画|プレゼントのご案内|\[toall\])",
+    re.I,
+)
+# activity 用: 要返信ノイズ（toall 一斉告知）はダッシュボードで見えるように残す
+ACTIVITY_NOISE_RE = re.compile(
+    r"(password|パスワード|MailGates|mgc-filelink|配信漏れ)",
     re.I,
 )
 NOISE_BODY_RE = re.compile(
@@ -236,7 +241,12 @@ def find_recent_chat_activity(
             continue
         if not is_chat_inbound(e.get("channel") or ""):
             continue
-        if NOISE_SUBJECT_RE.search(e.get("summary") or "") or NOISE_SUBJECT_RE.search(e.get("subject") or ""):
+        if ACTIVITY_NOISE_RE.search(e.get("summary") or "") or ACTIVITY_NOISE_RE.search(
+            e.get("subject") or ""
+        ):
+            continue
+        # [deleted] のみの投稿はダッシュボードに載せない
+        if re.fullmatch(r"\[deleted\]", (e.get("summary") or "").strip()):
             continue
         if cutoff:
             dt = parse_received_at(e.get("received_at") or "")
@@ -394,6 +404,14 @@ def find_recent_openchat_activity(
 def replace_activity_items(queue: dict[str, Any], activities: list[dict[str, Any]]) -> int:
     """kind=activity を一括差し替え。"""
     kept = [it for it in queue.get("items") or [] if it.get("kind") != "activity"]
+    # activity_id 衝突を潰す（同一摘要の二重抽出など）
+    by_id: dict[str, dict[str, Any]] = {}
+    for a in activities:
+        aid = str(a.get("id") or "").strip()
+        if not aid:
+            continue
+        by_id[aid] = a
+    activities = list(by_id.values())
     stamped = []
     for a in activities:
         item = queue_item_fields(
@@ -535,10 +553,11 @@ def list_partner_mds(base: Path) -> list[tuple[str, Path]]:
     return out
 
 
-def run_gmail_fetch(dry_run: bool) -> int:
-    script = MANUAL_DIR / "gmail_to_yoritoori.py"
+def run_partner_fetch(name: str, script_name: str, dry_run: bool, *, timeout_s: int = 900) -> int:
+    """Gmail / Chatwork 等のパートナー取込。ハング防止のため timeout 必須。"""
+    script = MANUAL_DIR / script_name
     if not script.is_file():
-        print(f"# fetch: script missing: {script}", file=sys.stderr)
+        print(f"# {name}: script missing: {script}", file=sys.stderr)
         return 1
     if dry_run:
         print(f"# dry-run: would run {script}")
@@ -546,9 +565,21 @@ def run_gmail_fetch(dry_run: bool) -> int:
     env = os.environ.copy()
     env.setdefault("YORITOORI_BASE_PATH", str(partner_base()))
     cmd = [str(PY), str(script)]
-    print(f"# fetch: {' '.join(cmd)}")
-    r = subprocess.run(cmd, cwd=str(MANUAL_DIR), env=env)
-    return r.returncode
+    print(f"# {name}: {' '.join(cmd)} (timeout={timeout_s}s)")
+    try:
+        r = subprocess.run(cmd, cwd=str(MANUAL_DIR), env=env, timeout=timeout_s)
+        return int(r.returncode)
+    except subprocess.TimeoutExpired:
+        print(f"# {name}: TIMEOUT ({timeout_s}s)", file=sys.stderr)
+        return 124
+
+
+def run_gmail_fetch(dry_run: bool) -> int:
+    return run_partner_fetch("gmail_fetch", "gmail_to_yoritoori.py", dry_run)
+
+
+def run_chatwork_fetch(dry_run: bool) -> int:
+    return run_partner_fetch("chatwork_fetch", "chatwork_to_yoritoori.py", dry_run, timeout_s=300)
 
 
 def gemini_generate(prompt: str, model: str, api_key: str) -> str:
@@ -1221,7 +1252,10 @@ def main() -> int:
     if do_partner and not args.skip_fetch:
         rc = run_gmail_fetch(args.dry_run)
         if rc != 0:
-            print(f"# fetch failed rc={rc}", file=sys.stderr)
+            print(f"# gmail_fetch failed rc={rc}", file=sys.stderr)
+        rc_cw = run_chatwork_fetch(args.dry_run)
+        if rc_cw != 0:
+            print(f"# chatwork_fetch failed rc={rc_cw}", file=sys.stderr)
 
     base = partner_base()
     print(f"# partner base: {base}")

@@ -38,6 +38,7 @@ MANUAL_DIR = (
     / "1b_Cursorマニュアル"
 )
 GMAIL_SCRIPT = MANUAL_DIR / "gmail_to_yoritoori.py"
+CHATWORK_SCRIPT = MANUAL_DIR / "chatwork_to_yoritoori.py"
 CATCHUP = REPO / "scripts" / "jarvis_triage_yoritoori_catchup.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 POC = REPO / "line_unofficial_poc"
@@ -235,7 +236,7 @@ def main() -> int:
     ap.add_argument(
         "--skip-fetch",
         action="store_true",
-        help="gmail_to_yoritoori をスキップ",
+        help="gmail_to_yoritoori / chatwork_to_yoritoori をスキップ",
     )
     ap.add_argument(
         "--skip-push",
@@ -279,11 +280,11 @@ def main() -> int:
     if rc != 0:
         failures += 1
 
-    # 2. パートナー Gmail → OneDrive（軽量=通常差分。フル夜トリアージはしない）
+    # 2. パートナー Gmail / Chatwork → OneDrive（軽量=通常差分。フル夜トリアージはしない）
     if not args.skip_fetch:
+        env = os.environ.copy()
+        env.setdefault("YORITOORI_BASE_PATH", str(partner_base()))
         if GMAIL_SCRIPT.is_file():
-            env = os.environ.copy()
-            env.setdefault("YORITOORI_BASE_PATH", str(partner_base()))
             rc = run_step(
                 "gmail_fetch",
                 [exe, str(GMAIL_SCRIPT)],
@@ -299,8 +300,25 @@ def main() -> int:
             print(f"# gmail_fetch: missing {GMAIL_SCRIPT}", file=sys.stderr)
             results["steps"]["gmail_fetch"] = -1
             failures += 1
+        if CHATWORK_SCRIPT.is_file():
+            rc = run_step(
+                "chatwork_fetch",
+                [exe, str(CHATWORK_SCRIPT)],
+                cwd=MANUAL_DIR,
+                timeout=300,
+                dry_run=args.dry_run,
+                env=env,
+            )
+            results["steps"]["chatwork_fetch"] = rc
+            if rc != 0:
+                failures += 1
+        else:
+            print(f"# chatwork_fetch: missing {CHATWORK_SCRIPT}", file=sys.stderr)
+            results["steps"]["chatwork_fetch"] = -1
+            failures += 1
     else:
         results["steps"]["gmail_fetch"] = "skipped"
+        results["steps"]["chatwork_fetch"] = "skipped"
 
     # 3–4. 状況ウォッチ再集約込みの投影 push（push 内で situation_watch 実行）
     if not args.skip_push:
