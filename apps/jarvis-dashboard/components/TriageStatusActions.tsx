@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { setTriageStatus } from "@/app/actions/triage";
 import type { TriageStatus } from "@/lib/triageStatus";
 import { STATUS_LABEL, isUnread } from "@/lib/triageStatus";
+import { useToast } from "@/components/Toast";
 
 type Props = {
   id: string;
@@ -21,30 +22,38 @@ export default function TriageStatusActions({
   mode,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [pending, start] = useTransition();
-  const unread = isUnread(status);
+  const [optimisticStatus, setOptimistic] = useOptimistic(status);
+  const unread = isUnread(optimisticStatus);
   const view = mode || (unread ? "unread" : "closed");
 
-  function go(next: TriageStatus) {
+  function go(next: TriageStatus, label: string) {
     start(async () => {
+      setOptimistic(next);
       const r = await setTriageStatus(id, next, path);
-      if (!r.ok) alert(r.error);
-      else router.refresh();
+      if (!r.ok) {
+        toast.push(r.error, "err");
+        router.refresh();
+        return;
+      }
+      toast.push(label);
+      router.refresh();
     });
   }
 
   if (view === "closed") {
     return (
       <div className="triage-actions" style={{ marginLeft: "auto" }}>
-        <span className={`status-badge status-${status}`}>
-          {STATUS_LABEL[status as TriageStatus] || status}
+        <span className={`status-badge status-${optimisticStatus}`}>
+          {STATUS_LABEL[optimisticStatus as TriageStatus] || optimisticStatus}
         </span>
         <button
           type="button"
           className="btn"
           style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
           disabled={pending}
-          onClick={() => go("pending")}
+          onClick={() => go("pending", "未読に戻しました")}
         >
           未読に戻す
         </button>
@@ -59,7 +68,7 @@ export default function TriageStatusActions({
         className="btn"
         style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
         disabled={pending}
-        onClick={() => go("skipped")}
+        onClick={() => go("skipped", "スキップしました")}
       >
         スキップ
       </button>
@@ -68,7 +77,7 @@ export default function TriageStatusActions({
         className="btn"
         style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
         disabled={pending}
-        onClick={() => go("snoozed")}
+        onClick={() => go("snoozed", "後でにしました")}
       >
         後で
       </button>
