@@ -1,4 +1,9 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useOptimistic, useTransition } from "react";
 import { setCardStatus, setWatchStatus } from "@/app/actions/archive";
+import { useToast } from "@/components/Toast";
 
 type Props = {
   table: "cards" | "watch_status";
@@ -15,6 +20,11 @@ export default function StatusToggle({
   path,
   neverArchive,
 }: Props) {
+  const router = useRouter();
+  const toast = useToast();
+  const [pending, start] = useTransition();
+  const [optimisticStatus, setOptimistic] = useOptimistic(status);
+
   if (neverArchive) {
     return (
       <span
@@ -25,23 +35,39 @@ export default function StatusToggle({
       </span>
     );
   }
-  const archived = status === "archived";
+
+  const archived = optimisticStatus === "archived";
   const next = archived ? ("active" as const) : ("archived" as const);
   const label = archived ? "再表示" : "アーカイブ";
-  const action =
-    table === "cards"
-      ? setCardStatus.bind(null, id, next, path)
-      : setWatchStatus.bind(null, id, next, path);
+
+  function onClick() {
+    start(async () => {
+      setOptimistic(next);
+      try {
+        if (table === "cards") {
+          await setCardStatus(id, next, path);
+        } else {
+          await setWatchStatus(id, next, path);
+        }
+        toast.push(archived ? "再表示しました" : "アーカイブしました");
+      } catch (e) {
+        toast.push(e instanceof Error ? e.message : "更新に失敗しました", "err");
+      }
+      router.refresh();
+    });
+  }
 
   return (
-    <form action={action} style={{ marginLeft: "auto" }}>
+    <div style={{ marginLeft: "auto" }}>
       <button
-        type="submit"
+        type="button"
         className="btn"
         style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
+        disabled={pending}
+        onClick={onClick}
       >
-        {label}
+        {pending ? "…" : label}
       </button>
-    </form>
+    </div>
   );
 }

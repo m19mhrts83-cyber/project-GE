@@ -2,6 +2,7 @@ import Shell from "@/components/Shell";
 import BulkSkipNonPartnerButton from "@/components/BulkSkipNonPartnerButton";
 import DraftWorkbench from "@/components/DraftWorkbench";
 import TriageStatusActions from "@/components/TriageStatusActions";
+import PartnerKeyboardNav from "@/components/PartnerKeyboardNav";
 import LaneViewTabs from "@/components/LaneViewTabs";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
 import { LEVEL_LABEL, mailPriorityToLevel } from "@/lib/homeLevels";
@@ -254,6 +255,16 @@ export default async function TriageLanePage({
         {view === "unread" && !skimUnread ? (
           <>
             <h2>未読（1通ずつ）</h2>
+            <PartnerKeyboardNav
+              idx={idx}
+              total={unread.length}
+              focusId={focus?.id ?? null}
+              path={viewPath}
+              prevHref={idx > 0 ? unreadHref(idx - 1) : null}
+              nextHref={
+                idx < unread.length - 1 ? unreadHref(idx + 1) : null
+              }
+            />
             {!focus || !focusTo ? (
               <p className="empty">未読なし</p>
             ) : (

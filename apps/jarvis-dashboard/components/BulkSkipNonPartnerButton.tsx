@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { skipAllNonPartnerPending } from "@/app/actions/triage";
+import { useToast } from "@/components/Toast";
 
 type Props = {
   path: string;
@@ -18,9 +19,11 @@ export default function BulkSkipNonPartnerButton({
   className,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [pending, start] = useTransition();
+  const [optimisticCount, setOptimisticCount] = useOptimistic(pendingCount);
 
-  if (pendingCount <= 0) return null;
+  if (optimisticCount <= 0) return null;
 
   function onClick() {
     const actionNote =
@@ -28,18 +31,19 @@ export default function BulkSkipNonPartnerButton({
         ? `（対応候補 ${actionCandidateCount} 件含む）`
         : "";
     const ok = window.confirm(
-      `パートナー以外の未読 ${pendingCount} 件をスキップします${actionNote}。\n残したいものは先に開いて処置してください。よろしいですか？`,
+      `パートナー以外の未読 ${optimisticCount} 件をスキップします${actionNote}。\n残したいものは先に開いて処置してください。よろしいですか？`,
     );
     if (!ok) return;
     start(async () => {
+      setOptimisticCount(0);
       const r = await skipAllNonPartnerPending(path);
-      if (!r.ok) alert(r.error);
-      else {
-        if (r.message) {
-          /* refresh で件数が消えるので alert は短く */
-        }
+      if (!r.ok) {
+        toast.push(r.error, "err");
         router.refresh();
+        return;
       }
+      toast.push(r.message || "スキップしました");
+      router.refresh();
     });
   }
 
@@ -50,7 +54,7 @@ export default function BulkSkipNonPartnerButton({
       disabled={pending}
       onClick={onClick}
     >
-      {pending ? "スキップ中…" : `未読を一括スキップ（${pendingCount}）`}
+      {pending ? "スキップ中…" : `未読を一括スキップ（${optimisticCount}）`}
     </button>
   );
 }
