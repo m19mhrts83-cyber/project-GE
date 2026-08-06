@@ -1,10 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import type { NavCounts } from "@/lib/navBadges";
 
-export type NavCounts = {
-  partnerUnread: number;
-  watchAttention: number;
-  otherUnread: number;
-};
+export type { NavCounts };
 
 /** サイドバーバッジ用。失敗時は 0（ナビ自体は止めない） */
 export async function fetchNavCounts(): Promise<NavCounts> {
@@ -37,14 +34,4 @@ export async function fetchNavCounts(): Promise<NavCounts> {
   } catch {
     return { partnerUnread: 0, otherUnread: 0, watchAttention: 0 };
   }
-}
-
-export function badgeForHref(
-  href: string,
-  counts: NavCounts,
-): number | null {
-  if (href === "/partner") return counts.partnerUnread || null;
-  if (href === "/general") return counts.otherUnread || null;
-  if (href === "/situation") return counts.watchAttention || null;
-  return null;
 }

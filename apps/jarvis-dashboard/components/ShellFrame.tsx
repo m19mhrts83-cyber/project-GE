@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import CommandPalette from "@/components/CommandPalette";
 import { ToastProvider } from "@/components/Toast";
-import type { NavCounts } from "@/lib/navCounts";
-import { badgeForHref } from "@/lib/navCounts";
+import type { NavCounts } from "@/lib/navBadges";
+import { badgeForHref } from "@/lib/navBadges";
 import { HOME_NAV, NAV_GROUPS } from "@/lib/nav";
 
 type Props = {
