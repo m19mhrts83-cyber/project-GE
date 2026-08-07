@@ -2,6 +2,9 @@ import Shell from "@/components/Shell";
 import QuietEdgeClient, {
   type SnoreRow,
 } from "@/components/quiet-edge/QuietEdgeClient";
+import QuietEdgeHealthBand, {
+  type VitalDailyRow,
+} from "@/components/quiet-edge/QuietEdgeHealthBand";
 import SnoreTrendChart, {
   type SnorePoint,
 } from "@/components/quiet-edge/SnoreTrendChart";
@@ -33,7 +36,17 @@ export default async function QuietEdgePage() {
     .select("session_no,scheduled_at,label,status,note")
     .order("session_no", { ascending: true });
 
+  const since = new Date();
+  since.setDate(since.getDate() - 21);
+  const sinceYmd = since.toISOString().slice(0, 10);
+  const { data: healthRows } = await supabase
+    .from("vital_daily")
+    .select("recorded_at,metric,value,unit,source")
+    .gte("recorded_at", sinceYmd)
+    .order("recorded_at", { ascending: true });
+
   const rows = (snoreRows || []) as SnoreRow[];
+  const vitalRows = (healthRows || []) as VitalDailyRow[];
   const chartPoints: SnorePoint[] = rows.map((r) => ({
     date: r.recorded_at,
     score: Number(r.score),
@@ -144,6 +157,8 @@ export default async function QuietEdgePage() {
           <p className="meta">Canvas 移行込み</p>
         </article>
       </div>
+
+      <QuietEdgeHealthBand rows={vitalRows} windowDays={14} />
 
       <article className="card">
         <header>
