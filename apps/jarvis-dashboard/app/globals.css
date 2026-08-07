@@ -2963,3 +2963,108 @@ p.back {
   background: transparent;
   border: 1px solid var(--line, #e7e5e4);
 }
+
+.qe-health-band {
+  margin-bottom: 16px;
+}
+.qe-health-kpi {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+@media (max-width: 960px) {
+  .qe-health-kpi {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.qe-health-kpi-item {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-soft, #f5f5f4);
+}
+.qe-coverage {
+  margin-top: 14px;
+}
+.qe-coverage-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.qe-coverage-list li {
+  font-size: 0.82rem;
+  color: #57534e;
+}
+
+.qe-journal-band,
+.qe-ask-panel,
+.qe-review-panel {
+  margin-bottom: 16px;
+}
+.qe-journal-list,
+.qe-ask-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.qe-journal-toggle {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-soft, #f5f5f4);
+  border: 1px solid var(--line, #e7e5e4);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.qe-journal-list li[data-thin="1"] .qe-journal-toggle {
+  border-style: dashed;
+}
+.qe-journal-excerpt,
+.qe-review-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #0c0a09;
+  color: #fafaf9;
+  max-height: 280px;
+  overflow: auto;
+}
+.qe-ask-prompt {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.qe-ask-list textarea {
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #e7e5e4);
+  padding: 8px 10px;
+  font: inherit;
+}
+.qe-notes-recent {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, #e7e5e4);
+}
+.qe-notes-recent ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.qe-journal-band code {
+  font-size: 0.78rem;
+}

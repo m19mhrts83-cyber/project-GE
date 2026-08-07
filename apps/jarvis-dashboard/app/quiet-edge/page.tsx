@@ -1,10 +1,23 @@
 import Shell from "@/components/Shell";
+import QuietEdgeAskPanel from "@/components/quiet-edge/QuietEdgeAskPanel";
 import QuietEdgeClient, {
   type SnoreRow,
 } from "@/components/quiet-edge/QuietEdgeClient";
+import QuietEdgeHealthBand, {
+  type VitalDailyRow,
+} from "@/components/quiet-edge/QuietEdgeHealthBand";
+import QuietEdgeJournalBand from "@/components/quiet-edge/QuietEdgeJournalBand";
+import QuietEdgeReviewPanel from "@/components/quiet-edge/QuietEdgeReviewPanel";
 import SnoreTrendChart, {
   type SnorePoint,
 } from "@/components/quiet-edge/SnoreTrendChart";
+import {
+  buildQuietEdgeAsks,
+  addDaysYmd,
+  ymdJst,
+  type ContextNoteRow,
+  type JournalDailyRow,
+} from "@/lib/quietEdgeContext";
 import { createClient } from "@/lib/supabase/server";
 
 function fmtCount(n: number | null | undefined) {
@@ -33,13 +46,48 @@ export default async function QuietEdgePage() {
     .select("session_no,scheduled_at,label,status,note")
     .order("session_no", { ascending: true });
 
+  const sinceYmd = addDaysYmd(ymdJst(), -20);
+  const { data: healthRows } = await supabase
+    .from("vital_daily")
+    .select("recorded_at,metric,value,unit,source")
+    .gte("recorded_at", sinceYmd)
+    .order("recorded_at", { ascending: true });
+
+  const { data: journalRows } = await supabase
+    .from("vital_journal_daily")
+    .select("recorded_at,excerpt,char_count,source")
+    .gte("recorded_at", sinceYmd)
+    .order("recorded_at", { ascending: false });
+
+  const { data: noteRows } = await supabase
+    .from("vital_context_notes")
+    .select("id,recorded_at,trigger,prompt,answer,source,created_at")
+    .gte("recorded_at", sinceYmd)
+    .order("created_at", { ascending: false })
+    .limit(40);
+
   const rows = (snoreRows || []) as SnoreRow[];
+  const vitalRows = (healthRows || []) as VitalDailyRow[];
+  const journals = (journalRows || []) as JournalDailyRow[];
+  const notes = (noteRows || []) as ContextNoteRow[];
   const chartPoints: SnorePoint[] = rows.map((r) => ({
     date: r.recorded_at,
     score: Number(r.score),
     count: r.count,
     event: r.event,
   }));
+
+  const asks = buildQuietEdgeAsks({
+    journals,
+    notes,
+    snore: rows.map((r) => ({
+      recorded_at: r.recorded_at,
+      score: Number(r.score),
+      count: r.count,
+    })),
+    windowDays: 14,
+    maxAsks: 5,
+  });
 
   const latest = rows.length ? rows[rows.length - 1] : null;
   const withCount = rows.filter((r) => r.count != null);
@@ -64,7 +112,7 @@ export default async function QuietEdgePage() {
       <h1>Quiet Edge</h1>
       <p className="sub">
         静音ロード — AutoSnore のいびき記録を長期保管し、レーザー治療の推移を見る。
-        診断ではありません。医師に見せるための観察整理です。
+        Journal と「何がありましたか？」で生活要因を重ねる。診断ではありません。
       </p>
 
       <div className="qe-top-grid">
@@ -141,9 +189,17 @@ export default async function QuietEdgePage() {
         <article className="card">
           <p className="meta">記録日数</p>
           <p className="qe-kpi">{rows.length}</p>
-          <p className="meta">Canvas 移行込み</p>
+          <p className="meta">Journal {journals.length}日分</p>
         </article>
       </div>
+
+      <QuietEdgeHealthBand rows={vitalRows} windowDays={14} />
+
+      <QuietEdgeAskPanel asks={asks} notes={notes} />
+
+      <QuietEdgeJournalBand journals={journals} windowDays={14} />
+
+      <QuietEdgeReviewPanel />
 
       <article className="card">
         <header>
