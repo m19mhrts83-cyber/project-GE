@@ -13,6 +13,8 @@ import SnoreTrendChart, {
 } from "@/components/quiet-edge/SnoreTrendChart";
 import {
   buildQuietEdgeAsks,
+  addDaysYmd,
+  ymdJst,
   type ContextNoteRow,
   type JournalDailyRow,
 } from "@/lib/quietEdgeContext";
@@ -44,9 +46,7 @@ export default async function QuietEdgePage() {
     .select("session_no,scheduled_at,label,status,note")
     .order("session_no", { ascending: true });
 
-  const since = new Date();
-  since.setDate(since.getDate() - 21);
-  const sinceYmd = since.toISOString().slice(0, 10);
+  const sinceYmd = addDaysYmd(ymdJst(), -20);
   const { data: healthRows } = await supabase
     .from("vital_daily")
     .select("recorded_at,metric,value,unit,source")

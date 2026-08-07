@@ -1,8 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { geminiReply, geminiVisionJson } from "@/lib/geminiReply";
+import { addDaysYmd, ymdJst } from "@/lib/quietEdgeContext";
+import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
 
 export type SnoreEvent = "通常日" | "治療当日" | "治療直後";
 
@@ -305,9 +306,7 @@ export type QuietEdgeReviewResult =
 /** Journal・補完・いびき・Health を横断した観察整理（診断禁止） */
 export async function generateQuietEdgeReview(): Promise<QuietEdgeReviewResult> {
   const supabase = await createClient();
-  const since = new Date();
-  since.setDate(since.getDate() - 21);
-  const sinceYmd = since.toISOString().slice(0, 10);
+  const sinceYmd = addDaysYmd(ymdJst(), -20);
 
   const [snore, health, journal, notes, treatments] = await Promise.all([
     supabase
