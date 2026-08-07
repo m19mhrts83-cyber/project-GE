@@ -2963,3 +2963,37 @@ p.back {
   background: transparent;
   border: 1px solid var(--line, #e7e5e4);
 }
+
+.qe-health-band {
+  margin-bottom: 16px;
+}
+.qe-health-kpi {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+@media (max-width: 960px) {
+  .qe-health-kpi {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.qe-health-kpi-item {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-soft, #f5f5f4);
+}
+.qe-coverage {
+  margin-top: 14px;
+}
+.qe-coverage-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.qe-coverage-list li {
+  font-size: 0.82rem;
+  color: #57534e;
+}

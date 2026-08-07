@@ -6,7 +6,10 @@
 - 正本 DB: Supabase `jarvis-dashboard` の `vital_snore_daily` / `vital_treatment_events`
 - **診断アプリではない。** 医師に見せるための観察整理。
 
-関連ロードマップ（Health 日次・主観）は Cursor Plan「Quiet Edge Roadmap」を参照。
+関連ロードマップ（Health 日次・ジャーナル重ね合わせ）は Cursor Plan「Quiet Edge Roadmap」を参照。  
+主観の本線は毎朝の点数入力ではなく、帰りの Obsidian `★Journal`（`config/dashboard_lanes.yaml` の `obsidian_journal`）を日付でバイタルと重ねる方針。
+
+Health 日次の送り方: [`docs/Quiet_Edge_ヘルスケアショートカット手順.md`](Quiet_Edge_ヘルスケアショートカット手順.md)
 
 ---
 
