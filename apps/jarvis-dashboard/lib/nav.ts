@@ -48,6 +48,10 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/billing", label: "サブスク・課金" },
     ],
   },
+  {
+    title: "からだ",
+    items: [{ href: "/quiet-edge", label: "Quiet Edge" }],
+  },
 ];
 
 export const HOME_NAV: NavItem = { href: "/", label: "ホーム" };

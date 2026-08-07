@@ -2784,3 +2784,182 @@ p.back {
   }
 }
 
+/* Quiet Edge */
+.qe-top-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  margin: 16px 0;
+}
+@media (max-width: 860px) {
+  .qe-top-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.qe-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 860px) {
+  .qe-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.qe-kpi {
+  margin: 4px 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.qe-countdown-num {
+  margin: 8px 0 4px;
+  font-size: 2rem;
+  font-weight: 800;
+}
+.qe-progress {
+  margin-top: 10px;
+}
+.qe-progress-bar {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-soft, #f5f5f4);
+  overflow: hidden;
+}
+.qe-progress-bar > i {
+  display: block;
+  height: 100%;
+  background: #b45309;
+}
+.qe-chart-wrap {
+  overflow-x: auto;
+}
+.qe-chart {
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+}
+.qe-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: #78716c;
+}
+.qe-chart-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.qe-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 2px solid var(--line, #e7e5e4);
+}
+.qe-timeline li {
+  position: relative;
+  padding: 0 0 14px 12px;
+}
+.qe-timeline li::before {
+  content: "";
+  position: absolute;
+  left: -19px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #a8a29e;
+  border: 2px solid #fff;
+}
+.qe-timeline li[data-status="done"]::before {
+  background: #059669;
+}
+.qe-timeline li[data-status="scheduled"]::before {
+  background: #b45309;
+}
+.qe-client {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+.qe-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.qe-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #57534e;
+}
+.qe-form-grid input,
+.qe-form-grid select {
+  padding: 8px 10px;
+  border: 1px solid var(--line, #e7e5e4);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.qe-span2 {
+  grid-column: 1 / -1;
+}
+.qe-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.qe-file {
+  margin-top: 8px;
+}
+.qe-err {
+  color: #b91c1c;
+}
+.qe-ok {
+  color: #047857;
+}
+.qe-table-wrap {
+  overflow-x: auto;
+}
+.qe-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.qe-table th,
+.qe-table td {
+  border-bottom: 1px solid var(--line, #e7e5e4);
+  padding: 8px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.qe-memo {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qe-linkish {
+  background: none;
+  border: none;
+  color: #1d4ed8;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+}
+.qe-del {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line, #e7e5e4);
+}
