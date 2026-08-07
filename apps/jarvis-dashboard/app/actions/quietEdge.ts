@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { geminiVisionJson } from "@/lib/geminiReply";
+import { geminiReply, geminiVisionJson } from "@/lib/geminiReply";
 
 export type SnoreEvent = "通常日" | "治療当日" | "治療直後";
 
@@ -265,4 +265,107 @@ export async function parseSnoreScreenshots(
       payload,
     },
   };
+}
+
+export type ContextNoteInput = {
+  recorded_at: string;
+  trigger: string;
+  prompt: string;
+  answer: string;
+};
+
+export async function saveContextNote(
+  input: ContextNoteInput,
+): Promise<QuietEdgeResult> {
+  const recorded_at = normalizeDate(input.recorded_at);
+  if (!recorded_at) return { ok: false, error: "日付が不正です" };
+  const answer = String(input.answer || "").trim();
+  if (!answer) return { ok: false, error: "回答が空です" };
+  const trigger = String(input.trigger || "manual").trim() || "manual";
+  const prompt = String(input.prompt || "").trim();
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("vital_context_notes").insert({
+    recorded_at,
+    trigger,
+    prompt,
+    answer,
+    source: "user_reply",
+    payload: {},
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidateQuietEdge();
+  return { ok: true };
+}
+
+export type QuietEdgeReviewResult =
+  | { ok: true; text: string }
+  | { ok: false; error: string };
+
+/** Journal・補完・いびき・Health を横断した観察整理（診断禁止） */
+export async function generateQuietEdgeReview(): Promise<QuietEdgeReviewResult> {
+  const supabase = await createClient();
+  const since = new Date();
+  since.setDate(since.getDate() - 21);
+  const sinceYmd = since.toISOString().slice(0, 10);
+
+  const [snore, health, journal, notes, treatments] = await Promise.all([
+    supabase
+      .from("vital_snore_daily")
+      .select("recorded_at,score,count,event,sleep_time,memo")
+      .gte("recorded_at", sinceYmd)
+      .order("recorded_at", { ascending: true }),
+    supabase
+      .from("vital_daily")
+      .select("recorded_at,metric,value,unit,source")
+      .gte("recorded_at", sinceYmd)
+      .order("recorded_at", { ascending: true }),
+    supabase
+      .from("vital_journal_daily")
+      .select("recorded_at,excerpt,char_count")
+      .gte("recorded_at", sinceYmd)
+      .order("recorded_at", { ascending: true }),
+    supabase
+      .from("vital_context_notes")
+      .select("recorded_at,trigger,prompt,answer,created_at")
+      .gte("recorded_at", sinceYmd)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    supabase
+      .from("vital_treatment_events")
+      .select("session_no,scheduled_at,label,status")
+      .order("session_no", { ascending: true }),
+  ]);
+
+  const bundle = {
+    window: { since: sinceYmd, days: 21 },
+    snore: snore.data || [],
+    health: health.data || [],
+    journal: (journal.data || []).map((j) => ({
+      recorded_at: j.recorded_at,
+      char_count: j.char_count,
+      excerpt: String(j.excerpt || "").slice(0, 400),
+    })),
+    context_notes: notes.data || [],
+    treatments: treatments.data || [],
+  };
+
+  const prompt = `あなたは Quiet Edge（いびきレーザー治療の経過観察アプリ）の観察アシスタントです。
+診断・病名断定・治療指示は禁止。医師に見せるための観察整理のみ。
+
+データ（JSON）:
+${JSON.stringify(bundle, null, 2)}
+
+出力（日本語・箇条書き中心）:
+1. 直近の傾向（いびきスコア／回数、分かる範囲の睡眠・呼吸）
+2. Journal・補完メモから読み取れる生活要因（飲酒・残業・鼻・旅行など）
+3. 治療スケジュールとの時系列の重なり（ある場合）
+4. 欠測・確認したい点（データが薄い日）
+5. 次回診察で見せるとよい観察ポイント（質問リスト形式可）
+
+厳守: 「診断」「睡眠時無呼吸確定」などの断定をしない。短く（目安 400〜700 字）。`;
+
+  const res = await geminiReply(prompt);
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, text: res.text };
 }

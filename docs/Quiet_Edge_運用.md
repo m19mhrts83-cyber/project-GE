@@ -1,15 +1,17 @@
-# Quiet Edge 運用（Phase 1）
+# Quiet Edge 運用
 
 いびきレーザー治療の経過を Jarvis Dashboard「Quiet Edge」に長期保管する手順。
 
 - 画面: `/quiet-edge`
-- 正本 DB: Supabase `jarvis-dashboard` の `vital_snore_daily` / `vital_treatment_events`
+- 正本 DB: Supabase `jarvis-dashboard`
+  - Phase1: `vital_snore_daily` / `vital_treatment_events`
+  - Phase2: `vital_daily`（Health）
+  - Phase3: `vital_journal_daily` / `vital_context_notes`
 - **診断アプリではない。** 医師に見せるための観察整理。
 
-関連ロードマップ（Health 日次・ジャーナル重ね合わせ）は Cursor Plan「Quiet Edge Roadmap」を参照。  
-主観の本線は毎朝の点数入力ではなく、帰りの Obsidian `★Journal`（`config/dashboard_lanes.yaml` の `obsidian_journal`）を日付でバイタルと重ねる方針。
+主観の本線は毎朝の点数入力ではなく、Obsidian `★Journal`（`config/dashboard_lanes.yaml` の `obsidian_journal`）を日付でバイタルと重ねる。欠落・急変には「何がありましたか？」で補完する。
 
-Health 日次の送り方: [`docs/Quiet_Edge_ヘルスケアショートカット手順.md`](Quiet_Edge_ヘルスケアショートカット手順.md)
+Health 日次: [`docs/Quiet_Edge_ヘルスケアショートカット手順.md`](Quiet_Edge_ヘルスケアショートカット手順.md)
 
 ---
 
@@ -44,6 +46,25 @@ AutoSnore から次の **2画面** をスクリーンショットする。
 
 ---
 
+## Phase 3: Journal 同期（Mac）
+
+Vercel はローカル Disk を見ないため、★Journal 抜粋を Supabase に投影する。
+
+```bash
+cd ~/git-repos
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_journal_sync.py
+# 確認だけ
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_journal_sync.py --dry-run --days 14
+```
+
+- パス: `config/dashboard_lanes.yaml` → `obsidian_journal`（または env `QUIET_EDGE_JOURNAL_DIR` / `JARVIS_LANES_OBSIDIAN_JOURNAL`）
+- 秘密: `JARVIS_SUPABASE_URL` + Service Role（`.env.jarvis_private`）
+- 画面: Journal 帯・Ask（何がありましたか？）・観察レビュー
+
+推奨: パートナー確認のついで、または launchd で日次1回。
+
+---
+
 ## 治療ステータス
 
 | 値 | いつ付けるか |
@@ -64,12 +85,26 @@ AutoSnore から次の **2画面** をスクリーンショットする。
 
 ---
 
+## デプロイ前チェック（Vercel）
+
+| 変数 | 用途 |
+|---|---|
+| `GEMINI_API_KEY` | OCR・観察レビュー |
+| `QUIET_EDGE_INGEST_SECRET` | Health ingest API |
+| `JARVIS_SUPABASE_*` / Dashboard 用 Supabase | 既存どおり |
+
+Redeploy 後、サイドバー **からだ → Quiet Edge**。
+
+---
+
 ## トラブル
 
 | 症状 | 確認 |
 |---|---|
 | OCR 失敗 | `GEMINI_API_KEY`（Vercel / ローカル `.env.local`） |
 | スコアだけ／回数だけ | もう1枚を追加アップロードして同じ日で保存 |
+| Journal が空 | Mac で sync スクリプト実行。Drive パス・Service Role |
+| Health が空 | Shortcuts → ingest。秘密ヘッダと Vercel env |
 | データが見えない | ログイン済みか。テーブル未作成なら migration 適用 |
 
-画像ファイル自体は DB に保存しない（数値のみ）。
+画像ファイル自体は DB に保存しない（数値のみ）。Journal は抜粋のみ（全文は Obsidian 正本）。
