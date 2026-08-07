@@ -36,7 +36,7 @@ export type QuietEdgeAsk = {
   reason: string;
 };
 
-function ymdJst(d: Date): string {
+export function ymdJst(d: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
     year: "numeric",
@@ -45,11 +45,19 @@ function ymdJst(d: Date): string {
   }).format(d);
 }
 
-function addDaysYmd(ymd: string, delta: number): string {
+export function addDaysYmd(ymd: string, delta: number): string {
   const [y, m, d] = ymd.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + delta);
   return dt.toISOString().slice(0, 10);
+}
+
+function daysBetweenYmd(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  const ta = Date.UTC(ay, am - 1, ad);
+  const tb = Date.UTC(by, bm - 1, bd);
+  return Math.round((tb - ta) / (1000 * 60 * 60 * 24));
 }
 
 /** 直近 N 日で Journal 欠落・いびき急変を拾い、未回答の問いを返す */
@@ -81,33 +89,31 @@ export function buildQuietEdgeAsks(input: {
 
   const asks: QuietEdgeAsk[] = [];
 
-  // 1) Journal 欠落（いびき記録がある日を優先）
+  // 1) Journal 欠落 — いびき記録がある日だけ（無関係な空白日は聞かない）
   const snoreDays = new Set(snoreSorted.map((s) => s.recorded_at));
   for (let i = 0; i < windowDays; i++) {
     const d = addDaysYmd(start, i);
     if (d >= today) continue; // 今日は書いている最中かも
+    if (!snoreDays.has(d)) continue;
     const j = journalByDay.get(d);
     const thin = !j || !j.excerpt.trim() || j.char_count < 40;
     if (!thin) continue;
     const trigger = "missing_journal";
     if (answered.has(`${d}|${trigger}`)) continue;
-    const hasSnore = snoreDays.has(d);
     asks.push({
       recorded_at: d,
       trigger,
-      reason: hasSnore
-        ? "いびき記録あり・Journal 薄い／なし"
-        : "Journal が無い／極端に短い",
-      prompt: hasSnore
-        ? `${d} はいびき記録がありますが Journal が薄いです。その夜〜朝、何がありましたか？（飲酒・残業・鼻詰まり・旅行など短くでOK）`
-        : `${d} の Journal が見つかりません。覚えていれば、その日の睡眠まわりで何がありましたか？`,
+      reason: "いびき記録あり・Journal 薄い／なし",
+      prompt: `${d} はいびき記録がありますが Journal が薄いです。その夜〜朝、何がありましたか？（飲酒・残業・鼻詰まり・旅行など短くでOK）`,
     });
   }
 
-  // 2) いびきスコア急変（前日比 +15 以上、または回数 1.6 倍）
+  // 2) いびき急変 — カレンダー上 1〜2 日以内の連続比較のみ（欠測明けの戻りを悪化と誤認しない）
   for (let i = 1; i < snoreSorted.length; i++) {
     const prev = snoreSorted[i - 1];
     const cur = snoreSorted[i];
+    const gap = daysBetweenYmd(prev.recorded_at, cur.recorded_at);
+    if (gap < 1 || gap > 2) continue;
     const scoreJump = Number(cur.score) - Number(prev.score) >= 15;
     const countJump =
       prev.count != null &&
@@ -118,23 +124,19 @@ export function buildQuietEdgeAsks(input: {
     if (!scoreJump && !countJump) continue;
     const trigger = "snore_spike";
     if (answered.has(`${cur.recorded_at}|${trigger}`)) continue;
+    const deltaLabel = scoreJump
+      ? `スコア ${Number(prev.score).toFixed(1)}→${Number(cur.score).toFixed(1)}`
+      : `回数 ${prev.count}→${cur.count}`;
     asks.push({
       recorded_at: cur.recorded_at,
       trigger,
-      reason: scoreJump
-        ? `スコア ${Number(prev.score).toFixed(1)}→${Number(cur.score).toFixed(1)}`
-        : `回数 ${prev.count}→${cur.count}`,
-      prompt: `${cur.recorded_at} のいびきが前日より悪化しています（${
-        scoreJump
-          ? `スコア ${Number(prev.score).toFixed(1)}→${Number(cur.score).toFixed(1)}`
-          : `回数 ${prev.count}→${cur.count}`
-      }）。その夜、何がありましたか？`,
+      reason: deltaLabel,
+      prompt: `${cur.recorded_at} のいびきが直近より悪化しています（${deltaLabel}）。その夜、何がありましたか？`,
     });
   }
 
-  // 優先: spike → missing with snore → missing
-  const rank = (a: QuietEdgeAsk) =>
-    a.trigger === "snore_spike" ? 0 : a.reason.includes("いびき") ? 1 : 2;
+  // 優先: spike → missing journal（いびきあり）
+  const rank = (a: QuietEdgeAsk) => (a.trigger === "snore_spike" ? 0 : 1);
   asks.sort((a, b) => {
     const r = rank(a) - rank(b);
     if (r !== 0) return r;

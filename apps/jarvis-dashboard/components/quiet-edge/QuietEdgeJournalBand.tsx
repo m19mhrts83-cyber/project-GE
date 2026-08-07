@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { JournalDailyRow } from "@/lib/quietEdgeContext";
+import {
+  addDaysYmd,
+  ymdJst,
+  type JournalDailyRow,
+} from "@/lib/quietEdgeContext";
 
 export default function QuietEdgeJournalBand({
   journals,
@@ -13,13 +17,15 @@ export default function QuietEdgeJournalBand({
   const [open, setOpen] = useState<string | null>(null);
 
   const recent = useMemo(() => {
-    const sorted = [...journals].sort((a, b) =>
-      b.recorded_at.localeCompare(a.recorded_at),
-    );
-    return sorted.slice(0, windowDays);
+    const today = ymdJst();
+    const start = addDaysYmd(today, -(windowDays - 1));
+    return [...journals]
+      .filter((j) => j.recorded_at >= start && j.recorded_at <= today)
+      .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
   }, [journals, windowDays]);
 
   const withText = recent.filter((j) => j.excerpt.trim().length > 0);
+  const coverage = recent.length;
 
   return (
     <section className="card qe-journal-band">
@@ -30,7 +36,7 @@ export default function QuietEdgeJournalBand({
       <p className="meta">
         Obsidian の日次メモ抜粋。Mac で
         <code> jarvis_quiet_edge_journal_sync.py </code>
-        を走らせるとここに載ります（直近 {windowDays} 日表示）。
+        を走らせるとここに載ります（直近 {windowDays} 日中 {coverage} 日分）。
       </p>
       {!withText.length ? (
         <p className="sum">まだ同期された Journal がありません。</p>
