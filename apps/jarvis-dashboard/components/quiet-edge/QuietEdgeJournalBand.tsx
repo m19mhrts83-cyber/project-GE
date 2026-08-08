@@ -18,11 +18,14 @@ export default function QuietEdgeJournalBand({
   snore = [],
   vitals = [],
   windowDays = 14,
+  sleepFocus = false,
 }: {
   journals: JournalDailyRow[];
   snore?: SnoreLite[];
   vitals?: VitalLite[];
   windowDays?: number;
+  /** 睡眠シグナル中心の説明＋仕事／運動への導線 */
+  sleepFocus?: boolean;
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -74,12 +77,24 @@ export default function QuietEdgeJournalBand({
     <section className="card qe-journal-band">
       <header>
         <span className="lvl">Journal</span>
-        <strong>日付ジョイン（★Journal × いびき × Health）</strong>
+        <strong>
+          {sleepFocus
+            ? "睡眠シグナル × いびき × Health"
+            : "日付ジョイン（★Journal × いびき × Health）"}
+        </strong>
       </header>
       <p className="meta">
         全文ではなく「夜の防衛線」など睡眠関連を優先表示。直近 {windowDays} 日中
         Journal {journalDays} 日／睡眠シグナル {withSignal} 日。Mac で{" "}
         <code>jarvis_quiet_edge_journal_sync.py</code>（launchd 08:15）が更新。
+        {sleepFocus ? (
+          <>
+            {" "}
+            仕事・運動の抜粋は{" "}
+            <a href="/performance/work">仕事</a>／
+            <a href="/performance/move">運動</a> へ。
+          </>
+        ) : null}
       </p>
       {!recent.length ? (
         <p className="sum">まだ同期された Journal / バイタルがありません。</p>

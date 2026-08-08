@@ -3,6 +3,7 @@
 いびきレーザー治療の経過を Jarvis Dashboard「Quiet Edge」に長期保管する手順。
 
 - 画面: `/quiet-edge`
+- サイドバー: **からだ → Quiet Edge**（同グループに **仕事** `/performance/work`・**運動** `/performance/move`。いびき治療は Quiet Edge 専用）
 - 正本 DB: Supabase `jarvis-dashboard`
   - Phase1: `vital_snore_daily` / `vital_treatment_events`
   - Phase2: `vital_daily`（Health）
@@ -25,7 +26,7 @@ Journal（Phase 3）は Health 確立後に **launchd 日次同期**で定常化
 | 2 | 推移グラフ | いびきスコア／回数 |
 | 3 | 取込・確認フォーム | AutoSnore OCR → 確認 → 取り込む |
 | 4 | **月次レビュー** | 既定は**先月**（JST）。対象月の傾向・その前月比較・Journal・注意点（kind=`monthly`）。UI で先月／今月／前後切替可 |
-| 5 | KPI・Health・Journal・治療 | 経過サマリー |
+| 5 | KPI・Health（睡眠・SpO2要約）・Journal（睡眠シグナル）・治療 | 経過サマリー。仕事／運動は別ページ |
 | 6 | 補完 Ask / 横断 Review | 折りたたみ（必要なときだけ） |
 | 7 | **ログ表** | 全記録（長いので末尾） |
 
@@ -190,7 +191,7 @@ cd ~/git-repos
 | `QUIET_EDGE_INGEST_SECRET` | Health ingest API |
 | `JARVIS_SUPABASE_*` / Dashboard 用 Supabase | 既存どおり |
 
-Redeploy 後、サイドバー **からだ → Quiet Edge**。
+Redeploy 後、サイドバー **からだ → Quiet Edge**（仕事・運動は同グループの別項目）。
 
 ---
 
