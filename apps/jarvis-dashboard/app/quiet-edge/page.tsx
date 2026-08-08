@@ -9,6 +9,7 @@ import QuietEdgeHealthBand, {
 import QuietEdgeJournalBand from "@/components/quiet-edge/QuietEdgeJournalBand";
 import QuietEdgeReviewPanel from "@/components/quiet-edge/QuietEdgeReviewPanel";
 import SnoreTrendChart, {
+  SNORE_SCORE_TARGET,
   type SnorePoint,
 } from "@/components/quiet-edge/SnoreTrendChart";
 import {
@@ -115,18 +116,29 @@ export default async function QuietEdgePage() {
         Journal と「何がありましたか？」で生活要因を重ねる。診断ではありません。
       </p>
 
+      <article className="card qe-chart-hero">
+        <header>
+          <span className="lvl">推移</span>
+          <strong>いびき改善プロセス</strong>
+        </header>
+        <SnoreTrendChart points={chartPoints} />
+      </article>
+
+      <QuietEdgeClient rows={rows} />
+
       <div className="qe-top-grid">
         <article className="card qe-banner">
           <header>
             <span className="lvl">経過</span>
             <strong>
               {latest
-                ? `最新 ${latest.recorded_at}（スコア ${Number(latest.score).toFixed(1)} / ${fmtCount(latest.count)}）`
+                ? `最新 ${latest.recorded_at}（いびきスコア ${Number(latest.score).toFixed(1)} / いびき回数 ${fmtCount(latest.count)}）`
                 : "まだ記録がありません"}
             </strong>
           </header>
           <p className="sum">
-            毎朝 AutoSnore から「イビガースコア」と「検出回数」のスクショ2枚を取り込むと、30日失効後もここに残ります。
+            毎朝 AutoSnore から「いびきスコア」と「いびき回数」のスクショ2枚を取り込むと、30日失効後もここに残ります。
+            改善目標の目安はいびきスコア ≤ {SNORE_SCORE_TARGET}（観察用）。
           </p>
         </article>
 
@@ -164,21 +176,22 @@ export default async function QuietEdgePage() {
 
       <div className="qe-kpi-grid">
         <article className="card">
-          <p className="meta">直近スコア</p>
+          <p className="meta">直近いびきスコア</p>
           <p className="qe-kpi">
             {latest ? Number(latest.score).toFixed(1) : "—"}
           </p>
           <p className="meta">
-            平均 {avgScore != null ? avgScore.toFixed(1) : "—"}
+            平均 {avgScore != null ? avgScore.toFixed(1) : "—"} ／ 目標 ≤
+            {SNORE_SCORE_TARGET}
           </p>
         </article>
         <article className="card">
-          <p className="meta">直近回数</p>
+          <p className="meta">直近いびき回数</p>
           <p className="qe-kpi">{latest ? fmtCount(latest.count) : "—"}</p>
           <p className="meta">回数あり {withCount.length}日</p>
         </article>
         <article className="card">
-          <p className="meta">最小スコア</p>
+          <p className="meta">最小いびきスコア</p>
           <p className="qe-kpi">
             {minScoreRow ? Number(minScoreRow.score).toFixed(1) : "—"}
           </p>
@@ -200,14 +213,6 @@ export default async function QuietEdgePage() {
       <QuietEdgeJournalBand journals={journals} windowDays={14} />
 
       <QuietEdgeReviewPanel />
-
-      <article className="card">
-        <header>
-          <span className="lvl">推移</span>
-          <strong>いびき改善プロセス</strong>
-        </header>
-        <SnoreTrendChart points={chartPoints} />
-      </article>
 
       <article className="card">
         <header>
@@ -234,8 +239,6 @@ export default async function QuietEdgePage() {
           ))}
         </ul>
       </article>
-
-      <QuietEdgeClient rows={rows} />
     </Shell>
   );
 }
