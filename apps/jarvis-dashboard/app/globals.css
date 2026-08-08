@@ -2946,6 +2946,14 @@ p.back {
 .qe-upload-card .qe-form-actions {
   margin-top: 12px;
 }
+.qe-ingest-review {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, #e7e5e4);
+}
+.qe-ingest-review .qe-review-text {
+  max-height: 360px;
+}
 .qe-err {
   color: #b91c1c;
 }

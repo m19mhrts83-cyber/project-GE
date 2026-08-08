@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import {
   deleteSnoreDaily,
+  generateQuietEdgeIngestReview,
   parseSnoreScreenshots,
   upsertSnoreDaily,
   type SnoreDailyInput,
@@ -57,6 +58,8 @@ export default function QuietEdgeClient({
   const [ocrHint, setOcrHint] = useState<string | null>(null);
   const [picked, setPicked] = useState<File[]>([]);
   const [ocrReady, setOcrReady] = useState(false);
+  const [ingestReview, setIngestReview] = useState<string | null>(null);
+  const [reviewPending, setReviewPending] = useState(false);
 
   const showUpload = sections.includes("upload");
   const showForm = sections.includes("form");
@@ -114,6 +117,8 @@ export default function QuietEdgeClient({
   function saveRecord(source?: string) {
     setErr(null);
     setMsg(null);
+    setIngestReview(null);
+    const savedAt = form.recorded_at;
     start(async () => {
       const r = await upsertSnoreDaily({
         ...form,
@@ -123,9 +128,18 @@ export default function QuietEdgeClient({
         setErr(r.error);
         return;
       }
-      setMsg(`${form.recorded_at} を取り込みました`);
+      setMsg(`${savedAt} を取り込みました。レビューを作成中…`);
       setOcrReady(false);
       clearPicked();
+      setReviewPending(true);
+      const review = await generateQuietEdgeIngestReview(savedAt);
+      setReviewPending(false);
+      if (review.ok) {
+        setIngestReview(review.text);
+        setMsg(`${savedAt} を取り込みました`);
+      } else {
+        setMsg(`${savedAt} を取り込みました（レビュー: ${review.error}）`);
+      }
       router.refresh();
     });
   }
@@ -205,6 +219,17 @@ export default function QuietEdgeClient({
           {ocrHint ? <p className="meta qe-ocr-hint">{ocrHint}</p> : null}
           {err ? <p className="meta qe-err">{err}</p> : null}
           {msg ? <p className="meta qe-ok">{msg}</p> : null}
+          {reviewPending ? (
+            <p className="meta">依存データ（前回比・Health・Journal・治療）を見てレビュー作成中…</p>
+          ) : null}
+          {ingestReview ? (
+            <div className="qe-ingest-review">
+              <p className="meta">
+                <strong>取込レビュー</strong>（診断ではなく励ましの観察メモ）
+              </p>
+              <pre className="qe-review-text">{ingestReview}</pre>
+            </div>
+          ) : null}
         </section>
       ) : null}
 

@@ -1,5 +1,7 @@
 /** Quiet Edge — いびきスコア／いびき回数の二重軸 SVG */
 
+import { SNORE_SCORE_TARGET } from "@/lib/quietEdgeContext";
+
 export type SnorePoint = {
   date: string;
   score: number;
@@ -7,12 +9,7 @@ export type SnorePoint = {
   event: string;
 };
 
-/** 観察用の改善目標（診断ではない）。
- * AutoSnore 公式の閾値は公開されていないため、同種アプリ SnoreLab の
- * 「Snore Score ≤10 はパートナー妨害が少ない目安」をスコア目標として参照。
- * 回数はアプリ公式の推奨値がないため目標線はスコアのみ。
- */
-export const SNORE_SCORE_TARGET = 10;
+export { SNORE_SCORE_TARGET };
 
 const COLOR_SCORE = "#b45309";
 const COLOR_COUNT = "#4338ca";
