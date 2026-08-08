@@ -16,7 +16,7 @@ export default function QuietEdgeReviewPanel() {
       </header>
       <p className="meta">
         診断ではなく、医師に見せる前の観察整理です。いびき・Health・Journal・補完メモを横断します。
-        取込直後の短い励ましレビューは、上の取込カードに自動表示されます。
+        取込直後の励ましは画面最上段、月次の分析は「月次レビュー」が主線です。
       </p>
       <div className="qe-form-actions">
         <button
