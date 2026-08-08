@@ -23,6 +23,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "タスク",
     items: [
       { href: "/kamiooya", label: "神大家運営" },
+      { href: "/glucon", label: "グルコン報告" },
       { href: "/properties", label: "所有物件" },
       { href: "/kodate", label: "戸建て購入" },
       { href: "/ai-raimo", label: "AI推進・Raimo" },

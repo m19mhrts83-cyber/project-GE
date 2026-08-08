@@ -3242,3 +3242,9 @@ p.back {
   border-color: #fed7aa;
   color: #9a3412;
 }
+
+/* グルコン報告: 提出期限が近いとき */
+.card.glucon-urgent {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25);
+}

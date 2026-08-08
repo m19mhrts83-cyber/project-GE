@@ -969,6 +969,52 @@ def eval_westudy(meta: dict, data: dict | None) -> dict[str, Any]:
     )
 
 
+def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
+    """グルコン提出期限（開催日−10日）。期限7日以内かつ未投稿なら warn。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="未設定または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    summary = str(data.get("summary") or "—")
+    days = data.get("days_until_deadline")
+    detail = "\n".join(
+        [
+            f"開催: {data.get('glucon_date') or '—'}",
+            f"提出期限: {data.get('report_deadline') or '—'}",
+            f"残り日数: {days if days is not None else '—'}",
+            f"活動: {data.get('activity_status') or '—'}",
+            f"成果: {data.get('result_status') or '—'}",
+            "Dashboard: /glucon",
+        ]
+    )
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level if level in ("ok", "info", "warn", "attention") else "ok",
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": "/glucon",
+            "glucon_date": data.get("glucon_date"),
+            "report_deadline": data.get("report_deadline"),
+            "period_key": data.get("period_key"),
+        },
+    )
+
+
 def count_today_thread_headings() -> int:
     base = OPENCHAT_MD_GLOB
     if not base.is_dir():
@@ -1512,6 +1558,9 @@ EVALUATORS = {
     "line_export": lambda m: eval_line_export(m, load_json(STATE / "line_export_reminder.json")),
     "energy_cf": lambda m: eval_energy_cf(m, load_json(STATE / "energy_cf.json")),
     "westudy_weekly": lambda m: eval_westudy(m, load_json(STATE / "westudy_weekly_watch.json")),
+    "glucon_report_due": lambda m: eval_glucon_report(
+        m, load_json(STATE / "glucon_report.json")
+    ),
     "openchat_threads": lambda m: eval_openchat(m),
     "square_probe": lambda m: eval_square(m, load_json(STATE / "square_probe.json")),
     "chrline_version": lambda m: eval_chrline(m, load_json(STATE / "chrline_version.json")),
