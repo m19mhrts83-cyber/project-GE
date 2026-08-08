@@ -121,7 +121,9 @@ export default async function QuietEdgePage() {
   }, null);
 
   const doneSessions = (treatments || []).filter((t) => t.status === "done");
-  const nextSession = (treatments || []).find((t) => t.status === "scheduled");
+  const nextSession =
+    (treatments || []).find((t) => t.status === "scheduled") ||
+    (treatments || []).find((t) => t.status === "planned");
   const totalPlanned = Math.max(9, (treatments || []).length);
   const progressPct = Math.round((doneSessions.length / totalPlanned) * 1000) / 10;
   const countdown = daysUntil(nextSession?.scheduled_at);
@@ -214,11 +216,14 @@ export default async function QuietEdgePage() {
               ? new Date(nextSession.scheduled_at).toLocaleString("ja-JP", {
                   timeZone: "Asia/Tokyo",
                 })
-              : "—"}
+              : nextSession
+                ? "日程未定"
+                : "次回はチャットで Jarvis に伝えて更新"}
           </p>
           <div className="qe-progress">
             <span>
-              進行 {doneSessions.length}/{totalPlanned}（{progressPct}%）
+              進行 {doneSessions.length}/{totalPlanned}（総{totalPlanned}回目安・
+              {progressPct}%）
             </span>
             <div className="qe-progress-bar">
               <i style={{ width: `${Math.min(100, progressPct)}%` }} />
@@ -276,6 +281,10 @@ export default async function QuietEdgePage() {
           <span className="lvl">スケジュール</span>
           <strong>レーザー治療タイムライン</strong>
         </header>
+        <p className="meta">
+          総回数の目安は最大9回（経過を見て判断）。日程更新はアプリ入力せず、Jarvis
+          に「第N回を〇月〇日」と伝えるだけで反映します。
+        </p>
         <ul className="qe-timeline">
           {(treatments || []).map((t) => (
             <li key={t.session_no} data-status={t.status}>
@@ -283,13 +292,24 @@ export default async function QuietEdgePage() {
                 {t.label}
                 <span className="meta">
                   {" "}
-                  · {t.status === "done" ? "完了" : t.status === "scheduled" ? "予定" : t.status}
+                  ·{" "}
+                  {t.status === "done"
+                    ? "完了"
+                    : t.status === "scheduled"
+                      ? "予定"
+                      : t.status === "planned"
+                        ? "枠（日程未定）"
+                        : t.status === "cancelled"
+                          ? "中止"
+                          : t.status}
                 </span>
               </strong>
               <p className="meta">
-                {new Date(t.scheduled_at).toLocaleString("ja-JP", {
-                  timeZone: "Asia/Tokyo",
-                })}
+                {t.scheduled_at
+                  ? new Date(t.scheduled_at).toLocaleString("ja-JP", {
+                      timeZone: "Asia/Tokyo",
+                    })
+                  : "日程未定"}
               </p>
               {t.note ? <p className="sum">{t.note}</p> : null}
             </li>
