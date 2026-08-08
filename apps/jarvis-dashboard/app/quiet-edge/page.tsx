@@ -111,6 +111,18 @@ export default async function QuietEdgePage() {
       score: Number(r.score),
       count: r.count,
     })),
+    vitals: vitalRows.map((v) => ({
+      recorded_at: v.recorded_at,
+      metric: v.metric,
+      value: Number(v.value),
+      source: v.source,
+    })),
+    treatments: (treatments || []).map((t) => ({
+      session_no: t.session_no,
+      scheduled_at: t.scheduled_at,
+      status: t.status,
+      label: t.label,
+    })),
     windowDays: 14,
     maxAsks: 5,
   });
@@ -274,6 +286,12 @@ export default async function QuietEdgePage() {
           recorded_at: r.recorded_at,
           score: Number(r.score),
           count: r.count,
+        }))}
+        vitals={vitalRows.map((v) => ({
+          recorded_at: v.recorded_at,
+          metric: v.metric,
+          value: Number(v.value),
+          source: v.source,
         }))}
         windowDays={14}
       />

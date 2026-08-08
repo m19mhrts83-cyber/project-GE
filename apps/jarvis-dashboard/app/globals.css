@@ -3109,6 +3109,39 @@ p.back {
 .qe-review-panel {
   margin-bottom: 16px;
 }
+.qe-scale-optional {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line, #e7e5e4);
+}
+.qe-scale-optional > summary {
+  cursor: pointer;
+  color: #57534e;
+  font-size: 0.92rem;
+}
+.qe-scale-date {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  max-width: 220px;
+}
+.qe-scale-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.qe-scale-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.qe-scale-list select {
+  min-width: 72px;
+}
 .qe-journal-list,
 .qe-ask-list {
   list-style: none;

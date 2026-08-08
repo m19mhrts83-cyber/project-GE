@@ -63,6 +63,7 @@ export type VitalLite = {
   recorded_at: string;
   metric: string;
   value: number;
+  source?: string;
 };
 
 export type QuietEdgeAsk = {
@@ -71,6 +72,60 @@ export type QuietEdgeAsk = {
   prompt: string;
   reason: string;
 };
+
+export type TreatmentLite = {
+  session_no: number;
+  scheduled_at: string | null;
+  status: string;
+  label?: string | null;
+};
+
+/** 治療イベントの実施日（JST 暦日） */
+export function treatmentYmdJst(scheduledAt: string | null | undefined): string | null {
+  if (!scheduledAt) return null;
+  const t = new Date(scheduledAt);
+  if (!Number.isFinite(t.getTime())) return null;
+  return ymdJst(t);
+}
+
+/** 日付ごとの Health 指標（source 優先: oramemo > watch > health_unknown） */
+export function preferVitalByDay(
+  vitals: VitalLite[],
+): Map<string, Map<string, number>> {
+  const rank = (s: string) =>
+    s === "oramemo" ? 0 : s === "watch" ? 1 : 2;
+  const best = new Map<string, Map<string, { value: number; rank: number }>>();
+  for (const v of vitals) {
+    const dayMap = best.get(v.recorded_at) || new Map();
+    const prev = dayMap.get(v.metric);
+    const r = rank(v.source || "health_unknown");
+    if (!prev || r < prev.rank) {
+      dayMap.set(v.metric, { value: v.value, rank: r });
+    }
+    best.set(v.recorded_at, dayMap);
+  }
+  const out = new Map<string, Map<string, number>>();
+  for (const [day, m] of best) {
+    const nums = new Map<string, number>();
+    for (const [metric, row] of m) nums.set(metric, row.value);
+    out.set(day, nums);
+  }
+  return out;
+}
+
+export function formatHealthBitsForDay(
+  byMetric: Map<string, number> | undefined,
+): string {
+  if (!byMetric || !byMetric.size) return "";
+  const parts: string[] = [];
+  const sleep = byMetric.get("sleep_hours");
+  const spo2 = byMetric.get("spo2");
+  const rr = byMetric.get("respiratory_rate");
+  if (sleep != null) parts.push(`睡眠${sleep.toFixed(1)}h`);
+  if (spo2 != null) parts.push(`SpO2 ${Math.round(spo2)}%`);
+  if (rr != null) parts.push(`呼吸${rr.toFixed(1)}`);
+  return parts.join(" / ");
+}
 
 export function ymdJst(d: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -112,12 +167,13 @@ function daysBetweenYmd(a: string, b: string): number {
   return Math.round((tb - ta) / (1000 * 60 * 60 * 24));
 }
 
-/** 直近 N 日で Journal 欠落・いびき急変を拾い、未回答の問いを返す */
+/** 直近 N 日で Journal 欠落・いびき急変・Health食い違い等を拾い、未回答の問いを返す */
 export function buildQuietEdgeAsks(input: {
   journals: JournalDailyRow[];
   notes: ContextNoteRow[];
   snore: SnoreLite[];
   vitals?: VitalLite[];
+  treatments?: TreatmentLite[];
   windowDays?: number;
   maxAsks?: number;
 }): QuietEdgeAsk[] {
@@ -138,6 +194,11 @@ export function buildQuietEdgeAsks(input: {
   const snoreSorted = [...input.snore]
     .filter((s) => s.recorded_at >= start && s.recorded_at <= today)
     .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+  const vitalsByDay = preferVitalByDay(
+    (input.vitals || []).filter(
+      (v) => v.recorded_at >= start && v.recorded_at <= today,
+    ),
+  );
 
   const asks: QuietEdgeAsk[] = [];
 
@@ -184,6 +245,41 @@ export function buildQuietEdgeAsks(input: {
     });
   }
 
+  // 1c) いびきありなのに Health（睡眠/SpO2）欠測
+  for (const s of snoreSorted) {
+    if (s.recorded_at >= today) continue;
+    const h = vitalsByDay.get(s.recorded_at);
+    const hasSleep = h?.has("sleep_hours");
+    const hasSpo2 = h?.has("spo2");
+    if (hasSleep || hasSpo2) continue;
+    const trigger = "health_gap";
+    if (answered.has(`${s.recorded_at}|${trigger}`)) continue;
+    asks.push({
+      recorded_at: s.recorded_at,
+      trigger,
+      reason: "いびき記録あり・Health（睡眠/SpO2）なし",
+      prompt: `${s.recorded_at} はいびき記録がありますが Health の睡眠・SpO2 がありません。測定漏れ／Shortcuts未実行／リング未同期など、思い当たることはありますか？`,
+    });
+  }
+
+  // 1d) 治療実施日なのに Journal が空（メモも薄い）
+  for (const t of input.treatments || []) {
+    if (t.status !== "done") continue;
+    const d = treatmentYmdJst(t.scheduled_at);
+    if (!d || d < start || d >= today) continue;
+    const j = journalByDay.get(d);
+    const thin = !j || !j.excerpt.trim() || j.char_count < 40;
+    if (!thin) continue;
+    const trigger = "treatment_day_empty";
+    if (answered.has(`${d}|${trigger}`)) continue;
+    asks.push({
+      recorded_at: d,
+      trigger,
+      reason: `${t.label || `第${t.session_no}回`}当日・メモ薄い`,
+      prompt: `${d} はレーザー治療日（${t.label || `第${t.session_no}回`}）です。体調・痛み・睡眠の所感を短く残しますか？`,
+    });
+  }
+
   // 2) いびき急変 — カレンダー上 1〜2 日以内の連続比較のみ（欠測明けの戻りを悪化と誤認しない）
   for (let i = 1; i < snoreSorted.length; i++) {
     const prev = snoreSorted[i - 1];
@@ -211,8 +307,21 @@ export function buildQuietEdgeAsks(input: {
     });
   }
 
-  // 優先: spike → missing journal（いびきあり）
-  const rank = (a: QuietEdgeAsk) => (a.trigger === "snore_spike" ? 0 : 1);
+  // 優先: spike → treatment → health_gap → lifestyle → missing journal
+  const rank = (a: QuietEdgeAsk) => {
+    switch (a.trigger) {
+      case "snore_spike":
+        return 0;
+      case "treatment_day_empty":
+        return 1;
+      case "health_gap":
+        return 2;
+      case "journal_lifestyle":
+        return 3;
+      default:
+        return 4;
+    }
+  };
   asks.sort((a, b) => {
     const r = rank(a) - rank(b);
     if (r !== 0) return r;

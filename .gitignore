@@ -134,3 +134,4 @@ dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx
 .jarvis_state/ms_graph_token_cache.json
 .jarvis_state/ms_graph_device_login.env
 .jarvis_state/ms_graph_new_refresh.env
+.vercel
