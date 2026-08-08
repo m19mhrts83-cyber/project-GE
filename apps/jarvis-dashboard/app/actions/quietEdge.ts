@@ -325,7 +325,7 @@ export async function generateQuietEdgeReview(): Promise<QuietEdgeReviewResult> 
       .order("recorded_at", { ascending: true }),
     supabase
       .from("vital_journal_daily")
-      .select("recorded_at,excerpt,char_count")
+      .select("recorded_at,excerpt,char_count,sleep_signal,sleep_tags")
       .gte("recorded_at", sinceYmd)
       .order("recorded_at", { ascending: true }),
     supabase
@@ -347,6 +347,8 @@ export async function generateQuietEdgeReview(): Promise<QuietEdgeReviewResult> 
     journal: (journal.data || []).map((j) => ({
       recorded_at: j.recorded_at,
       char_count: j.char_count,
+      sleep_signal: j.sleep_signal || "",
+      sleep_tags: j.sleep_tags || [],
       excerpt: String(j.excerpt || "").slice(0, 400),
     })),
     context_notes: notes.data || [],
@@ -361,7 +363,7 @@ ${JSON.stringify(bundle, null, 2)}
 
 出力（日本語・箇条書き中心）:
 1. 直近の傾向（いびきスコア／回数、分かる範囲の睡眠・呼吸）
-2. Journal・補完メモから読み取れる生活要因（飲酒・残業・鼻・旅行など）
+2. Journal の sleep_signal / sleep_tags を必ず使い、いびき悪化・改善日と生活要因（就寝遅れ・飲酒・遅夜作業など）の重なりを具体日で書く
 3. 治療スケジュールとの時系列の重なり（ある場合）
 4. 欠測・確認したい点（データが薄い日）
 5. 次回診察で見せるとよい観察ポイント（質問リスト形式可）
@@ -381,6 +383,8 @@ function fallbackIngestReview(input: {
   avg7: number | null;
   bestScore: number | null;
   hasJournal: boolean;
+  sleepSignal: string;
+  sleepTags: string[];
   healthBits: string[];
   nearTreatment: string | null;
 }): string {
@@ -428,8 +432,16 @@ function fallbackIngestReview(input: {
   if (input.healthBits.length) {
     lines.push(`Health: ${input.healthBits.join("、")}`);
   }
-  if (input.hasJournal) {
-    lines.push("同日の Journal あり。生活要因との照合がしやすいです。");
+  if (input.sleepSignal) {
+    lines.push(`Journal睡眠シグナル: ${input.sleepSignal}`);
+    if (input.sleepTags.includes("bedtime_late") && input.score >= 30) {
+      lines.push("就寝遅れといびき高めが同日です。因果の断定はせず、傾向のメモとして残しましょう。");
+    }
+    if (input.sleepTags.includes("bedtime_ok") && input.score <= 25) {
+      lines.push("就寝達成の夜とスコアが噛み合っています。良いパターンです。");
+    }
+  } else if (input.hasJournal) {
+    lines.push("同日 Journal はあるが睡眠シグナルが薄いです。防衛線の一行があると照合しやすいです。");
   } else {
     lines.push("同日 Journal が薄い／なし。短くでも夜のメモがあると次のレビューが厚くなります。");
   }
@@ -449,7 +461,6 @@ export async function generateQuietEdgeIngestReview(
 
   const supabase = await createClient();
   const sinceYmd = addDaysYmd(recorded_at, -14);
-  const untilYmd = addDaysYmd(recorded_at, 14);
 
   const [snore, health, journal, notes, treatments] = await Promise.all([
     supabase
@@ -464,7 +475,7 @@ export async function generateQuietEdgeIngestReview(
       .eq("recorded_at", recorded_at),
     supabase
       .from("vital_journal_daily")
-      .select("recorded_at,excerpt,char_count")
+      .select("recorded_at,excerpt,char_count,sleep_signal,sleep_tags")
       .eq("recorded_at", recorded_at)
       .maybeSingle(),
     supabase
@@ -543,7 +554,11 @@ export async function generateQuietEdgeIngestReview(
   const journalExcerpt = journal.data?.excerpt
     ? String(journal.data.excerpt).slice(0, 280)
     : "";
-  const hasJournal = Boolean(journalExcerpt && (journal.data?.char_count || 0) >= 40);
+  const sleepSignal = String(journal.data?.sleep_signal || "").trim();
+  const sleepTags = (journal.data?.sleep_tags as string[] | null) || [];
+  const hasJournal = Boolean(
+    (sleepSignal || journalExcerpt) && (journal.data?.char_count || 0) >= 40,
+  );
 
   const fallback = fallbackIngestReview({
     recorded_at,
@@ -553,6 +568,8 @@ export async function generateQuietEdgeIngestReview(
     avg7,
     bestScore,
     hasJournal,
+    sleepSignal,
+    sleepTags,
     healthBits,
     nearTreatment,
   });
@@ -569,7 +586,12 @@ export async function generateQuietEdgeIngestReview(
       ...v,
     })),
     journal_today: hasJournal
-      ? { char_count: journal.data?.char_count, excerpt: journalExcerpt }
+      ? {
+          char_count: journal.data?.char_count,
+          sleep_signal: sleepSignal,
+          sleep_tags: sleepTags,
+          excerpt: journalExcerpt,
+        }
       : null,
     context_notes_today: notes.data || [],
     next_treatment: nextTreat || null,
@@ -586,10 +608,10 @@ ${JSON.stringify(bundle, null, 2)}
 1. 今日のいびきスコア／回数を一言で認める
 2. 前回または直近平均との比較（分かる範囲）
 3. 改善目標（スコア≤${SNORE_SCORE_TARGET}）までの距離か到達の喜び
-4. Health / Journal / 補完メモ / 治療予定のうち「あるものだけ」触れる（無いものは無理に作らない）
+4. journal_today.sleep_signal / sleep_tags があれば必ず触れ、いびきとの重なりを観察として書く（無いときは Health / 補完 / 治療のどれか）
 5. 明日も続けたくなる一文
 
-禁止: 医療診断、恐怖訴求、長文。`;
+禁止: 医療診断、恐怖訴求、長文。業務タスク（会議・資料）の要約は不要。睡眠・生活要因だけ。`;
 
   const res = await geminiReply(prompt);
   if (!res.ok) {

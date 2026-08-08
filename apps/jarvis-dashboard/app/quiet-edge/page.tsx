@@ -56,7 +56,7 @@ export default async function QuietEdgePage() {
 
   const { data: journalRows } = await supabase
     .from("vital_journal_daily")
-    .select("recorded_at,excerpt,char_count,source")
+    .select("recorded_at,excerpt,char_count,source,sleep_signal,sleep_tags")
     .gte("recorded_at", sinceYmd)
     .order("recorded_at", { ascending: false });
 
@@ -210,7 +210,15 @@ export default async function QuietEdgePage() {
 
       <QuietEdgeAskPanel asks={asks} notes={notes} />
 
-      <QuietEdgeJournalBand journals={journals} windowDays={14} />
+      <QuietEdgeJournalBand
+        journals={journals}
+        snore={rows.map((r) => ({
+          recorded_at: r.recorded_at,
+          score: Number(r.score),
+          count: r.count,
+        }))}
+        windowDays={14}
+      />
 
       <QuietEdgeReviewPanel />
 

@@ -10,6 +10,37 @@ export type JournalDailyRow = {
   excerpt: string;
   char_count: number;
   source: string;
+  sleep_signal?: string | null;
+  sleep_tags?: string[] | null;
+};
+
+/** Journal から睡眠関連タグを推定（DB未同期時のフォールバック） */
+export function inferJournalSleepTags(
+  excerpt: string,
+  signal?: string | null,
+): string[] {
+  const blob = `${signal || ""}\n${excerpt || ""}`;
+  const tags: string[] = [];
+  if (blob.includes("夜の防衛線")) tags.push("defense_line");
+  if (/達成（〇）|就寝達成|達成\(〇\)/.test(blob)) tags.push("bedtime_ok");
+  if (/就寝超過|超過（×）|24:00超過|就寝未定|遅延|未達成/.test(blob)) {
+    tags.push("bedtime_late");
+  }
+  if (/飲酒|ワイン|ビール|飲み会/.test(blob)) tags.push("alcohol");
+  if (/鼻|鼻づまり|花粉症/.test(blob)) tags.push("nasal");
+  if (/残業|深夜作業|深追い|没頭/.test(blob)) tags.push("late_work");
+  if (/疲れ|疲労|爆睡|猛烈な眠気/.test(blob)) tags.push("fatigue");
+  return [...new Set(tags)];
+}
+
+export const SLEEP_TAG_LABELS: Record<string, string> = {
+  defense_line: "防衛線あり",
+  bedtime_ok: "就寝達成",
+  bedtime_late: "就寝遅れ",
+  alcohol: "飲酒言及",
+  nasal: "鼻・詰まり",
+  late_work: "遅夜作業",
+  fatigue: "疲労",
 };
 
 export type ContextNoteRow = {
@@ -110,6 +141,30 @@ export function buildQuietEdgeAsks(input: {
       trigger,
       reason: "いびき記録あり・Journal 薄い／なし",
       prompt: `${d} はいびき記録がありますが Journal が薄いです。その夜〜朝、何がありましたか？（飲酒・残業・鼻詰まり・旅行など短くでOK）`,
+    });
+  }
+
+  // 1b) Journal に就寝遅れがあり、いびきも悪い日 → 要因確認
+  for (const s of snoreSorted) {
+    if (s.recorded_at >= today) continue;
+    const j = journalByDay.get(s.recorded_at);
+    if (!j) continue;
+    const tags =
+      j.sleep_tags && j.sleep_tags.length
+        ? j.sleep_tags
+        : inferJournalSleepTags(j.excerpt, j.sleep_signal);
+    if (!tags.includes("bedtime_late") && !tags.includes("alcohol")) continue;
+    if (Number(s.score) < 30 && (s.count == null || s.count < 200)) continue;
+    const trigger = "journal_lifestyle";
+    if (answered.has(`${s.recorded_at}|${trigger}`)) continue;
+    const signal = (j.sleep_signal || "").trim();
+    asks.push({
+      recorded_at: s.recorded_at,
+      trigger,
+      reason: tags.includes("alcohol")
+        ? "Journalに飲酒言及＋いびき高め"
+        : "Journalに就寝遅れ＋いびき高め",
+      prompt: `${s.recorded_at} は Journal（${signal || tags.join(",")}）といびきスコア ${Number(s.score).toFixed(1)} が重なっています。その夜、他に思い当たることはありますか？`,
     });
   }
 

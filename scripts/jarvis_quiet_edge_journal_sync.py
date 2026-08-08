@@ -2,6 +2,7 @@
 """Quiet Edge: Obsidian ★Journal → vital_journal_daily 同期.
 
 Vercel はローカル Disk を見ないため、Mac で抜粋を Supabase に投影する。
+睡眠関連（夜の防衛線など）を優先抽出し、分析用タグも付ける。
 """
 
 from __future__ import annotations
@@ -49,19 +50,96 @@ def journal_dir() -> Path:
     return Path(str(raw)).expanduser()
 
 
-def excerpt_text(text: str, max_chars: int = 1200) -> str:
-    body: list[str] = []
+def clean_line(s: str) -> str:
+    s = re.sub(r"[*`_]+", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def extract_sleep_signal(text: str) -> str:
+    for line in text.splitlines():
+        if "夜の防衛線" in line:
+            return clean_line(line)[:220]
+    # fallback: first sleep-ish line
+    for line in text.splitlines():
+        if any(k in line for k in ("就寝", "睡眠", "いびき", "飲酒")):
+            return clean_line(line)[:220]
+    return ""
+
+
+def extract_sleep_tags(text: str, signal: str) -> list[str]:
+    blob = f"{signal}\n{text}"
+    tags: list[str] = []
+    if "夜の防衛線" in blob:
+        tags.append("defense_line")
+    if any(k in blob for k in ("達成（〇）", "就寝達成", "達成(〇)", "`達成")):
+        tags.append("bedtime_ok")
+    if any(
+        k in blob
+        for k in ("就寝超過", "超過（×）", "24:00超過", "就寝未定", "遅延", "未達成")
+    ):
+        tags.append("bedtime_late")
+    if any(k in blob for k in ("飲酒", "酒", "ワイン", "ビール", "飲み会")):
+        tags.append("alcohol")
+    if any(k in blob for k in ("鼻", "鼻づまり", "花粉症")):
+        tags.append("nasal")
+    if any(k in blob for k in ("残業", "深夜作業", "深追い", "没頭")):
+        tags.append("late_work")
+    if any(k in blob for k in ("疲れ", "疲労", "爆睡", "猛烈な眠気")):
+        tags.append("fatigue")
+    # unique preserve order
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in tags:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+def excerpt_text(text: str, signal: str, max_chars: int = 900) -> str:
+    """睡眠関連を先頭に置き、その後に本文要約を足す。"""
+    chunks: list[str] = []
+    if signal:
+        chunks.append(signal)
+
+    # pull a few more sleep-related lines
+    sleep_lines: list[str] = []
+    other: list[str] = []
     for line in text.splitlines():
         s = line.strip()
-        if not s:
+        if not s or s.startswith("#"):
             continue
-        if s.startswith("#"):
+        if signal and clean_line(s) == signal:
             continue
-        body.append(s)
-        joined = "\n".join(body)
-        if len(joined) >= max_chars:
-            return joined[:max_chars]
-    return "\n".join(body)[:max_chars]
+        if any(
+            k in s
+            for k in (
+                "就寝",
+                "睡眠",
+                "いびき",
+                "夜の防衛",
+                "飲酒",
+                "風呂",
+                "24:00",
+                "鼻",
+            )
+        ):
+            sleep_lines.append(s)
+        else:
+            other.append(s)
+
+    for s in sleep_lines[:6]:
+        chunks.append(s)
+        if sum(len(c) for c in chunks) >= max_chars:
+            break
+    if sum(len(c) for c in chunks) < max_chars // 2:
+        for s in other[:8]:
+            chunks.append(s)
+            if sum(len(c) for c in chunks) >= max_chars:
+                break
+    out = "\n".join(chunks)
+    return out[:max_chars]
 
 
 def main() -> int:
@@ -96,22 +174,30 @@ def main() -> int:
         if d < since:
             continue
         raw = f.read_text(encoding="utf-8", errors="ignore")
-        ex = excerpt_text(raw)
+        signal = extract_sleep_signal(raw)
+        tags = extract_sleep_tags(raw, signal)
+        ex = excerpt_text(raw, signal)
         rows.append(
             {
                 "recorded_at": m.group(1),
                 "excerpt": ex,
                 "char_count": len(raw),
+                "sleep_signal": signal,
+                "sleep_tags": tags,
                 "source": "obsidian_star_journal",
-                "payload": {"filename": f.name},
+                "payload": {"filename": f.name, "tags": tags},
                 "updated_at": datetime.utcnow().isoformat() + "Z",
             }
         )
 
     print(f"dir={jdir} files={len(rows)} since={since.isoformat()}")
     if args.dry_run:
-        for r in rows[-3:]:
-            print(r["recorded_at"], r["char_count"], r["excerpt"][:80].replace("\n", " "))
+        for r in rows[-5:]:
+            print(
+                r["recorded_at"],
+                r["sleep_tags"],
+                (r["sleep_signal"] or "")[:70],
+            )
         return 0
 
     sb = create_client(url, key)

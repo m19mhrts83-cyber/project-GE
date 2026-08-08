@@ -263,6 +263,8 @@ create table if not exists public.vital_journal_daily (
   recorded_at date primary key,
   excerpt text not null default '',
   char_count integer not null default 0,
+  sleep_signal text not null default '',
+  sleep_tags text[] not null default '{}'::text[],
   source text not null default 'obsidian_star_journal',
   payload jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now(),
