@@ -140,7 +140,9 @@ Site URL = `https://jarvis-dashboard-amber.vercel.app`、Redirect に `/auth/cal
 
 ## Vercel デプロイ（Phase 3・iPhone 閲覧）
 
-1. Vercel にログインし、ルートを `apps/jarvis-dashboard` にして import
+**本番自動デプロイ**: Vercel プロジェクト `jarvis-dashboard` は GitHub `m19mhrts83-cyber/project-GE` に接続済み（Root Directory = `apps/jarvis-dashboard`、Production Branch = `main`）。`main` への merge / push で本番へ自動デプロイ。モノレポの別アプリは `project-ge`（`apps/kamiooya-qa-web`）側。
+
+1. （初回のみ）Vercel にログインし、ルートを `apps/jarvis-dashboard` にして import
 2. Environment Variables:
    - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`（**jarvis-dashboard**・`sb_publishable_…`）
    - `NEXT_PUBLIC_SITE_URL` = 本番 URL
