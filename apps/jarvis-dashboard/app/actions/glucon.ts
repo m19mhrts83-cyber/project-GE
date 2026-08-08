@@ -40,7 +40,10 @@ function asExamples(raw: unknown): GluconExample[] {
     });
 }
 
-function mapDraft(row: Record<string, unknown>): GluconDraftRow {
+function mapDraft(
+  row: Record<string, unknown>,
+  opts?: { includeExamples?: boolean },
+): GluconDraftRow {
   return {
     id: String(row.id),
     period_key: String(row.period_key),
@@ -52,7 +55,8 @@ function mapDraft(row: Record<string, unknown>): GluconDraftRow {
     title: String(row.title || ""),
     body: String(row.body || ""),
     status: row.status as GluconDraftRow["status"],
-    examples: asExamples(row.examples),
+    // UI には不要。RSC / Server Action 応答を軽くするため既定は空
+    examples: opts?.includeExamples ? asExamples(row.examples) : [],
     journal_day_count: Number(row.journal_day_count || 0),
     post_error: row.post_error ? String(row.post_error) : null,
     posted_at: row.posted_at ? String(row.posted_at) : null,
@@ -213,77 +217,86 @@ export async function generateGluconDrafts(
   error?: string;
   drafts?: GluconDraftRow[];
 }> {
-  const schedules = await loadGluconSchedules();
-  let cycle = pickActiveCycle(schedules);
-  if (!cycle) {
-    const refreshed = await refreshGluconScheduleFromKamiooya();
-    if (!refreshed.ok) return { ok: false, error: refreshed.error };
-    cycle = refreshed.cycle || null;
-  }
-  if (!cycle) {
+  try {
+    const schedules = await loadGluconSchedules();
+    let cycle = pickActiveCycle(schedules);
+    if (!cycle) {
+      const refreshed = await refreshGluconScheduleFromKamiooya();
+      if (!refreshed.ok) return { ok: false, error: refreshed.error };
+      cycle = refreshed.cycle || null;
+    }
+    if (!cycle) {
+      return {
+        ok: false,
+        error:
+          "グルコン日程が未設定です。手動で開催日を入力するか、WeStudy取込後に日程更新してください。",
+      };
+    }
+
+    const journals = await loadGluconJournalRange(
+      cycle.journalFrom,
+      cycle.journalTo,
+    );
+    const targetKinds: GluconReportKind[] = kinds?.length
+      ? kinds
+      : ["activity", "result"];
+    const supabase = await createClient();
+    const out: GluconDraftRow[] = [];
+
+    for (const kind of targetKinds) {
+      const ex = await fetchGluconExamples(kind);
+      const examples = ex.ok ? ex.examples : [];
+      const prompt =
+        kind === "activity"
+          ? activityPrompt({ cycle, journals, examples })
+          : resultPrompt({ cycle, journals, examples });
+      const res = await geminiReply(prompt);
+      if (!res.ok) {
+        return { ok: false, error: res.error };
+      }
+      const body = res.text.trim();
+      const title =
+        kind === "activity"
+          ? `${cycle.periodKey} 活動報告`
+          : `${cycle.periodKey} 成果報告`;
+      const noResult =
+        kind === "result" &&
+        (body.includes("該当する成果報告なし") || body.length < 40);
+
+      const { data, error } = await supabase
+        .from("glucon_report_drafts")
+        .upsert(
+          {
+            period_key: cycle.periodKey,
+            kind,
+            glucon_date: cycle.gluconDate,
+            report_deadline: cycle.reportDeadline,
+            title,
+            body,
+            status: noResult ? "skipped" : "ready",
+            examples,
+            journal_day_count: journals.length,
+            post_error: null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "period_key,kind" },
+        )
+        .select("*")
+        .maybeSingle();
+
+      if (error) return { ok: false, error: error.message };
+      if (data) out.push(mapDraft(data as Record<string, unknown>));
+    }
+
+    revalidateGlucon();
+    return { ok: true, drafts: out };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     return {
       ok: false,
-      error: "グルコン日程が未設定です。手動で開催日を入力するか、WeStudy取込後に日程更新してください。",
+      error: `下書き生成に失敗しました: ${msg}`,
     };
   }
-
-  const journals = await loadGluconJournalRange(
-    cycle.journalFrom,
-    cycle.journalTo,
-  );
-  const targetKinds: GluconReportKind[] = kinds?.length
-    ? kinds
-    : ["activity", "result"];
-  const supabase = await createClient();
-  const out: GluconDraftRow[] = [];
-
-  for (const kind of targetKinds) {
-    const ex = await fetchGluconExamples(kind);
-    const examples = ex.ok ? ex.examples : [];
-    const prompt =
-      kind === "activity"
-        ? activityPrompt({ cycle, journals, examples })
-        : resultPrompt({ cycle, journals, examples });
-    const res = await geminiReply(prompt);
-    if (!res.ok) {
-      return { ok: false, error: res.error };
-    }
-    const body = res.text.trim();
-    const title =
-      kind === "activity"
-        ? `${cycle.periodKey} 活動報告`
-        : `${cycle.periodKey} 成果報告`;
-    const noResult =
-      kind === "result" &&
-      (body.includes("該当する成果報告なし") || body.length < 40);
-
-    const { data, error } = await supabase
-      .from("glucon_report_drafts")
-      .upsert(
-        {
-          period_key: cycle.periodKey,
-          kind,
-          glucon_date: cycle.gluconDate,
-          report_deadline: cycle.reportDeadline,
-          title,
-          body,
-          status: noResult ? "skipped" : "ready",
-          examples,
-          journal_day_count: journals.length,
-          post_error: null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "period_key,kind" },
-      )
-      .select("*")
-      .maybeSingle();
-
-    if (error) return { ok: false, error: error.message };
-    if (data) out.push(mapDraft(data as Record<string, unknown>));
-  }
-
-  revalidateGlucon();
-  return { ok: true, drafts: out };
 }
 
 export async function saveGluconDraft(
@@ -377,6 +390,12 @@ export async function queueGluconPost(
   if (row.status === "skipped") {
     return { ok: false, error: "スキップ済みです。先に本文を保存してください。" };
   }
+  if (String(row.body || "").includes("該当する成果報告なし")) {
+    return {
+      ok: false,
+      error: "「該当する成果報告なし」は投稿対象外です。投稿スキップのままで問題ありません。",
+    };
+  }
 
   const { error } = await supabase
     .from("glucon_report_drafts")
@@ -400,33 +419,59 @@ export async function getGluconPageState(): Promise<{
   journals: GluconJournalDay[];
   drafts: GluconDraftRow[];
   journalSyncedAt: string | null;
+  loadError?: string;
 }> {
-  let schedules = await loadGluconSchedules();
-  if (!schedules.length) {
-    await refreshGluconScheduleFromKamiooya();
-    schedules = await loadGluconSchedules();
-  }
-  const cycle = pickActiveCycle(schedules);
-  const journals = cycle
-    ? await loadGluconJournalRange(cycle.journalFrom, cycle.journalTo)
-    : [];
-  const drafts = cycle ? await loadGluconDrafts(cycle.periodKey) : [];
-  const supabase = await createClient();
-  const { data: lastSync } = await supabase
-    .from("glucon_journal_days")
-    .select("synced_at")
-    .order("synced_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  try {
+    let schedules = await loadGluconSchedules();
+    if (!schedules.length) {
+      const refreshed = await refreshGluconScheduleFromKamiooya();
+      if (!refreshed.ok) {
+        // 日程が空でもページは落とさない（手動入力へ誘導）
+        return {
+          today: ymdJst(),
+          cycle: null,
+          schedules: [],
+          journals: [],
+          drafts: [],
+          journalSyncedAt: null,
+          loadError: refreshed.error,
+        };
+      }
+      schedules = await loadGluconSchedules();
+    }
+    const cycle = pickActiveCycle(schedules);
+    const journals = cycle
+      ? await loadGluconJournalRange(cycle.journalFrom, cycle.journalTo)
+      : [];
+    const drafts = cycle ? await loadGluconDrafts(cycle.periodKey) : [];
+    const supabase = await createClient();
+    const { data: lastSync } = await supabase
+      .from("glucon_journal_days")
+      .select("synced_at")
+      .order("synced_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  return {
-    today: ymdJst(),
-    cycle,
-    schedules,
-    journals,
-    drafts,
-    journalSyncedAt: lastSync?.synced_at
-      ? String(lastSync.synced_at)
-      : null,
-  };
+    return {
+      today: ymdJst(),
+      cycle,
+      schedules,
+      journals,
+      drafts,
+      journalSyncedAt: lastSync?.synced_at
+        ? String(lastSync.synced_at)
+        : null,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      today: ymdJst(),
+      cycle: null,
+      schedules: [],
+      journals: [],
+      drafts: [],
+      journalSyncedAt: null,
+      loadError: msg,
+    };
+  }
 }

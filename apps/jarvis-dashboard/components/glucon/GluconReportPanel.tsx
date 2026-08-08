@@ -125,7 +125,14 @@ function DraftEditor({
         <button
           type="button"
           className="btn"
-          disabled={pending || !body.trim() || status === "posted" || status === "queued"}
+          disabled={
+            pending ||
+            !body.trim() ||
+            status === "posted" ||
+            status === "queued" ||
+            status === "skipped" ||
+            body.includes("該当する成果報告なし")
+          }
           onClick={() => setConfirmOpen(true)}
         >
           WeStudy に投稿
