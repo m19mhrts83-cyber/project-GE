@@ -2973,6 +2973,20 @@ p.back {
 .qe-monthly-review {
   margin: 16px 0;
 }
+.qe-month-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.qe-month-nav-btn {
+  font-size: 0.85rem;
+  padding: 6px 10px;
+}
+.qe-month-nav-active {
+  outline: 2px solid #b45309;
+  outline-offset: 1px;
+}
 .qe-monthly-review .qe-review-text-monthly {
   max-height: 480px;
   font-size: 0.88rem;

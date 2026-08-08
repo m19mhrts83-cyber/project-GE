@@ -2,22 +2,25 @@
 
 Apple ヘルスケアの主要指標を、毎朝（または起床後）iPhone ショートカットから Jarvis Dashboard に送ります。
 
-- 送信先: `POST /api/quiet-edge/health/ingest`
+- 送信先: `POST https://jarvis-dashboard-amber.vercel.app/api/quiet-edge/health/ingest`
 - 保護: 共有シークレット（`QUIET_EDGE_INGEST_SECRET`）
 - 画面: Quiet Edge の「Health」カードとカバレッジ
 
 追加課金は不要です（Shortcuts 標準機能）。
+
+**運用の順序**: まず本手順（Phase 2・Health）を毎朝回せるようにする → そのあと Journal 同期（Phase 3）を定常化すると、月次レビューの質が上がる。Phase 3 のコードは既にあるので、Health 確立と並行して Mac 同期だけ先に動かしてもよい。
 
 ---
 
 ## 事前準備（Mac / Vercel・1回だけ）
 
 1. `.env.jarvis_private` に `QUIET_EDGE_INGEST_SECRET=`（長いランダム文字列）があること  
-2. Vercel の Jarvis Dashboard プロジェクト Environment Variables にも同名で入れる  
-3. あわせてサーバー書込用に `JARVIS_SUPABASE_SERVICE_ROLE_KEY`（または `JARVIS_SUPABASE_SECRET_KEY`）が Vercel にあること  
-4. デプロイ後の URL 例: `https://（あなたのダッシュボード）.vercel.app/api/quiet-edge/health/ingest`
+2. Vercel の **jarvis-dashboard** プロジェクト Environment Variables にも同名で入れる（Production / Preview）  
+3. あわせて `JARVIS_SUPABASE_URL` と `JARVIS_SUPABASE_SECRET_KEY`（または SERVICE_ROLE）が Vercel にあること  
+4. 変数追加後は **Redeploy** が必要（未デプロイだと `503 QUIET_EDGE_INGEST_SECRET 未設定`）  
+5. URL: `https://jarvis-dashboard-amber.vercel.app/api/quiet-edge/health/ingest`
 
-シークレットの値はチャットに貼らないでください。
+シークレットの値はチャットに貼らないでください。Jarvis に「ショートカット用のシークレットを教えて」と言えば、チャットに出さず案内できます。
 
 ---
 

@@ -17,6 +17,7 @@ import SnoreTrendChart, {
 import {
   buildQuietEdgeAsks,
   addDaysYmd,
+  defaultMonthlyReviewYm,
   ymdJst,
   type ContextNoteRow,
   type JournalDailyRow,
@@ -38,7 +39,8 @@ function daysUntil(iso: string | null | undefined): number | null {
 
 export default async function QuietEdgePage() {
   const supabase = await createClient();
-  const currentYm = ymdJst().slice(0, 7);
+  /** 月次レビュー既定: 先月（JST） */
+  const monthlyYm = defaultMonthlyReviewYm();
 
   const [
     { data: snoreRows },
@@ -84,7 +86,7 @@ export default async function QuietEdgePage() {
       .from("vital_quiet_reviews")
       .select("period_key,title,body,created_at")
       .eq("kind", "monthly")
-      .eq("period_key", currentYm)
+      .eq("period_key", monthlyYm)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -168,7 +170,7 @@ export default async function QuietEdgePage() {
 
       {/* 2. 月次レビュー（取込とログのあいだ） */}
       <QuietEdgeMonthlyReview
-        currentYm={currentYm}
+        initialYm={monthlyYm}
         initial={
           latestMonthly
             ? {

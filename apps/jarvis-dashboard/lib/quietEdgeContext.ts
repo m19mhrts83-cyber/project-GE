@@ -81,6 +81,22 @@ export function ymdJst(d: Date = new Date()): string {
   }).format(d);
 }
 
+export function monthKeyJst(d: Date = new Date()): string {
+  return ymdJst(d).slice(0, 7);
+}
+
+/** YYYY-MM を delta 月ずらす（JST の暦月想定） */
+export function shiftMonthYm(ym: string, delta: number): string {
+  const [y, m] = ym.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** 月次レビューの既定対象: 今日(JST)の前月（例: 2026-08-08 → 2026-07） */
+export function defaultMonthlyReviewYm(d: Date = new Date()): string {
+  return shiftMonthYm(monthKeyJst(d), -1);
+}
+
 export function addDaysYmd(ymd: string, delta: number): string {
   const [y, m, d] = ymd.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
