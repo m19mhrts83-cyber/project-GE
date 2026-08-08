@@ -86,6 +86,18 @@ items:
       コマンド: scripts/jarvis_westudy_weekly_check.py
       ルール: jarvis-westudy-weekly-watch.mdc
 
+  - id: glucon_report_due
+    title: グルコン報告（活動・成果）
+    category: kamiooya
+    enabled: true
+    source: .jarvis_state/glucon_report.json
+    cursor_prompt: |
+      グルコン提出期限を確認して。開催日−10日が期限。前回期限〜今回期限の Journal から
+      活動報告・成果報告をまとめる。Dashboard /glucon。
+      コマンド: scripts/jarvis_glucon_report_check.py --mark-checked
+      Journal sync: scripts/jarvis_glucon_journal_sync.py
+      投稿: scripts/jarvis_westudy_forum_post_worker.py --dry-run のあと --i-confirm-post
+
   - id: openchat_threads
     title: 815スレッド健全性（常時監視）
     category: line
