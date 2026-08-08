@@ -4,6 +4,8 @@ import { geminiReply, geminiVisionJson } from "@/lib/geminiReply";
 import {
   addDaysYmd,
   SNORE_SCORE_TARGET,
+  defaultMonthlyReviewYm,
+  shiftMonthYm,
   ymdJst,
 } from "@/lib/quietEdgeContext";
 import { createClient } from "@/lib/supabase/server";
@@ -640,14 +642,8 @@ ${JSON.stringify(bundle, null, 2)}
   };
 }
 
-function monthKeyJst(d = new Date()): string {
-  return ymdJst(d).slice(0, 7);
-}
-
 function prevMonthKey(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 2, 1));
-  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+  return shiftMonthYm(ym, -1);
 }
 
 function monthRange(ym: string): { start: string; end: string } {
@@ -696,11 +692,14 @@ function summarizeMonth(
   };
 }
 
-/** 月次レビュー（今月 vs 前月、Journal 睡眠シグナル込み） */
+/** 月次レビュー（対象月 vs その前月。既定の対象は「先月」） */
 export async function generateQuietEdgeMonthlyReview(
   monthYm?: string,
 ): Promise<QuietEdgeReviewResult & { period?: string }> {
-  const ym = monthYm && /^\d{4}-\d{2}$/.test(monthYm) ? monthYm : monthKeyJst();
+  const ym =
+    monthYm && /^\d{4}-\d{2}$/.test(monthYm)
+      ? monthYm
+      : defaultMonthlyReviewYm();
   const prevYm = prevMonthKey(ym);
   const cur = monthRange(ym);
   const prev = monthRange(prevYm);
@@ -796,7 +795,7 @@ ${JSON.stringify(bundle, null, 2)}
 
   const res = await geminiReply(prompt);
   const text = res.ok ? res.text.trim() || fallback : fallback;
-  const title = `${ym} 月次レビュー`;
+  const title = `${ym} の分析レビュー`;
   const { data: saved } = await supabase
     .from("vital_quiet_reviews")
     .insert({
@@ -839,12 +838,14 @@ export async function loadLatestIngestReview(): Promise<QuietReviewRow | null> {
   return (data as QuietReviewRow | null) || null;
 }
 
-/** 指定年月（YYYY-MM）の最新月次レビュー */
+/** 指定年月（YYYY-MM）の最新月次レビュー。未指定時は先月（JST） */
 export async function loadLatestMonthlyReview(
   monthYm?: string,
 ): Promise<QuietReviewRow | null> {
   const ym =
-    monthYm && /^\d{4}-\d{2}$/.test(monthYm) ? monthYm : monthKeyJst();
+    monthYm && /^\d{4}-\d{2}$/.test(monthYm)
+      ? monthYm
+      : defaultMonthlyReviewYm();
   const supabase = await createClient();
   const { data } = await supabase
     .from("vital_quiet_reviews")
