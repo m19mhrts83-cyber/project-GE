@@ -73,7 +73,8 @@ cd ~/git-repos
 
 - パス: `config/dashboard_lanes.yaml` → `obsidian_journal`（または env `QUIET_EDGE_JOURNAL_DIR` / `JARVIS_LANES_OBSIDIAN_JOURNAL`）
 - 秘密: `JARVIS_SUPABASE_URL` + Service Role（`.env.jarvis_private`）
-- 画面: Journal 帯・Ask（何がありましたか？）・観察レビュー
+- 画面: **睡眠シグナル**（夜の防衛線・タグ）といびき日次のジョイン、Ask、観察レビュー
+- sync は業務メモ全文ではなく、防衛線など睡眠関連を優先抽出（`sleep_signal` / `sleep_tags`）
 
 推奨: パートナー確認のついで、または launchd で日次1回。
 
