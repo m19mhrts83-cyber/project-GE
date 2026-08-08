@@ -36,11 +36,71 @@ Apple ヘルスケアの主要指標を、毎朝（または起床後）iPhone �
 
 `source` は次のいずれか:
 
-- `oramemo` … OraMemo / MemoHealth 由来と分かるとき
-- `watch` … Apple Watch 由来と分かるとき
-- `health_unknown` … 分からないとき（初期はこれでOK）
+- `oramemo` … OraMemo / **MemoHealth** 由来（リング優先。Health 上のソース名は MemoHealth）
+- `watch` … Apple Watch 由来
+- `health_unknown` … 分からないとき（混在しやすいので常用しない）
 
 同じ日・同じ metric で source が違う場合、画面では **oramemo → watch → health_unknown** の優先で表示します。
+
+### 指標ごとの推奨 source（書き出し確認済み・2026-08）
+
+| metric | 推奨 source | ヘルスケア検索でソースを絞る |
+|---|---|---|
+| `spo2` | `oramemo` | **MemoHealth**（無ければその日は送らない／後で Watch フォールバック可） |
+| `hrv` | `oramemo` | **MemoHealth** |
+| `sleep_hours` | `oramemo` | **MemoHealth**（AutoSleep と混在しやすい） |
+| `respiratory_rate` | `watch` | Watch のみ存在するので **Apple Watch** または絞らず `watch` ラベル |
+| `resting_hr` | `watch` | 同上 |
+
+詳細・件数: `docs/Quiet_Edge_Healthソース引き継ぎ.md`
+
+---
+
+## リング優先の設定手順（既存 Quiet Edge Health 向け）
+
+いま `source: health_unknown` のままだとリング優先は効きません。次の2系統に分けます。
+
+### 1. SpO2（および後から HRV）を MemoHealth に絞る
+
+1. SpO2 用の **ヘルスケアサンプルを検索** を開く  
+2. フィルタを **すべて**  
+3. **＋フィルタを追加** → **ソース**（または「データソース」）が **次と等しい** → **MemoHealth**  
+4. 並び: 開始日・新しい順／制限 1  
+5. 値を取得 → 変数 `spo2`  
+6. サンプルが空の日は `spo2` を JSON に載せない（0 を送らない）
+
+※ 「ソース」フィルタが無い／MemoHealth が出ない場合は、いったん絞らず次の「送信を2回に分ける」だけでも `source: oramemo` を付けられるが、Watch の値をリング扱いしてしまうリスクあり。そのときはスクショを Jarvis に共有。
+
+### 2. 送信を2回に分ける（推奨・わかりやすい）
+
+**POST A（リング）**
+
+- `source`: `oramemo`（テキスト固定）  
+- フィールド: `recorded_at` / `spo2`（あとで `hrv` / `sleep_hours`）  
+
+**POST B（Watch）**
+
+- `source`: `watch`  
+- フィールド: `recorded_at` / `respiratory_rate` /（あとで `resting_hr`）  
+
+どちらも同じ URL・同じ `x-quiet-edge-secret`。  
+成功例: それぞれ `"ok": true`（upserted が指標数）。
+
+### 3. 代替: 1回の POST で metrics 配列
+
+本文をフラットではなく配列にする場合（上級）:
+
+```json
+{
+  "recorded_at": "2026-08-08",
+  "metrics": [
+    { "metric": "spo2", "value": 96, "source": "oramemo" },
+    { "metric": "respiratory_rate", "value": 14, "source": "watch" }
+  ]
+}
+```
+
+Shortcuts ではフィールド追加より難しいので、まずは **POST 2回** で十分です。
 
 ---
 
@@ -71,11 +131,12 @@ Apple ヘルスケアの主要指標を、毎朝（または起床後）iPhone �
 1. 「ヘルスケアサンプルを見つける」または「ヘルスケアの統計」  
 2. 種類: 睡眠／酸素／呼吸数／心拍変動／安静時心拍数  
 3. 期間: **今日** または **昨日の夜〜今朝**（取れる方）  
-4. 結果を変数に入れる（例: `睡眠時間`）
+4. リング系は可能ならソース **MemoHealth**  
+5. 結果を変数に入れる（例: `spo2`）
 
 睡眠が「分」で取れた場合は、ショートカットで **÷60** して時間にしてから送ります。
 
-取得できない項目は送らなくて構いません（あるものだけ JSON に載せる）。
+取得できない項目は送らなくて構いません（あるものだけ JSON に載せる）。`0` は送らない。
 
 ### D. Web リクエストで送る
 
