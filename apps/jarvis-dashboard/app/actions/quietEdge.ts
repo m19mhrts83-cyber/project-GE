@@ -1,7 +1,11 @@
 "use server";
 
 import { geminiReply, geminiVisionJson } from "@/lib/geminiReply";
-import { addDaysYmd, ymdJst } from "@/lib/quietEdgeContext";
+import {
+  addDaysYmd,
+  SNORE_SCORE_TARGET,
+  ymdJst,
+} from "@/lib/quietEdgeContext";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -367,4 +371,229 @@ ${JSON.stringify(bundle, null, 2)}
   const res = await geminiReply(prompt);
   if (!res.ok) return { ok: false, error: res.error };
   return { ok: true, text: res.text };
+}
+
+function fallbackIngestReview(input: {
+  recorded_at: string;
+  score: number;
+  count: number | null;
+  prevScore: number | null;
+  avg7: number | null;
+  bestScore: number | null;
+  hasJournal: boolean;
+  healthBits: string[];
+  nearTreatment: string | null;
+}): string {
+  const lines: string[] = [];
+  lines.push(`📅 ${input.recorded_at} の取込レビュー（観察メモ）`);
+  lines.push(
+    `いびきスコア ${input.score.toFixed(1)}` +
+      (input.count != null
+        ? `／いびき回数 ${input.count.toLocaleString("ja-JP")}回`
+        : ""),
+  );
+  if (input.prevScore != null) {
+    const d = input.score - input.prevScore;
+    if (d <= -3) {
+      lines.push(`前回よりスコアが ${Math.abs(d).toFixed(1)} 改善。良い流れです。`);
+    } else if (d >= 3) {
+      lines.push(
+        `前回よりスコアが +${d.toFixed(1)}。生活要因（飲酒・鼻・残業など）を Journal で振り返ると次に活かせます。`,
+      );
+    } else {
+      lines.push("前回とほぼ同水準。記録を続けていること自体が強みです。");
+    }
+  }
+  if (input.avg7 != null) {
+    const vs = input.score - input.avg7;
+    lines.push(
+      vs <= -2
+        ? `直近7日平均（${input.avg7.toFixed(1)}）より良い夜でした。`
+        : `直近7日平均は ${input.avg7.toFixed(1)}。平均との差を見て傾向を掴みましょう。`,
+    );
+  }
+  const gap = input.score - SNORE_SCORE_TARGET;
+  if (gap <= 0) {
+    lines.push(
+      `改善目標（スコア≤${SNORE_SCORE_TARGET}）到達圏です。この水準を定着させる観察を続けましょう。`,
+    );
+  } else {
+    lines.push(
+      `改善目標まであとスコア約 ${gap.toFixed(1)}（目安≤${SNORE_SCORE_TARGET}・観察用）。一歩ずつで十分です。`,
+    );
+  }
+  if (input.bestScore != null && input.score <= input.bestScore + 0.2) {
+    lines.push("これまでの最良スコアに近い／並ぶ夜です。");
+  }
+  if (input.healthBits.length) {
+    lines.push(`Health: ${input.healthBits.join("、")}`);
+  }
+  if (input.hasJournal) {
+    lines.push("同日の Journal あり。生活要因との照合がしやすいです。");
+  } else {
+    lines.push("同日 Journal が薄い／なし。短くでも夜のメモがあると次のレビューが厚くなります。");
+  }
+  if (input.nearTreatment) {
+    lines.push(`治療予定: ${input.nearTreatment}`);
+  }
+  lines.push("※診断ではありません。励ましと観察の整理です。");
+  return lines.join("\n");
+}
+
+/** 取込直後の短い励ましレビュー（いびき＋Health＋Journal＋治療） */
+export async function generateQuietEdgeIngestReview(
+  recordedAt: string,
+): Promise<QuietEdgeReviewResult> {
+  const recorded_at = normalizeDate(recordedAt);
+  if (!recorded_at) return { ok: false, error: "日付が不正です" };
+
+  const supabase = await createClient();
+  const sinceYmd = addDaysYmd(recorded_at, -14);
+  const untilYmd = addDaysYmd(recorded_at, 14);
+
+  const [snore, health, journal, notes, treatments] = await Promise.all([
+    supabase
+      .from("vital_snore_daily")
+      .select("recorded_at,score,count,event,sleep_time,memo")
+      .gte("recorded_at", sinceYmd)
+      .lte("recorded_at", recorded_at)
+      .order("recorded_at", { ascending: true }),
+    supabase
+      .from("vital_daily")
+      .select("recorded_at,metric,value,unit,source")
+      .eq("recorded_at", recorded_at),
+    supabase
+      .from("vital_journal_daily")
+      .select("recorded_at,excerpt,char_count")
+      .eq("recorded_at", recorded_at)
+      .maybeSingle(),
+    supabase
+      .from("vital_context_notes")
+      .select("recorded_at,trigger,answer")
+      .eq("recorded_at", recorded_at)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("vital_treatment_events")
+      .select("session_no,scheduled_at,label,status")
+      .order("session_no", { ascending: true }),
+  ]);
+
+  const snoreRows = snore.data || [];
+  const today = snoreRows.find((r) => r.recorded_at === recorded_at);
+  if (!today) {
+    return { ok: false, error: "取込データが見つかりません。保存後に再試行してください。" };
+  }
+
+  const prev = [...snoreRows]
+    .filter((r) => r.recorded_at < recorded_at)
+    .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0];
+  const last7 = snoreRows.filter((r) => r.recorded_at <= recorded_at).slice(-7);
+  const avg7 =
+    last7.length > 0
+      ? last7.reduce((s, r) => s + Number(r.score), 0) / last7.length
+      : null;
+  const bestScore =
+    snoreRows.length > 0
+      ? Math.min(...snoreRows.map((r) => Number(r.score)))
+      : null;
+
+  const healthBits: string[] = [];
+  const prefer = new Map<string, { value: number; unit: string | null; source: string }>();
+  for (const h of health.data || []) {
+    const rank = h.source === "oramemo" ? 0 : h.source === "watch" ? 1 : 2;
+    const prevH = prefer.get(h.metric);
+    const prevRank = prevH
+      ? prevH.source === "oramemo"
+        ? 0
+        : prevH.source === "watch"
+          ? 1
+          : 2
+      : 99;
+    if (!prevH || rank < prevRank) {
+      prefer.set(h.metric, {
+        value: Number(h.value),
+        unit: h.unit,
+        source: h.source,
+      });
+    }
+  }
+  const labels: Record<string, (v: number) => string> = {
+    sleep_hours: (v) => `睡眠 ${v.toFixed(1)}時間`,
+    spo2: (v) => `SpO2 ${Math.round(v)}%`,
+    respiratory_rate: (v) => `呼吸 ${v.toFixed(1)}回/分`,
+    hrv: (v) => `HRV ${Math.round(v)}ms`,
+    resting_hr: (v) => `安静時心拍 ${Math.round(v)}bpm`,
+  };
+  for (const [k, fmt] of Object.entries(labels)) {
+    const row = prefer.get(k);
+    if (row) healthBits.push(fmt(row.value));
+  }
+
+  const nextTreat = (treatments.data || []).find((t) => t.status === "scheduled");
+  let nearTreatment: string | null = null;
+  if (nextTreat?.scheduled_at) {
+    const days = Math.ceil(
+      (new Date(nextTreat.scheduled_at).getTime() - Date.now()) /
+        (1000 * 60 * 60 * 24),
+    );
+    nearTreatment = `${nextTreat.label}（あと約${days}日）`;
+  }
+
+  const journalExcerpt = journal.data?.excerpt
+    ? String(journal.data.excerpt).slice(0, 280)
+    : "";
+  const hasJournal = Boolean(journalExcerpt && (journal.data?.char_count || 0) >= 40);
+
+  const fallback = fallbackIngestReview({
+    recorded_at,
+    score: Number(today.score),
+    count: today.count,
+    prevScore: prev ? Number(prev.score) : null,
+    avg7,
+    bestScore,
+    hasJournal,
+    healthBits,
+    nearTreatment,
+  });
+
+  const bundle = {
+    focus_date: recorded_at,
+    score_target: SNORE_SCORE_TARGET,
+    today,
+    previous: prev || null,
+    avg7_score: avg7,
+    best_score_in_window: bestScore,
+    health_today: [...prefer.entries()].map(([metric, v]) => ({
+      metric,
+      ...v,
+    })),
+    journal_today: hasJournal
+      ? { char_count: journal.data?.char_count, excerpt: journalExcerpt }
+      : null,
+    context_notes_today: notes.data || [],
+    next_treatment: nextTreat || null,
+    recent_snore: snoreRows.slice(-10),
+  };
+
+  const prompt = `あなたは Quiet Edge の励ましコーチです。いまユーザーが AutoSnore データを取り込みました。
+診断・病名断定・治療指示は禁止。観察と励ましのみ。短く温かく。
+
+参照データ（JSON）:
+${JSON.stringify(bundle, null, 2)}
+
+必ず含める（箇条書き・日本語・目安 180〜320 字）:
+1. 今日のいびきスコア／回数を一言で認める
+2. 前回または直近平均との比較（分かる範囲）
+3. 改善目標（スコア≤${SNORE_SCORE_TARGET}）までの距離か到達の喜び
+4. Health / Journal / 補完メモ / 治療予定のうち「あるものだけ」触れる（無いものは無理に作らない）
+5. 明日も続けたくなる一文
+
+禁止: 医療診断、恐怖訴求、長文。`;
+
+  const res = await geminiReply(prompt);
+  if (!res.ok) {
+    return { ok: true, text: fallback };
+  }
+  return { ok: true, text: res.text.trim() || fallback };
 }

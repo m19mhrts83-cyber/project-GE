@@ -1,5 +1,10 @@
 /** Quiet Edge Phase 3 — Journal 欠落・異常検知と問い生成 */
 
+/** 観察用の改善目標（診断ではない）。
+ * AutoSnore 公式閾値は非公開のため、同種 SnoreLab の「≤10」を参照。
+ */
+export const SNORE_SCORE_TARGET = 10;
+
 export type JournalDailyRow = {
   recorded_at: string;
   excerpt: string;
