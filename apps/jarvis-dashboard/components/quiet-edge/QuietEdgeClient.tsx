@@ -10,6 +10,7 @@ import {
   type SnoreDailyInput,
   type SnoreEvent,
 } from "@/app/actions/quietEdge";
+import { compressImageFiles } from "@/lib/compressImageFile";
 
 export type SnoreRow = {
   recorded_at: string;
@@ -92,25 +93,41 @@ export default function QuietEdgeClient({
     setErr(null);
     setMsg(null);
     setOcrHint(null);
-    const fd = new FormData();
-    picked.slice(0, 2).forEach((f) => fd.append("images", f));
     start(async () => {
-      const r = await parseSnoreScreenshots(fd);
-      if (!r.ok) {
-        setErr(r.error);
+      try {
+        setMsg("画像を圧縮して読み取り中…");
+        const compressed = await compressImageFiles(picked.slice(0, 2));
+        const fd = new FormData();
+        compressed.forEach((f) => fd.append("images", f));
+        const r = await parseSnoreScreenshots(fd);
+        if (!r.ok) {
+          setErr(r.error);
+          setOcrReady(false);
+          setMsg(null);
+          return;
+        }
+        setForm({
+          ...r.merged,
+          event: (r.merged.event as SnoreEvent) || "通常日",
+        });
+        const kinds = r.parts.map((p) => p.screen).join(" + ");
+        setOcrHint(`読取: ${kinds} → ${r.merged.recorded_at}`);
+        setOcrReady(true);
+        setMsg(
+          "読み取りました。下の内容を確認し、「取り込む」でアプリに保存してください。",
+        );
+      } catch (e) {
+        const raw = e instanceof Error ? e.message : String(e);
         setOcrReady(false);
-        return;
+        setMsg(null);
+        if (/Body exceeded|413|body size|too large/i.test(raw)) {
+          setErr(
+            "画像が大きすぎて送れませんでした。スクショを1枚ずつ読み取るか、もう一度お試しください。",
+          );
+        } else {
+          setErr(`読み取りエラー: ${raw.slice(0, 160)}`);
+        }
       }
-      setForm({
-        ...r.merged,
-        event: (r.merged.event as SnoreEvent) || "通常日",
-      });
-      const kinds = r.parts.map((p) => p.screen).join(" + ");
-      setOcrHint(`読取: ${kinds} → ${r.merged.recorded_at}`);
-      setOcrReady(true);
-      setMsg(
-        "読み取りました。下の内容を確認し、「取り込む」でアプリに保存してください。",
-      );
     });
   }
 
