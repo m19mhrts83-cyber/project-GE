@@ -8,7 +8,7 @@ export type VitalDailyRow = {
   source: string;
 };
 
-const TRACKED = [
+const TRACKED_ALL = [
   { key: "sleep_hours", label: "睡眠", fmt: (v: number) => `${v.toFixed(1)}時間` },
   { key: "spo2", label: "SpO2", fmt: (v: number) => `${Math.round(v)}%` },
   {
@@ -23,6 +23,10 @@ const TRACKED = [
     fmt: (v: number) => `${Math.round(v)} bpm`,
   },
 ] as const;
+
+const TRACKED_COMPACT = TRACKED_ALL.filter(
+  (t) => t.key === "sleep_hours" || t.key === "spo2",
+);
 
 function ymdJst(d: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -43,10 +47,14 @@ function addDaysYmd(ymd: string, delta: number): string {
 export default function QuietEdgeHealthBand({
   rows,
   windowDays = 14,
+  compact = false,
 }: {
   rows: VitalDailyRow[];
   windowDays?: number;
+  /** いびき連動用に睡眠・SpO2 だけ表示 */
+  compact?: boolean;
 }) {
+  const TRACKED = compact ? TRACKED_COMPACT : TRACKED_ALL;
   const today = ymdJst(new Date());
   const start = addDaysYmd(today, -(windowDays - 1));
 
@@ -80,14 +88,23 @@ export default function QuietEdgeHealthBand({
     return { ...t, present, total: windowDays };
   });
 
-  const anyData = best.size > 0;
+  const anyData = TRACKED.some((t) => latestByMetric.has(t.key));
 
   return (
     <section className="card qe-health-band">
       <header>
         <span className="lvl">Health</span>
-        <strong>睡眠・呼吸・心拍（直近）</strong>
+        <strong>
+          {compact
+            ? "睡眠・SpO2（いびき連動の要約）"
+            : "睡眠・呼吸・心拍（直近）"}
+        </strong>
       </header>
+      {compact ? (
+        <p className="meta">
+          HRV・安静時心拍など広いバイタルは、仕事／運動ページの回復文脈でも参照できます。
+        </p>
+      ) : null}
       {!anyData ? (
         <p className="meta">
           まだ Health 日次がありません。iOSショートカットから ingest するとここに出ます（手順は

@@ -315,7 +315,8 @@ export default function GluconReportPanel({
         <p className="meta">
           コマンド例:{" "}
           <code>
-            cd ~/git-repos && python scripts/jarvis_glucon_journal_sync.py
+            cd ~/git-repos && ~/selenium_env/venv/bin/python
+            scripts/jarvis_glucon_journal_sync.py
           </code>
         </p>
       </section>

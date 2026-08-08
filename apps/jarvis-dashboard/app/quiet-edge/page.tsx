@@ -151,8 +151,13 @@ export default async function QuietEdgePage() {
     <Shell active="/quiet-edge">
       <h1>Quiet Edge</h1>
       <p className="sub">
-        静音ロード — AutoSnore のいびき記録を長期保管し、レーザー治療の推移を見る。
-        Journal と月次レビューで生活要因を重ねる。診断ではありません。
+        いびきレーザー治療の経過観察 — AutoSnore の長期保管と治療スケジュール。
+        睡眠・SpO2 は治療連動の要約のみ。日中の仕事・運動は別ページ。診断ではありません。
+      </p>
+      <p className="meta">
+        からだナビ: Quiet Edge（いびき）／
+        <a href="/performance/work">仕事</a>／
+        <a href="/performance/move">運動</a>
       </p>
 
       {/* 1. 直近の取込 Gemini レビュー（最上部） */}
@@ -278,7 +283,7 @@ export default async function QuietEdgePage() {
         </article>
       </div>
 
-      <QuietEdgeHealthBand rows={vitalRows} windowDays={14} />
+      <QuietEdgeHealthBand rows={vitalRows} windowDays={14} compact />
 
       <QuietEdgeJournalBand
         journals={journals}
@@ -294,6 +299,7 @@ export default async function QuietEdgePage() {
           source: v.source,
         }))}
         windowDays={14}
+        sleepFocus
       />
 
       <article className="card">

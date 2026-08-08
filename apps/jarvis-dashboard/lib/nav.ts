@@ -51,7 +51,11 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: "からだ",
-    items: [{ href: "/quiet-edge", label: "Quiet Edge" }],
+    items: [
+      { href: "/quiet-edge", label: "Quiet Edge" },
+      { href: "/performance/work", label: "仕事" },
+      { href: "/performance/move", label: "運動" },
+    ],
   },
 ];
 
