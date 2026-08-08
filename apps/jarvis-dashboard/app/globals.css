@@ -2894,6 +2894,10 @@ p.back {
 .qe-timeline li[data-status="scheduled"]::before {
   background: #b45309;
 }
+.qe-timeline li[data-status="planned"]::before {
+  background: #d6d3d1;
+  border-style: dashed;
+}
 .qe-client {
   display: flex;
   flex-direction: column;

@@ -99,7 +99,9 @@ cd ~/git-repos
 
 ---
 
-## 治療ステータス
+## 治療ステータス（日次・いびき記録）
+
+グラフ上のマーク。取込フォームの「治療ステータス」で付ける（従来どおり）。
 
 | 値 | いつ付けるか |
 |---|---|
@@ -107,7 +109,43 @@ cd ~/git-repos
 | 治療当日 | レーザー照射日の睡眠測定 |
 | 治療直後 | 照射後数日（目安 1〜3 日。迷ったら通常日） |
 
-スケジュール本体は `vital_treatment_events`（タイムライン表示）。変更は Jarvis／SQL で行う。
+---
+
+## 治療スケジュール（回数・次回日）
+
+- **総回数の目安**: 最大 **9回**（経過を見て判断。6回で終わってもよい）
+- **正本テーブル**: `vital_treatment_events`
+- **更新本線（推奨）**: アプリUI・Journal自動抽出は使わない。月1回程度、チャットで Jarvis に伝える → CLI で反映
+
+伝える例:
+
+- 「今日第4回終わった。次回（第5回）は9/5 15時」
+- 「第5回を9月5日に予約した。スケジュール更新して」
+
+Jarvis 実行コマンド:
+
+```bash
+cd ~/git-repos
+# 一覧
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_treatment.py --list
+
+# 実施済み
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_treatment.py \
+  --done 4 --at 2026-08-08T15:00 --note "第4回完遂"
+
+# 次回日程が決まったとき
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_treatment.py \
+  --schedule 5 --at 2026-09-05T15:00 --note "診察時に予約"
+```
+
+| status | 意味 |
+|---|---|
+| done | 実施済み |
+| scheduled | 日程確定の次回以降 |
+| planned | 枠のみ（日程未定） |
+| cancelled | 中止 |
+
+**作らないもの**: アプリ内の治療日入力フォーム、Journal からの日程自動読取（不安定・頻度に見合わない）。
 
 ---
 
