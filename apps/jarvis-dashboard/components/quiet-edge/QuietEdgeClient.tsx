@@ -39,13 +39,25 @@ function emptyForm(): SnoreDailyInput {
   };
 }
 
-export default function QuietEdgeClient({ rows }: { rows: SnoreRow[] }) {
+export type QuietEdgeClientSection = "upload" | "form" | "log";
+
+export default function QuietEdgeClient({
+  rows,
+  sections = ["upload", "form", "log"],
+}: {
+  rows: SnoreRow[];
+  sections?: QuietEdgeClientSection[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [form, setForm] = useState<SnoreDailyInput>(emptyForm);
   const [ocrHint, setOcrHint] = useState<string | null>(null);
+
+  const showUpload = sections.includes("upload");
+  const showForm = sections.includes("form");
+  const showLog = sections.includes("log");
 
   const sorted = useMemo(
     () =>
@@ -62,13 +74,14 @@ export default function QuietEdgeClient({ rows }: { rows: SnoreRow[] }) {
 
   return (
     <div className="qe-client">
+      {showUpload ? (
       <section className="card qe-upload-card">
         <header>
           <span className="lvl">取込</span>
           <strong>AutoSnore スクショ（1日2枚）</strong>
         </header>
         <p className="meta">
-          「イビガースコア」と「検出回数」を同時選択、または1枚ずつ。日付が同じなら1レコードにマージします。
+          「いびきスコア」と「いびき回数」の画面を同時選択、または1枚ずつ。日付が同じなら1レコードにマージします。
         </p>
         <input
           type="file"
@@ -103,7 +116,9 @@ export default function QuietEdgeClient({ rows }: { rows: SnoreRow[] }) {
         />
         {ocrHint ? <p className="meta qe-ocr-hint">{ocrHint}</p> : null}
       </section>
+      ) : null}
 
+      {showForm ? (
       <section className="card qe-form-card">
         <header>
           <span className="lvl">記録</span>
@@ -133,7 +148,7 @@ export default function QuietEdgeClient({ rows }: { rows: SnoreRow[] }) {
             </select>
           </label>
           <label>
-            イビガースコア
+            いびきスコア
             <input
               type="number"
               step="0.1"
@@ -145,7 +160,7 @@ export default function QuietEdgeClient({ rows }: { rows: SnoreRow[] }) {
             />
           </label>
           <label>
-            検出回数
+            いびき回数
             <input
               type="number"
               min={0}
@@ -219,7 +234,9 @@ export default function QuietEdgeClient({ rows }: { rows: SnoreRow[] }) {
         {err ? <p className="meta qe-err">{err}</p> : null}
         {msg ? <p className="meta qe-ok">{msg}</p> : null}
       </section>
+      ) : null}
 
+      {showLog ? (
       <section className="card qe-log-card">
         <header>
           <span className="lvl">ログ</span>
@@ -231,8 +248,8 @@ export default function QuietEdgeClient({ rows }: { rows: SnoreRow[] }) {
               <tr>
                 <th>日付</th>
                 <th>ステータス</th>
-                <th>スコア</th>
-                <th>回数</th>
+                <th>いびきスコア</th>
+                <th>いびき回数</th>
                 <th>睡眠</th>
                 <th>メモ</th>
                 <th />
@@ -292,7 +309,10 @@ export default function QuietEdgeClient({ rows }: { rows: SnoreRow[] }) {
             </tbody>
           </table>
         </div>
+        {!showForm && err ? <p className="meta qe-err">{err}</p> : null}
+        {!showForm && msg ? <p className="meta qe-ok">{msg}</p> : null}
       </section>
+      ) : null}
     </div>
   );
 }
