@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   deleteSnoreDaily,
   generateQuietEdgeIngestReview,
@@ -11,6 +11,7 @@ import {
   type SnoreEvent,
 } from "@/app/actions/quietEdge";
 import { compressImageFiles } from "@/lib/compressImageFile";
+import { dispatchIngestReview } from "@/components/quiet-edge/QuietEdgeLatestReview";
 
 export type SnoreRow = {
   recorded_at: string;
@@ -23,6 +24,12 @@ export type SnoreRow = {
 };
 
 const EVENTS: SnoreEvent[] = ["通常日", "治療当日", "治療直後"];
+const EDIT_ROW_EVENT = "qe-edit-snore-row";
+
+function dispatchEditRow(row: SnoreRow) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(EDIT_ROW_EVENT, { detail: row }));
+}
 
 function emptyForm(): SnoreDailyInput {
   const d = new Date();
@@ -59,7 +66,6 @@ export default function QuietEdgeClient({
   const [ocrHint, setOcrHint] = useState<string | null>(null);
   const [picked, setPicked] = useState<File[]>([]);
   const [ocrReady, setOcrReady] = useState(false);
-  const [ingestReview, setIngestReview] = useState<string | null>(null);
   const [reviewPending, setReviewPending] = useState(false);
 
   const showUpload = sections.includes("upload");
@@ -72,11 +78,52 @@ export default function QuietEdgeClient({
     [rows],
   );
 
+  useEffect(() => {
+    if (!showForm) return;
+    function onEdit(e: Event) {
+      const row = (e as CustomEvent<SnoreRow>).detail;
+      if (!row?.recorded_at) return;
+      setForm({
+        recorded_at: row.recorded_at,
+        score: row.score,
+        count: row.count,
+        event: row.event,
+        sleep_time: row.sleep_time || "",
+        memo: row.memo || "",
+        source: row.source || "manual",
+      });
+      setOcrReady(false);
+      setMsg(`${row.recorded_at} を確認フォームに載せました`);
+      document
+        .querySelector(".qe-form-card")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    window.addEventListener(EDIT_ROW_EVENT, onEdit);
+    return () => window.removeEventListener(EDIT_ROW_EVENT, onEdit);
+  }, [showForm]);
+
   function setField<K extends keyof SnoreDailyInput>(
     key: K,
     value: SnoreDailyInput[K],
   ) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function loadRowIntoForm(r: SnoreRow) {
+    if (showForm) {
+      setForm({
+        recorded_at: r.recorded_at,
+        score: r.score,
+        count: r.count,
+        event: r.event,
+        sleep_time: r.sleep_time || "",
+        memo: r.memo || "",
+        source: r.source || "manual",
+      });
+      setOcrReady(false);
+      return;
+    }
+    dispatchEditRow(r);
   }
 
   function clearPicked() {
@@ -134,7 +181,6 @@ export default function QuietEdgeClient({
   function saveRecord(source?: string) {
     setErr(null);
     setMsg(null);
-    setIngestReview(null);
     const savedAt = form.recorded_at;
     start(async () => {
       const r = await upsertSnoreDaily({
@@ -145,15 +191,21 @@ export default function QuietEdgeClient({
         setErr(r.error);
         return;
       }
-      setMsg(`${savedAt} を取り込みました。レビューを作成中…`);
+      setMsg(`${savedAt} を取り込みました。画面上部にレビューを作成中…`);
       setOcrReady(false);
       clearPicked();
       setReviewPending(true);
+      dispatchIngestReview({ pending: true });
       const review = await generateQuietEdgeIngestReview(savedAt);
       setReviewPending(false);
       if (review.ok) {
-        setIngestReview(review.text);
-        setMsg(`${savedAt} を取り込みました`);
+        dispatchIngestReview({
+          period_key: savedAt,
+          title: `取込レビュー ${savedAt}`,
+          body: review.text,
+          created_at: review.created_at || new Date().toISOString(),
+        });
+        setMsg(`${savedAt} を取り込みました。直近レビューは画面上部です。`);
       } else {
         setMsg(`${savedAt} を取り込みました（レビュー: ${review.error}）`);
       }
@@ -237,15 +289,9 @@ export default function QuietEdgeClient({
           {err ? <p className="meta qe-err">{err}</p> : null}
           {msg ? <p className="meta qe-ok">{msg}</p> : null}
           {reviewPending ? (
-            <p className="meta">依存データ（前回比・Health・Journal・治療）を見てレビュー作成中…</p>
-          ) : null}
-          {ingestReview ? (
-            <div className="qe-ingest-review">
-              <p className="meta">
-                <strong>取込レビュー</strong>（診断ではなく励ましの観察メモ）
-              </p>
-              <pre className="qe-review-text">{ingestReview}</pre>
-            </div>
+            <p className="meta">
+              レビュー作成中… 完成後は画面いちばん上の「直近レビュー」に出ます。
+            </p>
           ) : null}
         </section>
       ) : null}
@@ -381,18 +427,7 @@ export default function QuietEdgeClient({
                       <button
                         type="button"
                         className="qe-linkish"
-                        onClick={() => {
-                          setForm({
-                            recorded_at: r.recorded_at,
-                            score: r.score,
-                            count: r.count,
-                            event: r.event,
-                            sleep_time: r.sleep_time || "",
-                            memo: r.memo || "",
-                            source: r.source || "manual",
-                          });
-                          setOcrReady(false);
-                        }}
+                        onClick={() => loadRowIntoForm(r)}
                       >
                         {r.recorded_at}
                       </button>

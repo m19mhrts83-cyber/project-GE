@@ -304,7 +304,7 @@ export async function saveContextNote(
 }
 
 export type QuietEdgeReviewResult =
-  | { ok: true; text: string }
+  | { ok: true; text: string; created_at?: string }
   | { ok: false; error: string };
 
 /** Journal・補完・いびき・Health を横断した観察整理（診断禁止） */
@@ -614,8 +614,245 @@ ${JSON.stringify(bundle, null, 2)}
 禁止: 医療診断、恐怖訴求、長文。業務タスク（会議・資料）の要約は不要。睡眠・生活要因だけ。`;
 
   const res = await geminiReply(prompt);
-  if (!res.ok) {
-    return { ok: true, text: fallback };
+  const text = res.ok ? res.text.trim() || fallback : fallback;
+  const title = `取込レビュー ${recorded_at}`;
+  const { data: saved } = await supabase
+    .from("vital_quiet_reviews")
+    .insert({
+      kind: "ingest",
+      period_key: recorded_at,
+      title,
+      body: text,
+      payload: {
+        score: today.score,
+        count: today.count,
+        sleep_signal: sleepSignal,
+        sleep_tags: sleepTags,
+      },
+    })
+    .select("created_at")
+    .maybeSingle();
+  revalidateQuietEdge();
+  return {
+    ok: true,
+    text,
+    created_at: saved?.created_at || new Date().toISOString(),
+  };
+}
+
+function monthKeyJst(d = new Date()): string {
+  return ymdJst(d).slice(0, 7);
+}
+
+function prevMonthKey(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 2, 1));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthRange(ym: string): { start: string; end: string } {
+  const [y, m] = ym.split("-").map(Number);
+  const start = `${ym}-01`;
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const end = `${ym}-${String(last).padStart(2, "0")}`;
+  return { start, end };
+}
+
+function summarizeMonth(
+  snore: Array<{
+    recorded_at: string;
+    score: number;
+    count: number | null;
+  }>,
+  journals: Array<{
+    recorded_at: string;
+    sleep_signal: string | null;
+    sleep_tags: string[] | null;
+  }>,
+) {
+  const scores = snore.map((r) => Number(r.score)).filter(Number.isFinite);
+  const counts = snore
+    .map((r) => r.count)
+    .filter((c): c is number => c != null && Number.isFinite(c));
+  const tagCount: Record<string, number> = {};
+  for (const j of journals) {
+    for (const t of j.sleep_tags || []) {
+      tagCount[t] = (tagCount[t] || 0) + 1;
+    }
   }
-  return { ok: true, text: res.text.trim() || fallback };
+  const avg = (xs: number[]) =>
+    xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+  return {
+    days: snore.length,
+    avg_score: avg(scores),
+    min_score: scores.length ? Math.min(...scores) : null,
+    max_score: scores.length ? Math.max(...scores) : null,
+    avg_count: avg(counts),
+    target_hit_days: scores.filter((s) => s <= SNORE_SCORE_TARGET).length,
+    journal_days: journals.length,
+    sleep_tag_counts: tagCount,
+    bedtime_ok_days: tagCount.bedtime_ok || 0,
+    bedtime_late_days: tagCount.bedtime_late || 0,
+  };
+}
+
+/** 月次レビュー（今月 vs 前月、Journal 睡眠シグナル込み） */
+export async function generateQuietEdgeMonthlyReview(
+  monthYm?: string,
+): Promise<QuietEdgeReviewResult & { period?: string }> {
+  const ym = monthYm && /^\d{4}-\d{2}$/.test(monthYm) ? monthYm : monthKeyJst();
+  const prevYm = prevMonthKey(ym);
+  const cur = monthRange(ym);
+  const prev = monthRange(prevYm);
+  const supabase = await createClient();
+
+  const [snoreCur, snorePrev, journalCur, journalPrev, treatments, healthCur] =
+    await Promise.all([
+      supabase
+        .from("vital_snore_daily")
+        .select("recorded_at,score,count,event")
+        .gte("recorded_at", cur.start)
+        .lte("recorded_at", cur.end)
+        .order("recorded_at", { ascending: true }),
+      supabase
+        .from("vital_snore_daily")
+        .select("recorded_at,score,count,event")
+        .gte("recorded_at", prev.start)
+        .lte("recorded_at", prev.end)
+        .order("recorded_at", { ascending: true }),
+      supabase
+        .from("vital_journal_daily")
+        .select("recorded_at,sleep_signal,sleep_tags,excerpt,char_count")
+        .gte("recorded_at", cur.start)
+        .lte("recorded_at", cur.end),
+      supabase
+        .from("vital_journal_daily")
+        .select("recorded_at,sleep_signal,sleep_tags,excerpt,char_count")
+        .gte("recorded_at", prev.start)
+        .lte("recorded_at", prev.end),
+      supabase
+        .from("vital_treatment_events")
+        .select("session_no,scheduled_at,label,status")
+        .order("session_no", { ascending: true }),
+      supabase
+        .from("vital_daily")
+        .select("recorded_at,metric,value,source")
+        .gte("recorded_at", cur.start)
+        .lte("recorded_at", cur.end),
+    ]);
+
+  const curSum = summarizeMonth(snoreCur.data || [], journalCur.data || []);
+  const prevSum = summarizeMonth(snorePrev.data || [], journalPrev.data || []);
+
+  const journalSignals = (journalCur.data || [])
+    .filter((j) => j.sleep_signal)
+    .map((j) => ({
+      recorded_at: j.recorded_at,
+      sleep_signal: j.sleep_signal,
+      sleep_tags: j.sleep_tags,
+    }))
+    .slice(0, 20);
+
+  const bundle = {
+    month: ym,
+    previous_month: prevYm,
+    score_target: SNORE_SCORE_TARGET,
+    current: curSum,
+    previous: prevSum,
+    journal_sleep_signals: journalSignals,
+    treatments: treatments.data || [],
+    health_rows_current_month: (healthCur.data || []).length,
+  };
+
+  const fallbackLines = [
+    `📊 ${ym} の月次レビュー（観察）`,
+    `記録日数: ${curSum.days}日（前月 ${prevSum.days}日）`,
+    curSum.avg_score != null
+      ? `平均いびきスコア: ${curSum.avg_score.toFixed(1)}` +
+        (prevSum.avg_score != null
+          ? `（前月 ${prevSum.avg_score.toFixed(1)} / 差 ${(curSum.avg_score - prevSum.avg_score).toFixed(1)}）`
+          : "")
+      : "平均いびきスコア: データ不足",
+    `改善目標≤${SNORE_SCORE_TARGET} 到達: ${curSum.target_hit_days}日`,
+    `Journal 就寝達成 ${curSum.bedtime_ok_days}日 / 就寝遅れ ${curSum.bedtime_late_days}日`,
+    "※診断ではありません。翌月の観察ポイントとして使ってください。",
+  ];
+  const fallback = fallbackLines.join("\n");
+
+  const prompt = `あなたは Quiet Edge の月次観察コーチです。
+診断・病名断定・治療指示は禁止。前月比較と「今月／来月気をつける点」を出す。
+
+データ（JSON）:
+${JSON.stringify(bundle, null, 2)}
+
+出力（日本語・見出し付き・目安 450〜750 字）:
+1. ${ym} の総括（いびきスコア／回数の傾向）
+2. 前月（${prevYm}）との比較（良くなった点・悪化した点）
+3. Journal 睡眠シグナル（就寝達成／遅れ／飲酒／遅夜作業）といびきの重なり
+4. 来月気をつけるポイント（2〜4個・実行しやすい観察行動）
+5. 励ましの一文
+
+禁止: 業務タスクの列挙、医療診断、恐怖訴求。`;
+
+  const res = await geminiReply(prompt);
+  const text = res.ok ? res.text.trim() || fallback : fallback;
+  const title = `${ym} 月次レビュー`;
+  const { data: saved } = await supabase
+    .from("vital_quiet_reviews")
+    .insert({
+      kind: "monthly",
+      period_key: ym,
+      title,
+      body: text,
+      payload: bundle,
+    })
+    .select("created_at")
+    .maybeSingle();
+  revalidateQuietEdge();
+  return {
+    ok: true,
+    text,
+    period: ym,
+    created_at: saved?.created_at || new Date().toISOString(),
+  };
+}
+
+export type QuietReviewRow = {
+  id: number;
+  kind: "ingest" | "monthly";
+  period_key: string;
+  title: string;
+  body: string;
+  created_at: string;
+};
+
+/** 直近の取込レビュー1件 */
+export async function loadLatestIngestReview(): Promise<QuietReviewRow | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("vital_quiet_reviews")
+    .select("id,kind,period_key,title,body,created_at")
+    .eq("kind", "ingest")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as QuietReviewRow | null) || null;
+}
+
+/** 指定年月（YYYY-MM）の最新月次レビュー */
+export async function loadLatestMonthlyReview(
+  monthYm?: string,
+): Promise<QuietReviewRow | null> {
+  const ym =
+    monthYm && /^\d{4}-\d{2}$/.test(monthYm) ? monthYm : monthKeyJst();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("vital_quiet_reviews")
+    .select("id,kind,period_key,title,body,created_at")
+    .eq("kind", "monthly")
+    .eq("period_key", ym)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as QuietReviewRow | null) || null;
 }
