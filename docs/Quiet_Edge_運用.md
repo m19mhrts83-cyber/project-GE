@@ -80,7 +80,16 @@ Gemini が使えないときはルールベースのフォールバック文を�
 
 ---
 
-## Phase 3: Journal 同期（Mac）
+## Phase 3（完了）— Journal 本線 + 欠落時の双方向補完
+
+| 段階 | 内容 | 状態 |
+|---|---|---|
+| 3-MVP | ★Journal を日付キーでいびき・Health と重ね表示（`QuietEdgeJournalBand`） | 完了 |
+| 3-Ask | 欠落・急変・Health食い違い・治療日メモ空 →「何がありましたか？」→ `vital_context_notes` | 完了 |
+| 3-AI | 横断観察／取込／月次レビューに Journal・補完を注入（診断禁止） | 完了 |
+| 任意スケール | 眠気・主観いびき 1〜5（Ask 内の折りたたみ。毎朝必須にしない） | 完了 |
+
+### Journal 同期（Mac）
 
 Vercel はローカル Disk を見ないため、★Journal 抜粋を Supabase に投影する。
 
