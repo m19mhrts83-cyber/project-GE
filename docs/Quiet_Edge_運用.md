@@ -13,7 +13,7 @@
 主観の本線は毎朝の点数入力ではなく、Obsidian `★Journal`（`config/dashboard_lanes.yaml` の `obsidian_journal`）を日付でバイタルと重ねる。欠落・急変には「何がありましたか？」で補完する。観察の主線は **月次レビュー**。
 
 Health 日次（Phase 2・先に確立）: [`docs/Quiet_Edge_ヘルスケアショートカット手順.md`](Quiet_Edge_ヘルスケアショートカット手順.md)  
-Journal（Phase 3）は Health が回ってから定常化すると月次レビューが効く。コードは既にあるので同期だけ並行可。
+Journal（Phase 3）は Health 確立後に **launchd 日次同期**で定常化（下記「Phase 3」）。画面の Journal バンド・月次レビューが同データを参照する。
 
 ---
 
@@ -93,10 +93,25 @@ cd ~/git-repos
 
 - パス: `config/dashboard_lanes.yaml` → `obsidian_journal`（または env `QUIET_EDGE_JOURNAL_DIR` / `JARVIS_LANES_OBSIDIAN_JOURNAL`）
 - 秘密: `JARVIS_SUPABASE_URL` + Service Role（`.env.jarvis_private`）
-- 画面: **睡眠シグナル**（夜の防衛線・タグ）といびき日次のジョイン、Ask、観察レビュー
+- 画面: `/quiet-edge` の **Journal（睡眠シグナル）** バンド（`QuietEdgeJournalBand`）。取込レビュー・月次レビューも同日 Journal を参照
 - sync は業務メモ全文ではなく、防衛線など睡眠関連を優先抽出（`sleep_signal` / `sleep_tags`）
 
-推奨: パートナー確認のついで、または launchd で日次1回。
+### 定常化（本線: launchd 日次）
+
+ユーザー操作は増やさない。Mac ログイン中なら毎朝自動で投影する。
+
+```bash
+# 初回だけ（または Mac 再セットアップ時）
+~/git-repos/launchd/install_quiet_edge_journal_sync_launchd.sh
+# 解除
+~/git-repos/launchd/uninstall_quiet_edge_journal_sync_launchd.sh
+```
+
+- Label: `com.matsunoma.jarvis.quiet-edge-journal-sync`
+- 時刻: **毎日 08:15**（ローカル）／直近60日 upsert
+- ログ: `~/Library/Logs/jarvis_quiet_edge/`
+
+補完: パートナー確認のついでに手動実行してもよい（launchd が止まっているときの保険）。画面に「まだ同期された Journal がありません」と出たら上記 sync を一度走らせる。
 
 ---
 
