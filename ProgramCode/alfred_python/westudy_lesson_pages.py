@@ -115,10 +115,62 @@ def create_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--disable-gpu")
     opts.add_argument("--window-size=1280,1024")
     opts.add_argument("--lang=ja")
+    opts.add_argument("--disable-background-networking")
+    opts.add_argument("--disable-renderer-backgrounding")
+    # 全リソース待機で renderer timeout になりやすいため DOM 完了で打ち切る
+    opts.page_load_strategy = "eager"
     d = webdriver.Chrome(options=opts)
     d.set_page_load_timeout(60)
     d.implicitly_wait(5)
     return d
+
+
+_HEADLESS = True
+
+
+def _safe_get(url: str, *, retries: int = 3) -> None:
+    """page load / renderer timeout 時は部分ロード許容＋ドライバ再生成で再試行。"""
+    global driver
+    last_err: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            driver.get(url)
+            return
+        except TimeoutException as e:
+            last_err = e
+            ready = ""
+            try:
+                ready = str(driver.execute_script("return document.readyState") or "")
+            except Exception:
+                ready = ""
+            log(f"page load timeout ({attempt}/{retries}) readyState={ready or 'n/a'} url={url}")
+            if ready in ("interactive", "complete"):
+                try:
+                    driver.execute_script("window.stop();")
+                except Exception:
+                    pass
+                return
+            if attempt >= retries:
+                break
+            try:
+                driver.quit()
+            except Exception:
+                pass
+            driver = create_driver(headless=_HEADLESS)
+            time.sleep(1.5)
+        except WebDriverException as e:
+            last_err = e
+            log(f"navigation error ({attempt}/{retries}): {e.__class__.__name__}")
+            if attempt >= retries:
+                break
+            try:
+                driver.quit()
+            except Exception:
+                pass
+            driver = create_driver(headless=_HEADLESS)
+            time.sleep(1.5)
+    if last_err is not None:
+        raise last_err
 
 
 def login_westudy() -> None:
@@ -128,7 +180,7 @@ def login_westudy() -> None:
     login_url = (os.environ.get("WESTUDY_LOGIN_URL") or "").strip() or _DEFAULT_LOGIN_URL
 
     log(f"ログイン: {login_url}")
-    driver.get(login_url)
+    _safe_get(login_url)
 
     try:
         WebDriverWait(driver, 20).until(
@@ -317,7 +369,8 @@ def slug_from_url(url: str) -> str:
 
 def run_scrape(headless: bool = True) -> list[dict]:
     """全タブ → 全セクション → 全 lesson を巡回し、説明テキストを収集。"""
-    global driver
+    global driver, _HEADLESS
+    _HEADLESS = headless
     driver = create_driver(headless=headless)
 
     try:
