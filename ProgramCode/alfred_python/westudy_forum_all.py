@@ -184,6 +184,9 @@ WATCHDOG_STALL_SEC = 180  # この秒数以上ハートビートが更新され�
 PAGELOAD_TIMEOUT = 120
 SCRIPT_TIMEOUT = 60
 IMPLICIT_WAIT = 0
+# CI で稀に出る renderer timeout（Timed out receiving message from renderer）対策
+LOGIN_NAV_RETRIES = 3
+PAGE_GET_RETRIES = 2
 
 # 共有オブジェクト
 driver = None
@@ -287,6 +290,13 @@ def create_driver() -> webdriver.Chrome:
     options.add_argument("--disable-infobars")
     options.add_argument("--window-size=1366,900")
     options.add_argument("--lang=ja-JP")
+    # 全リソース待機で renderer timeout になりやすいため DOM 完了で打ち切る
+    options.page_load_strategy = "eager"
+    # GHA ヘッドレスでのハング緩和
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-ipc-flooding-protection")
     options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
     # ヘッドレス検知で中身が空になるサイト向けの一般的緩和
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -323,20 +333,86 @@ def quit_driver_silent():
         driver = None
 
 
+def recreate_driver() -> None:
+    """ログインなしで Chrome だけ作り直す（ログイン中の再試行用）。"""
+    global driver, wait
+    quit_driver_silent()
+    time.sleep(1.0)
+    driver = create_driver()
+    wait = WebDriverWait(driver, PAGELOAD_TIMEOUT)
+
+
+def _document_ready_state() -> str:
+    try:
+        return str(driver.execute_script("return document.readyState") or "")
+    except Exception:
+        return ""
+
+
+def safe_get(
+    url: str,
+    *,
+    retries: int = PAGE_GET_RETRIES,
+    recreate_on_renderer_timeout: bool = True,
+) -> None:
+    """driver.get のラッパ。page load / renderer timeout 時は部分ロードを許容し再試行する。"""
+    global driver, wait
+    last_err: Exception | None = None
+    attempts = max(1, int(retries) + 1)
+    for attempt in range(1, attempts + 1):
+        try:
+            driver.get(url)
+            return
+        except TimeoutException as e:
+            last_err = e
+            ready = _document_ready_state()
+            msg = str(e)
+            log(
+                f"⚠️ page load timeout ({attempt}/{attempts}) "
+                f"readyState={ready or 'n/a'} url={url}"
+            )
+            # DOM が既に interactive/complete なら続行（eager でも稀に timeout 報告が出る）
+            if ready in ("interactive", "complete"):
+                try:
+                    driver.execute_script("window.stop();")
+                except Exception:
+                    pass
+                return
+            if attempt >= attempts:
+                break
+            try:
+                driver.execute_script("window.stop();")
+            except Exception:
+                pass
+            # renderer 切断系はセッションが壊れていることが多いので作り直す
+            if recreate_on_renderer_timeout and (
+                "renderer" in msg.lower() or "timed out receiving message" in msg.lower()
+            ):
+                log("🔁 renderer timeout のため Chrome を再生成して再試行します")
+                recreate_driver()
+            time.sleep(1.5 + attempt * 0.5)
+        except (InvalidSessionIdException, WebDriverException) as e:
+            last_err = e
+            log(f"⚠️ navigation error ({attempt}/{attempts}): {e.__class__.__name__}: {e}")
+            if attempt >= attempts:
+                break
+            if recreate_on_renderer_timeout:
+                recreate_driver()
+            time.sleep(1.5)
+    if last_err is not None:
+        raise last_err
+
+
 def restart_and_recover(recover_url: str = None):
     """Chrome を再起動し、必要なら再ログイン＆対象URLへ復帰"""
     global driver, wait
     log("🔁 Chrome を再起動します...")
-    quit_driver_silent()
-    time.sleep(1.0)
-
-    driver = create_driver()
-    wait = WebDriverWait(driver, PAGELOAD_TIMEOUT)
+    recreate_driver()
 
     login_wordpress()
     if recover_url:
         try:
-            driver.get(recover_url)
+            safe_get(recover_url)
             log("🔁 復旧URLを開きました")
         except Exception as e:
             log(f"⚠️ 復旧URLオープン失敗: {e}")
@@ -358,13 +434,13 @@ def login_wordpress():
     login_url = _westudy_login_url()
     log(f"🔐 ログインURL: {login_url}")
 
-    driver.get(login_url)
+    safe_get(login_url, retries=LOGIN_NAV_RETRIES)
 
     try:
         WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "user_login")))
     except TimeoutException:
         log("ℹ️ ログインフォームが見つかりません（既にログイン済みの可能性）。フォーラムで確認します。")
-        driver.get(forum_base_url())
+        safe_get(forum_base_url(), retries=LOGIN_NAV_RETRIES)
         wait_for_forum_ready("既存セッション")
         log("✅ ログイン完了（既存セッション）")
         return
@@ -450,9 +526,9 @@ def login_wordpress():
         )
 
     # クッキーを westudy.co.jp 全体に馴染ませてからフォーラムへ
-    driver.get("https://westudy.co.jp/")
+    safe_get("https://westudy.co.jp/")
     time.sleep(2.0)
-    driver.get(forum_base_url())
+    safe_get(forum_base_url())
     wait_for_forum_ready("ログイン直後")
     log("✅ ログイン完了")
 

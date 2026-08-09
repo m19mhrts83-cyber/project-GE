@@ -104,8 +104,10 @@ jobs:
             "${cmd[@]}"
           )
 
+      # 失敗時もサマリーを残す（ログ Artifact と合わせて原因切り分け用）
       - name: Collect latest run info
         id: latest
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
