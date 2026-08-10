@@ -2,7 +2,8 @@
 """
 Jarvis: Vercel / GitHub Actions の Fail を検知し watch_status へ反映。
 
-夜間トリアージ・GHA Gmail triage・situation watch から呼ぶ。
+定例は朝1回のみ（Gmail トリアージ 05:00 JST の末尾）。昼・夜は回さない。
+手動・修正お知らせは workflow_dispatch / --note で。
 修正完了時は ops_fix_notice（ホームお知らせ）を立てる。
 
   python scripts/jarvis_ops_fail_watch.py --dry-run
