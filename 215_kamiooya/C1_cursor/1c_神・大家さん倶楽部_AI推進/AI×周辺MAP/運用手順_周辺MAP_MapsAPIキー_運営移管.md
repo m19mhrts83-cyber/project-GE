@@ -131,7 +131,7 @@ Phase 5（Q&A 移管）とあわせて実施してよい。
 |---|---|
 | 地図が出ない・ApiNotActivated | API 未有効 or API 制限漏れ |
 | RefererNotAllowedMapError | リファラ未登録／タイポ。**Raimo入口だけ失敗→Pages直開き**で切り分け。Raimo URL もキー制限に追加（上記 §2） |
-| **「ピンを表示」が ⏳ のまま進まない** | リファラ拒否等で Geocoding/Places の応答が返らないことが多い。`shuhen-map.js` は約15秒でタイムアウト表示。Places API 有効化・クォータも確認 |
+| **「ピンを表示」が ⏳／ジオコードタイムアウト** | ①**APIキー期限切れ**（`The provided API key is expired`）→ Secret `GOOGLE_MAPS_BROWSER_KEY` を差し替え＆Pages再デプロイ ②リファラ拒否 ③Places/Geocoding 未有効・クォータ |
 | ピンが立たない／未ヒットだらけ | ## E 形式崩れ・全角｜・見出し混入。**「## E 一括貼付」**に **コードブロック1つ**を貼って再実行 |
 | 地図はあるが地名が無い | **クリーン表示ON**（仕様）。オフ→「表示を更新」 |
 | ピンが一切見えない | 「ピンを隠す」ON |
