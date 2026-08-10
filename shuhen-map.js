@@ -680,11 +680,19 @@ async function runNumberedPins() {
         try {
             const geo = await withTimeout(geocodeAddress(address), 15000, 'ジオコード（住所→座標）');
             if (!geo || geo.lat == null) {
-                const st = geo && geo.status ? `（${geo.status}）` : '';
-                showError(
-                    `物件住所のジオコードに失敗しました${st}。` +
-                        '住所表記を見直すか、Geocoding API／リファラ制限を確認してください。'
-                );
+                const st = geo && geo.status ? String(geo.status) : '';
+                if (st === 'REQUEST_DENIED') {
+                    showError(
+                        '物件住所のジオコードが拒否されました（REQUEST_DENIED）。' +
+                            '公開キーの期限切れ／無効化、または HTTPリファラ・Geocoding API 制限の可能性が高いです。' +
+                            'GitHub Secret `GOOGLE_MAPS_BROWSER_KEY` と Pages 再デプロイを確認してください。'
+                    );
+                } else {
+                    showError(
+                        `物件住所のジオコードに失敗しました${st ? `（${st}）` : ''}。` +
+                            '住所表記を見直すか、Geocoding API／リファラ制限を確認してください。'
+                    );
+                }
                 return;
             }
             const property = geo;
