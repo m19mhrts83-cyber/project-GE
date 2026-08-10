@@ -1,0 +1,87 @@
+---
+description: チャプロ更新時は確認前に Raimo・Prompt Share へ3先同期。不安なら「同期しましたか？」と聞く
+alwaysApply: true
+---
+
+# チャプロ／Raimo／Prompt Share — プロンプト3先同期（Jarvis）
+
+## 方針
+
+周辺MAP・MyPrompt・チャプロ代替のプロンプトを直したら、**ユーザーへの確認・完了報告の前に**次の **3先を同期**する。片方だけ更新して終わりにしない。
+
+| # | 先 | 役割（当面） |
+|---|---|---|
+| 1 | **チャプロ MyPrompt** | **主に書き換える正**（ユーザーが編集することが多い） |
+| 2 | **Raimoビズ MyPrompt**（`raimo.buzz`） | チャプロと同系統UI。主編集のあとに追従 |
+| 3 | **Prompt Share**（チャプロ代替・`apps/prompt-share`） | 公開URL共有用。主編集のあとに追従 |
+
+同期できているか不安なときは、報告前に **「同期しましたか？」** と聞く（または止まずに残りの先を同期してから報告する）。
+
+## トリガー
+
+次のいずれかに該当するとき:
+
+- チャプロ／Raimo／Prompt Share のプロンプト本文・変数・タイトルを更新した
+- 正本 MD（例: `AI×周辺MAP/01_Raimoプロンプト_*.md`）を直して「反映して」と言われた
+- 「プロンプト見直して」「変数の並び替え」「チャプロに上げて」等
+
+## Jarvis の動作（必須順）
+
+1. **正本を確定**（MDフェンス本文 or チャプロ上の最新）
+2. **3先へ反映**（未反映があればその場でやる）
+3. 各先の **URL と反映有無**を短く報告してから、ユーザー確認へ進む
+
+当面の流れ: **チャプロで直す → Raimo と Prompt Share へ同期**。Raimo／Prompt Share 側だけ直した場合も、他2先を揃える。
+
+## 各先の正（周辺MAP Step1.1 例）
+
+| 先 | 参照 |
+|---|---|
+| チャプロ | https://chapro.jp/prompt/473908 （管理: `manage.chapro.jp/gpt/prompt/473908`） |
+| Raimo | https://raimo.buzz/prompt/473911 （編集: `raimo.buzz/gpt/prompt/473911`、フォルダ `AI周辺MAP`） |
+| Prompt Share | https://prompt-share-taupe.vercel.app/p/8a5a1ec8b239596916f797da |
+| 正本 MD | `215_kamiooya/.../AI×周辺MAP/01_Raimoプロンプト_Step1基本洗い出し.md` |
+| カタログ | `config/apps_prompts_catalog.yaml` |
+
+他 Step はカタログ／`docs/運用コマンド一覧.md`「プロンプト共有」表を参照。
+
+## 同期時の注意
+
+### 入力欄の並び
+
+チャプロ／Raimoは本文中 `{変数}` の **初出順**で入力欄を並べる。希望順にするには `#情報`（変数行）を `#実行指示` より前に置く。並び替え時は変数を消してから希望順で再登録するか、API／管理画面で fieldList を組み直す。
+
+### Prompt Share
+
+- DB: Supabase `kamiooya-qa` の `prompts`（`.env.local` の `SUPABASE_*`。チャットにキーを出さない）
+- **`public_token` を壊さない**。`scripts/seed_shuhen_map.mjs` は更新時にトークンを新規発行しうる → **既存トークン維持の更新**（`template` / `variables` のみ）を優先
+- 本文内の次工程 URL は、共有運用なら Prompt Share の Step URL に合わせる（チャプロ URL のままにしない）
+
+### Raimo API（自動化向き）
+
+ログイン Cookie（`ptx_nuxt_session`）付きで:
+
+- `GET/PUT https://raimo.buzz/gpt/api/promptBox/{id}`
+- `GET https://raimo.buzz/gpt/api/promptBox/{id}/prompt/1`（本文）
+- `PUT .../fields` は **`{"fieldList":[...]}`** 形式（配列直投げは 422）
+
+認証: `.env.jarvis_private` の `RAIMO_PORTAL_EMAIL` / `RAIMO_PORTAL_PASSWORD`（チャットに出さない）。
+
+### チャプロ
+
+TipTap／管理画面。**再生成ボタンは押さない**。部分置換・`setData` 可。変数並び替えは削除→希望順で再登録が確実。
+
+## 報告フォーマット（短く）
+
+```
+📎 プロンプト3先同期
+- チャプロ: ✅/❌ {URL}
+- Raimo: ✅/❌ {URL}
+- Prompt Share: ✅/❌ {URL}（token維持: はい/いいえ）
+```
+
+## 関連
+
+- 運用コマンド: `docs/運用コマンド一覧.md`「プロンプト共有（prompt-share・チャプロ代替）」
+- 秘密: `jarvis.mdc` → `.env.jarvis_private`
+- Supabase 1PJ: `jarvis-supabase-free-one-project.mdc`
