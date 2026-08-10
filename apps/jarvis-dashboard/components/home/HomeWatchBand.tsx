@@ -24,15 +24,28 @@ export default async function HomeWatchBand() {
         w.id === "vpoint" ||
         w.id === "rent_step" ||
         w.id === "zaim_quality" ||
-        w.id === "cursor_pro_plus_downgrade"
+        w.id === "cursor_pro_plus_downgrade" ||
+        w.id === "glucon_report_due" ||
+        w.id === "mobile_plan"
       ) {
         if (pl.show_banner === true) return true;
       }
       return w.level !== "ok";
     })
     .sort((a, b) => {
-      if (a.id === "cursor_pro_plus_downgrade") return -1;
-      if (b.id === "cursor_pro_plus_downgrade") return 1;
+      const pa =
+        a.payload && typeof a.payload === "object"
+          ? (a.payload as Record<string, unknown>)
+          : {};
+      const pb =
+        b.payload && typeof b.payload === "object"
+          ? (b.payload as Record<string, unknown>)
+          : {};
+      const pinA =
+        pa.pin_top === true || a.id === "cursor_pro_plus_downgrade";
+      const pinB =
+        pb.pin_top === true || b.id === "cursor_pro_plus_downgrade";
+      if (pinA !== pinB) return pinA ? -1 : 1;
       return (
         watchSortKey(a.level) - watchSortKey(b.level) ||
         String(b.updated_at || "").localeCompare(String(a.updated_at || ""))

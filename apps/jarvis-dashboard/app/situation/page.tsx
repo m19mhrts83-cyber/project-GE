@@ -44,8 +44,21 @@ export default async function SituationPage() {
   const active = (items || []).filter((i) => i.status === "active");
   const archivedCount = (items || []).filter((i) => i.status === "archived").length;
   active.sort((a, b) => {
-    if (a.id === "cursor_pro_plus_downgrade" && a.level !== "ok") return -1;
-    if (b.id === "cursor_pro_plus_downgrade" && b.level !== "ok") return 1;
+    const pa =
+      a.payload && typeof a.payload === "object"
+        ? (a.payload as Record<string, unknown>)
+        : {};
+    const pb =
+      b.payload && typeof b.payload === "object"
+        ? (b.payload as Record<string, unknown>)
+        : {};
+    const pinA =
+      (pa.pin_top === true || a.id === "cursor_pro_plus_downgrade") &&
+      a.level !== "ok";
+    const pinB =
+      (pb.pin_top === true || b.id === "cursor_pro_plus_downgrade") &&
+      b.level !== "ok";
+    if (pinA !== pinB) return pinA ? -1 : 1;
     return watchSortKey(a.level) - watchSortKey(b.level);
   });
 
