@@ -26,6 +26,7 @@ import type {
   GluconDraftRow,
   GluconFactItem,
   GluconJournalDay,
+  GluconLastResultCoverage,
   GluconMemberHeaderStatus,
   GluconMonthlyDigestPreview,
   GluconReportKind,
@@ -38,6 +39,26 @@ const KIND_LABEL: Record<GluconReportKind, string> = {
   activity: "活動報告",
   result: "成果報告",
 };
+
+function nextYmdClient(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return ymd;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1));
+  return d.toISOString().slice(0, 10);
+}
+
+function todayYmdClient(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year")?.value;
+  const mo = parts.find((p) => p.type === "month")?.value;
+  const d = parts.find((p) => p.type === "day")?.value;
+  return `${y}-${mo}-${d}`;
+}
 
 function draftFor(
   drafts: GluconDraftRow[],
@@ -307,6 +328,8 @@ function DraftActions({
   pending,
   start,
   postError,
+  coveredFrom,
+  coveredTo,
 }: {
   cycle: GluconActiveCycle;
   kind: GluconReportKind;
@@ -316,6 +339,8 @@ function DraftActions({
   pending: boolean;
   start: (fn: () => Promise<void>) => void;
   postError?: string | null;
+  coveredFrom?: string;
+  coveredTo?: string;
 }) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
@@ -480,7 +505,10 @@ function DraftActions({
                     router.refresh();
                     return;
                   }
-                  const r = await queueGluconPost(cycle.periodKey, kind);
+                  const r = await queueGluconPost(cycle.periodKey, kind, {
+                    coveredFrom,
+                    coveredTo,
+                  });
                   if (!r.ok) {
                     setErr(r.error || "キュー投入失敗");
                     return;
@@ -580,9 +608,13 @@ function ActivityEditor({
 function ResultEditor({
   cycle,
   initial,
+  lastResultCoverage,
+  today,
 }: {
   cycle: GluconActiveCycle;
   initial: GluconDraftRow | null;
+  lastResultCoverage?: GluconLastResultCoverage | null;
+  today: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -596,6 +628,14 @@ function ResultEditor({
   const [clarify, setClarify] = useState<GluconClarifyItem[]>(
     payload.clarify || [],
   );
+  const defaultFrom = lastResultCoverage?.covered_to
+    ? nextYmdClient(lastResultCoverage.covered_to)
+    : cycle.journalFrom;
+  const defaultTo = today || todayYmdClient();
+  const [coveredFrom, setCoveredFrom] = useState(
+    payload.covered_from || defaultFrom,
+  );
+  const [coveredTo, setCoveredTo] = useState(payload.covered_to || defaultTo);
 
   useEffect(() => {
     setBody(initial?.body || "");
@@ -603,6 +643,8 @@ function ResultEditor({
     const pl = (initial?.payload || {}) as GluconDraftPayload;
     setFacts(pl.facts || []);
     setClarify(pl.clarify || []);
+    if (pl.covered_from) setCoveredFrom(pl.covered_from);
+    if (pl.covered_to) setCoveredTo(pl.covered_to);
   }, [initial?.id, initial?.body, initial?.status, initial?.updated_at]);
 
   const stepLabel = useMemo(() => {
@@ -624,6 +666,48 @@ function ResultEditor({
       </header>
       <p className="meta">
         神・大家さんポイントが貯まるのは成果報告です。空室の早期入居付けなども成果候補として扱います。
+        月次に限らず、前回報告以降〜今回の期間でまとめられます（Journal sync
+        は直近約90日が実用範囲）。
+      </p>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "0.75rem",
+          alignItems: "flex-end",
+          marginTop: "0.5rem",
+        }}
+      >
+        <label style={{ fontSize: "0.85rem" }}>
+          対象期間（開始）
+          <input
+            type="date"
+            value={coveredFrom}
+            onChange={(e) => setCoveredFrom(e.target.value)}
+            disabled={pending}
+            style={{ display: "block", marginTop: 4 }}
+          />
+        </label>
+        <label style={{ fontSize: "0.85rem" }}>
+          対象期間（終了）
+          <input
+            type="date"
+            value={coveredTo}
+            onChange={(e) => setCoveredTo(e.target.value)}
+            disabled={pending}
+            style={{ display: "block", marginTop: 4 }}
+          />
+        </label>
+      </div>
+      <p className="meta" style={{ marginTop: "0.35rem" }}>
+        {lastResultCoverage?.covered_to
+          ? `前回報告: ${lastResultCoverage.covered_to} まで${
+              lastResultCoverage.posted_at
+                ? `（投稿 ${String(lastResultCoverage.posted_at).slice(0, 10)}）`
+                : ""
+            }`
+          : "前回報告の履歴なし（初回まとめ可。長い期間はスレッド下書き推奨）"}
       </p>
 
       <div className="qe-form-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
@@ -635,7 +719,10 @@ function ResultEditor({
             setErr(null);
             setMsg(null);
             start(async () => {
-              const r = await generateGluconFacts();
+              const r = await generateGluconFacts({
+                coveredFrom,
+                coveredTo,
+              });
               if (!r.ok) {
                 setErr(r.error || "事実生成失敗");
                 return;
@@ -644,6 +731,10 @@ function ResultEditor({
                 setBody(r.draft.body);
                 setStatus(r.draft.status);
                 setFacts(r.draft.payload?.facts || []);
+                if (r.draft.payload?.covered_from)
+                  setCoveredFrom(r.draft.payload.covered_from);
+                if (r.draft.payload?.covered_to)
+                  setCoveredTo(r.draft.payload.covered_to);
               }
               setMsg("① 事実のみ下書きを生成しました");
               router.refresh();
@@ -688,7 +779,10 @@ function ResultEditor({
                   clarify.map((c) => ({ id: c.id, answer: c.answer })),
                 );
               }
-              const r = await generateGluconFinal();
+              const r = await generateGluconFinal({
+                coveredFrom,
+                coveredTo,
+              });
               if (!r.ok) {
                 setErr(r.error || "最終稿生成失敗");
                 return;
@@ -812,6 +906,8 @@ function ResultEditor({
         pending={pending}
         start={start}
         postError={initial?.post_error}
+        coveredFrom={coveredFrom}
+        coveredTo={coveredTo}
       />
     </section>
   );
@@ -824,6 +920,8 @@ export default function GluconReportPanel({
   journalSyncedAt,
   memberHeader,
   monthlyDigest,
+  lastResultCoverage,
+  today,
 }: {
   cycle: GluconActiveCycle | null;
   drafts: GluconDraftRow[];
@@ -831,6 +929,8 @@ export default function GluconReportPanel({
   journalSyncedAt: string | null;
   memberHeader: GluconMemberHeaderStatus;
   monthlyDigest?: GluconMonthlyDigestPreview | null;
+  lastResultCoverage?: GluconLastResultCoverage | null;
+  today?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -1009,7 +1109,12 @@ export default function GluconReportPanel({
         </p>
       </section>
 
-      <ResultEditor cycle={cycle} initial={draftFor(drafts, "result")} />
+      <ResultEditor
+        cycle={cycle}
+        initial={draftFor(drafts, "result")}
+        lastResultCoverage={lastResultCoverage}
+        today={today || todayYmdClient()}
+      />
       <ActivityEditor cycle={cycle} initial={draftFor(drafts, "activity")} />
     </>
   );
