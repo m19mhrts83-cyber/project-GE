@@ -4,14 +4,16 @@ Jarvis: Vercel / GitHub Actions の Fail を検知し watch_status へ反映。
 
 定例は朝1回のみ（Gmail トリアージ 05:00 JST の末尾）。昼・夜は回さない。
 手動・修正お知らせは workflow_dispatch / --note で。
+--autofix で Cloud Agent 自動起動（上限時はローカル queued）。
 修正完了時は ops_fix_notice（ホームお知らせ）を立てる。
 
   python scripts/jarvis_ops_fail_watch.py --dry-run
   python scripts/jarvis_ops_fail_watch.py --push
+  python scripts/jarvis_ops_fail_watch.py --push --autofix
   python scripts/jarvis_ops_fail_watch.py --push --note "直した内容"
 
 環境: JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY
-任意: gh 認証（GITHUB_TOKEN）
+任意: gh 認証（GITHUB_TOKEN）/ CURSOR_API_KEY（--autofix）/ CURSOR_CLOUD_REPO_URL
 """
 from __future__ import annotations
 
@@ -42,6 +44,9 @@ WATCH_WORKFLOWS = (
     "westudy-raimo-weekly.yml",
     "pages-docs.yml",
 )
+
+AUTOFIX_IDS = ("vercel_deploy", "gha_workflow_fail")
+BUSY_STATUSES = ("queued", "running", "launched")
 
 
 def now_iso() -> str:
@@ -307,15 +312,160 @@ def collect_items(*, note: str | None = None) -> list[dict[str, Any]]:
     return items
 
 
-def push_items(items: list[dict[str, Any]]) -> int:
+def _sb_client():
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
     key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     if not url or not key:
-        print("JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY が必要", file=sys.stderr)
-        return 1
+        raise RuntimeError("JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY が必要")
     from supabase import create_client
 
-    sb = create_client(url, key)
+    return create_client(url, key)
+
+
+def _build_autofix_prompt(it: dict[str, Any]) -> str:
+    return "\n".join(
+        [
+            "あなたは Jarvis（運用修復 Cloud Agent）です。",
+            "リポジトリ m19mhrts83-cyber/project-GE の失敗を直してください。",
+            "秘密（APIキー等）は出力しない。対外メール送信はしない。",
+            "手順:",
+            "1. 失敗内容を確認（下記 summary / detail。必要なら gh / npm run build）",
+            "2. 最小修正をコミットして push（無関係ファイルは触らない）",
+            "3. autoCreatePR が効いていれば draft PR でよい",
+            "4. 直したら可能なら `python scripts/jarvis_ops_fail_watch.py --push --note '直した内容'`",
+            "",
+            f"watch_id: {it.get('id')}",
+            f"title: {it.get('title')}",
+            f"level: {it.get('level')}",
+            f"summary: {it.get('summary')}",
+            f"detail: {it.get('detail')}",
+            "",
+            "cursor_prompt:",
+            str(it.get("cursor_prompt") or ""),
+        ]
+    )
+
+
+def _existing_ops_status(sb, watch_id: str) -> str:
+    try:
+        r = (
+            sb.table("watch_status")
+            .select("payload")
+            .eq("id", watch_id)
+            .limit(1)
+            .execute()
+        )
+        rows = r.data or []
+        row = rows[0] if rows else {}
+        pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+        ops = pl.get("cursor_ops_fix") if isinstance(pl.get("cursor_ops_fix"), dict) else {}
+        return str(ops.get("status") or "")
+    except Exception:
+        return ""
+
+
+def _patch_ops_payload(sb, watch_id: str, ops_patch: dict[str, Any], *, keep_banner: bool = True) -> None:
+    r = (
+        sb.table("watch_status")
+        .select("payload")
+        .eq("id", watch_id)
+        .limit(1)
+        .execute()
+    )
+    rows = r.data or []
+    row = rows[0] if rows else {}
+    pl = dict(row.get("payload") or {}) if isinstance(row.get("payload"), dict) else {}
+    ops = dict(pl.get("cursor_ops_fix") or {}) if isinstance(pl.get("cursor_ops_fix"), dict) else {}
+    ops.update(ops_patch)
+    pl["cursor_ops_fix"] = ops
+    if keep_banner:
+        pl["show_banner"] = True
+    pl["origin"] = pl.get("origin") or "ops_fail_watch"
+    sb.table("watch_status").update(
+        {"payload": pl, "updated_at": now_iso()}
+    ).eq("id", watch_id).execute()
+
+
+def run_autofix(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """要対応の Fail に対し Cloud 起動。失敗・上限ならローカル queued。"""
+    from jarvis_cloud_agent_launch import launch_cloud_agent
+
+    sb = _sb_client()
+    notices: list[str] = []
+    for it in items:
+        wid = str(it.get("id") or "")
+        if wid not in AUTOFIX_IDS:
+            continue
+        if (it.get("level") or "") not in ("attention", "warn"):
+            continue
+        existing = _existing_ops_status(sb, wid)
+        if existing in BUSY_STATUSES:
+            print(f"# autofix skip {wid}: already {existing}", file=sys.stderr)
+            continue
+
+        prompt = _build_autofix_prompt(it)
+        launched = launch_cloud_agent(
+            prompt=prompt,
+            name=f"jarvis-ops-{wid}"[:80],
+            auto_create_pr=True,
+        )
+        if launched.get("ok"):
+            _patch_ops_payload(
+                sb,
+                wid,
+                {
+                    "status": "launched",
+                    "via": "cloud",
+                    "agent_id": launched.get("agent_id"),
+                    "run_id": launched.get("run_id"),
+                    "url": launched.get("url"),
+                    "launched_at": datetime.now(timezone.utc).isoformat(),
+                    "prompt": prompt[:1500],
+                },
+            )
+            notices.append(
+                f"Cloud Agent で {wid} の修復を起動した → {launched.get('url')}"
+            )
+            print(f"# autofix cloud ok {wid} {launched.get('url')}", file=sys.stderr)
+            continue
+
+        # Cloud 失敗 → ローカル待ち
+        reason = str(launched.get("error") or "cloud failed")
+        limit = bool(launched.get("limit"))
+        _patch_ops_payload(
+            sb,
+            wid,
+            {
+                "status": "queued",
+                "via": "local_fallback",
+                "queued_at": datetime.now(timezone.utc).isoformat(),
+                "cloud_error": reason[:400],
+                "cloud_limit": limit,
+                "prompt": prompt[:1500],
+            },
+        )
+        if limit:
+            notices.append(
+                f"Cloud 上限／枠のため {wid} はローカル待ちにした（Mac Worker／朝起動で処理）"
+            )
+        else:
+            notices.append(
+                f"Cloud 起動できず {wid} をローカル待ちにした: {reason[:120]}"
+            )
+        print(f"# autofix local queue {wid}: {reason}", file=sys.stderr)
+
+    extra: list[dict[str, Any]] = []
+    for n in notices:
+        extra.append(make_fix_notice(n, level="info"))
+    return extra
+
+
+def push_items(items: list[dict[str, Any]]) -> int:
+    try:
+        sb = _sb_client()
+    except RuntimeError as e:
+        print(str(e), file=sys.stderr)
+        return 1
     remote_arch: set[str] = set()
     try:
         r = sb.table("watch_status").select("id").eq("status", "archived").execute()
@@ -323,15 +473,33 @@ def push_items(items: list[dict[str, Any]]) -> int:
     except Exception as e:
         print(f"# archive merge skip: {e}", file=sys.stderr)
 
+    # 既存の cursor_ops_fix を潰さないよう merge
+    existing_payload: dict[str, dict[str, Any]] = {}
+    try:
+        er = (
+            sb.table("watch_status")
+            .select("id,payload")
+            .in_("id", list(AUTOFIX_IDS))
+            .execute()
+        )
+        for row in er.data or []:
+            pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+            existing_payload[str(row["id"])] = pl
+    except Exception as e:
+        print(f"# payload merge skip: {e}", file=sys.stderr)
+
     rows = []
     for it in items:
-        # ops_fix_notice は archived でも note 指定時は復活させたい
         if it["id"] in remote_arch and it["id"] != "ops_fix_notice":
             continue
-        if it["id"] == "ops_fix_notice" and it["id"] in remote_arch:
-            # 再掲
-            pass
-        rows.append(to_row(it))
+        row = to_row(it)
+        prev = existing_payload.get(str(it["id"])) or {}
+        if prev.get("cursor_ops_fix"):
+            merged = dict(row["payload"] or {})
+            merged["cursor_ops_fix"] = prev["cursor_ops_fix"]
+            # show_banner は今回の判定を優先
+            row["payload"] = merged
+        rows.append(row)
     if rows:
         sb.table("watch_status").upsert(rows, on_conflict="id").execute()
     meta_now = now_iso()
@@ -358,6 +526,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--push", action="store_true")
     ap.add_argument(
+        "--autofix",
+        action="store_true",
+        help="要対応 Fail を Cloud Agent 起動（失敗時はローカル queued）",
+    )
+    ap.add_argument(
         "--note",
         default="",
         help="修正内容をホームお知らせ（ops_fix_notice）に載せる",
@@ -370,7 +543,23 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps({"count": len(items), "items": items}, ensure_ascii=False, indent=2))
     if args.dry_run:
         return 0
-    return push_items(items)
+    rc = push_items(items)
+    if rc != 0:
+        return rc
+    if args.autofix:
+        try:
+            extra = run_autofix(items)
+        except Exception as e:
+            print(f"# autofix error: {e}", file=sys.stderr)
+            extra = [
+                make_fix_notice(
+                    f"自動修復の起動に失敗: {e}",
+                    level="warn",
+                )
+            ]
+        if extra:
+            push_items(extra)
+    return 0
 
 
 if __name__ == "__main__":

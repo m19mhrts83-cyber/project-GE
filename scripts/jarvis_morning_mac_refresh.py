@@ -316,6 +316,21 @@ def main() -> int:
     else:
         results["steps"]["dashboard_push"] = "skipped"
 
+    # 4b. Ops Fail ローカル修復キュー（Cloud 上限時の受け皿）
+    ops_worker = REPO / "scripts" / "jarvis_ops_fail_local_worker.py"
+    if ops_worker.is_file():
+        rc = run_step(
+            "ops_fail_local",
+            [exe, str(ops_worker)],
+            timeout=1200,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["ops_fail_local"] = rc
+        if rc != 0:
+            failures += 1
+    else:
+        results["steps"]["ops_fail_local"] = "skipped"
+
     # 5. 任意: CHRLINE／オプチャ
     if with_line:
         if mac_line_running():
