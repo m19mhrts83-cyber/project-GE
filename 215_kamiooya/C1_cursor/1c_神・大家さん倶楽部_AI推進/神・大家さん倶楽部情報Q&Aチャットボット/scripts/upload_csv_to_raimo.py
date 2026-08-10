@@ -19,6 +19,8 @@ Raimo アプリに管理者ログインし、CSV取込を自動実行する。
   RAIMO_POST_LOGIN_WAIT_MS (ラッパーログイン後〜#mainView 表示まで ms、既定: 180000)
   RAIMO_TRY_COMMUNITY_REFRESH=1/0 (既定: 1) CSV取込後に「コミュニティ情報の最新化」相当の操作を試す
   RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC (既定: 300) 上記の完了待ち秒
+  RAIMO_IMPORT_MAX_ATTEMPTS (既定: 3) Page crash 時のブラウザ再生成リトライ回数
+  RAIMO_CHROMIUM_ARGS (任意) Chromium 追加引数（空白区切り）。既定で --disable-dev-shm-usage 等を付与
   RAIMO_NOTIFY_MACOS=1/0 (既定: 1) macOS のみ終了時に通知センターへ表示（osascript）
 
 使い方:
@@ -36,6 +38,7 @@ import time
 from pathlib import Path
 
 try:
+    from playwright.sync_api import Error as PwError
     from playwright.sync_api import TimeoutError as PwTimeoutError
     from playwright.sync_api import sync_playwright
 except Exception as e:  # pragma: no cover
@@ -46,6 +49,37 @@ except Exception as e:  # pragma: no cover
         file=sys.stderr,
     )
     raise SystemExit(2)
+
+
+def _is_page_crash_error(exc: BaseException) -> bool:
+    """Chromium の Page crashed / Target closed 系（CI の /dev/shm 不足で起きやすい）。"""
+    msg = str(exc).lower()
+    needles = (
+        "page crashed",
+        "target closed",
+        "target page, context or browser has been closed",
+        "browser has been closed",
+        "has been closed",
+    )
+    return any(n in msg for n in needles)
+
+
+def _chromium_launch_args() -> list[str]:
+    """
+    GitHub Actions 等の共有ランナーでは /dev/shm が小さく、
+    Chromium が CSV 取込中に Page crashed しやすい。
+    """
+    args = [
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+    ]
+    extra = (os.environ.get("RAIMO_CHROMIUM_ARGS") or "").strip()
+    if extra:
+        args.extend(a for a in extra.split() if a)
+    return args
 
 
 def get_required_env(key: str) -> str:
@@ -558,25 +592,31 @@ def wait_import_finished(ctx, timeout_sec: int) -> str:
     stable_rounds = 0
     started = False
     while time.time() < deadline:
-        current = _safe_inner_text(ctx.locator("#importResult"), 5000)
-        if current:
-            started = True
-        if current != last_text:
-            last_text = current
-            stable_rounds = 0
-        else:
-            stable_rounds += 1
+        try:
+            current = _safe_inner_text(ctx.locator("#importResult"), 5000)
+            if current:
+                started = True
+            if current != last_text:
+                last_text = current
+                stable_rounds = 0
+            else:
+                stable_rounds += 1
 
-        toast = _safe_inner_text(ctx.locator("#toast"), 2000)
-        # 完了トーストを優先（文言変更時は Raimo 側確認）
-        if toast and ("CSV取込完了" in toast or "取込完了" in toast):
-            return current
+            toast = _safe_inner_text(ctx.locator("#toast"), 2000)
+            # 完了トーストを優先（文言変更時は Raimo 側確認）
+            if toast and ("CSV取込完了" in toast or "取込完了" in toast):
+                return current
 
-        # ログが出始めてから 3 回連続で不変なら完了扱い
-        if started and stable_rounds >= 3:
-            return current
-        # Frame には wait_for_timeout がないため、常に親 Page で待つ
-        getattr(ctx, "page", ctx).wait_for_timeout(2000)
+            # ログが出始めてから 3 回連続で不変なら完了扱い
+            if started and stable_rounds >= 3:
+                return current
+        except Exception as e:
+            if _is_page_crash_error(e):
+                raise PwError(f"CSV取込待ち中にページがクラッシュしました: {e}") from e
+            raise
+        # page.wait_for_timeout は CDP 経由のためクラッシュ時に分かりにくい。
+        # 待ち自体は time.sleep で行い、次回ループで DOM を再読取する。
+        time.sleep(2)
     raise PwTimeoutError(f"CSV取込の完了待ちがタイムアウトしました（{timeout_sec}秒）")
 
 
@@ -725,123 +765,157 @@ def main() -> int:
 
     exit_code = 2
     notify_detail = "処理が完了しませんでした。"
+    max_attempts = max(1, int(os.environ.get("RAIMO_IMPORT_MAX_ATTEMPTS", "3")))
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=headless,
-            slow_mo=slow_mo,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        context = browser.new_context(
-            user_agent=user_agent,
-            locale="ja-JP",
-            viewport={"width": 1440, "height": 900},
-        )
-        context.add_init_script(
-            """
-            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-            Object.defineProperty(navigator, 'platform', {get: () => 'MacIntel'});
-            Object.defineProperty(navigator, 'language', {get: () => 'ja-JP'});
-            Object.defineProperty(navigator, 'languages', {get: () => ['ja-JP', 'ja', 'en-US']});
-            """
-        )
-        page = context.new_page()
-        try:
-            page.goto(app_url, wait_until="domcontentloaded", timeout=120000)
+        last_error: BaseException | None = None
+        for attempt in range(1, max_attempts + 1):
+            browser = None
+            context = None
+            page = None
+            try:
+                if attempt > 1:
+                    print(
+                        f"🔁 Page crash 等のため再試行します（{attempt}/{max_attempts}）",
+                        flush=True,
+                    )
+                    time.sleep(2)
 
-            authenticate_raimo_page(
-                page,
-                app_email=app_email,
-                app_password=app_password,
-                portal_creds=portal_creds,
-                login_wait_ms=login_wait_ms,
-                post_login_wait_ms=post_login_wait_ms,
-            )
+                browser = p.chromium.launch(
+                    headless=headless,
+                    slow_mo=slow_mo,
+                    args=_chromium_launch_args(),
+                )
+                context = browser.new_context(
+                    user_agent=user_agent,
+                    locale="ja-JP",
+                    viewport={"width": 1440, "height": 900},
+                )
+                context.add_init_script(
+                    """
+                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                    Object.defineProperty(navigator, 'platform', {get: () => 'MacIntel'});
+                    Object.defineProperty(navigator, 'language', {get: () => 'ja-JP'});
+                    Object.defineProperty(navigator, 'languages', {get: () => ['ja-JP', 'ja', 'en-US']});
+                    """
+                )
+                page = context.new_page()
+                page.goto(app_url, wait_until="domcontentloaded", timeout=120000)
 
-            app_fr = resolve_app_frame(page, timeout_ms=120000)
+                authenticate_raimo_page(
+                    page,
+                    app_email=app_email,
+                    app_password=app_password,
+                    portal_creds=portal_creds,
+                    login_wait_ms=login_wait_ms,
+                    post_login_wait_ms=post_login_wait_ms,
+                )
 
-            # 管理者タブ（CSV取込）へ（iframe 内でも操作）
-            admin_tab = app_fr.locator("#adminDataTabBtn")
-            admin_tab.wait_for(state="visible", timeout=120000)
-            admin_tab.click()
+                app_fr = resolve_app_frame(page, timeout_ms=120000)
 
-            # タブ切り替え後に file input が差し込まれるまで待つ
-            file_input = app_fr.locator("#csvFileInput")
-            file_input.wait_for(state="attached", timeout=120000)
+                # 管理者タブ（CSV取込）へ（iframe 内でも操作）
+                admin_tab = app_fr.locator("#adminDataTabBtn")
+                admin_tab.wait_for(state="visible", timeout=120000)
+                admin_tab.click()
 
-            # CSV ファイル選択と取込実行
-            file_input.set_input_files(str(csv_path))
-            app_fr.locator("#importCsvBtn").click()
-            print(
-                "ブラウザでCSV取込を実行中（行数が多いと完了まで時間がかかります）…",
-                flush=True,
-            )
+                # タブ切り替え後に file input が差し込まれるまで待つ
+                file_input = app_fr.locator("#csvFileInput")
+                file_input.wait_for(state="attached", timeout=120000)
 
-            result_text = wait_import_finished(app_fr, timeout_sec=args.timeout_sec)
-            stats = parse_result_stats(result_text)
-            toast_text = _safe_inner_text(app_fr.locator("#toast"), 3000)
+                # CSV ファイル選択と取込実行
+                file_input.set_input_files(str(csv_path))
+                app_fr.locator("#importCsvBtn").click()
+                print(
+                    "ブラウザでCSV取込を実行中（行数が多いと完了まで時間がかかります）…",
+                    flush=True,
+                )
 
-            refresh_timeout = int(
-                os.environ.get("RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC", "300")
-            )
-            ok_refresh, refresh_msg = try_community_info_refresh(
-                page, timeout_sec=max(30, refresh_timeout)
-            )
-            if ok_refresh:
+                result_text = wait_import_finished(app_fr, timeout_sec=args.timeout_sec)
+                stats = parse_result_stats(result_text)
+                toast_text = _safe_inner_text(app_fr.locator("#toast"), 3000)
+
+                refresh_timeout = int(
+                    os.environ.get("RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC", "300")
+                )
+                ok_refresh, refresh_msg = try_community_info_refresh(
+                    page, timeout_sec=max(30, refresh_timeout)
+                )
                 print(f"コミュニティ最新化: {refresh_msg}", flush=True)
-            else:
-                print(f"コミュニティ最新化: {refresh_msg}", flush=True)
 
-            if shot_dir:
-                ok_shot = shot_dir / f"raimo_import_ok_{int(time.time())}.png"
-                page.screenshot(path=str(ok_shot), full_page=True)
-                print(f"スクリーンショット保存: {ok_shot}", flush=True)
+                if shot_dir:
+                    ok_shot = shot_dir / f"raimo_import_ok_{int(time.time())}.png"
+                    page.screenshot(path=str(ok_shot), full_page=True)
+                    print(f"スクリーンショット保存: {ok_shot}", flush=True)
 
-            print(
-                "Raimo取込完了: "
-                f"OK={stats['ok']} / SKIP={stats['skip']} / NG={stats['ng']}",
-                flush=True,
-            )
-            if toast_text:
-                print(f"トースト: {toast_text}", flush=True)
+                print(
+                    "Raimo取込完了: "
+                    f"OK={stats['ok']} / SKIP={stats['skip']} / NG={stats['ng']}",
+                    flush=True,
+                )
+                if toast_text:
+                    print(f"トースト: {toast_text}", flush=True)
 
-            summary_bits = [
-                f'importResult行カウント OK={stats["ok"]} SKIP={stats["skip"]} NG={stats["ng"]}',
-            ]
-            if toast_text:
-                summary_bits.append(toast_text.strip()[:220])
-            notify_detail = " ".join(summary_bits)
+                summary_bits = [
+                    f'importResult行カウント OK={stats["ok"]} SKIP={stats["skip"]} NG={stats["ng"]}',
+                ]
+                if toast_text:
+                    summary_bits.append(toast_text.strip()[:220])
+                notify_detail = " ".join(summary_bits)
 
-            if stats["ng"] > 0:
-                print("NG行があるため終了コード1を返します", file=sys.stderr)
-                exit_code = 1
-            else:
-                exit_code = 0
-        except PwTimeoutError as e:
-            if shot_dir:
-                ng_shot = shot_dir / f"raimo_import_ng_{int(time.time())}.png"
+                if stats["ng"] > 0:
+                    print("NG行があるため終了コード1を返します", file=sys.stderr)
+                    exit_code = 1
+                else:
+                    exit_code = 0
+                last_error = None
+                break
+            except PwTimeoutError as e:
+                last_error = e
+                if shot_dir and page is not None:
+                    ng_shot = shot_dir / f"raimo_import_ng_{int(time.time())}.png"
+                    try:
+                        page.screenshot(path=str(ng_shot), full_page=True)
+                        print(f"失敗時スクリーンショット: {ng_shot}", file=sys.stderr)
+                    except Exception:
+                        pass
+                print(f"Raimo取込失敗(タイムアウト): {e}", file=sys.stderr)
+                notify_detail = str(e)
+                exit_code = 2
+                # タイムアウトは再試行しても同じになりやすいので打ち切り
+                break
+            except Exception as e:
+                last_error = e
+                if shot_dir and page is not None:
+                    ng_shot = shot_dir / f"raimo_import_ng_{int(time.time())}.png"
+                    try:
+                        page.screenshot(path=str(ng_shot), full_page=True)
+                        print(f"失敗時スクリーンショット: {ng_shot}", file=sys.stderr)
+                    except Exception:
+                        pass
+                if _is_page_crash_error(e) and attempt < max_attempts:
+                    print(
+                        f"Raimo取込: Page crash を検出（{e}）。ブラウザを作り直して再試行します。",
+                        flush=True,
+                    )
+                    continue
+                print(f"Raimo取込失敗: {e}", file=sys.stderr)
+                notify_detail = str(e)
+                exit_code = 2
+                break
+            finally:
                 try:
-                    page.screenshot(path=str(ng_shot), full_page=True)
-                    print(f"失敗時スクリーンショット: {ng_shot}", file=sys.stderr)
+                    if context is not None:
+                        context.close()
                 except Exception:
                     pass
-            print(f"Raimo取込失敗(タイムアウト): {e}", file=sys.stderr)
-            notify_detail = str(e)
-            exit_code = 2
-        except Exception as e:
-            if shot_dir:
-                ng_shot = shot_dir / f"raimo_import_ng_{int(time.time())}.png"
                 try:
-                    page.screenshot(path=str(ng_shot), full_page=True)
-                    print(f"失敗時スクリーンショット: {ng_shot}", file=sys.stderr)
+                    if browser is not None:
+                        browser.close()
                 except Exception:
                     pass
-            print(f"Raimo取込失敗: {e}", file=sys.stderr)
-            notify_detail = str(e)
-            exit_code = 2
-        finally:
-            context.close()
-            browser.close()
+
+        if exit_code == 2 and last_error is not None and notify_detail == "処理が完了しませんでした。":
+            notify_detail = str(last_error)
 
     maybe_macos_notify_done(exit_code, notify_detail)
     return exit_code
