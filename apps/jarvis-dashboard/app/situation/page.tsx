@@ -1,22 +1,16 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
-import OpsFixAckButton from "@/components/OpsFixAckButton";
-import StatusToggle from "@/components/StatusToggle";
 import WatchAckAllButton from "@/components/WatchAckAllButton";
-import WatchAckButton from "@/components/WatchAckButton";
-import WatchCommentThread, {
-  type WatchCommentRow,
-} from "@/components/WatchCommentThread";
 import WatchHashFocus from "@/components/WatchHashFocus";
-import { LEVEL_LABEL, HomeLevel, watchSortKey } from "@/lib/homeLevels";
+import WatchSituationCard from "@/components/WatchSituationCard";
+import { watchSortKey } from "@/lib/homeLevels";
 import {
   isOpsEphemeralId,
   opsWatchVisibleOnSituation,
 } from "@/lib/opsWatch";
-import {
-  canShowGenericAckButton,
-} from "@/lib/watchUserAck";
+import { canShowGenericAckButton } from "@/lib/watchUserAck";
 import { createClient } from "@/lib/supabase/server";
+import type { WatchCommentRow } from "@/components/WatchCommentThread";
 
 type ActionItem = {
   date?: string;
@@ -34,16 +28,6 @@ function readActions(payload: unknown): ActionItem[] {
   return actions.filter((a) => a && typeof a === "object") as ActionItem[];
 }
 
-function yen(n: number | undefined) {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `¥${Math.round(n).toLocaleString("ja-JP")}`;
-}
-
-/** Zaim 用の YYYY-MM-DD。それ以外（アクションID等）は日付列に出さない */
-function isYmdDate(raw: string | undefined): boolean {
-  return Boolean(raw && /^\d{4}-\d{2}-\d{2}$/.test(raw));
-}
-
 export default async function SituationPage() {
   const supabase = await createClient();
   const { data: items } = await supabase
@@ -53,13 +37,13 @@ export default async function SituationPage() {
 
   const active = (items || []).filter((i) => {
     if (i.status !== "active") return false;
-    // Vercel/GHA/直したよは問題・お知らせがあるときだけ一覧表示
     if (isOpsEphemeralId(String(i.id))) {
       return opsWatchVisibleOnSituation(i);
     }
     return true;
   });
-  const archivedCount = (items || []).filter((i) => i.status === "archived").length;
+  const archivedCount = (items || []).filter((i) => i.status === "archived")
+    .length;
   active.sort((a, b) => {
     const pa =
       a.payload && typeof a.payload === "object"
@@ -104,9 +88,9 @@ export default async function SituationPage() {
       <WatchHashFocus />
       <h1>状況ウォッチ</h1>
       <p className="sub">
-        気にしている項目（3段階: 要確認／注意／参考）。各カードの「確認した」でナビ／ホームのバッジを一時的に消せます（既定7日、または状況が変わると再表示）。
-        Vercel／GHA 失敗と「直したよ」は問題・お知らせがあるときだけ表示し、確認または解決で消えます（アーカイブに溜めません）。
-        各項目で Jarvis に詳しく聞けます。復元は{" "}
+        気にしている項目（3段階: 要確認／注意／参考）。各項目は折りたたみ表示です（タップで詳細・確認・聞くを展開）。
+        「確認した」でナビ／ホームのバッジを一時的に消せます（既定7日、または状況が変わると再表示）。
+        復元は{" "}
         <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
           アーカイブ
         </Link>
@@ -145,14 +129,6 @@ export default async function SituationPage() {
         <p className="empty">まだ push されていません</p>
       ) : (
         active.map((it) => {
-          const level = (
-            ["attention", "warn", "info", "ok"].includes(it.level)
-              ? it.level
-              : "info"
-          ) as HomeLevel | "ok";
-          const label =
-            level === "ok" ? "OK" : LEVEL_LABEL[level as HomeLevel] || it.level;
-          const actions = readActions(it.payload);
           const pl =
             it.payload && typeof it.payload === "object"
               ? (it.payload as Record<string, unknown>)
@@ -163,123 +139,22 @@ export default async function SituationPage() {
           const showOpsAck =
             it.id === "ops_fix_notice" && pl.show_banner === true;
           return (
-            <article
+            <WatchSituationCard
               key={it.id}
-              id={`watch-${it.id}`}
-              data-watch-id={it.id}
-              className={`card level-${it.level}`}
-            >
-              <header>
-                <span className="lvl">{label}</span>
-                <strong>{it.title}</strong>
-                <span className="meta">{it.source}</span>
-                {isOpsEphemeralId(String(it.id)) ? (
-                  <span
-                    className="meta"
-                    style={{ marginLeft: "auto", fontSize: "0.78rem" }}
-                  >
-                    {it.id === "ops_fix_notice"
-                      ? "確認で消す"
-                      : "解決で消える"}
-                  </span>
-                ) : (
-                  <StatusToggle
-                    table="watch_status"
-                    id={it.id}
-                    status={it.status}
-                    path="/situation"
-                    neverArchive={neverArchive}
-                  />
-                )}
-              </header>
-              <p className="sum">{it.summary}</p>
-              {showOpsAck ? <OpsFixAckButton /> : null}
-              <WatchAckButton
-                watchId={String(it.id)}
-                level={it.level}
-                summary={it.summary}
-                payload={pl}
-              />
-              {it.id === "etc_mileage" ? (
-                <p className="meta">
-                  <Link href="/etc">ETCページ（還元サマリ・申請案内）→</Link>
-                </p>
-              ) : null}
-              {it.id === "vpoint" ? (
-                <p className="meta">
-                  <Link href="/vpoint">Vポイントページ（付与サマリ・考察）→</Link>
-                </p>
-              ) : null}
-              {it.id === "rent_step" ? (
-                <p className="meta">
-                  <Link href="/rent-step">家賃ステップ（+4,000・変動）→</Link>
-                </p>
-              ) : null}
-              {it.id === "zaim_quality" ? (
-                <p className="meta">
-                  <Link href="/zaim">Zaim Watch（年間収支・直し確認）→</Link>
-                </p>
-              ) : null}
-              {actions.length > 0 ? (
-                <div className="watch-actions">
-                  <p className="watch-actions-title">要対応（具体）</p>
-                  <ul>
-                    {actions.map((a, idx) => {
-                      const showDate = isYmdDate(a.date);
-                      const showYen =
-                        a.amount != null && !Number.isNaN(a.amount);
-                      const stacked = !showDate || !showYen;
-                      return (
-                        <li
-                          key={`${a.date}-${a.shop}-${a.amount}-${idx}`}
-                          className={stacked ? "watch-action-stack" : undefined}
-                        >
-                          {showDate ? (
-                            <span className="watch-action-date">{a.date}</span>
-                          ) : null}
-                          <span className="watch-action-shop">
-                            {a.shop || "—"}
-                          </span>
-                          {showYen ? (
-                            <span className="watch-action-yen">
-                              {yen(a.amount)}
-                            </span>
-                          ) : null}
-                          <span className="watch-action-proposal">
-                            {a.proposal || a.line || "—"}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : it.detail ? (
-                <pre className="watch-detail">{it.detail}</pre>
-              ) : null}
-              {actions.length > 0 && it.detail && !String(it.detail).includes("要対応:") ? (
-                <pre className="watch-detail">{it.detail}</pre>
-              ) : null}
-              {it.cursor_prompt ? (
-                <details className="watch-prompt-details">
-                  <summary>Cursor用メモ</summary>
-                  <pre className="watch-detail">{it.cursor_prompt}</pre>
-                </details>
-              ) : null}
-              <WatchCommentThread
-                watchId={it.id}
-                title={it.title}
-                summary={it.summary}
-                detail={it.detail}
-                cursorPrompt={it.cursor_prompt}
-                payload={
-                  it.payload && typeof it.payload === "object"
-                    ? (it.payload as Record<string, unknown>)
-                    : null
-                }
-                comments={commentsByWatch.get(it.id) || []}
-                path="/situation"
-              />
-            </article>
+              id={String(it.id)}
+              title={it.title || String(it.id)}
+              level={it.level || "info"}
+              summary={it.summary}
+              detail={it.detail}
+              source={it.source}
+              status={it.status}
+              cursorPrompt={it.cursor_prompt}
+              payload={pl}
+              actions={readActions(it.payload)}
+              comments={commentsByWatch.get(it.id) || []}
+              neverArchive={neverArchive}
+              showOpsAck={showOpsAck}
+            />
           );
         })
       )}

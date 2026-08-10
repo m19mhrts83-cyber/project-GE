@@ -66,6 +66,13 @@ export default function WatchHashFocus() {
         return;
       }
       tries = 0;
+      // 折りたたみカードなら展開してからスクロール
+      if (el instanceof HTMLDetailsElement) {
+        el.open = true;
+      } else {
+        const fold = el.closest("details.watch-fold");
+        if (fold instanceof HTMLDetailsElement) fold.open = true;
+      }
       // レイアウト確定後にスクロール（1フレーム遅延）
       window.requestAnimationFrame(() => {
         if (cancelled) return;
