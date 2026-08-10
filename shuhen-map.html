@@ -22,7 +22,7 @@
 
             <div class="form-row bulk-paste-row">
                 <label for="bulkStep2Paste">## E 一括貼付（推奨）</label>
-                <textarea id="bulkStep2Paste" rows="8" spellcheck="false" placeholder="Step1.2の「## E」をまとめて貼る（E-1〜E-3のコードブロックごと／デモ用txt全体でも可）&#10;→「振り分け」または「ピンを表示」で住所・ラベル・施設リストへ自動分解"></textarea>
+                <textarea id="bulkStep2Paste" rows="8" spellcheck="false" placeholder="Step1.2の「## E」コードブロック1つを貼る（===== 物件住所 ===== 形式／デモ用txt全体でも可）&#10;→「振り分け」または「ピンを表示」で住所・ラベル・施設リストへ自動分解"></textarea>
                 <div class="shuhen-actions" style="margin-top: 8px;">
                     <button type="button" id="bulkSplitButton" class="secondary-btn">振り分け</button>
                 </div>
@@ -32,16 +32,16 @@
             <div class="form-row">
                 <label for="propertyAddress">物件住所</label>
                 <input type="text" id="propertyAddress" placeholder="例: ○○県○○市○○町1-2-3">
-                <small>Step1.2「## E → E-1 物件住所」のコードブロック（1行）。一括貼付を使えば自動入力。</small>
+                <small>一括貼付を使えば自動入力。手貼りする場合のみ Step1.2 ## E 内の住所行。</small>
             </div>
             <div class="form-row">
                 <label for="propertyLabel">物件ラベル（P0）</label>
                 <input type="text" id="propertyLabel" placeholder="例: ○○マンション（物件名）">
-                <small>Step1.2「## E → E-2 物件ラベル」。一括貼付を使えば自動入力。</small>
+                <small>一括貼付を使えば自動入力。手貼りする場合のみ物件名1行。</small>
             </div>
             <div class="form-row">
                 <label for="placesList">店・施設リスト（1行1件：ID | 検索クエリ | 表示名）</label>
-                <textarea id="placesList" rows="10" spellcheck="false" placeholder="Step1.2の「## E → 店・施設リスト」をそのまま貼り付け（1行1件）&#10;P1 | 地下鉄 ○○駅 市名 | ○○駅&#10;P2 | スーパー△△店 市名 | △△スーパー&#10;P3 | ドラッグ□□店 | □□ドラッグ"></textarea>
+                <textarea id="placesList" rows="10" spellcheck="false" placeholder="一括貼付推奨。手貼りする場合のみ:&#10;P1 | 地下鉄 ○○駅 市名 | ○○駅&#10;P2 | スーパー△△店 市名 | △△スーパー&#10;P3 | ドラッグ□□店 | □□ドラッグ"></textarea>
                 <small>半角の縦棒 <code>|</code> 区切り。全角｜は自動で半角に直します。見出し・Access・## H は入れない。</small>
             </div>
 
