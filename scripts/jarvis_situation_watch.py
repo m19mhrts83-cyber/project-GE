@@ -969,6 +969,63 @@ def eval_westudy(meta: dict, data: dict | None) -> dict[str, Any]:
     )
 
 
+def eval_mobile_plan(meta: dict, data: dict | None) -> dict[str, Any]:
+    """携帯プラン乗り換え（Zaim 月額・オプション・次回乗り換えリマインド）。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="未設定または無効化中（scripts/jarvis_mobile_plan_check.py）",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    summary = str(data.get("summary") or "—")
+    detail = str(data.get("detail") or "")
+    if not detail:
+        bits = [
+            f"キャリア: {data.get('carrier') or '—'}",
+            f"次回乗り換え: {data.get('next_switch_date') or '—'} → {data.get('next_switch_to') or '—'}",
+            f"残り日数: {data.get('days_to_switch') if data.get('days_to_switch') is not None else '—'}",
+            f"比較月: {data.get('compare_month') or '—'} / {data.get('compare_yen') or '—'}円",
+        ]
+        for n in data.get("special_notes") or []:
+            bits.append(f"特記: {n}")
+        detail = "\n".join(bits)
+    pin_top = bool(data.get("pin_top"))
+    show_banner = bool(data.get("show_banner")) or pin_top or level in (
+        "warn",
+        "attention",
+    )
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level if level in ("ok", "info", "warn", "attention") else "ok",
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "next_switch_date": data.get("next_switch_date"),
+            "next_switch_to": data.get("next_switch_to"),
+            "days_to_switch": data.get("days_to_switch"),
+            "pin_top": pin_top,
+            "show_banner": show_banner,
+            "special_note": (data.get("special_notes") or [None])[0],
+            "compare_month": data.get("compare_month"),
+            "compare_yen": data.get("compare_yen"),
+            "open_options": data.get("open_options") or [],
+            "missing_credentials": data.get("missing_credentials") or [],
+        },
+    )
+
+
 def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
     """グルコン提出期限（開催日−10日）。期限7日以内かつ未投稿なら warn。"""
     title = meta["title"]
@@ -1011,6 +1068,8 @@ def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
             "glucon_date": data.get("glucon_date"),
             "report_deadline": data.get("report_deadline"),
             "period_key": data.get("period_key"),
+            # ホーム状況バンドで拾いやすくする（warn/attention 時）
+            "show_banner": level in ("warn", "attention"),
         },
     )
 
@@ -1560,6 +1619,9 @@ EVALUATORS = {
     "westudy_weekly": lambda m: eval_westudy(m, load_json(STATE / "westudy_weekly_watch.json")),
     "glucon_report_due": lambda m: eval_glucon_report(
         m, load_json(STATE / "glucon_report.json")
+    ),
+    "mobile_plan": lambda m: eval_mobile_plan(
+        m, load_json(STATE / "mobile_plan.json")
     ),
     "openchat_threads": lambda m: eval_openchat(m),
     "square_probe": lambda m: eval_square(m, load_json(STATE / "square_probe.json")),
