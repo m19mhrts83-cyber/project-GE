@@ -88,6 +88,33 @@ export function treatmentYmdJst(scheduledAt: string | null | undefined): string 
   return ymdJst(t);
 }
 
+/** グラフ用: 完了セッションから治療当日／直後（既定+1〜+2日）を付与。
+ * 取込フォームで既に「治療当日」「治療直後」ならそれを優先。
+ */
+export function enrichSnoreChartEvents<
+  T extends { date: string; event: string },
+>(
+  points: T[],
+  treatments: Array<{ scheduled_at?: string | null; status?: string | null }>,
+  postDays = 2,
+): T[] {
+  const day0 = new Set<string>();
+  const post = new Set<string>();
+  for (const t of treatments) {
+    if (t.status !== "done") continue;
+    const ymd = treatmentYmdJst(t.scheduled_at);
+    if (!ymd) continue;
+    day0.add(ymd);
+    for (let i = 1; i <= postDays; i++) post.add(addDaysYmd(ymd, i));
+  }
+  return points.map((p) => {
+    if (p.event === "治療当日" || p.event === "治療直後") return p;
+    if (day0.has(p.date)) return { ...p, event: "治療当日" };
+    if (post.has(p.date)) return { ...p, event: "治療直後" };
+    return p;
+  });
+}
+
 /** 日付ごとの Health 指標（source 優先: oramemo > watch > health_unknown） */
 export function preferVitalByDay(
   vitals: VitalLite[],
