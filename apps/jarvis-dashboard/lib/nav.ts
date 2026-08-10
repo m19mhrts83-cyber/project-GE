@@ -12,6 +12,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "見る",
     items: [
+      { href: "/queue", label: "処理キュー" },
       { href: "/partner", label: "パートナー" },
       { href: "/general", label: "その他メール" },
       { href: "/openchat", label: "神大家オプチャ" },

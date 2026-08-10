@@ -19,22 +19,84 @@ function asPayload(raw: unknown): Record<string, unknown> {
   return {};
 }
 
+export type SetTriageStatusOpts = {
+  /** snoozed 時に payload.snooze_until へ書く ISO */
+  snoozeUntil?: string | null;
+};
+
 export async function setTriageStatus(
   id: string,
   next: TriageStatus,
   path: string,
-): Promise<TriageActionResult> {
+  opts?: SetTriageStatusOpts,
+): Promise<TriageActionResult & { prevStatus?: TriageStatus }> {
   const supabase = await createClient();
+  const { data: row, error: fetchErr } = await supabase
+    .from("triage_items")
+    .select("status,payload")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!row) return { ok: false, error: "not found" };
+
+  const prevStatus = (row.status || "pending") as TriageStatus;
+  const payload = asPayload(row.payload);
+  if (next === "snoozed" && opts?.snoozeUntil) {
+    payload.snooze_until = opts.snoozeUntil;
+  } else if (next === "pending" || next === "skipped" || next === "sent") {
+    delete payload.snooze_until;
+  }
+
   const { error } = await supabase
     .from("triage_items")
-    .update({ status: next, updated_at: new Date().toISOString() })
+    .update({
+      status: next,
+      payload,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath(path);
   revalidatePath("/");
   revalidatePath("/partner");
   revalidatePath("/general");
-  return { ok: true };
+  revalidatePath("/queue");
+  revalidatePath("/archive");
+  return { ok: true, prevStatus };
+}
+
+/** snooze_until が過ぎた件を pending に戻す（キュー／ホーム用） */
+export async function wakeDueSnoozes(): Promise<number> {
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("triage_items")
+    .select("id,payload")
+    .eq("status", "snoozed")
+    .limit(80);
+  if (error || !data?.length) return 0;
+  let n = 0;
+  for (const row of data) {
+    const pl = asPayload(row.payload);
+    const until = typeof pl.snooze_until === "string" ? pl.snooze_until : "";
+    if (!until || until > now) continue;
+    delete pl.snooze_until;
+    const { error: uErr } = await supabase
+      .from("triage_items")
+      .update({
+        status: "pending",
+        payload: pl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+    if (!uErr) n += 1;
+  }
+  if (n) {
+    revalidatePath("/");
+    revalidatePath("/partner");
+    revalidatePath("/queue");
+  }
+  return n;
 }
 
 /** パートナー以外（general / openchat 等）の pending を一括スキップ。activity は除外。 */
