@@ -24,7 +24,10 @@ export default async function HomeWatchBand() {
         w.id === "vpoint" ||
         w.id === "rent_step" ||
         w.id === "zaim_quality" ||
-        w.id === "cursor_pro_plus_downgrade"
+        w.id === "cursor_pro_plus_downgrade" ||
+        w.id === "vercel_deploy" ||
+        w.id === "gha_workflow_fail" ||
+        w.id === "ops_fix_notice"
       ) {
         if (pl.show_banner === true) return true;
       }

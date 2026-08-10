@@ -26,6 +26,10 @@ jobs:
   triage:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      statuses: read
     steps:
       - uses: actions/checkout@v4
 
@@ -75,3 +79,13 @@ jobs:
             ARGS+=(--push)
           fi
           python scripts/jarvis_gha_gmail_triage.py "${ARGS[@]}"
+
+      - name: Ops fail watch (Vercel / GHA)
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/jarvis_ops_fail_watch.py --push
