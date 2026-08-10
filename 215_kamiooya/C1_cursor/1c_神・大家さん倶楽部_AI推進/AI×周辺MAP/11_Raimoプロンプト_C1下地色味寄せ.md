@@ -1,13 +1,15 @@
 # Raimo MyPrompt：周辺MAP Step3 下地色味寄せ（旧C1）
 
 - **用途**: アプリで撮った **ピンなしクリーン地図スクショ** を、見本に近いベージュ／簡略イラスト風の **地図下地のみ** に寄せる
+- **意図（重要）**: Canvaでは地図形状を直せないため、ここは **地図情報（道路・配置）を保持したまま色味だけ変える** 工程。描き直しは失敗。挙動は安定しないことがあり、本番の色味再現は **Canva 本線**
 - **登録先**: [Raimo MyPrompt](https://raimo.buzz/myprompt)（フォルダ `AI周辺MAP`）
 - **推奨LLM**: Gemini（**画像モード**）／ ChatGPT（**画像作成**）
 - **モード**: **新しいチャット ＋ 画像生成／編集モード**（Deep Research は使わない）
-  - Gemini: モデル切替で **Flash／Pro／画像**（または Tools → **Create images／画像を作成**）。推奨は **Pro（Nano Banana Pro／Gemini 3 Pro Image）**。速さ優先なら Flash Image（Nano Banana 系）
+  - Gemini: モデル切替で **Flash／Pro／画像**（または Tools → **Create images／画像を作成**）。推奨は **Pro（Nano Banana Pro／Gemini 3 Pro Image）**（安定保証ではない）。速さ優先なら Flash Image（Nano Banana 系）
   - ChatGPT: **画像作成（Images／Create image）** を選ぶ
-- **位置づけ**: **Step3**。Step2（地図アプリ）の後、Step4（印刷用仕上げ）／手組の前。番号ピン・Access・吹き出しは描かない（文言は Step1.2 の ## H を別途使う）
+- **位置づけ**: **Step3（任意）**。Step2（地図アプリ）の後。番号ピン・Access・吹き出しは描かない（文言は Step1.2 の ## H を別途使う）
 - **Raimo URL**: https://raimo.buzz/prompt/474296
+- **チャプロ暫定**: https://chapro.jp/prompt/475606
 
 関連: `10c_PhaseC_Gemini色味寄せ.md` / `03_使い方_基本と発展.md` / `12_Raimoミニアプリ_周辺MAP番号ピン.md` / `13`（Step4）／試走メモ: Nano Banana＝Flash Image、Nano Banana Pro＝`gemini-3-pro-image`
 
@@ -102,8 +104,13 @@ Step2 スクショ
 このプロンプトは「新しいチャット」かつ「画像生成／編集モード」で実行してください。
 Deep Research（ディープリサーチ）は使わないでください。
 
+【意図（最重要）】
+Canvaでは地図形状を直せないため、ここは添付地図の情報（道路・交差・東西南北）を保持したまま色味・タッチだけ変える工程です。
+地図の描き直し・道路の付け替え・建物の追加は失敗です。うまくいかない場合は無理に続けず、元のクリーン下地＋Canvaで色味を付けます。
+挙動は安定しないことがあります（安定保証はない）。
+
 始めるときの指定:
-・Gemini: モデル切替で Flash／Pro／画像 を選ぶ（または Create images／画像を作成）。推奨は Pro。速さ優先なら Flash
+・Gemini: モデル切替で Flash／Pro／画像 を選ぶ（または Create images／画像を作成）。推奨は Pro（安定保証ではない）。速さ優先なら Flash
 ・ChatGPT: 画像作成（Images／Create image）を選ぶ
 ・いずれも、地図スクショを添付したうえでこのプロンプトを送る
 
@@ -117,8 +124,8 @@ Deep Research のチャットの続きで送られた場合、または画像モ
 
 #前提条件:
 - タイトル：空室対策用「周辺MAP」の地図下地を、見本に近いベージュ／簡略イラスト風に寄せる
-- 目的：Access・吹き出し・印刷用仕上げの前に、読みやすいチラシ用の地図下地を1枚作る
-- 位置づけ：店リスト洗い出しでも紙面装飾でもなく、地図画像の色味・タッチ変換のみ
+- 目的：Access・吹き出し・印刷用仕上げの前に、読みやすいチラシ用の地図下地を1枚作る（本番の色味再現はCanva本線）
+- 位置づけ：店リスト洗い出しでも紙面装飾でもなく、地図画像の色味・タッチ変換のみ（地理は変えない）
 - 物件名：{物件名}（未指定可。画像上に大きく物件名を書き込まない）
 - タッチの強さ：{タッチの強さ}（未指定なら標準＝ベージュ紙面）
 
