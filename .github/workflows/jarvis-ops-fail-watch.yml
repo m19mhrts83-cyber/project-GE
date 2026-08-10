@@ -1,0 +1,64 @@
+name: Jarvis Ops Fail Watch
+
+# Vercel / GitHub Actions の Fail を検知 → watch_status（ホームお知らせ）
+# Gmail トリアージと同系統で定期実行。夜間・朝の収集タイミングでも回す。
+
+on:
+  schedule:
+    # 夜間トリアージ前後（JST 05:30）・昼（JST 14:00）・夜（JST 22:30）
+    - cron: "30 20 * * *"
+    - cron: "0 5 * * *"
+    - cron: "30 13 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Supabase へ書かず判定だけ"
+        required: false
+        type: boolean
+        default: false
+      note:
+        description: "修正お知らせ文（任意・ホームに載せる）"
+        required: false
+        default: ""
+
+concurrency:
+  group: jarvis-ops-fail-watch
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -q supabase
+
+      - name: Run ops fail watch
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+          NOTE: ${{ github.event.inputs.note || '' }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run)
+          else
+            ARGS+=(--push)
+          fi
+          if [[ -n "${NOTE:-}" ]]; then
+            ARGS+=(--note "$NOTE")
+          fi
+          python scripts/jarvis_ops_fail_watch.py "${ARGS[@]}"
