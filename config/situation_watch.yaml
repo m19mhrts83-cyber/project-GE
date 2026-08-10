@@ -156,9 +156,10 @@ items:
     enabled: true
     source: line_unofficial_poc/.line_auth/.chrline_open_chat_watch_status.json
     cursor_prompt: |
-      815オープンチャットの常時監視とスレッド健全性を確認して。
-      status JSON・watch.err.log・今日の【スレッド】追記を見て報告して。
-      ルール: jarvis-openchat-thread-health.mdc
+      815オープンチャットの常時監視・スレッド健全性・メイン鮮度を確認して。
+      status JSON・watch.err.log・今日の【スレッド】・直近【メイン】追記を見て報告して。
+      全ルートでメインが止まっているときはパートナー確認／朝 --with-line／QR。
+      ルール: jarvis-openchat-thread-health.mdc / ダッシュボード /openchat/health
 
   - id: square_probe
     title: Square API復活監視

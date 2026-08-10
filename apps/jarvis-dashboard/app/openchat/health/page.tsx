@@ -4,6 +4,9 @@ import CopyPathButton from "@/components/CopyPathButton";
 import OpenchatThreadChart, {
   type OpenchatDayPoint,
 } from "@/components/OpenchatThreadChart";
+import OpenchatHealthRemediation, {
+  type Remediation,
+} from "@/components/OpenchatHealthRemediation";
 import { LEVEL_LABEL, type HomeLevel } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,19 +24,25 @@ type RouteEval = {
   closed?: number;
   last_ok_at?: string | null;
   level?: string;
+  symptom?: string;
   reasons?: string[];
   action?: string;
   needs_bootstrap?: boolean;
+  cursor_prompt_short?: string;
 };
 
 function parseHealth(raw: unknown): {
   worst?: string;
   summary?: string;
+  summary_split?: Record<string, unknown>;
+  main_freshness?: Record<string, unknown>;
   watch?: Record<string, unknown>;
   batch?: Record<string, unknown>;
   threads_today?: number;
+  attention_count?: number;
   routes?: RouteEval[];
   daily_series?: OpenchatDayPoint[];
+  remediation?: Remediation | null;
 } {
   if (!raw) return {};
   let obj: unknown = raw;
@@ -49,14 +58,28 @@ function parseHealth(raw: unknown): {
   return {
     worst: String(o.worst_level || ""),
     summary: String(o.summary || ""),
+    summary_split:
+      o.summary_split && typeof o.summary_split === "object"
+        ? (o.summary_split as Record<string, unknown>)
+        : {},
+    main_freshness:
+      o.main_freshness && typeof o.main_freshness === "object"
+        ? (o.main_freshness as Record<string, unknown>)
+        : {},
     watch: (o.watch as Record<string, unknown>) || {},
     batch: (o.batch as Record<string, unknown>) || {},
     threads_today:
       typeof o.threads_today === "number" ? o.threads_today : undefined,
+    attention_count:
+      typeof o.attention_count === "number" ? o.attention_count : undefined,
     routes: Array.isArray(o.routes) ? (o.routes as RouteEval[]) : [],
     daily_series: Array.isArray(o.daily_series)
       ? (o.daily_series as OpenchatDayPoint[])
       : [],
+    remediation:
+      o.remediation && typeof o.remediation === "object"
+        ? (o.remediation as Remediation)
+        : null,
   };
 }
 
@@ -76,8 +99,14 @@ export default async function OpenchatHealthPage() {
     .maybeSingle();
   const { data: watchRows } = await supabase
     .from("watch_status")
-    .select("id,title,level,summary,detail,payload,updated_at")
+    .select("id,title,level,summary,detail,payload,cursor_prompt,updated_at")
     .in("id", ["openchat_threads", "square_probe"]);
+  const { data: comments } = await supabase
+    .from("watch_comments")
+    .select("id,role,body,created_at")
+    .eq("watch_id", "openchat_threads")
+    .order("created_at", { ascending: true })
+    .limit(40);
 
   const health = parseHealth(meta?.value);
   const watch = (watchRows || []).find((w) => w.id === "openchat_threads");
@@ -98,6 +127,39 @@ export default async function OpenchatHealthPage() {
     health.worst ||
     String(payload.worst_level || watch?.level || "info");
   const summary = health.summary || watch?.summary || "データなし（push 待ち）";
+  const summarySplit =
+    health.summary_split && Object.keys(health.summary_split).length
+      ? health.summary_split
+      : (payload.summary_split as Record<string, unknown>) || {};
+  const remediation =
+    health.remediation ||
+    (payload.remediation && typeof payload.remediation === "object"
+      ? (payload.remediation as Remediation)
+      : null);
+  const mainFreshness =
+    (health.main_freshness && Object.keys(health.main_freshness).length
+      ? health.main_freshness
+      : null) ||
+    (payload.main_freshness && typeof payload.main_freshness === "object"
+      ? (payload.main_freshness as Record<string, unknown>)
+      : {});
+  const attentionCount =
+    health.attention_count ??
+    (typeof payload.attention_count === "number"
+      ? payload.attention_count
+      : 0);
+  const writeErr = health.watch?.last_write_error
+    ? String(health.watch.last_write_error)
+    : null;
+  const showRemediation =
+    worst !== "ok" ||
+    attentionCount > 0 ||
+    Boolean(writeErr) ||
+    Boolean(remediation?.infra_attention) ||
+    Boolean(remediation?.main_stale) ||
+    Boolean(mainFreshness?.stale) ||
+    Boolean(remediation?.mac_recipe);
+
   const levelClass =
     worst === "ok" ? "level-info" : `level-${(worst as HomeLevel) || "info"}`;
 
@@ -118,7 +180,8 @@ export default async function OpenchatHealthPage() {
       </p>
       <h1>オプチャ・スレッド取得ヘルス</h1>
       <p className="sub">
-        「登録0件で正常終了」などの静かな失敗を監視。情報収集枠のため返信提案はしません。
+        情報収集枠。返信提案なし。予兆を見たら下の解消パネルから Cursor／聞く／Mac
+        既知復旧へ。
       </p>
 
       <section className={`openchat-health ${levelClass}`} aria-label="全体ステータス">
@@ -138,6 +201,26 @@ export default async function OpenchatHealthPage() {
         </p>
         <ul className="openchat-health-meta">
           <li>
+            <strong>ルート</strong>:{" "}
+            {String(summarySplit.route || `要確認 ${attentionCount}`)}
+          </li>
+          <li>
+            <strong>基盤</strong>:{" "}
+            {String(summarySplit.infra || "—")}
+            {summarySplit.infra_attention ? " （要確認）" : ""}
+          </li>
+          <li>
+            <strong>メイン鮮度</strong>:{" "}
+            {String(
+              summarySplit.main ||
+                mainFreshness?.summary ||
+                "—"
+            )}
+            {summarySplit.main_stale || mainFreshness?.stale
+              ? " （要確認）"
+              : ""}
+          </li>
+          <li>
             常時監視: {String(health.watch?.state || "—")}
             {health.watch?.heartbeat_at
               ? ` · heartbeat ${String(health.watch.heartbeat_at)}`
@@ -154,17 +237,39 @@ export default async function OpenchatHealthPage() {
               Square probe: {square.level} — {square.summary}
             </li>
           ) : null}
-          {health.watch?.last_write_error ? (
+          {writeErr ? (
             <li className="warn-line">
-              書込エラー: {String(health.watch.last_write_error).slice(0, 160)}
+              書込エラー（基盤）: {writeErr.slice(0, 160)}
             </li>
           ) : null}
         </ul>
       </section>
 
+      <OpenchatHealthRemediation
+        show={showRemediation}
+        remediation={remediation}
+        title={watch?.title || "オプチャ・スレッド取得"}
+        summary={summary}
+        detail={watch?.detail}
+        cursorPrompt={
+          remediation?.cursor_prompt || watch?.cursor_prompt || null
+        }
+        payload={payload}
+        comments={(comments || []).map((c) => ({
+          id: c.id,
+          role: c.role,
+          body: c.body,
+          created_at: c.created_at,
+        }))}
+      />
+
       <section aria-label="日次グラフ" className="openchat-health-section">
         <h2>直近30日の【スレッド】追記</h2>
         <OpenchatThreadChart points={series} />
+        <p className="meta">
+          棒が細い＋メインはある → 静かな失敗の予兆。メイン鮮度が全ルート0 →
+          取込経路（パートナー確認／朝 --with-line）。解消パネルへ。
+        </p>
       </section>
 
       <section aria-label="route別" className="openchat-health-section">
@@ -191,8 +296,10 @@ export default async function OpenchatHealthPage() {
                 {sorted.map((r) => {
                   const lv = r.level || "ok";
                   const silentFail =
-                    (r.thread_mids_registered || 0) === 0 &&
-                    (r.md_replies_14d || 0) > 0;
+                    r.symptom === "silent_fail_empty_mids" ||
+                    ((r.thread_mids_registered || 0) === 0 &&
+                      ((r.md_replies_14d || 0) > 0 ||
+                        (r.md_main_14d || 0) > 0));
                   return (
                     <tr
                       key={r.route_id}
@@ -229,14 +336,21 @@ export default async function OpenchatHealthPage() {
                           : "—"}
                       </td>
                       <td>
-                        {r.action ? (
-                          <CopyPathButton
-                            path={r.action}
-                            label="bootstrap コマンド"
-                          />
-                        ) : (
-                          "—"
-                        )}
+                        <div className="openchat-remediation-actions">
+                          {r.action ? (
+                            <CopyPathButton
+                              path={r.action}
+                              label="bootstrap コマンド"
+                            />
+                          ) : null}
+                          {r.cursor_prompt_short ? (
+                            <CopyPathButton
+                              path={r.cursor_prompt_short}
+                              label="短プロンプト"
+                            />
+                          ) : null}
+                          {!r.action && !r.cursor_prompt_short ? "—" : null}
+                        </div>
                       </td>
                     </tr>
                   );
