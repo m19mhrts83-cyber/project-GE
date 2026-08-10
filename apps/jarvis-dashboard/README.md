@@ -76,7 +76,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ### アプリ・プロンプト集（`/apps`）
 
-サイドバー **アプリ・プロンプト集**。自作アプリ・MyPrompt・NotebookLM の入口一覧。正本 `config/apps_prompts_catalog.yaml`（表示用 JSON と同期）。周辺MAP自動作成の Raimo 入口: https://ma-qr4gudwmgqtg.raimo-app.buzz
+サイドバー **アプリ・プロンプト集**。自作アプリ・MyPrompt・NotebookLM の入口一覧。正本 `config/apps_prompts_catalog.yaml`（表示用 JSON と同期）。**Prompt Share（チャプロ代替）**: https://prompt-share-taupe.vercel.app 。周辺MAP自動作成の Raimo 入口: https://ma-qr4gudwmgqtg.raimo-app.buzz
 
 ### 課金／SaaS（`/billing`）
 

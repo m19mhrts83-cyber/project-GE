@@ -10,6 +10,7 @@ type CatalogItem = {
   tags?: string[];
   raimo_miniapp_url?: string;
   raimo_edit_url?: string;
+  admin_url?: string;
   internal?: boolean;
 };
 
@@ -57,7 +58,12 @@ function ItemCard({ item }: { item: CatalogItem }) {
             Raimo編集 ↗
           </a>
         ) : null}
-        {!item.raimo_miniapp_url && item.kind === "app" && external ? (
+        {item.admin_url ? (
+          <a href={item.admin_url} target="_blank" rel="noopener noreferrer">
+            管理画面 ↗
+          </a>
+        ) : null}
+        {!item.raimo_miniapp_url && !item.admin_url && item.kind === "app" && external ? (
           <span className="meta">※ マイミニアプリ未登録（Pages直）</span>
         ) : null}
       </p>
