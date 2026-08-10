@@ -2,7 +2,9 @@
 
 import type {
   GluconActiveCycle,
+  GluconClarifyItem,
   GluconExample,
+  GluconFactItem,
   GluconJournalDay,
   GluconMemberHeaderStatus,
 } from "./types";
@@ -26,12 +28,200 @@ function memberHeader(): string {
   return getMemberHeaderStatus().preview;
 }
 
+const RESULT_CANDIDATE_TAGS =
+  "購入AP／戸建・空室・修繕・売却・融資・業者・情報・幹事";
+
+/** Step1: 事実のみ（推測禁止）。JSON で返す */
+export function resultFactsPrompt(args: {
+  cycle: GluconActiveCycle;
+  journals: GluconJournalDay[];
+  monthlyMovesBlock?: string;
+  earlyFillBlock?: string;
+  rubricSummary?: string;
+}): string {
+  const moves = args.monthlyMovesBlock?.trim()
+    ? `\n${args.monthlyMovesBlock.trim()}\n`
+    : "";
+  const early = args.earlyFillBlock?.trim()
+    ? `\n${args.earlyFillBlock.trim()}\n`
+    : "";
+  const rubric = args.rubricSummary?.trim()
+    ? `\n【scoring 観点（タグ付け用。点数は書かない）】\n${args.rubricSummary.trim()}\n`
+    : "";
+
+  return `あなたは神・大家さん倶楽部の成果報告向け「事実抽出」アシスタントです。
+
+【厳守】
+- 推測・解釈・感情・「たぶん」は禁止。データに明示された事実だけを書く。
+- Journal／今月の動き／早期入居に無いことは出さない。
+- 会社人事・家庭雑談は除外。神大家・不動産・融資・物件・空室・修繕関連のみ。
+- 出力は JSON のみ（前後の説明文・マークダウン禁止）。
+
+【神・大家さんポイント方針】
+- ポイントが貯まるのは成果報告のみ。塾生に共有すべき実践成果は forResult=true にする。
+- 候補タグは次から選ぶ（該当しなければ null）: ${RESULT_CANDIDATE_TAGS}
+- 空室の早期入居付け（退去から短い日数で入居）は立派な成果候補。
+
+【出力 JSON スキーマ】
+{
+  "facts": [
+    {
+      "id": "f1",
+      "text": "事実1文",
+      "source": "Journal 2026-07-12 / occupancy / yoritoori 等",
+      "resultCandidateTag": "空室" | null,
+      "forResult": true
+    }
+  ],
+  "factsBody": "事実だけを箇条書きにした短い下書き（推測なし・見出し可）"
+}
+
+【提出期限】${args.cycle.reportDeadline}
+【Journal 期間】${args.cycle.journalFrom} 〜 ${args.cycle.journalTo}
+【会員】${memberHeader()}
+${rubric}
+【ジャーナル抜粋】
+${JSON.stringify(
+    args.journals.map((j) => ({
+      date: j.recorded_at,
+      keywords: j.keywords,
+      excerpt: j.excerpt,
+    })),
+    null,
+    2,
+  )}
+${moves}${early}`;
+}
+
+/** Step2: 確認質問の生成 */
+export function resultClarifyPrompt(args: {
+  cycle: GluconActiveCycle;
+  facts: GluconFactItem[];
+  factsBody: string;
+}): string {
+  return `あなたは神・大家さん倶楽部の成果報告向け「確認質問」アシスタントです。
+
+【目的】
+最終稿に必要な不足情報（苦労・工夫・入会前の状態・数字の裏付け・成果として書けるか）を、3〜5問で聞く。
+
+【厳守】
+- 事実に無いことを前提にした質問はしない。
+- 出力は JSON のみ。
+
+【出力】
+{
+  "questions": [
+    { "id": "q1", "question": "質問文" }
+  ]
+}
+
+【期間】${args.cycle.journalFrom} 〜 ${args.cycle.journalTo}
+【事実リスト】
+${JSON.stringify(args.facts, null, 2)}
+
+【事実下書き】
+${args.factsBody}`;
+}
+
+/** Step3: 型テンプレ＋Before/After＋回答を織り込んだ最終稿 */
+export function resultPrompt(args: {
+  cycle: GluconActiveCycle;
+  journals: GluconJournalDay[];
+  examples: GluconExample[];
+  rubricSummary?: string;
+  monthlyMovesBlock?: string;
+  facts?: GluconFactItem[];
+  factsBody?: string;
+  clarify?: GluconClarifyItem[];
+  earlyFillBlock?: string;
+}): string {
+  const rubricBlock = args.rubricSummary?.trim()
+    ? `
+【神大家ポイント観点（採点者が見る軸。投稿本文に点数・ルールIDは書かない）】
+${args.rubricSummary.trim()}
+`
+    : "";
+
+  const moves = args.monthlyMovesBlock?.trim()
+    ? `\n${args.monthlyMovesBlock.trim()}\n`
+    : "";
+  const early = args.earlyFillBlock?.trim()
+    ? `\n${args.earlyFillBlock.trim()}\n`
+    : "";
+
+  const factsBlock =
+    args.facts?.length || args.factsBody?.trim()
+      ? `
+【確定した事実（これ以外の成果・金額を捏造しない）】
+${args.factsBody?.trim() || ""}
+${JSON.stringify(args.facts || [], null, 2)}
+`
+      : "";
+
+  const clarifyBlock =
+    args.clarify && args.clarify.some((c) => c.answer.trim())
+      ? `
+【ユーザー回答（苦労・工夫・入会前後など。未回答の観点は書かない）】
+${JSON.stringify(
+        args.clarify.filter((c) => c.answer.trim()),
+        null,
+        2,
+      )}
+`
+      : "";
+
+  return `あなたは神・大家さん倶楽部の塾生向け「成果報告」の下書きライターです。
+
+【厳守】
+- 物件購入・融資実行・空室解消・賃料アップ・修繕コスト削減・管理改善など「実践して成果が出た」ことだけを書く。
+- ジャーナル／今月の動き／確定事実に明確な成果が無い場合は、本文を次の1行だけにする:
+  （今月は該当する成果報告なし）
+- 事実にない成果・金額を捏造しない。会社業務の成果は書かない。
+- 投稿本文に「〇点」「ルールID」は書かない。
+- 出力は投稿本文のみ。
+${rubricBlock}
+【必須の型（成果があるとき・コミュニティ実例に合わせる）】
+■【カテゴリの成果報告】（空室／修繕／融資／購入AP など）
+${memberHeader()}
+・項目行（分かる範囲で）: エリア／物件／号室／対策前／対策後／実施内容 1. 2. 3.／金額・日数など
+・再現できる手順と数字を書く
+所感等：
+・学びと次の一手
+■Before(入会前)：
+・入会前の状態・悩み（ユーザー回答または事実から。無い場合は短い所感のみ）
+■After(入会後)：
+・入会後に得られた変化・学び（同上）
+
+※ 空室の早期入居付けは立派な成果。退去→入居の日数があれば必ず書く。
+※ Before/After は毎月必ず入れる（回答が無い場合も、事実から書ける範囲の短い所感で可。捏造は禁止）。
+
+【提出期限】${args.cycle.reportDeadline}
+【Journal 期間】${args.cycle.journalFrom} 〜 ${args.cycle.journalTo}
+
+【参考例（文体のみ。内容はコピーしない）】
+${JSON.stringify(args.examples, null, 2)}
+${factsBlock}${clarifyBlock}
+【ジャーナル抜粋】
+${JSON.stringify(
+    args.journals.map((j) => ({
+      date: j.recorded_at,
+      keywords: j.keywords,
+      excerpt: j.excerpt,
+    })),
+    null,
+    2,
+  )}
+${moves}${early}`;
+}
+
 export function activityPrompt(args: {
   cycle: GluconActiveCycle;
   journals: GluconJournalDay[];
   examples: GluconExample[];
   /** メール・metrics・入退去の月次集約テキスト（任意） */
   monthlyMovesBlock?: string;
+  /** 成果報告側に採用した事実（活動では書かない／1行参照に留める） */
+  resultExcludedFacts?: string[];
 }): string {
   const monthLabel = args.cycle.periodKey.replace("-", "年") + "月";
   const nextMonth = (() => {
@@ -45,13 +235,24 @@ export function activityPrompt(args: {
     ? `\n${args.monthlyMovesBlock.trim()}\n`
     : "";
 
+  const exclude =
+    args.resultExcludedFacts && args.resultExcludedFacts.length
+      ? `
+【成果報告へ優先配分済み（活動報告では詳細を書かない）】
+- 神・大家さんポイントは成果報告でのみ貯まる。下記は成果側へ寄せる。
+- 触れるなら「詳細は成果報告に記載」の1行まで。仕込み・学習・進行中のみ活動に書く。
+${args.resultExcludedFacts.map((t) => `- ${t}`).join("\n")}
+`
+      : "";
+
   return `あなたは神・大家さん倶楽部の塾生向け「月次活動報告」の下書きライターです。
 
 【厳守】
 - 会社の人員計画・社内DX・家庭の雑談など、神大家・不動産投資・融資・物件・空室・修繕・コミュニティ学習・AI推進（神大家関連）以外は書かない。
 - 事実のない成果を捏造しない。ジャーナル／今月の動きに無いことは「宣言」側の予定としてだけ書いてよい。
+- 成果として共有すべき実践結果（空室早期入居・融資実行・購入完了等）は活動報告の本編に書かない（成果報告側）。
 - 出力は投稿本文のみ（前置き・説明・マークダウン見出しの#は不要）。
-
+${exclude}
 【形式】コミュニティの定型に合わせる:
 ■1■今月の活動報告（${monthLabel}度）
 ・箇条書き（3〜8行）
@@ -79,61 +280,44 @@ ${JSON.stringify(
 ${moves}`;
 }
 
-export function resultPrompt(args: {
-  cycle: GluconActiveCycle;
-  journals: GluconJournalDay[];
-  examples: GluconExample[];
-  /** 神大家ポイント配点基準の要約（formatRubricForPrompt の出力） */
-  rubricSummary?: string;
-  monthlyMovesBlock?: string;
+/** 聞く／直すパネル用 */
+export function consultAskPrompt(args: {
+  body: string;
+  question: string;
+  kind: "activity" | "result";
 }): string {
-  const rubricBlock = args.rubricSummary?.trim()
-    ? `
-【神大家ポイント観点（採点者が見る軸。投稿本文に点数・ルールIDは書かない）】
-${args.rubricSummary.trim()}
-`
-    : "";
-
-  const moves = args.monthlyMovesBlock?.trim()
-    ? `\n${args.monthlyMovesBlock.trim()}\n`
-    : "";
-
-  return `あなたは神・大家さん倶楽部の塾生向け「成果報告」の下書きライターです。
+  return `あなたは神・大家さん倶楽部の${
+    args.kind === "result" ? "成果" : "活動"
+  }報告の相談相手です。
 
 【厳守】
-- 物件購入・融資実行・空室解消・賃料アップ・修繕コスト削減・管理改善など「実践して成果が出た」ことだけを書く。
-- ジャーナル／今月の動きに明確な成果が無い場合は、本文を次の1行だけにする:
-  （今月は該当する成果報告なし）
-- Journal／今月の動きにない成果・金額を捏造しない。会社業務の成果は書かない。
-- 該当カテゴリが分かる題名／箇条書きにする（購入AP・戸建・空室・修繕・売却・融資・業者・情報・幹事など）。
-- 価格・利回り・融資条件・期間・削減額・手順など、採点根拠になる数字・再現情報を、事実がある範囲で必ず書く。
-- 投稿本文に「〇点」「ルールID」は書かない。
-- 出力は投稿本文のみ。
-${rubricBlock}
-【推奨形式（成果があるとき）】
-■【カテゴリが分かる題名】
-${memberHeader()}
-・成果の事実（何をいつ）
-・数字（金額／利回り／融資／削減額など、分かるもの）
-・やったこと・手順（再現できる粒度）
-所感等：
-・学びと次の一手
+- 本文の事実を増やして捏造しない。質問に短く答える。
+- 出力は回答本文のみ。
 
-【提出期限】${args.cycle.reportDeadline}
-【Journal 期間】${args.cycle.journalFrom} 〜 ${args.cycle.journalTo}
+【現在の本文】
+${args.body}
 
-【参考例（文体のみ）】
-${JSON.stringify(args.examples, null, 2)}
+【質問】
+${args.question}`;
+}
 
-【ジャーナル抜粋】
-${JSON.stringify(
-    args.journals.map((j) => ({
-      date: j.recorded_at,
-      keywords: j.keywords,
-      excerpt: j.excerpt,
-    })),
-    null,
-    2,
-  )}
-${moves}`;
+export function consultRevisePrompt(args: {
+  body: string;
+  instruction: string;
+  kind: "activity" | "result";
+}): string {
+  return `あなたは神・大家さん倶楽部の${
+    args.kind === "result" ? "成果" : "活動"
+  }報告の編集アシスタントです。
+
+【厳守】
+- 指示に沿って本文を書き直す。事実の捏造は禁止。
+- 成果報告の場合、型（■【カテゴリ】・所感等・■Before(入会前)／■After(入会後)）を崩さない。
+- 出力は修正後の投稿本文のみ。
+
+【現在の本文】
+${args.body}
+
+【修正指示】
+${args.instruction}`;
 }
