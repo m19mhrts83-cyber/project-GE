@@ -83,6 +83,17 @@ export type GluconDraftPayload = {
   consult?: GluconConsultTurn[];
   /** 活動報告から除外する成果候補テキスト */
   resultCandidates?: string[];
+  /** 成果報告の対象期間（前回報告以降〜今回） */
+  covered_from?: string;
+  covered_to?: string;
+};
+
+/** 前回投稿した成果報告のカバレッジ */
+export type GluconLastResultCoverage = {
+  covered_from: string | null;
+  covered_to: string | null;
+  posted_at: string | null;
+  period_key: string | null;
 };
 
 export type GluconDraftRow = {

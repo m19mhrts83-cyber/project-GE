@@ -39,6 +39,7 @@ import type {
   GluconExample,
   GluconFactItem,
   GluconJournalDay,
+  GluconLastResultCoverage,
   GluconMemberHeaderStatus,
   GluconMonthlyDigestPreview,
   GluconReportKind,
@@ -48,6 +49,50 @@ import { createClient } from "@/lib/supabase/server";
 
 function revalidateGlucon() {
   revalidatePath("/glucon");
+}
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isYmd(s: string | null | undefined): s is string {
+  return !!s && YMD_RE.test(s);
+}
+
+/** JST で日付文字列の翌日 */
+function nextYmd(ymd: string): string {
+  const t = Date.parse(`${ymd}T00:00:00+09:00`);
+  if (!Number.isFinite(t)) return ymd;
+  const d = new Date(t + 86400000);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  return `${y}-${m}-${day}`;
+}
+
+function resolveCoveredRange(args: {
+  cycle: GluconActiveCycle;
+  coveredFrom?: string | null;
+  coveredTo?: string | null;
+  fallbackFrom?: string | null;
+  fallbackTo?: string | null;
+}): { from: string; to: string; error?: string } {
+  const from =
+    (isYmd(args.coveredFrom) && args.coveredFrom) ||
+    (isYmd(args.fallbackFrom) && args.fallbackFrom) ||
+    args.cycle.journalFrom;
+  const to =
+    (isYmd(args.coveredTo) && args.coveredTo) ||
+    (isYmd(args.fallbackTo) && args.fallbackTo) ||
+    args.cycle.journalTo;
+  if (from > to) {
+    return { from, to, error: "対象期間の開始日が終了日より後です" };
+  }
+  return { from, to };
 }
 
 function asExamples(raw: unknown): GluconExample[] {
@@ -122,6 +167,12 @@ function asPayload(raw: unknown): GluconDraftPayload {
     consult,
     resultCandidates: Array.isArray(o.resultCandidates)
       ? o.resultCandidates.map((t) => String(t))
+      : undefined,
+    covered_from: isYmd(String(o.covered_from || ""))
+      ? String(o.covered_from)
+      : undefined,
+    covered_to: isYmd(String(o.covered_to || ""))
+      ? String(o.covered_to)
       : undefined,
   };
 }
@@ -557,8 +608,50 @@ export async function generateGluconDrafts(
   }
 }
 
+/** 投稿済み成果報告から前回の covered 期間を取得 */
+export async function getLastResultCoverage(): Promise<GluconLastResultCoverage | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("glucon_report_drafts")
+    .select("period_key,posted_at,payload")
+    .eq("kind", "result")
+    .eq("status", "posted")
+    .order("posted_at", { ascending: false })
+    .limit(20);
+  if (!data?.length) return null;
+
+  let best: GluconLastResultCoverage | null = null;
+  for (const row of data) {
+    const pl = asPayload(row.payload);
+    const to = pl.covered_to || null;
+    if (!to) continue;
+    if (!best || (best.covered_to && to > best.covered_to) || !best.covered_to) {
+      best = {
+        covered_from: pl.covered_from || null,
+        covered_to: to,
+        posted_at: row.posted_at ? String(row.posted_at) : null,
+        period_key: row.period_key ? String(row.period_key) : null,
+      };
+    }
+  }
+  // covered_to が無い古い投稿は posted_at の日付を近似に使う
+  if (!best && data[0]) {
+    const posted = data[0].posted_at ? String(data[0].posted_at).slice(0, 10) : null;
+    return {
+      covered_from: null,
+      covered_to: posted,
+      posted_at: data[0].posted_at ? String(data[0].posted_at) : null,
+      period_key: data[0].period_key ? String(data[0].period_key) : null,
+    };
+  }
+  return best;
+}
+
 /** Step1: 成果報告の事実のみ下書き */
-export async function generateGluconFacts(): Promise<{
+export async function generateGluconFacts(opts?: {
+  coveredFrom?: string;
+  coveredTo?: string;
+}): Promise<{
   ok: boolean;
   error?: string;
   draft?: GluconDraftRow;
@@ -567,14 +660,21 @@ export async function generateGluconFacts(): Promise<{
     const resolved = await resolveActiveCycle();
     if (!resolved.ok) return { ok: false, error: resolved.error };
     const cycle = resolved.cycle;
-    const journals = await loadGluconJournalRange(
-      cycle.journalFrom,
-      cycle.journalTo,
-    );
-    const monthly = await buildGluconMonthlyDigest(
-      cycle.journalFrom,
-      cycle.journalTo,
-    );
+    const last = await getLastResultCoverage();
+    const defaultFrom = last?.covered_to
+      ? nextYmd(last.covered_to)
+      : cycle.journalFrom;
+    const range = resolveCoveredRange({
+      cycle,
+      coveredFrom: opts?.coveredFrom,
+      coveredTo: opts?.coveredTo,
+      fallbackFrom: defaultFrom,
+      fallbackTo: ymdJst(),
+    });
+    if (range.error) return { ok: false, error: range.error };
+
+    const journals = await loadGluconJournalRange(range.from, range.to);
+    const monthly = await buildGluconMonthlyDigest(range.from, range.to);
     const rubricSummary = formatRubricForPrompt(loadScoringRules());
     const res = await geminiReply(
       resultFactsPrompt({
@@ -619,6 +719,8 @@ export async function generateGluconFacts(): Promise<{
       clarify: [],
       consult: [],
       resultCandidates,
+      covered_from: range.from,
+      covered_to: range.to,
     };
     const supabase = await createClient();
     const { data: prevRow } = await supabase
@@ -782,7 +884,10 @@ export async function saveGluconClarifyAnswers(
 }
 
 /** Step3: 最終稿生成 */
-export async function generateGluconFinal(): Promise<{
+export async function generateGluconFinal(opts?: {
+  coveredFrom?: string;
+  coveredTo?: string;
+}): Promise<{
   ok: boolean;
   error?: string;
   draft?: GluconDraftRow;
@@ -791,14 +896,6 @@ export async function generateGluconFinal(): Promise<{
     const resolved = await resolveActiveCycle();
     if (!resolved.ok) return { ok: false, error: resolved.error };
     const cycle = resolved.cycle;
-    const journals = await loadGluconJournalRange(
-      cycle.journalFrom,
-      cycle.journalTo,
-    );
-    const monthly = await buildGluconMonthlyDigest(
-      cycle.journalFrom,
-      cycle.journalTo,
-    );
     const supabase = await createClient();
     const { data: row } = await supabase
       .from("glucon_report_drafts")
@@ -808,6 +905,17 @@ export async function generateGluconFinal(): Promise<{
       .maybeSingle();
     if (!row) return { ok: false, error: "先に事実下書きを生成してください" };
     const pl = asPayload(row.payload);
+    const range = resolveCoveredRange({
+      cycle,
+      coveredFrom: opts?.coveredFrom || pl.covered_from,
+      coveredTo: opts?.coveredTo || pl.covered_to,
+      fallbackFrom: cycle.journalFrom,
+      fallbackTo: cycle.journalTo,
+    });
+    if (range.error) return { ok: false, error: range.error };
+
+    const journals = await loadGluconJournalRange(range.from, range.to);
+    const monthly = await buildGluconMonthlyDigest(range.from, range.to);
     const ex = await fetchGluconExamples("result");
     const examples = ex.ok ? ex.examples : [];
     const rubricSummary = formatRubricForPrompt(loadScoringRules());
@@ -830,6 +938,8 @@ export async function generateGluconFinal(): Promise<{
     const payload: GluconDraftPayload = {
       ...pl,
       phase: "final",
+      covered_from: range.from,
+      covered_to: range.to,
       resultCandidates:
         pl.resultCandidates ||
         (pl.facts || [])
@@ -1029,6 +1139,7 @@ export async function skipGluconDraft(
 export async function queueGluconPost(
   periodKey: string,
   kind: GluconReportKind,
+  opts?: { coveredFrom?: string; coveredTo?: string },
 ): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const { data: row } = await supabase
@@ -1046,11 +1157,29 @@ export async function queueGluconPost(
   });
   if (blocked) return { ok: false, error: blocked };
 
+  const pl = asPayload(row.payload);
+  const payload: GluconDraftPayload = { ...pl };
+  if (kind === "result") {
+    if (isYmd(opts?.coveredFrom)) payload.covered_from = opts!.coveredFrom;
+    else if (!payload.covered_from) {
+      /* keep */
+    }
+    if (isYmd(opts?.coveredTo)) payload.covered_to = opts!.coveredTo;
+    // 投稿キュー投入時に期間が無ければサイクル相当を確定
+    if (!payload.covered_from && row.report_deadline) {
+      // leave as-is; UI should have set it
+    }
+    if (!payload.covered_to) {
+      payload.covered_to = ymdJst();
+    }
+  }
+
   const { error } = await supabase
     .from("glucon_report_drafts")
     .update({
       status: "queued",
       post_error: null,
+      payload,
       updated_at: new Date().toISOString(),
     })
     .eq("period_key", periodKey)
@@ -1070,6 +1199,7 @@ export async function getGluconPageState(): Promise<{
   journalSyncedAt: string | null;
   memberHeader: GluconMemberHeaderStatus;
   monthlyDigest: GluconMonthlyDigestPreview | null;
+  lastResultCoverage: GluconLastResultCoverage | null;
   loadError?: string;
 }> {
   const memberHeader = getMemberHeaderStatus();
@@ -1088,6 +1218,7 @@ export async function getGluconPageState(): Promise<{
           journalSyncedAt: null,
           memberHeader,
           monthlyDigest: null,
+          lastResultCoverage: null,
           loadError: refreshed.error,
         };
       }
@@ -1144,6 +1275,7 @@ export async function getGluconPageState(): Promise<{
       .order("synced_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    const lastResultCoverage = await getLastResultCoverage();
 
     return {
       today: ymdJst(),
@@ -1156,6 +1288,7 @@ export async function getGluconPageState(): Promise<{
         : null,
       memberHeader,
       monthlyDigest,
+      lastResultCoverage,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -1168,6 +1301,7 @@ export async function getGluconPageState(): Promise<{
       journalSyncedAt: null,
       memberHeader,
       monthlyDigest: null,
+      lastResultCoverage: null,
       loadError: msg,
     };
   }
