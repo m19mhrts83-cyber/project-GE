@@ -7,6 +7,11 @@ const nextConfig = {
       bodySizeLimit: "8mb",
     },
   },
+  // グルコン成果報告の配点 CSV（fs 読込）をサーバレスに同梱
+  outputFileTracingIncludes: {
+    "/glucon": ["./lib/glucon/scoring_seed.csv"],
+    "/*": ["./lib/glucon/scoring_seed.csv"],
+  },
 };
 
 module.exports = nextConfig;

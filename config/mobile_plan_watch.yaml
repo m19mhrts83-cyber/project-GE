@@ -1,0 +1,171 @@
+# 携帯プラン乗り換えウォッチ（Y!mobile / UQ 半年サイクル）
+# check: scripts/jarvis_mobile_plan_check.py → .jarvis_state/mobile_plan.json
+# 認証: .env.jarvis_private の YMOBILE_L*_PHONE / PASSWORD 等（値はここへ書かない）
+
+version: 1
+
+zaim:
+  csv_base_dir: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/50_税金,確定申告"
+  # 店名キーワード（NFKC 正規化後に部分一致）
+  shop_keywords:
+    - ソフトバンクМ
+    - ソフトバンクモバイル
+    - ソフトバンク
+    - ワイモバイル
+    - Ｙ！ｍｏｂｉｌｅ
+    - ＵＱ ｍｏｂｉｌｅ
+    - UQ mobile
+    - ＵＱｍｏｂｉｌｅ
+  # SoftBank Air も通信費として見る場合
+  include_air_keywords:
+    - SoftBank Air
+    - ソフトバンクエアー
+    - ＳＢ Ａｉｒ
+
+current_contract:
+  carrier: Y!mobile
+  contracted_at: "2026-05-31"
+  shop: ソフトバンク緑徳重
+  shop_phone: "0528793581"
+  receipt_no: "20260531039457A1"
+  plan: シンプル3 M
+  data_gb: 35
+  lines:
+    - id: L1
+      role: main
+      name: 真治
+      phone: "090-9670-7595"
+      device: USIM（SIM単体・一括）
+      env_phone: YMOBILE_L1_PHONE
+      env_password: YMOBILE_L1_PASSWORD
+    - id: L2
+      role: sub
+      name: 千景
+      phone: "090-4259-3687"
+      device: USIM（SIM単体・一括）
+      env_phone: YMOBILE_L2_PHONE
+      env_password: YMOBILE_L2_PASSWORD
+    - id: L3
+      role: sub
+      name: 珠己
+      phone: "070-1613-3238"
+      device: iPhone 17e 256GB YM White（48回分割）
+      env_phone: YMOBILE_L3_PHONE
+      env_password: YMOBILE_L3_PASSWORD
+    - id: L4
+      role: sub
+      name: 円香
+      phone: "070-2269-7244"
+      device: USIM（SIM単体・一括）
+      env_phone: YMOBILE_L4_PHONE
+      env_password: YMOBILE_L4_PASSWORD
+      notes: UQ mobile から借りている端末あり（返却必要）
+  air:
+    plan: SoftBank Air（Airターミナル6・12回分割）
+    device_price_yen: 71280
+
+# 次回乗り換え（ダッシュボード・ホームのトップ固定リマインド起点）
+next_switch:
+  date: "2026-12-05"
+  to: UQ mobile
+  remind_days_info: 60
+  remind_days_warn: 30
+  remind_days_attention: 14
+
+# 特記事項（リマインド文面に常に併記）
+special_notes:
+  - id: madoka_uq_rental
+    text: 円香の携帯は UQ mobile からのレンタル。12月の UQ 移行時に返却し、新しいスマホを購入する必要がある。
+    open: true
+
+# オプション解約後の想定月額（4回線＋Air・各種割引後の目安）
+# 初月は事務手数料込みで高い。2ヶ月目以降の確定月で検証する。
+# 初回検証（2026-08-10）: Zaim に 2026-07 以降の携帯行がまだ無い。
+#   2026-06 = 41,870円（初月・skip）。内訳: 6/15 ソフトバンクモバイル 21,395円（三井住友PP・旧側最終疑い）
+#   + 6/30 ソフトバンクМ 16,074円（PayPay・Y!mobile初月）+ UQ最終 4,400円 + AMEX 1円。
+#   expected は見積ベース仮値。7月確定取込後に実測で更新する。
+expected_monthly_yen: 13000
+warn_over_yen: 3000
+# 初月・端末分割等で月額比較から外す YYYY-MM
+skip_months:
+  - "2026-06"
+
+# 契約時に付けたオプション（消し込みの正本。解約確認後に canceled_at を記入）
+options:
+  - id: daretodemo
+    name: だれとでも定額+
+    yen: 880
+    cancel_via: my Y!mobile
+    cancel_by: "2026-06-30"
+    canceled_at: null
+  - id: device_warranty
+    name: 持込端末保証
+    yen: 715
+    cancel_via: my Y!mobile（SIM回線）
+    cancel_by: "2026-06-30"
+    canceled_at: null
+  - id: security_pack
+    name: セキュリティパックプレミアム／データ増量オプション
+    yen: 1320
+    cancel_via: my Y!mobile
+    cancel_by: "2026-06-30"
+    canceled_at: null
+  - id: anshin_databox
+    name: あんしんデータボックス 500GB
+    yen: 600
+    cancel_via: my Y!mobile
+    cancel_by: "2026-06-30"
+    canceled_at: null
+  - id: basket_live
+    name: バスケットLIVE 月額プラン
+    yen: 550
+    cancel_via: DMM マイページ → プラン確認 → 解約
+    cancel_by: "2026-06-30"
+    canceled_at: null
+    env_login: DMM_LOGIN_EMAIL
+    env_password: DMM_PASSWORD
+  - id: helpo
+    name: HELPO
+    yen: 0
+    note: 初月無料→有料。申し込なし表記あり要確認
+    cancel_via: my Y!mobile
+    cancel_by: "2026-06-30"
+    canceled_at: null
+  - id: youtube_premium_lite
+    name: YouTube Premium Lite
+    yen: 0
+    note: 初月無料。手書きで 6/21〜28 に解約指定
+    cancel_via: my Y!mobile → 契約内容確認
+    cancel_by: "2026-06-28"
+    canceled_at: null
+
+cashback:
+  - id: cash_day0
+    label: 即日キャッシュバック
+    yen: 45000
+    due: "2026-05-31"
+    received_at: null
+    note: 契約当日分。受取確認できたら日付を記入
+  - id: paypay_2m
+    label: PayPayポイント（おうち割光セット加入キャンペーン）
+    yen: 60000
+    due: "2026-07-31"
+    received_at: "2026-08-10"
+    note: 15,000×4コード。発行2026-07-21／メール2026-07-26／有効期限2026-08-31。2026-08-10 に4本チャージ完了。
+    gmail_account: m19m.hrts83@gmail.com
+    gmail_message_ids:
+      - "19f9db4219833fcc"
+      - "19f9db405ae648dd"
+      - "19f9db98e6ff7633"
+      - "19f9df065e73dbda"
+    open_command: "scripts/jarvis_mobile_plan_open_paypay_mails.py"
+
+device_plan:
+  - line_id: L3
+    model: iPhone 17e 256GB YM White
+    total_yen: 124560
+    installments: 48
+    months_1_to_24_yen: 1
+    months_25_plus_yen: 5189
+    support: 新トクするサポート(A)
+    note: 25回目到来前（2028-05頃）に返却判断。故障安心パックプレミアム加入

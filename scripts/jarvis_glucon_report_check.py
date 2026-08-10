@@ -131,6 +131,39 @@ def draft_status(period_key: str) -> dict[str, str]:
     return {r["kind"]: r["status"] for r in (res.data or [])}
 
 
+def persist_estimated_schedule(cycle: dict) -> None:
+    """メモリ上の推定日程を jarvis-dashboard.glucon_schedule に残す。"""
+    if (cycle.get("source") or "") != "estimated":
+        return
+    from supabase import create_client
+
+    url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
+    key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    if not url or not key:
+        return
+    sb = create_client(url, key)
+    existing = (
+        sb.table("glucon_schedule")
+        .select("glucon_date, source")
+        .eq("glucon_date", cycle["glucon_date"])
+        .limit(1)
+        .execute()
+    )
+    row = (existing.data or [None])[0]
+    if row and row.get("source") in ("scraped", "manual"):
+        return
+    sb.table("glucon_schedule").upsert(
+        {
+            "glucon_date": cycle["glucon_date"],
+            "report_deadline": cycle["report_deadline"],
+            "title": cycle.get("title") or f"推定: {cycle['glucon_date']}",
+            "source": "estimated",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="glucon_date",
+    ).execute()
+
+
 def pick_cycle(rows: list[dict], today: date) -> dict | None:
     if not rows:
         return None
@@ -190,6 +223,11 @@ def main() -> int:
     today = today_jst()
     rows = fetch_schedule_from_jarvis() or fetch_lessons_from_kamiooya()
     cycle = pick_cycle(rows, today)
+    if cycle:
+        try:
+            persist_estimated_schedule(cycle)
+        except Exception as e:
+            print(f"# estimated persist warn: {e}", file=sys.stderr)
     if not cycle:
         payload = {
             "version": 1,

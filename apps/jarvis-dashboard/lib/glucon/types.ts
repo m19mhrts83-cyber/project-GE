@@ -12,6 +12,27 @@ export type GluconScheduleRow = {
 
 export type GluconReportKind = "activity" | "result";
 
+export type GluconMemberHeaderStatus = {
+  ok: boolean;
+  missing: string[];
+  preview: string;
+};
+
+export type ScoringSuggestion = {
+  ruleId: string;
+  mid: string;
+  level: number;
+  viewpoint: string;
+  points: number;
+  matchedKeywords: string[];
+};
+
+export type ResultScoringHints = {
+  suggestions: ScoringSuggestion[];
+  gaps: string[];
+  disclaimer: string;
+};
+
 export type GluconDraftStatus =
   | "draft"
   | "ready"

@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { flatNavItems, type NavItem } from "@/lib/nav";
 import { useEscape } from "@/components/Toast";
+import {
+  fetchFirstPartnerPendingId,
+  searchCmdk,
+  type CmdkSearchHit,
+} from "@/app/actions/cmdkSearch";
 
 type Action = {
   id: string;
@@ -16,8 +21,6 @@ type Action = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  /** 追加アクション（スキップ等は画面側で渡す） */
-  extraActions?: Omit<Action, "run"> & { href?: string; run?: () => void }[];
 };
 
 function matchQuery(label: string, q: string): boolean {
@@ -26,11 +29,104 @@ function matchQuery(label: string, q: string): boolean {
   return n(label).includes(n(q));
 }
 
+const HELP_ACTIONS: Omit<Action, "run">[] = [
+  {
+    id: "help:keys",
+    label: "ショートカット: j/k 前後 · e スキップ · s 後で · h 時間スヌーズ · z 戻す",
+    hint: "パートナー／キュー",
+    group: "ヘルプ",
+  },
+  {
+    id: "help:cmdk",
+    label: "⌘K / / でこのパレット、? でも開く",
+    hint: "どこでも",
+    group: "ヘルプ",
+  },
+];
+
 export default function CommandPalette({ open, onClose }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
+  const [hits, setHits] = useState<CmdkSearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  const go = useCallback(
+    (href: string) => {
+      router.push(href);
+      onClose();
+    },
+    [router, onClose],
+  );
+
+  const nowActions: Action[] = useMemo(
+    () => [
+      {
+        id: "now:queue",
+        label: "処理キューを開く",
+        hint: "/queue",
+        group: "今やる",
+        run: () => go("/queue"),
+      },
+      {
+        id: "now:partner",
+        label: "パートナー未読",
+        hint: "/partner",
+        group: "今やる",
+        run: () => go("/partner"),
+      },
+      {
+        id: "now:partner-first",
+        label: "最初のパートナー未読（詳細）",
+        hint: "mail",
+        group: "今やる",
+        run: () => {
+          void (async () => {
+            const id = await fetchFirstPartnerPendingId();
+            if (id) go(`/mail/${encodeURIComponent(id)}`);
+            else go("/partner");
+          })();
+        },
+      },
+      {
+        id: "now:situation",
+        label: "状況ウォッチ",
+        hint: "/situation",
+        group: "今やる",
+        run: () => go("/situation"),
+      },
+      {
+        id: "now:today",
+        label: "ホーム（今日のキュー）",
+        hint: "/",
+        group: "今やる",
+        run: () => go("/"),
+      },
+    ],
+    [go],
+  );
+
+  const draftActions: Action[] = useMemo(() => {
+    const m = pathname?.match(/^\/mail\/([^/]+)/);
+    if (!m) return [];
+    const id = decodeURIComponent(m[1]);
+    return [
+      {
+        id: "draft:open-confirm",
+        label: "送信確認モーダルを開く（ゲート維持・未送信）",
+        hint: id.slice(0, 8),
+        group: "下書き",
+        run: () => {
+          onClose();
+          window.setTimeout(() => {
+            document.getElementById("draft-send-open")?.click();
+          }, 50);
+        },
+      },
+    ];
+  }, [pathname, onClose]);
 
   const navActions: Action[] = useMemo(() => {
     const items: NavItem[] = flatNavItems();
@@ -39,17 +135,58 @@ export default function CommandPalette({ open, onClose }: Props) {
       label: it.label,
       hint: it.href,
       group: "移動",
-      run: () => {
-        router.push(it.href);
-        onClose();
-      },
+      run: () => go(it.href),
     }));
-  }, [router, onClose]);
+  }, [go]);
+
+  const helpActions: Action[] = useMemo(
+    () =>
+      HELP_ACTIONS.map((a) => ({
+        ...a,
+        run: () => onClose(),
+      })),
+    [onClose],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => {
+      if (q.trim().length < 1) {
+        setHits([]);
+        setSearching(false);
+        return;
+      }
+      setSearching(true);
+      void searchCmdk(q).then((r) => {
+        setHits(r);
+        setSearching(false);
+      });
+    }, 180);
+    return () => window.clearTimeout(t);
+  }, [q, open]);
 
   const filtered = useMemo(() => {
-    const list = navActions.filter((a) => matchQuery(`${a.label} ${a.hint || ""}`, q));
-    return list;
-  }, [navActions, q]);
+    const staticList = [
+      ...nowActions,
+      ...draftActions,
+      ...navActions,
+      ...helpActions,
+    ].filter((a) => matchQuery(`${a.label} ${a.hint || ""} ${a.group}`, q));
+
+    const searchActions: Action[] = hits.map((h) => ({
+      id: h.id,
+      label: h.title,
+      hint: h.detail,
+      group: h.kind === "mail" ? "検索・メール" : "検索・ウォッチ",
+      run: () => go(h.href),
+    }));
+
+    // クエリありなら検索結果を先頭寄り
+    if (q.trim()) {
+      return [...searchActions, ...staticList];
+    }
+    return [...nowActions, ...draftActions, ...navActions, ...helpActions];
+  }, [nowActions, draftActions, navActions, helpActions, hits, q, go]);
 
   useEscape(onClose, open);
 
@@ -57,13 +194,14 @@ export default function CommandPalette({ open, onClose }: Props) {
     if (!open) return;
     setQ("");
     setActive(0);
+    setHits([]);
     const t = window.setTimeout(() => inputRef.current?.focus(), 10);
     return () => window.clearTimeout(t);
   }, [open]);
 
   useEffect(() => {
     setActive(0);
-  }, [q]);
+  }, [q, filtered.length]);
 
   const runActive = useCallback(() => {
     const item = filtered[active];
@@ -71,6 +209,8 @@ export default function CommandPalette({ open, onClose }: Props) {
   }, [filtered, active]);
 
   if (!open) return null;
+
+  let lastGroup = "";
 
   return (
     <div
@@ -101,7 +241,7 @@ export default function CommandPalette({ open, onClose }: Props) {
         <input
           ref={inputRef}
           className="cmdk-input"
-          placeholder="画面へ移動…（⌘K）"
+          placeholder="移動・検索・今やる…（⌘K /）"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-autocomplete="list"
@@ -109,25 +249,36 @@ export default function CommandPalette({ open, onClose }: Props) {
         />
         <ul id="cmdk-list" className="cmdk-list" role="listbox">
           {filtered.length === 0 ? (
-            <li className="cmdk-empty">該当なし</li>
+            <li className="cmdk-empty">
+              {searching ? "検索中…" : "該当なし"}
+            </li>
           ) : (
-            filtered.map((a, i) => (
-              <li key={a.id} role="option" aria-selected={i === active}>
-                <button
-                  type="button"
-                  className={`cmdk-item${i === active ? " is-active" : ""}`}
-                  onMouseEnter={() => setActive(i)}
-                  onClick={() => a.run()}
-                >
-                  <span className="cmdk-item-label">{a.label}</span>
-                  {a.hint ? <span className="cmdk-item-hint">{a.hint}</span> : null}
-                </button>
-              </li>
-            ))
+            filtered.map((a, i) => {
+              const showGroup = a.group !== lastGroup;
+              lastGroup = a.group;
+              return (
+                <li key={a.id} role="option" aria-selected={i === active}>
+                  {showGroup ? (
+                    <div className="cmdk-group">{a.group}</div>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={`cmdk-item${i === active ? " is-active" : ""}`}
+                    onMouseEnter={() => setActive(i)}
+                    onClick={() => a.run()}
+                  >
+                    <span className="cmdk-item-label">{a.label}</span>
+                    {a.hint ? (
+                      <span className="cmdk-item-hint">{a.hint}</span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })
           )}
         </ul>
         <p className="cmdk-footer">
-          <kbd>↑↓</kbd> 移動 <kbd>Enter</kbd> 開く <kbd>Esc</kbd> 閉じる
+          <kbd>↑↓</kbd> 移動 <kbd>Enter</kbd> 実行 <kbd>Esc</kbd> 閉じる
         </p>
       </div>
     </div>
