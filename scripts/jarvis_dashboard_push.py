@@ -465,6 +465,35 @@ def push_openchat_digest() -> int:
     return 0
 
 
+def push_openchat_thread_health() -> int:
+    """スレッド取得健全性。失敗しても 0。"""
+    import subprocess
+
+    py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+    exe = str(py) if py.is_file() else sys.executable
+    try:
+        r = subprocess.run(
+            [
+                exe,
+                str(REPO / "scripts" / "jarvis_openchat_thread_health.py"),
+                "--push",
+            ],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=180,
+            env=os.environ.copy(),
+        )
+        print(r.stderr or "", file=sys.stderr, end="")
+        print(r.stdout or "", file=sys.stderr, end="")
+        if r.returncode == 0:
+            return 1
+        print(f"# openchat_thread_health failed rc={r.returncode}", file=sys.stderr)
+    except Exception as e:
+        print(f"# openchat_thread_health failed: {e}", file=sys.stderr)
+    return 0
+
+
 def push_lanes_finance_subscriptions() -> tuple[int, int, int, int]:
     """サブプロセスで lanes / finance / subscriptions / occupancy を集約＋push。失敗しても 0。"""
     import subprocess
@@ -569,13 +598,15 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     sb = client()
-    t = w = digest = oc_digest = 0
+    t = w = digest = oc_digest = oc_health = 0
     if not args.watch_only:
         t = push_triage(sb)
         digest = push_other_mail_digest(sb)
         oc_digest = push_openchat_digest()
     if not args.triage_only:
         w = push_watch(sb)
+        # watch 後に健全性で openchat_threads を上書き（構造化 payload）
+        oc_health = push_openchat_thread_health()
     cards = finance = subscriptions = occupancy = 0
     if args.full or (not args.triage_only and not args.watch_only):
         cards, finance, subscriptions, occupancy = push_lanes_finance_subscriptions()
@@ -586,6 +617,7 @@ def main(argv: list[str] | None = None) -> int:
                 "watch": w,
                 "other_mail_digest": digest,
                 "openchat_digest": oc_digest,
+                "openchat_thread_health": oc_health,
                 "lanes": cards,
                 "finance": finance,
                 "subscriptions": subscriptions,

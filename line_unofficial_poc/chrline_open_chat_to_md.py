@@ -40,6 +40,11 @@ from chrline_square_sender_names import SquareSenderNameResolver, build_my_squar
 
 STATE_FILENAME = ".chrline_open_chat_state.json"
 DEDUP_FILENAME = ".chrline_open_chat_dedup.json"
+# バッチ同期の route 別統計（ダッシュボード健全性用。日次30日）
+HEALTH_STATS_PATH = (
+    Path(__file__).resolve().parents[1] / ".jarvis_state" / "openchat_thread_health.json"
+)
+HEALTH_HISTORY_DAYS = 30
 
 # スレッド専用ストリーム: 失敗時の指数バックオフ（秒）
 THREAD_BACKOFF_BASE_SEC = 3600
@@ -972,6 +977,91 @@ class ThreadSyncStats:
     appended: int = 0
 
 
+def _jst_today() -> str:
+    return datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d")
+
+
+def _persist_route_thread_health(
+    routes: list[Route],
+    route_stats: dict[str, ThreadSyncStats],
+    main_appended: dict[str, int],
+    *,
+    run_at: str | None = None,
+) -> Path | None:
+    """route 別スレッド同期統計を .jarvis_state に日次追記（最大30日）。"""
+    try:
+        HEALTH_STATS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if HEALTH_STATS_PATH.is_file():
+            raw = json.loads(HEALTH_STATS_PATH.read_text(encoding="utf-8"))
+        else:
+            raw = {}
+    except Exception as e:
+        print(f"# openchat_thread_health load skip: {e}", file=sys.stderr)
+        raw = {}
+
+    day = _jst_today()
+    now = run_at or datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    history: dict[str, Any] = raw.get("history") if isinstance(raw.get("history"), dict) else {}
+    day_bucket: dict[str, Any] = history.get(day) if isinstance(history.get(day), dict) else {}
+    routes_day: dict[str, Any] = (
+        day_bucket.get("routes") if isinstance(day_bucket.get("routes"), dict) else {}
+    )
+
+    latest_routes: dict[str, Any] = {}
+    for route in routes:
+        rid = route.rid
+        st = route_stats.get(rid) or ThreadSyncStats()
+        registered = len(route.thread_mids or [])
+        entry = {
+            "route_id": rid,
+            "org_label": route.org_label,
+            "include_threads": bool(route.include_threads),
+            "thread_mids_registered": registered,
+            "total": st.total,
+            "ok": st.ok,
+            "skipped": st.skipped,
+            "deleted": st.deleted,
+            "closed": st.closed,
+            "degraded": st.degraded,
+            "join_denied": st.join_denied,
+            "appended_threads": st.appended,
+            "appended_main": int(main_appended.get(rid) or 0),
+            "last_ok_at": now if st.ok > 0 else routes_day.get(rid, {}).get("last_ok_at"),
+            "run_at": now,
+        }
+        # 同日複数回は加算ではなく最新実行で上書き（日次スナップショット）
+        routes_day[rid] = entry
+        latest_routes[rid] = entry
+
+    day_bucket["routes"] = routes_day
+    day_bucket["run_at"] = now
+    history[day] = day_bucket
+
+    # 30日分だけ残す
+    keep = sorted(history.keys())[-HEALTH_HISTORY_DAYS:]
+    history = {k: history[k] for k in keep}
+
+    out = {
+        "updated_at": now,
+        "latest_day": day,
+        "latest": {"run_at": now, "routes": latest_routes},
+        "history": history,
+    }
+    try:
+        HEALTH_STATS_PATH.write_text(
+            json.dumps(out, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(
+            f"# openchat_thread_health saved: {HEALTH_STATS_PATH} routes={len(latest_routes)}",
+            file=sys.stderr,
+        )
+        return HEALTH_STATS_PATH
+    except Exception as e:
+        print(f"# openchat_thread_health save skip: {e}", file=sys.stderr)
+        return None
+
+
 def _resolve_route_chat_mid(cl, route: Route) -> tuple[str, str]:
     if route.square_chat_mid:
         return route.square_chat_mid, ""
@@ -1549,16 +1639,21 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
 
     appended = 0
     thread_stats = ThreadSyncStats()
+    route_thread_stats: dict[str, ThreadSyncStats] = defaultdict(ThreadSyncStats)
+    route_main_appended: dict[str, int] = defaultdict(int)
     session_thread_titles: dict[str, str] = {}
     for st in all_streams:
         sdata = streams_state.get(st.stream_key, {})
+        rid = st.route.rid
 
         if st.thread_mid:
             thread_stats.total += 1
+            route_thread_stats[rid].total += 1
             registered = st.thread_mid in set(st.route.thread_mids or [])
             if not args.init:
                 if _is_thread_closed(sdata):
                     thread_stats.skipped += 1
+                    route_thread_stats[rid].skipped += 1
                     if args.verbose:
                         health = _stream_health(sdata)
                         print(
@@ -1570,6 +1665,7 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
                     skip_reason = _health_skip_reason(sdata)
                     if skip_reason:
                         thread_stats.skipped += 1
+                        route_thread_stats[rid].skipped += 1
                         if args.verbose:
                             print(f"# stream skip ({skip_reason}): {st.stream_key}", file=sys.stderr)
                         continue
@@ -1600,6 +1696,7 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
                             "health": h,
                         }
                         thread_stats.deleted += 1
+                        route_thread_stats[rid].deleted += 1
                     if args.verbose:
                         print(f"# stream skip (deleted via join): {st.stream_key}", file=sys.stderr)
                     continue
@@ -1692,12 +1789,15 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
                     if join_failed and _is_fetch_permission_error(last_exc or Exception()):
                         h = _health_on_closed(sdata, last_exc or RuntimeError("fetch denied"), reason="join_denied")
                         thread_stats.closed += 1
+                        route_thread_stats[rid].closed += 1
                     else:
                         h = _health_on_error(sdata, last_exc or RuntimeError("fetch failed"))
                         if h.get("status") == "deleted":
                             thread_stats.deleted += 1
+                            route_thread_stats[rid].deleted += 1
                         else:
                             thread_stats.degraded += 1
+                            route_thread_stats[rid].degraded += 1
                     prev_sync = str(sdata.get("sync_token") or "")
                     prev_cont = str(sdata.get("continuation_token") or "")
                     # 401 再試行後も失敗した場合は stale token を残さない
@@ -1793,13 +1893,23 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
                 "sync_token": sync_token or "",
                 "continuation_token": cont_token or "",
             }
+            delta = appended - stream_appended_start
             if st.thread_mid:
                 entry["health"] = _health_on_success(sdata)
                 thread_stats.ok += 1
-                thread_stats.appended += appended - stream_appended_start
+                thread_stats.appended += delta
+                route_thread_stats[rid].ok += 1
+                route_thread_stats[rid].appended += delta
+            else:
+                route_main_appended[rid] += delta
             streams_state[st.stream_key] = entry
 
-    yaml_append_total = 0
+    # include_threads なのに thread ストリーム0件の route も統計に載せる
+    for route in routes:
+        if route.rid not in route_thread_stats:
+            route_thread_stats[route.rid] = ThreadSyncStats()
+        if route.rid not in route_main_appended:
+            route_main_appended[route.rid] = route_main_appended.get(route.rid, 0)
     if args.discover_thread_mids:
         if args.discover_from_yoritoori:
             for route in routes:
@@ -1877,6 +1987,13 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
             f"degraded={thread_stats.degraded} deleted={thread_stats.deleted} "
             f"appended={thread_stats.appended}",
             file=sys.stderr,
+        )
+
+    if not skip_md_state and not args.discover_only:
+        _persist_route_thread_health(
+            routes,
+            dict(route_thread_stats),
+            dict(route_main_appended),
         )
 
     print(f"# open-chat 追記: {appended} 件", file=sys.stderr)

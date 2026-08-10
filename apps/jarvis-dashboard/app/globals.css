@@ -830,6 +830,88 @@ a.stat-link:active {
   margin: 0 0 6px;
 }
 
+.openchat-health-meta {
+  margin: 8px 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.openchat-health-meta .warn-line,
+.openchat-route-table .warn-line {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.openchat-health-section {
+  margin: 0 0 1.5rem;
+}
+
+.openchat-chart-wrap {
+  overflow-x: auto;
+  margin: 0.5rem 0 0;
+}
+
+.openchat-chart {
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+  display: block;
+}
+
+.openchat-route-table-wrap {
+  overflow-x: auto;
+}
+
+.openchat-route-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.openchat-route-table th,
+.openchat-route-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.openchat-route-table th {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.openchat-route-table tr.row-attention {
+  background: color-mix(in srgb, #fecaca 35%, transparent);
+}
+
+.openchat-route-table .badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.openchat-route-table .lvl-ok {
+  background: #dcfce7;
+  color: #166534;
+}
+.openchat-route-table .lvl-attention {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.openchat-route-table .lvl-warn {
+  background: #ffedd5;
+  color: #9a3412;
+}
+.openchat-route-table .lvl-info {
+  background: #e2e8f0;
+  color: #334155;
+}
+
 .openchat-digest-overview {
   margin: 0 0 12px;
   font-size: 0.92rem;
@@ -3363,6 +3445,14 @@ p.back {
   align-items: flex-end;
   margin: 8px 0 4px;
   flex-wrap: wrap;
+}
+
+.tavily-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 2px;
 }
 
 .queue-panel {

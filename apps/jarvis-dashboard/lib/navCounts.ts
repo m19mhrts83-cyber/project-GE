@@ -7,7 +7,7 @@ export type { NavCounts };
 export async function fetchNavCounts(): Promise<NavCounts> {
   try {
     const supabase = await createClient();
-    const [partner, other, watch] = await Promise.all([
+    const [partner, other, watch, openchat] = await Promise.all([
       supabase
         .from("triage_items")
         .select("id", { count: "exact", head: true })
@@ -25,13 +25,36 @@ export async function fetchNavCounts(): Promise<NavCounts> {
         .select("id", { count: "exact", head: true })
         .eq("status", "active")
         .eq("level", "attention"),
+      supabase
+        .from("watch_status")
+        .select("id,payload,level")
+        .eq("id", "openchat_threads")
+        .eq("status", "active")
+        .maybeSingle(),
     ]);
+    let openchatAttention = 0;
+    if (openchat.data?.level === "attention") {
+      const payload = openchat.data.payload;
+      if (payload && typeof payload === "object") {
+        const n = (payload as { attention_count?: unknown }).attention_count;
+        openchatAttention =
+          typeof n === "number" && n > 0 ? n : 1;
+      } else {
+        openchatAttention = 1;
+      }
+    }
     return {
       partnerUnread: partner.count ?? 0,
       otherUnread: other.count ?? 0,
       watchAttention: watch.count ?? 0,
+      openchatAttention,
     };
   } catch {
-    return { partnerUnread: 0, otherUnread: 0, watchAttention: 0 };
+    return {
+      partnerUnread: 0,
+      otherUnread: 0,
+      watchAttention: 0,
+      openchatAttention: 0,
+    };
   }
 }
