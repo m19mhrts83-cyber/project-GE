@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { flatNavItems, type NavItem } from "@/lib/nav";
-import { useEscape } from "@/components/Toast";
+import { useEscape, useToast } from "@/components/Toast";
+import { setTriageStatus } from "@/app/actions/triage";
 import {
   fetchFirstPartnerPendingId,
   searchCmdk,
@@ -21,6 +22,8 @@ type Action = {
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** `?` 起動時はヘルプを先頭に */
+  preferHelp?: boolean;
 };
 
 function matchQuery(label: string, q: string): boolean {
@@ -38,15 +41,20 @@ const HELP_ACTIONS: Omit<Action, "run">[] = [
   },
   {
     id: "help:cmdk",
-    label: "⌘K / / でこのパレット、? でも開く",
+    label: "⌘K / / でこのパレット、? でも開く（? はヘルプ優先）",
     hint: "どこでも",
     group: "ヘルプ",
   },
 ];
 
-export default function CommandPalette({ open, onClose }: Props) {
+export default function CommandPalette({
+  open,
+  onClose,
+  preferHelp = false,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
@@ -59,6 +67,31 @@ export default function CommandPalette({ open, onClose }: Props) {
       onClose();
     },
     [router, onClose],
+  );
+
+  const mutateFocus = useCallback(
+    (id: string, next: "skipped" | "snoozed", label: string) => {
+      void (async () => {
+        const r = await setTriageStatus(id, next, pathname || "/partner");
+        if (!r.ok) {
+          toast.push(r.error, "err");
+          return;
+        }
+        toast.push(label, {
+          undo: async () => {
+            await setTriageStatus(
+              id,
+              r.prevStatus || "pending",
+              pathname || "/partner",
+            );
+            router.refresh();
+          },
+        });
+        onClose();
+        router.refresh();
+      })();
+    },
+    [pathname, toast, onClose, router],
   );
 
   const nowActions: Action[] = useMemo(
@@ -107,6 +140,88 @@ export default function CommandPalette({ open, onClose }: Props) {
     ],
     [go],
   );
+
+  const opActions: Action[] = useMemo(() => {
+    const m = pathname?.match(/^\/mail\/([^/]+)/);
+    if (m) {
+      const id = decodeURIComponent(m[1]);
+      return [
+        {
+          id: "op:detail",
+          label: "この件の詳細を開く（現在）",
+          hint: id.slice(0, 8),
+          group: "操作",
+          run: () => onClose(),
+        },
+        {
+          id: "op:skip",
+          label: "この件をスキップ",
+          hint: "e",
+          group: "操作",
+          run: () => mutateFocus(id, "skipped", "スキップしました"),
+        },
+        {
+          id: "op:snooze",
+          label: "この件を後で（即）",
+          hint: "s",
+          group: "操作",
+          run: () => mutateFocus(id, "snoozed", "後でにしました"),
+        },
+      ];
+    }
+    return [
+      {
+        id: "op:first-open",
+        label: "先頭のパートナー未読を開く",
+        hint: "詳細",
+        group: "操作",
+        run: () => {
+          void (async () => {
+            const id = await fetchFirstPartnerPendingId();
+            if (id) go(`/mail/${encodeURIComponent(id)}`);
+            else {
+              toast.push("パートナー未読はありません", "info");
+              onClose();
+            }
+          })();
+        },
+      },
+      {
+        id: "op:first-skip",
+        label: "先頭のパートナー未読をスキップ",
+        hint: "e",
+        group: "操作",
+        run: () => {
+          void (async () => {
+            const id = await fetchFirstPartnerPendingId();
+            if (!id) {
+              toast.push("パートナー未読はありません", "info");
+              onClose();
+              return;
+            }
+            mutateFocus(id, "skipped", "スキップしました");
+          })();
+        },
+      },
+      {
+        id: "op:first-snooze",
+        label: "先頭のパートナー未読を後で",
+        hint: "s",
+        group: "操作",
+        run: () => {
+          void (async () => {
+            const id = await fetchFirstPartnerPendingId();
+            if (!id) {
+              toast.push("パートナー未読はありません", "info");
+              onClose();
+              return;
+            }
+            mutateFocus(id, "snoozed", "後でにしました");
+          })();
+        },
+      },
+    ];
+  }, [pathname, onClose, mutateFocus, go, toast]);
 
   const draftActions: Action[] = useMemo(() => {
     const m = pathname?.match(/^\/mail\/([^/]+)/);
@@ -166,12 +281,25 @@ export default function CommandPalette({ open, onClose }: Props) {
   }, [q, open]);
 
   const filtered = useMemo(() => {
-    const staticList = [
-      ...nowActions,
-      ...draftActions,
-      ...navActions,
-      ...helpActions,
-    ].filter((a) => matchQuery(`${a.label} ${a.hint || ""} ${a.group}`, q));
+    const baseStatic = preferHelp
+      ? [
+          ...helpActions,
+          ...nowActions,
+          ...opActions,
+          ...draftActions,
+          ...navActions,
+        ]
+      : [
+          ...nowActions,
+          ...opActions,
+          ...draftActions,
+          ...navActions,
+          ...helpActions,
+        ];
+
+    const staticList = baseStatic.filter((a) =>
+      matchQuery(`${a.label} ${a.hint || ""} ${a.group}`, q),
+    );
 
     const searchActions: Action[] = hits.map((h) => ({
       id: h.id,
@@ -181,12 +309,21 @@ export default function CommandPalette({ open, onClose }: Props) {
       run: () => go(h.href),
     }));
 
-    // クエリありなら検索結果を先頭寄り
     if (q.trim()) {
       return [...searchActions, ...staticList];
     }
-    return [...nowActions, ...draftActions, ...navActions, ...helpActions];
-  }, [nowActions, draftActions, navActions, helpActions, hits, q, go]);
+    return baseStatic;
+  }, [
+    preferHelp,
+    nowActions,
+    opActions,
+    draftActions,
+    navActions,
+    helpActions,
+    hits,
+    q,
+    go,
+  ]);
 
   useEscape(onClose, open);
 
@@ -241,7 +378,11 @@ export default function CommandPalette({ open, onClose }: Props) {
         <input
           ref={inputRef}
           className="cmdk-input"
-          placeholder="移動・検索・今やる…（⌘K /）"
+          placeholder={
+            preferHelp
+              ? "ショートカットヘルプ…（入力で検索）"
+              : "移動・検索・今やる・操作…（⌘K /）"
+          }
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-autocomplete="list"
