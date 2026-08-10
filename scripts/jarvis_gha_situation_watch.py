@@ -257,6 +257,30 @@ def main(argv: list[str] | None = None) -> int:
     meta = fetch_sync_meta(sb)
     items = check_collect_freshness(meta) + [check_westudy()]
 
+    # Vercel / GHA Fail 監視（ops_fail_watch）
+    try:
+        sys.path.insert(0, str(__file__).rsplit("/", 1)[0])
+        from jarvis_ops_fail_watch import collect_items as collect_ops_fail
+
+        items.extend(collect_ops_fail())
+    except Exception as e:
+        print(f"# ops_fail_watch skip: {e}", file=sys.stderr)
+        items.append(
+            {
+                "id": "vercel_deploy",
+                "title": "Vercelデプロイ",
+                "category": "ops",
+                "level": "attention",
+                "summary": f"ops_fail_watch 取込失敗: {e}",
+                "detail": None,
+                "source": "gha:ops_fail_watch",
+                "cursor_prompt": "Vercel / GHA の失敗監視スクリプトを確認して。",
+                "status": "active",
+                "checked_at": now_iso(),
+                "payload": {"show_banner": True, "origin": "gha"},
+            }
+        )
+
     print(json.dumps({"count": len(items), "items": items}, ensure_ascii=False, indent=2))
     if args.dry_run:
         return 0
