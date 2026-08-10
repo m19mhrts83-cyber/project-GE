@@ -7,6 +7,7 @@ import OpenchatThreadChart, {
 import OpenchatHealthRemediation, {
   type Remediation,
 } from "@/components/OpenchatHealthRemediation";
+import WatchAckButton from "@/components/WatchAckButton";
 import { LEVEL_LABEL, type HomeLevel } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
 
@@ -243,6 +244,12 @@ export default async function OpenchatHealthPage() {
             </li>
           ) : null}
         </ul>
+        <WatchAckButton
+          watchId="openchat_threads"
+          level={worst}
+          summary={summary}
+          payload={payload}
+        />
       </section>
 
       <OpenchatHealthRemediation

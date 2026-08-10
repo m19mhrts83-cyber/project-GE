@@ -681,7 +681,8 @@ def push_report(report: dict[str, Any]) -> None:
     sb = sb_client()
     now = now_iso()
 
-    # Supabase 上の進行中 mac_recipe を優先維持
+    remote_pl: dict[str, Any] = {}
+    # Supabase 上の進行中 mac_recipe / user_ack を優先維持
     try:
         prev = (
             sb.table("watch_status")
@@ -693,6 +694,7 @@ def push_report(report: dict[str, Any]) -> None:
         rows = prev.data or []
         pl = rows[0].get("payload") if rows else None
         if isinstance(pl, dict):
+            remote_pl = pl
             rem = pl.get("remediation") if isinstance(pl.get("remediation"), dict) else {}
             mr = rem.get("mac_recipe") if isinstance(rem.get("mac_recipe"), dict) else pl.get("mac_recipe")
             if isinstance(mr, dict) and str(mr.get("status") or "") in {"queued", "running"}:
@@ -717,6 +719,7 @@ def push_report(report: dict[str, Any]) -> None:
     cursor_prompt = str(remediation.get("cursor_prompt") or "").strip() or (
         "ダッシュボード /openchat/health を確認。"
     )
+    summary = report.get("summary") or ""
     payload = {
         "origin": "openchat_thread_health",
         "show_banner": level in ("attention", "warn"),
@@ -731,14 +734,32 @@ def push_report(report: dict[str, Any]) -> None:
         "main_freshness": report.get("main_freshness") or {},
         "remediation": remediation,
         "mac_recipe": remediation.get("mac_recipe"),
+        "last_write_error": (report.get("watch") or {}).get("last_write_error"),
+        "watch": report.get("watch") or {},
     }
+    try:
+        scripts_dir = str(Path(__file__).resolve().parent)
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from jarvis_watch_user_ack import merge_user_ack_into_payload
+
+        payload = merge_user_ack_into_payload(
+            "openchat_threads",
+            payload,
+            level=str(level),
+            summary=str(summary),
+            remote_payload=remote_pl,
+        )
+    except Exception as e:
+        print(f"# user_ack merge skip: {e}", file=sys.stderr)
+
     sb.table("watch_status").upsert(
         {
             "id": "openchat_threads",
             "title": "オプチャ・スレッド取得",
             "category": "ops",
             "level": level,
-            "summary": report.get("summary") or "",
+            "summary": summary,
             "detail": "/openchat/health",
             "source": "openchat_thread_health",
             "cursor_prompt": cursor_prompt,

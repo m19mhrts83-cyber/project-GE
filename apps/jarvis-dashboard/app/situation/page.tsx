@@ -2,6 +2,7 @@ import Link from "next/link";
 import Shell from "@/components/Shell";
 import OpsFixAckButton from "@/components/OpsFixAckButton";
 import StatusToggle from "@/components/StatusToggle";
+import WatchAckButton from "@/components/WatchAckButton";
 import WatchCommentThread, {
   type WatchCommentRow,
 } from "@/components/WatchCommentThread";
@@ -174,6 +175,12 @@ export default async function SituationPage() {
               </header>
               <p className="sum">{it.summary}</p>
               {showOpsAck ? <OpsFixAckButton /> : null}
+              <WatchAckButton
+                watchId={String(it.id)}
+                level={it.level}
+                summary={it.summary}
+                payload={pl}
+              />
               {it.id === "etc_mileage" ? (
                 <p className="meta">
                   <Link href="/etc">ETCページ（還元サマリ・申請案内）→</Link>
