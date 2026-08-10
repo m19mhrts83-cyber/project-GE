@@ -5,6 +5,7 @@ import {
   watchSortKey,
 } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
+import { wakeDueSnoozes } from "@/app/actions/triage";
 import { watchHref } from "./homeHelpers";
 
 type QueueItem = {
@@ -18,6 +19,7 @@ type QueueItem = {
 
 /** ホーム最上段: 今やるべき件数の要約 */
 export default async function HomeTodayQueue() {
+  await wakeDueSnoozes();
   const supabase = await createClient();
 
   const [{ data: watchRows }, { data: mailRows }] = await Promise.all([
@@ -47,15 +49,27 @@ export default async function HomeTodayQueue() {
         w.id === "cursor_pro_plus_downgrade" ||
         w.id === "vercel_deploy" ||
         w.id === "gha_workflow_fail" ||
-        w.id === "ops_fix_notice"
+        w.id === "ops_fix_notice" ||
+        w.id === "mobile_plan"
       ) {
         if (pl.show_banner === true) return true;
       }
       return w.level !== "ok";
     })
     .sort((a, b) => {
-      if (a.id === "cursor_pro_plus_downgrade") return -1;
-      if (b.id === "cursor_pro_plus_downgrade") return 1;
+      const pa =
+        a.payload && typeof a.payload === "object"
+          ? (a.payload as Record<string, unknown>)
+          : {};
+      const pb =
+        b.payload && typeof b.payload === "object"
+          ? (b.payload as Record<string, unknown>)
+          : {};
+      const pinA =
+        pa.pin_top === true || a.id === "cursor_pro_plus_downgrade";
+      const pinB =
+        pb.pin_top === true || b.id === "cursor_pro_plus_downgrade";
+      if (pinA !== pinB) return pinA ? -1 : 1;
       return (
         watchSortKey(a.level) - watchSortKey(b.level) ||
         String(b.updated_at || "").localeCompare(String(a.updated_at || ""))
@@ -141,6 +155,9 @@ export default async function HomeTodayQueue() {
         </ul>
       )}
       <div className="today-queue-links">
+        <a href="/queue" className="home-more">
+          処理キュー →
+        </a>
         <a href="/partner" className="home-more">
           パートナー →
         </a>

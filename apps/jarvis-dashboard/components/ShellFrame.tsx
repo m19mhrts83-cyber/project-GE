@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import CommandPalette from "@/components/CommandPalette";
-import { ToastProvider } from "@/components/Toast";
+import { GlobalUndoKey, ToastProvider } from "@/components/Toast";
 import type { NavCounts } from "@/lib/navBadges";
 import { badgeForHref } from "@/lib/navBadges";
 import { HOME_NAV, NAV_GROUPS } from "@/lib/nav";
@@ -51,6 +51,11 @@ export default function ShellFrame({
       ) {
         return;
       }
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        setCmdOpen(true);
+        return;
+      }
       if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         setCmdOpen(true);
@@ -76,6 +81,7 @@ export default function ShellFrame({
 
   return (
     <ToastProvider>
+      <GlobalUndoKey />
       <div className={`layout${navOpen ? " nav-open" : ""}`}>
         <button
           type="button"

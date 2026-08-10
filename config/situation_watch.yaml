@@ -66,6 +66,26 @@ items:
       次回引落日・解約期限・退会モード・資産運用特典を整理。期限が近いなら先に警告。
       秘密は .env.jarvis_private（PP_CANCEL_* / OLIVE_INF_*_FEE_*）。値は出さない。
 
+  - id: mobile_plan
+    title: 携帯プラン乗り換え（Y!mobile/UQ）
+    category: finance
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/mobile_plan.json
+    cursor_prompt: |
+      携帯プラン乗り換えの状況を確認して。半年サイクル（現契約 Y!mobile → 次回 2026-12-05 UQ mobile）。
+      正本: config/mobile_plan_watch.yaml
+      state: .jarvis_state/mobile_plan.json
+      コマンド: scripts/jarvis_mobile_plan_check.py --mark-checked
+      反映: scripts/jarvis_dashboard_push.py --watch-only
+      Zaim 月額超過・未消し込みオプション・PayPay CB・乗り換え残日数を見て報告。
+      特記: 円香の携帯は UQ からのレンタル。移行時に返却＋新スマホ購入が必要。
+      認証（値はチャットに出さない）:
+        cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+        変数: YMOBILE_L1〜L4_PHONE / PASSWORD、DMM_LOGIN_EMAIL / DMM_PASSWORD、UQ_LOGIN_*
+      手続き時: my Y!mobile（https://my.ymobile.jp/）をブラウザで開き、回線ごとに確認しながら進める。
+      対外的な確定操作（解約・申込・MNP）の前は必ずユーザー確認。
+
   - id: line_export
     title: LINE公式エクスポート経過
     category: line

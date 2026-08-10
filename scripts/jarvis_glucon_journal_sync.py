@@ -33,6 +33,21 @@ KEYWORD_RE = re.compile(
     re.I,
 )
 
+# 会社人事・社内業務（キーワード偶発ヒットで混入しやすい行を除外）
+EXCLUDE_RE = re.compile(
+    r"人員計画|採用枠|人事部|工数計上|防衛省|コンプライアンス監査|"
+    r"社内DX|評価面談|1on1|ワンオンワン|組織改編|異動発令|"
+    r"採用協議|チェックリスト展開|工数教育",
+    re.I,
+)
+
+# 除外行でもこれがあれば神大家関連として残す
+STRONG_KAMIOOYA_RE = re.compile(
+    r"神大家|神尾屋|WeStudy|グルコン|物件購入|融資実行|空室|戸建|"
+    r"アパート|LEAF|ミニテック|大家さん|利回り|買付|決済",
+    re.I,
+)
+
 
 def load_env() -> None:
     if not ENV_PATH.exists():
@@ -73,6 +88,15 @@ def find_keywords(text: str) -> list[str]:
     return found
 
 
+def line_is_kamiooya(line: str) -> bool:
+    """キーワードヒットかつ会社人事行でないこと。"""
+    if not KEYWORD_RE.search(line):
+        return False
+    if EXCLUDE_RE.search(line) and not STRONG_KAMIOOYA_RE.search(line):
+        return False
+    return True
+
+
 def extract_kamiooya_excerpt(text: str, max_chars: int = 2400) -> tuple[str, list[str]]:
     """キーワードヒット行と周辺を抜粋。ヒットが無ければ空。"""
     keywords = find_keywords(text)
@@ -82,9 +106,12 @@ def extract_kamiooya_excerpt(text: str, max_chars: int = 2400) -> tuple[str, lis
     lines = text.splitlines()
     chunks: list[str] = []
     for i, line in enumerate(lines):
-        if not KEYWORD_RE.search(line):
+        if not line_is_kamiooya(line):
             continue
         for j in range(max(0, i - 1), min(len(lines), i + 5)):
+            # 周辺行も人事だけの行は落とす
+            if EXCLUDE_RE.search(lines[j]) and not STRONG_KAMIOOYA_RE.search(lines[j]):
+                continue
             t = clean_line(lines[j])
             if t and t not in chunks:
                 chunks.append(t)
@@ -101,7 +128,7 @@ def extract_kamiooya_excerpt(text: str, max_chars: int = 2400) -> tuple[str, lis
                 continue
             if s.startswith("## ") or s.startswith("---"):
                 in_battle = False
-            if in_battle and KEYWORD_RE.search(s):
+            if in_battle and line_is_kamiooya(s):
                 chunks.append(clean_line(s))
 
     excerpt = "\n".join(chunks)[:max_chars]

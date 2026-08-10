@@ -10,6 +10,7 @@ import {
   type CursorReviseState,
   type ReviseEngine,
 } from "@/app/actions/triage";
+import { researchWithTavily } from "@/app/actions/tavilyResearch";
 
 type Payload = {
   draft_gemini?: string;
@@ -75,6 +76,9 @@ export default function DraftWorkbench({
   const [err, setErr] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, start] = useTransition();
+  const [tavilyQ, setTavilyQ] = useState(() =>
+    [subject, partner].filter(Boolean).join(" ").trim().slice(0, 120),
+  );
   const [polling, setPolling] = useState(() => {
     const cr = readCursorRevise(payload);
     return cr?.status === "queued" || cr?.status === "running";
@@ -276,11 +280,47 @@ export default function DraftWorkbench({
           }
         />
       </label>
+      <div className="tavily-row">
+        <label className="draft-instruction-label" style={{ flex: 1 }}>
+          Web下調べ（Tavily・送信しない）
+          <input
+            className="draft-instruction"
+            value={tavilyQ}
+            onChange={(e) => setTavilyQ(e.target.value)}
+            placeholder="検索語（件名・トピック）"
+            disabled={pending || polling}
+          />
+        </label>
+        <button
+          type="button"
+          className="btn"
+          style={{ alignSelf: "flex-end", marginBottom: 2 }}
+          disabled={pending || polling || !tavilyQ.trim()}
+          onClick={() =>
+            start(async () => {
+              setErr(null);
+              const r = await researchWithTavily(tavilyQ);
+              if (!r.ok) {
+                setErr(r.error);
+                return;
+              }
+              setInstruction((prev) =>
+                prev.trim()
+                  ? `${prev.trim()}\n\n${r.block}`
+                  : `下調べを踏まえて丁寧に整えて。\n\n${r.block}`,
+              );
+              setMsg("Tavily の結果を見直し指示に追記しました（未送信）");
+            })
+          }
+        >
+          下調べして指示へ
+        </button>
+      </div>
       <p className="draft-hint">
         「見直しを実行」は、上の下書きとこの指示だけを見ます（{lane === "partner"
           ? "やり取り.md は開き直さない"
           : "元メール全文は再読しない"}
-        ）。
+        ）。Tavily は文脈注入のみで、送信確認ゲートは変わりません。
       </p>
 
       <fieldset className="draft-engine">
@@ -374,6 +414,7 @@ export default function DraftWorkbench({
         {status === "pending" ? (
           <button
             type="button"
+            id="draft-send-open"
             className="btn primary"
             disabled={pending || polling || !draft.trim() || !to.trim()}
             onClick={() => {
