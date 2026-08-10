@@ -73,6 +73,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const cleanToggle = document.getElementById('cleanStyleToggle');
     const hidePinsToggle = document.getElementById('hidePinsToggle');
     const routeToggle = document.getElementById('walkRouteToggle');
+    const splitBtn = document.getElementById('bulkSplitButton');
+    if (splitBtn) {
+        splitBtn.addEventListener('click', () => {
+            applyBulkPasteToFields();
+        });
+    }
     if (cleanToggle) {
         const savedClean = localStorage.getItem('shuhenCleanStyle');
         if (savedClean !== null) cleanToggle.checked = savedClean === '1';
@@ -120,13 +126,204 @@ function applyMapDisplayOptions() {
     if (routeInfoMarker) routeInfoMarker.setMap(hide ? null : map);
 }
 
+/** 全角縦棒などを半角 | に揃える（Step1.2／デモコピペの揺れ対策） */
+function normalizePipes(text) {
+    return String(text || '')
+        .replace(/\uFF5C/g, '|') // ｜ FULLWIDTH VERTICAL LINE
+        .replace(/\u2502/g, '|') // │ BOX DRAWINGS
+        .replace(/\u2503/g, '|');
+}
+
+function looksLikeAddressLine(line) {
+    const t = String(line || '').trim();
+    if (!t || t.includes('|')) return false;
+    return /[都道府県]/.test(t) || /市|区|町|村/.test(t) || /^〒/.test(t);
+}
+
+function looksLikePlaceLine(line) {
+    const t = normalizePipes(line).trim();
+    if (!t) return false;
+    if (/^#{1,6}\s/.test(t)) return false;
+    if (/^=====/.test(t) || /^-----/.test(t)) return false;
+    if (/^(使い方|アプリ:|補足|Access参考|※)/i.test(t)) return false;
+    if (/物件住所|物件ラベル|施設リスト|店・施設リスト|Step1\.2|コピペ/.test(t)) return false;
+    if (/^（/.test(t) && t.includes('）')) return false;
+    const parts = t.split('|').map((s) => s.trim()).filter(Boolean);
+    if (parts.length >= 2) return true;
+    // P1 だけの行は施設行とみなさない
+    return false;
+}
+
+function extractFencedBlocks(text) {
+    const blocks = [];
+    const re = /```[^\n]*\n?([\s\S]*?)```/g;
+    let m;
+    while ((m = re.exec(text))) {
+        const body = (m[1] || '').trim();
+        if (body) blocks.push(body);
+    }
+    return blocks;
+}
+
+/**
+ * Step1.2 の ## E 全文／デモ txt／3欄バラバラ、いずれでも住所・ラベル・施設行に分解する。
+ * @returns {{ address: string, label: string, placesText: string, placeCount: number, warnings: string[] }}
+ */
+function parseBulkStep2Input(raw) {
+    const text = normalizePipes(raw).trim();
+    const warnings = [];
+    let address = '';
+    let label = '';
+    let placeLines = [];
+
+    if (!text) {
+        return { address, label, placesText: '', placeCount: 0, warnings };
+    }
+
+    // デモ／手順用: ===== 物件住所 ===== 形式
+    const addrSec = text.match(/=====\s*物件住所\s*=====\s*\r?\n([^\r\n=]+)/);
+    const labelSec = text.match(/=====\s*物件ラベル[^\n=]*=====\s*\r?\n([^\r\n=]+)/);
+    const listSec = text.match(
+        /=====\s*(?:店・)?施設リスト[^\n=]*=====\s*\r?\n([\s\S]*?)(?=\r?\n=====|\r?\n-----|\r?\nAccess|$)/i
+    );
+    if (addrSec) address = addrSec[1].trim();
+    if (labelSec) label = labelSec[1].trim();
+    if (listSec) {
+        placeLines = listSec[1]
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(looksLikePlaceLine);
+    }
+
+    // Markdown の ``` コードブロック（## E の E-1/E-2/E-3）
+    const blocks = extractFencedBlocks(text);
+    if (blocks.length) {
+        const singleLines = [];
+        const multiPlace = [];
+        for (const b of blocks) {
+            const lines = b
+                .split(/\r?\n/)
+                .map((l) => l.trim())
+                .filter(Boolean);
+            if (lines.length === 1 && !lines[0].includes('|')) {
+                singleLines.push(lines[0]);
+            } else if (lines.some((l) => looksLikePlaceLine(l))) {
+                multiPlace.push(...lines.filter(looksLikePlaceLine));
+            }
+        }
+        if (!address) {
+            const a = singleLines.find(looksLikeAddressLine);
+            if (a) address = a;
+        }
+        if (!label) {
+            const rest = singleLines.filter((l) => l !== address);
+            if (rest.length) label = rest[0];
+        }
+        if (!placeLines.length && multiPlace.length) placeLines = multiPlace;
+    }
+
+    // 見出し付きプレーン（### E-1. 物件住所 の次行、など）
+    if (!address) {
+        const m = text.match(/(?:E-1[^\n]*物件住所|物件住所)[^\n]*\r?\n+([^\r\n`#=]+)/i);
+        if (m && looksLikeAddressLine(m[1])) address = m[1].trim();
+    }
+    if (!label) {
+        const m = text.match(/(?:E-2[^\n]*物件ラベル|物件ラベル\s*\(?P0\)?)[^\n]*\r?\n+([^\r\n`#=|]+)/i);
+        if (m) label = m[1].trim();
+    }
+
+    // フォールバック: 全文から施設行／住所行を拾う
+    if (!placeLines.length) {
+        placeLines = text
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(looksLikePlaceLine);
+    }
+    if (!address) {
+        const a = text
+            .split(/\r?\n/)
+            .map((l) => l.trim().replace(/^住所[:：]\s*/, ''))
+            .find(looksLikeAddressLine);
+        if (a) address = a;
+    }
+    if (!label) {
+        const m = text.match(/(?:物件名|ラベル)[:：]\s*([^\r\n|]+)/);
+        if (m) label = m[1].trim();
+    }
+
+    // ゴミ行が施設に紛れたときの警告
+    const junkish = placeLines.filter((l) => l.split('|').length < 2);
+    if (junkish.length) {
+        warnings.push('施設行に縦棒（|）が無い行があります。未ヒットになりやすいです。');
+    }
+    if (placeLines.length === 0) {
+        warnings.push('施設リスト行（例: P1 | 検索クエリ | 表示名）が見つかりません。');
+    }
+    if (!address) {
+        warnings.push('物件住所が見つかりません。');
+    }
+
+    return {
+        address,
+        label,
+        placesText: placeLines.join('\n'),
+        placeCount: placeLines.length,
+        warnings,
+    };
+}
+
+/** 一括欄の内容を3欄へ振り分け。成功時 true */
+function applyBulkPasteToFields() {
+    const bulkEl = document.getElementById('bulkStep2Paste');
+    const raw = (bulkEl && bulkEl.value.trim()) || '';
+    // 一括が空なら、施設リスト欄に ## E 全文が入っているケースを救済
+    const placesEl = document.getElementById('placesList');
+    const source =
+        raw ||
+        (placesEl &&
+        (placesEl.value.includes('=====') ||
+            placesEl.value.includes('```') ||
+            placesEl.value.includes('## E') ||
+            placesEl.value.includes('物件住所'))
+            ? placesEl.value
+            : '');
+    if (!source.trim()) {
+        showError('「## E 一括貼付」欄に Step1.2 の ## E 全文（またはデモ用 txt）を貼ってから「振り分け」を押してください。');
+        return false;
+    }
+    const parsed = parseBulkStep2Input(source);
+    const addrEl = document.getElementById('propertyAddress');
+    const labelEl = document.getElementById('propertyLabel');
+    if (parsed.address && addrEl) addrEl.value = parsed.address;
+    if (parsed.label && labelEl) labelEl.value = parsed.label;
+    if (parsed.placesText && placesEl) placesEl.value = parsed.placesText;
+    if (bulkEl && raw) {
+        // 振り分け後も一括欄は残す（再実行用）
+    }
+    if (!parsed.address || parsed.placeCount === 0) {
+        showError(
+            '振り分けに失敗しました。' +
+                (parsed.warnings.length ? parsed.warnings.join(' ') : '') +
+                ' E-1住所・E-2物件名・E-3の「P1 | クエリ | 表示名」形式を確認してください。'
+        );
+        return false;
+    }
+    hideError();
+    const tip = document.getElementById('bulkPasteStatus');
+    if (tip) {
+        tip.textContent = `振り分け完了: 住所あり / ラベル「${parsed.label || '（空）'}」 / 施設 ${parsed.placeCount} 行` +
+            (parsed.warnings.length ? ` ※${parsed.warnings[0]}` : '');
+    }
+    return true;
+}
+
 function parsePlacesList(text) {
-    return text
-        .split('\n')
+    return normalizePipes(text)
+        .split(/\r?\n/)
         .map((line) => line.trim())
-        .filter(Boolean)
+        .filter((line) => looksLikePlaceLine(line))
         .map((line) => {
-            const parts = line.split('|').map((s) => s.trim());
+            const parts = line.split('|').map((s) => s.trim()).filter(Boolean);
             if (parts.length >= 3) {
                 return { id: parts[0], query: parts[1], name: parts[2] };
             }
@@ -387,9 +584,24 @@ async function updateWalkRoute(rows) {
 
 async function runNumberedPins() {
     const currentApiKey = resolveApiKey();
-    const address = document.getElementById('propertyAddress').value.trim();
+    let address = document.getElementById('propertyAddress').value.trim();
+    let places = parsePlacesList(document.getElementById('placesList').value);
+    const bulkRaw = (document.getElementById('bulkStep2Paste') || {}).value || '';
+
+    // 住所が空／施設0件／一括欄あり → 自動振り分け（## E 全文の手分け忘れ対策）
+    const placesRaw = document.getElementById('placesList').value;
+    const needBulk =
+        Boolean(bulkRaw.trim()) ||
+        (!address && placesRaw.trim()) ||
+        (places.length === 0 && placesRaw.trim());
+    if (needBulk) {
+        const ok = applyBulkPasteToFields();
+        if (!ok && !document.getElementById('propertyAddress').value.trim()) return;
+        address = document.getElementById('propertyAddress').value.trim();
+        places = parsePlacesList(document.getElementById('placesList').value);
+    }
+
     const propertyLabel = document.getElementById('propertyLabel').value.trim() || '物件';
-    const places = parsePlacesList(document.getElementById('placesList').value);
 
     if (!currentApiKey) {
         showError(
@@ -400,11 +612,22 @@ async function runNumberedPins() {
         return;
     }
     if (!address) {
-        showError('物件住所を入力してください。');
+        showError(
+            '物件住所が空です。「## E 一括貼付」に Step1.2 の ## E 全文を貼るか、物件住所欄へ E-1 を入れてください。'
+        );
         return;
     }
     if (places.length === 0) {
-        showError('店・施設リストを1行以上入力してください。');
+        showError(
+            '施設リストが空、または形式が不正です。1行を「P1 | 検索クエリ | 表示名」（半角|）にしてください。全角｜や見出しだけの貼付は失敗します。'
+        );
+        return;
+    }
+    const weak = places.filter((p) => p.id === '?' || !p.query);
+    if (weak.length >= Math.max(2, Math.ceil(places.length / 2))) {
+        showError(
+            `施設行の形式が崩れている可能性が高いです（${weak.length}/${places.length} 行）。## E の E-3 だけ、または「振り分け」後のリストを確認してください。`
+        );
         return;
     }
 
@@ -521,8 +744,14 @@ function renderMapAndList(property, rows) {
     const failCount = rows.filter((r) => !r.ok).length;
     document.getElementById('resultsSection').style.display = 'block';
     document.getElementById('resultsTitle').textContent = `${property.formatted || '物件'} 周辺`;
-    document.getElementById('resultsCount').textContent =
-        `成功 ${okRows.length} 件` + (failCount ? ` / 失敗 ${failCount} 件` : '');
+    let countMsg = `成功 ${okRows.length} 件` + (failCount ? ` / 失敗 ${failCount} 件` : '');
+    if (clean) {
+        countMsg += '　※クリーン表示ON：地図上の地名ラベルはオフです（ピンは表示）。地名も見る場合はトグルを外して「表示を更新」';
+    }
+    if (isHidePinsOn()) {
+        countMsg += '　※「ピンを隠す」ON中';
+    }
+    document.getElementById('resultsCount').textContent = countMsg;
 
     const list = document.getElementById('pinList');
     list.innerHTML = rows
