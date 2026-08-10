@@ -1,14 +1,29 @@
 /** グルコン活動／成果報告の Gemini プロンプト */
 
-import type { GluconActiveCycle, GluconExample, GluconJournalDay } from "./types";
+import type {
+  GluconActiveCycle,
+  GluconExample,
+  GluconJournalDay,
+  GluconMemberHeaderStatus,
+} from "./types";
 
-function memberHeader(): string {
+export type { GluconMemberHeaderStatus };
+
+export function getMemberHeaderStatus(): GluconMemberHeaderStatus {
   const id = (process.env.KAMIOOYA_MEMBER_ID || "").trim();
   const name = (process.env.PERSONAL_NAME || "").trim();
-  if (id && name) return `会員番号：${id} ${name}`;
-  if (id) return `会員番号：${id}`;
-  if (name) return name;
-  return "会員番号：（未設定）";
+  const missing: string[] = [];
+  if (!id) missing.push("KAMIOOYA_MEMBER_ID");
+  if (!name) missing.push("PERSONAL_NAME");
+  let preview = "会員番号：（未設定）";
+  if (id && name) preview = `会員番号：${id} ${name}`;
+  else if (id) preview = `会員番号：${id}`;
+  else if (name) preview = name;
+  return { ok: missing.length === 0, missing, preview };
+}
+
+function memberHeader(): string {
+  return getMemberHeaderStatus().preview;
 }
 
 export function activityPrompt(args: {
@@ -62,20 +77,34 @@ export function resultPrompt(args: {
   cycle: GluconActiveCycle;
   journals: GluconJournalDay[];
   examples: GluconExample[];
+  /** 神大家ポイント配点基準の要約（formatRubricForPrompt の出力） */
+  rubricSummary?: string;
 }): string {
+  const rubricBlock = args.rubricSummary?.trim()
+    ? `
+【神大家ポイント観点（採点者が見る軸。投稿本文に点数・ルールIDは書かない）】
+${args.rubricSummary.trim()}
+`
+    : "";
+
   return `あなたは神・大家さん倶楽部の塾生向け「成果報告」の下書きライターです。
 
 【厳守】
 - 物件購入・融資実行・空室解消・賃料アップ・修繕コスト削減・管理改善など「実践して成果が出た」ことだけを書く。
 - ジャーナルに明確な成果が無い場合は、本文を次の1行だけにする:
   （今月は該当する成果報告なし）
-- 会社業務の成果は書かない。捏造禁止。
+- Journal にない成果・金額を捏造しない。会社業務の成果は書かない。
+- 該当カテゴリが分かる題名／箇条書きにする（購入AP・戸建・空室・修繕・売却・融資・業者・情報・幹事など）。
+- 価格・利回り・融資条件・期間・削減額・手順など、採点根拠になる数字・再現情報を、事実がある範囲で必ず書く。
+- 投稿本文に「〇点」「ルールID」は書かない。
 - 出力は投稿本文のみ。
-
+${rubricBlock}
 【推奨形式（成果があるとき）】
-■【成果の短い題名】
+■【カテゴリが分かる題名】
 ${memberHeader()}
-（可能な範囲でエリア・金額・融資・所感等を箇条書き）
+・成果の事実（何をいつ）
+・数字（金額／利回り／融資／削減額など、分かるもの）
+・やったこと・手順（再現できる粒度）
 所感等：
 ・学びと次の一手
 
