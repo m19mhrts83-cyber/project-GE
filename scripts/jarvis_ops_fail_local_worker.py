@@ -69,8 +69,18 @@ def run_local_agent(prompt: str, *, timeout: int = 900) -> str:
     exe = find_cursor_agent()
     if not exe:
         raise RuntimeError("cursor-agent / agent が見つかりません（未インストール）")
-    # 書込あり（ask ではない）。非対話。
-    cmd = [exe, "-p", "--force", "--output-format", "text", prompt]
+    # 書込あり（ask ではない）。非対話。--trust/--force は Workspace Trust 回避用
+    cmd = [
+        exe,
+        "-p",
+        "--trust",
+        "--force",
+        "--workspace",
+        str(REPO),
+        "--output-format",
+        "text",
+        prompt,
+    ]
     r = subprocess.run(
         cmd,
         cwd=str(REPO),

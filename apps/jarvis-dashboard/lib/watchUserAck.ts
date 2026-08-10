@@ -67,11 +67,15 @@ export function buildOpenchatAckFingerprint(payload: unknown, level?: string | n
 /** 一般 watch 用指紋（相対時間などを落として push ごとの揺れを防ぐ） */
 export function normalizeSummaryForAck(summary: string | null | undefined): string {
   let s = String(summary || "").trim();
-  // 「約 50 時間前」「3日前」「あと14日」など相対表現を正規化
+  // 「約 50 時間前」「3日前」「今日」「きのう」「あと14日」など相対表現を正規化
   s = s.replace(/約\s*\d+\s*時間前/g, "時間前");
   s = s.replace(/\d+\s*時間前/g, "時間前");
   s = s.replace(/約\s*\d+\s*日前/g, "日前");
   s = s.replace(/\d+\s*日前/g, "日前");
+  s = s.replace(/は今日/g, "は相対日");
+  s = s.replace(/が今日/g, "が相対日");
+  s = s.replace(/はきのう/g, "は相対日");
+  s = s.replace(/がきのう/g, "が相対日");
   s = s.replace(/あと\s*\d+\s*日/g, "あとN日");
   s = s.replace(/残り\s*\d+\s*日/g, "残りN日");
   s = s.replace(/\d{4}-\d{2}-\d{2}T[\d:+.-]+/g, "TS");
