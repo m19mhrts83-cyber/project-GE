@@ -2,6 +2,7 @@ name: Jarvis Dashboard Gmail Triage
 
 # admin INBOX の未返信候補 → jarvis-dashboard triage_items（Mac 非依存）
 # パートナー MD / CHRLINE は対象外。
+# 末尾で Ops Fail Watch（Vercel/GHA）も朝1回だけ実行する。
 
 on:
   schedule:
