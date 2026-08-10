@@ -1088,8 +1088,28 @@ p.back {
 .home-pin-banner {
   display: block;
   margin: 0 0 18px;
+}
+
+.home-pin-banner-alert {
   border: 2px solid #dc2626;
   box-shadow: 0 4px 18px rgba(220, 38, 38, 0.18);
+}
+
+.home-pin-banner-info {
+  border: 2px solid #0d9488;
+  box-shadow: 0 4px 18px rgba(13, 148, 136, 0.16);
+}
+
+.home-pin-banner-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-pin-banner-actions {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .home-pin-banner .sum {
