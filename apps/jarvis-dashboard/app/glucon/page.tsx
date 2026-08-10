@@ -32,6 +32,7 @@ export default async function GluconPage() {
         journals={state.journals}
         journalSyncedAt={state.journalSyncedAt}
         memberHeader={state.memberHeader}
+        monthlyDigest={state.monthlyDigest}
       />
     </Shell>
   );
