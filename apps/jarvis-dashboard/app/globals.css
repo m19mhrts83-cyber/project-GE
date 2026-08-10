@@ -912,6 +912,40 @@ a.stat-link:active {
   color: #334155;
 }
 
+.openchat-remediation {
+  margin: 0 0 1.5rem;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #2563eb 28%, var(--line));
+  background: color-mix(in srgb, #dbeafe 28%, var(--card));
+}
+
+.openchat-remediation h2 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.openchat-remediation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.openchat-remediation-confirm {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--line);
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+}
+
+.openchat-remediation .err {
+  color: #991b1b;
+  margin: 8px 0 0;
+}
+
 .openchat-digest-overview {
   margin: 0 0 12px;
   font-size: 0.92rem;

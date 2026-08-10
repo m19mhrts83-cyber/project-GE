@@ -19,3 +19,5 @@ set +a
 "$PY" -u "${REPO_DIR}/scripts/jarvis_card_cursor_ask_worker.py" "$@" || true
 # Ops Fail のローカル修復キュー（Cloud 上限時の受け皿）
 "$PY" -u "${REPO_DIR}/scripts/jarvis_ops_fail_local_worker.py" "$@" || true
+# オプチャ静かな失敗の既知レシピ復旧
+"$PY" -u "${REPO_DIR}/scripts/jarvis_openchat_recover_worker.py" "$@" || true
