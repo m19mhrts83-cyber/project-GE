@@ -303,6 +303,15 @@ export default async function TriageLanePage({
                       status={focus.status}
                       path={viewPath}
                       mode="unread"
+                      snoozeUntil={
+                        focus.payload &&
+                        typeof focus.payload === "object" &&
+                        typeof (focus.payload as { snooze_until?: unknown })
+                          .snooze_until === "string"
+                          ? ((focus.payload as { snooze_until: string })
+                              .snooze_until)
+                          : null
+                      }
                     />
                   </header>
                   <h3 style={{ fontSize: "1.05rem", margin: "8px 0 6px" }}>
@@ -380,6 +389,15 @@ export default async function TriageLanePage({
                         status={it.status}
                         path={viewPath}
                         mode="closed"
+                        snoozeUntil={
+                          it.payload &&
+                          typeof it.payload === "object" &&
+                          typeof (it.payload as { snooze_until?: unknown })
+                            .snooze_until === "string"
+                            ? ((it.payload as { snooze_until: string })
+                                .snooze_until)
+                            : null
+                        }
                       />
                     </header>
                     <p className="mail-subject" style={{ margin: "6px 0" }}>

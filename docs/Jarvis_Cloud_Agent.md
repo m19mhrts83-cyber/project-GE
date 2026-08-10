@@ -166,6 +166,7 @@ Environment: リポジトリ `m19mhrts83-cyber/project-GE`（Dashboard に Activ
 | `JARVIS_SUPABASE_URL` | 投影 DB |
 | `JARVIS_SUPABASE_SERVICE_ROLE_KEY` / `JARVIS_SUPABASE_SECRET_KEY` | 読取／upsert（**`sb_secret_` 新形式**） |
 | `GEMINI_API_KEY` | リサーチ（`scripts/jarvis_gemini_research.py`） |
+| `TAVILY_API_KEY` | Web 検索（ローカル Tavily MCP と同キー。正本 `.env.jarvis_private`） |
 | `GMAIL_CREDENTIALS_B64` / `GMAIL_ADMIN_TOKEN_B64` | admin 取込（既存 GHA と同系） |
 | `GMAIL_ESTATE_TOKEN_B64`（または `GMAIL_M19M_TOKEN_B64`） | **Cloud 対外送信**（`jarvis_cloud_gmail_send.py`） |
 | `MS_GRAPH_*` | OneDrive レーン収集（GHA／Cloud）。**委任＋REFRESH_TOKEN**（`AUTHORITY=consumers`）
