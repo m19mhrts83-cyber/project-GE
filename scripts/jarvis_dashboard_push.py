@@ -34,6 +34,31 @@ def now_iso() -> str:
     return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
+def dedupe_rows_by_id(
+    rows: list[dict[str, Any]], *, id_key: str = "id", label: str = "rows"
+) -> list[dict[str, Any]]:
+    """同一 id が1バッチに複数あると Postgres 21000（ON CONFLICT 二重更新）になるため排除。後勝ち。"""
+    by_id: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    skipped_empty = 0
+    for row in rows:
+        iid = str(row.get(id_key) or "").strip()
+        if not iid:
+            skipped_empty += 1
+            continue
+        if iid not in by_id:
+            order.append(iid)
+        by_id[iid] = row
+    out = [by_id[i] for i in order]
+    dropped = len(rows) - len(out) - skipped_empty
+    if dropped > 0 or skipped_empty:
+        print(
+            f"# dedupe {label}: kept={len(out)} dropped_dup={dropped} empty_id={skipped_empty}",
+            file=sys.stderr,
+        )
+    return out
+
+
 def client():
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
     key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
@@ -137,6 +162,7 @@ def push_triage(sb) -> int:
                 "updated_at": it.get("updated_at") or now_iso(),
             }
         )
+    rows = dedupe_rows_by_id(rows, label="triage")
     if not rows:
         print("# triage: 0 rows", file=sys.stderr)
         return 0
@@ -419,6 +445,7 @@ def push_watch(sb) -> int:
                 "updated_at": now_iso(),
             }
         )
+    rows = dedupe_rows_by_id(rows, label="watch")
     if not rows:
         return 0
     sb.table("watch_status").upsert(rows, on_conflict="id").execute()

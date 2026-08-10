@@ -19,14 +19,16 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
 JST = ZoneInfo("Asia/Tokyo")
 WESTUDY_WORKFLOW = "westudy-raimo-weekly.yml"
-STALE_MAC_HOURS = 36
-STALE_GHA_HOURS = 30
+# 鮮度は「日にち」で見せる（カレンダー日・JST）。閾値も日単位。
+STALE_MAC_DAYS = 2
+STALE_GHA_DAYS = 2
+STALE_HEARTBEAT_DAYS = 2
 
 
 def now_iso() -> str:
@@ -50,12 +52,22 @@ def parse_meta_dt(s: str | None) -> datetime | None:
         return None
 
 
-def hours_ago(dt: datetime | None) -> float | None:
+def days_ago(dt: datetime | None) -> int | None:
+    """JST カレンダー日の差（今日=0、きのう=1）。"""
     if not dt:
         return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=JST)
-    return (datetime.now(timezone.utc) - dt.astimezone(timezone.utc)).total_seconds() / 3600.0
+    today = datetime.now(JST).date()
+    return (today - dt.astimezone(JST).date()).days
+
+
+def format_days_ago(n: int) -> str:
+    if n <= 0:
+        return "今日"
+    if n == 1:
+        return "きのう"
+    return f"約 {n} 日前"
 
 
 def fetch_sync_meta(sb) -> dict[str, str]:
@@ -148,13 +160,16 @@ def check_collect_freshness(meta: dict[str, str]) -> list[dict[str, Any]]:
     hb_at = parse_meta_dt(meta.get("gha_heartbeat_at"))
     src = meta.get("triage_source") or "—"
 
-    gha_h = hours_ago(gha_at)
-    if gha_h is None:
+    gha_d = days_ago(gha_at)
+    if gha_d is None:
         level, summary = "attention", "GHA トリアージ未実行（gha_triage_pushed_at なし）"
-    elif gha_h > STALE_GHA_HOURS:
-        level, summary = "warn", f"GHA トリアージが約 {gha_h:.0f} 時間前（閾値 {STALE_GHA_HOURS}h）"
+    elif gha_d >= STALE_GHA_DAYS:
+        level, summary = (
+            "warn",
+            f"GHA トリアージが{format_days_ago(gha_d)}（閾値 {STALE_GHA_DAYS}日）",
+        )
     else:
-        level, summary = "ok", f"GHA トリアージ約 {gha_h:.1f} 時間前 / source={src}"
+        level, summary = "ok", f"GHA トリアージは{format_days_ago(gha_d)} / source={src}"
 
     items.append(
         {
@@ -171,13 +186,16 @@ def check_collect_freshness(meta: dict[str, str]) -> list[dict[str, Any]]:
         }
     )
 
-    mac_h = hours_ago(mac_at)
-    if mac_h is None:
+    mac_d = days_ago(mac_at)
+    if mac_d is None:
         m_level, m_sum = "info", "Mac トリアージ push 未記録（GHA のみでも可）"
-    elif mac_h > STALE_MAC_HOURS:
-        m_level, m_sum = "attention", f"Mac push が約 {mac_h:.0f} 時間前（CHRLINE/MD は Mac 依存）"
+    elif mac_d >= STALE_MAC_DAYS:
+        m_level, m_sum = (
+            "attention",
+            f"Mac トリアージ push が{format_days_ago(mac_d)}（CHRLINE/MD は Mac 依存）",
+        )
     else:
-        m_level, m_sum = "ok", f"Mac push 約 {mac_h:.1f} 時間前"
+        m_level, m_sum = "ok", f"Mac トリアージ push は{format_days_ago(mac_d)}"
 
     items.append(
         {
@@ -194,13 +212,13 @@ def check_collect_freshness(meta: dict[str, str]) -> list[dict[str, Any]]:
         }
     )
 
-    hb_h = hours_ago(hb_at)
-    if hb_h is None:
+    hb_d = days_ago(hb_at)
+    if hb_d is None:
         h_level, h_sum = "info", "GHA 心拍未記録"
-    elif hb_h > 48:
-        h_level, h_sum = "warn", f"心拍が約 {hb_h:.0f} 時間前（休止リスク）"
+    elif hb_d >= STALE_HEARTBEAT_DAYS:
+        h_level, h_sum = "warn", f"心拍が{format_days_ago(hb_d)}（休止リスク）"
     else:
-        h_level, h_sum = "ok", f"心拍約 {hb_h:.1f} 時間前"
+        h_level, h_sum = "ok", f"心拍は{format_days_ago(hb_d)}"
 
     items.append(
         {

@@ -392,13 +392,17 @@ def find_recent_openchat_activity(
 
 
 def replace_activity_items(queue: dict[str, Any], activities: list[dict[str, Any]]) -> int:
-    """kind=activity を一括差し替え。"""
+    """kind=activity を一括差し替え。同一 id は後勝ち（upsert 21000 防止）。"""
     kept = [it for it in queue.get("items") or [] if it.get("kind") != "activity"]
-    stamped = []
+    by_id: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
     for a in activities:
+        iid = str(a.get("id") or "").strip()
+        if not iid:
+            continue
         item = queue_item_fields(
             {
-                "id": a["id"],
+                "id": iid,
                 "lane": a.get("lane") or "partner",
                 "partner_name": a.get("partner_name") or "",
                 "folder": a.get("folder") or "",
@@ -416,8 +420,21 @@ def replace_activity_items(queue: dict[str, Any], activities: list[dict[str, Any
                 "reason": "",
             },
         )
-        stamped.append(item)
-    queue["items"] = kept + stamped
+        if iid not in by_id:
+            order.append(iid)
+        by_id[iid] = item
+    stamped = [by_id[i] for i in order]
+    # kept 側も id 重複があれば後勝ちで潰す
+    kept_by: dict[str, dict[str, Any]] = {}
+    kept_order: list[str] = []
+    for it in kept:
+        kid = str(it.get("id") or "").strip()
+        if not kid:
+            continue
+        if kid not in kept_by:
+            kept_order.append(kid)
+        kept_by[kid] = it
+    queue["items"] = [kept_by[i] for i in kept_order] + stamped
     queue["updated_at"] = now_iso()
     return len(stamped)
 
@@ -598,8 +615,20 @@ def cursor_generate(prompt: str) -> str:
     if not exe:
         raise RuntimeError("cursor-agent / agent が見つかりません（未インストール）")
     # 非対話・読取専用（下書き生成のみ。ファイル書込させない）
-    cmd = [exe, "-p", "--mode", "ask", "--output-format", "text", prompt]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    # --trust: launchd / Worker は対話プロンプト不可。未指定だと Workspace Trust で失敗する
+    cmd = [
+        exe,
+        "-p",
+        "--trust",
+        "--workspace",
+        str(REPO),
+        "--mode",
+        "ask",
+        "--output-format",
+        "text",
+        prompt,
+    ]
+    r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True, timeout=180)
     if r.returncode != 0:
         raise RuntimeError(f"cursor-agent failed ({r.returncode}): {r.stderr[:500] or r.stdout[:500]}")
     return (r.stdout or "").strip()
@@ -830,7 +859,24 @@ def load_queue() -> dict[str, Any]:
         if not it.get("lane"):
             it["lane"] = "partner"
             changed = True
+    # 同一 id の二重行を除去（dashboard upsert の Postgres 21000 防止）
+    by_id: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for it in data["items"]:
+        iid = str(it.get("id") or "").strip()
+        if not iid:
+            changed = True
+            continue
+        if iid not in by_id:
+            order.append(iid)
+        else:
+            changed = True
+        by_id[iid] = it
+    if len(order) != len(data["items"]):
+        data["items"] = [by_id[i] for i in order]
+        changed = True
     if changed:
+        data["updated_at"] = now_iso()
         save_json(QUEUE_PATH, data)
     return data
 
