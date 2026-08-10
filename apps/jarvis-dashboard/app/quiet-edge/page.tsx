@@ -18,6 +18,7 @@ import {
   buildQuietEdgeAsks,
   addDaysYmd,
   defaultMonthlyReviewYm,
+  enrichSnoreChartEvents,
   ymdJst,
   type ContextNoteRow,
   type JournalDailyRow,
@@ -96,12 +97,19 @@ export default async function QuietEdgePage() {
   const vitalRows = (healthRows || []) as VitalDailyRow[];
   const journals = (journalRows || []) as JournalDailyRow[];
   const notes = (noteRows || []) as ContextNoteRow[];
-  const chartPoints: SnorePoint[] = rows.map((r) => ({
-    date: r.recorded_at,
-    score: Number(r.score),
-    count: r.count,
-    event: r.event,
-  }));
+  const chartPoints: SnorePoint[] = enrichSnoreChartEvents(
+    rows.map((r) => ({
+      date: r.recorded_at,
+      score: Number(r.score),
+      count: r.count,
+      event: r.event,
+    })),
+    (treatments || []).map((t) => ({
+      scheduled_at: t.scheduled_at,
+      status: t.status,
+    })),
+    2,
+  );
 
   const asks = buildQuietEdgeAsks({
     journals,

@@ -15,9 +15,37 @@ const COLOR_SCORE = "#b45309";
 const COLOR_COUNT = "#4338ca";
 const COLOR_TARGET = "#0f766e";
 const COLOR_GRID = "#e7e5e4";
+/** 治療当日（照射日の睡眠） */
+const COLOR_DAY_SCORE = "#e11d48";
+const COLOR_DAY_COUNT = "#059669";
+const COLOR_DAY_BAND = "rgba(225, 29, 72, 0.10)";
+/** 治療直後（照射後の直近2日）— 当日と区別する */
+const COLOR_POST_SCORE = "#c026d3";
+const COLOR_POST_COUNT = "#0891b2";
+const COLOR_POST_BAND = "rgba(192, 38, 211, 0.12)";
+
+function isTreatmentDay(event: string) {
+  return event === "治療当日";
+}
+
+function isPostTreatment(event: string) {
+  return event === "治療直後";
+}
 
 function isTreatment(event: string) {
-  return event === "治療当日" || event === "治療直後";
+  return isTreatmentDay(event) || isPostTreatment(event);
+}
+
+function scoreDotColor(event: string) {
+  if (isTreatmentDay(event)) return COLOR_DAY_SCORE;
+  if (isPostTreatment(event)) return COLOR_POST_SCORE;
+  return COLOR_SCORE;
+}
+
+function countDotColor(event: string) {
+  if (isTreatmentDay(event)) return COLOR_DAY_COUNT;
+  if (isPostTreatment(event)) return COLOR_POST_COUNT;
+  return COLOR_COUNT;
 }
 
 function niceStep(span: number, targetTicks: number): number {
@@ -167,6 +195,26 @@ export default function SnoreTrendChart({ points }: { points: SnorePoint[] }) {
           いびき回数
         </text>
 
+        {/* 治療当日／直後の帯（直近2日は直後色で区別） */}
+        {data.map((p, i) => {
+          if (!isTreatment(p.event)) return null;
+          const x = xAt(i);
+          const half =
+            data.length <= 1
+              ? innerW / 4
+              : Math.max(8, innerW / (data.length - 1) / 2);
+          return (
+            <rect
+              key={`band-${p.date}`}
+              x={x - half}
+              y={padT}
+              width={half * 2}
+              height={innerH}
+              fill={isPostTreatment(p.event) ? COLOR_POST_BAND : COLOR_DAY_BAND}
+            />
+          );
+        })}
+
         {/* improvement target */}
         <line
           x1={padL}
@@ -213,14 +261,14 @@ export default function SnoreTrendChart({ points }: { points: SnorePoint[] }) {
                 cx={xAt(i)}
                 cy={yScore(p.score)}
                 r={treat ? 4.5 : 3}
-                fill={treat ? "#e11d48" : COLOR_SCORE}
+                fill={scoreDotColor(p.event)}
               />
               {p.count != null ? (
                 <circle
                   cx={xAt(i)}
                   cy={yCount(p.count)}
                   r={treat ? 4 : 2.5}
-                  fill={treat ? "#059669" : COLOR_COUNT}
+                  fill={countDotColor(p.event)}
                 />
               ) : null}
               {i % labelStep === 0 || i === data.length - 1 ? (
@@ -264,8 +312,12 @@ export default function SnoreTrendChart({ points }: { points: SnorePoint[] }) {
           改善目標（スコア≤{SNORE_SCORE_TARGET}）
         </span>
         <span>
-          <i style={{ background: "#e11d48" }} />
-          治療日・スコア
+          <i style={{ background: COLOR_DAY_SCORE }} />
+          治療当日
+        </span>
+        <span>
+          <i style={{ background: COLOR_POST_SCORE }} />
+          治療直後（+1〜2日）
         </span>
       </div>
       <p className="meta qe-chart-note">
