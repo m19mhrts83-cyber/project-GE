@@ -16,7 +16,9 @@ type Props = {
 
 function isActive(active: string, href: string): boolean {
   if (href === "/") return active === "/";
-  return active === href || active.startsWith(href);
+  if (active === href) return true;
+  // 子パスのみ（/openchat と /openchat/health が並ぶとき親だけ全一致扱いにしない）
+  return active.startsWith(href.endsWith("/") ? href : `${href}/`);
 }
 
 export default function ShellFrame({

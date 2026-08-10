@@ -61,8 +61,8 @@ export default async function OpenchatPage() {
       <section className={`openchat-health ${levelClass}`} aria-label="スレッド健全性">
         <div className="openchat-health-head">
           <h2>スレッド健全性</h2>
-          <Link href="/situation" className="home-more">
-            状況ウォッチへ →
+          <Link href="/openchat/health" className="home-more">
+            詳細ヘルス →
           </Link>
         </div>
         {health ? (

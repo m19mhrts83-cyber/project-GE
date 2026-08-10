@@ -16,6 +16,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/partner", label: "パートナー" },
       { href: "/general", label: "その他メール" },
       { href: "/openchat", label: "神大家オプチャ" },
+      { href: "/openchat/health", label: "オプチャ健全性" },
       { href: "/situation", label: "状況ウォッチ" },
       { href: "/archive", label: "処理済み" },
     ],
