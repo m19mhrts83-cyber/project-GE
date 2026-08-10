@@ -16,6 +16,11 @@ on:
         description: "修正お知らせ文（任意・ホームに載せる）"
         required: false
         default: ""
+      autofix:
+        description: "要対応なら Cloud Agent 自動起動（失敗時ローカル待ち）"
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: jarvis-ops-fail-watch
@@ -44,8 +49,11 @@ jobs:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          CURSOR_CLOUD_REPO_URL: ${{ secrets.CURSOR_CLOUD_REPO_URL }}
           DRY: ${{ github.event.inputs.dry_run || 'false' }}
           NOTE: ${{ github.event.inputs.note || '' }}
+          AUTOFIX: ${{ github.event.inputs.autofix || 'true' }}
         run: |
           set -euo pipefail
           ARGS=()
@@ -56,5 +64,8 @@ jobs:
           fi
           if [[ -n "${NOTE:-}" ]]; then
             ARGS+=(--note "$NOTE")
+          fi
+          if [[ "$AUTOFIX" == "true" && "$DRY" != "true" ]]; then
+            ARGS+=(--autofix)
           fi
           python scripts/jarvis_ops_fail_watch.py "${ARGS[@]}"
