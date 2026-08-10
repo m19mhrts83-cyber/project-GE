@@ -1,11 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   analyzeGluconResultBody,
+  consultGluconDraft,
+  generateGluconClarify,
   generateGluconDrafts,
+  generateGluconFacts,
+  generateGluconFinal,
   queueGluconPost,
+  saveGluconClarifyAnswers,
   saveGluconDraft,
   skipGluconDraft,
 } from "@/app/actions/glucon";
@@ -15,11 +20,16 @@ import {
 } from "@/lib/glucon/postGuard";
 import type {
   GluconActiveCycle,
+  GluconClarifyItem,
+  GluconConsultTurn,
+  GluconDraftPayload,
   GluconDraftRow,
+  GluconFactItem,
   GluconJournalDay,
   GluconMemberHeaderStatus,
   GluconMonthlyDigestPreview,
   GluconReportKind,
+  GluconResultPhase,
   ResultScoringHints,
 } from "@/lib/glucon/types";
 import { WESTUDY_FORUM_URLS } from "@/lib/glucon/types";
@@ -101,30 +111,217 @@ function ResultScoringChecklist({ body }: { body: string }) {
   );
 }
 
-function DraftEditor({
+function ConsultPanel({
+  kind,
+  body,
+  consult,
+  onApplyRevised,
+  pending,
+  start,
+}: {
+  kind: GluconReportKind;
+  body: string;
+  consult: GluconConsultTurn[];
+  onApplyRevised: (text: string) => void;
+  pending: boolean;
+  start: (fn: () => Promise<void>) => void;
+}) {
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [reply, setReply] = useState<string | null>(null);
+  const [pendingRevise, setPendingRevise] = useState<string | null>(null);
+
+  return (
+    <div style={{ marginTop: "0.75rem" }}>
+      <strong style={{ fontSize: "0.9rem" }}>聞く／直す</strong>
+      <p className="meta">本文を見ながら相談・部分修正できます。</p>
+      <textarea
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        rows={3}
+        placeholder="例: 工夫の部分を膨らませて／数字をもっと前に"
+        style={{
+          width: "100%",
+          fontSize: "0.85rem",
+          marginTop: "0.35rem",
+        }}
+        disabled={pending}
+      />
+      <div className="qe-form-actions" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={pending || !q.trim()}
+          onClick={() => {
+            setErr(null);
+            setReply(null);
+            setPendingRevise(null);
+            start(async () => {
+              const r = await consultGluconDraft({
+                kind,
+                mode: "ask",
+                prompt: q,
+                body,
+              });
+              if (!r.ok) {
+                setErr(r.error || "失敗");
+                return;
+              }
+              setReply(r.reply || "");
+              router.refresh();
+            });
+          }}
+        >
+          聞く
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={pending || !q.trim()}
+          onClick={() => {
+            setErr(null);
+            setReply(null);
+            setPendingRevise(null);
+            start(async () => {
+              const r = await consultGluconDraft({
+                kind,
+                mode: "revise",
+                prompt: q,
+                body,
+              });
+              if (!r.ok) {
+                setErr(r.error || "失敗");
+                return;
+              }
+              setReply(r.reply || "");
+              if (r.revisedBody) setPendingRevise(r.revisedBody);
+              router.refresh();
+            });
+          }}
+        >
+          この指示で直す
+        </button>
+      </div>
+      {err ? <p className="qe-err">{err}</p> : null}
+      {reply ? (
+        <pre
+          style={{
+            whiteSpace: "pre-wrap",
+            fontSize: "0.8rem",
+            marginTop: "0.5rem",
+            maxHeight: 140,
+            overflow: "auto",
+          }}
+        >
+          {reply}
+        </pre>
+      ) : null}
+      {pendingRevise ? (
+        <div className="card" style={{ marginTop: "0.5rem" }}>
+          <strong>修正案</strong>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "0.5rem",
+              marginTop: "0.35rem",
+            }}
+          >
+            <div>
+              <p className="meta">修正前</p>
+              <pre
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: "0.72rem",
+                  maxHeight: 180,
+                  overflow: "auto",
+                }}
+              >
+                {body}
+              </pre>
+            </div>
+            <div>
+              <p className="meta">修正後</p>
+              <pre
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: "0.72rem",
+                  maxHeight: 180,
+                  overflow: "auto",
+                }}
+              >
+                {pendingRevise}
+              </pre>
+            </div>
+          </div>
+          <div className="qe-form-actions" style={{ gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                onApplyRevised(pendingRevise);
+                setPendingRevise(null);
+              }}
+            >
+              反映
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setPendingRevise(null)}
+            >
+              破棄
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {consult.length ? (
+        <details style={{ marginTop: "0.5rem" }}>
+          <summary style={{ cursor: "pointer" }}>
+            相談履歴（{consult.length}）
+          </summary>
+          <ul style={{ fontSize: "0.78rem" }}>
+            {consult
+              .slice()
+              .reverse()
+              .map((t, i) => (
+                <li key={`${t.at}-${i}`}>
+                  [{t.mode}] {t.prompt.slice(0, 60)}
+                  {t.prompt.length > 60 ? "…" : ""}
+                </li>
+              ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function DraftActions({
   cycle,
   kind,
-  initial,
+  body,
+  status,
+  setStatus,
+  pending,
+  start,
+  postError,
 }: {
   cycle: GluconActiveCycle;
   kind: GluconReportKind;
-  initial: GluconDraftRow | null;
+  body: string;
+  status: string;
+  setStatus: (s: GluconDraftRow["status"]) => void;
+  pending: boolean;
+  start: (fn: () => Promise<void>) => void;
+  postError?: string | null;
 }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
-  const [body, setBody] = useState(initial?.body || "");
-  const [status, setStatus] = useState(initial?.status || "draft");
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-
-  useEffect(() => {
-    setBody(initial?.body || "");
-    setStatus(initial?.status || "draft");
-  }, [initial?.id, initial?.body, initial?.status, initial?.updated_at]);
-
   const forumUrl = WESTUDY_FORUM_URLS[kind];
-  // skipped でも実内容に書き換えていれば投稿導線を開く（保存で ready になる）
   const queueStatusForUi =
     status === "skipped" && !(kind === "result" && isNoResultBody(body))
       ? "ready"
@@ -136,34 +333,7 @@ function DraftEditor({
   });
 
   return (
-    <section className="card">
-      <header>
-        <span className="lvl">{KIND_LABEL[kind]}</span>
-        <strong>
-          {initial?.title || `${cycle.periodKey} ${KIND_LABEL[kind]}`}
-        </strong>
-        <span className="meta" style={{ marginLeft: "0.5rem" }}>
-          status: {status}
-        </span>
-      </header>
-
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        rows={14}
-        style={{
-          width: "100%",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-          fontSize: "0.85rem",
-          lineHeight: 1.45,
-          marginTop: "0.5rem",
-        }}
-        disabled={pending}
-        placeholder={`${KIND_LABEL[kind]}の本文`}
-      />
-
-      {kind === "result" ? <ResultScoringChecklist body={body} /> : null}
-
+    <>
       <div className="qe-form-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
         <button
           type="button"
@@ -249,10 +419,7 @@ function DraftEditor({
           成果なしの本文のため「WeStudy に投稿」は使えません。投稿スキップのままで問題ありません。
         </p>
       ) : null}
-
-      {initial?.post_error ? (
-        <p className="qe-err">投稿エラー: {initial.post_error}</p>
-      ) : null}
+      {postError ? <p className="qe-err">投稿エラー: {postError}</p> : null}
       {err ? <p className="qe-err">{err}</p> : null}
       {msg ? <p className="meta">{msg}</p> : null}
 
@@ -339,6 +506,313 @@ function DraftEditor({
           </div>
         </div>
       ) : null}
+    </>
+  );
+}
+
+function ActivityEditor({
+  cycle,
+  initial,
+}: {
+  cycle: GluconActiveCycle;
+  initial: GluconDraftRow | null;
+}) {
+  const [pending, start] = useTransition();
+  const [body, setBody] = useState(initial?.body || "");
+  const [status, setStatus] = useState(initial?.status || "draft");
+  const payload = (initial?.payload || {}) as GluconDraftPayload;
+
+  useEffect(() => {
+    setBody(initial?.body || "");
+    setStatus(initial?.status || "draft");
+  }, [initial?.id, initial?.body, initial?.status, initial?.updated_at]);
+
+  return (
+    <section className="card">
+      <header>
+        <span className="lvl">{KIND_LABEL.activity}</span>
+        <strong>
+          {initial?.title || `${cycle.periodKey} ${KIND_LABEL.activity}`}
+        </strong>
+        <span className="meta" style={{ marginLeft: "0.5rem" }}>
+          status: {status}
+        </span>
+      </header>
+      <p className="meta">
+        成果候補は成果報告側へ優先。活動は仕込み・学習・進行中が中心です。
+      </p>
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={14}
+        style={{
+          width: "100%",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          fontSize: "0.85rem",
+          lineHeight: 1.45,
+          marginTop: "0.5rem",
+        }}
+        disabled={pending}
+        placeholder="活動報告の本文"
+      />
+      <ConsultPanel
+        kind="activity"
+        body={body}
+        consult={payload.consult || []}
+        onApplyRevised={setBody}
+        pending={pending}
+        start={start}
+      />
+      <DraftActions
+        cycle={cycle}
+        kind="activity"
+        body={body}
+        status={status}
+        setStatus={setStatus}
+        pending={pending}
+        start={start}
+        postError={initial?.post_error}
+      />
+    </section>
+  );
+}
+
+function ResultEditor({
+  cycle,
+  initial,
+}: {
+  cycle: GluconActiveCycle;
+  initial: GluconDraftRow | null;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [body, setBody] = useState(initial?.body || "");
+  const [status, setStatus] = useState(initial?.status || "draft");
+  const [err, setErr] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const payload = (initial?.payload || {}) as GluconDraftPayload;
+  const phase: GluconResultPhase = payload.phase || "facts";
+  const [facts, setFacts] = useState<GluconFactItem[]>(payload.facts || []);
+  const [clarify, setClarify] = useState<GluconClarifyItem[]>(
+    payload.clarify || [],
+  );
+
+  useEffect(() => {
+    setBody(initial?.body || "");
+    setStatus(initial?.status || "draft");
+    const pl = (initial?.payload || {}) as GluconDraftPayload;
+    setFacts(pl.facts || []);
+    setClarify(pl.clarify || []);
+  }, [initial?.id, initial?.body, initial?.status, initial?.updated_at]);
+
+  const stepLabel = useMemo(() => {
+    if (phase === "facts") return "① 事実確認";
+    if (phase === "clarify") return "② 確認質問";
+    return "③ 最終稿";
+  }, [phase]);
+
+  return (
+    <section className="card">
+      <header>
+        <span className="lvl">{KIND_LABEL.result}</span>
+        <strong>
+          {initial?.title || `${cycle.periodKey} ${KIND_LABEL.result}`}
+        </strong>
+        <span className="meta" style={{ marginLeft: "0.5rem" }}>
+          status: {status} ／ {stepLabel}
+        </span>
+      </header>
+      <p className="meta">
+        神・大家さんポイントが貯まるのは成果報告です。空室の早期入居付けなども成果候補として扱います。
+      </p>
+
+      <div className="qe-form-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={pending}
+          onClick={() => {
+            setErr(null);
+            setMsg(null);
+            start(async () => {
+              const r = await generateGluconFacts();
+              if (!r.ok) {
+                setErr(r.error || "事実生成失敗");
+                return;
+              }
+              if (r.draft) {
+                setBody(r.draft.body);
+                setStatus(r.draft.status);
+                setFacts(r.draft.payload?.facts || []);
+              }
+              setMsg("① 事実のみ下書きを生成しました");
+              router.refresh();
+            });
+          }}
+        >
+          {pending ? "生成中…" : "① 事実だけで下書き"}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={pending || !facts.length}
+          onClick={() => {
+            setErr(null);
+            setMsg(null);
+            start(async () => {
+              const r = await generateGluconClarify();
+              if (!r.ok) {
+                setErr(r.error || "質問生成失敗");
+                return;
+              }
+              if (r.draft) {
+                setClarify(r.draft.payload?.clarify || []);
+              }
+              setMsg("② 確認質問を用意しました");
+              router.refresh();
+            });
+          }}
+        >
+          ② 質問を出す
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={pending || !facts.length}
+          onClick={() => {
+            setErr(null);
+            setMsg(null);
+            start(async () => {
+              if (clarify.length) {
+                await saveGluconClarifyAnswers(
+                  clarify.map((c) => ({ id: c.id, answer: c.answer })),
+                );
+              }
+              const r = await generateGluconFinal();
+              if (!r.ok) {
+                setErr(r.error || "最終稿生成失敗");
+                return;
+              }
+              if (r.draft) {
+                setBody(r.draft.body);
+                setStatus(r.draft.status);
+              }
+              setMsg("③ 最終稿を生成しました（Before/After 込み）");
+              router.refresh();
+            });
+          }}
+        >
+          ③ 最終稿を生成
+        </button>
+      </div>
+
+      {facts.length ? (
+        <details open={phase === "facts"} style={{ marginTop: "0.75rem" }}>
+          <summary style={{ cursor: "pointer" }}>
+            事実リスト（{facts.length}）
+          </summary>
+          <ul style={{ fontSize: "0.82rem", marginTop: "0.35rem" }}>
+            {facts.map((f) => (
+              <li key={f.id}>
+                {f.forResult !== false ? "【成果候補】" : ""}
+                {f.resultCandidateTag ? `[${f.resultCandidateTag}] ` : ""}
+                {f.text}
+                <span className="meta"> — {f.source}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
+      {clarify.length ? (
+        <div style={{ marginTop: "0.75rem" }}>
+          <strong style={{ fontSize: "0.9rem" }}>② 確認質問（スキップ可）</strong>
+          {clarify.map((c, idx) => (
+            <div key={c.id} style={{ marginTop: "0.5rem" }}>
+              <p style={{ fontSize: "0.85rem", margin: 0 }}>
+                {idx + 1}. {c.question}
+              </p>
+              <textarea
+                value={c.answer}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setClarify((prev) =>
+                    prev.map((x) =>
+                      x.id === c.id ? { ...x, answer: v } : x,
+                    ),
+                  );
+                }}
+                rows={2}
+                style={{ width: "100%", fontSize: "0.85rem", marginTop: "0.25rem" }}
+                disabled={pending}
+                placeholder="回答（空ならその観点は書かない）"
+              />
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn"
+            style={{ marginTop: "0.5rem" }}
+            disabled={pending}
+            onClick={() => {
+              setErr(null);
+              start(async () => {
+                const r = await saveGluconClarifyAnswers(
+                  clarify.map((c) => ({ id: c.id, answer: c.answer })),
+                );
+                if (!r.ok) {
+                  setErr(r.error || "回答保存失敗");
+                  return;
+                }
+                setMsg("回答を保存しました");
+                router.refresh();
+              });
+            }}
+          >
+            回答を保存
+          </button>
+        </div>
+      ) : null}
+
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={16}
+        style={{
+          width: "100%",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          fontSize: "0.85rem",
+          lineHeight: 1.45,
+          marginTop: "0.75rem",
+        }}
+        disabled={pending}
+        placeholder="成果報告の本文"
+      />
+
+      <ResultScoringChecklist body={body} />
+
+      <ConsultPanel
+        kind="result"
+        body={body}
+        consult={payload.consult || []}
+        onApplyRevised={setBody}
+        pending={pending}
+        start={start}
+      />
+
+      {err ? <p className="qe-err">{err}</p> : null}
+      {msg ? <p className="meta">{msg}</p> : null}
+
+      <DraftActions
+        cycle={cycle}
+        kind="result"
+        body={body}
+        status={status}
+        setStatus={setStatus}
+        pending={pending}
+        start={start}
+        postError={initial?.post_error}
+      />
     </section>
   );
 }
@@ -425,7 +899,11 @@ export default function GluconReportPanel({
               今月の動きプレビュー（やり取り{" "}
               {monthlyDigest.yoritooriCount}／数値{" "}
               {monthlyDigest.metricsCount}／入退去{" "}
-              {monthlyDigest.occupancyCount}）
+              {monthlyDigest.occupancyCount}
+              {monthlyDigest.earlyFills?.length
+                ? `／早期入居 ${monthlyDigest.earlyFills.filter((f) => f.early).length}`
+                : ""}
+              ）
             </summary>
             <p className="meta" style={{ marginTop: "0.5rem" }}>
               {monthlyDigest.from}〜{monthlyDigest.to}
@@ -439,6 +917,23 @@ export default function GluconReportPanel({
                   <li key={n}>{n}</li>
                 ))}
               </ul>
+            ) : null}
+            {monthlyDigest.earlyFills?.length ? (
+              <>
+                <h3 style={{ fontSize: "0.9rem", margin: "0.6rem 0 0.25rem" }}>
+                  空室→入居日数（成果候補）
+                </h3>
+                <ul style={{ fontSize: "0.8rem" }}>
+                  {monthlyDigest.earlyFills.map((f) => (
+                    <li
+                      key={`${f.property_name}-${f.room}-${f.occupied_on}`}
+                    >
+                      {f.property_name} {f.room}: {f.days}日
+                      {f.early ? "（早期）" : ""}
+                    </li>
+                  ))}
+                </ul>
+              </>
             ) : null}
             <h3 style={{ fontSize: "0.9rem", margin: "0.6rem 0 0.25rem" }}>
               パートナーやり取り
@@ -499,11 +994,13 @@ export default function GluconReportPanel({
               });
             }}
           >
-            {pending ? "生成中…" : "活動・成果の下書きを生成"}
+            {pending ? "生成中…" : "一括生成（成果優先→活動）"}
           </button>
         </div>
         {err ? <p className="qe-err">{err}</p> : null}
         <p className="meta">
+          成果報告は下のステップ（①事実→②質問→③最終稿）が本線。一括は従来互換です。
+          <br />
           コマンド例:{" "}
           <code>
             cd ~/git-repos && ~/selenium_env/venv/bin/python
@@ -512,16 +1009,8 @@ export default function GluconReportPanel({
         </p>
       </section>
 
-      <DraftEditor
-        cycle={cycle}
-        kind="activity"
-        initial={draftFor(drafts, "activity")}
-      />
-      <DraftEditor
-        cycle={cycle}
-        kind="result"
-        initial={draftFor(drafts, "result")}
-      />
+      <ResultEditor cycle={cycle} initial={draftFor(drafts, "result")} />
+      <ActivityEditor cycle={cycle} initial={draftFor(drafts, "activity")} />
     </>
   );
 }

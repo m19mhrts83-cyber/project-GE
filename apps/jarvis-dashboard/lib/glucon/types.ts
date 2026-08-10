@@ -48,6 +48,43 @@ export type GluconExample = {
   excerpt: string;
 };
 
+/** 成果報告フローのフェーズ */
+export type GluconResultPhase = "facts" | "clarify" | "final";
+
+export type GluconFactItem = {
+  id: string;
+  text: string;
+  source: string;
+  /** scoring_seed 中分類など（空室・修繕・融資…） */
+  resultCandidateTag?: string | null;
+  /** 成果報告側に載せる候補か */
+  forResult?: boolean;
+};
+
+export type GluconClarifyItem = {
+  id: string;
+  question: string;
+  answer: string;
+};
+
+export type GluconConsultTurn = {
+  at: string;
+  mode: "ask" | "revise";
+  prompt: string;
+  reply: string;
+  revisedBody?: string | null;
+};
+
+export type GluconDraftPayload = {
+  phase?: GluconResultPhase;
+  facts?: GluconFactItem[];
+  factsBody?: string;
+  clarify?: GluconClarifyItem[];
+  consult?: GluconConsultTurn[];
+  /** 活動報告から除外する成果候補テキスト */
+  resultCandidates?: string[];
+};
+
 export type GluconDraftRow = {
   id: string;
   period_key: string;
@@ -62,6 +99,7 @@ export type GluconDraftRow = {
   post_error: string | null;
   posted_at: string | null;
   westudy_comment_id: string | null;
+  payload: GluconDraftPayload;
   updated_at?: string;
 };
 
@@ -74,6 +112,15 @@ export type GluconJournalDay = {
 };
 
 /** 画面プレビュー用の月次集約（やり取り・metrics・入退去） */
+export type EarlyFillHint = {
+  property_name: string;
+  room: string;
+  vacant_on: string;
+  occupied_on: string;
+  days: number;
+  early: boolean;
+};
+
 export type GluconMonthlyDigestPreview = {
   from: string;
   to: string;
@@ -84,6 +131,7 @@ export type GluconMonthlyDigestPreview = {
   metricsCount: number;
   occupancyText: string;
   occupancyCount: number;
+  earlyFills: EarlyFillHint[];
   notices: string[];
 };
 

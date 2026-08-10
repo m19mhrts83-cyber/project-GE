@@ -350,6 +350,7 @@ create table if not exists public.glucon_report_drafts (
   post_error text,
   posted_at timestamptz,
   westudy_comment_id text,
+  payload jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   unique (period_key, kind)

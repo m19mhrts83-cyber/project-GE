@@ -9,7 +9,11 @@ import {
 } from "@/lib/glucon/postGuard";
 import {
   activityPrompt,
+  consultAskPrompt,
+  consultRevisePrompt,
   getMemberHeaderStatus,
+  resultClarifyPrompt,
+  resultFactsPrompt,
   resultPrompt,
 } from "@/lib/glucon/prompts";
 import {
@@ -28,8 +32,12 @@ import {
 import { buildGluconMonthlyDigest } from "@/lib/glucon/monthlyDigest";
 import type {
   GluconActiveCycle,
+  GluconClarifyItem,
+  GluconConsultTurn,
+  GluconDraftPayload,
   GluconDraftRow,
   GluconExample,
+  GluconFactItem,
   GluconJournalDay,
   GluconMemberHeaderStatus,
   GluconMonthlyDigestPreview,
@@ -57,6 +65,81 @@ function asExamples(raw: unknown): GluconExample[] {
     });
 }
 
+function asPayload(raw: unknown): GluconDraftPayload {
+  if (!raw || typeof raw !== "object") return {};
+  const o = raw as Record<string, unknown>;
+  const facts: GluconFactItem[] = Array.isArray(o.facts)
+    ? o.facts
+        .filter((x) => x && typeof x === "object")
+        .map((x, i) => {
+          const f = x as Record<string, unknown>;
+          return {
+            id: String(f.id || `f${i + 1}`),
+            text: String(f.text || ""),
+            source: String(f.source || ""),
+            resultCandidateTag: f.resultCandidateTag
+              ? String(f.resultCandidateTag)
+              : null,
+            forResult: f.forResult !== false,
+          };
+        })
+    : [];
+  const clarify: GluconClarifyItem[] = Array.isArray(o.clarify)
+    ? o.clarify
+        .filter((x) => x && typeof x === "object")
+        .map((x, i) => {
+          const c = x as Record<string, unknown>;
+          return {
+            id: String(c.id || `q${i + 1}`),
+            question: String(c.question || ""),
+            answer: String(c.answer || ""),
+          };
+        })
+    : [];
+  const consult: GluconConsultTurn[] = Array.isArray(o.consult)
+    ? o.consult
+        .filter((x) => x && typeof x === "object")
+        .map((x) => {
+          const t = x as Record<string, unknown>;
+          return {
+            at: String(t.at || new Date().toISOString()),
+            mode: t.mode === "revise" ? "revise" : "ask",
+            prompt: String(t.prompt || ""),
+            reply: String(t.reply || ""),
+            revisedBody: t.revisedBody ? String(t.revisedBody) : null,
+          };
+        })
+    : [];
+  const phase =
+    o.phase === "facts" || o.phase === "clarify" || o.phase === "final"
+      ? o.phase
+      : undefined;
+  return {
+    phase,
+    facts,
+    factsBody: o.factsBody ? String(o.factsBody) : undefined,
+    clarify,
+    consult,
+    resultCandidates: Array.isArray(o.resultCandidates)
+      ? o.resultCandidates.map((t) => String(t))
+      : undefined,
+  };
+}
+
+function extractJsonObject(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw = fence ? fence[1].trim() : trimmed;
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 function mapDraft(
   row: Record<string, unknown>,
   opts?: { includeExamples?: boolean },
@@ -72,7 +155,6 @@ function mapDraft(
     title: String(row.title || ""),
     body: String(row.body || ""),
     status: row.status as GluconDraftRow["status"],
-    // UI には不要。RSC / Server Action 応答を軽くするため既定は空
     examples: opts?.includeExamples ? asExamples(row.examples) : [],
     journal_day_count: Number(row.journal_day_count || 0),
     post_error: row.post_error ? String(row.post_error) : null,
@@ -80,8 +162,30 @@ function mapDraft(
     westudy_comment_id: row.westudy_comment_id
       ? String(row.westudy_comment_id)
       : null,
+    payload: asPayload(row.payload),
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
   };
+}
+
+async function resolveActiveCycle(): Promise<{
+  ok: true;
+  cycle: GluconActiveCycle;
+} | { ok: false; error: string }> {
+  const schedules = await loadGluconSchedules();
+  let cycle = pickActiveCycle(schedules);
+  if (!cycle) {
+    const refreshed = await refreshGluconScheduleFromKamiooya();
+    if (!refreshed.ok) return { ok: false, error: refreshed.error || "日程取得失敗" };
+    cycle = refreshed.cycle || null;
+  }
+  if (!cycle) {
+    return {
+      ok: false,
+      error:
+        "グルコン日程が未設定です。手動で開催日を入力するか、WeStudy取込後に日程更新してください。",
+    };
+  }
+  return { ok: true, cycle };
 }
 
 export async function loadGluconSchedules(): Promise<GluconScheduleRow[]> {
@@ -262,20 +366,9 @@ export async function generateGluconDrafts(
   drafts?: GluconDraftRow[];
 }> {
   try {
-    const schedules = await loadGluconSchedules();
-    let cycle = pickActiveCycle(schedules);
-    if (!cycle) {
-      const refreshed = await refreshGluconScheduleFromKamiooya();
-      if (!refreshed.ok) return { ok: false, error: refreshed.error };
-      cycle = refreshed.cycle || null;
-    }
-    if (!cycle) {
-      return {
-        ok: false,
-        error:
-          "グルコン日程が未設定です。手動で開催日を入力するか、WeStudy取込後に日程更新してください。",
-      };
-    }
+    const resolved = await resolveActiveCycle();
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    const cycle = resolved.cycle;
 
     const journals = await loadGluconJournalRange(
       cycle.journalFrom,
@@ -286,42 +379,148 @@ export async function generateGluconDrafts(
       cycle.journalTo,
     );
     const monthlyMovesBlock = monthly.promptBlock;
-    const targetKinds: GluconReportKind[] = kinds?.length
+    const earlyFillBlock = monthly.occupancy.earlyFillText;
+    // 成果優先 → 活動（成果候補を活動から除外）
+    const requested: GluconReportKind[] = kinds?.length
       ? kinds
-      : ["activity", "result"];
+      : ["result", "activity"];
+    const targetKinds: GluconReportKind[] = [
+      ...(requested.includes("result") ? (["result"] as const) : []),
+      ...(requested.includes("activity") ? (["activity"] as const) : []),
+    ];
     const supabase = await createClient();
     const out: GluconDraftRow[] = [];
     const rubricSummary = formatRubricForPrompt(loadScoringRules());
+    let resultExcludedFacts: string[] = [];
+
+    // 既存成果ドラフトの候補を活動除外に使う
+    if (targetKinds.includes("activity") && !targetKinds.includes("result")) {
+      const { data: existingResult } = await supabase
+        .from("glucon_report_drafts")
+        .select("payload")
+        .eq("period_key", cycle.periodKey)
+        .eq("kind", "result")
+        .maybeSingle();
+      const pl = asPayload(existingResult?.payload);
+      resultExcludedFacts =
+        pl.resultCandidates ||
+        (pl.facts || [])
+          .filter((f) => f.forResult !== false)
+          .map((f) => f.text)
+          .filter(Boolean);
+    }
 
     for (const kind of targetKinds) {
       const ex = await fetchGluconExamples(kind);
       const examples = ex.ok ? ex.examples : [];
-      const prompt =
-        kind === "activity"
-          ? activityPrompt({
-              cycle,
-              journals,
-              examples,
-              monthlyMovesBlock,
-            })
-          : resultPrompt({
-              cycle,
-              journals,
-              examples,
-              rubricSummary,
-              monthlyMovesBlock,
-            });
-      const res = await geminiReply(prompt);
-      if (!res.ok) {
-        return { ok: false, error: res.error };
-      }
-      const body = res.text.trim();
-      const title =
-        kind === "activity"
-          ? `${cycle.periodKey} 活動報告`
-          : `${cycle.periodKey} 成果報告`;
-      const status = resolveDraftSaveStatus({ kind, body });
+      let payload: GluconDraftPayload = {};
 
+      if (kind === "result") {
+        // 一括生成時は事実抽出→最終稿まで一気に（UI ではステップ分割可）
+        const factsRes = await geminiReply(
+          resultFactsPrompt({
+            cycle,
+            journals,
+            monthlyMovesBlock,
+            earlyFillBlock,
+            rubricSummary,
+          }),
+        );
+        if (!factsRes.ok) return { ok: false, error: factsRes.error };
+        const parsed = extractJsonObject(factsRes.text);
+        const facts: GluconFactItem[] = Array.isArray(parsed?.facts)
+          ? (parsed!.facts as unknown[])
+              .filter((x) => x && typeof x === "object")
+              .map((x, i) => {
+                const f = x as Record<string, unknown>;
+                return {
+                  id: String(f.id || `f${i + 1}`),
+                  text: String(f.text || ""),
+                  source: String(f.source || ""),
+                  resultCandidateTag: f.resultCandidateTag
+                    ? String(f.resultCandidateTag)
+                    : null,
+                  forResult: f.forResult !== false,
+                };
+              })
+          : [];
+        const factsBody =
+          typeof parsed?.factsBody === "string"
+            ? parsed.factsBody
+            : facts.map((f) => `・${f.text}`).join("\n");
+        resultExcludedFacts = facts
+          .filter((f) => f.forResult !== false)
+          .map((f) => f.text)
+          .filter(Boolean);
+
+        const finalRes = await geminiReply(
+          resultPrompt({
+            cycle,
+            journals,
+            examples,
+            rubricSummary,
+            monthlyMovesBlock,
+            earlyFillBlock,
+            facts,
+            factsBody,
+          }),
+        );
+        if (!finalRes.ok) return { ok: false, error: finalRes.error };
+        const body = finalRes.text.trim();
+        payload = {
+          phase: "final",
+          facts,
+          factsBody,
+          clarify: [],
+          consult: [],
+          resultCandidates: resultExcludedFacts,
+        };
+        const title = `${cycle.periodKey} 成果報告`;
+        const status = resolveDraftSaveStatus({ kind, body });
+        const { data, error } = await supabase
+          .from("glucon_report_drafts")
+          .upsert(
+            {
+              period_key: cycle.periodKey,
+              kind,
+              glucon_date: cycle.gluconDate,
+              report_deadline: cycle.reportDeadline,
+              title,
+              body,
+              status,
+              examples,
+              journal_day_count: journals.length,
+              post_error: null,
+              payload,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "period_key,kind" },
+          )
+          .select("*")
+          .maybeSingle();
+        if (error) return { ok: false, error: error.message };
+        if (data) out.push(mapDraft(data as Record<string, unknown>));
+        continue;
+      }
+
+      const prompt = activityPrompt({
+        cycle,
+        journals,
+        examples,
+        monthlyMovesBlock,
+        resultExcludedFacts,
+      });
+      const res = await geminiReply(prompt);
+      if (!res.ok) return { ok: false, error: res.error };
+      const body = res.text.trim();
+      const title = `${cycle.periodKey} 活動報告`;
+      const status = resolveDraftSaveStatus({ kind, body });
+      const { data: existingAct } = await supabase
+        .from("glucon_report_drafts")
+        .select("payload")
+        .eq("period_key", cycle.periodKey)
+        .eq("kind", "activity")
+        .maybeSingle();
       const { data, error } = await supabase
         .from("glucon_report_drafts")
         .upsert(
@@ -336,13 +535,13 @@ export async function generateGluconDrafts(
             examples,
             journal_day_count: journals.length,
             post_error: null,
+            payload: asPayload(existingAct?.payload),
             updated_at: new Date().toISOString(),
           },
           { onConflict: "period_key,kind" },
         )
         .select("*")
         .maybeSingle();
-
       if (error) return { ok: false, error: error.message };
       if (data) out.push(mapDraft(data as Record<string, unknown>));
     }
@@ -355,6 +554,392 @@ export async function generateGluconDrafts(
       ok: false,
       error: `下書き生成に失敗しました: ${msg}`,
     };
+  }
+}
+
+/** Step1: 成果報告の事実のみ下書き */
+export async function generateGluconFacts(): Promise<{
+  ok: boolean;
+  error?: string;
+  draft?: GluconDraftRow;
+}> {
+  try {
+    const resolved = await resolveActiveCycle();
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    const cycle = resolved.cycle;
+    const journals = await loadGluconJournalRange(
+      cycle.journalFrom,
+      cycle.journalTo,
+    );
+    const monthly = await buildGluconMonthlyDigest(
+      cycle.journalFrom,
+      cycle.journalTo,
+    );
+    const rubricSummary = formatRubricForPrompt(loadScoringRules());
+    const res = await geminiReply(
+      resultFactsPrompt({
+        cycle,
+        journals,
+        monthlyMovesBlock: monthly.promptBlock,
+        earlyFillBlock: monthly.occupancy.earlyFillText,
+        rubricSummary,
+      }),
+    );
+    if (!res.ok) return { ok: false, error: res.error };
+    const parsed = extractJsonObject(res.text);
+    const facts: GluconFactItem[] = Array.isArray(parsed?.facts)
+      ? (parsed!.facts as unknown[])
+          .filter((x) => x && typeof x === "object")
+          .map((x, i) => {
+            const f = x as Record<string, unknown>;
+            return {
+              id: String(f.id || `f${i + 1}`),
+              text: String(f.text || ""),
+              source: String(f.source || ""),
+              resultCandidateTag: f.resultCandidateTag
+                ? String(f.resultCandidateTag)
+                : null,
+              forResult: f.forResult !== false,
+            };
+          })
+      : [];
+    const factsBody =
+      typeof parsed?.factsBody === "string"
+        ? parsed.factsBody
+        : facts.map((f) => `・${f.text}`).join("\n");
+    const resultCandidates = facts
+      .filter((f) => f.forResult !== false)
+      .map((f) => f.text)
+      .filter(Boolean);
+    const body = factsBody.trim() || "（抽出できる事実なし）";
+    const payload: GluconDraftPayload = {
+      phase: "facts",
+      facts,
+      factsBody: body,
+      clarify: [],
+      consult: [],
+      resultCandidates,
+    };
+    const supabase = await createClient();
+    const { data: prevRow } = await supabase
+      .from("glucon_report_drafts")
+      .select("payload")
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", "result")
+      .maybeSingle();
+    const prevPl = asPayload(prevRow?.payload);
+    if (prevPl.consult?.length) payload.consult = prevPl.consult;
+
+    const { data, error } = await supabase
+      .from("glucon_report_drafts")
+      .upsert(
+        {
+          period_key: cycle.periodKey,
+          kind: "result",
+          glucon_date: cycle.gluconDate,
+          report_deadline: cycle.reportDeadline,
+          title: `${cycle.periodKey} 成果報告`,
+          body,
+          status: "draft",
+          journal_day_count: journals.length,
+          post_error: null,
+          payload,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "period_key,kind" },
+      )
+      .select("*")
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    revalidateGlucon();
+    return {
+      ok: true,
+      draft: data ? mapDraft(data as Record<string, unknown>) : undefined,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/** Step2: 確認質問を生成 */
+export async function generateGluconClarify(): Promise<{
+  ok: boolean;
+  error?: string;
+  draft?: GluconDraftRow;
+}> {
+  try {
+    const resolved = await resolveActiveCycle();
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    const cycle = resolved.cycle;
+    const supabase = await createClient();
+    const { data: row } = await supabase
+      .from("glucon_report_drafts")
+      .select("*")
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", "result")
+      .maybeSingle();
+    if (!row) return { ok: false, error: "先に事実下書きを生成してください" };
+    const pl = asPayload(row.payload);
+    const facts = pl.facts || [];
+    const factsBody = pl.factsBody || String(row.body || "");
+    const res = await geminiReply(
+      resultClarifyPrompt({ cycle, facts, factsBody }),
+    );
+    if (!res.ok) return { ok: false, error: res.error };
+    const parsed = extractJsonObject(res.text);
+    const questions = Array.isArray(parsed?.questions)
+      ? (parsed!.questions as unknown[])
+          .filter((x) => x && typeof x === "object")
+          .map((x, i) => {
+            const q = x as Record<string, unknown>;
+            return {
+              id: String(q.id || `q${i + 1}`),
+              question: String(q.question || ""),
+              answer: "",
+            };
+          })
+      : [];
+    const payload: GluconDraftPayload = {
+      ...pl,
+      phase: "clarify",
+      clarify: questions.length
+        ? questions
+        : [
+            {
+              id: "q1",
+              question: "苦労した点・工夫した点があれば教えてください",
+              answer: "",
+            },
+            {
+              id: "q2",
+              question: "入会前と入会後で変わった点はありますか？",
+              answer: "",
+            },
+          ],
+    };
+    const { data, error } = await supabase
+      .from("glucon_report_drafts")
+      .update({
+        payload,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", "result")
+      .select("*")
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    revalidateGlucon();
+    return {
+      ok: true,
+      draft: data ? mapDraft(data as Record<string, unknown>) : undefined,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+export async function saveGluconClarifyAnswers(
+  answers: { id: string; answer: string }[],
+): Promise<{ ok: boolean; error?: string; draft?: GluconDraftRow }> {
+  try {
+    const resolved = await resolveActiveCycle();
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    const cycle = resolved.cycle;
+    const supabase = await createClient();
+    const { data: row } = await supabase
+      .from("glucon_report_drafts")
+      .select("*")
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", "result")
+      .maybeSingle();
+    if (!row) return { ok: false, error: "下書きがありません" };
+    const pl = asPayload(row.payload);
+    const byId = new Map(answers.map((a) => [a.id, a.answer]));
+    const clarify = (pl.clarify || []).map((c) => ({
+      ...c,
+      answer: byId.has(c.id) ? String(byId.get(c.id) || "") : c.answer,
+    }));
+    const payload: GluconDraftPayload = { ...pl, clarify, phase: "clarify" };
+    const { data, error } = await supabase
+      .from("glucon_report_drafts")
+      .update({ payload, updated_at: new Date().toISOString() })
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", "result")
+      .select("*")
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    revalidateGlucon();
+    return {
+      ok: true,
+      draft: data ? mapDraft(data as Record<string, unknown>) : undefined,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/** Step3: 最終稿生成 */
+export async function generateGluconFinal(): Promise<{
+  ok: boolean;
+  error?: string;
+  draft?: GluconDraftRow;
+}> {
+  try {
+    const resolved = await resolveActiveCycle();
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    const cycle = resolved.cycle;
+    const journals = await loadGluconJournalRange(
+      cycle.journalFrom,
+      cycle.journalTo,
+    );
+    const monthly = await buildGluconMonthlyDigest(
+      cycle.journalFrom,
+      cycle.journalTo,
+    );
+    const supabase = await createClient();
+    const { data: row } = await supabase
+      .from("glucon_report_drafts")
+      .select("*")
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", "result")
+      .maybeSingle();
+    if (!row) return { ok: false, error: "先に事実下書きを生成してください" };
+    const pl = asPayload(row.payload);
+    const ex = await fetchGluconExamples("result");
+    const examples = ex.ok ? ex.examples : [];
+    const rubricSummary = formatRubricForPrompt(loadScoringRules());
+    const res = await geminiReply(
+      resultPrompt({
+        cycle,
+        journals,
+        examples,
+        rubricSummary,
+        monthlyMovesBlock: monthly.promptBlock,
+        earlyFillBlock: monthly.occupancy.earlyFillText,
+        facts: pl.facts,
+        factsBody: pl.factsBody,
+        clarify: pl.clarify,
+      }),
+    );
+    if (!res.ok) return { ok: false, error: res.error };
+    const body = res.text.trim();
+    const status = resolveDraftSaveStatus({ kind: "result", body });
+    const payload: GluconDraftPayload = {
+      ...pl,
+      phase: "final",
+      resultCandidates:
+        pl.resultCandidates ||
+        (pl.facts || [])
+          .filter((f) => f.forResult !== false)
+          .map((f) => f.text)
+          .filter(Boolean),
+    };
+    const { data, error } = await supabase
+      .from("glucon_report_drafts")
+      .update({
+        body,
+        status,
+        examples,
+        journal_day_count: journals.length,
+        payload,
+        post_error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", "result")
+      .select("*")
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    revalidateGlucon();
+    return {
+      ok: true,
+      draft: data ? mapDraft(data as Record<string, unknown>) : undefined,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/** 聞く／直す */
+export async function consultGluconDraft(args: {
+  kind: GluconReportKind;
+  mode: "ask" | "revise";
+  prompt: string;
+  body: string;
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  reply?: string;
+  revisedBody?: string;
+  draft?: GluconDraftRow;
+}> {
+  try {
+    const q = args.prompt.trim();
+    if (!q) return { ok: false, error: "質問または指示を入力してください" };
+    const resolved = await resolveActiveCycle();
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    const cycle = resolved.cycle;
+    const gemini =
+      args.mode === "ask"
+        ? await geminiReply(
+            consultAskPrompt({
+              body: args.body,
+              question: q,
+              kind: args.kind,
+            }),
+          )
+        : await geminiReply(
+            consultRevisePrompt({
+              body: args.body,
+              instruction: q,
+              kind: args.kind,
+            }),
+          );
+    if (!gemini.ok) return { ok: false, error: gemini.error };
+    const reply = gemini.text.trim();
+    const revisedBody = args.mode === "revise" ? reply : undefined;
+    const supabase = await createClient();
+    const { data: row } = await supabase
+      .from("glucon_report_drafts")
+      .select("*")
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", args.kind)
+      .maybeSingle();
+    const pl = asPayload(row?.payload);
+    const turn: GluconConsultTurn = {
+      at: new Date().toISOString(),
+      mode: args.mode,
+      prompt: q,
+      reply: args.mode === "ask" ? reply : "（修正案を提示）",
+      revisedBody: revisedBody || null,
+    };
+    const consult = [...(pl.consult || []), turn].slice(-20);
+    const payload: GluconDraftPayload = { ...pl, consult };
+    if (!row) {
+      return { ok: true, reply, revisedBody };
+    }
+    const { data, error } = await supabase
+      .from("glucon_report_drafts")
+      .update({ payload, updated_at: new Date().toISOString() })
+      .eq("period_key", cycle.periodKey)
+      .eq("kind", args.kind)
+      .select("*")
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    revalidateGlucon();
+    return {
+      ok: true,
+      reply: args.mode === "ask" ? reply : "修正案を用意しました。反映できます。",
+      revisedBody,
+      draft: data ? mapDraft(data as Record<string, unknown>) : undefined,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
   }
 }
 
@@ -394,6 +979,7 @@ export async function saveGluconDraft(
         report_deadline: existing?.report_deadline || null,
         examples: existing?.examples || [],
         journal_day_count: existing?.journal_day_count || 0,
+        payload: asPayload(existing?.payload),
         post_error: null,
         updated_at: new Date().toISOString(),
       },
@@ -531,6 +1117,7 @@ export async function getGluconPageState(): Promise<{
           metricsCount: monthly.metrics.rows.length,
           occupancyText: monthly.occupancy.text,
           occupancyCount: monthly.occupancy.events.length,
+          earlyFills: monthly.occupancy.earlyFills,
           notices: monthly.yoritoori.notices,
         };
       } catch (e) {
@@ -545,6 +1132,7 @@ export async function getGluconPageState(): Promise<{
           metricsCount: 0,
           occupancyText: "（集約失敗）",
           occupancyCount: 0,
+          earlyFills: [],
           notices: [msg.slice(0, 160)],
         };
       }

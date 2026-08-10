@@ -2,12 +2,15 @@
 
 import sources from "@/data/glucon_sources.json";
 import { createClient } from "@/lib/supabase/server";
+import type { EarlyFillHint } from "./types";
 import {
   digestYoritooriRange,
   formatYoritooriDigestText,
   type YoritooriDigestLine,
   type YoritooriDigestResult,
 } from "./yoritooriDigest";
+
+export type { EarlyFillHint };
 
 export type MetricsDigestRow = {
   recorded_at: string;
@@ -24,6 +27,9 @@ export type OccupancyDigestEvent = {
   room: string;
   note: string | null;
 };
+
+/** 退去→入居がこの日数以下なら「早期」 */
+export const EARLY_FILL_DAYS = 30;
 
 export type GluconMonthlyDigest = {
   from: string;
@@ -42,6 +48,8 @@ export type GluconMonthlyDigest = {
   occupancy: {
     events: OccupancyDigestEvent[];
     text: string;
+    earlyFills: EarlyFillHint[];
+    earlyFillText: string;
   };
   promptBlock: string;
 };
@@ -114,6 +122,63 @@ function formatOccupancyText(events: OccupancyDigestEvent[]): string {
     .join("\n");
 }
 
+function daysBetween(a: string, b: string): number {
+  const ta = Date.parse(`${a}T00:00:00+09:00`);
+  const tb = Date.parse(`${b}T00:00:00+09:00`);
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return -1;
+  return Math.round((tb - ta) / 86400000);
+}
+
+function unitKey(property: string, room: string): string {
+  return `${property.trim()}|${room.trim()}`;
+}
+
+/** 期間内の入居に対し、直近の空室日からの日数を計算 */
+export function computeEarlyFills(
+  events: OccupancyDigestEvent[],
+  periodFrom: string,
+  periodTo: string,
+  earlyDays = EARLY_FILL_DAYS,
+): EarlyFillHint[] {
+  const sorted = [...events].sort((a, b) =>
+    a.occurred_on.localeCompare(b.occurred_on),
+  );
+  const lastVacant = new Map<string, string>();
+  const out: EarlyFillHint[] = [];
+
+  for (const e of sorted) {
+    const key = unitKey(e.property_name, e.room);
+    if (e.event_type === "vacant") {
+      lastVacant.set(key, e.occurred_on);
+      continue;
+    }
+    if (e.event_type !== "occupied") continue;
+    if (e.occurred_on < periodFrom || e.occurred_on > periodTo) continue;
+    const vacantOn = lastVacant.get(key);
+    if (!vacantOn) continue;
+    const days = daysBetween(vacantOn, e.occurred_on);
+    if (days < 0) continue;
+    out.push({
+      property_name: e.property_name,
+      room: e.room,
+      vacant_on: vacantOn,
+      occupied_on: e.occurred_on,
+      days,
+      early: days <= earlyDays,
+    });
+  }
+  return out;
+}
+
+export function formatEarlyFillText(fills: EarlyFillHint[]): string {
+  if (!fills.length) return "";
+  const lines = fills.map((f) => {
+    const tag = f.early ? "早期" : "通常";
+    return `- ${f.property_name} ${f.room}: 退去 ${f.vacant_on} → 入居 ${f.occupied_on}（${f.days}日・${tag}）`;
+  });
+  return `〈空室→入居の日数（成果候補）〉\n${lines.join("\n")}`;
+}
+
 async function loadMetricsRange(
   from: string,
   to: string,
@@ -140,17 +205,25 @@ async function loadMetricsRange(
 async function loadOccupancyRange(
   from: string,
   to: string,
+  lookbackDays = 120,
 ): Promise<OccupancyDigestEvent[]> {
   const supabase = await createClient();
+  // 早期入居計算のため、期間前の空室イベントも取得
+  const lookbackFrom = (() => {
+    const t = Date.parse(`${from}T00:00:00+09:00`);
+    if (!Number.isFinite(t)) return from;
+    const d = new Date(t - lookbackDays * 86400000);
+    return d.toISOString().slice(0, 10);
+  })();
   const { data } = await supabase
     .from("property_occupancy_events")
     .select(
       "occurred_on,event_type,property_name,property_id,room,note",
     )
-    .gte("occurred_on", from)
+    .gte("occurred_on", lookbackFrom)
     .lte("occurred_on", to)
     .order("occurred_on", { ascending: true })
-    .limit(100);
+    .limit(200);
   return (data || []).map((r) => ({
     occurred_on: String(r.occurred_on),
     event_type: String(r.event_type),
@@ -166,12 +239,16 @@ function buildPromptBlock(args: {
   yoritooriText: string;
   metricsText: string;
   occupancyText: string;
+  earlyFillText?: string;
   notices: string[];
 }): string {
   const notice =
     args.notices.length > 0
       ? `\n【集約メモ】\n${args.notices.map((n) => `- ${n}`).join("\n")}`
       : "";
+  const early = args.earlyFillText?.trim()
+    ? `\n${args.earlyFillText.trim()}\n`
+    : "";
   return `【今月の動き（メール・数値・入退去）】期間 ${args.from} 〜 ${args.to}
 ※ Journal と並列の事実ソース。ここに無い成果・金額を捏造しない。
 
@@ -183,7 +260,7 @@ ${args.metricsText}
 
 〈入居・空室イベント〉
 ${args.occupancyText}
-${notice}
+${early}${notice}
 `;
 }
 
@@ -227,10 +304,20 @@ export async function buildGluconMonthlyDigest(
     occupancyEvents = [];
   }
 
+  const periodEvents = occupancyEvents.filter(
+    (e) => e.occurred_on >= from && e.occurred_on <= to,
+  );
+  const earlyFills = computeEarlyFills(occupancyEvents, from, to);
   const yoritooriText = formatYoritooriDigestText(yoritoori);
   const metricsText = formatMetricsText(metricsRows);
-  const occupancyText = formatOccupancyText(occupancyEvents);
+  const occupancyText = formatOccupancyText(periodEvents);
+  const earlyFillText = formatEarlyFillText(earlyFills);
   const notices = [...yoritoori.notices];
+  if (earlyFills.some((f) => f.early)) {
+    notices.push(
+      `早期入居候補 ${earlyFills.filter((f) => f.early).length} 件（退去から${EARLY_FILL_DAYS}日以内）`,
+    );
+  }
 
   return {
     from,
@@ -243,13 +330,19 @@ export async function buildGluconMonthlyDigest(
       ok: yoritoori.ok,
     },
     metrics: { rows: metricsRows, text: metricsText },
-    occupancy: { events: occupancyEvents, text: occupancyText },
+    occupancy: {
+      events: periodEvents,
+      text: occupancyText,
+      earlyFills,
+      earlyFillText,
+    },
     promptBlock: buildPromptBlock({
       from,
       to,
       yoritooriText,
       metricsText,
       occupancyText,
+      earlyFillText,
       notices,
     }),
   };
