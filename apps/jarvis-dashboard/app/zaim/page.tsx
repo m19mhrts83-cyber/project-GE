@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
+import FolderLinks from "@/components/FolderLinks";
 import StatusToggle from "@/components/StatusToggle";
 import WatchCommentThread, {
   type WatchCommentRow,
@@ -7,6 +8,7 @@ import WatchCommentThread, {
 import ZaimFixActions from "@/components/ZaimFixActions";
 import ZaimReviewAckButton from "@/components/ZaimReviewAckButton";
 import { LEVEL_LABEL, HomeLevel } from "@/lib/homeLevels";
+import { getFolderLinks, pageFolderKey } from "@/lib/folderLinks";
 import { createClient } from "@/lib/supabase/server";
 
 const WATCH_ID = "zaim_quality";
@@ -178,10 +180,12 @@ export default async function ZaimWatchPage() {
     body: c.body,
     created_at: c.created_at,
   }));
+  const folderLinks = getFolderLinks(pageFolderKey("zaim"));
 
   return (
     <Shell active="/zaim">
       <h1>Zaim Watch</h1>
+      <FolderLinks links={folderLinks} />
       <p className="sub">
         財務の年間収支と、集計設定・二重取込・費目見直しの確認。アーカイブせず常駐します。
         火・金に見直し（CSV は同曜日）。年間収支は Zaim の「集計に含めない」を除外した合計です（当年は1〜当月の

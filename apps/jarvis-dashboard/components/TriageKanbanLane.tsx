@@ -4,7 +4,9 @@ import CardSummaryBody from "@/components/CardSummaryBody";
 import CardTriageActions, {
   type CardCommentRow,
 } from "@/components/CardTriageActions";
+import FolderLinks from "@/components/FolderLinks";
 import NotionBoardClient from "@/components/NotionBoardClient";
+import { getFolderLinks, laneFolderKey } from "@/lib/folderLinks";
 import {
   queryLaneBoard,
   type NotionBoardSummary,
@@ -143,6 +145,7 @@ export default async function TriageKanbanLane({
   }
 
   const board = await queryLaneBoard(lane);
+  const folderLinks = getFolderLinks(laneFolderKey(lane));
 
   return (
     <Shell active={active}>
@@ -159,6 +162,7 @@ export default async function TriageKanbanLane({
           </a>
         ) : null}
       </div>
+      <FolderLinks links={folderLinks} />
       <p className="sub">
         {subtitle ||
           "ソースを要約した確認テーマです。コメントで方針を相談し、納得したら「タスク化する…」で内容確認のうえ Notion に1件登録。履歴は OneDrive「Jarvis処置ログ/{レーン}/5.処置ログ.md」。"}{" "}

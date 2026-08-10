@@ -73,6 +73,20 @@ export type GluconJournalDay = {
   synced_at?: string;
 };
 
+/** 画面プレビュー用の月次集約（やり取り・metrics・入退去） */
+export type GluconMonthlyDigestPreview = {
+  from: string;
+  to: string;
+  yoritooriText: string;
+  yoritooriCount: number;
+  yoritooriOk: boolean;
+  metricsText: string;
+  metricsCount: number;
+  occupancyText: string;
+  occupancyCount: number;
+  notices: string[];
+};
+
 export type GluconActiveCycle = {
   gluconDate: string;
   reportDeadline: string;

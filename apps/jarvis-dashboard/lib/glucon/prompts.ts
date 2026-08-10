@@ -30,6 +30,8 @@ export function activityPrompt(args: {
   cycle: GluconActiveCycle;
   journals: GluconJournalDay[];
   examples: GluconExample[];
+  /** メール・metrics・入退去の月次集約テキスト（任意） */
+  monthlyMovesBlock?: string;
 }): string {
   const monthLabel = args.cycle.periodKey.replace("-", "年") + "月";
   const nextMonth = (() => {
@@ -39,11 +41,15 @@ export function activityPrompt(args: {
     return `${ny}年${nm}月`;
   })();
 
+  const moves = args.monthlyMovesBlock?.trim()
+    ? `\n${args.monthlyMovesBlock.trim()}\n`
+    : "";
+
   return `あなたは神・大家さん倶楽部の塾生向け「月次活動報告」の下書きライターです。
 
 【厳守】
 - 会社の人員計画・社内DX・家庭の雑談など、神大家・不動産投資・融資・物件・空室・修繕・コミュニティ学習・AI推進（神大家関連）以外は書かない。
-- 事実のない成果を捏造しない。ジャーナルに無いことは「宣言」側の予定としてだけ書いてよい。
+- 事実のない成果を捏造しない。ジャーナル／今月の動きに無いことは「宣言」側の予定としてだけ書いてよい。
 - 出力は投稿本文のみ（前置き・説明・マークダウン見出しの#は不要）。
 
 【形式】コミュニティの定型に合わせる:
@@ -70,7 +76,7 @@ ${JSON.stringify(
     null,
     2,
   )}
-`;
+${moves}`;
 }
 
 export function resultPrompt(args: {
@@ -79,6 +85,7 @@ export function resultPrompt(args: {
   examples: GluconExample[];
   /** 神大家ポイント配点基準の要約（formatRubricForPrompt の出力） */
   rubricSummary?: string;
+  monthlyMovesBlock?: string;
 }): string {
   const rubricBlock = args.rubricSummary?.trim()
     ? `
@@ -87,13 +94,17 @@ ${args.rubricSummary.trim()}
 `
     : "";
 
+  const moves = args.monthlyMovesBlock?.trim()
+    ? `\n${args.monthlyMovesBlock.trim()}\n`
+    : "";
+
   return `あなたは神・大家さん倶楽部の塾生向け「成果報告」の下書きライターです。
 
 【厳守】
 - 物件購入・融資実行・空室解消・賃料アップ・修繕コスト削減・管理改善など「実践して成果が出た」ことだけを書く。
-- ジャーナルに明確な成果が無い場合は、本文を次の1行だけにする:
+- ジャーナル／今月の動きに明確な成果が無い場合は、本文を次の1行だけにする:
   （今月は該当する成果報告なし）
-- Journal にない成果・金額を捏造しない。会社業務の成果は書かない。
+- Journal／今月の動きにない成果・金額を捏造しない。会社業務の成果は書かない。
 - 該当カテゴリが分かる題名／箇条書きにする（購入AP・戸建・空室・修繕・売却・融資・業者・情報・幹事など）。
 - 価格・利回り・融資条件・期間・削減額・手順など、採点根拠になる数字・再現情報を、事実がある範囲で必ず書く。
 - 投稿本文に「〇点」「ルールID」は書かない。
@@ -124,5 +135,5 @@ ${JSON.stringify(
     null,
     2,
   )}
-`;
+${moves}`;
 }

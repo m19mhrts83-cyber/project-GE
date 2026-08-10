@@ -1,7 +1,9 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import CopyPathButton from "@/components/CopyPathButton";
+import FolderLinks from "@/components/FolderLinks";
 import { LEVEL_LABEL, type HomeLevel } from "@/lib/homeLevels";
+import { getFolderLinks, pageFolderKey } from "@/lib/folderLinks";
 import {
   bundleByGroup,
   parseOpenchatDigest,
@@ -49,6 +51,7 @@ export default async function OpenchatPage() {
   return (
     <Shell active="/openchat">
       <h1>神大家オプチャ</h1>
+      <FolderLinks links={getFolderLinks(pageFolderKey("openchat"))} />
       <p className="sub">
         情報収集枠。返信提案なし。詳細はグループから。Web
         からローカル OneDrive は直接開けません（パスコピー／Cursor

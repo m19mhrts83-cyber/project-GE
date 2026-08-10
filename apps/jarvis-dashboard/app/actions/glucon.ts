@@ -25,12 +25,14 @@ import {
   reportDeadlineFromGluconDate,
   ymdJst,
 } from "@/lib/glucon/schedule";
+import { buildGluconMonthlyDigest } from "@/lib/glucon/monthlyDigest";
 import type {
   GluconActiveCycle,
   GluconDraftRow,
   GluconExample,
   GluconJournalDay,
   GluconMemberHeaderStatus,
+  GluconMonthlyDigestPreview,
   GluconReportKind,
   GluconScheduleRow,
 } from "@/lib/glucon/types";
@@ -279,6 +281,11 @@ export async function generateGluconDrafts(
       cycle.journalFrom,
       cycle.journalTo,
     );
+    const monthly = await buildGluconMonthlyDigest(
+      cycle.journalFrom,
+      cycle.journalTo,
+    );
+    const monthlyMovesBlock = monthly.promptBlock;
     const targetKinds: GluconReportKind[] = kinds?.length
       ? kinds
       : ["activity", "result"];
@@ -291,8 +298,19 @@ export async function generateGluconDrafts(
       const examples = ex.ok ? ex.examples : [];
       const prompt =
         kind === "activity"
-          ? activityPrompt({ cycle, journals, examples })
-          : resultPrompt({ cycle, journals, examples, rubricSummary });
+          ? activityPrompt({
+              cycle,
+              journals,
+              examples,
+              monthlyMovesBlock,
+            })
+          : resultPrompt({
+              cycle,
+              journals,
+              examples,
+              rubricSummary,
+              monthlyMovesBlock,
+            });
       const res = await geminiReply(prompt);
       if (!res.ok) {
         return { ok: false, error: res.error };
@@ -465,6 +483,7 @@ export async function getGluconPageState(): Promise<{
   drafts: GluconDraftRow[];
   journalSyncedAt: string | null;
   memberHeader: GluconMemberHeaderStatus;
+  monthlyDigest: GluconMonthlyDigestPreview | null;
   loadError?: string;
 }> {
   const memberHeader = getMemberHeaderStatus();
@@ -482,6 +501,7 @@ export async function getGluconPageState(): Promise<{
           drafts: [],
           journalSyncedAt: null,
           memberHeader,
+          monthlyDigest: null,
           loadError: refreshed.error,
         };
       }
@@ -494,6 +514,41 @@ export async function getGluconPageState(): Promise<{
       ? await loadGluconJournalRange(cycle.journalFrom, cycle.journalTo)
       : [];
     const drafts = cycle ? await loadGluconDrafts(cycle.periodKey) : [];
+    let monthlyDigest: GluconMonthlyDigestPreview | null = null;
+    if (cycle) {
+      try {
+        const monthly = await buildGluconMonthlyDigest(
+          cycle.journalFrom,
+          cycle.journalTo,
+        );
+        monthlyDigest = {
+          from: monthly.from,
+          to: monthly.to,
+          yoritooriText: monthly.yoritoori.text,
+          yoritooriCount: monthly.yoritoori.lines.length,
+          yoritooriOk: monthly.yoritoori.ok,
+          metricsText: monthly.metrics.text,
+          metricsCount: monthly.metrics.rows.length,
+          occupancyText: monthly.occupancy.text,
+          occupancyCount: monthly.occupancy.events.length,
+          notices: monthly.yoritoori.notices,
+        };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        monthlyDigest = {
+          from: cycle.journalFrom,
+          to: cycle.journalTo,
+          yoritooriText: "（集約失敗）",
+          yoritooriCount: 0,
+          yoritooriOk: false,
+          metricsText: "（集約失敗）",
+          metricsCount: 0,
+          occupancyText: "（集約失敗）",
+          occupancyCount: 0,
+          notices: [msg.slice(0, 160)],
+        };
+      }
+    }
     const supabase = await createClient();
     const { data: lastSync } = await supabase
       .from("glucon_journal_days")
@@ -512,6 +567,7 @@ export async function getGluconPageState(): Promise<{
         ? String(lastSync.synced_at)
         : null,
       memberHeader,
+      monthlyDigest,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -523,6 +579,7 @@ export async function getGluconPageState(): Promise<{
       drafts: [],
       journalSyncedAt: null,
       memberHeader,
+      monthlyDigest: null,
       loadError: msg,
     };
   }

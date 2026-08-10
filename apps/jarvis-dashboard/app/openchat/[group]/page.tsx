@@ -2,6 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Shell from "@/components/Shell";
 import CopyPathButton from "@/components/CopyPathButton";
+import FolderLinks from "@/components/FolderLinks";
+import {
+  getFolderLinksMany,
+  openchatFolderKey,
+  partnerFolderKey,
+} from "@/lib/folderLinks";
 import {
   parseOpenchatDigest,
   yoritooriCursorPrompt,
@@ -64,6 +70,10 @@ export default async function OpenchatGroupPage({
 
   const path = yoritooriRelPath(displayName);
   const prompt = yoritooriCursorPrompt(displayName);
+  const folderLinks = getFolderLinksMany([
+    openchatFolderKey(displayName),
+    partnerFolderKey("815_神大家オプチャ", null),
+  ]);
 
   return (
     <Shell active="/openchat">
@@ -76,6 +86,7 @@ export default async function OpenchatGroupPage({
         ではこのページが本文確認の正。Mac ではパスコピーか Cursor
         プロンプトで OneDrive のやり取り MD を開く。
       </p>
+      <FolderLinks links={folderLinks} />
       <p className="openchat-group-actions">
         <CopyPathButton path={path} label="やり取りパスをコピー" />
         <span className="meta"> · </span>
