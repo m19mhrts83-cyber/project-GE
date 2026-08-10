@@ -2,6 +2,7 @@ import Link from "next/link";
 import Shell from "@/components/Shell";
 import OpsFixAckButton from "@/components/OpsFixAckButton";
 import StatusToggle from "@/components/StatusToggle";
+import WatchAckAllButton from "@/components/WatchAckAllButton";
 import WatchAckButton from "@/components/WatchAckButton";
 import WatchCommentThread, {
   type WatchCommentRow,
@@ -12,6 +13,9 @@ import {
   isOpsEphemeralId,
   opsWatchVisibleOnSituation,
 } from "@/lib/opsWatch";
+import {
+  canShowGenericAckButton,
+} from "@/lib/watchUserAck";
 import { createClient } from "@/lib/supabase/server";
 
 type ActionItem = {
@@ -100,7 +104,7 @@ export default async function SituationPage() {
       <WatchHashFocus />
       <h1>状況ウォッチ</h1>
       <p className="sub">
-        気にしている項目（3段階: 要確認／注意／参考）。要対応は日付・店・金額まで表示。
+        気にしている項目（3段階: 要確認／注意／参考）。各カードの「確認した」でナビ／ホームのバッジを一時的に消せます（既定7日、または状況が変わると再表示）。
         Vercel／GHA 失敗と「直したよ」は問題・お知らせがあるときだけ表示し、確認または解決で消えます（アーカイブに溜めません）。
         各項目で Jarvis に詳しく聞けます。復元は{" "}
         <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
@@ -121,6 +125,21 @@ export default async function SituationPage() {
           </strong>
         </div>
       </div>
+      <WatchAckAllButton
+        count={active.filter((it) => {
+          const pl =
+            it.payload && typeof it.payload === "object"
+              ? (it.payload as Record<string, unknown>)
+              : {};
+          return canShowGenericAckButton({
+            id: String(it.id),
+            level: it.level,
+            summary: it.summary,
+            status: it.status,
+            payload: pl,
+          });
+        }).length}
+      />
       <h2>アクティブ</h2>
       {active.length === 0 ? (
         <p className="empty">まだ push されていません</p>
