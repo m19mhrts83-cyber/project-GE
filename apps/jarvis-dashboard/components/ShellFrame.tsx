@@ -27,16 +27,24 @@ export default function ShellFrame({
 }: Props) {
   const [navOpen, setNavOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [cmdPreferHelp, setCmdPreferHelp] = useState(false);
 
   const closeNav = useCallback(() => setNavOpen(false), []);
-  const openCmd = useCallback(() => setCmdOpen(true), []);
-  const closeCmd = useCallback(() => setCmdOpen(false), []);
+  const openCmd = useCallback((preferHelp = false) => {
+    setCmdPreferHelp(preferHelp);
+    setCmdOpen(true);
+  }, []);
+  const closeCmd = useCallback(() => {
+    setCmdOpen(false);
+    setCmdPreferHelp(false);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
       if (meta && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        setCmdPreferHelp(false);
         setCmdOpen((v) => !v);
         return;
       }
@@ -53,17 +61,17 @@ export default function ShellFrame({
       }
       if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
-        setCmdOpen(true);
+        openCmd(false);
         return;
       }
       if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
-        setCmdOpen(true);
+        openCmd(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [openCmd]);
 
   useEffect(() => {
     closeNav();
@@ -108,7 +116,7 @@ export default function ShellFrame({
             <button
               type="button"
               className="side-cmd-btn"
-              onClick={openCmd}
+              onClick={() => openCmd(false)}
               title="コマンドパレット (⌘K)"
             >
               ⌘K
@@ -153,7 +161,11 @@ export default function ShellFrame({
         </aside>
         <main>{children}</main>
       </div>
-      <CommandPalette open={cmdOpen} onClose={closeCmd} />
+      <CommandPalette
+        open={cmdOpen}
+        onClose={closeCmd}
+        preferHelp={cmdPreferHelp}
+      />
     </ToastProvider>
   );
 }
