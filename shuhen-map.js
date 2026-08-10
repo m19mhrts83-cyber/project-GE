@@ -360,17 +360,27 @@ function resetPinButton() {
 }
 
 function loadGoogleMapsScript(callback) {
+    const run = () => {
+        Promise.resolve()
+            .then(() => callback())
+            .catch((err) => {
+                console.error(err);
+                showError(`エラー: ${err.message || err}`);
+            });
+    };
     if (typeof google !== 'undefined' && google.maps) {
-        callback();
+        run();
         return;
     }
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&language=ja`;
     script.async = true;
     script.defer = true;
-    script.onload = callback;
+    script.onload = run;
     script.onerror = () => {
-        showError('Google Maps APIの読み込みに失敗しました。APIキー／制限設定を確認してください。');
+        showError(
+            'Google Maps APIの読み込みに失敗しました。APIキー／HTTPリファラ制限／Maps JavaScript API の有効化を確認してください。'
+        );
     };
     document.head.appendChild(script);
 }
@@ -410,6 +420,32 @@ function numberedIcon(label, isProperty) {
     };
 }
 
+/** Maps コールバックが返らない（リファラ拒否・ネットワーク等）ときの無限待ち防止 */
+function withTimeout(promise, ms, label) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(
+                new Error(
+                    `${label}がタイムアウトしました（${Math.round(ms / 1000)}秒）。` +
+                        'Google Cloud の APIキー制限を確認してください' +
+                        '（HTTPリファラに Pages URL／Raimo URL があるか、' +
+                        'Maps JavaScript / Places / Geocoding が有効か）。'
+                )
+            );
+        }, ms);
+        promise.then(
+            (value) => {
+                clearTimeout(timer);
+                resolve(value);
+            },
+            (err) => {
+                clearTimeout(timer);
+                reject(err);
+            }
+        );
+    });
+}
+
 function geocodeAddress(address) {
     return new Promise((resolve) => {
         const geocoder = new google.maps.Geocoder();
@@ -419,9 +455,10 @@ function geocodeAddress(address) {
                     lat: results[0].geometry.location.lat(),
                     lng: results[0].geometry.location.lng(),
                     formatted: results[0].formatted_address,
+                    status: String(status),
                 });
             } else {
-                resolve(null);
+                resolve({ ok: false, status: String(status) });
             }
         });
     });
@@ -446,6 +483,7 @@ function findPlace(query, biasLatLng) {
                         formatted: r.formatted_address || '',
                         placeId: r.place_id || '',
                         ok: true,
+                        status: String(status),
                     });
                 } else {
                     resolve({ ok: false, status: String(status) });
@@ -640,11 +678,16 @@ async function runNumberedPins() {
 
     loadGoogleMapsScript(async () => {
         try {
-            const property = await geocodeAddress(address);
-            if (!property) {
-                showError('物件住所のジオコードに失敗しました。');
+            const geo = await withTimeout(geocodeAddress(address), 15000, 'ジオコード（住所→座標）');
+            if (!geo || geo.lat == null) {
+                const st = geo && geo.status ? `（${geo.status}）` : '';
+                showError(
+                    `物件住所のジオコードに失敗しました${st}。` +
+                        '住所表記を見直すか、Geocoding API／リファラ制限を確認してください。'
+                );
                 return;
             }
+            const property = geo;
 
             const bias = new google.maps.LatLng(property.lat, property.lng);
             const rows = [
@@ -660,8 +703,14 @@ async function runNumberedPins() {
                 },
             ];
 
+            const placeStatuses = [];
             for (const p of places) {
-                const found = await findPlace(p.query, bias);
+                const found = await withTimeout(
+                    findPlace(p.query, bias),
+                    12000,
+                    `施設検索「${p.id}」`
+                );
+                if (!found.ok) placeStatuses.push(`${p.id}:${found.status || 'FAIL'}`);
                 rows.push({
                     id: p.id,
                     query: p.query,
@@ -679,11 +728,28 @@ async function runNumberedPins() {
             lastCoords = rows;
             lastPropertyCenter = property;
             renderMapAndList(property, rows);
-            await updateWalkRoute(rows);
+            await withTimeout(updateWalkRoute(rows), 15000, '徒歩動線');
             document.getElementById('mapOnlyButton').disabled = false;
             document.getElementById('copyJsonButton').disabled = false;
             const applyBtn = document.getElementById('applyStyleButton');
             if (applyBtn) applyBtn.disabled = false;
+
+            const denied = placeStatuses.filter((s) =>
+                /REQUEST_DENIED|OVER_QUERY_LIMIT|UNKNOWN_ERROR/.test(s)
+            );
+            const okPlaces = rows.filter((r) => !r.isProperty && r.ok).length;
+            if (denied.length && okPlaces === 0) {
+                showError(
+                    `施設検索がAPI制限で全滅しました: ${denied.slice(0, 4).join(', ')}` +
+                        '。Places API の有効化・日次クォータ・HTTPリファラ制限を確認してください。'
+                );
+            } else if (denied.length) {
+                const tip = document.getElementById('resultsCount');
+                if (tip) {
+                    tip.textContent +=
+                        `　※API制限の失敗あり（${denied.slice(0, 2).join(', ')}）。リファラ／クォータを確認。`;
+                }
+            }
             resetPinButton();
         } catch (err) {
             console.error(err);
