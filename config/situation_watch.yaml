@@ -115,6 +115,7 @@ items:
       Vercel Production/Development のデプロイ失敗を確認して直して。
       jarvis-dashboard と project-ge の双方。npm run build で再現し、修正後 push。
       直したら: python scripts/jarvis_ops_fail_watch.py --push --note '直した内容'
+      （失敗ピンは消えて「Jarvisが直したよ」に切り替わる。アーカイブしない）
       ルール: jarvis-ops-fail-watch.mdc
 
   - id: gha_workflow_fail
@@ -125,6 +126,7 @@ items:
     cursor_prompt: |
       失敗した GitHub Actions を直して。ログ要約→修正→再実行。
       直したら: python scripts/jarvis_ops_fail_watch.py --push --note '直した内容'
+      （失敗ピンは消えて「Jarvisが直したよ」に切り替わる。アーカイブしない）
       ルール: jarvis-ops-fail-watch.mdc
 
   - id: ops_fix_notice
@@ -133,7 +135,8 @@ items:
     enabled: true
     source: gha:ops_fail_watch
     cursor_prompt: |
-      ホームのお知らせ（ops_fix_notice）を確認。読み終わったらアーカイブしてよい。
+      ホーム／状況ウォッチの「Jarvisが直したよ」を確認。
+      「確認しました」で消してよい（アーカイブに溜めない・都度確認）。
 
   - id: glucon_report_due
     title: グルコン報告（活動・成果）

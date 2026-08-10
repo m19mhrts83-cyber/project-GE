@@ -1,5 +1,10 @@
 import { LEVEL_LABEL, HomeLevel } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
+import {
+  OPS_EPHEMERAL_IDS,
+  opsWatchVisibleOnHome,
+} from "@/lib/opsWatch";
+import OpsPinCard from "@/components/OpsPinCard";
 
 const PIN_IDS = [
   "ops_fix_notice",
@@ -39,17 +44,20 @@ export default async function HomePinBanner() {
   >;
 
   const visible = pins.filter((data) => {
+    const id = String(data.id);
+    if ((OPS_EPHEMERAL_IDS as readonly string[]).includes(id)) {
+      return opsWatchVisibleOnHome({
+        id,
+        level: data.level as string | null,
+        payload: data.payload,
+      });
+    }
     const pl =
       data.payload && typeof data.payload === "object"
         ? (data.payload as Record<string, unknown>)
         : {};
     const level = String(data.level || "");
-    if (pl.show_banner === true) return true;
-    if (data.id === "ops_fix_notice") return level !== "ok";
-    if (data.id === "vercel_deploy" || data.id === "gha_workflow_fail") {
-      return level === "attention" || level === "warn";
-    }
-    if (data.id === "cursor_pro_plus_downgrade") {
+    if (id === "cursor_pro_plus_downgrade") {
       return pl.show_banner === true || (level && level !== "ok");
     }
     return false;
@@ -71,24 +79,21 @@ export default async function HomePinBanner() {
           id === "cursor_pro_plus_downgrade"
             ? "期限 2026-08-24 · Cursor Settings で Schedule Downgrade · 状況ウォッチにも掲載"
             : id === "ops_fix_notice"
-              ? "Jarvis が直した内容 · 状況ウォッチにも掲載"
-              : "運用監視 · 状況ウォッチにも掲載";
+              ? "Jarvis が直した内容 · 「確認しました」で消えます"
+              : "運用監視 · 直ったらホームのお知らせに切り替わります";
         return (
-          <a
+          <OpsPinCard
             key={id}
+            id={id}
+            level={level}
+            levelLabel={LEVEL_LABEL[level]}
+            title={String(data.title || id)}
+            summary={String(data.summary || "")}
+            meta={metaExtra}
             href={href}
-            className={`card watch-card level-${level} home-pin-banner`}
-            {...(external
-              ? { target: "_blank", rel: "noopener noreferrer" }
-              : {})}
-          >
-            <header>
-              <span className="lvl">{LEVEL_LABEL[level]}</span>
-              <strong>{String(data.title || id)}</strong>
-            </header>
-            <p className="sum">{String(data.summary || "")}</p>
-            <p className="meta">{metaExtra}</p>
-          </a>
+            external={external}
+            showAck={id === "ops_fix_notice"}
+          />
         );
       })}
     </>

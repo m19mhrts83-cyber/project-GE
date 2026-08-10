@@ -3,6 +3,7 @@ import {
   HomeLevel,
   watchSortKey,
 } from "@/lib/homeLevels";
+import { isOpsEphemeralId, opsWatchVisibleOnHome } from "@/lib/opsWatch";
 import { createClient } from "@/lib/supabase/server";
 import { watchHref } from "./homeHelpers";
 
@@ -15,6 +16,9 @@ export default async function HomeWatchBand() {
 
   const watchNeed = (watchRows || [])
     .filter((w) => {
+      if (isOpsEphemeralId(String(w.id))) {
+        return opsWatchVisibleOnHome(w);
+      }
       const pl =
         w.payload && typeof w.payload === "object"
           ? (w.payload as Record<string, unknown>)
@@ -25,9 +29,6 @@ export default async function HomeWatchBand() {
         w.id === "rent_step" ||
         w.id === "zaim_quality" ||
         w.id === "cursor_pro_plus_downgrade" ||
-        w.id === "vercel_deploy" ||
-        w.id === "gha_workflow_fail" ||
-        w.id === "ops_fix_notice" ||
         w.id === "glucon_report_due" ||
         w.id === "mobile_plan"
       ) {

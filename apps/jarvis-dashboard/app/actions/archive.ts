@@ -36,8 +36,10 @@ export async function setWatchStatus(
       data?.payload && typeof data.payload === "object"
         ? (data.payload as Record<string, unknown>)
         : {};
-    if (payload.never_archive) {
-      throw new Error("この項目は常駐のためアーカイブできません");
+    if (payload.never_archive || payload.ephemeral) {
+      throw new Error(
+        "この項目はアーカイブできません（確認で消す／解決で消える運用）",
+      );
     }
   }
   const patch =

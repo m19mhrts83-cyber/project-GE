@@ -1,11 +1,16 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
+import OpsFixAckButton from "@/components/OpsFixAckButton";
 import StatusToggle from "@/components/StatusToggle";
 import WatchCommentThread, {
   type WatchCommentRow,
 } from "@/components/WatchCommentThread";
 import WatchHashFocus from "@/components/WatchHashFocus";
 import { LEVEL_LABEL, HomeLevel, watchSortKey } from "@/lib/homeLevels";
+import {
+  isOpsEphemeralId,
+  opsWatchVisibleOnSituation,
+} from "@/lib/opsWatch";
 import { createClient } from "@/lib/supabase/server";
 
 type ActionItem = {
@@ -41,7 +46,14 @@ export default async function SituationPage() {
     .select("*")
     .order("updated_at", { ascending: false });
 
-  const active = (items || []).filter((i) => i.status === "active");
+  const active = (items || []).filter((i) => {
+    if (i.status !== "active") return false;
+    // Vercel/GHA/直したよは問題・お知らせがあるときだけ一覧表示
+    if (isOpsEphemeralId(String(i.id))) {
+      return opsWatchVisibleOnSituation(i);
+    }
+    return true;
+  });
   const archivedCount = (items || []).filter((i) => i.status === "archived").length;
   active.sort((a, b) => {
     const pa =
@@ -88,6 +100,7 @@ export default async function SituationPage() {
       <h1>状況ウォッチ</h1>
       <p className="sub">
         気にしている項目（3段階: 要確認／注意／参考）。要対応は日付・店・金額まで表示。
+        Vercel／GHA 失敗と「直したよ」は問題・お知らせがあるときだけ表示し、確認または解決で消えます（アーカイブに溜めません）。
         各項目で Jarvis に詳しく聞けます。復元は{" "}
         <Link href="/archive" style={{ color: "var(--accent)", fontWeight: 600 }}>
           アーカイブ
@@ -120,11 +133,15 @@ export default async function SituationPage() {
           const label =
             level === "ok" ? "OK" : LEVEL_LABEL[level as HomeLevel] || it.level;
           const actions = readActions(it.payload);
+          const pl =
+            it.payload && typeof it.payload === "object"
+              ? (it.payload as Record<string, unknown>)
+              : {};
           const neverArchive = Boolean(
-            it.payload &&
-              typeof it.payload === "object" &&
-              (it.payload as { never_archive?: boolean }).never_archive,
+            pl.never_archive || isOpsEphemeralId(String(it.id)),
           );
+          const showOpsAck =
+            it.id === "ops_fix_notice" && pl.show_banner === true;
           return (
             <article
               key={it.id}
@@ -136,15 +153,27 @@ export default async function SituationPage() {
                 <span className="lvl">{label}</span>
                 <strong>{it.title}</strong>
                 <span className="meta">{it.source}</span>
-                <StatusToggle
-                  table="watch_status"
-                  id={it.id}
-                  status={it.status}
-                  path="/situation"
-                  neverArchive={neverArchive}
-                />
+                {isOpsEphemeralId(String(it.id)) ? (
+                  <span
+                    className="meta"
+                    style={{ marginLeft: "auto", fontSize: "0.78rem" }}
+                  >
+                    {it.id === "ops_fix_notice"
+                      ? "確認で消す"
+                      : "解決で消える"}
+                  </span>
+                ) : (
+                  <StatusToggle
+                    table="watch_status"
+                    id={it.id}
+                    status={it.status}
+                    path="/situation"
+                    neverArchive={neverArchive}
+                  />
+                )}
               </header>
               <p className="sum">{it.summary}</p>
+              {showOpsAck ? <OpsFixAckButton /> : null}
               {it.id === "etc_mileage" ? (
                 <p className="meta">
                   <Link href="/etc">ETCページ（還元サマリ・申請案内）→</Link>

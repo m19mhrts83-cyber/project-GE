@@ -8,6 +8,7 @@ import {
 } from "@/lib/homeLevels";
 import { createClient } from "@/lib/supabase/server";
 import { watchHref } from "@/components/home/homeHelpers";
+import { isOpsEphemeralId, opsWatchVisibleOnHome } from "@/lib/opsWatch";
 
 export default async function QueuePage() {
   await wakeDueSnoozes();
@@ -28,6 +29,9 @@ export default async function QueuePage() {
 
   const watchNeed = (watchRows || [])
     .filter((w) => {
+      if (isOpsEphemeralId(String(w.id))) {
+        return opsWatchVisibleOnHome(w);
+      }
       const pl =
         w.payload && typeof w.payload === "object"
           ? (w.payload as Record<string, unknown>)
