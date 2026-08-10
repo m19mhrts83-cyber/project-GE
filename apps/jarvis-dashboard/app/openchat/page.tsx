@@ -11,6 +11,12 @@ import {
   yoritooriRelPath,
   type ActivityRow,
 } from "@/lib/openchatDigest";
+import {
+  buildWatchAckFingerprint,
+  formatQuietUntilLabel,
+  isWatchAckActive,
+  readUserAck,
+} from "@/lib/watchUserAck";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function OpenchatPage() {
@@ -39,14 +45,24 @@ export default async function OpenchatPage() {
   const health = (watchRows || []).find((w) => w.id === "openchat_threads");
   const square = (watchRows || []).find((w) => w.id === "square_probe");
   const healthLevel = (health?.level || "info") as string;
-  const levelClass =
-    healthLevel === "ok"
-      ? "level-info"
-      : `level-${(healthLevel as HomeLevel) || "info"}`;
   const healthPayload =
     health?.payload && typeof health.payload === "object"
       ? (health.payload as Record<string, unknown>)
       : {};
+  const healthFp = buildWatchAckFingerprint({
+    id: "openchat_threads",
+    level: health?.level,
+    summary: health?.summary,
+    status: health?.status || "active",
+    payload: healthPayload,
+  });
+  const healthAcked = isWatchAckActive(healthPayload, healthFp);
+  const healthUa = readUserAck(healthPayload);
+  const displayLevel = healthAcked ? "info" : healthLevel;
+  const levelClass =
+    displayLevel === "ok"
+      ? "level-info"
+      : `level-${(displayLevel as HomeLevel) || "info"}`;
 
   return (
     <Shell active="/openchat">
@@ -69,13 +85,24 @@ export default async function OpenchatPage() {
           <>
             <p className="openchat-health-status">
               <span className="lvl">
-                {healthLevel === "ok"
-                  ? "健全"
-                  : LEVEL_LABEL[healthLevel as HomeLevel] || healthLevel}
+                {healthAcked
+                  ? "確認済"
+                  : healthLevel === "ok"
+                    ? "健全"
+                    : LEVEL_LABEL[healthLevel as HomeLevel] || healthLevel}
               </span>{" "}
               <strong>{health.title}</strong>
             </p>
             <p className="sum">{health.summary}</p>
+            {healthAcked ? (
+              <p className="meta">
+                バッジ抑制中
+                {formatQuietUntilLabel(healthUa?.quiet_until)
+                  ? ` · ${formatQuietUntilLabel(healthUa?.quiet_until)}まで`
+                  : ""}
+                。詳細はヘルスページで確認・再表示条件を確認できます。
+              </p>
+            ) : null}
             {health.detail ? (
               <p className="meta">{String(health.detail).slice(0, 200)}</p>
             ) : null}

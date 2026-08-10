@@ -377,6 +377,23 @@ def push_watch(sb) -> int:
             except Exception as e:
                 print(f"# rent_step ack sync skipped: {e}", file=sys.stderr)
 
+        # 汎用「確認した」user_ack（指紋一致＋静穏期間）を Mac push で潰さない
+        try:
+            scripts_dir = str(Path(__file__).resolve().parent)
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            from jarvis_watch_user_ack import merge_user_ack_into_payload
+
+            payload = merge_user_ack_into_payload(
+                iid,
+                payload,
+                level=str(it.get("level") or ""),
+                summary=str(it.get("summary") or ""),
+                remote_payload=remote_pl,
+            )
+        except Exception as e:
+            print(f"# user_ack merge skip {iid}: {e}", file=sys.stderr)
+
         st = it.get("status") or "active"
         arch_at = it.get("archived_at")
         if never_archive:
