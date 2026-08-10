@@ -106,6 +106,35 @@ items:
       コマンド: scripts/jarvis_westudy_weekly_check.py
       ルール: jarvis-westudy-weekly-watch.mdc
 
+  - id: vercel_deploy
+    title: Vercelデプロイ
+    category: ops
+    enabled: true
+    source: gha:ops_fail_watch
+    cursor_prompt: |
+      Vercel Production/Development のデプロイ失敗を確認して直して。
+      jarvis-dashboard と project-ge の双方。npm run build で再現し、修正後 push。
+      直したら: python scripts/jarvis_ops_fail_watch.py --push --note '直した内容'
+      ルール: jarvis-ops-fail-watch.mdc
+
+  - id: gha_workflow_fail
+    title: GitHub Actions失敗
+    category: ops
+    enabled: true
+    source: gha:ops_fail_watch
+    cursor_prompt: |
+      失敗した GitHub Actions を直して。ログ要約→修正→再実行。
+      直したら: python scripts/jarvis_ops_fail_watch.py --push --note '直した内容'
+      ルール: jarvis-ops-fail-watch.mdc
+
+  - id: ops_fix_notice
+    title: Jarvisが直したよ
+    category: ops
+    enabled: true
+    source: gha:ops_fail_watch
+    cursor_prompt: |
+      ホームのお知らせ（ops_fix_notice）を確認。読み終わったらアーカイブしてよい。
+
   - id: glucon_report_due
     title: グルコン報告（活動・成果）
     category: kamiooya

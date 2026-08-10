@@ -25,6 +25,9 @@ export default async function HomeWatchBand() {
         w.id === "rent_step" ||
         w.id === "zaim_quality" ||
         w.id === "cursor_pro_plus_downgrade" ||
+        w.id === "vercel_deploy" ||
+        w.id === "gha_workflow_fail" ||
+        w.id === "ops_fix_notice" ||
         w.id === "glucon_report_due" ||
         w.id === "mobile_plan"
       ) {

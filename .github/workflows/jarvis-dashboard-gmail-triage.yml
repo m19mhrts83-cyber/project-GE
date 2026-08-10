@@ -2,6 +2,7 @@ name: Jarvis Dashboard Gmail Triage
 
 # admin INBOX の未返信候補 → jarvis-dashboard triage_items（Mac 非依存）
 # パートナー MD / CHRLINE は対象外。
+# 末尾で Ops Fail Watch（Vercel/GHA）も朝1回だけ実行する。
 
 on:
   schedule:
@@ -26,6 +27,10 @@ jobs:
   triage:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      statuses: read
     steps:
       - uses: actions/checkout@v4
 
@@ -75,3 +80,16 @@ jobs:
             ARGS+=(--push)
           fi
           python scripts/jarvis_gha_gmail_triage.py "${ARGS[@]}"
+
+      - name: Ops fail watch (Vercel / GHA) + autofix
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          CURSOR_CLOUD_REPO_URL: ${{ secrets.CURSOR_CLOUD_REPO_URL }}
+        run: |
+          set -euo pipefail
+          # CURSOR_API_KEY があれば Cloud 起動、無ければローカル queued
+          python scripts/jarvis_ops_fail_watch.py --push --autofix
