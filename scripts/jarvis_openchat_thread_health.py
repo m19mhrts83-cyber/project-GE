@@ -38,8 +38,11 @@ OPENCHAT_BASE = Path(
 BOOTSTRAP_HINT = (
     "cd ~/git-repos/line_unofficial_poc && ./launchd/open_chat_watch_pause.sh && "
     "./run_patch.sh chrline_open_chat_to_md.py --allow-qr-login "
-    "--discover-only --discover-from-yoritoori --auto-append-thread-mids "
-    "--route-ids {route_id} && ./launchd/open_chat_watch_resume.sh"
+    "--discover-only --discover-thread-mids --init --auto-append-thread-mids "
+    "--route-ids {route_id} --min-hit-count 1 --max-pages-per-stream 80 && "
+    "./run_patch.sh chrline_open_chat_to_md.py --allow-qr-login --init --no-main "
+    "--route-ids {route_id} --join-threads-yes --max-pages-per-stream 80 && "
+    "./launchd/open_chat_watch_resume.sh"
 )
 
 
@@ -191,12 +194,20 @@ def evaluate_route(
     reasons: list[str] = []
     action = ""
 
-    if include and registered == 0 and replies_14 > 0:
+    if include and registered == 0 and (replies_14 > 0 or main_14 > 0):
         level = "attention"
-        reasons.append(
-            f"thread_mids 未登録なのに直近14日【スレッド返信】{replies_14}件"
-            "（専用スレ取得できていない静かな失敗）"
-        )
+        if replies_14 > 0:
+            reasons.append(
+                f"thread_mids 未登録なのに直近14日【スレッド返信】{replies_14}件"
+                "（専用スレ取得できていない静かな失敗）"
+            )
+        else:
+            # メインだけ取れていて relatedMessageId が MD に無い典型。
+            # 差分 discover では候補0になりやすい → --init で履歴スキャンが必要。
+            reasons.append(
+                f"thread_mids 未登録なのに直近14日【メイン】{main_14}件"
+                "（スレは立っていても差分discoverでは拾えない。--init 要）"
+            )
         action = BOOTSTRAP_HINT.format(route_id=rid)
 
     # 登録あり・7日連続 appended_threads=0、かつ main 追記あり
@@ -227,10 +238,10 @@ def evaluate_route(
             f"登録の大半が deleted/closed（構造限界: deleted={deleted} closed={closed}）"
         )
 
-    if include and registered == 0 and replies_14 == 0 and threads_14 == 0:
+    if include and registered == 0 and replies_14 == 0 and threads_14 == 0 and main_14 == 0:
         if level == "ok":
             level = "info"
-            reasons.append("thread_mids 0件・直近スレ活動なし（問題なしの可能性）")
+            reasons.append("thread_mids 0件・直近スレ／メイン活動なし（問題なしの可能性）")
 
     return {
         "route_id": rid,
