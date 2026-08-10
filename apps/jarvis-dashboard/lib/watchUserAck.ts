@@ -64,14 +64,30 @@ export function buildOpenchatAckFingerprint(payload: unknown, level?: string | n
   ].join("|");
 }
 
+/** 一般 watch 用指紋（相対時間などを落として push ごとの揺れを防ぐ） */
+export function normalizeSummaryForAck(summary: string | null | undefined): string {
+  let s = String(summary || "").trim();
+  // 「約 50 時間前」「3日前」「あと14日」など相対表現を正規化
+  s = s.replace(/約\s*\d+\s*時間前/g, "時間前");
+  s = s.replace(/\d+\s*時間前/g, "時間前");
+  s = s.replace(/約\s*\d+\s*日前/g, "日前");
+  s = s.replace(/\d+\s*日前/g, "日前");
+  s = s.replace(/あと\s*\d+\s*日/g, "あとN日");
+  s = s.replace(/残り\s*\d+\s*日/g, "残りN日");
+  s = s.replace(/\d{4}-\d{2}-\d{2}T[\d:+.-]+/g, "TS");
+  s = s.replace(/\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/g, "DT");
+  s = s.replace(/\s+/g, " ").trim();
+  return s.slice(0, 120);
+}
+
 /** 一般 watch 用指紋 */
 export function buildGenericAckFingerprint(
   id: string,
   level: string | null | undefined,
   summary: string | null | undefined,
 ): string {
-  const sum = String(summary || "").trim().slice(0, 120);
-  return ["watch", id, String(level || "").trim(), sum].join("|");
+  const sum120 = normalizeSummaryForAck(summary);
+  return ["watch", id, String(level || "").trim(), sum120].join("|");
 }
 
 export function buildWatchAckFingerprint(row: WatchAckRow): string {
@@ -125,10 +141,12 @@ export function usesSpecializedAck(watchId: string): boolean {
   return SPECIALIZED_ACK_WATCH_IDS.has(watchId);
 }
 
-/** 汎用「確認した」ボタンを出すか */
+/** 汎用「確認した」ボタンを出すか（専用ページ確認がある項目も状況ウォッチから消せる） */
 export function canShowGenericAckButton(row: WatchAckRow, now = new Date()): boolean {
   const id = String(row.id || "");
-  if (!id || usesSpecializedAck(id)) return false;
+  if (!id) return false;
+  // ops お知らせは専用ボタンのみ（ephemeral）
+  if (id === "ops_fix_notice") return false;
   const level = String(row.level || "");
   if (level !== "attention" && level !== "warn") return false;
   const fp = buildWatchAckFingerprint(row);

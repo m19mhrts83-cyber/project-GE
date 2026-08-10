@@ -6,6 +6,7 @@ Dashboard lib/watchUserAck.ts と仕様を揃える。
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -21,6 +22,20 @@ def quiet_days() -> int:
 
 def _as_dict(v: Any) -> dict[str, Any]:
     return v if isinstance(v, dict) else {}
+
+
+def normalize_summary_for_ack(summary: str | None) -> str:
+    s = str(summary or "").strip()
+    s = re.sub(r"約\s*\d+\s*時間前", "時間前", s)
+    s = re.sub(r"\d+\s*時間前", "時間前", s)
+    s = re.sub(r"約\s*\d+\s*日前", "日前", s)
+    s = re.sub(r"\d+\s*日前", "日前", s)
+    s = re.sub(r"あと\s*\d+\s*日", "あとN日", s)
+    s = re.sub(r"残り\s*\d+\s*日", "残りN日", s)
+    s = re.sub(r"\d{4}-\d{2}-\d{2}T[\d:+.-]+", "TS", s)
+    s = re.sub(r"\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}", "DT", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s[:120]
 
 
 def build_openchat_fingerprint(payload: dict[str, Any], level: str | None = None) -> str:
@@ -50,7 +65,7 @@ def build_openchat_fingerprint(payload: dict[str, Any], level: str | None = None
 
 
 def build_generic_fingerprint(watch_id: str, level: str | None, summary: str | None) -> str:
-    sum120 = str(summary or "").strip()[:120]
+    sum120 = normalize_summary_for_ack(summary)
     return "|".join(["watch", str(watch_id or "").strip(), str(level or "").strip(), sum120])
 
 

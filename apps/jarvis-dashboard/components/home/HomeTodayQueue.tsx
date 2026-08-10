@@ -5,6 +5,10 @@ import {
   watchSortKey,
 } from "@/lib/homeLevels";
 import { isOpsEphemeralId, opsWatchVisibleOnHome } from "@/lib/opsWatch";
+import {
+  buildWatchAckFingerprint,
+  isWatchAckActive,
+} from "@/lib/watchUserAck";
 import { createClient } from "@/lib/supabase/server";
 import { wakeDueSnoozes } from "@/app/actions/triage";
 import { watchHref } from "./homeHelpers";
@@ -45,6 +49,14 @@ export default async function HomeTodayQueue() {
         w.payload && typeof w.payload === "object"
           ? (w.payload as Record<string, unknown>)
           : {};
+      const fp = buildWatchAckFingerprint({
+        id: String(w.id),
+        level: w.level,
+        summary: w.summary,
+        status: w.status,
+        payload: pl,
+      });
+      if (isWatchAckActive(pl, fp)) return false;
       if (
         w.id === "etc_mileage" ||
         w.id === "vpoint" ||
