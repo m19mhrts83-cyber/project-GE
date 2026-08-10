@@ -3,7 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { geminiReply } from "@/lib/geminiReply";
 import { fetchGluconExamples, fetchGluconLessonRows } from "@/lib/glucon/examples";
-import { activityPrompt, resultPrompt } from "@/lib/glucon/prompts";
+import {
+  queueBlockReason,
+  resolveDraftSaveStatus,
+} from "@/lib/glucon/postGuard";
+import {
+  activityPrompt,
+  getMemberHeaderStatus,
+  resultPrompt,
+} from "@/lib/glucon/prompts";
+import {
+  buildResultScoringHints,
+  formatRubricForPrompt,
+  loadScoringRules,
+  type ResultScoringHints,
+} from "@/lib/glucon/scoring";
 import {
   lessonsToScheduleRows,
   mergeManualOverride,
@@ -16,6 +30,7 @@ import type {
   GluconDraftRow,
   GluconExample,
   GluconJournalDay,
+  GluconMemberHeaderStatus,
   GluconReportKind,
   GluconScheduleRow,
 } from "@/lib/glucon/types";
@@ -80,6 +95,33 @@ export async function loadGluconSchedules(): Promise<GluconScheduleRow[]> {
     source: (r.source || "scraped") as GluconScheduleRow["source"],
     comment_id: r.comment_id ? String(r.comment_id) : null,
   }));
+}
+
+/** pickActiveCycle がメモリ上で推定した日程を DB に残す（画面・ウォッチと共有） */
+async function persistEstimatedCycleIfNeeded(
+  cycle: GluconActiveCycle | null,
+  schedules: GluconScheduleRow[],
+): Promise<GluconScheduleRow[]> {
+  if (!cycle?.estimated) return schedules;
+  const exists = schedules.some((s) => s.glucon_date === cycle.gluconDate);
+  if (exists) {
+    const row = schedules.find((s) => s.glucon_date === cycle.gluconDate);
+    if (row?.source === "estimated" || row?.source === "manual") return schedules;
+    // scraped が未来日なら推定不要
+    return schedules;
+  }
+  const supabase = await createClient();
+  await supabase.from("glucon_schedule").upsert(
+    {
+      glucon_date: cycle.gluconDate,
+      report_deadline: cycle.reportDeadline,
+      title: cycle.title,
+      source: "estimated",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "glucon_date" },
+  );
+  return loadGluconSchedules();
 }
 
 export async function refreshGluconScheduleFromKamiooya(): Promise<{
@@ -242,6 +284,7 @@ export async function generateGluconDrafts(
       : ["activity", "result"];
     const supabase = await createClient();
     const out: GluconDraftRow[] = [];
+    const rubricSummary = formatRubricForPrompt(loadScoringRules());
 
     for (const kind of targetKinds) {
       const ex = await fetchGluconExamples(kind);
@@ -249,7 +292,7 @@ export async function generateGluconDrafts(
       const prompt =
         kind === "activity"
           ? activityPrompt({ cycle, journals, examples })
-          : resultPrompt({ cycle, journals, examples });
+          : resultPrompt({ cycle, journals, examples, rubricSummary });
       const res = await geminiReply(prompt);
       if (!res.ok) {
         return { ok: false, error: res.error };
@@ -259,9 +302,7 @@ export async function generateGluconDrafts(
         kind === "activity"
           ? `${cycle.periodKey} 活動報告`
           : `${cycle.periodKey} 成果報告`;
-      const noResult =
-        kind === "result" &&
-        (body.includes("該当する成果報告なし") || body.length < 40);
+      const status = resolveDraftSaveStatus({ kind, body });
 
       const { data, error } = await supabase
         .from("glucon_report_drafts")
@@ -273,7 +314,7 @@ export async function generateGluconDrafts(
             report_deadline: cycle.reportDeadline,
             title,
             body,
-            status: noResult ? "skipped" : "ready",
+            status,
             examples,
             journal_day_count: journals.length,
             post_error: null,
@@ -313,10 +354,14 @@ export async function saveGluconDraft(
     .eq("kind", kind)
     .maybeSingle();
 
-  const nextStatus =
-    existing?.status === "posted" || existing?.status === "queued"
-      ? existing.status
-      : "ready";
+  // posted の再編集は ready へ。queued は維持。成果なしは skipped を維持／復帰。
+  const existingStatus =
+    existing?.status === "posted" ? "ready" : existing?.status || null;
+  const nextStatus = resolveDraftSaveStatus({
+    kind,
+    body,
+    existingStatus,
+  });
 
   const { data, error } = await supabase
     .from("glucon_report_drafts")
@@ -326,7 +371,7 @@ export async function saveGluconDraft(
         kind,
         title: title?.trim() || existing?.title || `${periodKey} ${kind}`,
         body,
-        status: nextStatus === "posted" ? "ready" : nextStatus,
+        status: nextStatus,
         glucon_date: existing?.glucon_date || null,
         report_deadline: existing?.report_deadline || null,
         examples: existing?.examples || [],
@@ -345,6 +390,18 @@ export async function saveGluconDraft(
     ok: true,
     draft: data ? mapDraft(data as Record<string, unknown>) : undefined,
   };
+}
+
+/** 成果報告本文の観点チェック（著者向け。投稿キューには載せない） */
+export async function analyzeGluconResultBody(
+  body: string,
+): Promise<{ ok: boolean; hints?: ResultScoringHints; error?: string }> {
+  try {
+    return { ok: true, hints: buildResultScoringHints(body) };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
 }
 
 export async function skipGluconDraft(
@@ -378,24 +435,12 @@ export async function queueGluconPost(
     .maybeSingle();
 
   if (!row) return { ok: false, error: "下書きがありません" };
-  if (!String(row.body || "").trim()) {
-    return { ok: false, error: "本文が空です" };
-  }
-  if (row.status === "posted") {
-    return { ok: false, error: "既に投稿済みです。再投稿する場合は本文を保存し直してください。" };
-  }
-  if (row.status === "queued") {
-    return { ok: false, error: "既に投稿待ちです。Mac worker の完了を待ってください。" };
-  }
-  if (row.status === "skipped") {
-    return { ok: false, error: "スキップ済みです。先に本文を保存してください。" };
-  }
-  if (String(row.body || "").includes("該当する成果報告なし")) {
-    return {
-      ok: false,
-      error: "「該当する成果報告なし」は投稿対象外です。投稿スキップのままで問題ありません。",
-    };
-  }
+  const blocked = queueBlockReason({
+    kind,
+    body: String(row.body || ""),
+    status: String(row.status || ""),
+  });
+  if (blocked) return { ok: false, error: blocked };
 
   const { error } = await supabase
     .from("glucon_report_drafts")
@@ -419,8 +464,10 @@ export async function getGluconPageState(): Promise<{
   journals: GluconJournalDay[];
   drafts: GluconDraftRow[];
   journalSyncedAt: string | null;
+  memberHeader: GluconMemberHeaderStatus;
   loadError?: string;
 }> {
+  const memberHeader = getMemberHeaderStatus();
   try {
     let schedules = await loadGluconSchedules();
     if (!schedules.length) {
@@ -434,12 +481,15 @@ export async function getGluconPageState(): Promise<{
           journals: [],
           drafts: [],
           journalSyncedAt: null,
+          memberHeader,
           loadError: refreshed.error,
         };
       }
       schedules = await loadGluconSchedules();
     }
-    const cycle = pickActiveCycle(schedules);
+    let cycle = pickActiveCycle(schedules);
+    schedules = await persistEstimatedCycleIfNeeded(cycle, schedules);
+    cycle = pickActiveCycle(schedules);
     const journals = cycle
       ? await loadGluconJournalRange(cycle.journalFrom, cycle.journalTo)
       : [];
@@ -461,6 +511,7 @@ export async function getGluconPageState(): Promise<{
       journalSyncedAt: lastSync?.synced_at
         ? String(lastSync.synced_at)
         : null,
+      memberHeader,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -471,6 +522,7 @@ export async function getGluconPageState(): Promise<{
       journals: [],
       drafts: [],
       journalSyncedAt: null,
+      memberHeader,
       loadError: msg,
     };
   }
