@@ -181,6 +181,24 @@ button, input, textarea, select {
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
+.list-section {
+  margin: 1.5rem 0 0;
+}
+.list-section-split {
+  margin-top: 2rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--border);
+}
+.list-section-head {
+  margin-bottom: 0.85rem;
+}
+.list-section-head .h2 {
+  margin-bottom: 0.25rem;
+}
+.list-section-lead {
+  margin: 0;
+  font-size: 0.9rem;
+}
 .list-cards {
   display: grid;
   gap: 0.75rem;

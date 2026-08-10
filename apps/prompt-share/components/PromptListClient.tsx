@@ -51,8 +51,11 @@ export function PromptListClient({ groupSlug }: { groupSlug?: string }) {
         </p>
 
         {!groupSlug && groups.length > 0 ? (
-          <section style={{ margin: "1.25rem 0" }}>
-            <h2 className="h2">グループ</h2>
+          <section className="list-section">
+            <div className="list-section-head">
+              <h2 className="h2">グループ</h2>
+              <p className="muted list-section-lead">フォルダ単位でまとめたプロンプト集へ移動します。</p>
+            </div>
             <div className="list-cards">
               {groups.map((g) => (
                 <Link key={g.id} href={`/g/${g.slug}`} className="card">
@@ -71,25 +74,35 @@ export function PromptListClient({ groupSlug }: { groupSlug?: string }) {
         ) : null}
 
         {error ? <p className="error">{error}</p> : null}
-        <section className="list-cards" style={{ marginTop: "1rem" }}>
-          {prompts.length === 0 ? (
-            <div className="card muted">公開中のプロンプトはまだありません。</div>
-          ) : (
-            prompts.map((p) => (
-              <Link key={p.id} href={`/p/${p.public_token}`} className="card">
-                <strong>{p.title}</strong>
-                {p.description ? (
-                  <div className="muted" style={{ marginTop: 4 }}>
-                    {p.description.slice(0, 120)}
-                    {p.description.length > 120 ? "…" : ""}
+        <section className={`list-section${ !groupSlug && groups.length > 0 ? " list-section-split" : ""}`}>
+          <div className="list-section-head">
+            <h2 className="h2">{groupSlug ? "プロンプト" : "プロンプト一覧"}</h2>
+            <p className="muted list-section-lead">
+              {groupSlug
+                ? "このグループに属する公開プロンプトです。"
+                : "個別の公開URLで変数を入力・コピーできます。"}
+            </p>
+          </div>
+          <div className="list-cards">
+            {prompts.length === 0 ? (
+              <div className="card muted">公開中のプロンプトはまだありません。</div>
+            ) : (
+              prompts.map((p) => (
+                <Link key={p.id} href={`/p/${p.public_token}`} className="card">
+                  <strong>{p.title}</strong>
+                  {p.description ? (
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {p.description.slice(0, 120)}
+                      {p.description.length > 120 ? "…" : ""}
+                    </div>
+                  ) : null}
+                  <div className="muted" style={{ marginTop: 8, fontSize: "0.85rem" }}>
+                    表示 {p.view_count} / コピー {p.copy_count}
                   </div>
-                ) : null}
-                <div className="muted" style={{ marginTop: 8, fontSize: "0.85rem" }}>
-                  表示 {p.view_count} / コピー {p.copy_count}
-                </div>
-              </Link>
-            ))
-          )}
+                </Link>
+              ))
+            )}
+          </div>
         </section>
       </main>
     </>
