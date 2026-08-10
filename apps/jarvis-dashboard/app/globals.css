@@ -857,6 +857,47 @@ a.stat-link:active {
   font-size: 0.75rem;
 }
 
+.folder-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.folder-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  line-height: 1.4;
+}
+
+.folder-link:hover {
+  border-color: var(--accent);
+}
+
+.folder-link-kind {
+  font-size: 0.7rem;
+  opacity: 0.75;
+  font-weight: 600;
+}
+
+.folder-link-onedrive .folder-link-kind {
+  color: #0078d4;
+}
+
+.folder-link-gdrive .folder-link-kind {
+  color: #34a853;
+}
+
 .copy-path-btn {
   appearance: none;
   border: 1px solid var(--line);

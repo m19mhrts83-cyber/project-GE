@@ -2,6 +2,8 @@ import Shell from "@/components/Shell";
 import EnergyCfChart, {
   type EnergyPoint,
 } from "@/components/EnergyCfChart";
+import FolderLinks from "@/components/FolderLinks";
+import { getFolderLinks, pageFolderKey } from "@/lib/folderLinks";
 import { createClient } from "@/lib/supabase/server";
 
 function fmt(n: number | null | undefined) {
@@ -114,6 +116,7 @@ export default async function MetricsPage() {
   return (
     <Shell active="/metrics">
       <h1>モチベーション数値</h1>
+      <FolderLinks links={getFolderLinks(pageFolderKey("metrics"))} />
       <p className="sub">
         表示の基準は<strong>先月（{targetYm}）</strong>。Zaim
         CSVから法人／個人別に集計。部屋単位の修繕引き当てはせず法人単位で見ます。

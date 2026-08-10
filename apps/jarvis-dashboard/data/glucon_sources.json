@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "updated": "2026-08-10",
+  "note": "グルコン月次集約の対象パートナー（5.やり取り.md）。815 オプチャは含めない。",
+  "yoritoori_partners": [
+    { "folder": "104_LEAF", "name": "LEAF" },
+    { "folder": "102_ミニテック", "name": "ミニテック" },
+    { "folder": "205_立木", "name": "立木" },
+    { "folder": "317_日本総険", "name": "日本総険" },
+    { "folder": "516_名古屋銀行", "name": "名古屋銀行" },
+    { "folder": "103_Tcell", "name": "Tcell" },
+    { "folder": "311_グッドウィン", "name": "グッドウィン" },
+    { "folder": "809_神大家運営回答", "name": "神大家運営回答" }
+  ],
+  "metrics": [
+    "cashflow",
+    "rent_income",
+    "expense_total",
+    "repair_expense",
+    "income_total",
+    "energy_net_cf"
+  ]
+}

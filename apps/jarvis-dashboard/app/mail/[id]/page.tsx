@@ -2,8 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Shell from "@/components/Shell";
 import DraftWorkbench from "@/components/DraftWorkbench";
+import FolderLinks from "@/components/FolderLinks";
 import TriageStatusActions from "@/components/TriageStatusActions";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
+import {
+  getFolderLinksMany,
+  partnerFolderKey,
+} from "@/lib/folderLinks";
 import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import {
   LEVEL_LABEL,
@@ -47,6 +52,9 @@ export default async function MailDetailPage({
         ? (it.payload as Record<string, unknown>)
         : null,
   });
+  const folderLinks = getFolderLinksMany([
+    partnerFolderKey(it.folder, it.partner),
+  ]);
 
   return (
     <Shell active="/">
@@ -69,6 +77,7 @@ export default async function MailDetailPage({
           </span>
           <TriageStatusActions id={it.id} status={it.status} path={path} />
         </header>
+        <FolderLinks links={folderLinks} />
         <h1 style={{ fontSize: "1.25rem", margin: "10px 0 8px" }}>
           {it.subject || "（件名なし）"}
         </h1>

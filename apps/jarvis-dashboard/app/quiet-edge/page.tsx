@@ -1,4 +1,5 @@
 import Shell from "@/components/Shell";
+import FolderLinks from "@/components/FolderLinks";
 import QuietEdgeAskPanel from "@/components/quiet-edge/QuietEdgeAskPanel";
 import QuietEdgeClient, {
   type SnoreRow,
@@ -14,6 +15,7 @@ import SnoreTrendChart, {
   SNORE_SCORE_TARGET,
   type SnorePoint,
 } from "@/components/quiet-edge/SnoreTrendChart";
+import { getFolderLinks, pageFolderKey } from "@/lib/folderLinks";
 import {
   buildQuietEdgeAsks,
   addDaysYmd,
@@ -158,6 +160,7 @@ export default async function QuietEdgePage() {
   return (
     <Shell active="/quiet-edge">
       <h1>Quiet Edge</h1>
+      <FolderLinks links={getFolderLinks(pageFolderKey("quiet-edge"))} />
       <p className="sub">
         いびきレーザー治療の経過観察 — AutoSnore の長期保管と治療スケジュール。
         睡眠・SpO2 は治療連動の要約のみ。日中の仕事・運動は別ページ。診断ではありません。

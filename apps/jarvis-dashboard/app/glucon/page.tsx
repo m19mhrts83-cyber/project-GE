@@ -15,7 +15,7 @@ export default async function GluconPage() {
     <Shell active="/glucon">
       <h1>グルコン報告</h1>
       <p className="meta">
-        神大家の月次活動報告・成果報告を、Journal（前回期限〜今回期限）とコミュニティ参考例からまとめ、確認後に WeStudy へ投稿します。
+        神大家の月次活動報告・成果報告を、Journal・パートナーやり取り・モチベーション数値・入退去イベント（前回期限〜今回期限）とコミュニティ参考例からまとめ、確認後に WeStudy へ投稿します。
       </p>
       <FolderLinks links={folderLinks} />
 

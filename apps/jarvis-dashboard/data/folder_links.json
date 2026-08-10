@@ -1,0 +1,347 @@
+{
+  "version": 1,
+  "updated": "2026-08-10",
+  "note": "キー: lane:<id> / partner:<フォルダ名> / page:<id> / openchat:<グループ名>。url が空のエントリは UI に出さない。OneDrive webUrl は Graph で初期取得。",
+  "links": {
+    "lane:kamiooya": [
+      {
+        "label": "パートナー相談（OneDrive）",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s48bb58333ead4037954662969cd1266e",
+        "kind": "onedrive"
+      },
+      {
+        "label": "神大家運営回答",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s0885d4ed923b430abee0b199314211d5",
+        "kind": "onedrive"
+      },
+      {
+        "label": "神大家AI推進",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s0565454234154f35a4ccf89d11e7b3bf",
+        "kind": "onedrive"
+      },
+      {
+        "label": "採点自動化（Drive）",
+        "url": "https://drive.google.com/drive/folders/1QI-r0upkP335FZNQ8q99pe7FpPfTt1h_",
+        "kind": "gdrive"
+      }
+    ],
+    "lane:properties": [
+      {
+        "label": "パートナー相談（OneDrive）",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s48bb58333ead4037954662969cd1266e",
+        "kind": "onedrive"
+      },
+      {
+        "label": "ミニテック",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!scd8ae9ea3b2e4dad9d411cefcfcccf96",
+        "kind": "onedrive"
+      },
+      {
+        "label": "LEAF",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s7c394a648ad94af486da27955b6bb80f",
+        "kind": "onedrive"
+      }
+    ],
+    "lane:kodate": [
+      {
+        "label": "パートナー相談（OneDrive）",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s48bb58333ead4037954662969cd1266e",
+        "kind": "onedrive"
+      },
+      {
+        "label": "名古屋銀行",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s52bae23db461431aa768f07395dc22a4",
+        "kind": "onedrive"
+      }
+    ],
+    "lane:ai_raimo": [
+      {
+        "label": "神大家AI推進",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s0565454234154f35a4ccf89d11e7b3bf",
+        "kind": "onedrive"
+      },
+      {
+        "label": "Raimo代理店",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s29a4401ef8e04033956beb64c07c2e88",
+        "kind": "onedrive"
+      }
+    ],
+    "lane:kazoku": [
+      {
+        "label": "215 神大家ルート",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sd4791451082a47f48bb5cb46ccf8d001",
+        "kind": "onedrive"
+      }
+    ],
+    "page:glucon": [
+      {
+        "label": "神大家運営回答",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s0885d4ed923b430abee0b199314211d5",
+        "kind": "onedrive"
+      },
+      {
+        "label": "WeStudy 活動報告",
+        "url": "https://westudy.co.jp/forum/monthly_output",
+        "kind": "other"
+      },
+      {
+        "label": "WeStudy 成果報告",
+        "url": "https://westudy.co.jp/forum/results",
+        "kind": "other"
+      }
+    ],
+    "page:zaim": [
+      {
+        "label": "税金・確定申告（Zaim CSV）",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s80cf7cb1cde14c8c9a842f275553de9e",
+        "kind": "onedrive"
+      }
+    ],
+    "page:metrics": [
+      {
+        "label": "税金・確定申告（Zaim CSV）",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s80cf7cb1cde14c8c9a842f275553de9e",
+        "kind": "onedrive"
+      }
+    ],
+    "page:quiet-edge": [],
+    "page:openchat": [
+      {
+        "label": "815 神大家オプチャ",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sb52bda051f8c4f81b764b32ca925e072",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:101_ホームプランナー": [
+      {
+        "label": "ホームプランナー",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s9b428c67664e471ba2dc463c2eacf30a",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:102_ミニテック": [
+      {
+        "label": "ミニテック",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!scd8ae9ea3b2e4dad9d411cefcfcccf96",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:103_Tcell": [
+      {
+        "label": "Tcell",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s4945c265cfe044fda1f918dc7ed3c1c3",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:104_LEAF": [
+      {
+        "label": "LEAF",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s7c394a648ad94af486da27955b6bb80f",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:205_立木": [
+      {
+        "label": "立木",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sa18c7d3027fd4c8f95b9ca96bd5e36e1",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:311_グッドウィン": [
+      {
+        "label": "グッドウィン",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s3195b9ca2dbe4de6ac6cd178e659fa48",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:312_Newtus": [
+      {
+        "label": "Newtus",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sd81fa89c92ec484f8f9cd3cb567729b8",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:313_アイリック": [
+      {
+        "label": "アイリック",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s90d6ac2995e0422d9632fc7cf0ec15ee",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:317_日本総険": [
+      {
+        "label": "日本総険",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s1958bab192dd47b98aca0451673db1b8",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:419_Kneesbee税理士法人": [
+      {
+        "label": "Kneesbee税理士法人",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s8f6d8d96213b48e2b8478d0ab180e0bb",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:516_名古屋銀行": [
+      {
+        "label": "名古屋銀行",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s52bae23db461431aa768f07395dc22a4",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:618_Grandole志賀本通I_入居者": [
+      {
+        "label": "Grandole入居者",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s4d471d4f61b44ea49a4ba1fafc59ac9e",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:710_水田塾": [
+      {
+        "label": "水田塾",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s34ef7969977e41eea5cb81f089edd50a",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:806_神大家AI推進": [
+      {
+        "label": "神大家AI推進",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s0565454234154f35a4ccf89d11e7b3bf",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:809_神大家運営回答": [
+      {
+        "label": "神大家運営回答",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s0885d4ed923b430abee0b199314211d5",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:907_Raimo代理店": [
+      {
+        "label": "Raimo代理店",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s29a4401ef8e04033956beb64c07c2e88",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:908_SHIFT AI代理店": [
+      {
+        "label": "SHIFT AI代理店",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sce539f8641f444b98e2feaf4edae2f29",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:914_Workstyle-evolution代理店": [
+      {
+        "label": "Workstyle-evolution",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sbba576f818864aed883c4e7144fb72be",
+        "kind": "onedrive"
+      }
+    ],
+    "partner:815_神大家オプチャ": [
+      {
+        "label": "815 神大家オプチャ",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sb52bda051f8c4f81b764b32ca925e072",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:01全体周知G": [
+      {
+        "label": "01全体周知G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s75b26d784f87451aa85f1c9f6c5f49e1",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:11関西地域G": [
+      {
+        "label": "11関西地域G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s648deec6818549399e810b9f1cfbcc4f",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:12東海北陸G": [
+      {
+        "label": "12東海北陸G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s45d4415fcf6b4a2d8437ac0e03b74b3e",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:21中古APにチャレンジ": [
+      {
+        "label": "21中古APにチャレンジ",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s63642d3a45b646319698f84db699da33",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:23再生AP_MSにチャレンジ": [
+      {
+        "label": "23再生AP_MSにチャレンジ",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sc54e3d8299124707ac2d3cd3be07f055",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:25神コンセプト物件にチャレンジ": [
+      {
+        "label": "25神コンセプト物件にチャレンジ",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s8c8b9e0e7fbe4ae39faa1613a3916ca0",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:30空室相談G": [
+      {
+        "label": "30空室相談G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!se1d64b00c4ed42968e1052bf96a6888c",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:31修繕相談G": [
+      {
+        "label": "31修繕相談G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s5076c31a523f47c3a9ec0b30f06a2243",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:32売却相談G": [
+      {
+        "label": "32売却相談G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sef1d7369debf41fcbd1b7cc0606b598a",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:33融資相談G": [
+      {
+        "label": "33融資相談G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s87e939366a104f3583843bbbcb1d6fb3",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:34保険相談G": [
+      {
+        "label": "34保険相談G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sdddc5ee511404306ae0d5f0fa4c787d4",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:35税金・確定申告G": [
+      {
+        "label": "35税金・確定申告G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s06a7c3f0f309467fa6d5f833ef8c25f2",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:39その他相談共有G": [
+      {
+        "label": "39その他相談共有G",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sa64e267edd9646818b372d91f0c070fb",
+        "kind": "onedrive"
+      }
+    ],
+    "openchat:東海飲み会幹事やりとり": [
+      {
+        "label": "東海飲み会幹事",
+        "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!sd7f09f51b5084cc2966e462807782fd3",
+        "kind": "onedrive"
+      }
+    ]
+  }
+}

@@ -18,6 +18,7 @@ import type {
   GluconDraftRow,
   GluconJournalDay,
   GluconMemberHeaderStatus,
+  GluconMonthlyDigestPreview,
   GluconReportKind,
   ResultScoringHints,
 } from "@/lib/glucon/types";
@@ -348,12 +349,14 @@ export default function GluconReportPanel({
   journals,
   journalSyncedAt,
   memberHeader,
+  monthlyDigest,
 }: {
   cycle: GluconActiveCycle | null;
   drafts: GluconDraftRow[];
   journals: GluconJournalDay[];
   journalSyncedAt: string | null;
   memberHeader: GluconMemberHeaderStatus;
+  monthlyDigest?: GluconMonthlyDigestPreview | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -415,6 +418,70 @@ export default function GluconReportPanel({
             後に再試行してください。
           </p>
         )}
+
+        {monthlyDigest ? (
+          <details style={{ marginTop: "0.75rem" }}>
+            <summary style={{ cursor: "pointer" }}>
+              今月の動きプレビュー（やり取り{" "}
+              {monthlyDigest.yoritooriCount}／数値{" "}
+              {monthlyDigest.metricsCount}／入退去{" "}
+              {monthlyDigest.occupancyCount}）
+            </summary>
+            <p className="meta" style={{ marginTop: "0.5rem" }}>
+              {monthlyDigest.from}〜{monthlyDigest.to}
+              {!monthlyDigest.yoritooriOk
+                ? " ／ やり取り取得に問題あり（下書き生成は続行可）"
+                : ""}
+            </p>
+            {monthlyDigest.notices.length ? (
+              <ul style={{ fontSize: "0.8rem", color: "var(--muted, #888)" }}>
+                {monthlyDigest.notices.slice(0, 5).map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            ) : null}
+            <h3 style={{ fontSize: "0.9rem", margin: "0.6rem 0 0.25rem" }}>
+              パートナーやり取り
+            </h3>
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                fontSize: "0.78rem",
+                maxHeight: 160,
+                overflow: "auto",
+              }}
+            >
+              {monthlyDigest.yoritooriText}
+            </pre>
+            <h3 style={{ fontSize: "0.9rem", margin: "0.6rem 0 0.25rem" }}>
+              モチベーション数値
+            </h3>
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                fontSize: "0.78rem",
+                maxHeight: 120,
+                overflow: "auto",
+              }}
+            >
+              {monthlyDigest.metricsText}
+            </pre>
+            <h3 style={{ fontSize: "0.9rem", margin: "0.6rem 0 0.25rem" }}>
+              入居・空室イベント
+            </h3>
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                fontSize: "0.78rem",
+                maxHeight: 120,
+                overflow: "auto",
+              }}
+            >
+              {monthlyDigest.occupancyText}
+            </pre>
+          </details>
+        ) : null}
+
         <div className="qe-form-actions">
           <button
             type="button"
