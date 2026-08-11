@@ -1,64 +1,59 @@
 ---
-description: Obsidian Mac/iPhone同期。Google Drive Sync(OGD)。Cursorでノートを書いたらDocuments正本＋ogd_retag。Driveデスクトップ直書き禁止。
+description: Obsidian Mac/iPhone同期。iPhoneはPush。Cursorは書類正本＋ogd_pull/ogd_retag。Driveデスクトップ直書き禁止。
 alwaysApply: true
 ---
 
 # Obsidian 同期 — Google Drive Sync（現行正）
 
-## 方針（2026-08-11 更新）
+## 使い方（2026-08-11）
 
-- **本線**: コミュニティプラグイン **Google Drive Sync**（略称 **OGD**。作者 Richard Xiong / `ogd.richardxiong.com`）
-- **使わない**: Remotely Save / OneDrive `Apps/remotely-save/…` 橋
-- **Mac 正本ボルト（開く場所）**: `~/Documents/500_Obsidian_r1`
-- **ボルト名**: `500_Obsidian_r1`（Mac / iPhone で同一。リネームしない）
-- 認証アカウント: **`admin@livingsupport-matsu.co.jp`**
-- OGD が Drive に書く。Finder の Google Drive デスクトップは **ボルトとして開かない**
-- Mac のボルトを開くときは Finder か Obsidian のボルト一覧から。`obsidian://open?path=/Users/...` は iPhone に飛んで「Vault not found」になるので使わない
+- **iPhone**: Typeless で日誌 → Obsidian → **Push**（維持）
+- **Mac**: Obsidian はほぼ開かない。参照・追記は **Cursor**
+- **正本**: `~/Documents/500_Obsidian_r1`（ワークスペースの `500_Obsidian_r1`）
+- **ボルト名**: `500_Obsidian_r1`（リネームしない）
+- **本線**: Google Drive Sync（略称 **OGD** / `ogd.richardxiong.com`）
+- 認証: **`admin@livingsupport-matsu.co.jp`**
+- **使わない**: Remotely Save、Drive デスクトップの同名フォルダへの書き込み
+- `@` は書類の `500_Obsidian_r1`。マイドライブ配下の同名フォルダは指定しない
+- `obsidian://open?path=/Users/...` は使わない（iPhone に飛んで Vault not found）
 
-## 使わないパス
+## 使わないパス（書かない・ボルトとして開かない）
 
 `~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1`
 
-旧配置。OGD と Finder 同期が衝突し、iPhone に印付きファイルが届かない。退避コピーとして残してよいが、Obsidian では開かない。
-
-## 理解の正（2026-08-11 成功）
-
-Cursor でノートを書いて **Documents に置くだけでは iPhone には届かない**。  
-Mac ではすぐ見える。iPhone は OGD が作った（印付き）ファイルだけ Pull する。
-
-| 手順 | Mac Obsidian | iPhone Pull |
-|---|---|---|
-| Documents に書くだけ | 見える | 届かない |
-| Documents に書く → `ogd_retag` または Mac で Push | 見える | **届く** |
-| Drive デスクトップへ直書き | Finder では見える | **届かない** |
-
-## 原因
-
-OGD は **drive.file** だけ使う。プラグインが作ったファイルしか見えない。
-
-印なしノートを OGD 側へ載せる（書いたパスを引数に付ける）:
-
-```bash
-cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
-  scripts/jarvis_obsidian_ogd_retag.py \
-  "01_Journaling/Obsidianなどの知識管理/GoogleDriveSync_MacとiPhone_教訓_20260811.md"
-```
+退避のまま残してよい。ワークスペースの「マイドライブ」は他用途用。その下の `500_Obsidian_r1` には書かない。
 
 ## Jarvis の必須動作
 
-ノートを **新規作成・大幅更新**したら、報告の前に **その場で `ogd_retag.py` にパスを付けて実行**する。ユーザーに「Push して」だけで終わらない。
+| 依頼 | 先にやること | そのあと |
+|---|---|---|
+| Journal を読む・今日の日誌 | `ogd_pull.py --prefix '01_Journaling/★Journal'` | 書類の正本を読む |
+| 「Obsidian 同期して」 | `ogd_pull.py`（必要なら `--prefix`） | Remotely Save は実行しない |
+| ノートを新規作成・更新 | 書類に書く | 報告前に `ogd_retag.py` へそのパス（更新含む） |
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_obsidian_ogd_pull.py --prefix '01_Journaling/★Journal'
+
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_obsidian_ogd_retag.py \
+  "03_Literature Note(まとめノート)/家族,Yearly/例.md"
+```
 
 - 書く先は **Documents 正本だけ**
-- Drive デスクトップへ直書きしない
 - 貼り付け（ミラーリング）は最後の手段
-- 「Obsidian 同期して」→ Remotely Save は実行しない
-- Journal を読む → `~/Documents/500_Obsidian_r1`
+- パートナー確認で Remotely Save は行わない。Journal が必要なら Pull してよい
+- Pull の `conflict` 行は、書類の方が新しいので Drive で上書きしていない。ユーザーに1行伝える
 
 ## 運用（ユーザー）
 
-- **Push to Google Drive ＝ 保存**（Mac で自分で編集したとき）
-- 閉じる前に Push。同じノートの同時編集は避ける
-- iPhone は **Pull**（Reset ではない）
+- iPhone: 入力したら **Push**。Cursor の成果を見るときは **Pull**
+- Mac Obsidian は開かなくてよい
+- 同じノートを iPhone と Cursor で同時に直さない
+
+## 原因（印なしは iPhone に届かない）
+
+OGD は **drive.file** だけ使う。Drive デスクトップへ直書きしたファイルは印なしで、iPhone Pull の対象外。
 
 ## iPhone 初回（空ボルト）— Pull しても増えないとき
 

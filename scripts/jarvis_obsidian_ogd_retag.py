@@ -12,6 +12,7 @@ Never prints tokens.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -71,7 +72,7 @@ def find_by_path(session: requests.Session, path: str) -> dict | None:
         DRIVE,
         params={
             "q": f"trashed=false and properties has {{ key='path' and value='{path}' }}",
-            "fields": "files(id,name,properties)",
+            "fields": "files(id,name,properties,md5Checksum)",
         },
         timeout=30,
     )
@@ -142,6 +143,35 @@ def upload_file(session: requests.Session, local: Path, parent_id: str, vault_pa
     return r.json()["id"]
 
 
+def update_file(session: requests.Session, file_id: str, local: Path, vault_path: str) -> str:
+    meta = {
+        "name": local.name,
+        "mimeType": "text/markdown",
+        "properties": {"vault": VAULT_NAME, "path": vault_path},
+    }
+    boundary = "=======ogd_jarvis======="
+    body = (
+        f"--{boundary}\r\n"
+        "Content-Type: application/json; charset=UTF-8\r\n\r\n"
+        f"{json.dumps(meta, ensure_ascii=False)}\r\n"
+        f"--{boundary}\r\n"
+        "Content-Type: text/markdown\r\n\r\n"
+    ).encode("utf-8") + local.read_bytes() + f"\r\n--{boundary}--".encode("ascii")
+    r = session.patch(
+        f"{UPLOAD}/{file_id}",
+        params={"uploadType": "multipart", "fields": "id,name,properties"},
+        headers={"Content-Type": f"multipart/related; boundary={boundary}"},
+        data=body,
+        timeout=60,
+    )
+    r.raise_for_status()
+    return r.json()["id"]
+
+
+def _local_md5(path: Path) -> str:
+    return hashlib.md5(path.read_bytes()).hexdigest()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
@@ -163,6 +193,7 @@ def main() -> int:
     session.headers["Authorization"] = f"Bearer {access_token(refresh)}"
 
     created: dict[str, str] = {}
+    updated: dict[str, str] = {}
     already = 0
     missing_local = []
 
@@ -173,8 +204,17 @@ def main() -> int:
             continue
         hit = find_by_path(session, path)
         if hit:
-            print(f"ok      {path}")
-            already += 1
+            drive_md5 = (hit.get("md5Checksum") or "").lower()
+            if drive_md5 and drive_md5 == _local_md5(local):
+                print(f"ok      {path}")
+                already += 1
+                continue
+            print(f"{'would-up' if args.dry_run else 'update '} {path}")
+            if args.dry_run:
+                updated[path] = hit["id"]
+                continue
+            update_file(session, hit["id"], local, path)
+            updated[path] = hit["id"]
             continue
         parent_path = str(Path(path).parent)
         print(f"{'would-up' if args.dry_run else 'upload '} {path}")
@@ -184,23 +224,21 @@ def main() -> int:
         new_id = upload_file(session, local, parent_id, path)
         created[path] = new_id
 
-    if not args.dry_run and created:
+    if not args.dry_run and (created or updated):
         mapping = raw.setdefault("driveIdToPath", {})
         ops = raw.setdefault("operations", {})
-        for path, fid in created.items():
+        for path, fid in {**created, **updated}.items():
             mapping[fid] = path
-            if ops.get(path) == "create":
+            if ops.get(path) in ("create", "modify"):
                 del ops[path]
-            # folder create op
-            parent = str(Path(path).parent)
-            if ops.get(parent) == "create" and parent.endswith("研修,Yearly"):
-                # keep until we confirm folder mapped
-                pass
         if ops.get("03_Literature Note(まとめノート)/研修,Yearly") == "create":
             del ops["03_Literature Note(まとめノート)/研修,Yearly"]
         DATA_JSON.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n")
 
-    print(f"uploaded={len(created)} already_ok={already} missing_local={len(missing_local)}")
+    print(
+        f"uploaded={len(created)} updated={len(updated)} "
+        f"already_ok={already} missing_local={len(missing_local)}"
+    )
     for m in missing_local:
         print(f"missing {m}")
     return 0 if not missing_local else 2
