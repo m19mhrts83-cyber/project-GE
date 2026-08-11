@@ -3721,4 +3721,60 @@ p.back {
   border-radius: 8px;
 }
 
+.glucon-carry {
+  margin: 1.25rem 0;
+}
+
+.glucon-carry h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.glucon-carry-list {
+  margin: 0.6rem 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.glucon-carry-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.glucon-carry-body {
+  margin: 0.45rem 0 0.65rem;
+  white-space: pre-wrap;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.glucon-carry-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.glucon-carry-form label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.glucon-carry-form input,
+.glucon-carry-form textarea,
+.glucon-carry-form select {
+  width: 100%;
+}
+
+.glucon-carry-used {
+  margin-top: 0.75rem;
+}
+
+.glucon-carry-used summary {
+  cursor: pointer;
+}
+
 

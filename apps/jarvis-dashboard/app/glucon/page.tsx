@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import FolderLinks from "@/components/FolderLinks";
 import GluconArchiveList from "@/components/glucon/GluconArchiveList";
+import GluconCarryMemoPanel from "@/components/glucon/GluconCarryMemoPanel";
 import GluconMotivationPanel from "@/components/glucon/GluconMotivationPanel";
 import GluconReportPanel from "@/components/glucon/GluconReportPanel";
 import GluconScheduleHeader from "@/components/glucon/GluconScheduleHeader";
@@ -32,6 +33,10 @@ export default async function GluconPage() {
       ) : null}
 
       <GluconScheduleHeader cycle={state.cycle} />
+      <GluconCarryMemoPanel
+        memos={state.carryMemos}
+        periodKey={state.cycle?.periodKey || null}
+      />
       <GluconReportPanel
         cycle={state.cycle}
         drafts={state.drafts}

@@ -47,6 +47,17 @@ export function periodKeyFromGluconDate(gluconDate: string): string {
   return gluconDate.slice(0, 7);
 }
 
+/** YYYY-MM の翌月 */
+export function nextPeriodKey(periodKey: string): string {
+  const [ys, ms] = periodKey.split("-");
+  const y = Number(ys);
+  const m = Number(ms);
+  if (!y || !m) return periodKey;
+  const nm = m === 12 ? 1 : m + 1;
+  const ny = m === 12 ? y + 1 : y;
+  return `${ny}-${String(nm).padStart(2, "0")}`;
+}
+
 export function daysBetween(fromYmd: string, toYmd: string): number {
   const a = new Date(`${fromYmd}T00:00:00+09:00`).getTime();
   const b = new Date(`${toYmd}T00:00:00+09:00`).getTime();

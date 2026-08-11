@@ -2,6 +2,7 @@
 
 import type {
   GluconActiveCycle,
+  GluconCarryMemo,
   GluconClarifyItem,
   GluconExample,
   GluconFactItem,
@@ -31,6 +32,42 @@ function memberHeader(): string {
 const RESULT_CANDIDATE_TAGS =
   "購入AP／戸建・空室・修繕・売却・融資・業者・情報・幹事";
 
+export function injectableCarryMemos(
+  memos: GluconCarryMemo[],
+  periodKey: string,
+): GluconCarryMemo[] {
+  return memos.filter(
+    (m) =>
+      m.status === "open" && m.available_from_period_key <= periodKey,
+  );
+}
+
+/** 下書き生成に渡す次月メモブロック。未実施を成果として断定しない */
+export function carryMemoPromptBlock(
+  memos: GluconCarryMemo[],
+  kind: "activity" | "result",
+): string {
+  if (!memos.length) return "";
+  const lines = memos
+    .map((m) => `- [${m.kind_hint}] ${m.title}\n  ${m.body.trim()}`)
+    .join("\n");
+  if (kind === "activity") {
+    return `
+【次月から回したメモ（今月やる／宣言に含めてよい）】
+- 進行中・予定なら今月の活動や来月の宣言に書いてよい。
+- 未実施なら成果として書かない。
+${lines}
+`;
+  }
+  return `
+【次月から回した報告候補メモ】
+- Journal／今月の動きに無くても候補にしてよい。
+- 共有・見直しが完了したと断定しない。未実施なら成果本文に入れない。
+- facts に載せるなら source に「carry_memo（未実施の可能性）」と書き、完了が確認できないなら forResult=false。
+${lines}
+`;
+}
+
 /** Step1: 事実のみ（推測禁止）。JSON で返す */
 export function resultFactsPrompt(args: {
   cycle: GluconActiveCycle;
@@ -38,6 +75,7 @@ export function resultFactsPrompt(args: {
   monthlyMovesBlock?: string;
   earlyFillBlock?: string;
   rubricSummary?: string;
+  carryMemoBlock?: string;
 }): string {
   const moves = args.monthlyMovesBlock?.trim()
     ? `\n${args.monthlyMovesBlock.trim()}\n`
@@ -48,12 +86,15 @@ export function resultFactsPrompt(args: {
   const rubric = args.rubricSummary?.trim()
     ? `\n【scoring 観点（タグ付け用。点数は書かない）】\n${args.rubricSummary.trim()}\n`
     : "";
+  const carry = args.carryMemoBlock?.trim()
+    ? `\n${args.carryMemoBlock.trim()}\n`
+    : "";
 
   return `あなたは神・大家さん倶楽部の成果報告向け「事実抽出」アシスタントです。
 
 【厳守】
 - 推測・解釈・感情・「たぶん」は禁止。データに明示された事実だけを書く。
-- Journal／今月の動き／早期入居に無いことは出さない。
+- Journal／今月の動き／早期入居に無いことは出さない。ただし【次月から回した報告候補メモ】は候補として出してよい（完了を断定しない）。
 - 会社人事・家庭雑談は除外。神大家・不動産・融資・物件・空室・修繕関連のみ。
 - 出力は JSON のみ（前後の説明文・マークダウン禁止）。
 
@@ -90,7 +131,7 @@ ${JSON.stringify(
     null,
     2,
   )}
-${moves}${early}`;
+${moves}${early}${carry}`;
 }
 
 /** Step2: 確認質問の生成 */
@@ -134,6 +175,7 @@ export function resultPrompt(args: {
   factsBody?: string;
   clarify?: GluconClarifyItem[];
   earlyFillBlock?: string;
+  carryMemoBlock?: string;
 }): string {
   const rubricBlock = args.rubricSummary?.trim()
     ? `
@@ -147,6 +189,9 @@ ${args.rubricSummary.trim()}
     : "";
   const early = args.earlyFillBlock?.trim()
     ? `\n${args.earlyFillBlock.trim()}\n`
+    : "";
+  const carry = args.carryMemoBlock?.trim()
+    ? `\n${args.carryMemoBlock.trim()}\n`
     : "";
 
   const factsBlock =
@@ -211,7 +256,7 @@ ${JSON.stringify(
     null,
     2,
   )}
-${moves}${early}`;
+${moves}${early}${carry}`;
 }
 
 export function activityPrompt(args: {
@@ -222,6 +267,7 @@ export function activityPrompt(args: {
   monthlyMovesBlock?: string;
   /** 成果報告側に採用した事実（活動では書かない／1行参照に留める） */
   resultExcludedFacts?: string[];
+  carryMemoBlock?: string;
 }): string {
   const monthLabel = args.cycle.periodKey.replace("-", "年") + "月";
   const nextMonth = (() => {
@@ -233,6 +279,9 @@ export function activityPrompt(args: {
 
   const moves = args.monthlyMovesBlock?.trim()
     ? `\n${args.monthlyMovesBlock.trim()}\n`
+    : "";
+  const carry = args.carryMemoBlock?.trim()
+    ? `\n${args.carryMemoBlock.trim()}\n`
     : "";
 
   const exclude =
@@ -277,7 +326,7 @@ ${JSON.stringify(
     null,
     2,
   )}
-${moves}`;
+${moves}${carry}`;
 }
 
 /** 聞く／直すパネル用 */
