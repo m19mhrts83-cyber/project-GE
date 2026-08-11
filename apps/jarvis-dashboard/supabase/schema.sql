@@ -359,6 +359,25 @@ create table if not exists public.glucon_report_drafts (
 create index if not exists glucon_report_drafts_status_idx
   on public.glucon_report_drafts (status, updated_at desc);
 
+-- glucon_carry_memos: 次月報告に回すメモ（下書き周期とは独立）
+create table if not exists public.glucon_carry_memos (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  body text not null default '',
+  kind_hint text not null default 'result'
+    check (kind_hint in ('result', 'activity', 'either')),
+  status text not null default 'open'
+    check (status in ('open', 'used', 'discarded')),
+  parked_period_key text not null,
+  available_from_period_key text not null,
+  used_in_period_key text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists glucon_carry_memos_status_idx
+  on public.glucon_carry_memos (status, available_from_period_key);
+
 -- RLS: 本人（authenticated）のみ。Service Role はバイパス。
 alter table public.triage_items enable row level security;
 alter table public.watch_status enable row level security;
@@ -380,6 +399,7 @@ alter table public.vital_quiet_reviews enable row level security;
 alter table public.glucon_schedule enable row level security;
 alter table public.glucon_journal_days enable row level security;
 alter table public.glucon_report_drafts enable row level security;
+alter table public.glucon_carry_memos enable row level security;
 
 -- 単一ユーザー想定: ログイン済みなら全行可。将来 multi-user なら owner_id を追加。
 drop policy if exists triage_items_auth_all on public.triage_items;
@@ -498,6 +518,12 @@ create policy glucon_journal_days_auth_all on public.glucon_journal_days
 
 drop policy if exists glucon_report_drafts_auth_all on public.glucon_report_drafts;
 create policy glucon_report_drafts_auth_all on public.glucon_report_drafts
+  for all to authenticated
+  using (true)
+  with check (true);
+
+drop policy if exists glucon_carry_memos_auth_all on public.glucon_carry_memos;
+create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
   for all to authenticated
   using (true)
   with check (true);

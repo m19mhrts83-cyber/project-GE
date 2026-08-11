@@ -9,9 +9,11 @@ import {
 } from "@/lib/glucon/postGuard";
 import {
   activityPrompt,
+  carryMemoPromptBlock,
   consultAskPrompt,
   consultRevisePrompt,
   getMemberHeaderStatus,
+  injectableCarryMemos,
   resultClarifyPrompt,
   resultFactsPrompt,
   resultPrompt,
@@ -26,6 +28,7 @@ import {
 import {
   lessonsToScheduleRows,
   mergeManualOverride,
+  nextPeriodKey,
   pickActiveCycle,
   reportDeadlineFromGluconDate,
   ymdJst,
@@ -33,6 +36,8 @@ import {
 import { buildGluconMonthlyDigest } from "@/lib/glucon/monthlyDigest";
 import type {
   GluconActiveCycle,
+  GluconCarryKindHint,
+  GluconCarryMemo,
   GluconClarifyItem,
   GluconConsultTurn,
   GluconDraftPayload,
@@ -456,6 +461,150 @@ export async function loadGluconArchiveDrafts(): Promise<GluconDraftRow[]> {
   return (data || []).map((r) => mapDraft(r as Record<string, unknown>));
 }
 
+function asCarryKindHint(raw: unknown): GluconCarryKindHint {
+  if (raw === "activity" || raw === "either") return raw;
+  return "result";
+}
+
+function mapCarryMemo(row: Record<string, unknown>): GluconCarryMemo {
+  const status =
+    row.status === "used" || row.status === "discarded" ? row.status : "open";
+  return {
+    id: String(row.id || ""),
+    title: String(row.title || ""),
+    body: String(row.body || ""),
+    kind_hint: asCarryKindHint(row.kind_hint),
+    status,
+    parked_period_key: String(row.parked_period_key || ""),
+    available_from_period_key: String(row.available_from_period_key || ""),
+    used_in_period_key: row.used_in_period_key
+      ? String(row.used_in_period_key)
+      : null,
+    created_at: String(row.created_at || ""),
+    updated_at: String(row.updated_at || ""),
+  };
+}
+
+export async function loadGluconCarryMemos(): Promise<GluconCarryMemo[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("glucon_carry_memos")
+    .select("*")
+    .neq("status", "discarded")
+    .order("updated_at", { ascending: false });
+  return (data || []).map((r) => mapCarryMemo(r as Record<string, unknown>));
+}
+
+async function carryMemoBlockForCycle(
+  periodKey: string,
+  kind: "activity" | "result",
+): Promise<string> {
+  const memos = injectableCarryMemos(await loadGluconCarryMemos(), periodKey);
+  const filtered =
+    kind === "result"
+      ? memos.filter((m) => m.kind_hint !== "activity")
+      : memos.filter((m) => m.kind_hint !== "result");
+  return carryMemoPromptBlock(filtered, kind);
+}
+
+export async function createGluconCarryMemo(input: {
+  title: string;
+  body: string;
+  kind_hint?: GluconCarryKindHint;
+}): Promise<{ ok: boolean; error?: string; memo?: GluconCarryMemo }> {
+  const title = input.title.trim();
+  if (!title) return { ok: false, error: "タイトルを入力してください" };
+  const resolved = await resolveActiveCycle();
+  const parked = resolved.ok
+    ? resolved.cycle.periodKey
+    : ymdJst().slice(0, 7);
+  const available = nextPeriodKey(parked);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("glucon_carry_memos")
+    .insert({
+      title,
+      body: input.body.trim(),
+      kind_hint: input.kind_hint || "result",
+      status: "open",
+      parked_period_key: parked,
+      available_from_period_key: available,
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  revalidateGlucon();
+  return {
+    ok: true,
+    memo: data ? mapCarryMemo(data as Record<string, unknown>) : undefined,
+  };
+}
+
+export async function updateGluconCarryMemo(
+  id: string,
+  input: {
+    title: string;
+    body: string;
+    kind_hint: GluconCarryKindHint;
+  },
+): Promise<{ ok: boolean; error?: string }> {
+  if (!id) return { ok: false, error: "id がありません" };
+  const title = input.title.trim();
+  if (!title) return { ok: false, error: "タイトルを入力してください" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("glucon_carry_memos")
+    .update({
+      title,
+      body: input.body.trim(),
+      kind_hint: input.kind_hint,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidateGlucon();
+  return { ok: true };
+}
+
+export async function discardGluconCarryMemo(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!id) return { ok: false, error: "id がありません" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("glucon_carry_memos")
+    .update({
+      status: "discarded",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidateGlucon();
+  return { ok: true };
+}
+
+export async function markGluconCarryMemoUsed(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!id) return { ok: false, error: "id がありません" };
+  const resolved = await resolveActiveCycle();
+  const usedIn = resolved.ok
+    ? resolved.cycle.periodKey
+    : ymdJst().slice(0, 7);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("glucon_carry_memos")
+    .update({
+      status: "used",
+      used_in_period_key: usedIn,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidateGlucon();
+  return { ok: true };
+}
+
 export async function generateGluconDrafts(
   kinds?: GluconReportKind[],
 ): Promise<{
@@ -478,6 +627,14 @@ export async function generateGluconDrafts(
     );
     const monthlyMovesBlock = monthly.promptBlock;
     const earlyFillBlock = monthly.occupancy.earlyFillText;
+    const resultCarryBlock = await carryMemoBlockForCycle(
+      cycle.periodKey,
+      "result",
+    );
+    const activityCarryBlock = await carryMemoBlockForCycle(
+      cycle.periodKey,
+      "activity",
+    );
     // 成果優先 → 活動（成果候補を活動から除外）
     const requested: GluconReportKind[] = kinds?.length
       ? kinds
@@ -522,6 +679,7 @@ export async function generateGluconDrafts(
             monthlyMovesBlock,
             earlyFillBlock,
             rubricSummary,
+            carryMemoBlock: resultCarryBlock,
           }),
         );
         if (!factsRes.ok) return { ok: false, error: factsRes.error };
@@ -561,6 +719,7 @@ export async function generateGluconDrafts(
             earlyFillBlock,
             facts,
             factsBody,
+            carryMemoBlock: resultCarryBlock,
           }),
         );
         if (!finalRes.ok) return { ok: false, error: finalRes.error };
@@ -607,6 +766,7 @@ export async function generateGluconDrafts(
         examples,
         monthlyMovesBlock,
         resultExcludedFacts,
+        carryMemoBlock: activityCarryBlock,
       });
       const res = await geminiReply(prompt);
       if (!res.ok) return { ok: false, error: res.error };
@@ -730,6 +890,7 @@ export async function generateGluconFacts(opts?: {
         monthlyMovesBlock: monthly.promptBlock,
         earlyFillBlock: monthly.occupancy.earlyFillText,
         rubricSummary,
+        carryMemoBlock: await carryMemoBlockForCycle(cycle.periodKey, "result"),
       }),
     );
     if (!res.ok) return { ok: false, error: res.error };
@@ -977,6 +1138,7 @@ export async function generateGluconFinal(opts?: {
         facts: pl.facts,
         factsBody: pl.factsBody,
         clarify: pl.clarify,
+        carryMemoBlock: await carryMemoBlockForCycle(cycle.periodKey, "result"),
       }),
     );
     if (!res.ok) return { ok: false, error: res.error };
@@ -1249,6 +1411,7 @@ export async function getGluconPageState(): Promise<{
   monthlyDigest: GluconMonthlyDigestPreview | null;
   lastResultCoverage: GluconLastResultCoverage | null;
   archiveDrafts: GluconDraftRow[];
+  carryMemos: GluconCarryMemo[];
   loadError?: string;
 }> {
   const memberHeader = getMemberHeaderStatus();
@@ -1269,6 +1432,7 @@ export async function getGluconPageState(): Promise<{
           monthlyDigest: null,
           lastResultCoverage: null,
           archiveDrafts: [],
+          carryMemos: [],
           loadError: refreshed.error,
         };
       }
@@ -1327,6 +1491,7 @@ export async function getGluconPageState(): Promise<{
       .maybeSingle();
     const lastResultCoverage = await getLastResultCoverage();
     const archiveDrafts = await loadGluconArchiveDrafts();
+    const carryMemos = await loadGluconCarryMemos();
 
     return {
       today: ymdJst(),
@@ -1341,6 +1506,7 @@ export async function getGluconPageState(): Promise<{
       monthlyDigest,
       lastResultCoverage,
       archiveDrafts,
+      carryMemos,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -1355,6 +1521,7 @@ export async function getGluconPageState(): Promise<{
       monthlyDigest: null,
       lastResultCoverage: null,
       archiveDrafts: [],
+      carryMemos: [],
       loadError: msg,
     };
   }

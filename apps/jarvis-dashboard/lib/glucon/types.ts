@@ -47,6 +47,24 @@ export type GluconDraftStatus =
   | "failed"
   | "skipped";
 
+export type GluconCarryKindHint = "result" | "activity" | "either";
+
+export type GluconCarryMemoStatus = "open" | "used" | "discarded";
+
+/** 次月報告に回すメモ（下書き周期とは独立） */
+export type GluconCarryMemo = {
+  id: string;
+  title: string;
+  body: string;
+  kind_hint: GluconCarryKindHint;
+  status: GluconCarryMemoStatus;
+  parked_period_key: string;
+  available_from_period_key: string;
+  used_in_period_key: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type GluconExample = {
   comment_id: string;
   author_name: string;
