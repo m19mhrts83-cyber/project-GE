@@ -33,7 +33,7 @@ function isTypingTarget(t: EventTarget | null): boolean {
 
 /**
  * パートナー未読のキーボード・トリアージ。
- * j/k: 前後、e: スキップ、s: 即スヌーズ、h: 時間付きスヌーズ、z: Undo、Enter: 詳細
+ * j/k: 前後、e: スキップ、s: 即スヌーズ、h: 時間付きスヌーズ、z: Undo（GlobalUndoKey）、Enter: 詳細
  */
 export default function PartnerKeyboardNav({
   idx,

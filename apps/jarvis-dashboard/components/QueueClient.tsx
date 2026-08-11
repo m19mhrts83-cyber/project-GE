@@ -83,6 +83,12 @@ export default function QueueClient({ initialItems }: Props) {
         toast.push(label, {
           undo: async () => {
             await setTriageStatus(row.id, r.prevStatus || "pending", "/queue");
+            setItems((prev) => {
+              const copy = prev.slice();
+              copy.splice(Math.min(at, copy.length), 0, row);
+              return copy;
+            });
+            setIdx(at);
             router.refresh();
           },
         });

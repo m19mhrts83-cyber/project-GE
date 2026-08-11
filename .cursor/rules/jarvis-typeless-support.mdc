@@ -1,0 +1,46 @@
+---
+description: Typeless（hello@typeless.com）はパートナー一覧に入れない。返信監視は一時運用。英語送信・返信は和訳＋本文。しばらく音沙汰なければリマインド終了確認。
+alwaysApply: true
+---
+
+# Typeless サポート（一時）
+
+## 方針（2026-08-11）
+
+- **パートナー問い合わせには入れない**（`連絡先一覧.yaml` に追加しない／`yoritoori` 対象外）。
+- サポート宛は **英語**で送る（From: **m19m** `m19m.hrts83@gmail.com`）。
+- 先方返信があれば、**日本語訳**と **やり取り本文（要点）** をセットで報告する。
+- **一時運用**。しばらくやり取りがなければ、次の一文で終了確認する:  
+  「もうリマインドは不要です。もし必要であれば言ってください」
+
+## トリガー
+
+- パートナー確認（前半のついで。失敗しても確認全体は止めない）
+- ユーザーが Typeless / タイプレス / `hello@typeless.com` に言及したとき
+- Typeless へ送信・返信確認の依頼
+
+## Jarvis の動作
+
+1. **使用アカウント: m19m / Gmail API**（`token_m19m.json`）。MCP `user-gmail` は使わない。
+2. `from:hello@typeless.com OR to:hello@typeless.com` を検索。
+3. **未報告の先方返信**があれば、和訳＋原文要点を出す（送信前確認ルールは対外送信時のみ）。
+4. **静穏**: 最終送受信から **21日以上** かつ `disabled` でない → 上記の終了確認を **1回**出す。ユーザーが不要と言ったら state を `disabled: true`。
+5. 促しすぎ防止: 終了確認は **14日以内に再表示しない**。
+
+## 送信
+
+- 対外送信前確認（`jarvis-outbound-confirm`）を守る。
+- 新規要望は **新規メール**可（5月のガイダンス要望スレとは別件なら混ぜない）。
+- 宛先: `hello@typeless.com`
+
+## state
+
+`~/git-repos/.jarvis_state/typeless_support.json`  
+（`last_outbound_at` / `last_inbound_at` / `last_reported_message_id` / `last_quiet_prompt_at` / `disabled`）
+
+無効化: `"disabled": true` またはユーザーが「リマインド不要」。
+
+## やらないこと
+
+- Typeless をパートナー確認の返信提案枠に混ぜる
+- estate / admin から新規送信する（過去 estate スレは文字起こし不具合・別件）

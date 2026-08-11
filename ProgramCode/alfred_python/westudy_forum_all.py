@@ -1735,8 +1735,16 @@ def main():
             for x in ((_CLI_ARGS.url_contains or []) if _CLI_ARGS else [])
             if x and str(x).strip()
         ]
+        url_excludes = [
+            x.strip()
+            for x in ((_CLI_ARGS.url_exclude or []) if _CLI_ARGS else [])
+            if x and str(x).strip()
+        ]
         for idx, (title, url) in enumerate(topics, start=1):
             if url_filters and not any(f in url for f in url_filters):
+                continue
+            if url_excludes and any(f in url for f in url_excludes):
+                log(f"⏩ 除外: {title}  {url}")
                 continue
             # スキップ判定
             topic_dir, csv_path, done_flag = topic_output_paths(title, url)
@@ -1794,6 +1802,12 @@ if __name__ == "__main__":
         action="append",
         default=[],
         help="URL にこの文字列を含むトピックだけ処理（複数指定可）",
+    )
+    parser.add_argument(
+        "--url-exclude",
+        action="append",
+        default=[],
+        help="URL にこの文字列を含むトピックを除外（複数指定可）",
     )
     parser.add_argument(
         "--save-attachments",
