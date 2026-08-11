@@ -9,6 +9,7 @@ import {
   generateGluconDrafts,
   generateGluconFacts,
   generateGluconFinal,
+  markGluconPosted,
   queueGluconPost,
   saveGluconClarifyAnswers,
   saveGluconDraft,
@@ -26,6 +27,7 @@ import type {
   GluconDraftRow,
   GluconFactItem,
   GluconJournalDay,
+  GluconLastActivityCoverage,
   GluconLastResultCoverage,
   GluconMemberHeaderStatus,
   GluconMonthlyDigestPreview,
@@ -437,6 +439,39 @@ function DraftActions({
         <a className="btn" href={forumUrl} target="_blank" rel="noreferrer">
           板を開く
         </a>
+        <button
+          type="button"
+          className="btn"
+          disabled={pending || status === "posted" || !body.trim()}
+          onClick={() => {
+            setErr(null);
+            setMsg(null);
+            start(async () => {
+              const saved = await saveGluconDraft(
+                cycle.periodKey,
+                kind,
+                body,
+              );
+              if (!saved.ok) {
+                setErr(saved.error || "保存失敗");
+                return;
+              }
+              const r = await markGluconPosted(cycle.periodKey, kind, {
+                coveredFrom,
+                coveredTo,
+              });
+              if (!r.ok) {
+                setErr(r.error || "投稿済み反映に失敗");
+                return;
+              }
+              if (r.draft) setStatus(r.draft.status);
+              setMsg("ダッシュボードを投稿済みにしました（WeStudy へは再送信していません）");
+              router.refresh();
+            });
+          }}
+        >
+          WeStudy で投稿した
+        </button>
       </div>
 
       {kind === "result" && isNoResultBody(body) ? (
@@ -459,8 +494,12 @@ function DraftActions({
             background: "var(--panel, #111)",
           }}
         >
-          <strong>投稿確認</strong>
+          <strong>投稿確認（まだコミュニティには送られません）</strong>
           <p className="meta">
+            「これで投稿してよい」は WeStudy への即送信ではありません。
+            下書きを投稿待ちに入れるだけです。最終の「コミュニティに登録する」は
+            WeStudy 側で押します。
+            <br />
             板: {KIND_LABEL[kind]}（{forumUrl}）
             <br />
             提出期限: {cycle.reportDeadline} ／ グルコン: {cycle.gluconDate}
@@ -541,9 +580,13 @@ function DraftActions({
 function ActivityEditor({
   cycle,
   initial,
+  lastActivityCoverage,
+  today,
 }: {
   cycle: GluconActiveCycle;
   initial: GluconDraftRow | null;
+  lastActivityCoverage?: GluconLastActivityCoverage | null;
+  today: string;
 }) {
   const [pending, start] = useTransition();
   const [body, setBody] = useState(initial?.body || "");
@@ -600,6 +643,12 @@ function ActivityEditor({
         pending={pending}
         start={start}
         postError={initial?.post_error}
+        coveredFrom={
+          lastActivityCoverage?.covered_to
+            ? nextYmdClient(lastActivityCoverage.covered_to)
+            : cycle.journalFrom
+        }
+        coveredTo={today}
       />
     </section>
   );
@@ -921,6 +970,7 @@ export default function GluconReportPanel({
   memberHeader,
   monthlyDigest,
   lastResultCoverage,
+  lastActivityCoverage,
   today,
 }: {
   cycle: GluconActiveCycle | null;
@@ -930,6 +980,7 @@ export default function GluconReportPanel({
   memberHeader: GluconMemberHeaderStatus;
   monthlyDigest?: GluconMonthlyDigestPreview | null;
   lastResultCoverage?: GluconLastResultCoverage | null;
+  lastActivityCoverage?: GluconLastActivityCoverage | null;
   today?: string;
 }) {
   const router = useRouter();
@@ -974,6 +1025,9 @@ export default function GluconReportPanel({
           {journalSyncedAt
             ? ` ／ 最終 sync ${journalSyncedAt}`
             : " ／ 未 sync（Mac で jarvis_glucon_journal_sync.py を実行）"}
+          {lastActivityCoverage?.covered_to
+            ? ` ／ 前回活動 ${lastActivityCoverage.covered_to} まで（次は翌日から）`
+            : ""}
         </p>
         {journals.length ? (
           <ul style={{ fontSize: "0.85rem", maxHeight: 180, overflow: "auto" }}>
@@ -1094,12 +1148,13 @@ export default function GluconReportPanel({
               });
             }}
           >
-            {pending ? "生成中…" : "一括生成（成果優先→活動）"}
+            {pending ? "生成中…" : "活動の下書きを作る"}
           </button>
         </div>
         {err ? <p className="qe-err">{err}</p> : null}
         <p className="meta">
-          成果報告は下のステップ（①事実→②質問→③最終稿）が本線。一括は従来互換です。
+          定常は活動報告。前回投稿の翌日から今回期限までの進展だけを書きます。
+          成果報告は大きな区切りのとき、下のステップ（①事実→②質問→③最終稿）を使います。
           <br />
           コマンド例:{" "}
           <code>
@@ -1115,7 +1170,12 @@ export default function GluconReportPanel({
         lastResultCoverage={lastResultCoverage}
         today={today || todayYmdClient()}
       />
-      <ActivityEditor cycle={cycle} initial={draftFor(drafts, "activity")} />
+      <ActivityEditor
+        cycle={cycle}
+        initial={draftFor(drafts, "activity")}
+        lastActivityCoverage={lastActivityCoverage}
+        today={today || todayYmdClient()}
+      />
     </>
   );
 }

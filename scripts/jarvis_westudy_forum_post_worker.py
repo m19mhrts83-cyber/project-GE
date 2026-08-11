@@ -8,6 +8,9 @@ Dashboard で確認後 status=queued になった行を処理する。
   python scripts/jarvis_westudy_forum_post_worker.py --dry-run
   python scripts/jarvis_westudy_forum_post_worker.py --i-confirm-post
   python scripts/jarvis_westudy_forum_post_worker.py --i-confirm-post --show
+  # 入力まで進めて最終ボタンは押さない（ブラウザを開いたまま）
+  python scripts/jarvis_westudy_forum_post_worker.py --dry-run --show --keep-open \\
+    --period-key 2026-08 --kind activity
 """
 
 from __future__ import annotations
@@ -186,6 +189,19 @@ def main() -> int:
         help="本番投稿を実行する明示フラグ（dry-run 以外で必須）",
     )
     ap.add_argument("--show", action="store_true")
+    ap.add_argument(
+        "--keep-open",
+        action="store_true",
+        help="--show 時、最終ボタンをユーザーが押せるようブラウザを開いたまま待つ",
+    )
+    ap.add_argument(
+        "--keep-open-sec",
+        type=int,
+        default=900,
+        help="--keep-open の待機秒（既定 900）",
+    )
+    ap.add_argument("--period-key", help="特定サイクルだけ処理（例: 2026-08）")
+    ap.add_argument("--kind", choices=["activity", "result"], help="activity / result")
     ap.add_argument("--limit", type=int, default=5)
     args = ap.parse_args()
 
@@ -198,17 +214,19 @@ def main() -> int:
 
     load_env()
     sb = supabase_client()
-    res = (
-        sb.table("glucon_report_drafts")
-        .select("*")
-        .eq("status", "queued")
-        .order("updated_at")
-        .limit(args.limit)
-        .execute()
-    )
+    q = sb.table("glucon_report_drafts").select("*")
+    if args.period_key:
+        q = q.eq("period_key", args.period_key)
+    if args.kind:
+        q = q.eq("kind", args.kind)
+    if args.period_key or args.kind:
+        q = q.in_("status", ["ready", "queued", "draft"])
+    else:
+        q = q.eq("status", "queued")
+    res = q.order("updated_at").limit(args.limit).execute()
     rows = res.data or []
     if not rows:
-        print("# no queued drafts")
+        print("# no matching drafts")
         return 0
 
     from playwright.sync_api import sync_playwright
@@ -224,7 +242,14 @@ def main() -> int:
                 except Exception as e:
                     print(f"# fail {row.get('id')}: {e}", file=sys.stderr)
         finally:
-            if args.show:
+            if args.show and args.keep_open:
+                print(
+                    f"--keep-open: {args.keep_open_sec}秒待ちます。"
+                    " WeStudy の「コミュニティに登録する」は押していません。画面で押してください。",
+                    flush=True,
+                )
+                time.sleep(max(30, args.keep_open_sec))
+            elif args.show:
                 print("--show: 10秒後に閉じます")
                 time.sleep(10)
             browser.close()

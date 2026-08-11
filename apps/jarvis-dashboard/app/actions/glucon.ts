@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { geminiReply } from "@/lib/geminiReply";
 import { fetchGluconExamples, fetchGluconLessonRows } from "@/lib/glucon/examples";
 import {
+  isNoResultBody,
   queueBlockReason,
   resolveDraftSaveStatus,
 } from "@/lib/glucon/postGuard";
@@ -29,6 +30,7 @@ import {
   lessonsToScheduleRows,
   mergeManualOverride,
   nextPeriodKey,
+  peekNextCycle,
   pickActiveCycle,
   reportDeadlineFromGluconDate,
   ymdJst,
@@ -45,8 +47,10 @@ import type {
   GluconExample,
   GluconFactItem,
   GluconJournalDay,
+  GluconLastActivityCoverage,
   GluconLastResultCoverage,
   GluconMemberHeaderStatus,
+  GluconNextCycleHint,
   GluconMonthlyDigestPreview,
   GluconReportKind,
   GluconScheduleRow,
@@ -617,14 +621,14 @@ export async function generateGluconDrafts(
     if (!resolved.ok) return { ok: false, error: resolved.error };
     const cycle = resolved.cycle;
 
-    const journals = await loadGluconJournalRange(
-      cycle.journalFrom,
-      cycle.journalTo,
-    );
-    const monthly = await buildGluconMonthlyDigest(
-      cycle.journalFrom,
-      cycle.journalTo,
-    );
+    const lastActivity = await getLastActivityCoverage();
+    const activityFrom =
+      lastActivity?.covered_to && isYmd(lastActivity.covered_to)
+        ? nextYmd(lastActivity.covered_to)
+        : cycle.journalFrom;
+    const activityTo = cycle.journalTo;
+    const journals = await loadGluconJournalRange(activityFrom, activityTo);
+    const monthly = await buildGluconMonthlyDigest(activityFrom, activityTo);
     const monthlyMovesBlock = monthly.promptBlock;
     const earlyFillBlock = monthly.occupancy.earlyFillText;
     const resultCarryBlock = await carryMemoBlockForCycle(
@@ -635,10 +639,10 @@ export async function generateGluconDrafts(
       cycle.periodKey,
       "activity",
     );
-    // 成果優先 → 活動（成果候補を活動から除外）
+    // 定常は活動本線。成果は明示指定時のみ
     const requested: GluconReportKind[] = kinds?.length
       ? kinds
-      : ["result", "activity"];
+      : ["activity"];
     const targetKinds: GluconReportKind[] = [
       ...(requested.includes("result") ? (["result"] as const) : []),
       ...(requested.includes("activity") ? (["activity"] as const) : []),
@@ -767,6 +771,9 @@ export async function generateGluconDrafts(
         monthlyMovesBlock,
         resultExcludedFacts,
         carryMemoBlock: activityCarryBlock,
+        previousPostedBody: lastActivity?.body || null,
+        progressFrom: activityFrom,
+        progressTo: activityTo,
       });
       const res = await geminiReply(prompt);
       if (!res.ok) return { ok: false, error: res.error };
@@ -793,8 +800,12 @@ export async function generateGluconDrafts(
             examples,
             journal_day_count: journals.length,
             post_error: null,
-            payload: asPayload(existingAct?.payload),
-            updated_at: new Date().toISOString(),
+          payload: {
+            ...asPayload(existingAct?.payload),
+            covered_from: activityFrom,
+            covered_to: activityTo,
+          },
+          updated_at: new Date().toISOString(),
           },
           { onConflict: "period_key,kind" },
         )
@@ -852,6 +863,108 @@ export async function getLastResultCoverage(): Promise<GluconLastResultCoverage 
     };
   }
   return best;
+}
+
+/** 投稿済み活動報告から前回の covered 期間と本文を取得 */
+export async function getLastActivityCoverage(): Promise<GluconLastActivityCoverage | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("glucon_report_drafts")
+    .select("period_key,posted_at,payload,body")
+    .eq("kind", "activity")
+    .eq("status", "posted")
+    .order("posted_at", { ascending: false })
+    .limit(20);
+  if (!data?.length) return null;
+
+  let best: GluconLastActivityCoverage | null = null;
+  for (const row of data) {
+    const pl = asPayload(row.payload);
+    const to = pl.covered_to || null;
+    if (!to) continue;
+    if (!best || (best.covered_to && to > best.covered_to) || !best.covered_to) {
+      best = {
+        covered_from: pl.covered_from || null,
+        covered_to: to,
+        posted_at: row.posted_at ? String(row.posted_at) : null,
+        period_key: row.period_key ? String(row.period_key) : null,
+        body: row.body ? String(row.body) : null,
+      };
+    }
+  }
+  if (!best && data[0]) {
+    const posted = data[0].posted_at
+      ? String(data[0].posted_at).slice(0, 10)
+      : null;
+    return {
+      covered_from: null,
+      covered_to: posted,
+      posted_at: data[0].posted_at ? String(data[0].posted_at) : null,
+      period_key: data[0].period_key ? String(data[0].period_key) : null,
+      body: data[0].body ? String(data[0].body) : null,
+    };
+  }
+  return best;
+}
+
+/** WeStudy でユーザーが投稿したあと、ダッシュボードだけ投稿済みにする */
+export async function markGluconPosted(
+  periodKey: string,
+  kind: GluconReportKind,
+  opts?: { coveredFrom?: string; coveredTo?: string },
+): Promise<{ ok: boolean; error?: string; draft?: GluconDraftRow }> {
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("glucon_report_drafts")
+    .select("*")
+    .eq("period_key", periodKey)
+    .eq("kind", kind)
+    .maybeSingle();
+  if (!row) return { ok: false, error: "下書きがありません" };
+  if (!String(row.body || "").trim()) {
+    return { ok: false, error: "本文が空です" };
+  }
+  if (kind === "result" && isNoResultBody(String(row.body || ""))) {
+    return { ok: false, error: "成果なしの本文は投稿済みにできません" };
+  }
+
+  const pl = asPayload(row.payload);
+  const coveredTo =
+    (isYmd(opts?.coveredTo) && opts!.coveredTo) ||
+    pl.covered_to ||
+    ymdJst();
+  const coveredFrom =
+    (isYmd(opts?.coveredFrom) && opts!.coveredFrom) ||
+    pl.covered_from ||
+    undefined;
+  const payload: GluconDraftPayload = {
+    ...pl,
+    ...(coveredFrom ? { covered_from: coveredFrom } : {}),
+    covered_to: coveredTo,
+    ...(kind === "result"
+      ? { scoring: pl.scoring || snapshotScoringFromBody(String(row.body || "")) }
+      : {}),
+  };
+
+  const { data, error } = await supabase
+    .from("glucon_report_drafts")
+    .update({
+      status: "posted",
+      posted_at: new Date().toISOString(),
+      post_error: null,
+      payload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("period_key", periodKey)
+    .eq("kind", kind)
+    .select("*")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  revalidateGlucon();
+  return {
+    ok: true,
+    draft: data ? mapDraft(data as Record<string, unknown>) : undefined,
+  };
 }
 
 /** Step1: 成果報告の事実のみ下書き */
@@ -1410,6 +1523,8 @@ export async function getGluconPageState(): Promise<{
   memberHeader: GluconMemberHeaderStatus;
   monthlyDigest: GluconMonthlyDigestPreview | null;
   lastResultCoverage: GluconLastResultCoverage | null;
+  lastActivityCoverage: GluconLastActivityCoverage | null;
+  nextCycleHint: GluconNextCycleHint | null;
   archiveDrafts: GluconDraftRow[];
   carryMemos: GluconCarryMemo[];
   loadError?: string;
@@ -1431,6 +1546,8 @@ export async function getGluconPageState(): Promise<{
           memberHeader,
           monthlyDigest: null,
           lastResultCoverage: null,
+          lastActivityCoverage: null,
+          nextCycleHint: null,
           archiveDrafts: [],
           carryMemos: [],
           loadError: refreshed.error,
@@ -1490,6 +1607,8 @@ export async function getGluconPageState(): Promise<{
       .limit(1)
       .maybeSingle();
     const lastResultCoverage = await getLastResultCoverage();
+    const lastActivityCoverage = await getLastActivityCoverage();
+    const nextCycleHint = cycle ? peekNextCycle(cycle) : null;
     const archiveDrafts = await loadGluconArchiveDrafts();
     const carryMemos = await loadGluconCarryMemos();
 
@@ -1505,6 +1624,8 @@ export async function getGluconPageState(): Promise<{
       memberHeader,
       monthlyDigest,
       lastResultCoverage,
+      lastActivityCoverage,
+      nextCycleHint,
       archiveDrafts,
       carryMemos,
     };
@@ -1520,6 +1641,8 @@ export async function getGluconPageState(): Promise<{
       memberHeader,
       monthlyDigest: null,
       lastResultCoverage: null,
+      lastActivityCoverage: null,
+      nextCycleHint: null,
       archiveDrafts: [],
       carryMemos: [],
       loadError: msg,
