@@ -22,7 +22,7 @@ export default async function GluconPage() {
     <Shell active="/glucon">
       <h1>グルコン報告</h1>
       <p className="meta">
-        神大家の月次活動報告・成果報告を、Journal・パートナーやり取り・モチベーション数値・入退去イベント（前回期限〜今回期限）とコミュニティ参考例からまとめ、確認後に WeStudy へ投稿します。
+        定常は活動報告です。前回投稿以降の進展を Journal・パートナーやり取り・数値・入退去から下書きし、確認後に WeStudy へ投稿します。成果報告は大きな区切りのときだけ使います。
       </p>
       <FolderLinks links={folderLinks} />
 
@@ -32,7 +32,10 @@ export default async function GluconPage() {
         </p>
       ) : null}
 
-      <GluconScheduleHeader cycle={state.cycle} />
+      <GluconScheduleHeader
+        cycle={state.cycle}
+        nextCycleHint={state.nextCycleHint}
+      />
       <GluconCarryMemoPanel
         memos={state.carryMemos}
         periodKey={state.cycle?.periodKey || null}
@@ -45,6 +48,7 @@ export default async function GluconPage() {
         memberHeader={state.memberHeader}
         monthlyDigest={state.monthlyDigest}
         lastResultCoverage={state.lastResultCoverage}
+        lastActivityCoverage={state.lastActivityCoverage}
         today={state.today}
       />
       <GluconMotivationPanel

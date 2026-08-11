@@ -265,9 +265,14 @@ export function activityPrompt(args: {
   examples: GluconExample[];
   /** メール・metrics・入退去の月次集約テキスト（任意） */
   monthlyMovesBlock?: string;
-  /** 成果報告側に採用した事実（活動では書かない／1行参照に留める） */
+  /** 成果報告側に採用した事実（大きな区切り。詳細は成果へ） */
   resultExcludedFacts?: string[];
   carryMemoBlock?: string;
+  /** 前回投稿本文（再掲禁止） */
+  previousPostedBody?: string | null;
+  /** 今回書く進展の期間 */
+  progressFrom?: string | null;
+  progressTo?: string | null;
 }): string {
   const monthLabel = args.cycle.periodKey.replace("-", "年") + "月";
   const nextMonth = (() => {
@@ -287,21 +292,32 @@ export function activityPrompt(args: {
   const exclude =
     args.resultExcludedFacts && args.resultExcludedFacts.length
       ? `
-【成果報告へ優先配分済み（活動報告では詳細を書かない）】
-- 神・大家さんポイントは成果報告でのみ貯まる。下記は成果側へ寄せる。
-- 触れるなら「詳細は成果報告に記載」の1行まで。仕込み・学習・進行中のみ活動に書く。
+【大きな成果の扱い】
+- 購入完了・満室化などの大きな区切りは、活動では1行触れる程度。詳細は成果報告パネルへ。
 ${args.resultExcludedFacts.map((t) => `- ${t}`).join("\n")}
 `
       : "";
+
+  const previous = args.previousPostedBody?.trim()
+    ? `
+【前回投稿済み（再掲禁止。同じ事実を繰り返さない）】
+${args.previousPostedBody.trim()}
+`
+    : "";
+
+  const progressLabel =
+    args.progressFrom && args.progressTo
+      ? `${args.progressFrom} 〜 ${args.progressTo}`
+      : `${args.cycle.journalFrom} 〜 ${args.cycle.journalTo}`;
 
   return `あなたは神・大家さん倶楽部の塾生向け「月次活動報告」の下書きライターです。
 
 【厳守】
 - 会社の人員計画・社内DX・家庭の雑談など、神大家・不動産投資・融資・物件・空室・修繕・コミュニティ学習・AI推進（神大家関連）以外は書かない。
 - 事実のない成果を捏造しない。ジャーナル／今月の動きに無いことは「宣言」側の予定としてだけ書いてよい。
-- 成果として共有すべき実践結果（空室早期入居・融資実行・購入完了等）は活動報告の本編に書かない（成果報告側）。
+- 定常の本線は活動報告。前回投稿以降の進展だけを書く。
 - 出力は投稿本文のみ（前置き・説明・マークダウン見出しの#は不要）。
-${exclude}
+${exclude}${previous}
 【形式】コミュニティの定型に合わせる:
 ■1■今月の活動報告（${monthLabel}度）
 ・箇条書き（3〜8行）
@@ -310,6 +326,7 @@ ${exclude}
 末尾に短い挨拶1行可。
 
 【提出期限】${args.cycle.reportDeadline}（グルコン ${args.cycle.gluconDate} の10日前）
+【今回書く進展の期間】${progressLabel}
 【Journal 期間】${args.cycle.journalFrom} 〜 ${args.cycle.journalTo}
 【会員】${memberHeader()}
 

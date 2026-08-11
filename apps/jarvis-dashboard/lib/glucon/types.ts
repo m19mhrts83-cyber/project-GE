@@ -122,6 +122,19 @@ export type GluconLastResultCoverage = {
   period_key: string | null;
 };
 
+/** 前回投稿した活動報告のカバレッジ（成果と同型 + 本文） */
+export type GluconLastActivityCoverage = GluconLastResultCoverage & {
+  body: string | null;
+};
+
+/** 次サイクルの目安（開催翌日以降にアクティブ） */
+export type GluconNextCycleHint = {
+  availableFrom: string;
+  gluconDate: string;
+  reportDeadline: string;
+  periodKey: string;
+};
+
 export type GluconDraftRow = {
   id: string;
   period_key: string;

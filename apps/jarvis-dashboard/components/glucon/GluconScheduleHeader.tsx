@@ -6,12 +6,14 @@ import {
   refreshGluconScheduleFromKamiooya,
   setManualGluconDate,
 } from "@/app/actions/glucon";
-import type { GluconActiveCycle } from "@/lib/glucon/types";
+import type { GluconActiveCycle, GluconNextCycleHint } from "@/lib/glucon/types";
 
 export default function GluconScheduleHeader({
   cycle,
+  nextCycleHint,
 }: {
   cycle: GluconActiveCycle | null;
+  nextCycleHint?: GluconNextCycleHint | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -49,6 +51,13 @@ export default function GluconScheduleHeader({
             （前回期限〜今回期限）
           </li>
           <li>報告 period: {cycle.periodKey}</li>
+          {nextCycleHint ? (
+            <li>
+              次サイクル: <strong>{nextCycleHint.availableFrom}</strong> から表示
+              （目安 開催 {nextCycleHint.gluconDate} ／ 期限{" "}
+              {nextCycleHint.reportDeadline} ／ {nextCycleHint.periodKey}）
+            </li>
+          ) : null}
           {cycle.title ? <li className="meta">{cycle.title}</li> : null}
         </ul>
       ) : (

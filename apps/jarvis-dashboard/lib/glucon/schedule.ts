@@ -165,6 +165,25 @@ export function pickActiveCycle(
   };
 }
 
+/** 現サイクル開催の翌日以降に切り替わる次開催の目安 */
+export function peekNextCycle(
+  current: GluconActiveCycle,
+): {
+  availableFrom: string;
+  gluconDate: string;
+  reportDeadline: string;
+  periodKey: string;
+} {
+  const availableFrom = addDaysYmd(current.gluconDate, 1);
+  const est = estimateNextFromLast(current.gluconDate, availableFrom);
+  return {
+    availableFrom,
+    gluconDate: est.glucon_date,
+    reportDeadline: est.report_deadline,
+    periodKey: periodKeyFromGluconDate(est.glucon_date),
+  };
+}
+
 export function mergeManualOverride(
   schedules: GluconScheduleRow[],
   manualDate: string,
