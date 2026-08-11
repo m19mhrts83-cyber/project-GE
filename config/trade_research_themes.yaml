@@ -1,0 +1,87 @@
+# Trade Desk 情報レイヤー（判断の順番を固定する）
+# ニュース単体では売買しない。市況フィルタ → セクター相対 → 銘柄テクニカルの順。
+
+layers:
+  - id: regime
+    name: 市況（最優先）
+    role: "買い相場 / 守り相場。ここが守りなら個別の強気ニュースでも新規買いは抑制"
+    sources: [price, calendar]
+  - id: sector
+    name: セクター相対
+    role: "資金が集まっている分野だけ候補を厚くする。弱い分野は見送り"
+    sources: [price, tavily, chatgpt_weekly]
+  - id: name
+    name: 銘柄
+    role: "押し目・出来高・材料。材料は加点のみ。材料だけでエントリーしない"
+    sources: [price, tavily, chatgpt_weekly, gemini_deep_research]
+
+# 週次で見る分野（ChatGPT週次は ai / space を横流し）
+themes:
+  - id: macro
+    name: マクロ・為替・金利
+    queries:
+      - "日銀 金融政策 円相場"
+      - "FOMC 米国金利 株式市場"
+    watch_symbols: ["1321.T", "8306.T"]
+    weight: high
+  - id: ai
+    name: AI・半導体
+    ingest: chatgpt_weekly
+    queries:
+      - "半導体 東京エレクトロン アドバンテスト 日本株"
+      - "AI data center semiconductor Japan stocks"
+    watch_symbols: ["8035.T", "6857.T", "6920.T", "4063.T", "3778.T"]
+    weight: high
+  - id: space
+    name: 宇宙・防衛・重工
+    ingest: chatgpt_weekly
+    queries:
+      - "宇宙 防衛 三菱重工 IHI 日本株"
+    watch_symbols: ["7011.T", "7013.T", "7012.T"]
+    weight: high
+  - id: mega_us
+    name: メガテック・フロンティア
+    ingest: chatgpt_weekly
+    queries:
+      - "GAFAM NVIDIA stock news selloff rebound"
+      - "OpenAI Anthropic Microsoft Amazon Alphabet stock"
+      - "SpaceX SPCX stock volatility"
+    watch_symbols: ["1545.T", "1546.T", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "SPCX"]
+    weight: high
+    note: >
+      OpenAI / Anthropic / SpaceX 本体は未上場または取扱確認前。
+      ニュース沈みは加点。紙くず想定はしないが、上昇平均が折れたら乗らない。
+  - id: japan_core
+    name: 日本大型（海外勢の波）
+    queries:
+      - "日経平均 海外投資家 売買動向"
+    watch_symbols: ["7203.T", "9984.T", "6758.T", "6098.T", "7974.T"]
+    weight: medium
+  - id: pharma
+    name: ヘルスケア
+    queries:
+      - "中外製薬 医薬品 日本株 材料"
+    watch_symbols: ["4519.T"]
+    weight: low
+  - id: risk
+    name: 地政学・原油・リスクオフ
+    queries:
+      - "地政学リスク 原油 日本株 リスクオフ"
+    watch_symbols: ["1357.T"]
+    weight: high
+
+ingest:
+  chatgpt_weekly:
+    how: "ChatGPTの週次メモをメール転送 or inbox に保存。Jarvisがtrade_researchへ取り込み"
+    inbox: "000_共通は使わず git-repos/.jarvis_state/trade_research_inbox/"
+    from_hint: "openai.com / chatgpt.com / 手動保存"
+  tavily_weekly:
+    how: "日曜にテーマごと検索し、要約を trade_research へ"
+  gemini_deep_research:
+    how: "必要週だけユーザーが実行→Drive保存→取込（後続）"
+
+rules:
+  - ニュースはスコア加点のみ。価格の押し目条件を満たさない新規買いはしない
+  - 同一テーマに建玉を集中させない（相関リスク）
+  - 週次イベント（FOMC・日銀・雇用統計）の前は新規を減らす
+  - 大型株中心（流動性・チャートが読みやすい）

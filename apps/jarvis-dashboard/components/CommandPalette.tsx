@@ -68,6 +68,11 @@ export default function CommandPalette({
 
   const go = useCallback(
     (href: string) => {
+      if (/^https?:\/\//.test(href)) {
+        window.open(href, "_blank", "noopener,noreferrer");
+        onClose();
+        return;
+      }
       router.push(href);
       onClose();
     },

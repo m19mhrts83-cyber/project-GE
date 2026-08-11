@@ -1,0 +1,58 @@
+# Trade Desk ウォッチリスト（日本株・現物）
+# Yahoo Finance 記号は .T 付き。実弾は立花証券の単元・単元未満を別途確認。
+# 売買原理: config/trade_strategy.yaml（平均回帰リズム）
+
+instruments:
+  # 市況
+  - symbol: "1306.T"
+    ticker_jp: "1306"
+    name: "NEXT FUNDS TOPIX連動型上場投信"
+    theme: index
+    asset_class: etf
+  - symbol: "1321.T"
+    ticker_jp: "1321"
+    name: "NEXT FUNDS 日経225連動型上場投信"
+    theme: index
+    asset_class: etf
+  - symbol: "1357.T"
+    ticker_jp: "1357"
+    name: "NEXT FUNDS 日経平均インバース"
+    theme: hedge
+    asset_class: inverse_etf
+
+  # AI / 半導体
+  - {symbol: "8035.T", ticker_jp: "8035", name: "東京エレクトロン", theme: ai, asset_class: equity}
+  - {symbol: "6857.T", ticker_jp: "6857", name: "アドバンテスト", theme: ai, asset_class: equity}
+  - {symbol: "6920.T", ticker_jp: "6920", name: "レーザーテック", theme: ai, asset_class: equity}
+  - {symbol: "4063.T", ticker_jp: "4063", name: "信越化学工業", theme: ai, asset_class: equity}
+  - {symbol: "6701.T", ticker_jp: "6701", name: "NEC", theme: ai, asset_class: equity}
+  - {symbol: "6702.T", ticker_jp: "6702", name: "富士通", theme: ai, asset_class: equity}
+  - {symbol: "6501.T", ticker_jp: "6501", name: "日立製作所", theme: ai, asset_class: equity}
+  - {symbol: "3778.T", ticker_jp: "3778", name: "さくらインターネット", theme: ai, asset_class: equity}
+
+  # 宇宙 / 防衛・重工
+  - {symbol: "7011.T", ticker_jp: "7011", name: "三菱重工業", theme: space, asset_class: equity}
+  - {symbol: "7013.T", ticker_jp: "7013", name: "IHI", theme: space, asset_class: equity}
+  - {symbol: "7012.T", ticker_jp: "7012", name: "川崎重工業", theme: space, asset_class: equity}
+  - {symbol: "6758.T", ticker_jp: "6758", name: "ソニーグループ", theme: space, asset_class: equity}
+
+  # メガテック（東証で買える受け皿。ニュース沈みの平均回帰）
+  - {symbol: "1545.T", ticker_jp: "1545", name: "NEXT FUNDS S&P500", theme: mega_us, asset_class: etf}
+  - {symbol: "1546.T", ticker_jp: "1546", name: "NEXT FUNDS NASDAQ-100", theme: mega_us, asset_class: etf}
+
+  # GAFAM・フロンティア（価格監視。立花e支店の米株取扱確認まで実弾対象外）
+  - {symbol: "AAPL", name: "Apple", theme: mega_us, asset_class: equity, currency: USD, enabled: false}
+  - {symbol: "MSFT", name: "Microsoft（OpenAI代理）", theme: mega_us, asset_class: equity, currency: USD, enabled: false}
+  - {symbol: "GOOGL", name: "Alphabet（Anthropic/DeepMind代理）", theme: mega_us, asset_class: equity, currency: USD, enabled: false}
+  - {symbol: "AMZN", name: "Amazon（Anthropic代理）", theme: mega_us, asset_class: equity, currency: USD, enabled: false}
+  - {symbol: "META", name: "Meta", theme: mega_us, asset_class: equity, currency: USD, enabled: false}
+  - {symbol: "NVDA", name: "NVIDIA", theme: mega_us, asset_class: equity, currency: USD, enabled: false}
+  - {symbol: "SPCX", name: "SpaceX（上場確認中）", theme: mega_us, asset_class: equity, currency: USD, enabled: false}
+
+  # 日本コア（値動きが追いやすい大型）
+  - {symbol: "7203.T", ticker_jp: "7203", name: "トヨタ自動車", theme: japan_core, asset_class: equity}
+  - {symbol: "9984.T", ticker_jp: "9984", name: "ソフトバンクグループ", theme: japan_core, asset_class: equity}
+  - {symbol: "8306.T", ticker_jp: "8306", name: "三菱UFJフィナンシャル・グループ", theme: japan_core, asset_class: equity}
+  - {symbol: "6098.T", ticker_jp: "6098", name: "リクルートホールディングス", theme: japan_core, asset_class: equity}
+  - {symbol: "7974.T", ticker_jp: "7974", name: "任天堂", theme: japan_core, asset_class: equity}
+  - {symbol: "4519.T", ticker_jp: "4519", name: "中外製薬", theme: japan_core, asset_class: equity}

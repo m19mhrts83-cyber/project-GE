@@ -140,9 +140,12 @@ export default function ShellFrame({
                   key={n.href}
                   href={n.href}
                   className={`side-link${
-                    isActive(active, n.href) ? " active" : ""
+                    !n.external && isActive(active, n.href) ? " active" : ""
                   }`}
                   onClick={closeNav}
+                  {...(n.external
+                    ? { target: "_blank", rel: "noopener noreferrer" }
+                    : {})}
                 >
                   <span className="side-link-label">{n.label}</span>
                   {renderBadge(n.href)}

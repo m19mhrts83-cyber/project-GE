@@ -1,7 +1,15 @@
 {
   "version": 1,
-  "updated": "2026-08-10",
+  "updated": "2026-08-12",
   "items": [
+    {
+      "id": "trade-desk",
+      "kind": "app",
+      "title": "Trade Desk",
+      "url": "https://jarvis-trade-desk.vercel.app",
+      "note": "株・資産デスク（ダッシュボードとは別アプリ。同じ自分用ログイン）",
+      "tags": ["株", "ペーパー", "資産", "立花"]
+    },
     {
       "id": "prompt-share",
       "kind": "app",

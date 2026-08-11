@@ -1,0 +1,50 @@
+# Trade Desk 戦略原理（平均回帰・リズム）
+# 実行時パラメータの正は Supabase trade_params.strategy_v1。ここは人間向けの正本。
+
+style: mean_reversion_scale
+summary: >
+  資本主義では優良企業の株価平均は右肩上がり（金持ちがさらに金持ち）だが、
+  ニュースで一時的に沈む。その沈みから平均へ戻る区間だけ、機械的に刻んで乗る。
+  反発確認後に買い増し、リズムが崩れたら一部撤退。ナンピンはしない。
+  紙くず前提の銘柄は対象外。上昇平均が折れた銘柄にも乗らない。
+
+universe:
+  quality_mega: GAFAM / NVIDIA など、価値が消えるとは考えにくい大型
+  frontier_proxy: OpenAI→MSFT、Anthropic→AMZN/GOOGL、SpaceX→SPCX（上場確認後）
+  japan_now: 東証の S&P500・NASDAQ100 ETF、ソフトバンク等（立花で今買える）
+  not_yet: OpenAI / Anthropic 本体、立花e支店の米株API未確認の個別米株
+
+# 3段階の枠配分（1銘柄上限に対する割合）。合計 1.0
+scale_fracs: [0.25, 0.35, 0.40]
+
+phases:
+  probe:
+    when: 平均（SMA60）または直近高値から十分沈み、かつ反発サインが揃った
+    size: 枠の 25%
+  confirm:
+    when: 初回より高値切り上げ／陽線が続き、一時的な戻りではない
+    size: 追加 35%
+  convince:
+    when: 短期平均を回復し RSI が中立以上、平均へ戻る動きが続いている
+    size: 追加 40%
+
+exit:
+  rhythm_break: 一部（半分）だけ売る。残りで「ノイズか転換か」を見る
+  second_break: 残りも撤退
+  mean_reached: 平均（SMA60）付近まで戻ったら半分利確
+  never: 下がったからといって買い増さない
+
+rollout:
+  A_backtest: 過去1〜2年を翌営業日始値で再現。お金もDBも動かさない
+  B_paper: 日次の先回り仮想。最低4週間
+  C_tranche1: 実弾10万円。発注は1件ずつ承認
+  D_promote: +10万円は8週プラスかつDD-8%以内、かつユーザーが明示したときだけ
+  never_auto_live: true
+
+filters:
+  drop_min_pct: 0.08      # これ未満は「著しい下落」と見ない
+  drop_max_pct: 0.22      # これ超は構造悪化の可能性 → 見送り
+  rebound_min_signs: 2    # 陽転・陽線・高値切り上げ安値・RSI上向き のうち
+  falling_knife: SMA20 が急傾斜で沈み続けているときは乗らない
+  rising_mean: SMA60 が直近20営業日でほぼ上がっている／横ばいであること
+  news: ニュースは「どの優良株が一時沈みか」の探索。売買の主因にはしない
