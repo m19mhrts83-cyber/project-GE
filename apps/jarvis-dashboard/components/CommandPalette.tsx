@@ -10,6 +10,11 @@ import {
   searchCmdk,
   type CmdkSearchHit,
 } from "@/app/actions/cmdkSearch";
+import {
+  SNOOZE_PRESET_LABEL,
+  type SnoozePreset,
+  snoozeUntilIso,
+} from "@/lib/snoozePresets";
 
 type Action = {
   id: string;
@@ -70,9 +75,19 @@ export default function CommandPalette({
   );
 
   const mutateFocus = useCallback(
-    (id: string, next: "skipped" | "snoozed", label: string) => {
+    (
+      id: string,
+      next: "skipped" | "snoozed",
+      label: string,
+      snoozeUntil?: string,
+    ) => {
       void (async () => {
-        const r = await setTriageStatus(id, next, pathname || "/partner");
+        const r = await setTriageStatus(
+          id,
+          next,
+          pathname || "/partner",
+          snoozeUntil ? { snoozeUntil } : undefined,
+        );
         if (!r.ok) {
           toast.push(r.error, "err");
           return;
@@ -167,6 +182,21 @@ export default function CommandPalette({
           group: "操作",
           run: () => mutateFocus(id, "snoozed", "後でにしました"),
         },
+        ...(
+          Object.keys(SNOOZE_PRESET_LABEL) as SnoozePreset[]
+        ).map((preset) => ({
+          id: `op:snooze-${preset}`,
+          label: `この件を後で（${SNOOZE_PRESET_LABEL[preset]}）`,
+          hint: "h",
+          group: "操作",
+          run: () =>
+            mutateFocus(
+              id,
+              "snoozed",
+              `後で（${SNOOZE_PRESET_LABEL[preset]}）`,
+              snoozeUntilIso(preset),
+            ),
+        })),
       ];
     }
     return [

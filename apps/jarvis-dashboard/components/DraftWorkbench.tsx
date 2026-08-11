@@ -291,30 +291,52 @@ export default function DraftWorkbench({
             disabled={pending || polling}
           />
         </label>
-        <button
-          type="button"
-          className="btn"
-          style={{ alignSelf: "flex-end", marginBottom: 2 }}
-          disabled={pending || polling || !tavilyQ.trim()}
-          onClick={() =>
-            start(async () => {
-              setErr(null);
-              const r = await researchWithTavily(tavilyQ);
-              if (!r.ok) {
-                setErr(r.error);
-                return;
-              }
-              setInstruction((prev) =>
-                prev.trim()
-                  ? `${prev.trim()}\n\n${r.block}`
-                  : `下調べを踏まえて丁寧に整えて。\n\n${r.block}`,
-              );
-              setMsg("Tavily の結果を見直し指示に追記しました（未送信）");
-            })
-          }
-        >
-          下調べして指示へ
-        </button>
+        <div className="tavily-actions">
+          <button
+            type="button"
+            className="btn"
+            disabled={pending || polling || !tavilyQ.trim()}
+            onClick={() =>
+              start(async () => {
+                setErr(null);
+                const r = await researchWithTavily(tavilyQ);
+                if (!r.ok) {
+                  setErr(r.error);
+                  return;
+                }
+                setInstruction((prev) =>
+                  prev.trim()
+                    ? `${prev.trim()}\n\n${r.block}`
+                    : `下調べを踏まえて丁寧に整えて。\n\n${r.block}`,
+                );
+                setMsg("Tavily の結果を見直し指示に追記しました（未送信）");
+              })
+            }
+          >
+            指示へ
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={pending || polling || !tavilyQ.trim()}
+            onClick={() =>
+              start(async () => {
+                setErr(null);
+                const r = await researchWithTavily(tavilyQ);
+                if (!r.ok) {
+                  setErr(r.error);
+                  return;
+                }
+                const quote = `\n\n---\n${r.block}\n---\n`;
+                setDraft((prev) => `${prev.trimEnd()}${quote}`);
+                setTab("edit");
+                setMsg("Tavily の結果を下書き末尾に引用しました（未送信）");
+              })
+            }
+          >
+            下書き末尾へ
+          </button>
+        </div>
       </div>
       <p className="draft-hint">
         「見直しを実行」は、上の下書きとこの指示だけを見ます（{lane === "partner"
