@@ -139,6 +139,21 @@ Secrets（Cloud My Secrets 推奨）: `GMAIL_CREDENTIALS_B64` ＋ `GMAIL_ESTATE_
 
 ソース正本は Drive `200_NoteBookLM`（`jarvis-notebooklm-drive-sources`）。ローカル MCP も同様に `setup_auth` が必要なことがある。
 
+### 3. Tavily（Cloud で Web 検索。ローカル mcp.json は継承されない）
+
+| 項目 | 値 |
+|---|---|
+| 種別 | **HTTP**（推奨。`mcp-remote` / SSE は Cloud 非対応） |
+| URL | `https://mcp.tavily.com/mcp` |
+| 認証 | OAuth（agents の MCP 一覧で **Login**）または Header `Authorization: Bearer <TAVILY_API_KEY>` |
+
+**登録場所**: [cursor.com/agents](https://cursor.com/agents) → 入力欄横の context → **MCP Servers** → Add MCP → Custom MCP。
+
+疎通（Cloud 起動後）: 「Tavily で『日銀 金融政策』を検索して3件要約して」  
+切れたら同画面で Re-authenticate。キーの正本は `.env.jarvis_private` の `TAVILY_API_KEY`（チャットに出さない）。
+
+ローカル IDE は従来どおり `~/.cursor/mcp.json` の stdio `tavily-mcp`。Cloud とは別登録。
+
 **Mac 作業セット（Finder＋NotebookLM）**:
 
 ```bash
@@ -151,7 +166,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ダッシュボード `/notebooklm`（本番・`:3001`）を開くと、ヘルパー起動中なら Finder＋NLM を一括オープン。未起動時は Web リンクのみ。設定: `config/notebooklm_workbench.yaml`／任意で `NOTEBOOKLM_DRIVE_FOLDER_URL`。
 
-### 3. やらない MCP
+### 4. やらない MCP
 
 - ローカル専用パス前提の stdio を無検証で増やさない
 - Service Role / パスワードを MCP env に平文で増やしすぎない（Environment Secrets を優先）
@@ -166,7 +181,7 @@ Environment: リポジトリ `m19mhrts83-cyber/project-GE`（Dashboard に Activ
 | `JARVIS_SUPABASE_URL` | 投影 DB |
 | `JARVIS_SUPABASE_SERVICE_ROLE_KEY` / `JARVIS_SUPABASE_SECRET_KEY` | 読取／upsert（**`sb_secret_` 新形式**） |
 | `GEMINI_API_KEY` | リサーチ（`scripts/jarvis_gemini_research.py`） |
-| `TAVILY_API_KEY` | Web 検索（ローカル Tavily MCP と同キー。正本 `.env.jarvis_private`） |
+| `TAVILY_API_KEY` | Web 検索（ローカル MCP / Cloud HTTP の Header 用。正本 `.env.jarvis_private`） |
 | `GMAIL_CREDENTIALS_B64` / `GMAIL_ADMIN_TOKEN_B64` | admin 取込（既存 GHA と同系） |
 | `GMAIL_ESTATE_TOKEN_B64`（または `GMAIL_M19M_TOKEN_B64`） | **Cloud 対外送信**（`jarvis_cloud_gmail_send.py`） |
 | `MS_GRAPH_*` | OneDrive レーン収集（GHA／Cloud）。**委任＋REFRESH_TOKEN**（`AUTHORITY=consumers`）
@@ -243,8 +258,9 @@ CHRLINE／オプチャ、Zaim Playwright、パートナー MD 全文取込、One
 1. [ ] Cloud environment を project-GE に接続
 2. [ ] Secrets を上表どおり登録（`sb_secret_` ＋ 必要なら Gmail send B64）
 3. [ ] Notion MCP（HTTP）追加 → OAuth 完了 → 1 検索成功
-4. [ ] NotebookLM MCP（stdio）追加 → `setup_auth` → list／1 問成功
-5. [ ] Supabase `sync_meta` を Cloud から読めることを確認
-6. [ ] （任意）`jarvis_cloud_gmail_send.py --preview` が Cloud で動く
-7. [x] `MS_GRAPH_*`（委任）→ lanes GHA 収集（downloadUrl 修正・Secrets 反映後に緑化確認）
-8. [ ] on-demand 利用の要否を Dashboard Usage で確認（枠切れ対策）
+4. [ ] Tavily MCP（HTTP `https://mcp.tavily.com/mcp`）追加 → Login／OAuth → 1 検索成功
+5. [ ] NotebookLM MCP（stdio）追加 → `setup_auth` → list／1 問成功
+6. [ ] Supabase `sync_meta` を Cloud から読めることを確認
+7. [ ] （任意）`jarvis_cloud_gmail_send.py --preview` が Cloud で動く
+8. [x] `MS_GRAPH_*`（委任）→ lanes GHA 収集（downloadUrl 修正・Secrets 反映後に緑化確認）
+9. [ ] on-demand 利用の要否を Dashboard Usage で確認（枠切れ対策）
