@@ -7,11 +7,12 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import type {
+  GluconScoringSnapshot,
   ResultScoringHints,
   ScoringSuggestion,
 } from "./types";
 
-export type { ResultScoringHints, ScoringSuggestion };
+export type { GluconScoringSnapshot, ResultScoringHints, ScoringSuggestion };
 
 export type ScoringRule = {
   ruleId: string;
@@ -208,5 +209,13 @@ export function buildResultScoringHints(text: string): ResultScoringHints {
     suggestions: suggestRulesFromText(text, rules),
     gaps: findMissingAspects(text),
     disclaimer: DISCLAIMER,
+  };
+}
+
+export function snapshotScoringFromBody(text: string): GluconScoringSnapshot {
+  const suggestions = suggestRulesFromText(text);
+  return {
+    estimated_points: suggestions.reduce((sum, s) => sum + (s.points || 0), 0),
+    suggestions,
   };
 }

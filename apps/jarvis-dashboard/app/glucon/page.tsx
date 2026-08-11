@@ -1,9 +1,15 @@
 import Shell from "@/components/Shell";
 import FolderLinks from "@/components/FolderLinks";
+import GluconArchiveList from "@/components/glucon/GluconArchiveList";
+import GluconMotivationPanel from "@/components/glucon/GluconMotivationPanel";
 import GluconReportPanel from "@/components/glucon/GluconReportPanel";
 import GluconScheduleHeader from "@/components/glucon/GluconScheduleHeader";
 import { getGluconPageState } from "@/app/actions/glucon";
 import { getFolderLinks, pageFolderKey } from "@/lib/folderLinks";
+import {
+  buildGluconMotivation,
+  groupArchiveByPeriod,
+} from "@/lib/glucon/stats";
 
 export const maxDuration = 120;
 
@@ -36,6 +42,15 @@ export default async function GluconPage() {
         lastResultCoverage={state.lastResultCoverage}
         today={state.today}
       />
+      <GluconMotivationPanel
+        stats={buildGluconMotivation({
+          drafts: state.archiveDrafts,
+          currentPeriodKey: state.cycle?.periodKey || null,
+          today: state.today,
+          reportDeadline: state.cycle?.reportDeadline || null,
+        })}
+      />
+      <GluconArchiveList months={groupArchiveByPeriod(state.archiveDrafts)} />
     </Shell>
   );
 }

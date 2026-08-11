@@ -20,6 +20,7 @@ import {
   buildResultScoringHints,
   formatRubricForPrompt,
   loadScoringRules,
+  snapshotScoringFromBody,
   type ResultScoringHints,
 } from "@/lib/glucon/scoring";
 import {
@@ -44,6 +45,8 @@ import type {
   GluconMonthlyDigestPreview,
   GluconReportKind,
   GluconScheduleRow,
+  GluconScoringSnapshot,
+  ScoringSuggestion,
 } from "@/lib/glucon/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -174,6 +177,37 @@ function asPayload(raw: unknown): GluconDraftPayload {
     covered_to: isYmd(String(o.covered_to || ""))
       ? String(o.covered_to)
       : undefined,
+    scoring: asScoringSnapshot(o.scoring),
+  };
+}
+
+function asScoringSnapshot(raw: unknown): GluconScoringSnapshot | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const suggestions: ScoringSuggestion[] = Array.isArray(o.suggestions)
+    ? o.suggestions
+        .filter((x) => x && typeof x === "object")
+        .map((x) => {
+          const s = x as Record<string, unknown>;
+          return {
+            ruleId: String(s.ruleId || ""),
+            mid: String(s.mid || ""),
+            level: Number(s.level || 0),
+            viewpoint: String(s.viewpoint || ""),
+            points: Number(s.points || 0),
+            matchedKeywords: Array.isArray(s.matchedKeywords)
+              ? s.matchedKeywords.map((k) => String(k))
+              : [],
+          };
+        })
+    : [];
+  const estimated = Number(o.estimated_points);
+  if (!Number.isFinite(estimated) && !suggestions.length) return undefined;
+  return {
+    estimated_points: Number.isFinite(estimated)
+      ? estimated
+      : suggestions.reduce((sum, s) => sum + (s.points || 0), 0),
+    suggestions,
   };
 }
 
@@ -406,6 +440,19 @@ export async function loadGluconDrafts(
     .from("glucon_report_drafts")
     .select("*")
     .eq("period_key", periodKey);
+  return (data || []).map((r) => mapDraft(r as Record<string, unknown>));
+}
+
+const ARCHIVE_STATUSES = ["posted", "skipped", "queued", "failed"] as const;
+
+/** 過去報告アーカイブ用。当周期の draft/ready は含めない */
+export async function loadGluconArchiveDrafts(): Promise<GluconDraftRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("glucon_report_drafts")
+    .select("*")
+    .in("status", [...ARCHIVE_STATUSES])
+    .order("period_key", { ascending: false });
   return (data || []).map((r) => mapDraft(r as Record<string, unknown>));
 }
 
@@ -1172,6 +1219,7 @@ export async function queueGluconPost(
     if (!payload.covered_to) {
       payload.covered_to = ymdJst();
     }
+    payload.scoring = snapshotScoringFromBody(String(row.body || ""));
   }
 
   const { error } = await supabase
@@ -1200,6 +1248,7 @@ export async function getGluconPageState(): Promise<{
   memberHeader: GluconMemberHeaderStatus;
   monthlyDigest: GluconMonthlyDigestPreview | null;
   lastResultCoverage: GluconLastResultCoverage | null;
+  archiveDrafts: GluconDraftRow[];
   loadError?: string;
 }> {
   const memberHeader = getMemberHeaderStatus();
@@ -1219,6 +1268,7 @@ export async function getGluconPageState(): Promise<{
           memberHeader,
           monthlyDigest: null,
           lastResultCoverage: null,
+          archiveDrafts: [],
           loadError: refreshed.error,
         };
       }
@@ -1276,6 +1326,7 @@ export async function getGluconPageState(): Promise<{
       .limit(1)
       .maybeSingle();
     const lastResultCoverage = await getLastResultCoverage();
+    const archiveDrafts = await loadGluconArchiveDrafts();
 
     return {
       today: ymdJst(),
@@ -1289,6 +1340,7 @@ export async function getGluconPageState(): Promise<{
       memberHeader,
       monthlyDigest,
       lastResultCoverage,
+      archiveDrafts,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -1302,6 +1354,7 @@ export async function getGluconPageState(): Promise<{
       memberHeader,
       monthlyDigest: null,
       lastResultCoverage: null,
+      archiveDrafts: [],
       loadError: msg,
     };
   }
