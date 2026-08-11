@@ -4,7 +4,7 @@
 
 静かな失敗（登録0件で正常終了・追記0が続く等）と、
 メイン鮮度（全ルートで直近N日【メイン】0＋常時監視は稼働）を検知し、
-ダッシュボード /openchat/health 用の JSON を push する。
+ダッシュボード /openchat 用の JSON を push する。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_openchat_thread_health.py
@@ -355,7 +355,7 @@ def evaluate_route(
             f"【期待】{route['org_label'] or rid} のスレッドが 5.やり取り.md に【スレッド】で入る\n"
             f"【実際】{'; '.join(reasons) if reasons else level}\n"
             f"【対象】route_id={rid}\n"
-            f"【一手】{action or 'ダッシュボード /openchat/health の解消パネルへ'}"
+            f"【一手】{action or 'ダッシュボード /openchat の解消パネルへ'}"
             if level == "attention"
             else ""
         ),
@@ -428,7 +428,7 @@ def build_cursor_prompt(
             "- CHRLINE／QR／pause は Mac 専用（Cloud では回さない）",
             "- 方針が複数ある・構造限界なら Plan モードで整理",
             "【コマンド例】",
-            *(cmds or ["- （既知レシピ対象なし。/openchat/health で状況確認）"]),
+            *(cmds or ["- （既知レシピ対象なし。/openchat で状況確認）"]),
         ]
     )
 
@@ -717,7 +717,7 @@ def push_report(report: dict[str, Any]) -> None:
     level = report.get("worst_level") or "info"
     remediation = report.get("remediation") if isinstance(report.get("remediation"), dict) else {}
     cursor_prompt = str(remediation.get("cursor_prompt") or "").strip() or (
-        "ダッシュボード /openchat/health を確認。"
+        "ダッシュボード /openchat を確認。"
     )
     summary = report.get("summary") or ""
     payload = {
@@ -729,7 +729,7 @@ def push_report(report: dict[str, Any]) -> None:
         "attention_count": report.get("attention_count"),
         "routes": report.get("routes") or [],
         "batch_run_at": (report.get("batch") or {}).get("run_at"),
-        "href": "/openchat/health",
+        "href": "/openchat",
         "summary_split": report.get("summary_split") or {},
         "main_freshness": report.get("main_freshness") or {},
         "remediation": remediation,
@@ -760,7 +760,7 @@ def push_report(report: dict[str, Any]) -> None:
             "category": "ops",
             "level": level,
             "summary": summary,
-            "detail": "/openchat/health",
+            "detail": "/openchat",
             "source": "openchat_thread_health",
             "cursor_prompt": cursor_prompt,
             "status": "active",

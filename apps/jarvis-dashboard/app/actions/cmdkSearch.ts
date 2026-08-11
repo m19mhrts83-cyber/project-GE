@@ -62,7 +62,7 @@ export async function searchCmdk(q: string): Promise<CmdkSearchHit[]> {
             : w.id === "rent_step"
               ? "/rent-step"
               : w.id === "openchat_threads"
-                ? "/openchat/health"
+                ? "/openchat"
                 : `/situation?watch=${encodeURIComponent(String(w.id))}#watch-${encodeURIComponent(String(w.id))}`;
     hits.push({
       id: `watch:${w.id}`,

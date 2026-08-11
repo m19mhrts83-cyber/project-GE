@@ -63,7 +63,7 @@ export default function OpenchatHealthRemediation({
   const prompt =
     rem.cursor_prompt ||
     cursorPrompt ||
-    "ダッシュボード /openchat/health を確認してください。";
+    "ダッシュボード /openchat を確認してください。";
   const recipe = rem.mac_recipe;
   const canQueue =
     recipe &&
@@ -175,7 +175,7 @@ export default function OpenchatHealthRemediation({
           cursorPrompt={prompt}
           payload={payload}
           comments={comments}
-          path="/openchat/health"
+          path="/openchat"
         />
       </div>
     </section>

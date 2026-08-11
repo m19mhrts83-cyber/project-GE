@@ -22,7 +22,6 @@ function revalidateWatchPaths() {
   revalidatePath("/");
   revalidatePath("/situation");
   revalidatePath("/openchat");
-  revalidatePath("/openchat/health");
 }
 
 /**
