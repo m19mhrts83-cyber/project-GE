@@ -20,7 +20,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -45,6 +45,9 @@ RUN_PATCH = POC / "run_patch.sh"
 ZAIM_WEEKLY_STATE = REPO / ".jarvis_state" / "zaim_csv_weekly.json"
 ZAIM_WEEKLY_RUNNER = REPO / "launchd" / "zaim_csv_weekly_runner.sh"
 ZAIM_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_zaim"
+WESTUDY_GDRIVE_STATE = REPO / ".jarvis_state" / "westudy_gdrive_weekly.json"
+WESTUDY_GDRIVE_RUNNER = REPO / "launchd" / "westudy_gdrive_archive_runner.sh"
+WESTUDY_GDRIVE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_westudy_gdrive"
 
 
 def now_iso() -> str:
@@ -141,6 +144,88 @@ def zaim_csv_needs_catchup(*, max_age_days: int = 6) -> bool:
         return True
     age = datetime.now(JST) - ts
     return age.total_seconds() >= max_age_days * 86400
+
+
+def _parse_state_ts(raw: str) -> datetime | None:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=JST)
+    except ValueError:
+        return None
+
+
+def this_week_sunday_slot() -> datetime:
+    """今週日曜 08:00 JST（本線の予定時刻）。"""
+    now = datetime.now(JST)
+    days_since_sun = (now.weekday() + 1) % 7
+    return now.replace(hour=8, minute=0, second=0, microsecond=0) - timedelta(
+        days=days_since_sun
+    )
+
+
+def westudy_gdrive_needs_catchup() -> bool:
+    """日曜 08:00 を取りこぼした／失敗したとき True。月曜以降の朝オープンで拾う。"""
+    if os.environ.get("JARVIS_WESTUDY_GDRIVE_WEEKLY_DISABLE") == "1":
+        return False
+    try:
+        r = subprocess.run(
+            ["pgrep", "-f", "westudy_forum_all.py"],
+            capture_output=True,
+            check=False,
+        )
+        if r.returncode == 0:
+            return False
+    except Exception:
+        pass
+    now = datetime.now(JST)
+    slot = this_week_sunday_slot()
+    if now < slot:
+        return False
+    if not WESTUDY_GDRIVE_STATE.is_file():
+        return True
+    try:
+        data = json.loads(WESTUDY_GDRIVE_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("last_ok") is False:
+        return True
+    ts = _parse_state_ts(str(data.get("last_success_at") or ""))
+    if ts is None:
+        return True
+    return ts < slot
+
+
+def spawn_westudy_gdrive_weekly(*, dry_run: bool) -> str:
+    """Drive 添付週次をバックグラウンド起動（朝バンドルをブロックしない）。"""
+    if not WESTUDY_GDRIVE_RUNNER.is_file():
+        print(f"# westudy_gdrive: missing {WESTUDY_GDRIVE_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn westudy_gdrive_archive_runner.sh", flush=True)
+        return "dry_run"
+    WESTUDY_GDRIVE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(WESTUDY_GDRIVE_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(WESTUDY_GDRIVE_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(WESTUDY_GDRIVE_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# westudy_gdrive: spawned weekly runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# westudy_gdrive spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
 
 
 def spawn_zaim_csv_weekly(*, dry_run: bool) -> str:
@@ -377,6 +462,15 @@ def main() -> int:
     else:
         results["steps"]["zaim_csv_weekly"] = "fresh"
         print("# zaim_csv: skip (success within 6 days)", flush=True)
+
+    # 7. WeStudy Drive 添付の取りこぼし（日曜 08:00 失敗／Mac スリープ時）
+    if westudy_gdrive_needs_catchup():
+        results["steps"]["westudy_gdrive_weekly"] = spawn_westudy_gdrive_weekly(
+            dry_run=args.dry_run
+        )
+    else:
+        results["steps"]["westudy_gdrive_weekly"] = "fresh"
+        print("# westudy_gdrive: skip (this week's Sunday slot already done)", flush=True)
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()

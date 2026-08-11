@@ -44,4 +44,20 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   --state-dir "$HOME/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/state"
 ```
 
+## 週次（Mac launchd）
+
+本線は日曜 **08:00 JST**。取りこぼしは朝オープン（Zaim と同じ）で拾う。**日曜に開けなくても、月曜以降に Mac を開ければよい。** 出力は `runs/archive`（既存ファイルはスキップ）。GHA 週次（文字）とは別。
+
+```bash
+~/git-repos/launchd/install_westudy_gdrive_archive_launchd.sh
+# 手動
+~/git-repos/launchd/westudy_gdrive_archive_runner.sh
+```
+
+無効化: `.env.jarvis_private` に `JARVIS_WESTUDY_GDRIVE_WEEKLY_DISABLE=1`  
+ログ: `~/Library/Logs/jarvis_westudy_gdrive/`  
+state: `~/git-repos/.jarvis_state/westudy_gdrive_weekly.json`
+
+スリープ中の日曜 08:00 は飛ばすが、次に Mac を開いた朝に自動で追いつく。
+
 詳細: 同 Drive の `README.md`、`docs/運用コマンド一覧.md` 神大家 WeStudy 節

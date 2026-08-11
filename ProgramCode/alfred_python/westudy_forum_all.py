@@ -815,7 +815,7 @@ def get_comment_snapshot(current_url: str):
                     const s = String(t).trim();
                     if (!s || s === "返信") return false;
                     if (s.startsWith("http://") || s.startsWith("https://")) return false;
-                    return /(\d{4}年|\d{4}[\/-]\d{1,2}|\d{1,2}:\d{2})/.test(s);
+                    return /(\d{4}年|\d{4}[-/]\d{1,2}|\d{1,2}:\d{2})/.test(s);
                 };
 
                 const tSel = [
@@ -849,7 +849,7 @@ def get_comment_snapshot(current_url: str):
                     const meta = el.querySelector(".comment-meta, .commentmetadata, .bbp-reply-header");
                     const metaText = meta ? (meta.textContent || "").trim() : "";
                     if (metaText) {
-                        const m = metaText.match(/(\d{4}年\d{1,2}月\d{1,2}日\s*\d{1,2}時\d{1,2}分|\d{4}[\/-]\d{1,2}[\/-]\d{1,2}(?:\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)?)/);
+                        const m = metaText.match(/(\d{4}年\d{1,2}月\d{1,2}日\s*\d{1,2}時\d{1,2}分|\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)?)/);
                         if (m) timeText = (m[1] || "").trim();
                     }
                 }
@@ -887,7 +887,8 @@ def get_comment_snapshot(current_url: str):
                 const seenAtt = new Set();
                 const pushAtt = (url, kind) => {
                     if (!url || url.startsWith("data:") || url.startsWith("#")) return;
-                    if (/gravatar|avatar|emoji|smilies|wpulike|wp-includes\\/images|favicon|spinner/i.test(url)) return;
+                    if (/gravatar|avatar|emoji|smilies|wpulike|favicon|spinner/i.test(url)) return;
+                    if (url.indexOf("wp-includes/images") !== -1) return;
                     if (seenAtt.has(url)) return;
                     seenAtt.add(url);
                     const name = (url.split("?")[0].split("/").pop() || "file");
@@ -913,7 +914,7 @@ def get_comment_snapshot(current_url: str):
                     });
                     bodyNode.querySelectorAll("a[href]").forEach((a) => {
                         const href = a.getAttribute("href") || "";
-                        if (/\\.(pdf|xlsx?|docx?|pptx?|csv|zip|jpe?g|png|gif|webp|heic)(\\?|$)/i.test(href)) {
+                        if (/\.(pdf|xlsx?|docx?|pptx?|csv|zip|jpe?g|png|gif|webp|heic)(\?|$)/i.test(href)) {
                             pushAtt(href, "file");
                         }
                     });
@@ -1758,7 +1759,14 @@ def main():
             except (TimeoutException, InvalidSessionIdException, WebDriverException) as e:
                 log(f"  ⚠️ 例外発生（再起動してリカバリ）: {e.__class__.__name__}: {e}")
                 restart_and_recover(url)
-                rows = harvest_topic(title, url, expected_count=None)
+                try:
+                    rows = harvest_topic(title, url, expected_count=None)
+                except Exception as e2:
+                    log(f"  ⚠️ このトピックをスキップ: {e2.__class__.__name__}: {e2}")
+                    continue
+            except Exception as e:
+                log(f"  ⚠️ このトピックをスキップ: {e.__class__.__name__}: {e}")
+                continue
 
             # CSV 書き出し
             write_topic_csv(csv_path, rows)

@@ -82,6 +82,28 @@ def gh_run_list(limit: int = 3) -> list[dict]:
     return rows if isinstance(rows, list) else []
 
 
+def _gdrive_archive_line() -> str:
+    """Mac 週次（admin Drive 添付）の最終結果。無ければ空。"""
+    path = REPO / ".jarvis_state" / "westudy_gdrive_weekly.json"
+    if not path.is_file():
+        return "- Drive添付: 未実行（launchd 日曜 08:00）"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    finished = data.get("last_success_at") or data.get("last_finished_at") or "—"
+    started = data.get("last_started_at") or "—"
+    if data.get("last_ok") is False:
+        status = f"失敗（{data.get('last_error') or 'error'}）@ {data.get('last_error_at') or finished}"
+    elif data.get("last_ok") is True or data.get("last_exit") == 0:
+        status = f"成功 @ {finished}"
+    elif data.get("last_started_at") and not data.get("last_finished_at"):
+        status = f"実行中または未完了（開始 {started}）"
+    else:
+        status = f"未完了（開始 {started}）"
+    return f"- Drive添付: {status}"
+
+
 def fmt_jst(iso: str | None) -> str:
     if not iso:
         return "—"
@@ -144,6 +166,10 @@ def build_block(state: dict, runs: list[dict], *, force: bool) -> tuple[str, dic
     lines.append(f"- 連続成功（記録）: {consec}/{SUCCESS_NEEDED}" + (" · watch中" if not state.get("disabled") else ""))
     if consec >= SUCCESS_NEEDED and not state.get("disabled"):
         lines.append("- ヒント: 連続成功に達したら `--mark-stable` または state で disabled 可")
+
+    gdrive_line = _gdrive_archive_line()
+    if gdrive_line:
+        lines.append(gdrive_line)
 
     note = f"{label}; run={run_id}"
     return "\n".join(lines), {
