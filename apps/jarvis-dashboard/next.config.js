@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [
+      {
+        source: "/openchat/health",
+        destination: "/openchat",
+        permanent: false,
+      },
+    ];
+  },
   experimental: {
     // AutoSnore スクショ2枚（元画像が大きい）を Server Action で受け取る
     serverActions: {

@@ -12,7 +12,7 @@ export function badgeForHref(
   if (href === "/partner") return counts.partnerUnread || null;
   if (href === "/general") return counts.otherUnread || null;
   if (href === "/situation") return counts.watchAttention || null;
-  if (href === "/openchat" || href === "/openchat/health") {
+  if (href === "/openchat") {
     return counts.openchatAttention || null;
   }
   return null;
