@@ -4,6 +4,7 @@ const NAV = [
   { href: "/", label: "概要" },
   { href: "/portfolio", label: "資産" },
   { href: "/paper", label: "ペーパー" },
+  { href: "/research", label: "リサーチ" },
 ];
 
 export default function Shell({

@@ -40,6 +40,7 @@ _tmp/
 # Jarvis 実行時 state（ローカルのみ）
 # 残渣ファイルの削除は後でよい。ここは git status / コミットに上がらないための除外。
 # 方針: .jarvis_state 直下の *.json は原則無視し、*.example.json と運用で追跡したい実体だけ ! で戻す。
+.jarvis_state/tavily_cache/
 .jarvis_state/*.json
 !.jarvis_state/*.example.json
 !.jarvis_state/vpoint_audit_result.json

@@ -36,7 +36,7 @@ def main() -> int:
     if not args.skip_tavily:
         n = run([exe, str(REPO / "scripts" / "jarvis_trade_research_ingest.py"), "--tavily"])
         if n != 0:
-            print("# tavily skipped/failed（キー未設定でも週次全体は止めない）", flush=True)
+            print("# tavily ingest rc!=0（キャッシュ再利用で週次全体は止めない）", flush=True)
 
     if not args.skip_portfolio:
         n = run(

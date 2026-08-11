@@ -1,5 +1,7 @@
 "use server";
 
+import { createClient } from "@/lib/supabase/server";
+
 export type TavilyResearchResult =
   | {
       ok: true;
@@ -18,10 +20,12 @@ export async function researchWithTavily(
 
   const key = (process.env.TAVILY_API_KEY || "").trim();
   if (!key) {
+    const cached = await researchFromStore(q);
+    if (cached) return cached;
     return {
       ok: false,
       error:
-        "TAVILY_API_KEY が未設定です（.env.jarvis_private / Cloud My Secrets）",
+        "Tavily オフライン（キー未設定）。Trade Desk の蓄積も見つかりませんでした",
     };
   }
 
@@ -39,6 +43,8 @@ export async function researchWithTavily(
       cache: "no-store",
     });
     if (!res.ok) {
+      const cached = await researchFromStore(q);
+      if (cached) return cached;
       const text = await res.text().catch(() => "");
       return {
         ok: false,
@@ -78,9 +84,47 @@ export async function researchWithTavily(
 
     return { ok: true, query: q, block, sources };
   } catch (e) {
+    const cached = await researchFromStore(q);
+    if (cached) return cached;
     return {
       ok: false,
       error: e instanceof Error ? e.message : "Tavily リクエスト失敗",
     };
+  }
+}
+
+async function researchFromStore(q: string): Promise<TavilyResearchResult | null> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("trade_research")
+      .select("topic,summary,url,source,fetched_at")
+      .order("fetched_at", { ascending: false })
+      .limit(30);
+    const needle = q.toLowerCase();
+    const hits = (data || []).filter((r) => {
+      const blob = `${r.topic || ""} ${r.summary || ""}`.toLowerCase();
+      return needle.split(/\s+/).some((w) => w.length >= 2 && blob.includes(w));
+    });
+    const use = hits.length ? hits.slice(0, 5) : (data || []).slice(0, 3);
+    if (!use.length) return null;
+    const block = [
+      "【Tavilyキャッシュ（オフライン）】",
+      `クエリ: ${q}`,
+      "APIに繋がらなかったため、Trade Desk 蓄積から拾いました。",
+      use
+        .map((r) => `- [${r.source}/${r.topic}] ${(r.summary || "").slice(0, 180)}`)
+        .join("\n"),
+    ].join("\n\n");
+    return {
+      ok: true,
+      query: q,
+      block,
+      sources: use
+        .filter((r) => r.url)
+        .map((r) => ({ title: `${r.topic}（蓄積）`, url: r.url || "" })),
+    };
+  } catch {
+    return null;
   }
 }
