@@ -130,7 +130,7 @@ export default function WatchSituationCard(props: WatchSituationCardProps) {
         ) : null}
         {id === "openchat_threads" ? (
           <p className="meta">
-            <Link href="/openchat/health">オプチャ・スレッドヘルス →</Link>
+            <Link href="/openchat">神大家オプチャ →</Link>
           </p>
         ) : null}
 
