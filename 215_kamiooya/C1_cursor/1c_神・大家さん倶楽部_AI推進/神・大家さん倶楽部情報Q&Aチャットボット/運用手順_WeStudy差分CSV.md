@@ -147,7 +147,9 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 
 1. WeStudy スクレイプ（**cron 週次は `--force` で全トピック再取得**。新規コメントは完了済みトピックにも付くため）  
 2. 差分CSV生成（**state 更新は Raimo 取込成功後**）  
-3. 差分が 1 件以上のときのみ Raimo 自動取込（0件ならスキップ）
+3. 差分が 1 件以上のときのみ Raimo 自動取込（0件ならスキップ）  
+
+**画像アーカイブは GHA に含めない**（admin Drive・Mac 日曜 08:00。`launchd/install_westudy_gdrive_archive_launchd.sh`）。
 
 いつでも手動実行する場合は、GitHub の **Actions** タブで **WeStudy Delta Import Weekly** を選び **Run workflow** から実行できます。
 
