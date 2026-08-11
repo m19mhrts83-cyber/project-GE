@@ -11,6 +11,9 @@
 生成物の既定の保存先は **OneDrive 固定**です（`CHATBOT_OUTPUT_ROOT` 未設定時）。
 `CHATBOT_OUTPUT_ROOT` を設定した場合のみ、任意の保存先へ変更できます。
 
+自分用の本文＋添付アーカイブ（Q&A 取込とは別）は admin Google Drive  
+`マイドライブ/215_神大家_WeStudyスクレイプ/`。`--save-attachments` で画像を保存する。ルール: `jarvis-kamiooya-westudy-gdrive.mdc`。
+
 | 種別 | パス |
 |------|------|
 | 生スクレイプ（トピック別フォルダ） | `<CHATBOT_OUTPUT_ROOT>/exports/raw/<RUN_ID>/` |
