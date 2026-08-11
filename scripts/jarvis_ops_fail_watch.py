@@ -43,6 +43,7 @@ WATCH_WORKFLOWS = (
     "jarvis-dashboard-lanes.yml",
     "jarvis-dashboard-heartbeat.yml",
     "westudy-raimo-weekly.yml",
+    "trade-desk-weekly.yml",
     "pages-docs.yml",
 )
 

@@ -1,0 +1,181 @@
+:root {
+  --bg: #0f1419;
+  --ink: #e8eef4;
+  --muted: #8b9aab;
+  --line: #243040;
+  --card: #17202a;
+  --accent: #3dd6c6;
+  --high: #f07178;
+  --med: #e0af68;
+  --side: #0b1016;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
+  background: radial-gradient(900px 420px at 0% -10%, #134e4a44, transparent),
+    var(--bg);
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 210px;
+  flex-shrink: 0;
+  background: var(--side);
+  padding: 22px 14px;
+}
+
+.side-brand {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0 8px 18px;
+}
+
+.side-link {
+  display: block;
+  color: #d6dee8;
+  padding: 9px 12px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.side-link.active,
+.side-link:hover {
+  background: #1c2836;
+  color: #fff;
+}
+
+main {
+  flex: 1;
+  padding: 28px 32px 48px;
+  max-width: 980px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 1.45rem;
+}
+
+.sub {
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lvl {
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.btn {
+  display: inline-block;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: #115e59;
+  border-color: #14b8a6;
+}
+
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px 24px;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 8px 10px;
+  margin: 4px 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0f1419;
+  color: var(--ink);
+}
+
+.warn {
+  color: var(--med);
+}
+
+.bad {
+  color: var(--high);
+}
+
+@media (max-width: 720px) {
+  .layout {
+    display: block;
+  }
+  .sidebar {
+    width: auto;
+  }
+  main {
+    padding: 18px 16px 36px;
+  }
+}

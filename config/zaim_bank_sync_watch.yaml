@@ -102,5 +102,12 @@ accounts:
     unlinkable: true
 
 # 事情で Zaim 連携しない口座（注意事項に常時載せる）
+  - id: mhi_espp
+    label: "三菱重工 持株会（野村マイ・ターゲット）"
+    match: "野村持株WEBサービス"
+    stale_days: 40
+    env_hint: ["ZAIM_MHI_ACCOUNT_MATCH"]
+    note: "毎月買い足し。資産ビューの評価額は Zaim 口座残高が正（Yahoo口数固定にしない）"
+
 unlinkable_notes:
   - "オリックス銀行ローンは他銀行引き落としのため Zaim 未連携でOK"

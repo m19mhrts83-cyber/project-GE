@@ -17,6 +17,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import time
 from urllib.parse import urljoin
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -233,6 +234,63 @@ def _click_bond_navigation(page) -> bool:
     return False
 
 
+def _maybe_complete_email_otp(page) -> None:
+    """ログイン後のメール認証（送信→Gmail OTP→入力）。コードはチャットに出さない。"""
+    body = ""
+    try:
+        body = page.inner_text("body")
+    except Exception:
+        return
+    if "メール認証" not in (page.title() or "") and "認証コード" not in body:
+        return
+
+    send = page.locator("button.btn-proceed, button:has-text('送信')")
+    sent_ms = int(time.time() * 1000)
+    if send.count() > 0:
+        send.first.click()
+        page.wait_for_load_state("domcontentloaded")
+        page.wait_for_timeout(1500)
+
+    to_email = (
+        os.environ.get("AKATSUKI_OTP_GMAIL")
+        or os.environ.get("PERSONAL_EMAIL")
+        or "m19m.hrts83@gmail.com"
+    ).strip()
+    prev_q = os.environ.get("SOLAR_LOAN_OTP_GMAIL_QUERY")
+    os.environ["SOLAR_LOAN_OTP_GMAIL_QUERY"] = (
+        os.environ.get("AKATSUKI_OTP_GMAIL_QUERY")
+        or f'to:{to_email} (あかつき OR starmf OR 認証コード) newer_than:1d'
+    )
+    try:
+        from solar_gmail_otp import poll_solar_otp_from_gmail
+
+        code = poll_solar_otp_from_gmail(
+            to_email=to_email,
+            min_internal_date_ms=sent_ms,
+            max_wait_s=180,
+        )
+    finally:
+        if prev_q is None:
+            os.environ.pop("SOLAR_LOAN_OTP_GMAIL_QUERY", None)
+        else:
+            os.environ["SOLAR_LOAN_OTP_GMAIL_QUERY"] = prev_q
+
+    box = page.locator(
+        "input[name*='otp' i], input[name*='code' i], input[name*='auth' i], "
+        "input[type='tel'], input[type='text'], input[inputmode='numeric']"
+    )
+    if box.count() == 0:
+        raise RuntimeError("メール認証の入力欄が見つかりません")
+    box.first.fill(code)
+    go = page.locator(
+        "button[type='submit'], button:has-text('認証'), button:has-text('次へ'), button.btn-proceed"
+    )
+    if go.count() == 0:
+        raise RuntimeError("メール認証の送信ボタンが見つかりません")
+    go.first.click()
+    page.wait_for_load_state("networkidle")
+
+
 def fetch_bond_balance(
     *,
     headless: bool,
@@ -273,6 +331,7 @@ def fetch_bond_balance(
         page.locator("#passwd1").fill(login_pass)
         page.locator("button[type='submit'][name='_ActionID']").click()
         page.wait_for_load_state("networkidle")
+        _maybe_complete_email_otp(page)
 
         if bond_page_url:
             target = bond_page_url

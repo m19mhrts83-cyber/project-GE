@@ -1,7 +1,12 @@
 /** サイドバー／⌘K 共通のナビ定義 */
 
-export type NavItem = { href: string; label: string };
+export type NavItem = { href: string; label: string; external?: boolean };
 export type NavGroup = { title: string; items: NavItem[] };
+
+/** 別アプリ。ダッシュボード内に /trade は置かない */
+export const TRADE_DESK_URL =
+  process.env.NEXT_PUBLIC_TRADE_DESK_URL ||
+  "https://jarvis-trade-desk.vercel.app";
 
 /**
  * B+A: グループ見出し＋分かりやすい名前。
@@ -43,6 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "お金",
     items: [
       { href: "/zaim", label: "Zaim Watch" },
+      { href: TRADE_DESK_URL, label: "Trade Desk", external: true },
       { href: "/etc", label: "ETC" },
       { href: "/vpoint", label: "Vポイント" },
       { href: "/rent-step", label: "家賃ステップ" },

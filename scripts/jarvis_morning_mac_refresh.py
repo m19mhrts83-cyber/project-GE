@@ -48,6 +48,9 @@ ZAIM_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_zaim"
 WESTUDY_GDRIVE_STATE = REPO / ".jarvis_state" / "westudy_gdrive_weekly.json"
 WESTUDY_GDRIVE_RUNNER = REPO / "launchd" / "westudy_gdrive_archive_runner.sh"
 WESTUDY_GDRIVE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_westudy_gdrive"
+PORTFOLIO_WEEKLY_STATE = REPO / ".jarvis_state" / "portfolio_weekly.json"
+PORTFOLIO_WEEKLY_RUNNER = REPO / "launchd" / "portfolio_weekly_runner.sh"
+PORTFOLIO_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_portfolio"
 
 
 def now_iso() -> str:
@@ -223,6 +226,54 @@ def spawn_westudy_gdrive_weekly(*, dry_run: bool) -> str:
         return "spawned"
     except Exception as e:
         print(f"# westudy_gdrive spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
+def portfolio_weekly_needs_catchup() -> bool:
+    """今週のフル収集（ログインサイト）が未成功なら True。"""
+    if os.environ.get("JARVIS_PORTFOLIO_WEEKLY_DISABLE") == "1":
+        return False
+    now = datetime.now(JST)
+    y, w, _ = now.isocalendar()
+    this_week = f"{y}-W{w:02d}"
+    if not PORTFOLIO_WEEKLY_STATE.is_file():
+        return True
+    try:
+        data = json.loads(PORTFOLIO_WEEKLY_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("last_full_iso_week") != this_week:
+        return True
+    return data.get("last_full_ok") is not True
+
+
+def spawn_portfolio_weekly(*, dry_run: bool) -> str:
+    if not PORTFOLIO_WEEKLY_RUNNER.is_file():
+        print(f"# portfolio_weekly: missing {PORTFOLIO_WEEKLY_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn portfolio_weekly_runner.sh", flush=True)
+        return "dry_run"
+    PORTFOLIO_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(PORTFOLIO_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(PORTFOLIO_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(PORTFOLIO_WEEKLY_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# portfolio_weekly: spawned weekly runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# portfolio_weekly spawn failed: {e}", file=sys.stderr)
         out.close()
         err.close()
         return "error"
@@ -471,6 +522,13 @@ def main() -> int:
     else:
         results["steps"]["westudy_gdrive_weekly"] = "fresh"
         print("# westudy_gdrive: skip (this week's Sunday slot already done)", flush=True)
+
+    # 8. 資産週次（ログインサイト）の取りこぼし
+    if portfolio_weekly_needs_catchup():
+        results["steps"]["portfolio_weekly"] = spawn_portfolio_weekly(dry_run=args.dry_run)
+    else:
+        results["steps"]["portfolio_weekly"] = "fresh"
+        print("# portfolio_weekly: skip (this week's full collect already done)", flush=True)
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()

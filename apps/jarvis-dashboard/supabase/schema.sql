@@ -527,3 +527,8 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
   for all to authenticated
   using (true)
   with check (true);
+
+-- Trade Desk / 資産全体ビュー: migrations/20260812_trade_desk.sql を正本とする
+-- trade_instruments, trade_prices, trade_signals, trade_orders, trade_positions,
+-- trade_daily_pnl, trade_risk_state, trade_params, trade_reviews, trade_research,
+-- portfolio_accounts, portfolio_snapshots, portfolio_cashflows, advisor_notes

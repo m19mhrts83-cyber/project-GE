@@ -2,7 +2,7 @@
 
 ## Cursor Cloud specific instructions
 
-このリポジトリは個人自動化モノレポ（Jarvis）です。クラウドで実際に動かせる「アプリ」は次の3つです。Python スクリプト群（`scripts/`, `215_kamiooya/`, `line_unofficial_poc/` など）は Mac 専用（`/Users/matsunomasaharu2` 等のハードコードパス・launchd・Selenium 前提）で、クラウド環境では動かしません。
+このリポジトリは個人自動化モノレポ（Jarvis）です。クラウドで実際に動かせる「アプリ」は次の4つです。Python スクリプト群（`scripts/`, `215_kamiooya/`, `line_unofficial_poc/` など）は Mac 専用（`/Users/matsunomasaharu2` 等のハードコードパス・launchd・Selenium 前提）で、クラウド環境では動かしません。
 
 ### 動かせるアプリと起動方法
 
@@ -11,6 +11,7 @@
 | `apps/kamiooya-qa-web` | Next.js 16 (API サービス) | 3000 | `cd apps/kamiooya-qa-web && npm run dev` |
 | `apps/jarvis-dashboard` | Next.js 15 (認証ダッシュボード) | 3001 | 下記の env を渡して `npm run dev` |
 | `apps/prompt-share` | Next.js 16 (チャプロ代替プロンプト共有) | 3002 | `cd apps/prompt-share && npm run dev`（本番: https://prompt-share-taupe.vercel.app） |
+| `apps/trade-desk` | Next.js 15 (株・資産デスク) | 3003 | ダッシュボードと同じ `NEXT_PUBLIC_SUPABASE_*` を渡して `npm run dev` |
 | ルート静的サイト | 素の HTML/JS（Google Maps） | 8000 | `python3 -m http.server 8000`（`index.html`） |
 
 - Node は v22 系。依存は各アプリで `npm install`（lockfile は `package-lock.json` = npm）。標準コマンドは各 `README.md` 参照。
