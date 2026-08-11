@@ -10,7 +10,7 @@
 		},
 		{
 			"name": "500_Obsidian_r1",
-			"path": "../Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1"
+			"path": "../Documents/500_Obsidian_r1"
 		},
 		{
 			"name": "DX互助会_共有フォルダ",
@@ -41,5 +41,8 @@
 			"path": "../Library/CloudStorage/OneDrive-個人用/240_融資"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.defaultInterpreterPath": "/Users/matsunomasaharu2/selenium_env/venv/bin/python",
+		"python.terminal.activateEnvironment": false
+	}
 }

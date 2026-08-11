@@ -1,0 +1,78 @@
+---
+description: Obsidian Mac/iPhone同期。Google Drive Sync(OGD)。Cursorでノートを書いたらDocuments正本＋ogd_retag。Driveデスクトップ直書き禁止。
+alwaysApply: true
+---
+
+# Obsidian 同期 — Google Drive Sync（現行正）
+
+## 方針（2026-08-11 更新）
+
+- **本線**: コミュニティプラグイン **Google Drive Sync**（略称 **OGD**。作者 Richard Xiong / `ogd.richardxiong.com`）
+- **使わない**: Remotely Save / OneDrive `Apps/remotely-save/…` 橋
+- **Mac 正本ボルト（開く場所）**: `~/Documents/500_Obsidian_r1`
+- **ボルト名**: `500_Obsidian_r1`（Mac / iPhone で同一。リネームしない）
+- 認証アカウント: **`admin@livingsupport-matsu.co.jp`**
+- OGD が Drive に書く。Finder の Google Drive デスクトップは **ボルトとして開かない**
+- Mac のボルトを開くときは Finder か Obsidian のボルト一覧から。`obsidian://open?path=/Users/...` は iPhone に飛んで「Vault not found」になるので使わない
+
+## 使わないパス
+
+`~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1`
+
+旧配置。OGD と Finder 同期が衝突し、iPhone に印付きファイルが届かない。退避コピーとして残してよいが、Obsidian では開かない。
+
+## 理解の正（2026-08-11 成功）
+
+Cursor でノートを書いて **Documents に置くだけでは iPhone には届かない**。  
+Mac ではすぐ見える。iPhone は OGD が作った（印付き）ファイルだけ Pull する。
+
+| 手順 | Mac Obsidian | iPhone Pull |
+|---|---|---|
+| Documents に書くだけ | 見える | 届かない |
+| Documents に書く → `ogd_retag` または Mac で Push | 見える | **届く** |
+| Drive デスクトップへ直書き | Finder では見える | **届かない** |
+
+## 原因
+
+OGD は **drive.file** だけ使う。プラグインが作ったファイルしか見えない。
+
+印なしノートを OGD 側へ載せる（書いたパスを引数に付ける）:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_obsidian_ogd_retag.py \
+  "01_Journaling/Obsidianなどの知識管理/GoogleDriveSync_MacとiPhone_教訓_20260811.md"
+```
+
+## Jarvis の必須動作
+
+ノートを **新規作成・大幅更新**したら、報告の前に **その場で `ogd_retag.py` にパスを付けて実行**する。ユーザーに「Push して」だけで終わらない。
+
+- 書く先は **Documents 正本だけ**
+- Drive デスクトップへ直書きしない
+- 貼り付け（ミラーリング）は最後の手段
+- 「Obsidian 同期して」→ Remotely Save は実行しない
+- Journal を読む → `~/Documents/500_Obsidian_r1`
+
+## 運用（ユーザー）
+
+- **Push to Google Drive ＝ 保存**（Mac で自分で編集したとき）
+- 閉じる前に Push。同じノートの同時編集は避ける
+- iPhone は **Pull**（Reset ではない）
+
+## iPhone 初回（空ボルト）— Pull しても増えないとき
+
+1. 今の `500_Obsidian_r1` は一覧から外す（中身は消さなくてよい）
+2. **空の**ボルトを新規作成。名前は **`500_Obsidian_r1`**
+3. Google Drive Sync を入れる。Refresh token は Mac と同じ（Living Support Matsu）
+4. **Pull from Google Drive**（Reset ではない）
+
+## 旧経路（廃止）
+
+- `scripts/jarvis_obsidian_remotely_pull.py` は残置のみ
+- `.jarvis_state/obsidian_remotely_pull.json` は `"disabled": true`
+
+## 関連
+
+- アカウント: `jarvis-google-accounts.mdc`
+- 人向けメモ: `~/Documents/500_Obsidian_r1/01_Journaling/Obsidianなどの知識管理/GoogleDriveSync_MacとiPhone_教訓_20260811.md`

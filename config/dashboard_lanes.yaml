@@ -2,7 +2,7 @@
 version: 1
 
 partner_base: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談"
-obsidian_journal: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1/01_Journaling/★Journal"
+obsidian_journal: "~/Documents/500_Obsidian_r1/01_Journaling/★Journal"
 kodate_actions: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/10_【購入】物件購入,融資/戸建てアクション.md"
 
 # 自動カード上限（0＝機械生成しない。要約確認は jarvis_lane_digest.py）
