@@ -13,7 +13,7 @@ export function fmtSync(v: string | undefined) {
 
 export function watchHref(id: string): { href: string; external: boolean } {
   if (id === "zaim_quality") return { href: "/zaim", external: false };
-  if (id === "openchat_threads") return { href: "/openchat/health", external: false };
+  if (id === "openchat_threads") return { href: "/openchat", external: false };
   if (id === "cursor_pro_plus_downgrade") {
     return { href: "https://www.cursor.com/settings", external: true };
   }

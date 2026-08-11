@@ -71,7 +71,6 @@ export async function queueOpenchatMacRecover(opts: {
     .eq("id", "openchat_threads");
   if (upErr) return { ok: false, error: upErr.message };
 
-  revalidatePath("/openchat/health");
   revalidatePath("/openchat");
   revalidatePath("/situation");
   revalidatePath("/");

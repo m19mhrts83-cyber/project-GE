@@ -2,7 +2,7 @@ import Link from "next/link";
 import Shell from "@/components/Shell";
 import CopyPathButton from "@/components/CopyPathButton";
 import FolderLinks from "@/components/FolderLinks";
-import { LEVEL_LABEL, type HomeLevel } from "@/lib/homeLevels";
+import OpenchatHealthBody from "@/components/OpenchatHealthBody";
 import { getFolderLinks, pageFolderKey } from "@/lib/folderLinks";
 import {
   bundleByGroup,
@@ -11,12 +11,6 @@ import {
   yoritooriRelPath,
   type ActivityRow,
 } from "@/lib/openchatDigest";
-import {
-  buildWatchAckFingerprint,
-  formatQuietUntilLabel,
-  isWatchAckActive,
-  readUserAck,
-} from "@/lib/watchUserAck";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function OpenchatPage() {
@@ -31,112 +25,30 @@ export default async function OpenchatPage() {
     .order("received_at", { ascending: false })
     .limit(120);
 
-  const { data: watchRows } = await supabase
-    .from("watch_status")
-    .select("id,title,level,summary,detail,status,updated_at,payload")
-    .in("id", ["openchat_threads", "square_probe"]);
-
   const { data: meta } = await supabase.from("sync_meta").select("key,value");
   const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
   const digest = parseOpenchatDigest(metaMap.openchat_digest);
 
   const rows = (activities || []) as ActivityRow[];
   const groups = bundleByGroup(rows, digest);
-  const health = (watchRows || []).find((w) => w.id === "openchat_threads");
-  const square = (watchRows || []).find((w) => w.id === "square_probe");
-  const healthLevel = (health?.level || "info") as string;
-  const healthPayload =
-    health?.payload && typeof health.payload === "object"
-      ? (health.payload as Record<string, unknown>)
-      : {};
-  const healthFp = buildWatchAckFingerprint({
-    id: "openchat_threads",
-    level: health?.level,
-    summary: health?.summary,
-    status: health?.status || "active",
-    payload: healthPayload,
-  });
-  const healthAcked = isWatchAckActive(healthPayload, healthFp);
-  const healthUa = readUserAck(healthPayload);
-  const displayLevel = healthAcked ? "info" : healthLevel;
-  const levelClass =
-    displayLevel === "ok"
-      ? "level-info"
-      : `level-${(displayLevel as HomeLevel) || "info"}`;
 
   return (
     <Shell active="/openchat">
       <h1>神大家オプチャ</h1>
       <FolderLinks links={getFolderLinks(pageFolderKey("openchat"))} />
       <p className="sub">
-        情報収集枠。返信提案なし。詳細はグループから。Web
-        からローカル OneDrive は直接開けません（パスコピー／Cursor
-        プロンプト、またはこの詳細ページで確認）。
+        情報収集枠。返信提案なし。上部が取得の健全性、下部がグループ別ダイジェスト。
+        Web からローカル OneDrive は直接開けません（パスコピー／Cursor
+        プロンプト、またはグループ詳細で確認）。
       </p>
 
-      <section className={`openchat-health ${levelClass}`} aria-label="スレッド健全性">
-        <div className="openchat-health-head">
-          <h2>スレッド健全性</h2>
-          <Link href="/openchat/health" className="home-more">
-            詳細ヘルス →
-          </Link>
-        </div>
-        {health ? (
-          <>
-            <p className="openchat-health-status">
-              <span className="lvl">
-                {healthAcked
-                  ? "確認済"
-                  : healthLevel === "ok"
-                    ? "健全"
-                    : LEVEL_LABEL[healthLevel as HomeLevel] || healthLevel}
-              </span>{" "}
-              <strong>{health.title}</strong>
-            </p>
-            <p className="sum">{health.summary}</p>
-            {healthAcked ? (
-              <p className="meta">
-                バッジ抑制中
-                {formatQuietUntilLabel(healthUa?.quiet_until)
-                  ? ` · ${formatQuietUntilLabel(healthUa?.quiet_until)}まで`
-                  : ""}
-                。詳細はヘルスページで確認・再表示条件を確認できます。
-              </p>
-            ) : null}
-            {health.detail ? (
-              <p className="meta">{String(health.detail).slice(0, 200)}</p>
-            ) : null}
-            {healthPayload.threads_today != null ||
-            healthPayload.heartbeat_at != null ? (
-              <p className="meta">
-                {healthPayload.threads_today != null
-                  ? `今日【スレッド】 ${String(healthPayload.threads_today)}件`
-                  : null}
-                {healthPayload.threads_today != null &&
-                healthPayload.heartbeat_at != null
-                  ? " · "
-                  : null}
-                {healthPayload.heartbeat_at != null
-                  ? `heartbeat ${String(healthPayload.heartbeat_at)}`
-                  : null}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="empty">健全性データなし（situation_watch push 待ち）</p>
-        )}
-        {square ? (
-          <p className="meta" style={{ marginTop: 8 }}>
-            Square: {square.level} — {square.summary}
-          </p>
-        ) : null}
-      </section>
+      <OpenchatHealthBody />
 
       {digest?.overview ? (
         <p className="openchat-digest-overview">{digest.overview}</p>
       ) : null}
 
-      <h2>グループ別</h2>
+      <h2>グループ別ダイジェスト</h2>
       {!groups.length ? (
         <p className="empty">なし（push 待ち）</p>
       ) : (
