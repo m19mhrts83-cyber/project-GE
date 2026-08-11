@@ -1,0 +1,47 @@
+---
+description: 神大家コミュニティ・WeStudy・グルコン報告を検索・検証するとき、admin Drive のスクレイプ本文と添付画像を参照する
+alwaysApply: false
+---
+
+# 神大家 WeStudy スクレイプ（admin Drive・自分用）
+
+Q&A チャットボット（Supabase `kamiooya-qa` / Raimo）とは別。**自分用の本文＋添付の正本**。
+
+## 正本
+
+`~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/`
+
+| 場所 | 中身 |
+|---|---|
+| `text/<RUN>/` | トピック別 CSV（本文のみ。2026-07 既存分をコピー済み） |
+| `runs/<RUN>/<トピック>/` | CSV + `attachments/` + `attachments.jsonl` |
+
+使用アカウント: **admin**
+
+## トリガー
+
+次のいずれかのとき、**先にこのフォルダを探す**（Supabase 文字検索だけで終わらない）:
+
+- 神大家コミュニティ／WeStudy フォーラム／グルコン報告の内容確認
+- 「成果報告」「月次活動」「添付」「スクショ」「図」を見たい
+- 自分の過去報告や他会員の実例を画像込みで検証
+
+## Jarvis の動作
+
+1. `text/` の最新 CSV と、あれば `runs/` の `attachments.jsonl` を grep / 読む
+2. ヒットしたら **本文の要点** と、対応する **画像ファイルを Read して見せる**（パスを列挙するだけにしない）
+3. 有用な添付が無い／未取得なら、その旨を言い、再取得コマンドを出す（勝手に全フォーラム再スクレイプはしない）
+4. チャットボット向け Supabase へ画像は上げない（容量方針。文字連携は別件）
+
+## 再取得（成果・活動が主）
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+/Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  ProgramCode/alfred_python/westudy_forum_all.py --force --save-attachments \
+  --url-contains /forum/results --url-contains /forum/monthly_output \
+  --output-root "$HOME/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/runs/$(date +%Y%m%d-%H%M%S)" \
+  --state-dir "$HOME/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/state"
+```
+
+詳細: 同 Drive の `README.md`、`docs/運用コマンド一覧.md` 神大家 WeStudy 節

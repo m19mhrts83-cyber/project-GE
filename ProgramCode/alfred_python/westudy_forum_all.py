@@ -43,6 +43,8 @@ from datetime import datetime
 from pathlib import Path
 from threading import Thread, Event, Lock
 
+from urllib.parse import urljoin, urlparse, unquote
+
 import requests
 
 from selenium import webdriver
@@ -71,6 +73,29 @@ _DEFAULT_MEMBER_LOGIN_URL = "https://westudy.co.jp/login"
 # 会員サイトでは /forum/ トップが404のことがあり、コース内のフォーラムタブが一覧になる
 _DEFAULT_FORUM_ENTRY_URL = "https://westudy.co.jp/course/kami-ooyasan-club?t=forums"
 _DEFAULT_TOPIC_HREF_PREFIX = "https://westudy.co.jp/forum/"
+
+# アバター・絵文字・いいね等は添付アーカイブから除外
+_ATTACH_SKIP_RE = re.compile(
+    r"gravatar|avatar|emoji|smilies|wpulike|wp-includes/images|favicon|spinner|loading\.gif",
+    re.I,
+)
+_ATTACH_EXT_OK = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".pdf",
+    ".xlsx",
+    ".xls",
+    ".csv",
+    ".doc",
+    ".docx",
+    ".ppt",
+    ".pptx",
+    ".heic",
+    ".zip",
+}
 
 
 def forum_base_url() -> str:
@@ -858,20 +883,44 @@ def get_comment_snapshot(current_url: str):
                     junk.forEach((x, i) => { x.style.display = saved[i]; });
                     return t;
                 };
+                const attachments = [];
+                const seenAtt = new Set();
+                const pushAtt = (url, kind) => {
+                    if (!url || url.startsWith("data:") || url.startsWith("#")) return;
+                    if (/gravatar|avatar|emoji|smilies|wpulike|wp-includes\\/images|favicon|spinner/i.test(url)) return;
+                    if (seenAtt.has(url)) return;
+                    seenAtt.add(url);
+                    const name = (url.split("?")[0].split("/").pop() || "file");
+                    attachments.push({url, kind, name});
+                };
                 const bSel = [".comment-content", ".bbp-reply-content", ".content", ".entry", ".text", ".message"];
+                let bodyNode = null;
                 for (const s of bSel) {
                     const b = el.querySelector(s);
                     if (b) {
                         body = readTextWithoutJunk(b);
+                        bodyNode = b;
                         break;
                     }
                 }
                 if (!body) {
                     body = readTextWithoutJunk(el);
+                    bodyNode = el;
+                }
+                if (bodyNode) {
+                    bodyNode.querySelectorAll("img[src], img[data-src]").forEach((img) => {
+                        pushAtt(img.getAttribute("src") || img.getAttribute("data-src") || "", "image");
+                    });
+                    bodyNode.querySelectorAll("a[href]").forEach((a) => {
+                        const href = a.getAttribute("href") || "";
+                        if (/\\.(pdf|xlsx?|docx?|pptx?|csv|zip|jpe?g|png|gif|webp|heic)(\\?|$)/i.test(href)) {
+                            pushAtt(href, "file");
+                        }
+                    });
                 }
 
                 if (id || body) {
-                    out.push({id, author, timeText, timeISO, body, profileUrl, parentNum});
+                    out.push({id, author, timeText, timeISO, body, profileUrl, parentNum, attachments});
                 }
             } catch(e) {}
         }
@@ -891,6 +940,7 @@ def get_comment_snapshot(current_url: str):
             "body": body,
             "profile_url": (it.get("profileUrl") or "").strip(),
             "parent_comment_id": (it.get("parentNum") or "").strip(),
+            "attachments": it.get("attachments") or [],
         })
     return cleaned
 
@@ -1213,6 +1263,125 @@ def _extract_time_from_block(block: str) -> tuple[str, str]:
     return time_text, time_iso
 
 
+def extract_media_from_html(raw_html: str, page_url: str = "") -> list[dict]:
+    """コメント HTML から画像・ファイル URL を拾う（本文ストリップ前に使う）。"""
+    if not raw_html:
+        return []
+    found: list[dict] = []
+    seen: set[str] = set()
+    for attr, kind_guess in (("src", "image"), ("href", "file"), ("data-src", "image")):
+        for m in re.finditer(
+            rf"{attr}=[\"']([^\"']+)[\"']", raw_html, flags=re.I
+        ):
+            raw = html_lib.unescape(m.group(1)).strip()
+            if not raw or raw.startswith("data:") or raw.startswith("#"):
+                continue
+            url = urljoin(page_url or "https://westudy.co.jp/", raw)
+            if url in seen:
+                continue
+            if _ATTACH_SKIP_RE.search(url):
+                continue
+            path = unquote(urlparse(url).path or "")
+            ext = Path(path).suffix.lower()
+            kind = kind_guess
+            if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"}:
+                kind = "image"
+            elif ext in _ATTACH_EXT_OK:
+                kind = "file"
+            elif kind_guess == "file" and ext and ext not in _ATTACH_EXT_OK:
+                continue
+            elif kind_guess == "image" and ext and ext not in _ATTACH_EXT_OK:
+                continue
+            seen.add(url)
+            found.append(
+                {
+                    "url": url,
+                    "kind": kind,
+                    "name": Path(path).name or "file",
+                }
+            )
+    return found
+
+
+def selenium_cookie_session() -> requests.Session:
+    sess = requests.Session()
+    sess.headers["User-Agent"] = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    )
+    if driver is None:
+        return sess
+    for c in driver.get_cookies() or []:
+        name = c.get("name")
+        val = c.get("value")
+        if not name:
+            continue
+        sess.cookies.set(name, val, domain=c.get("domain") or "westudy.co.jp")
+    return sess
+
+
+def save_comment_attachments(
+    rows: list[dict],
+    topic_dir: Path,
+    page_url: str,
+) -> int:
+    """harvest 行の attachments を topic_dir/attachments/ へ保存し catalog を追記。"""
+    attach_root = topic_dir / "attachments"
+    attach_root.mkdir(parents=True, exist_ok=True)
+    catalog_path = topic_dir / "attachments.jsonl"
+    sess = selenium_cookie_session()
+    saved = 0
+    with catalog_path.open("a", encoding="utf-8") as cat:
+        for row in rows:
+            raw = row.get("attachments") or []
+            if isinstance(raw, str):
+                try:
+                    raw = json.loads(raw) if raw else []
+                except json.JSONDecodeError:
+                    raw = []
+            if not raw:
+                continue
+            cid = re.sub(r"[^\d]", "", str(row.get("comment_id") or "")) or "unknown"
+            for i, att in enumerate(raw, start=1):
+                url = (att.get("url") or "").strip()
+                if not url:
+                    continue
+                name = att.get("name") or Path(urlparse(url).path).name or f"file{i}"
+                safe = re.sub(r"[^\w.\-]+", "_", name)[:80] or f"file{i}"
+                dest = attach_root / f"{cid}_{i:02d}_{safe}"
+                if dest.exists() and dest.stat().st_size > 0:
+                    rec = {
+                        **att,
+                        "comment_id": row.get("comment_id"),
+                        "author": row.get("author"),
+                        "local_path": str(dest),
+                        "skipped": "exists",
+                    }
+                    cat.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                    saved += 1
+                    continue
+                try:
+                    r = sess.get(url, timeout=60, stream=True)
+                    if r.status_code >= 400:
+                        log(f"    添付HTTP {r.status_code}: {url[:120]}")
+                        continue
+                    dest.write_bytes(r.content)
+                    rec = {
+                        **att,
+                        "comment_id": row.get("comment_id"),
+                        "author": row.get("author"),
+                        "topic_title": row.get("topic_title"),
+                        "body_excerpt": (row.get("body") or "")[:180],
+                        "local_path": str(dest),
+                        "bytes": dest.stat().st_size,
+                    }
+                    cat.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                    saved += 1
+                except Exception as e:
+                    log(f"    添付失敗: {e.__class__.__name__}: {url[:120]}")
+    return saved
+
+
 def _parse_comments_from_html(html: str) -> list[dict]:
     """li.comment / #comment-N 断片からコメント辞書を抽出。"""
     if not html:
@@ -1241,8 +1410,10 @@ def _parse_comments_from_html(html: str) -> list[dict]:
             block,
             flags=re.I,
         )
+        attachments: list[dict] = []
         if bm:
             raw_body = bm.group(1)
+            attachments = extract_media_from_html(raw_body)
             raw_body = re.sub(r"<br\s*/?>", "\n", raw_body, flags=re.I)
             raw_body = re.sub(r"</p\s*>", "\n", raw_body, flags=re.I)
             raw_body = re.sub(r"<[^>]+>", "", raw_body)
@@ -1264,6 +1435,7 @@ def _parse_comments_from_html(html: str) -> list[dict]:
                 "body": body,
                 "profile_url": profile,
                 "parent_comment_id": parent,
+                "attachments": attachments,
             }
         )
     # fallback: id only
@@ -1278,6 +1450,7 @@ def _parse_comments_from_html(html: str) -> list[dict]:
                     "body": "",
                     "profile_url": "",
                     "parent_comment_id": "",
+                    "attachments": [],
                 }
             )
     # dedupe by id (keep first richer)
@@ -1465,6 +1638,7 @@ def harvest_topic(title: str, url: str, expected_count: int | None):
             "time_text": s["time_text"],
             "time_iso": s["time_iso"],
             "body": s["body"],
+            "attachments": s.get("attachments") or [],
         })
 
     log(f"  - 吸い上げ件数: {len(rows)}（期待件数なし）" if not expected_count else f"  - 吸い上げ件数: {len(rows)}（期待: {expected_count}）")
@@ -1486,12 +1660,16 @@ def write_topic_csv(csv_path: Path, rows: list[dict]):
         "time_text",
         "time_iso",
         "body",
+        "attachments_json",
     ]
     with csv_path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=headers)
+        w = csv.DictWriter(f, fieldnames=headers, extrasaction="ignore")
         w.writeheader()
         for r in rows:
-            w.writerow(r)
+            rec = dict(r)
+            atts = rec.pop("attachments", []) or []
+            rec["attachments_json"] = json.dumps(atts, ensure_ascii=False)
+            w.writerow(rec)
 
 
 def should_skip_topic(url: str, done_flag: Path) -> bool:
@@ -1552,9 +1730,16 @@ def main():
             return
 
         # 簡易に「期待件数なし」として処理（サイト側の件数表示に依存すると壊れやすい）
+        url_filters = [
+            x.strip()
+            for x in ((_CLI_ARGS.url_contains or []) if _CLI_ARGS else [])
+            if x and str(x).strip()
+        ]
         for idx, (title, url) in enumerate(topics, start=1):
+            if url_filters and not any(f in url for f in url_filters):
+                continue
             # スキップ判定
-            _, csv_path, done_flag = topic_output_paths(title, url)
+            topic_dir, csv_path, done_flag = topic_output_paths(title, url)
             if should_skip_topic(url, done_flag):
                 log(f"⏩ スキップ: {title}  {url}")
                 continue
@@ -1569,6 +1754,9 @@ def main():
 
             # CSV 書き出し
             write_topic_csv(csv_path, rows)
+            if getattr(_CLI_ARGS, "save_attachments", False):
+                n_att = save_comment_attachments(rows, topic_dir, url)
+                log(f"  - 添付保存: {n_att} 件 → {topic_dir / 'attachments'}")
             mark_topic_done(url, done_flag, title, len(rows))
 
         log("\n🎉 全トピック処理が完了しました。")
@@ -1601,6 +1789,17 @@ if __name__ == "__main__":
     parser.set_defaults(headless=True)
 
     parser.add_argument("--force", action="store_true", help="完了済みトピックも再取得する")
+    parser.add_argument(
+        "--url-contains",
+        action="append",
+        default=[],
+        help="URL にこの文字列を含むトピックだけ処理（複数指定可）",
+    )
+    parser.add_argument(
+        "--save-attachments",
+        action="store_true",
+        help="コメント内の画像・ファイルをトピックフォルダ/attachments/ へ保存",
+    )
     parser.add_argument(
         "--output-root",
         default=None,
