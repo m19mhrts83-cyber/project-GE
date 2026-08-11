@@ -1,0 +1,39 @@
+{
+  "updated_at": null,
+  "disabled": false,
+  "primary": {
+    "form_id": "1986",
+    "form_name": "Oliveフレキシブルペイ暗証番号変更届",
+    "status": "done",
+    "verified_store": true,
+    "note": "本会員は再設定済なら1986を再請求しない。"
+  },
+  "family": {
+    "member": "",
+    "form_id": "3255",
+    "form_name": "暗証番号変更届",
+    "status": "awaiting_form",
+    "pin_in_canon": false,
+    "last4_in_canon": false,
+    "verified_store": false,
+    "unused_form_at_home": null
+  },
+  "fill_checklist": [
+    "カード番号・氏名は家族カード（本会員番号を書かない）",
+    "新しい4桁は家族会員が決める。署名は本人が原則",
+    "4桁はチャットに出さず .env.jarvis_private の OLIVE_INF_FAMILY_PIN へ"
+  ],
+  "vpass_request": {
+    "when": "未提出の3255が手元にないときだけ",
+    "login": "本会員 Vpass",
+    "request_only": "3255 暗証番号変更届",
+    "do_not_request": "1986",
+    "url": "https://www.smbc-card.com/mem/update/pin_henkou.jsp"
+  },
+  "verify_checklist": [
+    "新カード到着後、家族カードだけで店頭PINを試す",
+    "本会員カードは触らない",
+    "ATM（キャッシュカード）PINは対象外"
+  ],
+  "next_action": ""
+}
