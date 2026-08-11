@@ -15,9 +15,11 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from jarvis_trade_common import JST, sb_client, sma, today_jst
+from jarvis_trade_research_ingest import research_bonus_for_symbol
 from jarvis_trade_strategy import (
     INVERSE_SYMBOL,
     REGIME_SYMBOL,
+    closes_of,
     decide_rhythm_exit,
     decide_scale_in,
     merge_params,
@@ -317,6 +319,10 @@ def maybe_entries(
             if not scored:
                 continue
             score, reason = scored
+            bonus, bonus_note = research_bonus_for_symbol(sb, it["symbol"])
+            if bonus:
+                score += bonus
+                reason = f"{reason} / {bonus_note}"
             candidates.append((score, it, "buy", reason))
     else:
         if INVERSE_SYMBOL not in held_symbols:

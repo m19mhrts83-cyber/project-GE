@@ -130,7 +130,7 @@ OpenAI / Anthropic / SpaceX 本体は未上場または取扱確認前。当面�
 1. **市況（regime）** — 日経ETFの長短移動平均。守り相場なら新規買いは抑制
 2. **セクター相対** — 資金が集まっている分野だけ厚くする
 3. **銘柄テクニカル** — 平均からの沈み幅・反発サイン・リズム（買い増し／一部撤退）
-4. **ニュースは加点のみ** — ChatGPT週次 / Tavily / Deep Research
+4. **ニュースは加点のみ** — ChatGPT週次 / Tavily / Deep Research。Tavily はオンライン時にキャッシュし、オフラインは蓄積を読む
 
 分野: マクロ・為替 / AI・半導体 / 宇宙・防衛 / 日本大型 / ヘルスケア / 地政学リスク  
 定義: `config/trade_research_themes.yaml`
@@ -146,7 +146,11 @@ AI・宇宙の週次メモは次のいずれか:
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_trade_research_ingest.py --from-inbox --topic ai,space
 ~/selenium_env/venv/bin/python scripts/jarvis_trade_research_ingest.py --tavily
+# オフライン（APIを呼ばずキャッシュだけ）
+~/selenium_env/venv/bin/python scripts/jarvis_trade_research_ingest.py --tavily --cache-only
 ```
+
+画面の「リサーチ」は `trade_research` を表示するだけ（Tavily を呼ばない）。キャッシュ実体は `.jarvis_state/tavily_cache/`。
 
 ## 関連
 

@@ -76,7 +76,7 @@ ingest:
     inbox: "000_共通は使わず git-repos/.jarvis_state/trade_research_inbox/"
     from_hint: "openai.com / chatgpt.com / 手動保存"
   tavily_weekly:
-    how: "日曜にテーマごと検索し、要約を trade_research へ"
+    how: "日曜にテーマごと検索し、要約を trade_research へ。成功分は .jarvis_state/tavily_cache/ に残し、オフラインは --cache-only"
   gemini_deep_research:
     how: "必要週だけユーザーが実行→Drive保存→取込（後続）"
 

@@ -45,7 +45,8 @@ jobs:
             exit 1
           fi
           ARGS=()
-          if [[ "$SKIP_TAVILY" == "true" || -z "${TAVILY_API_KEY:-}" ]]; then
+          if [[ "$SKIP_TAVILY" == "true" ]]; then
             ARGS+=(--skip-tavily)
           fi
+          # キー無しでも ingest 側がキャッシュ／既存DBで続ける（オフライン可）
           python scripts/jarvis_trade_weekly_cloud.py "${ARGS[@]}"
