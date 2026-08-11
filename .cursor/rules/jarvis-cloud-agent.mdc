@@ -26,6 +26,7 @@ alwaysApply: true
 | 1 | Supabase `jarvis-dashboard`（投影: triage / watch / cards / sync_meta） |
 | 2 | **Notion MCP**（物件タスク等の原本。Cloud では cursor.com/agents の MCP） |
 | 3 | **NotebookLM MCP**（調査ノート。Drive `200_NoteBookLM` がソース正本） |
+| 3b | **Tavily MCP**（Web 下調べ。Cloud は agents の HTTP `https://mcp.tavily.com/mcp`。ローカル mcp.json は継承されない） |
 | 4 | admin Gmail → 既に `triage_items` にあるもの、または Gmail API（Secrets） |
 | 5 | OneDrive は Graph 後続（Server 注入）。未設定時は Mac ローカル path。**Web Cloud はディスク非参照** |
 
