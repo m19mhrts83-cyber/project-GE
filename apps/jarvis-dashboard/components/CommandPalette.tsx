@@ -282,7 +282,7 @@ export default function CommandPalette({
     const items: NavItem[] = flatNavItems();
     return items.map((it) => ({
       id: `nav:${it.href}`,
-      label: it.label,
+      label: it.external ? `${it.label} ↗` : it.label,
       hint: it.href,
       group: "移動",
       run: () => go(it.href),

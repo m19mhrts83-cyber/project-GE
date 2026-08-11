@@ -147,7 +147,10 @@ export default function ShellFrame({
                     ? { target: "_blank", rel: "noopener noreferrer" }
                     : {})}
                 >
-                  <span className="side-link-label">{n.label}</span>
+                  <span className="side-link-label">
+                    {n.label}
+                    {n.external ? " ↗" : ""}
+                  </span>
                   {renderBadge(n.href)}
                 </a>
               ))}
