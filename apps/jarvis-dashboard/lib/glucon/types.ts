@@ -33,6 +33,12 @@ export type ResultScoringHints = {
   disclaimer: string;
 };
 
+/** 投稿キュー投入時に payload へ残す目安点スナップ */
+export type GluconScoringSnapshot = {
+  estimated_points: number;
+  suggestions: ScoringSuggestion[];
+};
+
 export type GluconDraftStatus =
   | "draft"
   | "ready"
@@ -86,6 +92,8 @@ export type GluconDraftPayload = {
   /** 成果報告の対象期間（前回報告以降〜今回） */
   covered_from?: string;
   covered_to?: string;
+  /** 成果の神大家ポイント目安（投稿時スナップ。無ければ本文から再計算） */
+  scoring?: GluconScoringSnapshot;
 };
 
 /** 前回投稿した成果報告のカバレッジ */
