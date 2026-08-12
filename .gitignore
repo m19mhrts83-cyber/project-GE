@@ -77,6 +77,14 @@ _tmp/
 
 # Zaim 明細 CSV（個人データ・容量大。ダウンロード残はローカルのみ）
 215_kamiooya/C1_cursor/finance/zaim_budget_sync/downloads/*.csv
+# KURASHIFT / 保険スクレイプ: ブラウザセッション・OTP・デバッグ HTML（秘密・容量）
+215_kamiooya/C1_cursor/finance/.*storage_state*.json
+215_kamiooya/C1_cursor/finance/.*otp*.json
+215_kamiooya/C1_cursor/finance/debug/
+# ローカル専用 state ディレクトリ（JSON 以外の成果物）
+.jarvis_state/kurashift_lifeplan/
+.jarvis_state/trade_research_inbox/
+.jarvis_state/mf_me_browser_profile.bak*/
 
 # --- Q&Aチャットボット／ProgramCode の実行成果物（容量大） ---
 **/神・大家さん倶楽部情報Q&Aチャットボット/state/exports/
