@@ -109,6 +109,24 @@ allowed_jobs:
   - portfolio_weekly
   - theme_preview  # 提案のみ。実弾は別承認ジョブ
   - theme_propose_from_status
+  - theme_ensure_index_rb
+  - theme_execute_assist  # 手順メモのみ。live 発注はしない
+  - secrets_upsert
+  - secrets_status
+
+secrets:
+  store: .env.jarvis_private
+  via: app_/settings → kurashift_jobs → Mac worker
+  scrub_payload_after_success: true
+
+insurance_policy_loan:
+  purpose: 不動産購入時の頭金枠（保険投資額の範囲内で借入可能）
+  primary: sony_life_surrender_page  # 契約者貸付元利金(4)／自動振替(3)
+  accounts:
+    - sony_life_policy_loan
+    - sony_life_chikage_policy_loan
+    - prudential_life_policy_loan
+    - prudential_life_chikage_policy_loan
 
 theme:
   start_simple: true

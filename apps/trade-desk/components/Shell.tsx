@@ -8,6 +8,7 @@ const NAV = [
   { href: "/tax", label: "個人申告" },
   { href: "/consultations", label: "相談" },
   { href: "/jobs", label: "ジョブ" },
+  { href: "/settings", label: "設定" },
   { href: "/research", label: "リサーチ" },
   { href: "/paper", label: "Lab" },
 ];

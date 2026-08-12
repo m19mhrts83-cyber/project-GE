@@ -31,7 +31,7 @@ DEFAULT_DEBUG_DIR = SCRIPT_DIR / "debug"
 
 @dataclass
 class SonySurrenderAccountResult:
-    """1利用者IDあたりの解約返戻金。"""
+    """1利用者IDあたりの解約返戻金（＋同ページの貸付残高）。"""
 
     account_index: int
     username: str
@@ -39,6 +39,8 @@ class SonySurrenderAccountResult:
     value_text: str
     source_url: str
     parser_mode: str
+    policy_loan_jpy: int = 0
+    auto_premium_loan_jpy: int = 0
 
 
 @dataclass
@@ -50,6 +52,9 @@ class SurrenderValueResult:
     value_text: str
     source_url: str
     parser_mode: str
+    policy_loan_jpy: int = 0
+    auto_premium_loan_jpy: int = 0
+    total_loan_jpy: int = 0
 
 
 def _load_env_file(path: Path) -> None:
@@ -501,6 +506,34 @@ def _extract_sony_surrender_primary_amount(page) -> tuple[int | None, str]:
     return _parse_first_jpy((raw or "").strip())
 
 
+def _extract_sony_loan_amounts(page) -> dict[str, int]:
+    """同ページの契約者貸付元利金(4)／保険料自動振替貸付元利金(3)。"""
+    data = page.evaluate(
+        r"""
+() => {
+  const norm = (s) => (s || "").replace(/\s/g, "").replace(/\u3000/g, "");
+  const out = { policy_loan_text: "", auto_premium_loan_text: "" };
+  for (const tr of document.querySelectorAll("table tr")) {
+    const th = tr.querySelector("th");
+    if (!th) continue;
+    const t = norm(th.innerText || "");
+    const td = tr.querySelector("td:last-of-type") || tr.querySelector("td");
+    const txt = td ? (td.innerText || "").replace(/\s+/g, " ").trim() : "";
+    if (t.includes("契約者貸付元利金")) out.policy_loan_text = txt;
+    if (t.includes("保険料自動振替貸付元利金")) out.auto_premium_loan_text = txt;
+  }
+  return out;
+}
+"""
+    )
+    policy, _ = _parse_first_jpy((data or {}).get("policy_loan_text") or "")
+    auto, _ = _parse_first_jpy((data or {}).get("auto_premium_loan_text") or "")
+    return {
+        "policy_loan_jpy": int(policy or 0),
+        "auto_premium_loan_jpy": int(auto or 0),
+    }
+
+
 def _extract_surrender_from_page(
     page,
     *,
@@ -661,6 +694,7 @@ def fetch_sony_surrender_value(
                 value_selector=value_selector,
                 value_label=value_label,
             )
+            loans = _extract_sony_loan_amounts(page)
 
             if save_debug:
                 DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
@@ -687,14 +721,25 @@ def fetch_sony_surrender_value(
                     value_text=value_text or f"{value:,}円",
                     source_url=source_url,
                     parser_mode=mode,
+                    policy_loan_jpy=int(loans.get("policy_loan_jpy") or 0),
+                    auto_premium_loan_jpy=int(loans.get("auto_premium_loan_jpy") or 0),
                 )
             )
 
         browser.close()
 
     total = sum(x.value_jpy for x in items)
-    lines = [f"アカウント{x.account_index}（{x.username}）: {x.value_text}" for x in items]
-    combined_text = "\n".join(lines) + f"\n合計: {total:,}円"
+    policy_loan = sum(x.policy_loan_jpy for x in items)
+    auto_loan = sum(x.auto_premium_loan_jpy for x in items)
+    lines = [
+        (
+            f"アカウント{x.account_index}（{x.username}）: 解約返戻 {x.value_text}"
+            f" / 契約者貸付 {x.policy_loan_jpy:,}円"
+            f" / 自動振替貸付 {x.auto_premium_loan_jpy:,}円"
+        )
+        for x in items
+    ]
+    combined_text = "\n".join(lines) + f"\n合計解約返戻: {total:,}円 / 貸付合計: {policy_loan + auto_loan:,}円"
     parser_mode = f"multi:{len(items)}accounts"
     last_url = items[-1].source_url if items else ""
 
@@ -704,6 +749,9 @@ def fetch_sony_surrender_value(
         value_text=combined_text,
         source_url=last_url,
         parser_mode=parser_mode,
+        policy_loan_jpy=policy_loan,
+        auto_premium_loan_jpy=auto_loan,
+        total_loan_jpy=policy_loan + auto_loan,
     )
 
 

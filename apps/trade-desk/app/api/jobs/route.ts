@@ -13,6 +13,10 @@ const ALLOWED = new Set([
   "portfolio_weekly",
   "theme_preview",
   "theme_propose_from_status",
+  "theme_ensure_index_rb",
+  "theme_execute_assist",
+  "secrets_upsert",
+  "secrets_status",
 ]);
 
 export async function POST(req: Request) {
