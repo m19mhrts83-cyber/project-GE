@@ -1,0 +1,115 @@
+# KURASHIFT Theme / LifePlan playbook
+# 人間＋アプリ＋Mac worker の正本。秘密は書かない。
+
+app:
+  name: KURASHIFT
+  subtitle: 暮らしを整え、資産を動かす
+  code_path: apps/trade-desk
+  port: 3003
+
+numbers:
+  canonical_path: >-
+    /Users/matsunomasaharu2/Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan/260621_松野家FinancePlan.numbers
+  sheets:
+    cashflow: キャッシュフロー
+    single_income: シングルインカム年収手取
+    table1: 表1.月別予算設定
+    table2: 表2.収入まとめ
+    roi: ROI・リバランスまとめ
+
+lifeplan_routine:
+  cadence: 1_to_3_per_year
+  home_focus: false  # トップは Theme／資産ステータス。LPはレーン＋お知らせ
+  triggers:
+    - id: annual_after_december
+      when: january_february
+      notice: 年間実績確定 → 当年以降の LP／予算更新
+      mode: annual
+    - id: real_estate_purchase
+      when: on_purchase
+      mode: re_purchase
+      entry: /lifeplan?mode=re_purchase
+    - id: other
+      when: ad_hoc
+      entry: local_jarvis_consultation
+  steps:
+    - id: ingest_actuals
+      label: 年度実績を取り込む
+      job: lifeplan_ingest_actuals
+    - id: revise_budget
+      label: 実績を見て予算を補正する
+      job: lifeplan_revise_budget
+    - id: update_century_plan
+      label: 100年ライフプランを更新・チューニングする
+      job: lifeplan_update_century
+    - id: push_finance
+      label: 固めた予算を財務へ反映する
+      job: lifeplan_push_zaim
+  abg_targets:
+    alpha_save_pct: 20
+    beta_living_pct: 60
+    gamma_self_pct: 20
+  delta_real_estate_in_growth_eval: false
+
+home:
+  primary:
+    - theme_proposals
+    - theme_execution
+    - portfolio_status
+    - status_based_suggestions
+  secondary_notices:
+    - annual_lifeplan_window
+
+
+execution_boundary:
+  routine_entry: app_button
+  consultation_entry: local_jarvis
+  app_shows: [job_status, logs, artifacts, consultations, proposals, tax_cases]
+  never_without_approval: [live_trade, fund_transfer, yayoi_register]
+
+approval_then_run:
+  preview_required: true
+  otp:
+    sms: messages_db
+    email: gmail_api
+  stop_only_for: [biometrics, app_only_wall, otp_unreachable]
+
+bloomo:
+  primary: web
+  fixed_sleeve_pct_range: [70, 80]
+  dynamic_sleeve_pct_range: [20, 30]
+  public_api: false
+
+index_rebalance:
+  frequency: annual
+  keep_jgb_ratio: false
+
+insurance_core:
+  - sony_life
+  - sony_life_chikage
+  - prudential_life
+  - prudential_life_chikage
+
+tax:
+  personal_only: true
+  corporate: tax_accountant_email_only
+  yayoi_csv: true
+  evidence_reexport: true
+  gmail_ingest: true
+
+allowed_jobs:
+  - lifeplan_ingest_actuals
+  - lifeplan_revise_budget
+  - lifeplan_update_century
+  - lifeplan_push_zaim
+  - lifeplan_snapshot
+  - tax_build_yayoi_csv
+  - tax_ingest_accountant_mail
+  - tax_export_evidence
+  - portfolio_weekly
+  - theme_preview  # 提案のみ。実弾は別承認ジョブ
+
+theme:
+  start_simple: true
+  iterate_via_consultation: true
+  card_states: [draft, consulting, approved, executing, closed, reviewed]

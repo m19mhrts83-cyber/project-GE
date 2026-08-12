@@ -1,5 +1,9 @@
-# Trade Desk 情報レイヤー（判断の順番を固定する）
+# KURASHIFT — Theme 入力レイヤー（判断の順番を固定する）
 # ニュース単体では売買しない。市況フィルタ → セクター相対 → 銘柄テクニカルの順。
+# Theme カードの証拠欄・提案材料として使う。定石は固定せず相談で改善する。
+
+layer: Theme
+app: KURASHIFT
 
 layers:
   - id: regime

@@ -1,10 +1,15 @@
 import { DASHBOARD_URL } from "@/lib/format";
 
 const NAV = [
-  { href: "/", label: "概要" },
+  { href: "/", label: "ホーム" },
+  { href: "/themes", label: "テーマ" },
   { href: "/portfolio", label: "資産" },
-  { href: "/paper", label: "ペーパー" },
+  { href: "/lifeplan", label: "ライフプラン" },
+  { href: "/tax", label: "個人申告" },
+  { href: "/consultations", label: "相談" },
+  { href: "/jobs", label: "ジョブ" },
   { href: "/research", label: "リサーチ" },
+  { href: "/paper", label: "Lab" },
 ];
 
 export default function Shell({
@@ -19,7 +24,10 @@ export default function Shell({
   return (
     <div className="layout">
       <aside className="sidebar">
-        <div className="side-brand">Trade Desk</div>
+        <div className="side-brand">KURASHIFT</div>
+        <div className="meta" style={{ margin: "0 8px 14px", fontSize: 12 }}>
+          暮らしを整え、資産を動かす
+        </div>
         {NAV.map((n) => (
           <a
             key={n.href}

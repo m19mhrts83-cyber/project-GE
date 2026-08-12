@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Trade Desk",
-  description: "Jarvis 株・資産デスク（ダッシュボードとは別アプリ）",
+  title: "KURASHIFT",
+  description: "暮らしを整え、資産を動かす — ライフプラン軌道の資産運用HQ",
 };
 
 export default function RootLayout({

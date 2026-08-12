@@ -1,12 +1,14 @@
-# Trade Desk 戦略原理（平均回帰・リズム）
+# KURASHIFT — Lab 層（平均回帰・リズム）
+# アプリ本線は LifePlan / Core / Theme。ここは小額実験用。利回り本線にしない。
 # 実行時パラメータの正は Supabase trade_params.strategy_v1。ここは人間向けの正本。
 
+layer: Lab
+app: KURASHIFT
 style: mean_reversion_scale
 summary: >
-  資本主義では優良企業の株価平均は右肩上がり（金持ちがさらに金持ち）だが、
-  ニュースで一時的に沈む。その沈みから平均へ戻る区間だけ、機械的に刻んで乗る。
+  【Lab】資本主義では優良企業の株価平均は右肩上がりだが、ニュースで一時的に沈む。
+  その沈みから平均へ戻る区間だけ刻んで乗る実験。本線の Theme／インデックス年1RB とは別。
   反発確認後に買い増し、リズムが崩れたら一部撤退。ナンピンはしない。
-  紙くず前提の銘柄は対象外。上昇平均が折れた銘柄にも乗らない。
 
 universe:
   quality_mega: GAFAM / NVIDIA など、価値が消えるとは考えにくい大型
