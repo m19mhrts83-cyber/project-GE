@@ -22,6 +22,14 @@ const SUBFOLDERS: { name: string; note: string }[] = [
     name: "05_Jarvisダッシュボード_設計と引き継ぎ",
     note: "設計メモ・NotebookLM説明用",
   },
+  {
+    name: "06_周辺MAP自動化_単独Web検証",
+    note: "単独Web自動化の概要・Studio用",
+  },
+  {
+    name: "08_北海道GW2027_家族向け概要",
+    note: "2027 GW 家族旅行・インフォ1＋スライド8・04にプロンプト",
+  },
   { name: "99_PlusAI検証_20260727", note: "検証用" },
   { name: "★アウトプット", note: "生成スライド等" },
 ];
