@@ -2,13 +2,23 @@
 """
 NotebookLM Studio 生成ランナー（Infographic / Slide Deck）。
 
+モード:
+  create     … Studio から新規作成（既定）
+  recreate   … 新規作成と同じ UI（インフォ等の作り直し）
+  revise     … 既存スライドを開き、ページ別「変更」で修正
+
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   # dry-run（生成クリックなし）
   python scripts/jarvis_notebooklm_studio_run.py --artifact infographic \\
     --prompt-file PATH.md --prompt-section info --dry-run
-  # 生成＋保存
+  # インフォ再作成
   python scripts/jarvis_notebooklm_studio_run.py --artifact infographic \\
-    --prompt-file PATH.md --prompt-section info --confirm-generate --wait-and-save
+    --mode recreate --prompt-file PATH.md --prompt-section info \\
+    --confirm-generate --wait-and-save
+  # スライド 3・8 をページ別修正
+  python scripts/jarvis_notebooklm_studio_run.py --artifact slide_deck \\
+    --mode revise --slide-pages 3,8 --prompt-file PATH.md \\
+    --confirm-generate --wait-and-save
 """
 from __future__ import annotations
 
@@ -24,6 +34,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 from jarvis_notebooklm_studio_lib import (  # noqa: E402
     expand,
     extract_prompt_section,
+    extract_slide_page_prompt,
     first_match,
     load_cfg,
     load_selectors,
@@ -49,7 +60,7 @@ def _launch(headed: bool, downloads_path: Path):
         headless=not headed,
         channel="chrome",
         args=["--disable-blink-features=AutomationControlled"],
-        viewport={"width": 1400, "height": 900},
+        viewport={"width": 1600, "height": 1000},
         ignore_default_args=["--enable-automation"],
         accept_downloads=True,
     )
@@ -60,7 +71,6 @@ def _launch(headed: bool, downloads_path: Path):
 def _click_first(page, selectors: list[str], what: str):
     loc, sel = first_match(page, selectors, timeout_ms=2000)
     if not loc:
-        # text fallbacks embedded in selector list already; try get_by_text for short labels
         for s in selectors:
             if s.startswith("text="):
                 label = s[5:]
@@ -74,10 +84,25 @@ def _click_first(page, selectors: list[str], what: str):
     return sel
 
 
+def _js_click_aria_description(page, description: str) -> bool:
+    return bool(
+        page.evaluate(
+            """(desc) => {
+              const b = [...document.querySelectorAll('button')].find(
+                x => (x.getAttribute('aria-description') || '') === desc
+              );
+              if (!b) return false;
+              b.click();
+              return true;
+            }""",
+            description,
+        )
+    )
+
+
 def _fill_prompt(page, selectors: list[str], prompt: str) -> str:
     loc, sel = first_match(page, selectors, timeout_ms=2500)
     if not loc:
-        # last resort: first textarea / contenteditable
         for s in ("textarea", '[contenteditable="true"]', 'div[role="textbox"]'):
             loc2 = page.locator(s)
             if loc2.count():
@@ -88,12 +113,10 @@ def _fill_prompt(page, selectors: list[str], prompt: str) -> str:
     try:
         loc.click(timeout=3000)
         page.wait_for_timeout(300)
-        # clear
         page.keyboard.press("Meta+A")
         page.keyboard.press("Backspace")
         loc.fill(prompt)
     except Exception:
-        # contenteditable may not support fill
         page.keyboard.press("Meta+A")
         page.keyboard.press("Backspace")
         page.keyboard.insert_text(prompt)
@@ -120,9 +143,10 @@ def _pick_model(page, selectors: dict, model_name: str) -> None:
         except Exception:
             pass
     else:
-        # try get_by_text
         try:
-            page.get_by_text(model_name or "Nano Banana Pro", exact=False).first.click(timeout=2000)
+            page.get_by_text(model_name or "Nano Banana Pro", exact=False).first.click(
+                timeout=2000
+            )
         except Exception:
             print("# model pick skipped (not found)", file=sys.stderr)
 
@@ -142,15 +166,21 @@ def _wait_idle(page, selectors: dict, timeout_sec: int, poll: float) -> bool:
                     break
             except Exception:
                 continue
+        # also treat enabled→disabled generate as busy for revise
+        try:
+            gen = page.get_by_label("改訂版のスライドを生成")
+            if gen.count() and not gen.is_enabled():
+                busy = True
+                saw_busy = True
+        except Exception:
+            pass
         if saw_busy and not busy:
             return True
-        # download button as completion signal
         dl_sels = selectors.get("download") or []
         loc, _ = first_match(page, dl_sels, timeout_ms=400)
         if loc and saw_busy:
             return True
         if loc and not saw_busy and time.time() + 30 > deadline - timeout_sec + 60:
-            # download visible without busy — treat as ready after short wait
             page.wait_for_timeout(2000)
             return True
         page.wait_for_timeout(int(poll * 1000))
@@ -163,7 +193,6 @@ def _download_and_save(page, selectors: dict, dest_dir: Path, stem: str) -> list
     dl_sels = selectors.get("download") or []
     loc, sel = first_match(page, dl_sels, timeout_ms=3000)
     if not loc:
-        # try menu
         for label in ("Download", "ダウンロード", "Export", "エクスポート"):
             try:
                 page.get_by_text(label, exact=False).first.click(timeout=2000)
@@ -174,7 +203,23 @@ def _download_and_save(page, selectors: dict, dest_dir: Path, stem: str) -> list
             except Exception:
                 continue
     if not loc:
-        raise RuntimeError("download_button_not_found")
+        # more_vert → download
+        try:
+            page.get_by_label("その他のオプション").first.click(timeout=2000)
+            page.wait_for_timeout(600)
+            page.get_by_text("ダウンロード", exact=False).first.click(timeout=2000)
+            with page.expect_download(timeout=120000) as di:
+                page.wait_for_timeout(500)
+            download = di.value
+            suggested = download.suggested_filename or f"{stem}.bin"
+            ext = Path(suggested).suffix or ".pdf"
+            out = dest_dir / f"{stem}{ext}"
+            download.save_as(str(out))
+            saved.append(str(out))
+            print(f"# saved {out}", file=sys.stderr)
+            return saved
+        except Exception as e:
+            raise RuntimeError(f"download_button_not_found:{e}") from e
 
     with page.expect_download(timeout=120000) as di:
         loc.click()
@@ -188,6 +233,318 @@ def _download_and_save(page, selectors: dict, dest_dir: Path, stem: str) -> list
     return saved
 
 
+def _open_studio(page, selectors: dict) -> None:
+    try:
+        _click_first(page, selectors.get("studio_tab") or [], "studio_tab")
+        page.wait_for_timeout(1500)
+        return
+    except Exception:
+        pass
+    for label in ("Studio", "スタジオ"):
+        try:
+            page.get_by_text(label, exact=True).first.click(timeout=2000)
+            page.wait_for_timeout(1500)
+            return
+        except Exception:
+            continue
+    try:
+        page.locator('[aria-label*="Studio"]').first.click(timeout=2000, force=True)
+        page.wait_for_timeout(1500)
+    except Exception:
+        print("# studio open soft-fail (may already be open)", file=sys.stderr)
+
+
+def _open_create_dialog(page, artifact: str) -> None:
+    """Studio パネル内の新規作成タイルをクリック（インフォ／スライド）。"""
+    label = "インフォグラフィック" if artifact == "infographic" else "スライド資料"
+    # Prefer exact text inside studio-panel
+    try:
+        page.locator("section.studio-panel").get_by_text(label, exact=True).first.click(
+            timeout=4000, force=True
+        )
+        page.wait_for_timeout(2000)
+        return
+    except Exception:
+        pass
+    ok = page.evaluate(
+        """(label) => {
+          const panel = document.querySelector('section.studio-panel');
+          if (!panel) return false;
+          const el = [...panel.querySelectorAll('*')].find(
+            e => (e.innerText || '').trim() === label
+          );
+          if (!el) return false;
+          (el.closest('button') || el.closest('[role=button]') || el).click();
+          return true;
+        }""",
+        label,
+    )
+    if not ok:
+        raise RuntimeError(f"create_tile_not_found:{label}")
+    page.wait_for_timeout(2000)
+
+
+def _wait_studio_generating(page, timeout_sec: int, poll: float) -> bool:
+    """Wait until '生成しています' appears then disappears."""
+    deadline = time.time() + timeout_sec
+    saw = False
+    while time.time() < deadline:
+        generating = page.evaluate(
+            """() => /生成しています|Generating|Creating|生成中/.test(document.body.innerText)"""
+        )
+        if generating:
+            saw = True
+        elif saw:
+            page.wait_for_timeout(2000)
+            still = page.evaluate(
+                """() => /生成しています|Generating|Creating|生成中/.test(document.body.innerText)"""
+            )
+            if not still:
+                return True
+        page.wait_for_timeout(int(poll * 1000))
+    return saw  # if we saw it but never cleared, still timeout-ish
+
+
+def _screenshot_artifact(page, dest: Path) -> str:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    handle = page.evaluate_handle(
+        """() => {
+          let best=null, bestA=0;
+          for (const img of document.querySelectorAll('img')) {
+            const r=img.getBoundingClientRect();
+            const a=r.width*r.height;
+            if (a>bestA && r.width>250) { best=img; bestA=a; }
+          }
+          return best;
+        }"""
+    )
+    el = handle.as_element()
+    if el:
+        el.screenshot(path=str(dest))
+    else:
+        page.screenshot(path=str(dest))
+    return str(dest)
+
+
+def _run_create_or_recreate(
+    page,
+    selectors: dict,
+    artifact: str,
+    prompt: str,
+    model: str,
+    will_generate: bool,
+    dry_run: bool,
+    wait_and_save: bool,
+    out_dir: Path,
+    stem: str,
+    cfg: dict,
+    state: dict,
+) -> int:
+    _open_studio(page, selectors)
+    _open_create_dialog(page, artifact)
+    state["phase"] = "artifact_open"
+    write_run_state(state)
+
+    used = _fill_prompt(page, selectors.get("prompt_field") or [], prompt)
+    print(f"# prompt filled via {used} chars={len(prompt)}", file=sys.stderr)
+    _pick_model(page, selectors, model)
+    state["phase"] = "prompt_ready"
+    write_run_state(state)
+
+    if dry_run or not will_generate:
+        print("# dry-run / no generate — stopping before click", file=sys.stderr)
+        state["ok"] = True
+        state["phase"] = "dry_run_done"
+        write_run_state(state)
+        return 0
+
+    # Prefer visible enabled 生成 / 作成 near dialog
+    clicked = False
+    for name in ("生成", "作成", "Generate"):
+        btns = page.get_by_role("button", name=name)
+        for j in range(btns.count()):
+            b = btns.nth(j)
+            try:
+                if b.is_visible() and b.is_enabled():
+                    box = b.bounding_box()
+                    if box and box["y"] > 400:
+                        b.click(timeout=3000)
+                        clicked = True
+                        print(f"# generate clicked ({name})", file=sys.stderr)
+                        break
+            except Exception:
+                continue
+        if clicked:
+            break
+    if not clicked:
+        _click_first(page, selectors.get("generate") or [], "generate")
+        print("# generate clicked (fallback)", file=sys.stderr)
+    state["phase"] = "generating"
+    write_run_state(state)
+
+    if wait_and_save:
+        ok_wait = _wait_studio_generating(
+            page,
+            int(cfg.get("generate_timeout_sec") or 900),
+            float(cfg.get("poll_interval_sec") or 5),
+        )
+        if not ok_wait:
+            # fallback to generic idle
+            ok_wait = _wait_idle(
+                page,
+                selectors,
+                60,
+                float(cfg.get("poll_interval_sec") or 5),
+            )
+        if not ok_wait:
+            state["error"] = "generate_timeout"
+            write_run_state(state)
+            print("# generate timeout", file=sys.stderr)
+            return 1
+        state["phase"] = "ready"
+        write_run_state(state)
+        files: list[str] = []
+        try:
+            files = _download_and_save(page, selectors, out_dir, stem)
+        except Exception as e:
+            print(f"# download soft-fail: {e}", file=sys.stderr)
+            # open newest artifact of this type and screenshot
+            desc = "インフォグラフィック" if artifact == "infographic" else "スライド資料"
+            page.evaluate(
+                """(desc) => {
+                  const bs=[...document.querySelectorAll('button')].filter(
+                    b => (b.getAttribute('aria-description')||'')===desc
+                  );
+                  const ranked=bs.map(b=>({b,y:b.getBoundingClientRect().y}))
+                    .filter(x=>x.y>400).sort((a,c)=>a.y-c.y);
+                  if(ranked.length) ranked[0].b.click();
+                }""",
+                desc,
+            )
+            page.wait_for_timeout(3500)
+            shot = out_dir / f"{stem}.png"
+            files = [_screenshot_artifact(page, shot)]
+        state["files"] = files
+        state["ok"] = True
+        state["phase"] = "saved"
+        write_run_state(state)
+        print(f"# done files={files}")
+        return 0
+
+    state["ok"] = True
+    state["phase"] = "generate_clicked"
+    write_run_state(state)
+    print("# generate started (no --wait-and-save)")
+    return 0
+
+
+def _run_revise(
+    page,
+    selectors: dict,
+    artifact: str,
+    page_prompts: dict[int, str],
+    will_generate: bool,
+    dry_run: bool,
+    wait_and_save: bool,
+    out_dir: Path,
+    stem: str,
+    cfg: dict,
+    state: dict,
+) -> int:
+    if artifact != "slide_deck":
+        raise RuntimeError("revise_mode_supports_slide_deck_only")
+
+    # Open existing slide deck artifact (JS click avoids touch-target intercept)
+    open_sels = (selectors.get("open_existing") or {}).get("slide_deck") or []
+    opened = False
+    for sel in open_sels:
+        if 'aria-description="スライド資料"' in sel:
+            opened = _js_click_aria_description(page, "スライド資料")
+            break
+    if not opened:
+        # fallback: any stretched button with スライド資料
+        opened = _js_click_aria_description(page, "スライド資料")
+    if not opened:
+        raise RuntimeError("existing_slide_artifact_not_found")
+    page.wait_for_timeout(3500)
+    state["phase"] = "artifact_open"
+    write_run_state(state)
+
+    rev = selectors.get("revise") or {}
+    _click_first(page, rev.get("open_edit") or [], "revise_open_edit")
+    page.wait_for_timeout(2000)
+    state["phase"] = "revise_mode"
+    write_run_state(state)
+
+    thumb_tpl = rev.get("slide_thumb_template") or '[aria-label^="スライド {n}"]'
+    for n, prompt in sorted(page_prompts.items()):
+        sel = thumb_tpl.format(n=n)
+        try:
+            page.locator(sel).first.click(timeout=4000)
+        except Exception:
+            page.get_by_label(f"スライド {n}", exact=False).first.click(timeout=4000)
+        page.wait_for_timeout(600)
+        used = _fill_prompt(page, rev.get("prompt_field") or [], prompt)
+        print(f"# slide {n} revision queued via {used} chars={len(prompt)}", file=sys.stderr)
+        page.wait_for_timeout(700)
+        try:
+            pending = page.get_by_label("保留中の変更のポップアップを切り替え").inner_text()
+            print(f"# pending: {pending.replace(chr(10), ' ')}", file=sys.stderr)
+        except Exception:
+            pass
+
+    state["phase"] = "revise_queued"
+    state["revise_pages"] = list(page_prompts.keys())
+    write_run_state(state)
+
+    if dry_run or not will_generate:
+        print("# dry-run / no generate — cancel revise mode", file=sys.stderr)
+        try:
+            _click_first(page, rev.get("cancel") or [], "revise_cancel")
+        except Exception:
+            pass
+        state["ok"] = True
+        state["phase"] = "dry_run_done"
+        write_run_state(state)
+        return 0
+
+    _click_first(page, rev.get("generate") or [], "revise_generate")
+    print("# revise generate clicked", file=sys.stderr)
+    state["phase"] = "generating"
+    write_run_state(state)
+
+    if wait_and_save:
+        ok_wait = _wait_idle(
+            page,
+            selectors,
+            int(cfg.get("generate_timeout_sec") or 900),
+            float(cfg.get("poll_interval_sec") or 5),
+        )
+        if not ok_wait:
+            # soft: wait a bit more if pending disappeared
+            page.wait_for_timeout(15000)
+        state["phase"] = "ready"
+        write_run_state(state)
+        try:
+            files = _download_and_save(page, selectors, out_dir, stem)
+            state["files"] = files
+        except Exception as e:
+            print(f"# download soft-fail: {e}", file=sys.stderr)
+            state["files"] = []
+            state["error"] = f"download:{e}"
+        state["ok"] = True
+        state["phase"] = "saved" if state.get("files") else "generated_no_download"
+        write_run_state(state)
+        print(f"# done files={state.get('files')}")
+        return 0
+
+    state["ok"] = True
+    state["phase"] = "generate_clicked"
+    write_run_state(state)
+    print("# revise generate started (no --wait-and-save)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="NotebookLM Studio run")
     ap.add_argument("--notebook-url", default=None)
@@ -196,6 +553,17 @@ def main(argv: list[str] | None = None) -> int:
         "--artifact",
         choices=("infographic", "slide_deck"),
         required=True,
+    )
+    ap.add_argument(
+        "--mode",
+        choices=("create", "recreate", "revise"),
+        default="create",
+        help="create/recreate=新規作成UI / revise=既存スライドのページ別修正",
+    )
+    ap.add_argument(
+        "--slide-pages",
+        default=None,
+        help="revise 時の対象ページ（例: 3,8）",
     )
     ap.add_argument("--prompt-file", default=None)
     ap.add_argument("--prompt-inline", default=None)
@@ -225,29 +593,50 @@ def main(argv: list[str] | None = None) -> int:
         print("missing notebook url", file=sys.stderr)
         return 2
 
-    prompt = (args.prompt_inline or "").strip()
+    prompt_file_text = ""
     if args.prompt_file:
         p = Path(args.prompt_file).expanduser()
         if not p.is_file():
             print(f"prompt_file_missing:{p}", file=sys.stderr)
             return 2
-        prompt = extract_prompt_section(p.read_text(encoding="utf-8"), args.prompt_section)
-    if not prompt:
-        print("missing prompt (--prompt-file or --prompt-inline)", file=sys.stderr)
-        return 2
+        prompt_file_text = p.read_text(encoding="utf-8")
+
+    prompt = (args.prompt_inline or "").strip()
+    page_prompts: dict[int, str] = {}
+    if args.mode == "revise":
+        if not args.slide_pages:
+            print("revise requires --slide-pages (e.g. 3,8)", file=sys.stderr)
+            return 2
+        pages = [int(x.strip()) for x in args.slide_pages.split(",") if x.strip()]
+        if not pages:
+            print("empty --slide-pages", file=sys.stderr)
+            return 2
+        if prompt and len(pages) == 1:
+            page_prompts[pages[0]] = prompt
+        else:
+            src = prompt_file_text or prompt
+            if not src:
+                print("missing prompt for revise", file=sys.stderr)
+                return 2
+            for n in pages:
+                page_prompts[n] = extract_slide_page_prompt(src, n)
+    else:
+        if args.prompt_file and not prompt:
+            prompt = extract_prompt_section(prompt_file_text, args.prompt_section)
+        if not prompt:
+            print("missing prompt (--prompt-file or --prompt-inline)", file=sys.stderr)
+            return 2
 
     model = args.model or cfg.get("preferred_model") or "Nano Banana Pro"
     nb_cfg = (cfg.get("notebooks") or {}).get(args.notebook_key or "") or {}
     drive_folder = nb_cfg.get("drive_folder") or cfg.get("default_drive_folder")
     out_dir = resolve_drive_out(cfg, drive_folder)
     stem = args.output_name or (
-        f"08_studio_{args.artifact}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        f"08_studio_{args.mode}_{args.artifact}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     )
 
     require = bool(cfg.get("require_confirm_generate", True))
-    will_generate = (not args.dry_run) and (
-        args.confirm_generate or not require
-    )
+    will_generate = (not args.dry_run) and (args.confirm_generate or not require)
     if not args.dry_run and require and not args.confirm_generate:
         print(
             "refusing generate: pass --confirm-generate (or --dry-run)",
@@ -260,6 +649,8 @@ def main(argv: list[str] | None = None) -> int:
         "phase": "start",
         "notebook_url": url,
         "artifact": args.artifact,
+        "mode": args.mode,
+        "slide_pages": list(page_prompts.keys()) if page_prompts else None,
         "dry_run": bool(args.dry_run),
         "confirm_generate": bool(args.confirm_generate),
         "will_generate": will_generate,
@@ -282,70 +673,34 @@ def main(argv: list[str] | None = None) -> int:
         state["phase"] = "opened"
         write_run_state(state)
 
-        # Studio tab
-        try:
-            _click_first(page, selectors.get("studio_tab") or [], "studio_tab")
-            page.wait_for_timeout(1500)
-        except Exception:
-            for label in ("Studio", "スタジオ"):
-                try:
-                    page.get_by_text(label, exact=True).first.click(timeout=2000)
-                    page.wait_for_timeout(1500)
-                    break
-                except Exception:
-                    continue
-
-        arts = (selectors.get("artifacts") or {}).get(args.artifact) or []
-        _click_first(page, arts, f"artifact:{args.artifact}")
-        page.wait_for_timeout(1500)
-        state["phase"] = "artifact_open"
-        write_run_state(state)
-
-        used_prompt_sel = _fill_prompt(page, selectors.get("prompt_field") or [], prompt)
-        print(f"# prompt filled via {used_prompt_sel} chars={len(prompt)}", file=sys.stderr)
-        _pick_model(page, selectors, model)
-        state["phase"] = "prompt_ready"
-        write_run_state(state)
-
-        if args.dry_run or not will_generate:
-            print("# dry-run / no generate — stopping before click", file=sys.stderr)
-            state["ok"] = True
-            state["phase"] = "dry_run_done"
-            write_run_state(state)
-            return 0
-
-        _click_first(page, selectors.get("generate") or [], "generate")
-        print("# generate clicked", file=sys.stderr)
-        state["phase"] = "generating"
-        write_run_state(state)
-
-        if args.wait_and_save:
-            ok_wait = _wait_idle(
+        if args.mode == "revise":
+            return _run_revise(
                 page,
                 selectors,
-                int(cfg.get("generate_timeout_sec") or 900),
-                float(cfg.get("poll_interval_sec") or 5),
+                args.artifact,
+                page_prompts,
+                will_generate,
+                bool(args.dry_run),
+                bool(args.wait_and_save),
+                out_dir,
+                stem,
+                cfg,
+                state,
             )
-            if not ok_wait:
-                state["error"] = "generate_timeout"
-                write_run_state(state)
-                print("# generate timeout", file=sys.stderr)
-                return 1
-            state["phase"] = "ready"
-            write_run_state(state)
-            files = _download_and_save(page, selectors, out_dir, stem)
-            state["files"] = files
-            state["ok"] = True
-            state["phase"] = "saved"
-            write_run_state(state)
-            print(f"# done files={files}")
-            return 0
-
-        state["ok"] = True
-        state["phase"] = "generate_clicked"
-        write_run_state(state)
-        print("# generate started (no --wait-and-save)")
-        return 0
+        return _run_create_or_recreate(
+            page,
+            selectors,
+            args.artifact,
+            prompt,
+            model,
+            will_generate,
+            bool(args.dry_run),
+            bool(args.wait_and_save),
+            out_dir,
+            stem,
+            cfg,
+            state,
+        )
     except Exception as e:
         state["error"] = str(e)
         state["ok"] = False

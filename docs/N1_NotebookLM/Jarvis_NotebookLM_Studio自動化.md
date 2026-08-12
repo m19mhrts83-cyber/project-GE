@@ -72,22 +72,35 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   --confirm-generate \
   --wait-and-save
 
-# スライド
+# インフォ再作成（新規作成 UI）
 /Users/matsunomasaharu2/selenium_env/venv/bin/python \
   scripts/jarvis_notebooklm_studio_run.py \
-  --artifact slide_deck \
+  --artifact infographic --mode recreate \
   --prompt-file '…/08_Studio修正プロンプト_20260812.md' \
-  --prompt-section slides \
-  --confirm-generate \
-  --wait-and-save
+  --prompt-section info \
+  --confirm-generate --wait-and-save
+
+# スライドのページ別修正（例: 3 と 8）
+/Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_notebooklm_studio_run.py \
+  --artifact slide_deck --mode revise --slide-pages 3,8 \
+  --prompt-file '…/08_Studio修正プロンプト_20260812.md' \
+  --confirm-generate --wait-and-save
 ```
 
 | フラグ | 意味 |
 |---|---|
+| `--mode create\|recreate\|revise` | 新規作成／作り直し／既存スライドのページ別修正 |
+| `--slide-pages 3,8` | revise 時の対象ページ |
 | `--dry-run` | 生成ボタンを押さない |
 | `--confirm-generate` | 生成クリックを許可（必須・誤操作防止） |
-| `--wait-and-save` | 完了待ち＋ Downloads → `★アウトプット/` |
+| `--wait-and-save` | 完了待ち＋ Downloads／スクリーンショット → `★アウトプット/` |
 | `--notebook-url` | 既定以外のノート |
+
+UI メモ（2026-08-13 検証）:
+- 既存成果物: `aria-description` = `スライド資料` / `インフォグラフィック`（JS click）
+- 修正: `このアーティファクトを変更` → `リビジョンの手順`（切替で保留中に積む）→ `改訂版のスライドを生成`
+- 新規インフォ: Studio タイル「インフォグラフィック」→ 説明欄 → `生成`
 
 設定: `config/notebooklm_studio.yaml`  
 直近結果: `.jarvis_state/notebooklm_studio_run.json`
@@ -102,6 +115,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | セレクタ不一致 | `studio_probe.py` 再実行 → selectors.yaml 更新 |
 | ログイン切れ | `--profile studio` で再ログイン |
 | 生成タイムアウト | `generate_timeout_sec` を延ばす／手動で完了確認 |
+| ダウンロード失敗 | フォールバックで成果物画像をスクショ保存（`★アウトプット/`） |
 
 ---
 
@@ -110,5 +124,6 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - 「Studio でインフォを直して（プロンプトは 08_Studio修正…）」
 - 「北海道ノートの Studio を probe して」
 - 「スライド再生成して ★アウトプット に保存して」
+- 「スライド3と8をページ別修正して」
 
 Jarvis は人間依頼起点のみ実行する（連打しない）。
