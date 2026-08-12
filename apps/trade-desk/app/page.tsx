@@ -13,6 +13,11 @@ import {
   failedSources,
   parseWeeklySummary,
 } from "@/lib/nextAction";
+import {
+  aggregateReCfFromCategoryYear,
+  monthsElapsedInYear,
+  type FinanceCategoryYearRow,
+} from "@/lib/reFinanceYtd";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +62,7 @@ export default async function HomePage() {
     { data: queuedJobs },
     { data: taxCase },
     { count: evidenceCount },
+    { data: financeCats },
   ] = await Promise.all([
     supabase
       .from("portfolio_accounts")
@@ -136,6 +142,11 @@ export default async function HomePage() {
       .from("kurashift_tax_evidence")
       .select("id", { count: "exact", head: true })
       .eq("fiscal_year", taxYear),
+    supabase
+      .from("kurashift_finance_category_year")
+      .select("fiscal_year, category, income_jpy, expense_jpy, net_jpy")
+      .eq("fiscal_year", new Date().getFullYear())
+      .limit(200),
   ]);
 
   const metaMap = new Map((syncMeta ?? []).map((r) => [r.key, r]));
@@ -258,10 +269,20 @@ export default async function HomePage() {
       | null
   )?.re19;
   const CF_GOAL_MONTH = 500_000;
+  const calendarYear = new Date().getFullYear();
+  const { combined: combinedYtd } = aggregateReCfFromCategoryYear(
+    (financeCats || []) as FinanceCategoryYearRow[],
+    calendarYear
+  );
+  const monthsElapsed = monthsElapsedInYear();
+  const combinedMonth =
+    combinedYtd.categories.length > 0
+      ? Math.round(combinedYtd.cf / monthsElapsed)
+      : null;
   const cfAnnual = typeof re19?.cf_jpy === "number" ? re19.cf_jpy : null;
-  const cfMonth = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
-  const cfGap =
-    cfMonth != null ? CF_GOAL_MONTH - cfMonth : null;
+  const cfMonthLp = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
+  const cfMonth = combinedMonth ?? cfMonthLp;
+  const cfGap = cfMonth != null ? CF_GOAL_MONTH - cfMonth : null;
 
   return (
     <Shell active="/" email={user?.email ?? null}>
@@ -420,7 +441,7 @@ export default async function HomePage() {
           <p className="meta">
             目標 月50万
             {cfGap != null
-              ? ` · ギャップ ${fmtYen(cfGap)}（個人LP橋渡し÷12・法人は未接続）`
+              ? ` · ギャップ ${fmtYen(cfGap)}（個人＋法人・Zaim当年÷${monthsElapsed}ヶ月）`
               : " · スナップ待ち"}
           </p>
           <p className="meta">

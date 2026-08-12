@@ -542,3 +542,5 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- kurashift_buy_plan_versions/events/criteria/constraints/notes,
 -- kurashift_re_deals, kurashift_ops_consult_events
 -- （migrations/20260813_kurashift_buy_plan.sql）
+-- kurashift_loan_tracker_loans
+-- （migrations/20260813_kurashift_loan_tracker.sql）

@@ -26,7 +26,10 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 - ホーム: データ鮮度（`sync_meta`）／いまやること／一部未取得
 - ②: `/lifeplan` 年次・Zaim本番 confirm／`/tax` 手動取込・ドラフト
 - ③: CF月50万 KPI、Bridge 19CF、loan-tracker リンク
+- ③-A: 個人 YTD（Zaim 19系）＋法人カテゴリ参考表示（合算は未承認）
 - ③-B: `/realestate/deals` 千三つ、メール候補、WeStudy助言、運営経緯
+- ③-C: `/realestate/properties` 号室一覧（Phase1）
+- ③-D: `/realestate/finance-pack` チェックリスト骨格
 - 買い進め Excel: ingest（7版）／STEP3 export（OneDrive `05_…/exports/`）
 - 履歴: lifeplan `.numbers` + Zaim → `kurashift_lifeplan_*` / `kurashift_finance_*`
 - Mac worker: 買い進め系ジョブ配線済（下表）
@@ -64,17 +67,16 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ### P1（③を実務レベルへ）
 
-3. **loan-tracker 本接続** — estate に Drive scope＋`LOAN_TRACKER_*`（Discover 済）  
-   → その後 `re_sync_loan_tracker` を実装完成
-4. **③-A 個人YTDを実データ化** — 現状は暦按分スタブ。Zaim 19系の当年実績を月次で載せる
-5. **③-A 法人取込** — データ源すり合わせ後。接続まで合算は出さない（方針固定）
-6. **メール候補の精度** — ノイズ除外は一部済。エリア条件・戸建・価格帯でスコア強化
+3. **loan-tracker 本接続** — Discover 済（データは estate Drive の専用ファイル。画面からは ID が取れない）。投影表は作成済。残は JSON パス or Drive OAuth or ログイン済み `/api/data`
+4. **③-A 個人YTD** — ✅ Zaim カテゴリ年次
+5. **③-A 法人＋合算** — ✅ 顧客承認により合算 KPI に投入（2026-08-13）
+6. **メール候補** — ✅ スコア5以上を内見（詳細取り寄せ〜日程調整）
 
 ### P2（拡張）
 
 7. 健美家／楽待（Sprint3）
-8. `/realestate/properties` 物件マスタ UI
-9. `/realestate/finance-pack` 融資提出パック
+8. `/realestate/properties` — ✅ Phase1 一覧（号室）。編集・loan突合は残
+9. `/realestate/finance-pack` — ✅ チェックリスト骨格。PDF/状態保存は残
 10. Excel STEP3 **完全互換** export（現状は骨格）
 11. Lab 立花実弾（口座・鍵後）
 12. 本線プランの verification-with-user（ユーザー同席）

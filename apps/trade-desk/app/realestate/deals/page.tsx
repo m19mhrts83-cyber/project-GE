@@ -30,8 +30,9 @@ export default async function RealEstateDealsPage() {
         .select(
           "id, title, status, source, area, structure, price_man, yield_pct, match_score, updated_at, advice_json"
         )
+        .order("match_score", { ascending: false, nullsFirst: false })
         .order("updated_at", { ascending: false })
-        .limit(50),
+        .limit(80),
       supabase
         .from("kurashift_buy_plan_criteria")
         .select("kind, raw_text, sort_order, version_id")
@@ -65,7 +66,8 @@ export default async function RealEstateDealsPage() {
       <p className="page-kicker">③-B · 買い進め</p>
       <h1>千三つファネル</h1>
       <p className="sub">
-        情報→内見→買付→融資→購入。見送りは失敗ではなく学習。自動問い合わせ送信はしません。
+        情報→内見（詳細取り寄せ〜日程調整）→買付→融資→購入。見送りは失敗ではなく学習。自動問い合わせ送信はしません。
+        スコア 5 以上のメール候補は内見に載せます。
         仕様: <code>docs/KURASHIFT_買い進めJob仕様.md</code>
       </p>
 
@@ -186,21 +188,39 @@ export default async function RealEstateDealsPage() {
             <thead>
               <tr>
                 <th>状態</th>
+                <th>スコア</th>
                 <th>タイトル</th>
                 <th>エリア</th>
+                <th>構造</th>
                 <th>価格万</th>
                 <th>利回</th>
                 <th>助言</th>
               </tr>
             </thead>
             <tbody>
-              {(deals || []).map((d) => {
-                const advice = d.advice_json as { summary?: string } | null;
+              {(deals || [])
+                .filter((d) => d.status !== "archived")
+                .map((d) => {
+                const advice = d.advice_json as {
+                  summary?: string;
+                  tips?: string[];
+                } | null;
+                const tip =
+                  advice?.summary ||
+                  (advice?.tips && advice.tips[0]) ||
+                  "—";
                 return (
                   <tr key={d.id}>
                     <td>{STATUS_LABEL[d.status] || d.status}</td>
-                    <td>{d.title}</td>
+                    <td className="meta">
+                      {d.match_score != null ? d.match_score : "—"}
+                    </td>
+                    <td>
+                      {d.title}
+                      <div className="meta">{d.source || ""}</div>
+                    </td>
                     <td className="meta">{d.area || "—"}</td>
+                    <td className="meta">{d.structure || "—"}</td>
                     <td className="meta">
                       {d.price_man != null ? fmtYen(Number(d.price_man) * 10000) : "—"}
                     </td>
@@ -209,7 +229,7 @@ export default async function RealEstateDealsPage() {
                         ? `${(Number(d.yield_pct) * 100).toFixed(1)}%`
                         : "—"}
                     </td>
-                    <td className="meta">{advice?.summary || "—"}</td>
+                    <td className="meta">{tip}</td>
                   </tr>
                 );
               })}
