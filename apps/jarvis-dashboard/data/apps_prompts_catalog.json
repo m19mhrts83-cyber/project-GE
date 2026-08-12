@@ -3,12 +3,12 @@
   "updated": "2026-08-12",
   "items": [
     {
-      "id": "trade-desk",
+      "id": "kurashift",
       "kind": "app",
-      "title": "Trade Desk",
+      "title": "KURASHIFT",
       "url": "https://jarvis-trade-desk.vercel.app",
-      "note": "株・資産デスク（ダッシュボードとは別アプリ。同じ自分用ログイン）",
-      "tags": ["株", "ペーパー", "資産", "立花"]
+      "note": "クラシフト（暮らし・資産HQ。ダッシュボードとは別アプリ。同じ自分用ログイン）",
+      "tags": ["資産", "ライフプラン", "保険", "立花", "KURASHIFT"]
     },
     {
       "id": "prompt-share",
