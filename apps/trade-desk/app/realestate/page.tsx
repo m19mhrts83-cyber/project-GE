@@ -11,16 +11,32 @@ export default async function RealEstatePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const year = new Date().getFullYear();
+  // LP 実績スナップは「前年実績」が本線（年次モード）。当年が空なら直近の re19 付きを拾う。
+  const calendarYear = new Date().getFullYear();
+  const actualsYear = calendarYear - 1;
   const liabilityRates = loadLiabilityRates();
 
-  const { data: latestSnap } = await supabase
+  const { data: yearSnap } = await supabase
     .from("kurashift_plan_snapshots")
     .select("fiscal_year, snapshot_at, metrics, label")
-    .eq("fiscal_year", year)
+    .eq("fiscal_year", actualsYear)
     .order("snapshot_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  let latestSnap = yearSnap;
+  if (!latestSnap) {
+    const { data: anySnap } = await supabase
+      .from("kurashift_plan_snapshots")
+      .select("fiscal_year, snapshot_at, metrics, label")
+      .order("snapshot_at", { ascending: false })
+      .limit(8);
+    latestSnap =
+      (anySnap || []).find((s) => {
+        const m = s.metrics as { re19?: unknown } | null;
+        return Boolean(m?.re19);
+      }) ?? null;
+  }
 
   const re19 = (latestSnap?.metrics as { re19?: { income_jpy?: number; expense_jpy?: number; cf_jpy?: number } } | null)
     ?.re19;
@@ -180,7 +196,8 @@ export default async function RealEstatePage() {
           </table>
         ) : (
           <p className="meta">
-            {year} 年度の LP 実績スナップがありません。{" "}
+            {actualsYear}{" "}
+            年度（実績年）の LP スナップがありません。{" "}
             <a href="/lifeplan?mode=annual">ライフプラン</a>
             で Step1「年度実績を取り込む」を実行すると 19不動産の橋渡し表示が出ます。
           </p>
