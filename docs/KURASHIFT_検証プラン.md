@@ -72,7 +72,7 @@ Jarvis ダッシュボード（パートナーメール等）は **別アプリ*
 | **B-RATE-1** | ソニー契約者貸付（真治）の**利率％**を正本化 | **完了 2.50%**（2026-08-12） | 商品=変額確定年金（変額個人年金扱い）。公式 PDF（2026-07-02）＋WEB利息逆算。メールには％なし |
 | **B-RATE-2** | 千景ソニー／PRU 貸付の利率欄 | 残高0なら **n/a** で可 | 借りたときだけ記入 |
 | **B-RATE-3** | `/portfolio`・ホーム①に利率列／参考行が出ることを確認 | **骨格実装済** | 未記入は「要確認」表示。B-RATE-1 記入後に見た目確認 |
-| **B-RATE-4** | 不動産: 物件ごと **利回り − ローン金利 ≈ 正味** の一覧 | **後段**（③-C／本田アプリ連携後） | `/realestate` はプレースホルダ文言のみ。`liability_rates.yaml` の `real_estate.properties` |
+| **B-RATE-4** | 不動産: 物件ごと **利回り − ローン金利 ≈ 正味** の一覧 | **後段**（③-C／借入残高トラッカー連携後） | URL: https://loan-tracker-plum.vercel.app/（estate） |
 | **B-RATE-5** | （任意）他負債（住宅ローン等）の利率を負債一覧に載せる | **後段** | 保険貸付以外の負債マスタ整備とセット |
 
 正本ファイル:
@@ -283,12 +283,12 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 | 3B-2 | Theme 連携（`realestate` / acquisition） | 取得判断を承認フローで記録 |
 | 3B-3 | 取得後 → ③-A 計画へ／`/lifeplan?mode=re_purchase` | LP 更新に接続 |
 
-## ③-C 保有物件マスタ（本田アプリ連携）
+## ③-C 保有物件マスタ（借入残高トラッカー連携）
 
 | # | やること | 期待 |
 |---|---|---|
 | 3C-1 | （Phase 5）`/realestate/properties` で物件一覧 | 法人／個人フィルタ・基本情報 |
-| 3C-2 | 本田さんアプリからローン同期 | KURASHIFT に二重入力なしで投影（**B-RATE-4** の金利・正味一覧の前提） |
+| 3C-2 | 借入残高トラッカーからローン同期 | KURASHIFT に二重入力なしで投影（**B-RATE-4**）。正本 https://loan-tracker-plum.vercel.app/（Google: estate） |
 | 3C-3 | property_units・property_info と突合 | 号室・管理会社が物件に紐づく |
 
 ## ③-D 融資提出パック
@@ -305,7 +305,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 - [ ] 年間計画に対する YTD 差分が1画面で分かる  
 - [ ] 補正が dry-run で試せる（本反映は承認）  
 - [ ] （任意）新規検討案件を1件 draft で残した  
-- [ ] （Phase 5 以降）保有物件とローン（本田アプリ）が一覧できる  
+- [ ] （Phase 5 以降）保有物件とローン（借入残高トラッカー）が一覧できる  
 - [ ] （Phase 6 以降）融資提出パックを1案件分出力できる  
 
 ### ② 完了チェック
@@ -334,6 +334,57 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 
 ---
 
+## 実務で回す検証チェックリスト（正・2026-08-13）
+
+技術単体ではなく、**毎週／年次で見る項目**。検証セッションはこの表を埋める。
+
+### 毎週（日曜週次 or 手動 force 後）— 5分
+
+| # | 見る場所 | 合格 |
+|---|---|---|
+| W1 | ホーム「データの鮮度」 | 失敗ソース名が出る／全部 ok なら問題なし |
+| W2 | 「いまやること」 | 滞留ジョブ・一部未取得の誘導（異常時） |
+| W3 | Core 合計 | 異常ゼロ／極端な前回比なし |
+| W4 | 境界 | 未承認のまま売買・振替・Zaim本番が走っていない |
+| W5 | （ローン sync 後） | 最終同期が古すぎない |
+
+### ② 年次（ライフプラン／税）
+
+| # | 見る場所 | 合格 |
+|---|---|---|
+| Y1 | `/lifeplan?mode=annual` | Step が押せる（worker succeeded） |
+| Y2 | αβγ注記・Zaim本番 | 分母注記あり／confirm 必須 |
+| Y3 | Step3 | 「記録のみ」 |
+| Y4 | `/tax` | 手動取込・ドラフト表記 |
+
+### ③ 不動産（いまできる範囲）
+
+| # | 見る場所 | 合格 |
+|---|---|---|
+| R1 | `/realestate` | 19CF（実績年優先）が見える |
+| R2 | ローン正本リンク | 借入残高トラッカー URL |
+
+### デプロイ後（trade-desk 変更時）
+
+| # | 合格 |
+|---|---|
+| D1 | 必要なら手動 `vercel deploy --prod` |
+| D2 | W1〜W2 を本番で煙確認 |
+
+### 受け入れ記録（Sprint 1・記入欄）
+
+| 項目 | 結果 | 日付 |
+|---|---|---|
+| ホームにソニー失敗ソース名 | ✅ W33 `error=2`・真治/千景の失敗理由表示。`last_full_ok=false` | 2026-08-13 |
+| Zaim confirm | ✅ `/lifeplan?mode=annual` に「Zaim本番反映（要確認）」＋API `ui_confirmed` | 2026-08-13 |
+| `/tax` 手動取込 | ✅ 「3. 手動フォルダ（inbox）を取り込む」＋ドラフト表記 | 2026-08-13 |
+| `/lifeplan` 画面通し | ✅ 年次モード・4段階ルーティン・αβγ／19表示 | 2026-08-13 |
+| `/realestate` 19CF | ✅ Bridge: 収入 6,976,458／支出 16,936,341／CF -9,959,883・loan-tracker リンク | 2026-08-13 |
+| ジョブ詳細に秘密なし | ✅ 一覧に password/token なし（log は theme JSON のみ） | 2026-08-13 |
+| ソニー週次再取得 | ⏸ 01:58 JST は **サービス時間外**（debug HTML title）。誤 `no-table` → 時間外検出を追加。日中に `portfolio_weekly --force` 再検証 | 2026-08-13 |
+
+---
+
 ## スレッド洗い出し — やり残し（2026-08-13）
 
 このスレッド＋検証プランを突き合わせた **plan-build 用バックログ**。  
@@ -358,7 +409,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 | **RE-1** | ③-A 個人／法人／合算＋YTD計画vs実績 | 1 |
 | **RE-2** | ③-A 計画補正 dry-run→承認 | 3 |
 | **RE-3** | ③-B `/realestate/deals` 案件 | 4 |
-| **RE-4** | ③-C 物件マスタ＋本田アプリローン投影 | 5（B-RATE-4 前提） |
+| **RE-4** | ③-C 物件マスタ＋借入残高トラッカー投影 | 5（B-RATE-4 前提） |
 | **RE-5** | ③-D 融資提出パック | 6 |
 | **RE-6** | （任意）`mode=re_purchase` 通し | 案件発生時 |
 
