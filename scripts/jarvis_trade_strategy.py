@@ -18,8 +18,8 @@ DEFAULT_PARAMS: dict[str, Any] = {
     "rsi_period": 14,
     "rsi_buy_low": 25,
     "rsi_buy_high": 48,
-    "drop_min_pct": 0.08,
-    "drop_max_pct": 0.22,
+    "drop_min_pct": 0.10,
+    "drop_max_pct": 0.18,
     "rebound_min_signs": 2,
     "scale_fracs": [0.25, 0.35, 0.40],
     "confirm_gain_pct": 0.02,
@@ -39,6 +39,7 @@ DEFAULT_PARAMS: dict[str, Any] = {
     "promote_max_dd_pct": 0.08,
     "rising_mean_lookback": 20,
     "rising_mean_min_ratio": 0.98,
+    "hedge_inverse": False,  # 17年比較でインバースがエッジを食った
 }
 
 

@@ -35,16 +35,17 @@ exit:
   never: 下がったからといって買い増さない
 
 rollout:
-  A_backtest: 過去1〜2年を翌営業日始値で再現。お金もDBも動かさない
+  A_backtest: 過去は Yahoo 日足を最長分割取得（max は月足になるため period 分割）。お金もDBも動かさない
   B_paper: 日次の先回り仮想。最低4週間
   C_tranche1: 実弾10万円。発注は1件ずつ承認
   D_promote: +10万円は8週プラスかつDD-8%以内、かつユーザーが明示したときだけ
   never_auto_live: true
 
 filters:
-  drop_min_pct: 0.08      # これ未満は「著しい下落」と見ない
-  drop_max_pct: 0.22      # これ超は構造悪化の可能性 → 見送り
+  drop_min_pct: 0.10      # これ未満は「著しい下落」と見ない（2026-08 17年比較で 8–22 より安定）
+  drop_max_pct: 0.18      # これ超は構造悪化の可能性 → 見送り
   rebound_min_signs: 2    # 陽転・陽線・高値切り上げ安値・RSI上向き のうち
   falling_knife: SMA20 が急傾斜で沈み続けているときは乗らない
   rising_mean: SMA60 が直近20営業日でほぼ上がっている／横ばいであること
   news: ニュースは「どの優良株が一時沈みか」の探索。売買の主因にはしない
+  hedge_inverse: false    # 17年比較でインバースがリターンを食った。リスクオフは現金待機

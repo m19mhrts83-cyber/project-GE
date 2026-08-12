@@ -231,7 +231,9 @@ def maybe_scale_in(
         budget = name_cap * float(fracs[next_level - 1])
         if cash - spent < budget * 0.5:
             continue
-        qty = max(1, int(budget // px))
+        qty = int(budget // px)
+        if qty < 1:
+            continue
         cost = qty * px
         if cost > cash - spent:
             qty = int((cash - spent) // px)
@@ -325,7 +327,7 @@ def maybe_entries(
                 reason = f"{reason} / {bonus_note}"
             candidates.append((score, it, "buy", reason))
     else:
-        if INVERSE_SYMBOL not in held_symbols:
+        if p.get("hedge_inverse") and INVERSE_SYMBOL not in held_symbols:
             rows = load_closes(sb, INVERSE_SYMBOL)
             c = closes_of(rows)
             fast = sma(c, int(p["sma_fast"]))
@@ -342,7 +344,9 @@ def maybe_entries(
         px = last_close(sb, it["symbol"])
         if not px or px <= 0:
             continue
-        qty = max(1, int(probe_budget // px))
+        qty = int(probe_budget // px)
+        if qty < 1:
+            continue
         cost = qty * px
         if cost > cash - spent:
             qty = int((cash - spent) // px)
