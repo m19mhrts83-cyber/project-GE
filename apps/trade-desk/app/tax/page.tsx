@@ -49,6 +49,11 @@ export default async function TaxPage() {
         <ol className="meta" style={{ marginTop: 8, paddingLeft: 18 }}>
           <li>弥生CSVを作る（Zaimサマリー→勘定ドラフト。本登録はしない）</li>
           <li>税理士メールを取り込む（admin Gmail）</li>
+          <li>
+            メール0件なら OneDrive{" "}
+            <code>…/kurashift/{year}/evidence/inbox/</code>{" "}
+            にPDFを置き、手動取込
+          </li>
           <li>下の一覧でパスと件名を確認。必要なら証憑出力</li>
         </ol>
         <EnqueueJobButton
@@ -63,6 +68,15 @@ export default async function TaxPage() {
           payload={{ fiscal_year: year, limit: 30 }}
           label="2. 税理士メールを取り込む"
         />
+        <EnqueueJobButton
+          jobType="tax_ingest_manual_dir"
+          title={`証憑手動取込 ${year}`}
+          payload={{ fiscal_year: year }}
+          label="3. 手動フォルダ（inbox）を取り込む"
+        />
+        <p className="meta" style={{ marginTop: 8 }}>
+          CSVは<strong>ドラフト</strong>（勘定マップ未整備の費目はスキップされうる）。弥生本登録UIはありません。
+        </p>
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>

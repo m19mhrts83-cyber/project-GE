@@ -481,11 +481,75 @@ def export_evidence(year: int, evidence_id: str, dry_run: bool) -> dict:
     return out
 
 
+def ingest_manual_dir(year: int, dry_run: bool) -> dict:
+    """OneDrive kurashift/{year}/evidence/inbox の PDF 等を証憑として取り込む。"""
+    import shutil
+
+    inbox = year_dir(year) / "evidence" / "inbox"
+    store = year_dir(year) / "evidence"
+    out: dict[str, Any] = {
+        "action": "ingest_manual_dir",
+        "fiscal_year": year,
+        "inbox": str(inbox),
+        "saved": 0,
+        "items": [],
+    }
+    if not inbox.is_dir():
+        inbox.mkdir(parents=True, exist_ok=True)
+        out["note"] = "inbox を作成しました。PDF を置いて再実行してください。"
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        emit_result(out)
+        return out
+
+    files = sorted(
+        p
+        for p in inbox.iterdir()
+        if p.is_file() and p.suffix.lower() in {".pdf", ".png", ".jpg", ".jpeg", ".heic"}
+    )
+    if dry_run:
+        out["candidates"] = [p.name for p in files]
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        emit_result(out)
+        return out
+
+    store.mkdir(parents=True, exist_ok=True)
+    sb = sb_client()
+    for src in files:
+        dest = store / src.name
+        if dest.exists():
+            dest = store / f"{date.today().isoformat()}_{src.name}"
+        shutil.move(str(src), str(dest))
+        item = {
+            "filename": dest.name,
+            "path": str(dest),
+        }
+        if sb:
+            sb.table("kurashift_tax_evidence").insert(
+                {
+                    "fiscal_year": year,
+                    "scope": "personal",
+                    "doc_kind": "manual_inbox",
+                    "subject": f"手動取込: {dest.name}",
+                    "original_filename": src.name,
+                    "stored_path": str(dest),
+                    "received_at": date.today().isoformat(),
+                }
+            ).execute()
+        out["items"].append(item)
+        out["saved"] += 1
+
+    out["artifacts"] = [{"kind": "evidence_dir", "path": str(store)}]
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    emit_result(out)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--year", type=int, default=date.today().year - 1)
     ap.add_argument("--build-csv", action="store_true")
     ap.add_argument("--ingest-mail", action="store_true")
+    ap.add_argument("--ingest-manual-dir", action="store_true")
     ap.add_argument("--export-evidence", action="store_true")
     ap.add_argument("--evidence-id", default="")
     ap.add_argument("--limit", type=int, default=20)
@@ -496,10 +560,14 @@ def main() -> int:
         build_csv(args.year, args.dry_run)
     elif args.ingest_mail:
         ingest_mail(args.year, args.dry_run, args.limit)
+    elif args.ingest_manual_dir:
+        ingest_manual_dir(args.year, args.dry_run)
     elif args.export_evidence:
         export_evidence(args.year, args.evidence_id, args.dry_run)
     else:
-        raise SystemExit("specify --build-csv | --ingest-mail | --export-evidence")
+        raise SystemExit(
+            "specify --build-csv | --ingest-mail | --ingest-manual-dir | --export-evidence"
+        )
     return 0
 
 

@@ -7,6 +7,12 @@ import {
   isAnnualLifeplanWindow,
 } from "@/lib/lifeplanNotices";
 import { fmtRatePct, loadLiabilityRates } from "@/lib/liabilityRates";
+import {
+  computeNextAction,
+  countStalledQueued,
+  failedSources,
+  parseWeeklySummary,
+} from "@/lib/nextAction";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +40,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   const weekStart = mondayOfIsoDate();
+  const taxYear = new Date().getFullYear() - 1;
 
   const [
     { data: accounts },
@@ -46,6 +53,10 @@ export default async function HomePage() {
     { data: liqSnaps },
     { data: liqAccounts },
     { data: moneyOps },
+    { data: syncMeta },
+    { data: queuedJobs },
+    { data: taxCase },
+    { count: evidenceCount },
   ] = await Promise.all([
     supabase
       .from("portfolio_accounts")
@@ -105,7 +116,53 @@ export default async function HomePage() {
       .in("status", ["draft", "consulting", "approved", "executing"])
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("sync_meta")
+      .select("key, value, updated_at")
+      .in("key", ["portfolio_weekly_at", "portfolio_weekly_summary"]),
+    supabase
+      .from("kurashift_jobs")
+      .select("id, job_type, status, created_at")
+      .eq("status", "queued")
+      .order("created_at", { ascending: true })
+      .limit(20),
+    supabase
+      .from("kurashift_tax_cases")
+      .select("id, status, fiscal_year")
+      .eq("scope", "personal")
+      .eq("fiscal_year", taxYear)
+      .maybeSingle(),
+    supabase
+      .from("kurashift_tax_evidence")
+      .select("id", { count: "exact", head: true })
+      .eq("fiscal_year", taxYear),
   ]);
+
+  const metaMap = new Map((syncMeta ?? []).map((r) => [r.key, r]));
+  const weeklySummary = parseWeeklySummary(
+    metaMap.get("portfolio_weekly_summary")?.value ?? null
+  );
+  const weeklyAt = metaMap.get("portfolio_weekly_at")?.value ?? null;
+  const fails = failedSources(weeklySummary);
+  const stalled = countStalledQueued(queuedJobs ?? []);
+  const month = new Date().getMonth() + 1;
+  const taxSeason = month <= 3 || month === 12;
+  const next = computeNextAction({
+    summary: weeklySummary,
+    themes: (themes ?? []).map((t) => ({
+      id: t.id,
+      status: t.status,
+      title: t.title,
+    })),
+    stalledQueued: stalled,
+    annualWindow: isAnnualLifeplanWindow(),
+    annualDone: (annualDone?.length ?? 0) > 0,
+    taxNeedsEvidence:
+      taxSeason &&
+      Boolean(taxCase) &&
+      (evidenceCount ?? 0) === 0,
+  });
+  const partialWarn = weeklySummary?.last_full_ok === false;
 
   const nameById = new Map((accounts ?? []).map((a) => [a.id, a.name]));
   const kindById = new Map((accounts ?? []).map((a) => [a.id, a.kind]));
@@ -208,6 +265,67 @@ export default async function HomePage() {
         className="card"
         style={{
           marginTop: 12,
+          borderColor:
+            next.level === "warn" ? "var(--danger, #b45309)" : undefined,
+        }}
+      >
+        <header>
+          <span className="lvl">いまやること</span>
+          <strong>{next.label}</strong>
+        </header>
+        {next.href !== "/" ? (
+          <p style={{ marginTop: 8 }}>
+            <a className="btn primary" href={next.href}>
+              開く →
+            </a>
+          </p>
+        ) : null}
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <header>
+          <span className="lvl">データの鮮度</span>
+          <strong>
+            {weeklyAt
+              ? `最終週次メタ ${weeklyAt}`
+              : "週次メタ未取得（Mac 週次後に表示）"}
+          </strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          week={weeklySummary?.iso_week ?? "—"} · ok=
+          {weeklySummary?.ok ?? "—"} · error={weeklySummary?.error ?? "—"} ·
+          last_full_ok=
+          {weeklySummary?.last_full_ok == null
+            ? "—"
+            : weeklySummary.last_full_ok
+              ? "true"
+              : "false"}
+        </p>
+        {fails.length > 0 ? (
+          <ul className="meta" style={{ marginTop: 8, paddingLeft: 18 }}>
+            {fails.map((f) => (
+              <li key={f.id}>
+                ⚠️ {f.label}
+                {f.reason ? ` — ${f.reason}` : ""}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="meta" style={{ marginTop: 8 }}>
+            ✅ ソース別エラーなし（または未報告）
+          </p>
+        )}
+        {stalled > 0 ? (
+          <p className="meta" style={{ marginTop: 6 }}>
+            ⚠️ キュー滞留 {stalled} 件（30分超）→ <a href="/jobs">ジョブ</a>
+          </p>
+        ) : null}
+      </div>
+
+      <div
+        className="card"
+        style={{
+          marginTop: 12,
           background: "var(--card-soft)",
           borderStyle: "dashed",
         }}
@@ -219,11 +337,11 @@ export default async function HomePage() {
         <ol className="meta" style={{ margin: "8px 0 0", paddingLeft: 20 }}>
           <li>
             <strong>週次は自動</strong>
-            …日曜 09:00＋Mac起動時／朝オープンの取りこぼしで資産・銀行・収支を更新（設定は触らない）
+            …日曜 09:00＋Mac起動時／朝オープン。上の「データの鮮度」で失敗を確認
           </li>
           <li>
-            <strong>ホームで見る</strong>
-            …①の合計＋下のテーマ一覧で「次に押すボタン」を決める
+            <strong>いまやること</strong>
+            …上の1行だけ押す（テーマ承認・失敗復旧など）
           </li>
           <li>
             <strong>大きな判断だけ承認</strong>
@@ -251,6 +369,7 @@ export default async function HomePage() {
           </header>
           <p className="meta">
             {assetRows.length}口座 · 週次スナップ（契約者貸付は含めない）
+            {partialWarn ? " · ⚠️ 一部未取得の可能性" : ""}
           </p>
           <p className="meta">
             保険借入合計 {fmtYen(loanTotal)}

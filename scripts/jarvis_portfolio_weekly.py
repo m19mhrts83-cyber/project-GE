@@ -540,13 +540,39 @@ def write_review(sb, sources: dict[str, Any]) -> None:
 
 
 def upsert_sync_meta(sb, payload: dict[str, Any]) -> None:
+    """ホーム鮮度カード用。ソース別 status を必ず含める（Vercel は Mac JSON を読めない）。"""
     ts = now_iso()
+    sources_raw = payload.get("sources") or {}
+    sources_brief: dict[str, Any] = {}
+    for aid, rec in sources_raw.items():
+        if not isinstance(rec, dict):
+            continue
+        sources_brief[str(aid)] = {
+            "status": rec.get("status") or ("ok" if rec.get("ok") else "unknown"),
+            "reason": str(rec.get("reason") or rec.get("error") or "")[:120],
+        }
+    meta = {
+        "iso_week": payload.get("iso_week"),
+        "ok": payload.get("ok"),
+        "error": payload.get("error"),
+        "skipped": payload.get("skipped"),
+        "cloud_only": payload.get("cloud_only"),
+        "last_full_ok": payload.get("last_full_ok"),
+        "last_full_at": payload.get("last_full_at"),
+        "last_full_iso_week": payload.get("last_full_iso_week"),
+        "finished_at": payload.get("finished_at"),
+        "sources": sources_brief,
+    }
+    raw = json.dumps(meta, ensure_ascii=False)
+    # sync_meta.value は長文可。sources を落とさないよう余裕を持たせる
+    if len(raw) > 12000:
+        raw = json.dumps({**meta, "sources": {k: {"status": v.get("status")} for k, v in sources_brief.items()}}, ensure_ascii=False)[:12000]
     sb.table("sync_meta").upsert(
         [
             {"key": "portfolio_weekly_at", "value": ts, "updated_at": ts},
             {
                 "key": "portfolio_weekly_summary",
-                "value": json.dumps(payload, ensure_ascii=False)[:1800],
+                "value": raw,
                 "updated_at": ts,
             },
         ],
@@ -961,7 +987,7 @@ def main() -> int:
 
     if not args.dry_run:
         write_review(sb, sources)
-        upsert_sync_meta(sb, {k: payload[k] for k in ("iso_week", "ok", "error", "skipped", "cloud_only")})
+        upsert_sync_meta(sb, payload)
         save_state(payload)
 
     print(

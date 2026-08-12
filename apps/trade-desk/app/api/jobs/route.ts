@@ -9,6 +9,7 @@ const ALLOWED = new Set([
   "lifeplan_snapshot",
   "tax_build_yayoi_csv",
   "tax_ingest_accountant_mail",
+  "tax_ingest_manual_dir",
   "tax_export_evidence",
   "portfolio_weekly",
   "theme_preview",
@@ -34,9 +35,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "job_type not allowed" }, { status: 400 });
   }
 
-  const title = String(body.title || job_type);
+  let title = String(body.title || job_type);
   const payload =
-    body.payload && typeof body.payload === "object" ? body.payload : {};
+    body.payload && typeof body.payload === "object"
+      ? { ...(body.payload as Record<string, unknown>) }
+      : {};
+
+  // Zaim 本番反映は UI 確認必須（誤射防止）
+  if (job_type === "lifeplan_push_zaim" && payload.confirm_apply === true) {
+    if (payload.ui_confirmed !== true) {
+      return NextResponse.json(
+        {
+          error:
+            "Zaim本番反映には画面確認（ui_confirmed）が必要です。確認ダイアログ付きボタンから実行してください。",
+        },
+        { status: 400 }
+      );
+    }
+    if (!title.includes("[本番Zaim]")) {
+      title = `[本番Zaim] ${title}`;
+    }
+  }
 
   const { data, error } = await supabase
     .from("kurashift_jobs")

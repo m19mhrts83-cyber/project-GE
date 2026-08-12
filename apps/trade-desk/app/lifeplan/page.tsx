@@ -65,7 +65,7 @@ const STEPS = [
     n: 3,
     job: "lifeplan_update_century",
     title: "100年ライフプランを更新する",
-    desc: "予算ベースで CF をチューニングし、固める。相談は Jarvis。",
+    desc: "Numbers 正本＋Jarvis相談で手作業。下のボタンは「記録のみ」（自動では書き換えない）。",
   },
   {
     n: 4,
@@ -235,6 +235,7 @@ export default async function LifeplanPage({
             {actuals.expense_delta_re_jpy != null
               ? `（${fmtYen(actuals.expense_delta_re_jpy)}）`
               : ""}
+            。％は収入比のため合計が100を超える場合あり（支出が収入を上回る年）。
           </p>
           <AbgBar
             label="α 貯蓄・投資"
@@ -429,14 +430,20 @@ export default async function LifeplanPage({
                       ? { ...fiscalPayload, confirm_apply: false }
                       : fiscalPayload
                   }
-                  label="実行キューへ"
+                  label={
+                    s.job === "lifeplan_update_century"
+                      ? "記録のみをキューへ"
+                      : "実行キューへ"
+                  }
                 />
                 {s.job === "lifeplan_push_zaim" ? (
                   <EnqueueJobButton
                     jobType="lifeplan_push_zaim"
-                    title={`${intro.heading}: Zaim本番反映`}
+                    title={`[本番Zaim] ${intro.heading}: Zaim本番反映`}
                     payload={{ ...fiscalPayload, confirm_apply: true }}
                     label="Zaim本番反映（要確認）"
+                    requireConfirm
+                    confirmMessage="Zaim の月次予算を上書きします。よろしいですか？（本番反映）"
                   />
                 ) : null}
               </article>
