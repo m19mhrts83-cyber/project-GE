@@ -10,6 +10,7 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 LOG="${LOG_DIR}/weekly_${STAMP}.log"
 
 cd "$REPO_DIR"
+export PYTHONUNBUFFERED=1
 # .env は壊れた行があっても落とさない（本読込は Python 側 load_private_env）
 if [[ -f "${REPO_DIR}/.env.jarvis_private" ]]; then
   set +e
@@ -22,6 +23,6 @@ fi
 
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
-  "$PY" "${REPO_DIR}/scripts/jarvis_portfolio_weekly.py"
+  "$PY" -u "${REPO_DIR}/scripts/jarvis_portfolio_weekly.py"
   echo "# end exit=$?"
 } >>"$LOG" 2>&1
