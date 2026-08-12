@@ -1,54 +1,33 @@
-# 借入残高トラッカー — データはどこにあるか（2026-08-13）
+# 借入残高トラッカー — これから一緒に作る（2026-08-13）
 
-アプリ: https://loan-tracker-plum.vercel.app/  
+アプリ URL（未使用）: https://loan-tracker-plum.vercel.app/  
 Google アカウント（正）: **estate** `matsuno.estate@gmail.com`
 
-## 結論（画面だけでは分からない理由）
+## 現状（ユーザー確認 2026-08-13）
 
-トラッカーの一覧は **ブラウザに永続保存されていません**。  
-ログインした Google アカウントの **Google Drive 上の専用ファイル** が正本です。
+- **アプリはまだ使っていない。** 中身のまとめを共有してもらい、教えながら進める。
+- Drive OAuth や `/api/data` の探索は **一旦止める**（データがまだ無い）。
+- KURASHIFT 側の投影表（`kurashift_loan_tracker_loans`）と同期スクリプトは受け皿だけ用意済み。
 
-| 層 | 中身 | KURASHIFT が触るか |
-|---|---|---|
-| 画面 | 残高・月返済・金利の表示 | 見ない（スクレイピングしない） |
-| `GET /api/data` | ログイン後に Drive から読んだ JSON | セッションがあれば読める |
-| Google Drive | 専用ファイル（**マイドライブに出ないことが多い**） | 読取投影のみ |
+## 次の一手
 
-ヘルプ原文: 「Google アカウントでログインし、借入データを Google Drive に保存します。」  
-保存ボタンは「Google Drive に保存」。FAQ: 「データはあなたの Google Drive 上のファイル」。
+1. ユーザーが「中身のまとめ」（借り入れ一覧・残高・金利・返済など見たい項目）を共有する
+2. Jarvis が項目を KURASHIFT の投影表／画面に落とす案を出す
+3. アプリを使い始めたら、正本をトラッカーにするか・KURASHIFT 入力にするかを決める
 
-いわゆるスプレッドシート ID を画面からコピーする場所はありません。  
-Drive デスクトップ（m19m / admin）を検索しても **該当 JSON は見つかりませんでした**。  
-estate の Drive は Mac にマウントされていません。
-
-## なぜ Jarvis の Gmail token では探せないか
-
-`token_estate.json` のスコープは **Gmail のみ**。Drive 一覧は `invalid_scope`。  
-さらに、アプリが `drive.file` / `appDataFolder`（アプリ専用の隠し領域）を使っている場合、  
-**loan-tracker 自身の OAuth クライアント以外からはファイルが見えない**ことがあります。
-
-## KURASHIFT 側の受け皿（実装済）
+## 受け皿（実装済・未接続）
 
 - 表: `kurashift_loan_tracker_loans`（読取投影。トラッカーへは書かない）
 - ジョブ: `re_sync_loan_tracker` → `scripts/jarvis_kurashift_loan_tracker_sync.py`
 - UI: `/realestate/properties` の「ローン投影」
 
-```bash
-cd ~/git-repos && set -a && source .env.jarvis_private && set +a
-~/selenium_env/venv/bin/python scripts/jarvis_kurashift_loan_tracker_sync.py --discover
-```
+アプリを使い始めたあとの接続候補（今は不要）:
 
-## 残ブロッカー（どれか1つで同期できる）
-
-1. **JSON 書き出し**（最短）  
-   トラッカーで一覧または返済予定の JSON/CSV を保存し、  
-   `.env.jarvis_private` に `LOAN_TRACKER_JSON_PATH=/絶対パス` を追記 → `--apply`
-2. **estate で Drive 読取 OAuth**（`token_estate_drive.json`）  
-   見えるファイルなら Discover が ID を拾う。隠し領域なら 1 か 3。
-3. **ログイン済みセッションで `/api/data`**  
-   Cursor ブラウザで estate ログイン後に Jarvis が JSON 形を確定して投影。
+1. JSON/CSV 書き出し → `LOAN_TRACKER_JSON_PATH`
+2. estate Drive 読取 OAuth
+3. ログイン済みセッションで `GET /api/data`
 
 ## 方針（変更なし）
 
-- トラッカーがローン正本。KURASHIFT は二重入力しない
+- トラッカーを使い始めたら、そちらをローン正本にする。KURASHIFT は二重入力しない
 - トラッカーへの書込はしない

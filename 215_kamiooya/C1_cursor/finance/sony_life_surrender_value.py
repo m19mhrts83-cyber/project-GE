@@ -115,7 +115,7 @@ def _raise_if_sony_out_of_service(page) -> None:
     if "サービス時間外" in blob or "サービス時間外エラー" in title:
         raise RuntimeError(
             "ソニー生命 LIFEPLANNER WEB がサービス時間外です。"
-            "営業時間内（概ね日中）に再実行してください。"
+            "お客さまWEBの目安は 9:00–17:30（日・GW・年末年始除く）。"
             f"（page_title={title[:80]!r}）"
         )
 
