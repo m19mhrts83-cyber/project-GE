@@ -535,3 +535,6 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- KURASHIFT HQ: migrations/20260812_kurashift_hq_liquidity.sql
 -- liquidity_accounts, liquidity_snapshots, cashflow_week_summaries,
 -- securities_holdings, kurashift_money_ops
+-- KURASHIFT 時点履歴: migrations/20260813_kurashift_history.sql
+-- kurashift_lifeplan_versions, kurashift_lifeplan_budget_rows, kurashift_lifeplan_sheet_dumps,
+-- kurashift_finance_sources, kurashift_finance_transactions, kurashift_finance_category_year
