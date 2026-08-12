@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 DEFAULT_NUMBERS_PATH = Path(
-    "/Users/matsunomasaharu2/Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan/260418_松野家FinancePlan.numbers"
+    "/Users/matsunomasaharu2/Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan/260621_松野家FinancePlan.numbers"
 )
 DEFAULT_SHEET = "シングルインカム年収手取"
 MANSION_TABLE = "19_マンションローン・管理費(予算山積み複雑なので別表で）〜支出計画〜"

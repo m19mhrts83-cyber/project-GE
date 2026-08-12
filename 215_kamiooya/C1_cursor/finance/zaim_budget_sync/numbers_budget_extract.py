@@ -17,7 +17,7 @@ from mansion_budget_split import mansion_split_records
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_NUMBERS_PATH = Path(
-    "/Users/matsunomasaharu2/Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan/260418_松野家FinancePlan.numbers"
+    "/Users/matsunomasaharu2/Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan/260621_松野家FinancePlan.numbers"
 )
 DEFAULT_MAP_PATH = SCRIPT_DIR / "budget_category_map.yaml"
 DEFAULT_SHEET = "シングルインカム年収手取"
