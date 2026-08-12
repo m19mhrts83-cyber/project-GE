@@ -538,3 +538,7 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- KURASHIFT 時点履歴: migrations/20260813_kurashift_history.sql
 -- kurashift_lifeplan_versions, kurashift_lifeplan_budget_rows, kurashift_lifeplan_sheet_dumps,
 -- kurashift_finance_sources, kurashift_finance_transactions, kurashift_finance_category_year
+-- （migrations/20260813_kurashift_history.sql）
+-- kurashift_buy_plan_versions/events/criteria/constraints/notes,
+-- kurashift_re_deals, kurashift_ops_consult_events
+-- （migrations/20260813_kurashift_buy_plan.sql）

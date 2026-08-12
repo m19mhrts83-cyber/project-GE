@@ -252,6 +252,16 @@ export default async function HomePage() {
   const planLabel = plan
     ? `${plan.label}${plan.fiscal_year ? ` (${plan.fiscal_year})` : ""}`
     : "未整備";
+  const re19 = (
+    plan?.metrics as
+      | { re19?: { cf_jpy?: number; income_jpy?: number; expense_jpy?: number } }
+      | null
+  )?.re19;
+  const CF_GOAL_MONTH = 500_000;
+  const cfAnnual = typeof re19?.cf_jpy === "number" ? re19.cf_jpy : null;
+  const cfMonth = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
+  const cfGap =
+    cfMonth != null ? CF_GOAL_MONTH - cfMonth : null;
 
   return (
     <Shell active="/" email={user?.email ?? null}>
@@ -401,10 +411,23 @@ export default async function HomePage() {
         <article className="card">
           <header>
             <span className="lvl">③ 不動産</span>
-            <strong>レーン</strong>
+            <strong>
+              {cfMonth != null
+                ? `月次CF ${fmtYen(cfMonth)}`
+                : "レーン"}
+            </strong>
           </header>
-          <p className="meta">運用／購入検討／物件マスタ／融資（整備中）</p>
-          <a href="/realestate">不動産 →</a>
+          <p className="meta">
+            目標 月50万
+            {cfGap != null
+              ? ` · ギャップ ${fmtYen(cfGap)}（個人LP橋渡し÷12・法人は未接続）`
+              : " · スナップ待ち"}
+          </p>
+          <p className="meta">
+            <a href="/realestate">不動産 →</a>
+            {" · "}
+            <a href="/realestate/deals">買い進め →</a>
+          </p>
         </article>
         <article className="card">
           <header>

@@ -163,3 +163,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   - 計画版: `kurashift_lifeplan_versions` / `kurashift_lifeplan_budget_rows` / `kurashift_lifeplan_sheet_dumps`
   - 実績: `kurashift_finance_sources` / `kurashift_finance_transactions` / `kurashift_finance_category_year`
   - 運用: 実績は年次確定後は据え置きで継ぎ足し／計画は翌年以降を毎年見直し（時点比較の正）
+- **買い進め OS（2026-08-13）**: Excel 変遷＋千三つファネル＋CF50万 KPI
+  - 取込: `scripts/jarvis_kurashift_buy_plan_ingest.py` / `jarvis_kurashift_ops_consult_ingest.py`
+  - 画面: `/realestate`（KPI）・`/realestate/deals`（ファネル）
+  - 仕様: `docs/KURASHIFT_買い進めJob仕様.md` / `docs/KURASHIFT_CF正規化メモ.md`
