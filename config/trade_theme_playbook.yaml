@@ -10,6 +10,10 @@ app:
 numbers:
   canonical_path: >-
     /Users/matsunomasaharu2/Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan/260621_松野家FinancePlan.numbers
+  archive_dir: >-
+    /Users/matsunomasaharu2/Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan
+  # 実績: 年次確定後は据え置きで継ぎ足し。計画: 翌年以降を毎年見直し。
+  # 時点版は kurashift_lifeplan_versions（scripts/jarvis_kurashift_history_ingest.py）
   sheets:
     cashflow: キャッシュフロー
     single_income: シングルインカム年収手取

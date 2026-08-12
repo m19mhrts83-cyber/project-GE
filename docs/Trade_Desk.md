@@ -158,3 +158,8 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - 戦略ラベル: `config/trade_strategy.yaml`（Lab）
 - Theme入力: `config/trade_research_themes.yaml`
 - 予算抽出: `215_kamiooya/.../zaim_budget_sync/numbers_budget_extract.py`（正本 `260621`）
+- **時点履歴（2026-08-13）**: Life Plan の `.numbers` 版＋ Zaim 年度CSV を Supabase へ集約
+  - 取込: `scripts/jarvis_kurashift_history_ingest.py`
+  - 計画版: `kurashift_lifeplan_versions` / `kurashift_lifeplan_budget_rows` / `kurashift_lifeplan_sheet_dumps`
+  - 実績: `kurashift_finance_sources` / `kurashift_finance_transactions` / `kurashift_finance_category_year`
+  - 運用: 実績は年次確定後は据え置きで継ぎ足し／計画は翌年以降を毎年見直し（時点比較の正）
