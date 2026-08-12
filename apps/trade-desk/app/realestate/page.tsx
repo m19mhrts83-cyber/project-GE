@@ -75,6 +75,18 @@ export default async function RealEstatePage() {
   const cfMonth = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
   const cfGap = cfMonth != null ? CF_GOAL_MONTH - cfMonth : null;
 
+  // ③-A Phase1 スタブ: 個人は前年実績スナップを年換算の目安に、法人は未接続
+  const now = new Date();
+  const yearStart = Date.UTC(now.getFullYear(), 0, 1);
+  const yearEnd = Date.UTC(now.getFullYear() + 1, 0, 1);
+  const ytdFrac = Math.min(
+    1,
+    Math.max(0, (Date.now() - yearStart) / (yearEnd - yearStart))
+  );
+  const personalPlanCf = cfAnnual;
+  const personalYtdEst =
+    personalPlanCf != null ? Math.round(personalPlanCf * ytdFrac) : null;
+
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <h1>不動産賃貸経営</h1>
@@ -83,6 +95,37 @@ export default async function RealEstatePage() {
         ③保有物件マスタ ④融資提出パック（段階実装中）。長期目標は{" "}
         <strong>CF 月50万円</strong>（個人＋法人合算・定義は正規化メモ）。
       </p>
+
+      <div className="card notice">
+        <header>
+          <span className="lvl">③-A</span>
+          <strong>運用進捗（個人スタブ）</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          ⚠️ <strong>法人は未接続</strong>のため合算ビューは出しません（虚偽の合算を避ける）。
+          個人は LP 実績年の 19CF を計画目安とし、YTD は暦日按分の概算です。
+        </p>
+        <table>
+          <tbody>
+            <tr>
+              <td>個人・計画目安（年）</td>
+              <td>{personalPlanCf != null ? fmtYen(personalPlanCf) : "—"}</td>
+            </tr>
+            <tr>
+              <td>個人・YTD概算（暦按分）</td>
+              <td>{personalYtdEst != null ? fmtYen(personalYtdEst) : "—"}</td>
+            </tr>
+            <tr>
+              <td>法人</td>
+              <td>Stub（取込未接続）</td>
+            </tr>
+            <tr>
+              <td>合算</td>
+              <td>法人接続後に有効化</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <div className="card" style={{ borderColor: "var(--accent, #c45c26)" }}>
         <header>

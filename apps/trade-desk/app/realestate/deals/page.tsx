@@ -1,4 +1,5 @@
 import Shell from "@/components/Shell";
+import EnqueueJobButton from "@/components/EnqueueJobButton";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 
@@ -67,6 +68,49 @@ export default async function RealEstateDealsPage() {
         情報→内見→買付→融資→購入。見送りは失敗ではなく学習。自動問い合わせ送信はしません。
         仕様: <code>docs/KURASHIFT_買い進めJob仕様.md</code>
       </p>
+
+      <div className="card">
+        <header>
+          <span className="lvl">Jobs</span>
+          <strong>候補の更新（Mac worker）</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 8 }}>
+          送信はしません。キュー後に Mac の{" "}
+          <code>jarvis_kurashift_job_worker.py</code> が実行します。
+        </p>
+        <p style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <EnqueueJobButton
+            jobType="re_mail_match"
+            title="物件メール候補を取り込む"
+            label="メール候補を更新"
+            payload={{ apply: true, days: 120, limit: 40 }}
+          />
+          <EnqueueJobButton
+            jobType="re_deal_advice"
+            title="案件にQ&A助言を付与"
+            label="助言を更新"
+            payload={{ apply: true }}
+          />
+          <EnqueueJobButton
+            jobType="buy_plan_ingest"
+            title="買い進めExcel再取込"
+            label="Excel再取込"
+            payload={{}}
+          />
+          <EnqueueJobButton
+            jobType="buy_plan_export"
+            title="STEP3互換Excelをexport"
+            label="STEP3 export"
+            payload={{}}
+          />
+          <EnqueueJobButton
+            jobType="ops_consult_ingest"
+            title="運営経緯を再取込"
+            label="運営経緯"
+            payload={{}}
+          />
+        </p>
+      </div>
 
       <div className="card">
         <header>
