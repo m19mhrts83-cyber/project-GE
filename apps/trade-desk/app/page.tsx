@@ -204,6 +204,34 @@ export default async function HomePage() {
         全体俯瞰。①資産・②ライフプラン／税・③不動産のサマリーと、その週の収支・銀行残高。詳細は各レーンへ。
       </p>
 
+      <div
+        className="card"
+        style={{
+          marginTop: 12,
+          background: "var(--card-soft)",
+          borderStyle: "dashed",
+        }}
+      >
+        <header>
+          <span className="lvl">①-C</span>
+          <strong>日常の短い回し方</strong>
+        </header>
+        <ol className="meta" style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+          <li>
+            <strong>週次だけ</strong>
+            …下の「週次ステータス更新」で資産・銀行・収支を更新（設定は触らない）
+          </li>
+          <li>
+            <strong>ホームで見る</strong>
+            …①の合計＋下のテーマ一覧で「次に押すボタン」を決める
+          </li>
+          <li>
+            <strong>大きな判断だけ承認</strong>
+            …相談→内容確認→承認。ライフプランは年数回でよい
+          </li>
+        </ol>
+      </div>
+
       {showAnnualNotice ? (
         <div className="notice">
           <strong>{notice.title}</strong>
@@ -385,7 +413,23 @@ export default async function HomePage() {
                         href={`/themes/${t.id}`}
                         style={{ fontSize: 12, padding: "4px 8px" }}
                       >
-                        相談確認→承認
+                        次へ: 相談確認→承認
+                      </a>
+                    ) : t.status === "draft" ? (
+                      <a
+                        className="btn primary"
+                        href="/themes"
+                        style={{ fontSize: 12, padding: "4px 8px" }}
+                      >
+                        次へ: 相談中へ
+                      </a>
+                    ) : t.status === "approved" || t.status === "executing" ? (
+                      <a
+                        className="btn primary"
+                        href="/themes"
+                        style={{ fontSize: 12, padding: "4px 8px" }}
+                      >
+                        次へ: 完走アシスト
                       </a>
                     ) : (
                       <EnqueueJobButton
