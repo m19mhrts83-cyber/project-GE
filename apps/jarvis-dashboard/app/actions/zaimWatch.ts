@@ -81,13 +81,14 @@ export async function confirmZaimFix(
   return { ok: true };
 }
 
-/** 火・金の見直しお知らせを確認済みにしてホームバナーを消す */
+/**
+ * 「Jarvisが直したよ（財務）」を確認済みにしてホームピンを消す。
+ * 確認待ちの直しを一括 confirmed。未実施の要対応・費目提案は残す。
+ * batchId が空でも、現在の review_batch_id または pending 指紋で ack する。
+ */
 export async function acknowledgeZaimReview(
-  batchId: string,
+  batchId?: string,
 ): Promise<FixConfirmResult> {
-  const bid = (batchId || "").trim();
-  if (!bid) return { ok: false, error: "batch が空です" };
-
   const supabase = await createClient();
   const { data: watch, error } = await supabase
     .from("watch_status")
@@ -105,24 +106,50 @@ export async function acknowledgeZaimReview(
         >)
       : {};
 
+  const now = new Date().toISOString();
   const fixes = Array.isArray(prev.recent_fixes)
     ? (prev.recent_fixes as Record<string, unknown>[]).map((f) => {
         const row = { ...f };
         if (row.status === "pending_confirm" || !row.status) {
           row.status = "confirmed";
-          row.confirmed_at = new Date().toISOString();
+          row.confirmed_at = now;
         }
         return row;
       })
     : [];
 
+  const pendingIds = (
+    Array.isArray(prev.recent_fixes)
+      ? (prev.recent_fixes as Record<string, unknown>[])
+      : []
+  )
+    .filter((f) => !f.status || f.status === "pending_confirm")
+    .map((f) => String(f.id || ""))
+    .filter(Boolean)
+    .sort()
+    .join(",");
+
+  const bid = (batchId || "").trim();
+  const existingBatch = String(prev.review_batch_id || "").trim();
+  const ackId =
+    bid ||
+    existingBatch ||
+    (pendingIds ? `pending:${pendingIds.slice(0, 120)}` : `ack:${now}`);
+
+  const note = String(watch.summary || "")
+    .replace(/^見直したよ[·・]\s*/, "")
+    .replace(/^直し確認待ち\s*\d+件\s*[·・]\s*/, "")
+    .replace(/^Jarvisが直したよ（財務）[·・]\s*/, "")
+    .slice(0, 180);
+
   const payload = {
     ...prev,
     recent_fixes: fixes,
     pending_confirm_count: 0,
-    dashboard_ack_batch_id: bid,
-    review_batch_id: prev.review_batch_id || bid,
+    dashboard_ack_batch_id: ackId,
+    review_batch_id: existingBatch || ackId,
     show_banner: false,
+    acknowledged_at: now,
   };
 
   const { error: uErr } = await supabase
@@ -130,8 +157,11 @@ export async function acknowledgeZaimReview(
     .update({
       payload,
       level: "ok",
-      summary: `見直し確認済 · ${String(watch.summary || "").replace(/^見直したよ[·・]\s*/, "").slice(0, 180)}`,
-      updated_at: new Date().toISOString(),
+      title: "Zaim Watch",
+      summary: note
+        ? `確認済み · ${note}`.slice(0, 500)
+        : "確認済み（財務の直しお知らせ）",
+      updated_at: now,
     })
     .eq("id", WATCH_ID);
   if (uErr) return { ok: false, error: uErr.message };

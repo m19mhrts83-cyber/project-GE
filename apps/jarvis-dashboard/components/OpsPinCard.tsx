@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { HomeLevel } from "@/lib/homeLevels";
 import OpsFixAckButton from "@/components/OpsFixAckButton";
 
@@ -13,9 +14,11 @@ type Props = {
   href: string;
   external: boolean;
   showAck?: boolean;
+  /** 未指定時は運用の「直したよ」確認ボタン */
+  ackSlot?: ReactNode;
 };
 
-/** ホームピン1枚（リンク＋「直したよ」確認ボタン） */
+/** ホームピン1枚（リンク＋確認ボタン） */
 export default function OpsPinCard({
   id,
   level,
@@ -26,9 +29,10 @@ export default function OpsPinCard({
   href,
   external,
   showAck,
+  ackSlot,
 }: Props) {
   const tone =
-    id === "ops_fix_notice" || level === "info"
+    id === "ops_fix_notice" || id === "zaim_quality" || level === "info"
       ? "home-pin-banner-info"
       : "home-pin-banner-alert";
 
@@ -50,7 +54,7 @@ export default function OpsPinCard({
       </a>
       {showAck ? (
         <div className="home-pin-banner-actions">
-          <OpsFixAckButton />
+          {ackSlot ?? <OpsFixAckButton />}
         </div>
       ) : null}
     </div>

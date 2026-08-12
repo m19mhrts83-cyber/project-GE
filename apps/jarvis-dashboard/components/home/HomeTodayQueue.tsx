@@ -9,6 +9,7 @@ import {
   buildWatchAckFingerprint,
   isWatchAckActive,
 } from "@/lib/watchUserAck";
+import { zaimWatchVisibleOnHome } from "@/lib/zaimWatchPin";
 import { createClient } from "@/lib/supabase/server";
 import { wakeDueSnoozes } from "@/app/actions/triage";
 import { watchHref } from "./homeHelpers";
@@ -57,11 +58,14 @@ export default async function HomeTodayQueue() {
         payload: pl,
       });
       if (isWatchAckActive(pl, fp)) return false;
+      if (w.id === "zaim_quality") {
+        if (zaimWatchVisibleOnHome(pl)) return true;
+        return w.level !== "ok";
+      }
       if (
         w.id === "etc_mileage" ||
         w.id === "vpoint" ||
         w.id === "rent_step" ||
-        w.id === "zaim_quality" ||
         w.id === "cursor_pro_plus_downgrade" ||
         w.id === "mobile_plan"
       ) {

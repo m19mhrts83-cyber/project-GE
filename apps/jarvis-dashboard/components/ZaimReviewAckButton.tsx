@@ -6,23 +6,28 @@ import { acknowledgeZaimReview } from "@/app/actions/zaimWatch";
 
 export default function ZaimReviewAckButton({
   batchId,
+  className,
 }: {
-  batchId: string;
+  /** 空でも可（確認待ちの直し一式を潰す） */
+  batchId?: string;
+  className?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
   return (
-    <div className="etc-ack-wrap">
+    <div className={className || "etc-ack-wrap"}>
       <button
         type="button"
         className="btn etc-ack-btn"
-        disabled={pending || !batchId}
-        onClick={() => {
+        disabled={pending}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
           setErr(null);
           start(async () => {
-            const r = await acknowledgeZaimReview(batchId);
+            const r = await acknowledgeZaimReview(batchId || "");
             if (!r.ok) {
               setErr(r.error || "確認に失敗しました");
               return;

@@ -188,6 +188,7 @@ export default async function ZaimWatchPage() {
       <FolderLinks links={folderLinks} />
       <p className="sub">
         財務の年間収支と、集計設定・二重取込・費目見直しの確認。アーカイブせず常駐します。
+        確信度の高い直しは Jarvis が適用し、ホームに「直したよ（財務）」として残します（確認するまで消えません）。
         火・金に見直し（CSV は同曜日）。年間収支は Zaim の「集計に含めない」を除外した合計です（当年は1〜当月の
         YTD）。詳細な月次は{" "}
         <Link href="/metrics" style={{ color: "var(--accent)", fontWeight: 600 }}>
@@ -196,21 +197,24 @@ export default async function ZaimWatchPage() {
         。
       </p>
 
-      {showBanner && reviewBatchId ? (
+      {showBanner || pendingFixes.length > 0 ? (
         <section className="card level-attention" style={{ marginBottom: 16 }}>
           <header>
             <span className="lvl">お知らせ</span>
-            <strong>Zaim を見直しました</strong>
+            <strong>Jarvisが直したよ（財務）</strong>
           </header>
           <ul className="openchat-group-lines">
-            {(reviewLines.length ? reviewLines : ["見直し結果があります"]).map(
-              (ln, i) => (
-                <li key={i}>{ln}</li>
-              ),
-            )}
+            {(reviewLines.length
+              ? reviewLines
+              : pendingFixes.length
+                ? [`直し確認待ち ${pendingFixes.length}件`]
+                : ["見直し結果があります"]
+            ).map((ln, i) => (
+              <li key={i}>{ln}</li>
+            ))}
           </ul>
           <p className="meta" style={{ marginBottom: 8 }}>
-            「確認しました」でホームのお知らせだけ消え、直し履歴は下に残ります（削除しません）。
+            「確認しました」でホームのピンと確認待ちを消します。直し履歴は下に残ります。新しい直しが出たらまた表示されます。
           </p>
           <ZaimReviewAckButton batchId={reviewBatchId} />
         </section>

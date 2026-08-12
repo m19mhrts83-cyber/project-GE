@@ -284,7 +284,7 @@ def push_watch(sb) -> int:
             except Exception as e:
                 print(f"# changelog sync skipped: {e}", file=sys.stderr)
 
-        # Zaim: ホーム「見直したよ」の確認済みを Mac push で潰さない
+        # Zaim: ホーム「直したよ（財務）」の確認済みを Mac push で潰さない
         if iid == "zaim_quality":
             remote_ack = remote_pl.get("dashboard_ack_batch_id")
             local_ack = payload.get("dashboard_ack_batch_id")
@@ -294,12 +294,15 @@ def push_watch(sb) -> int:
                 payload["dashboard_ack_batch_id"] = ack
             if batch:
                 payload["review_batch_id"] = batch
-            # remote が確認済みならバナーを落とす（ローカルに新しい batch が無いとき）
-            if ack and batch and str(ack) == str(batch):
+            if remote_pl.get("acknowledged_at") and not payload.get("acknowledged_at"):
+                payload["acknowledged_at"] = remote_pl.get("acknowledged_at")
+            pending_after = int(payload.get("pending_confirm_count") or 0)
+            # 新しい確認待ちがあればピンを再表示。無ければダッシュボード確認を尊重
+            if pending_after > 0:
+                payload["show_banner"] = True
+            elif ack and batch and str(ack) == str(batch):
                 payload["show_banner"] = False
-            elif remote_pl.get("show_banner") is False and str(remote_ack or "") == str(
-                batch or ""
-            ):
+            elif remote_pl.get("show_banner") is False and pending_after == 0:
                 payload["show_banner"] = False
             try:
                 rb_path = STATE / "zaim_review_batch.json"
