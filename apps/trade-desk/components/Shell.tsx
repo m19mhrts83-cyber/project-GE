@@ -3,6 +3,7 @@ import { DASHBOARD_URL } from "@/lib/format";
 const NAV = [
   { href: "/", label: "ホーム" },
   { href: "/themes", label: "テーマ" },
+  { href: "/money-ops", label: "資金移動" },
   { href: "/portfolio", label: "資産" },
   { href: "/consultations", label: "相談" },
   { href: "/lifeplan", label: "ライフプラン" },
@@ -64,7 +65,9 @@ export default function Shell({
         <NavLinks
           active={active}
           items={NAV.filter((n) =>
-            ["/", "/themes", "/portfolio", "/consultations"].includes(n.href)
+            ["/", "/themes", "/money-ops", "/portfolio", "/consultations"].includes(
+              n.href
+            )
           )}
         />
 

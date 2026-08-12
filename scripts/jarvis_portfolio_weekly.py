@@ -770,7 +770,7 @@ def main() -> int:
         try:
             hold_script = REPO / "scripts" / "jarvis_securities_holdings.py"
             out = subprocess.run(
-                [py_exe(), str(hold_script)],
+                [py_exe(), str(hold_script), "--push-db"],
                 capture_output=True,
                 text=True,
                 timeout=300,
@@ -782,6 +782,29 @@ def main() -> int:
                 print(out.stderr.rstrip(), file=sys.stderr)
         except Exception as exc:
             print(f"# securities_holdings: {exc}", file=sys.stderr)
+
+    # 流動性・週次家計（銀行残高＋収支要約）
+    if not args.cloud_only and not args.dry_run:
+        try:
+            liq_script = REPO / "scripts" / "jarvis_liquidity_weekly.py"
+            out = subprocess.run(
+                [py_exe(), str(liq_script), "--json"],
+                capture_output=True,
+                text=True,
+                timeout=240,
+                cwd=str(REPO),
+            )
+            if out.stdout.strip():
+                print(out.stdout.rstrip())
+            if out.stderr.strip():
+                print(out.stderr.rstrip(), file=sys.stderr)
+            sources["liquidity_weekly"] = {
+                "status": "ok" if out.returncode == 0 else "error",
+                "reason": f"exit={out.returncode}",
+            }
+        except Exception as exc:
+            sources["liquidity_weekly"] = {"status": "error", "reason": str(exc)[:300]}
+            print(f"# liquidity_weekly: {exc}", file=sys.stderr)
 
     if not args.cloud_only and not args.dry_run:
         try:

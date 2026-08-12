@@ -53,6 +53,32 @@ def save_snap(data: dict[str, Any]) -> None:
     )
 
 
+def push_supabase(snap: dict[str, Any]) -> int:
+    """securities_holdings へ account_id×as_of で upsert。"""
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_trade_common import sb_client
+
+    sb = sb_client()
+    n = 0
+    for aid, rec in (snap.get("accounts") or {}).items():
+        if rec.get("error") and not rec.get("funds"):
+            continue
+        as_of = rec.get("as_of") or date.today().isoformat()
+        funds = rec.get("funds") or []
+        sb.table("securities_holdings").upsert(
+            {
+                "account_id": aid,
+                "as_of": as_of,
+                "value_jpy": rec.get("value_jpy"),
+                "source": rec.get("source"),
+                "payload": {"funds": funds, "url": rec.get("url")},
+            },
+            on_conflict="account_id,as_of",
+        ).execute()
+        n += 1
+    return n
+
+
 def _yen(s: str) -> int:
     return int(re.sub(r"[^\d]", "", s or "0") or "0")
 
@@ -234,6 +260,16 @@ def main() -> int:
     ap.add_argument("--skip-web", action="store_true", help="前回 snap のみ表示")
     ap.add_argument("--sbi-only", action="store_true")
     ap.add_argument("--bloomo-only", action="store_true")
+    ap.add_argument(
+        "--push-db",
+        action="store_true",
+        help="Supabase securities_holdings へ upsert",
+    )
+    ap.add_argument(
+        "--no-push-db",
+        action="store_true",
+        help="DB upsert をしない（ローカル snap のみ）",
+    )
     args = ap.parse_args()
 
     snap = load_snap()
@@ -266,6 +302,14 @@ def main() -> int:
                 accounts.setdefault("bloomo", {})["error"] = str(exc)[:300]
         snap = {"accounts": accounts}
         save_snap(snap)
+
+    do_push = args.push_db or (not args.no_push_db and not args.skip_web)
+    if do_push and not args.no_push_db:
+        try:
+            n = push_supabase(snap)
+            print(f"# securities_holdings supabase upsert={n}", file=sys.stderr)
+        except Exception as exc:
+            print(f"# securities_holdings supabase FAIL: {exc}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(snap, ensure_ascii=False))

@@ -129,7 +129,7 @@
 ## Core 資産網羅（要約）
 
 - Bloomo Web・固定／動的スリーブ（公開 API なし）
-- **取得ハブ（2026-08-12 確定）**: **Bloomo → マネーフォワード ME**（実 Chrome セッション・評価の正）。**SBI インデックス → Zaim「SBI 証券」**（サイト直ログインは使わない）。**あかつき → 公式サイト Playwright**（メールOTP。MF連携は不可のため不採用）。証券内訳は `jarvis_securities_holdings.py`（SBI=Zaim／Bloomo=MF）。Bloomo→Zaim 週次反映は後段
+- **取得ハブ（2026-08-12 確定）**: **Bloomo → マネーフォワード ME**（実 Chrome セッション・評価の正）。**SBI インデックス → Zaim「SBI 証券」**（サイト直ログインは使わない）。**あかつき → 公式サイト Playwright**（メールOTP。MF連携は不可のため不採用）。証券内訳は `jarvis_securities_holdings.py`（SBI=Zaim／Bloomo=MF）→ Supabase。流動性は `jarvis_liquidity_weekly.py`。ホーム `/` は全体HQ。資金移動は `/money-ops`（承認＋手順アシストまで）。Bloomo→Zaim 週次反映は後段
 - **アクサ生命**は保険 Core の本線。特別勘定比率は **IFA石河さん反映の正（参考）**
 - ソニー生命・プルデンシャル生命は **真治＋千景** を分けて載せ、**/portfolio で対アクサ差分**を見る
 - プルデンシャルは Web 取得せず手登録（`PRUDENTIAL_WEB_FETCH_DISABLE=1`／`PRUDENTIAL_*_VALUE_JPY`）

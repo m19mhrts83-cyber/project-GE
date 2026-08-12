@@ -532,3 +532,6 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- trade_instruments, trade_prices, trade_signals, trade_orders, trade_positions,
 -- trade_daily_pnl, trade_risk_state, trade_params, trade_reviews, trade_research,
 -- portfolio_accounts, portfolio_snapshots, portfolio_cashflows, advisor_notes
+-- KURASHIFT HQ: migrations/20260812_kurashift_hq_liquidity.sql
+-- liquidity_accounts, liquidity_snapshots, cashflow_week_summaries,
+-- securities_holdings, kurashift_money_ops
