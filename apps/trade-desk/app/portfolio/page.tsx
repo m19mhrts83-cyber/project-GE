@@ -53,6 +53,12 @@ export default async function PortfolioPage() {
     .eq("advisor", "ishikawa")
     .order("note_date", { ascending: false })
     .limit(1);
+  const { data: holdingsRows } = await supabase
+    .from("securities_holdings")
+    .select("account_id, as_of, value_jpy, source, payload")
+    .in("account_id", ["sbi_index", "bloomo"])
+    .order("as_of", { ascending: false })
+    .limit(10);
 
   const latest = new Map<
     string,
@@ -121,6 +127,28 @@ export default async function PortfolioPage() {
     (sum, r) => sum + (r.snap?.value_jpy ?? 0),
     0
   );
+
+  const latestHoldings = new Map<
+    string,
+    {
+      as_of: string;
+      value_jpy: number | null;
+      source: string | null;
+      funds: { name?: string; code?: string; value_jpy?: number }[];
+    }
+  >();
+  for (const row of holdingsRows ?? []) {
+    if (latestHoldings.has(row.account_id)) continue;
+    const payload = (row.payload || {}) as {
+      funds?: { name?: string; code?: string; value_jpy?: number }[];
+    };
+    latestHoldings.set(row.account_id, {
+      as_of: row.as_of,
+      value_jpy: row.value_jpy != null ? Number(row.value_jpy) : null,
+      source: row.source,
+      funds: payload.funds || [],
+    });
+  }
 
   return (
     <Shell active="/portfolio" email={user?.email ?? null}>
@@ -225,6 +253,56 @@ export default async function PortfolioPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="card">
+        <header>
+          <span className="lvl">証券内訳（SBI / Bloomo）</span>
+          <strong>ファンド・銘柄</strong>
+        </header>
+        <p className="meta">
+          SBI＝Zaim 証券詳細／Bloomo＝マネーフォワード。保険の特別勘定と同系統。
+        </p>
+        {["sbi_index", "bloomo"].map((aid) => {
+          const h = latestHoldings.get(aid);
+          const label = aid === "sbi_index" ? "SBI インデックス" : "Bloomo";
+          return (
+            <details key={aid} style={{ marginTop: 12 }} open={aid === "sbi_index"}>
+              <summary>
+                <strong>{label}</strong>{" "}
+                <span className="meta">
+                  {h?.value_jpy != null ? fmtYen(h.value_jpy) : "—"} ·{" "}
+                  {h?.as_of ?? "未取得"} · {h?.source ?? "—"}
+                </span>
+              </summary>
+              {!h || h.funds.length === 0 ? (
+                <p className="meta">内訳未取得（週次で securities_holdings を実行）</p>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>銘柄</th>
+                      <th>評価</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {h.funds.map((f, i) => (
+                      <tr key={`${aid}-${i}`}>
+                        <td>
+                          {f.code ? `${f.code} ` : ""}
+                          {f.name || "—"}
+                        </td>
+                        <td>
+                          {f.value_jpy != null ? fmtYen(Number(f.value_jpy)) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </details>
+          );
+        })}
       </div>
 
       <div className="card">

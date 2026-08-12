@@ -9,19 +9,42 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function mondayOfIsoDate(d = new Date()): string {
+  // Asia/Tokyo の暦日で月曜週初を返す
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const y = Number(parts.find((p) => p.type === "year")?.value);
+  const m = Number(parts.find((p) => p.type === "month")?.value);
+  const day = Number(parts.find((p) => p.type === "day")?.value);
+  const local = new Date(Date.UTC(y, m - 1, day));
+  const dow = (local.getUTCDay() + 6) % 7;
+  local.setUTCDate(local.getUTCDate() - dow);
+  return local.toISOString().slice(0, 10);
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const weekStart = mondayOfIsoDate();
+
   const [
     { data: accounts },
     { data: snaps },
     { data: themes },
-    { data: research },
     { data: consults },
     { data: annualDone },
+    { data: planSnaps },
+    { data: cashflow },
+    { data: liqSnaps },
+    { data: liqAccounts },
+    { data: moneyOps },
   ] = await Promise.all([
     supabase
       .from("portfolio_accounts")
@@ -41,11 +64,6 @@ export default async function HomePage() {
       .order("created_at", { ascending: false })
       .limit(8),
     supabase
-      .from("trade_research")
-      .select("id, topic, summary, fetched_at")
-      .order("fetched_at", { ascending: false })
-      .limit(5),
-    supabase
       .from("kurashift_consultations")
       .select("id, title, lane, status, created_at")
       .eq("status", "open")
@@ -58,6 +76,34 @@ export default async function HomePage() {
       .eq("status", "succeeded")
       .gte("finished_at", `${new Date().getFullYear()}-01-01`)
       .limit(1),
+    supabase
+      .from("kurashift_plan_snapshots")
+      .select("label, fiscal_year, snapshot_at, metrics")
+      .order("snapshot_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("cashflow_week_summaries")
+      .select(
+        "week_start, income_jpy, expense_jpy, credit_spend_jpy, note, source"
+      )
+      .eq("week_start", weekStart)
+      .maybeSingle(),
+    supabase
+      .from("liquidity_snapshots")
+      .select("account_id, as_of, balance_jpy, source")
+      .order("as_of", { ascending: false })
+      .limit(80),
+    supabase
+      .from("liquidity_accounts")
+      .select("id, name, kind, sort_order")
+      .eq("active", true)
+      .order("sort_order"),
+    supabase
+      .from("kurashift_money_ops")
+      .select("id, title, kind, amount_jpy, status, from_account, to_account")
+      .in("status", ["draft", "consulting", "approved", "executing"])
+      .order("created_at", { ascending: false })
+      .limit(5),
   ]);
 
   const nameById = new Map((accounts ?? []).map((a) => [a.id, a.name]));
@@ -83,6 +129,35 @@ export default async function HomePage() {
     .sort((a, b) => b.value_jpy - a.value_jpy);
   const total = assetRows.reduce((s, r) => s + r.value_jpy, 0);
 
+  const liqName = new Map((liqAccounts ?? []).map((a) => [a.id, a.name]));
+  const latestLiq = new Map<
+    string,
+    { as_of: string; balance_jpy: number }
+  >();
+  for (const row of liqSnaps ?? []) {
+    if (!latestLiq.has(row.account_id)) {
+      latestLiq.set(row.account_id, {
+        as_of: row.as_of,
+        balance_jpy: Number(row.balance_jpy),
+      });
+    }
+  }
+  const bankRows = (liqAccounts ?? [])
+    .filter((a) => a.kind === "bank" || a.kind === "cash")
+    .map((a) => ({
+      id: a.id,
+      name: liqName.get(a.id) || a.name,
+      snap: latestLiq.get(a.id),
+    }))
+    .filter((r) => r.snap)
+    .sort(
+      (a, b) => (b.snap?.balance_jpy ?? 0) - (a.snap?.balance_jpy ?? 0)
+    );
+  const bankTotal = bankRows.reduce(
+    (s, r) => s + (r.snap?.balance_jpy ?? 0),
+    0
+  );
+
   const notice = annualNoticeCopy();
   const showAnnualNotice =
     isAnnualLifeplanWindow() && !(annualDone && annualDone.length > 0);
@@ -91,12 +166,17 @@ export default async function HomePage() {
     ["draft", "consulting", "approved"].includes(t.status)
   );
 
+  const plan = planSnaps?.[0];
+  const planLabel = plan
+    ? `${plan.label}${plan.fiscal_year ? ` (${plan.fiscal_year})` : ""}`
+    : "未整備";
+
   return (
     <Shell active="/" email={user?.email ?? null}>
-      <p className="page-kicker">HOME</p>
+      <p className="page-kicker">HOME · HQ</p>
       <h1>KURASHIFT</h1>
       <p className="sub">
-        ①資産運用（把握・テーマ提案／実行）と ②ライフプラン更新・個人申告ネタ。日常のトップは①。
+        全体俯瞰。①資産・②ライフプラン／税・③不動産のサマリーと、その週の収支・銀行残高。詳細は各レーンへ。
       </p>
 
       {showAnnualNotice ? (
@@ -109,10 +189,11 @@ export default async function HomePage() {
         </div>
       ) : null}
 
+      <h2 style={{ marginTop: 8, fontSize: "1.05rem" }}>3本の柱</h2>
       <div className="grid">
         <article className="card">
           <header>
-            <span className="lvl">資産合計</span>
+            <span className="lvl">① 資産運用</span>
             <strong>{fmtYen(total)}</strong>
           </header>
           <p className="meta">{assetRows.length}口座 · 週次スナップ</p>
@@ -120,35 +201,107 @@ export default async function HomePage() {
         </article>
         <article className="card">
           <header>
-            <span className="lvl">テーマ</span>
-            <strong>{themes?.length ?? 0}</strong>
+            <span className="lvl">② 計画・税</span>
+            <strong>{planLabel}</strong>
           </header>
-          <p className="meta">進行中の投資テーマ</p>
-          <a href="/themes">テーマ一覧 →</a>
+          <p className="meta">
+            {plan?.snapshot_at
+              ? `直近プラン snap ${plan.snapshot_at}`
+              : "ライフプラン／個人申告"}
+          </p>
+          <a href="/lifeplan">ライフプラン →</a>
+          {" · "}
+          <a href="/tax">個人申告 →</a>
         </article>
         <article className="card">
           <header>
-            <span className="lvl">提案候補</span>
-            <strong>{actionable.length}</strong>
+            <span className="lvl">③ 不動産</span>
+            <strong>レーン</strong>
           </header>
-          <p className="meta">draft / consulting / approved</p>
+          <p className="meta">運用／購入検討／物件マスタ／融資（整備中）</p>
+          <a href="/realestate">不動産 →</a>
         </article>
         <article className="card">
           <header>
-            <span className="lvl">相談</span>
-            <strong>{consults?.length ?? 0}</strong>
+            <span className="lvl">進行中</span>
+            <strong>
+              {(themes?.length ?? 0) + (moneyOps?.length ?? 0)}
+            </strong>
           </header>
-          <p className="meta">Jarvis オープン相談</p>
-          <a href="/consultations">相談記録 →</a>
+          <p className="meta">
+            テーマ {themes?.length ?? 0} · 資金移動 {moneyOps?.length ?? 0} ·
+            相談 {consults?.length ?? 0}
+          </p>
+          <a href="/themes">テーマ →</a>
+          {" · "}
+          <a href="/money-ops">資金移動 →</a>
         </article>
       </div>
 
+      <h2 style={{ marginTop: 28, fontSize: "1.05rem" }}>
+        その週の家計・銀行
+      </h2>
+      <div className="grid">
+        <article className="card">
+          <header>
+            <span className="lvl">週次収支</span>
+            <strong>
+              {cashflow?.week_start ?? weekStart}
+            </strong>
+          </header>
+          <p className="meta">
+            収入{" "}
+            {cashflow?.income_jpy != null
+              ? fmtYen(Number(cashflow.income_jpy))
+              : "—"}{" "}
+            · 支出{" "}
+            {cashflow?.expense_jpy != null
+              ? fmtYen(Number(cashflow.expense_jpy))
+              : "—"}{" "}
+            · クレカ{" "}
+            {cashflow?.credit_spend_jpy != null
+              ? fmtYen(Number(cashflow.credit_spend_jpy))
+              : "—"}
+          </p>
+          {cashflow?.note ? (
+            <p className="meta">{cashflow.note}</p>
+          ) : (
+            <p className="meta">週次ジョブ未実行なら資産ステータス更新で取得</p>
+          )}
+        </article>
+        <article className="card">
+          <header>
+            <span className="lvl">銀行・現金</span>
+            <strong>{fmtYen(bankTotal)}</strong>
+          </header>
+          <p className="meta">Zaim 残高スポット（トップ）</p>
+          <ul className="meta" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            {bankRows.slice(0, 6).map((r) => (
+              <li key={r.id}>
+                {r.name}: {fmtYen(r.snap!.balance_jpy)}
+                <span className="meta"> ({r.snap!.as_of})</span>
+              </li>
+            ))}
+            {bankRows.length === 0 ? <li>未取得</li> : null}
+          </ul>
+        </article>
+      </div>
+      <p style={{ marginTop: 10 }}>
+        <span className="meta">週次未取得なら下のボタンでキュー（Mac worker 要）</span>
+      </p>
+      <EnqueueJobButton
+        jobType="portfolio_weekly"
+        title="資産＋流動性週次をキュー"
+        payload={{}}
+        label="週次ステータス更新（資産・銀行・収支）"
+      />
+
       <h2 style={{ marginTop: 28, fontSize: "1.1rem" }}>
-        テーマからの投資提案・実行
+        資産運用の次アクション
       </h2>
       <p className="meta" style={{ marginBottom: 12 }}>
-        分析→提案→相談→承認→実行。まずは一般的でやりやすいところから。やりづらければ Jarvis
-        に相談して見直す。
+        分析→提案→相談→承認→実行。資金移動は{" "}
+        <a href="/money-ops">資金移動オペ</a>（提案→承認→手順アシスト）。
       </p>
       <EnqueueJobButton
         jobType="theme_propose_from_status"
@@ -160,8 +313,7 @@ export default async function HomePage() {
       <div className="card">
         {(themes ?? []).length === 0 ? (
           <p className="meta">
-            まだテーマカードがありません。リサーチや資産状況を見ながら Jarvis
-            で提案を作り、アプリのテーマへ登録します。
+            まだテーマカードがありません。提案候補: {actionable.length}
           </p>
         ) : (
           <table>
@@ -204,8 +356,45 @@ export default async function HomePage() {
         </p>
       </div>
 
+      {(moneyOps ?? []).length > 0 ? (
+        <div className="card" style={{ marginTop: 16 }}>
+          <header>
+            <span className="lvl">資金移動</span>
+            <strong>{moneyOps!.length}</strong>
+          </header>
+          <table>
+            <thead>
+              <tr>
+                <th>状態</th>
+                <th>内容</th>
+                <th>金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              {moneyOps!.map((o) => (
+                <tr key={o.id}>
+                  <td>{o.status}</td>
+                  <td>
+                    <strong>{o.title}</strong>
+                    <div className="meta">
+                      {o.kind} · {o.from_account ?? "—"} → {o.to_account ?? "—"}
+                    </div>
+                  </td>
+                  <td>
+                    {o.amount_jpy != null ? fmtYen(Number(o.amount_jpy)) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={{ marginTop: 12 }}>
+            <a href="/money-ops">資金移動オペへ →</a>
+          </p>
+        </div>
+      ) : null}
+
       <h2 style={{ marginTop: 28, fontSize: "1.1rem" }}>
-        他資産のステータス → 提案の材料
+        他資産のステータス
       </h2>
       <div className="card">
         <table>
@@ -221,7 +410,7 @@ export default async function HomePage() {
             {assetRows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="meta">
-                  スナップショットがありません（週次 portfolio を実行）
+                  スナップショットがありません（週次を実行）
                 </td>
               </tr>
             ) : (
@@ -237,42 +426,9 @@ export default async function HomePage() {
           </tbody>
         </table>
         <p className="meta" style={{ marginTop: 10 }}>
-          余力・保険・Bloomo・インデックスの偏りはここを見て Theme
-          提案に反映。詳細更新は資産画面／週次ジョブ。
+          詳細・内訳は <a href="/portfolio">資産</a>。
         </p>
-        <EnqueueJobButton
-          jobType="portfolio_weekly"
-          title="資産週次をキュー"
-          payload={{}}
-          label="資産ステータス更新（週次）"
-        />
       </div>
-
-      {(research ?? []).length > 0 ? (
-        <>
-          <h2 style={{ marginTop: 28, fontSize: "1.1rem" }}>最近のリサーチ</h2>
-          <div className="card">
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {(research ?? []).map((r) => (
-                <li key={r.id} style={{ marginBottom: 8 }}>
-                  <strong>{r.topic || "リサーチ"}</strong>
-                  <div className="meta">
-                    {(r.summary || "").slice(0, 160)}
-                    {(r.summary || "").length > 160 ? "…" : ""}
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <a href="/research">リサーチ一覧 →</a>
-          </div>
-        </>
-      ) : null}
-
-      <p className="meta" style={{ marginTop: 24 }}>
-        ライフプランの年次更新・物件購入時の計画更新は{" "}
-        <a href="/lifeplan">ライフプラン</a>
-        から。別モードが出たら Jarvis に相談。
-      </p>
     </Shell>
   );
 }
