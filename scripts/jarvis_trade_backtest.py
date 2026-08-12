@@ -6,15 +6,16 @@
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_trade_backtest.py
-  ~/selenium_env/venv/bin/python scripts/jarvis_trade_backtest.py --range 2y --capital 100000
+  ~/selenium_env/venv/bin/python scripts/jarvis_trade_backtest.py --range 10y --capital 100000
+  ~/selenium_env/venv/bin/python scripts/jarvis_trade_backtest_tune.py --range max
 """
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import sys
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 from jarvis_trade_common import fetch_yahoo_daily, load_watchlist, sleep_polite
@@ -27,11 +28,13 @@ from jarvis_trade_strategy import (
     pos_payload,
     regime_from_rows,
     score_probe,
-    swing_low_since,
 )
+
+from pathlib import Path
 
 STATE_DIR = Path.home() / "git-repos" / ".jarvis_state"
 OUT_JSON = STATE_DIR / "trade_backtest_last.json"
+HIST_TAIL = 90  # SMA60 + rising_mean 20 + 余裕
 
 
 def load_bars(range_: str, symbols: list[str]) -> dict[str, list[dict[str, Any]]]:
@@ -49,29 +52,43 @@ def load_bars(range_: str, symbols: list[str]) -> dict[str, list[dict[str, Any]]
     return out
 
 
-def by_date(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    return {str(r["trade_date"])[:10]: r for r in rows}
-
-
 def history_until(rows: list[dict[str, Any]], day: str) -> list[dict[str, Any]]:
     return [r for r in rows if str(r["trade_date"])[:10] <= day]
 
 
-def next_open(rows: list[dict[str, Any]], day: str) -> tuple[str, float] | None:
-    after = [r for r in rows if str(r["trade_date"])[:10] > day]
-    if not after:
+def _dates_of(rows: list[dict[str, Any]]) -> list[str]:
+    return [str(r["trade_date"])[:10] for r in rows]
+
+
+def history_until_idx(rows: list[dict[str, Any]], dates: list[str], day: str) -> list[dict[str, Any]]:
+    i = bisect.bisect_right(dates, day)
+    if i <= 0:
+        return []
+    start = max(0, i - HIST_TAIL)
+    return rows[start:i]
+
+
+def next_open(rows: list[dict[str, Any]], dates: list[str], day: str) -> tuple[str, float] | None:
+    i = bisect.bisect_right(dates, day)
+    if i >= len(rows):
         return None
-    r = after[0]
+    r = rows[i]
     px = r.get("open") if r.get("open") is not None else r.get("close")
     if px is None:
         return None
     return str(r["trade_date"])[:10], float(px)
 
 
-def mark_equity(positions: list[dict[str, Any]], bars: dict[str, list], day: str, cash: float) -> float:
+def mark_equity(
+    positions: list[dict[str, Any]],
+    bars: dict[str, list],
+    date_ix: dict[str, list[str]],
+    day: str,
+    cash: float,
+) -> float:
     mkt = 0.0
     for pos in positions:
-        hist = history_until(bars.get(pos["symbol"], []), day)
+        hist = history_until_idx(bars.get(pos["symbol"], []), date_ix.get(pos["symbol"], []), day)
         if not hist:
             mkt += float(pos["avg_price"]) * int(pos["qty"])
             continue
@@ -79,56 +96,70 @@ def mark_equity(positions: list[dict[str, Any]], bars: dict[str, list], day: str
     return cash + mkt
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description="Trade Desk 過去シミュレーション")
-    ap.add_argument("--range", default="1y", help="Yahoo range (6mo/1y/2y/5y)")
-    ap.add_argument("--capital", type=float, default=100000)
-    args = ap.parse_args()
+def tradable_jp(it: dict[str, Any]) -> bool:
+    if it.get("enabled", True) is False:
+        return False
+    if str(it.get("currency") or "JPY").upper() != "JPY":
+        return False
+    if it.get("asset_class") in ("inverse_etf", "index"):
+        return False
+    if it.get("theme") == "index":
+        return False
+    if it["symbol"] in (REGIME_SYMBOL, INVERSE_SYMBOL):
+        return False
+    return it.get("asset_class") in ("equity", "etf")
 
-    p = merge_params(None)
-    instruments = load_watchlist()
-    def _tradable_jp(it: dict[str, Any]) -> bool:
-        if it.get("enabled", True) is False:
-            return False
-        if str(it.get("currency") or "JPY").upper() != "JPY":
-            return False
-        if it.get("asset_class") in ("inverse_etf", "index"):
-            return False
-        if it.get("theme") == "index":
-            return False
-        if it["symbol"] in (REGIME_SYMBOL, INVERSE_SYMBOL):
-            return False
-        return it.get("asset_class") in ("equity", "etf")
 
-    equities = [it for it in instruments if _tradable_jp(it)]
-    symbols = [REGIME_SYMBOL, INVERSE_SYMBOL, *[it["symbol"] for it in equities]]
-    print(f"# backtest range={args.range} capital={args.capital:.0f} names={len(equities)}", flush=True)
-    bars = load_bars(args.range, symbols)
-    if len(bars.get(REGIME_SYMBOL) or []) < 70:
-        print("# 日経ETFの日足が足りません", file=sys.stderr)
-        return 2
-
-    calendar = sorted({str(r["trade_date"])[:10] for r in bars[REGIME_SYMBOL]})
-    # SMA60 が効くところから開始
+def run_sim(
+    bars: dict[str, list[dict[str, Any]]],
+    equities: list[dict[str, Any]],
+    p: dict[str, Any],
+    capital: float,
+    *,
+    force_lot: bool = False,
+    skip_inverse: bool = False,
+    allow_symbols: set[str] | None = None,
+) -> dict[str, Any]:
+    """1セットのパラメータで全期間を回す。DB・実弾は触らない。"""
+    p = merge_params(p)
+    if allow_symbols:
+        equities = [it for it in equities if it["symbol"] in allow_symbols]
+    date_ix = {sym: _dates_of(rows) for sym, rows in bars.items()}
+    calendar = sorted(set(date_ix.get(REGIME_SYMBOL) or []))
+    if len(calendar) < 80:
+        raise RuntimeError(f"日経ETFの日足が足りません（{len(calendar)}本）")
     start_i = 60
-    cash = float(args.capital)
-    capital = float(args.capital)
+    cash = float(capital)
     positions: list[dict[str, Any]] = []
     trades: list[dict[str, Any]] = []
     equity_curve: list[tuple[str, float]] = []
-    peak = capital
+    peak = float(capital)
     max_dd = 0.0
-    pending: list[dict[str, Any]] = []  # 翌営業日約定
+    pending: list[dict[str, Any]] = []
+    skipped_lot = 0
 
     fracs = list(p["scale_fracs"])
     per = float(p["per_name_pct"])
     max_pos = int(p["max_positions"])
 
+    def sized_qty(budget: float, px: float) -> int:
+        nonlocal skipped_lot
+        if px <= 0:
+            return 0
+        qty = int(budget // px)
+        if qty < 1:
+            if force_lot:
+                skipped_lot += 0
+                return 1
+            skipped_lot += 1
+            return 0
+        return qty
+
     def fill_pending(day: str) -> None:
         nonlocal cash
         still: list[dict[str, Any]] = []
         for od in pending:
-            fill = next_open(bars.get(od["symbol"], []), od["signal_day"])
+            fill = next_open(bars.get(od["symbol"], []), date_ix.get(od["symbol"], []), od["signal_day"])
             if not fill:
                 still.append(od)
                 continue
@@ -208,14 +239,13 @@ def main() -> int:
     for day in calendar[start_i:]:
         fill_pending(day)
         as_of = date.fromisoformat(day)
-        regime_rows = history_until(bars[REGIME_SYMBOL], day)
+        regime_rows = history_until_idx(bars[REGIME_SYMBOL], date_ix[REGIME_SYMBOL], day)
         regime = regime_from_rows(regime_rows, p)
 
-        # exits / scale on today's close → fill next open
         for pos in list(positions):
             if pos.get("_pending_exit") or pos.get("_pending_add"):
                 continue
-            hist = history_until(bars.get(pos["symbol"], []), day)
+            hist = history_until_idx(bars.get(pos["symbol"], []), date_ix.get(pos["symbol"], []), day)
             if not hist:
                 continue
             px = float(hist[-1]["close"])
@@ -239,7 +269,9 @@ def main() -> int:
             if add:
                 next_level, tag, signs = add
                 budget = capital * per * float(fracs[next_level - 1])
-                qty = max(1, int(budget // px))
+                qty = sized_qty(budget, px)
+                if qty < 1:
+                    continue
                 pending.append(
                     {
                         "side": "buy",
@@ -260,7 +292,7 @@ def main() -> int:
             for it in equities:
                 if it["symbol"] in held:
                     continue
-                hist = history_until(bars.get(it["symbol"], []), day)
+                hist = history_until_idx(bars.get(it["symbol"], []), date_ix.get(it["symbol"], []), day)
                 scored = score_probe(hist, p)
                 if not scored:
                     continue
@@ -270,9 +302,9 @@ def main() -> int:
             slots = max_pos - open_count
             probe_budget = capital * per * float(fracs[0])
             for score, it, reason in cands[:slots]:
-                hist = history_until(bars[it["symbol"]], day)
+                hist = history_until_idx(bars[it["symbol"]], date_ix[it["symbol"]], day)
                 px = float(hist[-1]["close"])
-                qty = max(1, int(probe_budget // px))
+                qty = sized_qty(probe_budget, px)
                 if qty < 1:
                     continue
                 pending.append(
@@ -287,21 +319,30 @@ def main() -> int:
                 )
                 held.add(it["symbol"])
                 open_count += 1
-        elif regime == "risk_off" and INVERSE_SYMBOL not in held and open_count < max_pos:
-            hist = history_until(bars.get(INVERSE_SYMBOL, []), day)
+        elif (
+            not skip_inverse
+            and p.get("hedge_inverse", False)
+            and regime == "risk_off"
+            and INVERSE_SYMBOL not in held
+            and open_count < max_pos
+        ):
+            hist = history_until_idx(bars.get(INVERSE_SYMBOL, []), date_ix.get(INVERSE_SYMBOL, []), day)
             if hist:
-                pending.append(
-                    {
-                        "side": "inverse_buy",
-                        "symbol": INVERSE_SYMBOL,
-                        "qty": max(1, int((capital * per * fracs[0]) // float(hist[-1]["close"]))),
-                        "signal_day": day,
-                        "reason": "risk_off hedge probe",
-                        "scale_level": 1,
-                    }
-                )
+                px = float(hist[-1]["close"])
+                qty = sized_qty(capital * per * fracs[0], px)
+                if qty >= 1:
+                    pending.append(
+                        {
+                            "side": "inverse_buy",
+                            "symbol": INVERSE_SYMBOL,
+                            "qty": qty,
+                            "signal_day": day,
+                            "reason": "risk_off hedge probe",
+                            "scale_level": 1,
+                        }
+                    )
 
-        eq = mark_equity(positions, bars, day, cash)
+        eq = mark_equity(positions, bars, date_ix, day, cash)
         if eq > peak:
             peak = eq
         dd = (peak - eq) / peak if peak else 0.0
@@ -309,19 +350,17 @@ def main() -> int:
             max_dd = dd
         equity_curve.append((day, eq))
 
-    # 最終日で残建玉を終値評価（決済はしない）
     last_day = calendar[-1]
     fill_pending(last_day)
-    final_eq = mark_equity(positions, bars, last_day, cash)
+    final_eq = mark_equity(positions, bars, date_ix, last_day, cash)
     closed = [t for t in trades if t.get("status") == "filled" and t.get("side") in ("sell",)]
     pnls = [float(t.get("pnl") or 0) for t in closed]
     wins = [x for x in pnls if x > 0]
     ret = (final_eq - capital) / capital if capital else 0.0
-
-    summary = {
-        "range": args.range,
+    return {
         "from": calendar[start_i],
         "to": last_day,
+        "calendar_days": len(calendar) - start_i,
         "capital": capital,
         "final_equity": round(final_eq, 0),
         "return_pct": round(ret * 100, 2),
@@ -329,22 +368,74 @@ def main() -> int:
         "fills": len([t for t in trades if t.get("status") == "filled"]),
         "round_trips": len(pnls),
         "win_rate_pct": round(100 * len(wins) / len(pnls), 1) if pnls else None,
+        "avg_win": round(sum(wins) / len(wins), 0) if wins else 0,
+        "avg_loss": round(sum(x for x in pnls if x <= 0) / max(1, len(pnls) - len(wins)), 0) if pnls else 0,
+        "skipped_lot": skipped_lot,
         "open_positions": [
             {"symbol": x["symbol"], "qty": x["qty"], "avg": x["avg_price"]} for x in positions
         ],
-        "fill_model": "next_open",
-        "note": "過去検証。先読み回避のため翌営業日始値。実弾・ペーパー口座には未反映。",
+        "trades": trades,
+        "equity_curve": equity_curve,
     }
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    OUT_JSON.write_text(json.dumps({"summary": summary, "trades": trades[-80:]}, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Trade Desk 過去シミュレーション")
+    ap.add_argument("--range", default="1y", help="Yahoo range (1y/2y/5y/10y/max)")
+    ap.add_argument("--capital", type=float, default=100000)
+    ap.add_argument("--params-json", default="", help="DEFAULT_PARAMS を上書きする JSON")
+    ap.add_argument("--force-lot", action="store_true", help="予算不足でも1株買う（旧挙動・非推奨）")
+    ap.add_argument("--skip-inverse", action="store_true")
+    ap.add_argument("--no-save", action="store_true")
+    args = ap.parse_args()
+
+    extra = json.loads(args.params_json) if args.params_json else {}
+    p = merge_params(extra)
+    instruments = load_watchlist()
+    equities = [it for it in instruments if tradable_jp(it)]
+    symbols = [REGIME_SYMBOL, INVERSE_SYMBOL, *[it["symbol"] for it in equities]]
+    print(
+        f"# backtest range={args.range} capital={args.capital:.0f} names={len(equities)} force_lot={args.force_lot}",
+        flush=True,
+    )
+    bars = load_bars(args.range, symbols)
+    if len(bars.get(REGIME_SYMBOL) or []) < 70:
+        print("# 日経ETFの日足が足りません", file=sys.stderr)
+        return 2
+
+    result = run_sim(
+        bars,
+        equities,
+        p,
+        args.capital,
+        force_lot=args.force_lot,
+        skip_inverse=args.skip_inverse,
+    )
+    summary = {
+        "range": args.range,
+        **{k: v for k, v in result.items() if k not in ("trades", "equity_curve")},
+        "fill_model": "next_open",
+        "force_lot": args.force_lot,
+        "note": "過去検証。先読み回避のため翌営業日始値。1株が枠を超える銘柄は見送り（--force-lot で旧挙動）。",
+    }
+    if not args.no_save:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        OUT_JSON.write_text(
+            json.dumps({"summary": summary, "trades": result["trades"][-80:]}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
     print("📎 Trade Desk バックテスト")
     print(f"- 期間: {summary['from']} → {summary['to']}（{args.range}）")
-    print(f"- 仮想元手: {capital:,.0f}円 → 期末 {final_eq:,.0f}円（{ret*100:+.1f}%）")
-    print(f"- 最大DD: {max_dd*100:.1f}%")
-    print(f"- 約定: {summary['fills']}件 / 決済ラウンド {len(pnls)} / 勝率 {summary['win_rate_pct']}%")
-    print(f"- 約定モデル: 翌営業日始値（当日終値で判断）")
-    print(f"- 保存: {OUT_JSON}")
+    print(f"- 仮想元手: {args.capital:,.0f}円 → 期末 {summary['final_equity']:,.0f}円（{summary['return_pct']:+.1f}%）")
+    print(f"- 最大DD: {summary['max_drawdown_pct']:.1f}%")
+    print(
+        f"- 約定: {summary['fills']}件 / 決済ラウンド {summary['round_trips']} / 勝率 {summary['win_rate_pct']}%"
+    )
+    print(f"- 枠不足スキップ: {summary['skipped_lot']}回")
+    print("- 約定モデル: 翌営業日始値（当日終値で判断）")
+    if not args.no_save:
+        print(f"- 保存: {OUT_JSON}")
     print("- これはシミュレーション。実弾はトランシェ1までユーザー判断後")
     return 0
 

@@ -42,18 +42,17 @@ def load_watchlist() -> list[dict[str, Any]]:
     return list(data.get("instruments") or [])
 
 
-def fetch_yahoo_daily(symbol: str, range_: str = "1y") -> list[dict[str, Any]]:
-    url = f"{YAHOO_CHART.format(symbol=symbol)}?interval=1d&range={range_}"
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    ctx = ssl.create_default_context()
-    try:
-        with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"yahoo HTTP {e.code} {symbol}") from e
+def _yahoo_chart_url(symbol: str, *, range_: str | None = None, period1: int | None = None, period2: int | None = None) -> str:
+    base = YAHOO_CHART.format(symbol=symbol)
+    if period1 is not None and period2 is not None:
+        return f"{base}?interval=1d&period1={period1}&period2={period2}"
+    return f"{base}?interval=1d&range={range_ or '1y'}"
+
+
+def _parse_yahoo_chart(payload: dict[str, Any], symbol: str) -> list[dict[str, Any]]:
     result = ((payload.get("chart") or {}).get("result") or [None])[0]
     if not result:
-        raise RuntimeError(f"yahoo empty {symbol}")
+        return []
     ts = result.get("timestamp") or []
     quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
     opens = quote.get("open") or []
@@ -80,6 +79,44 @@ def fetch_yahoo_daily(symbol: str, range_: str = "1y") -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _fetch_yahoo_url(url: str, symbol: str) -> list[dict[str, Any]]:
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    ctx = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"yahoo HTTP {e.code} {symbol}") from e
+    return _parse_yahoo_chart(payload, symbol)
+
+
+def fetch_yahoo_daily(symbol: str, range_: str = "1y") -> list[dict[str, Any]]:
+    """日足取得。range=max は Yahoo が月足に間引くため、期間指定で分割する。"""
+    long = range_ in {"max", "20y", "15y", "10y"}
+    if long:
+        years = {"10y": 10, "15y": 15, "20y": 20}.get(range_, 20)
+        now = int(time.time())
+        start = now - years * 365 * 24 * 3600
+        chunk = 4 * 365 * 24 * 3600  # 4年ずつなら interval=1d が保たれやすい
+        merged: dict[str, dict[str, Any]] = {}
+        t = start
+        while t < now:
+            t2 = min(t + chunk, now)
+            url = _yahoo_chart_url(symbol, period1=t, period2=t2)
+            try:
+                chunk_rows = _fetch_yahoo_url(url, symbol)
+            except RuntimeError:
+                chunk_rows = []
+            for row in chunk_rows:
+                merged[row["trade_date"]] = row
+            t = t2
+            time.sleep(0.2)
+        if merged:
+            return [merged[k] for k in sorted(merged)]
+        return _fetch_yahoo_url(_yahoo_chart_url(symbol, range_="5y"), symbol)
+    return _fetch_yahoo_url(_yahoo_chart_url(symbol, range_=range_), symbol)
 
 
 def _num(arr: list[Any], i: int) -> float | None:
