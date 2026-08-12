@@ -95,7 +95,7 @@ export default async function HomePage() {
     <Shell active="/" email={user?.email ?? null}>
       <h1>KURASHIFT</h1>
       <p className="sub">
-        トップは資産の状態とテーマ投資の提案・実行。ライフプランは年1〜3回（年末／物件購入時など）。
+        ①資産運用（把握・テーマ提案／実行）と ②ライフプラン更新・個人申告ネタ。日常のトップは①。
       </p>
 
       {showAnnualNotice ? (
