@@ -113,7 +113,13 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             "--evidence-id",
             str(payload.get("evidence_id") or ""),
         ],
-        "portfolio_weekly": [py, str(REPO / "scripts" / "jarvis_portfolio_weekly.py"), "--cloud-only"],
+        "portfolio_weekly": [
+            py,
+            str(REPO / "scripts" / "jarvis_portfolio_weekly.py"),
+            # Mac worker 本線はフル収集（クラウドは GHA trade-desk-weekly）。手動ボタンは force 可。
+            *(["--force"] if payload.get("force") else []),
+            *(["--cloud-only"] if payload.get("cloud_only") else []),
+        ],
         "theme_preview": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_theme.py"),

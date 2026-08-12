@@ -24,6 +24,35 @@ from jarvis_trade_common import JST, REPO, sb_client, today_jst
 STATE_PATH = REPO / ".jarvis_state" / "portfolio_weekly.json"
 FINANCE = REPO / "215_kamiooya" / "C1_cursor" / "finance"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+ENV_PRIVATE = REPO / ".env.jarvis_private"
+
+
+def load_private_env() -> None:
+    """launchd の source 失敗でも動くよう、Python 側で .env.jarvis_private を読む。"""
+    if not ENV_PRIVATE.is_file():
+        return
+    try:
+        text = ENV_PRIVATE.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[7:].strip()
+        key, _, val = line.partition("=")
+        key = key.strip()
+        if not key or not key.replace("_", "").isalnum():
+            continue
+        val = val.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+            val = val[1:-1]
+        # 既にシェルで入っている値は上書きしない（手動実行の上書きを尊重）
+        if key not in os.environ or os.environ.get(key, "") == "":
+            os.environ[key] = val
+
+
 def now_iso() -> str:
     return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z")
 
@@ -531,6 +560,8 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
+
+    load_private_env()
 
     if os.environ.get("JARVIS_PORTFOLIO_WEEKLY_DISABLE") == "1":
         print("# skip: JARVIS_PORTFOLIO_WEEKLY_DISABLE=1")
