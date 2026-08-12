@@ -141,3 +141,7 @@ dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx
 .jarvis_state/ms_graph_device_login.env
 .jarvis_state/ms_graph_new_refresh.env
 .vercel
+# MF ME Playwright session (cookies / profile)
+.jarvis_state/mf_me_storage_state.json
+.jarvis_state/mf_bloomo_debug/
+.jarvis_state/mf_me_browser_profile/

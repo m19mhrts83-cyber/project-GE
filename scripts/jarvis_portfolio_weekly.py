@@ -186,13 +186,58 @@ def fetch_sony_by_account() -> dict[str, Any]:
     }
 
 
+def _mf_bloomo_ready() -> bool:
+    mf = REPO / "scripts" / "jarvis_mf_bloomo_balance.py"
+    if not mf.is_file():
+        return False
+    mf_state = (os.environ.get("MONEYFORWARD_STORAGE_STATE") or "").strip()
+    state = Path(mf_state).expanduser() if mf_state else (
+        REPO / ".jarvis_state" / "mf_me_storage_state.json"
+    )
+    if state.is_file():
+        return True
+    prof_raw = (os.environ.get("MONEYFORWARD_BROWSER_PROFILE") or "").strip()
+    profile = Path(prof_raw).expanduser() if prof_raw else (
+        REPO / ".jarvis_state" / "mf_me_browser_profile"
+    )
+    if profile.is_dir() and any(profile.iterdir()):
+        return True
+    return bool(
+        (os.environ.get("MONEYFORWARD_EMAIL") or "").strip()
+        and (os.environ.get("MONEYFORWARD_PASSWORD") or "").strip()
+    )
+
+
 def fetch_bloomo() -> dict[str, Any]:
+    """優先: マネーフォワード ME。失敗時のみ直スクレイプ（BLOOMO_*）。"""
+    mf_err = ""
+    if _mf_bloomo_ready():
+        mf = REPO / "scripts" / "jarvis_mf_bloomo_balance.py"
+        data = run_json_script(
+            [py_exe(), str(mf), "--headless", "--json"],
+            timeout=240,
+        )
+        if data.get("status") == "ok":
+            return {
+                "status": "ok",
+                "value_jpy": int(data["value_jpy"]),
+                "note": data.get("note") or "moneyforward",
+                "source": "moneyforward",
+            }
+        if data.get("status") != "skipped":
+            mf_err = str(data.get("reason") or data.get("status") or "mf_error")
+
     if not (
         os.environ.get("BLOOMO_EMAIL")
         or os.environ.get("BLOOMO_USERNAME")
         or os.environ.get("BLOOMO_LOGIN_ID")
     ):
-        return {"status": "skipped", "reason": "BLOOMO_EMAIL 未設定（.env.jarvis_private）"}
+        if mf_err:
+            return {"status": "error", "reason": f"MF取得失敗: {mf_err}"}
+        return {
+            "status": "skipped",
+            "reason": "MFセッション未設定かつ BLOOMO_EMAIL 未設定",
+        }
     script = REPO / "scripts" / "jarvis_bloomo_balance.py"
     if not script.is_file():
         return {"status": "skipped", "reason": "jarvis_bloomo_balance.py missing"}
@@ -202,10 +247,14 @@ def fetch_bloomo() -> dict[str, Any]:
     )
     if data.get("status") and data.get("status") != "ok":
         return data
+    note = data.get("note") or data.get("parser_mode") or ""
+    if mf_err:
+        note = f"{note}; mf_fallback={mf_err}"
     return {
         "status": "ok",
         "value_jpy": int(data["value_jpy"]),
-        "note": data.get("note") or data.get("parser_mode") or "",
+        "note": note,
+        "source": "bloomo_direct",
     }
 
 
@@ -505,7 +554,8 @@ def main() -> int:
             ),
             "sony_life_chikage": bool(os.environ.get("SONYLIFE_USERNAME_2")),
             "bloomo": bool(
-                os.environ.get("BLOOMO_EMAIL")
+                _mf_bloomo_ready()
+                or os.environ.get("BLOOMO_EMAIL")
                 or os.environ.get("BLOOMO_USERNAME")
                 or os.environ.get("BLOOMO_LOGIN_ID")
             ),
@@ -775,6 +825,39 @@ def main() -> int:
         print(
             f"# akatsuki_zaim: {sources['akatsuki_zaim'].get('status')} "
             f"{sources['akatsuki_zaim'].get('reason')}"
+        )
+
+    if (
+        not args.cloud_only
+        and not args.dry_run
+        and sources.get("bloomo", {}).get("status") == "ok"
+    ):
+        zaim_script = REPO / "scripts" / "jarvis_zaim_bloomo_weekly.py"
+        try:
+            zrc = subprocess.run(
+                [
+                    py_exe(),
+                    str(zaim_script),
+                    "--skip-fetch",
+                    "--value",
+                    str(int(sources["bloomo"]["value_jpy"])),
+                    "--apply",
+                    "--yes",
+                    "--headless",
+                ],
+                cwd=str(REPO),
+                timeout=240,
+                check=False,
+            )
+            sources["bloomo_zaim"] = {
+                "status": "ok" if zrc.returncode == 0 else "error",
+                "reason": f"exit={zrc.returncode}",
+            }
+        except Exception as exc:
+            sources["bloomo_zaim"] = {"status": "error", "reason": str(exc)[:300]}
+        print(
+            f"# bloomo_zaim: {sources['bloomo_zaim'].get('status')} "
+            f"{sources['bloomo_zaim'].get('reason')}"
         )
 
     ok_n = sum(1 for r in sources.values() if r.get("status") == "ok")

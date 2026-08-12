@@ -19,7 +19,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 DEBUG = REPO / ".jarvis_state" / "bloomo_debug"
-LOGIN_URL = os.environ.get("BLOOMO_LOGIN_URL", "https://bloomo.jp/").strip()
+LOGIN_URL = os.environ.get("BLOOMO_LOGIN_URL", "https://sec.bloomo.co.jp").strip()
 
 
 def creds() -> tuple[str, str]:

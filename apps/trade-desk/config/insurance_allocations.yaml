@@ -2,8 +2,8 @@
 # 正本: アクサ = IFA石川さん反映の参考配分。他社は対アクサ比較用。
 # 未確認の pct / monthly_yen は null。取得成功で web、失敗時は snap JSON を参照。
 #
-# 後続（未実装）: 月額・配分は「ユーザー指定 URL から取得」する方針。
-# 今は評価額のみ週次スクレイプ。配分％は手入力 or スクショ反映。
+# 配分・月額 URL の実体は .env.jarvis_private（口座トークン・セッション付きのため Git 非共有）。
+# 実装方針: ログイン後に下記 path_hint / screen_code へ遷移。Sony の cid/flashId 直叩きは参考のみ。
 
 reference_account: axa_life
 
@@ -14,6 +14,9 @@ advisor:
     アクサ生命の特別勘定比率は石川さんのアドバイスを反映した正とする。
     ソニー・プルデンシャルも同方針で揃えた。今後の比率変更はまずアクサを更新し、
     他社との差分を /portfolio で確認してから手を動かす。
+    【後回し・要望】比率確認後は石川さんへ連絡し、返信を要約して変更／見直しをユーザー確認する。
+    連絡はまず iMessage。文字数不足ならメールアドレスを聞いてメールへ。
+    詳細: docs/KURASHIFT_検証プラン.md「後回しバックログ B-IFA-1」
   related_accounts:
     - axa_life
     - sony_life
@@ -26,9 +29,17 @@ accounts:
     label: アクサ生命（真治）
     role: reference
     monthly_yen: null
+    monthly_source: zaim
     funds: []
     as_of: null
     source: pending
+    fetch:
+      premium_url_env: AXA_ALLOC_PREMIUM_URL
+      account_value_url_env: AXA_ALLOC_ACCOUNT_VALUE_URL
+      path_hint:
+        - /fund-allocation/premium/
+        - /fund-allocation/account-value/
+      note: 月額は MyAXA で見つからず。Zaim 入金履歴を正とする（AXA_MONTHLY_SOURCE=zaim）
 
   sony_life:
     label: ソニー生命（真治）
@@ -37,6 +48,17 @@ accounts:
     funds: []
     as_of: null
     source: pending
+    fetch:
+      alloc_url_env: SONYLIFE_ALLOC_URL_1
+      alloc_url_env_alt: SONYLIFE_ALLOC_URL_1B
+      monthly_url_env: SONYLIFE_MONTHLY_URL_1
+      monthly_url_env_alt: SONYLIFE_MONTHLY_URL_1B
+      screen_code_alloc:
+        - PYHW0770
+        - PYHW0730
+      screen_code_monthly:
+        - PYHW2410
+      note: Seam cid/flashId はセッション切れしやすい。ログイン後に画面コード遷移が本線
 
   sony_life_chikage:
     label: ソニー生命（千景）
@@ -45,6 +67,14 @@ accounts:
     funds: []
     as_of: null
     source: pending
+    fetch:
+      alloc_url_env: SONYLIFE_ALLOC_URL_2
+      monthly_url_env: SONYLIFE_MONTHLY_URL_2
+      screen_code_alloc:
+        - PYHW0730
+      screen_code_monthly:
+        - PYHW2410
+      note: 真治と同様、cid 直叩きは参考。ログイン後遷移が本線
 
   prudential_life:
     label: プルデンシャル生命（真治）
