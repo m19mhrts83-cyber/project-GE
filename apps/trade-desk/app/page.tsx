@@ -338,7 +338,7 @@ export default async function HomePage() {
         資産運用の次アクション
       </h2>
       <p className="meta" style={{ marginBottom: 12 }}>
-        分析→提案→相談→承認→実行。資金移動は{" "}
+        分析→提案→<strong>相談で内容確認</strong>→承認→実行。資金移動は{" "}
         <a href="/money-ops">資金移動オペ</a>（提案→承認→手順アシスト）。
       </p>
       <EnqueueJobButton
@@ -369,7 +369,9 @@ export default async function HomePage() {
                 <tr key={t.id}>
                   <td>{t.status}</td>
                   <td>
-                    <strong>{t.title}</strong>
+                    <a href={`/themes/${t.id}`}>
+                      <strong>{t.title}</strong>
+                    </a>
                     <div className="meta">{t.hypothesis}</div>
                   </td>
                   <td>
@@ -377,12 +379,22 @@ export default async function HomePage() {
                   </td>
                   <td className="meta">{t.funding_path ?? "—"}</td>
                   <td>
-                    <EnqueueJobButton
-                      jobType="theme_preview"
-                      title={`preview ${t.title}`}
-                      payload={{ theme_id: t.id }}
-                      label="プレビュー"
-                    />
+                    {t.status === "consulting" ? (
+                      <a
+                        className="btn primary"
+                        href={`/themes/${t.id}`}
+                        style={{ fontSize: 12, padding: "4px 8px" }}
+                      >
+                        相談確認→承認
+                      </a>
+                    ) : (
+                      <EnqueueJobButton
+                        jobType="theme_preview"
+                        title={`preview ${t.title}`}
+                        payload={{ theme_id: t.id }}
+                        label="プレビュー"
+                      />
+                    )}
                   </td>
                 </tr>
               ))}
