@@ -1,0 +1,62 @@
+# 生命保険の特別勘定配分・月額積立（KURASHIFT）
+# 正本: アクサ = IFA石川さん反映の参考配分。他社は対アクサ比較用。
+# 未確認の pct / monthly_yen は null。取得成功で web、失敗時は snap JSON を参照。
+
+reference_account: axa_life
+
+advisor:
+  name: 石川さん
+  role: IFA（独立系ファイナンシャルアドバイザー）
+  policy: |
+    アクサ生命の特別勘定比率は石川さんのアドバイスを反映した正とする。
+    ソニー・プルデンシャルも同方針で揃えた。今後の比率変更はまずアクサを更新し、
+    他社との差分を /portfolio で確認してから手を動かす。
+  related_accounts:
+    - axa_life
+    - sony_life
+    - sony_life_chikage
+    - prudential_life
+    - prudential_life_chikage
+
+accounts:
+  axa_life:
+    label: アクサ生命（真治）
+    role: reference
+    monthly_yen: null
+    funds: []
+    as_of: null
+    source: pending
+
+  sony_life:
+    label: ソニー生命（真治）
+    role: compare
+    monthly_yen: null
+    funds: []
+    as_of: null
+    source: pending
+
+  sony_life_chikage:
+    label: ソニー生命（千景）
+    role: compare
+    monthly_yen: null
+    funds: []
+    as_of: null
+    source: pending
+
+  prudential_life:
+    label: プルデンシャル生命（真治）
+    role: compare
+    monthly_yen: null
+    funds: []
+    as_of: null
+    source: pending
+    note: 評価額は手登録（PRUDENTIAL_VALUE_JPY）。配分は手登録 snap のみ
+
+  prudential_life_chikage:
+    label: プルデンシャル生命（千景）
+    role: compare
+    monthly_yen: null
+    funds: []
+    as_of: null
+    source: pending
+    note: 評価額は手登録（PRUDENTIAL_CHIKAGE_VALUE_JPY）。配分は手登録 snap のみ

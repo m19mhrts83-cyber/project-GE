@@ -169,7 +169,7 @@ def _load_env_file(path: Path) -> None:
         key, value = stripped.split("=", 1)
         key = key.strip()
         value = value.strip().strip("'\"")
-        if key and value and key not in os.environ:
+        if key and value:
             os.environ[key] = value
 
 
@@ -507,6 +507,26 @@ def _collect_prudential_accounts() -> list[tuple[str, str]]:
             )
         pairs.append((u, p))
     return pairs
+
+
+def _filter_prudential_accounts(
+    pairs: list[tuple[str, str]],
+    *,
+    only_accounts: list[int] | None,
+) -> list[tuple[int, str, str]]:
+    """(account_no, username, password) のリスト。only_accounts で口座番号を絞る。"""
+    out: list[tuple[int, str, str]] = []
+    for i, (u, p) in enumerate(pairs):
+        account_no = i + 1
+        if only_accounts and account_no not in only_accounts:
+            continue
+        out.append((account_no, u, p))
+    if only_accounts and not out:
+        want = ", ".join(str(x) for x in only_accounts)
+        raise RuntimeError(
+            f"--account で指定した口座がありません: {want}（PRUDENTIAL_USERNAME_N / PASSWORD_N を確認）"
+        )
+    return out
 
 
 def _otp_env_for_account(account_1based: int) -> str:
@@ -1214,61 +1234,229 @@ def _prudential_looks_like_login_form_again(page) -> bool:
     return False
 
 
-def _wait_prudential_post_login_settle(
+def _prudential_page_is_loading(page) -> bool:
+    """LWC / Salesforce のローディング表示中か（ログイン・OTP 直後の待ちに使用）。"""
+    try:
+        for sel in (
+            "c-alfa-spinner",
+            ".slds-spinner",
+            ".slds-spinner_container",
+            "lightning-spinner",
+            ".m-loading",
+            '[class*="loading-overlay"]',
+        ):
+            loc = page.locator(sel).first
+            if loc.count() > 0 and loc.is_visible(timeout=400):
+                return True
+    except Exception:
+        pass
+    try:
+        body = (page.inner_text("body") or "")[:4000]
+        if "読み込み中" in body:
+            return True
+    except Exception:
+        pass
+    try:
+        title = (page.title() or "").strip()
+        if title in ("Loading...", "読み込み中"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _prudential_contract_surface_ready(page, *, timeout_ms: int = 2000) -> bool:
+    """契約一覧・契約詳細の本体が見えているか。"""
+    for sel in (
+        "c-mypg-contr-cont-inq-basic-detail",
+        "c-mypg-contr-cont-inq-cash-val-detail",
+        "c-mypg-contract-list-detail",
+    ):
+        try:
+            loc = page.locator(sel).first
+            if loc.count() > 0 and loc.is_visible(timeout=timeout_ms):
+                return True
+        except Exception:
+            continue
+    try:
+        title = (page.title() or "")
+        if "契約内容" in title:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _prudential_try_dismiss_blocking_modals_js(page) -> bool:
+    """Shadow DOM 内モーダルを JS で閉じる（Playwright locator が届かない場合の救済）。"""
+    try:
+        clicked = page.evaluate(
+            """
+() => {
+  const selectors = [
+    'section[aria-labelledby*="addr-chg"] button.m-btn-modal-close',
+    'button.m-btn-modal-close[data-micromodal-close]',
+    'c-mypg-common-dialog-addr-chg-modal-detail',
+  ];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (!el) continue;
+    const btn = el.matches('button') ? el : el.closest('section')?.querySelector('button.m-btn-modal-close');
+    if (btn) { btn.click(); return true; }
+  }
+  return false;
+}
+"""
+        )
+        if clicked:
+            print("↪ JS で「メール送信できませんでした」モーダルを閉じました。", file=sys.stderr)
+            try:
+                page.wait_for_timeout(1000)
+            except Exception:
+                time.sleep(1.0)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _prudential_try_dismiss_blocking_modals(page, timeout_ms: int = 4000) -> bool:
+    """ログイン直後に **表示中** の「メールアドレス変更のお願い」等のモーダルを閉じる。"""
+    if not _prudential_page_has_email_send_failed_modal(page):
+        return False
+    cap = min(8000, max(1500, timeout_ms))
+    dialog_selectors = (
+        '[data-id="addr-chg-modal"]:not([aria-hidden="true"])',
+        'section[role="dialog"][aria-labelledby*="addr-chg"]:visible',
+    )
+    for dlg_sel in dialog_selectors:
+        try:
+            dlg = page.locator(dlg_sel).first
+            if dlg.count() == 0 or not dlg.is_visible(timeout=600):
+                continue
+            for btn_sel in (
+                'button.m-btn-modal-close:has-text("閉じる")',
+                'button[aria-label="モーダルを閉じる"]',
+            ):
+                btn = dlg.locator(btn_sel).first
+                if btn.count() > 0 and btn.is_visible(timeout=600):
+                    btn.click(timeout=cap)
+                    print("↪ 「メール送信できませんでした」モーダルを閉じました。", file=sys.stderr)
+                    try:
+                        page.wait_for_timeout(800)
+                    except Exception:
+                        time.sleep(0.8)
+                    return True
+        except Exception:
+            continue
+    return _prudential_try_dismiss_blocking_modals_js(page)
+
+
+def _wait_prudential_spa_surface(
     page,
     *,
     otp_selector: str,
     timeout_ms: int,
+    phase: str,
 ) -> tuple[str, str]:
     """
-    ログインクリック直後: LWC が **確認番号画面** か **マイページ** に落ち着くまで待つ。
-
-    固定の PRUDENTIAL_POST_LOGIN_ANIMATION_MS だけ sleep すると、
-    確認番号 UI が一瞬表示されたあと SPA がログイン画面に戻る場合に、
-    その後の処理が「どのページか分からない」まま進んでしまう。
-
-    - マイページ（c-mypg-top-detail）が先に出たら確認番号不要として終了。
-    - 確認番号欄が **一定時間連続で見える** まで待ってから otp とする（チラ見えを除外）。
-    - ログイン画面に戻ったと判断したら login_reset。
+    ログイン／OTP 送信後: ローディングを挟みながら OTP・マイページ・契約画面のいずれかが
+    安定して見えるまで待つ（固定 sleep の代わり）。
     """
-    max_ms = _env_int_nonneg("PRUDENTIAL_POST_LOGIN_SETTLE_MS", 90000)
-    poll_ms = max(200, _env_int_nonneg("PRUDENTIAL_POST_LOGIN_SETTLE_POLL_MS", 400))
-    stable_ms = max(500, _env_int_nonneg("PRUDENTIAL_OTP_STEP_STABLE_MS", 2000))
+    max_ms = _env_int_nonneg("PRUDENTIAL_SPA_SETTLE_MS", 120000)
+    poll_ms = max(300, _env_int_nonneg("PRUDENTIAL_SPA_SETTLE_POLL_MS", 500))
+    stable_ms = max(800, _env_int_nonneg("PRUDENTIAL_OTP_STEP_STABLE_MS", 2000))
     deadline = time.monotonic() + max_ms / 1000.0
-    first_otp_mono: float | None = None
+    first_hit_mono: float | None = None
+    last_loading_log = 0.0
     login_reset_streak = 0
 
     while time.monotonic() < deadline:
+        _prudential_try_dismiss_blocking_modals(page, timeout_ms=min(4000, timeout_ms))
+        if _prudential_page_is_loading(page):
+            first_hit_mono = None
+            nowl = time.monotonic()
+            if nowl - last_loading_log >= 8.0:
+                print(f"⏳ [{phase}] サイト側ローディング中… 待機を続けます。", file=sys.stderr)
+                last_loading_log = nowl
+            try:
+                page.wait_for_timeout(poll_ms)
+            except Exception:
+                time.sleep(poll_ms / 1000.0)
+            continue
+
+        # ログイン送信直後: guest シェル上でスピナーが **表示中**（OTP/ログイン欄未表示）＝遷移中
         try:
-            if _prudential_authenticated_top_ready(page, timeout_ms=2500):
-                return "mypage", "マイページ（認証後トップ）を検出しました。"
+            spinner = page.locator("c-alfa-spinner").first
+            spinner_visible = spinner.count() > 0 and spinner.is_visible(timeout=400)
+            if (
+                spinner_visible
+                and _prudential_guest_shell_visible(page)
+                and not _prudential_looks_like_login_form_again(page)
+            ):
+                otp_probe = _prudential_otp_input_visible(page, otp_selector) or (
+                    _page_looks_like_prudential_otp_challenge(page)
+                )
+                if not otp_probe and not _prudential_authenticated_top_ready(page, timeout_ms=1200):
+                    first_hit_mono = None
+                    nowg = time.monotonic()
+                    if nowg - last_loading_log >= 8.0:
+                        print(
+                            f"⏳ [{phase}] ゲスト画面の遷移中（スピナー）… 待機を続けます。",
+                            file=sys.stderr,
+                        )
+                        last_loading_log = nowg
+                    try:
+                        page.wait_for_timeout(poll_ms)
+                    except Exception:
+                        time.sleep(poll_ms / 1000.0)
+                    continue
         except Exception:
             pass
+
+        if _prudential_page_has_email_send_failed_modal(page):
+            first_hit_mono = None
+            nowm = time.monotonic()
+            if nowm - last_loading_log >= 6.0:
+                print(
+                    f"⏳ [{phase}] 「メール送信できませんでした」モーダルを検出。閉じて待機を続けます。",
+                    file=sys.stderr,
+                )
+                last_loading_log = nowm
+            login_reset_streak = 0
+            try:
+                page.wait_for_timeout(poll_ms)
+            except Exception:
+                time.sleep(poll_ms / 1000.0)
+            continue
+
+        try:
+            if _prudential_authenticated_top_ready(page, timeout_ms=2000):
+                return "mypage", f"[{phase}] マイページ（認証後）を検出しました。"
+        except Exception:
+            pass
+        if _prudential_contract_surface_ready(page, timeout_ms=1500):
+            return "contract", f"[{phase}] 契約画面を検出しました。"
 
         otp_ok = _prudential_otp_input_visible(page, otp_selector) or _page_looks_like_prudential_otp_challenge(
             page
         )
         now = time.monotonic()
-
         if otp_ok:
-            if first_otp_mono is None:
-                first_otp_mono = now
-                print(
-                    "⏳ 確認番号まわりの画面を検出しました。表示が安定するまで待ちます…",
-                    file=sys.stderr,
-                )
-            elif (now - first_otp_mono) * 1000.0 >= stable_ms:
-                return "otp", "確認番号ステップが安定して表示されています。"
+            if first_hit_mono is None:
+                first_hit_mono = now
+                print(f"⏳ [{phase}] 確認番号画面を検出。安定するまで待ちます…", file=sys.stderr)
+            elif (now - first_hit_mono) * 1000.0 >= stable_ms:
+                return "otp", f"[{phase}] 確認番号ステップが安定して表示されています。"
         else:
-            first_otp_mono = None
+            first_hit_mono = None
 
         if _prudential_looks_like_login_form_again(page) and not otp_ok:
             login_reset_streak += 1
-            if login_reset_streak >= max(3, int(5000 / poll_ms)):
+            if login_reset_streak >= max(12, int(15000 / poll_ms)):
                 return (
                     "login_reset",
-                    "ログイン画面（ID・パスワード）に戻ったように見えます。"
-                    "確認番号画面が消えた・セッションが切れた可能性があります。",
+                    f"[{phase}] ログイン画面に戻ったように見えます。",
                 )
         else:
             login_reset_streak = 0
@@ -1280,8 +1468,77 @@ def _wait_prudential_post_login_settle(
 
     return (
         "timeout",
-        f"{max_ms} ms 以内にマイページまたは安定した確認番号画面を確認できませんでした。",
+        f"[{phase}] {max_ms} ms 以内に OTP・マイページ・契約画面のいずれも安定表示されませんでした。",
     )
+
+
+def _spa_surface_timeout_kind(page) -> str:
+    if _prudential_page_has_email_send_failed_modal(page):
+        return "email_modal"
+    return "timeout"
+
+
+def _wait_prudential_post_login_settle(
+    page,
+    *,
+    otp_selector: str,
+    timeout_ms: int,
+) -> tuple[str, str]:
+    """
+    ログインクリック直後: LWC が **確認番号画面** か **マイページ** に落ち着くまで待つ。
+    ローディング中はタイムアウトにカウントせず待機を続ける。
+    """
+    override_ms = os.environ.get("PRUDENTIAL_POST_LOGIN_SETTLE_MS", "").strip()
+    if override_ms:
+        prev = os.environ.get("PRUDENTIAL_SPA_SETTLE_MS", "")
+        os.environ["PRUDENTIAL_SPA_SETTLE_MS"] = override_ms
+        try:
+            return _wait_prudential_spa_surface(
+                page,
+                otp_selector=otp_selector,
+                timeout_ms=timeout_ms,
+                phase="post_login",
+            )
+        finally:
+            if prev:
+                os.environ["PRUDENTIAL_SPA_SETTLE_MS"] = prev
+            else:
+                os.environ.pop("PRUDENTIAL_SPA_SETTLE_MS", None)
+    return _wait_prudential_spa_surface(
+        page,
+        otp_selector=otp_selector,
+        timeout_ms=timeout_ms,
+        phase="post_login",
+    )
+
+
+def _prudential_page_has_email_send_failed_modal(page) -> bool:
+    """
+    「メールアドレス変更のお願い」モーダルが **表示中** かどうか。
+    文言は非表示テンプレートにも常に含まれるため page.content() 全文検索は使わない。
+    """
+    try:
+        modal = page.locator('[data-id="addr-chg-modal"]').first
+        if modal.count() > 0:
+            hidden = modal.get_attribute("aria-hidden")
+            if hidden is None or hidden.lower() == "false":
+                if modal.is_visible(timeout=400):
+                    return True
+    except Exception:
+        pass
+    try:
+        dlg = page.locator(
+            'section[role="dialog"][aria-labelledby*="addr-chg"]:visible'
+        ).first
+        if dlg.count() > 0 and dlg.is_visible(timeout=400):
+            body = dlg.locator("c-mypg-common-dialog-addr-chg-modal-detail").first
+            if body.count() > 0:
+                txt = body.inner_text(timeout=800)
+                if "メールを送信できませんでした" in txt:
+                    return True
+    except Exception:
+        pass
+    return False
 
 
 def _prudential_try_check_trusted_device(page, timeout_ms: int) -> bool:
@@ -1989,18 +2246,32 @@ def _env_int_nonneg(name: str, default: int) -> int:
         return default
 
 
-def _otp_storage_state_path() -> Path:
+def _otp_storage_state_path(account_no: int = 1) -> Path:
     raw = os.environ.get("PRUDENTIAL_OTP_STORAGE_STATE_PATH", "").strip()
-    return Path(raw).expanduser() if raw else DEFAULT_OTP_STORAGE_STATE
+    if raw:
+        base = Path(raw).expanduser()
+        if account_no <= 1:
+            return base
+        return base.with_name(f"{base.stem}_account{account_no}{base.suffix}")
+    if account_no <= 1:
+        return DEFAULT_OTP_STORAGE_STATE
+    return SCRIPT_DIR / f".prudential_otp_storage_state_account{account_no}.json"
 
 
-def _otp_resume_meta_path() -> Path:
+def _otp_resume_meta_path(account_no: int = 1) -> Path:
     raw = os.environ.get("PRUDENTIAL_OTP_RESUME_META_PATH", "").strip()
-    return Path(raw).expanduser() if raw else DEFAULT_OTP_RESUME_META
+    if raw:
+        base = Path(raw).expanduser()
+        if account_no <= 1:
+            return base
+        return base.with_name(f"{base.stem}_account{account_no}{base.suffix}")
+    if account_no <= 1:
+        return DEFAULT_OTP_RESUME_META
+    return SCRIPT_DIR / f".prudential_otp_resume_meta_account{account_no}.json"
 
 
-def _load_otp_resume_meta() -> dict | None:
-    p = _otp_resume_meta_path()
+def _load_otp_resume_meta(account_no: int = 1) -> dict | None:
+    p = _otp_resume_meta_path(account_no)
     if not p.exists():
         return None
     try:
@@ -2018,8 +2289,8 @@ def _save_prudential_otp_checkpoint(
     login_submit_ms: int,
 ) -> None:
     """確認番号画面の Playwright storage_state を保存（--resume-otp でログインを繰り返さない）。"""
-    state_path = _otp_storage_state_path()
-    meta_path = _otp_resume_meta_path()
+    state_path = _otp_storage_state_path(account_no)
+    meta_path = _otp_resume_meta_path(account_no)
     state_path.parent.mkdir(parents=True, exist_ok=True)
     context.storage_state(path=str(state_path))
     meta = {
@@ -2051,6 +2322,7 @@ def fetch_prudential_surrender_value(
     resume_otp_only: bool | None = None,
     otp_pause_before_submit: bool | None = None,
     otp_pause_at_screen: bool | None = None,
+    only_accounts: list[int] | None = None,
 ) -> PrudentialSurrenderValueResult:
     _load_env_file(env_file)
 
@@ -2091,29 +2363,38 @@ def fetch_prudential_surrender_value(
     if not login_url:
         raise RuntimeError("PRUDENTIAL_LOGIN_URL が未設定です。")
 
-    accounts = _collect_prudential_accounts()
+    accounts = _filter_prudential_accounts(
+        _collect_prudential_accounts(),
+        only_accounts=only_accounts,
+    )
 
     resume_otp_effective = (
         resume_otp_only
         if resume_otp_only is not None
         else _env_yesno_or_default("PRUDENTIAL_RESUME_OTP_ONLY", default=False)
     )
-    if resume_otp_effective and len(accounts) > 1:
-        print(
-            "注意: --resume-otp は保存セッションが 1人目の確認番号画面のため、"
-            f"2人目以降（{len(accounts) - 1} 件）はこの実行ではスキップします。",
-            file=sys.stderr,
-        )
-        accounts = accounts[:1]
 
     username_selector = os.environ.get("PRUDENTIAL_USERNAME_SELECTOR", "").strip()
     password_selector = os.environ.get("PRUDENTIAL_PASSWORD_SELECTOR", "").strip()
     submit_selector = os.environ.get("PRUDENTIAL_SUBMIT_SELECTOR", "").strip()
+    login_heuristic_fallback_early = _env_yesno_or_default(
+        "PRUDENTIAL_LOGIN_HEURISTIC_FALLBACK",
+        default=True,
+    )
     if not username_selector or not password_selector or not submit_selector:
-        raise RuntimeError(
-            "プルデンシャル生命のログイン用に "
-            "PRUDENTIAL_USERNAME_SELECTOR / PRUDENTIAL_PASSWORD_SELECTOR / "
-            "PRUDENTIAL_SUBMIT_SELECTOR を設定してください（契約者サイトの画面に合わせる）。"
+        if not login_heuristic_fallback_early:
+            raise RuntimeError(
+                "プルデンシャル生命のログイン用に "
+                "PRUDENTIAL_USERNAME_SELECTOR / PRUDENTIAL_PASSWORD_SELECTOR / "
+                "PRUDENTIAL_SUBMIT_SELECTOR を設定してください（契約者サイトの画面に合わせる）。"
+            )
+        # ヒューリスティック解決が有効なときは仮セレクタで先へ進む（実フィールドは後段で解決）
+        username_selector = username_selector or 'input[id^="input-"]'
+        password_selector = password_selector or 'input[type="password"]'
+        submit_selector = submit_selector or 'button:has-text("ログイン")'
+        print(
+            "ℹ️ PRUDENTIAL_*_SELECTOR 未設定のため、ログイン欄はヒューリスティック解決を使います。",
+            file=sys.stderr,
         )
 
     logout_url = os.environ.get("PRUDENTIAL_LOGOUT_URL", "").strip()
@@ -2157,16 +2438,32 @@ def fetch_prudential_surrender_value(
     items: list[PrudentialSurrenderAccountResult] = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
+        browser = p.chromium.launch(
+            headless=headless,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+            ],
+        )
         # 重要: 同一タブ/同一セッションを使い回すと、ログインがループしてゲストに戻ることがある。
         # そのため、原則として「アカウントごとに新しい browser context（=新セッション）」を使う。
         context = None
         page = None
 
-        for idx, (username, password) in enumerate(accounts):
-            account_no = idx + 1
+        for account_no, username, password in accounts:
             login_submit_ms = 0
-            resume_here = bool(resume_otp_effective and idx == 0)
+            after_settle = ""
+            meta_pre = _load_otp_resume_meta(account_no) if resume_otp_effective else None
+            resume_here = bool(
+                resume_otp_effective
+                and meta_pre
+                and (meta_pre.get("otp_page_url") or "").strip()
+            )
+            if resume_otp_effective and not resume_here:
+                raise RuntimeError(
+                    f"アカウント{account_no} の確認番号画面からの再開用データがありません。"
+                    f"先に `--account {account_no}` で通常実行し、確認番号画面まで進むと "
+                    f"{_otp_resume_meta_path(account_no).name} が作成されます。"
+                )
             # 1アカウント分を新しいセッションで開始
             if context is not None:
                 try:
@@ -2174,13 +2471,7 @@ def fetch_prudential_surrender_value(
                 except Exception:
                     pass
             if resume_here:
-                meta_pre = _load_otp_resume_meta()
-                state_path = _otp_storage_state_path()
-                if not meta_pre or not (meta_pre.get("otp_page_url") or "").strip():
-                    raise RuntimeError(
-                        "確認番号画面からの再開用データがありません。"
-                        f"先に通常実行でログイン〜確認番号画面まで進むと {DEFAULT_OTP_RESUME_META.name} が作成されます。"
-                    )
+                state_path = _otp_storage_state_path(account_no)
                 if not state_path.exists():
                     raise RuntimeError(
                         f"セッションファイルがありません: {state_path}\n"
@@ -2196,7 +2487,7 @@ def fetch_prudential_surrender_value(
             page.set_default_timeout(timeout_ms)
 
             if resume_here:
-                meta = _load_otp_resume_meta() or {}
+                meta = _load_otp_resume_meta(account_no) or {}
                 otp_url = (meta.get("otp_page_url") or "").strip()
                 if not otp_url:
                     raise RuntimeError("再開用メタに otp_page_url がありません。")
@@ -2289,6 +2580,7 @@ def fetch_prudential_surrender_value(
                     s_loc.click()
                     login_submit_ms = int(time.time() * 1000)
                     _wait_page_ready(page, timeout_ms)
+                    _prudential_try_dismiss_blocking_modals(page, timeout_ms=min(5000, timeout_ms))
                     # 固定 sleep だけだと、確認番号画面が一瞬で消えてログインに戻る SPA では
                     # 「今どのページか」が不定のまま Gmail 待ち等に進んでしまうため、
                     # マイページ or 確認番号ステップが安定するまでポーリングする。
@@ -2298,6 +2590,7 @@ def fetch_prudential_surrender_value(
                         timeout_ms=timeout_ms,
                     )
                     print(f"📌 {settle_msg} （判定: {settle_kind}）", file=sys.stderr)
+                    after_settle = settle_kind
                     if settle_kind == "login_reset":
                         DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
                         dbg_lr = DEFAULT_DEBUG_DIR / (
@@ -2314,7 +2607,12 @@ def fetch_prudential_surrender_value(
                             "ログインへ戻る場合があります。表示ありブラウザで再現を確認するか、"
                             "時間帯を変えて試してください。"
                         )
-                    if settle_kind == "timeout":
+                    if settle_kind == "timeout" and _prudential_page_has_email_send_failed_modal(page):
+                        settle_kind = "email_modal"
+                        settle_msg = (
+                            "[post_login] 確認番号メール送信エラーのモーダルが解消されませんでした。"
+                        )
+                    if settle_kind in ("timeout", "email_modal"):
                         DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
                         dbg_to = DEFAULT_DEBUG_DIR / (
                             f"prudential_post_login_settle_timeout_account{account_no}.html"
@@ -2323,8 +2621,17 @@ def fetch_prudential_surrender_value(
                             dbg_to.write_text(page.content(), encoding="utf-8")
                         except Exception:
                             pass
+                        extra = ""
+                        if _prudential_page_has_email_send_failed_modal(page):
+                            extra = (
+                                " 「メールを送信できませんでした」モーダルが表示されたままです。"
+                                " ヘッドレスでは確認番号メールが送れないことがあります。"
+                                " ブラウザ手動ログイン後 `--account 2 --resume-otp`、"
+                                " または `--account 2` をヘッドレスなしで試してください。"
+                            )
                         raise RuntimeError(
                             f"{settle_msg} {dbg_to.name} を保存しました。"
+                            f"{extra}"
                             " PRUDENTIAL_POST_LOGIN_SETTLE_MS（最大待ち）や"
                             " PRUDENTIAL_OTP_STEP_STABLE_MS（確認番号 UI が連続で見える時間）を"
                             "伸ばして試してください。"
@@ -2337,11 +2644,16 @@ def fetch_prudential_surrender_value(
                     if debug_login_submit_effective:
                         _dump_login_submit_debug(page, account_no, "after_post_login_anim")
 
-            otp_override = otp_code_override if account_no == 1 else None
+            if otp_code_override and (account_no == 1 or len(accounts) == 1):
+                otp_override = otp_code_override
+            else:
+                otp_override = None
             otp_env = _otp_env_for_account(account_no)
             has_otp_from_user = bool((otp_override or "").strip() or (otp_env or "").strip())
             if resume_here:
                 needs_otp = True
+            elif after_settle in ("mypage", "contract"):
+                needs_otp = False
             else:
                 needs_otp = bool(otp_selector and page.locator(otp_selector).count() > 0) or (
                     _page_looks_like_prudential_otp_challenge(page)
@@ -2752,8 +3064,30 @@ def fetch_prudential_surrender_value(
                         page.screenshot(path=str(png), full_page=True)
                     except Exception:
                         pass
-                # OTP 通過後の「マイページ」アニメーション・本体描画待ち
-                _sleep_ms(page, after_otp_anim_ms)
+                # OTP 通過後: ローディングを挟みながらマイページ／契約画面まで待つ
+                after_settle, after_msg = _wait_prudential_spa_surface(
+                    page,
+                    otp_selector=otp_selector,
+                    timeout_ms=timeout_ms,
+                    phase="after_otp",
+                )
+                print(f"📌 {after_msg} （判定: {after_settle}）", file=sys.stderr)
+                if after_settle == "timeout":
+                    if save_debug:
+                        try:
+                            DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+                            dbg = DEFAULT_DEBUG_DIR / (
+                                f"prudential_after_otp_settle_timeout_account{account_no}.html"
+                            )
+                            dbg.write_text(page.content(), encoding="utf-8")
+                        except Exception:
+                            pass
+                    raise RuntimeError(
+                        f"{after_msg} PRUDENTIAL_SPA_SETTLE_MS / "
+                        "PRUDENTIAL_AFTER_OTP_ANIMATION_MS を伸ばして試してください。"
+                    )
+                # 従来の固定アニメ待ち（契約ナビ前の余裕）
+                _sleep_ms(page, min(after_otp_anim_ms, 8000))
 
             if _page_still_matches_login_hint(page):
                 raise RuntimeError(
@@ -2765,11 +3099,15 @@ def fetch_prudential_surrender_value(
             top_wait = int(
                 os.environ.get(
                     "PRUDENTIAL_MYPAGE_TOP_WAIT_MS",
-                    str(min(25000, max(8000, timeout_ms // 2))),
+                    str(min(45000, max(15000, timeout_ms))),
                 )
-                or str(min(25000, max(8000, timeout_ms // 2)))
+                or str(min(45000, max(15000, timeout_ms)))
             )
-            if not _prudential_authenticated_top_ready(page, timeout_ms=top_wait):
+            auth_ok = (
+                _prudential_authenticated_top_ready(page, timeout_ms=top_wait)
+                or _prudential_contract_surface_ready(page, timeout_ms=min(top_wait, 15000))
+            )
+            if not auth_ok:
                 if _prudential_guest_shell_visible(page):
                     try:
                         dbg = DEFAULT_DEBUG_DIR / f"prudential_otp_guest_fail_account{account_no}.html"
@@ -2816,7 +3154,10 @@ def fetch_prudential_surrender_value(
                 )
 
             try:
-                _navigate_after_login_prudential(page, timeout_ms)
+                if after_settle == "contract":
+                    print("↪ すでに契約画面のため、ナビゲーションの一部をスキップします。", file=sys.stderr)
+                else:
+                    _navigate_after_login_prudential(page, timeout_ms)
             except Exception:
                 DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
                 fail_html = DEFAULT_DEBUG_DIR / f"prudential_life_nav_fail_account{account_no}.html"
@@ -2899,7 +3240,15 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--otp-code",
         default="",
-        help="確認番号（1人目）。メール確認後にチャットで受け取った番号を渡すか、対話プロンプトで入力。2人目は PRUDENTIAL_OTP_CODE_2 等",
+        help="確認番号。--account 1 のとき真治、--account 2 のとき千景。複数口座同時実行時は PRUDENTIAL_OTP_CODE_2 等",
+    )
+    parser.add_argument(
+        "--account",
+        type=int,
+        action="append",
+        dest="accounts",
+        metavar="N",
+        help="処理する口座番号（1=真治 2=千景）。未指定時は登録済み全口座。複数指定可",
     )
     parser.add_argument(
         "--fetch-otp-gmail",
@@ -2984,6 +3333,7 @@ def main() -> int:
             resume_otp_only=True if args.resume_otp else None,
             otp_pause_before_submit=True if args.pause_before_otp_submit else None,
             otp_pause_at_screen=True if args.pause_at_otp_screen else None,
+            only_accounts=args.accounts if args.accounts else None,
         )
     except PlaywrightTimeoutError as exc:
         print(f"タイムアウト: {exc}", file=sys.stderr)

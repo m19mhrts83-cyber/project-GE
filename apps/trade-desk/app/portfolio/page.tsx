@@ -2,6 +2,12 @@ import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
+import {
+  INSURANCE_ORDER,
+  compareToReference,
+  fundSummary,
+  loadInsuranceAllocations,
+} from "@/lib/insuranceAllocations";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +47,12 @@ export default async function PortfolioPage() {
     .select("account_id, as_of, value_jpy, source")
     .order("as_of", { ascending: false })
     .limit(120);
+  const { data: advisorNotes } = await supabase
+    .from("advisor_notes")
+    .select("advisor, note_date, body")
+    .eq("advisor", "ishikawa")
+    .order("note_date", { ascending: false })
+    .limit(1);
 
   const latest = new Map<
     string,
@@ -55,6 +67,32 @@ export default async function PortfolioPage() {
       });
     }
   }
+
+  const alloc = loadInsuranceAllocations();
+  const refId = alloc.reference_account || "axa_life";
+  const refFunds = alloc.accounts[refId]?.funds || [];
+  const ishikawa = advisorNotes?.[0];
+
+  const insuranceRows = INSURANCE_ORDER.map((id) => {
+    const acc = (accounts ?? []).find((a) => a.id === id);
+    const conf = alloc.accounts[id] || {};
+    const s = latest.get(id);
+    const value =
+      s?.value_jpy ??
+      (typeof conf.value_jpy === "number" ? conf.value_jpy : null);
+    return {
+      id,
+      name: conf.label || acc?.name || id,
+      isRef: id === refId,
+      value,
+      snapAsOf: s?.as_of ?? null,
+      monthly: conf.monthly_yen ?? null,
+      fundsText: fundSummary(conf.funds),
+      vsAxa: compareToReference(refFunds, conf.funds, id === refId),
+      source: conf.source || "pending",
+      asOf: conf.as_of || s?.as_of || null,
+    };
+  });
 
   const coreRows = CORE_IDS.map((id) => {
     const acc = (accounts ?? []).find((a) => a.id === id);
@@ -98,6 +136,68 @@ export default async function PortfolioPage() {
         payload={{}}
         label="週次スナップをキュー"
       />
+
+      <div className="card">
+        <header>
+          <span className="lvl">生命保険（評価＋積立配分）</span>
+          <strong>アクサ＝IFA正</strong>
+        </header>
+        <p className="meta">
+          特別勘定の参考はアクサ（石川さん反映）。他社は対アクサ差分。月額・配分％は未確認なら
+          pending／スクレイプ失敗時は前回 snap。
+          {alloc.snap_updated_at
+            ? ` snap更新: ${alloc.snap_updated_at}`
+            : ""}
+        </p>
+        {ishikawa?.body ? (
+          <p className="meta" style={{ marginTop: "0.5rem" }}>
+            IFA（{ishikawa.note_date}）: {ishikawa.body}
+          </p>
+        ) : alloc.advisor?.policy ? (
+          <p className="meta" style={{ marginTop: "0.5rem" }}>
+            IFA: {alloc.advisor.policy}
+          </p>
+        ) : null}
+        <table>
+          <thead>
+            <tr>
+              <th>口座</th>
+              <th>評価</th>
+              <th>月額</th>
+              <th>配分</th>
+              <th>対アクサ</th>
+              <th>source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {insuranceRows.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  {r.name}
+                  {r.isRef ? (
+                    <div className="meta">参考（正）</div>
+                  ) : null}
+                </td>
+                <td>
+                  {r.value != null ? fmtYen(r.value) : "— 未取得"}
+                  {r.snapAsOf ? (
+                    <div className="meta">{r.snapAsOf}</div>
+                  ) : null}
+                </td>
+                <td>
+                  {r.monthly != null ? fmtYen(r.monthly) : "—"}
+                </td>
+                <td>
+                  {r.fundsText}
+                  {r.asOf ? <div className="meta">{r.asOf}</div> : null}
+                </td>
+                <td>{r.vsAxa}</td>
+                <td>{r.source}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="card">
         <header>

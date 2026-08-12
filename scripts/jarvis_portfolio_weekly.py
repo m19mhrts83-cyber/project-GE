@@ -209,8 +209,17 @@ def fetch_bloomo() -> dict[str, Any]:
     }
 
 
-def fetch_prudential(account_id: str) -> dict[str, Any]:
-    """Web 取得が無い間は env の手登録値を週次スナップに載せる。"""
+def _prudential_web_fetch_disabled() -> bool:
+    return os.environ.get("PRUDENTIAL_WEB_FETCH_DISABLE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def fetch_prudential_manual(account_id: str) -> dict[str, Any]:
+    """手登録フォールバック（Web 未設定・失敗時）。"""
     env_key = {
         "prudential_life": "PRUDENTIAL_VALUE_JPY",
         "prudential_life_chikage": "PRUDENTIAL_CHIKAGE_VALUE_JPY",
@@ -223,7 +232,7 @@ def fetch_prudential(account_id: str) -> dict[str, Any]:
     if not raw:
         return {
             "status": "skipped",
-            "reason": f"{env_key} 未設定（手登録。少額でも Core に載せる）",
+            "reason": f"{env_key} 未設定",
         }
     try:
         value = int(float(raw))
@@ -231,6 +240,90 @@ def fetch_prudential(account_id: str) -> dict[str, Any]:
         return {"status": "error", "reason": f"{env_key} が数値ではありません"}
     return {"status": "ok", "value_jpy": value, "note": f"env:{env_key}"}
 
+
+def fetch_prudential_by_account() -> dict[str, Any]:
+    """Myページ Web 取得（真治／千景）。未設定ならスキップ。"""
+    if _prudential_web_fetch_disabled():
+        return {
+            "status": "skipped",
+            "reason": "PRUDENTIAL_WEB_FETCH_DISABLE=1（手登録のみ）",
+        }
+    if not (
+        os.environ.get("PRUDENTIAL_LOGIN_URL")
+        and (
+            os.environ.get("PRUDENTIAL_USERNAME_1")
+            or os.environ.get("PRUDENTIAL_USERNAME")
+        )
+    ):
+        return {
+            "status": "skipped",
+            "reason": "PRUDENTIAL_LOGIN_URL / USERNAME 未設定（手登録へフォールバック可）",
+        }
+    script = FINANCE / "prudential_life_surrender_value.py"
+    if not script.is_file():
+        return {"status": "skipped", "reason": "prudential script missing"}
+    data = run_json_script(
+        [py_exe(), str(script), "--headless", "--json", "--save-debug"],
+        timeout=600,
+        cwd=FINANCE,
+    )
+    items = data.get("items") or []
+    accounts: dict[str, dict[str, Any]] = {}
+    loans: dict[str, dict[str, Any]] = {}
+    for it in items:
+        idx = int(it.get("account_index") or 0)
+        aid = "prudential_life" if idx <= 1 else "prudential_life_chikage"
+        loan_aid = (
+            "prudential_life_policy_loan"
+            if idx <= 1
+            else "prudential_life_chikage_policy_loan"
+        )
+        accounts[aid] = {
+            "status": "ok",
+            "value_jpy": int(it.get("value_jpy") or 0),
+            "note": f"web account{idx}",
+        }
+        loan_v = int(
+            it.get("policy_loan_jpy")
+            or it.get("loan_jpy")
+            or it.get("total_loan_jpy")
+            or 0
+        )
+        if loan_v or "policy_loan_jpy" in it or "loan_jpy" in it:
+            loans[loan_aid] = {
+                "status": "ok",
+                "value_jpy": loan_v,
+                "note": "web policy loan",
+            }
+    if not accounts and data.get("value_jpy") is not None:
+        accounts["prudential_life"] = {
+            "status": "ok",
+            "value_jpy": int(data["value_jpy"]),
+            "note": data.get("parser_mode") or "web",
+        }
+    if not accounts:
+        return {
+            "status": data.get("status") or "error",
+            "reason": data.get("reason")
+            or data.get("error")
+            or "prudential web 取得0件",
+            "raw_note": data.get("note") or "",
+        }
+    return {
+        "status": "ok",
+        "total_jpy": int(
+            data.get("value_jpy")
+            or sum(a["value_jpy"] for a in accounts.values())
+        ),
+        "accounts": accounts,
+        "loans": loans,
+        "note": data.get("parser_mode") or "web",
+    }
+
+
+def fetch_prudential(account_id: str) -> dict[str, Any]:
+    """互換: 単口座は手登録。Web 一括は fetch_prudential_by_account。"""
+    return fetch_prudential_manual(account_id)
 
 def fetch_akatsuki() -> dict[str, Any]:
     env_file = FINANCE / ".env.akatsuki"
@@ -258,8 +351,34 @@ def fetch_axa() -> dict[str, Any]:
     script = REPO / "scripts" / "jarvis_axa_balance.py"
     data = run_json_script(
         [py_exe(), str(script), "--headless", "--json", "--save-debug"],
-        timeout=180,
+        timeout=300,
     )
+    # 特別勘定 snap も更新（失敗しても評価は返す）
+    try:
+        import importlib.util
+
+        alloc_path = REPO / "scripts" / "jarvis_insurance_allocations.py"
+        spec = importlib.util.spec_from_file_location(
+            "jarvis_insurance_allocations", alloc_path
+        )
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            snap = mod.load_snap()
+            snap.setdefault("accounts", {})
+            prev = dict(snap["accounts"].get("axa_life") or {})
+            funds = data.get("funds") or []
+            if funds:
+                prev["funds"] = funds
+                prev["as_of"] = data.get("funds_as_of") or prev.get("as_of")
+                prev["source"] = data.get("funds_source") or "web"
+            else:
+                prev["source"] = prev.get("source") or "manual_snapshot"
+            prev["value_jpy"] = int(data["value_jpy"])
+            snap["accounts"]["axa_life"] = prev
+            mod.save_snap(snap)
+    except Exception as exc:
+        print(f"# axa allocation snap: {exc}", file=sys.stderr)
     return {
         "status": "ok",
         "value_jpy": int(data["value_jpy"]),
@@ -390,9 +509,23 @@ def main() -> int:
                 or os.environ.get("BLOOMO_USERNAME")
                 or os.environ.get("BLOOMO_LOGIN_ID")
             ),
-            "prudential_life": bool(os.environ.get("PRUDENTIAL_VALUE_JPY")),
+            "prudential_life": bool(
+                os.environ.get("PRUDENTIAL_VALUE_JPY")
+                or (
+                    not _prudential_web_fetch_disabled()
+                    and os.environ.get("PRUDENTIAL_LOGIN_URL")
+                    and (
+                        os.environ.get("PRUDENTIAL_USERNAME_1")
+                        or os.environ.get("PRUDENTIAL_USERNAME")
+                    )
+                )
+            ),
             "prudential_life_chikage": bool(
                 os.environ.get("PRUDENTIAL_CHIKAGE_VALUE_JPY")
+                or (
+                    not _prudential_web_fetch_disabled()
+                    and os.environ.get("PRUDENTIAL_USERNAME_2")
+                )
             ),
             "axa_life": bool(
                 os.environ.get("AXA_MYAXA_ID") and os.environ.get("AXA_MYAXA_PASSWORD")
@@ -431,16 +564,6 @@ def main() -> int:
             ("mhi_stock", fetch_mhi_zaim),
             ("akatsuki_bond", fetch_akatsuki),
             ("bloomo", fetch_bloomo),
-            ("prudential_life", lambda: fetch_prudential("prudential_life")),
-            ("prudential_life_chikage", lambda: fetch_prudential("prudential_life_chikage")),
-            (
-                "prudential_life_policy_loan",
-                lambda: fetch_prudential("prudential_life_policy_loan"),
-            ),
-            (
-                "prudential_life_chikage_policy_loan",
-                lambda: fetch_prudential("prudential_life_chikage_policy_loan"),
-            ),
         ]
 
     # ソニーは1回のログイン往復で名義別に分割
@@ -493,6 +616,65 @@ def main() -> int:
                 f"{sony_multi.get('reason') or sony_multi.get('note') or ''}"
             )
 
+    # プルデンシャルも Web 一括 → 失敗時のみ手登録
+    if not args.cloud_only:
+        try:
+            pru_multi = fetch_prudential_by_account()
+        except Exception as exc:
+            pru_multi = {"status": "error", "reason": str(exc)[:300]}
+        pru_ids = (
+            "prudential_life",
+            "prudential_life_chikage",
+            "prudential_life_policy_loan",
+            "prudential_life_chikage_policy_loan",
+        )
+        if pru_multi.get("status") == "ok":
+            for aid, rec in (pru_multi.get("accounts") or {}).items():
+                sources[aid] = rec
+                print(
+                    f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
+                )
+                if not args.dry_run and rec.get("status") == "ok":
+                    upsert_snapshot(
+                        sb,
+                        aid,
+                        float(rec["value_jpy"]),
+                        source="weekly_web",
+                        note=rec.get("note"),
+                    )
+            for aid, rec in (pru_multi.get("loans") or {}).items():
+                sources[aid] = rec
+                print(
+                    f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
+                )
+                if not args.dry_run and rec.get("status") == "ok":
+                    upsert_snapshot(
+                        sb,
+                        aid,
+                        float(rec["value_jpy"]),
+                        source="weekly_web_loan",
+                        note=rec.get("note"),
+                    )
+        else:
+            print(
+                f"# prudential_web: {pru_multi.get('status')} "
+                f"{pru_multi.get('reason') or ''}"
+            )
+            for aid in pru_ids:
+                rec = fetch_prudential_manual(aid)
+                sources[aid] = rec
+                print(
+                    f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
+                )
+                if not args.dry_run and rec.get("status") == "ok":
+                    upsert_snapshot(
+                        sb,
+                        aid,
+                        float(rec["value_jpy"]),
+                        source="weekly_manual",
+                        note=rec.get("note"),
+                    )
+
     for account_id, fn in jobs:
         try:
             rec = fn()
@@ -510,6 +692,24 @@ def main() -> int:
             source="zaim" if account_id == "mhi_stock" else "weekly_web",
             note=rec.get("note"),
         )
+
+    # 保険配分ビュー（スクレイプは fetch_axa 内で実施済み。ここでは表示用 merge）
+    if not args.cloud_only:
+        try:
+            alloc_script = REPO / "scripts" / "jarvis_insurance_allocations.py"
+            out = subprocess.run(
+                [py_exe(), str(alloc_script), "--skip-web"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(REPO),
+            )
+            if out.stdout.strip():
+                print(out.stdout.rstrip())
+            if out.stderr.strip():
+                print(out.stderr.rstrip(), file=sys.stderr)
+        except Exception as exc:
+            print(f"# insurance_allocations: {exc}", file=sys.stderr)
 
     if not args.cloud_only and not args.dry_run:
         try:
