@@ -83,8 +83,15 @@
 ## 個人確定申告
 
 - **個人のみ**（弥生青色申告用 CSV）。法人は税理士。
-- 税理士メール＋添付は Gmail API で取込 → アプリで検索・閲覧
+- 税理士メール＋添付は Gmail API で取込 → アプリで検索・閲覧（**既定アカウント: admin** `token_livingsupport.json`。切替は `KURASHIFT_TAX_GMAIL_TOKEN`）
 - 添付は年度・案件・資料種別と紐づけ、**証憑として再出力**できる
+
+## テーマ提案（ステージ2）
+
+- ホーム／テーマ画面の「ステータスから提案を生成」→ `theme_propose_from_status`
+- 資産スナップ＋リサーチから draft を作成（既存タイトルはスキップ）
+- 手動草案は `/api/themes` フォームからも登録可
+- Mac worker: `./launchd/install_kurashift_job_worker_launchd.sh`（15分間隔）
 
 ## Core 資産網羅（要約）
 

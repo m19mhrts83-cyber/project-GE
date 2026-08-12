@@ -119,6 +119,13 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             "--theme-id",
             str(payload.get("theme_id") or ""),
         ],
+        "theme_propose_from_status": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_theme.py"),
+            "--propose-from-status",
+            "--limit",
+            str(payload.get("limit") or 6),
+        ],
     }
     cmd = mapping.get(job_type)
     if not cmd:

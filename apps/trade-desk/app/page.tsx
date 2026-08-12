@@ -149,6 +149,12 @@ export default async function HomePage() {
         分析→提案→相談→承認→実行。まずは一般的でやりやすいところから。やりづらければ Jarvis
         に相談して見直す。
       </p>
+      <EnqueueJobButton
+        jobType="theme_propose_from_status"
+        title="資産ステータスから提案を生成"
+        payload={{ limit: 6 }}
+        label="ステータスから提案を生成"
+      />
 
       <div className="card">
         {(themes ?? []).length === 0 ? (
