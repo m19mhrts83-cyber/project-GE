@@ -1,9 +1,9 @@
 # NotebookLM Studio UI セレクタ辞書（Phase 0 probe で更新）
 # 日英ゆれを配列で持つ。最初にマッチしたものを使う。
 
-version: 1
-updated_at: '2026-08-12T14:23:06.230711+00:00'
-notes: "probe 20260812T142254Z 北海道旅行_2027GW — Studio/Infographic/Slide deck/textarea/作成 を確認"
+version: 2
+updated_at: '2026-08-13T00:00:00+09:00'
+notes: "probe 20260813 — 既存成果物 open / リビジョン（ページ別修正）セレクタ追加"
 
 studio_tab:
   - text=Studio
@@ -12,7 +12,9 @@ studio_tab:
   - 'button:has-text("スタジオ")'
   - '[role="tab"]:has-text("Studio")'
   - '[role="tab"]:has-text("スタジオ")'
+  - '[aria-label*="Studio"]'
 
+# 新規作成（Studio パネル内のカード）
 artifacts:
   infographic:
     - text=Infographic
@@ -31,14 +33,42 @@ artifacts:
     - '[aria-label*="Slide" i]'
     - '[aria-label*="スライド"]'
 
+# 既存成果物を開く（右ドックの artifact-stretched-button）
+open_existing:
+  infographic:
+    - 'button[aria-description="インフォグラフィック"]'
+  slide_deck:
+    - 'button[aria-description="スライド資料"]'
+
+# ページ別修正（リビジョン）モード
+revise:
+  open_edit:
+    - '[aria-label="このアーティファクトを変更"]'
+    - 'button:has-text("edit")'
+  prompt_field:
+    - 'textarea[aria-label="リビジョンの手順"]'
+  generate:
+    - '[aria-label="改訂版のスライドを生成"]'
+    - 'button:has-text("改訂版のスライドを生成")'
+  cancel:
+    - '[aria-label="リビジョン モードをキャンセル"]'
+    - 'button:has-text("キャンセル")'
+  pending:
+    - '[aria-label="保留中の変更のポップアップを切り替え"]'
+  # サムネ: aria-label="スライド N" / "スライド N、選択中"
+  slide_thumb_template: '[aria-label^="スライド {n}"]'
+
 prompt_field:
-  - textarea
-  - '[contenteditable="true"]'
-  - 'div[role="textbox"]'
+  - 'textarea[aria-label*="インフォグラフィックについて説明"]'
+  - 'textarea[aria-label*="スライド"]'
+  - 'textarea[aria-label*="説明してください"]'
   - 'textarea[aria-label*="prompt" i]'
   - 'textarea[aria-label*="指示"]'
   - 'textarea[placeholder*="Describe" i]'
   - 'textarea[placeholder*="説明"]'
+  - textarea
+  - '[contenteditable="true"]'
+  - 'div[role="textbox"]'
 
 model_picker:
   open:
@@ -52,9 +82,9 @@ model_picker:
     - 'button:has-text("Nano Banana Pro")'
 
 generate:
+  - 'button:has-text("生成")'
   - 'button:has-text("作成")'
   - 'button:has-text("Generate")'
-  - 'button:has-text("生成")'
   - 'button:has-text("再生成")'
   - 'button:has-text("Regenerate")'
   - 'button:has-text("Create")'
@@ -74,3 +104,7 @@ busy:
   - text=Generating
   - text=生成中
   - text=Creating
+  - text=改訂
+  - text=インフォグラフィックを生成しています
+  - text=スライドを生成しています
+  - text=生成しています

@@ -98,9 +98,6 @@ def extract_prompt_section(text: str, section: str) -> str:
     )
     markers = markers_info if section in ("info", "infographic", "インフォ") else markers_slides
 
-    # Split by ``` fences
-    parts = re.split(r"```(?:\w+)?\n", text)
-    # Odd indices are often fence bodies if text starts outside fence
     # Safer: find marker then next fence
     for mpat in markers:
         m = re.search(mpat, text, re.I)
@@ -112,6 +109,26 @@ def extract_prompt_section(text: str, section: str) -> str:
             return fm.group(1).strip()
     # Fallback: whole file
     return text.strip()
+
+
+def extract_slide_page_prompt(text: str, page_num: int) -> str:
+    """Extract a single ### Slide N block from slides section (or full text)."""
+    slides = extract_prompt_section(text, "slides")
+    pat = rf"###\s*Slide\s*{page_num}\s*[:：].*?(?=###\s*Slide\s*\d+|#\s*NG|\Z)"
+    m = re.search(pat, slides, re.S | re.I)
+    if not m:
+        # fallback: Japanese スライドN
+        pat2 = rf"スライド\s*{page_num}\s*[:：].*?(?=スライド\s*\d+|#\s*NG|\Z)"
+        m = re.search(pat2, slides, re.S | re.I)
+    if not m:
+        raise ValueError(f"slide_page_prompt_not_found:{page_num}")
+    body = m.group(0).strip()
+    # Wrap as focused revision instruction
+    return (
+        f"このスライド（Slide {page_num}）だけを次の指示どおりに修正してください。"
+        f"他のスライドは変えないでください。スタイル（いけともゆるキャラ／白背景／水彩／細いペン線）は維持。\n\n"
+        f"{body}"
+    )
 
 
 def first_match(page, selectors: list[str], timeout_ms: int = 2000):
