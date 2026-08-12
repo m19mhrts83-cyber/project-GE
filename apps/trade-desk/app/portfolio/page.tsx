@@ -8,6 +8,7 @@ import {
   fundSummary,
   loadInsuranceAllocations,
 } from "@/lib/insuranceAllocations";
+import { fmtRatePct, loadLiabilityRates } from "@/lib/liabilityRates";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,7 @@ export default async function PortfolioPage() {
   }
 
   const alloc = loadInsuranceAllocations();
+  const liabilityRates = loadLiabilityRates();
   const refId = alloc.reference_account || "axa_life";
   const refFunds = alloc.accounts[refId]?.funds || [];
   const ishikawa = advisorNotes?.[0];
@@ -233,24 +235,43 @@ export default async function PortfolioPage() {
           <strong>{fmtYen(loanTotal)}</strong>
         </header>
         <p className="meta">
-          不動産購入の頭金枠把握用。解約返戻と同ログインで取得（ソニー）／PRUは手登録可。
+          不動産購入の頭金枠把握用。返済戦略のため<strong>貸付利率（年%）</strong>
+          も参考表示。利率は契約ごと — YAML／env で正本化（未記入は要確認）。
+          {liabilityRates.updated_at
+            ? ` rates更新: ${liabilityRates.updated_at}`
+            : ""}
         </p>
         <table>
           <thead>
             <tr>
               <th>口座</th>
               <th>借入残高</th>
+              <th>利率</th>
               <th>日付</th>
             </tr>
           </thead>
           <tbody>
-            {loanRows.map((r) => (
-              <tr key={r.id}>
-                <td>{r.name}</td>
-                <td>{r.snap ? fmtYen(r.snap.value_jpy) : "— 未取得"}</td>
-                <td>{r.snap?.as_of ?? "—"}</td>
-              </tr>
-            ))}
+            {loanRows.map((r) => {
+              const rate = liabilityRates.insurance[r.id];
+              return (
+                <tr key={r.id}>
+                  <td>
+                    {r.name}
+                    {rate?.rate_note ? (
+                      <div className="meta">{rate.rate_note}</div>
+                    ) : null}
+                  </td>
+                  <td>{r.snap ? fmtYen(r.snap.value_jpy) : "— 未取得"}</td>
+                  <td>
+                    {fmtRatePct(rate?.rate_pct ?? null)}
+                    {rate?.source ? (
+                      <div className="meta">{rate.source}</div>
+                    ) : null}
+                  </td>
+                  <td>{r.snap?.as_of ?? "—"}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

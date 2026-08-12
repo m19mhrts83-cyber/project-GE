@@ -1,0 +1,33 @@
+{
+  "updated_at": "2026-08-12",
+  "insurance_loans": {
+    "sony_life_policy_loan": {
+      "label": "ソニー契約者貸付（真治）",
+      "rate_pct": null,
+      "rate_note": "契約ごと。ソニー生命の利率表／契約者WEBで要確認",
+      "source": "pending"
+    },
+    "sony_life_chikage_policy_loan": {
+      "label": "ソニー契約者貸付（千景）",
+      "rate_pct": null,
+      "rate_note": "残高0。借りる場合は真治と同様に契約照会",
+      "source": "pending"
+    },
+    "prudential_life_policy_loan": {
+      "label": "PRU契約者貸付（真治）",
+      "rate_pct": null,
+      "rate_note": "当面借入なし（0円）",
+      "source": "n/a"
+    },
+    "prudential_life_chikage_policy_loan": {
+      "label": "PRU契約者貸付（千景）",
+      "rate_pct": null,
+      "rate_note": "当面借入なし（0円）",
+      "source": "n/a"
+    }
+  },
+  "real_estate": {
+    "note": "収支利回りとローン金利の差＝正味の利率イメージ。詳細は③-C／本田アプリ連携後",
+    "properties": []
+  }
+}
