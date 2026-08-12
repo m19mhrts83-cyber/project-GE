@@ -6,6 +6,7 @@ import {
   annualNoticeCopy,
   isAnnualLifeplanWindow,
 } from "@/lib/lifeplanNotices";
+import { fmtRatePct, loadLiabilityRates } from "@/lib/liabilityRates";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +146,13 @@ export default async function HomePage() {
     }))
     .sort((a, b) => b.value_jpy - a.value_jpy);
   const loanTotal = loanRows.reduce((s, r) => s + r.value_jpy, 0);
+  const liabilityRates = loadLiabilityRates();
+  const activeLoanRates = loanRows
+    .filter((r) => r.value_jpy > 0)
+    .map((r) => {
+      const rate = liabilityRates.insurance[r.id];
+      return `${r.name}: ${fmtRatePct(rate?.rate_pct ?? null)}`;
+    });
 
   const liqName = new Map((liqAccounts ?? []).map((a) => [a.id, a.name]));
   const latestLiq = new Map<
@@ -220,6 +228,13 @@ export default async function HomePage() {
             保険借入合計 {fmtYen(loanTotal)}
             {loanTotal > 0 ? "（頭金枠の把握用・負債）" : ""}
           </p>
+          {activeLoanRates.length > 0 ? (
+            <p className="meta">
+              貸付利率: {activeLoanRates.join(" / ")}
+              {" · "}
+              <a href="/portfolio">詳細 →</a>
+            </p>
+          ) : null}
           <a href="/portfolio">資産の詳細 →</a>
         </article>
         <article className="card">

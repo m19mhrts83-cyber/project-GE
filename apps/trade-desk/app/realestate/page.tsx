@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
+import { loadLiabilityRates } from "@/lib/liabilityRates";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function RealEstatePage() {
   } = await supabase.auth.getUser();
 
   const year = new Date().getFullYear();
+  const liabilityRates = loadLiabilityRates();
 
   const { data: latestSnap } = await supabase
     .from("kurashift_plan_snapshots")
@@ -42,6 +44,23 @@ export default async function RealEstatePage() {
         </header>
         <p className="meta">
           詳細: <code>docs/KURASHIFT_不動産賃貸経営.md</code>
+        </p>
+      </div>
+
+      <div className="card">
+        <header>
+          <span className="lvl">返済戦略</span>
+          <strong>正味の利率（イメージ）</strong>
+        </header>
+        <p className="meta">
+          物件の収支利回り（％）− ローン金利（％）≈ 正味。利子が高い負債から返す判断に使う。
+          保険の契約者貸付利率は <a href="/portfolio">資産</a> を参照。
+        </p>
+        <p className="meta" style={{ marginTop: 8 }}>
+          {liabilityRates.realEstateNote}
+        </p>
+        <p className="meta">
+          本田アプリ連携（③-C）後に物件ごとの利回り／金利／正味を一覧化する予定。
         </p>
       </div>
 

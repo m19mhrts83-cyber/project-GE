@@ -1,0 +1,41 @@
+# 負債の金利・利回り（返済戦略用の参考表記）
+#
+# 保険の契約者貸付利率は契約ごと・時期で異なる。公式の一律％ではない。
+# 正本: この YAML ＋ .env.jarvis_private の *_POLICY_LOAN_RATE_PCT（あれば上書き）
+# 不動産のローン金利・物件利回りは本田アプリ連携後に埋める（当面プレースホルダ）
+
+updated_at: "2026-08-12"
+
+insurance_loans:
+  sony_life_policy_loan:
+    label: ソニー契約者貸付（真治）
+    rate_pct: null  # 例: 3.75 — 契約照会／利率表で確認後に記入
+    rate_note: "契約ごと。ソニー生命の利率表／契約者WEBで要確認"
+    source: pending
+  sony_life_chikage_policy_loan:
+    label: ソニー契約者貸付（千景）
+    rate_pct: null
+    rate_note: "残高0。借りる場合は真治と同様に契約照会"
+    source: pending
+  prudential_life_policy_loan:
+    label: PRU契約者貸付（真治）
+    rate_pct: null
+    rate_note: "当面借入なし（0円）"
+    source: n/a
+  prudential_life_chikage_policy_loan:
+    label: PRU契約者貸付（千景）
+    rate_pct: null
+    rate_note: "当面借入なし（0円）"
+    source: n/a
+
+# 不動産: 正味 ≈ 物件利回り（％） − ローン金利（％）
+# 本田アプリ連携前は空。物件ごとに埋める想定。
+real_estate:
+  note: "収支利回りとローン金利の差＝正味の利率イメージ。詳細は③-C／本田アプリ連携後"
+  properties: []
+  # 例:
+  # - id: example_ap
+  #   name: 物件A
+  #   yield_pct: 6.5      # 家賃等の利回り（定義は後で固定）
+  #   mortgage_rate_pct: 1.8
+  #   net_rate_pct: 4.7   # yield - mortgage（単純差。税金・空室は別）
