@@ -8,6 +8,7 @@ import {
   buildWatchAckFingerprint,
   isWatchAckActive,
 } from "@/lib/watchUserAck";
+import { zaimWatchVisibleOnHome } from "@/lib/zaimWatchPin";
 import { createClient } from "@/lib/supabase/server";
 import { watchHref } from "./homeHelpers";
 
@@ -36,11 +37,15 @@ export default async function HomeWatchBand() {
       });
       // 汎用確認済はホーム要フォローから外す
       if (isWatchAckActive(pl, fp)) return false;
+      if (w.id === "zaim_quality") {
+        // ピンと同条件。確認待ち／直したよのあいだは残す
+        if (zaimWatchVisibleOnHome(pl)) return true;
+        return w.level !== "ok";
+      }
       if (
         w.id === "etc_mileage" ||
         w.id === "vpoint" ||
         w.id === "rent_step" ||
-        w.id === "zaim_quality" ||
         w.id === "cursor_pro_plus_downgrade" ||
         w.id === "glucon_report_due" ||
         w.id === "mobile_plan"

@@ -9,6 +9,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { watchHref } from "@/components/home/homeHelpers";
 import { isOpsEphemeralId, opsWatchVisibleOnHome } from "@/lib/opsWatch";
+import { zaimWatchVisibleOnHome } from "@/lib/zaimWatchPin";
 
 export default async function QueuePage() {
   await wakeDueSnoozes();
@@ -36,11 +37,14 @@ export default async function QueuePage() {
         w.payload && typeof w.payload === "object"
           ? (w.payload as Record<string, unknown>)
           : {};
+      if (w.id === "zaim_quality") {
+        if (zaimWatchVisibleOnHome(pl)) return true;
+        return w.level !== "ok";
+      }
       if (
         w.id === "etc_mileage" ||
         w.id === "vpoint" ||
         w.id === "rent_step" ||
-        w.id === "zaim_quality" ||
         w.id === "cursor_pro_plus_downgrade"
       ) {
         if (pl.show_banner === true) return true;

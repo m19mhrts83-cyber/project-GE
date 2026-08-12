@@ -1483,14 +1483,14 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
     except Exception:
         pass
 
-    # ホーム「見直したよ」バナー（確認済み batch は出さない）
+    # ホーム「Jarvisが直したよ（財務）」— 確認済み batch は出さない。
+    # 確認待ちの直しがある間はピンを残す。新規 pending / 新 batch で再表示。
     batch_id = str(review_batch.get("batch_id") or "")
     ack = str(review_batch.get("dashboard_ack_batch_id") or "")
-    show_banner = bool(
-        review_batch.get("show_banner")
-        and batch_id
-        and ack != batch_id
+    batch_pending = bool(
+        review_batch.get("show_banner") and batch_id and ack != batch_id
     )
+    show_banner = bool(batch_pending or pending_n > 0)
     if show_banner and level in ("ok", "info"):
         level = "attention"
     payload["review_batch_id"] = batch_id or None
@@ -1511,7 +1511,14 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
     if pending_n:
         summary = f"直し確認待ち {pending_n}件 · " + summary
     if show_banner and payload.get("review_lines"):
-        summary = "見直したよ · " + " / ".join(payload["review_lines"]) + " · " + summary
+        summary = (
+            "Jarvisが直したよ（財務） · "
+            + " / ".join(payload["review_lines"])
+            + " · "
+            + summary
+        )
+    elif show_banner and pending_n:
+        summary = "Jarvisが直したよ（財務） · " + summary
     return card(
         item_id=meta["id"],
         title=title,

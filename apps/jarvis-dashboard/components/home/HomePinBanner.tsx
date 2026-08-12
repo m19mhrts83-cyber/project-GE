@@ -4,10 +4,13 @@ import {
   OPS_EPHEMERAL_IDS,
   opsWatchVisibleOnHome,
 } from "@/lib/opsWatch";
+import { zaimWatchVisibleOnHome } from "@/lib/zaimWatchPin";
 import OpsPinCard from "@/components/OpsPinCard";
+import ZaimReviewAckButton from "@/components/ZaimReviewAckButton";
 
 const PIN_IDS = [
   "ops_fix_notice",
+  "zaim_quality",
   "vercel_deploy",
   "gha_workflow_fail",
   "cursor_pro_plus_downgrade",
@@ -17,6 +20,7 @@ function hrefFor(id: string, detail: string | null | undefined): {
   href: string;
   external: boolean;
 } {
+  if (id === "zaim_quality") return { href: "/zaim", external: false };
   if (id === "cursor_pro_plus_downgrade") {
     return { href: "https://www.cursor.com/settings", external: true };
   }
@@ -29,7 +33,12 @@ function hrefFor(id: string, detail: string | null | undefined): {
   };
 }
 
-/** ホーム最上段ピン（運用お知らせ・Vercel Fail・Cursor 戻し 等） */
+function pinTitle(id: string, fallback: string): string {
+  if (id === "zaim_quality") return "Jarvisが直したよ（財務）";
+  return fallback || id;
+}
+
+/** ホーム最上段ピン（運用お知らせ・財務直し・Vercel Fail・Cursor 戻し 等） */
 export default async function HomePinBanner() {
   const supabase = await createClient();
   const { data: rows } = await supabase
@@ -57,6 +66,9 @@ export default async function HomePinBanner() {
         ? (data.payload as Record<string, unknown>)
         : {};
     const level = String(data.level || "");
+    if (id === "zaim_quality") {
+      return zaimWatchVisibleOnHome(pl);
+    }
     if (id === "cursor_pro_plus_downgrade") {
       return pl.show_banner === true || (level && level !== "ok");
     }
@@ -74,25 +86,37 @@ export default async function HomePinBanner() {
             ? data.level
             : "info"
         ) as HomeLevel;
+        const pl =
+          data.payload && typeof data.payload === "object"
+            ? (data.payload as Record<string, unknown>)
+            : {};
         const { href, external } = hrefFor(id, data.detail as string | null);
+        const batchId = String(pl.review_batch_id || "");
         const metaExtra =
           id === "cursor_pro_plus_downgrade"
             ? "期限 2026-08-24 · Cursor Settings で Schedule Downgrade · 状況ウォッチにも掲載"
             : id === "ops_fix_notice"
               ? "Jarvis が直した内容 · 「確認しました」で消えます"
-              : "運用監視 · 直ったらホームのお知らせに切り替わります";
+              : id === "zaim_quality"
+                ? "確認するまで残ります · 「確認しました」で消えます · 詳細は /zaim"
+                : "運用監視 · 直ったらホームのお知らせに切り替わります";
         return (
           <OpsPinCard
             key={id}
             id={id}
             level={level}
             levelLabel={LEVEL_LABEL[level]}
-            title={String(data.title || id)}
+            title={pinTitle(id, String(data.title || id))}
             summary={String(data.summary || "")}
             meta={metaExtra}
             href={href}
             external={external}
-            showAck={id === "ops_fix_notice"}
+            showAck={id === "ops_fix_notice" || id === "zaim_quality"}
+            ackSlot={
+              id === "zaim_quality" ? (
+                <ZaimReviewAckButton batchId={batchId} />
+              ) : undefined
+            }
           />
         );
       })}
