@@ -41,7 +41,7 @@ subfolders:
     note: "単独Web自動化の概要・Studio用 / NotebookLM https://notebooklm.google.com/notebook/100e18b3-30e0-4569-b69b-ef4a0805e815"
   - id: "08"
     name: "08_北海道GW2027_家族向け概要"
-    note: "2027 GW 家族旅行・インフォ1枚＋スライド8枚・04にプロンプト"
+    note: "2027 GW 家族旅行・インフォ1＋スライド8 / NotebookLM https://notebooklm.google.com/notebook/5a8dd67d-0789-48e2-b1e4-fb53484ffd2f"
   - id: "99"
     name: "99_PlusAI検証_20260727"
     note: "検証用"

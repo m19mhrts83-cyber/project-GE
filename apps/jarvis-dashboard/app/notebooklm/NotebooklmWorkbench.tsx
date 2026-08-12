@@ -147,6 +147,13 @@ export default function NotebooklmWorkbench() {
         アカウント: admin@livingsupport-matsu.co.jp ／ ヘルパー:{" "}
         <code>127.0.0.1:8766</code>
       </p>
+
+      <h2>Studio 自動化（Mac）</h2>
+      <p className="sub">
+        Infographic／Slide Deck は MCP ではなく専用ランナー（別 Chrome プロファイル）。手順:{" "}
+        <code>docs/N1_NotebookLM/Jarvis_NotebookLM_Studio自動化.md</code>
+        。ヘルパー <code>POST /notebooklm-studio</code>（prompt_file 必須）。
+      </p>
     </>
   );
 }

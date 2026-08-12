@@ -1,0 +1,45 @@
+# Jarvis NotebookLM Studio 自動化
+# MCP（チャット）とは別。headed Playwright で Infographic / Slide Deck を操作する。
+
+version: 1
+
+# Chrome プロファイル（MCP の notebooklm-mcp とは分離必須）
+profile_dir: "~/Library/Application Support/notebooklm-studio/chrome_profile"
+state_dir: "~/Library/Application Support/notebooklm-studio/browser_state"
+
+# 既定ノート（北海道 GW 検証用）。CLI --notebook-url で上書き可
+default_notebook_url: "https://notebooklm.google.com/notebook/5a8dd67d-0789-48e2-b1e4-fb53484ffd2f"
+default_notebook_name: "北海道旅行_2027GW"
+default_drive_folder: "08_北海道GW2027_家族向け概要"
+
+# Drive 正本ルート
+drive_root: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM"
+output_subdir: "★アウトプット"
+
+# 生成モデル（UI 表示名のゆれは selectors 側で吸収）
+preferred_model: "Nano Banana Pro"
+
+# タイムアウト（秒）
+goto_timeout_sec: 90
+generate_timeout_sec: 900
+poll_interval_sec: 5
+
+# 安全: 生成クリックは明示フラグ必須（run の既定）
+require_confirm_generate: true
+
+# スクリーンショット・probe ダンプ（大容量・git-repos 外）
+probe_out_dir: "/tmp/notebooklm_studio_probe"
+
+# Downloads 監視（Phase 2）
+downloads_dir: "~/Downloads"
+
+# ノート登録（任意・state 参照用）
+notebooks:
+  hokkaido_gw2027:
+    url: "https://notebooklm.google.com/notebook/5a8dd67d-0789-48e2-b1e4-fb53484ffd2f"
+    drive_folder: "08_北海道GW2027_家族向け概要"
+    state_file: ".jarvis_state/notebooklm_hokkaido_gw2027.json"
+  shuhen_map:
+    url: "https://notebooklm.google.com/notebook/100e18b3-30e0-4569-b69b-ef4a0805e815"
+    drive_folder: "06_周辺MAP自動化_単独Web検証"
+    state_file: ".jarvis_state/notebooklm_shuhen_create_run.json"

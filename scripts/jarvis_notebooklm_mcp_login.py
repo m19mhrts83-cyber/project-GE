@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NotebookLM MCP 用 Chrome プロファイルへ Google ログインする。
+NotebookLM 用 Chrome プロファイルへ Google ログインする。
 
 要: .env.jarvis_private の NOTEBOOKLM_EMAIL / NOTEBOOKLM_PASSWORD
 （未設定時は COMPANY_EMAIL をメール候補に使う）
@@ -9,8 +9,11 @@ NotebookLM MCP 用 Chrome プロファイルへ Google ログインする。
   python scripts/jarvis_notebooklm_mcp_login.py
   python scripts/jarvis_notebooklm_mcp_login.py --headed   # 既定は headed
   python scripts/jarvis_notebooklm_mcp_login.py --headless # 非対話（2FA 不可時は失敗）
+  python scripts/jarvis_notebooklm_mcp_login.py --profile studio  # Studio 自動化用（MCPと分離）
 
-成功後: Cursor の NotebookLM MCP で get_health → authenticated=true を確認。
+成功後:
+  --profile mcp（既定）: Cursor NotebookLM MCP で get_health → authenticated=true
+  --profile studio: Studio ランナー用プロファイルにログイン
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ import sys
 import time
 from pathlib import Path
 
+# 既定は MCP。--profile studio で Studio 自動化用へ切替
 PROFILE = (
     Path.home()
     / "Library/Application Support/notebooklm-mcp/chrome_profile"
@@ -31,6 +35,30 @@ STATE_DIR = (
 )
 STATE_JSON = STATE_DIR / "state.json"
 MESSAGES_DB = Path.home() / "Library/Messages/chat.db"
+
+
+def _apply_profile(kind: str) -> None:
+    global PROFILE, STATE_DIR, STATE_JSON
+    kind = (kind or "mcp").strip().lower()
+    if kind == "studio":
+        PROFILE = (
+            Path.home()
+            / "Library/Application Support/notebooklm-studio/chrome_profile"
+        )
+        STATE_DIR = (
+            Path.home()
+            / "Library/Application Support/notebooklm-studio/browser_state"
+        )
+    else:
+        PROFILE = (
+            Path.home()
+            / "Library/Application Support/notebooklm-mcp/chrome_profile"
+        )
+        STATE_DIR = (
+            Path.home()
+            / "Library/Application Support/notebooklm-mcp/browser_state"
+        )
+    STATE_JSON = STATE_DIR / "state.json"
 
 
 def _env(*names: str) -> str:
@@ -95,7 +123,13 @@ def _is_notebook_home(url: str) -> bool:
     return "notebooklm.google.com" in url or "notebook.google.com" in url
 
 
-def login(*, headed: bool = True, timeout_sec: int = 300) -> int:
+def login(
+    *,
+    headed: bool = True,
+    timeout_sec: int = 300,
+    profile: str = "mcp",
+) -> int:
+    _apply_profile(profile)
     email = _env("NOTEBOOKLM_EMAIL", "COMPANY_EMAIL")
     password = _env("NOTEBOOKLM_PASSWORD", "GOOGLE_ADMIN_PASSWORD")
     if not email or not password:
@@ -113,6 +147,7 @@ def login(*, headed: bool = True, timeout_sec: int = 300) -> int:
         return 1
 
     PROFILE.mkdir(parents=True, exist_ok=True)
+    print(f"# profile_kind={profile}", file=sys.stderr)
     print(f"# profile={PROFILE}", file=sys.stderr)
     print(f"# email={email[:3]}…{email[-10:]}", file=sys.stderr)
 
@@ -247,9 +282,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--headed", action="store_true", default=True)
     ap.add_argument("--headless", action="store_true")
     ap.add_argument("--timeout", type=int, default=300)
+    ap.add_argument(
+        "--profile",
+        choices=("mcp", "studio"),
+        default="mcp",
+        help="mcp=NotebookLM MCP / studio=Studio 自動化（別プロファイル）",
+    )
     args = ap.parse_args(argv)
     headed = not args.headless
-    return login(headed=headed, timeout_sec=args.timeout)
+    return login(headed=headed, timeout_sec=args.timeout, profile=args.profile)
 
 
 if __name__ == "__main__":

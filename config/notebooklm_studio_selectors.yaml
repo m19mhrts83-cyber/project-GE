@@ -1,0 +1,76 @@
+# NotebookLM Studio UI セレクタ辞書（Phase 0 probe で更新）
+# 日英ゆれを配列で持つ。最初にマッチしたものを使う。
+
+version: 1
+updated_at: '2026-08-12T14:23:06.230711+00:00'
+notes: "probe 20260812T142254Z 北海道旅行_2027GW — Studio/Infographic/Slide deck/textarea/作成 を確認"
+
+studio_tab:
+  - text=Studio
+  - text=スタジオ
+  - 'button:has-text("Studio")'
+  - 'button:has-text("スタジオ")'
+  - '[role="tab"]:has-text("Studio")'
+  - '[role="tab"]:has-text("スタジオ")'
+
+artifacts:
+  infographic:
+    - text=Infographic
+    - 'button:has-text("Infographic")'
+    - 'button:has-text("インフォグラフィック")'
+    - text=インフォグラフィック
+    - '[aria-label*="Infographic" i]'
+    - '[aria-label*="インフォグラフィック"]'
+  slide_deck:
+    - text=Slide deck
+    - text=Slide Deck
+    - 'button:has-text("Slide Deck")'
+    - 'button:has-text("スライド")'
+    - 'button:has-text("スライドデッキ")'
+    - text=スライドデッキ
+    - '[aria-label*="Slide" i]'
+    - '[aria-label*="スライド"]'
+
+prompt_field:
+  - textarea
+  - '[contenteditable="true"]'
+  - 'div[role="textbox"]'
+  - 'textarea[aria-label*="prompt" i]'
+  - 'textarea[aria-label*="指示"]'
+  - 'textarea[placeholder*="Describe" i]'
+  - 'textarea[placeholder*="説明"]'
+
+model_picker:
+  open:
+    - 'button:has-text("Nano Banana")'
+    - 'button:has-text("Banana")'
+    - '[aria-label*="model" i]'
+    - '[aria-label*="モデル"]'
+  option_nano_banana_pro:
+    - text=Nano Banana Pro
+    - '[role="option"]:has-text("Nano Banana Pro")'
+    - 'button:has-text("Nano Banana Pro")'
+
+generate:
+  - 'button:has-text("作成")'
+  - 'button:has-text("Generate")'
+  - 'button:has-text("生成")'
+  - 'button:has-text("再生成")'
+  - 'button:has-text("Regenerate")'
+  - 'button:has-text("Create")'
+  - '[aria-label*="Generate" i]'
+  - '[aria-label*="生成"]'
+  - '[aria-label*="作成"]'
+
+download:
+  - 'button:has-text("Download")'
+  - 'button:has-text("ダウンロード")'
+  - '[aria-label*="Download" i]'
+  - '[aria-label*="ダウンロード"]'
+  - 'a[download]'
+
+busy:
+  - '[role="progressbar"]'
+  - text=Generating
+  - text=生成中
+  - text=Creating
