@@ -1,5 +1,6 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
+import NewThemeForm from "@/components/NewThemeForm";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 
@@ -17,23 +18,29 @@ export default async function ThemesPage() {
       "id, title, hypothesis, amount_jpy, duration_note, funding_path, status, review_note, created_at"
     )
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(40);
 
   return (
     <Shell active="/themes" email={user?.email ?? null}>
       <h1>テーマ運用</h1>
       <p className="sub">
-        提案→相談→承認→実行→振り返り。まずは一般的で実行しやすい提案から。定石は相談で改善。
+        提案→相談→承認→実行→振り返り。資産ステータスから草案を自動生成するか、手動で追加。
       </p>
+
+      <EnqueueJobButton
+        jobType="theme_propose_from_status"
+        title="資産ステータスから提案を生成"
+        payload={{ limit: 6 }}
+        label="ステータスから提案を生成"
+      />
+
+      <NewThemeForm />
 
       <div className="card">
         <header>
           <span className="lvl">Theme</span>
           <strong>カード一覧</strong>
         </header>
-        <p className="meta">
-          新規テーマは Jarvis 相談後に登録。プレビュージョブは実弾を出しません。
-        </p>
         <table>
           <thead>
             <tr>
@@ -48,7 +55,7 @@ export default async function ThemesPage() {
             {(themes ?? []).length === 0 ? (
               <tr>
                 <td colSpan={5} className="meta">
-                  まだテーマがありません。Jarvis で相談した内容を登録してください。
+                  まだテーマがありません。上の生成ボタンか手動フォームから追加してください。
                 </td>
               </tr>
             ) : (
@@ -59,7 +66,9 @@ export default async function ThemesPage() {
                     <strong>{t.title}</strong>
                     <div className="meta">{t.hypothesis}</div>
                   </td>
-                  <td>{t.amount_jpy != null ? fmtYen(Number(t.amount_jpy)) : "—"}</td>
+                  <td>
+                    {t.amount_jpy != null ? fmtYen(Number(t.amount_jpy)) : "—"}
+                  </td>
                   <td className="meta">{t.funding_path ?? "—"}</td>
                   <td>
                     <EnqueueJobButton

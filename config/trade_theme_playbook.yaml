@@ -108,6 +108,7 @@ allowed_jobs:
   - tax_export_evidence
   - portfolio_weekly
   - theme_preview  # 提案のみ。実弾は別承認ジョブ
+  - theme_propose_from_status
 
 theme:
   start_simple: true

@@ -12,6 +12,7 @@ const ALLOWED = new Set([
   "tax_export_evidence",
   "portfolio_weekly",
   "theme_preview",
+  "theme_propose_from_status",
 ]);
 
 export async function POST(req: Request) {
