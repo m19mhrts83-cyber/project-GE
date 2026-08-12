@@ -1,7 +1,8 @@
 {
-  "name": "trade-desk",
+  "name": "kurashift",
   "private": true,
   "version": "0.1.0",
+  "description": "KURASHIFT — 暮らしを整え、資産を動かす（旧 Trade Desk）",
   "scripts": {
     "dev": "next dev --port 3003",
     "build": "next build",
