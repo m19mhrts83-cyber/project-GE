@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -79,6 +80,7 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             "push_zaim",
             "--year",
             year,
+            *(["--confirm-apply"] if payload.get("confirm_apply") else []),
         ],
         "lifeplan_snapshot": [
             py,
@@ -125,12 +127,110 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             "--propose-from-status",
             "--limit",
             str(payload.get("limit") or 6),
+            *(["--include-index-rb"] if payload.get("include_index_rb") else []),
+        ],
+        "theme_ensure_index_rb": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_theme.py"),
+            "--ensure-index-rb",
+        ],
+        "theme_execute_assist": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_theme.py"),
+            "--execute-assist",
+            "--theme-id",
+            str(payload.get("theme_id") or ""),
+        ],
+        "secrets_status": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_secrets.py"),
+            "--status",
         ],
     }
     cmd = mapping.get(job_type)
     if not cmd:
         raise ValueError(f"unsupported job_type: {job_type}")
     return cmd
+
+
+def run_secrets_upsert(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
+    """秘密を一時ファイル経由で書き込み、成功後にジョブ payload を空にする。"""
+    job_id = row["id"]
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    updates = payload.get("updates") if isinstance(payload.get("updates"), dict) else {}
+    print(f"# job {job_id} type=secrets_upsert keys={sorted(updates.keys())}")
+    if dry_run:
+        print("  dry-run: secrets upsert", sorted(updates.keys()))
+        return "dry_run"
+
+    sb.table("kurashift_jobs").update(
+        {"status": "running", "started_at": now_iso(), "error_text": None}
+    ).eq("id", job_id).execute()
+
+    py = str(PY if PY.exists() else sys.executable)
+    tmp = Path(tempfile.mkstemp(prefix="kurashift_secrets_", suffix=".json")[1])
+    try:
+        tmp.write_text(json.dumps(updates, ensure_ascii=False), encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        proc = subprocess.run(
+            [
+                py,
+                str(REPO / "scripts" / "jarvis_kurashift_secrets.py"),
+                "--upsert-file",
+                str(tmp),
+            ],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=os.environ.copy(),
+        )
+        log = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
+        # 値をログから落とす（念のため）
+        for k, v in updates.items():
+            if v and str(v) in log:
+                log = log.replace(str(v), "***")
+        ok = proc.returncode == 0
+        result: dict[str, Any] = {"returncode": proc.returncode, "keys": sorted(updates.keys())}
+        for line in (proc.stdout or "").splitlines():
+            if line.startswith("KURASHIFT_RESULT:"):
+                try:
+                    parsed = json.loads(line[len("KURASHIFT_RESULT:") :])
+                    result["parsed"] = {
+                        "updated": parsed.get("updated"),
+                        "added": parsed.get("added"),
+                        "rejected": parsed.get("rejected"),
+                        "set_count": parsed.get("set_count"),
+                    }
+                except json.JSONDecodeError:
+                    pass
+        sb.table("kurashift_jobs").update(
+            {
+                "status": "succeeded" if ok else "failed",
+                "payload": {},  # 秘密を残さない
+                "log_text": log[-20000:],
+                "result": result,
+                "error_text": None if ok else (proc.stderr or f"exit {proc.returncode}")[:2000],
+                "finished_at": now_iso(),
+            }
+        ).eq("id", job_id).execute()
+        return "ok" if ok else "fail"
+    except Exception as e:  # noqa: BLE001
+        sb.table("kurashift_jobs").update(
+            {
+                "status": "failed",
+                "payload": {},
+                "error_text": str(e)[:2000],
+                "finished_at": now_iso(),
+            }
+        ).eq("id", job_id).execute()
+        return "fail"
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
 
 
 def run_one(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
@@ -149,6 +249,9 @@ def run_one(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
                 }
             ).eq("id", job_id).execute()
         return "denied"
+
+    if job_type == "secrets_upsert":
+        return run_secrets_upsert(sb, row, dry_run=dry_run)
 
     print(f"# job {job_id} type={job_type}")
     if dry_run:

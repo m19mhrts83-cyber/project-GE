@@ -81,11 +81,13 @@ def upsert_snapshot(
     ).execute()
 
 
-def run_json_script(args: list[str], timeout: int = 180) -> dict[str, Any]:
+def run_json_script(
+    args: list[str], timeout: int = 180, *, cwd: Path | None = None
+) -> dict[str, Any]:
     env = os.environ.copy()
     r = subprocess.run(
         args,
-        cwd=str(REPO),
+        cwd=str(cwd or REPO),
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -98,36 +100,136 @@ def run_json_script(args: list[str], timeout: int = 180) -> dict[str, Any]:
     line = (r.stdout or "").strip().splitlines()
     if not line:
         raise RuntimeError("empty stdout")
+    # JSON 行を末尾から探す（ログが混ざる場合に備える）
+    for raw in reversed(line):
+        raw = raw.strip()
+        if raw.startswith("{") and raw.endswith("}"):
+            return json.loads(raw)
     return json.loads(line[-1])
 
 
 def fetch_sony() -> dict[str, Any]:
+    """後方互換: 合計のみ。名義別は fetch_sony_by_account() を使う。"""
+    multi = fetch_sony_by_account()
+    if multi.get("status") != "ok":
+        return multi
+    return {
+        "status": "ok",
+        "value_jpy": int(multi["total_jpy"]),
+        "note": multi.get("note") or "",
+        "accounts": multi.get("accounts") or {},
+    }
+
+
+def fetch_sony_by_account() -> dict[str, Any]:
+    """真治=sony_life / 千景=sony_life_chikage に分割して返す。"""
     if not (
         os.environ.get("SONYLIFE_USERNAME")
         or os.environ.get("SONYLIFE_USERNAME_1")
     ):
         return {"status": "skipped", "reason": "SONYLIFE_USERNAME 未設定"}
-    script = FINANCE / "run_sony_life_step3.py"
+    script = FINANCE / "sony_life_surrender_value.py"
     if not script.is_file():
         return {"status": "skipped", "reason": "sony script missing"}
-    env = os.environ.copy()
-    r = subprocess.run(
-        [py_exe(), str(script), "--headless"],
-        cwd=str(FINANCE),
-        capture_output=True,
-        text=True,
-        timeout=240,
-        env=env,
-        check=False,
+    data = run_json_script(
+        [py_exe(), str(script), "--headless", "--json", "--save-debug"],
+        timeout=360,
+        cwd=FINANCE,
     )
-    if r.returncode != 0:
-        raise RuntimeError((r.stderr or r.stdout or "sony fail").strip().splitlines()[-1])
-    for line in (r.stdout or "").splitlines():
-        if "解約返戻金（合計）" in line:
-            digits = "".join(ch for ch in line if ch.isdigit())
-            if digits:
-                return {"status": "ok", "value_jpy": int(digits), "note": line.strip()}
-    raise RuntimeError("ソニー生命の金額行が見つかりません")
+    items = data.get("items") or []
+    accounts: dict[str, dict[str, Any]] = {}
+    loans: dict[str, dict[str, Any]] = {}
+    # 既定: 1人目=真治, 2人目=千景（debug HTML の実績に合わせる）
+    for it in items:
+        idx = int(it.get("account_index") or 0)
+        aid = "sony_life" if idx <= 1 else "sony_life_chikage"
+        loan_aid = (
+            "sony_life_policy_loan"
+            if idx <= 1
+            else "sony_life_chikage_policy_loan"
+        )
+        accounts[aid] = {
+            "status": "ok",
+            "value_jpy": int(it.get("value_jpy") or 0),
+            "note": f"account{idx} {it.get('username') or ''}".strip(),
+        }
+        policy = int(it.get("policy_loan_jpy") or 0)
+        auto = int(it.get("auto_premium_loan_jpy") or 0)
+        loans[loan_aid] = {
+            "status": "ok",
+            "value_jpy": policy + auto,
+            "note": f"契約者貸付{policy:,}+自動振替{auto:,}",
+            "policy_loan_jpy": policy,
+            "auto_premium_loan_jpy": auto,
+        }
+    if not accounts and data.get("value_jpy") is not None:
+        accounts["sony_life"] = {
+            "status": "ok",
+            "value_jpy": int(data["value_jpy"]),
+            "note": data.get("parser_mode") or "",
+        }
+        total_loan = int(data.get("total_loan_jpy") or 0)
+        if total_loan or data.get("policy_loan_jpy") is not None:
+            loans["sony_life_policy_loan"] = {
+                "status": "ok",
+                "value_jpy": total_loan
+                or int(data.get("policy_loan_jpy") or 0)
+                + int(data.get("auto_premium_loan_jpy") or 0),
+                "note": "from aggregate",
+            }
+    return {
+        "status": "ok",
+        "total_jpy": int(data.get("value_jpy") or sum(a["value_jpy"] for a in accounts.values())),
+        "note": data.get("parser_mode") or "",
+        "accounts": accounts,
+        "loans": loans,
+    }
+
+
+def fetch_bloomo() -> dict[str, Any]:
+    if not (
+        os.environ.get("BLOOMO_EMAIL")
+        or os.environ.get("BLOOMO_USERNAME")
+        or os.environ.get("BLOOMO_LOGIN_ID")
+    ):
+        return {"status": "skipped", "reason": "BLOOMO_EMAIL 未設定（.env.jarvis_private）"}
+    script = REPO / "scripts" / "jarvis_bloomo_balance.py"
+    if not script.is_file():
+        return {"status": "skipped", "reason": "jarvis_bloomo_balance.py missing"}
+    data = run_json_script(
+        [py_exe(), str(script), "--headless", "--json"],
+        timeout=240,
+    )
+    if data.get("status") and data.get("status") != "ok":
+        return data
+    return {
+        "status": "ok",
+        "value_jpy": int(data["value_jpy"]),
+        "note": data.get("note") or data.get("parser_mode") or "",
+    }
+
+
+def fetch_prudential(account_id: str) -> dict[str, Any]:
+    """Web 取得が無い間は env の手登録値を週次スナップに載せる。"""
+    env_key = {
+        "prudential_life": "PRUDENTIAL_VALUE_JPY",
+        "prudential_life_chikage": "PRUDENTIAL_CHIKAGE_VALUE_JPY",
+        "prudential_life_policy_loan": "PRUDENTIAL_LOAN_JPY",
+        "prudential_life_chikage_policy_loan": "PRUDENTIAL_CHIKAGE_LOAN_JPY",
+    }.get(account_id)
+    if not env_key:
+        return {"status": "skipped", "reason": f"unknown account {account_id}"}
+    raw = (os.environ.get(env_key) or "").strip().replace(",", "")
+    if not raw:
+        return {
+            "status": "skipped",
+            "reason": f"{env_key} 未設定（手登録。少額でも Core に載せる）",
+        }
+    try:
+        value = int(float(raw))
+    except ValueError:
+        return {"status": "error", "reason": f"{env_key} が数値ではありません"}
+    return {"status": "ok", "value_jpy": value, "note": f"env:{env_key}"}
 
 
 def fetch_akatsuki() -> dict[str, Any]:
@@ -275,18 +377,121 @@ def main() -> int:
         return 0
 
     print(f"# portfolio_weekly start {now_iso()} cloud_only={args.cloud_only}")
+    if args.dry_run and not args.cloud_only:
+        # ブラウザを起動せず、資格情報の有無だけ報告する
+        checks = {
+            "sony_life": bool(
+                os.environ.get("SONYLIFE_USERNAME")
+                or os.environ.get("SONYLIFE_USERNAME_1")
+            ),
+            "sony_life_chikage": bool(os.environ.get("SONYLIFE_USERNAME_2")),
+            "bloomo": bool(
+                os.environ.get("BLOOMO_EMAIL")
+                or os.environ.get("BLOOMO_USERNAME")
+                or os.environ.get("BLOOMO_LOGIN_ID")
+            ),
+            "prudential_life": bool(os.environ.get("PRUDENTIAL_VALUE_JPY")),
+            "prudential_life_chikage": bool(
+                os.environ.get("PRUDENTIAL_CHIKAGE_VALUE_JPY")
+            ),
+            "axa_life": bool(
+                os.environ.get("AXA_MYAXA_ID") and os.environ.get("AXA_MYAXA_PASSWORD")
+            ),
+            "sbi_index": bool(
+                os.environ.get("SBI_SEC_USER")
+                and os.environ.get("SBI_SEC_LOGIN_PASSWORD")
+            ),
+            "akatsuki_bond": bool(
+                (
+                    os.environ.get("AKATSUKI_BRANCH_CODE")
+                    and os.environ.get("AKATSUKI_ACCOUNT_NUMBER")
+                    and os.environ.get("AKATSUKI_LOGIN_PASSWORD")
+                )
+                or (FINANCE / ".env.akatsuki").is_file()
+            ),
+            "mhi_stock": True,
+        }
+        for k, ok in checks.items():
+            print(f"# dry-run {k}: {'creds_ok' if ok else 'missing_creds'}")
+        print(
+            f"📎 資産週次 dry-run: week={iso_week()} "
+            f"creds_ok={sum(1 for v in checks.values() if v)}/{len(checks)} "
+            "(ブラウザ未起動)"
+        )
+        return 0
+
     sb = None if args.dry_run else sb_client()
     sources: dict[str, Any] = {}
 
     jobs: list[tuple[str, Any]] = []
     if not args.cloud_only:
         jobs = [
-            ("sony_life", fetch_sony),
             ("axa_life", fetch_axa),
             ("sbi_index", fetch_sbi),
             ("mhi_stock", fetch_mhi_zaim),
             ("akatsuki_bond", fetch_akatsuki),
+            ("bloomo", fetch_bloomo),
+            ("prudential_life", lambda: fetch_prudential("prudential_life")),
+            ("prudential_life_chikage", lambda: fetch_prudential("prudential_life_chikage")),
+            (
+                "prudential_life_policy_loan",
+                lambda: fetch_prudential("prudential_life_policy_loan"),
+            ),
+            (
+                "prudential_life_chikage_policy_loan",
+                lambda: fetch_prudential("prudential_life_chikage_policy_loan"),
+            ),
         ]
+
+    # ソニーは1回のログイン往復で名義別に分割
+    if not args.cloud_only:
+        try:
+            sony_multi = fetch_sony_by_account()
+        except Exception as exc:
+            sony_multi = {"status": "error", "reason": str(exc)[:300]}
+        if sony_multi.get("status") == "ok":
+            for aid, rec in (sony_multi.get("accounts") or {}).items():
+                sources[aid] = rec
+                print(
+                    f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
+                )
+                if not args.dry_run and rec.get("status") == "ok":
+                    upsert_snapshot(
+                        sb,
+                        aid,
+                        float(rec["value_jpy"]),
+                        source="weekly_web",
+                        note=rec.get("note"),
+                    )
+            for aid, rec in (sony_multi.get("loans") or {}).items():
+                sources[aid] = rec
+                print(
+                    f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
+                )
+                if not args.dry_run and rec.get("status") == "ok":
+                    upsert_snapshot(
+                        sb,
+                        aid,
+                        float(rec["value_jpy"]),
+                        source="weekly_web_loan",
+                        note=rec.get("note"),
+                    )
+            if "sony_life_chikage" not in (sony_multi.get("accounts") or {}):
+                sources["sony_life_chikage"] = {
+                    "status": "skipped",
+                    "reason": "SONYLIFE_USERNAME_2 未設定または取得0件",
+                }
+                print("# sony_life_chikage: skipped SONYLIFE_USERNAME_2 未設定または取得0件")
+        else:
+            sources["sony_life"] = sony_multi
+            sources["sony_life_chikage"] = {
+                "status": sony_multi.get("status") or "error",
+                "reason": sony_multi.get("reason") or "sony parent failed",
+            }
+            print(
+                f"# sony_life: {sony_multi.get('status')} "
+                f"{sony_multi.get('reason') or sony_multi.get('note') or ''}"
+            )
 
     for account_id, fn in jobs:
         try:
