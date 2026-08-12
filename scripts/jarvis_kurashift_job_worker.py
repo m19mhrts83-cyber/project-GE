@@ -104,6 +104,13 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             "--year",
             year,
         ],
+        "tax_ingest_manual_dir": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_tax.py"),
+            "--ingest-manual-dir",
+            "--year",
+            year,
+        ],
         "tax_export_evidence": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_tax.py"),

@@ -405,11 +405,28 @@ def _lifeplanner_nav_to_surrender_value_page(page, timeout_ms: int) -> None:
     err = page.evaluate(
         """
 (rowIdx) => {
+  const norm = (txt) => (txt || "").replace(/\\s/g, "").replace(/\\u3000/g, "");
   const wantCol = (txt) => {
-    const n = (txt || "").replace(/\\s/g, "").replace(/\\u3000/g, "");
-    return n.includes("解約返戻金") || (n.includes("貸付") && n.includes("解約"));
+    const n = norm(txt);
+    return n.includes("解約返戻金") || (n.includes("貸付") && n.includes("解約"))
+      || n.includes("貸付金") || n.includes("選択する");
   };
-  for (const table of document.querySelectorAll("table")) {
+  const clickIn = (el) => {
+    if (!el) return false;
+    const clickable = el.querySelector(
+      'button, a[href], [role="button"], input[type="button"], input[type="submit"], a'
+    );
+    if (clickable) { clickable.click(); return true; }
+    // セル全体がリンク相当
+    if (el.tagName === "A" || el.getAttribute("onclick") || el.getAttribute("href")) {
+      el.click();
+      return true;
+    }
+    return false;
+  };
+
+  const tables = Array.from(document.querySelectorAll("table"));
+  for (const table of tables) {
     const headerRow = table.querySelector("thead tr") || table.rows[0];
     if (!headerRow) continue;
     const hs = headerRow.querySelectorAll("th, td");
@@ -419,10 +436,9 @@ def _lifeplanner_nav_to_surrender_value_page(page, timeout_ms: int) -> None:
     }
     if (col < 0) {
       for (let i = 0; i < hs.length; i++) {
-        if ((hs[i].innerText || "").indexOf("解約返戻金") >= 0) { col = i; break; }
+        if (norm(hs[i].innerText).includes("解約")) { col = i; break; }
       }
     }
-    if (col < 0) continue;
     let rows = [];
     if (table.tBodies && table.tBodies[0] && table.tBodies[0].rows.length) {
       rows = Array.from(table.tBodies[0].rows);
@@ -430,23 +446,42 @@ def _lifeplanner_nav_to_surrender_value_page(page, timeout_ms: int) -> None:
       const trs = table.querySelectorAll("tbody tr");
       rows = trs.length ? Array.from(trs) : Array.from(table.querySelectorAll("tr")).slice(1);
     }
-    if (!rows[rowIdx]) return "no-row";
-    const cells = rows[rowIdx].querySelectorAll("th, td");
-    if (!cells[col]) return "no-cell";
-    const cell = cells[col];
-    const clickable = cell.querySelector(
-      'button, a[href], [role="button"], input[type="button"], input[type="submit"]'
-    );
-    if (!clickable) return "no-button";
-    clickable.click();
-    return "ok";
+    // ヘッダ行が tbody に混ざる場合を除外
+    rows = rows.filter((r) => !r.querySelector("th") || r.querySelectorAll("td").length > 0);
+    if (!rows.length) continue;
+
+    if (col >= 0 && rows[rowIdx]) {
+      const cells = rows[rowIdx].querySelectorAll("th, td");
+      if (cells[col] && clickIn(cells[col])) return "ok";
+    }
+
+    // フォールバック: 行内の「選択する」をクリック
+    const target = rows[Math.min(rowIdx, rows.length - 1)];
+    if (target) {
+      const byText = Array.from(target.querySelectorAll("a, button, [role='button'], span, td"))
+        .find((el) => norm(el.innerText).includes("選択する"));
+      if (byText && clickIn(byText.parentElement || byText)) return "ok-fallback-select";
+      if (byText) { byText.click(); return "ok-fallback-select"; }
+    }
   }
-  return "no-table";
+
+  // 最終手段: ページ内の N 番目の「選択する」
+  const allSelect = Array.from(document.querySelectorAll("a, button, [role='button']"))
+    .filter((el) => norm(el.innerText).includes("選択する"));
+  if (allSelect[rowIdx]) {
+    allSelect[rowIdx].click();
+    return "ok-page-select";
+  }
+  if (allSelect.length === 1) {
+    allSelect[0].click();
+    return "ok-page-select-only";
+  }
+  return tables.length ? "no-table" : "no-table-dom";
 }
 """,
         row_idx,
     )
-    if err != "ok":
+    if err not in ("ok", "ok-fallback-select", "ok-page-select", "ok-page-select-only"):
         raise RuntimeError(
             "契約一覧の「貸付金／解約返戻金」列の「選択する」をクリックできませんでした。"
             f"（{err}）複数契約がある場合は SONYLIFE_NAV_CONTRACT_ROW_INDEX を調整してください。"

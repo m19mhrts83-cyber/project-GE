@@ -105,6 +105,7 @@ allowed_jobs:
   - lifeplan_snapshot
   - tax_build_yayoi_csv
   - tax_ingest_accountant_mail
+  - tax_ingest_manual_dir
   - tax_export_evidence
   - portfolio_weekly
   - theme_preview  # 提案のみ。実弾は別承認ジョブ
