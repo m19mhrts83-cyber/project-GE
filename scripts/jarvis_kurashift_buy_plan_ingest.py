@@ -25,11 +25,28 @@ BUY_DIR = Path(
     "215_神・大家さん倶楽部/05_【購入】買い進めプランニング"
 )
 CANONICAL_KEY = "251124"
-STEP3_NAME = "STEP3 夢を叶えるプランニングシート（ver3.0)"
+STEP3_NAME = "STEP3 夢を叶えるプランニングシート（ver3.0)"  # 現行優先名
 AREA_NAME = "物件購入検討エリア・条件"
 CONSTRAINT_NAME = "プランニング制約"
 KIMURA_NAME = "木村さんコメント"
 EXCEL_EPOCH = datetime(1899, 12, 30)
+
+
+def pick_step3_sheet(sheet_names: list[str]) -> str | None:
+    """版によって STEP3 シート名が異なる（あなたのシート / ver2.0 / ver3.0）。SAMPLE は除外。"""
+    preferred = [
+        STEP3_NAME,
+        "STEP3 夢を叶えるプランニングシート（ver2.0)",
+        "STEP3 夢を叶えるプランニングシート（あなたのシート）",
+    ]
+    for name in preferred:
+        if name in sheet_names:
+            return name
+    for name in sheet_names:
+        if name.startswith("STEP3") and "SAMPLE" not in name.upper() and "サンプル" not in name:
+            return name
+    return None
+
 
 
 def jst_now() -> datetime:
@@ -247,9 +264,10 @@ def upsert_version(
     constraints: list[dict[str, Any]] = []
     notes: list[dict[str, Any]] = []
     notes_status = "ok"
+    step3 = pick_step3_sheet(sheet_names)
 
-    if STEP3_NAME in wb.sheetnames:
-        events = parse_step3(wb[STEP3_NAME])
+    if step3:
+        events = parse_step3(wb[step3])
     else:
         notes_status = "partial"
     if AREA_NAME in wb.sheetnames:
@@ -265,8 +283,16 @@ def upsert_version(
         "event_count": len(events),
         "criteria_count": len(criteria),
         "constraint_count": len(constraints),
+        "step3_sheet": step3,
         "ingested_at": jst_now().isoformat(),
     }
+    extract_notes = None
+    if not events:
+        extract_notes = (
+            f"STEP3 rows empty (sheet={step3!r})"
+            if step3
+            else "STEP3 sheet missing"
+        )
     version_row = {
         "version_key": key,
         "as_of": as_of.isoformat(),
@@ -276,8 +302,8 @@ def upsert_version(
         "is_canonical": is_canonical,
         "file_mtime": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
         "file_size_bytes": st.st_size,
-        "extract_status": notes_status if events or criteria else "failed",
-        "extract_notes": None if events else "STEP3 rows empty or sheet missing",
+        "extract_status": notes_status if (events or criteria or constraints) else "failed",
+        "extract_notes": extract_notes,
         "sheet_names": sheet_names,
         "metadata": meta,
         "updated_at": jst_now().isoformat(),
