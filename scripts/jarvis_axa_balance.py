@@ -237,6 +237,19 @@ def _navigate_axa_value_pages(page, timeout_ms: int) -> None:
 
 
 
+def _raise_if_axa_out_of_hours(page) -> None:
+    """営業日 5:00–8:00 は積立金ページがメンテナンス。抽出失敗と混同しない。"""
+    try:
+        text = page.inner_text("body") or ""
+    except Exception:
+        text = ""
+    if "受付時間外" in text or "メンテナンス終了後" in text or "AM5:00-AM8:00" in text:
+        raise RuntimeError(
+            "MyAXA 積立金ページが時間外／メンテナンスです。"
+            "目安は 8:00 以降（5:00–8:00 はメンテ）。"
+        )
+
+
 def _page_looks_like_otp(page) -> bool:
     try:
         body = page.inner_text("body") or ""
@@ -492,8 +505,10 @@ def fetch_axa_balance(*, headless: bool, timeout_ms: int, save_debug: bool) -> A
                 raise RuntimeError("MyAXA が OTP を要求し、自動取得に失敗しました")
 
         _dismiss_overlays(page)
+        _raise_if_axa_out_of_hours(page)
         _navigate_axa_value_pages(page, timeout_ms)
 
+        _raise_if_axa_out_of_hours(page)
         text = page.inner_text("body")
         value, mode = _yen_near_labels(text)
         if value is None:

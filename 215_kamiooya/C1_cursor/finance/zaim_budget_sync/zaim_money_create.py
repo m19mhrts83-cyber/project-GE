@@ -94,13 +94,70 @@ def _fill_date(page: Page, day: str) -> None:
 
 
 def _fill_amount(page: Page, amount: int) -> None:
+    """Zaim の金額欄は CalculatorField で readonly のことがある。"""
     loc = page.locator(
         'input[name="amount"], input[name="price"], input[inputmode="numeric"], '
         'input[type="tel"], input[placeholder*="金額"]'
     )
     if loc.count() == 0:
         raise RuntimeError("金額欄が見つかりません")
-    loc.first.fill(str(amount))
+    el = loc.first
+    el.click(timeout=5000)
+    page.wait_for_timeout(250)
+    target = str(amount)
+    try:
+        el.fill(target, timeout=1500)
+        return
+    except Exception:
+        pass
+    try:
+        page.keyboard.type(target, delay=40)
+        page.wait_for_timeout(200)
+        typed = (el.input_value() or "").replace(",", "").replace("¥", "")
+        if target in typed:
+            return
+    except Exception:
+        pass
+    # readonly の電卓 UI: 属性を外して React 向けに value setter を叩く
+    page.evaluate(
+        """(val) => {
+          const el = document.querySelector(
+            'input[name="amount"], input[name="price"], input[inputmode="numeric"]'
+          );
+          if (!el) return false;
+          el.removeAttribute('readonly');
+          el.readOnly = false;
+          const desc = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype, 'value'
+          );
+          if (desc && desc.set) desc.set.call(el, val);
+          else el.value = val;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }""",
+        target,
+    )
+    page.wait_for_timeout(200)
+    got = ""
+    try:
+        got = (el.input_value() or "").replace(",", "").replace("¥", "")
+    except Exception:
+        pass
+    if target in got:
+        return
+    # 電卓の数字ボタン
+    for ch in target:
+        btn = page.locator(
+            f'[class*="Calculator"] button:has-text("{ch}"), '
+            f'[class*="calculator"] button:has-text("{ch}")'
+        )
+        if btn.count() == 0:
+            btn = page.get_by_role("button", name=ch, exact=True)
+        if btn.count() == 0:
+            raise RuntimeError(f"金額を入力できません（readonly・電卓ボタンなし）: {amount}")
+        btn.first.click(timeout=1500)
+        page.wait_for_timeout(80)
 
 
 def _pick_by_text(page: Page, label: str) -> bool:
@@ -123,36 +180,119 @@ def _pick_by_text(page: Page, label: str) -> bool:
     return False
 
 
+def _select_native(page: Page, label: str, *, index: int | None = None) -> bool:
+    """Zaim のカテゴリ／口座／集計は hidden な <select>。JS で value を入れる。"""
+    if not label:
+        return False
+    found = page.evaluate(
+        """([q, idx]) => {
+          const norm = (t) => (t || '').replace(/\\s+/g, '');
+          const qn = norm(q);
+          const selects = [...document.querySelectorAll('select')];
+          const list = (idx === null || idx === undefined) ? selects : [selects[idx]].filter(Boolean);
+          for (const s of list) {
+            for (const o of s.options) {
+              const t = (o.text || '').trim();
+              if (t === q || norm(t) === qn) {
+                const desc = Object.getOwnPropertyDescriptor(
+                  window.HTMLSelectElement.prototype, 'value'
+                );
+                if (desc && desc.set) desc.set.call(s, o.value);
+                else s.value = o.value;
+                s.dispatchEvent(new Event('input', { bubbles: true }));
+                s.dispatchEvent(new Event('change', { bubbles: true }));
+                return t;
+              }
+            }
+          }
+          return null;
+        }""",
+        [label, index],
+    )
+    if found:
+        page.wait_for_timeout(200)
+        return True
+    return False
+
+
 def _open_select(page: Page, names: list[str]) -> bool:
     for name in names:
         loc = page.locator(
             f'label:has-text("{name}"), [aria-label*="{name}"], '
             f'button:has-text("{name}"), select[name*="{name}"]'
         )
-        if loc.count() == 0:
+        if loc.count() > 0:
+            try:
+                loc.first.click(timeout=2000)
+                page.wait_for_timeout(400)
+                return True
+            except Exception:
+                pass
+        # 新UI: 「カテゴリ」ラベルの右の値（現在の分類名）をクリック
+        label = page.get_by_text(name, exact=True)
+        if label.count() == 0:
             continue
         try:
-            loc.first.click(timeout=2000)
-            page.wait_for_timeout(400)
-            return True
+            opened = label.first.evaluate(
+                """el => {
+                  const row = el.closest(
+                    '[class*="row"], [class*="Row"], [class*="Field"], [class*="Item"], li, tr'
+                  ) || el.parentElement;
+                  if (!row) { el.click(); return true; }
+                  const value = row.querySelector(
+                    'button, [role="button"], [class*="value"], [class*="Value"], select'
+                  );
+                  (value || row).click();
+                  return true;
+                }"""
+            )
+            if opened:
+                page.wait_for_timeout(500)
+                return True
         except Exception:
-            continue
+            try:
+                label.first.click(timeout=2000)
+                page.wait_for_timeout(400)
+                return True
+            except Exception:
+                continue
     return False
 
 
+def _filter_picker(page: Page, query: str) -> None:
+    search = page.locator(
+        'input[placeholder*="検索"], input[placeholder*="カテゴリ"], input[type="search"], '
+        '[role="dialog"] input[type="text"], [class*="Modal"] input, [class*="Search"] input'
+    )
+    if search.count() == 0:
+        return
+    try:
+        search.first.fill(query)
+        page.wait_for_timeout(400)
+    except Exception:
+        pass
+
+
 def _pick_category(page: Page, category: str, genre: str) -> None:
-    _open_select(page, ["カテゴリ", "分類", "category"])
-    if category and not _pick_by_text(page, category):
-        short = category.split(".")[-1] if "." in category else category
-        if not _pick_by_text(page, short):
-            raise RuntimeError(f"カテゴリが見つかりません: {category}")
+    if category:
+        if not _select_native(page, category):
+            _open_select(page, ["カテゴリ", "分類", "category"])
+            _filter_picker(page, category.split(".")[-1] if "." in category else category)
+            if not _pick_by_text(page, category):
+                short = category.split(".")[-1] if "." in category else category
+                if not _pick_by_text(page, short):
+                    raise RuntimeError(f"カテゴリが見つかりません: {category}")
     if genre:
-        _open_select(page, ["内訳", "ジャンル", "genre"])
-        if not _pick_by_text(page, genre):
-            raise RuntimeError(f"内訳が見つかりません: {genre}")
+        if not _select_native(page, genre):
+            _open_select(page, ["内訳", "ジャンル", "genre"])
+            _filter_picker(page, genre)
+            if not _pick_by_text(page, genre):
+                raise RuntimeError(f"内訳が見つかりません: {genre}")
 
 
 def _pick_account(page: Page, account: str, *, kind: str) -> None:
+    if _select_native(page, account):
+        return
     labels = ["口座", "支払元", "出金元"] if kind == "payment" else ["口座", "入金先", "入金元"]
     _open_select(page, labels)
     if not _pick_by_text(page, account):
@@ -162,21 +302,33 @@ def _pick_account(page: Page, account: str, *, kind: str) -> None:
 def _set_exclude(page: Page, exclude: bool) -> None:
     if not exclude:
         return
-    for lab in ("集計に含めない", "集計から除外", "この支出を集計に含めない", "この収入を集計に含めない"):
-        loc = page.get_by_text(lab, exact=False)
+    if _select_native(page, "常に含めない"):
+        return
+    for lab in (
+        "常に含めない",
+        "この収入を集計に含めない",
+        "この支出を集計に含めない",
+        "集計に含めない",
+        "集計から除外",
+    ):
+        loc = page.get_by_text(lab, exact=True)
+        if loc.count() == 0:
+            loc = page.get_by_text(lab, exact=False)
         if loc.count() == 0:
             continue
-        box = page.locator(
-            f'label:has-text("{lab}") input[type="checkbox"], input[type="checkbox"]'
-        )
         try:
-            if box.count() > 0 and not box.first.is_checked():
-                box.first.check()
-                return
-            loc.first.click()
+            loc.first.click(timeout=2000)
+            page.wait_for_timeout(200)
             return
         except Exception:
             continue
+    box = page.locator('input[type="checkbox"]')
+    if box.count() > 0:
+        try:
+            if not box.first.is_checked():
+                box.first.check()
+        except Exception:
+            pass
 
 
 def _fill_comment(page: Page, comment: str) -> None:
@@ -194,16 +346,26 @@ def _fill_comment(page: Page, comment: str) -> None:
 
 
 def _submit(page: Page) -> None:
-    for text in ("登録", "保存", "完了", "入力する"):
-        btn = page.get_by_role("button", name=re.compile(text))
-        if btn.count() == 0:
-            btn = page.locator(f'input[type="submit"][value*="{text}"]')
-        if btn.count() == 0:
-            continue
-        btn.first.click(timeout=4000)
-        page.wait_for_timeout(1500)
-        return
-    raise RuntimeError("登録ボタンが見つかりません")
+    btn = page.locator('input[type="submit"][value*="入力する"], input[type="submit"][value*="登録"]')
+    if btn.count() == 0:
+        for text in ("登録", "保存", "完了", "入力する"):
+            role_btn = page.get_by_role("button", name=re.compile(text))
+            if role_btn.count() > 0:
+                btn = role_btn
+                break
+    if btn.count() == 0:
+        raise RuntimeError("登録ボタンが見つかりません")
+    btn.first.click(timeout=4000, no_wait_after=True)
+    try:
+        page.get_by_text("入力しました", exact=False).wait_for(timeout=8000)
+    except Exception:
+        body = ""
+        try:
+            body = page.inner_text("body") or ""
+        except Exception:
+            pass
+        if "入力しました" not in body:
+            raise RuntimeError("登録ボタンを押したが完了表示がありません")
 
 
 def create_money(

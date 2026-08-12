@@ -60,14 +60,14 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ### P0（信頼・日次で触る）
 
-1. **ソニー週次フル成功** — 日中に  
+1. **ソニー／アクサ週次** — 時間外は **skipped**（エラーにしない）。日中に  
    `python scripts/jarvis_portfolio_weekly.py --force`  
-   （深夜はサービス時間外。検出は実装済）
+   （ソニー 9:00–17:30、アクサは 5:00–8:00 メンテ）
 2. **ダッシュボードPW** — 既に Rotate 済。正本は `.env.jarvis_private` のみ
 
 ### P1（③を実務レベルへ）
 
-3. **loan-tracker 本接続** — Discover 済（データは estate Drive の専用ファイル。画面からは ID が取れない）。投影表は作成済。残は JSON パス or Drive OAuth or ログイン済み `/api/data`
+3. **loan-tracker** — **アプリ未使用**（2026-08-13 確認）。中身まとめを共有してもらい、一緒に項目設計する。Drive 探索は停止。投影表は受け皿のみ
 4. **③-A 個人YTD** — ✅ Zaim カテゴリ年次
 5. **③-A 法人＋合算** — ✅ 顧客承認により合算 KPI に投入（2026-08-13）
 6. **メール候補** — ✅ スコア5以上を内見（詳細取り寄せ〜日程調整）
@@ -88,7 +88,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - 未承認の実弾売買・自動振替・弥生本登録・Zaim本番（confirm なし）は禁止
 - 秘密は `.env.jarvis_private` のみ（チャット・Git・ジョブログに値を出さない）
 - Supabase Free は `kamiooya-qa` と `jarvis-dashboard` の2本まで
-- ローン正本は [借入残高トラッカー](https://loan-tracker-plum.vercel.app/)（Google: **estate**）。KURASHIFT は読取投影のみ
+- ローン正本は [借入残高トラッカー](https://loan-tracker-plum.vercel.app/)（Google: **estate**）を使い始めたら読取投影。**現状は未使用**（中身まとめ待ち）
 - 物件問い合わせの対外送信は **送信前確認必須**
 
 ---

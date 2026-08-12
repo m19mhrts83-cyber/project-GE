@@ -57,6 +57,38 @@ def now_iso() -> str:
     return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
+def sony_web_hours_ok(now: datetime | None = None) -> tuple[bool, str]:
+    """お客さまWEB / LIFEPLANNER WEB の目安は 9:00–17:30。"""
+    n = now or datetime.now(JST)
+    hm = n.hour * 60 + n.minute
+    if hm < 9 * 60 or hm >= 17 * 60 + 30:
+        return False, "ソニーお客さまWEBは目安 9:00–17:30（今回は時間外）"
+    return True, ""
+
+
+def axa_web_hours_ok(now: datetime | None = None) -> tuple[bool, str]:
+    """MyAXA 積立金ページは営業日 5:00–8:00 がメンテナンス。"""
+    n = now or datetime.now(JST)
+    hm = n.hour * 60 + n.minute
+    if 5 * 60 <= hm < 8 * 60:
+        return False, "MyAXA 積立金は 5:00–8:00 メンテナンス（8:00以降に再実行）"
+    return True, ""
+
+
+def rec_from_exc(exc: BaseException) -> dict[str, Any]:
+    msg = str(exc)[:300]
+    hours = (
+        "サービス時間外",
+        "時間外／メンテナンス",
+        "時間外/メンテナンス",
+        "5:00–8:00",
+        "9:00–17:30",
+    )
+    if any(x in msg for x in hours):
+        return {"status": "skipped", "reason": msg}
+    return {"status": "error", "reason": msg}
+
+
 def iso_week(d=None) -> str:
     d = d or today_jst()
     y, w, _ = d.isocalendar()
@@ -160,6 +192,9 @@ def fetch_sony_by_account() -> dict[str, Any]:
     script = FINANCE / "sony_life_surrender_value.py"
     if not script.is_file():
         return {"status": "skipped", "reason": "sony script missing"}
+    ok, reason = sony_web_hours_ok()
+    if not ok:
+        return {"status": "skipped", "reason": reason}
     data = run_json_script(
         [py_exe(), str(script), "--headless", "--json", "--save-debug"],
         timeout=360,
@@ -426,6 +461,9 @@ def fetch_akatsuki() -> dict[str, Any]:
 def fetch_axa() -> dict[str, Any]:
     if not (os.environ.get("AXA_MYAXA_ID") and os.environ.get("AXA_MYAXA_PASSWORD")):
         return {"status": "skipped", "reason": "AXA_MYAXA_* 未設定"}
+    ok, reason = axa_web_hours_ok()
+    if not ok:
+        return {"status": "skipped", "reason": reason}
     script = REPO / "scripts" / "jarvis_axa_balance.py"
     data = run_json_script(
         [py_exe(), str(script), "--headless", "--json", "--save-debug"],
@@ -677,7 +715,7 @@ def main() -> int:
         try:
             sony_multi = fetch_sony_by_account()
         except Exception as exc:
-            sony_multi = {"status": "error", "reason": str(exc)[:300]}
+            sony_multi = rec_from_exc(exc)
         if sony_multi.get("status") == "ok":
             for aid, rec in (sony_multi.get("accounts") or {}).items():
                 sources[aid] = rec
@@ -785,7 +823,7 @@ def main() -> int:
         try:
             rec = fn()
         except Exception as exc:
-            rec = {"status": "error", "reason": str(exc)[:300]}
+            rec = rec_from_exc(exc)
         sources[account_id] = rec
         print(f"# {account_id}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}")
 
@@ -917,10 +955,21 @@ def main() -> int:
                 cwd=str(REPO),
                 timeout=240,
                 check=False,
+                capture_output=True,
+                text=True,
             )
+            if zrc.stdout:
+                print(zrc.stdout.rstrip())
+            reason = f"exit={zrc.returncode}"
+            if zrc.returncode != 0:
+                err = (zrc.stderr or zrc.stdout or "").strip().splitlines()
+                if err:
+                    reason = err[-1][:300]
+                if zrc.stderr:
+                    print(zrc.stderr.rstrip(), file=sys.stderr)
             sources["akatsuki_zaim"] = {
                 "status": "ok" if zrc.returncode == 0 else "error",
-                "reason": f"exit={zrc.returncode}",
+                "reason": reason,
             }
         except Exception as exc:
             sources["akatsuki_zaim"] = {"status": "error", "reason": str(exc)[:300]}
@@ -950,10 +999,21 @@ def main() -> int:
                 cwd=str(REPO),
                 timeout=240,
                 check=False,
+                capture_output=True,
+                text=True,
             )
+            if zrc.stdout:
+                print(zrc.stdout.rstrip())
+            reason = f"exit={zrc.returncode}"
+            if zrc.returncode != 0:
+                err = (zrc.stderr or zrc.stdout or "").strip().splitlines()
+                if err:
+                    reason = err[-1][:300]
+                if zrc.stderr:
+                    print(zrc.stderr.rstrip(), file=sys.stderr)
             sources["bloomo_zaim"] = {
                 "status": "ok" if zrc.returncode == 0 else "error",
-                "reason": f"exit={zrc.returncode}",
+                "reason": reason,
             }
         except Exception as exc:
             sources["bloomo_zaim"] = {"status": "error", "reason": str(exc)[:300]}
