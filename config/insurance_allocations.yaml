@@ -1,6 +1,9 @@
 # 生命保険の特別勘定配分・月額積立（KURASHIFT）
 # 正本: アクサ = IFA石川さん反映の参考配分。他社は対アクサ比較用。
 # 未確認の pct / monthly_yen は null。取得成功で web、失敗時は snap JSON を参照。
+#
+# 後続（未実装）: 月額・配分は「ユーザー指定 URL から取得」する方針。
+# 今は評価額のみ週次スクレイプ。配分％は手入力 or スクショ反映。
 
 reference_account: axa_life
 
