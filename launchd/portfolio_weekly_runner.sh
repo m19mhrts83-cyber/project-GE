@@ -1,5 +1,6 @@
 #!/bin/zsh
-# 資産全体の週次 Web 収集（日曜 09:00 ＋ Mac 朝オープン取りこぼし）
+# 資産全体の週次 Web 収集（日曜 09:00 ＋ Mac 起動時 RunAtLoad ＋ 朝オープン取りこぼし）
+# 成功済みの ISO 週は scripts 側でスキップ。手動は KURASHIFT ホームのボタン or --force。
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY="${HOME}/selenium_env/venv/bin/python"
@@ -9,11 +10,14 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 LOG="${LOG_DIR}/weekly_${STAMP}.log"
 
 cd "$REPO_DIR"
+# .env は壊れた行があっても落とさない（本読込は Python 側 load_private_env）
 if [[ -f "${REPO_DIR}/.env.jarvis_private" ]]; then
+  set +e
   set -a
   # shellcheck disable=SC1091
-  source "${REPO_DIR}/.env.jarvis_private"
+  source "${REPO_DIR}/.env.jarvis_private" 2>>"${LOG_DIR}/env_source.err.log"
   set +a
+  set -e
 fi
 
 {

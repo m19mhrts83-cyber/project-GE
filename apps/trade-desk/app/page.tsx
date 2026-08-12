@@ -218,8 +218,8 @@ export default async function HomePage() {
         </header>
         <ol className="meta" style={{ margin: "8px 0 0", paddingLeft: 20 }}>
           <li>
-            <strong>週次だけ</strong>
-            …下の「週次ステータス更新」で資産・銀行・収支を更新（設定は触らない）
+            <strong>週次は自動</strong>
+            …日曜 09:00＋Mac起動時／朝オープンの取りこぼしで資産・銀行・収支を更新（設定は触らない）
           </li>
           <li>
             <strong>ホームで見る</strong>
@@ -353,13 +353,15 @@ export default async function HomePage() {
         </article>
       </div>
       <p style={{ marginTop: 10 }}>
-        <span className="meta">週次未取得なら下のボタンでキュー（Mac worker 要）</span>
+        <span className="meta">
+          週次は日曜 09:00 と Mac 起動／朝オープンで自動実行。下のボタンは気になったときの手動用。
+        </span>
       </p>
       <EnqueueJobButton
         jobType="portfolio_weekly"
-        title="資産＋流動性週次をキュー"
-        payload={{}}
-        label="週次ステータス更新（資産・銀行・収支）"
+        title="資産＋流動性週次をキュー（手動）"
+        payload={{ force: true }}
+        label="週次を今すぐ更新（手動）"
       />
 
       <h2 style={{ marginTop: 28, fontSize: "1.1rem" }}>
