@@ -15,7 +15,7 @@ type Group = { title: string; hint?: string; fields: Field[] };
 const GROUPS: Group[] = [
   {
     title: "ソニー生命",
-    hint: "解約返戻・契約者貸付の取得に使用（真治=1 / 千景=2）",
+    hint: "お客さまWEBのログインID／パスワード（真治=1 / 千景=2）。保存後にこちらで実ログイン検証します。",
     fields: [
       { key: "SONYLIFE_LOGIN_URL", label: "ログインURL" },
       { key: "SONYLIFE_USERNAME_1", label: "真治 利用者ID" },
@@ -26,24 +26,34 @@ const GROUPS: Group[] = [
   },
   {
     title: "Bloomo",
+    hint: "公式は bloomo.co.jp。ログインは https://sec.bloomo.co.jp （※2025年以降パスワードレス＝メール認証コードの可能性あり）。",
     fields: [
       { key: "BLOOMO_EMAIL", label: "メール" },
-      { key: "BLOOMO_PASSWORD", label: "パスワード", type: "password" },
+      { key: "BLOOMO_PASSWORD", label: "パスワード（従来方式の場合）", type: "password" },
       {
         key: "BLOOMO_LOGIN_URL",
-        label: "ログインURL（任意）",
-        placeholder: "https://bloomo.jp/",
+        label: "ログインURL",
+        placeholder: "https://sec.bloomo.co.jp",
       },
     ],
   },
   {
-    title: "プルデンシャル生命（手登録）",
-    hint: "Web取得が無い間の評価・貸付残高",
+    title: "プルデンシャル生命（Web）",
+    hint: "Myページで解約返戻・貸付を取得（真治=1 / 千景=2）。確認番号は Gmail 連携が既定。手登録は予備。",
     fields: [
-      { key: "PRUDENTIAL_VALUE_JPY", label: "真治 評価額（円）" },
-      { key: "PRUDENTIAL_LOAN_JPY", label: "真治 契約者貸付残高（円）" },
-      { key: "PRUDENTIAL_CHIKAGE_VALUE_JPY", label: "千景 評価額（円）" },
-      { key: "PRUDENTIAL_CHIKAGE_LOAN_JPY", label: "千景 契約者貸付残高（円）" },
+      {
+        key: "PRUDENTIAL_LOGIN_URL",
+        label: "ログインURL",
+        placeholder: "https://mypage-poj.jpsso.prudential.com/s/login",
+      },
+      { key: "PRUDENTIAL_USERNAME_1", label: "真治 ログインID" },
+      { key: "PRUDENTIAL_PASSWORD_1", label: "真治 パスワード", type: "password" },
+      { key: "PRUDENTIAL_USERNAME_2", label: "千景 ログインID" },
+      { key: "PRUDENTIAL_PASSWORD_2", label: "千景 パスワード", type: "password" },
+      { key: "PRUDENTIAL_VALUE_JPY", label: "（予備）真治 評価額手登録" },
+      { key: "PRUDENTIAL_LOAN_JPY", label: "（予備）真治 貸付手登録" },
+      { key: "PRUDENTIAL_CHIKAGE_VALUE_JPY", label: "（予備）千景 評価額手登録" },
+      { key: "PRUDENTIAL_CHIKAGE_LOAN_JPY", label: "（予備）千景 貸付手登録" },
     ],
   },
 ];
