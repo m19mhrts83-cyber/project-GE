@@ -25,7 +25,7 @@ export async function researchWithTavily(
     return {
       ok: false,
       error:
-        "Tavily オフライン（キー未設定）。Trade Desk の蓄積も見つかりませんでした",
+        "Tavily オフライン（キー未設定）。KURASHIFT の蓄積も見つかりませんでした",
     };
   }
 
@@ -111,7 +111,7 @@ async function researchFromStore(q: string): Promise<TavilyResearchResult | null
     const block = [
       "【Tavilyキャッシュ（オフライン）】",
       `クエリ: ${q}`,
-      "APIに繋がらなかったため、Trade Desk 蓄積から拾いました。",
+      "APIに繋がらなかったため、KURASHIFT 蓄積から拾いました。",
       use
         .map((r) => `- [${r.source}/${r.topic}] ${(r.summary || "").slice(0, 180)}`)
         .join("\n"),

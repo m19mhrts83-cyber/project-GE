@@ -10,7 +10,7 @@ import HomeWatchBand from "@/components/home/HomeWatchBand";
 import HomeOtherBand from "@/components/home/HomeOtherBand";
 import HomeOpenchatBand from "@/components/home/HomeOpenchatBand";
 import HomeMetaDetails from "@/components/home/HomeMetaDetails";
-import HomeTradeDeskLink from "@/components/home/HomeTradeDeskLink";
+import HomeKurashiftLink from "@/components/home/HomeKurashiftLink";
 
 export default function HomePage() {
   return (
@@ -45,7 +45,7 @@ export default function HomePage() {
         <HomeMetricsBand />
       </Suspense>
 
-      <HomeTradeDeskLink />
+      <HomeKurashiftLink />
 
       <Suspense fallback={<BandSkeleton label="状況ウォッチ" />}>
         <HomeWatchBand />
