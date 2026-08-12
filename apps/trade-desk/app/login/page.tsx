@@ -36,9 +36,9 @@ export default function LoginPage() {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <h1>Trade Desk</h1>
+        <h1>KURASHIFT</h1>
         <p className="sub">
-          株・資産。Jarvis ダッシュボードと同じアカウントです（クッキーは共有しません）。
+          暮らしを整え、資産を動かす。Jarvis ダッシュボードと同じアカウントです（クッキーは共有しません）。
         </p>
         <form onSubmit={signInPassword} autoComplete="on">
           <label className="meta">メール</label>

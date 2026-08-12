@@ -301,8 +301,10 @@ def ensure_tax_case(sb: Any, year: int) -> str | None:
 def ingest_mail(year: int, dry_run: bool, limit: int) -> dict:
     """Search admin Gmail for tax-accountant-like mail; save attachments as evidence."""
     query = (
-        f"(from:税理士 OR from:公認会計士 OR subject:税理士 OR subject:確定申告 "
-        f"OR subject:決算 OR subject:申告) after:{year}/1/1"
+        f"(from:税理士 OR from:公認会計士 OR from:会計事務所 "
+        f"OR subject:税理士 OR subject:確定申告 OR subject:決算 OR subject:申告 "
+        f"OR subject:源泉 OR subject:控除 OR filename:pdf) "
+        f"after:{year}/1/1 before:{year + 1}/4/1"
     )
     store = year_dir(year) / "evidence"
     out: dict[str, Any] = {

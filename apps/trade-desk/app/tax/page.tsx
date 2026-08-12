@@ -10,7 +10,9 @@ export default async function TaxPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: cases }, { data: evidence }] = await Promise.all([
+  const year = new Date().getFullYear() - 1;
+
+  const [{ data: cases }, { data: evidence }, { data: jobs }] = await Promise.all([
     supabase
       .from("kurashift_tax_cases")
       .select("id, fiscal_year, title, status, csv_path, notes, updated_at")
@@ -23,29 +25,43 @@ export default async function TaxPage() {
       )
       .order("created_at", { ascending: false })
       .limit(40),
+    supabase
+      .from("kurashift_jobs")
+      .select("id, job_type, status, title, created_at, error_text")
+      .like("job_type", "tax_%")
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   return (
     <Shell active="/tax" email={user?.email ?? null}>
       <h1>個人申告</h1>
       <p className="sub">
-        個人のみ（弥生CSV）。法人は税理士委託。メール添付は証憑として保管・再出力。
+        個人のみ（弥生CSV）。法人は税理士委託。サイクル: CSV作成 → 証憑取込 →
+        一覧確認 →（承認後に）弥生登録。
       </p>
 
       <div className="card">
         <header>
-          <span className="lvl">アクション</span>
-          <strong>弥生CSV / メール取込</strong>
+          <span className="lvl">サイクル D</span>
+          <strong>{year}年分を回す</strong>
         </header>
+        <ol className="meta" style={{ marginTop: 8, paddingLeft: 18 }}>
+          <li>弥生CSVを作る（Zaimサマリー→勘定ドラフト。本登録はしない）</li>
+          <li>税理士メールを取り込む（admin Gmail）</li>
+          <li>下の一覧でパスと件名を確認。必要なら証憑出力</li>
+        </ol>
         <EnqueueJobButton
           jobType="tax_build_yayoi_csv"
-          title="弥生CSVを作る"
-          payload={{ fiscal_year: 2025 }}
+          title={`弥生CSV ${year}`}
+          payload={{ fiscal_year: year }}
+          label="1. 弥生CSVを作る"
         />
         <EnqueueJobButton
           jobType="tax_ingest_accountant_mail"
-          title="税理士メールを取り込む"
-          payload={{ fiscal_year: 2025 }}
+          title={`税理士メール取込 ${year}`}
+          payload={{ fiscal_year: year, limit: 30 }}
+          label="2. 税理士メールを取り込む"
         />
       </div>
 
@@ -67,7 +83,7 @@ export default async function TaxPage() {
             {(cases ?? []).length === 0 ? (
               <tr>
                 <td colSpan={4} className="meta">
-                  案件なし
+                  案件なし — 上の「弥生CSVを作る」から
                 </td>
               </tr>
             ) : (
@@ -101,7 +117,7 @@ export default async function TaxPage() {
             {(evidence ?? []).length === 0 ? (
               <tr>
                 <td colSpan={3} className="meta">
-                  証憑はまだありません
+                  証憑はまだありません — 「税理士メールを取り込む」後に増えます
                 </td>
               </tr>
             ) : (
@@ -120,6 +136,46 @@ export default async function TaxPage() {
                       label="証憑出力"
                     />
                   </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <header>
+          <span className="lvl">最近のジョブ</span>
+          <strong>tax_*</strong>
+        </header>
+        <table>
+          <thead>
+            <tr>
+              <th>状態</th>
+              <th>種別</th>
+              <th>タイトル</th>
+              <th>作成</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(jobs ?? []).length === 0 ? (
+              <tr>
+                <td colSpan={4} className="meta">
+                  ジョブなし
+                </td>
+              </tr>
+            ) : (
+              (jobs ?? []).map((j) => (
+                <tr key={j.id}>
+                  <td>{j.status}</td>
+                  <td>{j.job_type}</td>
+                  <td>
+                    {j.title}
+                    {j.error_text ? (
+                      <div className="meta">{j.error_text}</div>
+                    ) : null}
+                  </td>
+                  <td className="meta">{j.created_at?.slice(0, 19)}</td>
                 </tr>
               ))
             )}
