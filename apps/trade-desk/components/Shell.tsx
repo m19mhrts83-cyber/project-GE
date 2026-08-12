@@ -5,6 +5,7 @@ const NAV = [
   { href: "/themes", label: "テーマ" },
   { href: "/portfolio", label: "資産" },
   { href: "/lifeplan", label: "ライフプラン" },
+  { href: "/roi", label: "ROI" },
   { href: "/tax", label: "個人申告" },
   { href: "/consultations", label: "相談" },
   { href: "/jobs", label: "ジョブ" },

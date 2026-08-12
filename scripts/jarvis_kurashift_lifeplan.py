@@ -209,6 +209,25 @@ def aggregate_abg(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "beta_living_pct": 60,
         "gamma_self_pct": 20,
     }
+
+    # 19不動産・教育の内訳
+    re19_rows = [r for r in by_cat if r["bucket"] == "delta_re" or str(r["category"]).startswith("19")]
+    edu_rows = [
+        r
+        for r in by_cat
+        if any(x in str(r["category"]) for x in ("10.2", "10.3", "こども教育", "こども学費", "学資"))
+    ]
+    re19_income = sum(int(r["income"]) for r in re19_rows)
+    re19_expense = sum(int(r["expense"]) for r in re19_rows)
+    edu_expense = sum(int(r["expense"]) for r in edu_rows)
+    # 返済っぽい行（奨学金・マンション／賃貸経営支出の一部は別表示）
+    repay_rows = [
+        r
+        for r in by_cat
+        if any(x in str(r["category"]) for x in ("奨学金", "15F", "ローン"))
+    ]
+    repay_jpy = sum(int(r["expense"]) for r in repay_rows)
+
     return {
         "income_household_jpy": income_household,
         "income_delta_re_jpy": income_delta,
@@ -223,6 +242,35 @@ def aggregate_abg(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "gamma_pct": pct["gamma"],
         "targets": targets,
         "delta_excluded_from_denominator": True,
+        "re19": {
+            "income_jpy": re19_income,
+            "expense_jpy": re19_expense,
+            "cf_jpy": re19_income - re19_expense,
+            "rows": [
+                {
+                    "category": r["category"],
+                    "income": r["income"],
+                    "expense": r["expense"],
+                }
+                for r in re19_rows
+            ],
+        },
+        "education": {
+            "expense_jpy": edu_expense,
+            "share_of_household_pct": round(100.0 * edu_expense / living_base, 1)
+            if living_base
+            else None,
+            "rows": [
+                {"category": r["category"], "expense": r["expense"]}
+                for r in edu_rows
+                if int(r["expense"]) != 0
+            ],
+        },
+        "roi": {
+            "re_cf_jpy": re19_income - re19_expense,
+            "repayment_jpy": repay_jpy,
+            "note": "CF≒19収入−19支出。返済は奨学金等の明示行のみ（ローン元利は19支出に含まれる場合あり）",
+        },
         "categories": by_cat,
     }
 
