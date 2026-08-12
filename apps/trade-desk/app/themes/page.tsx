@@ -16,7 +16,7 @@ export default async function ThemesPage() {
   const { data: themes } = await supabase
     .from("kurashift_themes")
     .select(
-      "id, title, hypothesis, amount_jpy, duration_note, funding_path, status, review_note, created_at"
+      "id, title, hypothesis, amount_jpy, duration_note, funding_path, status, review_note, consultation_id, created_at"
     )
     .order("created_at", { ascending: false })
     .limit(40);
@@ -25,7 +25,7 @@ export default async function ThemesPage() {
     <Shell active="/themes" email={user?.email ?? null}>
       <h1>テーマ運用</h1>
       <p className="sub">
-        draft → consulting → approved → executing → reviewed。承認前に実弾は動きません。
+        draft → <strong>相談中（内容確認）</strong> → 承認 → 実行。相談を挟むときは確認画面から承認。草案から直接承認も可。承認前に実弾は動きません。
       </p>
 
       <EnqueueJobButton
@@ -77,7 +77,9 @@ export default async function ThemesPage() {
                     <strong>{t.status}</strong>
                   </td>
                   <td>
-                    <strong>{t.title}</strong>
+                    <a href={`/themes/${t.id}`}>
+                      <strong>{t.title}</strong>
+                    </a>
                     <div className="meta">{t.hypothesis}</div>
                     {t.duration_note ? (
                       <div className="meta">期間: {t.duration_note}</div>
@@ -88,7 +90,11 @@ export default async function ThemesPage() {
                   </td>
                   <td>
                     <div className="meta">{t.funding_path ?? "—"}</div>
-                    <ThemeStatusActions id={t.id} status={t.status} />
+                    <ThemeStatusActions
+                      id={t.id}
+                      status={t.status}
+                      consultationId={t.consultation_id}
+                    />
                     <EnqueueJobButton
                       jobType="theme_preview"
                       title={`preview ${t.title}`}

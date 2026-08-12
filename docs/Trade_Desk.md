@@ -125,6 +125,7 @@
 - ホーム／テーマ画面の「ステータスから提案を生成」→ `theme_propose_from_status`
 - 資産スナップ＋リサーチから draft を作成（既存タイトルはスキップ）
 - 手動草案は `/api/themes` フォームからも登録可
+- **承認の本線**: draft → **相談中へ**（相談メモ自動作成）→ `/themes/[id]` または `/consultations/[id]` で内容確認 →「相談内容を確認して承認」。草案から直接承認（相談スキップ）も可
 - Mac worker: `./launchd/install_kurashift_job_worker_launchd.sh`（15分間隔）
 
 ## Core 資産網羅（要約）
