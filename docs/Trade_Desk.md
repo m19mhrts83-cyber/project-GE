@@ -167,3 +167,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   - 取込: `scripts/jarvis_kurashift_buy_plan_ingest.py` / `jarvis_kurashift_ops_consult_ingest.py`
   - 画面: `/realestate`（KPI）・`/realestate/deals`（ファネル）
   - 仕様: `docs/KURASHIFT_買い進めJob仕様.md` / `docs/KURASHIFT_CF正規化メモ.md`
+- **実務者引き継ぎ（入口）**: `docs/KURASHIFT_実務者引き継ぎ.md`

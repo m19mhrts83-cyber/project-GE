@@ -159,6 +159,38 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             str(REPO / "scripts" / "jarvis_kurashift_secrets.py"),
             "--status",
         ],
+        "buy_plan_ingest": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_buy_plan_ingest.py"),
+            *(["--canonical-only"] if payload.get("canonical_only") else []),
+        ],
+        "buy_plan_export": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_buy_plan_export.py"),
+        ],
+        "re_mail_match": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"),
+            *(["--apply"] if payload.get("apply", True) else ["--dry-run"]),
+            "--days",
+            str(payload.get("days") or 120),
+            "--limit",
+            str(payload.get("limit") or 40),
+        ],
+        "re_deal_advice": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_deal_advice.py"),
+            *(["--apply"] if payload.get("apply", True) else ["--dry-run"]),
+        ],
+        "ops_consult_ingest": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_ops_consult_ingest.py"),
+        ],
+        "re_sync_loan_tracker": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_loan_tracker_sync.py"),
+            *(["--dry-run"] if payload.get("dry_run") else []),
+        ],
     }
     cmd = mapping.get(job_type)
     if not cmd:

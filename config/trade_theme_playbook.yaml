@@ -118,6 +118,12 @@ allowed_jobs:
   - theme_execute_assist  # 手順メモのみ。live 発注はしない
   - secrets_upsert
   - secrets_status
+  - buy_plan_ingest
+  - buy_plan_export
+  - re_mail_match
+  - re_deal_advice
+  - ops_consult_ingest
+  - re_sync_loan_tracker  # Discover未完了時は明示エラーで止まる
 
 secrets:
   store: .env.jarvis_private
@@ -144,13 +150,13 @@ real_estate_operations:
       label: 運用・計画進捗
       purpose: 今持っている資産が計画に対して現在どうか（YTD・差分・補正）
       entry: /realestate
-      status: planned
+      status: in_progress  # Sprint2: CF KPI・Bridge・メール候補・助言まで。YTD合算は未
     acquisition:
       id: re_acquisition
       label: 新規購入検討
       purpose: これから買う物件の検討を案件としてまとめる
       entry: /realestate/deals
-      status: planned
+      status: in_progress  # 千三つUI・mail match・advice 実装済。健美家/楽待は未
     property_master:
       id: re_property_master
       label: 保有物件マスタ
