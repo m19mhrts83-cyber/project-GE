@@ -52,8 +52,8 @@ SKIP_NAMES = {
 }
 
 
-def match_needles() -> list[str]:
-    raw = (os.environ.get("ZAIM_MHI_ACCOUNT_MATCH") or DEFAULT_MATCH).strip()
+def match_needles(override: str | None = None) -> list[str]:
+    raw = (override or os.environ.get("ZAIM_MHI_ACCOUNT_MATCH") or DEFAULT_MATCH).strip()
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
@@ -147,13 +147,26 @@ def scrape(headless: bool) -> tuple[list[dict[str, Any]], str]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Zaim から三菱重工持株の評価額")
+    ap = argparse.ArgumentParser(
+        description="Zaim 口座残高（既定=持株。--match / ZAIM_*_ACCOUNT_MATCH で他口座可）"
+    )
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--list", action="store_true", help="口座名と残高を列挙（突合用）")
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument(
+        "--match",
+        default="",
+        help="口座名の部分一致（カンマ区切り）。例: 'SBI 証券'",
+    )
+    ap.add_argument(
+        "--label",
+        default="",
+        help="エラー文言用ラベル（例: SBIインデックス）",
+    )
     args = ap.parse_args()
 
-    needles = match_needles()
+    needles = match_needles(args.match or None)
+    label = (args.label or ("持株" if not args.match else args.match.split(",")[0])).strip()
     try:
         accounts, _ = scrape(headless=not args.headed)
     except Exception as exc:
@@ -171,7 +184,7 @@ def main() -> int:
     if not hit:
         payload = {
             "status": "error",
-            "reason": f"Zaim口座に持株が見つかりません needles={needles}",
+            "reason": f"Zaim口座に{label}が見つかりません needles={needles}",
             "accounts": [a["name"] for a in accounts[:30]],
         }
         print(json.dumps(payload, ensure_ascii=False))

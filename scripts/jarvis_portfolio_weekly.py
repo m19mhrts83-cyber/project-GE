@@ -436,17 +436,19 @@ def fetch_axa() -> dict[str, Any]:
 
 
 def fetch_sbi() -> dict[str, Any]:
-    if not (os.environ.get("SBI_SEC_USER") and os.environ.get("SBI_SEC_LOGIN_PASSWORD")):
-        return {"status": "skipped", "reason": "SBI_SEC_* 未設定"}
-    script = REPO / "scripts" / "jarvis_sbi_index_balance.py"
-    data = run_json_script(
-        [py_exe(), str(script), "--headless", "--json", "--save-debug"],
-        timeout=180,
-    )
+    """インデックス枠は Zaim「SBI 証券」を正本（サイト直ログインはフォールバックしない）。"""
+    script = REPO / "scripts" / "jarvis_zaim_sbi_balance.py"
+    data = run_json_script([py_exe(), str(script), "--json"], timeout=180)
+    if data.get("status") != "ok":
+        return {
+            "status": "error",
+            "reason": data.get("reason") or "Zaim SBI証券が取れません",
+        }
     return {
         "status": "ok",
         "value_jpy": int(data["value_jpy"]),
-        "note": data.get("parser_mode") or "",
+        "note": data.get("note") or "",
+        "source": "zaim",
     }
 
 
@@ -580,10 +582,7 @@ def main() -> int:
             "axa_life": bool(
                 os.environ.get("AXA_MYAXA_ID") and os.environ.get("AXA_MYAXA_PASSWORD")
             ),
-            "sbi_index": bool(
-                os.environ.get("SBI_SEC_USER")
-                and os.environ.get("SBI_SEC_LOGIN_PASSWORD")
-            ),
+            "sbi_index": True,  # Zaim「SBI 証券」正本（サイト直ログイン不要）
             "akatsuki_bond": bool(
                 (
                     os.environ.get("AKATSUKI_BRANCH_CODE")
@@ -739,7 +738,12 @@ def main() -> int:
             sb,
             account_id,
             float(rec["value_jpy"]),
-            source="zaim" if account_id == "mhi_stock" else "weekly_web",
+            source=(
+                "zaim"
+                if account_id in ("mhi_stock", "sbi_index")
+                or rec.get("source") == "zaim"
+                else "weekly_web"
+            ),
             note=rec.get("note"),
         )
 
@@ -760,6 +764,24 @@ def main() -> int:
                 print(out.stderr.rstrip(), file=sys.stderr)
         except Exception as exc:
             print(f"# insurance_allocations: {exc}", file=sys.stderr)
+
+    # 証券内訳（SBI=Zaim／Bloomo=MF。失敗しても週次本体は継続）
+    if not args.cloud_only and not args.dry_run:
+        try:
+            hold_script = REPO / "scripts" / "jarvis_securities_holdings.py"
+            out = subprocess.run(
+                [py_exe(), str(hold_script)],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=str(REPO),
+            )
+            if out.stdout.strip():
+                print(out.stdout.rstrip())
+            if out.stderr.strip():
+                print(out.stderr.rstrip(), file=sys.stderr)
+        except Exception as exc:
+            print(f"# securities_holdings: {exc}", file=sys.stderr)
 
     if not args.cloud_only and not args.dry_run:
         try:

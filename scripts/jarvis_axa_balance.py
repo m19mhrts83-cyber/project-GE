@@ -109,6 +109,33 @@ def _parse_fund_pcts(text: str) -> list[AxaFund]:
     return funds[:12]
 
 
+def _parse_fund_balances_to_pcts(text: str) -> list[AxaFund]:
+    """積立金残高（円）から保有割合を推定。『名称 … 177,997円』行向け。"""
+    pairs: list[tuple[str, int]] = []
+    seen: set[str] = set()
+    for m in re.finditer(
+        r"([一-龥ぁ-んァ-ンA-Za-z0-9＋プラス型]{2,24}型)\s*([0-9]{1,3}(?:,[0-9]{3})+)\s*円",
+        text or "",
+    ):
+        name = m.group(1).strip()
+        if name in seen or "合計" in name:
+            continue
+        yen = int(m.group(2).replace(",", ""))
+        if yen < 1000:
+            continue
+        seen.add(name)
+        pairs.append((name, yen))
+    if len(pairs) < 2:
+        return []
+    total = sum(v for _, v in pairs)
+    if total <= 0:
+        return []
+    return [
+        AxaFund(name=n, pct=round(100.0 * v / total, 1))
+        for n, v in pairs
+    ]
+
+
 def _dismiss_overlays(page) -> None:
     for name in ("はい", "閉じる", "同意する", "同意して続ける", "Accept", "OK"):
         try:
@@ -482,16 +509,20 @@ def fetch_axa_balance(*, headless: bool, timeout_ms: int, save_debug: bool) -> A
                 page.screenshot(path=str(DEBUG_DIR / "axa_last_page.png"), full_page=True)
             raise RuntimeError("積立金／払いもどし金を抽出できませんでした")
 
-        funds: list[AxaFund] = _parse_fund_pcts(text)
-        funds_source = "account-value"
+        funds: list[AxaFund] = []
+        funds_source = ""
+        # 優先: 積立金（保有）→ 繰入割合。env URL 付きを先に。
+        alloc_candidates: list[tuple[str, str]] = [
+            ((os.environ.get("AXA_ALLOC_ACCOUNT_VALUE_URL") or "").strip(), "account-value"),
+            (ACCOUNT_VALUE_URL, "account-value"),
+            ((os.environ.get("AXA_ALLOC_PREMIUM_URL") or "").strip(), "premium"),
+            (FUND_ALLOC_URL, "fund-allocation"),
+        ]
+        # 評価ページ本文からも一応試す
+        funds = _parse_fund_balances_to_pcts(text) or _parse_fund_pcts(text)
+        if funds:
+            funds_source = "account-value"
         if not funds:
-            # 優先: .env の口座トークン付き URL → 既定パス
-            alloc_candidates: list[tuple[str, str]] = [
-                ((os.environ.get("AXA_ALLOC_ACCOUNT_VALUE_URL") or "").strip(), "account-value"),
-                ((os.environ.get("AXA_ALLOC_PREMIUM_URL") or "").strip(), "premium"),
-                (ACCOUNT_VALUE_URL, "account-value"),
-                (FUND_ALLOC_URL, "fund-allocation"),
-            ]
             for url, src in alloc_candidates:
                 if not url:
                     continue
@@ -500,7 +531,11 @@ def fetch_axa_balance(*, headless: bool, timeout_ms: int, save_debug: bool) -> A
                     page.wait_for_timeout(2500)
                     _dismiss_overlays(page)
                     _select_axa_policy_if_needed(page)
-                    funds = _parse_fund_pcts(page.inner_text("body"))
+                    body = page.inner_text("body")
+                    if src == "account-value":
+                        funds = _parse_fund_balances_to_pcts(body) or _parse_fund_pcts(body)
+                    else:
+                        funds = _parse_fund_pcts(body)
                     if funds:
                         funds_source = src
                         break
