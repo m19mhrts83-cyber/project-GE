@@ -37,6 +37,9 @@ GMAIL_QUERY = (
     " newer_than:{days}d -unsubscribe"
 )
 
+# 戸建+エリア程度で内見（詳細取り寄せ〜日程調整）へ
+VIEWING_SCORE_MIN = 5.0
+
 SUBJECT_NOISE = (
     "号外",
     "ダイジェスト",
@@ -127,11 +130,34 @@ def score_text(text: str, criteria_blob: str) -> tuple[float, list[str]]:
     if re.search(r"戸建|戸建て", text):
         hits.append("戸建")
         score += 3.0
+    if re.search(r"土地値", text):
+        hits.append("土地値")
+        score += 2.0
     if re.search(r"利回り\s*[１２3-9０-９\d]", text) or "利回り" in text:
         hits.append("利回り")
         score += 1.5
-    if "万円" in text or re.search(r"\d+\s*万", text):
+    # 価格帯（戸建想定 500〜3500万）
+    pm = re.search(r"(\d{2,5})\s*万", text)
+    if pm:
+        try:
+            man = float(pm.group(1))
+            if 500 <= man <= 3500:
+                hits.append(f"価格帯{int(man)}")
+                score += 1.5
+            elif man > 8000:
+                score -= 1.5
+        except Exception:
+            pass
+    if "万円" in text or pm:
         score += 0.5
+    # 区分・都内寄りは減点（東海戸建方針）
+    if re.search(r"区分|ワンルーム|都内|東京２３|東京23", text) and not re.search(
+        r"戸建|戸建て", text
+    ):
+        hits.append("区分/都内-")
+        score -= 2.0
+    if re.search(r"アパート|マンション一棟", text) and not re.search(r"戸建|戸建て", text):
+        score -= 0.5
     if "海沿" in text and "除外" not in criteria_blob:
         score -= 0.5
     return score, hits
@@ -212,7 +238,7 @@ def fetch_account(
         out.append(
             {
                 "title": subject[:180],
-                "status": "info",
+                "status": "viewing" if sc >= VIEWING_SCORE_MIN else "info",
                 "source": source,
                 "area": area,
                 "structure": "戸建" if re.search(r"戸建|戸建て", text) else None,
@@ -309,7 +335,26 @@ def main() -> int:
         inserted += 1
         if gid:
             seen.add(gid)
-    print(f"📎 property_mail_match: inserted={inserted} skipped_existing={len(uniq) - inserted}")
+
+    promoted = 0
+    existing = (
+        sb.table("kurashift_re_deals")
+        .select("id, status, match_score")
+        .eq("status", "info")
+        .limit(500)
+        .execute()
+    )
+    for row in existing.data or []:
+        sc = float(row.get("match_score") or 0)
+        if sc >= VIEWING_SCORE_MIN:
+            sb.table("kurashift_re_deals").update(
+                {"status": "viewing", "updated_at": datetime.now(timezone.utc).isoformat()}
+            ).eq("id", row["id"]).execute()
+            promoted += 1
+    print(
+        f"📎 property_mail_match: inserted={inserted} "
+        f"skipped_existing={len(uniq) - inserted} promoted_to_viewing={promoted}"
+    )
     return 0
 
 

@@ -2,6 +2,11 @@ import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 import { loadLiabilityRates } from "@/lib/liabilityRates";
+import {
+  aggregateReCfFromCategoryYear,
+  monthsElapsedInYear,
+  type FinanceCategoryYearRow,
+} from "@/lib/reFinanceYtd";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +60,31 @@ export default async function RealEstatePage() {
     .from("kurashift_re_deals")
     .select("status");
 
+  const { data: financeCats } = await supabase
+    .from("kurashift_finance_category_year")
+    .select("fiscal_year, category, income_jpy, expense_jpy, net_jpy")
+    .eq("fiscal_year", calendarYear)
+    .limit(200);
+
+  const { personal: personalYtd, corporate: corpYtd, combined: combinedYtd } =
+    aggregateReCfFromCategoryYear(
+      (financeCats || []) as FinanceCategoryYearRow[],
+      calendarYear
+    );
+  const monthsElapsed = monthsElapsedInYear();
+  const hasYtd = combinedYtd.categories.length > 0;
+  const combinedYtdMonth = hasYtd
+    ? Math.round(combinedYtd.cf / monthsElapsed)
+    : null;
+  const personalYtdMonth =
+    personalYtd.categories.length > 0
+      ? Math.round(personalYtd.cf / monthsElapsed)
+      : null;
+  const corpYtdMonth =
+    corpYtd.categories.length > 0
+      ? Math.round(corpYtd.cf / monthsElapsed)
+      : null;
+
   const funnelOrder = [
     "info",
     "viewing",
@@ -72,20 +102,9 @@ export default async function RealEstatePage() {
 
   const CF_GOAL_MONTH = 500_000;
   const cfAnnual = typeof re19?.cf_jpy === "number" ? re19.cf_jpy : null;
-  const cfMonth = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
+  const cfMonthLp = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
+  const cfMonth = combinedYtdMonth ?? cfMonthLp;
   const cfGap = cfMonth != null ? CF_GOAL_MONTH - cfMonth : null;
-
-  // ③-A Phase1 スタブ: 個人は前年実績スナップを年換算の目安に、法人は未接続
-  const now = new Date();
-  const yearStart = Date.UTC(now.getFullYear(), 0, 1);
-  const yearEnd = Date.UTC(now.getFullYear() + 1, 0, 1);
-  const ytdFrac = Math.min(
-    1,
-    Math.max(0, (Date.now() - yearStart) / (yearEnd - yearStart))
-  );
-  const personalPlanCf = cfAnnual;
-  const personalYtdEst =
-    personalPlanCf != null ? Math.round(personalPlanCf * ytdFrac) : null;
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
@@ -99,32 +118,60 @@ export default async function RealEstatePage() {
       <div className="card notice">
         <header>
           <span className="lvl">③-A</span>
-          <strong>運用進捗（個人スタブ）</strong>
+          <strong>運用進捗（Zaim 19系・当年・個人＋法人合算）</strong>
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
-          ⚠️ <strong>法人は未接続</strong>のため合算ビューは出しません（虚偽の合算を避ける）。
-          個人は LP 実績年の 19CF を計画目安とし、YTD は暦日按分の概算です。
+          暦年のカテゴリ年次（会計管理）が正。{calendarYear} 年・19系を個人／法人に分け、
+          <strong>合算を KPI の財務行</strong>に載せます。
         </p>
         <table>
           <tbody>
             <tr>
-              <td>個人・計画目安（年）</td>
-              <td>{personalPlanCf != null ? fmtYen(personalPlanCf) : "—"}</td>
+              <td>合算 YTD CF</td>
+              <td>
+                <strong>{hasYtd ? fmtYen(combinedYtd.cf) : "—"}</strong>
+              </td>
             </tr>
             <tr>
-              <td>個人・YTD概算（暦按分）</td>
-              <td>{personalYtdEst != null ? fmtYen(personalYtdEst) : "—"}</td>
+              <td>合算・月次換算（÷{monthsElapsed}ヶ月）</td>
+              <td>
+                {combinedYtdMonth != null ? fmtYen(combinedYtdMonth) : "—"}
+                {cfGap != null && combinedYtdMonth != null
+                  ? ` · 対50万ギャップ ${fmtYen(cfGap)}`
+                  : ""}
+              </td>
             </tr>
             <tr>
-              <td>法人</td>
-              <td>Stub（取込未接続）</td>
+              <td>個人 YTD（収入／支出／CF）</td>
+              <td>
+                {personalYtd.categories.length
+                  ? `${fmtYen(personalYtd.income)} / ${fmtYen(personalYtd.expense)} / ${fmtYen(personalYtd.cf)}`
+                  : "—"}
+                {personalYtdMonth != null ? ` · 月 ${fmtYen(personalYtdMonth)}` : ""}
+              </td>
             </tr>
             <tr>
-              <td>合算</td>
-              <td>法人接続後に有効化</td>
+              <td>法人 YTD（収入／支出／CF）</td>
+              <td>
+                {corpYtd.categories.length
+                  ? `${fmtYen(corpYtd.income)} / ${fmtYen(corpYtd.expense)} / ${fmtYen(corpYtd.cf)}`
+                  : "—"}
+                {corpYtdMonth != null ? ` · 月 ${fmtYen(corpYtdMonth)}` : ""}
+              </td>
+            </tr>
+            <tr>
+              <td>LP橋渡し（前年実績・参考）</td>
+              <td>{cfAnnual != null ? `${fmtYen(cfAnnual)}／年 · 月 ${fmtYen(cfMonthLp ?? 0)}` : "—"}</td>
             </tr>
           </tbody>
         </table>
+        {hasYtd ? (
+          <p className="meta" style={{ marginTop: 8 }}>
+            個人: {personalYtd.categories.join(" · ") || "—"}
+            <br />
+            法人: {corpYtd.categories.join(" · ") || "—"}
+          </p>
+        ) : null}
       </div>
 
       <div className="card" style={{ borderColor: "var(--accent, #c45c26)" }}>
@@ -135,7 +182,7 @@ export default async function RealEstatePage() {
         <table>
           <tbody>
             <tr>
-              <td>現状（月・個人LP橋渡し÷12）</td>
+              <td>現状（月・合算 YTD÷経過月）</td>
               <td>
                 <strong>{cfMonth != null ? fmtYen(cfMonth) : "—"}</strong>
               </td>
@@ -159,7 +206,7 @@ export default async function RealEstatePage() {
           </tbody>
         </table>
         <p className="meta" style={{ marginTop: 8 }}>
-          法人は未接続のため合算は暫定。詳細:{" "}
+          合算は Zaim 19系（個人＋法人）。LP 前年は参考。詳細:{" "}
           <code>docs/KURASHIFT_CF正規化メモ.md</code>
           {" · "}
           <a href="/realestate/deals">千三つファネル →</a>
@@ -263,7 +310,7 @@ export default async function RealEstatePage() {
             <li>法人／個人の物件一覧</li>
             <li>既存: property_units・property_info.yaml</li>
             <li>
-              入口: <code>/realestate/properties</code>（未実装）
+              入口: <a href="/realestate/properties">/realestate/properties</a>
             </li>
           </ul>
         </div>
@@ -281,7 +328,9 @@ export default async function RealEstatePage() {
             <li>書類 × 状態 × 入力フィールドの表</li>
             <li>③-C・240_融資・法人情報を参照</li>
             <li>
-              入口: <code>/realestate/finance-pack</code>（未実装）
+              入口:{" "}
+              <a href="/realestate/finance-pack">/realestate/finance-pack</a>
+              （チェックリスト骨格）
             </li>
           </ul>
         </div>
