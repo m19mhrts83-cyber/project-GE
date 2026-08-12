@@ -128,6 +128,57 @@ insurance_policy_loan:
     - prudential_life_policy_loan
     - prudential_life_chikage_policy_loan
 
+# ③ 不動産賃貸経営（Phase 0＝設計のみ。実装は docs/KURASHIFT_不動産賃貸経営.md）
+real_estate_operations:
+  entry: /realestate
+  design_doc: docs/KURASHIFT_不動産賃貸経営.md
+  # ③ 内は2レーンに分離（2026-08-12 ユーザー方針）
+  sub_lanes:
+    operations:
+      id: re_operations
+      label: 運用・計画進捗
+      purpose: 今持っている資産が計画に対して現在どうか（YTD・差分・補正）
+      entry: /realestate
+      status: planned
+    acquisition:
+      id: re_acquisition
+      label: 新規購入検討
+      purpose: これから買う物件の検討を案件としてまとめる
+      entry: /realestate/deals
+      status: planned
+    property_master:
+      id: re_property_master
+      label: 保有物件マスタ
+      purpose: 所有物件の基本情報。ローンは本田さんアプリ連携（正本）
+      entry: /realestate/properties
+      status: planned
+      external:
+        honda_app:
+          role: loan_data_source
+          url: TBD  # ユーザー追って確定
+          sync: csv_or_api_tbd
+    finance_pack:
+      id: re_finance_pack
+      label: 融資提出パック
+      purpose: 融資時書類一覧・必要事項入力・銀行向け出力
+      entry: /realestate/finance-pack
+      status: planned
+      templates: config/kurashift_re_finance_doc_templates.yaml
+  entities: [personal, corporate, combined]
+  default_view: combined
+  theme_lane: realestate
+  theme_sub_tags: [operations, acquisition]
+  data_sources:
+    personal_actuals: zaim_19
+    corporate_actuals: tbd  # MyKomon / 税理士 CSV / 手入力 — Phase 2 で確定
+    occupancy: property_units
+    plan_canonical: numbers_19_sheet
+  jobs_planned:
+    - re_ingest_actuals
+    - re_build_plan_from_actuals
+    - re_compare_plan_actual
+    - re_revise_plan
+
 theme:
   start_simple: true
   iterate_via_consultation: true
