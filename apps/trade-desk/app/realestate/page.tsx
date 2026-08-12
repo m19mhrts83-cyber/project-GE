@@ -45,13 +45,83 @@ export default async function RealEstatePage() {
     .from("property_units")
     .select("id", { count: "exact", head: true });
 
+  const { data: buyPlan } = await supabase
+    .from("kurashift_buy_plan_versions")
+    .select("version_key, label, as_of, metadata")
+    .eq("is_canonical", true)
+    .maybeSingle();
+
+  const { data: dealRows } = await supabase
+    .from("kurashift_re_deals")
+    .select("status");
+
+  const funnelOrder = [
+    "info",
+    "viewing",
+    "offer",
+    "loan",
+    "purchased",
+    "passed",
+  ] as const;
+  const funnelCounts: Record<string, number> = {};
+  for (const s of funnelOrder) funnelCounts[s] = 0;
+  for (const d of dealRows || []) {
+    const st = d.status as string;
+    funnelCounts[st] = (funnelCounts[st] || 0) + 1;
+  }
+
+  const CF_GOAL_MONTH = 500_000;
+  const cfAnnual = typeof re19?.cf_jpy === "number" ? re19.cf_jpy : null;
+  const cfMonth = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
+  const cfGap = cfMonth != null ? CF_GOAL_MONTH - cfMonth : null;
+
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <h1>不動産賃貸経営</h1>
       <p className="sub">
         第3の柱。レーンは<strong>4本</strong> — ①運用・計画進捗 ②新規購入検討
-        ③保有物件マスタ ④融資提出パック（段階実装中）。
+        ③保有物件マスタ ④融資提出パック（段階実装中）。長期目標は{" "}
+        <strong>CF 月50万円</strong>（個人＋法人合算・定義は正規化メモ）。
       </p>
+
+      <div className="card" style={{ borderColor: "var(--accent, #c45c26)" }}>
+        <header>
+          <span className="lvl">目標</span>
+          <strong>CF 月50万円</strong>
+        </header>
+        <table>
+          <tbody>
+            <tr>
+              <td>現状（月・個人LP橋渡し÷12）</td>
+              <td>
+                <strong>{cfMonth != null ? fmtYen(cfMonth) : "—"}</strong>
+              </td>
+            </tr>
+            <tr>
+              <td>ギャップ</td>
+              <td>{cfGap != null ? fmtYen(cfGap) : "—"}</td>
+            </tr>
+            <tr>
+              <td>年次CF（参考）</td>
+              <td>{cfAnnual != null ? fmtYen(cfAnnual) : "—"}</td>
+            </tr>
+            <tr>
+              <td>買い進め Excel</td>
+              <td>
+                {buyPlan
+                  ? `${buyPlan.label || buyPlan.version_key}（${buyPlan.as_of}）`
+                  : "未取込"}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="meta" style={{ marginTop: 8 }}>
+          法人は未接続のため合算は暫定。詳細:{" "}
+          <code>docs/KURASHIFT_CF正規化メモ.md</code>
+          {" · "}
+          <a href="/realestate/deals">千三つファネル →</a>
+        </p>
+      </div>
 
       <div className="card notice">
         <header>
@@ -60,6 +130,8 @@ export default async function RealEstatePage() {
         </header>
         <p className="meta">
           詳細: <code>docs/KURASHIFT_不動産賃貸経営.md</code>
+          {" · "}
+          <code>docs/KURASHIFT_買い進めJob仕様.md</code>
         </p>
       </div>
 
@@ -77,7 +149,15 @@ export default async function RealEstatePage() {
         </p>
         <p className="meta">
           借入残高トラッカー連携（③-C）後に物件ごとの利回り／金利／正味を一覧化する予定。
-          （<a href="https://loan-tracker-plum.vercel.app/" target="_blank" rel="noreferrer">loan-tracker</a>）
+          （
+          <a
+            href="https://loan-tracker-plum.vercel.app/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            loan-tracker
+          </a>
+          ）
         </p>
       </div>
 
@@ -103,12 +183,18 @@ export default async function RealEstatePage() {
             <strong>新規購入検討</strong>
           </header>
           <p>
-            <strong>これから買う物件</strong>の検討を案件としてまとめる（運用ダッシュボードとは別）。
+            <strong>これから買う物件</strong>の検討を案件としてまとめる（千三つファネル）。
           </p>
           <ul className="meta">
-            <li>案件カード・CF・融資・LP 影響（詳細は追って）</li>
+            <li>
+              情報 {funnelCounts.info} · 内見 {funnelCounts.viewing} · 買付{" "}
+              {funnelCounts.offer} · 融資 {funnelCounts.loan} · 購入{" "}
+              {funnelCounts.purchased} · 見送り {funnelCounts.passed}
+            </li>
             <li>取得後 → ③-A の計画へ／LP 物件購入モード</li>
-            <li>入口: <code>/realestate/deals</code>（未実装・プレースホルダ）</li>
+            <li>
+              入口: <a href="/realestate/deals">/realestate/deals</a>
+            </li>
           </ul>
         </div>
       </div>
@@ -121,7 +207,11 @@ export default async function RealEstatePage() {
           </header>
           <p>
             <strong>今所有している物件</strong>の基本情報。ローンは
-            <a href="https://loan-tracker-plum.vercel.app/" target="_blank" rel="noreferrer">
+            <a
+              href="https://loan-tracker-plum.vercel.app/"
+              target="_blank"
+              rel="noreferrer"
+            >
               借入残高トラッカー
             </a>
             を正本として連携（二重入力しない）。
@@ -129,7 +219,9 @@ export default async function RealEstatePage() {
           <ul className="meta">
             <li>法人／個人の物件一覧</li>
             <li>既存: property_units・property_info.yaml</li>
-            <li>入口: <code>/realestate/properties</code>（未実装）</li>
+            <li>
+              入口: <code>/realestate/properties</code>（未実装）
+            </li>
           </ul>
         </div>
 
@@ -139,12 +231,15 @@ export default async function RealEstatePage() {
             <strong>融資提出パック</strong>
           </header>
           <p>
-            融資時の<strong>提出書類一覧</strong>。必要事項を入力し、<strong>銀行向けに出力</strong>。
+            融資時の<strong>提出書類一覧</strong>。必要事項を入力し、
+            <strong>銀行向けに出力</strong>。
           </p>
           <ul className="meta">
             <li>書類 × 状態 × 入力フィールドの表</li>
             <li>③-C・240_融資・法人情報を参照</li>
-            <li>入口: <code>/realestate/finance-pack</code>（未実装）</li>
+            <li>
+              入口: <code>/realestate/finance-pack</code>（未実装）
+            </li>
           </ul>
         </div>
       </div>
@@ -216,3 +311,4 @@ export default async function RealEstatePage() {
     </Shell>
   );
 }
+

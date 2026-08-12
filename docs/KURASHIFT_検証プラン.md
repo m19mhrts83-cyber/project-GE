@@ -382,6 +382,9 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 | `/realestate` 19CF | ✅ Bridge: 収入 6,976,458／支出 16,936,341／CF -9,959,883・loan-tracker リンク | 2026-08-13 |
 | ジョブ詳細に秘密なし | ✅ 一覧に password/token なし（log は theme JSON のみ） | 2026-08-13 |
 | ソニー週次再取得 | ⏸ 01:58 JST は **サービス時間外**（debug HTML title）。誤 `no-table` → 時間外検出を追加。日中に `portfolio_weekly --force` 再検証 | 2026-08-13 |
+| CF月50万 KPI | ✅ ホーム③・`/realestate` に現状÷12とギャップ・定義メモ | 2026-08-13 |
+| 買い進め Excel 取込 | ✅ 7版・events=88（canonical 251124=55） | 2026-08-13 |
+| 千三つ `/realestate/deals` | ✅ ファネル軸・条件・運営経緯8件（案件0は仕様どおり） | 2026-08-13 |
 
 ---
 
