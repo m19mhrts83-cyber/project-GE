@@ -4,10 +4,10 @@ const NAV = [
   { href: "/", label: "ホーム" },
   { href: "/themes", label: "テーマ" },
   { href: "/portfolio", label: "資産" },
+  { href: "/consultations", label: "相談" },
   { href: "/lifeplan", label: "ライフプラン" },
   { href: "/roi", label: "ROI" },
   { href: "/tax", label: "個人申告" },
-  { href: "/consultations", label: "相談" },
   { href: "/jobs", label: "ジョブ" },
   { href: "/settings", label: "設定" },
   { href: "/research", label: "リサーチ" },
@@ -30,7 +30,40 @@ export default function Shell({
         <div className="meta" style={{ margin: "0 8px 14px", fontSize: 12 }}>
           暮らしを整え、資産を動かす
         </div>
-        {NAV.map((n) => (
+        <div className="meta" style={{ margin: "0 8px 6px", fontSize: 11, opacity: 0.75 }}>
+          ①資産運用
+        </div>
+        {NAV.filter((n) =>
+          ["/", "/themes", "/portfolio", "/consultations"].includes(n.href)
+        ).map((n) => (
+          <a
+            key={n.href}
+            href={n.href}
+            className={`side-link${active === n.href ? " active" : ""}`}
+          >
+            {n.label}
+          </a>
+        ))}
+        <div className="meta" style={{ margin: "12px 8px 6px", fontSize: 11, opacity: 0.75 }}>
+          ②計画・税
+        </div>
+        {NAV.filter((n) =>
+          ["/lifeplan", "/roi", "/tax"].includes(n.href)
+        ).map((n) => (
+          <a
+            key={n.href}
+            href={n.href}
+            className={`side-link${active === n.href ? " active" : ""}`}
+          >
+            {n.label}
+          </a>
+        ))}
+        <div className="meta" style={{ margin: "12px 8px 6px", fontSize: 11, opacity: 0.75 }}>
+          運用
+        </div>
+        {NAV.filter((n) =>
+          ["/jobs", "/settings", "/research", "/paper"].includes(n.href)
+        ).map((n) => (
           <a
             key={n.href}
             href={n.href}
