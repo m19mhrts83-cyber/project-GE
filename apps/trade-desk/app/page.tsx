@@ -93,6 +93,7 @@ export default async function HomePage() {
 
   return (
     <Shell active="/" email={user?.email ?? null}>
+      <p className="page-kicker">HOME</p>
       <h1>KURASHIFT</h1>
       <p className="sub">
         ①資産運用（把握・テーマ提案／実行）と ②ライフプラン更新・個人申告ネタ。日常のトップは①。
