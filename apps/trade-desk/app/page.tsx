@@ -107,6 +107,7 @@ export default async function HomePage() {
   ]);
 
   const nameById = new Map((accounts ?? []).map((a) => [a.id, a.name]));
+  const kindById = new Map((accounts ?? []).map((a) => [a.id, a.kind]));
   const latestByAccount = new Map<
     string,
     { as_of: string; value_jpy: number; source: string | null }
@@ -120,7 +121,13 @@ export default async function HomePage() {
       });
     }
   }
+
+  const isLoanAccount = (id: string) =>
+    id.includes("policy_loan") ||
+    (kindById.get(id) || "").includes("loan");
+
   const assetRows = [...latestByAccount.entries()]
+    .filter(([id]) => !isLoanAccount(id))
     .map(([id, v]) => ({
       id,
       name: nameById.get(id) || id,
@@ -128,6 +135,16 @@ export default async function HomePage() {
     }))
     .sort((a, b) => b.value_jpy - a.value_jpy);
   const total = assetRows.reduce((s, r) => s + r.value_jpy, 0);
+
+  const loanRows = [...latestByAccount.entries()]
+    .filter(([id]) => isLoanAccount(id))
+    .map(([id, v]) => ({
+      id,
+      name: nameById.get(id) || id,
+      ...v,
+    }))
+    .sort((a, b) => b.value_jpy - a.value_jpy);
+  const loanTotal = loanRows.reduce((s, r) => s + r.value_jpy, 0);
 
   const liqName = new Map((liqAccounts ?? []).map((a) => [a.id, a.name]));
   const latestLiq = new Map<
@@ -196,7 +213,13 @@ export default async function HomePage() {
             <span className="lvl">① 資産運用</span>
             <strong>{fmtYen(total)}</strong>
           </header>
-          <p className="meta">{assetRows.length}口座 · 週次スナップ</p>
+          <p className="meta">
+            {assetRows.length}口座 · 週次スナップ（契約者貸付は含めない）
+          </p>
+          <p className="meta">
+            保険借入合計 {fmtYen(loanTotal)}
+            {loanTotal > 0 ? "（頭金枠の把握用・負債）" : ""}
+          </p>
           <a href="/portfolio">資産の詳細 →</a>
         </article>
         <article className="card">
