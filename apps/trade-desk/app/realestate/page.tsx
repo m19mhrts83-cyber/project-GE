@@ -76,7 +76,8 @@ export default async function RealEstatePage() {
           {liabilityRates.realEstateNote}
         </p>
         <p className="meta">
-          本田アプリ連携（③-C）後に物件ごとの利回り／金利／正味を一覧化する予定。
+          借入残高トラッカー連携（③-C）後に物件ごとの利回り／金利／正味を一覧化する予定。
+          （<a href="https://loan-tracker-plum.vercel.app/" target="_blank" rel="noreferrer">loan-tracker</a>）
         </p>
       </div>
 
@@ -119,7 +120,11 @@ export default async function RealEstatePage() {
             <strong>保有物件マスタ</strong>
           </header>
           <p>
-            <strong>今所有している物件</strong>の基本情報。ローンは<strong>本田さんアプリ</strong>を正本として連携（二重入力しない）。
+            <strong>今所有している物件</strong>の基本情報。ローンは
+            <a href="https://loan-tracker-plum.vercel.app/" target="_blank" rel="noreferrer">
+              借入残高トラッカー
+            </a>
+            を正本として連携（二重入力しない）。
           </p>
           <ul className="meta">
             <li>法人／個人の物件一覧</li>

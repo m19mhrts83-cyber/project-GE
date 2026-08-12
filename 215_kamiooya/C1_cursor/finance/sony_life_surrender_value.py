@@ -94,6 +94,32 @@ def _wait_page_ready(page, timeout_ms: int) -> None:
         pass
 
 
+def _raise_if_sony_out_of_service(page) -> None:
+    """
+    LIFEPLANNER WEB のサービス時間外ページを誤って no-table 扱いにしない。
+    実績: 深夜帯に title「サービス時間外エラー」で契約一覧が無く、
+    契約者照会の「選択する」探索が no-table で落ちていた（2026-08-13）。
+    """
+    try:
+        title = (page.title() or "").strip()
+    except Exception:
+        title = ""
+    body = ""
+    try:
+        body = page.evaluate(
+            "() => (document.body && (document.body.innerText || '')) || ''"
+        ) or ""
+    except Exception:
+        pass
+    blob = f"{title}\n{body}"
+    if "サービス時間外" in blob or "サービス時間外エラー" in title:
+        raise RuntimeError(
+            "ソニー生命 LIFEPLANNER WEB がサービス時間外です。"
+            "営業時間内（概ね日中）に再実行してください。"
+            f"（page_title={title[:80]!r}）"
+        )
+
+
 def _sonylife_default_login_selectors() -> tuple[str, str, str]:
     """
     契約者向けログイン（PYFW1011 系）でよくある JSF の name / alt に合わせた既定セレクタ。
@@ -389,13 +415,17 @@ def _lifeplanner_nav_to_surrender_value_page(page, timeout_ms: int) -> None:
     except Exception:
         pass
 
+    _raise_if_sony_out_of_service(page)
+
     if not _click_contract_inquiry_tab_robust(page, tab_text, tab_sel, timeout_ms):
+        _raise_if_sony_out_of_service(page)
         raise RuntimeError(
             f"「{tab_text}」を開けませんでした。"
             "SONYLIFE_NAV_CONTRACT_TAB_SELECTOR に CSS セレクタを指定するか、"
             "ログイン直後の画面を debug に保存して DOM を確認してください。"
         )
     _wait_page_ready(page, timeout_ms)
+    _raise_if_sony_out_of_service(page)
 
     try:
         page.wait_for_selector("table", timeout=min(timeout_ms, 25000))
@@ -482,9 +512,11 @@ def _lifeplanner_nav_to_surrender_value_page(page, timeout_ms: int) -> None:
         row_idx,
     )
     if err not in ("ok", "ok-fallback-select", "ok-page-select", "ok-page-select-only"):
+        _raise_if_sony_out_of_service(page)
         raise RuntimeError(
             "契約一覧の「貸付金／解約返戻金」列の「選択する」をクリックできませんでした。"
             f"（{err}）複数契約がある場合は SONYLIFE_NAV_CONTRACT_ROW_INDEX を調整してください。"
+            "深夜帯はサービス時間外の誤判定にも注意。"
         )
     _wait_page_ready(page, timeout_ms)
 
@@ -696,6 +728,8 @@ def fetch_sony_surrender_value(
                     "ID・パスワードを確認するか、追加認証が必要なら "
                     "SONYLIFE_OTP_SELECTOR / SONYLIFE_OTP_CODE を設定してください。"
                 )
+
+            _raise_if_sony_out_of_service(page)
 
             if target_url:
                 page.goto(target_url, wait_until="domcontentloaded")

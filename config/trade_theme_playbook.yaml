@@ -154,14 +154,16 @@ real_estate_operations:
     property_master:
       id: re_property_master
       label: 保有物件マスタ
-      purpose: 所有物件の基本情報。ローンは本田さんアプリ連携（正本）
+      purpose: 所有物件の基本情報。ローンは借入残高トラッカー連携（正本）
       entry: /realestate/properties
       status: planned
       external:
-        honda_app:
+        loan_tracker:
           role: loan_data_source
-          url: TBD  # ユーザー追って確定
-          sync: csv_or_api_tbd
+          url: https://loan-tracker-plum.vercel.app/
+          google_account: estate
+          sync: re_sync_loan_tracker  # Drive形式調査後
+          legacy_name: 本田さんアプリ
     finance_pack:
       id: re_finance_pack
       label: 融資提出パック

@@ -29,12 +29,16 @@ cd apps/trade-desk && npx vercel deploy --prod --yes --token "$VERCEL_TOKEN"
 
 - ダッシュボードは `main` push で自動。trade-desk は Git 連携を Vercel コンソールで確認すること。
 
-### 受け入れ（本番）
+### 受け入れ（本番）— Sprint 1 検証中
 
 - [ ] ホームにソニー失敗がソース名で出る
 - [ ] Zaim本番ボタンで confirm が出る／API 直叩きは 400
 - [ ] `/tax` で手動取込ボタンがある
-- [ ] 週次 `--force` 後に last_full_ok 改善（ソニー）
+- [ ] 週次 `--force` 後に last_full_ok 改善（ソニー）または失敗表示の合格
+
+### ローン正本（2026-08-13）
+
+- 旧「本田連携」→ **借入残高トラッカー** https://loan-tracker-plum.vercel.app/（Google: **estate**）
 
 ## Phase B / C
 
