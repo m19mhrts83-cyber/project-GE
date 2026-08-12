@@ -9,6 +9,7 @@ import {
   postWatchComment,
 } from "@/app/actions/watchComments";
 import type { AskEngine } from "@/lib/askEngineTypes";
+import { defaultAskContextSources } from "@/lib/askContextBundle";
 import { buildLocalHandoffPrompt } from "@/lib/localHandoff";
 import LocalHandoffBar from "@/components/LocalHandoffBar";
 import { formatJstMmDdHm } from "@/lib/formatJst";
@@ -47,6 +48,17 @@ export default function WatchCommentThread({
   const [localPrompt, setLocalPrompt] = useState("");
   const [needLocal, setNeedLocal] = useState(false);
   const [engine, setEngine] = useState<AskEngine>("cursor");
+  const contextLane =
+    typeof payload?.lane === "string" ? payload.lane : null;
+  const [useKamiooya, setUseKamiooya] = useState(
+    () => defaultAskContextSources(contextLane).kamiooya,
+  );
+  const [useOnedrive, setUseOnedrive] = useState(
+    () => defaultAskContextSources(contextLane).onedriveYoritoori,
+  );
+  const [useGdrive, setUseGdrive] = useState(
+    () => defaultAskContextSources(contextLane).gdrive,
+  );
   const [pending, start] = useTransition();
   const [macPolling, setMacPolling] = useState(() => {
     const ask = payload?.cursor_ask;
@@ -133,7 +145,11 @@ export default function WatchCommentThread({
         router.refresh();
         return;
       }
-      const r = await askJarvisOnWatch(watchId, body, path, engine);
+      const r = await askJarvisOnWatch(watchId, body, path, engine, {
+        useKamiooyaKnowledge: useKamiooya,
+        useOnedriveYoritoori: useOnedrive,
+        useGdrive,
+      });
       setNotices(r.fallbackNotices || []);
       if (r.localPrompt) setLocalPrompt(r.localPrompt);
       if (!r.ok) {
@@ -196,6 +212,48 @@ export default function WatchCommentThread({
           Gemini
         </label>
       </fieldset>
+      {engine === "cursor" ? (
+        <p className="meta" style={{ margin: "6px 0 0" }}>
+          既定は Jarvis Cloud。失敗時は Gemini に自動切替し、その旨を表示します。
+        </p>
+      ) : null}
+      <label
+        className="draft-engine-opt"
+        style={{ display: "flex", marginTop: 8, gap: 8 }}
+      >
+        <input
+          type="checkbox"
+          checked={useKamiooya}
+          onChange={(e) => setUseKamiooya(e.target.checked)}
+          disabled={pending || macPolling}
+        />
+        神大家ナレッジを参照（コメント・動画／kamiooya-qa）
+      </label>
+      <label
+        className="draft-engine-opt"
+        style={{ display: "flex", marginTop: 6, gap: 8 }}
+      >
+        <input
+          type="checkbox"
+          checked={useOnedrive}
+          onChange={(e) => setUseOnedrive(e.target.checked)}
+          disabled={pending || macPolling}
+        />
+        OneDriveやり取り末尾を参照（5.やり取り.md／Graph）
+      </label>
+      <label
+        className="draft-engine-opt"
+        style={{ display: "flex", marginTop: 6, gap: 8 }}
+        title="admin Drive の 200_NoteBookLM を検索して注入（手動オン）"
+      >
+        <input
+          type="checkbox"
+          checked={useGdrive}
+          onChange={(e) => setUseGdrive(e.target.checked)}
+          disabled={pending || macPolling}
+        />
+        Google Drive／NotebookLM を参照（200_NoteBookLM）
+      </label>
       <textarea
         className="watch-comment-input"
         rows={3}

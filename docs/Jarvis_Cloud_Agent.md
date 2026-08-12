@@ -62,8 +62,8 @@ Web／no-repo Cloud は **OneDrive・Google Drive を直接見ない**。Server 
 | ソース | 現状 |
 |---|---|
 | カード／スレ（jarvis-dashboard） | 常に注入 |
-| 神大家コメント・動画（kamiooya-qa） | Phase1 実装。運営／戸建／物件レーン既定オン。`SUPABASE_*` 読取専用 |
-| OneDrive `5.やり取り.md` | Phase2 実装。パートナー／物件レーン既定オン。`MS_GRAPH_*`（回転 refresh は sync_meta に保存） |
+| 神大家コメント・動画（kamiooya-qa） | Phase1 実装。タスクは運営／戸建／物件レーン既定オン、ウォッチは手動オン。`SUPABASE_*` 読取専用 |
+| OneDrive `5.やり取り.md` | Phase2 実装。タスクはパートナー／物件レーン既定オン、ウォッチは手動オン。`MS_GRAPH_*`（回転 refresh は sync_meta に保存） |
 | admin Google Drive / NotebookLM | **Phase3 実装**。ダッシュボード「聞く」で手動オン → Drive API が `200_NoteBookLM` を検索しスニペット注入。Cloud **対話**は引き続き NotebookLM MCP（admin）。神大家共有 Drive は **estate**、NotebookLM ソースは **admin**（混同しない） |
 
 #### Phase3（Google Drive）でやること／やらないこと
@@ -81,6 +81,7 @@ Web／no-repo Cloud は **OneDrive・Google Drive を直接見ない**。Server 
 - 神大家読取: Vercel に `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（kamiooya-qa。JARVIS_SUPABASE_* とは別）
 - OneDrive 読取: Vercel に `MS_GRAPH_CLIENT_ID` / `MS_GRAPH_REFRESH_TOKEN` / `MS_GRAPH_AUTHORITY`（回転時は `sync_meta.ms_graph_refresh_token`）。Mac では `jarvis_ms_graph_sync_refresh.py` 後に Vercel へ再 push
 - 任意: `CURSOR_CLOUD_REPO_URL`（**空推奨**= no-repo agent。下書き見直し用。**「聞く」はコード側で常に no-repo** のため、設定があっても無視する）
+- 任意（「聞く」の Cloud Agent ツール）: `CURSOR_CLOUD_ASK_ENABLE_TAVILY=1` + `TAVILY_API_KEY` で Tavily MCP をインライン追加。さらに `CURSOR_CLOUD_ASK_MCP_SERVERS_JSON` に MCP server 定義の JSON 配列を入れると Cloud Agent API の `mcpServers` として渡す（`headers` / `env` の `${ENV_NAME}` は実行時展開）
 - Mac Worker: `launchd/install_cursor_revise_worker_launchd.sh`（revise と ask を同じ runner）
 
 技術メモ: Gmail API＋token（Secrets）があれば Cloud Agent から送信可能。対外送信前確認・`--via` 確認は Mac と同じ。

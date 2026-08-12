@@ -50,7 +50,25 @@ Server Action が読んでプロンプトに注入する（`lib/askContextBundle
 | OneDrive `5.やり取り.md` | partner／物件レーン | `MS_GRAPH_CLIENT_ID` / `REFRESH_TOKEN` / `AUTHORITY` |
 | admin Drive／NotebookLM | 手動オン | `GDRIVE_CLIENT_ID` / `SECRET` / `REFRESH_TOKEN` / `NOTEBOOKLM_FOLDER_ID`（`jarvis_gdrive_admin_login.py`） |
 
-失敗したソースは notice のみで聞く自体は続行。同じ根拠ブロックをローカルコピー／Mac キューに同梱する。
+失敗したソースは notice のみで聞く自体は続行。同じ根拠ブロックをローカルコピー／Mac キューに同梱する。タスクカードと状況ウォッチの両方で、必要なソースをチェックしてから聞ける。
+
+### Cloud Agent「聞く」のツール
+
+Cloud Agent には、Server Action で集めた文脈に加えて、必要な MCP ツールをインラインで渡せる。
+
+| 設定 | 内容 |
+|---|---|
+| `CURSOR_CLOUD_ASK_ENABLE_TAVILY=1` | `TAVILY_API_KEY` を使い、Tavily MCP（`https://mcp.tavily.com/mcp`）を「聞く」Cloud Agent に渡す |
+| `CURSOR_CLOUD_ASK_MCP_SERVERS_JSON` | 追加 MCP server 定義の JSON 配列。`headers` / `env` の文字列内 `${ENV_NAME}` は実行時に展開 |
+
+例:
+
+```env
+CURSOR_CLOUD_ASK_ENABLE_TAVILY=1
+CURSOR_CLOUD_ASK_MCP_SERVERS_JSON=[{"name":"docs","type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer ${DOCS_MCP_TOKEN}"}}]
+```
+
+Cloud 側の指示では書き込みツール利用を禁止し、事実確認が必要なときだけ読み取り系 MCP/Web 検索を使う。
 
 ```bash
 # Mac Worker（一度だけ・revise と ask を同じ runner）

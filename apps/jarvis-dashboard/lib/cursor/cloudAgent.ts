@@ -16,6 +16,16 @@ export type CloudAgentOk = {
 };
 export type CloudAgentErr = { ok: false; error: string };
 export type CloudAgentResult = CloudAgentOk | CloudAgentErr;
+export type CloudAgentMcpServer = {
+  name: string;
+  type?: "http" | "sse" | "stdio";
+  url?: string;
+  command?: string;
+  args?: string[];
+  headers?: Record<string, string>;
+  env?: Record<string, string>;
+  auth?: Record<string, unknown>;
+};
 
 function authHeader(apiKey: string): string {
   return "Basic " + Buffer.from(`${apiKey}:`, "utf8").toString("base64");
@@ -70,6 +80,8 @@ export async function runCloudAgentPrompt(opts: {
   name?: string;
   /** 任意。未指定なら no-repo agent */
   repoUrl?: string;
+  /** Inline MCP servers available to this run. */
+  mcpServers?: CloudAgentMcpServer[];
   timeoutMs?: number;
   /** 既定 agent。聞く用途は agent、見直しは plan 可 */
   mode?: "plan" | "agent";
@@ -94,6 +106,9 @@ export async function runCloudAgentPrompt(opts: {
     body.autoCreatePR = false;
     body.skipReviewerRequest = true;
     body.workOnCurrentBranch = false;
+  }
+  if (opts.mcpServers?.length) {
+    body.mcpServers = opts.mcpServers;
   }
 
   let createRes: Response;

@@ -11,6 +11,7 @@ import {
   buildLocalHandoffPrompt,
   type CursorAskState,
 } from "@/lib/localHandoff";
+import { buildAskContextBundle } from "@/lib/askContextBundle";
 
 export type WatchCommentActionResult = {
   ok: boolean;
@@ -51,6 +52,11 @@ export async function askJarvisOnWatch(
   body: string,
   path = "/situation",
   engine: AskEngine = "cursor",
+  opts?: {
+    useKamiooyaKnowledge?: boolean;
+    useOnedriveYoritoori?: boolean;
+    useGdrive?: boolean;
+  },
 ): Promise<WatchCommentActionResult> {
   const question = body.trim();
   if (!question) return { ok: false, error: "質問が空です" };
@@ -98,10 +104,40 @@ export async function askJarvisOnWatch(
     .map((c) => `[${c.role}] ${c.body}`)
     .join("\n");
 
+  const contextLane =
+    typeof payload.lane === "string" ? payload.lane : null;
+  const ctxQuery = [
+    question,
+    watch.title,
+    watch.summary,
+    watch.detail,
+    ...actionLines.slice(0, 5),
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 1200);
+  const ctx = await buildAskContextBundle({
+    lane: contextLane,
+    title: watch.title,
+    summary: watch.summary,
+    payload,
+    query: ctxQuery,
+    sources: {
+      kamiooya: opts?.useKamiooyaKnowledge,
+      onedriveYoritoori: opts?.useOnedriveYoritoori,
+      gdrive: opts?.useGdrive,
+    },
+  });
+  const knowledgeNotices = ctx.notices;
+  const knowledgeBlock = ctx.promptBlock;
+
   const prompt = [
     "あなたは Jarvis（秘書 AI）です。状況ウォッチ項目について、ユーザーの質問に日本語で具体的に答えてください。",
     "推測で事実を捏造しない。要対応リストがある場合は日付・店・金額・直し方を明示する。",
     "短く要点から。必要なら次の一手を1〜3個。",
+    knowledgeBlock
+      ? "外部根拠（神大家DB／OneDriveやり取り／Drive NotebookLM）がある場合はそれを優先し、無いことは推測しない。"
+      : "",
     "",
     `【項目】${watch.title}`,
     `【レベル】${watch.level}`,
@@ -111,6 +147,7 @@ export async function askJarvisOnWatch(
       ? `【要対応リスト】\n${actionLines.map((l) => `- ${l}`).join("\n")}`
       : "【要対応リスト】なし",
     watch.cursor_prompt ? `【参考プロンプト】\n${watch.cursor_prompt}` : "",
+    knowledgeBlock,
     `【直近コメント】\n${thread || "（なし）"}`,
     "",
     `【今回の質問】\n${question}`,
@@ -118,17 +155,22 @@ export async function askJarvisOnWatch(
     .filter(Boolean)
     .join("\n");
 
-  const localPrompt = buildLocalHandoffPrompt({
-    kind: "watch",
-    id: watch.id,
-    title: watch.title,
-    summary: watch.summary,
-    detail: watch.detail,
-    bullets: actionLines,
-    cursorPrompt: watch.cursor_prompt,
-    comments: threadRows.map((c) => ({ role: c.role, body: c.body })),
-    lastUserMessage: question,
-  });
+  const localPrompt = [
+    buildLocalHandoffPrompt({
+      kind: "watch",
+      id: watch.id,
+      title: watch.title,
+      summary: watch.summary,
+      detail: watch.detail,
+      bullets: actionLines,
+      cursorPrompt: watch.cursor_prompt,
+      comments: threadRows.map((c) => ({ role: c.role, body: c.body })),
+      lastUserMessage: question,
+    }),
+    knowledgeBlock,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const resolved = await resolveAskReply({ engine, prompt });
   if (!resolved.ok) {
@@ -138,9 +180,9 @@ export async function askJarvisOnWatch(
       ok: false,
       needLocal: true,
       error: resolved.error,
-      fallbackNotices: resolved.fallbackNotices,
+      fallbackNotices: [...knowledgeNotices, ...resolved.fallbackNotices],
       localPrompt,
-      message: resolved.fallbackNotices.join(" / "),
+      message: [...knowledgeNotices, ...resolved.fallbackNotices].join(" / "),
     };
   }
 
@@ -159,16 +201,17 @@ export async function askJarvisOnWatch(
 
   revalidatePath(path);
   revalidatePath("/");
+  const allNotices = [...knowledgeNotices, ...resolved.fallbackNotices];
   const noticeMsg =
-    resolved.fallbackNotices.length > 0
-      ? resolved.fallbackNotices.join(" → ")
+    allNotices.length > 0
+      ? allNotices.join(" → ")
       : resolved.via === "cloud"
         ? "Jarvis Cloud が返答しました"
         : "Gemini が返答しました";
   return {
     ok: true,
     message: noticeMsg,
-    fallbackNotices: resolved.fallbackNotices,
+    fallbackNotices: allNotices,
     via: resolved.via,
     localPrompt,
   };
