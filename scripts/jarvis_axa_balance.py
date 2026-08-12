@@ -485,16 +485,27 @@ def fetch_axa_balance(*, headless: bool, timeout_ms: int, save_debug: bool) -> A
         funds: list[AxaFund] = _parse_fund_pcts(text)
         funds_source = "account-value"
         if not funds:
-            try:
-                page.goto(FUND_ALLOC_URL, wait_until="domcontentloaded")
-                page.wait_for_timeout(2500)
-                _dismiss_overlays(page)
-                _select_axa_policy_if_needed(page)
-                funds = _parse_fund_pcts(page.inner_text("body"))
-                if funds:
-                    funds_source = "fund-allocation"
-            except Exception:
-                pass
+            # 優先: .env の口座トークン付き URL → 既定パス
+            alloc_candidates: list[tuple[str, str]] = [
+                ((os.environ.get("AXA_ALLOC_ACCOUNT_VALUE_URL") or "").strip(), "account-value"),
+                ((os.environ.get("AXA_ALLOC_PREMIUM_URL") or "").strip(), "premium"),
+                (ACCOUNT_VALUE_URL, "account-value"),
+                (FUND_ALLOC_URL, "fund-allocation"),
+            ]
+            for url, src in alloc_candidates:
+                if not url:
+                    continue
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+                    page.wait_for_timeout(2500)
+                    _dismiss_overlays(page)
+                    _select_axa_policy_if_needed(page)
+                    funds = _parse_fund_pcts(page.inner_text("body"))
+                    if funds:
+                        funds_source = src
+                        break
+                except Exception:
+                    continue
 
         from datetime import date
 
