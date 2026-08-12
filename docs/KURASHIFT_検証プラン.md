@@ -1,16 +1,26 @@
-# KURASHIFT 検証プラン（一通り実装後にまとめて実施）
+# KURASHIFT 検証プラン（実装完了後・最後の To-do）
 
-実装を先に進め、**検証はバッチで行う**前提のチェックリスト。  
-秘密・実弾・Zaim 本番反映は本番データに触るので、最後のブロックで実施。
+プラン末尾 To-do: **`verification-with-user`**  
+実装は先に全部進め、**検証はこのドキュメントに沿ってユーザー確認しながら**実務レベルまで整える。
 
-## 方針
+## 進め方（合意）
 
-| 段階 | 内容 | いつ |
+| 誰 | 何をするか |
+|---|---|
+| **Jarvis** | 実装 To-do を先に完了。検証フェーズでは本プランの手順を案内し、指摘をその場で修正 |
+| **ユーザー** | V0→V3 を確認。おかしい点・足りない点を検証実行中に伝える |
+| **ゴール** | 実務で使える（残高・貸付・αβγ・年次・設定が説明でき、承認境界が守られている） |
+
+検証中に「ここ違う」「この数字が欲しい」と言われたら、実装に戻って直し、同じチェック項目を再確認する。
+
+## 段階
+
+| 段階 | 内容 | 前提 |
 |---|---|---|
-| **V0 静的** | 型チェック・dry-run・DB 行の有無 | 実装直後でも可（自動） |
-| **V1 設定後** | `/settings` 反映 → 週次 skipped 解消 | ログイン情報を入れたあと |
-| **V2 年次** | 実績取込〜αβγ表示〜スナップ比較 | 1〜2月ウィンドウ or 手動 |
-| **V3 本番境界** | Zaim 反映・Theme 承認完走・貸付実額 | 明示承認があるときだけ |
+| **V0 静的** | 型チェック・dry-run・画面 200 | ログイン不要 |
+| **V1 設定後** | `/settings` → 週次・契約者貸付 | ソニー等を登録済み |
+| **V2 年次** | 実績・αβγ・19不動産・教育・ROI・比較 | Zaim サマリーあり |
+| **V3 承認境界** | Theme 承認／Zaim 本番／税 | **明示承認があるときだけ** |
 
 ---
 
@@ -18,59 +28,49 @@
 
 - [ ] `cd apps/trade-desk && npx tsc --noEmit`
 - [ ] `python -m py_compile scripts/jarvis_kurashift_*.py scripts/jarvis_portfolio_weekly.py`
-- [ ] `jarvis_portfolio_weekly.py --dry-run` → 資格情報の有無だけ表示（ブラウザなし）
-- [ ] `jarvis_kurashift_theme.py --ensure-index-rb --dry-run`
-- [ ] `jarvis_kurashift_lifeplan.py --step ingest_actuals --year 2025 --dry-run` → サマリー検出
-- [ ] `jarvis_kurashift_secrets.py --status` → set_count 表示（値は出ない）
-- [ ] アプリ起動 `apps/trade-desk` : `/` `/themes` `/portfolio` `/lifeplan` `/settings` `/tax` が 200
-- [ ] Supabase: `portfolio_accounts` に `*_policy_loan` / `bloomo` 等がある
+- [ ] `jarvis_portfolio_weekly.py --dry-run` → 資格情報の有無だけ（ブラウザなし）
+- [ ] `jarvis_kurashift_lifeplan.py --step ingest_actuals --year 2025 --dry-run`
+- [ ] `jarvis_kurashift_secrets.py --status`（値は出ない）
+- [ ] アプリ: `/` `/themes` `/portfolio` `/lifeplan` `/settings` `/tax` `/roi`（あれば）が開く
+- [ ] Supabase に loan / bloomo 口座がある
 
-## V1 — 秘密・週次・契約者貸付（settings 後）
+## V1 — 秘密・週次・契約者貸付
 
-前提: `/settings` でソニー（必要なら Bloomo／PRU）を保存し、Mac worker が成功していること。
+- [ ] `/settings` で必要キーを保存 → worker 成功 → ジョブ payload が空
+- [ ] 週次 `--force` で `sony_life*` と `*_policy_loan` にスナップ
+- [ ] `/portfolio` の保険借入合計が実態と合う（ユーザーが金額を見て判定）
+- [ ] skipped 理由が説明できる（未設定の口座）
 
-- [ ] ジョブ `secrets_upsert` が succeeded、payload が空
-- [ ] `sync_meta.kurashift_secrets_status` が更新されている
-- [ ] `jarvis_portfolio_weekly.py --force`（またはアプリからキュー）
-  - [ ] `sony_life` / `sony_life_chikage` にスナップ
-  - [ ] `sony_life_policy_loan` / `sony_life_chikage_policy_loan` に借入残高
-- [ ] `/portfolio` の「保険借入」合計が 0 でない（借入がある場合）
-- [ ] Bloomo／PRU は設定どおり ok or skipped が説明可能
+## V2 — ライフプラン
 
-## V2 — ライフプラン実績・比較
+- [ ] 実績取込で `kind=actuals` スナップが増える
+- [ ] `/lifeplan` の αβγ ゲージ・19不動産・教育ブロックが読める
+- [ ] 目標 20/60/20 との差が分かる
+- [ ] 実績 vs 計画比較表が埋まる
+- [ ] ROI（CF／返済）が横並びで見える
+- [ ] 年次モードで Step1〜4 がキューに入る
 
-- [ ] `--step ingest_actuals --year 2025`（dry-run なし）→ `kurashift_plan_snapshots` に `kind=actuals`
-- [ ] `/lifeplan` に αβγ ゲージと金額が出る
-- [ ] `--step revise_budget --year 2025` → gaps（目標との差分）が JSON／state に出る
-- [ ] `--step snapshot` → `kind=plan` 行が増える
-- [ ] `/lifeplan` の「実績 vs 直近計画」表が埋まる
-- [ ] 年次モード `?mode=annual` で Step1〜4 ボタンがジョブを積む
+## V3 — 承認境界
 
-## V3 — 承認境界（壊すとまずいもの）
+- [ ] Theme 承認〜完走アシストで **発注なし**（手順メモのみ）
+- [ ] `push_zaim` は CSV のみ（confirm なし）
+- [ ] （明示時のみ）Zaim 本番・税登録
 
-**やらないこと**: 未承認の実弾・振替・弥生本登録・Zaim 一括 apply。
-
-- [ ] Theme: draft → consulting → approved（確認ダイアログ）→ 完走アシスト  
-  → `review_note` に手順のみ。**発注なし**
-- [ ] `lifeplan_push_zaim`（`confirm_apply=false`）→ CSV のみ生成
-- [ ] （明示時のみ）`confirm_apply=true` → Zaim 予算 1 ヶ月試験 → 年間
-- [ ] 税: `--build-csv --dry-run`／証憑 ingest dry-run。本番登録は別承認
-
-## V4 — ブランド／Lab（後回し可）
+## V4 — ブランド／Lab（任意）
 
 - [ ] Vercel 表示名 KURASHIFT
-- [ ] Lab／立花: 口座・API 鍵が揃うまでスキップ
+- [ ] Lab／立花は鍵が揃うまでスキップ可
 
 ---
 
-## 合格の目安（まとめて見るとき）
+## 合格の目安
 
-1. Core 網羅と保険借入が `/portfolio` で説明できる  
-2. `/lifeplan` で前年 αβγ が目標 20/60/20 と並べて見える  
-3. 秘密がチャット・Git・ジョブ payload に残っていない  
-4. 実弾・Zaim 本番が「確認なしで動いた」ログが無い  
+1. Core と保険借入が `/portfolio` で説明できる  
+2. `/lifeplan` で αβγ・19・教育・ROI が目標と並べて見える  
+3. 秘密がチャット・Git・ジョブに残っていない  
+4. 未承認の実弾／Zaim／弥生が動いていない  
 
-## 実行コマンド（検証時の貼り付け用）
+## コマンド（貼り付け用）
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -79,14 +79,13 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_portfolio_weekly.py --dry-run --force
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_lifeplan.py --step ingest_actuals --year 2025 --dry-run
 
-# V2（実書き込み）
+# V2
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_lifeplan.py --step ingest_actuals --year 2025
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_lifeplan.py --step revise_budget --year 2025
-~/selenium_env/venv/bin/python scripts/jarvis_kurashift_lifeplan.py --step snapshot --year 2026
 
 # V1（ログイン後）
 ~/selenium_env/venv/bin/python scripts/jarvis_portfolio_weekly.py --force
 ```
 
-正本プラン: `~/.cursor/plans/ライフプランhq再整理_c37d6392.plan.md`  
-運用コマンド: `docs/運用コマンド一覧.md` §7.6
+プラン: `~/.cursor/plans/ライフプランhq再整理_c37d6392.plan.md`（末尾 `verification-with-user`）  
+運用: `docs/運用コマンド一覧.md` §7.6

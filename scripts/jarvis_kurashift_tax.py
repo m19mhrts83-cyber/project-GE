@@ -48,27 +48,124 @@ def sb_client() -> Any | None:
     return create_client(url, key)
 
 
+TAX_DIR = Path(
+    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/"
+    "215_神・大家さん倶楽部/50_税金,確定申告"
+).expanduser()
+
+# 個人側のざっくり勘定（弥生取り込み用ドラフト。検証で直す）
+ZAIM_TO_YAYOI: dict[str, str] = {
+    "2C.食費": "消耗品費",
+    "3C.水道/光熱": "水道光熱費",
+    "4C.通信": "通信費",
+    "5C.日用雑貨": "消耗品費",
+    "6.1C.エ/交際/被服/趣味": "接待交際費",
+    "6.2C 自己投資・寄付": "新聞図書費",
+    "7C.医療費": "医療費",
+    "8C.交通": "旅費交通費",
+    "13.1F.生命保険": "保険料",
+    "13.2F.自動車保険": "保険料",
+    "17S.帰省・旅行": "旅費交通費",
+    "21F.AIリスキリング": "研修費",
+}
+
+
+def parse_yen_cell(raw: str) -> int:
+    s = (raw or "").strip().replace(",", "").replace("円", "")
+    if not s:
+        return 0
+    try:
+        return int(round(float(s)))
+    except ValueError:
+        return 0
+
+
+def find_zaim_summary(year: int) -> Path | None:
+    year_dir_path = TAX_DIR / f"{year}年度"
+    for p in [
+        year_dir_path / f"Zaim_ライフプラン_サマリー_{year}年度.csv",
+        year_dir_path / f"Zaim_ライフプラン_サマリー_{year}年度.csv",
+    ]:
+        if p.is_file():
+            return p
+    if year_dir_path.is_dir():
+        for p in sorted(year_dir_path.glob("Zaim*サマリー*.csv")):
+            return p
+    return None
+
+
 def build_csv(year: int, dry_run: bool) -> dict:
     d = year_dir(year)
-    path = d / f"yayoi_personal_{year}_stub.csv"
-    rows = [
+    path = d / f"yayoi_personal_{year}.csv"
+    summary = find_zaim_summary(year)
+    rows: list[list[str]] = [
         ["日付", "借方勘定科目", "借方金額", "貸方勘定科目", "貸方金額", "摘要", "スコープ"],
-        [
-            f"{year}-01-01",
-            "普通預金",
-            "0",
-            "事業主借",
-            "0",
-            "KURASHIFT stub — replace with real postings",
-            "personal",
-        ],
     ]
+    mapped = 0
+    skipped: list[str] = []
+
+    if summary and summary.is_file():
+        with summary.open(encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            for r in reader:
+                cat = (r.get("カテゴリ") or "").strip()
+                if not cat or cat.startswith("合計"):
+                    continue
+                # 法人・不動産事業は個人CSVから除外（税理士／別仕訳）
+                if cat.startswith("19") or "賃貸" in cat or "マンション" in cat or cat.startswith("A."):
+                    skipped.append(cat)
+                    continue
+                expense = parse_yen_cell(r.get("支出（円）") or r.get("支出") or "0")
+                if expense <= 0:
+                    continue
+                account = ZAIM_TO_YAYOI.get(cat)
+                if not account:
+                    # 前方一致のゆるいマップ
+                    for k, v in ZAIM_TO_YAYOI.items():
+                        if k in cat or cat in k:
+                            account = v
+                            break
+                if not account:
+                    skipped.append(cat)
+                    continue
+                rows.append(
+                    [
+                        f"{year}-12-31",
+                        account,
+                        str(expense),
+                        "事業主借",
+                        str(expense),
+                        f"Zaim年間 {cat}",
+                        "personal",
+                    ]
+                )
+                mapped += 1
+    else:
+        rows.append(
+            [
+                f"{year}-01-01",
+                "普通預金",
+                "0",
+                "事業主借",
+                "0",
+                "Zaimサマリー未検出 — 手動で差し替え",
+                "personal",
+            ]
+        )
+
     out: dict[str, Any] = {
         "action": "build_csv",
         "fiscal_year": year,
         "path": str(path),
         "scope": "personal",
-        "note": "個人のみ。法人は対象外。本番仕訳マッピングは次フェーズ。",
+        "source": str(summary) if summary else None,
+        "mapped_rows": mapped,
+        "skipped_categories": skipped[:30],
+        "note": (
+            "個人のみ。19不動産・会社費用は除外。"
+            "勘定マップは検証で直すドラフト。弥生本登録は承認後。"
+        ),
+        "register": False,
     }
     if dry_run:
         out["dry_run"] = True
@@ -99,7 +196,7 @@ def build_csv(year: int, dry_run: bool) -> dict:
             "status": "csv_ready",
             "scope": "personal",
             "csv_path": str(path),
-            "notes": "stub CSV from jarvis_kurashift_tax.py",
+            "notes": f"mapped={mapped} from Zaim summary; register=false",
             "updated_at": now_iso(),
         }
         if existing:

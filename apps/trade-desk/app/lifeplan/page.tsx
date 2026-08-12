@@ -29,6 +29,22 @@ type Metrics = {
     beta_living_pct?: number;
     gamma_self_pct?: number;
   };
+  re19?: {
+    income_jpy?: number;
+    expense_jpy?: number;
+    cf_jpy?: number;
+    rows?: { category: string; income: number; expense: number }[];
+  };
+  education?: {
+    expense_jpy?: number;
+    share_of_household_pct?: number | null;
+    rows?: { category: string; expense: number }[];
+  };
+  roi?: {
+    re_cf_jpy?: number;
+    repayment_jpy?: number;
+    note?: string;
+  };
   source?: string;
 };
 
@@ -257,6 +273,83 @@ export default async function LifeplanPage({
           </p>
         </div>
       )}
+
+      {actuals?.re19 || actuals?.education ? (
+        <div className="grid" style={{ marginBottom: 16 }}>
+          {actuals.re19 ? (
+            <article className="card">
+              <header>
+                <span className="lvl">19不動産</span>
+                <strong>
+                  CF {actuals.re19.cf_jpy != null ? fmtYen(actuals.re19.cf_jpy) : "—"}
+                </strong>
+              </header>
+              <p className="meta">
+                収入{" "}
+                {actuals.re19.income_jpy != null
+                  ? fmtYen(actuals.re19.income_jpy)
+                  : "—"}
+                {" / "}支出{" "}
+                {actuals.re19.expense_jpy != null
+                  ? fmtYen(actuals.re19.expense_jpy)
+                  : "—"}
+                （αβγ分母外）
+              </p>
+              <ul className="meta" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                {(actuals.re19.rows ?? []).slice(0, 6).map((r) => (
+                  <li key={r.category}>
+                    {r.category}: 入{fmtYen(r.income)} / 出{fmtYen(r.expense)}
+                  </li>
+                ))}
+              </ul>
+              <a href="/roi">ROI 詳細 →</a>
+            </article>
+          ) : null}
+          {actuals.education ? (
+            <article className="card">
+              <header>
+                <span className="lvl">10.2 教育</span>
+                <strong>
+                  {actuals.education.expense_jpy != null
+                    ? fmtYen(actuals.education.expense_jpy)
+                    : "—"}
+                </strong>
+              </header>
+              <p className="meta">
+                世帯収入比{" "}
+                {actuals.education.share_of_household_pct != null
+                  ? `${actuals.education.share_of_household_pct}%`
+                  : "—"}
+                （γ に含む）
+              </p>
+              <ul className="meta" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                {(actuals.education.rows ?? []).map((r) => (
+                  <li key={r.category}>
+                    {r.category}: {fmtYen(r.expense)}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
+          {actuals.roi ? (
+            <article className="card">
+              <header>
+                <span className="lvl">ROI 要約</span>
+                <strong>
+                  CF {actuals.roi.re_cf_jpy != null ? fmtYen(actuals.roi.re_cf_jpy) : "—"}
+                </strong>
+              </header>
+              <p className="meta">
+                明示返済{" "}
+                {actuals.roi.repayment_jpy != null
+                  ? fmtYen(actuals.roi.repayment_jpy)
+                  : "—"}
+              </p>
+              <a href="/roi">横並び詳細 →</a>
+            </article>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid" style={{ marginBottom: 8 }}>
         <article className="card">
