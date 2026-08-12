@@ -129,12 +129,12 @@
 ## Core 資産網羅（要約）
 
 - Bloomo Web・固定／動的スリーブ（公開 API なし）
-- **取得ハブ（2026-08-12 確定）**: **Bloomo → マネーフォワード ME**（実 Chrome セッション）。**あかつき → 公式サイト Playwright**（メールOTP。MF連携は不可のため不採用）。アウトプット（週次 snap／Zaim）が得られれば経路は問わない
-- **アクサ生命**は保険 Core の本線。特別勘定比率は **IFA石川さん反映の正（参考）**
+- **取得ハブ（2026-08-12 確定）**: **Bloomo → マネーフォワード ME**（実 Chrome セッション・評価の正）。**SBI インデックス → Zaim「SBI 証券」**（サイト直ログインは使わない）。**あかつき → 公式サイト Playwright**（メールOTP。MF連携は不可のため不採用）。証券内訳は `jarvis_securities_holdings.py`（SBI=Zaim／Bloomo=MF）。Bloomo→Zaim 週次反映は後段
+- **アクサ生命**は保険 Core の本線。特別勘定比率は **IFA石河さん反映の正（参考）**
 - ソニー生命・プルデンシャル生命は **真治＋千景** を分けて載せ、**/portfolio で対アクサ差分**を見る
 - プルデンシャルは Web 取得せず手登録（`PRUDENTIAL_WEB_FETCH_DISABLE=1`／`PRUDENTIAL_*_VALUE_JPY`）
 - 保険の月額・配分％: `config/insurance_allocations.yaml`（正）＋ `.jarvis_state/insurance_allocations_snap.json`（スクレイプ結果）。失敗時は前回 snap を維持
-- **後回し**: 比率確認 → 石川さんへ **iMessage** 連絡 → 返信要約と変更／見直しの確認（不足時はメール）。`docs/KURASHIFT_検証プラン.md` B-IFA-1
+- **後回し**: 比率確認 → 石河さんへ **iMessage** 連絡 → 返信要約と変更／見直しの確認（不足時はメール）。`docs/KURASHIFT_検証プラン.md` B-IFA-1
 - 既存: SBIインデックス／持株／あかつき／立花 等
 - インデックス **年1リバランス**（現状は国債比率保持なし）
 
