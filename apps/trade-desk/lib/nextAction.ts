@@ -105,7 +105,7 @@ export function computeNextAction(input: {
     return {
       level: "info",
       label: "ライフプラン年次更新を開く",
-      href: "/lifeplan?mode=annual",
+      href: "/lifeplan/budget?mode=annual",
     };
   }
   if (input.corporateTaxAlert) {

@@ -404,7 +404,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 | **V-2B-EV** | 税理士メール証憑が0 | 未 | クエリ拡張／estate箱／2024年分／手動PDF置き |
 | **V-2B-MAP** | 弥生勘定マップが薄い（skip多） | ドラフト | 個人申告に必要な費目だけマップ拡充 |
 | **V-2A-MAP** | Numbers→Zaim 対象外12件 | 警告のみ | 年次反映前にマッピング見直し（本番適用は承認後） |
-| **V-2A-CENT** | 100年LP（Step3）は Numbers＋相談のみ | 仕様どおり | 自動化しない／チェックリスト化 |
+| **V-2A-CENT** | 100歳計画の閲覧はアプリ。更新の書込は当面 Numbers＋Jarvis | 閲覧実装 | 年次ウィザード(a–d)→差分表示。セル編集は次 |
 | **V-3-P0** | 不動産 Phase0 煙＋ブリッジ | ほぼ済 | 本番で `/realestate` の19CF表示を目視 |
 | **V-X-UI** | 横断境界を画面上でも再確認 | CLI済 | ジョブ詳細に秘密が無いことをUIで見る |
 

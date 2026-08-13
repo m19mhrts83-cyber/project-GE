@@ -89,10 +89,10 @@ export const ROI_ASSETS: RoiAsset[] = [
     status: "owned",
     bought: "2025-12-25",
     bodyPrice: 46_000_000,
-    acquireCost: 1_132_000,
+    acquireCost: 2_711_790,
     acquireCostComplete: false,
     acquireCostNote:
-      "判明分のみ（諸費用ローン 100万＋融資手数料 13.2万）。登記等は未反映",
+      "シャルア精算案内の仲介158.4万＋所有権司法書士73.8万、キャスト抵当25.8万、滋賀銀事務手数料13.2万。火災保険と売主精算戻し22.9万は未反映。諸費用ローン100万は支払手段のため含めない",
     settlementPay: null,
     loan: 45_000_000,
     rateBuy: "2.55%＋諸費用2.675%",
