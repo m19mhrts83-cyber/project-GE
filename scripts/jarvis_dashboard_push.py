@@ -406,6 +406,40 @@ def push_watch(sb) -> int:
             except Exception as e:
                 print(f"# rent_step ack sync skipped: {e}", file=sys.stderr)
 
+        # カード引落: due 単位 ack（汎用7日 ack は使わない）
+        if iid == "card_debit_watch":
+            remote_ack = remote_pl.get("dashboard_ack_due")
+            local_ack = payload.get("dashboard_ack_due")
+            ack = remote_ack or local_ack
+            if ack:
+                payload["dashboard_ack_due"] = ack
+            olive = (
+                payload.get("olive_infinite")
+                if isinstance(payload.get("olive_infinite"), dict)
+                else {}
+            )
+            due = str(payload.get("due_date") or olive.get("due_date") or "")[:10]
+            settled = str(payload.get("settled_due") or "")[:10]
+            emphasize = str(it.get("level") or "") in ("warn", "attention")
+            if settled and due and settled == due:
+                payload["show_banner"] = False
+            elif emphasize and due and ack and str(ack)[:10] == due:
+                payload["show_banner"] = False
+            elif emphasize:
+                payload["show_banner"] = True
+            try:
+                cd_path = STATE / "card_debit_watch.json"
+                if cd_path.is_file() and ack:
+                    cd = json.loads(cd_path.read_text(encoding="utf-8"))
+                    if cd.get("dashboard_ack_due") != ack:
+                        cd["dashboard_ack_due"] = ack
+                        cd_path.write_text(
+                            json.dumps(cd, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
+            except Exception as e:
+                print(f"# card_debit ack sync skipped: {e}", file=sys.stderr)
+
         # 汎用「確認した」user_ack（指紋一致＋静穏期間）を Mac push で潰さない
         try:
             scripts_dir = str(Path(__file__).resolve().parent)

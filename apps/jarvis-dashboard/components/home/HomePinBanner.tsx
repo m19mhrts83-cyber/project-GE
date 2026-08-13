@@ -8,6 +8,7 @@ import { zaimWatchVisibleOnHome } from "@/lib/zaimWatchPin";
 import { KURASHIFT_URL } from "@/lib/nav";
 import OpsPinCard from "@/components/OpsPinCard";
 import ZaimReviewAckButton from "@/components/ZaimReviewAckButton";
+import CardDebitAckButton from "@/components/CardDebitAckButton";
 
 const PIN_IDS = [
   "card_debit_watch",
@@ -83,11 +84,7 @@ export default async function HomePinBanner() {
         : {};
     const level = String(data.level || "");
     if (id === "card_debit_watch") {
-      return (
-        pl.show_banner === true ||
-        level === "warn" ||
-        level === "attention"
-      );
+      return pl.show_banner === true;
     }
     if (id === "zaim_quality") {
       return zaimWatchVisibleOnHome(pl);
@@ -119,9 +116,18 @@ export default async function HomePinBanner() {
           pl
         );
         const batchId = String(pl.review_batch_id || "");
+        const cardDue =
+          typeof pl.due_date === "string"
+            ? pl.due_date
+            : pl.olive_infinite &&
+                typeof pl.olive_infinite === "object" &&
+                typeof (pl.olive_infinite as { due_date?: string }).due_date ===
+                  "string"
+              ? (pl.olive_infinite as { due_date: string }).due_date
+              : "";
         const metaExtra =
           id === "card_debit_watch"
-            ? "重要: 支払いを確実に · 処置は KURASHIFT 資金移動で · 詳細は状況ウォッチにも掲載"
+            ? "重要: 支払いを確実に · 処置は KURASHIFT 資金移動で · 「確認」はピン解除のみ（完了は money-ops done）"
             : id === "cursor_pro_plus_downgrade"
               ? "期限 2026-08-24 · Cursor Settings で Schedule Downgrade · 状況ウォッチにも掲載"
               : id === "ops_fix_notice"
@@ -140,10 +146,16 @@ export default async function HomePinBanner() {
             meta={metaExtra}
             href={href}
             external={external}
-            showAck={id === "ops_fix_notice" || id === "zaim_quality"}
+            showAck={
+              id === "ops_fix_notice" ||
+              id === "zaim_quality" ||
+              id === "card_debit_watch"
+            }
             ackSlot={
               id === "zaim_quality" ? (
                 <ZaimReviewAckButton batchId={batchId} />
+              ) : id === "card_debit_watch" ? (
+                <CardDebitAckButton dueDate={cardDue} />
               ) : undefined
             }
           />

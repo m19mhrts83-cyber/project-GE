@@ -63,15 +63,15 @@ export const FUNDING_LADDER: FundingStep[] = [
     order: 2,
     id: "policy_loan",
     title: "契約者貸付（既存ソニー等）でブリッジ",
-    verdict: "推奨",
-    note: "目安年2.5%。コア株を売らず短期穴埋め。返済原資を必ず書く",
+    verdict: "条件付き",
+    note: "定額返済カレンダー（月額・期間・原資）が書けるときOK。防衛・次物件・NISA9万の余りから。書けないなら Bloomo 優先",
   },
   {
     order: 3,
     id: "bloomo_partial",
     title: "Bloomo（衛星）の一部売却",
     verdict: "条件付き",
-    note: "テーマ／動的側のみ。NISAコアは触らない",
+    note: "返済枠が給与に乗らないとき／宿題を早く閉じたいとき。再建は余り枠で任意",
   },
   {
     order: 4,
@@ -81,6 +81,10 @@ export const FUNDING_LADDER: FundingStep[] = [
     note: "寝かせて方針に反する。明示合意があるときだけ",
   },
 ];
+
+/** フォーム・アシストに出す貸付の注記（1行） */
+export const POLICY_LOAN_UI_NOTE =
+  "定額返済を書けるなら契約者貸付は可（株再建と同型の強制貯蓄）。書けない／防衛・NISAを削るなら衛星清算を優先";
 
 export type GapView = {
   /** 引落口座に足りない額（寄せの目標） */
@@ -140,9 +144,10 @@ export function buildCardSettlementAssistSteps(input: {
     `SMBC不足（寄せ目標） ${short} — ${cover}`,
     "各行に当月固定引落＋バッファだけ残し、余剰を洗い出す",
     "無料レール: ①SBI↔SMBC無料枠 ②ことら分割（〜10万/件）③エアウォレット（MUFGハブ）",
-    "なお不足なら調達ラダー: 利金送金 → 契約者貸付 → Bloomo一部 →（最終）SBIコアは原則禁止",
+    "なお不足なら調達ラダー: 利金送金 →（定額返済カレンダー可なら）契約者貸付 → Bloomo一部 →（最終）SBIコアは原則禁止",
+    "定額返済を書けるなら貸付は可（防衛・次物件・NISA9万の余りから）。書けないなら Bloomo 優先",
     "あかつき元本売却は使わない",
-    "承認後も振込は手動。実行したら status を executing→done に更新",
+    "承認後も振込は手動。実行したら status を executing→done に更新（done で引落アラート解除）",
   ];
 }
 
@@ -164,7 +169,8 @@ export function defaultCardSettlementRationale(input: {
         : "";
   return [
     `Olive Infinite カード引落バッファ（${due}）。${need}。${cover}`,
-    "無料レールでSMBCへ寄せ、不足時のみ利金→契約者貸付→Bloomoの順。",
+    "無料レールでSMBCへ寄せ、不足時は利金→（定額返済可なら）貸付→Bloomoの順。",
+    "定額返済カレンダーを書ける貸付は可。防衛・次物件・NISA9万を削るなら不可。衛星売却は宿題を早く閉じるとき。",
     "あかつき元本・SBIコア売却は原則しない。詳細は docs/KURASHIFT_資金移動_カード引落バッファ_検討素案_20260814.md",
   ].join(" ");
 }

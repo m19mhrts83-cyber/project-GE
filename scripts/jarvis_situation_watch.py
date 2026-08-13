@@ -544,6 +544,10 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
     cards = data.get("cards") if isinstance(data.get("cards"), dict) else {}
     olive = cards.get("olive_infinite") if isinstance(cards.get("olive_infinite"), dict) else {}
     smbc = data.get("smbc_balance_jpy")
+    due = str(olive.get("due_date") or "").strip()[:10] or None
+    settled = str(data.get("settled_due") or "").strip()[:10] or None
+    plan_ready = str(data.get("plan_ready_due") or "").strip()[:10] or None
+    ack_due = str(data.get("dashboard_ack_due") or "").strip()[:10] or None
 
     detail_lines: list[str] = [
         "支払いを確実に行うことは重要です。気づきは Jarvis ダッシュボード、",
@@ -561,11 +565,20 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
             f"- {c.get('label') or cid}: {amt_s} / 引落 {c.get('due_date') or '—'} "
             f"/ 不足 {c.get('smbc_shortfall') if c.get('smbc_shortfall') is not None else '—'}"
         )
+    if settled or plan_ready or ack_due:
+        detail_lines.append(
+            f"\nライフサイクル: settled={settled or '—'} "
+            f"plan_ready={plan_ready or '—'} ack={ack_due or '—'}"
+        )
 
     level = "ok"
     summary = "引落アラートなし（支払い準備は不要）"
     path_q = "/money-ops"
-    if alerts:
+    if settled and due and settled == due:
+        level = "ok"
+        summary = f"【支払い完了扱い】引落日 {due} は settled（アラート解除）"
+        path_q = f"/money-ops?due={due}&card=olive_infinite"
+    elif alerts:
         top = alerts[0]
         level = "warn" if top.get("level") == "warn" else "attention"
         summary = f"【支払い準備】{top.get('label')}: {top.get('reason')}"
@@ -579,9 +592,8 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
             f"（金額{'未確定' if olive.get('amount_pending') else '確定'}・引落 {olive.get('due_date') or '—'}）"
         )
         level = "attention"
-        due = olive.get("due_date") or ""
         need = olive.get("amount_jpy")
-        path_q = f"/money-ops?due={due}&need={need or ''}&card=olive_infinite"
+        path_q = f"/money-ops?due={due or ''}&need={need or ''}&card=olive_infinite"
 
     kurashift_base = (
         os.environ.get("JARVIS_KURASHIFT_URL")
@@ -594,6 +606,8 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
         action_url = f"{kurashift_base}{path_q if path_q.startswith('/') else '/' + path_q}"
 
     emphasize = level in ("warn", "attention")
+    acked = bool(due and ack_due and due == ack_due)
+    show_banner = emphasize and not acked
     actions: list[dict[str, Any]] = []
     if emphasize:
         actions = [
@@ -607,9 +621,16 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
             {
                 "date": "",
                 "shop": "Vpass",
-                "proposal": "金額未確定なら Vpass で確定額を確認し state に --set",
-                "line": "Vpass — お支払い金額を確定",
+                "proposal": "金額未確定なら Vpass Web 取得（--fetch-vpass）またはメール金額表示ON／手動 --set",
+                "line": "Vpass — お支払い金額を確定（金額把握本線）",
                 "kind": "card_debit_vpass",
+            },
+            {
+                "date": "",
+                "shop": "Vpass設定",
+                "proposal": "再発防止: お支払い金額の確定メールに金額を表示する設定をON",
+                "line": "Vpass — メール金額表示（任意・再発防止）",
+                "kind": "card_debit_mail_amount_on",
             },
         ]
 
@@ -626,12 +647,16 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
             "alerts": alerts,
             "olive_infinite": olive or None,
             "smbc_balance_jpy": smbc,
+            "due_date": due,
+            "settled_due": settled,
+            "plan_ready_due": plan_ready,
+            "dashboard_ack_due": ack_due,
             "href": action_url,
             "action_url": action_url,
             "kurashift_path": path_q,
-            "pin_home_top": emphasize,
+            "pin_home_top": show_banner,
             "pin_top": emphasize,
-            "show_banner": emphasize,
+            "show_banner": show_banner,
             "never_dismiss_lightly": True,
             "emphasis": "payment_duty",
             "actions": actions,

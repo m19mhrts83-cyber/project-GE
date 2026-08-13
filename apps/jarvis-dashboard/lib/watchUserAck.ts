@@ -9,6 +9,7 @@ export const SPECIALIZED_ACK_WATCH_IDS = new Set([
   "rent_step",
   "zaim_quality",
   "ops_fix_notice",
+  "card_debit_watch",
 ]);
 
 export type UserAck = {
@@ -149,8 +150,8 @@ export function usesSpecializedAck(watchId: string): boolean {
 export function canShowGenericAckButton(row: WatchAckRow, now = new Date()): boolean {
   const id = String(row.id || "");
   if (!id) return false;
-  // ops お知らせは専用ボタンのみ（ephemeral）
-  if (id === "ops_fix_notice") return false;
+  // 専用ボタンのみ（汎用7日 ack は支払義務と衝突するため card_debit も除外）
+  if (id === "ops_fix_notice" || id === "card_debit_watch") return false;
   const level = String(row.level || "");
   if (level !== "attention" && level !== "warn") return false;
   const fp = buildWatchAckFingerprint(row);

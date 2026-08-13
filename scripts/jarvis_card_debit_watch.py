@@ -9,12 +9,27 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_card_debit_watch.py --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_card_debit_watch.py \\
     --set olive_infinite --amount 1200000 --due 2026-08-26
+  ~/selenium_env/venv/bin/python scripts/jarvis_card_debit_watch.py \\
+    --dismiss-due 2026-08-26
+  ~/selenium_env/venv/bin/python scripts/jarvis_card_debit_watch.py --fetch-vpass
+  ~/selenium_env/venv/bin/python scripts/jarvis_card_debit_watch.py --fetch-vpass-if-pending
+
+金額把握ライン（優先・確定）:
+  1) Gmail「お支払い金額のお知らせ」に金額あり（Vpassでメール金額表示ON時）
+  2) Vpass Web 取得（--fetch-vpass / 日次 --fetch-vpass-if-pending）← 本線
+  3) 手動 --set
+  ※既定メールは金額非表示。「お支払い日のご案内」は due 補強のみ。
 
 閾値（env・任意）:
   CARD_DEBIT_OLIVE_WARN_YEN=500000
   CARD_DEBIT_OTHER_WARN_YEN=300000
   CARD_DEBIT_DEFAULT_DUE_DAY=26
   CARD_DEBIT_LEAD_DAYS=14
+
+ライフサイクル（state / sync_meta）:
+  settled_due … money_ops done または --dismiss-due（当該 due のアラート消）
+  plan_ready_due … consulting/approved/executing（warn→attention）
+  dashboard_ack_due … ダッシュボード「確認」（ホームピンのみ消）
 """
 from __future__ import annotations
 
@@ -175,22 +190,35 @@ def match_card(text: str) -> tuple[str, str, bool] | None:
 
 
 def parse_yen_amounts(text: str) -> list[int]:
+    # HTML 残骸を軽く正規化
+    t = (
+        text.replace("\xa0", " ")
+        .replace("&nbsp;", " ")
+        .replace("，", ",")
+    )
     out: list[int] = []
     for m in re.finditer(
-        r"(?:お支払い(?:合計|金額)|ご請求金額|請求金額|合計)\s*[:：]?\s*"
+        r"(?:お支払い(?:合計|金額)|お支払金額|ご請求金額|請求金額|合計)\s*[:：]?\s*"
         r"([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)\s*円",
-        text,
+        t,
+    ):
+        out.append(int(m.group(1).replace(",", "")))
+    # メール表示設定ON時の別表記
+    for m in re.finditer(
+        r"([0-9]{1,3}(?:,[0-9]{3})+)\s*円\s*(?:（税込）)?\s*(?:が|を)?\s*お支払い",
+        t,
     ):
         out.append(int(m.group(1).replace(",", "")))
     return out
 
 
 def parse_due_from_text(text: str, notice_date: date) -> date | None:
-    # 明示: 引落日 2026年8月26日 / 8月26日
+    t = text.replace("\xa0", " ").replace("&nbsp;", " ")
+    # 明示: 引落日 2026年8月26日 / お支払い日 8月26日（金）
     m = re.search(
-        r"(?:引落|振替|お支払(?:い)?日)[^\d]{0,12}"
+        r"(?:引落|振替|お支払(?:い)?日)[^\d]{0,20}"
         r"(?:(\d{4})\s*年\s*)?(\d{1,2})\s*月\s*(\d{1,2})\s*日",
-        text,
+        t,
     )
     if m:
         y = int(m.group(1)) if m.group(1) else notice_date.year
@@ -243,15 +271,30 @@ def fetch_smbc_balance() -> int | None:
         return None
 
 
-def push_sync_meta(summary: dict[str, Any]) -> None:
+def _ymd(s: Any) -> date | None:
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(str(s)[:10])
+    except ValueError:
+        return None
+
+
+def _sb():
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
     key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     if not url or not key:
+        return None
+    from supabase import create_client
+
+    return create_client(url, key)
+
+
+def push_sync_meta(summary: dict[str, Any], lifecycle: dict[str, Any] | None = None) -> None:
+    sb = _sb()
+    if not sb:
         return
     try:
-        from supabase import create_client
-
-        sb = create_client(url, key)
         sb.table("sync_meta").upsert(
             {
                 "key": "card_debit_watch_summary",
@@ -260,8 +303,102 @@ def push_sync_meta(summary: dict[str, Any]) -> None:
             },
             on_conflict="key",
         ).execute()
+        if lifecycle is not None:
+            sb.table("sync_meta").upsert(
+                {
+                    "key": "card_debit_lifecycle",
+                    "value": json.dumps(lifecycle, ensure_ascii=False),
+                    "updated_at": now_iso(),
+                },
+                on_conflict="key",
+            ).execute()
     except Exception as e:
         print(f"# sync_meta skip: {e}", file=sys.stderr)
+
+
+def _due_str(v: Any) -> str | None:
+    d = _ymd(v)
+    return d.isoformat() if d else None
+
+
+def merge_lifecycle_from_remote(state: dict[str, Any]) -> dict[str, Any]:
+    """money_ops / sync_meta から settled・plan_ready を合流。"""
+    settled = _due_str(state.get("settled_due"))
+    plan_ready = _due_str(state.get("plan_ready_due"))
+    ack = _due_str(state.get("dashboard_ack_due"))
+
+    sb = _sb()
+    if sb:
+        try:
+            rows = (
+                sb.table("sync_meta")
+                .select("value")
+                .eq("key", "card_debit_lifecycle")
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            if rows:
+                raw = rows[0].get("value")
+                lc = json.loads(raw) if isinstance(raw, str) else raw
+                if isinstance(lc, dict):
+                    settled = _due_str(lc.get("settled_due")) or settled
+                    plan_ready = _due_str(lc.get("plan_ready_due")) or plan_ready
+                    ack = _due_str(lc.get("dashboard_ack_due")) or ack
+        except Exception as e:
+            print(f"# lifecycle sync_meta skip: {e}", file=sys.stderr)
+
+        try:
+            rows = (
+                sb.table("kurashift_money_ops")
+                .select("id, status, assist_payload, updated_at")
+                .eq("kind", "card_settlement_buffer")
+                .in_("status", ["consulting", "approved", "executing", "done"])
+                .order("updated_at", desc=True)
+                .limit(20)
+                .execute()
+                .data
+                or []
+            )
+            for op in rows:
+                ap = (
+                    op.get("assist_payload")
+                    if isinstance(op.get("assist_payload"), dict)
+                    else {}
+                )
+                due = _due_str(ap.get("due_date"))
+                if not due:
+                    continue
+                st = str(op.get("status") or "")
+                if st == "done" and not settled:
+                    settled = due
+                elif (
+                    st in ("consulting", "approved", "executing")
+                    and not plan_ready
+                ):
+                    plan_ready = due
+                if settled and plan_ready:
+                    break
+        except Exception as e:
+            print(f"# lifecycle money_ops skip: {e}", file=sys.stderr)
+
+    if settled:
+        state["settled_due"] = settled
+    if plan_ready:
+        state["plan_ready_due"] = plan_ready
+    if ack:
+        state["dashboard_ack_due"] = ack
+    return state
+
+
+def lifecycle_payload(state: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "settled_due": state.get("settled_due"),
+        "plan_ready_due": state.get("plan_ready_due"),
+        "dashboard_ack_due": state.get("dashboard_ack_due"),
+        "updated_at": state.get("updated_at") or now_iso(),
+    }
 
 
 def shortfall(need: int | None, smbc: int | None, reserve: int = 0) -> int | None:
@@ -271,11 +408,19 @@ def shortfall(need: int | None, smbc: int | None, reserve: int = 0) -> int | Non
     return need - usable
 
 
-def build_alerts(cards: dict[str, Any], smbc: int | None) -> list[dict[str, Any]]:
+def build_alerts(
+    cards: dict[str, Any],
+    smbc: int | None,
+    *,
+    settled_due: str | None = None,
+    plan_ready_due: str | None = None,
+) -> list[dict[str, Any]]:
     olive_warn = env_int("CARD_DEBIT_OLIVE_WARN_YEN", 500_000)
     other_warn = env_int("CARD_DEBIT_OTHER_WARN_YEN", 300_000)
     lead = env_int("CARD_DEBIT_LEAD_DAYS", 14)
     today = today_jst()
+    settled = _due_str(settled_due)
+    plan_ready = _due_str(plan_ready_due)
     alerts: list[dict[str, Any]] = []
 
     for cid, c in cards.items():
@@ -284,13 +429,23 @@ def build_alerts(cards: dict[str, Any], smbc: int | None) -> list[dict[str, Any]
         if c.get("dismissed"):
             continue
         amount = c.get("amount_jpy")
-        due_s = c.get("due_date")
-        due = None
-        if due_s:
-            try:
-                due = date.fromisoformat(str(due_s)[:10])
-            except ValueError:
-                due = None
+        due_s = _due_str(c.get("due_date"))
+        due = _ymd(due_s)
+        # 引落日経過、または settled 済み → アラートなし
+        if due is not None and due < today:
+            c["smbc_shortfall"] = shortfall(
+                int(amount) if isinstance(amount, int) else None,
+                smbc,
+                int(c.get("reserve_jpy") or 0),
+            )
+            continue
+        if due_s and settled and due_s == settled:
+            c["smbc_shortfall"] = shortfall(
+                int(amount) if isinstance(amount, int) else None,
+                smbc,
+                int(c.get("reserve_jpy") or 0),
+            )
+            continue
         days = (due - today).days if due else None
         sf = shortfall(
             int(amount) if isinstance(amount, int) else None,
@@ -303,7 +458,6 @@ def build_alerts(cards: dict[str, Any], smbc: int | None) -> list[dict[str, Any]
         reason = None
 
         if primary:
-            # Infinite: 常に state 更新済み。アラート条件
             if isinstance(amount, int) and amount >= olive_warn:
                 level = "warn"
                 reason = f"請求額 {amount:,}円（≥{olive_warn:,}）"
@@ -316,7 +470,6 @@ def build_alerts(cards: dict[str, Any], smbc: int | None) -> list[dict[str, Any]
                 level = "warn"
                 reason = f"引落まで{days}日・SMBC不足 {sf:,}円"
             elif amount is None and c.get("notice_at"):
-                # 金額未確定でも通知あり → 要確認（T-14内なら warn）
                 if days is not None and 0 <= days <= lead:
                     level = "warn"
                     reason = "お支払い金額のお知らせあり（金額未確定・Vpassで確認）"
@@ -330,7 +483,10 @@ def build_alerts(cards: dict[str, Any], smbc: int | None) -> list[dict[str, Any]
             if isinstance(amount, int) and amount >= other_warn:
                 level = "warn" if amount >= olive_warn else "attention"
                 reason = f"請求額 {amount:,}円（≥{other_warn:,}）"
-            # 未満はアラートなし（記録のみ）
+
+        if level and due_s and plan_ready and due_s == plan_ready and level == "warn":
+            level = "attention"
+            reason = f"寄せ計画作成済み・実行待ち — {reason}"
 
         if level:
             alerts.append(
@@ -349,25 +505,26 @@ def build_alerts(cards: dict[str, Any], smbc: int | None) -> list[dict[str, Any]
                     ),
                 }
             )
-    # warn 優先
     rank = {"warn": 0, "attention": 1, "info": 2}
     alerts.sort(key=lambda a: (rank.get(a["level"], 9), a.get("card_id") or ""))
     return alerts
 
 
 def scan_gmail(svc, newer_days: int = 60) -> list[dict[str, Any]]:
-    q = (
-        f'from:statement@vpass.ne.jp subject:お支払い金額のお知らせ '
-        f"newer_than:{newer_days}d"
-    )
-    # AMEX 請求系も拾う（件数少なめ）
-    q_amex = (
-        f'(from:americanexpress.com OR from:welcome.americanexpress.com) '
-        f'(お支払い OR ご請求 OR statement OR Statement) newer_than:{newer_days}d'
-    )
+    queries = [
+        # 金額が入るのはメール表示設定ON時のみ。OFFでもカード特定・通知日は取れる
+        f'from:statement@vpass.ne.jp subject:お支払い金額のお知らせ newer_than:{newer_days}d',
+        # 引落日の再通知（金額は通常なし。due 補強用）
+        f'subject:お支払い日のご案内 newer_than:{newer_days}d',
+        # AMEX 請求系
+        (
+            f'(from:americanexpress.com OR from:welcome.americanexpress.com) '
+            f'(お支払い OR ご請求 OR statement OR Statement) newer_than:{newer_days}d'
+        ),
+    ]
     found: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for query in (q, q_amex):
+    for query in queries:
         r = (
             svc.users()
             .messages()
@@ -391,13 +548,21 @@ def scan_gmail(svc, newer_days: int = 60) -> list[dict[str, Any]]:
                 continue
             text = message_body_text(full)
             card = match_card(text + "\n" + subj)
-            if not card and "お支払い金額のお知らせ" in subj:
-                # 製品名が取れない通知はスキップ
+            is_due_notice = "お支払い日のご案内" in subj
+            is_pay_notice = "お支払い金額のお知らせ" in subj
+            if not card and is_pay_notice:
                 continue
-            if not card:
+            if not card and is_due_notice:
+                # カード名が無い案内は Infinite 本線の due 補強として採用
+                cid, label, primary = (
+                    "olive_infinite",
+                    "Olive Infinite（クレジット）",
+                    True,
+                )
+            elif not card:
                 continue
-            cid, label, primary = card
-            # 日付
+            else:
+                cid, label, primary = card
             notice_date = today_jst()
             try:
                 if hdrs.get("Date"):
@@ -406,12 +571,9 @@ def scan_gmail(svc, newer_days: int = 60) -> list[dict[str, Any]]:
                 pass
             amounts = parse_yen_amounts(text)
             amount = max(amounts) if amounts else None
-            # 副線は金額が取れる請求だけ（マーケティング・金額なし通知は捨てる）
-            if not primary and amount is None and "お支払い金額のお知らせ" not in subj:
+            if not primary and amount is None and not is_pay_notice:
                 continue
             if not primary and amount is None:
-                # Vpass 金額なし通知は Amazon 等も来るが、閾値アラート不能なので記録のみ省略可
-                # Infinite 以外は金額確定メールだけ残す
                 continue
             due = parse_due_from_text(text, notice_date) or default_due(notice_date)
             found.append(
@@ -425,18 +587,53 @@ def scan_gmail(svc, newer_days: int = 60) -> list[dict[str, Any]]:
                     "source_message_id": mid,
                     "subject": subj,
                     "amount_pending": amount is None,
+                    "mail_kind": (
+                        "due_guide"
+                        if is_due_notice
+                        else "payment_notice"
+                        if is_pay_notice
+                        else "other"
+                    ),
                 }
             )
     return found
 
 
-def _ymd(s: Any) -> date | None:
-    if not s:
-        return None
+def merge_vpass_fetch(state: dict[str, Any], fetched: dict[str, Any]) -> dict[str, Any]:
+    """Vpass Web 取得結果を olive_infinite に反映（手動上書きは尊重）。"""
+    if not fetched.get("ok"):
+        state["last_vpass_fetch_error"] = fetched.get("error")
+        state["last_vpass_fetch_at"] = fetched.get("fetched_at") or now_iso()
+        return state
+    cards = dict(state.get("cards") or {})
+    row = dict(cards.get("olive_infinite") or {})
+    row["id"] = "olive_infinite"
+    row["label"] = row.get("label") or "Olive Infinite（クレジット）"
+    row["primary"] = True
+    if not row.get("amount_jpy_manual") and isinstance(fetched.get("amount_jpy"), int):
+        row["amount_jpy"] = fetched["amount_jpy"]
+        row["amount_pending"] = False
+        row["amount_source"] = "vpass_web"
+    if not row.get("due_date_manual") and fetched.get("due_date"):
+        row["due_date"] = fetched["due_date"]
+        row["due_source"] = "vpass_web"
+    row["vpass_fetched_at"] = fetched.get("fetched_at") or now_iso()
+    row["updated_at"] = now_iso()
+    row["source"] = "vpass_web"
+    cards["olive_infinite"] = row
+    state["cards"] = cards
+    state["last_vpass_fetch_at"] = row["vpass_fetched_at"]
+    state.pop("last_vpass_fetch_error", None)
+    return state
+
+
+def fetch_vpass_payment() -> dict[str, Any]:
     try:
-        return date.fromisoformat(str(s)[:10])
-    except ValueError:
-        return None
+        from jarvis_vpass_payment_fetch import fetch_olive_payment
+
+        return fetch_olive_payment()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def merge_scan(state: dict[str, Any], scanned: list[dict[str, Any]]) -> dict[str, Any]:
@@ -529,6 +726,9 @@ def summary_for_meta(state: dict[str, Any], smbc: int | None) -> dict[str, Any]:
     return {
         "updated_at": state.get("updated_at"),
         "smbc_balance_jpy": smbc,
+        "settled_due": state.get("settled_due"),
+        "plan_ready_due": state.get("plan_ready_due"),
+        "dashboard_ack_due": state.get("dashboard_ack_due"),
         "olive_infinite": {
             "amount_jpy": olive.get("amount_jpy"),
             "due_date": olive.get("due_date"),
@@ -573,6 +773,20 @@ def main() -> int:
     ap.add_argument("--set", dest="set_card", help="手動更新するカード id")
     ap.add_argument("--amount", type=int, help="手動の請求額（円）")
     ap.add_argument("--due", help="手動の引落日 YYYY-MM-DD")
+    ap.add_argument(
+        "--dismiss-due",
+        help="当該引落日を settled としてアラート解除（YYYY-MM-DD）",
+    )
+    ap.add_argument(
+        "--fetch-vpass",
+        action="store_true",
+        help="Vpass Web から Olive INF の支払額・引落日を取得（金額把握本線）",
+    )
+    ap.add_argument(
+        "--fetch-vpass-if-pending",
+        action="store_true",
+        help="olive_infinite が amount_pending のときだけ Vpass 取得",
+    )
     ap.add_argument("--newer-days", type=int, default=60)
     args = ap.parse_args()
 
@@ -581,8 +795,17 @@ def main() -> int:
         print("📎 カード引落ウォッチ: disabled")
         return 0
 
+    if args.dismiss_due:
+        due = _due_str(args.dismiss_due)
+        if not due:
+            print("# --dismiss-due は YYYY-MM-DD", file=sys.stderr)
+            return 2
+        state["settled_due"] = due
+        print(f"# settled_due={due}", file=sys.stderr)
+
     token_name = "—"
-    if not args.no_gmail and not args.set_card:
+    skip_gmail = bool(args.no_gmail or args.set_card or args.dismiss_due)
+    if not skip_gmail:
         try:
             svc, token_name = gmail_service()
             scanned = scan_gmail(svc, newer_days=args.newer_days)
@@ -597,11 +820,38 @@ def main() -> int:
     if args.set_card:
         state = apply_manual(state, args.set_card, args.amount, args.due)
 
+    olive = (state.get("cards") or {}).get("olive_infinite") or {}
+    need_vpass = bool(args.fetch_vpass) or (
+        args.fetch_vpass_if_pending
+        and (
+            olive.get("amount_pending")
+            or olive.get("amount_jpy") is None
+            or not olive.get("due_date")
+        )
+    )
+    if need_vpass:
+        print("# vpass fetch…", file=sys.stderr)
+        fetched = fetch_vpass_payment()
+        state = merge_vpass_fetch(state, fetched)
+        if fetched.get("ok"):
+            print(
+                f"# vpass ok amount={fetched.get('amount_jpy')} due={fetched.get('due_date')}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"# vpass fail: {fetched.get('error')}", file=sys.stderr)
+
+    state = merge_lifecycle_from_remote(state)
+
     smbc = fetch_smbc_balance()
     state["smbc_balance_jpy"] = smbc
     state["smbc_account_id"] = SMBC_ACCOUNT_ID
-    state["alerts"] = build_alerts(state.get("cards") or {}, smbc)
-    # shortfall を cards に反映済み
+    state["alerts"] = build_alerts(
+        state.get("cards") or {},
+        smbc,
+        settled_due=state.get("settled_due"),
+        plan_ready_due=state.get("plan_ready_due"),
+    )
     state["thresholds"] = {
         "olive_warn_yen": env_int("CARD_DEBIT_OLIVE_WARN_YEN", 500_000),
         "other_warn_yen": env_int("CARD_DEBIT_OTHER_WARN_YEN", 300_000),
@@ -611,13 +861,25 @@ def main() -> int:
 
     summary = summary_for_meta(state, smbc)
     print_block(state, smbc)
+    if state.get("settled_due") or state.get("plan_ready_due"):
+        print(
+            f"- lifecycle: settled={state.get('settled_due') or '—'} "
+            f"plan_ready={state.get('plan_ready_due') or '—'} "
+            f"ack={state.get('dashboard_ack_due') or '—'}"
+        )
+    olive2 = (state.get("cards") or {}).get("olive_infinite") or {}
+    if olive2.get("amount_pending") or olive2.get("amount_jpy") is None:
+        print(
+            "- 金額把握: 未確定 → Vpass Web（--fetch-vpass）か "
+            "メール金額表示設定ON、または --set が必要"
+        )
 
     if args.dry_run:
         print("# dry-run: state / sync_meta は書きません", file=sys.stderr)
         return 0
 
     save_state(state)
-    push_sync_meta(summary)
+    push_sync_meta(summary, lifecycle_payload(state))
     print(f"# wrote {STATE_PATH}", file=sys.stderr)
     return 0
 
