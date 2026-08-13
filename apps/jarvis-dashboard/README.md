@@ -59,13 +59,14 @@ Cloud Agent には、Server Action で集めた文脈に加えて、必要な MC
 | 設定 | 内容 |
 |---|---|
 | `CURSOR_CLOUD_ASK_ENABLE_TAVILY=1` | `TAVILY_API_KEY` を使い、Tavily MCP（`https://mcp.tavily.com/mcp`）を「聞く」Cloud Agent に渡す |
-| `CURSOR_CLOUD_ASK_MCP_SERVERS_JSON` | 追加 MCP server 定義の JSON 配列。`headers` / `env` の文字列内 `${ENV_NAME}` は実行時に展開 |
+| `CURSOR_CLOUD_ASK_MCP_SERVERS_JSON` | 追加 MCP server 定義。JSON 配列、または `mcp.json` 形式のオブジェクト。`headers` / `env` の `${ENV_NAME}` は実行時に展開。Cloud Agents REST へは `{ name, ... }[]` で送る |
 
 例:
 
 ```env
 CURSOR_CLOUD_ASK_ENABLE_TAVILY=1
 CURSOR_CLOUD_ASK_MCP_SERVERS_JSON=[{"name":"docs","type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer ${DOCS_MCP_TOKEN}"}}]
+# または {"docs":{"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer ${DOCS_MCP_TOKEN}"}}}
 ```
 
 Cloud 側の指示では書き込みツール利用を禁止し、事実確認が必要なときだけ読み取り系 MCP/Web 検索を使う。
