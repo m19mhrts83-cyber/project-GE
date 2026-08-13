@@ -7,6 +7,17 @@
 リポ: `~/git-repos`（アプリ `apps/trade-desk`）  
 DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
+### いま最初に読む（QA 2026-08-13）
+
+| 文書 | 用途 |
+|---|---|
+| [`KURASHIFT_品質保証点検ログ_20260813.md`](./KURASHIFT_品質保証点検ログ_20260813.md) | **Wave0 合否・P1/P2・実務者タスク順** |
+| [`KURASHIFT_品質保証点検_実行プラン_20260813.md`](./KURASHIFT_品質保証点検_実行プラン_20260813.md) | Wave 定義・「満足」の定義 |
+
+**QA 要約**: ③-A〜D 骨格は条件付き合格・**P0 なし**。本線全満足は未宣言（年計画 vs YTD／②通し／ログイン目視補完が残）。
+
+**実務実装（同日）**: P1（C DSCR注記・年表種別バッジ・LS強調・ナビB計/B実）＋ RE-1b（年計画 vs YTD バー）を本番反映済。詳細は点検ログ §8。
+
 ---
 
 ## 1. プラン地図（どれが生きているか）
@@ -25,12 +36,14 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
 - ホーム: データ鮮度（`sync_meta`）／いまやること／一部未取得
 - ②: `/lifeplan` 年次・Zaim本番 confirm／`/tax` 手動取込・ドラフト
-- ③: CF月50万 KPI、Bridge 19CF、loan-tracker リンク
-- ③-A: 個人 YTD（Zaim 19系）＋法人カテゴリ参考表示（合算は未承認）
-- ③-B: `/realestate/deals` 千三つ、メール候補、WeStudy助言、運営経緯
-- ③-C: `/realestate/properties` 号室一覧（Phase1）
-- ③-D: `/realestate/finance-pack` チェックリスト骨格
-- 買い進め Excel: ingest（7版）／STEP3 export（OneDrive `05_…/exports/`）
+- ③: CF月50万 KPI、Bridge 19CF、loan-tracker リンク、**レーンナビ A〜D**
+- ③-A: `/realestate` — 個人／法人／合算 KPI、簡易 DSCR、YTD CF、B-RATE＋DSCR（**年計画バーは未**）
+- ③-B: `/realestate/buy-plan`（長期年表・Focus）＋ `/realestate/deals`（千三つ実行）
+- ③-C: `/realestate/properties` — 号室・RR合計 vs 月返済・合算金利・DSCR
+- ③-D: `/realestate/finance-pack` — 物件／運転／フリー／教育 × 個人／法人、マイナ共通、コピーのみ（送信なし）
+- loan-tracker: OneDrive `240_融資/loan_tracker_export/loans.json` → `jarvis_kurashift_loan_tracker_sync.py --apply` で投影（**二重入力しない**）
+- B-RATE-4b: 残高加重合算金利（キャラメル目安 ≈2.55%）
+- 買い進め Excel: ingest／STEP3 export
 - 履歴: lifeplan `.numbers` + Zaim → `kurashift_lifeplan_*` / `kurashift_finance_*`
 - Mac worker: 買い進め系ジョブ配線済（下表）
 
@@ -65,19 +78,21 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
    （ソニー 9:00–17:30・バッチ後半、アクサは 5:00–8:00 メンテ）
 2. **ダッシュボードPW** — 既に Rotate 済。正本は `.env.jarvis_private` のみ
 
-### P1（③を実務レベルへ）
+### P1（③を実務レベルへ・QA後）
 
-3. **loan-tracker** — **アプリ未使用**（2026-08-13 確認）。中身まとめを共有してもらい、一緒に項目設計する。Drive 探索は停止。投影表は受け皿のみ
-4. **③-A 個人YTD** — ✅ Zaim カテゴリ年次
-5. **③-A 法人＋合算** — ✅ 顧客承認により合算 KPI に投入（2026-08-13）
-6. **メール候補** — ✅ スコア5以上を内見（詳細取り寄せ〜日程調整）
+3. **ログイン補完** — QA ログ §5（数値目視・キャラメル 2.55%／DSCR）
+4. **DOC 同期** — 検証プラン「いまの位置」を ③現行到達に（QA DOC-STALE-1）
+5. **③-A 年計画 vs YTD** — Wave2 RE-1b（未）
+6. **③-B 案件1件** — draft→内見通し（Wave2）
+7. **P1 UX** — C の DSCR 注記／年表 action 日本語化（QA ログ）
+8. **③-A 個人YTD** — ✅　**法人＋合算** — ✅　**メール候補** — ✅
 
 ### P2（拡張）
 
-7. 健美家／楽待（Sprint3）
-8. `/realestate/properties` — ✅ Phase1 一覧（号室）。編集・loan突合は残
-9. `/realestate/finance-pack` — ✅ チェックリスト骨格。PDF/状態保存は残
-10. Excel STEP3 **完全互換** export（現状は骨格）
+9. 健美家／楽待（Sprint3）
+10. 融資パック: localStorage 以外の案件保存・PDF
+11. Excel STEP3 **完全互換** export（現状は骨格）
+12. YAML↔`financePackCatalog.ts` ドリフト防止
 11. Lab 立花実弾（口座・鍵後）
 12. 本線プランの verification-with-user（ユーザー同席）
 

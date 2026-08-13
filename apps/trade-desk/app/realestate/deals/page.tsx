@@ -1,5 +1,6 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
+import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 
@@ -63,12 +64,13 @@ export default async function RealEstateDealsPage() {
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
-      <p className="page-kicker">③-B · 買い進め</p>
+      <RealEstateLaneNav active="b-funnel" />
+      <p className="page-kicker">③-B · 実行</p>
       <h1>千三つファネル</h1>
       <p className="sub">
-        情報→内見（詳細取り寄せ〜日程調整）→買付→融資→購入。見送りは失敗ではなく学習。自動問い合わせ送信はしません。
-        スコア 5 以上のメール候補は内見に載せます。
-        仕様: <code>docs/KURASHIFT_買い進めJob仕様.md</code>
+        情報→内見→買付→融資→購入。見送りは学習。長期プラン・今狙う条件は{" "}
+        <a href="/realestate/buy-plan">買い進めプラン</a>。
+        自動問い合わせ送信はしません。
       </p>
 
       <div className="card">
@@ -94,23 +96,15 @@ export default async function RealEstateDealsPage() {
             payload={{ apply: true }}
           />
           <EnqueueJobButton
-            jobType="buy_plan_ingest"
-            title="買い進めExcel再取込"
-            label="Excel再取込"
-            payload={{}}
-          />
-          <EnqueueJobButton
-            jobType="buy_plan_export"
-            title="STEP3互換Excelをexport"
-            label="STEP3 export"
-            payload={{}}
-          />
-          <EnqueueJobButton
             jobType="ops_consult_ingest"
             title="運営経緯を再取込"
             label="運営経緯"
             payload={{}}
           />
+        </p>
+        <p className="meta" style={{ marginTop: 8 }}>
+          Excel 再取込・STEP3 export は{" "}
+          <a href="/realestate/buy-plan">買い進めプラン</a> へ移動しました。
         </p>
       </div>
 
@@ -130,46 +124,54 @@ export default async function RealEstateDealsPage() {
           </span>
         </p>
         <p className="meta">
-          現行プラン: {buyPlan?.label || buyPlan?.version_key || "未取込"}
+          現行プラン:{" "}
+          <a href="/realestate/buy-plan">
+            {buyPlan?.label || buyPlan?.version_key || "未取込"}
+          </a>
           {" · "}
-          <a href="/realestate">不動産ハブ →</a>
+          <a href="/realestate">運用ハブ →</a>
         </p>
       </div>
 
-      <div className="card-grid">
-        <div className="card">
-          <header>
-            <span className="lvl">Match</span>
-            <strong>エリア・購入条件（canonical）</strong>
-          </header>
-          <ul className="meta" style={{ paddingLeft: 18 }}>
-            {criteriaLines.length === 0 ? (
-              <li>条件未取込</li>
-            ) : (
-              criteriaLines.slice(0, 18).map((c, i) => (
-                <li key={`${c.sort_order}-${i}`}>{c.raw_text}</li>
-              ))
-            )}
-          </ul>
-        </div>
-        <div className="card">
-          <header>
-            <span className="lvl">運営経緯</span>
-            <strong>809 ヒット</strong>
-          </header>
-          <ul className="meta" style={{ paddingLeft: 18 }}>
-            {(ops || []).length === 0 ? (
-              <li>まだ無し</li>
-            ) : (
-              (ops || []).map((e, i) => (
-                <li key={i}>
-                  {(e.occurred_at || "").slice(0, 10)} · {e.subject}
-                  {e.tags?.length ? `（${(e.tags as string[]).join(",")}）` : ""}
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
+      <div className="card">
+        <header>
+          <span className="lvl">Focus</span>
+          <strong>今狙う条件（要約）</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 8 }}>
+          詳細・年表はプラン画面。ここは候補マッチ用の短冊のみ。
+        </p>
+        <ul className="meta" style={{ paddingLeft: 18 }}>
+          {criteriaLines.length === 0 ? (
+            <li>条件未取込 — プランで Excel 再取込</li>
+          ) : (
+            criteriaLines.slice(0, 8).map((c, i) => (
+              <li key={`${c.sort_order}-${i}`}>{c.raw_text}</li>
+            ))
+          )}
+        </ul>
+        <p style={{ marginTop: 8 }}>
+          <a href="/realestate/buy-plan">買い進めプランで全条件・年表を見る →</a>
+        </p>
+      </div>
+
+      <div className="card">
+        <header>
+          <span className="lvl">運営経緯</span>
+          <strong>809 ヒット（直近）</strong>
+        </header>
+        <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
+          {(ops || []).length === 0 ? (
+            <li>まだ無し</li>
+          ) : (
+            (ops || []).map((e, i) => (
+              <li key={i}>
+                {(e.occurred_at || "").slice(0, 10)} · {e.subject}
+                {e.tags?.length ? `（${(e.tags as string[]).join(",")}）` : ""}
+              </li>
+            ))
+          )}
+        </ul>
       </div>
 
       <div className="card">
