@@ -9,7 +9,7 @@ drive_csv_filename: WeStudy_for_scoring.csv
 saiten_drive_folder_id: 1QI-r0upkP335FZNQ8q99pe7FpPfTt1h_
 saiten_spreadsheet_url: https://docs.google.com/spreadsheets/d/1ZX2xVBpUAtQOB6wz4_CpcZ3lIxhVdtrzS_dGd1yqPkQ/edit
 saiten_drive_folder_url: https://drive.google.com/drive/folders/1QI-r0upkP335FZNQ8q99pe7FpPfTt1h_
-release_version: V1.0
-release_date: 2026-06-27
+release_version: V1.1
+release_date: 2026-08-13
 onedrive_backup_v1: WeStudy_採点自動化_V1.0_20260627.xlsx
 onedrive_gas_v1: 04_gas_Code_V2.1_V1.0.gs

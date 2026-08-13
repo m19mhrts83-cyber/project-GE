@@ -356,6 +356,20 @@ function appendCorrectionLearningData() {
   SpreadsheetApp.getUi().alert("補正学習データに " + appendRows.length + " 件追加しました。");
 }
 
+function normalizeHeaderKey_(raw) {
+  var s = String(raw == null ? "" : raw).trim();
+  // UTF-8 BOM / Excel由来の余分な引用符を除去（列名不一致で採点0件になるのを防ぐ）
+  if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+  s = s.replace(/^\uFEFF/, "").trim();
+  if (
+    (s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') ||
+    (s.charAt(0) === "'" && s.charAt(s.length - 1) === "'")
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
+
 function importCsvFromDrive_(fileId) {
   var cfg = readConfig_();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -366,6 +380,13 @@ function importCsvFromDrive_(fileId) {
   var blob = file.getBlob();
   var text = blob.getDataAsString("UTF-8");
   var csv = Utilities.parseCsv(text);
+  if (!csv.length) {
+    throw new Error("CSV が空です: " + file.getName());
+  }
+  // ヘッダー行の BOM・余分な引用符を除去（Excel/UTF-8 CSV 由来の採点0件を防ぐ）
+  csv[0] = csv[0].map(function (h) {
+    return normalizeHeaderKey_(h);
+  });
 
   sourceSheet.clearContents();
   sourceSheet.getRange(1, 1, csv.length, csv[0].length).setValues(csv);
@@ -551,8 +572,8 @@ function log_(level, fn, commentId, message) {
 function buildIndex_(headers) {
   var idx = {};
   for (var i = 0; i < headers.length; i++) {
-    var k = headers[i];
-    if (k !== null && k !== "") idx[String(k).trim()] = i;
+    var k = normalizeHeaderKey_(headers[i]);
+    if (k !== "") idx[k] = i;
   }
   return idx;
 }
