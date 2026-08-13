@@ -190,10 +190,11 @@ def _select_native(page: Page, label: str, *, index: int | None = None) -> bool:
           const qn = norm(q);
           const selects = [...document.querySelectorAll('select')];
           const list = (idx === null || idx === undefined) ? selects : [selects[idx]].filter(Boolean);
-          for (const s of list) {
-            for (const o of s.options) {
-              const t = (o.text || '').trim();
-              if (t === q || norm(t) === qn) {
+          const tryMatch = (pred) => {
+            for (const s of list) {
+              for (const o of s.options) {
+                const t = (o.text || '').trim();
+                if (!pred(t)) continue;
                 const desc = Object.getOwnPropertyDescriptor(
                   window.HTMLSelectElement.prototype, 'value'
                 );
@@ -204,8 +205,20 @@ def _select_native(page: Page, label: str, *, index: int | None = None) -> bool:
                 return t;
               }
             }
-          }
-          return null;
+            return null;
+          };
+          // exact → 空白無視 exact → 一意の部分一致（Bloomo vs bloomo証券 など）
+          return (
+            tryMatch((t) => t === q || norm(t) === qn) ||
+            tryMatch((t) => {
+              const tn = norm(t);
+              if (!qn || qn.length < 3) return false;
+              if (!(tn.includes(qn) || qn.includes(tn))) return false;
+              const hits = list.flatMap((s) => [...s.options].map((o) => norm(o.text || '')))
+                .filter((x) => x && (x.includes(qn) || qn.includes(x)));
+              return new Set(hits).size === 1;
+            })
+          );
         }""",
         [label, index],
     )

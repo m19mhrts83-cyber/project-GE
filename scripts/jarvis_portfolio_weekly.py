@@ -58,11 +58,13 @@ def now_iso() -> str:
 
 
 def sony_web_hours_ok(now: datetime | None = None) -> tuple[bool, str]:
-    """お客さまWEB / LIFEPLANNER WEB の目安は 9:00–17:30。"""
+    """契約内容照会の目安は平日 8:00–24:00（深夜帯は時間外になりやすい）。"""
     n = now or datetime.now(JST)
+    if n.weekday() >= 5:
+        return False, "ソニーお客さまWEBの契約照会は平日のみ（今回は土日）"
     hm = n.hour * 60 + n.minute
-    if hm < 9 * 60 or hm >= 17 * 60 + 30:
-        return False, "ソニーお客さまWEBは目安 9:00–17:30（今回は時間外）"
+    if hm < 8 * 60 or hm >= 24 * 60:
+        return False, "ソニーお客さまWEBは目安 平日 8:00–24:00（今回は時間外）"
     return True, ""
 
 
@@ -83,6 +85,8 @@ def rec_from_exc(exc: BaseException) -> dict[str, Any]:
         "時間外/メンテナンス",
         "5:00–8:00",
         "9:00–17:30",
+        "8:00–24:00",
+        "平日のみ",
     )
     if any(x in msg for x in hours):
         return {"status": "skipped", "reason": msg}
@@ -129,15 +133,19 @@ def upsert_snapshot(
     source: str,
     note: str | None = None,
     as_of: str | None = None,
+    cost_jpy: float | None = None,
 ) -> None:
+    row: dict[str, Any] = {
+        "account_id": account_id,
+        "as_of": as_of or today_jst().isoformat(),
+        "value_jpy": value_jpy,
+        "source": source,
+        "note": note,
+    }
+    if cost_jpy is not None:
+        row["cost_jpy"] = cost_jpy
     sb.table("portfolio_snapshots").upsert(
-        {
-            "account_id": account_id,
-            "as_of": as_of or today_jst().isoformat(),
-            "value_jpy": value_jpy,
-            "source": source,
-            "note": note,
-        },
+        row,
         on_conflict="account_id,as_of",
     ).execute()
 
@@ -151,6 +159,15 @@ def upsert_akatsuki_holding(sb, rec: dict[str, Any], *, as_of: str | None = None
     pl = rec.get("pl_jpy")
     if pl is not None:
         fund["pnl_jpy"] = int(pl)
+    cost = rec.get("cost_jpy")
+    if cost is not None:
+        fund["cost_jpy"] = int(cost)
+    elif pl is not None:
+        fund["cost_jpy"] = value - int(pl)
+    if rec.get("coupon_pct") is not None:
+        fund["coupon_pct"] = float(rec["coupon_pct"])
+    if rec.get("face_usd") is not None:
+        fund["face_usd"] = int(rec["face_usd"])
     sb.table("securities_holdings").upsert(
         {
             "account_id": "akatsuki_bond",
@@ -203,8 +220,115 @@ def fetch_sony() -> dict[str, Any]:
     }
 
 
+def map_sony_item_to_account(it: dict[str, Any]) -> str:
+    """スクレイプ1契約 → portfolio account_id。"""
+    idx = int(it.get("account_index") or 0)
+    product = str(it.get("product_name") or "")
+    pu = product.upper()
+    kids_markers = ("珠己", "円香", "紗和", "こども", "子ども", "子供")
+    is_sovani = (
+        "SOVANI" in pu
+        or "ソバニ" in product
+        or "変額個人年金" in product
+        or "変額無告" in product
+        or ("確年" in product and "一時払" not in product)
+    )
+    if any(k in product for k in kids_markers):
+        return "sony_life_sovani_kids"
+    if idx >= 2:
+        if is_sovani:
+            return "sony_life_sovani"  # 千景ログインにSOVANIがある稀ケース
+        return "sony_life_chikage"
+    if is_sovani:
+        return "sony_life_sovani"
+    if "一時払" in product:
+        return "sony_life"
+    # 商品名が取れない旧HTMLは先頭行＝一時払想定
+    row = int(it.get("contract_row_index") or 0)
+    if row == 0:
+        return "sony_life"
+    return "sony_life_sovani"
+
+
+def estimate_sony_costs_from_zaim(sb) -> dict[str, dict[str, Any]]:
+    """Zaim投影からソニー各口座の払込累計（推計）を返す。
+
+    - 真治SOVANI: 2023-07以降の 32,725 のうち月4,000分
+    - 千景: 28,725 全期間 ＋ 32,725 のうち 28,725分
+    - 子どもSOVANI: 楽天名義の月4,000（珠己・円香・紗和）
+    - 一時払: Zaimに一括が見当たらないため env SONYLIFE_LUMP_COST_JPY のみ
+    """
+    out: dict[str, dict[str, Any]] = {}
+    lump = (os.environ.get("SONYLIFE_LUMP_COST_JPY") or "").strip().replace(",", "")
+    if lump:
+        try:
+            out["sony_life"] = {
+                "cost_jpy": int(float(lump)),
+                "note": "SONYLIFE_LUMP_COST_JPY",
+            }
+        except ValueError:
+            pass
+
+    try:
+        rows = (
+            sb.table("kurashift_finance_transactions")
+            .select("txn_date,expense_jpy,from_account,subcategory")
+            .ilike("subcategory", "%ソニー%")
+            .execute()
+            .data
+            or []
+        )
+    except Exception as exc:
+        return {**out, "_error": {"note": str(exc)[:200]}}
+
+    chikage = 0
+    shinji_sovani = 0
+    kids = 0
+    n_chikage = n_sovani = n_kids = 0
+    for r in rows:
+        try:
+            amt = int(float(r.get("expense_jpy") or 0))
+        except (TypeError, ValueError):
+            continue
+        if amt <= 0:
+            continue
+        from_acc = str(r.get("from_account") or "")
+        if amt == 28_725:
+            chikage += amt
+            n_chikage += 1
+        elif amt == 32_725:
+            chikage += 28_725
+            shinji_sovani += 4_000
+            n_chikage += 1
+            n_sovani += 1
+        elif amt == 4_000 and any(k in from_acc for k in ("珠己", "円香", "紗和")):
+            kids += amt
+            n_kids += 1
+        elif amt == 12_000:
+            # 子ども3人まとめ払いの1回
+            kids += amt
+            n_kids += 3
+
+    if n_chikage:
+        out["sony_life_chikage"] = {
+            "cost_jpy": chikage,
+            "note": f"Zaim月額累計 n={n_chikage}",
+        }
+    if n_sovani:
+        out["sony_life_sovani"] = {
+            "cost_jpy": shinji_sovani,
+            "note": f"Zaim推計（32,725内4,000）n={n_sovani}",
+        }
+    if n_kids:
+        out["sony_life_sovani_kids"] = {
+            "cost_jpy": kids,
+            "note": f"Zaim楽天名義4,000累計 n={n_kids}",
+        }
+    return out
+
+
 def fetch_sony_by_account() -> dict[str, Any]:
-    """真治=sony_life / 千景=sony_life_chikage に分割して返す。"""
+    """契約ごとに sony_life / sony_life_sovani / sony_life_chikage 等へ分割。"""
     if not (
         os.environ.get("SONYLIFE_USERNAME")
         or os.environ.get("SONYLIFE_USERNAME_1")
@@ -218,28 +342,55 @@ def fetch_sony_by_account() -> dict[str, Any]:
         return {"status": "skipped", "reason": reason}
     data = run_json_script(
         [py_exe(), str(script), "--headless", "--json", "--save-debug"],
-        timeout=360,
+        timeout=600,
         cwd=FINANCE,
     )
     items = data.get("items") or []
     accounts: dict[str, dict[str, Any]] = {}
     loans: dict[str, dict[str, Any]] = {}
-    # 既定: 1人目=真治, 2人目=千景（debug HTML の実績に合わせる）
     for it in items:
+        aid = map_sony_item_to_account(it)
         idx = int(it.get("account_index") or 0)
-        aid = "sony_life" if idx <= 1 else "sony_life_chikage"
+        product = str(it.get("product_name") or "")
+        prev = accounts.get(aid)
+        val = int(it.get("value_jpy") or 0)
+        note = (
+            f"account{idx} row{it.get('contract_row_index', 0)} "
+            f"{product or it.get('username') or ''}"
+        ).strip()
+        if prev and prev.get("status") == "ok":
+            # 同口座に複数契約が載った場合は合算
+            accounts[aid] = {
+                "status": "ok",
+                "value_jpy": int(prev["value_jpy"]) + val,
+                "note": f"{prev.get('note')}; {note}",
+                "product_name": product,
+            }
+            if it.get("paid_in_jpy") is not None or prev.get("cost_jpy") is not None:
+                accounts[aid]["cost_jpy"] = int(prev.get("cost_jpy") or 0) + int(
+                    it.get("paid_in_jpy") or 0
+                )
+        else:
+            accounts[aid] = {
+                "status": "ok",
+                "value_jpy": val,
+                "note": note,
+                "product_name": product,
+            }
+            if it.get("paid_in_jpy") is not None:
+                accounts[aid]["cost_jpy"] = int(it["paid_in_jpy"])
+                accounts[aid]["note"] = f"{note}; paid_in公式"
         loan_aid = (
-            "sony_life_policy_loan"
-            if idx <= 1
-            else "sony_life_chikage_policy_loan"
+            "sony_life_chikage_policy_loan"
+            if aid == "sony_life_chikage"
+            else "sony_life_policy_loan"
         )
-        accounts[aid] = {
-            "status": "ok",
-            "value_jpy": int(it.get("value_jpy") or 0),
-            "note": f"account{idx} {it.get('username') or ''}".strip(),
-        }
         policy = int(it.get("policy_loan_jpy") or 0)
         auto = int(it.get("auto_premium_loan_jpy") or 0)
+        prev_loan = loans.get(loan_aid)
+        if prev_loan and prev_loan.get("status") == "ok":
+            policy += int(prev_loan.get("policy_loan_jpy") or 0)
+            auto += int(prev_loan.get("auto_premium_loan_jpy") or 0)
         loans[loan_aid] = {
             "status": "ok",
             "value_jpy": policy + auto,
@@ -264,10 +415,14 @@ def fetch_sony_by_account() -> dict[str, Any]:
             }
     return {
         "status": "ok",
-        "total_jpy": int(data.get("value_jpy") or sum(a["value_jpy"] for a in accounts.values())),
+        "total_jpy": int(
+            data.get("value_jpy")
+            or sum(a["value_jpy"] for a in accounts.values())
+        ),
         "note": data.get("parser_mode") or "",
         "accounts": accounts,
         "loans": loans,
+        "raw_items": items,
     }
 
 
@@ -472,11 +627,21 @@ def fetch_akatsuki() -> dict[str, Any]:
     if env_file.is_file():
         cmd += ["--env-file", str(env_file)]
     data = run_json_script(cmd, timeout=180)
+    cost = data.get("cost_jpy")
+    pl = data.get("pl_jpy")
+    if cost is None and pl is not None:
+        cost = int(data["total_jpy"]) - int(pl)
     return {
         "status": "ok",
         "value_jpy": int(data["total_jpy"]),
         "note": data.get("parser_mode") or "",
-        "pl_jpy": int(data["pl_jpy"]) if data.get("pl_jpy") is not None else None,
+        "pl_jpy": int(pl) if pl is not None else None,
+        "cost_jpy": int(cost) if cost is not None else None,
+        "coupon_pct": float(data["coupon_pct"]) if data.get("coupon_pct") is not None else None,
+        "face_usd": int(data["face_usd"]) if data.get("face_usd") is not None else None,
+        "fx_jpy_per_usd": (
+            float(data["fx_jpy_per_usd"]) if data.get("fx_jpy_per_usd") is not None else None
+        ),
         "category": data.get("category") or "外国債券",
     }
 
@@ -642,16 +807,28 @@ def upsert_sync_meta(sb, payload: dict[str, Any]) -> None:
 
 
 def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
-    """ソニーはバッチ後半（9:00 開店直後の混雑を避ける）。"""
+    """ソニーはバッチ後半（朝の混雑を避ける）。複数契約＋Zaim払込推計。"""
     try:
         sony_multi = fetch_sony_by_account()
     except Exception as exc:
         sony_multi = rec_from_exc(exc)
+    costs = estimate_sony_costs_from_zaim(sb) if not dry_run else {}
+    if costs.get("_error"):
+        print(f"# sony cost estimate warn: {costs['_error'].get('note')}")
     if sony_multi.get("status") == "ok":
         for aid, rec in (sony_multi.get("accounts") or {}).items():
+            cost_rec = costs.get(aid) or {}
+            # 公式 paid_in を優先。無ければ Zaim 推計
+            if rec.get("cost_jpy") is None and cost_rec.get("cost_jpy") is not None:
+                rec = {**rec, "cost_jpy": cost_rec["cost_jpy"]}
+                note_extra = cost_rec.get("note")
+                if note_extra:
+                    rec["note"] = f"{rec.get('note') or ''}; cost:{note_extra}".strip("; ")
             sources[aid] = rec
             print(
-                f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
+                f"# {aid}: {rec.get('status')} "
+                f"value={rec.get('value_jpy')} cost={rec.get('cost_jpy')} "
+                f"{rec.get('reason') or rec.get('note') or ''}"
             )
             if not dry_run and rec.get("status") == "ok":
                 upsert_snapshot(
@@ -660,6 +837,11 @@ def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
                     float(rec["value_jpy"]),
                     source="weekly_web",
                     note=rec.get("note"),
+                    cost_jpy=(
+                        float(rec["cost_jpy"])
+                        if rec.get("cost_jpy") is not None
+                        else None
+                    ),
                 )
         for aid, rec in (sony_multi.get("loans") or {}).items():
             sources[aid] = rec
@@ -674,15 +856,83 @@ def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
                     source="weekly_web_loan",
                     note=rec.get("note"),
                 )
+        # 評価が取れなくても原価だけ入れたい口座（子どもSOVANI等）
+        # value=0 で上書きしない。既存評価があるときだけ cost を更新。
+        fetched = set((sony_multi.get("accounts") or {}).keys())
+        for aid, cost_rec in costs.items():
+            if aid.startswith("_") or aid in fetched:
+                continue
+            if cost_rec.get("cost_jpy") is None:
+                continue
+            try:
+                prev = (
+                    sb.table("portfolio_snapshots")
+                    .select("value_jpy,as_of")
+                    .eq("account_id", aid)
+                    .order("as_of", desc=True)
+                    .limit(1)
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception:
+                prev = []
+            if not prev or prev[0].get("value_jpy") is None:
+                sources[aid] = {
+                    "status": "skipped",
+                    "reason": (
+                        f"評価未取得のため原価のみ保留 "
+                        f"(推計{int(cost_rec['cost_jpy']):,}円 / {cost_rec.get('note')})"
+                    ),
+                    "cost_jpy": cost_rec["cost_jpy"],
+                }
+                print(
+                    f"# {aid}: skipped cost-only保留 "
+                    f"{cost_rec['cost_jpy']} ({cost_rec.get('note')})"
+                )
+                continue
+            val = float(prev[0]["value_jpy"])
+            sources[aid] = {
+                "status": "ok",
+                "value_jpy": val,
+                "cost_jpy": cost_rec["cost_jpy"],
+                "note": f"cost-update {cost_rec.get('note')}",
+            }
+            print(
+                f"# {aid}: cost-update value={val} cost={cost_rec['cost_jpy']} "
+                f"({cost_rec.get('note')})"
+            )
+            if not dry_run:
+                upsert_snapshot(
+                    sb,
+                    aid,
+                    val,
+                    source="zaim_cost_estimate",
+                    note=cost_rec.get("note"),
+                    cost_jpy=float(cost_rec["cost_jpy"]),
+                )
         if "sony_life_chikage" not in (sony_multi.get("accounts") or {}):
             sources["sony_life_chikage"] = {
                 "status": "skipped",
                 "reason": "SONYLIFE_USERNAME_2 未設定または取得0件",
             }
             print("# sony_life_chikage: skipped SONYLIFE_USERNAME_2 未設定または取得0件")
+        if "sony_life_sovani" not in (sony_multi.get("accounts") or {}):
+            sources.setdefault(
+                "sony_life_sovani",
+                {
+                    "status": "skipped",
+                    "reason": "真治ログイン内にSOVANI契約が見つからない",
+                },
+            )
+            print("# sony_life_sovani: skipped 契約未検出")
         return
     sources["sony_life"] = sony_multi
     sources["sony_life_chikage"] = {
+        "status": sony_multi.get("status") or "error",
+        "reason": sony_multi.get("reason") or "sony parent failed",
+    }
+    sources["sony_life_sovani"] = {
         "status": sony_multi.get("status") or "error",
         "reason": sony_multi.get("reason") or "sony parent failed",
     }
@@ -697,12 +947,25 @@ def main() -> int:
     ap.add_argument("--cloud-only", action="store_true", help="Yahoo / 既存DBのみ（GHA向け）")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true")
+    ap.add_argument(
+        "--sony-only",
+        action="store_true",
+        help="ソニー生命のみ取得（解約返戻＋Zaim払込推計）",
+    )
     args = ap.parse_args()
 
     load_private_env()
 
     if os.environ.get("JARVIS_PORTFOLIO_WEEKLY_DISABLE") == "1":
         print("# skip: JARVIS_PORTFOLIO_WEEKLY_DISABLE=1")
+        return 0
+
+    if args.sony_only:
+        print(f"# portfolio_weekly sony-only {now_iso()}")
+        sb = sb_client()
+        sources: dict[str, Any] = {}
+        ingest_sony(sb, sources, dry_run=args.dry_run)
+        print(json.dumps({"sony_only": True, "sources": sources}, ensure_ascii=False, default=str))
         return 0
 
     prev = load_state()
@@ -864,6 +1127,11 @@ def main() -> int:
                 else "weekly_web"
             ),
             note=rec.get("note"),
+            cost_jpy=(
+                float(rec["cost_jpy"])
+                if account_id == "akatsuki_bond" and rec.get("cost_jpy") is not None
+                else None
+            ),
         )
         if account_id == "akatsuki_bond":
             try:

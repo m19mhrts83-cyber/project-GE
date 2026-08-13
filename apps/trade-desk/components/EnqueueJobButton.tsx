@@ -22,6 +22,7 @@ export default function EnqueueJobButton({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [queued, setQueued] = useState(false);
 
   async function onClick() {
     if (requireConfirm) {
@@ -30,11 +31,13 @@ export default function EnqueueJobButton({
         "この操作は本番データに影響します。本当にキューへ入れますか？";
       if (!window.confirm(text)) {
         setMsg("キャンセルしました");
+        setQueued(false);
         return;
       }
     }
     setBusy(true);
     setMsg(null);
+    setQueued(false);
     try {
       const bodyPayload = {
         ...(payload ?? {}),
@@ -55,7 +58,8 @@ export default function EnqueueJobButton({
       if (!res.ok) {
         setMsg(data.error || "失敗しました");
       } else {
-        setMsg("キューに入れました。Mac worker が実行します。");
+        setQueued(true);
+        setMsg("キューに入れました。Mac のバックグラウンドワーカーが実行します。");
         router.refresh();
       }
     } catch (e) {
@@ -75,7 +79,21 @@ export default function EnqueueJobButton({
       >
         {busy ? "送信中…" : label || title}
       </button>
-      {msg ? <div className="meta">{msg}</div> : null}
+      {msg ? (
+        <div className="meta" style={{ marginTop: 6, maxWidth: 420 }}>
+          {msg}
+          {queued ? (
+            <>
+              <br />
+              結果は Cursor
+              のチャットには出ません。KURASHIFT の{" "}
+              <a href="/jobs">ジョブ</a> で queued → running →
+              succeeded / failed とログを確認してください（Mac
+              起動中。launchd は最大約15分間隔）。
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

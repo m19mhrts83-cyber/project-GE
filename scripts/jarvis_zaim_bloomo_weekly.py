@@ -2,7 +2,7 @@
 """Bloomo（MF経由評価）の週次値動きを Zaim（財務）へ登録する。
 
 学習メモ（あかつき週次コメント）: 増収は「H.株増収」。減収は α.B.C.投資 / 株減収。
-口座名は ZAIM_BLOOMO_ACCOUNT（既定 Bloomo）。
+口座名は ZAIM_BLOOMO_ACCOUNT（既定 bloomo証券。Zaim 上の表記どおり）。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_zaim_bloomo_weekly.py --dry-run
@@ -33,7 +33,7 @@ CAT_UP = "H.株増収"
 
 
 def account_name() -> str:
-    return (os.environ.get("ZAIM_BLOOMO_ACCOUNT") or "Bloomo").strip() or "Bloomo"
+    return (os.environ.get("ZAIM_BLOOMO_ACCOUNT") or "bloomo証券").strip() or "bloomo証券"
 
 
 def now_iso() -> str:

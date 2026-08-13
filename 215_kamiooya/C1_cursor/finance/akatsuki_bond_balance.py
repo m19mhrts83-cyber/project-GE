@@ -43,6 +43,101 @@ class BalanceResult:
     parser_mode: str
     category: str = ""
     pl_jpy: int | None = None
+    cost_jpy: int | None = None
+    coupon_pct: float | None = None
+    face_usd: int | None = None
+    fx_jpy_per_usd: float | None = None
+
+
+def _extract_bond_detail_meta(page) -> dict[str, Any]:
+    """外国債券銘柄表から取得金額・利率・数量・評価レートを拾う。"""
+    raw = page.evaluate(
+        """
+() => {
+  const out = { cost: null, coupon: null, qty: null, fx: null, pl: null, value: null };
+  const costNodes = Array.from(document.querySelectorAll('[data-title="取得金額"]'));
+  for (const n of costNodes) {
+    const t = (n.innerText || '').replace(/\\s+/g, '');
+    const m = t.match(/([\\d,]+)円/);
+    if (m) { out.cost = m[1].replace(/,/g, ''); break; }
+  }
+  const plNodes = Array.from(document.querySelectorAll('[data-title="評価損益"]'));
+  for (const n of plNodes) {
+    const t = (n.innerText || '').replace(/\\s+/g, '');
+    const m = t.match(/([+-]?[\\d,]+)/);
+    if (m) { out.pl = m[1].replace(/,/g, ''); break; }
+  }
+  const valNodes = Array.from(document.querySelectorAll('[data-title="評価額"]'));
+  for (const n of valNodes) {
+    const t = (n.innerText || '').replace(/\\s+/g, '');
+    const m = t.match(/([\\d,]+)円/);
+    if (m) { out.value = m[1].replace(/,/g, ''); break; }
+  }
+  const body = document.body ? (document.body.innerText || '') : '';
+  const coup = body.match(/\\[利率\\]\\s*([0-9.]+)\\s*%/);
+  if (coup) out.coupon = coup[1];
+  const fx = body.match(/([0-9.]+)\\s*円\\/米ドル/);
+  if (fx) out.fx = fx[1];
+  // 数量セル（外国債券表の数量列）
+  const qtyCell = document.querySelector('#foreign-bond [headers*="th3"], #foreign-bond td.txt-num');
+  if (qtyCell) {
+    const qm = (qtyCell.innerText || '').replace(/,/g, '').match(/\\b(\\d{4,})\\b/);
+    if (qm) out.qty = qm[1];
+  }
+  if (!out.cost) {
+    const m2 = body.match(/取得金額[^\\d\\n]{0,20}([\\d,]+)円/);
+    if (m2) out.cost = m2[1].replace(/,/g, '');
+  }
+  return out;
+}
+"""
+    )
+    meta: dict[str, Any] = {}
+    if raw.get("cost"):
+        try:
+            meta["cost_jpy"] = int(str(raw["cost"]).replace(",", ""))
+        except ValueError:
+            pass
+    if raw.get("pl") is not None and str(raw.get("pl")).strip() != "":
+        try:
+            meta["pl_jpy"] = int(str(raw["pl"]).replace(",", ""))
+        except ValueError:
+            pass
+    if raw.get("value"):
+        try:
+            meta["detail_value_jpy"] = int(str(raw["value"]).replace(",", ""))
+        except ValueError:
+            pass
+    if raw.get("coupon"):
+        try:
+            meta["coupon_pct"] = float(raw["coupon"])
+        except ValueError:
+            pass
+    if raw.get("qty"):
+        try:
+            meta["face_usd"] = int(str(raw["qty"]).replace(",", ""))
+        except ValueError:
+            pass
+    if raw.get("fx"):
+        try:
+            meta["fx_jpy_per_usd"] = float(raw["fx"])
+        except ValueError:
+            pass
+    return meta
+
+
+def _resolve_cost_jpy(
+    value_jpy: int,
+    pl_jpy: int | None,
+    detail_cost: int | None,
+) -> int | None:
+    if detail_cost is not None and detail_cost > 0:
+        return detail_cost
+    if pl_jpy is not None:
+        # 評価損益が取れているときだけ原価を復元（0 は「本当に損益ゼロ」の可能性もあるが、
+        # summary 誤検知で 0 になることがあるため、detail 優先）
+        return value_jpy - pl_jpy
+    return None
 
 
 def _load_env_file(path: Path) -> None:
@@ -316,6 +411,14 @@ def fetch_bond_balance(
     if missing:
         raise RuntimeError(f"必須環境変数が不足しています: {', '.join(missing)}")
 
+    amounts: list[int] = []
+    mode = ""
+    total = 0
+    pl: int | None = None
+    picked_cat = ""
+    detail: dict[str, Any] = {}
+    source_url = ""
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
         context = browser.new_context(
@@ -347,6 +450,11 @@ def fetch_bond_balance(
         # まず「預り資産」形式のテーブルを狙って抽出（外国債券の評価額など）
         summary_rows = _extract_holdings_summary_rows(page)
         ev, pl, picked_cat = _pick_eval_and_pl(summary_rows, target_category)
+        detail = _extract_bond_detail_meta(page)
+        if detail.get("pl_jpy") is not None and (
+            pl is None or (pl == 0 and detail["pl_jpy"] != 0)
+        ):
+            pl = int(detail["pl_jpy"])
         if ev is not None:
             amounts = [ev]
             mode = f"holdings-summary:{picked_cat or target_category}"
@@ -354,11 +462,17 @@ def fetch_bond_balance(
         else:
             # テーブルフォールバックの評価額は holdings summary の P/L と対応しないため、
             # summary 試行で得た pl / category は使わない（将来 _pick_eval_and_pl が変わっても安全）
-            pl = None
+            pl = detail.get("pl_jpy")
+            if pl is not None:
+                pl = int(pl)
             picked_cat = ""
             tables = _extract_table_snapshot(page)
             amounts, mode = _extract_amounts_from_tables(tables)
             total = sum(amounts)
+            if detail.get("detail_value_jpy"):
+                total = int(detail["detail_value_jpy"])
+                amounts = [total]
+                mode = "bond-detail-value"
 
         if save_debug:
             DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
@@ -377,13 +491,19 @@ def fetch_bond_balance(
             "AKATSUKI_BOND_LINK_TEXT を見直し、debug/akatsuki_last_page.html を確認してください。"
         )
 
+    cost = _resolve_cost_jpy(total, pl, detail.get("cost_jpy"))
+
     return BalanceResult(
         total_jpy=total,
         amount_rows=amounts,
         source_url=source_url,
         parser_mode=mode,
-        category=picked_cat if 'picked_cat' in locals() else "",
-        pl_jpy=pl if (pl is not None) else None,
+        category=picked_cat or "",
+        pl_jpy=pl,
+        cost_jpy=cost,
+        coupon_pct=detail.get("coupon_pct"),
+        face_usd=detail.get("face_usd"),
+        fx_jpy_per_usd=detail.get("fx_jpy_per_usd"),
     )
 
 
@@ -432,6 +552,10 @@ def main() -> int:
                     "source_url": result.source_url,
                     "parser_mode": result.parser_mode,
                     "pl_jpy": result.pl_jpy,
+                    "cost_jpy": result.cost_jpy,
+                    "coupon_pct": result.coupon_pct,
+                    "face_usd": result.face_usd,
+                    "fx_jpy_per_usd": result.fx_jpy_per_usd,
                     "category": result.category,
                 },
                 ensure_ascii=False,
@@ -439,6 +563,8 @@ def main() -> int:
         )
     else:
         print(f"債券残高合計: {result.total_jpy:,}円")
+        if result.cost_jpy is not None:
+            print(f"取得金額: {result.cost_jpy:,}円")
     return 0
 
 

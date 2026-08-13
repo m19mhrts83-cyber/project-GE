@@ -7,6 +7,7 @@
     "related_accounts": [
       "axa_life",
       "sony_life",
+      "sony_life_sovani",
       "sony_life_chikage",
       "prudential_life",
       "prudential_life_chikage"
@@ -22,38 +23,63 @@
       "source": "pending"
     },
     "sony_life": {
-      "label": "ソニー生命（真治）",
+      "label": "ソニー生命（真治・一時払）",
+      "product": "変額確定年金１５年７０歳一時払",
       "role": "compare",
       "monthly_yen": null,
       "funds": [],
       "as_of": null,
-      "source": "pending"
+      "source": "pending",
+      "note": "月次払込なし。評価は週次スクレイプ。払込累計は公式入金履歴待ち"
+    },
+    "sony_life_sovani": {
+      "label": "ソニー生命（真治・SOVANI）",
+      "product": "SOVANI（月4,000円）",
+      "role": "compare",
+      "monthly_yen": 4000,
+      "funds": [],
+      "as_of": null,
+      "source": "pending",
+      "note": "2023-07〜大垣共立32,725円のうち4,000円。一時払とは分けて評価。公式評価は未取得"
     },
     "sony_life_chikage": {
       "label": "ソニー生命（千景）",
+      "product": "変額確定年金１５年６５歳",
       "role": "compare",
-      "monthly_yen": null,
+      "monthly_yen": 28725,
       "funds": [],
       "as_of": null,
       "source": "pending"
     },
+    "sony_life_sovani_kids": {
+      "label": "ソニー生命 SOVANI（子ども）",
+      "product": "SOVANI（珠己・円香・紗和 各月4,000円）",
+      "role": "education_baseline",
+      "monthly_yen": 12000,
+      "funds": [],
+      "as_of": null,
+      "source": "pending",
+      "note": "教育・資産運用の勉強用。このまま貯め続けた場合の基準値。別の使い方をしたときの比較用。成人の対アクサ評価には混ぜない。"
+    },
     "prudential_life": {
       "label": "プルデンシャル生命（真治）",
+      "product": "変額保険(終身型)６５歳払込",
       "role": "compare",
       "monthly_yen": null,
       "funds": [],
       "as_of": null,
       "source": "pending",
-      "note": "評価額は手登録（PRUDENTIAL_VALUE_JPY）。配分は手登録 snap のみ"
+      "note": "評価額は手登録（PRUDENTIAL_VALUE_JPY）。払込は現行月額10,346円（2契約合算）を全期間に適用し、2023-03の有期払込完了分は除外"
     },
     "prudential_life_chikage": {
       "label": "プルデンシャル生命（千景）",
+      "product": "変額保険(終身型)６５歳払込",
       "role": "compare",
       "monthly_yen": null,
       "funds": [],
       "as_of": null,
       "source": "pending",
-      "note": "評価額は手登録（PRUDENTIAL_CHIKAGE_VALUE_JPY）。配分は手登録 snap のみ"
+      "note": "評価額は手登録（PRUDENTIAL_CHIKAGE_VALUE_JPY）。払込の切り分けは真治と同じ（2契約合算）"
     }
   }
 }

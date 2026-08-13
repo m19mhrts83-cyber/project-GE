@@ -97,7 +97,7 @@ Jarvis ダッシュボード（パートナーメール等）は **別アプリ*
 
 | # | 内容 | メモ |
 |---|---|---|
-| **E** | MF 正の Bloomo 評価を **週次で Zaim に反映**し、前回比の変動を履歴として残す | `jarvis_zaim_bloomo_weekly.py` が骨格。口座名 `ZAIM_BLOOMO_ACCOUNT`（現状 `bloomo証券` と表記差あり要突合） |
+| **E** | MF 正の Bloomo 評価を **週次で Zaim に反映**し、前回比の変動を履歴として残す | `jarvis_zaim_bloomo_weekly.py`。口座名 `ZAIM_BLOOMO_ACCOUNT=bloomo証券`（Zaim 表記。旧 `Bloomo` は不一致で失敗する） |
 | **F** | 証券の**ファンド内訳**（保険の特別勘定と同系統） | SBI＝Zaim／Bloomo＝MF。`jarvis_securities_holdings.py` → Supabase `securities_holdings` |
 | **G** | KURASHIFT UI で内訳表示・週次変動 | `/portfolio` 折りたたみ表示（実装済） |
 
@@ -247,7 +247,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 | 2B-3 | 必要なら「証憑出力」 | ローカル再保存 |
 | 2B-4 | 弥生本登録は**しない** | 承認なし本登録が走っていない |
 
-法人申告は税理士委託のまま（アプリ対象外）。
+法人の**申告作成**は税理士委託のまま（アプリ対象外）。アプリでは証憑取込・閲覧と**決算KPIの年次評価**（`kurashift_tax_year_metrics`）まで。
 
 **2B 検証メモ（2026-08-13）**
 
@@ -404,7 +404,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 | **V-2B-EV** | 税理士メール証憑が0 | 未 | クエリ拡張／estate箱／2024年分／手動PDF置き |
 | **V-2B-MAP** | 弥生勘定マップが薄い（skip多） | ドラフト | 個人申告に必要な費目だけマップ拡充 |
 | **V-2A-MAP** | Numbers→Zaim 対象外12件 | 警告のみ | 年次反映前にマッピング見直し（本番適用は承認後） |
-| **V-2A-CENT** | 100歳計画の閲覧はアプリ。更新の書込は当面 Numbers＋Jarvis | 閲覧実装 | 年次ウィザード(a–d)→差分表示。セル編集は次 |
+| **V-2A-CENT** | 生涯CFの閲覧はアプリ。更新の書込は当面 Numbers＋Jarvis | 閲覧実装 | 年次ウィザード(a–d)→差分表示。セル編集は次 |
 | **V-3-P0** | 不動産 Phase0 煙＋ブリッジ | ほぼ済 | 本番で `/realestate` の19CF表示を目視 |
 | **V-X-UI** | 横断境界を画面上でも再確認 | CLI済 | ジョブ詳細に秘密が無いことをUIで見る |
 

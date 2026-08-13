@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { fmtManUnit } from "@/lib/format";
 import {
+  centuryMilestones,
   decadesFromYears,
   defaultYearWindow,
-  eventsForYear,
+  eventTracks,
+  lifeExpenseGaps,
+  lineLinkedAtYear,
   notesForLine,
   planDeltasForLine,
   shinjiHorizon,
@@ -13,6 +16,7 @@ import {
   yearsWithActuals,
   type CenturyDiff,
   type CenturyLine,
+  type CenturyMilestone,
   type CenturyModel,
   type LifeEventModel,
   type LifeplanNote,
@@ -29,13 +33,13 @@ function Sparkline({
   plan,
   actual,
   nowYear,
-  age100Year,
+  markers,
 }: {
   years: number[];
   plan: (number | null)[];
   actual: (number | null)[];
   nowYear: number;
-  age100Year: number | null;
+  markers: CenturyMilestone[];
 }) {
   const pts = (vals: (number | null)[]) =>
     years
@@ -60,25 +64,61 @@ function Sparkline({
     return { x, y };
   };
   const poly = (list: { y: number; v: number }[]) =>
-    list.map((p) => {
-      const { x, y } = xy(p.y, p.v);
-      return `${x},${y}`;
-    }).join(" ");
+    list
+      .map((p) => {
+        const { x, y } = xy(p.y, p.v);
+        return `${x},${y}`;
+      })
+      .join(" ");
   const zeroY = xy(x0, 0).y;
   const nowX = xy(nowYear, 0).x;
-  const age100X = age100Year != null ? xy(age100Year, 0).x : null;
+  const markClass: Record<CenturyMilestone["key"], string> = {
+    actuals: "lp-spark-actuals",
+    peak: "lp-spark-peak",
+    age100: "lp-spark-100",
+  };
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="lp-spark" role="img" aria-label="貯蓄可能額の推移（〜100歳）">
+    <svg viewBox={`0 0 ${w} ${h}`} className="lp-spark" role="img" aria-label="貯蓄可能額の推移">
       <line x1={pad} x2={w - pad} y1={zeroY} y2={zeroY} className="lp-spark-zero" />
       <line x1={nowX} x2={nowX} y1={pad} y2={h - pad} className="lp-spark-now" />
-      {age100X != null ? (
-        <line x1={age100X} x2={age100X} y1={pad} y2={h - pad} className="lp-spark-100" />
-      ) : null}
+      {markers.map((m) => {
+        const x = xy(m.year, 0).x;
+        return (
+          <line
+            key={m.key}
+            x1={x}
+            x2={x}
+            y1={pad}
+            y2={h - pad}
+            className={markClass[m.key]}
+          />
+        );
+      })}
       <polyline fill="none" points={poly(planPts)} className="lp-spark-line plan" />
       {actualPts.length >= 2 ? (
         <polyline fill="none" points={poly(actualPts)} className="lp-spark-line actual" />
       ) : null}
     </svg>
+  );
+}
+
+function MilestoneStrip({ items }: { items: CenturyMilestone[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="lp-milestones" aria-label="推移の節目">
+      {items.map((m) => (
+        <div key={m.key} className={`lp-ms ${m.key}`}>
+          <div className="lp-ms-k">{m.title}</div>
+          <div className="lp-ms-y">{m.year}</div>
+          <div className="lp-ms-a">{m.age != null ? `真治 ${m.age}歳` : "年齢—"}</div>
+          {m.key === "peak" && m.value != null ? (
+            <div className="lp-ms-d">{fmtManUnit(m.value)}</div>
+          ) : (
+            <div className="lp-ms-d">{m.detail}</div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -88,7 +128,7 @@ function DeltaMark({ d }: { d: LineDelta | undefined }) {
   return (
     <span
       className={`lp-delta ${up ? "up" : "down"}`}
-      title={`前回 ${fmtManUnit(d.before)} → ${fmtManUnit(d.after)}`}
+      title={`前回の計画版 ${fmtManUnit(d.before)} → ${fmtManUnit(d.after)}（前年比ではありません）`}
     >
       {up ? "▲" : "▼"}
       {fmtManUnit(Math.abs(d.delta)).replace("万", "")}
@@ -101,32 +141,34 @@ function YearHead({
   nowYear,
   age,
   age100Year,
-  events,
 }: {
   year: number;
   nowYear: number;
   age: number | null;
   age100Year: number | null;
-  events: ReturnType<typeof eventsForYear>;
 }) {
-  const chips = events.slice(0, 3).map((e) => e.text);
-  const extra = events.length - chips.length;
-  const title = events.map((e) => `${e.source}: ${e.text}`).join("\n");
   const is100 = age === 100 || year === age100Year;
   const isNow = year === nowYear;
   return (
-    <th
-      className={`num th-year${isNow ? " year-now" : ""}${is100 ? " year-100" : ""}`}
-      title={title || undefined}
-    >
+    <th className={`num th-year${isNow ? " year-now" : ""}${is100 ? " year-100" : ""}`}>
       <div className="y">{year}</div>
       {age != null ? <div className="age">{is100 ? "100歳" : `${age}歳`}</div> : <div className="age">&nbsp;</div>}
-      <div className="ev">
-        {chips.join(" · ")}
-        {extra > 0 ? ` +${extra}` : ""}
-      </div>
     </th>
   );
+}
+
+function groupedLines(rows: CenturyLine[]): { group: string; rows: CenturyLine[] }[] {
+  const order: string[] = [];
+  const map = new Map<string, CenturyLine[]>();
+  for (const r of rows) {
+    const g = r.isTotal ? "合計" : r.group || "その他";
+    if (!map.has(g)) {
+      map.set(g, []);
+      order.push(g);
+    }
+    map.get(g)!.push(r);
+  }
+  return order.map((group) => ({ group, rows: map.get(group)! }));
 }
 
 function CenturyTable({
@@ -155,6 +197,8 @@ function CenturyTable({
   onOpenNote: (item: string) => void;
 }) {
   const shinji = events?.people.find((p) => p.name === "真治");
+  const tracks = eventTracks(events);
+  const gaps = lifeExpenseGaps(model);
   const sections: { key: CenturyLine["section"]; title: string }[] = [
     { key: "income", title: "生活収入" },
     { key: "expense", title: "生活支出" },
@@ -179,28 +223,68 @@ function CenturyTable({
                 nowYear={nowYear}
                 age={shinji?.ages[y] ?? null}
                 age100Year={age100Year}
-                events={eventsForYear(events, y)}
               />
             ))}
           </tr>
         </thead>
         <tbody>
+          {tracks.length ? (
+            <>
+              <tr className="section-row">
+                <td colSpan={years.length + 2}>ライフイベント（人別）</td>
+              </tr>
+              {tracks.map((track) => (
+                <tr key={track.person} className="event-row">
+                  <td className="sticky-col">
+                    <span className="item-lab">{track.person}</span>
+                    {track.hint ? <div className="event-hint">→ {track.hint}</div> : null}
+                  </td>
+                  <td>
+                    <span className="series-pill event">行事</span>
+                  </td>
+                  {years.map((y) => {
+                    const texts = track.byYear[y] ?? [];
+                    return (
+                      <td key={y} className={`num event-cell${texts.length ? " has-ev" : ""}`}>
+                        {texts.join(" / ")}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </>
+          ) : null}
           {sections.map((sec) => {
             const rows = model.lines.filter((l) => l.section === sec.key && show(l.series));
             if (!rows.length) return null;
+            const groups = groupedLines(rows);
+            const showGroups = sec.key !== "eval" && groups.length > 1;
             return (
-              <FragmentSection
-                key={sec.key}
-                title={sec.title}
-                colSpan={years.length + 2}
-                rows={rows}
-                years={years}
-                overlay={overlay}
-                showInlineDiff={showInlineDiff}
-                notes={notes}
-                openNoteItem={openNoteItem}
-                onOpenNote={onOpenNote}
-              />
+              <Fragment key={sec.key}>
+                <tr className="section-row">
+                  <td colSpan={years.length + 2}>
+                    {sec.title}
+                    {sec.key === "expense" && gaps.length ? (
+                      <span className="section-note"> {gaps[0]}</span>
+                    ) : null}
+                  </td>
+                </tr>
+                {groups.map((g) => (
+                  <FragmentSection
+                    key={`${sec.key}-${g.group}`}
+                    groupTitle={showGroups ? g.group : null}
+                    colSpan={years.length + 2}
+                    rows={g.rows}
+                    years={years}
+                    overlay={overlay}
+                    showInlineDiff={showInlineDiff}
+                    events={events}
+                    notes={notes}
+                    openNoteItem={openNoteItem}
+                    onOpenNote={onOpenNote}
+                  />
+                ))}
+              </Fragment>
             );
           })}
         </tbody>
@@ -210,31 +294,35 @@ function CenturyTable({
 }
 
 function FragmentSection({
-  title,
+  groupTitle,
   colSpan,
   rows,
   years,
   overlay,
   showInlineDiff,
+  events,
   notes,
   openNoteItem,
   onOpenNote,
 }: {
-  title: string;
+  groupTitle: string | null;
   colSpan: number;
   rows: CenturyLine[];
   years: number[];
   overlay?: CenturyModel | null;
   showInlineDiff: boolean;
+  events: LifeEventModel | null;
   notes: LifeplanNote[];
   openNoteItem: string | null;
   onOpenNote: (item: string) => void;
 }) {
   return (
     <>
-      <tr className="section-row">
-        <td colSpan={colSpan}>{title}</td>
-      </tr>
+      {groupTitle ? (
+        <tr className="group-row">
+          <td colSpan={colSpan}>{groupTitle}</td>
+        </tr>
+      ) : null}
       {rows.map((row) => {
         const deltas = showInlineDiff ? planDeltasForLine(row, overlay ?? null) : {};
         const rowNotes = notesForLine(notes, row);
@@ -265,10 +353,11 @@ function FragmentSection({
             {years.map((y) => {
               const cur = row.values[y] ?? null;
               const d = deltas[y];
+              const hit = lineLinkedAtYear(row, events, y);
               return (
                 <td
                   key={y}
-                  className={`num${d ? (d.delta! > 0 ? " diff-pos" : " diff-neg") : ""}`}
+                  className={`num${d ? (d.delta! > 0 ? " diff-pos" : " diff-neg") : ""}${hit ? " event-hit" : ""}`}
                 >
                   <span className="cell-val">{fmtManUnit(cur)}</span>
                   <DeltaMark d={d} />
@@ -339,6 +428,7 @@ export default function CenturyExplorer({
   const decades = decadesFromYears(current.years);
   const horizon = shinjiHorizon(events, nowYear);
   const actualYears = yearsWithActuals(current);
+  const markers = centuryMilestones(current, events);
   const [range, setRange] = useState<RangeKey>("all");
   const [seriesFilter, setSeriesFilter] = useState<SeriesFilter>("both");
   const [compare, setCompare] = useState<CompareMode>(previous ? "inline" : "latest");
@@ -393,7 +483,7 @@ export default function CenturyExplorer({
       <div className="grid" style={{ marginBottom: 16 }}>
         <article className="card">
           <header>
-            <span className="lvl">100歳まで</span>
+            <span className="lvl">見通し</span>
             <strong>
               真治 {horizon.nowAge != null ? `${horizon.nowAge}歳` : "—"}（{nowYear}）→ 100歳（
               {age100Label}）
@@ -419,12 +509,13 @@ export default function CenturyExplorer({
             plan={sparkPlan}
             actual={sparkActual}
             nowYear={nowYear}
-            age100Year={horizon.age100Year}
+            markers={markers}
           />
+          <MilestoneStrip items={markers} />
           <div className="lp-bar-legend meta" style={{ marginTop: 8 }}>
             <span className="swatch plan" /> 計画
             <span className="swatch actual" /> 実績
-            <span>縦線＝今年 / 100歳</span>
+            <span>縦線＝今年 / 実績開始 / ピーク / 100歳</span>
           </div>
         </article>
       </div>
@@ -434,11 +525,11 @@ export default function CenturyExplorer({
           <header>
             <span className="lvl">計画の差分</span>
             <strong>
-              前回 {previous.versionKey} → 今回 {current.versionKey}
+              前回の計画版 {previous.versionKey} → 今回 {current.versionKey}
             </strong>
           </header>
           <p className="meta" style={{ margin: "8px 0 0" }}>
-            表の計画行は、前回から動いたセルを緑（増）／赤（減）で示します。▲▼は前回比（万円）。
+            緑／赤のセルと▲▼は<strong>前回のライフプラン版との差</strong>です。去年からの変化（前年比）ではありません。
           </p>
           {sig.length ? (
             <ul className="meta" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
@@ -552,7 +643,9 @@ export default function CenturyExplorer({
         <span className="series-pill plan">計画</span>
         インク紺　
         <span className="series-pill actual">実績</span>
-        オレンジ　年ヘッダは真治の年齢＋ライフイベント。編集は Numbers 側です。
+        オレンジ　
+        <span className="series-pill event">行事</span>
+        人別イベント。支出セルの枠は、その年の行事（車の購入など）に対応。緑セルは前回計画比。編集は Numbers 側です。
       </p>
 
       {showNotes ? (

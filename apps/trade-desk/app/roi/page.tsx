@@ -2,16 +2,19 @@ import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
 import { DASHBOARD_URL, fmtMan, fmtPct, fmtYen } from "@/lib/format";
 import {
+  PAPER_ROI_PURCHASES,
   ROI_ASSETS,
   acquireTotal,
   allInYield,
   cashOnCash,
   cfRoi,
   costOnBodyPct,
+  couponIncomeYieldOnCost,
   fullCf,
   groupUnitsLive,
   occRate,
   payYear,
+  simpleRoi,
   surfaceYield,
   type PropertyUnitRow,
 } from "@/lib/roiAssets";
@@ -20,6 +23,7 @@ export const dynamic = "force-dynamic";
 
 const FIN_CORE = [
   "sony_life",
+  "sony_life_sovani",
   "sony_life_chikage",
   "prudential_life",
   "prudential_life_chikage",
@@ -155,7 +159,83 @@ export default async function RoiPage() {
               <strong>金融の単純ROI</strong> =（いまの評価 −
               取得原価）÷ 取得原価。原価が無い口座は「—」
             </li>
+            <li>
+              <strong>ペーパー大きな買い物</strong>
+              （あかつき等）は物件の CF-ROI
+              ではなく、取得原価ベースの単純ROI＋クーポン収入利回りで見る
+            </li>
           </ul>
+        </div>
+
+        <div className="card" style={{ marginTop: 16 }}>
+          <header>
+            <span className="lvl">ペーパー</span>
+            <strong>大きな買い物（債券など）</strong>
+          </header>
+          <p className="meta">
+            不動産と同じ「買い物ごとの振り返り」枠。売却・追加は方針どおりしません。
+          </p>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>銘柄</th>
+                  <th className="num">取得原価</th>
+                  <th className="num">いまの評価</th>
+                  <th className="num">含み損益</th>
+                  <th className="num">単純ROI</th>
+                  <th className="num">クーポン</th>
+                  <th className="num">収入利回り</th>
+                  <th>償還・方針</th>
+                </tr>
+              </thead>
+              <tbody>
+                {PAPER_ROI_PURCHASES.map((p) => {
+                  const s = latest.get(p.accountId);
+                  const value = num(s?.value_jpy);
+                  const cost = num(s?.cost_jpy) ?? p.costFallbackJpy;
+                  const gain =
+                    value != null ? value - cost : null;
+                  const roi = simpleRoi(value, cost);
+                  const incomeY = couponIncomeYieldOnCost(
+                    cost,
+                    p.faceUsd,
+                    p.couponPct,
+                    value
+                  );
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        {p.name}
+                        <div className="meta">{p.bought}</div>
+                      </td>
+                      <td className="num">
+                        {fmtYen(cost)}
+                        {num(s?.cost_jpy) == null ? (
+                          <div className="meta">マイページ控え</div>
+                        ) : null}
+                      </td>
+                      <td className="num">{fmtYen(value)}</td>
+                      <td className="num">{fmtYen(gain)}</td>
+                      <td className="num">{fmtPct(roi)}</td>
+                      <td className="num">{fmtPct(p.couponPct / 100)}</td>
+                      <td className="num">{fmtPct(incomeY)}</td>
+                      <td className="meta">
+                        償還 {p.maturity}
+                        <br />
+                        {p.couponSchedule}
+                        <br />
+                        {p.policy}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="meta" style={{ marginTop: 10 }}>
+            {PAPER_ROI_PURCHASES[0]?.note}
+          </p>
         </div>
 
         <div className="card" style={{ marginTop: 16 }}>
@@ -438,13 +518,15 @@ export default async function RoiPage() {
                   const s = latest.get(id);
                   const p = prev.get(id);
                   const value = num(s?.value_jpy);
-                  const cost = num(s?.cost_jpy);
+                  const paper = PAPER_ROI_PURCHASES.find(
+                    (x) => x.accountId === id
+                  );
+                  const cost =
+                    num(s?.cost_jpy) ??
+                    (paper ? paper.costFallbackJpy : null);
                   const gain =
                     value != null && cost != null ? value - cost : null;
-                  const simple =
-                    value != null && cost != null && cost !== 0
-                      ? (value - cost) / cost
-                      : null;
+                  const simple = simpleRoi(value, cost);
                   const fl = flowByAccount.get(id);
                   const flowNet = fl ? fl.inJpy - fl.outJpy : null;
                   const delta =

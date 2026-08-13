@@ -207,7 +207,7 @@ export default async function RentStepPage() {
           </div>
           <p className="sum">
             {(payload.grant_rule as string) ||
-              "I=PayPay / II=MUFG / キャラメル=滋賀 / LEAF現行=京都（変更予定）"}
+              "I=PayPay主 / II=MUFG / キャラメル=滋賀 / LEAF=京都＋PayPay併用"}
           </p>
           {payload.note ? (
             <p className="meta">{String(payload.note)}</p>
@@ -232,7 +232,7 @@ export default async function RentStepPage() {
         <h2>入金ソース・口座</h2>
         <ul className="etc-guide-list">
           <li>
-            <strong>LEAF</strong> — くらさぽ PDF。現行振込先は京都銀行（変更予定）
+            <strong>LEAF</strong> — くらさぽ PDF。振込は京都銀行と PayPay の併用（号室正本は PDF）
           </li>
           <li>
             <strong>ミニテック</strong> — オーナーサイト送金案内 PDF（号室別）

@@ -63,7 +63,7 @@ export default async function RealEstatePage() {
       supabase.from("kurashift_re_deals").select("status"),
       supabase
         .from("kurashift_finance_transactions")
-        .select("category, subcategory, txn_date, income_jpy, expense_jpy")
+        .select("category, subcategory, txn_date, income_jpy, expense_jpy, to_account")
         .eq("fiscal_year", calendarYear)
         .or("category.ilike.%19%,category.ilike.%賃貸%,category.ilike.%家賃%")
         .limit(4000),
@@ -161,6 +161,21 @@ export default async function RealEstatePage() {
                 </span>
               </td>
             </tr>
+            {reBoard.rentByBank.length > 0 ? (
+              <tr>
+                <td>実家賃の入金口座（19.1）</td>
+                <td>
+                  {reBoard.rentByBank.map((b) => (
+                    <div key={b.id}>
+                      {b.label} {fmtYen(Math.round(b.yen))}
+                    </div>
+                  ))}
+                  <div className="meta">
+                    Grandole I は PayPay が主。LEAF は京都にも残る（併用）。LUUP・保険金は含めない。
+                  </div>
+                </td>
+              </tr>
+            ) : null}
             <tr>
               <td>会計の月次（特別込み）</td>
               <td>

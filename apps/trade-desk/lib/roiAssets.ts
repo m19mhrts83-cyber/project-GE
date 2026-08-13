@@ -341,3 +341,68 @@ export function occRate(live: UnitLive | undefined): number | null {
   if (!live || live.total === 0) return null;
   return live.occupied / live.total;
 }
+
+/** 物件以外の「大きな買い物」（ペーパー）。CF-ROI ではなく単純ROI＋クーポン収入。 */
+export type PaperRoiPurchase = {
+  id: string;
+  accountId: string;
+  name: string;
+  bought: string;
+  /** 画面フォールバック用の取得原価（週次で cost_jpy が入れば DB 優先） */
+  costFallbackJpy: number;
+  couponPct: number;
+  faceUsd: number;
+  maturity: string;
+  couponSchedule: string;
+  policy: string;
+  note: string;
+};
+
+export const PAPER_ROI_PURCHASES: PaperRoiPurchase[] = [
+  {
+    id: "akatsuki-gs-subordinated",
+    accountId: "akatsuki_bond",
+    name: "あかつき証券・GS劣後債（L0354）",
+    bought: "購入済み（保有継続）",
+    costFallbackJpy: 7_266_704,
+    couponPct: 5.15,
+    faceUsd: 51_000,
+    maturity: "2045-05-22",
+    couponSchedule: "年2回（5/22・11/22）",
+    policy: "売らない・これ以上増やさない。成長は株式側。",
+    note:
+      "取得金額はあかつきマイページの「取得金額」。単純ROI＝（評価−取得）÷取得。クーポン収入利回り＝額面×利率×想定為替÷取得。",
+  },
+];
+
+/** 単純ROI =（評価 − 取得）÷ 取得 */
+export function simpleRoi(
+  value: number | null,
+  cost: number | null
+): number | null {
+  if (value == null || cost == null || cost === 0) return null;
+  return (value - cost) / cost;
+}
+
+/**
+ * クーポン収入の取得原価に対する利回り（概算）。
+ * 年クーポン円 = 額面USD × 利率 × 為替。為替未取得時は 評価÷額面 を使う。
+ */
+export function couponIncomeYieldOnCost(
+  cost: number | null,
+  faceUsd: number,
+  couponPct: number,
+  valueJpy: number | null,
+  fxJpyPerUsd: number | null = null
+): number | null {
+  if (cost == null || cost === 0 || faceUsd <= 0 || couponPct <= 0) return null;
+  const fx =
+    fxJpyPerUsd != null && fxJpyPerUsd > 0
+      ? fxJpyPerUsd
+      : valueJpy != null && valueJpy > 0
+        ? valueJpy / faceUsd
+        : null;
+  if (fx == null) return null;
+  const annualCouponJpy = faceUsd * (couponPct / 100) * fx;
+  return annualCouponJpy / cost;
+}

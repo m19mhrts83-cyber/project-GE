@@ -5,6 +5,7 @@ export type InsuranceFund = { name: string; pct: number };
 
 export type InsuranceAccountAlloc = {
   label?: string;
+  product?: string;
   role?: string;
   monthly_yen?: number | null;
   funds?: InsuranceFund[];
@@ -29,9 +30,11 @@ export type InsuranceAllocations = {
 const INSURANCE_ORDER = [
   "axa_life",
   "sony_life",
+  "sony_life_sovani",
   "sony_life_chikage",
   "prudential_life",
   "prudential_life_chikage",
+  "sony_life_sovani_kids",
 ] as const;
 
 function readJsonSafe(filePath: string): Record<string, unknown> | null {

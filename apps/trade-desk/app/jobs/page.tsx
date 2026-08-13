@@ -21,8 +21,11 @@ export default async function JobsPage() {
     <Shell active="/jobs" email={user?.email ?? null}>
       <h1>ジョブ</h1>
       <p className="sub">
-        アプリのボタン → queued →{" "}
-        <code>jarvis_kurashift_job_worker.py</code>（Mac）が実行。
+        アプリのボタン → queued → Mac の{" "}
+        <code>jarvis_kurashift_job_worker.py</code> が実行。Cursor
+        のチャットには出ません。状態は queued / running / succeeded /
+        failed。ログはこの表のタイトル下。Mac が眠っていると queued
+        のままです（launchd は約15分間隔）。
       </p>
 
       <div className="card">

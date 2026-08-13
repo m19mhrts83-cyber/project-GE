@@ -23,7 +23,8 @@ export type NextAction = {
 };
 
 const SOURCE_LABEL: Record<string, string> = {
-  sony_life: "ソニー生命（真治）",
+  sony_life: "ソニー生命（真治・一時払）",
+  sony_life_sovani: "ソニー生命（真治・SOVANI）",
   sony_life_chikage: "ソニー生命（千景）",
   bloomo: "Bloomo",
   sbi_index: "SBIインデックス",

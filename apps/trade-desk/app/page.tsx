@@ -175,7 +175,7 @@ export default async function HomePage() {
       .limit(8000),
     supabase
       .from("kurashift_finance_transactions")
-      .select("category, subcategory, txn_date, income_jpy, expense_jpy")
+        .select("category, subcategory, txn_date, income_jpy, expense_jpy, to_account")
       .eq("fiscal_year", tokyoYear)
       .or("category.ilike.%19%,category.ilike.%賃貸%,category.ilike.%家賃%")
       .limit(4000),
@@ -452,10 +452,24 @@ export default async function HomePage() {
         </article>
         <article className="card">
           <header>
-            <span className="lvl">② 計画・税</span>
-            <strong>
+            <span className="lvl">② 計画・実績</span>
+            <strong
+              className={
+                lifeplanBoard.gapYtd == null
+                  ? undefined
+                  : lifeplanBoard.gapYtd > 0
+                    ? "hq-pace over"
+                    : lifeplanBoard.gapYtd < 0
+                      ? "hq-pace under"
+                      : undefined
+              }
+            >
               {lifeplanBoard.gapYtd != null
-                ? `差 ${fmtYenSigned(lifeplanBoard.gapYtd)}`
+                ? lifeplanBoard.gapYtd > 0
+                  ? `ペース悪い ${fmtYenSigned(lifeplanBoard.gapYtd)}`
+                  : lifeplanBoard.gapYtd < 0
+                    ? `ペース良い ${fmtYenSigned(lifeplanBoard.gapYtd)}`
+                    : `差 ${fmtYenSigned(lifeplanBoard.gapYtd)}`
                 : lifeplanBoard.planAnnual > 0
                   ? `${lifeplanBoard.year}年 計画`
                   : planLabel}
@@ -485,16 +499,20 @@ export default async function HomePage() {
                     ? ""
                     : lifeplanBoard.gapYtd > 0
                       ? " over"
-                      : " under")
+                      : lifeplanBoard.gapYtd < 0
+                        ? " under"
+                        : "")
                 }
               >
                 <dt>
                   {lifeplanBoard.throughLabel} の差
                   {lifeplanBoard.gapYtd != null && lifeplanBoard.gapYtd > 0
-                    ? "（使いすぎ）"
+                    ? "（使いすぎ・ペース悪い）"
                     : lifeplanBoard.gapYtd != null && lifeplanBoard.gapYtd < 0
-                      ? "（計画内）"
-                      : ""}
+                      ? "（余裕・ペース良い）"
+                      : lifeplanBoard.gapYtd === 0
+                        ? "（計画どおり）"
+                        : ""}
                 </dt>
                 <dd>{fmtYenSigned(lifeplanBoard.gapYtd)}</dd>
               </div>
@@ -507,7 +525,7 @@ export default async function HomePage() {
             </p>
           )}
           <p className="meta">
-            家計支出（表1）。不動産19系は③
+            差＝実績−計画。＋は使いすぎ（赤）、−は余裕（緑）。家計支出（表1）。不動産19系は③
             {canonicalVersion?.label ? ` · ${canonicalVersion.label}` : ""}
           </p>
           <a href="/lifeplan">ライフプラン →</a>
@@ -577,6 +595,15 @@ export default async function HomePage() {
               ? ` · 会計生 ${fmtYen(Math.round(reBoard.accountingCfMonth))}/月（取得税・固都税・修繕込み）`
               : ""}
           </p>
+          {reBoard.rentByBank.length > 0 ? (
+            <p className="meta" style={{ marginTop: 6 }}>
+              実家賃の入金（19.1・{reBoard.throughLabel}）:{" "}
+              {reBoard.rentByBank
+                .map((b) => `${b.label} ${fmtYen(Math.round(b.yen))}`)
+                .join(" / ")}
+              。LEAF は京都と PayPay の併用。
+            </p>
+          ) : null}
           <p className="meta">
             <a href="/realestate">不動産 →</a>
             {" · "}
