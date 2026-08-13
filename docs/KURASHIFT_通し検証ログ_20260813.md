@@ -81,3 +81,18 @@
 | ホーム要フォロー／今日のキュー | 同ウォッチを上位表示 → 状況ウォッチ詳細 |
 | 状況ウォッチ | ピン＋「処置は KURASHIFT で」リンク |
 | 役割分担 | 気づき＝Jarvis ダッシュボード／処置＝KURASHIFT |
+
+### 実務者設計 P0 完了（2026-08-14）
+
+正本: `docs/KURASHIFT_カード引落支払い_実務者設計_20260814.md`（コミット `779a6f6` ほか）
+
+| 項目 | 結果 |
+|---|---|
+| P0-1 日次収集 | `dashboard_push_runner.sh` 先頭で `--fetch-vpass-if-pending` → situation_watch → push（12:30 相乗り） |
+| P0-2 サイクル完了 | `settled_due` / `plan_ready_due`。money-ops done → `sync_meta.card_debit_lifecycle`。CLI `--dismiss-due` |
+| P0-3 due ack | `dashboard_ack_due`＋専用ボタン。汎用7日 ack 除外。push で remote ack 保護 |
+| P0-4/5 方針・文言 | finance-philosophy・UI `POLICY_LOAN_UI_NOTE`・Form 重複解消 |
+| 金額把握 | Vpass Web 本線。実測 Infinite ¥1,596,308 / due 2026-08-26 / 不足約92万 |
+| 自動振込 | なし（確認済み） |
+
+受け入れチェックリストは設計書 §7 を参照（コード上クローズ）。

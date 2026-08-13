@@ -83,8 +83,15 @@ _tmp/
 215_kamiooya/C1_cursor/finance/debug/
 # ローカル専用 state ディレクトリ（JSON 以外の成果物）
 .jarvis_state/kurashift_lifeplan/
+.jarvis_state/kurashift_history/
 .jarvis_state/trade_research_inbox/
 .jarvis_state/mf_me_browser_profile.bak*/
+# ブラウザ probe（残高・保険・Vpass 画面スクショ — Git に載せない）
+.jarvis_state/vpass_payment_fetch/
+.jarvis_state/securities_holdings_probe/
+.jarvis_state/sony_rate_probe/
+.jarvis_state/zaim_sbi_probe/
+.vercel-tmp-dashboard/
 
 # --- Q&Aチャットボット／ProgramCode の実行成果物（容量大） ---
 **/神・大家さん倶楽部情報Q&Aチャットボット/state/exports/
