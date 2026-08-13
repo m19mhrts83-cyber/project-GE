@@ -673,6 +673,8 @@ code {
 .lp-bar-legend .swatch.actual {
   background: var(--accent);
 }
+
+@media (max-width: 900px) {
   .login-wrap {
     grid-template-columns: 1fr;
   }
