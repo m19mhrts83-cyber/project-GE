@@ -11,6 +11,15 @@ export function fmtMan(n: number | null | undefined): string {
   return `${s}万`;
 }
 
+/** Numbers キャッシュフローのセル値（すでに万円）。 */
+export function fmtManUnit(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(Number(n))) return "—";
+  const v = Number(n);
+  const abs = Math.abs(v);
+  const s = abs >= 100 ? v.toFixed(0) : abs >= 10 ? v.toFixed(1) : v.toFixed(1);
+  return `${s}万`;
+}
+
 export function fmtPct(n: number | null | undefined, digits = 1): string {
   if (n == null || Number.isNaN(Number(n))) return "—";
   return `${(Number(n) * 100).toFixed(digits)}%`;

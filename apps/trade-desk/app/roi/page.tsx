@@ -141,7 +141,7 @@ export default async function RoiPage() {
               <strong>表面利回り</strong> = 満室年収 ÷ 本体購入価格（経費を含まない）
             </li>
             <li>
-              <strong>取得利回り</strong> = 満室年収 ÷（本体＋購入経費）
+              <strong>実質利回り</strong> = 満室年収 ÷（本体＋購入経費）
             </li>
             <li>
               <strong>CF-ROI</strong>（Numbers 流）=（満室年収 − 年返済）÷
@@ -181,7 +181,7 @@ export default async function RoiPage() {
                   <th className="num">決済支払</th>
                   <th className="num">満室年収</th>
                   <th className="num">表面</th>
-                  <th className="num">取得利回り</th>
+                  <th className="num">実質利回り</th>
                   <th className="num">年返済</th>
                   <th className="num">満室CF</th>
                   <th className="num">CF-ROI</th>
