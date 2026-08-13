@@ -23,14 +23,18 @@ weekday_names = ["月", "火", "水", "木", "金", "土", "日"]
 thin = Side(style="thin", color="000000")
 
 
-def add_month_block(ws, year: int, month: int, start_row: int, is_first: bool):
+def month_week_count(year: int, month: int) -> int:
+    cal = calendar.Calendar(calendar.MONDAY)
+    return len(list(cal.monthdays2calendar(year, month)))
+
+
+def add_month_block(ws, year: int, month: int, start_row: int, is_first: bool, max_weeks: int = 5):
     """
     指定シートに1ヶ月分のブロックを追加する。
     is_first=True のときはタイトル行を描く。戻り値は次の開始行。
     """
     cal = calendar.Calendar(calendar.MONDAY)
     weeks = list(cal.monthdays2calendar(year, month))
-    max_weeks = 5
     while len(weeks) < max_weeks:
         weeks.append([(0, i) for i in range(7)])
 
@@ -94,21 +98,24 @@ def add_month_block(ws, year: int, month: int, start_row: int, is_first: bool):
 
 
 def create_two_month_sheet(wb, year: int, month1: int, month2: int, sheet_title: str):
-    """1シートに2ヶ月を配置し、月の間に1行空ける。"""
-    ws = wb.create_sheet(title=sheet_title, index=0)
+    """1シートに2ヶ月を配置（既存の4〜7月シートと同じく、月の間に空行は入れない）。"""
+    ws = wb.create_sheet(title=sheet_title)
 
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_setup.orientation = "portrait"
     ws.page_margins = PageMargins(left=0.5, right=0.5, top=0.5, bottom=0.5)
     ws.print_options.horizontalCentered = True
+    ws.page_setup.fitToPage = True
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+
+    # 8月・11月など月曜始まりで6週になる月は、末日が落ちないよう週数を合わせる
+    max_weeks = max(5, month_week_count(year, month1), month_week_count(year, month2))
 
     row = 1
-    row = add_month_block(ws, year, month1, row, is_first=True)
-    # 4月と5月（または6月と7月）の間を1行あける
-    row += 1
-    row = add_month_block(ws, year, month2, row, is_first=True)  # 2ヶ月目もタイトル行を描く
+    row = add_month_block(ws, year, month1, row, is_first=True, max_weeks=max_weeks)
+    row = add_month_block(ws, year, month2, row, is_first=True, max_weeks=max_weeks)
 
     ws.column_dimensions["A"].width = COL_LABEL_WIDTH
     for c in range(2, 9):
@@ -123,10 +130,10 @@ def main():
     wb.remove(wb.active)
     year = date.today().year
 
-    # シート1: 4月・5月（間に1行空け）
     create_two_month_sheet(wb, year, 4, 5, "4月・5月")
-    # シート2: 6月・7月（間に1行空け）
     create_two_month_sheet(wb, year, 6, 7, "6月・7月")
+    create_two_month_sheet(wb, year, 8, 9, "8月・9月")
+    create_two_month_sheet(wb, year, 10, 11, "10月・11月")
 
     wb.save(out_path)
     print(f"保存しました: {out_path}")
