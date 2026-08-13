@@ -1,0 +1,100 @@
+# ③-C 保有物件マスタ — 最小データ揃え（3C-PREP / 2026-08-13）
+# 目的: 物件 id × 名義 × 住所 × 号室 × ローン行 を1か所で突合できるようにする。
+# ローン残高の正本は借入残高トラッカー（estate）。ここへ残高を二重入力しない。
+# UI: /realestate/properties · ROI: apps/trade-desk/lib/roiAssets.ts · 号室: property_units
+# 管理・鍵: config/property_info.yaml
+
+version: 1
+as_of: "2026-08-13"
+status: prep_ok
+
+# id は property_units.property_id / ROI unitPropertyId / loan payload.propertyId と共通
+properties:
+  grandole-i:
+    name: Grandole志賀本通Ⅰ
+    name_ascii: Grandole志賀本通I
+    owner: 法人
+    owner_entity: リビングサポート松
+    acquired: "2025-02-28"
+    address: 愛知県名古屋市北区長田町4丁目69番地5
+    rooms_expected: 8
+    managers: [LEAF, Tcell]
+    default_manager: ミニテック
+    loans:
+      primary:
+        - id: orix-g1-corp
+          role: 本担保
+          tracker_name: Grandole志賀本通Ⅰ
+      attached: []
+    sources:
+      units: property_units
+      meta: property_info.yaml
+      roi: grandole-i
+      loans_json: 240_融資/loan_tracker_export/loans.json
+
+  grandole-ii:
+    name: Grandole志賀本通Ⅱ
+    name_ascii: Grandole志賀本通II
+    owner: 個人
+    owner_entity: 松野真治
+    acquired: "2022-09"
+    address: 愛知県名古屋市北区長田町4丁目69番地5
+    rooms_expected: 8
+    managers: [ホームプランナー]
+    loans:
+      primary:
+        - id: orix-g2-pers
+          role: 本担保
+          tracker_name: Grandole志賀本通Ⅱ
+      attached: []
+    sources:
+      units: property_units
+      meta: property_info.yaml
+      roi: grandole-ii
+      loans_json: 240_融資/loan_tracker_export/loans.json
+
+  caramel:
+    name: キャラメル
+    name_ascii: キャラメル
+    owner: 個人
+    owner_entity: 松野真治
+    acquired: "2025-12-26"
+    address: 愛知県名古屋市緑区文久山418
+    rooms_expected: 4
+    managers: [Tcell]
+    loans:
+      primary:
+        - id: shiga-caramel
+          role: 本担保
+          tracker_name: キャラメル
+      attached:
+        - id: shiga-caramel-cost
+          role: 諸費用（ジャストサポート・オリコ）
+          tracker_name: キャラメル諸費用（ジャストサポート・オリコ）
+          note: 担保外の可能性。融資主表では別行
+    sources:
+      units: property_units
+      meta: property_info.yaml
+      roi: caramel
+      loans_json: 240_融資/loan_tracker_export/loans.json
+
+# 物件に紐づけない借入（③-C 物件カードには出さない）
+unlinked_loans:
+  - 教育ローン（名古屋銀行・多目的）
+  - 教育ローン（住信SBI・目的ローン）
+  - マイカーローン（三菱UFJ・ネットDE）
+  - 太陽光ローン（オリコ・ヒラソル）  # propertyId を付けない（誤って grandole-i にしない）
+
+checklist:
+  - id: ids_aligned
+    ok: true
+    note: grandole-i / grandole-ii / caramel が units・ROI・loans・property_info で一致
+  - id: owner_filled
+    ok: true
+    note: 法人1・個人2
+  - id: loans_linked
+    ok: true
+    note: 本担保3＋キャラメル諸費用1
+  - id: rooms_live
+    ok: true
+    note: property_units 20室（8+8+4）・空室0（2026-08-13確認）

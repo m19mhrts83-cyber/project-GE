@@ -41,7 +41,7 @@
 | **連携方針** | トラッカーを**ローン正本**とし、KURASHIFT は **読取投影**のみ（ジョブ案: `re_sync_loan_tracker`） |
 | **URL** | https://loan-tracker-plum.vercel.app/ |
 | **Google ログイン** | **estate**（`matsuno.estate@gmail.com`）— Drive に借入データを保存 |
-| **既存資産** | `property_units`（号室・家賃・空室）、`config/property_info.yaml`（管理会社・鍵）、Numbers `19不動産` |
+| **既存資産** | `property_units`（号室・家賃・空室）、`config/property_info.yaml`（管理会社・鍵・名義）、`config/kurashift_re_property_master.yaml`（③-C 最小突合）、Numbers `19不動産` |
 
 旧称「本田さんアプリ／本田連携待ち」はこのトラッカーを指す。すり合わせ待ち（名称・URL）は **解消**。残作業は Drive 保存形式の調査と sync 実装。
 

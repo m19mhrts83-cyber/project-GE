@@ -18,18 +18,23 @@ properties:
   grandole-i:
     name: Grandole志賀本通I
     short: I
+    owner: 法人
+    owner_entity: リビングサポート松
+    acquired: "2025-02-28"
     address: 愛知県名古屋市北区長田町4丁目69番地5
     match_names:
       - "Grandole志賀本通I"
       - "02_Grandole志賀本通I"
       - "Grandole志賀本通Ⅰ"
-    # 所有: 法人（リビングサポート松）／税務: knees bee 法人資料
+    # 税務: knees bee 法人資料
     # 棟: LEAF + Tcell（号室未指定の既定はミニテック）
     managers:
       - LEAF
       - Tcell
     default_manager: ミニテック
     key_number: 2842
+    loan_ids:
+      - orix-g1-corp
     rooms:
       "102":
         manager: Tcell
@@ -42,29 +47,40 @@ properties:
   grandole-ii:
     name: Grandole志賀本通II
     short: II
+    owner: 個人
+    owner_entity: 松野真治
+    acquired: "2022-09"
     # I と同敷地・周辺MAP正本と同じ住所
     address: 愛知県名古屋市北区長田町4丁目69番地5
     match_names:
       - "Grandole志賀本通II"
       - "01_Grandole志賀本通II"
       - "Grandole志賀本通Ⅱ"
-    # 所有: 個人／税務: knees bee 個人レントロール
+    # 税務: knees bee 個人レントロール
     # 棟管理: ホームプランナー
     managers:
       - ホームプランナー
     key_number: 1555
+    loan_ids:
+      - orix-g2-pers
     rooms: {}
   caramel:
     name: キャラメル
     short: C
+    owner: 個人
+    owner_entity: 松野真治
+    acquired: "2025-12-26"
     # 管理契約書・Notion 物件住所
     address: 愛知県名古屋市緑区文久山418
     match_names:
       - "キャラメル"
       - "03_キャラメル"
     # 棟管理: Tcell
-    # 所有: 個人（税務: knees bee / 個人レントロール）
+    # 税務: knees bee / 個人レントロール
     managers:
       - Tcell
     key_number: null
+    loan_ids:
+      - shiga-caramel
+      - shiga-caramel-cost
     rooms: {}

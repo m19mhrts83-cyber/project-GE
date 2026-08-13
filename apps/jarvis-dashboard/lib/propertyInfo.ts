@@ -7,6 +7,10 @@ export type PropertyRoomInfo = {
 export type PropertyInfo = {
   name: string;
   short?: string;
+  /** 個人 / 法人 */
+  owner?: string;
+  owner_entity?: string;
+  acquired?: string;
   /** 物件所在地（棟単位） */
   address?: string;
   match_names: string[];
@@ -14,6 +18,8 @@ export type PropertyInfo = {
   /** 号室・メモで特定できないときの既定管理会社 */
   default_manager?: string;
   key_number: number | null;
+  /** 借入残高トラッカー id（任意） */
+  loan_ids?: string[];
   rooms: Record<string, PropertyRoomInfo>;
 };
 
@@ -42,6 +48,9 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
     "grandole-i": {
       name: "Grandole志賀本通I",
       short: "I",
+      owner: "法人",
+      owner_entity: "リビングサポート松",
+      acquired: "2025-02-28",
       address: "愛知県名古屋市北区長田町4丁目69番地5",
       match_names: [
         "Grandole志賀本通I",
@@ -51,6 +60,7 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
       managers: ["LEAF", "Tcell"],
       default_manager: "ミニテック",
       key_number: 2842,
+      loan_ids: ["orix-g1-corp"],
       rooms: {
         "102": { manager: "Tcell" },
         "105": { manager: "LEAF" },
@@ -61,6 +71,9 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
     "grandole-ii": {
       name: "Grandole志賀本通II",
       short: "II",
+      owner: "個人",
+      owner_entity: "松野真治",
+      acquired: "2022-09",
       address: "愛知県名古屋市北区長田町4丁目69番地5",
       match_names: [
         "Grandole志賀本通II",
@@ -69,15 +82,20 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
       ],
       managers: ["ホームプランナー"],
       key_number: 1555,
+      loan_ids: ["orix-g2-pers"],
       rooms: {},
     },
     caramel: {
       name: "キャラメル",
       short: "C",
+      owner: "個人",
+      owner_entity: "松野真治",
+      acquired: "2025-12-26",
       address: "愛知県名古屋市緑区文久山418",
       match_names: ["キャラメル", "03_キャラメル"],
       managers: ["Tcell"],
       key_number: null,
+      loan_ids: ["shiga-caramel", "shiga-caramel-cost"],
       rooms: {},
     },
   },
