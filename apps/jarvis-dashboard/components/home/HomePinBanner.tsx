@@ -5,10 +5,12 @@ import {
   opsWatchVisibleOnHome,
 } from "@/lib/opsWatch";
 import { zaimWatchVisibleOnHome } from "@/lib/zaimWatchPin";
+import { KURASHIFT_URL } from "@/lib/nav";
 import OpsPinCard from "@/components/OpsPinCard";
 import ZaimReviewAckButton from "@/components/ZaimReviewAckButton";
 
 const PIN_IDS = [
+  "card_debit_watch",
   "ops_fix_notice",
   "zaim_quality",
   "vercel_deploy",
@@ -16,10 +18,23 @@ const PIN_IDS = [
   "cursor_pro_plus_downgrade",
 ] as const;
 
-function hrefFor(id: string, detail: string | null | undefined): {
+function hrefFor(
+  id: string,
+  detail: string | null | undefined,
+  payload: Record<string, unknown>
+): {
   href: string;
   external: boolean;
 } {
+  if (id === "card_debit_watch") {
+    const action =
+      (typeof payload.action_url === "string" && payload.action_url) ||
+      (typeof payload.href === "string" && payload.href.startsWith("http")
+        ? payload.href
+        : null) ||
+      `${KURASHIFT_URL}/money-ops`;
+    return { href: action, external: true };
+  }
   if (id === "zaim_quality") return { href: "/zaim", external: false };
   if (id === "cursor_pro_plus_downgrade") {
     return { href: "https://www.cursor.com/settings", external: true };
@@ -34,11 +49,12 @@ function hrefFor(id: string, detail: string | null | undefined): {
 }
 
 function pinTitle(id: string, fallback: string): string {
+  if (id === "card_debit_watch") return "Olive Infinite 引落 — 支払い準備";
   if (id === "zaim_quality") return "Jarvisが直したよ（財務）";
   return fallback || id;
 }
 
-/** ホーム最上段ピン（運用お知らせ・財務直し・Vercel Fail・Cursor 戻し 等） */
+/** ホーム最上段ピン（カード引落・運用お知らせ・財務直し 等） */
 export default async function HomePinBanner() {
   const supabase = await createClient();
   const { data: rows } = await supabase
@@ -66,6 +82,13 @@ export default async function HomePinBanner() {
         ? (data.payload as Record<string, unknown>)
         : {};
     const level = String(data.level || "");
+    if (id === "card_debit_watch") {
+      return (
+        pl.show_banner === true ||
+        level === "warn" ||
+        level === "attention"
+      );
+    }
     if (id === "zaim_quality") {
       return zaimWatchVisibleOnHome(pl);
     }
@@ -90,16 +113,22 @@ export default async function HomePinBanner() {
           data.payload && typeof data.payload === "object"
             ? (data.payload as Record<string, unknown>)
             : {};
-        const { href, external } = hrefFor(id, data.detail as string | null);
+        const { href, external } = hrefFor(
+          id,
+          data.detail as string | null,
+          pl
+        );
         const batchId = String(pl.review_batch_id || "");
         const metaExtra =
-          id === "cursor_pro_plus_downgrade"
-            ? "期限 2026-08-24 · Cursor Settings で Schedule Downgrade · 状況ウォッチにも掲載"
-            : id === "ops_fix_notice"
-              ? "Jarvis が直した内容 · 「確認しました」で消えます"
-              : id === "zaim_quality"
-                ? "確認するまで残ります · 「確認しました」で消えます · 詳細は /zaim"
-                : "運用監視 · 直ったらホームのお知らせに切り替わります";
+          id === "card_debit_watch"
+            ? "重要: 支払いを確実に · 処置は KURASHIFT 資金移動で · 詳細は状況ウォッチにも掲載"
+            : id === "cursor_pro_plus_downgrade"
+              ? "期限 2026-08-24 · Cursor Settings で Schedule Downgrade · 状況ウォッチにも掲載"
+              : id === "ops_fix_notice"
+                ? "Jarvis が直した内容 · 「確認しました」で消えます"
+                : id === "zaim_quality"
+                  ? "確認するまで残ります · 「確認しました」で消えます · 詳細は /zaim"
+                  : "運用監視 · 直ったらホームのお知らせに切り替わります";
         return (
           <OpsPinCard
             key={id}

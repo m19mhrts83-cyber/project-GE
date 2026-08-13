@@ -128,6 +128,26 @@ export default function WatchSituationCard(props: WatchSituationCardProps) {
             <Link href="/zaim">Zaim Watch（年間収支・直し確認）→</Link>
           </p>
         ) : null}
+        {id === "card_debit_watch" ? (
+          <p className="meta" style={{ marginTop: 8 }}>
+            <strong>処置は KURASHIFT で</strong>
+            {" · "}
+            <a
+              href={
+                typeof payload.action_url === "string"
+                  ? payload.action_url
+                  : typeof payload.href === "string" &&
+                      String(payload.href).startsWith("http")
+                    ? String(payload.href)
+                    : "https://jarvis-trade-desk.vercel.app/money-ops"
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              資金移動オペ（寄せ計画）を開く ↗
+            </a>
+          </p>
+        ) : null}
         {id === "openchat_threads" ? (
           <p className="meta">
             <Link href="/openchat">神大家オプチャ →</Link>
