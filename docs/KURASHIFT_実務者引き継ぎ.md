@@ -11,15 +11,17 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
 | 文書 | 用途 |
 |---|---|
-| [`KURASHIFT_plan棚卸し_20260813.md`](./KURASHIFT_plan棚卸し_20260813.md) | **plan 全本線の done/pending 棚卸し（検証前）** |
+| [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) | **残 ToDo だけ・元プランへ辿れる。タブ整理の正** |
+| [`KURASHIFT_plan棚卸し_20260813.md`](./KURASHIFT_plan棚卸し_20260813.md) | plan 全本線の done/pending 棚卸し経緯 |
+| [`KURASHIFT_通し検証ログ_20260813.md`](./KURASHIFT_通し検証ログ_20260813.md) | 通し検証（煙＋DB済／目視脇置き） |
 | [`KURASHIFT_品質保証点検ログ_20260813.md`](./KURASHIFT_品質保証点検ログ_20260813.md) | Wave0 合否・P1/P2・実務者タスク順 |
 | [`KURASHIFT_品質保証点検_実行プラン_20260813.md`](./KURASHIFT_品質保証点検_実行プラン_20260813.md) | Wave 定義・「満足」の定義 |
 
-**QA 要約**: ③-A〜D 骨格は条件付き合格・**P0 なし**。本線全満足は未宣言（通し検証・V-2-UI・案件1件が残）。
+**QA 要約**: ③-A〜D 骨格は条件付き合格・**P0 なし**。本線全満足は未宣言（目視通し・V-2-UI・案件1件が残）。
 
-**実務実装（同日）**: P1＋RE-1b＋買い進めCF年次推移＋借入トラッカー導線を本番反映済。
+**実務実装（同日）**: P1＋RE-1b＋買い進めCF年次プロット＋借入トラッカー導線を本番反映済。
 
-**plan 棚卸し（同日）**: HQ／買い進め／融資パック／QA／改善を同期。**残 pending は棚卸し doc を正**。買い進めの年1実績反映・Excel改訂→運営相談は **検証後**（`buy-plan-revise-modes`）。
+**残 ToDo**: [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) を正。完了 plan タブは閉じてよい（同 doc の「閉じ用」）。
 
 ---
 
