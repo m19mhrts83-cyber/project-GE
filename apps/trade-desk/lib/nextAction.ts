@@ -61,6 +61,11 @@ export function failedSources(
 type ThemeLite = { id: string; status: string; title: string };
 type JobLite = { id: string; status: string; created_at: string; job_type: string };
 
+export type DealFunnelBrief = {
+  info: number;
+  viewing: number;
+};
+
 export function computeNextAction(input: {
   summary: PortfolioWeeklySummary | null;
   themes: ThemeLite[];
@@ -69,6 +74,10 @@ export function computeNextAction(input: {
   annualDone: boolean;
   personalTaxAlert: boolean;
   corporateTaxAlert: boolean;
+  /** Phase C: 千三つに情報だけ溜まっている */
+  dealFunnel?: DealFunnelBrief | null;
+  /** Phase C: 買い進め canonical が無い */
+  buyPlanMissing?: boolean;
 }): NextAction {
   const fails = failedSources(input.summary);
   if (fails.length > 0) {
@@ -102,6 +111,13 @@ export function computeNextAction(input: {
       href: `/themes/${approved.id}`,
     };
   }
+  if (input.buyPlanMissing) {
+    return {
+      level: "warn",
+      label: "買い進めプランが未取込です（Excel再取込）",
+      href: "/realestate/buy-plan",
+    };
+  }
   if (input.annualWindow && !input.annualDone) {
     return {
       level: "info",
@@ -121,6 +137,21 @@ export function computeNextAction(input: {
       level: "info",
       label: "個人の確定申告をそろそろ回す",
       href: "/tax",
+    };
+  }
+  const funnel = input.dealFunnel;
+  if (funnel && funnel.info >= 8 && funnel.viewing === 0) {
+    return {
+      level: "info",
+      label: `千三つ: 情報 ${funnel.info} 件が未内見（1件でも進める）`,
+      href: "/realestate/deals",
+    };
+  }
+  if (funnel && funnel.info >= 12) {
+    return {
+      level: "info",
+      label: `千三つ: 情報 ${funnel.info} 件 — 内見候補を絞る`,
+      href: "/realestate/deals",
     };
   }
   return {

@@ -169,6 +169,7 @@ allowed_jobs:
   - re_deal_advice
   - ops_consult_ingest
   - re_sync_loan_tracker  # Discover未完了時は明示エラーで止まる
+  - re_revise_plan  # dry-run既定。apply は UI confirm 必須
 
 secrets:
   store: .env.jarvis_private

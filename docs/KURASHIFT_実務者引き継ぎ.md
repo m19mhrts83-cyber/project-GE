@@ -21,7 +21,9 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
 **実務実装（同日）**: P1＋RE-1b＋買い進めCF年次プロット＋借入トラッカー導線を本番反映済。
 
-**残 ToDo**: [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) を正。Cursor は **生きている1本**（`kurashift残バックログ_20260813.plan.md`）だけ開く。旧本線 plan は `_archive/kurashift/`（タブは閉じてよい）。
+**残 ToDo**: [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) を正。Cursor は **生きている1本**（`kurashift残バックログ_20260813.plan.md`）だけ開く。旧本線 plan は `_archive/kurashift/`（タブは閉じてよい）。**2026-08-13: 本線6 ID 完了**（検証ログ参照）。
+
+再開チェックリストから「verification-with-user（ユーザー同席）」は完了扱いで外してよい。
 
 ---
 
@@ -29,7 +31,7 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
 | プラン | 役割 | 状態 |
 |---|---|---|
-| [`kurashift残バックログ_20260813.plan.md`](/Users/matsunomasaharu2/.cursor/plans/kurashift残バックログ_20260813.plan.md) | **生きている1本**（残6 todo） | pending のみ。docs 残一覧と同期 |
+| [`kurashift残バックログ_20260813.plan.md`](/Users/matsunomasaharu2/.cursor/plans/kurashift残バックログ_20260813.plan.md) | **生きている1本**（残6 todo → 2026-08-13 完了） | docs 残一覧と同期。plan frontmatter は手元で completed にしてよい |
 | `~/.cursor/plans/_archive/kurashift/*`（9本） | 本線の経緯・完了履歴 | **ARCHIVED**（読取専用）。索引は残 ToDo 一覧 |
 
 旧パス（HQ／買い進め／QA／改善／CFプロット／融資／実務検証／overview／trade_desk 方向再編）はすべてアーカイブへ移動済み。新しい作業の todo は生きている1本にだけ足す。
@@ -93,12 +95,13 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ### P2（拡張）
 
-9. 健美家／楽待（Sprint3）
+9. 健美家／楽待（Sprint3・任意）
 10. 融資パック: localStorage 以外の案件保存・PDF
 11. Excel STEP3 **完全互換** export（現状は骨格）
 12. YAML↔`financePackCatalog.ts` ドリフト防止
-11. Lab 立花実弾（口座・鍵後）
-12. 本線プランの verification-with-user（ユーザー同席）
+13. Lab 立花実弾（口座・鍵後・明示解錠のみ。現状はゲート掲示のみ）
+
+（旧「verification-with-user」は 2026-08-13 完了）
 
 ---
 

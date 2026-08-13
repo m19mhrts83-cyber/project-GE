@@ -42,7 +42,12 @@ export default function EnqueueJobButton({
       const bodyPayload = {
         ...(payload ?? {}),
         ...(requireConfirm
-          ? { ui_confirmed: true, ui_confirmed_at: new Date().toISOString() }
+          ? {
+              ui_confirmed: true,
+              ui_confirmed_at: new Date().toISOString(),
+              // Zaim / 計画補正 apply 等の API ゲートと揃える
+              confirm_apply: true,
+            }
           : {}),
       };
       const res = await fetch("/api/jobs", {
