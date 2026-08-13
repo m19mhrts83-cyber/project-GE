@@ -17,6 +17,7 @@ numbers:
   sheets:
     cashflow: キャッシュフロー
     cashflow_tables:
+      events: 表3.ライフイベント
       income: 表4.生活収入
       expense: 表5.生活支出
       eval: 表8.収支評価

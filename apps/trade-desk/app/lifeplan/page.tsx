@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   buildCenturyModel,
   diffEvalPlan,
+  parseLifeEvents,
+  parseLifeplanNotes,
   type SheetDump,
 } from "@/lib/centuryPlan";
 import { parseLifeplanMode } from "@/lib/lifeplanNotices";
@@ -50,7 +52,7 @@ export default async function LifeplanCenturyPage({
     ? await supabase
         .from("kurashift_lifeplan_sheet_dumps")
         .select("version_id, sheet_name, table_name, payload")
-        .eq("sheet_name", "キャッシュフロー")
+        .in("sheet_name", ["キャッシュフロー", "ライフプラン主要変更履歴", "要確認事項"])
         .in("version_id", ids)
     : { data: [] as DumpRow[] };
 
@@ -79,22 +81,27 @@ export default async function LifeplanCenturyPage({
     : null;
   const diffs =
     current && prevModel
-      ? diffEvalPlan(
-          current,
-          prevModel,
-          current.years.filter((y) => y >= 2020 && y <= 2050)
-        )
+      ? diffEvalPlan(current, prevModel, current.years)
       : [];
+  const events = current ? parseLifeEvents(dumpsOf(canonical!.id)) : null;
+  const notes = canonical ? parseLifeplanNotes(dumpsOf(canonical.id)) : [];
 
   return (
     <Shell active="/lifeplan" email={user?.email ?? null}>
       <LifeplanSheetsNav current="century" />
       <h1>100歳計画</h1>
       <p className="sub">
-        これまで Numbers で見ていたキャッシュフロー（〜100歳）です。最新版を閲覧し、年次更新の前後差もここで確認します。
+        支出の見方をベースに、真治が100歳になる年までを見通す家計キャッシュフローです。上部の年は
+        Numbers「表3.ライフイベント」（年齢・家族イベント・進学）と揃えています。
       </p>
       {current ? (
-        <CenturyExplorer current={current} previous={prevModel} diffs={diffs} />
+        <CenturyExplorer
+          current={current}
+          previous={prevModel}
+          diffs={diffs}
+          events={events}
+          notes={notes}
+        />
       ) : (
         <div className="card">
           <p className="meta" style={{ margin: 0 }}>

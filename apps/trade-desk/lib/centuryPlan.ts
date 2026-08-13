@@ -261,3 +261,256 @@ export function decadesFromYears(years: number[]): number[] {
   const set = new Set(years.map((y) => Math.floor(y / 10) * 10));
   return [...set].sort((a, b) => a - b);
 }
+
+export type LifeEventKind = "family" | "child" | "maint";
+
+export type PersonAges = {
+  name: string;
+  ages: Record<number, number>;
+};
+
+export type LifeEventMark = {
+  year: number;
+  kind: LifeEventKind;
+  source: string;
+  text: string;
+};
+
+export type LifeEventModel = {
+  years: number[];
+  people: PersonAges[];
+  marks: LifeEventMark[];
+};
+
+export type LifeplanNote = {
+  kind: "check" | "history";
+  item: string;
+  category: string;
+  date: string;
+  body: string;
+  result: string;
+};
+
+export type LineDelta = {
+  year: number;
+  before: number | null;
+  after: number | null;
+  delta: number | null;
+};
+
+const PEOPLE_NAMES = ["真治", "千景", "円香", "珠己", "紗和"];
+
+function yearMapFromGrid(grid: DumpGridRow[]): Record<number, number> {
+  const header = grid.find((row) => isHeaderRow((row.cells ?? []).map(cellText)));
+  const cells = (header?.cells ?? []).map(cellText);
+  const found: { col: number; year: number }[] = [];
+  cells.forEach((c, i) => {
+    const y = parseYearToken(c);
+    if (y != null) found.push({ col: i, year: y });
+  });
+  const map: Record<number, number> = {};
+  if (!found.length) return map;
+  found.sort((a, b) => a.col - b.col);
+  const minCol = found[0].col;
+  const yearAtMin = found[0].year;
+  for (let col = minCol; col < cells.length; col++) {
+    const y = yearAtMin + (col - minCol);
+    if (y >= 2010 && y <= 2100) map[col] = y;
+  }
+  for (const f of found) map[f.col] = f.year;
+  return map;
+}
+
+function parseAgeToken(raw: string): number | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const m = t.match(/^(\d+(?:\.\d+)?)歳?$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n < 0 || n > 120) return null;
+  return Math.round(n);
+}
+
+function eventKind(label: string): LifeEventKind {
+  if (label.includes("メンテナンス") || label.includes("メンテ")) return "maint";
+  if (/円香|珠己|紗和/.test(label)) return "child";
+  return "family";
+}
+
+function formatEventText(raw: string, kind: LifeEventKind): string {
+  const t = raw.trim().replace(/\.0$/, "");
+  if (!t || t === "missing value") return "";
+  if (kind === "maint") {
+    const n = Number(t.replace(/,/g, ""));
+    if (Number.isFinite(n) && n > 0 && n < 1000) return `${n}万`;
+  }
+  return t;
+}
+
+function childShort(label: string): string {
+  for (const n of ["円香", "珠己", "紗和"]) {
+    if (label.includes(n)) return n;
+  }
+  return "";
+}
+
+/** Numbers キャッシュフロー上部「表3.ライフイベント」。 */
+export function parseLifeEvents(dumps: SheetDump[]): LifeEventModel | null {
+  const dump = dumps.find((d) => d.table_name.includes("表3") || d.table_name.includes("ライフイベント"));
+  if (!dump) return null;
+  const grid = dump.payload?.grid ?? [];
+  const colYears = yearMapFromGrid(grid);
+  const years = [...new Set(Object.values(colYears))].sort((a, b) => a - b);
+  if (!years.length) return null;
+  const people: PersonAges[] = [];
+  const marks: LifeEventMark[] = [];
+  for (const row of grid) {
+    const cells = (row.cells ?? []).map(cellText);
+    if (isHeaderRow(cells)) continue;
+    const name = (cells[0] || "").replace(/\s+/g, "");
+    if (!name) continue;
+    if (PEOPLE_NAMES.includes(name)) {
+      const ages: Record<number, number> = {};
+      for (const [colStr, year] of Object.entries(colYears)) {
+        const age = parseAgeToken(cells[Number(colStr)] ?? "");
+        if (age != null) ages[year] = age;
+      }
+      people.push({ name, ages });
+      continue;
+    }
+    const kind = eventKind(name);
+    const prefix = kind === "child" ? childShort(name) : "";
+    for (const [colStr, year] of Object.entries(colYears)) {
+      const text = formatEventText(cells[Number(colStr)] ?? "", kind);
+      if (!text || text === "新築") continue;
+      const shown = prefix && kind === "child" ? `${prefix}${text}` : text;
+      marks.push({ year, kind, source: name, text: shown });
+    }
+  }
+  return { years, people, marks };
+}
+
+export function shinjiHorizon(
+  events: LifeEventModel | null,
+  nowYear = new Date().getFullYear()
+): {
+  nowAge: number | null;
+  age100Year: number | null;
+  startYear: number | null;
+  endYear: number | null;
+} {
+  const shinji = events?.people.find((p) => p.name === "真治");
+  const ages = shinji?.ages ?? {};
+  const years = Object.keys(ages).map(Number).sort((a, b) => a - b);
+  let age100Year: number | null = null;
+  for (const y of years) {
+    if (ages[y] === 100) age100Year = y;
+  }
+  return {
+    nowAge: ages[nowYear] ?? null,
+    age100Year,
+    startYear: years[0] ?? null,
+    endYear: years[years.length - 1] ?? age100Year,
+  };
+}
+
+export function eventsForYear(events: LifeEventModel | null, year: number): LifeEventMark[] {
+  if (!events) return [];
+  return events.marks.filter((m) => m.year === year);
+}
+
+function noteDate(raw: string): string {
+  const m = raw.match(/(20\d{2})年\s*(\d{1,2})月\s*(\d{1,2})日/);
+  if (m) {
+    return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  }
+  const y = raw.match(/(20\d{2})/);
+  return y ? y[1] : raw.replace(/\s.*/, "").trim();
+}
+
+function parseNoteTable(
+  dump: SheetDump | undefined,
+  kind: LifeplanNote["kind"]
+): LifeplanNote[] {
+  if (!dump) return [];
+  const grid = dump.payload?.grid ?? [];
+  const out: LifeplanNote[] = [];
+  for (const row of grid) {
+    const cells = (row.cells ?? []).map(cellText);
+    if (!cells.length) continue;
+    const head = cells.join("");
+    if (head.includes("項目") && (head.includes("確認") || head.includes("変更"))) continue;
+    const item = cells[0] || "";
+    const category = cells[1] || "";
+    const date = noteDate(cells[2] || "");
+    const body = (cells[3] || "").trim();
+    const result = String((kind === "check" ? cells[4] : cells[5]) || "").trim();
+    if (!item && !body) continue;
+    out.push({ kind, item, category, date, body, result });
+  }
+  return out;
+}
+
+/** Numbers「要確認事項」「主要変更履歴」。閲覧専用。 */
+export function parseLifeplanNotes(dumps: SheetDump[]): LifeplanNote[] {
+  const checks = parseNoteTable(
+    dumps.find((d) => d.table_name.includes("要確認") || d.sheet_name.includes("要確認")),
+    "check"
+  );
+  const hist = parseNoteTable(
+    dumps.find((d) => d.table_name.includes("変更履歴") || d.sheet_name.includes("変更履歴")),
+    "history"
+  );
+  return [...checks, ...hist];
+}
+
+export function notesForLine(notes: LifeplanNote[], line: CenturyLine): LifeplanNote[] {
+  const hay = `${line.label} ${line.group}`.replace(/\s+/g, "");
+  return notes.filter((n) => {
+    const item = (n.item || "").replace(/\s+/g, "");
+    if (!item) return false;
+    if (hay.includes(item) || item.includes(hay.slice(0, 8))) return true;
+    const code = item.match(/0\.\d+/);
+    if (code && hay.includes(code[0])) return true;
+    const key = item.replace(/[0-9.／/]/g, "");
+    return key.length >= 2 && hay.includes(key);
+  });
+}
+
+export function planDeltasForLine(
+  current: CenturyLine,
+  previous: CenturyModel | null
+): Record<number, LineDelta> {
+  if (!previous || current.series !== "plan") return {};
+  const ov = previous.lines.find(
+    (l) =>
+      l.section === current.section &&
+      l.series === "plan" &&
+      l.label === current.label
+  );
+  if (!ov) return {};
+  const out: Record<number, LineDelta> = {};
+  const years = new Set(
+    [...Object.keys(current.values), ...Object.keys(ov.values)].map(Number)
+  );
+  for (const year of years) {
+    const after = current.values[year] ?? null;
+    const before = ov.values[year] ?? null;
+    if (after == null && before == null) continue;
+    const delta = after != null && before != null ? after - before : null;
+    if (delta == null || Math.abs(delta) < 1) continue;
+    out[year] = { year, before, after, delta };
+  }
+  return out;
+}
+
+export function yearsWithActuals(model: CenturyModel): number[] {
+  const set = new Set<number>();
+  for (const line of model.lines) {
+    if (line.series !== "actual") continue;
+    for (const [y, v] of Object.entries(line.values)) {
+      if (v != null) set.add(Number(y));
+    }
+  }
+  return [...set].sort((a, b) => a - b);
+}
