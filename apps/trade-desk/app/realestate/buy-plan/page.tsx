@@ -3,11 +3,13 @@ import EnqueueJobButton from "@/components/EnqueueJobButton";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
+import { buyPlanActionView } from "@/lib/buyPlanAction";
 import {
-  buyPlanActionView,
-  isBuyAction,
-  isSaleAction,
-} from "@/lib/buyPlanAction";
+  CF_GOAL_MONTH_YEN,
+  buildBuyPlanPaceSummary,
+} from "@/lib/buyPlanPace";
+import { buildBRate4Rows } from "@/lib/bRate4";
+import { RE_PROPERTY_MASTER } from "@/lib/rePropertyMaster";
 
 export const dynamic = "force-dynamic";
 
@@ -53,38 +55,50 @@ export default async function BuyPlanPage() {
 
   const vid = buyPlan?.id;
 
-  const [{ data: events }, { data: criteria }, { data: constraints }] =
-    await Promise.all([
-      vid
-        ? supabase
-            .from("kurashift_buy_plan_events")
-            .select(
-              "row_no, action, entity, location, structure, property_name, price_man, yield_pct, bank, loan_man, down_man, event_date, memo, sale_strategy"
-            )
-            .eq("version_id", vid)
-            .order("event_date", { ascending: true, nullsFirst: false })
-            .order("row_no", { ascending: true })
-            .limit(200)
-        : Promise.resolve({ data: [] as EventRow[] }),
-      vid
-        ? supabase
-            .from("kurashift_buy_plan_criteria")
-            .select("kind, raw_text, sort_order")
-            .eq("version_id", vid)
-            .order("sort_order", { ascending: true })
-            .limit(60)
-        : Promise.resolve({ data: [] }),
-      vid
-        ? supabase
-            .from("kurashift_buy_plan_constraints")
-            .select(
-              "lender, collateral_type, limit_note, rate_term, prop_cond, geo_cond, attr_note"
-            )
-            .eq("version_id", vid)
-            .order("row_no", { ascending: true })
-            .limit(40)
-        : Promise.resolve({ data: [] }),
-    ]);
+  const [
+    { data: events },
+    { data: criteria },
+    { data: constraints },
+    { data: unitRows },
+    { data: loanRows },
+  ] = await Promise.all([
+    vid
+      ? supabase
+          .from("kurashift_buy_plan_events")
+          .select(
+            "row_no, action, entity, location, structure, property_name, price_man, yield_pct, bank, loan_man, down_man, event_date, memo, sale_strategy"
+          )
+          .eq("version_id", vid)
+          .order("event_date", { ascending: true, nullsFirst: false })
+          .order("row_no", { ascending: true })
+          .limit(200)
+      : Promise.resolve({ data: [] as EventRow[] }),
+    vid
+      ? supabase
+          .from("kurashift_buy_plan_criteria")
+          .select("kind, raw_text, sort_order")
+          .eq("version_id", vid)
+          .order("sort_order", { ascending: true })
+          .limit(60)
+      : Promise.resolve({ data: [] }),
+    vid
+      ? supabase
+          .from("kurashift_buy_plan_constraints")
+          .select(
+            "lender, collateral_type, limit_note, rate_term, prop_cond, geo_cond, attr_note"
+          )
+          .eq("version_id", vid)
+          .order("row_no", { ascending: true })
+          .limit(40)
+      : Promise.resolve({ data: [] }),
+    supabase.from("property_units").select("property_id, rent").limit(200),
+    supabase
+      .from("kurashift_loan_tracker_loans")
+      .select(
+        "id, name, lender, rate_pct, balance_jpy, monthly_payment_jpy, tags, payload"
+      )
+      .limit(80),
+  ]);
 
   const rows = (events || []) as EventRow[];
   const byYear = new Map<string, EventRow[]>();
@@ -99,10 +113,21 @@ export default async function BuyPlanPage() {
     return a.localeCompare(b);
   });
 
-  const buyCount = rows.filter((e) => isBuyAction(e.action)).length;
-  const saleCount = rows.filter((e) => isSaleAction(e.action)).length;
-  const loanSum = rows.reduce((s, e) => s + (n(e.loan_man) || 0), 0);
-  const priceSum = rows.reduce((s, e) => s + (n(e.price_man) || 0), 0);
+  const portfolioRent = (unitRows || []).reduce(
+    (s, u) => s + (Number(u.rent) || 0),
+    0
+  );
+  const bRate4 = buildBRate4Rows(loanRows || []);
+  const masterIds = new Set(RE_PROPERTY_MASTER.map((p) => p.id));
+  const portfolioPay = bRate4
+    .filter((r) => masterIds.has(r.propertyId))
+    .reduce((s, r) => s + (r.monthlyPaymentJpy || 0), 0);
+  const currentCfYen = portfolioRent - portfolioPay;
+
+  const pace = buildBuyPlanPaceSummary(rows, {
+    currentCfYen,
+    goalYen: CF_GOAL_MONTH_YEN,
+  });
 
   const areas = (criteria || []).filter((c) => c.kind === "area");
   const rules = (criteria || []).filter((c) => c.kind === "purchase_rule");
@@ -110,7 +135,6 @@ export default async function BuyPlanPage() {
     (c) => c.kind !== "area" && c.kind !== "purchase_rule"
   );
 
-  // Notion「物件買い進め条件」(2025-11) の要約（正本は Excel criteria。ここはフォーカス補助）
   const focusHints = [
     "戸建中心・築古OK",
     "想定利回り 20%以上",
@@ -120,13 +144,20 @@ export default async function BuyPlanPage() {
     "エリア: 愛知（岡崎・碧南・知多・安城・豊田・瀬戸・春日井・犬山・一宮）／岐阜（各務原・岐阜・大垣）／三重（桑名・四日市・津・鈴鹿・海沿除外）／大阪・門真",
   ];
 
+  const buyN = pace.futureBuysPersonal + pace.futureBuysCorporate;
+  const personalBuyShare = buyN
+    ? Math.round((pace.futureBuysPersonal / buyN) * 100)
+    : 0;
+  const corpBuyShare = buyN ? 100 - personalBuyShare : 0;
+
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <RealEstateLaneNav active="b-plan" />
       <p className="page-kicker">③-B · 長期プラン</p>
       <h1>買い進めプラン</h1>
       <p className="sub">
-        トップダウン（目標CFから逆算）。正本は買い進め Excel → DB 投影。ライフプランと同じく「年表」で見る。
+        トップダウン（目標CFから逆算）。正本は買い進め Excel → DB
+        投影。ライフプランと同じく「年表」で見る。
         {" · "}
         <a href="/lifeplan?mode=re_purchase">LP 物件購入モード →</a>
         {" · "}
@@ -166,47 +197,270 @@ export default async function BuyPlanPage() {
       <div className="card">
         <header>
           <span className="lvl">KPI</span>
-          <strong>プラン要約（STEP3 部品化の俯瞰）</strong>
+          <strong>スピード感 · CF 月50万への道のり</strong>
         </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          いま＝保有物件の家賃−ローン返済。プラン積み上げ＝今後の購入行の利回り×価格から見た想定月家賃（粗・返済控除なし）。価格合計より「いつ・どれくらいの速さで」を見る。
+        </p>
         <table style={{ marginTop: 8 }}>
           <tbody>
             <tr>
-              <td>イベント行</td>
+              <td>目標</td>
               <td>
-                <strong>{rows.length}</strong>
+                <strong>CF {fmtYen(pace.goalYen)}／月</strong>
               </td>
             </tr>
             <tr>
-              <td>購入系 / 売却系（action キーワード）</td>
+              <td>いま（家賃−返済）</td>
+              <td>
+                <strong>{fmtYen(Math.round(currentCfYen))}</strong>
+                <span className="meta">
+                  {" "}
+                  · <a href="/realestate">運用Aで詳細 →</a>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td>ギャップ</td>
               <td>
                 <strong>
-                  {buyCount} / {saleCount}
+                  {pace.gapYen != null ? fmtYen(pace.gapYen) : "—"}
                 </strong>
+                {pace.gapYen === 0 ? (
+                  <span className="meta"> · 目標到達済み（簡易）</span>
+                ) : null}
               </td>
             </tr>
             <tr>
-              <td>価格合計（万円・行の合算）</td>
+              <td>プランの購入ペース</td>
               <td>
-                <strong>{priceSum ? `${Math.round(priceSum)} 万` : "—"}</strong>
+                <strong>
+                  {pace.buysPerYear != null
+                    ? `約 ${pace.buysPerYear} 件／年`
+                    : "—"}
+                </strong>
+                <span className="meta">
+                  {pace.spanYears != null
+                    ? ` · 今後 ${pace.spanYears} 年分の利回り付き購入`
+                    : ""}
+                </span>
               </td>
             </tr>
             <tr>
-              <td>借入合計（万円・行の合算）</td>
+              <td>想定CF積み上げペース</td>
               <td>
-                <strong>{loanSum ? `${Math.round(loanSum)} 万` : "—"}</strong>
+                <strong>
+                  {pace.cfAddPerYearYen != null
+                    ? `${fmtYen(pace.cfAddPerYearYen)}／年`
+                    : "—"}
+                </strong>
+                <span className="meta">
+                  {" "}
+                  · 累計粗{" "}
+                  {pace.futureCfAddYen ? fmtYen(pace.futureCfAddYen) : "—"}
+                </span>
               </td>
             </tr>
             <tr>
-              <td>目標接続</td>
+              <td>ギャップ解消の目安</td>
               <td>
-                CF 月50万 ·{" "}
-                <a href="/realestate">運用レーンでギャップ確認 →</a>
+                {pace.gapYen === 0 ? (
+                  <strong>いま（到達済み）</strong>
+                ) : pace.reachYear != null && pace.yearsToCloseGap != null ? (
+                  <>
+                    <strong>
+                      今から約 {pace.yearsToCloseGap} 年後（{pace.reachYear}年）
+                    </strong>
+                    <span className="meta"> · プランどおりのとき</span>
+                  </>
+                ) : (
+                  <span className="meta">
+                    利回り付きの今後購入が足りない／未設定
+                  </span>
+                )}
               </td>
             </tr>
           </tbody>
         </table>
+
+        {pace.trajectory.length > 1 ? (
+          <>
+            <h2 style={{ fontSize: 15, margin: "16px 0 8px" }}>
+              推移：いま → CF 月50万
+            </h2>
+            <p className="meta" style={{ marginBottom: 8 }}>
+              各年末の「想定CF」＝いま（家賃−返済）＋それまでにプランで積む想定月家賃（粗）。目標到達行を強調。
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>時点</th>
+                  <th className="num">何年後</th>
+                  <th className="num">その年の積み上げ</th>
+                  <th className="num">想定CF（月）</th>
+                  <th className="num">目標まで</th>
+                  <th className="num">進捗</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pace.trajectory.map((row) => {
+                  const pct = Math.min(
+                    100,
+                    Math.max(
+                      0,
+                      Math.round((row.projectedCfYen / pace.goalYen) * 100)
+                    )
+                  );
+                  return (
+                    <tr
+                      key={`${row.label}-${row.year}`}
+                      style={
+                        row.reachedGoal
+                          ? { background: "rgba(46, 125, 50, 0.08)" }
+                          : undefined
+                      }
+                    >
+                      <td>
+                        <strong>{row.label}</strong>
+                        {row.buys > 0 ? (
+                          <span className="meta"> · 購入{row.buys}件</span>
+                        ) : null}
+                      </td>
+                      <td className="num">
+                        {row.yearsFromNow === 0
+                          ? "—"
+                          : `${row.yearsFromNow}年後`}
+                      </td>
+                      <td className="num meta">
+                        {row.addYen > 0 ? `+${fmtYen(row.addYen)}` : "—"}
+                      </td>
+                      <td className="num">
+                        <strong>{fmtYen(row.projectedCfYen)}</strong>
+                      </td>
+                      <td className="num meta">
+                        {row.remainingYen > 0
+                          ? fmtYen(row.remainingYen)
+                          : "0"}
+                      </td>
+                      <td className="num" style={{ minWidth: 88 }}>
+                        <div
+                          style={{
+                            height: 8,
+                            background: "var(--border, #e0e0e0)",
+                            borderRadius: 4,
+                            overflow: "hidden",
+                          }}
+                          title={`${pct}%`}
+                        >
+                          <div
+                            style={{
+                              width: `${pct}%`,
+                              height: "100%",
+                              background: row.reachedGoal
+                                ? "#2e7d32"
+                                : "#1565c0",
+                            }}
+                          />
+                        </div>
+                        <span className="meta">{pct}%</span>
+                      </td>
+                      <td className="meta">
+                        {row.reachedGoal ? "到達" : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        ) : null}
+      </div>
+
+      <div className="card">
+        <header>
+          <span className="lvl">名義</span>
+          <strong>個人と法人の取り組み（今後）</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          Excel の
+          entity（個人／法人）。購入・調達・売却の件数と、利回り付き購入の想定CF寄与。
+        </p>
+        <table style={{ marginTop: 8 }}>
+          <thead>
+            <tr>
+              <th></th>
+              <th className="num">個人</th>
+              <th className="num">法人</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>今後の購入（件数）</td>
+              <td className="num">
+                <strong>{pace.futureBuysPersonal}</strong>
+              </td>
+              <td className="num">
+                <strong>{pace.futureBuysCorporate}</strong>
+              </td>
+            </tr>
+            <tr>
+              <td>うち利回り付き（CF算出可）</td>
+              <td className="num meta" colSpan={2}>
+                {pace.futureBuysWithCf} 件がペース計算に使用
+              </td>
+            </tr>
+            <tr>
+              <td>想定月家賃積み上げ（粗）</td>
+              <td className="num">{fmtYen(pace.futureCfPersonalYen)}</td>
+              <td className="num">{fmtYen(pace.futureCfCorporateYen)}</td>
+            </tr>
+            <tr>
+              <td>今後の資金調達</td>
+              <td className="num">{pace.financePersonal}</td>
+              <td className="num">{pace.financeCorporate}</td>
+            </tr>
+            <tr>
+              <td>今後の売却</td>
+              <td className="num">{pace.salePersonal}</td>
+              <td className="num">{pace.saleCorporate}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style={{ marginTop: 12 }}>
+          <div className="meta" style={{ marginBottom: 4 }}>
+            今後購入の名義バランス（件数）
+          </div>
+          <div
+            style={{
+              display: "flex",
+              height: 10,
+              borderRadius: 5,
+              overflow: "hidden",
+              background: "var(--border, #e0e0e0)",
+            }}
+            title={`個人 ${personalBuyShare}% / 法人 ${corpBuyShare}%`}
+          >
+            <div
+              style={{
+                width: `${personalBuyShare}%`,
+                background: "#1565c0",
+              }}
+            />
+            <div
+              style={{
+                width: `${corpBuyShare}%`,
+                background: "#6a1b9a",
+              }}
+            />
+          </div>
+          <p className="meta" style={{ marginTop: 6 }}>
+            個人 {personalBuyShare}% · 法人 {corpBuyShare}%
+          </p>
+        </div>
         <p className="meta" style={{ marginTop: 8 }}>
-          神大家 STEP3: トップダウン・戸建売却で資金回復・フリー／運転は原資部品。カードローンは禁じ手。
+          神大家
+          STEP3: トップダウン・戸建売却で資金回復・フリー／運転は原資部品。カードローンは禁じ手。
         </p>
       </div>
 
@@ -216,7 +470,8 @@ export default async function BuyPlanPage() {
           <strong>今狙う物件（条件フォーカス）</strong>
         </header>
         <p className="meta" style={{ marginTop: 8 }}>
-          Notion「物件買い進め条件」＋ Excel criteria。ここに合わない提案は断る（勝ち続けるプランニング）。
+          Notion「物件買い進め条件」＋ Excel
+          criteria。ここに合わない提案は断る（勝ち続けるプランニング）。
         </p>
         <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
           {focusHints.map((h) => (
@@ -295,7 +550,8 @@ export default async function BuyPlanPage() {
           <strong>長期年表（購入・売却・調達）</strong>
         </header>
         <p className="meta" style={{ marginTop: 8 }}>
-          STEP3 シートのイベント行。日付が無い行は「未定」。ライフプランの年次感で読む。
+          STEP3
+          シートのイベント行。日付が無い行は「未定」。ライフプランの年次感で読む。
         </p>
         {years.length === 0 ? (
           <p className="meta" style={{ marginTop: 8 }}>
@@ -321,47 +577,48 @@ export default async function BuyPlanPage() {
                 <tbody>
                   {(byYear.get(y) || []).map((e) => {
                     const act = buyPlanActionView(e.action);
+                    const yld = n(e.yield_pct);
                     return (
-                    <tr key={`${y}-${e.row_no}`}>
-                      <td className="meta">
-                        {e.event_date ? e.event_date.slice(0, 10) : "—"}
-                      </td>
-                      <td>
-                        <span
-                          title={e.action || ""}
-                          style={{
-                            display: "inline-block",
-                            padding: "2px 8px",
-                            borderRadius: 4,
-                            fontSize: 12,
-                            background: act.bg,
-                            color: act.fg,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {act.label}
-                        </span>
-                      </td>
-                      <td className="meta">{e.entity || "—"}</td>
-                      <td>
-                        {e.property_name || e.location || "—"}
-                        {e.structure ? (
-                          <span className="meta"> · {e.structure}</span>
-                        ) : null}
-                      </td>
-                      <td className="num meta">
-                        {n(e.price_man) != null ? n(e.price_man) : "—"}
-                      </td>
-                      <td className="num meta">
-                        {n(e.yield_pct) != null
-                          ? `${n(e.yield_pct)}%`
-                          : "—"}
-                      </td>
-                      <td className="meta">{e.bank || "—"}</td>
-                      <td className="num meta">
-                        {n(e.loan_man) != null ? n(e.loan_man) : "—"}
-                      </td>
-                    </tr>
+                      <tr key={`${y}-${e.row_no}`}>
+                        <td className="meta">
+                          {e.event_date ? e.event_date.slice(0, 10) : "—"}
+                        </td>
+                        <td>
+                          <span
+                            title={e.action || ""}
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 8px",
+                              borderRadius: 4,
+                              fontSize: 12,
+                              background: act.bg,
+                              color: act.fg,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {act.label}
+                          </span>
+                        </td>
+                        <td className="meta">{e.entity || "—"}</td>
+                        <td>
+                          {e.property_name || e.location || "—"}
+                          {e.structure ? (
+                            <span className="meta"> · {e.structure}</span>
+                          ) : null}
+                        </td>
+                        <td className="num meta">
+                          {n(e.price_man) != null ? n(e.price_man) : "—"}
+                        </td>
+                        <td className="num meta">
+                          {yld != null
+                            ? `${Math.round(yld * 1000) / 10}%`
+                            : "—"}
+                        </td>
+                        <td className="meta">{e.bank || "—"}</td>
+                        <td className="num meta">
+                          {n(e.loan_man) != null ? n(e.loan_man) : "—"}
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>

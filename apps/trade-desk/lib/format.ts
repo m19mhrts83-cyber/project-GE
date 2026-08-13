@@ -58,3 +58,8 @@ export function gainPct(
 export const DASHBOARD_URL =
   process.env.NEXT_PUBLIC_DASHBOARD_URL ||
   "https://jarvis-dashboard-amber.vercel.app";
+
+/** 借入残高トラッカー（ローン正本。Google: estate） */
+export const LOAN_TRACKER_URL =
+  process.env.NEXT_PUBLIC_LOAN_TRACKER_URL ||
+  "https://loan-tracker-plum.vercel.app/";

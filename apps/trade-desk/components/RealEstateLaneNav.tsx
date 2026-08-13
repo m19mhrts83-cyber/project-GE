@@ -1,5 +1,7 @@
 /** 不動産 ③-A〜D レーンナビ */
 
+import { LOAN_TRACKER_URL } from "@/lib/format";
+
 export type ReLaneId = "a" | "b-plan" | "b-funnel" | "c" | "d";
 
 const LANES: {
@@ -68,6 +70,22 @@ export default function RealEstateLaneNav({ active }: { active: ReLaneId }) {
           </a>
         );
       })}
+      <a
+        href={LOAN_TRACKER_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="ローン正本（Google: estate）"
+        style={{
+          marginLeft: 4,
+          padding: "4px 10px",
+          border: "1px solid var(--border, #ccc)",
+          borderRadius: 6,
+          textDecoration: "none",
+          fontSize: 13,
+        }}
+      >
+        借入残高トラッカー ↗
+      </a>
     </nav>
   );
 }

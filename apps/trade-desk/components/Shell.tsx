@@ -1,4 +1,4 @@
-import { DASHBOARD_URL } from "@/lib/format";
+import { DASHBOARD_URL, LOAN_TRACKER_URL } from "@/lib/format";
 
 const NAV = [
   { href: "/", label: "ホーム" },
@@ -89,6 +89,15 @@ export default function Shell({
           active={active}
           items={NAV.filter((n) => ["/realestate"].includes(n.href))}
         />
+        <a
+          className="side-link"
+          href={LOAN_TRACKER_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="ローン正本（Google: estate）"
+        >
+          借入残高トラッカー ↗
+        </a>
 
         <div className="side-group-title side-group-title--rule">運用</div>
         <NavLinks
