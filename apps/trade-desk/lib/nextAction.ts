@@ -67,6 +67,40 @@ export type DealFunnelBrief = {
   viewing: number;
 };
 
+export type CardDebitWatchBrief = {
+  updated_at?: string;
+  smbc_balance_jpy?: number | null;
+  olive_infinite?: {
+    amount_jpy?: number | null;
+    due_date?: string | null;
+    amount_pending?: boolean;
+    smbc_shortfall?: number | null;
+    notice_date?: string | null;
+  };
+  top_alert?: {
+    card_id?: string;
+    label?: string;
+    level?: string;
+    reason?: string;
+    amount_jpy?: number | null;
+    due_date?: string | null;
+    smbc_shortfall?: number | null;
+    href?: string;
+  } | null;
+  money_ops_href?: string;
+};
+
+export function parseCardDebitWatch(
+  raw: string | null | undefined
+): CardDebitWatchBrief | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as CardDebitWatchBrief;
+  } catch {
+    return null;
+  }
+}
+
 export function computeNextAction(input: {
   summary: PortfolioWeeklySummary | null;
   themes: ThemeLite[];
@@ -79,7 +113,20 @@ export function computeNextAction(input: {
   dealFunnel?: DealFunnelBrief | null;
   /** Phase C: 買い進め canonical が無い */
   buyPlanMissing?: boolean;
+  /** カード引落（Infinite 本線） */
+  cardDebit?: CardDebitWatchBrief | null;
 }): NextAction {
+  const debit = input.cardDebit?.top_alert;
+  if (debit && (debit.level === "warn" || debit.level === "attention")) {
+    const label = debit.label || "カード引落";
+    const reason = debit.reason || "要確認";
+    return {
+      level: debit.level === "warn" ? "warn" : "info",
+      label: `${label}: ${reason} → 寄せ計画`,
+      href: debit.href || input.cardDebit?.money_ops_href || "/money-ops",
+    };
+  }
+
   const fails = failedSources(input.summary);
   if (fails.length > 0) {
     const f = fails[0];

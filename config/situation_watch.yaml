@@ -66,6 +66,19 @@ items:
       次回引落日・解約期限・退会モード・資産運用特典を整理。期限が近いなら先に警告。
       秘密は .env.jarvis_private（PP_CANCEL_* / OLIVE_INF_*_FEE_*）。値は出さない。
 
+  - id: card_debit_watch
+    title: カード引落（Infinite 本線）
+    category: finance
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/card_debit_watch.json
+    cursor_prompt: |
+      カード月次引落を確認して。state: .jarvis_state/card_debit_watch.json
+      Olive Infinite が本線（大型月を必ず見る）。他カードは閾値超えのみ。
+      コマンド: scripts/jarvis_card_debit_watch.py
+      金額未確定なら Vpass で確定し --set olive_infinite --amount N --due YYYY-MM-DD
+      不足時は /money-ops のカード引落バッファへ。年会費ウォッチ（card_annual_fee）と混ぜない。
+
   - id: mobile_plan
     title: 携帯プラン乗り換え（Y!mobile/UQ）
     category: finance
