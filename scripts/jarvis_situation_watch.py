@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import date, datetime, timedelta
@@ -524,7 +525,7 @@ def _parse_ymd(s: str) -> date | None:
 
 
 def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
-    """Olive Infinite 本線の月次引落。年会費ウォッチとは別。"""
+    """Olive Infinite 本線の月次引落。年会費ウォッチとは別。処置は KURASHIFT。"""
     title = meta["title"]
     prompt = meta.get("cursor_prompt") or ""
     src = meta.get("source") or ""
@@ -544,7 +545,11 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
     olive = cards.get("olive_infinite") if isinstance(cards.get("olive_infinite"), dict) else {}
     smbc = data.get("smbc_balance_jpy")
 
-    detail_lines: list[str] = []
+    detail_lines: list[str] = [
+        "支払いを確実に行うことは重要です。気づきは Jarvis ダッシュボード、",
+        "寄せ・調達の処置は KURASHIFT（/money-ops）で行います。",
+        "",
+    ]
     if isinstance(smbc, int):
         detail_lines.append(f"SMBC刈谷残高: {smbc:,}円")
     for cid, c in cards.items():
@@ -558,19 +563,55 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
         )
 
     level = "ok"
-    summary = "引落アラートなし"
-    href = "/money-ops"
+    summary = "引落アラートなし（支払い準備は不要）"
+    path_q = "/money-ops"
     if alerts:
         top = alerts[0]
         level = "warn" if top.get("level") == "warn" else "attention"
-        summary = f"{top.get('label')}: {top.get('reason')}"
-        href = str(top.get("href") or href)
+        summary = f"【支払い準備】{top.get('label')}: {top.get('reason')}"
+        path_q = str(top.get("href") or path_q)
         detail_lines.append("\n【アラート】")
         for a in alerts:
             detail_lines.append(f"- [{a.get('level')}] {a.get('label')}: {a.get('reason')}")
     elif olive.get("notice_date"):
-        summary = f"Infinite 通知あり（金額{'未確定' if olive.get('amount_pending') else '確定'}）"
-        level = "info"
+        summary = (
+            f"【支払い準備】Infinite 通知あり"
+            f"（金額{'未確定' if olive.get('amount_pending') else '確定'}・引落 {olive.get('due_date') or '—'}）"
+        )
+        level = "attention"
+        due = olive.get("due_date") or ""
+        need = olive.get("amount_jpy")
+        path_q = f"/money-ops?due={due}&need={need or ''}&card=olive_infinite"
+
+    kurashift_base = (
+        os.environ.get("JARVIS_KURASHIFT_URL")
+        or os.environ.get("NEXT_PUBLIC_KURASHIFT_URL")
+        or "https://jarvis-trade-desk.vercel.app"
+    ).rstrip("/")
+    if path_q.startswith("http"):
+        action_url = path_q
+    else:
+        action_url = f"{kurashift_base}{path_q if path_q.startswith('/') else '/' + path_q}"
+
+    emphasize = level in ("warn", "attention")
+    actions: list[dict[str, Any]] = []
+    if emphasize:
+        actions = [
+            {
+                "date": str(olive.get("due_date") or ""),
+                "shop": "KURASHIFT",
+                "proposal": "資金移動オペで寄せ計画を作る（自動振込なし）",
+                "line": "KURASHIFT /money-ops — 寄せ計画・調達ラダー",
+                "kind": "card_debit_kurashift",
+            },
+            {
+                "date": "",
+                "shop": "Vpass",
+                "proposal": "金額未確定なら Vpass で確定額を確認し state に --set",
+                "line": "Vpass — お支払い金額を確定",
+                "kind": "card_debit_vpass",
+            },
+        ]
 
     return card(
         item_id=meta["id"],
@@ -585,8 +626,15 @@ def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
             "alerts": alerts,
             "olive_infinite": olive or None,
             "smbc_balance_jpy": smbc,
-            "href": href,
-            "pin_home_top": level in ("warn", "attention"),
+            "href": action_url,
+            "action_url": action_url,
+            "kurashift_path": path_q,
+            "pin_home_top": emphasize,
+            "pin_top": emphasize,
+            "show_banner": emphasize,
+            "never_dismiss_lightly": True,
+            "emphasis": "payment_duty",
+            "actions": actions,
         },
     )
 

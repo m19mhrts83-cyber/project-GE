@@ -54,10 +54,16 @@ export default async function SituationPage() {
         ? (b.payload as Record<string, unknown>)
         : {};
     const pinA =
-      (pa.pin_top === true || a.id === "cursor_pro_plus_downgrade") &&
+      (pa.pin_top === true ||
+        pa.pin_home_top === true ||
+        a.id === "cursor_pro_plus_downgrade" ||
+        a.id === "card_debit_watch") &&
       a.level !== "ok";
     const pinB =
-      (pb.pin_top === true || b.id === "cursor_pro_plus_downgrade") &&
+      (pb.pin_top === true ||
+        pb.pin_home_top === true ||
+        b.id === "cursor_pro_plus_downgrade" ||
+        b.id === "card_debit_watch") &&
       b.level !== "ok";
     if (pinA !== pinB) return pinA ? -1 : 1;
     return watchSortKey(a.level) - watchSortKey(b.level);

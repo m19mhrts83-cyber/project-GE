@@ -31,13 +31,20 @@ export default function OpsPinCard({
   showAck,
   ackSlot,
 }: Props) {
-  const tone =
-    id === "ops_fix_notice" || id === "zaim_quality" || level === "info"
+  // カード引落は支払い重要度のため常に alert トーン
+  const bannerTone =
+    id === "ops_fix_notice" || id === "zaim_quality"
       ? "home-pin-banner-info"
-      : "home-pin-banner-alert";
+      : id === "card_debit_watch"
+        ? "home-pin-banner-alert"
+        : level === "info"
+          ? "home-pin-banner-info"
+          : "home-pin-banner-alert";
 
   return (
-    <div className={`card watch-card level-${level} home-pin-banner ${tone}`}>
+    <div
+      className={`card watch-card level-${level} home-pin-banner ${bannerTone}`}
+    >
       <a
         href={href}
         className="home-pin-banner-link"

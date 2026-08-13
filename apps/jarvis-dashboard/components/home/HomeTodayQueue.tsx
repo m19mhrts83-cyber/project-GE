@@ -67,7 +67,8 @@ export default async function HomeTodayQueue() {
         w.id === "vpoint" ||
         w.id === "rent_step" ||
         w.id === "cursor_pro_plus_downgrade" ||
-        w.id === "mobile_plan"
+        w.id === "mobile_plan" ||
+        w.id === "card_debit_watch"
       ) {
         if (pl.show_banner === true) return true;
       }
@@ -83,9 +84,15 @@ export default async function HomeTodayQueue() {
           ? (b.payload as Record<string, unknown>)
           : {};
       const pinA =
-        pa.pin_top === true || a.id === "cursor_pro_plus_downgrade";
+        pa.pin_top === true ||
+        pa.pin_home_top === true ||
+        a.id === "cursor_pro_plus_downgrade" ||
+        a.id === "card_debit_watch";
       const pinB =
-        pb.pin_top === true || b.id === "cursor_pro_plus_downgrade";
+        pb.pin_top === true ||
+        pb.pin_home_top === true ||
+        b.id === "cursor_pro_plus_downgrade" ||
+        b.id === "card_debit_watch";
       if (pinA !== pinB) return pinA ? -1 : 1;
       return (
         watchSortKey(a.level) - watchSortKey(b.level) ||
@@ -100,7 +107,12 @@ export default async function HomeTodayQueue() {
     return order[la] - order[lb];
   });
   const partnerMails = mails.filter((m) => m.lane === "partner");
-  const attentionWatch = watchNeed.filter((w) => w.level === "attention");
+  const attentionWatch = watchNeed.filter(
+    (w) =>
+      w.level === "attention" ||
+      w.level === "warn" ||
+      w.id === "card_debit_watch"
+  );
 
   const items: QueueItem[] = [];
   for (const m of partnerMails.slice(0, 4)) {
