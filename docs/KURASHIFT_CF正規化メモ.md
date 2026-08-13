@@ -43,13 +43,27 @@ KPI の定常／特別の分解は **`kurashift_finance_transactions` の subcat
 - 法人側の家賃・返済は合算 KPI に含める（2026-08-13 承認）
 - subcategory でローン／経費／特別を分解（`19F` 一塊は使わない）
 
+### 年次プロット（2026-08-13）
+
+`/realestate/buy-plan` の「想定 vs 実績 · キャッシュフロー推移」:
+
+| 線 | 定義 |
+|---|---|
+| 計画 ver.1.0 / 2.2 / 3.1 | STEP3 イベントの粗月次CF（`price × yield / 12`）。売却は `property_name` 一致で減算 |
+| 実際のキャッシュフロー（定常） | `kurashift_finance_transactions` → `composeReSteadyBoard`（家賃−ローン−毎月経費） |
+| 目標線 | 月次 CF ¥500,000 |
+
+メジャー版キー: `240224` / `250901` / `251124`（`lib/buyPlanCfSeries.ts`）
+
 ## 次の正規化ステップ
 
 1. 買い進め Excel の「保有後想定月次 CF」合計と、満室想定の突合を deals に載せる
 2. 号室キャンペーン終了後に想定家賃を2年目帯へ寄せる（Grandole I）
+3. （棚卸し後）年次実績の計画への取り込み／Excel 改訂モード（`buy-plan-revise-modes`）— 通し検証・相談後
 
 ## 関連
 
 - プラン: `kurashift実務検証` Sprint 2
 - 取込: `scripts/jarvis_kurashift_buy_plan_ingest.py`
-- 表示: `/` ホーム KPI、`/realestate` Bridge
+- 表示: `/` ホーム KPI、`/realestate` Bridge、`/realestate/buy-plan` 年度評価
+- 通し検証ログ: `docs/KURASHIFT_通し検証ログ_20260813.md`
