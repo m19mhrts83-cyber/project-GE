@@ -31,10 +31,6 @@ function ingested(
   cases: CaseRow[],
   evidence: EvidenceRow[]
 ): boolean {
-  const ev = evidence.filter(
-    (e) => e.fiscal_year === year && (e.scope || "personal") === scope
-  );
-  if (ev.length > 0) return true;
   if (scope === "personal") {
     return cases.some(
       (c) =>
@@ -43,7 +39,10 @@ function ingested(
         (c.status === "csv_ready" || c.status === "registered" || c.status === "closed")
     );
   }
-  return false;
+  const ev = evidence.filter(
+    (e) => e.fiscal_year === year && (e.scope || "personal") === scope
+  );
+  return ev.length > 0;
 }
 
 export default async function TaxPage() {
@@ -82,11 +81,11 @@ export default async function TaxPage() {
 
   return (
     <Shell active="/tax" email={user?.email ?? null}>
-      <p className="page-kicker">② · 申告サイクル</p>
-      <h1>申告</h1>
+      <p className="page-kicker">② · 確定申告サイクル</p>
+      <h1>確定申告</h1>
       <p className="sub">
-        いま回す年は日付で切り替わります。個人は12月締め・2月申告、法人は5月決算・8月頃。
-        未取込で窓に入ったら「そろそろ取り込みます」。Jarvis に下の文で依頼してください。
+        いま回す年は日付で切り替わります。個人は自分で確定申告します（Jarvis
+        に依頼可）。法人は5月決算・8月頃に大野さんメールを取り込みます。
       </p>
 
       <div className="grid">
@@ -97,13 +96,13 @@ export default async function TaxPage() {
           </header>
           <p>
             <span className={`status-pill ${personalIn ? "ingested" : "pending"}`}>
-              {personalIn ? "取り込んでいる" : "取り込んでいない"}
+              {personalIn ? "弥生CSV あり" : "まだ"}
             </span>
           </p>
           <p className="meta">{personal.windowLabel}</p>
           {personal.window && !personalIn ? (
             <div className="card notice" style={{ marginTop: 12, marginBottom: 12 }}>
-              <strong>そろそろ取り込みます</strong>
+              <strong>そろそろ確定申告の季節です</strong>
               <p className="meta" style={{ marginTop: 6 }}>
                 Jarvis へ: 「{personal.jarvisPrompt}」
               </p>
@@ -118,12 +117,6 @@ export default async function TaxPage() {
             title={`弥生CSV ${personal.year}`}
             payload={{ fiscal_year: personal.year, scope: "personal" }}
             label="弥生CSVを作る"
-          />
-          <EnqueueJobButton
-            jobType="tax_ingest_accountant_mail"
-            title={`税理士メール取込 ${personal.year}`}
-            payload={{ fiscal_year: personal.year, scope: "personal", limit: 30 }}
-            label="税理士メールを取り込む"
           />
         </article>
 
@@ -201,13 +194,16 @@ export default async function TaxPage() {
           <span className="lvl">証憑</span>
           <strong>メール添付など</strong>
         </header>
+        <p className="meta" style={{ marginTop: 0 }}>
+          中身の確認はプレビューです。フォルダへの書き出しが必要なときは Jarvis に指示してください。
+        </p>
         <table>
           <thead>
             <tr>
               <th>区分</th>
               <th>年度</th>
               <th>件名／ファイル</th>
-              <th>再出力</th>
+              <th>表示</th>
             </tr>
           </thead>
           <tbody>
@@ -224,15 +220,11 @@ export default async function TaxPage() {
                   <td>{e.fiscal_year}</td>
                   <td>
                     {e.subject || e.original_filename || e.doc_kind}
+                    <div className="meta">{e.original_filename}</div>
                     <div className="meta">{e.stored_path}</div>
                   </td>
                   <td>
-                    <EnqueueJobButton
-                      jobType="tax_export_evidence"
-                      title={`export ${e.id}`}
-                      payload={{ fiscal_year: e.fiscal_year, evidence_id: e.id }}
-                      label="証憑出力"
-                    />
+                    <a href={`/tax/evidence/${e.id}`}>プレビュー</a>
                   </td>
                 </tr>
               ))

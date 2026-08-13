@@ -74,7 +74,32 @@ export function aggregateReCfFromCategoryYear(
   return { personal, corporate, combined: combineReCf(personal, corporate) };
 }
 
-/** 当年経過月数（最低1）。月次ランレート用。 */
+/** 当年経過月数（最低1）。月次ランレート用。Asia/Tokyo。 */
+export function tokyoYmd(now = new Date()): {
+  year: number;
+  month: number;
+  day: number;
+} {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  return {
+    year: Number(parts.find((p) => p.type === "year")?.value),
+    month: Number(parts.find((p) => p.type === "month")?.value),
+    day: Number(parts.find((p) => p.type === "day")?.value),
+  };
+}
+
 export function monthsElapsedInYear(now = new Date()): number {
-  return Math.max(1, now.getMonth() + 1);
+  return Math.max(1, tokyoYmd(now).month);
+}
+
+/** 月次ランレート用。当月20日未満なら前月まで（未完了月を割らない）。 */
+export function completeMonthsElapsed(now = new Date()): number {
+  const { month, day } = tokyoYmd(now);
+  if (day >= 20) return Math.max(1, month);
+  return Math.max(1, month - 1);
 }

@@ -490,6 +490,28 @@ tr:hover td {
   box-shadow: var(--shadow);
 }
 
+.notice p {
+  margin: 0.55rem 0 0;
+  line-height: 1.55;
+}
+
+.notice p:first-of-type {
+  margin-top: 0.65rem;
+}
+
+details {
+  margin: 0 0 4px;
+}
+
+details > summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+details > table {
+  margin-top: 8px;
+}
+
 .warn {
   color: var(--med);
 }
@@ -813,6 +835,17 @@ code {
   stroke-dasharray: 2 4;
 }
 
+.evidence-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 220px);
+  min-height: 640px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  object-fit: contain;
+}
+
 .lp-bars {
   display: flex;
   align-items: flex-end;
@@ -865,6 +898,54 @@ code {
 
 .lp-bar-legend .swatch.actual {
   background: var(--accent);
+}
+
+.hq-board {
+  display: grid;
+  gap: 5px 0;
+  margin: 10px 0 12px;
+}
+
+.hq-board-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 0.86rem;
+}
+
+.hq-board-row dt {
+  margin: 0;
+  color: var(--muted);
+}
+
+.hq-board-row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  text-align: right;
+}
+
+.hq-board-row.plan dd {
+  color: var(--ink-blue);
+}
+
+.hq-board-row.actual dd {
+  color: var(--accent-deep);
+}
+
+.hq-board-row.gap {
+  margin-top: 4px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--line);
+}
+
+.hq-board-row.gap.over dd {
+  color: var(--high);
+}
+
+.hq-board-row.gap.under dd {
+  color: var(--ink-blue);
 }
 
 @media (max-width: 900px) {

@@ -42,7 +42,7 @@ class BalanceResult:
     source_url: str
     parser_mode: str
     category: str = ""
-    pl_jpy: int = 0
+    pl_jpy: int | None = None
 
 
 def _load_env_file(path: Path) -> None:
@@ -383,7 +383,7 @@ def fetch_bond_balance(
         source_url=source_url,
         parser_mode=mode,
         category=picked_cat if 'picked_cat' in locals() else "",
-        pl_jpy=pl if (pl is not None) else 0,
+        pl_jpy=pl if (pl is not None) else None,
     )
 
 
@@ -431,6 +431,8 @@ def main() -> int:
                     "amount_rows": result.amount_rows,
                     "source_url": result.source_url,
                     "parser_mode": result.parser_mode,
+                    "pl_jpy": result.pl_jpy,
+                    "category": result.category,
                 },
                 ensure_ascii=False,
             )

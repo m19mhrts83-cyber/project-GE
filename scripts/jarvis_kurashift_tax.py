@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""KURASHIFT tax: personal Yayoi CSV + accountant mail evidence (Gmail).
+"""KURASHIFT tax: personal Yayoi CSV + corporate accountant mail (Gmail).
 
-Personal: Zaim summary → CSV draft. Corporate: Knees bee (Ohno) PDF, yearly.
+Personal: Zaim summary → CSV draft（税理士メール取込はしない）。
+Corporate: Knees bee（大野さん）PDF, yearly.
 Default Gmail: admin (token_livingsupport.json).
 Override: KURASHIFT_TAX_GMAIL_TOKEN=/path/to/token.json
 """
@@ -11,6 +12,7 @@ import argparse
 import base64
 import csv
 import json
+import mimetypes
 import os
 import re
 import sys
@@ -29,6 +31,7 @@ TAX_DIR = Path(
     "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/"
     "215_神・大家さん倶楽部/50_税金,確定申告"
 ).expanduser()
+STORAGE_BUCKET = "kurashift-tax"
 
 
 def now_iso() -> str:
@@ -37,6 +40,88 @@ def now_iso() -> str:
 
 def emit_result(obj: dict) -> None:
     print("KURASHIFT_RESULT:" + json.dumps(obj, ensure_ascii=False))
+
+
+def guess_mime(name: str) -> str:
+    guessed, _ = mimetypes.guess_type(name)
+    return guessed or "application/octet-stream"
+
+
+def storage_key(scope: str, year: int, evidence_id: str, filename: str) -> str:
+    ext = Path(filename).suffix.lower()
+    if not re.match(r"^\.[a-z0-9]{1,8}$", ext or ""):
+        ext = ""
+    return f"{scope}/{year}/{evidence_id}{ext}"
+
+
+def upload_evidence_bytes(sb: Any, key: str, data: bytes, mime: str) -> str | None:
+    try:
+        sb.storage.from_(STORAGE_BUCKET).upload(
+            key,
+            data,
+            file_options={"content-type": mime, "upsert": "true"},
+        )
+        return key
+    except Exception as e:  # noqa: BLE001
+        print(f"# storage upload skip {key}: {e}", flush=True)
+        return None
+
+
+def insert_evidence_row(sb: Any, row: dict, file_path: Path | None, blob: bytes | None) -> str | None:
+    """DB 行を作り、可能なら Storage にも上げてプレビューできるようにする。"""
+    ins = sb.table("kurashift_tax_evidence").insert(row).execute()
+    eid = ((ins.data or [{}])[0] or {}).get("id")
+    if not eid:
+        return None
+    data = blob
+    if data is None and file_path and file_path.exists():
+        data = file_path.read_bytes()
+    name = row.get("original_filename") or (file_path.name if file_path else "file")
+    if data is not None:
+        key = storage_key(str(row.get("scope") or "personal"), int(row["fiscal_year"]), eid, str(name))
+        uploaded = upload_evidence_bytes(sb, key, data, guess_mime(str(name)))
+        if uploaded:
+            sb.table("kurashift_tax_evidence").update({"storage_path": uploaded}).eq("id", eid).execute()
+    return eid
+
+
+def sync_storage(dry_run: bool) -> dict:
+    """既存の stored_path を Storage に上げてプレビュー可能にする。"""
+    sb = sb_client()
+    if not sb:
+        raise SystemExit("JARVIS_SUPABASE_* required")
+    rows = (
+        sb.table("kurashift_tax_evidence")
+        .select("id, fiscal_year, scope, stored_path, original_filename, storage_path")
+        .execute()
+        .data
+        or []
+    )
+    out: dict[str, Any] = {"action": "sync_storage", "checked": len(rows), "uploaded": 0, "skipped": 0, "missing": []}
+    for row in rows:
+        if row.get("storage_path"):
+            out["skipped"] += 1
+            continue
+        src = Path(row.get("stored_path") or "")
+        if not src.exists():
+            out["missing"].append(str(src))
+            continue
+        if dry_run:
+            out["uploaded"] += 1
+            continue
+        key = storage_key(
+            str(row.get("scope") or "personal"),
+            int(row["fiscal_year"]),
+            str(row["id"]),
+            str(row.get("original_filename") or src.name),
+        )
+        uploaded = upload_evidence_bytes(sb, key, src.read_bytes(), guess_mime(src.name))
+        if uploaded:
+            sb.table("kurashift_tax_evidence").update({"storage_path": uploaded}).eq("id", row["id"]).execute()
+            out["uploaded"] += 1
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    emit_result(out)
+    return out
 
 
 def year_dir(year: int, scope: str = "personal") -> Path:
@@ -278,7 +363,7 @@ def sanitize_filename(name: str) -> str:
 
 
 def ensure_tax_case(sb: Any, year: int, scope: str = "personal") -> str | None:
-    title = f"個人申告 {year}" if scope == "personal" else f"法人申告 {year}年5月期"
+    title = f"個人確定申告 {year}" if scope == "personal" else f"法人確定申告 {year}年5月期"
     rows = (
         sb.table("kurashift_tax_cases")
         .select("id")
@@ -324,7 +409,18 @@ def mail_query(year: int, scope: str) -> str:
 
 
 def ingest_mail(year: int, dry_run: bool, limit: int, scope: str = "personal") -> dict:
-    """Search admin Gmail; personal=税理士一般、corporate=Knees bee 大野さんPDF。"""
+    """法人のみ。Knees bee 大野さんPDFを Gmail から取り込む。個人は対象外。"""
+    if scope != "corporate":
+        out = {
+            "ok": False,
+            "action": "ingest_mail",
+            "fiscal_year": year,
+            "scope": scope,
+            "error": "個人の税理士メール取込は廃止。法人（corporate）のみ。",
+        }
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        emit_result(out)
+        return out
     query = mail_query(year, scope)
     store = year_dir(year, scope) / "evidence"
     out: dict[str, Any] = {
@@ -398,7 +494,8 @@ def ingest_mail(year: int, dry_run: bool, limit: int, scope: str = "personal") -
                 encoding="utf-8",
             )
             if sb:
-                sb.table("kurashift_tax_evidence").insert(
+                insert_evidence_row(
+                    sb,
                     {
                         "tax_case_id": case_id,
                         "fiscal_year": year,
@@ -411,8 +508,10 @@ def ingest_mail(year: int, dry_run: bool, limit: int, scope: str = "personal") -
                         "original_filename": note_path.name,
                         "received_at": received_at,
                         "metadata": {"has_attachment": False},
-                    }
-                ).execute()
+                    },
+                    note_path,
+                    None,
+                )
             saved.append({"message_id": mid, "subject": subject, "files": [str(note_path)]})
             continue
 
@@ -434,7 +533,8 @@ def ingest_mail(year: int, dry_run: bool, limit: int, scope: str = "personal") -
             dest.write_bytes(data)
             files.append(str(dest))
             if sb:
-                sb.table("kurashift_tax_evidence").insert(
+                insert_evidence_row(
+                    sb,
                     {
                         "tax_case_id": case_id,
                         "fiscal_year": year,
@@ -447,8 +547,10 @@ def ingest_mail(year: int, dry_run: bool, limit: int, scope: str = "personal") -
                         "original_filename": part["filename"],
                         "received_at": received_at,
                         "metadata": {"has_attachment": True},
-                    }
-                ).execute()
+                    },
+                    dest,
+                    data,
+                )
         saved.append({"message_id": mid, "subject": subject, "files": files})
 
     out["messages_scanned"] = len(messages)
@@ -547,7 +649,8 @@ def ingest_manual_dir(year: int, dry_run: bool) -> dict:
             "path": str(dest),
         }
         if sb:
-            sb.table("kurashift_tax_evidence").insert(
+            insert_evidence_row(
+                sb,
                 {
                     "fiscal_year": year,
                     "scope": "personal",
@@ -556,8 +659,10 @@ def ingest_manual_dir(year: int, dry_run: bool) -> dict:
                     "original_filename": src.name,
                     "stored_path": str(dest),
                     "received_at": date.today().isoformat(),
-                }
-            ).execute()
+                },
+                dest,
+                None,
+            )
         out["items"].append(item)
         out["saved"] += 1
 
@@ -575,6 +680,7 @@ def main() -> int:
     ap.add_argument("--ingest-mail", action="store_true")
     ap.add_argument("--ingest-manual-dir", action="store_true")
     ap.add_argument("--export-evidence", action="store_true")
+    ap.add_argument("--sync-storage", action="store_true", help="既存証憑をプレビュー用 Storage へ上げる")
     ap.add_argument("--evidence-id", default="")
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--dry-run", action="store_true")
@@ -591,9 +697,11 @@ def main() -> int:
         ingest_manual_dir(year, args.dry_run)
     elif args.export_evidence:
         export_evidence(year, args.evidence_id, args.dry_run)
+    elif args.sync_storage:
+        sync_storage(args.dry_run)
     else:
         raise SystemExit(
-            "specify --build-csv | --ingest-mail | --ingest-manual-dir | --export-evidence"
+            "specify --build-csv | --ingest-mail | --ingest-manual-dir | --export-evidence | --sync-storage"
         )
     return 0
 
