@@ -1,5 +1,5 @@
 #!/bin/zsh
-# 資産全体の週次 Web 収集（日曜 09:00 ＋ Mac 起動時 RunAtLoad ＋ 朝オープン取りこぼし）
+# 資産全体の週次 Web 収集（日曜 09:10 ＋ Mac 起動時 RunAtLoad ＋ 朝オープン取りこぼし）
 # 成功済みの ISO 週は scripts 側でスキップ。手動は KURASHIFT ホームのボタン or --force。
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"

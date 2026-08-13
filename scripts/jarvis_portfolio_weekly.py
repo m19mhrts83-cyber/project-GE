@@ -618,6 +618,57 @@ def upsert_sync_meta(sb, payload: dict[str, Any]) -> None:
     ).execute()
 
 
+def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
+    """ソニーはバッチ後半（9:00 開店直後の混雑を避ける）。"""
+    try:
+        sony_multi = fetch_sony_by_account()
+    except Exception as exc:
+        sony_multi = rec_from_exc(exc)
+    if sony_multi.get("status") == "ok":
+        for aid, rec in (sony_multi.get("accounts") or {}).items():
+            sources[aid] = rec
+            print(
+                f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
+            )
+            if not dry_run and rec.get("status") == "ok":
+                upsert_snapshot(
+                    sb,
+                    aid,
+                    float(rec["value_jpy"]),
+                    source="weekly_web",
+                    note=rec.get("note"),
+                )
+        for aid, rec in (sony_multi.get("loans") or {}).items():
+            sources[aid] = rec
+            print(
+                f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
+            )
+            if not dry_run and rec.get("status") == "ok":
+                upsert_snapshot(
+                    sb,
+                    aid,
+                    float(rec["value_jpy"]),
+                    source="weekly_web_loan",
+                    note=rec.get("note"),
+                )
+        if "sony_life_chikage" not in (sony_multi.get("accounts") or {}):
+            sources["sony_life_chikage"] = {
+                "status": "skipped",
+                "reason": "SONYLIFE_USERNAME_2 未設定または取得0件",
+            }
+            print("# sony_life_chikage: skipped SONYLIFE_USERNAME_2 未設定または取得0件")
+        return
+    sources["sony_life"] = sony_multi
+    sources["sony_life_chikage"] = {
+        "status": sony_multi.get("status") or "error",
+        "reason": sony_multi.get("reason") or "sony parent failed",
+    }
+    print(
+        f"# sony_life: {sony_multi.get('status')} "
+        f"{sony_multi.get('reason') or sony_multi.get('note') or ''}"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="資産全体 週次収集")
     ap.add_argument("--cloud-only", action="store_true", help="Yahoo / 既存DBのみ（GHA向け）")
@@ -710,56 +761,6 @@ def main() -> int:
             ("bloomo", fetch_bloomo),
         ]
 
-    # ソニーは1回のログイン往復で名義別に分割
-    if not args.cloud_only:
-        try:
-            sony_multi = fetch_sony_by_account()
-        except Exception as exc:
-            sony_multi = rec_from_exc(exc)
-        if sony_multi.get("status") == "ok":
-            for aid, rec in (sony_multi.get("accounts") or {}).items():
-                sources[aid] = rec
-                print(
-                    f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
-                )
-                if not args.dry_run and rec.get("status") == "ok":
-                    upsert_snapshot(
-                        sb,
-                        aid,
-                        float(rec["value_jpy"]),
-                        source="weekly_web",
-                        note=rec.get("note"),
-                    )
-            for aid, rec in (sony_multi.get("loans") or {}).items():
-                sources[aid] = rec
-                print(
-                    f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
-                )
-                if not args.dry_run and rec.get("status") == "ok":
-                    upsert_snapshot(
-                        sb,
-                        aid,
-                        float(rec["value_jpy"]),
-                        source="weekly_web_loan",
-                        note=rec.get("note"),
-                    )
-            if "sony_life_chikage" not in (sony_multi.get("accounts") or {}):
-                sources["sony_life_chikage"] = {
-                    "status": "skipped",
-                    "reason": "SONYLIFE_USERNAME_2 未設定または取得0件",
-                }
-                print("# sony_life_chikage: skipped SONYLIFE_USERNAME_2 未設定または取得0件")
-        else:
-            sources["sony_life"] = sony_multi
-            sources["sony_life_chikage"] = {
-                "status": sony_multi.get("status") or "error",
-                "reason": sony_multi.get("reason") or "sony parent failed",
-            }
-            print(
-                f"# sony_life: {sony_multi.get('status')} "
-                f"{sony_multi.get('reason') or sony_multi.get('note') or ''}"
-            )
-
     # プルデンシャルも Web 一括 → 失敗時のみ手登録
     if not args.cloud_only:
         try:
@@ -841,6 +842,10 @@ def main() -> int:
             ),
             note=rec.get("note"),
         )
+
+    # ソニーは他サイトのあと（9:00 開店直後の混雑回避）
+    if not args.cloud_only:
+        ingest_sony(sb, sources, dry_run=args.dry_run)
 
     # 保険配分ビュー（スクレイプは fetch_axa 内で実施済み。ここでは表示用 merge）
     if not args.cloud_only:
@@ -1025,8 +1030,16 @@ def main() -> int:
     ok_n = sum(1 for r in sources.values() if r.get("status") == "ok")
     err_n = sum(1 for r in sources.values() if r.get("status") == "error")
     skip_n = sum(1 for r in sources.values() if r.get("status") == "skipped")
+    hours_skip = any(
+        r.get("status") == "skipped"
+        and any(
+            x in str(r.get("reason") or "")
+            for x in ("時間外", "メンテナンス", "9:00", "5:00–8:00")
+        )
+        for r in sources.values()
+    )
     last_ok = err_n == 0 and ok_n > 0
-    full_ok = (not args.cloud_only) and err_n == 0
+    full_ok = (not args.cloud_only) and err_n == 0 and not hours_skip
 
     payload = {
         **prev,
@@ -1051,7 +1064,8 @@ def main() -> int:
         save_state(payload)
 
     print(
-        f"📎 資産週次: week={iso_week()} ok={ok_n} skipped={skip_n} error={err_n} last_ok={last_ok}"
+        f"📎 資産週次: week={iso_week()} ok={ok_n} skipped={skip_n} error={err_n} "
+        f"last_ok={last_ok} last_full_ok={full_ok}"
     )
     return 0 if err_n == 0 else 1
 
