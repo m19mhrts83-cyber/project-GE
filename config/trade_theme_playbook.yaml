@@ -95,8 +95,8 @@ insurance_core:
   - prudential_life_chikage
 
 tax:
-  personal_only: true
-  corporate: tax_accountant_email_only
+  personal_only: false
+  corporate: knees_bee_gmail_pdf
   yayoi_csv: true
   evidence_reexport: true
   gmail_ingest: true

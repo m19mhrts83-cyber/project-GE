@@ -66,7 +66,8 @@ export function computeNextAction(input: {
   stalledQueued: number;
   annualWindow: boolean;
   annualDone: boolean;
-  taxNeedsEvidence: boolean;
+  personalTaxAlert: boolean;
+  corporateTaxAlert: boolean;
 }): NextAction {
   const fails = failedSources(input.summary);
   if (fails.length > 0) {
@@ -107,10 +108,17 @@ export function computeNextAction(input: {
       href: "/lifeplan?mode=annual",
     };
   }
-  if (input.taxNeedsEvidence) {
+  if (input.corporateTaxAlert) {
+    return {
+      level: "warn",
+      label: "法人申告のメールをそろそろ取り込む",
+      href: "/tax",
+    };
+  }
+  if (input.personalTaxAlert) {
     return {
       level: "info",
-      label: "個人申告の証憑を取り込む",
+      label: "個人申告をそろそろ取り込む",
       href: "/tax",
     };
   }

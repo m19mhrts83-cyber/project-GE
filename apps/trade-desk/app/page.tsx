@@ -14,6 +14,10 @@ import {
   parseWeeklySummary,
 } from "@/lib/nextAction";
 import {
+  corporateCycle,
+  personalCycle,
+} from "@/lib/taxCycle";
+import {
   aggregateReCfFromCategoryYear,
   monthsElapsedInYear,
   type FinanceCategoryYearRow,
@@ -45,7 +49,8 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   const weekStart = mondayOfIsoDate();
-  const taxYear = new Date().getFullYear() - 1;
+  const personal = personalCycle();
+  const corporate = corporateCycle();
 
   const [
     { data: accounts },
@@ -61,7 +66,8 @@ export default async function HomePage() {
     { data: syncMeta },
     { data: queuedJobs },
     { data: taxCase },
-    { count: evidenceCount },
+    { count: personalEvidenceCount },
+    { count: corporateEvidenceCount },
     { data: financeCats },
   ] = await Promise.all([
     supabase
@@ -136,12 +142,18 @@ export default async function HomePage() {
       .from("kurashift_tax_cases")
       .select("id, status, fiscal_year")
       .eq("scope", "personal")
-      .eq("fiscal_year", taxYear)
+      .eq("fiscal_year", personal.year)
       .maybeSingle(),
     supabase
       .from("kurashift_tax_evidence")
       .select("id", { count: "exact", head: true })
-      .eq("fiscal_year", taxYear),
+      .eq("scope", "personal")
+      .eq("fiscal_year", personal.year),
+    supabase
+      .from("kurashift_tax_evidence")
+      .select("id", { count: "exact", head: true })
+      .eq("scope", "corporate")
+      .eq("fiscal_year", corporate.year),
     supabase
       .from("kurashift_finance_category_year")
       .select("fiscal_year, category, income_jpy, expense_jpy, net_jpy")
@@ -156,8 +168,15 @@ export default async function HomePage() {
   const weeklyAt = metaMap.get("portfolio_weekly_at")?.value ?? null;
   const fails = failedSources(weeklySummary);
   const stalled = countStalledQueued(queuedJobs ?? []);
-  const month = new Date().getMonth() + 1;
-  const taxSeason = month <= 3 || month === 12;
+  const personalIngested =
+    (personalEvidenceCount ?? 0) > 0 ||
+    Boolean(
+      taxCase &&
+        (taxCase.status === "csv_ready" ||
+          taxCase.status === "registered" ||
+          taxCase.status === "closed")
+    );
+  const corporateIngested = (corporateEvidenceCount ?? 0) > 0;
   const next = computeNextAction({
     summary: weeklySummary,
     themes: (themes ?? []).map((t) => ({
@@ -168,10 +187,8 @@ export default async function HomePage() {
     stalledQueued: stalled,
     annualWindow: isAnnualLifeplanWindow(),
     annualDone: (annualDone?.length ?? 0) > 0,
-    taxNeedsEvidence:
-      taxSeason &&
-      Boolean(taxCase) &&
-      (evidenceCount ?? 0) === 0,
+    personalTaxAlert: personal.window && !personalIngested,
+    corporateTaxAlert: corporate.window && !corporateIngested,
   });
   const partialWarn = weeklySummary?.last_full_ok === false;
 
@@ -423,11 +440,11 @@ export default async function HomePage() {
           <p className="meta">
             {plan?.snapshot_at
               ? `直近プラン snap ${plan.snapshot_at}`
-              : "ライフプラン／個人申告"}
+              : "ライフプラン／申告"}
           </p>
           <a href="/lifeplan">ライフプラン →</a>
           {" · "}
-          <a href="/tax">個人申告 →</a>
+          <a href="/tax">申告 →</a>
         </article>
         <article className="card">
           <header>

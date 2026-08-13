@@ -286,10 +286,16 @@ tr.sold td {
   color: #1e6b45;
 }
 
-.status-pill.sold {
-  background: #eef1f5;
-  border-color: var(--line);
-  color: var(--muted);
+.status-pill.ingested {
+  background: #e8f5ee;
+  border-color: #b7dcc8;
+  color: #1e6b45;
+}
+
+.status-pill.pending {
+  background: #fff6e8;
+  border-color: #f0c9a8;
+  color: var(--accent-deep);
 }
 
 .def-list {

@@ -47,7 +47,8 @@ def sb_client() -> Any:
 
 def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
     py = str(PY if PY.exists() else sys.executable)
-    year = str(payload.get("fiscal_year") or datetime.now().year - 1)
+    year = str(payload.get("fiscal_year") or datetime.now().year)
+    scope = str(payload.get("scope") or "personal")
     mapping = {
         "lifeplan_ingest_actuals": [
             py,
@@ -103,6 +104,8 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             "--ingest-mail",
             "--year",
             year,
+            "--scope",
+            scope,
         ],
         "tax_ingest_manual_dir": [
             py,

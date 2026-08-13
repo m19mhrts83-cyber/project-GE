@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""KURASHIFT personal tax: Yayoi CSV stub + accountant mail evidence (Gmail).
+"""KURASHIFT tax: personal Yayoi CSV + accountant mail evidence (Gmail).
 
-Default Gmail account: admin (token_livingsupport.json) — Workspace 受信集約。
+Personal: Zaim summary → CSV draft. Corporate: Knees bee (Ohno) PDF, yearly.
+Default Gmail: admin (token_livingsupport.json).
 Override: KURASHIFT_TAX_GMAIL_TOKEN=/path/to/token.json
 """
 from __future__ import annotations
@@ -24,6 +25,10 @@ OUT_ROOT = Path(
     "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/"
     "215_神・大家さん倶楽部/C2_ルーティン作業/27_確定申告_個人/kurashift"
 )
+TAX_DIR = Path(
+    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/"
+    "215_神・大家さん倶楽部/50_税金,確定申告"
+).expanduser()
 
 
 def now_iso() -> str:
@@ -34,8 +39,17 @@ def emit_result(obj: dict) -> None:
     print("KURASHIFT_RESULT:" + json.dumps(obj, ensure_ascii=False))
 
 
-def year_dir(year: int) -> Path:
+def year_dir(year: int, scope: str = "personal") -> Path:
+    if scope == "corporate":
+        return TAX_DIR / "knees bee 税理士法人" / "kurashift" / str(year)
     return OUT_ROOT / str(year)
+
+
+def default_year(scope: str = "personal") -> int:
+    today = date.today()
+    if scope == "corporate":
+        return today.year if today.month <= 8 else today.year + 1
+    return today.year - 1 if today.month <= 3 else today.year
 
 
 def sb_client() -> Any | None:
@@ -47,11 +61,6 @@ def sb_client() -> Any | None:
 
     return create_client(url, key)
 
-
-TAX_DIR = Path(
-    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/"
-    "215_神・大家さん倶楽部/50_税金,確定申告"
-).expanduser()
 
 # 個人側のざっくり勘定（弥生取り込み用ドラフト。検証で直す）
 ZAIM_TO_YAYOI: dict[str, str] = {
@@ -268,12 +277,13 @@ def sanitize_filename(name: str) -> str:
     return name[:180]
 
 
-def ensure_tax_case(sb: Any, year: int) -> str | None:
-    title = f"個人申告 {year}"
+def ensure_tax_case(sb: Any, year: int, scope: str = "personal") -> str | None:
+    title = f"個人申告 {year}" if scope == "personal" else f"法人申告 {year}年5月期"
     rows = (
         sb.table("kurashift_tax_cases")
         .select("id")
         .eq("fiscal_year", year)
+        .eq("scope", scope)
         .eq("title", title)
         .limit(1)
         .execute()
@@ -288,7 +298,7 @@ def ensure_tax_case(sb: Any, year: int) -> str | None:
                 "fiscal_year": year,
                 "title": title,
                 "status": "draft",
-                "scope": "personal",
+                "scope": scope,
                 "notes": "auto from tax mail ingest",
                 "updated_at": now_iso(),
             }
@@ -298,19 +308,29 @@ def ensure_tax_case(sb: Any, year: int) -> str | None:
     return (res.data or [{}])[0].get("id")
 
 
-def ingest_mail(year: int, dry_run: bool, limit: int) -> dict:
-    """Search admin Gmail for tax-accountant-like mail; save attachments as evidence."""
-    query = (
+def mail_query(year: int, scope: str) -> str:
+    if scope == "corporate":
+        return (
+            "(from:t.ohno@knees-bee.jp OR from:knees-bee.jp) "
+            "(filename:pdf OR subject:決算 OR subject:申告書 OR subject:法人税) "
+            f"after:{year}/5/1 before:{year}/10/1"
+        )
+    return (
         f"(from:税理士 OR from:公認会計士 OR from:会計事務所 "
         f"OR subject:税理士 OR subject:確定申告 OR subject:決算 OR subject:申告 "
         f"OR subject:源泉 OR subject:控除 OR filename:pdf) "
         f"after:{year}/1/1 before:{year + 1}/4/1"
     )
-    store = year_dir(year) / "evidence"
+
+
+def ingest_mail(year: int, dry_run: bool, limit: int, scope: str = "personal") -> dict:
+    """Search admin Gmail; personal=税理士一般、corporate=Knees bee 大野さんPDF。"""
+    query = mail_query(year, scope)
+    store = year_dir(year, scope) / "evidence"
     out: dict[str, Any] = {
         "action": "ingest_mail",
         "fiscal_year": year,
-        "scope": "personal",
+        "scope": scope,
         "gmail_query": query,
         "store_dir": str(store),
         "account_default": "admin / token_livingsupport.json",
@@ -334,7 +354,7 @@ def ingest_mail(year: int, dry_run: bool, limit: int) -> dict:
     )
     messages = listed.get("messages") or []
     sb = sb_client()
-    case_id = ensure_tax_case(sb, year) if sb else None
+    case_id = ensure_tax_case(sb, year, scope) if sb else None
     saved: list[dict[str, Any]] = []
 
     for m in messages:
@@ -369,18 +389,20 @@ def ingest_mail(year: int, dry_run: bool, limit: int) -> dict:
 
         parts = collect_attachment_parts(full.get("payload") or {})
         if not parts:
+            if scope == "corporate":
+                continue
             # still record a placeholder note file for body-only mail
             note_path = store / f"{mid}_no_attachment.txt"
             note_path.write_text(
                 f"subject: {subject}\ndate: {date_hdr}\nid: {mid}\n",
                 encoding="utf-8",
             )
-            parts = []
             if sb:
                 sb.table("kurashift_tax_evidence").insert(
                     {
                         "tax_case_id": case_id,
                         "fiscal_year": year,
+                        "scope": scope,
                         "source": "gmail",
                         "doc_kind": "mail_note",
                         "subject": subject,
@@ -416,6 +438,7 @@ def ingest_mail(year: int, dry_run: bool, limit: int) -> dict:
                     {
                         "tax_case_id": case_id,
                         "fiscal_year": year,
+                        "scope": scope,
                         "source": "gmail",
                         "doc_kind": "attachment",
                         "subject": subject,
@@ -546,7 +569,8 @@ def ingest_manual_dir(year: int, dry_run: bool) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--year", type=int, default=date.today().year - 1)
+    ap.add_argument("--scope", choices=["personal", "corporate"], default="personal")
+    ap.add_argument("--year", type=int, default=None)
     ap.add_argument("--build-csv", action="store_true")
     ap.add_argument("--ingest-mail", action="store_true")
     ap.add_argument("--ingest-manual-dir", action="store_true")
@@ -555,15 +579,18 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+    year = args.year if args.year is not None else default_year(args.scope)
 
     if args.build_csv:
-        build_csv(args.year, args.dry_run)
+        if args.scope == "corporate":
+            raise SystemExit("法人は弥生CSV対象外。--ingest-mail --scope corporate を使う")
+        build_csv(year, args.dry_run)
     elif args.ingest_mail:
-        ingest_mail(args.year, args.dry_run, args.limit)
+        ingest_mail(year, args.dry_run, args.limit, args.scope)
     elif args.ingest_manual_dir:
-        ingest_manual_dir(args.year, args.dry_run)
+        ingest_manual_dir(year, args.dry_run)
     elif args.export_evidence:
-        export_evidence(args.year, args.evidence_id, args.dry_run)
+        export_evidence(year, args.evidence_id, args.dry_run)
     else:
         raise SystemExit(
             "specify --build-csv | --ingest-mail | --ingest-manual-dir | --export-evidence"
