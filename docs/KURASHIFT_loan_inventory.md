@@ -24,3 +24,8 @@
 ## 同期用 JSON
 
 `240_融資/loan_tracker_export/loans.json`（`LOAN_TRACKER_JSON_PATH`）
+
+## LT-CLOSE / LT-SYNC（2026-08-13）
+
+- **LT-CLOSE**: 融資向け「残高＋as-of」ゲート閉じ。詳細は `KURASHIFT_loan_tracker_Discover.md` §LT-CLOSE。
+- **LT-SYNC**: `--apply` → `kurashift_loan_tracker_loans` upserted=8（同日）。
