@@ -39,6 +39,20 @@ EXTRA_YAML = REPO / "config" / "property_units_extra.yaml"
 ROOM_RE = re.compile(r"^(\d{3})号室$")
 OCCUPIED_MARKERS = ("入居中", "入居済", "入居済み")
 OCCUPIED_PATTERN = re.compile(r"入居\s*\d|→[^\n]*入居|入居[^\n]*")
+YEAR1_TOTAL_RE = re.compile(
+    r"1年目[^\d]{0,16}合計\s*([\d,]+)\s*円|"
+    r"1年目[^\d]{0,8}([\d,]+)\s*円"
+)
+DISCOUNT_RE = re.compile(
+    r"(?:家賃)?\s*[▲△]\s*([\d,]+)\s*円|"
+    r"割引\s*([\d,]+)\s*円|"
+    r"-\s*([\d,]+)\s*円"
+)
+CAMPAIGN_UNTIL_RE = re.compile(
+    r"(?:〜|～)\s*(\d{1,2})\s*月\s*まで|"
+    r"(?:〜|～)?\s*(\d{1,2}/\d{1,2})\s*まで|"
+    r"(\d{2}/\d{1,2})\s*まで"
+)
 
 
 def classify_status(text: str) -> str:
@@ -72,17 +86,66 @@ def _as_rent(v: Any) -> float | None:
     return None
 
 
+def _extract_campaign_fields(memos: list[str]) -> dict[str, Any]:
+    """メモ行から 1年目・割引・キャンペーン期限を推定。"""
+    joined = "\n".join(memos)
+    out: dict[str, Any] = {}
+    year1_amounts: list[float] = []
+    for m in YEAR1_TOTAL_RE.finditer(joined):
+        raw = m.group(1) or m.group(2)
+        if not raw:
+            continue
+        try:
+            year1_amounts.append(float(raw.replace(",", "")))
+        except ValueError:
+            continue
+    if year1_amounts:
+        # 大きい方を合計候補、小さい方を家賃候補（両方あるとき）
+        amounts = sorted(set(year1_amounts))
+        if len(amounts) >= 2:
+            out["rent_year1"] = amounts[0]
+            out["total_year1"] = amounts[-1]
+        else:
+            v = amounts[0]
+            if v >= 48000:
+                out["total_year1"] = v
+            else:
+                out["rent_year1"] = v
+
+    for m in DISCOUNT_RE.finditer(joined):
+        raw = next((g for g in m.groups() if g), None)
+        if not raw:
+            continue
+        try:
+            out["discount_yen"] = float(raw.replace(",", ""))
+            break
+        except ValueError:
+            continue
+
+    for m in CAMPAIGN_UNTIL_RE.finditer(joined):
+        raw = next((g for g in m.groups() if g), None)
+        if raw:
+            out["campaign_until"] = raw
+            break
+
+    plan_bits = [t for t in memos if "1年目" in t or "▲" in t or "△" in t]
+    if plan_bits:
+        out["plan_note"] = " / ".join(plan_bits)[:240]
+    return out
+
+
 def parse_rent_map(path: Path) -> list[dict[str, Any]]:
     """★家賃マップ.xlsx を号室単位で読む。
 
     Excel は号室列ごとに「状態」「（合計）」「家賃」「管理費」＋メモ行が並ぶ。
-    rent=家賃、payload.management_fee=管理費、payload.total_rent=合計（家賃+管理費）。
+    rent=現状家賃、payload に management_fee / total_rent と
+    rent_year1 / rent_year2 / total_year* / discount_* / memo_log を載せる。
     """
     import openpyxl
 
     wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
     ws = wb.active
-    rows = [list(r) for r in ws.iter_rows(max_col=12, values_only=True)]
+    rows = [list(r) for r in ws.iter_rows(max_col=14, values_only=True)]
     wb.close()
 
     def detect_property(row: list[Any]) -> tuple[str, str] | None:
@@ -138,26 +201,26 @@ def parse_rent_map(path: Path) -> list[dict[str, Any]]:
                 end = k
                 break
             # 別表（G2 / 日付 など）に入ったら止める
-            b0 = _cell_str(peek[0] if peek else None)
             b2 = _cell_str(peek[2] if len(peek) > 2 else None)
-            if re.fullmatch(r"G\d+", b2) or isinstance(peek[3] if len(peek) > 3 else None, datetime):
+            if re.fullmatch(r"G\d+", b2) or isinstance(
+                peek[3] if len(peek) > 3 else None, datetime
+            ):
                 end = k
                 break
             # 部屋列がすべて空ならメモ収集を打ち切り（ただし家賃/管理費ラベル行は残す）
-            room_vals = [
-                peek[c] if c < len(peek) else None for c, _ in rooms
-            ]
-            if all(v is None or _cell_str(v) == "" for v in room_vals) and row_label(peek) == "":
-                # 連続空はブロック終端候補だが、直後に家賃行がある場合があるので1行先も見る
+            room_vals = [peek[c] if c < len(peek) else None for c, _ in rooms]
+            if all(v is None or _cell_str(v) == "" for v in room_vals) and row_label(
+                peek
+            ) == "":
                 nxt = rows[k + 1] if k + 1 < len(rows) else []
                 if row_label(nxt) not in ("家賃", "管理費", "合計"):
                     end = k
                     break
 
-        # ラベル行を優先して家賃／管理費を取る
         rent_by_col: dict[int, float] = {}
         mgmt_by_col: dict[int, float] = {}
         total_by_col: dict[int, float] = {}
+        unlabeled_totals: dict[int, list[float]] = {col: [] for col, _ in rooms}
         memo_by_col: dict[int, list[str]] = {col: [] for col, _ in rooms}
 
         for k in range(j + 2, end):
@@ -174,28 +237,46 @@ def parse_rent_map(path: Path) -> list[dict[str, Any]]:
                 elif label == "合計" and r is not None:
                     total_by_col[col] = r
                 elif r is not None and label == "":
-                    # ラベル無しの数値: 小さい値は管理費候補、大きい値は合計候補
-                    # （家賃・管理費のラベル行がある場合はそちらを優先）
                     if r <= 8000 and col not in mgmt_by_col:
                         mgmt_by_col[col] = r
-                    elif col not in total_by_col:
-                        total_by_col[col] = r
+                    else:
+                        unlabeled_totals[col].append(r)
+                        if col not in total_by_col:
+                            total_by_col[col] = r
                 elif (
                     cs
-                    and label == ""
                     and "号室" not in cs
                     and len(cs) < 120
                     and not re.fullmatch(r"G\d+", cs)
+                    and (label == "" or r is None)
                 ):
+                    # 家賃／管理費行でも文言（1年目メモ等）なら控える
                     memo_by_col[col].append(cs)
 
+            # 号室列の右隣（メモがはみ出すケース）を末尾号室へ寄せる
+            if rooms:
+                last_col, _ = rooms[-1]
+                side = peek[last_col + 1] if last_col + 1 < len(peek) else None
+                side_s = _cell_str(side)
+                if (
+                    side_s
+                    and _as_rent(side) is None
+                    and "号室" not in side_s
+                    and ("1年目" in side_s or "▲" in side_s or "△" in side_s)
+                    and side_s not in memo_by_col[last_col]
+                ):
+                    memo_by_col[last_col].append(side_s)
+
         for col, room in rooms:
-            status_text = _cell_str(status_row[col] if col < len(status_row) else None)
-            rent = rent_by_col.get(col)
+            status_text = _cell_str(
+                status_row[col] if col < len(status_row) else None
+            )
+            rent_labeled = rent_by_col.get(col)
             mgmt = mgmt_by_col.get(col)
             labeled_total = total_by_col.get(col)
             # 賃料合計は家賃+管理費を正とする（Excelの先頭合計行は割引前のことがある）
-            if rent is not None:
+            if rent_labeled is not None:
+                rent = float(rent_labeled)
                 total = float(rent) + (float(mgmt) if mgmt is not None else 0.0)
             elif labeled_total is not None and mgmt is not None:
                 total = float(labeled_total)
@@ -205,19 +286,106 @@ def parse_rent_map(path: Path) -> list[dict[str, Any]]:
                 rent = total
             else:
                 total = None
+                rent = None
+
+            memos = list(memo_by_col.get(col) or [])
             note_parts = [status_text] if status_text else []
-            for m in memo_by_col.get(col) or []:
-                if m and m not in note_parts:
-                    note_parts.append(m)
+            for mtxt in memos:
+                if mtxt and mtxt not in note_parts:
+                    note_parts.append(mtxt)
             status = classify_status(status_text)
+            campaign = _extract_campaign_fields(memos)
+
+            rent_year2 = float(rent_labeled) if rent_labeled is not None else (
+                float(rent) if rent is not None else None
+            )
+            total_year2 = None
+            if rent_year2 is not None:
+                total_year2 = float(rent_year2) + (
+                    float(mgmt) if mgmt is not None else 0.0
+                )
+            elif total is not None:
+                total_year2 = float(total)
+
+            rent_year1 = campaign.get("rent_year1")
+            total_year1 = campaign.get("total_year1")
+            discount_yen = campaign.get("discount_yen")
+
+            if total_year1 is None and rent_year1 is not None:
+                total_year1 = float(rent_year1) + (
+                    float(mgmt) if mgmt is not None else 0.0
+                )
+            if rent_year1 is None and total_year1 is not None and mgmt is not None:
+                rent_year1 = float(total_year1) - float(mgmt)
+            if (
+                discount_yen is None
+                and total_year2 is not None
+                and total_year1 is not None
+            ):
+                discount_yen = float(total_year2) - float(total_year1)
+            if (
+                total_year1 is None
+                and discount_yen is not None
+                and total_year2 is not None
+            ):
+                total_year1 = float(total_year2) - float(discount_yen)
+                if rent_year1 is None and mgmt is not None:
+                    rent_year1 = float(total_year1) - float(mgmt)
+            if (
+                rent_year1 is None
+                and discount_yen is not None
+                and rent_year2 is not None
+            ):
+                rent_year1 = float(rent_year2) - float(discount_yen)
+
+            discount_rate = None
+            if (
+                discount_yen is not None
+                and total_year2 is not None
+                and float(total_year2) > 0
+            ):
+                discount_rate = round(
+                    100.0 * float(discount_yen) / float(total_year2), 1
+                )
+
+            now_iso = datetime.now(tz=JST).isoformat()
+            memo_log: list[dict[str, str]] = []
+            for mtxt in note_parts:
+                if not mtxt:
+                    continue
+                memo_log.append(
+                    {"at": now_iso, "text": mtxt[:400], "source": "excel"}
+                )
+
             payload: dict[str, Any] = {
                 "status_raw": status_text,
                 "short": PROPERTY_META[prop_id]["short"],
+                "memo_log": memo_log,
             }
             if mgmt is not None:
                 payload["management_fee"] = mgmt
+                payload["mgmt_fee"] = mgmt
             if total is not None:
                 payload["total_rent"] = total
+            if rent_year1 is not None:
+                payload["rent_year1"] = rent_year1
+            if rent_year2 is not None:
+                payload["rent_year2"] = rent_year2
+            if total_year1 is not None:
+                payload["total_year1"] = total_year1
+            if total_year2 is not None:
+                payload["total_year2"] = total_year2
+            if discount_yen is not None and float(discount_yen) > 0:
+                payload["discount_yen"] = discount_yen
+            if discount_rate is not None and float(discount_rate) > 0:
+                payload["discount_rate"] = discount_rate
+            if campaign.get("plan_note"):
+                payload["plan_note"] = campaign["plan_note"]
+            if campaign.get("campaign_until"):
+                payload["campaign_until"] = campaign["campaign_until"]
+            if unlabeled_totals.get(col):
+                payload["listing_totals_raw"] = unlabeled_totals[col]
+
             units.append(
                 {
                     "id": f"{prop_id}-{room}",
@@ -307,8 +475,14 @@ def merge_extra_units(
             ep = eu.get("payload") or {}
             if ep.get("management_fee") is not None:
                 payload["management_fee"] = ep["management_fee"]
+                payload["mgmt_fee"] = ep["management_fee"]
             if ep.get("total_rent") is not None:
                 payload["total_rent"] = ep["total_rent"]
+            # 計画（2年目）が空なら補完家賃を計画としても載せる
+            if payload.get("rent_year2") is None and eu.get("rent") is not None:
+                payload["rent_year2"] = eu["rent"]
+            if payload.get("total_year2") is None and ep.get("total_rent") is not None:
+                payload["total_year2"] = ep["total_rent"]
             existing["payload"] = payload
             note_add = eu.get("note")
             if note_add:
@@ -318,6 +492,22 @@ def merge_extra_units(
             existing["source"] = f"{existing.get('source') or 'excel'}+config"
             continue
         by_id[eid] = {k: v for k, v in eu.items() if k != "fill_missing"}
+    # 最終: rent があるのに year2 が空ならフォールバック
+    for u in by_id.values():
+        payload = dict(u.get("payload") or {})
+        rent = u.get("rent")
+        mgmt = payload.get("management_fee")
+        total = payload.get("total_rent")
+        if payload.get("rent_year2") is None and rent is not None:
+            payload["rent_year2"] = rent
+        if payload.get("total_year2") is None:
+            if total is not None:
+                payload["total_year2"] = total
+            elif rent is not None:
+                payload["total_year2"] = float(rent) + (
+                    float(mgmt) if mgmt is not None else 0.0
+                )
+        u["payload"] = payload
     return list(by_id.values())
 
 
@@ -408,6 +598,46 @@ def sb_client():
     return create_client(url, key)
 
 
+def _merge_memo_log(
+    existing: list[Any] | None,
+    incoming: list[Any] | None,
+) -> list[dict[str, str]]:
+    """ui/jarvis/mail を残し、excel 由来は本文重複を避けて追記。"""
+    out: list[dict[str, str]] = []
+    seen_excel: set[str] = set()
+    for item in existing or []:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        source = str(item.get("source") or "excel")
+        at = str(item.get("at") or "")
+        entry = {"at": at, "text": text[:400], "source": source}
+        out.append(entry)
+        if source == "excel":
+            seen_excel.add(text)
+    for item in incoming or []:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        source = str(item.get("source") or "excel")
+        if source == "excel" and text in seen_excel:
+            continue
+        if source == "excel":
+            seen_excel.add(text)
+        out.append(
+            {
+                "at": str(item.get("at") or datetime.now(tz=JST).isoformat()),
+                "text": text[:400],
+                "source": source,
+            }
+        )
+    return out[-80:]
+
+
 def push_units(
     units: list[dict[str, Any]],
     summary: dict[str, Any],
@@ -416,8 +646,25 @@ def push_units(
 ) -> None:
     sb = sb_client()
     now = datetime.now(tz=JST).isoformat()
+    existing_by_id: dict[str, dict[str, Any]] = {}
+    try:
+        res = sb.table("property_units").select("id,payload,note").execute()
+        for row in res.data or []:
+            existing_by_id[str(row["id"])] = row
+    except Exception as e:  # noqa: BLE001
+        print(f"# warn: could not load existing units for memo merge: {e}", file=sys.stderr)
+
     rows = []
     for u in units:
+        payload = dict(u.get("payload") or {})
+        prev = existing_by_id.get(u["id"]) or {}
+        prev_payload = prev.get("payload") if isinstance(prev.get("payload"), dict) else {}
+        payload["memo_log"] = _merge_memo_log(
+            (prev_payload or {}).get("memo_log"),
+            payload.get("memo_log"),
+        )
+        # note は Excel 側を正（最新要約）。空なら既存を残す
+        note = u.get("note") or prev.get("note")
         rows.append(
             {
                 "id": u["id"],
@@ -426,9 +673,9 @@ def push_units(
                 "room": u["room"],
                 "status": u["status"],
                 "rent": u["rent"],
-                "note": u.get("note"),
+                "note": note,
                 "source": u.get("source") or "excel",
-                "payload": u.get("payload") or {},
+                "payload": payload,
                 "updated_at": now,
             }
         )

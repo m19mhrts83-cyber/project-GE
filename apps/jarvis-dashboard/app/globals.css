@@ -724,6 +724,185 @@ a.stat-link:active {
   line-height: 1.4;
 }
 
+.rent-map {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.rent-map-floors {
+  display: grid;
+  gap: 10px;
+}
+
+.rent-map-floor {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.rent-map-floor-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rent-map-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rent-map-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 9px;
+  min-height: 5.4rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 94%, var(--line));
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.rent-map-cell.is-occupied {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+}
+
+.rent-map-cell.is-vacant {
+  background: color-mix(in srgb, var(--warn) 16%, var(--card));
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+}
+
+.rent-map-cell.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.rent-map-cell.is-missing {
+  opacity: 0.28;
+  cursor: default;
+  background: transparent;
+  border-style: dashed;
+}
+
+.rent-map-room {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.rent-map-status {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.rent-map-now,
+.rent-map-plan,
+.rent-map-disc {
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.rent-map-disc {
+  color: color-mix(in srgb, var(--warn) 70%, var(--ink));
+}
+
+.rent-map-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--card) 92%, var(--line));
+}
+
+.rent-map-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.rent-map-panel-head h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.rent-map-compare {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+}
+
+.rent-map-plan-note {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.rent-map-memos,
+.rent-map-events {
+  margin: 0 0 12px;
+}
+
+.rent-map-memos h5,
+.rent-map-events h5 {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+}
+
+.rent-map-memos ul,
+.rent-map-events ul {
+  margin: 0 0 10px;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
+
+.rent-map-memos li,
+.rent-map-events li {
+  margin: 4px 0;
+}
+
+.rent-map-memo-form {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.rent-map-memo-form textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+
+.rent-map-err {
+  color: var(--warn);
+  font-size: 0.85rem;
+  margin: 0 0 6px;
+}
+
+.rent-map-hint {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .rent-map-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .prop-note {
   white-space: pre-wrap;
   max-width: 28rem;
