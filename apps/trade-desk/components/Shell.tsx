@@ -76,7 +76,7 @@ export default function Shell({
           )}
         />
 
-        <div className="side-group-title">② 計画・税</div>
+        <div className="side-group-title side-group-title--rule">② 計画・税</div>
         <NavLinks
           active={active}
           items={NAV.filter((n) =>
@@ -84,13 +84,13 @@ export default function Shell({
           )}
         />
 
-        <div className="side-group-title">③ 不動産賃貸</div>
+        <div className="side-group-title side-group-title--rule">③ 不動産賃貸</div>
         <NavLinks
           active={active}
           items={NAV.filter((n) => ["/realestate"].includes(n.href))}
         />
 
-        <div className="side-group-title">運用</div>
+        <div className="side-group-title side-group-title--rule">運用</div>
         <NavLinks
           active={active}
           items={NAV.filter((n) =>

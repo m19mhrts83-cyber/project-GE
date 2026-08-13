@@ -43,7 +43,7 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 | `re_mail_match` | `jarvis_kurashift_property_mail_match.py --apply` | 低（送信なし） |
 | `re_deal_advice` | `jarvis_kurashift_deal_advice.py --apply` | 低 |
 | `ops_consult_ingest` | `jarvis_kurashift_ops_consult_ingest.py` | 低 |
-| `re_sync_loan_tracker` | `jarvis_kurashift_loan_tracker_sync.py` | **現状は意図的に失敗**（未配線） |
+| `re_sync_loan_tracker` | `jarvis_kurashift_loan_tracker_sync.py` | **JSON 経路で接続済**（`LOAN_TRACKER_JSON_PATH` / `240_融資/loan_tracker_export/loans.json`）。estate でトラッカー画面投入後は export で上書き |
 
 ワーカー起動:
 
