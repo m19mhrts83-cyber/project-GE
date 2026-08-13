@@ -3,10 +3,12 @@
 
 学習メモ（あかつき週次コメント）: 増収は「H.株増収」。減収は α.B.C.投資 / 株減収。
 口座名は ZAIM_BLOOMO_ACCOUNT（既定 bloomo証券。Zaim 上の表記どおり）。
+旧名「Bloomo」は不一致で失敗するため、候補を自動リトライして成功名を state に覚える。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_zaim_bloomo_weekly.py --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_zaim_bloomo_weekly.py --apply --yes --headless
+  ~/selenium_env/venv/bin/python scripts/jarvis_zaim_bloomo_weekly.py --heal-meta-only
 """
 from __future__ import annotations
 
@@ -31,9 +33,8 @@ CAT_DOWN = "α.B.C.投資"
 GENRE_DOWN = "株減収"
 CAT_UP = "H.株増収"
 
-
-def account_name() -> str:
-    return (os.environ.get("ZAIM_BLOOMO_ACCOUNT") or "bloomo証券").strip() or "bloomo証券"
+# Zaim 表記ゆれ。先頭ほど優先（env / state のあとに続く）
+ACCOUNT_ALIASES = ("bloomo証券", "Bloomo", "bloomo")
 
 
 def now_iso() -> str:
@@ -51,11 +52,23 @@ def load_state() -> dict[str, Any]:
 
 def save_state(data: dict[str, Any]) -> None:
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    STATE_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def py_exe() -> str:
     return str(PY) if PY.is_file() else sys.executable
+
+
+def account_candidates(st: dict[str, Any]) -> list[str]:
+    preferred = str(st.get("preferred_zaim_account") or "").strip()
+    env = (os.environ.get("ZAIM_BLOOMO_ACCOUNT") or "").strip()
+    out: list[str] = []
+    for a in (preferred, env, *ACCOUNT_ALIASES):
+        if a and a not in out:
+            out.append(a)
+    return out or ["bloomo証券"]
 
 
 def fetch_current() -> int:
@@ -71,18 +84,17 @@ def fetch_current() -> int:
     return int(data["value_jpy"])
 
 
-def plan_entry(prev: int, curr: int, day: str) -> dict[str, Any] | None:
+def plan_entry(prev: int, curr: int, day: str, account: str) -> dict[str, Any] | None:
     delta = curr - prev
     if delta == 0:
         return None
     comment = f"週次評価(MF) {prev:,}→{curr:,}"
-    acc = account_name()
     if delta < 0:
         return {
             "kind": "payment",
             "amount": abs(delta),
             "date": day,
-            "account": acc,
+            "account": account,
             "category": CAT_DOWN,
             "genre": GENRE_DOWN,
             "comment": comment,
@@ -92,7 +104,7 @@ def plan_entry(prev: int, curr: int, day: str) -> dict[str, Any] | None:
         "kind": "income",
         "amount": delta,
         "date": day,
-        "account": acc,
+        "account": account,
         "category": CAT_UP,
         "genre": "",
         "comment": comment,
@@ -100,7 +112,7 @@ def plan_entry(prev: int, curr: int, day: str) -> dict[str, Any] | None:
     }
 
 
-def post_zaim(entry: dict[str, Any], *, apply: bool, yes: bool, headless: bool) -> int:
+def post_zaim(entry: dict[str, Any], *, apply: bool, yes: bool, headless: bool) -> tuple[int, str]:
     args = [
         py_exe(),
         str(CREATE),
@@ -128,7 +140,105 @@ def post_zaim(entry: dict[str, Any], *, apply: bool, yes: bool, headless: bool) 
     else:
         args.append("--dry-run")
     print(f"# zaim {' '.join(args[2:])}")
-    return subprocess.run(args, cwd=str(CREATE.parent), check=False).returncode
+    r = subprocess.run(
+        args, cwd=str(CREATE.parent), check=False, capture_output=True, text=True
+    )
+    if r.stdout:
+        print(r.stdout.rstrip())
+    if r.stderr:
+        print(r.stderr.rstrip(), file=sys.stderr)
+    err = ((r.stderr or "") + "\n" + (r.stdout or "")).strip()
+    return r.returncode, err
+
+
+def is_account_missing(err: str) -> bool:
+    return "口座が見つかりません" in (err or "")
+
+
+def mark_sync_meta_bloomo_zaim_ok(*, reason: str) -> None:
+    """ホーム鮮度の bloomo_zaim 失敗を、財務反映成功後に自己修復する。"""
+    url = os.environ.get("JARVIS_SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    key = os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        print("# heal-meta skip: no supabase env")
+        return
+    from supabase import create_client
+
+    sb = create_client(url, key)
+    row = (
+        sb.table("sync_meta")
+        .select("value")
+        .eq("key", "portfolio_weekly_summary")
+        .maybe_single()
+        .execute()
+        .data
+    )
+    if not row or not row.get("value"):
+        print("# heal-meta skip: no portfolio_weekly_summary")
+        return
+    try:
+        meta = json.loads(row["value"])
+    except json.JSONDecodeError:
+        print("# heal-meta skip: bad json")
+        return
+    sources = meta.get("sources") if isinstance(meta.get("sources"), dict) else {}
+    prev = sources.get("bloomo_zaim") if isinstance(sources.get("bloomo_zaim"), dict) else {}
+    if prev.get("status") == "ok" and not reason:
+        print("# heal-meta: already ok")
+        return
+    sources["bloomo_zaim"] = {"status": "ok", "reason": reason[:120]}
+    meta["sources"] = sources
+    # error 件数をざっくり再計算
+    err_n = sum(
+        1
+        for v in sources.values()
+        if isinstance(v, dict) and (v.get("status") or "") == "error"
+    )
+    meta["error"] = err_n
+    if err_n == 0:
+        meta["last_full_ok"] = True
+    ts = now_iso()
+    sb.table("sync_meta").upsert(
+        {
+            "key": "portfolio_weekly_summary",
+            "value": json.dumps(meta, ensure_ascii=False),
+            "updated_at": ts,
+        },
+        on_conflict="key",
+    ).execute()
+    print(f"# heal-meta: bloomo_zaim → ok ({reason[:80]})")
+
+
+def post_with_account_retry(
+    *,
+    prev: int,
+    curr: int,
+    day: str,
+    st: dict[str, Any],
+    apply: bool,
+    yes: bool,
+    headless: bool,
+) -> tuple[int, dict[str, Any] | None, str | None]:
+    """口座名候補を順に試す。成功した名前を返す。"""
+    last_err = ""
+    for acc in account_candidates(st):
+        entry = plan_entry(prev, curr, day, acc)
+        if entry is None:
+            return 0, None, None
+        print(
+            f"📎 Bloomo財務案: {entry['kind']} {entry['category']}/{entry['genre'] or '-'} "
+            f"{entry['account']} ¥{entry['amount']:,} 集計除外  # {entry['comment']}"
+        )
+        rc, err = post_zaim(entry, apply=apply, yes=yes, headless=headless)
+        if rc == 0:
+            return 0, entry, acc
+        last_err = err or f"exit={rc}"
+        if is_account_missing(err):
+            print(f"# account miss → retry next alias (failed={acc!r})")
+            continue
+        # 口座以外の失敗はリトライしない
+        break
+    return 1, None, last_err
 
 
 def main() -> int:
@@ -139,6 +249,11 @@ def main() -> int:
     ap.add_argument("--headless", action="store_true")
     ap.add_argument("--value", type=int, default=0)
     ap.add_argument("--skip-fetch", action="store_true")
+    ap.add_argument(
+        "--heal-meta-only",
+        action="store_true",
+        help="Zaim登録はせず、今日の成功実績があればホーム鮮度の bloomo_zaim を ok に直す",
+    )
     args = ap.parse_args()
 
     if os.environ.get("JARVIS_BLOOMO_ZAIM_DISABLE") == "1":
@@ -147,6 +262,22 @@ def main() -> int:
 
     st = load_state()
     day = today_jst().isoformat()
+
+    if args.heal_meta_only:
+        acc = (
+            st.get("preferred_zaim_account")
+            or (st.get("last_entry") or {}).get("account")
+            or ""
+        )
+        posted = st.get("last_posted_date") or st.get("last_posted_at")
+        if posted and acc:
+            mark_sync_meta_bloomo_zaim_ok(
+                reason=f"healed: last post {posted} via {acc}"
+            )
+            return 0
+        print("# heal-meta-only: no successful post to trust")
+        return 1
+
     if args.skip_fetch and args.value:
         curr = int(args.value)
     else:
@@ -164,6 +295,7 @@ def main() -> int:
                 "last_posted_at": None,
                 "note": "初回はベースラインのみ（Zaim未登録）",
                 "source": "moneyforward",
+                "preferred_zaim_account": account_candidates(st)[0],
             }
         )
         print(f"📎 Bloomo財務: 初回ベースライン {curr:,}円（差分登録なし）")
@@ -172,22 +304,34 @@ def main() -> int:
     prev = int(prev)
     if st.get("last_posted_date") == day:
         print(f"# skip: already posted today ({day})")
+        # 週次本体が先に失敗メタを書いたあとに手動成功した場合の自己修復
+        mark_sync_meta_bloomo_zaim_ok(
+            reason=(
+                f"already posted {day} "
+                f"via {(st.get('last_entry') or {}).get('account') or st.get('preferred_zaim_account')}"
+            )
+        )
         return 0
 
-    entry = plan_entry(prev, curr, day)
-    if entry is None:
+    do_apply = args.apply and args.yes and not args.dry_run
+    rc, entry, detail = post_with_account_retry(
+        prev=prev,
+        curr=curr,
+        day=day,
+        st=st,
+        apply=do_apply,
+        yes=args.yes,
+        headless=args.headless,
+    )
+    if entry is None and rc == 0:
         print("📎 Bloomo財務: 動きなし")
         save_state({**st, "last_checked_at": now_iso(), "last_value_jpy": curr})
         return 0
+    if rc != 0 or entry is None:
+        print(f"# fail: {detail}")
+        return rc if rc else 1
 
-    print(
-        f"📎 Bloomo財務案: {entry['kind']} {entry['category']}/{entry['genre'] or '-'} "
-        f"{entry['account']} ¥{entry['amount']:,} 集計除外  # {entry['comment']}"
-    )
-    do_apply = args.apply and args.yes and not args.dry_run
-    rc = post_zaim(entry, apply=do_apply, yes=args.yes, headless=args.headless)
-    if rc != 0:
-        return rc
+    winning_account = str(entry.get("account") or detail or "")
     if do_apply:
         save_state(
             {
@@ -197,12 +341,14 @@ def main() -> int:
                 "last_posted_date": day,
                 "last_delta_jpy": curr - prev,
                 "last_entry": entry,
+                "preferred_zaim_account": winning_account,
                 "source": "moneyforward",
             }
         )
-        print(f"# posted and state updated value={curr:,}")
+        mark_sync_meta_bloomo_zaim_ok(reason=f"posted via {winning_account}")
+        print(f"# posted and state updated value={curr:,} account={winning_account}")
     else:
-        print("# dry-run: state の評価額は更新していません")
+        print(f"# dry-run ok with account={winning_account}（state 未更新）")
     return 0
 
 
