@@ -1,40 +1,17 @@
 import Shell from "@/components/Shell";
+import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
+import FinancePackClient from "./FinancePackClient";
 
 export const dynamic = "force-dynamic";
 
-const CHECKLIST: { id: string; title: string; note: string }[] = [
-  {
-    id: "id",
-    title: "本人確認（免許証等）",
-    note: "融資申込時の必須一式",
-  },
-  {
-    id: "income",
-    title: "収入証明（源泉・確定申告）",
-    note: "個人／法人でセットが異なる",
-  },
-  {
-    id: "corp",
-    title: "法人関連（登記・決算）",
-    note: "法人案件時。`.env` の COMPANY_* と突合予定",
-  },
-  {
-    id: "property",
-    title: "物件資料（登記・図面・レントロール）",
-    note: "③-C 物件マスタ＋買い進め案件から生成予定",
-  },
-  {
-    id: "loan",
-    title: "既存借入一覧",
-    note: "正本は借入残高トラッカー（読取投影後に埋め込み）",
-  },
-  {
-    id: "bank",
-    title: "銀行別・提出フォーマット",
-    note: "240_融資フォルダの銀行別テンプレを参照",
-  },
-];
+function fmtYen(n: number): string {
+  return new Intl.NumberFormat("ja-JP", {
+    style: "currency",
+    currency: "JPY",
+    maximumFractionDigits: 0,
+  }).format(n);
+}
 
 export default async function FinancePackPage() {
   const supabase = await createClient();
@@ -42,67 +19,49 @@ export default async function FinancePackPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { count: unitCount } = await supabase
-    .from("property_units")
-    .select("id", { count: "exact", head: true });
+  const { data: loans } = await supabase
+    .from("kurashift_loan_tracker_loans")
+    .select("balance_jpy, name");
+
+  const total =
+    loans?.reduce((a, l) => a + (Number(l.balance_jpy) || 0), 0) ?? 0;
+  const loanSummary =
+    loans && loans.length > 0
+      ? `${loans.length}本 · 残高合計 ${fmtYen(total)}`
+      : "投影なし（sync 後に表示）";
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
+      <RealEstateLaneNav active="d" />
       <p className="page-kicker">③-D · 融資</p>
       <h1>融資提出パック</h1>
       <p className="sub">
-        銀行提出用の書類チェックリスト骨格。自動送信・自動アップロードはしません。
+        物件購入・運転資金・フリー・教育の書類チェック。個人／法人分離、マイナは共通。
+        自動送信・自動アップロードはしません。
         {" · "}
         <a href="/realestate">不動産ハブ →</a>
         {" · "}
         <a href="/realestate/properties">物件マスタ →</a>
       </p>
 
-      <div className="card notice">
-        <header>
-          <span className="lvl">現状</span>
-          <strong>Phase 0（チェックリスト）</strong>
-        </header>
-        <p className="meta" style={{ marginTop: 8 }}>
-          号室データ {unitCount ?? 0} 件を参照可能。PDF 一括出力・状態保存は未実装。
-          OneDrive 正本: <code>240_融資</code>。
-        </p>
-      </div>
+      <FinancePackClient loanSummary={loanSummary} />
 
       <div className="card">
         <header>
-          <span className="lvl">Checklist</span>
-          <strong>提出物（仮）</strong>
+          <span className="lvl">Docs</span>
+          <strong>参照</strong>
         </header>
-        <table>
-          <thead>
-            <tr>
-              <th>項目</th>
-              <th>状態</th>
-              <th>メモ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {CHECKLIST.map((c) => (
-              <tr key={c.id}>
-                <td>{c.title}</td>
-                <td className="meta">未着手</td>
-                <td className="meta">{c.note}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card">
-        <header>
-          <span className="lvl">依存</span>
-          <strong>次に揃えるもの</strong>
-        </header>
-        <ul className="meta" style={{ paddingLeft: 18 }}>
-          <li>loan-tracker 読取投影（既存借入一覧の自動埋込）</li>
-          <li>銀行ごとの必須項目マスタ（ユーザー確認後）</li>
-          <li>案件（③-B）から「この物件用パック」を切る UI</li>
+        <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
+          <li>
+            <code>docs/KURASHIFT_融資提出パック.md</code>
+          </li>
+          <li>
+            <code>config/kurashift_re_finance_doc_templates.yaml</code>
+          </li>
+          <li>
+            OneDrive <code>240_融資/finance_packs/</code>・
+            <code>243_カードローン書類/</code>
+          </li>
         </ul>
       </div>
     </Shell>

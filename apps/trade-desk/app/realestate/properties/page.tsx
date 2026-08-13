@@ -1,4 +1,5 @@
 import Shell from "@/components/Shell";
+import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 import { buildBRate4Rows, fmtPct } from "@/lib/bRate4";
@@ -7,6 +8,7 @@ import {
   getRePropertyMaster,
   loansForProperty,
 } from "@/lib/rePropertyMaster";
+import { dscrLabel, fmtDscr, simpleDscr } from "@/lib/reDscr";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +91,7 @@ export default async function RealEstatePropertiesPage() {
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
+      <RealEstateLaneNav active="c" />
       <p className="page-kicker">③-C · 保有物件</p>
       <h1>物件マスタ</h1>
       <p className="sub">
@@ -115,14 +118,23 @@ export default async function RealEstatePropertiesPage() {
           {" · "}
           管理・住所: <code>config/property_info.yaml</code>
         </p>
+        <p className="meta" style={{ marginTop: 8 }}>
+          レントロール合計と月返済を並べ、家賃−返済の関係が一目で分かるようにしています。
+        </p>
+        <p className="meta" style={{ marginTop: 6 }}>
+          DSCR 簡易 = 月家賃合計 ÷ 月返済合計（業界定番。厳密 NOI
+          ではない）。目安 1.2×以上。
+        </p>
         <table>
           <thead>
             <tr>
-              <th>id</th>
               <th>物件</th>
               <th>名義</th>
-              <th>取得</th>
               <th className="num">号室</th>
+              <th className="num">レントロール合計</th>
+              <th className="num">月返済合計</th>
+              <th className="num">家賃−返済</th>
+              <th className="num">DSCR</th>
               <th>紐づくローン</th>
             </tr>
           </thead>
@@ -130,17 +142,52 @@ export default async function RealEstatePropertiesPage() {
             {RE_PROPERTY_MASTER.map((p) => {
               const live = byProp.get(p.id);
               const linked = loansForProperty(p.id, loanRows);
+              const rentSum = live?.rentSum ?? 0;
+              const paySum = linked.reduce((s, l) => {
+                const v =
+                  l.monthly_payment_jpy == null
+                    ? 0
+                    : Number(l.monthly_payment_jpy);
+                return s + (Number.isFinite(v) ? v : 0);
+              }, 0);
+              const gap = live ? rentSum - paySum : null;
+              const dscr = live ? simpleDscr(rentSum, paySum) : null;
               return (
                 <tr key={p.id}>
-                  <td className="meta">{p.id}</td>
-                  <td>{p.name}</td>
+                  <td>
+                    {p.name}
+                    <div className="meta">{p.id}</div>
+                  </td>
                   <td className="meta">
                     {p.owner}
                     {p.ownerEntity ? `（${p.ownerEntity}）` : ""}
                   </td>
-                  <td className="meta">{p.acquired}</td>
                   <td className="num meta">
                     {live ? live.units.length : "—"}/{p.roomsExpected}
+                  </td>
+                  <td className="num">
+                    {live ? (
+                      <strong>{fmtYen(rentSum)}／月</strong>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="num meta">
+                    {linked.length ? `${fmtYen(paySum)}／月` : "—"}
+                  </td>
+                  <td className="num">
+                    {gap == null ? (
+                      "—"
+                    ) : (
+                      <strong>
+                        {gap >= 0 ? "+" : ""}
+                        {fmtYen(gap)}
+                      </strong>
+                    )}
+                  </td>
+                  <td className="num">
+                    <strong>{fmtDscr(dscr)}</strong>
+                    <div className="meta">{dscrLabel(dscr)}</div>
                   </td>
                   <td className="meta">
                     {linked.length
@@ -169,26 +216,64 @@ export default async function RealEstatePropertiesPage() {
               ローン正本の月返済合計（参考）: {fmtYen(loanPayMonth)}／月 ·{" "}
               <a href="/realestate">不動産ハブの一覧 →</a>
             </p>
+            <p className="meta" style={{ marginTop: 4 }}>
+              合算 = 残高加重平均。キャラメルは本担保＋諸費用を合算。式は Discover §B-RATE-4。
+            </p>
             <table>
               <thead>
                 <tr>
                   <th>物件</th>
+                  <th className="num">レントロール</th>
+                  <th className="num">月返済</th>
+                  <th className="num">家賃−返済</th>
+                  <th className="num">DSCR</th>
                   <th className="num">表面</th>
-                  <th className="num">金利</th>
+                  <th className="num">合算金利</th>
                   <th className="num">正味</th>
                 </tr>
               </thead>
               <tbody>
-                {bRate4.map((r) => (
-                  <tr key={r.propertyId}>
-                    <td>{r.name}</td>
-                    <td className="num meta">{fmtPct(r.surfaceYieldPct)}</td>
-                    <td className="num meta">{fmtPct(r.loanRatePct)}</td>
-                    <td className="num">
-                      <strong>{fmtPct(r.netSpreadPct)}</strong>
-                    </td>
-                  </tr>
-                ))}
+                {bRate4.map((r) => {
+                  const live = byProp.get(r.propertyId);
+                  const rentSum = live?.rentSum ?? null;
+                  const pay = r.monthlyPaymentJpy;
+                  const gap =
+                    rentSum != null && pay != null ? rentSum - pay : null;
+                  const dscr = simpleDscr(rentSum, pay);
+                  return (
+                    <tr key={r.propertyId}>
+                      <td>{r.name}</td>
+                      <td className="num">
+                        {rentSum != null ? (
+                          <strong>{fmtYen(rentSum)}／月</strong>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="num meta">
+                        {pay != null ? `${fmtYen(pay)}／月` : "—"}
+                      </td>
+                      <td className="num">
+                        {gap == null ? (
+                          "—"
+                        ) : (
+                          <strong>
+                            {gap >= 0 ? "+" : ""}
+                            {fmtYen(gap)}
+                          </strong>
+                        )}
+                      </td>
+                      <td className="num">
+                        <strong>{fmtDscr(dscr)}</strong>
+                      </td>
+                      <td className="num meta">{fmtPct(r.surfaceYieldPct)}</td>
+                      <td className="num meta">{fmtPct(r.loanRatePct)}</td>
+                      <td className="num">
+                        <strong>{fmtPct(r.netSpreadPct)}</strong>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </>
@@ -252,6 +337,12 @@ export default async function RealEstatePropertiesPage() {
         const roomCount = g?.units.length ?? 0;
         const vacant = g?.vacant ?? 0;
         const rentSum = g?.rentSum ?? 0;
+        const paySum = linked.reduce((s, l) => {
+          const v =
+            l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
+          return s + (Number.isFinite(v) ? v : 0);
+        }, 0);
+        const gap = g ? rentSum - paySum : null;
         return (
           <div className="card" key={pid}>
             <header>
@@ -265,12 +356,48 @@ export default async function RealEstatePropertiesPage() {
             </p>
             <p className="meta" style={{ marginTop: 4 }}>
               {g
-                ? `${roomCount} 室 · 空室 ${vacant} · 家賃合計 ${fmtYen(rentSum)}／月`
+                ? `${roomCount} 室 · 空室 ${vacant}`
                 : "号室データなし"}
               {master?.managers?.length
                 ? ` · 管理 ${master.managers.join(" / ")}`
                 : ""}
             </p>
+            <table style={{ marginTop: 10 }}>
+              <thead>
+                <tr>
+                  <th className="num">レントロール合計</th>
+                  <th className="num">月返済合計</th>
+                  <th className="num">家賃−返済</th>
+                  <th className="num">DSCR</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="num">
+                    {g ? <strong>{fmtYen(rentSum)}／月</strong> : "—"}
+                  </td>
+                  <td className="num meta">
+                    {linked.length ? `${fmtYen(paySum)}／月` : "—"}
+                  </td>
+                  <td className="num">
+                    {gap == null ? (
+                      "—"
+                    ) : (
+                      <strong>
+                        {gap >= 0 ? "+" : ""}
+                        {fmtYen(gap)}／月
+                      </strong>
+                    )}
+                  </td>
+                  <td className="num">
+                    <strong>{fmtDscr(simpleDscr(rentSum, paySum))}</strong>
+                    <div className="meta">
+                      {dscrLabel(simpleDscr(rentSum, paySum))}
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
             {linked.length > 0 ? (
               <table style={{ marginTop: 10 }}>
                 <thead>
@@ -302,6 +429,16 @@ export default async function RealEstatePropertiesPage() {
                       </td>
                     </tr>
                   ))}
+                  <tr>
+                    <td colSpan={3}>
+                      <strong>月返済合計</strong>
+                      <span className="meta">（対レントロール {g ? fmtYen(rentSum) : "—"}）</span>
+                    </td>
+                    <td className="num">
+                      <strong>{fmtYen(paySum)}</strong>
+                    </td>
+                    <td />
+                  </tr>
                 </tbody>
               </table>
             ) : (
@@ -315,7 +452,7 @@ export default async function RealEstatePropertiesPage() {
                   <tr>
                     <th>号室</th>
                     <th>状態</th>
-                    <th>家賃</th>
+                    <th className="num">家賃</th>
                     <th>メモ</th>
                   </tr>
                 </thead>
@@ -324,12 +461,26 @@ export default async function RealEstatePropertiesPage() {
                     <tr key={u.id}>
                       <td>{u.room}</td>
                       <td>{u.status === "vacant" ? "空室" : "入居"}</td>
-                      <td className="meta">
+                      <td className="num meta">
                         {u.rent != null ? fmtYen(u.rent) : "—"}
                       </td>
                       <td className="meta">{u.note || "—"}</td>
                     </tr>
                   ))}
+                  <tr>
+                    <td colSpan={2}>
+                      <strong>レントロール合計</strong>
+                      <span className="meta">（対月返済 {linked.length ? fmtYen(paySum) : "—"}）</span>
+                    </td>
+                    <td className="num">
+                      <strong>{fmtYen(rentSum)}／月</strong>
+                    </td>
+                    <td className="meta">
+                      {gap == null
+                        ? ""
+                        : `家賃−返済 ${gap >= 0 ? "+" : ""}${fmtYen(gap)}`}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             ) : null}

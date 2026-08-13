@@ -1,10 +1,13 @@
 import Shell from "@/components/Shell";
+import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen, fmtYenSigned } from "@/lib/format";
 import { loadLiabilityRates } from "@/lib/liabilityRates";
 import {
   completeMonthsElapsed,
   tokyoYmd,
+  aggregateReCfFromCategoryYear,
+  type FinanceCategoryYearRow,
 } from "@/lib/reFinanceYtd";
 import {
   SPECIAL_LABEL,
@@ -12,10 +15,24 @@ import {
 } from "@/lib/reSteadyCf";
 import type { PropertyUnitRow } from "@/lib/roiAssets";
 import { buildBRate4Rows, fmtPct } from "@/lib/bRate4";
+import { dscrLabel, fmtDscr, simpleDscr } from "@/lib/reDscr";
+import { RE_PROPERTY_MASTER } from "@/lib/rePropertyMaster";
+import { buildPlanProgress } from "@/lib/rePlanProgress";
 
 export const dynamic = "force-dynamic";
 
-export default async function RealEstatePage() {
+export default async function RealEstatePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scope?: string }>;
+}) {
+  const sp = await searchParams;
+  const scopeRaw = (sp.scope || "combined").toLowerCase();
+  const scope =
+    scopeRaw === "personal" || scopeRaw === "corporate"
+      ? scopeRaw
+      : "combined";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -57,6 +74,7 @@ export default async function RealEstatePage() {
     { data: dealRows },
     { data: reTxns },
     { data: loanRows },
+    { data: catYear },
   ] = await Promise.all([
       supabase
         .from("property_units")
@@ -79,13 +97,57 @@ export default async function RealEstatePage() {
           "id, name, lender, rate_pct, balance_jpy, monthly_payment_jpy, tags, payload"
         )
         .limit(80),
+      supabase
+        .from("kurashift_finance_category_year")
+        .select("fiscal_year, category, income_jpy, expense_jpy, net_jpy")
+        .eq("fiscal_year", calendarYear)
+        .limit(500),
     ]);
 
-  const bRate4 = buildBRate4Rows(loanRows || []);
+  const bRate4All = buildBRate4Rows(loanRows || []);
+  const ownerOf = (propertyId: string) =>
+    RE_PROPERTY_MASTER.find((p) => p.id === propertyId)?.owner || "";
+  const bRate4 = bRate4All.filter((r) => {
+    if (scope === "combined") return true;
+    const o = ownerOf(r.propertyId);
+    if (scope === "personal") return o === "個人";
+    if (scope === "corporate") return o === "法人";
+    return true;
+  });
+
+  const rentByProp = new Map<string, number>();
+  for (const u of unitRows || []) {
+    const pid = String(u.property_id || "");
+    if (!pid) continue;
+    if (scope !== "combined") {
+      const o = ownerOf(pid);
+      if (scope === "personal" && o !== "個人") continue;
+      if (scope === "corporate" && o !== "法人") continue;
+    }
+    rentByProp.set(pid, (rentByProp.get(pid) || 0) + (Number(u.rent) || 0));
+  }
+  const portfolioRent = [...rentByProp.values()].reduce((a, b) => a + b, 0);
+  const portfolioPay = bRate4.reduce(
+    (s, r) => s + (r.monthlyPaymentJpy || 0),
+    0
+  );
+  const portfolioDscr = simpleDscr(portfolioRent, portfolioPay);
+
   const loanTrackerPayMonth = (loanRows || []).reduce((s, l) => {
     const v = l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
     return s + (Number.isFinite(v) ? v : 0);
   }, 0);
+
+  const ytdCf = aggregateReCfFromCategoryYear(
+    (catYear || []) as FinanceCategoryYearRow[],
+    calendarYear
+  );
+  const ytdBucket =
+    scope === "personal"
+      ? ytdCf.personal
+      : scope === "corporate"
+        ? ytdCf.corporate
+        : ytdCf.combined;
 
   const unitCount = unitRows?.length ?? 0;
   const reBoard = composeReSteadyBoard(
@@ -114,14 +176,187 @@ export default async function RealEstatePage() {
   const cfAnnual = typeof re19?.cf_jpy === "number" ? re19.cf_jpy : null;
   const assumedGap = CF_GOAL_MONTH - reBoard.assumedCfMonth;
 
+  /** 合算: 目標50万。個人／法人: そのスコープの満室想定CFを計画月次とする */
+  const planMonthForBar =
+    scope === "combined"
+      ? CF_GOAL_MONTH
+      : Math.max(0, Math.round(reBoard.assumedCfMonth));
+  const planProg = buildPlanProgress({
+    planMonthYen: planMonthForBar,
+    actualYtdYen: ytdBucket.cf,
+    months: throughMonth,
+  });
+  const assumedProg = buildPlanProgress({
+    planMonthYen: Math.max(0, Math.round(reBoard.assumedCfMonth)),
+    actualYtdYen: ytdBucket.cf,
+    months: throughMonth,
+  });
+  const barPct = Math.min(100, Math.max(0, planProg.pct ?? 0));
+
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
-      <h1>不動産賃貸経営</h1>
+      <RealEstateLaneNav active="a" />
+      <h1>不動産賃貸経営 · 運用・進捗</h1>
       <p className="sub">
-        第3の柱。レーンは<strong>4本</strong> — ①運用・計画進捗 ②新規購入検討
-        ③保有物件マスタ ④融資提出パック（段階実装中）。長期目標は{" "}
-        <strong>CF 月50万円</strong>（個人＋法人合算・定義は正規化メモ）。
+        ③-A: 今持っている資産のCF・返済余裕・計画ギャップ。目標は{" "}
+        <strong>CF 月50万円</strong>（個人＋法人合算）。
+        買い進めの長期年表は{" "}
+        <a href="/realestate/buy-plan">レーンB</a>。
       </p>
+
+      <p className="meta" style={{ marginBottom: 12 }}>
+        名義:{" "}
+        <a href="/realestate?scope=combined">
+          {scope === "combined" ? <strong>合算</strong> : "合算"}
+        </a>
+        {" · "}
+        <a href="/realestate?scope=personal">
+          {scope === "personal" ? <strong>個人</strong> : "個人"}
+        </a>
+        {" · "}
+        <a href="/realestate?scope=corporate">
+          {scope === "corporate" ? <strong>法人</strong> : "法人"}
+        </a>
+      </p>
+
+      <div className="card notice">
+        <header>
+          <span className="lvl">Portfolio KPI</span>
+          <strong>レントロール × 返済 × DSCR（簡易）</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          DSCR 簡易 = 月家賃合計 ÷ 月返済合計（業界定番。厳密 NOI ではない）。目安
+          1.2×以上。
+        </p>
+        <table style={{ marginTop: 8 }}>
+          <tbody>
+            <tr>
+              <td>レントロール合計</td>
+              <td>
+                <strong>{fmtYen(portfolioRent)}／月</strong>
+              </td>
+            </tr>
+            <tr>
+              <td>物件ローン月返済合計</td>
+              <td>
+                <strong>{fmtYen(portfolioPay)}／月</strong>
+              </td>
+            </tr>
+            <tr>
+              <td>家賃−返済</td>
+              <td>
+                <strong>
+                  {portfolioPay
+                    ? `${portfolioRent - portfolioPay >= 0 ? "+" : ""}${fmtYen(portfolioRent - portfolioPay)}`
+                    : "—"}
+                </strong>
+              </td>
+            </tr>
+            <tr>
+              <td>DSCR（簡易）</td>
+              <td>
+                <strong>{fmtDscr(portfolioDscr)}</strong>
+                <span className="meta"> · {dscrLabel(portfolioDscr)}</span>
+              </td>
+            </tr>
+            <tr>
+              <td>YTD 19系CF（Zaim投影・{calendarYear}）</td>
+              <td>
+                <strong>{fmtYen(Math.round(ytdBucket.cf))}</strong>
+                <span className="meta">
+                  {" "}
+                  · 収 {fmtYen(Math.round(ytdBucket.income))} − 支{" "}
+                  {fmtYen(Math.round(ytdBucket.expense))}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <header>
+          <span className="lvl">RE-1b</span>
+          <strong>
+            年計画 vs YTD（{calendarYear}・経過 {throughMonth}ヶ月）
+          </strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          計画（比例）= 月次計画 × 経過月。実績 = Zaim 投影の 19系 CF（
+          {scope === "combined"
+            ? "合算"
+            : scope === "personal"
+              ? "個人"
+              : "法人"}
+          ）。合算の月次計画は目標 CF 50万。個人／法人は満室想定 CF を計画に使用。
+        </p>
+        <table style={{ marginTop: 8 }}>
+          <tbody>
+            <tr>
+              <td>月次計画</td>
+              <td>
+                <strong>{fmtYen(planProg.planMonthYen)}</strong>
+                <span className="meta">
+                  {scope === "combined" ? " · 目標50万" : " · 満室想定"}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <td>計画 YTD（比例）</td>
+              <td>
+                <strong>{fmtYen(planProg.planYtdYen)}</strong>
+              </td>
+            </tr>
+            <tr>
+              <td>実績 YTD</td>
+              <td>
+                <strong>{fmtYen(planProg.actualYtdYen)}</strong>
+              </td>
+            </tr>
+            <tr>
+              <td>差分（実−計）</td>
+              <td>
+                <strong>{fmtYenSigned(planProg.deltaYen)}</strong>
+                <span className="meta">
+                  {planProg.pct != null ? ` · 進捗 ${planProg.pct}%` : ""}
+                </span>
+              </td>
+            </tr>
+            {scope === "combined" ? (
+              <tr>
+                <td>参考: 満室想定との進捗</td>
+                <td className="meta">
+                  計画比例 {fmtYen(assumedProg.planYtdYen)} · 進捗{" "}
+                  {assumedProg.pct != null ? `${assumedProg.pct}%` : "—"}
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+        <div
+          style={{
+            marginTop: 12,
+            height: 10,
+            background: "var(--border, #e0e0e0)",
+            borderRadius: 5,
+            overflow: "hidden",
+          }}
+          title={planProg.pct != null ? `${planProg.pct}%` : undefined}
+        >
+          <div
+            style={{
+              width: `${barPct}%`,
+              height: "100%",
+              background:
+                (planProg.pct ?? 0) >= 100
+                  ? "#2e7d32"
+                  : (planProg.pct ?? 0) >= 80
+                    ? "#f9a825"
+                    : "#c62828",
+            }}
+          />
+        </div>
+      </div>
 
       <div className="card notice">
         <header>
@@ -300,14 +535,29 @@ export default async function RealEstatePage() {
 
       <div className="card notice">
         <header>
-          <span className="lvl">Phase 0</span>
-          <strong>4レーン方針をプランに反映済み</strong>
+          <span className="lvl">Lanes</span>
+          <strong>4レーン（分離）</strong>
         </header>
-        <p className="meta">
-          詳細: <code>docs/KURASHIFT_不動産賃貸経営.md</code>
-          {" · "}
-          <code>docs/KURASHIFT_買い進めJob仕様.md</code>
-        </p>
+        <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
+          <li>
+            <a href="/realestate">A 運用</a> — 今のCF・DSCR・ギャップ（この画面）
+          </li>
+          <li>
+            <a href="/realestate/buy-plan">B 買い進めプラン</a> — 長期年表・今狙う条件
+            {buyPlan
+              ? ` · ${buyPlan.label || buyPlan.version_key}`
+              : " · 未取込"}
+          </li>
+          <li>
+            <a href="/realestate/deals">B 千三つ</a> — 情報→内見→買付→融資→購入
+          </li>
+          <li>
+            <a href="/realestate/properties">C 保有</a> — レントロール vs 月返済
+          </li>
+          <li>
+            <a href="/realestate/finance-pack">D 融資パック</a> — 提出書類
+          </li>
+        </ul>
       </div>
 
       <div className="card">
@@ -332,6 +582,11 @@ export default async function RealEstatePage() {
             loan-tracker
           </a>
         </p>
+        <p className="meta" style={{ marginTop: 8 }}>
+          合算金利 = Σ(残高×金利) ÷ Σ残高（物件紐づけローン）。正味 =
+          表面利回り − 合算金利。計算式:{" "}
+          <code>docs/KURASHIFT_loan_tracker_Discover.md</code> §B-RATE-4
+        </p>
         {bRate4.length === 0 ? (
           <p className="meta" style={{ marginTop: 8 }}>
             保有物件がありません。
@@ -342,35 +597,62 @@ export default async function RealEstatePage() {
               <tr>
                 <th>物件</th>
                 <th>名義</th>
-                <th className="num">表面利回り</th>
-                <th className="num">ローン金利</th>
-                <th className="num">正味</th>
-                <th>金融機関</th>
-                <th className="num">残高</th>
+                <th className="num">レントロール</th>
                 <th className="num">月返済</th>
+                <th className="num">家賃−返済</th>
+                <th className="num">DSCR</th>
+                <th className="num">表面利回り</th>
+                <th className="num">合算金利</th>
+                <th className="num">正味</th>
+                <th className="num">残高合計</th>
               </tr>
             </thead>
             <tbody>
-              {bRate4.map((r) => (
-                <tr key={r.propertyId}>
-                  <td>{r.name}</td>
-                  <td className="meta">{r.owner}</td>
-                  <td className="num meta">{fmtPct(r.surfaceYieldPct)}</td>
-                  <td className="num meta">{fmtPct(r.loanRatePct)}</td>
-                  <td className="num">
-                    <strong>{fmtPct(r.netSpreadPct)}</strong>
-                  </td>
-                  <td className="meta">{r.lender || "—"}</td>
-                  <td className="num meta">
-                    {r.balanceJpy != null ? fmtYen(r.balanceJpy) : "—"}
-                  </td>
-                  <td className="num meta">
-                    {r.monthlyPaymentJpy != null
-                      ? fmtYen(r.monthlyPaymentJpy)
-                      : "—"}
-                  </td>
-                </tr>
-              ))}
+              {bRate4.map((r) => {
+                const rent = rentByProp.get(r.propertyId) ?? null;
+                const pay = r.monthlyPaymentJpy;
+                const gap =
+                  rent != null && pay != null ? rent - pay : null;
+                const dscr = simpleDscr(rent, pay);
+                return (
+                  <tr key={r.propertyId}>
+                    <td>{r.name}</td>
+                    <td className="meta">{r.owner}</td>
+                    <td className="num">
+                      {rent != null ? (
+                        <strong>{fmtYen(rent)}／月</strong>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="num meta">
+                      {pay != null ? `${fmtYen(pay)}／月` : "—"}
+                    </td>
+                    <td className="num">
+                      {gap == null ? (
+                        "—"
+                      ) : (
+                        <strong>
+                          {gap >= 0 ? "+" : ""}
+                          {fmtYen(gap)}
+                        </strong>
+                      )}
+                    </td>
+                    <td className="num">
+                      <strong>{fmtDscr(dscr)}</strong>
+                      <div className="meta">{dscrLabel(dscr)}</div>
+                    </td>
+                    <td className="num meta">{fmtPct(r.surfaceYieldPct)}</td>
+                    <td className="num meta">{fmtPct(r.loanRatePct)}</td>
+                    <td className="num">
+                      <strong>{fmtPct(r.netSpreadPct)}</strong>
+                    </td>
+                    <td className="num meta">
+                      {r.balanceJpy != null ? fmtYen(r.balanceJpy) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

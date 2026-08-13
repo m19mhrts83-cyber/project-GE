@@ -69,7 +69,14 @@
 | `re_sync_loan_tracker` | ローン投影 | 低（読取） |
 | （将来）問い合わせ下書き | 送信は別確認 | 高 |
 
-## 受け入れ（Sprint 2 最小）
+## UI 導線（2026-08-13）
+
+1. **長期プラン** `/realestate/buy-plan` — events 年表・criteria・constraints・Excel Jobs  
+2. **今狙う** — 同画面 Focus（Notion 条件＋ Excel）  
+3. **実行** `/realestate/deals` — 千三つファネル・メール候補  
+4. **運用** `/realestate` — CF・DSCR・名義切替（③-A）
+
+編集者向け: [`docs/KURASHIFT_編集者引き継ぎ_不動産AB_20260813.md`](KURASHIFT_編集者引き継ぎ_不動産AB_20260813.md)
 
 - [ ] canonical Excel が DB に入り、イベント件数が 0 でない
 - [ ] `/realestate` に CF 月50万 KPI（定義メモリンク）

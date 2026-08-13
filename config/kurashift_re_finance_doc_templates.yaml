@@ -1,0 +1,297 @@
+# 融資提出パック — 書類カタログ
+# 正本: この YAML。UI: /realestate/finance-pack
+# ownership: common | personal | corporate
+# product_types: property_purchase | working_capital | free_loan | education_loan
+
+version: 1
+updated: "2026-08-13"
+
+folder_convention:
+  property: "240_融資/finance_packs/{YYYYMM}_{物件略称}_{銀行}/"
+  unsecured: "240_融資/finance_packs/{YYYYMM}_{product}_{銀行or制度}/"
+  subdirs:
+    - "00_共通"
+    - "01_個人" # または 01_法人
+    - "02_収入税務"
+    - "03_既存借入"
+    - "04_資産"
+    - "05_物件または使途根拠"
+    - "06_取引契約"
+    - "07_銀行固有"
+    - "08_送信控え"
+  reference_paths:
+    - "240_融資/243_カードローン書類/"
+    - "240_融資/241_融資審査/"
+    - "215/…/10_【購入】物件購入,融資/"
+
+product_types:
+  property_purchase:
+    label: 物件購入融資
+    note: オリックス／滋賀など担保付き本体
+  working_capital:
+    label: 運転資金
+    note: 名銀・信金・マル経（商工会→公庫）等。購入原資・修繕バッファ
+  free_loan:
+    label: フリーローン
+    note: 使途確認書類（見積等）が鍵
+  education_loan:
+    label: 教育ローン
+    note: 納付書・在学証明。既存: 名銀・住信SBI
+
+# --- 共通（個人・法人どちらでも） ---
+slots_common:
+  - id: mynumber_card
+    title: マイナンバーカード（券面コピー）
+    layer: always
+    ownership: common
+    product_types: [property_purchase, working_capital, free_loan, education_loan]
+    media: digital
+    how: スキャナ／スマホ。表面・裏面
+    path_hint: "00_共通/マイナンバーカード"
+  - id: drivers_license
+    title: 運転免許証（表裏）
+    layer: always
+    ownership: common
+    product_types: [property_purchase, working_capital, free_loan, education_loan]
+    media: digital
+    how: スキャナ。実物参照: 243_カードローン書類
+    path_hint: "00_共通/免許証"
+  - id: health_insurance_card
+    title: 健康保険証（表裏）
+    layer: always
+    ownership: common
+    product_types: [property_purchase, working_capital, free_loan, education_loan]
+    media: digital
+    how: スキャナ
+    path_hint: "00_共通/保険証"
+  - id: existing_loans_list
+    title: 既存借入一覧・残高（as-of）
+    layer: always
+    ownership: common
+    product_types: [property_purchase, working_capital, free_loan, education_loan]
+    media: digital
+    how: 借入残高トラッカー → loans.json。返済予定表PDFも
+    path_hint: "03_既存借入/"
+    data_source: loan_tracker
+
+# --- 個人名義 ---
+slots_personal:
+  - id: withholding_3y
+    title: 源泉徴収票（直近〜3期）
+    layer: always
+    ownership: personal
+    product_types: [property_purchase, free_loan, education_loan, working_capital]
+    media: digital
+    how: smartHR／勤務先配布
+    path_hint: "02_収入税務/源泉"
+  - id: tax_return_personal
+    title: 確定申告書控（直近）
+    layer: always
+    ownership: personal
+    product_types: [property_purchase, free_loan, education_loan, working_capital]
+    media: digital
+    how: e-Tax。マイナ削除版も可（カードローン実績）
+    path_hint: "02_収入税務/確定申告"
+  - id: residence_certificate
+    title: 住民票
+    layer: always
+    ownership: personal
+    product_types: [property_purchase, free_loan, education_loan]
+    media: mail_original
+    how: コンビニ交付／区役所
+    path_hint: "01_個人/住民票"
+  - id: seal_certificate
+    title: 印鑑証明書
+    layer: always
+    ownership: personal
+    product_types: [property_purchase]
+    media: mail_original
+    how: コンビニ／区役所。物件決済前後で要原本が多い
+    path_hint: "01_個人/印鑑証明"
+  - id: personal_assets_snapshot
+    title: 資産残高（預金・証券・保険等）
+    layer: always
+    ownership: personal
+    product_types: [property_purchase, free_loan, education_loan]
+    media: digital
+    how: 各社マイページ画面／週次資産
+    path_hint: "04_資産/"
+  - id: personal_profile
+    title: 身上書
+    layer: always
+    ownership: personal
+    product_types: [property_purchase]
+    media: digital
+    how: "241_融資審査/【共通：融資説明資料】身上書"
+    path_hint: "01_個人/身上書"
+
+# --- 法人名義 ---
+slots_corporate:
+  - id: corp_registry
+    title: 履歴事項全部証明書（3カ月以内原本）
+    layer: always
+    ownership: corporate
+    product_types: [property_purchase, working_capital]
+    media: mail_original
+    how: 法務局。名銀口座作成時も必須
+    path_hint: "01_法人/履歴事項全部証明書"
+  - id: corp_articles
+    title: 定款
+    layer: always
+    ownership: corporate
+    product_types: [property_purchase, working_capital]
+    media: digital
+    how: 法人フォルダ。名銀口座時も必須
+    path_hint: "01_法人/定款"
+  - id: corp_seal
+    title: 法人記名版・銀行届印
+    layer: always
+    ownership: corporate
+    product_types: [property_purchase, working_capital]
+    media: mail_original
+    how: 窓口持参
+    path_hint: "01_法人/印鑑"
+  - id: corp_financials_2y
+    title: 決算書・確定申告（前期・前々期）
+    layer: always
+    ownership: corporate
+    product_types: [property_purchase, working_capital]
+    media: digital
+    how: 税理士／Kneesbee。マル経も同型
+    path_hint: "02_収入税務/決算"
+  - id: corp_trial_balance
+    title: 直近残高試算表（決算後6カ月超のとき）
+    layer: always
+    ownership: corporate
+    product_types: [working_capital]
+    media: digital
+    how: 税理士
+    path_hint: "02_収入税務/試算表"
+  - id: corp_tax_receipts
+    title: 法人税等の納税証明・領収書
+    layer: always
+    ownership: corporate
+    product_types: [working_capital, property_purchase]
+    media: digital
+    how: e-Tax／税理士。マル経必須
+    path_hint: "02_収入税務/納税"
+  - id: guarantor_income
+    title: 代表者個人の収入証明（保証・併走）
+    layer: always
+    ownership: corporate
+    product_types: [property_purchase, working_capital]
+    media: digital
+    how: 源泉・個人確定申告。01_法人/代表者個人/ に配置
+    path_hint: "01_法人/代表者個人/収入"
+
+# --- 案件レイヤ（物件） ---
+slots_deal_property:
+  - id: property_flyer
+    title: マイソク／図面
+    layer: deal
+    ownership: common
+    product_types: [property_purchase]
+    media: digital
+    path_hint: "05_物件または使途根拠/図面"
+  - id: rent_roll
+    title: レントロール
+    layer: deal
+    ownership: common
+    product_types: [property_purchase]
+    media: digital
+    path_hint: "05_物件または使途根拠/レントロール"
+  - id: property_registry
+    title: 謄本・公図
+    layer: deal
+    ownership: common
+    product_types: [property_purchase]
+    media: digital
+    path_hint: "05_物件または使途根拠/登記"
+  - id: sale_contract
+    title: 売買契約・重要事項説明
+    layer: deal
+    ownership: common
+    product_types: [property_purchase]
+    media: digital
+    path_hint: "06_取引契約/"
+  - id: offer_sheet
+    title: 買付申込
+    layer: deal
+    ownership: common
+    product_types: [property_purchase]
+    media: digital
+    path_hint: "06_取引契約/買付"
+
+# --- 案件レイヤ（無担保・使途） ---
+slots_deal_unsecured:
+  - id: purpose_estimate
+    title: 資金使途確認（見積書・注文書・請求書）
+    layer: deal
+    ownership: common
+    product_types: [free_loan, working_capital]
+    media: digital
+    how: フリーローン必須パターン（信金等）。運転の設備枠でも
+    path_hint: "05_物件または使途根拠/見積"
+  - id: education_payment_slip
+    title: 学校納付書・振込用紙・在学証明
+    layer: deal
+    ownership: personal
+    product_types: [education_loan]
+    media: digital
+    how: 教育ローンの使途証明
+    path_hint: "05_物件または使途根拠/教育"
+  - id: repair_history
+    title: 修繕履歴・修繕計画（運転資金根拠）
+    layer: deal
+    ownership: corporate
+    product_types: [working_capital]
+    media: digital
+    how: 商工会相談実績（決算＋修繕履歴の事前送付）
+    path_hint: "05_物件または使途根拠/修繕"
+  - id: marukei_guidance_status
+    title: 商工会・経営指導ステータス／相談日
+    layer: deal
+    ownership: corporate
+    product_types: [working_capital]
+    media: digital
+    how: マル経は指導・推薦が前提。メモ欄で可
+    path_hint: "07_銀行固有/マル経"
+
+# --- 銀行・制度プロファイル（差分） ---
+bank_profiles:
+  orix:
+    label: オリックス銀行（物件）
+    product_types: [property_purchase]
+    extra_slot_ids: []
+    note: GrandoleⅠ・Ⅱ実績。団信・銀行固有申込書は07へ
+  shiga:
+    label: 滋賀銀行ジャストサポート（物件・諸費用）
+    product_types: [property_purchase, free_loan]
+    extra_slot_ids: []
+    note: キャラメル本担保＋オリコ諸費用。無担保枠・保証会社に注意
+  meigin:
+    label: 名古屋銀行
+    product_types: [working_capital, education_loan, property_purchase]
+    extra_slot_ids: [corp_registry, corp_articles, corp_seal]
+    note: 法人口座作成時に登記・定款・届印。運転資金相談実績（越野）。教育ローン既存
+  marukei:
+    label: マル経（商工会推薦→日本公庫）
+    product_types: [working_capital]
+    extra_slot_ids:
+      - corp_financials_2y
+      - corp_trial_balance
+      - corp_tax_receipts
+      - corp_registry
+      - repair_history
+      - marukei_guidance_status
+    note: 無担保・無保証人。指導期間あり
+  free_loan_generic:
+    label: フリーローン（汎用・信金等）
+    product_types: [free_loan]
+    extra_slot_ids: [purpose_estimate, withholding_3y, tax_return_personal]
+    note: 本人確認＋年収＋使途確認が標準
+  education_generic:
+    label: 教育ローン（汎用）
+    product_types: [education_loan]
+    extra_slot_ids: [education_payment_slip, withholding_3y]
+    note: 既存名銀・住信SBI。納付書必須
