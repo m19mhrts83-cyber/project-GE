@@ -1,0 +1,17 @@
+# 買い進めプラン画面の年次CFオーバーレイに載せるメジャー版
+# 実装正本: apps/trade-desk/lib/buyPlanCfSeries.ts の BUY_PLAN_CHART_MAJOR_VERSIONS
+# 差し替え時は YAML と TS を揃える
+
+goal_month_yen: 500000
+chart_start_year: 2011
+
+versions:
+  - version_key: "240224"
+    label: "計画 ver.1.0"
+    as_of: "2024-02-24"
+  - version_key: "250901"
+    label: "計画 ver.2.2"
+    as_of: "2025-09-01"
+  - version_key: "251124"
+    label: "計画 ver.3.1（現行）"
+    as_of: "2025-11-24"

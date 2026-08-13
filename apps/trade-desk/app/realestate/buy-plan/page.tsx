@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
+import BuyPlanYearEval from "@/components/BuyPlanYearEval";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 import { buyPlanActionView } from "@/lib/buyPlanAction";
@@ -10,6 +11,18 @@ import {
 } from "@/lib/buyPlanPace";
 import { buildBRate4Rows } from "@/lib/bRate4";
 import { RE_PROPERTY_MASTER } from "@/lib/rePropertyMaster";
+import {
+  BUY_PLAN_CHART_MAJOR_VERSIONS,
+  buildPlanCfSeriesForVersion,
+  defaultChartYears,
+} from "@/lib/buyPlanCfSeries";
+import { buildOpsCfSeries } from "@/lib/reOpsCfSeries";
+import {
+  completeMonthsElapsed,
+  tokyoYmd,
+} from "@/lib/reFinanceYtd";
+import type { ReTxn } from "@/lib/reSteadyCf";
+import type { PropertyUnitRow } from "@/lib/roiAssets";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +60,15 @@ export default async function BuyPlanPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { year: calendarYear } = tokyoYmd();
+  const throughMonth = completeMonthsElapsed();
+  const chartYears = defaultChartYears(2011, calendarYear + 8);
+  const majorKeys = BUY_PLAN_CHART_MAJOR_VERSIONS.map((v) => v.versionKey);
+  const opsYears = Array.from(
+    { length: calendarYear - 2016 + 1 },
+    (_, i) => 2016 + i
+  );
+
   const { data: buyPlan } = await supabase
     .from("kurashift_buy_plan_versions")
     .select("id, version_key, label, as_of, metadata, source_filename")
@@ -55,12 +77,18 @@ export default async function BuyPlanPage() {
 
   const vid = buyPlan?.id;
 
+  const { data: majorVers } = await supabase
+    .from("kurashift_buy_plan_versions")
+    .select("id, version_key, label, as_of")
+    .in("version_key", majorKeys);
+
   const [
     { data: events },
     { data: criteria },
     { data: constraints },
     { data: unitRows },
     { data: loanRows },
+    { data: unitLive },
   ] = await Promise.all([
     vid
       ? supabase
@@ -98,7 +126,38 @@ export default async function BuyPlanPage() {
         "id, name, lender, rate_pct, balance_jpy, monthly_payment_jpy, tags, payload"
       )
       .limit(80),
+    supabase
+      .from("property_units")
+      .select("property_id, property_name, room, status, rent, note, payload")
+      .limit(200),
   ]);
+
+  const majorEventsEntries = await Promise.all(
+    (majorVers || []).map(async (v) => {
+      const { data: ev } = await supabase
+        .from("kurashift_buy_plan_events")
+        .select("action, property_name, price_man, yield_pct, event_date")
+        .eq("version_id", v.id)
+        .limit(300);
+      return [v.version_key, ev || []] as const;
+    })
+  );
+  const eventsByVersionKey = new Map(majorEventsEntries);
+
+  const txnByYearEntries = await Promise.all(
+    opsYears.map(async (fy) => {
+      const { data: tx } = await supabase
+        .from("kurashift_finance_transactions")
+        .select(
+          "category, subcategory, txn_date, income_jpy, expense_jpy, to_account"
+        )
+        .eq("fiscal_year", fy)
+        .or("category.ilike.%19%,category.ilike.%賃貸%,category.ilike.%家賃%")
+        .limit(8000);
+      return [fy, (tx || []) as ReTxn[]] as const;
+    })
+  );
+  const txnsByYear = new Map(txnByYearEntries);
 
   const rows = (events || []) as EventRow[];
   const byYear = new Map<string, EventRow[]>();
@@ -128,6 +187,69 @@ export default async function BuyPlanPage() {
     currentCfYen,
     goalYen: CF_GOAL_MONTH_YEN,
   });
+
+  const planSeries = BUY_PLAN_CHART_MAJOR_VERSIONS.map((meta) => {
+    const ev = eventsByVersionKey.get(meta.versionKey) || [];
+    const dbLabel = (majorVers || []).find(
+      (v) => v.version_key === meta.versionKey
+    );
+    return buildPlanCfSeriesForVersion(
+      {
+        ...meta,
+        label: meta.label,
+        asOf: dbLabel?.as_of || meta.asOf,
+      },
+      ev,
+      chartYears
+    );
+  });
+
+  const opsSeries = buildOpsCfSeries(
+    txnsByYear,
+    (unitLive || []) as PropertyUnitRow[],
+    chartYears,
+    { currentYear: calendarYear, throughMonthCurrent: throughMonth }
+  );
+  const opsByYear = new Map(opsSeries.map((o) => [o.year, o]));
+
+  const overlaySeries = [
+    ...planSeries.map((s, i) => ({
+      key: s.versionKey,
+      label: s.label,
+      values: chartYears.map(
+        (y) => s.byYear.find((p) => p.year === y)?.cfYen ?? null
+      ),
+      emphasis: i === planSeries.length - 1,
+    })),
+    {
+      key: "ops",
+      label: "実際のキャッシュフロー（定常）",
+      values: chartYears.map((y) => opsByYear.get(y)?.steadyCfMonth ?? null),
+      emphasis: false,
+    },
+  ];
+
+  const latestPlan = planSeries[planSeries.length - 1];
+  const evalRows = chartYears
+    .filter((y) => y <= calendarYear)
+    .map((y) => {
+      const plan = latestPlan?.byYear.find((p) => p.year === y)?.cfYen ?? null;
+      const ops = opsByYear.get(y);
+      return {
+        year: y,
+        planLatestYen: plan,
+        opsYen: ops?.steadyCfMonth ?? null,
+        specialYtd: ops?.specialYtd ?? 0,
+      };
+    })
+    .filter((r) => r.planLatestYen != null || r.opsYen != null);
+
+  const chartMarkers = BUY_PLAN_CHART_MAJOR_VERSIONS.filter((m) => m.asOf).map(
+    (m) => ({
+      year: Number(m.asOf!.slice(0, 4)),
+      label: m.label.replace("計画 ", ""),
+    })
+  );
 
   const areas = (criteria || []).filter((c) => c.kind === "area");
   const rules = (criteria || []).filter((c) => c.kind === "purchase_rule");
@@ -463,6 +585,13 @@ export default async function BuyPlanPage() {
           STEP3: トップダウン・戸建売却で資金回復・フリー／運転は原資部品。カードローンは禁じ手。
         </p>
       </div>
+
+      <BuyPlanYearEval
+        years={chartYears}
+        series={overlaySeries}
+        rows={evalRows}
+        markers={chartMarkers}
+      />
 
       <div className="card">
         <header>

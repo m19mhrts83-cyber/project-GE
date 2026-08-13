@@ -11,24 +11,30 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
 | 文書 | 用途 |
 |---|---|
-| [`KURASHIFT_品質保証点検ログ_20260813.md`](./KURASHIFT_品質保証点検ログ_20260813.md) | **Wave0 合否・P1/P2・実務者タスク順** |
+| [`KURASHIFT_plan棚卸し_20260813.md`](./KURASHIFT_plan棚卸し_20260813.md) | **plan 全本線の done/pending 棚卸し（検証前）** |
+| [`KURASHIFT_品質保証点検ログ_20260813.md`](./KURASHIFT_品質保証点検ログ_20260813.md) | Wave0 合否・P1/P2・実務者タスク順 |
 | [`KURASHIFT_品質保証点検_実行プラン_20260813.md`](./KURASHIFT_品質保証点検_実行プラン_20260813.md) | Wave 定義・「満足」の定義 |
 
-**QA 要約**: ③-A〜D 骨格は条件付き合格・**P0 なし**。本線全満足は未宣言（年計画 vs YTD／②通し／ログイン目視補完が残）。
+**QA 要約**: ③-A〜D 骨格は条件付き合格・**P0 なし**。本線全満足は未宣言（通し検証・V-2-UI・案件1件が残）。
 
-**実務実装（同日）**: P1（C DSCR注記・年表種別バッジ・LS強調・ナビB計/B実）＋ RE-1b（年計画 vs YTD バー）を本番反映済。詳細は点検ログ §8。
+**実務実装（同日）**: P1＋RE-1b＋買い進めCF年次推移＋借入トラッカー導線を本番反映済。
+
+**plan 棚卸し（同日）**: HQ／買い進め／融資パック／QA／改善を同期。**残 pending は棚卸し doc を正**。買い進めの年1実績反映・Excel改訂→運営相談は **検証後**（`buy-plan-revise-modes`）。
 
 ---
 
 ## 1. プラン地図（どれが生きているか）
 
-| プランファイル | 役割 | 状態 |
+| プランファイル | 役割 | 状態（2026-08-13 棚卸し） |
 |---|---|---|
-| [`ライフプランhq再整理_c37d6392.plan.md`](~/.cursor/plans/ライフプランhq再整理_c37d6392.plan.md) | **本線**（①②③の骨格） | 大半完了。残は③-A〜D実装・verification・Lab立花 |
-| [`kurashift実務検証_fbf4058e.plan.md`](~/.cursor/plans/kurashift実務検証_fbf4058e.plan.md) | Sprint1検証＋Sprint2買い進めOS | **To-do 完了**。成果は本番＋DBに反映済 |
-| [`kurashift改善プラン_86acd2ee.plan.md`](~/.cursor/plans/kurashift改善プラン_86acd2ee.plan.md) | QAゲート仕様 | Phase A 実装済（frontmatter は要同期）。Phase B/C は未 |
+| [`ライフプランhq再整理_c37d6392.plan.md`](~/.cursor/plans/ライフプランhq再整理_c37d6392.plan.md) | **本線**（①②③） | 24 done / **3 pending**（検証・計画補正・Lab） |
+| [`買い進め長期レーン_77a6bd3e.plan.md`](~/.cursor/plans/買い進め長期レーン_77a6bd3e.plan.md) | ③-B 長期→実行 | 6 done / **1 pending**（検証後の改訂モード） |
+| [`融資提出パック設計_74653333.plan.md`](~/.cursor/plans/融資提出パック設計_74653333.plan.md) | ③-D | **完了** |
+| [`qa実行プラン整理_b3b4e68d.plan.md`](~/.cursor/plans/qa実行プラン整理_b3b4e68d.plan.md) | QA Waves | Wave0–1済 / **Wave2残** |
+| [`kurashift改善プラン_86acd2ee.plan.md`](~/.cursor/plans/kurashift改善プラン_86acd2ee.plan.md) | QAゲート | Phase A/B済 / **Phase C残** |
+| [`kurashift実務検証_fbf4058e.plan.md`](~/.cursor/plans/kurashift実務検証_fbf4058e.plan.md) | Sprint1–2 | **To-do 完了** |
 | [`kurashift_hq_overview_e49b0cea.plan.md`](~/.cursor/plans/kurashift_hq_overview_e49b0cea.plan.md) | HQ俯瞰 | **完了** |
-| [`trade_desk_方向再編_9c87a14e.plan.md`](~/.cursor/plans/trade_desk_方向再編_9c87a14e.plan.md) | 旧議論 | **cancelled（吸収済み）**。再開しない |
+| [`trade_desk_方向再編_9c87a14e.plan.md`](~/.cursor/plans/trade_desk_方向再編_9c87a14e.plan.md) | 旧議論 | **cancelled（吸収済み）** |
 
 ---
 

@@ -200,8 +200,8 @@ export default async function RealEstatePage({
       <p className="sub">
         ③-A: 今持っている資産のCF・返済余裕・計画ギャップ。目標は{" "}
         <strong>CF 月50万円</strong>（個人＋法人合算）。
-        買い進めの長期年表は{" "}
-        <a href="/realestate/buy-plan">レーンB</a>。
+        買い進めの長期年表・想定vs実績は{" "}
+        <a href="/realestate/buy-plan">レーンB（買い進めプラン）</a>。
       </p>
 
       <p className="meta" style={{ marginBottom: 12 }}>
