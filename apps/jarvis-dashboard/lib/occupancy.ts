@@ -31,6 +31,48 @@ export type PropertyRentBreakdown = {
   total_rent: number | null;
 };
 
+export type UnitMemoEntry = {
+  at: string;
+  text: string;
+  source: "ui" | "jarvis" | "excel" | "mail" | string;
+};
+
+export type UnitRentPlan = {
+  rent_year1: number | null;
+  rent_year2: number | null;
+  management_fee: number | null;
+  total_year1: number | null;
+  total_year2: number | null;
+  discount_yen: number | null;
+  discount_rate: number | null;
+  plan_note: string | null;
+  campaign_until: string | null;
+  memo_log: UnitMemoEntry[];
+};
+
+/** Grandole I/II 用フロア格子（欠番 204/104 は空セル） */
+export const FLOOR_MAP_LAYOUTS: Record<
+  string,
+  { floors: { floor: number; rooms: string[] }[] }
+> = {
+  "grandole-i": {
+    floors: [
+      { floor: 2, rooms: ["201", "202", "203", "204", "205"] },
+      { floor: 1, rooms: ["101", "102", "103", "104", "105"] },
+    ],
+  },
+  "grandole-ii": {
+    floors: [
+      { floor: 2, rooms: ["201", "202", "203", "204", "205"] },
+      { floor: 1, rooms: ["101", "102", "103", "104", "105"] },
+    ],
+  },
+};
+
+export function hasFloorMap(propertyId: string): boolean {
+  return propertyId in FLOOR_MAP_LAYOUTS;
+}
+
 export type OccupancySummary = {
   total: number;
   occupied: number;
@@ -198,6 +240,115 @@ export function parseOccupancySummary(
 export function fmtYen(n: number | null | undefined): string {
   if (n == null) return "—";
   return `${Math.round(n).toLocaleString("ja-JP")}円`;
+}
+
+function numOrNull(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v.replace(/,/g, ""));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+export function parseMemoLog(raw: unknown): UnitMemoEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: UnitMemoEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const text = typeof o.text === "string" ? o.text.trim() : "";
+    if (!text) continue;
+    const at =
+      typeof o.at === "string" && o.at
+        ? o.at
+        : new Date().toISOString();
+    const source =
+      typeof o.source === "string" && o.source ? o.source : "excel";
+    out.push({ at, text, source });
+  }
+  return out;
+}
+
+/** payload から 1年目／2年目計画とメモ履歴を取り出す */
+export function unitRentPlan(unit: PropertyUnit): UnitRentPlan {
+  const p = unit.payload || {};
+  const current = unitRentBreakdown(unit);
+  const mgmt =
+    numOrNull(p.mgmt_fee) ??
+    numOrNull(p.management_fee) ??
+    current.management_fee;
+
+  let rent_year2 = numOrNull(p.rent_year2);
+  let rent_year1 = numOrNull(p.rent_year1);
+  let total_year2 = numOrNull(p.total_year2);
+  let total_year1 = numOrNull(p.total_year1);
+  let discount_yen = numOrNull(p.discount_yen);
+
+  if (rent_year2 == null) rent_year2 = current.rent;
+  if (total_year2 == null) {
+    if (rent_year2 != null) {
+      total_year2 = rent_year2 + (mgmt != null ? mgmt : 0);
+    } else {
+      total_year2 = current.total_rent;
+    }
+  }
+  if (rent_year1 == null && rent_year2 != null && discount_yen != null) {
+    rent_year1 = rent_year2 - discount_yen;
+  }
+  if (total_year1 == null) {
+    if (rent_year1 != null) {
+      total_year1 = rent_year1 + (mgmt != null ? mgmt : 0);
+    } else if (total_year2 != null && discount_yen != null) {
+      total_year1 = total_year2 - discount_yen;
+    }
+  }
+  if (discount_yen == null && total_year2 != null && total_year1 != null) {
+    discount_yen = total_year2 - total_year1;
+  } else if (discount_yen == null && rent_year2 != null && rent_year1 != null) {
+    discount_yen = rent_year2 - rent_year1;
+  }
+
+  let discount_rate = numOrNull(p.discount_rate);
+  if (
+    discount_rate == null &&
+    discount_yen != null &&
+    total_year2 != null &&
+    total_year2 > 0
+  ) {
+    discount_rate = Math.round((1000 * discount_yen) / total_year2) / 10;
+  }
+
+  const plan_note =
+    typeof p.plan_note === "string" && p.plan_note.trim()
+      ? p.plan_note.trim()
+      : null;
+  const campaign_until =
+    typeof p.campaign_until === "string" && p.campaign_until.trim()
+      ? p.campaign_until.trim()
+      : null;
+
+  return {
+    rent_year1,
+    rent_year2,
+    management_fee: mgmt,
+    total_year1,
+    total_year2,
+    discount_yen,
+    discount_rate,
+    plan_note,
+    campaign_until,
+    memo_log: parseMemoLog(p.memo_log),
+  };
+}
+
+export function fmtDiscount(
+  plan: Pick<UnitRentPlan, "discount_yen" | "discount_rate">,
+): string {
+  if (plan.discount_yen == null || plan.discount_yen <= 0) return "—";
+  const rate =
+    plan.discount_rate != null ? `（${plan.discount_rate}%）` : "";
+  return `▲${Math.round(plan.discount_yen).toLocaleString("ja-JP")}円${rate}`;
 }
 
 /** 先月（JST・カレンダー月） YYYY-MM */

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import TriageKanbanLane from "@/components/TriageKanbanLane";
+import UnitFloorMap from "@/components/properties/UnitFloorMap";
 import {
   fmtYen,
   groupUnitsByProperty,
+  hasFloorMap,
   shortLabel,
   summarizeUnits,
   unitRentBreakdown,
@@ -59,7 +61,7 @@ export default async function Page() {
       lane="properties"
       title="所有物件"
       active="/properties"
-      subtitle="号室ごとに家賃・管理費・管理会社・空室時鍵番号。建物ごとの住所・合計も表示。"
+      subtitle="号室格子で家賃マップ（計画／現状比較・メモ追記）。建物ごとの住所・合計も表示。"
     >
       <div className="stats">
         <div className="stat">
@@ -123,6 +125,18 @@ export default async function Page() {
           const key = propertyKeys.keys[g.property_id];
           const info = getPropertyInfo(g.property_id);
           const address = info?.address;
+          const useMap = hasFloorMap(g.property_id);
+          const managerMap: Record<string, string | null> = {};
+          for (const u of g.units) {
+            managerMap[u.room] = resolveRoomManager(
+              g.property_id,
+              u.room,
+              u.note,
+            );
+          }
+          const propEvents = eventList.filter(
+            (e) => e.property_id === g.property_id,
+          );
           return (
             <section key={g.property_id} className="prop-block">
               <div className="prop-block-head">
@@ -145,60 +159,72 @@ export default async function Page() {
               {address ? (
                 <p className="prop-block-address">{address}</p>
               ) : null}
-              <div className="home-unit-table-wrap">
-                <table className="home-unit-table">
-                  <thead>
-                    <tr>
-                      <th>ラベル</th>
-                      <th>号室</th>
-                      <th>状態</th>
-                      <th>管理会社</th>
-                      <th>家賃</th>
-                      <th>管理費</th>
-                      <th>賃料合計</th>
-                      <th>メモ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {g.units.map((u) => {
-                      const b = unitRentBreakdown(u);
-                      const mgr = resolveRoomManager(
-                        g.property_id,
-                        u.room,
-                        u.note,
-                      );
-                      return (
-                        <tr
-                          key={u.id}
-                          className={
-                            u.status === "vacant" ? "is-vacant" : undefined
-                          }
-                        >
-                          <td>{shortLabel(u)}</td>
-                          <td>{u.room}</td>
-                          <td>{u.status === "vacant" ? "空室" : "入居"}</td>
-                          <td>{mgr || "—"}</td>
-                          <td>{fmtYen(b.rent)}</td>
-                          <td>{fmtYen(b.management_fee)}</td>
-                          <td>
-                            <strong>{fmtYen(b.total_rent)}</strong>
-                          </td>
-                          <td className="prop-note">{u.note || "—"}</td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="prop-total-row">
-                      <td colSpan={4}>建物合計</td>
-                      <td>{fmtYen(g.rent_sum || null)}</td>
-                      <td>{fmtYen(g.mgmt_sum || null)}</td>
-                      <td>
-                        <strong>{fmtYen(g.total_rent_sum || null)}</strong>
-                      </td>
-                      <td />
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {useMap ? (
+                <UnitFloorMap
+                  propertyId={g.property_id}
+                  propertyName={g.property_name}
+                  units={g.units}
+                  events={propEvents}
+                  managers={managerMap}
+                />
+              ) : (
+                <div className="home-unit-table-wrap">
+                  <table className="home-unit-table">
+                    <thead>
+                      <tr>
+                        <th>ラベル</th>
+                        <th>号室</th>
+                        <th>状態</th>
+                        <th>管理会社</th>
+                        <th>家賃</th>
+                        <th>管理費</th>
+                        <th>賃料合計</th>
+                        <th>メモ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.units.map((u) => {
+                        const b = unitRentBreakdown(u);
+                        const mgr = resolveRoomManager(
+                          g.property_id,
+                          u.room,
+                          u.note,
+                        );
+                        return (
+                          <tr
+                            key={u.id}
+                            className={
+                              u.status === "vacant" ? "is-vacant" : undefined
+                            }
+                          >
+                            <td>{shortLabel(u)}</td>
+                            <td>{u.room}</td>
+                            <td>
+                              {u.status === "vacant" ? "空室" : "入居"}
+                            </td>
+                            <td>{mgr || "—"}</td>
+                            <td>{fmtYen(b.rent)}</td>
+                            <td>{fmtYen(b.management_fee)}</td>
+                            <td>
+                              <strong>{fmtYen(b.total_rent)}</strong>
+                            </td>
+                            <td className="prop-note">{u.note || "—"}</td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="prop-total-row">
+                        <td colSpan={4}>建物合計</td>
+                        <td>{fmtYen(g.rent_sum || null)}</td>
+                        <td>{fmtYen(g.mgmt_sum || null)}</td>
+                        <td>
+                          <strong>{fmtYen(g.total_rent_sum || null)}</strong>
+                        </td>
+                        <td />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
           );
         })
@@ -228,7 +254,11 @@ export default async function Page() {
       {eventList.length === 0 ? (
         <p className="empty">履歴はまだありません（メール検知後に増えます）</p>
       ) : (
-        <div className="prop-event-table-wrap" role="region" aria-label="空室入居履歴">
+        <div
+          className="prop-event-table-wrap"
+          role="region"
+          aria-label="空室入居履歴"
+        >
           <table className="prop-event-table">
             <thead>
               <tr>
