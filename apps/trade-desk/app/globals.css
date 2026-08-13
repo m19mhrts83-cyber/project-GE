@@ -126,6 +126,13 @@ a:hover {
   color: var(--muted);
 }
 
+/* ①②③（＋運用）の柱区切り。ブランド下の線と同色・同程度の短さ */
+.side-group-title--rule {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
 .side-link {
   display: block;
   color: #334155;

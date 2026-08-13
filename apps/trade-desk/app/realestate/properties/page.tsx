@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
+import { buildBRate4Rows, fmtPct } from "@/lib/bRate4";
 
 export const dynamic = "force-dynamic";
 
@@ -32,10 +33,16 @@ export default async function RealEstatePropertiesPage() {
   const { data: loans } = await supabase
     .from("kurashift_loan_tracker_loans")
     .select(
-      "id, name, lender, category_major, balance_jpy, monthly_payment_jpy, annual_payment_jpy, rate_pct, synced_at"
+      "id, name, lender, category_major, balance_jpy, monthly_payment_jpy, annual_payment_jpy, rate_pct, tags, payload, synced_at"
     )
     .order("balance_jpy", { ascending: false, nullsFirst: false })
     .limit(80);
+
+  const bRate4 = buildBRate4Rows(loans || []);
+  const loanPayMonth = (loans || []).reduce((s, l) => {
+    const v = l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
+    return s + (Number.isFinite(v) ? v : 0);
+  }, 0);
 
   const byProp = new Map<
     string,
@@ -84,13 +91,55 @@ export default async function RealEstatePropertiesPage() {
 
       <div className="card">
         <header>
+          <span className="lvl">B-RATE-4</span>
+          <strong>正味（表面利回り − 金利）</strong>
+        </header>
+        {(loans || []).length === 0 ? (
+          <p className="meta" style={{ marginTop: 8 }}>
+            ローン投影後に表示されます。
+          </p>
+        ) : (
+          <>
+            <p className="meta" style={{ marginTop: 8 }}>
+              ローン正本の月返済合計（参考）: {fmtYen(loanPayMonth)}／月 ·{" "}
+              <a href="/realestate">不動産ハブの一覧 →</a>
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>物件</th>
+                  <th className="num">表面</th>
+                  <th className="num">金利</th>
+                  <th className="num">正味</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bRate4.map((r) => (
+                  <tr key={r.propertyId}>
+                    <td>{r.name}</td>
+                    <td className="num meta">{fmtPct(r.surfaceYieldPct)}</td>
+                    <td className="num meta">{fmtPct(r.loanRatePct)}</td>
+                    <td className="num">
+                      <strong>{fmtPct(r.netSpreadPct)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+
+      <div className="card">
+        <header>
           <span className="lvl">③-C</span>
           <strong>ローン投影（loan-tracker）</strong>
         </header>
         {(loans || []).length === 0 ? (
           <p className="meta" style={{ marginTop: 8 }}>
-            まだ投影がありません。データはトラッカー画面ではなく、estate の Google Drive
-            （アプリ専用ファイル）にあります。Discover:{" "}
+            まだ投影がありません。JSON:{" "}
+            <code>240_融資/loan_tracker_export/loans.json</code> →{" "}
+            <code>jarvis_kurashift_loan_tracker_sync.py --apply</code>。Discover:{" "}
             <code>docs/KURASHIFT_loan_tracker_Discover.md</code>
           </p>
         ) : (

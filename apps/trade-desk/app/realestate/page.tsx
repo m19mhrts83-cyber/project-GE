@@ -11,6 +11,7 @@ import {
   composeReSteadyBoard,
 } from "@/lib/reSteadyCf";
 import type { PropertyUnitRow } from "@/lib/roiAssets";
+import { buildBRate4Rows, fmtPct } from "@/lib/bRate4";
 
 export const dynamic = "force-dynamic";
 
@@ -50,8 +51,13 @@ export default async function RealEstatePage() {
   const re19 = (latestSnap?.metrics as { re19?: { income_jpy?: number; expense_jpy?: number; cf_jpy?: number } } | null)
     ?.re19;
 
-  const [{ data: unitRows }, { data: buyPlan }, { data: dealRows }, { data: reTxns }] =
-    await Promise.all([
+  const [
+    { data: unitRows },
+    { data: buyPlan },
+    { data: dealRows },
+    { data: reTxns },
+    { data: loanRows },
+  ] = await Promise.all([
       supabase
         .from("property_units")
         .select("property_id, property_name, room, status, rent, note, payload"),
@@ -67,7 +73,19 @@ export default async function RealEstatePage() {
         .eq("fiscal_year", calendarYear)
         .or("category.ilike.%19%,category.ilike.%賃貸%,category.ilike.%家賃%")
         .limit(4000),
+      supabase
+        .from("kurashift_loan_tracker_loans")
+        .select(
+          "id, name, lender, rate_pct, balance_jpy, monthly_payment_jpy, tags, payload"
+        )
+        .limit(80),
     ]);
+
+  const bRate4 = buildBRate4Rows(loanRows || []);
+  const loanTrackerPayMonth = (loanRows || []).reduce((s, l) => {
+    const v = l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
+    return s + (Number.isFinite(v) ? v : 0);
+  }, 0);
 
   const unitCount = unitRows?.length ?? 0;
   const reBoard = composeReSteadyBoard(
@@ -190,6 +208,11 @@ export default async function RealEstatePage() {
             </tr>
           </tbody>
         </table>
+        <p className="meta" style={{ marginTop: 10 }}>
+          ローン正本の月返済合計（loan-tracker 投影）:{" "}
+          {loanTrackerPayMonth > 0 ? fmtYen(Math.round(loanTrackerPayMonth)) : "—"}
+          ／月（想定返済 {fmtYen(Math.round(reBoard.assumedPayMonth))} と比較用）
+        </p>
       </div>
 
       <div className="card">
@@ -289,19 +312,18 @@ export default async function RealEstatePage() {
 
       <div className="card">
         <header>
-          <span className="lvl">返済戦略</span>
-          <strong>正味の利率（イメージ）</strong>
+          <span className="lvl">B-RATE-4</span>
+          <strong>正味の利率（表面利回り − ローン金利）</strong>
         </header>
         <p className="meta">
-          物件の収支利回り（％）− ローン金利（％）≈ 正味。利子が高い負債から返す判断に使う。
+          満室年収÷本体価格の表面利回りからローン金利を引いた参考％。利子が高い負債から返す判断に使う。
           保険の契約者貸付利率は <a href="/portfolio">資産</a> を参照。
         </p>
         <p className="meta" style={{ marginTop: 8 }}>
           {liabilityRates.realEstateNote}
-        </p>
-        <p className="meta">
-          借入残高トラッカー連携（③-C）後に物件ごとの利回り／金利／正味を一覧化する予定。
-          （
+          {" · "}
+          <a href="/realestate/properties">物件マスタ（ローン投影）→</a>
+          {" · "}
           <a
             href="https://loan-tracker-plum.vercel.app/"
             target="_blank"
@@ -309,8 +331,49 @@ export default async function RealEstatePage() {
           >
             loan-tracker
           </a>
-          ）
         </p>
+        {bRate4.length === 0 ? (
+          <p className="meta" style={{ marginTop: 8 }}>
+            保有物件がありません。
+          </p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>物件</th>
+                <th>名義</th>
+                <th className="num">表面利回り</th>
+                <th className="num">ローン金利</th>
+                <th className="num">正味</th>
+                <th>金融機関</th>
+                <th className="num">残高</th>
+                <th className="num">月返済</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bRate4.map((r) => (
+                <tr key={r.propertyId}>
+                  <td>{r.name}</td>
+                  <td className="meta">{r.owner}</td>
+                  <td className="num meta">{fmtPct(r.surfaceYieldPct)}</td>
+                  <td className="num meta">{fmtPct(r.loanRatePct)}</td>
+                  <td className="num">
+                    <strong>{fmtPct(r.netSpreadPct)}</strong>
+                  </td>
+                  <td className="meta">{r.lender || "—"}</td>
+                  <td className="num meta">
+                    {r.balanceJpy != null ? fmtYen(r.balanceJpy) : "—"}
+                  </td>
+                  <td className="num meta">
+                    {r.monthlyPaymentJpy != null
+                      ? fmtYen(r.monthlyPaymentJpy)
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="card-grid">

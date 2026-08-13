@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """借入残高トラッカー → KURASHIFT 投影（読取のみ・書込しない）。
 
-データは loan-tracker アプリの画面ではなく、ログインした Google アカウントの
-Drive（多くの場合アプリ専用の隠し領域 appDataFolder）に JSON として保存される。
-KURASHIFT はそれを読んで kurashift_loan_tracker_loans に投影する。
+第一候補: LOAN_TRACKER_JSON_PATH（OneDrive 240_融資/loan_tracker_export/loans.json）。
+Drive / appDataFolder は JSON が無いときだけ試す。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_loan_tracker_sync.py --discover
@@ -187,18 +186,31 @@ def normalize_loans(payload: Any) -> list[dict[str, Any]]:
     return out
 
 
+DEFAULT_JSON_HINT = (
+    "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/"
+    "240_融資/loan_tracker_export/loans.json"
+)
+
+
 def discover() -> dict[str, Any]:
+    json_env = (os.environ.get("LOAN_TRACKER_JSON_PATH") or "").strip()
+    if not json_env and Path(DEFAULT_JSON_HINT).is_file():
+        # 初回シードがある場合は既定パスを採用（env 未設定でも投影できる）
+        os.environ["LOAN_TRACKER_JSON_PATH"] = DEFAULT_JSON_HINT
+        json_env = DEFAULT_JSON_HINT
+
     result: dict[str, Any] = {
         "app_url": APP_URL,
         "google_account": "estate（アプリログインと同じ Google）",
         "where_data_lives": (
-            "画面の表ではなく、Google ログイン後に Drive へ保存される専用ファイル。"
-            "マイドライブに見えないことが多い（appDataFolder＝アプリ専用の隠し領域）。"
-            "API はログイン後 GET /api/data。"
+            "第一候補: LOAN_TRACKER_JSON_PATH（トラッカーからの JSON/CSV 書き出し）。"
+            "無い場合のみ Drive / appDataFolder / GET /api/data を試す。"
         ),
+        "fields_doc": str(DISCOVER),
+        "inventory_doc": str(REPO / "docs" / "KURASHIFT_loan_inventory.md"),
         "visible_drive_search": [],
         "appdata_search": [],
-        "json_path": (os.environ.get("LOAN_TRACKER_JSON_PATH") or "").strip() or None,
+        "json_path": json_env or None,
         "sheet_id": (os.environ.get("LOAN_TRACKER_SHEET_ID") or "").strip() or None,
         "folder_id": (os.environ.get("LOAN_TRACKER_DRIVE_FOLDER_ID") or "").strip() or None,
         "blocker": None,
@@ -207,6 +219,12 @@ def discover() -> dict[str, Any]:
     if json_path and Path(json_path).expanduser().is_file():
         result["blocker"] = None
         result["ready"] = "json_path"
+        try:
+            payload = json.loads(Path(json_path).expanduser().read_text(encoding="utf-8"))
+            result["loan_count"] = len(normalize_loans(payload))
+        except Exception as e:  # noqa: BLE001
+            result["blocker"] = f"JSON 読取失敗: {type(e).__name__}: {e}"
+            result.pop("ready", None)
         return result
 
     any_drive = False
@@ -289,7 +307,7 @@ def main() -> int:
     if not args.apply and not args.discover:
         args.dry_run = True
 
-    print("使用アカウント: estate / 借入残高トラッカーは Drive 保存（画面の表はコピーではない）")
+    print("使用アカウント: estate / 借入残高トラッカー投影（JSON 第一候補）")
     disc = discover()
     print(json.dumps({k: v for k, v in disc.items() if k != "picked" or v}, ensure_ascii=False, indent=2)[:8000])
 
