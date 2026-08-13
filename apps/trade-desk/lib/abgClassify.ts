@@ -52,8 +52,8 @@ export const NATURE_MEANING = [
   {
     key: "spot" as const,
     code: "S",
-    title: "スポット",
-    blurb: "Zaim の S。帰省・大型出費・ご褒美など、たまに乗る",
+    title: "スペシャル",
+    blurb: "Zaim の S。その年度固有の特別な支出（帰省・大型出費・ご褒美など）",
   },
 ] as const;
 
@@ -181,7 +181,7 @@ export function classifyAbg(category: string): AbgBucket {
   return "other";
 }
 
-/** Zaim 費目コード: F=固定 / C=変動 / S=スポット */
+/** Zaim 費目コード: F=固定 / C=変動 / S=スペシャル（年度固有） */
 export function classifyNature(category: string): CostNature {
   const c = (category || "").trim();
   if (/\dS\.|[.]S[.]/.test(c)) return "spot";
@@ -224,7 +224,7 @@ export function markVsTarget(
   return "×";
 }
 
-/** 前年比。上がると困るもの（固定・スポット）は増加で厳しく見る。 */
+/** 前年比。上がると困るもの（固定・スペシャル）は増加で厳しく見る。 */
 export function markVsPrev(
   prevPct: number | null | undefined,
   nowPct: number | null | undefined,

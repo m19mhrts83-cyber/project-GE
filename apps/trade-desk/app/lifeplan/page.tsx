@@ -392,7 +392,7 @@ export default async function LifeplanPage({
                   </li>
                 ))}
               </ul>
-              <a href="/roi">ROI 詳細 →</a>
+              <a href="/roi">物件ごとの ROI →</a>
             </article>
           ) : null}
           {actuals.education ? (
@@ -435,7 +435,7 @@ export default async function LifeplanPage({
                   ? fmtYen(actuals.roi.repayment_jpy)
                   : "—"}
               </p>
-              <a href="/roi">横並び詳細 →</a>
+              <a href="/roi">物件ごとの ROI →</a>
             </article>
           ) : null}
         </div>
@@ -760,7 +760,7 @@ export default async function LifeplanPage({
               </td>
             </tr>
             <tr>
-              <td>S スポット</td>
+              <td>S スペシャル</td>
               <td>
                 {fmtAbgPct(yearPrev.spotPct)}（{fmtYen(yearPrev.spot)}）
               </td>

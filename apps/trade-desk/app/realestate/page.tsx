@@ -397,7 +397,7 @@ export default async function RealEstatePage() {
         <p className="meta" style={{ marginTop: "0.75rem" }}>
           関連: <a href="/lifeplan?mode=re_purchase">物件購入モード</a>
           {" · "}
-          <a href="/roi">ROI／CF</a>
+          <a href="/roi">ROI（物件ごと）</a>
         </p>
       </div>
     </Shell>

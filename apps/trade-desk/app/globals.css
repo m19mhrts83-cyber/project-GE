@@ -161,6 +161,10 @@ main {
   max-width: 1040px;
 }
 
+main:has(.roi-page) {
+  max-width: 1320px;
+}
+
 .page-kicker {
   display: inline-flex;
   align-items: center;
@@ -242,6 +246,63 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 -4px;
+}
+
+.table-scroll table {
+  min-width: 960px;
+}
+
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+tr.sold td {
+  color: var(--muted);
+}
+
+.status-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card-soft);
+  color: var(--ink);
+}
+
+.status-pill.owned {
+  background: #e8f5ee;
+  border-color: #b7dcc8;
+  color: #1e6b45;
+}
+
+.status-pill.sold {
+  background: #eef1f5;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.def-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.def-list li {
+  margin: 6px 0;
+}
+
+.def-list code {
+  font-size: 0.84em;
 }
 
 th {
