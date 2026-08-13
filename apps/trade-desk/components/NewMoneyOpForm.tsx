@@ -57,6 +57,7 @@ export default function NewMoneyOpForm() {
           <option value="broker_transfer">証券への入出金</option>
           <option value="securities_cash">証券口座内の資金移動</option>
           <option value="insurance_alloc">保険積立率・配分（アシストのみ）</option>
+          <option value="card_settlement_buffer">カード引落バッファ</option>
         </select>
         <input name="from_account" placeholder="From（口座名）" />
         <input name="to_account" placeholder="To（口座名）" />

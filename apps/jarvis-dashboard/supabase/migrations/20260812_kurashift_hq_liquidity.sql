@@ -52,10 +52,15 @@ create table if not exists public.securities_holdings (
 create index if not exists securities_holdings_as_of_idx
   on public.securities_holdings (as_of desc);
 
+-- kind は後続で card_settlement_buffer を追加
+-- （20260814_kurashift_money_ops_card_settlement.sql）
 create table if not exists public.kurashift_money_ops (
   id uuid primary key default gen_random_uuid(),
   kind text not null
-    check (kind in ('bank_transfer', 'broker_transfer', 'securities_cash', 'insurance_alloc')),
+    check (kind in (
+      'bank_transfer', 'broker_transfer', 'securities_cash', 'insurance_alloc',
+      'card_settlement_buffer'
+    )),
   title text not null,
   rationale text not null default '',
   from_account text,

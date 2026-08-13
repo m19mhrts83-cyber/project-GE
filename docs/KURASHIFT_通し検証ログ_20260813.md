@@ -43,3 +43,19 @@
 ## 完了扱い
 
 上記目視＋煙で `verification-with-user` / `wave2-re1` は閉じる。健美家フィードは Phase C 対象外のまま。
+
+---
+
+## 資金移動・カード引落バッファ QA（2026-08-14）
+
+| 項目 | 結果 |
+|---|---|
+| kind `card_settlement_buffer` | DB migration 適用済み＋UI プレイブック |
+| P0 ギャップ表示 | 「SMBC不足（寄せの目標）」と明示。銀行＋現金合計を併記 |
+| P0 引落日 | フォーム必須＋API で consulting 時必須 |
+| P0 二重作成 | 同一 `due_date` の open 案は再利用 |
+| P1 引落口座 | `smbc_kariya`（三井住友銀行 刈谷）1本固定。Oliveカード口座は合算しない |
+| P1 schema | `schema.sql` 注記＋旧 migration の kind 一覧を同期 |
+| 本番 | `/money-ops` にプレイブック表示（本コミット deploy 後） |
+
+**Phase B（運用）**: Vpass 確定額・引落日を入れて寄せ計画→承認→**手動**振込→done。自動振込なし。
