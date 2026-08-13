@@ -672,6 +672,59 @@ def ingest_manual_dir(year: int, dry_run: bool) -> dict:
     return out
 
 
+def upsert_metrics(args: argparse.Namespace) -> dict:
+    """申告結果KPIを kurashift_tax_year_metrics へ upsert。"""
+    sb = sb_client()
+    if sb is None:
+        raise SystemExit("JARVIS_SUPABASE_* 未設定")
+
+    year = args.year if args.year is not None else default_year(args.scope)
+    row: dict[str, Any] = {
+        "scope": args.scope,
+        "fiscal_year": int(year),
+        "filing_status": args.filing_status or "filed",
+        "filed_on": (args.filed_on or "").strip() or None,
+        "note": (args.note or "").strip() or None,
+        "source": "jarvis",
+    }
+    if (args.metrics_json or "").strip():
+        extra = json.loads(args.metrics_json)
+        if not isinstance(extra, dict):
+            raise SystemExit("--metrics-json はオブジェクトである必要があります")
+        row.update(extra)
+        row["scope"] = args.scope
+        row["fiscal_year"] = int(year)
+        row.setdefault("source", "jarvis")
+
+    if args.scope == "personal":
+        if args.taxable_income is not None:
+            row["taxable_income_jpy"] = args.taxable_income
+        if args.income_tax is not None:
+            row["income_tax_jpy"] = args.income_tax
+        if args.refund_or_pay:
+            row["refund_or_pay"] = args.refund_or_pay
+    else:
+        if args.revenue is not None:
+            row["revenue_jpy"] = args.revenue
+        if args.ordinary_income is not None:
+            row["ordinary_income_jpy"] = args.ordinary_income
+        if args.corporate_tax is not None:
+            row["corporate_tax_jpy"] = args.corporate_tax
+        if args.tax_payable is not None:
+            row["tax_payable_jpy"] = args.tax_payable
+
+    out = {"ok": True, "dry_run": bool(args.dry_run), "row": row}
+    if args.dry_run:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return out
+
+    sb.table("kurashift_tax_year_metrics").upsert(
+        row, on_conflict="scope,fiscal_year"
+    ).execute()
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--scope", choices=["personal", "corporate"], default="personal")
@@ -681,6 +734,18 @@ def main() -> int:
     ap.add_argument("--ingest-manual-dir", action="store_true")
     ap.add_argument("--export-evidence", action="store_true")
     ap.add_argument("--sync-storage", action="store_true", help="既存証憑をプレビュー用 Storage へ上げる")
+    ap.add_argument("--upsert-metrics", action="store_true", help="申告結果KPIを kurashift_tax_year_metrics へ登録")
+    ap.add_argument("--taxable-income", type=float, default=None)
+    ap.add_argument("--income-tax", type=float, default=None)
+    ap.add_argument("--refund-or-pay", choices=["refund", "pay", "zero"], default=None)
+    ap.add_argument("--revenue", type=float, default=None)
+    ap.add_argument("--ordinary-income", type=float, default=None)
+    ap.add_argument("--corporate-tax", type=float, default=None)
+    ap.add_argument("--tax-payable", type=float, default=None)
+    ap.add_argument("--filing-status", choices=["draft", "filed", "amended", "unknown"], default="filed")
+    ap.add_argument("--filed-on", default="")
+    ap.add_argument("--note", default="")
+    ap.add_argument("--metrics-json", default="", help="KPIをJSONで渡す（フラグより優先）")
     ap.add_argument("--evidence-id", default="")
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--dry-run", action="store_true")
@@ -699,9 +764,12 @@ def main() -> int:
         export_evidence(year, args.evidence_id, args.dry_run)
     elif args.sync_storage:
         sync_storage(args.dry_run)
+    elif args.upsert_metrics:
+        upsert_metrics(args)
     else:
         raise SystemExit(
-            "specify --build-csv | --ingest-mail | --ingest-manual-dir | --export-evidence | --sync-storage"
+            "specify --build-csv | --ingest-mail | --ingest-manual-dir | "
+            "--export-evidence | --sync-storage | --upsert-metrics"
         )
     return 0
 

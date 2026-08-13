@@ -21,7 +21,7 @@ numbers:
       income: 表4.生活収入
       expense: 表5.生活支出
       eval: 表8.収支評価
-    # アプリ: /lifeplan = 100歳計画（閲覧）、/lifeplan/budget = 予算編成
+    # アプリ: /lifeplan = 生涯CF（閲覧）、/lifeplan/analyze = 分析、/lifeplan/budget = 予算編成
     single_income: シングルインカム年収手取
     table1: 表1.月別予算設定
     table2: 表2.収入まとめ
@@ -93,6 +93,45 @@ bloomo:
 index_rebalance:
   frequency: annual
   keep_jgb_ratio: false
+
+# あかつき外国債券（2026-08-13 本人確定）
+akatsuki_bond:
+  name: GS劣後債 5.15 USD 20450522
+  coupon_pct: 5.15
+  pay_dates: ["05-22", "11-22"]
+  maturity: "2045-05-22"
+  isin: US38148LAF31
+  policy: hold_do_not_add
+  # 売らない。これ以上増やさない。余剰現金は surplus_cash 順（SBI 上乗せではない）。
+  rationale: 米高金利局面で意図して厚くした。値動きは株式より穏やか。利金を引き出して使った実績あり。成長エンジンは株式のまま。
+
+# SBI NISA クレカ積立（2026-08-13 本人確定）
+sbi_nisa_credit:
+  monthly_jpy: 90000
+  mix: { developed: 70000, emerging: 10000, japan: 10000 }
+  channel: nisa_credit_card_vpoint
+  policy: fixed_do_not_increase
+  # 回し続けるが上乗せしない。金額・内訳は Jarvis が勝手に変えない。
+
+# 余った現金の優先（2026-08-13）
+surplus_cash:
+  - living_and_property_buffer
+  - keep_next_property_down_payment
+  - theme_yield_bloomo_dynamic  # 承認前提。コア置き換え禁止
+
+# 助言の理念（詳細は .cursor/rules/jarvis-finance-philosophy.mdc）
+finance_philosophy:
+  paper: お金は寝かせて増やしなさい
+  cashflow: 金持ち父さん貧乏父さん
+  paper_core: worldwide_or_developed_index
+  real_estate: cashflow_asset
+  do_not:
+    - sell_index_for_themes
+    - sell_akatsuki_bond
+    - dismiss_rental_cf
+    - increase_sbi_nisa_above_90k
+    - spot_add_to_nisa_instead_of_theme
+
 
 insurance_core:
   - sony_life

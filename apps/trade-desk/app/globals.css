@@ -20,6 +20,7 @@
   --accent-soft: #fff1e6;
   --ink-blue: #1f4e79;
   --high: #c0392b;
+  --ok: #1f7a4d;
   --med: #b7791f;
   --side: #f8fafc;
   --side-ink: #152033;
@@ -296,6 +297,56 @@ tr.sold td {
   background: #fff6e8;
   border-color: #f0c9a8;
   color: var(--accent-deep);
+}
+
+.tax-check {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+
+.tax-metrics-form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tax-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+
+.tax-metrics-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.tax-metrics-form input,
+.tax-metrics-form select {
+  min-width: 140px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.tax-form-note {
+  width: 100%;
+}
+
+.tax-form-note input {
+  width: min(100%, 480px);
+}
+
+.tax-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .def-list {
@@ -640,16 +691,6 @@ code {
   font-size: 0.68rem;
 }
 
-.century-table .th-year .ev {
-  color: var(--ink-blue);
-  font-size: 0.62rem;
-  font-weight: 650;
-  max-width: 4.6rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .century-table th.year-now {
   box-shadow: inset 0 -3px 0 var(--accent);
 }
@@ -659,8 +700,7 @@ code {
   color: #fff;
 }
 
-.century-table th.year-100 .age,
-.century-table th.year-100 .ev {
+.century-table th.year-100 .age {
   color: #d6e4f0;
 }
 
@@ -670,6 +710,54 @@ code {
   font-size: 0.78rem;
   letter-spacing: 0.06em;
   color: var(--muted);
+}
+
+.century-table .section-note {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-left: 8px;
+}
+
+.century-table .group-row td {
+  background: #f3f6fa;
+  font-weight: 700;
+  font-size: 0.74rem;
+  color: var(--ink-blue);
+  padding-top: 8px;
+}
+
+.century-table tr.event-row td {
+  background: #f7f4ee;
+}
+
+.century-table tr.event-row .sticky-col {
+  background: #f3eee4;
+}
+
+.century-table td.event-cell {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-blue);
+  white-space: normal;
+  line-height: 1.2;
+  min-width: 4.6rem;
+}
+
+.century-table td.event-cell.has-ev {
+  background: #efe6d4;
+}
+
+.century-table td.event-hit {
+  box-shadow: inset 0 -2px 0 #c4a574;
+}
+
+.event-hint {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.3;
+  margin-top: 2px;
 }
 
 .century-table .total-row td {
@@ -754,6 +842,11 @@ code {
   color: var(--accent-deep);
 }
 
+.series-pill.event {
+  background: #efe6d4;
+  color: #6b5428;
+}
+
 .item-lab {
   margin-right: 6px;
 }
@@ -833,6 +926,125 @@ code {
   stroke: var(--ink-blue);
   stroke-width: 1.2;
   stroke-dasharray: 2 4;
+}
+
+.lp-spark-actuals {
+  stroke: #2a9d6a;
+  stroke-width: 1.2;
+  stroke-dasharray: 5 3;
+}
+
+.lp-spark-peak {
+  stroke: #c4a574;
+  stroke-width: 1.4;
+}
+
+.lp-milestones {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lp-ms {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--card-soft);
+}
+
+.lp-ms.actuals {
+  border-color: #8fcdb0;
+}
+
+.lp-ms.peak {
+  border-color: #c4a574;
+}
+
+.lp-ms.age100 {
+  border-color: var(--ink-blue);
+}
+
+.lp-ms-k {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.lp-ms-y {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.lp-ms-a {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.lp-ms-d {
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.lp-analyze-spark {
+  height: 220px;
+}
+
+.lp-analyze-lab {
+  font-size: 9px;
+  fill: var(--muted);
+}
+
+.lp-year-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 160px;
+  padding-top: 8px;
+}
+
+.lp-yb {
+  flex: 1;
+  min-width: 28px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.lp-yb-cols {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 100%;
+}
+
+.lp-yb-bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+}
+
+.lp-yb-bar.plan {
+  background: var(--ink-blue);
+}
+
+.lp-yb-bar.actual {
+  background: var(--accent);
+}
+
+.lp-yb-bar.neg {
+  opacity: 0.55;
+}
+
+.lp-yb-y {
+  font-size: 0.62rem;
+  margin-top: 4px;
+  color: var(--muted);
 }
 
 .evidence-frame {
@@ -940,12 +1152,39 @@ code {
   border-top: 1px dashed var(--line);
 }
 
-.hq-board-row.gap.over dd {
+/* 家計の差（実績−計画）: プラス＝使いすぎ＝赤、マイナス＝余裕＝緑 */
+.hq-board-row.gap.over dt,
+.hq-board-row.gap.over dd,
+.hq-pace.over {
   color: var(--high);
 }
 
-.hq-board-row.gap.under dd {
-  color: var(--ink-blue);
+.hq-board-row.gap.under dt,
+.hq-board-row.gap.under dd,
+.hq-pace.under {
+  color: var(--ok);
+}
+
+.hq-board-row.gap.over {
+  background: color-mix(in srgb, var(--high) 8%, transparent);
+  margin-left: -8px;
+  margin-right: -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 6px;
+}
+
+.hq-board-row.gap.under {
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+  margin-left: -8px;
+  margin-right: -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 6px;
+}
+
+.hq-pace {
+  font-weight: 700;
 }
 
 @media (max-width: 900px) {
@@ -969,5 +1208,8 @@ code {
   }
   main {
     padding: 20px 16px 40px;
+  }
+  .lp-milestones {
+    grid-template-columns: 1fr;
   }
 }

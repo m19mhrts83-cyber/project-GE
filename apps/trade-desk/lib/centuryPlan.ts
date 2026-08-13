@@ -1,4 +1,7 @@
-/** Numbers「キャッシュフロー」シート（100歳計画）のダンプ解釈。単位は万円。 */
+/** Numbers「キャッシュフロー」シート（生涯CF）のダンプ解釈。単位は万円。 */
+
+export const CENTURY_NAV_LABEL = "生涯CF";
+export const CENTURY_PAGE_TITLE = "生涯キャッシュフロー";
 
 export type DumpCell = string | number | null;
 export type DumpGridRow = { r?: number | string; cells?: DumpCell[] };
@@ -88,6 +91,19 @@ function itemLabel(cells: string[], section: CenturyLine["section"]): string {
 function groupLabel(cells: string[], section: CenturyLine["section"]): string {
   if (section === "eval") return "収支評価";
   if (section === "income") return cells[0] || "生活収入";
+  const blob = `${cells[2] || ""} ${cells[3] || ""} ${cells[1] || ""}`;
+  if (/合計/.test(blob) || cells.slice(0, 5).some((c) => c === "合計")) return "合計";
+  if (/マンシ/.test(blob)) return "マンション（19）";
+  if (/予測生活費|変動費|使途不明/.test(blob)) return "変動費（生活）";
+  if (/自動車|家電等/.test(blob)) return "自動車・家電（20）";
+  if (/結婚・教育|学資/.test(blob)) return "教育・進学";
+  if (/住宅ローン|頭金\/固定/.test(blob)) return "住居（ローン・維持）";
+  if (/生命保険|火災保険/.test(blob)) return "保険";
+  if (/旅行|帰省/.test(blob)) return "旅行・帰省";
+  if (/財形|定期預金|インデックス|奨学金|会社費用/.test(blob)) {
+    return "貯蓄・投資・返済";
+  }
+  if (/イベント|家計固定/.test(blob)) return "家計固定費・イベント";
   return (cells[2] || cells[1] || cells[0] || "生活支出").replace(/\s+/g, " ");
 }
 
@@ -273,7 +289,26 @@ export type LifeEventMark = {
   year: number;
   kind: LifeEventKind;
   source: string;
+  person: string;
   text: string;
+  planLabels: string[];
+  planHint: string;
+};
+
+export type EventTrack = {
+  person: string;
+  hint: string;
+  planLabels: string[];
+  byYear: Record<number, string[]>;
+};
+
+export type CenturyMilestone = {
+  key: "actuals" | "peak" | "age100";
+  year: number;
+  age: number | null;
+  title: string;
+  detail: string;
+  value: number | null;
 };
 
 export type LifeEventModel = {
@@ -347,11 +382,50 @@ function formatEventText(raw: string, kind: LifeEventKind): string {
   return t;
 }
 
-function childShort(label: string): string {
-  for (const n of ["円香", "珠己", "紗和"]) {
-    if (label.includes(n)) return n;
+function eventPerson(source: string): string {
+  if (source.includes("メンテナンス") || source.includes("メンテ")) return "家";
+  if (source.includes("家族")) return "家族";
+  for (const n of PEOPLE_NAMES) {
+    if (source.includes(n)) return n;
   }
-  return "";
+  return source.replace(/イベント$/, "") || "家族";
+}
+
+export function linkEventToPlan(
+  text: string,
+  source: string,
+  person: string
+): { planLabels: string[]; planHint: string } {
+  if (/^車/.test(text) || text === "家電") {
+    return {
+      planLabels: ["自動車/家電等"],
+      planHint: "この年の支出「自動車/家電等」（表1の20）",
+    };
+  }
+  if (text === "住宅新築") {
+    return {
+      planLabels: ["住宅ローン", "頭金/固定/維持費"],
+      planHint: "住宅取得（ローン・頭金）",
+    };
+  }
+  const who =
+    ["円香", "珠己", "紗和"].find(
+      (n) => person === n || source.includes(n) || text.includes(n)
+    ) ?? "";
+  if (who && /幼稚園|小学校|中学校|高校|大学|社会人|誕生/.test(text)) {
+    return {
+      planLabels: [`結婚・教育（${who}）`, `${who}学資等`],
+      planHint: `${who}の進学・教育費`,
+    };
+  }
+  if (source.includes("メンテナンス") || source.includes("メンテ")) {
+    const item = source.replace(/^家メンテナンス：/, "");
+    return {
+      planLabels: ["頭金/固定/維持費"],
+      planHint: `家のメンテナンス（${item}）`,
+    };
+  }
+  return { planLabels: [], planHint: "" };
 }
 
 /** Numbers キャッシュフロー上部「表3.ライフイベント」。 */
@@ -379,12 +453,20 @@ export function parseLifeEvents(dumps: SheetDump[]): LifeEventModel | null {
       continue;
     }
     const kind = eventKind(name);
-    const prefix = kind === "child" ? childShort(name) : "";
+    const person = eventPerson(name);
     for (const [colStr, year] of Object.entries(colYears)) {
       const text = formatEventText(cells[Number(colStr)] ?? "", kind);
       if (!text || text === "新築") continue;
-      const shown = prefix && kind === "child" ? `${prefix}${text}` : text;
-      marks.push({ year, kind, source: name, text: shown });
+      const link = linkEventToPlan(text, name, person);
+      marks.push({
+        year,
+        kind,
+        source: name,
+        person,
+        text,
+        planLabels: link.planLabels,
+        planHint: link.planHint,
+      });
     }
   }
   return { years, people, marks };
@@ -513,4 +595,123 @@ export function yearsWithActuals(model: CenturyModel): number[] {
     }
   }
   return [...set].sort((a, b) => a - b);
+}
+
+export function shinjiAgeInYear(
+  events: LifeEventModel | null,
+  year: number
+): number | null {
+  const ages = events?.people.find((p) => p.name === "真治")?.ages ?? {};
+  if (ages[year] != null) return ages[year];
+  const known = Object.keys(ages)
+    .map(Number)
+    .sort((a, b) => a - b);
+  if (!known.length) return null;
+  const base = known[0];
+  return ages[base] + (year - base);
+}
+
+export function centuryMilestones(
+  model: CenturyModel,
+  events: LifeEventModel | null
+): CenturyMilestone[] {
+  const actualYears = yearsWithActuals(model);
+  const total = evalTotalPlan(model);
+  let peakYear: number | null = null;
+  let peakVal = -Infinity;
+  for (const y of model.years) {
+    const v = total?.values[y];
+    if (v != null && v > peakVal) {
+      peakVal = v;
+      peakYear = y;
+    }
+  }
+  const horizon = shinjiHorizon(events);
+  const items: CenturyMilestone[] = [];
+  if (actualYears[0] != null) {
+    items.push({
+      key: "actuals",
+      year: actualYears[0],
+      age: shinjiAgeInYear(events, actualYears[0]),
+      title: "実績の開始",
+      detail: "実績が載っている最初の年",
+      value: null,
+    });
+  }
+  if (peakYear != null) {
+    items.push({
+      key: "peak",
+      year: peakYear,
+      age: shinjiAgeInYear(events, peakYear),
+      title: "ピーク",
+      detail: "合計・計画の貯蓄可能額が最大の年",
+      value: peakVal,
+    });
+  }
+  if (horizon.age100Year != null) {
+    items.push({
+      key: "age100",
+      year: horizon.age100Year,
+      age: 100,
+      title: "100歳",
+      detail: "真治が100歳になる年",
+      value: null,
+    });
+  }
+  return items;
+}
+
+const EVENT_TRACK_ORDER = ["家族", "真治", "千景", "円香", "珠己", "紗和", "家"];
+
+export function eventTracks(events: LifeEventModel | null): EventTrack[] {
+  if (!events) return [];
+  const map = new Map<string, EventTrack>();
+  for (const mark of events.marks) {
+    let track = map.get(mark.person);
+    if (!track) {
+      track = { person: mark.person, hint: "", planLabels: [], byYear: {} };
+      map.set(mark.person, track);
+    }
+    const list = track.byYear[mark.year] ?? [];
+    if (!list.includes(mark.text)) list.push(mark.text);
+    track.byYear[mark.year] = list;
+    for (const lab of mark.planLabels) {
+      if (!track.planLabels.includes(lab)) track.planLabels.push(lab);
+    }
+    if (mark.planHint && !track.hint.includes(mark.planHint)) {
+      track.hint = track.hint ? `${track.hint}／${mark.planHint}` : mark.planHint;
+    }
+  }
+  return EVENT_TRACK_ORDER.map((p) => map.get(p)).filter(
+    (t): t is EventTrack => t != null
+  );
+}
+
+export function lineLinkedAtYear(
+  line: CenturyLine,
+  events: LifeEventModel | null,
+  year: number
+): boolean {
+  if (!events || line.section !== "expense") return false;
+  return events.marks.some(
+    (m) =>
+      m.year === year &&
+      m.planLabels.some(
+        (lab) => line.label.includes(lab) || lab.includes(line.label)
+      )
+  );
+}
+
+export function lifeExpenseGaps(model: CenturyModel): string[] {
+  const hay = model.lines
+    .filter((l) => l.section === "expense")
+    .map((l) => `${l.group} ${l.label}`)
+    .join(" ");
+  const gaps: string[] = [];
+  if (!/マンシ/.test(hay)) {
+    gaps.push(
+      "表1の「19 マンションローン・管理費」は生活CF（表5）に独立行がありません。不動産の収支は不動産シートで見ます。"
+    );
+  }
+  return gaps;
 }

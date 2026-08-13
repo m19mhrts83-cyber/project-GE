@@ -6,7 +6,7 @@ export const LIFEPLAN_ANNUAL_STEPS = [
     key: "a" as const,
     job: "lifeplan_ingest_actuals",
     title: "終了した年度の実績を反映する",
-    desc: "Zaim 年度サマリーから実績を取り込み、αβγ と100歳計画の「実績」列の材料にする。",
+    desc: "Zaim 年度サマリーから実績を取り込み、αβγ と生涯CFの「実績」列の材料にする。",
   },
   {
     n: 2,
@@ -19,7 +19,7 @@ export const LIFEPLAN_ANNUAL_STEPS = [
     n: 3,
     key: "c" as const,
     job: "lifeplan_update_century",
-    title: "予算を100歳計画に反映する",
+    title: "予算を生涯CFに反映する",
     desc: "当年度予算をキャッシュフロー（〜100歳）へ載せる。現時点の書込は Numbers 正本＋Jarvis。",
   },
   {

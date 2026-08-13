@@ -3,6 +3,7 @@ import LifeplanSheetsNav from "@/components/LifeplanSheetsNav";
 import CenturyExplorer from "@/components/CenturyExplorer";
 import { createClient } from "@/lib/supabase/server";
 import {
+  CENTURY_PAGE_TITLE,
   buildCenturyModel,
   diffEvalPlan,
   parseLifeEvents,
@@ -69,7 +70,7 @@ export default async function LifeplanCenturyPage({
     ? buildCenturyModel(dumpsOf(canonical.id), {
         versionKey: canonical.version_key,
         asOf: canonical.as_of,
-        label: canonical.label || "100歳計画",
+        label: canonical.label || CENTURY_PAGE_TITLE,
       })
     : null;
   const prevModel = previous
@@ -89,10 +90,9 @@ export default async function LifeplanCenturyPage({
   return (
     <Shell active="/lifeplan" email={user?.email ?? null}>
       <LifeplanSheetsNav current="century" />
-      <h1>100歳計画</h1>
+      <h1>{CENTURY_PAGE_TITLE}</h1>
       <p className="sub">
-        支出の見方をベースに、真治が100歳になる年までを見通す家計キャッシュフローです。上部の年は
-        Numbers「表3.ライフイベント」（年齢・家族イベント・進学）と揃えています。
+        真治が100歳になる年までの家計キャッシュフローです。人別のライフイベントと、車の購入など計画項目の対応を同じ表で見られます。
       </p>
       {current ? (
         <CenturyExplorer
@@ -110,7 +110,8 @@ export default async function LifeplanCenturyPage({
         </div>
       )}
       <p className="meta" style={{ marginTop: 18 }}>
-        年次の予算づくりは <a href="/lifeplan/budget">予算編成</a>、支出内訳 αβγ は{" "}
+        グラフで重ねて見る場合は <a href="/lifeplan/analyze">分析</a>、年次の予算づくりは{" "}
+        <a href="/lifeplan/budget">予算編成</a>、支出内訳 αβγ は{" "}
         <a href="/lifeplan/abg">支出の見方</a> です。
       </p>
     </Shell>

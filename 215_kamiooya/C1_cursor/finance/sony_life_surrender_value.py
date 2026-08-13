@@ -7,7 +7,9 @@
 1人目でログイン→解約返戻金を取得→セッションを切ってログインURLへ戻る→2人目で再ログイン→取得…を順に行う。
 
 ログイン後の既定導線（SONYLIFE_TARGET_URL 未設定時）:
-「契約内容の照会」→ 契約一覧の「貸付金／解約返戻金」列の「選択する」→「解約返戻金の照会」。
+「契約内容の照会」→ 契約一覧の各行で「貸付金／解約返戻金」→「解約返戻金の照会」。
+1ログインに複数契約がある場合は全行を順に取得する（例: 真治＝一時払＋SOVANI）。
+環境変数 SONYLIFE_NAV_CONTRACT_ROW_INDEX があるときはその1行だけ（後方互換）。
 """
 
 from __future__ import annotations
@@ -31,7 +33,11 @@ DEFAULT_DEBUG_DIR = SCRIPT_DIR / "debug"
 
 @dataclass
 class SonySurrenderAccountResult:
-    """1利用者IDあたりの解約返戻金（＋同ページの貸付残高）。"""
+    """1契約あたりの解約返戻金（＋同ページの貸付残高）。
+
+    1ログインに複数契約がある場合は items が複数行になる
+    （例: 真治＝一時払＋SOVANI）。
+    """
 
     account_index: int
     username: str
@@ -41,6 +47,10 @@ class SonySurrenderAccountResult:
     parser_mode: str
     policy_loan_jpy: int = 0
     auto_premium_loan_jpy: int = 0
+    product_name: str = ""
+    policy_no: str = ""
+    contract_row_index: int = 0
+    paid_in_jpy: int | None = None
 
 
 @dataclass
@@ -601,6 +611,153 @@ def _extract_sony_loan_amounts(page) -> dict[str, int]:
     }
 
 
+def _extract_sony_paid_in_from_contract_detail(page) -> int | None:
+    """
+    契約内容照会の「次回払込保険料」。
+    一時払の場合、公式注記どおりここが払込済金額。
+    """
+    data = page.evaluate(
+        r"""
+() => {
+  const norm = (s) => (s || "").replace(/\s/g, "").replace(/\u3000/g, "");
+  const out = { next_premium: "", method: "" };
+  for (const tr of document.querySelectorAll("table tr")) {
+    const cells = Array.from(tr.querySelectorAll("th, td"));
+    for (let i = 0; i < cells.length; i++) {
+      const t = norm(cells[i].innerText || "");
+      const next = cells[i + 1] ? (cells[i + 1].innerText || "").replace(/\s+/g, " ").trim() : "";
+      if (t.includes("次回払込保険料") && next) out.next_premium = next;
+      if (t.includes("保険料払込方法") && next) out.method = next;
+    }
+  }
+  return out;
+}
+"""
+    )
+    method = str((data or {}).get("method") or "")
+    raw = str((data or {}).get("next_premium") or "")
+    amt, _ = _parse_first_jpy(raw)
+    if amt is None:
+        return None
+    # 一時払は払込済。月払等は「次回」なので原価に使わない
+    if "一時払" in method.replace(" ", "").replace("　", ""):
+        return int(amt)
+    return None
+
+
+def _open_contract_detail_from_surrender(page, timeout_ms: int) -> bool:
+    """解約返戻金ページから「この契約の内容を照会する」。"""
+    try:
+        page.locator('a[href*="PYHW0110"]').first.click(timeout=min(8000, timeout_ms))
+        _wait_page_ready(page, timeout_ms)
+        return True
+    except Exception:
+        pass
+    try:
+        page.get_by_role("link", name=re.compile("この契約の内容")).first.click(
+            timeout=min(8000, timeout_ms)
+        )
+        _wait_page_ready(page, timeout_ms)
+        return True
+    except Exception:
+        return False
+
+
+def _extract_sony_contract_header(page) -> dict[str, str]:
+    """貸付金・解約返戻金照会ページの保険種類・証券番号。"""
+    data = page.evaluate(
+        r"""
+() => {
+  const norm = (s) => (s || "").replace(/\s/g, "").replace(/\u3000/g, "");
+  const out = { product: "", policy_no: "" };
+  for (const tr of document.querySelectorAll("table tr")) {
+    const cells = Array.from(tr.querySelectorAll("th, td"));
+    for (let i = 0; i < cells.length; i++) {
+      const t = norm(cells[i].innerText || "");
+      const next = cells[i + 1] ? (cells[i + 1].innerText || "").replace(/\s+/g, " ").trim() : "";
+      if (t.includes("保険種類") && next) out.product = next;
+      if (t.includes("証券番号") && next) out.policy_no = next.replace(/\s/g, "");
+    }
+  }
+  return out;
+}
+"""
+    )
+    return {
+        "product_name": str((data or {}).get("product") or "").strip(),
+        "policy_no": str((data or {}).get("policy_no") or "").strip(),
+    }
+
+
+def _list_contract_row_count(page) -> int:
+    """契約一覧テーブルのボディ行数（貸付／解約列がある表）。"""
+    n = page.evaluate(
+        r"""
+() => {
+  const norm = (txt) => (txt || "").replace(/\s/g, "").replace(/\u3000/g, "");
+  const wantCol = (txt) => {
+    const n = norm(txt);
+    return n.includes("解約返戻金") || (n.includes("貸付") && n.includes("解約"))
+      || n.includes("貸付金") || n.includes("選択する");
+  };
+  const tables = Array.from(document.querySelectorAll("table"));
+  for (const table of tables) {
+    const headerRow = table.querySelector("thead tr") || table.rows[0];
+    if (!headerRow) continue;
+    const hs = headerRow.querySelectorAll("th, td");
+    let col = -1;
+    for (let i = 0; i < hs.length; i++) {
+      if (wantCol(hs[i].innerText)) { col = i; break; }
+    }
+    if (col < 0) continue;
+    let rows = [];
+    if (table.tBodies && table.tBodies[0] && table.tBodies[0].rows.length) {
+      rows = Array.from(table.tBodies[0].rows);
+    } else {
+      const trs = table.querySelectorAll("tbody tr");
+      rows = trs.length ? Array.from(trs) : Array.from(table.querySelectorAll("tr")).slice(1);
+    }
+    rows = rows.filter((r) => !r.querySelector("th") || r.querySelectorAll("td").length > 0);
+    return rows.length;
+  }
+  const allSelect = Array.from(document.querySelectorAll("a, button, [role='button']"))
+    .filter((el) => norm(el.innerText).includes("選択する"));
+  return allSelect.length;
+}
+"""
+    )
+    try:
+        return max(1, int(n or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _open_contract_list(page, timeout_ms: int) -> None:
+    """契約内容の照会タブまで戻る（複数契約を順に取るため）。"""
+    tab_text = os.environ.get("SONYLIFE_NAV_CONTRACT_TAB_TEXT", "契約内容の照会").strip()
+    tab_sel = os.environ.get("SONYLIFE_NAV_CONTRACT_TAB_SELECTOR", "").strip()
+    if not _click_contract_inquiry_tab_robust(page, tab_text, tab_sel, timeout_ms):
+        # パンくずや戻る
+        for label in ("契約内容の確認", "契約内容の照会", "トップページ"):
+            try:
+                page.get_by_text(label, exact=False).first.click(timeout=3000)
+                _wait_page_ready(page, timeout_ms)
+                break
+            except Exception:
+                continue
+    _wait_page_ready(page, timeout_ms)
+    try:
+        page.wait_for_selector("table", timeout=min(timeout_ms, 20000))
+    except Exception:
+        pass
+
+
+def _nav_to_surrender_for_row(page, timeout_ms: int, row_idx: int) -> None:
+    """契約一覧の指定行 → 解約返戻金の照会。"""
+    os.environ["SONYLIFE_NAV_CONTRACT_ROW_INDEX"] = str(row_idx)
+    _lifeplanner_nav_to_surrender_value_page(page, timeout_ms)
+
+
 def _extract_surrender_from_page(
     page,
     *,
@@ -731,69 +888,136 @@ def fetch_sony_surrender_value(
 
             _raise_if_sony_out_of_service(page)
 
-            if target_url:
-                page.goto(target_url, wait_until="domcontentloaded")
-                _wait_page_ready(page, timeout_ms)
-            elif after_login_click_selector or after_login_click_text:
-                moved = _click_by_selector_or_text(
-                    page,
-                    selector=after_login_click_selector,
-                    text=after_login_click_text,
-                    timeout_ms=timeout_ms,
-                )
-                if not moved:
-                    raise RuntimeError(
-                        "解約返戻金ページへの遷移に失敗しました。"
-                        "SONYLIFE_TARGET_URL または AFTER_LOGIN_CLICK_* を見直してください。"
-                    )
+            # 取得対象の契約行。明示 ROW_INDEX があれば1行のみ（後方互換）。
+            row_env = (os.environ.get("SONYLIFE_NAV_CONTRACT_ROW_INDEX") or "").strip()
+            forced_single_row = row_env != "" and not target_url and not (
+                after_login_click_selector or after_login_click_text
+            )
+
+            if target_url or after_login_click_selector or after_login_click_text:
+                contract_rows = [0]
+            elif forced_single_row:
+                contract_rows = [int(row_env)]
             else:
+                # 契約一覧の行数を数えるため、いったん照会タブへ
                 try:
-                    _lifeplanner_nav_to_surrender_value_page(page, timeout_ms)
+                    _open_contract_list(page, timeout_ms)
+                    n_rows = _list_contract_row_count(page)
                 except Exception:
-                    DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-                    fail_html = DEFAULT_DEBUG_DIR / f"sony_life_nav_fail_account{account_no}.html"
+                    n_rows = 1
+                contract_rows = list(range(max(1, n_rows)))
+
+            for row_i, row_idx in enumerate(contract_rows):
+                if target_url:
+                    if row_i > 0:
+                        break
+                    page.goto(target_url, wait_until="domcontentloaded")
+                    _wait_page_ready(page, timeout_ms)
+                elif after_login_click_selector or after_login_click_text:
+                    if row_i > 0:
+                        break
+                    moved = _click_by_selector_or_text(
+                        page,
+                        selector=after_login_click_selector,
+                        text=after_login_click_text,
+                        timeout_ms=timeout_ms,
+                    )
+                    if not moved:
+                        raise RuntimeError(
+                            "解約返戻金ページへの遷移に失敗しました。"
+                            "SONYLIFE_TARGET_URL または AFTER_LOGIN_CLICK_* を見直してください。"
+                        )
+                else:
                     try:
-                        fail_html.write_text(page.content(), encoding="utf-8")
+                        if row_i > 0 or forced_single_row or len(contract_rows) > 1:
+                            _open_contract_list(page, timeout_ms)
+                        os.environ["SONYLIFE_NAV_CONTRACT_ROW_INDEX"] = str(row_idx)
+                        _lifeplanner_nav_to_surrender_value_page(page, timeout_ms)
                     except Exception:
-                        pass
-                    raise
+                        DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+                        fail_html = (
+                            DEFAULT_DEBUG_DIR
+                            / f"sony_life_nav_fail_account{account_no}_row{row_idx}.html"
+                        )
+                        try:
+                            fail_html.write_text(page.content(), encoding="utf-8")
+                        except Exception:
+                            pass
+                        raise
 
-            value, value_text, mode = _extract_surrender_from_page(
-                page,
-                value_selector=value_selector,
-                value_label=value_label,
-            )
-            loans = _extract_sony_loan_amounts(page)
+                value, value_text, mode = _extract_surrender_from_page(
+                    page,
+                    value_selector=value_selector,
+                    value_label=value_label,
+                )
+                loans = _extract_sony_loan_amounts(page)
+                header = _extract_sony_contract_header(page)
+                paid_in: int | None = None
+                product_name = header.get("product_name") or ""
+                if "一時払" in product_name:
+                    if _open_contract_detail_from_surrender(page, timeout_ms):
+                        paid_in = _extract_sony_paid_in_from_contract_detail(page)
+                        if save_debug:
+                            suffix = f"account{account_no}_row{row_idx}_detail"
+                            (
+                                DEFAULT_DEBUG_DIR
+                                / f"sony_life_contract_detail_{suffix}.html"
+                            ).write_text(page.content(), encoding="utf-8")
+                        # 次の契約へ戻るため一覧へ
+                        try:
+                            _open_contract_list(page, timeout_ms)
+                        except Exception:
+                            pass
 
-            if save_debug:
-                DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-                html_path = DEFAULT_DEBUG_DIR / f"sony_life_last_page_account{account_no}.html"
-                png_path = DEFAULT_DEBUG_DIR / f"sony_life_last_page_account{account_no}.png"
-                html_path.write_text(page.content(), encoding="utf-8")
-                page.screenshot(path=str(png_path), full_page=True)
+                if save_debug:
+                    DEFAULT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+                    suffix = f"account{account_no}_row{row_idx}"
+                    html_path = DEFAULT_DEBUG_DIR / f"sony_life_last_page_{suffix}.html"
+                    png_path = DEFAULT_DEBUG_DIR / f"sony_life_last_page_{suffix}.png"
+                    html_path.write_text(page.content(), encoding="utf-8")
+                    page.screenshot(path=str(png_path), full_page=True)
+                    # 後方互換のファイル名（先頭契約）
+                    if row_i == 0:
+                        (DEFAULT_DEBUG_DIR / f"sony_life_last_page_account{account_no}.html").write_text(
+                            page.content(), encoding="utf-8"
+                        )
+                        page.screenshot(
+                            path=str(
+                                DEFAULT_DEBUG_DIR / f"sony_life_last_page_account{account_no}.png"
+                            ),
+                            full_page=True,
+                        )
 
-            source_url = page.url
+                source_url = page.url
 
-            if value is None:
-                browser.close()
-                raise RuntimeError(
-                    f"アカウント{account_no}（{username}）で解約返戻金を抽出できませんでした。"
-                    "SONYLIFE_SURRENDER_VALUE_SELECTOR もしくは SONYLIFE_SURRENDER_VALUE_LABEL を見直し、"
-                    f"debug/sony_life_last_page_account{account_no}.html を確認してください。"
+                if value is None:
+                    browser.close()
+                    raise RuntimeError(
+                        f"アカウント{account_no}（{username}）行{row_idx}で解約返戻金を抽出できませんでした。"
+                        "SONYLIFE_SURRENDER_VALUE_SELECTOR もしくは SONYLIFE_SURRENDER_VALUE_LABEL を見直し、"
+                        f"debug/sony_life_last_page_account{account_no}_row{row_idx}.html を確認してください。"
+                    )
+
+                items.append(
+                    SonySurrenderAccountResult(
+                        account_index=account_no,
+                        username=username,
+                        value_jpy=value,
+                        value_text=value_text or f"{value:,}円",
+                        source_url=source_url,
+                        parser_mode=mode,
+                        policy_loan_jpy=int(loans.get("policy_loan_jpy") or 0),
+                        auto_premium_loan_jpy=int(loans.get("auto_premium_loan_jpy") or 0),
+                        product_name=header.get("product_name") or "",
+                        policy_no=header.get("policy_no") or "",
+                        contract_row_index=int(row_idx),
+                        paid_in_jpy=paid_in,
+                    )
                 )
 
-            items.append(
-                SonySurrenderAccountResult(
-                    account_index=account_no,
-                    username=username,
-                    value_jpy=value,
-                    value_text=value_text or f"{value:,}円",
-                    source_url=source_url,
-                    parser_mode=mode,
-                    policy_loan_jpy=int(loans.get("policy_loan_jpy") or 0),
-                    auto_premium_loan_jpy=int(loans.get("auto_premium_loan_jpy") or 0),
-                )
-            )
+            # ループ後に ROW_INDEX 環境を残さない（次ログインへ影響しない）
+            if "SONYLIFE_NAV_CONTRACT_ROW_INDEX" in os.environ and not forced_single_row:
+                os.environ.pop("SONYLIFE_NAV_CONTRACT_ROW_INDEX", None)
 
         browser.close()
 
@@ -802,14 +1026,15 @@ def fetch_sony_surrender_value(
     auto_loan = sum(x.auto_premium_loan_jpy for x in items)
     lines = [
         (
-            f"アカウント{x.account_index}（{x.username}）: 解約返戻 {x.value_text}"
+            f"アカウント{x.account_index}行{x.contract_row_index}"
+            f"（{x.username} / {x.product_name or '商品不明'}）: 解約返戻 {x.value_text}"
             f" / 契約者貸付 {x.policy_loan_jpy:,}円"
             f" / 自動振替貸付 {x.auto_premium_loan_jpy:,}円"
         )
         for x in items
     ]
     combined_text = "\n".join(lines) + f"\n合計解約返戻: {total:,}円 / 貸付合計: {policy_loan + auto_loan:,}円"
-    parser_mode = f"multi:{len(items)}accounts"
+    parser_mode = f"multi:{len(items)}contracts"
     last_url = items[-1].source_url if items else ""
 
     return SurrenderValueResult(

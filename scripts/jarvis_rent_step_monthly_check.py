@@ -605,7 +605,7 @@ def attach_deposits(
             # LINE明細なし → HPと同型（物件口座合算＋メモ）
             u["deposit_flag"] = "aggregate"
         elif mgr == "LEAF":
-            # くらさぽPDFなし → 現行・京都銀行合算（振込先変更予定）
+            # くらさぽPDFなし → 京都合算（PayPay にも着金するため号室正本は PDF）
             u["deposit_flag"] = "aggregate"
         elif mgr == "ミニテック":
             u["deposit_flag"] = "deposit_missing"
@@ -713,7 +713,7 @@ def attach_deposits(
             "grandole-i",
             "kyoto",
             leaf_missing,
-            "LEAF（明細なし）→ 京都銀行 合算（振込先変更予定）",
+            "LEAF（明細なし）→ 京都銀行合算（PayPay にも着金。号室はくらさぽPDF）",
         )
 
     return units, aggregates
@@ -929,7 +929,7 @@ def run_build(*, mark_done: bool, write_follow_drafts: bool = True) -> dict[str,
         ),
         "grant_rule": (
             "Grandole は入居から1年で家賃 +4,000円（空室対策メール準拠・入居日ズバリ）。"
-            " 口座: I=PayPay / II=MUFG / キャラメル=滋賀 / LEAF現行=京都（変更予定）。"
+            " 口座: I=PayPay主 / II=MUFG / キャラメル=滋賀 / LEAF=京都＋PayPay併用。"
         ),
     }
 

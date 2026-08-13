@@ -369,6 +369,115 @@ def find_summary_csv(year: int) -> Path | None:
     return None
 
 
+def strip_abg_prefix(cat: str) -> str:
+    return re.sub(r"^[αβγδε]\.", "", (cat or "").strip())
+
+
+def build_category_year_from_txns(sb: Any, year: int, *, dry_run: bool = False) -> dict:
+    """サマリーCSVが無い年度向け。取引明細から費目年次を作る。"""
+    source_key = f"zaim_txn_rollup_{year}"
+    totals: dict[str, dict[str, float]] = {}
+    start = 0
+    page = 1000
+    scanned = 0
+    while True:
+        res = (
+            sb.table("kurashift_finance_transactions")
+            .select("category,method,aggregation,income_jpy,expense_jpy")
+            .eq("fiscal_year", year)
+            .range(start, start + page - 1)
+            .execute()
+        )
+        rows = res.data or []
+        if not rows:
+            break
+        for row in rows:
+            scanned += 1
+            agg = str(row.get("aggregation") or "")
+            if "含めない" in agg:
+                continue
+            method = str(row.get("method") or "")
+            if method in ("balance", "transfer"):
+                continue
+            cat = strip_abg_prefix(str(row.get("category") or ""))
+            if not cat or cat in ("-", "合計"):
+                continue
+            bucket = totals.setdefault(cat, {"income": 0.0, "expense": 0.0})
+            bucket["income"] += float(row.get("income_jpy") or 0)
+            bucket["expense"] += float(row.get("expense_jpy") or 0)
+        if len(rows) < page:
+            break
+        start += page
+
+    cats = []
+    for cat, v in sorted(totals.items()):
+        income = round(v["income"])
+        expense = round(v["expense"])
+        if income == 0 and expense == 0:
+            continue
+        cats.append(
+            {
+                "fiscal_year": year,
+                "category": cat,
+                "income_jpy": income,
+                "expense_jpy": expense,
+                "net_jpy": income - expense,
+                "abg": classify_abg(cat),
+            }
+        )
+    out = {
+        "year": year,
+        "source": "txn_rollup",
+        "scanned": scanned,
+        "categories": len(cats),
+        "dry_run": dry_run,
+    }
+    if dry_run:
+        return out
+
+    meta = {
+        "source_key": source_key,
+        "fiscal_year": year,
+        # check制約は zaim_raw / zaim_lifeplan_summary のみ。ロールアップは summary 扱い。
+        "kind": "zaim_lifeplan_summary",
+        "source_path": f"kurashift_finance_transactions:{year}",
+        "row_count": len(cats),
+        "checksum": hashlib.sha256(f"{year}:{len(cats)}:{scanned}".encode()).hexdigest()[:40],
+        "file_mtime": jst_now().isoformat(),
+        "metadata": {"from": "transactions", "scanned": scanned, "rollup": True},
+    }
+    src = (
+        sb.table("kurashift_finance_sources")
+        .upsert(meta, on_conflict="source_key")
+        .execute()
+        .data
+    )
+    source_id = src[0]["id"]
+    sb.table("kurashift_finance_category_year").delete().eq("source_id", source_id).execute()
+    for c in cats:
+        c["source_id"] = source_id
+    for i in range(0, len(cats), 100):
+        sb.table("kurashift_finance_category_year").insert(cats[i : i + 100]).execute()
+    out["source_id"] = source_id
+    return out
+
+
+def run_category_from_txns(years: list[int], *, dry_run: bool) -> dict:
+    sb = None if dry_run else sb_client()
+    results = []
+    for year in years:
+        if dry_run:
+            # dry-run still needs read for counts
+            sb = sb or sb_client()
+        results.append(build_category_year_from_txns(sb, year, dry_run=dry_run))
+        print(
+            f"# category_from_txns {year}: cats={results[-1].get('categories')} "
+            f"scanned={results[-1].get('scanned')}",
+            flush=True,
+        )
+    return {"ok": True, "years": years, "results": results}
+
+
 def run_finance(*, dry_run: bool, push_metrics: bool) -> dict:
     sb = None if dry_run else sb_client()
     results = []
@@ -832,17 +941,34 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--finance", action="store_true", help="Zaim 年度CSVを取込")
     ap.add_argument("--lifeplan", action="store_true", help="Life Plan .numbers を登録")
     ap.add_argument("--all", action="store_true", help="finance + lifeplan")
+    ap.add_argument(
+        "--category-from-txns",
+        action="store_true",
+        help="取引明細から費目年次を作る（サマリーCSVが無い年向け）",
+    )
+    ap.add_argument(
+        "--years",
+        default="",
+        help="カンマ区切り年度（--category-from-txns 用。例: 2022,2023,2024）",
+    )
     ap.add_argument("--extract", action="store_true", help="Numbers から予算を抽出（AppleScript）")
     ap.add_argument("--dump-sheet", action="store_true", help="月別予算表の生グリッドも保存")
     ap.add_argument("--no-metrics-push", action="store_true", help="metrics テーブルへの月次pushを省略")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
 
-    if not (args.finance or args.lifeplan or args.all):
-        ap.error("--finance / --lifeplan / --all のいずれかを指定")
+    if not (args.finance or args.lifeplan or args.all or args.category_from_txns):
+        ap.error("--finance / --lifeplan / --all / --category-from-txns のいずれかを指定")
 
     STATE.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {"at": jst_now().isoformat(timespec="seconds")}
+
+    if args.category_from_txns:
+        years = [int(x.strip()) for x in args.years.split(",") if x.strip()]
+        if not years:
+            years = [2022, 2023, 2024]
+        print("# === category_from_txns ===", flush=True)
+        report["category_from_txns"] = run_category_from_txns(years, dry_run=args.dry_run)
 
     if args.all or args.finance:
         print("# === finance ===", flush=True)

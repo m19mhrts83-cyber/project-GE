@@ -50,7 +50,12 @@ const LOAN_IDS = [
   "prudential_life_chikage_policy_loan",
 ] as const;
 
-const VARIABLE_INS = ["axa_life", "sony_life", "sony_life_chikage"] as const;
+const VARIABLE_INS = [
+  "axa_life",
+  "sony_life",
+  "sony_life_sovani",
+  "sony_life_chikage",
+] as const;
 const PRU_INS = ["prudential_life", "prudential_life_chikage"] as const;
 
 function num(v: number | string | null | undefined): number | null {
@@ -150,6 +155,8 @@ export default async function PortfolioPage() {
     return {
       id,
       name: conf.label || acc?.name || id,
+      product: conf.product || null,
+      role: conf.role || "compare",
       isRef: id === refId,
       value,
       snapAsOf: s?.as_of ?? null,
@@ -162,14 +169,25 @@ export default async function PortfolioPage() {
     };
   });
 
-  const insTotal = insuranceRows.reduce((s, r) => s + (r.value ?? 0), 0);
-  const sonyValue = insuranceRows
-    .filter((r) => r.id === "sony_life" || r.id === "sony_life_chikage")
+  const adultRows = insuranceRows.filter(
+    (r) => r.role !== "education_baseline"
+  );
+  const eduRows = insuranceRows.filter((r) => r.role === "education_baseline");
+  const insTotal = adultRows.reduce((s, r) => s + (r.value ?? 0), 0);
+  const sonyAdultValue = insuranceRows
+    .filter(
+      (r) =>
+        r.id === "sony_life" ||
+        r.id === "sony_life_sovani" ||
+        r.id === "sony_life_chikage"
+    )
     .reduce((s, r) => s + (r.value ?? 0), 0);
+  const sonyAdultPaid = paid.sonyChikage + paid.sonyShinjiSovani;
   const variableValue = insuranceRows
     .filter((r) => (VARIABLE_INS as readonly string[]).includes(r.id))
     .reduce((s, r) => s + (r.value ?? 0), 0);
-  const variablePaid = paid.axa + paid.sony;
+  const variablePaid = paid.axa + sonyAdultPaid;
+  const adultPaid = paid.axa + sonyAdultPaid + paid.prudentialCurrent;
   const pruValue = insuranceRows
     .filter((r) => (PRU_INS as readonly string[]).includes(r.id))
     .reduce((s, r) => s + (r.value ?? 0), 0);
@@ -392,8 +410,8 @@ export default async function PortfolioPage() {
           <strong>{fmtYen(insTotal)}</strong>
         </header>
         <p className="meta">
-          右上は評価の合算。増減率は Zaim の払込累計に対する解約返戻（評価）。
-          特別勘定の参考はアクサ（石川さん反映）。
+          右上は成人契約の評価合算。真治は一時払と SOVANI（月4,000円）を分けて見る。
+          子ども SOVANI は下の教育用カード（継続貯蓄の基準）。特別勘定の参考はアクサ（石河さん反映）。
           {alloc.snap_updated_at ? ` snap更新: ${alloc.snap_updated_at}` : ""}
         </p>
         {ishikawa?.body ? (
@@ -417,29 +435,36 @@ export default async function PortfolioPage() {
             </tr>
           </thead>
           <tbody>
-            {insuranceRows.map((r) => {
+            {adultRows.map((r) => {
               let cost: number | null = null;
               let valueForPct = r.value;
               let note: string | null = null;
               if (r.id === "axa_life") cost = paid.axa || null;
-              else if (r.id === "sony_life" || r.id === "sony_life_chikage") {
-                cost = paid.sony || null;
-                valueForPct = sonyValue;
-                note = "払込は真治・千景が同一費目。増減率は2契約合算";
+              else if (r.id === "sony_life") {
+                cost = null;
+                note = "一時払。取得原価は契約照会の払込済（次回払込保険料欄）";
+              } else if (r.id === "sony_life_sovani") {
+                cost = paid.sonyShinjiSovani || null;
+                note =
+                  "月4,000円。払込は大垣共立32,725円のうち4,000円（2023-07〜）。評価は真治ログインの解約返戻";
+              } else if (r.id === "sony_life_chikage") {
+                cost = paid.sonyChikage || null;
+                note = "月28,725円。Zaim 大垣共立から切り出し";
               } else if (
                 r.id === "prudential_life" ||
                 r.id === "prudential_life_chikage"
               ) {
-                cost = paid.prudential || null;
+                cost = paid.prudentialCurrent || null;
                 valueForPct = pruValue;
                 note =
-                  "保障コスト込み。増減率は2契約合算（投資リターンではない）";
+                  "現行2契約の払込のみ（月10,346円×継続月）。有期払込完了分は除外。増減率は2契約合算";
               }
               const pct = gainPct(valueForPct, cost);
               return (
                 <tr key={r.id}>
                   <td>
                     {r.name}
+                    {r.product ? <div className="meta">{r.product}</div> : null}
                     {r.isRef ? <div className="meta">参考（正）</div> : null}
                     {note ? <div className="meta">{note}</div> : null}
                   </td>
@@ -472,15 +497,20 @@ export default async function PortfolioPage() {
           </thead>
           <tbody>
             <tr>
-              <td>ソニー（真治＋千景）</td>
-              <td className="num">{fmtYen(sonyValue)}</td>
-              <td className="num">{fmtYen(paid.sony)}</td>
+              <td>
+                ソニー（成人）
+                <div className="meta">
+                  真治一時払＋真治SOVANI＋千景。子ども分は含めない。一時払の払込は公式の払込済欄を使用
+                </div>
+              </td>
+              <td className="num">{fmtYen(sonyAdultValue)}</td>
+              <td className="num">{fmtYen(sonyAdultPaid)}</td>
               <td className="num">
-                {fmtPctSigned(gainPct(sonyValue, paid.sony))}
+                {fmtPctSigned(gainPct(sonyAdultValue, sonyAdultPaid))}
               </td>
             </tr>
             <tr>
-              <td>変額全体（アクサ＋ソニー）</td>
+              <td>変額全体（アクサ＋ソニー成人）</td>
               <td className="num">{fmtYen(variableValue)}</td>
               <td className="num">{fmtYen(variablePaid)}</td>
               <td className="num">
@@ -488,25 +518,71 @@ export default async function PortfolioPage() {
               </td>
             </tr>
             <tr>
-              <td>プルデンシャル（保障型・2契約）</td>
+              <td>
+                プルデンシャル（現行・2契約）
+                <div className="meta">
+                  変額終身65歳払込。Zaim全期間 {fmtYen(paid.prudential)}{" "}
+                  のうち有期払込完了分を除く
+                </div>
+              </td>
               <td className="num">{fmtYen(pruValue)}</td>
-              <td className="num">{fmtYen(paid.prudential)}</td>
+              <td className="num">{fmtYen(paid.prudentialCurrent)}</td>
               <td className="num">
-                {fmtPctSigned(gainPct(pruValue, paid.prudential))}
+                {fmtPctSigned(gainPct(pruValue, paid.prudentialCurrent))}
               </td>
             </tr>
             <tr>
-              <td>生命保険 全体</td>
+              <td>生命保険 全体（成人）</td>
               <td className="num">{fmtYen(insTotal)}</td>
+              <td className="num">{fmtYen(adultPaid)}</td>
               <td className="num">
-                {fmtYen(paid.axa + paid.sony + paid.prudential)}
-              </td>
-              <td className="num">
-                {fmtPctSigned(
-                  gainPct(insTotal, paid.axa + paid.sony + paid.prudential)
-                )}
+                {fmtPctSigned(gainPct(insTotal, adultPaid))}
               </td>
             </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <header>
+          <span className="lvl">子ども SOVANI（継続貯蓄の基準）</span>
+          <strong>
+            {eduRows.reduce((s, r) => s + (r.value ?? 0), 0)
+              ? fmtYen(eduRows.reduce((s, r) => s + (r.value ?? 0), 0))
+              : "評価 未取得"}
+          </strong>
+        </header>
+        <p className="meta">
+          珠己・円香・紗和が各月4,000円。資産運用の勉強用に、このまま貯め続けた場合の参考値として残します。
+          別の使い方・運用に切り替えたときの比較用で、上の成人保険・対アクサ評価には混ぜません。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>口座</th>
+              <th className="num">評価</th>
+              <th className="num">払込累計</th>
+              <th className="num">増減率</th>
+            </tr>
+          </thead>
+          <tbody>
+            {eduRows.map((r) => {
+              const cost = paid.sonyKids || null;
+              return (
+                <tr key={r.id}>
+                  <td>
+                    {r.name}
+                    {r.product ? <div className="meta">{r.product}</div> : null}
+                    <div className="meta">月12,000円（3人合計）。2023-04〜</div>
+                  </td>
+                  <td className="num">
+                    {r.value != null ? fmtYen(r.value) : "— 未取得"}
+                  </td>
+                  <td className="num">{cost != null ? fmtYen(cost) : "—"}</td>
+                  <td className="num">{fmtPctSigned(gainPct(r.value, cost))}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -651,7 +727,8 @@ export default async function PortfolioPage() {
             </tbody>
           </table>
           <p className="meta">
-            週次スクレイプの保有資産評価。取得原価はサイトの評価損益列が取れ次第、増減率を付けます。
+            銘柄はゴールドマン・サックス劣後債（L0354／利率 5.15%・利払 5/22と11/22・償還
+            2045/05/22）。週次スクレイプの評価。取得原価はサイトの評価損益列が取れ次第、増減率を付けます。
           </p>
         </details>
       </div>
@@ -662,31 +739,37 @@ export default async function PortfolioPage() {
           <strong>寝かせて増やす前提の見立て</strong>
         </header>
         <p>
-          『お金は寝かせて増やしなさい』どおり、<strong>コアは低コストの全世界（または先進国）株式インデックスを持ち続ける</strong>のが本線です。テーマ株の当てに時間を使うより、入金と年1回のリバランスで十分です。
+          『お金は寝かせて増やしなさい』どおり、<strong>コアは低コストの全世界（または先進国）株式インデックスを持ち続ける</strong>のが本線です。テーマ株でコアを組み替えない。年1回リバランス。
         </p>
         <p className="meta" style={{ marginTop: 8 }}>
-          いまの形: 海外株式（SBI 先進国・新興国＋Bloomo の米国ETF）が厚く、あかつき外国債券が約{" "}
-          {mixTotal > 0 ? fmtPctSigned(mix.ex_bd.value / mixTotal) : "—"}
-          。国内株式は日本株インデックス・持株・Bloomo の EWJ 程度。Bloomo
-          の個別（GOOGL 等）とテーマETFは「動的スリーブ」として小さく置く、という整理が本に近いです。
+          いまの形: SBI の NISA クレカ積立 <strong>月9万円固定</strong>
+          （先進国7万＋新興国1万＋日本株1万・Vポイント経路）がコア。Bloomo の個別・テーマETFが衛星、あかつきが海外債券の守り。海外債券（あかつき約{" "}
+          {fmtYen(akatsukiValue)}
+          ＋保険の債券勘定）はトップ3では厚いが、高金利局面で意図して厚くした枠です。急いで売らない・これ以上増やさない。SBI
+          9万への上乗せ・スポット追加も勧めない。
+        </p>
+        <p>
+          <strong>債券を厚く持った理由（確定）</strong>
+          …米金利が高止まりしていたときに、インフレ沈静化で金利が下がれば債券価格が上がる、という判断。利率は額面に対し
+          <strong>年5.15%</strong>（年2回・5/22と11/22）。時価（約88）に対する直接利回りは約
+          5.8%。値動きが株式より穏やかで、利金を銀行へ出して使った実績もある（Zaim「J.外国債受取」）。成長エンジンは株式のまま、既存債券は維持。
         </p>
         <p>
           <strong>1. 世界テーマにいくら・何を</strong>
-          …2026年の話題は AI／半導体、防衛、米株集中の見直しです。ただしコアをテーマに置き換えない。手元現金から新たに個別を買う必要は薄く、
-          <strong>追加は SBI の先進国（または全世界）へ</strong>
-          。テーマを触るなら Bloomo の動的側（いまの IXN・GOOGL など）の範囲に留め、枠の目安は金融資産の 5〜10%（Bloomo 全体でも約{" "}
-          {fmtYen(bloomoValue)}）です。
+          …2026年の話題は AI／半導体、防衛、米株集中の見直しです。コア（SBI 9万）は触らない。余力でテーマを触るなら Bloomo
+          の動的側（いまの IXN・GOOGL など）の範囲に留め、枠の目安は金融資産の 5〜10%（Bloomo 全体でも約{" "}
+          {fmtYen(bloomoValue)}）。実弾は承認後のみ。
         </p>
         <p>
           <strong>2. 現金と契約者貸付で今やること</strong>
           …銀行＋財布は約 {fmtYen(cashTotal)}
           。ソニー貸付は {fmtYen(sonyLoan)}・年2.50%・任意返済で、定額引き落としはありません。変額口座の期待リターンが金利を上回る前提なら、
           <strong>現金を空にして全額返済する必要はない</strong>
-          （不動産のバッファと生活防衛資金を残す）。余った現金の使い道は①生活＋物件の半年〜1年分を確保 →
-          ②残りをインデックスへ入金、が本に沿います。すららネットの含み損は個別株の典型で、コアの成績と混ぜて判断しない。
+          。余った現金の使い道は①生活防衛＋物件バッファ → ②次の物件を買う金額はキープ →
+          ③その上で Theme（利回り狙い・承認前提）。インデックスへの追加入金は勧めません。すららネットの含み損は個別株の典型で、コアの成績と混ぜて判断しない。
         </p>
         <p className="meta">
-          プルデンシャルの払込対評価が大幅マイナスに見えるのは、保障コストが払込に含まれるためです。解約の判断材料にはしません。
+          プルデンシャルの払込は、2023年3月に月額約6万円→10,346円へ下がったあとの現行契約（変額終身65歳払込・真治＋千景）だけを見ています。それ以前の有期払込完了分は分母に入れていません。保障コスト込みなので投資リターンとしては使いません。
         </p>
       </div>
 

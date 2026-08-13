@@ -137,20 +137,46 @@ export function allocateInsuranceValue(
   }));
 }
 
+/** 現行2契約（変額終身65歳払込）の合算月額。2023-03以降のZaim実額がこの定額。 */
+export const PRU_CURRENT_MONTHLY_YEN = 10_346;
+
+/** 千景・変額確定年金の月額（大垣共立）。2023-07以降は真治SOVANI 4,000が加算され 32,725。 */
+export const SONY_CHIKAGE_MONTHLY_YEN = 28_725;
+export const SONY_SOVANI_MONTHLY_YEN = 4_000;
+export const SONY_MAIN_WITH_SOVANI_YEN =
+  SONY_CHIKAGE_MONTHLY_YEN + SONY_SOVANI_MONTHLY_YEN;
+export const SONY_KIDS_TRIPLE_YEN = SONY_SOVANI_MONTHLY_YEN * 3;
+
 export function paidInByInsurer(
   rows: { subcategory: string | null; expense_jpy: number | string | null }[]
 ): Record<string, number> {
   const out: Record<string, number> = {
     axa: 0,
     sony: 0,
+    sonyChikage: 0,
+    sonyShinjiSovani: 0,
+    sonyKids: 0,
     prudential: 0,
+    prudentialCurrent: 0,
   };
   for (const r of rows) {
     const sub = (r.subcategory || "").trim();
     const amt = yen(r.expense_jpy);
     if (sub.includes("アクサ")) out.axa += amt;
-    else if (sub.includes("ソニー")) out.sony += amt;
-    else if (sub.includes("プルデンシャル")) out.prudential += amt;
+    else if (sub.includes("ソニー")) {
+      out.sony += amt;
+      if (amt === SONY_SOVANI_MONTHLY_YEN || amt === SONY_KIDS_TRIPLE_YEN) {
+        out.sonyKids += amt;
+      } else if (amt === SONY_CHIKAGE_MONTHLY_YEN) {
+        out.sonyChikage += amt;
+      } else if (amt === SONY_MAIN_WITH_SOVANI_YEN) {
+        out.sonyChikage += SONY_CHIKAGE_MONTHLY_YEN;
+        out.sonyShinjiSovani += SONY_SOVANI_MONTHLY_YEN;
+      }
+    } else if (sub.includes("プルデンシャル")) {
+      out.prudential += amt;
+      out.prudentialCurrent += Math.min(amt, PRU_CURRENT_MONTHLY_YEN);
+    }
   }
   return out;
 }

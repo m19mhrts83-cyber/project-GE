@@ -78,7 +78,7 @@ function modeIntro(mode: LifeplanMode, actualsYear: number, planYear: number) {
   return {
     heading: "支出の見方",
     blurb:
-      "暮らしの支出を αβγ と変えにくさで見るシートです。100歳計画と予算編成は上のタブから。",
+      "暮らしの支出を αβγ と変えにくさで見るシートです。生涯CFと予算編成は上のタブから。",
   };
 }
 
@@ -482,7 +482,7 @@ export default async function LifeplanPage({
             <strong>操作は予算編成シートへ</strong>
           </header>
           <p className="meta">
-            実績反映・月別予算・100歳計画への反映は予算編成で進めます。こちらは支出内訳の確認用です。
+            実績反映・月別予算・生涯CFへの反映は予算編成で進めます。こちらは支出内訳の確認用です。
           </p>
           <a className="btn primary" href={`/lifeplan/budget?mode=${mode}`}>
             予算編成で更新する

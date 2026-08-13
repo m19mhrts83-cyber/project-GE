@@ -29,12 +29,12 @@ defaults:
     - occupancy_note
 
 # 物件ごとの入金口座（Zaim 入金先マッチ）
-# LEAF は現行・京都銀行（変更予定）。ミニテック送金は PayPay に着金することが多い。
+# Grandole I は PayPay が主（ミニテック・Tcell）。LEAF は京都と PayPay の併用。
 deposit_accounts:
   grandole-i:
     bank_id: paypay
     zaim_match: "★PayPay銀行"
-    note: "Grandole I の主口座。Tcell(I-102)・ミニテック送金もここに着金しやすい"
+    note: "Grandole I の主口座。ミニテック・Tcell、LEAF の一部もここに着金"
   grandole-ii:
     bank_id: mufg
     zaim_match: "★MUFG(アパート経営)"
@@ -43,11 +43,10 @@ deposit_accounts:
     bank_id: shiga
     zaim_match: "★滋賀銀行"
     note: "Tcell・キャラメル送金先"
-  # LEAF 現行（Grandole I の LEAF 号室）。変更予定のためメモ必須になりやすい
   leaf_legacy:
     bank_id: kyoto
     zaim_match: "★京都銀行"
-    note: "LEAF 現行振込先。コミュニケーション後に変更予定"
+    note: "LEAF の京都着金は残存（2026-05/07 に法人家賃）。PayPay へも送金。号室正本はくらさぽPDF"
 
 # 管理会社 → 明細ソース
 managers:

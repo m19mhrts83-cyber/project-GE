@@ -14,6 +14,8 @@ export type ReTxn = {
   txn_date: string | null;
   income_jpy: number | string | null;
   expense_jpy: number | string | null;
+  to_account?: string | null;
+  from_account?: string | null;
 };
 
 export type SpecialKind =
@@ -63,7 +65,41 @@ export type ReSteadyBoard = {
   loanYtd: number;
   opexYtd: number;
   allExpYtd: number;
+  rentByBank: { id: RentBankId; label: string; yen: number }[];
 };
+
+export type RentBankId = "paypay" | "mufg" | "shiga" | "kyoto" | "other";
+
+export const RENT_BANK_LABEL: Record<RentBankId, string> = {
+  paypay: "PayPay（Grandole I 主・LEAF一部）",
+  mufg: "三菱UFJアパート経営（Grandole II）",
+  shiga: "滋賀銀行（キャラメル）",
+  kyoto: "京都銀行（LEAF残）",
+  other: "その他口座",
+};
+
+/** 家賃の入金口座。豊明支店など生活用UFJは other。 */
+export function classifyRentBank(
+  toAccount: string | null | undefined
+): RentBankId {
+  const a = toAccount || "";
+  if (a.includes("PayPay")) return "paypay";
+  if (a.includes("京都")) return "kyoto";
+  if (a.includes("滋賀")) return "shiga";
+  if (
+    a.includes("MUFG") &&
+    (a.includes("アパート") || a.includes("マンション"))
+  ) {
+    return "mufg";
+  }
+  return "other";
+}
+
+/** 実家賃は 19.1 家賃収入だけ（LUUP・保険金・事業収入は混ぜない）。 */
+export function isRentIncomeCat(category: string): boolean {
+  const c = stripAbgPrefix(category);
+  return c.includes("19.1") && c.includes("家賃");
+}
 
 function yen(n: number | string | null | undefined): number {
   const v = Number(n);
@@ -152,6 +188,7 @@ export function composeReSteadyBoard(
   let opexYtd = 0;
   let specialYtd = 0;
   const specialMap = new Map<SpecialKind, number>();
+  const bankYtd = new Map<RentBankId, number>();
 
   for (const t of txns) {
     const cat = (t.category || "").trim();
@@ -160,7 +197,14 @@ export function composeReSteadyBoard(
     if (m == null || m > throughMonth) continue;
     const inc = yen(t.income_jpy);
     const exp = yen(t.expense_jpy);
-    if (inc > 0) rentYtd += inc;
+    if (inc > 0) {
+      if (isRentIncomeCat(cat)) {
+        rentYtd += inc;
+        const bid = classifyRentBank(t.to_account);
+        bankYtd.set(bid, (bankYtd.get(bid) ?? 0) + inc);
+      }
+      continue;
+    }
     if (exp <= 0) continue;
     const sub = t.subcategory || "";
     const kind = classifySpecialKind(sub);
@@ -197,6 +241,21 @@ export function composeReSteadyBoard(
     .map(([kind, yenAmt]) => ({ kind, yen: yenAmt }))
     .sort((a, b) => b.yen - a.yen);
 
+  const bankOrder: RentBankId[] = [
+    "paypay",
+    "mufg",
+    "shiga",
+    "kyoto",
+    "other",
+  ];
+  const rentByBank = bankOrder
+    .filter((id) => (bankYtd.get(id) ?? 0) > 0)
+    .map((id) => ({
+      id,
+      label: RENT_BANK_LABEL[id],
+      yen: bankYtd.get(id) ?? 0,
+    }));
+
   return {
     year,
     throughMonth,
@@ -223,5 +282,6 @@ export function composeReSteadyBoard(
     loanYtd,
     opexYtd,
     allExpYtd,
+    rentByBank,
   };
 }
