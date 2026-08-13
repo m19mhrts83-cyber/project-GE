@@ -73,6 +73,8 @@ Jarvis ダッシュボード（パートナーメール等）は **別アプリ*
 | **B-RATE-2** | 千景ソニー／PRU 貸付の利率欄 | 残高0なら **n/a** で可 | 借りたときだけ記入 |
 | **B-RATE-3** | `/portfolio`・ホーム①に利率列／参考行が出ることを確認 | **骨格実装済** | 未記入は「要確認」表示。B-RATE-1 記入後に見た目確認 |
 | **B-RATE-4** | 不動産: 物件ごと **利回り − ローン金利 ≈ 正味** の一覧 | **実装 2026-08-13**（`/realestate`） | 投影: `kurashift_loan_tracker_loans`。正本 https://loan-tracker-plum.vercel.app/（estate）＋ JSON `240_融資/loan_tracker_export/loans.json` |
+| **LT-CLOSE** | 融資用「残高＋as-of」ゲート | **閉じ 2026-08-13** | Discover §LT-CLOSE。提出前は銀行表／実績アンカーで更新 |
+| **LT-SYNC** | トラッカー JSON → KURASHIFT 投影 | **確認済 2026-08-13** | `--apply` upserted=8。JSON残高＝DB一致 |
 | **B-RATE-5** | （任意）他負債（住宅ローン等）の利率を負債一覧に載せる | **後段** | 保険貸付以外の負債マスタ整備とセット |
 
 正本ファイル:
