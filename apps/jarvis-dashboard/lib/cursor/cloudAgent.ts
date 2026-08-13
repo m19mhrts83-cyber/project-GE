@@ -27,6 +27,27 @@ export type CloudAgentMcpServer = {
   auth?: Record<string, unknown>;
 };
 
+/**
+ * Cloud Agents REST `POST /v1/agents` の `mcpServers` は
+ * `{ name, type?, url? | command?, ... }[]`。
+ * SDK / `mcp.json` の名前キーオブジェクトとは別形。
+ * @see https://cursor.com/docs/cloud-agent/api/endpoints
+ */
+export function toCloudAgentsRestMcpServers(
+  servers: CloudAgentMcpServer[],
+): CloudAgentMcpServer[] {
+  const seen = new Set<string>();
+  const out: CloudAgentMcpServer[] = [];
+  for (const server of servers) {
+    const name = server.name.trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    const { name: _ignored, ...cfg } = server;
+    out.push({ name, ...cfg });
+  }
+  return out;
+}
+
 function authHeader(apiKey: string): string {
   return "Basic " + Buffer.from(`${apiKey}:`, "utf8").toString("base64");
 }
@@ -107,8 +128,11 @@ export async function runCloudAgentPrompt(opts: {
     body.skipReviewerRequest = true;
     body.workOnCurrentBranch = false;
   }
-  if (opts.mcpServers?.length) {
-    body.mcpServers = opts.mcpServers;
+  const mcpServers = opts.mcpServers?.length
+    ? toCloudAgentsRestMcpServers(opts.mcpServers)
+    : [];
+  if (mcpServers.length) {
+    body.mcpServers = mcpServers;
   }
 
   let createRes: Response;

@@ -42,10 +42,26 @@ function stringRecord(v: unknown): Record<string, string> | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
-function normalizeMcpServer(v: unknown): CloudAgentMcpServer | null {
+function unwrapMcpJson(parsed: unknown): unknown {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return parsed;
+  }
+  const row = parsed as Record<string, unknown>;
+  if (row.mcpServers && typeof row.mcpServers === "object") {
+    return row.mcpServers;
+  }
+  return parsed;
+}
+
+function normalizeMcpServer(
+  v: unknown,
+  nameFromKey?: string,
+): CloudAgentMcpServer | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
   const row = v as Record<string, unknown>;
-  const name = typeof row.name === "string" ? row.name.trim() : "";
+  const name = (
+    nameFromKey || (typeof row.name === "string" ? row.name : "")
+  ).trim();
   if (!name) return null;
   const type =
     row.type === "http" || row.type === "sse" || row.type === "stdio"
@@ -96,15 +112,23 @@ function configuredAskMcpServers():
         }`,
       };
     }
-    if (!Array.isArray(parsed)) {
+    const shape = unwrapMcpJson(parsed);
+    if (Array.isArray(shape)) {
+      for (const item of shape) {
+        const server = normalizeMcpServer(item);
+        if (server) servers.push(server);
+      }
+    } else if (shape && typeof shape === "object") {
+      for (const [key, item] of Object.entries(shape)) {
+        const server = normalizeMcpServer(item, key);
+        if (server) servers.push(server);
+      }
+    } else {
       return {
         ok: false,
-        error: "CURSOR_CLOUD_ASK_MCP_SERVERS_JSON は配列で指定してください",
+        error:
+          "CURSOR_CLOUD_ASK_MCP_SERVERS_JSON は配列、または mcp.json 形式のオブジェクトで指定してください",
       };
-    }
-    for (const item of parsed) {
-      const server = normalizeMcpServer(item);
-      if (server) servers.push(server);
     }
   }
 
