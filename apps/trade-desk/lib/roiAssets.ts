@@ -259,6 +259,7 @@ export type UnitLive = {
   total: number;
   rentMonth: number;
   totalRentMonth: number;
+  occupiedRentMonth: number;
   units: {
     room: string;
     status: string;
@@ -312,12 +313,16 @@ export function groupUnitsLive(rows: PropertyUnitRow[]): Map<string, UnitLive> {
         total: 0,
         rentMonth: 0,
         totalRentMonth: 0,
+        occupiedRentMonth: 0,
         units: [],
       };
       map.set(u.property_id, g);
     }
     g.total += 1;
-    if (u.status === "occupied") g.occupied += 1;
+    if (u.status === "occupied") {
+      g.occupied += 1;
+      g.occupiedRentMonth += b.totalRent ?? 0;
+    }
     g.rentMonth += b.rent ?? 0;
     g.totalRentMonth += b.totalRent ?? 0;
     g.units.push({

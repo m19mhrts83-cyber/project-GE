@@ -41,6 +41,19 @@ export async function POST(req: Request) {
       ? { ...(body.payload as Record<string, unknown>) }
       : {};
 
+  if (
+    job_type === "tax_ingest_accountant_mail" &&
+    String(payload.scope || "personal") === "personal"
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "個人の税理士メール取込は使いません。法人（大野さん）のみキューできます。",
+      },
+      { status: 400 }
+    );
+  }
+
   // Zaim 本番反映は UI 確認必須（誤射防止）
   if (job_type === "lifeplan_push_zaim" && payload.confirm_apply === true) {
     if (payload.ui_confirmed !== true) {

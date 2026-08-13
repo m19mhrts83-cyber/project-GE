@@ -1,7 +1,10 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import { createClient } from "@/lib/supabase/server";
-import { fmtYen } from "@/lib/format";
+import { fmtYen, fmtYenSigned } from "@/lib/format";
+import { composeLifeplanBoard } from "@/lib/lifeplanBoard";
+import { composeReSteadyBoard } from "@/lib/reSteadyCf";
+import type { PropertyUnitRow } from "@/lib/roiAssets";
 import {
   annualNoticeCopy,
   isAnnualLifeplanWindow,
@@ -18,9 +21,8 @@ import {
   personalCycle,
 } from "@/lib/taxCycle";
 import {
-  aggregateReCfFromCategoryYear,
-  monthsElapsedInYear,
-  type FinanceCategoryYearRow,
+  completeMonthsElapsed,
+  tokyoYmd,
 } from "@/lib/reFinanceYtd";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +53,7 @@ export default async function HomePage() {
   const weekStart = mondayOfIsoDate();
   const personal = personalCycle();
   const corporate = corporateCycle();
+  const { year: tokyoYear, month: tokyoMonth } = tokyoYmd();
 
   const [
     { data: accounts },
@@ -66,9 +69,12 @@ export default async function HomePage() {
     { data: syncMeta },
     { data: queuedJobs },
     { data: taxCase },
-    { count: personalEvidenceCount },
     { count: corporateEvidenceCount },
-    { data: financeCats },
+    { data: canonicalVersion },
+    { data: budgetRows },
+    { data: financeTxns },
+    { data: reTxns },
+    { data: unitRows },
   ] = await Promise.all([
     supabase
       .from("portfolio_accounts")
@@ -98,7 +104,7 @@ export default async function HomePage() {
       .select("id")
       .eq("job_type", "lifeplan_push_zaim")
       .eq("status", "succeeded")
-      .gte("finished_at", `${new Date().getFullYear()}-01-01`)
+      .gte("finished_at", `${tokyoYear}-01-01`)
       .limit(1),
     supabase
       .from("kurashift_plan_snapshots")
@@ -147,18 +153,35 @@ export default async function HomePage() {
     supabase
       .from("kurashift_tax_evidence")
       .select("id", { count: "exact", head: true })
-      .eq("scope", "personal")
-      .eq("fiscal_year", personal.year),
-    supabase
-      .from("kurashift_tax_evidence")
-      .select("id", { count: "exact", head: true })
       .eq("scope", "corporate")
       .eq("fiscal_year", corporate.year),
     supabase
-      .from("kurashift_finance_category_year")
-      .select("fiscal_year, category, income_jpy, expense_jpy, net_jpy")
-      .eq("fiscal_year", new Date().getFullYear())
-      .limit(200),
+      .from("kurashift_lifeplan_versions")
+      .select("id, label")
+      .eq("is_canonical", true)
+      .maybeSingle(),
+    supabase
+      .from("kurashift_lifeplan_budget_rows")
+      .select(
+        "version_id, plan_year, month, numbers_category, category_key, amount_yen"
+      )
+      .eq("plan_year", tokyoYear)
+      .limit(4000),
+    supabase
+      .from("kurashift_finance_transactions")
+      .select("category, txn_date, expense_jpy")
+      .eq("fiscal_year", tokyoYear)
+      .gt("expense_jpy", 0)
+      .limit(8000),
+    supabase
+      .from("kurashift_finance_transactions")
+      .select("category, subcategory, txn_date, income_jpy, expense_jpy")
+      .eq("fiscal_year", tokyoYear)
+      .or("category.ilike.%19%,category.ilike.%賃貸%,category.ilike.%家賃%")
+      .limit(4000),
+    supabase
+      .from("property_units")
+      .select("property_id, property_name, room, status, rent, note, payload"),
   ]);
 
   const metaMap = new Map((syncMeta ?? []).map((r) => [r.key, r]));
@@ -168,14 +191,12 @@ export default async function HomePage() {
   const weeklyAt = metaMap.get("portfolio_weekly_at")?.value ?? null;
   const fails = failedSources(weeklySummary);
   const stalled = countStalledQueued(queuedJobs ?? []);
-  const personalIngested =
-    (personalEvidenceCount ?? 0) > 0 ||
-    Boolean(
-      taxCase &&
-        (taxCase.status === "csv_ready" ||
-          taxCase.status === "registered" ||
-          taxCase.status === "closed")
-    );
+  const personalCsvReady = Boolean(
+    taxCase &&
+      (taxCase.status === "csv_ready" ||
+        taxCase.status === "registered" ||
+        taxCase.status === "closed")
+  );
   const corporateIngested = (corporateEvidenceCount ?? 0) > 0;
   const next = computeNextAction({
     summary: weeklySummary,
@@ -187,7 +208,7 @@ export default async function HomePage() {
     stalledQueued: stalled,
     annualWindow: isAnnualLifeplanWindow(),
     annualDone: (annualDone?.length ?? 0) > 0,
-    personalTaxAlert: personal.window && !personalIngested,
+    personalTaxAlert: personal.window && !personalCsvReady,
     corporateTaxAlert: corporate.window && !corporateIngested,
   });
   const partialWarn = weeklySummary?.last_full_ok === false;
@@ -280,26 +301,23 @@ export default async function HomePage() {
   const planLabel = plan
     ? `${plan.label}${plan.fiscal_year ? ` (${plan.fiscal_year})` : ""}`
     : "未整備";
-  const re19 = (
-    plan?.metrics as
-      | { re19?: { cf_jpy?: number; income_jpy?: number; expense_jpy?: number } }
-      | null
-  )?.re19;
   const CF_GOAL_MONTH = 500_000;
-  const calendarYear = new Date().getFullYear();
-  const { combined: combinedYtd } = aggregateReCfFromCategoryYear(
-    (financeCats || []) as FinanceCategoryYearRow[],
-    calendarYear
+  const canonId = canonicalVersion?.id;
+  const canonicalBudget = (budgetRows ?? []).filter((r) =>
+    canonId ? r.version_id === canonId : false
   );
-  const monthsElapsed = monthsElapsedInYear();
-  const combinedMonth =
-    combinedYtd.categories.length > 0
-      ? Math.round(combinedYtd.cf / monthsElapsed)
-      : null;
-  const cfAnnual = typeof re19?.cf_jpy === "number" ? re19.cf_jpy : null;
-  const cfMonthLp = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
-  const cfMonth = combinedMonth ?? cfMonthLp;
-  const cfGap = cfMonth != null ? CF_GOAL_MONTH - cfMonth : null;
+  const lifeplanBoard = composeLifeplanBoard(
+    canonicalBudget,
+    financeTxns ?? [],
+    tokyoYear,
+    tokyoMonth
+  );
+  const reBoard = composeReSteadyBoard(
+    reTxns ?? [],
+    (unitRows ?? []) as PropertyUnitRow[],
+    tokyoYear,
+    completeMonthsElapsed()
+  );
 
   return (
     <Shell active="/" email={user?.email ?? null}>
@@ -435,36 +453,136 @@ export default async function HomePage() {
         <article className="card">
           <header>
             <span className="lvl">② 計画・税</span>
-            <strong>{planLabel}</strong>
+            <strong>
+              {lifeplanBoard.gapYtd != null
+                ? `差 ${fmtYenSigned(lifeplanBoard.gapYtd)}`
+                : lifeplanBoard.planAnnual > 0
+                  ? `${lifeplanBoard.year}年 計画`
+                  : planLabel}
+            </strong>
           </header>
+          {lifeplanBoard.planAnnual > 0 ? (
+            <dl className="hq-board">
+              <div className="hq-board-row plan">
+                <dt>{lifeplanBoard.year}年 年間計画</dt>
+                <dd>{fmtYen(lifeplanBoard.planAnnual)}</dd>
+              </div>
+              <div className="hq-board-row plan">
+                <dt>{lifeplanBoard.throughLabel} 計画</dt>
+                <dd>{fmtYen(lifeplanBoard.planYtd)}</dd>
+              </div>
+              <div className="hq-board-row actual">
+                <dt>
+                  {lifeplanBoard.actualThroughLabel ??
+                    `${lifeplanBoard.throughLabel} 実績`}
+                </dt>
+                <dd>{fmtYen(lifeplanBoard.actualYtd)}</dd>
+              </div>
+              <div
+                className={
+                  "hq-board-row gap" +
+                  (lifeplanBoard.gapYtd == null
+                    ? ""
+                    : lifeplanBoard.gapYtd > 0
+                      ? " over"
+                      : " under")
+                }
+              >
+                <dt>
+                  {lifeplanBoard.throughLabel} の差
+                  {lifeplanBoard.gapYtd != null && lifeplanBoard.gapYtd > 0
+                    ? "（使いすぎ）"
+                    : lifeplanBoard.gapYtd != null && lifeplanBoard.gapYtd < 0
+                      ? "（計画内）"
+                      : ""}
+                </dt>
+                <dd>{fmtYenSigned(lifeplanBoard.gapYtd)}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="meta">
+              {plan?.snapshot_at
+                ? `直近プラン snap ${plan.snapshot_at}`
+                : "ライフプラン正本の月別予算が未取込です"}
+            </p>
+          )}
           <p className="meta">
-            {plan?.snapshot_at
-              ? `直近プラン snap ${plan.snapshot_at}`
-              : "ライフプラン／申告"}
+            家計支出（表1）。不動産19系は③
+            {canonicalVersion?.label ? ` · ${canonicalVersion.label}` : ""}
           </p>
           <a href="/lifeplan">ライフプラン →</a>
           {" · "}
-          <a href="/tax">申告 →</a>
+          <a href="/tax">確定申告 →</a>
         </article>
         <article className="card">
           <header>
             <span className="lvl">③ 不動産</span>
             <strong>
-              {cfMonth != null
-                ? `月次CF ${fmtYen(cfMonth)}`
+              {reBoard.steadyCfMonth != null
+                ? `定常 ${fmtYen(Math.round(reBoard.steadyCfMonth))}/月`
                 : "レーン"}
             </strong>
           </header>
+          <dl className="hq-board">
+            <div className="hq-board-row plan">
+              <dt>想定CF（満室・家賃−返済）</dt>
+              <dd>{fmtYen(Math.round(reBoard.assumedCfMonth))}/月</dd>
+            </div>
+            <div className="hq-board-row actual">
+              <dt>実CF（定常・{reBoard.throughLabel}）</dt>
+              <dd>
+                {reBoard.steadyCfMonth != null
+                  ? `${fmtYen(Math.round(reBoard.steadyCfMonth))}/月`
+                  : "—"}
+              </dd>
+            </div>
+            <div className="hq-board-row">
+              <dt>家賃の差（想定−実）</dt>
+              <dd>
+                {reBoard.rentGapMonth != null
+                  ? fmtYenSigned(Math.round(reBoard.rentGapMonth))
+                  : "—"}
+              </dd>
+            </div>
+            <div
+              className={
+                "hq-board-row gap" +
+                (reBoard.coverShortfall != null && reBoard.coverShortfall > 0
+                  ? " over"
+                  : " under")
+              }
+            >
+              <dt>
+                特別支出のカバー
+                {reBoard.coverRatio != null
+                  ? `（年換算÷特別 ${Math.round(reBoard.coverRatio * 100)}%）`
+                  : ""}
+              </dt>
+              <dd>
+                {reBoard.coverShortfall == null
+                  ? "—"
+                  : reBoard.coverShortfall <= 0
+                    ? "賄える"
+                    : `不足 ${fmtYen(Math.round(reBoard.coverShortfall))}`}
+              </dd>
+            </div>
+          </dl>
           <p className="meta">
-            目標 月50万
-            {cfGap != null
-              ? ` · ギャップ ${fmtYen(cfGap)}（個人＋法人・Zaim当年÷${monthsElapsed}ヶ月）`
-              : " · スナップ待ち"}
+            目標 月50万 · 想定ギャップ{" "}
+            {fmtYen(Math.round(CF_GOAL_MONTH - reBoard.assumedCfMonth))}
+            {reBoard.liveTotal > 0
+              ? ` · 現況 ${reBoard.liveOccupied}/${reBoard.liveTotal}戸`
+              : ""}
+            {reBoard.accountingCfMonth != null
+              ? ` · 会計生 ${fmtYen(Math.round(reBoard.accountingCfMonth))}/月（取得税・固都税・修繕込み）`
+              : ""}
           </p>
           <p className="meta">
             <a href="/realestate">不動産 →</a>
             {" · "}
             <a href="/realestate/deals">買い進め →</a>
+            {" · "}
+            <a href="/roi">ROI →</a>
           </p>
         </article>
         <article className="card">

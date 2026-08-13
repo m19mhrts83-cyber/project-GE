@@ -42,7 +42,7 @@ export default function LoginPage() {
           <p className="lead">暮らしを整え、資産を動かす。</p>
           <p className="diff">
             Jarvis ダッシュボードとは別アプリです。トリアージやパートナー確認は
-            Jarvis、資産・ライフプラン・個人申告はこちら。
+            Jarvis、資産・ライフプラン・個人確定申告はこちら。
           </p>
         </div>
       </section>

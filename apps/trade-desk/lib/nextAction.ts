@@ -111,14 +111,14 @@ export function computeNextAction(input: {
   if (input.corporateTaxAlert) {
     return {
       level: "warn",
-      label: "法人申告のメールをそろそろ取り込む",
+      label: "法人確定申告のメールをそろそろ取り込む",
       href: "/tax",
     };
   }
   if (input.personalTaxAlert) {
     return {
       level: "info",
-      label: "個人申告をそろそろ取り込む",
+      label: "個人の確定申告をそろそろ回す",
       href: "/tax",
     };
   }

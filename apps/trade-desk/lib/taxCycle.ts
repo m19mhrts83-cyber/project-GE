@@ -1,4 +1,4 @@
-/** 申告サイクル（Asia/Tokyo）。個人は暦年、法人は5月決算。 */
+/** 確定申告サイクル（Asia/Tokyo）。個人は暦年、法人は5月決算。 */
 
 export type TaxScope = "personal" | "corporate";
 
@@ -54,8 +54,8 @@ export function personalCycle(now = new Date()): TaxCycle {
     year,
     label: `${year}年分`,
     window: isPersonalIngestWindow(now),
-    windowLabel: "12月締め → 2月中旬〜下旬に申告",
-    jarvisPrompt: `${year}年分の個人申告を回して。弥生CSVと税理士メールを取り込んでください。`,
+    windowLabel: "12月締め → 2月中旬〜下旬に確定申告（自分で・Jarvis依頼可）",
+    jarvisPrompt: `${year}年分の個人確定申告を回して。弥生CSVを作ってください。`,
   };
 }
 
@@ -67,6 +67,6 @@ export function corporateCycle(now = new Date()): TaxCycle {
     label: `${year}年5月期`,
     window: isCorporateIngestWindow(now),
     windowLabel: "5月決算 → だいたい8月頃にまとまる",
-    jarvisPrompt: `${year}年5月期の法人申告メール（Knees bee 大野さんのPDF）を取り込んでください。`,
+    jarvisPrompt: `${year}年5月期の法人確定申告メール（Knees bee 大野さんのPDF）を取り込んでください。`,
   };
 }

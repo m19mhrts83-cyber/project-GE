@@ -1,12 +1,16 @@
 import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
-import { fmtYen } from "@/lib/format";
+import { fmtYen, fmtYenSigned } from "@/lib/format";
 import { loadLiabilityRates } from "@/lib/liabilityRates";
 import {
-  aggregateReCfFromCategoryYear,
-  monthsElapsedInYear,
-  type FinanceCategoryYearRow,
+  completeMonthsElapsed,
+  tokyoYmd,
 } from "@/lib/reFinanceYtd";
+import {
+  SPECIAL_LABEL,
+  composeReSteadyBoard,
+} from "@/lib/reSteadyCf";
+import type { PropertyUnitRow } from "@/lib/roiAssets";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +20,9 @@ export default async function RealEstatePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // LP 実績スナップは「前年実績」が本線（年次モード）。当年が空なら直近の re19 付きを拾う。
-  const calendarYear = new Date().getFullYear();
+  const { year: calendarYear } = tokyoYmd();
   const actualsYear = calendarYear - 1;
+  const throughMonth = completeMonthsElapsed();
   const liabilityRates = loadLiabilityRates();
 
   const { data: yearSnap } = await supabase
@@ -46,44 +50,32 @@ export default async function RealEstatePage() {
   const re19 = (latestSnap?.metrics as { re19?: { income_jpy?: number; expense_jpy?: number; cf_jpy?: number } } | null)
     ?.re19;
 
-  const { count: unitCount } = await supabase
-    .from("property_units")
-    .select("id", { count: "exact", head: true });
+  const [{ data: unitRows }, { data: buyPlan }, { data: dealRows }, { data: reTxns }] =
+    await Promise.all([
+      supabase
+        .from("property_units")
+        .select("property_id, property_name, room, status, rent, note, payload"),
+      supabase
+        .from("kurashift_buy_plan_versions")
+        .select("version_key, label, as_of, metadata")
+        .eq("is_canonical", true)
+        .maybeSingle(),
+      supabase.from("kurashift_re_deals").select("status"),
+      supabase
+        .from("kurashift_finance_transactions")
+        .select("category, subcategory, txn_date, income_jpy, expense_jpy")
+        .eq("fiscal_year", calendarYear)
+        .or("category.ilike.%19%,category.ilike.%賃貸%,category.ilike.%家賃%")
+        .limit(4000),
+    ]);
 
-  const { data: buyPlan } = await supabase
-    .from("kurashift_buy_plan_versions")
-    .select("version_key, label, as_of, metadata")
-    .eq("is_canonical", true)
-    .maybeSingle();
-
-  const { data: dealRows } = await supabase
-    .from("kurashift_re_deals")
-    .select("status");
-
-  const { data: financeCats } = await supabase
-    .from("kurashift_finance_category_year")
-    .select("fiscal_year, category, income_jpy, expense_jpy, net_jpy")
-    .eq("fiscal_year", calendarYear)
-    .limit(200);
-
-  const { personal: personalYtd, corporate: corpYtd, combined: combinedYtd } =
-    aggregateReCfFromCategoryYear(
-      (financeCats || []) as FinanceCategoryYearRow[],
-      calendarYear
-    );
-  const monthsElapsed = monthsElapsedInYear();
-  const hasYtd = combinedYtd.categories.length > 0;
-  const combinedYtdMonth = hasYtd
-    ? Math.round(combinedYtd.cf / monthsElapsed)
-    : null;
-  const personalYtdMonth =
-    personalYtd.categories.length > 0
-      ? Math.round(personalYtd.cf / monthsElapsed)
-      : null;
-  const corpYtdMonth =
-    corpYtd.categories.length > 0
-      ? Math.round(corpYtd.cf / monthsElapsed)
-      : null;
+  const unitCount = unitRows?.length ?? 0;
+  const reBoard = composeReSteadyBoard(
+    reTxns ?? [],
+    (unitRows ?? []) as PropertyUnitRow[],
+    calendarYear,
+    throughMonth
+  );
 
   const funnelOrder = [
     "info",
@@ -102,9 +94,7 @@ export default async function RealEstatePage() {
 
   const CF_GOAL_MONTH = 500_000;
   const cfAnnual = typeof re19?.cf_jpy === "number" ? re19.cf_jpy : null;
-  const cfMonthLp = cfAnnual != null ? Math.round(cfAnnual / 12) : null;
-  const cfMonth = combinedYtdMonth ?? cfMonthLp;
-  const cfGap = cfMonth != null ? CF_GOAL_MONTH - cfMonth : null;
+  const assumedGap = CF_GOAL_MONTH - reBoard.assumedCfMonth;
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
@@ -118,60 +108,112 @@ export default async function RealEstatePage() {
       <div className="card notice">
         <header>
           <span className="lvl">③-A</span>
-          <strong>運用進捗（Zaim 19系・当年・個人＋法人合算）</strong>
+          <strong>
+            想定と実のキャッシュフロー（{calendarYear}・{reBoard.throughLabel}）
+          </strong>
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
-          暦年のカテゴリ年次（会計管理）が正。{calendarYear} 年・19系を個人／法人に分け、
-          <strong>合算を KPI の財務行</strong>に載せます。
+          満室想定はレントロール年収−返済。実の定常はローン・管理・毎月経費だけ。
+          取得税・固都税・修繕・年払い保険は特別支出に分けます。
+          {reBoard.liveTotal > 0
+            ? ` 現況 ${reBoard.liveOccupied}/${reBoard.liveTotal}戸。`
+            : ""}
         </p>
         <table>
           <tbody>
             <tr>
-              <td>合算 YTD CF</td>
+              <td>想定CF（満室）</td>
               <td>
-                <strong>{hasYtd ? fmtYen(combinedYtd.cf) : "—"}</strong>
+                <strong>{fmtYen(Math.round(reBoard.assumedCfMonth))}/月</strong>
+                <span className="meta">
+                  {" "}
+                  · 家賃 {fmtYen(Math.round(reBoard.assumedRentMonth))} − 返済{" "}
+                  {fmtYen(Math.round(reBoard.assumedPayMonth))}
+                </span>
               </td>
             </tr>
             <tr>
-              <td>合算・月次換算（÷{monthsElapsed}ヶ月）</td>
+              <td>実CF（定常）</td>
               <td>
-                {combinedYtdMonth != null ? fmtYen(combinedYtdMonth) : "—"}
-                {cfGap != null && combinedYtdMonth != null
-                  ? ` · 対50万ギャップ ${fmtYen(cfGap)}`
-                  : ""}
+                <strong>
+                  {reBoard.steadyCfMonth != null
+                    ? `${fmtYen(Math.round(reBoard.steadyCfMonth))}/月`
+                    : "—"}
+                </strong>
+                <span className="meta">
+                  {reBoard.actualRentMonth != null
+                    ? ` · 実家賃 ${fmtYen(Math.round(reBoard.actualRentMonth))} − 返済 ${fmtYen(Math.round(reBoard.actualLoanMonth ?? 0))} − 経費 ${fmtYen(Math.round(reBoard.actualOpexMonth ?? 0))}`
+                    : ""}
+                </span>
               </td>
             </tr>
             <tr>
-              <td>個人 YTD（収入／支出／CF）</td>
+              <td>家賃の差（空室・未入金・NET）</td>
               <td>
-                {personalYtd.categories.length
-                  ? `${fmtYen(personalYtd.income)} / ${fmtYen(personalYtd.expense)} / ${fmtYen(personalYtd.cf)}`
+                {reBoard.rentGapMonth != null
+                  ? fmtYenSigned(Math.round(reBoard.rentGapMonth))
                   : "—"}
-                {personalYtdMonth != null ? ` · 月 ${fmtYen(personalYtdMonth)}` : ""}
+                <span className="meta">
+                  {reBoard.liveOccupied === reBoard.liveTotal &&
+                  reBoard.liveTotal > 0
+                    ? " · いま満室。差はキャンペーン賃料・管理会社差引後・入金タイミング"
+                    : " · 想定家賃 − 財務の実家賃"}
+                </span>
               </td>
             </tr>
             <tr>
-              <td>法人 YTD（収入／支出／CF）</td>
+              <td>会計の月次（特別込み）</td>
               <td>
-                {corpYtd.categories.length
-                  ? `${fmtYen(corpYtd.income)} / ${fmtYen(corpYtd.expense)} / ${fmtYen(corpYtd.cf)}`
+                {reBoard.accountingCfMonth != null
+                  ? fmtYen(Math.round(reBoard.accountingCfMonth))
                   : "—"}
-                {corpYtdMonth != null ? ` · 月 ${fmtYen(corpYtdMonth)}` : ""}
+                <span className="meta">
+                  {" "}
+                  · ここがマイナスでも、一時費用の割り戻しであることが多い
+                </span>
               </td>
-            </tr>
-            <tr>
-              <td>LP橋渡し（前年実績・参考）</td>
-              <td>{cfAnnual != null ? `${fmtYen(cfAnnual)}／年 · 月 ${fmtYen(cfMonthLp ?? 0)}` : "—"}</td>
             </tr>
           </tbody>
         </table>
-        {hasYtd ? (
-          <p className="meta" style={{ marginTop: 8 }}>
-            個人: {personalYtd.categories.join(" · ") || "—"}
-            <br />
-            法人: {corpYtd.categories.join(" · ") || "—"}
-          </p>
-        ) : null}
+      </div>
+
+      <div className="card">
+        <header>
+          <span className="lvl">特別支出のカバー</span>
+          <strong>
+            {reBoard.coverShortfall == null
+              ? "—"
+              : reBoard.coverShortfall <= 0
+                ? "年換算定常CFで賄える"
+                : `不足 ${fmtYen(Math.round(reBoard.coverShortfall))}`}
+          </strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          定常月次 × 12 ={" "}
+          {reBoard.annualSteady != null
+            ? fmtYen(Math.round(reBoard.annualSteady))
+            : "—"}
+          。{reBoard.throughLabel}の特別支出合計{" "}
+          {fmtYen(Math.round(reBoard.specialYtd))}
+          {reBoard.coverRatio != null
+            ? ` · カバー率 ${Math.round(reBoard.coverRatio * 100)}%`
+            : ""}
+          。
+        </p>
+        {reBoard.specials.length > 0 ? (
+          <table>
+            <tbody>
+              {reBoard.specials.map((s) => (
+                <tr key={s.kind}>
+                  <td>{SPECIAL_LABEL[s.kind]}</td>
+                  <td className="num">{fmtYen(Math.round(s.yen))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="meta">特別支出はまだ集計されていません。</p>
+        )}
       </div>
 
       <div className="card" style={{ borderColor: "var(--accent, #c45c26)" }}>
@@ -182,17 +224,21 @@ export default async function RealEstatePage() {
         <table>
           <tbody>
             <tr>
-              <td>現状（月・合算 YTD÷経過月）</td>
+              <td>想定（満室）とのギャップ</td>
               <td>
-                <strong>{cfMonth != null ? fmtYen(cfMonth) : "—"}</strong>
+                <strong>{fmtYen(Math.round(assumedGap))}</strong>
               </td>
             </tr>
             <tr>
-              <td>ギャップ</td>
-              <td>{cfGap != null ? fmtYen(cfGap) : "—"}</td>
+              <td>定常とのギャップ</td>
+              <td>
+                {reBoard.steadyCfMonth != null
+                  ? fmtYen(Math.round(CF_GOAL_MONTH - reBoard.steadyCfMonth))
+                  : "—"}
+              </td>
             </tr>
             <tr>
-              <td>年次CF（参考）</td>
+              <td>LP前年（参考）</td>
               <td>{cfAnnual != null ? fmtYen(cfAnnual) : "—"}</td>
             </tr>
             <tr>
@@ -206,8 +252,9 @@ export default async function RealEstatePage() {
           </tbody>
         </table>
         <p className="meta" style={{ marginTop: 8 }}>
-          合算は Zaim 19系（個人＋法人）。LP 前年は参考。詳細:{" "}
-          <code>docs/KURASHIFT_CF正規化メモ.md</code>
+          詳細: <code>docs/KURASHIFT_CF正規化メモ.md</code>
+          {" · "}
+          <a href="/roi">物件ごとの満室CF →</a>
           {" · "}
           <a href="/realestate/deals">千三つファネル →</a>
         </p>

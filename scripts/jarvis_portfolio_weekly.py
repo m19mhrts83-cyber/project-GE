@@ -142,6 +142,27 @@ def upsert_snapshot(
     ).execute()
 
 
+def upsert_akatsuki_holding(sb, rec: dict[str, Any], *, as_of: str | None = None) -> None:
+    value = int(rec["value_jpy"])
+    fund: dict[str, Any] = {
+        "name": rec.get("category") or "外国債券",
+        "value_jpy": value,
+    }
+    pl = rec.get("pl_jpy")
+    if pl is not None:
+        fund["pnl_jpy"] = int(pl)
+    sb.table("securities_holdings").upsert(
+        {
+            "account_id": "akatsuki_bond",
+            "as_of": as_of or today_jst().isoformat(),
+            "value_jpy": value,
+            "source": "weekly_web",
+            "payload": {"funds": [fund]},
+        },
+        on_conflict="account_id,as_of",
+    ).execute()
+
+
 def run_json_script(
     args: list[str], timeout: int = 180, *, cwd: Path | None = None
 ) -> dict[str, Any]:
@@ -455,6 +476,8 @@ def fetch_akatsuki() -> dict[str, Any]:
         "status": "ok",
         "value_jpy": int(data["total_jpy"]),
         "note": data.get("parser_mode") or "",
+        "pl_jpy": int(data["pl_jpy"]) if data.get("pl_jpy") is not None else None,
+        "category": data.get("category") or "外国債券",
     }
 
 
@@ -842,6 +865,11 @@ def main() -> int:
             ),
             note=rec.get("note"),
         )
+        if account_id == "akatsuki_bond":
+            try:
+                upsert_akatsuki_holding(sb, rec)
+            except Exception as exc:
+                print(f"# akatsuki holdings: {exc}", file=sys.stderr)
 
     # ソニーは他サイトのあと（9:00 開店直後の混雑回避）
     if not args.cloud_only:
