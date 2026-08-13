@@ -78,7 +78,7 @@ create table if not exists public.kurashift_tax_cases (
   status text not null default 'draft'
     check (status in ('draft', 'csv_ready', 'registered', 'closed')),
   scope text not null default 'personal'
-    check (scope = 'personal'),
+    check (scope in ('personal', 'corporate')),
   csv_path text,
   notes text,
   metadata jsonb not null default '{}'::jsonb,
@@ -98,6 +98,8 @@ create table if not exists public.kurashift_tax_evidence (
   gmail_message_id text,
   stored_path text not null,
   original_filename text,
+  scope text not null default 'personal'
+    check (scope in ('personal', 'corporate')),
   metadata jsonb not null default '{}'::jsonb,
   received_at timestamptz,
   created_at timestamptz not null default now()

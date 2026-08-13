@@ -1,8 +1,50 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import { createClient } from "@/lib/supabase/server";
+import { corporateCycle, personalCycle } from "@/lib/taxCycle";
 
 export const dynamic = "force-dynamic";
+
+type CaseRow = {
+  id: string;
+  fiscal_year: number;
+  title: string;
+  status: string;
+  scope: string;
+  csv_path: string | null;
+};
+
+type EvidenceRow = {
+  id: string;
+  fiscal_year: number;
+  scope: string | null;
+  doc_kind: string;
+  subject: string | null;
+  original_filename: string | null;
+  stored_path: string;
+  received_at: string | null;
+};
+
+function ingested(
+  scope: "personal" | "corporate",
+  year: number,
+  cases: CaseRow[],
+  evidence: EvidenceRow[]
+): boolean {
+  const ev = evidence.filter(
+    (e) => e.fiscal_year === year && (e.scope || "personal") === scope
+  );
+  if (ev.length > 0) return true;
+  if (scope === "personal") {
+    return cases.some(
+      (c) =>
+        c.scope === "personal" &&
+        c.fiscal_year === year &&
+        (c.status === "csv_ready" || c.status === "registered" || c.status === "closed")
+    );
+  }
+  return false;
+}
 
 export default async function TaxPage() {
   const supabase = await createClient();
@@ -10,21 +52,21 @@ export default async function TaxPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const year = new Date().getFullYear() - 1;
+  const personal = personalCycle();
+  const corporate = corporateCycle();
 
   const [{ data: cases }, { data: evidence }, { data: jobs }] = await Promise.all([
     supabase
       .from("kurashift_tax_cases")
-      .select("id, fiscal_year, title, status, csv_path, notes, updated_at")
-      .eq("scope", "personal")
+      .select("id, fiscal_year, title, status, scope, csv_path")
       .order("fiscal_year", { ascending: false }),
     supabase
       .from("kurashift_tax_evidence")
       .select(
-        "id, fiscal_year, doc_kind, subject, original_filename, stored_path, received_at"
+        "id, fiscal_year, scope, doc_kind, subject, original_filename, stored_path, received_at"
       )
       .order("created_at", { ascending: false })
-      .limit(40),
+      .limit(60),
     supabase
       .from("kurashift_jobs")
       .select("id, job_type, status, title, created_at, error_text")
@@ -33,80 +75,120 @@ export default async function TaxPage() {
       .limit(8),
   ]);
 
+  const caseRows = (cases ?? []) as CaseRow[];
+  const evRows = (evidence ?? []) as EvidenceRow[];
+  const personalIn = ingested("personal", personal.year, caseRows, evRows);
+  const corporateIn = ingested("corporate", corporate.year, caseRows, evRows);
+
   return (
     <Shell active="/tax" email={user?.email ?? null}>
-      <h1>個人申告</h1>
+      <p className="page-kicker">② · 申告サイクル</p>
+      <h1>申告</h1>
       <p className="sub">
-        個人のみ（弥生CSV）。法人は税理士委託。サイクル: CSV作成 → 証憑取込 →
-        一覧確認 →（承認後に）弥生登録。
+        いま回す年は日付で切り替わります。個人は12月締め・2月申告、法人は5月決算・8月頃。
+        未取込で窓に入ったら「そろそろ取り込みます」。Jarvis に下の文で依頼してください。
       </p>
 
-      <div className="card">
-        <header>
-          <span className="lvl">サイクル D</span>
-          <strong>{year}年分を回す</strong>
-        </header>
-        <ol className="meta" style={{ marginTop: 8, paddingLeft: 18 }}>
-          <li>弥生CSVを作る（Zaimサマリー→勘定ドラフト。本登録はしない）</li>
-          <li>税理士メールを取り込む（admin Gmail）</li>
-          <li>
-            メール0件なら OneDrive{" "}
-            <code>…/kurashift/{year}/evidence/inbox/</code>{" "}
-            にPDFを置き、手動取込
-          </li>
-          <li>下の一覧でパスと件名を確認。必要なら証憑出力</li>
-        </ol>
-        <EnqueueJobButton
-          jobType="tax_build_yayoi_csv"
-          title={`弥生CSV ${year}`}
-          payload={{ fiscal_year: year }}
-          label="1. 弥生CSVを作る"
-        />
-        <EnqueueJobButton
-          jobType="tax_ingest_accountant_mail"
-          title={`税理士メール取込 ${year}`}
-          payload={{ fiscal_year: year, limit: 30 }}
-          label="2. 税理士メールを取り込む"
-        />
-        <EnqueueJobButton
-          jobType="tax_ingest_manual_dir"
-          title={`証憑手動取込 ${year}`}
-          payload={{ fiscal_year: year }}
-          label="3. 手動フォルダ（inbox）を取り込む"
-        />
-        <p className="meta" style={{ marginTop: 8 }}>
-          CSVは<strong>ドラフト</strong>（勘定マップ未整備の費目はスキップされうる）。弥生本登録UIはありません。
-        </p>
+      <div className="grid">
+        <article className="card">
+          <header>
+            <span className="lvl">個人</span>
+            <strong>{personal.label}</strong>
+          </header>
+          <p>
+            <span className={`status-pill ${personalIn ? "ingested" : "pending"}`}>
+              {personalIn ? "取り込んでいる" : "取り込んでいない"}
+            </span>
+          </p>
+          <p className="meta">{personal.windowLabel}</p>
+          {personal.window && !personalIn ? (
+            <div className="card notice" style={{ marginTop: 12, marginBottom: 12 }}>
+              <strong>そろそろ取り込みます</strong>
+              <p className="meta" style={{ marginTop: 6 }}>
+                Jarvis へ: 「{personal.jarvisPrompt}」
+              </p>
+            </div>
+          ) : (
+            <p className="meta" style={{ marginTop: 8 }}>
+              依頼文: 「{personal.jarvisPrompt}」
+            </p>
+          )}
+          <EnqueueJobButton
+            jobType="tax_build_yayoi_csv"
+            title={`弥生CSV ${personal.year}`}
+            payload={{ fiscal_year: personal.year, scope: "personal" }}
+            label="弥生CSVを作る"
+          />
+          <EnqueueJobButton
+            jobType="tax_ingest_accountant_mail"
+            title={`税理士メール取込 ${personal.year}`}
+            payload={{ fiscal_year: personal.year, scope: "personal", limit: 30 }}
+            label="税理士メールを取り込む"
+          />
+        </article>
+
+        <article className="card">
+          <header>
+            <span className="lvl">法人</span>
+            <strong>{corporate.label}</strong>
+          </header>
+          <p>
+            <span className={`status-pill ${corporateIn ? "ingested" : "pending"}`}>
+              {corporateIn ? "取り込んでいる" : "取り込んでいない"}
+            </span>
+          </p>
+          <p className="meta">
+            {corporate.windowLabel}。Knees bee 大野さんの決算PDF（年1回）
+          </p>
+          {corporate.window && !corporateIn ? (
+            <div className="card notice" style={{ marginTop: 12, marginBottom: 12 }}>
+              <strong>そろそろ取り込みます</strong>
+              <p className="meta" style={{ marginTop: 6 }}>
+                Jarvis へ: 「{corporate.jarvisPrompt}」
+              </p>
+            </div>
+          ) : (
+            <p className="meta" style={{ marginTop: 8 }}>
+              依頼文: 「{corporate.jarvisPrompt}」
+            </p>
+          )}
+          <EnqueueJobButton
+            jobType="tax_ingest_accountant_mail"
+            title={`法人メール取込 ${corporate.year}`}
+            payload={{ fiscal_year: corporate.year, scope: "corporate", limit: 20 }}
+            label="大野さんメールを取り込む"
+          />
+        </article>
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>
         <header>
           <span className="lvl">案件</span>
-          <strong>個人</strong>
+          <strong>履歴</strong>
         </header>
         <table>
           <thead>
             <tr>
+              <th>区分</th>
               <th>年度</th>
               <th>タイトル</th>
               <th>状態</th>
-              <th>CSV</th>
             </tr>
           </thead>
           <tbody>
-            {(cases ?? []).length === 0 ? (
+            {caseRows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="meta">
-                  案件なし — 上の「弥生CSVを作る」から
+                  まだ案件がありません
                 </td>
               </tr>
             ) : (
-              (cases ?? []).map((c) => (
+              caseRows.map((c) => (
                 <tr key={c.id}>
+                  <td>{c.scope === "corporate" ? "法人" : "個人"}</td>
                   <td>{c.fiscal_year}</td>
                   <td>{c.title}</td>
                   <td>{c.status}</td>
-                  <td className="meta">{c.csv_path ?? "—"}</td>
                 </tr>
               ))
             )}
@@ -117,26 +199,28 @@ export default async function TaxPage() {
       <div className="card" style={{ marginTop: 20 }}>
         <header>
           <span className="lvl">証憑</span>
-          <strong>税理士添付など</strong>
+          <strong>メール添付など</strong>
         </header>
         <table>
           <thead>
             <tr>
+              <th>区分</th>
               <th>年度</th>
               <th>件名／ファイル</th>
               <th>再出力</th>
             </tr>
           </thead>
           <tbody>
-            {(evidence ?? []).length === 0 ? (
+            {evRows.length === 0 ? (
               <tr>
-                <td colSpan={3} className="meta">
-                  証憑はまだありません — 「税理士メールを取り込む」後に増えます
+                <td colSpan={4} className="meta">
+                  証憑はまだありません
                 </td>
               </tr>
             ) : (
-              (evidence ?? []).map((e) => (
+              evRows.map((e) => (
                 <tr key={e.id}>
+                  <td>{e.scope === "corporate" ? "法人" : "個人"}</td>
                   <td>{e.fiscal_year}</td>
                   <td>
                     {e.subject || e.original_filename || e.doc_kind}

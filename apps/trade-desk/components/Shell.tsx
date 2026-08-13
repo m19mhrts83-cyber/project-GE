@@ -9,7 +9,7 @@ const NAV = [
   { href: "/lifeplan", label: "ライフプラン" },
   { href: "/realestate", label: "不動産" },
   { href: "/roi", label: "ROI" },
-  { href: "/tax", label: "個人申告" },
+  { href: "/tax", label: "申告" },
   { href: "/jobs", label: "ジョブ" },
   { href: "/settings", label: "設定" },
   { href: "/research", label: "リサーチ" },
