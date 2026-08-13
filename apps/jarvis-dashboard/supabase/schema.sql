@@ -544,3 +544,5 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260813_kurashift_buy_plan.sql）
 -- kurashift_loan_tracker_loans
 -- （migrations/20260813_kurashift_loan_tracker.sql）
+-- kurashift_tax_year_metrics（個人暦年／法人5月期の申告結果KPI）
+-- （migrations/20260814_kurashift_tax_year_metrics.sql）
