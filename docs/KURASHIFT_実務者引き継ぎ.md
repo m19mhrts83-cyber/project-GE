@@ -11,7 +11,7 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
 | 文書 | 用途 |
 |---|---|
-| [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) | **残 ToDo だけ・元プランへ辿れる。タブ整理の正** |
+| [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) | **残 ToDo・生きている1 plan・アーカイブ索引（タブ整理の正）** |
 | [`KURASHIFT_plan棚卸し_20260813.md`](./KURASHIFT_plan棚卸し_20260813.md) | plan 全本線の done/pending 棚卸し経緯 |
 | [`KURASHIFT_通し検証ログ_20260813.md`](./KURASHIFT_通し検証ログ_20260813.md) | 通し検証（煙＋DB済／目視脇置き） |
 | [`KURASHIFT_品質保証点検ログ_20260813.md`](./KURASHIFT_品質保証点検ログ_20260813.md) | Wave0 合否・P1/P2・実務者タスク順 |
@@ -21,22 +21,18 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
 **実務実装（同日）**: P1＋RE-1b＋買い進めCF年次プロット＋借入トラッカー導線を本番反映済。
 
-**残 ToDo**: [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) を正。完了 plan タブは閉じてよい（同 doc の「閉じ用」）。
+**残 ToDo**: [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) を正。Cursor は **生きている1本**（`kurashift残バックログ_20260813.plan.md`）だけ開く。旧本線 plan は `_archive/kurashift/`（タブは閉じてよい）。
 
 ---
 
 ## 1. プラン地図（どれが生きているか）
 
-| プランファイル | 役割 | 状態（2026-08-13 棚卸し） |
+| プラン | 役割 | 状態 |
 |---|---|---|
-| [`ライフプランhq再整理_c37d6392.plan.md`](~/.cursor/plans/ライフプランhq再整理_c37d6392.plan.md) | **本線**（①②③） | 24 done / **3 pending**（検証・計画補正・Lab） |
-| [`買い進め長期レーン_77a6bd3e.plan.md`](~/.cursor/plans/買い進め長期レーン_77a6bd3e.plan.md) | ③-B 長期→実行 | 6 done / **1 pending**（検証後の改訂モード） |
-| [`融資提出パック設計_74653333.plan.md`](~/.cursor/plans/融資提出パック設計_74653333.plan.md) | ③-D | **完了** |
-| [`qa実行プラン整理_b3b4e68d.plan.md`](~/.cursor/plans/qa実行プラン整理_b3b4e68d.plan.md) | QA Waves | Wave0–1済 / **Wave2残** |
-| [`kurashift改善プラン_86acd2ee.plan.md`](~/.cursor/plans/kurashift改善プラン_86acd2ee.plan.md) | QAゲート | Phase A/B済 / **Phase C残** |
-| [`kurashift実務検証_fbf4058e.plan.md`](~/.cursor/plans/kurashift実務検証_fbf4058e.plan.md) | Sprint1–2 | **To-do 完了** |
-| [`kurashift_hq_overview_e49b0cea.plan.md`](~/.cursor/plans/kurashift_hq_overview_e49b0cea.plan.md) | HQ俯瞰 | **完了** |
-| [`trade_desk_方向再編_9c87a14e.plan.md`](~/.cursor/plans/trade_desk_方向再編_9c87a14e.plan.md) | 旧議論 | **cancelled（吸収済み）** |
+| [`kurashift残バックログ_20260813.plan.md`](/Users/matsunomasaharu2/.cursor/plans/kurashift残バックログ_20260813.plan.md) | **生きている1本**（残6 todo） | pending のみ。docs 残一覧と同期 |
+| `~/.cursor/plans/_archive/kurashift/*`（9本） | 本線の経緯・完了履歴 | **ARCHIVED**（読取専用）。索引は残 ToDo 一覧 |
+
+旧パス（HQ／買い進め／QA／改善／CFプロット／融資／実務検証／overview／trade_desk 方向再編）はすべてアーカイブへ移動済み。新しい作業の todo は生きている1本にだけ足す。
 
 ---
 

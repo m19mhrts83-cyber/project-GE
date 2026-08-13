@@ -72,5 +72,5 @@
 
 1. ~~**通し検証**~~ → 煙＋DB完了（`docs/KURASHIFT_通し検証ログ_20260813.md`）。ログイン目視は脇置き  
 2. ~~不動産 CF 年次プロット~~ → `/realestate/buy-plan` 実装・本番反映（2026-08-13）  
-3. **残 ToDo の正本（タブ整理）**: [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md)  
+3. **残 ToDo の正本（タブ整理・1本運用）**: [`KURASHIFT_残ToDo一覧_タブ整理_20260813.md`](./KURASHIFT_残ToDo一覧_タブ整理_20260813.md) ＋ Cursor `kurashift残バックログ_20260813.plan.md`（旧9本は `_archive/kurashift/`）  
 4. 検証後に `buy-plan-revise-modes` と `re-a-plan-revise` を優先順位付け
