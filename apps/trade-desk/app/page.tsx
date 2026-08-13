@@ -14,6 +14,7 @@ import {
   computeNextAction,
   countStalledQueued,
   failedSources,
+  parseCardDebitWatch,
   parseWeeklySummary,
 } from "@/lib/nextAction";
 import {
@@ -139,7 +140,11 @@ export default async function HomePage() {
     supabase
       .from("sync_meta")
       .select("key, value, updated_at")
-      .in("key", ["portfolio_weekly_at", "portfolio_weekly_summary"]),
+      .in("key", [
+        "portfolio_weekly_at",
+        "portfolio_weekly_summary",
+        "card_debit_watch_summary",
+      ]),
     supabase
       .from("kurashift_jobs")
       .select("id, job_type, status, created_at")
@@ -196,6 +201,9 @@ export default async function HomePage() {
   const weeklySummary = parseWeeklySummary(
     metaMap.get("portfolio_weekly_summary")?.value ?? null
   );
+  const cardDebit = parseCardDebitWatch(
+    metaMap.get("card_debit_watch_summary")?.value ?? null
+  );
   const weeklyAt = metaMap.get("portfolio_weekly_at")?.value ?? null;
   const fails = failedSources(weeklySummary);
   const stalled = countStalledQueued(queuedJobs ?? []);
@@ -223,6 +231,7 @@ export default async function HomePage() {
       viewing: (dealStatuses ?? []).filter((d) => d.status === "viewing").length,
     },
     buyPlanMissing: !buyPlanCanon?.id,
+    cardDebit,
   });
   const partialWarn = weeklySummary?.last_full_ok === false;
 

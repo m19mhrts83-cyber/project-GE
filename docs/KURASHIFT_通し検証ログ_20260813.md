@@ -59,3 +59,16 @@
 | 本番 | `/money-ops` にプレイブック表示（本コミット deploy 後） |
 
 **Phase B（運用）**: Vpass 確定額・引落日を入れて寄せ計画→承認→**手動**振込→done。自動振込なし。
+
+### カード引落アラート（2026-08-14）
+
+| 項目 | 結果 |
+|---|---|
+| スクリプト | `scripts/jarvis_card_debit_watch.py`（Gmail m19m・Vpass お支払い金額のお知らせ） |
+| Infinite 本線 | 通知検知 → state / `sync_meta.card_debit_watch_summary` → ホーム Next Action |
+| 他カード | 金額≥30万のみアラート（金額なし通知は記録しない） |
+| 状況ウォッチ | `card_debit_watch`（年会費 `card_annual_fee` と分離） |
+| `/money-ops` | `?due=&need=` および sync_meta からプレフィル |
+| 備考 | 既定の Vpass メールは**金額非表示**のため、確定額は `--set` またはフォーム手入力 |
+
+受け入れ: Infinite の 8月通知で引落目安 2026-08-26 が入り、金額未確定のまま warn（T−14内）→ `/money-ops` 誘導。

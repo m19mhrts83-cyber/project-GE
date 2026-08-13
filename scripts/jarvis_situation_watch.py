@@ -523,6 +523,74 @@ def _parse_ymd(s: str) -> date | None:
         return None
 
 
+def eval_card_debit_watch(meta: dict, data: dict | None) -> dict[str, Any]:
+    """Olive Infinite 本線の月次引落。年会費ウォッチとは別。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="未設定または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+
+    alerts = [a for a in (data.get("alerts") or []) if isinstance(a, dict)]
+    cards = data.get("cards") if isinstance(data.get("cards"), dict) else {}
+    olive = cards.get("olive_infinite") if isinstance(cards.get("olive_infinite"), dict) else {}
+    smbc = data.get("smbc_balance_jpy")
+
+    detail_lines: list[str] = []
+    if isinstance(smbc, int):
+        detail_lines.append(f"SMBC刈谷残高: {smbc:,}円")
+    for cid, c in cards.items():
+        if not isinstance(c, dict):
+            continue
+        amt = c.get("amount_jpy")
+        amt_s = f"{amt:,}円" if isinstance(amt, int) else "未確定"
+        detail_lines.append(
+            f"- {c.get('label') or cid}: {amt_s} / 引落 {c.get('due_date') or '—'} "
+            f"/ 不足 {c.get('smbc_shortfall') if c.get('smbc_shortfall') is not None else '—'}"
+        )
+
+    level = "ok"
+    summary = "引落アラートなし"
+    href = "/money-ops"
+    if alerts:
+        top = alerts[0]
+        level = "warn" if top.get("level") == "warn" else "attention"
+        summary = f"{top.get('label')}: {top.get('reason')}"
+        href = str(top.get("href") or href)
+        detail_lines.append("\n【アラート】")
+        for a in alerts:
+            detail_lines.append(f"- [{a.get('level')}] {a.get('label')}: {a.get('reason')}")
+    elif olive.get("notice_date"):
+        summary = f"Infinite 通知あり（金額{'未確定' if olive.get('amount_pending') else '確定'}）"
+        level = "info"
+
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=summary,
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "alerts": alerts,
+            "olive_infinite": olive or None,
+            "smbc_balance_jpy": smbc,
+            "href": href,
+            "pin_home_top": level in ("warn", "attention"),
+        },
+    )
+
+
 def eval_card_annual_fee(meta: dict, data: dict | None) -> dict[str, Any]:
     """Olive / 単体PP の年会費ウォッチ（二重会員・有効期限退会・期限前を強調）。"""
     title = meta["title"]
@@ -1620,6 +1688,9 @@ EVALUATORS = {
     "rent_step": lambda m: eval_rent_step(m),
     "card_annual_fee": lambda m: eval_card_annual_fee(
         m, load_json(STATE / "card_annual_fee.json")
+    ),
+    "card_debit_watch": lambda m: eval_card_debit_watch(
+        m, load_json(STATE / "card_debit_watch.json")
     ),
     "line_export": lambda m: eval_line_export(m, load_json(STATE / "line_export_reminder.json")),
     "energy_cf": lambda m: eval_energy_cf(m, load_json(STATE / "energy_cf.json")),

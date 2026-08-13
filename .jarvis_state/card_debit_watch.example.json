@@ -1,0 +1,28 @@
+{
+  "updated_at": null,
+  "disabled": false,
+  "gmail_account": "m19m",
+  "smbc_account_id": "smbc_kariya",
+  "smbc_balance_jpy": null,
+  "thresholds": {
+    "olive_warn_yen": 500000,
+    "other_warn_yen": 300000,
+    "lead_days": 14,
+    "default_due_day": 26
+  },
+  "cards": {
+    "olive_infinite": {
+      "id": "olive_infinite",
+      "label": "Olive Infinite（クレジット）",
+      "primary": true,
+      "amount_jpy": null,
+      "due_date": null,
+      "amount_pending": true,
+      "notice_date": null,
+      "smbc_shortfall": null,
+      "source": null,
+      "source_message_id": null
+    }
+  },
+  "alerts": []
+}

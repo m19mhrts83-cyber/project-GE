@@ -16,16 +16,24 @@ export default function CardSettlementBufferForm({
   smbcBalanceYen,
   smbcAccountLabel,
   liquidityTotalYen,
+  initialDueDate,
+  initialNeedYen,
 }: {
   smbcBalanceYen?: number | null;
   smbcAccountLabel?: string;
   liquidityTotalYen?: number | null;
+  initialDueDate?: string | null;
+  initialNeedYen?: number | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [dueDate, setDueDate] = useState("");
-  const [needYen, setNeedYen] = useState("1000000");
+  const [dueDate, setDueDate] = useState(initialDueDate?.trim() || "");
+  const [needYen, setNeedYen] = useState(
+    initialNeedYen != null && Number.isFinite(initialNeedYen)
+      ? String(Math.round(initialNeedYen))
+      : "1000000"
+  );
   const [smbcYen, setSmbcYen] = useState(
     smbcBalanceYen != null ? String(Math.round(smbcBalanceYen)) : ""
   );
@@ -142,6 +150,8 @@ export default function CardSettlementBufferForm({
       <p className="meta" style={{ marginTop: 8 }}>
         Olive などの大型引落に向け、<strong>引落口座へ無料で寄せる</strong>計画です。
         自動振込はしません。承認は「この寄せ方でよい」の合意だけです。
+        金額・引落日は財務メール（Gmail）または Vpass で確定して入力してください。
+        金額・引落日は財務メール（Gmail）または Vpass で確定して入力してください。
       </p>
 
       <div

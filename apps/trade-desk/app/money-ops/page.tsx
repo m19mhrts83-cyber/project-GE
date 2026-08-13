@@ -11,13 +11,22 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function MoneyOpsPage() {
+export default async function MoneyOpsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = (await searchParams) || {};
+  const dueParam = typeof sp.due === "string" ? sp.due : "";
+  const needRaw = typeof sp.need === "string" ? sp.need : "";
+  const needParam = needRaw ? Number(needRaw) : null;
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: ops }, { data: liqSnaps }, { data: liqAccounts }] =
+  const [{ data: ops }, { data: liqSnaps }, { data: liqAccounts }, { data: debitMeta }] =
     await Promise.all([
       supabase
         .from("kurashift_money_ops")
@@ -35,7 +44,35 @@ export default async function MoneyOpsPage() {
         .from("liquidity_accounts")
         .select("id, name, kind")
         .eq("active", true),
+      supabase
+        .from("sync_meta")
+        .select("value")
+        .eq("key", "card_debit_watch_summary")
+        .maybeSingle(),
     ]);
+
+  let prefillDue = dueParam;
+  let prefillNeed =
+    needParam != null && Number.isFinite(needParam) ? needParam : null;
+  if ((!prefillDue || prefillNeed == null) && debitMeta?.value) {
+    try {
+      const brief = JSON.parse(debitMeta.value) as {
+        olive_infinite?: { due_date?: string; amount_jpy?: number | null };
+        top_alert?: { due_date?: string; amount_jpy?: number | null };
+      };
+      const olive = brief.olive_infinite || {};
+      const top = brief.top_alert || {};
+      if (!prefillDue) {
+        prefillDue = String(top.due_date || olive.due_date || "");
+      }
+      if (prefillNeed == null) {
+        const n = top.amount_jpy ?? olive.amount_jpy;
+        if (typeof n === "number" && Number.isFinite(n)) prefillNeed = n;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   const accountById = new Map(
     (liqAccounts ?? []).map((a) => [a.id, { name: a.name, kind: a.kind }])
@@ -81,6 +118,8 @@ export default async function MoneyOpsPage() {
         smbcBalanceYen={smbcBalance}
         smbcAccountLabel={SMBC_SETTLEMENT_ACCOUNT_LABEL}
         liquidityTotalYen={hasLiquidity ? liquidityTotal : null}
+        initialDueDate={prefillDue || null}
+        initialNeedYen={prefillNeed}
       />
 
       <NewMoneyOpForm />
