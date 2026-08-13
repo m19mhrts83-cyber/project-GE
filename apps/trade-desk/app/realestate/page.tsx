@@ -1,5 +1,6 @@
 import Shell from "@/components/Shell";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
+import EnqueueJobButton from "@/components/EnqueueJobButton";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen, fmtYenSigned } from "@/lib/format";
 import { loadLiabilityRates } from "@/lib/liabilityRates";
@@ -356,6 +357,26 @@ export default async function RealEstatePage({
             }}
           />
         </div>
+        <p className="meta" style={{ marginTop: 12 }}>
+          ③-A 計画補正: dry-run で差分を見てから、承認付きでスナップショット（Numbers
+          直書きなし）。
+        </p>
+        <p style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <EnqueueJobButton
+            jobType="re_revise_plan"
+            title="計画補正プレビュー"
+            label="補正 dry-run"
+            payload={{ dry_run: true }}
+          />
+          <EnqueueJobButton
+            jobType="re_revise_plan"
+            title="計画補正をスナップ"
+            label="補正を確定（確認あり）"
+            payload={{ apply: true }}
+            requireConfirm
+            confirmMessage="計画補正スナップを DB に残します（Numbersは手動）。よろしいですか？"
+          />
+        </p>
       </div>
 
       <div className="card notice">

@@ -32,6 +32,21 @@ export default async function PaperPage() {
       <p className="sub">
         実発注なし。平均回帰＋分割建てのリズム。ライブは承認ゲート後。
       </p>
+      <div className="card notice" style={{ marginBottom: 16 }}>
+        <header>
+          <span className="lvl">Lab · ゲート</span>
+          <strong>立花 API・少額実弾</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 8 }}>
+          本線外。口座・鍵が揃うまで<strong>実弾は撃たない</strong>。紙トレードと
+          ROI の立花行は閲覧のみ。解錠はユーザー明示＋別タスク。
+        </p>
+        <ul className="meta" style={{ marginTop: 6 }}>
+          <li>API 鍵パスは `.env.jarvis_private` のみ（チャットに出さない）</li>
+          <li>少額実弾は kill_switch OFF かつ別ジョブ承認後</li>
+          <li>健美家フィード等の外部物件クローラは Phase C 対象外のまま</li>
+        </ul>
+      </div>
       <div className="grid">
         <article className="card">
           <header>

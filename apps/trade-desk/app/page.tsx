@@ -75,6 +75,8 @@ export default async function HomePage() {
     { data: financeTxns },
     { data: reTxns },
     { data: unitRows },
+    { data: dealStatuses },
+    { data: buyPlanCanon },
   ] = await Promise.all([
     supabase
       .from("portfolio_accounts")
@@ -182,6 +184,12 @@ export default async function HomePage() {
     supabase
       .from("property_units")
       .select("property_id, property_name, room, status, rent, note, payload"),
+    supabase.from("kurashift_re_deals").select("status"),
+    supabase
+      .from("kurashift_buy_plan_versions")
+      .select("id")
+      .eq("is_canonical", true)
+      .maybeSingle(),
   ]);
 
   const metaMap = new Map((syncMeta ?? []).map((r) => [r.key, r]));
@@ -210,6 +218,11 @@ export default async function HomePage() {
     annualDone: (annualDone?.length ?? 0) > 0,
     personalTaxAlert: personal.window && !personalCsvReady,
     corporateTaxAlert: corporate.window && !corporateIngested,
+    dealFunnel: {
+      info: (dealStatuses ?? []).filter((d) => d.status === "info").length,
+      viewing: (dealStatuses ?? []).filter((d) => d.status === "viewing").length,
+    },
+    buyPlanMissing: !buyPlanCanon?.id,
   });
   const partialWarn = weeklySummary?.last_full_ok === false;
 

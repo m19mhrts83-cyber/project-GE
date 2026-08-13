@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import LifeplanSheetsNav from "@/components/LifeplanSheetsNav";
 import BudgetComposer from "@/components/BudgetComposer";
+import EnqueueJobButton from "@/components/EnqueueJobButton";
 import { createClient } from "@/lib/supabase/server";
 import {
   budgetLookbackYears,
@@ -96,14 +97,36 @@ export default async function LifeplanBudgetPage({
           <strong>{planYear}年 月別予算の確認</strong>
         </header>
         <p className="meta" style={{ marginTop: 8 }}>
-          年次更新の実行キュー（実績取込→生涯CF反映→Zaim反映）はまだ使いません。
-          まず表の形と、2022・2023実績が入っているかを確認してください。
+          年次更新の実行キューは、まず表の形と実績を見てから。Zaim
+          本番反映は確認ダイアログ必須です（誤射防止）。
           {mode !== "default" ? (
             <>
               {" "}
-              （mode={mode} でも実行ボタンは出していません）
+              （mode={mode}）
             </>
           ) : null}
+        </p>
+        <p style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <EnqueueJobButton
+            jobType="lifeplan_ingest_actuals"
+            title="財務実績を取り込む"
+            label="実績取込"
+            payload={{ fiscal_year: planYear }}
+          />
+          <EnqueueJobButton
+            jobType="lifeplan_push_zaim"
+            title="Zaim予算プレビュー"
+            label="Zaim dry-run"
+            payload={{ dry_run: true, fiscal_year: planYear }}
+          />
+          <EnqueueJobButton
+            jobType="lifeplan_push_zaim"
+            title="Zaim本番反映"
+            label="Zaim本番（確認あり）"
+            payload={{ confirm_apply: true, fiscal_year: planYear }}
+            requireConfirm
+            confirmMessage="Zaimの月次予算を本番反映します。本当によろしいですか？"
+          />
         </p>
       </div>
 

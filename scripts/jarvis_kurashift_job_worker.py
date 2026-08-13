@@ -194,6 +194,22 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             str(REPO / "scripts" / "jarvis_kurashift_loan_tracker_sync.py"),
             *(["--dry-run"] if payload.get("dry_run") else []),
         ],
+        "re_revise_plan": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_re_revise_plan.py"),
+            "--year",
+            year,
+            *(
+                ["--apply"]
+                if payload.get("apply") or payload.get("confirm_apply")
+                else ["--dry-run"]
+            ),
+            *(
+                ["--note", str(payload.get("note"))]
+                if payload.get("note")
+                else []
+            ),
+        ],
     }
     cmd = mapping.get(job_type)
     if not cmd:

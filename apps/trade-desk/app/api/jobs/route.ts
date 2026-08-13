@@ -18,6 +18,13 @@ const ALLOWED = new Set([
   "theme_execute_assist",
   "secrets_upsert",
   "secrets_status",
+  "buy_plan_ingest",
+  "buy_plan_export",
+  "ops_consult_ingest",
+  "re_mail_match",
+  "re_deal_advice",
+  "re_sync_loan_tracker",
+  "re_revise_plan",
 ]);
 
 export async function POST(req: Request) {
@@ -54,19 +61,25 @@ export async function POST(req: Request) {
     );
   }
 
-  // Zaim 本番反映は UI 確認必須（誤射防止）
-  if (job_type === "lifeplan_push_zaim" && payload.confirm_apply === true) {
+  // Zaim 本番反映・計画補正 apply は UI 確認必須（誤射防止）
+  if (
+    (job_type === "lifeplan_push_zaim" || job_type === "re_revise_plan") &&
+    (payload.confirm_apply === true || payload.apply === true)
+  ) {
     if (payload.ui_confirmed !== true) {
       return NextResponse.json(
         {
           error:
-            "Zaim本番反映には画面確認（ui_confirmed）が必要です。確認ダイアログ付きボタンから実行してください。",
+            "本番反映／計画補正の確定には画面確認（ui_confirmed）が必要です。確認ダイアログ付きボタンから実行してください。",
         },
         { status: 400 }
       );
     }
-    if (!title.includes("[本番Zaim]")) {
+    if (job_type === "lifeplan_push_zaim" && !title.includes("[本番Zaim]")) {
       title = `[本番Zaim] ${title}`;
+    }
+    if (job_type === "re_revise_plan" && !title.includes("[計画補正]")) {
+      title = `[計画補正] ${title}`;
     }
   }
 

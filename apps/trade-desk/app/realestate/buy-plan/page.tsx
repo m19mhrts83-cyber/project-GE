@@ -318,6 +318,65 @@ export default async function BuyPlanPage() {
 
       <div className="card">
         <header>
+          <span className="lvl">改訂モード</span>
+          <strong>評価／年次反映／運営相談</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          画面は評価が本線。Excel・Numbers への自動上書きはしません。年1の実績反映と運営相談は下のチェックリスト＋ジョブで進めます。
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gap: 12,
+            marginTop: 12,
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          }}
+        >
+          <div>
+            <strong style={{ fontSize: 14 }}>① 評価（いま）</strong>
+            <p className="meta" style={{ marginTop: 4 }}>
+              KPI・年表・想定vs実績チャートを見るだけ。読取専用。
+            </p>
+          </div>
+          <div>
+            <strong style={{ fontSize: 14 }}>② 年次実績反映</strong>
+            <ol className="meta" style={{ marginTop: 4, paddingLeft: 18 }}>
+              <li>Zaim／財務年次が揃っているか確認</li>
+              <li>Excel を手で直す（Jarvisは書かない）</li>
+              <li>「Excel再取込」で DB 投影</li>
+              <li>必要なら STEP3 export で手元確認</li>
+            </ol>
+            <p style={{ marginTop: 8 }}>
+              <EnqueueJobButton
+                jobType="buy_plan_ingest"
+                title="年次反映後のExcel再取込"
+                label="② 再取込キュー"
+                payload={{ reason: "annual_actuals" }}
+              />
+            </p>
+          </div>
+          <div>
+            <strong style={{ fontSize: 14 }}>③ 運営相談</strong>
+            <p className="meta" style={{ marginTop: 4 }}>
+              神大家運営メモ／相談経緯を取り込み、千三つと突合。
+            </p>
+            <p style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <EnqueueJobButton
+                jobType="ops_consult_ingest"
+                title="運営相談メモ取込"
+                label="運営経緯を更新"
+                payload={{}}
+              />
+              <a className="btn" href="/realestate/deals">
+                千三つへ
+              </a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <header>
           <span className="lvl">KPI</span>
           <strong>スピード感 · CF 月50万への道のり</strong>
         </header>

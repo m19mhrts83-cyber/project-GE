@@ -103,13 +103,35 @@ export default function ThemeConsultApprove({
           className="btn primary"
           disabled={busy}
           onClick={approve}
+          style={{
+            minHeight: 48,
+            minWidth: 220,
+            width: "100%",
+            maxWidth: 420,
+            fontSize: 16,
+            touchAction: "manipulation",
+          }}
         >
           {busy ? "処理中…" : "相談内容を確認して承認する"}
         </button>
-        <a className="btn" href="/themes">
+        <a
+          className="btn"
+          href="/themes"
+          style={{
+            minHeight: 48,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 140,
+            touchAction: "manipulation",
+          }}
+        >
           テーマ一覧へ
         </a>
       </div>
+      <p className="meta" style={{ marginTop: 8 }}>
+        スマホでも同じ確認ダイアログ → 承認。実弾は自動では動きません。
+      </p>
       {msg ? <p className="meta">{msg}</p> : null}
     </div>
   );
