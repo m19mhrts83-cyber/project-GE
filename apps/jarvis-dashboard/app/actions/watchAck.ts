@@ -31,7 +31,7 @@ function revalidateWatchPaths() {
 export async function acknowledgeWatch(id: string): Promise<WatchAckResult> {
   const watchId = String(id || "").trim();
   if (!watchId) return { ok: false, error: "id が空です" };
-  if (watchId === "ops_fix_notice") {
+  if (watchId === "ops_fix_notice" || watchId === "card_debit_watch") {
     return { ok: false, error: "この項目は専用の確認ボタンを使ってください" };
   }
 
@@ -105,7 +105,12 @@ export async function acknowledgeWatchAllAttention(): Promise<WatchAckResult> {
   let n = 0;
   for (const row of rows || []) {
     const watchId = String(row.id || "");
-    if (!watchId || watchId === "ops_fix_notice") continue;
+    if (
+      !watchId ||
+      watchId === "ops_fix_notice" ||
+      watchId === "card_debit_watch"
+    )
+      continue;
     const payload =
       row.payload && typeof row.payload === "object"
         ? ({ ...(row.payload as Record<string, unknown>) } as Record<

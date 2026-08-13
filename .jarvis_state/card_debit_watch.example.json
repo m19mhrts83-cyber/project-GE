@@ -4,6 +4,9 @@
   "gmail_account": "m19m",
   "smbc_account_id": "smbc_kariya",
   "smbc_balance_jpy": null,
+  "settled_due": null,
+  "plan_ready_due": null,
+  "dashboard_ack_due": null,
   "thresholds": {
     "olive_warn_yen": 500000,
     "other_warn_yen": 300000,

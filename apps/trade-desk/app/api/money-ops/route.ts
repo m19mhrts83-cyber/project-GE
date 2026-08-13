@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { writeCardDebitLifecycle } from "@/lib/cardDebitLifecycle";
 import { buildCardSettlementAssistSteps } from "@/lib/cardSettlementBuffer";
 
 const KINDS = new Set([
@@ -117,5 +118,22 @@ export async function POST(req: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  if (
+    kind === "card_settlement_buffer" &&
+    dueDate &&
+    (status === "consulting" ||
+      status === "approved" ||
+      status === "executing" ||
+      status === "done")
+  ) {
+    await writeCardDebitLifecycle(supabase, {
+      dueDate,
+      planReady: status !== "done",
+      settled: status === "done",
+      opId: data.id,
+    });
+  }
+
   return NextResponse.json({ ok: true, op: data, reused: false });
 }

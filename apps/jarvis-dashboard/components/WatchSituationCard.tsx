@@ -2,6 +2,7 @@ import Link from "next/link";
 import OpsFixAckButton from "@/components/OpsFixAckButton";
 import StatusToggle from "@/components/StatusToggle";
 import WatchAckButton from "@/components/WatchAckButton";
+import CardDebitAckButton from "@/components/CardDebitAckButton";
 import WatchCommentThread, {
   type WatchCommentRow,
 } from "@/components/WatchCommentThread";
@@ -108,6 +109,27 @@ export default function WatchSituationCard(props: WatchSituationCardProps) {
           summary={summary}
           payload={payload}
         />
+        {id === "card_debit_watch" ? (
+          <p className="meta" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <CardDebitAckButton
+              dueDate={
+                typeof payload.due_date === "string"
+                  ? payload.due_date
+                  : payload.olive_infinite &&
+                      typeof payload.olive_infinite === "object" &&
+                      typeof (payload.olive_infinite as { due_date?: string })
+                        .due_date === "string"
+                    ? (payload.olive_infinite as { due_date: string }).due_date
+                    : ""
+              }
+            />
+            {typeof payload.action_url === "string" ? (
+              <a href={payload.action_url} target="_blank" rel="noreferrer">
+                KURASHIFT で寄せ計画 →
+              </a>
+            ) : null}
+          </p>
+        ) : null}
         {id === "etc_mileage" ? (
           <p className="meta">
             <Link href="/etc">ETCページ（還元サマリ・申請案内）→</Link>

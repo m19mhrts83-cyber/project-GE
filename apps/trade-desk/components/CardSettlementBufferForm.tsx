@@ -6,6 +6,7 @@ import { fmtYen } from "@/lib/format";
 import {
   FREE_RAILS,
   FUNDING_LADDER,
+  POLICY_LOAN_UI_NOTE,
   SMBC_SETTLEMENT_ACCOUNT_LABEL,
   buildCardSettlementAssistSteps,
   computeGapView,
@@ -138,7 +139,7 @@ export default function CardSettlementBufferForm({
         : gapView.householdCoverable === true
           ? "他の銀行・現金を寄せれば足りそう（まず無料レール。調達ラダーは原則不要）"
           : gapView.householdCoverable === false
-            ? "他行寄せでも足りない可能性 → 利金・契約者貸付を検討"
+            ? "他行寄せでも足りない可能性 → 利金、または返済計画付き貸付／Bloomo"
             : "他行合計は下の参考額を見て判断";
 
   return (
@@ -151,7 +152,9 @@ export default function CardSettlementBufferForm({
         Olive などの大型引落に向け、<strong>引落口座へ無料で寄せる</strong>計画です。
         自動振込はしません。承認は「この寄せ方でよい」の合意だけです。
         金額・引落日は財務メール（Gmail）または Vpass で確定して入力してください。
-        金額・引落日は財務メール（Gmail）または Vpass で確定して入力してください。
+      </p>
+      <p className="meta" style={{ marginTop: 6 }}>
+        {POLICY_LOAN_UI_NOTE}
       </p>
 
       <div
