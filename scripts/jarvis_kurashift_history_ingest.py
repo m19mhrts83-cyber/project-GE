@@ -535,32 +535,75 @@ end replaceText
     return {"row_count": rc, "col_count": cc, "grid": grid}
 
 
+def cashflow_named_tables() -> tuple[str, list[str]]:
+    sheets = (playbook().get("numbers") or {}).get("sheets") or {}
+    cf = str(sheets.get("cashflow") or "キャッシュフロー")
+    named = [str(v) for v in (sheets.get("cashflow_tables") or {}).values() if v]
+    return cf, named
+
+
+def upsert_table_dump(sb: Any, version: dict, sheet: str, table: str) -> None:
+    path = Path(version["source_path"])
+    dump = applescript_dump_table(path, sheet, table)
+    sb.table("kurashift_lifeplan_sheet_dumps").upsert(
+        {
+            "version_id": version["id"],
+            "sheet_name": sheet,
+            "table_name": table,
+            "row_count": dump["row_count"],
+            "col_count": dump["col_count"],
+            "payload": {"grid": dump["grid"], "source": "legacy_table_dump"},
+        },
+        on_conflict="version_id,sheet_name,table_name",
+    ).execute()
+
+
+def dump_named_cashflow_tables(sb: Any, version: dict) -> int:
+    """正本のキャッシュフロー表（ライフイベント含む）を名前指定で保存。"""
+    path = Path(version["source_path"])
+    cf_sheet, named = cashflow_named_tables()
+    if not named:
+        return 0
+    try:
+        tables = applescript_list_tables(path, cf_sheet)
+    except Exception as e:
+        print(f"# dump named skip {version.get('version_key')} {cf_sheet}: {e}", flush=True)
+        return 0
+    dumped = 0
+    for table in named:
+        if table not in tables:
+            continue
+        try:
+            upsert_table_dump(sb, version, cf_sheet, table)
+            dumped += 1
+        except Exception as e:
+            print(f"# dump skip {version.get('version_key')} {cf_sheet}/{table}: {e}", flush=True)
+    return dumped
+
+
 def dump_legacy_sheets(sb: Any, version: dict, *, per_sheet: int = 3) -> int:
     """表名が現行と違う旧版向け。各シートの先頭表を生保存。"""
     path = Path(version["source_path"])
     sheets = list(version.get("sheet_names") or [])
     if not sheets:
         return 0
+    cf_sheet, cf_named = cashflow_named_tables()
     dumped = 0
     for sheet in sheets:
         try:
             tables = applescript_list_tables(path, sheet)
         except Exception:
             continue
-        for table in tables[:per_sheet]:
+        if sheet == cf_sheet and cf_named:
+            pick = [t for t in cf_named if t in tables]
+            for t in tables[:per_sheet]:
+                if t not in pick:
+                    pick.append(t)
+        else:
+            pick = tables[:per_sheet]
+        for table in pick:
             try:
-                dump = applescript_dump_table(path, sheet, table)
-                sb.table("kurashift_lifeplan_sheet_dumps").upsert(
-                    {
-                        "version_id": version["id"],
-                        "sheet_name": sheet,
-                        "table_name": table,
-                        "row_count": dump["row_count"],
-                        "col_count": dump["col_count"],
-                        "payload": {"grid": dump["grid"], "source": "legacy_table_dump"},
-                    },
-                    on_conflict="version_id,sheet_name,table_name",
-                ).execute()
+                upsert_table_dump(sb, version, sheet, table)
                 dumped += 1
             except Exception as e:
                 print(f"# dump skip {version.get('version_key')} {sheet}/{table}: {e}", flush=True)
@@ -664,6 +707,14 @@ def extract_one_version(sb: Any, version: dict, *, dump_sheet: bool, structured_
         except Exception as e:
             notes.append(f"structured:{e}")
             status = "partial"
+
+    # 正本はライフイベント（表3）を含むキャッシュフロー表を名前指定で保存
+    if status != "failed" and version.get("is_canonical"):
+        try:
+            n_cf = dump_named_cashflow_tables(sb, version)
+            result["cashflow_dumps"] = n_cf
+        except Exception as e:
+            notes.append(f"cashflow_dump:{e}")
 
     # 現行表名で取れない／明示 dump 時 → シート内の表を生保存
     need_legacy = dump_sheet or not result.get("budget_rows")
