@@ -80,12 +80,52 @@ aggregate_memos: {}
 #   "tcell:grandole-i:2026-07": "LINE明細未着。PayPay着金を目視済み"
 
 # 号室ごとの上書き（入居日がメモから曖昧なとき）
+# Grandole I: 家賃は共益費を含まない。共益費は一律 4,000。
 units:
+  - property_id: grandole-i
+    room: "101"
+    year1_rent: 48000
+    year2_rent: 48000
+    note: "ミニテック2026-07。長期でキャンペーンなし"
+  - property_id: grandole-i
+    room: "102"
+    move_in: "2026-03-01"
+    year1_rent: 51000
+    year2_rent: 51000
+    note: "Tcell明細 51,000+共益4,000。ユーザー想定の1年目49,000合計とは不一致"
   - property_id: grandole-i
     room: "103"
     move_in: "2025-08-11"
+    campaign_end_ym: "2026-07"
     year1_rent: 45000
     year2_rent: 49000
+  - property_id: grandole-i
+    room: "105"
+    move_in: "2026-05-01"
+    year1_rent: 45000
+    year2_rent: 49000
+  - property_id: grandole-i
+    room: "201"
+    year1_rent: 49000
+    year2_rent: 49000
+    note: "ミニテック2026-07。長期入居"
+  - property_id: grandole-i
+    room: "202"
+    move_in: "2026-07-01"
+    year1_rent: 50000
+    year2_rent: 54000
+    note: "家賃マップ 50,000+管理4,000。2年目は+4,000推定"
+  - property_id: grandole-i
+    room: "203"
+    move_in: "2026-03-01"
+    year1_rent: 49000
+    year2_rent: 53000
+  - property_id: grandole-i
+    room: "205"
+    move_in: "2025-09-01"
+    campaign_end_ym: "2026-09"
+    year1_rent: 47000
+    year2_rent: 53000
   - property_id: grandole-ii
     room: "203"
     campaign_end_ym: "2026-08"

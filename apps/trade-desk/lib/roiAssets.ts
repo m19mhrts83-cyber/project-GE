@@ -73,13 +73,14 @@ export const ROI_ASSETS: RoiAsset[] = [
     rateBuy: "2.65%→2.90%",
     monthlyPayBuy: 262_928,
     monthlyPayNow: 262_928,
-    fullRentBuy: null,
+    fullRentBuy: 5_256_000,
     fullRentBuyNote:
-      "購入時レントロールは突合待ち。現況年収は Jarvis ダッシュボード号室を仮置き",
+      "2年目帯（キャンペーン終了後）家賃+管理費 月43.8万。現況は1年目混在で月41.6万→年499.2万。町費は含めない",
     equity: 7_535_531,
     occBuy: "19.5%（第1期）",
     occ2025: "第1期売上 973,104円（短縮決算）",
-    actualNote: "計画 NET 388.6万 @稼働 77.4%。管理は LEAF / Tcell / ミニテック",
+    actualNote:
+      "計画 NET 388.6万 @稼働 77.4%。管理は LEAF / Tcell / ミニテック。1年目は号室により月4,000円引き",
     unitPropertyId: "grandole-i",
   },
   {

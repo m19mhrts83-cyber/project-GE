@@ -307,11 +307,10 @@ export default async function RoiPage() {
         <div className="card" style={{ marginTop: 16 }}>
           <header>
             <span className="lvl">I</span>
-            <strong>志賀本通I 年収 — ダッシュボード号室</strong>
+            <strong>志賀本通I 年収 — 現況と2年目</strong>
           </header>
           <p className="meta">
-            レントロール共有後にこの表と突き合わせます。いまは Jarvis
-            ダッシュボードの号室賃料＋管理費を仮の満室年収にしています。
+            表は現況（1年目キャンペーン込み）。実質利回りの満室年収は2年目帯（キャンペーン終了後）。
           </p>
           {!iLive ? (
             <p className="meta">号室データがありません。</p>
