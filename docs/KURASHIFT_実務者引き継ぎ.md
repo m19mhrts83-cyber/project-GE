@@ -60,9 +60,9 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ### P0（信頼・日次で触る）
 
-1. **ソニー／アクサ週次** — 時間外は **skipped**（エラーにしない）。日中に  
+1. **ソニー／アクサ週次** — 時間外は **skipped**（フル成功にはしない）。本線は日曜 **09:10**。  
    `python scripts/jarvis_portfolio_weekly.py --force`  
-   （ソニー 9:00–17:30、アクサは 5:00–8:00 メンテ）
+   （ソニー 9:00–17:30・バッチ後半、アクサは 5:00–8:00 メンテ）
 2. **ダッシュボードPW** — 既に Rotate 済。正本は `.env.jarvis_private` のみ
 
 ### P1（③を実務レベルへ）

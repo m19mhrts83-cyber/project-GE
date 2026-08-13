@@ -368,7 +368,7 @@ export default async function HomePage() {
         <ol className="meta" style={{ margin: "8px 0 0", paddingLeft: 20 }}>
           <li>
             <strong>週次は自動</strong>
-            …日曜 09:00＋Mac起動時／朝オープン。上の「データの鮮度」で失敗を確認
+            …日曜 09:10＋Mac起動時／朝オープン。上の「データの鮮度」で失敗を確認
           </li>
           <li>
             <strong>いまやること</strong>
@@ -517,7 +517,7 @@ export default async function HomePage() {
       </div>
       <p style={{ marginTop: 10 }}>
         <span className="meta">
-          週次は日曜 09:00 と Mac 起動／朝オープンで自動実行。下のボタンは気になったときの手動用。
+          週次は日曜 09:10 と Mac 起動／朝オープンで自動実行。下のボタンは気になったときの手動用。
         </span>
       </p>
       <EnqueueJobButton

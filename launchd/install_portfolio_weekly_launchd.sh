@@ -1,5 +1,6 @@
 #!/bin/zsh
-# install: 資産週次（日曜 09:00 JST）＋ Mac 起動時に未実施なら走らせる
+# install: 資産週次（日曜 09:10 JST）＋ Mac 起動時に未実施なら走らせる
+# 9:00 ジャストはソニーお客さまWEBの開店混雑を避ける。バッチ内でもソニーは後半。
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.portfolio-weekly"
@@ -27,7 +28,7 @@ cat >"$PLIST" <<EOF
     <key>Hour</key>
     <integer>9</integer>
     <key>Minute</key>
-    <integer>0</integer>
+    <integer>10</integer>
   </dict>
   <key>RunAtLoad</key>
   <true/>
@@ -42,6 +43,6 @@ EOF
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
-echo "installed ${LABEL} (Sun 09:00 + RunAtLoad) → ${PLIST}"
+echo "installed ${LABEL} (Sun 09:10 + RunAtLoad) → ${PLIST}"
 echo "logs: ${LOG_DIR}/"
 echo "週次スクリプト自体が ISO 週の成功済みなら起動時はスキップします"
