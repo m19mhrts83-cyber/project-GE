@@ -8,6 +8,18 @@ import {
   parseLifeplanMode,
   type LifeplanMode,
 } from "@/lib/lifeplanNotices";
+import { monthsElapsedInYear } from "@/lib/reFinanceYtd";
+import {
+  ABG_MEANING,
+  CONTROL_MEANING,
+  NATURE_MEANING,
+  abgYearFromSnapshot,
+  aggregateAbgFromCategoryYear,
+  markVsTarget,
+  type AbgYear,
+  type FinanceCategoryYearRow,
+  type Mark,
+} from "@/lib/abgClassify";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +65,13 @@ const STEPS = [
     n: 1,
     job: "lifeplan_ingest_actuals",
     title: "年度実績を取り込む",
-    desc: "Zaim 年度サマリーから αβγ を集計（δ不動産は分母外）。表1補正の材料にする。",
+    desc: "Zaim 年度サマリーから αβγ を支出内訳で集計（δ不動産は分母外）。表1補正の材料にする。",
   },
   {
     n: 2,
     job: "lifeplan_revise_budget",
     title: "実績を見て予算を補正する",
-    desc: "αβγ 20/60/20 とのギャップを出し、Numbers でその年の予算を作る。",
+    desc: "支出内訳 αβγ 20/60/20 とのギャップを出し、Numbers でその年の予算を作る。",
   },
   {
     n: 3,
@@ -100,10 +112,14 @@ function AbgBar({
   label,
   pct,
   target,
+  amount,
+  mark,
 }: {
   label: string;
   pct: number | null | undefined;
   target: number;
+  amount?: number | null;
+  mark?: Mark | null;
 }) {
   const v = pct ?? 0;
   const width = Math.max(0, Math.min(100, v));
@@ -118,6 +134,7 @@ function AbgBar({
         }}
       >
         <strong>
+          {mark ? `${mark} ` : ""}
           {label} {pct == null ? "—" : `${pct}%`}
         </strong>
         <span className="meta">
@@ -137,12 +154,81 @@ function AbgBar({
           style={{
             width: `${width}%`,
             height: "100%",
-            background: "var(--accent, #2a6f6a)",
+            background: "var(--accent, #e8762a)",
           }}
         />
       </div>
+      {amount != null ? (
+        <div className="meta" style={{ fontSize: 12, marginTop: 2 }}>
+          {fmtYen(amount)}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function AbgYearCard({
+  year,
+  periodLabel,
+  data,
+  targets,
+}: {
+  year: number;
+  periodLabel: string;
+  data: AbgYear | null;
+  targets: { alpha: number; beta: number; gamma: number };
+}) {
+  return (
+    <article className="card">
+      <header>
+        <span className="lvl">{periodLabel}</span>
+        <strong>
+          {year}年
+          {data ? "" : "（データなし）"}
+        </strong>
+      </header>
+      <p className="meta">
+        支出合計（分母） {data ? fmtYen(data.spendTotal) : "—"}
+        {data?.incomeHousehold
+          ? ` · 世帯収入 ${fmtYen(data.incomeHousehold)}（参考）`
+          : ""}
+      </p>
+      <AbgBar
+        label="α 貯蓄・投資"
+        pct={data?.alphaPct}
+        target={targets.alpha}
+        amount={data?.alpha}
+        mark={markVsTarget(data?.alphaPct, targets.alpha)}
+      />
+      <AbgBar
+        label="β 生活"
+        pct={data?.betaPct}
+        target={targets.beta}
+        amount={data?.beta}
+        mark={markVsTarget(data?.betaPct, targets.beta)}
+      />
+      <AbgBar
+        label="γ 自己・教育"
+        pct={data?.gammaPct}
+        target={targets.gamma}
+        amount={data?.gamma}
+        mark={markVsTarget(data?.gammaPct, targets.gamma)}
+      />
+    </article>
+  );
+}
+
+function ptDelta(
+  a: number | null | undefined,
+  b: number | null | undefined
+): string {
+  if (a == null || b == null) return "—";
+  const d = Math.round((b - a) * 10) / 10;
+  return `${d > 0 ? "+" : ""}${d}pt`;
+}
+
+function fmtAbgPct(n: number | null | undefined): string {
+  return n == null ? "—" : `${n}%`;
 }
 
 export default async function LifeplanPage({
@@ -160,30 +246,32 @@ export default async function LifeplanPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: snaps }, { data: jobs }] = await Promise.all([
-    supabase
-      .from("kurashift_plan_snapshots")
-      .select("id, label, fiscal_year, snapshot_at, metrics, notes")
-      .order("snapshot_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("kurashift_jobs")
-      .select("id, job_type, status, title, created_at, finished_at, error_text")
-      .like("job_type", "lifeplan_%")
-      .order("created_at", { ascending: false })
-      .limit(15),
-  ]);
+  const monthsElapsed = monthsElapsedInYear();
+  const [{ data: snaps }, { data: jobs }, { data: financeCats }] =
+    await Promise.all([
+      supabase
+        .from("kurashift_plan_snapshots")
+        .select("id, label, fiscal_year, snapshot_at, metrics, notes")
+        .order("snapshot_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("kurashift_jobs")
+        .select("id, job_type, status, title, created_at, finished_at, error_text")
+        .like("job_type", "lifeplan_%")
+        .order("created_at", { ascending: false })
+        .limit(15),
+      supabase
+        .from("kurashift_finance_category_year")
+        .select("fiscal_year, category, income_jpy, expense_jpy")
+        .in("fiscal_year", [notice.actualsYear, notice.planYear])
+        .limit(400),
+    ]);
 
   const actualsSnap = (snaps ?? []).find((s) => {
     const m = s.metrics as Metrics | null;
     return m?.kind === "actuals";
   });
-  const planSnap = (snaps ?? []).find((s) => {
-    const m = s.metrics as Metrics | null;
-    return m?.kind === "plan" || !m?.kind;
-  });
   const actuals = (actualsSnap?.metrics || null) as Metrics | null;
-  const planM = (planSnap?.metrics || null) as Metrics | null;
 
   const fiscalPayload =
     mode === "re_purchase"
@@ -202,6 +290,27 @@ export default async function LifeplanPage({
     beta_living_pct: 60,
     gamma_self_pct: 20,
   };
+  const targetNums = {
+    alpha: targets.alpha_save_pct ?? 20,
+    beta: targets.beta_living_pct ?? 60,
+    gamma: targets.gamma_self_pct ?? 20,
+  };
+  const catRows = (financeCats || []) as FinanceCategoryYearRow[];
+  const fromCatsPrev = aggregateAbgFromCategoryYear(
+    catRows,
+    notice.actualsYear,
+    "通年"
+  );
+  const yearPrev =
+    fromCatsPrev.spendTotal > 0
+      ? fromCatsPrev
+      : abgYearFromSnapshot(notice.actualsYear, "通年", actuals) ?? fromCatsPrev;
+  const yearNow = aggregateAbgFromCategoryYear(
+    catRows,
+    notice.planYear,
+    `YTD（1〜${monthsElapsed}月）`
+  );
+  const hasNow = yearNow.spendTotal > 0;
 
   return (
     <Shell active="/lifeplan" email={user?.email ?? null}>
@@ -218,62 +327,42 @@ export default async function LifeplanPage({
         </div>
       ) : null}
 
-      {actuals ? (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <header>
-            <span className="lvl">αβγ 実績</span>
-            <strong>
-              {actualsSnap?.fiscal_year ?? notice.actualsYear}年（世帯収入比）
-            </strong>
-          </header>
-          <p className="meta">
-            世帯収入{" "}
-            {actuals.income_household_jpy != null
-              ? fmtYen(actuals.income_household_jpy)
-              : "—"}
-            {" · "}δ不動産支出は分母外
-            {actuals.expense_delta_re_jpy != null
-              ? `（${fmtYen(actuals.expense_delta_re_jpy)}）`
-              : ""}
-            。％は収入比のため合計が100を超える場合あり（支出が収入を上回る年）。
-          </p>
-          <AbgBar
-            label="α 貯蓄・投資"
-            pct={actuals.alpha_pct}
-            target={targets.alpha_save_pct ?? 20}
-          />
-          <AbgBar
-            label="β 生活"
-            pct={actuals.beta_pct}
-            target={targets.beta_living_pct ?? 60}
-          />
-          <AbgBar
-            label="γ 自己・教育"
-            pct={actuals.gamma_pct}
-            target={targets.gamma_self_pct ?? 20}
-          />
-          <p className="meta">
-            α{" "}
-            {actuals.expense_alpha_jpy != null
-              ? fmtYen(actuals.expense_alpha_jpy)
-              : "—"}
-            {" / "}β{" "}
-            {actuals.expense_beta_jpy != null
-              ? fmtYen(actuals.expense_beta_jpy)
-              : "—"}
-            {" / "}γ{" "}
-            {actuals.expense_gamma_jpy != null
-              ? fmtYen(actuals.expense_gamma_jpy)
-              : "—"}
-          </p>
-        </div>
-      ) : (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <p className="meta" style={{ margin: 0 }}>
-            まだ実績スナップがありません。Step1「年度実績を取り込む」を実行してください。
-          </p>
-        </div>
-      )}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <header>
+          <span className="lvl">αβγ</span>
+          <strong>支出の内訳（α＋β＋γ＝100%）</strong>
+        </header>
+        <p className="meta" style={{ margin: "0 0 8px" }}>
+          分母は世帯収入ではなく、暮らしの支出合計です。目標は α20 / β60 / γ20。
+          ここの ○△× は目標との差（±3pt / ±8pt）です。下の固定→変動の識別（変えにくさ）とは別です。δ不動産は分母に含めません。
+        </p>
+        <ul className="meta" style={{ margin: 0, paddingLeft: 18 }}>
+          {ABG_MEANING.map((x) => (
+            <li key={x.key}>
+              <strong>
+                {x.glyph} {x.title}
+              </strong>
+              {" … "}
+              {x.blurb}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="grid" style={{ marginBottom: 16 }}>
+        <AbgYearCard
+          year={notice.actualsYear}
+          periodLabel={yearPrev?.periodLabel ?? "通年"}
+          data={yearPrev}
+          targets={targetNums}
+        />
+        <AbgYearCard
+          year={notice.planYear}
+          periodLabel={yearNow.periodLabel}
+          data={hasNow ? yearNow : null}
+          targets={targetNums}
+        />
+      </div>
 
       {actuals?.re19 || actuals?.education ? (
         <div className="grid" style={{ marginBottom: 16 }}>
@@ -463,36 +552,224 @@ export default async function LifeplanPage({
       <div className="card" style={{ marginTop: 20 }}>
         <header>
           <span className="lvl">比較</span>
-          <strong>実績 vs 直近計画スナップ</strong>
+          <strong>
+            {notice.actualsYear}通年 vs {notice.planYear} YTD（支出比）
+          </strong>
         </header>
+        <p className="meta">
+          ％は αβγ 支出合計に対する内訳なので、年の途中でも並べられます。金額は期間が違います。
+        </p>
         <table>
           <thead>
             <tr>
               <th>項目</th>
-              <th>実績</th>
-              <th>計画スナップ</th>
+              <th>目標</th>
+              <th>{notice.actualsYear} 通年</th>
+              <th>
+                {notice.planYear} YTD（1〜{monthsElapsed}月）
+              </th>
+              <th>差</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>α %</td>
-              <td>{actuals?.alpha_pct ?? "—"}</td>
-              <td>{planM?.alpha_target_pct ?? planM?.alpha_pct ?? "—"}</td>
+              <td>α 貯蓄・投資</td>
+              <td>{targetNums.alpha}%</td>
+              <td>
+                {markVsTarget(yearPrev.alphaPct, targetNums.alpha) ?? ""}{" "}
+                {fmtAbgPct(yearPrev.alphaPct)}
+              </td>
+              <td>
+                {hasNow
+                  ? `${markVsTarget(yearNow.alphaPct, targetNums.alpha) ?? ""} ${fmtAbgPct(yearNow.alphaPct)}`
+                  : "—"}
+              </td>
+              <td>{hasNow ? ptDelta(yearPrev.alphaPct, yearNow.alphaPct) : "—"}</td>
             </tr>
             <tr>
-              <td>β %</td>
-              <td>{actuals?.beta_pct ?? "—"}</td>
-              <td>{planM?.beta_target_pct ?? planM?.beta_pct ?? "—"}</td>
+              <td>β 生活</td>
+              <td>{targetNums.beta}%</td>
+              <td>
+                {markVsTarget(yearPrev.betaPct, targetNums.beta) ?? ""}{" "}
+                {fmtAbgPct(yearPrev.betaPct)}
+              </td>
+              <td>
+                {hasNow
+                  ? `${markVsTarget(yearNow.betaPct, targetNums.beta) ?? ""} ${fmtAbgPct(yearNow.betaPct)}`
+                  : "—"}
+              </td>
+              <td>{hasNow ? ptDelta(yearPrev.betaPct, yearNow.betaPct) : "—"}</td>
             </tr>
             <tr>
-              <td>γ %</td>
-              <td>{actuals?.gamma_pct ?? "—"}</td>
-              <td>{planM?.gamma_target_pct ?? planM?.gamma_pct ?? "—"}</td>
+              <td>γ 自己・教育</td>
+              <td>{targetNums.gamma}%</td>
+              <td>
+                {markVsTarget(yearPrev.gammaPct, targetNums.gamma) ?? ""}{" "}
+                {fmtAbgPct(yearPrev.gammaPct)}
+              </td>
+              <td>
+                {hasNow
+                  ? `${markVsTarget(yearNow.gammaPct, targetNums.gamma) ?? ""} ${fmtAbgPct(yearNow.gammaPct)}`
+                  : "—"}
+              </td>
+              <td>{hasNow ? ptDelta(yearPrev.gammaPct, yearNow.gammaPct) : "—"}</td>
             </tr>
             <tr>
-              <td>ラベル</td>
-              <td className="meta">{actualsSnap?.label ?? "—"}</td>
-              <td className="meta">{planSnap?.label ?? "—"}</td>
+              <td>支出合計（分母）</td>
+              <td className="meta">—</td>
+              <td>{fmtYen(yearPrev.spendTotal)}</td>
+              <td>{hasNow ? fmtYen(yearNow.spendTotal) : "—"}</td>
+              <td className="meta">金額は期間が違う</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <header>
+          <span className="lvl">固定 → 変動</span>
+          <strong>変えにくさ（× → △ → ○）</strong>
+        </header>
+        <p className="meta" style={{ margin: "0 0 8px" }}>
+          αβγ の支出だけを分解します（δ不動産は含めない）。ここの記号は目標達成度ではなく、手を付ける順番です。
+        </p>
+        <ul className="meta" style={{ margin: "0 0 12px", paddingLeft: 18 }}>
+          {CONTROL_MEANING.map((x) => (
+            <li key={x.mark}>
+              <strong>
+                {x.mark} {x.title}
+              </strong>
+              {" … "}
+              {x.blurb}
+            </li>
+          ))}
+        </ul>
+        <table>
+          <thead>
+            <tr>
+              <th>識別</th>
+              <th>{notice.actualsYear} 通年</th>
+              <th>
+                {notice.planYear} YTD（1〜{monthsElapsed}月）
+              </th>
+              <th>差</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>× 変更困難（しない）</td>
+              <td>
+                {fmtAbgPct(yearPrev.controlHardPct)}（{fmtYen(yearPrev.controlHard)}）
+              </td>
+              <td>
+                {hasNow
+                  ? `${fmtAbgPct(yearNow.controlHardPct)}（${fmtYen(yearNow.controlHard)}）`
+                  : "—"}
+              </td>
+              <td>
+                {hasNow
+                  ? ptDelta(yearPrev.controlHardPct, yearNow.controlHardPct)
+                  : "—"}
+              </td>
+            </tr>
+            <tr>
+              <td>△ 固定費削減検討の価値あり</td>
+              <td>
+                {fmtAbgPct(yearPrev.controlReviewPct)}（
+                {fmtYen(yearPrev.controlReview)}）
+              </td>
+              <td>
+                {hasNow
+                  ? `${fmtAbgPct(yearNow.controlReviewPct)}（${fmtYen(yearNow.controlReview)}）`
+                  : "—"}
+              </td>
+              <td>
+                {hasNow
+                  ? ptDelta(yearPrev.controlReviewPct, yearNow.controlReviewPct)
+                  : "—"}
+              </td>
+            </tr>
+            <tr>
+              <td>○ 予算見て削減可能</td>
+              <td>
+                {fmtAbgPct(yearPrev.controlFlexPct)}（{fmtYen(yearPrev.controlFlex)}）
+              </td>
+              <td>
+                {hasNow
+                  ? `${fmtAbgPct(yearNow.controlFlexPct)}（${fmtYen(yearNow.controlFlex)}）`
+                  : "—"}
+              </td>
+              <td>
+                {hasNow
+                  ? ptDelta(yearPrev.controlFlexPct, yearNow.controlFlexPct)
+                  : "—"}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="meta" style={{ margin: "12px 0 8px" }}>
+          参考：Zaim の F / C / S（会計上の出方）。識別の ×△○ とは1対1ではありません。
+        </p>
+        <ul className="meta" style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+          {NATURE_MEANING.map((x) => (
+            <li key={x.key}>
+              <strong>
+                {x.code} {x.title}
+              </strong>
+              {" … "}
+              {x.blurb}
+            </li>
+          ))}
+        </ul>
+        <table>
+          <thead>
+            <tr>
+              <th>費目コード</th>
+              <th>{notice.actualsYear} 通年</th>
+              <th>
+                {notice.planYear} YTD（1〜{monthsElapsed}月）
+              </th>
+              <th>差</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>F 固定</td>
+              <td>
+                {fmtAbgPct(yearPrev.fixedPct)}（{fmtYen(yearPrev.fixed)}）
+              </td>
+              <td>
+                {hasNow
+                  ? `${fmtAbgPct(yearNow.fixedPct)}（${fmtYen(yearNow.fixed)}）`
+                  : "—"}
+              </td>
+              <td>{hasNow ? ptDelta(yearPrev.fixedPct, yearNow.fixedPct) : "—"}</td>
+            </tr>
+            <tr>
+              <td>C 変動</td>
+              <td>
+                {fmtAbgPct(yearPrev.variablePct)}（{fmtYen(yearPrev.variable)}）
+              </td>
+              <td>
+                {hasNow
+                  ? `${fmtAbgPct(yearNow.variablePct)}（${fmtYen(yearNow.variable)}）`
+                  : "—"}
+              </td>
+              <td>
+                {hasNow ? ptDelta(yearPrev.variablePct, yearNow.variablePct) : "—"}
+              </td>
+            </tr>
+            <tr>
+              <td>S スポット</td>
+              <td>
+                {fmtAbgPct(yearPrev.spotPct)}（{fmtYen(yearPrev.spot)}）
+              </td>
+              <td>
+                {hasNow
+                  ? `${fmtAbgPct(yearNow.spotPct)}（${fmtYen(yearNow.spot)}）`
+                  : "—"}
+              </td>
+              <td>{hasNow ? ptDelta(yearPrev.spotPct, yearNow.spotPct) : "—"}</td>
             </tr>
           </tbody>
         </table>
