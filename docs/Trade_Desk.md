@@ -113,7 +113,7 @@
 |---|---|---|
 | 定型ルーティン | アプリの実行ボタン | `kurashift_jobs` に queued → Mac worker が実行 → 結果・ログ・成果物をアプリ表示 |
 | 相談 | ローカル Jarvis | 相談記録を `kurashift_consultations` へ → アプリで閲覧 |
-| 個人申告 | アプリ申告画面＋Jarvis | CSV生成・検査・弥生登録支援・税理士メール／証憑 |
+| 個人申告 | アプリ `/tax` ＋Jarvis | CSV生成・検査（**本登録なし**）。法人は証憑＋KPI年次評価 |
 
 許可されたジョブ種別のみ worker が実行する（任意シェルは禁止）。正本: `config/trade_theme_playbook.yaml`。
 
@@ -123,6 +123,14 @@
 - 税理士メール＋添付は **法人のみ** Gmail API で取込 → アプリで検索・閲覧（**既定アカウント: admin** `token_livingsupport.json`。切替は `KURASHIFT_TAX_GMAIL_TOKEN`）
 - 添付は年度・案件・資料種別と紐づけ、**証憑として再出力**できる
 - **年度評価**（`/tax`）: 個人＝暦年／法人＝5月期で推移表。申告結果KPIは `kurashift_tax_year_metrics`（画面登録 or `jarvis_kurashift_tax.py --upsert-metrics`）。Zaim年次は「気配」であり申告所得そのものではない
+- 回帰ログ: `docs/KURASHIFT_Tax_YoY_QAゲート_20260813.md`
+- CLI 例:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_tax.py --upsert-metrics \
+  --scope personal --year 2025 --taxable-income 7305000 --income-tax 795410 --refund-or-pay pay
+```
 
 ## テーマ提案（ステージ2）
 

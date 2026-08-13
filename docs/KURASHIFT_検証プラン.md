@@ -246,14 +246,15 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 
 画面（`/lifeplan?mode=annual`・`/roi`）の見た目確認はユーザー起床後の体感残。ジョブ経路は worker 経由で同スクリプト。
 
-## ②-B 確定申告ネタ整理（個人）
+## ②-B 確定申告ネタ整理（個人＋法人証憑／KPI）
 
 | # | やること | 期待 |
 |---|---|---|
-| 2B-1 | **個人申告**「1. 弥生CSVを作る」 | csv_ready・パス |
-| 2B-2 | 「2. 税理士メールを取り込む」 | 証憑一覧（該当年にメールがある場合） |
+| 2B-1 | **個人**「弥生CSVを作る」 | csv_ready・パス。**本登録はしない** |
+| 2B-2 | **法人**「大野さんメールを取り込む」 | 証憑一覧（個人カードにこのボタンは出さない） |
 | 2B-3 | 必要なら「証憑出力」 | ローカル再保存 |
-| 2B-4 | 弥生本登録は**しない** | 承認なし本登録が走っていない |
+| 2B-4 | 弥生本登録は**しない** | `register=false`・承認なし本登録が走っていない |
+| 2B-5 | `/tax` 年度推移・評価 | 個人＝暦年／法人＝5月期。結果KPI＋Zaim気配（注記付き）。住民税列なし |
 
 法人の**申告作成**は税理士委託のまま（アプリ対象外）。アプリでは証憑取込・閲覧と**決算KPIの年次評価**（`kurashift_tax_year_metrics`）まで。
 
@@ -262,9 +263,10 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 | 項目 | 結果 |
 |---|---|
 | 弥生CSV | `…/27_確定申告_個人/kurashift/2025/yayoi_personal_2025.csv`・**mapped 12**・`register=false`・case upsert 済 |
-| スキップ多 | 住まい・教育・クルマ・19不動産・会社・投資など（個人ドラフトマップ未整備） |
-| 税理士メール取込 | admin Gmail・2025クエリで **messages_scanned=0**（証憑0）。クエリ／箱／期間の見直しが残 |
+| スキップ多 | 住まい・教育・クルマ・19不動産・会社・投資など（個人ドラフトマップ未整備）→ **V-2B-MAP** |
+| 税理士メール取込 | **法人のみ** UI。admin Gmail・2025クエリで **messages_scanned=0**（証憑0）→ **V-2B-EV** |
 | 本登録 | 走っていない（境界OK） |
+| 年度評価 YoY | テーブル＋UI 実装。回帰: [`KURASHIFT_Tax_YoY_QAゲート_20260813.md`](./KURASHIFT_Tax_YoY_QAゲート_20260813.md) |
 
 ---
 
