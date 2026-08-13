@@ -75,6 +75,7 @@ Jarvis ダッシュボード（パートナーメール等）は **別アプリ*
 | **B-RATE-4** | 不動産: 物件ごと **利回り − ローン金利 ≈ 正味** の一覧 | **検証済 2026-08-13**（本番 `/realestate`） | 3物件とも金利・残高表示。trade-desk 手動 prod デプロイ後に確認 |
 | **LT-CLOSE** | 融資用「残高＋as-of」ゲート | **閉じ 2026-08-13** | Discover §LT-CLOSE。提出前は銀行表／実績アンカーで更新 |
 | **LT-SYNC** | トラッカー JSON → KURASHIFT 投影 | **確認済 2026-08-13** | `--apply` upserted=8。JSON残高＝DB一致 |
+| **3C-PREP** | ③-C 物件×名義×ローンの最小揃え | **完了 2026-08-13** | `kurashift_re_property_master.yaml`＋`/realestate/properties` 紐づけ表。太陽光の誤 propertyId 解除 |
 | **B-RATE-5** | （任意）他負債（住宅ローン等）の利率を負債一覧に載せる | **後段** | 保険貸付以外の負債マスタ整備とセット |
 
 正本ファイル:

@@ -2,6 +2,11 @@ import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 import { buildBRate4Rows, fmtPct } from "@/lib/bRate4";
+import {
+  RE_PROPERTY_MASTER,
+  getRePropertyMaster,
+  loansForProperty,
+} from "@/lib/rePropertyMaster";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +19,20 @@ type Unit = {
   rent: number | null;
   note: string | null;
   updated_at: string;
+};
+
+type LoanRow = {
+  id: string;
+  name: string | null;
+  lender: string | null;
+  category_major: string | null;
+  balance_jpy: number | string | null;
+  monthly_payment_jpy: number | string | null;
+  annual_payment_jpy: number | string | null;
+  rate_pct: number | string | null;
+  tags: string[] | null;
+  payload: Record<string, unknown> | null;
+  synced_at: string | null;
 };
 
 export default async function RealEstatePropertiesPage() {
@@ -38,8 +57,9 @@ export default async function RealEstatePropertiesPage() {
     .order("balance_jpy", { ascending: false, nullsFirst: false })
     .limit(80);
 
-  const bRate4 = buildBRate4Rows(loans || []);
-  const loanPayMonth = (loans || []).reduce((s, l) => {
+  const loanRows = (loans || []) as LoanRow[];
+  const bRate4 = buildBRate4Rows(loanRows);
+  const loanPayMonth = loanRows.reduce((s, l) => {
     const v = l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
     return s + (Number.isFinite(v) ? v : 0);
   }, 0);
@@ -59,6 +79,13 @@ export default async function RealEstatePropertiesPage() {
     g.rentSum += Number(u.rent) || 0;
     if (u.status === "vacant") g.vacant += 1;
   }
+
+  const orderedIds = [
+    ...RE_PROPERTY_MASTER.map((p) => p.id),
+    ...[...byProp.keys()].filter(
+      (id) => !RE_PROPERTY_MASTER.some((p) => p.id === id)
+    ),
+  ];
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
@@ -80,13 +107,51 @@ export default async function RealEstatePropertiesPage() {
 
       <div className="card notice">
         <header>
-          <span className="lvl">範囲</span>
-          <strong>Phase 1（一覧）</strong>
+          <span className="lvl">3C-PREP</span>
+          <strong>物件 × 名義 × ローン（最小揃え）</strong>
         </header>
         <p className="meta" style={{ marginTop: 8 }}>
-          号室は一覧のみ。ローンは借入残高トラッカーの読取投影（下表）。空室メモは
-          note をそのまま表示します。
+          正本: <code>config/kurashift_re_property_master.yaml</code>
+          {" · "}
+          管理・住所: <code>config/property_info.yaml</code>
         </p>
+        <table>
+          <thead>
+            <tr>
+              <th>id</th>
+              <th>物件</th>
+              <th>名義</th>
+              <th>取得</th>
+              <th className="num">号室</th>
+              <th>紐づくローン</th>
+            </tr>
+          </thead>
+          <tbody>
+            {RE_PROPERTY_MASTER.map((p) => {
+              const live = byProp.get(p.id);
+              const linked = loansForProperty(p.id, loanRows);
+              return (
+                <tr key={p.id}>
+                  <td className="meta">{p.id}</td>
+                  <td>{p.name}</td>
+                  <td className="meta">
+                    {p.owner}
+                    {p.ownerEntity ? `（${p.ownerEntity}）` : ""}
+                  </td>
+                  <td className="meta">{p.acquired}</td>
+                  <td className="num meta">
+                    {live ? live.units.length : "—"}/{p.roomsExpected}
+                  </td>
+                  <td className="meta">
+                    {linked.length
+                      ? linked.map((l) => l.name || l.id).join(" / ")
+                      : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       <div className="card">
@@ -94,7 +159,7 @@ export default async function RealEstatePropertiesPage() {
           <span className="lvl">B-RATE-4</span>
           <strong>正味（表面利回り − 金利）</strong>
         </header>
-        {(loans || []).length === 0 ? (
+        {loanRows.length === 0 ? (
           <p className="meta" style={{ marginTop: 8 }}>
             ローン投影後に表示されます。
           </p>
@@ -135,7 +200,7 @@ export default async function RealEstatePropertiesPage() {
           <span className="lvl">③-C</span>
           <strong>ローン投影（loan-tracker）</strong>
         </header>
-        {(loans || []).length === 0 ? (
+        {loanRows.length === 0 ? (
           <p className="meta" style={{ marginTop: 8 }}>
             まだ投影がありません。JSON:{" "}
             <code>240_融資/loan_tracker_export/loans.json</code> →{" "}
@@ -155,7 +220,7 @@ export default async function RealEstatePropertiesPage() {
               </tr>
             </thead>
             <tbody>
-              {(loans || []).map((l) => (
+              {loanRows.map((l) => (
                 <tr key={l.id}>
                   <td className="meta">{l.category_major || "—"}</td>
                   <td>{l.name}</td>
@@ -178,40 +243,99 @@ export default async function RealEstatePropertiesPage() {
         )}
       </div>
 
-      {[...byProp.entries()].map(([pid, g]) => (
-        <div className="card" key={pid}>
-          <header>
-            <span className="lvl">{pid}</span>
-            <strong>{g.name}</strong>
-          </header>
-          <p className="meta" style={{ marginTop: 6 }}>
-            {g.units.length} 室 · 空室 {g.vacant} · 家賃合計{" "}
-            {fmtYen(g.rentSum)}／月
-          </p>
-          <table>
-            <thead>
-              <tr>
-                <th>号室</th>
-                <th>状態</th>
-                <th>家賃</th>
-                <th>メモ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {g.units.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.room}</td>
-                  <td>{u.status === "vacant" ? "空室" : "入居"}</td>
-                  <td className="meta">
-                    {u.rent != null ? fmtYen(u.rent) : "—"}
-                  </td>
-                  <td className="meta">{u.note || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+      {orderedIds.map((pid) => {
+        const g = byProp.get(pid);
+        const master = getRePropertyMaster(pid);
+        const linked = loansForProperty(pid, loanRows);
+        if (!g && !master) return null;
+        const title = master?.name || g?.name || pid;
+        const roomCount = g?.units.length ?? 0;
+        const vacant = g?.vacant ?? 0;
+        const rentSum = g?.rentSum ?? 0;
+        return (
+          <div className="card" key={pid}>
+            <header>
+              <span className="lvl">{pid}</span>
+              <strong>{title}</strong>
+            </header>
+            <p className="meta" style={{ marginTop: 6 }}>
+              {master
+                ? `${master.owner}（${master.ownerEntity}）· 取得 ${master.acquired} · ${master.address}`
+                : null}
+            </p>
+            <p className="meta" style={{ marginTop: 4 }}>
+              {g
+                ? `${roomCount} 室 · 空室 ${vacant} · 家賃合計 ${fmtYen(rentSum)}／月`
+                : "号室データなし"}
+              {master?.managers?.length
+                ? ` · 管理 ${master.managers.join(" / ")}`
+                : ""}
+            </p>
+            {linked.length > 0 ? (
+              <table style={{ marginTop: 10 }}>
+                <thead>
+                  <tr>
+                    <th>紐づくローン</th>
+                    <th>金融機関</th>
+                    <th className="num">残高</th>
+                    <th className="num">月返済</th>
+                    <th className="num">金利</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linked.map((l) => (
+                    <tr key={l.id}>
+                      <td>{l.name}</td>
+                      <td className="meta">{l.lender || "—"}</td>
+                      <td className="num meta">
+                        {l.balance_jpy != null
+                          ? fmtYen(Number(l.balance_jpy))
+                          : "—"}
+                      </td>
+                      <td className="num meta">
+                        {l.monthly_payment_jpy != null
+                          ? fmtYen(Number(l.monthly_payment_jpy))
+                          : "—"}
+                      </td>
+                      <td className="num meta">
+                        {l.rate_pct != null ? `${Number(l.rate_pct)}%` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="meta" style={{ marginTop: 8 }}>
+                紐づくローンなし
+              </p>
+            )}
+            {g ? (
+              <table style={{ marginTop: 10 }}>
+                <thead>
+                  <tr>
+                    <th>号室</th>
+                    <th>状態</th>
+                    <th>家賃</th>
+                    <th>メモ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {g.units.map((u) => (
+                    <tr key={u.id}>
+                      <td>{u.room}</td>
+                      <td>{u.status === "vacant" ? "空室" : "入居"}</td>
+                      <td className="meta">
+                        {u.rent != null ? fmtYen(u.rent) : "—"}
+                      </td>
+                      <td className="meta">{u.note || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+          </div>
+        );
+      })}
 
       {(units || []).length === 0 ? (
         <div className="card">
