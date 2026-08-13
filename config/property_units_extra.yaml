@@ -6,16 +6,16 @@
 # fill_missing: true の行は、Excel に同 ID があるとき rent が空欄なら上書きする
 # （既存の status / note は Excel 側を維持）。
 units:
-  # Grandole I — 家賃マップで 101・201 が空欄。棟の1年目帯（49,000+管理費4,000）で補完
+  # Grandole I — 家賃マップで 101・201 が空欄。ミニテック送金（2026-07）で補完
   - property_id: grandole-i
     property_name: Grandole志賀本通I
     short: I
     room: "101"
     status: occupied
-    rent: 49000
+    rent: 48000
     management_fee: 4000
     fill_missing: true
-    note: 家賃マップ空欄のため1年目帯で補完
+    note: ミニテック2026-07 家賃48,000+共益4,000（未納あり）。キャンペーン記載なし
   - property_id: grandole-i
     property_name: Grandole志賀本通I
     short: I
@@ -24,7 +24,7 @@ units:
     rent: 49000
     management_fee: 4000
     fill_missing: true
-    note: 家賃マップ空欄のため1年目帯で補完
+    note: ミニテック2026-07 家賃49,000+共益4,000。長期入居でステップアップ記載なし
   # キャラメル（個人・Tcell）— Excel に無い。契約書の賃料＋共益費
   - property_id: caramel
     property_name: キャラメル
