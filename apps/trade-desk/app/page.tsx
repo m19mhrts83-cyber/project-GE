@@ -386,6 +386,12 @@ export default async function HomePage() {
               <li key={f.id}>
                 ⚠️ {f.label}
                 {f.reason ? ` — ${f.reason}` : ""}
+                {f.id === "bloomo_zaim" ? (
+                  <>
+                    {" "}
+                    · 評価取得とは別工程（財務の差分登録）。手動ケア不要・週次が口座名を自動再試行します
+                  </>
+                ) : null}
               </li>
             ))}
           </ul>

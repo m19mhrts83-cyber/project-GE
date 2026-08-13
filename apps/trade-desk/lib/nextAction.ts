@@ -26,7 +26,8 @@ const SOURCE_LABEL: Record<string, string> = {
   sony_life: "ソニー生命（真治・一時払）",
   sony_life_sovani: "ソニー生命（真治・SOVANI）",
   sony_life_chikage: "ソニー生命（千景）",
-  bloomo: "Bloomo",
+  bloomo: "Bloomo評価取得",
+  bloomo_zaim: "Bloomo→Zaim財務反映",
   sbi_index: "SBIインデックス",
   liquidity_weekly: "銀行・流動性",
   axa_life: "アクサ生命",
@@ -82,6 +83,17 @@ export function computeNextAction(input: {
   const fails = failedSources(input.summary);
   if (fails.length > 0) {
     const f = fails[0];
+    // Bloomo 評価は取れて Zaim 差分だけ失敗、が典型。資産画面に行っても操作がない
+    if (f.id === "bloomo_zaim") {
+      const accountMiss = /口座/.test(f.reason);
+      return {
+        level: "warn",
+        label: accountMiss
+          ? "Bloomo評価は取得済み。Zaim財務への差分登録だけ失敗（口座名ゆれ）。週次が自動再試行します"
+          : "Bloomo評価は取得済み。Zaim財務への差分登録に失敗。Jarvisに「Bloomo財務を直して」",
+        href: "/jobs",
+      };
+    }
     return {
       level: "warn",
       label: `週次の${f.label}が失敗しています（再実行または確認）`,
