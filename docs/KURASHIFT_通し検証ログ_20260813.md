@@ -96,3 +96,26 @@
 | 自動振込 | なし（確認済み） |
 
 受け入れチェックリストは設計書 §7 を参照（コード上クローズ）。
+
+### 点検者向け仕様引き渡し・本番目視（2026-08-14）
+
+正本: `docs/KURASHIFT_カード引落支払い_点検者向け仕様_20260814.md`
+
+| 項目 | 結果 |
+|---|---|
+| ダッシュボード本番 | ホーム最上段ピン「Olive Infinite 引落 — 支払い準備」表示。文言に支払い準備・KURASHIFT 処置誘導あり（Playwright ログイン目視） |
+| watch_status | `card_debit_watch` level=warn→attention（plan_ready 後）。`pin_top` / `show_banner` / href=`/money-ops?due=2026-08-26&need=1596308` |
+| 年会費分離 | `card_annual_fee` は別タイトル「カード年会費（Olive / PP）」 |
+| KURASHIFT `/money-ops` | プレイブック・SMBC不足・自動振込なし注記あり。既存 consulting を Vpass 確定額へ更新 |
+| 方針文言 | `POLICY_LOAN_UI_NOTE`＝短期ブリッジ・常態化禁止・返済原資必須。finance-philosophy に6段型 |
+
+### Phase B 支援（8月 Infinite・手動寄せ）
+
+| 項目 | 内容 |
+|---|---|
+| 確定額 | **1,596,308円** / 引落 **2026-08-26**（Vpass Web） |
+| SMBC刈谷 | 678,379円 → **不足 917,929円** |
+| money-ops | id `88bbac98-…` consulting「Olive Infinite 引落バッファ（2026-08-26・Vpass確定）」 |
+| plan_ready_due | 2026-08-26（ピンは attention＝計画作成済み・実行待ち） |
+| 次の手動 | 無料レールで寄せ →（必要なら）利金／定額返済カレンダー付き貸付／Bloomo → 承認後も**振込は手動** → done |
+| やらない | 自動振込・あかつき元本・SBIコア安易売却 |

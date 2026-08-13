@@ -62,9 +62,9 @@ export const FUNDING_LADDER: FundingStep[] = [
   {
     order: 2,
     id: "policy_loan",
-    title: "契約者貸付（既存ソニー等）でブリッジ",
+    title: "契約者貸付（既存ソニー等）で短期ブリッジ",
     verdict: "条件付き",
-    note: "定額返済カレンダー（月額・期間・原資）が書けるときOK。防衛・次物件・NISA9万の余りから。書けないなら Bloomo 優先",
+    note: "常態化禁止。返済原資必須。定額返済カレンダー（月額・期間・原資）が書けるときOK。防衛・次物件・NISA9万の余りから。書けないなら Bloomo 優先",
   },
   {
     order: 3,
@@ -84,7 +84,7 @@ export const FUNDING_LADDER: FundingStep[] = [
 
 /** フォーム・アシストに出す貸付の注記（1行） */
 export const POLICY_LOAN_UI_NOTE =
-  "定額返済を書けるなら契約者貸付は可（株再建と同型の強制貯蓄）。書けない／防衛・NISAを削るなら衛星清算を優先";
+  "契約者貸付は短期ブリッジのみ・常態化禁止・返済原資必須。定額返済を書けるなら可（株再建と同型）。書けない／防衛・NISAを削るなら衛星清算を優先";
 
 export type GapView = {
   /** 引落口座に足りない額（寄せの目標） */
