@@ -42,6 +42,7 @@ DB: Supabase **`jarvis-dashboard`**（`JARVIS_SUPABASE_*`）
 
 - ホーム: データ鮮度（`sync_meta`）／いまやること／一部未取得
 - ②: `/lifeplan` 年次・Zaim本番 confirm／`/tax` 手動取込・ドラフト
+- 資金移動: `/money-ops` — **カード引落バッファ**プレイブック（2026-08-14）。正本 `docs/KURASHIFT_資金移動_カード引落バッファ_検討素案_20260814.md`。自動振込なし
 - ③: CF月50万 KPI、Bridge 19CF、loan-tracker リンク、**レーンナビ A〜D**
 - ③-A: `/realestate` — 個人／法人／合算 KPI、簡易 DSCR、YTD CF、B-RATE＋DSCR（**年計画バーは未**）
 - ③-B: `/realestate/buy-plan`（長期年表・Focus）＋ `/realestate/deals`（千三つ実行）
