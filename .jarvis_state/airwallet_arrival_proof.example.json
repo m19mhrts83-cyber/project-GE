@@ -1,0 +1,8 @@
+{
+  "proven": false,
+  "proven_at": null,
+  "dest_mask": null,
+  "note": "",
+  "amount_jpy_first": null,
+  "_comment": "Copy to airwallet_arrival_proof.json after first SMBC credit. Do not commit the real proof file."
+}

@@ -86,20 +86,23 @@ flowchart LR
 
 ## 5. 点検チェックリスト
 
-- [ ] R6' が docs／UI（承認ダイアログ・プレイブック文言）に反映
-- [ ] `otp_channel` がレール設定にあり、gmail／sms 経路が動く（モック可）
-- [ ] 承認だけで記帳されない
-- [ ] 三重金額一致・残高ガード・ロックがコードにある
-- [ ] OTP 値がログ／チャットに出ない
-- [ ] 東海労金は app OTP で `waiting_user` になる
-- [ ] Terminal.app 手順が運用コマンドにある
-- [ ] `transfer_audit` が gitignore
+- [x] R6' が docs／UI（承認ダイアログ・プレイブック文言）に反映
+- [x] `otp_channel` がレール設定にあり、gmail／sms 経路が動く（モック可）
+- [x] 承認だけで記帳されない
+- [x] 三重金額一致・残高ガード・ロックがコードにある
+- [x] OTP 値がログ／チャットに出ない
+- [x] 東海労金は app OTP で `waiting_user` になる
+- [x] Terminal.app 手順が運用コマンドにある
+- [x] `transfer_audit` が gitignore
+- [x] Wave2: エアウォレット初回着金ゲート＋SMS OTP 自動（proven 後に本額）
+- [x] Wave3: 滋賀／京都 `otp_channel` 調査結果を YAML に反映（現行=app／自動配線済み）
 
 ---
 
 ## 6. 既知の制約（バグ扱いしない）
 
 - 東海労金ワンタイム PW はアプリ専用 → ユーザー一手が残る（技術限界）
+- 滋賀・京都 IB 振込確認も現行は `app_onetime_pw`（調査 2026-08-15）。メール／SMS 切替時は YAML のみ変更
 - Cursor 統合ターミナルの Enter 自動消費 → 本番は Terminal.app
-- エアウォレットは初回着金証明ゲートがある（Wave 2）
+- エアウォレットは初回着金証明ゲートがある（Wave 2）。proven 前の本額 Go は拒否
 - PayPay 等 blocked レールは起動禁止

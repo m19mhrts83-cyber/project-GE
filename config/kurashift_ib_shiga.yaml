@@ -3,9 +3,17 @@
 # ログインPW失念: Web不可 → 0120-450-280 → SMS eKYC → 会員カード郵送（1〜10日）
 # FAQ: https://faq.shigagin.com/faq_detail.html?id=132
 # 案内ページではなく FineMax IB 本体（2026-08 確認）
+#
+# OTPチャネル調査（2026-08-15）:
+#   振込確認 = アプリワンタイムPW（app_onetime_pw）→ ユーザー入力。
+#   ログイン合言葉 = env（SHIGA_IB_KOTOBA_*）で Jarvis 自動可。
+#   メール／SMS OTP は振込フローでは未確認。将来切替時は otp_channel を変更。
 login_url: "https://bb4.ib.finemax.net/0157/B/B/B/C100/KBC11BN000B000.do"
 # 入口（ログインリンクあり）: https://www.shigagin.com/personal/direct/
 otp_channel: app_onetime_pw
+otp_fallback_channels: []
+sender_hint: "滋賀|しがぎん|認証|ワンタイム|確認コード"
+gmail_account: null
 username_selectors:
   - "#cntrId"
   - "input[name='cntrId']"
