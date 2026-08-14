@@ -9,7 +9,11 @@
   python scripts/jarvis_ib_transfer_assist.py --bank kyoto --go --execute
 
 設定: config/kurashift_ib_{shiga,kyoto}.yaml
-秘密: SHIGA_IB_USER / SHIGA_IB_PASSWORD / KYOTO_IB_USER / KYOTO_IB_PASSWORD
+秘密: SHIGA_IB_USER / SHIGA_IB_PASSWORD / SHIGA_IB_CONFIRM_PIN（任意）
+      KYOTO_IB_USER / KYOTO_IB_PASSWORD
+
+滋賀ログインPW失念: Web再設定不可。ヘルプデスク 0120-450-280（平日9–17）→ SMS eKYC →
+会員カード郵送（1〜10日）。FAQ https://faq.shigagin.com/faq_detail.html?id=132
 """
 
 from __future__ import annotations
@@ -47,6 +51,7 @@ BANKS: dict[str, dict[str, Any]] = {
         "keep_floor_jpy": 300_000,
         "user_env": "SHIGA_IB_USER",
         "pass_env": "SHIGA_IB_PASSWORD",
+        "confirm_pin_env": "SHIGA_IB_CONFIRM_PIN",
         "config": REPO / "config" / "kurashift_ib_shiga.yaml",
         "cdp_port": 9242,
         "profile": Path.home() / ".jarvis_state" / "chrome_ib_shiga",
@@ -144,6 +149,38 @@ def _fill_login(page: Page, cfg: dict[str, Any], user: str, pw: str) -> None:
             break
     page.wait_for_load_state("domcontentloaded", timeout=90000)
     page.wait_for_timeout(2000)
+
+
+def _fill_confirm_pin(page: Page, pin: str) -> bool:
+    """振込実行画面の『確認用暗証番号』を埋める。"""
+    if not pin:
+        return False
+    candidates = [
+        page.get_by_label(re.compile(r"確認用暗証|暗証番号")),
+        page.locator("input[name*='pin' i]"),
+        page.locator("input[id*='pin' i]"),
+        page.locator("input[name*='kakunin' i]"),
+        page.locator("input[placeholder*='暗証' i]"),
+    ]
+    for loc in candidates:
+        try:
+            if loc.count():
+                loc.first.fill(pin)
+                print("📎 確認用暗証番号入力", file=sys.stderr)
+                return True
+        except Exception:
+            continue
+    body = _body(page, 4000)
+    if "確認用暗証" in body or "暗証番号" in body:
+        pw = page.locator("input[type='password']")
+        try:
+            if pw.count():
+                pw.nth(pw.count() - 1).fill(pin)
+                print("📎 確認用暗証番号入力（password末尾）", file=sys.stderr)
+                return True
+        except Exception:
+            pass
+    return False
 
 
 def _handle_otp(page: Page, *, otp_channel: str, rail_id: str, hold: bool) -> str:
@@ -371,6 +408,9 @@ def run_go(
                 }
             )
             return 1
+        pin_env = meta.get("confirm_pin_env") or ""
+        if pin_env:
+            _fill_confirm_pin(page, _env(pin_env))
         exec_btn = page.get_by_role(
             "button", name=re.compile("実行|確定|振込する|申し込む")
         )

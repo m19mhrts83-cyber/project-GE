@@ -1,5 +1,7 @@
 # 滋賀銀行『しがぎん』ダイレクト — Wave3
-# 秘密は .env.jarvis_private の SHIGA_IB_USER / SHIGA_IB_PASSWORD
+# 秘密: SHIGA_IB_USER / SHIGA_IB_PASSWORD / SHIGA_IB_CONFIRM_PIN（任意）
+# ログインPW失念: Web不可 → 0120-450-280 → SMS eKYC → 会員カード郵送（1〜10日）
+# FAQ: https://faq.shigagin.com/faq_detail.html?id=132
 login_url: "https://www.shigagin.com/personal/direct"
 # 実ログインフォームURLが案内ページと違う場合は、ブラウザで確認して差し替え
 otp_channel: app_onetime_pw

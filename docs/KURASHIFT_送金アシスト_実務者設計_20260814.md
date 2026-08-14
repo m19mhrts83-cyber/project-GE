@@ -192,6 +192,9 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 
 - Creds: `SHIGA_IB_*` / `KYOTO_IB_*`（jarvis_private）
 - 設定: `config/kurashift_ib_shiga.yaml` / `kurashift_ib_kyoto.yaml`
+- **滋賀ログインPW失念**: Web では再設定不可。ヘルプデスク **0120-450-280**（平日 9–17）→ SMS の URL で eKYC → **会員カード郵送（約1〜10日）**。FAQ: https://faq.shigagin.com/faq_detail.html?id=132  
+  引落直前サイクルでは、届くまで他レールで寄せ、滋賀は届き次第 or ATM（カード暗証が分かる場合）で補完。
+- 振込時: `SHIGA_IB_CONFIRM_PIN`（確認用暗証番号・数字6桁）があると実行画面が楽
 
 ```bash
 ./run_phase1_shiga_to_smbc.sh --preview
