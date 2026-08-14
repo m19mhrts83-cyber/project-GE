@@ -125,6 +125,8 @@ transfer_direct_fallback_to_menu_on_b0470: true
 # false のとき先に画面上の振込メニューをクリックし、ダメなら transfer_direct_* を試す（東海労金向け推奨）
 transfer_direct_first: false
 transfer_direct_path: "BPT001Dispatch"
+# Playwright 経路（arm64 既定）では transfer 指定時に自動で #btn002-1 → フォーム入力へ進む
+manual_click_transfer_menu: false
 # またはフルURLを指定（ServerID はセッションで変わる場合あり）
 # transfer_direct_url: "https://www.parasol.anser.ne.jp/ib/BPT001Dispatch?ServerID=RSRA0506&B=2972&PT=BS"
 # 上記を未指定時のみ「振込」ボタンクリックを試行
@@ -135,22 +137,23 @@ transfer_menu_button_selector: "#btn002-1"
 # 振込フォームの自動入力（--bank --branch --account --amount で指定時）
 # 振込画面のHTMLを確認し、各セレクタを設定してください（開発者ツールで要素を検証）
 transfer_form:
-  # 振込URL直後〜振込先入力前に押すボタン（ユーザー確認: #btn002-1）
-  specify_destination_button_selector: "#btn002-1"
+  # 振込先の選択画面で「振込先を指定」を押す（2026-08-14 DOM確認）
+  specify_destination_button_selector: "#btn001"
   # 銀行コード入力後、検索ボタン
   bank_confirm_button_selector: "#btn008"
   # 検索結果の「選択」ボタン（金融機関）
-  bank_select_button_selector: ""
+  bank_select_button_selector: "#btn002-1"
   # 支店コード入力後、検索ボタン
   branch_confirm_button_selector: "#btn001"
   # 検索結果の「選択」ボタン（支店）
-  branch_select_button_selector: ""
+  branch_select_button_selector: "#btn002-1"
   bank_code_selector: "#txtBox001"
   branch_code_selector: "#txtBox001"
-  account_number_selector: "/html/body/div[4]/div/div/form/div[2]/div[5]/table/tbody/tr[2]/td/input"
-  amount_selector: "/html/body/div[4]/div/div/form/div[2]/div[5]/table/tbody/tr[3]/td/input"
+  # ランダム化 ID ではなく行見出しから特定する（受取人名欄との取り違え防止）
+  account_number_selector: "//tr[.//*[contains(normalize-space(.),'口座番号')]]//input[@type='text']"
+  amount_selector: "//tr[.//*[contains(normalize-space(.),'振込金額')]]//input[@type='text']"
   # 口座・金額入力後、確認画面から実行画面へ進むボタン（例: 実行画面へ、次へ）
-  execution_screen_button_selector: ""
+  execution_screen_button_selector: "#btn001"
   # 実行画面の「確認しました」チェックボックス（OTP入力前にチェック必須）
   confirmation_checkbox_selector: ""
   # OTP 入力欄（ワンタイムPW アプリの番号を手入力）。東海労金では #pswd002

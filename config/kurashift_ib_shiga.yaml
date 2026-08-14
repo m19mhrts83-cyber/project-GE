@@ -2,18 +2,36 @@
 # 秘密: SHIGA_IB_USER / SHIGA_IB_PASSWORD / SHIGA_IB_CONFIRM_PIN（任意）
 # ログインPW失念: Web不可 → 0120-450-280 → SMS eKYC → 会員カード郵送（1〜10日）
 # FAQ: https://faq.shigagin.com/faq_detail.html?id=132
-login_url: "https://www.shigagin.com/personal/direct"
-# 実ログインフォームURLが案内ページと違う場合は、ブラウザで確認して差し替え
+# 案内ページではなく FineMax IB 本体（2026-08 確認）
+login_url: "https://bb4.ib.finemax.net/0157/B/B/B/C100/KBC11BN000B000.do"
+# 入口（ログインリンクあり）: https://www.shigagin.com/personal/direct/
 otp_channel: app_onetime_pw
 username_selectors:
+  - "#cntrId"
+  - "input[name='cntrId']"
   - "input[name*='user' i]"
   - "input[id*='user' i]"
-  - "input[name*='login' i]"
-  - "input[type='text']"
+  - "input[name*='kaiin' i]"
 password_selectors:
+  - "#scndPinNmbr"
+  - "input[name='scndPinNmbr']"
   - "input[type='password']"
 login_button_names:
   - "ログイン"
+login_button_selectors:
+  - "#btn_lgon"
+  - "input[name='btn_lgon']"
+  - "input[value='ログイン']"
+# 合言葉（未登録端末）。値は .env.jarvis_private の env（チャットに出さない）
+secret_phrase_auto:
+  - match: "母親の旧姓"
+    env: SHIGA_IB_KOTOBA_MOTHER
+secret_phrase_answer_selector: "#wcwdAskRspo"
+secret_phrase_next_selectors:
+  - "#butn01"
+  - "input[value='次へ']"
+# 端末登録: false=「登録しない」。true なら登録名を入れる
+register_terminal: false
 transfer_link_patterns:
   - "振込"
   - "振替"

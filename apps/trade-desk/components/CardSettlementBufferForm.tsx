@@ -160,8 +160,9 @@ export default function CardSettlementBufferForm({
       </header>
       <p className="meta" style={{ marginTop: 8 }}>
         Olive などの大型引落に向け、<strong>引落口座へ無料で寄せる</strong>計画です。
-        承認は「この寄せ方でよい」の合意だけ（記帳しません）。実行は Terminal でレールごとに
-        Preview→Go。メール／SMS OTP は Jarvis、アプリOTPはユーザーです。
+        承認は「この寄せ方でよい」の合意だけ（記帳しません）。実行はレールごと:
+        ①プラン承認 → ②Jarvis入力 → ③最終画面確認 → ④OTP＋実行ボタン。
+        あなたは①③④だけ。終わった送金用 Chrome は閉じます。
         金額・引落日は財務メール（Gmail）または Vpass で確定して入力してください。
       </p>
       <p className="meta" style={{ marginTop: 6 }}>

@@ -35,6 +35,7 @@ export type TransferRailStatus =
   | "pending"
   | "previewed"
   | "running"
+  | "awaiting_final_confirm"
   | "otp_fetch"
   | "otp_submit"
   | "waiting_user"
@@ -42,7 +43,8 @@ export type TransferRailStatus =
   | "verifying"
   | "done"
   | "failed"
-  | "blocked";
+  | "blocked"
+  | "deferred";
 
 export type TransferOtpChannel =
   | "gmail_api"
@@ -71,6 +73,61 @@ export type TransferRail = {
   where?: "iphone_app" | "mac_ib" | "either";
   /** 残す下限の説明 */
   keep_note?: string;
+  /** リマインド（例: 明日朝・時間外明け） */
+  remind_at?: string | null;
+  /** ユーザー向け短いメモ */
+  note?: string | null;
+};
+
+/**
+ * 資金移動の鉄板 UX（ユーザー操作は3点だけ）
+ * 1 プラン承認 → 2 Jarvis実行 → 3 最終画面確認 → 4 OTP＋実行ボタン
+ */
+export const FUND_MOVE_UX = {
+  title: "資金移動の進め方",
+  steps: [
+    {
+      id: "plan_approve",
+      actor: "user" as const,
+      label: "プランを承認する",
+      detail: "money-ops で寄せ方に合意（この時点では資金は動かない）",
+    },
+    {
+      id: "jarvis_execute",
+      actor: "jarvis" as const,
+      label: "Jarvis が入力・遷移する",
+      detail: "ログイン・金額・宛先まで。実行クリックはしない",
+    },
+    {
+      id: "final_confirm",
+      actor: "user" as const,
+      label: "最終画面を確認する",
+      detail: "金額・手数料・宛先が意図どおりか見てから次へ",
+    },
+    {
+      id: "otp_submit",
+      actor: "user" as const,
+      label: "OTP を入れて実行ボタン",
+      detail: "ワンタイムPW／アプリ承認はユーザー。Jarvis は待機案内のみ",
+    },
+  ],
+  user_only: ["plan_approve", "final_confirm", "otp_submit"] as const,
+} as const;
+
+export const RAIL_STATUS_LABEL: Record<TransferRailStatus, string> = {
+  pending: "未着手",
+  previewed: "プレビュー済",
+  running: "Jarvis実行中",
+  awaiting_final_confirm: "最終確認待ち",
+  otp_fetch: "OTP取得中",
+  otp_submit: "OTP入力中",
+  waiting_user: "OTP／タップ待ち",
+  executing_click: "実行クリック待ち",
+  verifying: "証跡確認中",
+  done: "完了",
+  failed: "失敗",
+  blocked: "ブロック",
+  deferred: "延期",
 };
 
 /** Phase1 既定（config/kurashift_transfer_rails.yaml と同期） */
@@ -110,7 +167,7 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
   {
     id: "tokairokin_smbc",
     label: "東海労金→SMBC刈谷",
-    amount_jpy: 233000,
+    amount_jpy: 232000,
     from_account_id: "tokairokin",
     to_account_id: "smbc_kariya",
     otp_channel: "app_onetime_pw",
@@ -121,23 +178,23 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     where: "mac_ib",
     keep_note: "残≈12.1万",
     manual_iphone:
-      "ワンタイムPWアプリ必須。IBはMac推奨。宛先=三井住友刈谷・233,000円",
+      "ワンタイムPWアプリ必須。IBはMac推奨。宛先=三井住友刈谷・232,000円",
   },
   {
     id: "mufg_airwallet",
-    label: "MUFG豊明→エアウォレット→SMBC",
+    label: "MUFG豊明（千景）→IB→SMBC刈谷",
     amount_jpy: 290000,
     from_account_id: "mufg_toyoake",
     to_account_id: "smbc_kariya",
-    otp_channel: "sms_messages",
+    otp_channel: "app_onetime_pw",
     keep_floor_jpy: 85000,
     status: "pending",
     order: 40,
-    free_rail: true,
-    where: "iphone_app",
-    keep_note: "MUFG残≈8.5万",
+    free_rail: false,
+    where: "mac_ib",
+    keep_note: "MUFG残≈8.5万。千景名義のため真治AW直結不可→今回はIB（手数料あり）",
     manual_iphone:
-      "エアウォレットでMUFG→チャージ→SMBC刈谷へ出金290,000。初回は少額テスト推奨",
+      "千景名義口座。エアウォレットは真治AWに紐づけ不可。IBで290,000＋手数料",
   },
   {
     id: "shiga_smbc",
@@ -149,10 +206,10 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     keep_floor_jpy: 300000,
     status: "pending",
     order: 50,
-    where: "either",
+    where: "mac_ib",
     keep_note: "残≈30万（27日返済あり）",
     manual_iphone:
-      "しがぎんダイレクト／アプリで62,000→三井住友刈谷。残30万を切らない",
+      "しがぎんダイレクト。時間外は不可（BEQB0003）。営業時間に Jarvis Go→最終確認→OTP",
   },
   {
     id: "kyoto_smbc",
@@ -173,15 +230,15 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
 
 /** iPhone 手動チェック用の進捗メタ（画面表示） */
 export const MANUAL_EXEC_PROGRESS = {
-  as_of: "2026-08-14",
+  as_of: "2026-08-15",
   automation_status:
-    "アシスト骨格は Wave0〜4 まで実装済み。実送金は未実行（Previewのみ）。銀行ログイン用 env は未設定のため Go 未着手。",
+    "Phase1: NEOBANK本・副・東海労金・千景MUFG(IB)は完了。滋賀62,000は時間外で翌朝へ延期。京都50,000は滋賀の次。",
   jarvis_continues_when:
-    "Mac が起動し、money-ops が approved/executing、かつ Terminal/Cursor で Jarvis に『続けて』と依頼したとき。KURASHIFT 画面に書くだけでは自動振込は始まりません。",
+    "朝の営業時間帯に Cursor で『滋賀の続き』と依頼。プラン承認済みなら Jarvis実行→最終確認→OTP の順。",
   iphone_can:
-    "エアウォレット・各銀行アプリでの手動寄せ、ワンタイムPW承認、money-ops の承認／ステータス更新、完了の一声",
+    "最終画面の金額確認、ワンタイムPW入力と実行ボタン、money-ops のレール status 更新",
   needs_mac:
-    "IB ブラウザ自動化（東海労金・SBIネット・滋賀・京都の --go）、SMS OTP の Messages DB 読取、監査ログ更新の本線",
+    "滋賀・京都 IB の --go、送金用 Chrome の後片付け（完了後は必ず閉じる）",
 } as const;
 
 export const WHERE_LABEL: Record<NonNullable<TransferRail["where"]>, string> = {
@@ -394,9 +451,11 @@ export function buildCardSettlementAssistSteps(input: {
     "【不足時だけ】調達ラダー: 利金送金 →（定額返済カレンダー可なら）契約者貸付 → Bloomo一部 →（最終）SBIコアは原則禁止",
     "定額返済を書けるなら貸付は可（防衛・次物件・NISA9万の余りから）。書けないなら Bloomo 優先",
     "あかつき元本売却は使わない",
-    "【手動チェック】iPhone: エアウォレット・各銀行アプリ。Mac: IB自動化。承認だけでは資金は動かない",
+    "【鉄板UX】①プラン承認 → ②Jarvis入力 → ③最終画面確認 → ④OTP＋実行ボタン（ユーザーは①③④のみ）",
+    "【手動チェック】iPhone: 最終確認とOTP。Mac: IB自動化。承認だけでは資金は動かない",
     "承認＝計画合意のみ。実行はレールごと。メール／SMS OTPはJarvis、アプリOTPはユーザー",
-    "各レール完了は証跡付きで rails[].status=done。オペ全体の done で引落アラート解除",
+    "各レール完了は証跡付きで rails[].status=done。レール終了後は送金用Chromeを閉じる",
+    "オペ全体の done で引落アラート解除",
   ];
 }
 

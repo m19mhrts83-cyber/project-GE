@@ -243,8 +243,27 @@ def _fill_otp_code(page: Page, code: str) -> bool:
 
 
 def _fill_login(page: Page, user: str, pw: str) -> None:
+    # 既ログイン（完了画面・振込画面など）ならスキップ
+    try:
+        body0 = page.inner_text("body")[:3000]
+        if "ログアウト" in body0 and "ログイン" not in page.title():
+            # ログインフォームが無ければセッション継続
+            if not page.locator("input[type='password']").count():
+                print("📎 既存ログインセッションを利用")
+                return
+    except Exception:
+        pass
     page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=90000)
     page.wait_for_timeout(1500)
+    # 遷移後も既ログインなら戻る
+    try:
+        if "ログアウト" in page.inner_text("body")[:2000] and not page.locator(
+            "input[type='password']"
+        ).count():
+            print("📎 既存ログインセッションを利用（goto後）")
+            return
+    except Exception:
+        pass
     user_sels = (
         "input[name*='user' i]",
         "input[id*='user' i]",
@@ -454,6 +473,15 @@ def _click_named(page: Page, names: tuple[str, ...]) -> bool:
             link.first.click()
             page.wait_for_timeout(1500)
             return True
+        # NEOBANK 等: <a class="m-btn…">確定する</a> で role 名が取れないことがある
+        txt = page.get_by_text(re.compile(name))
+        if txt.count():
+            try:
+                txt.first.click(timeout=5000)
+                page.wait_for_timeout(1500)
+                return True
+            except Exception:
+                continue
     return False
 
 
@@ -466,7 +494,7 @@ def _try_execute_click(page: Page, *, amount: int, branch: str, last4: str) -> s
         return "blocked"
     if _click_named(
         page,
-        ("実行する", "振込実行", "送金する", "^実行$", "確定", "申し込む"),
+        ("実行する", "振込実行", "送金する", "^実行$", "確定する", "確定", "申し込む"),
     ):
         return "clicked"
     return "not_found"

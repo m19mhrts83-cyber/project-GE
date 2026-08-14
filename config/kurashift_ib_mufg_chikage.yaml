@@ -1,0 +1,20 @@
+# 千景・MUFG豊明 — 三菱UFJダイレクト（Wave: カード引落バッファ）
+# ログイン正: ご契約番号 + ログインパスワード
+# 秘密: MUFG_CHIKAGE_CONTRACT_NO / MUFG_CHIKAGE_LOGIN_PASSWORD
+# 代替: MUFG_CHIKAGE_TENBAN + MUFG_CHIKAGE_KOZA（契約番号が空のとき）
+login_url: "https://entry11.bk.mufg.jp/ibg/dfw/APLIN/loginib/login?_TRANID=AA000_001"
+otp_channel: app_onetime_pw
+login_mode: contract  # contract | branch_account
+contract_number_selector: "#tx-contract-number"
+branch_selector: "#tx-branch-number"
+account_selector: "#tx-account-number"
+password_selector: "#tx-ib-password"
+login_button_selectors:
+  - "button:has-text('ログイン')"
+  - "text=ログイン"
+amount_jpy: 290000
+keep_floor_jpy: 85000
+dest_bank_code: "0009"
+transfer_link_patterns:
+  - "振込"
+  - "振替"

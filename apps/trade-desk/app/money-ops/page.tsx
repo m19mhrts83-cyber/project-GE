@@ -1,10 +1,12 @@
 import Shell from "@/components/Shell";
 import MoneyOpStatusActions from "@/components/MoneyOpStatusActions";
+import MoneyOpRailsPanel from "@/components/MoneyOpRailsPanel";
 import NewMoneyOpForm from "@/components/NewMoneyOpForm";
 import CardSettlementBufferForm from "@/components/CardSettlementBufferForm";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 import {
+  FUND_MOVE_UX,
   SMBC_SETTLEMENT_ACCOUNT_ID,
   SMBC_SETTLEMENT_ACCOUNT_LABEL,
 } from "@/lib/cardSettlementBuffer";
@@ -111,8 +113,8 @@ export default async function MoneyOpsPage({
       <h1>資金移動オペ</h1>
       <p className="sub">
         draft → consulting → approved → executing → done。承認＝計画合意のみ（実弾は動かない）。
-        iPhoneでは下の「Phase1 手動実行チェック」を見ながらアプリ送金できます。
-        Jarvis のブラウザ自動化の続きは Mac 起動中に Cursor／Terminal で依頼したときだけ動きます。
+        実行はレールごと: {FUND_MOVE_UX.steps.map((s) => s.label).join(" → ")}。
+        あなたは「プラン承認・最終画面確認・OTP＋実行ボタン」だけ。終わった送金用 Chrome は Jarvis が閉じます。
       </p>
 
       <CardSettlementBufferForm
@@ -169,6 +171,10 @@ export default async function MoneyOpsPage({
                         status?: string;
                         otp_channel?: string;
                         manual_iphone?: string;
+                        evidence?: string | null;
+                        last_error?: string | null;
+                        note?: string | null;
+                        remind_at?: string | null;
                       }>)
                     : [];
                 return (
@@ -185,20 +191,15 @@ export default async function MoneyOpsPage({
                         {due ? ` · 引落日 ${due}` : ""}
                       </div>
                       {rails.length > 0 ? (
-                        <ul className="meta" style={{ marginTop: 6 }}>
-                          {rails.map((r) => (
-                            <li key={r.id || r.label}>
-                              {(r.label || r.id || "レール") +
-                                (r.amount_jpy != null
-                                  ? ` ${fmtYen(Number(r.amount_jpy))}`
-                                  : "")}
-                              {" · "}
-                              {r.status || "pending"}
-                              {r.otp_channel ? ` · OTP:${r.otp_channel}` : ""}
-                              {r.manual_iphone ? ` — ${r.manual_iphone}` : ""}
-                            </li>
-                          ))}
-                        </ul>
+                        <MoneyOpRailsPanel
+                          opId={o.id}
+                          rails={rails}
+                          showUx={
+                            o.status === "approved" ||
+                            o.status === "executing" ||
+                            o.status === "consulting"
+                          }
+                        />
                       ) : null}
                       {o.status === "approved" ||
                       o.status === "executing" ||

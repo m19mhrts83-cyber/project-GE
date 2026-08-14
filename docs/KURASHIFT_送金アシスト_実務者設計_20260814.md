@@ -30,7 +30,7 @@ Phase1 目安（2026-08 Infinite）:
 
 | rail_id | 額目安 | otp_channel | Jarvis 上限 |
 |---|---:|---|---|
-| `tokairokin_smbc` | 233,000 | `app_onetime_pw` | 確認まで＋ホールド。OTP ユーザー |
+| `tokairokin_smbc` | 232,000 | `app_onetime_pw` | 確認まで＋ホールド。OTP ユーザー |
 | `sbi_main_smbc` | 26,000 | 調査後（gmail/sms/app） | 取れるなら実行まで |
 | `sbi_sub_smbc` | 161,000 | 同上 | 同上 |
 | `mufg_airwallet` | 290,000 | 調査後 | 初回着金証明ゲート |
@@ -81,7 +81,7 @@ Phase1 目安（2026-08 Infinite）:
 {
   "id": "tokairokin_smbc",
   "label": "東海労金→SMBC刈谷",
-  "amount_jpy": 233000,
+  "amount_jpy": 232000,
   "from_account_id": "tokairokin",
   "to_account_id": "smbc_kariya",
   "otp_channel": "app_onetime_pw",
@@ -137,16 +137,27 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 - [x] SBIネット Preview／Go（ログイン〜確認。スマート認証NEOは waiting_user）
 - [x] SBI 実行クリック＋証跡 done／resume（Wave 1b）
 
-### 最小ユーザー操作モデル（正・Wave1b）
+### 最小ユーザー操作モデル（正・Wave1b → 2026-08-15 確定）
+
+資金移動の鉄板（ユーザーは3点だけ）:
+
+1. **プラン承認**（money-ops）
+2. **最終画面の確認**（金額・宛先・手数料）
+3. **OTP 入力＋実行ボタン**
+
+Jarvis: ログイン・入力・遷移・金額照合。実行クリックはしない。  
+レール完了／中断後は `scripts/jarvis_transfer_chrome_cleanup.py` で送金用 Chrome を閉じる。
 
 | 行為 | Jarvis | あなた |
 |---|---|---|
 | money-ops 承認・Terminal Preview/Go | 主 | Go の一声／承認ボタン |
 | ログイン ID/PW | 主（env） | 初回だけ env 追記 |
 | メール／SMS OTP | **主（自動取得・入力）** | Full Disk／再認証時のみ |
-| スマート認証NEO・アプリ承認 | ホールド案内 | **主（一手）** |
+| **最終確認画面の目視** | ホールド案内 | **主（意図どおりか）** |
+| スマート認証NEO・アプリ OTP・実行ボタン | ホールド案内 | **主** |
 | Jarvis が取れない OTP | 入力・続行 | **コードを Terminal に1行**（チャット禁止） |
 | 振込金額・宛先入力・照合 | 主 | — |
+| 送金用 Chrome 後片付け | **主（必須）** | — |
 | 実行クリック | 照合OKなら主（`--execute`） | — |
 | 完了証跡 → done | 主 | 「承認した」→ `--resume` 可 |
 
@@ -158,7 +169,7 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 - ログイン URL: `https://www.netbk.co.jp/contents/pages/wpl020601/i020601CT/DI02060100`
 - Creds 本線3つ: `SBI_NET_USER` / `SBI_NET_LOGIN_PASSWORD` / `SBI_NET_TRADE_PASSWORD`（`SBI_SEC_*` と分離）
 - `SBI_NET_MAIN_ACCOUNT` … 代表（普通）口座番号のメモ（ログイン必須ではない）
-- `SBI_NET_SUB_ACCOUNT` … 任意。目的別等。**SBIハイブリッド預金は証券スイープ用**で、他行送金前に普通へ戻すことが多く、口座番号は空でよいことが多い
+- `SBI_NET_SUB_ACCOUNT` … 任意。目的別等。**SBIハイブリッド預金は他行振込・ATM出金不可**。必ず **振替**（出金=ハイブリッド → 振替先=代表円普通、手数料無料）してから振込。画面: `…/wpl040201/…/DI04020100`。いわゆる「フルハイブリッドから直接出金」は不可（コース切替では解消しない）
 - 無料寄せ: ことらおおむね **1件10万**。副口座 161k は **100k+61k**（`--chunk 0/1`）
 - 取引実行はスマート認証NEO（アプリ承認）が多い → Terminal で Enter または `--resume`
 
