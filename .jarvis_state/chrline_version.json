@@ -5,18 +5,18 @@
     "app_version": "9.0.0.3360",
     "device": "DESKTOPWIN",
     "runner": "line_unofficial_poc/run_patch.sh",
-    "checked_at": "2026-08-10T13:26:27.290771+00:00",
+    "checked_at": "2026-08-13T13:27:50.738927+00:00",
     "upstream_commit_sha": "d1bc68737421"
   },
   "upstream": {
     "version": "2.6.14",
     "commit_sha": "d1bc68737421",
     "commit_date": "2026-02-26T09:23:32Z",
-    "fetched_at": "2026-08-10T13:26:03.902237+00:00",
+    "fetched_at": "2026-08-13T13:27:50.738973+00:00",
     "error": ""
   },
   "update_available": false,
   "source_refresh_suggested": false,
-  "last_check_at": "2026-08-10T13:26:27.290950+00:00",
+  "last_check_at": "2026-08-13T13:27:51.425418+00:00",
   "update_command": "cd ~/git-repos && ./scripts/jarvis_chrline_update.sh"
 }
