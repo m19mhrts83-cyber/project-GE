@@ -79,6 +79,20 @@ items:
       金額未確定なら Vpass で確定し --set olive_infinite --amount N --due YYYY-MM-DD
       年会費ウォッチ（card_annual_fee）と混ぜない。
 
+  - id: airwallet_banks
+    title: エアウォレット対応銀行
+    category: finance
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/airwallet_banks_weekly.json
+    cursor_prompt: |
+      エアウォレット対応銀行の週次結果を確認して。
+      state: .jarvis_state/airwallet_banks_weekly.json
+      設定: config/kurashift_airwallet_banks.yaml
+      コマンド: scripts/jarvis_airwallet_banks_weekly.py
+      家計で使う銀行が新たに対応したら AW 紐づけを案内（≤10万は AW 優先）。
+      ルール: jarvis-airwallet-prefer.mdc
+
   - id: mobile_plan
     title: 携帯プラン乗り換え（Y!mobile/UQ）
     category: finance

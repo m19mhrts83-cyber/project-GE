@@ -1,6 +1,8 @@
 # KURASHIFT 資金送金アシスト — レール定義（Wave 0）
 # 正本: docs/KURASHIFT_送金アシスト_実務者設計_20260814.md
 # 秘密はここへ書かない（.env.jarvis_private）
+# 推奨順: 無料(SBI) → ≤10万かつ AW 紐づけ可ならエアウォレット → IB 他行
+# AW 監視: config/kurashift_airwallet_banks.yaml / scripts/jarvis_airwallet_banks_weekly.py
 
 version: 1
 dest_whitelist:
@@ -97,6 +99,7 @@ rails:
     config: config/kurashift_ib_mufg_chikage.yaml
     status_default: pending
 
+  # ≤10万かつ AW 紐づけ可 → エアウォレット優先（IB はフォールバック）
   - id: shiga_smbc
     label: "滋賀銀行→SMBC刈谷"
     enabled: true
@@ -106,11 +109,12 @@ rails:
     from_account_id: shiga
     to_account_id: smbc_kariya
     otp_channel: app_onetime_pw
+    preferred_channel: airwallet
     runner: ib_assist
     launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_shiga_to_smbc.sh"
     config: config/kurashift_ib_shiga.yaml
     status_default: pending
-    note: "時間外 BEQB0003 → 翌朝営業時間。完了後 chrome cleanup"
+    note: "2026-08-15 AW 出金で完了。≤10万は AW 優先。IB 時間外 BEQB0003"
 
   - id: kyoto_smbc
     label: "京都銀行刈谷→SMBC刈谷"
@@ -121,10 +125,12 @@ rails:
     from_account_id: kyoto_kariya
     to_account_id: smbc_kariya
     otp_channel: app_onetime_pw
+    preferred_channel: airwallet
     runner: ib_assist
     launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_kyoto_to_smbc.sh"
     config: config/kurashift_ib_kyoto.yaml
     status_default: pending
+    note: "2026-08-15 AW 出金で完了。≤10万は AW 優先"
 
 blocked:
   - id: paypay_orix_keep

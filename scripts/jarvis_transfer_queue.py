@@ -29,7 +29,7 @@ def main() -> int:
     blocked = data.get("blocked") or []
     mid = f" --money-ops-id {args.money_ops_id}" if args.money_ops_id else ""
     print("=== 送金アシスト キュー（Wave4）===")
-    print("順序: 無料(SBI) → IB他行 → エアウォレット。並列禁止・間隔≥60秒")
+    print("順序: 無料(SBI) → ≤10万かつAW可ならエアウォレット → IB他行。並列禁止・間隔≥60秒")
     if args.money_ops_id:
         print(f"money_ops_id: {args.money_ops_id}")
     print(f"cwd: {LAUNCH_DIR}")

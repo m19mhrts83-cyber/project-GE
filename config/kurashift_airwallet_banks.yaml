@@ -1,0 +1,144 @@
+# エアウォレット（COIN+）対応銀行ウォッチ
+# 調査: scripts/jarvis_airwallet_banks_weekly.py
+# 公式一覧: https://faq.coinplus.jp/s/article/000031794
+# 方針: 10万以下かつ紐づけ可能な口座は AW 優先（IB の OTP 画面より早いことが多い）
+
+version: 1
+
+policy:
+  prefer_airwallet_max_jpy: 100000
+  note: |
+    10万円以下はことら経由の即時出金が使いやすい。
+    ただし紐づけは同一名義のみ。千景名義の MUFG 豊明は真治 AW に付けられない。
+  official_list_url: "https://faq.coinplus.jp/s/article/000031794"
+  list_as_of_hint: "2026-08-03"  # FAQ 記載時点（週次取得で上書き）
+  # SPA のため HTTP 直取得不可。FAQ（2026-08-03）を正本シードとし、週次は Tavily で増分を見る
+  baseline_official_banks:
+    - 足利銀行
+    - 阿波銀行
+    - イオン銀行
+    - 池田泉州銀行
+    - 愛媛銀行
+    - auじぶん銀行
+    - 大分銀行
+    - 関西みらい銀行
+    - 紀陽銀行
+    - 京都銀行
+    - 熊本銀行
+    - 群馬銀行
+    - 埼玉りそな銀行
+    - 佐賀銀行
+    - 滋賀銀行
+    - 四国銀行
+    - 七十七銀行
+    - 十八親和銀行
+    - 十六銀行
+    - 常陽銀行
+    - ドコモSMTBネット銀行
+    - 千葉銀行
+    - 鳥取銀行
+    - 八十二長野銀行
+    - 百五銀行
+    - 百十四銀行
+    - 広島銀行
+    - 福岡銀行
+    - PayPay銀行
+    - 北洋銀行
+    - 北海道銀行
+    - みずほ銀行
+    - 三井住友銀行
+    - 三菱ＵＦＪ銀行
+    - 宮崎銀行
+    - 武蔵野銀行
+    - 山形銀行
+    - ゆうちょ銀行
+    - 横浜銀行
+    - 楽天銀行
+    - りそな銀行
+    - 琉球銀行
+
+# 家計で使う口座（監視対象）。match_names は公式一覧の表記と突合する。
+household_banks:
+  - id: shiga
+    label: "滋賀銀行"
+    match_names: ["滋賀銀行"]
+    owner: shinji
+    aw_status: confirmed  # 2026-08-15 出金実績
+    prefer_aw_under_100k: true
+
+  - id: kyoto
+    label: "京都銀行"
+    match_names: ["京都銀行"]
+    owner: shinji
+    aw_status: confirmed  # 2026-08-15 出金実績
+    prefer_aw_under_100k: true
+
+  - id: mufg_atsuta
+    label: "三菱UFJ銀行 熱田"
+    match_names: ["三菱ＵＦＪ銀行", "三菱UFJ銀行"]
+    owner: shinji
+    aw_status: confirmed  # ユーザー確認: AW で使える
+    prefer_aw_under_100k: true
+    note: "熱田支店。豊明（千景）と混同しない"
+
+  - id: mufg_toyoake
+    label: "三菱UFJ銀行 豊明（千景）"
+    match_names: ["三菱ＵＦＪ銀行", "三菱UFJ銀行"]
+    owner: chikage
+    aw_status: blocked_other_owner
+    prefer_aw_under_100k: false
+    note: "真治 AW に紐づけ不可。IB 有料寄せ"
+
+  - id: smbc_kariya
+    label: "三井住友銀行 刈谷"
+    match_names: ["三井住友銀行"]
+    owner: shinji
+    aw_status: likely  # 出金先として登録想定
+    prefer_aw_under_100k: true
+    role: destination
+
+  - id: neo_bank
+    label: "ドコモSMTB／第一生命NEOBANK"
+    match_names: ["ドコモSMTBネット銀行"]
+    owner: shinji
+    aw_status: watch
+    prefer_aw_under_100k: true
+    note: "無料レール（NEOBANK↔SMBC）がある場合はそちら優先"
+
+  - id: paypay
+    label: "PayPay銀行"
+    match_names: ["PayPay銀行"]
+    owner: shinji
+    aw_status: watch
+    prefer_aw_under_100k: true
+
+  - id: tokairokin
+    label: "東海労金"
+    match_names: ["東海労金", "東海労働金庫"]
+    owner: shinji
+    aw_status: not_on_list  # 2026-08 FAQ 時点で一覧に無し
+    prefer_aw_under_100k: false
+    note: "公式一覧に無い想定。増えたらお知らせ"
+
+  - id: ogaki
+    label: "大垣共立銀行"
+    match_names: ["大垣共立銀行"]
+    owner: shinji
+    aw_status: not_on_list
+    prefer_aw_under_100k: false
+
+  - id: nagoya
+    label: "名古屋銀行"
+    match_names: ["名古屋銀行"]
+    owner: shinji
+    aw_status: not_on_list
+    prefer_aw_under_100k: false
+
+# お知らせ条件
+notify:
+  # 監視対象のうち、前回「一覧外」→今回「一覧内」になったら attention
+  household_became_supported: true
+  # 公式一覧に新規銀行が載ったら info（家計と無関係でも短く）
+  official_list_grew: true
+  # stale: 最終調査から何日超えたら attention
+  stale_days: 10

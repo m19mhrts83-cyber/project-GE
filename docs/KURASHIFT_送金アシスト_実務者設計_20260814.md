@@ -37,7 +37,8 @@ Phase1 目安（2026-08 Infinite）:
 | `shiga_smbc` / `kyoto_smbc` | 62k／50k | 調査後 | 東海労金型 |
 | blocked | PayPay 等 | — | 起動禁止 |
 
-推奨順: 無料レール（SBI）→ IB 他行（東海労金・滋賀・京都）→ アプリ系（エアウォレット）。同一 `from_account_id` の並列禁止。連続間隔 ≥60 秒。
+推奨順: 無料レール（SBI）→ **≤10万かつ AW 紐づけ可ならエアウォレット優先** → IB 他行（東海労金等）。同一 `from_account_id` の並列禁止。連続間隔 ≥60 秒。  
+週次: `scripts/jarvis_airwallet_banks_weekly.py`（家計銀行が新たに対応したらお知らせ）。
 
 ---
 

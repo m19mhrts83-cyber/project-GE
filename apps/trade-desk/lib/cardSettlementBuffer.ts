@@ -204,12 +204,12 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     to_account_id: "smbc_kariya",
     otp_channel: "app_onetime_pw",
     keep_floor_jpy: 300000,
-    status: "pending",
+    status: "done",
     order: 50,
-    where: "mac_ib",
-    keep_note: "残≈30万（27日返済あり）",
+    where: "iphone_app",
+    keep_note: "残≈30万（27日返済あり）。≤10万は AW 優先",
     manual_iphone:
-      "しがぎんダイレクト。時間外は不可（BEQB0003）。営業時間に Jarvis Go→最終確認→OTP",
+      "エアウォレットで出金（≤10万即時）。IB はフォールバック（時間外 BEQB0003）",
   },
   {
     id: "kyoto_smbc",
@@ -219,12 +219,12 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     to_account_id: "smbc_kariya",
     otp_channel: "app_onetime_pw",
     keep_floor_jpy: 51000,
-    status: "pending",
+    status: "done",
     order: 60,
-    where: "either",
-    keep_note: "残≈5.1万",
+    where: "iphone_app",
+    keep_note: "残≈5.1万。≤10万は AW 優先",
     manual_iphone:
-      "京銀アプリ／ダイレクトで50,000→三井住友刈谷。残5万超を維持",
+      "エアウォレットで出金（≤10万即時）。IB はフォールバック",
   },
 ];
 
@@ -232,13 +232,13 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
 export const MANUAL_EXEC_PROGRESS = {
   as_of: "2026-08-15",
   automation_status:
-    "Phase1: NEOBANK本・副・東海労金・千景MUFG(IB)は完了。滋賀62,000は時間外で翌朝へ延期。京都50,000は滋賀の次。",
+    "Phase1: NEOBANK本・副・東海労金・千景MUFG(IB)・滋賀(AW)・京都(AW) 完了。≤10万かつ紐づけ可はエアウォレット優先。",
   jarvis_continues_when:
-    "朝の営業時間帯に Cursor で『滋賀の続き』と依頼。プラン承認済みなら Jarvis実行→最終確認→OTP の順。",
+    "残レール（PayPay等・blocked解除後）や次サイクルの寄せ。AW 対応銀行の週次お知らせを確認。",
   iphone_can:
-    "最終画面の金額確認、ワンタイムPW入力と実行ボタン、money-ops のレール status 更新",
+    "エアウォレットでの出金（≤10万）、最終画面確認、money-ops のレール status 更新",
   needs_mac:
-    "滋賀・京都 IB の --go、送金用 Chrome の後片付け（完了後は必ず閉じる）",
+    "IB フォールバック時のみ --go と送金用 Chrome の後片付け",
 } as const;
 
 export const WHERE_LABEL: Record<NonNullable<TransferRail["where"]>, string> = {
@@ -270,8 +270,8 @@ export const FREE_RAILS: FreeRail[] = [
   {
     id: "airwallet",
     title: "エアウォレット（COIN+／MUFGハブ）",
-    use: "MUFG系↔他行の無料チャージ／出金／送金",
-    caution: "出金先が引落口座に届くか初回だけ実機確認",
+    use: "≤10万の即時寄せを優先。紐づけ可の口座間で無料チャージ／出金",
+    caution: "同一名義のみ。千景MUFG豊明は真治AW不可。熱田・滋賀・京都は可",
   },
   {
     id: "cotra",

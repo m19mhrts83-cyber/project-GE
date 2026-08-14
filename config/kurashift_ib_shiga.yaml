@@ -26,6 +26,12 @@ login_button_selectors:
 secret_phrase_auto:
   - match: "母親の旧姓"
     env: SHIGA_IB_KOTOBA_MOTHER
+  - match: "子供の頃のニックネーム"
+    env: SHIGA_IB_KOTOBA_NICKNAME
+  - match: "ニックネーム"
+    env: SHIGA_IB_KOTOBA_NICKNAME
+  - match: "あだ名"
+    env: SHIGA_IB_KOTOBA_NICKNAME
 secret_phrase_answer_selector: "#wcwdAskRspo"
 secret_phrase_next_selectors:
   - "#butn01"
