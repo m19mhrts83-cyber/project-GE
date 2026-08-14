@@ -15,6 +15,21 @@ export type FreeRail = {
   caution: string;
 };
 
+export type TransferPhase = {
+  id: string;
+  title: string;
+  timing: string;
+  action: string;
+  gate: string;
+};
+
+export type ScenarioExample = {
+  id: "A" | "B" | "C" | "D";
+  title: string;
+  role: string;
+  example: string;
+};
+
 /** Olive Infinite 引落の現金置き場（流動性マスタ正本） */
 export const SMBC_SETTLEMENT_ACCOUNT_ID = "smbc_kariya";
 export const SMBC_SETTLEMENT_ACCOUNT_LABEL = "三井住友銀行 刈谷";
@@ -43,12 +58,75 @@ export const FREE_RAILS: FreeRail[] = [
   },
 ];
 
+/**
+ * 毎回使う本流。無料レールは「送る手段」、A〜D は「結果の比較例」であり、
+ * この手順の分岐記号ではない。
+ */
+export const TRANSFER_PHASES: TransferPhase[] = [
+  {
+    id: "now",
+    title: "いま動かせる余剰を寄せる",
+    timing: "計画承認後",
+    action: "各口座の次回引落とバッファを先に残し、確認済み余剰だけを引落口座へ送る",
+    gate: "送金後残高が、その口座の残す下限を下回らない",
+  },
+  {
+    id: "after_income",
+    title: "入金先行を確認して追加で寄せる",
+    timing: "家賃・売上などの着金後",
+    action: "出金が先に来る口座は着金前に触らず、着金後の余剰だけを送る",
+    gate: "次回のローン・固定費と安全バッファが残る",
+  },
+  {
+    id: "after_salary",
+    title: "給与後に不足を再計算する",
+    timing: "給与着金後",
+    action: "給与が引落口座へ直接入る分を反映し、まだ足りない額だけを再計算する",
+    gate: "大垣・名銀など固定振分先の生活費を動かさない",
+  },
+  {
+    id: "final_check",
+    title: "引落前に最終確認する",
+    timing: "引落日の2〜3営業日前",
+    action: "引落口座残高が必要額以上か確認し、不足時だけ調達ラダーへ進む",
+    gate: "同じ資金を二重計上せず、実残高で判定する",
+  },
+];
+
+/** A〜D は本流を置き換える案ではなく、入金の効き方を見る感度分析の例。 */
+export const SCENARIO_EXAMPLES: ScenarioExample[] = [
+  {
+    id: "A",
+    title: "いま寄せる分だけ",
+    role: "下限ケース",
+    example: "Phase 1だけで、引落口座にあといくら足りないかを見る",
+  },
+  {
+    id: "B",
+    title: "A＋給与が少なめ",
+    role: "慎重ケース",
+    example: "給与の引落口座入金が想定より少ない場合の不足を見る",
+  },
+  {
+    id: "C",
+    title: "A＋通常給与",
+    role: "本命ケース",
+    example: "安定している通常給与を反映し、引落を満たすか判断する",
+  },
+  {
+    id: "D",
+    title: "C＋家賃・売上着金後の余剰",
+    role: "安全余裕ケース",
+    example: "出金先行口座の着金後余剰まで加え、引落後バッファを確認する",
+  },
+];
+
 /** IFA推奨順（ユーザー案 a→b→c から b/c 入替・コア売却を最後へ） */
 export const FUNDING_LADDER: FundingStep[] = [
   {
     order: 0,
     id: "bank_consolidate",
-    title: "銀行内の無料寄せ（レールA〜C）",
+    title: "銀行内の無料寄せ（無料レール3本）",
     verdict: "必須",
     note: "資産を崩さない。ギャップの第一対応",
   },
@@ -142,9 +220,12 @@ export function buildCardSettlementAssistSteps(input: {
   return [
     `引落日 ${due}・必要額 ${need}・${SMBC_SETTLEMENT_ACCOUNT_LABEL} ${smbc}`,
     `SMBC不足（寄せ目標） ${short} — ${cover}`,
-    "各行に当月固定引落＋バッファだけ残し、余剰を洗い出す",
-    "無料レール: ①SBI↔SMBC無料枠 ②ことら分割（〜10万/件）③エアウォレット（MUFGハブ）",
-    "なお不足なら調達ラダー: 利金送金 →（定額返済カレンダー可なら）契約者貸付 → Bloomo一部 →（最終）SBIコアは原則禁止",
+    "【本流1】各行に当月固定引落＋バッファを先に残し、いま動かせる余剰だけ寄せる",
+    "【本流2】出金先行口座は家賃・売上の着金後にだけ再計算して追加で寄せる",
+    "【本流3】給与着金後に不足を再計算し、引落2〜3営業日前に実残高で最終確認する",
+    "【送金手段】無料レール: SBI↔SMBC無料枠／ことら分割（〜10万/件）／エアウォレット（MUFGハブ）。本流の別案ではない",
+    "【結果例A〜D】Phase後の残高を比べる感度分析。本流の分岐ではなく、A=下限・B=慎重・C=本命・D=安全余裕",
+    "【不足時だけ】調達ラダー: 利金送金 →（定額返済カレンダー可なら）契約者貸付 → Bloomo一部 →（最終）SBIコアは原則禁止",
     "定額返済を書けるなら貸付は可（防衛・次物件・NISA9万の余りから）。書けないなら Bloomo 優先",
     "あかつき元本売却は使わない",
     "承認後も振込は手動。実行したら status を executing→done に更新（done で引落アラート解除）",
