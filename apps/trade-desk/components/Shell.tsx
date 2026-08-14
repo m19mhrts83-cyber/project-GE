@@ -2,6 +2,7 @@ import { DASHBOARD_URL, LOAN_TRACKER_URL } from "@/lib/format";
 
 const NAV = [
   { href: "/", label: "ホーム" },
+  { href: "/guide", label: "構成ガイド" },
   { href: "/themes", label: "テーマ" },
   { href: "/money-ops", label: "資金移動" },
   { href: "/portfolio", label: "資産" },
@@ -70,9 +71,14 @@ export default function Shell({
         <NavLinks
           active={active}
           items={NAV.filter((n) =>
-            ["/", "/themes", "/money-ops", "/portfolio", "/consultations"].includes(
-              n.href
-            )
+            [
+              "/",
+              "/guide",
+              "/themes",
+              "/money-ops",
+              "/portfolio",
+              "/consultations",
+            ].includes(n.href)
           )}
         />
 

@@ -559,6 +559,11 @@ export default async function RealEstatePage({
           <span className="lvl">Lanes</span>
           <strong>4レーン（分離）</strong>
         </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          記号の意味・「やりたいこと／実装」は{" "}
+          <a href="/guide#re-lanes">構成ガイド</a>。KPI / Portfolio / Jobs
+          はレーン内の見出しです。
+        </p>
         <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
           <li>
             <a href="/realestate">A 運用</a> — 今のCF・DSCR・ギャップ（この画面）
