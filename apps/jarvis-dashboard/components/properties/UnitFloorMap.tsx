@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { appendPropertyUnitMemo } from "@/app/actions/propertyUnitMemo";
+import { useEffect, useMemo, useState } from "react";
+import {
+  appendPropertyUnitMemo,
+  updatePropertyUnitTerms,
+} from "@/app/actions/propertyUnitMemo";
 import {
   FLOOR_MAP_LAYOUTS,
   fmtDiscount,
@@ -38,6 +41,10 @@ function fmtWhen(iso: string): string {
   });
 }
 
+function numInput(v: number | null | undefined): string {
+  return v == null ? "" : String(Math.round(v));
+}
+
 export default function UnitFloorMap({
   propertyId,
   propertyName,
@@ -62,7 +69,23 @@ export default function UnitFloorMap({
   const [memoText, setMemoText] = useState("");
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
   const [localUnits, setLocalUnits] = useState(units);
+  const [editOpen, setEditOpen] = useState(false);
+
+  const [formRent, setFormRent] = useState("");
+  const [formMgmt, setFormMgmt] = useState("");
+  const [formY1, setFormY1] = useState("");
+  const [formY2, setFormY2] = useState("");
+  const [formUntil, setFormUntil] = useState("");
+  const [formStatus, setFormStatus] = useState<"occupied" | "vacant">(
+    "occupied",
+  );
+  const [formReason, setFormReason] = useState("");
+
+  useEffect(() => {
+    setLocalUnits(units);
+  }, [units]);
 
   const localByRoom = useMemo(() => {
     const m = new Map<string, PropertyUnit>();
@@ -81,12 +104,28 @@ export default function UnitFloorMap({
       )
     : [];
 
+  useEffect(() => {
+    if (!selected) return;
+    const plan = unitRentPlan(selected);
+    const cur = unitRentBreakdown(selected);
+    setFormRent(numInput(cur.rent));
+    setFormMgmt(numInput(cur.management_fee ?? plan.management_fee));
+    setFormY1(numInput(plan.rent_year1));
+    setFormY2(numInput(plan.rent_year2));
+    setFormUntil(plan.campaign_until || "");
+    setFormStatus(selected.status === "vacant" ? "vacant" : "occupied");
+    setFormReason("");
+    setEditOpen(false);
+    setOkMsg(null);
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate form when号室切替
+
   if (!layout) return null;
 
   async function onAppendMemo() {
     if (!selected) return;
     setPending(true);
     setErr(null);
+    setOkMsg(null);
     const res = await appendPropertyUnitMemo({
       unitId: selected.id,
       text: memoText,
@@ -116,11 +155,70 @@ export default function UnitFloorMap({
       }),
     );
     setMemoText("");
+    setOkMsg("メモを追記しました");
+  }
+
+  async function onSaveTerms() {
+    if (!selected) return;
+    setPending(true);
+    setErr(null);
+    setOkMsg(null);
+    const res = await updatePropertyUnitTerms({
+      unitId: selected.id,
+      rent: formRent,
+      management_fee: formMgmt,
+      rent_year1: formY1,
+      rent_year2: formY2,
+      campaign_until: formUntil,
+      status: formStatus,
+      reason: formReason,
+      source: "ui",
+    });
+    setPending(false);
+    if (!res.ok) {
+      setErr(res.error);
+      return;
+    }
+    setLocalUnits((prev) =>
+      prev.map((u) =>
+        u.id === selected.id
+          ? {
+              ...u,
+              rent: res.unit.rent,
+              status: res.unit.status,
+              note: res.unit.note,
+              payload: res.unit.payload,
+            }
+          : u,
+      ),
+    );
+    const saved: PropertyUnit = {
+      ...selected,
+      rent: res.unit.rent,
+      status: res.unit.status,
+      note: res.unit.note,
+      payload: res.unit.payload,
+    };
+    const plan = unitRentPlan(saved);
+    const cur = unitRentBreakdown(saved);
+    setFormRent(numInput(cur.rent));
+    setFormMgmt(numInput(cur.management_fee ?? plan.management_fee));
+    setFormY1(numInput(plan.rent_year1));
+    setFormY2(numInput(plan.rent_year2));
+    setFormUntil(plan.campaign_until || "");
+    setFormStatus(saved.status === "vacant" ? "vacant" : "occupied");
+    setFormReason("");
+    setEditOpen(false);
+    setOkMsg("条件を修正しました");
   }
 
   return (
     <div className="rent-map">
-      <div className="rent-map-floors" role="group" aria-label={`${propertyName} 家賃マップ`}>
+      <div
+        className="rent-map-floors"
+        role="group"
+        aria-label={`${propertyName} 家賃マップ`}
+      >
         {layout.floors.map((fl) => (
           <div key={fl.floor} className="rent-map-floor">
             <div className="rent-map-floor-label">{fl.floor}F</div>
@@ -142,6 +240,10 @@ export default function UnitFloorMap({
                 const plan = unitRentPlan(unit);
                 const cur = unitRentBreakdown(unit);
                 const isSel = selectedId === unit.id;
+                const mismatch =
+                  cur.total_rent != null &&
+                  plan.total_year2 != null &&
+                  Math.abs(cur.total_rent - plan.total_year2) >= 1;
                 return (
                   <button
                     key={room}
@@ -150,6 +252,7 @@ export default function UnitFloorMap({
                       "rent-map-cell",
                       unit.status === "vacant" ? "is-vacant" : "is-occupied",
                       isSel ? "is-selected" : "",
+                      mismatch ? "is-mismatch" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -157,11 +260,13 @@ export default function UnitFloorMap({
                     onClick={() => {
                       setSelectedId(unit.id);
                       setErr(null);
+                      setOkMsg(null);
                     }}
                   >
                     <span className="rent-map-room">{unit.room}</span>
                     <span className="rent-map-status">
                       {unit.status === "vacant" ? "空室" : "入居"}
+                      {mismatch ? " · 差あり" : ""}
                     </span>
                     <span className="rent-map-now">
                       現状 {fmtYen(cur.total_rent)}
@@ -183,7 +288,10 @@ export default function UnitFloorMap({
       </div>
 
       {selected && selectedPlan && selectedCurrent ? (
-        <aside className="rent-map-panel" aria-label={`${shortLabel(selected)} 詳細`}>
+        <aside
+          className="rent-map-panel"
+          aria-label={`${shortLabel(selected)} 詳細`}
+        >
           <header className="rent-map-panel-head">
             <h4>
               {shortLabel(selected)}{" "}
@@ -192,13 +300,22 @@ export default function UnitFloorMap({
                 {managers[selected.room] ? ` · ${managers[selected.room]}` : ""}
               </span>
             </h4>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setSelectedId(null)}
-            >
-              閉じる
-            </button>
+            <div className="rent-map-panel-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setEditOpen((v) => !v)}
+              >
+                {editOpen ? "修正を閉じる" : "条件を修正"}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setSelectedId(null)}
+              >
+                閉じる
+              </button>
+            </div>
           </header>
 
           <div className="rent-map-compare">
@@ -236,6 +353,94 @@ export default function UnitFloorMap({
             <p className="rent-map-plan-note">{selectedPlan.plan_note}</p>
           ) : null}
 
+          {editOpen ? (
+            <section className="rent-map-edit" aria-label="条件修正">
+              <h5>条件を修正</h5>
+              <p className="meta">
+                差があるときはここで直します。保存するとメモ履歴にも残ります。
+              </p>
+              <div className="rent-map-edit-grid">
+                <label>
+                  <span className="meta">現状家賃</span>
+                  <input
+                    inputMode="numeric"
+                    value={formRent}
+                    onChange={(e) => setFormRent(e.target.value)}
+                    disabled={pending}
+                  />
+                </label>
+                <label>
+                  <span className="meta">管理費</span>
+                  <input
+                    inputMode="numeric"
+                    value={formMgmt}
+                    onChange={(e) => setFormMgmt(e.target.value)}
+                    disabled={pending}
+                  />
+                </label>
+                <label>
+                  <span className="meta">1年目家賃</span>
+                  <input
+                    inputMode="numeric"
+                    value={formY1}
+                    onChange={(e) => setFormY1(e.target.value)}
+                    disabled={pending}
+                  />
+                </label>
+                <label>
+                  <span className="meta">2年目家賃（計画）</span>
+                  <input
+                    inputMode="numeric"
+                    value={formY2}
+                    onChange={(e) => setFormY2(e.target.value)}
+                    disabled={pending}
+                  />
+                </label>
+                <label>
+                  <span className="meta">キャンペーン期限</span>
+                  <input
+                    value={formUntil}
+                    onChange={(e) => setFormUntil(e.target.value)}
+                    placeholder="例: 26/7 または 8月"
+                    disabled={pending}
+                  />
+                </label>
+                <label>
+                  <span className="meta">状態</span>
+                  <select
+                    value={formStatus}
+                    onChange={(e) =>
+                      setFormStatus(
+                        e.target.value === "vacant" ? "vacant" : "occupied",
+                      )
+                    }
+                    disabled={pending}
+                  >
+                    <option value="occupied">入居</option>
+                    <option value="vacant">空室</option>
+                  </select>
+                </label>
+              </div>
+              <label className="rent-map-memo-form">
+                <span className="meta">修正理由（任意）</span>
+                <input
+                  value={formReason}
+                  onChange={(e) => setFormReason(e.target.value)}
+                  placeholder="例: 成約条件に合わせて現状を修正"
+                  disabled={pending}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn"
+                disabled={pending}
+                onClick={() => void onSaveTerms()}
+              >
+                {pending ? "保存中…" : "条件を保存"}
+              </button>
+            </section>
+          ) : null}
+
           <section className="rent-map-memos">
             <h5>メモ履歴</h5>
             {selectedPlan.memo_log.length === 0 ? (
@@ -263,6 +468,7 @@ export default function UnitFloorMap({
               />
             </label>
             {err ? <p className="rent-map-err">{err}</p> : null}
+            {okMsg ? <p className="rent-map-ok">{okMsg}</p> : null}
             <button
               type="button"
               className="btn"
@@ -294,7 +500,9 @@ export default function UnitFloorMap({
           </section>
         </aside>
       ) : (
-        <p className="meta rent-map-hint">号室セルをクリックすると詳細・メモ追記が開きます（ホバーで要約）。</p>
+        <p className="meta rent-map-hint">
+          号室セルをクリックすると詳細・条件修正・メモ追記が開きます（ホバーで要約）。現状≠計画は「差あり」表示。
+        </p>
       )}
     </div>
   );
