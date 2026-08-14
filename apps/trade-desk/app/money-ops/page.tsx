@@ -147,21 +147,28 @@ export default async function MoneyOpsPage({
               </tr>
             ) : (
               (ops ?? []).map((o) => {
+                const payload =
+                  o.assist_payload && typeof o.assist_payload === "object"
+                    ? (o.assist_payload as Record<string, unknown>)
+                    : null;
                 const steps =
-                  o.assist_payload &&
-                  typeof o.assist_payload === "object" &&
-                  Array.isArray(
-                    (o.assist_payload as { steps?: string[] }).steps
-                  )
-                    ? (o.assist_payload as { steps: string[] }).steps
+                  payload && Array.isArray(payload.steps)
+                    ? (payload.steps as string[])
                     : [];
                 const due =
-                  o.assist_payload &&
-                  typeof o.assist_payload === "object" &&
-                  typeof (o.assist_payload as { due_date?: string }).due_date ===
-                    "string"
-                    ? (o.assist_payload as { due_date: string }).due_date
+                  payload && typeof payload.due_date === "string"
+                    ? payload.due_date
                     : null;
+                const rails =
+                  payload && Array.isArray(payload.rails)
+                    ? (payload.rails as Array<{
+                        id?: string;
+                        label?: string;
+                        amount_jpy?: number;
+                        status?: string;
+                        otp_channel?: string;
+                      }>)
+                    : [];
                 return (
                   <tr key={o.id}>
                     <td>
@@ -175,6 +182,21 @@ export default async function MoneyOpsPage({
                         {o.from_account ?? "—"} → {o.to_account ?? "—"}
                         {due ? ` · 引落日 ${due}` : ""}
                       </div>
+                      {rails.length > 0 ? (
+                        <ul className="meta" style={{ marginTop: 6 }}>
+                          {rails.map((r) => (
+                            <li key={r.id || r.label}>
+                              {(r.label || r.id || "レール") +
+                                (r.amount_jpy != null
+                                  ? ` ${fmtYen(Number(r.amount_jpy))}`
+                                  : "")}
+                              {" · "}
+                              {r.status || "pending"}
+                              {r.otp_channel ? ` · OTP:${r.otp_channel}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
                       {o.status === "approved" ||
                       o.status === "executing" ||
                       o.status === "consulting" ? (

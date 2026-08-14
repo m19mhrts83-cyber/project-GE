@@ -1,0 +1,110 @@
+# KURASHIFT 資金送金アシスト — レール定義（Wave 0）
+# 正本: docs/KURASHIFT_送金アシスト_実務者設計_20260814.md
+# 秘密はここへ書かない（.env.jarvis_private）
+
+version: 1
+dest_whitelist:
+  smbc_kariya:
+    bank_code: "0009"
+    branch_code: "486"  # PERSONAL_BANK_BRANCH_CODE と突合
+    account_type: ordinary
+    # 口座番号は env PERSONAL_BANK_ACCOUNT のみ。ここには下4桁マスク用の参照だけ
+    account_env: PERSONAL_BANK_ACCOUNT
+    label: "三井住友銀行 刈谷"
+
+defaults:
+  min_interval_sec: 60
+  headless: false
+  require_terminal_app: true
+
+# Phase1（2026-08 Infinite）目安。money-ops 作成時の初値。
+rails:
+  - id: sbi_main_smbc
+    label: "住信SBI本→SMBC刈谷"
+    enabled: true
+    order: 10
+    amount_jpy: 26000
+    keep_floor_jpy: 500800
+    from_account_id: sbi_net_main
+    to_account_id: smbc_kariya
+    otp_channel: gmail_api  # 実装時に実機で確定。違う場合は差し替え
+    gmail_account: m19m
+    sender_hint: "住信SBI|SBI|ネット銀行"
+    free_rail: true
+    runner: null  # Wave 1
+    status_default: pending
+
+  - id: sbi_sub_smbc
+    label: "住信SBI副→SMBC刈谷"
+    enabled: true
+    order: 20
+    amount_jpy: 161000
+    keep_floor_jpy: 81000
+    from_account_id: sbi_net_sub
+    to_account_id: smbc_kariya
+    otp_channel: gmail_api
+    gmail_account: m19m
+    sender_hint: "住信SBI|SBI|ネット銀行"
+    free_rail: true
+    runner: null
+    status_default: pending
+
+  - id: tokairokin_smbc
+    label: "東海労金→SMBC刈谷"
+    enabled: true
+    order: 30
+    amount_jpy: 233000
+    keep_floor_jpy: 121000
+    from_account_id: tokairokin
+    to_account_id: smbc_kariya
+    otp_channel: app_onetime_pw
+    gmail_account: null
+    sender_hint: null
+    free_rail: false
+    runner: tokairokin
+    launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_tokairokin_to_smbc.sh"
+    status_default: pending
+
+  - id: mufg_airwallet
+    label: "MUFG豊明→エアウォレット→SMBC"
+    enabled: true
+    order: 40
+    amount_jpy: 290000
+    keep_floor_jpy: 85000
+    from_account_id: mufg_toyoake
+    to_account_id: smbc_kariya
+    otp_channel: sms_messages  # 調査後に確定
+    gmail_account: null
+    sender_hint: "エアウォレット|COIN|三菱UFJ"
+    free_rail: true
+    require_first_arrival_proof: true
+    runner: null  # Wave 2
+    status_default: pending
+
+  - id: shiga_smbc
+    label: "滋賀銀行→SMBC刈谷"
+    enabled: true
+    order: 50
+    amount_jpy: 62000
+    keep_floor_jpy: 300000
+    from_account_id: shiga
+    to_account_id: smbc_kariya
+    otp_channel: app_onetime_pw  # 調査後
+    runner: null  # Wave 3
+    status_default: pending
+
+  - id: kyoto_smbc
+    label: "京都銀行刈谷→SMBC刈谷"
+    enabled: true
+    order: 60
+    amount_jpy: 50000
+    keep_floor_jpy: 51000
+    from_account_id: kyoto_kariya
+    to_account_id: smbc_kariya
+    otp_channel: app_onetime_pw
+    runner: null
+    status_default: pending
+
+blocked:
+  - id: paypay_orix_keep
+    reason: "ミニテック着金・ORIX keep 前は触らない"

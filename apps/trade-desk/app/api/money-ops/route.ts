@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { writeCardDebitLifecycle } from "@/lib/cardDebitLifecycle";
-import { buildCardSettlementAssistSteps } from "@/lib/cardSettlementBuffer";
+import { buildCardSettlementAssistSteps, buildDefaultTransferRails } from "@/lib/cardSettlementBuffer";
 
 const KINDS = new Set([
   "bank_transfer",
@@ -91,9 +91,15 @@ export async function POST(req: Request) {
             })
           : [
               "承認後に手順アシストを確認",
-              "銀行／証券の振込確定は手動（自動振込なし）",
+              "送金は Terminal でレール Preview→Go（無人記帳なし）",
               "保険配分変更はアシストのみ",
             ],
+      ...(kind === "card_settlement_buffer"
+        ? {
+            rails: buildDefaultTransferRails(),
+            transfer_assist: "kurashift_v0",
+          }
+        : {}),
     };
   }
   if (dueDate && !(assist as { due_date?: string }).due_date) {

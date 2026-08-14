@@ -30,6 +30,124 @@ export type ScenarioExample = {
   example: string;
 };
 
+/** money-ops assist_payload.rails[]（送金アシスト Wave 0） */
+export type TransferRailStatus =
+  | "pending"
+  | "previewed"
+  | "running"
+  | "otp_fetch"
+  | "otp_submit"
+  | "waiting_user"
+  | "executing_click"
+  | "verifying"
+  | "done"
+  | "failed"
+  | "blocked";
+
+export type TransferOtpChannel =
+  | "gmail_api"
+  | "sms_messages"
+  | "app_onetime_pw"
+  | "passkey_or_bio"
+  | "none";
+
+export type TransferRail = {
+  id: string;
+  label: string;
+  amount_jpy: number;
+  from_account_id: string;
+  to_account_id: string;
+  otp_channel: TransferOtpChannel;
+  keep_floor_jpy?: number;
+  status: TransferRailStatus;
+  order?: number;
+  free_rail?: boolean;
+  idempotency_key?: string | null;
+  evidence?: string | null;
+  last_error?: string | null;
+};
+
+/** Phase1 既定（config/kurashift_transfer_rails.yaml と同期） */
+export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
+  {
+    id: "sbi_main_smbc",
+    label: "住信SBI本→SMBC刈谷",
+    amount_jpy: 26000,
+    from_account_id: "sbi_net_main",
+    to_account_id: "smbc_kariya",
+    otp_channel: "gmail_api",
+    keep_floor_jpy: 500800,
+    status: "pending",
+    order: 10,
+    free_rail: true,
+  },
+  {
+    id: "sbi_sub_smbc",
+    label: "住信SBI副→SMBC刈谷",
+    amount_jpy: 161000,
+    from_account_id: "sbi_net_sub",
+    to_account_id: "smbc_kariya",
+    otp_channel: "gmail_api",
+    keep_floor_jpy: 81000,
+    status: "pending",
+    order: 20,
+    free_rail: true,
+  },
+  {
+    id: "tokairokin_smbc",
+    label: "東海労金→SMBC刈谷",
+    amount_jpy: 233000,
+    from_account_id: "tokairokin",
+    to_account_id: "smbc_kariya",
+    otp_channel: "app_onetime_pw",
+    keep_floor_jpy: 121000,
+    status: "pending",
+    order: 30,
+    free_rail: false,
+  },
+  {
+    id: "mufg_airwallet",
+    label: "MUFG豊明→エアウォレット→SMBC",
+    amount_jpy: 290000,
+    from_account_id: "mufg_toyoake",
+    to_account_id: "smbc_kariya",
+    otp_channel: "sms_messages",
+    keep_floor_jpy: 85000,
+    status: "pending",
+    order: 40,
+    free_rail: true,
+  },
+  {
+    id: "shiga_smbc",
+    label: "滋賀銀行→SMBC刈谷",
+    amount_jpy: 62000,
+    from_account_id: "shiga",
+    to_account_id: "smbc_kariya",
+    otp_channel: "app_onetime_pw",
+    keep_floor_jpy: 300000,
+    status: "pending",
+    order: 50,
+  },
+  {
+    id: "kyoto_smbc",
+    label: "京都銀行刈谷→SMBC刈谷",
+    amount_jpy: 50000,
+    from_account_id: "kyoto_kariya",
+    to_account_id: "smbc_kariya",
+    otp_channel: "app_onetime_pw",
+    keep_floor_jpy: 51000,
+    status: "pending",
+    order: 60,
+  },
+];
+
+export const TRANSFER_ASSIST_DOC =
+  "docs/KURASHIFT_送金アシスト_実務者設計_20260814.md";
+
+export function buildDefaultTransferRails(): TransferRail[] {
+  return DEFAULT_TRANSFER_RAILS.map((r) => ({ ...r }));
+}
+
 /** Olive Infinite 引落の現金置き場（流動性マスタ正本） */
 export const SMBC_SETTLEMENT_ACCOUNT_ID = "smbc_kariya";
 export const SMBC_SETTLEMENT_ACCOUNT_LABEL = "三井住友銀行 刈谷";
@@ -228,7 +346,8 @@ export function buildCardSettlementAssistSteps(input: {
     "【不足時だけ】調達ラダー: 利金送金 →（定額返済カレンダー可なら）契約者貸付 → Bloomo一部 →（最終）SBIコアは原則禁止",
     "定額返済を書けるなら貸付は可（防衛・次物件・NISA9万の余りから）。書けないなら Bloomo 優先",
     "あかつき元本売却は使わない",
-    "承認後も振込は手動。実行したら status を executing→done に更新（done で引落アラート解除）",
+    "承認＝計画合意のみ（自動記帳なし）。実行は Terminal.app でレール Go。メール／SMS OTP は Jarvis、アプリOTPはユーザー",
+    "各レール完了は証跡付きで rails[].status=done。オペ全体の done で引落アラート解除",
   ];
 }
 
