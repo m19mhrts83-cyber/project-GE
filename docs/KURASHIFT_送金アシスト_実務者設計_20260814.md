@@ -120,10 +120,10 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 |---|---|---|
 | **0** | 仕様・R6'・rails[]・OTP／監査骨格・東海労金プロトコル | 完了 |
 | **1** | 住信SBIネット→SMBC（本／副）・ことら分割・スマート認証NEO待ち | 完了（ログイン〜確認） |
-| **1b** | 最小ユーザー操作＋実行クリック＋証跡 done／resume | **本版** |
-| **2** | エアウォレット | 後続 |
-| **3** | 滋賀・京都 | 後続 |
-| **4** | ことら分割・任意キュー | 後続 |
+| **1b** | 最小ユーザー操作＋実行クリック＋証跡 done／resume | 完了 |
+| **2** | エアウォレット（手順・初回着金ゲート・SMS OTP） | **完了（アプリタップはユーザー最小）** |
+| **3** | 滋賀・京都 IB（東海労金型 Preview→Go） | **骨格完了（creds 待ち）** |
+| **4** | ことら分割キューの横断オーケストレーション | **骨格（`jarvis_transfer_queue.py`）** |
 
 ---
 
@@ -168,6 +168,33 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 ./run_phase1_sbi_main_to_smbc.sh --resume --execute
 ./run_phase1_sbi_sub_to_smbc.sh --go --chunk 0 --execute
 ./run_phase1_sbi_sub_to_smbc.sh --go --chunk 1 --execute
+```
+
+### Wave2 エアウォレット
+
+- アプリ中心。Jarvis=手順・初回着金ゲート・SMS OTP・監査／あなた=アプリタップ
+- 状態: `.jarvis_state/airwallet_arrival_proof.json`
+
+```bash
+cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
+./run_phase1_airwallet_to_smbc.sh --preview
+./run_phase1_airwallet_to_smbc.sh --go --money-ops-id <UUID>
+# 初回 SMBC 着金確認後
+./run_phase1_airwallet_to_smbc.sh --mark-arrival-proven --note 'SMBC着金OK'
+# SMS OTP のみ取得（値は stdout・ログに残さない）
+./run_phase1_airwallet_to_smbc.sh --fetch-sms-otp
+```
+
+### Wave3 滋賀・京都 IB
+
+- Creds: `SHIGA_IB_*` / `KYOTO_IB_*`（jarvis_private）
+- 設定: `config/kurashift_ib_shiga.yaml` / `kurashift_ib_kyoto.yaml`
+
+```bash
+./run_phase1_shiga_to_smbc.sh --preview
+./run_phase1_shiga_to_smbc.sh --go --execute
+./run_phase1_kyoto_to_smbc.sh --preview
+./run_phase1_kyoto_to_smbc.sh --go --execute
 ```
 
 ---

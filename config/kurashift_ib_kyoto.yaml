@@ -1,0 +1,18 @@
+# 京都銀行 京銀ダイレクト（parasol.anser — 東海労金と同系統）— Wave3
+# 秘密: KYOTO_IB_USER / KYOTO_IB_PASSWORD
+login_url: "https://www.parasol.anser.ne.jp/ib/index.do?PT=BS&CCT0080=0158"
+otp_channel: app_onetime_pw
+username_selectors:
+  - "input[name*='user' i]"
+  - "input[id*='user' i]"
+  - "input[name*='login' i]"
+  - "input[name*='kaiin' i]"
+  - "input[type='text']"
+password_selectors:
+  - "input[type='password']"
+login_button_names:
+  - "ログイン"
+transfer_link_patterns:
+  - "振込"
+  - "振替"
+  - "ことら"

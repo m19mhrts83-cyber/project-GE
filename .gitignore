@@ -94,6 +94,10 @@ _tmp/
 .jarvis_state/transfer_audit/
 .jarvis_state/transfer_locks/
 .jarvis_state/transfer_session/
+.jarvis_state/airwallet_arrival_proof.json
+.jarvis_state/chrome_sbi_net_transfer/
+.jarvis_state/chrome_ib_shiga/
+.jarvis_state/chrome_ib_kyoto/
 .vercel-tmp-dashboard/
 
 # --- Q&Aチャットボット／ProgramCode の実行成果物（容量大） ---
