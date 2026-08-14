@@ -7,7 +7,9 @@ import {
   FREE_RAILS,
   FUNDING_LADDER,
   POLICY_LOAN_UI_NOTE,
+  SCENARIO_EXAMPLES,
   SMBC_SETTLEMENT_ACCOUNT_LABEL,
+  TRANSFER_PHASES,
   buildCardSettlementAssistSteps,
   computeGapView,
   defaultCardSettlementRationale,
@@ -102,6 +104,8 @@ export default function CardSettlementBufferForm({
             household_coverable: gv?.householdCoverable ?? null,
             funding_ladder: FUNDING_LADDER.map((s) => s.id),
             free_rails: FREE_RAILS.map((r) => r.id),
+            transfer_phases: TRANSFER_PHASES.map((p) => p.id),
+            scenario_examples: SCENARIO_EXAMPLES.map((s) => s.id),
             steps: buildCardSettlementAssistSteps({
               dueDate,
               needYen: Number.isFinite(need) ? need : null,
@@ -181,7 +185,38 @@ export default function CardSettlementBufferForm({
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <strong style={{ fontSize: 14 }}>① まず無料で寄せる</strong>
+        <strong style={{ fontSize: 14 }}>この画面の読み方</strong>
+        <p className="meta" style={{ marginTop: 6 }}>
+          <strong>本流</strong>は①〜④です。無料レールは送金手段、例A〜Dは入金額が変わった場合の
+          結果比較です。どちらも本流とは別の記号です。
+        </p>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <strong style={{ fontSize: 14 }}>本流① 必要額と残す額を確定する</strong>
+        <p className="meta" style={{ marginTop: 6 }}>
+          引落日・必要額・引落口座残高を確認し、各口座では次回の固定引落と安全バッファを先に確保します。
+        </p>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <strong style={{ fontSize: 14 }}>本流② 段階的に寄せる</strong>
+        <ol className="meta" style={{ marginTop: 6, paddingLeft: 18 }}>
+          {TRANSFER_PHASES.map((p) => (
+            <li key={p.id} style={{ marginBottom: 6 }}>
+              <strong>{p.title}</strong>（{p.timing}）— {p.action}
+              <br />
+              確認: {p.gate}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <strong style={{ fontSize: 14 }}>送金手段：無料レール3本</strong>
+        <p className="meta" style={{ marginTop: 4 }}>
+          以下は本流②で使う「運び方」です。A・B・Cの代替案ではありません。
+        </p>
         <ol className="meta" style={{ marginTop: 6, paddingLeft: 18 }}>
           {FREE_RAILS.map((r) => (
             <li key={r.id}>
@@ -192,7 +227,24 @@ export default function CardSettlementBufferForm({
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <strong style={{ fontSize: 14 }}>② それでも足りないときだけ</strong>
+        <strong style={{ fontSize: 14 }}>本流③ 例A〜Dで充足度を確認する</strong>
+        <p className="meta" style={{ marginTop: 4 }}>
+          A〜Dは手順の選択肢ではなく、給与や家賃入金をどこまで反映したかを比較する例です。
+        </p>
+        <ol className="meta" style={{ marginTop: 6, paddingLeft: 18 }}>
+          {SCENARIO_EXAMPLES.map((s) => (
+            <li key={s.id} style={{ marginBottom: 4 }}>
+              <strong>
+                例{s.id}：{s.title}（{s.role}）
+              </strong>{" "}
+              — {s.example}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <strong style={{ fontSize: 14 }}>本流④ それでも足りないときだけ調達する</strong>
         <ol className="meta" style={{ marginTop: 6, paddingLeft: 18 }}>
           {FUNDING_LADDER.filter((s) => s.order >= 1).map((s) => (
             <li key={s.id}>
