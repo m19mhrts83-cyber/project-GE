@@ -433,7 +433,7 @@ export default async function HomePage() {
           <strong>A 把握</strong>／<strong>B 提案・相談・実行</strong>／
           <strong>C 日常回し</strong>。いまのホームは C を前面にしています。
           {" · "}
-          <a href="/guide">構成ガイド（記号の説明）→</a>
+          <a href="/guide">構成ガイド（運用メニュー・記号の説明）→</a>
         </p>
         <ol className="meta" style={{ margin: "8px 0 0", paddingLeft: 20 }}>
           <li>
