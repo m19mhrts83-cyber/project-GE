@@ -91,6 +91,8 @@ _tmp/
 .jarvis_state/securities_holdings_probe/
 .jarvis_state/sony_rate_probe/
 .jarvis_state/zaim_sbi_probe/
+.jarvis_state/transfer_audit/
+.jarvis_state/transfer_locks/
 .vercel-tmp-dashboard/
 
 # --- Q&Aチャットボット／ProgramCode の実行成果物（容量大） ---

@@ -36,7 +36,7 @@ export default function MoneyOpStatusActions({
   async function setStatus(next: string) {
     if (next === "approved") {
       const ok = window.confirm(
-        "この資金移動を承認しますか？\n（銀行・証券の振込確定は自動では動きません。手順アシストに従って手動実行してください）"
+        "この資金移動を承認しますか？\n（承認＝計画合意のみ。記帳はしません。\n実行は Terminal.app でレールごとに Preview→Go。\nメール／SMS OTP は Jarvis、アプリOTP・生体はユーザー）"
       );
       if (!ok) return;
     }

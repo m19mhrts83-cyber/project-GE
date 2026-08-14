@@ -35,9 +35,9 @@ flowchart TB
 |---|---|
 | Infinite | 本線。通知で必ず state 更新 |
 | 他カード | 金額≥30万のみアラート |
-| 金額ソース Phase1 | Gmail（金額表示ON時）＋ **Vpass Web**（本線）＋手動 `--set`／フォーム。スクレイプ以外の銀行自動振込はしない |
+| 金額ソース Phase1 | Gmail（金額表示ON時）＋ **Vpass Web**（本線）＋手動 `--set`／フォーム |
 | 引落口座 | `smbc_kariya` のみ |
-| 自動振込 | しない |
+| 送金アシスト | 承認≠記帳。取得可能 OTP は Jarvis。アプリ OTP はユーザー。正本: `docs/KURASHIFT_送金アシスト_実務者設計_20260814.md` |
 | ダッシュボード専用ページ `/card-debit` | **作らない**（処置は money-ops） |
 | 年会費 | `card_annual_fee` のまま分離 |
 
@@ -137,13 +137,15 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - [x] 汎用 ack だけで支払いピンが7日消えない（specialized）
 - [x] 貸付が「積極推奨」文言になっていない（定額返済可の条件付き）
 - [x] finance-philosophy に判断軸がある
-- [x] 自動振込が無い
+- [x] 承認だけでは記帳されない（送金アシストは Preview→Go）
+- [x] R6'／rails[] 正本あり（`docs/KURASHIFT_送金アシスト_*`）
 
 ---
 
 ## 8. 禁止
 
-- 自動振込
+- 承認のみでの振込実行（無人無確認記帳）
 - あかつき元本・SBIコアの安易な推奨
 - 返済カレンダーなしの契約者貸付推奨
 - `card_annual_fee` との混同
+- OTP／口座全文のチャット出力

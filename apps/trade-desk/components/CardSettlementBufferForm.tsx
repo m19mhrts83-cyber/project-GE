@@ -11,6 +11,7 @@ import {
   SMBC_SETTLEMENT_ACCOUNT_LABEL,
   TRANSFER_PHASES,
   buildCardSettlementAssistSteps,
+  buildDefaultTransferRails,
   computeGapView,
   defaultCardSettlementRationale,
 } from "@/lib/cardSettlementBuffer";
@@ -106,6 +107,8 @@ export default function CardSettlementBufferForm({
             free_rails: FREE_RAILS.map((r) => r.id),
             transfer_phases: TRANSFER_PHASES.map((p) => p.id),
             scenario_examples: SCENARIO_EXAMPLES.map((s) => s.id),
+            rails: buildDefaultTransferRails(),
+            transfer_assist: "kurashift_v0",
             steps: buildCardSettlementAssistSteps({
               dueDate,
               needYen: Number.isFinite(need) ? need : null,
@@ -154,7 +157,8 @@ export default function CardSettlementBufferForm({
       </header>
       <p className="meta" style={{ marginTop: 8 }}>
         Olive などの大型引落に向け、<strong>引落口座へ無料で寄せる</strong>計画です。
-        自動振込はしません。承認は「この寄せ方でよい」の合意だけです。
+        承認は「この寄せ方でよい」の合意だけ（記帳しません）。実行は Terminal でレールごとに
+        Preview→Go。メール／SMS OTP は Jarvis、アプリOTPはユーザーです。
         金額・引落日は財務メール（Gmail）または Vpass で確定して入力してください。
       </p>
       <p className="meta" style={{ marginTop: 6 }}>

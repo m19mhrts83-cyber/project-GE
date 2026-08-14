@@ -48,7 +48,7 @@ export default function NewMoneyOpForm() {
         <strong>資金移動・手続きドラフト</strong>
       </header>
       <p className="meta">
-        承認後も自動振込はしません。保険配分変更は手順アシストのみ。
+        承認後も無人記帳はしません。送金アシストは Terminal でレール Go（OTP はチャネル依存）。保険配分変更は手順アシストのみ。
       </p>
       <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
         <input name="title" required placeholder="タイトル" />
