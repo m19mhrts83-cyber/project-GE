@@ -82,12 +82,13 @@ rails:
     keep_floor_jpy: 85000
     from_account_id: mufg_toyoake
     to_account_id: smbc_kariya
-    otp_channel: sms_messages  # 調査後に確定
+    otp_channel: sms_messages
     gmail_account: null
-    sender_hint: "エアウォレット|COIN|三菱UFJ"
+    sender_hint: "エアウォレット|COIN|COIN+|三菱UFJ|リクルート"
     free_rail: true
     require_first_arrival_proof: true
-    runner: null  # Wave 2
+    runner: airwallet
+    launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_airwallet_to_smbc.sh"
     status_default: pending
 
   - id: shiga_smbc
@@ -98,8 +99,10 @@ rails:
     keep_floor_jpy: 300000
     from_account_id: shiga
     to_account_id: smbc_kariya
-    otp_channel: app_onetime_pw  # 調査後
-    runner: null  # Wave 3
+    otp_channel: app_onetime_pw
+    runner: ib_assist
+    launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_shiga_to_smbc.sh"
+    config: config/kurashift_ib_shiga.yaml
     status_default: pending
 
   - id: kyoto_smbc
@@ -111,7 +114,9 @@ rails:
     from_account_id: kyoto_kariya
     to_account_id: smbc_kariya
     otp_channel: app_onetime_pw
-    runner: null
+    runner: ib_assist
+    launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_kyoto_to_smbc.sh"
+    config: config/kurashift_ib_kyoto.yaml
     status_default: pending
 
 blocked:

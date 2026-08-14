@@ -1,0 +1,18 @@
+# 滋賀銀行『しがぎん』ダイレクト — Wave3
+# 秘密は .env.jarvis_private の SHIGA_IB_USER / SHIGA_IB_PASSWORD
+login_url: "https://www.shigagin.com/personal/direct"
+# 実ログインフォームURLが案内ページと違う場合は、ブラウザで確認して差し替え
+otp_channel: app_onetime_pw
+username_selectors:
+  - "input[name*='user' i]"
+  - "input[id*='user' i]"
+  - "input[name*='login' i]"
+  - "input[type='text']"
+password_selectors:
+  - "input[type='password']"
+login_button_names:
+  - "ログイン"
+transfer_link_patterns:
+  - "振込"
+  - "振替"
+  - "ことら"
