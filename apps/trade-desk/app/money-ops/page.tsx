@@ -110,8 +110,9 @@ export default async function MoneyOpsPage({
     <Shell active="/money-ops" email={user?.email ?? null}>
       <h1>資金移動オペ</h1>
       <p className="sub">
-        draft → consulting → approved → executing → done。承認前に実弾は動きません。
-        銀行・証券の振込確定と保険配分変更の自動実行は対象外（手順アシストまで）。
+        draft → consulting → approved → executing → done。承認＝計画合意のみ（実弾は動かない）。
+        iPhoneでは下の「Phase1 手動実行チェック」を見ながらアプリ送金できます。
+        Jarvis のブラウザ自動化の続きは Mac 起動中に Cursor／Terminal で依頼したときだけ動きます。
       </p>
 
       <CardSettlementBufferForm
@@ -167,6 +168,7 @@ export default async function MoneyOpsPage({
                         amount_jpy?: number;
                         status?: string;
                         otp_channel?: string;
+                        manual_iphone?: string;
                       }>)
                     : [];
                 return (
@@ -193,6 +195,7 @@ export default async function MoneyOpsPage({
                               {" · "}
                               {r.status || "pending"}
                               {r.otp_channel ? ` · OTP:${r.otp_channel}` : ""}
+                              {r.manual_iphone ? ` — ${r.manual_iphone}` : ""}
                             </li>
                           ))}
                         </ul>

@@ -4,12 +4,15 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { fmtYen } from "@/lib/format";
 import {
+  DEFAULT_TRANSFER_RAILS,
   FREE_RAILS,
   FUNDING_LADDER,
+  MANUAL_EXEC_PROGRESS,
   POLICY_LOAN_UI_NOTE,
   SCENARIO_EXAMPLES,
   SMBC_SETTLEMENT_ACCOUNT_LABEL,
   TRANSFER_PHASES,
+  WHERE_LABEL,
   buildCardSettlementAssistSteps,
   buildDefaultTransferRails,
   computeGapView,
@@ -214,6 +217,52 @@ export default function CardSettlementBufferForm({
             </li>
           ))}
         </ol>
+      </div>
+
+      <div
+        className="meta"
+        style={{
+          marginTop: 14,
+          padding: 12,
+          borderRadius: 8,
+          background: "var(--card-soft, #f6f6f4)",
+          border: "1px solid var(--border, #e5e5e0)",
+        }}
+      >
+        <strong style={{ fontSize: 14, color: "var(--fg, #111)" }}>
+          Phase1 手動実行チェック（iPhone向け）
+        </strong>
+        <p style={{ marginTop: 6 }}>
+          引落口座へ寄せるレール一覧です。アプリでできるものは自分で進めてOK。
+          終わったレールは一覧のオペで status を更新するか、Jarvis に「〇〇完了」と一声ください。
+        </p>
+        <p style={{ marginTop: 6 }}>
+          <strong>進捗（{MANUAL_EXEC_PROGRESS.as_of}）:</strong>{" "}
+          {MANUAL_EXEC_PROGRESS.automation_status}
+        </p>
+        <ol style={{ marginTop: 8, paddingLeft: 18 }}>
+          {DEFAULT_TRANSFER_RAILS.map((r) => (
+            <li key={r.id} style={{ marginBottom: 10 }}>
+              <strong>
+                {r.label} · {fmtYen(r.amount_jpy)}
+              </strong>
+              <br />
+              {r.where ? WHERE_LABEL[r.where] : ""}
+              {r.keep_note ? ` · ${r.keep_note}` : ""}
+              <br />
+              {r.manual_iphone}
+            </li>
+          ))}
+        </ol>
+        <p style={{ marginTop: 4 }}>
+          iPhoneでできること: {MANUAL_EXEC_PROGRESS.iphone_can}
+        </p>
+        <p style={{ marginTop: 4 }}>
+          Macが必要なこと: {MANUAL_EXEC_PROGRESS.needs_mac}
+        </p>
+        <p style={{ marginTop: 4 }}>
+          Jarvisが続きをやる条件: {MANUAL_EXEC_PROGRESS.jarvis_continues_when}
+        </p>
       </div>
 
       <div style={{ marginTop: 12 }}>
