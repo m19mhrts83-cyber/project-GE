@@ -65,6 +65,12 @@ export type TransferRail = {
   idempotency_key?: string | null;
   evidence?: string | null;
   last_error?: string | null;
+  /** iPhone で自分でやる手順（1行） */
+  manual_iphone?: string;
+  /** 実行の置き場 */
+  where?: "iphone_app" | "mac_ib" | "either";
+  /** 残す下限の説明 */
+  keep_note?: string;
 };
 
 /** Phase1 既定（config/kurashift_transfer_rails.yaml と同期） */
@@ -80,6 +86,10 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     status: "pending",
     order: 10,
     free_rail: true,
+    where: "either",
+    keep_note: "残≈50.1万（Amex過渡）",
+    manual_iphone:
+      "NEOBANKアプリで本口座から三井住友刈谷へ26,000円（ことら可）。残50万超を維持",
   },
   {
     id: "sbi_sub_smbc",
@@ -92,6 +102,10 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     status: "pending",
     order: 20,
     free_rail: true,
+    where: "either",
+    keep_note: "残≈8.1万",
+    manual_iphone:
+      "ことらで100,000＋61,000の2回（1件10万超は分割）。副の残≈8万を維持",
   },
   {
     id: "tokairokin_smbc",
@@ -104,6 +118,10 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     status: "pending",
     order: 30,
     free_rail: false,
+    where: "mac_ib",
+    keep_note: "残≈12.1万",
+    manual_iphone:
+      "ワンタイムPWアプリ必須。IBはMac推奨。宛先=三井住友刈谷・233,000円",
   },
   {
     id: "mufg_airwallet",
@@ -116,6 +134,10 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     status: "pending",
     order: 40,
     free_rail: true,
+    where: "iphone_app",
+    keep_note: "MUFG残≈8.5万",
+    manual_iphone:
+      "エアウォレットでMUFG→チャージ→SMBC刈谷へ出金290,000。初回は少額テスト推奨",
   },
   {
     id: "shiga_smbc",
@@ -127,6 +149,10 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     keep_floor_jpy: 300000,
     status: "pending",
     order: 50,
+    where: "either",
+    keep_note: "残≈30万（27日返済あり）",
+    manual_iphone:
+      "しがぎんダイレクト／アプリで62,000→三井住友刈谷。残30万を切らない",
   },
   {
     id: "kyoto_smbc",
@@ -138,9 +164,31 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     keep_floor_jpy: 51000,
     status: "pending",
     order: 60,
+    where: "either",
+    keep_note: "残≈5.1万",
+    manual_iphone:
+      "京銀アプリ／ダイレクトで50,000→三井住友刈谷。残5万超を維持",
   },
 ];
 
+/** iPhone 手動チェック用の進捗メタ（画面表示） */
+export const MANUAL_EXEC_PROGRESS = {
+  as_of: "2026-08-14",
+  automation_status:
+    "アシスト骨格は Wave0〜4 まで実装済み。実送金は未実行（Previewのみ）。銀行ログイン用 env は未設定のため Go 未着手。",
+  jarvis_continues_when:
+    "Mac が起動し、money-ops が approved/executing、かつ Terminal/Cursor で Jarvis に『続けて』と依頼したとき。KURASHIFT 画面に書くだけでは自動振込は始まりません。",
+  iphone_can:
+    "エアウォレット・各銀行アプリでの手動寄せ、ワンタイムPW承認、money-ops の承認／ステータス更新、完了の一声",
+  needs_mac:
+    "IB ブラウザ自動化（東海労金・SBIネット・滋賀・京都の --go）、SMS OTP の Messages DB 読取、監査ログ更新の本線",
+} as const;
+
+export const WHERE_LABEL: Record<NonNullable<TransferRail["where"]>, string> = {
+  iphone_app: "iPhoneアプリ向き",
+  mac_ib: "Mac IB向き",
+  either: "iPhoneでも可",
+};
 export const TRANSFER_ASSIST_DOC =
   "docs/KURASHIFT_送金アシスト_実務者設計_20260814.md";
 
@@ -346,7 +394,8 @@ export function buildCardSettlementAssistSteps(input: {
     "【不足時だけ】調達ラダー: 利金送金 →（定額返済カレンダー可なら）契約者貸付 → Bloomo一部 →（最終）SBIコアは原則禁止",
     "定額返済を書けるなら貸付は可（防衛・次物件・NISA9万の余りから）。書けないなら Bloomo 優先",
     "あかつき元本売却は使わない",
-    "承認＝計画合意のみ（自動記帳なし）。実行は Terminal.app でレール Go。メール／SMS OTP は Jarvis、アプリOTPはユーザー",
+    "【手動チェック】iPhone: エアウォレット・各銀行アプリ。Mac: IB自動化。承認だけでは資金は動かない",
+    "承認＝計画合意のみ。実行はレールごと。メール／SMS OTPはJarvis、アプリOTPはユーザー",
     "各レール完了は証跡付きで rails[].status=done。オペ全体の done で引落アラート解除",
   ];
 }
