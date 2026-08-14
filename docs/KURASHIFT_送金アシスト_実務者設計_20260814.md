@@ -119,7 +119,8 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 | Wave | 内容 | 状態 |
 |---|---|---|
 | **0** | 仕様・R6'・rails[]・OTP／監査骨格・東海労金プロトコル | 完了 |
-| **1** | 住信SBIネット→SMBC（本／副）・ことら分割・スマート認証NEO待ち | **実装（ログイン〜確認。実行クリックは未）** |
+| **1** | 住信SBIネット→SMBC（本／副）・ことら分割・スマート認証NEO待ち | 完了（ログイン〜確認） |
+| **1b** | 最小ユーザー操作＋実行クリック＋証跡 done／resume | **本版** |
 | **2** | エアウォレット | 後続 |
 | **3** | 滋賀・京都 | 後続 |
 | **4** | ことら分割・任意キュー | 後続 |
@@ -133,22 +134,40 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 - [x] `kurashift_transfer_rails.yaml` + OTP／監査モジュール
 - [x] money-ops `rails[]` 表示
 - [x] 東海労金 Preview／Go／監査フック
-- [x] SBIネット Preview／Go（ログイン〜確認。スマート認証NEOは waiting_user。実行クリック未）
-- [ ] SBI 実行クリック＋証跡 done（Wave 1b）
+- [x] SBIネット Preview／Go（ログイン〜確認。スマート認証NEOは waiting_user）
+- [x] SBI 実行クリック＋証跡 done／resume（Wave 1b）
+
+### 最小ユーザー操作モデル（正・Wave1b）
+
+| 行為 | Jarvis | あなた |
+|---|---|---|
+| money-ops 承認・Terminal Preview/Go | 主 | Go の一声／承認ボタン |
+| ログイン ID/PW | 主（env） | 初回だけ env 追記 |
+| メール／SMS OTP | **主（自動取得・入力）** | Full Disk／再認証時のみ |
+| スマート認証NEO・アプリ承認 | ホールド案内 | **主（一手）** |
+| Jarvis が取れない OTP | 入力・続行 | **コードを Terminal に1行**（チャット禁止） |
+| 振込金額・宛先入力・照合 | 主 | — |
+| 実行クリック | 照合OKなら主（`--execute`） | — |
+| 完了証跡 → done | 主 | 「承認した」→ `--resume` 可 |
+
+**原則**: あなたがやるのは「あなたにしかできない所有物・生体」だけ。渡した直後の続行は Jarvis。
 
 ### Wave1 補足（ドコモSMTB／旧住信SBI）
 
 - ログイン URL: `https://www.netbk.co.jp/contents/pages/wpl020601/i020601CT/DI02060100`
 - Creds: `SBI_NET_USER` / `SBI_NET_LOGIN_PASSWORD`（`SBI_SEC_*` と分離）
-- 無料寄せ: ことらおおむね **1件10万**。副口座 161k は **100k+61k** 分割
-- 取引実行はスマート認証NEO（アプリ承認）が多い → `waiting_user`
+- 無料寄せ: ことらおおむね **1件10万**。副口座 161k は **100k+61k**（`--chunk 0/1`）
+- 取引実行はスマート認証NEO（アプリ承認）が多い → Terminal で Enter または `--resume`
 
 ```bash
 # Terminal.app
 cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 ./run_phase1_sbi_main_to_smbc.sh --preview
-./run_phase1_sbi_main_to_smbc.sh --go --money-ops-id <UUID>
-./run_phase1_sbi_sub_to_smbc.sh --preview
+./run_phase1_sbi_main_to_smbc.sh --go --execute --money-ops-id <UUID>
+# アプリ承認待ちで止まったら承認 → Enter（同プロセス）または
+./run_phase1_sbi_main_to_smbc.sh --resume --execute
+./run_phase1_sbi_sub_to_smbc.sh --go --chunk 0 --execute
+./run_phase1_sbi_sub_to_smbc.sh --go --chunk 1 --execute
 ```
 
 ---
