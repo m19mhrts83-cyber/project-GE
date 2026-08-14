@@ -124,3 +124,27 @@
 
 正本記入: `docs/KURASHIFT_資金移動_カード引落バッファ_検討素案_20260814.md` §4。
 
+---
+
+## V-2 検証（2026-08-15）
+
+| ID | 結果 | メモ |
+|---|---|---|
+| **V-2-UI** | ✅ 合格 | `/lifeplan`・budget・abg・`/roi`・`/tax` 本番目視。Zaim dry-run キューOK。Zaim本番は自動化が confirm 誤承認→**実行前に failed**（本番未反映） |
+| **V-2B-EV** | ✅ 合格 | 旧「0件」は **year=2025** 窓。実メールは 2026-07 大野さん「決算のご報告」。`messages_scanned=2`・証憑1（`R8_…申告書一式.pdf`）。クエリを `before:{year+1}/1/1` に拡張 |
+
+### 一時停止ブックマーク（2026-08-15・検証後回し）
+
+**いまの位置**: ② `/tax` — KPIカタログ登録＋提出PDFプレビュー実装まで完了。検証は止めてよい。
+
+| 戻るとき | やること |
+|---|---|
+| **再開の一言** | 「②税の検証から。次は V-2B-MAP」 |
+| **正本** | [`KURASHIFT_検証プラン.md`](./KURASHIFT_検証プラン.md) の「スレッド洗い出し A」表 |
+| **次候補** | **V-2B-MAP**（弥生勘定マップ）→ 必要なら **V-2A-MAP**（Numbers→Zaim）。混ぜない |
+| **本番で見る** | `/tax` の気配差・申告書プレビュー（要デプロイ） |
+| **再取込** | `jarvis_kurashift_tax.py --import-metrics-catalog` / `--ingest-filed-returns` |
+| **カタログ** | `config/kurashift_tax_year_metrics.yaml` |
+
+次: V-2B-MAP / V-2A-MAP 等は別セッション。
+

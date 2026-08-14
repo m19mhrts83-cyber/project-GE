@@ -11,7 +11,7 @@ type Props = {
 
 export default function TaxMetricsForm({ scope, currentYear }: Props) {
   const router = useRouter();
-  const years = yearOptions(scope, currentYear, 5);
+  const years = yearOptions(scope, currentYear, scope === "personal" ? 10 : 5);
   const [fiscalYear, setFiscalYear] = useState(currentYear);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);

@@ -4,6 +4,15 @@ import { aggregateReCfFromCategoryYear, type FinanceCategoryYearRow } from "@/li
 
 export type TaxScope = "personal" | "corporate";
 
+export type TaxYearMetricPayload = {
+  re_income_jpy?: number | string | null;
+  re_income_statement_jpy?: number | string | null;
+  re_revenue_jpy?: number | string | null;
+  withholding_jpy?: number | string | null;
+  refund_amount_jpy?: number | string | null;
+  [key: string]: unknown;
+};
+
 export type TaxYearMetricRow = {
   scope: string;
   fiscal_year: number;
@@ -18,6 +27,7 @@ export type TaxYearMetricRow = {
   ordinary_income_jpy: number | string | null;
   corporate_tax_jpy: number | string | null;
   tax_payable_jpy: number | string | null;
+  payload?: TaxYearMetricPayload | null;
 };
 
 export type TaxPrepHint = {
@@ -36,6 +46,12 @@ export type TaxYearView = {
   hasCaseReady: boolean;
   evidenceCount: number;
   prep: TaxPrepHint | null;
+  /** 第一表の不動産所得（確定） */
+  filedReIncome: number | null;
+  /** 気配CF − 確定不動産所得 */
+  zaimVsFiledDiff: number | null;
+  /** 差 ÷ |確定|。確定が0のときは null */
+  zaimVsFiledPct: number | null;
   taxableIncome: number | null;
   incomeTax: number | null;
   refundOrPay: string | null;
@@ -88,6 +104,21 @@ export function prepHintForYear(
   };
 }
 
+function filedReIncomeFromMetric(m: TaxYearMetricRow | undefined): number | null {
+  if (!m?.payload) return null;
+  return yen(m.payload.re_income_jpy);
+}
+
+export function zaimVsFiled(
+  prepCf: number | null | undefined,
+  filedRe: number | null | undefined
+): { diff: number | null; pct: number | null } {
+  if (prepCf == null || filedRe == null) return { diff: null, pct: null };
+  const diff = prepCf - filedRe;
+  if (filedRe === 0) return { diff, pct: null };
+  return { diff, pct: diff / Math.abs(filedRe) };
+}
+
 function taxAmount(scope: TaxScope, m: TaxYearMetricRow | undefined): number | null {
   if (!m) return null;
   if (scope === "personal") return yen(m.income_tax_jpy);
@@ -119,6 +150,8 @@ export function buildTaxYearViews(args: {
   const views: TaxYearView[] = args.years.map((y) => {
     const m = byYear.get(y);
     const prep = prepHintForYear(args.scope, y, args.categoryRows);
+    const filedReIncome = filedReIncomeFromMetric(m);
+    const vs = zaimVsFiled(prep?.reCf ?? null, filedReIncome);
     return {
       fiscalYear: y,
       label: yearLabel(args.scope, y),
@@ -126,6 +159,9 @@ export function buildTaxYearViews(args: {
       hasCaseReady: args.caseReadyYears.has(y),
       evidenceCount: args.evidenceCountByYear.get(y) ?? 0,
       prep,
+      filedReIncome,
+      zaimVsFiledDiff: vs.diff,
+      zaimVsFiledPct: vs.pct,
       taxableIncome: yen(m?.taxable_income_jpy),
       incomeTax: yen(m?.income_tax_jpy),
       refundOrPay: m?.refund_or_pay ?? null,
@@ -213,6 +249,17 @@ function buildInsights(args: {
 
   if (args.scope === "personal" && v.prep && v.prep.reCf < 0) {
     out.push("不動産CF気配がマイナスです。申告後にライフプラン年次も見直せます。");
+  }
+
+  if (
+    args.scope === "personal" &&
+    v.zaimVsFiledPct != null &&
+    Math.abs(v.zaimVsFiledPct) >= 0.2
+  ) {
+    const dir = v.zaimVsFiledDiff != null && v.zaimVsFiledDiff > 0 ? "上振れ" : "下振れ";
+    out.push(
+      `気配が確定不動産所得より${dir}（約${Math.round(Math.abs(v.zaimVsFiledPct) * 100)}%）。減価償却・借入利息の差を疑うとよいです。`
+    );
   }
 
   return out.slice(0, 3);

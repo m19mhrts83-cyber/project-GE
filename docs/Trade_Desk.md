@@ -131,14 +131,17 @@
 - **個人のみ**（弥生青色申告用 CSV）。法人の申告作成は税理士。
 - 税理士メール＋添付は **法人のみ** Gmail API で取込 → アプリで検索・閲覧（**既定アカウント: admin** `token_livingsupport.json`。切替は `KURASHIFT_TAX_GMAIL_TOKEN`）
 - 添付は年度・案件・資料種別と紐づけ、**証憑として再出力**できる
-- **年度評価**（`/tax`）: 個人＝暦年／法人＝5月期で推移表。申告結果KPIは `kurashift_tax_year_metrics`（画面登録 or `jarvis_kurashift_tax.py --upsert-metrics`）。Zaim年次は「気配」であり申告所得そのものではない
+- **年度評価**（`/tax`）: 個人＝暦年／法人＝5月期で推移表。申告結果KPIは `kurashift_tax_year_metrics`（画面登録 or `--upsert-metrics`／`--import-metrics-catalog`）。気配はZaim不動産CFの絶対値で、確定不動産所得（第一表③）との差・差率も表示する
+- カタログ正本: `config/kurashift_tax_year_metrics.yaml`（OneDrive `50_税金,確定申告`）
 - 回帰ログ: `docs/KURASHIFT_Tax_YoY_QAゲート_20260813.md`
 - CLI 例:
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_tax.py --import-metrics-catalog
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_tax.py --ingest-filed-returns
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_tax.py --upsert-metrics \
-  --scope personal --year 2025 --taxable-income 7305000 --income-tax 795410 --refund-or-pay pay
+  --scope personal --year 2025 --taxable-income 7305000 --income-tax 795410 --refund-or-pay refund
 ```
 
 ## テーマ提案（ステージ2）

@@ -34,6 +34,31 @@ type EvidenceRow = {
   received_at: string | null;
 };
 
+function docKindLabel(kind: string): string {
+  if (kind === "filed_return") return "確定申告書";
+  if (kind === "re_statement") return "収支内訳書";
+  if (kind === "attachment") return "メール添付";
+  if (kind === "manual_inbox") return "手動取込";
+  if (kind === "mail_note") return "メールメモ";
+  return kind;
+}
+
+function primaryFiledEvidence(
+  scope: string,
+  year: number,
+  evidence: EvidenceRow[]
+): EvidenceRow | null {
+  const rows = evidence.filter(
+    (e) => (e.scope || "personal") === scope && e.fiscal_year === year
+  );
+  return (
+    rows.find((e) => e.doc_kind === "filed_return") ||
+    rows.find((e) => e.doc_kind === "attachment") ||
+    rows[0] ||
+    null
+  );
+}
+
 function ingested(
   scope: "personal" | "corporate",
   year: number,
@@ -85,7 +110,7 @@ export default async function TaxPage() {
 
   const personal = personalCycle();
   const corporate = corporateCycle();
-  const personalYears = yearOptions("personal", personal.year, 5);
+  const personalYears = yearOptions("personal", personal.year, 10);
   const corporateYears = yearOptions("corporate", corporate.year, 5);
   const minYear = Math.min(...personalYears, ...corporateYears);
 
@@ -105,8 +130,8 @@ export default async function TaxPage() {
       .select(
         "id, fiscal_year, scope, doc_kind, subject, original_filename, stored_path, received_at"
       )
-      .order("created_at", { ascending: false })
-      .limit(60),
+      .order("fiscal_year", { ascending: false })
+      .limit(120),
     supabase
       .from("kurashift_jobs")
       .select("id, job_type, status, title, created_at, error_text")
@@ -124,7 +149,15 @@ export default async function TaxPage() {
   ]);
 
   const caseRows = (cases ?? []) as CaseRow[];
-  const evRows = (evidence ?? []) as EvidenceRow[];
+  const evRows = ([...(evidence ?? [])] as EvidenceRow[]).sort((a, b) => {
+    const sa = a.scope === "corporate" ? 1 : 0;
+    const sb = b.scope === "corporate" ? 1 : 0;
+    if (sa !== sb) return sa - sb;
+    if (a.fiscal_year !== b.fiscal_year) return b.fiscal_year - a.fiscal_year;
+    const ka = a.doc_kind === "filed_return" ? 0 : a.doc_kind === "re_statement" ? 1 : 2;
+    const kb = b.doc_kind === "filed_return" ? 0 : b.doc_kind === "re_statement" ? 1 : 2;
+    return ka - kb;
+  });
   const metricRows = (metrics ?? []) as TaxYearMetricRow[];
   const categoryRows = (catYears ?? []) as FinanceCategoryYearRow[];
   const personalIn = ingested("personal", personal.year, caseRows, evRows);
@@ -261,7 +294,7 @@ export default async function TaxPage() {
           <strong>年度推移（暦年）</strong>
         </header>
         <p className="meta">
-          結果KPIは申告後の手入力／Jarvis登録が正です。Zaim行は気配であり、確定申告の所得そのものではありません。
+          結果KPIは申告PDF／Jarvis登録が正です。気配はZaimの不動産CF絶対値。差＝気配−確定不動産所得（第一表③）。
         </p>
         {!personalViews.some((v) => v.hasMetrics) ? (
           <div className="card notice" style={{ marginTop: 12 }}>
@@ -277,7 +310,10 @@ export default async function TaxPage() {
               <tr>
                 <th>年</th>
                 <th>準備</th>
+                <th>申告書</th>
                 <th className="num">気配・不動産CF</th>
+                <th className="num">確定・不動産所得</th>
+                <th className="num">差（気配−確定）</th>
                 <th className="num">課税所得</th>
                 <th className="num">所得税</th>
                 <th>還付／納付</th>
@@ -286,7 +322,9 @@ export default async function TaxPage() {
               </tr>
             </thead>
             <tbody>
-              {personalViews.map((v) => (
+              {personalViews.map((v) => {
+                const filedEv = primaryFiledEvidence("personal", v.fiscalYear, evRows);
+                return (
                 <tr key={`p-${v.fiscalYear}`}>
                   <td>
                     {v.label}
@@ -299,11 +337,28 @@ export default async function TaxPage() {
                     <br />
                     証憑 {v.evidenceCount}件
                   </td>
+                  <td className="meta">
+                    {filedEv ? (
+                      <a href={`/tax/evidence/${filedEv.id}`}>プレビュー</a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="num">
-                    {v.prep ? fmtYen(v.prep.reCf) : "—"}
+                    {v.prep ? fmtYenSigned(v.prep.reCf) : "—"}
                     {v.prep ? (
                       <div className="meta">気配</div>
                     ) : null}
+                  </td>
+                  <td className="num">
+                    {fmtYenSigned(v.filedReIncome)}
+                    {v.filedReIncome != null ? (
+                      <div className="meta">第一表③</div>
+                    ) : null}
+                  </td>
+                  <td className="num">
+                    {fmtYenSigned(v.zaimVsFiledDiff)}
+                    <div className="meta">{fmtPctSigned(v.zaimVsFiledPct)}</div>
                   </td>
                   <td className="num">{fmtYen(v.taxableIncome)}</td>
                   <td className="num">{fmtYen(v.incomeTax)}</td>
@@ -318,7 +373,8 @@ export default async function TaxPage() {
                       : v.insights.map((t) => <div key={t}>{t}</div>)}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -363,7 +419,9 @@ export default async function TaxPage() {
               </tr>
             </thead>
             <tbody>
-              {corporateViews.map((v) => (
+              {corporateViews.map((v) => {
+                const filedEv = primaryFiledEvidence("corporate", v.fiscalYear, evRows);
+                return (
                 <tr key={`c-${v.fiscalYear}`}>
                   <td>
                     {v.label}
@@ -371,7 +429,15 @@ export default async function TaxPage() {
                       {v.hasMetrics ? "結果あり" : "結果なし"}
                     </div>
                   </td>
-                  <td className="meta">{v.evidenceCount}件</td>
+                  <td className="meta">
+                    {v.evidenceCount}件
+                    {filedEv ? (
+                      <>
+                        <br />
+                        <a href={`/tax/evidence/${filedEv.id}`}>プレビュー</a>
+                      </>
+                    ) : null}
+                  </td>
                   <td className="num">{fmtYen(v.revenue)}</td>
                   <td className="num">{fmtYen(v.ordinaryIncome)}</td>
                   <td className="num">{fmtYen(v.corporateTax)}</td>
@@ -386,7 +452,8 @@ export default async function TaxPage() {
                       : v.insights.map((t) => <div key={t}>{t}</div>)}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -439,16 +506,17 @@ export default async function TaxPage() {
       <div className="card" style={{ marginTop: 20 }}>
         <header>
           <span className="lvl">証憑</span>
-          <strong>メール添付など</strong>
+          <strong>提出PDF・メール添付</strong>
         </header>
         <p className="meta" style={{ marginTop: 0 }}>
-          中身の確認はプレビューです。フォルダへの書き出しが必要なときは Jarvis に指示してください。
+          中身の確認はプレビューです。個人の提出PDFはカタログ取込、法人は大野さんメール取込が本線です。
         </p>
         <table>
           <thead>
             <tr>
               <th>区分</th>
               <th>年度</th>
+              <th>種別</th>
               <th>件名／ファイル</th>
               <th>表示</th>
             </tr>
@@ -456,7 +524,7 @@ export default async function TaxPage() {
           <tbody>
             {evRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="meta">
+                <td colSpan={5} className="meta">
                   証憑はまだありません
                 </td>
               </tr>
@@ -465,10 +533,10 @@ export default async function TaxPage() {
                 <tr key={e.id}>
                   <td>{e.scope === "corporate" ? "法人" : "個人"}</td>
                   <td>{e.fiscal_year}</td>
+                  <td className="meta">{docKindLabel(e.doc_kind)}</td>
                   <td>
                     {e.subject || e.original_filename || e.doc_kind}
                     <div className="meta">{e.original_filename}</div>
-                    <div className="meta">{e.stored_path}</div>
                   </td>
                   <td>
                     <a href={`/tax/evidence/${e.id}`}>プレビュー</a>

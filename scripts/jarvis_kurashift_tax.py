@@ -394,11 +394,16 @@ def ensure_tax_case(sb: Any, year: int, scope: str = "personal") -> str | None:
 
 
 def mail_query(year: int, scope: str) -> str:
+    """法人: year = N年5月期。決算報告メールは概ね同年5〜12月に届く。
+
+    旧クエリ before:{year}/10/1 だと遅延便を落とす。2025窓で0件だったのは、
+    実際の大野さん決算報告が 2026-07（2026年5月期）だったため。
+    """
     if scope == "corporate":
         return (
             "(from:t.ohno@knees-bee.jp OR from:knees-bee.jp) "
             "(filename:pdf OR subject:決算 OR subject:申告書 OR subject:法人税) "
-            f"after:{year}/5/1 before:{year}/10/1"
+            f"after:{year}/5/1 before:{year + 1}/1/1"
         )
     return (
         f"(from:税理士 OR from:公認会計士 OR from:会計事務所 "
@@ -557,6 +562,12 @@ def ingest_mail(year: int, dry_run: bool, limit: int, scope: str = "personal") -
     out["saved"] = len(saved)
     out["items"] = saved
     out["artifacts"] = [{"kind": "evidence_dir", "path": str(store)}]
+    if not messages:
+        out["hint"] = (
+            f"0件です。法人は year=N年5月期（例: 2026）。"
+            f"決算報告メールは {year}/5〜{year}/12 想定。"
+            "前年窓で探すと届いていないことが多い。"
+        )
     print(json.dumps(out, ensure_ascii=False, indent=2))
     emit_result(out)
     return out
@@ -725,6 +736,272 @@ def upsert_metrics(args: argparse.Namespace) -> dict:
     return out
 
 
+def _catalog_path(args: argparse.Namespace) -> Path:
+    raw = (args.catalog or "").strip()
+    path = Path(raw).expanduser() if raw else REPO / "config" / "kurashift_tax_year_metrics.yaml"
+    if not path.is_file():
+        raise SystemExit(f"catalog が見つかりません: {path}")
+    return path
+
+
+def _find_re_statement(pdf: Path) -> Path | None:
+    """同ディレクトリの収支内訳書（不動産）を1件探す。"""
+    parent = pdf.parent
+    if not parent.is_dir():
+        return None
+    hits = sorted(
+        p
+        for p in parent.iterdir()
+        if p.is_file()
+        and p.suffix.lower() == ".pdf"
+        and "収支内訳" in p.name
+        and ("不動産" in p.name or "不動産所得" in p.name)
+    )
+    if hits:
+        return hits[0]
+    # ゆるめ: 収支内訳書のみ
+    hits2 = sorted(
+        p
+        for p in parent.iterdir()
+        if p.is_file() and p.suffix.lower() == ".pdf" and "収支内訳" in p.name
+    )
+    return hits2[0] if hits2 else None
+
+
+def _evidence_already(sb: Any, *, scope: str, year: int, stored_path: str, filename: str) -> bool:
+    by_path = (
+        sb.table("kurashift_tax_evidence")
+        .select("id")
+        .eq("stored_path", stored_path)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if by_path:
+        return True
+    by_name = (
+        sb.table("kurashift_tax_evidence")
+        .select("id")
+        .eq("scope", scope)
+        .eq("fiscal_year", year)
+        .eq("original_filename", filename)
+        .limit(1)
+        .execute()
+        .data
+    )
+    return bool(by_name)
+
+
+def ingest_filed_returns(args: argparse.Namespace) -> dict:
+    """KPIカタログの source_pdf（＋収支内訳書）を証憑化し Storage へ上げる。"""
+    try:
+        import yaml
+    except ImportError as e:
+        raise SystemExit(f"PyYAML が必要です: {e}") from e
+
+    path = _catalog_path(args)
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    year_filter = args.year
+    want_scopes = ("personal", "corporate")
+
+    candidates: list[dict[str, Any]] = []
+    for scope in want_scopes:
+        for item in data.get(scope) or []:
+            if not isinstance(item, dict):
+                continue
+            year = int(item["fiscal_year"])
+            if year_filter is not None and year != int(year_filter):
+                continue
+            payload = item.get("payload") or {}
+            rel = (payload.get("source_pdf") or "").strip()
+            if not rel:
+                continue
+            pdf = (TAX_DIR / rel).resolve()
+            label = f"{year}年分 確定申告書" if scope == "personal" else f"{year}年5月期 申告書"
+            candidates.append(
+                {
+                    "scope": scope,
+                    "fiscal_year": year,
+                    "doc_kind": "filed_return",
+                    "subject": label,
+                    "path": pdf,
+                    "rel": rel,
+                }
+            )
+            if scope == "personal":
+                re_pdf = _find_re_statement(pdf)
+                if re_pdf is not None:
+                    try:
+                        rel_re = str(re_pdf.relative_to(TAX_DIR))
+                    except ValueError:
+                        rel_re = re_pdf.name
+                    candidates.append(
+                        {
+                            "scope": scope,
+                            "fiscal_year": year,
+                            "doc_kind": "re_statement",
+                            "subject": f"{year}年分 収支内訳書（不動産）",
+                            "path": re_pdf,
+                            "rel": rel_re,
+                        }
+                    )
+
+    out: dict[str, Any] = {
+        "action": "ingest_filed_returns",
+        "catalog": str(path),
+        "dry_run": bool(args.dry_run),
+        "candidates": len(candidates),
+        "inserted": 0,
+        "skipped": 0,
+        "missing": [],
+        "items": [],
+    }
+
+    if args.dry_run:
+        for c in candidates:
+            exists = c["path"].is_file()
+            out["items"].append(
+                {
+                    "scope": c["scope"],
+                    "year": c["fiscal_year"],
+                    "doc_kind": c["doc_kind"],
+                    "path": str(c["path"]),
+                    "exists": exists,
+                }
+            )
+            if not exists:
+                out["missing"].append(str(c["path"]))
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        emit_result(out)
+        return out
+
+    sb = sb_client()
+    if sb is None:
+        raise SystemExit("JARVIS_SUPABASE_* 未設定")
+
+    for c in candidates:
+        pdf: Path = c["path"]
+        if not pdf.is_file():
+            out["missing"].append(str(pdf))
+            continue
+        if _evidence_already(
+            sb,
+            scope=c["scope"],
+            year=c["fiscal_year"],
+            stored_path=str(pdf),
+            filename=pdf.name,
+        ):
+            out["skipped"] += 1
+            out["items"].append(
+                {
+                    "scope": c["scope"],
+                    "year": c["fiscal_year"],
+                    "doc_kind": c["doc_kind"],
+                    "status": "skipped_dup",
+                    "file": pdf.name,
+                }
+            )
+            continue
+        eid = insert_evidence_row(
+            sb,
+            {
+                "fiscal_year": c["fiscal_year"],
+                "scope": c["scope"],
+                "source": "upload",
+                "doc_kind": c["doc_kind"],
+                "subject": c["subject"],
+                "original_filename": pdf.name,
+                "stored_path": str(pdf),
+                "received_at": date.today().isoformat(),
+                "metadata": {
+                    "catalog_rel": c["rel"],
+                    "ingest": "filed_returns",
+                },
+            },
+            pdf,
+            None,
+        )
+        out["inserted"] += 1
+        out["items"].append(
+            {
+                "scope": c["scope"],
+                "year": c["fiscal_year"],
+                "doc_kind": c["doc_kind"],
+                "status": "inserted",
+                "id": eid,
+                "file": pdf.name,
+            }
+        )
+
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    emit_result(out)
+    return out
+
+
+def import_metrics_catalog(args: argparse.Namespace) -> dict:
+    """config/kurashift_tax_year_metrics.yaml から一括 upsert。"""
+    try:
+        import yaml
+    except ImportError as e:
+        raise SystemExit(f"PyYAML が必要です: {e}") from e
+
+    path = _catalog_path(args)
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    rows_out: list[dict[str, Any]] = []
+    for scope in ("personal", "corporate"):
+        for item in data.get(scope) or []:
+            if not isinstance(item, dict):
+                continue
+            year = int(item["fiscal_year"])
+            row: dict[str, Any] = {
+                "scope": scope,
+                "fiscal_year": year,
+                "filing_status": item.get("filing_status") or "filed",
+                "filed_on": item.get("filed_on") or None,
+                "note": item.get("note") or None,
+                "source": "import",
+                "payload": item.get("payload") or {},
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if scope == "personal":
+                row["taxable_income_jpy"] = item.get("taxable_income_jpy")
+                row["income_tax_jpy"] = item.get("income_tax_jpy")
+                row["refund_or_pay"] = item.get("refund_or_pay")
+            else:
+                row["revenue_jpy"] = item.get("revenue_jpy")
+                row["ordinary_income_jpy"] = item.get("ordinary_income_jpy")
+                row["corporate_tax_jpy"] = item.get("corporate_tax_jpy")
+                row["tax_payable_jpy"] = item.get("tax_payable_jpy")
+            rows_out.append(row)
+
+    out = {
+        "ok": True,
+        "dry_run": bool(args.dry_run),
+        "catalog": str(path),
+        "count": len(rows_out),
+        "rows": rows_out,
+    }
+    if args.dry_run:
+        print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+        return out
+
+    sb = sb_client()
+    if sb is None:
+        raise SystemExit("JARVIS_SUPABASE_* 未設定")
+    for row in rows_out:
+        sb.table("kurashift_tax_year_metrics").upsert(
+            row, on_conflict="scope,fiscal_year"
+        ).execute()
+    print(json.dumps({k: out[k] for k in ("ok", "dry_run", "catalog", "count")}, ensure_ascii=False, indent=2))
+    for row in rows_out:
+        print(
+            f"  {row['scope']} {row['fiscal_year']}: "
+            f"taxable/ord={row.get('taxable_income_jpy') if row.get('taxable_income_jpy') is not None else row.get('ordinary_income_jpy')} "
+            f"re={((row.get('payload') or {}).get('re_income_jpy'))}"
+        )
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--scope", choices=["personal", "corporate"], default="personal")
@@ -732,9 +1009,20 @@ def main() -> int:
     ap.add_argument("--build-csv", action="store_true")
     ap.add_argument("--ingest-mail", action="store_true")
     ap.add_argument("--ingest-manual-dir", action="store_true")
+    ap.add_argument(
+        "--ingest-filed-returns",
+        action="store_true",
+        help="KPIカタログの提出PDF（＋収支内訳書）を証憑化しプレビュー用Storageへ",
+    )
     ap.add_argument("--export-evidence", action="store_true")
     ap.add_argument("--sync-storage", action="store_true", help="既存証憑をプレビュー用 Storage へ上げる")
     ap.add_argument("--upsert-metrics", action="store_true", help="申告結果KPIを kurashift_tax_year_metrics へ登録")
+    ap.add_argument(
+        "--import-metrics-catalog",
+        action="store_true",
+        help="config/kurashift_tax_year_metrics.yaml からKPI一括登録",
+    )
+    ap.add_argument("--catalog", default="", help="metrics/filed カタログYAMLパス")
     ap.add_argument("--taxable-income", type=float, default=None)
     ap.add_argument("--income-tax", type=float, default=None)
     ap.add_argument("--refund-or-pay", choices=["refund", "pay", "zero"], default=None)
@@ -760,16 +1048,21 @@ def main() -> int:
         ingest_mail(year, args.dry_run, args.limit, args.scope)
     elif args.ingest_manual_dir:
         ingest_manual_dir(year, args.dry_run)
+    elif args.ingest_filed_returns:
+        ingest_filed_returns(args)
     elif args.export_evidence:
         export_evidence(year, args.evidence_id, args.dry_run)
     elif args.sync_storage:
         sync_storage(args.dry_run)
+    elif args.import_metrics_catalog:
+        import_metrics_catalog(args)
     elif args.upsert_metrics:
         upsert_metrics(args)
     else:
         raise SystemExit(
             "specify --build-csv | --ingest-mail | --ingest-manual-dir | "
-            "--export-evidence | --sync-storage | --upsert-metrics"
+            "--ingest-filed-returns | --export-evidence | --sync-storage | "
+            "--upsert-metrics | --import-metrics-catalog"
         )
     return 0
 
