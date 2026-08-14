@@ -20,7 +20,7 @@ defaults:
 # Phase1（2026-08 Infinite）目安。money-ops 作成時の初値。
 rails:
   - id: sbi_main_smbc
-    label: "住信SBI本→SMBC刈谷"
+    label: "第一生命NEOBANK本（普通）→SMBC刈谷"
     enabled: true
     order: 10
     amount_jpy: 26000
@@ -31,7 +31,7 @@ rails:
     otp_channel: gmail_api
     execute_auth: passkey_or_bio
     gmail_account: m19m
-    sender_hint: "ドコモSMTB|住信SBI|ネット銀行|NEOBANK|netbk"
+    sender_hint: "ドコモSMTB|住信SBI|ネット銀行|NEOBANK|第一生命|netbk"
     free_rail: true
     cotra_max_jpy: 100000
     runner: sbi_net
@@ -39,7 +39,7 @@ rails:
     status_default: pending
 
   - id: sbi_sub_smbc
-    label: "住信SBI副→SMBC刈谷"
+    label: "第一生命NEOBANK副→SMBC刈谷"
     enabled: true
     order: 20
     amount_jpy: 161000
@@ -49,7 +49,7 @@ rails:
     otp_channel: gmail_api
     execute_auth: passkey_or_bio
     gmail_account: m19m
-    sender_hint: "ドコモSMTB|住信SBI|ネット銀行|NEOBANK|netbk"
+    sender_hint: "ドコモSMTB|住信SBI|ネット銀行|NEOBANK|第一生命|netbk"
     free_rail: true
     cotra_max_jpy: 100000
     # 161k → ことら 100k + 61k
@@ -57,6 +57,7 @@ rails:
     runner: sbi_net
     launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_sbi_sub_to_smbc.sh"
     status_default: pending
+    # 副がハイブリッド預金の場合、他行送金前に普通へ戻すことがある
 
   - id: tokairokin_smbc
     label: "東海労金→SMBC刈谷"
