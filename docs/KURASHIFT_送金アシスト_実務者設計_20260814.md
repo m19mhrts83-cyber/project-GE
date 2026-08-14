@@ -118,8 +118,8 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 
 | Wave | 内容 | 状態 |
 |---|---|---|
-| **0** | 仕様・R6'・rails[]・OTP／監査骨格・東海労金プロトコル | 本版 |
-| **1** | 住信SBIネット→SMBC（本／副） | 次 |
+| **0** | 仕様・R6'・rails[]・OTP／監査骨格・東海労金プロトコル | 完了 |
+| **1** | 住信SBIネット→SMBC（本／副）・ことら分割・スマート認証NEO待ち | **実装（ログイン〜確認。実行クリックは未）** |
 | **2** | エアウォレット | 後続 |
 | **3** | 滋賀・京都 | 後続 |
 | **4** | ことら分割・任意キュー | 後続 |
@@ -133,7 +133,23 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 - [x] `kurashift_transfer_rails.yaml` + OTP／監査モジュール
 - [x] money-ops `rails[]` 表示
 - [x] 東海労金 Preview／Go／監査フック
-- [ ] SBI ネット PoC（Wave 1）
+- [x] SBIネット Preview／Go（ログイン〜確認。スマート認証NEOは waiting_user。実行クリック未）
+- [ ] SBI 実行クリック＋証跡 done（Wave 1b）
+
+### Wave1 補足（ドコモSMTB／旧住信SBI）
+
+- ログイン URL: `https://www.netbk.co.jp/contents/pages/wpl020601/i020601CT/DI02060100`
+- Creds: `SBI_NET_USER` / `SBI_NET_LOGIN_PASSWORD`（`SBI_SEC_*` と分離）
+- 無料寄せ: ことらおおむね **1件10万**。副口座 161k は **100k+61k** 分割
+- 取引実行はスマート認証NEO（アプリ承認）が多い → `waiting_user`
+
+```bash
+# Terminal.app
+cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
+./run_phase1_sbi_main_to_smbc.sh --preview
+./run_phase1_sbi_main_to_smbc.sh --go --money-ops-id <UUID>
+./run_phase1_sbi_sub_to_smbc.sh --preview
+```
 
 ---
 

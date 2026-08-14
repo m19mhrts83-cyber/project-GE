@@ -27,11 +27,15 @@ rails:
     keep_floor_jpy: 500800
     from_account_id: sbi_net_main
     to_account_id: smbc_kariya
-    otp_channel: gmail_api  # 実装時に実機で確定。違う場合は差し替え
+    # ログインOTPはメール/SMS可。実行承認はスマート認証NEO（アプリ）が多い
+    otp_channel: gmail_api
+    execute_auth: passkey_or_bio
     gmail_account: m19m
-    sender_hint: "住信SBI|SBI|ネット銀行"
+    sender_hint: "ドコモSMTB|住信SBI|ネット銀行|NEOBANK|netbk"
     free_rail: true
-    runner: null  # Wave 1
+    cotra_max_jpy: 100000
+    runner: sbi_net
+    launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_sbi_main_to_smbc.sh"
     status_default: pending
 
   - id: sbi_sub_smbc
@@ -43,10 +47,15 @@ rails:
     from_account_id: sbi_net_sub
     to_account_id: smbc_kariya
     otp_channel: gmail_api
+    execute_auth: passkey_or_bio
     gmail_account: m19m
-    sender_hint: "住信SBI|SBI|ネット銀行"
+    sender_hint: "ドコモSMTB|住信SBI|ネット銀行|NEOBANK|netbk"
     free_rail: true
-    runner: null
+    cotra_max_jpy: 100000
+    # 161k → ことら 100k + 61k
+    cotra_split: [100000, 61000]
+    runner: sbi_net
+    launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_sbi_sub_to_smbc.sh"
     status_default: pending
 
   - id: tokairokin_smbc
