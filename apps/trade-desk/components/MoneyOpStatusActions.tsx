@@ -36,7 +36,7 @@ export default function MoneyOpStatusActions({
   async function setStatus(next: string) {
     if (next === "approved") {
       const ok = window.confirm(
-        "この資金移動を承認しますか？\n（承認＝計画合意のみ。記帳はしません。\n実行は Terminal.app でレールごとに Preview→Go。\nメール／SMS OTP は Jarvis、アプリOTP・生体はユーザー）"
+        "この資金移動を承認しますか？\n（承認＝計画合意のみ。記帳はしません。\n次: Jarvisが入力 → あなたが最終画面確認 → OTP＋実行ボタン。\n送金用Chromeは完了後に閉じます）"
       );
       if (!ok) return;
     }

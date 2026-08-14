@@ -124,29 +124,64 @@ def _fill_login(page: Page, cfg: dict[str, Any], user: str, pw: str) -> None:
         "input[type='password']",
         "input[name*='pass' i]",
     ]
-    for sel in u_sels:
-        loc = page.locator(sel)
-        if loc.count():
-            loc.first.fill(user)
-            break
-    else:
-        raise RuntimeError("username_field_not_found")
-    for sel in p_sels:
-        loc = page.locator(sel)
-        if loc.count():
-            loc.first.fill(pw)
-            break
-    else:
-        raise RuntimeError("password_field_not_found")
-    for name in cfg.get("login_button_names") or ["ログイン", "Login"]:
-        btn = page.get_by_role("button", name=re.compile(name))
-        if btn.count():
-            btn.first.click()
-            break
-        link = page.get_by_role("link", name=re.compile(name))
-        if link.count():
-            link.first.click()
-            break
+    def _fill_first_visible(sels: list[str], value: str, *, label: str) -> None:
+        for sel in sels:
+            loc = page.locator(sel)
+            n = loc.count()
+            for i in range(n):
+                el = loc.nth(i)
+                try:
+                    if not el.is_visible():
+                        continue
+                    # サイト検索欄などを誤入力しない
+                    name = (el.get_attribute("name") or "").lower()
+                    ph = (el.get_attribute("placeholder") or "")
+                    if name == "kw" or "検索" in ph:
+                        continue
+                    el.fill(value)
+                    print(f"📎 {label}入力 ({sel})", file=sys.stderr)
+                    return
+                except Exception:
+                    continue
+        raise RuntimeError(f"{label}_field_not_found")
+
+    _fill_first_visible(list(u_sels), user, label="username")
+    _fill_first_visible(list(p_sels), pw, label="password")
+    clicked = False
+    for sel in cfg.get("login_button_selectors") or []:
+        if not sel:
+            continue
+        try:
+            loc = page.locator(sel).first
+            if loc.is_visible():
+                loc.click()
+                clicked = True
+                print(f"📎 ログインボタン ({sel})", file=sys.stderr)
+                break
+        except Exception:
+            continue
+    if not clicked:
+        for name in cfg.get("login_button_names") or ["ログイン", "Login"]:
+            btn = page.get_by_role("button", name=re.compile(name))
+            if btn.count():
+                btn.first.click()
+                clicked = True
+                break
+            link = page.get_by_role("link", name=re.compile(name))
+            if link.count():
+                link.first.click()
+                clicked = True
+                break
+            try:
+                inp = page.locator(f"input[type='button'][value*='{name}'], input[type='submit'][value*='{name}']").first
+                if inp.is_visible():
+                    inp.click()
+                    clicked = True
+                    break
+            except Exception:
+                continue
+    if not clicked:
+        raise RuntimeError("login_button_not_found")
     page.wait_for_load_state("domcontentloaded", timeout=90000)
     page.wait_for_timeout(2000)
 
@@ -231,6 +266,70 @@ def _handle_otp(page: Page, *, otp_channel: str, rail_id: str, hold: bool) -> st
             btn.first.click()
         page.wait_for_timeout(1500)
     return "ok"
+
+
+def _handle_secret_phrase(page: Page, cfg: dict[str, Any]) -> str:
+    """合言葉画面なら自動入力。戻り値: filled / missing / skipped / failed。"""
+    body = _body(page, 4000)
+    if "合言葉" not in body and "質問の答え" not in body:
+        return "skipped"
+    mappings = cfg.get("secret_phrase_auto") or []
+    answer = ""
+    matched = ""
+    for m in mappings:
+        kw = (m.get("match") or "").strip()
+        env_name = (m.get("env") or "").strip()
+        if kw and kw in body and env_name:
+            answer = _env(env_name)
+            matched = kw
+            break
+    if not answer:
+        print(
+            "📎 合言葉画面です。答えをブラウザに入力するか、"
+            " .env.jarvis_private に SHIGA_IB_KOTOBA_* を追記して再実行してください。",
+            file=sys.stderr,
+        )
+        return "missing"
+    ans_sel = (cfg.get("secret_phrase_answer_selector") or "#wcwdAskRspo").strip()
+    try:
+        page.locator(ans_sel).first.fill(answer)
+        print(f"📎 合言葉を自動入力しました（キーワード: {matched[:20]}…）", file=sys.stderr)
+    except Exception as e:
+        print(f"合言葉入力失敗: {e}", file=sys.stderr)
+        return "failed"
+    # 端末登録ラジオ（既定: 登録しない）
+    if cfg.get("register_terminal"):
+        try:
+            page.locator("#actvTmnlMsge1").check()
+            name = (_env("SHIGA_IB_TERMINAL_NAME") or "Mac").strip()
+            page.locator("#inptActvTmnlName").fill(name)
+        except Exception:
+            pass
+    else:
+        try:
+            page.locator("#actvTmnlMsge2").check()
+        except Exception:
+            pass
+        # 「登録しない」でも登録名が残っているとエラーになる
+        try:
+            page.locator("#inptActvTmnlName").fill("")
+        except Exception:
+            pass
+    for sel in cfg.get("secret_phrase_next_selectors") or ["#butn01", "input[value='次へ']"]:
+        try:
+            loc = page.locator(sel).first
+            if loc.is_visible():
+                loc.click()
+                page.wait_for_timeout(2500)
+                return "filled"
+        except Exception:
+            continue
+    nxt = page.get_by_role("button", name=re.compile("次へ"))
+    if nxt.count():
+        nxt.first.click()
+        page.wait_for_timeout(2500)
+        return "filled"
+    return "failed"
 
 
 def _goto_transfer(page: Page, cfg: dict[str, Any]) -> bool:
@@ -338,6 +437,20 @@ def run_go(
         ctx = browser.contexts[0] if browser.contexts else browser.new_context()
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         _fill_login(page, cfg, user, pw)
+        kotoba = _handle_secret_phrase(page, cfg)
+        if kotoba == "missing":
+            append_audit(
+                {
+                    "rail_id": meta["rail_id"],
+                    "status": "waiting_user",
+                    "amount_jpy": amount,
+                    "dest_mask": dmask,
+                    "otp_channel": otp_channel,
+                    "error": "awaiting_secret_phrase",
+                }
+            )
+            print("📎 waiting_user: 合言葉入力後に同コマンド再実行（--go --execute）")
+            return 2
         st = _handle_otp(
             page, otp_channel=otp_channel, rail_id=meta["rail_id"], hold=hold
         )

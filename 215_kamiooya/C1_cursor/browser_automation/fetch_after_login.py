@@ -2298,6 +2298,348 @@ def _run_tokairokin_undetected(
             driver.quit()
 
 
+def _pw_iter_scopes(page):
+    """メイン＋全 frame（parasol の振込フォームが iframe 内のことがある）。"""
+    yield page
+    try:
+        for fr in page.frames:
+            if fr is page.main_frame:
+                continue
+            yield fr
+    except Exception:
+        return
+
+
+def _pw_click_first(page, selectors: list[str], timeout_ms: int = 4000) -> bool:
+    """Playwright: セレクタまたはテキスト候補を順に試し、最初に押せたものをクリック。"""
+    for scope in _pw_iter_scopes(page):
+        for sel in selectors:
+            sel = (sel or "").strip()
+            if not sel:
+                continue
+            try:
+                if sel.startswith("text:"):
+                    loc = scope.get_by_text(sel[5:], exact=False).first
+                elif sel.startswith("/") or sel.startswith("("):
+                    loc = scope.locator(f"xpath={sel}").first
+                else:
+                    loc = scope.locator(sel).first
+                loc.wait_for(state="visible", timeout=timeout_ms)
+                loc.click(timeout=timeout_ms)
+                return True
+            except Exception:
+                continue
+    return False
+
+
+def _pw_fill(page, selector: str, value: str, timeout_ms: int = 5000) -> bool:
+    selector = (selector or "").strip()
+    if not selector or value is None:
+        return False
+    for scope in _pw_iter_scopes(page):
+        try:
+            if selector.startswith("/") or selector.startswith("("):
+                loc = scope.locator(f"xpath={selector}").first
+            else:
+                loc = scope.locator(selector).first
+            loc.wait_for(state="visible", timeout=timeout_ms)
+            loc.fill("")
+            loc.fill(str(value))
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def _pw_dump_form_structure(page, label: str) -> Path:
+    """現在画面のフォーム要素をローカル state へ保存（秘密の値は保存しない）。"""
+    out_dir = Path.home() / "git-repos" / ".jarvis_state" / "transfer_session"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"tokairokin_{label}_{datetime.now():%Y%m%d_%H%M%S}.txt"
+    lines = [f"title={page.title()}", f"url={page.url}"]
+    for index, scope in enumerate(_pw_iter_scopes(page)):
+        try:
+            lines.append(f"\n=== scope {index}: {getattr(scope, 'url', '')} ===")
+            try:
+                body_text = scope.locator("body").inner_text(timeout=2000)
+                lines.append("--- visible text ---")
+                lines.append(body_text[:12000])
+                lines.append("--- controls ---")
+            except Exception:
+                pass
+            elements = scope.locator("input, button, select, a").all()
+            for el in elements[:300]:
+                try:
+                    tag = el.evaluate("el => el.tagName")
+                    element_id = el.get_attribute("id") or ""
+                    name = el.get_attribute("name") or ""
+                    input_type = el.get_attribute("type") or ""
+                    text = (el.inner_text() or el.get_attribute("value") or "").strip()
+                    text = re.sub(r"\s+", " ", text)[:120]
+                    lines.append(
+                        f"{tag} id={element_id!r} name={name!r} type={input_type!r} text={text!r}"
+                    )
+                except Exception:
+                    continue
+        except Exception:
+            continue
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"振込フォーム構造を保存しました: {out_path}", file=sys.stderr)
+    return out_path
+
+
+def _tokairokin_playwright_transfer(page, config: dict, transfer: dict) -> None:
+    """Playwright 経路の振込メニュー遷移〜フォーム入力〜OTP Enter 待ち。
+
+    undetected-chromedriver が arm64 で使えないため、本経路が本番。
+    """
+    tf = config.get("transfer_form") or {}
+    wait_page = float(config.get("wait_after_page", 2) or 2)
+
+    # 1) 振込メニュー
+    menu_sel = (config.get("transfer_menu_button_selector") or "").strip()
+    clicked = False
+    if menu_sel:
+        clicked = _pw_click_first(page, [menu_sel], timeout_ms=8000)
+        if clicked:
+            print(f"振込メニュー（{menu_sel}）をクリックしました。", file=sys.stderr)
+    if not clicked:
+        for kw in config.get("transfer_menu_keywords") or [
+            "振込振替・ペイジー",
+            "振込振替",
+            "振込",
+        ]:
+            try:
+                loc = page.locator(
+                    f"a:text-is('{kw}'), button:text-is('{kw}'), input[value='{kw}']"
+                ).first
+                loc.click(timeout=3000)
+                clicked = True
+                print(f"振込メニュー（「{kw}」）をクリックしました。", file=sys.stderr)
+                break
+            except Exception:
+                try:
+                    loc = page.get_by_role("link", name=kw, exact=True)
+                    loc.click(timeout=2000)
+                    clicked = True
+                    print(f"振込メニュー（link「{kw}」）をクリックしました。", file=sys.stderr)
+                    break
+                except Exception:
+                    continue
+    if not clicked:
+        print("\n" + "=" * 60, file=sys.stderr)
+        print("【手動クリック】画面上で「振込」をクリックしてください。", file=sys.stderr)
+        print("  クリック後、このターミナルで Enter を押してください。", file=sys.stderr)
+        print("=" * 60 + "\n", file=sys.stderr)
+        _wait_enter()
+    page.wait_for_timeout(int(wait_page * 1000) + 1500)
+    print(f"振込遷移後 URL: {page.url}", file=sys.stderr)
+
+    has_bank = transfer.get("bank_code") or transfer.get("bank_name")
+    has_branch = transfer.get("branch_code") or transfer.get("branch_name")
+    if not (
+        has_bank and has_branch and transfer.get("account_number") and transfer.get("amount")
+    ):
+        print("振込パラメータ不足のためフォーム入力をスキップします。", file=sys.stderr)
+        return
+
+    # 2) 振込先を指定（parasol は #btn001。曖昧な文言検索より設定セレクタを優先）
+    if _pw_click_first(
+        page,
+        [
+            (tf.get("specify_destination_button_selector") or "").strip(),
+            "text:振込先を指定",
+            "text:振込先を選択",
+        ],
+        timeout_ms=15000,
+    ):
+        print("「振込先を指定」をクリックしました。", file=sys.stderr)
+        page.wait_for_timeout(int(wait_page * 1000) + 1000)
+    else:
+        print("「振込先を指定」が見つかりません。画面を確認してください。", file=sys.stderr)
+
+    print(f"振込先指定後 URL: {page.url} / title={page.title()}", file=sys.stderr)
+    _pw_dump_form_structure(page, "destination")
+
+    bank_input = (
+        str(transfer.get("bank_code", "")).zfill(4)
+        if transfer.get("bank_code")
+        else (transfer.get("bank_name") or "").strip()
+    )
+    branch_input = (
+        str(transfer.get("branch_code", "")).zfill(3)
+        if transfer.get("branch_code")
+        else (transfer.get("branch_name") or "").strip()
+    )
+    account_number = str(transfer.get("account_number") or "")
+    amount = transfer.get("amount")
+
+    # 3) 銀行
+    if _pw_fill(page, tf.get("bank_code_selector") or "#txtBox001", bank_input):
+        print(f"銀行コードを入力しました（{bank_input}）。", file=sys.stderr)
+        page.wait_for_timeout(400)
+        if _pw_click_first(
+            page,
+            [tf.get("bank_confirm_button_selector") or "", "text:検索"],
+            timeout_ms=5000,
+        ):
+            print("銀行の検索をクリックしました。", file=sys.stderr)
+            page.wait_for_timeout(int(wait_page * 1000))
+            _pw_click_first(page, [tf.get("bank_select_button_selector") or "", "text:選択"], timeout_ms=5000)
+            page.wait_for_timeout(int(wait_page * 1000))
+    else:
+        print("銀行コード入力欄が見つかりませんでした。", file=sys.stderr)
+
+    # 4) 支店
+    if _pw_fill(page, tf.get("branch_code_selector") or "#txtBox001", branch_input):
+        print(f"支店コードを入力しました（{branch_input}）。", file=sys.stderr)
+        page.wait_for_timeout(400)
+        if _pw_click_first(
+            page,
+            [tf.get("branch_confirm_button_selector") or "", "text:検索"],
+            timeout_ms=5000,
+        ):
+            print("支店の検索をクリックしました。", file=sys.stderr)
+            page.wait_for_timeout(int(wait_page * 1000))
+            _pw_click_first(page, [tf.get("branch_select_button_selector") or "", "text:選択"], timeout_ms=5000)
+            page.wait_for_timeout(int(wait_page * 1000))
+    else:
+        print("支店コード入力欄が見つかりませんでした。", file=sys.stderr)
+
+    # 5) 口座・金額
+    _pw_dump_form_structure(page, "account_amount")
+    # 科目: 普通預金（value=1）を明示。サイト側の既定値に依存しない。
+    for scope in _pw_iter_scopes(page):
+        try:
+            ordinary = scope.locator("input[type='radio'][value='1']").first
+            if ordinary.is_visible(timeout=1000):
+                ordinary.check()
+                print("振込先科目を普通預金に設定しました。", file=sys.stderr)
+                break
+        except Exception:
+            continue
+    filled = 0
+    if _pw_fill(page, tf.get("account_number_selector") or "", account_number):
+        filled += 1
+        print("口座番号を入力しました。", file=sys.stderr)
+    if _pw_fill(page, tf.get("amount_selector") or "", str(amount)):
+        filled += 1
+        print(f"金額を入力しました（{amount}）。", file=sys.stderr)
+    # 営業時間外は受取人照会ができないため、自分名義口座への振込では
+    # 画面に表示済みの振込依頼人名（半角カナ）を受取人名へ補完する。
+    for scope in _pw_iter_scopes(page):
+        try:
+            sender = scope.locator("#txtBox001").first.input_value(timeout=1500).strip()
+            recipient = scope.locator(
+                "xpath=//tr[.//*[contains(normalize-space(.),'受取人名')]]//input[@type='text']"
+            ).first
+            if sender and recipient.is_visible(timeout=1000):
+                recipient.fill(sender)
+                print("受取人名を本人名義（画面表示の半角カナ）で補完しました。", file=sys.stderr)
+                break
+        except Exception:
+            continue
+    # 振込指定日は選択可能な最短日を明示（営業時間外は翌営業日）。
+    for scope in _pw_iter_scopes(page):
+        try:
+            date_select = scope.locator("#pulldown001").first
+            if date_select.is_visible(timeout=1000):
+                date_select.select_option(index=0)
+                print("振込指定日を選択可能な最短日に設定しました。", file=sys.stderr)
+                break
+        except Exception:
+            continue
+    if filled >= 2:
+        if _pw_click_first(page, ["text:確認", "text:次へ", "text:入力する"], timeout_ms=5000):
+            print("確認へ進みました。", file=sys.stderr)
+            page.wait_for_timeout(int(float(config.get("wait_after_transfer_confirm", 2) or 2) * 1000))
+    else:
+        print(
+            f"口座・金額の自動入力が不足しています（filled={filled}）。ブラウザで手動入力してください。",
+            file=sys.stderr,
+        )
+
+    # 確認画面 → 実行／OTP へ（「実行画面へ」だけでなく「実行」も試す）
+    _pw_dump_form_structure(page, "confirm")
+    cb_sel = (tf.get("confirmation_checkbox_selector") or "").strip()
+    if cb_sel:
+        for scope in _pw_iter_scopes(page):
+            try:
+                cb = scope.locator(cb_sel).first
+                if cb.is_visible(timeout=1000):
+                    cb.check()
+                    print("「確認しました」チェックを入れました。", file=sys.stderr)
+                    break
+            except Exception:
+                continue
+    else:
+        for scope in _pw_iter_scopes(page):
+            try:
+                cb = scope.locator(
+                    "xpath=//label[contains(.,'確認しました')]/preceding-sibling::input[@type='checkbox']"
+                    " | //label[contains(.,'確認しました')]/following-sibling::input[@type='checkbox']"
+                    " | //input[@type='checkbox']"
+                ).first
+                if cb.is_visible(timeout=800):
+                    cb.check()
+                    print("「確認しました」チェックを入れました。", file=sys.stderr)
+                    break
+            except Exception:
+                continue
+    exec_clicked = _pw_click_first(
+        page,
+        [
+            tf.get("execution_screen_button_selector") or "",
+            "text:実行画面へ",
+            "text:実行する",
+            "text:実行",
+            "text:次へ",
+            "#btn001",
+        ],
+        timeout_ms=5000,
+    )
+    if exec_clicked:
+        print("実行（確認画面の次）をクリックしました。", file=sys.stderr)
+        page.wait_for_timeout(int(wait_page * 1000))
+    else:
+        print(
+            "実行ボタンを自動クリックできませんでした。確認画面で「実行」を押してください。",
+            file=sys.stderr,
+        )
+    _pw_dump_form_structure(page, "otp_or_exec")
+
+    # 6) OTP（アプリ手入力）— OTP欄 or 文言が見えるときだけホールド
+    if config.get("pause_for_otp", True):
+        otp_sel = (tf.get("otp_input_selector") or "#pswd002").strip()
+        otp_visible = False
+        try:
+            body = page.locator("body").inner_text(timeout=3000)
+            if "ワンタイム" in (body or "") or "ワンタイムパスワード" in (body or ""):
+                otp_visible = True
+        except Exception:
+            pass
+        if not otp_visible:
+            for scope in _pw_iter_scopes(page):
+                try:
+                    loc = scope.locator(otp_sel).first
+                    if loc.is_visible(timeout=1500):
+                        otp_visible = True
+                        break
+                except Exception:
+                    continue
+        print("\n" + "=" * 60, file=sys.stderr)
+        if otp_visible:
+            print("【一時停止】ワンタイムパスワード（OTP）を運用してください。", file=sys.stderr)
+            print("  スマホのワンタイムPWアプリで番号を確認し、ブラウザへ入力→確認/実行。", file=sys.stderr)
+            print(f"  OTP欄セレクタ目安: {otp_sel}", file=sys.stderr)
+        else:
+            print("【一時停止】振込フォーム〜確認〜OTP をブラウザで完了してください。", file=sys.stderr)
+            print("  宛先: 三井住友・刈谷 / 金額: 指定どおり。OTP はアプリのワンタイムPW。", file=sys.stderr)
+        print("  完了したらこのターミナルで Enter を押してください。", file=sys.stderr)
+        print("=" * 60 + "\n", file=sys.stderr)
+        _wait_enter()
+
+
 def run_tokairokin(
     headless: bool = False,
     transfer: dict = None,
@@ -2402,11 +2744,25 @@ def run_tokairokin(
                 page.locator("#txtBox005").fill(user)
                 page.locator("#pswd010").fill(password)
 
-            # 送信ボタン（parasol: #btn012）
-            submit = page.locator("#btn012, button:has-text('ログイン'), input[type='submit'][value*='ログイン']").first
+            # 送信は #btn012 のみ。button:has-text('ログイン') は「ログインパスワードの再登録」
+            # （PT=IM 本人情報入力）にもマッチし、DOM 順で先に押してしまうため禁止。
+            submit = page.locator("#btn012")
+            submit.wait_for(state="visible", timeout=15000)
             submit.click()
 
             page.wait_for_timeout(wait_login * 1000)
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+            except Exception:
+                pass
+
+            current_url = page.url
+            print(f"ログイン後 URL: {current_url}", file=sys.stderr)
+            if "PT=IM" in (current_url or "") or "本人情報" in (page.title() or ""):
+                raise RuntimeError(
+                    "ログインがインターネット申込（PT=IM／本人情報入力）に流れました。"
+                    " #btn012 以外の『ログイン…』ボタンを押していないか確認してください。"
+                )
 
             body_text = page.locator("body").inner_text()
             if "エラー" in body_text or "認証に失敗" in body_text or "ログインに失敗" in body_text or "口座情報が誤っています" in body_text:
@@ -2526,61 +2882,30 @@ def run_tokairokin(
                 print("=" * 60 + "\n", file=sys.stderr)
                 _wait_enter()
 
-            # 振込画面への遷移（設定で有効な場合）
+            # 振込画面への遷移＋フォーム入力（transfer 指定時）
             go_to_transfer = config.get("go_to_transfer", True)
-            if go_to_transfer:
+            if go_to_transfer and transfer:
                 wait_before = config.get("wait_before_transfer_menu", 5)
                 page.wait_for_timeout(int(wait_before * 1000))
-
-                # 手動クリックモード: こちらで「振込」をクリックしてもらい、クリック後に Enter で次の処理を自動実行
+                try:
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(400)
+                except Exception:
+                    pass
+                _tokairokin_playwright_transfer(page, config, transfer)
+            elif go_to_transfer:
+                wait_before = config.get("wait_before_transfer_menu", 5)
+                page.wait_for_timeout(int(wait_before * 1000))
                 manual_click = config.get("manual_click_transfer_menu", True)
                 if manual_click:
                     print("\n" + "=" * 60, file=sys.stderr)
                     print("【手動クリック】画面上で「振込」または「振込振替 ペイジー」をクリックしてください。", file=sys.stderr)
                     print("  クリックしたら、ターミナルにフォーカスを移して Enter キーを押してください。", file=sys.stderr)
-                    print("  ※ Enter が反応しない場合は、Terminal.app で同じコマンドを実行してください。", file=sys.stderr)
                     print("=" * 60 + "\n", file=sys.stderr)
                     _wait_enter()
-                    page.wait_for_timeout(3000)  # 画面遷移の待機
+                    page.wait_for_timeout(3000)
                 else:
-                    # 自動クリック（従来どおり）
-                    if config.get("pause_before_transfer_click", True):
-                        print("\n" + "=" * 60, file=sys.stderr)
-                        print("【振込画面へ進む前】「パスワードを保存しますか？」が出ている場合は、", file=sys.stderr)
-                        print("  「使用しない」または「保存」で閉じてください。閉じたら Enter キーを押してください。", file=sys.stderr)
-                        print("=" * 60 + "\n", file=sys.stderr)
-                        _wait_enter()
-                    try:
-                        page.keyboard.press("Escape")
-                        page.wait_for_timeout(500)
-                        page.keyboard.press("Escape")
-                        page.wait_for_timeout(500)
-                    except Exception:
-                        pass
-                    wait_page = config.get("wait_after_page", 2)
-                    keywords = config.get("transfer_menu_keywords") or [
-                        "振込振替・ペイジー", "振込振替", "振込", "振替", "お振込"
-                    ]
-                    clicked = False
-                    frames_to_check = list(page.frames) if page.frames else [page]
-                    for frame in frames_to_check:
-                        if clicked:
-                            break
-                        for kw in keywords:
-                            try:
-                                loc = frame.locator(
-                                    f"a:has-text('{kw}'), button:has-text('{kw}'), input[value*='{kw}']"
-                                ).first
-                                loc.click(timeout=3000)
-                                page.wait_for_timeout(int(wait_page * 1000))
-                                print(f"振込メニュー（「{kw}」）をクリックし、振込画面へ遷移しました。")
-                                clicked = True
-                                break
-                            except Exception:
-                                continue
-                    if not clicked:
-                        print("振込メニューへのリンク・ボタンが見つかりませんでした。", file=sys.stderr)
-                        print("  → 画面上の「振込」を手動でクリックし、クリック後に Enter を押してください。", file=sys.stderr)
+                    _tokairokin_playwright_transfer(page, config, transfer or {})
             else:
                 print("※ 振込画面への遷移はスキップしました（go_to_transfer: false）")
 

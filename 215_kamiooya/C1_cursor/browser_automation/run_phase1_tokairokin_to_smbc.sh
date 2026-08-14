@@ -5,7 +5,7 @@
 set -euo pipefail
 
 RAIL_ID="tokairokin_smbc"
-AMOUNT=233000
+AMOUNT=232000
 KEEP_FLOOR=121000
 MODE=""
 MONEY_OPS_ID=""
