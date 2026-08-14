@@ -37,7 +37,7 @@ Jarvis ダッシュボード（パートナーメール等）は **別アプリ*
 
 > **正**: ③-A〜D の画面骨格・レーンナビ・簡易 DSCR・合算金利・融資パック（送信なし）は **本番稼働**。  
 > 詳細合否: [`KURASHIFT_品質保証点検ログ_20260813.md`](./KURASHIFT_品質保証点検ログ_20260813.md)  
-> 残本線: 年計画 vs YTD、②ブラウザ通し（V-2-UI）、案件1件体感、ログイン後目視補完。  
+> 残本線: 年計画 vs YTD、案件1件体感。**V-2-UI／V-2B-EV は 2026-08-15 合格**。  
 > 下の「Phase 1〜6 未実装」行は **歴史メモ**（現行到達は上表を優先）。
 
 | 区分 | 内容 | 扱い |
@@ -264,7 +264,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 |---|---|
 | 弥生CSV | `…/27_確定申告_個人/kurashift/2025/yayoi_personal_2025.csv`・**mapped 12**・`register=false`・case upsert 済 |
 | スキップ多 | 住まい・教育・クルマ・19不動産・会社・投資など（個人ドラフトマップ未整備）→ **V-2B-MAP** |
-| 税理士メール取込 | **法人のみ** UI。admin Gmail・2025クエリで **messages_scanned=0**（証憑0）→ **V-2B-EV** |
+| 税理士メール取込 | **法人のみ** UI。admin Gmail。**2026年5月期**で証憑1件（`R8_…申告書一式.pdf`）。旧「2025窓0件」は届いていない年度の誤り |
 | 本登録 | 走っていない（境界OK） |
 | 年度評価 YoY | テーブル＋UI 実装。回帰: [`KURASHIFT_Tax_YoY_QAゲート_20260813.md`](./KURASHIFT_Tax_YoY_QAゲート_20260813.md) |
 
@@ -322,7 +322,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 
 - [x] LP 実績と ROI を見た（Zaim 本番未実行・CLI 2026-08-13）  
 - [x] 弥生CSVパスが出た  
-- [ ] （可能なら）証憑1件以上 — **未（メール0件）**  
+- [x] （可能なら）証憑1件以上 — **2026法人・申告書一式PDF（2026-08-15 確認）**  
 - [ ] ブラウザで年次モード UI を一通り見た（体感残）  
 
 ### ③ Phase 0 チェック
@@ -410,9 +410,10 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 
 | ID | 内容 | 状態 | 次の一手案 |
 |---|---|---|---|
-| **V-2-UI** | `/lifeplan?mode=annual`・`/roi`・`/tax` の画面体感 | 未 | 本番で Step ボタン→worker→表示を通し確認 |
-| **V-2B-EV** | 税理士メール証憑が0 | 未 | クエリ拡張／estate箱／2024年分／手動PDF置き |
-| **V-2B-MAP** | 弥生勘定マップが薄い（skip多） | ドラフト | 個人申告に必要な費目だけマップ拡充 |
+| **V-2-UI** | `/lifeplan?mode=annual`・`/roi`・`/tax` の画面体感 | **合格（2026-08-15）** | 本番目視OK。Zaim本番は誤キュー→実行前に failed 化（本番未反映） |
+| **V-2B-EV** | 税理士メール証憑が0 | **合格（2026-08-15）** | 根因は年度窓。2026年5月期で scanned=2・証憑1（申告書一式PDF）。クエリを同年末までに拡張 |
+| **V-2B-PREV** | 個人提出PDFも `/tax` プレビュー | **実装済（2026-08-15）**・本番デプロイ後に目視 | `--ingest-filed-returns`・カタログ KPI。検証は後回し可 |
+| **V-2B-MAP** | 弥生勘定マップが薄い（skip多） | ドラフト・**次に戻る候補** | 個人申告に必要な費目だけマップ拡充 |
 | **V-2A-MAP** | Numbers→Zaim 対象外12件 | 警告のみ | 年次反映前にマッピング見直し（本番適用は承認後） |
 | **V-2A-CENT** | 生涯CFの閲覧はアプリ。更新の書込は当面 Numbers＋Jarvis | 閲覧実装 | 年次ウィザード(a–d)→差分表示。セル編集は次 |
 | **V-3-P0** | 不動産 Phase0 煙＋ブリッジ | ほぼ済 | 本番で `/realestate` の19CF表示を目視 |

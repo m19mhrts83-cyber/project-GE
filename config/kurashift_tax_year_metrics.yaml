@@ -1,0 +1,156 @@
+# 確定申告KPIカタログ（OneDrive 50_税金,確定申告 の提出用PDFから抽出）
+# 個人=暦年 / 法人=5月期。payload.re_income_jpy は第一表の不動産所得（③）。
+# 登録: scripts/jarvis_kurashift_tax.py --import-metrics-catalog
+
+version: 1
+updated: "2026-08-15"
+source_root: "OneDrive/215_神・大家さん倶楽部/50_税金,確定申告"
+
+personal:
+  - fiscal_year: 2025
+    filing_status: filed
+    taxable_income_jpy: 7305000
+    income_tax_jpy: 795410
+    refund_or_pay: refund
+    note: "第一表:課税7,305,000・税795,410・還付751,890。不動産所得△1,538,030（土地利子制限後）。収支内訳書△1,811,310"
+    payload:
+      re_income_jpy: -1538030
+      re_income_statement_jpy: -1811310
+      re_revenue_jpy: 4371840
+      withholding_jpy: 1547300
+      refund_amount_jpy: 751890
+      source_pdf: "2025年度/令和7年分確定申告書.pdf"
+
+  - fiscal_year: 2024
+    filing_status: filed
+    taxable_income_jpy: 7254000
+    income_tax_jpy: 864501
+    refund_or_pay: refund
+    note: "第一表:所得計9,544,770−控除2,290,107→課税約7,254,000・税864,501・還付62,199。不動産所得11,675"
+    payload:
+      re_income_jpy: 11675
+      re_income_statement_jpy: 11675
+      re_revenue_jpy: 5948140
+      withholding_jpy: 926700
+      refund_amount_jpy: 62199
+      source_pdf: "2024年度/令和6年分確定申告書.pdf"
+
+  - fiscal_year: 2023
+    filing_status: filed
+    taxable_income_jpy: 6833000
+    income_tax_jpy: 669163
+    refund_or_pay: refund
+    note: "第一表:課税6,833,000・税669,163・還付224,037。不動産所得72,489"
+    payload:
+      re_income_jpy: 72489
+      re_income_statement_jpy: 72489
+      re_revenue_jpy: 7782010
+      withholding_jpy: 893200
+      refund_amount_jpy: 224037
+      source_pdf: "2023年分/提出版/令和5年分確定申告書.pdf"
+
+  - fiscal_year: 2022
+    filing_status: filed
+    taxable_income_jpy: 0
+    income_tax_jpy: 0
+    refund_or_pay: refund
+    note: "第一表:課税0・税0・還付762,100。不動産所得△6,046,994"
+    payload:
+      re_income_jpy: -6046994
+      re_revenue_jpy: 3500576
+      withholding_jpy: 762100
+      refund_amount_jpy: 762100
+      source_pdf: "2022年分/令和4年分確定申告書.pdf"
+
+  - fiscal_year: 2021
+    filing_status: filed
+    taxable_income_jpy: 5713000
+    income_tax_jpy: 421264
+    refund_or_pay: refund
+    note: "第一表:課税5,713,000・税421,264・還付305,536。不動産所得△964,934"
+    payload:
+      re_income_jpy: -964934
+      re_revenue_jpy: 2188620
+      withholding_jpy: 726800
+      refund_amount_jpy: 305536
+      source_pdf: "2021年分/令和3年分確定申告書.pdf"
+
+  - fiscal_year: 2020
+    filing_status: filed
+    taxable_income_jpy: 3980000
+    income_tax_jpy: 57890
+    refund_or_pay: refund
+    note: "第一表:課税3,980,000・税57,890・還付585,610。不動産所得△1,140,951"
+    payload:
+      re_income_jpy: -1140951
+      re_revenue_jpy: 2235550
+      withholding_jpy: 643500
+      refund_amount_jpy: 585610
+      source_pdf: "2020年分/令和2年分確定申告書.pdf"
+
+  - fiscal_year: 2019
+    filing_status: filed
+    taxable_income_jpy: 4971000
+    income_tax_jpy: 250757
+    refund_or_pay: refund
+    note: "第一表:課税4,971,000・税250,757・還付464,443。不動産所得△435,421"
+    payload:
+      re_income_jpy: -435421
+      re_revenue_jpy: 2356600
+      withholding_jpy: 715200
+      refund_amount_jpy: 464443
+      source_pdf: "2019年分/令和1年分確定申告書B.pdf"
+
+  - fiscal_year: 2018
+    filing_status: filed
+    taxable_income_jpy: 5590000
+    income_tax_jpy: 370929
+    refund_or_pay: refund
+    note: "第一表:課税5,590,000・税370,929・還付407,171。不動産所得△278,801"
+    payload:
+      re_income_jpy: -278801
+      re_revenue_jpy: 2413080
+      withholding_jpy: 778100
+      refund_amount_jpy: 407171
+      source_pdf: "2018年分/2018年分確定申告書n.pdf"
+
+  - fiscal_year: 2017
+    filing_status: filed
+    taxable_income_jpy: 4760000
+    income_tax_jpy: 199197
+    refund_or_pay: refund
+    note: "第一表:課税4,760,000・税199,197・還付446,703。不動産所得△461,018"
+    payload:
+      re_income_jpy: -461018
+      re_revenue_jpy: 2317330
+      withholding_jpy: 645900
+      refund_amount_jpy: 446703
+      source_pdf: "2017年分/2017年分確定申告書n.pdf"
+
+corporate:
+  - fiscal_year: 2026
+    filing_status: filed
+    filed_on: "2026-07-31"
+    revenue_jpy: null
+    ordinary_income_jpy: -1190714
+    corporate_tax_jpy: 0
+    tax_payable_jpy: 71000
+    note: "R8(令7.6.1-8.5.31)納付税額一覧:当期利益△1,190,714・所得△1,190,621・法人税0・地方均等割71,000・源泉還付187"
+    payload:
+      taxable_income_jpy: -1190621
+      national_refund_jpy: 187
+      local_per_capita_jpy: 71000
+      source_pdf: "knees bee 税理士法人/kurashift/2026/evidence/19f6450438b17204_R8_リビングサポート松_申告書一式.pdf"
+
+  - fiscal_year: 2025
+    filing_status: filed
+    filed_on: "2025-07-31"
+    revenue_jpy: 973104
+    ordinary_income_jpy: -175832
+    corporate_tax_jpy: 0
+    tax_payable_jpy: 23600
+    note: "第1期(令7.1.6-5.31):売上973,104・経常損失175,832・所得△313,638・法人税0・納付23,600（均等割）。納付一覧の当期利益△337,332は別表記"
+    payload:
+      taxable_income_jpy: -313638
+      local_per_capita_jpy: 23600
+      source_pdf: "knees bee 税理士法人/3.決算/株式会社リビングサポート松様_第1期申告書一式.pdf"

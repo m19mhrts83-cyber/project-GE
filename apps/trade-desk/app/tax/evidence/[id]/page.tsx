@@ -29,13 +29,21 @@ export default async function TaxEvidencePreviewPage({
   const kind = previewKind(filename);
   const src = `/api/tax/evidence/${id}/file`;
   const scopeLabel = data.scope === "corporate" ? "法人" : "個人";
+  const kindLabel =
+    data.doc_kind === "filed_return"
+      ? "確定申告書"
+      : data.doc_kind === "re_statement"
+        ? "収支内訳書"
+        : data.doc_kind === "attachment"
+          ? "メール添付"
+          : data.doc_kind;
 
   return (
     <Shell active="/tax" email={user?.email ?? null}>
       <p className="page-kicker">確定申告 · プレビュー</p>
       <h1>{filename}</h1>
       <p className="sub">
-        {scopeLabel} {data.fiscal_year}年
+        {scopeLabel} {data.fiscal_year}年 · {kindLabel}
         {data.subject ? ` · ${data.subject}` : ""}
       </p>
       <p className="meta" style={{ marginTop: 0 }}>

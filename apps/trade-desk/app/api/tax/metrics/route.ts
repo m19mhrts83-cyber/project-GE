@@ -73,7 +73,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "source invalid" }, { status: 400 });
   }
 
-  const row = {
+  const payload =
+    body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)
+      ? (body.payload as Record<string, unknown>)
+      : undefined;
+
+  const row: Record<string, unknown> = {
     scope,
     fiscal_year,
     filing_status,
@@ -89,6 +94,9 @@ export async function POST(req: Request) {
     tax_payable_jpy: numOrNull(body.tax_payable_jpy),
     updated_at: new Date().toISOString(),
   };
+  if (payload) {
+    row.payload = payload;
+  }
 
   const { data, error } = await supabase
     .from("kurashift_tax_year_metrics")
