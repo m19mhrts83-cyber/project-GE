@@ -218,53 +218,92 @@ def _fill_confirm_pin(page: Page, pin: str) -> bool:
     return False
 
 
-def _handle_otp(page: Page, *, otp_channel: str, rail_id: str, hold: bool) -> str:
+def _fill_otp_code(page: Page, code: str) -> None:
+    for sel in (
+        "input[autocomplete='one-time-code']",
+        "input[name*='otp' i]",
+        "input[type='tel']",
+        "input[type='password']",
+    ):
+        loc = page.locator(sel)
+        if loc.count():
+            loc.first.fill(code)
+            break
+    btn = page.get_by_role("button", name=re.compile("送信|認証|次へ|確認"))
+    if btn.count():
+        btn.first.click()
+    page.wait_for_timeout(1500)
+
+
+def _try_auto_otp(
+    page: Page,
+    *,
+    channel: str,
+    rail_id: str,
+    sender_hint: str,
+    gmail_account: str | None,
+) -> bool:
+    if channel not in ("gmail_api", "sms_messages"):
+        return False
+    try:
+        kwargs: dict[str, Any] = {
+            "otp_channel": channel,
+            "rail_id": rail_id,
+            "sender_hint": sender_hint,
+            "timeout_sec": 60,
+        }
+        if channel == "gmail_api" and gmail_account:
+            kwargs["gmail_account"] = gmail_account
+        code = fetch_otp(**kwargs)
+        if code:
+            _fill_otp_code(page, code)
+            append_audit(
+                {
+                    "rail_id": rail_id,
+                    "status": "otp_submit",
+                    "otp_channel": channel,
+                    "otp_obtained": True,
+                    "wave": "3",
+                }
+            )
+            return True
+    except (NeedsUserOtp, OtpFetchError) as e:
+        print(f"# otp_auto_skip channel={channel} {e}", file=sys.stderr)
+    return False
+
+
+def _handle_otp(
+    page: Page,
+    *,
+    otp_channel: str,
+    rail_id: str,
+    hold: bool,
+    sender_hint: str = "",
+    gmail_account: str | None = None,
+    fallback_channels: list[str] | None = None,
+) -> str:
     if not _looks_otp(page):
         return "ok"
-    if otp_channel in ("gmail_api", "sms_messages"):
-        try:
-            code = fetch_otp(
-                otp_channel=otp_channel,
-                rail_id=rail_id,
-                sender_hint="滋賀|しがぎん|京都|京銀|認証|ワンタイム",
-                timeout_sec=60,
-            )
-            if code:
-                for sel in (
-                    "input[autocomplete='one-time-code']",
-                    "input[name*='otp' i]",
-                    "input[type='tel']",
-                    "input[type='password']",
-                ):
-                    loc = page.locator(sel)
-                    if loc.count():
-                        loc.first.fill(code)
-                        break
-                btn = page.get_by_role("button", name=re.compile("送信|認証|次へ|確認"))
-                if btn.count():
-                    btn.first.click()
-                page.wait_for_timeout(1500)
-                return "ok"
-        except (NeedsUserOtp, OtpFetchError) as e:
-            print(f"# otp_auto_skip {e}", file=sys.stderr)
+    hint = sender_hint or "滋賀|しがぎん|京都|京銀|認証|ワンタイム"
+    channels = [otp_channel] + list(fallback_channels or [])
+    seen: set[str] = set()
+    for ch in channels:
+        if not ch or ch in seen:
+            continue
+        seen.add(ch)
+        if _try_auto_otp(
+            page,
+            channel=ch,
+            rail_id=rail_id,
+            sender_hint=hint,
+            gmail_account=gmail_account,
+        ):
+            return "ok"
     if not hold:
         return "needs_user"
     code = _wait_tty("⏳ ワンタイム／アプリ認証待ち…")
     if code:
-        for sel in (
-            "input[autocomplete='one-time-code']",
-            "input[name*='otp' i]",
-            "input[type='tel']",
-            "input[type='password']",
-        ):
-            loc = page.locator(sel)
-            if loc.count():
-                loc.first.fill(code)
-                break
-        btn = page.get_by_role("button", name=re.compile("送信|認証|次へ|確認"))
-        if btn.count():
-            btn.first.click()
-        page.wait_for_timeout(1500)
+        _fill_otp_code(page, code)
     return "ok"
 
 
@@ -361,12 +400,17 @@ def preview(bank: str, amount: int, money_ops_id: str, balance: int | None) -> s
     acct = _env("PERSONAL_BANK_ACCOUNT")
     dmask = dest_mask(acct, branch)
     key = make_idempotency_key(money_ops_id or "noid", meta["rail_id"], amount, dmask)
+    otp_ch = cfg.get("otp_channel") or meta["otp_channel_default"]
     print(f"=== 送金アシスト Preview ({meta['rail_id']}) / Wave3 ===")
     print(f"ラベル: {meta['label']}")
     print(f"ログイン: {cfg.get('login_url', '(config未作成)')}")
     print(f"金額: {amount:,}円 / keep下限目安: {meta['keep_floor_jpy']:,}円")
     print(f"宛先: 三井住友銀行 刈谷 普通 {dmask}")
-    print("役割: Jarvis=ログイン〜照合・実行 / あなた=アプリOTPのみ")
+    print(f"otp_channel: {otp_ch}（gmail/sms なら自動入力。app はユーザー）")
+    if otp_ch in ("gmail_api", "sms_messages"):
+        print("役割: Jarvis=ログイン〜OTP入力・照合・実行 / あなた=生体のみ")
+    else:
+        print("役割: Jarvis=ログイン〜照合・実行 / あなた=アプリOTPのみ")
     print(f"idempotency_key: {key}")
     if balance is not None:
         assert_balance_keep(balance, int(meta["keep_floor_jpy"]), amount)
@@ -409,6 +453,9 @@ def run_go(
     acct = _env("PERSONAL_BANK_ACCOUNT")
     dmask = dest_mask(acct, branch)
     otp_channel = cfg.get("otp_channel") or meta["otp_channel_default"]
+    sender_hint = str(cfg.get("sender_hint") or "")
+    gmail_account = cfg.get("gmail_account")
+    fallback_channels = list(cfg.get("otp_fallback_channels") or [])
     lock = TransferLock(key)
     if not lock.acquire():
         print("lock_busy", file=sys.stderr)
@@ -423,6 +470,7 @@ def run_go(
                 "dest_mask": dmask,
                 "otp_channel": otp_channel,
                 "money_ops_id": money_ops_id or None,
+                "wave": "3",
             }
         )
         start_cdp_chrome(
@@ -447,12 +495,19 @@ def run_go(
                     "dest_mask": dmask,
                     "otp_channel": otp_channel,
                     "error": "awaiting_secret_phrase",
+                    "wave": "3",
                 }
             )
             print("📎 waiting_user: 合言葉入力後に同コマンド再実行（--go --execute）")
             return 2
         st = _handle_otp(
-            page, otp_channel=otp_channel, rail_id=meta["rail_id"], hold=hold
+            page,
+            otp_channel=otp_channel,
+            rail_id=meta["rail_id"],
+            hold=hold,
+            sender_hint=sender_hint,
+            gmail_account=gmail_account,
+            fallback_channels=fallback_channels,
         )
         if st == "needs_user":
             append_audit(
@@ -463,6 +518,7 @@ def run_go(
                     "dest_mask": dmask,
                     "otp_channel": otp_channel,
                     "error": "awaiting_app_otp",
+                    "wave": "3",
                 }
             )
             print("📎 waiting_user: アプリOTP後に同コマンド再実行（--go）")
@@ -481,7 +537,15 @@ def run_go(
             btn.first.click()
             page.wait_for_timeout(1500)
         if _looks_otp(page):
-            _handle_otp(page, otp_channel=otp_channel, rail_id=meta["rail_id"], hold=hold)
+            _handle_otp(
+                page,
+                otp_channel=otp_channel,
+                rail_id=meta["rail_id"],
+                hold=hold,
+                sender_hint=sender_hint,
+                gmail_account=gmail_account,
+                fallback_channels=fallback_channels,
+            )
         if not _amount_ok(page, amount):
             print("⚠️ 金額照合不可 → 実行しません")
             append_audit(
@@ -491,6 +555,7 @@ def run_go(
                     "amount_jpy": amount,
                     "dest_mask": dmask,
                     "error": "amount_not_visible",
+                    "wave": "3",
                 }
             )
             return 2
@@ -504,6 +569,7 @@ def run_go(
                     "amount_jpy": amount,
                     "dest_mask": dmask,
                     "error": "confirm_ready",
+                    "wave": "3",
                 }
             )
             return 0
@@ -518,6 +584,7 @@ def run_go(
                     "amount_jpy": amount,
                     "dest_mask": dmask,
                     "error": "dest_hint_mismatch",
+                    "wave": "3",
                 }
             )
             return 1
@@ -537,11 +604,20 @@ def run_go(
                 "status": "executing_click",
                 "amount_jpy": amount,
                 "dest_mask": dmask,
+                "wave": "3",
             }
         )
         page.wait_for_timeout(2500)
         if _looks_otp(page):
-            _handle_otp(page, otp_channel=otp_channel, rail_id=meta["rail_id"], hold=hold)
+            _handle_otp(
+                page,
+                otp_channel=otp_channel,
+                rail_id=meta["rail_id"],
+                hold=hold,
+                sender_hint=sender_hint,
+                gmail_account=gmail_account,
+                fallback_channels=fallback_channels,
+            )
         done = any(
             k in _body(page)
             for k in ("受け付けました", "完了", "受付番号", "お手続きが完了")
@@ -554,6 +630,7 @@ def run_go(
                     "amount_jpy": amount,
                     "dest_mask": dmask,
                     "evidence": "completion_screen",
+                    "wave": "3",
                 }
             )
             print("✅ done")
@@ -564,6 +641,7 @@ def run_go(
                 "status": "verifying",
                 "amount_jpy": amount,
                 "dest_mask": dmask,
+                "wave": "3",
             }
         )
         print("📎 verifying: 完了画面未検出。必要ならアプリ承認後に再確認")
@@ -575,7 +653,6 @@ def run_go(
                 pw_api.stop()
             except Exception:
                 pass
-
 
 def main() -> int:
     load_env()

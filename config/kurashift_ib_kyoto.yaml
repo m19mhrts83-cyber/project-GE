@@ -1,7 +1,15 @@
 # 京都銀行 京銀ダイレクト（parasol.anser — 東海労金と同系統）— Wave3
 # 秘密: KYOTO_IB_USER / KYOTO_IB_PASSWORD
+#
+# OTPチャネル調査（2026-08-15）:
+#   振込確認 = アプリワンタイム／スマート認証系（app_onetime_pw）→ ユーザー。
+#   一日限度額 0 円の画面を観測（2026-08）。AW 出金で代替可（≤10万優先）。
+#   メール／SMS OTP は未確認。切替時は otp_channel を gmail_api / sms_messages へ。
 login_url: "https://www.parasol.anser.ne.jp/ib/index.do?PT=BS&CCT0080=0158"
 otp_channel: app_onetime_pw
+otp_fallback_channels: []
+sender_hint: "京都|京銀|認証|ワンタイム|確認コード"
+gmail_account: null
 username_selectors:
   - "input[name*='user' i]"
   - "input[id*='user' i]"

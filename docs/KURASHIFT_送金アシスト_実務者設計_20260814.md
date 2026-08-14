@@ -33,8 +33,8 @@ Phase1 目安（2026-08 Infinite）:
 | `tokairokin_smbc` | 232,000 | `app_onetime_pw` | 確認まで＋ホールド。OTP ユーザー |
 | `sbi_main_smbc` | 26,000 | 調査後（gmail/sms/app） | 取れるなら実行まで |
 | `sbi_sub_smbc` | 161,000 | 同上 | 同上 |
-| `mufg_airwallet` | 290,000 | 調査後 | 初回着金証明ゲート |
-| `shiga_smbc` / `kyoto_smbc` | 62k／50k | 調査後 | 東海労金型 |
+| `mufg_airwallet` | 290,000 | `sms_messages`（AW）／千景IBは別 | 初回着金証明ゲート＋SMS自動 |
+| `shiga_smbc` / `kyoto_smbc` | 62k／50k | `app_onetime_pw`（調査済） | IB=東海労金型。≤10万は AW 優先 |
 | blocked | PayPay 等 | — | 起動禁止 |
 
 推奨順: 無料レール（SBI）→ **≤10万かつ AW 紐づけ可ならエアウォレット優先** → IB 他行（東海労金等）。同一 `from_account_id` の並列禁止。連続間隔 ≥60 秒。  
@@ -123,7 +123,7 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 | **1** | 第一生命NEOBANK→SMBC（本／副）・ことら分割・スマート認証NEO待ち | 完了（ログイン〜確認） |
 | **1b** | 最小ユーザー操作＋実行クリック＋証跡 done／resume | 完了 |
 | **2** | エアウォレット（手順・初回着金ゲート・SMS OTP） | **完了（アプリタップはユーザー最小）** |
-| **3** | 滋賀・京都 IB（東海労金型 Preview→Go） | **骨格完了（creds 待ち）** |
+| **3** | 滋賀・京都 IB（OTP調査・自動入力配線・AW優先） | **完了（otp=app_onetime_pw／メールSMS切替可）** |
 | **4** | ことら分割キューの横断オーケストレーション | **骨格（`jarvis_transfer_queue.py`）** |
 
 ---
@@ -187,8 +187,10 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 
 ### Wave2 エアウォレット
 
-- アプリ中心。Jarvis=手順・初回着金ゲート・SMS OTP・監査／あなた=アプリタップ
+- アプリ中心。Jarvis=手順・**初回着金ゲート**・**SMS OTP 自動ポーリング**・監査／あなた=アプリタップ
 - 状態: `.jarvis_state/airwallet_arrival_proof.json`
+- proven 前の本額 Go は拒否（少額 ≤1,000 または `--allow-unproven`）
+- done は `--complete --evidence completion_screen|smbc_credit|source_debit`
 
 ```bash
 cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
@@ -196,6 +198,8 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 ./run_phase1_airwallet_to_smbc.sh --go --money-ops-id <UUID>
 # 初回 SMBC 着金確認後
 ./run_phase1_airwallet_to_smbc.sh --mark-arrival-proven --note 'SMBC着金OK'
+# 操作完了後（証跡必須）
+./run_phase1_airwallet_to_smbc.sh --complete --evidence smbc_credit
 # SMS OTP のみ取得（値は stdout・ログに残さない）
 ./run_phase1_airwallet_to_smbc.sh --fetch-sms-otp
 ```
@@ -204,9 +208,11 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 
 - Creds: `SHIGA_IB_*` / `KYOTO_IB_*`（jarvis_private）
 - 設定: `config/kurashift_ib_shiga.yaml` / `kurashift_ib_kyoto.yaml`
+- **OTP 調査結果（2026-08-15）**: 両行とも振込確認は **`app_onetime_pw`（ユーザー）**。メール／SMS は未確認。YAML の `otp_channel` を変えれば自動入力経路が有効。
 - **滋賀ログインPW失念**: Web では再設定不可。ヘルプデスク **0120-450-280**（平日 9–17）→ SMS の URL で eKYC → **会員カード郵送（約1〜10日）**。FAQ: https://faq.shigagin.com/faq_detail.html?id=132  
   引落直前サイクルでは、届くまで他レールで寄せ、滋賀は届き次第 or ATM（カード暗証が分かる場合）で補完。
 - 振込時: `SHIGA_IB_CONFIRM_PIN`（確認用暗証番号・数字6桁）があると実行画面が楽
+- ≤10万かつ AW 紐づけ可なら **エアウォレット優先**（IB はフォールバック）
 
 ```bash
 ./run_phase1_shiga_to_smbc.sh --preview

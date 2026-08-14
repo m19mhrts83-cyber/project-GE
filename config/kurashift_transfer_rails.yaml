@@ -80,26 +80,28 @@ rails:
   # 注意: MUFG豊明は千景名義のため、真治AWへの口座紐づけ不可。
   # 真治名義の対応銀行＋刈谷の登録は可。千景分は本人AW or IB有料寄せ。
   # 2026-08 サイクル: IB（手数料220）で 290,000 完了。AW ランチャは真治名義口座向けに残置。
+  # Wave2: 初回着金証明＋SMS OTP 自動（jarvis_airwallet_transfer.py）
   - id: mufg_airwallet
-    label: "MUFG豊明（千景）→IB→SMBC刈谷"
+    label: "MUFG豊明（千景）→IB→SMBC刈谷 / AWランチャ残置"
     enabled: true
     order: 40
     amount_jpy: 290000
     keep_floor_jpy: 85000
     from_account_id: mufg_toyoake
     to_account_id: smbc_kariya
-    otp_channel: app_onetime_pw
+    otp_channel: sms_messages
     gmail_account: null
     sender_hint: "エアウォレット|COIN|COIN+|三菱UFJ|リクルート"
     free_rail: false
     require_first_arrival_proof: true
-    owner_note: "mufg_toyoake=千景名義。真治AW直結不可。今回サイクルはIB有料寄せ（config/kurashift_ib_mufg_chikage.yaml）。"
-    runner: ib_assist
+    owner_note: "mufg_toyoake=千景名義。真治AW直結不可。今回サイクルはIB有料寄せ。AWスクリプトは真治名義向けWave2。"
+    runner: airwallet
     launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_airwallet_to_smbc.sh"
     config: config/kurashift_ib_mufg_chikage.yaml
     status_default: pending
 
   # ≤10万かつ AW 紐づけ可 → エアウォレット優先（IB はフォールバック）
+  # Wave3 IB: otp=app_onetime_pw（調査済）。AW出金実績あり。
   - id: shiga_smbc
     label: "滋賀銀行→SMBC刈谷"
     enabled: true
@@ -114,7 +116,7 @@ rails:
     launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_shiga_to_smbc.sh"
     config: config/kurashift_ib_shiga.yaml
     status_default: pending
-    note: "2026-08-15 AW 出金で完了。≤10万は AW 優先。IB 時間外 BEQB0003"
+    note: "2026-08-15 AW 出金で完了。≤10万は AW 優先。IB フォールバックは Wave3"
 
   - id: kyoto_smbc
     label: "京都銀行刈谷→SMBC刈谷"
@@ -130,7 +132,7 @@ rails:
     launcher: "215_kamiooya/C1_cursor/browser_automation/run_phase1_kyoto_to_smbc.sh"
     config: config/kurashift_ib_kyoto.yaml
     status_default: pending
-    note: "2026-08-15 AW 出金で完了。≤10万は AW 優先"
+    note: "2026-08-15 AW 出金で完了。≤10万は AW 優先。IB フォールバックは Wave3"
 
 blocked:
   - id: paypay_orix_keep
