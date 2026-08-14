@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Phase1 Wave1b: 住信SBIネット（本）→ SMBC刈谷 26,000円
+# Phase1 Wave1b: 第一生命NEOBANK（本・普通）→ SMBC刈谷 26,000円
 # 最小ユーザー操作: アプリ承認／取れないOTPのみ。他は Jarvis。
 # Terminal.app のみ。
 set -euo pipefail

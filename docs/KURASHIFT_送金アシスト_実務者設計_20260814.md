@@ -17,7 +17,7 @@
 | 宛先（Phase1 集約） | SMBC 刈谷 = `PERSONAL_BANK_*` / `smbc_kariya`（銀行 0009・支店 486・普通・下4桁突合） |
 | OTP | `gmail_api`／`sms_messages` → Jarvis。`app_onetime_pw`／`passkey_or_bio` → ユーザー |
 | 秘密 | `.env.jarvis_private` のみ。チャット・監査に値を出さない |
-| SBI ネット認証 | `SBI_NET_*`（証券 `SBI_SEC_*` と分離） |
+| SBI／第一生命NEOBANK 認証 | `SBI_NET_*`（証券 `SBI_SEC_*` と分離） |
 | headless | 本番 false（アプリ OTP 時に画面を見る） |
 
 ---
@@ -119,7 +119,7 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 | Wave | 内容 | 状態 |
 |---|---|---|
 | **0** | 仕様・R6'・rails[]・OTP／監査骨格・東海労金プロトコル | 完了 |
-| **1** | 住信SBIネット→SMBC（本／副）・ことら分割・スマート認証NEO待ち | 完了（ログイン〜確認） |
+| **1** | 第一生命NEOBANK→SMBC（本／副）・ことら分割・スマート認証NEO待ち | 完了（ログイン〜確認） |
 | **1b** | 最小ユーザー操作＋実行クリック＋証跡 done／resume | 完了 |
 | **2** | エアウォレット（手順・初回着金ゲート・SMS OTP） | **完了（アプリタップはユーザー最小）** |
 | **3** | 滋賀・京都 IB（東海労金型 Preview→Go） | **骨格完了（creds 待ち）** |
@@ -152,10 +152,13 @@ cd ~/git-repos/215_kamiooya/C1_cursor/browser_automation
 
 **原則**: あなたがやるのは「あなたにしかできない所有物・生体」だけ。渡した直後の続行は Jarvis。
 
-### Wave1 補足（ドコモSMTB／旧住信SBI）
+### Wave1 補足（第一生命NEOBANK／所属=ドコモSMTB＝旧住信SBI）
 
+- ブランド: **第一生命NEOBANK**（第一生命支店）。銀行本体は 2026-08-03 以降ドコモSMTBネット銀行
 - ログイン URL: `https://www.netbk.co.jp/contents/pages/wpl020601/i020601CT/DI02060100`
-- Creds: `SBI_NET_USER` / `SBI_NET_LOGIN_PASSWORD`（`SBI_SEC_*` と分離）
+- Creds 本線3つ: `SBI_NET_USER` / `SBI_NET_LOGIN_PASSWORD` / `SBI_NET_TRADE_PASSWORD`（`SBI_SEC_*` と分離）
+- `SBI_NET_MAIN_ACCOUNT` … 代表（普通）口座番号のメモ（ログイン必須ではない）
+- `SBI_NET_SUB_ACCOUNT` … 任意。目的別等。**SBIハイブリッド預金は証券スイープ用**で、他行送金前に普通へ戻すことが多く、口座番号は空でよいことが多い
 - 無料寄せ: ことらおおむね **1件10万**。副口座 161k は **100k+61k**（`--chunk 0/1`）
 - 取引実行はスマート認証NEO（アプリ承認）が多い → Terminal で Enter または `--resume`
 

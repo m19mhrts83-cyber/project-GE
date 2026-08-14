@@ -77,7 +77,7 @@ export type TransferRail = {
 export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
   {
     id: "sbi_main_smbc",
-    label: "住信SBI本→SMBC刈谷",
+    label: "第一生命NEOBANK本（普通）→SMBC刈谷",
     amount_jpy: 26000,
     from_account_id: "sbi_net_main",
     to_account_id: "smbc_kariya",
@@ -89,11 +89,11 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     where: "either",
     keep_note: "残≈50.1万（Amex過渡）",
     manual_iphone:
-      "NEOBANKアプリで本口座から三井住友刈谷へ26,000円（ことら可）。残50万超を維持",
+      "第一生命NEOBANKアプリで本（普通）から三井住友刈谷へ26,000円（ことら可）。残50万超を維持",
   },
   {
     id: "sbi_sub_smbc",
-    label: "住信SBI副→SMBC刈谷",
+    label: "第一生命NEOBANK副→SMBC刈谷",
     amount_jpy: 161000,
     from_account_id: "sbi_net_sub",
     to_account_id: "smbc_kariya",
@@ -105,7 +105,7 @@ export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
     where: "either",
     keep_note: "残≈8.1万",
     manual_iphone:
-      "ことらで100,000＋61,000の2回（1件10万超は分割）。副の残≈8万を維持",
+      "ことらで100,000＋61,000の2回。ハイブリッドなら先に普通へ戻してから。残≈8万維持",
   },
   {
     id: "tokairokin_smbc",
@@ -206,7 +206,7 @@ export const CARD_SETTLEMENT_DOC =
 export const FREE_RAILS: FreeRail[] = [
   {
     id: "sbi_smbc",
-    title: "住信SBI ↔ 三井住友の無料振込枠",
+    title: "第一生命NEOBANK ↔ 三井住友の無料振込枠",
     use: "月内寄せの本線。SBI余剰 → Olive（SMBC）",
     caution: "無料回数・時間帯を超えず有料化しない",
   },

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Phase1 Wave1b: 住信SBIネット（副）→ SMBC刈谷 161,000円
+# Phase1 Wave1b: 第一生命NEOBANK（副）→ SMBC刈谷 161,000円
 # ことら分割: --chunk 0 → 100,000 / --chunk 1 → 61,000
 # Terminal.app のみ。
 set -euo pipefail

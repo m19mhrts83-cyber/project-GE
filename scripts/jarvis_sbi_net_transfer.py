@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""ドコモSMTBネット銀行（旧住信SBIネット）→ SMBC刈谷 送金アシスト Wave1b。
+"""第一生命NEOBANK（第一生命支店／所属=ドコモSMTB＝旧住信SBI）→ SMBC刈谷 送金アシスト Wave1b。
 
 最小ユーザー操作:
-  Jarvis … ログイン / メール・SMS OTP / 振込入力 / 金額照合 / 実行クリック / 証跡
+  Jarvis … ログイン / メール・SMS OTP / 取引PW / 振込入力 / 金額照合 / 実行クリック / 証跡
   ユーザー … スマート認証NEO・アプリ承認、および Jarvis が取れない OTP の提供のみ
 
+秘密（.env.jarvis_private・証券 SBI_SEC_* と分離）:
+  SBI_NET_USER / SBI_NET_LOGIN_PASSWORD / SBI_NET_TRADE_PASSWORD（本線3つ）
+  SBI_NET_MAIN_ACCOUNT … 代表普通の口座番号メモ（任意）
+  SBI_NET_SUB_ACCOUNT … 任意（目的別等）。ハイブリッドは通常空で可
+
   python scripts/jarvis_sbi_net_transfer.py --rail sbi_main_smbc --preview
-  python scripts/jarvis_sbi_net_transfer.py --rail sbi_main_smbc --go --money-ops-id UUID
+  python scripts/jarvis_sbi_net_transfer.py --rail sbi_main_smbc --go --execute --money-ops-id UUID
   # waiting_user 後（ブラウザは開いたまま）:
   python scripts/jarvis_sbi_net_transfer.py --rail sbi_main_smbc --resume --money-ops-id UUID
 
-Terminal.app 必須。秘密は .env.jarvis_private の SBI_NET_*（証券と分離）。
+Terminal.app 必須。
 """
 
 from __future__ import annotations
@@ -53,15 +58,16 @@ RAILS: dict[str, dict[str, Any]] = {
         "amount_jpy": 26_000,
         "keep_floor_jpy": 500_800,
         "from_account_id": "sbi_net_main",
-        "label": "住信SBI本→SMBC刈谷",
+        "label": "第一生命NEOBANK本（普通）→SMBC刈谷",
         "account_hint_env": "SBI_NET_MAIN_ACCOUNT",
     },
     "sbi_sub_smbc": {
         "amount_jpy": 161_000,
         "keep_floor_jpy": 81_000,
         "from_account_id": "sbi_net_sub",
-        "label": "住信SBI副→SMBC刈谷",
+        "label": "第一生命NEOBANK副→SMBC刈谷",
         "account_hint_env": "SBI_NET_SUB_ACCOUNT",
+        "note": "副がハイブリッドの場合、他行送金前に普通へ戻してから送ることがある",
     },
 }
 
@@ -70,16 +76,23 @@ def _env(name: str) -> str:
     return (os.environ.get(name) or "").strip()
 
 
-def _require_creds() -> tuple[str, str]:
+def _require_creds(*, need_trade: bool = False) -> tuple[str, str, str]:
     user = _env("SBI_NET_USER")
     pw = _env("SBI_NET_LOGIN_PASSWORD")
+    trade = _env("SBI_NET_TRADE_PASSWORD")
     if not user or not pw:
         raise SystemExit(
             "SBI_NET_USER / SBI_NET_LOGIN_PASSWORD が未設定です。"
+            " 第一生命NEOBANK のユーザーネームとログインPWを"
             " .env.jarvis_private に追記してください（証券 SBI_SEC_* とは別）。"
             " 追記後『保存した』と一声ください。"
         )
-    return user, pw
+    if need_trade and not trade:
+        raise SystemExit(
+            "SBI_NET_TRADE_PASSWORD（取引パスワード）が未設定です。"
+            " 振込実行には必要です。.env.jarvis_private に追記後『保存した』と一声ください。"
+        )
+    return user, pw, trade
 
 
 def _split_cotra(amount: int) -> list[int]:
@@ -265,6 +278,42 @@ def _fill_login(page: Page, user: str, pw: str) -> None:
             break
     page.wait_for_load_state("domcontentloaded", timeout=90000)
     page.wait_for_timeout(2000)
+
+
+def _fill_trade_password(page: Page, trade_pw: str) -> bool:
+    """振込確認などで『取引パスワード』欄が出たら埋める。見つからなければ False。"""
+    if not trade_pw:
+        return False
+    # ラベル近傍・name/id のヒューリスティック
+    candidates = [
+        page.get_by_label(re.compile(r"取引.*(パス|暗証|PW)", re.I)),
+        page.locator("input[name*='trade' i]"),
+        page.locator("input[id*='trade' i]"),
+        page.locator("input[name*='torihiki' i]"),
+        page.locator("input[placeholder*='取引' i]"),
+    ]
+    for loc in candidates:
+        try:
+            if loc.count():
+                loc.first.fill(trade_pw)
+                print("📎 取引パスワード入力", file=sys.stderr)
+                return True
+        except Exception:
+            continue
+    # password 欄が複数ある場合、ログイン以外の2つ目を試す
+    pw_inputs = page.locator("input[type='password']")
+    try:
+        n = pw_inputs.count()
+        if n >= 1:
+            # 画面文言に取引があれば最後の password を優先
+            body = (page.content() or "")[:8000]
+            if "取引" in body or "暗証" in body:
+                pw_inputs.nth(n - 1).fill(trade_pw)
+                print("📎 取引パスワード入力（password末尾欄）", file=sys.stderr)
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def _try_otp_auto(page: Page, *, otp_channel: str, sender_hint: str) -> str:
@@ -491,6 +540,7 @@ def _post_auth_flow(
     chunk_amount: int,
     auto_execute: bool,
     hold: bool,
+    trade_pw: str = "",
 ) -> int:
     if _looks_like_done(page):
         append_audit(
@@ -586,6 +636,9 @@ def _post_auth_flow(
         if st == "abort":
             return 2
 
+    if trade_pw:
+        _fill_trade_password(page, trade_pw)
+
     result = _try_execute_click(page, amount=chunk_amount, branch=branch, last4=last4)
     if result == "blocked":
         append_audit(
@@ -677,7 +730,7 @@ def run_go(
     hold: bool,
     chunk_index: int,
 ) -> int:
-    user, pw = _require_creds()
+    user, pw, trade = _require_creds(need_trade=auto_execute)
     key = _preview(rail_id, amount, money_ops_id, balance)
     branch = _env("PERSONAL_BANK_BRANCH_CODE")
     acct = _env("PERSONAL_BANK_ACCOUNT")
@@ -711,7 +764,7 @@ def run_go(
         otp_st = _try_otp_auto(
             page,
             otp_channel=otp_channel,
-            sender_hint="ドコモSMTB|住信SBI|ネット銀行|NEOBANK|netbk",
+            sender_hint="ドコモSMTB|住信SBI|ネット銀行|NEOBANK|第一生命|netbk",
         )
         if otp_st == "needs_user" or _looks_like_smart_auth(page):
             st = _handle_user_gate(
@@ -758,6 +811,7 @@ def run_go(
             chunk_amount=chunk_amount,
             auto_execute=auto_execute,
             hold=hold,
+            trade_pw=trade,
         )
     finally:
         lock.release()
@@ -792,6 +846,7 @@ def run_resume(
         )
         return 1
     print(f"📎 resume phase={sess.get('phase')} amount={chunk_amount}")
+    _, _, trade = _require_creds(need_trade=auto_execute)
     append_audit(
         {
             "rail_id": rail_id,
@@ -810,7 +865,7 @@ def run_resume(
             st_auto = _try_otp_auto(
                 page,
                 otp_channel=otp_channel,
-                sender_hint="ドコモSMTB|住信SBI|ネット銀行|NEOBANK|netbk",
+                sender_hint="ドコモSMTB|住信SBI|ネット銀行|NEOBANK|第一生命|netbk",
             )
             if st_auto != "ok":
                 st = _handle_user_gate(
@@ -834,6 +889,7 @@ def run_resume(
             chunk_amount=chunk_amount,
             auto_execute=auto_execute,
             hold=hold,
+            trade_pw=trade,
         )
     finally:
         if pw_api is not None:
@@ -845,7 +901,7 @@ def run_resume(
 
 def main() -> int:
     load_env()
-    p = argparse.ArgumentParser(description="SBIネット→SMBC Wave1b（最小ユーザー操作）")
+    p = argparse.ArgumentParser(description="第一生命NEOBANK→SMBC Wave1b（最小ユーザー操作）")
     p.add_argument("--rail", required=True, choices=sorted(RAILS.keys()))
     p.add_argument("--preview", action="store_true")
     p.add_argument("--go", action="store_true")
