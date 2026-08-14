@@ -428,10 +428,17 @@ export default async function HomePage() {
           <span className="lvl">①-C</span>
           <strong>日常の短い回し方</strong>
         </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          ①資産運用の中身は{" "}
+          <strong>A 把握</strong>／<strong>B 提案・相談・実行</strong>／
+          <strong>C 日常回し</strong>。いまのホームは C を前面にしています。
+          {" · "}
+          <a href="/guide">構成ガイド（記号の説明）→</a>
+        </p>
         <ol className="meta" style={{ margin: "8px 0 0", paddingLeft: 20 }}>
           <li>
             <strong>週次は自動</strong>
-            …日曜 09:10＋Mac起動時／朝オープン。上の「データの鮮度」で失敗を確認
+            …日曜 09:10＋Mac起動時／朝オープン。上の「データの鮮度」で失敗を確認（①-A）
           </li>
           <li>
             <strong>いまやること</strong>
@@ -439,7 +446,7 @@ export default async function HomePage() {
           </li>
           <li>
             <strong>大きな判断だけ承認</strong>
-            …相談→内容確認→承認。ライフプランは年数回でよい
+            …相談→内容確認→承認（①-B）。ライフプランは年数回でよい
           </li>
         </ol>
       </div>

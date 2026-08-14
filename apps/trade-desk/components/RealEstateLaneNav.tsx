@@ -47,6 +47,14 @@ export default function RealEstateLaneNav({ active }: { active: ReLaneId }) {
       <span className="meta" style={{ marginRight: 4 }}>
         レーン
       </span>
+      <a
+        href="/guide#re-lanes"
+        className="meta"
+        style={{ marginRight: 4, textDecoration: "underline" }}
+        title="記号の意味・実装メモ"
+      >
+        説明
+      </a>
       {LANES.map((l) => {
         const on = l.id === active;
         return (
