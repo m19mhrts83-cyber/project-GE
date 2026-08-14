@@ -1499,6 +1499,50 @@ def eval_night_triage(meta: dict, data: dict | None) -> dict[str, Any]:
     )
 
 
+def eval_airwallet_banks(meta: dict, data: dict | None) -> dict[str, Any]:
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "finance",
+            level="info",
+            summary="未調査 — jarvis_airwallet_banks_weekly.py を実行",
+            detail="≤10万かつ紐づけ可ならエアウォレット優先。週次で公式一覧を取る。",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    if level not in ("ok", "info", "warn", "attention"):
+        level = "ok"
+    newly = data.get("newly_supported_household") or []
+    detail = str(data.get("detail") or "")
+    if newly:
+        detail = (
+            "【新規対応】\n"
+            + "\n".join(f"- {x.get('label')}" for x in newly if isinstance(x, dict))
+            + ("\n\n" + detail if detail else "")
+        )
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "finance",
+        level=level,
+        summary=str(data.get("summary") or "データあり"),
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": data.get("href") or "/money-ops",
+            "official_count": data.get("official_count"),
+            "prefer_airwallet_max_jpy": data.get("prefer_airwallet_max_jpy"),
+            "newly_supported_household": newly,
+        },
+    )
+
+
 def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
     title = meta["title"]
     prompt = meta.get("cursor_prompt") or ""
@@ -1764,6 +1808,9 @@ EVALUATORS = {
     ),
     "card_debit_watch": lambda m: eval_card_debit_watch(
         m, load_json(STATE / "card_debit_watch.json")
+    ),
+    "airwallet_banks": lambda m: eval_airwallet_banks(
+        m, load_json(STATE / "airwallet_banks_weekly.json")
     ),
     "line_export": lambda m: eval_line_export(m, load_json(STATE / "line_export_reminder.json")),
     "energy_cf": lambda m: eval_energy_cf(m, load_json(STATE / "energy_cf.json")),

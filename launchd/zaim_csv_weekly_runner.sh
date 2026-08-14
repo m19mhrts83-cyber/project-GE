@@ -108,6 +108,13 @@ CSV_OUT="${HOME}/Library/CloudStorage/OneDrive-個人用/215_神・大家さん�
   "$PY" "${REPO_DIR}/scripts/jarvis_zaim_watch_runner.py" --skip-finance
   set -e
 
+  # エアウォレット対応銀行（家計銀行が新たに載ったらお知らせ）
+  set +e
+  "$PY" "${REPO_DIR}/scripts/jarvis_airwallet_banks_weekly.py"
+  "$PY" "${REPO_DIR}/scripts/jarvis_situation_watch.py" --write
+  "$PY" "${REPO_DIR}/scripts/jarvis_dashboard_push.py" --watch-only
+  set -e
+
   write_state "1" "export+push ok" "$CSV_OUT"
   echo "# end ok $(date '+%Y-%m-%d %H:%M:%S %z')"
 } >>"$LOG" 2>&1
