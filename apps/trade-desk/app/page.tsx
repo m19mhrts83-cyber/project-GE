@@ -741,7 +741,9 @@ export default async function HomePage() {
             </p>
           ) : null}
           <p className="meta">
-            <a href="/realestate">不動産 →</a>
+            <a href="/realestate">不動産賃貸 →</a>
+            {" · "}
+            <a href="/mq">MQ会計評価 →</a>
             {" · "}
             <a href="/realestate/deals">買い進め →</a>
             {" · "}
