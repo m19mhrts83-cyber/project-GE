@@ -555,3 +555,5 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260816_kurashift_mq_period_facts.sql）
 -- kurashift_mq_account_map（Zaim→MQ要素）
 -- （migrations/20260816_kurashift_mq_account_map.sql）
+-- kurashift_mq_bs_snapshots（軽量B/S・欠損はNULL）
+-- （migrations/20260816_kurashift_mq_bs_snapshots.sql）
