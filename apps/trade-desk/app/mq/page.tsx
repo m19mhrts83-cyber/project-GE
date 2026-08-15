@@ -1,22 +1,29 @@
 import Shell from "@/components/Shell";
 import MqCompareBars from "@/components/MqCompareBars";
 import MqFactsForm from "@/components/MqFactsForm";
+import MqPlanForm from "@/components/MqPlanForm";
 import MqStrackPanel from "@/components/MqStrackPanel";
 import { fmtYen } from "@/lib/format";
 import {
+  aggregatePlanAnnual,
   aggregateRows,
   availableMonths,
   availableYears,
   entityLabel,
   filterFactsMonth,
   filterFactsYearActual,
+  filterPlans,
   lineLabel,
+  listPlanVariants,
   metricBars,
+  scaleAnnualComputedToMonth,
+  type CompareMode,
   type EntityFilter,
   type GrainFilter,
   type LineFilter,
   type MqFactRow,
 } from "@/lib/mqAggregate";
+import type { MqComputed } from "@/lib/mqEquations";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +41,17 @@ function currentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+type Panel = {
+  title: string;
+  computed: MqComputed | null;
+  cashIn?: number | null;
+  cashOut?: number | null;
+  cashEnd?: number | null;
+  depreciation?: number | null;
+  emptyHint: string;
+  fNote?: string;
+};
+
 export default async function MqPage({
   searchParams,
 }: {
@@ -48,8 +66,7 @@ export default async function MqPage({
   const line = one(sp, "line", "realestate") as LineFilter;
   const entity = one(sp, "entity", "combined") as EntityFilter;
   const grain = one(sp, "grain", "month") as GrainFilter;
-  const monthsHint = availableMonths([]);
-  void monthsHint;
+  const mode = one(sp, "mode", "aa") as CompareMode;
 
   const { data: raw, error } = await supabase
     .from("kurashift_mq_period_facts")
@@ -62,6 +79,8 @@ export default async function MqPage({
   const years = availableYears(rows);
   const defaultMonth = months[0] || currentMonth();
   const defaultYear = years[0] || String(new Date().getFullYear());
+  const variants = listPlanVariants(rows);
+  const defaultVariant = variants[0] || "基本";
 
   const periodA =
     grain === "year"
@@ -71,26 +90,113 @@ export default async function MqPage({
     grain === "year"
       ? one(sp, "b", years[1] || defaultYear).slice(0, 4)
       : one(sp, "b", months[1] || defaultMonth).slice(0, 7);
+  const planYear = one(sp, "py", periodA.length === 4 ? periodA : periodA.slice(0, 4));
+  const variantA = one(sp, "va", defaultVariant);
+  const variantB = one(sp, "vb", variants[1] || defaultVariant);
 
-  const rowsA =
+  function buildActual(period: string) {
+    const subset =
+      grain === "year"
+        ? filterFactsYearActual(rows, line, entity, period)
+        : filterFactsMonth(rows, line, entity, period);
+    return aggregateRows(subset, grain === "year" ? "year" : "month");
+  }
+
+  function buildPlan(year: string, variant: string, asMonth: boolean) {
+    const subset = filterPlans(rows, line, entity, year, variant);
+    const ann = aggregatePlanAnnual(subset);
+    if (!ann.computed) {
+      return {
+        ...ann,
+        computed: null as MqComputed | null,
+      };
+    }
+    return {
+      ...ann,
+      computed: asMonth
+        ? scaleAnnualComputedToMonth(ann.computed)
+        : ann.computed,
+    };
+  }
+
+  let left: Panel;
+  let right: Panel;
+  let byLine = aggregateRows(
     grain === "year"
       ? filterFactsYearActual(rows, line, entity, periodA)
-      : filterFactsMonth(rows, line, entity, periodA);
-  const rowsB =
-    grain === "year"
-      ? filterFactsYearActual(rows, line, entity, periodB)
-      : filterFactsMonth(rows, line, entity, periodB);
+      : filterFactsMonth(rows, line, entity, periodA),
+    grain === "year" ? "year" : "month"
+  ).byLine;
 
-  const aggA = aggregateRows(rowsA, grain === "year" ? "year" : "month");
-  const aggB = aggregateRows(rowsB, grain === "year" ? "year" : "month");
+  if (mode === "aa") {
+    const a = buildActual(periodA);
+    const b = buildActual(periodB);
+    left = {
+      title: `実績 ${periodA}`,
+      computed: a.computed,
+      cashIn: a.cashIn,
+      cashOut: a.cashOut,
+      cashEnd: a.cashEnd,
+      depreciation: a.depreciation,
+      emptyHint: "この条件の実績がありません。下の月次フォームで保存してください。",
+      fNote:
+        grain === "month" && a.computed
+          ? `F内訳: 月額 ${fmtYen(Math.round(a.fMonthlyPart))} + 年額÷12 ${fmtYen(Math.round(a.fAnnualAllocated))}`
+          : undefined,
+    };
+    right = {
+      title: `実績 ${periodB}`,
+      computed: b.computed,
+      cashIn: b.cashIn,
+      cashOut: b.cashOut,
+      cashEnd: b.cashEnd,
+      depreciation: b.depreciation,
+      emptyHint: "比較用のもう一方の実績がありません。",
+    };
+  } else if (mode === "ap") {
+    const a = buildActual(periodA);
+    const p = buildPlan(planYear, variantA, grain === "month");
+    left = {
+      title: `実績 ${periodA}`,
+      computed: a.computed,
+      cashIn: a.cashIn,
+      cashOut: a.cashOut,
+      cashEnd: a.cashEnd,
+      depreciation: a.depreciation,
+      emptyHint: "実績がありません。",
+    };
+    right = {
+      title: `計画「${variantA}」${planYear}${grain === "month" ? "（÷12）" : ""}`,
+      computed: p.computed,
+      emptyHint: "この計画がありません。下の年次計画フォームで保存してください。",
+    };
+  } else {
+    const p1 = buildPlan(planYear, variantA, grain === "month");
+    const p2 = buildPlan(planYear, variantB, grain === "month");
+    left = {
+      title: `計画「${variantA}」${planYear}${grain === "month" ? "（÷12）" : ""}`,
+      computed: p1.computed,
+      emptyHint: "計画Aがありません。",
+    };
+    right = {
+      title: `計画「${variantB}」${planYear}${grain === "month" ? "（÷12）" : ""}`,
+      computed: p2.computed,
+      emptyHint: "計画Bがありません。別パターン名で保存してください。",
+    };
+    byLine = [];
+  }
 
   function href(next: Record<string, string>) {
     const p = new URLSearchParams({
       line,
       entity,
       grain,
+      mode,
       a: periodA,
       b: periodB,
+      py: planYear,
+      va: variantA,
+      vb: variantB,
       ...next,
     });
     return `/mq?${p.toString()}`;
@@ -103,16 +209,12 @@ export default async function MqPage({
       <p className="page-kicker">③ 事業 · MQ</p>
       <h1>MQ会計評価</h1>
       <p className="sub">
-        直接原価で粗利（MQ）を見る。実績は月次でチューニング、計画は年次（Phase
-        D）。年額固定費は月表示で÷12按分。
+        実績は月次でチューニング、計画は年次で立てる。年額Fは月次で÷12。計画との差も同じMQ表で見る。
       </p>
 
       {error ? (
         <div className="card" style={{ marginTop: 12, borderColor: "var(--high)" }}>
-          <p className="meta">
-            読取エラー: {error.message}
-            （テーブル未作成なら Jarvis に DDL 適用を依頼）
-          </p>
+          <p className="meta">読取エラー: {error.message}</p>
         </div>
       ) : null}
 
@@ -122,6 +224,24 @@ export default async function MqPage({
           <strong>集計条件</strong>
         </header>
         <div className="mq-slicer" style={{ marginTop: 10 }}>
+          <div className="mq-slicer-group">
+            <span className="meta">比較</span>
+            {(
+              [
+                ["aa", "実績 ↔ 実績"],
+                ["ap", "実績 ↔ 計画"],
+                ["pp", "計画 ↔ 計画"],
+              ] as const
+            ).map(([v, lab]) => (
+              <a
+                key={v}
+                className={`btn${mode === v ? " primary" : ""}`}
+                href={href({ mode: v })}
+              >
+                {lab}
+              </a>
+            ))}
+          </div>
           <div className="mq-slicer-group">
             <span className="meta">事業線</span>
             {(
@@ -162,9 +282,13 @@ export default async function MqPage({
             <span className="meta">粒度</span>
             <a
               className={`btn${grain === "month" ? " primary" : ""}`}
-              href={href({ grain: "month", a: defaultMonth, b: months[1] || defaultMonth })}
+              href={href({
+                grain: "month",
+                a: defaultMonth,
+                b: months[1] || defaultMonth,
+              })}
             >
-              月次（実績チューニング）
+              月次
             </a>
             <a
               className={`btn${grain === "year" ? " primary" : ""}`}
@@ -174,68 +298,120 @@ export default async function MqPage({
                 b: years[1] || defaultYear,
               })}
             >
-              年次（締めて評価）
+              年次
             </a>
           </div>
-          <div className="mq-slicer-group">
-            <span className="meta">左の期間</span>
-            <PeriodLinks
-              grain={grain}
-              months={months}
-              years={years}
-              current={periodA}
-              makeHref={(v) => href({ a: v })}
-            />
-          </div>
-          <div className="mq-slicer-group">
-            <span className="meta">右の期間</span>
-            <PeriodLinks
-              grain={grain}
-              months={months}
-              years={years}
-              current={periodB}
-              makeHref={(v) => href({ b: v })}
-            />
-          </div>
+
+          {mode !== "pp" ? (
+            <div className="mq-slicer-group">
+              <span className="meta">{mode === "ap" ? "実績の期間" : "左（実績）"}</span>
+              <PeriodLinks
+                grain={grain}
+                months={months}
+                years={years}
+                current={periodA}
+                makeHref={(v) => href({ a: v })}
+              />
+            </div>
+          ) : null}
+          {mode === "aa" ? (
+            <div className="mq-slicer-group">
+              <span className="meta">右（実績）</span>
+              <PeriodLinks
+                grain={grain}
+                months={months}
+                years={years}
+                current={periodB}
+                makeHref={(v) => href({ b: v })}
+              />
+            </div>
+          ) : null}
+
+          {mode !== "aa" ? (
+            <>
+              <div className="mq-slicer-group">
+                <span className="meta">計画の年度</span>
+                {(years.length ? years : [defaultYear]).slice(0, 12).map((y) => (
+                  <a
+                    key={y}
+                    className={`btn${planYear === y ? " primary" : ""}`}
+                    href={href({ py: y })}
+                  >
+                    {y}
+                  </a>
+                ))}
+              </div>
+              <div className="mq-slicer-group">
+                <span className="meta">{mode === "pp" ? "計画A" : "計画"}</span>
+                {(variants.length ? variants : [defaultVariant]).map((v) => (
+                  <a
+                    key={v}
+                    className={`btn${variantA === v ? " primary" : ""}`}
+                    href={href({ va: v })}
+                  >
+                    {v}
+                  </a>
+                ))}
+              </div>
+            </>
+          ) : null}
+          {mode === "pp" ? (
+            <div className="mq-slicer-group">
+              <span className="meta">計画B</span>
+              {(variants.length ? variants : [defaultVariant]).map((v) => (
+                <a
+                  key={`b-${v}`}
+                  className={`btn${variantB === v ? " primary" : ""}`}
+                  href={href({ vb: v })}
+                >
+                  {v}
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
         <p className="meta" style={{ marginTop: 8 }}>
-          表示中: {lineLabel(line)} · {entityLabel(entity)} ·{" "}
-          {grain === "month" ? "月次" : "年次"}
-          {entity === "combined"
-            ? "（合算は内部取引を除いた値の入力を推奨）"
+          {lineLabel(line)} · {entityLabel(entity)} ·{" "}
+          {grain === "month" ? "月次表示" : "年次表示"}
+          {mode === "ap" && grain === "month"
+            ? " · 計画側は年額÷12で月次換算"
             : ""}
-          {grain === "month"
-            ? " · F年額は÷12で按分"
-            : " · 年額Fは年に1回分だけ加算（月次行の重複なし）"}
+          {entity === "combined" ? " · 合算は内部取引除外推奨" : ""}
         </p>
       </div>
 
       <div className="mq-dual" style={{ marginTop: 12 }}>
         <MqStrackPanel
-          title={`左 ${periodA}`}
-          computed={aggA.computed}
-          cashIn={aggA.cashIn}
-          cashOut={aggA.cashOut}
-          cashEnd={aggA.cashEnd}
-          depreciation={aggA.depreciation}
-          emptyHint="この条件の実績がありません。下のフォームで月次を保存してください。"
+          title={left.title}
+          computed={left.computed}
+          cashIn={left.cashIn}
+          cashOut={left.cashOut}
+          cashEnd={left.cashEnd}
+          depreciation={left.depreciation}
+          emptyHint={left.emptyHint}
         />
         <MqStrackPanel
-          title={`右 ${periodB}`}
-          computed={aggB.computed}
-          cashIn={aggB.cashIn}
-          cashOut={aggB.cashOut}
-          cashEnd={aggB.cashEnd}
-          depreciation={aggB.depreciation}
-          emptyHint="比較用のもう一方の期間データがありません。"
+          title={right.title}
+          computed={right.computed}
+          cashIn={right.cashIn}
+          cashOut={right.cashOut}
+          cashEnd={right.cashEnd}
+          depreciation={right.depreciation}
+          emptyHint={right.emptyHint}
         />
       </div>
 
-      {line === "all" && aggA.byLine.length > 0 ? (
+      {left.fNote ? (
+        <p className="meta" style={{ marginTop: 8 }}>
+          {left.fNote}
+        </p>
+      ) : null}
+
+      {line === "all" && byLine.length > 0 ? (
         <div className="card" style={{ marginTop: 12 }}>
           <header>
             <span className="lvl">内訳</span>
-            <strong>左期間 · 不動産 / AI</strong>
+            <strong>左 · 不動産 / AI</strong>
           </header>
           <table style={{ marginTop: 8 }}>
             <thead>
@@ -247,7 +423,7 @@ export default async function MqPage({
               </tr>
             </thead>
             <tbody>
-              {aggA.byLine.map((b) => (
+              {byLine.map((b) => (
                 <tr key={b.line}>
                   <td>{lineLabel(b.line)}</td>
                   <td className="num">{fmtYen(Math.round(b.computed.mq))}</td>
@@ -260,19 +436,12 @@ export default async function MqPage({
         </div>
       ) : null}
 
-      {grain === "month" && aggA.computed ? (
-        <p className="meta" style={{ marginTop: 8 }}>
-          左の F 内訳目安: 月額分 {fmtYen(Math.round(aggA.fMonthlyPart))} + 年額按分{" "}
-          {fmtYen(Math.round(aggA.fAnnualAllocated))}
-        </p>
-      ) : null}
-
       <div style={{ marginTop: 12 }}>
         <MqCompareBars
-          titleA={`左 ${periodA}`}
-          titleB={`右 ${periodB}`}
-          rowsA={metricBars(aggA.computed)}
-          rowsB={metricBars(aggB.computed)}
+          titleA={left.title}
+          titleB={right.title}
+          rowsA={metricBars(left.computed)}
+          rowsB={metricBars(right.computed)}
         />
       </div>
 
@@ -282,7 +451,7 @@ export default async function MqPage({
           <strong>要確認（捏造しない）</strong>
         </header>
         <p className="meta" style={{ marginTop: 8 }}>
-          流動・固定／他人資本・自己資本は、正本（借入トラッカー／税理士資料）が揃い次第ここに載せます。現時点は未入力です。
+          流動・固定／他人資本・自己資本は正本が揃い次第。未入力のままです。
         </p>
       </div>
 
@@ -292,22 +461,39 @@ export default async function MqPage({
           <strong>月次オンゴーイング</strong>
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
-          空室は主に Q（稼働戸月）の減少として見ます。固都税など年払いは「F年額」へ。ローン元本は出金合計側（Gに入れない）。
+          空室は主に Q（稼働戸月）の減少。年払いは F年額。ローン元本は出金合計（Gに入れない）。
         </p>
         <div style={{ marginTop: 10 }}>
           <MqFactsForm
             defaultLine={line === "ai" ? "ai" : "realestate"}
             defaultEntity={entity === "corporate" ? "corporate" : "personal"}
-            defaultMonth={formMonth}
+            defaultMonth={formMonth.slice(0, 7)}
+          />
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <header>
+          <span className="lvl">計画入力</span>
+          <strong>年次パターン</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          同じ年度に「基本」「家賃+5%」など複数パターンを保存し、上の比較で差し引きできます。数値は年額。
+        </p>
+        <div style={{ marginTop: 10 }}>
+          <MqPlanForm
+            defaultLine={line === "ai" ? "ai" : "realestate"}
+            defaultEntity={entity === "corporate" ? "corporate" : "personal"}
+            defaultYear={planYear}
+            existingVariants={variants.length ? variants : ["基本", "家賃+5%", "空室改善"]}
           />
         </div>
       </div>
 
       <p className="meta" style={{ marginTop: 16 }}>
-        買い進めプラン（
+        買い進め（
         <a href="/realestate/buy-plan">/realestate/buy-plan</a>
-        ）は物件条件の検討。こちらは固定費込みで粗利が残るかの評価です。次フェーズ:
-        年次計画パターン比較（Phase D）。
+        ）は物件条件。こちらは固定費込みの粗利評価です。次: Zaim自動仕分け（Phase C）。
       </p>
     </Shell>
   );
