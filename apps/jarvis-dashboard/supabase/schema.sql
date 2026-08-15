@@ -553,3 +553,5 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260814_kurashift_tax_year_metrics.sql）
 -- kurashift_mq_period_facts（MQ会計評価・月次実績／年額F÷12）
 -- （migrations/20260816_kurashift_mq_period_facts.sql）
+-- kurashift_mq_account_map（Zaim→MQ要素）
+-- （migrations/20260816_kurashift_mq_account_map.sql）
