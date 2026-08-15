@@ -6,17 +6,57 @@ import {
   gmailSendConfigured,
   sendGmailViaEnv,
 } from "@/lib/gmail/sendFromEnv";
+import { markGmailReadViaEnv } from "@/lib/gmail/markReadFromEnv";
 import type { TriageStatus } from "@/lib/triageStatus";
 
 export type TriageActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
 
+/** 確認完了・スキップ時に Gmail を既読にする（snooze / pending 復帰は対象外） */
+const MARK_READ_STATUSES: TriageStatus[] = ["skipped", "sent", "done"];
+
 function asPayload(raw: unknown): Record<string, unknown> {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     return { ...(raw as Record<string, unknown>) };
   }
   return {};
+}
+
+async function tryMarkTriageGmailRead(row: {
+  gmail_message_id?: string | null;
+  account?: string | null;
+  payload?: Record<string, unknown>;
+}): Promise<Record<string, unknown>> {
+  const payload = asPayload(row.payload);
+  const gid = String(row.gmail_message_id || "").trim();
+  if (!gid) return payload;
+  if (typeof payload.gmail_read_at === "string" && payload.gmail_read_at) {
+    return payload;
+  }
+  try {
+    const r = await markGmailReadViaEnv({
+      messageId: gid,
+      account: row.account,
+    });
+    if (r.ok) {
+      payload.gmail_read_at = new Date().toISOString();
+      delete payload.gmail_read_error;
+      delete payload.gmail_read_pending;
+    } else {
+      payload.gmail_read_pending = true;
+      if (r.error || r.skipped) {
+        payload.gmail_read_error = String(r.error || r.skipped).slice(0, 200);
+      }
+    }
+  } catch (e) {
+    payload.gmail_read_pending = true;
+    payload.gmail_read_error = (e instanceof Error ? e.message : String(e)).slice(
+      0,
+      200,
+    );
+  }
+  return payload;
 }
 
 export type SetTriageStatusOpts = {
@@ -33,18 +73,26 @@ export async function setTriageStatus(
   const supabase = await createClient();
   const { data: row, error: fetchErr } = await supabase
     .from("triage_items")
-    .select("status,payload")
+    .select("status,payload,gmail_message_id,account")
     .eq("id", id)
     .maybeSingle();
   if (fetchErr) return { ok: false, error: fetchErr.message };
   if (!row) return { ok: false, error: "not found" };
 
   const prevStatus = (row.status || "pending") as TriageStatus;
-  const payload = asPayload(row.payload);
+  let payload = asPayload(row.payload);
   if (next === "snoozed" && opts?.snoozeUntil) {
     payload.snooze_until = opts.snoozeUntil;
   } else if (next === "pending" || next === "skipped" || next === "sent") {
     delete payload.snooze_until;
+  }
+
+  if (MARK_READ_STATUSES.includes(next)) {
+    payload = await tryMarkTriageGmailRead({
+      gmail_message_id: row.gmail_message_id,
+      account: row.account,
+      payload,
+    });
   }
 
   const { error } = await supabase
@@ -104,15 +152,29 @@ export async function skipAllNonPartnerPending(
   path: string,
 ): Promise<TriageActionResult & { count?: number }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data: targets, error: fetchErr } = await supabase
     .from("triage_items")
-    .update({ status: "skipped", updated_at: new Date().toISOString() })
+    .select("id,gmail_message_id,account,payload")
     .eq("status", "pending")
     .neq("lane", "partner")
-    .neq("kind", "activity")
-    .select("id");
-  if (error) return { ok: false, error: error.message };
-  const count = data?.length ?? 0;
+    .neq("kind", "activity");
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+
+  const now = new Date().toISOString();
+  let count = 0;
+  for (const row of targets || []) {
+    const payload = await tryMarkTriageGmailRead({
+      gmail_message_id: row.gmail_message_id,
+      account: row.account,
+      payload: asPayload(row.payload),
+    });
+    const { error } = await supabase
+      .from("triage_items")
+      .update({ status: "skipped", payload, updated_at: now })
+      .eq("id", row.id);
+    if (!error) count += 1;
+  }
+
   revalidatePath(path);
   revalidatePath("/");
   revalidatePath("/general");
@@ -485,7 +547,7 @@ export async function sendTriageAfterConfirm(
       body,
       threadId: it.gmail_thread_id || null,
     });
-    const payload = asPayload(it.payload);
+    let payload = asPayload(it.payload);
     payload.sent_at = new Date().toISOString();
     payload.gmail_sent_id = sent.id;
     payload.gmail_sent_thread_id = sent.threadId || it.gmail_thread_id;
@@ -493,6 +555,11 @@ export async function sendTriageAfterConfirm(
     payload.web_draft_saved_at = new Date().toISOString();
     payload.sent_to = to;
     payload.to_source = resolved.source;
+    payload = await tryMarkTriageGmailRead({
+      gmail_message_id: it.gmail_message_id,
+      account: it.account,
+      payload,
+    });
 
     const { error } = await supabase
       .from("triage_items")

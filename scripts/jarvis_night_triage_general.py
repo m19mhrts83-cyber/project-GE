@@ -9,7 +9,7 @@ import hashlib
 import os
 import re
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.utils import parseaddr
 from pathlib import Path
@@ -35,6 +35,110 @@ NOISE_SUBJECT_RE = re.compile(
     r"ワンタイム|OTP|password reset|パスワードリセット)",
     re.I,
 )
+
+# 不動産購入・物件紹介は KURASHIFT が選定〜返信まで消化（Jarvis「要確認」対象外）
+RE_PURCHASE_MAIL_RE = re.compile(
+    r"(物件紹介|収益物件|戸建(て|)|土地値|不動産投資|"
+    r"投資用(不動産|物件)|利回り\s*[：:]?\s*\d|"
+    r"物件情報|空き家再生|中古戸建|"
+    r"買付|販売図面|健美家|楽待|レインズ|"
+    r"表面利回り|想定利回り|満室経営|一棟(アパート|マンション|物件)?|"
+    r"物件選定|指値|融資付(き|)|区分(投資|マンション))",
+    re.I,
+)
+
+
+def is_kurashift_property_mail(subject: str, body: str = "") -> bool:
+    """KURASHIFT `/realestate/deals` 側で扱う物件紹介メールか。"""
+    blob = f"{subject or ''}\n{(body or '')[:1200]}"
+    return bool(RE_PURCHASE_MAIL_RE.search(blob))
+
+
+def skip_pending_kurashift_property_triage(
+    sb: Any,
+    *,
+    mark_gmail_read: bool = True,
+    dry_run: bool = False,
+    limit: int = 200,
+) -> dict[str, Any]:
+    """既存 pending の general 物件紹介を skipped にし、任意で Gmail 既読。
+
+    GHA / 夜間 push 後や手動クリーンアップ用。パートナー lane は触らない。
+    """
+    resp = (
+        sb.table("triage_items")
+        .select(
+            "id,subject,original_body,summary,gmail_message_id,account,payload,status,lane"
+        )
+        .eq("status", "pending")
+        .eq("lane", "general")
+        .limit(limit)
+        .execute()
+    )
+    rows = resp.data or []
+    skipped_ids: list[str] = []
+    read_ok = 0
+    read_fail = 0
+    now = datetime.now(JST).isoformat()
+
+    for row in rows:
+        subject = row.get("subject") or ""
+        body = row.get("original_body") or row.get("summary") or ""
+        if not is_kurashift_property_mail(subject, str(body)):
+            continue
+        rid = str(row.get("id") or "")
+        if not rid:
+            continue
+        skipped_ids.append(rid)
+        if dry_run:
+            continue
+
+        payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+        payload = {
+            **payload,
+            "kurashift_excluded_at": now,
+            "kurashift_exclude_reason": "re_purchase_mail",
+        }
+        gid = (row.get("gmail_message_id") or "").strip()
+        account = (row.get("account") or "admin").strip() or "admin"
+
+        if mark_gmail_read and gid:
+            try:
+                service, _ = build_admin_gmail_service()
+                # estate 取込は稀。現状 general は admin 固定
+                if account not in ("", "admin", "mail_admin"):
+                    print(
+                        f"# skip mark-read non-admin account={account} id={rid}",
+                        file=sys.stderr,
+                    )
+                else:
+                    service.users().messages().modify(
+                        userId="me",
+                        id=gid,
+                        body={"removeLabelIds": ["UNREAD"]},
+                    ).execute()
+                    payload["gmail_read_at"] = datetime.now(timezone.utc).isoformat()
+                    read_ok += 1
+            except Exception as e:
+                read_fail += 1
+                payload["gmail_read_error"] = str(e)[:200]
+                print(f"# mark-read fail id={rid}: {e}", file=sys.stderr)
+
+        sb.table("triage_items").update(
+            {
+                "status": "skipped",
+                "payload": payload,
+                "updated_at": now,
+            }
+        ).eq("id", rid).execute()
+
+    return {
+        "matched": len(skipped_ids),
+        "skipped_ids": skipped_ids,
+        "gmail_read_ok": read_ok,
+        "gmail_read_fail": read_fail,
+        "dry_run": dry_run,
+    }
 
 
 def _ensure_manual_path() -> None:
@@ -195,6 +299,10 @@ def find_general_unreplied(
             continue
 
         body = _extract_body(payload)
+        # 物件紹介は KURASHIFT 千三つ担当（確認／対象外で既読）
+        if is_kurashift_property_mail(subject, body):
+            continue
+
         # context: last up to 3 messages
         ctx = []
         for m in msgs_sorted[-3:]:

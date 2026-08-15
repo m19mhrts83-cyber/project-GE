@@ -1,6 +1,6 @@
 # KURASHIFT — 買い進め Job（千三つファネル）仕様
 
-最終更新: 2026-08-13  
+最終更新: 2026-08-15  
 対象: Sprint 2 骨格（実装境界の固定）
 
 ## 目的
@@ -29,6 +29,40 @@
 | 手動 | `manual` | UI／Jarvis |
 
 対外問い合わせは **送信前確認必須**（`jarvis-outbound-confirm`）。
+
+## Gmail 既読（確認／対象外）
+
+| 操作 | status | Gmail |
+|---|---|---|
+| メール取込・**明らかに対象外** | `passed`（`auto_pass_reason`） | **取込時に既読** |
+| メール取込・境界／候補 | `info` / 高スコアは `viewing` | **既読にしない** |
+| **確認した** | `info`→`viewing`（以降は維持） | `re_deal_mark_gmail_read` で UNREAD 除去 |
+| **対象外**（手動） | `passed` | 同上 |
+
+取込時 auto_pass の判定（`clearly_out_of_scope`）:
+
+- 件名ノイズ（号外・ダイジェスト・税理士 等）
+- 区分／ワンルームで戸建なし
+- 都内寄りで戸建なし・東海ヒントなし
+- スコア `< 2.0`（`CANDIDATE_SCORE_MIN`）
+
+- 紐づけ: `summary_json.gmail_id` ＋ `source`（`mail_admin`→admin token／`mail_estate`→estate）
+- 二重実行防止: `summary_json.gmail_read_at`
+- UI: `/realestate/deals` → API `POST /api/re/deals/[id]` `{ action: confirm|pass }` → Mac worker
+- Jarvis ダッシュボードの general トリアージは物件紹介を除外（`jarvis_night_triage_general.is_kurashift_property_mail`）
+
+## 第一問い合わせ（不動産会社）＋返信蓄積＋運営相談
+
+| 操作 | 内容 |
+|---|---|
+| **第一問い合わせ** | From=**admin**。テンプレは `config/kurashift_re_inquiry_template.yaml`。画面確認後 `re_deal_inquiry_send` |
+| **返信取込** | `re_deal_inquiry_poll`（スレッドから inbound を蓄積） |
+| **運営相談パック** | `re_deal_ops_pack` → `kurashift_consultations`（lane=`realestate` 予定。未DDL時は general） |
+
+- 蓄積先: `kurashift_re_deal_messages`（DDL: `20260815_kurashift_re_inquiry.sql`）。未適用時は `summary_json.messages` にフォールバック
+- 問い合わせ状態: 列 `inquiry_status` または `summary_json.inquiry_status`
+- 運営への自動送信はしない（パック作成まで）。Notion 購入判断メモ URL を metadata に保持
+- 細かい仕様は第1号案件で詰める
 
 ## マッチ入力（買い進め Excel から）
 
@@ -64,7 +98,11 @@
 | job_type | 内容 | 危険度 |
 |---|---|---|
 | `buy_plan_ingest` | Excel 再取込 | 低 |
-| `re_mail_match_dry_run` | admin/estate 物件メール候補 | 低（送信なし） |
+| `re_mail_match` | admin/estate 物件メール候補。明らかに対象外は passed＋既読 | 低（候補は送信・既読なし） |
+| `re_deal_mark_gmail_read` | 確認／対象外後の Gmail 既読 | 低（UNREAD のみ） |
+| `re_deal_inquiry_send` | 不動産会社へ第一問い合わせ（admin） | 中（UI確認必須） |
+| `re_deal_inquiry_poll` | 問い合わせスレッドの返信取込 | 低 |
+| `re_deal_ops_pack` | 運営相談パック作成 | 低（送信なし） |
 | `re_deal_advice` | Q&A 注入 | 低 |
 | `re_sync_loan_tracker` | ローン投影 | 低（読取） |
 | （将来）問い合わせ下書き | 送信は別確認 | 高 |
@@ -73,7 +111,7 @@
 
 1. **長期プラン** `/realestate/buy-plan` — events 年表・criteria・constraints・Excel Jobs  
 2. **今狙う** — 同画面 Focus（Notion 条件＋ Excel）  
-3. **実行** `/realestate/deals` — 千三つファネル・メール候補  
+3. **実行** `/realestate/deals` — 千三つファネル・メール候補・確認／対象外  
 4. **運用** `/realestate` — CF・DSCR・名義切替（③-A）
 
 編集者向け: [`docs/KURASHIFT_編集者引き継ぎ_不動産AB_20260813.md`](KURASHIFT_編集者引き継ぎ_不動産AB_20260813.md)
@@ -83,3 +121,4 @@
 - [ ] `/realestate/deals` にファネル件数（空でもステータス軸）
 - [ ] 運営経緯が1件以上（キーワードヒットがある場合）
 - [ ] 自動問い合わせ送信が走っていない
+- [ ] 確認／対象外で Gmail 既読ジョブが succeeded になる

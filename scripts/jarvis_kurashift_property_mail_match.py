@@ -6,11 +6,18 @@
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --apply
+  # 千三つ「確認した／対象外」後の既読
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py \\
+    --mark-read-deal-id <uuid>
+
+取込時: 明らかに対象外（ノイズ件名・低スコア・区分/都内寄り等）は
+status=passed で残し、その場で Gmail 既読にする。境界候補は未読のまま。
 """
 from __future__ import annotations
 
 import argparse
 import base64
+import json
 import os
 import re
 import sys
@@ -37,6 +44,8 @@ GMAIL_QUERY = (
     " newer_than:{days}d -unsubscribe"
 )
 
+# 候補として残す最低点（未満は取込時に対象外＋既読）
+CANDIDATE_SCORE_MIN = 2.0
 # 戸建+エリア程度で内見（詳細取り寄せ〜日程調整）へ
 VIEWING_SCORE_MIN = 5.0
 
@@ -72,6 +81,11 @@ CITY_HINTS = [
     "三重",
     "名古屋",
 ]
+
+TOKEN_BY_SOURCE = {
+    "mail_admin": "token_livingsupport.json",
+    "mail_estate": "token_estate.json",
+}
 
 
 def sb_client() -> Any:
@@ -120,7 +134,6 @@ def header_map(headers: list[dict]) -> dict[str, str]:
 
 
 def score_text(text: str, criteria_blob: str) -> tuple[float, list[str]]:
-    blob = text + "\n" + criteria_blob
     hits: list[str] = []
     score = 0.0
     for city in CITY_HINTS:
@@ -163,6 +176,22 @@ def score_text(text: str, criteria_blob: str) -> tuple[float, list[str]]:
     return score, hits
 
 
+def clearly_out_of_scope(subject: str, text: str, score: float) -> tuple[bool, str]:
+    """取込時点で明らかに対象外か（境界候補は False）。"""
+    if any(n in subject for n in SUBJECT_NOISE):
+        return True, "subject_noise"
+    has_kodate = bool(re.search(r"戸建|戸建て", text))
+    if re.search(r"区分|ワンルーム", text) and not has_kodate:
+        return True, "mansion_unit"
+    if re.search(r"都内|東京２３|東京23|東京23区", text) and not has_kodate:
+        tokai = any(c in text for c in CITY_HINTS)
+        if not tokai:
+            return True, "tokyo_focus"
+    if score < CANDIDATE_SCORE_MIN:
+        return True, "low_score"
+    return False, ""
+
+
 def load_criteria_blob(sb: Any) -> str:
     ver = (
         sb.table("kurashift_buy_plan_versions")
@@ -183,6 +212,66 @@ def load_criteria_blob(sb: Any) -> str:
     return "\n".join((r.get("raw_text") or "") for r in (rows.data or []))
 
 
+def _deal_row_from_message(
+    *,
+    gmail_id: str,
+    source: str,
+    subject: str,
+    text: str,
+    hm: dict[str, str],
+    sc: float,
+    hits: list[str],
+    status: str,
+    auto_pass_reason: str | None = None,
+) -> dict[str, Any]:
+    date_hdr = hm.get("date")
+    try:
+        occurred = parsedate_to_datetime(date_hdr) if date_hdr else datetime.now(timezone.utc)
+        if occurred.tzinfo is None:
+            occurred = occurred.replace(tzinfo=timezone.utc)
+    except Exception:
+        occurred = datetime.now(timezone.utc)
+    area = next(
+        (c for c in CITY_HINTS if c in text and c not in ("愛知", "岐阜県", "三重")),
+        None,
+    )
+    price = None
+    pm = re.search(r"(\d{2,5})\s*万", text)
+    if pm:
+        try:
+            price = float(pm.group(1))
+        except Exception:
+            pass
+    yld = None
+    ym = re.search(r"利回り\s*[：:]?\s*(\d+(?:\.\d+)?)\s*%", text)
+    if ym:
+        yld = float(ym.group(1)) / 100.0
+    sj: dict[str, Any] = {
+        "gmail_id": gmail_id,
+        "from": hm.get("from", "")[:200],
+        "hits": hits,
+        "snippet": text[:500],
+        "account": source,
+    }
+    if auto_pass_reason:
+        sj["auto_pass_reason"] = auto_pass_reason
+        sj["auto_pass_at_ingest"] = True
+    return {
+        "title": subject[:180],
+        "status": status,
+        "source": source,
+        "area": area,
+        "structure": "戸建" if re.search(r"戸建|戸建て", text) else None,
+        "price_man": price,
+        "yield_pct": yld,
+        "match_score": round(sc, 2),
+        "summary_json": sj,
+        "advice_json": {},
+        "first_seen_at": occurred.isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def fetch_account(
     token_name: str,
     source: str,
@@ -190,7 +279,8 @@ def fetch_account(
     days: int,
     limit: int,
     criteria_blob: str,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Returns (candidates_to_review, auto_pass_out_of_scope)."""
     svc = gmail_service(token_name)
     q = GMAIL_QUERY.format(days=days)
     resp = (
@@ -199,7 +289,8 @@ def fetch_account(
         .list(userId="me", q=q, maxResults=min(limit, 50))
         .execute()
     )
-    out: list[dict[str, Any]] = []
+    keepers: list[dict[str, Any]] = []
+    auto_pass: list[dict[str, Any]] = []
     for m in resp.get("messages") or []:
         full = (
             svc.users()
@@ -209,56 +300,40 @@ def fetch_account(
         )
         hm = header_map(full.get("payload", {}).get("headers") or [])
         subject = hm.get("subject") or "(無題)"
-        if any(n in subject for n in SUBJECT_NOISE):
-            continue
         body = decode_body(full.get("payload") or {})
         text = f"{subject}\n{body}"
         sc, hits = score_text(text, criteria_blob)
-        if sc < 2.0:
+        out, reason = clearly_out_of_scope(subject, text, sc)
+        if out:
+            auto_pass.append(
+                _deal_row_from_message(
+                    gmail_id=m["id"],
+                    source=source,
+                    subject=subject,
+                    text=text,
+                    hm=hm,
+                    sc=sc,
+                    hits=hits,
+                    status="passed",
+                    auto_pass_reason=reason,
+                )
+            )
             continue
-        date_hdr = hm.get("date")
-        try:
-            occurred = parsedate_to_datetime(date_hdr) if date_hdr else datetime.now(timezone.utc)
-            if occurred.tzinfo is None:
-                occurred = occurred.replace(tzinfo=timezone.utc)
-        except Exception:
-            occurred = datetime.now(timezone.utc)
-        area = next((c for c in CITY_HINTS if c in text and c not in ("愛知", "岐阜県", "三重")), None)
-        price = None
-        pm = re.search(r"(\d{2,5})\s*万", text)
-        if pm:
-            try:
-                price = float(pm.group(1))
-            except Exception:
-                pass
-        yld = None
-        ym = re.search(r"利回り\s*[：:]?\s*(\d+(?:\.\d+)?)\s*%", text)
-        if ym:
-            yld = float(ym.group(1)) / 100.0
-        out.append(
-            {
-                "title": subject[:180],
-                "status": "viewing" if sc >= VIEWING_SCORE_MIN else "info",
-                "source": source,
-                "area": area,
-                "structure": "戸建" if re.search(r"戸建|戸建て", text) else None,
-                "price_man": price,
-                "yield_pct": yld,
-                "match_score": round(sc, 2),
-                "summary_json": {
-                    "gmail_id": m["id"],
-                    "from": hm.get("from", "")[:200],
-                    "hits": hits,
-                    "snippet": text[:500],
-                    "account": source,
-                },
-                "advice_json": {},
-                "first_seen_at": occurred.isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
+        keepers.append(
+            _deal_row_from_message(
+                gmail_id=m["id"],
+                source=source,
+                subject=subject,
+                text=text,
+                hm=hm,
+                sc=sc,
+                hits=hits,
+                status="viewing" if sc >= VIEWING_SCORE_MIN else "info",
+            )
         )
-    out.sort(key=lambda x: (-(x["match_score"] or 0), x["title"]))
-    return out
+    keepers.sort(key=lambda x: (-(x["match_score"] or 0), x["title"]))
+    auto_pass.sort(key=lambda x: (-(x["match_score"] or 0), x["title"]))
+    return keepers, auto_pass
 
 
 def existing_gmail_ids(sb: Any) -> set[str]:
@@ -278,13 +353,115 @@ def existing_gmail_ids(sb: Any) -> set[str]:
     return ids
 
 
+def mark_gmail_message_read(
+    source: str, gmail_id: str, *, dry_run: bool = False
+) -> dict[str, Any]:
+    token_name = TOKEN_BY_SOURCE.get(str(source))
+    if not token_name:
+        return {"ok": False, "error": f"unknown source: {source}"}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "gmail_id": gmail_id, "source": source}
+    svc = gmail_service(token_name)
+    svc.users().messages().modify(
+        userId="me",
+        id=str(gmail_id),
+        body={"removeLabelIds": ["UNREAD"]},
+    ).execute()
+    return {"ok": True, "gmail_id": gmail_id, "source": source}
+
+
+def mark_deal_gmail_read(sb: Any, deal_id: str, *, dry_run: bool = False) -> dict[str, Any]:
+    """案件に紐づく Gmail を既読（UNREAD 除去）。"""
+    deal_id = (deal_id or "").strip()
+    if not deal_id:
+        return {"ok": False, "error": "deal_id required"}
+    resp = (
+        sb.table("kurashift_re_deals")
+        .select("id, title, source, summary_json")
+        .eq("id", deal_id)
+        .limit(1)
+        .execute()
+    )
+    rows = resp.data or []
+    if not rows:
+        return {"ok": False, "error": "deal not found"}
+    row = rows[0]
+    sj = row.get("summary_json") if isinstance(row.get("summary_json"), dict) else {}
+    gid = sj.get("gmail_id")
+    if not gid:
+        return {"ok": True, "skipped": "no_gmail_id", "deal_id": deal_id}
+    if sj.get("gmail_read_at"):
+        return {
+            "ok": True,
+            "skipped": "already_read",
+            "deal_id": deal_id,
+            "gmail_id": gid,
+            "gmail_read_at": sj.get("gmail_read_at"),
+        }
+    source = row.get("source") or sj.get("account") or "mail_admin"
+    print(f"使用アカウント: {source} / Gmail API（既読）")
+    marked = mark_gmail_message_read(str(source), str(gid), dry_run=dry_run)
+    if not marked.get("ok"):
+        return {**marked, "deal_id": deal_id}
+    if dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            "deal_id": deal_id,
+            "gmail_id": gid,
+            "source": source,
+        }
+    read_at = datetime.now(timezone.utc).isoformat()
+    sj2 = {**sj, "gmail_read_at": read_at}
+    sb.table("kurashift_re_deals").update(
+        {
+            "summary_json": sj2,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", deal_id).execute()
+    print(f"📎 mark_gmail_read: deal={deal_id} gmail_id={gid} source={source}")
+    return {
+        "ok": True,
+        "deal_id": deal_id,
+        "gmail_id": gid,
+        "source": source,
+        "gmail_read_at": read_at,
+    }
+
+
+def _dedupe_by_gmail(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_id: dict[str, dict[str, Any]] = {}
+    for c in rows:
+        gid = (c.get("summary_json") or {}).get("gmail_id")
+        if not gid:
+            continue
+        prev = by_id.get(gid)
+        if not prev or (c.get("match_score") or 0) > (prev.get("match_score") or 0):
+            by_id[gid] = c
+    return sorted(by_id.values(), key=lambda x: (-(x["match_score"] or 0), x["title"]))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=120)
     ap.add_argument("--limit", type=int, default=40)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--apply", action="store_true", help="kurashift_re_deals へ upsert")
+    ap.add_argument(
+        "--mark-read-deal-id",
+        default="",
+        help="案件IDの Gmail を既読（UNREAD除去）。取込と併用しない",
+    )
     args = ap.parse_args()
+
+    if args.mark_read_deal_id:
+        sb = sb_client()
+        result = mark_deal_gmail_read(sb, args.mark_read_deal_id, dry_run=args.dry_run)
+        print(f"KURASHIFT_RESULT:{json.dumps(result, ensure_ascii=False)}")
+        if not result.get("ok"):
+            return 1
+        return 0
+
     if not args.apply:
         args.dry_run = True
 
@@ -292,37 +469,58 @@ def main() -> int:
     sb = sb_client()
     criteria_blob = load_criteria_blob(sb)
     candidates: list[dict[str, Any]] = []
+    auto_pass_all: list[dict[str, Any]] = []
     for token, source in (
         ("token_livingsupport.json", "mail_admin"),
         ("token_estate.json", "mail_estate"),
     ):
         try:
-            part = fetch_account(
+            keepers, auto_pass = fetch_account(
                 token, source, days=args.days, limit=args.limit, criteria_blob=criteria_blob
             )
-            print(f"# {source}: candidates={len(part)}")
-            candidates.extend(part)
+            print(
+                f"# {source}: candidates={len(keepers)} auto_pass={len(auto_pass)}"
+            )
+            candidates.extend(keepers)
+            auto_pass_all.extend(auto_pass)
         except Exception as e:
             print(f"# {source}: FAIL {type(e).__name__}: {e}")
 
-    # dedupe by gmail_id preferring higher score
-    by_id: dict[str, dict[str, Any]] = {}
-    for c in candidates:
-        gid = (c.get("summary_json") or {}).get("gmail_id")
-        if not gid:
-            continue
-        prev = by_id.get(gid)
-        if not prev or (c.get("match_score") or 0) > (prev.get("match_score") or 0):
-            by_id[gid] = c
-    uniq = sorted(by_id.values(), key=lambda x: (-(x["match_score"] or 0), x["title"]))
-    print(f"# unique={len(uniq)}")
+    uniq = _dedupe_by_gmail(candidates)
+    uniq_pass = _dedupe_by_gmail(auto_pass_all)
+    keep_ids = {(c.get("summary_json") or {}).get("gmail_id") for c in uniq}
+    uniq_pass = [
+        c
+        for c in uniq_pass
+        if (c.get("summary_json") or {}).get("gmail_id") not in keep_ids
+    ]
+    print(f"# unique_candidates={len(uniq)} unique_auto_pass={len(uniq_pass)}")
     for c in uniq[:12]:
         print(
             f"  - [{c['match_score']}] {c['source']} {c.get('area') or '-'} {c['title'][:70]}"
         )
+    for c in uniq_pass[:8]:
+        reason = (c.get("summary_json") or {}).get("auto_pass_reason")
+        print(
+            f"  × auto_pass[{reason}] [{c['match_score']}] {c['source']} {c['title'][:60]}"
+        )
 
     if args.dry_run and not args.apply:
-        print("📎 property_mail_match: dry-run（--apply で deals 反映）")
+        print(
+            "📎 property_mail_match: dry-run（--apply で deals 反映・"
+            "auto_pass は既読）"
+        )
+        print(
+            "KURASHIFT_RESULT:"
+            + json.dumps(
+                {
+                    "candidates": len(uniq),
+                    "auto_pass": len(uniq_pass),
+                    "dry_run": True,
+                },
+                ensure_ascii=False,
+            )
+        )
         return 0
 
     seen = existing_gmail_ids(sb)
@@ -335,6 +533,27 @@ def main() -> int:
         inserted += 1
         if gid:
             seen.add(gid)
+
+    auto_inserted = 0
+    auto_read = 0
+    for c in uniq_pass:
+        gid = (c.get("summary_json") or {}).get("gmail_id")
+        if not gid or gid in seen:
+            continue
+        read_at = datetime.now(timezone.utc).isoformat()
+        sj = dict(c.get("summary_json") or {})
+        sj["gmail_read_at"] = read_at
+        row = {**c, "summary_json": sj, "status": "passed"}
+        try:
+            mark_gmail_message_read(str(c.get("source") or "mail_admin"), str(gid))
+            auto_read += 1
+        except Exception as e:
+            print(f"# auto_pass mark-read FAIL {gid}: {type(e).__name__}: {e}")
+            sj.pop("gmail_read_at", None)
+            row["summary_json"] = sj
+        sb.table("kurashift_re_deals").insert(row).execute()
+        auto_inserted += 1
+        seen.add(gid)
 
     promoted = 0
     existing = (
@@ -353,7 +572,21 @@ def main() -> int:
             promoted += 1
     print(
         f"📎 property_mail_match: inserted={inserted} "
-        f"skipped_existing={len(uniq) - inserted} promoted_to_viewing={promoted}"
+        f"auto_pass_inserted={auto_inserted} auto_pass_marked_read={auto_read} "
+        f"skipped_existing={len(uniq) + len(uniq_pass) - inserted - auto_inserted} "
+        f"promoted_to_viewing={promoted}"
+    )
+    print(
+        "KURASHIFT_RESULT:"
+        + json.dumps(
+            {
+                "inserted": inserted,
+                "auto_pass_inserted": auto_inserted,
+                "auto_pass_marked_read": auto_read,
+                "promoted": promoted,
+            },
+            ensure_ascii=False,
+        )
     )
     return 0
 
