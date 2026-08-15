@@ -398,7 +398,7 @@ export default async function HomePage() {
       <p className="page-kicker">HOME · HQ</p>
       <h1>KURASHIFT</h1>
       <p className="sub">
-        全体俯瞰。①資産・②ライフプラン／税・③不動産のサマリーと、その週の収支・銀行残高。詳細は各レーンへ。
+        全体俯瞰。①資産・②ライフプラン／税・③事業（不動産賃貸・MQ）のサマリーと、その週の収支・銀行残高。詳細は各レーンへ。
       </p>
 
       <div
@@ -623,7 +623,7 @@ export default async function HomePage() {
         </article>
         <article className="card">
           <header>
-            <span className="lvl">③ 不動産</span>
+            <span className="lvl">③ 事業</span>
             <strong>
               {reBoard.steadyCfMonth != null
                 ? `定常 ${fmtYen(Math.round(reBoard.steadyCfMonth))}/月`
