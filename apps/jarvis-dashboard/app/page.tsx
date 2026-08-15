@@ -4,6 +4,7 @@ import { BandSkeleton, TodayQueueSkeleton } from "@/components/Skeletons";
 import HomeTodayQueue from "@/components/home/HomeTodayQueue";
 import HomeSyncBar from "@/components/home/HomeSyncBar";
 import HomePinBanner from "@/components/home/HomePinBanner";
+import HomeMqMonthClosePin from "@/components/home/HomeMqMonthClosePin";
 import HomePartnerBand from "@/components/home/HomePartnerBand";
 import HomeMetricsBand from "@/components/home/HomeMetricsBand";
 import HomeWatchBand from "@/components/home/HomeWatchBand";
@@ -27,6 +28,10 @@ export default function HomePage() {
 
       <Suspense fallback={null}>
         <HomePinBanner />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <HomeMqMonthClosePin />
       </Suspense>
 
       <Suspense fallback={<div className="skel-line" style={{ maxWidth: 360, marginBottom: 12 }} />}>

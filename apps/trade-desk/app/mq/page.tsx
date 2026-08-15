@@ -33,6 +33,8 @@ import {
   yearEndDate,
   type MqBsRow,
 } from "@/lib/mqBs";
+import { sumLoanTrackerLt } from "@/lib/mqLoanSuggest";
+import { qUnitLabel } from "@/lib/mqPolicy";
 import type { MqComputed } from "@/lib/mqEquations";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,6 +56,7 @@ function currentMonth(): string {
 type Panel = {
   title: string;
   computed: MqComputed | null;
+  cashBegin?: number | null;
   cashIn?: number | null;
   cashOut?: number | null;
   cashEnd?: number | null;
@@ -90,8 +93,13 @@ export default async function MqPage({
     .order("as_of_date", { ascending: false })
     .limit(200);
 
+  const { data: loanRaw } = await supabase
+    .from("kurashift_loan_tracker_loans")
+    .select("balance_jpy, category_major, tags, name");
+
   const rows = (raw ?? []) as MqFactRow[];
   const bsRows = (bsRaw ?? []) as MqBsRow[];
+  const loanTrackerLt = sumLoanTrackerLt(loanRaw ?? []);
   const months = availableMonths(rows);
   const years = availableYears(rows);
   const defaultMonth = months[0] || currentMonth();
@@ -272,12 +280,57 @@ export default async function MqPage({
     }
   }
 
+  const yearForCarry = (grain === "year" ? periodA : periodA.slice(0, 4)).slice(
+    0,
+    4
+  );
+  const priorYear = String(Number(yearForCarry) - 1);
+  const priorYearEnd = yearEndDate(priorYear);
+  let priorYearCash: number | null = null;
+  let priorYearAsOf: string | null = null;
+  if (line !== "all") {
+    if (entity === "combined") {
+      const p = pickNearestBs(bsRows, bsLine, "personal", priorYearEnd);
+      const c = pickNearestBs(bsRows, bsLine, "corporate", priorYearEnd);
+      const combined = combineBs(
+        p ? normalizeBs(p) : null,
+        c ? normalizeBs(c) : null
+      );
+      if (combined?.cash != null) {
+        priorYearCash = combined.cash;
+        priorYearAsOf = priorYearEnd;
+      }
+    } else {
+      const prev = pickNearestBs(bsRows, bsLine, entity, priorYearEnd);
+      if (prev?.cash != null) {
+        priorYearCash = Number(prev.cash);
+        priorYearAsOf = String(prev.as_of_date).slice(0, 10);
+      }
+    }
+  }
+
+  /** 現金橋の前期繰越: 年次=前年B/S現金、月次=前月末 facts.cash_end */
+  function cashBeginFor(period: string): number | null {
+    if (grain === "year") {
+      return priorYearCash;
+    }
+    const [y, m] = period.slice(0, 7).split("-").map(Number);
+    const prev = new Date(Date.UTC(y, m - 2, 1));
+    const prevKey = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, "0")}`;
+    const subset = filterFactsMonth(rows, line, entity, prevKey);
+    const agg = aggregateRows(subset, "month");
+    return agg.cashEnd;
+  }
+
+  const qLabel = line === "all" ? undefined : qUnitLabel(line);
+
   return (
     <Shell active="/mq" email={user?.email ?? null}>
       <p className="page-kicker">③ 事業 · MQ</p>
       <h1>MQ会計評価</h1>
       <p className="sub">
         実績は月次でチューニング、計画は年次で立てる。年額Fは月次で÷12。計画との差も同じMQ表で見る。
+        AIのQは案件数。現金は家計含む参考・年別クローズで繰越。
       </p>
 
       {error ? (
@@ -452,20 +505,24 @@ export default async function MqPage({
         <MqStrackPanel
           title={left.title}
           computed={left.computed}
+          cashBegin={cashBeginFor(periodA)}
           cashIn={left.cashIn}
           cashOut={left.cashOut}
           cashEnd={left.cashEnd}
           depreciation={left.depreciation}
           emptyHint={left.emptyHint}
+          qUnitLabel={qLabel}
         />
         <MqStrackPanel
           title={right.title}
           computed={right.computed}
+          cashBegin={mode === "aa" ? cashBeginFor(periodB) : null}
           cashIn={right.cashIn}
           cashOut={right.cashOut}
           cashEnd={right.cashEnd}
           depreciation={right.depreciation}
           emptyHint={right.emptyHint}
+          qUnitLabel={qLabel}
         />
       </div>
 
@@ -525,6 +582,9 @@ export default async function MqPage({
           defaultEntity={bsFormEntity}
           defaultAsOf={bsAsOf}
           initial={bsInitial}
+          loanTrackerLt={bsLine === "realestate" ? loanTrackerLt : null}
+          priorYearCash={priorYearCash}
+          priorYearAsOf={priorYearAsOf}
         />
       </div>
 

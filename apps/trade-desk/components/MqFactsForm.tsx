@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { computeMq, formatRatio } from "@/lib/mqEquations";
 import { fmtYen } from "@/lib/format";
+import { qFieldLabel } from "@/lib/mqPolicy";
 
 type Props = {
   defaultLine: "realestate" | "ai";
@@ -108,14 +109,18 @@ export default function MqFactsForm({
       </div>
       <div className="tax-form-row">
         <label>
-          Q（稼働戸月など）
+          {qFieldLabel(defaultLine)}
           <input
             name="q"
             type="number"
             step="any"
             value={q}
             onChange={(ev) => setQ(ev.target.value)}
-            placeholder="未入力可（単価は —）"
+            placeholder={
+              defaultLine === "ai"
+                ? "案件数（未入力可）"
+                : "稼働戸月（未入力可・単価は —）"
+            }
           />
         </label>
         <label>

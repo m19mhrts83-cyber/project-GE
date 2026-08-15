@@ -10,19 +10,24 @@ function yenOrDash(n: number | null | undefined): string {
 export default function MqStrackPanel({
   title,
   computed,
+  cashBegin,
   cashIn,
   cashOut,
   cashEnd,
   depreciation,
   emptyHint,
+  qUnitLabel,
 }: {
   title: string;
   computed: MqComputed | null;
+  cashBegin?: number | null;
   cashIn?: number | null;
   cashOut?: number | null;
   cashEnd?: number | null;
   depreciation?: number | null;
   emptyHint?: string;
+  /** 例: 稼働戸月 / 案件数 */
+  qUnitLabel?: string;
 }) {
   if (!computed) {
     return (
@@ -51,6 +56,7 @@ export default function MqStrackPanel({
           <div className="mq-box-val">{yenOrDash(c.pq)}</div>
           <div className="meta">
             P {yenOrDash(c.p)} × Q {c.q ?? "—"}
+            {qUnitLabel ? `（${qUnitLabel}）` : ""}
           </div>
         </div>
         <div className="mq-box mq-box-vq">
@@ -92,6 +98,12 @@ export default function MqStrackPanel({
         <table>
           <tbody>
             <tr>
+              <td>前期繰越現金</td>
+              <td className="num">
+                {cashBegin == null ? "要入力" : yenOrDash(cashBegin)}
+              </td>
+            </tr>
+            <tr>
               <td>入金合計</td>
               <td className="num">
                 {cashIn == null ? "要入力" : yenOrDash(cashIn)}
@@ -104,7 +116,7 @@ export default function MqStrackPanel({
               </td>
             </tr>
             <tr>
-              <td>期末現金</td>
+              <td>期末現金（家計含む・参考）</td>
               <td className="num">
                 {cashEnd == null ? "要入力" : yenOrDash(cashEnd)}
               </td>
