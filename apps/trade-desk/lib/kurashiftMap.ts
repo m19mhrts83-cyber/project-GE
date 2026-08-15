@@ -33,10 +33,31 @@ export const PILLARS: MapItem[] = [
   {
     id: "p3",
     code: "③",
-    title: "不動産賃貸経営",
-    intent: "保有の運用と、これから買う案件を混ぜずに進める",
-    implemented: "不動産 ③-A〜D（ナビ分離）",
+    title: "事業",
+    intent: "不動産賃貸とAIなど事業の粗利・運用を見る（MQ会計評価）",
+    implemented: "不動産賃貸 ③-A〜D · MQ会計評価",
+    href: "/mq",
+  },
+];
+
+/** ③ 事業の横断メニュー（サイドバーと同じ粒度） */
+export const BUSINESS_LANES: MapItem[] = [
+  {
+    id: "3-re",
+    code: "不動産賃貸",
+    title: "保有・買い進め",
+    intent: "物件条件・CF・千三つ。MQの代わりではない",
+    implemented: "③-A〜D（/realestate）",
     href: "/realestate",
+  },
+  {
+    id: "3-mq",
+    code: "MQ会計評価",
+    title: "粗利構造（直接原価）",
+    intent:
+      "実績は月次（年額Fは÷12按分）、計画は年次。個人／法人／合算・不動産／AI",
+    implemented: "/mq · kurashift_mq_period_facts",
+    href: "/mq",
   },
 ];
 
@@ -151,7 +172,7 @@ export const PLAN_TAX_LANES: MapItem[] = [
   },
 ];
 
-/** ③ 不動産の正式レーン（ナビに出るもの） */
+/** ③ 不動産賃貸の正式レーン（ナビ「不動産賃貸」配下） */
 export const RE_LANES: MapItem[] = [
   {
     id: "3a",

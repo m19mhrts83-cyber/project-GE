@@ -338,8 +338,109 @@ tr.sold td {
   padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--card);
+  font: inherit;
+  background: #fff;
   color: var(--ink);
+}
+
+/* MQ会計評価 */
+.mq-slicer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mq-slicer-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.mq-dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.mq-strack-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mq-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--card-soft);
+}
+.mq-box-pq {
+  grid-column: 1 / -1;
+  background: #eef5fb;
+  border-color: #c5d8ee;
+}
+.mq-box-mq {
+  background: #fff6eb;
+  border-color: #f0c9a8;
+}
+.mq-box-g {
+  background: #eef8f2;
+  border-color: #b7dfc8;
+}
+.mq-box-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.mq-box-val {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 2px;
+}
+.mq-cash-bridge table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.mq-cash-bridge td {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.mq-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.mq-bar-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.mq-bar-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.mq-bar-track {
+  height: 10px;
+  background: #e8eef5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.mq-bar-fill {
+  height: 100%;
+  background: var(--ink-blue);
+  border-radius: 4px;
+}
+.mq-bar-val {
+  font-size: 0.8rem;
+  min-width: 5.5rem;
+  text-align: right;
+}
+@media (max-width: 900px) {
+  .mq-dual,
+  .mq-compare-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .tax-form-note {

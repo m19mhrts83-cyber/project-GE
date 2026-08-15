@@ -7,7 +7,8 @@ const NAV = [
   { href: "/portfolio", label: "資産" },
   { href: "/consultations", label: "相談" },
   { href: "/lifeplan", label: "ライフプラン" },
-  { href: "/realestate", label: "不動産" },
+  { href: "/realestate", label: "不動産賃貸" },
+  { href: "/mq", label: "MQ会計評価" },
   { href: "/roi", label: "ROI" },
   { href: "/tax", label: "確定申告" },
   { href: "/guide", label: "構成ガイド" },
@@ -85,10 +86,12 @@ export default function Shell({
           )}
         />
 
-        <div className="side-group-title side-group-title--rule">③ 不動産賃貸</div>
+        <div className="side-group-title side-group-title--rule">③ 事業</div>
         <NavLinks
           active={active}
-          items={NAV.filter((n) => ["/realestate"].includes(n.href))}
+          items={NAV.filter((n) =>
+            ["/realestate", "/mq"].includes(n.href)
+          )}
         />
         <a
           className="side-link"

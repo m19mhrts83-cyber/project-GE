@@ -6,6 +6,7 @@ import {
   OPS_LANES,
   PILLARS,
   PLAN_TAX_LANES,
+  BUSINESS_LANES,
   RE_LANES,
   SCREEN_LABELS,
   type MapItem,
@@ -78,7 +79,10 @@ export default async function GuidePage() {
             <strong>①-A / ①-B / ①-C</strong> = 資産運用の考え方（把握／判断／日常）
           </li>
           <li>
-            <strong>③-A〜D</strong> = 不動産の正式レーン
+            <strong>③-A〜D</strong> = 不動産賃貸の正式レーン（事業の一部）
+          </li>
+          <li>
+            <strong>MQ会計評価</strong> = 事業の粗利構造（③事業の兄弟メニュー）
           </li>
           <li>
             <strong>運用</strong> = 地図・ジョブ・設定・実験（本線の外）
@@ -139,10 +143,23 @@ export default async function GuidePage() {
         </div>
       </div>
 
+      <div className="card" style={{ marginTop: 16 }} id="business-lanes">
+        <header>
+          <span className="lvl">③</span>
+          <strong>事業 — サイドバー</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          不動産賃貸（条件・運用）と MQ会計評価（粗利）を分けます。
+        </p>
+        <div style={{ marginTop: 8 }}>
+          <MapTable items={BUSINESS_LANES} />
+        </div>
+      </div>
+
       <div className="card" style={{ marginTop: 16 }} id="re-lanes">
         <header>
           <span className="lvl">③</span>
-          <strong>不動産レーン（正式）</strong>
+          <strong>不動産賃貸レーン（正式）</strong>
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
           保有の運用と購入検討を混ぜないための分割です。Bは計画／実行に分かれます。
