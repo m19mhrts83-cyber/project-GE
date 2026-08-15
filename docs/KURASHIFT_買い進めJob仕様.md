@@ -49,7 +49,9 @@
 - 紐づけ: `summary_json.gmail_id` ＋ `source`（`mail_admin`→admin token／`mail_estate`→estate）
 - 二重実行防止: `summary_json.gmail_read_at`
 - UI: `/realestate/deals` → API `POST /api/re/deals/[id]` `{ action: confirm|pass }` → Mac worker
-- Jarvis ダッシュボードの general トリアージは物件紹介を除外（`jarvis_night_triage_general.is_kurashift_property_mail`）
+- Jarvis ダッシュボードの general トリアージは物件紹介を除外（`jarvis_night_triage_general.is_kurashift_property_mail`）。既存 pending は `jarvis_triage_gmail_read_catchup.py --cleanup-re-pending` で掃除
+- ダッシュボードでスキップ／送信済みにしたメールは Gmail 既読（`markReadFromEnv`／Mac catchup）
+- KURASHIFT で確認／対象外にした案件も Gmail 既読（`re_deal_mark_gmail_read`）
 
 ## 第一問い合わせ（不動産会社）＋返信蓄積＋運営相談
 

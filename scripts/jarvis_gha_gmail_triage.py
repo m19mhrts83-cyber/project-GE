@@ -199,6 +199,31 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"count": len(rows), "dry_run": True}, ensure_ascii=False))
         return 0
     n = push_rows(rows)
+    # 既存 pending の物件紹介を KURASHIFT 担当として除外（要確認から外す）
+    try:
+        from supabase import create_client
+        from jarvis_night_triage_general import skip_pending_kurashift_property_triage
+
+        url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
+        key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+        if url and key:
+            # GHA 上ではローカル token が無いことがある → status のみ skip
+            mark_read = Path(
+                os.environ.get("GMAIL_ADMIN_TOKEN_PATH")
+                or (MANUAL / "token_livingsupport.json")
+            ).is_file()
+            cleaned = skip_pending_kurashift_property_triage(
+                create_client(url, key),
+                mark_gmail_read=mark_read,
+                dry_run=False,
+            )
+            print(
+                f"# cleanup_re_pending matched={cleaned.get('matched')} "
+                f"read_ok={cleaned.get('gmail_read_ok')}",
+                file=sys.stderr,
+            )
+    except Exception as e:
+        print(f"# cleanup_re_pending skipped: {e}", file=sys.stderr)
     # ダイジェスト更新（失敗しても triage push は成功扱い）
     try:
         sys.path.insert(0, str(REPO / "scripts"))
