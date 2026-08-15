@@ -7,7 +7,7 @@
     "dev": "next dev --port 3003",
     "build": "next build",
     "start": "next start --port 3003",
-    "test:mq": "npx --yes tsx lib/mqEquations.selftest.ts && npx --yes tsx lib/mqZaimMap.selftest.ts && npx --yes tsx lib/mqBs.selftest.ts && npx --yes tsx lib/mqMonthCloseNotice.selftest.ts"
+    "test:mq": "npx --yes tsx lib/mqEquations.selftest.ts && npx --yes tsx lib/mqZaimMap.selftest.ts && npx --yes tsx lib/mqBs.selftest.ts && npx --yes tsx lib/mqMonthCloseNotice.selftest.ts && npx --yes tsx lib/mqAggregate.selftest.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

@@ -113,15 +113,19 @@ function byLineBreakdown(rows: MqFactRow[], mode: "month" | "year") {
     list.push(r);
     map.set(r.business_line, list);
   }
-  return Array.from(map.entries()).map(([line, list]) => ({
-    line,
-    computed: aggregateRows(list, mode).computed!,
-  })).filter((x) => x.computed);
+  // includeByLine:false — 再帰防止（事業線ごとの集計では byLine を作らない）
+  return Array.from(map.entries())
+    .map(([line, list]) => ({
+      line,
+      computed: aggregateRows(list, mode, { includeByLine: false }).computed!,
+    }))
+    .filter((x) => x.computed);
 }
 
 export function aggregateRows(
   rows: MqFactRow[],
-  mode: "month" | "year"
+  mode: "month" | "year",
+  opts?: { includeByLine?: boolean }
 ): {
   input: MqInput;
   computed: MqComputed | null;
@@ -133,6 +137,7 @@ export function aggregateRows(
   fMonthlyPart: number;
   fAnnualAllocated: number;
 } {
+  const includeByLine = opts?.includeByLine !== false;
   if (rows.length === 0) {
     return {
       input: { pq: 0, vq: 0, f: 0, q: null },
@@ -190,7 +195,7 @@ export function aggregateRows(
     input,
     computed: computeMq(input),
     ...cash,
-    byLine: byLineBreakdown(rows, mode),
+    byLine: includeByLine ? byLineBreakdown(rows, mode) : [],
     fMonthlyPart,
     fAnnualAllocated,
   };
