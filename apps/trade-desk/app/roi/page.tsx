@@ -14,6 +14,9 @@ import {
   groupUnitsLive,
   occRate,
   payYear,
+  repaymentRatio,
+  repaymentRatioLabel,
+  repaymentRatioTone,
   simpleRoi,
   surfaceYield,
   type PropertyUnitRow,
@@ -114,7 +117,6 @@ export default async function RoiPage() {
     flowByAccount.set(f.account_id, cur);
   }
 
-  const iLive = liveMap.get("grandole-i");
   const snapAsOf = [...latest.values()][0]?.as_of ?? null;
 
   return (
@@ -154,6 +156,11 @@ export default async function RoiPage() {
             <li>
               <strong>CoC</strong>（キャッシュオンキャッシュ）= 満室CF ÷
               自己資金。収支評価
+            </li>
+            <li>
+              <strong>返済比率</strong> = 年返済 ÷ 年収。目安{" "}
+              <strong>50%前後</strong>（MG会計・中津さん。会話では 50〜60%
+              も言及）。購入時は満室年収、現況は入居中年収。③-A の DSCR（家賃÷返済）は余裕の見方
             </li>
             <li>
               <strong>金融の単純ROI</strong> =（いまの評価 −
@@ -245,7 +252,9 @@ export default async function RoiPage() {
           </header>
           <p className="meta">
             本体と経費を分けて、本体に対する上乗せ率を見ます。志賀本通I
-            の決済支払合計は 65,214,215円（6,521万）で確定。
+            の決済支払合計は 65,214,215円（6,521万）で確定。号室の現況は{" "}
+            <a href="/realestate/properties">③-C 保有マスタ</a>
+            、運用の進捗は <a href="/realestate">③-A</a>。
           </p>
           <div className="table-scroll">
             <table>
@@ -263,6 +272,7 @@ export default async function RoiPage() {
                   <th className="num">表面</th>
                   <th className="num">実質利回り</th>
                   <th className="num">年返済</th>
+                  <th className="num">返済比率</th>
                   <th className="num">満室CF</th>
                   <th className="num">CF-ROI</th>
                   <th className="num">CoC</th>
@@ -282,6 +292,18 @@ export default async function RoiPage() {
                     a.fullRentBuy ?? liveAnnual ?? null;
                   const total = acquireTotal(a);
                   const annualPay = payYear(a.monthlyPayBuy);
+                  const annualPayNow = payYear(
+                    a.monthlyPayNow ?? a.monthlyPayBuy
+                  );
+                  const liveActualAnnual =
+                    live && live.occupiedRentMonth > 0
+                      ? live.occupiedRentMonth * 12
+                      : null;
+                  const ratioBuy = repaymentRatio(annualPay, fullRent);
+                  const ratioNow = repaymentRatio(
+                    annualPayNow,
+                    liveActualAnnual
+                  );
                   const cf = fullCf(fullRent, annualPay);
                   const nowRate = occRate(live);
                   return (
@@ -324,6 +346,26 @@ export default async function RoiPage() {
                         {fmtPct(allInYield(fullRent, total))}
                       </td>
                       <td className="num">{fmtMan(annualPay)}</td>
+                      <td className="num">
+                        <div>
+                          購入 {fmtPct(ratioBuy)}
+                          <span
+                            className={`ratio-tone ${repaymentRatioTone(ratioBuy) ?? ""}`}
+                          >
+                            {repaymentRatioLabel(ratioBuy)}
+                          </span>
+                        </div>
+                        {a.status === "owned" ? (
+                          <div className="meta">
+                            現況 {fmtPct(ratioNow)}
+                            <span
+                              className={`ratio-tone ${repaymentRatioTone(ratioNow) ?? ""}`}
+                            >
+                              {repaymentRatioLabel(ratioNow)}
+                            </span>
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="num">{fmtMan(cf)}</td>
                       <td className="num">{fmtPct(cfRoi(fullRent, annualPay))}</td>
                       <td className="num">{fmtPct(cashOnCash(cf, a.equity))}</td>
@@ -342,7 +384,8 @@ export default async function RoiPage() {
           </div>
           <p className="meta" style={{ marginTop: 10 }}>
             経費率 = 購入経費 ÷ 本体。決済支払は当日現金（志賀本通I
-            は手付済みのため本体全額ではない）。
+            は手付済みのため本体全額ではない）。返済比率の目安は 50%前後（〜60%
+            まで目安帯）。現況は入居中年収÷いまの年返済。
           </p>
         </div>
 
@@ -386,50 +429,56 @@ export default async function RoiPage() {
 
         <div className="card" style={{ marginTop: 16 }}>
           <header>
-            <span className="lvl">I</span>
-            <strong>志賀本通I 年収 — 現況と2年目</strong>
+            <span className="lvl">年収</span>
+            <strong>評価用（満室）と現況 — 号室は保有マスタ</strong>
           </header>
           <p className="meta">
-            表は現況（1年目キャンペーン込み）。実質利回りの満室年収は2年目帯（キャンペーン終了後）。
+            利回り・返済比率の分母は満室年収（買い物評価）。入居中の実績年収は現況列。
+            号室・管理費・キャンペーンは{" "}
+            <a href="/realestate/properties">③-C 保有マスタ</a>
+            。運用の履歴・改修は <a href="/realestate">③-A</a>。
           </p>
-          {!iLive ? (
-            <p className="meta">号室データがありません。</p>
-          ) : (
-            <>
-              <p style={{ margin: "8px 0 12px" }}>
-                入居 {iLive.occupied}/{iLive.total}
-                {" · "}家賃月 {fmtYen(iLive.rentMonth)}
-                {" · "}家賃＋管理費月 {fmtYen(iLive.totalRentMonth)}
-                {" → 年 "}
-                <strong>{fmtYen(iLive.totalRentMonth * 12)}</strong>
-                （{fmtMan(iLive.totalRentMonth * 12)}）
-              </p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>号室</th>
-                    <th>状態</th>
-                    <th className="num">家賃</th>
-                    <th className="num">管理費</th>
-                    <th className="num">合計</th>
-                    <th>メモ</th>
+          <table>
+            <thead>
+              <tr>
+                <th>物件</th>
+                <th className="num">満室年収（評価）</th>
+                <th className="num">現況年収（入居）</th>
+                <th>メモ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ROI_ASSETS.filter((a) => a.status === "owned").map((a) => {
+                const live = a.unitPropertyId
+                  ? liveMap.get(a.unitPropertyId)
+                  : undefined;
+                const actual =
+                  live && live.occupiedRentMonth > 0
+                    ? live.occupiedRentMonth * 12
+                    : null;
+                return (
+                  <tr key={`${a.id}-rent`}>
+                    <td>
+                      {a.name}
+                      <div className="meta">
+                        <a href="/realestate/properties">号室・マスタ →</a>
+                      </div>
+                    </td>
+                    <td className="num">{fmtMan(a.fullRentBuy)}</td>
+                    <td className="num">
+                      {fmtMan(actual)}
+                      {live ? (
+                        <div className="meta">
+                          {live.occupied}/{live.total}戸
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="meta">{a.fullRentBuyNote}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {iLive.units.map((u) => (
-                    <tr key={u.room}>
-                      <td>{u.room}</td>
-                      <td>{u.status === "occupied" ? "入居" : u.status}</td>
-                      <td className="num">{fmtYen(u.rent)}</td>
-                      <td className="num">{fmtYen(u.mgmt)}</td>
-                      <td className="num">{fmtYen(u.totalRent)}</td>
-                      <td className="meta">{u.note ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
         <div className="grid" style={{ marginTop: 16 }}>

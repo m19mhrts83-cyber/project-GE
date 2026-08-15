@@ -306,6 +306,23 @@ tr.sold td {
   color: var(--accent-deep);
 }
 
+.ratio-tone {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.ratio-tone.ok {
+  color: #1e6b45;
+}
+.ratio-tone.mid {
+  color: #b45309;
+}
+.ratio-tone.high,
+.ratio-tone.out {
+  color: #b42318;
+}
+
 .tax-check {
   margin: 8px 0;
   padding-left: 18px;

@@ -227,7 +227,8 @@ export default async function RealEstatePage({
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
           DSCR 簡易 = 月家賃合計 ÷ 月返済合計（業界定番。厳密 NOI ではない）。目安
-          1.2×以上。
+          1.2×以上。買い物評価の返済比率（目安 50%前後）は{" "}
+          <a href="/roi">ROI</a>。
         </p>
         <table style={{ marginTop: 8 }}>
           <tbody>
@@ -566,7 +567,7 @@ export default async function RealEstatePage({
         </p>
         <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
           <li>
-            <a href="/realestate">A 運用</a> — 今のCF・DSCR・ギャップ（この画面）
+            <a href="/realestate">A 運用</a> — 今のCF・DSCR・ギャップ・改修の進み（この画面）
           </li>
           <li>
             <a href="/realestate/buy-plan">B 買い進めプラン</a> — 長期年表・今狙う条件
@@ -578,10 +579,13 @@ export default async function RealEstatePage({
             <a href="/realestate/deals">B 千三つ</a> — 情報→内見→買付→融資→購入
           </li>
           <li>
-            <a href="/realestate/properties">C 保有</a> — レントロール vs 月返済
+            <a href="/realestate/properties">C 保有</a> — 号室・住所・管理・レントロール
           </li>
           <li>
             <a href="/realestate/finance-pack">D 融資パック</a> — 提出書類
+          </li>
+          <li>
+            <a href="/roi">ROI</a> — 買い物評価（利回り・返済比率・CoC）
           </li>
         </ul>
       </div>
