@@ -56,7 +56,7 @@ export const BUSINESS_LANES: MapItem[] = [
     title: "粗利構造（直接原価）",
     intent:
       "実績は月次（年額Fは÷12按分）、計画は年次。個人／法人／合算・不動産／AI",
-    implemented: "/mq · kurashift_mq_period_facts",
+    implemented: "/mq · facts/map/bs · スライサー · 比較",
     href: "/mq",
   },
 ];
@@ -157,8 +157,9 @@ export const PLAN_TAX_LANES: MapItem[] = [
   {
     id: "2-roi",
     code: "ROI",
-    title: "自己投資の見え方",
-    intent: "教育・自己投資（γ）の振り返り用。売買の本線ではない",
+    title: "買い物ごとの評価",
+    intent:
+      "物件・ペーパーを1購入ずつ振り返る（利回り・返済比率・CoC）。号室現況は③-C、運用進捗は③-A",
     implemented: "ROI 画面",
     href: "/roi",
   },
