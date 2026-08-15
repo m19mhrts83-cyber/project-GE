@@ -90,6 +90,9 @@ def maybe_gemini_draft(subject: str, body: str, from_email: str) -> str | None:
 
 
 def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_night_triage_general import classify_general_kind
+
     rows = []
     for c in cands:
         draft = maybe_gemini_draft(
@@ -100,20 +103,32 @@ def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # カード上の「要約」にはしない。全文は original_body。短いメモのみ。
         body_full = c.get("body") or ""
         summary = f"（本文 {len(body_full)} 文字・全文はカード内）" if body_full else ""
+        kind = c.get("kind") or classify_general_kind(
+            c.get("subject") or "",
+            body_full,
+            c.get("from_email") or "",
+        )
+        priority = "high" if kind == "mail" else "low"
+        if c.get("priority") in ("high", "med", "low"):
+            # candidate 側の明示を優先（mail=high / skim=low）
+            if kind == "mail":
+                priority = "high"
+            elif kind == "skim":
+                priority = "low"
         rows.append(
             {
                 "id": f"gha-{c['id']}",
                 "lane": "general",
-                "kind": "mail",
+                "kind": kind,
                 "status": "pending",
                 "partner": c.get("partner") or c.get("partner_name"),
                 "folder": c.get("folder") or None,
                 "subject": c.get("subject"),
                 "received_at": c.get("received_at"),
                 "summary": summary or None,
-                "draft_text": draft,
+                "draft_text": draft if kind == "mail" else None,
                 "original_body": (c.get("body") or "")[:8000] or None,
-                "priority": "med",
+                "priority": priority,
                 "channel": c.get("channel") or "gmail",
                 "account": "admin",
                 "gmail_thread_id": c.get("gmail_thread_id"),
@@ -122,6 +137,7 @@ def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "payload": {
                     "source": "gha_gmail_triage",
                     "message_id_header": c.get("message_id_header"),
+                    "ingest_kind": kind,
                 },
                 "updated_at": now_iso(),
             }
@@ -229,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.path.insert(0, str(REPO / "scripts"))
         from jarvis_other_mail_digest import build_and_maybe_push
 
-        build_and_maybe_push(do_push=True, use_llm=True)
+        build_and_maybe_push(do_push=True, use_llm=True, reclassify=True)
     except Exception as e:
         print(f"# other_mail_digest skipped: {e}", file=sys.stderr)
     print(json.dumps({"upserted": n, "source": "gha"}, ensure_ascii=False))

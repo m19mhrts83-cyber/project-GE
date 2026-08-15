@@ -187,6 +187,98 @@ export async function skipAllNonPartnerPending(
   };
 }
 
+/**
+ * ジャンル要約の「確認したよ」: kind=skim のみ skipped＋Gmail既読。
+ * kind=mail（要確認）は残す。
+ */
+export async function ackOtherMailDigestSkim(
+  path: string,
+  itemIds: string[],
+  genreId?: string,
+): Promise<TriageActionResult & { count?: number }> {
+  const ids = [...new Set(itemIds.map((x) => String(x || "").trim()).filter(Boolean))];
+  if (!ids.length) {
+    return { ok: false, error: "対象がありません" };
+  }
+  const supabase = await createClient();
+  const { data: rows, error: fetchErr } = await supabase
+    .from("triage_items")
+    .select("id,kind,status,gmail_message_id,account,payload")
+    .in("id", ids)
+    .eq("status", "pending");
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+
+  const now = new Date().toISOString();
+  let count = 0;
+  for (const row of rows || []) {
+    if ((row.kind || "mail") !== "skim") continue;
+    const payload = await tryMarkTriageGmailRead({
+      gmail_message_id: row.gmail_message_id,
+      account: row.account,
+      payload: asPayload(row.payload),
+    });
+    payload.digest_acked_at = now;
+    if (genreId) payload.digest_ack_genre = genreId;
+    const { error } = await supabase
+      .from("triage_items")
+      .update({ status: "skipped", payload, updated_at: now })
+      .eq("id", row.id);
+    if (!error) count += 1;
+  }
+
+  revalidatePath(path);
+  revalidatePath("/");
+  revalidatePath("/general");
+  return {
+    ok: true,
+    count,
+    message:
+      count > 0
+        ? `要約 ${count} 件を確認済み（既読）にしました`
+        : "要約用（skim）の未読はありません（要確認は個別に処置してください）",
+  };
+}
+
+/** ジャンル要約について聞く（カードなし・一時回答） */
+export async function askOtherMailDigestGenre(opts: {
+  genreLabel: string;
+  bullets: string[];
+  question: string;
+  engine?: "cursor" | "gemini";
+}): Promise<TriageActionResult & { answer?: string; via?: string }> {
+  const q = (opts.question || "").trim();
+  if (!q) return { ok: false, error: "質問が空です" };
+  const { resolveAskReply } = await import("@/lib/askEngine");
+  const prompt = [
+    "あなたは Jarvis（秘書 AI）です。パートナー以外メールのジャンル要約について答えてください。",
+    "捏造しない。短く要点から。次の一手があれば1〜3個。",
+    "",
+    `【ジャンル】${opts.genreLabel}`,
+    "【要約メモ】",
+    ...(opts.bullets || []).slice(0, 8).map((b) => `- ${b}`),
+    "",
+    `【質問】${q}`,
+  ].join("\n");
+  const r = await resolveAskReply({
+    engine: opts.engine || "cursor",
+    prompt,
+  });
+  if (!r.ok) {
+    return {
+      ok: false,
+      error: r.error || "聞くに失敗しました",
+    };
+  }
+  return {
+    ok: true,
+    answer: r.text,
+    via: r.via,
+    message: r.fallbackNotices?.length
+      ? r.fallbackNotices.join(" / ")
+      : undefined,
+  };
+}
+
 export async function saveTriageDraft(
   id: string,
   draftText: string,

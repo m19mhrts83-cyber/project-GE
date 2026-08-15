@@ -40,6 +40,7 @@ MANUAL_DIR = (
 GMAIL_SCRIPT = MANUAL_DIR / "gmail_to_yoritoori.py"
 CATCHUP = REPO / "scripts" / "jarvis_triage_yoritoori_catchup.py"
 GMAIL_READ_CATCHUP = REPO / "scripts" / "jarvis_triage_gmail_read_catchup.py"
+INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
@@ -420,7 +421,7 @@ def main() -> int:
     if GMAIL_READ_CATCHUP.is_file():
         rc = run_step(
             "triage_gmail_read",
-            [exe, str(GMAIL_READ_CATCHUP), "--cleanup-re-pending"],
+            [exe, str(GMAIL_READ_CATCHUP), "--cleanup-re-pending", "--rescue-partner"],
             timeout=300,
             dry_run=args.dry_run,
         )
@@ -452,6 +453,21 @@ def main() -> int:
             failures += 1
     else:
         results["steps"]["gmail_fetch"] = "skipped"
+
+    # 2b. Journal／チャット関心 → 要確認アップデート（朝1回・常時監視なし）
+    if INTENT_SYNC.is_file():
+        rc = run_step(
+            "intent_sync",
+            [exe, str(INTENT_SYNC), "--pull-journal", "--push"],
+            timeout=300,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["intent_sync"] = rc
+        # 失敗しても朝バンドル全体は落とさない（負荷・JWT ずれ等）
+        if rc != 0:
+            print(f"# intent_sync soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["intent_sync"] = "skipped"
 
     # 3–4. 状況ウォッチ再集約込みの投影 push（push 内で situation_watch 実行）
     if not args.skip_push:

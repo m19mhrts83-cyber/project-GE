@@ -139,27 +139,42 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--cleanup-re-pending",
         action="store_true",
-        help="pending の物件紹介メールを skipped＋既読（KURASHIFT 担当分）",
+        help="pending の物件紹介メールを skipped＋既読（KURASHIFT 担当分・パートナー除外）",
+    )
+    ap.add_argument(
+        "--rescue-partner",
+        action="store_true",
+        help="general に紛れたパートナー差出を lane=partner へ戻す",
     )
     args = ap.parse_args(argv)
 
     out: dict[str, Any] = {}
-    if args.cleanup_re_pending:
+    if args.rescue_partner or args.cleanup_re_pending:
         sys.path.insert(0, str(REPO / "scripts"))
         from jarvis_night_triage_general import (  # type: ignore
+            rescue_partner_misfiled_in_general,
             skip_pending_kurashift_property_triage,
         )
 
         sb = sb_client()
-        out["cleanup_re"] = skip_pending_kurashift_property_triage(
-            sb,
-            mark_gmail_read=True,
-            dry_run=args.dry_run,
-        )
-        print(
-            "📎 cleanup_re_pending:",
-            json.dumps(out["cleanup_re"], ensure_ascii=False),
-        )
+        if args.rescue_partner or args.cleanup_re_pending:
+            out["rescue_partner"] = rescue_partner_misfiled_in_general(
+                sb, dry_run=args.dry_run
+            )
+            print(
+                "📎 rescue_partner:",
+                json.dumps(out["rescue_partner"], ensure_ascii=False),
+            )
+        if args.cleanup_re_pending:
+            out["cleanup_re"] = skip_pending_kurashift_property_triage(
+                sb,
+                mark_gmail_read=True,
+                dry_run=args.dry_run,
+            )
+            print(
+                "📎 cleanup_re_pending:",
+                json.dumps(out["cleanup_re"], ensure_ascii=False),
+            )
 
     out["catchup"] = catchup_closed(dry_run=args.dry_run, limit=args.limit)
     print("📎 triage_gmail_read_catchup:", json.dumps(out["catchup"], ensure_ascii=False))
