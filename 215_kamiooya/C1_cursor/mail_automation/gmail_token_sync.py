@@ -119,17 +119,22 @@ def sync_token_mirrors(
             print(f"{log_prefix}: ミラー失敗 {dest}: {e}", file=sys.stderr)
 
     if skip_github or _truthy_env("GMAIL_TOKEN_SKIP_GITHUB_SYNC"):
+        # admin → Vercel は GitHub スキップ時も実施（別系統）
+        _maybe_sync_admin_to_vercel(primary)
         return
 
     # GitHub Actions（いけとも AI ニュース等）は m19m 系トークンを想定。estate だけの再保存で Secret を上書きしない
     if primary.name not in ("token.json", "token_m19m.json"):
+        _maybe_sync_admin_to_vercel(primary)
         return
 
     if shutil.which("gh") is None:
+        _maybe_sync_admin_to_vercel(primary)
         return
 
     repo = os.environ.get("GITHUB_GMAIL_SECRET_REPO", "m19mhrts83-cyber/DX-_-").strip()
     if "/" not in repo:
+        _maybe_sync_admin_to_vercel(primary)
         return
 
     token_b64 = base64.b64encode(primary.read_bytes()).decode("ascii").replace("\n", "")
@@ -154,6 +159,44 @@ def sync_token_mirrors(
             )
     except (subprocess.TimeoutExpired, OSError) as e:
         print(f"{log_prefix}: gh 実行エラー: {e}", file=sys.stderr)
+
+    _maybe_sync_admin_to_vercel(primary)
+
+
+def _maybe_sync_admin_to_vercel(primary: Path) -> None:
+    """token_livingsupport.json 更新時のみ admin → Vercel 投影。"""
+    if primary.name != "token_livingsupport.json":
+        return
+    if _truthy_env("GMAIL_ADMIN_TOKEN_VERCEL_SYNC_DISABLE"):
+        return
+    try:
+        # scripts は git-repos 直下。mail_automation から相対で辿る
+        sync_script = (
+            Path(__file__).resolve().parents[3] / "scripts" / "jarvis_gmail_admin_token_to_vercel.py"
+        )
+        # Path: …/215_kamiooya/C1_cursor/mail_automation → parents[3]=git-repos? 
+        # mail_automation parents: 0=mail_automation, 1=C1_cursor, 2=215_kamiooya, 3=git-repos ✓
+        if not sync_script.is_file():
+            sync_script = Path.home() / "git-repos/scripts/jarvis_gmail_admin_token_to_vercel.py"
+        if not sync_script.is_file():
+            print("📎 Gmail admin token → Vercel: スクリプト未検出", file=sys.stderr)
+            return
+        py = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
+        exe = str(py if py.is_file() else sys.executable)
+        proc = subprocess.run(
+            [exe, str(sync_script), "--token", str(primary)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            cwd=str(Path.home() / "git-repos"),
+        )
+        # 子の stderr を中継（値は子が出さない）
+        if proc.stderr:
+            sys.stderr.write(proc.stderr)
+        if proc.returncode != 0 and proc.stdout:
+            sys.stderr.write(proc.stdout[:500])
+    except (subprocess.TimeoutExpired, OSError) as e:
+        print(f"📎 Gmail admin token → Vercel: FAIL {e}", file=sys.stderr)
 
 
 def save_token_json_and_sync(token_path: Path, creds_json: str, *, log_prefix: str = "📎 Gmail token") -> None:
