@@ -2,6 +2,7 @@ import Shell from "@/components/Shell";
 import MqCompareBars from "@/components/MqCompareBars";
 import MqFactsForm from "@/components/MqFactsForm";
 import MqPlanForm from "@/components/MqPlanForm";
+import MqZaimIngestPanel from "@/components/MqZaimIngestPanel";
 import MqStrackPanel from "@/components/MqStrackPanel";
 import { fmtYen } from "@/lib/format";
 import {
@@ -457,6 +458,19 @@ export default async function MqPage({
 
       <div className="card" style={{ marginTop: 16 }}>
         <header>
+          <span className="lvl">Zaim取込</span>
+          <strong>月次実績の自動集計（Phase C）</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          承認済み科目マップで事業系だけ集計します。手入力月は既定で保護。未分類は下に出し、MQからは除外（暫定）します。
+        </p>
+        <div style={{ marginTop: 10 }}>
+          <MqZaimIngestPanel defaultYear={planYear} />
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <header>
           <span className="lvl">実績入力</span>
           <strong>月次オンゴーイング</strong>
         </header>
@@ -493,7 +507,7 @@ export default async function MqPage({
       <p className="meta" style={{ marginTop: 16 }}>
         買い進め（
         <a href="/realestate/buy-plan">/realestate/buy-plan</a>
-        ）は物件条件。こちらは固定費込みの粗利評価です。次: Zaim自動仕分け（Phase C）。
+        ）は物件条件。こちらは固定費込みの粗利評価です。
       </p>
     </Shell>
   );
