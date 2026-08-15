@@ -10,6 +10,12 @@ import {
   annualNoticeCopy,
   isAnnualLifeplanWindow,
 } from "@/lib/lifeplanNotices";
+import {
+  mqMonthCloseNotice,
+  parseMqMonthCloseAck,
+  previousCalendarMonth,
+} from "@/lib/mqMonthCloseNotice";
+import MqMonthCloseNoticeCard from "@/components/MqMonthCloseNoticeCard";
 import { fmtRatePct, loadLiabilityRates } from "@/lib/liabilityRates";
 import {
   computeNextAction,
@@ -152,6 +158,7 @@ export default async function HomePage() {
         "portfolio_weekly_at",
         "portfolio_weekly_summary",
         "card_debit_watch_summary",
+        "mq_month_close",
       ]),
     supabase
       .from("kurashift_jobs")
@@ -257,6 +264,37 @@ export default async function HomePage() {
     metaMap.get("card_debit_watch_summary")?.value ?? null
   );
   const weeklyAt = metaMap.get("portfolio_weekly_at")?.value ?? null;
+
+  let mqAck: Record<string, string> = {};
+  const mqRaw = metaMap.get("mq_month_close")?.value ?? null;
+  if (mqRaw) {
+    try {
+      const parsed =
+        typeof mqRaw === "string" ? JSON.parse(mqRaw) : mqRaw;
+      mqAck = parseMqMonthCloseAck(parsed);
+    } catch {
+      mqAck = {};
+    }
+  }
+  const mqTarget = previousCalendarMonth();
+  const { count: mqFactCount } = await supabase
+    .from("kurashift_mq_period_facts")
+    .select("id", { count: "exact", head: true })
+    .eq("scenario_kind", "actual")
+    .gte("period_month", `${mqTarget}-01`)
+    .lt(
+      "period_month",
+      (() => {
+        const [y, m] = mqTarget.split("-").map(Number);
+        const n = new Date(Date.UTC(y, m, 1));
+        return `${n.getUTCFullYear()}-${String(n.getUTCMonth() + 1).padStart(2, "0")}-01`;
+      })()
+    );
+  const mqNotice = mqMonthCloseNotice({
+    acked: mqAck,
+    hasFacts: (mqFactCount ?? 0) > 0,
+  });
+
   const fails = failedSources(weeklySummary);
   const stalled = countStalledQueued(queuedJobs ?? []);
   const personalCsvReady = Boolean(
@@ -504,6 +542,15 @@ export default async function HomePage() {
           </li>
         </ol>
       </div>
+
+      {mqNotice.show ? (
+        <MqMonthCloseNoticeCard
+          title={mqNotice.title}
+          body={mqNotice.body}
+          href={mqNotice.href}
+          targetMonth={mqNotice.targetMonth}
+        />
+      ) : null}
 
       {showAnnualNotice ? (
         <div className="notice">
