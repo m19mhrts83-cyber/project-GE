@@ -1,4 +1,5 @@
 import Shell from "@/components/Shell";
+import MqBsPanel from "@/components/MqBsPanel";
 import MqCompareBars from "@/components/MqCompareBars";
 import MqFactsForm from "@/components/MqFactsForm";
 import MqPlanForm from "@/components/MqPlanForm";
@@ -24,6 +25,14 @@ import {
   type LineFilter,
   type MqFactRow,
 } from "@/lib/mqAggregate";
+import {
+  combineBs,
+  monthEndDate,
+  normalizeBs,
+  pickNearestBs,
+  yearEndDate,
+  type MqBsRow,
+} from "@/lib/mqBs";
 import type { MqComputed } from "@/lib/mqEquations";
 import { createClient } from "@/lib/supabase/server";
 
@@ -75,7 +84,14 @@ export default async function MqPage({
     .order("period_month", { ascending: false })
     .limit(500);
 
+  const { data: bsRaw } = await supabase
+    .from("kurashift_mq_bs_snapshots")
+    .select("*")
+    .order("as_of_date", { ascending: false })
+    .limit(200);
+
   const rows = (raw ?? []) as MqFactRow[];
+  const bsRows = (bsRaw ?? []) as MqBsRow[];
   const months = availableMonths(rows);
   const years = availableYears(rows);
   const defaultMonth = months[0] || currentMonth();
@@ -204,6 +220,57 @@ export default async function MqPage({
   }
 
   const formMonth = grain === "month" ? periodA : defaultMonth;
+
+  const bsAsOf =
+    grain === "year" ? yearEndDate(periodA) : monthEndDate(periodA);
+  const bsLine =
+    line === "ai" ? "ai" : line === "realestate" ? "realestate" : "realestate";
+  const requireInventory = line === "ai";
+
+  let bsFields = null as ReturnType<typeof normalizeBs> | null;
+  let bsCombineNote: string | null = null;
+  let bsFormEntity: "personal" | "corporate" =
+    entity === "corporate" ? "corporate" : "personal";
+  let bsInitial: Partial<ReturnType<typeof normalizeBs>> & {
+    note?: string | null;
+  } = {};
+
+  if (line === "all") {
+    bsCombineNote =
+      "事業線「全体」のB/Sは未対応です。不動産またはAIを選んで入力してください。";
+  } else if (entity === "combined") {
+    const pers = pickNearestBs(bsRows, bsLine, "personal", bsAsOf);
+    const corp = pickNearestBs(bsRows, bsLine, "corporate", bsAsOf);
+    if (!pers && !corp) {
+      bsCombineNote = "個人・法人ともスナップがありません。片方ずつ穴埋めしてください。";
+    } else if (!pers || !corp) {
+      bsCombineNote =
+        "合算には個人・法人の両方のスナップが必要です（いまは片方のみ表示）。";
+      const one = pers || corp!;
+      bsFields = normalizeBs(one);
+      bsFormEntity = one.entity === "corporate" ? "corporate" : "personal";
+      bsInitial = { ...bsFields, note: one.note };
+    } else {
+      bsFields = combineBs(normalizeBs(pers), normalizeBs(corp));
+      bsFormEntity = "personal";
+      bsInitial = { ...normalizeBs(pers), note: pers.note };
+      bsCombineNote =
+        "合算表示。穴埋めは主体を選んで個別保存（片側の欠損は合算でも要確認）。";
+    }
+  } else {
+    const hit = pickNearestBs(bsRows, bsLine, entity, bsAsOf);
+    if (hit) {
+      bsFields = normalizeBs(hit);
+      bsFormEntity = entity;
+      bsInitial = { ...bsFields, note: hit.note };
+      if (String(hit.as_of_date).slice(0, 10) !== bsAsOf) {
+        bsCombineNote = `直近スナップ ${String(hit.as_of_date).slice(0, 10)} を表示（基準 ${bsAsOf}）`;
+      }
+    } else {
+      bsFormEntity = entity;
+      bsCombineNote = "この条件のB/Sスナップがありません。下の穴埋めで作成できます。";
+    }
+  }
 
   return (
     <Shell active="/mq" email={user?.email ?? null}>
@@ -446,14 +513,19 @@ export default async function MqPage({
         />
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <header>
-          <span className="lvl">軽量B/S</span>
-          <strong>要確認（捏造しない）</strong>
-        </header>
-        <p className="meta" style={{ marginTop: 8 }}>
-          流動・固定／他人資本・自己資本は正本が揃い次第。未入力のままです。
-        </p>
+      <div style={{ marginTop: 16 }}>
+        <MqBsPanel
+          title={`${lineLabel(line)} · ${entityLabel(entity)}`}
+          fields={bsFields}
+          mqG={left.computed?.g ?? null}
+          asOfLabel={bsAsOf}
+          combineNote={bsCombineNote}
+          requireInventory={requireInventory}
+          defaultLine={bsLine}
+          defaultEntity={bsFormEntity}
+          defaultAsOf={bsAsOf}
+          initial={bsInitial}
+        />
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
