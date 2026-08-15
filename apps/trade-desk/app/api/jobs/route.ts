@@ -23,6 +23,10 @@ const ALLOWED = new Set([
   "ops_consult_ingest",
   "re_mail_match",
   "re_deal_advice",
+  "re_deal_mark_gmail_read",
+  "re_deal_inquiry_send",
+  "re_deal_inquiry_poll",
+  "re_deal_ops_pack",
   "re_sync_loan_tracker",
   "re_revise_plan",
 ]);
@@ -81,6 +85,16 @@ export async function POST(req: Request) {
     if (job_type === "re_revise_plan" && !title.includes("[計画補正]")) {
       title = `[計画補正] ${title}`;
     }
+  }
+
+  if (job_type === "re_deal_inquiry_send" && payload.ui_confirmed !== true) {
+    return NextResponse.json(
+      {
+        error:
+          "第一問い合わせ送信には画面確認（ui_confirmed）が必要です。deals の確認ダイアログから実行してください。",
+      },
+      { status: 400 }
+    );
   }
 
   const { data, error } = await supabase

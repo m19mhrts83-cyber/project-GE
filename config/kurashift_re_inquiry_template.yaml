@@ -1,0 +1,28 @@
+# 千三つ — 不動産会社への第一問い合わせテンプレ
+# From: admin（token_livingsupport.json）／対外送信は UI 確認必須
+# 細かい仕様は第1号案件で詰める
+
+from_account: admin
+from_token: token_livingsupport.json
+
+subject_template: "物件資料のご依頼（{title_short}）"
+
+body_template: |
+  お世話になっております。物件情報の送付をよろしくお願いします。
+  併せて、固定資産評価額、修繕履歴(時期/内容/金額)が分かる資料も送付いただけると幸いです。
+  差し支えなければ、以下についてもご教授ください。よろしくお願いします。
+  ・売却理由
+  ・売却希望時期
+  ・価格交渉可能でしょうか
+
+  {signature}
+
+# 署名は worker が COMPANY_NAME / REPRESENTATIVE_NAME 等で埋める。空なら省略。
+signature_template: |
+  {company_name}
+  {representative_name}
+
+# 運営相談パックに載せる Notion 参照（購入判断の文脈）
+ops_notion_url: "https://app.notion.com/p/25ef6bbe5a7680c7be60dd114cb0e231?v=27cf6bbe5a76809db3b9000c827f3785&source=copy_link"
+
+title_short_max: 40

@@ -1,5 +1,7 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
+import DealReviewActions from "@/components/DealReviewActions";
+import DealInquiryActions from "@/components/DealInquiryActions";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
@@ -29,7 +31,7 @@ export default async function RealEstateDealsPage() {
       supabase
         .from("kurashift_re_deals")
         .select(
-          "id, title, status, source, area, structure, price_man, yield_pct, match_score, updated_at, advice_json"
+          "id, title, status, source, area, structure, price_man, yield_pct, match_score, updated_at, advice_json, summary_json"
         )
         .order("match_score", { ascending: false, nullsFirst: false })
         .order("updated_at", { ascending: false })
@@ -70,7 +72,8 @@ export default async function RealEstateDealsPage() {
       <p className="sub">
         情報→内見→買付→融資→購入。見送りは学習。長期プラン・今狙う条件は{" "}
         <a href="/realestate/buy-plan">買い進めプラン</a>。
-        自動問い合わせ送信はしません。
+        「確認した」「対象外」で紐づく Gmail を既読。取込時に明らかに対象外のものは自動で見送り＋既読。
+        検討を進める物件は「第一問い合わせ」（From=admin・確認後送信）。返信は蓄積し運営相談パックへ。
       </p>
 
       <div className="card">
@@ -99,6 +102,12 @@ export default async function RealEstateDealsPage() {
             jobType="ops_consult_ingest"
             title="運営経緯を再取込"
             label="運営経緯"
+            payload={{}}
+          />
+          <EnqueueJobButton
+            jobType="re_deal_inquiry_poll"
+            title="第一問い合わせの返信を取込"
+            label="返信取込"
             payload={{}}
           />
         </p>
@@ -197,6 +206,8 @@ export default async function RealEstateDealsPage() {
                 <th>価格万</th>
                 <th>利回</th>
                 <th>助言</th>
+                <th>操作</th>
+                <th>第一問合せ</th>
               </tr>
             </thead>
             <tbody>
@@ -211,6 +222,23 @@ export default async function RealEstateDealsPage() {
                   advice?.summary ||
                   (advice?.tips && advice.tips[0]) ||
                   "—";
+                const sj =
+                  d.summary_json && typeof d.summary_json === "object"
+                    ? (d.summary_json as {
+                        gmail_id?: string;
+                        gmail_read_at?: string;
+                        from?: string;
+                        inquiry_status?: string;
+                        messages?: Array<{
+                          direction?: string;
+                          kind?: string;
+                          subject?: string;
+                          from_email?: string;
+                          occurred_at?: string;
+                          body_text?: string;
+                        }>;
+                      })
+                    : {};
                 return (
                   <tr key={d.id}>
                     <td>{STATUS_LABEL[d.status] || d.status}</td>
@@ -232,6 +260,23 @@ export default async function RealEstateDealsPage() {
                         : "—"}
                     </td>
                     <td className="meta">{tip}</td>
+                    <td>
+                      <DealReviewActions
+                        dealId={d.id}
+                        status={d.status}
+                        gmailId={sj.gmail_id || null}
+                        gmailReadAt={sj.gmail_read_at || null}
+                      />
+                    </td>
+                    <td>
+                      <DealInquiryActions
+                        dealId={d.id}
+                        title={d.title}
+                        fromRaw={sj.from || null}
+                        inquiryStatus={sj.inquiry_status || null}
+                        messages={sj.messages || null}
+                      />
+                    </td>
                   </tr>
                 );
               })}
