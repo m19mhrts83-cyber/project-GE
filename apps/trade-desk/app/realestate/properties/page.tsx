@@ -9,6 +9,11 @@ import {
   loansForProperty,
 } from "@/lib/rePropertyMaster";
 import { dscrLabel, fmtDscr, simpleDscr } from "@/lib/reDscr";
+import {
+  ROI_ASSETS,
+  unitBreakdown,
+  type PropertyUnitRow,
+} from "@/lib/roiAssets";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +26,7 @@ type Unit = {
   rent: number | null;
   note: string | null;
   updated_at: string;
+  payload: Record<string, unknown> | null;
 };
 
 type LoanRow = {
@@ -46,7 +52,7 @@ export default async function RealEstatePropertiesPage() {
   const { data: units } = await supabase
     .from("property_units")
     .select(
-      "id, property_id, property_name, room, status, rent, note, updated_at"
+      "id, property_id, property_name, room, status, rent, note, updated_at, payload"
     )
     .order("property_name", { ascending: true })
     .order("room", { ascending: true });
@@ -78,7 +84,8 @@ export default async function RealEstatePropertiesPage() {
       byProp.set(key, g);
     }
     g.units.push(u);
-    g.rentSum += Number(u.rent) || 0;
+    const broken = unitBreakdown(u as PropertyUnitRow);
+    g.rentSum += broken.totalRent ?? (Number(u.rent) || 0);
     if (u.status === "vacant") g.vacant += 1;
   }
 
@@ -105,7 +112,9 @@ export default async function RealEstatePropertiesPage() {
         </a>
         が正本（ここでは二重入力しない）。
         {" · "}
-        <a href="/realestate">不動産ハブ →</a>
+        買い物評価（利回り・返済比率）は <a href="/roi">ROI</a>
+        {" · "}
+        運用進捗は <a href="/realestate">③-A</a>
       </p>
 
       <div className="card notice">
@@ -337,6 +346,7 @@ export default async function RealEstatePropertiesPage() {
         const roomCount = g?.units.length ?? 0;
         const vacant = g?.vacant ?? 0;
         const rentSum = g?.rentSum ?? 0;
+        const roi = ROI_ASSETS.find((a) => a.unitPropertyId === pid);
         const paySum = linked.reduce((s, l) => {
           const v =
             l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
@@ -361,7 +371,14 @@ export default async function RealEstatePropertiesPage() {
               {master?.managers?.length
                 ? ` · 管理 ${master.managers.join(" / ")}`
                 : ""}
+              {" · "}
+              <a href="/roi">ROI（評価）→</a>
             </p>
+            {roi?.fullRentBuyNote ? (
+              <p className="meta" style={{ marginTop: 4 }}>
+                年収メモ: {roi.fullRentBuyNote}
+              </p>
+            ) : null}
             <table style={{ marginTop: 10 }}>
               <thead>
                 <tr>
@@ -453,24 +470,41 @@ export default async function RealEstatePropertiesPage() {
                     <th>号室</th>
                     <th>状態</th>
                     <th className="num">家賃</th>
+                    <th className="num">管理費</th>
+                    <th className="num">合計</th>
                     <th>メモ</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {g.units.map((u) => (
-                    <tr key={u.id}>
-                      <td>{u.room}</td>
-                      <td>{u.status === "vacant" ? "空室" : "入居"}</td>
-                      <td className="num meta">
-                        {u.rent != null ? fmtYen(u.rent) : "—"}
-                      </td>
-                      <td className="meta">{u.note || "—"}</td>
-                    </tr>
-                  ))}
+                  {g.units.map((u) => {
+                    const b = unitBreakdown(u as PropertyUnitRow);
+                    return (
+                      <tr key={u.id}>
+                        <td>{u.room}</td>
+                        <td>{u.status === "vacant" ? "空室" : "入居"}</td>
+                        <td className="num meta">
+                          {b.rent != null ? fmtYen(b.rent) : "—"}
+                        </td>
+                        <td className="num meta">
+                          {b.mgmt != null ? fmtYen(b.mgmt) : "—"}
+                        </td>
+                        <td className="num">
+                          {b.totalRent != null ? fmtYen(b.totalRent) : "—"}
+                        </td>
+                        <td className="meta">{u.note || "—"}</td>
+                      </tr>
+                    );
+                  })}
                   <tr>
-                    <td colSpan={2}>
+                    <td colSpan={4}>
                       <strong>レントロール合計</strong>
-                      <span className="meta">（対月返済 {linked.length ? fmtYen(paySum) : "—"}）</span>
+                      <span className="meta">
+                        （対月返済 {linked.length ? fmtYen(paySum) : "—"}
+                        {roi
+                          ? ` · 評価用満室年収 ${roi.fullRentBuy != null ? `${Math.round(roi.fullRentBuy / 10_000)}万` : "—"}`
+                          : ""}
+                        ）
+                      </span>
                     </td>
                     <td className="num">
                       <strong>{fmtYen(rentSum)}／月</strong>

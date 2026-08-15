@@ -225,6 +225,42 @@ export function cfRoi(
   return (fullRent - annualPay) / annualPay;
 }
 
+/**
+ * 返済比率 = 年返済 ÷ 年収。
+ * MG会計研修の目安は 50%前後（会話では 50〜60% も言及）。
+ * DSCR（家賃÷返済）の逆数に近いが、投資家側の「家賃の何割が返済か」を見る。
+ */
+export const REPAYMENT_RATIO_GUIDE = 0.5;
+export const REPAYMENT_RATIO_SOFT_MAX = 0.6;
+
+export function repaymentRatio(
+  annualPay: number | null,
+  annualIncome: number | null
+): number | null {
+  if (annualPay == null || annualIncome == null || annualIncome === 0) {
+    return null;
+  }
+  return annualPay / annualIncome;
+}
+
+export function repaymentRatioLabel(r: number | null): string {
+  if (r == null || !Number.isFinite(r)) return "—";
+  if (r <= REPAYMENT_RATIO_GUIDE) return "目安内";
+  if (r <= REPAYMENT_RATIO_SOFT_MAX) return "目安帯";
+  if (r < 1) return "高め";
+  return "持ち出し";
+}
+
+export function repaymentRatioTone(
+  r: number | null
+): "ok" | "mid" | "high" | "out" | null {
+  if (r == null || !Number.isFinite(r)) return null;
+  if (r <= REPAYMENT_RATIO_GUIDE) return "ok";
+  if (r <= REPAYMENT_RATIO_SOFT_MAX) return "mid";
+  if (r < 1) return "high";
+  return "out";
+}
+
 export function fullCf(
   fullRent: number | null,
   annualPay: number | null
@@ -270,7 +306,7 @@ export type UnitLive = {
   }[];
 };
 
-function unitBreakdown(u: PropertyUnitRow): {
+export function unitBreakdown(u: PropertyUnitRow): {
   rent: number | null;
   mgmt: number | null;
   totalRent: number | null;
