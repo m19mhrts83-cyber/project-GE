@@ -28,6 +28,14 @@ const n1 = mqMonthCloseNotice({ now: aug5, hasFacts: true });
 assert.equal(n1.show, true);
 assert.equal(n1.targetMonth, "2026-07");
 
+const nAuto = mqMonthCloseNotice({
+  now: aug5,
+  hasFacts: true,
+  autoRefresh: { ok: true, unmapped_total: 2, heuristic_total: 5, manual_protected: 1 },
+});
+assert.equal(nAuto.statusLabel, "自動更新済み");
+assert.match(nAuto.body, /自動更新済み/);
+
 const n2 = mqMonthCloseNotice({
   now: aug5,
   acked: { "2026-07": "2026-08-02T00:00:00Z" },

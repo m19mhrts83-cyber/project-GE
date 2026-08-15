@@ -108,6 +108,11 @@ CSV_OUT="${HOME}/Library/CloudStorage/OneDrive-個人用/215_神・大家さん�
   "$PY" "${REPO_DIR}/scripts/jarvis_zaim_watch_runner.py" --skip-finance
   set -e
 
+  # MQ会計評価: 毎月5日以降の初回成功で流動年度を再取込・再集計
+  set +e
+  "$PY" "${REPO_DIR}/scripts/jarvis_mq_monthly_refresh.py"
+  set -e
+
   # エアウォレット対応銀行（家計銀行が新たに載ったらお知らせ）
   set +e
   "$PY" "${REPO_DIR}/scripts/jarvis_airwallet_banks_weekly.py"

@@ -1,7 +1,12 @@
 /**
  * Run via: npx tsx lib/mqZaimMap.selftest.ts
  */
-import { aggregateZaimToMq, resolveMap, type MqAccountMapRow } from "./mqZaimMap";
+import {
+  aggregateZaimToMq,
+  resolveMap,
+  resolveMapDetailed,
+  type MqAccountMapRow,
+} from "./mqZaimMap";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);
@@ -112,5 +117,34 @@ assert(b.f_annual === 120000, `f_annual ${b.f_annual}`);
 assert(b.f === 0, "loan not in f");
 assert(b.cash_out === 10000 + 80000 + 120000, "cash out");
 assert(agg.loanMixedWarn, "loan warn");
+
+// ヒューリスティック: 口座+文言で不動産に寄せる
+const heur = resolveMapDetailed([], {
+  category: "その他",
+  subcategory: "管理費",
+  entity: "corporate",
+  kind: "other_expense",
+  txn_date: "2026-04-01",
+  income_jpy: 0,
+  expense_jpy: 5000,
+  from_account: "★PayPay銀行",
+  description: "賃貸管理",
+});
+assert(heur.reason === "heuristic_realestate", "heuristic reason");
+assert(heur.map?.business_line === "realestate", "heuristic line");
+assert(heur.map?.mq_element === "vq", "heuristic vq");
+
+// 曖昧な家計は未分類
+const vague = resolveMapDetailed([], {
+  category: "食費",
+  subcategory: "外食",
+  entity: "personal",
+  kind: "other_expense",
+  txn_date: "2026-04-01",
+  income_jpy: 0,
+  expense_jpy: 1000,
+  from_account: "★名古屋銀行",
+});
+assert(vague.map == null, "vague unmapped");
 
 console.log("mqZaimMap.selftest: ok");

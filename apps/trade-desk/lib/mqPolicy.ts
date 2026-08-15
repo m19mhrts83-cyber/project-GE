@@ -17,6 +17,12 @@ export const MQ_POLICY = {
   realestateQUnit: "稼働戸月" as const,
   /** 先月まとめ促し: 翌月1〜10日（JST） */
   monthCloseWindowDays: [1, 10] as const,
+  /**
+   * 月次自動更新: 火金 Zaim CSV 成功後に相乗り。
+   * 毎月5日以降の当月初回。1月=前年+当年、2月=前年確定+当年、3〜12=当年。
+   * source=manual は保護。確定年度は通常触らない（--reopen で再開）。
+   */
+  monthlyRefreshFromDay: 5,
 } as const;
 
 export function qUnitLabel(businessLine: string): string {
