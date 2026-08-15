@@ -8,11 +8,13 @@ export default function MqMonthCloseNoticeCard({
   body,
   href,
   targetMonth,
+  statusLabel,
 }: {
   title: string;
   body: string;
   href: string;
   targetMonth: string;
+  statusLabel?: "取込待ち" | "自動更新済み" | "要確認" | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -44,6 +46,11 @@ export default function MqMonthCloseNoticeCard({
   return (
     <div className="notice" style={{ marginBottom: 12 }}>
       <strong>{title}</strong>
+      {statusLabel ? (
+        <p className="meta" style={{ margin: "4px 0 0" }}>
+          状態: {statusLabel}
+        </p>
+      ) : null}
       <p style={{ margin: "6px 0 10px" }}>{body}</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <a className="btn primary" href={href}>

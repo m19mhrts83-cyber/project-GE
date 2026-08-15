@@ -12,6 +12,7 @@ import {
 } from "@/lib/lifeplanNotices";
 import {
   mqMonthCloseNotice,
+  parseMqAutoRefresh,
   parseMqMonthCloseAck,
   previousCalendarMonth,
 } from "@/lib/mqMonthCloseNotice";
@@ -159,6 +160,7 @@ export default async function HomePage() {
         "portfolio_weekly_summary",
         "card_debit_watch_summary",
         "mq_month_close",
+        "mq_monthly_refresh",
       ]),
     supabase
       .from("kurashift_jobs")
@@ -276,6 +278,19 @@ export default async function HomePage() {
       mqAck = {};
     }
   }
+  let mqAutoRefresh = null as ReturnType<typeof parseMqAutoRefresh>;
+  const mqRefreshRaw = metaMap.get("mq_monthly_refresh")?.value ?? null;
+  if (mqRefreshRaw) {
+    try {
+      const parsed =
+        typeof mqRefreshRaw === "string"
+          ? JSON.parse(mqRefreshRaw)
+          : mqRefreshRaw;
+      mqAutoRefresh = parseMqAutoRefresh(parsed);
+    } catch {
+      mqAutoRefresh = null;
+    }
+  }
   const mqTarget = previousCalendarMonth();
   const { count: mqFactCount } = await supabase
     .from("kurashift_mq_period_facts")
@@ -293,6 +308,7 @@ export default async function HomePage() {
   const mqNotice = mqMonthCloseNotice({
     acked: mqAck,
     hasFacts: (mqFactCount ?? 0) > 0,
+    autoRefresh: mqAutoRefresh,
   });
 
   const fails = failedSources(weeklySummary);
@@ -549,6 +565,7 @@ export default async function HomePage() {
           body={mqNotice.body}
           href={mqNotice.href}
           targetMonth={mqNotice.targetMonth}
+          statusLabel={mqNotice.statusLabel}
         />
       ) : null}
 

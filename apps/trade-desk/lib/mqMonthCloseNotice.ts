@@ -7,12 +7,22 @@ import { MQ_POLICY } from "./mqPolicy";
 
 export type MqMonthCloseAckMap = Record<string, string>;
 
+export type MqAutoRefreshStatus = {
+  ok?: boolean;
+  cycle_month?: string;
+  unmapped_total?: number;
+  heuristic_total?: number;
+  manual_protected?: number;
+  at?: string;
+};
+
 export type MqMonthCloseNotice = {
   show: boolean;
   targetMonth: string; // YYYY-MM
   title: string;
   body: string;
   href: string;
+  statusLabel: "取込待ち" | "自動更新済み" | "要確認" | null;
 };
 
 function tokyoParts(now = new Date()) {
@@ -55,11 +65,17 @@ export function parseMqMonthCloseAck(raw: unknown): MqMonthCloseAckMap {
   return out;
 }
 
+export function parseMqAutoRefresh(raw: unknown): MqAutoRefreshStatus | null {
+  if (!raw || typeof raw !== "object") return null;
+  return raw as MqAutoRefreshStatus;
+}
+
 export function mqMonthCloseNotice(
   opts: {
     acked?: MqMonthCloseAckMap;
     /** 対象月に実績行があるか（任意・文言強化） */
     hasFacts?: boolean;
+    autoRefresh?: MqAutoRefreshStatus | null;
     now?: Date;
   } = {}
 ): MqMonthCloseNotice {
@@ -70,6 +86,26 @@ export function mqMonthCloseNotice(
   const already = Boolean(acked[targetMonth]);
   const show = inWindow && !already;
 
+  const ar = opts.autoRefresh;
+  let statusLabel: MqMonthCloseNotice["statusLabel"] = null;
+  let statusLine = "";
+  if (ar) {
+    if (ar.ok === false) {
+      statusLabel = "要確認";
+      statusLine = `自動更新に失敗または未完了があります（未分類 ${ar.unmapped_total ?? "—"}）。`;
+    } else if (ar.ok === true) {
+      statusLabel = "自動更新済み";
+      const parts = [
+        `未分類 ${ar.unmapped_total ?? 0}`,
+        `不動産寄せ ${ar.heuristic_total ?? 0}`,
+        `手入力保護 ${ar.manual_protected ?? 0}`,
+      ];
+      statusLine = `自動更新済み（${parts.join("・")}）。`;
+    }
+  } else if (!opts.hasFacts) {
+    statusLabel = "取込待ち";
+  }
+
   const bodyBase = opts.hasFacts
     ? `${targetMonth} の実績が入っています。MQ会計表・現金橋・軽量B/Sをまとめて確認しましょう。`
     : `${targetMonth} 分のデータが出揃う頃です。Zaim取込や手入力のうえ、MQ会計評価でまとめましょう。`;
@@ -78,7 +114,8 @@ export function mqMonthCloseNotice(
     show,
     targetMonth,
     title: `MQ会計評価 — ${targetMonth} をまとめる`,
-    body: bodyBase,
+    body: statusLine ? `${bodyBase} ${statusLine}` : bodyBase,
     href: `/mq?grain=month&a=${encodeURIComponent(targetMonth)}&b=${encodeURIComponent(targetMonth)}&mode=aa`,
+    statusLabel,
   };
 }
