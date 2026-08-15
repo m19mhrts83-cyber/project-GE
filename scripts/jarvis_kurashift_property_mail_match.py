@@ -538,6 +538,30 @@ def _dedupe_by_gmail(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(by_id.values(), key=lambda x: (-(x["match_score"] or 0), x["title"]))
 
 
+def _reason_allowlisted(sb: Any, reason: str) -> bool:
+    """学習テーブルで allowlisted の理由だけ取込時既読（Phase C）。"""
+    reason = (reason or "").strip()
+    if not reason:
+        return False
+    try:
+        resp = (
+            sb.table("kurashift_auto_pass_learn")
+            .select("allowlisted_at, confirm_count, reject_count")
+            .eq("reason", reason)
+            .limit(1)
+            .execute()
+        )
+        rows = resp.data or []
+        if not rows:
+            return False
+        row = rows[0]
+        if row.get("reject_count"):
+            return False
+        return bool(row.get("allowlisted_at")) and int(row.get("confirm_count") or 0) >= 3
+    except Exception:
+        return False
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=120)
@@ -605,7 +629,7 @@ def main() -> int:
     if args.dry_run and not args.apply:
         print(
             "📎 property_mail_match: dry-run（--apply で deals 反映・"
-            "auto_pass は既読）"
+            "auto_pass は未既読／allowlist理由のみ既読）"
         )
         print(
             "KURASHIFT_RESULT:"
@@ -637,17 +661,27 @@ def main() -> int:
         gid = (c.get("summary_json") or {}).get("gmail_id")
         if not gid or gid in seen:
             continue
-        read_at = datetime.now(timezone.utc).isoformat()
         sj = dict(c.get("summary_json") or {})
-        sj["gmail_read_at"] = read_at
+        # Phase A: 取込時は既読にしない。学習確認後のみ既読。
+        sj["auto_pass_pending_read"] = True
+        sj.pop("gmail_read_at", None)
         row = {**c, "summary_json": sj, "status": "passed"}
-        try:
-            mark_gmail_message_read(str(c.get("source") or "mail_admin"), str(gid))
-            auto_read += 1
-        except Exception as e:
-            print(f"# auto_pass mark-read FAIL {gid}: {type(e).__name__}: {e}")
-            sj.pop("gmail_read_at", None)
-            row["summary_json"] = sj
+        # allowlist 済み理由だけ自動既読（Phase C）
+        reason = str(sj.get("auto_pass_reason") or "")
+        if reason and _reason_allowlisted(sb, reason):
+            try:
+                read_at = datetime.now(timezone.utc).isoformat()
+                mark_gmail_message_read(str(c.get("source") or "mail_admin"), str(gid))
+                sj["gmail_read_at"] = read_at
+                sj["auto_pass_pending_read"] = False
+                sj["auto_pass_allowlisted_read"] = True
+                row["summary_json"] = sj
+                auto_read += 1
+            except Exception as e:
+                print(f"# allowlisted mark-read FAIL {gid}: {type(e).__name__}: {e}")
+                sj.pop("gmail_read_at", None)
+                sj["auto_pass_pending_read"] = True
+                row["summary_json"] = sj
         sb.table("kurashift_re_deals").insert(row).execute()
         auto_inserted += 1
         seen.add(gid)

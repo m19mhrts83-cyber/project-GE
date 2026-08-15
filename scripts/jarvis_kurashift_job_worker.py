@@ -258,9 +258,7 @@ def run_secrets_upsert(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
         print("  dry-run: secrets upsert", sorted(updates.keys()))
         return "dry_run"
 
-    sb.table("kurashift_jobs").update(
-        {"status": "running", "started_at": now_iso(), "error_text": None}
-    ).eq("id", job_id).execute()
+    # claim_job 済み想定（status=running）
 
     py = str(PY if PY.exists() else sys.executable)
     tmp = Path(tempfile.mkstemp(prefix="kurashift_secrets_", suffix=".json")[1])
@@ -328,6 +326,54 @@ def run_secrets_upsert(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
             pass
 
 
+def claim_job(sb: Any, job_id: str) -> bool:
+    """queued → running の CAS。他プロセスが先に取ったら False。"""
+    started = datetime.now(timezone.utc).isoformat()
+    resp = (
+        sb.table("kurashift_jobs")
+        .update({"status": "running", "started_at": started, "error_text": None})
+        .eq("id", job_id)
+        .eq("status", "queued")
+        .execute()
+    )
+    if resp.data:
+        return True
+    # Prefer 無しで data 空の環境向けフォールバック
+    cur = (
+        sb.table("kurashift_jobs")
+        .select("status, started_at")
+        .eq("id", job_id)
+        .limit(1)
+        .execute()
+    )
+    rows = cur.data or []
+    if not rows or rows[0].get("status") != "running":
+        return False
+    # 同時更新の曖昧時はスキップ（at-most-once）
+    return False
+
+
+def reap_stale_running(sb: Any, *, minutes: int = 30) -> int:
+    """開始から minutes 超の running を failed にする。"""
+    from datetime import timedelta
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+    resp = (
+        sb.table("kurashift_jobs")
+        .update(
+            {
+                "status": "failed",
+                "error_text": "stale_running_reaped",
+                "finished_at": now_iso(),
+            }
+        )
+        .eq("status", "running")
+        .lt("started_at", cutoff)
+        .execute()
+    )
+    return len(resp.data or [])
+
+
 def run_one(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
     job_id = row["id"]
     job_type = row["job_type"]
@@ -346,6 +392,12 @@ def run_one(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
         return "denied"
 
     if job_type == "secrets_upsert":
+        if dry_run:
+            print("  dry-run: secrets_upsert")
+            return "dry_run"
+        if not claim_job(sb, job_id):
+            print(f"# job {job_id} skipped (not claimed)")
+            return "skipped"
         return run_secrets_upsert(sb, row, dry_run=dry_run)
 
     print(f"# job {job_id} type={job_type}")
@@ -353,9 +405,9 @@ def run_one(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
         print("  dry-run:", " ".join(command_for(job_type, payload)))
         return "dry_run"
 
-    sb.table("kurashift_jobs").update(
-        {"status": "running", "started_at": now_iso(), "error_text": None}
-    ).eq("id", job_id).execute()
+    if not claim_job(sb, job_id):
+        print(f"# job {job_id} skipped (not claimed)")
+        return "skipped"
 
     cmd = command_for(job_type, payload)
     try:
@@ -404,9 +456,19 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--once", action="store_true", help="process at most one queued job")
     ap.add_argument("--limit", type=int, default=5)
+    ap.add_argument(
+        "--reap-stale-minutes",
+        type=int,
+        default=30,
+        help="running がこの分数を超えたら failed（0で無効）",
+    )
     args = ap.parse_args()
 
     sb = sb_client()
+    if args.reap_stale_minutes > 0 and not args.dry_run:
+        n = reap_stale_running(sb, minutes=args.reap_stale_minutes)
+        if n:
+            print(f"# reaped stale running={n}")
     q = (
         sb.table("kurashift_jobs")
         .select("*")

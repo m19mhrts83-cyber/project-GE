@@ -1,5 +1,5 @@
 #!/bin/zsh
-# install: KURASHIFT job worker（15分間隔）
+# install: KURASHIFT job watch（KeepAlive 常駐・30s ドレイン）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.kurashift-job-worker"
@@ -20,20 +20,25 @@ cat >"$PLIST" <<EOF
   <array>
     <string>${RUNNER}</string>
   </array>
-  <key>StartInterval</key>
-  <integer>900</integer>
   <key>RunAtLoad</key>
   <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
   <key>StandardOutPath</key>
-  <string>${LOG_DIR}/launchd.out.log</string>
+  <string>${LOG_DIR}/watch.out.log</string>
   <key>StandardErrorPath</key>
-  <string>${LOG_DIR}/launchd.err.log</string>
+  <string>${LOG_DIR}/watch.err.log</string>
 </dict>
 </plist>
 EOF
 
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
+sleep 1
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
-echo "installed ${LABEL} (every 15m, RunAtLoad) → ${PLIST}"
-echo "logs: ${LOG_DIR}/"
+launchctl kickstart -k "gui/$(id -u)/${LABEL}" 2>/dev/null || true
+echo "installed ${LABEL} (KeepAlive watch) → ${PLIST}"
+echo "logs: ${LOG_DIR}/watch.*.log"
+echo "heartbeat: ${REPO_DIR}/.jarvis_state/kurashift_job_watch.json"

@@ -1,5 +1,6 @@
 import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
+import { readMacWatchStatus } from "@/lib/macWatchStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -9,23 +10,27 @@ export default async function JobsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: jobs } = await supabase
-    .from("kurashift_jobs")
-    .select(
-      "id, job_type, status, title, created_at, started_at, finished_at, error_text, log_text, artifacts"
-    )
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [{ data: jobs }, watch] = await Promise.all([
+    supabase
+      .from("kurashift_jobs")
+      .select(
+        "id, job_type, status, title, created_at, started_at, finished_at, error_text, log_text, artifacts"
+      )
+      .order("created_at", { ascending: false })
+      .limit(50),
+    readMacWatchStatus(120),
+  ]);
 
   return (
     <Shell active="/jobs" email={user?.email ?? null}>
       <h1>ジョブ</h1>
       <p className="sub">
-        アプリのボタン → queued → Mac の{" "}
-        <code>jarvis_kurashift_job_worker.py</code> が実行。Cursor
-        のチャットには出ません。状態は queued / running / succeeded /
-        failed。ログはこの表のタイトル下。Mac が眠っていると queued
-        のままです（launchd は約15分間隔）。
+        アプリのボタン → queued → Mac KeepAlive 常駐（
+        <code>jarvis_kurashift_job_watch.py</code>）が 30
+        秒ごとにドレイン。常駐オンライン時は数秒〜数十秒、スリープ中は起動後に実行。
+      </p>
+      <p className="meta" style={{ marginBottom: 12 }}>
+        {watch.label}
       </p>
 
       <div className="card">

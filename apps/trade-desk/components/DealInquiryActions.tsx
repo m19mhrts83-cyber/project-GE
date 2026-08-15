@@ -12,6 +12,16 @@ type Msg = {
   body_text?: string;
 };
 
+type Step = "edit" | "confirm";
+
+async function sha256Hex(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function parseEmail(fromRaw: string | undefined): string {
   if (!fromRaw) return "";
   const m = fromRaw.match(/<([^>]+)>/);
@@ -24,21 +34,31 @@ export default function DealInquiryActions({
   fromRaw,
   inquiryStatus,
   messages,
+  autoPassPendingRead,
+  autoPassReason,
+  lastSendJobFailed,
 }: {
   dealId: string;
   title: string;
   fromRaw?: string | null;
   inquiryStatus?: string | null;
   messages?: Msg[] | null;
+  autoPassPendingRead?: boolean;
+  autoPassReason?: string | null;
+  lastSendJobFailed?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<Step>("edit");
   const [to, setTo] = useState(() => parseEmail(fromRaw || undefined));
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
 
   const status = inquiryStatus || "none";
-  const canSend = status === "none" || status === "draft";
+  const canSend =
+    status === "none" || status === "draft" || status === "";
+  const showPack = !canSend || (messages || []).length > 0;
 
   const defaultBody = useMemo(
     () =>
@@ -58,20 +78,18 @@ export default function DealInquiryActions({
   const [body, setBody] = useState(defaultBody);
 
   async function send() {
-    if (!to.includes("@")) {
-      setMsg("宛先メールを入力してください");
+    if (!checked) {
+      setMsg("確認チェックを入れてください");
       return;
     }
-    if (
-      !window.confirm(
-        `admin から不動産会社へ第一問い合わせを送信します。\nTo: ${to}\n件名: ${subject}\n\nこの内容で送信してよいですか？`
-      )
-    ) {
+    if (!to.includes("@")) {
+      setMsg("宛先メールを入力してください");
       return;
     }
     setBusy("send");
     setMsg(null);
     try {
+      const body_sha256 = await sha256Hex(body);
       const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,14 +99,17 @@ export default function DealInquiryActions({
           subject,
           body,
           ui_confirmed: true,
+          confirm_snapshot: { to, subject, body_sha256 },
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         setMsg(data.error || "失敗");
       } else {
-        setMsg("送信ジョブをキューしました（Mac worker）");
+        setMsg("送信ジョブをキューしました（Mac常駐が数秒〜数十秒で実行）");
         setOpen(false);
+        setStep("edit");
+        setChecked(false);
         router.refresh();
       }
     } catch (e) {
@@ -125,33 +146,97 @@ export default function DealInquiryActions({
     }
   }
 
+  async function autopass(action: "autopass_confirm" | "autopass_reject") {
+    setBusy(action);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(data.error || "失敗");
+      } else {
+        setMsg(
+          action === "autopass_confirm"
+            ? "既読で正しい → 既読ジョブをキュー"
+            : "誤り → 候補（info）に戻しました"
+        );
+        router.refresh();
+      }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div style={{ minWidth: 160 }}>
       <div className="meta" style={{ marginBottom: 4 }}>
         問合せ: {status}
       </div>
-      {canSend ? (
-        <button
-          type="button"
-          className="btn primary"
-          style={{ fontSize: 12, padding: "4px 8px", marginBottom: 4 }}
-          disabled={busy !== null}
-          onClick={() => setOpen((v) => !v)}
-        >
-          第一問い合わせ
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="btn"
-          style={{ fontSize: 12, padding: "4px 8px", marginBottom: 4 }}
-          disabled={busy !== null}
-          onClick={pack}
-        >
-          {busy === "pack" ? "…" : "運営相談パック"}
-        </button>
-      )}
-      {open ? (
+      {lastSendJobFailed ? (
+        <div className="meta" style={{ marginBottom: 4, color: "#b00020" }}>
+          送信失敗: {lastSendJobFailed.slice(0, 80)}
+        </div>
+      ) : null}
+      {autoPassPendingRead ? (
+        <div style={{ marginBottom: 6 }}>
+          <div className="meta">自動見送り・未既読（{autoPassReason || "—"}）</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: 11, padding: "2px 6px" }}
+              disabled={busy !== null}
+              onClick={() => autopass("autopass_confirm")}
+            >
+              既読で正しい
+            </button>
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: 11, padding: "2px 6px" }}
+              disabled={busy !== null}
+              onClick={() => autopass("autopass_reject")}
+            >
+              誤り（候補へ）
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 }}>
+        {canSend ? (
+          <button
+            type="button"
+            className="btn primary"
+            style={{ fontSize: 12, padding: "4px 8px" }}
+            disabled={busy !== null}
+            onClick={() => {
+              setOpen((v) => !v);
+              setStep("edit");
+              setChecked(false);
+            }}
+          >
+            第一問い合わせ
+          </button>
+        ) : null}
+        {showPack ? (
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 12, padding: "4px 8px" }}
+            disabled={busy !== null}
+            onClick={pack}
+          >
+            {busy === "pack" ? "…" : "運営相談パック"}
+          </button>
+        ) : null}
+      </div>
+      {open && canSend ? (
         <div
           style={{
             marginTop: 8,
@@ -161,43 +246,103 @@ export default function DealInquiryActions({
             maxWidth: 360,
           }}
         >
-          <label className="meta">
-            To
-            <input
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              style={{ display: "block", width: "100%", marginTop: 2 }}
-            />
-          </label>
-          <label className="meta" style={{ display: "block", marginTop: 6 }}>
-            件名
-            <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              style={{ display: "block", width: "100%", marginTop: 2 }}
-            />
-          </label>
-          <label className="meta" style={{ display: "block", marginTop: 6 }}>
-            本文
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={8}
-              style={{ display: "block", width: "100%", marginTop: 2 }}
-            />
-          </label>
-          <p className="meta" style={{ marginTop: 6 }}>
-            From: admin@livingsupport-matsu.co.jp（確認後に送信）
-          </p>
-          <button
-            type="button"
-            className="btn primary"
-            disabled={busy !== null}
-            onClick={send}
-            style={{ marginTop: 6 }}
-          >
-            {busy === "send" ? "送信中…" : "確認して送信キューへ"}
-          </button>
+          {step === "edit" ? (
+            <>
+              <label className="meta">
+                To
+                <input
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  style={{ display: "block", width: "100%", marginTop: 2 }}
+                />
+              </label>
+              <label className="meta" style={{ display: "block", marginTop: 6 }}>
+                件名
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  style={{ display: "block", width: "100%", marginTop: 2 }}
+                />
+              </label>
+              <label className="meta" style={{ display: "block", marginTop: 6 }}>
+                本文
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  rows={8}
+                  style={{ display: "block", width: "100%", marginTop: 2 }}
+                />
+              </label>
+              <p className="meta" style={{ marginTop: 6 }}>
+                From: admin@livingsupport-matsu.co.jp
+              </p>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={busy !== null}
+                onClick={() => {
+                  setStep("confirm");
+                  setChecked(false);
+                }}
+                style={{ marginTop: 6 }}
+              >
+                確認画面へ
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="meta">
+                <strong>送信内容の再確認</strong>（編集不可）
+              </p>
+              <p className="meta" style={{ marginTop: 6 }}>
+                From: admin@livingsupport-matsu.co.jp
+              </p>
+              <p className="meta">
+                <strong>To:</strong> {to}
+              </p>
+              <p className="meta">
+                <strong>件名:</strong> {subject}
+              </p>
+              <pre
+                className="meta"
+                style={{
+                  whiteSpace: "pre-wrap",
+                  maxHeight: 120,
+                  overflow: "auto",
+                  marginTop: 6,
+                }}
+              >
+                {body.slice(0, 600)}
+                {body.length > 600 ? "…" : ""}
+              </pre>
+              <label className="meta" style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => setChecked(e.target.checked)}
+                />
+                宛先・件名・本文を確認した
+              </label>
+              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy !== null}
+                  onClick={() => setStep("edit")}
+                >
+                  戻る
+                </button>
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={busy !== null || !checked}
+                  onClick={send}
+                >
+                  {busy === "send" ? "送信中…" : "確認したので送信キューへ"}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       ) : null}
       {(messages || []).length > 0 ? (

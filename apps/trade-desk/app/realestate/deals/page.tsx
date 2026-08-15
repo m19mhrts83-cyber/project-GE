@@ -5,6 +5,7 @@ import DealInquiryActions from "@/components/DealInquiryActions";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
+import { readMacWatchStatus } from "@/lib/macWatchStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function RealEstateDealsPage() {
       supabase
         .from("kurashift_re_deals")
         .select(
-          "id, title, status, source, area, structure, price_man, yield_pct, match_score, updated_at, advice_json, summary_json"
+          "id, title, status, source, area, structure, price_man, yield_pct, match_score, updated_at, advice_json, summary_json, inquiry_status, inquiry_thread_id, inquiry_sent_at"
         )
         .order("match_score", { ascending: false, nullsFirst: false })
         .order("updated_at", { ascending: false })
@@ -53,6 +54,68 @@ export default async function RealEstateDealsPage() {
         .maybeSingle(),
     ]);
 
+  const watch = await readMacWatchStatus(120);
+
+  const dealIds = (deals || []).map((d) => d.id);
+  const [{ data: dealMessages }, { data: recentSendJobs }] = await Promise.all([
+    dealIds.length > 0
+      ? supabase
+          .from("kurashift_re_deal_messages")
+          .select(
+            "deal_id, direction, kind, subject, from_email, occurred_at, body_text"
+          )
+          .in("deal_id", dealIds)
+          .order("occurred_at", { ascending: true })
+          .limit(400)
+      : Promise.resolve({
+          data: [] as Array<{
+            deal_id: string;
+            direction?: string;
+            kind?: string;
+            subject?: string;
+            from_email?: string;
+            occurred_at?: string;
+            body_text?: string;
+          }>,
+        }),
+    supabase
+      .from("kurashift_jobs")
+      .select("id, status, error_text, payload, created_at")
+      .eq("job_type", "re_deal_inquiry_send")
+      .order("created_at", { ascending: false })
+      .limit(40),
+  ]);
+
+  const failedSendByDeal = new Map<string, string>();
+  for (const j of recentSendJobs || []) {
+    const p =
+      j.payload && typeof j.payload === "object"
+        ? (j.payload as Record<string, unknown>)
+        : {};
+    const did = typeof p.deal_id === "string" ? p.deal_id : "";
+    if (!did || failedSendByDeal.has(did)) continue;
+    if (j.status === "failed") {
+      failedSendByDeal.set(did, j.error_text || "failed");
+    }
+  }
+
+  const messagesByDeal = new Map<
+    string,
+    Array<{
+      direction?: string;
+      kind?: string;
+      subject?: string;
+      from_email?: string;
+      occurred_at?: string;
+      body_text?: string;
+    }>
+  >();
+  for (const m of dealMessages || []) {
+    const list = messagesByDeal.get(m.deal_id) || [];
+    list.push(m);
+    messagesByDeal.set(m.deal_id, list);
+  }
+
   const counts: Record<string, number> = {};
   for (const s of Object.keys(STATUS_LABEL)) counts[s] = 0;
   for (const d of deals || []) {
@@ -72,18 +135,21 @@ export default async function RealEstateDealsPage() {
       <p className="sub">
         情報→内見→買付→融資→購入。見送りは学習。長期プラン・今狙う条件は{" "}
         <a href="/realestate/buy-plan">買い進めプラン</a>。
-        「確認した」「対象外」で紐づく Gmail を既読。取込時に明らかに対象外のものは自動で見送り＋既読。
-        検討を進める物件は「第一問い合わせ」（From=admin・確認後送信）。返信は蓄積し運営相談パックへ。
+        「確認した」「対象外」で紐づく Gmail を既読。取込の明らかに対象外は見送り候補（当面は未既読・確認後に学習）。
+        第一問い合わせは From=admin・2段確認後にキュー。Mac 常駐が数秒〜数十秒で実行（スリープ中は起動後）。
+      </p>
+      <p className="meta" style={{ marginBottom: 12 }}>
+        {watch.label} · <a href="/jobs">ジョブ一覧</a>
       </p>
 
       <div className="card">
         <header>
           <span className="lvl">Jobs</span>
-          <strong>候補の更新（Mac worker）</strong>
+          <strong>候補の更新（Mac 常駐）</strong>
         </header>
         <p className="meta" style={{ marginTop: 8 }}>
-          送信はしません。キュー後に Mac の{" "}
-          <code>jarvis_kurashift_job_worker.py</code> が実行します。
+          キュー後、常駐オンラインなら数十秒以内に実行。オフライン／スリープ中は Mac
+          起動後にドレイン。詳細は <a href="/jobs">ジョブ</a>。
         </p>
         <p style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <EnqueueJobButton
@@ -229,6 +295,8 @@ export default async function RealEstateDealsPage() {
                         gmail_read_at?: string;
                         from?: string;
                         inquiry_status?: string;
+                        auto_pass_pending_read?: boolean;
+                        auto_pass_reason?: string;
                         messages?: Array<{
                           direction?: string;
                           kind?: string;
@@ -239,6 +307,11 @@ export default async function RealEstateDealsPage() {
                         }>;
                       })
                     : {};
+                const inquiryStatus =
+                  d.inquiry_status || sj.inquiry_status || "none";
+                const timeline =
+                  messagesByDeal.get(d.id) || sj.messages || [];
+                const autoPassPending = Boolean(sj.auto_pass_pending_read);
                 return (
                   <tr key={d.id}>
                     <td>{STATUS_LABEL[d.status] || d.status}</td>
@@ -273,8 +346,15 @@ export default async function RealEstateDealsPage() {
                         dealId={d.id}
                         title={d.title}
                         fromRaw={sj.from || null}
-                        inquiryStatus={sj.inquiry_status || null}
-                        messages={sj.messages || null}
+                        inquiryStatus={inquiryStatus}
+                        messages={timeline}
+                        autoPassPendingRead={autoPassPending}
+                        autoPassReason={
+                          typeof sj.auto_pass_reason === "string"
+                            ? sj.auto_pass_reason
+                            : null
+                        }
+                        lastSendJobFailed={failedSendByDeal.get(d.id) || null}
                       />
                     </td>
                   </tr>

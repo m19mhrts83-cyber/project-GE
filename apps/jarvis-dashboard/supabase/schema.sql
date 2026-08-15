@@ -543,6 +543,10 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- kurashift_buy_plan_versions/events/criteria/constraints/notes,
 -- kurashift_re_deals, kurashift_ops_consult_events
 -- （migrations/20260813_kurashift_buy_plan.sql）
+-- 第一問い合わせ箱: inquiry_* 列 / kurashift_re_deal_messages / consultations.lane=realestate
+-- （migrations/20260815_kurashift_re_inquiry.sql）
+-- job watch / inquiry sending / auto_pass learn / realtime jobs
+-- （migrations/20260816_kurashift_job_watch_autopass_learn.sql）
 -- kurashift_loan_tracker_loans
 -- （migrations/20260813_kurashift_loan_tracker.sql）
 -- kurashift_tax_year_metrics（個人暦年／法人5月期の申告結果KPI）

@@ -34,10 +34,12 @@
 
 | 操作 | status | Gmail |
 |---|---|---|
-| メール取込・**明らかに対象外** | `passed`（`auto_pass_reason`） | **取込時に既読** |
+| メール取込・**明らかに対象外** | `passed`（`auto_pass_reason`・`auto_pass_pending_read`） | **当面は既読にしない**（確認後／allowlist 理由のみ） |
 | メール取込・境界／候補 | `info` / 高スコアは `viewing` | **既読にしない** |
 | **確認した** | `info`→`viewing`（以降は維持） | `re_deal_mark_gmail_read` で UNREAD 除去 |
 | **対象外**（手動） | `passed` | 同上 |
+| 自動見送りの「既読で正しい」 | passed 維持 | 既読ジョブ＋学習カウント |
+| 自動見送りの「誤り」 | `info` に戻す | 既読しない |
 
 取込時 auto_pass の判定（`clearly_out_of_scope`）:
 
@@ -46,6 +48,10 @@
 - 都内寄りで戸建なし・東海ヒントなし
 - スコア `< 2.0`（`CANDIDATE_SCORE_MIN`）
 
+学習: `kurashift_auto_pass_learn`（confirm≥3 かつ reject=0 で allowlist → 以降その理由のみ取込時既読）
+
+- Mac ジョブ実行: KeepAlive 常駐 `jarvis_kurashift_job_watch.py`（30s ポーリング本線）。心拍は `sync_meta.kurashift_job_watch`
+- 第一問い合わせ: 2段確認 + `confirm_snapshot` + `idempotency_key`。Worker は `sending` 後に送信（at-most-once）
 - 紐づけ: `summary_json.gmail_id` ＋ `source`（`mail_admin`→admin token／`mail_estate`→estate）
 - 二重実行防止: `summary_json.gmail_read_at`
 - UI: `/realestate/deals` → API `POST /api/re/deals/[id]` `{ action: confirm|pass }` → Mac worker
@@ -64,7 +70,7 @@
 |---|---|
 | **第一問い合わせ** | From=**admin**。テンプレは `config/kurashift_re_inquiry_template.yaml`。画面確認後 `re_deal_inquiry_send` |
 | **返信取込** | `re_deal_inquiry_poll`（スレッドから inbound を蓄積） |
-| **運営相談パック** | `re_deal_ops_pack` → `kurashift_consultations`（lane=`realestate` 予定。未DDL時は general） |
+| **運営相談パック** | `re_deal_ops_pack` → `kurashift_consultations`（lane=`realestate`。未DDL時は general） |
 
 - 蓄積先: `kurashift_re_deal_messages`（DDL: `20260815_kurashift_re_inquiry.sql`）。未適用時は `summary_json.messages` にフォールバック
 - 問い合わせ状態: 列 `inquiry_status` または `summary_json.inquiry_status`
@@ -105,8 +111,8 @@
 | job_type | 内容 | 危険度 |
 |---|---|---|
 | `buy_plan_ingest` | Excel 再取込 | 低 |
-| `re_mail_match` | admin/estate 物件メール候補。明らかに対象外は passed＋既読 | 低（候補は送信・既読なし） |
-| `re_deal_mark_gmail_read` | 確認／対象外後の Gmail 既読 | 低（UNREAD のみ） |
+| `re_mail_match` | admin/estate 物件メール候補。明らかに対象外は passed（当面未既読・学習後 allowlist のみ既読） | 低（候補は送信なし） |
+| `re_deal_mark_gmail_read` | 確認／対象外／学習確認後の Gmail 既読 | 低（UNREAD のみ） |
 | `re_deal_inquiry_send` | 不動産会社へ第一問い合わせ（admin） | 中（UI確認必須） |
 | `re_deal_inquiry_poll` | 問い合わせスレッドの返信取込 | 低 |
 | `re_deal_ops_pack` | 運営相談パック作成 | 低（送信なし） |
