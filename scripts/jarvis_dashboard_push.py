@@ -505,7 +505,7 @@ def push_other_mail_digest(sb=None) -> int:
     exe = str(py) if py.is_file() else sys.executable
     try:
         r = subprocess.run(
-            [exe, str(REPO / "scripts" / "jarvis_other_mail_digest.py"), "--push"],
+            [exe, str(REPO / "scripts" / "jarvis_other_mail_digest.py"), "--push", "--reclassify"],
             cwd=str(REPO),
             capture_output=True,
             text=True,

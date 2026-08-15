@@ -24,7 +24,7 @@ export async function fetchNavCounts(): Promise<NavCounts> {
         .select("id", { count: "exact", head: true })
         .neq("lane", "partner")
         .eq("status", "pending")
-        .neq("kind", "activity"),
+        .eq("kind", "mail"),
       supabase
         .from("watch_status")
         .select("id,level,summary,status,payload")

@@ -3,6 +3,11 @@
 
 使用アカウント: admin（主） + estate（補完） / Gmail API
 
+振り分け（二重経路可）:
+  - 物件紹介・購入シグナル → 本スクリプト（KURASHIFT 評価）。**パートナー差出も含む**
+  - パートナー差出は Jarvis「パートナー」レーンにも残る（管理軸）。排他ではない
+  - その他の要確認／要約 → Jarvis ダッシュボード general
+
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --apply
@@ -22,7 +27,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
+from email.utils import parseaddr, parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +42,17 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/gmail.send",
 ]
+
+# パートナー判定用（メタ付与。取込除外には使わない）
+CONTACT_YAML = (
+    Path.home()
+    / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+    / "C2_ルーティン作業/26_パートナー社への相談/000_共通/連絡先一覧.yaml"
+)
+CONTACT_CI = (
+    REPO
+    / "215_kamiooya/C1_cursor/1b_Cursorマニュアル/連絡先一覧.snapshot.yaml"
+)
 
 # 広めに拾い、criteria でスコア
 GMAIL_QUERY = (
@@ -106,6 +122,61 @@ def gmail_service(token_name: str):
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+
+def _partner_filters() -> tuple[set[str], set[str]]:
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_night_triage_general import (  # type: ignore
+        load_partner_filters,
+        resolve_contact_yaml,
+    )
+
+    path = CONTACT_YAML if CONTACT_YAML.is_file() else CONTACT_CI
+    return load_partner_filters(resolve_contact_yaml(path if path.is_file() else None))
+
+
+def _partner_name_by_email() -> dict[str, str]:
+    """email_lower → partner name（YAML）。"""
+    import yaml
+
+    path = CONTACT_YAML if CONTACT_YAML.is_file() else CONTACT_CI
+    if not path.is_file():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    out: dict[str, str] = {}
+    for p in data.get("partners") or []:
+        if not isinstance(p, dict):
+            continue
+        name = str(p.get("name") or p.get("folder") or "").strip()
+        if not name:
+            continue
+        for e in p.get("emails") or []:
+            if isinstance(e, str) and "@" in e:
+                out[e.strip().lower()] = name
+    return out
+
+
+def _partner_meta(
+    hm: dict[str, str],
+    emails: set[str],
+    domains: set[str],
+    name_by_email: dict[str, str],
+) -> dict[str, Any]:
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_night_triage_general import is_partner_address  # type: ignore
+
+    _, addr = parseaddr(hm.get("from") or "")
+    addr = (addr or "").strip().lower()
+    if not is_partner_address(addr, emails, domains):
+        return {"is_partner": False}
+    name = name_by_email.get(addr) or ""
+    if not name and "@" in addr:
+        dom = addr.split("@", 1)[1]
+        for e, n in name_by_email.items():
+            if e.endswith("@" + dom):
+                name = n
+                break
+    return {"is_partner": True, "partner_name": name or addr}
 
 
 def decode_body(payload: dict) -> str:
@@ -223,6 +294,7 @@ def _deal_row_from_message(
     hits: list[str],
     status: str,
     auto_pass_reason: str | None = None,
+    partner_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     date_hdr = hm.get("date")
     try:
@@ -253,6 +325,10 @@ def _deal_row_from_message(
         "snippet": text[:500],
         "account": source,
     }
+    if partner_meta:
+        sj["is_partner"] = bool(partner_meta.get("is_partner"))
+        if partner_meta.get("partner_name"):
+            sj["partner_name"] = partner_meta["partner_name"]
     if auto_pass_reason:
         sj["auto_pass_reason"] = auto_pass_reason
         sj["auto_pass_at_ingest"] = True
@@ -279,8 +355,18 @@ def fetch_account(
     days: int,
     limit: int,
     criteria_blob: str,
+    partner_emails: set[str] | None = None,
+    partner_domains: set[str] | None = None,
+    partner_names: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Returns (candidates_to_review, auto_pass_out_of_scope)."""
+    """Returns (candidates_to_review, auto_pass_out_of_scope).
+
+    パートナー差出も評価土俵に載せる（Jarvis partner レーンと併存）。
+    """
+    if partner_emails is None or partner_domains is None:
+        partner_emails, partner_domains = _partner_filters()
+    if partner_names is None:
+        partner_names = _partner_name_by_email()
     svc = gmail_service(token_name)
     q = GMAIL_QUERY.format(days=days)
     resp = (
@@ -291,6 +377,7 @@ def fetch_account(
     )
     keepers: list[dict[str, Any]] = []
     auto_pass: list[dict[str, Any]] = []
+    partner_hits = 0
     for m in resp.get("messages") or []:
         full = (
             svc.users()
@@ -299,6 +386,9 @@ def fetch_account(
             .execute()
         )
         hm = header_map(full.get("payload", {}).get("headers") or [])
+        pmeta = _partner_meta(hm, partner_emails, partner_domains, partner_names)
+        if pmeta.get("is_partner"):
+            partner_hits += 1
         subject = hm.get("subject") or "(無題)"
         body = decode_body(full.get("payload") or {})
         text = f"{subject}\n{body}"
@@ -316,6 +406,7 @@ def fetch_account(
                     hits=hits,
                     status="passed",
                     auto_pass_reason=reason,
+                    partner_meta=pmeta,
                 )
             )
             continue
@@ -329,7 +420,13 @@ def fetch_account(
                 sc=sc,
                 hits=hits,
                 status="viewing" if sc >= VIEWING_SCORE_MIN else "info",
+                partner_meta=pmeta,
             )
+        )
+    if partner_hits:
+        print(
+            f"# partner-sourced property mails included: {partner_hits} ({source})",
+            file=sys.stderr,
         )
     keepers.sort(key=lambda x: (-(x["match_score"] or 0), x["title"]))
     auto_pass.sort(key=lambda x: (-(x["match_score"] or 0), x["title"]))

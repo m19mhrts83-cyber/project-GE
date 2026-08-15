@@ -31,7 +31,7 @@ export default function BulkSkipNonPartnerButton({
         ? `（対応候補 ${actionCandidateCount} 件含む）`
         : "";
     const ok = window.confirm(
-      `パートナー以外の未読 ${optimisticCount} 件をスキップします${actionNote}。\n残したいものは先に開いて処置してください。よろしいですか？`,
+      `パートナー以外の未読 ${optimisticCount} 件をスキップします${actionNote}。\n要確認も含みます。要約だけ消す場合はジャンルの「確認したよ」を使ってください。よろしいですか？`,
     );
     if (!ok) return;
     start(async () => {

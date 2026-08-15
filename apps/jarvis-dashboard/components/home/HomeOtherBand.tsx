@@ -1,5 +1,7 @@
 import BulkSkipNonPartnerButton from "@/components/BulkSkipNonPartnerButton";
+import OtherMailDigestGenres from "@/components/home/OtherMailDigestGenres";
 import { LEVEL_LABEL, laneLabel, mailPriorityToLevel } from "@/lib/homeLevels";
+import { parseIntentDigest } from "@/lib/intentDigest";
 import {
   fallbackOtherMailDigest,
   parseOtherMailDigest,
@@ -19,7 +21,7 @@ export default async function HomeOtherBand() {
       .neq("lane", "partner")
       .neq("kind", "activity")
       .order("received_at", { ascending: false })
-      .limit(40),
+      .limit(60),
     supabase.from("sync_meta").select("key,value"),
   ]);
   const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
@@ -32,17 +34,27 @@ export default async function HomeOtherBand() {
     );
   });
 
+  const needConfirm = otherMails.filter((m) => (m.kind || "mail") === "mail");
+  const skimOnly = otherMails.filter((m) => m.kind === "skim");
+
   const digest =
     parseOtherMailDigest(metaMap.other_mail_digest) ||
     fallbackOtherMailDigest(otherMails);
   const actionItems = digest.action_items || [];
+  const genres = digest.genres || [];
+  const intent = parseIntentDigest(metaMap.intent_digest);
+  const intentThemes = intent?.themes || [];
+  const intentNotes = intent?.digest_notes || [];
+  const intentPromoted = (intent?.promoted || []).filter(
+    (p) => p.triage_id && p.action !== "candidate",
+  );
 
   return (
     <div className="home-band home-band-other">
       <div className="home-band-head">
         <h2 className="home-band-title">その他メール</h2>
         <p className="home-band-sub">
-          未読 {otherMails.length}
+          要確認 {needConfirm.length} · 要約 {skimOnly.length}
           {digest.generated_at
             ? ` · 要約 ${fmtSync(digest.generated_at)}`
             : ""}
@@ -50,20 +62,55 @@ export default async function HomeOtherBand() {
       </div>
 
       <p className="other-mail-hint">
-        ざざっと見て、残したい／対応したいものだけ開く。終わったら一括スキップ。
+        要確認は個別に開く。ざっと見る分はジャンル要約の「確認したよ」で既読にできます。
       </p>
+
+      {intent && (intentThemes.length > 0 || intentNotes.length > 0) ? (
+        <div className="intent-digest" role="status">
+          <p className="intent-digest-title">いまの関心</p>
+          {intentNotes.length > 0 ? (
+            <p className="intent-digest-notes">{intentNotes[0]}</p>
+          ) : null}
+          {intentThemes.length > 0 ? (
+            <ul className="intent-theme-list">
+              {intentThemes.slice(0, 4).map((t, i) => (
+                <li key={t.id || i}>
+                  <span className="intent-theme-label">
+                    {t.label || t.id || "テーマ"}
+                  </span>
+                  {t.why ? (
+                    <span className="intent-theme-why"> — {t.why}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {intentPromoted.length > 0 ? (
+            <p className="intent-promoted">
+              昇格:{" "}
+              {intentPromoted.slice(0, 3).map((p, i) => (
+                <span key={p.triage_id || i}>
+                  {i > 0 ? " · " : null}
+                  <a href={`/mail/${encodeURIComponent(p.triage_id!)}`}>
+                    {p.subject || p.triage_id}
+                  </a>
+                </span>
+              ))}
+            </p>
+          ) : null}
+          {intent.generated_at ? (
+            <p className="intent-digest-meta meta">
+              Journal連動 {fmtSync(intent.generated_at)}
+              {intent.via ? ` · ${intent.via}` : ""}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="other-mail-digest">
         <p className="other-mail-overview">
           {digest.overview || "（要約未生成。一覧をご確認ください）"}
         </p>
-        {(digest.lines || []).length > 0 ? (
-          <ul className="other-mail-lines">
-            {(digest.lines || []).slice(0, 5).map((line, i) => (
-              <li key={i}>{line}</li>
-            ))}
-          </ul>
-        ) : null}
         {actionItems.length > 0 ? (
           <div className="other-mail-actions" role="status">
             <p className="other-mail-actions-title">対応した方がよさそう</p>
@@ -87,16 +134,20 @@ export default async function HomeOtherBand() {
               ))}
             </ul>
           </div>
-        ) : otherMails.length > 0 ? (
-          <p className="other-mail-no-action">特に緊急候補なし</p>
+        ) : needConfirm.length > 0 ? (
+          <p className="other-mail-no-action">特に緊急候補なし（要確認は下の一覧）</p>
         ) : null}
       </div>
+
+      {genres.length > 0 ? (
+        <OtherMailDigestGenres genres={genres} path="/" />
+      ) : null}
 
       <div className="other-mail-toolbar">
         <BulkSkipNonPartnerButton
           path="/"
           pendingCount={otherMails.length}
-          actionCandidateCount={actionItems.length}
+          actionCandidateCount={needConfirm.length}
         />
         <a href="/general" className="home-more">
           レーンへ →
@@ -105,14 +156,14 @@ export default async function HomeOtherBand() {
 
       <section className="home-section">
         <div className="home-section-head">
-          <h3>一覧</h3>
+          <h3>要確認一覧</h3>
           <span className="meta">クリックで詳細</span>
         </div>
-        {otherMails.length === 0 ? (
-          <p className="empty">パートナー以外の未読はありません</p>
+        {needConfirm.length === 0 ? (
+          <p className="empty">要確認の未読はありません（要約は上のジャンルから）</p>
         ) : (
           <ul className="mail-skim">
-            {otherMails.map((it) => {
+            {needConfirm.map((it) => {
               const level = mailPriorityToLevel(it.priority);
               const who = it.partner || it.from_email || "—";
               const oneLine = (it.summary || "").replace(/\s+/g, " ").trim();
