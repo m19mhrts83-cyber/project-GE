@@ -39,6 +39,7 @@ MANUAL_DIR = (
 )
 GMAIL_SCRIPT = MANUAL_DIR / "gmail_to_yoritoori.py"
 CATCHUP = REPO / "scripts" / "jarvis_triage_yoritoori_catchup.py"
+GMAIL_READ_CATCHUP = REPO / "scripts" / "jarvis_triage_gmail_read_catchup.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
@@ -414,6 +415,20 @@ def main() -> int:
     results["steps"]["catchup"] = rc
     if rc != 0:
         failures += 1
+
+    # 1b. トリアージ閉じた件の Gmail 既読＋物件紹介 pending 除外
+    if GMAIL_READ_CATCHUP.is_file():
+        rc = run_step(
+            "triage_gmail_read",
+            [exe, str(GMAIL_READ_CATCHUP), "--cleanup-re-pending"],
+            timeout=300,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["triage_gmail_read"] = rc
+        if rc != 0:
+            failures += 1
+    else:
+        results["steps"]["triage_gmail_read"] = "skipped"
 
     # 2. パートナー Gmail → OneDrive（軽量=通常差分。フル夜トリアージはしない）
     if not args.skip_fetch:
