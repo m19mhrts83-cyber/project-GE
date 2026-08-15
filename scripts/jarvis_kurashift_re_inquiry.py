@@ -237,6 +237,30 @@ def send_inquiry(
     if not confirm and not dry_run:
         return {"ok": False, "error": "need --i-confirm-send or --dry-run"}
 
+    # at-most-once: 既に送信済みならスキップ
+    existing = list_messages(sb, deal)
+    for m in existing:
+        if (
+            m.get("kind") == "first_inquiry"
+            and m.get("direction") == "outbound"
+            and m.get("gmail_id")
+        ):
+            out = {
+                "ok": True,
+                "skipped": "already_sent",
+                "deal_id": deal_id,
+                "gmail_id": m.get("gmail_id"),
+                "thread_id": m.get("thread_id"),
+            }
+            print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+            return out
+
+    fields = inquiry_fields(deal)
+    if fields.get("inquiry_status") in ("awaiting_reply", "has_reply"):
+        out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
+        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return out
+
     result = {
         "ok": True,
         "deal_id": deal_id,
@@ -249,17 +273,28 @@ def send_inquiry(
         print(f"KURASHIFT_RESULT:{json.dumps(result, ensure_ascii=False)}")
         return result
 
-    svc = gmail_admin()
-    msg = MIMEText(body, _charset="utf-8")
-    msg["to"] = to_email
-    msg["subject"] = subject
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
-    sent = (
-        svc.users()
-        .messages()
-        .send(userId="me", body={"raw": raw})
-        .execute()
-    )
+    # 先に sending を書いてから送る（クラッシュ時の二重送信を抑止）
+    update_inquiry(sb, deal, inquiry_status="sending")
+    deal = get_deal(sb, deal_id)
+
+    try:
+        svc = gmail_admin()
+        msg = MIMEText(body, _charset="utf-8")
+        msg["to"] = to_email
+        msg["subject"] = subject
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+        sent = (
+            svc.users()
+            .messages()
+            .send(userId="me", body={"raw": raw})
+            .execute()
+        )
+    except Exception as e:
+        update_inquiry(sb, deal, inquiry_status="draft")
+        out = {"ok": False, "error": f"send_failed:{type(e).__name__}:{e}", "deal_id": deal_id}
+        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return out
+
     gmail_id = sent.get("id")
     thread_id = sent.get("threadId")
     insert_message(
@@ -286,7 +321,6 @@ def send_inquiry(
         inquiry_thread_id=thread_id,
         inquiry_sent_at=now_iso(),
     )
-    # status を viewing に寄せる（info のとき）
     if deal.get("status") == "info":
         try:
             sb.table("kurashift_re_deals").update(
@@ -294,7 +328,13 @@ def send_inquiry(
             ).eq("id", deal_id).execute()
         except Exception:
             pass
-    result.update({"gmail_id": gmail_id, "thread_id": thread_id, "inquiry_status": "awaiting_reply"})
+    result.update(
+        {
+            "gmail_id": gmail_id,
+            "thread_id": thread_id,
+            "inquiry_status": "awaiting_reply",
+        }
+    )
     print(f"📎 inquiry_send: to={to_email} thread={thread_id}")
     print(f"KURASHIFT_RESULT:{json.dumps(result, ensure_ascii=False)}")
     return result

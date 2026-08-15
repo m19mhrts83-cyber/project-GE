@@ -54,3 +54,12 @@ create unique index if not exists kurashift_re_deal_messages_gmail_id_uidx
 
 create index if not exists kurashift_re_deal_messages_deal_at_idx
   on public.kurashift_re_deal_messages (deal_id, occurred_at desc);
+
+alter table public.kurashift_re_deal_messages enable row level security;
+
+drop policy if exists kurashift_re_deal_messages_auth_all on public.kurashift_re_deal_messages;
+create policy kurashift_re_deal_messages_auth_all
+  on public.kurashift_re_deal_messages
+  for all to authenticated
+  using (true)
+  with check (true);
