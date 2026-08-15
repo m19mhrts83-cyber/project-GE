@@ -17,6 +17,7 @@ export type MqFactRow = {
   entity: string;
   period_month: string;
   scenario_kind: string;
+  plan_variant_id?: string | null;
   q: number | string | null;
   pq: number | string;
   vq: number | string;
@@ -31,6 +32,8 @@ export type MqFactRow = {
 export type LineFilter = "realestate" | "ai" | "all";
 export type EntityFilter = "personal" | "corporate" | "combined";
 export type GrainFilter = "month" | "year";
+/** actual_actual | actual_plan | plan_plan */
+export type CompareMode = "aa" | "ap" | "pp";
 
 function n(v: number | string | null | undefined): number {
   if (v == null || v === "") return 0;
@@ -202,9 +205,99 @@ export function availableMonths(rows: MqFactRow[]): string[] {
 
 export function availableYears(rows: MqFactRow[]): string[] {
   const s = new Set(
-    rows.filter((r) => r.scenario_kind === "actual").map((r) => yearKey(r.period_month))
+    rows
+      .filter((r) => r.scenario_kind === "actual" || r.scenario_kind === "plan")
+      .map((r) => yearKey(r.period_month))
   );
   return Array.from(s).sort().reverse();
+}
+
+/** 年次計画行（period は当該年の1月） */
+export function filterPlans(
+  rows: MqFactRow[],
+  line: LineFilter,
+  entity: EntityFilter,
+  year: string,
+  variantId?: string | null
+): MqFactRow[] {
+  const y = year.slice(0, 4);
+  return rows.filter((r) => {
+    if (r.scenario_kind !== "plan") return false;
+    if (yearKey(r.period_month) !== y) return false;
+    if (line !== "all" && r.business_line !== line) return false;
+    if (entity !== "combined" && r.entity !== entity) return false;
+    if (variantId != null && variantId !== "" && (r.plan_variant_id || "") !== variantId) {
+      return false;
+    }
+    return true;
+  });
+}
+
+export function listPlanVariants(rows: MqFactRow[], year?: string): string[] {
+  const s = new Set<string>();
+  for (const r of rows) {
+    if (r.scenario_kind !== "plan") continue;
+    if (year && yearKey(r.period_month) !== year.slice(0, 4)) continue;
+    const id = (r.plan_variant_id || "").trim();
+    if (id) s.add(id);
+  }
+  return Array.from(s).sort();
+}
+
+/**
+ * 年次計画の集約。計画行の pq/vq/f は年額。f_annual があれば加算。
+ */
+export function aggregatePlanAnnual(rows: MqFactRow[]) {
+  if (rows.length === 0) {
+    return {
+      input: { pq: 0, vq: 0, f: 0, q: null } as MqInput,
+      computed: null as MqComputed | null,
+      cashIn: null as number | null,
+      cashOut: null as number | null,
+      cashEnd: null as number | null,
+      depreciation: null as number | null,
+      byLine: [] as { line: string; computed: MqComputed }[],
+      fMonthlyPart: 0,
+      fAnnualAllocated: 0,
+    };
+  }
+  let pq = 0;
+  let vq = 0;
+  let f = 0;
+  let qSum = 0;
+  let qAny = false;
+  for (const r of rows) {
+    pq += n(r.pq);
+    vq += n(r.vq);
+    f += n(r.f) + n(r.f_annual);
+    const q = nNull(r.q);
+    if (q != null && q > 0) {
+      qSum += q;
+      qAny = true;
+    }
+  }
+  const input: MqInput = { pq, vq, f, q: qAny ? qSum : null };
+  return {
+    input,
+    computed: computeMq(input),
+    cashIn: null,
+    cashOut: null,
+    cashEnd: null,
+    depreciation: null,
+    byLine: [],
+    fMonthlyPart: 0,
+    fAnnualAllocated: f,
+  };
+}
+
+/** 年次計画を月次比較用に÷12（空室チューニング用） */
+export function scaleAnnualComputedToMonth(c: MqComputed): MqComputed {
+  return computeMq({
+    pq: c.pq / 12,
+    vq: c.vq / 12,
+    f: c.f / 12,
+    q: c.q != null ? c.q / 12 : null,
+  });
 }
 
 export function lineLabel(line: string): string {
