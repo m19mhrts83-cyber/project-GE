@@ -106,7 +106,9 @@ export default function DealInquiryActions({
       if (!res.ok) {
         setMsg(data.error || "失敗");
       } else {
-        setMsg("送信ジョブをキューしました（Mac常駐が数秒〜数十秒で実行）");
+        setMsg(
+          "キュー投入済み（Mac 常駐が送信します。失敗時はホームに表示されます）"
+        );
         setOpen(false);
         setStep("edit");
         setChecked(false);

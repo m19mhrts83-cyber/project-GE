@@ -75,7 +75,19 @@
 - 蓄積先: `kurashift_re_deal_messages`（DDL: `20260815_kurashift_re_inquiry.sql`）。未適用時は `summary_json.messages` にフォールバック
 - 問い合わせ状態: 列 `inquiry_status` または `summary_json.inquiry_status`
 - 運営への自動送信はしない（パック作成まで）。Notion 購入判断メモ URL を metadata に保持
+- **キュー投入 ≠ Gmail 送信完了**。失敗・`sending` 滞留は精密ホームの固定バナーで気づく（ack 可）
 - 細かい仕様は第1号案件で詰める
+
+### 運営相談パック — 段階ロードマップ（実装は Phase ごとに）
+
+| Phase | 内容 | 状態 |
+|---|---|---|
+| **0** | `re_deal_ops_pack` → DB レコードのみ。運営へ自動送信なし | 現行 |
+| **1** | 精密内で問い合わせ済み／内見候補を一覧しパック生成 | 設計済み |
+| **2** | Sheets 等へ横並びエクスポート。見送り／相談を人が判断 | 別詰め |
+| **3** | 相談価値ありのみ WeStudy 問い合わせフォームへ（**送信前確認必須**） | 別詰め |
+
+失敗時の確認3点: `kurashift_jobs.status` / `inquiry_status` / `gmail_read_at`（ホームバナーと併用）。
 
 ## マッチ入力（買い進め Excel から）
 
@@ -135,3 +147,7 @@
 - [ ] 運営経緯が1件以上（キーワードヒットがある場合）
 - [ ] 自動問い合わせ送信が走っていない
 - [ ] 確認／対象外で Gmail 既読ジョブが succeeded になる
+- [ ] 第一問い合わせ失敗（未 ack）が精密ホームに固定バナーで出る
+- [ ] `sending` 10分超がホームに出る
+- [ ] ack 後にバナーから消え、新規 failed では再表示される
+- [ ] `token_livingsupport` 更新で `GMAIL_ADMIN_TOKEN_B64` が追従（値はログに出ない）

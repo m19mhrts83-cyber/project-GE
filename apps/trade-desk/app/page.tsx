@@ -1,5 +1,6 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
+import JobFailBanner from "@/components/JobFailBanner";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen, fmtYenSigned } from "@/lib/format";
 import { composeLifeplanBoard } from "@/lib/lifeplanBoard";
@@ -17,6 +18,11 @@ import {
   parseCardDebitWatch,
   parseWeeklySummary,
 } from "@/lib/nextAction";
+import {
+  pickSendingStuckDeals,
+  pickUnackedFailedInquiryJobs,
+  USER_VISIBLE_FAIL_JOB_TYPES,
+} from "@/lib/jobFailVisibility";
 import {
   corporateCycle,
   personalCycle,
@@ -78,6 +84,8 @@ export default async function HomePage() {
     { data: unitRows },
     { data: dealStatuses },
     { data: buyPlanCanon },
+    { data: inquiryFailJobs },
+    { data: sendingDeals },
   ] = await Promise.all([
     supabase
       .from("portfolio_accounts")
@@ -195,7 +203,51 @@ export default async function HomePage() {
       .select("id")
       .eq("is_canonical", true)
       .maybeSingle(),
+    supabase
+      .from("kurashift_jobs")
+      .select("id, job_type, status, error_text, created_at, payload, result")
+      .in("job_type", [...USER_VISIBLE_FAIL_JOB_TYPES])
+      .order("created_at", { ascending: false })
+      .limit(80),
+    supabase
+      .from("kurashift_re_deals")
+      .select("id, title, inquiry_status, updated_at, summary_json")
+      .eq("inquiry_status", "sending")
+      .limit(40),
   ]);
+
+  const dealIdsForBanner = new Set<string>();
+  for (const d of sendingDeals ?? []) dealIdsForBanner.add(d.id);
+  for (const j of inquiryFailJobs ?? []) {
+    const p =
+      j.payload && typeof j.payload === "object"
+        ? (j.payload as Record<string, unknown>)
+        : {};
+    const r =
+      j.result && typeof j.result === "object"
+        ? (j.result as Record<string, unknown>)
+        : {};
+    const did =
+      (typeof p.deal_id === "string" && p.deal_id) ||
+      (typeof r.deal_id === "string" && r.deal_id) ||
+      "";
+    if (did) dealIdsForBanner.add(did);
+  }
+  const dealTitleById = new Map<string, string>();
+  if (dealIdsForBanner.size > 0) {
+    const { data: titleRows } = await supabase
+      .from("kurashift_re_deals")
+      .select("id, title")
+      .in("id", [...dealIdsForBanner].slice(0, 80));
+    for (const r of titleRows ?? []) {
+      dealTitleById.set(r.id, r.title || r.id.slice(0, 8));
+    }
+  }
+  const failBannerItems = pickUnackedFailedInquiryJobs(
+    inquiryFailJobs ?? [],
+    dealTitleById
+  );
+  const sendingStuckItems = pickSendingStuckDeals(sendingDeals ?? []);
 
   const metaMap = new Map((syncMeta ?? []).map((r) => [r.key, r]));
   const weeklySummary = parseWeeklySummary(
@@ -369,6 +421,8 @@ export default async function HomePage() {
           </p>
         ) : null}
       </div>
+
+      <JobFailBanner failed={failBannerItems} sendingStuck={sendingStuckItems} />
 
       <div className="card" style={{ marginTop: 12 }}>
         <header>

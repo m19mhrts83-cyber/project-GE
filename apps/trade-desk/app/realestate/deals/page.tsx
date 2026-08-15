@@ -21,7 +21,14 @@ const STATUS_LABEL: Record<string, string> = {
 
 const FUNNEL = ["info", "viewing", "offer", "loan", "purchased"] as const;
 
-export default async function RealEstateDealsPage() {
+export default async function RealEstateDealsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ deal?: string }>;
+}) {
+  const sp = (await searchParams) || {};
+  const highlightDeal = (sp.deal || "").trim();
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -80,23 +87,48 @@ export default async function RealEstateDealsPage() {
         }),
     supabase
       .from("kurashift_jobs")
-      .select("id, status, error_text, payload, created_at")
+      .select("id, status, error_text, payload, result, created_at")
       .eq("job_type", "re_deal_inquiry_send")
       .order("created_at", { ascending: false })
       .limit(40),
   ]);
 
   const failedSendByDeal = new Map<string, string>();
+  const latestJobByDeal = new Map<
+    string,
+    {
+      id: string;
+      status: string;
+      error_text?: string | null;
+      payload?: unknown;
+      result?: unknown;
+      created_at?: string | null;
+    }
+  >();
   for (const j of recentSendJobs || []) {
     const p =
       j.payload && typeof j.payload === "object"
         ? (j.payload as Record<string, unknown>)
         : {};
-    const did = typeof p.deal_id === "string" ? p.deal_id : "";
-    if (!did || failedSendByDeal.has(did)) continue;
-    if (j.status === "failed") {
-      failedSendByDeal.set(did, j.error_text || "failed");
-    }
+    const r =
+      j.result && typeof j.result === "object"
+        ? (j.result as Record<string, unknown>)
+        : {};
+    const did =
+      (typeof p.deal_id === "string" && p.deal_id) ||
+      (typeof r.deal_id === "string" && r.deal_id) ||
+      "";
+    if (!did || latestJobByDeal.has(did)) continue;
+    latestJobByDeal.set(did, j);
+  }
+  for (const [did, j] of latestJobByDeal) {
+    if (j.status !== "failed") continue;
+    const r =
+      j.result && typeof j.result === "object"
+        ? (j.result as Record<string, unknown>)
+        : {};
+    if (typeof r.user_acked_at === "string" && r.user_acked_at) continue;
+    failedSendByDeal.set(did, j.error_text || "failed");
   }
 
   const messagesByDeal = new Map<
@@ -313,7 +345,18 @@ export default async function RealEstateDealsPage() {
                   messagesByDeal.get(d.id) || sj.messages || [];
                 const autoPassPending = Boolean(sj.auto_pass_pending_read);
                 return (
-                  <tr key={d.id}>
+                  <tr
+                    key={d.id}
+                    id={`deal-${d.id}`}
+                    style={
+                      highlightDeal && highlightDeal === d.id
+                        ? {
+                            outline: "2px solid var(--danger, #b45309)",
+                            outlineOffset: 2,
+                          }
+                        : undefined
+                    }
+                  >
                     <td>{STATUS_LABEL[d.status] || d.status}</td>
                     <td className="meta">
                       {d.match_score != null ? d.match_score : "—"}

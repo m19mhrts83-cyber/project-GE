@@ -30,6 +30,35 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def merge_result_preserving_ack(
+    sb: Any, job_id: str, new_result: dict[str, Any], payload: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """result を差し替えるとき user_acked_at を残し、deal_id を result にも載せる。"""
+    out = dict(new_result)
+    try:
+        prev = (
+            sb.table("kurashift_jobs")
+            .select("result")
+            .eq("id", job_id)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        old = (prev[0].get("result") if prev else None) or {}
+        if isinstance(old, dict) and old.get("user_acked_at"):
+            out["user_acked_at"] = old["user_acked_at"]
+            if old.get("user_acked_by"):
+                out["user_acked_by"] = old["user_acked_by"]
+    except Exception:  # noqa: BLE001
+        pass
+    if payload and isinstance(payload, dict):
+        did = payload.get("deal_id")
+        if did and "deal_id" not in out:
+            out["deal_id"] = did
+    return out
+
+
 def load_allowed() -> set[str]:
     data = yaml.safe_load(PLAYBOOK.read_text(encoding="utf-8")) or {}
     return set(data.get("allowed_jobs") or [])
@@ -297,6 +326,7 @@ def run_secrets_upsert(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
                     }
                 except json.JSONDecodeError:
                     pass
+        result = merge_result_preserving_ack(sb, job_id, result, None)
         sb.table("kurashift_jobs").update(
             {
                 "status": "succeeded" if ok else "failed",
@@ -429,6 +459,7 @@ def run_one(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
                     result["parsed"] = json.loads(line[len("KURASHIFT_RESULT:") :])
                 except json.JSONDecodeError:
                     pass
+        result = merge_result_preserving_ack(sb, job_id, result, payload)
         sb.table("kurashift_jobs").update(
             {
                 "status": "succeeded" if ok else "failed",
