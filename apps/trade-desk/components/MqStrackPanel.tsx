@@ -1,10 +1,10 @@
 import type { MqComputed } from "@/lib/mqEquations";
 import { formatRatio } from "@/lib/mqEquations";
-import { fmtYen } from "@/lib/format";
+import { fmtMqMan } from "@/lib/mqUnits";
 
 function yenOrDash(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
-  return fmtYen(Math.round(n));
+  return fmtMqMan(n);
 }
 
 export default function MqStrackPanel({

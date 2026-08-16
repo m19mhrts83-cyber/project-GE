@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { fmtYen } from "@/lib/format";
+import { fmtMqMan, yenToMan } from "@/lib/mqUnits";
 
 type Unmapped = {
   category: string;
@@ -126,7 +126,7 @@ export default function MqZaimIngestPanel({
                   <td>{u.category}</td>
                   <td>{u.subcategory || "—"}</td>
                   <td className="num">{u.count}</td>
-                  <td className="num">{fmtYen(Math.round(u.amount))}</td>
+                  <td className="num">{fmtMqMan(yenToMan(u.amount))}</td>
                 </tr>
               ))}
             </tbody>

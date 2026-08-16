@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { fmtYen } from "@/lib/format";
+import { fmtMqMan, yenToMan } from "@/lib/mqUnits";
 import {
   BS_FIELD_LABELS,
   isBsBalanced,
@@ -18,7 +18,7 @@ import { MQ_POLICY } from "@/lib/mqPolicy";
 
 function yenOrNeed(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "要確認";
-  return fmtYen(Math.round(n));
+  return fmtMqMan(n);
 }
 
 function fieldDefault(
@@ -186,7 +186,7 @@ export default function MqBsPanel({
               <tr key={k}>
                 <td>
                   {k === "cash"
-                    ? "現金・預金（家計含む・参考）"
+                    ? "現金・預金（家計含む・参考・万円）"
                     : BS_FIELD_LABELS[k]}
                   {k === "inventory" && !requireInventory ? (
                     <span className="meta">（賃貸は任意）</span>
@@ -268,10 +268,10 @@ export default function MqBsPanel({
               setOpen(true);
               setOverrides((o) => ({
                 ...o,
-                liabilities_lt: String(loanTrackerLt),
+                liabilities_lt: String(yenToMan(loanTrackerLt)),
               }));
               setMsg(
-                `長期他人資本にトラッカー残高 ${fmtYen(loanTrackerLt)} をセット（保存で確定）`
+                `長期他人資本にトラッカー残高 ${fmtMqMan(yenToMan(loanTrackerLt))} をセット（保存で確定）`
               );
             }}
           >
@@ -289,7 +289,7 @@ export default function MqBsPanel({
                 cash: String(priorYearCash),
               }));
               setMsg(
-                `前年繰越現金 ${fmtYen(priorYearCash)}${
+                `前年繰越現金 ${fmtMqMan(priorYearCash)}${
                   priorYearAsOf ? `（${priorYearAsOf}）` : ""
                 } をセット（保存で確定）`
               );
@@ -336,7 +336,7 @@ export default function MqBsPanel({
               (k) => (
                 <label key={k}>
                   {k === "cash"
-                    ? "現金・預金（家計含む）"
+                    ? "現金・預金（家計含む・万円）"
                     : BS_FIELD_LABELS[k]}
                   <input
                     name={k}

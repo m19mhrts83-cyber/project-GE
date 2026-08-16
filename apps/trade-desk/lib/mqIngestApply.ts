@@ -9,6 +9,7 @@ import {
   type MqAccountMapRow,
   type MonthBucket,
 } from "./mqZaimMap";
+import { yenToMan, yenToManOrNull } from "./mqUnits";
 
 export type ExistingFactLite = {
   id?: string;
@@ -91,6 +92,7 @@ export function planMqIngestUpserts(
 }
 
 export function buildImportFactRow(b: MonthBucket, year: number) {
+  // Zaim 集計は円 → DB は万円（四捨五入）
   return {
     business_line: b.business_line,
     entity: b.entity,
@@ -98,14 +100,14 @@ export function buildImportFactRow(b: MonthBucket, year: number) {
     scenario_kind: "actual" as const,
     plan_variant_id: "",
     q: null as number | null,
-    pq: Math.round(b.pq),
-    vq: Math.round(b.vq),
-    f: Math.round(b.f),
-    f_annual: Math.round(b.f_annual),
-    cash_in: Math.round(b.cash_in) || null,
-    cash_out: Math.round(b.cash_out) || null,
+    pq: yenToMan(b.pq),
+    vq: yenToMan(b.vq),
+    f: yenToMan(b.f),
+    f_annual: yenToMan(b.f_annual),
+    cash_in: yenToManOrNull(b.cash_in || null) || null,
+    cash_out: yenToManOrNull(b.cash_out || null) || null,
     cash_end: null as number | null,
-    note: `Zaim取込 ${year}（Qは未設定・手入力可）`,
+    note: `Zaim取込 ${year}（万円・Qは未設定・手入力可）`,
     source: "import" as const,
     updated_at: new Date().toISOString(),
   };

@@ -1,7 +1,9 @@
 /**
  * MQ会計（西研究所要素法）の企業方程式 — 単一ソース。
- * PQ = VQ + F + G / MQ = PQ - VQ / G = MQ - F / M = P - V
+ * 金額は万円。PQ = VQ + F + G / MQ = PQ - VQ / G = MQ - F / M = P - V
  */
+
+import { roundMan, roundManOrNull } from "./mqUnits";
 
 export type MqInput = {
   pq: number;
@@ -11,9 +13,9 @@ export type MqInput = {
   q: number | null;
 };
 
-/** 月次評価用: 月額F + 年額F÷12 */
+/** 月次評価用: 月額F + 年額F÷12（結果は四捨五入して万円） */
 export function monthlyAllocatedF(fMonthly: number, fAnnual: number): number {
-  return (Number(fMonthly) || 0) + (Number(fAnnual) || 0) / 12;
+  return roundMan((Number(fMonthly) || 0) + (Number(fAnnual) || 0) / 12);
 }
 
 /**
@@ -29,7 +31,7 @@ export function yearlyFFromMonthlyRows(
     sumF += Number(r.f) || 0;
     maxAnnual = Math.max(maxAnnual, Number(r.f_annual) || 0);
   }
-  return sumF + maxAnnual;
+  return roundMan(sumF + maxAnnual);
 }
 
 export type MqComputed = {
@@ -47,22 +49,22 @@ export type MqComputed = {
   equationOk: boolean;
 };
 
-const EPS = 0.01;
+const EPS = 0.5; // 万円整数後の検算余裕
 
 export function computeMq(input: MqInput): MqComputed {
-  const pq = Number(input.pq) || 0;
-  const vq = Number(input.vq) || 0;
-  const f = Number(input.f) || 0;
-  const mq = pq - vq;
-  const g = mq - f;
+  const pq = roundMan(input.pq);
+  const vq = roundMan(input.vq);
+  const f = roundMan(input.f);
+  const mq = roundMan(pq - vq);
+  const g = roundMan(mq - f);
   const qRaw = input.q;
   const q =
     qRaw != null && Number.isFinite(Number(qRaw)) && Number(qRaw) > 0
       ? Number(qRaw)
       : null;
-  const p = q != null ? pq / q : null;
-  const v = q != null ? vq / q : null;
-  const m = p != null && v != null ? p - v : null;
+  const p = q != null ? roundMan(pq / q) : null;
+  const v = q != null ? roundMan(vq / q) : null;
+  const m = p != null && v != null ? roundMan(p - v) : null;
   const mOverP = pq !== 0 ? mq / pq : null;
   const gOverPq = pq !== 0 ? g / pq : null;
   const equationOk = Math.abs(pq - (vq + f + g)) < EPS;
@@ -79,7 +81,6 @@ export function gainIgnoresPrincipalRepayment(
     ...base,
     f: base.f + principalRepayment,
   }).g;
-  // 元本を F に足すと G が減る → 禁止パターンを検知する用
   return Math.abs(g0 - g1) > EPS;
 }
 
@@ -98,10 +99,17 @@ export function sumMqInputs(rows: MqInput[]): MqInput {
       qAny = true;
     }
   }
-  return { pq, vq, f, q: qAny ? qSum : null };
+  return {
+    pq: roundMan(pq),
+    vq: roundMan(vq),
+    f: roundMan(f),
+    q: qAny ? qSum : null,
+  };
 }
 
 export function formatRatio(r: number | null): string {
   if (r == null || !Number.isFinite(r)) return "—";
   return `${(r * 100).toFixed(1)}%`;
 }
+
+export { roundManOrNull };

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { computeMq, formatRatio } from "@/lib/mqEquations";
-import { fmtYen } from "@/lib/format";
+import { fmtMqMan } from "@/lib/mqUnits";
 import { qFieldLabel } from "@/lib/mqPolicy";
 
 type Props = {
@@ -124,7 +124,7 @@ export default function MqFactsForm({
           />
         </label>
         <label>
-          PQ（売上）
+          PQ（売上・万円）
           <input
             name="pq"
             type="number"
@@ -135,7 +135,7 @@ export default function MqFactsForm({
           />
         </label>
         <label>
-          VQ（変動費）
+          VQ（変動費・万円）
           <input
             name="vq"
             type="number"
@@ -146,7 +146,7 @@ export default function MqFactsForm({
           />
         </label>
         <label>
-          F 月額固定（利息・定額管理など）
+          F 月額固定・万円（利息・定額管理など）
           <input
             name="f"
             type="number"
@@ -157,7 +157,7 @@ export default function MqFactsForm({
           />
         </label>
         <label>
-          F 年額（固都税・年払保険など → 月次では÷12）
+          F 年額・万円（固都税・年払保険など → 月次では÷12・四捨五入）
           <input
             name="f_annual"
             type="number"
@@ -169,19 +169,19 @@ export default function MqFactsForm({
       </div>
       <div className="tax-form-row">
         <label>
-          入金合計
+          入金合計・万円
           <input name="cash_in" type="number" step="1" />
         </label>
         <label>
-          出金合計（元本返済含む可）
+          出金合計・万円（元本返済含む可）
           <input name="cash_out" type="number" step="1" />
         </label>
         <label>
-          期末現金
+          期末現金・万円
           <input name="cash_end" type="number" step="1" />
         </label>
         <label>
-          うち減価（F内・参考）
+          うち減価・万円（F内・参考）
           <input name="depreciation_jpy" type="number" step="1" />
         </label>
       </div>
@@ -190,8 +190,8 @@ export default function MqFactsForm({
         <input name="note" type="text" style={{ width: "100%" }} />
       </label>
       <p className="meta" style={{ marginTop: 8 }}>
-        プレビュー: MQ {fmtYen(Math.round(preview.mq))} · G{" "}
-        {fmtYen(Math.round(preview.g))} · m/p {formatRatio(preview.mOverP)}
+        プレビュー: MQ {fmtMqMan(preview.mq)} · G{" "}
+        {fmtMqMan(preview.g)} · m/p {formatRatio(preview.mOverP)}
         {!preview.equationOk ? " · ⚠ 方程式不一致" : ""}
       </p>
       <p className="meta">

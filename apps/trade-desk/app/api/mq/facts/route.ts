@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { roundMan, roundManOrNull } from "@/lib/mqUnits";
 import { NextResponse } from "next/server";
 
 const LINES = new Set(["realestate", "ai"]);
@@ -12,9 +13,12 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function numOrZero(v: unknown): number {
-  const n = numOrNull(v);
-  return n ?? 0;
+function manOrZero(v: unknown): number {
+  return roundMan(numOrNull(v) ?? 0);
+}
+
+function manOrNull(v: unknown): number | null {
+  return roundManOrNull(numOrNull(v));
 }
 
 /** YYYY-MM or YYYY-MM-DD → 月初 date */
@@ -102,14 +106,14 @@ export async function POST(req: Request) {
     scenario_kind,
     plan_variant_id,
     q: numOrNull(body.q),
-    pq: numOrZero(body.pq),
-    vq: numOrZero(body.vq),
-    f: numOrZero(body.f),
-    f_annual: numOrZero(body.f_annual),
-    cash_in: numOrNull(body.cash_in),
-    cash_out: numOrNull(body.cash_out),
-    cash_end: numOrNull(body.cash_end),
-    depreciation_jpy: numOrNull(body.depreciation_jpy),
+    pq: manOrZero(body.pq),
+    vq: manOrZero(body.vq),
+    f: manOrZero(body.f),
+    f_annual: manOrZero(body.f_annual),
+    cash_in: manOrNull(body.cash_in),
+    cash_out: manOrNull(body.cash_out),
+    cash_end: manOrNull(body.cash_end),
+    depreciation_jpy: manOrNull(body.depreciation_jpy),
     note: body.note ? String(body.note).slice(0, 2000) : null,
     source,
     updated_at: new Date().toISOString(),
