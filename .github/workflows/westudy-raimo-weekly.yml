@@ -187,6 +187,9 @@ jobs:
             ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/logs/
             ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/delta_*.csv
             ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/lessons/lesson_delta_*.csv
+            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/raw/**/*.png
+            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/raw/**/*.html
+            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/raw/**/*.log
           if-no-files-found: warn
           retention-days: 14
 
