@@ -128,23 +128,73 @@ def create_driver(headless: bool = True) -> webdriver.Chrome:
 _HEADLESS = True
 
 
-def _safe_get(url: str, *, retries: int = 3) -> None:
+def _safe_get(url: str, *, retries: int = 3, require_selector: str | None = None) -> None:
     """page load / renderer timeout 時は部分ロード許容＋ドライバ再生成で再試行。"""
     global driver
     last_err: Exception | None = None
     for attempt in range(1, retries + 1):
         try:
             driver.get(url)
+            if require_selector:
+                try:
+                    has = bool(
+                        driver.execute_script(
+                            "return !!document.querySelector(arguments[0]);",
+                            require_selector,
+                        )
+                    )
+                except Exception:
+                    has = False
+                if not has:
+                    log(
+                        f"page loaded but missing {require_selector} "
+                        f"({attempt}/{retries}) url={url}"
+                    )
+                    if attempt >= retries:
+                        last_err = TimeoutException(
+                            f"required selector missing: {require_selector}"
+                        )
+                        break
+                    try:
+                        driver.quit()
+                    except Exception:
+                        pass
+                    driver = create_driver(headless=_HEADLESS)
+                    time.sleep(1.5)
+                    continue
             return
         except TimeoutException as e:
             last_err = e
             ready = ""
+            body_len = 0
+            has_required = True
             try:
                 ready = str(driver.execute_script("return document.readyState") or "")
+                body_len = int(
+                    driver.execute_script(
+                        "const b=document.body; if(!b) return 0;"
+                        "return ((b.innerText||b.textContent||'').replace(/\\s+/g,' ').trim()).length;"
+                    )
+                    or 0
+                )
+                if require_selector:
+                    has_required = bool(
+                        driver.execute_script(
+                            "return !!document.querySelector(arguments[0]);",
+                            require_selector,
+                        )
+                    )
             except Exception:
                 ready = ""
-            log(f"page load timeout ({attempt}/{retries}) readyState={ready or 'n/a'} url={url}")
-            if ready in ("interactive", "complete"):
+            log(
+                f"page load timeout ({attempt}/{retries}) "
+                f"readyState={ready or 'n/a'} body_len={body_len} url={url}"
+            )
+            if (
+                ready in ("interactive", "complete")
+                and body_len >= 80
+                and has_required
+            ):
                 try:
                     driver.execute_script("window.stop();")
                 except Exception:
@@ -177,36 +227,75 @@ def login_westudy() -> None:
     global driver
     user = get_env_or_raise("WESTUDY_USER")
     pw = get_env_or_raise("WESTUDY_PASS")
-    login_url = (os.environ.get("WESTUDY_LOGIN_URL") or "").strip() or _DEFAULT_LOGIN_URL
+    primary = (os.environ.get("WESTUDY_LOGIN_URL") or "").strip() or _DEFAULT_LOGIN_URL
+    candidates: list[str] = []
+    for u in (primary, _DEFAULT_LOGIN_URL, "https://westudy.co.jp/wp-login.php"):
+        if u and u not in candidates:
+            candidates.append(u)
 
-    log(f"ログイン: {login_url}")
-    _safe_get(login_url)
+    last_err: Exception | None = None
+    for attempt, login_url in enumerate(candidates, start=1):
+        log(f"ログイン ({attempt}/{len(candidates)}): {login_url}")
+        try:
+            _safe_get(login_url, retries=3, require_selector="#user_login")
+        except Exception as e:
+            last_err = e
+            log(f"ログインページ取得失敗: {e}")
+            try:
+                driver.quit()
+            except Exception:
+                pass
+            driver = create_driver(headless=_HEADLESS)
+            continue
 
-    try:
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.ID, "user_login"))
-        )
-    except TimeoutException:
-        log("ログインフォーム未検出（既存セッションの可能性）。続行します。")
+        try:
+            WebDriverWait(driver, 25).until(
+                EC.presence_of_element_located((By.ID, "user_login"))
+            )
+        except TimeoutException:
+            # WordPress クッキーがあれば既存セッションとみなす
+            try:
+                wp = [
+                    c.get("name")
+                    for c in driver.get_cookies()
+                    if "wordpress" in (c.get("name") or "").lower()
+                ]
+            except Exception:
+                wp = []
+            if wp:
+                log(f"ログインフォーム未検出だが WP cookie あり → 続行 cookie={wp}")
+                return
+            log("ログインフォーム未検出。Chrome 再生成して再試行します。")
+            last_err = TimeoutException("login form not found")
+            try:
+                driver.quit()
+            except Exception:
+                pass
+            driver = create_driver(headless=_HEADLESS)
+            continue
+
+        el_user = driver.find_element(By.ID, "user_login")
+        el_user.clear()
+        el_user.send_keys(user)
+        driver.find_element(By.ID, "user_pass").clear()
+        driver.find_element(By.ID, "user_pass").send_keys(pw)
+
+        try:
+            remember = driver.find_element(By.ID, "rememberme")
+            if remember.is_displayed() and not remember.is_selected():
+                remember.click()
+        except NoSuchElementException:
+            pass
+
+        driver.find_element(By.ID, "wp-submit").click()
+        time.sleep(3)
+        log("ログイン完了")
         return
 
-    el_user = driver.find_element(By.ID, "user_login")
-    el_user.clear()
-    el_user.send_keys(user)
-    driver.find_element(By.ID, "user_pass").clear()
-    driver.find_element(By.ID, "user_pass").send_keys(pw)
-
-    try:
-        remember = driver.find_element(By.ID, "rememberme")
-        if remember.is_displayed() and not remember.is_selected():
-            remember.click()
-    except NoSuchElementException:
-        pass
-
-    driver.find_element(By.ID, "wp-submit").click()
-    time.sleep(3)
-    log("ログイン完了")
-
+    raise RuntimeError(
+        "WeStudy ログインフォームを取得できませんでした"
+        f"（lesson scraper）。 last_error={last_err}"
+    )
 
 def safe_js(script: str, default=None):
     """JS実行（例外時は default を返す）"""

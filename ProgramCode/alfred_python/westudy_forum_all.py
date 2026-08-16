@@ -120,6 +120,7 @@ def wait_for_forum_ready(reason: str = "") -> None:
     deadline = time.time() + float(PAGELOAD_TIMEOUT)
     note = f" ({reason})" if reason else ""
     last_log = 0.0
+    guest_hits = 0
     while time.time() < deadline:
         now = time.time()
         try:
@@ -137,12 +138,34 @@ def wait_for_forum_ready(reason: str = "") -> None:
                 )
                 or 0
             )
+            # 未ログイン時のコースページは「ログイン」導線だけで forum リンクが 0
+            guest_login = bool(
+                driver.execute_script(
+                    r"""
+                    const a = document.querySelector('a#login, .header-menu-login a[href*="login"]');
+                    const form = document.querySelector('#user_login, form#loginform');
+                    return !!(a || form);
+                    """
+                )
+            )
         except Exception:
-            cur, is404, n = "", False, 0
+            cur, is404, n, guest_login = "", False, 0, False
         if n >= 1:
             return
+        if guest_login and n == 0:
+            guest_hits += 1
+            # 数秒連続でゲスト UI なら、120秒待つ前に失敗（誤った「既存セッション」切り分け用）
+            if guest_hits >= 5:
+                raise TimeoutException(
+                    f"フォーラム未到達{note}: 未ログイン画面のまま "
+                    f"URL={cur}"
+                )
+        else:
+            guest_hits = 0
         if now - last_log >= 30:
             extra = " error404" if (is404 and "forum" in cur.lower()) else ""
+            if guest_login:
+                extra += " guest_login"
             log(f"… フォーラム到達待機{note} n={n}{extra} URL={cur[:120]}")
             last_log = now
         time.sleep(1.0)
@@ -212,6 +235,11 @@ IMPLICIT_WAIT = 0
 # CI で稀に出る renderer timeout（Timed out receiving message from renderer）対策
 LOGIN_NAV_RETRIES = 3
 PAGE_GET_RETRIES = 2
+# ログインフォーム未検出時の Chrome 再生成＋代替 URL 試行回数
+LOGIN_FORM_ATTEMPTS = 3
+_WP_LOGIN_FALLBACK_URL = "https://westudy.co.jp/wp-login.php"
+# safe_get 後に「空ページ」とみなす本文長の下限（タグ除去後）
+_MIN_USEFUL_BODY_CHARS = 80
 
 # 共有オブジェクト
 driver = None
@@ -374,56 +402,182 @@ def _document_ready_state() -> str:
         return ""
 
 
+def _page_body_text_len() -> int:
+    """タグ除去後の本文長。空 DOM / about:blank 検知用。"""
+    try:
+        return int(
+            driver.execute_script(
+                """
+                const b = document.body;
+                if (!b) return 0;
+                const t = (b.innerText || b.textContent || '').replace(/\\s+/g, ' ').trim();
+                return t.length;
+                """
+            )
+            or 0
+        )
+    except Exception:
+        return 0
+
+
+def _page_has_selector(css: str) -> bool:
+    try:
+        return bool(
+            driver.execute_script(
+                "return !!document.querySelector(arguments[0]);",
+                css,
+            )
+        )
+    except Exception:
+        return False
+
+
+def _wp_cookie_names() -> list[str]:
+    try:
+        cnames = sorted({(c.get("name") or "") for c in driver.get_cookies()})
+    except Exception:
+        return []
+    return [n for n in cnames if "wordpress" in n.lower()]
+
+
+def _dump_page_debug(tag: str) -> None:
+    """ログイン失敗切り分け用に URL / title / 本文長 / スクショを残す。"""
+    try:
+        cur = driver.current_url or ""
+    except Exception:
+        cur = ""
+    try:
+        title = driver.title or ""
+    except Exception:
+        title = ""
+    body_len = _page_body_text_len()
+    log(f"🔎 debug[{tag}] url={cur[:160]} title={title[:80]!r} body_len={body_len}")
+    if not OUTPUT_ROOT:
+        return
+    try:
+        shot = OUTPUT_ROOT / f"{tag}.png"
+        driver.save_screenshot(str(shot))
+        log(f"📸 スクリーンショット: {shot}")
+    except Exception as e:
+        log(f"⚠️ スクリーンショット保存失敗: {e}")
+    try:
+        html_path = OUTPUT_ROOT / f"{tag}.html"
+        src = driver.page_source or ""
+        html_path.write_text(src[:200_000], encoding="utf-8", errors="replace")
+        log(f"📄 HTML dump: {html_path} ({min(len(src), 200_000)} bytes)")
+    except Exception as e:
+        log(f"⚠️ HTML dump 失敗: {e}")
+
+
 def safe_get(
     url: str,
     *,
     retries: int = PAGE_GET_RETRIES,
     recreate_on_renderer_timeout: bool = True,
+    require_selector: str | None = None,
+    page_load_timeout: float | None = None,
 ) -> None:
-    """driver.get のラッパ。page load / renderer timeout 時は部分ロードを許容し再試行する。"""
+    """driver.get のラッパ。page load / renderer timeout 時は部分ロードを許容し再試行する。
+
+    require_selector がある場合、timeout 後に readyState が完了していても
+    セレクタが無ければ空ページ扱いして再試行する（ログインフォーム欠落対策）。
+    """
     global driver, wait
     last_err: Exception | None = None
     attempts = max(1, int(retries) + 1)
-    for attempt in range(1, attempts + 1):
+    prev_timeout: float | None = None
+    if page_load_timeout is not None:
         try:
-            driver.get(url)
-            return
-        except TimeoutException as e:
-            last_err = e
-            ready = _document_ready_state()
-            msg = str(e)
-            log(
-                f"⚠️ page load timeout ({attempt}/{attempts}) "
-                f"readyState={ready or 'n/a'} url={url}"
-            )
-            # DOM が既に interactive/complete なら続行（eager でも稀に timeout 報告が出る）
-            if ready in ("interactive", "complete"):
+            # selenium は get 前の set_page_load_timeout を参照する
+            prev_timeout = float(PAGELOAD_TIMEOUT)
+            driver.set_page_load_timeout(float(page_load_timeout))
+        except Exception:
+            prev_timeout = None
+    try:
+        for attempt in range(1, attempts + 1):
+            try:
+                driver.get(url)
+                # 成功しても空ページなら再試行（ヘッドレスで稀に起こる）
+                if require_selector and not _page_has_selector(require_selector):
+                    body_len = _page_body_text_len()
+                    log(
+                        f"⚠️ page loaded but missing {require_selector} "
+                        f"({attempt}/{attempts}) body_len={body_len} url={url}"
+                    )
+                    if attempt >= attempts:
+                        last_err = TimeoutException(
+                            f"required selector missing: {require_selector}"
+                        )
+                        break
+                    recreate_driver()
+                    if page_load_timeout is not None:
+                        try:
+                            driver.set_page_load_timeout(float(page_load_timeout))
+                        except Exception:
+                            pass
+                    time.sleep(1.5 + attempt * 0.5)
+                    continue
+                return
+            except TimeoutException as e:
+                last_err = e
+                ready = _document_ready_state()
+                body_len = _page_body_text_len()
+                msg = str(e)
+                log(
+                    f"⚠️ page load timeout ({attempt}/{attempts}) "
+                    f"readyState={ready or 'n/a'} body_len={body_len} url={url}"
+                )
+                # DOM が既に interactive/complete なら続行（eager でも稀に timeout 報告が出る）
+                # ただし空ページや必須セレクタ欠落は続行しない
+                useful = body_len >= _MIN_USEFUL_BODY_CHARS
+                has_required = (not require_selector) or _page_has_selector(require_selector)
+                if ready in ("interactive", "complete") and useful and has_required:
+                    try:
+                        driver.execute_script("window.stop();")
+                    except Exception:
+                        pass
+                    return
+                if attempt >= attempts:
+                    break
                 try:
                     driver.execute_script("window.stop();")
                 except Exception:
                     pass
-                return
-            if attempt >= attempts:
-                break
+                # renderer 切断系 / 空ページはセッションが壊れていることが多いので作り直す
+                should_recreate = recreate_on_renderer_timeout and (
+                    "renderer" in msg.lower()
+                    or "timed out receiving message" in msg.lower()
+                    or not useful
+                    or not has_required
+                )
+                if should_recreate:
+                    log("🔁 ページ不備/timeout のため Chrome を再生成して再試行します")
+                    recreate_driver()
+                    if page_load_timeout is not None:
+                        try:
+                            driver.set_page_load_timeout(float(page_load_timeout))
+                        except Exception:
+                            pass
+                time.sleep(1.5 + attempt * 0.5)
+            except (InvalidSessionIdException, WebDriverException) as e:
+                last_err = e
+                log(f"⚠️ navigation error ({attempt}/{attempts}): {e.__class__.__name__}: {e}")
+                if attempt >= attempts:
+                    break
+                if recreate_on_renderer_timeout:
+                    recreate_driver()
+                    if page_load_timeout is not None:
+                        try:
+                            driver.set_page_load_timeout(float(page_load_timeout))
+                        except Exception:
+                            pass
+                time.sleep(1.5)
+    finally:
+        if prev_timeout is not None:
             try:
-                driver.execute_script("window.stop();")
+                driver.set_page_load_timeout(prev_timeout)
             except Exception:
                 pass
-            # renderer 切断系はセッションが壊れていることが多いので作り直す
-            if recreate_on_renderer_timeout and (
-                "renderer" in msg.lower() or "timed out receiving message" in msg.lower()
-            ):
-                log("🔁 renderer timeout のため Chrome を再生成して再試行します")
-                recreate_driver()
-            time.sleep(1.5 + attempt * 0.5)
-        except (InvalidSessionIdException, WebDriverException) as e:
-            last_err = e
-            log(f"⚠️ navigation error ({attempt}/{attempts}): {e.__class__.__name__}: {e}")
-            if attempt >= attempts:
-                break
-            if recreate_on_renderer_timeout:
-                recreate_driver()
-            time.sleep(1.5)
     if last_err is not None:
         raise last_err
 
@@ -453,23 +607,34 @@ def _westudy_login_url() -> str:
     return _DEFAULT_MEMBER_LOGIN_URL
 
 
-def login_wordpress():
-    user = get_env_or_raise("WESTUDY_USER")
-    pw = get_env_or_raise("WESTUDY_PASS")
-    login_url = _westudy_login_url()
-    log(f"🔐 ログインURL: {login_url}")
-
-    safe_get(login_url, retries=LOGIN_NAV_RETRIES)
-
+def _wait_login_form(timeout: float = 25.0) -> bool:
     try:
-        WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "user_login")))
+        WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.ID, "user_login"))
+        )
+        return True
     except TimeoutException:
-        log("ℹ️ ログインフォームが見つかりません（既にログイン済みの可能性）。フォーラムで確認します。")
+        return False
+
+
+def _try_existing_session_forum() -> bool:
+    """WordPress クッキーがありフォーラムに到達できれば True。"""
+    cookies = _wp_cookie_names()
+    if not cookies:
+        log("ℹ️ 既存セッション候補だが WordPress クッキーなし → 再ログインが必要")
+        return False
+    log(f"ℹ️ 既存セッション候補 cookie={cookies} → フォーラムを確認")
+    try:
         safe_get(forum_base_url(), retries=LOGIN_NAV_RETRIES)
         wait_for_forum_ready("既存セッション")
         log("✅ ログイン完了（既存セッション）")
-        return
+        return True
+    except Exception as e:
+        log(f"⚠️ 既存セッションではフォーラム未到達: {e}")
+        return False
 
+
+def _submit_wordpress_login(user: str, pw: str) -> None:
     el_user = driver.find_element(By.ID, "user_login")
     el_user.clear()
     el_user.send_keys(user)
@@ -484,16 +649,28 @@ def login_wordpress():
     driver.find_element(By.ID, "wp-submit").click()
 
     def _login_page_resolved(drv: webdriver.Chrome) -> bool:
-        """wp-login から遷移した、または画面上にログインエラーが出たら True（待機終了）。"""
+        """ログインフォームから離れた／エラー表示が出たら待機終了。"""
         u = (drv.current_url or "").lower()
-        if u and "wp-login.php" not in u:
-            return True
         try:
             for e in drv.find_elements(By.CSS_SELECTOR, "#login_error, #login_error_msg"):
                 if e.is_displayed() and (e.text or "").strip():
                     return True
         except Exception:
             pass
+        # まだログイン画面上にフォームがある → 続行待機
+        try:
+            on_login_url = (
+                "wp-login.php" in u
+                or u.rstrip("/").endswith("/login")
+                or "/login?" in u
+            )
+            if on_login_url and drv.find_elements(By.ID, "user_login"):
+                return False
+        except Exception:
+            pass
+        # ログイン URL から離脱
+        if u and "wp-login.php" not in u and "/login" not in u:
+            return True
         return False
 
     try:
@@ -501,12 +678,7 @@ def login_wordpress():
     except TimeoutException:
         cur = driver.current_url or ""
         log(f"💥 ログイン応答タイムアウト URL={cur}")
-        if OUTPUT_ROOT:
-            try:
-                driver.save_screenshot(str(OUTPUT_ROOT / "login_failed.png"))
-                log(f"📸 スクリーンショット: {OUTPUT_ROOT / 'login_failed.png'}")
-            except Exception as e:
-                log(f"⚠️ スクリーンショット保存失敗: {e}")
+        _dump_page_debug("login_failed")
         raise RuntimeError(
             "WeStudy ログインがタイムアウトしました（ID/パスワード・ネットワークを確認）。"
             f" URL={cur}"
@@ -515,7 +687,12 @@ def login_wordpress():
     time.sleep(1.0)
     cur = driver.current_url or ""
     log(f"🔁 ログインPOST後のURL: {cur}")
-    if "wp-login.php" in cur.lower():
+    still_login = (
+        "wp-login.php" in cur.lower()
+        or cur.rstrip("/").endswith("/login")
+        or "/login?" in cur.lower()
+    )
+    if still_login and _page_has_selector("#user_login"):
         try:
             for sel in ("#login_error", "#login_error_msg"):
                 for e in driver.find_elements(By.CSS_SELECTOR, sel):
@@ -524,27 +701,17 @@ def login_wordpress():
                         break
         except Exception:
             pass
-        if OUTPUT_ROOT:
-            try:
-                driver.save_screenshot(str(OUTPUT_ROOT / "login_still_wplogin.png"))
-                log(f"📸 スクリーンショット: {OUTPUT_ROOT / 'login_still_wplogin.png'}")
-            except Exception:
-                pass
+        _dump_page_debug("login_still_wplogin")
         raise RuntimeError(
             "ログインに失敗しています（パスワード誤り・会員停止・追加認証など）。"
             " 画面上のメッセージを確認してください。"
             f" URL={cur}"
         )
 
-    cnames = sorted({(c.get("name") or "") for c in driver.get_cookies()})
-    wp_cookies = [n for n in cnames if "wordpress" in n.lower()]
+    wp_cookies = _wp_cookie_names()
     log(f"🍪 WordPress系クッキー: {wp_cookies if wp_cookies else '（なし）'}")
     if not wp_cookies:
-        if OUTPUT_ROOT:
-            try:
-                driver.save_screenshot(str(OUTPUT_ROOT / "login_no_wp_cookie.png"))
-            except Exception:
-                pass
+        _dump_page_debug("login_no_wp_cookie")
         raise RuntimeError(
             "ログイン後に WordPress クッキーが付きませんでした（認証できていない可能性）。"
             " --show または HEADLESS=0 で手元確認してください。"
@@ -557,6 +724,57 @@ def login_wordpress():
     wait_for_forum_ready("ログイン直後")
     log("✅ ログイン完了")
 
+
+def login_wordpress():
+    user = get_env_or_raise("WESTUDY_USER")
+    pw = get_env_or_raise("WESTUDY_PASS")
+    primary_url = _westudy_login_url()
+    # 1) 指定 URL → 2) 会員 /login → 3) wp-login.php の順でフォームを探す
+    candidate_urls: list[str] = []
+    for u in (primary_url, _DEFAULT_MEMBER_LOGIN_URL, _WP_LOGIN_FALLBACK_URL):
+        if u and u not in candidate_urls:
+            candidate_urls.append(u)
+
+    last_err: Exception | None = None
+    for attempt in range(1, LOGIN_FORM_ATTEMPTS + 1):
+        login_url = candidate_urls[(attempt - 1) % len(candidate_urls)]
+        log(f"🔐 ログインURL ({attempt}/{LOGIN_FORM_ATTEMPTS}): {login_url}")
+        try:
+            safe_get(
+                login_url,
+                retries=LOGIN_NAV_RETRIES,
+                require_selector="#user_login",
+                page_load_timeout=45,
+            )
+        except Exception as e:
+            last_err = e
+            log(f"⚠️ ログインページ取得失敗: {e}")
+            _dump_page_debug(f"login_nav_fail_{attempt}")
+            recreate_driver()
+            continue
+
+        if _wait_login_form(timeout=25.0):
+            _submit_wordpress_login(user, pw)
+            return
+
+        # フォームなし → 既存セッションか、空ページかを切り分け
+        _dump_page_debug(f"login_form_missing_{attempt}")
+        if _try_existing_session_forum():
+            return
+
+        log(
+            "ℹ️ ログインフォーム未検出かつ未ログイン。"
+            " Chrome を再生成して別 URL / 再試行します。"
+        )
+        last_err = TimeoutException("login form not found")
+        recreate_driver()
+        time.sleep(1.5 + attempt * 0.5)
+
+    raise RuntimeError(
+        "WeStudy ログインフォームを取得できませんでした"
+        "（ページロード停滞・空 DOM・ネットワーク）。"
+        f" last_error={last_err}"
+    )
 
 # -------------------------
 # 安全な JS 実行
