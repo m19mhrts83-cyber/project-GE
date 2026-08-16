@@ -10,7 +10,9 @@
 export const MQ_POLICY = {
   cashIncludesHousehold: true,
   cashNote:
-    "現金は家計含む参考値。事業の増減は期次締め→繰越で積む（年別クローズ基本）。",
+    "現金は家計含む参考値（万円・四捨五入）。事業の増減は期次締め→繰越で積む（年別クローズ基本）。",
+  amountUnit: "万円" as const,
+  amountUnitNote: "MQ・B/S・現金橋は万円。Zaim円からの換算は四捨五入。",
   bsLoanSource: "loan_tracker" as const,
   bsManualOk: true,
   aiQUnit: "案件数" as const,

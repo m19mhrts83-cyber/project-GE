@@ -1,4 +1,4 @@
-import { fmtYen } from "@/lib/format";
+import { fmtMqMan } from "@/lib/mqUnits";
 
 type BarRow = { label: string; value: number };
 
@@ -39,7 +39,7 @@ export default function MqCompareBars({
                   }}
                 />
               </div>
-              <div className="num mq-bar-val">{fmtYen(Math.round(r.value))}</div>
+              <div className="num mq-bar-val">{fmtMqMan(r.value)}</div>
             </div>
           ))
         )}
@@ -76,7 +76,7 @@ export default function MqCompareBars({
               {deltaRows.map((r) => (
                 <tr key={r.label}>
                   <td>{r.label}</td>
-                  <td className="num">{fmtYen(Math.round(r.value))}</td>
+                  <td className="num">{fmtMqMan(r.value)}</td>
                 </tr>
               ))}
             </tbody>

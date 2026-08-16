@@ -5,7 +5,7 @@ import MqFactsForm from "@/components/MqFactsForm";
 import MqPlanForm from "@/components/MqPlanForm";
 import MqZaimIngestPanel from "@/components/MqZaimIngestPanel";
 import MqStrackPanel from "@/components/MqStrackPanel";
-import { fmtYen } from "@/lib/format";
+import { fmtMqMan } from "@/lib/mqUnits";
 import {
   aggregatePlanAnnual,
   aggregateRows,
@@ -166,7 +166,7 @@ export default async function MqPage({
       emptyHint: "この条件の実績がありません。下の月次フォームで保存してください。",
       fNote:
         grain === "month" && a.computed
-          ? `F内訳: 月額 ${fmtYen(Math.round(a.fMonthlyPart))} + 年額÷12 ${fmtYen(Math.round(a.fAnnualAllocated))}`
+          ? `F内訳: 月額 ${fmtMqMan(a.fMonthlyPart)} + 年額÷12 ${fmtMqMan(a.fAnnualAllocated)}`
           : undefined,
     };
     right = {
@@ -329,7 +329,7 @@ export default async function MqPage({
       <p className="page-kicker">③ 事業 · MQ</p>
       <h1>MQ会計評価</h1>
       <p className="sub">
-        実績は月次でチューニング、計画は年次で立てる。年額Fは月次で÷12。計画との差も同じMQ表で見る。
+        実績は月次でチューニング、計画は年次で立てる。金額は万円（四捨五入）。年額Fは月次で÷12。
         AIのQは案件数。現金は家計含む参考・年別クローズで繰越。
       </p>
 
@@ -551,9 +551,9 @@ export default async function MqPage({
               {byLine.map((b) => (
                 <tr key={b.line}>
                   <td>{lineLabel(b.line)}</td>
-                  <td className="num">{fmtYen(Math.round(b.computed.mq))}</td>
-                  <td className="num">{fmtYen(Math.round(b.computed.f))}</td>
-                  <td className="num">{fmtYen(Math.round(b.computed.g))}</td>
+                  <td className="num">{fmtMqMan(b.computed.mq)}</td>
+                  <td className="num">{fmtMqMan(b.computed.f)}</td>
+                  <td className="num">{fmtMqMan(b.computed.g)}</td>
                 </tr>
               ))}
             </tbody>

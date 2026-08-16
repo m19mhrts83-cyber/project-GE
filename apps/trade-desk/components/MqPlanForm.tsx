@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { computeMq, formatRatio } from "@/lib/mqEquations";
-import { fmtYen } from "@/lib/format";
+import { fmtMqMan } from "@/lib/mqUnits";
 import { qFieldLabel } from "@/lib/mqPolicy";
 
 type Props = {
@@ -155,7 +155,7 @@ export default function MqPlanForm({
           />
         </label>
         <label>
-          PQ 年額
+          PQ 年額・万円
           <input
             name="pq"
             type="number"
@@ -166,7 +166,7 @@ export default function MqPlanForm({
           />
         </label>
         <label>
-          VQ 年額
+          VQ 年額・万円
           <input
             name="vq"
             type="number"
@@ -177,7 +177,7 @@ export default function MqPlanForm({
           />
         </label>
         <label>
-          F 年額（利息・固都税など全部）
+          F 年額・万円（利息・固都税など全部）
           <input
             name="f"
             type="number"
@@ -193,12 +193,12 @@ export default function MqPlanForm({
         <input name="note" type="text" style={{ width: "100%" }} />
       </label>
       <p className="meta" style={{ marginTop: 8 }}>
-        年次プレビュー: MQ {fmtYen(Math.round(preview.mq))} · G{" "}
-        {fmtYen(Math.round(preview.g))} · m/p {formatRatio(preview.mOverP)}
+        年次プレビュー: MQ {fmtMqMan(preview.mq)} · G{" "}
+        {fmtMqMan(preview.g)} · m/p {formatRatio(preview.mOverP)}
       </p>
       <p className="meta">
-        月次換算（÷12）: MQ {fmtYen(Math.round(monthly.mq))} · G{" "}
-        {fmtYen(Math.round(monthly.g))}（実績月次と比較用）
+        月次換算（÷12・四捨五入）: MQ {fmtMqMan(monthly.mq)} · G{" "}
+        {fmtMqMan(monthly.g)}（実績月次と比較用）
       </p>
       <button className="btn primary" type="submit" disabled={busy}>
         {busy ? "保存中…" : "年次計画を保存"}

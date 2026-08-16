@@ -40,21 +40,24 @@ export const BS_LIAB_EQ_KEYS = [
 ] as const;
 
 export const BS_FIELD_LABELS: Record<keyof MqBsFields, string> = {
-  cash: "現金・預金",
-  receivables: "売掛・未収",
-  inventory: "棚卸資産",
-  fixed_assets: "固定資産",
-  liabilities_st: "短期他人資本",
-  liabilities_lt: "長期他人資本",
-  capital: "資本金等",
-  retained_earnings: "繰越利益",
-  current_profit: "当期利益",
+  cash: "現金・預金（万円）",
+  receivables: "売掛・未収（万円）",
+  inventory: "棚卸資産（万円）",
+  fixed_assets: "固定資産（万円）",
+  liabilities_st: "短期他人資本（万円）",
+  liabilities_lt: "長期他人資本（万円）",
+  capital: "資本金等（万円）",
+  retained_earnings: "繰越利益（万円）",
+  current_profit: "当期利益（万円）",
 };
+
+import { roundManOrNull } from "./mqUnits";
 
 function nNull(v: number | string | null | undefined): number | null {
   if (v == null || v === "") return null;
   const x = Number(v);
-  return Number.isFinite(x) ? x : null;
+  if (!Number.isFinite(x)) return null;
+  return roundManOrNull(x);
 }
 
 /** 合計用: null は 0 として足すが、complete 判定とは別 */
