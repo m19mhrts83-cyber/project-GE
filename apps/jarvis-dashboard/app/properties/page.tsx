@@ -14,6 +14,7 @@ import {
 import { fetchPropertyKeyNumbers } from "@/lib/notionPropertyKeys";
 import {
   fmtKeyNumber,
+  fmtPostalCode,
   getPropertyInfo,
   managersForProperty,
   resolveRoomManager,
@@ -157,7 +158,12 @@ export default async function Page() {
                 </div>
               </div>
               {address ? (
-                <p className="prop-block-address">{address}</p>
+                <p className="prop-block-address">
+                  {info?.postal_code
+                    ? `${fmtPostalCode(info.postal_code)} `
+                    : ""}
+                  {address}
+                </p>
               ) : null}
               {useMap ? (
                 <UnitFloorMap
