@@ -5,11 +5,13 @@ import { fmtYen } from "@/lib/format";
 import { buildBRate4Rows, fmtPct } from "@/lib/bRate4";
 import {
   RE_PROPERTY_MASTER,
+  applyLiveKeyNumbers,
   fmtKeyNumber,
   formatMasterLocation,
   getRePropertyMaster,
   loansForProperty,
 } from "@/lib/rePropertyMaster";
+import { fetchPropertyKeyNumbers } from "@/lib/notionPropertyKeys";
 import { dscrLabel, fmtDscr, simpleDscr } from "@/lib/reDscr";
 import {
   ROI_ASSETS,
@@ -68,6 +70,12 @@ export default async function RealEstatePropertiesPage() {
     .limit(80);
 
   const loanRows = (loans || []) as LoanRow[];
+  const propertyKeys = await fetchPropertyKeyNumbers();
+  const masterRows = applyLiveKeyNumbers(
+    RE_PROPERTY_MASTER,
+    propertyKeys.keys
+  );
+  const masterById = new Map(masterRows.map((p) => [p.id, p]));
   const bRate4 = buildBRate4Rows(loanRows);
   const loanPayMonth = loanRows.reduce((s, l) => {
     const v = l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
@@ -130,6 +138,9 @@ export default async function RealEstatePropertiesPage() {
           管理・住所・郵便番号: <code>config/property_info.yaml</code>
           {" · "}
           鍵番号: Notion「所有物件関係」（DB_物件情報）
+          {propertyKeys.source === "notion"
+            ? " · API 取得"
+            : ` · YAML キャッシュ${propertyKeys.reason ? `（${propertyKeys.reason}）` : ""}`}
         </p>
         <p className="meta" style={{ marginTop: 8 }}>
           レントロール合計と月返済を並べ、家賃−返済の関係が一目で分かるようにしています。
@@ -137,6 +148,15 @@ export default async function RealEstatePropertiesPage() {
         <p className="meta" style={{ marginTop: 6 }}>
           DSCR 簡易 = 月家賃合計 ÷ 月返済合計（業界定番。厳密 NOI
           ではない）。目安 1.2×以上。
+        </p>
+        <p className="meta" style={{ marginTop: 6 }}>
+          鍵番号は{" "}
+          <a href={propertyKeys.boardUrl} target="_blank" rel="noreferrer">
+            Notion DB_物件情報
+          </a>
+          {propertyKeys.source === "notion"
+            ? " から取得。"
+            : ` のキャッシュ表示${propertyKeys.reason ? `（${propertyKeys.reason}）` : ""}。NOTION_API_TOKEN を入れると自動更新されます。`}
         </p>
         <table>
           <thead>
@@ -152,7 +172,7 @@ export default async function RealEstatePropertiesPage() {
             </tr>
           </thead>
           <tbody>
-            {RE_PROPERTY_MASTER.map((p) => {
+            {masterRows.map((p) => {
               const live = byProp.get(p.id);
               const linked = loansForProperty(p.id, loanRows);
               const rentSum = live?.rentSum ?? 0;
@@ -347,7 +367,7 @@ export default async function RealEstatePropertiesPage() {
 
       {orderedIds.map((pid) => {
         const g = byProp.get(pid);
-        const master = getRePropertyMaster(pid);
+        const master = masterById.get(pid) || getRePropertyMaster(pid);
         const linked = loansForProperty(pid, loanRows);
         if (!g && !master) return null;
         const title = master?.name || g?.name || pid;

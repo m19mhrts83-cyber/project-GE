@@ -9,8 +9,9 @@ export type RePropertyMaster = {
   /** 7桁ハイフン付き（例: 462-0834） */
   postalCode: string;
   address: string;
-  /** Notion「所有物件関係」DB_物件情報の鍵番号。null は「なし」 */
+  /** Notion「所有物件関係」DB_物件情報の鍵番号。null は「なし」。ライブ取得時は上書き */
   keyNumber: number | null;
+  matchNames: string[];
   roomsExpected: number;
   managers: string[];
   loanIds: string[];
@@ -26,6 +27,11 @@ export const RE_PROPERTY_MASTER: RePropertyMaster[] = [
     postalCode: "462-0834",
     address: "愛知県名古屋市北区長田町4丁目69番地5",
     keyNumber: 2842,
+    matchNames: [
+      "Grandole志賀本通I",
+      "02_Grandole志賀本通I",
+      "Grandole志賀本通Ⅰ",
+    ],
     roomsExpected: 8,
     managers: ["LEAF", "Tcell"],
     loanIds: ["orix-g1-corp"],
@@ -39,6 +45,11 @@ export const RE_PROPERTY_MASTER: RePropertyMaster[] = [
     postalCode: "462-0834",
     address: "愛知県名古屋市北区長田町4丁目69番地5",
     keyNumber: 1555,
+    matchNames: [
+      "Grandole志賀本通II",
+      "01_Grandole志賀本通II",
+      "Grandole志賀本通Ⅱ",
+    ],
     roomsExpected: 8,
     managers: ["ホームプランナー"],
     loanIds: ["orix-g2-pers"],
@@ -52,6 +63,7 @@ export const RE_PROPERTY_MASTER: RePropertyMaster[] = [
     postalCode: "459-8008",
     address: "愛知県名古屋市緑区文久山418",
     keyNumber: null,
+    matchNames: ["キャラメル", "03_キャラメル"],
     roomsExpected: 4,
     managers: ["Tcell"],
     loanIds: ["shiga-caramel", "shiga-caramel-cost"],
@@ -89,6 +101,40 @@ export function loansForProperty<T extends LoanLike>(
 
 export function getRePropertyMaster(id: string): RePropertyMaster | null {
   return RE_PROPERTY_MASTER.find((p) => p.id === id) || null;
+}
+
+/** Notion 行タイトルから物件 id。II を I より先に照合する */
+export function matchPropertyIdByNotionName(name: string): string | null {
+  const n = (name || "").trim();
+  if (!n) return null;
+  const isII =
+    /志賀本通\s*II/i.test(n) ||
+    /志賀本通Ⅱ/.test(n) ||
+    /Grandole.*II/i.test(n);
+  const order = ["grandole-ii", "grandole-i", "caramel"] as const;
+  for (const id of order) {
+    const info = RE_PROPERTY_MASTER.find((p) => p.id === id);
+    if (!info) continue;
+    const names = [info.name, ...info.matchNames];
+    const hit = names.some((m) => n === m || n.includes(m) || m.includes(n));
+    if (!hit) continue;
+    if (id === "grandole-i" && isII) continue;
+    if (id === "grandole-ii" && !isII) continue;
+    return id;
+  }
+  return null;
+}
+
+/** YAML キャッシュの上に Notion 取得分を載せる */
+export function applyLiveKeyNumbers(
+  rows: RePropertyMaster[],
+  keys: Record<string, number | null>
+): RePropertyMaster[] {
+  return rows.map((p) =>
+    Object.prototype.hasOwnProperty.call(keys, p.id)
+      ? { ...p, keyNumber: keys[p.id] ?? null }
+      : p
+  );
 }
 
 /** 郵便番号を 〒123-4567 形式にする */

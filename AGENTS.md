@@ -11,7 +11,7 @@
 | `apps/kamiooya-qa-web` | Next.js 16 (API サービス) | 3000 | `cd apps/kamiooya-qa-web && npm run dev` |
 | `apps/jarvis-dashboard` | Next.js 15 (認証ダッシュボード) | 3001 | 下記の env を渡して `npm run dev` |
 | `apps/prompt-share` | Next.js 16 (チャプロ代替プロンプト共有) | 3002 | `cd apps/prompt-share && npm run dev`（本番: https://prompt-share-taupe.vercel.app） |
-| `apps/trade-desk` | Next.js 15 (KURASHIFT・ライフプラン／資産HQ) | 3003 | ダッシュボードと同じ `NEXT_PUBLIC_SUPABASE_*` を渡して `npm run dev` |
+| `apps/trade-desk` | Next.js 15 (KURASHIFT・ライフプラン／資産HQ) | 3003 | 下記の env を渡して `npm run dev` |
 | ルート静的サイト | 素の HTML/JS（Google Maps） | 8000 | `python3 -m http.server 8000`（`index.html`） |
 
 - Node は v22 系。依存は各アプリで `npm install`（lockfile は `package-lock.json` = npm）。標準コマンドは各 `README.md` 参照。
@@ -41,6 +41,13 @@
   → `GET /` は 307 で `/login` にリダイレクト、ログイン後は `/` に認証済みダッシュボードが表示されます。
 - ログイン検証（Secrets にアカウントが無い場合）: service_role で使い捨てユーザーを作り、検証後に削除する。作成は `POST $JARVIS_SUPABASE_URL/auth/v1/admin/users`（`{"email":…,"password":…,"email_confirm":true}`、apikey/Authorization=service_role）、ログイン確認は `POST /auth/v1/token?grant_type=password`（apikey=anon）、削除は `DELETE /auth/v1/admin/users/{id}`。自分用DBへの書き込みなので検証後は必ず削除する。
 - `.env.local` は `.gitignore` 済み（ルート `.env.*`）。秘密はコミットしないこと。
+
+### apps/trade-desk（KURASHIFT）
+
+- 起動（注入済み env を利用）:
+  `NEXT_PUBLIC_SUPABASE_URL="$JARVIS_SUPABASE_URL" NEXT_PUBLIC_SITE_URL="http://localhost:3003" npm run dev`
+- ③-C 保有マスタの鍵番号ライブ取得には `NOTION_API_TOKEN`（Jarvis ダッシュボードと同じ Internal Integration）。未設定時は YAML キャッシュ（`config/property_info.yaml`）。
+- Cloud Secrets と Vercel プロジェクト `jarvis-trade-desk` の両方に入れる。対象 DB「DB_物件情報」（所有物件関係）を Integration の「接続」で共有すること。トークンの値はチャットに出さない。
 
 ### ルート静的サイト（不動産賃貸管理会社検索）
 
