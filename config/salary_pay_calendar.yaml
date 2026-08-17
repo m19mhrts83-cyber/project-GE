@@ -1,0 +1,47 @@
+# 給与・賞与の着金カレンダー（カード引落バッファ／資金移動の前提）
+# 正本ロジック: scripts/jarvis_salary_pay_calendar.py
+# 振分金額の正: Literature Note 給与振込4口座_Oliveメイン化_サマリー.md
+
+version: 1
+
+salary:
+  # 毎月の支給指定日（会社カレンダー）。土日祝なら直前の平日（多くは金曜）
+  nominal_day: 20
+  # 余り（可変）の着金先（2026-08〜 Olive／SMBC刈谷）。固定3口座は触らない
+  remainer_account_id: smbc_kariya
+  remainer_account_label: "三井住友銀行 刈谷（Olive）"
+  # Zaim マッチ（余り行）
+  remainer_zaim_match_current: "三井住友銀行"
+  # 移行前の余り先（実績比較用）
+  remainer_zaim_match_legacy: "★住信SBIネット銀行(その他出費)"
+  # 固定振分（給与枠・触らない）
+  fixed_splits:
+    - account_id: ogaki
+      label: 大垣共立
+      amount_jpy: 114000  # Zaim実績。Literature第1案は170000へ移行予定
+    - account_id: meigin
+      label: 名古屋銀行
+      amount_jpy: 150000  # Literature第1案は165000へ移行予定
+    - account_id: tokai_roukin
+      label: 東海労金
+      amount_jpy: 80000   # Literature第1案は70000へ移行予定
+  # 見積: 直近Nヶ月の余り実績の中央値／先月を優先
+  estimate:
+    prefer_last_month: true
+    lookback_months: 6
+    # 残業が増えない前提のフロア（これ未満なら要確認）
+    floor_jpy: 150000
+
+bonus:
+  # ユーザー認識: 1日払い（月末〜1日）。財務正は Zaim
+  # 2026夏実績: 2026-06-24 に SBI へ 1,720,746（1日払いではない）
+  nominal_day: 1
+  note: "冬・夏で日付がずれる。Zaimの賞与*ミツビシジユウコウギヨウを正とする"
+  remainer_account_id: smbc_kariya  # 今後Olive余り想定。2026-06はSBI着金
+
+# カード引落バッファ連携
+card_settlement:
+  # 大型寄せは「給与余り着金を確認してから」実行（出金先行口座は着金前に触らない）
+  wait_for_salary_before_xfer: true
+  # Amex が SBI 本から落ちるあいだは、給与日と同日でも SBI 側に Amex 額を先に残す
+  amex_from_account_id: sbinet_main
