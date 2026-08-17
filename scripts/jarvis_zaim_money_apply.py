@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Jarvis 入口: Zaim Web で集計設定を直す（承認後）。
+Jarvis 入口: Zaim Web で集計設定／費目を直す（承認後／Watch runner）。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_zaim_money_apply.py --from-watch --dry-run

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Zaim Watch 週次ランナー: 品質検知 → 安全な集計設定の自動適用 → changelog → push。
+Zaim Watch 週次ランナー: 学習 → 品質検知 → 安全な集計／高確信度費目の自動適用 → snapshot → changelog → push。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_zaim_watch_runner.py
   python scripts/jarvis_zaim_watch_runner.py --dry-run
   python scripts/jarvis_zaim_watch_runner.py --skip-apply
   python scripts/jarvis_zaim_watch_runner.py --skip-push
+  python scripts/jarvis_zaim_watch_runner.py --skip-learn
 
 CSV 週次エクスポート後に呼ぶ想定。セッション切れ時は apply をスキップして warn。
 """
@@ -29,6 +30,9 @@ CHANGELOG_PATH = STATE / "zaim_watch_changelog.json"
 REVIEW_BATCH_PATH = STATE / "zaim_review_batch.json"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 EXE = str(PY) if PY.is_file() else sys.executable
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_zaim_learn as zlearn  # noqa: E402
 
 SAFE_TARGETS = {"card", "smart", "must_include", "amazon_card", "amazon_site"}
 
@@ -67,7 +71,7 @@ def save_review_batch(data: dict[str, Any]) -> None:
 
 
 def sync_category_reviews_to_changelog(cl: dict[str, Any]) -> tuple[int, list[dict[str, Any]]]:
-    """品質検知の費目見直しを changelog に pending で載せる（Web 自動変更なし）。"""
+    """低確信度の費目見直しを changelog に pending で載せる（Web 未変更）。high は apply 側。"""
     if not WATCH_PATH.is_file():
         return 0, []
     data = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
@@ -75,6 +79,10 @@ def sync_category_reviews_to_changelog(cl: dict[str, Any]) -> tuple[int, list[di
     existing = {e.get("id") for e in cl.get("entries") or []}
     added: list[dict[str, Any]] = []
     for c in cats:
+        if c.get("auto_applied"):
+            continue
+        if c.get("confidence") == "high" and c.get("suggest"):
+            continue
         eid = category_review_id(c)
         if eid in existing:
             continue
@@ -86,6 +94,8 @@ def sync_category_reviews_to_changelog(cl: dict[str, Any]) -> tuple[int, list[di
             "amount": c.get("amount"),
             "category": c.get("category"),
             "suggest": c.get("suggest"),
+            "learn_key": c.get("learn_key"),
+            "confidence": c.get("confidence") or "low",
             "proposal": c.get("proposal"),
             "applied_at": now_iso(),
             "ok": True,
@@ -103,10 +113,17 @@ def open_review_batch(
     aggregate_applied: int,
     category_added: int,
     category_total: int,
+    category_applied: int = 0,
+    learned_n: int = 0,
 ) -> None:
     """ホームお知らせ用バッチ。新規直し／費目見直しがあれば未確認バナーを立てる。"""
     prev = load_review_batch()
-    something_new = aggregate_applied > 0 or category_added > 0
+    something_new = (
+        aggregate_applied > 0
+        or category_added > 0
+        or category_applied > 0
+        or learned_n > 0
+    )
     if not something_new:
         if category_total > 0 and not prev.get("batch_id"):
             something_new = True
@@ -116,8 +133,12 @@ def open_review_batch(
     lines = []
     if aggregate_applied:
         lines.append(f"集計設定を {aggregate_applied} 件直しました")
+    if category_applied:
+        lines.append(f"費目を {category_applied} 件自動で直しました")
     if category_total:
         lines.append(f"費目（その他等）を {category_total} 件見直しました")
+    if learned_n:
+        lines.append(f"手動修正から {learned_n} 件学習しました")
     if not lines:
         lines.append("Zaim を見直しました")
     save_review_batch(
@@ -127,7 +148,9 @@ def open_review_batch(
             "reviewed_at": batch_id,
             "aggregate_applied": aggregate_applied,
             "category_added": category_added,
+            "category_applied": category_applied,
             "category_total": category_total,
+            "learned_n": learned_n,
             "lines": lines,
             "dashboard_ack_batch_id": None,
             "show_banner": True,
@@ -217,6 +240,44 @@ def safe_actions_from_watch() -> list[dict[str, Any]]:
     return out
 
 
+def category_actions_from_watch() -> list[dict[str, Any]]:
+    if not WATCH_PATH.is_file():
+        return []
+    data = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for c in data.get("category_reviews") or []:
+        if c.get("confidence") != "high":
+            continue
+        suggest = str(c.get("suggest") or "").strip()
+        if not suggest:
+            continue
+        a = c.get("action") if isinstance(c.get("action"), dict) else {}
+        action = {
+            "action": "set_category",
+            "target": "category",
+            "value": suggest,
+            "genre": c.get("suggest_genre") or a.get("genre") or "",
+            "date": c.get("date"),
+            "shop": c.get("shop"),
+            "item": c.get("item"),
+            "amount": c.get("amount"),
+            "pay": c.get("pay"),
+            "method": c.get("method") or "payment",
+            "category": c.get("category"),
+            "suggest": suggest,
+            "learn_key": c.get("learn_key"),
+            "row_key": c.get("row_key"),
+            "confidence": "high",
+        }
+        fid = fix_id(action)
+        if fid in seen:
+            continue
+        seen.add(fid)
+        out.append(action)
+    return out
+
+
 def already_applied(cl: dict[str, Any], action: dict[str, Any]) -> bool:
     fid = fix_id(action)
     for e in cl.get("entries") or []:
@@ -241,6 +302,10 @@ def apply_actions(actions: list[dict[str, Any]], *, dry_run: bool, limit: int) -
                 "value": a.get("value"),
                 "target": a.get("target"),
                 "pay": a.get("pay"),
+                "kind": a.get("action") or "set_aggregate",
+                "learn_key": a.get("learn_key"),
+                "row_key": a.get("row_key"),
+                "item": a.get("item"),
                 "proposal": (
                     f"{a.get('shop')} ¥{float(a.get('amount') or 0):,.0f} "
                     f"→ {a.get('value')} ({a.get('target')})"
@@ -330,16 +395,84 @@ def apply_actions(actions: list[dict[str, Any]], *, dry_run: bool, limit: int) -
     return entries
 
 
+def merge_changelog_entries(cl: dict[str, Any], new_entries: list[dict[str, Any]]) -> int:
+    applied_ok = 0
+    existing_ids = {e.get("id") for e in cl.get("entries") or []}
+    for e in new_entries:
+        if e.get("ok"):
+            applied_ok += 1
+        if e.get("id") in existing_ids and e.get("ok"):
+            for old in cl["entries"]:
+                if old.get("id") == e.get("id"):
+                    old.update(e)
+                    break
+        else:
+            cl.setdefault("entries", []).append(e)
+    return applied_ok
+
+
+def mark_reviews_auto_applied(ok_row_keys: set[str]) -> None:
+    if not ok_row_keys or not WATCH_PATH.is_file():
+        return
+    try:
+        data = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    changed = False
+    for c in data.get("category_reviews") or []:
+        rk = str(c.get("row_key") or "")
+        if rk and rk in ok_row_keys:
+            c["auto_applied"] = True
+            changed = True
+    if changed:
+        WATCH_PATH.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+
+
+def write_learn_snapshot(applied_ok_keys: set[str], batch_id: str) -> int:
+    if not WATCH_PATH.is_file():
+        return 0
+    try:
+        data = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return 0
+    reviews = list(data.get("category_reviews") or [])
+    snap = zlearn.snapshot_from_reviews(
+        reviews,
+        applied_ok=applied_ok_keys,
+        batch_id=batch_id,
+        csv_path=str(data.get("csv") or ""),
+    )
+    zlearn.save_snapshot(snap)
+    return len(snap.get("rows") or [])
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--skip-apply", action="store_true")
     ap.add_argument("--skip-push", action="store_true")
     ap.add_argument("--skip-finance", action="store_true")
+    ap.add_argument("--skip-learn", action="store_true")
     ap.add_argument("--limit", type=int, default=8)
     args = ap.parse_args(argv)
 
     year = datetime.now(JST).year
+    learned_n = 0
+
+    # 0) 前回 snapshot × 今回 CSV の差分学習
+    if not args.skip_learn:
+        extra = ["--json"]
+        if args.dry_run:
+            extra.append("--dry-run")
+        run_script("jarvis_zaim_learn.py", extra)
+        last = STATE / "zaim_learn_last.json"
+        if last.is_file() and not args.dry_run:
+            try:
+                learned_n = int(json.loads(last.read_text(encoding="utf-8")).get("learned_n") or 0)
+            except Exception:
+                learned_n = 0
 
     # 1) quality + bank check
     run_script("jarvis_zaim_quality_check.py")
@@ -356,10 +489,11 @@ def main(argv: list[str] | None = None) -> int:
         if rc != 0:
             print(f"# prev year finance push rc={rc} (CSV が無ければ無視可)", flush=True)
 
-    # 3) safe apply
+    # 3) safe aggregate apply
     cl = load_changelog()
-    new_entries: list[dict[str, Any]] = []
     applied_ok = 0
+    cat_applied = 0
+    applied_row_keys: set[str] = set()
     if not args.skip_apply:
         actions = [
             a for a in safe_actions_from_watch() if not already_applied(cl, a)
@@ -367,23 +501,40 @@ def main(argv: list[str] | None = None) -> int:
         print(f"# safe actions pending apply: {len(actions)}", flush=True)
         new_entries = apply_actions(actions, dry_run=args.dry_run, limit=args.limit)
         if new_entries and not args.dry_run:
-            existing_ids = {e.get("id") for e in cl.get("entries") or []}
-            for e in new_entries:
-                if e.get("ok"):
-                    applied_ok += 1
-                if e.get("id") in existing_ids and e.get("ok"):
-                    for old in cl["entries"]:
-                        if old.get("id") == e.get("id"):
-                            old.update(e)
-                            break
-                else:
-                    cl.setdefault("entries", []).append(e)
+            applied_ok = merge_changelog_entries(cl, new_entries)
             save_changelog(cl)
             run_script("jarvis_zaim_quality_check.py")
         elif new_entries and args.dry_run:
             print(json.dumps(new_entries, ensure_ascii=False, indent=2))
 
-    # 3b) 費目見直しを changelog / ホームお知らせバッチへ
+        # 3b) high-confidence category apply
+        cl = load_changelog()
+        cat_actions = [
+            a for a in category_actions_from_watch() if not already_applied(cl, a)
+        ]
+        print(f"# category high actions pending apply: {len(cat_actions)}", flush=True)
+        if args.dry_run:
+            for i, a in enumerate(cat_actions[: args.limit], 1):
+                print(
+                    f"  {i}. [set_category] {a.get('date')} ¥{float(a.get('amount') or 0):,.0f} "
+                    f"{a.get('shop')} → {a.get('value')}",
+                    flush=True,
+                )
+        elif cat_actions:
+            cat_entries = apply_actions(cat_actions, dry_run=False, limit=args.limit)
+            cat_applied = merge_changelog_entries(cl, cat_entries)
+            save_changelog(cl)
+            for e, a in zip(cat_entries, cat_actions[: args.limit]):
+                if e.get("ok") and a.get("row_key"):
+                    applied_row_keys.add(str(a["row_key"]))
+            mark_reviews_auto_applied(applied_row_keys)
+
+    # 4) snapshot（自動後の状態をフィックス）
+    if not args.dry_run:
+        n_snap = write_learn_snapshot(applied_row_keys, now_iso())
+        print(f"# learn snapshot rows={n_snap} auto_applied={len(applied_row_keys)}", flush=True)
+
+    # 5) 費目見直し（low）を changelog / ホームお知らせバッチへ
     cat_added = 0
     cat_total = 0
     if not args.dry_run:
@@ -394,21 +545,25 @@ def main(argv: list[str] | None = None) -> int:
         if WATCH_PATH.is_file():
             try:
                 w = json.loads(WATCH_PATH.read_text(encoding="utf-8"))
-                cat_total = int(w.get("category_review_count") or 0)
+                reviews = list(w.get("category_reviews") or [])
+                cat_total = sum(1 for c in reviews if not c.get("auto_applied"))
             except Exception:
                 cat_total = 0
         open_review_batch(
             aggregate_applied=applied_ok,
             category_added=cat_added,
             category_total=cat_total,
+            category_applied=cat_applied,
+            learned_n=learned_n,
         )
 
-    # 4) push watch (+ merge happens in dashboard_push)
+    # 6) push watch
     if not args.skip_push and not args.dry_run:
         run_script("jarvis_dashboard_push.py", ["--watch-only"], timeout=180)
 
     print(
-        f"# Zaim Watch runner done applied={applied_ok} category_added={cat_added}",
+        f"# Zaim Watch runner done applied={applied_ok} "
+        f"category_applied={cat_applied} category_added={cat_added} learned={learned_n}",
         flush=True,
     )
     return 0

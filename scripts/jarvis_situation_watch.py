@@ -1686,11 +1686,46 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
         review_batch.get("category_total")
         or (data.get("category_review_count") or 0)
     )
-    # quality JSON の費目候補も載せる
+    # quality JSON の費目候補も載せる（自動適用済みは一覧から外す）
     try:
-        payload["category_reviews"] = list(data.get("category_reviews") or [])[:25]
+        raw_cats = list(data.get("category_reviews") or [])[:25]
+        payload["category_reviews"] = [
+            c for c in raw_cats if not c.get("auto_applied")
+        ]
+        payload["category_auto_applied_n"] = sum(
+            1 for c in raw_cats if c.get("auto_applied")
+        )
     except Exception:
         payload["category_reviews"] = []
+
+    learn_last = load_json(STATE / "zaim_learn_last.json") or {}
+    learn_rules = load_json(STATE / "zaim_learn_rules.json") or {}
+    ready_n = 0
+    try:
+        ready_n = int(learn_last.get("ready_auto_n") or 0)
+        if not ready_n:
+            ready_n = sum(
+                1
+                for v in (learn_rules.get("rules") or {}).values()
+                if isinstance(v, dict)
+                and not v.get("suppressed")
+                and not v.get("conflict")
+                and int(v.get("count") or 0) >= 2
+            )
+    except Exception:
+        ready_n = 0
+    payload["learn_feedback"] = {
+        "learned_n": int(learn_last.get("learned_n") or 0),
+        "bootstrap_n": int(learn_last.get("bootstrap_n") or 0),
+        "ready_auto_n": ready_n,
+        "rule_count": int(
+            learn_last.get("rule_count")
+            or len(learn_rules.get("rules") or {})
+        ),
+        "examples": list(learn_last.get("examples") or [])[:5],
+        "ready_examples": list(learn_last.get("ready_examples") or [])[:5],
+        "updated_at": learn_last.get("updated_at"),
+    }
 
     summary = str(data.get("summary") or "データあり") + weekly_note + bank_note
     if pending_n:

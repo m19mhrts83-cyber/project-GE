@@ -1,0 +1,24 @@
+{
+  "updated_at": null,
+  "batch_id": null,
+  "csv": "",
+  "rows": [
+    {
+      "row_key": "2026-08-14|1234|アオキ|Olive|payment",
+      "date": "2026-08-14",
+      "amount": 1234,
+      "shop": "アオキ",
+      "item": "",
+      "pay": "Olive",
+      "method": "payment",
+      "learn_key": "アオキ",
+      "category_before": "β.12.C.その他/使途不明",
+      "genre_before": "",
+      "category_after_auto": "β.2C.食費",
+      "genre_after_auto": "",
+      "auto_applied": true,
+      "suggest": "β.2C.食費",
+      "confidence": "high"
+    }
+  ]
+}

@@ -26,8 +26,16 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ## 方針
 
 - 確信度が高い集計設定直しは自動適用 → `/zaim` で「確認OK／おかしい」
-- 費目「その他／使途不明」等は見直し候補を列挙（Web 自動変更はしない）→ ホームに「見直したよ」→ `/zaim` で「確認しました」
+- 費目「その他／使途不明」等は見直し候補を列挙。**学習ルールで同一店が2回以上同じ直し**なら Web 自動適用 → `/zaim` で確認
+- 自動適用直後にスナップショットを保存。次の CSV（火・金）で手動修正差分を学習する
+- `/zaim` で「おかしい」にした費目自動適用は、その店キーを suppressed（再自動しない）
+- 曖昧・提案なしは手動確認のまま（Web 自動変更しない）
 - アーカイブしない（`never_archive`、id は `zaim_quality` のまま）
 - Suica 画像認証・ANA／NRK は対象外または手動
 - ナビ本線はお金グループ。状況ウォッチからも `/zaim` へ誘導
 - launchd: 火・金 09:00（銀行+Watch）／火・金 12:00（CSV+Watch）
+
+```bash
+# 学習だけ（前回 snapshot × 今回 CSV）
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_zaim_learn.py --dry-run --json
+```
