@@ -1,6 +1,6 @@
 # Zaim 品質ウォッチ（二重取込・集計設定）
 # 検知: scripts/jarvis_zaim_quality_check.py → .jarvis_state/zaim_quality_watch.json
-# 直し: scripts/jarvis_zaim_money_apply.py（ユーザー承認後）
+# 直し: scripts/jarvis_zaim_money_apply.py（集計は Watch runner が安全分を自動。費目は学習 high を自動）
 
 version: 1
 
@@ -58,10 +58,11 @@ must_include:
       - ORICO
     pay_keywords: []
 
-# 費目見直し（自動変更はせず、火・金の Watch で検知→ホームお知らせ）
+# 費目見直し（high=学習ルール count>=2 を Web 自動適用。low は提案のみ）
 category_review:
   lookback_days: 14
   max_items: 25
+  auto_min_count: 2
   suspicious_substrings:
     - その他
     - 使途不明

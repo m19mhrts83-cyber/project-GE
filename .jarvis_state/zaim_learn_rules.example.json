@@ -1,0 +1,16 @@
+{
+  "updated_at": null,
+  "auto_min_count": 2,
+  "rules": {
+    "アオキ": {
+      "category": "β.2C.食費",
+      "genre": "",
+      "count": 2,
+      "conflict": false,
+      "suppressed": false,
+      "source": "user_csv_diff",
+      "last_from": "2026-08-14",
+      "updated_at": null
+    }
+  }
+}

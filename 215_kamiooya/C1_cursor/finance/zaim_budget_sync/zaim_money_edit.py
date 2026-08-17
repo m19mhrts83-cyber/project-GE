@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Web版 Zaim で家計明細の「集計に含める／含めない」を変更する。
+Web版 Zaim で家計明細の集計設定／費目を変更する。
 
 既存ログイン: zaim_budget_apply.py の storage / open_browser_context を再利用。
+費目変更は zaim_money_create のカテゴリ選択 UI を流用。
 
   cd ~/git-repos/215_kamiooya/C1_cursor/finance/zaim_budget_sync
   python zaim_money_edit.py --from-watch --dry-run
@@ -21,6 +22,7 @@ from typing import Any
 from playwright.sync_api import Page
 
 import zaim_budget_apply as zaim
+import zaim_money_create as zcreate
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO = SCRIPT_DIR.parents[3]  # .../git-repos (finance -> C1 -> 215 -> git-repos)
@@ -54,14 +56,20 @@ def load_actions_from_watch(path: Path) -> list[dict[str, Any]]:
     seen: set[tuple] = set()
     out: list[dict[str, Any]] = []
     for a in actions:
-        if not a or a.get("action") != "set_aggregate":
+        if not a:
+            continue
+        kind = a.get("action")
+        if kind not in ("set_aggregate", "set_category"):
             continue
         if a.get("target") == "swap_hint":
             continue
+        if kind == "set_category" and not str(a.get("value") or a.get("suggest") or "").strip():
+            continue
         key = (
+            str(kind),
             str(a.get("date")),
             round(float(a.get("amount") or 0), 0),
-            str(a.get("value")),
+            str(a.get("value") or a.get("suggest") or ""),
             str(a.get("target")),
             str(a.get("shop") or "")[:20],
         )
@@ -75,9 +83,11 @@ def load_actions_from_watch(path: Path) -> list[dict[str, Any]]:
 def print_dry_run(actions: list[dict[str, Any]]) -> None:
     print(f"# dry-run {len(actions)} actions")
     for i, a in enumerate(actions, 1):
+        kind = a.get("action") or "set_aggregate"
+        dest = a.get("value") or a.get("suggest") or ""
         print(
-            f"  {i}. {a.get('date')} ¥{float(a.get('amount') or 0):,.0f} "
-            f"shop={str(a.get('shop') or '')[:30]} → {a.get('value')} "
+            f"  {i}. [{kind}] {a.get('date')} ¥{float(a.get('amount') or 0):,.0f} "
+            f"shop={str(a.get('shop') or '')[:30]} → {dest} "
             f"(target={a.get('target')}) pay={str(a.get('pay') or '')[:24]}"
         )
 
@@ -217,14 +227,19 @@ def _save_dialog(page: Page) -> bool:
     return False
 
 
+def _set_category_in_dialog(page: Page, category: str, genre: str) -> bool:
+    try:
+        zcreate._pick_category(page, category, genre)
+        return True
+    except Exception:
+        return False
+
+
 def apply_one(page: Page, action: dict[str, Any], *, shot_prefix: str) -> tuple[bool, str]:
     day = str(action.get("date") or "")
     amount = float(action.get("amount") or 0)
     shop = str(action.get("shop") or "")
-    raw_val = str(action.get("value") or "exclude")
-    value = VALUE_MAP.get(raw_val, raw_val)
-    if value not in ("include", "exclude"):
-        return False, f"unknown value={raw_val}"
+    kind = str(action.get("action") or "set_aggregate")
 
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
     try:
@@ -237,9 +252,22 @@ def apply_one(page: Page, action: dict[str, Any], *, shot_prefix: str) -> tuple[
         page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_row_fail.png"), full_page=True)
         return False, "明細行が見つからない／クリックできない"
 
-    if not _set_aggregate_in_dialog(page, value):
-        page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_agg_fail.png"), full_page=True)
-        return False, "集計設定コントロールが見つからない（UI要調整）"
+    if kind == "set_category":
+        category = str(action.get("value") or action.get("suggest") or "").strip()
+        genre = str(action.get("genre") or action.get("suggest_genre") or "").strip()
+        if not category or category == "review":
+            return False, "category empty"
+        if not _set_category_in_dialog(page, category, genre):
+            page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_cat_fail.png"), full_page=True)
+            return False, f"費目コントロールが見つからない: {category}"
+    else:
+        raw_val = str(action.get("value") or "exclude")
+        value = VALUE_MAP.get(raw_val, raw_val)
+        if value not in ("include", "exclude"):
+            return False, f"unknown value={raw_val}"
+        if not _set_aggregate_in_dialog(page, value):
+            page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_agg_fail.png"), full_page=True)
+            return False, "集計設定コントロールが見つからない（UI要調整）"
 
     if not _save_dialog(page):
         page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_save_fail.png"), full_page=True)
@@ -291,7 +319,11 @@ def run_apply(actions: list[dict[str, Any]], args: argparse.Namespace) -> int:
         )
         limit = args.limit if args.limit and args.limit > 0 else len(actions)
         for i, action in enumerate(actions[:limit]):
-            print(f"▶ {i+1}/{limit} {action.get('date')} ¥{action.get('amount')} → {action.get('value')}")
+            dest = action.get("value") or action.get("suggest") or ""
+            print(
+                f"▶ {i+1}/{limit} [{action.get('action')}] "
+                f"{action.get('date')} ¥{action.get('amount')} → {dest}"
+            )
             ok, msg = apply_one(page, action, shot_prefix=f"{i+1:02d}")
             print(f"  {'OK' if ok else 'NG'}: {msg}")
             results.append({**action, "ok": ok, "message": msg})
@@ -319,7 +351,7 @@ def run_apply(actions: list[dict[str, Any]], args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Zaim 明細の集計設定を Web で変更")
+    ap = argparse.ArgumentParser(description="Zaim 明細の集計設定／費目を Web で変更")
     ap.add_argument("--from-watch", action="store_true", help="zaim_quality_watch.json の提案を使う")
     ap.add_argument("--watch", type=Path, default=WATCH_PATH)
     ap.add_argument("--dry-run", action="store_true")

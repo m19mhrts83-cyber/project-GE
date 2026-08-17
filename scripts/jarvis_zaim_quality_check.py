@@ -28,6 +28,9 @@ REPO = Path(__file__).resolve().parents[1]
 CFG_PATH = REPO / "config" / "zaim_quality_watch.yaml"
 OUT_PATH = REPO / ".jarvis_state" / "zaim_quality_watch.json"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_zaim_learn as zlearn  # noqa: E402
+
 INCLUDE = "常に集計に含める"
 EXCLUDE = "集計に含めない"
 
@@ -313,27 +316,20 @@ def check_amazon(
 
 
 def suggest_category(shop: str, item: str, rules: list[dict[str, Any]]) -> str | None:
-    blob = f"{shop or ''}{item or ''}"
-    for rule in rules or []:
-        suggest = str(rule.get("suggest") or "").strip()
-        if not suggest:
-            continue
-        for kw in rule.get("keywords") or []:
-            if kw and kw in blob:
-                return suggest
-    return None
+    return zlearn.suggest_from_yaml(shop, item, rules)
 
 
 def check_category_reviews(
     payments: list[dict[str, str]],
     cfg: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """費目が『その他／使途不明』等の直近行を見直し候補として列挙（Web変更はしない）。"""
+    """費目が『その他／使途不明』等の直近行を列挙。high は runner が Web 自動適用。"""
     cr = cfg.get("category_review") or {}
     days = int(cr.get("lookback_days") or 14)
     max_items = int(cr.get("max_items") or 25)
     suspicious = list(cr.get("suspicious_substrings") or ["その他", "使途不明"])
-    rules = list(cr.get("suggest_rules") or [])
+    yaml_rules = list(cr.get("suggest_rules") or [])
+    learn_rules = zlearn.load_rules()
     since = date.today() - timedelta(days=days)
     out: list[dict[str, Any]] = []
     for r in payments:
@@ -345,45 +341,82 @@ def check_category_reviews(
         if d < since:
             continue
         cat = (r.get("カテゴリ") or "").strip()
-        if not any(s in cat for s in suspicious):
+        if not zlearn.is_suspicious(cat, suspicious):
             continue
         amount = yen(r)
         if amount == 0:
             continue
         shop = (r.get("お店") or "").strip()
         item = (r.get("品目") or "").strip()
-        suggest = suggest_category(shop, item, rules)
+        pay = (r.get("支払元") or "")[:40]
+        method = (r.get("方法") or "payment").strip()
+        resolved = zlearn.resolve_suggestion(
+            shop, item, yaml_rules=yaml_rules, rules=learn_rules
+        )
+        suggest = resolved.get("suggest")
+        genre = str(resolved.get("genre") or "")
+        confidence = str(resolved.get("confidence") or "low")
+        if not suggest:
+            confidence = "low"
         proposal = (
-            f"費目見直し: {cat} → {suggest}"
+            f"費目見直し: {cat} → {suggest}（{confidence}）"
             if suggest
             else f"費目見直し: {cat}（提案なし・要目視）"
         )
-        out.append(
-            {
-                "kind": "category_review",
+        action_name = "set_category" if suggest and confidence == "high" else "category_review"
+        row = {
+            "kind": "category_review",
+            "date": d.isoformat(),
+            "shop": shop or item or "—",
+            "item": item,
+            "amount": amount,
+            "category": cat,
+            "genre": (r.get("カテゴリの内訳") or "").strip(),
+            "suggest": suggest,
+            "suggest_genre": genre,
+            "confidence": confidence,
+            "learn_key": resolved.get("learn_key"),
+            "suggest_source": resolved.get("source"),
+            "pay": pay,
+            "method": method,
+            "row_key": zlearn.row_key(
+                {
+                    "日付": d.isoformat(),
+                    "支出": amount,
+                    "お店": shop,
+                    "支払元": pay,
+                    "方法": method,
+                    "amount": amount,
+                    "shop": shop,
+                    "pay": pay,
+                    "date": d.isoformat(),
+                    "method": method,
+                }
+            ),
+            "proposal": proposal,
+            "action": {
+                "action": action_name,
+                "target": "category",
+                "value": suggest or "review",
+                "genre": genre,
                 "date": d.isoformat(),
-                "shop": shop or item or "—",
+                "shop": shop or item,
                 "item": item,
                 "amount": amount,
+                "pay": pay,
+                "method": method,
                 "category": cat,
                 "suggest": suggest,
-                "pay": (r.get("支払元") or "")[:40],
-                "proposal": proposal,
-                "action": {
-                    "action": "category_review",
-                    "target": "category",
-                    "value": suggest or "review",
-                    "date": d.isoformat(),
-                    "shop": shop or item,
-                    "amount": amount,
-                    "category": cat,
-                    "suggest": suggest,
-                },
-            }
-        )
-    # 新しい日付優先・件数上限
-    out.sort(key=lambda x: x.get("date") or "", reverse=True)
-    return out[:max_items]
+                "confidence": confidence,
+                "learn_key": resolved.get("learn_key"),
+            },
+        }
+        out.append(row)
+    high = [x for x in out if x.get("confidence") == "high"]
+    low = [x for x in out if x.get("confidence") != "high"]
+    high.sort(key=lambda x: x.get("date") or "", reverse=True)
+    low.sort(key=lambda x: x.get("date") or "", reverse=True)
+    return (high + low)[:max_items]
 
 
 def check_must_include(
@@ -471,7 +504,8 @@ def build_result(
     if amazon:
         parts.append(f"Amazon二重疑い {len(amazon)}")
     if cats:
-        parts.append(f"費目見直し {len(cats)}")
+        high_n = sum(1 for c in cats if c.get("confidence") == "high")
+        parts.append(f"費目見直し {len(cats)}" + (f"（自動可 {high_n}）" if high_n else ""))
 
     samples = []
     for p in both_inc[:8]:

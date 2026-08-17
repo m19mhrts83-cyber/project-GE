@@ -163,8 +163,19 @@ export default async function ZaimWatchPage() {
         proposal?: string;
         category?: string;
         suggest?: string;
+        confidence?: string;
       }[])
     : [];
+  const learnFb =
+    payload.learn_feedback && typeof payload.learn_feedback === "object"
+      ? (payload.learn_feedback as {
+          learned_n?: number;
+          ready_auto_n?: number;
+          rule_count?: number;
+          examples?: { shop?: string; from?: string; to?: string; learn_key?: string }[];
+          ready_examples?: { key?: string; category?: string; count?: number }[];
+        })
+      : null;
   const neverArchive = Boolean(payload.never_archive);
   const level = (
     ["attention", "warn", "info", "ok"].includes(watch?.level || "")
@@ -188,7 +199,8 @@ export default async function ZaimWatchPage() {
       <FolderLinks links={folderLinks} />
       <p className="sub">
         財務の年間収支と、集計設定・二重取込・費目見直しの確認。アーカイブせず常駐します。
-        確信度の高い直しは Jarvis が適用し、ホームに「直したよ（財務）」として残します（確認するまで消えません）。
+        確信度の高い集計直しと、学習済みの費目は Jarvis が適用し、ホームに「直したよ（財務）」として残します（確認するまで消えません）。
+        手動で直した費目は次の取込で学習し、2回同じ直しが揃うと自動適用になります。
         火・金に見直し（CSV は同曜日）。年間収支は Zaim の「集計に含めない」を除外した合計です（当年は1〜当月の
         YTD）。詳細な月次は{" "}
         <Link href="/metrics" style={{ color: "var(--accent)", fontWeight: 600 }}>
@@ -292,6 +304,42 @@ export default async function ZaimWatchPage() {
                 </li>
               ))}
             </ul>
+          </div>
+        ) : null}
+
+        {learnFb ? (
+          <div className="watch-actions" style={{ marginTop: 12 }}>
+            <p className="watch-actions-title">学習フィードバック</p>
+            <p className="meta">
+              前回の手動差分 {learnFb.learned_n ?? 0} 件 · ルール{" "}
+              {learnFb.rule_count ?? 0} · 次回から自動{" "}
+              {learnFb.ready_auto_n ?? 0} 件
+            </p>
+            {(learnFb.examples || []).length > 0 ? (
+              <ul>
+                {(learnFb.examples || []).slice(0, 5).map((ex, idx) => (
+                  <li key={`learn-${idx}`}>
+                    <span className="watch-action-shop">
+                      {ex.shop || ex.learn_key || "—"}
+                    </span>
+                    <span className="watch-action-proposal">
+                      {ex.from || "?"} → {ex.to || "?"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="meta">今回の新規学習はありません</p>
+            )}
+            {(learnFb.ready_examples || []).length > 0 ? (
+              <p className="meta" style={{ marginTop: 6 }}>
+                自動候補:{" "}
+                {(learnFb.ready_examples || [])
+                  .slice(0, 4)
+                  .map((r) => `${r.key || "?"}→${r.category || "?"}`)
+                  .join(" / ")}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
