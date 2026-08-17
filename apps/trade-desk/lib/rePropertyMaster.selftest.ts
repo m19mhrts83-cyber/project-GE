@@ -32,6 +32,8 @@ assert(
 
 assert(g1.keyNumber === 2842, "G1 key from Notion cache");
 assert(g2.keyNumber === 1555, "G2 key from Notion cache");
+assert(g1.matchNames.includes("Grandole志賀本通I"), "G1 match");
+assert(caramel.matchNames.includes("キャラメル"), "caramel match");
 assert(caramel.keyNumber === null, "caramel has no key");
 assert(fmtKeyNumber(g1.keyNumber) === "2842", "fmt G1 key");
 assert(fmtKeyNumber(g2.keyNumber) === "1555", "fmt G2 key");
