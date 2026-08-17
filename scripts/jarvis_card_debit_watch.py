@@ -81,6 +81,12 @@ CARD_PATTERNS: list[tuple[str, str, str, bool]] = [
         r"アメリカン.?エキスプレス|American\s*Express|ＡＭＥＸ|AMEX",
         False,
     ),
+    (
+        "paypay_card",
+        "PayPayカード",
+        r"PayPayカード|ＰａｙＰａｙカード",
+        False,
+    ),
 ]
 
 
@@ -747,7 +753,7 @@ def print_block(state: dict[str, Any], smbc: int | None) -> None:
     print("📎 カード引落ウォッチ")
     print(f"- SMBC刈谷: {smbc:,}円" if smbc is not None else "- SMBC刈谷: —")
     cards = state.get("cards") or {}
-    for cid in ("olive_infinite", "amazon_master", "amex", "smcc_pp"):
+    for cid in ("olive_infinite", "amazon_master", "smcc_pp", "paypay_card", "amex"):
         c = cards.get(cid)
         if not isinstance(c, dict):
             continue
