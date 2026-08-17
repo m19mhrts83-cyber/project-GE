@@ -3,9 +3,11 @@
 # ローン残高の正本は借入残高トラッカー（estate）。ここへ残高を二重入力しない。
 # UI: /realestate/properties · ROI: apps/trade-desk/lib/roiAssets.ts · 号室: property_units
 # 管理・鍵: config/property_info.yaml
+# 郵便番号: 日本郵便の町域（長田町=462-0834 / 文久山=459-8008）
+# 鍵番号の正本: Notion「所有物件関係」DB_物件情報（YAML は表示用キャッシュ）
 
 version: 1
-as_of: "2026-08-13"
+as_of: "2026-08-17"
 status: prep_ok
 
 # id は property_units.property_id / ROI unitPropertyId / loan payload.propertyId と共通
@@ -16,7 +18,9 @@ properties:
     owner: 法人
     owner_entity: リビングサポート松
     acquired: "2025-02-28"
+    postal_code: "462-0834"
     address: 愛知県名古屋市北区長田町4丁目69番地5
+    key_number: 2842
     rooms_expected: 8
     managers: [LEAF, Tcell]
     default_manager: ミニテック
@@ -38,7 +42,9 @@ properties:
     owner: 個人
     owner_entity: 松野真治
     acquired: "2022-09"
+    postal_code: "462-0834"
     address: 愛知県名古屋市北区長田町4丁目69番地5
+    key_number: 1555
     rooms_expected: 8
     managers: [ホームプランナー]
     loans:
@@ -59,7 +65,9 @@ properties:
     owner: 個人
     owner_entity: 松野真治
     acquired: "2025-12-26"
+    postal_code: "459-8008"
     address: 愛知県名古屋市緑区文久山418
+    key_number: null  # なし（キーボックス無し）
     rooms_expected: 4
     managers: [Tcell]
     loans:
@@ -98,3 +106,6 @@ checklist:
   - id: rooms_live
     ok: true
     note: property_units 20室（8+8+4）・空室0（2026-08-13確認）
+  - id: postal_and_keys
+    ok: true
+    note: 郵便番号 462-0834 / 459-8008。鍵 G1=2842 G2=1555 キャラメル=なし（Notion DB_物件情報）

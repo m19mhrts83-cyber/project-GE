@@ -297,7 +297,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_wo
 
 | # | やること | 期待 |
 |---|---|---|
-| 3C-1 | （Phase 5）`/realestate/properties` で物件一覧 | 法人／個人フィルタ・基本情報 |
+| 3C-1 | `/realestate/properties` で物件一覧 | 法人／個人の基本情報。**郵便番号**と**鍵番号**（G1=2842 / G2=1555 / キャラメル=なし） |
 | 3C-2 | 借入残高トラッカーからローン同期 | KURASHIFT に二重入力なしで投影（**B-RATE-4**）。正本 https://loan-tracker-plum.vercel.app/（Google: estate） |
 | 3C-3 | property_units・property_info と突合 | 号室・管理会社が物件に紐づく |
 

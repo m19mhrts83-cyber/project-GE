@@ -11,6 +11,8 @@ export type PropertyInfo = {
   owner?: string;
   owner_entity?: string;
   acquired?: string;
+  /** 7桁ハイフン付き（例: 462-0834） */
+  postal_code?: string;
   /** 物件所在地（棟単位） */
   address?: string;
   match_names: string[];
@@ -51,6 +53,7 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
       owner: "法人",
       owner_entity: "リビングサポート松",
       acquired: "2025-02-28",
+      postal_code: "462-0834",
       address: "愛知県名古屋市北区長田町4丁目69番地5",
       match_names: [
         "Grandole志賀本通I",
@@ -74,6 +77,7 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
       owner: "個人",
       owner_entity: "松野真治",
       acquired: "2022-09",
+      postal_code: "462-0834",
       address: "愛知県名古屋市北区長田町4丁目69番地5",
       match_names: [
         "Grandole志賀本通II",
@@ -91,6 +95,7 @@ export const PROPERTY_INFO: PropertyInfoCatalog = {
       owner: "個人",
       owner_entity: "松野真治",
       acquired: "2025-12-26",
+      postal_code: "459-8008",
       address: "愛知県名古屋市緑区文久山418",
       match_names: ["キャラメル", "03_キャラメル"],
       managers: ["Tcell"],
@@ -149,8 +154,17 @@ export function managersForProperty(
 }
 
 export function fmtKeyNumber(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
+  if (n == null || Number.isNaN(n)) return "なし";
   return String(n);
+}
+
+export function fmtPostalCode(code: string | null | undefined): string {
+  const raw = (code || "").trim();
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 7) return `〒${digits.slice(0, 3)}-${digits.slice(3)}`;
+  if (raw.startsWith("〒")) return raw;
+  return `〒${raw}`;
 }
 
 export function matchPropertyIdByNotionName(name: string): string | null {

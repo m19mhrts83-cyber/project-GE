@@ -5,6 +5,8 @@ import { fmtYen } from "@/lib/format";
 import { buildBRate4Rows, fmtPct } from "@/lib/bRate4";
 import {
   RE_PROPERTY_MASTER,
+  fmtKeyNumber,
+  formatMasterLocation,
   getRePropertyMaster,
   loansForProperty,
 } from "@/lib/rePropertyMaster";
@@ -125,7 +127,9 @@ export default async function RealEstatePropertiesPage() {
         <p className="meta" style={{ marginTop: 8 }}>
           正本: <code>config/kurashift_re_property_master.yaml</code>
           {" · "}
-          管理・住所: <code>config/property_info.yaml</code>
+          管理・住所・郵便番号: <code>config/property_info.yaml</code>
+          {" · "}
+          鍵番号: Notion「所有物件関係」（DB_物件情報）
         </p>
         <p className="meta" style={{ marginTop: 8 }}>
           レントロール合計と月返済を並べ、家賃−返済の関係が一目で分かるようにしています。
@@ -166,6 +170,10 @@ export default async function RealEstatePropertiesPage() {
                   <td>
                     {p.name}
                     <div className="meta">{p.id}</div>
+                    <div className="meta">
+                      {formatMasterLocation(p)}
+                    </div>
+                    <div className="meta">鍵番号 {fmtKeyNumber(p.keyNumber)}</div>
                   </td>
                   <td className="meta">
                     {p.owner}
@@ -361,8 +369,12 @@ export default async function RealEstatePropertiesPage() {
             </header>
             <p className="meta" style={{ marginTop: 6 }}>
               {master
-                ? `${master.owner}（${master.ownerEntity}）· 取得 ${master.acquired} · ${master.address}`
+                ? `${master.owner}（${master.ownerEntity}）· 取得 ${master.acquired}`
                 : null}
+            </p>
+            <p className="meta" style={{ marginTop: 4 }}>
+              {master ? formatMasterLocation(master) : null}
+              {master ? ` · 鍵番号 ${fmtKeyNumber(master.keyNumber)}` : null}
             </p>
             <p className="meta" style={{ marginTop: 4 }}>
               {g
