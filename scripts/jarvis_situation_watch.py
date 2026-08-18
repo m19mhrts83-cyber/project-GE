@@ -1652,19 +1652,31 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
     pending_n = 0
     review_batch: dict[str, Any] = {}
     try:
+        rb_path = STATE / "zaim_review_batch.json"
+        if rb_path.is_file():
+            review_batch = json.loads(rb_path.read_text(encoding="utf-8"))
         cl_path = STATE / "zaim_watch_changelog.json"
         if cl_path.is_file():
             cl = json.loads(cl_path.read_text(encoding="utf-8"))
             entries = list(cl.get("entries") or [])
-            pending = [e for e in entries if e.get("status") == "pending_confirm"]
+            ack_id = str(review_batch.get("dashboard_ack_batch_id") or "")
+            review_bid = str(review_batch.get("batch_id") or "")
+            pending = []
+            for e in entries:
+                st = e.get("status") or "pending_confirm"
+                if st in ("confirmed", "failed"):
+                    continue
+                if st not in ("pending_confirm", "disputed"):
+                    continue
+                bid = str(e.get("batch_id") or review_bid or "")
+                if ack_id and bid and ack_id == bid:
+                    continue
+                pending.append(e)
             pending_n = len(pending)
             payload["recent_fixes"] = entries[-40:]
             payload["pending_confirm_count"] = pending_n
             if pending_n and level in ("ok", "info"):
                 level = "attention"
-        rb_path = STATE / "zaim_review_batch.json"
-        if rb_path.is_file():
-            review_batch = json.loads(rb_path.read_text(encoding="utf-8"))
     except Exception:
         pass
 

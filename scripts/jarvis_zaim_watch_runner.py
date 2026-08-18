@@ -101,6 +101,7 @@ def sync_category_reviews_to_changelog(cl: dict[str, Any]) -> tuple[int, list[di
             "ok": True,
             "status": "pending_confirm",
             "message": "reviewed_notice",
+            "batch_id": None,
         }
         cl.setdefault("entries", []).append(entry)
         added.append(entry)
@@ -186,6 +187,22 @@ def save_changelog(data: dict[str, Any]) -> None:
     CHANGELOG_PATH.write_text(
         json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+
+
+def stamp_changelog_batch_id(cl: dict[str, Any], batch_id: str) -> int:
+    """未 stamp の pending/disputed に今回の review batch を付ける。"""
+    if not batch_id:
+        return 0
+    n = 0
+    for e in cl.get("entries") or []:
+        st = e.get("status") or "pending_confirm"
+        if st not in ("pending_confirm", "disputed"):
+            continue
+        if e.get("batch_id"):
+            continue
+        e["batch_id"] = batch_id
+        n += 1
+    return n
 
 
 def run_script(script: str, extra: list[str] | None = None, timeout: int = 180) -> int:
@@ -281,7 +298,11 @@ def category_actions_from_watch() -> list[dict[str, Any]]:
 def already_applied(cl: dict[str, Any], action: dict[str, Any]) -> bool:
     fid = fix_id(action)
     for e in cl.get("entries") or []:
-        if e.get("id") == fid and e.get("ok"):
+        if e.get("id") != fid:
+            continue
+        if e.get("status") == "disputed":
+            return True
+        if e.get("ok"):
             return True
     return False
 
@@ -303,9 +324,11 @@ def apply_actions(actions: list[dict[str, Any]], *, dry_run: bool, limit: int) -
                 "target": a.get("target"),
                 "pay": a.get("pay"),
                 "kind": a.get("action") or "set_aggregate",
-                "learn_key": a.get("learn_key"),
+                "learn_key": a.get("learn_key")
+                or zlearn.learn_key(str(a.get("shop") or ""), str(a.get("item") or "")),
                 "row_key": a.get("row_key"),
                 "item": a.get("item"),
+                "batch_id": None,
                 "proposal": (
                     f"{a.get('shop')} ¥{float(a.get('amount') or 0):,.0f} "
                     f"→ {a.get('value')} ({a.get('target')})"
@@ -556,6 +579,13 @@ def main(argv: list[str] | None = None) -> int:
             category_applied=cat_applied,
             learned_n=learned_n,
         )
+        rb = load_review_batch()
+        bid = str(rb.get("batch_id") or "")
+        ack = str(rb.get("dashboard_ack_batch_id") or "")
+        if bid and ack != bid:
+            cl = load_changelog()
+            if stamp_changelog_batch_id(cl, bid):
+                save_changelog(cl)
 
     # 6) push watch
     if not args.skip_push and not args.dry_run:

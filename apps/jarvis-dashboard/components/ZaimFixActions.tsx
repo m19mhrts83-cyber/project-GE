@@ -5,28 +5,22 @@ import { confirmZaimFix } from "@/app/actions/zaimWatch";
 
 export default function ZaimFixActions({
   fixId,
+  flagged = false,
   path = "/zaim",
 }: {
   fixId: string;
+  flagged?: boolean;
   path?: string;
 }) {
   const [pending, start] = useTransition();
 
   return (
-    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-      <button
-        type="button"
-        className="btn"
-        disabled={pending}
-        style={{ padding: "4px 10px", fontSize: "0.78rem" }}
-        onClick={() =>
-          start(async () => {
-            await confirmZaimFix(fixId, "confirmed", path);
-          })
-        }
-      >
-        確認OK
-      </button>
+    <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+      {flagged ? (
+        <span className="meta" style={{ color: "var(--warn)", fontWeight: 600 }}>
+          学習が違う
+        </span>
+      ) : null}
       <button
         type="button"
         className="btn"
@@ -34,23 +28,19 @@ export default function ZaimFixActions({
         style={{
           padding: "4px 10px",
           fontSize: "0.78rem",
-          color: "var(--warn)",
+          color: flagged ? undefined : "var(--warn)",
         }}
         onClick={() =>
           start(async () => {
-            const note =
-              typeof window !== "undefined"
-                ? window.prompt(
-                    "どこがおかしいか（任意）。空でも「おかしい」として記録します。",
-                    "",
-                  )
-                : null;
-            if (note === null) return; // キャンセル
-            await confirmZaimFix(fixId, "disputed", path, note.trim() || undefined);
+            await confirmZaimFix(
+              fixId,
+              flagged ? "pending_confirm" : "disputed",
+              path,
+            );
           })
         }
       >
-        おかしい
+        {flagged ? "フラグ解除" : "おかしい"}
       </button>
     </div>
   );

@@ -133,7 +133,7 @@ export default async function HomePinBanner() {
               : id === "ops_fix_notice"
                 ? "Jarvis が直した内容 · 「確認しました」で消えます"
                 : id === "zaim_quality"
-                  ? "確認するまで残ります · 「確認しました」で消えます · 詳細は /zaim"
+                  ? "確認するまで残ります · 「確認した」で消えます · 詳細は /zaim"
                   : "運用監視 · 直ったらホームのお知らせに切り替わります";
         return (
           <OpsPinCard

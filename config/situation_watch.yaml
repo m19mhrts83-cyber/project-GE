@@ -244,7 +244,8 @@ items:
     cursor_prompt: |
       Zaim Watch（財務）を確認して。ダッシュボード /zaim が本線。
       日常買い物の二重取込と「集計に含める／含めない」の食い違い、銀行・カード連携の鮮度、
-      自動で直した履歴（changelog）の確認待ちを見て。
+      自動で直した履歴（changelog）を見て。行ごとの確認OKは不要。「確認した」まで残る。
+      「おかしい」は学習ミスのフラグ（直し先は Zaim 本体）。
       ホーム「Jarvisが直したよ（財務）」は確認するまで残る。確認後に消え、新規の直しだけ再表示。
       state: .jarvis_state/zaim_quality_watch.json / zaim_bank_sync.json / zaim_watch_changelog.json
       検知: scripts/jarvis_zaim_quality_check.py / jarvis_zaim_bank_sync_check.py

@@ -7,14 +7,29 @@ const WATCH_ID = "zaim_quality";
 
 export type FixConfirmResult = { ok: boolean; error?: string };
 
+export type ZaimFixStatus = "confirmed" | "disputed" | "pending_confirm";
+
+function stampBatchId(
+  row: Record<string, unknown>,
+  ackId: string,
+): Record<string, unknown> {
+  if (!String(row.batch_id || "").trim()) {
+    row.batch_id = ackId;
+  }
+  return row;
+}
+
 export async function confirmZaimFix(
   fixId: string,
-  next: "confirmed" | "disputed",
+  next: ZaimFixStatus,
   path = "/zaim",
   comment?: string,
 ): Promise<FixConfirmResult> {
   const id = fixId.trim();
   if (!id) return { ok: false, error: "id が空です" };
+  if (!["confirmed", "disputed", "pending_confirm"].includes(next)) {
+    return { ok: false, error: "status が不正です" };
+  }
 
   const supabase = await createClient();
   const { data: watch, error } = await supabase
@@ -32,6 +47,7 @@ export async function confirmZaimFix(
           unknown
         >)
       : {};
+  const batchId = String(payload.review_batch_id || "").trim();
   const fixes = Array.isArray(payload.recent_fixes)
     ? [...(payload.recent_fixes as Record<string, unknown>[])]
     : [];
@@ -40,23 +56,30 @@ export async function confirmZaimFix(
     const row = { ...fixes[i] };
     if (String(row.id || "") === id) {
       row.status = next;
-      row.confirmed_at = new Date().toISOString();
+      row.flagged_at = next === "disputed" ? new Date().toISOString() : null;
+      if (batchId) stampBatchId(row, batchId);
       fixes[i] = row;
       found = true;
     }
   }
   if (!found) {
-    fixes.push({
+    const row: Record<string, unknown> = {
       id,
       status: next,
-      confirmed_at: new Date().toISOString(),
+      flagged_at: next === "disputed" ? new Date().toISOString() : null,
       proposal: "(ダッシュボードから更新)",
-    });
+    };
+    if (batchId) stampBatchId(row, batchId);
+    fixes.push(row);
   }
   payload.recent_fixes = fixes;
-  payload.pending_confirm_count = fixes.filter(
-    (f) => f && f.status === "pending_confirm",
-  ).length;
+  payload.pending_confirm_count = fixes.filter((f) => {
+    const st = String(f.status || "pending_confirm");
+    const bid = String(f.batch_id || batchId || "");
+    const ack = String(payload.dashboard_ack_batch_id || "");
+    if (ack && bid && ack === bid) return false;
+    return st === "pending_confirm" || st === "disputed" || !f.status;
+  }).length;
 
   const { error: uErr } = await supabase
     .from("watch_status")
@@ -70,8 +93,8 @@ export async function confirmZaimFix(
       watch_id: WATCH_ID,
       role: "user",
       body: note
-        ? `直しがおかしい: ${id}\n${note.slice(0, 800)}`
-        : `直しがおかしい: ${id}`,
+        ? `学習が違う: ${id}\n${note.slice(0, 800)}`
+        : `学習が違う: ${id}`,
     });
   }
 
@@ -82,9 +105,8 @@ export async function confirmZaimFix(
 }
 
 /**
- * 「Jarvisが直したよ（財務）」を確認済みにしてホームピンを消す。
- * 確認待ちの直しを一括 confirmed。未実施の要対応・費目提案は残す。
- * batchId が空でも、現在の review_batch_id または pending 指紋で ack する。
+ * 「Jarvisが直したよ（財務）」を確認済みにしてホームピンと一覧を消す。
+ * pending は confirmed。disputed（おかしいフラグ）は上書きしない。
  */
 export async function acknowledgeZaimReview(
   batchId?: string,
@@ -107,9 +129,30 @@ export async function acknowledgeZaimReview(
       : {};
 
   const now = new Date().toISOString();
+  const bid = (batchId || "").trim();
+  const existingBatch = String(prev.review_batch_id || "").trim();
+  const pendingIds = (
+    Array.isArray(prev.recent_fixes)
+      ? (prev.recent_fixes as Record<string, unknown>[])
+      : []
+  )
+    .filter((f) => {
+      const st = String(f.status || "pending_confirm");
+      return st === "pending_confirm" || st === "disputed" || !f.status;
+    })
+    .map((f) => String(f.id || ""))
+    .filter(Boolean)
+    .sort()
+    .join(",");
+
+  const ackId =
+    bid ||
+    existingBatch ||
+    (pendingIds ? `pending:${pendingIds.slice(0, 120)}` : `ack:${now}`);
+
   const fixes = Array.isArray(prev.recent_fixes)
     ? (prev.recent_fixes as Record<string, unknown>[]).map((f) => {
-        const row = { ...f };
+        const row = stampBatchId({ ...f }, ackId);
         if (row.status === "pending_confirm" || !row.status) {
           row.status = "confirmed";
           row.confirmed_at = now;
@@ -117,24 +160,6 @@ export async function acknowledgeZaimReview(
         return row;
       })
     : [];
-
-  const pendingIds = (
-    Array.isArray(prev.recent_fixes)
-      ? (prev.recent_fixes as Record<string, unknown>[])
-      : []
-  )
-    .filter((f) => !f.status || f.status === "pending_confirm")
-    .map((f) => String(f.id || ""))
-    .filter(Boolean)
-    .sort()
-    .join(",");
-
-  const bid = (batchId || "").trim();
-  const existingBatch = String(prev.review_batch_id || "").trim();
-  const ackId =
-    bid ||
-    existingBatch ||
-    (pendingIds ? `pending:${pendingIds.slice(0, 120)}` : `ack:${now}`);
 
   const note = String(watch.summary || "")
     .replace(/^見直したよ[·・]\s*/, "")

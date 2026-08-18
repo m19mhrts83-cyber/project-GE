@@ -219,21 +219,36 @@ def apply_disputed_suppressions(rules: dict[str, Any]) -> int:
     except Exception:
         return 0
     n = 0
+    disputed_keys: set[str] = set()
     for e in cl.get("entries") or []:
         if e.get("status") != "disputed":
             continue
         kind = str(e.get("kind") or e.get("target") or "")
-        if kind not in ("set_category", "category", "category_review"):
-            if e.get("action") not in ("set_category", "category_review"):
-                continue
+        is_cat = kind in ("set_category", "category", "category_review") or e.get(
+            "action"
+        ) in ("set_category", "category_review")
+        if not is_cat:
+            continue
         key = str(e.get("learn_key") or learn_key(str(e.get("shop") or ""), str(e.get("item") or "")))
         if not key:
             continue
+        disputed_keys.add(key)
         before = (rules.get("rules") or {}).get(key) or {}
         if before.get("suppressed"):
             continue
         suppress_key(rules, key, reason="disputed")
         n += 1
+    store = rules.setdefault("rules", {})
+    for key, cur in list(store.items()):
+        if not isinstance(cur, dict):
+            continue
+        if not cur.get("suppressed") or cur.get("suppress_reason") != "disputed":
+            continue
+        if key in disputed_keys:
+            continue
+        cur["suppressed"] = False
+        cur["updated_at"] = now_iso()
+        store[key] = cur
     return n
 
 
