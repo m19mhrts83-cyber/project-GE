@@ -206,7 +206,7 @@ export const RE_LANES: MapItem[] = [
     title: "保有物件マスタ",
     intent: "所有物件の基本情報とレントロール。ローンは二重入力しない",
     implemented:
-      "物件一覧・郵便番号・鍵番号・RR vs 月返済・借入残高トラッカー投影（読取のみ）",
+      "物件一覧・郵便番号・鍵番号（Notion API／失敗時 YAML）・RR vs 月返済・借入残高トラッカー投影",
     href: "/realestate/properties",
   },
   {
