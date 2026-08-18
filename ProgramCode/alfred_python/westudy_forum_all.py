@@ -114,6 +114,26 @@ def forum_topic_href_prefix() -> str:
     return _DEFAULT_TOPIC_HREF_PREFIX
 
 
+def _forum_wait_abort_reason(
+    *,
+    forum_links: int,
+    guest_login: bool,
+    body_len: int,
+    guest_hits: int,
+    empty_hits: int,
+    min_body_chars: int = 80,
+    fail_hits: int = 5,
+) -> str | None:
+    """フォーラム到達待ちを早期打ち切る理由。到達できていれば None。"""
+    if forum_links >= 1:
+        return None
+    if guest_login and guest_hits >= fail_hits:
+        return "未ログイン画面のまま"
+    if (not guest_login) and body_len < min_body_chars and empty_hits >= fail_hits:
+        return "空ページのまま"
+    return None
+
+
 def wait_for_forum_ready(reason: str = "") -> None:
     """ログイン後など、フォーラム相当のページに到達したことを a[href*='forum'] で判定（厳密な CSS より寛容）。"""
     global driver
@@ -121,6 +141,7 @@ def wait_for_forum_ready(reason: str = "") -> None:
     note = f" ({reason})" if reason else ""
     last_log = 0.0
     guest_hits = 0
+    empty_hits = 0
     while time.time() < deadline:
         now = time.time()
         try:
@@ -148,24 +169,35 @@ def wait_for_forum_ready(reason: str = "") -> None:
                     """
                 )
             )
+            body_len = _page_body_text_len()
         except Exception:
-            cur, is404, n, guest_login = "", False, 0, False
+            cur, is404, n, guest_login, body_len = "", False, 0, False, 0
         if n >= 1:
             return
         if guest_login and n == 0:
             guest_hits += 1
-            # 数秒連続でゲスト UI なら、120秒待つ前に失敗（誤った「既存セッション」切り分け用）
-            if guest_hits >= 5:
-                raise TimeoutException(
-                    f"フォーラム未到達{note}: 未ログイン画面のまま "
-                    f"URL={cur}"
-                )
         else:
             guest_hits = 0
+        if n == 0 and (not guest_login) and body_len < _MIN_USEFUL_BODY_CHARS:
+            empty_hits += 1
+        else:
+            empty_hits = 0
+        abort = _forum_wait_abort_reason(
+            forum_links=n,
+            guest_login=guest_login,
+            body_len=body_len,
+            guest_hits=guest_hits,
+            empty_hits=empty_hits,
+            min_body_chars=_MIN_USEFUL_BODY_CHARS,
+        )
+        if abort:
+            raise TimeoutException(f"フォーラム未到達{note}: {abort} URL={cur}")
         if now - last_log >= 30:
             extra = " error404" if (is404 and "forum" in cur.lower()) else ""
             if guest_login:
                 extra += " guest_login"
+            if empty_hits:
+                extra += f" empty_body={body_len}"
             log(f"… フォーラム到達待機{note} n={n}{extra} URL={cur[:120]}")
             last_log = now
         time.sleep(1.0)
@@ -469,6 +501,17 @@ def _dump_page_debug(tag: str) -> None:
         log(f"⚠️ HTML dump 失敗: {e}")
 
 
+def _partial_load_usable(
+    ready: str,
+    body_len: int,
+    has_required: bool,
+    *,
+    min_body_chars: int = _MIN_USEFUL_BODY_CHARS,
+) -> bool:
+    """page load timeout 後にそのまま進めてよいか（空DOM・必須セレクタ欠落は不可）。"""
+    return ready in ("interactive", "complete") and body_len >= min_body_chars and has_required
+
+
 def safe_get(
     url: str,
     *,
@@ -531,7 +574,7 @@ def safe_get(
                 # ただし空ページや必須セレクタ欠落は続行しない
                 useful = body_len >= _MIN_USEFUL_BODY_CHARS
                 has_required = (not require_selector) or _page_has_selector(require_selector)
-                if ready in ("interactive", "complete") and useful and has_required:
+                if _partial_load_usable(ready, body_len, has_required):
                     try:
                         driver.execute_script("window.stop();")
                     except Exception:
@@ -625,7 +668,7 @@ def _try_existing_session_forum() -> bool:
         return False
     log(f"ℹ️ 既存セッション候補 cookie={cookies} → フォーラムを確認")
     try:
-        safe_get(forum_base_url(), retries=LOGIN_NAV_RETRIES)
+        safe_get(forum_base_url(), retries=LOGIN_NAV_RETRIES, page_load_timeout=45)
         wait_for_forum_ready("既存セッション")
         log("✅ ログイン完了（既存セッション）")
         return True
