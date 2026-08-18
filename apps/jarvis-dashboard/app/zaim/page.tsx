@@ -31,7 +31,22 @@ type FixItem = {
   value?: string;
   message?: string;
   applied_at?: string;
+  batch_id?: string;
+  learn_key?: string;
 };
+
+function isVisibleLearnFix(
+  f: FixItem,
+  ackBatchId: string,
+  reviewBatchId: string,
+): boolean {
+  const st = f.status || "pending_confirm";
+  if (st === "confirmed" || st === "failed") return false;
+  if (st !== "pending_confirm" && st !== "disputed") return false;
+  const bid = String(f.batch_id || reviewBatchId || "");
+  if (ackBatchId && bid && ackBatchId === bid) return false;
+  return true;
+}
 
 function fmtYen(n: number | null | undefined) {
   if (n == null || Number.isNaN(n)) return "—";
@@ -144,14 +159,15 @@ export default async function ZaimWatchPage() {
   const fixes = Array.isArray(payload.recent_fixes)
     ? (payload.recent_fixes as FixItem[])
     : [];
-  const pendingFixes = fixes.filter(
-    (f) => f.status === "pending_confirm" || !f.status,
+  const reviewBatchId = String(payload.review_batch_id || "");
+  const ackBatchId = String(payload.dashboard_ack_batch_id || "");
+  const visibleFixes = fixes.filter((f) =>
+    isVisibleLearnFix(f, ackBatchId, reviewBatchId),
   );
   const otherFixes = fixes.filter(
-    (f) => f.status && f.status !== "pending_confirm",
+    (f) => !isVisibleLearnFix(f, ackBatchId, reviewBatchId),
   );
-  const showBanner = payload.show_banner === true;
-  const reviewBatchId = String(payload.review_batch_id || "");
+  const showBanner = payload.show_banner === true || visibleFixes.length > 0;
   const reviewLines = Array.isArray(payload.review_lines)
     ? (payload.review_lines as string[])
     : [];
@@ -198,9 +214,9 @@ export default async function ZaimWatchPage() {
       <h1>Zaim Watch</h1>
       <FolderLinks links={folderLinks} />
       <p className="sub">
-        財務の年間収支と、集計設定・二重取込・費目見直しの確認。アーカイブせず常駐します。
-        確信度の高い集計直しと、学習済みの費目は Jarvis が適用し、ホームに「直したよ（財務）」として残します（確認するまで消えません）。
-        手動で直した費目は次の取込で学習し、2回同じ直しが揃うと自動適用になります。
+        財務の年間収支と、集計設定・二重取込・費目の学習結果。アーカイブせず常駐します。
+        確信度の高い直しは Jarvis が財務側へ適用し、結果をここに残します（確認したまで消えません）。
+        修正は Zaim 本体で行い、次の取込で学習します。学習が違うときだけ「おかしい」で印を付けます。
         火・金に見直し（CSV は同曜日）。年間収支は Zaim の「集計に含めない」を除外した合計です（当年は1〜当月の
         YTD）。詳細な月次は{" "}
         <Link href="/metrics" style={{ color: "var(--accent)", fontWeight: 600 }}>
@@ -209,7 +225,7 @@ export default async function ZaimWatchPage() {
         。
       </p>
 
-      {showBanner || pendingFixes.length > 0 ? (
+      {showBanner || visibleFixes.length > 0 ? (
         <section className="card level-attention" style={{ marginBottom: 16 }}>
           <header>
             <span className="lvl">お知らせ</span>
@@ -218,15 +234,15 @@ export default async function ZaimWatchPage() {
           <ul className="openchat-group-lines">
             {(reviewLines.length
               ? reviewLines
-              : pendingFixes.length
-                ? [`直し確認待ち ${pendingFixes.length}件`]
+              : visibleFixes.length
+                ? [`学習・修正 ${visibleFixes.length}件（未確認）`]
                 : ["見直し結果があります"]
             ).map((ln, i) => (
               <li key={i}>{ln}</li>
             ))}
           </ul>
           <p className="meta" style={{ marginBottom: 8 }}>
-            「確認しました」でホームのピンと確認待ちを消します。直し履歴は下に残ります。新しい直しが出たらまた表示されます。
+            修正は財務（Zaim）側。ここは結果の確認と、学習ミスの印です。「確認した」でピンと一覧を消します。新しい修正が出たらまた表示されます。
           </p>
           <ZaimReviewAckButton batchId={reviewBatchId} />
         </section>
@@ -365,11 +381,11 @@ export default async function ZaimWatchPage() {
           </div>
         ) : null}
 
-        {pendingFixes.length > 0 ? (
+        {visibleFixes.length > 0 ? (
           <div className="watch-actions">
-            <p className="watch-actions-title">直した履歴（確認待ち）</p>
+            <p className="watch-actions-title">学習・修正された内容</p>
             <ul>
-              {pendingFixes.map((f, idx) => (
+              {visibleFixes.map((f, idx) => (
                 <li
                   key={`${f.id}-${idx}`}
                   className="watch-action-stack"
@@ -391,7 +407,11 @@ export default async function ZaimWatchPage() {
                     </div>
                   </div>
                   {f.id ? (
-                    <ZaimFixActions fixId={String(f.id)} path="/zaim" />
+                    <ZaimFixActions
+                      fixId={String(f.id)}
+                      flagged={f.status === "disputed"}
+                      path="/zaim"
+                    />
                   ) : null}
                 </li>
               ))}
@@ -399,7 +419,7 @@ export default async function ZaimWatchPage() {
           </div>
         ) : (
           <p className="meta" style={{ marginTop: 8 }}>
-            確認待ちの直しはありません
+            未確認の学習・修正はありません
           </p>
         )}
 

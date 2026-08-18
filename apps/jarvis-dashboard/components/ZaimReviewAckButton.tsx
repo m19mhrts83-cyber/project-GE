@@ -36,7 +36,7 @@ export default function ZaimReviewAckButton({
           });
         }}
       >
-        {pending ? "更新中…" : "確認しました"}
+        {pending ? "更新中…" : "確認した"}
       </button>
       {err ? <p className="meta etc-ack-err">{err}</p> : null}
     </div>

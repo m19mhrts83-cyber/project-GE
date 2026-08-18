@@ -236,22 +236,39 @@ def push_watch(sb) -> int:
             row = dict(f)
             if fid and fid in remote_status:
                 rs = remote_status[fid]
-                if rs.get("status") in ("confirmed", "disputed"):
+                if rs.get("status") in ("confirmed", "disputed", "pending_confirm"):
                     row["status"] = rs.get("status")
                     if rs.get("confirmed_at"):
                         row["confirmed_at"] = rs.get("confirmed_at")
+                    if rs.get("batch_id"):
+                        row["batch_id"] = rs.get("batch_id")
+                    if rs.get("learn_key") and not row.get("learn_key"):
+                        row["learn_key"] = rs.get("learn_key")
             merged_fixes.append(row)
             if fid:
                 seen_ids.add(fid)
         for fid, rf in remote_status.items():
-            if fid not in seen_ids and rf.get("status") in ("confirmed", "disputed"):
+            if fid not in seen_ids and rf.get("status") in (
+                "confirmed",
+                "disputed",
+                "pending_confirm",
+            ):
                 merged_fixes.append(rf)
         if merged_fixes:
             payload["recent_fixes"] = merged_fixes[-40:]
             payload["pending_confirm_count"] = sum(
                 1
                 for f in merged_fixes
-                if isinstance(f, dict) and f.get("status") == "pending_confirm"
+                if isinstance(f, dict)
+                and (
+                    str(f.get("status") or "pending_confirm")
+                    in ("pending_confirm", "disputed")
+                )
+                and not (
+                    str(payload.get("dashboard_ack_batch_id") or "")
+                    and str(f.get("batch_id") or payload.get("review_batch_id") or "")
+                    == str(payload.get("dashboard_ack_batch_id") or "")
+                )
             )
             # ローカル changelog にも確認状態を反映（再適用・pending 表示のずれ防止）
             try:
@@ -269,11 +286,19 @@ def push_watch(sb) -> int:
                         if fid in by_id and by_id[fid].get("status") in (
                             "confirmed",
                             "disputed",
+                            "pending_confirm",
                         ):
-                            if e.get("status") != by_id[fid].get("status"):
-                                e["status"] = by_id[fid].get("status")
-                                if by_id[fid].get("confirmed_at"):
-                                    e["confirmed_at"] = by_id[fid].get("confirmed_at")
+                            rs = by_id[fid]
+                            if e.get("status") != rs.get("status"):
+                                e["status"] = rs.get("status")
+                                if rs.get("confirmed_at"):
+                                    e["confirmed_at"] = rs.get("confirmed_at")
+                                changed = True
+                            if rs.get("batch_id") and e.get("batch_id") != rs.get("batch_id"):
+                                e["batch_id"] = rs.get("batch_id")
+                                changed = True
+                            if rs.get("learn_key") and not e.get("learn_key"):
+                                e["learn_key"] = rs.get("learn_key")
                                 changed = True
                     if changed:
                         cl["updated_at"] = now_iso()
