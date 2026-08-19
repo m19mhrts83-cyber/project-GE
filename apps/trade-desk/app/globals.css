@@ -668,11 +668,40 @@ tr.sold td {
   left: 0;
   z-index: 2;
 }
-.mq-cashflow-col-item {
-  min-width: 108px;
+.mq-cashflow-col-sign {
+  min-width: 40px;
+  max-width: 40px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 800;
   left: 72px;
   z-index: 2;
+}
+.mq-cashflow-col-item {
+  min-width: 108px;
+  left: 112px;
+  z-index: 2;
   box-shadow: 4px 0 6px -4px rgba(0, 0, 0, 0.12);
+}
+.mq-cashflow-sign-plus {
+  color: #1a7a45;
+}
+.mq-cashflow-sign-minus {
+  color: #b54a3a;
+}
+.mq-cashflow-sign-pm {
+  color: #2a5ea8;
+}
+.mq-cashflow-sign-none {
+  color: var(--muted);
+}
+.mq-cashflow-cell-plus {
+  color: #1a7a45;
+  font-weight: 600;
+}
+.mq-cashflow-cell-minus {
+  color: #b54a3a;
+  font-weight: 600;
 }
 .mq-cashflow-sticky-col {
   position: sticky;
@@ -689,18 +718,22 @@ tr.sold td {
   background: inherit;
 }
 .mq-cashflow-row-income .mq-cashflow-col-group,
+.mq-cashflow-row-income .mq-cashflow-col-sign,
 .mq-cashflow-row-income .mq-cashflow-col-item {
   background: rgba(34, 139, 87, 0.04);
 }
 .mq-cashflow-row-expense .mq-cashflow-col-group,
+.mq-cashflow-row-expense .mq-cashflow-col-sign,
 .mq-cashflow-row-expense .mq-cashflow-col-item {
   background: rgba(220, 80, 60, 0.035);
 }
 .mq-cashflow-row-summary .mq-cashflow-col-group,
+.mq-cashflow-row-summary .mq-cashflow-col-sign,
 .mq-cashflow-row-summary .mq-cashflow-col-item {
   background: rgba(30, 100, 200, 0.05);
 }
 .mq-cashflow-row-metric .mq-cashflow-col-group,
+.mq-cashflow-row-metric .mq-cashflow-col-sign,
 .mq-cashflow-row-metric .mq-cashflow-col-item {
   background: rgba(120, 90, 20, 0.04);
 }
