@@ -2,6 +2,7 @@ import Shell from "@/components/Shell";
 import HouseholdBsAdvicePanel from "@/components/HouseholdBsAdvicePanel";
 import HouseholdBsPanel from "@/components/HouseholdBsPanel";
 import HouseholdBsTaxBandPanel from "@/components/HouseholdBsTaxBandPanel";
+import HouseholdBsYearNav from "@/components/HouseholdBsYearNav";
 import {
   composeHouseholdBs,
   householdBsViewFromSnapshot,
@@ -175,29 +176,11 @@ export default async function HouseholdBsPage({
       <p className="page-kicker">① · 家計B/S（キヨサキ4象限）</p>
       <h1>家計B/S</h1>
       <p className="sub">
-        上段=収入/支出（フロー）、下段=資産/負債（ストック）。
+        上段=損益の流れ（収入/支出）。下段=会計B/Sと同じ向き（左=資産、右=負債）。
         個人+法人はMQ合算がデフォルト。/mq の事業B/Sとは混ぜません。
       </p>
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <header>
-          <span className="lvl">年度</span>
-          <strong>{year}年</strong>
-        </header>
-        <div className="mq-slicer" style={{ marginTop: 8 }}>
-          {[year, String(Number(year) - 1), String(Number(year) - 2)].map(
-            (y) => (
-              <a
-                key={y}
-                className={`btn${y === year ? " primary" : ""}`}
-                href={`/household-bs?year=${y}`}
-              >
-                {y}
-              </a>
-            )
-          )}
-        </div>
-      </div>
+      <HouseholdBsYearNav year={year} live={forceLive} />
 
       {view.snapshotAsOf ? (
         <p className="meta" style={{ marginTop: 8 }}>
