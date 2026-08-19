@@ -23,6 +23,12 @@ routes:
     display_name: "Kneesbee税理士法人"
     group: false
     group_label: "Knees bee税理士法人"
+  - id: tokai_dx_gojokai
+    filename_hints: ["神大家東海DX", "東海DX互助会", "東海 DX 互助会"]
+    folder: "820_LINE_東海DX互助会"
+    display_name: "東海DX互助会"
+    group: true
+    group_label: "神大家東海DX互助会"
 
 # Phase C 段階3: Gmail 着信 → inbox（line_export_gmail_to_inbox.py）
 # 送信: iPhone EmailMe → matsuno.estate@gmail.com（admin@ へ転送あり・取込は estate を正）

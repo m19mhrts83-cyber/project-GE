@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""連絡先一覧.yaml から line_direct_chat_mid 付きパートナーを CHRLINE ターゲットとして読む。"""
+"""連絡先一覧.yaml から line_direct_chat_mid / line_group_chat_mid 付きパートナーを CHRLINE ターゲットとして読む。"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -54,12 +54,13 @@ def _partner_yoritoori_md(folder: str) -> Path | None:
     return p2.resolve() if p2.is_file() else None
 
 
-def load_direct_chat_targets(
-    contacts_path: Path | None = None,
+def _load_chat_targets(
     *,
+    mid_key: str,
+    contacts_path: Path | None = None,
     exclude_mids: set[str] | None = None,
 ) -> list[DirectChatTarget]:
-    """line_direct_chat_mid が設定されたパートナーの 1:1 ターゲット一覧。"""
+    """連絡先一覧.yaml から指定 mid キー付きパートナーの CHRLINE ターゲットを読む。"""
     path = contacts_path or default_contacts_yaml()
     if not path.is_file():
         return []
@@ -78,7 +79,7 @@ def load_direct_chat_targets(
     for p in partners:
         if not isinstance(p, dict):
             continue
-        mid = str(p.get("line_direct_chat_mid") or "").strip()
+        mid = str(p.get(mid_key) or "").strip()
         if not mid or mid in skip or mid in seen_mids:
             continue
         folder = str(p.get("folder") or "").strip()
@@ -88,14 +89,43 @@ def load_direct_chat_targets(
         name = str(p.get("name") or folder or "LINE").strip()
         line_label = str(p.get("line") or "").strip()
         peer = line_label.split("/")[0].strip() if line_label else name
-        org = name
         out.append(
             DirectChatTarget(
                 yoritoori_md=md,
-                org_label=org,
+                org_label=name,
                 chat_mid=mid,
                 peer_label=peer or name,
             )
         )
         seen_mids.add(mid)
     return out
+
+
+def load_direct_chat_targets(
+    contacts_path: Path | None = None,
+    *,
+    exclude_mids: set[str] | None = None,
+) -> list[DirectChatTarget]:
+    """line_direct_chat_mid が設定されたパートナーの 1:1 ターゲット一覧。"""
+    return _load_chat_targets(
+        mid_key="line_direct_chat_mid",
+        contacts_path=contacts_path,
+        exclude_mids=exclude_mids,
+    )
+
+
+def load_group_chat_targets(
+    contacts_path: Path | None = None,
+    *,
+    exclude_mids: set[str] | None = None,
+) -> list[DirectChatTarget]:
+    """line_group_chat_mid が設定されたパートナーのグループターゲット一覧。
+
+    Tcell / LEAF / 815幹事など、プリセット側で既に needle が入っている mid は
+    exclude_mids で除外する（二重追記防止）。
+    """
+    return _load_chat_targets(
+        mid_key="line_group_chat_mid",
+        contacts_path=contacts_path,
+        exclude_mids=exclude_mids,
+    )
