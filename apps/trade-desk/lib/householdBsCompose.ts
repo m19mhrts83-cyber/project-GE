@@ -27,6 +27,7 @@ export type HouseholdBsRow = {
   source?: string | null;
   hint?: string;
   entity?: "personal" | "corporate" | "combined";
+  staleDays?: number | null;
 };
 
 export type MqSlice = {
@@ -50,6 +51,8 @@ export type HouseholdBsView = {
   mqSlices: MqSlice[];
   notes: string[];
   composedAt: string;
+  snapshotAsOf?: string | null;
+  snapshotSource?: string | null;
 };
 
 export type HouseholdConfig = {
@@ -94,19 +97,42 @@ type CategoryRow = {
 
 export function loadHouseholdBsConfig(): HouseholdConfig {
   const candidates = [
+    path.join(process.cwd(), "..", "..", "config", "household_kiyosaki_bs.yaml"),
+    path.join(process.cwd(), "config", "household_kiyosaki_bs.yaml"),
     path.join(process.cwd(), "config", "household_kiyosaki_bs.json"),
     path.join(process.cwd(), "..", "..", "config", "household_kiyosaki_bs.json"),
   ];
   for (const p of candidates) {
     try {
-      if (fs.existsSync(p)) {
-        return JSON.parse(fs.readFileSync(p, "utf8")) as HouseholdConfig;
+      if (!fs.existsSync(p)) continue;
+      const raw = fs.readFileSync(p, "utf8");
+      if (p.endsWith(".yaml") || p.endsWith(".yml")) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { parse } = require("yaml") as typeof import("yaml");
+        return parse(raw) as HouseholdConfig;
       }
+      return JSON.parse(raw) as HouseholdConfig;
     } catch {
       /* try next */
     }
   }
-  throw new Error("household_kiyosaki_bs.json not found");
+  throw new Error("household_kiyosaki_bs config not found");
+}
+
+function staleDaysFrom(asOf: string | null | undefined): number | null {
+  if (!asOf) return null;
+  const d = new Date(String(asOf).slice(0, 10));
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  return Math.max(
+    0,
+    Math.floor((now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000))
+  );
+}
+
+function withStale<T extends HouseholdBsRow>(row: T): T {
+  if (!row.asOf) return row;
+  return { ...row, staleDays: staleDaysFrom(row.asOf) };
 }
 
 function num(v: number | string | null | undefined): number {
@@ -454,11 +480,29 @@ export function composeHouseholdBs(args: {
   return {
     year,
     grain,
-    rows,
+    rows: rows.map(withStale),
     totals: sumTotals(rows),
     mqSlices: [mqCombined, mqPersonal, mqCorporate],
     notes,
     composedAt: new Date().toISOString(),
+  };
+}
+
+/** DB スナップ payload → View（Phase C） */
+export function householdBsViewFromSnapshot(payload: unknown): HouseholdBsView | null {
+  if (!payload || typeof payload !== "object") return null;
+  const p = payload as Partial<HouseholdBsView>;
+  if (!Array.isArray(p.rows) || !p.totals || !p.year) return null;
+  return {
+    year: String(p.year),
+    grain: p.grain === "month" ? "month" : "year",
+    rows: p.rows as HouseholdBsRow[],
+    totals: p.totals as HouseholdBsView["totals"],
+    mqSlices: (p.mqSlices as MqSlice[]) ?? [],
+    notes: (p.notes as string[]) ?? [],
+    composedAt: String(p.composedAt ?? new Date().toISOString()),
+    snapshotAsOf: p.snapshotAsOf ?? null,
+    snapshotSource: p.snapshotSource ?? null,
   };
 }
 

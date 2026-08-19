@@ -13,6 +13,7 @@ import {
   type TaxYearMetricRow,
 } from "@/lib/taxInsights";
 import { yenToMan } from "@/lib/mqUnits";
+import { buildCategoryRows } from "@/lib/mqTaxCategoryBridge";
 
 export type MqTaxCompareRow = {
   id: string;
@@ -35,6 +36,7 @@ export type MqTaxCompare = {
   filingStatus: string | null;
   filedOn: string | null;
   rows: MqTaxCompareRow[];
+  categoryRows: MqTaxCompareRow[];
   insights: string[];
   disclaimer: string;
 };
@@ -46,6 +48,11 @@ export type MqTaxCompareDual = {
   entity: "combined";
   personal: MqTaxCompare | null;
   corporate: MqTaxCompare | null;
+  /** MQ合算参考（申告列は空） */
+  combinedReference?: {
+    pqMan: number | null;
+    gMan: number | null;
+  };
   disclaimer: string;
 };
 
@@ -228,6 +235,13 @@ export function buildMqTaxCompare(args: {
     fiscalYear: args.fiscalYear,
   });
 
+  const categoryRows = buildCategoryRows({
+    computed: c,
+    depreciationMan: args.depreciationMan,
+    metric: m,
+    limit: 3,
+  });
+
   return {
     scope,
     fiscalYear: args.fiscalYear,
@@ -238,6 +252,7 @@ export function buildMqTaxCompare(args: {
     filingStatus: m?.filing_status ?? null,
     filedOn: m?.filed_on ?? null,
     rows,
+    categoryRows,
     insights,
     disclaimer: DISCLAIMER,
   };
@@ -323,12 +338,24 @@ export function buildMqTaxCompareDual(args: {
 
   if (!personal && !corporate) return null;
 
+  let pqMan: number | null = null;
+  let gMan: number | null = null;
+  if (args.personal.computed || args.corporate.computed) {
+    const pq =
+      (args.personal.computed?.pq ?? 0) + (args.corporate.computed?.pq ?? 0);
+    const g =
+      (args.personal.computed?.g ?? 0) + (args.corporate.computed?.g ?? 0);
+    pqMan = pq !== 0 ? pq : null;
+    gMan = g !== 0 ? g : null;
+  }
+
   return {
     fiscalYear: args.fiscalYear,
     line: args.line,
     entity: "combined",
     personal,
     corporate,
+    combinedReference: { pqMan, gMan },
     disclaimer: DISCLAIMER,
   };
 }
