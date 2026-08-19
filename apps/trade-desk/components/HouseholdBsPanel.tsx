@@ -173,7 +173,7 @@ export default function HouseholdBsPanel({ view }: { view: HouseholdBsView }) {
           quadrant="expense"
           rows={expenseRows}
           allRows={rows}
-          totalLabel="支出合計"
+          totalLabel="支出合計（返済込み）"
           totalJpy={totals.expenseJpy}
         />
       </div>
@@ -199,6 +199,10 @@ export default function HouseholdBsPanel({ view }: { view: HouseholdBsView }) {
       <p className="meta" style={{ marginTop: 6 }}>
         会計のB/Sと同じ向きです。左が資産、右が負債。自己資本（純資産）は下の「資産 − 負債」。
         キヨサキ4象限の上段（収入/支出）は損益計算書側で、B/Sの右側ではありません。
+      </p>
+      <p className="meta" style={{ marginTop: 6 }}>
+        この画面の支出合計は Cash is King を優先し、ローン元本返済を含むキャッシュ支出で表示します。
+        会計上の支出との差は、上部サマリーと年次グラフで分けて確認できます。
       </p>
 
       <div className="card" style={{ marginTop: 12 }}>

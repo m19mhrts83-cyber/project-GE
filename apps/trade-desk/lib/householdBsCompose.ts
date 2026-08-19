@@ -333,7 +333,10 @@ function sumTotals(rows: HouseholdBsRow[]): HouseholdBsView["totals"] {
   let assetJpy = 0;
   let liabilityJpy = 0;
   for (const r of rows) {
-    if (!r.countsTowardTotal || r.amountJpy == null) continue;
+    if (r.amountJpy == null) continue;
+    const includeInTotals =
+      r.countsTowardTotal || (r.quadrant === "expense" && r.band === "debt_service");
+    if (!includeInTotals) continue;
     const a = r.amountJpy;
     if (r.quadrant === "income") incomeJpy += a;
     else if (r.quadrant === "expense") expenseJpy += a;
