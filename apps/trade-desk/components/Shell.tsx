@@ -5,6 +5,7 @@ const NAV = [
   { href: "/themes", label: "テーマ" },
   { href: "/money-ops", label: "資金移動" },
   { href: "/portfolio", label: "資産" },
+  { href: "/household-bs", label: "家計B/S" },
   { href: "/consultations", label: "相談" },
   { href: "/lifeplan", label: "ライフプラン" },
   { href: "/realestate", label: "不動産賃貸" },
@@ -85,9 +86,14 @@ export default function Shell({
         <NavLinks
           active={active}
           items={NAV.filter((n) =>
-            ["/", "/themes", "/money-ops", "/portfolio", "/consultations"].includes(
-              n.href
-            )
+            [
+              "/",
+              "/themes",
+              "/money-ops",
+              "/portfolio",
+              "/household-bs",
+              "/consultations",
+            ].includes(n.href)
           )}
         />
 

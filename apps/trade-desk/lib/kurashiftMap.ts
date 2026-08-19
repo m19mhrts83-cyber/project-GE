@@ -135,6 +135,14 @@ export const ASSET_NAV_ITEMS: MapItem[] = [
     href: "/portfolio",
   },
   {
+    id: "nav-household-bs",
+    code: "家計B/S",
+    title: "キヨサキ4象限（①-A）",
+    intent: "収入/支出/資産/負債の見分け。MQ合算・契約者貸付は二重計上しない",
+    implemented: "/household-bs · portfolio/MQ/loan-tracker 合成",
+    href: "/household-bs",
+  },
+  {
     id: "nav-consult",
     code: "相談",
     title: "例外・迷ったときの記録（①-B）",

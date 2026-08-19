@@ -7,9 +7,10 @@
     "dev": "next dev --port 3003",
     "build": "next build",
     "start": "next start --port 3003",
-    "test:mq": "npx --yes tsx lib/mqEquations.selftest.ts && npx --yes tsx lib/mqZaimMap.selftest.ts && npx --yes tsx lib/mqBs.selftest.ts && npx --yes tsx lib/mqMonthCloseNotice.selftest.ts && npx --yes tsx lib/mqAggregate.selftest.ts && npx --yes tsx lib/mqRefreshPolicy.selftest.ts && npx --yes tsx lib/mqIngestApply.selftest.ts && npx --yes tsx lib/mqUnits.selftest.ts",
+    "test:mq": "npx --yes tsx lib/mqEquations.selftest.ts && npx --yes tsx lib/mqZaimMap.selftest.ts && npx --yes tsx lib/mqBs.selftest.ts && npx --yes tsx lib/mqMonthCloseNotice.selftest.ts && npx --yes tsx lib/mqAggregate.selftest.ts && npx --yes tsx lib/mqRefreshPolicy.selftest.ts && npx --yes tsx lib/mqIngestApply.selftest.ts && npx --yes tsx lib/mqUnits.selftest.ts && npx --yes tsx lib/mqTaxCompare.selftest.ts",
+    "test:household": "npx --yes tsx lib/householdBsCompose.selftest.ts",
     "test:re": "npx --yes tsx lib/rePropertyMaster.selftest.ts",
-    "test": "npm run test:mq && npm run test:re"
+    "test": "npm run test:mq && npm run test:re && npm run test:household"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

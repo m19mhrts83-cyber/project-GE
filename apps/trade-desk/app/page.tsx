@@ -593,6 +593,8 @@ export default async function HomePage() {
           <p className="meta">
             保険借入合計 {fmtYen(loanTotal)}
             {loanTotal > 0 ? "（頭金枠の把握用・負債）" : ""}
+            {" · "}
+            <a href="/household-bs">家計B/S（4象限）→</a>
           </p>
           {activeLoanRates.length > 0 ? (
             <p className="meta">
