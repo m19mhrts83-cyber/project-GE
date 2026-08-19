@@ -51,6 +51,18 @@ static_rows:
 loan_match:
   mini_patterns: [MINI, Countryman, マイカー, 名鉄AUTO, mycar]
   mini_label: MINI Countryman D ローン
+  home_patterns: [大垣, 共立, 住宅, 自宅, 住居, ogaki]
+  home_label: 自宅ローン（大垣共立）
+  # 2026年完済予定・家計B/S対象外（日本学生支援機構等）
+  exclude_patterns: [奨学金, 日本学生支援, ガクセイシエン, JASSO, 15F]
+
+expense_flow:
+  exclude_category_patterns:
+    - MQ
+    - 不動産
+    - G.ローン借換
+    - 奨学金
+    - 15F
 
 income_categories:
   - 給与

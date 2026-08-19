@@ -4,7 +4,7 @@
  */
 
 import type { HouseholdBsView } from "./householdBsCompose";
-import { fmtYen } from "./format";
+import { fmtManRounded } from "./format";
 
 export type AdviceItem = {
   order: number;
@@ -81,5 +81,5 @@ export function buildHouseholdAdvice(view: HouseholdBsView): AdviceItem[] {
 
 export function formatAdviceAmount(n: number | null): string {
   if (n == null || !Number.isFinite(n)) return "要確認";
-  return fmtYen(n);
+  return fmtManRounded(n);
 }

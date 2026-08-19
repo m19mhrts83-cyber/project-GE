@@ -21,6 +21,13 @@ export function fmtMan(n: number | null | undefined): string {
   return `${s}万`;
 }
 
+/** 円 → 万円（四捨五入）。ざっくり把握用。 */
+export function fmtManRounded(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(Number(n))) return "要確認";
+  const man = Math.round(Number(n) / 10_000);
+  return `${man.toLocaleString("ja-JP")}万`;
+}
+
 /** Numbers キャッシュフローのセル値（すでに万円）。 */
 export function fmtManUnit(n: number | null | undefined): string {
   if (n == null || Number.isNaN(Number(n))) return "—";
