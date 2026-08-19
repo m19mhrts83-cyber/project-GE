@@ -104,7 +104,7 @@ export async function applyMqYearIngest(
     year: opts.year,
     force: opts.force,
   });
-  const importRows = plan.toUpsert.map((b) => buildImportFactRow(b, opts.year));
+  const importRows = result.buckets.map((b) => buildImportFactRow(b, opts.year));
   const preview = {
     year: opts.year,
     txnCount: txns.length,
