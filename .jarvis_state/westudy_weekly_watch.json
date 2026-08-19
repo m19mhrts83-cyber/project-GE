@@ -1,10 +1,10 @@
 {
   "disabled": false,
-  "consecutive_successes": 0,
-  "last_checked_at": "2026-08-13T22:25:08+09:00",
-  "last_run_id": 31391405864,
+  "consecutive_successes": 1,
+  "last_checked_at": "2026-08-19T12:22:26+09:00",
+  "last_run_id": 32193669110,
   "last_conclusion": "success",
-  "last_result_note": "成功; run=31391405864",
+  "last_result_note": "成功; run=32193669110",
   "success_needed": 2,
   "note": "安定確認まで Jarvis が週次 CI を確認。連続成功2回＋ユーザー合意、または disabled:true / JARVIS_WESTUDY_WEEKLY_WATCH_DISABLE=1 で解除"
 }
