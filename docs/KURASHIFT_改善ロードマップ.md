@@ -14,20 +14,20 @@
 | A2 | ソニー no-table フォールバック強化 | **実装（要再実行検証）** |
 | A3 | 証憑手動 inbox ジョブ | **実装** |
 | A4 | αβγ注記・Step3「記録のみ」 | **実装** |
-| A5 | Vercel 自動デプロイ手順 | 下記 |
+| A5 | Vercel 自動デプロイ手順 | **実装**（`trade-desk-deploy.yml` + `vercel_trade_desk_deploy.sh`） |
 
 ### デプロイ（A5）
 
 - 本番 URL: https://jarvis-trade-desk.vercel.app
 - プロジェクト: `jarvis-trade-desk`（Root: `apps/trade-desk`）
-- Git 連携が効かないときは:
+- **自動**: `.github/workflows/trade-desk-deploy.yml`（`main` + `apps/trade-desk/**`）
+- **手動**（ルートのみ）:
 
 ```bash
-cd ~/git-repos && set -a && source .env.jarvis_private && set +a
-cd apps/trade-desk && npx vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+cd ~/git-repos && ./scripts/vercel_trade_desk_deploy.sh
 ```
 
-- ダッシュボードは `main` push で自動。trade-desk は Git 連携を Vercel コンソールで確認すること。
+- ダッシュボードは `main` push で自動。trade-desk も同様に Actions 本線（Vercel Git 連携は未使用可）。
 
 ### 受け入れ（本番）— Sprint 1 検証中
 
