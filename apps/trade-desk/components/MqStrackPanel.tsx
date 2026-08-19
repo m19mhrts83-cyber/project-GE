@@ -6,6 +6,14 @@ import type { MqComputed } from "@/lib/mqEquations";
 import { formatRatio } from "@/lib/mqEquations";
 import { fmtMqMan } from "@/lib/mqUnits";
 
+type AccountMapSummary = {
+  category_match: string;
+  subcategory_match: string;
+  entity_match: string;
+  combine_treatment: string;
+  note?: string | null;
+};
+
 function yenOrDash(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
   return fmtMqMan(n);
@@ -24,6 +32,8 @@ export default function MqStrackPanel({
   fMonthlyPart,
   fAnnualAllocated,
   fBreakdownKind,
+  includeDebtServiceInF,
+  vqAccountMap,
 }: {
   title: string;
   computed: MqComputed | null;
@@ -41,6 +51,10 @@ export default function MqStrackPanel({
   fAnnualAllocated?: number | null;
   /** UI の見せ方: 粒度（month=年額÷12 / year=年額） */
   fBreakdownKind?: "month" | "year";
+  /** 不動産ラインだけ: ローン出金（cash_out）をFへ寄せて「実態版」で表示 */
+  includeDebtServiceInF?: boolean;
+  /** VQ（変動費）に割り当てられているZaimカテゴリのマップ（クリック内訳用） */
+  vqAccountMap?: AccountMapSummary[];
 }) {
   if (!computed) {
     return (
@@ -62,10 +76,18 @@ export default function MqStrackPanel({
     "pq" | "vq" | "mq" | "f" | "g" | "eq" | null
   >(null);
 
+  const debtServiceMan = includeDebtServiceInF && cashOut != null ? cashOut : null;
+  const fShown = debtServiceMan == null ? c.f : c.f + debtServiceMan;
+  const gShown = debtServiceMan == null ? c.g : c.g - debtServiceMan;
+  const gOverPqShown = c.pq !== 0 ? gShown / c.pq : null;
+
   const equationDiff = useMemo(() => {
-    const v = c.pq - (c.vq + c.f + c.g);
+    const v = c.pq - (c.vq + fShown + gShown);
     return Number.isFinite(v) ? v : null;
-  }, [c]);
+  }, [c.pq, c.vq, fShown, gShown]);
+
+  const equationOkShown =
+    equationDiff != null ? Math.abs(equationDiff) <= 0.5 : false;
 
   const fBreakdownText = useMemo(() => {
     if (fBreakdownKind === "year") {
@@ -145,8 +167,12 @@ export default function MqStrackPanel({
           }}
         >
           <div className="mq-box-label">F 固定費</div>
-          <div className="mq-box-val">{yenOrDash(c.f)}</div>
-          <div className="meta">元本返済は含めない</div>
+          <div className="mq-box-val">{yenOrDash(fShown)}</div>
+          <div className="meta">
+            {debtServiceMan == null
+              ? "元本返済は含めない（MQ定義）"
+              : "元本相当（ローン出金）を含む（実態版）"}
+          </div>
         </div>
         <div
           className="mq-box mq-box-g clickable"
@@ -159,11 +185,11 @@ export default function MqStrackPanel({
           }}
         >
           <div className="mq-box-label">G 利益</div>
-          <div className="mq-box-val">{yenOrDash(c.g)}</div>
-          <div className="meta">G/PQ {formatRatio(c.gOverPq)}</div>
+          <div className="mq-box-val">{yenOrDash(gShown)}</div>
+          <div className="meta">G/PQ {formatRatio(gOverPqShown)}</div>
         </div>
       </div>
-      {!c.equationOk ? (
+      {!equationOkShown ? (
         <p className="meta" style={{ color: "var(--high)", marginTop: 8 }}>
           企業方程式 PQ＝VQ＋F＋G が一致していません
           {equationDiff != null && Math.abs(equationDiff) > 0
@@ -208,7 +234,10 @@ export default function MqStrackPanel({
 
           {detail === "f" ? (
             <div className="mq-detail-grid">
-              <div className="k">F（固定費）</div>
+              <div className="k">F（表示）</div>
+              <div className="v">{fmtMqMan(fShown)}</div>
+
+              <div className="k">従来MQの固定費</div>
               <div className="v">{fmtMqMan(c.f)}</div>
 
               <div className="k">月次側</div>
@@ -217,6 +246,11 @@ export default function MqStrackPanel({
               <div className="k">{fBreakdownKind === "year" ? "年額側" : "年額換算（÷12）"}</div>
               <div className="v">
                 {fAnnualAllocated == null ? "要確認" : fmtMqMan(fAnnualAllocated)}
+              </div>
+
+              <div className="k">＋元本相当（ローン出金）</div>
+              <div className="v">
+                {debtServiceMan == null ? "要確認" : fmtMqMan(debtServiceMan)}
               </div>
             </div>
           ) : (
@@ -238,15 +272,51 @@ export default function MqStrackPanel({
                   <div className="k">PQ</div>
                   <div className="v">{fmtMqMan(c.pq)}</div>
                   <div className="k">VQ + F + G</div>
-                  <div className="v">{fmtMqMan(c.vq + c.f + c.g)}</div>
+                  <div className="v">{fmtMqMan(c.vq + fShown + gShown)}</div>
                 </>
               ) : null}
             </div>
           )}
 
+          {detail === "vq" ? (
+            <div style={{ marginTop: 10 }}>
+              <div className="meta" style={{ fontWeight: 700, marginBottom: 6 }}>
+                VQに入る科目（Zaim→MQ割当）
+              </div>
+              <div className="meta" style={{ fontSize: 12, marginBottom: 8 }}>
+                ※金額ではなく「Zaim科目→MQ要素」の割当マップです
+              </div>
+              {vqAccountMap && vqAccountMap.length > 0 ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {vqAccountMap.map((m, idx) => {
+                    const ent =
+                      m.entity_match === "personal"
+                        ? "個人"
+                        : m.entity_match === "corporate"
+                          ? "法人"
+                          : "両方";
+                    const cat = m.category_match || "—";
+                    const sub = m.subcategory_match || "";
+                    return (
+                      <div key={`${idx}-${cat}-${sub}`} className="meta" style={{ fontSize: 13 }}>
+                        - {cat}
+                        {sub ? ` / ${sub}` : ""}（${ent}・${m.combine_treatment}）
+                        {m.note ? `：${m.note}` : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="meta">マップ未取得（要確認）</div>
+              )}
+            </div>
+          ) : null}
+
           <div className="mq-detail-note">
             {detail === "f"
-              ? "元本返済は含めません（Gに入れない）"
+              ? debtServiceMan == null
+                ? "元本返済は含めません（MQ定義）"
+                : "ローン出金（元本相当近似）をFへ寄せた実態版です（従来MQと考え方が異なります）"
               : "企業方程式: PQ = VQ + F + G"}
             {detail === "f" && fBreakdownText ? ` · ${fBreakdownText}` : ""}
             {equationDiff != null ? ` · 差分 ${equationDiff.toFixed(0)}万` : ""}
