@@ -37,6 +37,8 @@ async function main() {
     { data: loans },
     { data: categoryYear },
     { data: debitMeta },
+    { data: propertyUnits },
+    { data: taxMetrics },
   ] = await Promise.all([
     sb.from("portfolio_snapshots").select("account_id, as_of, value_jpy, source").order("as_of", { ascending: false }).limit(200),
     sb.from("securities_holdings").select("account_id, as_of, value_jpy, source").order("as_of", { ascending: false }).limit(40),
@@ -46,6 +48,8 @@ async function main() {
     sb.from("kurashift_loan_tracker_loans").select("id, name, balance_jpy, category_major, tags, payload"),
     sb.from("kurashift_finance_category_year").select("fiscal_year, category, income_jpy, expense_jpy").eq("fiscal_year", Number(year)).limit(200),
     sb.from("sync_meta").select("value").eq("key", "card_debit_watch_summary").maybeSingle(),
+    sb.from("property_units").select("property_id, property_name, room, status, rent, note, payload"),
+    sb.from("kurashift_tax_year_metrics").select("scope,fiscal_year,filing_status,filed_on,taxable_income_jpy,income_tax_jpy,refund_or_pay,revenue_jpy,ordinary_income_jpy,corporate_tax_jpy,tax_payable_jpy,payload,note,source").order("fiscal_year", { ascending: false }).limit(24),
   ]);
 
   let cardDebitAmountJpy: number | null = null;
@@ -80,6 +84,8 @@ async function main() {
     mqFacts: (mqRaw ?? []) as MqFactRow[],
     loanTracker: loans ?? [],
     categoryYear: categoryYear ?? [],
+    propertyUnits: (propertyUnits ?? []) as import("../lib/roiAssets").PropertyUnitRow[],
+    taxMetrics: (taxMetrics ?? []) as import("../lib/taxInsights").TaxYearMetricRow[],
     cardDebitAmountJpy,
     cardDebitDue,
   });

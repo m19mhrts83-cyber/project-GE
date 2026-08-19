@@ -1,7 +1,9 @@
 # 確定申告KPIカタログ（OneDrive 50_税金,確定申告 の提出用PDFから抽出）
 # 個人=暦年 / 法人=5月期。payload.re_income_jpy は第一表の不動産所得（③）。
+# payload.re_revenue_jpy は収支内訳書の収入金額＝家計B/Sの過去年家賃の正。
 # payload 任意キー（科目ブリッジ用）: re_revenue_jpy / depreciation_jpy / interest_jpy / repair_jpy / management_fee_jpy
 # 登録: scripts/jarvis_kurashift_tax.py --import-metrics-catalog
+# 家計B/S: 申告後はこのカタログを更新すると過去年の家賃が差し替わる（docs/KURASHIFT_家計BS_不動産フロー.md）
 # UI: /tax の TaxMetricsForm からも個人の payload を手入力可
 
 version: 1

@@ -37,6 +37,8 @@ async function composeLive(
     { data: loans },
     { data: categoryYear },
     { data: debitMeta },
+    { data: propertyUnits },
+    { data: taxMetrics },
   ] = await Promise.all([
     supabase
       .from("portfolio_snapshots")
@@ -76,6 +78,14 @@ async function composeLive(
       .select("value")
       .eq("key", "card_debit_watch_summary")
       .maybeSingle(),
+    supabase
+      .from("property_units")
+      .select("property_id, property_name, room, status, rent, note, payload"),
+    supabase
+      .from("kurashift_tax_year_metrics")
+      .select(TAX_YEAR_METRICS_SELECT)
+      .order("fiscal_year", { ascending: false })
+      .limit(24),
   ]);
 
   let cardDebitAmountJpy: number | null = null;
@@ -110,6 +120,8 @@ async function composeLive(
     mqFacts: (mqRaw ?? []) as MqFactRow[],
     loanTracker: loans ?? [],
     categoryYear: categoryYear ?? [],
+    propertyUnits: (propertyUnits ?? []) as import("@/lib/roiAssets").PropertyUnitRow[],
+    taxMetrics: (taxMetrics ?? []) as TaxYearMetricRow[],
     cardDebitAmountJpy,
     cardDebitDue,
   });
@@ -145,9 +157,22 @@ export default async function HouseholdBsPage({
       .maybeSingle(),
   ]);
 
-  const snapView =
+  const snapViewRaw =
     !forceLive && snapshotRow?.payload
       ? householdBsViewFromSnapshot(snapshotRow.payload)
+      : null;
+  const pastYear = Number(year) < Number(currentYear());
+  const snapHasFiled = Boolean(
+    snapViewRaw?.rows.some((r) => r.id === "re_rent_filed_personal")
+  );
+  const snapView =
+    snapViewRaw &&
+    (!pastYear || snapHasFiled) &&
+    (snapViewRaw.reFlow ||
+      snapViewRaw.rows.some(
+        (r) => r.id === "re_rent_gross" || r.id === "re_rent_filed_personal"
+      ))
+      ? snapViewRaw
       : null;
 
   // スナップ優先: 表示はスナップ、助言もスナップから。live compose は未登録時のみ。
@@ -177,7 +202,7 @@ export default async function HouseholdBsPage({
       <h1>家計B/S</h1>
       <p className="sub">
         上段=損益の流れ（収入/支出）。下段=会計B/Sと同じ向き（左=資産、右=負債）。
-        個人+法人はMQ合算がデフォルト。/mq の事業B/Sとは混ぜません。
+        不動産家賃は内容確認（号室）×所有月。MQは参考のみ。/mq の事業B/Sとは混ぜません。
       </p>
 
       <HouseholdBsYearNav year={year} live={forceLive} />

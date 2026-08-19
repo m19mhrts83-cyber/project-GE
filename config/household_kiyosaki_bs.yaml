@@ -60,6 +60,11 @@ expense_flow:
   exclude_category_patterns:
     - MQ
     - 不動産
+    - 合計
+    - "19"
+    - 賃貸
+    - マンション
+    - δ
     - G.ローン借換
     - 奨学金
     - 15F
@@ -68,6 +73,15 @@ income_categories:
   - 給与
   - 賞与
   - 三菱重工
+
+# 不動産フロー（家計B/S）。詳細: docs/KURASHIFT_家計BS_不動産フロー.md
+realestate_flow:
+  income_source: tax_return_then_occupancy
+  income_basis: gross_total_rent
+  finance_rent_is_net: true
+  mgmt_expense: occupancy_mgmt_unfiled_only
+  mq_in_totals: false
+  other_income_patterns: ["19.2", "19.4", "19.6", "売却"]
 
 policy_loan_rules:
   net_in_total: true
