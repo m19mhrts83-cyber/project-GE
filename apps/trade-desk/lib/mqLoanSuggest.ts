@@ -2,6 +2,8 @@
 
 export type LoanTrackerRow = {
   balance_jpy?: number | string | null;
+  monthly_payment_jpy?: number | string | null;
+  annual_payment_jpy?: number | string | null;
   category_major?: string | null;
   tags?: string[] | null;
   name?: string | null;
