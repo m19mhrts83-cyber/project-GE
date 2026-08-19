@@ -40,9 +40,10 @@ import type { MqComputed } from "@/lib/mqEquations";
 import { buildMqTaxCompare, buildMqTaxCompareDual } from "@/lib/mqTaxCompare";
 import type { TaxYearMetricRow } from "@/lib/taxInsights";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllMqPeriodFacts } from "@/lib/mqFactsFetch";
+import MqPeriodLinks from "@/components/MqPeriodLinks";
 import {
   MQ_BS_SELECT,
-  MQ_FACT_SELECT,
   TAX_YEAR_METRICS_SELECT,
 } from "@/lib/mqLeanSelect";
 
@@ -89,12 +90,6 @@ export default async function MqPage({
   const grain = one(sp, "grain", "month") as GrainFilter;
   const mode = one(sp, "mode", "aa") as CompareMode;
 
-  const { data: raw, error } = await supabase
-    .from("kurashift_mq_period_facts")
-    .select(MQ_FACT_SELECT)
-    .order("period_month", { ascending: false })
-    .limit(360);
-
   const { data: bsRaw } = await supabase
     .from("kurashift_mq_bs_snapshots")
     .select(MQ_BS_SELECT)
@@ -111,7 +106,14 @@ export default async function MqPage({
     .order("fiscal_year", { ascending: false })
     .limit(24);
 
-  const rows = (raw ?? []) as MqFactRow[];
+  let rows: MqFactRow[];
+  let error: Error | null = null;
+  try {
+    rows = await fetchAllMqPeriodFacts(supabase);
+  } catch (e) {
+    rows = [];
+    error = e instanceof Error ? e : new Error(String(e));
+  }
   const bsRows = (bsRaw ?? []) as MqBsRow[];
   const loanTrackerLt = sumLoanTrackerLt(loanRaw ?? []);
   const months = availableMonths(rows);
@@ -493,10 +495,9 @@ export default async function MqPage({
           {mode !== "pp" ? (
             <div className="mq-slicer-group">
               <span className="meta">{mode === "ap" ? "実績の期間" : "左（実績）"}</span>
-              <PeriodLinks
+              <MqPeriodLinks
                 grain={grain}
-                months={months}
-                years={years}
+                periods={grain === "year" ? years : months}
                 current={periodA}
                 makeHref={(v) => href({ a: v })}
               />
@@ -505,10 +506,9 @@ export default async function MqPage({
           {mode === "aa" ? (
             <div className="mq-slicer-group">
               <span className="meta">右（実績）</span>
-              <PeriodLinks
+              <MqPeriodLinks
                 grain={grain}
-                months={months}
-                years={years}
+                periods={grain === "year" ? years : months}
                 current={periodB}
                 makeHref={(v) => href({ b: v })}
               />
@@ -519,15 +519,12 @@ export default async function MqPage({
             <>
               <div className="mq-slicer-group">
                 <span className="meta">計画の年度</span>
-                {(years.length ? years : [defaultYear]).slice(0, 12).map((y) => (
-                  <a
-                    key={y}
-                    className={`btn${planYear === y ? " primary" : ""}`}
-                    href={href({ py: y })}
-                  >
-                    {y}
-                  </a>
-                ))}
+                <MqPeriodLinks
+                  grain="year"
+                  periods={years.length ? years : [defaultYear]}
+                  current={planYear}
+                  makeHref={(v) => href({ py: v })}
+                />
               </div>
               <div className="mq-slicer-group">
                 <span className="meta">{mode === "pp" ? "計画A" : "計画"}</span>
@@ -718,37 +715,5 @@ export default async function MqPage({
         ）は物件条件。こちらは固定費込みの粗利評価です。
       </p>
     </Shell>
-  );
-}
-
-function PeriodLinks({
-  grain,
-  months,
-  years,
-  current,
-  makeHref,
-}: {
-  grain: GrainFilter;
-  months: string[];
-  years: string[];
-  current: string;
-  makeHref: (v: string) => string;
-}) {
-  const opts = grain === "year" ? years : months;
-  if (opts.length === 0) {
-    return <span className="meta">（保存後に選択可）</span>;
-  }
-  return (
-    <>
-      {opts.slice(0, 18).map((v) => (
-        <a
-          key={v}
-          className={`btn${current === v ? " primary" : ""}`}
-          href={makeHref(v)}
-        >
-          {v}
-        </a>
-      ))}
-    </>
   );
 }

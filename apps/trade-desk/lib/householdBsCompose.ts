@@ -74,7 +74,14 @@ export type HouseholdConfig = {
     band?: string;
     hint?: string;
   }[];
-  loan_match: { mini_patterns: string[]; mini_label: string };
+  loan_match: {
+    mini_patterns: string[];
+    mini_label: string;
+    home_patterns?: string[];
+    home_label?: string;
+    exclude_patterns?: string[];
+  };
+  expense_flow?: { exclude_category_patterns?: string[] };
   income_categories: string[];
 };
 
@@ -198,6 +205,73 @@ function matchesMini(loan: LoanRow, patterns: string[]): boolean {
   return patterns.some((p) => blob.includes(p.toUpperCase()));
 }
 
+function matchesHome(loan: LoanRow, patterns: string[]): boolean {
+  const payload = loan.payload as { lender?: string } | null | undefined;
+  const blob = `${loan.name || ""} ${(loan.tags || []).join(" ")} ${payload?.lender || ""} ${loan.id}`.toUpperCase();
+  return patterns.some((p) => blob.includes(p.toUpperCase()));
+}
+
+function matchesLoanExclude(loan: LoanRow, patterns: string[]): boolean {
+  if (patterns.length === 0) return false;
+  const payload = loan.payload as { lender?: string; note?: string } | null | undefined;
+  const blob = `${loan.name || ""} ${(loan.tags || []).join(" ")} ${payload?.lender || ""} ${payload?.note || ""} ${loan.id}`.toUpperCase();
+  return patterns.some((p) => blob.includes(p.toUpperCase()));
+}
+
+function incomeRowsFromCategories(
+  cats: CategoryRow[],
+  year: number,
+  patterns: string[]
+): HouseholdBsRow[] {
+  const out: HouseholdBsRow[] = [];
+  for (const r of cats) {
+    if (r.fiscal_year !== year) continue;
+    const cat = (r.category || "").trim();
+    const inc = num(r.income_jpy);
+    if (!cat || inc <= 0) continue;
+    if (!patterns.some((p) => cat.includes(p))) continue;
+    const slug = cat.replace(/[^\w\u3040-\u9fff]+/g, "_").slice(0, 40);
+    out.push({
+      id: `zaim_income_${slug}`,
+      label: cat.replace(/^[αβγδ]?\.?\d+F?\./, ""),
+      quadrant: "income",
+      band: "engine",
+      amountJpy: inc,
+      countsTowardTotal: true,
+      hint: "Zaim年次",
+      entity: "combined",
+    });
+  }
+  return out;
+}
+
+function expenseRowsFromCategories(
+  cats: CategoryRow[],
+  year: number,
+  exclude: string[]
+): HouseholdBsRow[] {
+  const out: HouseholdBsRow[] = [];
+  for (const r of cats) {
+    if (r.fiscal_year !== year) continue;
+    const cat = (r.category || "").trim();
+    const exp = num(r.expense_jpy);
+    if (!cat || exp <= 0) continue;
+    if (exclude.some((p) => cat.includes(p))) continue;
+    const slug = cat.replace(/[^\w\u3040-\u9fff]+/g, "_").slice(0, 40);
+    out.push({
+      id: `zaim_expense_${slug}`,
+      label: cat.replace(/^[αβγδ]?\.?\d+F?\./, ""),
+      quadrant: "expense",
+      band: "household",
+      amountJpy: exp,
+      countsTowardTotal: true,
+      hint: "Zaim年次（家計フロー）",
+      entity: "combined",
+    });
+  }
+  return out.sort((a, b) => (b.amountJpy ?? 0) - (a.amountJpy ?? 0));
+}
+
 function sumSalaryIncome(
   cats: CategoryRow[],
   year: number,
@@ -261,23 +335,33 @@ export function composeHouseholdBs(args: {
   const notes: string[] = [];
   const pf = latestSnaps(args.portfolioSnaps);
   const sec = latestSnaps(args.securitiesSnaps ?? []);
+  const yNum = Number(year);
 
-  const salary = sumSalaryIncome(
+  const incomeFromZaim = incomeRowsFromCategories(
     args.categoryYear ?? [],
-    Number(year),
+    yNum,
     cfg.income_categories
   );
-  if (salary > 0) {
-    rows.push({
-      id: "salary",
-      label: "給与・賞与",
-      quadrant: "income",
-      band: "engine",
-      amountJpy: salary,
-      countsTowardTotal: true,
-      hint: "Zaim年次。エンジンであり資産ではない",
-      entity: "combined",
-    });
+  if (incomeFromZaim.length > 0) {
+    rows.push(...incomeFromZaim);
+  } else {
+    const salary = sumSalaryIncome(
+      args.categoryYear ?? [],
+      yNum,
+      cfg.income_categories
+    );
+    if (salary > 0) {
+      rows.push({
+        id: "salary",
+        label: "給与・賞与",
+        quadrant: "income",
+        band: "engine",
+        amountJpy: salary,
+        countsTowardTotal: true,
+        hint: "Zaim年次。エンジンであり資産ではない",
+        entity: "combined",
+      });
+    }
   }
 
   const mqCombined = mqSlice(args.mqFacts, year, "combined");
@@ -313,6 +397,14 @@ export function composeHouseholdBs(args: {
     }
   }
 
+  const zaimExpenses = expenseRowsFromCategories(
+    args.categoryYear ?? [],
+    yNum,
+    cfg.expense_flow?.exclude_category_patterns ?? ["MQ", "不動産"]
+  );
+  rows.push(...zaimExpenses);
+
+  let homeLoanFilled = false;
   for (const s of cfg.static_rows) {
     rows.push({
       id: s.id,
@@ -437,10 +529,31 @@ export function composeHouseholdBs(args: {
 
   for (const ln of args.loanTracker) {
     if (usedLoanIds.has(ln.id)) continue;
+    const excludePatterns = cfg.loan_match.exclude_patterns ?? [];
+    if (matchesLoanExclude(ln, excludePatterns)) continue;
     const bal = num(ln.balance_jpy);
     if (bal <= 0) continue;
+    const homePatterns = cfg.loan_match.home_patterns ?? [];
+    const isHome =
+      homePatterns.length > 0 && matchesHome(ln, homePatterns);
     const isMini = matchesMini(ln, cfg.loan_match.mini_patterns);
     const major = String(ln.category_major || "");
+    if (isHome) {
+      rows.push({
+        id: `loan_${ln.id}`,
+        label: cfg.loan_match.home_label || ln.name || ln.id,
+        quadrant: "liability",
+        band: "consumer",
+        amountJpy: bal,
+        countsTowardTotal: true,
+        source: "loan_tracker",
+        hint: "自宅ローン。loan-tracker 残高",
+        asOf: (ln.payload as { asOf?: string } | null)?.asOf ?? null,
+      });
+      homeLoanFilled = true;
+      usedLoanIds.add(ln.id);
+      continue;
+    }
     if (isMini || major === "プライベート" || major === "その他") {
       rows.push({
         id: `loan_${ln.id}`,
@@ -451,6 +564,7 @@ export function composeHouseholdBs(args: {
         countsTowardTotal: true,
         source: "loan_tracker",
         hint: isMini ? "キヨサキ: CFが出ない買い物" : undefined,
+        asOf: (ln.payload as { asOf?: string } | null)?.asOf ?? null,
       });
       usedLoanIds.add(ln.id);
     }
@@ -470,6 +584,11 @@ export function composeHouseholdBs(args: {
 
   if (grain === "year" && !mqCombined.computed) {
     notes.push(`${year}年のMQ実績がありません。/mq で取込後にフロー行が出ます。`);
+  }
+  if (!homeLoanFilled) {
+    notes.push(
+      "自宅ローン（大垣共立）は loan-tracker に未登録です。残高が分かればトラッカーへ追加してください。"
+    );
   }
   if (policyLoanTotal > 0) {
     notes.push(

@@ -27,7 +27,8 @@ const cfg: HouseholdConfig = {
       band: "consumer",
     },
   ],
-  loan_match: { mini_patterns: ["MINI"], mini_label: "MINIローン" },
+  loan_match: { mini_patterns: ["MINI"], mini_label: "MINIローン", exclude_patterns: ["奨学金"] },
+  expense_flow: { exclude_category_patterns: ["奨学金", "15F"] },
   income_categories: ["給与"],
 };
 
@@ -73,6 +74,12 @@ const view = composeHouseholdBs({
       income_jpy: 8_000_000,
       expense_jpy: 0,
     },
+    {
+      fiscal_year: 2025,
+      category: "15F.奨学金返済",
+      income_jpy: 0,
+      expense_jpy: 249_576,
+    },
   ],
 });
 
@@ -84,5 +91,7 @@ assert(view.totals.assetJpy === 12_000_000, "assets = 7M + 5M sbi");
 assert(view.totals.liabilityJpy === 5_000_000, "mini liability");
 const mini = view.rows.find((r) => r.id === "loan_mini-1");
 assert(mini?.quadrant === "liability", "mini is liability");
+assert(!view.rows.some((r) => r.label.includes("奨学金")), "scholarship expense excluded");
+assert(view.totals.expenseJpy === 0, "no scholarship in expense total");
 
 console.log("householdBsCompose.selftest: ok");
