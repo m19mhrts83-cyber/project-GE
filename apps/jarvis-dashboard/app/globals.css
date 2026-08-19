@@ -3002,6 +3002,19 @@ p.back {
   margin: 0;
 }
 
+.side-brand-row .side-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.side-brand-icon {
+  flex-shrink: 0;
+  border-radius: 6px;
+  display: block;
+}
+
 .side-cmd-btn {
   flex-shrink: 0;
   border: 1px solid #44403c;

@@ -60,7 +60,19 @@ export default function Shell({
       <aside className="sidebar">
         <div className="side-brand-block">
           <div className="side-brand-mark">
-            <span className="side-brand-dot" aria-hidden />
+            <svg
+              className="side-brand-icon"
+              viewBox="0 0 32 32"
+              width="22"
+              height="22"
+              aria-hidden
+            >
+              <rect width="32" height="32" rx="7" fill="#1f4e79" />
+              <path
+                fill="#e8762a"
+                d="M7.4 6.4h4.55v19.2H7.4zm5.35 8.55 10.85-8.55h-5.6L12.15 13.3zm.05 2.5 5.85 8.15h5.6L12.8 17.05z"
+              />
+            </svg>
             <div>
               <div className="side-brand">KURASHIFT</div>
               <div className="side-brand-ja">クラシフト</div>

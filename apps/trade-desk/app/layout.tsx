@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 
@@ -13,6 +13,11 @@ const sans = Noto_Sans_JP({
 export const metadata: Metadata = {
   title: "KURASHIFT｜クラシフト",
   description: "暮らしを整え、資産を動かす — ライフプラン軌道の資産運用HQ",
+  applicationName: "KURASHIFT",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1f4e79",
 };
 
 export default function RootLayout({
