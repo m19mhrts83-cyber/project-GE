@@ -1,13 +1,21 @@
 import Shell from "@/components/Shell";
 import HouseholdBsAdvicePanel from "@/components/HouseholdBsAdvicePanel";
 import HouseholdBsPanel from "@/components/HouseholdBsPanel";
+import HouseholdBsSummaryPanel from "@/components/HouseholdBsSummaryPanel";
 import HouseholdBsTaxBandPanel from "@/components/HouseholdBsTaxBandPanel";
+import HouseholdBsTrendPanel from "@/components/HouseholdBsTrendPanel";
 import HouseholdBsYearNav from "@/components/HouseholdBsYearNav";
 import {
   composeHouseholdBs,
   householdBsViewFromSnapshot,
   type HouseholdBsView,
 } from "@/lib/householdBsCompose";
+import {
+  buildHouseholdBsSummary,
+  buildHouseholdBsTrendRow,
+  sortTrendRows,
+  type HouseholdBsTrendRow,
+} from "@/lib/householdBsInsights";
 import { buildHouseholdTaxBand } from "@/lib/householdBsTaxBand";
 import {
   MQ_FACT_SELECT,
@@ -141,8 +149,11 @@ export default async function HouseholdBsPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const currentYearNum = Number(currentYear());
+  const trendFromYear = currentYearNum - 4;
 
-  const [{ data: taxMetricsRaw }, { data: snapshotRow }] = await Promise.all([
+  const [{ data: taxMetricsRaw }, { data: snapshotRow }, { data: snapshotRows }] =
+    await Promise.all([
     supabase
       .from("kurashift_tax_year_metrics")
       .select(TAX_YEAR_METRICS_SELECT)
@@ -155,6 +166,13 @@ export default async function HouseholdBsPage({
       .order("as_of_month", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("kurashift_household_bs_snapshots")
+      .select("as_of_month, fiscal_year, payload, source, updated_at")
+      .gte("fiscal_year", trendFromYear)
+      .order("fiscal_year", { ascending: false })
+      .order("as_of_month", { ascending: false })
+      .limit(60),
   ]);
 
   const snapViewRaw =
@@ -195,6 +213,47 @@ export default async function HouseholdBsPage({
     mqSlices: view.mqSlices,
     metrics: taxMetrics,
   });
+  const latestByYear = new Map<
+    number,
+    {
+      as_of_month: string | null;
+      fiscal_year: number;
+      payload: unknown;
+      source: string | null;
+    }
+  >();
+  for (const row of snapshotRows ?? []) {
+    const fy = Number(row.fiscal_year);
+    if (!latestByYear.has(fy)) {
+      latestByYear.set(fy, {
+        as_of_month: row.as_of_month as string | null,
+        fiscal_year: fy,
+        payload: row.payload,
+        source: (row.source as string | null) ?? null,
+      });
+    }
+  }
+  const trendViewMap = new Map<number, HouseholdBsView>();
+  for (const [fy, row] of latestByYear) {
+    const parsed = householdBsViewFromSnapshot(row.payload);
+    if (!parsed) continue;
+    trendViewMap.set(fy, {
+      ...parsed,
+      snapshotAsOf: row.as_of_month,
+      snapshotSource: row.source,
+    });
+  }
+  const selectedYearNum = Number(view.year);
+  if (!trendViewMap.has(selectedYearNum) || forceLive || selectedYearNum === currentYearNum) {
+    trendViewMap.set(selectedYearNum, view);
+  }
+  const trendRows = sortTrendRows(
+    [...trendViewMap.values()].map((v) => buildHouseholdBsTrendRow(v))
+  );
+  const currentTrendIdx = trendRows.findIndex((r) => r.year === selectedYearNum);
+  const priorTrend: HouseholdBsTrendRow | null =
+    currentTrendIdx > 0 ? trendRows[currentTrendIdx - 1] : null;
+  const summary = buildHouseholdBsSummary(view, priorTrend);
 
   return (
     <Shell active="/household-bs" email={user?.email ?? null}>
@@ -219,6 +278,8 @@ export default async function HouseholdBsPage({
         </p>
       )}
 
+      <HouseholdBsSummaryPanel summary={summary} />
+      <HouseholdBsTrendPanel rows={trendRows} />
       <HouseholdBsPanel view={view} />
       <HouseholdBsTaxBandPanel band={taxBand} />
       <HouseholdBsAdvicePanel view={view} />

@@ -343,6 +343,27 @@ export default async function PortfolioPage() {
         <a href="/settings">設定</a> から。
       </p>
 
+      <div className="card" style={{ marginTop: 12 }}>
+        <header>
+          <span className="lvl">配分先</span>
+          <strong>家計B/Sから見た回し先の目安</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          現金土台 {fmtYen(cashTotal)}。証券・変額の受け皿 {fmtYen(secCombined)}、
+          衛星 {fmtYen(bloomoValue)}、保険貸付 {fmtYen(loanTotal)}。
+        </p>
+        <ul className="meta" style={{ marginTop: 8 }}>
+          <li>SBI はコア。新規余力がある月の主な置き場です。</li>
+          <li>Bloomo は衛星。現金が薄い月は積み増しより保留を優先します。</li>
+          <li>保険貸付が増えている月は、追加投資より返済・次物件キープ確認が自然です。</li>
+        </ul>
+        <p className="meta" style={{ marginTop: 8 }}>
+          <a href="/household-bs">家計B/Sで現金余力を見る →</a>
+          {" · "}
+          <a href="/money-ops">今月の資金ゲートを見る →</a>
+        </p>
+      </div>
+
       <EnqueueJobButton
         jobType="portfolio_weekly"
         title="資産週次（クラウドのみ）"
