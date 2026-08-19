@@ -3,8 +3,12 @@ import { notFound } from "next/navigation";
 import Shell from "@/components/Shell";
 import DraftWorkbench from "@/components/DraftWorkbench";
 import FolderLinks from "@/components/FolderLinks";
+import MailBodyView from "@/components/MailBodyView";
+import MailTaskHandoff from "@/components/MailTaskHandoff";
 import TriageStatusActions from "@/components/TriageStatusActions";
+import { ensureMailJa } from "@/app/actions/triage";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
+import { fetchMailVisuals } from "@/lib/gmail/fetchMessageParts";
 import {
   getFolderLinksMany,
   partnerFolderKey,
@@ -37,6 +41,25 @@ export default async function MailDetailPage({
 
   if (!it) notFound();
 
+  const ja = await ensureMailJa(it.id);
+  const payload =
+    it.payload && typeof it.payload === "object"
+      ? (it.payload as Record<string, unknown>)
+      : {};
+  const bodyJa =
+    ja.bodyJa || (typeof payload.body_ja === "string" ? payload.body_ja : "");
+  const subjectJa =
+    ja.subjectJa ||
+    (typeof payload.subject_ja === "string" ? payload.subject_ja : "");
+  const draftJa =
+    ja.draftJa || (typeof payload.draft_ja === "string" ? payload.draft_ja : "");
+
+  const visuals = await fetchMailVisuals({
+    triageId: it.id,
+    gmailMessageId: it.gmail_message_id,
+    account: it.account,
+  });
+
   const level = mailPriorityToLevel(it.priority);
   const body = (it.original_body || "").trim();
   const lanePath = laneHref(it.lane);
@@ -47,10 +70,7 @@ export default async function MailDetailPage({
     fromEmail: it.from_email,
     partner: it.partner,
     folder: it.folder,
-    payload:
-      it.payload && typeof it.payload === "object"
-        ? (it.payload as Record<string, unknown>)
-        : null,
+    payload,
   });
   const folderLinks = getFolderLinksMany([
     partnerFolderKey(it.folder, it.partner),
@@ -79,8 +99,11 @@ export default async function MailDetailPage({
         </header>
         <FolderLinks links={folderLinks} />
         <h1 style={{ fontSize: "1.25rem", margin: "10px 0 8px" }}>
-          {it.subject || "（件名なし）"}
+          {subjectJa || it.subject || "（件名なし）"}
         </h1>
+        {subjectJa && it.subject && subjectJa !== it.subject ? (
+          <p className="meta">原文件名: {it.subject}</p>
+        ) : null}
         {it.from_email ? (
           <p className="meta">From: {it.from_email}</p>
         ) : null}
@@ -91,13 +114,14 @@ export default async function MailDetailPage({
           </p>
         ) : null}
         <h2 style={{ fontSize: "1rem", marginTop: 16 }}>本文</h2>
-        {body ? (
-          <pre className="orig-body">{body}</pre>
-        ) : (
-          <p className="empty" style={{ padding: "8px 0" }}>
-            （元メール本文は未保存。次回の Mac 夜間バッチ／GHA 取得後に表示されます）
-          </p>
-        )}
+        <MailBodyView
+          triageId={it.id}
+          body={body}
+          bodyJa={bodyJa}
+          html={visuals.html}
+          images={visuals.images}
+          visualsError={visuals.error}
+        />
         <h2 style={{ fontSize: "1rem", marginTop: 16 }}>返信下書き</h2>
         <DraftWorkbench
           id={it.id}
@@ -108,12 +132,14 @@ export default async function MailDetailPage({
           folder={it.folder}
           lane={it.lane}
           draftText={it.draft_text}
+          draftJa={draftJa}
           payload={it.payload}
           status={it.status}
           gmailReady={gmailReady}
           resolvedTo={resolved.to}
           toSource={resolved.source}
         />
+        <MailTaskHandoff id={it.id} path={path} payload={it.payload} />
       </article>
     </Shell>
   );

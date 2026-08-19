@@ -5,6 +5,8 @@ import TriageStatusActions from "@/components/TriageStatusActions";
 import PartnerKeyboardNav from "@/components/PartnerKeyboardNav";
 import LaneViewTabs from "@/components/LaneViewTabs";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
+import { fetchMailVisuals } from "@/lib/gmail/fetchMessageParts";
+import MailBodyView from "@/components/MailBodyView";
 import { LEVEL_LABEL, mailPriorityToLevel } from "@/lib/homeLevels";
 import {
   VIEW_LABEL,
@@ -65,6 +67,8 @@ type TriageRow = {
   payload: unknown;
   channel: string | null;
   priority?: string | null;
+  gmail_message_id?: string | null;
+  account?: string | null;
 };
 
 export default async function TriageLanePage({
@@ -157,6 +161,17 @@ export default async function TriageLanePage({
         );
   const focus = unread[idx];
   const gmailReady = gmailSendConfigured();
+  const focusPayload =
+    focus?.payload && typeof focus.payload === "object"
+      ? (focus.payload as Record<string, unknown>)
+      : {};
+  const focusVisuals = focus
+    ? await fetchMailVisuals({
+        triageId: focus.id,
+        gmailMessageId: focus.gmail_message_id,
+        account: focus.account,
+      })
+    : { html: null, images: [], error: undefined };
   const focusTo = focus
     ? resolvePartnerToEmail({
         fromEmail: focus.from_email,
@@ -335,7 +350,19 @@ export default async function TriageLanePage({
                       {focus.summary}
                     </p>
                   ) : null}
-                  <OriginalBodyBlock body={focus.original_body} open />
+                  <MailBodyView
+                    triageId={focus.id}
+                    body={focus.original_body}
+                    bodyJa={
+                      typeof focusPayload.body_ja === "string"
+                        ? focusPayload.body_ja
+                        : ""
+                    }
+                    html={focusVisuals.html}
+                    images={focusVisuals.images}
+                    visualsError={focusVisuals.error}
+                    open
+                  />
                   <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>
                     返信下書き
                   </h3>

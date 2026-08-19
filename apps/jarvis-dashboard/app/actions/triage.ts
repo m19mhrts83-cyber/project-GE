@@ -7,6 +7,7 @@ import {
   sendGmailViaEnv,
 } from "@/lib/gmail/sendFromEnv";
 import { markGmailReadViaEnv } from "@/lib/gmail/markReadFromEnv";
+import type { CursorAskState } from "@/lib/localHandoff";
 import type { TriageStatus } from "@/lib/triageStatus";
 
 export type TriageActionResult =
@@ -684,4 +685,272 @@ export async function sendTriageAfterConfirm(
 
 export async function gmailSendReady(): Promise<boolean> {
   return gmailSendConfigured();
+}
+
+export type MailJaResult = {
+  bodyJa?: string;
+  subjectJa?: string;
+  draftJa?: string;
+};
+
+/** 英語本文／下書きがあれば和訳を payload に保存して返す */
+export async function ensureMailJa(
+  id: string,
+  path?: string,
+): Promise<TriageActionResult & MailJaResult> {
+  const supabase = await createClient();
+  const { data: it, error } = await supabase
+    .from("triage_items")
+    .select("subject,original_body,draft_text,payload")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!it) return { ok: false, error: "not found" };
+
+  const { looksEnglish } = await import("@/lib/mailLanguage");
+  const payload = asPayload(it.payload);
+  const body = String(it.original_body || "");
+  const subject = String(it.subject || "");
+  const draft = String(it.draft_text || "");
+  let bodyJa = String(payload.body_ja || "");
+  let subjectJa = String(payload.subject_ja || "");
+  let draftJa = String(payload.draft_ja || "");
+  const needBody = looksEnglish(body) && !bodyJa;
+  const needSubject = looksEnglish(subject) && !subjectJa;
+  const needDraft = looksEnglish(draft) && !draftJa;
+  if (!needBody && !needSubject && !needDraft) {
+    return { ok: true, bodyJa, subjectJa, draftJa };
+  }
+
+  const { geminiReply } = await import("@/lib/geminiReply");
+  const r = await geminiReply(
+    [
+      "次の英語メールを日本語に翻訳してください。意味は変えず、JSONだけ返す。",
+      '形式: {"subject_ja":"","body_ja":"","draft_ja":""}',
+      "不要なキーは空文字。前置き・コードフェンス禁止。",
+      needSubject ? `【件名】\n${subject.slice(0, 300)}` : "",
+      needBody ? `【本文】\n${body.slice(0, 6000)}` : "",
+      needDraft ? `【下書き】\n${draft.slice(0, 2500)}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  );
+  if (!r.ok) {
+    return { ok: false, error: r.error, bodyJa, subjectJa, draftJa };
+  }
+  let parsed: Record<string, string> = {};
+  try {
+    const raw = r.text.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+    parsed = JSON.parse(raw) as Record<string, string>;
+  } catch {
+    if (needBody) parsed.body_ja = r.text.trim();
+  }
+  if (needSubject) {
+    subjectJa = String(parsed.subject_ja || "").trim() || subjectJa;
+    if (subjectJa) payload.subject_ja = subjectJa;
+  }
+  if (needBody) {
+    bodyJa = String(parsed.body_ja || "").trim() || r.text.trim();
+    if (bodyJa) payload.body_ja = bodyJa;
+  }
+  if (needDraft) {
+    draftJa = String(parsed.draft_ja || "").trim();
+    if (draftJa) payload.draft_ja = draftJa;
+  }
+  payload.body_ja_at = new Date().toISOString();
+  const { error: uErr } = await supabase
+    .from("triage_items")
+    .update({ payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (uErr) return { ok: false, error: uErr.message };
+  if (path) revalidatePath(path);
+  return { ok: true, bodyJa, subjectJa, draftJa };
+}
+
+function mailTaskPrompt(opts: {
+  id: string;
+  subject: string;
+  from: string;
+  body: string;
+  draft: string;
+  instruction: string;
+}): string {
+  return [
+    "【ローカル／Cloud Cursor 用】Jarvis ダッシュボードのメールから作業依頼",
+    `triage_id: ${opts.id}`,
+    `件名: ${opts.subject || "（なし）"}`,
+    `From: ${opts.from || "—"}`,
+    "",
+    "【本文（和訳優先）】",
+    opts.body.slice(0, 5000) || "（本文なし）",
+    "",
+    opts.draft ? `【いまの返信下書き】\n${opts.draft.slice(0, 1500)}` : "",
+    "",
+    "【ユーザー指示】",
+    opts.instruction.trim() || "このメールの指示どおり作業してください。",
+    "",
+    "返信メールは送らない。リポや手元ファイルで作業してよい。結果は短く日本語で返す。",
+  ]
+    .filter((x) => x !== "")
+    .join("\n");
+}
+
+export type MailTaskState = {
+  status: "launched" | "error";
+  prompt?: string;
+  url?: string;
+  agent_id?: string;
+  run_id?: string;
+  requested_at?: string;
+  error?: string;
+};
+
+export async function launchMailCloudTask(
+  id: string,
+  instruction: string,
+  path: string,
+): Promise<
+  TriageActionResult & { url?: string; localPrompt?: string }
+> {
+  const supabase = await createClient();
+  const { data: it, error } = await supabase
+    .from("triage_items")
+    .select("subject,from_email,original_body,draft_text,payload")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!it) return { ok: false, error: "not found" };
+  const payload = asPayload(it.payload);
+  const body = String(payload.body_ja || it.original_body || "");
+  const prompt = mailTaskPrompt({
+    id,
+    subject: String(payload.subject_ja || it.subject || ""),
+    from: String(it.from_email || ""),
+    body,
+    draft: String(it.draft_text || ""),
+    instruction,
+  });
+  const apiKey = (process.env.CURSOR_API_KEY || "").trim();
+  if (!apiKey) {
+    return {
+      ok: false,
+      error: "CURSOR_API_KEY 未設定。Mac ワーカーかローカルコピーを使ってください。",
+      localPrompt: prompt,
+    };
+  }
+  const { launchCloudAgentPrompt } = await import("@/lib/cursor/cloudAgent");
+  const launched = await launchCloudAgentPrompt({
+    apiKey,
+    prompt,
+    name: "jarvis-mail-task",
+    repoUrl: (process.env.CURSOR_CLOUD_REPO_URL || "").trim() || undefined,
+    mode: "agent",
+  });
+  if (!launched.ok) {
+    return { ok: false, error: launched.error, localPrompt: prompt };
+  }
+  payload.mail_task = {
+    status: "launched",
+    prompt,
+    url: launched.url,
+    agent_id: launched.agentId,
+    run_id: launched.runId,
+    requested_at: new Date().toISOString(),
+  } satisfies MailTaskState;
+  const { error: uErr } = await supabase
+    .from("triage_items")
+    .update({ payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (uErr) return { ok: false, error: uErr.message };
+  revalidatePath(path);
+  revalidatePath("/");
+  return {
+    ok: true,
+    url: launched.url,
+    localPrompt: prompt,
+    message: "Cloud Agent を起動しました",
+  };
+}
+
+export async function enqueueMailCursorAsk(
+  id: string,
+  instruction: string,
+  path: string,
+  extraNote?: string,
+): Promise<TriageActionResult & { queued?: boolean; localPrompt?: string }> {
+  const supabase = await createClient();
+  const { data: it, error } = await supabase
+    .from("triage_items")
+    .select("subject,from_email,original_body,draft_text,payload")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!it) return { ok: false, error: "not found" };
+  const payload = asPayload(it.payload);
+  const prev = payload.cursor_ask as CursorAskState | undefined;
+  if (prev?.status === "queued" || prev?.status === "running") {
+    return {
+      ok: true,
+      queued: true,
+      message: "Mac への依頼は処理中です",
+    };
+  }
+  const instr = [instruction.trim(), extraNote?.trim()]
+    .filter(Boolean)
+    .join("\n");
+  const prompt = mailTaskPrompt({
+    id,
+    subject: String(payload.subject_ja || it.subject || ""),
+    from: String(it.from_email || ""),
+    body: String(payload.body_ja || it.original_body || ""),
+    draft: String(it.draft_text || ""),
+    instruction: instr,
+  });
+  const cursorAsk: CursorAskState = {
+    status: "queued",
+    prompt,
+    question: instr,
+    requested_at: new Date().toISOString(),
+    via: "local_worker",
+  };
+  payload.cursor_ask = cursorAsk;
+  const { error: uErr } = await supabase
+    .from("triage_items")
+    .update({ payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (uErr) return { ok: false, error: uErr.message };
+  revalidatePath(path);
+  return {
+    ok: true,
+    queued: true,
+    localPrompt: prompt,
+    message: "Mac のローカル Cursor に依頼しました（起動後に返答が付きます）",
+  };
+}
+
+export async function getMailCursorAskStatus(
+  id: string,
+): Promise<
+  TriageActionResult & {
+    ask?: CursorAskState | null;
+    mailTask?: MailTaskState | null;
+  }
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("triage_items")
+    .select("payload")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  const payload = asPayload(data?.payload);
+  const ask =
+    payload.cursor_ask && typeof payload.cursor_ask === "object"
+      ? (payload.cursor_ask as CursorAskState)
+      : null;
+  const mailTask =
+    payload.mail_task && typeof payload.mail_task === "object"
+      ? (payload.mail_task as MailTaskState)
+      : null;
+  return { ok: true, ask, mailTask };
 }

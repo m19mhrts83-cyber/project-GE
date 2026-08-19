@@ -235,6 +235,69 @@ a.stat-link:active {
   color: var(--accent);
 }
 
+.mail-body-label {
+  margin: 12px 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.mail-html-body {
+  white-space: normal;
+}
+
+.mail-html-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 8px 0;
+}
+
+.mail-image-gallery {
+  margin: 12px 0 0;
+}
+
+.mail-image-gallery-title {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.mail-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.mail-image-fig {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fafaf9;
+}
+
+.mail-image-fig img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.mail-image-fig figcaption {
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  color: var(--muted, #666);
+}
+
+.mail-visuals-err {
+  color: var(--high, #b91c1c);
+}
+
+.mail-task-handoff {
+  margin-top: 8px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--line);
+}
+
 .orig-body,
 .draft-body {
   white-space: pre-wrap;
