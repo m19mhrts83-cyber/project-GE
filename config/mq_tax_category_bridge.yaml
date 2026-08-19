@@ -1,0 +1,28 @@
+# MQ/Zaim ↔ 申告 payload 科目ブリッジ（差分可視化用）
+# 申告を正にしない。payload 未登録の行は filed 列が空。
+
+version: 1
+updated: "2026-08-19"
+
+bridges:
+  - id: rent
+    label: 家賃収入
+    mq_element: pq
+    tax_payload_key: re_revenue_jpy
+    hint: 入金漏れ・敷金・期ズレ
+  - id: re_income
+    label: 不動産所得（G）
+    mq_element: g
+    tax_payload_key: re_income_jpy
+    hint: 減価償却・利息・元本・経費寄せ
+    emphasize: true
+  - id: depreciation
+    label: 減価償却
+    mq_element: depreciation
+    tax_payload_key: depreciation_jpy
+    hint: 現金ゼロ・申告のみ
+  - id: interest
+    label: 借入利息
+    mq_element: f_interest
+    tax_payload_key: interest_jpy
+    hint: 元利一体の分解（未整備は空）

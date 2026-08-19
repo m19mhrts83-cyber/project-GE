@@ -47,6 +47,36 @@ function CompareTable({ compare }: { compare: MqTaxCompare }) {
         </table>
       </div>
 
+      {compare.categoryRows?.length ? (
+        <div style={{ marginTop: 16 }}>
+          <h3 style={{ fontSize: "0.9rem", marginBottom: 4 }}>
+            科目別差（上位）
+          </h3>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>科目</th>
+                  <th className="num">MQ</th>
+                  <th className="num">申告</th>
+                  <th className="num">差</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compare.categoryRows.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.label}</td>
+                    <td className="num">{cellMan(r.mqMan)}</td>
+                    <td className="num">{cellMan(r.filedMan)}</td>
+                    <td className="num">{cellMan(r.diffMan)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
       {compare.insights.length > 0 ? (
         <ul className="meta" style={{ marginTop: 10 }}>
           {compare.insights.map((t) => (
@@ -121,6 +151,13 @@ export default function MqTaxComparePanel({
           {dual.disclaimer}{" "}
           <Link href="/tax">/tax で申告KPI登録 →</Link>
         </p>
+
+        {dual.combinedReference ? (
+          <p className="meta" style={{ marginTop: 10 }}>
+            MQ合算参考: PQ {cellMan(dual.combinedReference.pqMan)} · G{" "}
+            {cellMan(dual.combinedReference.gMan)}（申告合算はしません）
+          </p>
+        ) : null}
 
         {dual.personal ? (
           <div style={{ marginTop: 16 }}>
