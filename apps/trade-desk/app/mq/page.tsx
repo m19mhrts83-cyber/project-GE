@@ -392,6 +392,16 @@ export default async function MqPage({
           ),
         })
       : null;
+  const mqCashMonthly =
+    left.cashIn != null && left.cashOut != null ? left.cashIn - left.cashOut : null;
+  const mqFundingSignal =
+    mqCashMonthly == null
+      ? "確認待ち"
+      : mqCashMonthly <= 0
+        ? "要テコ入れ"
+        : mqCashMonthly < 300_000
+          ? "注意"
+          : "余裕あり";
 
   return (
     <Shell active="/mq" email={user?.email ?? null}>
@@ -401,6 +411,21 @@ export default async function MqPage({
         実績は月次でチューニング、計画は年次で立てる。金額は万円（四捨五入）。年額Fは月次で÷12。
         AIのQは案件数。現金は家計含む参考・年別クローズで繰越。
       </p>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <header>
+          <span className="lvl">原資</span>
+          <strong>投資原資メモ: {mqFundingSignal}</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          {left.title} の現金純増 {fmtMqMan(mqCashMonthly != null ? mqCashMonthly / 10_000 : null)}
+          {" · "}長期借入残高 {fmtMqMan(loanTrackerLt != null ? loanTrackerLt / 10_000 : null)}
+        </p>
+        <p className="meta" style={{ marginTop: 6 }}>
+          事業CFが薄い局面では、新規投資より空室・賃料・固定費改善が先です。
+          家計側の受け止め余力は <a href="/household-bs">家計B/S</a> で確認します。
+        </p>
+      </div>
 
       {error ? (
         <div className="card" style={{ marginTop: 12, borderColor: "var(--high)" }}>

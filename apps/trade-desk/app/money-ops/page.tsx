@@ -107,6 +107,16 @@ export default async function MoneyOpsPage({
       hasLiquidity = true;
     }
   }
+  const fundingGap =
+    prefillNeed != null && smbcBalance != null ? Math.max(prefillNeed - smbcBalance, 0) : 0;
+  const moneyGateLabel =
+    fundingGap > 0
+      ? "要寄せ / 要調達"
+      : prefillNeed != null && smbcBalance != null && smbcBalance < prefillNeed * 1.2
+        ? "注意"
+        : prefillNeed != null
+          ? "余裕あり"
+          : "確認待ち";
 
   return (
     <Shell active="/money-ops" email={user?.email ?? null}>
@@ -116,6 +126,23 @@ export default async function MoneyOpsPage({
         実行はレールごと: {FUND_MOVE_UX.steps.map((s) => s.label).join(" → ")}。
         あなたは「プラン承認・最終画面確認・OTP＋実行ボタン」だけ。終わった送金用 Chrome は Jarvis が閉じます。
       </p>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <header>
+          <span className="lvl">ゲート</span>
+          <strong>今月のキャッシュゲート: {moneyGateLabel}</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          引落口座 {SMBC_SETTLEMENT_ACCOUNT_LABEL} {fmtYen(smbcBalance)} / 手元流動性{" "}
+          {fmtYen(hasLiquidity ? liquidityTotal : null)}
+          {prefillNeed != null ? ` / 今回必要額 ${fmtYen(prefillNeed)}` : ""}
+        </p>
+        <p className="meta" style={{ marginTop: 6 }}>
+          {fundingGap > 0
+            ? `まず寄せの候補整理。現時点の不足は ${fmtYen(fundingGap)}。`
+            : "当月の引落事故防止を優先し、その後に投資・返済判断へ進みます。"}
+        </p>
+      </div>
 
       <CardSettlementBufferForm
         smbcBalanceYen={smbcBalance}

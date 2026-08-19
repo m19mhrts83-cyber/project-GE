@@ -5,9 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import {
   CENTURY_PAGE_TITLE,
   buildCenturyModel,
+  evalTotalPlan,
   parseLifeEvents,
   type SheetDump,
 } from "@/lib/centuryPlan";
+import { fmtManUnit } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,17 @@ export default async function LifeplanAnalyzePage() {
     })
   );
   const events = ordered[0] ? parseLifeEvents(dumpsOf(ordered[0].id)) : null;
+  const currentModel = models[0] ?? null;
+  const currentYear = new Date().getFullYear();
+  const fiveYearRows = currentModel
+    ? currentModel.years
+        .filter((y) => y >= currentYear && y <= currentYear + 5)
+        .map((y) => ({
+          year: y,
+          value: evalTotalPlan(currentModel)?.values[y] ?? null,
+        }))
+    : [];
+  const weakYears = fiveYearRows.filter((r) => r.value != null && r.value < 0);
 
   return (
     <Shell active="/lifeplan" email={user?.email ?? null}>
@@ -67,6 +80,35 @@ export default async function LifeplanAnalyzePage() {
       <p className="sub">
         閲覧用シートはそのままに、過去の計画版を重ねたり、実績のある年をグラフで見たりするページです。
       </p>
+      <div className="card" style={{ marginTop: 12 }}>
+        <header>
+          <span className="lvl">5年耐性</span>
+          <strong>今後5年の継続チェック</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          直近5年は「続けて投資してよいか」ではなく、「キャッシュが痩せる年がどこか」を先に見ます。
+        </p>
+        {fiveYearRows.length ? (
+          <>
+            <ul className="meta" style={{ marginTop: 8 }}>
+              {fiveYearRows.map((r) => (
+                <li key={r.year}>
+                  {r.year}年: {fmtManUnit(r.value)}
+                </li>
+              ))}
+            </ul>
+            <p className="meta" style={{ marginTop: 8 }}>
+              {weakYears.length
+                ? `要注意年: ${weakYears.map((r) => r.year).join(" / ")}`
+                : "今見えている5年は大きな資金ショート年なし"}
+            </p>
+          </>
+        ) : (
+          <p className="meta" style={{ marginTop: 8 }}>
+            5年耐性を出す計画データがまだ不足しています。
+          </p>
+        )}
+      </div>
       {models.length ? (
         <CenturyAnalyze models={models} events={events} />
       ) : (
