@@ -5,8 +5,13 @@ import HouseholdBsTaxBandPanel from "@/components/HouseholdBsTaxBandPanel";
 import {
   composeHouseholdBs,
   householdBsViewFromSnapshot,
+  type HouseholdBsView,
 } from "@/lib/householdBsCompose";
 import { buildHouseholdTaxBand } from "@/lib/householdBsTaxBand";
+import {
+  MQ_FACT_SELECT,
+  TAX_YEAR_METRICS_SELECT,
+} from "@/lib/mqLeanSelect";
 import type { TaxYearMetricRow } from "@/lib/taxInsights";
 import { createClient } from "@/lib/supabase/server";
 import type { MqFactRow } from "@/lib/mqAggregate";
@@ -17,22 +22,11 @@ function currentYear(): string {
   return String(new Date().getFullYear());
 }
 
-export default async function HouseholdBsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const sp = await searchParams;
-  const year =
-    typeof sp.year === "string"
-      ? sp.year.slice(0, 4)
-      : currentYear();
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+async function composeLive(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  year: string
+): Promise<HouseholdBsView> {
+  const yNum = Number(year);
   const [
     { data: portfolioSnaps },
     { data: securitiesSnaps },
@@ -42,14 +36,12 @@ export default async function HouseholdBsPage({
     { data: loans },
     { data: categoryYear },
     { data: debitMeta },
-    { data: taxMetricsRaw },
-    { data: snapshotRow },
   ] = await Promise.all([
     supabase
       .from("portfolio_snapshots")
       .select("account_id, as_of, value_jpy, source")
       .order("as_of", { ascending: false })
-      .limit(200),
+      .limit(120),
     supabase
       .from("securities_holdings")
       .select("account_id, as_of, value_jpy, source")
@@ -63,34 +55,25 @@ export default async function HouseholdBsPage({
       .limit(80),
     supabase
       .from("kurashift_mq_period_facts")
-      .select("*")
+      .select(MQ_FACT_SELECT)
       .eq("scenario_kind", "actual")
+      .eq("business_line", "realestate")
+      .gte("period_month", `${year}-01-01`)
+      .lte("period_month", `${year}-12-31`)
       .order("period_month", { ascending: false })
-      .limit(500),
+      .limit(80),
     supabase
       .from("kurashift_loan_tracker_loans")
       .select("id, name, balance_jpy, category_major, tags, payload"),
     supabase
       .from("kurashift_finance_category_year")
       .select("fiscal_year, category, income_jpy, expense_jpy")
-      .eq("fiscal_year", Number(year))
-      .limit(500),
+      .eq("fiscal_year", yNum)
+      .limit(200),
     supabase
       .from("sync_meta")
       .select("value")
       .eq("key", "card_debit_watch_summary")
-      .maybeSingle(),
-    supabase
-      .from("kurashift_tax_year_metrics")
-      .select("*")
-      .order("fiscal_year", { ascending: false })
-      .limit(24),
-    supabase
-      .from("kurashift_household_bs_snapshots")
-      .select("as_of_month, fiscal_year, payload, source, updated_at")
-      .eq("fiscal_year", Number(year))
-      .order("as_of_month", { ascending: false })
-      .limit(1)
       .maybeSingle(),
   ]);
 
@@ -113,10 +96,10 @@ export default async function HouseholdBsPage({
   }
 
   const liqLabels = new Map(
-    (liqAccounts ?? []).map((a) => [a.id, a.name as string])
+    (liqAccounts ?? []).map((a) => [a.id as string, a.name as string])
   );
 
-  const liveView = composeHouseholdBs({
+  return composeHouseholdBs({
     year,
     grain: "year",
     portfolioSnaps: portfolioSnaps ?? [],
@@ -129,27 +112,61 @@ export default async function HouseholdBsPage({
     cardDebitAmountJpy,
     cardDebitDue,
   });
+}
 
-  const snapView = snapshotRow?.payload
-    ? householdBsViewFromSnapshot(snapshotRow.payload)
-    : null;
-  const view =
-    snapView ??
-    ({
-      ...liveView,
-      snapshotAsOf: null,
-      snapshotSource: null,
-    } as typeof liveView);
+export default async function HouseholdBsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const year =
+    typeof sp.year === "string" ? sp.year.slice(0, 4) : currentYear();
+  const forceLive = sp.live === "1" || sp.live === "true";
 
-  if (snapView && snapshotRow) {
-    view.snapshotAsOf = snapshotRow.as_of_month as string;
-    view.snapshotSource = (snapshotRow.source as string) ?? "jarvis";
-  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: taxMetricsRaw }, { data: snapshotRow }] = await Promise.all([
+    supabase
+      .from("kurashift_tax_year_metrics")
+      .select(TAX_YEAR_METRICS_SELECT)
+      .order("fiscal_year", { ascending: false })
+      .limit(24),
+    supabase
+      .from("kurashift_household_bs_snapshots")
+      .select("as_of_month, fiscal_year, payload, source, updated_at")
+      .eq("fiscal_year", Number(year))
+      .order("as_of_month", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const snapView =
+    !forceLive && snapshotRow?.payload
+      ? householdBsViewFromSnapshot(snapshotRow.payload)
+      : null;
+
+  // スナップ優先: 表示はスナップ、助言もスナップから。live compose は未登録時のみ。
+  const liveView = snapView ? null : await composeLive(supabase, year);
+  const view: HouseholdBsView = snapView
+    ? {
+        ...snapView,
+        snapshotAsOf: (snapshotRow!.as_of_month as string) ?? null,
+        snapshotSource: (snapshotRow!.source as string) ?? "jarvis",
+      }
+    : {
+        ...(liveView as HouseholdBsView),
+        snapshotAsOf: null,
+        snapshotSource: null,
+      };
 
   const taxMetrics = (taxMetricsRaw ?? []) as TaxYearMetricRow[];
   const taxBand = buildHouseholdTaxBand({
     year,
-    mqSlices: liveView.mqSlices,
+    mqSlices: view.mqSlices,
     metrics: taxMetrics,
   });
 
@@ -184,18 +201,19 @@ export default async function HouseholdBsPage({
 
       {view.snapshotAsOf ? (
         <p className="meta" style={{ marginTop: 8 }}>
-          表示: {view.snapshotAsOf} スナップ（{view.snapshotSource ?? "jarvis"}）。
-          live compose も並行更新中。
+          表示: {view.snapshotAsOf} スナップ（{view.snapshotSource ?? "jarvis"}
+          ）。最新を見る場合は{" "}
+          <a href={`/household-bs?year=${year}&live=1`}>live compose</a>。
         </p>
       ) : (
         <p className="meta" style={{ marginTop: 8 }}>
-          表示: live compose（月次スナップ未登録）
+          表示: live compose（月次スナップ未登録）。MQ月次更新成功時に自動保存されます。
         </p>
       )}
 
       <HouseholdBsPanel view={view} />
       <HouseholdBsTaxBandPanel band={taxBand} />
-      <HouseholdBsAdvicePanel view={liveView} />
+      <HouseholdBsAdvicePanel view={view} />
 
       <p className="meta" style={{ marginTop: 16 }}>
         詳細:{" "}

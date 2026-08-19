@@ -40,6 +40,11 @@ import type { MqComputed } from "@/lib/mqEquations";
 import { buildMqTaxCompare, buildMqTaxCompareDual } from "@/lib/mqTaxCompare";
 import type { TaxYearMetricRow } from "@/lib/taxInsights";
 import { createClient } from "@/lib/supabase/server";
+import {
+  MQ_BS_SELECT,
+  MQ_FACT_SELECT,
+  TAX_YEAR_METRICS_SELECT,
+} from "@/lib/mqLeanSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -86,15 +91,15 @@ export default async function MqPage({
 
   const { data: raw, error } = await supabase
     .from("kurashift_mq_period_facts")
-    .select("*")
+    .select(MQ_FACT_SELECT)
     .order("period_month", { ascending: false })
-    .limit(500);
+    .limit(360);
 
   const { data: bsRaw } = await supabase
     .from("kurashift_mq_bs_snapshots")
-    .select("*")
+    .select(MQ_BS_SELECT)
     .order("as_of_date", { ascending: false })
-    .limit(200);
+    .limit(120);
 
   const { data: loanRaw } = await supabase
     .from("kurashift_loan_tracker_loans")
@@ -102,7 +107,7 @@ export default async function MqPage({
 
   const { data: taxMetricsRaw } = await supabase
     .from("kurashift_tax_year_metrics")
-    .select("*")
+    .select(TAX_YEAR_METRICS_SELECT)
     .order("fiscal_year", { ascending: false })
     .limit(24);
 
