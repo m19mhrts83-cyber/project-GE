@@ -1,3 +1,6 @@
+ "use client";
+
+import { useState } from "react";
 import { fmtYen, fmtYenSigned } from "@/lib/format";
 import type { HouseholdBsTrendRow } from "@/lib/householdBsInsights";
 
@@ -15,18 +18,30 @@ type LineKey =
   | "netWorthJpy"
   | "liabilityJpy";
 
-function lineChart(
-  rows: HouseholdBsTrendRow[],
+function LineChartView({
+  rows,
+  series,
+  ariaLabel,
+  note,
+}: {
+  rows: HouseholdBsTrendRow[];
   series: Array<{
     key: LineKey;
     label: string;
     color: string;
     dash?: boolean;
     showLabel?: boolean;
-  }>,
-  ariaLabel: string,
-  note?: string
-) {
+  }>;
+  ariaLabel: string;
+  note?: string;
+}) {
+  const [tip, setTip] = useState<{
+    x: number;
+    y: number;
+    title: string;
+    value: string;
+    meta: string;
+  } | null>(null);
   if (rows.length < 2) return <p className="meta">推移データが足りません。</p>;
   const w = 980;
   const h = 280;
@@ -45,7 +60,7 @@ function lineChart(
     return { x, y };
   };
   return (
-    <div>
+    <div style={{ position: "relative" }}>
       {note ? (
         <p className="meta" style={{ margin: "0 0 10px" }}>
           {note}
@@ -56,6 +71,7 @@ function lineChart(
         role="img"
         aria-label={ariaLabel}
         style={{ width: "100%", maxWidth: w, height: "auto" }}
+        onMouseLeave={() => setTip(null)}
       >
         <line
           x1={pad}
@@ -123,22 +139,44 @@ function lineChart(
                 <circle
                   cx={p.x}
                   cy={p.y}
-                  r={7}
+                  r={10}
                   fill="transparent"
-                  style={{ cursor: "help" }}
-                >
-                  <title>
-                    {`${r.year}年 ${s.label} ${fmtYen(r[s.key])}${
-                      r.estimated ? " / 推定" : r.snapshotAsOf ? ` / snap ${r.snapshotAsOf}` : ""
-                    }`}
-                  </title>
-                </circle>
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={() =>
+                    setTip({
+                      x: p.x,
+                      y: p.y,
+                      title: `${r.year}年 ${s.label}`,
+                      value: fmtYen(r[s.key]),
+                      meta: r.estimated
+                        ? "推定・補完年"
+                        : r.snapshotAsOf
+                          ? `実績スナップ ${r.snapshotAsOf}`
+                          : "実績",
+                    })
+                  }
+                  onFocus={() =>
+                    setTip({
+                      x: p.x,
+                      y: p.y,
+                      title: `${r.year}年 ${s.label}`,
+                      value: fmtYen(r[s.key]),
+                      meta: r.estimated
+                        ? "推定・補完年"
+                        : r.snapshotAsOf
+                          ? `実績スナップ ${r.snapshotAsOf}`
+                          : "実績",
+                    })
+                  }
+                />
                 <circle
                   cx={p.x}
                   cy={p.y}
-                  r={4.5}
-                  fill={s.color}
-                  opacity={r.estimated ? 0.3 : 1}
+                  r={r.estimated ? 4.2 : 5}
+                  fill={r.estimated ? "#fff" : s.color}
+                  stroke={s.color}
+                  strokeWidth={r.estimated ? 2 : 1.6}
+                  opacity={r.estimated ? 0.55 : 1}
                 />
                 {s.showLabel ? (
                   <text
@@ -156,6 +194,27 @@ function lineChart(
           })
         )}
       </svg>
+      {tip ? (
+        <div
+          style={{
+            position: "absolute",
+            left: `clamp(8px, calc(${((tip.x / w) * 100).toFixed(2)}% + 10px), calc(100% - 220px))`,
+            top: `clamp(8px, calc(${((tip.y / h) * 100).toFixed(2)}% - 8px), calc(100% - 84px))`,
+            background: "rgba(28,25,23,0.94)",
+            color: "#fafaf9",
+            borderRadius: 10,
+            padding: "8px 10px",
+            fontSize: 12,
+            lineHeight: 1.45,
+            pointerEvents: "none",
+            boxShadow: "0 8px 24px rgba(28,25,23,0.16)",
+          }}
+        >
+          <div style={{ fontWeight: 700 }}>{tip.title}</div>
+          <div>{tip.value}</div>
+          <div style={{ opacity: 0.82 }}>{tip.meta}</div>
+        </div>
+      ) : null}
       <div
         className="meta"
         style={{
@@ -226,17 +285,17 @@ export default function HouseholdBsTrendPanel({
           <span className="lvl">フロー</span>
           <strong>収入・返済込みキャッシュ支出・返済後キャッシュ収支</strong>
         </header>
-        {lineChart(
-          sorted,
-          [
+        <LineChartView
+          rows={sorted}
+          series={[
             { key: "incomeJpy", label: "収入", color: "#2e7d32", showLabel: true },
             { key: "expenseJpy", label: "会計上の支出", color: "#ef6c00", dash: true },
             { key: "cashExpenseJpy", label: "返済込みキャッシュ支出", color: "#c62828", showLabel: true },
             { key: "cashflowAfterDebtJpy", label: "返済後キャッシュ収支", color: "#1565c0", showLabel: true },
-          ],
-          "収入と返済込みキャッシュ収支の推移",
-          "赤はローン元本返済を含む実際のキャッシュ流出です。青がプラスで積み上がるほど、Cash is King の土台が厚くなります。"
-        )}
+          ]}
+          ariaLabel="収入と返済込みキャッシュ収支の推移"
+          note="赤はローン元本返済を含む実際のキャッシュ流出です。青がプラスで積み上がるほど、Cash is King の土台が厚くなります。"
+        />
       </article>
 
       <article className="card" style={{ marginTop: 12 }}>
@@ -244,16 +303,16 @@ export default function HouseholdBsTrendPanel({
           <span className="lvl">土台</span>
           <strong>キャッシュ残高・純資産・負債残高</strong>
         </header>
-        {lineChart(
-          sorted,
-          [
+        <LineChartView
+          rows={sorted}
+          series={[
             { key: "cashJpy", label: "キャッシュ残高", color: "#0d47a1", showLabel: true },
             { key: "netWorthJpy", label: "純資産", color: "#2e7d32", showLabel: true },
             { key: "liabilityJpy", label: "負債残高", color: "#8e24aa" },
-          ],
-          "キャッシュ残高と純資産の推移",
-          "青は手元資金の厚み、緑は積み上がった純資産、紫は負債残高です。純資産が増え、負債が下がり、キャッシュが薄くなりすぎない流れが理想です。"
-        )}
+          ]}
+          ariaLabel="キャッシュ残高と純資産の推移"
+          note="青は手元資金の厚み、緑は積み上がった純資産、紫は負債残高です。純資産が増え、負債が下がり、キャッシュが薄くなりすぎない流れが理想です。"
+        />
       </article>
     </div>
   );
