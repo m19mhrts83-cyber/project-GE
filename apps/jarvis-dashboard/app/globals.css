@@ -288,6 +288,15 @@ a.stat-link:active {
   color: var(--muted, #666);
 }
 
+.mail-file-list {
+  margin: 12px 0 0;
+}
+
+.mail-file-list ul {
+  margin: 4px 0 0;
+  padding-left: 1.2rem;
+}
+
 .mail-visuals-err {
   color: var(--high, #b91c1c);
 }

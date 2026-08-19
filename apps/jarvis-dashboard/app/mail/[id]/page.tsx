@@ -120,6 +120,7 @@ export default async function MailDetailPage({
           bodyJa={bodyJa}
           html={visuals.html}
           images={visuals.images}
+          files={visuals.files}
           visualsError={visuals.error}
         />
         <h2 style={{ fontSize: "1rem", marginTop: 16 }}>返信下書き</h2>

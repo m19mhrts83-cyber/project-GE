@@ -1,5 +1,6 @@
 import MailImageGallery from "@/components/MailImageGallery";
-import type { MailImagePart } from "@/lib/gmail/fetchMessageParts";
+import type { MailFilePart, MailImagePart } from "@/lib/gmail/fetchMessageParts";
+import { imageProxyPath } from "@/lib/gmail/fetchMessageParts";
 
 export default function MailBodyView({
   triageId,
@@ -7,6 +8,7 @@ export default function MailBodyView({
   bodyJa,
   html,
   images,
+  files,
   visualsError,
   open = true,
 }: {
@@ -15,16 +17,17 @@ export default function MailBodyView({
   bodyJa?: string | null;
   html?: string | null;
   images?: MailImagePart[];
+  files?: MailFilePart[];
   visualsError?: string | null;
   open?: boolean;
 }) {
   const text = (body || "").trim();
   const ja = (bodyJa || "").trim();
   const imgs = images || [];
+  const atts = files || [];
   const hasHtml = Boolean((html || "").trim());
-  const gallery = hasHtml ? imgs.filter((i) => !i.inline) : imgs;
 
-  if (!text && !hasHtml && !imgs.length) {
+  if (!text && !hasHtml && !imgs.length && !atts.length) {
     return (
       <p className="empty" style={{ padding: "8px 0" }}>
         （元メール本文は未保存。次回の Mac 夜間バッチ／GHA 取得後に表示されます）
@@ -56,7 +59,28 @@ export default function MailBodyView({
         </details>
       ) : null}
 
-      <MailImageGallery triageId={triageId} images={gallery} />
+      <MailImageGallery triageId={triageId} images={imgs} />
+      {atts.length > 0 ? (
+        <div className="mail-file-list">
+          <p className="mail-body-label">添付</p>
+          <ul>
+            {atts.map((f) => (
+              <li key={f.attachmentId}>
+                <a
+                  href={imageProxyPath(triageId, f.attachmentId)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {f.filename}
+                </a>
+                {f.mimeType ? (
+                  <span className="meta"> · {f.mimeType}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {visualsError && !imgs.length && !hasHtml ? (
         <p className="meta mail-visuals-err">{visualsError}</p>
       ) : null}
