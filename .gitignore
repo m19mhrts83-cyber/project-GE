@@ -54,6 +54,7 @@ _tmp/
 !.jarvis_state/westudy_weekly_watch.json
 .jarvis_state/*.png
 .jarvis_state/*.txt
+.jarvis_state/*.pid
 .jarvis_state/zaim_watch_apply_batch.json
 .jarvis_state/zaim_watch_changelog.json
 .jarvis_state/zaim_review_batch.json
