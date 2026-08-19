@@ -50,21 +50,21 @@ export type UnitRentPlan = {
   memo_log: UnitMemoEntry[];
 };
 
-/** Grandole I/II 用フロア格子（欠番 204/104 は空セル） */
+/** Grandole I/II 用フロア格子（欠番 204/104 は表示しない） */
 export const FLOOR_MAP_LAYOUTS: Record<
   string,
   { floors: { floor: number; rooms: string[] }[] }
 > = {
   "grandole-i": {
     floors: [
-      { floor: 2, rooms: ["201", "202", "203", "204", "205"] },
-      { floor: 1, rooms: ["101", "102", "103", "104", "105"] },
+      { floor: 2, rooms: ["201", "202", "203", "205"] },
+      { floor: 1, rooms: ["101", "102", "103", "105"] },
     ],
   },
   "grandole-ii": {
     floors: [
-      { floor: 2, rooms: ["201", "202", "203", "204", "205"] },
-      { floor: 1, rooms: ["101", "102", "103", "104", "105"] },
+      { floor: 2, rooms: ["201", "202", "203", "205"] },
+      { floor: 1, rooms: ["101", "102", "103", "105"] },
     ],
   },
 };
