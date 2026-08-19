@@ -122,6 +122,11 @@ export async function applyMqYearIngest(
   if (opts.dryRun) {
     return { ...preview, dryRun: true as const, rpc: null };
   }
+  if (txns.length === 0) {
+    throw new Error(
+      `${opts.year}年の kurashift_finance_transactions が0件のため置換しません`
+    );
+  }
   const rpc = await replaceYearImportRpc(
     sb,
     opts.year,
