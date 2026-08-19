@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import MqBsPanel from "@/components/MqBsPanel";
 import MqCompareBars from "@/components/MqCompareBars";
+import MqCashflowTable from "@/components/MqCashflowTable";
 import MqTaxComparePanel from "@/components/MqTaxComparePanel";
 import MqFactsForm from "@/components/MqFactsForm";
 import MqPlanForm from "@/components/MqPlanForm";
@@ -36,16 +37,23 @@ import {
 } from "@/lib/mqBs";
 import { sumLoanTrackerLt } from "@/lib/mqLoanSuggest";
 import { qUnitLabel } from "@/lib/mqPolicy";
-import type { MqComputed } from "@/lib/mqEquations";
+import { computeMq, type MqComputed } from "@/lib/mqEquations";
+import type { MqAccountMapRow } from "@/lib/mqZaimMap";
 import { buildMqTaxCompare, buildMqTaxCompareDual } from "@/lib/mqTaxCompare";
 import type { TaxYearMetricRow } from "@/lib/taxInsights";
+import {
+  aggregateReCfFromCategoryYear,
+  type FinanceCategoryYearRow,
+} from "@/lib/reFinanceYtd";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllMqPeriodFacts } from "@/lib/mqFactsFetch";
+import { fetchYearFinanceTxns } from "@/lib/mqIngestDb";
 import MqPeriodLinks from "@/components/MqPeriodLinks";
 import {
   MQ_BS_SELECT,
   TAX_YEAR_METRICS_SELECT,
 } from "@/lib/mqLeanSelect";
+import { buildMqCashflowMonthRows, type MqCashflowMonthRow } from "@/lib/mqCashflow";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +87,23 @@ type Panel = {
   fNote?: string;
 };
 
+function yenToManRounded(yen: number): number {
+  return Math.round((Number(yen) || 0) / 10000);
+}
+
+function annualFactCoverageLabel(rows: MqFactRow[], year: string): string | null {
+  const months = Array.from(
+    new Set(
+      rows
+        .filter((r) => String(r.period_month).slice(0, 4) === year.slice(0, 4))
+        .map((r) => String(r.period_month).slice(5, 7))
+    )
+  ).sort();
+  if (!months.length) return null;
+  if (months.length >= 12) return "通年";
+  return `1-${String(Number(months[months.length - 1]))}月`;
+}
+
 export default async function MqPage({
   searchParams,
 }: {
@@ -92,7 +117,7 @@ export default async function MqPage({
 
   const line = one(sp, "line", "realestate") as LineFilter;
   const entity = one(sp, "entity", "combined") as EntityFilter;
-  const grain = one(sp, "grain", "month") as GrainFilter;
+  const grain = one(sp, "grain", "year") as GrainFilter;
   const mode = one(sp, "mode", "aa") as CompareMode;
 
   const { data: bsRaw } = await supabase
@@ -103,13 +128,34 @@ export default async function MqPage({
 
   const { data: loanRaw } = await supabase
     .from("kurashift_loan_tracker_loans")
-    .select("balance_jpy, category_major, tags, name");
+    .select(
+      "balance_jpy,monthly_payment_jpy,annual_payment_jpy, category_major, tags, name"
+    );
 
   const { data: taxMetricsRaw } = await supabase
     .from("kurashift_tax_year_metrics")
     .select(TAX_YEAR_METRICS_SELECT)
     .order("fiscal_year", { ascending: false })
     .limit(24);
+
+  const { data: accountMapRaw } = await supabase
+    .from("kurashift_mq_account_map")
+    .select(
+      "business_line,entity_match,category_match,subcategory_match,mq_element,combine_treatment,note,priority,approved"
+    )
+    .eq("approved", true)
+    .order("priority", { ascending: true });
+
+  const { data: financeCategoryYearRaw } = await supabase
+    .from("kurashift_finance_category_year")
+    .select("fiscal_year,category,income_jpy,expense_jpy,net_jpy")
+    .order("fiscal_year", { ascending: false })
+    .limit(400);
+
+  const { count: propertyUnitCount } = await supabase
+    .from("property_units")
+    .select("property_id", { count: "exact", head: true })
+    .eq("status", "occupied");
 
   let rows: MqFactRow[];
   let error: Error | null = null;
@@ -121,16 +167,34 @@ export default async function MqPage({
   }
   const bsRows = (bsRaw ?? []) as MqBsRow[];
   const loanTrackerLt = sumLoanTrackerLt(loanRaw ?? []);
+  const loanMonthlyPaymentYen = (loanRaw ?? []).reduce((sum, r) => {
+    const v = Number((r as any).monthly_payment_jpy ?? 0);
+    return sum + (Number.isFinite(v) ? v : 0);
+  }, 0);
+  const loanMonthlyPaymentMan =
+    loanMonthlyPaymentYen > 0 ? yenToManRounded(loanMonthlyPaymentYen) : null;
   const months = availableMonths(rows);
   const years = availableYears(rows);
   const bsYears = Array.from(
     new Set((bsRaw ?? []).map((r) => String(r.as_of_date).slice(0, 4)))
   ).sort();
-  const yearsAll = Array.from(new Set([...years, ...bsYears])).sort().reverse();
+  const financeYears = Array.from(
+    new Set((financeCategoryYearRaw ?? []).map((r) => String(r.fiscal_year)))
+  ).sort();
+  const taxYears = Array.from(
+    new Set((taxMetricsRaw ?? []).map((r) => String(r.fiscal_year)))
+  ).sort();
+  const yearsAll = Array.from(
+    new Set([...years, ...bsYears, ...financeYears, ...taxYears])
+  )
+    .sort()
+    .reverse();
   const defaultMonth = months[0] || currentMonth();
   const defaultYear = yearsAll[0] || String(new Date().getFullYear());
   const variants = listPlanVariants(rows);
   const defaultVariant = variants[0] || "基本";
+  const financeCategoryYearRows = (financeCategoryYearRaw ?? []) as FinanceCategoryYearRow[];
+  const annualQRealestate = propertyUnitCount && propertyUnitCount > 0 ? propertyUnitCount : null;
 
   const periodA =
     grain === "year"
@@ -144,12 +208,66 @@ export default async function MqPage({
   const variantA = one(sp, "va", defaultVariant);
   const variantB = one(sp, "vb", variants[1] || defaultVariant);
 
+  const cashflowYear = Number(periodA.slice(0, 4));
+  const cashflowMonths: string[] = Array.from({ length: 12 }, (_, i) => {
+    return `${cashflowYear}-${String(i + 1).padStart(2, "0")}`;
+  });
+
+  let cashflowRows: MqCashflowMonthRow[] = [];
+
   function buildActual(period: string) {
     const subset =
       grain === "year"
         ? filterFactsYearActual(rows, line, entity, period)
         : filterFactsMonth(rows, line, entity, period);
-    return aggregateRows(subset, grain === "year" ? "year" : "month");
+    const agg = aggregateRows(subset, grain === "year" ? "year" : "month");
+    if (
+      grain === "year" &&
+      line === "realestate" &&
+      annualQRealestate != null &&
+      agg.computed
+    ) {
+      return {
+        ...agg,
+        computed: computeMq({
+          pq: agg.input.pq,
+          vq: agg.input.vq,
+          f: agg.input.f,
+          q: annualQRealestate,
+        }),
+      };
+    }
+    if (subset.length > 0 || grain !== "year" || line !== "realestate") {
+      return agg;
+    }
+    const cf = aggregateReCfFromCategoryYear(
+      financeCategoryYearRows,
+      Number(period.slice(0, 4))
+    );
+    const bucket =
+      entity === "personal"
+        ? cf.personal
+        : entity === "corporate"
+          ? cf.corporate
+          : cf.combined;
+    if (!bucket.income && !bucket.expense) return agg;
+    const fallbackInput = {
+      pq: yenToManRounded(bucket.income),
+      vq: 0,
+      f: yenToManRounded(bucket.expense),
+      q: annualQRealestate,
+    };
+    return {
+      input: fallbackInput,
+      computed: computeMq(fallbackInput),
+      cashIn: yenToManRounded(bucket.income),
+      cashOut: yenToManRounded(bucket.expense),
+      cashEnd: null,
+      depreciation: null,
+      byLine: [],
+      fMonthlyPart: yenToManRounded(bucket.expense),
+      fAnnualAllocated: 0,
+    };
   }
 
   function buildPlan(year: string, variant: string, asMonth: boolean) {
@@ -181,8 +299,23 @@ export default async function MqPage({
   if (mode === "aa") {
     const a = buildActual(periodA);
     const b = buildActual(periodB);
+    const aCoverage =
+      grain === "year" ? annualFactCoverageLabel(filterFactsYearActual(rows, line, entity, periodA), periodA) : null;
+    const bCoverage =
+      grain === "year" ? annualFactCoverageLabel(filterFactsYearActual(rows, line, entity, periodB), periodB) : null;
+    const aFallback =
+      grain === "year" &&
+      filterFactsYearActual(rows, line, entity, periodA).length === 0 &&
+      a.computed != null;
+    const bFallback =
+      grain === "year" &&
+      filterFactsYearActual(rows, line, entity, periodB).length === 0 &&
+      b.computed != null;
     left = {
-      title: `実績 ${periodA}`,
+      title:
+        grain === "year"
+          ? `実績 ${periodA}${aFallback ? "（年次補完）" : aCoverage ? `（${aCoverage}実績）` : ""}`
+          : `実績 ${periodA}`,
       computed: a.computed,
       cashIn: a.cashIn,
       cashOut: a.cashOut,
@@ -191,14 +324,18 @@ export default async function MqPage({
       fMonthlyPart: a.computed ? a.fMonthlyPart : null,
       fAnnualAllocated: a.computed ? a.fAnnualAllocated : null,
       fBreakdownKind: grain === "month" ? "month" : "year",
-      emptyHint: "この条件の実績がありません。下の月次フォームで保存してください。",
+      emptyHint:
+        "この条件の実績がありません。下の月次フォームで保存してください（年次は月次実績の合算表示です）。",
       fNote:
         grain === "month" && a.computed
           ? `F内訳: 月額 ${fmtMqMan(a.fMonthlyPart)} + 年額÷12 ${fmtMqMan(a.fAnnualAllocated)}`
           : undefined,
     };
     right = {
-      title: `実績 ${periodB}`,
+      title:
+        grain === "year"
+          ? `実績 ${periodB}${bFallback ? "（年次補完）" : bCoverage ? `（${bCoverage}実績）` : ""}`
+          : `実績 ${periodB}`,
       computed: b.computed,
       cashIn: b.cashIn,
       cashOut: b.cashOut,
@@ -367,6 +504,61 @@ export default async function MqPage({
 
   const qLabel = line === "all" ? undefined : qUnitLabel(line);
 
+  const accountMapRows = (accountMapRaw ?? []) as MqAccountMapRow[];
+
+  // 月次資金繰り表（TXN→MQ集計→ローン除外/便宜分類）
+  if (line === "realestate") {
+    const factsCashByMonth: Record<
+      string,
+      { cashInMan: number | null; cashOutMan: number | null; cashEndMan: number | null }
+    > = {};
+
+    for (const mo of cashflowMonths) {
+      const subset = filterFactsMonth(rows, line, entity, mo);
+      const agg = aggregateRows(subset, "month");
+      factsCashByMonth[mo] = {
+        cashInMan: agg.cashIn,
+        cashOutMan: agg.cashOut,
+        cashEndMan: agg.cashEnd,
+      };
+    }
+
+    const txns = await fetchYearFinanceTxns(supabase, cashflowYear);
+    cashflowRows = buildMqCashflowMonthRows({
+      year: cashflowYear,
+      months: cashflowMonths,
+      line,
+      entity,
+      cashBeginMan: priorYearCash,
+      loanMonthlyPaymentMan,
+      txns,
+      maps: accountMapRows,
+      factsCashByMonth,
+    });
+  }
+
+  const vqAccountMap = accountMapRows
+    .filter((r) => {
+      const lineOk = line === "all" ? true : r.business_line === line;
+      if (!lineOk) return false;
+      const entityOk =
+        entity === "combined"
+          ? r.entity_match === "" ||
+            r.entity_match === "personal" ||
+            r.entity_match === "corporate"
+          : r.entity_match === "" || r.entity_match === entity;
+      if (!entityOk) return false;
+      return r.mq_element === "vq";
+    })
+    .slice(0, 8)
+    .map((r) => ({
+      category_match: String(r.category_match || ""),
+      subcategory_match: String(r.subcategory_match || ""),
+      entity_match: String(r.entity_match || ""),
+      combine_treatment: String(r.combine_treatment || ""),
+      note: r.note ?? null,
+    }));
+
   const taxMetrics = (taxMetricsRaw ?? []) as TaxYearMetricRow[];
   const compareYear = Number(
     (grain === "year" ? periodA : periodA.slice(0, 4)).slice(0, 4)
@@ -530,7 +722,7 @@ export default async function MqPage({
                 b: months[1] || defaultMonth,
               })}
             >
-              月次
+              月次（参考）
             </a>
             <a
               className={`btn${grain === "year" ? " primary" : ""}`}
@@ -609,12 +801,18 @@ export default async function MqPage({
         </div>
         <p className="meta" style={{ marginTop: 8 }}>
           {lineLabel(line)} · {entityLabel(entity)} ·{" "}
-          {grain === "month" ? "月次表示" : "年次表示"}
+          {grain === "month" ? "月次（参考）表示" : "年次表示"}
           {mode === "ap" && grain === "month"
             ? " · 計画側は年額÷12で月次換算"
             : ""}
           {entity === "combined" ? " · 合算は内部取引除外推奨" : ""}
         </p>
+        {grain === "year" && line === "realestate" ? (
+          <p className="meta" style={{ marginTop: 6 }}>
+            年次Qは `property_units` の運用戸数を使用します（現在 {annualQRealestate ?? "—"} 戸）。
+            月次実績が未整備の年は、年次カテゴリ集計から暫定補完します。
+          </p>
+        ) : null}
       </div>
 
       <div className="mq-dual" style={{ marginTop: 12 }}>
@@ -629,6 +827,8 @@ export default async function MqPage({
           fMonthlyPart={left.fMonthlyPart ?? null}
           fAnnualAllocated={left.fAnnualAllocated ?? null}
           fBreakdownKind={left.fBreakdownKind ?? (grain === "month" ? "month" : "year")}
+          includeDebtServiceInF={line === "realestate"}
+          vqAccountMap={vqAccountMap}
           emptyHint={left.emptyHint}
           qUnitLabel={qLabel}
         />
@@ -643,6 +843,8 @@ export default async function MqPage({
           fMonthlyPart={right.fMonthlyPart ?? null}
           fAnnualAllocated={right.fAnnualAllocated ?? null}
           fBreakdownKind={right.fBreakdownKind ?? (grain === "month" ? "month" : "year")}
+          includeDebtServiceInF={line === "realestate"}
+          vqAccountMap={vqAccountMap}
           emptyHint={right.emptyHint}
           qUnitLabel={qLabel}
         />
@@ -700,6 +902,15 @@ export default async function MqPage({
         entity={entity}
         periodLabel={left.title.replace(/^実績\s*/, "")}
       />
+
+      {line === "realestate" ? (
+        <MqCashflowTable
+          title={`${lineLabel(line)} · ${entityLabel(entity)} 月次資金繰り表`}
+          year={periodA.slice(0, 4)}
+          rows={cashflowRows}
+          grainHint="選択年（年次の補助表示）。各月は “月が行 / 項目が列” の並びです。"
+        />
+      ) : null}
 
       <div style={{ marginTop: 16 }}>
         <MqBsPanel
