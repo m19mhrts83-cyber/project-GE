@@ -17,7 +17,13 @@ type LineKey =
 
 function lineChart(
   rows: HouseholdBsTrendRow[],
-  series: Array<{ key: LineKey; label: string; color: string; dash?: boolean }>,
+  series: Array<{
+    key: LineKey;
+    label: string;
+    color: string;
+    dash?: boolean;
+    showLabel?: boolean;
+  }>,
   ariaLabel: string,
   note?: string
 ) {
@@ -91,6 +97,7 @@ function lineChart(
               stroke={s.color}
               strokeWidth={3}
               strokeDasharray={s.dash ? "8 6" : undefined}
+              opacity={0.9}
             />
           );
         })}
@@ -112,13 +119,39 @@ function lineChart(
           rows.map((r) => {
             const p = xy(r.year, r[s.key]);
             return (
-              <circle key={`${s.key}-${r.year}`} cx={p.x} cy={p.y} r={4.5} fill={s.color}>
-                <title>
-                  {`${r.year}年 ${s.label} ${fmtYen(r[s.key])}${
-                    r.snapshotAsOf ? ` / snap ${r.snapshotAsOf}` : ""
-                  }`}
-                </title>
-              </circle>
+              <g key={`${s.key}-${r.year}`}>
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={7}
+                  fill="transparent"
+                  style={{ cursor: "help" }}
+                >
+                  <title>
+                    {`${r.year}年 ${s.label} ${fmtYen(r[s.key])}${
+                      r.estimated ? " / 推定" : r.snapshotAsOf ? ` / snap ${r.snapshotAsOf}` : ""
+                    }`}
+                  </title>
+                </circle>
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={4.5}
+                  fill={s.color}
+                  opacity={r.estimated ? 0.3 : 1}
+                />
+                {s.showLabel ? (
+                  <text
+                    x={p.x + 6}
+                    y={p.y - 6}
+                    fontSize={r.estimated ? 10 : 11}
+                    fill={s.color}
+                    opacity={r.estimated ? 0.55 : 0.92}
+                  >
+                    {miniAmount(r[s.key])}
+                  </text>
+                ) : null}
+              </g>
             );
           })
         )}
@@ -145,6 +178,19 @@ function lineChart(
             {s.label}
           </span>
         ))}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: "#999",
+              opacity: 0.3,
+              display: "inline-block",
+            }}
+          />
+          推定・補完年
+        </span>
       </div>
     </div>
   );
@@ -166,7 +212,7 @@ export default function HouseholdBsTrendPanel({
           <strong>大きいレンジで見るキャッシュの推移</strong>
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
-          過去推移は年次スナップ基準です。横軸が年、縦軸が金額です。点にカーソルを乗せると各年の金額を確認できます。
+          過去推移は年次スナップ基準です。横軸が年、縦軸が金額です。点にカーソルを乗せると各年の金額を確認できます。薄い点は年次スナップが無く、その年の材料から補完した推定値です。
           {current && prev
             ? ` 直近は ${current.year}年、前年差は純資産 ${fmtYenSigned(
                 current.netWorthJpy - prev.netWorthJpy
@@ -183,10 +229,10 @@ export default function HouseholdBsTrendPanel({
         {lineChart(
           sorted,
           [
-            { key: "incomeJpy", label: "収入", color: "#2e7d32" },
+            { key: "incomeJpy", label: "収入", color: "#2e7d32", showLabel: true },
             { key: "expenseJpy", label: "会計上の支出", color: "#ef6c00", dash: true },
-            { key: "cashExpenseJpy", label: "返済込みキャッシュ支出", color: "#c62828" },
-            { key: "cashflowAfterDebtJpy", label: "返済後キャッシュ収支", color: "#1565c0" },
+            { key: "cashExpenseJpy", label: "返済込みキャッシュ支出", color: "#c62828", showLabel: true },
+            { key: "cashflowAfterDebtJpy", label: "返済後キャッシュ収支", color: "#1565c0", showLabel: true },
           ],
           "収入と返済込みキャッシュ収支の推移",
           "赤はローン元本返済を含む実際のキャッシュ流出です。青がプラスで積み上がるほど、Cash is King の土台が厚くなります。"
@@ -201,8 +247,8 @@ export default function HouseholdBsTrendPanel({
         {lineChart(
           sorted,
           [
-            { key: "cashJpy", label: "キャッシュ残高", color: "#0d47a1" },
-            { key: "netWorthJpy", label: "純資産", color: "#2e7d32" },
+            { key: "cashJpy", label: "キャッシュ残高", color: "#0d47a1", showLabel: true },
+            { key: "netWorthJpy", label: "純資産", color: "#2e7d32", showLabel: true },
             { key: "liabilityJpy", label: "負債残高", color: "#8e24aa" },
           ],
           "キャッシュ残高と純資産の推移",
