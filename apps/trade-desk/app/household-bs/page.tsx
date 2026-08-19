@@ -75,7 +75,7 @@ async function composeLive(
       .limit(80),
     supabase
       .from("kurashift_loan_tracker_loans")
-      .select("id, name, balance_jpy, category_major, tags, payload"),
+      .select("id, name, balance_jpy, monthly_payment_jpy, category_major, tags, payload"),
     supabase
       .from("kurashift_finance_category_year")
       .select("fiscal_year, category, income_jpy, expense_jpy")

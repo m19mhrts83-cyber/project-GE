@@ -5,7 +5,10 @@ export type HouseholdBsCashStatus = "余裕あり" | "注意" | "要資金調達
 export type HouseholdBsSummary = {
   cashStatus: HouseholdBsCashStatus;
   cashTotalJpy: number;
-  netFlowJpy: number;
+  accountingNetFlowJpy: number;
+  debtServiceJpy: number;
+  cashExpenseJpy: number;
+  cashNetFlowJpy: number;
   nextPropertyJpy: number;
   bridgeNeedJpy: number;
   deployableCashJpy: number;
@@ -23,7 +26,10 @@ export type HouseholdBsTrendRow = {
   year: number;
   incomeJpy: number;
   expenseJpy: number;
+  debtServiceJpy: number;
+  cashExpenseJpy: number;
   cashflowJpy: number;
+  cashflowAfterDebtJpy: number;
   assetJpy: number;
   liabilityJpy: number;
   netWorthJpy: number;
@@ -73,9 +79,14 @@ export function buildHouseholdBsSummary(
     countsOnly: true,
     quadrant: "liability",
   });
+  const debtServiceJpy = sumBand(view.rows, "debt_service", {
+    quadrant: "expense",
+  });
   const coreAssetJpy = sumBand(view.rows, "sleep", { countsOnly: true });
   const themeAssetJpy = sumBand(view.rows, "theme", { countsOnly: true });
-  const netFlowJpy = view.totals.incomeJpy - view.totals.expenseJpy;
+  const accountingNetFlowJpy = view.totals.incomeJpy - view.totals.expenseJpy;
+  const cashExpenseJpy = view.totals.expenseJpy + debtServiceJpy;
+  const cashNetFlowJpy = view.totals.incomeJpy - cashExpenseJpy;
   const deployableCashJpy = Math.max(cashTotalJpy - nextPropertyJpy - bridgeNeedJpy, 0);
   const fundingGapJpy = Math.max(bridgeNeedJpy - cashTotalJpy, 0);
   const fundingNote =
@@ -90,9 +101,12 @@ export function buildHouseholdBsSummary(
   const netWorthJpy = view.totals.assetJpy - view.totals.liabilityJpy;
 
   return {
-    cashStatus: cashStatusFromSummary(fundingGapJpy, deployableCashJpy, netFlowJpy),
+    cashStatus: cashStatusFromSummary(fundingGapJpy, deployableCashJpy, cashNetFlowJpy),
     cashTotalJpy,
-    netFlowJpy,
+    accountingNetFlowJpy,
+    debtServiceJpy,
+    cashExpenseJpy,
+    cashNetFlowJpy,
     nextPropertyJpy,
     bridgeNeedJpy,
     deployableCashJpy,
@@ -109,11 +123,18 @@ export function buildHouseholdBsSummary(
 
 export function buildHouseholdBsTrendRow(view: HouseholdBsView): HouseholdBsTrendRow {
   const cashJpy = sumBand(view.rows, "cash", { countsOnly: true });
+  const debtServiceJpy = sumBand(view.rows, "debt_service", {
+    quadrant: "expense",
+  });
+  const cashExpenseJpy = view.totals.expenseJpy + debtServiceJpy;
   return {
     year: Number(view.year),
     incomeJpy: view.totals.incomeJpy,
     expenseJpy: view.totals.expenseJpy,
+    debtServiceJpy,
+    cashExpenseJpy,
     cashflowJpy: view.totals.incomeJpy - view.totals.expenseJpy,
+    cashflowAfterDebtJpy: view.totals.incomeJpy - cashExpenseJpy,
     assetJpy: view.totals.assetJpy,
     liabilityJpy: view.totals.liabilityJpy,
     netWorthJpy: view.totals.assetJpy - view.totals.liabilityJpy,
