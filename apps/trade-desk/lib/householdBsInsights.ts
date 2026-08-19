@@ -36,6 +36,7 @@ export type HouseholdBsTrendRow = {
   cashJpy: number;
   source: string | null;
   snapshotAsOf: string | null;
+  estimated: boolean;
 };
 
 function sumBand(
@@ -150,6 +151,7 @@ export function buildHouseholdBsTrendRow(view: HouseholdBsView): HouseholdBsTren
     cashJpy,
     source: view.snapshotSource ?? null,
     snapshotAsOf: view.snapshotAsOf ?? null,
+    estimated: view.snapshotSource === "live_inferred",
   };
 }
 

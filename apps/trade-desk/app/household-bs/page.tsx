@@ -214,7 +214,7 @@ export default async function HouseholdBsPage({
     : {
         ...(liveView as HouseholdBsView),
         snapshotAsOf: null,
-        snapshotSource: null,
+        snapshotSource: "live_current",
       };
 
   const taxMetrics = (taxMetricsRaw ?? []) as TaxYearMetricRow[];
@@ -268,7 +268,11 @@ export default async function HouseholdBsPage({
   const trendStartYear = Math.min(...candidateYears);
   for (let y = trendStartYear; y <= currentYearNum; y += 1) {
     if (!trendViewMap.has(y)) {
-      trendViewMap.set(y, await composeLive(supabase, String(y)));
+      trendViewMap.set(y, {
+        ...(await composeLive(supabase, String(y))),
+        snapshotAsOf: null,
+        snapshotSource: "live_inferred",
+      });
     }
   }
   if (
@@ -295,22 +299,33 @@ export default async function HouseholdBsPage({
         不動産家賃は内容確認（号室）×所有月。MQは参考のみ。/mq の事業B/Sとは混ぜません。
       </p>
 
-      <HouseholdBsYearNav year={year} live={forceLive} />
-
-      {view.snapshotAsOf ? (
-        <p className="meta" style={{ marginTop: 8 }}>
-          表示: {view.snapshotAsOf} スナップ（{view.snapshotSource ?? "jarvis"}
-          ）。最新を見る場合は{" "}
-          <a href={`/household-bs?year=${year}&live=1`}>live compose</a>。
-        </p>
-      ) : (
-        <p className="meta" style={{ marginTop: 8 }}>
-          表示: live compose（月次スナップ未登録）。MQ月次更新成功時に自動保存されます。
-        </p>
-      )}
-
       <HouseholdBsSummaryPanel summary={summary} />
       <HouseholdBsTrendPanel rows={trendRows} />
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <header>
+          <span className="lvl">詳細切替</span>
+          <strong>年度別の見直し</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          上のサマリーとグラフは全体像です。ここから下は、年度を切り替えて四象限の中身を詳しく見ます。
+        </p>
+        <div style={{ marginTop: 10 }}>
+          <HouseholdBsYearNav year={year} live={forceLive} />
+        </div>
+        {view.snapshotAsOf ? (
+          <p className="meta" style={{ marginTop: 8 }}>
+            表示: {view.snapshotAsOf} スナップ（{view.snapshotSource ?? "jarvis"}
+            ）。最新を見る場合は{" "}
+            <a href={`/household-bs?year=${year}&live=1`}>live compose</a>。
+          </p>
+        ) : (
+          <p className="meta" style={{ marginTop: 8 }}>
+            表示: live compose（月次スナップ未登録）。MQ月次更新成功時に自動保存されます。
+          </p>
+        )}
+      </div>
+
       <HouseholdBsPanel view={view} />
       <HouseholdBsTaxBandPanel band={taxBand} />
       <HouseholdBsAdvicePanel view={view} />
