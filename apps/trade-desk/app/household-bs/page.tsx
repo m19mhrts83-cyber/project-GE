@@ -1,6 +1,13 @@
 import Shell from "@/components/Shell";
+import HouseholdBsAdvicePanel from "@/components/HouseholdBsAdvicePanel";
 import HouseholdBsPanel from "@/components/HouseholdBsPanel";
-import { composeHouseholdBs } from "@/lib/householdBsCompose";
+import HouseholdBsTaxBandPanel from "@/components/HouseholdBsTaxBandPanel";
+import {
+  composeHouseholdBs,
+  householdBsViewFromSnapshot,
+} from "@/lib/householdBsCompose";
+import { buildHouseholdTaxBand } from "@/lib/householdBsTaxBand";
+import type { TaxYearMetricRow } from "@/lib/taxInsights";
 import { createClient } from "@/lib/supabase/server";
 import type { MqFactRow } from "@/lib/mqAggregate";
 
@@ -35,6 +42,8 @@ export default async function HouseholdBsPage({
     { data: loans },
     { data: categoryYear },
     { data: debitMeta },
+    { data: taxMetricsRaw },
+    { data: snapshotRow },
   ] = await Promise.all([
     supabase
       .from("portfolio_snapshots")
@@ -71,6 +80,18 @@ export default async function HouseholdBsPage({
       .select("value")
       .eq("key", "card_debit_watch_summary")
       .maybeSingle(),
+    supabase
+      .from("kurashift_tax_year_metrics")
+      .select("*")
+      .order("fiscal_year", { ascending: false })
+      .limit(24),
+    supabase
+      .from("kurashift_household_bs_snapshots")
+      .select("as_of_month, fiscal_year, payload, source, updated_at")
+      .eq("fiscal_year", Number(year))
+      .order("as_of_month", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   let cardDebitAmountJpy: number | null = null;
@@ -95,7 +116,7 @@ export default async function HouseholdBsPage({
     (liqAccounts ?? []).map((a) => [a.id, a.name as string])
   );
 
-  const view = composeHouseholdBs({
+  const liveView = composeHouseholdBs({
     year,
     grain: "year",
     portfolioSnaps: portfolioSnaps ?? [],
@@ -107,6 +128,29 @@ export default async function HouseholdBsPage({
     categoryYear: categoryYear ?? [],
     cardDebitAmountJpy,
     cardDebitDue,
+  });
+
+  const snapView = snapshotRow?.payload
+    ? householdBsViewFromSnapshot(snapshotRow.payload)
+    : null;
+  const view =
+    snapView ??
+    ({
+      ...liveView,
+      snapshotAsOf: null,
+      snapshotSource: null,
+    } as typeof liveView);
+
+  if (snapView && snapshotRow) {
+    view.snapshotAsOf = snapshotRow.as_of_month as string;
+    view.snapshotSource = (snapshotRow.source as string) ?? "jarvis";
+  }
+
+  const taxMetrics = (taxMetricsRaw ?? []) as TaxYearMetricRow[];
+  const taxBand = buildHouseholdTaxBand({
+    year,
+    mqSlices: liveView.mqSlices,
+    metrics: taxMetrics,
   });
 
   return (
@@ -138,7 +182,20 @@ export default async function HouseholdBsPage({
         </div>
       </div>
 
+      {view.snapshotAsOf ? (
+        <p className="meta" style={{ marginTop: 8 }}>
+          表示: {view.snapshotAsOf} スナップ（{view.snapshotSource ?? "jarvis"}）。
+          live compose も並行更新中。
+        </p>
+      ) : (
+        <p className="meta" style={{ marginTop: 8 }}>
+          表示: live compose（月次スナップ未登録）
+        </p>
+      )}
+
       <HouseholdBsPanel view={view} />
+      <HouseholdBsTaxBandPanel band={taxBand} />
+      <HouseholdBsAdvicePanel view={liveView} />
 
       <p className="meta" style={{ marginTop: 16 }}>
         詳細:{" "}

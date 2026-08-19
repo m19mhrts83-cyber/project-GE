@@ -54,6 +54,11 @@ function QuadrantTable({
                     <div className="meta" style={{ fontWeight: 400 }}>
                       {String(r.asOf).slice(0, 10)}
                       {r.source ? ` · ${r.source}` : ""}
+                      {r.staleDays != null && r.staleDays > 14
+                        ? ` · ⚠ ${r.staleDays}日前`
+                        : r.staleDays != null
+                          ? ` · ${r.staleDays}日前`
+                          : ""}
                     </div>
                   ) : null}
                 </td>

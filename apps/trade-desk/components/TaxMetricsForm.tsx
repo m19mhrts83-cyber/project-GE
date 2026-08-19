@@ -33,6 +33,12 @@ export default function TaxMetricsForm({ scope, currentYear }: Props) {
       body.taxable_income_jpy = fd.get("taxable_income_jpy") || null;
       body.income_tax_jpy = fd.get("income_tax_jpy") || null;
       body.refund_or_pay = String(fd.get("refund_or_pay") || "") || null;
+      body.payload = {
+        re_income_jpy: fd.get("re_income_jpy") || null,
+        re_revenue_jpy: fd.get("re_revenue_jpy") || null,
+        depreciation_jpy: fd.get("depreciation_jpy") || null,
+        interest_jpy: fd.get("interest_jpy") || null,
+      };
     } else {
       body.revenue_jpy = fd.get("revenue_jpy") || null;
       body.ordinary_income_jpy = fd.get("ordinary_income_jpy") || null;
@@ -92,24 +98,44 @@ export default function TaxMetricsForm({ scope, currentYear }: Props) {
       </div>
 
       {scope === "personal" ? (
-        <div className="tax-form-row">
-          <label>
-            課税所得（円）
-            <input name="taxable_income_jpy" type="number" inputMode="numeric" />
-          </label>
-          <label>
-            所得税額（円）
-            <input name="income_tax_jpy" type="number" inputMode="numeric" />
-          </label>
-          <label>
-            還付／納付
-            <select name="refund_or_pay" defaultValue="pay">
-              <option value="pay">納付</option>
-              <option value="refund">還付</option>
-              <option value="zero">ゼロ</option>
-            </select>
-          </label>
-        </div>
+        <>
+          <div className="tax-form-row">
+            <label>
+              課税所得（円）
+              <input name="taxable_income_jpy" type="number" inputMode="numeric" />
+            </label>
+            <label>
+              所得税額（円）
+              <input name="income_tax_jpy" type="number" inputMode="numeric" />
+            </label>
+            <label>
+              還付／納付
+              <select name="refund_or_pay" defaultValue="pay">
+                <option value="pay">納付</option>
+                <option value="refund">還付</option>
+                <option value="zero">ゼロ</option>
+              </select>
+            </label>
+          </div>
+          <div className="tax-form-row">
+            <label>
+              不動産所得（円）
+              <input name="re_income_jpy" type="number" inputMode="numeric" />
+            </label>
+            <label>
+              不動産収入（円）
+              <input name="re_revenue_jpy" type="number" inputMode="numeric" />
+            </label>
+            <label>
+              減価償却（円）
+              <input name="depreciation_jpy" type="number" inputMode="numeric" />
+            </label>
+            <label>
+              借入利息（円）
+              <input name="interest_jpy" type="number" inputMode="numeric" />
+            </label>
+          </div>
+        </>
       ) : (
         <div className="tax-form-row">
           <label>

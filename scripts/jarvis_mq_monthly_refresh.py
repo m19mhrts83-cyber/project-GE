@@ -204,6 +204,11 @@ def main(argv: list[str] | None = None) -> int:
         help="確定解除して再処理する年度（カンマ区切り）",
     )
     ap.add_argument("--skip-finance", action="store_true", help="CSV→TXN を省略（MQ再集計のみ）")
+    ap.add_argument(
+        "--also-household-bs",
+        action="store_true",
+        help="MQ成功後に家計B/Sスナップも保存",
+    )
     args = ap.parse_args(argv)
 
     env_file = REPO / ".env.jarvis_private"
@@ -305,6 +310,16 @@ def main(argv: list[str] | None = None) -> int:
         state["last_result"] = summary
         save_state(state)
         push_sync_meta(summary)
+        if args.also_household_bs:
+            for year in years:
+                hb_cmd = [
+                    sys.executable,
+                    str(REPO / "scripts" / "jarvis_household_bs_snapshot.py"),
+                    "--year",
+                    str(year),
+                ]
+                hb = subprocess.run(hb_cmd, cwd=str(REPO), capture_output=True, text=True)
+                print((hb.stdout or hb.stderr or "").strip(), flush=True)
     elif args.dry_run:
         print("# dry-run: state / sync_meta は更新しません", flush=True)
     else:
