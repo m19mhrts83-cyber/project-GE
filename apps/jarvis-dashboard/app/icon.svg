@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Jarvis">
+  <rect width="32" height="32" fill="#1c1917"/>
+  <path
+    fill="#14b8a6"
+    d="M11.2 6.6h11.4v4.2h-3.5v8.9c0 1.95-1.05 3-2.95 3H12.3v-4.15h1.55c.45 0 .7-.28.7-.78V10.8H11.2z"
+  />
+</svg>

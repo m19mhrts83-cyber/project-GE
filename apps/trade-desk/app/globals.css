@@ -87,6 +87,13 @@ a:hover {
   margin-bottom: 6px;
 }
 
+.side-brand-icon {
+  flex-shrink: 0;
+  display: block;
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .side-brand-dot {
   width: 10px;
   height: 10px;

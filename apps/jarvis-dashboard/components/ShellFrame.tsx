@@ -113,7 +113,31 @@ export default function ShellFrame({
 
         <aside className="sidebar" id="app-sidebar">
           <div className="side-brand-row">
-            <div className="side-brand">Jarvis</div>
+            <div className="side-brand-mark">
+              <svg
+                className="side-brand-icon"
+                viewBox="0 0 32 32"
+                width="22"
+                height="22"
+                aria-hidden
+              >
+                <rect width="32" height="32" rx="7" fill="#1c1917" />
+                <rect
+                  x="0.75"
+                  y="0.75"
+                  width="30.5"
+                  height="30.5"
+                  rx="6.25"
+                  fill="none"
+                  stroke="#44403c"
+                />
+                <path
+                  fill="#14b8a6"
+                  d="M11.2 6.6h11.4v4.2h-3.5v8.9c0 1.95-1.05 3-2.95 3H12.3v-4.15h1.55c.45 0 .7-.28.7-.78V10.8H11.2z"
+                />
+              </svg>
+              <div className="side-brand">Jarvis</div>
+            </div>
             <button
               type="button"
               className="side-cmd-btn"
