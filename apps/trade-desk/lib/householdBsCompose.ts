@@ -110,6 +110,7 @@ type LoanRow = {
   id: string;
   name: string | null;
   balance_jpy: number | string | null;
+  monthly_payment_jpy?: number | string | null;
   category_major: string | null;
   tags?: string[] | null;
   payload?: Record<string, unknown> | null;
@@ -165,6 +166,24 @@ function num(v: number | string | null | undefined): number {
   if (v == null || v === "") return 0;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function loanAnnualPaymentJpy(loan: LoanRow): number {
+  const payload = (loan.payload || {}) as {
+    annualPayment?: number | string | null;
+    monthlyPayment?: number | string | null;
+    bonusAddAmount?: number | string | null;
+    bonusMonths?: unknown;
+  };
+  const annual = num(payload.annualPayment);
+  if (annual > 0) return annual;
+  const monthly = num(payload.monthlyPayment) || num(loan.monthly_payment_jpy);
+  const bonusAdd = num(payload.bonusAddAmount);
+  const bonusMonths = Array.isArray(payload.bonusMonths)
+    ? payload.bonusMonths.length
+    : 0;
+  const total = monthly * 12 + bonusAdd * bonusMonths;
+  return total > 0 ? total : 0;
 }
 
 function latestSnaps(
@@ -673,6 +692,21 @@ export function composeHouseholdBs(args: {
         countsTowardTotal: true,
         source: "loan_tracker",
       });
+      const annualPay = loanAnnualPaymentJpy(ln);
+      if (annualPay > 0) {
+        rows.push({
+          id: `re_loan_pay_${ln.id}`,
+          label: `　↳ 年返済 ${ln.name || ln.id}`,
+          quadrant: "expense",
+          band: "debt_service",
+          amountJpy: annualPay,
+          countsTowardTotal: false,
+          indent: true,
+          hint: "元本を含む返済。Cash is King 用のキャッシュ流出",
+          source: "loan_tracker",
+          entity: prop.owner === "法人" ? "corporate" : "personal",
+        });
+      }
     }
   }
 
@@ -688,6 +722,7 @@ export function composeHouseholdBs(args: {
     const isMini = matchesMini(ln, cfg.loan_match.mini_patterns);
     const major = String(ln.category_major || "");
     if (isHome) {
+      const annualPay = loanAnnualPaymentJpy(ln);
       rows.push({
         id: `loan_${ln.id}`,
         label: cfg.loan_match.home_label || ln.name || ln.id,
@@ -699,11 +734,24 @@ export function composeHouseholdBs(args: {
         hint: "自宅ローン。loan-tracker 残高",
         asOf: (ln.payload as { asOf?: string } | null)?.asOf ?? null,
       });
+      if (annualPay > 0) {
+        rows.push({
+          id: `loan_pay_${ln.id}`,
+          label: "住宅ローン返済（年・キャッシュ）",
+          quadrant: "expense",
+          band: "debt_service",
+          amountJpy: annualPay,
+          countsTowardTotal: false,
+          hint: "元本を含む返済。会計費用ではなくキャッシュ流出として扱う",
+          source: "loan_tracker",
+        });
+      }
       homeLoanFilled = true;
       usedLoanIds.add(ln.id);
       continue;
     }
     if (isMini || major === "プライベート" || major === "その他") {
+      const annualPay = loanAnnualPaymentJpy(ln);
       rows.push({
         id: `loan_${ln.id}`,
         label: isMini ? cfg.loan_match.mini_label : ln.name || ln.id,
@@ -715,6 +763,18 @@ export function composeHouseholdBs(args: {
         hint: isMini ? "キヨサキ: CFが出ない買い物" : undefined,
         asOf: (ln.payload as { asOf?: string } | null)?.asOf ?? null,
       });
+      if (annualPay > 0) {
+        rows.push({
+          id: `loan_pay_${ln.id}`,
+          label: `返済（年・キャッシュ）${isMini ? cfg.loan_match.mini_label : ln.name || ln.id}`,
+          quadrant: "expense",
+          band: "debt_service",
+          amountJpy: annualPay,
+          countsTowardTotal: false,
+          hint: "元本を含む返済。Cash is King 用のキャッシュ流出",
+          source: "loan_tracker",
+        });
+      }
       usedLoanIds.add(ln.id);
     }
   }
@@ -752,6 +812,9 @@ export function composeHouseholdBs(args: {
       "契約者貸付は次物件キープとして資産側に表示。金額は保険ネットに反映済みで合計は二重になりません。"
     );
   }
+  notes.push(
+    "ローン返済は、会計上の支出合計には入れず、Cash is King 用のキャッシュ支出として別表示します。"
+  );
 
   return {
     year,

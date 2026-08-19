@@ -71,7 +71,7 @@ export default function HouseholdBsSummaryPanel({
         <SummaryStat
           label="現金土台"
           value={fmtYen(summary.cashTotalJpy)}
-          note={`次物件キープ ${fmtYen(summary.nextPropertyJpy)} / 引落・ブリッジ ${fmtYen(summary.bridgeNeedJpy)}`}
+          note={`次物件キープ ${fmtYen(summary.nextPropertyJpy)} / 引落・ブリッジ ${fmtYen(summary.bridgeNeedJpy)} / ローン返済 ${fmtYen(summary.debtServiceJpy)}`}
         />
         <SummaryStat
           label="防衛後の余力"
@@ -91,9 +91,9 @@ export default function HouseholdBsSummaryPanel({
 
       <div className="mq-dual" style={{ marginTop: 12, gap: 12 }}>
         <SummaryStat
-          label="今年のキャッシュ収支"
-          value={fmtYenSigned(summary.netFlowJpy)}
-          note="収入 − 支出。プラスなら現金を積み上げやすい"
+          label="返済後キャッシュ収支"
+          value={fmtYenSigned(summary.cashNetFlowJpy)}
+          note={`会計収支 ${fmtYenSigned(summary.accountingNetFlowJpy)} / 返済込み支出 ${fmtYen(summary.cashExpenseJpy)}`}
         />
         <SummaryStat
           label="純資産前年差"
@@ -113,6 +113,9 @@ export default function HouseholdBsSummaryPanel({
         />
       </div>
 
+      <p className="meta" style={{ marginTop: 8 }}>
+        ここでは「会計上の支出」と「返済込みのキャッシュ支出」を分けています。Cash is King の判定は返済込みで見ています。
+      </p>
       <p className="meta" style={{ marginTop: 8 }}>
         判断導線: <Link href="/portfolio">どこへ回すか</Link> ·{" "}
         <Link href="/money-ops">今月事故らないか</Link> ·{" "}
