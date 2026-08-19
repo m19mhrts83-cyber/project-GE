@@ -30,26 +30,30 @@ function isTruncatedBodyPreview(
   return head.startsWith(s.slice(0, Math.min(100, s.length)));
 }
 
+function payloadBodyJa(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const ja = (payload as { body_ja?: unknown }).body_ja;
+  return typeof ja === "string" ? ja : "";
+}
+
 function OriginalBodyBlock({
+  triageId,
   body,
+  payload,
   open = true,
 }: {
+  triageId: string;
   body: string | null | undefined;
+  payload?: unknown;
   open?: boolean;
 }) {
-  const text = (body || "").trim();
-  if (!text) {
-    return (
-      <p className="empty" style={{ marginTop: 8 }}>
-        （元メール本文は未保存。次回の Mac 夜間バッチ／GHA 取得後に表示されます）
-      </p>
-    );
-  }
   return (
-    <details open={open} className="orig-details">
-      <summary>元メール全文</summary>
-      <pre className="orig-body">{text}</pre>
-    </details>
+    <MailBodyView
+      triageId={triageId}
+      body={body}
+      bodyJa={payloadBodyJa(payload)}
+      open={open}
+    />
   );
 }
 
@@ -171,7 +175,7 @@ export default async function TriageLanePage({
         gmailMessageId: focus.gmail_message_id,
         account: focus.account,
       })
-    : { html: null, images: [], error: undefined };
+    : { html: null, images: [], files: [], error: undefined };
   const focusTo = focus
     ? resolvePartnerToEmail({
         fromEmail: focus.from_email,
@@ -360,6 +364,7 @@ export default async function TriageLanePage({
                     }
                     html={focusVisuals.html}
                     images={focusVisuals.images}
+                    files={focusVisuals.files}
                     visualsError={focusVisuals.error}
                     open
                   />
@@ -446,7 +451,12 @@ export default async function TriageLanePage({
                     !isTruncatedBodyPreview(it.summary, it.original_body) ? (
                       <p className="sum">{it.summary}</p>
                     ) : null}
-                    <OriginalBodyBlock body={it.original_body} open={false} />
+                    <OriginalBodyBlock
+                      triageId={it.id}
+                      body={it.original_body}
+                      payload={it.payload}
+                      open={false}
+                    />
                   </article>
                 );
               })
@@ -469,7 +479,12 @@ export default async function TriageLanePage({
                   </header>
                   <p className="sum">{it.summary || it.subject}</p>
                   {it.original_body ? (
-                    <OriginalBodyBlock body={it.original_body} open={false} />
+                    <OriginalBodyBlock
+                      triageId={it.id}
+                      body={it.original_body}
+                      payload={it.payload}
+                      open={false}
+                    />
                   ) : null}
                 </article>
               ))

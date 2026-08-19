@@ -33,11 +33,16 @@ export async function GET(
   if (!r.ok) {
     return NextResponse.json({ error: r.error }, { status: 404 });
   }
+  const headers: Record<string, string> = {
+    "Content-Type": r.mimeType,
+    "Cache-Control": "private, max-age=3600",
+  };
+  if (r.filename) {
+    const safe = r.filename.replace(/[^\w.\-\u3040-\u9fff]/g, "_");
+    headers["Content-Disposition"] = `inline; filename="${safe}"`;
+  }
   return new NextResponse(new Uint8Array(r.bytes), {
     status: 200,
-    headers: {
-      "Content-Type": r.mimeType,
-      "Cache-Control": "private, max-age=3600",
-    },
+    headers,
   });
 }
