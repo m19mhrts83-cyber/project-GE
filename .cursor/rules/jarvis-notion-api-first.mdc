@@ -1,0 +1,55 @@
+---
+description: Notion の検索・タスク更新は MCP ではなく、初動から REST API（NOTION_API_TOKEN）で行う。
+alwaysApply: true
+---
+
+# Notion — API 初動（MCP 切断の手戻り防止）
+
+## 方針
+
+タスク検索・ステータス更新・看板確認は、**最初から Notion REST API** で行う。  
+Cursor 公式プラグイン（`plugin-notion-workspace-notion`）の OAuth 切れを初手にしない。
+
+教訓（2026-08-19）: MCP 再認証のあと「できない」で止まり、通勤申請の家族タスク更新が遅れた。API トークンは既にあった。
+
+## 正本
+
+| 項目 | 場所 |
+|---|---|
+| トークン | `.env.jarvis_private` の `NOTION_API_TOKEN` |
+| レーン定義 | `config/notion_task_dbs.yaml` |
+| CLI | `scripts/jarvis_notion_api.py` |
+| 投影 | `scripts/jarvis_notion_token_sync.py`（Vercel 2本 + GitHub + `.env.local`） |
+
+値はチャットに出さない。
+
+## Jarvis の動作
+
+1. **使用経路を1行宣言**（例: 「Notion: REST API / 家族タスク」）
+2. 次を実行する（MCP は使わない）:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_notion_api.py search --query 'マイカー通勤'
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_notion_api.py lane --id kazoku
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_notion_api.py update-status --page-id … --lane kazoku --status 進行中
+```
+
+3. Web 確認はダッシュボード各レーン、または KURASHIFT `/notion`
+
+## 禁止
+
+- Notion 探索の初手で `CallMcpTool` → `plugin-notion-workspace-notion`
+- MCP 失敗後に「では API で」と切り替える流れ（最初から API）
+- トークンを `mcp.json` やチャットに書く
+
+## 例外（MCP を使ってよいとき）
+
+- ユーザーが **明示的に MCP 経由**を指定したとき
+- Cursor の `notionApi`（`scripts/jarvis_notion_mcp.sh`。トークンは jarvis_private から読む）が生きていて、API CLI より画面操作が速いとき
+
+## 関連
+
+- 切断時の旧手順: `notion-mcp-reauth.mdc`（API 失敗後の最終手段）
+- 看板: `config/notion_task_dbs.yaml`
+- コマンド: `docs/運用コマンド一覧.md`
