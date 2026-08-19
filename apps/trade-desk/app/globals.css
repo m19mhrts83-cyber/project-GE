@@ -368,6 +368,105 @@ tr.sold td {
 }
 
 /* MQ会計評価 */
+.year-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.year-nav-current {
+  font-weight: 700;
+  font-size: 1.05rem;
+  min-width: 3.2em;
+  text-align: center;
+}
+.year-nav-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.2em;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--card);
+}
+.year-nav-step:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+.year-nav-step.is-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.year-nav-scroll {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 0 4px;
+  margin-top: 2px;
+}
+.year-chip {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  background: var(--card-soft);
+}
+.year-chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.bs-quadrant-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--card-soft);
+  border: 1px solid var(--line);
+}
+.bs-quadrant-total-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.bs-quadrant-total-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.bs-breakdown {
+  margin-top: 8px;
+}
+.bs-breakdown > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--accent-deep);
+  list-style: none;
+}
+.bs-breakdown > summary::-webkit-details-marker {
+  display: none;
+}
+.bs-breakdown > summary::before {
+  content: "▸ ";
+}
+.bs-breakdown[open] > summary::before {
+  content: "▾ ";
+}
+
 .mq-slicer {
   display: flex;
   flex-direction: column;
@@ -378,6 +477,14 @@ tr.sold td {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
+}
+.mq-slicer-group:has(.mq-period-nav) {
+  flex-direction: column;
+  align-items: stretch;
+}
+.mq-period-nav {
+  width: 100%;
+  min-width: 0;
 }
 .mq-dual {
   display: grid;
