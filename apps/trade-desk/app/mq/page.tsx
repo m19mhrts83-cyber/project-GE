@@ -894,6 +894,18 @@ export default async function MqPage({
         />
       </div>
 
+      <MqCashflowTable
+        title={`${lineLabel(line)} · ${entityLabel(entity)} 月次資金繰り表`}
+        year={periodA.slice(0, 4)}
+        rows={cashflowRows}
+        grainHint="選択年（年次の補助表示）。各月は “月が行 / 項目が列” の並びです。"
+        unavailableReason={
+          line === "realestate"
+            ? null
+            : "月次資金繰り表は現在、不動産ラインで表示します。上の事業線を「不動産賃貸」にすると内容が出ます。"
+        }
+      />
+
       <MqTaxComparePanel
         compare={taxCompare}
         dual={taxCompareDual}
@@ -902,15 +914,6 @@ export default async function MqPage({
         entity={entity}
         periodLabel={left.title.replace(/^実績\s*/, "")}
       />
-
-      {line === "realestate" ? (
-        <MqCashflowTable
-          title={`${lineLabel(line)} · ${entityLabel(entity)} 月次資金繰り表`}
-          year={periodA.slice(0, 4)}
-          rows={cashflowRows}
-          grainHint="選択年（年次の補助表示）。各月は “月が行 / 項目が列” の並びです。"
-        />
-      ) : null}
 
       <div style={{ marginTop: 16 }}>
         <MqBsPanel

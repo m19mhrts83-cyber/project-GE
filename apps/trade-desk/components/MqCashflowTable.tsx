@@ -6,6 +6,7 @@ type Props = {
   year: string; // 表示用
   rows: MqCashflowMonthRow[];
   grainHint?: string; // 例: "年次の選択年（各月）"
+  unavailableReason?: string | null;
 };
 
 const COLS: Array<{
@@ -58,7 +59,7 @@ function fmtCell(v: number | null, kind: "money" | "ratio"): string {
 }
 
 export default function MqCashflowTable(props: Props) {
-  const { title, rows, grainHint } = props;
+  const { title, rows, grainHint, unavailableReason } = props;
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
@@ -67,49 +68,56 @@ export default function MqCashflowTable(props: Props) {
         <strong>{title}</strong>
       </header>
       {grainHint ? <p className="meta">{grainHint}</p> : null}
+      {unavailableReason ? (
+        <p className="meta" style={{ marginTop: 6 }}>
+          {unavailableReason}
+        </p>
+      ) : null}
       <p className="meta" style={{ marginTop: 6 }}>
         不動産実務の便宜分類です（厳密MQ定義とは一致しない可能性があります）。
         経費側は「ローン返済を除く出金」を、クリックしない1段要約として
         修繕/広告/経費/管理費/取得時/税理士/年払いに分けています。
       </p>
 
-      <div style={{ overflowX: "auto", marginTop: 10 }}>
-        <table className="mq-table" style={{ minWidth: 980 }}>
-          <thead>
-            <tr>
-              <th style={{ position: "sticky", left: 0, background: "white" }}>月</th>
-              {COLS.map((c) => (
-                <th key={c.key} className="num">
-                  {c.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.month}>
-                <td style={{ position: "sticky", left: 0, background: "white" }}>
-                  {r.month}
-                </td>
-                {COLS.map((c) => {
-                  const v = r[c.key];
-                  // repaymentRatio は格納値が “fraction” 想定なので補正
-                  const outVal =
-                    c.key === "repaymentRatio" && v != null
-                      ? (v as number) * 100
-                      : (v as number | null);
-
-                  return (
-                    <td key={c.key} className="num">
-                      {outVal == null ? "—" : fmtCell(outVal, c.kind)}
-                    </td>
-                  );
-                })}
+      {unavailableReason ? null : (
+        <div style={{ overflowX: "auto", marginTop: 10 }}>
+          <table className="mq-table" style={{ minWidth: 980 }}>
+            <thead>
+              <tr>
+                <th style={{ position: "sticky", left: 0, background: "white" }}>月</th>
+                {COLS.map((c) => (
+                  <th key={c.key} className="num">
+                    {c.label}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.month}>
+                  <td style={{ position: "sticky", left: 0, background: "white" }}>
+                    {r.month}
+                  </td>
+                  {COLS.map((c) => {
+                    const v = r[c.key];
+                    // repaymentRatio は格納値が “fraction” 想定なので補正
+                    const outVal =
+                      c.key === "repaymentRatio" && v != null
+                        ? (v as number) * 100
+                        : (v as number | null);
+
+                    return (
+                      <td key={c.key} className="num">
+                        {outVal == null ? "—" : fmtCell(outVal, c.kind)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
