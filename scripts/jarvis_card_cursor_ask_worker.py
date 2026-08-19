@@ -2,8 +2,8 @@
 """
 ダッシュボード「聞く」の Mac Cursor キューを処理する。
 
-cards / watch_status の payload.cursor_ask.status=queued を拾い、
-ローカル cursor_generate で返答して card_comments / watch_comments に追記する。
+cards / watch_status / triage_items の payload.cursor_ask.status=queued を拾い、
+ローカル cursor_generate で返答する。
 
 既存 revise worker と同じ launchd 間隔から呼ぶ想定:
 
@@ -119,6 +119,67 @@ def process_row(
     return "done"
 
 
+def process_triage_row(
+    sb: Any,
+    row: dict[str, Any],
+    *,
+    dry_run: bool,
+) -> str:
+    """triage_items は comments テーブルが無いので payload.cursor_ask.reply に書く。"""
+    item_id = row["id"]
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    ask = payload.get("cursor_ask") if isinstance(payload.get("cursor_ask"), dict) else {}
+    prompt = str(ask.get("prompt") or "").strip()
+    if not prompt:
+        return "skip_empty"
+
+    print(f"# ask triage_items id={item_id}")
+    if dry_run:
+        return "dry_run"
+
+    running = dict(payload)
+    running_ask = dict(ask)
+    running_ask["status"] = "running"
+    running_ask["started_at"] = now_iso()
+    running["cursor_ask"] = running_ask
+    sb.table("triage_items").update({"payload": running, "updated_at": now_iso()}).eq(
+        "id", item_id
+    ).execute()
+
+    try:
+        raw = cursor_generate(build_reply_prompt(prompt))
+        reply = strip_fences(raw)
+        if not reply:
+            raise RuntimeError("Cursor Agent 応答が空")
+        body = f"〔via: ローカル Cursor（Mac）〕\n\n{reply[:4000]}"
+    except Exception as e:
+        err_payload = dict(payload)
+        err_ask = dict(ask)
+        err_ask["status"] = "error"
+        err_ask["error"] = str(e)[:400]
+        err_ask["finished_at"] = now_iso()
+        err_payload["cursor_ask"] = err_ask
+        sb.table("triage_items").update(
+            {"payload": err_payload, "updated_at": now_iso()}
+        ).eq("id", item_id).execute()
+        print(f"# error triage_items id={item_id}: {e}", file=sys.stderr)
+        return "error"
+
+    ok_payload: dict[str, Any] = dict(payload)
+    ok_ask = dict(ask)
+    ok_ask["status"] = "done"
+    ok_ask["finished_at"] = now_iso()
+    ok_ask["via"] = "local_worker"
+    ok_ask["reply"] = body
+    ok_ask.pop("error", None)
+    ok_payload["cursor_ask"] = ok_ask
+    sb.table("triage_items").update(
+        {"payload": ok_payload, "updated_at": now_iso()}
+    ).eq("id", item_id).execute()
+    print(f"# done triage_items id={item_id} chars={len(reply)}")
+    return "done"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Process Cursor ask queue from dashboard cards/watch")
     ap.add_argument("--dry-run", action="store_true")
@@ -181,6 +242,22 @@ def main(argv: list[str] | None = None) -> int:
             row=row,
             dry_run=args.dry_run,
         )
+        if st in ("done", "dry_run"):
+            done += 1
+        elif st == "error":
+            failed += 1
+
+    triage_r = (
+        sb.table("triage_items")
+        .select("id,subject,payload")
+        .filter("payload->cursor_ask->>status", "eq", "queued")
+        .order("updated_at", desc=False)
+        .limit(args.limit)
+        .execute()
+    )
+    for row in triage_r.data or []:
+        scanned += 1
+        st = process_triage_row(sb, row, dry_run=args.dry_run)
         if st in ("done", "dry_run"):
             done += 1
         elif st == "error":

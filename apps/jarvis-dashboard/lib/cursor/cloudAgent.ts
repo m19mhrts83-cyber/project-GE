@@ -16,6 +16,13 @@ export type CloudAgentOk = {
 };
 export type CloudAgentErr = { ok: false; error: string };
 export type CloudAgentResult = CloudAgentOk | CloudAgentErr;
+export type CloudAgentLaunchOk = {
+  ok: true;
+  agentId: string;
+  runId?: string;
+  url: string;
+};
+export type CloudAgentLaunchResult = CloudAgentLaunchOk | CloudAgentErr;
 export type CloudAgentMcpServer = {
   name: string;
   type?: "http" | "sse" | "stdio";
@@ -90,6 +97,105 @@ function interpretRun(
     };
   }
   return null;
+}
+
+function cloudAgentUrl(agentId: string): string {
+  return `https://cursor.com/agents?selectedBcId=${encodeURIComponent(agentId)}`;
+}
+
+function buildCreateBody(opts: {
+  promptText: string;
+  name?: string;
+  repoUrl?: string;
+  mcpServers?: CloudAgentMcpServer[];
+  mode?: "plan" | "agent";
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    prompt: { text: opts.promptText },
+    name: opts.name || "jarvis-cloud",
+    mode: opts.mode || "agent",
+  };
+  const repo = (opts.repoUrl || "").trim();
+  if (repo) {
+    body.repos = [{ url: repo, startingRef: "main" }];
+    body.autoCreatePR = false;
+    body.skipReviewerRequest = true;
+    body.workOnCurrentBranch = false;
+  }
+  const mcpServers = opts.mcpServers?.length
+    ? toCloudAgentsRestMcpServers(opts.mcpServers)
+    : [];
+  if (mcpServers.length) {
+    body.mcpServers = mcpServers;
+  }
+  return body;
+}
+
+/**
+ * Cloud Agent を起動するだけ（完了待ちしない）。メール作業の実行用。
+ */
+export async function launchCloudAgentPrompt(opts: {
+  apiKey: string;
+  prompt: string;
+  name?: string;
+  repoUrl?: string;
+  mcpServers?: CloudAgentMcpServer[];
+  mode?: "plan" | "agent";
+}): Promise<CloudAgentLaunchResult> {
+  const apiKey = opts.apiKey.trim();
+  if (!apiKey) return { ok: false, error: "CURSOR_API_KEY 未設定" };
+  const promptText = opts.prompt.trim();
+  if (!promptText) return { ok: false, error: "プロンプトが空です" };
+
+  let createRes: Response;
+  try {
+    createRes = await fetch(`${API_BASE}/agents`, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(apiKey),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(
+        buildCreateBody({
+          promptText,
+          name: opts.name,
+          repoUrl: opts.repoUrl,
+          mcpServers: opts.mcpServers,
+          mode: opts.mode || "agent",
+        }),
+      ),
+      signal: AbortSignal.timeout(25_000),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `Cloud Agent 起動失敗: ${msg}` };
+  }
+  const createText = await createRes.text();
+  if (!createRes.ok) {
+    return {
+      ok: false,
+      error: `Cloud Agent 起動 ${createRes.status}: ${createText.slice(0, 200)}`,
+    };
+  }
+  let created: { agent?: { id?: string }; id?: string; run?: { id?: string } };
+  try {
+    created = JSON.parse(createText) as typeof created;
+  } catch {
+    return { ok: false, error: "Cloud Agent 応答が JSON ではありません" };
+  }
+  const agentId = created.agent?.id || created.id;
+  if (!agentId) {
+    return {
+      ok: false,
+      error: `Cloud Agent ID 不足: ${createText.slice(0, 200)}`,
+    };
+  }
+  return {
+    ok: true,
+    agentId,
+    runId: created.run?.id,
+    url: cloudAgentUrl(agentId),
+  };
 }
 
 /**

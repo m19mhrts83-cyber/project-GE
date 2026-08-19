@@ -15,6 +15,7 @@ import { researchWithTavily } from "@/app/actions/tavilyResearch";
 type Payload = {
   draft_gemini?: string;
   draft_cursor?: string;
+  draft_ja?: string;
   yoritoori_appended?: boolean;
   sent_at?: string;
   cursor_revise?: CursorReviseState;
@@ -30,6 +31,8 @@ type Props = {
   /** partner のとき OneDrive やり取りの位置づけを表示 */
   lane?: string | null;
   draftText: string | null;
+  /** 英語下書きの読取用和訳（編集・送信は draftText） */
+  draftJa?: string | null;
   payload: Payload | null | unknown;
   status: string;
   gmailReady: boolean;
@@ -55,6 +58,7 @@ export default function DraftWorkbench({
   folder,
   lane,
   draftText,
+  draftJa,
   payload,
   status,
   gmailReady,
@@ -65,6 +69,7 @@ export default function DraftWorkbench({
   const pl = (payload && typeof payload === "object" ? payload : {}) as Payload;
   const gemini = (pl.draft_gemini || "").trim();
   const cursor = (pl.draft_cursor || "").trim();
+  const jaDraft = (draftJa || pl.draft_ja || "").trim();
 
   const initialTo = (resolvedTo || toEmail || "").trim();
   const [tab, setTab] = useState<Tab>("edit");
@@ -242,6 +247,12 @@ export default function DraftWorkbench({
         ) : null}
       </div>
 
+      {jaDraft ? (
+        <>
+          <p className="mail-body-label">下書きの和訳（送信用ではない）</p>
+          <pre className="orig-body">{jaDraft}</pre>
+        </>
+      ) : null}
       <textarea
         className="draft-textarea"
         value={draft}

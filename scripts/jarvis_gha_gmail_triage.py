@@ -89,6 +89,26 @@ def maybe_gemini_draft(subject: str, body: str, from_email: str) -> str | None:
         return None
 
 
+def _mail_payload(c: dict[str, Any], body_full: str, kind: str) -> dict[str, Any]:
+    from jarvis_mail_language import looks_english, translate_mail_en
+
+    pl: dict[str, Any] = {
+        "source": "gha_gmail_triage",
+        "message_id_header": c.get("message_id_header"),
+        "ingest_kind": kind,
+    }
+    subj = c.get("subject") or ""
+    if looks_english(body_full) or looks_english(subj):
+        tr = translate_mail_en(subject=subj, body=body_full)
+        if tr.get("body_ja"):
+            pl["body_ja"] = tr["body_ja"]
+        if tr.get("subject_ja"):
+            pl["subject_ja"] = tr["subject_ja"]
+        if tr:
+            pl["body_ja_at"] = now_iso()
+    return pl
+
+
 def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sys.path.insert(0, str(REPO / "scripts"))
     from jarvis_night_triage_general import classify_general_kind
@@ -134,11 +154,7 @@ def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "gmail_thread_id": c.get("gmail_thread_id"),
                 "gmail_message_id": c.get("gmail_message_id"),
                 "from_email": c.get("from_email"),
-                "payload": {
-                    "source": "gha_gmail_triage",
-                    "message_id_header": c.get("message_id_header"),
-                    "ingest_kind": kind,
-                },
+                "payload": _mail_payload(c, body_full, kind),
                 "updated_at": now_iso(),
             }
         )

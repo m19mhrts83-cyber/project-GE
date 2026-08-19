@@ -61,4 +61,5 @@ export type CursorAskState = {
   finished_at?: string;
   error?: string;
   via?: string;
+  reply?: string;
 };
