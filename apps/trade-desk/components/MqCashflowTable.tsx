@@ -3,14 +3,21 @@ import { fmtMqMan, fmtMqManSigned } from "@/lib/mqUnits";
 
 type Props = {
   title: string;
-  year: string; // 表示用
+  year: string;
   rows: MqCashflowMonthRow[];
-  grainHint?: string; // 例: "年次の選択年（各月）"
+  grainHint?: string;
   unavailableReason?: string | null;
+  originHint?: string | null;
+  negativeMonths?: { month: string; cashEndMan: number }[];
 };
 
-type RowKey =
+type RowKey = keyof Pick<
+  MqCashflowMonthRow,
+  | "cashBeginMan"
   | "salesMan"
+  | "borrowLtMan"
+  | "borrowStMan"
+  | "borrowOfficerMan"
   | "repairMan"
   | "advertisingMan"
   | "expenseMan"
@@ -19,13 +26,18 @@ type RowKey =
   | "taxAccountantMan"
   | "loanRepaymentMan"
   | "annualTaxMan"
+  | "interestYearendMan"
+  | "taxPaymentMan"
+  | "actionInflowMan"
   | "cashEndMan"
   | "netCashFlowMan"
-  | "repaymentRatio";
+  | "yearendCarryMan"
+  | "repaymentRatio"
+>;
 
-type RowSection = "income" | "expense" | "summary" | "metric";
+type RowSection = "balance" | "income" | "expense" | "summary" | "metric";
 
-type RowSign = "+" | "−" | "±" | "";
+type RowSign = "+" | "−" | "±" | "→" | "";
 
 const ROWS: Array<{
   key: RowKey;
@@ -37,12 +49,57 @@ const ROWS: Array<{
   kind: "money" | "ratio";
 }> = [
   {
+    key: "cashBeginMan",
+    section: "balance",
+    sectionLabel: "残高",
+    sign: "",
+    shortLabel: "期首残高",
+    note: "1月=起点設定、2月以降=前月末現金（万円）",
+    kind: "money",
+  },
+  {
     key: "salesMan",
     section: "income",
     sectionLabel: "収入",
     sign: "+",
     shortLabel: "売上",
     note: "PQ相当 / cash_inベース（プラス）",
+    kind: "money",
+  },
+  {
+    key: "borrowLtMan",
+    section: "income",
+    sectionLabel: "収入",
+    sign: "+",
+    shortLabel: "長期借入",
+    note: "物件融資等の実行（プラス）",
+    kind: "money",
+  },
+  {
+    key: "borrowStMan",
+    section: "income",
+    sectionLabel: "収入",
+    sign: "+",
+    shortLabel: "短期借入",
+    note: "フリー・教育ローン等・事業用（プラス）",
+    kind: "money",
+  },
+  {
+    key: "borrowOfficerMan",
+    section: "income",
+    sectionLabel: "収入",
+    sign: "+",
+    shortLabel: "個人借入",
+    note: "役員借入・個人持出（プラス）",
+    kind: "money",
+  },
+  {
+    key: "actionInflowMan",
+    section: "income",
+    sectionLabel: "収入",
+    sign: "+",
+    shortLabel: "処置",
+    note: "シミュレーション上の資金調達（プラス）",
     kind: "money",
   },
   {
@@ -118,12 +175,21 @@ const ROWS: Array<{
     kind: "money",
   },
   {
-    key: "cashEndMan",
-    section: "summary",
-    sectionLabel: "残高",
-    sign: "",
-    shortLabel: "月末現金",
-    note: "cash_end がある月は実績優先（残高・符号なし）",
+    key: "interestYearendMan",
+    section: "expense",
+    sectionLabel: "出金",
+    sign: "−",
+    shortLabel: "利息",
+    note: "期末利息支払（12月・マイナス）",
+    kind: "money",
+  },
+  {
+    key: "taxPaymentMan",
+    section: "expense",
+    sectionLabel: "出金",
+    sign: "−",
+    shortLabel: "税金",
+    note: "法人税等の手入力（12月・マイナス）",
     kind: "money",
   },
   {
@@ -132,7 +198,25 @@ const ROWS: Array<{
     sectionLabel: "残高",
     sign: "±",
     shortLabel: "差引増減",
-    note: "売上 − 出金（プラス/マイナス）",
+    note: "収入合計 − 出金合計（プラス/マイナス）",
+    kind: "money",
+  },
+  {
+    key: "cashEndMan",
+    section: "summary",
+    sectionLabel: "残高",
+    sign: "",
+    shortLabel: "月末現金",
+    note: "期末現金残高。マイナス時は警告表示",
+    kind: "money",
+  },
+  {
+    key: "yearendCarryMan",
+    section: "summary",
+    sectionLabel: "残高",
+    sign: "→",
+    shortLabel: "翌年繰越",
+    note: "12月末現金→翌年1月期首へ自動引継ぎ",
     kind: "money",
   },
   {
@@ -152,7 +236,13 @@ function fmtCell(
 ): string {
   if (v == null) return "—";
   if (item.kind === "ratio") return `${v.toFixed(1)}%`;
-  if (item.key === "cashEndMan") return fmtMqMan(v);
+  if (
+    item.key === "cashBeginMan" ||
+    item.key === "cashEndMan" ||
+    item.key === "yearendCarryMan"
+  ) {
+    return fmtMqMan(v);
+  }
   if (item.key === "netCashFlowMan") return fmtMqManSigned(v);
   if (item.section === "income") return fmtMqManSigned(Math.abs(v));
   if (item.section === "expense") return fmtMqManSigned(-Math.abs(v));
@@ -160,8 +250,18 @@ function fmtCell(
 }
 
 export default function MqCashflowTable(props: Props) {
-  const { title, year, rows, grainHint, unavailableReason } = props;
+  const {
+    title,
+    year,
+    rows,
+    grainHint,
+    unavailableReason,
+    originHint,
+    negativeMonths = [],
+  } = props;
   let lastSection: RowSection | null = null;
+
+  const negativeSet = new Set(negativeMonths.map((n) => n.month));
 
   return (
     <div className="card mq-cashflow-card">
@@ -175,14 +275,25 @@ export default function MqCashflowTable(props: Props) {
         </div>
       </header>
       {grainHint ? <p className="meta mq-cashflow-meta">{grainHint}</p> : null}
+      {originHint ? (
+        <p className="meta mq-cashflow-meta">{originHint}</p>
+      ) : null}
       {unavailableReason ? (
         <p className="meta mq-cashflow-meta">{unavailableReason}</p>
       ) : null}
+      {negativeMonths.length > 0 ? (
+        <div className="mq-cashflow-alert-banner" role="alert">
+          ⚠️ 現金がマイナスの月:{" "}
+          {negativeMonths
+            .map((n) => `${n.month.slice(5, 7)}月（${fmtMqManSigned(n.cashEndMan)}）`)
+            .join(" · ")}
+        </div>
+      ) : null}
       <p className="meta mq-cashflow-meta">
-        不動産実務の便宜分類です（厳密MQ定義とは一致しない可能性があります）。
-        収入は<strong className="mq-cashflow-sign-plus">＋</strong>、出金は
+        帳簿起点の現金推移です。収入は<strong className="mq-cashflow-sign-plus">＋</strong>
+        、出金は
         <strong className="mq-cashflow-sign-minus">−</strong>
-        で表示します。左の符号列と金額の符号で確認できます。
+        で表示します。
       </p>
 
       {unavailableReason ? null : (
@@ -195,8 +306,14 @@ export default function MqCashflowTable(props: Props) {
                   <th className="mq-cashflow-sticky-col mq-cashflow-col-sign">符号</th>
                   <th className="mq-cashflow-sticky-col mq-cashflow-col-item">項目</th>
                   {rows.map((r) => (
-                    <th key={r.month} className="num mq-cashflow-month-head">
+                    <th
+                      key={r.month}
+                      className={`num mq-cashflow-month-head${
+                        negativeSet.has(r.month) ? " mq-cashflow-alert-negative" : ""
+                      }`}
+                    >
                       {r.month.slice(5, 7)}月
+                      {negativeSet.has(r.month) ? " ⚠" : ""}
                     </th>
                   ))}
                 </tr>
@@ -218,16 +335,7 @@ export default function MqCashflowTable(props: Props) {
                         {showSection ? item.sectionLabel : ""}
                       </td>
                       <td
-                        className={`mq-cashflow-sticky-col mq-cashflow-col-sign mq-cashflow-sign-${item.sign === "+" ? "plus" : item.sign === "−" ? "minus" : item.sign === "±" ? "pm" : "none"}`}
-                        aria-label={
-                          item.sign === "+"
-                            ? "プラス（収入）"
-                            : item.sign === "−"
-                              ? "マイナス（出金）"
-                              : item.sign === "±"
-                                ? "増減"
-                                : undefined
-                        }
+                        className={`mq-cashflow-sticky-col mq-cashflow-col-sign mq-cashflow-sign-${item.sign === "+" ? "plus" : item.sign === "−" ? "minus" : item.sign === "±" ? "pm" : item.sign === "→" ? "carry" : "none"}`}
                       >
                         {item.sign || "—"}
                       </td>
@@ -235,21 +343,25 @@ export default function MqCashflowTable(props: Props) {
                         <strong>{item.shortLabel}</strong>
                       </td>
                       {rows.map((r) => {
-                        const v = r[item.key];
+                        const v = r[item.key] as number | null;
                         const outVal =
                           item.key === "repaymentRatio" && v != null
-                            ? (v as number) * 100
-                            : (v as number | null);
+                            ? v * 100
+                            : v;
+                        const isNegCell =
+                          item.key === "cashEndMan" && r.isNegative;
                         const cellClass =
-                          item.section === "income"
-                            ? "mq-cashflow-cell-plus"
-                            : item.section === "expense"
-                              ? "mq-cashflow-cell-minus"
-                              : item.key === "netCashFlowMan" && outVal != null
-                                ? outVal >= 0
-                                  ? "mq-cashflow-cell-plus"
-                                  : "mq-cashflow-cell-minus"
-                                : "";
+                          isNegCell
+                            ? "mq-cashflow-alert-negative"
+                            : item.section === "income"
+                              ? "mq-cashflow-cell-plus"
+                              : item.section === "expense"
+                                ? "mq-cashflow-cell-minus"
+                                : item.key === "netCashFlowMan" && outVal != null
+                                  ? outVal >= 0
+                                    ? "mq-cashflow-cell-plus"
+                                    : "mq-cashflow-cell-minus"
+                                  : "";
                         return (
                           <td
                             key={`${item.key}-${r.month}`}
@@ -285,4 +397,3 @@ export default function MqCashflowTable(props: Props) {
     </div>
   );
 }
-

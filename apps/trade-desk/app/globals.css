@@ -692,8 +692,29 @@ tr.sold td {
 .mq-cashflow-sign-pm {
   color: #2a5ea8;
 }
+.mq-cashflow-sign-carry {
+  color: #1565c0;
+}
 .mq-cashflow-sign-none {
   color: var(--muted);
+}
+.mq-cashflow-alert-banner {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff3e0;
+  border: 1px solid #ffb74d;
+  color: #e65100;
+  font-size: 0.92rem;
+}
+.mq-cashflow-alert-negative {
+  background: #ffebee !important;
+  color: #c62828 !important;
+  font-weight: 600;
+}
+.mq-cashflow-row-balance .mq-cashflow-sticky-col,
+.mq-cashflow-row-balance td {
+  background: #fafafa;
 }
 .mq-cashflow-cell-plus {
   color: #1a7a45;

@@ -47,15 +47,26 @@ import {
 } from "@/lib/reFinanceYtd";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllMqPeriodFacts } from "@/lib/mqFactsFetch";
-import { fetchYearFinanceTxns } from "@/lib/mqIngestDb";
+import { fetchFinanceTxnsRange } from "@/lib/mqIngestDb";
 import MqLaneNav, { type MqView as MqLaneView } from "@/components/MqLaneNav";
 import {
   MQ_BS_SELECT,
   TAX_YEAR_METRICS_SELECT,
 } from "@/lib/mqLeanSelect";
 import MqPeriodLinks from "@/components/MqPeriodLinks";
-
-import { buildMqCashflowMonthRows, type MqCashflowMonthRow } from "@/lib/mqCashflow";
+import { type MqCashflowMonthRow } from "@/lib/mqCashflow";
+import {
+  buildCashflowWithCarry,
+  negativeMonths,
+} from "@/lib/mqCashflowEngine";
+import {
+  DEFAULT_CORPORATE_CASHFLOW_SETTINGS,
+  type MqCashflowSettingsRow,
+} from "@/lib/mqCashflowSettings";
+import type {
+  CashflowClassifyRuleRow,
+  TxnOverrideRow,
+} from "@/lib/mqCashflowClassify";
 
 export const dynamic = "force-dynamic";
 
@@ -150,6 +161,18 @@ export default async function MqPage({
     .eq("approved", true)
     .order("priority", { ascending: true });
 
+  const { data: cashflowSettingsRaw } = await supabase
+    .from("kurashift_mq_cashflow_settings")
+    .select("*");
+
+  const { data: cashflowRulesRaw } = await supabase
+    .from("kurashift_mq_cashflow_classify_rules")
+    .select("*");
+
+  const { data: cashflowOverridesRaw } = await supabase
+    .from("kurashift_mq_cashflow_txn_overrides")
+    .select("txn_id,business_line,cashflow_column,note");
+
   const { data: financeCategoryYearRaw } = await supabase
     .from("kurashift_finance_category_year")
     .select("fiscal_year,category,income_jpy,expense_jpy,net_jpy")
@@ -213,11 +236,10 @@ export default async function MqPage({
   const variantB = one(sp, "vb", variants[1] || defaultVariant);
 
   const cashflowYear = Number(periodA.slice(0, 4));
-  const cashflowMonths: string[] = Array.from({ length: 12 }, (_, i) => {
-    return `${cashflowYear}-${String(i + 1).padStart(2, "0")}`;
-  });
 
   let cashflowRows: MqCashflowMonthRow[] = [];
+  let cashflowNegative: { month: string; cashEndMan: number }[] = [];
+  let cashflowOriginHint: string | null = null;
 
   function buildActual(period: string) {
     const subset =
@@ -513,35 +535,100 @@ export default async function MqPage({
 
   const accountMapRows = (accountMapRaw ?? []) as MqAccountMapRow[];
 
-  // 月次資金繰り表（TXN→MQ集計→ローン除外/便宜分類）
+  // 月次資金繰り表（L1 帳簿 · 起点設定 · 翌年繰越）
   if (line === "realestate") {
-    const factsCashByMonth: Record<
-      string,
-      { cashInMan: number | null; cashOutMan: number | null; cashEndMan: number | null }
-    > = {};
-
-    for (const mo of cashflowMonths) {
-      const subset = filterFactsMonth(rows, line, entity, mo);
-      const agg = aggregateRows(subset, "month");
-      factsCashByMonth[mo] = {
-        cashInMan: agg.cashIn,
-        cashOutMan: agg.cashOut,
-        cashEndMan: agg.cashEnd,
-      };
+    const businessLine = "realestate";
+    const settingsRows = (cashflowSettingsRaw ??
+      []) as MqCashflowSettingsRow[];
+    if (
+      settingsRows.length === 0 &&
+      entity === "corporate"
+    ) {
+      settingsRows.push({
+        id: "default",
+        business_line: DEFAULT_CORPORATE_CASHFLOW_SETTINGS.businessLine,
+        entity: DEFAULT_CORPORATE_CASHFLOW_SETTINGS.entity,
+        origin_month: `${DEFAULT_CORPORATE_CASHFLOW_SETTINGS.originMonth}-01`,
+        initial_cash_man: DEFAULT_CORPORATE_CASHFLOW_SETTINGS.initialCashMan,
+        note: DEFAULT_CORPORATE_CASHFLOW_SETTINGS.note,
+      });
     }
 
-    const txns = await fetchYearFinanceTxns(supabase, cashflowYear);
-    cashflowRows = buildMqCashflowMonthRows({
-      year: cashflowYear,
-      months: cashflowMonths,
-      line,
-      entity,
-      cashBeginMan: priorYearCash,
-      loanMonthlyPaymentMan,
-      txns,
-      maps: accountMapRows,
-      factsCashByMonth,
-    });
+    const originYear = settingsRows.reduce((min, r) => {
+      const y = Number(String(r.origin_month).slice(0, 4));
+      return Number.isFinite(y) ? Math.min(min, y) : min;
+    }, cashflowYear);
+
+    const factsCashByMonthByYear: Record<
+      number,
+      Record<
+        string,
+        {
+          cashInMan: number | null;
+          cashOutMan: number | null;
+          cashEndMan: number | null;
+        }
+      >
+    > = {};
+
+    for (let y = originYear; y <= cashflowYear; y++) {
+      const monthsY = Array.from({ length: 12 }, (_, i) => {
+        return `${y}-${String(i + 1).padStart(2, "0")}`;
+      });
+      const byMonth: Record<
+        string,
+        {
+          cashInMan: number | null;
+          cashOutMan: number | null;
+          cashEndMan: number | null;
+        }
+      > = {};
+      for (const mo of monthsY) {
+        const subset = filterFactsMonth(rows, line, entity, mo);
+        const agg = aggregateRows(subset, "month");
+        byMonth[mo] = {
+          cashInMan: agg.cashIn,
+          cashOutMan: agg.cashOut,
+          cashEndMan: agg.cashEnd,
+        };
+      }
+      factsCashByMonthByYear[y] = byMonth;
+    }
+
+    const txns = await fetchFinanceTxnsRange(
+      supabase,
+      originYear,
+      cashflowYear
+    );
+
+    const bsFallbackOpeningByYear: Record<number, number | null> = {
+      [cashflowYear]: priorYearCash,
+    };
+
+    const built = buildCashflowWithCarry(
+      {
+        businessLine,
+        entity,
+        settingsRows,
+        txnOverrides: (cashflowOverridesRaw ?? []) as TxnOverrideRow[],
+        classifyRules: (cashflowRulesRaw ?? []) as CashflowClassifyRuleRow[],
+        loanMonthlyPaymentMan,
+        txns,
+        maps: accountMapRows,
+        factsCashByMonthByYear,
+        bsFallbackOpeningByYear,
+      },
+      cashflowYear
+    );
+
+    cashflowRows = built.rows;
+    cashflowNegative = negativeMonths(cashflowRows);
+
+    if (built.settings) {
+      cashflowOriginHint = `起点: ${built.settings.originMonth} 期首 ${fmtMqMan(built.settings.initialCashMan)}（${built.settings.note || "設定"}）`;
+    } else if (built.openingCashMan != null) {
+      cashflowOriginHint = `${cashflowDisplayYear}年1月 期首 ${fmtMqMan(built.openingCashMan)}（前年末繰越）`;
+    }
   }
 
   const vqAccountMap = accountMapRows
@@ -720,6 +807,8 @@ export default async function MqPage({
             year={cashflowDisplayYear}
             rows={cashflowRows}
             grainHint={`${cashflowDisplayYear}年の各月を横に並べ、項目ごとの入出金を一覧できます。`}
+            originHint={cashflowOriginHint}
+            negativeMonths={cashflowNegative}
             unavailableReason={
               line === "realestate"
                 ? null

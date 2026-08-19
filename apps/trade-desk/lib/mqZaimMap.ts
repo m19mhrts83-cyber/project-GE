@@ -24,6 +24,7 @@ export type MqAccountMapRow = {
 };
 
 export type FinanceTxnLite = {
+  id?: number | string | null;
   category: string | null;
   subcategory: string | null;
   entity: string | null;
