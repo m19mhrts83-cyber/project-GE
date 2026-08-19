@@ -6,6 +6,7 @@ import WatchCommentThread, {
   type WatchCommentRow,
 } from "@/components/WatchCommentThread";
 import ZaimFixActions from "@/components/ZaimFixActions";
+import ZaimCategoryPicker from "@/components/ZaimCategoryPicker";
 import ZaimReviewAckButton from "@/components/ZaimReviewAckButton";
 import ZaimStatusBand, {
   type BankSyncPayload,
@@ -33,11 +34,23 @@ type FixItem = {
   proposal?: string;
   status?: string;
   value?: string;
+  genre?: string;
   message?: string;
   applied_at?: string;
   batch_id?: string;
   learn_key?: string;
+  row_key?: string;
+  kind?: string;
+  target?: string;
+  category?: string;
+  suggest?: string;
 };
+
+function isCategoryFix(f: FixItem): boolean {
+  if (f.kind === "set_category" || f.target === "category") return true;
+  const p = f.proposal || "";
+  return p.includes("費目") || p.includes("→");
+}
 
 function isVisibleLearnFix(
   f: FixItem,
@@ -177,13 +190,36 @@ export default async function ZaimWatchPage() {
     : [];
   const categoryReviews = Array.isArray(payload.category_reviews)
     ? (payload.category_reviews as {
+        row_key?: string;
         date?: string;
         shop?: string;
+        item?: string;
         amount?: number;
         proposal?: string;
         category?: string;
+        genre?: string;
         suggest?: string;
+        suggest_genre?: string;
         confidence?: string;
+        learn_key?: string;
+        pay?: string;
+        method?: string;
+        pending_apply?: boolean;
+        pending_category?: string;
+        pending_genre?: string;
+      }[])
+    : [];
+  const pendingApplies = Array.isArray(payload.pending_category_applies)
+    ? (payload.pending_category_applies as {
+        id?: string;
+        row_key?: string;
+        status?: string;
+        category?: string;
+        genre?: string;
+        shop?: string;
+        date?: string;
+        queued_at?: string;
+        message?: string;
       }[])
     : [];
   const learnFb =
@@ -245,6 +281,7 @@ export default async function ZaimWatchPage() {
         財務の年間収支と、集計・二重取込・費目の学習結果（常駐）。確信度の高い直しは Jarvis
         が適用し、ここは確認用です。学習は取込のたび自動。違うときだけ「おかしい」。
         CSV はクラウド毎日＋ Mac 火金（OneDrive 正本）。開いただけでは銀行は更新されません。
+        分類不明や提案中の費目は、下の選択表から大分類・内訳を選んで「反映」できます（Mac 側で Zaim に適用し、学習に記録します）。
         詳細な月次は{" "}
         <Link href="/metrics" style={{ color: "var(--accent)", fontWeight: 600 }}>
           収支・数値
@@ -388,22 +425,37 @@ export default async function ZaimWatchPage() {
 
         {categoryReviews.length > 0 ? (
           <div className="watch-actions">
-            <p className="watch-actions-title">費目見直し（提案・未自動変更）</p>
-            <ul>
+            <p className="watch-actions-title">
+              費目見直し（分類不明・提案 — ここで費目を選んで反映）
+            </p>
+            <ul className="zaim-category-review-list">
               {categoryReviews.slice(0, 20).map((c, idx) => (
-                <li key={`${c.date}-${c.shop}-${idx}`}>
-                  {isYmdDate(c.date) ? (
-                    <span className="watch-action-date">{c.date}</span>
-                  ) : null}
-                  <span className="watch-action-shop">{c.shop || "—"}</span>
-                  {c.amount != null ? (
-                    <span className="watch-action-yen">{fmtYen(c.amount)}</span>
-                  ) : null}
-                  <span className="watch-action-proposal">
-                    {c.proposal || c.category || "—"}
-                  </span>
+                <li key={`${c.row_key || c.date}-${c.shop}-${idx}`}>
+                  <ZaimCategoryPicker item={c} variant="review" />
                 </li>
               ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {pendingApplies.filter((p) => p.status === "queued" || p.status === "applying")
+          .length > 0 ? (
+          <div className="watch-actions" style={{ marginTop: 12 }}>
+            <p className="watch-actions-title">反映待ち（Zaim 適用キュー）</p>
+            <ul>
+              {pendingApplies
+                .filter((p) => p.status === "queued" || p.status === "applying")
+                .slice(0, 10)
+                .map((p) => (
+                  <li key={p.id || p.row_key}>
+                    <span className="watch-action-date">{p.date || "—"}</span>
+                    <span className="watch-action-shop">{p.shop || "—"}</span>
+                    <span className="watch-action-proposal">
+                      → {p.category}
+                      {p.genre ? ` / ${p.genre}` : ""}（{p.status}）
+                    </span>
+                  </li>
+                ))}
             </ul>
           </div>
         ) : null}
@@ -419,19 +471,41 @@ export default async function ZaimWatchPage() {
                   style={{ alignItems: "flex-start" }}
                 >
                   <div style={{ flex: 1 }}>
-                    {isYmdDate(f.date) ? (
-                      <span className="watch-action-date">{f.date} </span>
-                    ) : null}
-                    <span className="watch-action-shop">{f.shop || "—"}</span>
-                    {f.amount != null ? (
-                      <span className="watch-action-yen">
-                        {" "}
-                        {fmtYen(f.amount)}
-                      </span>
-                    ) : null}
-                    <div className="watch-action-proposal">
-                      {f.proposal || "—"}
-                    </div>
+                    {isCategoryFix(f) && f.row_key ? (
+                      <ZaimCategoryPicker
+                        item={{
+                          row_key: f.row_key,
+                          date: f.date,
+                          shop: f.shop,
+                          amount: f.amount,
+                          category: f.category,
+                          suggest: f.suggest || f.value,
+                          learn_key: f.learn_key,
+                          proposal: f.proposal,
+                          pending_apply: f.message === "dashboard_queued",
+                          pending_category: f.value,
+                          pending_genre: f.genre,
+                        }}
+                        variant="fix"
+                        fixId={f.id ? String(f.id) : undefined}
+                      />
+                    ) : (
+                      <>
+                        {isYmdDate(f.date) ? (
+                          <span className="watch-action-date">{f.date} </span>
+                        ) : null}
+                        <span className="watch-action-shop">{f.shop || "—"}</span>
+                        {f.amount != null ? (
+                          <span className="watch-action-yen">
+                            {" "}
+                            {fmtYen(f.amount)}
+                          </span>
+                        ) : null}
+                        <div className="watch-action-proposal">
+                          {f.proposal || "—"}
+                        </div>
+                      </>
+                    )}
                   </div>
                   {f.id ? (
                     <ZaimFixActions
