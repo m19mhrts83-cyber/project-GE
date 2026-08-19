@@ -13,7 +13,7 @@ LINE からコピーしたテキスト（または標準入力・ファイル）
   python line_to_yoritoori_clip.py --partner Newtus
 
   # フォルダ直指定（YAML に無いグループ用フォルダなど）
-  python line_to_yoritoori_clip.py --folder 950_LINE_案件名 --display-name "火災保険協議"
+  python line_to_yoritoori_clip.py --folder 820_LINE_案件名 --display-name "火災保険協議"
 
   # グループ見出し（--group-label ありで「LINE（グループ・貼り付け）」）
   python line_to_yoritoori_clip.py --partner Newtus --group-label "○○案件"
@@ -315,7 +315,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="LINE 貼り付けテキストを 5.やり取り.md に追記")
     g = parser.add_mutually_exclusive_group(required=True)
     g.add_argument("--partner", help="連絡先一覧の name または folder")
-    g.add_argument("--folder", help="追記先フォルダ名（例: 312_Newtus / 950_LINE_○○）")
+    g.add_argument("--folder", help="追記先フォルダ名（例: 312_Newtus / 820_LINE_○○）")
     parser.add_argument("--display-name", help="--folder 指定時の見出し名（省略時は folder 名）")
     parser.add_argument(
         "--direction",

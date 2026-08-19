@@ -11,6 +11,7 @@ CHRLINE sync の差分と getRecentMessagesV2 補完から、指定した 1:1 �
     - Tcell: グループ「キャラメル管理G」のみ → 103_Tcell/5.やり取り.md
     - LEAF: グループ名に「Grandole志賀本通」を含むトーク → 104_LEAF/5.やり取り.md
     - 815: グループ「東海飲み会幹事やりとり」→ 815_神大家オプチャ/東海飲み会幹事やりとり/5.やり取り.md
+    - 連絡先一覧.yaml の `line_group_chat_mid`（例: 神大家東海DX互助会）も自動追加
   - グループ chatMid はトーク名の部分一致で解決、または LINE_TCELL_GROUP_CHAT_MID / LINE_LEAF_GROUP_CHAT_MID / LINE_KAMIOOYA_KANJI_GROUP_CHAT_MID / 各 --*-group-chat-mid
 
 プリセット「tcell-both」: Tcell のみ・**キャラメル管理G グループのみ**（旧「yuki+G」から変更）
@@ -62,7 +63,10 @@ from chrline_sync_delta_poc import (
     _save_state,
 )
 from chrline_message_fetch import fetch_messages_deep
-from chrline_yoritoori_routes_from_contacts import load_direct_chat_targets
+from chrline_yoritoori_routes_from_contacts import (
+    load_direct_chat_targets,
+    load_group_chat_targets,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _ONEDRIVE_TCELL_YORITOORI = (
@@ -1367,6 +1371,25 @@ def run(args: argparse.Namespace, *, client=None) -> int:
                         send_tag="自分から送信（LINEグループ・CHRLINE sync）",
                     )
                 )
+
+            known_group_mids: set[str] = set()
+            for route in routes:
+                for t in route.targets:
+                    known_group_mids.add(t.needle)
+            for gct in load_group_chat_targets(exclude_mids=known_group_mids):
+                tgt = _YoritooriTarget(
+                    needle=gct.chat_mid,
+                    recv_tag=f"{gct.peer_label}（LINEグループ・CHRLINE sync・受信）",
+                    send_tag="自分から送信（LINEグループ・CHRLINE sync）",
+                )
+                merged = False
+                for route in routes:
+                    if route.yoritoori_md == gct.yoritoori_md:
+                        route.targets.append(tgt)
+                        merged = True
+                        break
+                if not merged:
+                    routes.append(_YoritooriRoute(gct.yoritoori_md, gct.org_label, [tgt]))
 
         route_target_map: dict[tuple[str, str], tuple[_YoritooriRoute, _YoritooriTarget]] = {}
         for route in routes:
