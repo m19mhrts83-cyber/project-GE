@@ -211,9 +211,89 @@ export default function HouseholdBsPanel({ view }: { view: HouseholdBsView }) {
         </p>
       </div>
 
+      <details className="card" style={{ marginTop: 12 }} open>
+        <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+          不動産の内訳
+        </summary>
+        {view.filedRe?.useFiledInTotals ? (
+          <p className="meta" style={{ marginTop: 8 }}>
+            この年は確定申告の収入金額が正（個人 {fmtAmount(view.filedRe.personalRevenueJpy)}
+            {view.filedRe.corporateRevenueJpy
+              ? ` ／ 法人5月期 ${fmtAmount(view.filedRe.corporateRevenueJpy)}`
+              : ""}
+            ）。内容確認は参考。
+            {view.filedRe.personalSource ? (
+              <>
+                {" "}
+                PDF: <code>{view.filedRe.personalSource}</code>
+              </>
+            ) : null}
+          </p>
+        ) : (
+          <p className="meta" style={{ marginTop: 8 }}>
+            未申告年は内容確認×所有月。申告後に PDF を正へ差し替えます。
+          </p>
+        )}
+        {view.reFlow && view.reFlow.properties.length > 0 ? (
+          <>
+            <p className="meta" style={{ marginTop: 8 }}>
+              {view.reFlow.basis}（基準日 {view.reFlow.asOf}）
+            </p>
+            <table style={{ marginTop: 8 }}>
+              <thead>
+                <tr>
+                  <th>物件</th>
+                  <th>月数</th>
+                  <th className="num">家賃</th>
+                  <th className="num">管理費</th>
+                  <th className="num">グロス</th>
+                </tr>
+              </thead>
+              <tbody>
+                {view.reFlow.properties.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      {p.label}
+                      <div className="meta">{p.owner}</div>
+                    </td>
+                    <td>{p.months}</td>
+                    <td className="num">{fmtAmount(p.rentJpy)}</td>
+                    <td className="num">{fmtAmount(p.mgmtJpy)}</td>
+                    <td className="num">{fmtAmount(p.grossJpy)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={2}>
+                    <strong>合計</strong>
+                  </td>
+                  <td className="num">
+                    {fmtAmount(view.reFlow.totals.rentJpy)}
+                  </td>
+                  <td className="num">
+                    {fmtAmount(view.reFlow.totals.mgmtJpy)}
+                  </td>
+                  <td className="num">
+                    {fmtAmount(view.reFlow.totals.grossJpy)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="meta" style={{ marginTop: 8 }}>
+              準拠: <code>docs/KURASHIFT_家計BS_不動産フロー.md</code> ／{" "}
+              <code>config/household_kiyosaki_bs.yaml</code> の{" "}
+              <code>realestate_flow</code>
+            </p>
+          </>
+        ) : (
+          <p className="meta" style={{ marginTop: 8 }}>
+            この年の所有月が無い、または号室データがありません。
+          </p>
+        )}
+      </details>
+
       <details className="card" style={{ marginTop: 12 }}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-          MQ不動産 · 法人内訳（{view.year}年）
+          MQ不動産 · 法人内訳（{view.year}年・参考）
         </summary>
         <table style={{ marginTop: 8 }}>
           <thead>
@@ -234,7 +314,7 @@ export default function HouseholdBsPanel({ view }: { view: HouseholdBsView }) {
           </tbody>
         </table>
         <p className="meta" style={{ marginTop: 8 }}>
-          合算は個人+法人の単純加算。内部取引は除外推奨。
+          合算は個人+法人の単純加算。家計B/Sの収入・支出合計には入れていません（内容確認が正）。
         </p>
       </details>
 

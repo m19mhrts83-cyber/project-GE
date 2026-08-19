@@ -12,6 +12,18 @@ import {
 } from "@/lib/mqAggregate";
 import type { MqComputed } from "@/lib/mqEquations";
 import { RE_PROPERTY_MASTER, loansForProperty } from "@/lib/rePropertyMaster";
+import {
+  buildHouseholdReFlow,
+  isHouseholdReOtherIncome,
+  type HouseholdReFlow,
+} from "@/lib/householdReFlow";
+import {
+  householdFiledReFromMetrics,
+  loadTaxYearMetricsFromCatalog,
+  type HouseholdFiledRe,
+} from "@/lib/householdReFiled";
+import type { PropertyUnitRow } from "@/lib/roiAssets";
+import type { TaxYearMetricRow } from "@/lib/taxInsights";
 
 export type Quadrant = "income" | "expense" | "asset" | "liability";
 
@@ -53,6 +65,8 @@ export type HouseholdBsView = {
   composedAt: string;
   snapshotAsOf?: string | null;
   snapshotSource?: string | null;
+  reFlow?: HouseholdReFlow | null;
+  filedRe?: HouseholdFiledRe | null;
 };
 
 export type HouseholdConfig = {
@@ -83,6 +97,11 @@ export type HouseholdConfig = {
   };
   expense_flow?: { exclude_category_patterns?: string[] };
   income_categories: string[];
+  realestate_flow?: {
+    other_income_patterns?: string[];
+    mq_in_totals?: boolean;
+    income_source?: string;
+  };
 };
 
 type Snap = { as_of: string; value_jpy: number; source?: string | null };
@@ -229,6 +248,7 @@ function incomeRowsFromCategories(
     const cat = (r.category || "").trim();
     const inc = num(r.income_jpy);
     if (!cat || inc <= 0) continue;
+    if (/19\.1/.test(cat) && /家賃|不労所得/.test(cat)) continue;
     if (!patterns.some((p) => cat.includes(p))) continue;
     const slug = cat.replace(/[^\w\u3040-\u9fff]+/g, "_").slice(0, 40);
     out.push({
@@ -324,6 +344,8 @@ export function composeHouseholdBs(args: {
   mqFacts: MqFactRow[];
   loanTracker: LoanRow[];
   categoryYear?: CategoryRow[];
+  propertyUnits?: PropertyUnitRow[];
+  taxMetrics?: TaxYearMetricRow[];
   cardDebitAmountJpy?: number | null;
   cardDebitDue?: string | null;
   config?: HouseholdConfig;
@@ -367,8 +389,128 @@ export function composeHouseholdBs(args: {
   const mqCombined = mqSlice(args.mqFacts, year, "combined");
   const mqPersonal = mqSlice(args.mqFacts, year, "personal");
   const mqCorporate = mqSlice(args.mqFacts, year, "corporate");
+  const mqInTotals = cfg.realestate_flow?.mq_in_totals === true;
+  const taxMetrics = args.taxMetrics ?? loadTaxYearMetricsFromCatalog();
+  const filedRe = householdFiledReFromMetrics(taxMetrics, yNum);
+  const occupancyInTotals = !filedRe.useFiledInTotals;
 
-  if (mqCombined.computed && mqCombined.computed.pq !== 0) {
+  const reFlow = buildHouseholdReFlow({
+    year: yNum,
+    units: args.propertyUnits ?? [],
+  });
+
+  if (filedRe.useFiledInTotals && filedRe.personalRevenueJpy) {
+    rows.push({
+      id: "re_rent_filed_personal",
+      label: "不動産家賃（確定申告・個人）",
+      quadrant: "income",
+      band: "business_cf",
+      amountJpy: filedRe.personalRevenueJpy,
+      countsTowardTotal: true,
+      hint: "収支内訳書の収入金額。提出PDFが正",
+      source: filedRe.personalSource ?? "tax_return",
+      entity: "personal",
+    });
+  }
+  if (filedRe.useFiledInTotals && filedRe.corporateRevenueJpy) {
+    rows.push({
+      id: "re_rent_filed_corporate",
+      label: "不動産売上（確定申告・法人5月期）",
+      quadrant: "income",
+      band: "business_cf",
+      amountJpy: filedRe.corporateRevenueJpy,
+      countsTowardTotal: true,
+      hint: "法人申告の売上。暦年とは期間がずれる",
+      source: filedRe.corporateSource ?? "tax_return",
+      entity: "corporate",
+    });
+  }
+
+  if (reFlow.totals.grossJpy > 0) {
+    rows.push({
+      id: "re_rent_gross",
+      label: occupancyInTotals
+        ? "不動産家賃（内容確認・グロス）"
+        : "　↳ 内容確認（参考・合計には含めない）",
+      quadrant: "income",
+      band: "business_cf",
+      amountJpy: reFlow.totals.grossJpy,
+      countsTowardTotal: occupancyInTotals,
+      indent: !occupancyInTotals,
+      hint: occupancyInTotals
+        ? reFlow.basis
+        : "申告後は内容確認を参考表示のみ。当年空室は未反映",
+      source: "occupancy",
+      asOf: reFlow.asOf,
+      entity: "combined",
+    });
+    for (const p of reFlow.properties) {
+      rows.push({
+        id: `re_rent_${p.id}`,
+        label: `　↳ ${p.label}（${p.owner}・${p.months}ヶ月）`,
+        quadrant: "income",
+        band: "business_cf",
+        amountJpy: p.grossJpy,
+        countsTowardTotal: false,
+        indent: true,
+        hint: `家賃 ${p.rentJpy.toLocaleString("ja-JP")} + 管理費 ${p.mgmtJpy.toLocaleString("ja-JP")}`,
+        source: "occupancy",
+        entity: p.owner === "法人" ? "corporate" : "personal",
+      });
+    }
+    if (occupancyInTotals && reFlow.totals.mgmtJpy > 0) {
+      rows.push({
+        id: "re_mgmt_expense",
+        label: "不動産管理費（内容確認）",
+        quadrant: "expense",
+        band: "business_cf",
+        amountJpy: reFlow.totals.mgmtJpy,
+        countsTowardTotal: true,
+        hint: "未申告年。財務19.1は管理費差引後のため、グロスから管理費を支出へ戻す",
+        source: "occupancy",
+        asOf: reFlow.asOf,
+        entity: "combined",
+      });
+      for (const p of reFlow.properties) {
+        if (p.mgmtJpy <= 0) continue;
+        rows.push({
+          id: `re_mgmt_${p.id}`,
+          label: `　↳ ${p.label}`,
+          quadrant: "expense",
+          band: "business_cf",
+          amountJpy: p.mgmtJpy,
+          countsTowardTotal: false,
+          indent: true,
+          source: "occupancy",
+        });
+      }
+    }
+  } else if (!filedRe.useFiledInTotals) {
+    notes.push(
+      "不動産家賃は内容確認（property_units）が空のため未計上。③-Cの号室を確認してください。"
+    );
+  }
+
+  for (const r of args.categoryYear ?? []) {
+    if (r.fiscal_year !== yNum) continue;
+    const cat = (r.category || "").trim();
+    const inc = num(r.income_jpy);
+    if (inc <= 0 || !isHouseholdReOtherIncome(cat)) continue;
+    const slug = cat.replace(/[^\w\u3040-\u9fff]+/g, "_").slice(0, 40);
+    rows.push({
+      id: `zaim_re_other_${slug}`,
+      label: cat.replace(/^[αβγδ]?\.?\d+F?\./, ""),
+      quadrant: "income",
+      band: "business_cf",
+      amountJpy: inc,
+      countsTowardTotal: true,
+      hint: "財務年次の不動産その他（売却・保険金・事業収入）。19.1家賃は使わない",
+      source: "finance_year",
+      entity: "combined",
+    });
+  }
+
+  if (mqInTotals && mqCombined.computed && mqCombined.computed.pq !== 0) {
     rows.push({
       id: "mq_rent_pq",
       label: "不動産売上（MQ・PQ合算）",
@@ -381,7 +523,7 @@ export function composeHouseholdBs(args: {
     });
   }
 
-  if (mqCombined.computed) {
+  if (mqInTotals && mqCombined.computed) {
     const expMan = (mqCombined.computed.vq || 0) + (mqCombined.computed.f || 0);
     if (expMan !== 0) {
       rows.push({
@@ -400,7 +542,14 @@ export function composeHouseholdBs(args: {
   const zaimExpenses = expenseRowsFromCategories(
     args.categoryYear ?? [],
     yNum,
-    cfg.expense_flow?.exclude_category_patterns ?? ["MQ", "不動産"]
+    cfg.expense_flow?.exclude_category_patterns ?? [
+      "MQ",
+      "不動産",
+      "合計",
+      "19",
+      "賃貸",
+      "マンション",
+    ]
   );
   rows.push(...zaimExpenses);
 
@@ -582,8 +731,16 @@ export function composeHouseholdBs(args: {
     });
   }
 
+  notes.push(
+    filedRe.useFiledInTotals
+      ? "過去年の家賃収入は確定申告（収支内訳の収入金額）が正。内容確認は参考。準拠: docs/KURASHIFT_家計BS_不動産フロー.md"
+      : "未申告年の家賃は内容確認（property_units）×所有月。申告後にPDFを正へ差し替える。準拠: docs/KURASHIFT_家計BS_不動産フロー.md"
+  );
+  if (!mqInTotals) {
+    notes.push("MQのPQ・経費は家計B/S合計に入れていません（参考カードのみ）。");
+  }
   if (grain === "year" && !mqCombined.computed) {
-    notes.push(`${year}年のMQ実績がありません。/mq で取込後にフロー行が出ます。`);
+    notes.push(`${year}年のMQ実績はありません。事業側は /mq を参照。`);
   }
   if (!homeLoanFilled) {
     notes.push(
@@ -604,6 +761,8 @@ export function composeHouseholdBs(args: {
     mqSlices: [mqCombined, mqPersonal, mqCorporate],
     notes,
     composedAt: new Date().toISOString(),
+    reFlow,
+    filedRe,
   };
 }
 
@@ -622,6 +781,8 @@ export function householdBsViewFromSnapshot(payload: unknown): HouseholdBsView |
     composedAt: String(p.composedAt ?? new Date().toISOString()),
     snapshotAsOf: p.snapshotAsOf ?? null,
     snapshotSource: p.snapshotSource ?? null,
+    reFlow: (p.reFlow as HouseholdReFlow | undefined) ?? null,
+    filedRe: (p.filedRe as HouseholdFiledRe | undefined) ?? null,
   };
 }
 
