@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "updated": "2026-08-19",
+  "notes": "家計4象限の分類正本。counts_toward_total=false は表示のみ（合計に再加算しない）。",
+  "insurance_pairs": [
+    { "gross_id": "sony_life", "loan_id": "sony_life_policy_loan", "label": "ソニー生命（ネット）" },
+    { "gross_id": "sony_life_chikage", "loan_id": "sony_life_chikage_policy_loan", "label": "ソニー生命・千景" },
+    { "gross_id": "prudential_life", "loan_id": "prudential_life_policy_loan", "label": "プルデンシャル生命" },
+    { "gross_id": "prudential_life_chikage", "loan_id": "prudential_life_chikage_policy_loan", "label": "プルデンシャル・千景" }
+  ],
+  "securities": [
+    { "id": "sbi_index", "label": "SBIインデックス（月9万・寝かせて）", "band": "sleep", "note": "事業CFとは別帯" },
+    { "id": "bloomo", "label": "Bloomo（衛星）", "band": "theme", "note": "Themeスリーブ" },
+    { "id": "akatsuki_bond", "label": "あかつきGS劣後債", "band": "sleep", "note": "増やさない・売らない" },
+    { "id": "mhi_stock", "label": "三菱重工持株", "band": "sleep" }
+  ],
+  "static_rows": [
+    {
+      "id": "home",
+      "label": "自宅（住居コスト）",
+      "quadrant": "liability",
+      "band": "consumer",
+      "hint": "キヨサキ: 継続してポケットから出る。時価は脚注のみ"
+    }
+  ],
+  "loan_match": {
+    "mini_patterns": ["MINI", "Countryman", "マイカー", "名鉄AUTO", "mycar"],
+    "mini_label": "MINI Countryman D ローン"
+  },
+  "income_categories": ["給与", "賞与", "三菱重工"]
+}

@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import MqBsPanel from "@/components/MqBsPanel";
 import MqCompareBars from "@/components/MqCompareBars";
+import MqTaxComparePanel from "@/components/MqTaxComparePanel";
 import MqFactsForm from "@/components/MqFactsForm";
 import MqPlanForm from "@/components/MqPlanForm";
 import MqZaimIngestPanel from "@/components/MqZaimIngestPanel";
@@ -36,6 +37,8 @@ import {
 import { sumLoanTrackerLt } from "@/lib/mqLoanSuggest";
 import { qUnitLabel } from "@/lib/mqPolicy";
 import type { MqComputed } from "@/lib/mqEquations";
+import { buildMqTaxCompare, buildMqTaxCompareDual } from "@/lib/mqTaxCompare";
+import type { TaxYearMetricRow } from "@/lib/taxInsights";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +99,12 @@ export default async function MqPage({
   const { data: loanRaw } = await supabase
     .from("kurashift_loan_tracker_loans")
     .select("balance_jpy, category_major, tags, name");
+
+  const { data: taxMetricsRaw } = await supabase
+    .from("kurashift_tax_year_metrics")
+    .select("*")
+    .order("fiscal_year", { ascending: false })
+    .limit(24);
 
   const rows = (raw ?? []) as MqFactRow[];
   const bsRows = (bsRaw ?? []) as MqBsRow[];
@@ -323,6 +332,59 @@ export default async function MqPage({
   }
 
   const qLabel = line === "all" ? undefined : qUnitLabel(line);
+
+  const taxMetrics = (taxMetricsRaw ?? []) as TaxYearMetricRow[];
+  const compareYear = Number(
+    (grain === "year" ? periodA : periodA.slice(0, 4)).slice(0, 4)
+  );
+
+  function actualFor(ent: "personal" | "corporate") {
+    const subset =
+      grain === "year"
+        ? filterFactsYearActual(rows, line, ent, periodA)
+        : filterFactsMonth(rows, line, ent, periodA);
+    return aggregateRows(subset, grain === "year" ? "year" : "month");
+  }
+
+  const taxCompareDual =
+    entity === "combined" && line !== "all" && grain === "year"
+      ? buildMqTaxCompareDual({
+          line,
+          fiscalYear: compareYear,
+          personal: {
+            computed: actualFor("personal").computed,
+            depreciationMan: actualFor("personal").depreciation ?? null,
+            metric: taxMetrics.find(
+              (m) =>
+                m.fiscal_year === compareYear && m.scope === "personal"
+            ),
+          },
+          corporate: {
+            computed: actualFor("corporate").computed,
+            depreciationMan: actualFor("corporate").depreciation ?? null,
+            metric: taxMetrics.find(
+              (m) =>
+                m.fiscal_year === compareYear && m.scope === "corporate"
+            ),
+          },
+        })
+      : null;
+
+  const taxCompare =
+    entity !== "combined"
+      ? buildMqTaxCompare({
+          line,
+          entity,
+          fiscalYear: compareYear,
+          computed: left.computed,
+          depreciationMan: left.depreciation ?? null,
+          metric: taxMetrics.find(
+            (m) =>
+              m.fiscal_year === compareYear &&
+              m.scope === (entity === "corporate" ? "corporate" : "personal")
+          ),
+        })
+      : null;
 
   return (
     <Shell active="/mq" email={user?.email ?? null}>
@@ -569,6 +631,15 @@ export default async function MqPage({
           rowsB={metricBars(right.computed)}
         />
       </div>
+
+      <MqTaxComparePanel
+        compare={taxCompare}
+        dual={taxCompareDual}
+        grain={grain}
+        line={line}
+        entity={entity}
+        periodLabel={left.title.replace(/^実績\s*/, "")}
+      />
 
       <div style={{ marginTop: 16 }}>
         <MqBsPanel
