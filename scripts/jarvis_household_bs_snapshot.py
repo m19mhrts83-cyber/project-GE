@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""家計B/S 月次スナップ — MQ月次更新と同サイクル
+"""家計B/S 月次スナップ — MQ月次更新と同サイクル（既定で自動）
 
+  # 単独（任意。初回手動は不要 — 未保存でも /household-bs は live compose）
   ~/selenium_env/venv/bin/python scripts/jarvis_household_bs_snapshot.py
   ~/selenium_env/venv/bin/python scripts/jarvis_household_bs_snapshot.py --dry-run
+
+  # 通常は jarvis_mq_monthly_refresh.py 成功後に自動実行
+  # 省略したいときだけ: … jarvis_mq_monthly_refresh.py --skip-household-bs
 """
 from __future__ import annotations
 
