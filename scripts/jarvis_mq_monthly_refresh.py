@@ -254,7 +254,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"# mq {year}: ok={r.get('ok')} upserted={r.get('upserted')} "
             f"stale={r.get('deletedStale')} heuristic={r.get('heuristicRealestateCount')} "
-            f"unmapped={r.get('unmappedTotal')} manual={r.get('skippedManual')}",
+            f"unmapped={r.get('unmappedTotal')} manual={r.get('skippedManual')} "
+            f"txn={r.get('txnCount')} reasons={r.get('reasonCounts')}",
             flush=True,
         )
         if not r.get("ok"):
@@ -281,6 +282,7 @@ def main(argv: list[str] | None = None) -> int:
                 "unmappedTotal": r.get("unmappedTotal"),
                 "heuristicRealestateCount": r.get("heuristicRealestateCount"),
                 "txnCount": r.get("txnCount"),
+                "reasonCounts": r.get("reasonCounts"),
             }
             for r in mq_results
         ],

@@ -147,4 +147,50 @@ const vague = resolveMapDetailed([], {
 });
 assert(vague.map == null, "vague unmapped");
 
+// 法人寄り口座だけでは不動産に寄せない
+const paypayOnly = resolveMapDetailed([], {
+  category: "その他",
+  subcategory: "手数料",
+  entity: "corporate",
+  kind: "other_expense",
+  txn_date: "2026-04-01",
+  income_jpy: 0,
+  expense_jpy: 500,
+  from_account: "★PayPay銀行",
+});
+assert(paypayOnly.map == null, "paypay alone unmapped");
+
+// アパート経営口座は単独でも不動産
+const apt = resolveMapDetailed([], {
+  category: "その他",
+  subcategory: "手数料",
+  entity: "corporate",
+  kind: "other_expense",
+  txn_date: "2026-04-01",
+  income_jpy: 0,
+  expense_jpy: 500,
+  from_account: "★MUFG(アパート経営)",
+});
+assert(apt.reason === "heuristic_realestate", "apt account strong");
+
+const agg2 = aggregateZaimToMq(
+  [
+    {
+      category: "その他",
+      subcategory: "管理費",
+      entity: "corporate",
+      kind: "other_expense",
+      txn_date: "2026-04-01",
+      income_jpy: 0,
+      expense_jpy: 5000,
+      from_account: "★PayPay銀行",
+      description: "賃貸管理",
+    },
+  ],
+  [],
+  { year: 2026 }
+);
+assert(agg2.heuristicRealestateCount === 1, "reason heuristic count");
+assert(agg2.reasonCounts.heuristic_realestate === 1, "reasonCounts");
+
 console.log("mqZaimMap.selftest: ok");

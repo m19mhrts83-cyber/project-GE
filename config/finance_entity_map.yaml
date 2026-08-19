@@ -6,6 +6,7 @@ version: 1
 # entity: corporate | personal | skip
 account_rules:
   # 法人寄り口座
+  # MQ不動産の単独採用は ★MUFG(アパート経営) のみ。PayPay/滋賀は文言とセット。
   - match: "★PayPay銀行"
     entity: corporate
   - match: "★MUFG(アパート経営)"
