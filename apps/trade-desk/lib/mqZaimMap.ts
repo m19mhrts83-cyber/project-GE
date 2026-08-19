@@ -44,6 +44,8 @@ export type MapResolveReason =
   | "heuristic_realestate"
   | "unmapped";
 
+export type MapReasonCounts = Record<MapResolveReason, number>;
+
 function yen(n: number | string | null | undefined): number {
   const v = Number(n);
   return Number.isFinite(v) ? v : 0;
@@ -54,13 +56,13 @@ function includesCI(hay: string, needle: string): boolean {
   return hay.toLowerCase().includes(needle.toLowerCase());
 }
 
-/** 不動産口座・文言の高確度シグナル（曖昧なものは付けない） */
-const RE_ACCOUNT_HINTS = [
-  "アパート経営",
-  "MUFG(アパート",
-  "PayPay銀行",
-  "滋賀銀行",
-];
+/**
+ * 不動産口座の高確度シグナル。
+ * finance_entity_map.yaml の法人口座のうち、用途が賃貸と分かるものだけを単独採用。
+ * PayPay / 滋賀は法人寄りだが AI・会社費用も通るので、文言とセットのときだけ。
+ */
+const RE_ACCOUNT_STRONG = ["アパート経営", "MUFG(アパート"];
+const RE_ACCOUNT_WEAK = ["PayPay銀行", "滋賀銀行"];
 const RE_TEXT_HINTS = [
   "家賃",
   "賃貸",
@@ -92,9 +94,18 @@ function blobOf(txn: FinanceTxnLite): string {
     .join(" ");
 }
 
-function hasReAccount(txn: FinanceTxnLite): boolean {
-  const acc = `${txn.from_account || ""} ${txn.to_account || ""}`;
-  return RE_ACCOUNT_HINTS.some((h) => acc.includes(h));
+function accountBlob(txn: FinanceTxnLite): string {
+  return `${txn.from_account || ""} ${txn.to_account || ""}`;
+}
+
+function hasStrongReAccount(txn: FinanceTxnLite): boolean {
+  const acc = accountBlob(txn);
+  return RE_ACCOUNT_STRONG.some((h) => acc.includes(h));
+}
+
+function hasWeakReAccount(txn: FinanceTxnLite): boolean {
+  const acc = accountBlob(txn);
+  return RE_ACCOUNT_WEAK.some((h) => acc.includes(h));
 }
 
 function hasReText(txn: FinanceTxnLite): boolean {
@@ -166,20 +177,15 @@ export function resolveMapDetailed(
     };
   }
 
+  const catLooksRe = /19|賃貸|家賃|不動産|マンション/i.test(cat);
   const strong =
     txn.kind === "rental_expense" ||
     txn.kind === "repair" ||
-    hasReAccount(txn) ||
-    (hasReText(txn) && hasReAccount(txn)) ||
-    (hasReText(txn) && /19|賃貸|家賃|不動産|マンション/i.test(cat));
+    hasStrongReAccount(txn) ||
+    (hasWeakReAccount(txn) && hasReText(txn)) ||
+    (hasReText(txn) && catLooksRe);
 
-  if (
-    strong &&
-    (hasReText(txn) ||
-      hasReAccount(txn) ||
-      txn.kind === "rental_expense" ||
-      txn.kind === "repair")
-  ) {
+  if (strong) {
     return {
       map: {
         business_line: "realestate",
@@ -224,6 +230,8 @@ export type AggregateResult = {
   loanMixedWarn: boolean;
   /** ヒューリスティックで不動産に寄せた件数 */
   heuristicRealestateCount: number;
+  /** 判定理由別件数（監査ログ） */
+  reasonCounts: MapReasonCounts;
 };
 
 export function monthStart(iso: string | null): string | null {
@@ -247,6 +255,12 @@ export function aggregateZaimToMq(
   >();
   let loanMixedWarn = false;
   let heuristicRealestateCount = 0;
+  const reasonCounts: MapReasonCounts = {
+    account_map: 0,
+    kind_rent_income: 0,
+    heuristic_realestate: 0,
+    unmapped: 0,
+  };
 
   function bucketKey(line: string, entity: string, month: string) {
     return `${line}|${entity}|${month}`;
@@ -298,6 +312,7 @@ export function aggregateZaimToMq(
       ) {
         continue;
       }
+      reasonCounts.unmapped += 1;
       const uk = `${cat}|${t.subcategory || ""}|${ent}`;
       const u = unmappedMap.get(uk) || {
         category: cat,
@@ -312,6 +327,7 @@ export function aggregateZaimToMq(
       continue;
     }
 
+    reasonCounts[reason] += 1;
     if (reason === "heuristic_realestate") heuristicRealestateCount += 1;
 
     const b = getBucket(hit.business_line, ent, month);
@@ -341,5 +357,6 @@ export function aggregateZaimToMq(
     skippedManualMonths: [],
     loanMixedWarn,
     heuristicRealestateCount,
+    reasonCounts,
   };
 }
