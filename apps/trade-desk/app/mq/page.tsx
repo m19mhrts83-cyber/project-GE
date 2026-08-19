@@ -70,6 +70,11 @@ type Panel = {
   cashOut?: number | null;
   cashEnd?: number | null;
   depreciation?: number | null;
+  /** F 固定費の内訳（クリックで確認用） */
+  fMonthlyPart?: number | null;
+  fAnnualAllocated?: number | null;
+  /** 表示粒度（month=年額÷12 / year=年額側） */
+  fBreakdownKind?: "month" | "year";
   emptyHint: string;
   fNote?: string;
 };
@@ -118,8 +123,12 @@ export default async function MqPage({
   const loanTrackerLt = sumLoanTrackerLt(loanRaw ?? []);
   const months = availableMonths(rows);
   const years = availableYears(rows);
+  const bsYears = Array.from(
+    new Set((bsRaw ?? []).map((r) => String(r.as_of_date).slice(0, 4)))
+  ).sort();
+  const yearsAll = Array.from(new Set([...years, ...bsYears])).sort().reverse();
   const defaultMonth = months[0] || currentMonth();
-  const defaultYear = years[0] || String(new Date().getFullYear());
+  const defaultYear = yearsAll[0] || String(new Date().getFullYear());
   const variants = listPlanVariants(rows);
   const defaultVariant = variants[0] || "基本";
 
@@ -129,7 +138,7 @@ export default async function MqPage({
       : one(sp, "a", defaultMonth).slice(0, 7);
   const periodB =
     grain === "year"
-      ? one(sp, "b", years[1] || defaultYear).slice(0, 4)
+      ? one(sp, "b", yearsAll[1] || defaultYear).slice(0, 4)
       : one(sp, "b", months[1] || defaultMonth).slice(0, 7);
   const planYear = one(sp, "py", periodA.length === 4 ? periodA : periodA.slice(0, 4));
   const variantA = one(sp, "va", defaultVariant);
@@ -179,6 +188,9 @@ export default async function MqPage({
       cashOut: a.cashOut,
       cashEnd: a.cashEnd,
       depreciation: a.depreciation,
+      fMonthlyPart: a.computed ? a.fMonthlyPart : null,
+      fAnnualAllocated: a.computed ? a.fAnnualAllocated : null,
+      fBreakdownKind: grain === "month" ? "month" : "year",
       emptyHint: "この条件の実績がありません。下の月次フォームで保存してください。",
       fNote:
         grain === "month" && a.computed
@@ -192,6 +204,9 @@ export default async function MqPage({
       cashOut: b.cashOut,
       cashEnd: b.cashEnd,
       depreciation: b.depreciation,
+      fMonthlyPart: b.computed ? b.fMonthlyPart : null,
+      fAnnualAllocated: b.computed ? b.fAnnualAllocated : null,
+      fBreakdownKind: grain === "month" ? "month" : "year",
       emptyHint: "比較用のもう一方の実績がありません。",
     };
   } else if (mode === "ap") {
@@ -204,11 +219,17 @@ export default async function MqPage({
       cashOut: a.cashOut,
       cashEnd: a.cashEnd,
       depreciation: a.depreciation,
+      fMonthlyPart: a.computed ? a.fMonthlyPart : null,
+      fAnnualAllocated: a.computed ? a.fAnnualAllocated : null,
+      fBreakdownKind: grain === "month" ? "month" : "year",
       emptyHint: "実績がありません。",
     };
     right = {
       title: `計画「${variantA}」${planYear}${grain === "month" ? "（÷12）" : ""}`,
       computed: p.computed,
+      fMonthlyPart: p.computed ? p.fMonthlyPart : null,
+      fAnnualAllocated: p.computed ? p.fAnnualAllocated : null,
+      fBreakdownKind: grain === "month" ? "month" : "year",
       emptyHint: "この計画がありません。下の年次計画フォームで保存してください。",
     };
   } else {
@@ -217,11 +238,17 @@ export default async function MqPage({
     left = {
       title: `計画「${variantA}」${planYear}${grain === "month" ? "（÷12）" : ""}`,
       computed: p1.computed,
+      fMonthlyPart: p1.computed ? p1.fMonthlyPart : null,
+      fAnnualAllocated: p1.computed ? p1.fAnnualAllocated : null,
+      fBreakdownKind: grain === "month" ? "month" : "year",
       emptyHint: "計画Aがありません。",
     };
     right = {
       title: `計画「${variantB}」${planYear}${grain === "month" ? "（÷12）" : ""}`,
       computed: p2.computed,
+      fMonthlyPart: p2.computed ? p2.fMonthlyPart : null,
+      fAnnualAllocated: p2.computed ? p2.fAnnualAllocated : null,
+      fBreakdownKind: grain === "month" ? "month" : "year",
       emptyHint: "計画Bがありません。別パターン名で保存してください。",
     };
     byLine = [];
@@ -510,7 +537,7 @@ export default async function MqPage({
               href={href({
                 grain: "year",
                 a: defaultYear,
-                b: years[1] || defaultYear,
+                b: yearsAll[1] || defaultYear,
               })}
             >
               年次
@@ -522,7 +549,7 @@ export default async function MqPage({
               <span className="meta">{mode === "ap" ? "実績の期間" : "左（実績）"}</span>
               <MqPeriodLinks
                 grain={grain}
-                periods={grain === "year" ? years : months}
+                periods={grain === "year" ? yearsAll : months}
                 current={periodA}
                 makeHref={(v) => href({ a: v })}
               />
@@ -533,7 +560,7 @@ export default async function MqPage({
               <span className="meta">右（実績）</span>
               <MqPeriodLinks
                 grain={grain}
-                periods={grain === "year" ? years : months}
+                periods={grain === "year" ? yearsAll : months}
                 current={periodB}
                 makeHref={(v) => href({ b: v })}
               />
@@ -546,7 +573,7 @@ export default async function MqPage({
                 <span className="meta">計画の年度</span>
                 <MqPeriodLinks
                   grain="year"
-                  periods={years.length ? years : [defaultYear]}
+                  periods={yearsAll.length ? yearsAll : [defaultYear]}
                   current={planYear}
                   makeHref={(v) => href({ py: v })}
                 />
@@ -599,6 +626,9 @@ export default async function MqPage({
           cashOut={left.cashOut}
           cashEnd={left.cashEnd}
           depreciation={left.depreciation}
+          fMonthlyPart={left.fMonthlyPart ?? null}
+          fAnnualAllocated={left.fAnnualAllocated ?? null}
+          fBreakdownKind={left.fBreakdownKind ?? (grain === "month" ? "month" : "year")}
           emptyHint={left.emptyHint}
           qUnitLabel={qLabel}
         />
@@ -610,6 +640,9 @@ export default async function MqPage({
           cashOut={right.cashOut}
           cashEnd={right.cashEnd}
           depreciation={right.depreciation}
+          fMonthlyPart={right.fMonthlyPart ?? null}
+          fAnnualAllocated={right.fAnnualAllocated ?? null}
+          fBreakdownKind={right.fBreakdownKind ?? (grain === "month" ? "month" : "year")}
           emptyHint={right.emptyHint}
           qUnitLabel={qLabel}
         />
