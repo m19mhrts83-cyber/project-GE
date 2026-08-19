@@ -207,7 +207,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--also-household-bs",
         action="store_true",
-        help="MQ成功後に家計B/Sスナップも保存",
+        help="互換: 既定で保存するため不要（明示しても害なし）",
+    )
+    ap.add_argument(
+        "--skip-household-bs",
+        action="store_true",
+        help="MQ成功後の家計B/Sスナップ保存を省略",
     )
     args = ap.parse_args(argv)
 
@@ -310,7 +315,8 @@ def main(argv: list[str] | None = None) -> int:
         state["last_result"] = summary
         save_state(state)
         push_sync_meta(summary)
-        if args.also_household_bs:
+        # 家計B/S月次スナップは既定で保存（初回手動不要。未保存時は /household-bs が live compose）
+        if not args.skip_household_bs:
             for year in years:
                 hb_cmd = [
                     sys.executable,

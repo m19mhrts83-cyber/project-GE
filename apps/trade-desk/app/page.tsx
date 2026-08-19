@@ -190,19 +190,19 @@ export default async function HomePage() {
         "version_id, plan_year, month, numbers_category, category_key, amount_yen"
       )
       .eq("plan_year", tokyoYear)
-      .limit(4000),
+      .limit(2500),
     supabase
       .from("kurashift_finance_transactions")
       .select("category, txn_date, expense_jpy")
       .eq("fiscal_year", tokyoYear)
       .gt("expense_jpy", 0)
-      .limit(8000),
+      .limit(4000),
     supabase
       .from("kurashift_finance_transactions")
         .select("category, subcategory, txn_date, income_jpy, expense_jpy, to_account")
       .eq("fiscal_year", tokyoYear)
       .or("category.ilike.%19%,category.ilike.%賃貸%,category.ilike.%家賃%")
-      .limit(4000),
+      .limit(2500),
     supabase
       .from("property_units")
       .select("property_id, property_name, room, status, rent, note, payload"),
