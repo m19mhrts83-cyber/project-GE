@@ -26,6 +26,10 @@ fi
 
 npx --yes vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
 npx --yes vercel build --prod --token "$VERCEL_TOKEN"
-npx --yes vercel deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN"
+DEPLOY_URL="$(npx --yes vercel deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN" 2>&1 | tee /dev/stderr | rg -o 'https://jarvis-trade-desk[^ ]+\.vercel\.app' | head -1)"
+if [[ -n "$DEPLOY_URL" ]]; then
+  npx --yes vercel alias set "$DEPLOY_URL" jarvis-trade-desk.vercel.app --token "$VERCEL_TOKEN" --scope m19mhrts83-1211s-projects
+fi
 
 echo "📎 本番: https://jarvis-trade-desk.vercel.app"
+[[ -n "${DEPLOY_URL:-}" ]] && echo "📎 デプロイURL: $DEPLOY_URL"

@@ -47,6 +47,15 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Production
-        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        id: deploy
+        run: |
+          set -euo pipefail
+          OUT="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          echo "$OUT"
+          URL="$(echo "$OUT" | grep -Eo 'https://jarvis-trade-desk[^ ]+\.vercel\.app' | head -1)"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          if [[ -n "$URL" ]]; then
+            vercel alias set "$URL" jarvis-trade-desk.vercel.app --token="$VERCEL_TOKEN"
+          fi
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
