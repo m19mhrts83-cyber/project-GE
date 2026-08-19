@@ -110,6 +110,9 @@ def _load_routes(path: Path, cl) -> dict[str, RtRoute]:
         if not isinstance(row, dict):
             continue
         rid = str(row.get("id") or f"route_{i}")
+        if row.get("enabled") is False:
+            print(f"# skip disabled route: {rid}", file=sys.stderr)
+            continue
         chat_mid = str(row.get("square_chat_mid") or "").strip()
         title_substring = str(row.get("title_substring") or "").strip()
         if not chat_mid:
