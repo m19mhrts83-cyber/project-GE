@@ -8,6 +8,7 @@ const NAV = [
   { href: "/consultations", label: "相談" },
   { href: "/lifeplan", label: "ライフプラン" },
   { href: "/realestate", label: "不動産賃貸" },
+  { href: "/notion", label: "Notionタスク" },
   { href: "/mq", label: "MQ会計評価" },
   { href: "/roi", label: "ROI" },
   { href: "/tax", label: "確定申告" },
@@ -90,7 +91,7 @@ export default function Shell({
         <NavLinks
           active={active}
           items={NAV.filter((n) =>
-            ["/realestate", "/mq"].includes(n.href)
+            ["/realestate", "/notion", "/mq"].includes(n.href)
           )}
         />
         <a

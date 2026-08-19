@@ -1,33 +1,33 @@
 ---
-description: Notion MCP 切断時は再認証を最優先（ローカル＋Cloud）。手動コピー回避策に頼らない
+description: Notion は API 初動。公式 MCP 切断時は再認証を最終手段にし、手動コピーに頼らない
 alwaysApply: true
 ---
 
-# Notion MCP：切断・認証失敗時の扱い
+# Notion MCP：切断時の扱い（API が先）
+
+## 方針
+
+日常の検索・更新は **`jarvis-notion-api-first.mdc`**（REST API）。  
+このルールは、ユーザーが MCP を明示したとき、または API まで全滅したときの最終手段。
 
 ## トリガー
 
-次のいずれかに当てはまるとき（Notion 連携のタスク中に限らない）:
-
-- Notion 関連の MCP 呼び出しが失敗する、401 / unauthorized / not authenticated / connection failed 等
-- ツール一覧で Notion MCP が未接続・要認証になっている
-- 「認証が必要」「セッションが切れた」といった MCP 由来のエラー
+- ユーザーが「MCP で Notion」と明示した
+- `scripts/jarvis_notion_api.py` が 401 で、トークン失効が疑われる
+- Cursor の `notionApi`（`jarvis_notion_mcp.sh`）が起動しない
 
 ## 必須動作（優先順）
 
-### ローカル Agent
-
-1. **まず Notion MCP を再接続する。** Cursor の MCP 統合で **`plugin-notion-workspace-notion` サーバーに対して `mcp_auth` を引数 `{}` で実行する**。認証フローがブラウザで開いた場合はユーザーに完了してもらう。
-2. 認証成功後、**同じ Notion MCP ツールで処理を再試行する**。
-3. **「Notion をコピーして貼って」と主導で案内しない。** 貼り付けは再認証が技術的に不可能なときの最後の手段。
-
-### Cloud Agent
-
-1. ローカル MCP は Cloud に継承されない。Notion は [cursor.com/agents](https://cursor.com/agents) で **HTTP `https://mcp.notion.com/mcp` + OAuth**（`docs/Jarvis_Cloud_Agent.md`）。
-2. 切断時は同画面で Re-authenticate。未配線なら配線依頼を先にし、コピー依頼を先にしない。
+1. **API を先に試す。** `jarvis_notion_api.py whoami` / `probe`
+2. トークン未設定なら `.env.jarvis_private` の `NOTION_API_TOKEN` を確認し、必要なら `jarvis_notion_token_sync.py`
+3. それでも MCP が必要なら:
+   - ローカル: Cursor MCP の **`notionApi`**（ラッパー。OAuth プラグインではない）
+   - 旧プラグイン `plugin-notion-workspace-notion` は **`mcp_auth`**（最終手段）
+   - Cloud: [cursor.com/agents](https://cursor.com/agents) の HTTP `https://mcp.notion.com/mcp` + OAuth
+4. **「Notion をコピーして貼って」と主導で案内しない。**
 
 ## 補足
 
-- Ask モード等でツールが呼べないときは、ユーザーに MCP 再接続を案内する。
-- OAuth は `https://mcp.notion.com/mcp`。デスクトップアプリ起動は不要。
-- 関連: `jarvis-cloud-agent.mdc`
+- Ask モードでシェルが使えないときだけ、MCP 再接続を案内する
+- トークンは `mcp.json` に書かない（`scripts/jarvis_notion_mcp.sh` が jarvis_private を読む）
+- 関連: `jarvis-notion-api-first.mdc` / `jarvis-cloud-agent.mdc`

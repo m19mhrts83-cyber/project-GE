@@ -11,7 +11,8 @@
 
 ## 環境変数
 
-`.env.example` を参照。本番は Vercel に `NEXT_PUBLIC_SUPABASE_*` と `NEXT_PUBLIC_SITE_URL` を入れる。
+`.env.example` を参照。本番は Vercel に `NEXT_PUBLIC_SUPABASE_*` と `NEXT_PUBLIC_SITE_URL` を入れる。  
+Notion 看板（`/notion`）は `NOTION_API_TOKEN`（正本 `.env.jarvis_private`、投影は `scripts/jarvis_notion_token_sync.py`）。
 
 ## Vercel ブランド
 
