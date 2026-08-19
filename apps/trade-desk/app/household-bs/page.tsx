@@ -152,7 +152,12 @@ export default async function HouseholdBsPage({
   const currentYearNum = Number(currentYear());
   const trendFromYear = currentYearNum - 4;
 
-  const [{ data: taxMetricsRaw }, { data: snapshotRow }, { data: snapshotRows }] =
+  const [
+    { data: taxMetricsRaw },
+    { data: snapshotRow },
+    { data: snapshotRows },
+    { data: financeYearsRaw },
+  ] =
     await Promise.all([
     supabase
       .from("kurashift_tax_year_metrics")
@@ -173,6 +178,11 @@ export default async function HouseholdBsPage({
       .order("fiscal_year", { ascending: false })
       .order("as_of_month", { ascending: false })
       .limit(60),
+    supabase
+      .from("kurashift_finance_category_year")
+      .select("fiscal_year")
+      .order("fiscal_year", { ascending: true })
+      .limit(1000),
   ]);
 
   const snapViewRaw =
@@ -244,7 +254,28 @@ export default async function HouseholdBsPage({
     });
   }
   const selectedYearNum = Number(view.year);
-  if (!trendViewMap.has(selectedYearNum) || forceLive || selectedYearNum === currentYearNum) {
+  const candidateYears = [
+    ...latestByYear.keys(),
+    ...taxMetrics
+      .map((m) => Number(m.fiscal_year))
+      .filter((n) => Number.isFinite(n) && n > 0),
+    ...((financeYearsRaw ?? [])
+      .map((r) => Number(r.fiscal_year))
+      .filter((n) => Number.isFinite(n) && n > 0) as number[]),
+    selectedYearNum,
+    currentYearNum,
+  ];
+  const trendStartYear = Math.min(...candidateYears);
+  for (let y = trendStartYear; y <= currentYearNum; y += 1) {
+    if (!trendViewMap.has(y)) {
+      trendViewMap.set(y, await composeLive(supabase, String(y)));
+    }
+  }
+  if (
+    !trendViewMap.has(selectedYearNum) ||
+    forceLive ||
+    selectedYearNum === currentYearNum
+  ) {
     trendViewMap.set(selectedYearNum, view);
   }
   const trendRows = sortTrendRows(

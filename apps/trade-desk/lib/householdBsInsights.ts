@@ -51,6 +51,13 @@ function sumBand(
   }, 0);
 }
 
+function sumQuadrantCounted(rows: HouseholdBsRow[], quadrant: HouseholdBsRow["quadrant"]): number {
+  return rows.reduce((sum, row) => {
+    if (row.quadrant !== quadrant || !row.countsTowardTotal) return sum;
+    return sum + (row.amountJpy ?? 0);
+  }, 0);
+}
+
 function sumIncomeExcludingBand(rows: HouseholdBsRow[], excludeBand: string): number {
   return rows.reduce((sum, row) => {
     if (row.quadrant !== "income" || !row.countsTowardTotal) return sum;
@@ -84,8 +91,9 @@ export function buildHouseholdBsSummary(
   });
   const coreAssetJpy = sumBand(view.rows, "sleep", { countsOnly: true });
   const themeAssetJpy = sumBand(view.rows, "theme", { countsOnly: true });
-  const accountingNetFlowJpy = view.totals.incomeJpy - view.totals.expenseJpy;
-  const cashExpenseJpy = view.totals.expenseJpy + debtServiceJpy;
+  const accountingExpenseJpy = sumQuadrantCounted(view.rows, "expense");
+  const accountingNetFlowJpy = view.totals.incomeJpy - accountingExpenseJpy;
+  const cashExpenseJpy = view.totals.expenseJpy;
   const cashNetFlowJpy = view.totals.incomeJpy - cashExpenseJpy;
   const deployableCashJpy = Math.max(cashTotalJpy - nextPropertyJpy - bridgeNeedJpy, 0);
   const fundingGapJpy = Math.max(bridgeNeedJpy - cashTotalJpy, 0);
@@ -126,14 +134,15 @@ export function buildHouseholdBsTrendRow(view: HouseholdBsView): HouseholdBsTren
   const debtServiceJpy = sumBand(view.rows, "debt_service", {
     quadrant: "expense",
   });
-  const cashExpenseJpy = view.totals.expenseJpy + debtServiceJpy;
+  const accountingExpenseJpy = sumQuadrantCounted(view.rows, "expense");
+  const cashExpenseJpy = view.totals.expenseJpy;
   return {
     year: Number(view.year),
     incomeJpy: view.totals.incomeJpy,
-    expenseJpy: view.totals.expenseJpy,
+    expenseJpy: accountingExpenseJpy,
     debtServiceJpy,
     cashExpenseJpy,
-    cashflowJpy: view.totals.incomeJpy - view.totals.expenseJpy,
+    cashflowJpy: view.totals.incomeJpy - accountingExpenseJpy,
     cashflowAfterDebtJpy: view.totals.incomeJpy - cashExpenseJpy,
     assetJpy: view.totals.assetJpy,
     liabilityJpy: view.totals.liabilityJpy,
