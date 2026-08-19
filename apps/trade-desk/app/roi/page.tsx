@@ -159,7 +159,7 @@ export default async function RoiPage() {
             </li>
             <li>
               <strong>返済比率</strong> = 年返済 ÷ 年収。目安{" "}
-              <strong>50%前後</strong>（MG会計・中津さん。会話では 50〜60%
+              <strong>50%前後</strong>（MG会計・中田さん。会話では 50〜60%
               も言及）。購入時は満室年収、現況は入居中年収。③-A の DSCR（家賃÷返済）は余裕の見方
             </li>
             <li>
@@ -523,7 +523,7 @@ export default async function RoiPage() {
         <div className="card" style={{ marginTop: 16 }}>
           <header>
             <span className="lvl">売却済み</span>
-            <strong>幸田さんワンルーム3戸</strong>
+            <strong>ワンルーム3戸</strong>
           </header>
           <p className="meta">
             一覧から外さず履歴として残しています。金額は Numbers
