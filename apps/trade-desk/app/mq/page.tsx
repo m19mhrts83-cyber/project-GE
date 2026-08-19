@@ -809,6 +809,9 @@ export default async function MqPage({
             grainHint={`${cashflowDisplayYear}年の各月を横に並べ、項目ごとの入出金を一覧できます。`}
             originHint={cashflowOriginHint}
             negativeMonths={cashflowNegative}
+            businessLine="realestate"
+            entity={entity}
+            interactive={line === "realestate"}
             unavailableReason={
               line === "realestate"
                 ? null

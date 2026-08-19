@@ -716,6 +716,73 @@ tr.sold td {
 .mq-cashflow-row-balance td {
   background: #fafafa;
 }
+.mq-cashflow-cell-clickable {
+  padding: 0;
+}
+.mq-cashflow-cell-btn {
+  display: block;
+  width: 100%;
+  padding: inherit;
+  margin: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: right;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.mq-cashflow-cell-btn:hover {
+  background: rgba(42, 94, 168, 0.08);
+}
+.mq-cashflow-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: none;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.mq-cashflow-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 41;
+  width: min(520px, 100vw);
+  height: 100vh;
+  overflow: auto;
+  background: var(--card, #fff);
+  border-left: 1px solid var(--border, #ddd);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  padding: 16px;
+}
+.mq-cashflow-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.mq-cashflow-detail-scroll {
+  overflow: auto;
+  max-height: calc(100vh - 180px);
+}
+.mq-cashflow-detail-table {
+  font-size: 0.88rem;
+}
+.mq-cashflow-detail-table th,
+.mq-cashflow-detail-table td {
+  vertical-align: top;
+  padding: 6px 8px;
+}
+.mq-cashflow-detail-row-residual {
+  opacity: 0.75;
+  font-style: italic;
+}
+.mq-cashflow-detail-summary {
+  margin-bottom: 10px;
+}
 .mq-cashflow-cell-plus {
   color: #1a7a45;
   font-weight: 600;

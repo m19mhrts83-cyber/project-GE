@@ -1,5 +1,14 @@
+"use client";
+
+import { useCallback, useState } from "react";
 import type { MqCashflowMonthRow } from "@/lib/mqCashflow";
 import { fmtMqMan, fmtMqManSigned } from "@/lib/mqUnits";
+import {
+  CLICKABLE_ROW_FIELDS,
+  rowFieldToColumn,
+  type CashflowLineItem,
+} from "@/lib/mqCashflowLineItems";
+import MqCashflowCellDetailPanel from "@/components/MqCashflowCellDetailPanel";
 
 type Props = {
   title: string;
@@ -9,6 +18,9 @@ type Props = {
   unavailableReason?: string | null;
   originHint?: string | null;
   negativeMonths?: { month: string; cashEndMan: number }[];
+  businessLine?: string;
+  entity?: string;
+  interactive?: boolean;
 };
 
 type RowKey = keyof Pick<
@@ -258,7 +270,59 @@ export default function MqCashflowTable(props: Props) {
     unavailableReason,
     originHint,
     negativeMonths = [],
+    businessLine = "realestate",
+    entity = "corporate",
+    interactive = true,
   } = props;
+
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelLoading, setPanelLoading] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
+  const [panelHeader, setPanelHeader] = useState<{
+    month: string;
+    columnKey: string;
+    columnLabel: string;
+    totalMan: number | null;
+    txnCount: number;
+    hasResidual: boolean;
+  } | null>(null);
+  const [panelItems, setPanelItems] = useState<CashflowLineItem[]>([]);
+
+  const openCellDetail = useCallback(
+    async (month: string, rowKey: RowKey, cellTotal: number | null) => {
+      const column = rowFieldToColumn(rowKey);
+      if (!column || cellTotal == null) return;
+
+      setPanelOpen(true);
+      setPanelLoading(true);
+      setPanelError(null);
+      setPanelHeader(null);
+      setPanelItems([]);
+
+      try {
+        const q = new URLSearchParams({
+          month,
+          column,
+          entity,
+          line: businessLine,
+          cellTotalMan: String(cellTotal),
+        });
+        const res = await fetch(`/api/mq/cashflow/cell-detail?${q.toString()}`);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "内訳の取得に失敗しました");
+        }
+        setPanelHeader(data.header);
+        setPanelItems(data.items ?? []);
+      } catch (e) {
+        setPanelError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setPanelLoading(false);
+      }
+    },
+    [businessLine, entity]
+  );
+
   let lastSection: RowSection | null = null;
 
   const negativeSet = new Set(negativeMonths.map((n) => n.month));
@@ -294,6 +358,9 @@ export default function MqCashflowTable(props: Props) {
         、出金は
         <strong className="mq-cashflow-sign-minus">−</strong>
         で表示します。
+        {interactive && !unavailableReason
+          ? " 金額セルをクリックすると内訳が表示されます。"
+          : ""}
       </p>
 
       {unavailableReason ? null : (
@@ -362,12 +429,33 @@ export default function MqCashflowTable(props: Props) {
                                     ? "mq-cashflow-cell-plus"
                                     : "mq-cashflow-cell-minus"
                                   : "";
+                        const clickable =
+                          interactive &&
+                          item.kind === "money" &&
+                          CLICKABLE_ROW_FIELDS.has(item.key) &&
+                          outVal != null;
+
+                        const cellInner =
+                          outVal == null ? "—" : fmtCell(outVal, item);
+
                         return (
                           <td
                             key={`${item.key}-${r.month}`}
-                            className={`num ${cellClass}`.trim()}
+                            className={`num ${cellClass}${clickable ? " mq-cashflow-cell-clickable" : ""}`.trim()}
                           >
-                            {outVal == null ? "—" : fmtCell(outVal, item)}
+                            {clickable ? (
+                              <button
+                                type="button"
+                                className="mq-cashflow-cell-btn"
+                                onClick={() =>
+                                  openCellDetail(r.month, item.key, outVal as number)
+                                }
+                              >
+                                {cellInner}
+                              </button>
+                            ) : (
+                              cellInner
+                            )}
                           </td>
                         );
                       })}
@@ -394,6 +482,15 @@ export default function MqCashflowTable(props: Props) {
           </div>
         </>
       )}
+
+      <MqCashflowCellDetailPanel
+        open={panelOpen}
+        loading={panelLoading}
+        error={panelError}
+        header={panelHeader}
+        items={panelItems}
+        onClose={() => setPanelOpen(false)}
+      />
     </div>
   );
 }
