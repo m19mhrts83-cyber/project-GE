@@ -108,6 +108,9 @@ def _parse_routes(path: Path) -> list[Route]:
             print(f"エラー: routes[{i}] が map ではありません。", file=sys.stderr)
             raise SystemExit(1)
         rid = str(row.get("id") or f"route_{i}")
+        if row.get("enabled") is False:
+            print(f"# skip disabled route: {rid}", file=sys.stderr)
+            continue
         square_chat_mid = str(row.get("square_chat_mid") or "").strip()
         title_substring = str(row.get("title_substring") or "").strip()
         output_md_raw = str(row.get("output_md") or "").strip()
