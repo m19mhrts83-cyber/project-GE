@@ -31,6 +31,12 @@
       "last_import_at": "2026-08-13T22:36:20+09:00",
       "last_import_source": "inbox",
       "last_prompted_at": "2026-08-13T22:25:07+09:00"
+    },
+    "tokai_dx_gojokai": {
+      "route_id": "tokai_dx_gojokai",
+      "folder": "820_LINE_東海DX互助会",
+      "last_import_at": "2026-08-19T16:25:36+09:00",
+      "last_import_source": "inbox"
     }
   }
 }
