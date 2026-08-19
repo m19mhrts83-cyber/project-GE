@@ -58,6 +58,7 @@ import { buildMqCashflowMonthRows, type MqCashflowMonthRow } from "@/lib/mqCashf
 export const dynamic = "force-dynamic";
 
 type Sp = Record<string, string | string[] | undefined>;
+type MqView = "mq" | "cashflow";
 
 function one(sp: Sp, key: string, fallback: string): string {
   const v = sp[key];
@@ -119,6 +120,7 @@ export default async function MqPage({
   const entity = one(sp, "entity", "combined") as EntityFilter;
   const grain = one(sp, "grain", "year") as GrainFilter;
   const mode = one(sp, "mode", "aa") as CompareMode;
+  const view = one(sp, "view", "mq") as MqView;
 
   const { data: bsRaw } = await supabase
     .from("kurashift_mq_bs_snapshots")
@@ -659,6 +661,21 @@ export default async function MqPage({
         </header>
         <div className="mq-slicer" style={{ marginTop: 10 }}>
           <div className="mq-slicer-group">
+            <span className="meta">レーン</span>
+            <a
+              className={`btn${view === "mq" ? " primary" : ""}`}
+              href={href({ view: "mq" })}
+            >
+              MQ会計表
+            </a>
+            <a
+              className={`btn${view === "cashflow" ? " primary" : ""}`}
+              href={href({ view: "cashflow" })}
+            >
+              資金繰り表
+            </a>
+          </div>
+          <div className="mq-slicer-group">
             <span className="meta">比較</span>
             {(
               [
@@ -815,105 +832,109 @@ export default async function MqPage({
         ) : null}
       </div>
 
-      <div className="mq-dual" style={{ marginTop: 12 }}>
-        <MqStrackPanel
-          title={left.title}
-          computed={left.computed}
-          cashBegin={cashBeginFor(periodA)}
-          cashIn={left.cashIn}
-          cashOut={left.cashOut}
-          cashEnd={left.cashEnd}
-          depreciation={left.depreciation}
-          fMonthlyPart={left.fMonthlyPart ?? null}
-          fAnnualAllocated={left.fAnnualAllocated ?? null}
-          fBreakdownKind={left.fBreakdownKind ?? (grain === "month" ? "month" : "year")}
-          includeDebtServiceInF={line === "realestate"}
-          vqAccountMap={vqAccountMap}
-          emptyHint={left.emptyHint}
-          qUnitLabel={qLabel}
+      {view === "mq" ? (
+        <>
+          <div className="mq-dual" style={{ marginTop: 12 }}>
+            <MqStrackPanel
+              title={left.title}
+              computed={left.computed}
+              cashBegin={cashBeginFor(periodA)}
+              cashIn={left.cashIn}
+              cashOut={left.cashOut}
+              cashEnd={left.cashEnd}
+              depreciation={left.depreciation}
+              fMonthlyPart={left.fMonthlyPart ?? null}
+              fAnnualAllocated={left.fAnnualAllocated ?? null}
+              fBreakdownKind={left.fBreakdownKind ?? (grain === "month" ? "month" : "year")}
+              includeDebtServiceInF={line === "realestate"}
+              vqAccountMap={vqAccountMap}
+              emptyHint={left.emptyHint}
+              qUnitLabel={qLabel}
+            />
+            <MqStrackPanel
+              title={right.title}
+              computed={right.computed}
+              cashBegin={mode === "aa" ? cashBeginFor(periodB) : null}
+              cashIn={right.cashIn}
+              cashOut={right.cashOut}
+              cashEnd={right.cashEnd}
+              depreciation={right.depreciation}
+              fMonthlyPart={right.fMonthlyPart ?? null}
+              fAnnualAllocated={right.fAnnualAllocated ?? null}
+              fBreakdownKind={right.fBreakdownKind ?? (grain === "month" ? "month" : "year")}
+              includeDebtServiceInF={line === "realestate"}
+              vqAccountMap={vqAccountMap}
+              emptyHint={right.emptyHint}
+              qUnitLabel={qLabel}
+            />
+          </div>
+
+          {left.fNote ? (
+            <p className="meta" style={{ marginTop: 8 }}>
+              {left.fNote}
+            </p>
+          ) : null}
+
+          {line === "all" && byLine.length > 0 ? (
+            <div className="card" style={{ marginTop: 12 }}>
+              <header>
+                <span className="lvl">内訳</span>
+                <strong>左 · 不動産 / AI</strong>
+              </header>
+              <table style={{ marginTop: 8 }}>
+                <thead>
+                  <tr>
+                    <th>事業線</th>
+                    <th className="num">MQ</th>
+                    <th className="num">F</th>
+                    <th className="num">G</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byLine.map((b) => (
+                    <tr key={b.line}>
+                      <td>{lineLabel(b.line)}</td>
+                      <td className="num">{fmtMqMan(b.computed.mq)}</td>
+                      <td className="num">{fmtMqMan(b.computed.f)}</td>
+                      <td className="num">{fmtMqMan(b.computed.g)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 12 }}>
+            <MqCompareBars
+              titleA={left.title}
+              titleB={right.title}
+              rowsA={metricBars(left.computed)}
+              rowsB={metricBars(right.computed)}
+            />
+          </div>
+
+          <MqTaxComparePanel
+            compare={taxCompare}
+            dual={taxCompareDual}
+            grain={grain}
+            line={line}
+            entity={entity}
+            periodLabel={left.title.replace(/^実績\s*/, "")}
+          />
+        </>
+      ) : (
+        <MqCashflowTable
+          title={`${lineLabel(line)} · ${entityLabel(entity)} 月次資金繰り表`}
+          year={periodA.slice(0, 4)}
+          rows={cashflowRows}
+          grainHint="選択年の月次推移です。月を横に見て、項目ごとの増減を一覧できます。"
+          unavailableReason={
+            line === "realestate"
+              ? null
+              : "資金繰り表は現在、不動産ラインで表示します。上の事業線を「不動産賃貸」にすると内容が出ます。"
+          }
         />
-        <MqStrackPanel
-          title={right.title}
-          computed={right.computed}
-          cashBegin={mode === "aa" ? cashBeginFor(periodB) : null}
-          cashIn={right.cashIn}
-          cashOut={right.cashOut}
-          cashEnd={right.cashEnd}
-          depreciation={right.depreciation}
-          fMonthlyPart={right.fMonthlyPart ?? null}
-          fAnnualAllocated={right.fAnnualAllocated ?? null}
-          fBreakdownKind={right.fBreakdownKind ?? (grain === "month" ? "month" : "year")}
-          includeDebtServiceInF={line === "realestate"}
-          vqAccountMap={vqAccountMap}
-          emptyHint={right.emptyHint}
-          qUnitLabel={qLabel}
-        />
-      </div>
-
-      {left.fNote ? (
-        <p className="meta" style={{ marginTop: 8 }}>
-          {left.fNote}
-        </p>
-      ) : null}
-
-      {line === "all" && byLine.length > 0 ? (
-        <div className="card" style={{ marginTop: 12 }}>
-          <header>
-            <span className="lvl">内訳</span>
-            <strong>左 · 不動産 / AI</strong>
-          </header>
-          <table style={{ marginTop: 8 }}>
-            <thead>
-              <tr>
-                <th>事業線</th>
-                <th className="num">MQ</th>
-                <th className="num">F</th>
-                <th className="num">G</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byLine.map((b) => (
-                <tr key={b.line}>
-                  <td>{lineLabel(b.line)}</td>
-                  <td className="num">{fmtMqMan(b.computed.mq)}</td>
-                  <td className="num">{fmtMqMan(b.computed.f)}</td>
-                  <td className="num">{fmtMqMan(b.computed.g)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-
-      <div style={{ marginTop: 12 }}>
-        <MqCompareBars
-          titleA={left.title}
-          titleB={right.title}
-          rowsA={metricBars(left.computed)}
-          rowsB={metricBars(right.computed)}
-        />
-      </div>
-
-      <MqCashflowTable
-        title={`${lineLabel(line)} · ${entityLabel(entity)} 月次資金繰り表`}
-        year={periodA.slice(0, 4)}
-        rows={cashflowRows}
-        grainHint="選択年（年次の補助表示）。各月は “月が行 / 項目が列” の並びです。"
-        unavailableReason={
-          line === "realestate"
-            ? null
-            : "月次資金繰り表は現在、不動産ラインで表示します。上の事業線を「不動産賃貸」にすると内容が出ます。"
-        }
-      />
-
-      <MqTaxComparePanel
-        compare={taxCompare}
-        dual={taxCompareDual}
-        grain={grain}
-        line={line}
-        entity={entity}
-        periodLabel={left.title.replace(/^実績\s*/, "")}
-      />
+      )}
 
       <div style={{ marginTop: 16 }}>
         <MqBsPanel
