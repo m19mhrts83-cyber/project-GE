@@ -591,6 +591,45 @@ tr.sold td {
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
+.mq-cashflow-matrix th,
+.mq-cashflow-matrix td {
+  padding: 8px 6px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.mq-cashflow-matrix strong {
+  font-size: 0.84rem;
+}
+.mq-cashflow-sticky-col {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 1;
+  min-width: 88px;
+}
+.mq-cashflow-notes {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+.mq-cashflow-note {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card-soft);
+  padding: 8px 10px;
+}
+.mq-cashflow-note-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.mq-cashflow-note-text {
+  margin-top: 2px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
 .mq-bar-row {
   display: grid;
   grid-template-columns: 36px 1fr auto;
