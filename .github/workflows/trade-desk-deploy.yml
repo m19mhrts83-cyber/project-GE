@@ -1,0 +1,52 @@
+name: Trade Desk deploy
+
+# KURASHIFT (apps/trade-desk) — main への push で本番デプロイ。
+# 手動: gh workflow run trade-desk-deploy.yml
+# ローカル代替: scripts/vercel_trade_desk_deploy.sh
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/trade-desk/**"
+      - "scripts/vercel_trade_desk_deploy.sh"
+      - ".github/workflows/trade-desk-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: trade-desk-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_ORG_ID: team_NJph8Tc5cSqw7rZSrPOQMp00
+      VERCEL_PROJECT_ID: prj_FoZQmiplAx31rMNxS7sodjYubyto
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/trade-desk/package-lock.json
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Production
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

@@ -48,17 +48,19 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllMqPeriodFacts } from "@/lib/mqFactsFetch";
 import { fetchYearFinanceTxns } from "@/lib/mqIngestDb";
-import MqPeriodLinks from "@/components/MqPeriodLinks";
+import MqLaneNav, { type MqView as MqLaneView } from "@/components/MqLaneNav";
 import {
   MQ_BS_SELECT,
   TAX_YEAR_METRICS_SELECT,
 } from "@/lib/mqLeanSelect";
+import MqPeriodLinks from "@/components/MqPeriodLinks";
+
 import { buildMqCashflowMonthRows, type MqCashflowMonthRow } from "@/lib/mqCashflow";
 
 export const dynamic = "force-dynamic";
 
 type Sp = Record<string, string | string[] | undefined>;
-type MqView = "mq" | "cashflow";
+type MqView = MqLaneView;
 
 function one(sp: Sp, key: string, fallback: string): string {
   const v = sp[key];
@@ -399,6 +401,7 @@ export default async function MqPage({
       entity,
       grain,
       mode,
+      view,
       a: periodA,
       b: periodB,
       py: planYear,
@@ -408,6 +411,8 @@ export default async function MqPage({
     });
     return `/mq?${p.toString()}`;
   }
+
+  const cashflowDisplayYear = periodA.slice(0, 4);
 
   const formMonth = grain === "month" ? periodA : defaultMonth;
 
@@ -633,6 +638,97 @@ export default async function MqPage({
         AIのQは案件数。現金は家計含む参考・年別クローズで繰越。
       </p>
 
+      <MqLaneNav
+        active={view}
+        hrefFor={(v) =>
+          href({
+            view: v,
+            ...(v === "cashflow"
+              ? { grain: "year", a: periodA.slice(0, 4) }
+              : {}),
+          })
+        }
+      />
+
+      {error ? (
+        <div className="card" style={{ marginTop: 12, borderColor: "var(--high)" }}>
+          <p className="meta">読取エラー: {error.message}</p>
+        </div>
+      ) : null}
+
+      {view === "cashflow" ? (
+        <>
+          <div className="card" style={{ marginTop: 12 }}>
+            <header>
+              <span className="lvl">条件</span>
+              <strong>資金繰り表 · {cashflowDisplayYear}年</strong>
+            </header>
+            <div className="mq-slicer" style={{ marginTop: 10 }}>
+              <div className="mq-slicer-group">
+                <span className="meta">表示年度</span>
+                <MqPeriodLinks
+                  grain="year"
+                  periods={yearsAll.length ? yearsAll : [defaultYear]}
+                  current={cashflowDisplayYear}
+                  makeHref={(v) => href({ a: v.slice(0, 4), grain: "year", view: "cashflow" })}
+                />
+              </div>
+              <div className="mq-slicer-group">
+                <span className="meta">事業線</span>
+                {(
+                  [
+                    ["realestate", "不動産"],
+                    ["ai", "AI"],
+                    ["all", "全体"],
+                  ] as const
+                ).map(([v, lab]) => (
+                  <a
+                    key={v}
+                    className={`btn${line === v ? " primary" : ""}`}
+                    href={href({ line: v, view: "cashflow" })}
+                  >
+                    {lab}
+                  </a>
+                ))}
+              </div>
+              <div className="mq-slicer-group">
+                <span className="meta">主体</span>
+                {(
+                  [
+                    ["personal", "個人"],
+                    ["corporate", "法人"],
+                    ["combined", "合算"],
+                  ] as const
+                ).map(([v, lab]) => (
+                  <a
+                    key={v}
+                    className={`btn${entity === v ? " primary" : ""}`}
+                    href={href({ entity: v, view: "cashflow" })}
+                  >
+                    {lab}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <p className="meta" style={{ marginTop: 8 }}>
+              {lineLabel(line)} · {entityLabel(entity)} · {cashflowDisplayYear}年の月次推移（1〜12月）
+            </p>
+          </div>
+
+          <MqCashflowTable
+            title={`${lineLabel(line)} · ${entityLabel(entity)} 月次資金繰り表`}
+            year={cashflowDisplayYear}
+            rows={cashflowRows}
+            grainHint={`${cashflowDisplayYear}年の各月を横に並べ、項目ごとの入出金を一覧できます。`}
+            unavailableReason={
+              line === "realestate"
+                ? null
+                : "資金繰り表は現在、不動産ラインで表示します。上の事業線を「不動産」にすると内容が出ます。"
+            }
+          />
+        </>
+      ) : (
+        <>
       <div className="card" style={{ marginTop: 12 }}>
         <header>
           <span className="lvl">原資</span>
@@ -648,33 +744,12 @@ export default async function MqPage({
         </p>
       </div>
 
-      {error ? (
-        <div className="card" style={{ marginTop: 12, borderColor: "var(--high)" }}>
-          <p className="meta">読取エラー: {error.message}</p>
-        </div>
-      ) : null}
-
       <div className="card" style={{ marginTop: 12 }}>
         <header>
           <span className="lvl">スライサー</span>
           <strong>集計条件</strong>
         </header>
         <div className="mq-slicer" style={{ marginTop: 10 }}>
-          <div className="mq-slicer-group">
-            <span className="meta">レーン</span>
-            <a
-              className={`btn${view === "mq" ? " primary" : ""}`}
-              href={href({ view: "mq" })}
-            >
-              MQ会計表
-            </a>
-            <a
-              className={`btn${view === "cashflow" ? " primary" : ""}`}
-              href={href({ view: "cashflow" })}
-            >
-              資金繰り表
-            </a>
-          </div>
           <div className="mq-slicer-group">
             <span className="meta">比較</span>
             {(
@@ -832,8 +907,6 @@ export default async function MqPage({
         ) : null}
       </div>
 
-      {view === "mq" ? (
-        <>
           <div className="mq-dual" style={{ marginTop: 12 }}>
             <MqStrackPanel
               title={left.title}
@@ -921,20 +994,6 @@ export default async function MqPage({
             entity={entity}
             periodLabel={left.title.replace(/^実績\s*/, "")}
           />
-        </>
-      ) : (
-        <MqCashflowTable
-          title={`${lineLabel(line)} · ${entityLabel(entity)} 月次資金繰り表`}
-          year={periodA.slice(0, 4)}
-          rows={cashflowRows}
-          grainHint="選択年の月次推移です。月を横に見て、項目ごとの増減を一覧できます。"
-          unavailableReason={
-            line === "realestate"
-              ? null
-              : "資金繰り表は現在、不動産ラインで表示します。上の事業線を「不動産賃貸」にすると内容が出ます。"
-          }
-        />
-      )}
 
       <div style={{ marginTop: 16 }}>
         <MqBsPanel
@@ -1007,6 +1066,8 @@ export default async function MqPage({
         <a href="/realestate/buy-plan">/realestate/buy-plan</a>
         ）は物件条件。こちらは固定費込みの粗利評価です。
       </p>
+        </>
+      )}
     </Shell>
   );
 }
