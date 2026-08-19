@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export type OverlaySeries = {
   key: string;
   label: string;
@@ -21,6 +23,12 @@ export default function OverlayLineChart({
   markers?: { year: number; label: string }[];
   ariaLabel?: string;
 }) {
+  const [tip, setTip] = useState<{
+    x: number;
+    y: number;
+    title: string;
+    value: string;
+  } | null>(null);
   const pts = series.flatMap((s) =>
     years
       .map((y, i) => ({ y, v: s.values[i] }))
@@ -52,12 +60,13 @@ export default function OverlayLineChart({
   const colors = ["#0d47a1", "#6a1b9a", "#2e7d32", "#c62828", "#546e7a"];
 
   return (
-    <div>
+    <div style={{ position: "relative" }}>
       <svg
         viewBox={`0 0 ${w} ${h}`}
         role="img"
         aria-label={ariaLabel}
         style={{ width: "100%", maxWidth: w, height: "auto" }}
+        onMouseLeave={() => setTip(null)}
       >
         <line
           x1={pad}
@@ -123,6 +132,49 @@ export default function OverlayLineChart({
             />
           );
         })}
+        {series.flatMap((s, i) => {
+          const color = colors[i % colors.length];
+          return years.flatMap((year, idx) => {
+            const v = s.values[idx];
+            if (v == null) return [];
+            const { x, y } = xy(year, v);
+            return [
+              <g key={`${s.key}-${year}`}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={s.emphasis ? 4.8 : 3.8}
+                  fill={color}
+                  stroke="#fff"
+                  strokeWidth={1.5}
+                />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={10}
+                  fill="transparent"
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={() =>
+                    setTip({
+                      x,
+                      y,
+                      title: `${year}年 ${s.label}`,
+                      value: `${Math.round(v).toLocaleString("ja-JP")}円`,
+                    })
+                  }
+                  onFocus={() =>
+                    setTip({
+                      x,
+                      y,
+                      title: `${year}年 ${s.label}`,
+                      value: `${Math.round(v).toLocaleString("ja-JP")}円`,
+                    })
+                  }
+                />
+              </g>,
+            ];
+          });
+        })}
         <text x={pad} y={14} fontSize={10} fill="var(--muted, #666)">
           {Math.round(max).toLocaleString("ja-JP")}
         </text>
@@ -135,6 +187,26 @@ export default function OverlayLineChart({
           {Math.round(min).toLocaleString("ja-JP")}
         </text>
       </svg>
+      {tip ? (
+        <div
+          style={{
+            position: "absolute",
+            left: `clamp(8px, calc(${((tip.x / w) * 100).toFixed(2)}% + 10px), calc(100% - 200px))`,
+            top: `clamp(8px, calc(${((tip.y / h) * 100).toFixed(2)}% - 8px), calc(100% - 80px))`,
+            background: "rgba(28,25,23,0.94)",
+            color: "#fafaf9",
+            borderRadius: 10,
+            padding: "8px 10px",
+            fontSize: 12,
+            lineHeight: 1.45,
+            pointerEvents: "none",
+            boxShadow: "0 8px 24px rgba(28,25,23,0.16)",
+          }}
+        >
+          <div style={{ fontWeight: 700 }}>{tip.title}</div>
+          <div>{tip.value}</div>
+        </div>
+      ) : null}
       <ul
         className="meta"
         style={{

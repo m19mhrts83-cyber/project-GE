@@ -1,4 +1,8 @@
+"use client";
+
 /** 電力・太陽光 CF の簡易 SVG グラフ（依存ライブラリなし） */
+
+import { useState } from "react";
 
 export type EnergyPoint = {
   ym: string;
@@ -8,8 +12,18 @@ export type EnergyPoint = {
   net: number | null;
 };
 
+function fmtValue(v: number | null): string {
+  return v == null ? "—" : `${Math.round(v).toLocaleString("ja-JP")}円`;
+}
+
 export default function EnergyCfChart({ points }: { points: EnergyPoint[] }) {
   const data = points.filter((p) => p.ym);
+  const [tip, setTip] = useState<{
+    x: number;
+    y: number;
+    title: string;
+    lines: string[];
+  } | null>(null);
   if (data.length < 2) {
     return <p className="empty">グラフ用の月次が足りません</p>;
   }
@@ -54,12 +68,13 @@ export default function EnergyCfChart({ points }: { points: EnergyPoint[] }) {
   const zeroY = yAt(0);
 
   return (
-    <div className="energy-chart-wrap">
+    <div className="energy-chart-wrap" style={{ position: "relative" }}>
       <svg
         className="energy-chart"
         viewBox={`0 0 ${w} ${h}`}
         role="img"
         aria-label="太陽光キャッシュフロー推移（買電・売電・ネット）"
+        onMouseLeave={() => setTip(null)}
       >
         <line
           x1={padL}
@@ -93,6 +108,65 @@ export default function EnergyCfChart({ points }: { points: EnergyPoint[] }) {
           strokeLinejoin="round"
           strokeLinecap="round"
         />
+        {data.flatMap((p, i) =>
+          [
+            { key: "buy" as const, label: "買電", color: "#b45309" },
+            { key: "sell" as const, label: "売電", color: "#0f766e" },
+            { key: "net" as const, label: "ネットCF", color: "#1d4ed8" },
+          ].flatMap((s) => {
+            const v = p[s.key];
+            if (v == null) return [];
+            const x = xAt(i);
+            const y = yAt(v);
+            return [
+              <g key={`${p.ym}-${s.key}`}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={4.2}
+                  fill={s.color}
+                  stroke="#fff"
+                  strokeWidth={1.4}
+                />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={10}
+                  fill="transparent"
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={() =>
+                    setTip({
+                      x,
+                      y,
+                      title: `${p.ym} ${s.label}`,
+                      lines: [
+                        `${s.label}: ${fmtValue(v)}`,
+                        `買電: ${fmtValue(p.buy)}`,
+                        `売電: ${fmtValue(p.sell)}`,
+                        `ローン: ${fmtValue(p.loan)}`,
+                        `ネットCF: ${fmtValue(p.net)}`,
+                      ],
+                    })
+                  }
+                  onFocus={() =>
+                    setTip({
+                      x,
+                      y,
+                      title: `${p.ym} ${s.label}`,
+                      lines: [
+                        `${s.label}: ${fmtValue(v)}`,
+                        `買電: ${fmtValue(p.buy)}`,
+                        `売電: ${fmtValue(p.sell)}`,
+                        `ローン: ${fmtValue(p.loan)}`,
+                        `ネットCF: ${fmtValue(p.net)}`,
+                      ],
+                    })
+                  }
+                />
+              </g>,
+            ];
+          }),
+        )}
         {data.map((p, i) => (
           <text
             key={p.ym}
@@ -126,6 +200,30 @@ export default function EnergyCfChart({ points }: { points: EnergyPoint[] }) {
           ネットCF
         </span>
       </div>
+      {tip ? (
+        <div
+          style={{
+            position: "absolute",
+            left: `clamp(8px, calc(${((tip.x / w) * 100).toFixed(2)}% + 10px), calc(100% - 220px))`,
+            top: `clamp(8px, calc(${((tip.y / h) * 100).toFixed(2)}% - 8px), calc(100% - 120px))`,
+            minWidth: 170,
+            maxWidth: 220,
+            background: "rgba(28,25,23,0.94)",
+            color: "#fafaf9",
+            borderRadius: 10,
+            padding: "8px 10px",
+            fontSize: 12,
+            lineHeight: 1.45,
+            pointerEvents: "none",
+            boxShadow: "0 8px 24px rgba(28,25,23,0.16)",
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>{tip.title}</div>
+          {tip.lines.map((line, idx) => (
+            <div key={`${tip.title}-${idx}`}>{line}</div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
