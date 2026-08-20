@@ -252,6 +252,11 @@ export function buildCellDetailResponse(args: {
   };
 }
 
+/** 内訳行が列再分類可能か（txn 由来のみ） */
+export function isLineItemReclassifiable(item: CashflowLineItem): boolean {
+  return item.source === "txn" && item.txnId != null;
+}
+
 export function rowFieldToColumn(rowField: string): CashflowColumnKey | null {
   const map: Record<string, CashflowColumnKey> = {
     salesMan: "sales",

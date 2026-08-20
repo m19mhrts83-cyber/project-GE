@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { MqCashflowMonthRow } from "@/lib/mqCashflow";
 import { fmtMqMan, fmtMqManSigned } from "@/lib/mqUnits";
 import {
@@ -287,17 +288,22 @@ export default function MqCashflowTable(props: Props) {
     hasResidual: boolean;
   } | null>(null);
   const [panelItems, setPanelItems] = useState<CashflowLineItem[]>([]);
+  const [panelReclassifiable, setPanelReclassifiable] = useState(false);
+  const detailContextRef = useRef<{
+    month: string;
+    rowKey: RowKey;
+    cellTotal: number;
+  } | null>(null);
 
-  const openCellDetail = useCallback(
-    async (month: string, rowKey: RowKey, cellTotal: number | null) => {
+  const router = useRouter();
+
+  const fetchCellDetail = useCallback(
+    async (month: string, rowKey: RowKey, cellTotal: number) => {
       const column = rowFieldToColumn(rowKey);
-      if (!column || cellTotal == null) return;
+      if (!column) return;
 
-      setPanelOpen(true);
       setPanelLoading(true);
       setPanelError(null);
-      setPanelHeader(null);
-      setPanelItems([]);
 
       try {
         const q = new URLSearchParams({
@@ -314,6 +320,7 @@ export default function MqCashflowTable(props: Props) {
         }
         setPanelHeader(data.header);
         setPanelItems(data.items ?? []);
+        setPanelReclassifiable(Boolean(data.reclassifiable));
       } catch (e) {
         setPanelError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -322,6 +329,32 @@ export default function MqCashflowTable(props: Props) {
     },
     [businessLine, entity]
   );
+
+  const openCellDetail = useCallback(
+    async (month: string, rowKey: RowKey, cellTotal: number | null) => {
+      const column = rowFieldToColumn(rowKey);
+      if (!column || cellTotal == null) return;
+
+      detailContextRef.current = { month, rowKey, cellTotal };
+      setPanelOpen(true);
+      setPanelLoading(true);
+      setPanelError(null);
+      setPanelHeader(null);
+      setPanelItems([]);
+      setPanelReclassifiable(false);
+
+      await fetchCellDetail(month, rowKey, cellTotal);
+    },
+    [fetchCellDetail]
+  );
+
+  const handleReclassified = useCallback(async () => {
+    router.refresh();
+    const ctx = detailContextRef.current;
+    if (ctx) {
+      await fetchCellDetail(ctx.month, ctx.rowKey, ctx.cellTotal);
+    }
+  }, [router, fetchCellDetail]);
 
   let lastSection: RowSection | null = null;
 
@@ -489,7 +522,13 @@ export default function MqCashflowTable(props: Props) {
         error={panelError}
         header={panelHeader}
         items={panelItems}
-        onClose={() => setPanelOpen(false)}
+        reclassifiable={panelReclassifiable}
+        businessLine={businessLine}
+        onClose={() => {
+          setPanelOpen(false);
+          detailContextRef.current = null;
+        }}
+        onReclassified={handleReclassified}
       />
     </div>
   );

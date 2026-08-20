@@ -780,6 +780,80 @@ tr.sold td {
   opacity: 0.75;
   font-style: italic;
 }
+.mq-cashflow-detail-row-reclassifiable {
+  cursor: pointer;
+}
+.mq-cashflow-detail-row-reclassifiable:hover {
+  background: rgba(42, 94, 168, 0.06);
+}
+.mq-cashflow-detail-row-active {
+  background: rgba(42, 94, 168, 0.1);
+}
+.mq-cashflow-reclassify-menu {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  background: var(--card-soft, #f8f9fb);
+}
+.mq-cashflow-reclassify-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.mq-cashflow-reclassify-close {
+  min-width: 2rem;
+  padding: 2px 8px;
+}
+.mq-cashflow-reclassify-target {
+  margin-bottom: 8px;
+}
+.mq-cashflow-reclassify-learn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  margin-bottom: 10px;
+}
+.mq-cashflow-reclassify-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mq-cashflow-reclassify-group-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted, #666);
+  margin-bottom: 4px;
+}
+.mq-cashflow-reclassify-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mq-cashflow-reclassify-option {
+  border: 1px solid var(--border, #ccc);
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.mq-cashflow-reclassify-option:hover:not(:disabled) {
+  border-color: #2a5ea8;
+  background: rgba(42, 94, 168, 0.06);
+}
+.mq-cashflow-reclassify-option-current {
+  opacity: 0.55;
+  cursor: default;
+}
+.mq-cashflow-reclassify-reset {
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
 .mq-cashflow-detail-summary {
   margin-bottom: 10px;
 }

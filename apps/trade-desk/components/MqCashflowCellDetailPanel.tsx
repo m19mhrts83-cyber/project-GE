@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import type { CashflowLineItem } from "@/lib/mqCashflowLineItems";
+import { isLineItemReclassifiable } from "@/lib/mqCashflowLineItems";
 import { CASHFLOW_COLUMN_LABELS } from "@/lib/mqCashflowColumns";
 import { fmtMqManSigned } from "@/lib/mqUnits";
+import MqCashflowReclassifyMenu from "@/components/MqCashflowReclassifyMenu";
 
 type Header = {
   month: string;
@@ -19,7 +22,10 @@ type Props = {
   error: string | null;
   header: Header | null;
   items: CashflowLineItem[];
+  reclassifiable?: boolean;
+  businessLine?: string;
   onClose: () => void;
+  onReclassified: () => void;
 };
 
 function reasonLabel(reason: string): string {
@@ -32,9 +38,28 @@ function reasonLabel(reason: string): string {
 }
 
 export default function MqCashflowCellDetailPanel(props: Props) {
-  const { open, loading, error, header, items, onClose } = props;
+  const {
+    open,
+    loading,
+    error,
+    header,
+    items,
+    reclassifiable = false,
+    businessLine = "realestate",
+    onClose,
+    onReclassified,
+  } = props;
+
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
 
   if (!open) return null;
+
+  const activeItem = items.find((it) => it.id === activeItemId) ?? null;
+
+  function handleReclassified() {
+    setActiveItemId(null);
+    onReclassified();
+  }
 
   return (
     <>
@@ -94,36 +119,74 @@ export default function MqCashflowCellDetailPanel(props: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((it) => (
-                      <tr
-                        key={it.id}
-                        className={
-                          it.source === "residual"
-                            ? "mq-cashflow-detail-row-residual"
-                            : ""
-                        }
-                      >
-                        <td>{it.txnDate ? String(it.txnDate).slice(0, 10) : "—"}</td>
-                        <td>
-                          {[it.category, it.subcategory].filter(Boolean).join(" / ") ||
-                            "—"}
-                        </td>
-                        <td>{it.place || "—"}</td>
-                        <td className="num">{fmtMqManSigned(it.amountMan)}</td>
-                        <td>{CASHFLOW_COLUMN_LABELS[it.columnKey]}</td>
-                        <td title={it.classifyDetail || ""}>
-                          {reasonLabel(it.classifyReason)}
-                        </td>
-                      </tr>
-                    ))}
+                    {items.map((it) => {
+                      const canReclassify = reclassifiable && isLineItemReclassifiable(it);
+                      const isActive = activeItemId === it.id;
+                      return (
+                        <tr
+                          key={it.id}
+                          className={[
+                            it.source === "residual"
+                              ? "mq-cashflow-detail-row-residual"
+                              : "",
+                            canReclassify ? "mq-cashflow-detail-row-reclassifiable" : "",
+                            isActive ? "mq-cashflow-detail-row-active" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          onClick={
+                            canReclassify
+                              ? () =>
+                                  setActiveItemId(isActive ? null : it.id)
+                              : undefined
+                          }
+                          onKeyDown={
+                            canReclassify
+                              ? (e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setActiveItemId(isActive ? null : it.id);
+                                  }
+                                }
+                              : undefined
+                          }
+                          tabIndex={canReclassify ? 0 : undefined}
+                          role={canReclassify ? "button" : undefined}
+                          aria-expanded={canReclassify ? isActive : undefined}
+                        >
+                          <td>{it.txnDate ? String(it.txnDate).slice(0, 10) : "—"}</td>
+                          <td>
+                            {[it.category, it.subcategory].filter(Boolean).join(" / ") ||
+                              "—"}
+                          </td>
+                          <td>{it.place || "—"}</td>
+                          <td className="num">{fmtMqManSigned(it.amountMan)}</td>
+                          <td>{CASHFLOW_COLUMN_LABELS[it.columnKey]}</td>
+                          <td title={it.classifyDetail || ""}>
+                            {reasonLabel(it.classifyReason)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
 
-            <p className="meta" style={{ marginTop: 10 }}>
-              行をクリックして列を変更する機能は次のステップ（P7）で追加します。
-            </p>
+            {activeItem && isLineItemReclassifiable(activeItem) ? (
+              <MqCashflowReclassifyMenu
+                item={activeItem}
+                businessLine={businessLine}
+                onDone={handleReclassified}
+                onCancel={() => setActiveItemId(null)}
+              />
+            ) : null}
+
+            {reclassifiable ? (
+              <p className="meta" style={{ marginTop: 10 }}>
+                取引行をクリックすると列を変更できます（端数調整・返済 tracker 行は不可）。
+              </p>
+            ) : null}
           </>
         ) : null}
       </aside>

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   buildCellDetailResponse,
   buildCashflowLineItems,
+  isLineItemReclassifiable,
   lineItemsForCell,
 } from "./mqCashflowLineItems";
 
@@ -62,5 +63,14 @@ const detail = buildCellDetailResponse({
 });
 assert.equal(detail.header.txnCount, 1);
 assert(detail.items.some((it) => it.source === "residual"), "residual when cell differs");
+assert.equal(detail.reclassifiable, true);
+
+assert.equal(isLineItemReclassifiable(expenseMarch[0]!), true);
+assert.equal(
+  isLineItemReclassifiable(
+    detail.items.find((it) => it.source === "residual")!
+  ),
+  false
+);
 
 console.log("mqCashflowLineItems.selftest: ok");
