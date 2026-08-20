@@ -199,7 +199,13 @@ def build_service_for_token(token_path_for_account: Path):
     return service, email_addr
 
 
-from yoritoori_utils import YORITOORI_FILENAME, resolve_incoming_attach_date_dir, resolve_incoming_attach_dir, parse_received_date_folder
+from yoritoori_utils import (
+    YORITOORI_FILENAME,
+    insert_after_timeline_heading,
+    parse_received_date_folder,
+    resolve_incoming_attach_date_dir,
+    resolve_incoming_attach_dir,
+)
 
 
 def extract_email(from_header):
@@ -606,13 +612,7 @@ def append_sent_to_yoritoori(folder_path, partner_name, date_str, subject, body,
 ---
 """
     content = md_path.read_text(encoding="utf-8")
-    marker = "## やり取り（時系列）"
-    if marker in content:
-        pos = content.find(marker) + len(marker)
-        content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
-    else:
-        content += block
-    md_path.write_text(content, encoding="utf-8")
+    md_path.write_text(insert_after_timeline_heading(content, block), encoding="utf-8")
     mirror_yoritoori_md_to_gitrepos(md_path)
     return True
 
@@ -646,14 +646,7 @@ def append_to_yoritoori(folder_path, partner_name, date_str, body, attachment_na
 
 ---
 """
-    # 新しいメッセージを冒頭に表示（時系列で新しい順）
-    marker = "## やり取り（時系列）"
-    if marker in content:
-        pos = content.find(marker) + len(marker)
-        content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
-    else:
-        content += block
-    md_path.write_text(content, encoding="utf-8")
+    md_path.write_text(insert_after_timeline_heading(content, block), encoding="utf-8")
     mirror_yoritoori_md_to_gitrepos(md_path)
     return True
 

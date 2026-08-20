@@ -141,12 +141,14 @@ partners:
     contact: "大石"
   - folder: "317_日本総険"
     name: "日本総険"
-    emails: ["ayanori.shimizu@iba-ns.co.jp"]
+    emails: ["ayanori.shimizu@iba-ns.co.jp", "naomi.waku@iba-ns.co.jp", "hozen@iba-ns.co.jp", "keiyaku@iba-ns.co.jp", "yohei.fukuda@iba-ns.co.jp"]
+    email_domains: ["iba-ns.co.jp"]
+    to_name_hints: ["日本総険"]
     phones: []
     line: ""
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
-    contact: "清水"
+    contact: "清水（和久・多田羅）"
   - folder: "419_Kneesbee税理士法人"
     name: "Kneesbee税理士法人"
     emails: ["t.ohno@knees-bee.jp", "t.ohno.sogou@gmail.com"]

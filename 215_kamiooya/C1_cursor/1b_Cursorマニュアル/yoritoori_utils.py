@@ -10,6 +10,18 @@ from pathlib import Path
 # パートナー別フォルダ内のファイル名（全社統一）
 YORITOORI_FILENAME = "5.やり取り.md"
 DRAFT_FILENAME = "4.送信下書き.txt"
+TIMELINE_HEADING = "## やり取り（時系列）"
+
+
+def insert_after_timeline_heading(content: str, block: str) -> str:
+    """見出し行の直後に追記する。説明文中の同文字列には挿入しない。"""
+    m = re.search(r"(?m)^## やり取り（時系列）[ \t]*$", content)
+    if not m:
+        m = re.search(re.escape(TIMELINE_HEADING), content)
+    if not m:
+        return content.rstrip() + "\n" + block
+    pos = m.end()
+    return content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
 
 
 def default_yoritoori_base_dir() -> Path:
