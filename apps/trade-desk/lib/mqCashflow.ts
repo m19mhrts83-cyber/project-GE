@@ -227,8 +227,10 @@ export function buildMqCashflowMonthRows(args: {
 
     const totalIn = sumParts(inflowParts);
     const totalOut = sumParts(outflowParts);
-    let netCashFlowMan =
-      totalIn != null && totalOut != null ? totalIn - totalOut : null;
+    let netCashFlowMan: number | null = null;
+    if (totalIn != null || totalOut != null) {
+      netCashFlowMan = (totalIn ?? 0) - (totalOut ?? 0);
+    }
     if (
       netCashFlowMan == null &&
       cashInMan != null &&
@@ -241,8 +243,8 @@ export function buildMqCashflowMonthRows(args: {
       i === 0 ? cashBeginMan : (out[i - 1]?.cashEndMan ?? null);
 
     let cashEndMan: number | null = cashFacts?.cashEndMan ?? null;
-    if (cashEndMan == null && monthBegin != null && netCashFlowMan != null) {
-      cashCursor = monthBegin + netCashFlowMan;
+    if (cashEndMan == null && monthBegin != null) {
+      cashCursor = monthBegin + (netCashFlowMan ?? 0);
       cashEndMan = cashCursor;
     } else if (cashEndMan != null) {
       cashCursor = cashEndMan;

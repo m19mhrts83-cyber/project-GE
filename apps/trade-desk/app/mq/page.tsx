@@ -1,7 +1,8 @@
 import Shell from "@/components/Shell";
 import MqBsPanel from "@/components/MqBsPanel";
 import MqCompareBars from "@/components/MqCompareBars";
-import MqCashflowTable from "@/components/MqCashflowTable";
+import MqCashflowWorkspace from "@/components/MqCashflowWorkspace";
+import MqReconcilePanel from "@/components/MqReconcilePanel";
 import MqTaxComparePanel from "@/components/MqTaxComparePanel";
 import MqFactsForm from "@/components/MqFactsForm";
 import MqPlanForm from "@/components/MqPlanForm";
@@ -67,6 +68,15 @@ import type {
   CashflowClassifyRuleRow,
   TxnOverrideRow,
 } from "@/lib/mqCashflowClassify";
+import type {
+  CashflowActionRow,
+  CashflowAdjustmentRow,
+} from "@/lib/mqCashflowManual";
+import { pickYearendAdjustment } from "@/lib/mqCashflowManual";
+import {
+  buildReconcileDiffs,
+  projectCashflowToMqBs,
+} from "@/lib/mqCashflowProject";
 
 export const dynamic = "force-dynamic";
 
@@ -173,6 +183,15 @@ export default async function MqPage({
     .from("kurashift_mq_cashflow_txn_overrides")
     .select("txn_id,business_line,cashflow_column,note");
 
+  const { data: cashflowAdjustmentsRaw } = await supabase
+    .from("kurashift_mq_cashflow_adjustments")
+    .select("*");
+
+  const { data: cashflowActionsRaw } = await supabase
+    .from("kurashift_mq_cashflow_actions")
+    .select("*")
+    .eq("is_active", true);
+
   const { data: financeCategoryYearRaw } = await supabase
     .from("kurashift_finance_category_year")
     .select("fiscal_year,category,income_jpy,expense_jpy,net_jpy")
@@ -240,6 +259,17 @@ export default async function MqPage({
   let cashflowRows: MqCashflowMonthRow[] = [];
   let cashflowNegative: { month: string; cashEndMan: number }[] = [];
   let cashflowOriginHint: string | null = null;
+  let cashflowAdjustments: CashflowAdjustmentRow[] = [];
+  let cashflowActions: CashflowActionRow[] = [];
+  let cashflowInterestMan: number | null = null;
+  let cashflowTaxMan: number | null = null;
+  let cashflowTaxAccrual: "december" | "payment" = "december";
+  let cashflowL1Begin: number | null = null;
+  let cashflowL1End: number | null = null;
+  let cashflowL1In: number | null = null;
+  let cashflowL1Out: number | null = null;
+  let reconcileProject: ReturnType<typeof projectCashflowToMqBs> | null = null;
+  let reconcileDiffs: ReturnType<typeof buildReconcileDiffs> = [];
 
   function buildActual(period: string) {
     const subset =
@@ -520,6 +550,9 @@ export default async function MqPage({
 
   /** 現金橋の前期繰越: 年次=前年B/S現金、月次=前月末 facts.cash_end */
   function cashBeginFor(period: string): number | null {
+    if (grain === "year" && cashflowL1Begin != null) {
+      return cashflowL1Begin;
+    }
     if (grain === "year") {
       return priorYearCash;
     }
@@ -605,6 +638,9 @@ export default async function MqPage({
       [cashflowYear]: priorYearCash,
     };
 
+    cashflowAdjustments = (cashflowAdjustmentsRaw ?? []) as CashflowAdjustmentRow[];
+    cashflowActions = (cashflowActionsRaw ?? []) as CashflowActionRow[];
+
     const built = buildCashflowWithCarry(
       {
         businessLine,
@@ -615,6 +651,8 @@ export default async function MqPage({
         loanMonthlyPaymentMan,
         txns,
         maps: accountMapRows,
+        adjustments: cashflowAdjustments,
+        actions: cashflowActions,
         factsCashByMonthByYear,
         bsFallbackOpeningByYear,
       },
@@ -623,6 +661,73 @@ export default async function MqPage({
 
     cashflowRows = built.rows;
     cashflowNegative = negativeMonths(cashflowRows);
+    cashflowL1Begin = built.rows[0]?.cashBeginMan ?? built.openingCashMan;
+    cashflowL1End =
+      built.rows[built.rows.length - 1]?.cashEndMan ?? null;
+    cashflowL1In = built.rows.reduce((s, r) => s + (r.salesMan ?? 0) + (r.borrowLtMan ?? 0) + (r.borrowStMan ?? 0) + (r.borrowOfficerMan ?? 0) + (r.actionInflowMan ?? 0), 0);
+    cashflowL1Out = built.rows.reduce((s, r) => {
+      const parts = [
+        r.repairMan, r.advertisingMan, r.expenseMan, r.managementMan,
+        r.acquisitionMan, r.taxAccountantMan, r.annualTaxMan, r.loanRepaymentMan,
+        r.interestYearendMan, r.taxPaymentMan,
+      ];
+      return s + parts.reduce<number>((a, p) => a + (p ?? 0), 0);
+    }, 0);
+
+    if (entity === "personal" || entity === "corporate") {
+      const interest = pickYearendAdjustment(cashflowAdjustments, {
+        businessLine,
+        entity,
+        year: cashflowYear,
+        field: "interest_yearend",
+      });
+      const tax = pickYearendAdjustment(cashflowAdjustments, {
+        businessLine,
+        entity,
+        year: cashflowYear,
+        field: "tax_payment",
+      });
+      cashflowInterestMan = interest ? Number(interest.amount_man) : null;
+      cashflowTaxMan = tax ? Number(tax.amount_man) : null;
+      cashflowTaxAccrual =
+        built.settings?.taxAccrualMonth === "payment" ? "payment" : "december";
+
+      reconcileProject = projectCashflowToMqBs({
+        year: cashflowYear,
+        rows: built.rows,
+        settings: built.settings,
+      });
+      const subset = filterFactsYearActual(
+        rows,
+        "realestate",
+        entity,
+        String(cashflowYear)
+      );
+      const agg = aggregateRows(subset, "year");
+      const bsSnap = pickNearestBs(
+        bsRows,
+        "realestate",
+        entity,
+        yearEndDate(String(cashflowYear))
+      );
+      reconcileDiffs = buildReconcileDiffs({
+        project: reconcileProject,
+        factsAnnual: {
+          pq: agg.computed?.pq ?? null,
+          vq: agg.computed?.vq ?? null,
+          f: agg.computed?.f ?? null,
+          cash_in: agg.cashIn,
+          cash_out: agg.cashOut,
+          cash_end: agg.cashEnd,
+        },
+        bsSnap: bsSnap
+          ? {
+              cash: normalizeBs(bsSnap).cash,
+              current_profit: normalizeBs(bsSnap).current_profit,
+            }
+          : null,
+      });
+    }
 
     if (built.settings) {
       cashflowOriginHint = `起点: ${built.settings.originMonth} 期首 ${fmtMqMan(built.settings.initialCashMan)}（${built.settings.note || "設定"}）`;
@@ -802,7 +907,7 @@ export default async function MqPage({
             </p>
           </div>
 
-          <MqCashflowTable
+          <MqCashflowWorkspace
             title={`${lineLabel(line)} · ${entityLabel(entity)} 月次資金繰り表`}
             year={cashflowDisplayYear}
             rows={cashflowRows}
@@ -812,12 +917,105 @@ export default async function MqPage({
             businessLine="realestate"
             entity={entity}
             interactive={line === "realestate"}
+            taxEntity={
+              entity === "personal" || entity === "corporate" ? entity : null
+            }
+            interestMan={cashflowInterestMan}
+            taxMan={cashflowTaxMan}
+            taxAccrualMonth={cashflowTaxAccrual}
+            actions={cashflowActions}
             unavailableReason={
               line === "realestate"
                 ? null
                 : "資金繰り表は現在、不動産ラインで表示します。上の事業線を「不動産」にすると内容が出ます。"
             }
           />
+        </>
+      ) : view === "reconcile" ? (
+        <>
+          <div className="card" style={{ marginTop: 12 }}>
+            <header>
+              <span className="lvl">条件</span>
+              <strong>整合 · {cashflowDisplayYear}年</strong>
+            </header>
+            <div className="mq-slicer" style={{ marginTop: 10 }}>
+              <div className="mq-slicer-group">
+                <span className="meta">表示年度</span>
+                <MqPeriodLinks
+                  grain="year"
+                  periods={yearsAll.length ? yearsAll : [defaultYear]}
+                  current={cashflowDisplayYear}
+                  makeHref={(v) =>
+                    href({ a: v.slice(0, 4), grain: "year", view: "reconcile" })
+                  }
+                />
+              </div>
+              <div className="mq-slicer-group">
+                <span className="meta">主体</span>
+                {(
+                  [
+                    ["personal", "個人"],
+                    ["corporate", "法人"],
+                  ] as const
+                ).map(([v, lab]) => (
+                  <a
+                    key={v}
+                    className={`btn${entity === v ? " primary" : ""}`}
+                    href={href({ entity: v, view: "reconcile" })}
+                  >
+                    {lab}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+          {entity !== "personal" && entity !== "corporate" ? (
+            <p className="meta" style={{ marginTop: 12 }}>
+              整合は法人または個人を選んでください。
+            </p>
+          ) : line !== "realestate" ? (
+            <p className="meta" style={{ marginTop: 12 }}>
+              資金繰り連動の整合は不動産ラインです。
+            </p>
+          ) : reconcileProject ? (
+            <div style={{ marginTop: 12 }}>
+              <MqReconcilePanel
+                year={cashflowDisplayYear}
+                entity={entity}
+                businessLine="realestate"
+                project={reconcileProject}
+                diffs={reconcileDiffs}
+                factsCount={
+                  filterFactsYearActual(
+                    rows,
+                    "realestate",
+                    entity,
+                    cashflowDisplayYear
+                  ).length
+                }
+                bsAsOf={
+                  pickNearestBs(
+                    bsRows,
+                    "realestate",
+                    entity,
+                    yearEndDate(cashflowDisplayYear)
+                  )?.as_of_date ?? null
+                }
+                bsSource={
+                  pickNearestBs(
+                    bsRows,
+                    "realestate",
+                    entity,
+                    yearEndDate(cashflowDisplayYear)
+                  )?.source ?? null
+                }
+              />
+            </div>
+          ) : (
+            <p className="meta" style={{ marginTop: 12 }}>
+              投影データを作れませんでした。
+            </p>
+          )}
         </>
       ) : (
         <>
@@ -1004,9 +1202,26 @@ export default async function MqPage({
               title={left.title}
               computed={left.computed}
               cashBegin={cashBeginFor(periodA)}
-              cashIn={left.cashIn}
-              cashOut={left.cashOut}
-              cashEnd={left.cashEnd}
+              cashIn={
+                grain === "year" && cashflowL1In != null
+                  ? cashflowL1In
+                  : left.cashIn
+              }
+              cashOut={
+                grain === "year" && cashflowL1Out != null
+                  ? cashflowL1Out
+                  : left.cashOut
+              }
+              cashEnd={
+                grain === "year" && cashflowL1End != null
+                  ? cashflowL1End
+                  : left.cashEnd
+              }
+              cashBridgeNote={
+                grain === "year" && cashflowL1End != null
+                  ? "資金繰り連動（L1 帳簿）"
+                  : undefined
+              }
               depreciation={left.depreciation}
               fMonthlyPart={left.fMonthlyPart ?? null}
               fAnnualAllocated={left.fAnnualAllocated ?? null}

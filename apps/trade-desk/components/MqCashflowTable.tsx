@@ -22,6 +22,7 @@ type Props = {
   businessLine?: string;
   entity?: string;
   interactive?: boolean;
+  onAddAction?: () => void;
 };
 
 type RowKey = keyof Pick<
@@ -274,6 +275,7 @@ export default function MqCashflowTable(props: Props) {
     businessLine = "realestate",
     entity = "corporate",
     interactive = true,
+    onAddAction,
   } = props;
 
   const [panelOpen, setPanelOpen] = useState(false);
@@ -384,6 +386,15 @@ export default function MqCashflowTable(props: Props) {
           {negativeMonths
             .map((n) => `${n.month.slice(5, 7)}月（${fmtMqManSigned(n.cashEndMan)}）`)
             .join(" · ")}
+          {" — 処置を追加してください"}
+          {onAddAction ? (
+            <>
+              {" "}
+              <button type="button" className="btn primary" onClick={onAddAction}>
+                処置を追加
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
       <p className="meta mq-cashflow-meta">
@@ -427,7 +438,7 @@ export default function MqCashflowTable(props: Props) {
                       key={item.key}
                       className={`mq-cashflow-row mq-cashflow-row-${item.section}${
                         showSection ? " mq-cashflow-row-section-start" : ""
-                      }`}
+                      }${item.key === "actionInflowMan" ? " mq-cashflow-row-virtual" : ""}`}
                     >
                       <td
                         className={`mq-cashflow-sticky-col mq-cashflow-col-group mq-cashflow-section-${item.section}`}

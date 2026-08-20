@@ -11,6 +11,12 @@ import {
 } from "./mqCashflow";
 import type { CashflowClassifyRuleRow, TxnOverrideRow } from "./mqCashflowClassify";
 import {
+  adjustmentsToByMonth,
+  mergeActionsIntoAdjustments,
+  type CashflowActionRow,
+  type CashflowAdjustmentRow,
+} from "./mqCashflowManual";
+import {
   type MqCashflowSettings,
   type MqCashflowSettingsRow,
   openingCashFromSettings,
@@ -27,6 +33,8 @@ export type CashflowEngineContext = {
   loanMonthlyPaymentMan: number | null;
   txns: FinanceTxnLite[];
   maps: MqAccountMapRow[];
+  adjustments?: CashflowAdjustmentRow[];
+  actions?: CashflowActionRow[];
   factsCashByMonthByYear: Record<
     number,
     Record<
@@ -74,6 +82,17 @@ export function buildCashflowYear(
   const line: LineFilter =
     ctx.businessLine === "ai" ? "ai" : "realestate";
 
+  const adj = mergeActionsIntoAdjustments(
+    adjustmentsToByMonth(
+      ctx.adjustments ?? [],
+      ctx.businessLine,
+      ctx.entity
+    ),
+    ctx.actions ?? [],
+    ctx.businessLine,
+    ctx.entity
+  );
+
   return buildMqCashflowMonthRows({
     year,
     months: monthsOfYear(year),
@@ -87,6 +106,7 @@ export function buildCashflowYear(
     businessLine: ctx.businessLine,
     txnOverrides: ctx.txnOverrides,
     classifyRules: ctx.classifyRules,
+    adjustmentsByMonth: adj,
   });
 }
 

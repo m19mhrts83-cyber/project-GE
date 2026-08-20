@@ -22,6 +22,7 @@ export type MqMonthCloseNotice = {
   title: string;
   body: string;
   href: string;
+  cashflowHref?: string;
   statusLabel: "取込待ち" | "自動更新済み" | "要確認" | null;
 };
 
@@ -106,16 +107,21 @@ export function mqMonthCloseNotice(
     statusLabel = "取込待ち";
   }
 
+  const isDecemberClose = targetMonth.endsWith("-12");
   const bodyBase = opts.hasFacts
-    ? `${targetMonth} の実績が入っています。MQ会計表・現金橋・軽量B/Sをまとめて確認しましょう。`
-    : `${targetMonth} 分のデータが出揃う頃です。Zaim取込や手入力のうえ、MQ会計評価でまとめましょう。`;
+    ? `${targetMonth} の実績が入っています。資金繰り表（帳簿）・MQ会計表・現金橋・軽量B/Sをまとめて確認しましょう。`
+    : `${targetMonth} 分のデータが出揃う頃です。Zaim取込や手入力のうえ、資金繰り表と MQ会計評価でまとめましょう。`;
+  const yearendLine = isDecemberClose
+    ? " 12月は期末利息・税金支払の入力も資金繰り表から行えます。"
+    : "";
 
   return {
     show,
     targetMonth,
     title: `MQ会計評価 — ${targetMonth} をまとめる`,
-    body: statusLine ? `${bodyBase} ${statusLine}` : bodyBase,
+    body: `${statusLine ? `${bodyBase} ${statusLine}` : bodyBase}${yearendLine}`,
     href: `/mq?grain=month&a=${encodeURIComponent(targetMonth)}&b=${encodeURIComponent(targetMonth)}&mode=aa`,
+    cashflowHref: `/mq?view=cashflow&grain=year&line=realestate&entity=corporate&a=${encodeURIComponent(targetMonth.slice(0, 4))}`,
     statusLabel,
   };
 }
