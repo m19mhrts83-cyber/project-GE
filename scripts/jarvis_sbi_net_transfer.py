@@ -55,19 +55,23 @@ DEST_BANK = "0009"
 
 RAILS: dict[str, dict[str, Any]] = {
     "sbi_main_smbc": {
-        "amount_jpy": 26_000,
-        "keep_floor_jpy": 500_800,
+        # 8/20給与確認後寄せ（PayPayカード26万＋バッファ5万を本に残す）
+        "amount_jpy": 138_183,
+        "keep_floor_jpy": 310_000,
         "from_account_id": "sbi_net_main",
         "label": "第一生命NEOBANK本（普通）→SMBC刈谷",
         "account_hint_env": "SBI_NET_MAIN_ACCOUNT",
     },
     "sbi_sub_smbc": {
-        "amount_jpy": 161_000,
-        "keep_floor_jpy": 81_000,
+        "amount_jpy": 131_017,
+        "keep_floor_jpy": 50_000,
         "from_account_id": "sbi_net_sub",
         "label": "第一生命NEOBANK副→SMBC刈谷",
         "account_hint_env": "SBI_NET_SUB_ACCOUNT",
-        "note": "副がハイブリッドの場合、他行送金前に普通へ戻してから送ることがある",
+        "note": (
+            "副がハイブリッドの場合、他行送金前に普通へ戻してから送ることがある。"
+            " 8/20計画では原則「副→本の内部振替」を先に行い、本からSMBCへ送る"
+        ),
     },
 }
 

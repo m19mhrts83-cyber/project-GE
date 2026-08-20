@@ -25,8 +25,9 @@ rails:
     label: "第一生命NEOBANK本（普通）→SMBC刈谷"
     enabled: true
     order: 10
-    amount_jpy: 26000
-    keep_floor_jpy: 500800
+    # 2026-08-20 給与確認後寄せ（PayPayカード26万＋バッファ5万）
+    amount_jpy: 138183
+    keep_floor_jpy: 310000
     from_account_id: sbi_net_main
     to_account_id: smbc_kariya
     # ログインOTPはメール/SMS可。実行承認はスマート認証NEO（アプリ）が多い
@@ -44,8 +45,9 @@ rails:
     label: "第一生命NEOBANK副→SMBC刈谷"
     enabled: true
     order: 20
-    amount_jpy: 161000
-    keep_floor_jpy: 81000
+    # 2026-08-20: 原則は副→本の内部振替131,017（副に5万残）。直送SMBCはフォールバック
+    amount_jpy: 131017
+    keep_floor_jpy: 50000
     from_account_id: sbi_net_sub
     to_account_id: smbc_kariya
     otp_channel: gmail_api
