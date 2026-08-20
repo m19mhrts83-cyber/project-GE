@@ -157,7 +157,7 @@ const ROWS: Array<{
     sectionLabel: "出金",
     sign: "−",
     shortLabel: "取得時",
-    note: "ローン手数料 / 火災保険 / 税理士費用など（マイナス）",
+    note: "ローン手数料 / 保証料 / 登記など取得時諸費用（マイナス）",
     kind: "money",
   },
   {
@@ -184,7 +184,7 @@ const ROWS: Array<{
     sectionLabel: "出金",
     sign: "−",
     shortLabel: "年払・税",
-    note: "年払い・税金などの大口出金（マイナス）",
+    note: "年払い・固都税 / 火災保険更新などの大口出金（マイナス）",
     kind: "money",
   },
   {

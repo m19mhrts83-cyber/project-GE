@@ -3,6 +3,7 @@ import {
   buildCellDetailResponse,
   buildCashflowLineItems,
   isLineItemReclassifiable,
+  lineItemDisplayTag,
   lineItemsForCell,
 } from "./mqCashflowLineItems";
 
@@ -29,6 +30,17 @@ const txns = [
     expense_jpy: 280_000,
     description: "△△保証料",
   },
+  {
+    id: 3,
+    category: "19F",
+    subcategory: "その他",
+    entity: "corporate",
+    kind: null,
+    txn_date: "2025-03-20",
+    income_jpy: 0,
+    expense_jpy: 350_000,
+    description: "LEAF 火災保険",
+  },
 ];
 
 const items = buildCashflowLineItems({
@@ -54,6 +66,10 @@ assert.equal(expenseMarch[0]?.place, "○○設備");
 const acqMarch = lineItemsForCell(items, "2025-03", "acquisition");
 assert.equal(acqMarch.length, 1);
 assert.equal(acqMarch[0]?.classifyReason, "learned_rule");
+
+const insuranceMarch = lineItemsForCell(items, "2025-03", "annual_tax");
+assert.equal(insuranceMarch.length, 1);
+assert.equal(lineItemDisplayTag(insuranceMarch[0]!), "火災保険");
 
 const detail = buildCellDetailResponse({
   month: "2025-03",

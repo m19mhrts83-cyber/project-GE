@@ -5,6 +5,7 @@ import { CASHFLOW_COLUMN_LABELS } from "./mqCashflowColumns";
 import type { CashflowClassifyRuleRow, TxnOverrideRow } from "./mqCashflowClassify";
 import {
   buildOverrideMap,
+  detectFireInsurance,
   resolveCashflowColumn,
   type ClassifyReason,
 } from "./mqCashflowClassify";
@@ -31,6 +32,15 @@ export type CashflowLineItem = {
   classifyReason: ClassifyReason | "manual" | "residual";
   classifyDetail?: string;
 };
+
+/** 内訳行の表示タグ（火災保険など） */
+export function lineItemDisplayTag(item: CashflowLineItem): string | null {
+  const blob = [item.category, item.subcategory, item.place]
+    .filter(Boolean)
+    .join(" ");
+  if (detectFireInsurance(blob)) return "火災保険";
+  return null;
+}
 
 export type LoanTrackerLite = {
   id: string;

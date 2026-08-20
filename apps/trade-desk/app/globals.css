@@ -857,6 +857,17 @@ tr.sold td {
 .mq-cashflow-detail-summary {
   margin-bottom: 10px;
 }
+.mq-cashflow-detail-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1a5a8a;
+  background: rgba(42, 94, 168, 0.12);
+  white-space: nowrap;
+}
 .mq-cashflow-cell-plus {
   color: #1a7a45;
   font-weight: 600;

@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import {
   buildLearnRuleFromTxn,
   classifyExpenseTxnHeuristic,
+  detectFireInsurance,
   resolveCashflowColumn,
+  txnTextBlob,
 } from "./mqCashflowClassify";
 import { buildMqCashflowMonthRows, decemberCashEnd } from "./mqCashflow";
 import { buildCashflowWithCarry } from "./mqCashflowEngine";
@@ -129,6 +131,32 @@ import { openingCashFromSettings } from "./mqCashflowSettings";
   );
   assert.equal(rule.cashflow_column, "acquisition");
   assert.equal(rule.category_match, "賃貸");
+}
+
+// 火災保険 — 摘要のみでも検出、年払は annualTax
+{
+  const annual = {
+    id: 10,
+    category: "19F",
+    subcategory: "経費",
+    entity: "corporate",
+    kind: null,
+    txn_date: "2025-04-01",
+    income_jpy: 0,
+    expense_jpy: 320_000,
+    description: "Grandole I 火災保険 年払更新",
+  };
+  assert(detectFireInsurance(txnTextBlob(annual)));
+  const hAnnual = classifyExpenseTxnHeuristic(annual);
+  assert.equal(hAnnual.bucket, "annualTax");
+
+  const atPurchase = {
+    ...annual,
+    id: 11,
+    description: "取得時 火災保険 初回契約",
+  };
+  const hPurchase = classifyExpenseTxnHeuristic(atPurchase);
+  assert.equal(hPurchase.bucket, "acquisition");
 }
 
 console.log("mqCashflowClassify.selftest: ok");

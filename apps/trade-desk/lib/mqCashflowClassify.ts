@@ -42,14 +42,40 @@ function matchesAny(hay: string, needles: readonly string[]): boolean {
   return needles.some((n) => h.includes(n.toLowerCase()));
 }
 
+/** 科目・摘要・口座名を含む全文（mqZaimMap.blobOf と同系） */
+export function txnTextBlob(txn: FinanceTxnLite): string {
+  return [
+    txn.category,
+    txn.subcategory,
+    txn.description,
+    txn.memo,
+    txn.from_account,
+    txn.to_account,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** 火災・地震保険の支払 */
+export function detectFireInsurance(text: string): boolean {
+  const b = text.toLowerCase();
+  if (b.includes("火災保険") || b.includes("地震保険")) return true;
+  if (b.includes("火災") && b.includes("保険")) return true;
+  return false;
+}
+
+function isAcquisitionContext(text: string): boolean {
+  return /取得|新規加入|契約時|引渡|購入時|ローン実行|諸費用|取得時|初回/.test(
+    text
+  );
+}
+
 /** 既存 mqCashflow.ts と同系統のヒューリスティック */
 export function classifyExpenseTxnHeuristic(txn: FinanceTxnLite): {
   isLoan: boolean;
   bucket: CashflowBucketKey | null;
 } {
-  const cat = (txn.category ?? "").toLowerCase();
-  const sub = (txn.subcategory ?? "").toLowerCase();
-  const blob = `${cat} ${sub}`;
+  const blob = txnTextBlob(txn).toLowerCase();
 
   const isLoan = matchesAny(blob, [
     "ローン",
@@ -67,14 +93,27 @@ export function classifyExpenseTxnHeuristic(txn: FinanceTxnLite): {
     return { isLoan: false, bucket: "acquisition" };
   }
 
-  if (matchesAny(blob, ["火災保険", "保険料"])) {
-    return { isLoan: false, bucket: "acquisition" };
+  if (detectFireInsurance(blob)) {
+    return {
+      isLoan: false,
+      bucket: isAcquisitionContext(blob) ? "acquisition" : "annualTax",
+    };
   }
+
   if (matchesAny(blob, ["手数料", "保証料", "登記", "印紙", "融資"])) {
     return { isLoan: false, bucket: "acquisition" };
   }
 
-  if (matchesAny(blob, ["固定資産税", "都市計画税", "税金", "租税"])) {
+  if (
+    matchesAny(blob, [
+      "固定資産税",
+      "都市計画税",
+      "固都税",
+      "税金",
+      "租税",
+      "租税公課",
+    ])
+  ) {
     return { isLoan: false, bucket: "annualTax" };
   }
 

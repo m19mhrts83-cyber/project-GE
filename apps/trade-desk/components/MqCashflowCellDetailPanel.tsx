@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { CashflowLineItem } from "@/lib/mqCashflowLineItems";
-import { isLineItemReclassifiable } from "@/lib/mqCashflowLineItems";
+import { isLineItemReclassifiable, lineItemDisplayTag } from "@/lib/mqCashflowLineItems";
 import { CASHFLOW_COLUMN_LABELS } from "@/lib/mqCashflowColumns";
 import { fmtMqManSigned } from "@/lib/mqUnits";
 import MqCashflowReclassifyMenu from "@/components/MqCashflowReclassifyMenu";
@@ -159,7 +159,14 @@ export default function MqCashflowCellDetailPanel(props: Props) {
                             {[it.category, it.subcategory].filter(Boolean).join(" / ") ||
                               "—"}
                           </td>
-                          <td>{it.place || "—"}</td>
+                          <td>
+                            {it.place || "—"}
+                            {lineItemDisplayTag(it) ? (
+                              <span className="mq-cashflow-detail-tag">
+                                {lineItemDisplayTag(it)}
+                              </span>
+                            ) : null}
+                          </td>
                           <td className="num">{fmtMqManSigned(it.amountMan)}</td>
                           <td>{CASHFLOW_COLUMN_LABELS[it.columnKey]}</td>
                           <td title={it.classifyDetail || ""}>
