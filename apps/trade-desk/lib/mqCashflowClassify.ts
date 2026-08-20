@@ -1,6 +1,7 @@
 import type { FinanceTxnLite } from "./mqZaimMap";
 import type { CashflowBucketKey } from "./mqCashflowColumns";
 import { BUCKET_TO_COLUMN, type CashflowColumnKey } from "./mqCashflowColumns";
+import { matchBusinessAllowlist } from "./mqCashflowBusinessAllowlist";
 
 export type CashflowClassifyRuleRow = {
   id?: string;
@@ -22,10 +23,13 @@ export type ClassifyReason =
   | "override"
   | "learned_rule"
   | "heuristic"
-  | "heuristic_loan";
+  | "heuristic_loan"
+  | "allowlist"
+  | "excluded";
 
 export type ClassifyResult = {
-  column: CashflowColumnKey;
+  /** 除外時は null（資金繰りに載せない） */
+  column: CashflowColumnKey | null;
   bucket: CashflowBucketKey | null;
   isLoan: boolean;
   reason: ClassifyReason;
@@ -260,17 +264,38 @@ export function resolveCashflowColumn(
     }
   }
 
-  const inc = Number(txn.income_jpy) || 0;
-  if (inc > 0) {
+  const hit = matchBusinessAllowlist(txn);
+  if (!hit) {
+    return {
+      column: null,
+      bucket: null,
+      isLoan: false,
+      reason: "excluded",
+      detail: "not on business allowlist",
+    };
+  }
+
+  if (hit.side === "income") {
     return {
       column: "sales",
       bucket: null,
       isLoan: false,
-      reason: "heuristic",
-      detail: "income",
+      reason: "allowlist",
+      detail: hit.label,
     };
   }
 
+  if (hit.expenseMode === "expense_flat") {
+    return {
+      column: "expense",
+      bucket: "expense",
+      isLoan: false,
+      reason: "allowlist",
+      detail: hit.label,
+    };
+  }
+
+  // Δ19F 内訳 → 既存ヒューリスティック
   const h = classifyExpenseTxnHeuristic(txn);
   if (h.isLoan) {
     return {
@@ -278,6 +303,7 @@ export function resolveCashflowColumn(
       bucket: null,
       isLoan: true,
       reason: "heuristic_loan",
+      detail: hit.label,
     };
   }
 
@@ -285,8 +311,8 @@ export function resolveCashflowColumn(
     column: columnFromBucket(h.bucket),
     bucket: h.bucket,
     isLoan: false,
-    reason: "heuristic",
-    detail: h.bucket ?? "expense",
+    reason: "allowlist",
+    detail: `${hit.label} → ${h.bucket ?? "expense"}`,
   };
 }
 

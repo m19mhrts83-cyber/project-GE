@@ -58,6 +58,40 @@ category_rules:
   - match: "賃貸経営(個人"
     entity: personal
     kind: rental_expense
+  # 資金繰り事業ホワイトリスト（主体既定）
+  - match: "AIリスキリング"
+    entity: personal
+    kind: other_expense
+  - match: "自己投資・寄付"
+    entity: personal
+    kind: other_expense
+  - match: "不労所得(LUUP)"
+    entity: personal
+    kind: other_income
+  - match: "不労所得（売却）"
+    entity: personal
+    kind: other_income
+  - match: "不労所得(売却)"
+    entity: personal
+    kind: other_income
+  - match: "事業収入(不動産)"
+    entity: personal
+    kind: other_income
+  - match: "事業収入（不動産）"
+    entity: personal
+    kind: other_income
+  - match: "不動産収入（AI）"
+    entity: personal
+    kind: other_income
+  - match: "不動産収入(AI)"
+    entity: personal
+    kind: other_income
+  - match: "保険金収入"
+    entity: personal
+    kind: other_income
+  - match: "19.6_保険金"
+    entity: personal
+    kind: other_income
   - match: "会社費用"
     entity: corporate
     kind: other_expense

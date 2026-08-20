@@ -10,7 +10,7 @@ import {
 const txns = [
   {
     id: 1,
-    category: "賃貸",
+    category: "δ.19F.賃貸経営(法人)",
     subcategory: "経費",
     entity: "corporate",
     kind: null,
@@ -21,7 +21,7 @@ const txns = [
   },
   {
     id: 2,
-    category: "賃貸",
+    category: "δ.19F.賃貸経営(法人)",
     subcategory: "保証料",
     entity: "corporate",
     kind: null,
@@ -32,7 +32,7 @@ const txns = [
   },
   {
     id: 3,
-    category: "19F",
+    category: "δ.19F.賃貸経営(法人)",
     subcategory: "その他",
     entity: "corporate",
     kind: null,
@@ -52,7 +52,7 @@ const items = buildCashflowLineItems({
     {
       business_line: "realestate",
       entity_match: "corporate",
-      category_match: "賃貸",
+      category_match: "賃貸経営",
       subcategory_match: "保証料",
       cashflow_column: "acquisition",
     },

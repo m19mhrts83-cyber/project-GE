@@ -31,6 +31,7 @@ type Props = {
 function reasonLabel(reason: string): string {
   if (reason === "override") return "上書き";
   if (reason === "learned_rule") return "学習ルール";
+  if (reason === "allowlist") return "事業費目";
   if (reason === "heuristic" || reason === "heuristic_loan") return "自動";
   if (reason === "residual") return "端数調整";
   if (reason === "manual") return "手動/参照";
