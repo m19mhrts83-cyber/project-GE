@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 const LINES = new Set(["realestate", "ai"]);
 const ENTITIES = new Set(["personal", "corporate"]);
 const SCENARIOS = new Set(["actual", "plan"]);
-const SOURCES = new Set(["manual", "jarvis", "import"]);
+const SOURCES = new Set(["manual", "jarvis", "import", "cashflow"]);
 
 function numOrNull(v: unknown): number | null {
   if (v == null || v === "") return null;

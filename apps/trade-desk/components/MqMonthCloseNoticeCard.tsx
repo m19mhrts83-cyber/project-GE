@@ -7,12 +7,14 @@ export default function MqMonthCloseNoticeCard({
   title,
   body,
   href,
+  cashflowHref,
   targetMonth,
   statusLabel,
 }: {
   title: string;
   body: string;
   href: string;
+  cashflowHref?: string;
   targetMonth: string;
   statusLabel?: "取込待ち" | "自動更新済み" | "要確認" | null;
 }) {
@@ -56,6 +58,11 @@ export default function MqMonthCloseNoticeCard({
         <a className="btn primary" href={href}>
           MQ会計評価へ
         </a>
+        {cashflowHref ? (
+          <a className="btn" href={cashflowHref}>
+            資金繰り表へ
+          </a>
+        ) : null}
         <button type="button" className="btn" disabled={busy} onClick={ack}>
           {busy ? "処理中…" : "まとめた／確認した"}
         </button>

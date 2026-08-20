@@ -26,7 +26,9 @@ assert.equal(previousCalendarMonth(aug5), "2026-07");
 assert.equal(isMqMonthCloseWindow(aug5), true);
 const n1 = mqMonthCloseNotice({ now: aug5, hasFacts: true });
 assert.equal(n1.show, true);
-assert.equal(n1.targetMonth, "2026-07");
+  assert.equal(n1.targetMonth, "2026-07");
+assert.match(n1.body, /資金繰り/);
+assert.match(n1.cashflowHref || "", /view=cashflow/);
 
 const nAuto = mqMonthCloseNotice({
   now: aug5,
@@ -45,5 +47,10 @@ assert.equal(n2.show, false);
 const aug20 = new Date("2026-08-20T12:00:00+09:00");
 assert.equal(isMqMonthCloseWindow(aug20), false);
 assert.equal(mqMonthCloseNotice({ now: aug20 }).show, false);
+
+const jan5 = new Date("2026-01-05T03:00:00+09:00");
+const nDec = mqMonthCloseNotice({ now: jan5, hasFacts: true });
+assert.equal(nDec.targetMonth, "2025-12");
+assert.match(nDec.body, /期末利息/);
 
 console.log("mqMonthCloseNotice.selftest: ok");

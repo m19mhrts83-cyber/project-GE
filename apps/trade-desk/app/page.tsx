@@ -564,6 +564,7 @@ export default async function HomePage() {
           title={mqNotice.title}
           body={mqNotice.body}
           href={mqNotice.href}
+          cashflowHref={mqNotice.cashflowHref}
           targetMonth={mqNotice.targetMonth}
           statusLabel={mqNotice.statusLabel}
         />
