@@ -382,6 +382,7 @@ def merge_lifecycle_from_remote(state: dict[str, Any]) -> dict[str, Any]:
                 elif (
                     st in ("consulting", "approved", "executing")
                     and not plan_ready
+                    and due != settled
                 ):
                     plan_ready = due
                 if settled and plan_ready:
@@ -391,6 +392,10 @@ def merge_lifecycle_from_remote(state: dict[str, Any]) -> dict[str, Any]:
 
     if settled:
         state["settled_due"] = settled
+        # settled と同一 due の plan_ready は「実行待ち」表示の原因になるので落とす
+        if plan_ready and plan_ready == settled:
+            plan_ready = None
+            state.pop("plan_ready_due", None)
     if plan_ready:
         state["plan_ready_due"] = plan_ready
     if ack:

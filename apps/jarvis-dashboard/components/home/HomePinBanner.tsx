@@ -9,6 +9,7 @@ import { KURASHIFT_URL } from "@/lib/nav";
 import OpsPinCard from "@/components/OpsPinCard";
 import ZaimReviewAckButton from "@/components/ZaimReviewAckButton";
 import CardDebitAckButton from "@/components/CardDebitAckButton";
+import CardDebitSettleButton from "@/components/CardDebitSettleButton";
 
 const PIN_IDS = [
   "card_debit_watch",
@@ -127,7 +128,7 @@ export default async function HomePinBanner() {
               : "";
         const metaExtra =
           id === "card_debit_watch"
-            ? "重要: 支払いを確実に · 処置は KURASHIFT 資金移動で · 「確認」はピン解除のみ（完了は money-ops done）"
+            ? "重要: 支払いを確実に · 「寄せ完了」でアラート解除 · 「確認」はピン解除のみ · 詳細は KURASHIFT"
             : id === "cursor_pro_plus_downgrade"
               ? "期限 2026-08-24 · Cursor Settings で Schedule Downgrade · 状況ウォッチにも掲載"
               : id === "ops_fix_notice"
@@ -155,7 +156,10 @@ export default async function HomePinBanner() {
               id === "zaim_quality" ? (
                 <ZaimReviewAckButton batchId={batchId} />
               ) : id === "card_debit_watch" ? (
-                <CardDebitAckButton dueDate={cardDue} />
+                <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 8 }}>
+                  <CardDebitSettleButton dueDate={cardDue} />
+                  <CardDebitAckButton dueDate={cardDue} />
+                </span>
               ) : undefined
             }
           />

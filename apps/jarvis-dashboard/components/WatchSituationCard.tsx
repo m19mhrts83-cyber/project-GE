@@ -3,6 +3,7 @@ import OpsFixAckButton from "@/components/OpsFixAckButton";
 import StatusToggle from "@/components/StatusToggle";
 import WatchAckButton from "@/components/WatchAckButton";
 import CardDebitAckButton from "@/components/CardDebitAckButton";
+import CardDebitSettleButton from "@/components/CardDebitSettleButton";
 import WatchCommentThread, {
   type WatchCommentRow,
 } from "@/components/WatchCommentThread";
@@ -111,6 +112,18 @@ export default function WatchSituationCard(props: WatchSituationCardProps) {
         />
         {id === "card_debit_watch" ? (
           <p className="meta" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <CardDebitSettleButton
+              dueDate={
+                typeof payload.due_date === "string"
+                  ? payload.due_date
+                  : payload.olive_infinite &&
+                      typeof payload.olive_infinite === "object" &&
+                      typeof (payload.olive_infinite as { due_date?: string })
+                        .due_date === "string"
+                    ? (payload.olive_infinite as { due_date: string }).due_date
+                    : ""
+              }
+            />
             <CardDebitAckButton
               dueDate={
                 typeof payload.due_date === "string"

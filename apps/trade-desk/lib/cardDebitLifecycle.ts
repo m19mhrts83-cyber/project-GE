@@ -42,8 +42,15 @@ export async function writeCardDebitLifecycle(
     updated_at: new Date().toISOString(),
   };
   if (patch.opId) next.source_op_id = patch.opId;
-  if (patch.planReady) next.plan_ready_due = due;
-  if (patch.settled) next.settled_due = due;
+  if (patch.settled) {
+    next.settled_due = due;
+    // 同一引落日の「実行待ち」は消す（settled が優先）
+    if (String(next.plan_ready_due || "") === due) {
+      next.plan_ready_due = null;
+    }
+  } else if (patch.planReady) {
+    next.plan_ready_due = due;
+  }
 
   const { error } = await supabase.from("sync_meta").upsert(
     {
