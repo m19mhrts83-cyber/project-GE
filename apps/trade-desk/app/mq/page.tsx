@@ -801,7 +801,12 @@ export default async function MqPage({
     projectedByYear: equityProjectedByYear,
   });
   const trendYearOptions = Array.from(
-    new Set([...yearsAll, ...trendYears.map(String)])
+    new Set([
+      ...trendYears.map(String),
+      ...yearsAll.filter(
+        (y) => Number(y) >= (equityOriginYear ?? cashflowYear) - 1
+      ),
+    ])
   )
     .sort()
     .reverse();
