@@ -429,6 +429,37 @@ function classifyInflow(txn): "sales" | "borrow_st" | "borrow_lt" | "exclude" {
 
 ---
 
+## 7.5 事業費目ホワイトリスト（2026-08-21）
+
+資金繰り表は **ライフプラン経費を含めない**。Zaim の事業関連費目だけを集計する。
+
+| 優先 | 内容 |
+|---|---|
+| 1 | txn override（画面再分類） |
+| 2 | 学習ルール |
+| 3 | 事業ホワイトリスト（`mqCashflowBusinessAllowlist.ts`） |
+| — | 該当なし → **除外**（列に載せない） |
+
+### 収入（→ 売上）
+
+- `19.1 家賃収入(個人/法人)`
+- 不労所得（売却）／`19.3 不労所得(LUUP)`／`19.4 事業収入(不動産)`／不動産収入（AI）／`19.6_保険金収入`
+
+### 支出
+
+- `δ.19F.賃貸経営(個人事業/法人)` → 内訳ヒューリスティック（修繕・管理・返済・税理士・年払・広告・経費）
+- `δ.21F.AIリスキリング` / `γ.6.2C`×不動産投資関連 / `βご褒美`×不動産 → 当面すべて **経費**
+
+### 主体の既定
+
+カテゴリに個人/法人があればそれを優先。保険金・γ/β/事業収入不動産などは **個人** 既定（`config/finance_entity_map.yaml` も同趣旨で追記）。
+
+### UI
+
+年度チップは **左＝過去 → 右＝最新**。既定表示年は最新。
+
+---
+
 ## 8. 翌年繰越ロジック（詳細）
 
 ```mermaid
@@ -824,28 +855,20 @@ DELETE /api/mq/cashflow/txn-override?txnId=88231&businessLine=realestate
 
 ## 20. 分類エンジン改修
 
-### 20.1 新規 `lib/mqCashflowClassify.ts`
+### 20.1 `lib/mqCashflowClassify.ts` + `mqCashflowBusinessAllowlist.ts`
 
 ```typescript
 export function resolveCashflowColumn(
   txn: FinanceTxnLite,
-  opts: {
-    businessLine: LineFilter;
-    overrides: Map<number, CashflowColumnKey>;
-  }
-): { column: CashflowColumnKey; reason: string } {
-  const id = txn.id;
-  if (id != null && opts.overrides.has(id)) {
-    return { column: opts.overrides.get(id)!, reason: "override" };
-  }
-  if (yen(txn.income_jpy) > 0) {
-    return classifyInflowTxn(txn);  // sales | borrow_st | ...
-  }
-  const { isLoan, bucket } = classifyExpenseTxn(txn);
-  if (isLoan) return { column: "loan_repayment", reason: "heuristic:loan" };
-  return { column: bucketToColumn(bucket), reason: `heuristic:${bucket}` };
+  opts: { businessLine: string; overrides: Map<…>; rules: … }
+): { column: CashflowColumnKey | null; reason: string } {
+  // override → learned_rule → business allowlist
+  // ヒットしない収入・支出は reason: "excluded", column: null
 }
 ```
+
+- **収入は全部売上にしない**（ホワイトリストのみ）
+- **支出もホワイトリストのみ**列振り分け（Δ19F はヒューリスティック、AI/γ/β不動産は経費固定）
 
 ### 20.2 `buildMqCashflowMonthRows` の置き換え
 

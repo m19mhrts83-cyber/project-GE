@@ -1,6 +1,5 @@
 import type { FinanceTxnLite, MqAccountMapRow } from "./mqZaimMap";
 import type { EntityFilter, LineFilter } from "./mqAggregate";
-import { aggregateZaimToMq } from "./mqZaimMap";
 import { formatRatio } from "./mqEquations";
 import type { CashflowClassifyRuleRow, TxnOverrideRow } from "./mqCashflowClassify";
 import {
@@ -102,31 +101,9 @@ export function buildMqCashflowMonthRows(args: {
 
   const overrides = buildOverrideMap(txnOverrides, businessLine);
 
-  const agg = aggregateZaimToMq(txns, maps, { year });
-  const buckets = agg.buckets;
-
-  function includeBucket(business_line: string, ent: string): boolean {
-    const lineOk = line === "all" ? true : business_line === line;
-    const entityOk =
-      entity === "combined"
-        ? ent === "personal" || ent === "corporate"
-        : ent === entity;
-    return lineOk && entityOk;
-  }
-
-  const cashFromTxns = new Map<
-    string,
-    { cashInMan: number; cashOutMan: number }
-  >();
-  for (const b of buckets) {
-    if (!includeBucket(b.business_line, b.entity)) continue;
-    const mo = b.period_month.slice(0, 7);
-    const prev = cashFromTxns.get(mo) ?? { cashInMan: 0, cashOutMan: 0 };
-    cashFromTxns.set(mo, {
-      cashInMan: prev.cashInMan + yenToManRounded(b.cash_in),
-      cashOutMan: prev.cashOutMan + yenToManRounded(b.cash_out),
-    });
-  }
+  // maps は呼び出し互換のため受け取る（列集計はホワイトリスト分類のみ）
+  void maps;
+  void line;
 
   const columnSumsByMonth = new Map<string, ColumnSums>();
 
@@ -144,6 +121,7 @@ export function buildMqCashflowMonthRows(args: {
       overrides,
       rules: classifyRules,
     });
+    if (resolved.column == null || resolved.reason === "excluded") continue;
 
     const amountMan =
       inc > 0 ? yenToManRounded(inc) : yenToManRounded(exp);
@@ -158,7 +136,6 @@ export function buildMqCashflowMonthRows(args: {
 
   for (let i = 0; i < months.length; i++) {
     const mo = months[i]!;
-    const cashTx = cashFromTxns.get(mo) ?? null;
     const cashFacts = factsCashByMonth?.[mo] ?? null;
     const adj = adjustmentsByMonth[mo] ?? {};
 
@@ -172,13 +149,7 @@ export function buildMqCashflowMonthRows(args: {
     };
 
     let salesMan = pick("sales");
-    const cashInMan =
-      cashFacts?.cashInMan ?? (cashTx ? cashTx.cashInMan : null);
-    const cashOutMan =
-      cashFacts?.cashOutMan ?? (cashTx ? cashTx.cashOutMan : null);
-    if (salesMan == null && cashInMan != null) {
-      salesMan = cashInMan;
-    }
+    // 売上は事業ホワイトリスト分類のみ（全収入 cash_in へのフォールバックはしない）
 
     let loanMan =
       line === "ai"
@@ -231,13 +202,7 @@ export function buildMqCashflowMonthRows(args: {
     if (totalIn != null || totalOut != null) {
       netCashFlowMan = (totalIn ?? 0) - (totalOut ?? 0);
     }
-    if (
-      netCashFlowMan == null &&
-      cashInMan != null &&
-      cashOutMan != null
-    ) {
-      netCashFlowMan = cashInMan - cashOutMan;
-    }
+    // 事業列が空のときでも、ライフプラン込みの cash_in/out では埋めない
 
     const monthBegin =
       i === 0 ? cashBeginMan : (out[i - 1]?.cashEndMan ?? null);

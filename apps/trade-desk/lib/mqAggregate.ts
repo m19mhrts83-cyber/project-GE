@@ -205,7 +205,8 @@ export function availableMonths(rows: MqFactRow[]): string[] {
   const s = new Set(
     rows.filter((r) => r.scenario_kind === "actual").map((r) => monthKey(r.period_month))
   );
-  return Array.from(s).sort().reverse();
+  // 過去 → 最新（左→右）
+  return Array.from(s).sort();
 }
 
 export function availableYears(rows: MqFactRow[]): string[] {
@@ -214,7 +215,8 @@ export function availableYears(rows: MqFactRow[]): string[] {
       .filter((r) => r.scenario_kind === "actual" || r.scenario_kind === "plan")
       .map((r) => yearKey(r.period_month))
   );
-  return Array.from(s).sort().reverse();
+  // 過去 → 最新（左→右）
+  return Array.from(s).sort();
 }
 
 /** 年次計画行（period は当該年の1月） */

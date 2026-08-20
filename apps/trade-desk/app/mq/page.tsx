@@ -238,13 +238,24 @@ export default async function MqPage({
   const taxYears = Array.from(
     new Set((taxMetricsRaw ?? []).map((r) => String(r.fiscal_year)))
   ).sort();
+  // 過去 → 最新（左→右）。既定は最新側
   const yearsAll = Array.from(
     new Set([...years, ...bsYears, ...financeYears, ...taxYears])
-  )
-    .sort()
-    .reverse();
-  const defaultMonth = months[0] || currentMonth();
-  const defaultYear = yearsAll[0] || String(new Date().getFullYear());
+  ).sort();
+  const latestYear =
+    yearsAll.length > 0
+      ? yearsAll[yearsAll.length - 1]!
+      : String(new Date().getFullYear());
+  const prevYear =
+    yearsAll.length >= 2
+      ? yearsAll[yearsAll.length - 2]!
+      : latestYear;
+  const latestMonth =
+    months.length > 0 ? months[months.length - 1]! : currentMonth();
+  const prevMonth =
+    months.length >= 2 ? months[months.length - 2]! : latestMonth;
+  const defaultMonth = latestMonth;
+  const defaultYear = latestYear;
   const variants = listPlanVariants(rows);
   const defaultVariant = variants[0] || "基本";
   const financeCategoryYearRows = (financeCategoryYearRaw ?? []) as FinanceCategoryYearRow[];
@@ -256,8 +267,8 @@ export default async function MqPage({
       : one(sp, "a", defaultMonth).slice(0, 7);
   const periodB =
     grain === "year"
-      ? one(sp, "b", yearsAll[1] || defaultYear).slice(0, 4)
-      : one(sp, "b", months[1] || defaultMonth).slice(0, 7);
+      ? one(sp, "b", prevYear).slice(0, 4)
+      : one(sp, "b", prevMonth).slice(0, 7);
   const planYear = one(sp, "py", periodA.length === 4 ? periodA : periodA.slice(0, 4));
   const variantA = one(sp, "va", defaultVariant);
   const variantB = one(sp, "vb", variants[1] || defaultVariant);
@@ -800,6 +811,7 @@ export default async function MqPage({
     mqGByYear,
     projectedByYear: equityProjectedByYear,
   });
+  // 過去 → 最新（左→右）
   const trendYearOptions = Array.from(
     new Set([
       ...trendYears.map(String),
@@ -807,9 +819,7 @@ export default async function MqPage({
         (y) => Number(y) >= (equityOriginYear ?? cashflowYear) - 1
       ),
     ])
-  )
-    .sort()
-    .reverse();
+  ).sort();
 
   const vqAccountMap = accountMapRows
     .filter((r) => {
@@ -1245,7 +1255,7 @@ export default async function MqPage({
               href={href({
                 grain: "month",
                 a: defaultMonth,
-                b: months[1] || defaultMonth,
+                b: prevMonth,
               })}
             >
               月次（参考）
@@ -1255,7 +1265,7 @@ export default async function MqPage({
               href={href({
                 grain: "year",
                 a: defaultYear,
-                b: yearsAll[1] || defaultYear,
+                b: prevYear,
               })}
             >
               年次

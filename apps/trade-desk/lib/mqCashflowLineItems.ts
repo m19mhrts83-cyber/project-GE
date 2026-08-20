@@ -121,6 +121,7 @@ export function buildCashflowLineItems(args: {
       overrides,
       rules: classifyRules,
     });
+    if (resolved.column == null || resolved.reason === "excluded") continue;
 
     const yen = inc > 0 ? inc : exp;
     const txnId = t.id != null ? Number(t.id) : undefined;
