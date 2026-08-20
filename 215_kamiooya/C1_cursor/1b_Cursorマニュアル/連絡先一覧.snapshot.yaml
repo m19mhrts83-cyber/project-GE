@@ -3,7 +3,8 @@ partners:
   emails:
   - suzuki@homeplanner.co.jp
   name: ホームプランナー
-- email_domains: []
+- email_domains:
+  - minitech.co.jp
   emails:
   - tomoki-hayashi@minitech.co.jp
   - hayashi@minitech.co.jp
@@ -53,9 +54,14 @@ partners:
   emails:
   - tomohito_oishi@irrc.co.jp
   name: アイリック
-- email_domains: []
+- email_domains:
+  - iba-ns.co.jp
   emails:
   - ayanori.shimizu@iba-ns.co.jp
+  - naomi.waku@iba-ns.co.jp
+  - hozen@iba-ns.co.jp
+  - keiyaku@iba-ns.co.jp
+  - yohei.fukuda@iba-ns.co.jp
   name: 日本総険
 - email_domains:
   - knees-bee.jp

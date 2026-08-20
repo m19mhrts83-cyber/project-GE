@@ -65,6 +65,14 @@ NOISE_BODY_RE = re.compile(
     r"This is password notification|添付ファイルダウンロードページへ遷移)",
     re.I,
 )
+# MailGates ラッパ本文の後に実本文が続くことがある → ノイズ判定前に除去
+MAILGATES_PREAMBLE_RE = re.compile(
+    r"(?:以下のURLをクリックすることにより[\s\S]*?(?:Password Needed|添付ファイル数|Number of attachment)[^\n]*\n*)+"
+    r"|(?:Hello,\s*the attachment can be downloaded[\s\S]*?(?:Password Needed|Number of attachment)[^\n]*\n*)+",
+    re.I,
+)
+# 件名末尾の「（日本総険 多田羅）」等。返信側に無いと同一スレが未返信扱いになる
+SUBJECT_SUFFIX_PAREN_RE = re.compile(r"[\s　]*[（(][^）)]{1,40}[）)]\s*$")
 
 SKIP_FOLDERS = {
     "000_共通",
@@ -144,8 +152,52 @@ def load_config() -> dict[str, Any]:
 def normalize_subject(subject: str) -> str:
     s = (subject or "").strip()
     s = RE_PREFIX_RE.sub("", s).strip()
+    # [Password] だけの差はスレキーから外す（パスワード通知自体は NOISE_SUBJECT で除外）
+    s = re.sub(r"^\[Password\]\s*", "", s, flags=re.I).strip()
+    # 末尾の送信者・会社サフィックスを複数段はぎ取る
+    for _ in range(3):
+        nxt = SUBJECT_SUFFIX_PAREN_RE.sub("", s).strip()
+        if nxt == s:
+            break
+        s = nxt
     s = re.sub(r"\s+", " ", s)
     return s
+
+
+def substantive_body(body: str) -> str:
+    """MailGates ラッパを除いた本文。空ならパスワード／リンク案内のみとみなす。"""
+    text = (body or "").strip()
+    if not text:
+        return ""
+    text = MAILGATES_PREAMBLE_RE.sub("", text).strip()
+    # URL 行・有効期限行だけ残るケース
+    lines = []
+    for line in text.splitlines():
+        ln = line.strip()
+        if not ln:
+            continue
+        if re.search(r"mgc-filelink\.cybermail\.jp|有効期限\s*\(Expiry", ln, re.I):
+            continue
+        if re.match(r"^https?://\S+$", ln):
+            continue
+        if re.match(r"^※?パスワードが必要", ln):
+            continue
+        lines.append(ln)
+    return "\n".join(lines).strip()
+
+
+def is_noise_mail(subject: str, body: str, summary: str = "") -> bool:
+    """パスワード通知・MailGatesのみはノイズ。ラッパ＋実本文はノイズにしない。"""
+    if NOISE_SUBJECT_RE.search(subject or ""):
+        return True
+    sub = substantive_body(body or "")
+    if not sub:
+        # ラッパ除去後が空 → 純ノイズ（または要約だけがノイズ）
+        if NOISE_BODY_RE.search(body or "") or NOISE_BODY_RE.search(summary or ""):
+            return True
+        return False
+    # 実本文があるときは本文ノイズ正規では落とさない（件名ノイズは上で判定済）
+    return False
 
 
 def is_gmail_channel(channel: str) -> bool:
@@ -486,7 +538,12 @@ def parse_yoritoori(md_path: Path, partner_folder: str, partner_name: str) -> li
 
 def find_unreplied(entries: list[dict[str, Any]], lookback_days: int) -> list[dict[str, Any]]:
     """同一 subject_norm の時系列で、最後が受信のものを未返信候補にする。"""
-    gmail = [e for e in entries if e["gmail"]]
+    gmail = [
+        e
+        for e in entries
+        if e["gmail"]
+        and not is_noise_mail(e.get("subject") or "", e.get("body") or "", e.get("summary") or "")
+    ]
     # ファイルは新しい順 → スレッド内では古い順に並べ替えて判定
     by_subj: dict[str, list[dict[str, Any]]] = {}
     for e in gmail:
@@ -518,10 +575,6 @@ def find_unreplied(entries: list[dict[str, Any]], lookback_days: int) -> list[di
                     dt = None
             if dt and dt < cutoff:
                 continue
-        subj = last["subject"]
-        body = last["body"]
-        if NOISE_SUBJECT_RE.search(subj) or NOISE_BODY_RE.search(body) or NOISE_BODY_RE.search(last["summary"]):
-            continue
         # 文脈: 直近最大4通
         ctx = ordered[-4:]
         candidates.append(
