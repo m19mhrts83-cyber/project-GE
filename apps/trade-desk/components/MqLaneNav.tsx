@@ -1,11 +1,12 @@
 /** MQページ · レーン（MQ会計表 / 資金繰り表） */
 
-export type MqView = "mq" | "cashflow" | "reconcile";
+export type MqView = "mq" | "cashflow" | "reconcile" | "trends";
 
 const LANES: { id: MqView; label: string; hint: string }[] = [
   { id: "mq", label: "MQ会計表", hint: "PQ / VQ / F / G の年次評価（L2）" },
   { id: "cashflow", label: "資金繰り表", hint: "帳簿・月次の入出金推移（L1）" },
   { id: "reconcile", label: "整合", hint: "資金繰り vs MQ / B/S の差分" },
+  { id: "trends", label: "推移", hint: "自己資本の年次グラフ（MQ指標表は準備中）" },
 ];
 
 export default function MqLaneNav({

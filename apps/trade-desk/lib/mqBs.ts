@@ -98,6 +98,22 @@ export function sumLiabEquity(b: MqBsFields): number {
   );
 }
 
+/**
+ * 自己資本 = 資本金等 + 繰越利益 + 当期利益。
+ * 当期利益が空なら MQ の G を参考に足す（保存はしない）。
+ * 3項目とも空なら null（0捏造しない）。
+ */
+export function sumEquity(
+  b: MqBsFields,
+  mqG?: number | null
+): number | null {
+  const profit = resolveCurrentProfit(b, mqG).value;
+  if (b.capital == null && b.retained_earnings == null && profit == null) {
+    return null;
+  }
+  return n0(b.capital) + n0(b.retained_earnings) + n0(profit);
+}
+
 /** 賃貸向け: 棚卸は必須にしない */
 export function missingBsFields(
   b: MqBsFields,

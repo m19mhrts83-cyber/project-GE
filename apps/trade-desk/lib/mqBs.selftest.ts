@@ -8,6 +8,7 @@ import {
   normalizeBs,
   resolveCurrentProfit,
   sumAssets,
+  sumEquity,
   sumLiabEquity,
 } from "./mqBs";
 
@@ -66,6 +67,13 @@ const g = resolveCurrentProfit(emptyBs(), 39);
 assert(g.value === 39 && g.fromMq === true, "G from MQ");
 const g2 = resolveCurrentProfit(normalizeBs({ current_profit: 40 }), 39);
 assert(g2.value === 40 && g2.fromMq === false, "G from BS");
+
+assert(sumEquity(sample) === 261 + -104 + 39, "equity = capital + retained + profit");
+assert(sumEquity(emptyBs()) == null, "empty equity is null not 0");
+assert(
+  sumEquity(normalizeBs({ capital: 10, retained_earnings: null, current_profit: null }), 7) === 17,
+  "equity uses MQ G when current_profit empty"
+);
 
 assert(monthEndDate("2026-08") === "2026-08-31", "month end");
 assert(monthEndDate("2026-02") === "2026-02-28", "feb");

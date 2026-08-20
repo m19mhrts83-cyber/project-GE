@@ -34,6 +34,7 @@ import {
   normalizeBs,
   pickNearestBs,
   yearEndDate,
+  type MqBsFields,
   type MqBsRow,
 } from "@/lib/mqBs";
 import { sumLoanTrackerLt } from "@/lib/mqLoanSuggest";
@@ -64,6 +65,10 @@ import {
   DEFAULT_CORPORATE_CASHFLOW_SETTINGS,
   type MqCashflowSettingsRow,
 } from "@/lib/mqCashflowSettings";
+import {
+  buildReconcileDiffs,
+  projectCashflowToMqBs,
+} from "@/lib/mqCashflowProject";
 import type {
   CashflowClassifyRuleRow,
   TxnOverrideRow,
@@ -74,9 +79,12 @@ import type {
 } from "@/lib/mqCashflowManual";
 import { pickYearendAdjustment } from "@/lib/mqCashflowManual";
 import {
-  buildReconcileDiffs,
-  projectCashflowToMqBs,
-} from "@/lib/mqCashflowProject";
+  buildEquityTrend,
+  combineProjectedEquityBs,
+  yearsForEquityTrend,
+} from "@/lib/mqEquityTrend";
+import MqEquityTrendPanel from "@/components/MqEquityTrendPanel";
+import MqMetricsTrendPlaceholder from "@/components/MqMetricsTrendPlaceholder";
 
 export const dynamic = "force-dynamic";
 
@@ -270,6 +278,8 @@ export default async function MqPage({
   let cashflowL1Out: number | null = null;
   let reconcileProject: ReturnType<typeof projectCashflowToMqBs> | null = null;
   let reconcileDiffs: ReturnType<typeof buildReconcileDiffs> = [];
+  const equityProjectedByYear: Record<number, MqBsFields> = {};
+  let equityOriginYear: number | null = null;
 
   function buildActual(period: string) {
     const subset =
@@ -641,23 +651,22 @@ export default async function MqPage({
     cashflowAdjustments = (cashflowAdjustmentsRaw ?? []) as CashflowAdjustmentRow[];
     cashflowActions = (cashflowActionsRaw ?? []) as CashflowActionRow[];
 
-    const built = buildCashflowWithCarry(
-      {
-        businessLine,
-        entity,
-        settingsRows,
-        txnOverrides: (cashflowOverridesRaw ?? []) as TxnOverrideRow[],
-        classifyRules: (cashflowRulesRaw ?? []) as CashflowClassifyRuleRow[],
-        loanMonthlyPaymentMan,
-        txns,
-        maps: accountMapRows,
-        adjustments: cashflowAdjustments,
-        actions: cashflowActions,
-        factsCashByMonthByYear,
-        bsFallbackOpeningByYear,
-      },
-      cashflowYear
-    );
+    const engineCtx = {
+      businessLine,
+      entity,
+      settingsRows,
+      txnOverrides: (cashflowOverridesRaw ?? []) as TxnOverrideRow[],
+      classifyRules: (cashflowRulesRaw ?? []) as CashflowClassifyRuleRow[],
+      loanMonthlyPaymentMan,
+      txns,
+      maps: accountMapRows,
+      adjustments: cashflowAdjustments,
+      actions: cashflowActions,
+      factsCashByMonthByYear,
+      bsFallbackOpeningByYear,
+    };
+
+    const built = buildCashflowWithCarry(engineCtx, cashflowYear);
 
     cashflowRows = built.rows;
     cashflowNegative = negativeMonths(cashflowRows);
@@ -734,7 +743,68 @@ export default async function MqPage({
     } else if (built.openingCashMan != null) {
       cashflowOriginHint = `${cashflowDisplayYear}年1月 期首 ${fmtMqMan(built.openingCashMan)}（前年末繰越）`;
     }
+
+    equityOriginYear = originYear;
+    for (let y = originYear; y <= cashflowYear; y++) {
+      if (entity === "combined") {
+        const corp = buildCashflowWithCarry(
+          { ...engineCtx, entity: "corporate" },
+          y
+        );
+        const pers = buildCashflowWithCarry(
+          { ...engineCtx, entity: "personal" },
+          y
+        );
+        const combined = combineProjectedEquityBs(
+          projectCashflowToMqBs({
+            year: y,
+            rows: pers.rows,
+            settings: pers.settings,
+          }).bs,
+          projectCashflowToMqBs({
+            year: y,
+            rows: corp.rows,
+            settings: corp.settings,
+          }).bs
+        );
+        if (combined) equityProjectedByYear[y] = combined;
+      } else if (entity === "personal" || entity === "corporate") {
+        const builtY =
+          y === cashflowYear ? built : buildCashflowWithCarry(engineCtx, y);
+        equityProjectedByYear[y] = projectCashflowToMqBs({
+          year: y,
+          rows: builtY.rows,
+          settings: builtY.settings,
+        }).bs;
+      }
+    }
   }
+
+  const trendLine = line === "ai" ? "ai" : line === "realestate" ? "realestate" : "all";
+  const trendYears = yearsForEquityTrend({
+    bsRows,
+    line: trendLine,
+    originYear: equityOriginYear,
+    throughYear: cashflowYear,
+  });
+  const mqGByYear: Record<number, number | null> = {};
+  for (const y of trendYears) {
+    const subset = filterFactsYearActual(rows, line, entity, String(y));
+    mqGByYear[y] = aggregateRows(subset, "year").computed?.g ?? null;
+  }
+  const equityTrendPoints = buildEquityTrend({
+    years: trendYears,
+    bsRows,
+    line: trendLine,
+    entity,
+    mqGByYear,
+    projectedByYear: equityProjectedByYear,
+  });
+  const trendYearOptions = Array.from(
+    new Set([...yearsAll, ...trendYears.map(String)])
+  )
+    .sort()
+    .reverse();
 
   const vqAccountMap = accountMapRows
     .filter((r) => {
@@ -835,7 +905,7 @@ export default async function MqPage({
         hrefFor={(v) =>
           href({
             view: v,
-            ...(v === "cashflow"
+            ...(v === "cashflow" || v === "reconcile" || v === "trends"
               ? { grain: "year", a: periodA.slice(0, 4) }
               : {}),
           })
@@ -1016,6 +1086,75 @@ export default async function MqPage({
               投影データを作れませんでした。
             </p>
           )}
+        </>
+      ) : view === "trends" ? (
+        <>
+          <div className="card" style={{ marginTop: 12 }}>
+            <header>
+              <span className="lvl">条件</span>
+              <strong>推移 · 自己資本</strong>
+            </header>
+            <div className="mq-slicer" style={{ marginTop: 10 }}>
+              <div className="mq-slicer-group">
+                <span className="meta">表示年度（終点）</span>
+                <MqPeriodLinks
+                  grain="year"
+                  periods={trendYearOptions.length ? trendYearOptions : [defaultYear]}
+                  current={cashflowDisplayYear}
+                  makeHref={(v) =>
+                    href({ a: v.slice(0, 4), grain: "year", view: "trends" })
+                  }
+                />
+              </div>
+              <div className="mq-slicer-group">
+                <span className="meta">事業線</span>
+                {(
+                  [
+                    ["realestate", "不動産"],
+                    ["ai", "AI"],
+                    ["all", "全体"],
+                  ] as const
+                ).map(([v, lab]) => (
+                  <a
+                    key={v}
+                    className={`btn${line === v ? " primary" : ""}`}
+                    href={href({ line: v, view: "trends" })}
+                  >
+                    {lab}
+                  </a>
+                ))}
+              </div>
+              <div className="mq-slicer-group">
+                <span className="meta">主体</span>
+                {(
+                  [
+                    ["personal", "個人"],
+                    ["corporate", "法人"],
+                    ["combined", "合算"],
+                  ] as const
+                ).map(([v, lab]) => (
+                  <a
+                    key={v}
+                    className={`btn${entity === v ? " primary" : ""}`}
+                    href={href({ entity: v, view: "trends" })}
+                  >
+                    {lab}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <p className="meta" style={{ marginTop: 8 }}>
+              {lineLabel(line)} · {entityLabel(entity)} · 起点{" "}
+              {equityOriginYear ?? cashflowYear}年〜{cashflowDisplayYear}年の期末
+            </p>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <MqEquityTrendPanel
+              title={`${lineLabel(line)} · ${entityLabel(entity)} 自己資本推移`}
+              points={equityTrendPoints}
+            />
+          </div>
+          <MqMetricsTrendPlaceholder />
         </>
       ) : (
         <>
