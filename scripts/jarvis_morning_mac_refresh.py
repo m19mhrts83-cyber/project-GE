@@ -4,6 +4,7 @@ Mac 必須の最新化バンドル（朝オープン裏実行・1日1回）。
 
 夜間フルクラウド化はしない。クラウドできるものは GHA 任せ、
 OneDrive path／ローカル依存は Mac 起床後にまとめて追従する。
+gmail 取込後に partner レーンの未返信キャッチアップ（night_triage --lane partner）も行う。
 
   python scripts/jarvis_morning_mac_refresh.py
   python scripts/jarvis_morning_mac_refresh.py --dry-run
@@ -431,7 +432,7 @@ def main() -> int:
     else:
         results["steps"]["triage_gmail_read"] = "skipped"
 
-    # 2. パートナー Gmail → OneDrive（軽量=通常差分。フル夜トリアージはしない）
+    # 2. パートナー Gmail → OneDrive（軽量=通常差分）
     if not args.skip_fetch:
         if GMAIL_SCRIPT.is_file():
             env = os.environ.copy()
@@ -453,6 +454,21 @@ def main() -> int:
             failures += 1
     else:
         results["steps"]["gmail_fetch"] = "skipped"
+
+    # 2a. 取込後の新規未返信を partner レーンへ（夜バッチ待ちだとダッシュに出ない）
+    night_triage = REPO / "scripts" / "jarvis_night_triage.py"
+    if night_triage.is_file():
+        rc = run_step(
+            "partner_triage_catchup",
+            [exe, str(night_triage), "--skip-fetch", "--lane", "partner"],
+            timeout=900,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["partner_triage_catchup"] = rc
+        if rc != 0:
+            print(f"# partner_triage_catchup soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["partner_triage_catchup"] = "skipped"
 
     # 2b. Journal／チャット関心 → 要確認アップデート（朝1回・常時監視なし）
     if INTENT_SYNC.is_file():
