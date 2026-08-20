@@ -6,7 +6,7 @@ import { useState } from "react";
 const ALLOWED: Record<string, string[]> = {
   draft: ["consulting", "approved", "cancelled"],
   consulting: ["draft", "approved", "cancelled"],
-  approved: ["executing", "consulting", "cancelled"],
+  approved: ["executing", "done", "consulting", "cancelled"],
   executing: ["done", "cancelled"],
   done: ["cancelled"],
   cancelled: ["draft"],
@@ -16,7 +16,7 @@ const LABELS: Record<string, string> = {
   consulting: "相談中へ",
   approved: "承認",
   executing: "実行中へ",
-  done: "完了",
+  done: "寄せ完了（ウォッチ解除）",
   cancelled: "取消",
   draft: "草案に戻す",
 };
@@ -24,19 +24,28 @@ const LABELS: Record<string, string> = {
 export default function MoneyOpStatusActions({
   id,
   status,
+  kind,
 }: {
   id: string;
   status: string;
+  kind?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const nexts = ALLOWED[status] || [];
+  const isCardBuffer = kind === "card_settlement_buffer";
 
   async function setStatus(next: string) {
     if (next === "approved") {
       const ok = window.confirm(
         "この資金移動を承認しますか？\n（承認＝計画合意のみ。記帳はしません。\n次: Jarvisが入力 → あなたが最終画面確認 → OTP＋実行ボタン。\n送金用Chromeは完了後に閉じます）"
+      );
+      if (!ok) return;
+    }
+    if (next === "done" && isCardBuffer) {
+      const ok = window.confirm(
+        "寄せ完了としてウォッチを消しますか？\n（銀行側の送金が済んだ前提。引落日そのものの完了ではありません）"
       );
       if (!ok) return;
     }
@@ -52,7 +61,11 @@ export default function MoneyOpStatusActions({
       if (!res.ok) {
         setMsg(data.error || "失敗");
       } else {
-        setMsg(`${next} に更新`);
+        setMsg(
+          next === "done" && isCardBuffer
+            ? "寄せ完了・ウォッチ解除"
+            : `${next} に更新`
+        );
         router.refresh();
       }
     } catch (e) {
@@ -70,12 +83,16 @@ export default function MoneyOpStatusActions({
         <button
           key={s}
           type="button"
-          className={s === "approved" ? "btn primary" : "btn"}
+          className={
+            s === "approved" || (s === "done" && isCardBuffer)
+              ? "btn primary"
+              : "btn"
+          }
           disabled={busy}
           onClick={() => setStatus(s)}
           style={{ fontSize: 12, padding: "4px 8px" }}
         >
-          {LABELS[s] || s}
+          {s === "done" && !isCardBuffer ? "完了" : LABELS[s] || s}
         </button>
       ))}
       {msg ? <span className="meta">{msg}</span> : null}

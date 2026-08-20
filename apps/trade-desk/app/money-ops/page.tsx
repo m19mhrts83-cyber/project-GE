@@ -244,7 +244,11 @@ export default async function MoneyOpsPage({
                         : "—"}
                     </td>
                     <td>
-                      <MoneyOpStatusActions id={o.id} status={o.status} />
+                      <MoneyOpStatusActions
+                        id={o.id}
+                        status={o.status}
+                        kind={o.kind}
+                      />
                     </td>
                   </tr>
                 );

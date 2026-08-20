@@ -6,7 +6,8 @@ import type { TransferRailStatus } from "@/lib/cardSettlementBuffer";
 const ALLOWED: Record<string, string[]> = {
   draft: ["consulting", "approved", "cancelled"],
   consulting: ["draft", "approved", "cancelled"],
-  approved: ["executing", "consulting", "cancelled"],
+  // 寄せを銀行側で済ませたあと、実行中を飛ばして完了できる
+  approved: ["executing", "done", "consulting", "cancelled"],
   executing: ["done", "cancelled"],
   done: ["cancelled"],
   cancelled: ["draft"],
@@ -170,6 +171,27 @@ export async function PATCH(
     if (next === "done" && due) {
       assistNext.settled_due = due;
       assistNext.settled_at = new Date().toISOString();
+      // 寄せ完了後は「実行待ち」ラベルを残さない
+      if (String(assistNext.plan_ready_due || "") === due) {
+        delete assistNext.plan_ready_due;
+      }
+      const railsRaw = Array.isArray(assistNext.rails)
+        ? [...(assistNext.rails as unknown[])]
+        : [];
+      if (railsRaw.length > 0) {
+        const nowIso = new Date().toISOString();
+        assistNext.rails = railsRaw.map((r) => {
+          if (!r || typeof r !== "object") return r;
+          const cur = { ...(r as Record<string, unknown>) };
+          const st = String(cur.status || "");
+          if (st !== "done" && st !== "cancelled") {
+            cur.status = "done";
+            cur.updated_at = nowIso;
+            if (!cur.note) cur.note = "オペ完了で一括 done";
+          }
+          return cur;
+        });
+      }
       patch.assist_payload = assistNext;
     } else if (
       (next === "consulting" || next === "approved" || next === "executing") &&
