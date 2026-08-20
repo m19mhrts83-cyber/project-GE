@@ -207,16 +207,37 @@ def _click_login_button(lp) -> None:
 
 
 def _login(page, store_no: str, account_no: str, password: str) -> None:
-    """PayPay銀行の法人ログインページでログインする。"""
+    """PayPay銀行の法人ログインページでログインする。
+
+    教訓: 一度蹴られる／「上書きログイン」が出ることがある。
+    同じパスワードで再入力すると通る（2026-08-20）。
+    """
     _navigate_to_login_page(page)
     lp = _login_page(page)
-    _fill_login_form(page, store_no, account_no, password)
-    _click_login_button(lp)
-
-    if _is_overwrite_login_page(lp):
-        print("  上書きログイン画面を検出。同じ認証情報を再入力してログインします")
+    for attempt in range(1, 4):
+        print(f"  ログイン試行 {attempt}/3")
         _fill_login_form(page, store_no, account_no, password)
         _click_login_button(lp)
+        if _is_overwrite_login_page(lp):
+            print("  上書きログイン画面を検出。同じ認証情報を再入力してログインします")
+            _fill_login_form(page, store_no, account_no, password)
+            _click_login_button(lp)
+        # 成功判定（残高・メニュー）／失敗ならフォーム残存で再試行
+        try:
+            body = lp.locator("body").inner_text(timeout=5000)
+        except Exception:
+            body = ""
+        if any(k in body for k in ("普通預金残高", "Welcome Page", "ログアウト", "振り込み")):
+            break
+        if attempt < 3 and (
+            "上書きログイン" in body
+            or "ログイン中です" in body
+            or "再度ログイン" in body
+            or (_has_login_form(page) and "普通預金残高" not in body)
+        ):
+            print("  → 蹴られ／ログイン継続を検出。再入力します")
+            continue
+        break
 
     page._paypay_active_page = lp  # type: ignore[attr-defined]
     print(f"  ログイン後 URL: {lp.url}")
