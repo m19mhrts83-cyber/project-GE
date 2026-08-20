@@ -692,8 +692,242 @@ tr.sold td {
 .mq-cashflow-sign-pm {
   color: #2a5ea8;
 }
+.mq-cashflow-sign-carry {
+  color: #1565c0;
+}
 .mq-cashflow-sign-none {
   color: var(--muted);
+}
+.mq-cashflow-alert-banner {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff3e0;
+  border: 1px solid #ffb74d;
+  color: #e65100;
+  font-size: 0.92rem;
+}
+.mq-cashflow-row-virtual td {
+  font-style: italic;
+  opacity: 0.92;
+}
+.mq-cashflow-tax-card {
+  margin-top: 12px;
+}
+.mq-cashflow-tax-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 10px;
+}
+.mq-cashflow-tax-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+.mq-cashflow-tax-form input,
+.mq-cashflow-tax-form select {
+  min-width: 8rem;
+  padding: 4px 8px;
+}
+.mq-cashflow-action-modal {
+  position: fixed;
+  top: 20vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 42;
+  width: min(420px, calc(100vw - 24px));
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+.mq-cashflow-action-modal header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.mq-cashflow-action-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.mq-cashflow-action-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border, #eee);
+}
+.mq-reconcile-card {
+  margin-top: 0;
+}
+.mq-cashflow-alert-negative {
+  background: #ffebee !important;
+  color: #c62828 !important;
+  font-weight: 600;
+}
+.mq-cashflow-row-balance .mq-cashflow-sticky-col,
+.mq-cashflow-row-balance td {
+  background: #fafafa;
+}
+.mq-cashflow-cell-clickable {
+  padding: 0;
+}
+.mq-cashflow-cell-btn {
+  display: block;
+  width: 100%;
+  padding: inherit;
+  margin: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: right;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.mq-cashflow-cell-btn:hover {
+  background: rgba(42, 94, 168, 0.08);
+}
+.mq-cashflow-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: none;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.mq-cashflow-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 41;
+  width: min(520px, 100vw);
+  height: 100vh;
+  overflow: auto;
+  background: var(--card, #fff);
+  border-left: 1px solid var(--border, #ddd);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  padding: 16px;
+}
+.mq-cashflow-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.mq-cashflow-detail-scroll {
+  overflow: auto;
+  max-height: calc(100vh - 180px);
+}
+.mq-cashflow-detail-table {
+  font-size: 0.88rem;
+}
+.mq-cashflow-detail-table th,
+.mq-cashflow-detail-table td {
+  vertical-align: top;
+  padding: 6px 8px;
+}
+.mq-cashflow-detail-row-residual {
+  opacity: 0.75;
+  font-style: italic;
+}
+.mq-cashflow-detail-row-reclassifiable {
+  cursor: pointer;
+}
+.mq-cashflow-detail-row-reclassifiable:hover {
+  background: rgba(42, 94, 168, 0.06);
+}
+.mq-cashflow-detail-row-active {
+  background: rgba(42, 94, 168, 0.1);
+}
+.mq-cashflow-reclassify-menu {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  background: var(--card-soft, #f8f9fb);
+}
+.mq-cashflow-reclassify-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.mq-cashflow-reclassify-close {
+  min-width: 2rem;
+  padding: 2px 8px;
+}
+.mq-cashflow-reclassify-target {
+  margin-bottom: 8px;
+}
+.mq-cashflow-reclassify-learn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  margin-bottom: 10px;
+}
+.mq-cashflow-reclassify-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mq-cashflow-reclassify-group-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted, #666);
+  margin-bottom: 4px;
+}
+.mq-cashflow-reclassify-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mq-cashflow-reclassify-option {
+  border: 1px solid var(--border, #ccc);
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.mq-cashflow-reclassify-option:hover:not(:disabled) {
+  border-color: #2a5ea8;
+  background: rgba(42, 94, 168, 0.06);
+}
+.mq-cashflow-reclassify-option-current {
+  opacity: 0.55;
+  cursor: default;
+}
+.mq-cashflow-reclassify-reset {
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+.mq-cashflow-detail-summary {
+  margin-bottom: 10px;
+}
+.mq-cashflow-detail-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1a5a8a;
+  background: rgba(42, 94, 168, 0.12);
+  white-space: nowrap;
 }
 .mq-cashflow-cell-plus {
   color: #1a7a45;

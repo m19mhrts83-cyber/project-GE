@@ -34,6 +34,7 @@ export default function MqStrackPanel({
   fBreakdownKind,
   includeDebtServiceInF,
   vqAccountMap,
+  cashBridgeNote,
 }: {
   title: string;
   computed: MqComputed | null;
@@ -55,6 +56,8 @@ export default function MqStrackPanel({
   includeDebtServiceInF?: boolean;
   /** VQ（変動費）に割り当てられているZaimカテゴリのマップ（クリック内訳用） */
   vqAccountMap?: AccountMapSummary[];
+  /** 現金橋の出典（資金繰り連動など） */
+  cashBridgeNote?: string;
 }) {
   if (!computed) {
     return (
@@ -340,6 +343,7 @@ export default function MqStrackPanel({
       <div className="mq-cash-bridge" style={{ marginTop: 12 }}>
         <div className="meta" style={{ fontWeight: 600, marginBottom: 4 }}>
           現金橋（第5表要約）
+          {cashBridgeNote ? ` · ${cashBridgeNote}` : ""}
         </div>
         <table>
           <tbody>

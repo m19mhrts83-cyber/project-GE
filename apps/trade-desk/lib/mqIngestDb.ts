@@ -35,12 +35,20 @@ export async function fetchYearFinanceTxns(
   sb: Sb,
   year: number
 ): Promise<FinanceTxnLite[]> {
+  return fetchFinanceTxnsRange(sb, year, year);
+}
+
+export async function fetchFinanceTxnsRange(
+  sb: Sb,
+  fromYear: number,
+  toYear: number
+): Promise<FinanceTxnLite[]> {
   return fetchAllPages((from, to) =>
     sb
       .from("kurashift_finance_transactions")
       .select(TXN_COLS)
-      .gte("txn_date", `${year}-01-01`)
-      .lt("txn_date", `${year + 1}-01-01`)
+      .gte("txn_date", `${fromYear}-01-01`)
+      .lt("txn_date", `${toYear + 1}-01-01`)
       .order("id", { ascending: true })
       .range(from, to)
   );

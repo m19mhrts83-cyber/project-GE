@@ -557,6 +557,10 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260816_kurashift_mq_account_map.sql）
 -- kurashift_mq_bs_snapshots（軽量B/S・欠損はNULL）
 -- （migrations/20260816_kurashift_mq_bs_snapshots.sql）
+-- kurashift_mq_cashflow_settings / txn_overrides / classify_rules
+-- （migrations/20260819_kurashift_mq_cashflow.sql）
+-- kurashift_mq_cashflow_adjustments / actions / projections
+-- （migrations/20260820_kurashift_mq_cashflow_p3_p11.sql）
 -- kurashift_mq_replace_year_import（年度 import 原子置換）
 -- （migrations/20260819_kurashift_mq_replace_year_import.sql）
 -- kurashift_household_bs_snapshots（家計B/S 月次）

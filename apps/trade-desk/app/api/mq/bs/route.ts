@@ -4,7 +4,7 @@ import { normalizeBs } from "@/lib/mqBs";
 
 const LINES = new Set(["realestate", "ai"]);
 const ENTITIES = new Set(["personal", "corporate"]);
-const SOURCES = new Set(["manual", "jarvis", "import"]);
+const SOURCES = new Set(["manual", "jarvis", "import", "cashflow_project"]);
 
 function toAsOf(raw: unknown): string | null {
   const s = String(raw || "").trim();

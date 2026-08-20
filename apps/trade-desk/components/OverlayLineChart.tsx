@@ -16,12 +16,16 @@ export default function OverlayLineChart({
   goalYen,
   markers = [],
   ariaLabel = "年次キャッシュフロー推移",
+  formatValue,
+  allowSinglePoint = false,
 }: {
   years: number[];
   series: OverlaySeries[];
   goalYen?: number | null;
   markers?: { year: number; label: string }[];
   ariaLabel?: string;
+  formatValue?: (v: number) => string;
+  allowSinglePoint?: boolean;
 }) {
   const [tip, setTip] = useState<{
     x: number;
@@ -38,7 +42,10 @@ export default function OverlayLineChart({
     pts.push({ y: years[0] ?? 0, v: goalYen });
     pts.push({ y: years[years.length - 1] ?? 0, v: goalYen });
   }
-  if (pts.length < 2 || years.length < 2) {
+  if (pts.length < 1 || years.length < 1) {
+    return <p className="meta">重ねる値が足りません。</p>;
+  }
+  if (!allowSinglePoint && (pts.length < 2 || years.length < 2)) {
     return <p className="meta">重ねる値が足りません。</p>;
   }
 
@@ -53,7 +60,10 @@ export default function OverlayLineChart({
   const x1 = years[years.length - 1];
   const xspan = x1 - x0 || 1;
   const xy = (year: number, v: number) => {
-    const x = pad + ((year - x0) / xspan) * (w - pad * 2);
+    const x =
+      years.length === 1
+        ? w / 2
+        : pad + ((year - x0) / xspan) * (w - pad * 2);
     const y = h - pad - ((v - min) / span) * (h - pad * 2);
     return { x, y };
   };
@@ -114,7 +124,21 @@ export default function OverlayLineChart({
           const list = years
             .map((y, idx) => ({ y, v: s.values[idx] }))
             .filter((p): p is { y: number; v: number } => p.v != null);
-          if (list.length < 2) return null;
+          if (list.length === 0) return null;
+          if (list.length === 1) {
+            const { x, y } = xy(list[0].y, list[0].v);
+            return (
+              <circle
+                key={s.key}
+                cx={x}
+                cy={y}
+                r={s.emphasis ? 5.2 : 4.2}
+                fill={colors[i % colors.length]}
+                stroke="#fff"
+                strokeWidth={1.5}
+              />
+            );
+          }
           const points = list
             .map((p) => {
               const { x, y } = xy(p.y, p.v);
@@ -159,7 +183,9 @@ export default function OverlayLineChart({
                       x,
                       y,
                       title: `${year}年 ${s.label}`,
-                      value: `${Math.round(v).toLocaleString("ja-JP")}円`,
+                      value: formatValue
+                        ? formatValue(v)
+                        : `${Math.round(v).toLocaleString("ja-JP")}円`,
                     })
                   }
                   onFocus={() =>
@@ -167,7 +193,9 @@ export default function OverlayLineChart({
                       x,
                       y,
                       title: `${year}年 ${s.label}`,
-                      value: `${Math.round(v).toLocaleString("ja-JP")}円`,
+                      value: formatValue
+                        ? formatValue(v)
+                        : `${Math.round(v).toLocaleString("ja-JP")}円`,
                     })
                   }
                 />
@@ -176,16 +204,26 @@ export default function OverlayLineChart({
           });
         })}
         <text x={pad} y={14} fontSize={10} fill="var(--muted, #666)">
-          {Math.round(max).toLocaleString("ja-JP")}
+          {formatValue ? formatValue(max) : Math.round(max).toLocaleString("ja-JP")}
         </text>
-        <text
-          x={pad}
-          y={h - 8}
-          fontSize={10}
-          fill="var(--muted, #666)"
-        >
-          {Math.round(min).toLocaleString("ja-JP")}
+        <text x={pad} y={h - pad + 4} fontSize={10} fill="var(--muted, #666)">
+          {formatValue ? formatValue(min) : Math.round(min).toLocaleString("ja-JP")}
         </text>
+        {years.map((year) => {
+          const x = xy(year, 0).x;
+          return (
+            <text
+              key={`xl-${year}`}
+              x={x}
+              y={h - 6}
+              fontSize={10}
+              textAnchor="middle"
+              fill="var(--muted, #666)"
+            >
+              {year}
+            </text>
+          );
+        })}
       </svg>
       {tip ? (
         <div
