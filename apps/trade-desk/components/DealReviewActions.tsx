@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
 
 type Action = "confirm" | "pass";
 
@@ -10,19 +11,34 @@ export default function DealReviewActions({
   status,
   gmailId,
   gmailReadAt,
+  dealTitle,
+  fromRaw,
+  inquiryReady,
+  inquiryHasTo,
+  openDealHref,
 }: {
   dealId: string;
   status: string;
   gmailId?: string | null;
   gmailReadAt?: string | null;
+  dealTitle?: string;
+  fromRaw?: string | null;
+  inquiryReady?: boolean;
+  inquiryHasTo?: boolean;
+  openDealHref?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<Action | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
 
   async function run(action: Action) {
     if (action === "pass") {
-      if (!window.confirm("対象外（見送り）にします。紐づく Gmail を既読にします。よろしいですか？")) {
+      if (
+        !window.confirm(
+          "対象外（見送り）にします。紐づく Gmail を既読にします。よろしいですか？"
+        )
+      ) {
         return;
       }
     }
@@ -48,6 +64,7 @@ export default function DealReviewActions({
             ? `確認しました${readNote}`
             : `対象外にしました${readNote}`
         );
+        if (action === "confirm") setConfirmed(true);
         router.refresh();
       }
     } catch (e) {
@@ -59,6 +76,7 @@ export default function DealReviewActions({
 
   const alreadyRead = Boolean(gmailReadAt);
   const showActions = status !== "archived";
+  const showInquiryCta = Boolean(inquiryReady && (confirmed || status !== "passed"));
 
   return (
     <div style={{ minWidth: 140 }}>
@@ -98,6 +116,19 @@ export default function DealReviewActions({
           >
             {busy === "pass" ? "…" : "対象外"}
           </button>
+        </div>
+      ) : null}
+      {showInquiryCta ? (
+        <div style={{ marginTop: 6 }}>
+          <DealInquiryQuickButton
+            dealId={dealId}
+            title={dealTitle || dealId}
+            fromRaw={fromRaw}
+            canQuickSend
+            hasTo={inquiryHasTo ?? Boolean(fromRaw && fromRaw.includes("@"))}
+            compact
+            openHref={openDealHref}
+          />
         </div>
       ) : null}
       {msg ? (

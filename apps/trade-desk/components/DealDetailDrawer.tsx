@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import DealInquiryActions from "@/components/DealInquiryActions";
+import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
 import DealReviewActions from "@/components/DealReviewActions";
 import GrokInvestigateCopy from "@/components/GrokInvestigateCopy";
 import { fmtYen } from "@/lib/format";
@@ -38,6 +39,15 @@ type DealRow = {
   inquiry_status?: string | null;
 };
 
+type InquiryEval = {
+  tier1: boolean;
+  tier2: boolean;
+  canQuickSend: boolean;
+  hasTo: boolean;
+  badges: string[];
+  reasons: string[];
+};
+
 export default function DealDetailDrawer({
   dealId,
   onClose,
@@ -50,6 +60,7 @@ export default function DealDetailDrawer({
   const [deal, setDeal] = useState<DealRow | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [attachCount, setAttachCount] = useState(0);
+  const [inquiryEval, setInquiryEval] = useState<InquiryEval | null>(null);
   const [expandedBody, setExpandedBody] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
@@ -65,6 +76,7 @@ export default function DealDetailDrawer({
       setDeal(data.deal);
       setTimeline(data.timeline || []);
       setAttachCount(data.attach_count || 0);
+      setInquiryEval(data.inquiry_eval || null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "エラー");
     } finally {
@@ -352,6 +364,29 @@ export default function DealDetailDrawer({
             </div>
 
             <div className="card" style={{ marginTop: 12, padding: 12 }}>
+              {inquiryEval?.tier1 ? (
+                <div
+                  style={{
+                    marginBottom: 10,
+                    padding: "8px 10px",
+                    borderRadius: 6,
+                    background: "#eff6ff",
+                    fontSize: 13,
+                  }}
+                >
+                  <strong>問合せ候補（Tier1）</strong>
+                  {inquiryEval.badges.length > 0 ? (
+                    <span className="meta" style={{ marginLeft: 8 }}>
+                      {inquiryEval.badges.join(" · ")}
+                    </span>
+                  ) : null}
+                  {inquiryEval.tier2 ? (
+                    <div className="meta" style={{ marginTop: 4 }}>
+                      日次キュー（Tier2）対象 — 朝 digest で確認
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <strong>
                 第一問合せ —{" "}
                 {INQUIRY_STATUS_LABEL[inquiryStatus] || inquiryStatus}
@@ -368,8 +403,24 @@ export default function DealDetailDrawer({
                       ? sj.gmail_read_at
                       : null
                   }
+                  dealTitle={deal.title}
+                  fromRaw={typeof sj.from === "string" ? sj.from : null}
+                  inquiryReady={inquiryEval?.tier1}
+                  inquiryHasTo={inquiryEval?.hasTo}
                 />
               </div>
+              {inquiryEval?.canQuickSend ? (
+                <div style={{ marginTop: 8 }}>
+                  <DealInquiryQuickButton
+                    dealId={deal.id}
+                    title={deal.title}
+                    fromRaw={typeof sj.from === "string" ? sj.from : null}
+                    canQuickSend={inquiryEval.canQuickSend}
+                    hasTo={inquiryEval.hasTo}
+                    badges={inquiryEval.badges}
+                  />
+                </div>
+              ) : null}
               {(deal.status === "info" || deal.status === "viewing") ? (
                 <GrokInvestigateCopy
                   dealId={deal.id}

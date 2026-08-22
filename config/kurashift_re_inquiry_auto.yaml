@@ -1,0 +1,59 @@
+# KURASHIFT 第一問合せ — 閾値・自動化（Phase 2.5 正本）
+# UI: apps/trade-desk/lib/reInquiryCandidate.ts
+# Python: scripts/jarvis_kurashift_re_inquiry_rules.py
+
+version: 1
+updated: "2026-08-23"
+
+# Tier3 完全自動送信 — 初期 OFF（E2E 10件成功後に YAML で enabled: true を検討）
+tier3_auto_send:
+  enabled: false
+  enable_after_note: "本番問合せ E2E が10件成功したら enabled を検討"
+
+daily_send_cap: 5
+
+tiers:
+  tier0_exclude_inquiry_status:
+    - sending
+    - awaiting_reply
+    - has_reply
+
+  tier1_candidate:
+    min_score: 2.0
+    grok_listen_values: [聞く, 保留]
+    require_inquiry_status: [none, draft, ""]
+
+  tier2_daily_queue:
+    min_score: 5.0
+    grok_listen: 聞く
+    hazard_eval_not: 除外
+
+  tier3_auto_send:
+    min_score: 7.0
+    grok_listen: 聞く
+    hazard_eval: OK
+    land100_not: 見送り
+
+inquiry_candidate_overrides:
+  grok_listen_values: [聞く, 保留]
+  revive_passed_status: true
+  exclude_auto_pass_reasons:
+    - mansion_unit
+    - subject_noise
+  structure_bonus:
+    allow_inquiry_if_match:
+      - pattern: "(築古|ボロ|空き家).*(アパート|AP|マンション一棟)"
+        min_score: 2.0
+        note: "築古一棟AP — 仕込み枠"
+      - pattern: "(アパート|AP|マンション一棟).*(築古|ボロ|空き家)"
+        min_score: 2.0
+        note: "築古一棟AP — 仕込み枠"
+
+ingest:
+  legacy_ap_skip_low_score_auto_pass: true
+  rc_score_bonus: 0.5
+  set_inquiry_tier_hint: true
+
+to_resolution:
+  - summary_json.from
+  - vendor_list_by_vendor_id

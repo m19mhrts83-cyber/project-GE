@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import DealReviewActions from "@/components/DealReviewActions";
+import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
 import DealsDrawerHost from "@/components/DealsDrawerHost";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
@@ -15,6 +16,11 @@ import {
   parseDealsTab,
   type DealsTabId,
 } from "@/lib/rePipelineUi";
+import {
+  evaluateInquiryCandidate,
+  type ReDealForInquiry,
+} from "@/lib/reInquiryCandidate";
+import { loadInquiryAutoConfig } from "@/lib/reInquiryAutoConfig";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -91,6 +97,11 @@ export default async function RealEstateDealsPage({
     ]);
 
   const watch = await readMacWatchStatus(120);
+  const inquiryConfig = loadInquiryAutoConfig();
+
+  function inquiryEval(d: ReDealForInquiry) {
+    return evaluateInquiryCandidate(d, inquiryConfig);
+  }
 
   let visibleDeals = (deals || []).filter((d) => {
     if (vendorFilter) {
@@ -110,6 +121,10 @@ export default async function RealEstateDealsPage({
           ? (d.summary_json as { inquiry_status: string }).inquiry_status
           : "none");
       if (inq !== "has_reply") return false;
+    }
+    if (inquiryFilter === "ready") {
+      if (!inquiryEval(d).tier1) return false;
+      return true;
     }
     if (tab === "candidates") {
       return d.status === "info" || d.status === "viewing";
@@ -185,6 +200,7 @@ export default async function RealEstateDealsPage({
   let needReply = 0;
   let grokPending = 0;
   let inquiryNone = 0;
+  let inquiryReady = 0;
   let viewingCount = 0;
   for (const d of candidateDeals) {
     if (d.status === "viewing") viewingCount++;
@@ -192,6 +208,9 @@ export default async function RealEstateDealsPage({
     if (inq === "has_reply") needReply++;
     if (inq === "none" || inq === "draft") inquiryNone++;
     if (d.source !== "mail_grok") grokPending++;
+  }
+  for (const d of deals || []) {
+    if (inquiryEval(d).tier1) inquiryReady++;
   }
 
   const counts: Record<string, number> = {};
@@ -246,6 +265,12 @@ export default async function RealEstateDealsPage({
           <Link href={`/realestate/deals?tab=${tab}`}>解除</Link>
         </p>
       ) : null}
+      {inquiryFilter === "ready" ? (
+        <p className="meta">
+          問合せフィルタ: 問合せ候補（Tier1）{" "}
+          <Link href={`/realestate/deals?tab=${tab}`}>解除</Link>
+        </p>
+      ) : null}
       <p className="meta" style={{ marginBottom: 12 }}>
         {watch.label} · <a href="/jobs">ジョブ一覧</a>
       </p>
@@ -290,14 +315,24 @@ export default async function RealEstateDealsPage({
             <strong>要対応サマリー</strong>
           </header>
           <p className="meta" style={{ marginTop: 8 }}>
-            要返信 {needReply} · Grok未調査 {grokPending} · 第一問合せ未送{" "}
-            {inquiryNone} · 内見候補 {viewingCount}
+            要返信 {needReply} · 問合せ候補 {inquiryReady} · Grok未調査{" "}
+            {grokPending} · 第一問合せ未送 {inquiryNone} · 内見候補{" "}
+            {viewingCount}
             {needReply > 0 ? (
               <>
                 {" "}
                 ·{" "}
                 <Link href="/realestate/deals?tab=candidates&inquiry=has_reply">
-                  要返信のみ表示
+                  要返信のみ
+                </Link>
+              </>
+            ) : null}
+            {inquiryReady > 0 ? (
+              <>
+                {" "}
+                ·{" "}
+                <Link href="/realestate/deals?tab=candidates&inquiry=ready">
+                  問合せ候補のみ
                 </Link>
               </>
             ) : null}
@@ -431,9 +466,13 @@ export default async function RealEstateDealsPage({
                     (typeof sj.inquiry_status === "string"
                       ? sj.inquiry_status
                       : "none");
+                  const evalInq = inquiryEval(d);
+                  const fromRaw =
+                    typeof sj.from === "string" ? sj.from : null;
                   const msgs = messagesByDeal.get(d.id) || [];
                   const evs = eventsByDeal.get(d.id) || [];
                   const activity = lastActivityLine(msgs, evs);
+                  const dealOpenHref = openDealHref(d.id);
                   return (
                     <tr
                       key={d.id}
@@ -451,6 +490,26 @@ export default async function RealEstateDealsPage({
                       <td>{DEAL_STATUS_LABEL[d.status] || d.status}</td>
                       <td>
                         {d.title}
+                        {evalInq.badges.length > 0 ? (
+                          <div className="meta">
+                            {evalInq.badges.map((b) => (
+                              <span
+                                key={b}
+                                style={{
+                                  display: "inline-block",
+                                  marginRight: 4,
+                                  padding: "1px 6px",
+                                  borderRadius: 4,
+                                  fontSize: 11,
+                                  background:
+                                    b === "再検討" ? "#fef3c7" : "#eff6ff",
+                                }}
+                              >
+                                {b}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                         <div className="meta">
                           {SOURCE_BADGE[d.source] || d.source}
                         </div>
@@ -487,10 +546,29 @@ export default async function RealEstateDealsPage({
                               ? sj.gmail_read_at
                               : null
                           }
+                          dealTitle={d.title}
+                          fromRaw={fromRaw}
+                          inquiryReady={evalInq.tier1}
+                          inquiryHasTo={evalInq.hasTo}
+                          openDealHref={dealOpenHref}
                         />
+                        {evalInq.canQuickSend ? (
+                          <div style={{ marginTop: 4 }}>
+                            <DealInquiryQuickButton
+                              dealId={d.id}
+                              title={d.title}
+                              fromRaw={fromRaw}
+                              canQuickSend={evalInq.canQuickSend}
+                              hasTo={evalInq.hasTo}
+                              badges={evalInq.badges}
+                              compact
+                              openHref={dealOpenHref}
+                            />
+                          </div>
+                        ) : null}
                       </td>
                       <td>
-                        <Link href={openDealHref(d.id)} className="btn">
+                        <Link href={dealOpenHref} className="btn">
                           開く
                         </Link>
                       </td>

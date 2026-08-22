@@ -98,6 +98,27 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 KURASHIFT: `/realestate/deals?tab=candidates&inquiry=has_reply`
 
+## 9. Tier1 クイック問合せ（Phase 2.5）
+
+**正本**: `config/kurashift_re_inquiry_auto.yaml`
+
+- [ ] 候補タブサマリーに「問合せ候補 N」が出る
+- [ ] `/realestate/deals?tab=candidates&inquiry=ready` で Tier1 のみ表示
+- [ ] Grok `聞く`/`保留` または score≥2 の info/viewing が載る
+- [ ] `status=passed` でも Grok 聞く/保留なら **再検討** バッジで Tier1
+- [ ] 区分/WR 単体（`auto_pass_reason=mansion_unit`）は Tier1 に **出ない**
+- [ ] 行内「クイック問合せ」→ プレビュー → 確認チェック → 送信
+- [ ] 宛先なし deal も Tier1 表示可 → モーダルで宛先入力
+- [ ] 「確認した」後、Tier1 なら問合せ CTA が出る
+
+分類 dry-run（全 deal）:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_re_inquiry_rules.py --dry-run
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_re_inquiry_rules.py --deal-id <uuid>
+```
+
 ---
 
 ## Phase 5 通しテスト（2026-08-22 実施）
@@ -127,5 +148,7 @@ Bot1 が `聞く価値: 聞く` の `[Grok調査]` を estate に送ったら、
 ## 正本
 
 - テンプレ: `config/kurashift_re_inquiry_template.yaml`
+- 閾値: `config/kurashift_re_inquiry_auto.yaml`
+- Tier 分類: `scripts/jarvis_kurashift_re_inquiry_rules.py`
 - パイプライン: `docs/KURASHIFT_GrokBot_不動産パイプライン.md`
 - 仕様: `docs/KURASHIFT_買い進めJob仕様.md`
