@@ -58,7 +58,8 @@ flowchart TB
 **Mac 同期**: 部長が `[Grok部長]` 日報を **estate メール** へ送信 → Jarvis が `jarvis_grok_bucho_mail_apply.py --apply` で `--mark` 反映（手動コピー不要）。
 
 **初回 / キュー補充**: `--batch-week --grok-kickoff` → **部長** に貼る（枯渇時は部長が促す）。  
-**毎日**: 部長スレッドで `本日分`（土日含む）。**土 or 日** に部長が `[Grok部長] 週次` メール。
+**毎日**: チーム or 参謀で `本日分`（土日含む · Gmail確認→S2→S1→探索）。**土 or 日** に部長が `[Grok部長] 週次` メール。  
+**Gmail**: 読取は **参謀のみ**。`[調査依頼]` / 業者返信（住所あり）→ `@物件調査`。S1 に estate Gmail は繋がない。
 
 ---
 
