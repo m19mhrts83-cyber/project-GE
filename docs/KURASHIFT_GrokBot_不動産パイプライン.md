@@ -6,10 +6,15 @@
 
 ```mermaid
 flowchart TB
-  subgraph grok [Grok Bot]
+  user[松野]
+  sanbo[参謀 Bot]
+  subgraph grok [Grok 社員]
     bot1[物件調査 Bot]
     bot2[業者開拓 Bot]
   end
+  user --> sanbo
+  sanbo --> bot1
+  sanbo --> bot2
   subgraph mail [estate Gmail]
     grokMail["[Grok調査]"]
     vendorReply[不動産会社返信]
@@ -32,11 +37,27 @@ flowchart TB
 
 | 役割 | 担当 | 正本 |
 |---|---|---|
-| ネット調査（路線価・ハザード） | **物件調査 Bot** | `[Grok調査]` メール → `mail_grok` |
-| 地場業者への初回接触 | **業者開拓 Bot** | 既存リスト + `config/grok_vendor_outreach_format.md` |
+| **Grok 窓口・社員統括** | **参謀 Bot** | `config/grok_sanbo_bot_grok_paste.md` |
+| Mac 台帳・deals・apply | **Jarvis** | `--apply-marks` / KURASHIFT |
+| ネット調査（路線価・ハザード） | **物件調査**（参謀が振分） | `[Grok調査]` → `mail_grok` |
+| 地場業者への初回接触 | **業者開拓**（参謀が振分） | `config/grok_vendor_outreach_format.md` |
 | メール取込・スコア・ファネル | **KURASHIFT** | `property_mail_match.py` / deals |
 | 物件詳細の第一問合せ | **KURASHIFT UI** | estate 送信・2段確認 |
 | PDF 添付の中身読取 | **未実装（Phase PDF）** | 下記 |
+
+---
+
+## 参謀 Bot — Grok 窓口（2026-08-22）
+
+**Grok Bot 名**: **参謀**（UI 役割 = **参謀** / Chief of Staff）  
+**Instructions**: `config/grok_sanbo_bot_grok_paste.md`  
+**運用**: `config/grok_sanbo_bot.md`
+
+松野は Grok では **参謀にだけ** 指示。参謀が社員（物件調査・業者開拓・周辺MAP）を振り分けて実行。  
+Mac 同期（`--apply-marks`）は **Jarvis** — 参謀は週次で `📎 Jarvis 用` ブロックを出力。
+
+**初回**: `--batch-week --grok-kickoff` の JSON を **参謀** に貼る（Bot2 直接は不要）。  
+**平日**: 参謀スレッドで `本日分`。
 
 ---
 
