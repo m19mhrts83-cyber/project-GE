@@ -138,6 +138,7 @@ export function buildGrokInvestigatePrompt(params: {
   area?: string | null;
   priceMan?: number | null;
   summaryJson?: Record<string, unknown> | null;
+  dealId?: string | null;
 }): string {
   const grok = grokFromSummary(params.summaryJson);
   const location =
@@ -150,9 +151,30 @@ export function buildGrokInvestigatePrompt(params: {
       : null) ||
     (params.priceMan != null ? String(params.priceMan) : "") ||
     (grok && grok.price_man != null ? String(grok.price_man) : "");
+  const url =
+    (params.summaryJson &&
+      typeof params.summaryJson.url === "string" &&
+      params.summaryJson.url) ||
+    (params.summaryJson &&
+      typeof params.summaryJson.listing_url === "string" &&
+      params.summaryJson.listing_url) ||
+    (grok && typeof grok.url === "string" && grok.url) ||
+    "";
+  const label =
+    params.title.length <= 40
+      ? params.title
+      : `${params.title.slice(0, 39)}…`;
 
   return [
-    "【物件調査 Bot — 必須2調査】",
+    "調査追加: " + label,
+    `住所: ${location}`,
+    price ? `価格: ${price}万` : "価格: （不明）",
+    url ? `URL: ${url}` : null,
+    params.dealId ? `deal_id: ${params.dealId}` : null,
+    "",
+    "（以下は不動産賃貸チーム / 参謀向け。@物件調査 に振って路線価・ハザードを調査）",
+    "",
+    "【物件調査 — 必須2調査】",
     "",
     "以下の物件について調査し、完了後 matsuno.estate@gmail.com 宛に",
     "件名 `[Grok調査] {市区町村} {短名}` でメール送信してください（承認不要）。",
@@ -162,6 +184,7 @@ export function buildGrokInvestigatePrompt(params: {
     `- 所在: ${location}`,
     price ? `- 価格_万: ${price}` : "- 価格_万: （メール等から読取）",
     params.title ? `- 案件タイトル: ${params.title}` : "",
+    url ? `- URL: ${url}` : "",
     "",
     "1) 相続税路線価: chikamap → 倍率なら国税庁路線価図。方式は 路線価|倍率 を必ず記載",
     "2) ハザード: disaportal.gsi.go.jp/maps/ で洪水/土砂/高潮/内水 → 評価 OK|注意|除外",
@@ -199,6 +222,6 @@ export function buildGrokInvestigatePrompt(params: {
     "- 聞く価値: 聞く|保留|見送り",
     "- 理由1行:",
   ]
-    .filter(Boolean)
+    .filter((line) => line != null)
     .join("\n");
 }

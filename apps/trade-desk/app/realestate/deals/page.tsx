@@ -187,6 +187,7 @@ export default async function RealEstateDealsPage({
         「確認した」「対象外」で紐づく Gmail を既読。取込の明らかに対象外は見送り候補（当面は未既読・確認後に学習）。
         第一問い合わせは From=estate・2段確認後にキュー。Mac 常駐が数秒〜数十秒で実行（スリープ中は起動後）。
         Grok 調査は `[Grok調査]` 件名で estate 受信箱 → mail_grok 取込。
+        気になる案件は「路線価・HZ 追加調査」でコピー → Grok「不動産賃貸チーム」に貼付（参謀が @物件調査）。
       </p>
       <p className="meta" style={{ marginBottom: 12 }}>
         {watch.label} · <a href="/jobs">ジョブ一覧</a>
@@ -418,8 +419,7 @@ export default async function RealEstateDealsPage({
                             : ""}
                         </div>
                       ) : null}
-                      {d.source !== "mail_grok" &&
-                      (d.status === "info" || d.status === "viewing") ? (
+                      {(d.status === "info" || d.status === "viewing") ? (
                         <GrokInvestigateCopy
                           dealId={d.id}
                           title={d.title}
@@ -428,6 +428,7 @@ export default async function RealEstateDealsPage({
                             d.price_man != null ? Number(d.price_man) : null
                           }
                           summaryJson={sj as Record<string, unknown>}
+                          alreadyGrok={d.source === "mail_grok"}
                         />
                       ) : null}
                     </td>
