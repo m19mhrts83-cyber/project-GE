@@ -8,6 +8,7 @@ export type ReDealForInquiry = {
   status?: string | null;
   match_score?: number | null;
   title?: string | null;
+  area?: string | null;
   inquiry_status?: string | null;
   summary_json?: Record<string, unknown> | null;
 };

@@ -21,6 +21,7 @@ import {
   type ReDealForInquiry,
 } from "@/lib/reInquiryCandidate";
 import { loadInquiryAutoConfig } from "@/lib/reInquiryAutoConfig";
+import { getTier2QueueSummary } from "@/lib/reInquiryTier2Queue";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -213,6 +214,9 @@ export default async function RealEstateDealsPage({
     if (inquiryEval(d).tier1) inquiryReady++;
   }
 
+  const tier2Summary = await getTier2QueueSummary(supabase);
+  const tier2Count = tier2Summary.queue.length;
+
   const counts: Record<string, number> = {};
   for (const s of Object.keys(DEAL_STATUS_LABEL)) counts[s] = 0;
   for (const d of deals || []) {
@@ -335,6 +339,21 @@ export default async function RealEstateDealsPage({
                   問合せ候補のみ
                 </Link>
               </>
+            ) : null}
+            {tier2Summary.enabled && tier2Count > 0 ? (
+              <>
+                {" "}
+                ·{" "}
+                <Link href="/realestate/deals/tier2">
+                  送信待ち Tier2（{tier2Count}件）
+                </Link>
+              </>
+            ) : null}
+            {tier2Summary.enabled ? (
+              <span className="meta">
+                {" "}
+                · 本日送信 {tier2Summary.sent_today}/{tier2Summary.daily_cap}
+              </span>
             ) : null}
           </p>
         </div>

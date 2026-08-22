@@ -21,6 +21,13 @@ REPO = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO / ".jarvis_state" / "kurashift_re_daily_digest.json"
 FORM_URL = "https://form.os7.biz/f/1906a1a5/"
 
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+from scripts.jarvis_kurashift_re_inquiry_rules import (  # noqa: E402
+    format_tier2_digest_block,
+    tier2_queue_summary,
+)
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -75,6 +82,9 @@ def run(*, mark_reported: bool) -> dict[str, Any]:
     )
     vendor_replied = int(getattr(vendors_r, "count", None) or 0)
 
+    tier2_summary = tier2_queue_summary(sb)
+    tier2_lines = format_tier2_digest_block(tier2_summary)
+
     new_deals: list[dict[str, Any]] = []
     for d in has_reply:
         did = str(d.get("id") or "")
@@ -84,12 +94,21 @@ def run(*, mark_reported: bool) -> dict[str, Any]:
             new_deals.append(d)
 
     lines = ["---", "📎 KURASHIFT不動産（日次）"]
+    if tier2_lines:
+        lines.extend(tier2_lines)
     if not has_reply and vendor_replied == 0:
         lines.append("- 問合せ返信: 0件 · 業者返信フォロー: 0件")
-        lines.append("- 判定: ✅ 要対応なし")
+        if not tier2_lines:
+            lines.append("- 判定: ✅ 要対応なし")
         lines.append("---")
         print("\n".join(lines))
-        out = {"ok": True, "has_reply": 0, "vendor_replied": 0, "new": 0}
+        out = {
+            "ok": True,
+            "has_reply": 0,
+            "vendor_replied": 0,
+            "new": 0,
+            "tier2_queue": tier2_summary.get("queue_count", 0),
+        }
         if mark_reported:
             save_state(state)
         print("KURASHIFT_RESULT:" + json.dumps(out, ensure_ascii=False))
@@ -103,6 +122,8 @@ def run(*, mark_reported: bool) -> dict[str, Any]:
         lines.append(f"  …他 {len(has_reply) - 5} 件")
 
     lines.append(f"- 業者返信フォロー（replied）: {vendor_replied}件")
+    if tier2_lines:
+        lines.extend(tier2_lines)
     lines.append("- 次の一手:")
     lines.append("  1. /realestate/deals?tab=candidates&inquiry=has_reply")
     lines.append("  2. ドロワーで返信・PDF確認 → フォーム項目調査")
@@ -126,6 +147,8 @@ def run(*, mark_reported: bool) -> dict[str, Any]:
         "vendor_replied": vendor_replied,
         "new": len(new_deals),
         "mark_reported": mark_reported,
+        "tier2_queue": tier2_summary.get("queue_count", 0),
+        "tier2_sent_today": tier2_summary.get("sent_today", 0),
     }
     print("KURASHIFT_RESULT:" + json.dumps(out, ensure_ascii=False))
     return out

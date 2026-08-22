@@ -396,7 +396,7 @@ Cursor ルール（ローカル）: `.cursor/rules/kamiooya-re-purchase-form.mdc
 
 **日次フロー**: Grok 本日分 → bucho apply → vendor sync → inquiry poll → KURASHIFT 要返信 → PDF/返信確認 → フォーム調査 → Drive → **確認後**フォーム送信 → 809 回答 → 内見
 
-### Phase 2.5（問合せ閾値・UI）— **2026-08-23 実装済**
+### Phase 2.5（問合せ閾値・Tier1 UI）— **2026-08-23 実装済**（commit `b442ca49`）
 
 **正本**: `config/kurashift_re_inquiry_auto.yaml`  
 **判定**: `apps/trade-desk/lib/reInquiryCandidate.ts` / `scripts/jarvis_kurashift_re_inquiry_rules.py`
@@ -425,6 +425,19 @@ Cursor ルール（ローカル）: `.cursor/rules/kamiooya-re-purchase-form.mdc
 - 候補表: Tier バッジ（再検討・送信待ち）+ `DealInquiryQuickButton`（プレビュー → チェック → 送信）
 - 「確認した」後に Tier1 なら問合せ CTA（`DealReviewActions`）
 - 宛先なしでも Tier1 表示可 → 送信時は宛先入力
+- 初級者手順: `docs/KURASHIFT_Tier1_問合せ_初級者手順.md`
+
+### Phase 2.6（Tier2 日次一括キュー）— **🚧 実装中（未 merge）**
+
+| 項目 | 状態 |
+|---|---|
+| YAML `tier2_daily_queue.enabled: true` | 🚧 ローカル |
+| `/realestate/deals/tier2` 一括確認 UI | 🚧 |
+| API `inquiry-tier2-queue` / `inquiry-tier2-send` | 🚧 |
+| digest Tier2 行 | 🚧 |
+| build 検証・deploy | ⬜ |
+
+**運用**: Tier1 手動5件 + poll 安定後に本番レビュー（目安 2026-09-06）。一括確認チェック必須。日次上限5件は Tier1 と合算。
 
 ### Phase 3（任意）
 
@@ -477,6 +490,9 @@ Cursor ルール（ローカル）: `.cursor/rules/kamiooya-re-purchase-form.mdc
 | Phase2.5 YAML | `config/kurashift_re_inquiry_auto.yaml` |
 | Phase2.5 rules | `scripts/jarvis_kurashift_re_inquiry_rules.py` |
 | Phase2.5 UI | `apps/trade-desk/lib/reInquiryCandidate.ts` + `DealInquiryQuickButton.tsx` |
+| Phase2.6 Tier2 | `lib/reInquiryTier2Queue.ts` + `/realestate/deals/tier2` + API |
+| Tier1 手順 | `docs/KURASHIFT_Tier1_問合せ_初級者手順.md` |
+| 進捗正本 | `docs/KURASHIFT_問合せパイプライン_進捗_20260823.md` |
 
 ---
 

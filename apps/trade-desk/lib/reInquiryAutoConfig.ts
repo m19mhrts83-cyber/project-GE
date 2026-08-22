@@ -13,6 +13,7 @@ export type InquiryAutoConfig = {
       require_inquiry_status?: string[];
     };
     tier2_daily_queue?: {
+      enabled?: boolean;
       min_score?: number;
       grok_listen?: string;
       hazard_eval_not?: string;
@@ -29,6 +30,10 @@ export type InquiryAutoConfig = {
     revive_passed_status?: boolean;
     exclude_auto_pass_reasons?: string[];
   };
+  production_filter?: {
+    exclude_title_substrings?: string[];
+    exclude_e2e_markers?: string[];
+  };
 };
 
 const DEFAULT_CONFIG: InquiryAutoConfig = {
@@ -42,6 +47,7 @@ const DEFAULT_CONFIG: InquiryAutoConfig = {
       require_inquiry_status: ["none", "draft", ""],
     },
     tier2_daily_queue: {
+      enabled: true,
       min_score: 5.0,
       grok_listen: "聞く",
       hazard_eval_not: "除外",

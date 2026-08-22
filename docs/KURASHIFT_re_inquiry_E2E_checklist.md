@@ -145,10 +145,23 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 Bot1 が `聞く価値: 聞く` の `[Grok調査]` を estate に送ったら、上記チェックリスト §1〜7 を手動で実施。  
 2026-08-22 時点の Grok 3件はすべて `見送り`（HZ除外）のため本番問合せは未実施。
 
+## 10. Tier2 一括問合せ（Phase 2.6）
+
+**URL**: `/realestate/deals/tier2`  
+**正本**: `config/kurashift_re_inquiry_auto.yaml` — `tier2_daily_queue.enabled: true`
+
+- [ ] 候補一覧に「送信待ち Tier2（N件）」リンク
+- [ ] Tier2 画面: 本日送信数 / 残り / キュー件数
+- [ ] 各行: 宛先・件名・本文プレビュー
+- [ ] 一括確認チェック → 送信 → `re_deal_inquiry_send` ジョブ（`tier2_batch: true`）
+- [ ] 日次上限5件（Tier1 送信と合算）
+- [ ] digest に Tier2 行が出る
+
 ## 正本
 
 - テンプレ: `config/kurashift_re_inquiry_template.yaml`
 - 閾値: `config/kurashift_re_inquiry_auto.yaml`
 - Tier 分類: `scripts/jarvis_kurashift_re_inquiry_rules.py`
-- パイプライン: `docs/KURASHIFT_GrokBot_不動産パイプライン.md`
+- 進捗一覧: `docs/KURASHIFT_問合せパイプライン_進捗_20260823.md`
+- Tier1 手順: `docs/KURASHIFT_Tier1_問合せ_初級者手順.md`
 - 仕様: `docs/KURASHIFT_買い進めJob仕様.md`
