@@ -2,6 +2,7 @@ import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import DealReviewActions from "@/components/DealReviewActions";
 import DealInquiryActions from "@/components/DealInquiryActions";
+import GrokInvestigateCopy from "@/components/GrokInvestigateCopy";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
@@ -374,11 +375,21 @@ export default async function RealEstateDealsPage({
                       <div className="meta">{d.source || ""}</div>
                       {d.source === "mail_grok" && grok ? (
                         <div className="meta" style={{ marginTop: 4 }}>
+                          {typeof grok.land_method === "string" && grok.land_method
+                            ? `方式:${grok.land_method} · `
+                            : ""}
+                          {typeof grok.land100 === "string" && grok.land100
+                            ? `土地:${grok.land100} · `
+                            : ""}
+                          {typeof grok.route_price_tsubo === "string" &&
+                          grok.route_price_tsubo
+                            ? `路線:${grok.route_price_tsubo} · `
+                            : ""}
+                          {typeof grok.hazard_eval === "string" && grok.hazard_eval
+                            ? `HZ:${grok.hazard_eval} · `
+                            : ""}
                           {typeof grok.parking === "string" && grok.parking
                             ? `駐:${grok.parking} · `
-                            : ""}
-                          {typeof grok.land_ratio === "string" && grok.land_ratio
-                            ? `倍率:${grok.land_ratio} · `
                             : ""}
                           {typeof grok.population_eval === "string" &&
                           grok.population_eval
@@ -389,6 +400,18 @@ export default async function RealEstateDealsPage({
                             ? `聞く:${grok.listen_value}`
                             : ""}
                         </div>
+                      ) : null}
+                      {d.source !== "mail_grok" &&
+                      (d.status === "info" || d.status === "viewing") ? (
+                        <GrokInvestigateCopy
+                          dealId={d.id}
+                          title={d.title}
+                          area={d.area}
+                          priceMan={
+                            d.price_man != null ? Number(d.price_man) : null
+                          }
+                          summaryJson={sj as Record<string, unknown>}
+                        />
                       ) : null}
                     </td>
                     <td className="meta">{d.area || "—"}</td>

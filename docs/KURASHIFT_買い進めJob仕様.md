@@ -24,7 +24,8 @@
 
 | 優先 | source | 実装 |
 |---|---|---|
-| ベース | `mail_admin`（主）＋ `mail_estate`（補完）＋ `mail_grok`（Grok `[Grok調査]`） | dry-run → 候補カード。自動送信なし |
+| ベース | `mail_admin`（主）＋ `mail_estate`（補完） | dry-run → 候補カード。自動送信なし |
+| 追加 | `mail_grok`（Grok `[Grok調査]`） | 路線価・ハザード・人口・聞く価値を構造化取込 |
 | 追加 | `kenbiya` / `rakumachi` | Sprint 3 |
 | 手動 | `manual` | UI／Jarvis |
 
@@ -68,7 +69,7 @@
 
 | 操作 | 内容 |
 |---|---|
-| **第一問い合わせ** | From=**estate**。テンプレは `config/kurashift_re_inquiry_template.yaml`。画面確認後 `re_deal_inquiry_send` |
+| **第一問い合わせ** | From=**estate**。テンプレは `config/kurashift_re_inquiry_template.yaml`。`GET /api/re/deals/[id]/inquiry-preview` で下書き（**倍率**=`summary_json.grok.land_method` に「倍率」→ 固定資産税依頼を自動挿入）。画面確認後 `re_deal_inquiry_send` |
 | **返信取込** | `re_deal_inquiry_poll`（スレッドから inbound を蓄積） |
 | **運営相談パック** | `re_deal_ops_pack` → `kurashift_consultations`（lane=`realestate`。未DDL時は general） |
 
@@ -77,6 +78,8 @@
 - 運営への自動送信はしない（パック作成まで）。Notion 購入判断メモ URL を metadata に保持
 - **キュー投入 ≠ Gmail 送信完了**。失敗・`sending` 滞留は精密ホームの固定バナーで気づく（ack 可）
 - 細かい仕様は第1号案件で詰める
+
+Grok Bot 併走（物件調査・業者開拓・PDF 未実装）: [`docs/KURASHIFT_GrokBot_不動産パイプライン.md`](KURASHIFT_GrokBot_不動産パイプライン.md)
 
 ### 運営相談パック — 段階ロードマップ（実装は Phase ごとに）
 

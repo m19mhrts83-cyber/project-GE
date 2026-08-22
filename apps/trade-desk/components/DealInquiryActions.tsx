@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useState } from "react";
+import { BAIRITSU_MARKER } from "@/lib/reInquiryShared";
 
 type Msg = {
   direction?: string;
@@ -54,28 +55,38 @@ export default function DealInquiryActions({
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
+  const [landMethodBairitsu, setLandMethodBairitsu] = useState(false);
 
   const status = inquiryStatus || "none";
   const canSend =
     status === "none" || status === "draft" || status === "";
   const showPack = !canSend || (messages || []).length > 0;
 
-  const defaultBody = useMemo(
-    () =>
-      [
-        "お世話になっております。物件情報の送付をよろしくお願いします。",
-        "併せて、固定資産評価額、修繕履歴(時期/内容/金額)が分かる資料も送付いただけると幸いです。",
-        "差し支えなければ、以下についてもご教授ください。よろしくお願いします。",
-        "・売却理由",
-        "・売却希望時期",
-        "・価格交渉可能でしょうか",
-      ].join("\n"),
-    []
-  );
-  const [subject, setSubject] = useState(
-    `物件資料のご依頼（${title.slice(0, 40)}${title.length > 40 ? "…" : ""}）`
-  );
-  const [body, setBody] = useState(defaultBody);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+
+  const loadPreview = useCallback(async () => {
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/re/deals/${dealId}/inquiry-preview`);
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(data.error || "下書き取得失敗");
+        return;
+      }
+      if (data.to) setTo(String(data.to));
+      setSubject(String(data.subject || ""));
+      setBody(String(data.body || ""));
+      setLandMethodBairitsu(Boolean(data.land_method_bairitsu));
+      setPreviewLoaded(true);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "下書き取得エラー");
+    }
+  }, [dealId]);
+
+  const bairitsuMissing =
+    landMethodBairitsu && !body.includes(BAIRITSU_MARKER);
 
   async function send() {
     if (!checked) {
@@ -84,6 +95,10 @@ export default function DealInquiryActions({
     }
     if (!to.includes("@")) {
       setMsg("宛先メールを入力してください");
+      return;
+    }
+    if (bairitsuMissing) {
+      setMsg("倍率地域のため固定資産税依頼文が必要です（編集画面に戻って追記）");
       return;
     }
     setBusy("send");
@@ -217,10 +232,14 @@ export default function DealInquiryActions({
             className="btn primary"
             style={{ fontSize: 12, padding: "4px 8px" }}
             disabled={busy !== null}
-            onClick={() => {
-              setOpen((v) => !v);
+            onClick={async () => {
+              const next = !open;
+              setOpen(next);
               setStep("edit");
               setChecked(false);
+              if (next && !previewLoaded) {
+                await loadPreview();
+              }
             }}
           >
             第一問い合わせ
@@ -250,6 +269,16 @@ export default function DealInquiryActions({
         >
           {step === "edit" ? (
             <>
+              {landMethodBairitsu ? (
+                <p className="meta" style={{ color: "#b45309", marginBottom: 6 }}>
+                  倍率地域 — 固定資産税（課税明細）の依頼を本文に含めます
+                </p>
+              ) : null}
+              {bairitsuMissing ? (
+                <p className="meta" style={{ color: "#b00020", marginBottom: 6 }}>
+                  【倍率地域のため】の固定資産税依頼が欠けています
+                </p>
+              ) : null}
               <label className="meta">
                 To
                 <input

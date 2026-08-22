@@ -1,0 +1,15 @@
+# 地場不動産 — 業者開拓リスト（正本の例）
+# ユーザー既存リストを転記して kurashift_re_vendor_list.yaml として保存（Git 非公開可）
+#
+# Grok 業者開拓 Bot が参照。Jarvis は YAML を読んでコピー用に deals に出してもよい。
+
+vendors:
+  - id: example-aichi-01
+    name: "（例）〇〇不動産"
+    area: "愛知県豊明市"
+    url: "https://example.co.jp/"
+    contact_url: "https://example.co.jp/contact"
+    channel: web_form  # web_form | email
+    contact_email: ""
+    status: pending  # pending | contacted | replied | skip
+    notes: "戸建実績あり"

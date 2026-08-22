@@ -243,6 +243,40 @@ def list_messages(sb: Any, deal: dict[str, Any]) -> list[dict[str, Any]]:
     return list(sj_of(deal).get("messages") or [])
 
 
+BAIRITSU_MARKER = "【倍率地域のため】"
+
+
+def is_land_method_bairitsu(land_method: str | None) -> bool:
+    return bool(land_method and "倍率" in str(land_method))
+
+
+def grok_land_method(deal: dict[str, Any]) -> str:
+    grok = sj_of(deal).get("grok") or {}
+    if isinstance(grok, dict):
+        return str(grok.get("land_method") or "").strip()
+    return ""
+
+
+def append_bairitsu_block(body: str, tmpl: dict[str, Any]) -> str:
+    extra = str(tmpl.get("body_append_bairitsu") or "").strip()
+    if not extra or BAIRITSU_MARKER in body:
+        return body
+    lines = body.splitlines()
+    sig_idx = len(lines)
+    for i in range(len(lines) - 1, -1, -1):
+        line = lines[i].strip()
+        if line and not line.startswith("・") and "お世話" not in line and "併せて" not in line:
+            if i >= len(lines) - 3:
+                sig_idx = i
+                break
+    head = "\n".join(lines[:sig_idx]).rstrip()
+    tail = "\n".join(lines[sig_idx:]).strip()
+    merged = f"{head}\n\n{extra}"
+    if tail:
+        merged = f"{merged}\n\n{tail}"
+    return merged.strip()
+
+
 def build_preview(deal: dict[str, Any], *, to_email: str | None = None) -> dict[str, Any]:
     tmpl = load_template()
     title = str(deal.get("title") or "物件")
@@ -262,6 +296,10 @@ def build_preview(deal: dict[str, Any], *, to_email: str | None = None) -> dict[
             company_name=company, representative_name=rep
         ).strip()
     body = str(tmpl.get("body_template") or "").format(signature=sig_t).strip()
+    land_method = grok_land_method(deal)
+    bairitsu = is_land_method_bairitsu(land_method)
+    if bairitsu:
+        body = append_bairitsu_block(body, tmpl)
     sj = sj_of(deal)
     if not to_email:
         _, parsed = parseaddr(str(sj.get("from") or ""))
@@ -273,6 +311,8 @@ def build_preview(deal: dict[str, Any], *, to_email: str | None = None) -> dict[
         "body": body,
         "from_account": tmpl.get("from_account") or "admin",
         "ops_notion_url": tmpl.get("ops_notion_url") or "",
+        "land_method": land_method or None,
+        "land_method_bairitsu": bairitsu,
     }
 
 
@@ -293,6 +333,8 @@ def send_inquiry(
     to_email = (to_email or prev["to"] or "").strip()
     subject = (subject or prev["subject"]).strip()
     body = (body or prev["body"]).strip()
+    if is_land_method_bairitsu(grok_land_method(deal)):
+        body = append_bairitsu_block(body, load_template())
     if not to_email or "@" not in to_email:
         return {"ok": False, "error": "to email required"}
     if not confirm and not dry_run:
@@ -512,8 +554,11 @@ def build_ops_pack(sb: Any, deal_id: str) -> dict[str, Any]:
                 "【Grok 調査要約】",
                 f"  駐車場: {grok.get('parking') or '—'}",
                 f"  倍率/方式: {grok.get('land_ratio') or '—'} ({grok.get('land_method') or '—'})",
-                f"  土地値100%: {grok.get('land100') or '—'}",
+                f"  土地値100%: {grok.get('land100') or '—'} ({grok.get('land100_ratio') or '—'})",
+                f"  路線価: {grok.get('route_price_tsubo') or '—'} / 積算: {grok.get('land_appraisal_man') or '—'}万",
                 f"  人口: {grok.get('population_eval') or '—'}",
+                f"  ハザード: {grok.get('hazard_eval') or '—'} "
+                f"(洪水:{grok.get('hazard_flood') or '—'} 土砂:{grok.get('hazard_landslide') or '—'})",
                 f"  聞く価値: {grok.get('listen_value') or '—'} — {grok.get('reason_line') or ''}",
                 "",
             ]
