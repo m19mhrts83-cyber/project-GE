@@ -1787,6 +1787,67 @@ def refresh_zaim_quality() -> None:
             print(f"# {script_name} refresh failed: {e}", file=sys.stderr)
 
 
+def eval_cursor_usage_watch(meta: dict, data: dict | None) -> dict[str, Any]:
+    """Cursor Spending の枠％（手動入力）。Other 逼迫で warn / attention。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    scripts_dir = str(REPO / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        from jarvis_cursor_usage_watch import evaluate as eval_usage  # type: ignore
+    except Exception as e:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "ops",
+            level="warn",
+            summary=f"評価モジュール読込失敗: {e}",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    e = eval_usage(data or {})
+    level = str(e.get("level") or "info")
+    if level not in ("ok", "info", "warn", "attention"):
+        level = "info"
+    summary = str(e.get("verdict") or "未記録")
+    detail_lines = [
+        f"プラン: {e.get('plan') or '—'}（Other込み ${e.get('other_included_usd') or '—'}）",
+        f"Other Models: {e.get('other_models_pct_used') if e.get('other_models_pct_used') is not None else '—'}%",
+        f"Cursor Models: {e.get('cursor_models_pct_used') if e.get('cursor_models_pct_used') is not None else '—'}%",
+        f"サイクル末日: {e.get('billing_cycle_end') or '—'}"
+        + (
+            f"（残{e.get('days_left')}日）"
+            if e.get("days_left") is not None
+            else ""
+        ),
+        "Grok BotはPro不可。SuperGrok Plus連携はPro+より高い→必要ならPro+再上げ。",
+        "更新: scripts/jarvis_cursor_usage_watch.py --set … → --push",
+    ]
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "ops",
+        level=level,
+        summary=summary,
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": "/billing",
+            "spending_url": e.get("spending_url")
+            or "https://cursor.com/dashboard/spending",
+            "show_banner": level in ("warn", "attention"),
+            "other_models_pct_used": e.get("other_models_pct_used"),
+            "cursor_models_pct_used": e.get("cursor_models_pct_used"),
+            "billing_cycle_end": e.get("billing_cycle_end"),
+            "days_left": e.get("days_left"),
+            "plan": e.get("plan"),
+        },
+    )
+
+
 def eval_cursor_pro_plus_downgrade(meta: dict) -> dict[str, Any]:
     """8月一時 Pro Plus → 9月前に Pro へ戻す催促（〜2026-08-24 まで attention）。"""
     title = meta["title"]
@@ -1879,6 +1940,9 @@ EVALUATORS = {
         eval_zaim_quality(m, load_json(STATE / "zaim_quality_watch.json")),
     )[1],
     "cursor_pro_plus_downgrade": lambda m: eval_cursor_pro_plus_downgrade(m),
+    "cursor_usage_watch": lambda m: eval_cursor_usage_watch(
+        m, load_json(STATE / "cursor_usage_watch.json")
+    ),
 }
 
 

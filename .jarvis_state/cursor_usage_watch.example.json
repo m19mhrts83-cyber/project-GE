@@ -1,0 +1,14 @@
+{
+  "updated_at": null,
+  "disabled": false,
+  "plan": "pro",
+  "billing_cycle_end": null,
+  "other_models_pct_used": null,
+  "cursor_models_pct_used": null,
+  "other_included_usd": 20,
+  "on_demand_enabled": null,
+  "note": null,
+  "level": "info",
+  "verdict": "未記録 — Spending を見て --set してください",
+  "spending_url": "https://cursor.com/dashboard/spending"
+}
