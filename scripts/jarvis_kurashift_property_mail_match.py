@@ -475,6 +475,22 @@ def _deal_row_from_message(
     if auto_pass_reason:
         sj["auto_pass_reason"] = auto_pass_reason
         sj["auto_pass_at_ingest"] = True
+    try:
+        from email.utils import parseaddr
+
+        from jarvis_kurashift_vendor_match import match_vendor
+
+        _, from_email = parseaddr(hm.get("from", ""))
+        hit = match_vendor(
+            from_email or "",
+            from_display=hm.get("from", ""),
+            subject=subject,
+        )
+        if hit and hit.get("id"):
+            sj["vendor_id"] = hit["id"]
+            sj["vendor_name"] = hit.get("name")
+    except Exception:
+        pass
     return {
         "title": subject[:180],
         "status": status,
@@ -882,10 +898,27 @@ def main() -> int:
         gid = (c.get("summary_json") or {}).get("gmail_id")
         if gid in seen:
             continue
-        sb.table("kurashift_re_deals").insert(c).execute()
+        ins = sb.table("kurashift_re_deals").insert(c).execute()
         inserted += 1
         if gid:
             seen.add(gid)
+        try:
+            from jarvis_kurashift_deal_events import insert_deal_event
+
+            new_id = (ins.data or [{}])[0].get("id")
+            if new_id:
+                et = "grok_applied" if c.get("source") == "mail_grok" else "created"
+                insert_deal_event(
+                    sb,
+                    deal_id=str(new_id),
+                    event_type=et,
+                    summary=f"取込: {c.get('title', '')[:80]}",
+                    actor="jarvis",
+                    to_status=str(c.get("status") or "info"),
+                    payload={"source": c.get("source"), "match_score": c.get("match_score")},
+                )
+        except Exception:
+            pass
 
     auto_inserted = 0
     auto_read = 0

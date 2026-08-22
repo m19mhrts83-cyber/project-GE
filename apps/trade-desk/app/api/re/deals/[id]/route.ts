@@ -75,6 +75,22 @@ export async function POST(
     );
   }
 
+  const prevStatus = String(row.status || "info");
+  const eventType = action === "confirm" ? "review_confirm" : "review_pass";
+  const eventSummary =
+    action === "confirm"
+      ? "候補を確認（内見レーンへ）"
+      : "対象外（見送り）";
+  await supabase.from("kurashift_re_deal_events").insert({
+    deal_id: id,
+    event_type: eventType,
+    from_status: prevStatus,
+    to_status: status,
+    actor: "user",
+    summary: eventSummary,
+    payload: { action },
+  });
+
   let mark_read_queued = false;
   let mark_read_skipped: string | null = null;
   let job_id: string | null = null;

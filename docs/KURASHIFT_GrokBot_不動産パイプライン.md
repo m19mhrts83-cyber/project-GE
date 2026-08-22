@@ -83,6 +83,7 @@ flowchart TB
 | 操作 | 担当 | コマンド / 正本 |
 |---|---|---|
 | リスト取込 | Jarvis | `--import-xlsx` → `kurashift_re_vendor_list.yaml` |
+| **KURASHIFT 投影** | Jarvis / UI | `jarvis_kurashift_vendor_sync.py --apply` または job `re_vendor_sync` → **`/realestate/vendors`** |
 | **週次バッチ** | Jarvis → Grok | `--batch-week --grok-kickoff`（7日×Phase上限） |
 | 日次のみ | Jarvis → Grok | `--next 3`（enriched JSON） |
 | 結果記録（単件） | Jarvis | `--mark ID --status contacted` |

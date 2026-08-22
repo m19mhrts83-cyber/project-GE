@@ -1,34 +1,56 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import DealReviewActions from "@/components/DealReviewActions";
-import DealInquiryActions from "@/components/DealInquiryActions";
-import GrokInvestigateCopy from "@/components/GrokInvestigateCopy";
+import DealsDrawerHost from "@/components/DealsDrawerHost";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
 import { readMacWatchStatus } from "@/lib/macWatchStatus";
+import {
+  DEAL_STATUS_LABEL,
+  INQUIRY_STATUS_LABEL,
+  SOURCE_BADGE,
+  grokOneLine,
+  lastActivityLine,
+  parseDealsTab,
+  type DealsTabId,
+} from "@/lib/rePipelineUi";
+import Link from "next/link";
+import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_LABEL: Record<string, string> = {
-  info: "情報",
-  viewing: "内見",
-  offer: "買付",
-  loan: "融資",
-  purchased: "購入",
-  passed: "見送り",
-  archived: "アーカイブ",
-};
-
 const FUNNEL = ["info", "viewing", "offer", "loan", "purchased"] as const;
+
+const TAB_LINKS: { id: DealsTabId; label: string }[] = [
+  { id: "candidates", label: "候補" },
+  { id: "all", label: "全ファネル" },
+  { id: "passed", label: "見送り" },
+];
+
+function inquiryChipStyle(status: string): Record<string, string | number> {
+  const base = {
+    display: "inline-block",
+    padding: "2px 8px",
+    borderRadius: 4,
+    fontSize: 12,
+    border: "1px solid var(--border, #ccc)",
+  };
+  if (status === "has_reply") return { ...base, background: "#ecfdf5" };
+  if (status === "awaiting_reply" || status === "sent")
+    return { ...base, background: "#eff6ff" };
+  return base;
+}
 
 export default async function RealEstateDealsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ deal?: string }>;
+  searchParams?: Promise<{ deal?: string; tab?: string; vendor?: string }>;
 }) {
   const sp = (await searchParams) || {};
   const highlightDeal = (sp.deal || "").trim();
+  const tab = parseDealsTab(sp.tab);
+  const vendorFilter = (sp.vendor || "").trim();
 
   const supabase = await createClient();
   const {
@@ -44,7 +66,7 @@ export default async function RealEstateDealsPage({
         )
         .order("match_score", { ascending: false, nullsFirst: false })
         .order("updated_at", { ascending: false })
-        .limit(80),
+        .limit(120),
       supabase
         .from("kurashift_buy_plan_criteria")
         .select("kind, raw_text, sort_order, version_id")
@@ -64,109 +86,99 @@ export default async function RealEstateDealsPage({
 
   const watch = await readMacWatchStatus(120);
 
-  const dealIds = (deals || []).map((d) => d.id);
-  const [{ data: dealMessages }, { data: recentSendJobs }, { data: dealAttachments }] =
-    await Promise.all([
-    dealIds.length > 0
-      ? supabase
-          .from("kurashift_re_deal_messages")
-          .select(
-            "deal_id, direction, kind, subject, from_email, occurred_at, body_text"
-          )
-          .in("deal_id", dealIds)
-          .order("occurred_at", { ascending: true })
-          .limit(400)
-      : Promise.resolve({
-          data: [] as Array<{
-            deal_id: string;
-            direction?: string;
-            kind?: string;
-            subject?: string;
-            from_email?: string;
-            occurred_at?: string;
-            body_text?: string;
-          }>,
-        }),
-    supabase
-      .from("kurashift_jobs")
-      .select("id, status, error_text, payload, result, created_at")
-      .eq("job_type", "re_deal_inquiry_send")
-      .order("created_at", { ascending: false })
-      .limit(40),
-    dealIds.length > 0
-      ? supabase
-          .from("kurashift_re_deal_attachments")
-          .select("deal_id")
-          .in("deal_id", dealIds)
-          .limit(500)
-      : Promise.resolve({ data: [] as Array<{ deal_id: string }> }),
-  ]);
-
-  const failedSendByDeal = new Map<string, string>();
-  const latestJobByDeal = new Map<
-    string,
-    {
-      id: string;
-      status: string;
-      error_text?: string | null;
-      payload?: unknown;
-      result?: unknown;
-      created_at?: string | null;
+  let visibleDeals = (deals || []).filter((d) => {
+    if (vendorFilter) {
+      const sj =
+        d.summary_json && typeof d.summary_json === "object"
+          ? (d.summary_json as { vendor_id?: string })
+          : {};
+      if (sj.vendor_id !== vendorFilter) return false;
     }
-  >();
-  for (const j of recentSendJobs || []) {
-    const p =
-      j.payload && typeof j.payload === "object"
-        ? (j.payload as Record<string, unknown>)
-        : {};
-    const r =
-      j.result && typeof j.result === "object"
-        ? (j.result as Record<string, unknown>)
-        : {};
-    const did =
-      (typeof p.deal_id === "string" && p.deal_id) ||
-      (typeof r.deal_id === "string" && r.deal_id) ||
-      "";
-    if (!did || latestJobByDeal.has(did)) continue;
-    latestJobByDeal.set(did, j);
-  }
-  for (const [did, j] of latestJobByDeal) {
-    if (j.status !== "failed") continue;
-    const r =
-      j.result && typeof j.result === "object"
-        ? (j.result as Record<string, unknown>)
-        : {};
-    if (typeof r.user_acked_at === "string" && r.user_acked_at) continue;
-    failedSendByDeal.set(did, j.error_text || "failed");
-  }
+    if (tab === "candidates") {
+      return d.status === "info" || d.status === "viewing";
+    }
+    if (tab === "passed") return d.status === "passed";
+    return d.status !== "archived";
+  });
+
+  const allDealIds = (deals || []).map((d) => d.id);
+
+  const [{ data: dealMessages }, { data: dealEvents }] = await Promise.all([
+      allDealIds.length > 0
+        ? supabase
+            .from("kurashift_re_deal_messages")
+            .select(
+              "deal_id, direction, kind, subject, from_email, occurred_at, body_text"
+            )
+            .in("deal_id", allDealIds)
+            .order("occurred_at", { ascending: true })
+            .limit(500)
+        : Promise.resolve({ data: [] as Array<{ deal_id: string }> }),
+      allDealIds.length > 0
+        ? supabase
+            .from("kurashift_re_deal_events")
+            .select("deal_id, event_type, summary, occurred_at")
+            .in("deal_id", allDealIds)
+            .order("occurred_at", { ascending: false })
+            .limit(400)
+        : Promise.resolve({ data: [] as Array<{ deal_id: string }> }),
+    ]);
 
   const messagesByDeal = new Map<
     string,
     Array<{
       direction?: string;
-      kind?: string;
       subject?: string;
-      from_email?: string;
       occurred_at?: string;
       body_text?: string;
     }>
   >();
   for (const m of dealMessages || []) {
-    const list = messagesByDeal.get(m.deal_id) || [];
-    list.push(m);
-    messagesByDeal.set(m.deal_id, list);
+    const row = m as {
+      deal_id: string;
+      direction?: string;
+      subject?: string;
+      occurred_at?: string;
+      body_text?: string;
+    };
+    const list = messagesByDeal.get(row.deal_id) || [];
+    list.push(row);
+    messagesByDeal.set(row.deal_id, list);
   }
 
-  const attachCountByDeal = new Map<string, number>();
-  for (const a of dealAttachments || []) {
-    attachCountByDeal.set(
-      a.deal_id,
-      (attachCountByDeal.get(a.deal_id) || 0) + 1
-    );
+  const eventsByDeal = new Map<
+    string,
+    Array<{ event_type?: string; summary?: string; occurred_at?: string }>
+  >();
+  for (const e of dealEvents || []) {
+    const row = e as {
+      deal_id: string;
+      event_type?: string;
+      summary?: string;
+      occurred_at?: string;
+    };
+    const list = eventsByDeal.get(row.deal_id) || [];
+    list.push(row);
+    eventsByDeal.set(row.deal_id, list);
+  }
+
+  const candidateDeals = (deals || []).filter(
+    (d) => d.status === "info" || d.status === "viewing"
+  );
+  let needReply = 0;
+  let grokPending = 0;
+  let inquiryNone = 0;
+  let viewingCount = 0;
+  for (const d of candidateDeals) {
+    if (d.status === "viewing") viewingCount++;
+    const inq = d.inquiry_status || "none";
+    if (inq === "has_reply") needReply++;
+    if (inq === "none" || inq === "draft") inquiryNone++;
+    if (d.source !== "mail_grok") grokPending++;
   }
 
   const counts: Record<string, number> = {};
-  for (const s of Object.keys(STATUS_LABEL)) counts[s] = 0;
+  for (const s of Object.keys(DEAL_STATUS_LABEL)) counts[s] = 0;
   for (const d of deals || []) {
     counts[d.status] = (counts[d.status] || 0) + 1;
   }
@@ -176,32 +188,94 @@ export default async function RealEstateDealsPage({
     (c) => !canonId || c.version_id === canonId
   );
 
+  const slimTable = tab === "candidates";
+
+  function tabHref(nextTab: DealsTabId) {
+    const q = new URLSearchParams();
+    q.set("tab", nextTab);
+    if (highlightDeal) q.set("deal", highlightDeal);
+    if (vendorFilter) q.set("vendor", vendorFilter);
+    return `/realestate/deals?${q.toString()}`;
+  }
+
+  function openDealHref(dealId: string) {
+    const q = new URLSearchParams();
+    q.set("tab", tab);
+    q.set("deal", dealId);
+    if (vendorFilter) q.set("vendor", vendorFilter);
+    return `/realestate/deals?${q.toString()}`;
+  }
+
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <RealEstateLaneNav active="b-funnel" />
       <p className="page-kicker">③-B · 実行</p>
       <h1>千三つファネル</h1>
       <p className="sub">
-        情報→内見→買付→融資→購入。見送りは学習。長期プラン・今狙う条件は{" "}
-        <a href="/realestate/buy-plan">買い進めプラン</a>。
-        「確認した」「対象外」で紐づく Gmail を既読。取込の明らかに対象外は見送り候補（当面は未既読・確認後に学習）。
-        第一問い合わせは From=estate・2段確認後にキュー。Mac 常駐が数秒〜数十秒で実行（スリープ中は起動後）。
-        Grok 調査は `[Grok調査]` 件名で estate 受信箱 → mail_grok 取込。
-        気になる案件は「路線価・HZ 追加調査」でコピー → Grok「不動産賃貸チーム」に貼付（参謀が @物件調査）。
+        検討中の物件候補は「候補」タブ。行の「開く」で返信・判断履歴・第一問合せ。
+        業者開拓は <a href="/realestate/vendors">業者開拓ウォッチ</a>。
       </p>
+      {vendorFilter ? (
+        <p className="meta">
+          業者フィルタ: {vendorFilter}{" "}
+          <Link href={`/realestate/deals?tab=${tab}`}>解除</Link>
+        </p>
+      ) : null}
       <p className="meta" style={{ marginBottom: 12 }}>
         {watch.label} · <a href="/jobs">ジョブ一覧</a>
       </p>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: 16,
+        }}
+      >
+        {TAB_LINKS.map((t) => {
+          const on = tab === t.id;
+          return (
+            <Link
+              key={t.id}
+              href={tabHref(t.id)}
+              className={on ? "btn" : undefined}
+              style={
+                on
+                  ? undefined
+                  : {
+                      padding: "4px 10px",
+                      border: "1px solid var(--border, #ccc)",
+                      borderRadius: 6,
+                      textDecoration: "none",
+                      fontSize: 13,
+                    }
+              }
+            >
+              {t.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      {tab === "candidates" ? (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <header>
+            <span className="lvl">候補</span>
+            <strong>要対応サマリー</strong>
+          </header>
+          <p className="meta" style={{ marginTop: 8 }}>
+            要返信 {needReply} · Grok未調査 {grokPending} · 第一問合せ未送{" "}
+            {inquiryNone} · 内見候補 {viewingCount}
+          </p>
+        </div>
+      ) : null}
 
       <div className="card">
         <header>
           <span className="lvl">Jobs</span>
           <strong>候補の更新（Mac 常駐）</strong>
         </header>
-        <p className="meta" style={{ marginTop: 8 }}>
-          キュー後、常駐オンラインなら数十秒以内に実行。オフライン／スリープ中は Mac
-          起動後にドレイン。詳細は <a href="/jobs">ジョブ</a>。
-        </p>
         <p style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <EnqueueJobButton
             jobType="re_mail_match"
@@ -216,269 +290,261 @@ export default async function RealEstateDealsPage({
             payload={{ apply: true }}
           />
           <EnqueueJobButton
-            jobType="ops_consult_ingest"
-            title="運営経緯を再取込"
-            label="運営経緯"
-            payload={{}}
-          />
-          <EnqueueJobButton
             jobType="re_deal_inquiry_poll"
             title="第一問い合わせの返信を取込"
             label="返信取込"
             payload={{}}
           />
         </p>
-        <p className="meta" style={{ marginTop: 8 }}>
-          Excel 再取込・STEP3 export は{" "}
-          <a href="/realestate/buy-plan">買い進めプラン</a> へ移動しました。
-        </p>
       </div>
 
-      <div className="card">
-        <header>
-          <span className="lvl">Funnel</span>
-          <strong>件数（千三つ前提）</strong>
-        </header>
-        <p className="meta" style={{ marginTop: 8 }}>
-          {FUNNEL.map((s) => (
-            <span key={s} style={{ marginRight: 12 }}>
-              {STATUS_LABEL[s]} <strong>{counts[s] || 0}</strong>
+      {tab === "all" ? (
+        <div className="card">
+          <header>
+            <span className="lvl">Funnel</span>
+            <strong>件数</strong>
+          </header>
+          <p className="meta" style={{ marginTop: 8 }}>
+            {FUNNEL.map((s) => (
+              <span key={s} style={{ marginRight: 12 }}>
+                {DEAL_STATUS_LABEL[s]} <strong>{counts[s] || 0}</strong>
+              </span>
+            ))}
+            <span style={{ marginRight: 12 }}>
+              見送り <strong>{counts.passed || 0}</strong>
             </span>
-          ))}
-          <span style={{ marginRight: 12 }}>
-            見送り <strong>{counts.passed || 0}</strong>
-          </span>
-        </p>
-        <p className="meta">
-          現行プラン:{" "}
-          <a href="/realestate/buy-plan">
-            {buyPlan?.label || buyPlan?.version_key || "未取込"}
-          </a>
-          {" · "}
-          <a href="/realestate">運用ハブ →</a>
-        </p>
-      </div>
+          </p>
+        </div>
+      ) : null}
 
-      <div className="card">
-        <header>
-          <span className="lvl">Focus</span>
-          <strong>今狙う条件（要約）</strong>
-        </header>
-        <p className="meta" style={{ marginTop: 8 }}>
-          詳細・年表はプラン画面。ここは候補マッチ用の短冊のみ。
-        </p>
-        <ul className="meta" style={{ paddingLeft: 18 }}>
-          {criteriaLines.length === 0 ? (
-            <li>条件未取込 — プランで Excel 再取込</li>
-          ) : (
-            criteriaLines.slice(0, 8).map((c, i) => (
-              <li key={`${c.sort_order}-${i}`}>{c.raw_text}</li>
-            ))
-          )}
-        </ul>
-        <p style={{ marginTop: 8 }}>
-          <a href="/realestate/buy-plan">買い進めプランで全条件・年表を見る →</a>
-        </p>
-      </div>
-
-      <div className="card">
-        <header>
-          <span className="lvl">運営経緯</span>
-          <strong>809 ヒット（直近）</strong>
-        </header>
-        <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
-          {(ops || []).length === 0 ? (
-            <li>まだ無し</li>
-          ) : (
-            (ops || []).map((e, i) => (
-              <li key={i}>
-                {(e.occurred_at || "").slice(0, 10)} · {e.subject}
-                {e.tags?.length ? `（${(e.tags as string[]).join(",")}）` : ""}
-              </li>
-            ))
-          )}
-        </ul>
-      </div>
+      {tab === "all" ? (
+        <>
+          <div className="card">
+            <header>
+              <span className="lvl">Focus</span>
+              <strong>今狙う条件（要約）</strong>
+            </header>
+            <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
+              {criteriaLines.length === 0 ? (
+                <li>条件未取込</li>
+              ) : (
+                criteriaLines.slice(0, 6).map((c, i) => (
+                  <li key={`${c.sort_order}-${i}`}>{c.raw_text}</li>
+                ))
+              )}
+            </ul>
+          </div>
+          <div className="card">
+            <header>
+              <span className="lvl">運営経緯</span>
+              <strong>809 ヒット（直近）</strong>
+            </header>
+            <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
+              {(ops || []).length === 0 ? (
+                <li>まだ無し</li>
+              ) : (
+                (ops || []).map((e, i) => (
+                  <li key={i}>
+                    {(e.occurred_at || "").slice(0, 10)} · {e.subject}
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        </>
+      ) : null}
 
       <div className="card">
         <header>
           <span className="lvl">Deals</span>
-          <strong>案件一覧</strong>
+          <strong>
+            案件一覧（{visibleDeals.length} 件）
+          </strong>
         </header>
-        {(deals || []).length === 0 ? (
+        {visibleDeals.length === 0 ? (
           <p className="meta" style={{ marginTop: 8 }}>
-            まだ案件がありません。次はメール dry-run（admin 主＋estate
-            補完）で候補を載せます。Q&amp;A 助言は案件条件確定後に{" "}
-            <code>advice_json</code> へ。
+            該当案件がありません。「メール候補を更新」で取込してください。
           </p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>状態</th>
-                <th>スコア</th>
-                <th>タイトル</th>
-                <th>エリア</th>
-                <th>構造</th>
-                <th>価格万</th>
-                <th>利回</th>
-                <th>助言</th>
-                <th>操作</th>
-                <th>第一問合せ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(deals || [])
-                .filter((d) => d.status !== "archived")
-                .map((d) => {
-                const advice = d.advice_json as {
-                  summary?: string;
-                  tips?: string[];
-                } | null;
-                const tip =
-                  advice?.summary ||
-                  (advice?.tips && advice.tips[0]) ||
-                  "—";
-                const sj =
-                  d.summary_json && typeof d.summary_json === "object"
-                    ? (d.summary_json as {
-                        gmail_id?: string;
-                        gmail_read_at?: string;
-                        from?: string;
-                        inquiry_status?: string;
-                        auto_pass_pending_read?: boolean;
-                        auto_pass_reason?: string;
-                        messages?: Array<{
-                          direction?: string;
-                          kind?: string;
-                          subject?: string;
-                          from_email?: string;
-                          occurred_at?: string;
-                          body_text?: string;
-                        }>;
-                      })
-                    : {};
-                const grok =
-                  sj && typeof (sj as { grok?: unknown }).grok === "object"
-                    ? ((sj as { grok?: Record<string, unknown> }).grok as Record<
-                        string,
-                        unknown
-                      >)
-                    : null;
-                const inquiryStatus =
-                  d.inquiry_status || sj.inquiry_status || "none";
-                const attachCount = attachCountByDeal.get(d.id) || 0;
-                const timeline =
-                  messagesByDeal.get(d.id) || sj.messages || [];
-                const autoPassPending = Boolean(sj.auto_pass_pending_read);
-                return (
-                  <tr
-                    key={d.id}
-                    id={`deal-${d.id}`}
-                    style={
-                      highlightDeal && highlightDeal === d.id
-                        ? {
-                            outline: "2px solid var(--danger, #b45309)",
-                            outlineOffset: 2,
-                          }
-                        : undefined
-                    }
-                  >
-                    <td>{STATUS_LABEL[d.status] || d.status}</td>
-                    <td className="meta">
-                      {d.match_score != null ? d.match_score : "—"}
-                    </td>
-                    <td>
-                      {d.title}
-                      <div className="meta">{d.source || ""}</div>
-                      {d.source === "mail_grok" && grok ? (
-                        <div className="meta" style={{ marginTop: 4 }}>
-                          {typeof grok.land_method === "string" && grok.land_method
-                            ? `方式:${grok.land_method} · `
-                            : ""}
-                          {typeof grok.land100 === "string" && grok.land100
-                            ? `土地:${grok.land100} · `
-                            : ""}
-                          {typeof grok.route_price_tsubo === "string" &&
-                          grok.route_price_tsubo
-                            ? `路線:${grok.route_price_tsubo} · `
-                            : ""}
-                          {typeof grok.hazard_eval === "string" && grok.hazard_eval
-                            ? `HZ:${grok.hazard_eval} · `
-                            : ""}
-                          {typeof grok.parking === "string" && grok.parking
-                            ? `駐:${grok.parking} · `
-                            : ""}
-                          {typeof grok.population_eval === "string" &&
-                          grok.population_eval
-                            ? `人口:${grok.population_eval} · `
-                            : ""}
-                          {typeof grok.listen_value === "string" &&
-                          grok.listen_value
-                            ? `聞く:${grok.listen_value}`
-                            : ""}
+        ) : slimTable ? (
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>優先</th>
+                  <th>状態</th>
+                  <th>物件</th>
+                  <th>エリア</th>
+                  <th>価格</th>
+                  <th>Grok</th>
+                  <th>問合せ</th>
+                  <th>最終動き</th>
+                  <th>操作</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleDeals.map((d) => {
+                  const sj =
+                    d.summary_json && typeof d.summary_json === "object"
+                      ? (d.summary_json as Record<string, unknown>)
+                      : {};
+                  const grok =
+                    sj.grok && typeof sj.grok === "object"
+                      ? (sj.grok as Record<string, unknown>)
+                      : null;
+                  const inquiryStatus =
+                    d.inquiry_status ||
+                    (typeof sj.inquiry_status === "string"
+                      ? sj.inquiry_status
+                      : "none");
+                  const msgs = messagesByDeal.get(d.id) || [];
+                  const evs = eventsByDeal.get(d.id) || [];
+                  const activity = lastActivityLine(msgs, evs);
+                  return (
+                    <tr
+                      key={d.id}
+                      id={`deal-${d.id}`}
+                      style={
+                        highlightDeal === d.id
+                          ? {
+                              outline: "2px solid var(--danger, #b45309)",
+                              outlineOffset: 2,
+                            }
+                          : undefined
+                      }
+                    >
+                      <td className="meta">{d.match_score ?? "—"}</td>
+                      <td>{DEAL_STATUS_LABEL[d.status] || d.status}</td>
+                      <td>
+                        {d.title}
+                        <div className="meta">
+                          {SOURCE_BADGE[d.source] || d.source}
                         </div>
-                      ) : null}
-                      {(d.status === "info" || d.status === "viewing") ? (
-                        <GrokInvestigateCopy
+                      </td>
+                      <td className="meta">{d.area || "—"}</td>
+                      <td className="meta">
+                        {d.price_man != null
+                          ? fmtYen(Number(d.price_man) * 10000)
+                          : "—"}
+                      </td>
+                      <td className="meta">{grokOneLine(grok)}</td>
+                      <td>
+                        <span style={inquiryChipStyle(inquiryStatus)}>
+                          {INQUIRY_STATUS_LABEL[inquiryStatus] ||
+                            inquiryStatus}
+                        </span>
+                      </td>
+                      <td className="meta">
+                        {activity.at
+                          ? `${activity.at.slice(0, 10)} ${activity.text.slice(0, 32)}`
+                          : "—"}
+                      </td>
+                      <td>
+                        <DealReviewActions
                           dealId={d.id}
-                          title={d.title}
-                          area={d.area}
-                          priceMan={
-                            d.price_man != null ? Number(d.price_man) : null
+                          status={d.status}
+                          gmailId={
+                            typeof sj.gmail_id === "string"
+                              ? sj.gmail_id
+                              : null
                           }
-                          summaryJson={sj as Record<string, unknown>}
-                          alreadyGrok={d.source === "mail_grok"}
+                          gmailReadAt={
+                            typeof sj.gmail_read_at === "string"
+                              ? sj.gmail_read_at
+                              : null
+                          }
                         />
-                      ) : null}
-                    </td>
-                    <td className="meta">{d.area || "—"}</td>
-                    <td className="meta">{d.structure || "—"}</td>
-                    <td className="meta">
-                      {d.price_man != null ? fmtYen(Number(d.price_man) * 10000) : "—"}
-                    </td>
-                    <td className="meta">
-                      {d.yield_pct != null
-                        ? `${(Number(d.yield_pct) * 100).toFixed(1)}%`
-                        : "—"}
-                    </td>
-                    <td className="meta">{tip}</td>
-                    <td>
-                      <DealReviewActions
-                        dealId={d.id}
-                        status={d.status}
-                        gmailId={sj.gmail_id || null}
-                        gmailReadAt={sj.gmail_read_at || null}
-                      />
-                    </td>
-                    <td>
-                      <DealInquiryActions
-                        dealId={d.id}
-                        title={d.title}
-                        fromRaw={sj.from || null}
-                        inquiryStatus={inquiryStatus}
-                        messages={timeline}
-                        autoPassPendingRead={autoPassPending}
-                        autoPassReason={
-                          typeof sj.auto_pass_reason === "string"
-                            ? sj.auto_pass_reason
-                            : null
-                        }
-                        lastSendJobFailed={failedSendByDeal.get(d.id) || null}
-                      />
-                      {attachCount > 0 ? (
-                        <div className="meta" style={{ marginTop: 4 }}>
-                          添付 {attachCount}件（PDF）
-                        </div>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td>
+                        <Link href={openDealHref(d.id)} className="btn">
+                          開く
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>状態</th>
+                  <th>スコア</th>
+                  <th>タイトル</th>
+                  <th>エリア</th>
+                  <th>価格</th>
+                  <th>問合せ</th>
+                  <th>操作</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleDeals.map((d) => {
+                  const sj =
+                    d.summary_json && typeof d.summary_json === "object"
+                      ? (d.summary_json as Record<string, unknown>)
+                      : {};
+                  const inquiryStatus =
+                    d.inquiry_status ||
+                    (typeof sj.inquiry_status === "string"
+                      ? sj.inquiry_status
+                      : "none");
+                  return (
+                    <tr key={d.id}>
+                      <td>{DEAL_STATUS_LABEL[d.status] || d.status}</td>
+                      <td className="meta">{d.match_score ?? "—"}</td>
+                      <td>
+                        {d.title}
+                        <div className="meta">{d.source}</div>
+                      </td>
+                      <td className="meta">{d.area || "—"}</td>
+                      <td className="meta">
+                        {d.price_man != null
+                          ? fmtYen(Number(d.price_man) * 10000)
+                          : "—"}
+                      </td>
+                      <td>
+                        <span style={inquiryChipStyle(inquiryStatus)}>
+                          {INQUIRY_STATUS_LABEL[inquiryStatus] ||
+                            inquiryStatus}
+                        </span>
+                      </td>
+                      <td>
+                        <DealReviewActions
+                          dealId={d.id}
+                          status={d.status}
+                          gmailId={
+                            typeof sj.gmail_id === "string"
+                              ? sj.gmail_id
+                              : null
+                          }
+                          gmailReadAt={
+                            typeof sj.gmail_read_at === "string"
+                              ? sj.gmail_read_at
+                              : null
+                          }
+                        />
+                      </td>
+                      <td>
+                        <Link href={openDealHref(d.id)} className="btn">
+                          開く
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
+
+      <Suspense fallback={null}>
+        <DealsDrawerHost dealId={highlightDeal || null} />
+      </Suspense>
     </Shell>
   );
 }
