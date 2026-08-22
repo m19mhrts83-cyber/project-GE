@@ -74,6 +74,30 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_re_inquiry.py --build-ops-pack --deal-id <uuid>
 ```
 
+- [ ] `/consultations` にパックが作成される（自動送信はしない）
+
+## 8. 神大家運営相談フォーム（has_reply 後）
+
+**正**: [戸建て購入・東海地域](https://form.os7.biz/f/1906a1a5/) — フィールド定義 `config/kurashift_re_ops_form_1906a1a5.yaml`
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_re_ops_form_draft.py --deal-id <uuid> --apply
+```
+
+- [ ] ドロワーに「返信あり — 次の一手」ガイド
+- [ ] 不足項目（家賃・修繕・CF・Drive 写真）を洗い出し
+- [ ] 神大家個人 Drive に物件フォルダ（フォルダ名＝物件名）
+- [ ] **ユーザー確認後**にフォーム送信（Jarvis は自動送信しない）
+- [ ] 809 運営回答 → 内見判断
+
+日次確認:
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_re_daily_digest.py
+```
+
+KURASHIFT: `/realestate/deals?tab=candidates&inquiry=has_reply`
+
 ---
 
 ## Phase 5 通しテスト（2026-08-22 実施）

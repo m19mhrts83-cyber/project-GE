@@ -193,6 +193,15 @@ def parse_grok_report(text: str) -> dict[str, Any]:
     out["population_eval"] = _field_in_section(text, "人口", "評価") or _field_after_label(
         text, "評価"
     )
+    pop_summary = _field_in_section(text, "人口", "表")
+    pop_table = ""
+    for line in _section_text(text, "人口").splitlines():
+        if line.strip().startswith("|"):
+            pop_table = (pop_table + "\n" + line).strip()
+    if pop_table:
+        out["population_table"] = pop_table[:800]
+    elif pop_summary:
+        out["population_table"] = pop_summary[:800]
     out["listen_value"] = _field_in_section(text, "総合", "聞く価値") or _field_after_label(
         text, "聞く価値"
     )
@@ -206,12 +215,6 @@ def parse_grok_report(text: str) -> dict[str, Any]:
             rid = m.group(1)
     if rid:
         out["report_id"] = rid
-    pop_table = ""
-    for line in _section_text(text, "人口").splitlines():
-        if line.strip().startswith("|"):
-            pop_table = (pop_table + "\n" + line).strip()
-    if pop_table:
-        out["population_table"] = pop_table[:800]
     return out
 
 

@@ -163,6 +163,34 @@ export default function DealInquiryActions({
     }
   }
 
+  async function formDraft() {
+    setBusy("form_draft");
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "form_draft" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(data.error || "失敗");
+      } else {
+        setMsg(
+          "フォーム下書きをキューしました（Mac 常駐実行後、ドロワーに反映）"
+        );
+        router.refresh();
+      }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const showFormDraft =
+    status === "has_reply" || status === "awaiting_reply" || showPack;
+
   async function autopass(action: "autopass_confirm" | "autopass_reject") {
     setBusy(action);
     setMsg(null);
@@ -254,6 +282,17 @@ export default function DealInquiryActions({
             onClick={pack}
           >
             {busy === "pack" ? "…" : "運営相談パック"}
+          </button>
+        ) : null}
+        {showFormDraft ? (
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 12, padding: "4px 8px" }}
+            disabled={busy !== null}
+            onClick={formDraft}
+          >
+            {busy === "form_draft" ? "…" : "フォーム下書き"}
           </button>
         ) : null}
       </div>

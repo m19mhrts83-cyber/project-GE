@@ -188,6 +188,24 @@ export async function POST(
     return NextResponse.json({ ok: true, job_id: job?.id });
   }
 
+  if (action === "form_draft") {
+    const { data: job, error: jobErr } = await supabase
+      .from("kurashift_jobs")
+      .insert({
+        job_type: "re_ops_form_draft",
+        title: `運営相談フォーム下書き: ${String(row.title || "").slice(0, 50)}`,
+        status: "queued",
+        payload: { deal_id: id },
+        created_by: user.email ?? user.id,
+      })
+      .select("id")
+      .single();
+    if (jobErr) {
+      return NextResponse.json({ error: jobErr.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, job_id: job?.id });
+  }
+
   if (action === "poll") {
     const { data: job, error: jobErr } = await supabase
       .from("kurashift_jobs")
@@ -280,7 +298,7 @@ export async function POST(
   return NextResponse.json(
     {
       error:
-        "action must be send | build_ops_pack | poll | autopass_confirm | autopass_reject",
+        "action must be send | build_ops_pack | form_draft | poll | autopass_confirm | autopass_reject",
     },
     { status: 400 }
   );

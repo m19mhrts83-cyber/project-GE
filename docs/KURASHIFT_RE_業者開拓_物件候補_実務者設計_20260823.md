@@ -334,7 +334,17 @@ EnqueueJobButton（vendors ページ）:
 
 **本番前**: Supabase に `20260823_kurashift_re_vendors_events.sql` を適用 → デプロイ → vendors 画面で「リストを同期」1 回。
 
-### Phase 2（任意）
+### Phase 2（日次サイクル）— **2026-08-23 実装済**
+
+- [x] 朝バンドル: `grok_bucho_mail_apply` / `vendor_sync` / `inquiry_poll` / `re_daily_digest`
+- [x] `jarvis_kurashift_re_ops_form_draft.py` + `config/kurashift_re_ops_form_1906a1a5.yaml`
+- [x] job `re_ops_form_draft` + ドロワー「フォーム下書き」
+- [x] deals `?inquiry=has_reply` フィルタ + 返信後ガイド
+- [x] `build_ops_pack` にフォーム下書き追記
+
+**日次フロー**: Grok 本日分 → bucho apply → vendor sync → inquiry poll → KURASHIFT 要返信 → PDF/返信確認 → フォーム調査 → Drive → **確認後**フォーム送信 → 809 回答 → 内見
+
+### Phase 3（任意）
 
 - [ ] vendor ↔ deal 自動紐付け強化（PDF 物件名）
 - [ ] 業者行から Dashboard 返信下書き deep link

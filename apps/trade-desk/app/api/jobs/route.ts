@@ -30,6 +30,7 @@ const ALLOWED = new Set([
   "re_sync_loan_tracker",
   "re_revise_plan",
   "re_vendor_sync",
+  "re_ops_form_draft",
 ]);
 
 export async function POST(req: Request) {

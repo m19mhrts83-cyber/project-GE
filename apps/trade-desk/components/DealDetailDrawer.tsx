@@ -92,6 +92,16 @@ export default function DealDetailDrawer({
   const inquiryStatus =
     deal?.inquiry_status ||
     (typeof sj.inquiry_status === "string" ? sj.inquiry_status : "none");
+  const opsFormDraft =
+    sj.ops_form_draft && typeof sj.ops_form_draft === "object"
+      ? (sj.ops_form_draft as {
+          form_url?: string;
+          missing_count?: number;
+          markdown?: string;
+        })
+      : null;
+  const OPS_FORM_URL =
+    "https://form.os7.biz/f/1906a1a5/";
   const messages = timeline.filter((t) => t.kind === "message");
   const events = timeline.filter((t) => t.kind === "event");
 
@@ -173,6 +183,12 @@ export default function DealDetailDrawer({
                 <p className="meta" style={{ marginTop: 6 }}>
                   {grokOneLine(grok)}
                 </p>
+                {typeof grok.population_table === "string" &&
+                grok.population_table ? (
+                  <p className="meta" style={{ marginTop: 4 }}>
+                    人口動態: {String(grok.population_table).slice(0, 200)}
+                  </p>
+                ) : null}
                 <details style={{ marginTop: 8 }}>
                   <summary className="meta">全文</summary>
                   <pre
@@ -186,6 +202,62 @@ export default function DealDetailDrawer({
                     {JSON.stringify(grok, null, 2)}
                   </pre>
                 </details>
+              </div>
+            ) : null}
+
+            {inquiryStatus === "has_reply" ? (
+              <div
+                className="card"
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  background: "#ecfdf5",
+                  border: "1px solid #a7f3d0",
+                }}
+              >
+                <strong>返信あり — 次の一手</strong>
+                <ol
+                  className="meta"
+                  style={{ paddingLeft: 18, marginTop: 8, marginBottom: 8 }}
+                >
+                  <li>メール返信・添付 PDF を確認</li>
+                  <li>「フォーム下書き」で不足項目を洗い出し</li>
+                  <li>神大家個人 Drive に物件フォルダ＋写真</li>
+                  <li>
+                    <a
+                      href={opsFormDraft?.form_url || OPS_FORM_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      運営相談フォーム
+                    </a>
+                    （確認後に送信）
+                  </li>
+                  <li>809 運営回答 → 内見判断</li>
+                </ol>
+              </div>
+            ) : null}
+
+            {opsFormDraft?.markdown ? (
+              <div className="card" style={{ marginTop: 12, padding: 12 }}>
+                <strong>
+                  フォーム下書き
+                  {opsFormDraft.missing_count != null
+                    ? `（不足 ${opsFormDraft.missing_count} 項目）`
+                    : ""}
+                </strong>
+                <pre
+                  className="meta"
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    fontSize: 11,
+                    marginTop: 8,
+                    maxHeight: 240,
+                    overflow: "auto",
+                  }}
+                >
+                  {opsFormDraft.markdown}
+                </pre>
               </div>
             ) : null}
 

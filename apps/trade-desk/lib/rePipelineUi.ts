@@ -58,6 +58,9 @@ export function grokOneLine(grok: Record<string, unknown> | null): string {
   if (typeof grok.land100 === "string" && grok.land100) {
     parts.push(`土地:${grok.land100}`);
   }
+  if (typeof grok.population_eval === "string" && grok.population_eval) {
+    parts.push(`人口:${grok.population_eval}`);
+  }
   return parts.length ? parts.join(" · ") : "—";
 }
 
