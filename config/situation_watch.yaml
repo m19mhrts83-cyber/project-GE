@@ -257,13 +257,27 @@ items:
 
   # 2026-08 一時 Pro Plus → 9月前に Pro へ戻す（意図しない継続課金防止）
   - id: cursor_pro_plus_downgrade
-    title: Cursor Pro Plus → Pro に戻す
+    title: Cursor Pro Plus → Pro に戻す（様子見）
     category: ops
     enabled: true
     never_archive: true
-    source: "deadline 2026-08-24 / cursor.com/settings"
+    source: "方針 2026-08-22 / cursor.com/dashboard/billing"
     cursor_prompt: |
-      Cursor を Pro Plus から Pro へダウングレードする期限は 2026-08-24。
-      設定: https://www.cursor.com/settings → Schedule Downgrade（またはプラン変更）。
-      9月請求で Pro Plus が続かないよう、24日までに手続きを確認して。
+      Cursor は Pro へ戻し月額で様子見（困ったら Pro+。年額 Pro+ は Notion 年額 9/28 の後）。
+      Billing で Schedule Downgrade を確認。ダウングレードは「請求期間の終わり」まで Pro+ が続く。
+      枠の正: Spending タブ。Other Models $20 が先に尽きやすい。Cursor Models（Composer/Grok）は別枠。
+      Grok Bot アプリは Pro では使えない（Pro+ 再上げか SuperGrok 連携が要る）。
       ダッシュボード課金: /billing（Cursor 行）。
+
+  - id: cursor_usage_watch
+    title: Cursor 枠（Other / Cursor Models）
+    category: ops
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/cursor_usage_watch.json
+    cursor_prompt: |
+      Cursor の枠使い切りを確認して。state: .jarvis_state/cursor_usage_watch.json
+      Spending 画面を目視し、scripts/jarvis_cursor_usage_watch.py --set で％を更新 → --push。
+      Other ≥70% は Composer/Cursor Grok へ寄せ、≥90% や残日少＋半分超えは Pro+ 再上げを検討。
+      SuperGrok Plus 連携は Pro+ より高いので採用しない（必要なら Pro+）。
+      ダッシュボード: /billing の「Cursor 枠」カード。

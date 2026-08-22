@@ -17,10 +17,10 @@ services:
     status: active
     billing: monthly
     amount_yen: 3239
-    usage_note: "2026-08 は Pro Plus（一時）。2026-08-24 までに Pro へ戻す。Usage 従量あり"
-    next_bill: "毎月25日前後"
+    usage_note: "2026-08-22方針: Proへ戻し月額で様子見。困ったらPro+。年額Pro+はNotion年額(9/28)の後。Grok BotはPro不可。SuperGrok Plus連携≈$100はPro+より高い→採用せず、必要ならPro+再上げ。枠は /billing Cursor枠カード（手動--set）"
+    next_bill: "毎月25日前後（Billingの更新日が正）"
     watch: true
-    watch_reason: "8月 Pro Plus → 9月前に Pro。意図しない継続課金防止（〜8/24）"
+    watch_reason: "Pro様子見。枠切れ→on-demandかPro+再上げ。年額固定はNotion後"
     cancel_candidate: false
     billing_url: "https://www.cursor.com/settings"
 

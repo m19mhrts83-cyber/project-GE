@@ -40,6 +40,21 @@ type MonthlySummary = {
   has_changes?: boolean;
 };
 
+type CursorUsageWatch = {
+  plan?: string;
+  billing_cycle_end?: string | null;
+  other_models_pct_used?: number | null;
+  cursor_models_pct_used?: number | null;
+  other_included_usd?: number | null;
+  on_demand_enabled?: boolean | null;
+  days_left?: number | null;
+  level?: string;
+  verdict?: string;
+  note?: string | null;
+  updated_at?: string | null;
+  spending_url?: string;
+};
+
 const CAT_LABEL: Record<string, string> = {
   ai: "AI 活用",
   lifestyle: "生活・ソフト",
@@ -56,6 +71,12 @@ const STATUS_LABEL: Record<string, string> = {
   ended: "終了",
   free: "無料",
   unknown: "不明",
+};
+
+const PLAN_LABEL: Record<string, string> = {
+  pro: "Pro",
+  pro_plus: "Pro+",
+  ultra: "Ultra",
 };
 
 const OTHER_ORDER = [
@@ -79,6 +100,110 @@ function parseMonthly(raw: string | undefined): MonthlySummary | null {
   } catch {
     return null;
   }
+}
+
+function parseCursorUsage(raw: string | undefined): CursorUsageWatch | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as CursorUsageWatch;
+    return v && typeof v === "object" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function UsageBar({
+  label,
+  pct,
+}: {
+  label: string;
+  pct: number | null | undefined;
+}) {
+  const n = pct == null || Number.isNaN(Number(pct)) ? null : Number(pct);
+  const clamped = n == null ? 0 : Math.max(0, Math.min(100, n));
+  const tone =
+    n == null
+      ? "neutral"
+      : n >= 90
+        ? "hot"
+        : n >= 70
+          ? "warm"
+          : "ok";
+  return (
+    <div className="cursor-usage-bar-row">
+      <div className="cursor-usage-bar-label">
+        <span>{label}</span>
+        <span className="meta">{n == null ? "—" : `${Math.round(n)}%`}</span>
+      </div>
+      <div className="cursor-usage-bar-track" aria-hidden>
+        <div
+          className={`cursor-usage-bar-fill tone-${tone}`}
+          style={{ width: n == null ? "0%" : `${clamped}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CursorUsageCard({ u }: { u: CursorUsageWatch | null }) {
+  const level = u?.level || "info";
+  const verdict = u?.verdict || "未記録 — Spending を見て --set してください";
+  const plan = PLAN_LABEL[u?.plan || ""] || u?.plan || "—";
+  const spending =
+    u?.spending_url || "https://cursor.com/dashboard/spending";
+  const levelCls =
+    level === "attention"
+      ? "level-attention"
+      : level === "warn"
+        ? "level-warn"
+        : "";
+
+  return (
+    <section className={`billing-cursor-usage card ${levelCls}`.trim()}>
+      <header className="cursor-usage-head">
+        <div>
+          <p className="billing-summary-kicker">Cursor 枠</p>
+          <p className="cursor-usage-plan">
+            {plan}
+            {u?.other_included_usd != null
+              ? ` · Other込み $${u.other_included_usd}`
+              : ""}
+          </p>
+        </div>
+        <span className={`cursor-usage-badge tone-${level}`}>
+          {level === "attention"
+            ? "要検討"
+            : level === "warn"
+              ? "注意"
+              : level === "ok"
+                ? "余裕"
+                : "未記録"}
+        </span>
+      </header>
+      <p className="cursor-usage-verdict">{verdict}</p>
+      <UsageBar label="Other Models" pct={u?.other_models_pct_used} />
+      <UsageBar label="Cursor Models" pct={u?.cursor_models_pct_used} />
+      <p className="meta cursor-usage-meta">
+        サイクル末日: {u?.billing_cycle_end || "—"}
+        {u?.days_left != null ? `（残${u.days_left}日）` : ""}
+        {u?.on_demand_enabled != null
+          ? ` · on-demand ${u.on_demand_enabled ? "ON" : "OFF"}`
+          : ""}
+      </p>
+      <p className="meta cursor-usage-foot">
+        <a href={spending} target="_blank" rel="noopener noreferrer">
+          Spending ↗
+        </a>
+        {" · "}
+        最終更新:{" "}
+        {u?.updated_at ? formatJstYmdHm(u.updated_at) : "未記録"}
+      </p>
+      <p className="meta cursor-usage-note">
+        Grok BotはPro不可。SuperGrok Plus連携≈$100はPro+より高い →
+        必要ならPro+再上げ（連携は採用しない）
+      </p>
+    </section>
+  );
 }
 
 function ServiceCard({ s }: { s: SubRow }) {
@@ -297,12 +422,17 @@ export default async function BillingPage() {
   const { data: meta } = await supabase
     .from("sync_meta")
     .select("key,value")
-    .in("key", ["subscriptions_pushed_at", "subscriptions_monthly_summary"]);
+    .in("key", [
+      "subscriptions_pushed_at",
+      "subscriptions_monthly_summary",
+      "cursor_usage_watch",
+    ]);
   const metaMap = Object.fromEntries(
     (meta || []).map((m) => [m.key, m.value as string]),
   );
   const pushedAt = metaMap.subscriptions_pushed_at;
   const monthly = parseMonthly(metaMap.subscriptions_monthly_summary);
+  const cursorUsage = parseCursorUsage(metaMap.cursor_usage_watch);
 
   return (
     <Shell active="/billing">
@@ -318,6 +448,8 @@ export default async function BillingPage() {
           <code>jarvis_subscriptions_push.py --push</code> を実行してください。
         </p>
       )}
+
+      <CursorUsageCard u={cursorUsage} />
 
       <div className="stats">
         <div className="stat">
