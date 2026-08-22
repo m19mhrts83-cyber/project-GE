@@ -21,7 +21,8 @@ send_gate: Phase4 — Grok Bot2 / approved A'-v2 の Web フォーム送信可�
 - **リスト正本**: `config/kurashift_re_vendor_list.yaml`
 - **送信者**: **松野個人**。**返信先・署名は `matsuno.estate@gmail.com`（松野エステイト）**
 - **運営問合済み**: `ops_contacted_at` は神大家運営作業の参考のみ。個人として改めて送る
-- **1日 N 件**: `daily_outreach_limit`（既定 3）
+- **1日 N 件**: `daily_outreach_limit`（Phase 1=3 → 2=5 → 3=10）
+- **系列重複**: 同一グループ・同一問合せ経路への二重送信禁止（Bot2 必須チェック）
 - **地場向け**: **利回り%・土地値%は書かない**（安さ・即検討・3棟所有で信頼を取る）
 
 ## 必須 / 禁止
@@ -101,8 +102,15 @@ matsuno.estate@gmail.com
 | お名前 | 松野真治 |
 | フリガナ | マツノマサハル |
 | メール | matsuno.estate@gmail.com |
-| 電話 | `.env.jarvis_private` の `PERSONAL_PHONE` |
-| 住所 | 要確認（フォーム必須時のみ。正本は jarvis_private） |
+| 電話 | JSON `form_contact.phone`（Jarvis が `--next` に付与）。無ければ松野に確認 |
+| 住所 | JSON `form_contact.address` + `postal_code`。無ければ松野に確認 |
+
+## 系列・グループ重複（心証）
+
+- **単独店** … 送信可
+- **同一系列で同一問合せ経路** … **2店目以降は送らない**（`skip` + 理由）
+- 判定: ブランド名 / 同一 `contact_url` / 同一本部フォーム / `group_key`
+- 詳細: `grok_vendor_outreach_bot_grok_paste.md` §系列
 
 ## Bot 作業手順
 

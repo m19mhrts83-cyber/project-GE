@@ -7,16 +7,27 @@
 **送信**: **A'-v2 固定・リスト3社/日・都度承認不要**（2026-08-22 松野委任）。  
 **別Bot**: 物件調査（`[Grok調査]` → estate）は `config/grok_property_report_format.md`（Bot1）
 
-## 毎日の流れ（1日3件）
+## 毎日の流れ（Phase 1 · 3社/日）
 
-1. Mac で次の3社を取得（ユーザーまたは Jarvis が実行）:
+### 週次バッチ（推奨 · 低メンテ）
 
 ```bash
 cd ~/git-repos
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --batch-week --grok-kickoff
+```
+
+- **週1回**: 出力のキックオフ文 + JSON を Grok Bot2 に1通送る
+- **平日**: 同スレッドで「**本日分**」のみ（JSON 再生成不要）
+- **週末**: Grok の `--mark` 一覧を Jarvis/Mac に同期
+
+### 日次のみ（従来）
+
+```bash
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --next 3
 ```
 
-2. JSON を Bot2 に渡す。Bot2 が各社について:
+2. JSON を Bot2 に渡す（週次 or 日次）。Bot2 が各社について:
+
    - `contact_url` または `url` の **Web 問合せフォーム**を開く
    - **本文**: `config/grok_vendor_outreach_format.md` の A'-v2（list_region でエリア差替）
    - **返信先**: matsuno.estate@gmail.com（必須）
