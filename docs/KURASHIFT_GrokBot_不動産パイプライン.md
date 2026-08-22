@@ -61,8 +61,11 @@ flowchart TB
 |---|---|---|
 | リスト取込 | Jarvis | `--import-csv` → `kurashift_re_vendor_list.yaml` |
 | 次に問合せ | Grok / 手動 | `--next 3` |
-| 結果記録 | Jarvis | `--mark ID --status contacted` |
+| 結果記録 | Jarvis | `--mark ID --status contacted` / 返信時 `replied` |
 | 日次探索 | Grok Bot | `--grok-discovery-prompt` → YAML 追記 → `--merge-append` |
+| **返信・物件** | Jarvis / KURASHIFT | `property_mail_match` → deals（**ブロックしない**） |
+
+**送信**: Bot2 は approved A'-v2 で **Web フォーム送信まで自動**（1日3社・都度承認不要）。
 
 正本: `config/kurashift_re_vendor_list.yaml`（gitignore）  
 CLI: `scripts/jarvis_kurashift_vendor_list.py`  
@@ -118,4 +121,26 @@ Grok 追記形式: `config/grok_vendor_discovery_append.md`
 5. ✅ E2E パイプライン（fixture PASS）— `jarvis_kurashift_grok_e2e_runner.py` / `docs/KURASHIFT_re_inquiry_E2E_checklist.md`
 6. ⏳ 本番第一問合せ（`聞く` 実物件待ち）— `docs/KURASHIFT_grok_first_stepA.md` §5
 7. ⏳ Phase PDF-1（PDF 中身抽出）
-8. ⏳ 業者開拓送信開始（`--next 3` / `grok_vendor_outreach_bot.md`）
+8. ⏳ 業者開拓送信（Bot2 自動送信・`--next 3`）— Instructions 更新済み 2026-08-22
+
+---
+
+## 業者返信（milestone）— ブロックしない
+
+問合せ後に業者から **質問・物件PDF** が estate に届くのは成功。Gmail ブロック／拒否リストには載せない。
+
+```mermaid
+flowchart LR
+  bot2[Bot2 初回問合せ] --> vendor[地場業者]
+  vendor --> reply[estate 返信]
+  reply --> match[property_mail_match]
+  match --> deals[deals]
+  deals --> grok[Bot1 Grok調査]
+  deals --> inquiry[第一問合せ UI]
+```
+
+| 返信 | 裁き |
+|---|---|
+| 予算・エリア等の質問 | estate 短文返信 + `--status replied` |
+| 物件資料 | deals 取込 → Grok → ファネル |
+| スパム・無関係 | 物件 `passed` のみ（業者ブロックとは別） |

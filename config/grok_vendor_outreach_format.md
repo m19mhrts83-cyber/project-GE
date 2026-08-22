@@ -4,7 +4,7 @@ version: A'-v2
 approved_at: 2026-08-22
 approved_by: 松野（Grok Bot2 A' + ボロAP1行・WeStudy step5-2）
 supersedes: v1（土地値100%・第二希望ブロック）
-send_gate: Phase4 — Grok Bot2 / 手動 Web 送信のみ。draft では送らない
+send_gate: Phase4 — Grok Bot2 / approved A'-v2 の Web フォーム送信可（1日3社・リスト順）。都度承認不要。draft では送らない
 ---
 
 # Grok 業者開拓 Bot — 問い合わせ形式（正本）
@@ -112,7 +112,8 @@ matsuno.estate@gmail.com
 2. 上記 **A'-v2 標準文面**（list_region でエリア差替）
 3. `ops_contacted_at` があっても個人未送信 → 送ってよい
 4. フォームに **返信先メール matsuno.estate@gmail.com** を必記
-5. 送信後: `--mark {id} --status contacted --note "個人Web送信(estate) YYYY-MM-DD"`
+5. **Bot2 が送信まで実行**（approved A'-v2・1日3社・都度承認不要）
+6. 送信後: `--mark {id} --status contacted --note "個人Web送信(estate) YYYY-MM-DD"`
 
 ### B. 新規探索（1日 M 件・問合せは送らない）
 
@@ -130,3 +131,18 @@ matsuno.estate@gmail.com
 - Bot 貼り付け: `config/grok_vendor_outreach_bot_grok_paste.md`
 - 返信 → `property_mail_match.py`（estate）
 - 具体物件 → deals → `kurashift_re_inquiry_template.yaml`
+
+## 返信・物件送付の裁き（milestone 業者）
+
+**ブロックリスト対象ではない。** 問合せの成功（期待どおりの返信）として扱う。
+
+| 返信の種類 | 裁き | ブロック？ |
+|---|---|---|
+| 条件確認・質問のみ（予算・エリア・用途） | estate から短文返信（Jarvis 下書き可）。YAML `--mark … --status replied` | **しない** |
+| 物件 PDF／リンク／概要資料 | `property_mail_match --apply` → deals → 候補なら Bot1 `[Grok調査]` → ファネル | **しない** |
+| 挨拶・登録完了・「物件があれば連絡」 | `replied` 記録。deals 待ち | **しない** |
+| 関係ない一斉・セミナー勧誘・スパム | `passed` または Gmail フィルタ。リスト `--status skip` | 物件メールとして除外（業者ブロックリストとは別） |
+
+- **auto_pass**（エリア外・区分のみ等）= 物件のふるい。業者そのものの拒否リストではない。
+- 返信が来た業者は **milestone（関係構築中）**。以降の物件メールは **パートナー系より軽い** が、**取込・評価パイプラインは同じ**（deals / Grok / 第一問合せ）。
+- Bot2 は **返信対応・物件判断をしない**。estate 受信 → Jarvis 取込 → KURASHIFT deals が正本。
