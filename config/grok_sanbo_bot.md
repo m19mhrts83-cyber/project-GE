@@ -1,96 +1,76 @@
-# Grok「参謀」Bot — 運用説明（正本）
+# Grok「不動産賃貸・部長」Bot — 運用説明（正本）
 
 更新: 2026-08-22
 
-## 位置づけ
+## 組織イメージ
+
+```text
+松野
+ ├── Jarvis（Mac · 右腕・参謀） … 台帳 · deals · メール取込
+ └── Grok
+      └── 【部署】不動産賃貸（現時点1つのみ）
+           ├── 部長 Bot … 松野の Grok 窓口
+           └── 社員 Bot … 物件調査 / 業者開拓 / 周辺MAP 等
+```
 
 | 名前 | 場所 | 役割 |
 |---|---|---|
-| **Jarvis** | Cursor / Mac | 右腕 · 台帳 · deals · `--apply-marks` · 正本 |
-| **参謀** | Grok Bot（役割=参謀） | Grok 社員の統括 · 松野の **Grok 窓口1本** |
-| **物件調査** | Grok 社員 | `[Grok調査]` |
-| **物件業者開拓** | Grok 社員 | Web 問合せ初回 |
-| **周辺MAP** | 参謀内 §周辺MAP（将来独立 Bot 可） | 購入後 MAP |
+| **Jarvis** | Cursor / Mac | 右腕 · 参謀 · 正本 |
+| **部長** | Grok Bot | 不動産賃貸部署の統括 |
+| **社員** | Grok Bot | 専門作業 |
 
-松野は **Grok には参謀だけ** に話す。参謀が社員役を実行（またはグループで指示）。  
-結果の Mac 反映は **Jarvis と相談**。
+松野は Grok では **部長だけ** に指示。
 
-## Instructions 貼り付け
+## 部長日報 → estate メール（正本 · 手動コピー不要）
 
-`config/grok_sanbo_bot_grok_paste.md` のコードブロック内を Grok Bot Instructions に貼る。
+部長が業務完了後、**matsuno.estate@gmail.com** へ `[Grok部長]` メールを送る。  
+Jarvis が estate 受信から `--mark` を YAML に反映する。
 
-Grok UI で **役割「参謀」** を選べる場合はそれを使用（Chief of Staff 相当）。
+| 種別 | 件名 |
+|---|---|
+| 日次 | `[Grok部長] 日報 YYYY-MM-DD` |
+| 週次 | `[Grok部長] 週次 YYYY-MM-DD` |
 
-## 毎週の流れ（業者開拓 · 既存 Bot2 運用を参謀経由に）
+本文に `📎 Jarvis 用` ブロックと `--mark` 行を含める（Instructions テンプレ参照）。
 
-### 月（週1）
+### Jarvis 取込
 
 ```bash
 cd ~/git-repos
-~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --batch-week --grok-kickoff
+~/selenium_env/venv/bin/python scripts/jarvis_grok_bucho_mail_apply.py --apply
 ```
 
-出力（キックオフ + JSON）→ **参謀** に1通（物件業者開拓 Bot への直接貼付は不要）。
+パートナー確認のついで・週1で実行可。プレビューは `--dry-run`。
+
+処理済み message_id は `.jarvis_state/grok_bucho_mail_apply.json` に記録（二重反映防止）。
+
+### 障害時
+
+`--apply-marks grok_summary.txt`（手動ファイル）にフォールバック。
+
+## Instructions 貼り付け
+
+`config/grok_sanbo_bot_grok_paste.md` のコードブロック内。
+
+## 毎週の流れ（業者開拓）
+
+### 月
+
+`--batch-week --grok-kickoff` → **部長** に1通。
 
 ### 火〜金
 
-参謀スレッドで:
+部長スレッド: `本日分` → 完了後 **部長日報メール**（日次）。
 
-```
-本日分
-```
+### 週末
 
-### 金 or 日（Mac · Jarvis）
-
-参謀の週次サマリー **`📎 Jarvis 用`** ブロックを保存 →
-
-```bash
-~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py \
-  --apply-marks grok_week_summary.txt
-```
-
-## 物件調査
-
-deals「Grok調査用コピー」または物件概要を **参謀** に渡す:
-
-```
-この物件を調査して（物件調査モード）
-```
-
-参謀が §物件調査モードで `[Grok調査]` 送信。取込は Jarvis:
-
-```bash
-~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --grok-only --apply
-```
-
-## 周辺MAP（段階導入）
-
-購入後:
-
-```
-【物件名】の周辺MAP。住所: ... ターゲット: ...
-```
-
-参謀が Step1.2 相当 + Canva チェックリストを返す。PNG 保存・フォルダ整理は Jarvis。
-
-## 独立社員 Bot との関係
-
-- **v0**: 参謀1体が社員役を **内包実行**（方式A）。既存 Bot1/Bot2 Instructions は正本として残す。
-- **v1（任意）**: グループ「不動産チーム」+ 独立 Bot。松野は参謀 DM のみ。
-
-独立 Bot を残す理由: 長期スレッド・専用 VM · 参謀がグループ経由で再利用。
-
-## 禁止（再掲）
-
-- 松野に「Bot2 に貼って」と丸投げ
-- Jarvis 領域（YAML / deals）を Grok 参謀が直接更新
-- approved 改変 · リスト外送信
+Jarvis: `jarvis_grok_bucho_mail_apply.py --apply`（週次メール取込）。
 
 ## 関連
 
 | ファイル | 内容 |
 |---|---|
-| `config/grok_sanbo_bot_grok_paste.md` | Instructions 貼り付け |
-| `config/grok_property_bot_grok_paste.md` | 社員: 物件調査 |
-| `config/grok_vendor_outreach_bot_grok_paste.md` | 社員: 業者開拓 |
-| `docs/KURASHIFT_GrokBot_不動産パイプライン.md` | 全体パイプライン |
+| `config/grok_sanbo_bot_grok_paste.md` | Instructions |
+| `scripts/jarvis_grok_bucho_mail_apply.py` | メール取込 |
+| `scripts/jarvis_kurashift_vendor_list.py` | `--apply-marks` 手動 |
+| `docs/KURASHIFT_GrokBot_不動産パイプライン.md` | パイプライン |

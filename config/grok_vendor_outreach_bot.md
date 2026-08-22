@@ -9,24 +9,24 @@
 
 ## 毎日の流れ（Phase 1 · 3社/日）
 
-### 週次バッチ（推奨 · 低メンテ）
+### 週次バッチ（推奨 · 低メンテ · 部長経由）
 
 ```bash
 cd ~/git-repos
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --batch-week --grok-kickoff
 ```
 
-- **週1回**: 出力のキックオフ文 + JSON を Grok Bot2 に1通送る
-- **平日**: 同スレッドで「**本日分**」のみ（JSON 再生成不要）
-- **週末**: Grok の `--mark` 一覧を Mac に一括反映:
+- **週1回**: 出力のキックオフ文 + JSON を **部長 Bot** に1通（Bot2 直接は不要）
+- **平日**: 部長スレッドで「**本日分**」→ 完了後 **部長日報メール**（日次 `[Grok部長] 日報`）
+- **週末**: 部長が **`[Grok部長] 週次 YYYY-MM-DD`** メール（`--mark` 全行）→ Jarvis:
 
 ```bash
-# Grok 週次サマリーを grok_week_summary.txt に保存してから
-~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py \
-  --apply-marks grok_week_summary.txt
+~/selenium_env/venv/bin/python scripts/jarvis_grok_bucho_mail_apply.py --apply
 ```
 
 `discovered_url:` が note にあれば YAML の `url` / `contact_url` も自動補完。
+
+独立 Bot2 スレッドを使う場合も、**週次 Mac 同期は部長日報メール1通**に集約（Bot2 単体で週次メールしない）。
 
 ### 日次のみ（従来）
 
