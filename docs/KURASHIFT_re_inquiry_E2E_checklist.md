@@ -76,10 +76,29 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ---
 
-## 待ち状態（2026-08-22）
+## Phase 5 通しテスト（2026-08-22 実施）
 
-今日の Grok 3件はすべて `聞く価値: 見送り`（HZ除外）→ E2E 本体は **`聞く` 物件到着まで**。  
-上記はその到着時にそのまま使う。
+自動ランナー `scripts/jarvis_kurashift_grok_e2e_runner.py` で **PASS**（fixture 物件・対外送信は dry-run）。
+
+| 段階 | 結果 |
+|---|---|
+| Grok レポート → estate | ✅ m19m → matsuno.estate |
+| `mail_grok` 取込 | ✅ status=viewing・聞く・倍率・HZ OK |
+| 第一問合せプレビュー | ✅ From=estate・倍率ブロック挿入 |
+| 送信 | ✅ `--dry-run`（実送信は UI 確認後） |
+| 返信 poll | ✅ 0件（fixture 返信は seed） |
+| ops パック | ✅ `kurashift_consultations` 作成 |
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_grok_e2e_runner.py
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_grok_e2e_runner.py --cleanup
+```
+
+## 本番 E2E（`聞く` 実物件）
+
+Bot1 が `聞く価値: 聞く` の `[Grok調査]` を estate に送ったら、上記チェックリスト §1〜7 を手動で実施。  
+2026-08-22 時点の Grok 3件はすべて `見送り`（HZ除外）のため本番問合せは未実施。
 
 ## 正本
 
