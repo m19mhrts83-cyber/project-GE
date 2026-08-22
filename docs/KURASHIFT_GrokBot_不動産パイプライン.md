@@ -64,6 +64,7 @@ flowchart TB
 | 結果記録 | Jarvis | `--mark ID --status contacted` / 返信時 `replied` |
 | 日次探索 | Grok Bot | `--grok-discovery-prompt` → YAML 追記 → `--merge-append` |
 | **返信・物件** | Jarvis / KURASHIFT | `property_mail_match` → deals（**ブロックしない**） |
+| **返信下書き・送信** | **Jarvis Dashboard** | `docs/Jarvis_Dashboard_業者返信下書き.md` |
 
 **送信**: Bot2 は approved A'-v2 で **Web フォーム送信まで自動**（1日3社・都度承認不要）。
 

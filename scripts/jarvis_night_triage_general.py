@@ -193,6 +193,9 @@ def skip_pending_kurashift_property_triage(
         if bucket == "partner":
             protected_partner.append(str(row.get("id") or ""))
             continue
+        payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+        if payload.get("re_vendor_reply") or payload.get("vendor_id"):
+            continue
         if bucket != "kurashift_purchase":
             continue
         rid = str(row.get("id") or "")

@@ -648,6 +648,9 @@ export async function sendTriageAfterConfirm(
     payload.web_draft_saved_at = new Date().toISOString();
     payload.sent_to = to;
     payload.to_source = resolved.source;
+    if (payload.re_vendor_reply) {
+      payload.vendor_reply_sent_at = new Date().toISOString();
+    }
     payload = await tryMarkTriageGmailRead({
       gmail_message_id: it.gmail_message_id,
       account: it.account,
@@ -672,8 +675,9 @@ export async function sendTriageAfterConfirm(
     return {
       ok: true,
       from: sent.from,
-      message:
-        "送信しました。OneDrive のやり取り追記は Mac 同期後に反映されます。",
+      message: payload.re_vendor_reply
+        ? "送信しました。業者リスト反映は Mac の vendor_catchup が行います。"
+        : "送信しました。OneDrive のやり取り追記は Mac 同期後に反映されます。",
     };
   } catch (e) {
     return {
