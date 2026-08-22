@@ -7,6 +7,7 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --summary
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --import-csv path/to/list.csv
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --next 3
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --batch-week --grok-kickoff
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --mark ID --status contacted --note "Web送信"
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --grok-discovery-prompt
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --merge-append block.yaml
@@ -19,9 +20,10 @@ import hashlib
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import yaml
 
@@ -36,6 +38,22 @@ STATUSES = frozenset(
 )
 
 REGION_ORDER = {"chubu": 0, "shiga": 1, "list": 9}
+
+PHASE_DAILY_LIMIT = {1: 3, 2: 5, 3: 10}
+
+JARVIS_PRIVATE = REPO / ".env.jarvis_private"
+
+CHAIN_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("daikyo-anabuki", r"大京穴吹|daikyo[\-\.]?anabuki"),
+    ("pitathouse", r"ピタット|PITATHOUSE|pitathouse"),
+    ("century21", r"センチュリー\s*21|CENTURY\s*21"),
+    ("tokyu-livable", r"東急リバブル|livable"),
+    ("sumitomo-fudosan", r"住友不動産"),
+    ("mitsui-rehouse", r"三井のリハウス|リハウス"),
+    ("suumo", r"スーモ|SUUMO"),
+    ("athome", r"アットホーム|athome"),
+    ("o-uccino", r"オウチーノ|ouchi"),
+)
 
 
 def now_iso() -> str:
@@ -454,6 +472,186 @@ def next_pending(*, limit: int, statuses: tuple[str, ...] = ("pending", "discove
     return out[:limit]
 
 
+def _domain_key(url: str) -> str:
+    s = (url or "").strip()
+    if not s:
+        return ""
+    try:
+        host = urlparse(s).netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        return host
+    except Exception:
+        return ""
+
+
+def infer_group_key(v: dict[str, Any]) -> str:
+    explicit = str(v.get("group_key") or v.get("chain_id") or "").strip()
+    if explicit:
+        return explicit
+    name = str(v.get("name") or "")
+    for key, pat in CHAIN_PATTERNS:
+        if re.search(pat, name, re.I):
+            return key
+    contact = str(v.get("contact_url") or v.get("url") or "")
+    dom = _domain_key(contact)
+    if dom:
+        return f"domain:{dom}"
+    return f"standalone:{v.get('id') or slug_id(name, str(v.get('area') or ''))}"
+
+
+def enrich_vendor(v: dict[str, Any]) -> dict[str, Any]:
+    out = dict(v)
+    out["group_key"] = infer_group_key(v)
+    return out
+
+
+def load_form_contact() -> dict[str, str] | None:
+    if not JARVIS_PRIVATE.is_file():
+        return None
+    vals: dict[str, str] = {}
+    for line in JARVIS_PRIVATE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, rest = line.partition("=")
+        vals[k.strip()] = rest.strip().strip('"').strip("'")
+    name = vals.get("PERSONAL_NAME", "")
+    if not name:
+        return None
+    family = vals.get("PERSONAL_NAME_KANA_FAMILY", "")
+    given = vals.get("PERSONAL_NAME_KANA_GIVEN", "")
+    return {
+        "name": name,
+        "name_kana": f"{family}{given}",
+        "email": "matsuno.estate@gmail.com",
+        "phone": vals.get("PERSONAL_PHONE", ""),
+        "postal_code": vals.get("HOME_POSTAL_CODE", ""),
+        "address": vals.get("HOME_ADDRESS", ""),
+    }
+
+
+def outreach_phase_settings(settings: dict[str, Any]) -> tuple[int, int]:
+    phase = int(settings.get("outreach_phase") or 1)
+    if phase not in PHASE_DAILY_LIMIT:
+        phase = 1
+    daily = int(settings.get("daily_outreach_limit") or PHASE_DAILY_LIMIT[phase])
+    cap = PHASE_DAILY_LIMIT[phase]
+    if daily > cap:
+        daily = cap
+    if daily < 1:
+        daily = cap
+    return phase, daily
+
+
+def contacted_snapshot(data: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
+    contacted: list[dict[str, Any]] = []
+    groups: set[str] = set()
+    for v in data.get("vendors") or []:
+        if not isinstance(v, dict) or not v.get("id"):
+            continue
+        st = str(v.get("status") or "")
+        if st not in {"contacted", "replied"} and not (v.get("contacted_at") or "").strip():
+            continue
+        gk = infer_group_key(v)
+        contacted.append(
+            {
+                "id": str(v["id"]),
+                "name": str(v.get("name") or ""),
+                "status": st,
+                "group_key": gk,
+                "contacted_at": str(v.get("contacted_at") or ""),
+            }
+        )
+        groups.add(gk)
+    contacted.sort(key=lambda x: x.get("id") or "")
+    return contacted, sorted(groups)
+
+
+def iso_week_id(d: date | None = None) -> str:
+    d = d or date.today()
+    iso = d.isocalendar()
+    return f"{iso.year}-W{iso.week:02d}"
+
+
+def build_batch_week_payload(
+    *,
+    batch_days: int = 7,
+    outreach_phase: int | None = None,
+) -> dict[str, Any]:
+    data = load_list()
+    settings = data.get("settings") or {}
+    phase, daily_limit = outreach_phase_settings(settings)
+    if outreach_phase is not None:
+        phase = outreach_phase
+        daily_limit = PHASE_DAILY_LIMIT.get(phase, 3)
+    queue_size = batch_days * daily_limit
+    pending = [enrich_vendor(v) for v in next_pending(limit=queue_size)]
+    contacted_vendors, group_contacted = contacted_snapshot(data)
+    today = date.today().isoformat()
+    batch_id = iso_week_id()
+    form_contact = load_form_contact()
+    payload: dict[str, Any] = {
+        "ok": True,
+        "mode": "batch_week",
+        "batch_id": batch_id,
+        "batch_days": batch_days,
+        "batch_start": today,
+        "outreach_phase": phase,
+        "daily_limit": daily_limit,
+        "weekly_quota": batch_days * daily_limit,
+        "outreach_from": settings.get("outreach_from", "matsuno.estate@gmail.com"),
+        "outreach_note": settings.get(
+            "outreach_note",
+            "送信は松野個人・松野エステイト（matsuno.estate）。",
+        ),
+        "batch_progress": {
+            "sent_ids": [],
+            "skipped_ids": [],
+            "failed_ids": [],
+            "last_run_date": None,
+            "days_completed": 0,
+        },
+        "contacted_vendors": contacted_vendors,
+        "group_contacted": group_contacted,
+        "vendors": pending,
+    }
+    if form_contact:
+        payload["form_contact"] = form_contact
+    else:
+        payload["form_contact_missing"] = True
+        payload["form_contact_note"] = (
+            "Mac .env.jarvis_private から form_contact を読めませんでした。"
+            "送信前に松野へ確認。"
+        )
+    return payload
+
+
+def grok_weekly_kickoff(payload: dict[str, Any]) -> str:
+    phase = payload.get("outreach_phase")
+    daily = payload.get("daily_limit")
+    batch_id = payload.get("batch_id")
+    n = len(payload.get("vendors") or [])
+    contacted_n = len(payload.get("contacted_vendors") or [])
+    first_id = (payload.get("vendors") or [{}])[0].get("id", "—")
+    return f"""【週次バッチ開始 · Phase {phase} · {batch_id}】
+
+添付 JSON が今週の作業キュー（最大 {n} 社 · 1日 {daily} 社上限 · {payload.get('batch_days')} 日分）。
+同じスレッド内で batch_progress を保持し、平日は「本日分」と言ったらその日の {daily} 社だけ送信してください。
+
+ルール:
+- 1日 {daily} 社まで（Phase {phase}）。超えない
+- 系列重複は skip（Instructions どおり）。スキップ分を別店で埋めない
+- 送信ごとに --mark 行を報告
+- その日終了時: 「本日完了（成功X / skipY / 失敗Z）」
+- 週末または batch 消化後: 週次サマリー + 全 --mark 行を一覧再掲（Mac 同期用）
+
+既 contact 済み: {contacted_n} 社（JSON の contacted_vendors 参照）。
+キュー先頭: {first_id} から。
+
+以下 JSON です。"""
+
+
 def mark_vendor(
     vid: str,
     *,
@@ -543,6 +741,33 @@ def main() -> int:
     )
     ap.add_argument("--merge-append", metavar="PATH", help="Grok 追記 YAML をマージ")
     ap.add_argument("--next", type=int, default=0, help="次に問合せする pending 件数表示")
+    ap.add_argument(
+        "--batch-week",
+        action="store_true",
+        help="Grok 週次バッチ用 JSON（batch_days × daily_limit 件）",
+    )
+    ap.add_argument(
+        "--batch-days",
+        type=int,
+        default=7,
+        help="--batch-week の日数（既定7）",
+    )
+    ap.add_argument(
+        "--outreach-phase",
+        type=int,
+        default=0,
+        help="Phase 上書き（1|2|3）。0=YAML settings 従う",
+    )
+    ap.add_argument(
+        "--grok-kickoff",
+        action="store_true",
+        help="--batch-week 時に Grok キックオフ文を JSON の前に出力",
+    )
+    ap.add_argument(
+        "--kickoff-only",
+        action="store_true",
+        help="--batch-week と併用。キックオフ文のみ（JSON なし）",
+    )
     ap.add_argument("--mark", metavar="ID")
     ap.add_argument("--status", default="contacted")
     ap.add_argument("--note", default="")
@@ -600,21 +825,38 @@ def main() -> int:
         items = next_pending(limit=args.next)
         data = load_list()
         settings = data.get("settings") or {}
-        print(
-            json.dumps(
-                {
-                    "ok": True,
-                    "count": len(items),
-                    "outreach_from": settings.get(
-                        "outreach_from", "matsuno.estate@gmail.com"
-                    ),
-                    "outreach_note": settings.get("outreach_note", ""),
-                    "vendors": items,
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
+        phase, daily_limit = outreach_phase_settings(settings)
+        contacted_vendors, group_contacted = contacted_snapshot(data)
+        body: dict[str, Any] = {
+            "ok": True,
+            "count": len(items),
+            "outreach_phase": phase,
+            "daily_limit": daily_limit,
+            "outreach_from": settings.get(
+                "outreach_from", "matsuno.estate@gmail.com"
+            ),
+            "outreach_note": settings.get("outreach_note", ""),
+            "contacted_vendors": contacted_vendors,
+            "group_contacted": group_contacted,
+            "vendors": [enrich_vendor(v) for v in items],
+        }
+        fc = load_form_contact()
+        if fc:
+            body["form_contact"] = fc
+        print(json.dumps(body, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.batch_week:
+        phase_override = args.outreach_phase if args.outreach_phase > 0 else None
+        payload = build_batch_week_payload(
+            batch_days=max(1, args.batch_days),
+            outreach_phase=phase_override,
         )
+        if args.grok_kickoff or args.kickoff_only:
+            print(grok_weekly_kickoff(payload))
+            print()
+        if not args.kickoff_only:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
     if args.summary or len(sys.argv) == 1:
