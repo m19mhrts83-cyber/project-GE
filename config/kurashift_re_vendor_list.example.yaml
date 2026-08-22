@@ -4,7 +4,7 @@
 
 settings:
   daily_outreach_limit: 3      # 1日あたり問合せ送付件数（Grok / 手動）
-  daily_discovery_limit: 5     # 1日あたり新規探索件数（Grok）
+  daily_discovery_limit: 3     # 1日あたり新規探索件数（Grok · Phase1=3 / Phase2+=5）
   target_areas:
     - 愛知県
     - 岐阜県

@@ -444,6 +444,54 @@ def merge_vendors(new_vendors: list[dict[str, Any]], *, dry_run: bool) -> dict[s
     return {"ok": True, "added": added, "updated": updated, "dry_run": dry_run}
 
 
+DISCOVERY_BLOCK_MARKER_RE = re.compile(
+    r"📎\s*Jarvis\s*用[（(]探索追記[）)]",
+    re.IGNORECASE,
+)
+
+
+def parse_discovery_yaml_from_text(text: str) -> list[dict[str, Any]]:
+    """部長日報・Grok 出力から vendors: YAML を抽出。"""
+    chunks: list[str] = []
+    for m in re.finditer(r"```(?:yaml|yml)?\s*\n(.*?)```", text, re.DOTALL | re.IGNORECASE):
+        chunks.append(m.group(1))
+    marker = DISCOVERY_BLOCK_MARKER_RE.search(text or "")
+    if marker:
+        tail = text[marker.end() :]
+        tail = re.split(r"\n📎", tail, maxsplit=1)[0]
+        chunks.append(tail)
+    vendors: list[dict[str, Any]] = []
+    for raw in chunks:
+        block = (raw or "").strip()
+        if not block or "vendors:" not in block:
+            continue
+        try:
+            parsed = yaml.safe_load(block)
+        except Exception:
+            continue
+        if isinstance(parsed, dict) and isinstance(parsed.get("vendors"), list):
+            vendors.extend(v for v in parsed["vendors"] if isinstance(v, dict))
+        elif isinstance(parsed, list):
+            vendors.extend(v for v in parsed if isinstance(v, dict))
+    return vendors
+
+
+def merge_vendors_from_text(text: str, *, dry_run: bool) -> dict[str, Any]:
+    vendors = parse_discovery_yaml_from_text(text)
+    if not vendors:
+        return {
+            "ok": True,
+            "skipped": "no discovery yaml",
+            "parsed": 0,
+            "added": 0,
+            "updated": 0,
+            "dry_run": dry_run,
+        }
+    out = merge_vendors(vendors, dry_run=dry_run)
+    out["parsed"] = len(vendors)
+    return out
+
+
 def summary(data: dict[str, Any] | None = None) -> dict[str, Any]:
     data = data or load_list()
     counts: dict[str, int] = {}
@@ -589,6 +637,17 @@ def outreach_phase_settings(settings: dict[str, Any]) -> tuple[int, int]:
     if daily < 1:
         daily = cap
     return phase, daily
+
+
+def discovery_daily_limit(settings: dict[str, Any]) -> int:
+    phase, _ = outreach_phase_settings(settings)
+    phase_cap = 3 if phase == 1 else 5
+    limit = int(settings.get("daily_discovery_limit") or phase_cap)
+    if limit > phase_cap:
+        limit = phase_cap
+    if limit < 1:
+        limit = phase_cap
+    return limit
 
 
 def contacted_snapshot(data: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str], list[str]]:
@@ -814,7 +873,8 @@ def mark_vendor(
 def grok_discovery_prompt() -> str:
     data = load_list()
     settings = data.get("settings") or {}
-    limit = int(settings.get("daily_discovery_limit") or 5)
+    limit = discovery_daily_limit(settings)
+    phase, _ = outreach_phase_settings(settings)
     areas = settings.get("target_areas") or ["愛知県", "岐阜県", "三重県"]
     existing = [
         f"- {v.get('name')} ({v.get('area') or '—'})"
@@ -822,7 +882,7 @@ def grok_discovery_prompt() -> str:
     ]
     areas_s = "、".join(areas)
     block = "\n".join(existing) if existing else "（まだなし）"
-    return f"""【Grok 業者探索 — 日次 {limit} 件】
+    return f"""【Grok 業者探索 — 日次 {limit} 件 · Phase {phase}】
 
 対象: {areas_s} の **戸建・投資向け地場不動産**（大手全国チェーンは優先度低）
 1日 **{limit} 社まで** 新規発見し、下記 YAML 追記ブロックで出力すること。
