@@ -388,6 +388,9 @@ def score_text(text: str, criteria_blob: str) -> tuple[float, list[str]]:
         score -= 2.0
     if re.search(r"アパート|マンション一棟", text) and not re.search(r"戸建|戸建て", text):
         score -= 0.5
+    if re.search(r"RC|鉄骨", text) and not re.search(r"戸建|戸建て", text):
+        hits.append("RC")
+        score += 0.5
     if "海沿" in text and "除外" not in criteria_blob:
         score -= 0.5
     return score, hits
@@ -405,6 +408,15 @@ def clearly_out_of_scope(subject: str, text: str, score: float) -> tuple[bool, s
         if not tokai:
             return True, "tokyo_focus"
     if score < CANDIDATE_SCORE_MIN:
+        try:
+            from jarvis_kurashift_re_inquiry_rules import should_skip_low_score_auto_pass
+
+            if should_skip_low_score_auto_pass(
+                text, score, city_hints=CITY_HINTS, min_score=CANDIDATE_SCORE_MIN
+            ):
+                return False, ""
+        except Exception:
+            pass
         return True, "low_score"
     return False, ""
 
@@ -653,6 +665,15 @@ def fetch_grok_mails(
         sj = dict(row.get("summary_json") or {})
         sj["grok"] = grok
         row["summary_json"] = sj
+        try:
+            from jarvis_kurashift_re_inquiry_rules import inquiry_tier_hint
+
+            hint = inquiry_tier_hint(row)
+            if hint is not None:
+                sj["inquiry_tier_hint"] = hint
+                row["summary_json"] = sj
+        except Exception:
+            pass
         if grok.get("price_man") is not None:
             row["price_man"] = grok["price_man"]
         loc = str(grok.get("location") or "")

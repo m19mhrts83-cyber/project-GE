@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { evaluateInquiryCandidate } from "@/lib/reInquiryCandidate";
+import { loadInquiryAutoConfig } from "@/lib/reInquiryAutoConfig";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -88,10 +90,14 @@ export async function GET(
       new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime()
   );
 
+  const inquiryConfig = loadInquiryAutoConfig();
+  const inquiry_eval = evaluateInquiryCandidate(deal, inquiryConfig);
+
   return NextResponse.json({
     ok: true,
     deal,
     timeline,
     attach_count: attachCount || 0,
+    inquiry_eval,
   });
 }

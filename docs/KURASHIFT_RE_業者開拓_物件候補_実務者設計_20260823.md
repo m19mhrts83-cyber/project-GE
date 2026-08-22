@@ -251,8 +251,10 @@ create index kurashift_re_deal_events_deal_idx
 #### 候補タブ — サマリー
 
 ```
-要返信 2 · Grok未調査 4 · 第一問合せ未送 6 · 内見候補 1
+要返信 2 · 問合せ候補 8 · Grok未調査 4 · 第一問合せ未送 6 · 内見候補 1
 ```
+
+フィルタ: `?inquiry=has_reply`（要返信）／`?inquiry=ready`（Tier1 問合せ候補）
 
 #### 候補タブ — 表（列 10）
 
@@ -266,7 +268,7 @@ create index kurashift_re_deal_events_deal_idx
 | Grok | 聞く価値 / HZ / 土地100%（1 行） |
 | 問合せ | inquiry_status チップ |
 | 最終動き | 最新 message or event の日付 + 1 行 |
-| 操作 | 既存 DealReviewActions + GrokInvestigateCopy |
+| 操作 | DealReviewActions + **クイック問合せ**（Tier1）+ GrokInvestigateCopy |
 | 詳細 | 「開く」→ ドロワー |
 
 #### 詳細ドロワー（右スライド / モバイル全画面）
@@ -319,6 +321,56 @@ EnqueueJobButton（vendors ページ）:
 <EnqueueJobButton jobType="re_vendor_sync" label="リストを同期" payload={{}} />
 ```
 
+| job_type | payload | 処理 |
+|---|---|---|
+| `re_ops_form_draft` | `{ deal_id }` | フォーム下書き → `summary_json.ops_form_draft`（送信しない） |
+
+---
+
+## 6.5 神大家運営相談フォーム（1906a1a5）
+
+| 呼び名 | 正 |
+|---|---|
+| 亀山さん相談 | **神大家さん運営相談**（運営窓口） |
+| 送信 | [戸建て購入・東海地域フォーム](https://form.os7.biz/f/1906a1a5/)（1物件1投稿・**ユーザー確認後のみ**） |
+| 下書き | `jarvis_kurashift_re_ops_form_draft.py` / ドロワー「フォーム下書き」 |
+| 809 回答 | `809_神大家運営回答/5.やり取り.md`（`jarvis_kurashift_ops_consult_ingest.py`） |
+
+フィールド定義の正本: [`config/kurashift_re_ops_form_1906a1a5.yaml`](../config/kurashift_re_ops_form_1906a1a5.yaml)
+
+### 項目マップ（tier）
+
+| tier | 意味 | 例 |
+|---|---|---|
+| **auto** | deal / grok / `.env.jarvis_private` から下書き可 | 姓名・メール・販売価格・路線価・HZ・駐車場 |
+| **reply** | 第一問合せ返信・PDF で補完 | 築年数・㎡・最寄駅・入居状況 |
+| **research** | 人が調査・試算（フォームの核心） | 想定家賃・修繕費・修繕後CF・残価値・融資条件 |
+| **manual** | 判断・記述 | 至急度・買付価格・講師への質問・内見済み |
+
+### Drive ルール
+
+- **格納先**: 神大家割当 **個人 Google Drive**（自分の Gmail Drive ではない）
+- **フォルダ名＝物件名**（フォームの「物件名」と一致）
+- **写真なし** → 修繕費妥当性の回答不可（運営側制約）
+- **ZIP 不可** — 解凍して格納
+- Jarvis はフォーム **自動送信しない**（`jarvis-outbound-confirm`）
+
+### 日次ルーティン（Phase 2）
+
+| 順 | 実行者 | 内容 |
+|---|---|---|
+| 1 | あなた | Grok 本日分（業者 + 物件調査） |
+| 2 | 自動 | 朝バンドル: bucho → vendor sync → inquiry poll → `re_daily_digest` |
+| 3 | あなた/Jarvis | KURASHIFT 要返信・業者要フォロー（`/realestate/deals?inquiry=has_reply`） |
+| 4 | あなた | ドロワーで返信・PDF 確認 |
+| 5 | あなた+Jarvis | フォーム下書き → 不足項目を調査・記入 |
+| 6 | あなた | 神大家個人 Drive に物件フォルダ + 写真 |
+| 7 | あなた | フォーム入力 → **確認後送信** |
+| 8 | 運営 | 809 回答 → 取込 |
+| 9 | あなた | 内見判断 → `viewing` |
+
+Cursor ルール（ローカル）: `.cursor/rules/kamiooya-re-purchase-form.mdc`
+
 ---
 
 ## 7. 実装フェーズ
@@ -343,6 +395,36 @@ EnqueueJobButton（vendors ページ）:
 - [x] `build_ops_pack` にフォーム下書き追記
 
 **日次フロー**: Grok 本日分 → bucho apply → vendor sync → inquiry poll → KURASHIFT 要返信 → PDF/返信確認 → フォーム調査 → Drive → **確認後**フォーム送信 → 809 回答 → 内見
+
+### Phase 2.5（問合せ閾値・UI）— **2026-08-23 実装済**
+
+**正本**: `config/kurashift_re_inquiry_auto.yaml`  
+**判定**: `apps/trade-desk/lib/reInquiryCandidate.ts` / `scripts/jarvis_kurashift_re_inquiry_rules.py`
+
+#### Tier 定義
+
+| Tier | 名称 | 条件（OR は明記） | 動作 |
+|---|---|---|---|
+| **0** | 除外 | `inquiry_status` ∈ sending / awaiting_reply / has_reply | 候補外 |
+| **1** | 問合せ候補 | `(Grok 聞く/保留) OR score≥2.0` **AND** inquiry none/draft **AND** status info/viewing（または passed 再検討） | UI フィルタ `?inquiry=ready`・行内/ドロワー **クイック問合せ** |
+| **2** | 日次キュー | 聞く **AND** score≥5 **AND** HZ≠除外 **AND** Tier1 | 朝 digest「送信待ち」（Web 一括確認後送信） |
+| **3** | 自動送信 | 聞く **AND** score≥7 **AND** HZ=OK **AND** 土地100≠見送り **AND** `enabled:false` | Mac worker 即送信（**初期 OFF**） |
+
+日次上限: `daily_send_cap: 5`
+
+#### auto_pass / passed の override
+
+- Grok `聞く` / `保留` があれば **status=passed でも Tier1**（バッジ: **再検討**）
+- **除外しない** override: `mansion_unit`（区分/WR 単体）・`subject_noise` は従来どおり候補外
+- **築古一棟 AP**: 件名/本文が `(築古|ボロ|空き家)×(アパート|AP|マンション一棟)` かつ東海エリア + score≥2 なら `low_score` auto_pass を **スキップ**（通常候補化）
+- **RC**: `score_text` に `RC` キーワードで +0.5 点（鉄骨/RC 本文）。RC 単独キーワードは auto_pass しない
+
+#### UI
+
+- `/realestate/deals?tab=candidates&inquiry=ready` — Tier1 一覧
+- 候補表: Tier バッジ（再検討・送信待ち）+ `DealInquiryQuickButton`（プレビュー → チェック → 送信）
+- 「確認した」後に Tier1 なら問合せ CTA（`DealReviewActions`）
+- 宛先なしでも Tier1 表示可 → 送信時は宛先入力
 
 ### Phase 3（任意）
 
@@ -389,6 +471,12 @@ EnqueueJobButton（vendors ページ）:
 | map | `apps/trade-desk/lib/kurashiftMap.ts` |
 | events | `apps/trade-desk/app/api/re/deals/[id]/route.ts`（POST 時 insert） |
 | match | `scripts/jarvis_kurashift_property_mail_match.py`（created/grok events） |
+| Phase2 digest | `scripts/jarvis_kurashift_re_daily_digest.py` |
+| Phase2 form | `scripts/jarvis_kurashift_re_ops_form_draft.py` + `config/kurashift_re_ops_form_1906a1a5.yaml` |
+| Phase2 morning | `scripts/jarvis_morning_mac_refresh.py`（bucho / vendor / poll / digest） |
+| Phase2.5 YAML | `config/kurashift_re_inquiry_auto.yaml` |
+| Phase2.5 rules | `scripts/jarvis_kurashift_re_inquiry_rules.py` |
+| Phase2.5 UI | `apps/trade-desk/lib/reInquiryCandidate.ts` + `DealInquiryQuickButton.tsx` |
 
 ---
 
