@@ -36,12 +36,23 @@ matsuno.estate@gmail.com
 
 ## Bot 作業手順
 
-1. リストの `url` / `contact_url` を開く
-2. 会社が戸建・投資向けか目視確認（違えばスキップ理由1行）
-3. 上記文面で問合せ（フォーム項目に合わせて要約可）
-4. 完了報告（会社名・URL・送信日・問合せ経路）
+### A. 既存リストへの問合せ（1日 N 件）
+
+1. Jarvis `--next N` で pending / discovered を確認
+2. リストの `contact_url` を開く
+3. 戸建・投資向けか目視（違えば `status: skip`）
+4. 問い合わせ文で送信
+5. Jarvis `--mark {id} --status contacted --note "Web送信 YYYY-MM-DD"`
+
+### B. 新規探索（1日 M 件・問合せは送らない）
+
+1. `grok_vendor_discovery_append.md` の形式で YAML 追記ブロックを返す
+2. Jarvis `--merge-append` でリストに追加（`status: discovered`）
+3. 問合せは **A** の別セッションで
 
 ## Jarvis 側
 
+- リスト正本: `config/kurashift_re_vendor_list.yaml`
+- CLI: `scripts/jarvis_kurashift_vendor_list.py`
 - 返信メール → `property_mail_match.py`（既存）
 - 候補 deal → deals「Grok調査用コピー」→ 物件調査 Bot

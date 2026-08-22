@@ -50,26 +50,18 @@ flowchart TB
 
 ## Bot 2 — 業者開拓（試行・次フェーズ）
 
-**目的**: 戸建ては地場不動産経由。リストアップ済み業者サイトへ **規定の問い合わせ** を送り、メール返信で物件が上がってくる導線を増やす。
+**目的**: 戸建ては地場不動産経由。リストへ **順次問合せ** + Grok **日次 N 件探索** で表を増やす。
 
-**Grok に任せること**
+| 操作 | 担当 | コマンド / 正本 |
+|---|---|---|
+| リスト取込 | Jarvis | `--import-csv` → `kurashift_re_vendor_list.yaml` |
+| 次に問合せ | Grok / 手動 | `--next 3` |
+| 結果記録 | Jarvis | `--mark ID --status contacted` |
+| 日次探索 | Grok Bot | `--grok-discovery-prompt` → YAML 追記 → `--merge-append` |
 
-1. リストの URL を開く（会社概要・問合せフォーム）
-2. 規定文面で「戸建投資・愛知中心・物件情報希望」を送信（Web フォーム）
-3. 送信ログを `[Grok業者]` 件名または estate 宛メモで残す（任意）
-
-**Jarvis に任せること**
-
-- 業者リスト正本: `config/kurashift_re_vendor_list.yaml`（要作成・ユーザー既存リストを転記）
-- 返信メール → 既存 `property_mail_match`（admin/estate）
-- 候補化後 → 物件調査 Bot へ（Grok調査用コピー）または自動 `[Grok調査]` 依頼（将来）
-
-**テンプレ**: `config/grok_vendor_outreach_format.md`
-
-**注意**
-
-- Web フォーム送信は **対外操作** → Bot 説明に「送信前にユーザー確認」または試行は estate 経由メール問合せのみ
-- コンピューター常時許可は Bot 専用・リスト URL のみに限定
+正本: `config/kurashift_re_vendor_list.yaml`（gitignore）  
+CLI: `scripts/jarvis_kurashift_vendor_list.py`  
+Grok 追記形式: `config/grok_vendor_discovery_append.md`
 
 ---
 
