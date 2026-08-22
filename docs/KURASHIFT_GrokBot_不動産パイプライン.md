@@ -7,14 +7,14 @@
 ```mermaid
 flowchart TB
   user[松野]
-  sanbo[参謀 Bot]
-  subgraph grok [Grok 社員]
-    bot1[物件調査 Bot]
-    bot2[業者開拓 Bot]
+  bucho[不動産賃貸·部長 Bot]
+  subgraph dept [Grok 不動産賃貸部署]
+    bot1[物件調査 S1]
+    bot2[業者開拓 S2]
   end
-  user --> sanbo
-  sanbo --> bot1
-  sanbo --> bot2
+  user --> bucho
+  bucho --> bot1
+  bucho --> bot2
   subgraph mail [estate Gmail]
     grokMail["[Grok調査]"]
     vendorReply[不動産会社返信]
@@ -37,27 +37,28 @@ flowchart TB
 
 | 役割 | 担当 | 正本 |
 |---|---|---|
-| **Grok 窓口・社員統括** | **参謀 Bot** | `config/grok_sanbo_bot_grok_paste.md` |
-| Mac 台帳・deals・apply | **Jarvis** | `--apply-marks` / KURASHIFT |
-| ネット調査（路線価・ハザード） | **物件調査**（参謀が振分） | `[Grok調査]` → `mail_grok` |
-| 地場業者への初回接触 | **業者開拓**（参謀が振分） | `config/grok_vendor_outreach_format.md` |
+| Mac 右腕・参謀 | **Jarvis** | `--apply-marks` / KURASHIFT |
+| **Grok 窓口（不動産賃貸部署）** | **部長 Bot** | `config/grok_sanbo_bot_grok_paste.md` |
+| ネット調査 | **S1 物件調査**（部長が振分） | `[Grok調査]` → `mail_grok` |
+| 地場初回接触 | **S2 業者開拓**（部長が振分） | `config/grok_vendor_outreach_format.md` |
 | メール取込・スコア・ファネル | **KURASHIFT** | `property_mail_match.py` / deals |
 | 物件詳細の第一問合せ | **KURASHIFT UI** | estate 送信・2段確認 |
 | PDF 添付の中身読取 | **未実装（Phase PDF）** | 下記 |
 
 ---
 
-## 参謀 Bot — Grok 窓口（2026-08-22）
+## 部長 Bot — 不動産賃貸部署（2026-08-22）
 
-**Grok Bot 名**: **参謀**（UI 役割 = **参謀** / Chief of Staff）  
+**Grok Bot 名**: **不動産賃貸部長**（短く **部長**）  
+**部署**: 不動産賃貸のみ（他テーマは将来別部長）  
 **Instructions**: `config/grok_sanbo_bot_grok_paste.md`  
 **運用**: `config/grok_sanbo_bot.md`
 
-松野は Grok では **参謀にだけ** 指示。参謀が社員（物件調査・業者開拓・周辺MAP）を振り分けて実行。  
-Mac 同期（`--apply-marks`）は **Jarvis** — 参謀は週次で `📎 Jarvis 用` ブロックを出力。
+松野は Grok では **部長だけ** に指示。部長が S1/S2 等へ振り分け・連携。  
+**Mac 同期**: 部長が `[Grok部長]` 日報を **estate メール** へ送信 → Jarvis が `jarvis_grok_bucho_mail_apply.py --apply` で `--mark` 反映（手動コピー不要）。
 
-**初回**: `--batch-week --grok-kickoff` の JSON を **参謀** に貼る（Bot2 直接は不要）。  
-**平日**: 参謀スレッドで `本日分`。
+**初回**: `--batch-week --grok-kickoff` → **部長** に貼る。  
+**平日**: 部長スレッドで `本日分`。
 
 ---
 
