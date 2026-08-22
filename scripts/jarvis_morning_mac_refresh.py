@@ -44,6 +44,8 @@ GMAIL_READ_CATCHUP = REPO / "scripts" / "jarvis_triage_gmail_read_catchup.py"
 INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
+VENDOR_REPLY_TRIAGE = REPO / "scripts" / "jarvis_kurashift_vendor_reply_triage.py"
+VENDOR_CATCHUP = REPO / "scripts" / "jarvis_triage_vendor_catchup.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
 ZAIM_WEEKLY_STATE = REPO / ".jarvis_state" / "zaim_csv_weekly.json"
@@ -469,6 +471,36 @@ def main() -> int:
             print(f"# kurashift_grok_mail soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["kurashift_grok_mail"] = "skipped"
+
+    # 2c2. 地場業者返信 → Jarvis Dashboard general（estate・下書き付き）
+    if VENDOR_REPLY_TRIAGE.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "vendor_reply_triage",
+            [
+                exe,
+                str(VENDOR_REPLY_TRIAGE),
+                "--push",
+                "--mark-inbound-replied",
+            ],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["vendor_reply_triage"] = rc
+        if rc != 0:
+            print(f"# vendor_reply_triage soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["vendor_reply_triage"] = "skipped"
+
+    if VENDOR_CATCHUP.is_file():
+        rc = run_step(
+            "vendor_catchup",
+            [exe, str(VENDOR_CATCHUP)],
+            timeout=60,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["vendor_catchup"] = rc
+    else:
+        results["steps"]["vendor_catchup"] = "skipped"
 
     # 2a. 取込後の新規未返信を partner レーンへ（夜バッチ待ちだとダッシュに出ない）
     night_triage = REPO / "scripts" / "jarvis_night_triage.py"

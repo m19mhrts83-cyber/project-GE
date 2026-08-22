@@ -1,0 +1,44 @@
+# 地場業者返信 — Jarvis Dashboard 下書きテンプレ（estate 返信）
+# 正本: grok_vendor_outreach_format.md の返信裁きと整合
+
+settings:
+  from_name: 松野真治
+  from_email: matsuno.estate@gmail.com
+  signature: |
+    松野真治
+    matsuno.estate@gmail.com
+
+# 変数: {vendor_name} {inquiry_summary}（先頭200字）
+
+templates:
+  question_ack: |
+    {vendor_name} 様
+
+    お問い合わせありがとうございます。松野真治です。
+    ご質問いただいた内容、承知しました。
+
+    引き続き、愛知・岐阜・静岡（滋賀リストの場合は滋賀）の戸建てで、
+    予算500万〜3,000万円程度・築古可の物件情報をお待ちしております。
+    概要資料（PDF等）があれば matsuno.estate@gmail.com 宛にご送付ください。
+
+    よろしくお願いいたします。
+
+    {signature}
+
+  property_thanks: |
+    {vendor_name} 様
+
+    物件情報のご連絡ありがとうございます。松野真治です。
+    内容を確認し、条件に合いそうであれば改めて詳細をお伺いします。
+
+    引き続きよろしくお願いいたします。
+
+    {signature}
+
+  generic: |
+    {vendor_name} 様
+
+    ご連絡ありがとうございます。松野真治です。
+    承知しました。今後ともよろしくお願いいたします。
+
+    {signature}

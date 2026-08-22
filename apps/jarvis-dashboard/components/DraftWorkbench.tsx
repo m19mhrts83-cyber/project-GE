@@ -19,6 +19,10 @@ type Payload = {
   yoritoori_appended?: boolean;
   sent_at?: string;
   cursor_revise?: CursorReviseState;
+  re_vendor_reply?: boolean;
+  vendor_id?: string;
+  vendor_name?: string;
+  has_property_signal?: boolean;
 };
 
 type Props = {
@@ -200,6 +204,31 @@ export default function DraftWorkbench({
                 <strong>経緯を足すとき</strong>
                 … 指示に要点を書くか、下書きを手で追記
               </li>
+            </ul>
+          </>
+        ) : pl.re_vendor_reply ? (
+          <>
+            <p className="draft-positioning-title">地場業者返信（Bot2 milestone）</p>
+            <ul>
+              <li>
+                <strong>初稿</strong>
+                … <code>kurashift_re_vendor_reply_template.yaml</code>{" "}
+                から自動生成（ブロック対象ではありません）
+              </li>
+              <li>
+                <strong>送信</strong>
+                … estate から返信。確認モーダル後に Gmail 送信
+              </li>
+              <li>
+                <strong>物件PDF</strong>
+                … 併走で <code>property_mail_match</code> → KURASHIFT deals
+              </li>
+              {pl.vendor_id ? (
+                <li>
+                  <strong>リスト</strong> … {pl.vendor_id}
+                  {pl.vendor_name ? `（${pl.vendor_name}）` : ""}
+                </li>
+              ) : null}
             </ul>
           </>
         ) : (

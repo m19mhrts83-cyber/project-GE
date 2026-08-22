@@ -72,6 +72,9 @@ export default async function MailDetailPage({
     folder: it.folder,
     payload,
   });
+  const isVendorReply = Boolean(payload.re_vendor_reply);
+  const vendorId =
+    typeof payload.vendor_id === "string" ? payload.vendor_id : null;
   const folderLinks = getFolderLinksMany([
     partnerFolderKey(it.folder, it.partner),
   ]);
@@ -106,6 +109,13 @@ export default async function MailDetailPage({
         ) : null}
         {it.from_email ? (
           <p className="meta">From: {it.from_email}</p>
+        ) : null}
+        {isVendorReply ? (
+          <p className="meta">
+            地場業者返信（milestone）
+            {vendorId ? ` · ${vendorId}` : ""}
+            {payload.has_property_signal ? " · 物件シグナルあり → property_mail_match 併走" : ""}
+          </p>
         ) : null}
         {it.summary ? (
           <p className="sum">
