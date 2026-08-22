@@ -751,14 +751,15 @@ def grok_weekly_kickoff(payload: dict[str, Any]) -> str:
     return f"""【週次バッチ開始 · Phase {phase} · {batch_id}】
 
 添付 JSON が今週の作業キュー（最大 {n} 社 · 1日 {daily} 社上限 · {payload.get('batch_days')} 日分）。
-同じスレッド内で batch_progress を保持し、平日は「本日分」と言ったらその日の {daily} 社だけ送信してください。
+同じスレッド内で batch_progress を保持し、毎日「本日分」と言ったらその日の {daily} 社だけ送信してください（土日も同じ）。
 
 ルール:
 - 1日 {daily} 社まで（Phase {phase}）。超えない
 - 系列重複は skip（Instructions どおり）。スキップ分を別店で埋めない
 - 送信ごとに --mark 行を報告
-- その日終了時: 「本日完了（成功X / skipY / 失敗Z）」
-- 週末または batch 消化後: 週次サマリー + 全 --mark 行を一覧再掲（Mac 同期用）
+- その日終了時: 「本日完了（成功X / skipY / 失敗Z）」+ 日次 [Grok部長] 日報メール
+- 土曜 or 日曜: 週次 [Grok部長] 週次 メール + 全 --mark 行一覧再掲
+- キュー残り0または不足: 松野へ Jarvis で --batch-week --grok-kickoff 再生成を依頼（Instructions §週次バッチ）
 
 既 contact 済み: {contacted_n} 社（JSON の contacted_vendors 参照）。
 キュー先頭: {first_id} から。

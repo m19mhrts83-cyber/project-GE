@@ -57,8 +57,8 @@ flowchart TB
 松野は Grok では **部長だけ** に指示。部長が S1/S2 等へ振り分け・連携。  
 **Mac 同期**: 部長が `[Grok部長]` 日報を **estate メール** へ送信 → Jarvis が `jarvis_grok_bucho_mail_apply.py --apply` で `--mark` 反映（手動コピー不要）。
 
-**初回**: `--batch-week --grok-kickoff` → **部長** に貼る。  
-**平日**: 部長スレッドで `本日分`。
+**初回 / キュー補充**: `--batch-week --grok-kickoff` → **部長** に貼る（枯渇時は部長が促す）。  
+**毎日**: 部長スレッドで `本日分`（土日含む）。**土 or 日** に部長が `[Grok部長] 週次` メール。
 
 ---
 
@@ -92,7 +92,7 @@ flowchart TB
 
 **送信**: Bot2 は approved A'-v2 で **Web フォーム送信まで自動**（Phase 1=3社/日・都度承認不要）。
 
-**週次運用（2026-08-22）**: 月1回 `--batch-week` JSON を Grok に渡す → 平日「本日分」のみ。系列 skip は **同一問合せ URL** のみ。URL 空は Grok が調査可（`discovered_url` を `--mark` に記載）。
+**週次運用（2026-08-23）**: `--batch-week` JSON を Grok に渡す（初回・枯渇時）→ **毎日**「本日分」（土日含む）。**土 or 日** に `[Grok部長] 週次`。キュー枯渇時は部長が Jarvis 再生成を促す。系列 skip は **同一問合せ URL** のみ。
 
 正本: `config/kurashift_re_vendor_list.yaml`（gitignore）  
 CLI: `scripts/jarvis_kurashift_vendor_list.py`  

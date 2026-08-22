@@ -265,7 +265,7 @@ cd ~/git-repos
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --batch-week --grok-kickoff
 ```
 
-出力（キックオフ文 + JSON）を Grok に **1通** 貼る。平日は同スレッドで「**本日分**」のみ。
+出力（キックオフ文 + JSON）を Grok に **1通** 貼る。以降は同スレッドで毎日「**本日分**」のみ（土日も同じ）。
 
 ## 送信後の Mac 記録（部長日報メール · 正本）
 
