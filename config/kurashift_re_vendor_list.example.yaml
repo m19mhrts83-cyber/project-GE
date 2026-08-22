@@ -1,15 +1,32 @@
-# 地場不動産 — 業者開拓リスト（正本の例）
-# ユーザー既存リストを転記して kurashift_re_vendor_list.yaml として保存（Git 非公開可）
-#
-# Grok 業者開拓 Bot が参照。Jarvis は YAML を読んでコピー用に deals に出してもよい。
+# 地場不動産 — 業者開拓リスト（正本スキーマ）
+# 実データ: config/kurashift_re_vendor_list.yaml（.gitignore・ローカル正本）
+# 取込: scripts/jarvis_kurashift_vendor_list.py --import-csv
 
+settings:
+  daily_outreach_limit: 3      # 1日あたり問合せ送付件数（Grok / 手動）
+  daily_discovery_limit: 5     # 1日あたり新規探索件数（Grok）
+  target_areas:
+    - 愛知県
+    - 岐阜県
+    - 三重県
+  outreach_from: matsuno.estate@gmail.com
+
+# status: pending | discovered | contacted | replied | skip | invalid
 vendors:
   - id: example-aichi-01
     name: "（例）〇〇不動産"
     area: "愛知県豊明市"
+    prefecture: "愛知県"
+    city: "豊明市"
     url: "https://example.co.jp/"
     contact_url: "https://example.co.jp/contact"
-    channel: web_form  # web_form | email
+    channel: web_form
     contact_email: ""
-    status: pending  # pending | contacted | replied | skip
+    phone: ""
+    status: pending
+    source: manual
+    discovered_at: "2026-08-22"
+    contacted_at: ""
+    replied_at: ""
+    last_result: ""
     notes: "戸建実績あり"

@@ -171,3 +171,6 @@ dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx
 .jarvis_state/mf_me_storage_state.json
 .jarvis_state/mf_bloomo_debug/
 .jarvis_state/mf_me_browser_profile/
+
+# 地場不動産リスト（連絡先・問合せ結果。ローカル正本）
+config/kurashift_re_vendor_list.yaml
