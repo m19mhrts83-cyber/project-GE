@@ -108,9 +108,16 @@ matsuno.estate@gmail.com
 ## 系列・グループ重複（心証）
 
 - **単独店** … 送信可
-- **同一系列で同一問合せ経路** … **2店目以降は送らない**（`skip` + 理由）
-- 判定: ブランド名 / 同一 `contact_url` / 同一本部フォーム / `group_key`
+- **同一問合せ URL／同一本部フォーム** … **2件目以降は送らない**（`skip` + 理由）
+- **同一ブランドでも店舗別 URL** … **送ってよい**（C21 複数店舗等）
+- 判定: **`contact_url` / `outreach_route_key` / `routes_contacted`** が主。ブランド名は参考のみ
 - 詳細: `grok_vendor_outreach_bot_grok_paste.md` §系列
+
+## URL 未登録（リストに URL なし）
+
+- JSON `needs_url_discovery: true` → **公式サイト・問合せ URL を調査してから送信可**
+- 同一性確認後、フォーム送信。`--mark` に `discovered_url:...` を必ず記載
+- 見つからなければ `skip`（理由1行）。詳細: Instructions §URL 未登録時
 
 ## Bot 作業手順
 

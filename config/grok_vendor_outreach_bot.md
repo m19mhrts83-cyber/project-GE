@@ -18,7 +18,15 @@ cd ~/git-repos
 
 - **週1回**: 出力のキックオフ文 + JSON を Grok Bot2 に1通送る
 - **平日**: 同スレッドで「**本日分**」のみ（JSON 再生成不要）
-- **週末**: Grok の `--mark` 一覧を Jarvis/Mac に同期
+- **週末**: Grok の `--mark` 一覧を Mac に一括反映:
+
+```bash
+# Grok 週次サマリーを grok_week_summary.txt に保存してから
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py \
+  --apply-marks grok_week_summary.txt
+```
+
+`discovered_url:` が note にあれば YAML の `url` / `contact_url` も自動補完。
 
 ### 日次のみ（従来）
 
