@@ -24,6 +24,8 @@ tiers:
     require_inquiry_status: [none, draft, ""]
 
   tier2_daily_queue:
+    enabled: true
+    enable_after_note: "Tier1手動5件成功・返信poll安定後に本番運用。一括確認画面必須"
     min_score: 5.0
     grok_listen: 聞く
     hazard_eval_not: 除外
@@ -57,3 +59,10 @@ ingest:
 to_resolution:
   - summary_json.from
   - vendor_list_by_vendor_id
+
+# Tier2 キュー — 本番候補のみ（E2E fixture 除外）
+production_filter:
+  exclude_title_substrings:
+    - "E2E-GROK-KURASHIFT"
+  exclude_e2e_markers:
+    - "E2E-GROK-KURASHIFT"

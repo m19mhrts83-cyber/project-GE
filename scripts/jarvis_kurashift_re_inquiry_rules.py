@@ -26,6 +26,7 @@ LEGACY_AP_RE = re.compile(
 LEGACY_AP_ALT = re.compile(
     r"(アパート|AP|マンション一棟).*(築古|ボロ|空き家)", re.I
 )
+DEFAULT_E2E_MARKER = "E2E-GROK-KURASHIFT"
 
 
 def load_config() -> dict[str, Any]:
@@ -69,6 +70,37 @@ def parse_email_from_deal(deal: dict[str, Any]) -> str:
     raw = str(sj_of(deal).get("from") or "")
     _, addr = parseaddr(raw)
     return (addr or "").strip()
+
+
+def is_production_inquiry_deal(
+    deal: dict[str, Any], cfg: dict[str, Any] | None = None
+) -> bool:
+    """Tier2 等 — E2E fixture を除外（本番候補のみ）。"""
+    cfg = cfg or load_config()
+    pf = cfg.get("production_filter") or {}
+    title_subs = pf.get("exclude_title_substrings") or [DEFAULT_E2E_MARKER]
+    e2e_markers = pf.get("exclude_e2e_markers") or [DEFAULT_E2E_MARKER]
+
+    title = str(deal.get("title") or "")
+    for sub in title_subs:
+        if sub and sub in title:
+            return False
+
+    sj = sj_of(deal)
+    grok = grok_of(deal) or {}
+    blob = "\n".join(
+        [
+            title,
+            str(sj.get("e2e") or ""),
+            str(sj.get("report_id") or ""),
+            str(grok.get("e2e") or ""),
+            str(grok.get("report_id") or ""),
+        ]
+    )
+    for marker in e2e_markers:
+        if marker and marker in blob:
+            return False
+    return True
 
 
 def inquiry_status(deal: dict[str, Any]) -> str:
@@ -239,6 +271,91 @@ def inquiry_tier_hint(deal: dict[str, Any]) -> int | None:
     if t in (1, 2, 3):
         return int(t)
     return None
+
+
+def jst_day_start_iso() -> str:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    now = datetime.now(ZoneInfo("Asia/Tokyo"))
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return start.isoformat()
+
+
+def count_today_inquiry_sends(sb: Any) -> int:
+    since = jst_day_start_iso()
+    r = (
+        sb.table("kurashift_jobs")
+        .select("id", count="exact")
+        .eq("job_type", "re_deal_inquiry_send")
+        .in_("status", ["queued", "running", "succeeded"])
+        .gte("created_at", since)
+        .execute()
+    )
+    return int(getattr(r, "count", None) or 0)
+
+
+def tier2_queue_summary(sb: Any, cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Tier2 日次キュー（digest / CLI 用。TS reInquiryTier2Queue と同等ロジック）。"""
+    cfg = cfg or load_config()
+    t2 = (cfg.get("tiers") or {}).get("tier2_daily_queue") or {}
+    enabled = bool(t2.get("enabled"))
+    daily_cap = int(cfg.get("daily_send_cap") or 5)
+    sent_today = count_today_inquiry_sends(sb)
+    remaining = max(0, daily_cap - sent_today)
+
+    base = {
+        "enabled": enabled,
+        "daily_cap": daily_cap,
+        "sent_today": sent_today,
+        "remaining": remaining,
+        "queue_count": 0,
+        "queue_titles": [],
+    }
+    if not enabled:
+        return base
+
+    rows = (
+        sb.table("kurashift_re_deals")
+        .select("id, title, status, match_score, area, inquiry_status, summary_json")
+        .in_("status", ["info", "viewing"])
+        .order("match_score", desc=True)
+        .limit(120)
+        .execute()
+    ).data or []
+
+    queue: list[dict[str, Any]] = []
+    for d in rows:
+        if not is_production_inquiry_deal(d, cfg):
+            continue
+        ev = evaluate_inquiry_candidate(d, cfg)
+        if not ev.get("tier2") or not ev.get("can_quick_send"):
+            continue
+        if "@" not in parse_email_from_deal(d):
+            continue
+        queue.append(d)
+
+    queue.sort(key=lambda x: float(x.get("match_score") or 0), reverse=True)
+    capped = queue[:remaining]
+    base["queue_count"] = len(capped)
+    base["queue_titles"] = [str(d.get("title") or "")[:50] for d in capped[:5]]
+    return base
+
+
+def format_tier2_digest_block(summary: dict[str, Any]) -> list[str]:
+    if not summary.get("enabled"):
+        return []
+    lines = [
+        f"- Tier2 送信待ち: {summary.get('queue_count', 0)}件 "
+        f"（本日 {summary.get('sent_today', 0)}/{summary.get('daily_cap', 5)} · "
+        f"残り {summary.get('remaining', 0)}）",
+    ]
+    for t in summary.get("queue_titles") or []:
+        if t:
+            lines.append(f"  · {t}")
+    if summary.get("queue_count", 0) > 0:
+        lines.append("- 次: KURASHIFT /realestate/deals/tier2 で一括確認")
+    return lines
 
 
 def sb_client() -> Any:
