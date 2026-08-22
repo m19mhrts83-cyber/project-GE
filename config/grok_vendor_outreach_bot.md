@@ -4,6 +4,7 @@
 **Instructions 貼り付け**: `config/grok_vendor_outreach_bot_grok_paste.md`（コードブロック内を Grok に貼る）
 
 **status**: `grok_vendor_outreach_format.md` が **approved** のときのみ送信可。  
+**送信**: **A'-v2 固定・リスト3社/日・都度承認不要**（2026-08-22 松野委任）。  
 **別Bot**: 物件調査（`[Grok調査]` → estate）は `config/grok_property_report_format.md`（Bot1）
 
 ## 毎日の流れ（1日3件）
@@ -15,11 +16,11 @@ cd ~/git-repos
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --next 3
 ```
 
-2. 出力された各社について:
-   - `contact_url` または `url` の Web 問合せフォームを開く
-   - **本文**: `config/grok_vendor_outreach_format.md` の標準文面（list_region でエリア差替）
+2. JSON を Bot2 に渡す。Bot2 が各社について:
+   - `contact_url` または `url` の **Web 問合せフォーム**を開く
+   - **本文**: `config/grok_vendor_outreach_format.md` の A'-v2（list_region でエリア差替）
    - **返信先**: matsuno.estate@gmail.com（必須）
-   - **From/署名**: 松野真治 / matsuno.estate@gmail.com
+   - **送信まで実行**（approved 条件内）
 
 3. 送信後、Mac で記録:
 
@@ -28,14 +29,34 @@ cd ~/git-repos
   --mark {id} --status contacted --note "個人Web送信(estate) YYYY-MM-DD"
 ```
 
-4. **対外送信前**: ユーザーがフォーム最終画面を確認（Jarvis は自動送信しない）
+4. **Jarvis / パートナー確認**で estate 返信を取込:
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --apply
+```
+
+## 返信・milestone 業者の裁き
+
+**ブロックリスト対象ではない。** 問合せの目的どおりの返信。
+
+| 種類 | やること |
+|---|---|
+| 条件質問のみ | estate から短文返信（Jarvis 下書き）。`--status replied` |
+| 物件 PDF／リンク | `property_mail_match` → deals → 必要なら Bot1 `[Grok調査]` |
+| 登録完了・挨拶 | `replied` 記録。物件待ち |
+| 無関係スパム | 物件 `passed` または skip。業者拒否リストとは別 |
+
+- **auto_pass** = 物件が条件外（エリア・区分等）。**業者をブロックする意味ではない**。
+- 第一問合せ（具体物件）は **KURASHIFT deals UI**（2段確認）。Bot2 文面とは別。
+- Bot2 は **返信対応しない**（送信専用）。
 
 ## 禁止
 
-- `status: draft` の文面で送らない（現在は approved）
-- 利回り%をフォームの目立つ欄に大書きしない
+- `status: draft` の文面で送らない
+- 利回り%・土地値%をフォームに大書き
 - 329社一括送信
-- 具体物件への第一問合せ（それは KURASHIFT deals 経由・別テンプレ）
+- リスト外・approved 改変
+- 具体物件への第一問合せ（KURASHIFT deals 経由）
 
 ## 新規探索（問合せは送らない）
 
