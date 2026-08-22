@@ -276,7 +276,7 @@ export default function DealInquiryActions({
                 />
               </label>
               <p className="meta" style={{ marginTop: 6 }}>
-                From: admin@livingsupport-matsu.co.jp
+                From: matsuno.estate@gmail.com
               </p>
               <button
                 type="button"
@@ -297,7 +297,7 @@ export default function DealInquiryActions({
                 <strong>送信内容の再確認</strong>（編集不可）
               </p>
               <p className="meta" style={{ marginTop: 6 }}>
-                From: admin@livingsupport-matsu.co.jp
+                From: matsuno.estate@gmail.com
               </p>
               <p className="meta">
                 <strong>To:</strong> {to}

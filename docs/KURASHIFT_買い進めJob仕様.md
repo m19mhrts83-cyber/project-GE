@@ -24,7 +24,7 @@
 
 | 優先 | source | 実装 |
 |---|---|---|
-| ベース | `mail_admin`（主）＋ `mail_estate`（補完） | dry-run → 候補カード。自動送信なし |
+| ベース | `mail_admin`（主）＋ `mail_estate`（補完）＋ `mail_grok`（Grok `[Grok調査]`） | dry-run → 候補カード。自動送信なし |
 | 追加 | `kenbiya` / `rakumachi` | Sprint 3 |
 | 手動 | `manual` | UI／Jarvis |
 
@@ -68,7 +68,7 @@
 
 | 操作 | 内容 |
 |---|---|
-| **第一問い合わせ** | From=**admin**。テンプレは `config/kurashift_re_inquiry_template.yaml`。画面確認後 `re_deal_inquiry_send` |
+| **第一問い合わせ** | From=**estate**。テンプレは `config/kurashift_re_inquiry_template.yaml`。画面確認後 `re_deal_inquiry_send` |
 | **返信取込** | `re_deal_inquiry_poll`（スレッドから inbound を蓄積） |
 | **運営相談パック** | `re_deal_ops_pack` → `kurashift_consultations`（lane=`realestate`。未DDL時は general） |
 
@@ -123,9 +123,9 @@
 | job_type | 内容 | 危険度 |
 |---|---|---|
 | `buy_plan_ingest` | Excel 再取込 | 低 |
-| `re_mail_match` | admin/estate 物件メール候補。明らかに対象外は passed（当面未既読・学習後 allowlist のみ既読） | 低（候補は送信なし） |
+| `re_mail_match` | admin/estate 物件メール候補＋`mail_grok`（`[Grok調査]`）。明らかに対象外は passed（当面未既読・学習後 allowlist のみ既読） | 低（候補は送信なし） |
 | `re_deal_mark_gmail_read` | 確認／対象外／学習確認後の Gmail 既読 | 低（UNREAD のみ） |
-| `re_deal_inquiry_send` | 不動産会社へ第一問い合わせ（admin） | 中（UI確認必須） |
+| `re_deal_inquiry_send` | 不動産会社へ第一問い合わせ（estate） | 中（UI確認必須） |
 | `re_deal_inquiry_poll` | 問い合わせスレッドの返信取込 | 低 |
 | `re_deal_ops_pack` | 運営相談パック作成 | 低（送信なし） |
 | `re_deal_advice` | Q&A 注入 | 低 |

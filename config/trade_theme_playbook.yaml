@@ -168,7 +168,7 @@ allowed_jobs:
   - re_mail_match
   - re_deal_advice
   - re_deal_mark_gmail_read  # 千三つ「確認した／対象外」→ Gmail UNREAD 除去
-  - re_deal_inquiry_send  # 不動産会社へ第一問い合わせ（From=admin・UI確認必須）
+  - re_deal_inquiry_send  # 不動産会社へ第一問い合わせ（From=estate・UI確認必須）
   - re_deal_inquiry_poll  # 第一問い合わせスレッドの返信取込
   - re_deal_ops_pack  # 運営相談パック（consultations）
   - ops_consult_ingest

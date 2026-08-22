@@ -168,7 +168,8 @@ export default async function RealEstateDealsPage({
         情報→内見→買付→融資→購入。見送りは学習。長期プラン・今狙う条件は{" "}
         <a href="/realestate/buy-plan">買い進めプラン</a>。
         「確認した」「対象外」で紐づく Gmail を既読。取込の明らかに対象外は見送り候補（当面は未既読・確認後に学習）。
-        第一問い合わせは From=admin・2段確認後にキュー。Mac 常駐が数秒〜数十秒で実行（スリープ中は起動後）。
+        第一問い合わせは From=estate・2段確認後にキュー。Mac 常駐が数秒〜数十秒で実行（スリープ中は起動後）。
+        Grok 調査は `[Grok調査]` 件名で estate 受信箱 → mail_grok 取込。
       </p>
       <p className="meta" style={{ marginBottom: 12 }}>
         {watch.label} · <a href="/jobs">ジョブ一覧</a>
@@ -339,6 +340,13 @@ export default async function RealEstateDealsPage({
                         }>;
                       })
                     : {};
+                const grok =
+                  sj && typeof (sj as { grok?: unknown }).grok === "object"
+                    ? ((sj as { grok?: Record<string, unknown> }).grok as Record<
+                        string,
+                        unknown
+                      >)
+                    : null;
                 const inquiryStatus =
                   d.inquiry_status || sj.inquiry_status || "none";
                 const timeline =
@@ -364,6 +372,24 @@ export default async function RealEstateDealsPage({
                     <td>
                       {d.title}
                       <div className="meta">{d.source || ""}</div>
+                      {d.source === "mail_grok" && grok ? (
+                        <div className="meta" style={{ marginTop: 4 }}>
+                          {typeof grok.parking === "string" && grok.parking
+                            ? `駐:${grok.parking} · `
+                            : ""}
+                          {typeof grok.land_ratio === "string" && grok.land_ratio
+                            ? `倍率:${grok.land_ratio} · `
+                            : ""}
+                          {typeof grok.population_eval === "string" &&
+                          grok.population_eval
+                            ? `人口:${grok.population_eval} · `
+                            : ""}
+                          {typeof grok.listen_value === "string" &&
+                          grok.listen_value
+                            ? `聞く:${grok.listen_value}`
+                            : ""}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="meta">{d.area || "—"}</td>
                     <td className="meta">{d.structure || "—"}</td>
