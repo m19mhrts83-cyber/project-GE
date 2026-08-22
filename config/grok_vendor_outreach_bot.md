@@ -1,7 +1,10 @@
 # Grok 業者開拓 Bot — 作業説明（Phase 4 正本）
 
+**Grok Bot 名（推奨）**: **物件業者開拓**（Bot2）  
+**Instructions 貼り付け**: `config/grok_vendor_outreach_bot_grok_paste.md`（コードブロック内を Grok に貼る）
+
 **status**: `grok_vendor_outreach_format.md` が **approved** のときのみ送信可。  
-**別Bot**: 物件調査（`[Grok調査]` → estate）は `config/grok_property_report_format.md`
+**別Bot**: 物件調査（`[Grok調査]` → estate）は `config/grok_property_report_format.md`（Bot1）
 
 ## 毎日の流れ（1日3件）
 
