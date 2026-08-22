@@ -118,8 +118,28 @@ def _field_after_label(text: str, label: str) -> str:
     return ""
 
 
+def _section_text(text: str, heading_prefix: str) -> str:
+    """## 見出し以降〜次の ## まで。"""
+    lines = text.splitlines()
+    buf: list[str] = []
+    in_sec = False
+    for line in lines:
+        if re.match(rf"^##\s*{re.escape(heading_prefix)}", line.strip()):
+            in_sec = True
+            continue
+        if in_sec and re.match(r"^##\s", line.strip()):
+            break
+        if in_sec:
+            buf.append(line)
+    return "\n".join(buf)
+
+
+def _field_in_section(text: str, section_prefix: str, label: str) -> str:
+    return _field_after_label(_section_text(text, section_prefix), label)
+
+
 def parse_grok_report(text: str) -> dict[str, Any]:
-    """Grok 調査レポート（Phase 2a 形式）を summary_json.grok_* に展開。"""
+    """Grok 調査レポート（Phase 2a+ 形式）を summary_json.grok に展開。"""
     out: dict[str, Any] = {"source_tag": "grok_bot"}
     loc = _field_after_label(text, "所在")
     if loc:
@@ -138,17 +158,47 @@ def parse_grok_report(text: str) -> dict[str, Any]:
         ("building", "建物"),
         ("parking", "駐車場"),
         ("url", "URL"),
-        ("land_method", "方式"),
-        ("land_ratio", "倍率"),
-        ("land100", "土地値100%判定"),
-        ("land_basis_url", "根拠URL"),
-        ("population_eval", "評価"),
-        ("listen_value", "聞く価値"),
-        ("reason_line", "理由1行"),
     ):
-        val = _field_after_label(text, label)
+        val = _field_in_section(text, "物件", label) or _field_after_label(text, label)
         if val:
             out[key] = val
+    # 土地評価（## 土地評価 セクション）
+    land_sec = _section_text(text, "土地評価")
+    for key, label in (
+        ("land_method", "方式"),
+        ("route_price_tsubo", "路線価_万円_坪"),
+        ("land_ratio", "倍率"),
+        ("land_appraisal_man", "土地積算_万円"),
+        ("land100_ratio", "土地値100%_比率"),
+        ("land100", "土地値100%判定"),
+        ("land_basis_url", "根拠URL"),
+    ):
+        val = _field_after_label(land_sec, label) if land_sec else _field_after_label(text, label)
+        if val:
+            out[key] = val
+    # ハザード（## ハザード セクション）
+    haz_sec = _section_text(text, "ハザード")
+    for key, label in (
+        ("hazard_survey_url", "調査URL"),
+        ("hazard_flood", "洪水"),
+        ("hazard_landslide", "土砂"),
+        ("hazard_storm_surge", "高潮"),
+        ("hazard_inland", "内水"),
+        ("hazard_eval", "評価"),
+        ("hazard_basis_url", "根拠URL"),
+    ):
+        val = _field_after_label(haz_sec, label) if haz_sec else ""
+        if val:
+            out[key] = val
+    out["population_eval"] = _field_in_section(text, "人口", "評価") or _field_after_label(
+        text, "評価"
+    )
+    out["listen_value"] = _field_in_section(text, "総合", "聞く価値") or _field_after_label(
+        text, "聞く価値"
+    )
+    out["reason_line"] = _field_in_section(text, "総合", "理由1行") or _field_after_label(
+        text, "理由1行"
+    )
     rid = _field_after_label(text, "report_id")
     if not rid:
         m = re.search(r"report_id:\s*(\S+)", text)
@@ -157,14 +207,8 @@ def parse_grok_report(text: str) -> dict[str, Any]:
     if rid:
         out["report_id"] = rid
     pop_table = ""
-    in_pop = False
-    for line in text.splitlines():
-        if re.match(r"^##\s*人口", line):
-            in_pop = True
-            continue
-        if in_pop and re.match(r"^##\s", line):
-            break
-        if in_pop and line.strip().startswith("|"):
+    for line in _section_text(text, "人口").splitlines():
+        if line.strip().startswith("|"):
             pop_table = (pop_table + "\n" + line).strip()
     if pop_table:
         out["population_table"] = pop_table[:800]
@@ -175,6 +219,7 @@ def grok_match_score(grok: dict[str, Any], base_score: float) -> float:
     score = base_score
     listen = str(grok.get("listen_value") or "")
     land100 = str(grok.get("land100") or "")
+    hazard = str(grok.get("hazard_eval") or "")
     if listen == "聞く":
         score += 4.0
     elif listen == "保留":
@@ -185,8 +230,20 @@ def grok_match_score(grok: dict[str, Any], base_score: float) -> float:
         score += 2.0
     elif land100 == "見送り":
         score -= 1.5
+    if grok.get("land_method") == "路線価" and grok.get("route_price_tsubo"):
+        score += 0.5
     if grok.get("parking") == "あり":
         score += 0.5
+    if hazard == "除外":
+        score -= 4.0
+    elif hazard == "注意":
+        score -= 1.0
+    elif hazard == "OK":
+        score += 0.5
+    for k in ("hazard_flood", "hazard_landslide", "hazard_storm_surge", "hazard_inland"):
+        if str(grok.get(k) or "") == "該当":
+            score -= 1.5
+            break
     return round(score, 2)
 
 
@@ -552,11 +609,18 @@ def fetch_grok_mails(
         sc, hits = score_text(text, criteria_blob)
         sc = grok_match_score(grok, sc)
         listen = str(grok.get("listen_value") or "")
-        status = (
-            "viewing"
-            if listen == "聞く" or sc >= VIEWING_SCORE_MIN
-            else "info"
-        )
+        hazard = str(grok.get("hazard_eval") or "")
+        if hazard == "除外" and listen != "聞く":
+            status = "passed"
+            hits = hits + ["hazard_exclude"]
+        elif listen == "見送り" and sc < CANDIDATE_SCORE_MIN:
+            status = "passed"
+        else:
+            status = (
+                "viewing"
+                if listen == "聞く" or sc >= VIEWING_SCORE_MIN
+                else "info"
+            )
         row = _deal_row_from_message(
             gmail_id=m["id"],
             source="mail_grok",

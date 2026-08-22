@@ -18,6 +18,11 @@ body_template: |
 
   {signature}
 
+# 倍率地域（summary_json.grok.land_method が倍率）のとき build_preview が署名前に挿入
+body_append_bairitsu: |
+  【倍率地域のため】固定資産税の課税明細（または固定資産評価額が確認できる資料）を
+  併せてご送付いただけますでしょうか。土地積算の確認に必要です。
+
 # 署名は worker が COMPANY_NAME / REPRESENTATIVE_NAME 等で埋める。空なら省略。
 signature_template: |
   {company_name}
