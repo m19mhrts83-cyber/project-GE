@@ -1,9 +1,10 @@
 # 千三つ — 不動産会社への第一問い合わせテンプレ
-# From: admin（token_livingsupport.json）／対外送信は UI 確認必須
+# From: estate（token_estate.json）／対外送信は UI 確認必須
+# 既存 admin スレッドは poll 時 payload.account=mail_admin で admin token にフォールバック
 # 細かい仕様は第1号案件で詰める
 
-from_account: admin
-from_token: token_livingsupport.json
+from_account: estate
+from_token: token_estate.json
 
 subject_template: "物件資料のご依頼（{title_short}）"
 

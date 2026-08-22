@@ -101,7 +101,93 @@ CITY_HINTS = [
 TOKEN_BY_SOURCE = {
     "mail_admin": "token_livingsupport.json",
     "mail_estate": "token_estate.json",
+    "mail_grok": "token_estate.json",
 }
+
+GROK_QUERY = 'subject:"[Grok調査]" newer_than:{days}d'
+GROK_SUBJECT_PREFIX = "[Grok調査]"
+
+
+def _field_after_label(text: str, label: str) -> str:
+    """Markdown 行 `- ラベル: 値` から値を取る。"""
+    pat = rf"^\s*[-*]\s*{re.escape(label)}\s*[:：]\s*(.+)$"
+    for line in text.splitlines():
+        m = re.match(pat, line.strip())
+        if m:
+            return m.group(1).strip()
+    return ""
+
+
+def parse_grok_report(text: str) -> dict[str, Any]:
+    """Grok 調査レポート（Phase 2a 形式）を summary_json.grok_* に展開。"""
+    out: dict[str, Any] = {"source_tag": "grok_bot"}
+    loc = _field_after_label(text, "所在")
+    if loc:
+        out["location"] = loc
+    price_raw = _field_after_label(text, "価格_万")
+    if price_raw:
+        out["price_man_raw"] = price_raw
+        pm = re.search(r"(\d+(?:\.\d+)?)", price_raw.replace(",", ""))
+        if pm:
+            try:
+                out["price_man"] = float(pm.group(1))
+            except Exception:
+                pass
+    for key, label in (
+        ("land_area", "土地面積"),
+        ("building", "建物"),
+        ("parking", "駐車場"),
+        ("url", "URL"),
+        ("land_method", "方式"),
+        ("land_ratio", "倍率"),
+        ("land100", "土地値100%判定"),
+        ("land_basis_url", "根拠URL"),
+        ("population_eval", "評価"),
+        ("listen_value", "聞く価値"),
+        ("reason_line", "理由1行"),
+    ):
+        val = _field_after_label(text, label)
+        if val:
+            out[key] = val
+    rid = _field_after_label(text, "report_id")
+    if not rid:
+        m = re.search(r"report_id:\s*(\S+)", text)
+        if m:
+            rid = m.group(1)
+    if rid:
+        out["report_id"] = rid
+    pop_table = ""
+    in_pop = False
+    for line in text.splitlines():
+        if re.match(r"^##\s*人口", line):
+            in_pop = True
+            continue
+        if in_pop and re.match(r"^##\s", line):
+            break
+        if in_pop and line.strip().startswith("|"):
+            pop_table = (pop_table + "\n" + line).strip()
+    if pop_table:
+        out["population_table"] = pop_table[:800]
+    return out
+
+
+def grok_match_score(grok: dict[str, Any], base_score: float) -> float:
+    score = base_score
+    listen = str(grok.get("listen_value") or "")
+    land100 = str(grok.get("land100") or "")
+    if listen == "聞く":
+        score += 4.0
+    elif listen == "保留":
+        score += 1.5
+    elif listen == "見送り":
+        score -= 2.0
+    if land100 == "聞く":
+        score += 2.0
+    elif land100 == "見送り":
+        score -= 1.5
+    if grok.get("parking") == "あり":
+        score += 0.5
+    return round(score, 2)
 
 
 def sb_client() -> Any:
@@ -433,11 +519,79 @@ def fetch_account(
     return keepers, auto_pass
 
 
+def fetch_grok_mails(
+    *,
+    days: int,
+    limit: int,
+    criteria_blob: str,
+) -> list[dict[str, Any]]:
+    """estate 受信箱の [Grok調査] 件名メールを deals 候補化。"""
+    svc = gmail_service("token_estate.json")
+    q = GROK_QUERY.format(days=days)
+    resp = (
+        svc.users()
+        .messages()
+        .list(userId="me", q=q, maxResults=min(limit, 50))
+        .execute()
+    )
+    keepers: list[dict[str, Any]] = []
+    for m in resp.get("messages") or []:
+        full = (
+            svc.users()
+            .messages()
+            .get(userId="me", id=m["id"], format="full")
+            .execute()
+        )
+        hm = header_map(full.get("payload", {}).get("headers") or [])
+        subject = hm.get("subject") or "(無題)"
+        if GROK_SUBJECT_PREFIX not in subject:
+            continue
+        body = decode_body(full.get("payload") or {})
+        text = f"{subject}\n{body}"
+        grok = parse_grok_report(text)
+        sc, hits = score_text(text, criteria_blob)
+        sc = grok_match_score(grok, sc)
+        listen = str(grok.get("listen_value") or "")
+        status = (
+            "viewing"
+            if listen == "聞く" or sc >= VIEWING_SCORE_MIN
+            else "info"
+        )
+        row = _deal_row_from_message(
+            gmail_id=m["id"],
+            source="mail_grok",
+            subject=subject,
+            text=text,
+            hm=hm,
+            sc=sc,
+            hits=hits + (["grok"] if grok else []),
+            status=status,
+        )
+        sj = dict(row.get("summary_json") or {})
+        sj["grok"] = grok
+        row["summary_json"] = sj
+        if grok.get("price_man") is not None:
+            row["price_man"] = grok["price_man"]
+        loc = str(grok.get("location") or "")
+        if loc:
+            area = next(
+                (c for c in CITY_HINTS if c in loc and c not in ("愛知", "岐阜県", "三重")),
+                None,
+            )
+            if area:
+                row["area"] = area
+        if re.search(r"戸建|戸建て", text):
+            row["structure"] = "戸建"
+        keepers.append(row)
+    keepers.sort(key=lambda x: (-(x["match_score"] or 0), x["title"]))
+    return keepers
+
+
 def existing_gmail_ids(sb: Any) -> set[str]:
     rows = (
         sb.table("kurashift_re_deals")
         .select("summary_json")
-        .in_("source", ["mail_admin", "mail_estate"])
+        .in_("source", ["mail_admin", "mail_estate", "mail_grok"])
         .limit(500)
         .execute()
     )
@@ -573,6 +727,11 @@ def main() -> int:
         default="",
         help="案件IDの Gmail を既読（UNREAD除去）。取込と併用しない",
     )
+    ap.add_argument(
+        "--grok-only",
+        action="store_true",
+        help="[Grok調査] メールのみ取込（estate）",
+    )
     args = ap.parse_args()
 
     if args.mark_read_deal_id:
@@ -586,26 +745,35 @@ def main() -> int:
     if not args.apply:
         args.dry_run = True
 
-    print("使用アカウント: admin（主）+ estate（補完） / Gmail API")
+    print("使用アカウント: admin（主）+ estate（補完）+ mail_grok（estate） / Gmail API")
     sb = sb_client()
     criteria_blob = load_criteria_blob(sb)
     candidates: list[dict[str, Any]] = []
     auto_pass_all: list[dict[str, Any]] = []
-    for token, source in (
-        ("token_livingsupport.json", "mail_admin"),
-        ("token_estate.json", "mail_estate"),
-    ):
-        try:
-            keepers, auto_pass = fetch_account(
-                token, source, days=args.days, limit=args.limit, criteria_blob=criteria_blob
-            )
-            print(
-                f"# {source}: candidates={len(keepers)} auto_pass={len(auto_pass)}"
-            )
-            candidates.extend(keepers)
-            auto_pass_all.extend(auto_pass)
-        except Exception as e:
-            print(f"# {source}: FAIL {type(e).__name__}: {e}")
+    if not args.grok_only:
+        for token, source in (
+            ("token_livingsupport.json", "mail_admin"),
+            ("token_estate.json", "mail_estate"),
+        ):
+            try:
+                keepers, auto_pass = fetch_account(
+                    token, source, days=args.days, limit=args.limit, criteria_blob=criteria_blob
+                )
+                print(
+                    f"# {source}: candidates={len(keepers)} auto_pass={len(auto_pass)}"
+                )
+                candidates.extend(keepers)
+                auto_pass_all.extend(auto_pass)
+            except Exception as e:
+                print(f"# {source}: FAIL {type(e).__name__}: {e}")
+    try:
+        grok_rows = fetch_grok_mails(
+            days=args.days, limit=args.limit, criteria_blob=criteria_blob
+        )
+        print(f"# mail_grok: candidates={len(grok_rows)}")
+        candidates.extend(grok_rows)
+    except Exception as e:
+        print(f"# mail_grok: FAIL {type(e).__name__}: {e}")
 
     uniq = _dedupe_by_gmail(candidates)
     uniq_pass = _dedupe_by_gmail(auto_pass_all)

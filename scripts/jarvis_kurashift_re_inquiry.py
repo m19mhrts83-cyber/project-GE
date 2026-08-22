@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""千三つ — 不動産会社への第一問い合わせ（From=admin）／返信取込／運営相談パック。
+"""千三つ — 不動産会社への第一問い合わせ（From=estate）／返信取込／運営相談パック。
 
-使用アカウント: admin / Gmail API（token_livingsupport.json）
+使用アカウント: estate / Gmail API（token_estate.json。テンプレ YAML 参照）
+既存 admin スレッドは poll 時 payload.account=mail_admin で admin token にフォールバック。
 対外送信は UI 確認後のジョブのみ（取込時は送らない）。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -38,6 +39,15 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
 ]
 ADMIN_TOKEN = "token_livingsupport.json"
+ESTATE_TOKEN = "token_estate.json"
+ACCOUNT_EMAIL = {
+    "admin": "admin@livingsupport-matsu.co.jp",
+    "estate": "matsuno.estate@gmail.com",
+}
+ACCOUNT_PAYLOAD = {
+    "admin": "mail_admin",
+    "estate": "mail_estate",
+}
 
 
 def now_iso() -> str:
@@ -58,14 +68,59 @@ def load_template() -> dict[str, Any]:
     return yaml.safe_load(TEMPLATE_PATH.read_text(encoding="utf-8")) or {}
 
 
-def gmail_admin():
-    path = MANUAL / ADMIN_TOKEN
+def _token_name_for_account(account: str) -> str:
+    acct = (account or "").strip().lower()
+    if acct == "admin":
+        return ADMIN_TOKEN
+    if acct == "estate":
+        return ESTATE_TOKEN
+    tmpl = load_template()
+    return str(tmpl.get("from_token") or ESTATE_TOKEN)
+
+
+def gmail_for_account(account: str):
+    token_name = _token_name_for_account(account)
+    path = MANUAL / token_name
     if not path.is_file():
         raise FileNotFoundError(path)
     creds = Credentials.from_authorized_user_file(str(path), SCOPES)
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+
+def default_from_account() -> str:
+    return str(load_template().get("from_account") or "estate")
+
+
+def estate_email() -> str:
+    return ACCOUNT_EMAIL["estate"]
+
+
+def account_for_deal_with_sb(sb: Any, deal: dict[str, Any]) -> str:
+    for m in list_messages(sb, deal):
+        payload = m.get("payload") or {}
+        if payload.get("account") == "mail_admin":
+            return "admin"
+        if payload.get("account") == "mail_estate":
+            return "estate"
+    sj = sj_of(deal)
+    if sj.get("account") == "mail_admin":
+        return "admin"
+    return default_from_account()
+
+
+def is_self_email(from_email: str) -> bool:
+    addr = (from_email or "").strip().lower()
+    if not addr:
+        return False
+    if addr.endswith("@livingsupport-matsu.co.jp"):
+        return True
+    if addr == estate_email():
+        return True
+    if addr == ACCOUNT_EMAIL["admin"]:
+        return True
+    return False
 
 
 def header_map(headers: list[dict] | None) -> dict[str, str]:
@@ -198,9 +253,14 @@ def build_preview(deal: dict[str, Any], *, to_email: str | None = None) -> dict[
     )
     company = (os.environ.get("COMPANY_NAME") or "").strip()
     rep = (os.environ.get("REPRESENTATIVE_NAME") or "").strip()
-    sig_t = str(tmpl.get("signature_template") or "").format(
-        company_name=company, representative_name=rep
-    ).strip()
+    personal = (os.environ.get("PERSONAL_NAME") or "").strip()
+    from_acct = str(tmpl.get("from_account") or "estate")
+    if from_acct == "estate" and personal:
+        sig_t = personal
+    else:
+        sig_t = str(tmpl.get("signature_template") or "").format(
+            company_name=company, representative_name=rep
+        ).strip()
     body = str(tmpl.get("body_template") or "").format(signature=sig_t).strip()
     sj = sj_of(deal)
     if not to_email:
@@ -226,7 +286,8 @@ def send_inquiry(
     confirm: bool,
     dry_run: bool,
 ) -> dict[str, Any]:
-    print("使用アカウント: admin / Gmail API（第一問い合わせ送信）")
+    from_acct = default_from_account()
+    print(f"使用アカウント: {from_acct} / Gmail API（第一問い合わせ送信）")
     deal = get_deal(sb, deal_id)
     prev = build_preview(deal, to_email=to_email)
     to_email = (to_email or prev["to"] or "").strip()
@@ -278,7 +339,7 @@ def send_inquiry(
     deal = get_deal(sb, deal_id)
 
     try:
-        svc = gmail_admin()
+        svc = gmail_for_account(from_acct)
         msg = MIMEText(body, _charset="utf-8")
         msg["to"] = to_email
         msg["subject"] = subject
@@ -297,6 +358,8 @@ def send_inquiry(
 
     gmail_id = sent.get("id")
     thread_id = sent.get("threadId")
+    from_email = ACCOUNT_EMAIL.get(from_acct, estate_email())
+    payload_account = ACCOUNT_PAYLOAD.get(from_acct, "mail_estate")
     insert_message(
         sb,
         deal,
@@ -306,12 +369,12 @@ def send_inquiry(
             "kind": "first_inquiry",
             "gmail_id": gmail_id,
             "thread_id": thread_id,
-            "from_email": "admin@livingsupport-matsu.co.jp",
+            "from_email": from_email,
             "to_email": to_email,
             "subject": subject,
             "body_text": body,
             "occurred_at": now_iso(),
-            "payload": {"account": "mail_admin"},
+            "payload": {"account": payload_account},
         },
     )
     update_inquiry(
@@ -341,15 +404,24 @@ def send_inquiry(
 
 
 def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) -> dict[str, Any]:
-    print("使用アカウント: admin / Gmail API（返信取込）")
+    print("使用アカウント: estate（主）+ admin（既存スレッド） / Gmail API（返信取込）")
     q = sb.table("kurashift_re_deals").select("*").limit(200)
     if deal_id:
         q = q.eq("id", deal_id)
     deals = q.execute().data or []
-    svc = gmail_admin()
+    svc_cache: dict[str, Any] = {}
     appended = 0
     scanned = 0
     for deal in deals:
+        acct = account_for_deal_with_sb(sb, deal)
+        if acct not in svc_cache:
+            try:
+                svc_cache[acct] = gmail_for_account(acct)
+            except Exception as e:
+                print(f"# gmail {acct}: {type(e).__name__}: {e}")
+                continue
+        svc = svc_cache[acct]
+        payload_account = ACCOUNT_PAYLOAD.get(acct, "mail_estate")
         fields = inquiry_fields(deal)
         thread_id = fields.get("inquiry_thread_id")
         if not thread_id:
@@ -382,8 +454,7 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
             from_raw = hm.get("from", "")
             _, from_email = parseaddr(from_raw)
             from_email = (from_email or "").lower()
-            # 自分の outbound は既に保存済み想定。未保存なら outbound として入れる
-            is_self = from_email.endswith("@livingsupport-matsu.co.jp") or from_email == "admin@livingsupport-matsu.co.jp"
+            is_self = is_self_email(from_email)
             direction = "outbound" if is_self else "inbound"
             kind = "first_inquiry" if is_self else "reply"
             date_hdr = hm.get("date", "")
@@ -404,7 +475,7 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
                 "subject": hm.get("subject") or "",
                 "body_text": decode_body(payload),
                 "occurred_at": occurred.isoformat(),
-                "payload": {"account": "mail_admin"},
+                "payload": {"account": payload_account},
             }
             if dry_run:
                 print(f"  dry-run would add {direction} {mid} {row['subject'][:60]}")
@@ -433,11 +504,28 @@ def build_ops_pack(sb: Any, deal_id: str) -> dict[str, Any]:
         f"price_man: {deal.get('price_man')} / yield: {deal.get('yield_pct')}",
         f"source: {deal.get('source')}",
         "",
+    ]
+    grok = sj_of(deal).get("grok")
+    if isinstance(grok, dict) and grok:
+        lines.extend(
+            [
+                "【Grok 調査要約】",
+                f"  駐車場: {grok.get('parking') or '—'}",
+                f"  倍率/方式: {grok.get('land_ratio') or '—'} ({grok.get('land_method') or '—'})",
+                f"  土地値100%: {grok.get('land100') or '—'}",
+                f"  人口: {grok.get('population_eval') or '—'}",
+                f"  聞く価値: {grok.get('listen_value') or '—'} — {grok.get('reason_line') or ''}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
         "【Notion 購入判断メモ】",
         str(tmpl.get("ops_notion_url") or ""),
         "",
         "【メール経緯】",
-    ]
+        ]
+    )
     for m in msgs:
         lines.append(
             f"— {m.get('occurred_at','')} [{m.get('direction')}/{m.get('kind')}] "
