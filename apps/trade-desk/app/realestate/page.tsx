@@ -73,6 +73,8 @@ export default async function RealEstatePage({
     { data: unitRows },
     { data: buyPlan },
     { data: dealRows },
+    { data: dealInquiryRows },
+    { data: vendorRows },
     { data: reTxns },
     { data: loanRows },
     { data: catYear },
@@ -86,6 +88,12 @@ export default async function RealEstatePage({
         .eq("is_canonical", true)
         .maybeSingle(),
       supabase.from("kurashift_re_deals").select("status"),
+      supabase
+        .from("kurashift_re_deals")
+        .select("status, inquiry_status")
+        .in("status", ["info", "viewing"])
+        .limit(200),
+      supabase.from("kurashift_re_vendors").select("status").limit(500),
       supabase
         .from("kurashift_finance_transactions")
         .select("category, subcategory, txn_date, income_jpy, expense_jpy, to_account")
@@ -172,6 +180,17 @@ export default async function RealEstatePage({
     const st = d.status as string;
     funnelCounts[st] = (funnelCounts[st] || 0) + 1;
   }
+
+  const vendorCounts: Record<string, number> = {};
+  for (const v of vendorRows || []) {
+    const st = (v.status as string) || "pending";
+    vendorCounts[st] = (vendorCounts[st] || 0) + 1;
+  }
+  let candidateNeedReply = 0;
+  for (const d of dealInquiryRows || []) {
+    if (d.inquiry_status === "has_reply") candidateNeedReply++;
+  }
+  const candidateTotal = (dealInquiryRows || []).length;
 
   const CF_GOAL_MONTH = 500_000;
   const cfAnnual = typeof re19?.cf_jpy === "number" ? re19.cf_jpy : null;
@@ -721,8 +740,39 @@ export default async function RealEstatePage({
             <li>取得後 → ③-A の計画へ／LP 物件購入モード</li>
             <li>
               入口: <a href="/realestate/deals">/realestate/deals</a>
+              {" · "}
+              <a href="/realestate/deals?tab=candidates">候補</a>
             </li>
           </ul>
+        </div>
+      </div>
+
+      <div className="card-grid">
+        <div className="card">
+          <header>
+            <span className="lvl">③-B開</span>
+            <strong>業者開拓</strong>
+          </header>
+          <p className="meta">
+            返信あり {vendorCounts.replied || 0} · 送信済{" "}
+            {vendorCounts.contacted || 0} · 未送信{" "}
+            {(vendorCounts.pending || 0) + (vendorCounts.discovered || 0)}
+          </p>
+          <p>
+            <a href="/realestate/vendors">業者開拓ウォッチ →</a>
+          </p>
+        </div>
+        <div className="card">
+          <header>
+            <span className="lvl">候補</span>
+            <strong>物件パイプライン</strong>
+          </header>
+          <p className="meta">
+            要返信 {candidateNeedReply} · 候補総数 {candidateTotal}
+          </p>
+          <p>
+            <a href="/realestate/deals?tab=candidates">候補一覧 →</a>
+          </p>
         </div>
       </div>
 

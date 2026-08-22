@@ -205,8 +205,17 @@ export const RE_LANES: MapItem[] = [
     code: "③-B実",
     title: "千三つ（実行）",
     intent: "候補→内見→買付→融資→購入の実行ファネルを回す",
-    implemented: "deals一覧・運営経緯取込・Focus導線（案件通しは運用中）",
+    implemented:
+      "deals一覧・候補タブ・詳細ドロワー・判断履歴・運営経緯取込",
     href: "/realestate/deals",
+  },
+  {
+    id: "3b-vendors",
+    code: "③-B開",
+    title: "業者開拓ウォッチ",
+    intent: "地場リストへの Web 問合せ送信状況を一覧で把握する",
+    implemented: "YAML 投影・要フォローフィルタ・deals 紐付け件数",
+    href: "/realestate/vendors",
   },
   {
     id: "3c",

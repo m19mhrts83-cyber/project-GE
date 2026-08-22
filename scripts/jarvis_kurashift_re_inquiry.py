@@ -433,6 +433,19 @@ def send_inquiry(
             ).eq("id", deal_id).execute()
         except Exception:
             pass
+    try:
+        from jarvis_kurashift_deal_events import insert_deal_event
+
+        insert_deal_event(
+            sb,
+            deal_id=deal_id,
+            event_type="inquiry_sent",
+            summary=f"第一問合せ送信: {to_email}",
+            actor="jarvis",
+            payload={"thread_id": thread_id, "gmail_id": gmail_id},
+        )
+    except Exception:
+        pass
     result.update(
         {
             "gmail_id": gmail_id,
@@ -527,6 +540,19 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
                 appended += 1
                 if direction == "inbound":
                     update_inquiry(sb, deal, inquiry_status="has_reply")
+                    try:
+                        from jarvis_kurashift_deal_events import insert_deal_event
+
+                        insert_deal_event(
+                            sb,
+                            deal_id=str(deal["id"]),
+                            event_type="inquiry_reply",
+                            summary=f"返信: {(row.get('subject') or '')[:80]}",
+                            actor="jarvis",
+                            payload={"gmail_id": mid, "from": from_email},
+                        )
+                    except Exception:
+                        pass
                     deal = get_deal(sb, deal["id"])  # refresh sj
                     if not dry_run:
                         try:
