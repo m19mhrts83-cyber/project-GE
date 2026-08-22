@@ -59,14 +59,18 @@ flowchart TB
 
 | 操作 | 担当 | コマンド / 正本 |
 |---|---|---|
-| リスト取込 | Jarvis | `--import-csv` → `kurashift_re_vendor_list.yaml` |
-| 次に問合せ | Grok / 手動 | `--next 3` |
-| 結果記録 | Jarvis | `--mark ID --status contacted` / 返信時 `replied` |
-| 日次探索 | Grok Bot | `--grok-discovery-prompt` → YAML 追記 → `--merge-append` |
+| リスト取込 | Jarvis | `--import-xlsx` → `kurashift_re_vendor_list.yaml` |
+| **週次バッチ** | Jarvis → Grok | `--batch-week --grok-kickoff`（7日×Phase上限） |
+| 日次のみ | Jarvis → Grok | `--next 3`（enriched JSON） |
+| 結果記録（単件） | Jarvis | `--mark ID --status contacted` |
+| **結果記録（一括）** | Jarvis | `--apply-marks grok_summary.txt`（Grok 週次サマリー） |
+| 日次探索 | Grok Bot | `--grok-discovery-prompt` → `--merge-append` |
 | **返信・物件** | Jarvis / KURASHIFT | `property_mail_match` → deals（**ブロックしない**） |
 | **返信下書き・送信** | **Jarvis Dashboard** | `docs/Jarvis_Dashboard_業者返信下書き.md` |
 
-**送信**: Bot2 は approved A'-v2 で **Web フォーム送信まで自動**（1日3社・都度承認不要）。
+**送信**: Bot2 は approved A'-v2 で **Web フォーム送信まで自動**（Phase 1=3社/日・都度承認不要）。
+
+**週次運用（2026-08-22）**: 月1回 `--batch-week` JSON を Grok に渡す → 平日「本日分」のみ。系列 skip は **同一問合せ URL** のみ。URL 空は Grok が調査可（`discovered_url` を `--mark` に記載）。
 
 正本: `config/kurashift_re_vendor_list.yaml`（gitignore）  
 CLI: `scripts/jarvis_kurashift_vendor_list.py`  
@@ -122,7 +126,7 @@ Grok 追記形式: `config/grok_vendor_discovery_append.md`
 5. ✅ E2E パイプライン（fixture PASS）— `jarvis_kurashift_grok_e2e_runner.py` / `docs/KURASHIFT_re_inquiry_E2E_checklist.md`
 6. ⏳ 本番第一問合せ（`聞く` 実物件待ち）— `docs/KURASHIFT_grok_first_stepA.md` §5
 7. ⏳ Phase PDF-1（PDF 中身抽出）
-8. ⏳ 業者開拓送信（Bot2 自動送信・`--next 3`）— Instructions 更新済み 2026-08-22
+8. ✅ 業者開拓送信（Bot2 週次バッチ・Phase 1 試運転 001-003 済 2026-08-22）
 
 ---
 

@@ -8,6 +8,7 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --import-csv path/to/list.csv
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --next 3
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --batch-week --grok-kickoff
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --apply-marks grok_summary.txt
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --mark ID --status contacted --note "Web送信"
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --grok-discovery-prompt
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --merge-append block.yaml
@@ -42,6 +43,18 @@ REGION_ORDER = {"chubu": 0, "shiga": 1, "list": 9}
 PHASE_DAILY_LIMIT = {1: 3, 2: 5, 3: 10}
 
 JARVIS_PRIVATE = REPO / ".env.jarvis_private"
+
+MARK_CMD_RE = re.compile(
+    r"--mark\s+(?P<id>[^\s]+)\s+--status\s+(?P<status>[^\s]+)"
+    r'(?:\s+--note\s+"(?P<note_dq>(?:[^"\\]|\\.)*)"|'
+    r"\s+--note\s+(?P<note_sq>[^\s]+))?",
+    re.I,
+)
+
+DISCOVERED_URL_RE = re.compile(
+    r"discovered_url:\s*(https?://[^\s|\"'<>]+)",
+    re.I,
+)
 
 CHAIN_PATTERNS: tuple[tuple[str, str], ...] = (
     ("daikyo-anabuki", r"大京穴吹|daikyo[\-\.]?anabuki"),
@@ -485,6 +498,34 @@ def _domain_key(url: str) -> str:
         return ""
 
 
+def outreach_route_key(v: dict[str, Any]) -> str:
+    cu = str(v.get("contact_url") or v.get("url") or "").strip()
+    if not cu:
+        return ""
+    try:
+        p = urlparse(cu)
+        host = p.netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        path = (p.path or "/").rstrip("/") or "/"
+        return f"route:{host}{path}"
+    except Exception:
+        return ""
+
+
+def vendor_has_url(v: dict[str, Any]) -> bool:
+    return bool(str(v.get("contact_url") or "").strip() or str(v.get("url") or "").strip())
+
+
+def discovery_query(v: dict[str, Any]) -> str:
+    name = str(v.get("name") or "").strip()
+    pref = str(v.get("prefecture") or "").strip()
+    city = str(v.get("city") or "").strip()
+    area = str(v.get("area") or "").strip()
+    loc = area or f"{pref}{city}"
+    return f"{name} {loc} 不動産 公式 問い合わせ"
+
+
 def infer_group_key(v: dict[str, Any]) -> str:
     explicit = str(v.get("group_key") or v.get("chain_id") or "").strip()
     if explicit:
@@ -503,6 +544,12 @@ def infer_group_key(v: dict[str, Any]) -> str:
 def enrich_vendor(v: dict[str, Any]) -> dict[str, Any]:
     out = dict(v)
     out["group_key"] = infer_group_key(v)
+    out["outreach_route_key"] = outreach_route_key(v)
+    if not vendor_has_url(v):
+        out["needs_url_discovery"] = True
+        out["discovery_query"] = discovery_query(v)
+    else:
+        out["needs_url_discovery"] = False
     return out
 
 
@@ -544,9 +591,10 @@ def outreach_phase_settings(settings: dict[str, Any]) -> tuple[int, int]:
     return phase, daily
 
 
-def contacted_snapshot(data: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
+def contacted_snapshot(data: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     contacted: list[dict[str, Any]] = []
-    groups: set[str] = set()
+    routes: set[str] = set()
+    brands: set[str] = set()
     for v in data.get("vendors") or []:
         if not isinstance(v, dict) or not v.get("id"):
             continue
@@ -554,18 +602,24 @@ def contacted_snapshot(data: dict[str, Any]) -> tuple[list[dict[str, Any]], list
         if st not in {"contacted", "replied"} and not (v.get("contacted_at") or "").strip():
             continue
         gk = infer_group_key(v)
+        rk = outreach_route_key(v)
+        cu = str(v.get("contact_url") or v.get("url") or "")
         contacted.append(
             {
                 "id": str(v["id"]),
                 "name": str(v.get("name") or ""),
                 "status": st,
                 "group_key": gk,
+                "outreach_route_key": rk,
+                "contact_url": cu,
                 "contacted_at": str(v.get("contacted_at") or ""),
             }
         )
-        groups.add(gk)
+        if rk:
+            routes.add(rk)
+        brands.add(gk)
     contacted.sort(key=lambda x: x.get("id") or "")
-    return contacted, sorted(groups)
+    return contacted, sorted(routes), sorted(brands)
 
 
 def iso_week_id(d: date | None = None) -> str:
@@ -587,7 +641,7 @@ def build_batch_week_payload(
         daily_limit = PHASE_DAILY_LIMIT.get(phase, 3)
     queue_size = batch_days * daily_limit
     pending = [enrich_vendor(v) for v in next_pending(limit=queue_size)]
-    contacted_vendors, group_contacted = contacted_snapshot(data)
+    contacted_vendors, routes_contacted, group_contacted = contacted_snapshot(data)
     today = date.today().isoformat()
     batch_id = iso_week_id()
     form_contact = load_form_contact()
@@ -613,6 +667,7 @@ def build_batch_week_payload(
             "days_completed": 0,
         },
         "contacted_vendors": contacted_vendors,
+        "routes_contacted": routes_contacted,
         "group_contacted": group_contacted,
         "vendors": pending,
     }
@@ -650,6 +705,77 @@ def grok_weekly_kickoff(payload: dict[str, Any]) -> str:
 キュー先頭: {first_id} から。
 
 以下 JSON です。"""
+
+
+def extract_discovered_url(note: str) -> str:
+    m = DISCOVERED_URL_RE.search(note or "")
+    if not m:
+        return ""
+    return m.group(1).rstrip(".,)")
+
+
+def parse_mark_commands(text: str) -> list[dict[str, str]]:
+    """Grok サマリー等から --mark 行を抽出（同一 id は最後 wins）。"""
+    by_id: dict[str, dict[str, str]] = {}
+    for line in text.splitlines():
+        for m in MARK_CMD_RE.finditer(line):
+            note = (m.group("note_dq") or m.group("note_sq") or "").strip()
+            by_id[m.group("id")] = {
+                "id": m.group("id"),
+                "status": m.group("status").lower(),
+                "note": note,
+            }
+    return list(by_id.values())
+
+
+def apply_marks_from_text(text: str, *, dry_run: bool) -> dict[str, Any]:
+    cmds = parse_mark_commands(text)
+    if not cmds:
+        return {"ok": False, "error": "no --mark commands found", "parsed": 0}
+    data = load_list()
+    by_id = vendor_index(data)
+    applied: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    url_updates: list[dict[str, str]] = []
+    today = now_iso()[:10]
+    for cmd in cmds:
+        vid = cmd["id"]
+        status = cmd["status"]
+        note = cmd["note"]
+        if status not in STATUSES:
+            errors.append({"id": vid, "error": f"invalid status: {status}"})
+            continue
+        v = by_id.get(vid)
+        if not v:
+            errors.append({"id": vid, "error": "vendor not found"})
+            continue
+        v["status"] = status
+        if note:
+            v["notes"] = note if not v.get("notes") else f"{v['notes']} | {note}"
+        if status == "contacted":
+            v["contacted_at"] = today
+        if status == "replied":
+            v["replied_at"] = today
+        discovered = extract_discovered_url(note)
+        if discovered:
+            if not str(v.get("contact_url") or "").strip():
+                v["contact_url"] = discovered
+                url_updates.append({"id": vid, "contact_url": discovered})
+            if not str(v.get("url") or "").strip():
+                v["url"] = discovered
+        v["updated_at"] = now_iso()
+        applied.append({"id": vid, "status": status, "note": note})
+    if not dry_run and applied:
+        save_list(data)
+    return {
+        "ok": len(errors) == 0,
+        "parsed": len(cmds),
+        "applied": len(applied),
+        "applied_items": applied,
+        "url_updates": url_updates,
+        "errors": errors,
+        "dry_run": dry_run,
+    }
 
 
 def mark_vendor(
@@ -773,6 +899,11 @@ def main() -> int:
     ap.add_argument("--note", default="")
     ap.add_argument("--result", default="")
     ap.add_argument("--grok-discovery-prompt", action="store_true")
+    ap.add_argument(
+        "--apply-marks",
+        metavar="PATH",
+        help="Grok サマリー等の --mark 行を一括反映（- で stdin）",
+    )
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument(
         "--merge",
@@ -821,12 +952,23 @@ def main() -> int:
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0 if out.get("ok") else 1
 
+    if args.apply_marks:
+        p = args.apply_marks
+        if p == "-":
+            text = sys.stdin.read()
+        else:
+            text = Path(p).read_text(encoding="utf-8")
+        out = apply_marks_from_text(text, dry_run=args.dry_run)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        print(f"VENDOR_LIST_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return 0 if out.get("ok") else 1
+
     if args.next > 0:
         items = next_pending(limit=args.next)
         data = load_list()
         settings = data.get("settings") or {}
         phase, daily_limit = outreach_phase_settings(settings)
-        contacted_vendors, group_contacted = contacted_snapshot(data)
+        contacted_vendors, routes_contacted, group_contacted = contacted_snapshot(data)
         body: dict[str, Any] = {
             "ok": True,
             "count": len(items),
@@ -837,6 +979,7 @@ def main() -> int:
             ),
             "outreach_note": settings.get("outreach_note", ""),
             "contacted_vendors": contacted_vendors,
+            "routes_contacted": routes_contacted,
             "group_contacted": group_contacted,
             "vendors": [enrich_vendor(v) for v in items],
         }
