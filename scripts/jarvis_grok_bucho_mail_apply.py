@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Grok 部長日報メール → 業者リスト --mark 自動反映。
+"""Grok 部長日報メール → 業者リスト --mark / 探索 YAML 自動反映。
 
 部長 Bot が matsuno.estate@gmail.com へ送った `[Grok部長]` メールを estate Gmail API で読み、
-本文の `--mark` 行を `kurashift_re_vendor_list.yaml` に反映する。
+本文の `--mark` 行と `📎 Jarvis 用（探索追記）` の vendors YAML を反映する。
 
   cd ~/git-repos
   ~/selenium_env/venv/bin/python scripts/jarvis_grok_bucho_mail_apply.py --dry-run
@@ -125,7 +125,12 @@ def fetch_bucho_messages(svc, *, days: int, max_results: int) -> list[dict[str, 
 
 def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, Any]:
     sys.path.insert(0, str(REPO / "scripts"))
-    from jarvis_kurashift_vendor_list import apply_marks_from_text, parse_mark_commands
+    from jarvis_kurashift_vendor_list import (
+        apply_marks_from_text,
+        merge_vendors_from_text,
+        parse_discovery_yaml_from_text,
+        parse_mark_commands,
+    )
 
     print("使用アカウント: estate / Gmail API（[Grok部長] 受信取込）")
 
@@ -137,6 +142,8 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
     results: list[dict[str, Any]] = []
     total_marks = 0
     total_applied = 0
+    total_discovery_parsed = 0
+    total_discovery_added = 0
 
     for msg in messages:
         mid = msg["id"]
@@ -144,10 +151,12 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
             continue
         body = msg.get("body") or ""
         cmds = parse_mark_commands(body)
+        discovery_preview = parse_discovery_yaml_from_text(body)
         entry: dict[str, Any] = {
             "message_id": mid,
             "subject": msg.get("subject"),
             "parsed_marks": len(cmds),
+            "parsed_discovery": len(discovery_preview),
         }
         if cmds:
             out = apply_marks_from_text(body, dry_run=dry_run)
@@ -157,6 +166,17 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
             entry["ok"] = out.get("ok", False)
         else:
             entry["apply"] = {"ok": True, "skipped": "no --mark in body"}
+
+        if discovery_preview:
+            disc = merge_vendors_from_text(body, dry_run=dry_run)
+            entry["discovery"] = disc
+            total_discovery_parsed += disc.get("parsed", 0)
+            total_discovery_added += disc.get("added", 0)
+            entry["ok"] = entry.get("ok", True) and disc.get("ok", False)
+        else:
+            entry["discovery"] = {"ok": True, "skipped": "no discovery yaml"}
+
+        if "ok" not in entry:
             entry["ok"] = True
 
         results.append(entry)
@@ -173,6 +193,8 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
         "messages_processed": len(results),
         "marks_parsed": total_marks,
         "marks_applied": total_applied,
+        "discovery_parsed": total_discovery_parsed,
+        "discovery_added": total_discovery_added,
         "dry_run": dry_run,
         "results": results,
     }
@@ -181,6 +203,9 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
     print(f"- 対象: 直近{days}日 · subject {BUCHO_PREFIX}")
     print(f"- 処理: {len(results)}通（一覧{len(messages)}通）")
     print(f"- --mark: 解析 {total_marks} 件 · 反映 {total_applied} 件")
+    print(
+        f"- 探索追記: 解析 {total_discovery_parsed} 件 · 新規追加 {total_discovery_added} 件"
+    )
     if dry_run:
         print("- モード: dry-run（YAML 未更新）")
     elif not results:

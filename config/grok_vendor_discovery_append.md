@@ -2,7 +2,17 @@
 
 Jarvis が `--merge-append` で取り込む YAML ブロック。Grok 日次探索の出力正本。
 
-## 1日の流れ（Grok Bot）
+## 1日の流れ（Grok 部長 · 本日分）
+
+1. 部長が **本日分** で S2 送信 → S1 調査 → **S2 探索**（Phase 1=3件 · 送信なし）を実行
+2. 部長日報メール `[Grok部長] 日報` に **`📎 Jarvis 用（探索追記）`** + YAML `vendors:` を載せる
+3. Jarvis: `jarvis_grok_bucho_mail_apply.py --apply`（`--mark` と探索 YAML を同時反映）
+
+手動（メール障害時）:
+
+4. ユーザーが Jarvis に「追記して」→ `--merge-append discovered.yaml`
+
+## 1日の流れ（旧 · 独立 Bot / 手動）
 
 1. Jarvis が `--grok-discovery-prompt` の文面を Bot に渡す（または Bot 説明に固定）
 2. Grok が **daily_discovery_limit 件** まで新規会社を調査（**問合せ送信はしない**）
@@ -34,6 +44,17 @@ vendors:
 ```
 
 ## Jarvis 取込
+
+**本線（部長日報メール）**:
+
+```bash
+cd ~/git-repos
+~/selenium_env/venv/bin/python scripts/jarvis_grok_bucho_mail_apply.py --apply
+```
+
+メール本文の `📎 Jarvis 用（探索追記）` 内 YAML を自動 merge。
+
+**手動ファイル**:
 
 ```bash
 cd ~/git-repos
