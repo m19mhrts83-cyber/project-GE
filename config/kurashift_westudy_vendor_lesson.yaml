@@ -1,25 +1,36 @@
 # 地場開拓文面 — WeStudy レッスン指定（Phase 3a 正本）
 
-version: 1
+version: 2
 picked_at: "2026-08-22"
+updated_at: "2026-08-22"
+update_note: |
+  kamiooya-otoiawase は問合フォーム窓口（動画なし）と判明。
+  地場アプローチ実務は kamiooya-kiso-step5-2（築古戸建20%・Vimeo自動字幕VTT取得済）を正とする。
 
 lesson:
-  id: kamiooya-otoiawase
-  url: https://westudy.co.jp/lesson/kamiooya-otoiawase
-  title: 神大家 — 地場への問い合わせ（お問い合わせ）
+  id: kamiooya-kiso-step5-2
+  url: https://westudy.co.jp/lesson/kamiooya-kiso-step5-2
+  title: STEP5-2 神スキル【トライアングル投資】2 築古戸建20%購入
   course: 神大家1.基礎
-  rationale: 地場不動産への初回アプローチ・問合せ文面が主題。step1_1 より実務寄り。
+  rationale: 築古戸建リサーチ・地場不動産業者へのアプローチが主題。Vimeo自動字幕VTTで文字起こし可。
 
 alternatives:
+  - id: kamiooya-otoiawase
+    url: https://westudy.co.jp/lesson/kamiooya-otoiawase
+    note: 問合フォーム窓口（動画なし）。地場開拓講義ではない
   - id: step1_1
     url: https://westudy.co.jp/lesson/step1_1
     note: STEP1 全体像
   - id: approach_enkakuchi
     url: https://westudy.co.jp/lesson/approach_enkakuchi
-    note: 遠隔地アプローチ
+    note: 遠隔地アプローチ（字幕なし動画あり）
   - id: approach_chintaiheiyou
     url: https://westudy.co.jp/lesson/approach_chintaiheiyou
-    note: 賃貸併用アプローチ
+    note: 賃貸併用アプローチ（メイン動画字幕なし→Notta）
 
 transcript_md: |
-  OneDrive/215_神・大家さん倶楽部/10_【購入】物件購入,融資/不動産業者リスト/基礎講座文字起こし_kamiooya-otoiawase.md
+  OneDrive/215_神・大家さん倶楽部/10_【購入】物件購入,融資/不動産業者リスト/基礎講座文字起こし_kamiooya-kiso-step5-2.md
+
+transcript_fetch:
+  script: scripts/jarvis_westudy_lesson_vtt_to_md.py
+  source: vimeo_auto_caption_vtt
