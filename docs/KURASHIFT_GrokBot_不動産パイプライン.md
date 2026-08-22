@@ -50,6 +50,9 @@ flowchart TB
 
 ## Bot 2 — 業者開拓（試行・次フェーズ）
 
+**Grok Bot 名**: **物件業者開拓**  
+**Instructions**: `config/grok_vendor_outreach_bot_grok_paste.md`（コードブロックを Grok に貼る）
+
 **目的**: 戸建ては地場不動産経由。リストへ **順次問合せ** + Grok **日次 N 件探索** で表を増やす。
 
 | 操作 | 担当 | コマンド / 正本 |
