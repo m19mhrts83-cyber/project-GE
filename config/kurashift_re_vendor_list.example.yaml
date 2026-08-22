@@ -10,8 +10,11 @@ settings:
     - 岐阜県
     - 三重県
   outreach_from: matsuno.estate@gmail.com
+  outreach_identity: personal   # 松野個人・松野エステイト。運営問合済み≠個人問合済み
 
 # status: pending | discovered | contacted | replied | skip | invalid
+# ops_contacted_at: 神大家運営作業の問合日（参考）。個人未送信なら status は pending のまま
+# contacted_at: 松野個人（estate）から問合せした日
 vendors:
   - id: example-aichi-01
     name: "（例）〇〇不動産"
