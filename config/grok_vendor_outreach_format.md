@@ -88,8 +88,8 @@ matsuno.estate@gmail.com
 ## 参照（旧・神大家付属）
 
 - `OneDrive/215/…/不動産業者リスト/販売業者向け定型文.txt` … AP向け・**1棟所有・利回り13%は旧版**。現行は**3棟・利回り前面NG**
-- WeStudy: `config/kurashift_westudy_vendor_lesson.yaml`（kamiooya-otoiawase）
-- 文字起こし正本: `…/基礎講座文字起こし_kamiooya-otoiawase.md`
+- WeStudy: `config/kurashift_westudy_vendor_lesson.yaml`（**kamiooya-kiso-step5-2**）
+- 文字起こし正本: `…/基礎講座文字起こし_kamiooya-kiso-step5-2.md`（Vimeo VTT）
 
 ## Jarvis 側
 
