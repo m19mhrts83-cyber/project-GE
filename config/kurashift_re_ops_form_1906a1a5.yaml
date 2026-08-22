@@ -1,0 +1,126 @@
+# 神大家運営相談 — 戸建て購入（東海地域）フォーム
+# URL: https://form.os7.biz/f/1906a1a5/
+
+form_id: "1906a1a5"
+form_url: "https://form.os7.biz/f/1906a1a5/"
+title: "【戸建て購入(物件住所が東海地域)】お問合せフォーム"
+rules:
+  one_deal_per_submission: true
+  drive_folder_name_must_match_property_name: true
+  photos_required_for_repair_review: true
+  no_zip_on_drive: true
+  submit_requires_user_confirm: true
+
+fields:
+  - id: name
+    label: 姓名
+    tier: auto
+    env: [PERSONAL_NAME]
+  - id: email
+    label: メールアドレス
+    tier: auto
+    env: [PERSONAL_EMAIL]
+  - id: planning_aligned
+    label: プランニングにおおむね沿っている物件ですか
+    tier: manual
+  - id: urgency
+    label: 至急度（練習か、本番か）
+    tier: manual
+  - id: kamiooya_intro
+    label: 神大家の紹介物件か
+    tier: auto
+    source: deal.source
+  - id: drive_folder
+    label: 資料格納場所（神大家個人Drive URL＋フォルダ名）
+    tier: manual
+  - id: property_name
+    label: 物件名（資料格納フォルダ名）
+    tier: auto
+    source: deal.title
+  - id: self_funds
+    label: 不動産投資に使える現在の自己資金（トータル）
+    tier: research
+  - id: purchase_purpose
+    label: 購入目的
+    tier: manual
+  - id: list_price
+    label: 販売価格
+    tier: auto
+    source: deal.price_man
+  - id: offer_price
+    label: 買付予定価格
+    tier: manual
+  - id: land_value
+    label: 土地価値（路線価より算出）
+    tier: auto
+    source: grok.land100
+  - id: loan_terms
+    label: 融資を使う場合、融資依頼先・融資条件
+    tier: research
+  - id: nearest_station
+    label: 最寄駅名と駅からの徒歩分数
+    tier: reply
+  - id: building_age
+    label: 築年数
+    tier: reply
+  - id: structure_rooms
+    label: 構造、部屋数
+    tier: auto
+    source: deal.structure
+  - id: annual_rent
+    label: 想定年間家賃収入
+    tier: research
+  - id: gross_yield
+    label: 表面利回り、家賃収入月額
+    tier: auto
+    source: deal.yield_pct
+  - id: repair_exterior
+    label: 想定修繕費(外装)
+    tier: research
+  - id: repair_interior
+    label: 想定修繕費(内装)
+    tier: research
+  - id: repair_total_yield
+    label: 想定修繕費総額、修繕後利回り
+    tier: research
+  - id: monthly_cf
+    label: 修繕後の月CF/万円
+    tier: research
+  - id: occupancy
+    label: 入居状況
+    tier: reply
+  - id: building_residual
+    label: 建物の残価値
+    tier: research
+  - id: land_sqm
+    label: 土地平米数
+    tier: reply
+  - id: building_sqm
+    label: 建物平米数
+    tier: reply
+  - id: features_hazard
+    label: 他の特徴・ハザード
+    tier: auto
+    source: grok.hazard_eval
+  - id: gas
+    label: 現状のガス状況
+    tier: reply
+  - id: parking
+    label: 現状の駐車場台数
+    tier: auto
+    source: grok.parking
+  - id: transaction_type
+    label: 取引形態
+    tier: reply
+  - id: viewing_done
+    label: 内見
+    tier: manual
+  - id: questions_for_instructor
+    label: 講師に確認したいこと
+    tier: manual
+    default_template: |
+      以下を確認したいです。
+      ・概算修繕費が概ね合っているかどうか。
+      ・他に注意点はないかどうか。
+      ・購入すべき数字かどうか
+      ご確認をお願い致します。

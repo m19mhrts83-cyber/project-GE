@@ -628,6 +628,29 @@ def build_ops_pack(sb: Any, deal_id: str) -> dict[str, Any]:
         lines.append((m.get("body_text") or "")[:3000])
         lines.append("")
     body = "\n".join(lines)
+    try:
+        import importlib.util
+
+        _fd_path = Path(__file__).resolve().parent / "jarvis_kurashift_re_ops_form_draft.py"
+        _spec = importlib.util.spec_from_file_location("kurashift_form_draft", _fd_path)
+        if _spec and _spec.loader:
+            _mod = importlib.util.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)
+            ac = _mod.count_attachments(deal_id, sb)
+            fd = _mod.build_form_draft(deal, attach_count=ac)
+            body = body + "\n\n" + str(fd.get("markdown") or "")
+            sj = sj_of(deal)
+            sj["ops_form_draft"] = {
+                "at": fd.get("generated_at"),
+                "form_url": fd.get("form_url"),
+                "missing_count": fd.get("missing_count"),
+                "markdown": fd.get("markdown"),
+            }
+            sb.table("kurashift_re_deals").update(
+                {"summary_json": sj, "updated_at": now_iso()}
+            ).eq("id", deal_id).execute()
+    except Exception as e:
+        print(f"# ops_form_draft soft-fail: {type(e).__name__}: {e}")
     title = f"運営相談: {(deal.get('title') or '')[:80]}"
     meta = {
         "deal_id": deal_id,

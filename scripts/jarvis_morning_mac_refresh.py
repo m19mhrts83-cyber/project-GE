@@ -44,6 +44,10 @@ GMAIL_READ_CATCHUP = REPO / "scripts" / "jarvis_triage_gmail_read_catchup.py"
 INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
+GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
+KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
+KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
+KURASHIFT_RE_DAILY_DIGEST = REPO / "scripts" / "jarvis_kurashift_re_daily_digest.py"
 VENDOR_REPLY_TRIAGE = REPO / "scripts" / "jarvis_kurashift_vendor_reply_triage.py"
 VENDOR_CATCHUP = REPO / "scripts" / "jarvis_triage_vendor_catchup.py"
 POC = REPO / "line_unofficial_poc"
@@ -472,6 +476,48 @@ def main() -> int:
     else:
         results["steps"]["kurashift_grok_mail"] = "skipped"
 
+    # 2c1. Grok 部長日報 → 業者リスト mark / 探索 YAML（soft-fail）
+    if GROK_BUCHO_APPLY.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "grok_bucho_mail_apply",
+            [exe, str(GROK_BUCHO_APPLY), "--apply"],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["grok_bucho_mail_apply"] = rc
+        if rc != 0:
+            print(f"# grok_bucho_mail_apply soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["grok_bucho_mail_apply"] = "skipped"
+
+    # 2c1b. 業者リスト → Supabase 投影（soft-fail）
+    if KURASHIFT_VENDOR_SYNC.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "kurashift_vendor_sync",
+            [exe, str(KURASHIFT_VENDOR_SYNC), "--apply"],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["kurashift_vendor_sync"] = rc
+        if rc != 0:
+            print(f"# kurashift_vendor_sync soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["kurashift_vendor_sync"] = "skipped"
+
+    # 2c1c. 第一問合せ返信取込（soft-fail）
+    if KURASHIFT_INQUIRY_POLL.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "kurashift_inquiry_poll",
+            [exe, str(KURASHIFT_INQUIRY_POLL), "--poll-replies"],
+            timeout=300,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["kurashift_inquiry_poll"] = rc
+        if rc != 0:
+            print(f"# kurashift_inquiry_poll soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["kurashift_inquiry_poll"] = "skipped"
+
     # 2c2. 地場業者返信 → Jarvis Dashboard general（estate・下書き付き）
     if VENDOR_REPLY_TRIAGE.is_file() and not args.skip_fetch:
         rc = run_step(
@@ -501,6 +547,20 @@ def main() -> int:
         results["steps"]["vendor_catchup"] = rc
     else:
         results["steps"]["vendor_catchup"] = "skipped"
+
+    # 2c3. KURASHIFT 不動産日次ダイジェスト（stdout のみ・soft-fail）
+    if KURASHIFT_RE_DAILY_DIGEST.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "kurashift_re_daily_digest",
+            [exe, str(KURASHIFT_RE_DAILY_DIGEST)],
+            timeout=60,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["kurashift_re_daily_digest"] = rc
+        if rc != 0:
+            print(f"# kurashift_re_daily_digest soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["kurashift_re_daily_digest"] = "skipped"
 
     # 2a. 取込後の新規未返信を partner レーンへ（夜バッチ待ちだとダッシュに出ない）
     night_triage = REPO / "scripts" / "jarvis_night_triage.py"

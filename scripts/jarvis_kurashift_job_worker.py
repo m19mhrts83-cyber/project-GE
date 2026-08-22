@@ -275,6 +275,13 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             str(REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"),
             "--apply",
         ],
+        "re_ops_form_draft": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_re_ops_form_draft.py"),
+            "--deal-id",
+            str(payload.get("deal_id") or ""),
+            "--apply",
+        ],
     }
     cmd = mapping.get(job_type)
     if not cmd:

@@ -45,12 +45,18 @@ function inquiryChipStyle(status: string): Record<string, string | number> {
 export default async function RealEstateDealsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ deal?: string; tab?: string; vendor?: string }>;
+  searchParams?: Promise<{
+    deal?: string;
+    tab?: string;
+    vendor?: string;
+    inquiry?: string;
+  }>;
 }) {
   const sp = (await searchParams) || {};
   const highlightDeal = (sp.deal || "").trim();
   const tab = parseDealsTab(sp.tab);
   const vendorFilter = (sp.vendor || "").trim();
+  const inquiryFilter = (sp.inquiry || "").trim();
 
   const supabase = await createClient();
   const {
@@ -93,6 +99,17 @@ export default async function RealEstateDealsPage({
           ? (d.summary_json as { vendor_id?: string })
           : {};
       if (sj.vendor_id !== vendorFilter) return false;
+    }
+    if (inquiryFilter === "has_reply") {
+      const inq =
+        d.inquiry_status ||
+        (d.summary_json &&
+        typeof d.summary_json === "object" &&
+        typeof (d.summary_json as { inquiry_status?: string }).inquiry_status ===
+          "string"
+          ? (d.summary_json as { inquiry_status: string }).inquiry_status
+          : "none");
+      if (inq !== "has_reply") return false;
     }
     if (tab === "candidates") {
       return d.status === "info" || d.status === "viewing";
@@ -195,6 +212,7 @@ export default async function RealEstateDealsPage({
     q.set("tab", nextTab);
     if (highlightDeal) q.set("deal", highlightDeal);
     if (vendorFilter) q.set("vendor", vendorFilter);
+    if (inquiryFilter) q.set("inquiry", inquiryFilter);
     return `/realestate/deals?${q.toString()}`;
   }
 
@@ -203,6 +221,7 @@ export default async function RealEstateDealsPage({
     q.set("tab", tab);
     q.set("deal", dealId);
     if (vendorFilter) q.set("vendor", vendorFilter);
+    if (inquiryFilter) q.set("inquiry", inquiryFilter);
     return `/realestate/deals?${q.toString()}`;
   }
 
@@ -218,6 +237,12 @@ export default async function RealEstateDealsPage({
       {vendorFilter ? (
         <p className="meta">
           業者フィルタ: {vendorFilter}{" "}
+          <Link href={`/realestate/deals?tab=${tab}`}>解除</Link>
+        </p>
+      ) : null}
+      {inquiryFilter === "has_reply" ? (
+        <p className="meta">
+          問合せフィルタ: 要返信のみ{" "}
           <Link href={`/realestate/deals?tab=${tab}`}>解除</Link>
         </p>
       ) : null}
@@ -267,6 +292,15 @@ export default async function RealEstateDealsPage({
           <p className="meta" style={{ marginTop: 8 }}>
             要返信 {needReply} · Grok未調査 {grokPending} · 第一問合せ未送{" "}
             {inquiryNone} · 内見候補 {viewingCount}
+            {needReply > 0 ? (
+              <>
+                {" "}
+                ·{" "}
+                <Link href="/realestate/deals?tab=candidates&inquiry=has_reply">
+                  要返信のみ表示
+                </Link>
+              </>
+            ) : null}
           </p>
         </div>
       ) : null}
