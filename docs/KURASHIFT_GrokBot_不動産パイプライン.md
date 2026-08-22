@@ -43,8 +43,10 @@ flowchart TB
 ## Bot 1 — 物件調査（実装済・本線）
 
 - テンプレ: `config/grok_property_report_format.md`
+- **Grok Instructions 貼り付け**: `config/grok_property_bot_grok_paste.md`
 - 取込: `jarvis_kurashift_property_mail_match.py --grok-only --apply`
 - deals「Grok調査用コピー」で候補を Bot に渡す
+- Step A 手順: `docs/KURASHIFT_grok_first_stepA.md`
 
 ---
 
@@ -113,6 +115,7 @@ Grok 追記形式: `config/grok_vendor_discovery_append.md`
 2. ✅ 業者リスト YAML + Grok 業者開拓テンプレ（`status: approved`）
 3. ✅ estate `[Grok調査]` → `--grok-only --apply`（朝バンドル含む）→ deals 3件取込済（2026-08-22）
 4. ✅ Phase PDF-0（`jarvis_kurashift_re_deal_pdf_fetch.py` + deals UI 添付件数）
-5. ⏳ E2E 第一問合せ（`聞く` 物件待ち）— チェックリスト: `docs/KURASHIFT_re_inquiry_E2E_checklist.md`
-6. ⏳ Phase PDF-1（PDF 中身抽出）
-7. ⏳ 業者開拓送信開始（`--next 3` / `grok_vendor_outreach_bot.md`）
+5. ✅ E2E パイプライン（fixture PASS）— `jarvis_kurashift_grok_e2e_runner.py` / `docs/KURASHIFT_re_inquiry_E2E_checklist.md`
+6. ⏳ 本番第一問合せ（`聞く` 実物件待ち）— `docs/KURASHIFT_grok_first_stepA.md` §5
+7. ⏳ Phase PDF-1（PDF 中身抽出）
+8. ⏳ 業者開拓送信開始（`--next 3` / `grok_vendor_outreach_bot.md`）

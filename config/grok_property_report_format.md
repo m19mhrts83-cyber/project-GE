@@ -9,6 +9,7 @@
 - **宛先**: `matsuno.estate@gmail.com`（松野エステイト宛は承認不要・送信してよい）
 - **件名**: `[Grok調査] {市区町村} {物件短名}`
 - **From**: m19m 等（estate ログインは Grok VM に載せない）
+- **Grok Instructions 貼り付け**: `config/grok_property_bot_grok_paste.md`
 
 ## 調査手順（Bot 説明文に載せる）
 
