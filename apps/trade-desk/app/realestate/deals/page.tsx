@@ -65,7 +65,8 @@ export default async function RealEstateDealsPage({
   const watch = await readMacWatchStatus(120);
 
   const dealIds = (deals || []).map((d) => d.id);
-  const [{ data: dealMessages }, { data: recentSendJobs }] = await Promise.all([
+  const [{ data: dealMessages }, { data: recentSendJobs }, { data: dealAttachments }] =
+    await Promise.all([
     dealIds.length > 0
       ? supabase
           .from("kurashift_re_deal_messages")
@@ -92,6 +93,13 @@ export default async function RealEstateDealsPage({
       .eq("job_type", "re_deal_inquiry_send")
       .order("created_at", { ascending: false })
       .limit(40),
+    dealIds.length > 0
+      ? supabase
+          .from("kurashift_re_deal_attachments")
+          .select("deal_id")
+          .in("deal_id", dealIds)
+          .limit(500)
+      : Promise.resolve({ data: [] as Array<{ deal_id: string }> }),
   ]);
 
   const failedSendByDeal = new Map<string, string>();
@@ -147,6 +155,14 @@ export default async function RealEstateDealsPage({
     const list = messagesByDeal.get(m.deal_id) || [];
     list.push(m);
     messagesByDeal.set(m.deal_id, list);
+  }
+
+  const attachCountByDeal = new Map<string, number>();
+  for (const a of dealAttachments || []) {
+    attachCountByDeal.set(
+      a.deal_id,
+      (attachCountByDeal.get(a.deal_id) || 0) + 1
+    );
   }
 
   const counts: Record<string, number> = {};
@@ -350,6 +366,7 @@ export default async function RealEstateDealsPage({
                     : null;
                 const inquiryStatus =
                   d.inquiry_status || sj.inquiry_status || "none";
+                const attachCount = attachCountByDeal.get(d.id) || 0;
                 const timeline =
                   messagesByDeal.get(d.id) || sj.messages || [];
                 const autoPassPending = Boolean(sj.auto_pass_pending_read);
@@ -448,6 +465,11 @@ export default async function RealEstateDealsPage({
                         }
                         lastSendJobFailed={failedSendByDeal.get(d.id) || null}
                       />
+                      {attachCount > 0 ? (
+                        <div className="meta" style={{ marginTop: 4 }}>
+                          添付 {attachCount}件（PDF）
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 );

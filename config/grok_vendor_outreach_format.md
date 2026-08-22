@@ -1,3 +1,10 @@
+---
+status: approved
+approved_at: 2026-08-22
+approved_by: 松野（WeStudy kamiooya-otoiawase 方針 + 現行3棟所有）
+send_gate: Phase4 — Grok Bot2 / 手動 Web 送信のみ。draft では送らない
+---
+
 # Grok 業者開拓 Bot — 問い合わせ形式（正本）
 
 **用途**: 地場リストへの**初回アプローチ**（顧客登録・条件マッチ物件の紹介依頼）。  
@@ -13,6 +20,7 @@
 - **送信者**: **松野個人**。**返信先・署名は `matsuno.estate@gmail.com`（松野エステイト）**
 - **運営問合済み**: `ops_contacted_at` は神大家運営作業の参考のみ。個人として改めて送る
 - **1日 N 件**: `daily_outreach_limit`（既定 3）
+- **地場向け**: **利回り%は前面に出さない**（土地値・即検討・所有実績で信頼を取る）
 
 ## 送信者プロフィール（文面に載せる属性）
 
@@ -41,14 +49,13 @@
 【第一希望：戸建（投資・賃貸運用）】
 ・エリア: 愛知県・岐阜県・滋賀県（近隣も可）
 ・価格帯: 500万〜3,000万円程度
-・利回り: 15%以上を目安（要相談）
 ・土地値が購入価格に対して高い物件を優先
 ・ハザードリスクが大きい物件は除外希望
 
 【第二希望：仕込みとして築古ボロアパート】
 ・上記戸建が第一候補ですが、愛知県中心で
   築古・ボロアパートも将来の仕込みとして情報提供をお願いします
-・利回り・土地値・CFが合えば検討します（即時購入より情報収集も歓迎）
+・土地値・キャッシュフローが合えば検討します（即時購入より情報収集も歓迎）
 
 条件に近い物件が出ましたら、即検討します。
 可能であれば概要資料（PDF等）を matsuno.estate@gmail.com 宛にご送付ください。
@@ -80,11 +87,13 @@ matsuno.estate@gmail.com
 
 ## 参照（旧・神大家付属）
 
-- `OneDrive/215/…/不動産業者リスト/販売業者向け定型文.txt` … AP向け・**1棟所有は旧版**。現行は**3棟**
-- estate 過去例: AZ不動産（2020）条件＋エリア列挙型
+- `OneDrive/215/…/不動産業者リスト/販売業者向け定型文.txt` … AP向け・**1棟所有・利回り13%は旧版**。現行は**3棟・利回り前面NG**
+- WeStudy: `config/kurashift_westudy_vendor_lesson.yaml`（kamiooya-otoiawase）
+- 文字起こし正本: `…/基礎講座文字起こし_kamiooya-otoiawase.md`
 
 ## Jarvis 側
 
 - CLI: `scripts/jarvis_kurashift_vendor_list.py`
+- Bot 説明: `config/grok_vendor_outreach_bot.md`
 - 返信 → `property_mail_match.py`（estate）
 - 具体物件 → deals → `kurashift_re_inquiry_template.yaml`

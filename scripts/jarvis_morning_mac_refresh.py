@@ -43,6 +43,7 @@ CATCHUP = REPO / "scripts" / "jarvis_triage_yoritoori_catchup.py"
 GMAIL_READ_CATCHUP = REPO / "scripts" / "jarvis_triage_gmail_read_catchup.py"
 INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
+KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
 ZAIM_WEEKLY_STATE = REPO / ".jarvis_state" / "zaim_csv_weekly.json"
@@ -454,6 +455,20 @@ def main() -> int:
             failures += 1
     else:
         results["steps"]["gmail_fetch"] = "skipped"
+
+    # 2c. Grok [Grok調査] → KURASHIFT deals（軽量・失敗しても朝バンドルは続行）
+    if KURASHIFT_GROK_MATCH.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "kurashift_grok_mail",
+            [exe, str(KURASHIFT_GROK_MATCH), "--grok-only", "--apply"],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["kurashift_grok_mail"] = rc
+        if rc != 0:
+            print(f"# kurashift_grok_mail soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["kurashift_grok_mail"] = "skipped"
 
     # 2a. 取込後の新規未返信を partner レーンへ（夜バッチ待ちだとダッシュに出ない）
     night_triage = REPO / "scripts" / "jarvis_night_triage.py"

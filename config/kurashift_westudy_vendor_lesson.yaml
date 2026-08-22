@@ -1,0 +1,25 @@
+# 地場開拓文面 — WeStudy レッスン指定（Phase 3a 正本）
+
+version: 1
+picked_at: "2026-08-22"
+
+lesson:
+  id: kamiooya-otoiawase
+  url: https://westudy.co.jp/lesson/kamiooya-otoiawase
+  title: 神大家 — 地場への問い合わせ（お問い合わせ）
+  course: 神大家1.基礎
+  rationale: 地場不動産への初回アプローチ・問合せ文面が主題。step1_1 より実務寄り。
+
+alternatives:
+  - id: step1_1
+    url: https://westudy.co.jp/lesson/step1_1
+    note: STEP1 全体像
+  - id: approach_enkakuchi
+    url: https://westudy.co.jp/lesson/approach_enkakuchi
+    note: 遠隔地アプローチ
+  - id: approach_chintaiheiyou
+    url: https://westudy.co.jp/lesson/approach_chintaiheiyou
+    note: 賃貸併用アプローチ
+
+transcript_md: |
+  OneDrive/215_神・大家さん倶楽部/10_【購入】物件購入,融資/不動産業者リスト/基礎講座文字起こし_kamiooya-otoiawase.md

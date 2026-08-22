@@ -2,6 +2,8 @@
 
 松野エステイト Gmail 宛 `[Grok調査]` メール。Jarvis `property_mail_match` が `mail_grok` として取込。
 
+**優先エリア・ふるい**: `config/grok_property_search_criteria.yaml`（愛知最優先 → 岐阜・三重。戸建500〜3500万・HZ原則除外）
+
 ## 送信方針
 
 - **宛先**: `matsuno.estate@gmail.com`（松野エステイト宛は承認不要・送信してよい）
@@ -91,8 +93,10 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ```bash
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --grok-only --dry-run
-~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --apply
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --grok-only --apply
 ```
+
+**定常化**: `jarvis_morning_mac_refresh.py` が `--grok-only --apply` を朝バンドルに含む（`kurashift_grok_mail` ステップ）。
 
 ## KURASHIFT で使われる評価
 
