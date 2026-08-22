@@ -107,6 +107,9 @@ Grok 追記形式: `config/grok_vendor_discovery_append.md`
 ## 実装順（Jarvis + Grok 併走）
 
 1. ✅ 倍率→固定資産税依頼、Grok調査コピー、路線/HZ 拡張
-2. 業者リスト YAML + Grok 業者開拓テンプレ（Bot 説明に貼る）
-3. estate に `[Grok調査]` / 地場返信が来たら `--apply` で E2E
-4. Phase PDF-0（添付保存）→ PDF-1（抽出）
+2. ✅ 業者リスト YAML + Grok 業者開拓テンプレ（`status: approved`）
+3. ✅ estate `[Grok調査]` → `--grok-only --apply`（朝バンドル含む）→ deals 3件取込済（2026-08-22）
+4. ✅ Phase PDF-0（`jarvis_kurashift_re_deal_pdf_fetch.py` + deals UI 添付件数）
+5. ⏳ E2E 第一問合せ（`聞く` 物件待ち）— チェックリスト: `docs/KURASHIFT_re_inquiry_E2E_checklist.md`
+6. ⏳ Phase PDF-1（PDF 中身抽出）
+7. ⏳ 業者開拓送信開始（`--next 3` / `grok_vendor_outreach_bot.md`）

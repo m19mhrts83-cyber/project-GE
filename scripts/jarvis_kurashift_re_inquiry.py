@@ -528,6 +528,28 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
                 if direction == "inbound":
                     update_inquiry(sb, deal, inquiry_status="has_reply")
                     deal = get_deal(sb, deal["id"])  # refresh sj
+                    if not dry_run:
+                        try:
+                            import importlib.util
+
+                            _pdf_path = (
+                                Path(__file__).resolve().parent
+                                / "jarvis_kurashift_re_deal_pdf_fetch.py"
+                            )
+                            _spec = importlib.util.spec_from_file_location(
+                                "kurashift_pdf_fetch", _pdf_path
+                            )
+                            if _spec and _spec.loader:
+                                _mod = importlib.util.module_from_spec(_spec)
+                                _spec.loader.exec_module(_mod)
+                                pr = _mod.fetch_pdfs_for_deal(sb, deal, dry_run=False)
+                                if int(pr.get("saved") or 0) > 0:
+                                    print(
+                                        f"# pdf_fetch deal={deal['id'][:8]}… "
+                                        f"saved={pr.get('saved')}"
+                                    )
+                        except Exception as e:
+                            print(f"# pdf_fetch soft-fail: {type(e).__name__}: {e}")
     out = {"ok": True, "scanned_threads": scanned, "appended": appended, "dry_run": dry_run}
     print(f"📎 inquiry_poll: scanned={scanned} appended={appended}")
     print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")

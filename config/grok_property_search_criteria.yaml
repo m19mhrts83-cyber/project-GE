@@ -1,0 +1,51 @@
+# Grok 物件調査 Bot — 優先エリア・ふるい（正本）
+# Jarvis property_mail_match の CITY_HINTS / スコアと整合。Bot 説明文は grok_property_report_format.md を参照。
+
+version: 1
+updated: "2026-08-22"
+
+priority_areas:
+  primary:
+    prefectures: [愛知県]
+    cities_hint:
+      - 名古屋
+      - 豊明
+      - 岡崎
+      - 碧南
+      - 知多
+      - 安城
+      - 豊田
+      - 瀬戸
+      - 春日井
+      - 犬山
+      - 一宮
+  secondary:
+    prefectures: [岐阜県, 三重県]
+    cities_hint:
+      - 岐阜
+      - 各務原
+      - 大垣
+      - 羽島
+      - 桑名
+      - 四日市
+      - 津
+      - 鈴鹿
+
+exclude_default:
+  - 東京23区・都心ワンルーム
+  - 区分マンション単体
+  - 一棟AP（戸建が主線）
+
+property_filter:
+  structure: 戸建
+  price_man_min: 500
+  price_man_max: 3500
+  yield_pct_internal_min: 0.15  # Bot 内部目安。地場 outreach 文面では前面に出さない
+  land_value100_prefer: true
+  parking_bonus: true
+  hazard_default: exclude  # OK|注意|除外 — 除外は原則見送り（高利回り例外なし）
+
+sources:
+  - kenbiya.net
+  - 健美家メルマガ
+  - 地場返信（estate Gmail → property_mail_match 通常ルート）
