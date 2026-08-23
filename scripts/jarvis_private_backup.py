@@ -19,6 +19,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -188,6 +189,96 @@ def cmd_backup() -> int:
     print(f"- iCloud: {ICLOUD_DIR}（保持{KEEP}世代・今回削除{pruned_i}）")
     print("- 秘密鍵は stdout に出していません。EasyPass2 の控えを確認してください。")
     return 0
+
+
+def _days_since_backup(state: dict | None) -> int | None:
+    if not state or not state.get("updated_at"):
+        return None
+    raw = str(state["updated_at"])
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=JST)
+        return (datetime.now(JST).date() - dt.astimezone(JST).date()).days
+    except ValueError:
+        return None
+
+
+def evaluate(state: dict | None = None) -> dict[str, Any]:
+    """状況ウォッチ用。秘密の値は載せない。"""
+    st = state if state is not None else read_state()
+    local_n = len(list(LOCAL_DIR.glob("jarvis_private_*.age"))) if LOCAL_DIR.is_dir() else 0
+    cloud_n = (
+        len(list(ICLOUD_DIR.glob("jarvis_private_*.age"))) if ICLOUD_DIR.is_dir() else 0
+    )
+    days = _days_since_backup(st)
+    has_src = SRC.is_file()
+    has_key = PRIV_KEY.is_file()
+    has_pub = PUB_KEY.is_file()
+
+    level = "ok"
+    issues: list[str] = []
+
+    if st.get("disabled"):
+        return {
+            "level": "info",
+            "verdict": "無効化中",
+            "local_generations": local_n,
+            "icloud_generations": cloud_n,
+            "days_since_backup": days,
+            "last_backup_name": st.get("last_backup_name"),
+            "updated_at": st.get("updated_at"),
+            "has_source": has_src,
+            "has_private_key": has_key,
+            "has_public_key": has_pub,
+        }
+
+    if not has_src:
+        issues.append("正本なし")
+        level = "attention"
+    if not has_key:
+        issues.append("秘密鍵なし（EasyPass2 控え要確認）")
+        level = "attention"
+    if local_n == 0 and cloud_n == 0:
+        issues.append(".age 未作成")
+        level = "attention"
+    elif local_n == 0 or cloud_n == 0:
+        issues.append("ローカル/iCloud 片方のみ")
+        if level == "ok":
+            level = "warn"
+    if days is None:
+        if level == "ok":
+            issues.append("最終成功未記録")
+            level = "warn"
+    elif days > 14:
+        issues.append(f"最終成功 {days} 日前")
+        level = "attention"
+    elif days > 8:
+        issues.append(f"最終成功 {days} 日前")
+        if level == "ok":
+            level = "warn"
+
+    if issues:
+        verdict = " · ".join(issues)
+    else:
+        verdict = (
+            f"最終成功 {days} 日前 · ローカル{local_n}/iCloud{cloud_n}世代"
+            if days is not None
+            else f"ローカル{local_n}/iCloud{cloud_n}世代"
+        )
+
+    return {
+        "level": level,
+        "verdict": verdict,
+        "local_generations": local_n,
+        "icloud_generations": cloud_n,
+        "days_since_backup": days,
+        "last_backup_name": st.get("last_backup_name"),
+        "updated_at": st.get("updated_at"),
+        "has_source": has_src,
+        "has_private_key": has_key,
+        "has_public_key": has_pub,
+    }
 
 
 def cmd_status() -> int:

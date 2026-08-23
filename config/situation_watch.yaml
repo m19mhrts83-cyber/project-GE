@@ -281,3 +281,16 @@ items:
       Other ≥70% は Composer/Cursor Grok へ寄せ、≥90% や残日少＋半分超えは Pro+ 再上げを検討。
       SuperGrok Plus 連携は Pro+ より高いので採用しない（必要なら Pro+）。
       ダッシュボード: /billing の「Cursor 枠」カード。
+
+  - id: jarvis_private_backup
+    title: Jarvis Private バックアップ（.env.age）
+    category: ops
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/jarvis_private_backup.json
+    cursor_prompt: |
+      .env.jarvis_private の age 暗号化バックアップ。週次 launchd（日曜 08:30）。
+      手動: scripts/jarvis_private_backup.py --backup / --status / --restore
+      復号鍵は EasyPass2（自動連携なし）。平文・秘密鍵は iCloud/Drive/Git に置かない。
+      8日超で warn、14日超で attention。平常時は ok でダッシュボード参照のみ。
+      手順: docs/運用コマンド一覧.md「Jarvis Private バックアップ」
