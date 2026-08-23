@@ -26,7 +26,7 @@ partners:
     contact: "鈴木"
   - folder: "102_ミニテック"
     name: "ミニテック"
-    emails: ["tomoki-hayashi@minitech.co.jp", "hayashi@minitech.co.jp"]
+    emails: ["tomoki-hayashi@minitech.co.jp", "hayashi@minitech.co.jp", "system@minitech.co.jp"]
     # system@ / 支店共通 From もパートナー取込（林さん個人アドレス以外）
     email_domains: ["minitech.co.jp"]
     to_name_hints: ["ミニテック", "minitech"]
