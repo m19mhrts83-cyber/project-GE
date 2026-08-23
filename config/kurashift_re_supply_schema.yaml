@@ -1,0 +1,66 @@
+# 需給三次判断・外的調査スキーマ（S3）
+# 正本プロンプト: https://chapro.jp/prompt/321242/7193
+# Excel 参考: 231_物件調査.xlsx「外的調査分析」
+
+version: 1
+updated: "2026-08-24"
+mail_subject_prefix: "[Grok需給]"
+portals:
+  - SUUMO
+  - at HOME
+  - "LIFULL HOME'S"
+rent_band_step_man: 0.5
+building_age_step_years: 5
+
+# チャプロ三次の出力ブロック
+output_sections:
+  - id: supply_near
+    title: 購入対象物件に近い賃貸物件数(供給その1)
+    columns: [市町村, 構造, 間取り, 築年数, 駐車場有無, 家賃帯_共益費込み, 件数, ポータルサイト名]
+  - id: supply_by_type
+    title: エリア賃貸物件数_物件タイプ別(供給その2)
+    columns: [市町村, 構造, 間取り, 件数, ポータルサイト名]
+  - id: supply_by_rent
+    title: エリア賃貸物件数_家賃帯別(供給その3)
+    columns: [市町村, 家賃帯_共益費込み, 件数, ポータルサイト名]
+  - id: supply_by_age
+    title: エリア賃貸物件数_築年数別(供給その4)
+    columns: [市町村, 築年数, 件数, ポータルサイト名]
+  - id: supply_by_parking
+    title: エリア賃貸物件数_駐車場有無(供給その5)
+    columns: [市町村, 駐車場有無, 件数, ポータルサイト名]
+  - id: population_trend
+    title: 人口動態調査結果(需要_統計)
+    notes: "IPSS。現場ヒアリング需要とは別"
+  - id: population_by_age
+    title: 調査年度時点の世代別人口(需要その2)
+  - id: verdict
+    title: 需要と供給についての考察・評価
+  - id: hearing_questions
+    title: ヒアリング確認リスト
+    notes: "地場仲介向け 3〜5問。必須"
+
+# Excel「外的調査分析」蓄積用（町単位の件数）
+excel_gaiteki_columns:
+  - 対象物件エリア市
+  - 対象エリア町
+  - サイト名
+  - 間取り
+  - 家賃
+  - 駐車場
+  - 件数
+  - 件数合計_市
+  - 件数合計_町
+  - 比率_市
+  - 比率_町
+  - ユーザー層
+  - 対象物件名
+  - 調査日/更新日
+
+# Phase K: deal.summary_json.judgment.supply
+kurashift_judgment_supply_keys:
+  status: "none|ready|verified"
+  verdict: "go|hold|pass"
+  body_md: string
+  hearing_questions: list
+  updated_at: ISO8601
