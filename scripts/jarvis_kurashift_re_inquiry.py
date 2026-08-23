@@ -111,16 +111,9 @@ def account_for_deal_with_sb(sb: Any, deal: dict[str, Any]) -> str:
 
 
 def is_self_email(from_email: str) -> bool:
-    addr = (from_email or "").strip().lower()
-    if not addr:
-        return False
-    if addr.endswith("@livingsupport-matsu.co.jp"):
-        return True
-    if addr == estate_email():
-        return True
-    if addr == ACCOUNT_EMAIL["admin"]:
-        return True
-    return False
+    from jarvis_kurashift_re_inquiry_channel import is_self_email as _is_self
+
+    return _is_self(from_email)
 
 
 def header_map(headers: list[dict] | None) -> dict[str, str]:
@@ -278,11 +271,17 @@ def append_bairitsu_block(body: str, tmpl: dict[str, Any]) -> str:
 
 
 def build_preview(deal: dict[str, Any], *, to_email: str | None = None) -> dict[str, Any]:
+    from jarvis_kurashift_re_inquiry_channel import (
+        build_grok_handoff_body,
+        build_grok_handoff_subject,
+        classify_inquiry_channel,
+    )
+
     tmpl = load_template()
     title = str(deal.get("title") or "物件")
     max_len = int(tmpl.get("title_short_max") or 40)
     title_short = title if len(title) <= max_len else title[: max_len - 1] + "…"
-    subject = str(tmpl.get("subject_template") or "物件資料のご依頼（{title_short}）").format(
+    agent_subject = str(tmpl.get("subject_template") or "物件資料のご依頼（{title_short}）").format(
         title_short=title_short
     )
     company = (os.environ.get("COMPANY_NAME") or "").strip()
@@ -295,24 +294,57 @@ def build_preview(deal: dict[str, Any], *, to_email: str | None = None) -> dict[
         sig_t = str(tmpl.get("signature_template") or "").format(
             company_name=company, representative_name=rep
         ).strip()
-    body = str(tmpl.get("body_template") or "").format(signature=sig_t).strip()
+    agent_body = str(tmpl.get("body_template") or "").format(signature=sig_t).strip()
     land_method = grok_land_method(deal)
     bairitsu = is_land_method_bairitsu(land_method)
     if bairitsu:
-        body = append_bairitsu_block(body, tmpl)
-    sj = sj_of(deal)
-    if not to_email:
-        _, parsed = parseaddr(str(sj.get("from") or ""))
-        to_email = (parsed or "").strip()
+        agent_body = append_bairitsu_block(agent_body, tmpl)
+
+    classified = classify_inquiry_channel(deal, explicit_to=to_email)
+    channel = classified["channel"]
+
+    if channel == "not_applicable":
+        return {
+            "deal_id": deal["id"],
+            "to": "",
+            "subject": agent_subject,
+            "body": agent_body,
+            "from_account": tmpl.get("from_account") or "estate",
+            "ops_notion_url": tmpl.get("ops_notion_url") or "",
+            "land_method": land_method or None,
+            "land_method_bairitsu": bairitsu,
+            "inquiry_channel": channel,
+            "channel_reason": classified["reason"],
+        }
+
+    if channel == "agent_email":
+        return {
+            "deal_id": deal["id"],
+            "to": classified["to"],
+            "subject": agent_subject,
+            "body": agent_body,
+            "from_account": tmpl.get("from_account") or "estate",
+            "ops_notion_url": tmpl.get("ops_notion_url") or "",
+            "land_method": land_method or None,
+            "land_method_bairitsu": bairitsu,
+            "inquiry_channel": channel,
+            "channel_reason": classified["reason"],
+        }
+
+    # grok_handoff
     return {
         "deal_id": deal["id"],
-        "to": to_email,
-        "subject": subject,
-        "body": body,
-        "from_account": tmpl.get("from_account") or "admin",
+        "to": classified["to"],
+        "subject": build_grok_handoff_subject(title, max_len),
+        "body": build_grok_handoff_body(
+            deal, inquiry_subject=agent_subject, inquiry_body=agent_body
+        ),
+        "from_account": tmpl.get("from_account") or "estate",
         "ops_notion_url": tmpl.get("ops_notion_url") or "",
         "land_method": land_method or None,
         "land_method_bairitsu": bairitsu,
+        "inquiry_channel": "grok_handoff",
+        "channel_reason": classified["reason"],
     }
 
 
@@ -325,18 +357,40 @@ def send_inquiry(
     body: str | None,
     confirm: bool,
     dry_run: bool,
+    handoff: bool | None = None,
+    inquiry_channel: str | None = None,
 ) -> dict[str, Any]:
+    from jarvis_kurashift_re_inquiry_channel import (
+        is_self_email as channel_is_self,
+    )
+
     from_acct = default_from_account()
     print(f"使用アカウント: {from_acct} / Gmail API（第一問い合わせ送信）")
     deal = get_deal(sb, deal_id)
     prev = build_preview(deal, to_email=to_email)
+    channel = (inquiry_channel or prev.get("inquiry_channel") or "").strip()
+    if handoff is None:
+        handoff = channel == "grok_handoff"
+    if channel == "not_applicable" or prev.get("inquiry_channel") == "not_applicable":
+        out = {"ok": False, "error": "not_applicable", "deal_id": deal_id}
+        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return out
+
     to_email = (to_email or prev["to"] or "").strip()
     subject = (subject or prev["subject"]).strip()
     body = (body or prev["body"]).strip()
-    if is_land_method_bairitsu(grok_land_method(deal)):
+    if not handoff and is_land_method_bairitsu(grok_land_method(deal)):
         body = append_bairitsu_block(body, load_template())
     if not to_email or "@" not in to_email:
         return {"ok": False, "error": "to email required"}
+    if not handoff and channel_is_self(to_email):
+        out = {
+            "ok": False,
+            "error": "agent_to_is_self",
+            "deal_id": deal_id,
+        }
+        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return out
     if not confirm and not dry_run:
         return {"ok": False, "error": "need --i-confirm-send or --dry-run"}
 
@@ -344,7 +398,7 @@ def send_inquiry(
     existing = list_messages(sb, deal)
     for m in existing:
         if (
-            m.get("kind") == "first_inquiry"
+            m.get("kind") in ("first_inquiry", "grok_handoff")
             and m.get("direction") == "outbound"
             and m.get("gmail_id")
         ):
@@ -359,7 +413,7 @@ def send_inquiry(
             return out
 
     fields = inquiry_fields(deal)
-    if fields.get("inquiry_status") in ("awaiting_reply", "has_reply"):
+    if fields.get("inquiry_status") in ("awaiting_reply", "awaiting_grok", "has_reply"):
         out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
         print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
         return out
@@ -370,6 +424,8 @@ def send_inquiry(
         "to": to_email,
         "subject": subject,
         "dry_run": dry_run,
+        "inquiry_channel": "grok_handoff" if handoff else "agent_email",
+        "handoff": bool(handoff),
     }
     if dry_run:
         result["body_preview"] = body[:400]
@@ -402,13 +458,14 @@ def send_inquiry(
     thread_id = sent.get("threadId")
     from_email = ACCOUNT_EMAIL.get(from_acct, estate_email())
     payload_account = ACCOUNT_PAYLOAD.get(from_acct, "mail_estate")
+    kind = "grok_handoff" if handoff else "first_inquiry"
     insert_message(
         sb,
         deal,
         {
             "deal_id": deal_id,
             "direction": "outbound",
-            "kind": "first_inquiry",
+            "kind": kind,
             "gmail_id": gmail_id,
             "thread_id": thread_id,
             "from_email": from_email,
@@ -416,17 +473,19 @@ def send_inquiry(
             "subject": subject,
             "body_text": body,
             "occurred_at": now_iso(),
-            "payload": {"account": payload_account},
+            "payload": {"account": payload_account, "handoff": bool(handoff)},
         },
     )
+    next_status = "awaiting_grok" if handoff else "awaiting_reply"
     update_inquiry(
         sb,
         deal,
-        inquiry_status="awaiting_reply",
+        inquiry_status=next_status,
         inquiry_thread_id=thread_id,
         inquiry_sent_at=now_iso(),
+        summary_json={"inquiry_channel": "grok_handoff" if handoff else "agent_email"},
     )
-    if deal.get("status") == "info":
+    if not handoff and deal.get("status") == "info":
         try:
             sb.table("kurashift_re_deals").update(
                 {"status": "viewing", "updated_at": now_iso()}
@@ -439,10 +498,14 @@ def send_inquiry(
         insert_deal_event(
             sb,
             deal_id=deal_id,
-            event_type="inquiry_sent",
-            summary=f"第一問合せ送信: {to_email}",
+            event_type="inquiry_sent" if not handoff else "grok_handoff_sent",
+            summary=(
+                f"Grok問合せ依頼: {to_email}"
+                if handoff
+                else f"第一問合せ送信: {to_email}"
+            ),
             actor="jarvis",
-            payload={"thread_id": thread_id, "gmail_id": gmail_id},
+            payload={"thread_id": thread_id, "gmail_id": gmail_id, "handoff": bool(handoff)},
         )
     except Exception:
         pass
@@ -450,10 +513,10 @@ def send_inquiry(
         {
             "gmail_id": gmail_id,
             "thread_id": thread_id,
-            "inquiry_status": "awaiting_reply",
+            "inquiry_status": next_status,
         }
     )
-    print(f"📎 inquiry_send: to={to_email} thread={thread_id}")
+    print(f"📎 inquiry_send: to={to_email} thread={thread_id} status={next_status}")
     print(f"KURASHIFT_RESULT:{json.dumps(result, ensure_ascii=False)}")
     return result
 
@@ -468,6 +531,9 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
     appended = 0
     scanned = 0
     for deal in deals:
+        fields = inquiry_fields(deal)
+        if fields.get("inquiry_status") == "awaiting_grok":
+            continue
         acct = account_for_deal_with_sb(sb, deal)
         if acct not in svc_cache:
             try:
@@ -703,6 +769,12 @@ def main() -> int:
     ap.add_argument("--subject", default="")
     ap.add_argument("--body", default="")
     ap.add_argument("--i-confirm-send", action="store_true")
+    ap.add_argument("--handoff", action="store_true", help="Grok 依頼メール（awaiting_grok）")
+    ap.add_argument(
+        "--inquiry-channel",
+        default="",
+        help="agent_email | grok_handoff（省略時は自動判定）",
+    )
     ap.add_argument("--poll-replies", action="store_true")
     ap.add_argument("--deal-id", default="", help="poll/pack の対象絞り込み")
     ap.add_argument("--build-ops-pack", action="store_true")
@@ -717,6 +789,11 @@ def main() -> int:
         print(f"KURASHIFT_RESULT:{json.dumps({'ok': True, **prev}, ensure_ascii=False)}")
         return 0
     if args.send_deal_id:
+        handoff_flag: bool | None = True if args.handoff else None
+        if args.inquiry_channel == "grok_handoff":
+            handoff_flag = True
+        elif args.inquiry_channel == "agent_email":
+            handoff_flag = False
         r = send_inquiry(
             sb,
             args.send_deal_id,
@@ -725,6 +802,8 @@ def main() -> int:
             body=args.body or None,
             confirm=args.i_confirm_send,
             dry_run=args.dry_run,
+            handoff=handoff_flag,
+            inquiry_channel=args.inquiry_channel or None,
         )
         return 0 if r.get("ok") else 1
     if args.poll_replies:

@@ -48,8 +48,10 @@
 | 築古一棟AP / RC 取込整合 | ✅ |
 | Tier1 初級者手順 | ✅ `docs/KURASHIFT_Tier1_問合せ_初級者手順.md` |
 | E2E checklist Tier 表 | ✅ |
+| **経路仕分け**（agent_email / grok_handoff / not_applicable） | ✅ `reInquiryChannel` + `awaiting_grok` |
+| Grok 依頼メール件名 `[KURASHIFT問合せ依頼]` | ✅ paste: `config/grok_kurashift_inquiry_handoff_paste.md` |
 
-**commit**: `b442ca49`
+**commit**: `b442ca49`（閾値）＋経路仕分けは後続 commit
 
 ### Phase 2.6 — Tier2 日次一括キュー ✅
 

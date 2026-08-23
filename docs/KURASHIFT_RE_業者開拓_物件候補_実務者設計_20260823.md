@@ -493,6 +493,19 @@ Cursor ルール（ローカル）: `.cursor/rules/kamiooya-re-purchase-form.mdc
 | Phase2.6 Tier2 | `lib/reInquiryTier2Queue.ts` + `/realestate/deals/tier2` + API |
 | Tier1 手順 | `docs/KURASHIFT_Tier1_問合せ_初級者手順.md` |
 | 進捗正本 | `docs/KURASHIFT_問合せパイプライン_進捗_20260823.md` |
+| 経路仕分け | `apps/trade-desk/lib/reInquiryChannel.ts` + `scripts/jarvis_kurashift_re_inquiry_channel.py` |
+| Grok handoff paste | `config/grok_kurashift_inquiry_handoff_paste.md` |
+
+---
+
+## 9.1 第一問合せ ≠ 業者開拓フォーム（2026-08-23）
+
+| レーン | 何をするか | 誰が送るか |
+|---|---|---|
+| **物件の第一問合せ** | 具体物件の資料依頼 | estate → **仲介メール**（無ければ `[KURASHIFT問合せ依頼]` で自分→Grok） |
+| **業者開拓 A'** | 地場リストへの顧客登録・条件マッチ依頼 | Grok Bot2 → **各社 Web フォーム** |
+
+`[Grok調査]` メモや「業者開拓 approved A'」単体の deal は **第一問合せボタンを出さない**（`not_applicable`）。
 
 ---
 

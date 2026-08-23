@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
+import {
+  classifyInquiryChannel,
+  isSelfEmail,
+  selfEmailsExtraFromEnv,
+} from "@/lib/reInquiryChannel";
 
 function bodySha256(body: string): string {
   return createHash("sha256").update(body, "utf8").digest("hex");
@@ -24,7 +29,7 @@ export async function POST(
 
   const { data: row, error: getErr } = await supabase
     .from("kurashift_re_deals")
-    .select("id, title, status, summary_json, inquiry_status")
+    .select("id, title, status, source, summary_json, inquiry_status")
     .eq("id", id)
     .maybeSingle();
   if (getErr || !row) {
@@ -61,6 +66,41 @@ export async function POST(
       );
     }
 
+    const channelInfo = classifyInquiryChannel({
+      title: String(row.title || ""),
+      source: row.source != null ? String(row.source) : null,
+      summaryJson: sj,
+      explicitTo: to,
+    });
+    if (channelInfo.channel === "not_applicable") {
+      return NextResponse.json(
+        {
+          error:
+            "この案件は第一問合せ対象外です（Grok調査メモ／業者開拓メモ等）",
+          inquiry_channel: channelInfo.channel,
+        },
+        { status: 400 }
+      );
+    }
+    const inquiryChannel =
+      String(body.inquiry_channel || "") === "grok_handoff" ||
+      String(body.inquiry_channel || "") === "agent_email"
+        ? String(body.inquiry_channel)
+        : channelInfo.channel;
+    const handoff = inquiryChannel === "grok_handoff";
+    if (
+      !handoff &&
+      isSelfEmail(to, selfEmailsExtraFromEnv())
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "仲介向け問合せの宛先が自己アドレスです。To を修正するか Grok 依頼に切り替えてください",
+        },
+        { status: 400 }
+      );
+    }
+
     const snap =
       body.confirm_snapshot && typeof body.confirm_snapshot === "object"
         ? (body.confirm_snapshot as Record<string, unknown>)
@@ -85,6 +125,7 @@ export async function POST(
     if (
       inquiryStatus === "sending" ||
       inquiryStatus === "awaiting_reply" ||
+      inquiryStatus === "awaiting_grok" ||
       inquiryStatus === "has_reply"
     ) {
       return NextResponse.json(
@@ -144,7 +185,9 @@ export async function POST(
       .from("kurashift_jobs")
       .insert({
         job_type: "re_deal_inquiry_send",
-        title: `第一問い合わせ: ${String(row.title || "").slice(0, 60)}`,
+        title: handoff
+          ? `Grok問合せ依頼: ${String(row.title || "").slice(0, 60)}`
+          : `第一問い合わせ: ${String(row.title || "").slice(0, 60)}`,
         status: "queued",
         payload: {
           deal_id: id,
@@ -155,6 +198,8 @@ export async function POST(
           ui_confirmed_at: now,
           confirm_snapshot: { to, subject, body_sha256: hash },
           idempotency_key: idempotencyKey,
+          inquiry_channel: inquiryChannel,
+          handoff,
         },
         created_by: user.email ?? user.id,
       })
@@ -167,6 +212,7 @@ export async function POST(
       ok: true,
       job_id: job?.id,
       inquiry_status: "draft",
+      inquiry_channel: inquiryChannel,
     });
   }
 

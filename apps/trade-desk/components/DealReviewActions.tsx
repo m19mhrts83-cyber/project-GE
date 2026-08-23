@@ -16,6 +16,7 @@ export default function DealReviewActions({
   inquiryReady,
   inquiryHasTo,
   inquiryBadges,
+  inquiryChannel,
   openDealHref,
 }: {
   dealId: string;
@@ -27,6 +28,7 @@ export default function DealReviewActions({
   inquiryReady?: boolean;
   inquiryHasTo?: boolean;
   inquiryBadges?: string[];
+  inquiryChannel?: "agent_email" | "grok_handoff" | "not_applicable" | null;
   openDealHref?: string;
 }) {
   const router = useRouter();
@@ -78,7 +80,11 @@ export default function DealReviewActions({
 
   const alreadyRead = Boolean(gmailReadAt);
   const showActions = status !== "archived";
-  const showInquiryCta = Boolean(inquiryReady && (confirmed || status !== "passed"));
+  const showInquiryCta = Boolean(
+    inquiryReady &&
+      inquiryChannel !== "not_applicable" &&
+      (confirmed || status !== "passed")
+  );
 
   return (
     <div style={{ minWidth: 140 }}>
@@ -128,6 +134,7 @@ export default function DealReviewActions({
             fromRaw={fromRaw}
             canQuickSend
             hasTo={inquiryHasTo ?? Boolean(fromRaw && fromRaw.includes("@"))}
+            inquiryChannel={inquiryChannel}
             badges={inquiryBadges}
             compact
             openHref={openDealHref}

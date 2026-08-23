@@ -224,6 +224,12 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             *(["--to", str(payload.get("to"))] if payload.get("to") else []),
             *(["--subject", str(payload.get("subject"))] if payload.get("subject") else []),
             *(["--body", str(payload.get("body"))] if payload.get("body") else []),
+            *(["--handoff"] if payload.get("handoff") else []),
+            *(
+                ["--inquiry-channel", str(payload.get("inquiry_channel"))]
+                if payload.get("inquiry_channel")
+                else []
+            ),
             "--i-confirm-send",
         ],
         "re_deal_inquiry_poll": [

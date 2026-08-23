@@ -1,3 +1,10 @@
+import {
+  buildGrokHandoffBody,
+  buildGrokHandoffSubject,
+  classifyInquiryChannel,
+  type InquiryChannel,
+} from "./reInquiryChannel";
+
 export const BAIRITSU_MARKER = "【倍率地域のため】";
 
 export type ReInquiryTemplate = {
@@ -32,12 +39,6 @@ export function isLandMethodBairitsu(
   landMethod: string | null | undefined
 ): boolean {
   return Boolean(landMethod && landMethod.includes("倍率"));
-}
-
-function parseEmailFromRaw(fromRaw: string | undefined | null): string {
-  if (!fromRaw) return "";
-  const m = fromRaw.match(/<([^>]+)>/);
-  return (m ? m[1] : fromRaw).trim();
 }
 
 function grokFromSummary(
@@ -86,6 +87,10 @@ export function buildInquiryPreviewFromTemplate(
     fromRaw?: string | null;
     toEmail?: string | null;
     signatureName?: string | null;
+    dealId?: string | null;
+    source?: string | null;
+    area?: string | null;
+    priceMan?: number | null;
   }
 ): {
   to: string;
@@ -93,17 +98,19 @@ export function buildInquiryPreviewFromTemplate(
   body: string;
   land_method: string | null;
   land_method_bairitsu: boolean;
+  inquiry_channel: InquiryChannel;
+  channel_reason: string;
 } {
   const title = params.title || "物件";
   const maxLen = Number(tmpl.title_short_max || 40);
   const titleShort =
     title.length <= maxLen ? title : `${title.slice(0, maxLen - 1)}…`;
-  const subject = String(
+  const agentSubject = String(
     tmpl.subject_template || "物件資料のご依頼（{title_short}）"
   ).replace("{title_short}", titleShort);
 
   const signature = String(params.signatureName || "").trim();
-  let body = String(tmpl.body_template || "")
+  let agentBody = String(tmpl.body_template || "")
     .replace("{signature}", signature)
     .trim();
 
@@ -112,24 +119,63 @@ export function buildInquiryPreviewFromTemplate(
     grok && typeof grok.land_method === "string" ? grok.land_method : null;
   const bairitsu = isLandMethodBairitsu(landMethod);
   if (bairitsu) {
-    body = appendBairitsuBlock(body, tmpl);
+    agentBody = appendBairitsuBlock(agentBody, tmpl);
   }
 
-  const to =
-    String(params.toEmail || "").trim() ||
-    parseEmailFromRaw(params.fromRaw) ||
-    parseEmailFromRaw(
-      typeof params.summaryJson?.from === "string"
-        ? params.summaryJson.from
-        : undefined
-    );
+  const sj = {
+    ...(params.summaryJson && typeof params.summaryJson === "object"
+      ? params.summaryJson
+      : {}),
+  } as Record<string, unknown>;
+  if (params.fromRaw && !sj.from) sj.from = params.fromRaw;
+
+  const classified = classifyInquiryChannel({
+    title,
+    source: params.source,
+    summaryJson: sj,
+    explicitTo: params.toEmail,
+  });
+
+  if (classified.channel === "not_applicable") {
+    return {
+      to: "",
+      subject: agentSubject,
+      body: agentBody,
+      land_method: landMethod,
+      land_method_bairitsu: bairitsu,
+      inquiry_channel: "not_applicable",
+      channel_reason: classified.reason,
+    };
+  }
+
+  if (classified.channel === "agent_email") {
+    return {
+      to: classified.to,
+      subject: agentSubject,
+      body: agentBody,
+      land_method: landMethod,
+      land_method_bairitsu: bairitsu,
+      inquiry_channel: "agent_email",
+      channel_reason: classified.reason,
+    };
+  }
 
   return {
-    to,
-    subject,
-    body,
+    to: classified.to,
+    subject: buildGrokHandoffSubject(title, maxLen),
+    body: buildGrokHandoffBody({
+      dealId: String(params.dealId || ""),
+      title,
+      inquirySubject: agentSubject,
+      inquiryBody: agentBody,
+      summaryJson: sj,
+      area: params.area,
+      priceMan: params.priceMan,
+    }),
     land_method: landMethod,
     land_method_bairitsu: bairitsu,
+    inquiry_channel: "grok_handoff",
+    channel_reason: classified.reason,
   };
 }
 

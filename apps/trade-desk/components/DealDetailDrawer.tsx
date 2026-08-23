@@ -43,6 +43,7 @@ type InquiryEval = {
   tier2: boolean;
   canQuickSend: boolean;
   hasTo: boolean;
+  inquiryChannel?: "agent_email" | "grok_handoff" | "not_applicable";
   badges: string[];
   reasons: string[];
 };
@@ -407,6 +408,7 @@ export default function DealDetailDrawer({
                   inquiryReady={inquiryEval?.tier1}
                   inquiryHasTo={inquiryEval?.hasTo}
                   inquiryBadges={inquiryEval?.badges}
+                  inquiryChannel={inquiryEval?.inquiryChannel}
                 />
               </div>
               {(deal.status === "info" || deal.status === "viewing") ? (

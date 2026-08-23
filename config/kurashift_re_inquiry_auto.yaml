@@ -16,6 +16,7 @@ tiers:
   tier0_exclude_inquiry_status:
     - sending
     - awaiting_reply
+    - awaiting_grok
     - has_reply
 
   tier1_candidate:
@@ -56,9 +57,19 @@ ingest:
   rc_score_bonus: 0.5
   set_inquiry_tier_hint: true
 
+# To 解決順（コード実装: reInquiryChannel / jarvis_kurashift_re_inquiry_channel）
+# 1 UI明示 → 2 reply_to → 3 from（自己除外）→ 4 vendor contact_email → 5 無ければ grok_handoff
 to_resolution:
-  - summary_json.from
+  - explicit_ui
+  - summary_json.reply_to
+  - summary_json.from_non_self
   - vendor_list_by_vendor_id
+  - grok_handoff
+
+grok_handoff:
+  subject_prefix: "[KURASHIFT問合せ依頼]"
+  # To: env INQUIRY_GROK_HANDOFF_TO または PERSONAL_EMAIL（チャットに値を書かない）
+  note: "仲介メールが無い案件は estate→自分宛の依頼メール。Grok が拾って Web/調査"
 
 # Tier2 キュー — 本番候補のみ（E2E fixture 除外）
 production_filter:

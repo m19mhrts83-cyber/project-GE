@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { BAIRITSU_MARKER } from "@/lib/reInquiryShared";
+import type { InquiryChannel } from "@/lib/reInquiryChannel";
+import { INQUIRY_CHANNEL_LABEL } from "@/lib/reInquiryChannel";
 
 async function sha256Hex(text: string): Promise<string> {
   const data = new TextEncoder().encode(text);
@@ -12,18 +14,13 @@ async function sha256Hex(text: string): Promise<string> {
     .join("");
 }
 
-function parseEmail(fromRaw: string | undefined): string {
-  if (!fromRaw) return "";
-  const m = fromRaw.match(/<([^>]+)>/);
-  return (m ? m[1] : fromRaw).trim();
-}
-
 export default function DealInquiryQuickButton({
   dealId,
   title,
-  fromRaw,
+  fromRaw: _fromRaw,
   canQuickSend,
   hasTo,
+  inquiryChannel: inquiryChannelProp,
   badges,
   compact,
   openHref,
@@ -33,6 +30,7 @@ export default function DealInquiryQuickButton({
   fromRaw?: string | null;
   canQuickSend: boolean;
   hasTo: boolean;
+  inquiryChannel?: InquiryChannel | null;
   badges?: string[];
   compact?: boolean;
   openHref?: string;
@@ -42,10 +40,13 @@ export default function DealInquiryQuickButton({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
-  const [to, setTo] = useState(() => parseEmail(fromRaw || undefined));
+  const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [landMethodBairitsu, setLandMethodBairitsu] = useState(false);
+  const [channel, setChannel] = useState<InquiryChannel | null>(
+    inquiryChannelProp || null
+  );
   const [loaded, setLoaded] = useState(false);
 
   const loadPreview = useCallback(async () => {
@@ -57,10 +58,21 @@ export default function DealInquiryQuickButton({
         setMsg(data.error || "下書き取得失敗");
         return;
       }
+      if (data.inquiry_channel === "not_applicable") {
+        setMsg("この案件は第一問合せ対象外です");
+        setChannel("not_applicable");
+        return;
+      }
       if (data.to) setTo(String(data.to));
       setSubject(String(data.subject || ""));
       setBody(String(data.body || ""));
       setLandMethodBairitsu(Boolean(data.land_method_bairitsu));
+      if (
+        data.inquiry_channel === "agent_email" ||
+        data.inquiry_channel === "grok_handoff"
+      ) {
+        setChannel(data.inquiry_channel);
+      }
       setLoaded(true);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "下書き取得エラー");
@@ -74,7 +86,11 @@ export default function DealInquiryQuickButton({
   if (!canQuickSend) return null;
 
   const bairitsuMissing =
-    landMethodBairitsu && !body.includes(BAIRITSU_MARKER);
+    landMethodBairitsu &&
+    channel === "agent_email" &&
+    !body.includes(BAIRITSU_MARKER);
+
+  const isHandoff = channel === "grok_handoff";
 
   async function send() {
     if (!checked) {
@@ -103,6 +119,7 @@ export default function DealInquiryQuickButton({
           body,
           ui_confirmed: true,
           confirm_snapshot: { to, subject, body_sha256 },
+          inquiry_channel: channel || undefined,
         }),
       });
       const data = await res.json();
@@ -122,6 +139,9 @@ export default function DealInquiryQuickButton({
 
   const badgeText =
     badges && badges.length > 0 ? badges.join(" · ") : null;
+  const channelLabel = channel
+    ? INQUIRY_CHANNEL_LABEL[channel]
+    : null;
 
   return (
     <>
@@ -133,12 +153,15 @@ export default function DealInquiryQuickButton({
         style={{
           fontSize: 12,
           padding: compact ? "4px 8px" : undefined,
-          background: "#fef3c7",
-          borderColor: "#f59e0b",
+          background: isHandoff ? "#e0e7ff" : "#fef3c7",
+          borderColor: isHandoff ? "#6366f1" : "#f59e0b",
         }}
-        title={badgeText || "テンプレで第一問合せ"}
+        title={
+          badgeText ||
+          (isHandoff ? "Grokに問合せ依頼" : "テンプレで第一問合せ")
+        }
       >
-        {busy ? "…" : "問合せ"}
+        {busy ? "…" : isHandoff ? "Grok依頼" : "問合せ"}
       </button>
       {open ? (
         <div
@@ -167,12 +190,25 @@ export default function DealInquiryQuickButton({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <strong>クイック問合せ</strong>
+            <strong>
+              {isHandoff ? "Grokに問合せ依頼" : "クイック問合せ"}
+            </strong>
+            {channelLabel ? (
+              <p className="meta" style={{ marginTop: 4 }}>
+                経路: {channelLabel}
+              </p>
+            ) : null}
             <p className="meta" style={{ marginTop: 4 }}>
               {title.slice(0, 60)}
               {badgeText ? ` · ${badgeText}` : ""}
             </p>
-            {!hasTo ? (
+            {isHandoff ? (
+              <p className="meta" style={{ color: "#4338ca", marginTop: 8 }}>
+                仲介メールが無いため、自分宛に依頼メールを送ります。Grok
+                が拾って Web／調査します。
+              </p>
+            ) : null}
+            {!hasTo && !isHandoff ? (
               <p className="meta" style={{ color: "#b45309", marginTop: 8 }}>
                 宛先が空です。下記に入力してください。
               </p>
@@ -183,7 +219,13 @@ export default function DealInquiryQuickButton({
                 type="email"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                style={{ display: "block", width: "100%", marginTop: 4 }}
+                readOnly={isHandoff}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  marginTop: 4,
+                  background: isHandoff ? "#f1f5f9" : undefined,
+                }}
               />
             </label>
             <p className="meta" style={{ marginTop: 8 }}>
@@ -217,7 +259,11 @@ export default function DealInquiryQuickButton({
                 checked={checked}
                 onChange={(e) => setChecked(e.target.checked)}
               />
-              <span>テンプレ内容で estate から送信してよい</span>
+              <span>
+                {isHandoff
+                  ? "この内容で estate から自分宛に依頼してよい"
+                  : "テンプレ内容で estate から仲介へ送信してよい"}
+              </span>
             </label>
             {msg ? (
               <p className="meta" style={{ color: "#b91c1c", marginTop: 8 }}>

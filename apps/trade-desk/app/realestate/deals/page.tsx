@@ -569,6 +569,7 @@ export default async function RealEstateDealsPage({
                           inquiryReady={evalInq.tier1}
                           inquiryHasTo={evalInq.hasTo}
                           inquiryBadges={evalInq.badges}
+                          inquiryChannel={evalInq.inquiryChannel}
                           openDealHref={dealOpenHref}
                         />
                       </td>
