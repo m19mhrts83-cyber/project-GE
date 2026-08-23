@@ -1,0 +1,77 @@
+# 家族コーチング — Notion 正本（Jarvis）
+# トークン: NOTION_API_TOKEN（同一WS・共有済み）または NOTION_FAMILY_API_TOKEN（別WS）
+# CLI: scripts/jarvis_notion_api.py --token-env … family-probe / get-page
+
+root_page_id: "26ef6bbe-5a76-8045-8a11-e7cbfb4c90cb"
+root_page_url: "https://app.notion.com/p/26ef6bbe5a7680458a11e7cbfb4c90cb"
+# API 未接続時は inventory_status: pending_share。接続後 get-page で更新する。
+inventory_status: pending_share
+inventory_note: >
+  2026-08-23: 既存 Integration「Jarvisダッシュボード」では 404。
+  ページ Connections で共有するか、別WSなら NOTION_FAMILY_API_TOKEN を jarvis_private に置く。
+
+# 参照ソース種別（Grok Instructions・材料パックで使うタグ）
+source_kinds:
+  - id: family_meeting
+    label: 家族会議の結果・決定
+  - id: juku_briefing
+    label: 塾の説明・オリエン
+  - id: teacher_meeting
+    label: 先生との面談結果
+  - id: meeting_consult
+    label: 面談前の相談メモ
+  - id: other_meeting
+    label: その他ミーティングメモ
+
+# 子ども（呼び名／漢字）
+children:
+  - id: madoka
+    call_name: まどか
+    formal_name: 円香
+    grade: 中3
+    focus: 高校受験・勉強
+    coach_bot: まどかコーチ
+  - id: tamaki
+    call_name: たまき
+    formal_name: 珠己
+    grade: 小5
+    focus: 中学受験・勉強
+    coach_bot: たまきコーチ
+  - id: sawa
+    call_name: さわ
+    formal_name: 紗和
+    grade: 小4
+    focus: 生活態度
+    coach_bot: さわコーチ
+
+# 棚卸し後に埋める（子ページ・DB）
+# sources:
+#   - page_id: "…"
+#     title: "…"
+#     kind: teacher_meeting
+#     child_ids: [madoka]
+#     updated_at: "YYYY-MM-DD"
+
+sources: []
+
+# 補完（Notion 外）
+obsidian_complements:
+  - path: "01_Journaling/★Journal/"
+    note: 日次 Journal・カール参謀レビュー
+  - path: "受験生へのエール.md"
+    note: まどか向け家族スピーチ構想
+  - path: "01_Journaling/★Note/考えたいこと.md"
+    note: 思春期対応・優先順位
+  - path: "01_Journaling/★Note/背景_Chappy行動フィードバック_準拠ログ.md"
+    note: たまき中学受験ミッションB
+  - path: "03_Literature Note(まとめノート)/★Journal_統合ログ_Geminiコーチング用.md"
+    note: 自分向けコーチの型
+
+partner_mail_note: >
+  水田塾などメール送受信の正本は OneDrive 215 パートナーフォルダ。
+  Notion は面談・説明・相談のミーティングメモ正本。混同しない。
+
+kazoku_tasks:
+  database_id: "9a5b4921-5835-49f8-b8c4-22e8caf8621a"
+  board_url: "https://app.notion.com/p/9a5b4921583549f8b8c422e8caf8621a"
+  note: 用事・予定の看板。コーチング議事の正本ではない。
