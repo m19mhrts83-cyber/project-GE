@@ -15,6 +15,7 @@ export const INQUIRY_STATUS_LABEL: Record<string, string> = {
   draft: "下書き",
   sent: "送信済",
   awaiting_reply: "返信待ち",
+  awaiting_grok: "Grok依頼中",
   has_reply: "返信あり",
 };
 

@@ -37,6 +37,10 @@ export function buildInquiryPreview(params: {
   fromRaw?: string | null;
   toEmail?: string | null;
   signatureName?: string | null;
+  dealId?: string | null;
+  source?: string | null;
+  area?: string | null;
+  priceMan?: number | null;
 }) {
   return buildInquiryPreviewFromTemplate(loadReInquiryTemplate(), params);
 }

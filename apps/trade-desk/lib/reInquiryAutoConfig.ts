@@ -34,13 +34,22 @@ export type InquiryAutoConfig = {
     exclude_title_substrings?: string[];
     exclude_e2e_markers?: string[];
   };
+  grok_handoff?: {
+    subject_prefix?: string;
+    note?: string;
+  };
 };
 
 const DEFAULT_CONFIG: InquiryAutoConfig = {
   daily_send_cap: 5,
   tier3_auto_send: { enabled: false },
   tiers: {
-    tier0_exclude_inquiry_status: ["sending", "awaiting_reply", "has_reply"],
+    tier0_exclude_inquiry_status: [
+      "sending",
+      "awaiting_reply",
+      "awaiting_grok",
+      "has_reply",
+    ],
     tier1_candidate: {
       min_score: 2.0,
       grok_listen_values: ["聞く", "保留"],
@@ -63,6 +72,10 @@ const DEFAULT_CONFIG: InquiryAutoConfig = {
     grok_listen_values: ["聞く", "保留"],
     revive_passed_status: true,
     exclude_auto_pass_reasons: ["mansion_unit", "subject_noise"],
+  },
+  grok_handoff: {
+    subject_prefix: "[KURASHIFT問合せ依頼]",
+    note: "To は INQUIRY_GROK_HANDOFF_TO または PERSONAL_EMAIL（Mac / Vercel env）",
   },
 };
 

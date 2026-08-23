@@ -65,11 +65,20 @@ def grok_of(deal: dict[str, Any]) -> dict[str, Any]:
 
 
 def parse_email_from_deal(deal: dict[str, Any]) -> str:
-    from email.utils import parseaddr
+    try:
+        from jarvis_kurashift_re_inquiry_channel import classify_inquiry_channel
 
-    raw = str(sj_of(deal).get("from") or "")
-    _, addr = parseaddr(raw)
-    return (addr or "").strip()
+        ch = classify_inquiry_channel(deal)
+        if ch.get("channel") in ("agent_email", "grok_handoff") and ch.get("to"):
+            return str(ch["to"])
+    except Exception:
+        pass
+    sj = deal.get("summary_json") if isinstance(deal.get("summary_json"), dict) else {}
+    from_raw = str(sj.get("from") or "")
+    if not from_raw.strip():
+        return ""
+    m = re.search(r"<([^>]+)>", from_raw)
+    return (m.group(1) if m else from_raw).strip()
 
 
 def is_production_inquiry_deal(
@@ -125,6 +134,7 @@ def evaluate_inquiry_candidate(
     t0 = tiers.get("tier0_exclude_inquiry_status") or [
         "sending",
         "awaiting_reply",
+        "awaiting_grok",
         "has_reply",
     ]
     t1 = tiers.get("tier1_candidate") or {}

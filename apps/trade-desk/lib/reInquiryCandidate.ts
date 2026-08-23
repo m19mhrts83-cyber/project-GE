@@ -2,10 +2,15 @@ import {
   loadInquiryAutoConfig,
   type InquiryAutoConfig,
 } from "./reInquiryAutoConfig";
+import {
+  classifyInquiryChannel,
+  type InquiryChannel,
+} from "./reInquiryChannel";
 
 export type ReDealForInquiry = {
   id?: string;
   status?: string | null;
+  source?: string | null;
   match_score?: number | null;
   title?: string | null;
   area?: string | null;
@@ -20,6 +25,7 @@ export type InquiryCandidateEval = {
   tier3: boolean;
   canQuickSend: boolean;
   hasTo: boolean;
+  inquiryChannel: InquiryChannel;
   revive: boolean;
   badges: string[];
   reasons: string[];
@@ -36,10 +42,23 @@ function grokOf(deal: ReDealForInquiry): Record<string, unknown> | null {
 }
 
 export function parseEmailFromDeal(deal: ReDealForInquiry): string {
-  const fromRaw = sjOf(deal).from;
-  if (typeof fromRaw !== "string" || !fromRaw.trim()) return "";
-  const m = fromRaw.match(/<([^>]+)>/);
-  return (m ? m[1] : fromRaw).trim();
+  const ch = classifyInquiryChannel({
+    title: deal.title,
+    source: deal.source,
+    summaryJson: sjOf(deal),
+  });
+  if (ch.channel === "agent_email" || ch.channel === "grok_handoff") {
+    return ch.to;
+  }
+  return "";
+}
+
+function channelOf(deal: ReDealForInquiry): ReturnType<typeof classifyInquiryChannel> {
+  return classifyInquiryChannel({
+    title: deal.title,
+    source: deal.source,
+    summaryJson: sjOf(deal),
+  });
 }
 
 function inquiryStatus(deal: ReDealForInquiry): string {
@@ -126,11 +145,19 @@ export function evaluateInquiryCandidate(
   const reasons: string[] = [];
   const badges: string[] = [];
   const inq = inquiryStatus(deal);
+  const ch = channelOf(deal);
+  const hasTo = Boolean(ch.to && ch.to.includes("@"));
   const tier0 = cfg.tiers?.tier0_exclude_inquiry_status || [
     "sending",
     "awaiting_reply",
+    "awaiting_grok",
     "has_reply",
   ];
+
+  const baseChannel = {
+    inquiryChannel: ch.channel,
+    hasTo,
+  };
 
   if (tier0.includes(inq)) {
     return {
@@ -139,10 +166,10 @@ export function evaluateInquiryCandidate(
       tier2: false,
       tier3: false,
       canQuickSend: false,
-      hasTo: parseEmailFromDeal(deal).includes("@"),
       revive: false,
       badges,
       reasons: [`inquiry_status=${inq}`],
+      ...baseChannel,
     };
   }
 
@@ -155,10 +182,24 @@ export function evaluateInquiryCandidate(
       tier2: false,
       tier3: false,
       canQuickSend: false,
-      hasTo: parseEmailFromDeal(deal).includes("@"),
       revive: false,
       badges,
       reasons: [`inquiry_not_ready=${inq}`],
+      ...baseChannel,
+    };
+  }
+
+  if (ch.channel === "not_applicable") {
+    return {
+      tier: null,
+      tier1: false,
+      tier2: false,
+      tier3: false,
+      canQuickSend: false,
+      revive: false,
+      badges: [...badges, "問合せ対象外"],
+      reasons: [`channel=${ch.reason}`],
+      ...baseChannel,
     };
   }
 
@@ -176,10 +217,10 @@ export function evaluateInquiryCandidate(
       tier2: false,
       tier3: false,
       canQuickSend: false,
-      hasTo: parseEmailFromDeal(deal).includes("@"),
       revive: false,
       badges,
       reasons: [`auto_pass=${autoPassReason(deal)}`],
+      ...baseChannel,
     };
   }
 
@@ -190,10 +231,10 @@ export function evaluateInquiryCandidate(
       tier2: false,
       tier3: false,
       canQuickSend: false,
-      hasTo: parseEmailFromDeal(deal).includes("@"),
       revive,
       badges,
       reasons: [`status=${deal.status}`],
+      ...baseChannel,
     };
   }
 
@@ -206,17 +247,15 @@ export function evaluateInquiryCandidate(
       tier2: false,
       tier3: false,
       canQuickSend: false,
-      hasTo: parseEmailFromDeal(deal).includes("@"),
       revive,
       badges,
       reasons: ["score/listen below tier1"],
+      ...baseChannel,
     };
   }
 
   if (scoreOk) reasons.push(`score≥${cfg.tiers?.tier1_candidate?.min_score ?? 2}`);
   if (listenOk) reasons.push(`listen=${listenValue(deal)}`);
-
-  const hasTo = parseEmailFromDeal(deal).includes("@");
 
   const t2cfg = cfg.tiers?.tier2_daily_queue;
   const tier2 =
@@ -233,6 +272,8 @@ export function evaluateInquiryCandidate(
     hazardEval(deal) === (t3cfg?.hazard_eval || "OK") &&
     land100(deal) !== (t3cfg?.land100_not || "見送り");
 
+  if (ch.channel === "grok_handoff") badges.push("Grok依頼");
+  else if (ch.channel === "agent_email") badges.push("メール問合せ");
   if (tier2) badges.push("送信待ち");
   if (tier3) badges.push("自動可");
 
@@ -244,9 +285,9 @@ export function evaluateInquiryCandidate(
     tier2,
     tier3,
     canQuickSend: true,
-    hasTo,
     revive,
     badges,
     reasons,
+    ...baseChannel,
   };
 }

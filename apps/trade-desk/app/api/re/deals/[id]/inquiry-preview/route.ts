@@ -17,7 +17,7 @@ export async function GET(
 
   const { data: row, error } = await supabase
     .from("kurashift_re_deals")
-    .select("id, title, summary_json")
+    .select("id, title, source, area, price_man, summary_json")
     .eq("id", id)
     .maybeSingle();
 
@@ -37,6 +37,10 @@ export async function GET(
     title: String(row.title || "物件"),
     summaryJson: sj,
     fromRaw: typeof sj?.from === "string" ? sj.from : null,
+    dealId: String(row.id),
+    source: row.source != null ? String(row.source) : null,
+    area: row.area != null ? String(row.area) : null,
+    priceMan: row.price_man != null ? Number(row.price_man) : null,
   });
 
   return NextResponse.json({

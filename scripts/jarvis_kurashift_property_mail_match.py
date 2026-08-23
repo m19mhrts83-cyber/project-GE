@@ -483,6 +483,9 @@ def _deal_row_from_message(
         "snippet": text[:500],
         "account": source,
     }
+    reply_to_raw = hm.get("reply-to") or hm.get("reply_to") or ""
+    if reply_to_raw:
+        sj["reply_to"] = str(reply_to_raw)[:200]
     if partner_meta:
         sj["is_partner"] = bool(partner_meta.get("is_partner"))
         if partner_meta.get("partner_name"):

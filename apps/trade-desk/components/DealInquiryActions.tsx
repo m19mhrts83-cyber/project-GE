@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { BAIRITSU_MARKER } from "@/lib/reInquiryShared";
+import type { InquiryChannel } from "@/lib/reInquiryChannel";
+import { INQUIRY_CHANNEL_LABEL } from "@/lib/reInquiryChannel";
 
 type Msg = {
   direction?: string;
@@ -23,16 +25,10 @@ async function sha256Hex(text: string): Promise<string> {
     .join("");
 }
 
-function parseEmail(fromRaw: string | undefined): string {
-  if (!fromRaw) return "";
-  const m = fromRaw.match(/<([^>]+)>/);
-  return (m ? m[1] : fromRaw).trim();
-}
-
 export default function DealInquiryActions({
   dealId,
   title,
-  fromRaw,
+  fromRaw: _fromRaw,
   inquiryStatus,
   messages,
   autoPassPendingRead,
@@ -51,17 +47,19 @@ export default function DealInquiryActions({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("edit");
-  const [to, setTo] = useState(() => parseEmail(fromRaw || undefined));
+  const [to, setTo] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const [landMethodBairitsu, setLandMethodBairitsu] = useState(false);
+  const [channel, setChannel] = useState<InquiryChannel | null>(null);
 
   const status = inquiryStatus || "none";
   const canSend =
     status === "none" || status === "draft" || status === "";
   const showPack = !canSend || (messages || []).length > 0;
+  const isHandoff = channel === "grok_handoff";
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -75,10 +73,21 @@ export default function DealInquiryActions({
         setMsg(data.error || "下書き取得失敗");
         return;
       }
+      if (data.inquiry_channel === "not_applicable") {
+        setMsg("この案件は第一問合せ対象外です");
+        setChannel("not_applicable");
+        return;
+      }
       if (data.to) setTo(String(data.to));
       setSubject(String(data.subject || ""));
       setBody(String(data.body || ""));
       setLandMethodBairitsu(Boolean(data.land_method_bairitsu));
+      if (
+        data.inquiry_channel === "agent_email" ||
+        data.inquiry_channel === "grok_handoff"
+      ) {
+        setChannel(data.inquiry_channel);
+      }
       setPreviewLoaded(true);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "下書き取得エラー");
@@ -86,7 +95,9 @@ export default function DealInquiryActions({
   }, [dealId]);
 
   const bairitsuMissing =
-    landMethodBairitsu && !body.includes(BAIRITSU_MARKER);
+    landMethodBairitsu &&
+    channel === "agent_email" &&
+    !body.includes(BAIRITSU_MARKER);
 
   async function send() {
     if (!checked) {
@@ -95,6 +106,10 @@ export default function DealInquiryActions({
     }
     if (!to.includes("@")) {
       setMsg("宛先メールを入力してください");
+      return;
+    }
+    if (channel === "not_applicable") {
+      setMsg("第一問合せ対象外です");
       return;
     }
     if (bairitsuMissing) {
@@ -115,6 +130,7 @@ export default function DealInquiryActions({
           body,
           ui_confirmed: true,
           confirm_snapshot: { to, subject, body_sha256 },
+          inquiry_channel: channel || undefined,
         }),
       });
       const data = await res.json();
@@ -254,7 +270,7 @@ export default function DealInquiryActions({
         </div>
       ) : null}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 }}>
-        {canSend ? (
+        {canSend && channel !== "not_applicable" ? (
           <button
             type="button"
             className="btn primary"
@@ -270,7 +286,7 @@ export default function DealInquiryActions({
               }
             }}
           >
-            詳細編集して問合せ
+            {isHandoff ? "詳細編集してGrok依頼" : "詳細編集して問合せ"}
           </button>
         ) : null}
         {showPack ? (
@@ -308,7 +324,17 @@ export default function DealInquiryActions({
         >
           {step === "edit" ? (
             <>
-              {landMethodBairitsu ? (
+              {channel ? (
+                <p className="meta" style={{ marginBottom: 6 }}>
+                  経路: {INQUIRY_CHANNEL_LABEL[channel]}
+                </p>
+              ) : null}
+              {isHandoff ? (
+                <p className="meta" style={{ color: "#4338ca", marginBottom: 6 }}>
+                  仲介メールなし → 自分宛に依頼（Grok が拾う）
+                </p>
+              ) : null}
+              {landMethodBairitsu && channel === "agent_email" ? (
                 <p className="meta" style={{ color: "#b45309", marginBottom: 6 }}>
                   倍率地域 — 固定資産税（課税明細）の依頼を本文に含めます
                 </p>
@@ -321,9 +347,16 @@ export default function DealInquiryActions({
               <label className="meta">
                 To
                 <input
+                  type="email"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
-                  style={{ display: "block", width: "100%", marginTop: 2 }}
+                  readOnly={isHandoff}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    marginTop: 2,
+                    background: isHandoff ? "#f1f5f9" : undefined,
+                  }}
                 />
               </label>
               <label className="meta" style={{ display: "block", marginTop: 6 }}>
