@@ -1,0 +1,14 @@
+{
+  "disabled": false,
+  "updated_at": null,
+  "completed_ids": [],
+  "last_prompted": {},
+  "milestones": {
+    "tier1-five-sends": "2026-08-25",
+    "research-reply-extract": "2026-09-01",
+    "tier2-prod-review": "2026-09-06",
+    "tier3-gate-decide": "2026-09-13",
+    "tier3-gate-enable": "2026-09-27"
+  },
+  "notes": "残 todo 完了後に disabled: true。ルール jarvis-kurashift-inquiry-followup.mdc を削除提案"
+}
