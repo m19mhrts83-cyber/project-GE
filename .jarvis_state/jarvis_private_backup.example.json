@@ -1,0 +1,11 @@
+{
+  "updated_at": "2026-08-22T14:55:21+0900",
+  "last_backup_name": "jarvis_private_YYYYMMDD_HHMMSS.age",
+  "local_path": "~/Library/Application Support/jarvis-private-backup/jarvis_private_YYYYMMDD_HHMMSS.age",
+  "icloud_path": "~/Library/Mobile Documents/com~apple~CloudDocs/JarvisPrivateBackup/jarvis_private_YYYYMMDD_HHMMSS.age",
+  "src_bytes": 0,
+  "age_bytes": 0,
+  "pruned_local": 0,
+  "pruned_icloud": 0,
+  "disabled": false
+}

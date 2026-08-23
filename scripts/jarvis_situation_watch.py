@@ -1787,6 +1787,56 @@ def refresh_zaim_quality() -> None:
             print(f"# {script_name} refresh failed: {e}", file=sys.stderr)
 
 
+def eval_jarvis_private_backup(meta: dict, data: dict | None) -> dict[str, Any]:
+    """`.env.jarvis_private` の age バックアップ鮮度（参照中心・平常は ok）。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    scripts_dir = str(REPO / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        from jarvis_private_backup import evaluate as eval_backup  # type: ignore
+    except Exception as e:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "ops",
+            level="warn",
+            summary=f"評価モジュール読込失敗: {e}",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    e = eval_backup(data)
+    level = str(e.get("level") or "info")
+    if level not in ("ok", "info", "warn", "attention"):
+        level = "info"
+    detail_lines = [
+        f"最終: {e.get('updated_at') or '—'} · {e.get('last_backup_name') or '—'}",
+        f"世代: ローカル {e.get('local_generations', '—')} / iCloud {e.get('icloud_generations', '—')}",
+        f"正本: {'あり' if e.get('has_source') else 'なし'} · 秘密鍵: {'あり' if e.get('has_private_key') else 'なし'}",
+        "復号鍵控え: EasyPass2（手動） · FileVault/TM は OS 別レイヤ",
+        "更新: scripts/jarvis_private_backup.py --backup",
+    ]
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "ops",
+        level=level,
+        summary=str(e.get("verdict") or "—"),
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "days_since_backup": e.get("days_since_backup"),
+            "local_generations": e.get("local_generations"),
+            "icloud_generations": e.get("icloud_generations"),
+            "last_backup_name": e.get("last_backup_name"),
+            "show_banner": level in ("warn", "attention"),
+        },
+    )
+
+
 def eval_cursor_usage_watch(meta: dict, data: dict | None) -> dict[str, Any]:
     """Cursor Spending の枠％（手動入力）。Other 逼迫で warn / attention。"""
     title = meta["title"]
@@ -1942,6 +1992,9 @@ EVALUATORS = {
     "cursor_pro_plus_downgrade": lambda m: eval_cursor_pro_plus_downgrade(m),
     "cursor_usage_watch": lambda m: eval_cursor_usage_watch(
         m, load_json(STATE / "cursor_usage_watch.json")
+    ),
+    "jarvis_private_backup": lambda m: eval_jarvis_private_backup(
+        m, load_json(STATE / "jarvis_private_backup.json")
     ),
 }
 
