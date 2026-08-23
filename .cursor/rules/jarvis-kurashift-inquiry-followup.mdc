@@ -1,0 +1,113 @@
+---
+description: KURASHIFT 問合せパイプライン（Tier1〜3）の目安日フォロー。残 todo が終わるまで Jarvis が促す。
+alwaysApply: true
+---
+
+# KURASHIFT 問合せパイプライン — 目安フォロー（暫定）
+
+**終わるまで有効。** 残 todo がすべて完了（またはユーザーが不要と明示）したら、本ルールを削除 or `disabled: true` にする。
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| 進捗 | `~/git-repos/docs/KURASHIFT_問合せパイプライン_進捗_20260823.md` |
+| Cursor plan | `~/.cursor/plans/kurashift_re問合せTier2以降_20260823.plan.md` |
+| 閾値 YAML | `config/kurashift_re_inquiry_auto.yaml` |
+| Tier1 手順 | `docs/KURASHIFT_Tier1_問合せ_初級者手順.md` |
+| state | `~/git-repos/.jarvis_state/kurashift_re_inquiry_followup.json` |
+
+## 無効化（終了条件）
+
+次のいずれかで **フォローを止める**:
+
+- state に `"disabled": true`
+- `.env.jarvis_private` に `JARVIS_KURASHIFT_INQUIRY_FOLLOWUP_DISABLE=1`
+- plan の残 todo（下記5つ）がすべて `completed` / `cancelled` → Jarvis が state を `disabled` にし、**本ルール削除を提案**
+
+## 残マイルストーン（目安日・JST）
+
+| ID | 目安 | ユーザーへの依頼（こうしてください） |
+|---|---|---|
+| `tier1-five-sends` | **2026-08-25** | Grok で「聞く」物件を増やしたうえで、Tier1 初級者手順どおり **手動5件**送信 → poll。完了したら「5件送った」と一声 |
+| `tier2-prod-review` | **2026-09-06** | `/realestate/deals/tier2` を開き、一括確認・日次上限5・本番候補のみを確認。問題なければ「Tier2 OK」 |
+| `research-reply-extract` | **2026-09-01** | 物件調査シート着手の合図。Jarvis に「調査シート進めて」で migration apply + 返信抽出を開始してよい |
+| `tier3-gate` | **2026-09-13**（可否）／**2026-09-27**（有効化検討） | 9/13: 送信・返信件数と Tier2 安定を見て Tier3 に進むか判断。9/27: 進むなら **明示同意のうえ** YAML `tier3_auto_send.enabled`。勝手に ON しない |
+| `phase3-optional` | （後回し） | 優先度が決まるまで促しは **info のみ**（毎回出さない） |
+
+## いつ動くか（トリガー）
+
+**ユーザーが Jarvis に何か話しかけたセッション**で、次を満たすとき本題の前後に **1ブロック**出す（同一セッションで1回まで）。
+
+1. state が無効でない
+2. 残 todo のうち **目安日当日〜経過後** のものがある（または **目安の3日前〜当日**）
+3. その ID を **7日以内に同レベルで促していない**（`last_prompted`）
+
+パートナー確認・KURASHIFT／問合せ／Tier／Grok 物件の話題なら、上記に加え **経過中のマイルストーンを1行**添えてよい。
+
+## 促しレベル
+
+| レベル | 条件 | 言い方 |
+|---|---|---|
+| **soon** | 目安の **3日前〜当日** | 「〇日が目安です。準備: …」 |
+| **due** | 目安日を **過ぎた**・未完了 | 「目安（〇月〇日）を過ぎています。次は: …」 |
+| **ask** | 目安から **7日以上**経過 | 「未完了のままです。今日やる／延期する／スキップ、どれにしますか？」 |
+
+`phase3-optional` は due/ask にしない（ユーザーが触れたときだけ）。
+
+## 報告フォーマット（短い1ブロック）
+
+```
+---
+📎 KURASHIFT問合せフォロー
+- {ID}: {soon|due|ask} — {依頼1行}
+- 手順: {URL or docs パス}
+- plan: kurashift_re問合せTier2以降
+---
+```
+
+例:
+
+```
+📎 KURASHIFT問合せフォロー
+- tier1-five-sends: due — Tier1 で手動5件＋poll をお願いします
+- 手順: docs/KURASHIFT_Tier1_問合せ_初級者手順.md
+  URL: https://jarvis-trade-desk.vercel.app/realestate/deals?tab=candidates&inquiry=ready
+```
+
+## Jarvis の動作
+
+1. 進捗 doc / plan の **pending** を見る（コード実装の推測で「完了」にしない）
+2. ユーザーが「5件送った」「Tier2 OK」「調査シート進めて」「Tier3 はやらない」等と言ったら:
+   - plan todo を `completed` / `cancelled` に更新
+   - 進捗 doc の todo 表を同期
+   - state の `completed_ids` に追記、`last_prompted` 更新
+3. **目安を過ぎても勝手に Tier3 を enabled にしない**（対外送信・自動化は明示同意）
+4. 延期希望 → 進捗 doc の日付とカレンダーを直し、state の `due` を更新
+
+## state 例
+
+`~/git-repos/.jarvis_state/kurashift_re_inquiry_followup.json`:
+
+```json
+{
+  "disabled": false,
+  "updated_at": null,
+  "completed_ids": [],
+  "last_prompted": {},
+  "notes": "残 todo 完了後に disabled: true とルール削除を提案"
+}
+```
+
+`last_prompted`: `{ "tier1-five-sends": { "at": "ISO", "level": "due" } }`
+
+## 終了時
+
+1. state `"disabled": true`
+2. ユーザーに「フォロールールを削除してよいですか？」→ OK なら本 `.mdc` を削除
+3. plan を履歴扱いにし、進捗 doc に「フォロー終了 YYYY-MM-DD」を1行
+
+## 関連
+
+- 対外送信確認: `jarvis-outbound-confirm.mdc`
+- 運用コマンド: `docs/運用コマンド一覧.md`（KURASHIFT 問合せ節）
