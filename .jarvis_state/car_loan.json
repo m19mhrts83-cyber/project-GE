@@ -134,15 +134,35 @@
   },
   "loan_desired_date": "2026/07/15",
   "funding_setup": {
-    "status": "pending",
+    "status": "settlement_learned",
     "added_at": "2026-07-11",
-    "note": "支払先が三菱UFJ。毎月約3万円引落を加味しOlive等からの振込設定が必要",
-    "approx_monthly_debit_yen": 30000,
+    "note": "支払先=三菱UFJ熱田。毎月約32,426円＋ボーナス月加算。SBIカード引落計画には含めない。実績は今後Zaimで補強。",
+    "approx_monthly_debit_yen": 32426,
     "handoff_id": "car_loan_mufg_funding",
     "env": "CARD_MIG_CAR_LOAN_MUFG_FUNDING",
     "bonus_payment_yen": 110000,
     "bonus_funding": "B1: Oliveきちんと振込 110000 on bonus months (1,7 assumed)",
-    "updated_at": "2026-07-11"
+    "updated_at": "2026-08-23T18:23:56+09:00",
+    "settlement_account_id": "mufg_atsuta"
   },
-  "loan_bonus_yen_per_payment": 110000
+  "loan_bonus_yen_per_payment": 110000,
+  "settlement": {
+    "learned_at": "2026-08-23T18:23:56+09:00",
+    "source": "user_confirm_2026-08-23",
+    "settlement_account_id": "mufg_atsuta",
+    "settlement_bank_label": "三菱UFJ銀行 熱田",
+    "repayment_branch_code": "405",
+    "repayment_branch_name": "熱田",
+    "day_of_month": 21,
+    "monthly_repayment_yen": 32426,
+    "not_from": [
+      "sbinet",
+      "sbi_net_main",
+      "sbi_net_sub",
+      "mufg_toyoake"
+    ],
+    "evidence_status": "pending_zaim",
+    "note": "ユーザー明示: BMW/MINIローン引落は三菱UFJ。SBIではない。Zaim実績が溜まるまで config/known_recurring_debits.yaml を正とする。旧『MUFG豊明＝マイカー』バッファ案は誤り（豊明は千景名義）。",
+    "config_ref": "config/known_recurring_debits.yaml#bmw_mini_mufg_mycar"
+  }
 }

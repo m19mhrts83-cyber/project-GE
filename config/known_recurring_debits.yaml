@@ -1,0 +1,39 @@
+# 定期引落の正本（実績が薄い／これから上がるもの用）
+# KURASHIFT・money-ops・Jarvis 資金計画は、Zaim実績より先にここを読む。
+# 秘密（口座番号全文）は書かない → .jarvis_state/car_loan.json / .env.jarvis_private
+# 実績が十分溜まったら source を zaim_observed に上げ、この override を薄くしてよい。
+
+version: 1
+updated_at: "2026-08-23"
+
+debits:
+  - id: bmw_mini_mufg_mycar
+    label: "BMW/MINI ネットDEマイカーローン"
+    aliases: [BMW, MINI, マイカーローン, Countryman, ネットDEマイカー]
+    # ユーザー明示学習（2026-08-23）。Zaim実績がまだ薄い前提で固定する
+    source: user_confirm
+    evidence_status: pending_zaim  # 今後 MUFG熱田の口座振替が上がったら observed へ
+    settlement_account_id: mufg_atsuta
+    settlement_bank_label: "三菱UFJ銀行 熱田"
+    # 旧バッファ案の「MUFG豊明＝マイカー」は誤り。豊明は千景名義・別用途
+    not_settlement_account_ids: [sbinet, sbi_net_main, sbi_net_sub, mufg_toyoake, smbc_kariya]
+    day_of_month: 21
+    amount_jpy_approx: 32426
+    amount_source: car_loan.json monthly_repayment_yen
+    bonus_months: [1, 7]
+    bonus_amount_jpy_approx: 111949
+    zaim_match_hints:
+      - "マイカー"
+      - "三菱UFJ"
+      - "ネットDE"
+      - "JACCS"  # 事務経由の表記ゆれ用（確定後に絞る）
+    # ディーラー系の旧「口座振替 AP（BMWJF）」は別経路の可能性がある。本ローンと混同しない
+    do_not_confuse_with:
+      - zaim_store: "口座振替ap(bmwjf"
+        note: "費目学習はあるが、引落口座の正は本エントリ（MUFG熱田）を優先"
+    funding_note: >
+      SBI本・副のカード引落バッファ計算に BMW 月額を足さない。
+      MUFG熱田の keep_floor / Oliveきちんと振込側で見る。
+    refs:
+      - .jarvis_state/car_loan.json
+      - config/situation_watch.yaml#car_loan

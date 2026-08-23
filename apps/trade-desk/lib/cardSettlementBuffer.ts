@@ -130,6 +130,11 @@ export const RAIL_STATUS_LABEL: Record<TransferRailStatus, string> = {
   deferred: "延期",
 };
 
+/**
+ * 定期引落の学習（BMW=MUFG熱田など実績前）は
+ * `knownRecurringDebits.ts` / `config/known_recurring_debits.yaml` を正とする。
+ * SBI keep にマイカー月額を足さないこと。
+ */
 /** Phase1 既定（config/kurashift_transfer_rails.yaml と同期） */
 export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [
   {
