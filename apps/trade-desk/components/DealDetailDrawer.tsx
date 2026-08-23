@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import DealInquiryActions from "@/components/DealInquiryActions";
-import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
 import DealReviewActions from "@/components/DealReviewActions";
 import GrokInvestigateCopy from "@/components/GrokInvestigateCopy";
 import { fmtYen } from "@/lib/format";
@@ -407,20 +406,9 @@ export default function DealDetailDrawer({
                   fromRaw={typeof sj.from === "string" ? sj.from : null}
                   inquiryReady={inquiryEval?.tier1}
                   inquiryHasTo={inquiryEval?.hasTo}
+                  inquiryBadges={inquiryEval?.badges}
                 />
               </div>
-              {inquiryEval?.canQuickSend ? (
-                <div style={{ marginTop: 8 }}>
-                  <DealInquiryQuickButton
-                    dealId={deal.id}
-                    title={deal.title}
-                    fromRaw={typeof sj.from === "string" ? sj.from : null}
-                    canQuickSend={inquiryEval.canQuickSend}
-                    hasTo={inquiryEval.hasTo}
-                    badges={inquiryEval.badges}
-                  />
-                </div>
-              ) : null}
               {(deal.status === "info" || deal.status === "viewing") ? (
                 <GrokInvestigateCopy
                   dealId={deal.id}

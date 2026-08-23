@@ -1,7 +1,6 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import DealReviewActions from "@/components/DealReviewActions";
-import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
 import DealsDrawerHost from "@/components/DealsDrawerHost";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
@@ -569,22 +568,9 @@ export default async function RealEstateDealsPage({
                           fromRaw={fromRaw}
                           inquiryReady={evalInq.tier1}
                           inquiryHasTo={evalInq.hasTo}
+                          inquiryBadges={evalInq.badges}
                           openDealHref={dealOpenHref}
                         />
-                        {evalInq.canQuickSend ? (
-                          <div style={{ marginTop: 4 }}>
-                            <DealInquiryQuickButton
-                              dealId={d.id}
-                              title={d.title}
-                              fromRaw={fromRaw}
-                              canQuickSend={evalInq.canQuickSend}
-                              hasTo={evalInq.hasTo}
-                              badges={evalInq.badges}
-                              compact
-                              openHref={dealOpenHref}
-                            />
-                          </div>
-                        ) : null}
                       </td>
                       <td>
                         <Link href={dealOpenHref} className="btn">
