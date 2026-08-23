@@ -1,54 +1,37 @@
-# Grandole 家賃ステップアップ（入居1年で +4,000円）＋入金突合
-# 月次: scripts/jarvis_rent_step_monthly_check.py
-# 入金: scripts/jarvis_rent_deposit_ingest.py → .jarvis_state/rent_deposits.json
-# ダッシュボード: /rent-step
-
 version: 1
-
 defaults:
   delta_yen: 4000
   upcoming_days: 45
-  # 1年後 = 入居日ズバリ（空室対策メール「入居から1年間」）
   anniversary_mode: exact_day
-  # 記念日直後は様子見。+30日以降に未反映を overdue
   overdue_grace_days: 30
-  # +60日以降に増額未反映のフォロー下書き候補を強く出す
   follow_draft_grace_days: 60
-  # 入金未確認は送金月ベースで1ヶ月様子見してから下書き
   deposit_follow_grace_months: 1
   deposit_mismatch_yen: 500
-  # 合算突合で「差」とみなす下限（管理費差引後のため大きめ）
   aggregate_gap_alert_yen: 30000
   property_ids:
-    - grandole-i
-    - grandole-ii
-  # 想定家賃の優先: vacancy_mail → yaml units → occupancy note
+  - grandole-i
+  - grandole-ii
   rent_source_priority:
-    - vacancy_mail
-    - yaml_override
-    - occupancy_note
-
-# 物件ごとの入金口座（Zaim 入金先マッチ）
-# Grandole I は PayPay が主（ミニテック・Tcell）。LEAF は京都と PayPay の併用。
+  - vacancy_mail
+  - yaml_override
+  - occupancy_note
 deposit_accounts:
   grandole-i:
     bank_id: paypay
-    zaim_match: "★PayPay銀行"
-    note: "Grandole I の主口座。ミニテック・Tcell、LEAF の一部もここに着金"
+    zaim_match: ★PayPay銀行
+    note: Grandole I の主口座。ミニテック・Tcell、LEAF の一部もここに着金
   grandole-ii:
     bank_id: mufg
-    zaim_match: "★MUFG(アパート経営)"
-    note: "ホームプランナー紙明細。号室内訳なし → 合算＋メモ運用"
+    zaim_match: ★MUFG(アパート経営)
+    note: ホームプランナー紙明細（写真→hp_remittance JSON）。号室内訳ありの月は photo、無い月は合算＋メモ
   caramel:
     bank_id: shiga
-    zaim_match: "★滋賀銀行"
-    note: "Tcell・キャラメル送金先"
+    zaim_match: ★滋賀銀行
+    note: Tcell・キャラメル送金先
   leaf_legacy:
     bank_id: kyoto
-    zaim_match: "★京都銀行"
-    note: "LEAF の京都着金は残存（2026-05/07 に法人家賃）。PayPay へも送金。号室正本はくらさぽPDF"
-
-# 管理会社 → 明細ソース
+    zaim_match: ★京都銀行
+    note: LEAF の京都着金は残存（2026-05/07 に法人家賃）。PayPay へも送金。号室正本はくらさぽPDF
 managers:
   LEAF:
     mode: pdf
@@ -57,76 +40,104 @@ managers:
   ミニテック:
     mode: pdf
     partner: minitech
-    bank_fallback: null  # 号室PDF優先。口座は grandole-i(PayPay)
+    bank_fallback: null
   Tcell:
     mode: pdf_or_aggregate
     partner: tcell
-    # LINE明細PDFが無いとき → ホームプランナーと同型（物件口座合算＋メモ）
-    # I → PayPay / キャラメル → 滋賀（Tcellは両口座へ振込）
     aggregate_by_property: true
   ホームプランナー:
-    mode: aggregate
+    mode: photo_or_aggregate
     partner: homeplanner
-    # 紙明細のみ。II → MUFG 合算＋メモ
     aggregate_by_property: true
-
-# 合算差のメモ（キー: "{group}:{property_id}:{YYYY-MM}" または "{group}:{YYYY-MM}"）
-# group 例: hp:grandole-ii / tcell:grandole-i / tcell:caramel / leaf:kyoto
-# ※ plan 上の homeplanner_memos は本キー（aggregate_memos）に統合
-aggregate_memos: {}
-# 例:
-#   "hp:grandole-ii:2026-07": "管理費・振込手数料差引のため△約4万は想定内"
-#   "tcell:grandole-i:2026-07": "LINE明細未着。PayPay着金を目視済み"
-
-# 号室ごとの上書き（入居日がメモから曖昧なとき）
-# Grandole I: 家賃は共益費を含まない。共益費は一律 4,000。
+aggregate_memos:
+  hp:grandole-ii:2026-08: HP紙明細読取済。収入計420,900（賃料388,000+共益30,500+町費2,400）/管理費込26,879（委託+消防+清掃+振込手数料）/広告料税込94,000/差引送金300,021（2026-08-25
+    MUFG熱田）
 units:
-  - property_id: grandole-i
-    room: "101"
-    year1_rent: 48000
-    year2_rent: 48000
-    note: "ミニテック2026-07。長期でキャンペーンなし"
-  - property_id: grandole-i
-    room: "102"
-    move_in: "2026-03-01"
-    year1_rent: 51000
-    year2_rent: 51000
-    note: "Tcell明細 51,000+共益4,000。ユーザー想定の1年目49,000合計とは不一致"
-  - property_id: grandole-i
-    room: "103"
-    move_in: "2025-08-11"
-    campaign_end_ym: "2026-07"
-    year1_rent: 45000
-    year2_rent: 49000
-  - property_id: grandole-i
-    room: "105"
-    move_in: "2026-05-01"
-    year1_rent: 45000
-    year2_rent: 49000
-  - property_id: grandole-i
-    room: "201"
-    year1_rent: 49000
-    year2_rent: 49000
-    note: "ミニテック2026-07。長期入居"
-  - property_id: grandole-i
-    room: "202"
-    move_in: "2026-07-01"
-    year1_rent: 50000
-    year2_rent: 54000
-    note: "家賃マップ 50,000+管理4,000。2年目は+4,000推定"
-  - property_id: grandole-i
-    room: "203"
-    move_in: "2026-03-01"
-    year1_rent: 49000
-    year2_rent: 53000
-  - property_id: grandole-i
-    room: "205"
-    move_in: "2025-09-01"
-    campaign_end_ym: "2026-09"
-    year1_rent: 47000
-    year2_rent: 53000
-  - property_id: grandole-ii
-    room: "203"
-    campaign_end_ym: "2026-08"
-    year1_rent: 49000
-    year2_rent: 53000
+- property_id: grandole-i
+  room: '101'
+  year1_rent: 48000
+  year2_rent: 48000
+  note: ミニテック2026-07。長期でキャンペーンなし
+- property_id: grandole-i
+  room: '102'
+  move_in: '2026-03-01'
+  year1_rent: 51000
+  year2_rent: 51000
+  note: Tcell明細 51,000+共益4,000。ユーザー想定の1年目49,000合計とは不一致
+- property_id: grandole-i
+  room: '103'
+  move_in: '2025-08-11'
+  campaign_end_ym: 2026-07
+  year1_rent: 45000
+  year2_rent: 49000
+- property_id: grandole-i
+  room: '105'
+  move_in: '2026-05-01'
+  year1_rent: 45000
+  year2_rent: 49000
+- property_id: grandole-i
+  room: '201'
+  year1_rent: 49000
+  year2_rent: 49000
+  note: ミニテック2026-07。長期入居
+- property_id: grandole-i
+  room: '202'
+  move_in: '2026-07-01'
+  year1_rent: 50000
+  year2_rent: 54000
+  note: 家賃マップ 50,000+管理4,000。2年目は+4,000推定
+- property_id: grandole-i
+  room: '203'
+  move_in: '2026-03-01'
+  year1_rent: 49000
+  year2_rent: 53000
+- property_id: grandole-i
+  room: '205'
+  move_in: '2025-09-01'
+  campaign_end_ym: 2026-09
+  year1_rent: 47000
+  year2_rent: 53000
+- property_id: grandole-ii
+  room: '203'
+  campaign_end_ym: 2026-08
+  year1_rent: 53000
+  year2_rent: 53000
+  note: HP 2026-08明細。家賃53,000+共益3,500
+- property_id: grandole-ii
+  room: '101'
+  year1_rent: 45000
+  year2_rent: 45000
+  note: HP 2026-08明細。現状家賃45,000+共益4,000。備考に将来合計49,000表記
+- property_id: grandole-ii
+  room: '102'
+  year1_rent: 45000
+  year2_rent: 45000
+  note: HP 2026-08明細。現状45,000+共益4,000。2027-04〜合計49,000
+  campaign_end_ym: 2027-03
+- property_id: grandole-ii
+  room: '103'
+  year1_rent: 51000
+  year2_rent: 51000
+  note: HP 2026-08明細。保浦。家賃51,000+共益3,500
+- property_id: grandole-ii
+  room: '105'
+  year1_rent: 45000
+  year2_rent: 45000
+  note: HP 2026-08明細。現状45,000+共益4,000。2026-10〜合計49,000
+  campaign_end_ym: 2026-09
+- property_id: grandole-ii
+  room: '201'
+  year1_rent: 53000
+  year2_rent: 53000
+  note: HP 2026-08明細。家賃53,000+共益3,500
+- property_id: grandole-ii
+  room: '202'
+  year1_rent: 49000
+  year2_rent: 49000
+  note: HP 2026-08明細。鷹森。家賃49,000+共益4,000
+- property_id: grandole-ii
+  room: '205'
+  year1_rent: 47000
+  year2_rent: 51000
+  move_in: '2026-08-01'
+  note: HP 2026-08明細。新規8/1。現状家賃47,000+共益4,000

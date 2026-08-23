@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""家賃入金明細の取り込み（LEAF / ミニテック / Tcell PDF ＋ Zaim 口座入金合算）。
+"""家賃入金明細の取り込み（LEAF / ミニテック / Tcell PDF ＋ HP紙明細JSON ＋ Zaim 口座入金合算）。
 
 使い方:
   python scripts/jarvis_rent_deposit_ingest.py
@@ -7,6 +7,7 @@
   python scripts/jarvis_rent_deposit_ingest.py --status
 
 出力: .jarvis_state/rent_deposits.json
+HP紙: .jarvis_state/hp_remittance_*.json（写真読取の仕分け）
 """
 
 from __future__ import annotations
@@ -406,6 +407,40 @@ def aggregate_banks(inflows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def load_homeplanner_photo_entries() -> list[dict[str, Any]]:
+    """紙明細写真の手仕分けJSON（.jarvis_state/hp_remittance_*.json）を号室行へ。"""
+    out: list[dict[str, Any]] = []
+    for path in sorted(STATE_DIR.glob("hp_remittance_*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if data.get("source") != "homeplanner_photo":
+            continue
+        ym = data.get("ym")
+        pid = data.get("property_id") or "grandole-ii"
+        for r in data.get("rooms") or []:
+            room = str(r.get("room") or "").strip()
+            rent = r.get("rent_yen")
+            if not ym or not room or rent is None:
+                continue
+            out.append(
+                {
+                    "source": "homeplanner_photo",
+                    "ym": ym,
+                    "property_id": pid,
+                    "room": room,
+                    "rent_yen": int(rent),
+                    "cam_yen": int(r["cam_yen"]) if r.get("cam_yen") is not None else None,
+                    "town_yen": int(r["town_yen"]) if r.get("town_yen") is not None else None,
+                    "total_yen": int(r["total_yen"]) if r.get("total_yen") is not None else None,
+                    "label": f"HP紙 {ym} {pid}-{room}",
+                    "file": data.get("file") or str(path),
+                }
+            )
+    return out
+
+
 def run_ingest(ym_filter: str | None = None) -> dict[str, Any]:
     entries: list[dict[str, Any]] = []
     errors: list[str] = []
@@ -434,6 +469,8 @@ def run_ingest(ym_filter: str | None = None) -> dict[str, Any]:
         except Exception as e:
             errors.append(f"tcell {path.name}: {e}")
 
+    entries.extend(load_homeplanner_photo_entries())
+
     if ym_filter:
         entries = [e for e in entries if e.get("ym") == ym_filter]
 
@@ -449,15 +486,47 @@ def run_ingest(ym_filter: str | None = None) -> dict[str, Any]:
         dedup[k] = e
     room_entries = list(dedup.values())
 
+    # 紙明細の月次サマリー（仕分け）
+    statement_summaries: list[dict[str, Any]] = []
+    for path in sorted(STATE_DIR.glob("hp_remittance_*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if data.get("source") != "homeplanner_photo":
+            continue
+        if ym_filter and data.get("ym") != ym_filter:
+            continue
+        cats = data.get("categories") or {}
+        income = data.get("income") or {}
+        statement_summaries.append(
+            {
+                "source": "homeplanner_photo",
+                "ym": data.get("ym"),
+                "property_id": data.get("property_id"),
+                "remittance_yen": data.get("remittance_yen"),
+                "income_total_yen": income.get("total_yen"),
+                "rent_yen": income.get("rent_yen"),
+                "cam_yen": income.get("cam_yen"),
+                "town_yen": income.get("town_yen"),
+                "management_yen_incl_tax": (cats.get("管理費") or {}).get("yen_incl_tax"),
+                "advertising_yen_incl_tax": (cats.get("広告料") or {}).get("yen_incl_tax"),
+                "expense_total_yen": (data.get("expense") or {}).get("total_yen"),
+                "file": data.get("file") or str(path),
+            }
+        )
+
     payload = {
         "updated_at": now_iso(),
         "ym_filter": ym_filter,
         "room_entries": room_entries,
         "bank_aggregates": bank_aggs,
+        "statement_summaries": statement_summaries,
         "errors": errors,
         "counts": {
             "room": len(room_entries),
             "bank_agg": len(bank_aggs),
+            "statement": len(statement_summaries),
             "errors": len(errors),
         },
     }
