@@ -1,0 +1,44 @@
+# kamiooya-qa（神大家 Q&A / WeStudy 投影）の Free 7日休止回避。
+# 週次スクレイプだけに心拍を頼ると、日曜失敗→数日後に INACTIVE→DNS消滅→また失敗、になる。
+# jarvis-dashboard の日次心拍と同型。第3プロジェクトは作らない。
+name: kamiooya-qa heartbeat
+
+on:
+  schedule:
+    # 毎日 06:00 JST（= 21:00 UTC）。日曜週次スクレイプ（08:00 JST）より前に起こす
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: kamiooya-qa-heartbeat
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Touch jarvis_heartbeat
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+            echo "::error::Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          python scripts/supabase_healthcheck.py \
+            --touch \
+            --restore-if-paused \
+            --note "gha-heartbeat:$(date -u +%Y-%m-%dT%H%MZ)"

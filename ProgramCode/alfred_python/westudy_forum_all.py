@@ -264,11 +264,24 @@ WATCHDOG_STALL_SEC = 180  # この秒数以上ハートビートが更新され�
 PAGELOAD_TIMEOUT = 120
 SCRIPT_TIMEOUT = 60
 IMPLICIT_WAIT = 0
+
+
+def _env_int(key: str, default: int) -> int:
+    raw = (os.environ.get(key) or "").strip()
+    if not raw:
+        return default
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return default
+
+
 # CI で稀に出る renderer timeout（Timed out receiving message from renderer）対策
-LOGIN_NAV_RETRIES = 3
-PAGE_GET_RETRIES = 2
+# 週次 GHA は WESTUDY_* で上書き（日曜朝のログイン/renderer タイムアウト対策）
+LOGIN_NAV_RETRIES = _env_int("WESTUDY_LOGIN_NAV_RETRIES", 3)
+PAGE_GET_RETRIES = _env_int("WESTUDY_PAGE_GET_RETRIES", 2)
 # ログインフォーム未検出時の Chrome 再生成＋代替 URL 試行回数
-LOGIN_FORM_ATTEMPTS = 3
+LOGIN_FORM_ATTEMPTS = _env_int("WESTUDY_LOGIN_FORM_ATTEMPTS", 3)
 _WP_LOGIN_FALLBACK_URL = "https://westudy.co.jp/wp-login.php"
 # safe_get 後に「空ページ」とみなす本文長の下限（タグ除去後）
 _MIN_USEFUL_BODY_CHARS = 80
