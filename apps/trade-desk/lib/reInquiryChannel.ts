@@ -1,10 +1,7 @@
 /**
- * 第一問合せの経路仕分け（メール本線 / Grok 依頼 / 対象外）
- * Python: scripts/jarvis_kurashift_re_inquiry_channel.py と同期
+ * 第一問合せの経路仕分け（Python: scripts/jarvis_kurashift_re_inquiry_channel.py と同期）
+ * クライアントからも import 可（fs 非依存）。vendor contact_email は Python 側で解決。
  */
-
-import fs from "fs";
-import path from "path";
 
 export type InquiryChannel = "agent_email" | "grok_handoff" | "not_applicable";
 
@@ -52,6 +49,7 @@ export function parseEmailAddr(raw: string | null | undefined): string {
 
 export function selfEmailsExtraFromEnv(): string[] {
   const out: string[] = [];
+  if (typeof process === "undefined" || !process.env) return out;
   for (const k of ["PERSONAL_EMAIL", "INQUIRY_GROK_HANDOFF_TO"]) {
     const v = (process.env[k] || "").trim();
     if (v) out.push(v.toLowerCase());
@@ -92,6 +90,9 @@ export function isPortalOrNoreplyEmail(email: string): boolean {
 }
 
 export function handoffToFromEnv(): string {
+  if (typeof process === "undefined" || !process.env) {
+    return "m19m.hrts83@gmail.com";
+  }
   return (
     (process.env.INQUIRY_GROK_HANDOFF_TO || "").trim() ||
     (process.env.PERSONAL_EMAIL || "").trim() ||
@@ -99,39 +100,9 @@ export function handoffToFromEnv(): string {
   );
 }
 
-let vendorEmailCache: Map<string, string> | null = null;
-
-function loadVendorContactEmails(): Map<string, string> {
-  if (vendorEmailCache) return vendorEmailCache;
-  const map = new Map<string, string>();
-  const candidates = [
-    path.join(process.cwd(), "..", "..", "config", "kurashift_re_vendor_list.yaml"),
-    path.join(process.cwd(), "config", "kurashift_re_vendor_list.yaml"),
-  ];
-  for (const p of candidates) {
-    try {
-      if (!fs.existsSync(p)) continue;
-      const raw = fs.readFileSync(p, "utf8");
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { parse } = require("yaml") as typeof import("yaml");
-      const doc = parse(raw) as { vendors?: Array<{ id?: string; contact_email?: string }> };
-      for (const v of doc?.vendors || []) {
-        const id = String(v.id || "").trim();
-        const em = String(v.contact_email || "").trim();
-        if (id && em.includes("@")) map.set(id, em);
-      }
-      break;
-    } catch {
-      /* try next */
-    }
-  }
-  vendorEmailCache = map;
-  return map;
-}
-
-export function vendorContactEmail(vendorId: string | null | undefined): string {
-  if (!vendorId) return "";
-  return loadVendorContactEmails().get(String(vendorId).trim()) || "";
+/** UI/TS 側は YAML を読まない（クライアントバンドル用）。Mac/Python が正。 */
+export function vendorContactEmail(_vendorId: string | null | undefined): string {
+  return "";
 }
 
 function sjOf(
