@@ -1,14 +1,25 @@
 # 家族コーチング — Notion 正本（Jarvis）
-# トークン: NOTION_API_TOKEN（同一WS・共有済み）または NOTION_FAMILY_API_TOKEN（別WS）
-# CLI: scripts/jarvis_notion_api.py --token-env … family-probe / get-page
+# トークン: NOTION_API_TOKEN（同一WS・Jarvisダッシュボード接続済み）
+# CLI: scripts/jarvis_notion_api.py family-probe / get-page
+
+# 二本柱（ユーザー確定 2026-08-23）
+# 1) 家族会議 … 週次の決定・宿題
+# 2) 子供コーチング … 塾説明・先生面談・子ども別メモ（今後の追記先）
 
 root_page_id: "26ef6bbe-5a76-8045-8a11-e7cbfb4c90cb"
 root_page_url: "https://app.notion.com/p/26ef6bbe5a7680458a11e7cbfb4c90cb"
-# API 未接続時は inventory_status: pending_share。接続後 get-page で更新する。
-inventory_status: pending_share
+root_page_title: 家族会議
+
+coaching_hub_page_id: "282f6bbe-5a76-8097-bd9d-c2fbbdb49a49"
+coaching_hub_page_url: "https://app.notion.com/p/282f6bbe5a768097bd9dc2fbbdb49a49"
+coaching_hub_title: 子供コーチング
+
+inventory_status: ok
+inventory_at: "2026-08-23"
 inventory_note: >
-  2026-08-23: 既存 Integration「Jarvisダッシュボード」では 404。
-  ページ Connections で共有するか、別WSなら NOTION_FAMILY_API_TOKEN を jarvis_private に置く。
+  Integration「Jarvisダッシュボード」で家族会議・子供コーチングを接続確認。
+  家族会議の直下に日付付き会議ログ35件。子供コーチング配下に円香／珠己／紗和ほか。
+  塾・学校説明・面談メモは主に子供コーチング配下（珠己→日能研、円香→水田塾 等）へ蓄積する想定。
 
 # 参照ソース種別（Grok Instructions・材料パックで使うタグ）
 source_kinds:
@@ -22,8 +33,10 @@ source_kinds:
     label: 面談前の相談メモ
   - id: other_meeting
     label: その他ミーティングメモ
+  - id: child_profile
+    label: 子ども別プロフィール・方針メモ
 
-# 子ども（呼び名／漢字）
+# 子ども（呼び名／漢字）＋ Notion ページ
 children:
   - id: madoka
     call_name: まどか
@@ -31,28 +44,74 @@ children:
     grade: 中3
     focus: 高校受験・勉強
     coach_bot: まどかコーチ
+    notion_page_id: "282f6bbe-5a76-808e-b835-e1272adf9cfe"
+    notion_page_url: "https://app.notion.com/p/282f6bbe5a76808eb835e1272adf9cfe"
   - id: tamaki
     call_name: たまき
     formal_name: 珠己
     grade: 小5
     focus: 中学受験・勉強
     coach_bot: たまきコーチ
+    notion_page_id: "282f6bbe-5a76-80e2-bd34-ed2ca3e0bc87"
+    notion_page_url: "https://app.notion.com/p/282f6bbe5a7680e2bd34ed2ca3e0bc87"
   - id: sawa
     call_name: さわ
     formal_name: 紗和
     grade: 小4
     focus: 生活態度
     coach_bot: さわコーチ
+    notion_page_id: "282f6bbe-5a76-80f0-a517-c98f295b2eff"
+    notion_page_url: "https://app.notion.com/p/282f6bbe5a7680f0a517c98f295b2eff"
 
-# 棚卸し後に埋める（子ページ・DB）
-# sources:
-#   - page_id: "…"
-#     title: "…"
-#     kind: teacher_meeting
-#     child_ids: [madoka]
-#     updated_at: "YYYY-MM-DD"
-
-sources: []
+# 主要ハブ・ソース（詳細な個別面談ログは get-page で都度列挙）
+sources:
+  - page_id: "26ef6bbe-5a76-8045-8a11-e7cbfb4c90cb"
+    title: 家族会議
+    kind: family_meeting
+    child_ids: [madoka, tamaki, sawa]
+    note: 日付付き会議子ページ群（2025-09〜。直近例 2026/08/23）
+  - page_id: "282f6bbe-5a76-8097-bd9d-c2fbbdb49a49"
+    title: 子供コーチング
+    kind: other_meeting
+    child_ids: [madoka, tamaki, sawa]
+    note: 塾・面談・子ども別の親ハブ
+  - page_id: "282f6bbe-5a76-808e-b835-e1272adf9cfe"
+    title: 円香
+    kind: child_profile
+    child_ids: [madoka]
+    note: プロフィール＋水田塾面談・相談子ページ
+  - page_id: "282f6bbe-5a76-80e2-bd34-ed2ca3e0bc87"
+    title: 珠己
+    kind: child_profile
+    child_ids: [tamaki]
+    note: 日能研面談/説明会・水田塾面談・中学校説明会・話し合い
+  - page_id: "282f6bbe-5a76-80f0-a517-c98f295b2eff"
+    title: 紗和
+    kind: child_profile
+    child_ids: [sawa]
+    note: 生活・好みメモ（面談ハブは今後追記想定）
+  - page_id: "28bf6bbe-5a76-801b-9191-c0f1a74876a7"
+    title: 日能研 面談/説明会
+    kind: teacher_meeting
+    child_ids: [tamaki]
+    note: 珠己配下。説明会・面談ログ多数
+  - page_id: "31df6bbe-5a76-8076-b286-c7ad07ebdc0b"
+    title: 水田塾面談
+    kind: teacher_meeting
+    child_ids: [tamaki]
+    note: 珠己配下ハブ（円香の水田メモは円香ページ直下にもあり）
+  - page_id: "31df6bbe-5a76-8021-b1e0-f87294f13a13"
+    title: 中学校説明会
+    kind: juku_briefing
+    child_ids: [tamaki]
+  - page_id: "316f6bbe-5a76-80d3-9e8f-d3154584fbff"
+    title: 子供の生きる力と人間関係力
+    kind: other_meeting
+    child_ids: [madoka, tamaki, sawa]
+  - page_id: "39af6bbe-5a76-806e-b987-fd5b4aab119b"
+    title: 2026-07-11 夏期講習前 生徒進捗・予定確認ミーティング
+    kind: meeting_consult
+    child_ids: [madoka, tamaki, sawa]
 
 # 補完（Notion 外）
 obsidian_complements:
@@ -75,3 +134,8 @@ kazoku_tasks:
   database_id: "9a5b4921-5835-49f8-b8c4-22e8caf8621a"
   board_url: "https://app.notion.com/p/9a5b4921583549f8b8c422e8caf8621a"
   note: 用事・予定の看板。コーチング議事の正本ではない。
+
+access:
+  integration: Jarvisダッシュボード
+  token_env: NOTION_API_TOKEN
+  family_token_needed: false

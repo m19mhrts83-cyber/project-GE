@@ -25,12 +25,13 @@
 
 | 項目 | 場所 |
 |---|---|
-| ページ／ソース定義 | `config/notion_family_coaching.yaml` |
-| トークン | `.env.jarvis_private` の `NOTION_API_TOKEN` または `NOTION_FAMILY_API_TOKEN` |
-| 接続確認 | `scripts/jarvis_notion_api.py [--token-env NOTION_FAMILY_API_TOKEN] family-probe` |
-| 棚卸し | `… get-page` |
+| 正本 YAML | `config/notion_family_coaching.yaml`（`inventory_status: ok`） |
+| ハブ1 | **家族会議** — 週次ログ |
+| ハブ2 | **子供コーチング** — 円香／珠己／紗和＋塾・面談メモ |
+| トークン | `.env.jarvis_private` の `NOTION_API_TOKEN`（同一WS・追加鍵不要） |
+| 接続確認 | `scripts/jarvis_notion_api.py family-probe` / `get-page` |
 
-参照する内容: 家族会議、塾説明、先生面談、面談相談メモ。
+参照する内容: 家族会議、塾説明、先生面談、面談相談メモ（主に子供コーチング配下へ蓄積）。
 
 ## 混同しないレーン
 
