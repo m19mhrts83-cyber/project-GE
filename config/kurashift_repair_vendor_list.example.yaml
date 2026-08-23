@@ -1,0 +1,48 @@
+# 修繕業者リスト（S4）— example / 雛形
+# 正本運用時は kurashift_repair_vendor_list.yaml にリネームして使う（Git に秘密を書かない）
+# Phase K: jarvis-dashboard 表 kurashift_re_repair_vendors へ投影予定
+
+version: 1
+updated: "2026-08-24"
+daily_limit: 2  # エリア×職種の探索単位/日
+mail_subject_prefix: "[Grok修繕候補]"
+
+# 職種ローテ（デイリーで順に回す）
+trade_rotation:
+  - plumbing   # 水廻り
+  - electric
+  - interior
+  - multi      # 多能工・便利屋
+  - roof
+
+# 所有物件周辺の seed（実装時に住所台帳から更新）
+seed_areas:
+  - id: nagoya_kita
+    prefecture: 愛知県
+    city: 名古屋市北区
+    note: Grandole志賀本通Ⅰ 周辺
+  - id: kyoto_leaf
+    prefecture: 京都府
+    city: 京都市
+    note: LEAF 物件周辺（区は運用で細分化）
+
+# 一人親方っぽさのヒューリスティック（Grok Instructions と同趣旨）
+sole_proprietor_signals:
+  - 個人名・屋号のみ
+  - 従業員数の記載なし／少人数
+  - 大手マッチング広告が主でない
+  - 対応エリアが市区〜近隣に限定
+
+vendors: []
+# 例:
+# - id: repair_example_001
+#   name: （個人名）水道工事
+#   trade: plumbing
+#   area: 名古屋市北区
+#   phone: ""
+#   url: ""
+#   sole_proprietor_score: high|mid|low
+#   status: discovered|contacted|skip|invalid
+#   notes: ""
+#   source: iタウンページ|Googleマップ
+#   updated_at: "2026-08-24"
