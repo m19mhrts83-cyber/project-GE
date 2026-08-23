@@ -270,7 +270,7 @@ export default function DealInquiryActions({
               }
             }}
           >
-            第一問い合わせ
+            詳細編集して問合せ
           </button>
         ) : null}
         {showPack ? (

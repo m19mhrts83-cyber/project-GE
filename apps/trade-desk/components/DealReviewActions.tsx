@@ -15,6 +15,7 @@ export default function DealReviewActions({
   fromRaw,
   inquiryReady,
   inquiryHasTo,
+  inquiryBadges,
   openDealHref,
 }: {
   dealId: string;
@@ -25,6 +26,7 @@ export default function DealReviewActions({
   fromRaw?: string | null;
   inquiryReady?: boolean;
   inquiryHasTo?: boolean;
+  inquiryBadges?: string[];
   openDealHref?: string;
 }) {
   const router = useRouter();
@@ -126,6 +128,7 @@ export default function DealReviewActions({
             fromRaw={fromRaw}
             canQuickSend
             hasTo={inquiryHasTo ?? Boolean(fromRaw && fromRaw.includes("@"))}
+            badges={inquiryBadges}
             compact
             openHref={openDealHref}
           />
