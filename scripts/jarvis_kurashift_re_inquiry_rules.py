@@ -125,6 +125,12 @@ def score_of(deal: dict[str, Any]) -> float:
         return 0.0
 
 
+def _channel_of(deal: dict[str, Any]) -> dict[str, str]:
+    from jarvis_kurashift_re_inquiry_channel import classify_inquiry_channel
+
+    return classify_inquiry_channel(deal)
+
+
 def evaluate_inquiry_candidate(
     deal: dict[str, Any], cfg: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -144,6 +150,15 @@ def evaluate_inquiry_candidate(
     inq = inquiry_status(deal)
     reasons: list[str] = []
     badges: list[str] = []
+    ch = _channel_of(deal)
+    channel = str(ch.get("channel") or "")
+    has_to = bool(ch.get("to") and "@" in str(ch.get("to")))
+
+    def _base() -> dict[str, Any]:
+        return {
+            "has_to": has_to,
+            "inquiry_channel": channel or None,
+        }
 
     if inq in t0:
         return {
@@ -152,10 +167,10 @@ def evaluate_inquiry_candidate(
             "tier2": False,
             "tier3": False,
             "can_quick_send": False,
-            "has_to": "@" in parse_email_from_deal(deal),
             "revive": False,
             "badges": badges,
             "reasons": [f"inquiry_status={inq}"],
+            **_base(),
         }
 
     allowed_inq = t1.get("require_inquiry_status") or ["none", "draft", ""]
@@ -166,10 +181,24 @@ def evaluate_inquiry_candidate(
             "tier2": False,
             "tier3": False,
             "can_quick_send": False,
-            "has_to": "@" in parse_email_from_deal(deal),
             "revive": False,
             "badges": badges,
             "reasons": [f"inquiry_not_ready={inq}"],
+            **_base(),
+        }
+
+    if channel == "not_applicable":
+        badges.append("問合せ対象外")
+        return {
+            "tier": None,
+            "tier1": False,
+            "tier2": False,
+            "tier3": False,
+            "can_quick_send": False,
+            "revive": False,
+            "badges": badges,
+            "reasons": [f"channel={ch.get('reason') or 'not_applicable'}"],
+            **_base(),
         }
 
     grok = grok_of(deal)
@@ -194,10 +223,10 @@ def evaluate_inquiry_candidate(
             "tier2": False,
             "tier3": False,
             "can_quick_send": False,
-            "has_to": "@" in parse_email_from_deal(deal),
             "revive": False,
             "badges": badges,
             "reasons": [f"auto_pass={reason}"],
+            **_base(),
         }
 
     st = str(deal.get("status") or "")
@@ -211,10 +240,10 @@ def evaluate_inquiry_candidate(
             "tier2": False,
             "tier3": False,
             "can_quick_send": False,
-            "has_to": "@" in parse_email_from_deal(deal),
             "revive": revive,
             "badges": badges,
             "reasons": [f"status={st}"],
+            **_base(),
         }
 
     min1 = float(t1.get("min_score") or 2.0)
@@ -228,10 +257,10 @@ def evaluate_inquiry_candidate(
             "tier2": False,
             "tier3": False,
             "can_quick_send": False,
-            "has_to": "@" in parse_email_from_deal(deal),
             "revive": revive,
             "badges": badges,
             "reasons": ["score/listen below tier1"],
+            **_base(),
         }
 
     if score_ok:
@@ -255,6 +284,10 @@ def evaluate_inquiry_candidate(
         and hazard == str(t3.get("hazard_eval") or "OK")
         and land100 != str(t3.get("land100_not") or "見送り")
     )
+    if channel == "grok_handoff":
+        badges.append("Grok依頼")
+    elif channel == "agent_email":
+        badges.append("メール問合せ")
     if tier2:
         badges.append("送信待ち")
     if tier3:
@@ -268,10 +301,10 @@ def evaluate_inquiry_candidate(
         "tier2": tier2,
         "tier3": tier3,
         "can_quick_send": True,
-        "has_to": "@" in parse_email_from_deal(deal),
         "revive": revive,
         "badges": badges,
         "reasons": reasons,
+        **_base(),
     }
 
 

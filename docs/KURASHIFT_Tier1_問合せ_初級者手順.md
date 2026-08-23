@@ -16,11 +16,19 @@
 
 ### 問合せの経路（2026-08-23〜）
 
-| 経路 | いつ | ボタン |
+| `inquiry_channel` | 条件 | UI / 送信 |
 |---|---|---|
-| **メールで問合せ** | 仲介の From／Reply-To がある | 黄「問合せ」→ **業者へ** |
-| **Grokに依頼** | 仲介メールが取れない（ポータルのみ等） | 「Grok依頼」→ **自分宛**に `[KURASHIFT問合せ依頼]` |
-| **問合せ対象外** | `[Grok調査]` メモ単体／業者開拓 A' メモ | 問合せボタンなし |
+| **agent_email** | 仲介の From／Reply-To が **自己以外** | 黄「問合せ」→ **To＝仲介**（estate From） |
+| **grok_handoff** | 仲介メールが取れない（ポータル・宛先空等） | 「Grok依頼」→ **To＝自分**、件名 `[KURASHIFT問合せ依頼]` |
+| **not_applicable** | `[Grok調査]` メモ単体／業者開拓 A' メモ | 問合せボタン **非表示** |
+
+**To 解決順**（メール経路）: UI 明示 → Reply-To → From（自己は除外）→ vendor リスト → 無ければ grok_handoff
+
+| 経路（表示名） | いつ | ボタン |
+|---|---|---|
+| **メールで問合せ** | 上記 agent_email | 黄「問合せ」 |
+| **Grokに依頼** | 上記 grok_handoff | 紫「Grok依頼」 |
+| **問合せ対象外** | 上記 not_applicable | ボタンなし |
 
 ※ **業者開拓（地場リストの Web フォーム A'）** と **物件の第一問合せ** は別レーンです。
 
@@ -119,7 +127,9 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 2. 失敗（failed）のとき  
    Mac で worker を再実行（上記 `--once`）。Mac 版 LINE は起動しない（CHRLINE 競合防止）。
 
-3. 同じ物件を再度開くと `inquiry_status` が **awaiting_reply**（返信待ち）になっているはず
+3. 同じ物件を再度開くと `inquiry_status` が次のいずれか:
+   - **awaiting_reply** … 仲介へメール送信済（返信 poll 対象）
+   - **awaiting_grok** … 自分宛 Grok 依頼済（**poll 対象外**。Grok が Web/調査）
 
 ---
 
@@ -161,6 +171,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 症状 | 対処 |
 |---|---|
 | 送信ボタンを押しても Gmail が出ない | Mac worker 実行・`/jobs` で queued のままか確認 |
+| To が自分アドレス（m19m/estate）のまま | 修正済（2026-08-23）。`[Grok調査]` 単体は **問合せ対象外**。仲介なしなら **Grok依頼** 経路 |
 | 候補が0件 | Grok `[Grok調査]` 取込 → `--dry-run` で Tier 分類 |
 | 1日5件で止まる | 仕様。翌日 JST 0:00 以降 |
 | 倍率なのに固定資産税文がない | 送信前に止める。Grok レポートの `方式: 倍率` を確認 |
