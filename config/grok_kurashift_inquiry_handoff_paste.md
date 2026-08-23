@@ -1,42 +1,39 @@
-# Grok 反映用 — `[KURASHIFT問合せ依頼]`（第一問合せ handoff）
+# KURASHIFT 第一問合せ依頼 — Grok 反映（索引）
 
-**対象 Bot**: 不動産賃貸チームの参謀／物件調査（Bot1 系）。**業者開拓 Bot2 には入れない**（別レーン）。
+**更新**: 2026-08-23  
+**方針**: 追記内容は **各 Bot の paste 正本に統合済み**。このファイル単体を Instructions に貼らない。
 
-以下を Instructions に追記する（新規セクション）。
+## Grok「説明」欄に貼るファイル（正本）
 
----
+| Bot（Grok UI 名） | ファイル | 貼り方 |
+|---|---|---|
+| **参謀**（不動産賃貸部長） | `config/grok_sanbo_bot_grok_paste.md` | コードブロック（`` ``` `` 〜 `` ``` ``）**全文**を説明欄へ |
+| **物件調査**（S1） | `config/grok_property_bot_grok_paste.md` | 同上 |
+| **物件業者開拓**（S2） | `config/grok_vendor_outreach_bot_grok_paste.md` | 同上 |
 
-```
-## KURASHIFT 第一問合せ依頼（2026-08-23〜）
+- **名前・タイトル**は UI の短い欄のまま（paste MD 末尾の「Grok プロフィール設定」参照）
+- **説明**＝上記コードブロック内の `# あなたの役割 — …` から末尾まで（2026-08-23 追記込み）
+- チャットは **本日分・007から** 等の**当日司令**用。恒久ルールは説明欄のみ
 
-estate（matsuno.estate@gmail.com）から自分宛に届く次のメールを拾う。
+## 今回追記した節（各正本内）
 
-- 件名先頭: `[KURASHIFT問合せ依頼]`
-- 本文に `deal_id:` / 住所 / URL / 「希望する第一問合せ文面」あり
+| Bot | 節名 |
+|---|---|
+| 参謀 | `§KURASHIFT 第一問合せ依頼` · 振り分け表1行 · Gmail「拾う」表1行 |
+| 物件調査 | `KURASHIFT 第一問合せ依頼` |
+| 業者開拓 | `別Bot（混同禁止）` に4行追加 |
 
-### やること
+## KURASHIFT 側（参考 · Grok 非掲載）
 
-1. 仲介メールが無い物件の **資料依頼・Web問合せ**（または必要なら路線価・ハザード調査）を実行
-2. 希望文面は参考。サイトの文字数制限があるときだけ短縮可（意味は変えない）
-3. 完了後は従来どおり:
-   - 調査結果 → 件名 `[Grok調査] {市区町村} {短名}` を matsuno.estate@gmail.com へ
-   - または業者から紹介メールが estate に来るのを待つ
-
-### やらないこと（混同禁止）
-
-- **業者開拓 A'**（地場リストへの顧客登録・条件マッチ依頼）とは別。`--next` リストのフォーム送信は Bot2 の仕事
-- `[KURASHIFT問合せ依頼]` を業者開拓の「今日の N 社」に混ぜない
-- 第一問合せメール（estate→仲介）が既に送られている案件は、この依頼の対象外
-
-### 判断の目安
-
-- URL があり Web 問合せフォームがある → フォームで資料依頼
-- ポータルのみ・連絡先不明 → 調査 or 参謀に1行確認
-```
-
----
-
-## Jarvis メモ
-
-- KURASHIFT 実装: `reInquiryChannel` / `awaiting_grok` / poll スキップ
+- 実装: `apps/trade-desk/lib/reInquiryChannel.ts` / `scripts/jarvis_kurashift_re_inquiry_channel.py`
+- 状態: `awaiting_grok`（poll スキップ）
 - To 解決: Reply-To → From（自己除外）→ vendor → 無ければ handoff
+- 初級者手順: `docs/KURASHIFT_Tier1_問合せ_初級者手順.md`
+
+## 混同しない3レーン（要約）
+
+| レーン | 誰 | 何をする |
+|---|---|---|
+| 仲介メールあり | KURASHIFT | estate → **仲介** へ第一問合せ |
+| 仲介なし | S1（参謀が振分） | `[KURASHIFT問合せ依頼]` → Web/調査 |
+| 業者開拓 A' | S2 | 地場リスト Web フォーム（approved 文面） |

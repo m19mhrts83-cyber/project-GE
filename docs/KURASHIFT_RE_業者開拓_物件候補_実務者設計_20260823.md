@@ -500,12 +500,31 @@ Cursor ルール（ローカル）: `.cursor/rules/kamiooya-re-purchase-form.mdc
 
 ## 9.1 第一問合せ ≠ 業者開拓フォーム（2026-08-23）
 
+```mermaid
+flowchart TD
+  deal[物件deal]
+  deal --> classify{inquiry_channel}
+  classify -->|agent_email| mailPath[estateから仲介へメール]
+  classify -->|grok_handoff| grokHandoff[自分宛に依頼メール]
+  classify -->|not_applicable| noInquiry[問合せボタン出さない]
+  grokHandoff --> grokBot[Grokが拾ってWeb/調査]
+  mailPath --> poll[返信poll]
+```
+
+| `inquiry_channel` | 条件 | UI / 送信 |
+|---|---|---|
+| `agent_email` | From／Reply-To が **自己以外** | To＝仲介 · `awaiting_reply` |
+| `grok_handoff` | 仲介メール不可 | To＝自分 · 件名 `[KURASHIFT問合せ依頼]` · `awaiting_grok`（poll スキップ） |
+| `not_applicable` | `mail_grok` 単体／業者開拓メモ | 問合せ CTA 非表示 |
+
 | レーン | 何をするか | 誰が送るか |
 |---|---|---|
 | **物件の第一問合せ** | 具体物件の資料依頼 | estate → **仲介メール**（無ければ `[KURASHIFT問合せ依頼]` で自分→Grok） |
 | **業者開拓 A'** | 地場リストへの顧客登録・条件マッチ依頼 | Grok Bot2 → **各社 Web フォーム** |
 
-`[Grok調査]` メモや「業者開拓 approved A'」単体の deal は **第一問合せボタンを出さない**（`not_applicable`）。
+**To 解決順**（`config/kurashift_re_inquiry_auto.yaml` `to_resolution`）: UI 明示 → `reply_to` → `from`（自己除外）→ vendor `contact_email` → grok_handoff
+
+`[Grok調査]` メモや「業者開拓 approved A'」単体の deal は **第一問合せボタンを出さない**（`not_applicable`）。**禁止**: `mail_grok` の From（自分）を To にそのまま使う。
 
 ---
 
