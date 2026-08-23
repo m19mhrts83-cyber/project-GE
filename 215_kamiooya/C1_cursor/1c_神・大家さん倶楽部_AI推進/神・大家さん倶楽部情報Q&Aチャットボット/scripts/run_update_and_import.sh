@@ -266,15 +266,24 @@ EOF
 fi
 
 echo "==> step3: Raimoへ差分CSVを自動取り込み"
-if ! "$PYTHON" "$UPLOAD_RAIMO_SCRIPT" \
+RAIMO_IMPORT_OK=0
+if "$PYTHON" "$UPLOAD_RAIMO_SCRIPT" \
   --csv "$LATEST_DELTA" \
   --screenshot-dir "$OUTPUT_ROOT/exports/logs"; then
-  if [[ "${RAIMO_FAIL_OPEN:-0}" == "1" ]]; then
+  RAIMO_IMPORT_OK=1
+else
+  # 週次の典型失敗: scrape+Supabase 成功後に Raimo Page crash。
+  # state を残さないと翌週に全件再スクレイプして 3h タイムアウトしやすい。
+  if [[ "$SUPABASE_CONFIGURED" -eq 1 ]]; then
+    echo "警告: Raimo取込失敗。Supabase 取込済みのため state は更新して継続します。" >&2
+  elif [[ "${RAIMO_FAIL_OPEN:-0}" == "1" ]]; then
     echo "警告: Raimo取込に失敗しましたが、RAIMO_FAIL_OPEN=1 のため処理を継続します。" >&2
     echo "確認ログ: $LOG_FILE" >&2
     exit 0
+  else
+    echo "Raimo取込失敗。state は更新しません。" >&2
+    exit 2
   fi
-  exit 2
 fi
 
 commit_state_after_success
@@ -306,7 +315,11 @@ PY
   fi
 fi
 
-echo "完了: 抽出〜Supabase/Raimo取込まで実行しました"
+if [[ "$RAIMO_IMPORT_OK" -eq 1 ]]; then
+  echo "完了: 抽出〜Supabase/Raimo取込まで実行しました"
+else
+  echo "完了: 抽出〜Supabase取込まで実行しました（Raimo は要再試行）"
+fi
 echo "delta(forum): $LATEST_DELTA"
 echo "delta(lesson): ${LESSON_DELTA_FILE:-なし}"
 echo "log:   $LOG_FILE"
