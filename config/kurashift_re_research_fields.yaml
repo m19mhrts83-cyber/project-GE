@@ -1,0 +1,188 @@
+# 物件調査シート — Notion DB_物件購入検討(購入手前) + 運営フォーム 1906a1a5 対応
+# UI: apps/trade-desk/components/DealResearchSheet.tsx
+# 抽出: scripts/jarvis_kurashift_re_reply_extract.py
+
+version: 1
+updated: "2026-08-23"
+notion_database: "DB_物件購入検討(購入手前)"
+
+# 初期は suggested + source を人が verified に昇格。verified 後は自動上書きしない。
+trust_ladder:
+  - suggested   # Jarvis/Grok 提案（ソース必須）
+  - verified    # ユーザー確認済み → 以降の根拠として信頼
+  - rejected    # 誤り → 再抽出可
+
+fields:
+  - id: property_name
+    label: 物件名
+    notion: 物件名
+    tier: auto
+    source: deal.title
+
+  - id: address
+    label: 物件住所
+    notion: 物件住所
+    tier: reply
+    extract:
+      - pattern: "(?:所在地|物件住所|住所)[：:\\s]*([^\\n]{5,80})"
+        group: 1
+
+  - id: list_price_man
+    label: 販売価格【万円】
+    notion: 販売価格【万円】
+    tier: auto
+    source: deal.price_man
+    value_type: number
+
+  - id: offer_price_man
+    label: 買付予定価格【万円】
+    notion: 買付予定価格【万円】
+    tier: manual
+    value_type: number
+
+  - id: building_age
+    label: 築年数
+    notion: 築年数
+    tier: reply
+    value_type: number
+    extract:
+      - pattern: "築(?:年数)?[：:\\s]*(\\d{1,2})\\s*年"
+        group: 1
+      - pattern: "(?:築|建築)(\\d{4})年"
+        group: 1
+        transform: building_year_to_age
+
+  - id: building_year
+    label: 建築年
+    notion: 建築年
+    tier: reply
+    value_type: number
+    extract:
+      - pattern: "(?:築|建築)(\\d{4})年"
+        group: 1
+
+  - id: nearest_station
+    label: 最寄駅と駅からの徒歩分数
+    notion: 最寄駅と駅からの徒歩分数
+    tier: reply
+    extract:
+      - pattern: "最寄(?:り)?駅[：:\\s]*([^\\n]{3,60})"
+        group: 1
+      - pattern: "([^\n]{2,20}駅)\\s*(?:徒歩|より)\\s*(\\d+)\\s*分"
+        group: 0
+
+  - id: structure_rooms
+    label: 構造、間取り✖️部屋数
+    notion: 構造、間取り✖️部屋数
+    tier: auto
+    source: deal.structure
+    extract:
+      - pattern: "(木造|鉄骨|RC|S造|軽量鉄骨)[^\\n]{0,40}(?:\\d+K|LDK|DK|\\d+部屋)"
+        group: 0
+
+  - id: land_sqm
+    label: 土地面積【平米】
+    notion: 土地面積【平米】
+    tier: reply
+    value_type: number
+    extract:
+      - pattern: "土地(?:面積)?[：:\\s]*(?:約)?(\\d+(?:\\.\\d+)?)\\s*(?:㎡|m2|平米)"
+        group: 1
+
+  - id: building_sqm
+    label: 建物面積【平米】
+    notion: 建物面積【平米】
+    tier: reply
+    value_type: number
+    extract:
+      - pattern: "建物(?:面積)?[：:\\s]*(?:約)?(\\d+(?:\\.\\d+)?)\\s*(?:㎡|m2|平米)"
+        group: 1
+
+  - id: occupancy
+    label: 入居状況
+    notion: 入居状況
+    tier: reply
+    extract:
+      - pattern: "(満室|空室|空き|入居中|\\d+\\s*戸中\\s*\\d+\\s*戸(?:入居|空室))"
+        group: 1
+
+  - id: gas
+    label: 現在のガス状況
+    notion: 現在のガス状況
+    tier: reply
+    extract:
+      - pattern: "(プロパンガス|都市ガス|LPガス)"
+        group: 1
+        map:
+          プロパンガス: "a）プロパンガス"
+          LPガス: "a）プロパンガス"
+          都市ガス: "b）都市ガス"
+
+  - id: parking
+    label: 現在の駐車場台数
+    notion: 現在の駐車場台数
+    tier: auto
+    source: grok.parking
+    extract:
+      - pattern: "駐車(?:場)?[：:\\s]*(\\d+\\s*台|[なし有])"
+        group: 1
+
+  - id: transaction_type
+    label: 取引形態
+    tier: reply
+    extract:
+      - pattern: "(売主|媒介|直売|専任|一般媒介)"
+        group: 1
+
+  - id: annual_rent_yen
+    label: 想定年間家賃収入調査結果【円】
+    notion: 想定年間家賃収入調査結果【円】
+    tier: research
+    value_type: number
+
+  - id: repair_total_man
+    label: 想定される修繕費総額【万円】
+    notion: 想定される修繕費総額【万円】
+    tier: research
+    value_type: number
+
+  - id: route_price_man
+    label: 路線価/評価額【万円】
+    notion: 路線価/評価額【万円】
+    tier: auto
+    source: grok.route_price_tsubo
+    value_type: number
+
+  - id: land_value_note
+    label: 土地価格(路線価より算出)
+    notion: 土地価格(路線価より算出)
+    tier: auto
+    source: grok.land100
+
+  - id: hazard_flood
+    label: 洪水(ハザード)
+    notion: 洪水(ハザード)
+    tier: auto
+    source: grok.hazard_flood
+
+  - id: hazard_tsunami
+    label: 津波(ハザード)
+    notion: 津波(ハザード)
+    tier: auto
+    source: grok.hazard_tsunami
+
+  - id: hazard_landslide
+    label: 土砂災害(ハザード)
+    notion: 土砂災害(ハザード)
+    tier: auto
+    source: grok.hazard_landslide
+
+  - id: eval_result
+    label: 評価結果
+    notion: 評価結果
+    tier: manual
+
+  - id: questions_for_instructor
+    label: 講師に確認したいこと
+    notion: 講師に確認したいこと
+    tier: manual
