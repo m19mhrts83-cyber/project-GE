@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bloomo（MF経由評価）の週次値動きを Zaim（財務）へ登録する。
 
-学習メモ（あかつき週次コメント）: 増収は「H.株増収」。減収は α.B.C.投資 / 株減収。
+学習メモ: 増収は「H.株増収」。減収は α.B.C.投資 / 外国株減収（株減収は未作成のため使わない）。
 口座名は ZAIM_BLOOMO_ACCOUNT（既定 bloomo証券。Zaim 上の表記どおり）。
 旧名「Bloomo」は不一致で失敗するため、候補を自動リトライして成功名を state に覚える。
 
@@ -30,7 +30,9 @@ PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 MF_SCRIPT = REPO / "scripts" / "jarvis_mf_bloomo_balance.py"
 
 CAT_DOWN = "α.B.C.投資"
-GENRE_DOWN = "株減収"
+# Zaim 実在内訳。旧想定「株減収」は未作成のため外国株減収を先に試す
+GENRES_DOWN = ("外国株減収", "株減収", "外国債減収", "")
+GENRE_DOWN = GENRES_DOWN[0]
 CAT_UP = "H.株増収"
 
 # Zaim 表記ゆれ。先頭ほど優先（env / state のあとに続く）
@@ -84,7 +86,9 @@ def fetch_current() -> int:
     return int(data["value_jpy"])
 
 
-def plan_entry(prev: int, curr: int, day: str, account: str) -> dict[str, Any] | None:
+def plan_entry(
+    prev: int, curr: int, day: str, account: str, *, genre_down: str = GENRE_DOWN
+) -> dict[str, Any] | None:
     delta = curr - prev
     if delta == 0:
         return None
@@ -96,7 +100,7 @@ def plan_entry(prev: int, curr: int, day: str, account: str) -> dict[str, Any] |
             "date": day,
             "account": account,
             "category": CAT_DOWN,
-            "genre": GENRE_DOWN,
+            "genre": genre_down,
             "comment": comment,
             "exclude": True,
         }
@@ -153,6 +157,11 @@ def post_zaim(entry: dict[str, Any], *, apply: bool, yes: bool, headless: bool) 
 
 def is_account_missing(err: str) -> bool:
     return "口座が見つかりません" in (err or "")
+
+
+def is_category_or_genre_missing(err: str) -> bool:
+    e = err or ""
+    return "カテゴリが見つかりません" in e or "内訳が見つかりません" in e
 
 
 def mark_sync_meta_bloomo_zaim_ok(*, reason: str) -> None:
@@ -219,25 +228,31 @@ def post_with_account_retry(
     yes: bool,
     headless: bool,
 ) -> tuple[int, dict[str, Any] | None, str | None]:
-    """口座名候補を順に試す。成功した名前を返す。"""
+    """口座名・減収内訳の候補を順に試す。成功した名前を返す。"""
     last_err = ""
+    delta = curr - prev
+    genre_list: tuple[str, ...] = GENRES_DOWN if delta < 0 else ("",)
     for acc in account_candidates(st):
-        entry = plan_entry(prev, curr, day, acc)
-        if entry is None:
-            return 0, None, None
-        print(
-            f"📎 Bloomo財務案: {entry['kind']} {entry['category']}/{entry['genre'] or '-'} "
-            f"{entry['account']} ¥{entry['amount']:,} 集計除外  # {entry['comment']}"
-        )
-        rc, err = post_zaim(entry, apply=apply, yes=yes, headless=headless)
-        if rc == 0:
-            return 0, entry, acc
-        last_err = err or f"exit={rc}"
-        if is_account_missing(err):
-            print(f"# account miss → retry next alias (failed={acc!r})")
-            continue
-        # 口座以外の失敗はリトライしない
-        break
+        for genre in genre_list:
+            entry = plan_entry(prev, curr, day, acc, genre_down=genre)
+            if entry is None:
+                return 0, None, None
+            print(
+                f"📎 Bloomo財務案: {entry['kind']} {entry['category']}/{entry['genre'] or '-'} "
+                f"{entry['account']} ¥{entry['amount']:,} 集計除外  # {entry['comment']}"
+            )
+            rc, err = post_zaim(entry, apply=apply, yes=yes, headless=headless)
+            if rc == 0:
+                return 0, entry, acc
+            last_err = err or f"exit={rc}"
+            if is_account_missing(err):
+                print(f"# account miss → retry next alias (failed={acc!r})")
+                break  # next account
+            if is_category_or_genre_missing(err) and delta < 0:
+                print(f"# category/genre miss → retry next genre (failed={genre!r})")
+                continue
+            # その他の失敗はリトライしない
+            return 1, None, last_err
     return 1, None, last_err
 
 
