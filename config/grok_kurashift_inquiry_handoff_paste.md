@@ -13,16 +13,20 @@
 | **需給三次判断** | S3 | `config/grok_supply_bot_grok_paste.md` | 同上 |
 | **修繕業者開拓** | S4 | `config/grok_repair_vendor_bot_grok_paste.md` | 同上 |
 | **ペルソナ二次判断** | S5 | `config/grok_persona_bot_grok_paste.md` | 同上 |
+| **買付交渉** | S6 | `config/grok_deal_negotiation_bot_grok_paste.md` | 同上 |
+| **融資相談** | S7 | `config/grok_loan_bot_grok_paste.md` | 同上 |
 
 - **名前・タイトル**は UI の短い欄のまま（paste MD 末尾の「Grok プロフィール設定」参照）
 - **説明**＝上記コードブロック内の `# あなたの役割 — …` から末尾まで
 - チャットは **本日分・007から** 等の**当日司令**用。恒久ルールは説明欄のみ
 
-## 設計（Phase 1）
+## 設計（Phase 1＋フェーズ拡張）
 
 - `docs/KURASHIFT_供給_ペルソナ_修繕Bot_設計_20260824.md`
-- 都度: 問合せ以降 → S5 → S3 → 人間ヒアリング
+- `docs/KURASHIFT_Grok_不動産フェーズBot_設計_20260824.md`
+- 都度: 問合せ以降 → S5 → S3 →（購入後）S6 → S7
 - デイリー: `本日分` = S2 → S4 → S1 → 探索
+- 別部署: 家族コーチング／アプリ開発統括
 
 ## KURASHIFT 第一問合せ（参考 · Grok 非掲載）
 
@@ -38,4 +42,6 @@
 | 仲介なし | S1（参謀が振分） | `[KURASHIFT問合せ依頼]` → Web/調査 |
 | 業者開拓 A' | S2 | 地場リスト Web フォーム（approved 文面） |
 | 二次・三次 | S5 → S3 | `[Grokペルソナ]` → `[Grok需給]` |
+| 買付・融資 | S6 / S7 | `[Grok買付]` / `[Grok融資]` |
 | 修繕候補 | S4 | `[Grok修繕候補]`（電話しない） |
+| アプリ | アプリ開発統括 | 別部署 |
