@@ -85,6 +85,12 @@ import {
 } from "@/lib/mqEquityTrend";
 import MqEquityTrendPanel from "@/components/MqEquityTrendPanel";
 import MqMetricsTrendPlaceholder from "@/components/MqMetricsTrendPlaceholder";
+import ReBusinessPlPanel from "@/components/ReBusinessPlPanel";
+import {
+  composeReBusinessPl,
+  DEFAULT_RE_PL_OVERRIDES,
+} from "@/lib/reBusinessPlCompose";
+import type { ReBusinessPlModel } from "@/lib/reBusinessPlTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -162,7 +168,7 @@ export default async function MqPage({
   const { data: loanRaw } = await supabase
     .from("kurashift_loan_tracker_loans")
     .select(
-      "balance_jpy,monthly_payment_jpy,annual_payment_jpy, category_major, tags, name"
+      "id,name,lender,balance_jpy,monthly_payment_jpy,annual_payment_jpy,rate_pct,category_major,tags,payload"
     );
 
   const { data: taxMetricsRaw } = await supabase
@@ -274,6 +280,43 @@ export default async function MqPage({
   const variantB = one(sp, "vb", variants[1] || defaultVariant);
 
   const cashflowYear = Number(periodA.slice(0, 4));
+
+  let rePlModel: ReBusinessPlModel | null = null;
+  if (view === "re-pl") {
+    const rePlTxns = await fetchFinanceTxnsRange(
+      supabase,
+      cashflowYear,
+      cashflowYear
+    );
+    const bsRowsAll = (bsRaw ?? []) as MqBsRow[];
+    const asOf = yearEndDate(String(cashflowYear));
+    const corpBs = pickNearestBs(
+      bsRowsAll,
+      "realestate",
+      "corporate",
+      asOf
+    );
+    const persBs = pickNearestBs(
+      bsRowsAll,
+      "realestate",
+      "personal",
+      asOf
+    );
+    rePlModel = composeReBusinessPl({
+      year: cashflowYear,
+      entity:
+        entity === "personal" || entity === "corporate" || entity === "combined"
+          ? entity
+          : "combined",
+      txns: rePlTxns,
+      loans: (loanRaw ?? []) as Parameters<typeof composeReBusinessPl>[0]["loans"],
+      mqBsCash: {
+        corporate: corpBs?.cash ?? null,
+        personal: persBs?.cash ?? null,
+      },
+      overrides: DEFAULT_RE_PL_OVERRIDES,
+    });
+  }
 
   let cashflowRows: MqCashflowMonthRow[] = [];
   let cashflowNegative: { month: string; cashEndMan: number }[] = [];
@@ -920,7 +963,10 @@ export default async function MqPage({
         hrefFor={(v) =>
           href({
             view: v,
-            ...(v === "cashflow" || v === "reconcile" || v === "trends"
+            ...(v === "cashflow" ||
+            v === "reconcile" ||
+            v === "trends" ||
+            v === "re-pl"
               ? { grain: "year", a: periodA.slice(0, 4) }
               : {}),
           })
@@ -933,7 +979,57 @@ export default async function MqPage({
         </div>
       ) : null}
 
-      {view === "cashflow" ? (
+      {view === "re-pl" ? (
+        <>
+          <div className="card" style={{ marginTop: 12 }}>
+            <header>
+              <span className="lvl">条件</span>
+              <strong>事業BS・PL · {cashflowYear}年</strong>
+            </header>
+            <div className="mq-slicer" style={{ marginTop: 10 }}>
+              <div className="mq-slicer-group">
+                <span className="meta">表示年度</span>
+                <MqPeriodLinks
+                  grain="year"
+                  periods={yearsAll.length ? yearsAll : [defaultYear]}
+                  current={String(cashflowYear)}
+                  makeHref={(v) =>
+                    href({ a: v.slice(0, 4), grain: "year", view: "re-pl" })
+                  }
+                />
+              </div>
+              <div className="mq-slicer-group">
+                <span className="meta">主体</span>
+                {(
+                  [
+                    ["personal", "個人"],
+                    ["corporate", "法人"],
+                    ["combined", "合算"],
+                  ] as const
+                ).map(([v, lab]) => (
+                  <a
+                    key={v}
+                    className={`btn${entity === v ? " primary" : ""}`}
+                    href={href({ entity: v, view: "re-pl" })}
+                  >
+                    {lab}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <p className="meta" style={{ marginTop: 8 }}>
+              {entityLabel(entity)} · Zaim事業費目＋物件マスタ簿価＋ローン残高トラッカー
+            </p>
+          </div>
+          {rePlModel ? (
+            <ReBusinessPlPanel model={rePlModel} />
+          ) : (
+            <p className="meta" style={{ marginTop: 12 }}>
+              合成できませんでした。
+            </p>
+          )}
+        </>
+      ) : view === "cashflow" ? (
         <>
           <div className="card" style={{ marginTop: 12 }}>
             <header>
