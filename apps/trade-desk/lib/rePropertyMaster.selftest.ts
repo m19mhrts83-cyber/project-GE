@@ -42,7 +42,13 @@ assert(fmtKeyNumber(undefined) === "なし", "undefined key");
 assert(g1.book && g1.book.bodyPriceJpy === 68_532_000, "G1 book body");
 assert(g1.entity === "corporate", "G1 entity");
 assert(caramel.entity === "personal", "caramel entity");
-assert(caramel.book && caramel.book.buildingYears === 22, "caramel years");
+assert(caramel.book && caramel.book.buildingYears === 19, "caramel years from tax rate");
+assert(g1.book?.allocation === "tax_return", "G1 tax_return");
+assert(g2.book?.buildingJpy === 32_119_650, "G2 building from 収支内訳");
+assert(g2.book?.annualDepBuildingJpy === 2_698_051, "G2 annual dep");
+assert(caramel.book?.buildingJpy === 21_090_413, "caramel building");
+assert(g1.book?.buildingJpy === 30_956_040, "G1 building from 第1期BS");
+assert(g1.book?.landJpy === 37_073_217, "G1 land");
 
 for (const p of RE_PROPERTY_MASTER) {
   assert(/^\d{3}-\d{4}$/.test(p.postalCode), `${p.id} postal format`);

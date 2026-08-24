@@ -198,14 +198,20 @@ function buildPlForProperty(
   let depB: number | null = null;
   let depE: number | null = null;
   if (prop?.book) {
-    depB = straightLineDepMan(
-      prop.book.buildingJpy,
-      prop.book.buildingYears
-    );
-    depE = straightLineDepMan(
-      prop.book.equipmentJpy,
-      prop.book.equipmentYears
-    );
+    depB =
+      prop.book.annualDepBuildingJpy != null
+        ? yenToMan(prop.book.annualDepBuildingJpy)
+        : straightLineDepMan(
+            prop.book.buildingJpy,
+            prop.book.buildingYears
+          );
+    depE =
+      prop.book.annualDepEquipmentJpy != null
+        ? yenToMan(prop.book.annualDepEquipmentJpy)
+        : straightLineDepMan(
+            prop.book.equipmentJpy,
+            prop.book.equipmentYears
+          );
   }
 
   const col = emptyPlColumn(propertyId, label, entity);
@@ -229,8 +235,22 @@ function buildPlForProperty(
     acc.other > 0 ? yenToMan(acc.other) : null,
     acc.other > 0 ? "zaim" : null
   );
-  col.depreciationBuilding = sourced(depB, depB == null ? null : "master");
-  col.depreciationEquipment = sourced(depE, depE == null ? null : "master");
+  col.depreciationBuilding = sourced(
+    depB,
+    depB == null
+      ? null
+      : prop?.book?.annualDepBuildingJpy != null
+        ? "tax_return"
+        : "master"
+  );
+  col.depreciationEquipment = sourced(
+    depE,
+    depE == null
+      ? null
+      : prop?.book?.annualDepEquipmentJpy != null
+        ? "tax_return"
+        : "master"
+  );
   col.interest = sourced(
     loanNums.interestMan,
     loanNums.interestMan == null ? null : "loan_tracker",
@@ -314,11 +334,33 @@ function buildBsForProperty(
     currentAssets: ca,
     building: sourced(
       building,
-      building == null ? null : "master",
-      prop?.book?.allocation === "estimated" ? "按分概算" : undefined
+      building == null
+        ? null
+        : prop?.book?.allocation === "tax_return"
+          ? "tax_return"
+          : "master",
+      prop?.book?.allocation === "estimated"
+        ? "按分概算"
+        : prop?.book?.allocation === "tax_return"
+          ? "申告・決算"
+          : undefined
     ),
-    equipment: sourced(equipment, equipment == null ? null : "master"),
-    land: sourced(land, land == null ? null : "master"),
+    equipment: sourced(
+      equipment,
+      equipment == null
+        ? null
+        : prop?.book?.allocation === "tax_return"
+          ? "tax_return"
+          : "master"
+    ),
+    land: sourced(
+      land,
+      land == null
+        ? null
+        : prop?.book?.allocation === "tax_return"
+          ? "tax_return"
+          : "master"
+    ),
     investments,
     fixedAssets: fa,
     totalAssets: ta,
@@ -547,6 +589,11 @@ export function composeReBusinessPl(args: {
 
   if (props.some((p) => p.book?.allocation === "estimated")) {
     notes.push("固定資産の土地・建物按分は概算です。税務上の取得価額に差し替えてください。");
+  }
+  if (props.some((p) => p.book?.allocation === "tax_return")) {
+    notes.push(
+      "固定資産は確定申告（収支内訳）または第1期BS提出用サマリーの数値です。法人Ⅰの償却明細は画像PDFのため未OCR。"
+    );
   }
 
   return {
