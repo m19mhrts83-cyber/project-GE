@@ -12,7 +12,8 @@ export type AmountSource =
   | "mq_bs"
   | "override"
   | "estimated"
-  | "derived";
+  | "derived"
+  | "tax_return";
 
 export type SourcedAmount = {
   man: number | null;
