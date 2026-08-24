@@ -64,6 +64,7 @@ PORTFOLIO_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_portfolio"
 FAMILY_JOURNAL_STATE = REPO / ".jarvis_state" / "family_journal_weekly.json"
 FAMILY_JOURNAL_RUNNER = REPO / "launchd" / "family_journal_weekly_runner.sh"
 FAMILY_JOURNAL_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_family_journal"
+APP_DEV_CARDS = REPO / "scripts" / "jarvis_app_dev_cards_morning.py"
 
 
 def now_iso() -> str:
@@ -769,6 +770,24 @@ def main() -> int:
             "# family_journal: skip (this week's Sunday 08:00 金締 slot already done)",
             flush=True,
         )
+
+    # 10. アプリ開発 Jarvis向けカード要約（[Grok開発]メール / inbox）
+    if APP_DEV_CARDS.is_file() and not (
+        (os.environ.get("JARVIS_APP_DEV_CARDS_DISABLE") or "").strip()
+        in ("1", "true", "yes")
+    ):
+        rc_ad = run_step(
+            "app_dev_cards",
+            [exe, str(APP_DEV_CARDS)],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["app_dev_cards"] = rc_ad
+        if rc_ad != 0:
+            failures += 1
+    else:
+        results["steps"]["app_dev_cards"] = "skipped"
+        print("# app_dev_cards: skip", flush=True)
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()
