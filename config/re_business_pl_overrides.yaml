@@ -1,0 +1,27 @@
+# 不動産事業 BS・PL — 手動オーバーライド（万円）
+# 未設定は compose 側で null / 推定。ローン残高はトラッカー正本のためここへ書かない。
+
+version: 1
+tax_rate: 0.2
+
+# 名義別の現預金など（期末）
+entity_overrides:
+  corporate:
+    cash_man: null  # MQ軽量BS cash を優先
+    receivables_man: 0
+    payables_man: 0
+    deposits_man: 0
+    investments_man: 0
+    capital_man: 10  # 法人設立資本金（万円）— 要確認
+    retained_man: null
+  personal:
+    cash_man: null
+    receivables_man: 0
+    payables_man: 0
+    deposits_man: 0
+    investments_man: 0
+    capital_man: null
+    retained_man: null
+
+# 物件別の上書き（任意）
+property_overrides: {}
