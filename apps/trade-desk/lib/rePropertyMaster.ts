@@ -7,7 +7,11 @@ export type RePropertyBook = {
   landJpy: number | null;
   buildingYears: number | null;
   equipmentYears: number | null;
-  allocation: "estimated" | "confirmed" | null;
+  /** estimated=按分概算 / tax_return=申告・決算 / confirmed=突合済 */
+  allocation: "estimated" | "confirmed" | "tax_return" | null;
+  /** 申告の建物本年償却（円）。あれば PL は定額計算より優先 */
+  annualDepBuildingJpy: number | null;
+  annualDepEquipmentJpy: number | null;
   note: string | null;
 };
 
@@ -48,13 +52,16 @@ export const RE_PROPERTY_MASTER: RePropertyMaster[] = [
     loanIds: ["orix-g1-corp"],
     book: {
       bodyPriceJpy: 68_532_000,
-      buildingJpy: 34_266_000,
-      equipmentJpy: 6_853_200,
-      landJpy: 27_412_800,
-      buildingYears: 47,
-      equipmentYears: 15,
-      allocation: "estimated",
-      note: "本体=ROI。按分 建物50%/設備10%/土地40%（概算）",
+      buildingJpy: 30_956_040,
+      equipmentJpy: null,
+      landJpy: 37_073_217,
+      buildingYears: 12,
+      equipmentYears: null,
+      allocation: "tax_return",
+      annualDepBuildingJpy: null,
+      annualDepEquipmentJpy: null,
+      note:
+        "第1期BS（knees bee提出用サマリー）建物30,956,040／土地37,073,217。耐用はⅡと同型の中古定額目安12年。申告書一式は画像PDFのため償却明細は未OCR",
     },
     matchHints: ["grandole", "志賀本通", "Ⅰ", "I", "アパート経営"],
   },
@@ -73,13 +80,16 @@ export const RE_PROPERTY_MASTER: RePropertyMaster[] = [
     loanIds: ["orix-g2-pers"],
     book: {
       bodyPriceJpy: 69_800_000,
-      buildingJpy: 34_900_000,
-      equipmentJpy: 6_980_000,
-      landJpy: 27_920_000,
-      buildingYears: 47,
-      equipmentYears: 15,
-      allocation: "estimated",
-      note: "本体=ROI。按分 建物50%/設備10%/土地40%（概算）",
+      buildingJpy: 32_119_650,
+      equipmentJpy: null,
+      landJpy: 37_680_350,
+      buildingYears: 12,
+      equipmentYears: null,
+      allocation: "tax_return",
+      annualDepBuildingJpy: 2_698_051,
+      annualDepEquipmentJpy: null,
+      note:
+        "令和7年分収支内訳書。建物取得32,119,650・定額0.08412・本年償却2,698,051。土地=本体−建物",
     },
     matchHints: ["grandole", "志賀本通", "Ⅱ", "II"],
   },
@@ -98,13 +108,16 @@ export const RE_PROPERTY_MASTER: RePropertyMaster[] = [
     loanIds: ["shiga-caramel", "shiga-caramel-cost"],
     book: {
       bodyPriceJpy: 46_000_000,
-      buildingJpy: 23_000_000,
-      equipmentJpy: 4_600_000,
-      landJpy: 18_400_000,
-      buildingYears: 22,
-      equipmentYears: 15,
-      allocation: "estimated",
-      note: "本体=ROI。木造想定・建物耐用22年。按分は概算",
+      buildingJpy: 21_090_413,
+      equipmentJpy: null,
+      landJpy: 24_909_587,
+      buildingYears: 19,
+      equipmentYears: null,
+      allocation: "tax_return",
+      annualDepBuildingJpy: 1_121_799,
+      annualDepEquipmentJpy: null,
+      note:
+        "令和7年分収支内訳書。建物取得21,090,413・定額0.05319（≈19年）。年償却は通年換算。土地=本体−建物。取得2025-12のため令和7は月割のみ",
     },
     matchHints: ["キャラメル", "caramel", "文久山"],
   },

@@ -7,7 +7,7 @@
 # 鍵番号の正本: Notion「所有物件関係」DB_物件情報（YAML は表示用キャッシュ）
 
 version: 1
-as_of: "2026-08-17"
+as_of: "2026-08-24"
 status: prep_ok
 
 # id は property_units.property_id / ROI unitPropertyId / loan payload.propertyId と共通
@@ -24,16 +24,18 @@ properties:
     rooms_expected: 8
     managers: [LEAF, Tcell]
     default_manager: ミニテック
-    # 事業BS・PL用。本体は ROI bodyPrice。土地・建物按分は概算（要確認）
+    # 事業BS・PL用。個人2物件=令和7年分収支内訳書／法人Ⅰ=第1期BS提出用サマリー
     book:
       body_price_jpy: 68532000
-      building_jpy: 34266000
-      equipment_jpy: 6853200
-      land_jpy: 27412800
-      building_years: 47
-      equipment_years: 15
-      allocation: estimated
-      note: "本体=ROI。按分 建物50%/設備10%/土地40%（概算）"
+      building_jpy: 30956040
+      equipment_jpy: null
+      land_jpy: 37073217
+      building_years: 12
+      equipment_years: null
+      allocation: tax_return
+      annual_dep_building_jpy: null
+      annual_dep_equipment_jpy: null
+      note: "第1期BS（knees bee提出用サマリー）建物30,956,040／土地37,073,217。耐用はⅡと同型目安12年。申告書一式は画像PDFのため償却明細は未OCR"
     loans:
       primary:
         - id: orix-g1-corp
@@ -59,13 +61,15 @@ properties:
     managers: [ホームプランナー]
     book:
       body_price_jpy: 69800000
-      building_jpy: 34900000
-      equipment_jpy: 6980000
-      land_jpy: 27920000
-      building_years: 47
-      equipment_years: 15
-      allocation: estimated
-      note: "本体=ROI。按分 建物50%/設備10%/土地40%（概算）"
+      building_jpy: 32119650
+      equipment_jpy: null
+      land_jpy: 37680350
+      building_years: 12
+      equipment_years: null
+      allocation: tax_return
+      annual_dep_building_jpy: 2698051
+      annual_dep_equipment_jpy: null
+      note: "令和7年分収支内訳書。建物取得32,119,650・定額0.08412・本年償却2,698,051。土地=本体−建物"
     loans:
       primary:
         - id: orix-g2-pers
@@ -91,13 +95,15 @@ properties:
     managers: [Tcell]
     book:
       body_price_jpy: 46000000
-      building_jpy: 23000000
-      equipment_jpy: 4600000
-      land_jpy: 18400000
-      building_years: 22
-      equipment_years: 15
-      allocation: estimated
-      note: "本体=ROI。木造想定・建物耐用22年。按分は概算"
+      building_jpy: 21090413
+      equipment_jpy: null
+      land_jpy: 24909587
+      building_years: 19
+      equipment_years: null
+      allocation: tax_return
+      annual_dep_building_jpy: 1121799
+      annual_dep_equipment_jpy: null
+      note: "令和7年分収支内訳書。建物取得21,090,413・定額0.05319（≈19年）。年償却は通年換算。土地=本体−建物"
     loans:
       primary:
         - id: shiga-caramel
