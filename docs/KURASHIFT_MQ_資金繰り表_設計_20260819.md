@@ -458,6 +458,11 @@ function classifyInflow(txn): "sales" | "borrow_st" | "borrow_lt" | "exclude" {
 
 年度チップは **左＝過去 → 右＝最新**。既定表示年は最新。
 
+### 7.6 事業BS・PL（ゼミ準拠・別ビュー）
+
+伝統的な不動産事業評価は **`/mq?view=re-pl`**（資金繰り・MQ会計表とは別レーン）。  
+設計: `docs/KURASHIFT_不動産事業BS_PL_設計_20260824.md`。
+
 ---
 
 ## 8. 翌年繰越ロジック（詳細）

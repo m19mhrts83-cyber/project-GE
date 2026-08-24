@@ -39,9 +39,15 @@ assert(fmtKeyNumber(caramel.keyNumber) === "なし", "caramel key is なし");
 assert(fmtKeyNumber(null) === "なし", "null key");
 assert(fmtKeyNumber(undefined) === "なし", "undefined key");
 
+assert(g1.book && g1.book.bodyPriceJpy === 68_532_000, "G1 book body");
+assert(g1.entity === "corporate", "G1 entity");
+assert(caramel.entity === "personal", "caramel entity");
+assert(caramel.book && caramel.book.buildingYears === 22, "caramel years");
+
 for (const p of RE_PROPERTY_MASTER) {
   assert(/^\d{3}-\d{4}$/.test(p.postalCode), `${p.id} postal format`);
   assert(p.address.length > 8, `${p.id} address`);
+  assert(p.book != null, `${p.id} book`);
 }
 
 console.log("rePropertyMaster.selftest: ok");
