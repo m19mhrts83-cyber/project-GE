@@ -34,8 +34,8 @@ export const PILLARS: MapItem[] = [
     id: "p3",
     code: "③",
     title: "事業",
-    intent: "不動産賃貸とAIなど事業の粗利・運用を見る（MQ会計評価）",
-    implemented: "不動産賃貸 ③-A〜D · MQ会計評価",
+    intent: "不動産賃貸とAIなど事業の粗利・運用を見る（MQ会計評価・事業BS・PL）",
+    implemented: "不動産賃貸 ③-A〜D · MQ会計評価 · 事業BS・PL",
     href: "/mq",
   },
 ];
@@ -58,6 +58,14 @@ export const BUSINESS_LANES: MapItem[] = [
       "実績は月次（年額Fは÷12按分）、計画は年次。個人／法人／合算・不動産／AI",
     implemented: "/mq · facts/map/bs · スライサー · 比較",
     href: "/mq",
+  },
+  {
+    id: "3-re-pl",
+    code: "事業BS・PL",
+    title: "不動産事業評価（ゼミ準拠）",
+    intent: "伝統的PL/BSで減価償却・利息・税込みの事業評価",
+    implemented: "/mq?view=re-pl · Zaim事業費目＋物件簿価＋ローン",
+    href: "/mq?view=re-pl",
   },
 ];
 

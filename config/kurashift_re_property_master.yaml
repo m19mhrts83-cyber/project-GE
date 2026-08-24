@@ -24,6 +24,16 @@ properties:
     rooms_expected: 8
     managers: [LEAF, Tcell]
     default_manager: ミニテック
+    # 事業BS・PL用。本体は ROI bodyPrice。土地・建物按分は概算（要確認）
+    book:
+      body_price_jpy: 68532000
+      building_jpy: 34266000
+      equipment_jpy: 6853200
+      land_jpy: 27412800
+      building_years: 47
+      equipment_years: 15
+      allocation: estimated
+      note: "本体=ROI。按分 建物50%/設備10%/土地40%（概算）"
     loans:
       primary:
         - id: orix-g1-corp
@@ -47,6 +57,15 @@ properties:
     key_number: 1555
     rooms_expected: 8
     managers: [ホームプランナー]
+    book:
+      body_price_jpy: 69800000
+      building_jpy: 34900000
+      equipment_jpy: 6980000
+      land_jpy: 27920000
+      building_years: 47
+      equipment_years: 15
+      allocation: estimated
+      note: "本体=ROI。按分 建物50%/設備10%/土地40%（概算）"
     loans:
       primary:
         - id: orix-g2-pers
@@ -70,6 +89,15 @@ properties:
     key_number: null  # なし（キーボックス無し）
     rooms_expected: 4
     managers: [Tcell]
+    book:
+      body_price_jpy: 46000000
+      building_jpy: 23000000
+      equipment_jpy: 4600000
+      land_jpy: 18400000
+      building_years: 22
+      equipment_years: 15
+      allocation: estimated
+      note: "本体=ROI。木造想定・建物耐用22年。按分は概算"
     loans:
       primary:
         - id: shiga-caramel
