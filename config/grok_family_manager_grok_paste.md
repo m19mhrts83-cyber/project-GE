@@ -173,6 +173,15 @@
 - **名前**: 家族コーチ統括
 - **Description**: Notionの家族会議・Journal週次を読み、子ども別コーチへ振り分け、親への助言とマサハルのQOLをまとめる統括
 
+## Grok ルーティン（チャンネル UI）
+
+投稿先は **家族コーチングチーム**。指示の正本:
+
+- 週次（日曜 21:00）: `config/grok_family_routine_週次.md`
+- マイルストーン（水曜 7:30・任意）: `config/grok_family_routine_マイルストーン.md`
+
+材料は Jarvis が Notion「Journal週次」へ投影する。ルーティンは Notion 自己読取で評価する（チャット貼付待ち禁止）。
+
 ## チャンネル定型（松野用・チャット用）
 
 **週次（家族会議後）**:
@@ -211,3 +220,5 @@ Notion読取OK前提で実施してください。
 - 索引: `config/grok_family_coaching_handoff_paste.md`
 - Notion: `config/notion_family_coaching.yaml`
 - 専属: `config/grok_madoka_coach_grok_paste.md` 他
+- 週次ルーティン: `config/grok_family_routine_週次.md`
+- マイルストーン: `config/grok_family_routine_マイルストーン.md`
