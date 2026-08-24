@@ -61,6 +61,9 @@ WESTUDY_GDRIVE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_westudy_gdri
 PORTFOLIO_WEEKLY_STATE = REPO / ".jarvis_state" / "portfolio_weekly.json"
 PORTFOLIO_WEEKLY_RUNNER = REPO / "launchd" / "portfolio_weekly_runner.sh"
 PORTFOLIO_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_portfolio"
+FAMILY_JOURNAL_STATE = REPO / ".jarvis_state" / "family_journal_weekly.json"
+FAMILY_JOURNAL_RUNNER = REPO / "launchd" / "family_journal_weekly_runner.sh"
+FAMILY_JOURNAL_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_family_journal"
 
 
 def now_iso() -> str:
@@ -284,6 +287,77 @@ def spawn_portfolio_weekly(*, dry_run: bool) -> str:
         return "spawned"
     except Exception as e:
         print(f"# portfolio_weekly spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
+def this_week_family_journal_slot() -> datetime:
+    """今週日曜 08:00 JST（金締 Journal 投影。WeStudy Drive と同刻）。"""
+    now = datetime.now(JST)
+    days_since_sun = (now.weekday() + 1) % 7
+    return now.replace(hour=8, minute=0, second=0, microsecond=0) - timedelta(
+        days=days_since_sun
+    )
+
+
+def family_journal_weekly_needs_catchup() -> bool:
+    """日曜 08:00 枠が未成功なら True（月曜以降の朝オープンで拾う）。"""
+    if os.environ.get("JARVIS_FAMILY_JOURNAL_WEEKLY_DISABLE") == "1":
+        return False
+    now = datetime.now(JST)
+    slot = this_week_family_journal_slot()
+    if now < slot:
+        return False
+    if not FAMILY_JOURNAL_STATE.is_file():
+        return True
+    try:
+        data = json.loads(FAMILY_JOURNAL_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("disabled") is True:
+        return False
+    if data.get("last_ok") is False:
+        return True
+    if not data.get("page_id"):
+        return True
+    # 金締ラベルが直近金曜と一致し、かつ slot 以降成功
+    fri = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    fri = fri - timedelta(days=(fri.weekday() - 4) % 7)
+    expect_week = f"金締-{fri.strftime('%Y-%m-%d')}"
+    if str(data.get("week") or "") != expect_week:
+        return True
+    ts = _parse_state_ts(str(data.get("last_success_at") or ""))
+    if ts is None:
+        return True
+    return ts < slot
+
+
+def spawn_family_journal_weekly(*, dry_run: bool) -> str:
+    if not FAMILY_JOURNAL_RUNNER.is_file():
+        print(f"# family_journal: missing {FAMILY_JOURNAL_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn family_journal_weekly_runner.sh", flush=True)
+        return "dry_run"
+    FAMILY_JOURNAL_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(FAMILY_JOURNAL_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(FAMILY_JOURNAL_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(FAMILY_JOURNAL_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# family_journal: spawned weekly runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# family_journal spawn failed: {e}", file=sys.stderr)
         out.close()
         err.close()
         return "error"
@@ -683,6 +757,18 @@ def main() -> int:
     else:
         results["steps"]["portfolio_weekly"] = "fresh"
         print("# portfolio_weekly: skip (this week's full collect already done)", flush=True)
+
+    # 9. 家族コーチ Journal週次 → Notion（日曜 08:00 金締・失敗／Mac スリープ時）
+    if family_journal_weekly_needs_catchup():
+        results["steps"]["family_journal_weekly"] = spawn_family_journal_weekly(
+            dry_run=args.dry_run
+        )
+    else:
+        results["steps"]["family_journal_weekly"] = "fresh"
+        print(
+            "# family_journal: skip (this week's Sunday 08:00 金締 slot already done)",
+            flush=True,
+        )
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()

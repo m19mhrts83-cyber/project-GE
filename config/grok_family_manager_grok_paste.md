@@ -13,6 +13,7 @@
 | C3 | さわコーチ | `config/grok_sawa_coach_grok_paste.md` |
 
 **Mac 側**: **Jarvis**（Cursor）。Journal週次の Notion 投影は Jarvis（`jarvis_family_journal_weekly.py`）。  
+**自動**: launchd 日曜 08:00（**金締＝土〜金**）＋ Mac 起動＋朝オープン取りこぼし。WeStudy Drive と同刻。  
 **Notion 読取**: Grok の Notion プラグインで **統括が自分で開く**（チャット貼付待ちにしない）。
 
 以下を Grok の Bot **Instructions** にそのまま貼る。
@@ -58,10 +59,10 @@
 
 参照順（厳守）:
 1. **家族会議** — 直近の日付付き子ページ（決定・宿題・条件）
-2. **Journal週次** — 子供コーチング配下の最新週ページ（Jarvis投影）
+2. **Journal週次** — 子供コーチング配下の最新週ページ（Jarvis投影・**金締＝土〜金**）
 3. 必要なら **子供コーチング** の円香／珠己／紗和ページ
 
-読めたらチャンネルに1行: Notion読取: OK · 家族会議 YYYY-MM-DD · Journal週次 {週}
+読めたらチャンネルに1行: Notion読取: OK · 家族会議 YYYY-MM-DD · Journal週次 {金締-YYYY-MM-DD}
 読めないとき: Notion読取: NG · 理由…（共有不足の可能性を1行）
 
 タグ: family_meeting / juku_briefing / teacher_meeting / meeting_consult

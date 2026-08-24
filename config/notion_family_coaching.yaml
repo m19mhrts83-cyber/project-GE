@@ -15,7 +15,7 @@ coaching_hub_page_url: "https://app.notion.com/p/282f6bbe5a768097bd9dc2fbbdb49a4
 coaching_hub_title: 子供コーチング
 journal_weekly_hub_page_id: "3c6f6bbe-5a76-8168-b72f-e35a7f44343c"
 journal_weekly_hub_page_url: "https://app.notion.com/p/Journal-3c6f6bbe5a768168b72fe35a7f44343c"
-journal_weekly_note: "Jarvis 週次 · Obsidian ★Journal 要約。scripts/jarvis_family_journal_weekly.py --pull --apply。Grok 家族コーチが読む"
+journal_weekly_note: "Jarvis 週次 · 金締（土〜金）· 日曜08:00。scripts/jarvis_family_journal_weekly.py --pull --apply。Grok 家族コーチが読む"
 
 inventory_status: ok
 inventory_at: "2026-08-23"
