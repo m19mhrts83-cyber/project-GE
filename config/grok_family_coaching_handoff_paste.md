@@ -26,7 +26,7 @@
 
 | 層 | 誰 | いまの状態 | トリガー |
 |---|---|---|---|
-| **材料** | Jarvis（Mac） | スクリプトあり。**launchd 未設定**（日曜セッションで実行） | `jarvis_family_journal_weekly.py --pull --apply` |
+| **材料** | Jarvis（Mac） | **自動本線**: 日曜08:00（金締・土〜金）＋起動時＋朝オープン | `family_journal_weekly` launchd / morning |
 | **評価** | Grok 統括＋専属3本 | Instructions 済み。**ルーティン ON**（ユーザー設定済） | 日曜 21:00 週次／水曜 7:30 マイルストーン（任意） |
 | **手動バックアップ** | 松野 | ルーティン前でも可 | 下の定型チャット |
 
@@ -57,7 +57,7 @@ Grok は Journal 本文を Jarvis からチャットで受け取らない。Noti
 | ハブ1 | **家族会議** |
 | ハブ2 | **子供コーチング** |
 | ハブ3 | **Journal週次**（Jarvis 週次） |
-| Journal週次更新 | `scripts/jarvis_family_journal_weekly.py --pull --apply` |
+| Journal週次更新 | 本線: `./launchd/install_family_journal_weekly_launchd.sh`（日曜08:00・金締＋RunAtLoad）。手動: `scripts/jarvis_family_journal_weekly.py --pull --apply` |
 
 ## 混同しないレーン
 
@@ -74,4 +74,4 @@ Grok は Journal 本文を Jarvis からチャットで受け取らない。Noti
 2. 専属3本は参照材料の1行追加を再貼り（任意だが推奨）
 3. Notion が Grok ログインアカウントから見えること（読取OK済みならスキップ）
 4. 初回フル文をチャンネルへ投下
-5. Grok ルーティン「家族コーチング · 週次」を家族コーチングチームに作成（`config/grok_family_routine_週次.md`）
+5. Grok ルーティン「家族コーチング · 週次」を家族コーチングチームに作成（日曜 21:00・ON済）

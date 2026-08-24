@@ -3,7 +3,7 @@
 Grok チャンネル **家族コーチングチーム** のルーティン UI に貼る。  
 Bot 恒久ルールの正本は `config/grok_family_manager_grok_paste.md`（こちらはスケジュール起動文だけ）。
 
-材料（Journal週次）は **Jarvis が Notion に置く**。Grok は Notion を自分で読む（チャット貼付待ち禁止）。
+材料（Journal週次）は **Jarvis が Notion に置く**（**金締＝土〜金**・日曜 08:00 投影）。Grok は Notion を自分で読む（チャット貼付待ち禁止）。
 
 ## ルーティン設定（推奨）
 

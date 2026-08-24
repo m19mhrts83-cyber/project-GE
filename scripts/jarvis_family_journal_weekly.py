@@ -2,13 +2,18 @@
 # -*- coding: utf-8 -*-
 """家族コーチ向け — Obsidian ★Journal 週次要約 → Notion（本線 B）。
 
+週の区切り: **土曜始まり〜金曜終わり（金締）**。
+土日の後追いログは月曜に残ることが多いため、日曜朝の投影は金曜までの分を正とする。
+
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_family_journal_weekly.py --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_family_journal_weekly.py --pull --apply
-  ~/selenium_env/venv/bin/python scripts/jarvis_family_journal_weekly.py --days 7 --apply
+  ~/selenium_env/venv/bin/python scripts/jarvis_family_journal_weekly.py --pull --apply --auto
+  ~/selenium_env/venv/bin/python scripts/jarvis_family_journal_weekly.py --apply --force
 
 正本 Journal: ~/Documents/500_Obsidian_r1/01_Journaling/★Journal/
 Notion 親: 子供コーチング配下の「Journal週次」ハブ（無ければ作成）
+自動: launchd 日曜 08:00（WeStudy Drive と同刻）＋ RunAtLoad ＋ 朝オープン取りこぼし（--auto）
 """
 from __future__ import annotations
 
@@ -36,6 +41,10 @@ OGD_PULL = REPO / "scripts" / "jarvis_obsidian_ogd_pull.py"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 NOTION_VERSION = "2022-06-28"
 API = "https://api.notion.com/v1"
+# WeStudy Drive 添付週次（日曜 08:00）に合わせる。Grok 家族コーチは日曜 21:00
+SLOT_HOUR = 8
+SLOT_MINUTE = 0
+FRI_WEEK_DAYS = 7  # 土〜金
 
 CHILD_KEYWORDS: list[tuple[str, list[str]]] = [
     ("まどか", ["まどか", "円香", "水田"]),
@@ -66,6 +75,29 @@ def now_jst() -> datetime:
 def iso_week_label(d: datetime) -> str:
     y, w, _ = d.isocalendar()
     return f"{y}-W{w:02d}"
+
+
+def friday_on_or_before(d: datetime) -> datetime:
+    """指定日以前の直近金曜（当日が金曜なら当日）0:00 JST。"""
+    d0 = d.replace(hour=0, minute=0, second=0, microsecond=0)
+    return d0 - timedelta(days=(d0.weekday() - 4) % 7)
+
+
+def most_recent_friday(hour: int = 0, minute: int = 0) -> datetime:
+    """直近の金曜（今日が金曜なら今日）の指定時刻 JST。"""
+    fri = friday_on_or_before(now_jst())
+    return fri.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
+def fri_week_label(end_friday: datetime) -> str:
+    """金締ラベル（例: 金締-2026-08-22）。"""
+    return f"金締-{end_friday.strftime('%Y-%m-%d')}"
+
+
+def sunday_slot_for_friday(end_friday: datetime) -> datetime:
+    """その金締週を投影する日曜 08:00（金曜の2日後）。"""
+    sun = end_friday + timedelta(days=2)
+    return sun.replace(hour=SLOT_HOUR, minute=SLOT_MINUTE, second=0, microsecond=0)
 
 
 def _token() -> str:
@@ -185,11 +217,31 @@ def extract_day_digest(text: str, day: datetime) -> dict[str, Any]:
 
 
 def build_pack(days: int, end: datetime | None = None) -> dict[str, Any]:
-    end = end or now_jst().replace(hour=0, minute=0, second=0, microsecond=0)
-    start = end - timedelta(days=days - 1)
+    """既定は金締（土〜金）。end は金曜にスナップ（手動 --end も同様）。"""
+    raw_end = end or now_jst()
+    end_fri = friday_on_or_before(raw_end)
+    # days 既定=7 のときは金締固定。明示的に日数を変えたときだけ rolling
+    if days == FRI_WEEK_DAYS:
+        start = end_fri - timedelta(days=6)
+        span = FRI_WEEK_DAYS
+        week = fri_week_label(end_fri)
+        title = (
+            f"Journal週次 {week}（{start.strftime('%Y-%m-%d')}土"
+            f"〜{end_fri.strftime('%Y-%m-%d')}金）"
+        )
+        end = end_fri
+    else:
+        end = raw_end.replace(hour=0, minute=0, second=0, microsecond=0)
+        start = end - timedelta(days=days - 1)
+        span = days
+        week = iso_week_label(end)
+        title = (
+            f"Journal週次 {week}（{start.strftime('%Y-%m-%d')}〜{end.strftime('%Y-%m-%d')}）"
+        )
+
     day_rows: list[dict[str, Any]] = []
     missing: list[str] = []
-    for i in range(days):
+    for i in range(span):
         d = start + timedelta(days=i)
         path = find_journal_file(d)
         if not path:
@@ -205,17 +257,14 @@ def build_pack(days: int, end: datetime | None = None) -> dict[str, Any]:
         for c in r["children"]:
             child_counts[c] = child_counts.get(c, 0) + 1
 
-    week = iso_week_label(end)
-    title = (
-        f"Journal週次 {week}（{start.strftime('%Y-%m-%d')}〜{end.strftime('%Y-%m-%d')}）"
-    )
     md_parts = [
         f"# {title}",
         "",
         f"更新: {now_jst().strftime('%Y-%m-%d %H:%M JST')} · source: Obsidian ★Journal · Jarvis",
+        f"区切り: 土曜始まり〜金曜終わり（金締）。土日後追いログは翌週以降に載ることがある。",
         "",
         "## 週の俯瞰",
-        f"- 取得日数: {len(day_rows)} / 対象 {days} 日",
+        f"- 取得日数: {len(day_rows)} / 対象 {span} 日",
         f"- 欠日: {', '.join(missing) if missing else 'なし'}",
         f"- 子ども言及日数: "
         + " / ".join(f"{k}={v}" for k, v in child_counts.items()),
@@ -243,14 +292,15 @@ def build_pack(days: int, end: datetime | None = None) -> dict[str, Any]:
         body = body[: TOTAL_MAX - 30].rstrip() + "\n\n…（全体省略）"
 
     return {
-        "title": title,
         "week": week,
+        "title": title,
         "start": start.strftime("%Y-%m-%d"),
         "end": end.strftime("%Y-%m-%d"),
         "days_found": len(day_rows),
         "missing": missing,
         "child_counts": child_counts,
         "markdown": body,
+        "end_friday": end_fri.strftime("%Y-%m-%d"),
         "day_rows": [
             {k: v for k, v in r.items() if k != "excerpt"} for r in day_rows
         ],
@@ -442,18 +492,92 @@ def upsert_week_page(hub_id: str, pack: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def save_state(pack: dict[str, Any], page: dict[str, Any] | None) -> None:
+def load_state() -> dict[str, Any]:
+    if not STATE_PATH.is_file():
+        return {}
+    try:
+        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def most_recent_sunday(hour: int = 0, minute: int = 0) -> datetime:
+    """直近の日曜（今日が日曜なら今日）の指定時刻 JST。"""
+    now = now_jst()
+    days_since_sun = (now.weekday() + 1) % 7
+    return now.replace(hour=hour, minute=minute, second=0, microsecond=0) - timedelta(
+        days=days_since_sun
+    )
+
+
+def parse_state_ts(raw: str) -> datetime | None:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(JST)
+    except ValueError:
+        try:
+            return datetime.strptime(raw[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=JST)
+        except ValueError:
+            return None
+
+
+def auto_should_skip() -> tuple[bool, str]:
+    """launchd / 朝取りこぼし用。金締週を日曜08:00以降に成功していればスキップ。"""
+    if os.environ.get("JARVIS_FAMILY_JOURNAL_WEEKLY_DISABLE") == "1":
+        return True, "JARVIS_FAMILY_JOURNAL_WEEKLY_DISABLE=1"
+    state = load_state()
+    if state.get("disabled") is True:
+        return True, "state.disabled"
+    end_fri = most_recent_friday(0, 0)
+    week = fri_week_label(end_fri)
+    slot_done = sunday_slot_for_friday(end_fri)
+    now = now_jst()
+    if now < slot_done:
+        return True, f"before Sunday slot {slot_done.strftime('%Y-%m-%d %H:%M')}"
+    if not state.get("page_id") or state.get("last_ok") is False:
+        return False, ""
+    if str(state.get("week") or "") != week:
+        return False, ""
+    ts = parse_state_ts(str(state.get("last_success_at") or ""))
+    if ts is None:
+        return False, ""
+    if ts >= slot_done:
+        return True, f"already ok since slot {slot_done.strftime('%Y-%m-%d %H:%M')}"
+    return False, ""
+
+
+def save_state(
+    pack: dict[str, Any],
+    page: dict[str, Any] | None,
+    *,
+    last_ok: bool | None = None,
+) -> None:
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    prev = load_state()
+    ok = True if last_ok is None else last_ok
+    now = now_jst()
+    applied = bool(page and page.get("page_id"))
     STATE_PATH.write_text(
         json.dumps(
             {
-                "updated_at": now_jst().isoformat(),
+                "updated_at": now.isoformat(),
+                "last_success_at": (
+                    now.isoformat()
+                    if applied and ok
+                    else prev.get("last_success_at")
+                ),
+                "last_ok": ok if applied else prev.get("last_ok"),
                 "week": pack["week"],
                 "title": pack["title"],
+                "end_friday": pack.get("end_friday"),
                 "days_found": pack["days_found"],
                 "missing": pack["missing"],
-                "page_id": (page or {}).get("page_id"),
-                "url": (page or {}).get("url"),
+                "page_id": (page or {}).get("page_id") or prev.get("page_id"),
+                "url": (page or {}).get("url") or prev.get("url"),
+                "disabled": prev.get("disabled", False),
             },
             ensure_ascii=False,
             indent=2,
@@ -465,17 +589,29 @@ def save_state(pack: dict[str, Any], page: dict[str, Any] | None) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--days", type=int, default=7)
+    ap.add_argument("--days", type=int, default=FRI_WEEK_DAYS)
     ap.add_argument("--pull", action="store_true", help="OGD Pull してから実行")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--apply", action="store_true", help="Notion に作成／更新")
     ap.add_argument(
         "--end",
         default="",
-        help="終了日 YYYY-MM-DD（既定=今日 JST）",
+        help="終了日 YYYY-MM-DD（金にスナップ。既定=直近金曜）",
     )
     ap.add_argument("--print-md", action="store_true", help="要約 MD を stdout")
+    ap.add_argument(
+        "--auto",
+        action="store_true",
+        help="launchd／朝取りこぼし用。金締パック＋日曜08:00成功済みならスキップ",
+    )
+    ap.add_argument("--force", action="store_true", help="--auto のスキップを無視")
     args = ap.parse_args()
+
+    if args.auto and not args.force:
+        skip, reason = auto_should_skip()
+        if skip:
+            print(f"# skip: {reason}", flush=True)
+            return 0
 
     if args.pull:
         pull_journal()
@@ -483,6 +619,8 @@ def main() -> int:
     end = None
     if args.end.strip():
         end = datetime.strptime(args.end.strip(), "%Y-%m-%d").replace(tzinfo=JST)
+    else:
+        end = most_recent_friday(0, 0)
 
     pack = build_pack(args.days, end)
     print(
@@ -499,46 +637,52 @@ def main() -> int:
     if not args.apply:
         if not args.dry_run:
             print("# --apply で Notion 反映。--dry-run で MD 確認可")
-        save_state(pack, None)
+        # dry-run / プレビューでは state を触らない（誤スキップ防止）
         return 0
 
-    cfg = _load_yaml()
-    hub_parent = cfg.get("coaching_hub_page_id") or ""
-    if not hub_parent:
-        print("ERROR: coaching_hub_page_id が YAML に無い", file=sys.stderr)
-        return 2
-    hub_id = ensure_journal_hub(hub_parent, cfg)
-    # persist hub id if newly found/created
-    if cfg.get("journal_weekly_hub_page_id"):
-        # keep existing yaml comments: rewrite carefully via patch keys only
-        text = FAMILY_YAML.read_text(encoding="utf-8")
-        if "journal_weekly_hub_page_id" not in text:
-            insert = (
-                f'\njournal_weekly_hub_page_id: "{cfg["journal_weekly_hub_page_id"]}"\n'
-                f'journal_weekly_hub_page_url: "{cfg.get("journal_weekly_hub_page_url", "")}"\n'
-                f'journal_weekly_note: "Jarvis 週次 · Obsidian ★Journal 要約。Grok 家族コーチが読む"\n'
-            )
-            # after coaching_hub_title line
-            if "coaching_hub_title:" in text:
-                text = text.replace(
-                    "coaching_hub_title: 子供コーチング\n",
-                    "coaching_hub_title: 子供コーチング\n" + insert.lstrip("\n"),
-                    1,
+    try:
+        cfg = _load_yaml()
+        hub_parent = cfg.get("coaching_hub_page_id") or ""
+        if not hub_parent:
+            print("ERROR: coaching_hub_page_id が YAML に無い", file=sys.stderr)
+            save_state(pack, None, last_ok=False)
+            return 2
+        hub_id = ensure_journal_hub(hub_parent, cfg)
+        # persist hub id if newly found/created
+        if cfg.get("journal_weekly_hub_page_id"):
+            # keep existing yaml comments: rewrite carefully via patch keys only
+            text = FAMILY_YAML.read_text(encoding="utf-8")
+            if "journal_weekly_hub_page_id" not in text:
+                insert = (
+                    f'\njournal_weekly_hub_page_id: "{cfg["journal_weekly_hub_page_id"]}"\n'
+                    f'journal_weekly_hub_page_url: "{cfg.get("journal_weekly_hub_page_url", "")}"\n'
+                    f'journal_weekly_note: "Jarvis 週次 · Obsidian ★Journal 要約。Grok 家族コーチが読む"\n'
                 )
-                FAMILY_YAML.write_text(text, encoding="utf-8")
-            else:
-                _save_yaml(cfg)
+                # after coaching_hub_title line
+                if "coaching_hub_title:" in text:
+                    text = text.replace(
+                        "coaching_hub_title: 子供コーチング\n",
+                        "coaching_hub_title: 子供コーチング\n" + insert.lstrip("\n"),
+                        1,
+                    )
+                    FAMILY_YAML.write_text(text, encoding="utf-8")
+                else:
+                    _save_yaml(cfg)
 
-    page = upsert_week_page(hub_id, pack)
-    save_state(pack, page)
-    print(
-        f"✅ Notion {'作成' if page['created'] else '更新'}: {page['title']}\n"
-        f"   {page.get('url') or page['page_id']}"
-    )
-    print(
-        "📎 Grok向け: 子供コーチング → Journal週次 → 上記ページを Notion プラグインで開いてください"
-    )
-    return 0
+        page = upsert_week_page(hub_id, pack)
+        save_state(pack, page, last_ok=True)
+        print(
+            f"✅ Notion {'作成' if page['created'] else '更新'}: {page['title']}\n"
+            f"   {page.get('url') or page['page_id']}"
+        )
+        print(
+            "📎 Grok向け: 子供コーチング → Journal週次 → 上記ページを Notion プラグインで開いてください"
+        )
+        return 0
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        save_state(pack, None, last_ok=False)
+        return 1
 
 
 if __name__ == "__main__":
