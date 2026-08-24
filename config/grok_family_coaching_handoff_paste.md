@@ -1,6 +1,6 @@
 # 家族コーチング — Grok 反映（索引）
 
-**更新**: 2026-08-23  
+**更新**: 2026-08-24  
 **方針**: このファイル単体を Instructions に貼らない。各 Bot の paste 正本を説明欄へ。
 
 ## Grok「説明」欄に貼るファイル（正本）
@@ -28,10 +28,12 @@
 | 正本 YAML | `config/notion_family_coaching.yaml`（`inventory_status: ok`） |
 | ハブ1 | **家族会議** — 週次ログ |
 | ハブ2 | **子供コーチング** — 円香／珠己／紗和＋塾・面談メモ |
+| ハブ3 | **Journal週次** — Obsidian ★Journal の Jarvis 週次要約（本線 B） |
 | トークン | `.env.jarvis_private` の `NOTION_API_TOKEN`（同一WS・追加鍵不要） |
 | 接続確認 | `scripts/jarvis_notion_api.py family-probe` / `get-page` |
+| Journal週次更新 | `scripts/jarvis_family_journal_weekly.py --pull --apply` |
 
-参照する内容: 家族会議、塾説明、先生面談、面談相談メモ（主に子供コーチング配下へ蓄積）。
+参照する内容: 家族会議、塾説明、先生面談、面談相談メモ、**Journal週次**（主に子供コーチング配下）。
 
 ## 混同しないレーン
 
