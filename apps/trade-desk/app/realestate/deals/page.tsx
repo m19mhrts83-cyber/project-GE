@@ -1,7 +1,7 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
-import DealReviewActions from "@/components/DealReviewActions";
 import DealsDrawerHost from "@/components/DealsDrawerHost";
+import DealsListTable, { type DealsListRow } from "@/components/DealsListTable";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
@@ -283,6 +283,60 @@ export default async function RealEstateDealsPage({
     if (inquiryFilter) q.set("inquiry", inquiryFilter);
     return `/realestate/deals?${q.toString()}`;
   }
+
+  const listRows: DealsListRow[] = visibleDeals.map((d) => {
+    const sj =
+      d.summary_json && typeof d.summary_json === "object"
+        ? (d.summary_json as Record<string, unknown>)
+        : {};
+    const grok =
+      sj.grok && typeof sj.grok === "object"
+        ? (sj.grok as Record<string, unknown>)
+        : null;
+    const inquiryStatus =
+      d.inquiry_status ||
+      (typeof sj.inquiry_status === "string" ? sj.inquiry_status : "none");
+    const evalInq = inquiryEval(d);
+    const fromRaw = typeof sj.from === "string" ? sj.from : null;
+    const msgs = messagesByDeal.get(d.id) || [];
+    const evs = eventsByDeal.get(d.id) || [];
+    const activity = lastActivityLine(msgs, evs);
+    const band = scoreBand(d.match_score);
+    return {
+      id: d.id,
+      title: d.title || "",
+      status: d.status,
+      statusLabel: DEAL_STATUS_LABEL[d.status] || d.status,
+      sourceBadge: slimTable
+        ? SOURCE_BADGE[d.source] || d.source
+        : d.source,
+      area: d.area || "—",
+      priceLabel:
+        d.price_man != null ? fmtYen(Number(d.price_man) * 10000) : "—",
+      grokLine: grokOneLine(grok),
+      inquiryStatus,
+      activityLine: activity.at
+        ? `${activity.at.slice(0, 10)} ${activity.text.slice(0, 32)}`
+        : "—",
+      scoreLabel: formatMatchScore(d.match_score),
+      scoreBand: band,
+      hitsPreview: scoreHitsPreview(sj.hits),
+      pursuing: pursueDeals.some((p) => p.id === d.id),
+      highlighted: highlightDeal === d.id,
+      badges: evalInq.badges,
+      openHref: openDealHref(d.id),
+      review: {
+        gmailId: typeof sj.gmail_id === "string" ? sj.gmail_id : null,
+        gmailReadAt:
+          typeof sj.gmail_read_at === "string" ? sj.gmail_read_at : null,
+        fromRaw,
+        inquiryReady: evalInq.tier1,
+        inquiryHasTo: evalInq.hasTo,
+        inquiryBadges: evalInq.badges,
+        inquiryChannel: evalInq.inquiryChannel,
+      },
+    };
+  });
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
@@ -588,287 +642,11 @@ export default async function RealEstateDealsPage({
         </>
       ) : null}
 
-      <div className="card">
-        <header>
-          <span className="lvl">Deals</span>
-          <strong>
-            案件一覧（{visibleDeals.length} 件
-            {dedupeHiddenCount > 0
-              ? ` · 重複 ${dedupeHiddenCount} 件を非表示`
-              : ""}
-            ）
-          </strong>
-        </header>
-        {visibleDeals.length === 0 ? (
-          <p className="meta" style={{ marginTop: 8 }}>
-            該当案件がありません。「メール候補を更新」で取込してください。
-          </p>
-        ) : slimTable ? (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>評価スコア</th>
-                  <th>状態</th>
-                  <th>物件</th>
-                  <th>エリア</th>
-                  <th>価格</th>
-                  <th>Grok評価</th>
-                  <th>問合せ</th>
-                  <th>最終動き</th>
-                  <th>操作</th>
-                  <th>詳細</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDeals.map((d) => {
-                  const sj =
-                    d.summary_json && typeof d.summary_json === "object"
-                      ? (d.summary_json as Record<string, unknown>)
-                      : {};
-                  const grok =
-                    sj.grok && typeof sj.grok === "object"
-                      ? (sj.grok as Record<string, unknown>)
-                      : null;
-                  const inquiryStatus =
-                    d.inquiry_status ||
-                    (typeof sj.inquiry_status === "string"
-                      ? sj.inquiry_status
-                      : "none");
-                  const evalInq = inquiryEval(d);
-                  const fromRaw =
-                    typeof sj.from === "string" ? sj.from : null;
-                  const msgs = messagesByDeal.get(d.id) || [];
-                  const evs = eventsByDeal.get(d.id) || [];
-                  const activity = lastActivityLine(msgs, evs);
-                  const dealOpenHref = openDealHref(d.id);
-                  const band = scoreBand(d.match_score);
-                  const hits = scoreHitsPreview(sj.hits);
-                  const pursuing = pursueDeals.some((p) => p.id === d.id);
-                  return (
-                    <tr
-                      key={d.id}
-                      id={`deal-${d.id}`}
-                      style={
-                        highlightDeal === d.id
-                          ? {
-                              outline: "2px solid var(--danger, #b45309)",
-                              outlineOffset: 2,
-                            }
-                          : pursuing
-                            ? { background: "#f0fdf4" }
-                            : undefined
-                      }
-                    >
-                      <td>
-                        <div style={scoreCellStyle(band)}>
-                          {formatMatchScore(d.match_score)}
-                          {band !== "none" ? (
-                            <span className="meta" style={{ marginLeft: 6 }}>
-                              {scoreBandLabel(band)}
-                            </span>
-                          ) : null}
-                        </div>
-                        {hits ? (
-                          <div className="meta" style={{ fontSize: 11 }}>
-                            {hits}
-                          </div>
-                        ) : null}
-                        {pursuing ? (
-                          <div
-                            className="meta"
-                            style={{ color: "#047857", fontSize: 11 }}
-                          >
-                            買い進め中
-                          </div>
-                        ) : null}
-                      </td>
-                      <td>{DEAL_STATUS_LABEL[d.status] || d.status}</td>
-                      <td>
-                        {d.title}
-                        {evalInq.badges.length > 0 ? (
-                          <div className="meta">
-                            {evalInq.badges.map((b) => (
-                              <span
-                                key={b}
-                                style={{
-                                  display: "inline-block",
-                                  marginRight: 4,
-                                  padding: "1px 6px",
-                                  borderRadius: 4,
-                                  fontSize: 11,
-                                  background:
-                                    b === "再検討" ? "#fef3c7" : "#eff6ff",
-                                }}
-                              >
-                                {b}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        <div className="meta">
-                          {SOURCE_BADGE[d.source] || d.source}
-                        </div>
-                      </td>
-                      <td className="meta">{d.area || "—"}</td>
-                      <td className="meta">
-                        {d.price_man != null
-                          ? fmtYen(Number(d.price_man) * 10000)
-                          : "—"}
-                      </td>
-                      <td className="meta">{grokOneLine(grok)}</td>
-                      <td>
-                        <span style={inquiryChipStyle(inquiryStatus)}>
-                          {INQUIRY_STATUS_LABEL[inquiryStatus] ||
-                            inquiryStatus}
-                        </span>
-                      </td>
-                      <td className="meta">
-                        {activity.at
-                          ? `${activity.at.slice(0, 10)} ${activity.text.slice(0, 32)}`
-                          : "—"}
-                      </td>
-                      <td>
-                        <DealReviewActions
-                          dealId={d.id}
-                          status={d.status}
-                          gmailId={
-                            typeof sj.gmail_id === "string"
-                              ? sj.gmail_id
-                              : null
-                          }
-                          gmailReadAt={
-                            typeof sj.gmail_read_at === "string"
-                              ? sj.gmail_read_at
-                              : null
-                          }
-                          dealTitle={d.title}
-                          fromRaw={fromRaw}
-                          inquiryReady={evalInq.tier1}
-                          inquiryHasTo={evalInq.hasTo}
-                          inquiryBadges={evalInq.badges}
-                          inquiryChannel={evalInq.inquiryChannel}
-                          openDealHref={dealOpenHref}
-                        />
-                      </td>
-                      <td>
-                        <Link href={dealOpenHref} className="btn">
-                          開く
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>状態</th>
-                  <th>評価スコア</th>
-                  <th>タイトル</th>
-                  <th>エリア</th>
-                  <th>価格</th>
-                  <th>問合せ</th>
-                  <th>操作</th>
-                  <th>詳細</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDeals.map((d) => {
-                  const sj =
-                    d.summary_json && typeof d.summary_json === "object"
-                      ? (d.summary_json as Record<string, unknown>)
-                      : {};
-                  const inquiryStatus =
-                    d.inquiry_status ||
-                    (typeof sj.inquiry_status === "string"
-                      ? sj.inquiry_status
-                      : "none");
-                  const band = scoreBand(d.match_score);
-                  const hits = scoreHitsPreview(sj.hits);
-                  const pursuing = pursueDeals.some((p) => p.id === d.id);
-                  return (
-                    <tr
-                      key={d.id}
-                      style={
-                        pursuing ? { background: "#f0fdf4" } : undefined
-                      }
-                    >
-                      <td>
-                        {DEAL_STATUS_LABEL[d.status] || d.status}
-                        {pursuing ? (
-                          <div
-                            className="meta"
-                            style={{ color: "#047857", fontSize: 11 }}
-                          >
-                            買い進め中
-                          </div>
-                        ) : null}
-                      </td>
-                      <td>
-                        <div style={scoreCellStyle(band)}>
-                          {formatMatchScore(d.match_score)}
-                          {band !== "none" ? (
-                            <span className="meta" style={{ marginLeft: 6 }}>
-                              {scoreBandLabel(band)}
-                            </span>
-                          ) : null}
-                        </div>
-                        {hits ? (
-                          <div className="meta" style={{ fontSize: 11 }}>
-                            {hits}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td>
-                        {d.title}
-                        <div className="meta">{d.source}</div>
-                      </td>
-                      <td className="meta">{d.area || "—"}</td>
-                      <td className="meta">
-                        {d.price_man != null
-                          ? fmtYen(Number(d.price_man) * 10000)
-                          : "—"}
-                      </td>
-                      <td>
-                        <span style={inquiryChipStyle(inquiryStatus)}>
-                          {INQUIRY_STATUS_LABEL[inquiryStatus] ||
-                            inquiryStatus}
-                        </span>
-                      </td>
-                      <td>
-                        <DealReviewActions
-                          dealId={d.id}
-                          status={d.status}
-                          gmailId={
-                            typeof sj.gmail_id === "string"
-                              ? sj.gmail_id
-                              : null
-                          }
-                          gmailReadAt={
-                            typeof sj.gmail_read_at === "string"
-                              ? sj.gmail_read_at
-                              : null
-                          }
-                        />
-                      </td>
-                      <td>
-                        <Link href={openDealHref(d.id)} className="btn">
-                          開く
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DealsListTable
+        variant={slimTable ? "slim" : "full"}
+        rows={listRows}
+        dedupeHiddenCount={dedupeHiddenCount}
+      />
 
       <Suspense fallback={null}>
         <DealsDrawerHost dealId={highlightDeal || null} />
