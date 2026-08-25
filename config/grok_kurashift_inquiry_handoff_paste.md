@@ -1,6 +1,6 @@
 # KURASHIFT / Grok Bot — paste 索引
 
-**更新**: 2026-08-24  
+**更新**: 2026-08-25  
 **方針**: 追記内容は **各 Bot の paste 正本に統合済み**。このファイル単体を Instructions に貼らない。
 
 ## Grok「説明」欄に貼るファイル（正本）
@@ -15,16 +15,18 @@
 | **ペルソナ二次判断** | S5 | `config/grok_persona_bot_grok_paste.md` | 同上 |
 | **買付交渉** | S6 | `config/grok_deal_negotiation_bot_grok_paste.md` | 同上 |
 | **融資相談** | S7 | `config/grok_loan_bot_grok_paste.md` | 同上 |
+| **物件ライフライン** | S8 | `config/grok_property_util_bot_grok_paste.md` | 同上 |
 
 - **名前・タイトル**は UI の短い欄のまま（paste MD 末尾の「Grok プロフィール設定」参照）
 - **説明**＝上記コードブロック内の `# あなたの役割 — …` から末尾まで
 - チャットは **本日分・007から** 等の**当日司令**用。恒久ルールは説明欄のみ
+- **未作成の UI 手順**: `config/grok_remaining_bots_setup.md`（S6/S7/S8）
 
 ## 設計（Phase 1＋フェーズ拡張）
 
 - `docs/KURASHIFT_供給_ペルソナ_修繕Bot_設計_20260824.md`
 - `docs/KURASHIFT_Grok_不動産フェーズBot_設計_20260824.md`
-- 都度: 問合せ以降 → S5 → S3 →（購入後）S6 → S7
+- 都度: 問合せ以降 → S5 → S3 →（購入後）S6 → S7 →（開通）S8
 - デイリー: `本日分` = S2 → S4 → S1 → 探索
 - 別部署: 家族コーチング／アプリ開発統括
 
@@ -68,5 +70,6 @@ poll 成功時も extract＋下書きを soft-fail で実行する。下書き�
 | 業者開拓 A' | S2 | 地場リスト Web フォーム（approved 文面） |
 | 二次・三次 | S5 → S3 | `[Grokペルソナ]` → `[Grok需給]` |
 | 買付・融資 | S6 / S7 | `[Grok買付]` / `[Grok融資]` |
+| ライフライン（電水ネットガス） | S8 | `[Grokライフライン]` |
 | 修繕候補 | S4 | `[Grok修繕候補]`（電話しない） |
 | アプリ | アプリ開発統括 | 別部署 |
