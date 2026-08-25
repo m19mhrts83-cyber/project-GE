@@ -21,6 +21,7 @@ import {
 } from "@/lib/reInquiryCandidate";
 import { loadInquiryAutoConfig } from "@/lib/reInquiryAutoConfig";
 import { getTier2QueueSummary } from "@/lib/reInquiryTier2Queue";
+import { dedupeAndPrioritizeDeals } from "@/lib/reDealDedupe";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -78,7 +79,7 @@ export default async function RealEstateDealsPage({
         )
         .order("match_score", { ascending: false, nullsFirst: false })
         .order("updated_at", { ascending: false })
-        .limit(120),
+        .limit(200),
       supabase
         .from("kurashift_buy_plan_criteria")
         .select("kind, raw_text, sort_order, version_id")
@@ -132,6 +133,12 @@ export default async function RealEstateDealsPage({
     if (tab === "passed") return d.status === "passed";
     return d.status !== "archived";
   });
+
+  const dedupedVisible = dedupeAndPrioritizeDeals(visibleDeals, {
+    preferId: highlightDeal,
+  });
+  visibleDeals = dedupedVisible.deals;
+  const dedupeHiddenCount = dedupedVisible.hiddenCount;
 
   const allDealIds = (deals || []).map((d) => d.id);
 
@@ -194,9 +201,9 @@ export default async function RealEstateDealsPage({
     eventsByDeal.set(row.deal_id, list);
   }
 
-  const candidateDeals = (deals || []).filter(
-    (d) => d.status === "info" || d.status === "viewing"
-  );
+  const candidateDeals = dedupeAndPrioritizeDeals(
+    (deals || []).filter((d) => d.status === "info" || d.status === "viewing")
+  ).deals;
   let needReply = 0;
   let grokPending = 0;
   let inquiryNone = 0;
@@ -209,7 +216,7 @@ export default async function RealEstateDealsPage({
     if (inq === "none" || inq === "draft") inquiryNone++;
     if (d.source !== "mail_grok") grokPending++;
   }
-  for (const d of deals || []) {
+  for (const d of candidateDeals) {
     if (inquiryEval(d).tier1) inquiryReady++;
   }
 
@@ -254,6 +261,7 @@ export default async function RealEstateDealsPage({
       <h1>千三つファネル</h1>
       <p className="sub">
         検討中の物件候補は「候補」タブ。行の「開く」で返信・判断履歴・第一問合せ。
+        表示は同一案件を1件にまとめ、優先はメール問合せ → Grok（Webフォーム）の順。
         業者開拓は <a href="/realestate/vendors">業者開拓ウォッチ</a>。
       </p>
       {vendorFilter ? (
@@ -445,7 +453,11 @@ export default async function RealEstateDealsPage({
         <header>
           <span className="lvl">Deals</span>
           <strong>
-            案件一覧（{visibleDeals.length} 件）
+            案件一覧（{visibleDeals.length} 件
+            {dedupeHiddenCount > 0
+              ? ` · 重複 ${dedupeHiddenCount} 件を非表示`
+              : ""}
+            ）
           </strong>
         </header>
         {visibleDeals.length === 0 ? (
