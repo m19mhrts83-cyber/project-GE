@@ -3,7 +3,7 @@
 # Python: scripts/jarvis_kurashift_re_inquiry_rules.py
 
 version: 1
-updated: "2026-08-23"
+updated: "2026-08-26"
 
 # Tier3 完全自動送信 — 初期 OFF（E2E 10件成功後に YAML で enabled: true を検討）
 tier3_auto_send:
@@ -43,6 +43,8 @@ inquiry_candidate_overrides:
   exclude_auto_pass_reasons:
     - mansion_unit
     - subject_noise
+    - uketsuke_shuryo
+    - uketsuke_shuryo_sibling
   structure_bonus:
     allow_inquiry_if_match:
       - pattern: "(築古|ボロ|空き家).*(アパート|AP|マンション一棟)"
@@ -75,5 +77,7 @@ grok_handoff:
 production_filter:
   exclude_title_substrings:
     - "E2E-GROK-KURASHIFT"
+    - "※受付終了※"
+    - "＊受付終了＊"
   exclude_e2e_markers:
     - "E2E-GROK-KURASHIFT"

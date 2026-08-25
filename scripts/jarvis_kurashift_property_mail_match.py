@@ -15,8 +15,9 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py \\
     --mark-read-deal-id <uuid>
 
-取込時: 明らかに対象外（ノイズ件名・低スコア・区分/都内寄り等）は
-status=passed で残し、その場で Gmail 既読にする。境界候補は未読のまま。
+取込時: 明らかに対象外（ノイズ件名・低スコア・区分/都内寄り・※受付終了※ 等）は
+status=passed で残し、その場で Gmail 既読にする（受付終了は固定で既読可）。境界候補は未読のまま。
+既存の受付終了掃除: --pass-uketsuke-existing --apply
 """
 from __future__ import annotations
 
@@ -514,8 +515,26 @@ def score_text(text: str, criteria_blob: str) -> tuple[float, list[str]]:
     return score, hits
 
 
+# 神大家紹介: 受付終了メール（件名先頭など）
+UKETSUKE_SHURYO_MARKERS = ("※受付終了※", "＊受付終了＊", "*受付終了*")
+
+
+def title_has_uketsuke_shuryo(subject: str) -> bool:
+    s = subject or ""
+    return any(m in s for m in UKETSUKE_SHURYO_MARKERS)
+
+
+def strip_uketsuke_shuryo_marker(subject: str) -> str:
+    s = subject or ""
+    for m in UKETSUKE_SHURYO_MARKERS:
+        s = s.replace(m, "")
+    return re.sub(r"\s+", " ", s).strip()
+
+
 def clearly_out_of_scope(subject: str, text: str, score: float) -> tuple[bool, str]:
     """取込時点で明らかに対象外か（境界候補は False）。"""
+    if title_has_uketsuke_shuryo(subject):
+        return True, "uketsuke_shuryo"
     if any(n in subject for n in SUBJECT_NOISE):
         return True, "subject_noise"
     has_kodate = bool(re.search(r"戸建|戸建て", text))
@@ -927,10 +946,15 @@ def _dedupe_by_gmail(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _reason_allowlisted(sb: Any, reason: str) -> bool:
-    """学習テーブルで allowlisted の理由だけ取込時既読（Phase C）。"""
+    """学習テーブルで allowlisted の理由だけ取込時既読（Phase C）。
+
+    受付終了（uketsuke_shuryo）は固定で自動既読可。
+    """
     reason = (reason or "").strip()
     if not reason:
         return False
+    if reason == "uketsuke_shuryo":
+        return True
     try:
         resp = (
             sb.table("kurashift_auto_pass_learn")
@@ -950,6 +974,82 @@ def _reason_allowlisted(sb: Any, reason: str) -> bool:
         return False
 
 
+def pass_deals_with_uketsuke_shuryo(
+    sb: Any, *, also_pass_siblings: bool = True
+) -> dict[str, int]:
+    """件名に受付終了がある候補を passed にし、元紹介（マーカー無し）も合わせて見送り。"""
+    now = datetime.now(timezone.utc).isoformat()
+    active = (
+        sb.table("kurashift_re_deals")
+        .select("id, title, status, summary_json")
+        .in_("status", ["info", "viewing"])
+        .limit(500)
+        .execute()
+    )
+    closed_cores: list[str] = []
+    passed_direct = 0
+    for row in active.data or []:
+        title = str(row.get("title") or "")
+        if not title_has_uketsuke_shuryo(title):
+            continue
+        core = strip_uketsuke_shuryo_marker(title)
+        if core:
+            closed_cores.append(core)
+        sj = dict(row.get("summary_json") or {})
+        sj["auto_pass_reason"] = "uketsuke_shuryo"
+        sj["auto_pass_at_ingest"] = True
+        sj["uketsuke_shuryo_passed_at"] = now
+        sb.table("kurashift_re_deals").update(
+            {
+                "status": "passed",
+                "summary_json": sj,
+                "updated_at": now,
+            }
+        ).eq("id", row["id"]).execute()
+        passed_direct += 1
+
+    passed_siblings = 0
+    if also_pass_siblings and closed_cores:
+        still = (
+            sb.table("kurashift_re_deals")
+            .select("id, title, status, summary_json")
+            .in_("status", ["info", "viewing"])
+            .limit(500)
+            .execute()
+        )
+        for row in still.data or []:
+            title = str(row.get("title") or "")
+            if title_has_uketsuke_shuryo(title):
+                continue
+            stripped = strip_uketsuke_shuryo_marker(title)
+            hit = False
+            for core in closed_cores:
+                if not core or len(core) < 12:
+                    continue
+                if stripped == core or core in title or stripped in core:
+                    hit = True
+                    break
+            if not hit:
+                continue
+            sj = dict(row.get("summary_json") or {})
+            sj["auto_pass_reason"] = "uketsuke_shuryo_sibling"
+            sj["uketsuke_shuryo_passed_at"] = now
+            sb.table("kurashift_re_deals").update(
+                {
+                    "status": "passed",
+                    "summary_json": sj,
+                    "updated_at": now,
+                }
+            ).eq("id", row["id"]).execute()
+            passed_siblings += 1
+
+    return {
+        "passed_direct": passed_direct,
+        "passed_siblings": passed_siblings,
+        "closed_cores": len(closed_cores),
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=120)
@@ -966,6 +1066,11 @@ def main() -> int:
         action="store_true",
         help="[Grok調査] メールのみ取込（estate）",
     )
+    ap.add_argument(
+        "--pass-uketsuke-existing",
+        action="store_true",
+        help="既存候補で件名に※受付終了※があるものを passed（＋元紹介も見送り）",
+    )
     args = ap.parse_args()
 
     if args.mark_read_deal_id:
@@ -974,6 +1079,34 @@ def main() -> int:
         print(f"KURASHIFT_RESULT:{json.dumps(result, ensure_ascii=False)}")
         if not result.get("ok"):
             return 1
+        return 0
+
+    if args.pass_uketsuke_existing:
+        sb = sb_client()
+        if args.dry_run and not args.apply:
+            active = (
+                sb.table("kurashift_re_deals")
+                .select("id, title, status")
+                .in_("status", ["info", "viewing"])
+                .limit(500)
+                .execute()
+            )
+            hits = [
+                r
+                for r in (active.data or [])
+                if title_has_uketsuke_shuryo(str(r.get("title") or ""))
+            ]
+            print(f"# dry-run uketsuke candidates={len(hits)}")
+            for r in hits[:20]:
+                print(f"  · {r.get('status')} {(r.get('title') or '')[:80]}")
+            print(
+                "KURASHIFT_RESULT:"
+                + json.dumps({"dry_run": True, "hits": len(hits)}, ensure_ascii=False)
+            )
+            return 0
+        result = pass_deals_with_uketsuke_shuryo(sb)
+        print(f"📎 uketsuke_shuryo pass: {result}")
+        print("KURASHIFT_RESULT:" + json.dumps(result, ensure_ascii=False))
         return 0
 
     if not args.apply:
@@ -1119,6 +1252,8 @@ def main() -> int:
         auto_inserted += 1
         seen.add(gid)
 
+    uketsuke_pass = pass_deals_with_uketsuke_shuryo(sb)
+
     promoted = 0
     existing = (
         sb.table("kurashift_re_deals")
@@ -1137,6 +1272,8 @@ def main() -> int:
     print(
         f"📎 property_mail_match: inserted={inserted} "
         f"auto_pass_inserted={auto_inserted} auto_pass_marked_read={auto_read} "
+        f"uketsuke_passed={uketsuke_pass.get('passed_direct', 0)}+"
+        f"{uketsuke_pass.get('passed_siblings', 0)} "
         f"skipped_existing={len(uniq) + len(uniq_pass) - inserted - auto_inserted} "
         f"promoted_to_viewing={promoted}"
     )

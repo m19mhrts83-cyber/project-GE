@@ -128,7 +128,17 @@ export default async function RealEstateDealsPage({
       return true;
     }
     if (tab === "candidates") {
-      return d.status === "info" || d.status === "viewing";
+      if (d.status !== "info" && d.status !== "viewing") return false;
+      // 受付終了メールは候補から外す（見送り反映前の保険）
+      const title = String(d.title || "");
+      if (
+        title.includes("※受付終了※") ||
+        title.includes("＊受付終了＊") ||
+        title.includes("*受付終了*")
+      ) {
+        return false;
+      }
+      return true;
     }
     if (tab === "passed") return d.status === "passed";
     return d.status !== "archived";
