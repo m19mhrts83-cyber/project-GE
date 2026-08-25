@@ -54,6 +54,10 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       RAIMO_NOTIFY_MACOS: "0"
       RAIMO_FAIL_OPEN: "0"
+      # 取込完了後の full_page スクショ / フレーム走査で Chromium が落ちないようにする
+      # （run 32625889438: Page.screenshot Target crashed）
+      RAIMO_TRY_COMMUNITY_REFRESH: "0"
+      RAIMO_SCREENSHOT_FULL_PAGE: "0"
       # 日曜朝の WeStudy タイムアウト対策（既定より多め）
       WESTUDY_LOGIN_NAV_RETRIES: "5"
       WESTUDY_PAGE_GET_RETRIES: "4"

@@ -19,6 +19,7 @@ Raimo アプリに管理者ログインし、CSV取込を自動実行する。
   RAIMO_POST_LOGIN_WAIT_MS (ラッパーログイン後〜#mainView 表示まで ms、既定: 180000)
   RAIMO_TRY_COMMUNITY_REFRESH=1/0 (既定: 1) CSV取込後に「コミュニティ情報の最新化」相当の操作を試す
   RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC (既定: 300) 上記の完了待ち秒
+  RAIMO_SCREENSHOT_IN_CI=1/0 (既定: 0) GitHub Actions でも成功時スクリーンショットを撮る
   RAIMO_IMPORT_MAX_ATTEMPTS (既定: 3) Page crash 時のブラウザ再生成リトライ回数
   RAIMO_CHROMIUM_ARGS (任意) Chromium 追加引数（空白区切り）。既定で --disable-dev-shm-usage 等を付与
   RAIMO_NOTIFY_MACOS=1/0 (既定: 1) macOS のみ終了時に通知センターへ表示（osascript）
@@ -65,12 +66,44 @@ def _is_page_crash_error(exc: BaseException) -> bool:
     return any(n in msg for n in needles)
 
 
+def _in_ci() -> bool:
+    """GitHub Actions / 一般 CI。成功時フルページスクショで Target crashed しやすい。"""
+    if os.environ.get("GITHUB_ACTIONS", "").strip().lower() == "true":
+        return True
+    return os.environ.get("CI", "").strip().lower() in ("1", "true", "yes")
+
+
+def _should_take_success_screenshot() -> bool:
+    """CI では取込完了後のスクショを既定スキップ（run 32625889438 の crash 対策）。"""
+    if get_env_bool("RAIMO_SCREENSHOT_IN_CI", False):
+        return True
+    return not _in_ci()
+
+
 def _safe_screenshot(page, path: Path, *, full_page: bool | None = None) -> bool:
     """記録用スクリーンショット。失敗しても CSV 取込の成否には影響させない。"""
+    if page is None:
+        return False
+    try:
+        is_closed = getattr(page, "is_closed", None)
+        if callable(is_closed) and is_closed():
+            print("スクリーンショット保存をスキップ（ページ閉鎖）", file=sys.stderr)
+            return False
+    except Exception as e:
+        print(
+            f"スクリーンショット保存をスキップ（ページ状態不明）: {e}",
+            file=sys.stderr,
+        )
+        return False
     if full_page is None:
         full_page = get_env_bool("RAIMO_SCREENSHOT_FULL_PAGE", False)
     try:
-        page.screenshot(path=str(path), full_page=full_page)
+        page.screenshot(
+            path=str(path),
+            full_page=full_page,
+            timeout=8000,
+            animations="disabled",
+        )
         print(f"スクリーンショット保存: {path}", flush=True)
         return True
     except Exception as e:
@@ -648,7 +681,11 @@ def _all_page_like(page):
     """メインページと子フレーム（Raimo シェルが iframe の場合）。"""
     seen = set()
     out = []
-    for fr in [page] + list(page.frames):
+    try:
+        frames = [page] + list(getattr(page, "frames", []) or [])
+    except Exception:
+        frames = [page]
+    for fr in frames:
         key = id(fr)
         if key in seen:
             continue
@@ -865,9 +902,14 @@ def main() -> int:
                     )
                 print(f"コミュニティ最新化: {refresh_msg}", flush=True)
 
-                if shot_dir:
+                if shot_dir and _should_take_success_screenshot():
                     ok_shot = shot_dir / f"raimo_import_ok_{int(time.time())}.png"
                     _safe_screenshot(page, ok_shot)
+                elif shot_dir:
+                    print(
+                        "成功時スクリーンショットをスキップ（CIの Target crashed 防止）",
+                        flush=True,
+                    )
 
                 print(
                     "Raimo取込完了: "
