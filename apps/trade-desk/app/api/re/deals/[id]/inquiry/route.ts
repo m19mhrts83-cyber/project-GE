@@ -6,6 +6,10 @@ import {
   isSelfEmail,
   selfEmailsExtraFromEnv,
 } from "@/lib/reInquiryChannel";
+import {
+  checkFingerprintSendGuard,
+  resolveDealFingerprint,
+} from "@/lib/reDealFingerprintGuard";
 
 function bodySha256(body: string): string {
   return createHash("sha256").update(body, "utf8").digest("hex");
@@ -29,7 +33,9 @@ export async function POST(
 
   const { data: row, error: getErr } = await supabase
     .from("kurashift_re_deals")
-    .select("id, title, status, source, summary_json, inquiry_status")
+    .select(
+      "id, title, area, price_man, status, source, summary_json, inquiry_status, property_fingerprint"
+    )
     .eq("id", id)
     .maybeSingle();
   if (getErr || !row) {
@@ -134,6 +140,33 @@ export async function POST(
       );
     }
 
+    const fpGuard = await checkFingerprintSendGuard(supabase, {
+      id: String(row.id),
+      title: row.title != null ? String(row.title) : null,
+      area: (row as { area?: string | null }).area ?? null,
+      price_man: (row as { price_man?: number | null }).price_man ?? null,
+      status: row.status != null ? String(row.status) : null,
+      source: row.source != null ? String(row.source) : null,
+      inquiry_status: inquiryStatus,
+      summary_json: sj,
+      property_fingerprint:
+        (row as { property_fingerprint?: string | null }).property_fingerprint ??
+        null,
+    });
+    if (fpGuard.blocked) {
+      return NextResponse.json(
+        {
+          error: fpGuard.reason,
+          property_fingerprint: fpGuard.fingerprint,
+          sibling_deal_id: fpGuard.sibling_deal_id,
+          sibling_inquiry_status: fpGuard.sibling_inquiry_status,
+          sibling_job_id: fpGuard.sibling_job_id,
+          sibling_job_status: fpGuard.sibling_job_status,
+        },
+        { status: 409 }
+      );
+    }
+
     const idempotencyKey = `${id}:first_inquiry`;
     const { data: existingJobs } = await supabase
       .from("kurashift_jobs")
@@ -164,21 +197,38 @@ export async function POST(
       );
     }
 
+    const fingerprint = fpGuard.fingerprint || resolveDealFingerprint({
+      id: String(row.id),
+      title: row.title != null ? String(row.title) : null,
+      area: (row as { area?: string | null }).area ?? null,
+      price_man: (row as { price_man?: number | null }).price_man ?? null,
+      summary_json: sj,
+      property_fingerprint:
+        (row as { property_fingerprint?: string | null }).property_fingerprint ??
+        null,
+    });
     sj.inquiry_status = "draft";
+    sj.property_fingerprint = fingerprint;
     const now = new Date().toISOString();
+    const draftPatch: Record<string, unknown> = {
+      inquiry_status: "draft",
+      summary_json: sj,
+      updated_at: now,
+      property_fingerprint: fingerprint,
+    };
     const { error: draftErr } = await supabase
       .from("kurashift_re_deals")
-      .update({
-        inquiry_status: "draft",
-        summary_json: sj,
-        updated_at: now,
-      })
+      .update(draftPatch)
       .eq("id", id);
     if (draftErr) {
-      await supabase
-        .from("kurashift_re_deals")
-        .update({ summary_json: sj, updated_at: now })
-        .eq("id", id);
+      const soft: Record<string, unknown> = {
+        summary_json: sj,
+        updated_at: now,
+      };
+      if (!/property_fingerprint|column/i.test(String(draftErr.message))) {
+        soft.inquiry_status = "draft";
+      }
+      await supabase.from("kurashift_re_deals").update(soft).eq("id", id);
     }
 
     const { data: job, error: jobErr } = await supabase

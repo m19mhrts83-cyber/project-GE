@@ -477,13 +477,34 @@ def send_inquiry(
         },
     )
     next_status = "awaiting_grok" if handoff else "awaiting_reply"
+    fp_patch: dict[str, Any] = {
+        "inquiry_channel": "grok_handoff" if handoff else "agent_email"
+    }
+    try:
+        # 送信時に fingerprint を正本化（ガード・マージ用）
+        from jarvis_kurashift_re_deal_dedupe_merge import deal_fingerprint
+
+        fp = deal_fingerprint(deal)
+        if fp and not str(fp).startswith("id:"):
+            fp_patch["property_fingerprint"] = fp
+            try:
+                sb.table("kurashift_re_deals").update(
+                    {
+                        "property_fingerprint": fp,
+                        "updated_at": now_iso(),
+                    }
+                ).eq("id", deal_id).execute()
+            except Exception:
+                pass
+    except Exception:
+        pass
     update_inquiry(
         sb,
         deal,
         inquiry_status=next_status,
         inquiry_thread_id=thread_id,
         inquiry_sent_at=now_iso(),
-        summary_json={"inquiry_channel": "grok_handoff" if handoff else "agent_email"},
+        summary_json=fp_patch,
     )
     if not handoff and deal.get("status") == "info":
         try:
