@@ -7,13 +7,15 @@
 | Bot（Grok UI） | 役割 |
 |---|---|
 | **参謀** | 部長 · `本日分` 統括 · estate Gmail **読取** · `[Grok部長]` メール |
-| **物件調査** | S1 · Web 調査 · `[Grok調査]` 送信（**Gmail 非接続**） |
+| **物件調査** | S1 · 自律探索・キュー調査・第一問合せ · `[Grok調査]`（**Gmail 非接続**） |
 | **物件紹介業者開拓** | S2 · Web 問合せ · チャンネルへ `--mark`（**Gmail 非接続**） |
 
-**松野の入口**: 参謀 DM **または** 不動産Dailyチーム — どちらでも `本日分` / `メール確認`。  
-**Jarvis**: estate の `[Grok部長]`（`--mark` + 探索）と `[Grok調査]`（deals）。
+**松野の入口**: 参謀 DM **または** 不動産Dailyチーム — `本日分` / `メール確認` /（10:30）**S1物件探し**。  
+**Jarvis**: estate の `[Grok部長]`（`--mark` + 探索）と `[Grok調査]`（deals＋inquiry 履歴＋証憑）。
 
-Instructions: `grok_*_grok_paste.md` を各 Bot に再貼り付け。
+Instructions: `grok_*_grok_paste.md` を各 Bot に再貼り付け。  
+ルーティン: `grok_bucho_routine_本日分.md` · `grok_bucho_routine_S1物件探し.md`  
+証憑: `docs/KURASHIFT_S1問合せ証憑_Drive_20260825.md`
 
 ## estate Gmail（参謀のみ）
 

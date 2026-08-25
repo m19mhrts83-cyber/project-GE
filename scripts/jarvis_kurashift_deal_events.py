@@ -12,6 +12,8 @@ EVENT_TYPES = frozenset(
         "inquiry_sent",
         "inquiry_reply",
         "grok_applied",
+        "grok_handoff_sent",
+        "grok_handoff_ready",
         "review_confirm",
         "review_pass",
         "note",

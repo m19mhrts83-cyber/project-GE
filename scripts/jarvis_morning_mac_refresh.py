@@ -44,6 +44,7 @@ GMAIL_READ_CATCHUP = REPO / "scripts" / "jarvis_triage_gmail_read_catchup.py"
 INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
+KURASHIFT_S1_EVIDENCE = REPO / "scripts" / "jarvis_kurashift_s1_evidence_to_drive.py"
 GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
 KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
@@ -549,6 +550,22 @@ def main() -> int:
         results["steps"]["kurashift_grok_mail"] = rc
         if rc != 0:
             print(f"# kurashift_grok_mail soft-fail rc={rc}", file=sys.stderr)
+        # 証憑（Grok調査添付 → Drive/OneDrive フォルダ）soft-fail
+        if KURASHIFT_S1_EVIDENCE.is_file():
+            rc_ev = run_step(
+                "kurashift_s1_evidence",
+                [exe, str(KURASHIFT_S1_EVIDENCE), "--poll-recent"],
+                timeout=180,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["kurashift_s1_evidence"] = rc_ev
+            if rc_ev != 0:
+                print(
+                    f"# kurashift_s1_evidence soft-fail rc={rc_ev}",
+                    file=sys.stderr,
+                )
+        else:
+            results["steps"]["kurashift_s1_evidence"] = "skipped"
     else:
         results["steps"]["kurashift_grok_mail"] = "skipped"
 
