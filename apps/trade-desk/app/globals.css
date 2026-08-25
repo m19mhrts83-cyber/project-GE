@@ -1986,8 +1986,8 @@ code {
 }
 
 .deals-list-scroll {
-  overflow: auto;
-  max-height: min(70vh, 640px);
+  overflow-x: auto;
+  overflow-y: visible;
   max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2012,14 +2012,25 @@ code {
 .deals-list-table .deals-col-open {
   position: sticky;
   right: 0;
-  z-index: 2;
+  z-index: 3;
   background: var(--card);
   white-space: nowrap;
-  min-width: 4.75rem;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
   box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.28);
 }
 
-.deals-list-table thead th.deals-col-open {
+.deals-list-table .deals-col-actions {
+  position: sticky;
+  right: 72px;
+  z-index: 2;
+  background: var(--card);
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.18);
+}
+
+.deals-list-table thead th.deals-col-open,
+.deals-list-table thead th.deals-col-actions {
   z-index: 4;
 }
 
@@ -2045,7 +2056,8 @@ code {
   background: #f0fdf4;
 }
 
-.deals-list-table tr.deals-row-pursue td.deals-col-open {
+.deals-list-table tr.deals-row-pursue td.deals-col-open,
+.deals-list-table tr.deals-row-pursue td.deals-col-actions {
   background: #f0fdf4;
 }
 
@@ -2054,7 +2066,8 @@ code {
   outline-offset: -2px;
 }
 
-.deals-list-table tr:hover td.deals-col-open {
+.deals-list-table tr:hover td.deals-col-open,
+.deals-list-table tr:hover td.deals-col-actions {
   background: var(--card-soft);
 }
 

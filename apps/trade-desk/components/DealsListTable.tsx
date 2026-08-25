@@ -214,7 +214,7 @@ export default function DealsListTable({
                         <th>Grok評価</th>
                         <th>問合せ</th>
                         <th>最終動き</th>
-                        <th>操作</th>
+                        <th className="deals-col-actions">操作</th>
                         <th className="deals-col-open">詳細</th>
                       </tr>
                     ) : (
@@ -225,7 +225,7 @@ export default function DealsListTable({
                         <th>エリア</th>
                         <th>価格</th>
                         <th>問合せ</th>
-                        <th>操作</th>
+                        <th className="deals-col-actions">操作</th>
                         <th className="deals-col-open">詳細</th>
                       </tr>
                     )}
@@ -263,7 +263,7 @@ export default function DealsListTable({
                               <td className="meta deals-clip" title={d.activityLine}>
                                 {d.activityLine}
                               </td>
-                              <td>
+                              <td className="deals-col-actions">
                                 <DealReviewActions
                                   dealId={d.id}
                                   status={d.status}
@@ -303,7 +303,7 @@ export default function DealsListTable({
                                     d.inquiryStatus}
                                 </span>
                               </td>
-                              <td>
+                              <td className="deals-col-actions">
                                 <DealReviewActions
                                   dealId={d.id}
                                   status={d.status}
