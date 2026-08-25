@@ -6,6 +6,11 @@ import DealReviewActions from "@/components/DealReviewActions";
 import GrokInvestigateCopy from "@/components/GrokInvestigateCopy";
 import { fmtYen } from "@/lib/format";
 import {
+  formatMatchScore,
+  scoreBand,
+  scoreBandLabel,
+} from "@/lib/reDealScoreUi";
+import {
   DEAL_STATUS_LABEL,
   INQUIRY_STATUS_LABEL,
   SOURCE_BADGE,
@@ -187,7 +192,15 @@ export default function DealDetailDrawer({
             <p className="meta">
               {DEAL_STATUS_LABEL[deal.status] || deal.status}
               {" · "}
-              スコア {deal.match_score ?? "—"}
+              スコア {formatMatchScore(deal.match_score)}
+              {(() => {
+                const band = scoreBand(deal.match_score);
+                return band !== "none" ? (
+                  <span className="meta" style={{ marginLeft: 6 }}>
+                    （{scoreBandLabel(band)}）
+                  </span>
+                ) : null;
+              })()}
               {" · "}
               {SOURCE_BADGE[deal.source] || deal.source}
             </p>
