@@ -95,6 +95,14 @@ function autoPassReason(deal: ReDealForInquiry): string {
   return typeof r === "string" ? r : "";
 }
 
+/** 神大家紹介の受付終了メール */
+const UKETSUKE_SHURYO_MARKERS = ["※受付終了※", "＊受付終了＊", "*受付終了*"];
+
+export function titleHasUketsukeShuryo(title: string | null | undefined): boolean {
+  const t = String(title || "");
+  return UKETSUKE_SHURYO_MARKERS.some((m) => t.includes(m));
+}
+
 function grokOverrideListen(deal: ReDealForInquiry, cfg: InquiryAutoConfig): boolean {
   const listen = listenValue(deal);
   const vals = cfg.inquiry_candidate_overrides?.grok_listen_values || [
@@ -199,6 +207,20 @@ export function evaluateInquiryCandidate(
       revive: false,
       badges: [...badges, "問合せ対象外"],
       reasons: [`channel=${ch.reason}`],
+      ...baseChannel,
+    };
+  }
+
+  if (titleHasUketsukeShuryo(deal.title)) {
+    return {
+      tier: null,
+      tier1: false,
+      tier2: false,
+      tier3: false,
+      canQuickSend: false,
+      revive: false,
+      badges: [...badges, "受付終了"],
+      reasons: ["uketsuke_shuryo"],
       ...baseChannel,
     };
   }

@@ -71,7 +71,20 @@ const DEFAULT_CONFIG: InquiryAutoConfig = {
   inquiry_candidate_overrides: {
     grok_listen_values: ["聞く", "保留"],
     revive_passed_status: true,
-    exclude_auto_pass_reasons: ["mansion_unit", "subject_noise"],
+    exclude_auto_pass_reasons: [
+      "mansion_unit",
+      "subject_noise",
+      "uketsuke_shuryo",
+      "uketsuke_shuryo_sibling",
+    ],
+  },
+  production_filter: {
+    exclude_title_substrings: [
+      "E2E-GROK-KURASHIFT",
+      "※受付終了※",
+      "＊受付終了＊",
+    ],
+    exclude_e2e_markers: ["E2E-GROK-KURASHIFT"],
   },
   grok_handoff: {
     subject_prefix: "[KURASHIFT問合せ依頼]",

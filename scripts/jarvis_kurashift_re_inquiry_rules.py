@@ -201,6 +201,21 @@ def evaluate_inquiry_candidate(
             **_base(),
         }
 
+    title = str(deal.get("title") or "")
+    if any(m in title for m in ("※受付終了※", "＊受付終了＊", "*受付終了*")):
+        badges.append("受付終了")
+        return {
+            "tier": None,
+            "tier1": False,
+            "tier2": False,
+            "tier3": False,
+            "can_quick_send": False,
+            "revive": False,
+            "badges": badges,
+            "reasons": ["uketsuke_shuryo"],
+            **_base(),
+        }
+
     grok = grok_of(deal)
     listen = str(grok.get("listen_value") or "")
     listen_vals = overrides.get("grok_listen_values") or ["聞く", "保留"]
