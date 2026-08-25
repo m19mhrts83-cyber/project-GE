@@ -48,10 +48,13 @@ export async function GET(
     );
   }
 
-  const { count: attachCount } = await supabase
+  const { data: attachRows, count: attachCount } = await supabase
     .from("kurashift_re_deal_attachments")
-    .select("id", { count: "exact", head: true })
-    .eq("deal_id", id);
+    .select("id, filename, mime_type, size_bytes, storage_path, payload, fetched_at", {
+      count: "exact",
+    })
+    .eq("deal_id", id)
+    .order("fetched_at", { ascending: false });
 
   type TimelineItem = {
     kind: "message" | "event";
@@ -93,11 +96,37 @@ export async function GET(
   const inquiryConfig = loadInquiryAutoConfig();
   const inquiry_eval = evaluateInquiryCandidate(deal, inquiryConfig);
 
+  const attachments = (attachRows || []).map((a) => {
+    const payload =
+      a.payload && typeof a.payload === "object"
+        ? (a.payload as Record<string, unknown>)
+        : {};
+    const openUrl =
+      typeof payload.open_url === "string"
+        ? payload.open_url
+        : typeof payload.drive_web_view_link === "string"
+          ? payload.drive_web_view_link
+          : typeof payload.evidence_dir === "string"
+            ? `file://${payload.evidence_dir}`
+            : null;
+    return {
+      id: a.id,
+      filename: a.filename,
+      mime_type: a.mime_type,
+      size_bytes: a.size_bytes,
+      storage_path: a.storage_path,
+      open_url: openUrl,
+      kind: typeof payload.kind === "string" ? payload.kind : null,
+      fetched_at: a.fetched_at,
+    };
+  });
+
   return NextResponse.json({
     ok: true,
     deal,
     timeline,
     attach_count: attachCount || 0,
+    attachments,
     inquiry_eval,
   });
 }

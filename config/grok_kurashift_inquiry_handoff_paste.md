@@ -27,8 +27,9 @@
 - `docs/KURASHIFT_供給_ペルソナ_修繕Bot_設計_20260824.md`
 - `docs/KURASHIFT_Grok_不動産フェーズBot_設計_20260824.md`
 - 都度: 問合せ以降 → S5 → S3 →（購入後）S6 → S7 →（開通）S8
-- デイリー: `本日分` = S2 → S4 → S1 → 探索
-- 別部署: 家族コーチング／アプリ開発統括
+- デイリー: `本日分` = S2 → S4 → S1キュー → 業者探索。**物件自律探索** = 別ルーティン `S1物件探し`（10:30）
+- 証憑 Drive: `docs/KURASHIFT_S1問合せ証憑_Drive_20260825.md`
+- ルーティン: `config/grok_bucho_routine_本日分.md` · `config/grok_bucho_routine_S1物件探し.md`
 
 ## KURASHIFT 第一問合せ（参考 · Grok 非掲載）
 
