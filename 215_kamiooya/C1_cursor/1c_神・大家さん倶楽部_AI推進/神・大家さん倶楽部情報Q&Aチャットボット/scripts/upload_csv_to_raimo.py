@@ -52,16 +52,48 @@ except Exception as e:  # pragma: no cover
 
 
 def _is_page_crash_error(exc: BaseException) -> bool:
-    """Chromium の Page crashed / Target closed 系（CI の /dev/shm 不足で起きやすい）。"""
+    """Chromium の Page crashed / Target crashed / Target closed 系（CI の /dev/shm 不足で起きやすい）。"""
     msg = str(exc).lower()
     needles = (
         "page crashed",
+        "target crashed",  # Page.screenshot: Target crashed
         "target closed",
         "target page, context or browser has been closed",
         "browser has been closed",
         "has been closed",
     )
     return any(n in msg for n in needles)
+
+
+def _safe_screenshot(page, dest: Path, *, timeout_ms: int = 15000) -> bool:
+    """
+    ベストエフォートのスクリーンショット。例外は出さない。
+
+    週次の差分CSVは結果ページが巨大になりやすく、full_page=True だと
+    GitHub Actions 上で `Page.screenshot: Target crashed` になり、
+    取込成功後にジョブ全体が失敗していた。
+    """
+    if page is None or dest is None:
+        return False
+    dest = Path(dest)
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(dest), full_page=False, timeout=timeout_ms)
+        print(f"スクリーンショット保存: {dest}", flush=True)
+        return True
+    except Exception as e:
+        print(
+            f"警告: スクリーンショット失敗（取込成否には影響しません）: {e}",
+            flush=True,
+        )
+        try:
+            html_path = dest.with_suffix(".html")
+            html = page.content()
+            html_path.write_text(html[:200_000], encoding="utf-8", errors="replace")
+            print(f"HTMLダンプ保存: {html_path}", flush=True)
+        except Exception:
+            pass
+        return False
 
 
 def _chromium_launch_args() -> list[str]:
@@ -834,18 +866,22 @@ def main() -> int:
                 stats = parse_result_stats(result_text)
                 toast_text = _safe_inner_text(app_fr.locator("#toast"), 3000)
 
-                refresh_timeout = int(
-                    os.environ.get("RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC", "300")
-                )
-                ok_refresh, refresh_msg = try_community_info_refresh(
-                    page, timeout_sec=max(30, refresh_timeout)
-                )
-                print(f"コミュニティ最新化: {refresh_msg}", flush=True)
+                # 取込本体は完了。以降はベストエフォート
+                # （巨大な importResult ページでの screenshot crash を失敗にしない）
+                try:
+                    refresh_timeout = int(
+                        os.environ.get("RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC", "300")
+                    )
+                    _ok_refresh, refresh_msg = try_community_info_refresh(
+                        page, timeout_sec=max(30, refresh_timeout)
+                    )
+                    print(f"コミュニティ最新化: {refresh_msg}", flush=True)
+                except Exception as e:
+                    print(f"コミュニティ最新化: 例外のためスキップ ({e})", flush=True)
 
                 if shot_dir:
                     ok_shot = shot_dir / f"raimo_import_ok_{int(time.time())}.png"
-                    page.screenshot(path=str(ok_shot), full_page=True)
-                    print(f"スクリーンショット保存: {ok_shot}", flush=True)
+                    _safe_screenshot(page, ok_shot)
 
                 print(
                     "Raimo取込完了: "
@@ -873,11 +909,7 @@ def main() -> int:
                 last_error = e
                 if shot_dir and page is not None:
                     ng_shot = shot_dir / f"raimo_import_ng_{int(time.time())}.png"
-                    try:
-                        page.screenshot(path=str(ng_shot), full_page=True)
-                        print(f"失敗時スクリーンショット: {ng_shot}", file=sys.stderr)
-                    except Exception:
-                        pass
+                    _safe_screenshot(page, ng_shot)
                 print(f"Raimo取込失敗(タイムアウト): {e}", file=sys.stderr)
                 notify_detail = str(e)
                 exit_code = 2
@@ -887,11 +919,7 @@ def main() -> int:
                 last_error = e
                 if shot_dir and page is not None:
                     ng_shot = shot_dir / f"raimo_import_ng_{int(time.time())}.png"
-                    try:
-                        page.screenshot(path=str(ng_shot), full_page=True)
-                        print(f"失敗時スクリーンショット: {ng_shot}", file=sys.stderr)
-                    except Exception:
-                        pass
+                    _safe_screenshot(page, ng_shot)
                 if _is_page_crash_error(e) and attempt < max_attempts:
                     print(
                         f"Raimo取込: Page crash を検出（{e}）。ブラウザを作り直して再試行します。",
