@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { buildGrokInvestigatePrompt } from "@/lib/reInquiryShared";
 
-/** KURASHIFT deals → 不動産賃貸チーム（参謀）へ路線価・HZ 追加調査を依頼するコピー */
+/** KURASHIFT deals → 不動産Dailyチーム（参謀）へ路線価・HZ 追加調査を依頼するコピー */
 export default function GrokInvestigateCopy({
   dealId,
   title,
@@ -35,7 +35,7 @@ export default function GrokInvestigateCopy({
         dealId,
       });
       await navigator.clipboard.writeText(text);
-      setMsg("コピー済 → Grok「不動産賃貸チーム」へ貼付");
+      setMsg("コピー済 → Grok「不動産Dailyチーム」へ貼付");
     } catch {
       setMsg("コピー失敗（ブラウザ権限を確認）");
     } finally {
@@ -53,7 +53,7 @@ export default function GrokInvestigateCopy({
         style={{ fontSize: 11, padding: "2px 6px" }}
         disabled={busy}
         onClick={copy}
-        title="クリップボードへ。Grok 不動産賃貸チーム（または参謀）に貼ると調査追加になります"
+        title="クリップボードへ。Grok 不動産Dailyチーム（または参謀）に貼ると調査追加になります"
       >
         {busy ? "…" : label}
       </button>
