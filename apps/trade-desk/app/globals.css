@@ -181,7 +181,7 @@ main:has(.roi-page) {
 }
 
 main:has(.deals-list) {
-  max-width: min(1320px, 100%);
+  max-width: none;
 }
 
 .page-kicker {
@@ -1995,7 +1995,10 @@ code {
 
 .deals-list-table {
   margin: 0;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .deals-list-table thead th {
@@ -2012,6 +2015,7 @@ code {
   z-index: 2;
   background: var(--card);
   white-space: nowrap;
+  min-width: 4.75rem;
   box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.28);
 }
 
