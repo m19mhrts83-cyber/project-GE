@@ -3,7 +3,7 @@
 # 抽出: scripts/jarvis_kurashift_re_reply_extract.py
 
 version: 1
-updated: "2026-08-23"
+updated: "2026-08-25"
 notion_database: "DB_物件購入検討(購入手前)"
 
 # 初期は suggested + source を人が verified に昇格。verified 後は自動上書きしない。

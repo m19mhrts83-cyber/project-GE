@@ -29,10 +29,10 @@ alwaysApply: true
 
 | ID | 目安 | ユーザーへの依頼（こうしてください） |
 |---|---|---|
-| `tier1-five-sends` | **2026-08-25** | Grok で「聞く」物件を増やしたうえで、Tier1 初級者手順どおり **手動5件**送信 → poll。完了したら「5件送った」と一声 |
+| `tier1-five-sends` | **2026-08-25** | Grok で「聞く」物件を増やしたうえで、Tier1 初級者手順どおり **手動5件**送信 → poll。完了したら「5件送った」と一声。以降の日次主線は Tier2 一括 |
 | `tier2-prod-review` | **2026-09-06** | `/realestate/deals/tier2` を開き、一括確認・日次上限5・本番候補のみを確認。問題なければ「Tier2 OK」 |
-| `research-reply-extract` | **2026-09-01** | 物件調査シート着手の合図。Jarvis に「調査シート進めて」で migration apply + 返信抽出を開始してよい |
-| `tier3-gate` | **2026-09-13**（可否）／**2026-09-27**（有効化検討） | 9/13: 送信・返信件数と Tier2 安定を見て Tier3 に進むか判断。9/27: 進むなら **明示同意のうえ** YAML `tier3_auto_send.enabled`。勝手に ON しない |
+| `research-reply-extract` | **2026-09-01** | コード・migration 済。本番は `--poll-replies` 後または `jarvis_kurashift_re_reply_extract.py --apply --emit-grok-mail-draft`。内見判断は `[Grok内見判断]` |
+| `tier3-gate` | **2026-09-13**（可否）／**2026-09-27**（有効化検討） | 9/13: 送信・返信件数と Tier2 安定を見て Tier3 に進むか判断。9/27: 進むなら **明示同意のうえ** YAML `tier3_auto_send.enabled`（手順: `docs/KURASHIFT_Tier3_自動送信_有効化手順.md`）。勝手に ON しない |
 | `phase3-optional` | （後回し） | 優先度が決まるまで促しは **info のみ**（毎回出さない） |
 
 ## いつ動くか（トリガー）
