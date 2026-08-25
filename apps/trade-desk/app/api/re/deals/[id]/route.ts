@@ -62,9 +62,21 @@ export async function POST(
   const status = nextStatus(action, String(row.status || "info"));
   const now = new Date().toISOString();
 
+  if (action === "confirm") {
+    sj.pursue = true;
+    sj.pursue_at = now;
+    sj.user_confirmed = true;
+    sj.user_confirmed_at = now;
+  }
+  if (action === "pass") {
+    delete sj.pursue;
+    delete sj.pursue_at;
+    sj.user_confirmed = false;
+  }
+
   const { data: updated, error: upErr } = await supabase
     .from("kurashift_re_deals")
-    .update({ status, updated_at: now })
+    .update({ status, summary_json: sj, updated_at: now })
     .eq("id", id)
     .select("id, title, status, source")
     .single();
