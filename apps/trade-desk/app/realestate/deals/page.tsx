@@ -22,6 +22,14 @@ import {
 import { loadInquiryAutoConfig } from "@/lib/reInquiryAutoConfig";
 import { getTier2QueueSummary } from "@/lib/reInquiryTier2Queue";
 import { dedupeAndPrioritizeDeals } from "@/lib/reDealDedupe";
+import { filterBuyProgressDeals } from "@/lib/reDealPursue";
+import {
+  formatMatchScore,
+  scoreBand,
+  scoreBandLabel,
+  scoreCellStyle,
+  scoreHitsPreview,
+} from "@/lib/reDealScoreUi";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -233,6 +241,18 @@ export default async function RealEstateDealsPage({
   const tier2Summary = await getTier2QueueSummary(supabase);
   const tier2Count = tier2Summary.queue.length;
 
+  const pursueDeals = filterBuyProgressDeals(
+    dedupeAndPrioritizeDeals(
+      (deals || []).filter(
+        (d) =>
+          d.status === "viewing" ||
+          d.status === "offer" ||
+          d.status === "loan" ||
+          d.status === "purchased"
+      )
+    ).deals
+  );
+
   const counts: Record<string, number> = {};
   for (const s of Object.keys(DEAL_STATUS_LABEL)) counts[s] = 0;
   for (const d of deals || []) {
@@ -272,6 +292,7 @@ export default async function RealEstateDealsPage({
       <p className="sub">
         検討中の物件候補は「候補」タブ。行の「開く」で返信・判断履歴・第一問合せ。
         表示は同一案件を1件にまとめ、優先はメール問合せ → Grok（Webフォーム）の順。
+        「評価スコア」は買い進め条件との一致度（数値＋高/中/低）。
         業者開拓は <a href="/realestate/vendors">業者開拓ウォッチ</a>。
       </p>
       {vendorFilter ? (
@@ -295,6 +316,114 @@ export default async function RealEstateDealsPage({
       <p className="meta" style={{ marginBottom: 12 }}>
         {watch.label} · <a href="/jobs">ジョブ一覧</a>
       </p>
+
+      {pursueDeals.length > 0 ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            borderColor: "#86efac",
+            background: "#f0fdf4",
+          }}
+        >
+          <header>
+            <span className="lvl">Pursue</span>
+            <strong>いま買い進め中（{pursueDeals.length}）</strong>
+          </header>
+          <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
+            買付・融資・購入、または内見で問合せ進行／Grok「聞く」／「確認した」の物件。
+            プラン全体は{" "}
+            <Link href="/realestate/buy-plan">買い進めプラン</Link>。
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>段階</th>
+                  <th>評価スコア</th>
+                  <th>物件</th>
+                  <th>エリア</th>
+                  <th>価格</th>
+                  <th>Grok</th>
+                  <th>問合せ</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pursueDeals.map((d) => {
+                  const sj =
+                    d.summary_json && typeof d.summary_json === "object"
+                      ? (d.summary_json as Record<string, unknown>)
+                      : {};
+                  const grok =
+                    sj.grok && typeof sj.grok === "object"
+                      ? (sj.grok as Record<string, unknown>)
+                      : null;
+                  const inq =
+                    d.inquiry_status ||
+                    (typeof sj.inquiry_status === "string"
+                      ? sj.inquiry_status
+                      : "none");
+                  const band = scoreBand(d.match_score);
+                  const hits = scoreHitsPreview(sj.hits);
+                  return (
+                    <tr key={`pursue-${d.id}`} id={`pursue-${d.id}`}>
+                      <td>
+                        <strong>
+                          {DEAL_STATUS_LABEL[d.status] || d.status}
+                        </strong>
+                      </td>
+                      <td>
+                        <div style={scoreCellStyle(band)}>
+                          {formatMatchScore(d.match_score)}
+                          {band !== "none" ? (
+                            <span className="meta" style={{ marginLeft: 6 }}>
+                              {scoreBandLabel(band)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {hits ? (
+                          <div className="meta" style={{ fontSize: 11 }}>
+                            {hits}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>{d.title}</td>
+                      <td className="meta">{d.area || "—"}</td>
+                      <td className="meta">
+                        {d.price_man != null
+                          ? fmtYen(Number(d.price_man) * 10000)
+                          : "—"}
+                      </td>
+                      <td className="meta">{grokOneLine(grok)}</td>
+                      <td>
+                        <span style={inquiryChipStyle(inq)}>
+                          {INQUIRY_STATUS_LABEL[inq] || inq}
+                        </span>
+                      </td>
+                      <td>
+                        <Link href={openDealHref(d.id)} className="btn">
+                          開く
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <header>
+            <span className="lvl">Pursue</span>
+            <strong>いま買い進め中</strong>
+          </header>
+          <p className="meta" style={{ marginTop: 8 }}>
+            まだ明示的な買い進め案件はありません。候補で「確認した」または問合せを進めると、ここに出ます。
+          </p>
+        </div>
+      )}
 
       <div
         style={{
@@ -479,12 +608,12 @@ export default async function RealEstateDealsPage({
             <table>
               <thead>
                 <tr>
-                  <th>優先</th>
+                  <th>評価スコア</th>
                   <th>状態</th>
                   <th>物件</th>
                   <th>エリア</th>
                   <th>価格</th>
-                  <th>Grok</th>
+                  <th>Grok評価</th>
                   <th>問合せ</th>
                   <th>最終動き</th>
                   <th>操作</th>
@@ -513,6 +642,9 @@ export default async function RealEstateDealsPage({
                   const evs = eventsByDeal.get(d.id) || [];
                   const activity = lastActivityLine(msgs, evs);
                   const dealOpenHref = openDealHref(d.id);
+                  const band = scoreBand(d.match_score);
+                  const hits = scoreHitsPreview(sj.hits);
+                  const pursuing = pursueDeals.some((p) => p.id === d.id);
                   return (
                     <tr
                       key={d.id}
@@ -523,10 +655,34 @@ export default async function RealEstateDealsPage({
                               outline: "2px solid var(--danger, #b45309)",
                               outlineOffset: 2,
                             }
-                          : undefined
+                          : pursuing
+                            ? { background: "#f0fdf4" }
+                            : undefined
                       }
                     >
-                      <td className="meta">{d.match_score ?? "—"}</td>
+                      <td>
+                        <div style={scoreCellStyle(band)}>
+                          {formatMatchScore(d.match_score)}
+                          {band !== "none" ? (
+                            <span className="meta" style={{ marginLeft: 6 }}>
+                              {scoreBandLabel(band)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {hits ? (
+                          <div className="meta" style={{ fontSize: 11 }}>
+                            {hits}
+                          </div>
+                        ) : null}
+                        {pursuing ? (
+                          <div
+                            className="meta"
+                            style={{ color: "#047857", fontSize: 11 }}
+                          >
+                            買い進め中
+                          </div>
+                        ) : null}
+                      </td>
                       <td>{DEAL_STATUS_LABEL[d.status] || d.status}</td>
                       <td>
                         {d.title}
@@ -612,7 +768,7 @@ export default async function RealEstateDealsPage({
               <thead>
                 <tr>
                   <th>状態</th>
-                  <th>スコア</th>
+                  <th>評価スコア</th>
                   <th>タイトル</th>
                   <th>エリア</th>
                   <th>価格</th>
@@ -632,10 +788,42 @@ export default async function RealEstateDealsPage({
                     (typeof sj.inquiry_status === "string"
                       ? sj.inquiry_status
                       : "none");
+                  const band = scoreBand(d.match_score);
+                  const hits = scoreHitsPreview(sj.hits);
+                  const pursuing = pursueDeals.some((p) => p.id === d.id);
                   return (
-                    <tr key={d.id}>
-                      <td>{DEAL_STATUS_LABEL[d.status] || d.status}</td>
-                      <td className="meta">{d.match_score ?? "—"}</td>
+                    <tr
+                      key={d.id}
+                      style={
+                        pursuing ? { background: "#f0fdf4" } : undefined
+                      }
+                    >
+                      <td>
+                        {DEAL_STATUS_LABEL[d.status] || d.status}
+                        {pursuing ? (
+                          <div
+                            className="meta"
+                            style={{ color: "#047857", fontSize: 11 }}
+                          >
+                            買い進め中
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        <div style={scoreCellStyle(band)}>
+                          {formatMatchScore(d.match_score)}
+                          {band !== "none" ? (
+                            <span className="meta" style={{ marginLeft: 6 }}>
+                              {scoreBandLabel(band)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {hits ? (
+                          <div className="meta" style={{ fontSize: 11 }}>
+                            {hits}
+                          </div>
+                        ) : null}
+                      </td>
                       <td>
                         {d.title}
                         <div className="meta">{d.source}</div>
