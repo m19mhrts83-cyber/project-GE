@@ -81,6 +81,14 @@ report_id: {YYYYMMDD-HHMM}
 ## 総合
 - 聞く価値: 聞く|保留|見送り
 - 理由1行:
+
+## 問合せ
+- inquiry_action: portal_sent|kurashift_handoff|investigate_only
+- agent_email_available: yes|no|unknown
+- inquiry_url:
+- portal: kenbiya|homes|other|none
+- sent_at: {YYYY-MM-DD HH:MM JST または blank}
+- note: （送信結果1行）
 ```
 
 ## Jarvis 中継（Cursor から送る場合）
@@ -97,8 +105,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --grok-only --apply
 ```
 
-**定常化**: `jarvis_morning_mac_refresh.py` が `--grok-only --apply` を朝バンドルに含む（`kurashift_grok_mail` ステップ）。
+`inquiry_action: portal_sent` → deals に `inquiry_status=awaiting_reply` と event `inquiry_sent`（actor=s1_portal）。  
+`kurashift_handoff` → `awaiting_grok` 相当のヒント（既存 Tier／第一問合せレーン）。  
+証憑画像・PDF → Drive（`docs/KURASHIFT_S1問合せ証憑_Drive_20260825.md`）· メタは `kurashift_re_deal_attachments`。
 
+**定常化**: `jarvis_morning_mac_refresh.py` が `--grok-only --apply` を朝バンドルに含む（`kurashift_grok_mail` ステップ）。
 ## KURASHIFT で使われる評価
 
 | 項目 | スコア影響 |

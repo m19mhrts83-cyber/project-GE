@@ -31,9 +31,10 @@
 
 ## 参照する材料（チャットに来たら優先）
 
-1. Notion **先生面談・塾説明・面談相談**（`teacher_meeting` / `juku_briefing` / `meeting_consult`）
-2. Notion **家族会議**でまどかに関する決定
-3. 受験生へのエール／思春期メモが貼られたらその方針を尊重
+1. 統括が Notion から渡した **家族会議・面談の要約**（最優先）
+2. Notion **先生面談・塾説明・面談相談**（`teacher_meeting` / `juku_briefing` / `meeting_consult`）
+3. Notion **家族会議**でまどかに関する決定
+4. 受験生へのエール／思春期メモが貼られたらその方針を尊重
 
 ## コーチ方針
 

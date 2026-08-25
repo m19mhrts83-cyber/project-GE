@@ -65,6 +65,14 @@ export default function DealDetailDrawer({
   const [deal, setDeal] = useState<DealRow | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [attachCount, setAttachCount] = useState(0);
+  const [attachments, setAttachments] = useState<
+    {
+      id: string;
+      filename: string;
+      open_url?: string | null;
+      kind?: string | null;
+    }[]
+  >([]);
   const [inquiryEval, setInquiryEval] = useState<InquiryEval | null>(null);
   const [expandedBody, setExpandedBody] = useState<Set<number>>(new Set());
 
@@ -81,6 +89,7 @@ export default function DealDetailDrawer({
       setDeal(data.deal);
       setTimeline(data.timeline || []);
       setAttachCount(data.attach_count || 0);
+      setAttachments(data.attachments || []);
       setInquiryEval(data.inquiry_eval || null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "エラー");
@@ -354,7 +363,26 @@ export default function DealDetailDrawer({
             </div>
 
             {attachCount > 0 ? (
-              <p className="meta">添付 PDF: {attachCount} 件</p>
+              <div className="card" style={{ marginTop: 12, padding: 12 }}>
+                <strong>証憑・添付（{attachCount}）</strong>
+                <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
+                  {attachments.map((a) => (
+                    <li key={a.id}>
+                      {a.open_url ? (
+                        <a href={a.open_url} target="_blank" rel="noreferrer">
+                          {a.filename}
+                        </a>
+                      ) : (
+                        a.filename
+                      )}
+                      {a.kind ? ` · ${a.kind}` : ""}
+                    </li>
+                  ))}
+                </ul>
+                <p className="meta" style={{ marginTop: 6 }}>
+                  実体は Drive/OneDrive 証憑フォルダ（Supabase にはバイナリなし）
+                </p>
+              </div>
             ) : null}
 
             <div className="card" style={{ marginTop: 12, padding: 12 }}>

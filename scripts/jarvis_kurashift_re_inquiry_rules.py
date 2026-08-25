@@ -291,14 +291,14 @@ def evaluate_inquiry_candidate(
         and score_of(deal) >= float(t2.get("min_score") or 5.0)
         and hazard != str(t2.get("hazard_eval_not") or "除外")
     )
-    tier3_enabled = bool((cfg.get("tier3_auto_send") or {}).get("enabled"))
-    tier3 = (
-        tier3_enabled
-        and listen == str(t3.get("grok_listen") or "聞く")
+    tier3_eligible = (
+        listen == str(t3.get("grok_listen") or "聞く")
         and score_of(deal) >= float(t3.get("min_score") or 7.0)
         and hazard == str(t3.get("hazard_eval") or "OK")
         and land100 != str(t3.get("land100_not") or "見送り")
     )
+    tier3_enabled = bool((cfg.get("tier3_auto_send") or {}).get("enabled"))
+    tier3 = bool(tier3_enabled and tier3_eligible)
     if channel == "grok_handoff":
         badges.append("Grok依頼")
     elif channel == "agent_email":
@@ -307,6 +307,8 @@ def evaluate_inquiry_candidate(
         badges.append("送信待ち")
     if tier3:
         badges.append("自動可")
+    elif tier3_eligible:
+        badges.append("Tier3候補")
 
     tier_num: int | None = 3 if tier3 else 2 if tier2 else 1
 
@@ -315,6 +317,7 @@ def evaluate_inquiry_candidate(
         "tier1": True,
         "tier2": tier2,
         "tier3": tier3,
+        "tier3_eligible": tier3_eligible,
         "can_quick_send": True,
         "revive": revive,
         "badges": badges,
