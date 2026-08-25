@@ -34,12 +34,37 @@
 - 状態: `awaiting_grok`（poll スキップ）
 - 初級者手順: `docs/KURASHIFT_Tier1_問合せ_初級者手順.md`
 
+## 返信後・内見判断（`[Grok内見判断]`）
+
+問合せ返信が `has_reply` になったあと、Jarvis が調査シート項目を抽出し、下書きを置く。
+
+| 項目 | 正本 |
+|---|---|
+| 抽出 YAML | `config/kurashift_re_research_fields.yaml` |
+| スクリプト | `scripts/jarvis_kurashift_re_reply_extract.py` |
+| 下書き出力 | `.jarvis_state/kurashift_viewing_judgment_drafts/<deal_id>.md` |
+| 件名 | `[Grok内見判断] {物件名}` |
+| 担当 | **S1 物件調査**（必要なら参謀が S5→S3 に振分） |
+| 出力ラベル | `内見: 行く|保留|見送り`（1行）＋理由3点以内 |
+
+運用:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_re_reply_extract.py --apply --emit-grok-mail-draft
+```
+
+poll 成功時も extract＋下書きを soft-fail で実行する。下書きを estate→自分宛で送る／チャンネルに貼るのはユーザー確認後（対外送信ルール）。
+
+購入手前ストック: Notion `DB_物件購入検討(購入手前)` ＋ KURASHIFT deals（`has_reply` / 内見候補）。Drawer の運営フォーム→809→内見は従来どおり。
+
 ## 混同しないレーン（要約）
 
 | レーン | 誰 | 何をする |
 |---|---|---|
 | 仲介メールあり | KURASHIFT | estate → **仲介** へ第一問合せ |
 | 仲介なし | S1（参謀が振分） | `[KURASHIFT問合せ依頼]` → Web/調査 |
+| 返信後・内見 | S1（→S5/S3） | `[Grok内見判断]` → 行く/保留/見送り |
 | 業者開拓 A' | S2 | 地場リスト Web フォーム（approved 文面） |
 | 二次・三次 | S5 → S3 | `[Grokペルソナ]` → `[Grok需給]` |
 | 買付・融資 | S6 / S7 | `[Grok買付]` / `[Grok融資]` |

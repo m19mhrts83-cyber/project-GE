@@ -3,7 +3,25 @@
 **用途**: Cursor plan がすべて「完了」に見えても、ここが **実装済 / 未実装** の正本。  
 **設計**: [`KURASHIFT_RE_業者開拓_物件候補_実務者設計_20260823.md`](KURASHIFT_RE_業者開拓_物件候補_実務者設計_20260823.md)  
 **生きている plan**: `~/.cursor/plans/kurashift_re問合せTier2以降_20260823.plan.md`  
-**閾値 YAML**: `config/kurashift_re_inquiry_auto.yaml`
+**閾値 YAML**: `config/kurashift_re_inquiry_auto.yaml`  
+**自動サイクル仕様**: 2026-08-25（下準備・既存 Tier 延長）
+
+---
+
+## 目標サイクル（自動問合せ → 内見／購入手前）
+
+```
+Grok調査 → score/聞く → Tier1手動 | Tier2一括確認 | Tier3自動(OFF)
+  → 送信 → poll → reply_extract → [Grok内見判断] → 購入手前ストック → 内見最終判断
+```
+
+| Phase | 内容 | 状態 |
+|---|---|---|
+| **A 運用** | Tier1 手動ボタンは残す。日次の主線は **Tier2 一括確認**（digest → `/realestate/deals/tier2`） | 🚧 コード済・運用ゲート待ち |
+| **B データ** | 返信抽出 → Grok 再調査 → Notion/deals ストック | 🚧 着手（migration / extract） |
+| **C 自動** | Tier3 無確認送信（明示同意後のみ YAML `enabled`） | ⬜ OFF・worker 用意 |
+
+しきい値は `kurashift_re_inquiry_auto.yaml` 正本（Tier2: score≥5＋聞く／Tier3: score≥7＋聞く＋HZ=OK）。送信量を増やすときは **score より日次 cap を上げる**。
 
 ---
 
@@ -71,18 +89,20 @@
 
 | 項目 | 状態 |
 |---|---|
-| YAML `tier3_auto_send.enabled` | ⬜ `false` |
-| Mac worker 即送信 | ⬜ 未実装 |
-| 有効化トリガー | 10送/3返・Tier2安定・明示同意 📅 9/13・9/27 |
+| YAML `tier3_auto_send.enabled` | ⬜ `false`（明示同意後のみ） |
+| Mac worker | 🚧 `scripts/jarvis_kurashift_re_tier3_auto_send.py`（enabled 時のみ実送信） |
+| 有効化手順 | `docs/KURASHIFT_Tier3_自動送信_有効化手順.md` |
+| 有効化トリガー | 10送/3返・Tier2安定・明示同意 📅 9/13・9/27（前倒し可） |
 
 ### 物件調査シート / 返信分析 🚧
 
 | 項目 | 状態 |
 |---|---|
-| migration `20260823_kurashift_re_deal_research_fields.sql` | 🚧 未 apply |
-| `config/kurashift_re_research_fields.yaml` | 🚧 |
-| `jarvis_kurashift_re_reply_extract.py` | ⬜ |
-| Notion `DB_物件購入検討` スキーマ doc | ⬜ |
+| migration `20260823_kurashift_re_deal_research_fields.sql` | ✅ apply（`kurashift_re_deal_field_values`） |
+| `config/kurashift_re_research_fields.yaml` | ✅ |
+| `jarvis_kurashift_re_reply_extract.py` | ✅ |
+| `[Grok内見判断]` handoff | ✅ paste 索引に追記 |
+| Notion `DB_物件購入検討` 投影 | ⬜ 抽出後の手動／後続 sync |
 
 ### Phase 3（任意）⬜
 
@@ -94,9 +114,11 @@ vendor↔deal 強化、Dashboard deep link、CSV export、週次バッチバー�
 
 | Tier | いま | 次のゲート |
 |---|---|---|
-| **1** | ✅ 主線（1件ずつ） | 手動5件 + poll 📅 8/25（Grok「聞く」を増やしてから） |
-| **2** | ✅ 本番 deploy 済 | 運用レビュー 📅 9/6 |
+| **1** | ✅ **手動導線**（1件ずつ・残す） | お試し数件 + poll 📅 8/25 |
+| **2** | ✅ **日次主線**（一括確認・deploy 済） | 運用レビュー 📅 9/6 |
 | **3** | ⬜ OFF | 可否 📅 9/13 → 有効化検討 📅 9/27 |
+
+**日常の押し方**: 朝 digest の Tier2 行 → https://jarvis-trade-desk.vercel.app/realestate/deals/tier2 で一括確認。個別は Tier1 ボタン。
 
 ---
 
@@ -106,10 +128,12 @@ vendor↔deal 強化、Dashboard deep link、CSV export、週次バッチバー�
 |---|---|
 | `tier2-finish-code` | ✅ |
 | `tier1-beginner-doc` | ✅ |
-| `tier1-five-sends` | ⬜ |
-| `tier2-prod-review` | ⬜ |
-| `research-reply-extract` | ⬜ |
-| `tier3-gate` | ⬜ |
+| `tier1-five-sends` | ⬜ 運用 |
+| `tier2-prod-review` | ⬜ 運用 |
+| `research-reply-extract` | 🚧 コード・migration 済／本番抽出運用 |
+| `tier3-gate` | ⬜ 同意後 |
+| `tier3-worker` | 🚧 スクリプト用意・enabled 待ち |
+| `viewing-judgment-handoff` | ✅ paste／進捗 |
 | `phase3-optional` | ⬜ |
 
 ---
