@@ -39,3 +39,10 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ```
 
 証憑設計: `docs/KURASHIFT_S1問合せ証憑_Drive_20260825.md`
+
+## 残アクション・リマインド
+
+- 一覧: `docs/S1_Grok_残アクション_20260826.md`
+- plan（閉じても開ける）: `~/.cursor/plans/s1役割復元_7a105b3b.plan.md`
+- Jarvis ルール: `.cursor/rules/jarvis-s1-grok-followup.mdc`
+

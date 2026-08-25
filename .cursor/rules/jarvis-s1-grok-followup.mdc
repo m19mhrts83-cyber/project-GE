@@ -1,0 +1,87 @@
+---
+description: S1役割復元・Grok Daily／証憑の残アクションを目安日でフォロー。plan を閉じてもリマインドから開ける。
+alwaysApply: true
+---
+
+# S1／Grok 残アクション・フォロー（暫定）
+
+**終わるまで有効。** 残マイルストーンがすべて完了（またはユーザーが不要と明示）したら、state を `disabled: true` にし、本ルール削除を提案する。
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| **残アクション一覧（人が読む）** | `~/git-repos/docs/S1_Grok_残アクション_20260826.md` |
+| **Cursor plan（閉じてもここから開く）** | `~/.cursor/plans/s1役割復元_7a105b3b.plan.md` |
+| state | `~/git-repos/.jarvis_state/s1_grok_followup.json` |
+| UI 手作業メモ | `config/grok_s1_ui_handoff_20260825.md` |
+| 証憑設計 | `docs/KURASHIFT_S1問合せ証憑_Drive_20260825.md` |
+
+リマインドでは **必ず plan パスまたは残アクション MD のリンクを1行添える**（plan を閉じていても辿れるようにする）。
+
+## 無効化
+
+- state `"disabled": true`
+- または `.env.jarvis_private` に `JARVIS_S1_GROK_FOLLOWUP_DISABLE=1`
+- ユーザーが「S1フォロー不要／残アクション終わり」と明示
+
+## 残マイルストーン（目安日・JST）
+
+| ID | 目安 | 依頼 |
+|---|---|---|
+| `morning-smoke` | **2026-08-27** | 9:00 本日分＋10:30 S1物件探しの初回確認。「スモークOK」で完了 |
+| `kurashift-evidence-ui` | **2026-08-28** | Production の deal 詳細で証憑リンク確認（`[Grok調査]` 添付あり案件） |
+| `drive-api-d3` | （任意） | Drive API アップロード。**ユーザーが触れたときだけ** info。due/ask にしない |
+
+完了済み（促さない）: S1/部長再貼り・両ルーティン・S2再貼り・main マージ。  
+保険・契約の独立 Bot は **やらない**（部長内蔵）。
+
+## いつ動くか（トリガー）
+
+**ユーザーが Jarvis に何か話しかけたセッション**で、次を満たすとき本題の前後に **1ブロック**（同一セッション1回まで）:
+
+1. state が無効でない
+2. 残 ID のうち **目安の3日前〜当日** または **目安経過** がある
+3. その ID を **7日以内に同レベルで促していない**（`last_prompted`）
+
+次の話題なら、上記に加え **経過中を1行**添えてよい（同一セッションで未出なら）:
+
+- Grok／不動産Daily／S1／物件調査／本日分／S1物件探し
+- KURASHIFT deals／証憑／`[Grok調査]`
+- パートナー確認のついで（失敗しても確認全体は止めない）
+
+## 促しレベル
+
+| レベル | 条件 | 言い方 |
+|---|---|---|
+| **soon** | 目安の **3日前〜当日** | 「〇日が目安です。…」 |
+| **due** | 目安を **過ぎた**・未完了 | 「目安（〇月〇日）を過ぎています。次は: …」 |
+| **ask** | 目安から **7日以上**経過 | 「未完了です。今日やる／延期／スキップ？」 |
+
+`drive-api-d3` は soon/due/ask にしない。
+
+## 報告フォーマット
+
+```
+---
+📎 S1/Grokフォロー
+- {ID}: {soon|due|ask} — {依頼1行}
+- plan: ~/.cursor/plans/s1役割復元_7a105b3b.plan.md
+- 一覧: docs/S1_Grok_残アクション_20260826.md
+---
+```
+
+## Jarvis の動作
+
+1. state を読む。`disabled` ならスキップ
+2. `completed_ids` と残表を照合し、促す ID だけ出す
+3. ユーザーが「スモークOK」「証憑UI見た」「Drive APIはやらない」等と言ったら:
+   - state の `completed_ids` に追記（または `cancelled` 相当を notes に）
+   - `docs/S1_Grok_残アクション_20260826.md` を同期
+   - `last_prompted` 更新
+4. 残が空（任意 D3 以外）→ `disabled: true` 提案＋本ルール削除の確認
+5. 延期 → 残アクション MD の目安日と state を更新
+
+## state キー
+
+`completed_ids` / `last_prompted`（`{ "morning-smoke": { "at": "ISO", "level": "due" } }`）/ `plan_path` / `disabled`
