@@ -50,13 +50,20 @@ def profile_paths(kind: str) -> tuple[Path, Path]:
 
 
 def resolve_notebook_url(cfg: dict[str, Any], url: str | None, key: str | None) -> str:
-    if url:
-        return url.strip()
+    if url and str(url).strip():
+        return str(url).strip()
     if key:
-        nb = (cfg.get("notebooks") or {}).get(key) or {}
-        if nb.get("url"):
-            return str(nb["url"]).strip()
+        notebooks = cfg.get("notebooks") or {}
+        if key in notebooks:
+            # キー指定時は当該ノートの url のみ（空なら default に落とさない）
+            return str((notebooks.get(key) or {}).get("url") or "").strip()
     return str(cfg.get("default_notebook_url") or "").strip()
+
+
+def resolve_notebook_meta(cfg: dict[str, Any], key: str | None) -> dict[str, Any]:
+    if not key:
+        return {}
+    return dict((cfg.get("notebooks") or {}).get(key) or {})
 
 
 def resolve_drive_out(cfg: dict[str, Any], folder: str | None = None) -> Path:

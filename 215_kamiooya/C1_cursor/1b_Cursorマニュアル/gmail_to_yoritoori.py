@@ -144,6 +144,32 @@ def resolve_token_paths():
     return paths or [token_path]
 
 
+def resolve_sent_supplement_token_paths(primary_paths: list[Path]) -> list[Path]:
+    """
+    admin 単独取込時でも、estate / m19m から送信トレイの漏れを拾う。
+    パートナー送信は estate 等から直接送ることが多いため。
+    """
+    primary_resolved = {p.resolve() for p in primary_paths if p.exists()}
+    out: list[Path] = []
+    for name in ("token_estate.json", "token_m19m.json", "token.json"):
+        p = SCRIPT_DIR / name
+        if not p.exists():
+            continue
+        try:
+            rp = p.resolve()
+        except Exception:
+            rp = p
+        if rp in primary_resolved:
+            continue
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+            if token_satisfies_215_scopes(d):
+                out.append(p)
+        except Exception:
+            continue
+    return out
+
+
 def build_service_for_token(token_path_for_account: Path):
     """tokenファイルごとにGmailサービスを作成し、(service, emailAddress) を返す。"""
     creds = None
@@ -784,6 +810,14 @@ def main():
             print("送信トレイを確認しています...")
             sys.stdout.flush()
             _, existing_sent = _run_include_sent(service, resolver, existing_sent=existing_sent)
+
+    supplement = resolve_sent_supplement_token_paths(token_paths)
+    for tpath in supplement:
+        service, account_email = build_service_for_token(tpath)
+        label = account_email or str(tpath)
+        print(f"\n=== Gmail送信トレイ補完: {label} ===")
+        sys.stdout.flush()
+        _, existing_sent = _run_include_sent(service, resolver, existing_sent=existing_sent)
 
     print("\n完了しました。")
     sys.stdout.flush()

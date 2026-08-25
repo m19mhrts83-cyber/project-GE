@@ -23,7 +23,7 @@ subfolders:
     note: "ゼロイチ／いけとも共通スタイル"
   - id: "01"
     name: "01_セサミ使用方法説明"
-    note: ""
+    note: "入居者向け。学び: docs/N1_NotebookLM/01_セサミ使用方法/／Studio修正 20260825（QR登録を本線に）"
   - id: "02"
     name: "02_Grandole周辺MAP試作"
     note: ""
