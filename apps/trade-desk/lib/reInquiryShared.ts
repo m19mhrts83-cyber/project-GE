@@ -218,7 +218,7 @@ export function buildGrokInvestigatePrompt(params: {
     url ? `URL: ${url}` : null,
     params.dealId ? `deal_id: ${params.dealId}` : null,
     "",
-    "（以下は不動産賃貸チーム / 参謀向け。@物件調査 に振って路線価・ハザードを調査）",
+    "（以下は不動産Dailyチーム / 参謀向け。@物件調査 に振って路線価・ハザードを調査）",
     "",
     "【物件調査 — 必須2調査】",
     "",

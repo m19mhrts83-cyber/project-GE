@@ -44,6 +44,7 @@ GMAIL_READ_CATCHUP = REPO / "scripts" / "jarvis_triage_gmail_read_catchup.py"
 INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
+KURASHIFT_S1_EVIDENCE = REPO / "scripts" / "jarvis_kurashift_s1_evidence_to_drive.py"
 GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
 KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
@@ -61,6 +62,11 @@ WESTUDY_GDRIVE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_westudy_gdri
 PORTFOLIO_WEEKLY_STATE = REPO / ".jarvis_state" / "portfolio_weekly.json"
 PORTFOLIO_WEEKLY_RUNNER = REPO / "launchd" / "portfolio_weekly_runner.sh"
 PORTFOLIO_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_portfolio"
+FAMILY_JOURNAL_STATE = REPO / ".jarvis_state" / "family_journal_weekly.json"
+FAMILY_JOURNAL_RUNNER = REPO / "launchd" / "family_journal_weekly_runner.sh"
+FAMILY_JOURNAL_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_family_journal"
+APP_DEV_CARDS = REPO / "scripts" / "jarvis_app_dev_cards_morning.py"
+APP_DEV_QUEUE = REPO / "scripts" / "jarvis_app_dev_queue.py"
 
 
 def now_iso() -> str:
@@ -289,6 +295,77 @@ def spawn_portfolio_weekly(*, dry_run: bool) -> str:
         return "error"
 
 
+def this_week_family_journal_slot() -> datetime:
+    """今週日曜 08:00 JST（金締 Journal 投影。WeStudy Drive と同刻）。"""
+    now = datetime.now(JST)
+    days_since_sun = (now.weekday() + 1) % 7
+    return now.replace(hour=8, minute=0, second=0, microsecond=0) - timedelta(
+        days=days_since_sun
+    )
+
+
+def family_journal_weekly_needs_catchup() -> bool:
+    """日曜 08:00 枠が未成功なら True（月曜以降の朝オープンで拾う）。"""
+    if os.environ.get("JARVIS_FAMILY_JOURNAL_WEEKLY_DISABLE") == "1":
+        return False
+    now = datetime.now(JST)
+    slot = this_week_family_journal_slot()
+    if now < slot:
+        return False
+    if not FAMILY_JOURNAL_STATE.is_file():
+        return True
+    try:
+        data = json.loads(FAMILY_JOURNAL_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("disabled") is True:
+        return False
+    if data.get("last_ok") is False:
+        return True
+    if not data.get("page_id"):
+        return True
+    # 金締ラベルが直近金曜と一致し、かつ slot 以降成功
+    fri = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    fri = fri - timedelta(days=(fri.weekday() - 4) % 7)
+    expect_week = f"金締-{fri.strftime('%Y-%m-%d')}"
+    if str(data.get("week") or "") != expect_week:
+        return True
+    ts = _parse_state_ts(str(data.get("last_success_at") or ""))
+    if ts is None:
+        return True
+    return ts < slot
+
+
+def spawn_family_journal_weekly(*, dry_run: bool) -> str:
+    if not FAMILY_JOURNAL_RUNNER.is_file():
+        print(f"# family_journal: missing {FAMILY_JOURNAL_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn family_journal_weekly_runner.sh", flush=True)
+        return "dry_run"
+    FAMILY_JOURNAL_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(FAMILY_JOURNAL_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(FAMILY_JOURNAL_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(FAMILY_JOURNAL_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# family_journal: spawned weekly runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# family_journal spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
 def spawn_zaim_csv_weekly(*, dry_run: bool) -> str:
     """週次 CSV をバックグラウンド起動（朝バンドルをブロックしない）。"""
     if not ZAIM_WEEKLY_RUNNER.is_file():
@@ -473,6 +550,22 @@ def main() -> int:
         results["steps"]["kurashift_grok_mail"] = rc
         if rc != 0:
             print(f"# kurashift_grok_mail soft-fail rc={rc}", file=sys.stderr)
+        # 証憑（Grok調査添付 → Drive/OneDrive フォルダ）soft-fail
+        if KURASHIFT_S1_EVIDENCE.is_file():
+            rc_ev = run_step(
+                "kurashift_s1_evidence",
+                [exe, str(KURASHIFT_S1_EVIDENCE), "--poll-recent"],
+                timeout=180,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["kurashift_s1_evidence"] = rc_ev
+            if rc_ev != 0:
+                print(
+                    f"# kurashift_s1_evidence soft-fail rc={rc_ev}",
+                    file=sys.stderr,
+                )
+        else:
+            results["steps"]["kurashift_s1_evidence"] = "skipped"
     else:
         results["steps"]["kurashift_grok_mail"] = "skipped"
 
@@ -683,6 +776,54 @@ def main() -> int:
     else:
         results["steps"]["portfolio_weekly"] = "fresh"
         print("# portfolio_weekly: skip (this week's full collect already done)", flush=True)
+
+    # 9. 家族コーチ Journal週次 → Notion（日曜 08:00 金締・失敗／Mac スリープ時）
+    if family_journal_weekly_needs_catchup():
+        results["steps"]["family_journal_weekly"] = spawn_family_journal_weekly(
+            dry_run=args.dry_run
+        )
+    else:
+        results["steps"]["family_journal_weekly"] = "fresh"
+        print(
+            "# family_journal: skip (this week's Sunday 08:00 金締 slot already done)",
+            flush=True,
+        )
+
+    # 10. アプリ開発 Jarvis向けカード要約（[Grok開発]メール / inbox）
+    if APP_DEV_CARDS.is_file() and not (
+        (os.environ.get("JARVIS_APP_DEV_CARDS_DISABLE") or "").strip()
+        in ("1", "true", "yes")
+    ):
+        rc_ad = run_step(
+            "app_dev_cards",
+            [exe, str(APP_DEV_CARDS)],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["app_dev_cards"] = rc_ad
+        if rc_ad != 0:
+            failures += 1
+    else:
+        results["steps"]["app_dev_cards"] = "skipped"
+        print("# app_dev_cards: skip", flush=True)
+
+    # 11. アプリ開発カード → PR／Issue キュー（低=Cloud PR、高=Issue）
+    if APP_DEV_QUEUE.is_file() and not (
+        (os.environ.get("JARVIS_APP_DEV_QUEUE_DISABLE") or "").strip()
+        in ("1", "true", "yes")
+    ):
+        rc_q = run_step(
+            "app_dev_queue",
+            [exe, str(APP_DEV_QUEUE)],
+            timeout=300,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["app_dev_queue"] = rc_q
+        if rc_q != 0:
+            failures += 1
+    else:
+        results["steps"]["app_dev_queue"] = "skipped"
+        print("# app_dev_queue: skip", flush=True)
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()

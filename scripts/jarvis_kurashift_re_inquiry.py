@@ -663,6 +663,23 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
                                     )
                         except Exception as e:
                             print(f"# pdf_fetch soft-fail: {type(e).__name__}: {e}")
+                        try:
+                            from jarvis_kurashift_re_reply_extract import (
+                                extract_deal,
+                                load_fields_cfg,
+                                emit_grok_mail_draft,
+                            )
+
+                            er = extract_deal(
+                                sb, deal, load_fields_cfg(), dry_run=False
+                            )
+                            emit_grok_mail_draft(deal, er)
+                            print(
+                                f"# reply_extract deal={str(deal['id'])[:8]}… "
+                                f"{er.get('stats')}"
+                            )
+                        except Exception as e:
+                            print(f"# reply_extract soft-fail: {type(e).__name__}: {e}")
     out = {"ok": True, "scanned_threads": scanned, "appended": appended, "dry_run": dry_run}
     print(f"📎 inquiry_poll: scanned={scanned} appended={appended}")
     print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")

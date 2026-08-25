@@ -209,6 +209,32 @@ def parse_grok_report(text: str) -> dict[str, Any]:
     out["reason_line"] = _field_in_section(text, "総合", "理由1行") or _field_after_label(
         text, "理由1行"
     )
+    # ## 問合せ（S1 portal / KURASHIFT handoff · 2026-08-25）
+    inq_sec = _section_text(text, "問合せ")
+    for key, label in (
+        ("inquiry_action", "inquiry_action"),
+        ("agent_email_available", "agent_email_available"),
+        ("inquiry_url", "inquiry_url"),
+        ("portal", "portal"),
+        ("inquiry_sent_at_note", "sent_at"),
+        ("inquiry_note", "note"),
+    ):
+        val = (
+            _field_after_label(inq_sec, label)
+            if inq_sec
+            else _field_after_label(text, label)
+        )
+        if val:
+            out[key] = val.strip()
+    # bare key: value lines (YAML-ish)
+    if not out.get("inquiry_action"):
+        m = re.search(
+            r"inquiry_action\s*[:：]\s*(portal_sent|kurashift_handoff|investigate_only)",
+            text,
+            re.I,
+        )
+        if m:
+            out["inquiry_action"] = m.group(1).lower()
     rid = _field_after_label(text, "report_id")
     if not rid:
         m = re.search(r"report_id:\s*(\S+)", text)
@@ -217,6 +243,98 @@ def parse_grok_report(text: str) -> dict[str, Any]:
     if rid:
         out["report_id"] = rid
     return out
+
+
+def apply_s1_inquiry_fields(
+    sb: Any,
+    *,
+    deal_id: str,
+    grok: dict[str, Any],
+    gmail_id: str | None = None,
+) -> dict[str, Any]:
+    """[Grok調査] の inquiry_action を deals.inquiry_* と events に反映。"""
+    action = str(grok.get("inquiry_action") or "").strip().lower()
+    if not action:
+        return {"ok": False, "skipped": "no_inquiry_action"}
+    now = datetime.now(timezone.utc).isoformat()
+    result: dict[str, Any] = {"ok": True, "action": action, "deal_id": deal_id}
+
+    try:
+        from jarvis_kurashift_deal_events import insert_deal_event
+        from jarvis_kurashift_re_inquiry import get_deal, update_inquiry
+    except Exception as e:
+        return {"ok": False, "error": f"import: {e}"}
+
+    deal = get_deal(sb, deal_id)
+    if not deal:
+        return {"ok": False, "error": "deal not found"}
+
+    if action == "portal_sent":
+        update_inquiry(
+            sb,
+            deal,
+            inquiry_status="awaiting_reply",
+            inquiry_sent_at=now,
+            summary_json={
+                "inquiry_channel": "s1_portal",
+                "inquiry_url": grok.get("inquiry_url"),
+                "portal": grok.get("portal"),
+                "s1_inquiry_note": grok.get("inquiry_note"),
+                "s1_gmail_id": gmail_id,
+            },
+        )
+        insert_deal_event(
+            sb,
+            deal_id=deal_id,
+            event_type="inquiry_sent",
+            summary=f"S1 ポータル問合せ: {(grok.get('inquiry_url') or '')[:80]}",
+            actor="s1_portal",
+            to_status="awaiting_reply",
+            payload={
+                "inquiry_action": action,
+                "portal": grok.get("portal"),
+                "inquiry_url": grok.get("inquiry_url"),
+                "gmail_id": gmail_id,
+            },
+        )
+        result["inquiry_status"] = "awaiting_reply"
+    elif action == "kurashift_handoff":
+        update_inquiry(
+            sb,
+            deal,
+            inquiry_status="awaiting_grok",
+            summary_json={
+                "inquiry_channel": "grok_handoff",
+                "inquiry_url": grok.get("inquiry_url"),
+                "portal": grok.get("portal"),
+                "s1_inquiry_note": grok.get("inquiry_note"),
+                "s1_gmail_id": gmail_id,
+                "awaiting_kurashift_first_inquiry": True,
+            },
+        )
+        insert_deal_event(
+            sb,
+            deal_id=deal_id,
+            event_type="grok_handoff_ready",
+            summary="S1: 仲介メール可 → KURASHIFT第一問合せ待ち",
+            actor="s1",
+            to_status="awaiting_grok",
+            payload={"inquiry_action": action, "gmail_id": gmail_id},
+        )
+        result["inquiry_status"] = "awaiting_grok"
+    elif action == "investigate_only":
+        insert_deal_event(
+            sb,
+            deal_id=deal_id,
+            event_type="grok_applied",
+            summary="S1 調査のみ（問合せなし）",
+            actor="s1",
+            payload={"inquiry_action": action, "gmail_id": gmail_id},
+        )
+        result["inquiry_status"] = "none"
+    else:
+        return {"ok": False, "skipped": f"unknown_action:{action}"}
+    return result
 
 
 def grok_match_score(grok: dict[str, Any], base_score: float) -> float:
@@ -686,6 +804,15 @@ def fetch_grok_mails(
         )
         sj = dict(row.get("summary_json") or {})
         sj["grok"] = grok
+        # inquiry_action → 列にも仮載せ（insert 後に apply_s1_inquiry_fields で確定）
+        action = str(grok.get("inquiry_action") or "").strip().lower()
+        if action == "portal_sent":
+            row["inquiry_status"] = "awaiting_reply"
+            sj["inquiry_channel"] = "s1_portal"
+        elif action == "kurashift_handoff":
+            row["inquiry_status"] = "awaiting_grok"
+            sj["inquiry_channel"] = "grok_handoff"
+            sj["awaiting_kurashift_first_inquiry"] = True
         row["summary_json"] = sj
         try:
             from jarvis_kurashift_re_inquiry_rules import inquiry_tier_hint
@@ -1077,6 +1204,20 @@ def main() -> int:
                     to_status=str(c.get("status") or "info"),
                     payload={"source": c.get("source"), "match_score": c.get("match_score")},
                 )
+                if c.get("source") == "mail_grok":
+                    grok = (c.get("summary_json") or {}).get("grok") or {}
+                    if isinstance(grok, dict) and grok.get("inquiry_action"):
+                        try:
+                            apply_s1_inquiry_fields(
+                                sb,
+                                deal_id=str(new_id),
+                                grok=grok,
+                                gmail_id=str(gid) if gid else None,
+                            )
+                        except Exception as e:
+                            print(
+                                f"# s1_inquiry_apply FAIL {new_id}: {type(e).__name__}: {e}"
+                            )
         except Exception:
             pass
 
