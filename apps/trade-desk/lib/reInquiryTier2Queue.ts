@@ -10,6 +10,11 @@ import {
   loadInquiryAutoConfig,
   type InquiryAutoConfig,
 } from "./reInquiryAutoConfig";
+import {
+  channelSortRank,
+  dedupeAndPrioritizeDeals,
+  inquiryChannelOf,
+} from "./reDealDedupe";
 
 export type Tier2QueueItem = {
   deal_id: string;
@@ -23,6 +28,8 @@ export type Tier2QueueItem = {
   body_preview: string;
   land_method_bairitsu: boolean;
   badges: string[];
+  /** 小さいほど優先（メール=0, Grok=1）— ソート用 */
+  channel_rank?: number;
 };
 
 export function isTier2Enabled(config?: InquiryAutoConfig): boolean {
@@ -68,8 +75,12 @@ export function buildTier2QueueFromDeals(
   const cfg = config || loadInquiryAutoConfig();
   if (!isTier2Enabled(cfg)) return [];
 
+  const uniqueDeals = dedupeAndPrioritizeDeals(
+    deals.filter((d): d is ReDealForInquiry & { id: string } => Boolean(d.id))
+  ).deals;
+
   const items: Tier2QueueItem[] = [];
-  for (const deal of deals) {
+  for (const deal of uniqueDeals) {
     if (!isProductionInquiryDeal(deal, cfg)) continue;
     const evalInq = evaluateInquiryCandidate(deal, cfg);
     if (!evalInq.tier2 || !evalInq.canQuickSend) continue;
@@ -100,12 +111,17 @@ export function buildTier2QueueFromDeals(
       body_preview: preview.body.slice(0, 280),
       land_method_bairitsu: preview.land_method_bairitsu,
       badges: evalInq.badges,
+      channel_rank: channelSortRank(inquiryChannelOf(deal)),
     });
   }
 
-  items.sort(
-    (a, b) => (b.match_score ?? 0) - (a.match_score ?? 0)
-  );
+  // メール問合せ → Grok Web → match_score
+  items.sort((a, b) => {
+    const ca = a.channel_rank ?? 9;
+    const cb = b.channel_rank ?? 9;
+    if (ca !== cb) return ca - cb;
+    return (b.match_score ?? 0) - (a.match_score ?? 0);
+  });
   return items;
 }
 
@@ -141,7 +157,7 @@ export async function getTier2QueueSummary(
     )
     .in("status", ["info", "viewing"])
     .order("match_score", { ascending: false, nullsFirst: false })
-    .limit(120);
+    .limit(200);
 
   const fullQueue = buildTier2QueueFromDeals(
     (deals || []) as ReDealForInquiry[],
