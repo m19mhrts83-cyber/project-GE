@@ -65,6 +65,7 @@ FAMILY_JOURNAL_STATE = REPO / ".jarvis_state" / "family_journal_weekly.json"
 FAMILY_JOURNAL_RUNNER = REPO / "launchd" / "family_journal_weekly_runner.sh"
 FAMILY_JOURNAL_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_family_journal"
 APP_DEV_CARDS = REPO / "scripts" / "jarvis_app_dev_cards_morning.py"
+APP_DEV_QUEUE = REPO / "scripts" / "jarvis_app_dev_queue.py"
 
 
 def now_iso() -> str:
@@ -788,6 +789,24 @@ def main() -> int:
     else:
         results["steps"]["app_dev_cards"] = "skipped"
         print("# app_dev_cards: skip", flush=True)
+
+    # 11. アプリ開発カード → PR／Issue キュー（低=Cloud PR、高=Issue）
+    if APP_DEV_QUEUE.is_file() and not (
+        (os.environ.get("JARVIS_APP_DEV_QUEUE_DISABLE") or "").strip()
+        in ("1", "true", "yes")
+    ):
+        rc_q = run_step(
+            "app_dev_queue",
+            [exe, str(APP_DEV_QUEUE)],
+            timeout=300,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["app_dev_queue"] = rc_q
+        if rc_q != 0:
+            failures += 1
+    else:
+        results["steps"]["app_dev_queue"] = "skipped"
+        print("# app_dev_queue: skip", flush=True)
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()

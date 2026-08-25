@@ -16,12 +16,12 @@
 
 ## 運用の要点
 
-- 統括＝レビューと **Jarvis向けカード**（材料／実装）。実装は Jarvis
+- 統括＝レビューと **Jarvis向けカード**（材料／実装）。**PR は切らない**
 - 「やってみたい」→ 実装カード（リスク: 低|高）
-- 低＝Jarvis 即実行可／高＝確認後
-- 週次の提案は全部やらない（カード最大3）
-- **受け渡し**: カード後に estate へ件名 `[Grok開発]`（朝取り込み）
-- 朝要約: `scripts/jarvis_app_dev_cards_morning.py`（`jarvis_morning_mac_refresh` 内）
+- **受け渡し**: カード後に estate へ件名 `[Grok開発]`
+- 朝: 要約 → **キュー**（低=Cloud→PR／高=Issue）。自動マージなし
+- 処置: GitHub で目視、または Jarvis に「委任して #N」
+- スクリプト: `jarvis_app_dev_cards_morning.py` / `jarvis_app_dev_queue.py`
 
 対象:
 1. 神・大家さんQ&Aチャットボット

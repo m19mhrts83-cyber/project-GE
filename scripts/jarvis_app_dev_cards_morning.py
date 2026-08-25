@@ -50,27 +50,28 @@ def now_iso() -> str:
 
 
 def load_state() -> dict[str, Any]:
+    empty = {
+        "processed_mail_ids": [],
+        "prompted_card_ids": [],
+        "queue": {},
+        "last_run_at": None,
+        "last_digest_at": None,
+        "last_queue_at": None,
+    }
     if not STATE_PATH.is_file():
-        return {
-            "processed_mail_ids": [],
-            "prompted_card_ids": [],
-            "last_run_at": None,
-            "last_digest_at": None,
-        }
+        return dict(empty)
     try:
         data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             raise ValueError("bad state")
         data.setdefault("processed_mail_ids", [])
         data.setdefault("prompted_card_ids", [])
+        data.setdefault("queue", {})
+        if not isinstance(data["queue"], dict):
+            data["queue"] = {}
         return data
     except Exception:
-        return {
-            "processed_mail_ids": [],
-            "prompted_card_ids": [],
-            "last_run_at": None,
-            "last_digest_at": None,
-        }
+        return dict(empty)
 
 
 def save_state(state: dict[str, Any]) -> None:
