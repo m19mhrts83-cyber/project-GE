@@ -14,23 +14,32 @@ Jarvis が正本を更新済み。以下を Grok で実施。
 正本: `config/grok_sanbo_bot_grok_paste.md`  
 本日分＝キューのみ、S1物件探し＝別枠、**§仲介返信パック（18:00）**、愛知→名銀・越野 を含む版。
 
-## 3. ルーティン
+## 4. 融資相談（S7）— **新規Botは作らない**（既存を更新）
+
+S7 は **不動産・購入フェーズ** チームに既にある。  
+→ **Instructions の全文差し替えのみ**（新ポッド／新Bot作成はしない）。
+
+正本: `config/grok_loan_bot_grok_paste.md`  
+フェンス内（`# あなたの役割 — 融資相談 Bot` 〜 禁止節の閉じまで）を貼る。
+
+追加で入る要点: 愛知→**名銀・越野将志**のソフト打診準備。銀行送信禁止。
+
+S5・S3 も既存メンバーのまま（新規作成しない）。
+
+## 3. ルーティン（既存チャンネルに追加のみ）
+
+**新チャンネル／新ポッドは作らない。**  
+既存の **不動産Dailyチーム**（朝の本日分がある方）にルーティンを1本追加。
 
 | 名前 | 時刻 | 指示の正本 |
 |---|---|---|
-| `不動産Daily · 本日分` | 9:00（既存） | `config/grok_bucho_routine_本日分.md`（朝Gmail＝調査候補。問合せ返信本線は18:00と明記） |
+| `不動産Daily · 本日分` | 9:00（既存） | `config/grok_bucho_routine_本日分.md`（朝Gmail＝調査候補。問合せ返信本線は18:00と明記）を再貼り推奨 |
 | `不動産Daily · S1物件探し` | **10:30** | `config/grok_bucho_routine_S1物件探し.md` |
-| `不動産Daily · 仲介返信` | **18:00（新規）** | `config/grok_bucho_routine_仲介返信.md` |
+| `不動産Daily · 仲介返信` | **18:00（新規ルーティン）** | `config/grok_bucho_routine_仲介返信.md` の指示フェンス全文 |
+
+購入フェーズ側に 18:00 を二重登録しない（Daily 側が本線）。
 
 チャンネル: **不動産Dailyチーム**。
-
-## 4. 融資相談（S7）— 未作成なら作成／作成済みなら再貼り
-
-正本: `config/grok_loan_bot_grok_paste.md`  
-愛知→名古屋銀行・越野将志のソフト打診準備。送信禁止。  
-手順: `config/grok_remaining_bots_setup.md`（チームに未追加なら追加）。
-
-S5（ペルソナ二次判断）・S3（需給三次判断）もチームメンバーであることを確認。
 
 ## 部長へ一言（任意）
 
@@ -56,3 +65,27 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - plan（閉じても開ける）: `~/.cursor/plans/s1役割復元_7a105b3b.plan.md`
 - 夕方 plan: `~/.cursor/plans/夕方仲介返信デイリー_a2426f31.plan.md`
 - Jarvis ルール: `.cursor/rules/jarvis-s1-grok-followup.mdc`
+
+---
+
+## 追記（2026-08-26）S9 管理会社開拓 · 生存確認
+
+### Grok UI 手作業
+
+1. **新 Bot「管理会社開拓」**（社員 S9）を作成し、`config/grok_mgmt_vendor_bot_grok_paste.md` のフェンス全文を Instructions に貼る
+2. **不動産Dailyチーム** に S9 をメンバー追加
+3. **部長** Instructions を `config/grok_sanbo_bot_grok_paste.md` で再貼り（S9 ロスター・§管理会社開拓）
+4. **本日分** ルーティンを `config/grok_bucho_routine_本日分.md` で再貼り（4b 任意 S9）
+5. **修繕業者開拓** Instructions を再貼り（生存確認節）
+
+### Mac
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_mgmt_vendor_list.py --import-xlsx --merge
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_mgmt_vendor_sync.py --apply
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_repair_vendor_list.py --bootstrap
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_alive_web_check.py --kind mgmt --apply --limit 30
+```
+
+UI: `/realestate/mgmt-vendors` · `/realestate/repair-vendors?filter=alive`

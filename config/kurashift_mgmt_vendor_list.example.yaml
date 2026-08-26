@@ -1,0 +1,45 @@
+# S9 管理会社開拓リスト（正本スキーマ）
+# 実データ: config/kurashift_mgmt_vendor_list.yaml（.gitignore）
+# 取込: scripts/jarvis_kurashift_mgmt_vendor_list.py --import-xlsx ★管理会社一覧.xlsx
+# Excel 正本（空室一括送信）は OneDrive のまま。ここは KURASHIFT 副本。
+
+settings:
+  daily_outreach_limit: 2
+  alive_due_days: 180
+  outreach_from: matsuno.estate@gmail.com
+  target_note: "戸別管理・空室募集の開拓（空室メール一括とは別レーン）"
+
+# status: pending | discovered | contacted | replied | skip | invalid
+# alive_*: 生存確認（周期 180日）
+vendors:
+  - id: mgmt-example-01
+    name: "（例）〇〇管理"
+    area: "愛知県名古屋市"
+    prefecture: "愛知県"
+    city: "名古屋市"
+    station: ""
+    property_area: "名古屋市北区周辺"
+    url: "https://example.co.jp/"
+    contact_url: "https://example.co.jp/contact"
+    channel: web_form
+    contact_email: ""
+    phone: ""
+    status: pending
+    source: example
+    notes: ""
+    services:
+      buy: false
+      lease_broker: true
+      lease_mgmt: true
+      repair: false
+      sale_appraisal: false
+      kodate_mgmt_ok: false
+    discovered_at: "2026-08-26"
+    contacted_at: ""
+    replied_at: ""
+    last_result: ""
+    alive_checked_at: ""
+    alive_status: unknown
+    alive_method: ""
+    alive_note: ""
+    alive_due_days: 180

@@ -4,6 +4,7 @@ import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import {
   VENDOR_STATUS_LABEL,
+  vendorAliveOk,
   vendorNeedsFollowUp,
 } from "@/lib/rePipelineUi";
 import Link from "next/link";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 const FILTERS: { id: string; label: string }[] = [
   { id: "followup", label: "要フォロー" },
+  { id: "alive", label: "生存OK" },
   { id: "all", label: "すべて" },
   { id: "pending", label: "未送信" },
   { id: "contacted", label: "送信済" },
@@ -84,6 +86,8 @@ export default async function RealEstateVendorsPage({
     rows = rows.filter((v) => v.status === "replied");
   } else if (filter === "excluded") {
     rows = rows.filter((v) => ["skip", "invalid"].includes(v.status || ""));
+  } else if (filter === "alive") {
+    rows = rows.filter((v) => vendorAliveOk(v));
   } else if (filter === "followup") {
     rows = rows.filter((v) => vendorNeedsFollowUp(v));
   }

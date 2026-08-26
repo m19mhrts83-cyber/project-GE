@@ -28,6 +28,13 @@ export const VENDOR_STATUS_LABEL: Record<string, string> = {
   invalid: "無効",
 };
 
+export const ALIVE_STATUS_LABEL: Record<string, string> = {
+  unknown: "未確認",
+  ok: "生存OK",
+  fail: "不通/失敗",
+  stale: "期限切れ",
+};
+
 export type DealsTabId = "candidates" | "all" | "passed";
 
 export function parseDealsTab(raw: string | undefined): DealsTabId {
@@ -45,6 +52,34 @@ export function vendorNeedsFollowUp(v: {
   if (Number.isNaN(sent.getTime())) return false;
   const days = (Date.now() - sent.getTime()) / (86400 * 1000);
   return days >= 7;
+}
+
+/** alive_ok = status ok かつ期限内（due_days） */
+export function vendorAliveOk(v: {
+  alive_status?: string | null;
+  alive_checked_at?: string | null;
+  alive_due_days?: number | null;
+}): boolean {
+  if ((v.alive_status || "unknown") !== "ok") return false;
+  if (!v.alive_checked_at) return false;
+  const checked = new Date(v.alive_checked_at);
+  if (Number.isNaN(checked.getTime())) return false;
+  const due = typeof v.alive_due_days === "number" && v.alive_due_days > 0
+    ? v.alive_due_days
+    : 180;
+  const days = (Date.now() - checked.getTime()) / (86400 * 1000);
+  return days < due;
+}
+
+export function vendorAliveEffective(v: {
+  alive_status?: string | null;
+  alive_checked_at?: string | null;
+  alive_due_days?: number | null;
+}): string {
+  const st = v.alive_status || "unknown";
+  if (st === "ok" && !vendorAliveOk(v)) return "stale";
+  if ((st === "unknown" || !st) && !v.alive_checked_at) return "stale";
+  return st;
 }
 
 export function grokOneLine(grok: Record<string, unknown> | null): string {

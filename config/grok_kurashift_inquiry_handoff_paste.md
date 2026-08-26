@@ -12,6 +12,7 @@
 | **物件業者開拓** | S2 | `config/grok_vendor_outreach_bot_grok_paste.md` | 同上 |
 | **需給三次判断** | S3 | `config/grok_supply_bot_grok_paste.md` | 同上 |
 | **修繕業者開拓** | S4 | `config/grok_repair_vendor_bot_grok_paste.md` | 同上 |
+| **管理会社開拓** | S9 | `config/grok_mgmt_vendor_bot_grok_paste.md` | 同上 |
 | **ペルソナ二次判断** | S5 | `config/grok_persona_bot_grok_paste.md` | 同上 |
 | **買付交渉** | S6 | `config/grok_deal_negotiation_bot_grok_paste.md` | 同上 |
 | **融資相談** | S7 | `config/grok_loan_bot_grok_paste.md` | 同上 |

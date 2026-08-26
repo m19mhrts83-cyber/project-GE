@@ -19,6 +19,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
 from jarvis_kurashift_vendor_list import load_list  # noqa: E402
+from jarvis_vendor_alive_lib import alive_db_fields, ensure_alive_fields  # noqa: E402
 
 
 def now_iso() -> str:
@@ -47,7 +48,8 @@ def _parse_date(val: Any) -> str | None:
 
 
 def vendor_row(v: dict[str, Any], *, synced_at: str) -> dict[str, Any]:
-    return {
+    ensure_alive_fields(v, kind="re")
+    row = {
         "id": str(v["id"]),
         "name": str(v.get("name") or "").strip() or str(v["id"]),
         "area": v.get("area") or None,
@@ -69,6 +71,8 @@ def vendor_row(v: dict[str, Any], *, synced_at: str) -> dict[str, Any]:
         "synced_at": synced_at,
         "updated_at": synced_at,
     }
+    row.update(alive_db_fields(v, kind="re"))
+    return row
 
 
 def sync_vendors(*, apply: bool) -> dict[str, Any]:
