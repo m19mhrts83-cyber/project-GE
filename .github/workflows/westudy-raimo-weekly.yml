@@ -54,6 +54,9 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       RAIMO_NOTIFY_MACOS: "0"
       RAIMO_FAIL_OPEN: "0"
+      # 公開URL1段ログインでは「コミュニティ情報の最新化」ボタンが無く、
+      # 取込直後の全フレーム走査が Chromium Target crashed の引き金になる
+      RAIMO_TRY_COMMUNITY_REFRESH: "0"
       # 日曜朝の WeStudy タイムアウト対策（既定より多め）
       WESTUDY_LOGIN_NAV_RETRIES: "5"
       WESTUDY_PAGE_GET_RETRIES: "4"

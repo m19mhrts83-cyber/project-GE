@@ -648,7 +648,12 @@ def _all_page_like(page):
     """メインページと子フレーム（Raimo シェルが iframe の場合）。"""
     seen = set()
     out = []
-    for fr in [page] + list(page.frames):
+    frames = []
+    try:
+        frames = list(getattr(page, "frames", []) or [])
+    except Exception:
+        frames = []
+    for fr in [page] + frames:
         key = id(fr)
         if key in seen:
             continue
@@ -724,6 +729,38 @@ def try_community_info_refresh(page, timeout_sec: int) -> tuple[bool, str]:
         page.wait_for_timeout(2000)
 
     return True, f"最新化操作はクリック済み（{timeout_sec}s 以内に完了トーストは未取得） frame={target_frame}"
+
+
+def _post_import_housekeeping(page, app_fr, shot_dir: Path | None) -> str:
+    """
+    CSV取込完了後のトースト取得・コミュニティ最新化・成功スクショ。
+    Chromium Target crashed が起きても取込成功は維持する（週次 CI の典型失敗）。
+    """
+    toast_text = ""
+    try:
+        toast_text = _safe_inner_text(app_fr.locator("#toast"), 3000)
+    except Exception as e:
+        print(f"トースト取得をスキップ: {e}", flush=True)
+
+    refresh_timeout = int(os.environ.get("RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC", "300"))
+    try:
+        _ok_refresh, refresh_msg = try_community_info_refresh(
+            page, timeout_sec=max(30, refresh_timeout)
+        )
+    except Exception as e:
+        refresh_msg = f"最新化操作でエラー（取込は完了）: {e}"
+    print(f"コミュニティ最新化: {refresh_msg}", flush=True)
+
+    if shot_dir:
+        try:
+            ok_shot = shot_dir / f"raimo_import_ok_{int(time.time())}.png"
+            _safe_screenshot(page, ok_shot)
+        except Exception as e:
+            print(
+                f"スクリーンショット保存をスキップ（取込結果は維持）: {e}",
+                file=sys.stderr,
+            )
+    return toast_text
 
 
 def main() -> int:
@@ -849,25 +886,14 @@ def main() -> int:
 
                 result_text = wait_import_finished(app_fr, timeout_sec=args.timeout_sec)
                 stats = parse_result_stats(result_text)
-                toast_text = _safe_inner_text(app_fr.locator("#toast"), 3000)
-
-                refresh_timeout = int(
-                    os.environ.get("RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC", "300")
-                )
                 try:
-                    ok_refresh, refresh_msg = try_community_info_refresh(
-                        page, timeout_sec=max(30, refresh_timeout)
-                    )
+                    toast_text = _post_import_housekeeping(page, app_fr, shot_dir)
                 except Exception as e:
-                    ok_refresh, refresh_msg = (
-                        False,
-                        f"最新化操作でエラー（取込は完了）: {e}",
+                    print(
+                        f"取込後処理をスキップ（CSV取込は完了）: {e}",
+                        file=sys.stderr,
                     )
-                print(f"コミュニティ最新化: {refresh_msg}", flush=True)
-
-                if shot_dir:
-                    ok_shot = shot_dir / f"raimo_import_ok_{int(time.time())}.png"
-                    _safe_screenshot(page, ok_shot)
+                    toast_text = ""
 
                 print(
                     "Raimo取込完了: "
