@@ -3,7 +3,9 @@ import EnqueueJobButton from "@/components/EnqueueJobButton";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import {
+  ALIVE_STATUS_LABEL,
   VENDOR_STATUS_LABEL,
+  vendorAliveEffective,
   vendorAliveOk,
   vendorNeedsFollowUp,
 } from "@/lib/rePipelineUi";
@@ -31,12 +33,13 @@ function chipStyle(status: string): Record<string, string | number> {
   };
   if (status === "replied") return { ...base, background: "#ecfdf5" };
   if (status === "contacted") return { ...base, background: "#eff6ff" };
-  if (status === "pending" || status === "discovered")
-    return { ...base, background: "#f8fafc" };
+  if (status === "ok") return { ...base, background: "#ecfdf5" };
+  if (status === "fail" || status === "stale")
+    return { ...base, background: "#fff7ed" };
   return base;
 }
 
-export default async function RealEstateVendorsPage({
+export default async function MgmtVendorsPage({
   searchParams,
 }: {
   searchParams?: Promise<{ filter?: string }>;
@@ -50,30 +53,11 @@ export default async function RealEstateVendorsPage({
   } = await supabase.auth.getUser();
 
   const { data: vendors, error } = await supabase
-    .from("kurashift_re_vendors")
+    .from("kurashift_re_mgmt_vendors")
     .select("*")
     .order("contacted_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false })
     .limit(500);
-
-  const { data: deals } = await supabase
-    .from("kurashift_re_deals")
-    .select("id, summary_json")
-    .limit(500);
-
-  const dealCountByVendor = new Map<string, number>();
-  for (const d of deals || []) {
-    const sj =
-      d.summary_json && typeof d.summary_json === "object"
-        ? (d.summary_json as { vendor_id?: string })
-        : {};
-    if (sj.vendor_id) {
-      dealCountByVendor.set(
-        sj.vendor_id,
-        (dealCountByVendor.get(sj.vendor_id) || 0) + 1
-      );
-    }
-  }
 
   let rows = vendors || [];
   if (filter === "pending") {
@@ -93,9 +77,11 @@ export default async function RealEstateVendorsPage({
   }
 
   const counts: Record<string, number> = {};
+  let aliveOk = 0;
   for (const v of vendors || []) {
     const st = v.status || "pending";
     counts[st] = (counts[st] || 0) + 1;
+    if (vendorAliveOk(v)) aliveOk += 1;
   }
 
   let latestSync: string | null = null;
@@ -104,17 +90,15 @@ export default async function RealEstateVendorsPage({
     if (s && (!latestSync || s > latestSync)) latestSync = s;
   }
 
-  const dailyLimit = 3;
-
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
-      <RealEstateLaneNav active="b-vendors" />
-      <p className="page-kicker">③-B開 · 業者開拓</p>
-      <h1>業者開拓ウォッチ</h1>
+      <RealEstateLaneNav active="b-mgmt" />
+      <p className="page-kicker">③-B開 · 管理会社</p>
+      <h1>管理会社開拓（S9）</h1>
       <p className="sub">
-        地場リストへの Web 問合せ（「物件情報をください」）の送信状況。正本は Mac の{" "}
-        <code>kurashift_re_vendor_list.yaml</code>。Grok 本日分の{" "}
-        <code>--mark</code> 反映後に「リストを同期」してください。
+        正本は Mac の <code>kurashift_mgmt_vendor_list.yaml</code>（Excel{" "}
+        <code>★管理会社一覧.xlsx</code> からの投影）。空室一括送信の Excel
+        は別経路のまま。
       </p>
 
       <div className="card">
@@ -123,20 +107,19 @@ export default async function RealEstateVendorsPage({
           <strong>件数</strong>
         </header>
         <p className="meta" style={{ marginTop: 8 }}>
-          未送信 {counts.pending || 0} · 探索 {counts.discovered || 0} · 送信済{" "}
-          {counts.contacted || 0} · 返信あり {counts.replied || 0} · スキップ{" "}
-          {counts.skip || 0}
+          未送信 {counts.pending || 0} · 送信済 {counts.contacted || 0} · 返信{" "}
+          {counts.replied || 0} · スキップ {counts.skip || 0} · 生存OK {aliveOk}
         </p>
         <p className="meta">
-          本日上限 {dailyLimit}/日 · 最終同期{" "}
+          最終同期{" "}
           {latestSync
             ? latestSync.slice(0, 16).replace("T", " ")
             : "—（未同期）"}
         </p>
         <p style={{ marginTop: 10 }}>
           <EnqueueJobButton
-            jobType="re_vendor_sync"
-            title="業者リストを Supabase へ投影"
+            jobType="re_mgmt_vendor_sync"
+            title="管理会社リストを Supabase へ投影"
             label="リストを同期"
             payload={{}}
           />
@@ -156,7 +139,7 @@ export default async function RealEstateVendorsPage({
           return (
             <Link
               key={f.id}
-              href={`/realestate/vendors?filter=${f.id}`}
+              href={`/realestate/mgmt-vendors?filter=${f.id}`}
               className={on ? "btn" : undefined}
               style={
                 on
@@ -178,12 +161,8 @@ export default async function RealEstateVendorsPage({
 
       <div className="card">
         <header>
-          <span className="lvl">Vendors</span>
-          <strong>
-            一覧（{rows.length} 件
-            {filter !== "all" ? ` · ${FILTERS.find((f) => f.id === filter)?.label}` : ""}
-            ）
-          </strong>
+          <span className="lvl">Mgmt</span>
+          <strong>一覧（{rows.length} 件）</strong>
         </header>
         {error ? (
           <p className="meta" style={{ color: "var(--danger, #b45309)" }}>
@@ -191,9 +170,8 @@ export default async function RealEstateVendorsPage({
           </p>
         ) : rows.length === 0 ? (
           <p className="meta" style={{ marginTop: 8 }}>
-            {vendors?.length === 0
-              ? "YAML 未取込 or 未同期 → Mac で import 後「リストを同期」"
-              : "このフィルタに該当する業者はありません"}
+            YAML 未取込 or 未同期 → Mac で{" "}
+            <code>--import-xlsx</code> 後「リストを同期」
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
@@ -201,70 +179,50 @@ export default async function RealEstateVendorsPage({
               <thead>
                 <tr>
                   <th>状態</th>
-                  <th>業者名</th>
+                  <th>生存</th>
+                  <th>会社名</th>
                   <th>エリア</th>
-                  <th>問合せURL</th>
+                  <th>URL</th>
                   <th>送信日</th>
-                  <th>返信日</th>
                   <th>備考</th>
-                  <th>物件</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((v) => {
-                  const dc = dealCountByVendor.get(v.id) || 0;
-                  const opsOnly =
-                    v.ops_contacted_at &&
-                    !v.contacted_at &&
-                    (v.status === "pending" || v.status === "discovered");
+                  const alive = vendorAliveEffective(v);
                   return (
                     <tr key={v.id}>
                       <td>
-                        <span
-                          style={chipStyle(v.status || "pending")}
-                          title={(v.last_result || "").slice(0, 80)}
-                        >
+                        <span style={chipStyle(v.status || "pending")}>
                           {VENDOR_STATUS_LABEL[v.status || "pending"] ||
                             v.status}
                         </span>
-                        {opsOnly ? (
-                          <div className="meta" style={{ marginTop: 2 }}>
-                            運営のみ
-                          </div>
-                        ) : null}
+                      </td>
+                      <td>
+                        <span style={chipStyle(alive)}>
+                          {ALIVE_STATUS_LABEL[alive] || alive}
+                        </span>
                       </td>
                       <td>{v.name}</td>
                       <td className="meta">
-                        {[v.prefecture, v.city].filter(Boolean).join(" ") ||
+                        {[v.prefecture, v.city, v.station]
+                          .filter(Boolean)
+                          .join(" ") ||
                           v.area ||
                           "—"}
                       </td>
                       <td className="meta">
-                        {v.contact_url ? (
-                          <a
-                            href={v.contact_url}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            フォーム ↗
+                        {v.url ? (
+                          <a href={v.url} target="_blank" rel="noreferrer">
+                            ↗
                           </a>
                         ) : (
                           "—"
                         )}
                       </td>
                       <td className="meta">{v.contacted_at || "—"}</td>
-                      <td className="meta">{v.replied_at || "—"}</td>
                       <td className="meta">
-                        {(v.notes || v.last_result || "—").slice(0, 40)}
-                      </td>
-                      <td className="meta">
-                        {dc > 0 ? (
-                          <Link href={`/realestate/deals?vendor=${v.id}`}>
-                            {dc} 件
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
+                        {(v.notes || v.last_result || "—").slice(0, 48)}
                       </td>
                     </tr>
                   );

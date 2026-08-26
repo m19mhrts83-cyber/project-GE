@@ -10,6 +10,8 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --batch-week --grok-kickoff
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --apply-marks grok_summary.txt
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --mark ID --status contacted --note "Web送信"
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --mark-alive ID --alive-status ok --alive-method phone --note "通電"
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --alive-queue --limit 2
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --grok-discovery-prompt
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --merge-append block.yaml
 """
@@ -29,6 +31,16 @@ from urllib.parse import urlparse
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+
+from jarvis_vendor_alive_lib import (  # noqa: E402
+    ALIVE_STATUSES,
+    build_alive_queue,
+    effective_alive_status,
+    ensure_alive_fields,
+    is_alive_ok,
+    mark_alive as mark_alive_fields,
+)
 LIST_PATH = REPO / "config" / "kurashift_re_vendor_list.yaml"
 EXAMPLE_PATH = REPO / "config" / "kurashift_re_vendor_list.example.yaml"
 TEMPLATE_CSV = REPO / "config" / "kurashift_re_vendor_list.template.csv"
@@ -137,6 +149,11 @@ def row_to_vendor(row: dict[str, str], *, source: str = "import") -> dict[str, A
         "contacted_at": (row.get("contacted_at") or "").strip(),
         "replied_at": (row.get("replied_at") or "").strip(),
         "last_result": (row.get("last_result") or "").strip(),
+        "alive_checked_at": (row.get("alive_checked_at") or "").strip(),
+        "alive_status": (row.get("alive_status") or "unknown").strip() or "unknown",
+        "alive_method": (row.get("alive_method") or "").strip(),
+        "alive_note": (row.get("alive_note") or "").strip(),
+        "alive_due_days": int(row.get("alive_due_days") or 180),
     }
 
 
@@ -866,9 +883,55 @@ def mark_vendor(
     if status == "replied":
         v["replied_at"] = today
     v["updated_at"] = now_iso()
+    ensure_alive_fields(v, kind="re")
     if not dry_run:
         save_list(data)
     return {"ok": True, "vendor": v, "dry_run": dry_run}
+
+
+def mark_vendor_alive(
+    vid: str,
+    *,
+    alive_status: str,
+    method: str = "phone",
+    note: str = "",
+    dry_run: bool,
+) -> dict[str, Any]:
+    st = (alive_status or "").strip().lower()
+    if st not in ALIVE_STATUSES or st == "stale":
+        if st != "ok" and st != "fail" and st != "unknown":
+            return {"ok": False, "error": f"invalid alive_status: {alive_status}"}
+    data = load_list()
+    by_id = vendor_index(data)
+    v = by_id.get(vid)
+    if not v:
+        return {"ok": False, "error": f"vendor not found: {vid}"}
+    try:
+        mark_alive_fields(
+            v,
+            status=st,
+            method=method,
+            note=note,
+            kind="re",
+        )
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    if not dry_run:
+        save_list(data)
+    return {
+        "ok": True,
+        "vendor": v,
+        "alive_effective": effective_alive_status(v, kind="re"),
+        "dry_run": dry_run,
+    }
+
+
+def alive_queue(*, limit: int = 2) -> list[dict[str, Any]]:
+    data = load_list()
+    vendors = [v for v in (data.get("vendors") or []) if isinstance(v, dict)]
+    for v in vendors:
+        ensure_alive_fields(v, kind="re")
+    return build_alive_queue(vendors, kind="re", limit=limit)
 
 
 def grok_discovery_prompt() -> str:
@@ -959,6 +1022,27 @@ def main() -> int:
     ap.add_argument("--status", default="contacted")
     ap.add_argument("--note", default="")
     ap.add_argument("--result", default="")
+    ap.add_argument(
+        "--mark-alive",
+        metavar="ID",
+        help="生存確認結果を記録（電話キュー等）",
+    )
+    ap.add_argument(
+        "--alive-status",
+        default="ok",
+        help="ok|fail|unknown（--mark-alive 用）",
+    )
+    ap.add_argument(
+        "--alive-method",
+        default="phone",
+        help="web|phone|both（--mark-alive 用）",
+    )
+    ap.add_argument(
+        "--alive-queue",
+        action="store_true",
+        help="電話確認キュー（期限切れ優先）",
+    )
+    ap.add_argument("--limit", type=int, default=2, help="--alive-queue 件数")
     ap.add_argument("--grok-discovery-prompt", action="store_true")
     ap.add_argument(
         "--apply-marks",
@@ -972,6 +1056,40 @@ def main() -> int:
         help="--import-xlsx 時に既存リストを残して追加・更新",
     )
     args = ap.parse_args()
+
+    if args.alive_queue:
+        items = alive_queue(limit=max(1, args.limit))
+        body = {
+            "ok": True,
+            "kind": "re",
+            "due_days_default": 180,
+            "count": len(items),
+            "vendors": [
+                {
+                    **{k: v.get(k) for k in (
+                        "id", "name", "area", "phone", "url", "contact_url",
+                        "alive_checked_at", "alive_status", "alive_method",
+                        "alive_note", "alive_due_days",
+                    )},
+                    "alive_effective": effective_alive_status(v, kind="re"),
+                    "alive_ok": is_alive_ok(v, kind="re"),
+                }
+                for v in items
+            ],
+        }
+        print(json.dumps(body, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.mark_alive:
+        out = mark_vendor_alive(
+            args.mark_alive,
+            alive_status=args.alive_status,
+            method=args.alive_method,
+            note=args.note,
+            dry_run=args.dry_run,
+        )
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out.get("ok") else 1
 
     if args.grok_discovery_prompt:
         print(grok_discovery_prompt())

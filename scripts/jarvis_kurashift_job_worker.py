@@ -281,6 +281,16 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             str(REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"),
             "--apply",
         ],
+        "re_mgmt_vendor_sync": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_mgmt_vendor_sync.py"),
+            "--apply",
+        ],
+        "re_repair_vendor_sync": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_repair_vendor_sync.py"),
+            "--apply",
+        ],
         "re_ops_form_draft": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_re_ops_form_draft.py"),

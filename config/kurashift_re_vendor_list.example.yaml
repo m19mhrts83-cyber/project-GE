@@ -15,6 +15,9 @@ settings:
 # status: pending | discovered | contacted | replied | skip | invalid
 # ops_contacted_at: 神大家運営作業の問合日（参考）。個人未送信なら status は pending のまま
 # contacted_at: 松野個人（estate）から問合せした日
+# alive_*: 生存確認（周期 180日）。ok+期限内＝すぐ連絡可
+#   alive_status: unknown | ok | fail | stale
+#   alive_method: web | phone | both
 vendors:
   - id: example-aichi-01
     name: "（例）〇〇不動産"
@@ -33,3 +36,8 @@ vendors:
     replied_at: ""
     last_result: ""
     notes: "戸建実績あり"
+    alive_checked_at: ""
+    alive_status: unknown
+    alive_method: ""
+    alive_note: ""
+    alive_due_days: 180

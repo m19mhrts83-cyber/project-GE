@@ -2,7 +2,15 @@
 
 import { LOAN_TRACKER_URL } from "@/lib/format";
 
-export type ReLaneId = "a" | "b-plan" | "b-funnel" | "b-vendors" | "c" | "d";
+export type ReLaneId =
+  | "a"
+  | "b-plan"
+  | "b-funnel"
+  | "b-vendors"
+  | "b-mgmt"
+  | "b-repair"
+  | "c"
+  | "d";
 
 const LANES: {
   id: ReLaneId;
@@ -28,6 +36,18 @@ const LANES: {
     href: "/realestate/vendors",
     short: "B開",
     label: "業者開拓",
+  },
+  {
+    id: "b-mgmt",
+    href: "/realestate/mgmt-vendors",
+    short: "管理",
+    label: "管理会社",
+  },
+  {
+    id: "b-repair",
+    href: "/realestate/repair-vendors",
+    short: "修繕",
+    label: "修繕業者",
   },
   { id: "c", href: "/realestate/properties", short: "C", label: "保有マスタ" },
   {

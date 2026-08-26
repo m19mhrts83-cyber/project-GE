@@ -549,6 +549,8 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260816_kurashift_job_watch_autopass_learn.sql）
 -- kurashift_re_vendors, kurashift_re_deal_events（業者開拓投影・案件イベント）
 -- （migrations/20260823_kurashift_re_vendors_events.sql）
+-- kurashift_re_vendors.alive_* / kurashift_re_mgmt_vendors / kurashift_re_repair_vendors
+-- （migrations/20260826_kurashift_vendor_alive_mgmt_repair.sql）
 -- kurashift_re_deal_field_values（物件調査シート・返信抽出 suggested）
 -- （migrations/20260823_kurashift_re_deal_research_fields.sql）
 -- kurashift_re_deals.property_fingerprint（DB 重複マージ・送信ガード）
