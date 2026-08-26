@@ -86,7 +86,7 @@ report_id: {YYYYMMDD-HHMM}
 - inquiry_action: portal_sent|kurashift_handoff|investigate_only
 - agent_email_available: yes|no|unknown
 - inquiry_url:
-- portal: kenbiya|homes|other|none
+- portal: rakumachi|kenbiya|homes|nagoya_rengo|athome|other|none
 - sent_at: {YYYY-MM-DD HH:MM JST または blank}
 - note: （送信結果1行）
 ```

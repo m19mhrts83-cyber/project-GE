@@ -2,7 +2,7 @@
 # Jarvis property_mail_match の CITY_HINTS / スコアと整合。Bot 説明文は grok_property_report_format.md を参照。
 
 version: 1
-updated: "2026-08-22"
+updated: "2026-08-26"
 
 priority_areas:
   primary:
@@ -45,7 +45,13 @@ property_filter:
   parking_bonus: true
   hazard_default: exclude  # OK|注意|除外 — 除外は原則見送り（高利回り例外なし）
 
+# S1 自律探索の優先ポータル（5）。ログイン問合せは楽待・健美家を特に優先。
+# 詳細ルール: config/grok_property_bot_grok_paste.md
 sources:
-  - kenbiya.net
+  - 楽待
+  - 健美家（kenbiya.net）
+  - LIFULL HOME'S
+  - 名古屋不動産連合体
+  - at home
   - 健美家メルマガ
   - 地場返信（estate Gmail → property_mail_match 通常ルート）
