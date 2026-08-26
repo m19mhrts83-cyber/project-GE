@@ -65,3 +65,13 @@ YORITOORI_BASE_PATH=../C2_ルーティン作業/26_パートナー社への相�
 
 - `credentials.json` と `token.json` は **`.gitignore` に追加**し、Git にコミットしない
 - これらは第三者に漏れると Gmail にアクセスされるため、厳重に管理する
+
+---
+
+## 7. OAuth 本番（Testing → Production）— 7日切れ対策
+
+個人利用（本人＋少数アカウント）の場合、**Publish のみ**で refresh_token の7日切れを避けやすい。**Verification / CASA 申請は不要**。
+
+- 手順正本: [`docs/GCP_OAuth本番移行_Jarvis_20260826.md`](../../../docs/GCP_OAuth本番移行_Jarvis_20260826.md)
+- プライバシーポリシー（Pages）: `docs/jarvis-oauth-privacy.html`
+- 公開後の確認: `~/git-repos/scripts/jarvis_gmail_token_health.py`

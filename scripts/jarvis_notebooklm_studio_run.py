@@ -39,6 +39,7 @@ from jarvis_notebooklm_studio_lib import (  # noqa: E402
     load_cfg,
     load_selectors,
     resolve_drive_out,
+    resolve_notebook_meta,
     resolve_notebook_url,
     write_run_state,
 )
@@ -588,14 +589,25 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = load_cfg()
     selectors = load_selectors()
+    nb_meta = resolve_notebook_meta(cfg, args.notebook_key)
+    if not args.prompt_file and nb_meta.get("revise_prompt") and args.mode == "revise":
+        args.prompt_file = str(nb_meta["revise_prompt"])
+    if not args.slide_pages and nb_meta.get("default_slide_pages") and args.mode == "revise":
+        args.slide_pages = str(nb_meta["default_slide_pages"])
+
     url = resolve_notebook_url(cfg, args.notebook_url, args.notebook_key)
     if not url:
-        print("missing notebook url", file=sys.stderr)
+        print(
+            "missing notebook url（--notebook-url か notebooks.<key>.url を設定）",
+            file=sys.stderr,
+        )
         return 2
 
     prompt_file_text = ""
     if args.prompt_file:
         p = Path(args.prompt_file).expanduser()
+        if not p.is_absolute():
+            p = REPO / p
         if not p.is_file():
             print(f"prompt_file_missing:{p}", file=sys.stderr)
             return 2
@@ -628,8 +640,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     model = args.model or cfg.get("preferred_model") or "Nano Banana Pro"
-    nb_cfg = (cfg.get("notebooks") or {}).get(args.notebook_key or "") or {}
-    drive_folder = nb_cfg.get("drive_folder") or cfg.get("default_drive_folder")
+    drive_folder = nb_meta.get("drive_folder") or cfg.get("default_drive_folder")
     out_dir = resolve_drive_out(cfg, drive_folder)
     stem = args.output_name or (
         f"08_studio_{args.mode}_{args.artifact}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

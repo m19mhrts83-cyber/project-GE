@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="google-site-verification" content="06dyX90SU9-5GhVaQfqjrtjakJP9hwcy9vW26ZATgt0" />
+  <title>Jarvis 個人自動化 — プライバシーポリシー</title>
+  <style>
+    body { font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1.25rem; line-height: 1.7; color: #222; }
+    h1 { font-size: 1.4rem; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; }
+    h2 { font-size: 1.1rem; margin-top: 1.75rem; }
+    .meta { color: #555; font-size: 0.9rem; }
+    a { color: #0366d6; }
+  </style>
+</head>
+<body>
+  <p class="meta"><a href="jarvis-oauth-home.html">← Jarvis 個人自動化（ホーム）</a></p>
+  <h1>プライバシーポリシー — Jarvis 個人自動化</h1>
+  <p class="meta">最終更新: 2026-08-26 · 運営: 松野真治（個人利用）</p>
+
+  <h2>1. 対象</h2>
+  <p>本ポリシーは、Google OAuth 2.0 経由で Gmail / Google Calendar 等にアクセスする<strong>個人用 Mac 自動化（Jarvis）</strong>に適用されます。第三者向けの公開サービスではありません。利用者は運営者本人および、運営者が明示的に許可した少数のアカウント（本人が管理する Google アカウント）に限ります。</p>
+
+  <h2>2. 取得する Google ユーザーデータ</h2>
+  <ul>
+    <li><strong>Gmail</strong>: パートナー・業務連絡のメール本文・ヘッダ・添付（読取・ラベル変更・本人からの送信）</li>
+    <li><strong>Google Calendar</strong>: 本人カレンダーへの予定登録・参照</li>
+  </ul>
+  <p>上記は、連絡先一覧に登録された相手とのやり取り整理、リマインダー登録、本人の業務効率化のためにのみ使用します。</p>
+
+  <h2>3. データの利用目的（Limited Use）</h2>
+  <p>Google ユーザーデータは、次の目的に<strong>限定</strong>して使用します。</p>
+  <ul>
+    <li>メール・メッセージの取り込みとローカル／本人管理ストレージへの記録</li>
+    <li>本人が指示した返信下書き・送信補助</li>
+    <li>本人カレンダーへの予定登録</li>
+    <li>本人のみがアクセスするダッシュボードへの投影（認証付き）</li>
+  </ul>
+  <p>広告、第三者への販売、信用調査、機械学習モデルの学習用データセット化、本ポリシーで明示していない目的には使用しません。</p>
+
+  <h2>4. 保存場所と期間</h2>
+  <ul>
+    <li>OAuth トークン: 運営者の Mac 上のローカルファイル（Git 非共有）</li>
+    <li>メール・やり取りログ: 運営者の OneDrive / ローカルリポジトリ（本人管理）</li>
+    <li>ダッシュボード投影: 運営者本人用 Supabase（認証付き）</li>
+  </ul>
+  <p>保存期間は業務上必要な期間。不要になったデータは運営者が削除します。</p>
+
+  <h2>5. 第三者への共有</h2>
+  <p>Google ユーザーデータを第三者に販売・貸与しません。クラウドホスティング（Vercel / Supabase 等）へ投影する場合も、運営者本人のアカウント・認証下で、上記利用目的の範囲に限ります。</p>
+
+  <h2>6. セキュリティ</h2>
+  <p>トークン・秘密情報は Git や公開チャットに含めません。Mac ローカルおよび運営者管理の秘密ストアに保管します。</p>
+
+  <h2>7. データの削除</h2>
+  <p>運営者は Google アカウント設定から本アプリのアクセス権をいつでも解除できます。解除後、新規の API アクセスは行いません。既存のローカルログの削除は運喸者が手動で実施します。</p>
+
+  <h2>8. お問い合わせ</h2>
+  <p>本アプリに関する問い合わせ: <a href="mailto:m19m.hrts83@gmail.com">m19m.hrts83@gmail.com</a></p>
+</body>
+</html>

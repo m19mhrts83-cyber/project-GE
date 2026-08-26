@@ -86,6 +86,17 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   --artifact slide_deck --mode revise --slide-pages 3,8 \
   --prompt-file '…/08_Studio修正プロンプト_20260812.md' \
   --confirm-generate --wait-and-save
+
+# セサミ入居者向け（QR登録を本線に・スライド 5/8/13/14）
+/Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_notebooklm_studio_run.py \
+  --notebook-key sesame_tenant \
+  --notebook-url 'https://notebooklm.google.com/notebook/＜ID＞' \
+  --artifact slide_deck --mode revise \
+  --confirm-generate --wait-and-save \
+  --output-name 'セサミ入居者向け_改訂_20260825'
+# ※ prompt / slide-pages は notebooks.sesame_tenant の既定を使用
+# ※ 先に学び MD をノートのソースへ追加: docs/N1_NotebookLM/01_セサミ使用方法/入居トラブル学び_20260825.md
 ```
 
 | フラグ | 意味 |
