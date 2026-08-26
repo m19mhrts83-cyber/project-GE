@@ -41,6 +41,20 @@ def token_satisfies_215_scopes(d: dict) -> bool:
     return set(GMAIL_SCOPES_215).issubset(granted)
 
 
+GMAIL_SCOPES_READ_MODIFY = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",
+]
+
+
+def token_satisfies_read_modify_scopes(d: dict) -> bool:
+    """Gmail 読取・ラベル変更のみ（MailGates 等）。send 欠如でも可。"""
+    granted = granted_scopes_from_token_record(d)
+    if not granted:
+        return False
+    return set(GMAIL_SCOPES_READ_MODIFY).issubset(granted)
+
+
 def _token_file_satisfies_215(path: Path) -> bool:
     if not path.is_file():
         return False
