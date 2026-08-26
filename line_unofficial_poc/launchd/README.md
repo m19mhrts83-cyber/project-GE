@@ -22,9 +22,11 @@
 ## OneDrive 書き込み（PermissionError）
 - `output_md` は OneDrive（`Library/CloudStorage/...`）上。同期ロック中に launchd から `PermissionError: Operation not permitted` が出ることがある
 - 監視側は短いリトライ＋原子的置換で吸収する。失敗時は `.line_auth/.chrline_open_chat_write_spool.jsonl` に退避し、heartbeat で再フラッシュする
-- 再現が続くとき: システム設定 → プライバシーとセキュリティ → **フルディスクアクセス** に  
-  `Python`（`/Library/Developer/CommandLineTools/.../Python.app`）を追加し、監視を再起動
-- 切り分け: 対話シェルでは書ける／launchd だけ失敗 → TCC または OneDrive 一時ロック
+- 再現が続くとき: システム設定 → プライバシーとセキュリティ → **フルディスクアクセス** に次を追加し、監視を再起動  
+  1. **`/bin/zsh`**（必須。launchd の ProgramArguments 先頭。これ無しだと Python.app だけでは OneDrive に書けない）  
+  2. `Python.app`（`/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app`）
+- 切り分け: 対話シェルでは書ける／launchd だけ失敗 → TCC。ローカル（git-repos）には書けるが OneDrive だけ NG なら上記 FDA
+- 教訓（2026-08-26）: Python.app のみ追加では不足。`/bin/zsh` 追加後に launchd 書込プローブ OK → 常時監視再開
 
 ## インストール
 `line_unofficial_poc` 直下で実行します。
