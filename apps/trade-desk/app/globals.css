@@ -180,6 +180,10 @@ main:has(.roi-page) {
   max-width: 1320px;
 }
 
+main:has(.deals-list) {
+  max-width: none;
+}
+
 .page-kicker {
   display: inline-flex;
   align-items: center;
@@ -1949,4 +1953,128 @@ code {
   .lp-milestones {
     grid-template-columns: 1fr;
   }
+}
+
+/* 千三つ案件一覧: ページング＋検索＋詳細列の固定 */
+.deals-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 16px;
+  margin: 8px 0 12px;
+}
+
+.deals-list-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+.deals-list-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.deals-list-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.deals-list-table {
+  margin: 0;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.deals-list-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--card);
+  box-shadow: 0 1px 0 var(--line-strong);
+}
+
+.deals-list-table .deals-col-open {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--card);
+  white-space: nowrap;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.28);
+}
+
+.deals-list-table .deals-col-actions {
+  position: sticky;
+  right: 72px;
+  z-index: 2;
+  background: var(--card);
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.18);
+}
+
+.deals-list-table thead th.deals-col-open,
+.deals-list-table thead th.deals-col-actions {
+  z-index: 4;
+}
+
+.deals-list-table .deals-title-cell {
+  max-width: 16rem;
+}
+
+.deals-list-table .deals-title-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deals-list-table .deals-clip {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deals-list-table tr.deals-row-pursue td {
+  background: #f0fdf4;
+}
+
+.deals-list-table tr.deals-row-pursue td.deals-col-open,
+.deals-list-table tr.deals-row-pursue td.deals-col-actions {
+  background: #f0fdf4;
+}
+
+.deals-list-table tr.deals-row-highlight {
+  outline: 2px solid var(--danger, #b45309);
+  outline-offset: -2px;
+}
+
+.deals-list-table tr:hover td.deals-col-open,
+.deals-list-table tr:hover td.deals-col-actions {
+  background: var(--card-soft);
+}
+
+.deals-list-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
 }
