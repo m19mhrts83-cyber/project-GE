@@ -166,7 +166,7 @@ def main() -> int:
 
     since = date.today() - timedelta(days=max(1, args.days) - 1)
     rows: list[dict] = []
-    for f in sorted(jdir.glob("????-??-??.md")):
+    for f in sorted(jdir.rglob("????-??-??.md")):
         m = DATE_RE.match(f.name)
         if not m:
             continue
