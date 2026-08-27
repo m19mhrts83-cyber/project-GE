@@ -1,8 +1,9 @@
 # S9 管理会社 — 事前確認メール（承認テンプレ）
 
-2026-08-27 松野承認。ギガファイル便は使わない。
-S9 は **会社名とレーン（area_phrase）の差し替えのみ**。本文の質問は改変禁止。
-本文に Drive URL は載せない。
+2026-08-27 松野承認。ギガファイル便は使わない。  
+**2026-08-27 更新**: 本文に Drive フォルダ URL を載せる（`precheck.property_folder_url` / `precheck.common_folder_url`）。欠けていればその行だけ省略。URL 捏造禁止。
+
+S9 は **会社名とレーン（area_phrase）・Drive URL の差し替えのみ**。本文の質問は改変禁止。
 
 ## 件名
 
@@ -28,10 +29,16 @@ S9 は **会社名とレーン（area_phrase）の差し替えのみ**。本文�
 
 ※当面は募集のご協力だけでも大変ありがたいです。
 
+資料は次のフォルダをご覧ください。
+物件フォルダ: {property_folder_url}
+共通フォルダ: {common_folder_url}
+
 松野真治
 matsuno.estate@gmail.com
 090-9670-7595
 ```
+
+`{property_folder_url}` / `{common_folder_url}` は Jarvis `--next` の `precheck.*` を使う。空ならその行を省略（捏造しない）。
 
 ## 差し替え表
 
@@ -45,7 +52,6 @@ matsuno.estate@gmail.com
 - 鍵番号の全文
 - キャンペーン家賃の細目の大量列挙（空室本番メール側）
 - ギガファイル便 URL
-- Drive フォルダ URL（本文には載せない）
 
 ## 完了マーク例
 

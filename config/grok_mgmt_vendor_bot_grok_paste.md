@@ -4,8 +4,8 @@
 **社員番号**: **S9**  
 **ペース**: **週数回〜本日分に軽く**（Phase1: `--next 2 --balanced`＝北区1・緑区1）  
 **リスト正本**: `config/kurashift_mgmt_vendor_list.yaml`  
-**事前確認テンプレ**: `config/grok_mgmt_vendor_precheck_template.md`（2026-08-27 松野承認）  
-**資料 Drive**: admin「【仲介パートナー共有】」（本文には載せない。ギガファイル便は使わない）  
+**事前確認テンプレ**: `config/grok_mgmt_vendor_precheck_template.md`（2026-08-27 松野承認・Drive URL 必須）  
+**資料 Drive**: admin「【仲介パートナー共有】」。本文に Jarvis `--next` の `precheck.property_folder_url` / `precheck.common_folder_url` を載せる。ギガファイル便は使わない。  
 **UI**: https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors
 
 以下を Grok の Bot **説明（Instructions）** にそのまま貼る。
@@ -47,7 +47,7 @@
 | 上限 | Phase1 **最大2社**（原則 北区1・緑区1） |
 | 対象 | 参謀の `--next --balanced` または ID のみ（**Excelで店頭・メール・チラシ送付など接触済みの会社は候補に出ない**） |
 | 文面 | **下記の承認テンプレのみ**（件名／本文の質問は改変禁止。会社名・レーン差し替えのみ） |
-| 資料 | 本文に Drive URL は載せない。ギガファイル便禁止 |
+| 資料 | Jarvis `--next` の `precheck.property_folder_url` / `common_folder_url` を本文に載せる（欠けたら行省略・捏造禁止）。ギガファイル便禁止 |
 | 送らない | 鍵番号全文・家賃細目の大量列挙（OK後の空室メール側） |
 
 開始1行: `S9 本日: 事前確認 · 上限 N · レーン内訳…`
@@ -61,7 +61,7 @@
 | kita_shiga | 【空室対策のご相談】名古屋市北区にアパートを所有している松野です |
 | midori_caramel | 【空室対策のご相談】名古屋市緑区にアパートを所有している松野です |
 
-本文（`{会社名}` と `{area_phrase}` のみ差し替え）:
+本文（`{会社名}`・`{area_phrase}`・Drive URL のみ差し替え。URL 欠けたらその行を省略）:
 
 {会社名} 御中
 
@@ -76,6 +76,10 @@
 2. 戸別管理（部屋単位での管理委託）はご対応可能でしょうか
 
 ※当面は募集のご協力だけでも大変ありがたいです。
+
+資料は次のフォルダをご覧ください。
+物件フォルダ: {property_folder_url}
+共通フォルダ: {common_folder_url}
 
 松野真治
 matsuno.estate@gmail.com
