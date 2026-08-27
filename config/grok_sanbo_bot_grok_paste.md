@@ -716,9 +716,10 @@ UI: `/realestate/mgmt-vendors`
 
 1. **事前確認のみ**（募集可否・戸別可否＋Drive物件資料リンク）。空室条件の大量列挙はしない
 2. Phase1: **`--next 2 --balanced`**（原則 **北区1・緑区1**。宛先リストはレーン別）
-3. 完了: `--mark {id} --status contacted --note "precheck:{lane}"`
-4. 返信仕分け（Jarvis poll＋人手）: OK→`--vacancy-listing-ok true` / 不可→`skip`＋`false`。リストは残す
-5. **空室 Excel 一斉送信は OK 社のみ・レーン別**（S9 は送らない）。生存確認は送信ではない（180日）
+3. **送信確認**: 初回定型＝確認不要。**2回目以降の返信メールは松野承認後のみ**（Jarvis が下書き）
+4. 完了: `--mark {id} --status contacted --note "precheck:{lane}"`
+5. 返信仕分け（Jarvis poll＋人手）: OK→`--vacancy-listing-ok true` / 不可→`skip`＋`false`。リストは残す。ルーティン: `不動産Daily · 管理会社返信`
+6. **空室 Excel 一斉送信は OK 社のみ・レーン別**（S9 は送らない）。生存確認は送信ではない（180日）
 
 ## §買付交渉（社員 S6 · 都度）
 

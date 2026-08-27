@@ -37,6 +37,7 @@ S5・S3 も既存メンバーのまま（新規作成しない）。
 | `不動産Daily · S1物件探し` | **10:30** | `config/grok_bucho_routine_S1物件探し.md` |
 | `不動産Daily · 仲介返信` | **18:00（新規ルーティン）** | `config/grok_bucho_routine_仲介返信.md` の指示フェンス全文 |
 | `不動産Daily · Jarvisボックス` | 日中 2〜3時間おき | `config/grok_bucho_routine_Jarvisボックス.md`（Drive outbox 先読み） |
+| `不動産Daily · 管理会社返信` | **11:00（推奨）** | `config/grok_bucho_routine_管理会社返信.md`（空室可否判定＋2回目以降は承認後送信） |
 
 購入フェーズ側に 18:00 を二重登録しない（Daily 側が本線）。
 
