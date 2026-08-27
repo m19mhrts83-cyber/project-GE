@@ -1,16 +1,18 @@
 # 家族コーチング — Grok 反映（索引）
 
-**更新**: 2026-08-26  
+**更新**: 2026-08-28  
 **方針**: このファイル単体を Instructions に貼らない。各 Bot の paste 正本を説明欄へ。
 
-## Notion自己読取・週次定型（運用の正）
+## Obsidian 直読み・週次定型（運用の正 · 2026-08-28〜）
 
 | 項目 | 正 |
 |---|---|
-| Notion 読取 | 統括が **自分で開く**（チャット貼付待ち禁止） |
-| 参照順 | ①家族会議 → ②Journal週次（金締） → ③必要なら子供別ページ |
-| Jarvis | Journal週次の投影のみ（`jarvis_family_journal_weekly.py`）。コーチ本文は Grok |
-| 週次定型 | `@家族コーチ統括 【今週の材料】…`（下表）／ルーティン日曜 21:00 |
+| **Journal 正本** | Obsidian `★Journal`（admin Google Drive `500_Obsidian_r1`） |
+| Journal 読取 | 統括が **Drive 自己読取**（金締＝土〜金。直下と `YYYY-MM/` 両方） |
+| Notion 正本 | **家族会議**・塾／面談・子供別ページ（Journal 要約は使わない） |
+| 参照順 | ①Drive ★Journal（金締） → ②Notion 家族会議 → ③必要なら子供別ページ |
+| Jarvis | Obsidian 同期補助。Notion 投影は **フォールバック**（`jarvis_family_journal_weekly.py`） |
+| 週次定型 | `@家族コーチ統括 【今週の材料】…`／ルーティン日曜 21:00 |
 | マイルストーン定型 | `@家族コーチ統括 【マイルストーン確認】…`／ルーティン水曜 7:30（任意） |
 | 初回 | paste 末尾「初回フル」ブロック（チャンネルへコピペ） |
 
@@ -25,7 +27,7 @@
 
 - **名前・タイトル**は UI の短い欄（各 paste 末尾のプロフィール設定）
 - チャットは当日の材料・司令用。恒久ルールは説明欄のみ
-- **統括は Notion 自己読取**（貼付待ち禁止）。Instructions 差し替え後に再貼り
+- **統括は Drive＋Notion 自己読取**（貼付待ち禁止）。Instructions 差し替え後に再貼り
 
 ## チャンネル（方式C）
 
@@ -37,11 +39,13 @@
 
 | 層 | 誰 | いまの状態 | トリガー |
 |---|---|---|---|
-| **材料** | Jarvis（Mac） | **自動本線**: 日曜08:00（金締・土〜金）＋起動時＋朝オープン | `family_journal_weekly` launchd / morning |
-| **評価** | Grok 統括＋専属3本 | Instructions 済み。**ルーティン ON**（ユーザー設定済） | 日曜 21:00 週次／水曜 7:30 マイルストーン（任意） |
+| **材料（Journal）** | iPhone Obsidian Push → Drive | 正本は Drive 上の ★Journal | 松野が日次入力・Push |
+| **材料（会議・面談）** | Notion | 統括が自己読取 | 手動／会議後 |
+| **評価** | Grok 統括＋専属3本 | Instructions 更新要。**ルーティン ON** | 日曜 21:00 週次 |
+| **フォールバック** | Jarvis（Mac） | Notion Journal週次投影（任意・Drive NG 時） | launchd 日曜 08:00 |
 | **手動バックアップ** | 松野 | ルーティン前でも可 | 下の定型チャット |
 
-Grok は Journal 本文を Jarvis からチャットで受け取らない。Notion の **Journal週次** を統括が読む。
+Grok は Journal 本文を Jarvis からチャットで受け取らない。**Drive の ★Journal** を統括が読む。
 
 ## Grok ルーティン（チャンネルに設定）
 
@@ -56,19 +60,27 @@ Grok は Journal 本文を Jarvis からチャットで受け取らない。Noti
 
 | タイミング | 文 |
 |---|---|
-| 週次（家族会議後） | `@家族コーチ統括 【今週の材料】Notionの直近家族会議と Journal週次を読んでまとめ。必要なら専属に振って。` |
+| 週次（家族会議後） | `@家族コーチ統括 【今週の材料】Drive の ★Journal（金締）と Notion 直近家族会議を読んでまとめ。必要なら専属に振って。` |
 | マイルストーン | `@家族コーチ統括 【マイルストーン確認】Notionの到達目標だけ見て、今夜の親の一言を1つ。` |
 | 初回フル | paste 末尾「初回フル」ブロック |
 
-## Notion・材料
+## 材料の置き場
 
 | 項目 | 場所 |
 |---|---|
-| 正本 YAML | `config/notion_family_coaching.yaml` |
-| ハブ1 | **家族会議** |
-| ハブ2 | **子供コーチング** |
-| ハブ3 | **Journal週次**（Jarvis 週次） |
-| Journal週次更新 | 本線: `./launchd/install_family_journal_weekly_launchd.sh`（日曜08:00・金締＋RunAtLoad）。手動: `scripts/jarvis_family_journal_weekly.py --pull --apply` |
+| 正本 YAML（Notion） | `config/notion_family_coaching.yaml` |
+| 正本 YAML（Obsidian） | `config/kurashift_obsidian_artifacts.yaml` → `family_journal` |
+| Journal（Drive） | `マイドライブ/500_Obsidian_r1/01_Journaling/★Journal/` |
+| Notion ハブ1 | **家族会議** |
+| Notion ハブ2 | **子供コーチング** |
+| Notion レガシー | **Journal週次**（Drive NG 時のみ） |
+| Notion 投影（任意） | `scripts/jarvis_family_journal_weekly.py --pull --apply` |
+
+## Drive 許可（Grok Bot）
+
+- **許可**: admin Google Drive のみ
+- **禁止**: Downloads／OneDrive／iCloud／Desktop 全体／Media
+- パスワード・API 鍵は Drive に置かない
 
 ## 混同しないレーン
 
@@ -81,15 +93,33 @@ Grok は Journal 本文を Jarvis からチャットで受け取らない。Noti
 
 ## 初回チェックリスト
 
-1. 統括 Instructions を更新版で差し替え（Notion自己読取）
-2. 専属3本は参照材料の1行追加を再貼り（任意だが推奨）
-3. Notion が Grok ログインアカウントから見えること（読取OK済みならスキップ）
-4. 初回フル文をチャンネルへ投下
-5. Grok ルーティン「家族コーチング · 週次」を家族コーチングチームに作成（日曜 21:00・ON済）
+1. 松野 → `@家族コーチ統括 JarvisBox の未処理（Obsidian直読み）を読んで実行して。`
+2. 統括が `Drive読取:` / `Notion読取:` を返すことを確認
+3. （任意）Instructions／週次ルーティン UI 貼付 — `00_松野向け_Grok_UI手順.md`
+4. 2〜3週 Drive OK が続いたら Notion 投影 launchd 停止検討
 
-## 運用開始時の期待優先（設計例・Botにやらせる内容）
+## 松野向け Grok UI（JarvisBox 本線）
 
-材料が 2026-08-23 家族会議＋Journal週次のときの正解イメージ（統括まとめに載せる優先）:
+**通常**: 松野は統括に **「JarvisBox 見て」** とだけ伝える。統括が Drive で読んで実行する。
+
+**任意（恒久化）**: Instructions／週次ルーティンの Grok UI 貼付は Bot 自身ではできない。余裕があれば松野が作業パックの 01・02 を UI に貼る。
+
+| 入口 | 内容 |
+|---|---|
+| **JarvisBox** | `20_outbox_to_grok/` 未処理 → **統括が読む** |
+| **作業パック** | `30_shared_working/2026-08-28_家族コーチ_Obsidian直読み/` |
+| 統括向け | `00_統括向け_運用切替.md` |
+| UI 貼付用（任意） | `01_統括_Instructions貼付用.md` / `02_ルーティン_週次_貼付用.md` |
+
+松野が統括へ言う一言:
+
+```
+@家族コーチ統括 JarvisBox の未処理（Obsidian直読み）を読んで実行して。
+```
+
+## 運用開始時の期待優先（設計例）
+
+材料が 2026-08-23 家族会議＋直近 ★Journal のときの正解イメージ:
 
 1. **まどか**: 数学到達と「0.1%／1〜2分」の毎週確認（一発理解を求めない）。マリオット条件の親の言い方は短く具体
 2. **たまき**: 算数など到達の意味を確認したうえで、開始時刻・後期自習→授業のリズムを1つ
