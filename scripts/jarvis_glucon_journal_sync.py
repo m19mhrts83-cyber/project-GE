@@ -161,7 +161,7 @@ def main() -> int:
 
     cutoff = date.today() - timedelta(days=max(1, args.days))
     rows: list[dict] = []
-    for path in sorted(jdir.glob("*.md")):
+    for path in sorted(jdir.rglob("????-??-??.md")):
         m = DATE_RE.match(path.name)
         if not m:
             continue
