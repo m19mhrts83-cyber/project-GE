@@ -45,7 +45,7 @@ notebooks:
     state_file: ".jarvis_state/notebooklm_shuhen_create_run.json"
   # 入居者向けセサミ手順（URL はノートを開いて --notebook-url で渡す／下記を埋める）
   sesame_tenant:
-    url: ""
+    url: "https://notebooklm.google.com/notebook/9268a6ce-7b79-4919-9b5a-a364f930d8bf"
     drive_folder: "01_セサミ使用方法説明"
     state_file: ".jarvis_state/notebooklm_sesame_tenant.json"
     revise_prompt: "docs/N1_NotebookLM/01_セサミ使用方法/08_Studio修正プロンプト_20260825.md"
