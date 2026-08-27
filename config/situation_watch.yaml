@@ -294,3 +294,17 @@ items:
       復号鍵は EasyPass2（自動連携なし）。平文・秘密鍵は iCloud/Drive/Git に置かない。
       8日超で warn、14日超で attention。平常時は ok でダッシュボード参照のみ。
       手順: docs/運用コマンド一覧.md「Jarvis Private バックアップ」
+
+  - id: grok_bridge_inbox
+    title: 部長ボックス（Grok → Jarvis）
+    category: ops
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/grok_bridge_inbox.json
+    cursor_prompt: |
+      部長ボックス（admin Drive【with Grok bot】/10_inbox_from_grok）の未処理を確認して。
+      state: .jarvis_state/grok_bridge_inbox.json
+      ポーリング: scripts/jarvis_bucho_inbox_poll.py [--push]
+      処理後: --archive FILE.md または --mark-seen FILE.md
+      Jarvis→部長は scripts/jarvis_bucho_outbox_write.py（20_outbox_to_grok）。
+      設定: config/kurashift_grok_bridge_folders.yaml

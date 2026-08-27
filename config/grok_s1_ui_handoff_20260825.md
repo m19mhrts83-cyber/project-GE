@@ -36,6 +36,7 @@ S5・S3 も既存メンバーのまま（新規作成しない）。
 | `不動産Daily · 本日分` | 9:00（既存） | `config/grok_bucho_routine_本日分.md`（朝Gmail＝調査候補。問合せ返信本線は18:00と明記）を再貼り推奨 |
 | `不動産Daily · S1物件探し` | **10:30** | `config/grok_bucho_routine_S1物件探し.md` |
 | `不動産Daily · 仲介返信` | **18:00（新規ルーティン）** | `config/grok_bucho_routine_仲介返信.md` の指示フェンス全文 |
+| `不動産Daily · Jarvisボックス` | 日中 2〜3時間おき | `config/grok_bucho_routine_Jarvisボックス.md`（Drive outbox 先読み） |
 
 購入フェーズ側に 18:00 を二重登録しない（Daily 側が本線）。
 
@@ -68,10 +69,35 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ## Jarvis ↔ Grok データ共有（admin Drive）
 
-- フォルダ: `【with Grok bot】`（inbox / outbox / shared / archive）
+- フォルダ: `【with Grok bot】`（**部長ボックス**=inbox / **Jarvisボックス**=outbox / shared / archive）
 - 設定: `config/kurashift_grok_bridge_folders.yaml`
-- 部長 paste に **§データ共有** あり → Instructions **再貼り推奨**
+- 部長 paste に **§データ共有**（先読み・ボックス運用）→ Instructions **再貼り推奨**
 - 対外チラシは `【仲介パートナー共有】`（別）
+
+### Grok ルーティン追加（手作業）
+
+| 名前 | 時刻 | 正本 |
+|---|---|---|
+| `不動産Daily · Jarvisボックス` | 日中 2〜3時間おき（例 11/14/16） | `config/grok_bucho_routine_Jarvisボックス.md` |
+| 本日分 / S1 / 仲介返信 | 既存時刻 | 各 MD 先頭に **Jarvisボックス先読み** 追記済み → **再貼り** |
+
+### Mac コマンド
+
+```bash
+# Jarvis → 部長
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_bucho_outbox_write.py \
+  --title 'S9事前確認2社' --action s9_precheck --priority high \
+  --body '北区1・緑区1で --next 2 --balanced'
+
+# 部長 → Jarvis（ポーリング）
+~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py
+~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --push
+# 処理後
+~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --archive 'YYYY-MM-DD_題名.md'
+
+# launchd（15分）
+~/git-repos/launchd/install_bucho_inbox_poll_launchd.sh
+```
 
 ---
 

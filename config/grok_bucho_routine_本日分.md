@@ -19,6 +19,10 @@ Grok チャンネル **不動産Dailyチーム** のルーティン UI に貼る
 今日すでに本日分を完了済み（[Grok部長] 日報送信済）なら、重複実行せず「本日分は完了済み」と1行だけ返す。
 
 【実行順・厳守】
+-0. **Jarvisボックス先読み**（§データ共有）
+- admin Drive `【with Grok bot】/20_outbox_to_grok/` の未処理 MD があれば先に処理（実行後 `90_archive/`）。0件なら1行スキップ可
+- 詳細はルーティン「不動産Daily · Jarvisボックス」と同じ解釈（action / priority）
+
 0. 参謀が estate Gmail を確認（§estate Gmail · 朝）
 - 拾う: 件名 [調査依頼] · 業者返信・物件PDFで住所が分かるもの（調査候補）
 - 拾わない: [Grok部長] / [Grok調査] · パートナー一般
