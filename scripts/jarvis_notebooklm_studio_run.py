@@ -64,8 +64,29 @@ def _launch(headed: bool, downloads_path: Path):
         viewport={"width": 1600, "height": 1000},
         ignore_default_args=["--enable-automation"],
         accept_downloads=True,
+        downloads_path=str(downloads_path),
     )
     page = context.pages[0] if context.pages else context.new_page()
+    # Chrome channel often skips Playwright's download event; allow native save.
+    for p in context.pages:
+        try:
+            client = context.new_cdp_session(p)
+            try:
+                client.send(
+                    "Browser.setDownloadBehavior",
+                    {
+                        "behavior": "allow",
+                        "downloadPath": str(downloads_path),
+                        "eventsEnabled": True,
+                    },
+                )
+            except Exception:
+                client.send(
+                    "Page.setDownloadBehavior",
+                    {"behavior": "allow", "downloadPath": str(downloads_path)},
+                )
+        except Exception as e:
+            print(f"# cdp download behavior skipped: {e}", file=sys.stderr)
     return pw, context, page
 
 
@@ -181,56 +202,135 @@ def _wait_idle(page, selectors: dict, timeout_sec: int, poll: float) -> bool:
         loc, _ = first_match(page, dl_sels, timeout_ms=400)
         if loc and saw_busy:
             return True
-        if loc and not saw_busy and time.time() + 30 > deadline - timeout_sec + 60:
-            page.wait_for_timeout(2000)
-            return True
+        # 旧成果物のダウンロードボタンは生成中でも残る。saw_busy なしで早期 return しない
         page.wait_for_timeout(int(poll * 1000))
     return False
+
+
+def _save_playwright_download(download, dest_dir: Path, stem: str) -> str:
+    suggested = download.suggested_filename or f"{stem}.bin"
+    ext = Path(suggested).suffix or ".pdf"
+    out = dest_dir / f"{stem}{ext}"
+    download.save_as(str(out))
+    print(f"# saved {out}", file=sys.stderr)
+    return str(out)
+
+
+def _watch_new_download(watch_dirs: list[Path], before: set[str], timeout_sec: int = 90) -> Path | None:
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        for d in watch_dirs:
+            if not d.is_dir():
+                continue
+            for p in d.iterdir():
+                if not p.is_file():
+                    continue
+                if p.suffix.lower() not in {".pdf", ".pptx"}:
+                    continue
+                if str(p) in before:
+                    continue
+                if p.name.endswith(".crdownload") or p.name.endswith(".tmp"):
+                    continue
+                return p
+        time.sleep(1)
+    return None
+
+
+def _snapshot_download_files(watch_dirs: list[Path]) -> set[str]:
+    out: set[str] = set()
+    for d in watch_dirs:
+        if not d.is_dir():
+            continue
+        for p in d.iterdir():
+            if p.is_file():
+                out.add(str(p))
+    return out
+
+
+def _click_pdf_download_menu(page) -> None:
+    """Open viewer more_vert (last match) and click the PDF download item."""
+    labels = ("その他のオプション", "More options", "その他")
+    opened = False
+    for lab in labels:
+        try:
+            locs = page.get_by_label(lab)
+            n = locs.count()
+            if n == 0:
+                continue
+            locs.nth(n - 1).click(timeout=2000)
+            opened = True
+            page.wait_for_timeout(600)
+            break
+        except Exception:
+            continue
+    if not opened:
+        try:
+            locs = page.locator('[aria-label*="その他"]')
+            n = locs.count()
+            locs.nth(max(n - 1, 0)).click(timeout=2000, force=True)
+            page.wait_for_timeout(600)
+        except Exception as e:
+            raise RuntimeError(f"more_vert_not_found:{e}") from e
+    exact = "PDF ドキュメント (.pdf) をダウンロード"
+    try:
+        page.get_by_role("menuitem", name=exact).click(timeout=3000, force=True)
+        return
+    except Exception:
+        pass
+    for txt in (exact, "PDF ドキュメント", "Download PDF", ".pdf"):
+        try:
+            page.get_by_text(txt, exact=False).first.click(timeout=2500, force=True)
+            return
+        except Exception:
+            continue
+    raise RuntimeError("pdf_download_menu_item_not_found")
 
 
 def _download_and_save(page, selectors: dict, dest_dir: Path, stem: str) -> list[str]:
     dest_dir.mkdir(parents=True, exist_ok=True)
     saved: list[str] = []
-    dl_sels = selectors.get("download") or []
-    loc, sel = first_match(page, dl_sels, timeout_ms=3000)
-    if not loc:
-        for label in ("Download", "ダウンロード", "Export", "エクスポート"):
-            try:
-                page.get_by_text(label, exact=False).first.click(timeout=2000)
-                page.wait_for_timeout(800)
-                loc, sel = first_match(page, dl_sels, timeout_ms=2000)
-                if loc:
-                    break
-            except Exception:
-                continue
-    if not loc:
-        # more_vert → download
-        try:
-            page.get_by_label("その他のオプション").first.click(timeout=2000)
-            page.wait_for_timeout(600)
-            page.get_by_text("ダウンロード", exact=False).first.click(timeout=2000)
-            with page.expect_download(timeout=120000) as di:
-                page.wait_for_timeout(500)
-            download = di.value
-            suggested = download.suggested_filename or f"{stem}.bin"
-            ext = Path(suggested).suffix or ".pdf"
-            out = dest_dir / f"{stem}{ext}"
-            download.save_as(str(out))
-            saved.append(str(out))
-            print(f"# saved {out}", file=sys.stderr)
-            return saved
-        except Exception as e:
-            raise RuntimeError(f"download_button_not_found:{e}") from e
+    home_dl = Path.home() / "Downloads"
+    watch_dirs = [dest_dir, home_dl]
+    before = _snapshot_download_files(watch_dirs)
 
-    with page.expect_download(timeout=120000) as di:
-        loc.click()
-    download = di.value
-    suggested = download.suggested_filename or f"{stem}.bin"
-    ext = Path(suggested).suffix or ".pdf"
+    dl_sels = selectors.get("download") or []
+    loc, _sel = first_match(page, dl_sels, timeout_ms=1500)
+
+    try:
+        with page.expect_download(timeout=15000) as di:
+            try:
+                _click_pdf_download_menu(page)
+            except Exception as menu_err:
+                print(f"# pdf menu skipped: {menu_err}", file=sys.stderr)
+                if loc:
+                    loc.click()
+                else:
+                    raise
+        saved.append(_save_playwright_download(di.value, dest_dir, stem))
+        return saved
+    except Exception as e:
+        print(f"# expect_download missed ({e}); watching folders", file=sys.stderr)
+
+    found = _watch_new_download(watch_dirs, before, timeout_sec=90)
+    if not found:
+        # retry menu once more, then watch
+        try:
+            _click_pdf_download_menu(page)
+        except Exception as e2:
+            print(f"# menu retry failed: {e2}", file=sys.stderr)
+        found = _watch_new_download(watch_dirs, before, timeout_sec=60)
+    if not found:
+        raise RuntimeError("download_not_captured")
+    ext = found.suffix or ".pdf"
     out = dest_dir / f"{stem}{ext}"
-    download.save_as(str(out))
+    try:
+        import shutil
+
+        shutil.copy2(found, out)
+    except Exception:
+        out = found
     saved.append(str(out))
-    print(f"# saved {out}", file=sys.stderr)
+    print(f"# saved_from_watch {out} (src={found})", file=sys.stderr)
     return saved
 
 
@@ -325,6 +425,68 @@ def _screenshot_artifact(page, dest: Path) -> str:
     else:
         page.screenshot(path=str(dest))
     return str(dest)
+
+
+def _open_existing_slide_deck(page, selectors: dict) -> None:
+    open_sels = (selectors.get("open_existing") or {}).get("slide_deck") or []
+    opened = False
+    for sel in open_sels:
+        if 'aria-description="スライド資料"' in sel:
+            opened = _js_click_aria_description(page, "スライド資料")
+            break
+    if not opened:
+        opened = _js_click_aria_description(page, "スライド資料")
+    if not opened:
+        raise RuntimeError("existing_slide_artifact_not_found")
+    page.wait_for_timeout(3500)
+
+
+def _screenshot_slide_pages(page, out_dir: Path, stem: str, pages: list[int]) -> list[str]:
+    saved: list[str] = []
+    thumb_tpl = '[aria-label^="スライド {n}"]'
+    for n in pages:
+        sel = thumb_tpl.format(n=n)
+        try:
+            page.locator(sel).first.click(timeout=4000)
+        except Exception:
+            page.get_by_label(f"スライド {n}", exact=False).first.click(timeout=4000)
+        page.wait_for_timeout(900)
+        dest = out_dir / f"{stem}_slide{n:02d}.png"
+        page.screenshot(path=str(dest))
+        saved.append(str(dest))
+        print(f"# screenshot {dest}", file=sys.stderr)
+    return saved
+
+
+def _run_save_only(
+    page,
+    selectors: dict,
+    out_dir: Path,
+    stem: str,
+    pages: list[int],
+    state: dict,
+) -> int:
+    _open_existing_slide_deck(page, selectors)
+    state["phase"] = "artifact_open"
+    write_run_state(state)
+    shots = []
+    if pages:
+        try:
+            shots = _screenshot_slide_pages(page, out_dir, stem, pages)
+        except Exception as e:
+            print(f"# screenshot soft-fail: {e}", file=sys.stderr)
+    try:
+        files = _download_and_save(page, selectors, out_dir, stem)
+    except Exception as e:
+        print(f"# download soft-fail: {e}", file=sys.stderr)
+        files = []
+        state["error"] = f"download:{e}"
+    state["files"] = files + shots
+    state["ok"] = bool(files) or bool(shots)
+    state["phase"] = "saved" if files else "generated_no_download"
+    write_run_state(state)
+    print(f"# done files={state.get('files')}")
+    return 0 if state["ok"] else 1
 
 
 def _run_create_or_recreate(
@@ -557,9 +719,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--mode",
-        choices=("create", "recreate", "revise"),
+        choices=("create", "recreate", "revise", "save"),
         default="create",
-        help="create/recreate=新規作成UI / revise=既存スライドのページ別修正",
+        help="create/recreate=新規作成UI / revise=既存スライドのページ別修正 / save=PDF保存のみ",
     )
     ap.add_argument(
         "--slide-pages",
@@ -615,7 +777,13 @@ def main(argv: list[str] | None = None) -> int:
 
     prompt = (args.prompt_inline or "").strip()
     page_prompts: dict[int, str] = {}
-    if args.mode == "revise":
+    save_pages: list[int] = []
+    if args.mode == "save":
+        if args.slide_pages:
+            save_pages = [int(x.strip()) for x in args.slide_pages.split(",") if x.strip()]
+        else:
+            save_pages = [3, 6]
+    elif args.mode == "revise":
         if not args.slide_pages:
             print("revise requires --slide-pages (e.g. 3,8)", file=sys.stderr)
             return 2
@@ -648,7 +816,7 @@ def main(argv: list[str] | None = None) -> int:
 
     require = bool(cfg.get("require_confirm_generate", True))
     will_generate = (not args.dry_run) and (args.confirm_generate or not require)
-    if not args.dry_run and require and not args.confirm_generate:
+    if args.mode != "save" and not args.dry_run and require and not args.confirm_generate:
         print(
             "refusing generate: pass --confirm-generate (or --dry-run)",
             file=sys.stderr,
@@ -661,7 +829,7 @@ def main(argv: list[str] | None = None) -> int:
         "notebook_url": url,
         "artifact": args.artifact,
         "mode": args.mode,
-        "slide_pages": list(page_prompts.keys()) if page_prompts else None,
+        "slide_pages": list(page_prompts.keys()) if page_prompts else (save_pages or None),
         "dry_run": bool(args.dry_run),
         "confirm_generate": bool(args.confirm_generate),
         "will_generate": will_generate,
@@ -672,7 +840,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     write_run_state(state)
 
-    downloads = expand(cfg.get("downloads_dir") or "~/Downloads")
+    downloads = out_dir if args.mode == "save" else expand(cfg.get("downloads_dir") or "~/Downloads")
     pw, context, page = _launch(headed, downloads)
     try:
         page.goto(
@@ -684,6 +852,8 @@ def main(argv: list[str] | None = None) -> int:
         state["phase"] = "opened"
         write_run_state(state)
 
+        if args.mode == "save":
+            return _run_save_only(page, selectors, out_dir, stem, save_pages, state)
         if args.mode == "revise":
             return _run_revise(
                 page,
