@@ -42,6 +42,7 @@ from jarvis_vendor_alive_lib import (  # noqa: E402
 
 LIST_PATH = REPO / "config" / "kurashift_mgmt_vendor_list.yaml"
 EXAMPLE_PATH = REPO / "config" / "kurashift_mgmt_vendor_list.example.yaml"
+SHARE_CFG_PATH = REPO / "config" / "kurashift_mgmt_share_folders.yaml"
 
 DEFAULT_XLSX = Path(
     "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/"
@@ -52,10 +53,74 @@ DEFAULT_XLSX = Path(
 STATUSES = frozenset(
     {"pending", "contacted", "replied", "skip", "discovered", "invalid"}
 )
+LANES = frozenset({"kita_shiga", "midori_caramel", "both"})
+AREA_PHRASE = {
+    "kita_shiga": "名古屋市北区（志賀本通駅周辺）",
+    "midori_caramel": "名古屋市緑区（キャラメル）",
+    "both": "名古屋市北区（志賀本通）および緑区",
+}
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def load_share_urls() -> dict[str, str]:
+    """MGMT_SHARE_URL_* または kurashift_mgmt_share_folders.yaml。"""
+    import os
+
+    out = {
+        "common": (os.environ.get("MGMT_SHARE_URL_COMMON") or "").strip(),
+        "kita_shiga": (os.environ.get("MGMT_SHARE_URL_KITA") or "").strip(),
+        "midori_caramel": (os.environ.get("MGMT_SHARE_URL_MIDORI") or "").strip(),
+    }
+    if SHARE_CFG_PATH.is_file():
+        try:
+            cfg = yaml.safe_load(SHARE_CFG_PATH.read_text(encoding="utf-8")) or {}
+            defaults = cfg.get("template_defaults") or {}
+            for k in ("common", "kita_shiga", "midori_caramel"):
+                if not out[k] and defaults.get(k):
+                    out[k] = str(defaults[k]).strip()
+        except Exception:
+            pass
+    return out
+
+
+def infer_property_lane(
+    *,
+    property_area: str = "",
+    city: str = "",
+    notes: str = "",
+    explicit: str = "",
+) -> str:
+    ex = (explicit or "").strip()
+    if ex in LANES:
+        return ex
+    # Excel レーン列の日本語
+    if ex in ("北区", "志賀", "kita"):
+        return "kita_shiga"
+    if ex in ("緑区", "キャラメル", "midori"):
+        return "midori_caramel"
+    blob = f"{property_area} {city} {notes}"
+    has_midori = "緑区" in blob or "キャラメル" in blob
+    has_kita = "北区" in blob or "志賀" in blob
+    if has_midori and has_kita:
+        return "both"
+    if has_midori:
+        return "midori_caramel"
+    return "kita_shiga"
+
+
+def ensure_precheck_fields(v: dict[str, Any]) -> None:
+    if "vacancy_listing_ok" not in v:
+        v["vacancy_listing_ok"] = None
+    if not v.get("property_lane"):
+        v["property_lane"] = infer_property_lane(
+            property_area=str(v.get("property_area") or ""),
+            city=str(v.get("city") or ""),
+            notes=str(v.get("notes") or ""),
+        )
+    v.setdefault("precheck_sent_at", "")
 
 
 def slug_id(name: str, area: str = "") -> str:
@@ -127,6 +192,30 @@ def _status_hint_from_notes(notes: str) -> str:
     return "pending"
 
 
+def _status_from_excel_contact(
+    *,
+    notes: str,
+    method: str,
+    date_cell: str,
+    flyer: str,
+    photo: str,
+    reply: str,
+    result: str,
+    memo: str,
+) -> str:
+    """備考＋方法/日付/チラシ送付/回答など。既アプローチは pending にしない。"""
+    status = _status_hint_from_notes(notes)
+    if "不可" in notes or "不可" in result:
+        return "skip"
+    if status in ("replied", "skip"):
+        return status
+    if any(k in result for k in ("一般仲介", "募集する", "反響", "OK", "可")) and "不可" not in result:
+        return "replied"
+    if any(str(x or "").strip() for x in (method, date_cell, flyer, photo, reply, result, memo)):
+        return "contacted"
+    return status
+
+
 def import_mgmt_xlsx(
     path: Path,
     *,
@@ -139,7 +228,13 @@ def import_mgmt_xlsx(
         raise SystemExit("openpyxl required for --import-xlsx") from exc
 
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    sheet_name = "一覧" if "一覧" in wb.sheetnames else wb.sheetnames[0]
+    # G2 が運用正本（方法・日付・チラシ送付あり）
+    if "G2" in wb.sheetnames:
+        sheet_name = "G2"
+    elif "一覧" in wb.sheetnames:
+        sheet_name = "一覧"
+    else:
+        sheet_name = wb.sheetnames[0]
     ws = wb[sheet_name]
     rows = list(ws.iter_rows(values_only=True))
     # header row: find row with 会社名
@@ -174,11 +269,19 @@ def import_mgmt_xlsx(
     i_mgmt = idx("賃貸管理")
     i_repair = idx("修繕")
     i_sale = idx("売却査定")
-    i_kodate_ok = idx("戸建管理OK")
+    i_kodate_ok = idx("戸建管理OK", "戸別管理")
+    i_vacancy_ok = idx("空室メール可")
+    i_lane = idx("物件レーン", "レーン")
     i_form = idx("問い合わせフォーム")
     i_mail = idx("mail", "個別メール")
     i_tel = idx("tel")
     i_result = idx("問い合わせ結果")
+    i_method = idx("方法")
+    i_date = idx("日付")
+    i_flyer = idx("募集チラシ")
+    i_photo = idx("部屋写真")
+    i_reply = idx("回答有無")
+    i_memo = idx("登録作業状況", "メモ欄")
 
     existing = load_list() if merge else {"settings": {}, "vendors": []}
     by_id = vendor_index(existing)
@@ -213,6 +316,13 @@ def import_mgmt_xlsx(
             url = f"https://{url}"
         notes = _cell(r, i_notes)
         result = _cell(r, i_result)
+        method = _cell(r, i_method)
+        date_raw = r[i_date] if i_date >= 0 and i_date < len(r) else None
+        date_cell = str(date_raw)[:10] if date_raw not in (None, "") else ""
+        flyer = _cell(r, i_flyer)
+        photo = _cell(r, i_photo)
+        reply = _cell(r, i_reply)
+        memo = _cell(r, i_memo)
         services = {
             "buy": _mark_true(_cell(r, i_buy)),
             "lease_broker": _mark_true(_cell(r, i_lease)),
@@ -230,9 +340,50 @@ def import_mgmt_xlsx(
         if no.isdigit():
             vid = f"mgmt-{int(no):03d}-{slug_id(name, '')[5:20]}"
 
-        status = _status_hint_from_notes(notes)
-        if "不可" in notes:
-            status = "skip"
+        status = _status_from_excel_contact(
+            notes=notes,
+            method=method,
+            date_cell=date_cell,
+            flyer=flyer,
+            photo=photo,
+            reply=reply,
+            result=result,
+            memo=memo,
+        )
+
+        vac_cell = _cell(r, i_vacancy_ok)
+        vacancy_ok: bool | None
+        if vac_cell in ("不可", "NG", "ng", "×", "x", "FALSE", "false", "0"):
+            vacancy_ok = False
+        elif _mark_true(vac_cell) or vac_cell in ("可", "OK"):
+            vacancy_ok = True
+        else:
+            vacancy_ok = None
+            if status == "replied" and "不可" not in notes and "不可" not in result:
+                vacancy_ok = True
+            elif status == "skip":
+                vacancy_ok = False
+
+        contact_bits = []
+        if method:
+            contact_bits.append(f"方法:{method}")
+        if date_cell:
+            contact_bits.append(f"日付:{date_cell}")
+        if flyer:
+            contact_bits.append("チラシ送付済")
+        if photo:
+            contact_bits.append("写真送付済")
+        if reply:
+            contact_bits.append(f"回答:{reply}")
+        note_extra = " / ".join(contact_bits)
+        notes_out = f"{notes} | {note_extra}".strip(" |") if note_extra else notes
+
+        lane = infer_property_lane(
+            property_area=prop_area,
+            city=city,
+            notes=notes_out,
+            explicit=_cell(r, i_lane),
+        )
 
         row: dict[str, Any] = {
             "id": vid,
@@ -242,14 +393,17 @@ def import_mgmt_xlsx(
             "city": city,
             "station": station,
             "property_area": prop_area,
+            "property_lane": lane,
             "url": url,
             "contact_url": contact_url,
             "channel": "web_form" if url else "phone",
             "contact_email": email if "@" in email else "",
             "phone": phone,
             "status": status if status in STATUSES else "pending",
+            "vacancy_listing_ok": vacancy_ok,
+            "precheck_sent_at": "",
             "source": "mgmt_xlsx",
-            "notes": notes,
+            "notes": notes_out,
             "last_result": result,
             "services": services,
             "discovered_at": now_iso()[:10],
@@ -262,46 +416,65 @@ def import_mgmt_xlsx(
             "alive_due_days": 180,
         }
         if status == "contacted":
-            row["contacted_at"] = now_iso()[:10]
+            row["contacted_at"] = date_cell or now_iso()[:10]
+            row["precheck_sent_at"] = row["contacted_at"]
         if status == "replied":
-            row["replied_at"] = now_iso()[:10]
-            row["contacted_at"] = row["contacted_at"] or now_iso()[:10]
+            row["replied_at"] = date_cell or now_iso()[:10]
+            row["contacted_at"] = date_cell or now_iso()[:10]
+            row["precheck_sent_at"] = row["contacted_at"]
 
         ensure_alive_fields(row, kind="mgmt")
+        ensure_precheck_fields(row)
 
         prev = by_id.get(vid) or by_name.get(name)
         if prev:
-            # keep outreach/alive progress
             for k in (
                 "status",
                 "contacted_at",
                 "replied_at",
+                "precheck_sent_at",
+                "vacancy_listing_ok",
+                "property_lane",
                 "alive_checked_at",
                 "alive_status",
                 "alive_method",
                 "alive_note",
                 "last_result",
             ):
-                if prev.get(k) and k in (
+                if k in (
                     "alive_checked_at",
                     "alive_status",
                     "alive_method",
                     "alive_note",
-                    "contacted_at",
-                    "replied_at",
-                ):
+                ) and prev.get(k):
                     row[k] = prev[k]
-                elif k == "status" and prev.get("status") in (
-                    "contacted",
-                    "replied",
-                    "skip",
-                    "invalid",
+                elif k == "vacancy_listing_ok" and prev.get("vacancy_listing_ok") is not None:
+                    if row.get("vacancy_listing_ok") is None:
+                        row[k] = prev[k]
+                elif k == "property_lane" and prev.get("property_lane") in (
+                    "midori_caramel",
+                    "both",
                 ):
-                    # import hint より既存の開拓進捗を優先
-                    row["status"] = prev["status"]
-                elif k == "last_result" and prev.get("last_result"):
+                    # 緑区シード等の手動レーンを維持
+                    row[k] = prev[k]
+                elif k == "status":
+                    # Excel が接触済みなら pending を上書き。手動 skip/invalid は維持
+                    if prev.get("status") in ("skip", "invalid") and status == "pending":
+                        row["status"] = prev["status"]
+                    elif status in ("contacted", "replied", "skip"):
+                        row["status"] = status
+                    elif prev.get("status") in ("contacted", "replied", "skip", "invalid"):
+                        row["status"] = prev["status"]
+                elif k in ("contacted_at", "replied_at", "precheck_sent_at"):
+                    if status in ("contacted", "replied") and row.get(k):
+                        pass  # Excel 日付を優先
+                    elif prev.get(k):
+                        row[k] = prev[k]
+                elif k == "last_result" and prev.get("last_result") and not result:
                     row["last_result"] = prev["last_result"]
             row["id"] = prev["id"]
+            if str(prev.get("source") or "").startswith("midori"):
+                row["source"] = prev["source"]
             by_id[row["id"]] = row
             updated += 1
         else:
@@ -334,35 +507,121 @@ def summary() -> dict[str, Any]:
     data = load_list()
     vendors = [v for v in (data.get("vendors") or []) if isinstance(v, dict)]
     counts: dict[str, int] = {}
+    by_lane: dict[str, int] = {}
     alive_ok_n = 0
+    vacancy_ok_n = 0
     for v in vendors:
         ensure_alive_fields(v, kind="mgmt")
+        ensure_precheck_fields(v)
         st = str(v.get("status") or "pending")
         counts[st] = counts.get(st, 0) + 1
+        lane = str(v.get("property_lane") or "kita_shiga")
+        by_lane[lane] = by_lane.get(lane, 0) + 1
         if is_alive_ok(v, kind="mgmt"):
             alive_ok_n += 1
+        if v.get("vacancy_listing_ok") is True:
+            vacancy_ok_n += 1
     return {
         "ok": True,
         "total": len(vendors),
         "by_status": counts,
+        "by_lane": by_lane,
         "alive_ok": alive_ok_n,
+        "vacancy_listing_ok": vacancy_ok_n,
         "yaml_exists": LIST_PATH.is_file(),
         "settings": data.get("settings") or {},
+        "share_urls": load_share_urls(),
     }
 
 
-def next_pending(*, limit: int) -> list[dict[str, Any]]:
+def _lane_match(v: dict[str, Any], lane: str) -> bool:
+    pl = str(v.get("property_lane") or "kita_shiga")
+    if lane == "both":
+        return True
+    return pl == lane or pl == "both"
+
+
+def next_pending(
+    *,
+    limit: int,
+    balanced: bool = False,
+    lane: str | None = None,
+) -> list[dict[str, Any]]:
     data = load_list()
-    out: list[dict[str, Any]] = []
+    pending: list[dict[str, Any]] = []
     for v in data.get("vendors") or []:
         if not isinstance(v, dict):
             continue
         if str(v.get("status") or "pending") not in ("pending", "discovered"):
             continue
         ensure_alive_fields(v, kind="mgmt")
-        out.append(v)
+        ensure_precheck_fields(v)
+        if lane and not _lane_match(v, lane):
+            continue
+        pending.append(v)
+
+    share = load_share_urls()
+
+    def enrich(v: dict[str, Any]) -> dict[str, Any]:
+        pl = str(v.get("property_lane") or "kita_shiga")
+        prop_url = share.get(pl if pl != "both" else "kita_shiga") or ""
+        if pl == "both":
+            prop_url = share.get("kita_shiga") or share.get("midori_caramel") or ""
+        return {
+            **v,
+            "precheck": {
+                "area_phrase": AREA_PHRASE.get(pl, AREA_PHRASE["kita_shiga"]),
+                "property_folder_url": prop_url,
+                "common_folder_url": share.get("common") or "",
+                "subject": (
+                    "【空室対策のご相談】名古屋市緑区にアパートを所有している松野です"
+                    if pl == "midori_caramel"
+                    else "【空室対策のご相談】名古屋市北区にアパートを所有している松野です"
+                ),
+            },
+        }
+
+    if not balanced or limit < 2 or lane:
+        return [enrich(v) for v in pending[:limit]]
+
+    kita_ex = [v for v in pending if v.get("property_lane") == "kita_shiga"]
+    midori_ex = [v for v in pending if v.get("property_lane") == "midori_caramel"]
+    both = [v for v in pending if v.get("property_lane") == "both"]
+    out: list[dict[str, Any]] = []
+    used: set[str] = set()
+    for pool in (kita_ex, midori_ex):
+        for v in pool:
+            vid = str(v.get("id"))
+            if vid in used:
+                continue
+            out.append(enrich(v))
+            used.add(vid)
+            break
         if len(out) >= limit:
             break
+    for v in both + kita_ex + midori_ex + pending:
+        if len(out) >= limit:
+            break
+        vid = str(v.get("id"))
+        if vid in used:
+            continue
+        out.append(enrich(v))
+        used.add(vid)
+    return out
+
+
+def vacancy_eligible(*, lane: str | None = None) -> list[dict[str, Any]]:
+    data = load_list()
+    out: list[dict[str, Any]] = []
+    for v in data.get("vendors") or []:
+        if not isinstance(v, dict):
+            continue
+        ensure_precheck_fields(v)
+        if v.get("vacancy_listing_ok") is not True:
+            continue
+        if lane and not _lane_match(v, lane):
+            continue
+        out.append(v)
     return out
 
 
@@ -372,6 +631,9 @@ def mark_vendor(
     status: str,
     note: str = "",
     result: str = "",
+    vacancy_listing_ok: str | None = None,
+    kodate_mgmt_ok: str | None = None,
+    property_lane: str | None = None,
     dry_run: bool,
 ) -> dict[str, Any]:
     if status not in STATUSES:
@@ -389,10 +651,30 @@ def mark_vendor(
         v["last_result"] = result
     if status == "contacted":
         v["contacted_at"] = today
+        v["precheck_sent_at"] = today
     if status == "replied":
         v["replied_at"] = today
+        v["contacted_at"] = v.get("contacted_at") or today
+    if vacancy_listing_ok is not None and vacancy_listing_ok != "":
+        s = str(vacancy_listing_ok).strip().lower()
+        if s in ("true", "1", "ok", "yes", "可"):
+            v["vacancy_listing_ok"] = True
+        elif s in ("false", "0", "ng", "no", "不可"):
+            v["vacancy_listing_ok"] = False
+            if status == "replied":
+                v["status"] = "skip"
+        elif s in ("null", "none", "-"):
+            v["vacancy_listing_ok"] = None
+    if kodate_mgmt_ok is not None and kodate_mgmt_ok != "":
+        services = v.get("services") if isinstance(v.get("services"), dict) else {}
+        s = str(kodate_mgmt_ok).strip().lower()
+        services["kodate_mgmt_ok"] = s in ("true", "1", "ok", "yes", "可")
+        v["services"] = services
+    if property_lane and property_lane in LANES:
+        v["property_lane"] = property_lane
     v["updated_at"] = now_iso()
     ensure_alive_fields(v, kind="mgmt")
+    ensure_precheck_fields(v)
     if not dry_run:
         save_list(data)
     return {"ok": True, "vendor": v, "dry_run": dry_run}
@@ -448,12 +730,20 @@ def merge_append(vendors: list[Any], *, dry_run: bool) -> dict[str, Any]:
             "city": raw.get("city") or "",
             "station": raw.get("station") or "",
             "property_area": raw.get("property_area") or "",
+            "property_lane": raw.get("property_lane")
+            or infer_property_lane(
+                property_area=str(raw.get("property_area") or ""),
+                city=str(raw.get("city") or ""),
+                notes=str(raw.get("notes") or ""),
+            ),
             "url": raw.get("url") or "",
             "contact_url": raw.get("contact_url") or raw.get("url") or "",
             "channel": raw.get("channel") or "web_form",
             "contact_email": raw.get("contact_email") or "",
             "phone": raw.get("phone") or "",
             "status": raw.get("status") or "discovered",
+            "vacancy_listing_ok": raw.get("vacancy_listing_ok", None),
+            "precheck_sent_at": "",
             "source": raw.get("source") or "grok_discovery",
             "notes": raw.get("notes") or "",
             "services": raw.get("services") or {},
@@ -464,12 +754,33 @@ def merge_append(vendors: list[Any], *, dry_run: bool) -> dict[str, Any]:
             "alive_due_days": 180,
         }
         ensure_alive_fields(row, kind="mgmt")
+        ensure_precheck_fields(row)
         by_id[vid] = row
         added += 1
     data["vendors"] = list(by_id.values())
     if not dry_run:
         save_list(data)
     return {"ok": True, "added": added, "total": len(data["vendors"]), "dry_run": dry_run}
+
+
+def backfill_lanes(*, dry_run: bool) -> dict[str, Any]:
+    """既存 YAML に property_lane / vacancy_listing_ok を埋める。"""
+    data = load_list()
+    n = 0
+    for v in data.get("vendors") or []:
+        if not isinstance(v, dict):
+            continue
+        before = v.get("property_lane")
+        ensure_precheck_fields(v)
+        if v.get("property_lane") != before or "vacancy_listing_ok" not in v:
+            n += 1
+        # 緑区補強: 名前にキャラメル関連は midori（現状リストは北区中心）
+        notes = str(v.get("notes") or "")
+        if "緑区" in notes or "キャラメル" in notes:
+            v["property_lane"] = "midori_caramel"
+    if not dry_run:
+        save_list(data)
+    return {"ok": True, "touched": n, "total": len(data.get("vendors") or []), "dry_run": dry_run}
 
 
 def main() -> int:
@@ -479,10 +790,17 @@ def main() -> int:
     ap.add_argument("--merge", action="store_true", default=True)
     ap.add_argument("--no-merge", action="store_true")
     ap.add_argument("--next", type=int, default=0)
+    ap.add_argument("--balanced", action="store_true", help="北区1+緑区1 を優先")
+    ap.add_argument("--lane", default="", help="kita_shiga|midori_caramel|both")
+    ap.add_argument("--vacancy-eligible", action="store_true")
+    ap.add_argument("--backfill-lanes", action="store_true")
     ap.add_argument("--mark", metavar="ID")
     ap.add_argument("--status", default="contacted")
     ap.add_argument("--note", default="")
     ap.add_argument("--result", default="")
+    ap.add_argument("--vacancy-listing-ok", default="")
+    ap.add_argument("--kodate-mgmt-ok", default="")
+    ap.add_argument("--property-lane", default="")
     ap.add_argument("--mark-alive", metavar="ID")
     ap.add_argument("--alive-status", default="ok")
     ap.add_argument("--alive-method", default="phone")
@@ -492,6 +810,22 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     merge = not args.no_merge
+
+    if args.backfill_lanes:
+        out = backfill_lanes(dry_run=args.dry_run)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.vacancy_eligible:
+        items = vacancy_eligible(lane=args.lane or None)
+        print(
+            json.dumps(
+                {"ok": True, "count": len(items), "lane": args.lane or "all", "vendors": items},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
 
     if args.alive_queue:
         data = load_list()
@@ -509,6 +843,7 @@ def main() -> int:
                             "name": v.get("name"),
                             "phone": v.get("phone"),
                             "url": v.get("url"),
+                            "property_lane": v.get("property_lane"),
                             "alive_status": v.get("alive_status"),
                             "alive_effective": effective_alive_status(v, kind="mgmt"),
                         }
@@ -556,16 +891,29 @@ def main() -> int:
             status=args.status,
             note=args.note,
             result=args.result,
+            vacancy_listing_ok=args.vacancy_listing_ok or None,
+            kodate_mgmt_ok=args.kodate_mgmt_ok or None,
+            property_lane=args.property_lane or None,
             dry_run=args.dry_run,
         )
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0 if out.get("ok") else 1
 
     if args.next > 0:
-        items = next_pending(limit=args.next)
+        items = next_pending(
+            limit=args.next,
+            balanced=bool(args.balanced),
+            lane=args.lane or None,
+        )
         print(
             json.dumps(
-                {"ok": True, "count": len(items), "vendors": items},
+                {
+                    "ok": True,
+                    "count": len(items),
+                    "balanced": bool(args.balanced),
+                    "lane": args.lane or None,
+                    "vendors": items,
+                },
                 ensure_ascii=False,
                 indent=2,
             )

@@ -41,7 +41,7 @@ portals:
 
 # 会員プロフィール正本スナップ（ポータル表示用。秘密は env）
 profile_snapshot:
-  checked_at: "2026-08-26"
+  checked_at: "2026-08-27"
   income_band: "1500万円以上（世帯・家賃込み目安／給与税込約1,361万円＋家賃収入欄）"
   own_funds_manyen: 830
   loan_balance_manyen: 16369  # 物件ローン合算（住宅ローン除く・トラッカー）
@@ -60,3 +60,4 @@ notes:
   - 2026-08-26: 健美家・楽待の年収／自己資金／ローン／棟数を最新化（一棟アパート3棟）。
   - 2026-08-26: HOME'S投資 新規登録＋会員情報更新完了（toushi.homes.co.jp）。S1 VM ログイン確認済み。
   - 2026-08-26: at home ログインOK（共通PW）。投資用会員プロフィール（年収・棟数）欄は無し。
+  - 2026-08-27: at home 再確認。ATHOME_PASSWORD を PORTAL 共通PWで正本化。 headless は Geetest でログイン画面到達不可。投資用プロフィール欄なしは既存結論を維持。

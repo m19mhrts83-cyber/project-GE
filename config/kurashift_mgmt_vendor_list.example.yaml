@@ -2,14 +2,17 @@
 # 実データ: config/kurashift_mgmt_vendor_list.yaml（.gitignore）
 # 取込: scripts/jarvis_kurashift_mgmt_vendor_list.py --import-xlsx ★管理会社一覧.xlsx
 # Excel 正本（空室一括送信）は OneDrive のまま。ここは KURASHIFT 副本。
+# Drive 資料: config/kurashift_mgmt_share_folders.yaml / MGMT_SHARE_URL_*
 
 settings:
   daily_outreach_limit: 2
   alive_due_days: 180
   outreach_from: matsuno.estate@gmail.com
-  target_note: "戸別管理・空室募集の開拓（空室メール一括とは別レーン）"
+  target_note: "事前確認（募集可否・戸別）→ OK社のみ空室メール。北区と緑区で宛先別"
+  # property_lane: kita_shiga | midori_caramel | both
 
 # status: pending | discovered | contacted | replied | skip | invalid
+# vacancy_listing_ok: null | true | false（空室メールの主ゲート）
 # alive_*: 生存確認（周期 180日）
 vendors:
   - id: mgmt-example-01
@@ -18,13 +21,16 @@ vendors:
     prefecture: "愛知県"
     city: "名古屋市"
     station: ""
-    property_area: "名古屋市北区周辺"
+    property_area: "北区"
+    property_lane: kita_shiga
     url: "https://example.co.jp/"
     contact_url: "https://example.co.jp/contact"
     channel: web_form
     contact_email: ""
     phone: ""
     status: pending
+    vacancy_listing_ok: null
+    precheck_sent_at: ""
     source: example
     notes: ""
     services:
@@ -34,7 +40,41 @@ vendors:
       repair: false
       sale_appraisal: false
       kodate_mgmt_ok: false
-    discovered_at: "2026-08-26"
+    discovered_at: "2026-08-27"
+    contacted_at: ""
+    replied_at: ""
+    last_result: ""
+    alive_checked_at: ""
+    alive_status: unknown
+    alive_method: ""
+    alive_note: ""
+    alive_due_days: 180
+  - id: mgmt-example-midori-01
+    name: "（例）緑区〇〇不動産"
+    area: "愛知県名古屋市緑区"
+    prefecture: "愛知県"
+    city: "名古屋市"
+    station: "有松"
+    property_area: "緑区"
+    property_lane: midori_caramel
+    url: "https://example.co.jp/"
+    contact_url: "https://example.co.jp/contact"
+    channel: phone
+    contact_email: ""
+    phone: ""
+    status: pending
+    vacancy_listing_ok: null
+    precheck_sent_at: ""
+    source: example
+    notes: "緑区レーン例"
+    services:
+      buy: false
+      lease_broker: true
+      lease_mgmt: true
+      repair: false
+      sale_appraisal: false
+      kodate_mgmt_ok: false
+    discovered_at: "2026-08-27"
     contacted_at: ""
     replied_at: ""
     last_result: ""
