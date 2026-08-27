@@ -1,6 +1,6 @@
 # KURASHIFT / Grok Bot — paste 索引
 
-**更新**: 2026-08-25  
+**更新**: 2026-08-27  
 **方針**: 追記内容は **各 Bot の paste 正本に統合済み**。このファイル単体を Instructions に貼らない。
 
 ## Grok「説明」欄に貼るファイル（正本）
@@ -10,7 +10,7 @@
 | **参謀**（不動産賃貸部長） | （番号外） | `config/grok_sanbo_bot_grok_paste.md` | コードブロック全文を説明欄へ |
 | **物件調査** | S1 | `config/grok_property_bot_grok_paste.md` | 同上 |
 | **物件業者開拓** | S2 | `config/grok_vendor_outreach_bot_grok_paste.md` | 同上 |
-| **需給三次判断** | S3 | `config/grok_supply_bot_grok_paste.md` | 同上 |
+| **需給三次判断** | S3 | `config/grok_supply_bot_grok_paste.md` | 同上 · **成果物は Obsidian `☆Real_Estate_Pick`（メールしない）** |
 | **修繕業者開拓** | S4 | `config/grok_repair_vendor_bot_grok_paste.md` | 同上 |
 | **管理会社開拓** | S9 | `config/grok_mgmt_vendor_bot_grok_paste.md` | 同上 |
 | **ペルソナ二次判断** | S5 | `config/grok_persona_bot_grok_paste.md` | 同上 |
@@ -20,6 +20,7 @@
 
 - **名前・タイトル**は UI の短い欄のまま（paste MD 末尾の「Grok プロフィール設定」参照）
 - **説明**＝上記コードブロック内の `# あなたの役割 — …` から末尾まで
+- **S3 置き場正本**: `config/kurashift_obsidian_artifacts.yaml`
 - チャットは **本日分・007から** 等の**当日司令**用。恒久ルールは説明欄のみ
 - **未作成の UI 手順**: `config/grok_remaining_bots_setup.md`（S6/S7/S8）
 
@@ -70,7 +71,7 @@ poll 成功時も extract＋下書きを soft-fail で実行する。下書き�
 | 仲介なし | S1（参謀が振分） | `[KURASHIFT問合せ依頼]` → Web/調査 |
 | 返信後・内見 | S1（→S5/S3） | `[Grok内見判断]` → 行く/保留/見送り |
 | 業者開拓 A' | S2 | 地場リスト Web フォーム（approved 文面） |
-| 二次・三次 | S5 → S3 | `[Grokペルソナ]` → `[Grok需給]` |
+| 二次・三次 | S5 → S3 | `[Grokペルソナ]` → **Obsidian `☆Real_Estate_Pick`**（S3・メールしない） |
 | 買付・融資 | S6 / S7 | `[Grok買付]` / `[Grok融資]` |
 | ライフライン（電水ネットガス） | S8 | `[Grokライフライン]` |
 | 修繕候補 | S4 | `[Grok修繕候補]`（電話しない） |

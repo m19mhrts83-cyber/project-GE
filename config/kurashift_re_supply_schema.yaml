@@ -3,8 +3,13 @@
 # Excel 参考: 231_物件調査.xlsx「外的調査分析」
 
 version: 1
-updated: "2026-08-24"
-mail_subject_prefix: "[Grok需給]"
+updated: "2026-08-27"
+# 成果物はメールではなく Obsidian（admin Drive）
+delivery: drive_obsidian
+obsidian_folder: "01_Journaling/☆Real_Estate_Pick"
+filename_pattern: "{YYYY-MM-DD}_{市区町村}_{物件短名}_S3.md"
+# レガシ（新規送信しない）
+mail_subject_prefix_legacy: "[Grok需給]"
 portals:
   - SUUMO
   - at HOME

@@ -1,0 +1,27 @@
+# Grok / Jarvis — Obsidian 成果物の置き場（admin Google Drive 正本）
+# Obsidian 共有データソース = Google Drive（Documents 経由の移し替え不要）
+
+version: 1
+updated: "2026-08-27"
+
+# ボルトルート（admin）
+obsidian_vault_drive: >-
+  /Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1
+
+artifacts:
+  # S3 需給三次 — 問合せ返信〜三次まとめ（案件ごと）
+  real_estate_pick:
+    relative: "01_Journaling/☆Real_Estate_Pick"
+    writers: [S3]
+    filename_pattern: "{YYYY-MM-DD}_{市区町村}_{物件短名}_S3.md"
+    delivery: drive_obsidian  # メール禁止（旧 [Grok需給] はレガシ）
+    note: >-
+      個別具体の候補パック。買い進め・内見以降の実務束はここではなく
+      KURASHIFT deals / OneDrive・Drive 案件フォルダ。
+
+  # 融資の横断知識（既運用）
+  financing_literature:
+    relative: "03_Literature Note(まとめノート)/融資"
+    writers: [human, S7_optional]
+    delivery: drive_obsidian
+    note: 戸建レーン等の考え方。案件ノートからはリンク。
