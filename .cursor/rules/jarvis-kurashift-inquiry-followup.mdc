@@ -1,21 +1,28 @@
 ---
-description: KURASHIFT 問合せパイプライン（Tier1〜3）の目安日フォロー。残 todo が終わるまで Jarvis が促す。
+description: KURASHIFT残（索引→問合せTier2以降）を目安日で促す。planを閉じても開けるパスを毎回添える。
 alwaysApply: true
 ---
 
-# KURASHIFT 問合せパイプライン — 目安フォロー（暫定）
+# KURASHIFT 残アクション — 目安フォロー（暫定）
 
 **終わるまで有効。** 残 todo がすべて完了（またはユーザーが不要と明示）したら、本ルールを削除 or `disabled: true` にする。
 
-## 正本
+ユーザーが閉じがちな **索引 plan** から辿れるように、促しには必ず **絶対パス（開く用）** を付ける。
 
-| 役割 | パス |
+## 正本（閉じてもここを開く）
+
+| 役割 | パス（チャットにそのまま貼る） |
 |---|---|
-| 進捗 | `~/git-repos/docs/KURASHIFT_問合せパイプライン_進捗_20260823.md` |
-| Cursor plan | `~/.cursor/plans/kurashift_re問合せTier2以降_20260823.plan.md` |
-| 閾値 YAML | `config/kurashift_re_inquiry_auto.yaml` |
-| Tier1 手順 | `docs/KURASHIFT_Tier1_問合せ_初級者手順.md` |
+| **入口・度忘れ索引** | `/Users/matsunomasaharu2/.cursor/plans/kurashift残プラン索引_240fd9fa.plan.md` |
+| **生きている残 plan** | `/Users/matsunomasaharu2/.cursor/plans/kurashift_re問合せTier2以降_20260823.plan.md` |
+| **実装済/未実装 git 正本** | `/Users/matsunomasaharu2/git-repos/docs/KURASHIFT_問合せパイプライン_進捗_20260823.md` |
+| Tier1 手順 | `/Users/matsunomasaharu2/git-repos/docs/KURASHIFT_Tier1_問合せ_初級者手順.md` |
+| Tier2 UI | https://jarvis-trade-desk.vercel.app/realestate/deals/tier2 |
+| 候補 UI | https://jarvis-trade-desk.vercel.app/realestate/deals?tab=candidates&inquiry=ready |
 | state | `~/git-repos/.jarvis_state/kurashift_re_inquiry_followup.json` |
+| 閾値 YAML | `config/kurashift_re_inquiry_auto.yaml` |
+
+旧「1本まとめ」バックログ（20260813）は **履歴・完了済み**。いまの残は **Tier2以降 plan** のみ。
 
 ## 無効化（終了条件）
 
@@ -23,91 +30,70 @@ alwaysApply: true
 
 - state に `"disabled": true`
 - `.env.jarvis_private` に `JARVIS_KURASHIFT_INQUIRY_FOLLOWUP_DISABLE=1`
-- plan の残 todo（下記5つ）がすべて `completed` / `cancelled` → Jarvis が state を `disabled` にし、**本ルール削除を提案**
+- 下の残 todo がすべて `completed` / `cancelled` → Jarvis が state を `disabled` にし、**本ルール削除を提案**
 
 ## 残マイルストーン（目安日・JST）
 
-| ID | 目安 | ユーザーへの依頼（こうしてください） |
+| ID | 目安 | ユーザーへの依頼 |
 |---|---|---|
-| `tier1-five-sends` | **2026-08-25** | Grok で「聞く」物件を増やしたうえで、Tier1 初級者手順どおり **手動5件**送信 → poll。完了したら「5件送った」と一声。以降の日次主線は Tier2 一括 |
-| `tier2-prod-review` | **2026-09-06** | `/realestate/deals/tier2` を開き、一括確認・日次上限5・本番候補のみを確認。問題なければ「Tier2 OK」 |
-| `research-reply-extract` | **2026-09-01** | コード・migration 済。本番は `--poll-replies` 後または `jarvis_kurashift_re_reply_extract.py --apply --emit-grok-mail-draft`。内見判断は `[Grok内見判断]` |
-| `tier3-gate` | **2026-09-13**（可否）／**2026-09-27**（有効化検討） | 9/13: 送信・返信件数と Tier2 安定を見て Tier3 に進むか判断。9/27: 進むなら **明示同意のうえ** YAML `tier3_auto_send.enabled`（手順: `docs/KURASHIFT_Tier3_自動送信_有効化手順.md`）。勝手に ON しない |
-| `phase3-optional` | （後回し） | 優先度が決まるまで促しは **info のみ**（毎回出さない） |
+| `tier1-five-sends` | **2026-08-25** | Tier1 初級者手順どおり **手動5件**送信＋poll。「5件送った」と一声 |
+| `tier2-prod-review` | **2026-09-06** | `/realestate/deals/tier2` で一括確認・日次上限5・本番候補のみ。「Tier2 OK」 |
+| `tier3-gate` | **2026-09-13**（可否）／**2026-09-27**（有効化検討） | 明示同意のうえのみ Tier3 `enabled`。勝手に ON しない |
+| `phase3-optional` | （後回し） | 触れたときだけ info |
 
-## いつ動くか（トリガー）
+完了済み（促さない）: `tier2-finish-code` / `tier1-beginner-doc` / `research-reply-extract` / `viewing-judgment-handoff` / `tier3-worker`
 
-**ユーザーが Jarvis に何か話しかけたセッション**で、次を満たすとき本題の前後に **1ブロック**出す（同一セッションで1回まで）。
+## いつ動くか（適切なタイミング）
 
-1. state が無効でない
-2. 残 todo のうち **目安日当日〜経過後** のものがある（または **目安の3日前〜当日**）
-3. その ID を **7日以内に同レベルで促していない**（`last_prompted`）
+**ユーザーが Jarvis に何か話しかけたセッション**で、同一セッション **1回まで**。
 
-パートナー確認・KURASHIFT／問合せ／Tier／Grok 物件の話題なら、上記に加え **経過中のマイルストーンを1行**添えてよい。
+| トリガー | 動作 |
+|---|---|
+| 残 todo が **soon / due / ask** | 本題の前後に1ブロック（必須） |
+| **KURASHIFT／千三つ／deals／問合せ／Tier／買い進め／Grok物件** | 経過中マイルストーンを1行＋**開くパス** |
+| **パートナー確認**（前半末尾のついで） | 同上。失敗しても確認全体は止めない |
+| 毎月 **1〜5日** | 未完了一覧を短く（索引パス付き） |
+
+促しすぎ防止: 同一 ID は **7日以内**に同レベルで再掲しない（`last_prompted`）。
 
 ## 促しレベル
 
-| レベル | 条件 | 言い方 |
-|---|---|---|
-| **soon** | 目安の **3日前〜当日** | 「〇日が目安です。準備: …」 |
-| **due** | 目安日を **過ぎた**・未完了 | 「目安（〇月〇日）を過ぎています。次は: …」 |
-| **ask** | 目安から **7日以上**経過 | 「未完了のままです。今日やる／延期する／スキップ、どれにしますか？」 |
+| レベル | 条件 |
+|---|---|
+| **soon** | 目安の **3日前〜当日** |
+| **due** | 目安日を **過ぎた**・未完了 |
+| **ask** | 目安から **7日以上**経過 |
+| **info** | 話題に触れたときだけ（phase3 等） |
 
-`phase3-optional` は due/ask にしない（ユーザーが触れたときだけ）。
-
-## 報告フォーマット（短い1ブロック）
+## 報告フォーマット（開くパス必須）
 
 ```
 ---
-📎 KURASHIFT問合せフォロー
+📎 KURASHIFT残フォロー（索引から辿れる）
 - {ID}: {soon|due|ask} — {依頼1行}
-- 手順: {URL or docs パス}
-- plan: kurashift_re問合せTier2以降
+- 開く（索引）: /Users/matsunomasaharu2/.cursor/plans/kurashift残プラン索引_240fd9fa.plan.md
+- 開く（生きているplan）: /Users/matsunomasaharu2/.cursor/plans/kurashift_re問合せTier2以降_20260823.plan.md
+- 進捗: docs/KURASHIFT_問合せパイプライン_進捗_20260823.md
+- UI: https://jarvis-trade-desk.vercel.app/realestate/deals?tab=candidates&inquiry=ready
 ---
-```
-
-例:
-
-```
-📎 KURASHIFT問合せフォロー
-- tier1-five-sends: due — Tier1 で手動5件＋poll をお願いします
-- 手順: docs/KURASHIFT_Tier1_問合せ_初級者手順.md
-  URL: https://jarvis-trade-desk.vercel.app/realestate/deals?tab=candidates&inquiry=ready
 ```
 
 ## Jarvis の動作
 
-1. 進捗 doc / plan の **pending** を見る（コード実装の推測で「完了」にしない）
-2. ユーザーが「5件送った」「Tier2 OK」「調査シート進めて」「Tier3 はやらない」等と言ったら:
-   - plan todo を `completed` / `cancelled` に更新
-   - 進捗 doc の todo 表を同期
-   - state の `completed_ids` に追記、`last_prompted` 更新
-3. **目安を過ぎても勝手に Tier3 を enabled にしない**（対外送信・自動化は明示同意）
-4. 延期希望 → 進捗 doc の日付とカレンダーを直し、state の `due` を更新
-
-## state 例
-
-`~/git-repos/.jarvis_state/kurashift_re_inquiry_followup.json`:
-
-```json
-{
-  "disabled": false,
-  "updated_at": null,
-  "completed_ids": [],
-  "last_prompted": {},
-  "notes": "残 todo 完了後に disabled: true とルール削除を提案"
-}
-```
-
-`last_prompted`: `{ "tier1-five-sends": { "at": "ISO", "level": "due" } }`
+1. state が無効ならスキップ
+2. `completed_ids` と plan / 進捗 doc の **pending** を見る（コード推測で完了にしない）
+3. 促すときは必ず上表の **開くパス**を含める（plan.md を閉じていても再開できる）
+4. 「5件送った」「Tier2 OK」「Tier3 はやらない」等 → plan todo・進捗・state を同期
+5. Tier3 は **明示同意なしに enabled にしない**
+6. 延期 → 目安日と state `milestones` を更新
 
 ## 終了時
 
 1. state `"disabled": true`
-2. ユーザーに「フォロールールを削除してよいですか？」→ OK なら本 `.mdc` を削除
-3. plan を履歴扱いにし、進捗 doc に「フォロー終了 YYYY-MM-DD」を1行
+2. 「フォロールールを削除してよいですか？」→ OK なら本 `.mdc` を削除
+3. 索引 plan に「フォロー終了 YYYY-MM-DD」を1行
 
-## 関連
+## 関連（混同しない）
 
-- 対外送信確認: `jarvis-outbound-confirm.mdc`
-- 運用コマンド: `docs/運用コマンド一覧.md`（KURASHIFT 問合せ節）
+- Gmail「確認した→既読」: `jarvis-kurashift-gmail-read-reminder.mdc`（別・実装済み習慣）
+- 対外送信: `jarvis-outbound-confirm.mdc`
