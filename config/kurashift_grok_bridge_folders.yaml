@@ -2,13 +2,16 @@
 # 対外資料の【仲介パートナー共有】とは別。秘密は置かない。
 account: admin@livingsupport-matsu.co.jp
 local_root: /Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/【with Grok bot】
+# 呼び名: 部長ボックス=inbox / Jarvisボックス=outbox
 folders:
   readme: 00_README.md
-  inbox_from_grok: 10_inbox_from_grok
-  outbox_to_grok: 20_outbox_to_grok
+  inbox_from_grok: 10_inbox_from_grok   # 部長ボックス（部長→Jarvis）
+  outbox_to_grok: 20_outbox_to_grok     # Jarvisボックス（Jarvis→部長）
   shared_working: 30_shared_working
   archive: 90_archive
 notes:
   - Bot Instructions の正本は git-repos/config の paste。このフォルダはキュー・作業 MD 用
-  - ファイル名: YYYY-MM-DD_題名.md
-  - Grok に見せるときは admin で Drive 連携／フォルダ権限を付与（anyone公開は原則しない）
+  - 日報・[Grok調査] は estate メールのまま。急ぎ任意は [Jarvis依頼]
+  - ファイル名: YYYY-MM-DD_題名.md（Jarvis 書込は YYYY-MM-DD_HHMM_題名.md）
+  - Grok Drive コネクタは admin。anyone公開は原則しない
+  - "outbox: scripts/jarvis_bucho_outbox_write.py / inbox: jarvis_bucho_inbox_poll.py（launchd 15分）"

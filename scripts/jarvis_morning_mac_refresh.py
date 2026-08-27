@@ -46,6 +46,7 @@ PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
 KURASHIFT_S1_EVIDENCE = REPO / "scripts" / "jarvis_kurashift_s1_evidence_to_drive.py"
 GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
+BUCHO_INBOX_POLL = REPO / "scripts" / "jarvis_bucho_inbox_poll.py"
 GROK_REPAIR_APPLY = REPO / "scripts" / "jarvis_grok_repair_mail_apply.py"
 MGMT_REPLY_APPLY = REPO / "scripts" / "jarvis_grok_mgmt_reply_apply.py"
 KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
@@ -584,6 +585,20 @@ def main() -> int:
             print(f"# grok_bucho_mail_apply soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["grok_bucho_mail_apply"] = "skipped"
+
+    # 2c1-inbox. 部長ボックス Drive poll（soft-fail · push は朝の dashboard に任せる）
+    if BUCHO_INBOX_POLL.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "bucho_inbox_poll",
+            [exe, str(BUCHO_INBOX_POLL)],
+            timeout=60,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["bucho_inbox_poll"] = rc
+        if rc != 0:
+            print(f"# bucho_inbox_poll soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["bucho_inbox_poll"] = "skipped"
 
     # 2c1a. Grok [Grok修繕候補] → 修繕 YAML / sync（soft-fail）
     if GROK_REPAIR_APPLY.is_file() and not args.skip_fetch:

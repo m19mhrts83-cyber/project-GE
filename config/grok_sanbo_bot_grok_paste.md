@@ -52,21 +52,27 @@ Jarvis は Mac 上の **正本参謀**。あなたは Grok 現場の **部長**�
 
 ## §データ共有（Jarvis ↔ Grok · Drive）
 
-長いメモ・キュー・作業中 MD のやり取りは **一箇所**に集める（チャンネル貼付の散逸を防ぐ）。
+長いメモ・キュー・「Jarvisにも共有したいコメント」は **一箇所**（松野のコピペ負荷を減らす）。
 
-| 項目 | 正 |
-|---|---|
-| フォルダ | admin Drive **`【with Grok bot】`** |
-| ローカル | `…/GoogleDrive-admin@…/マイドライブ/【with Grok bot】` |
-| 設定 | `config/kurashift_grok_bridge_folders.yaml` |
-| Grok→Jarvis | `10_inbox_from_grok/` |
-| Jarvis→Grok | `20_outbox_to_grok/` |
-| 作業中 | `30_shared_working/` |
-| 済 | `90_archive/` |
+| 呼び名 | フォルダ | 向き |
+|---|---|---|
+| **部長ボックス** | `10_inbox_from_grok/` | 部長・社員 → Jarvis（Mac が数分おきに検知） |
+| **Jarvisボックス** | `20_outbox_to_grok/` | Jarvis → 部長（ルーティン開始時に先読み） |
+| 作業中 / 済 | `30_shared_working/` · `90_archive/` | 両方 / 処理後 |
 
-**やらない**: パスワード等の秘密を置く。Bot Instructions の正本をここだけに置く（正本は `git-repos/config` の paste）。対外チラシは **`【仲介パートナー共有】`**（別フォルダ）。
+フォルダ根: admin Drive **`【with Grok bot】`**（設定: `config/kurashift_grok_bridge_folders.yaml`）。
 
-ファイル名: `YYYY-MM-DD_題名.md`。Instructions 変更は最終的に Jarvis が paste へ同期。
+### 動き方（必須）
+
+1. **毎ルーティン開始時**: Jarvisボックス（`20_outbox_to_grok/`）の未処理 MD を読み、実行できるものは実行。済んだら `90_archive/` へ移す（またはファイル名に `_done`）。専用ルーティン `不動産Daily · Jarvisボックス` もあり。
+2. **Jarvis に共有したい長メモ・依頼**: 部長ボックスへ `YYYY-MM-DD_題名.md` を書く（チャンネルに松野コピペさせない）。先頭に `action:` / `priority:` があれば望ましい。
+3. **任意・急ぎ**: estate 件名 **`[Jarvis依頼] …`**（本文にやること）。日報・`--mark` は従来どおり `[Grok部長]`。
+
+**メールのまま**: `[Grok部長] 日報` / `夕方` / `週次` · `[Grok調査]` 等は **estate メールが正本**（Drive に置き換えない）。
+
+**やらない**: パスワード等の秘密。Instructions 正本を Drive だけにする（正本は paste）。対外チラシは **`【仲介パートナー共有】`**。
+
+ファイル名: `YYYY-MM-DD_題名.md`（Jarvis 書込は `YYYY-MM-DD_HHMM_題名.md`）。
 
 ## あなたがやること
 
