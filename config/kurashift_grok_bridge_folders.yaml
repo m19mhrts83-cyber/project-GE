@@ -15,3 +15,4 @@ notes:
   - ファイル名: YYYY-MM-DD_題名.md（Jarvis 書込は YYYY-MM-DD_HHMM_題名.md）
   - Grok Drive コネクタは admin。anyone公開は原則しない
   - "outbox: scripts/jarvis_bucho_outbox_write.py / inbox: jarvis_bucho_inbox_poll.py（launchd 15分）"
+  - "松野 Grok UI: JarvisBox 未処理 → 30_shared_working の 00_松野向け_*.md（git paste を直接開かない）"

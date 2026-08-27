@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""家族コーチ向け — Obsidian ★Journal 週次要約 → Notion（本線 B）。
+"""家族コーチ向け — Obsidian ★Journal 週次要約 → Notion（フォールバック · 2026-08-28〜）。
+
+**Grok 正本**: admin Drive 上の Obsidian ★Journal（統括が直読み）。本スクリプトは Drive 読取 NG 時の
+Notion 投影用。移行安定後は launchd 停止可（`jarvis-family-coaching-weekly.mdc` Phase 3）。
 
 週の区切り: **土曜始まり〜金曜終わり（金締）**。
 土日の後追いログは月曜に残ることが多いため、日曜朝の投影は金曜までの分を正とする。

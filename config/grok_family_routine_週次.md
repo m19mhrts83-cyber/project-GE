@@ -3,7 +3,7 @@
 Grok チャンネル **家族コーチングチーム** のルーティン UI に貼る。  
 Bot 恒久ルールの正本は `config/grok_family_manager_grok_paste.md`（こちらはスケジュール起動文だけ）。
 
-材料（Journal週次）は **Jarvis が Notion に置く**（**金締＝土〜金**・日曜 08:00 投影）。Grok は Notion を自分で読む（チャット貼付待ち禁止）。
+**Journal 正本**: admin Google Drive 上の Obsidian `★Journal`（**金締＝土〜金**）。Grok は **Drive 自己読取**（チャット貼付待ち禁止）。Notion Journal週次は Drive NG 時のフォールバックのみ。
 
 ## ルーティン設定（推奨）
 
@@ -26,19 +26,24 @@ Bot 恒久ルールの正本は `config/grok_family_manager_grok_paste.md`（こ
 
 【実行順・厳守】
 1. 家族コーチ統括が開始宣言:
-【週次パック · 方式C】Notion読取 → 専属へ振分け → 松野向け1通
+【週次パック · 方式C】Drive ★Journal ＋ Notion家族会議 → 専属へ振分け → 松野向け1通
 
-2. 統括が Notion を自己読取（貼付待ち禁止）
-参照順:
+2. 統括が材料を自己読取（貼付待ち禁止）
+(A) Google Drive — admin · Obsidian 正本
+- ボルト: マイドライブ/500_Obsidian_r1/
+- Journal: 01_Journaling/★Journal/
+- 金締: 直近の土曜〜金曜の日次 MD（直下 YYYY-MM-DD.md と YYYY-MM/YYYY-MM-DD.md 両方）
+読めたら1行: Drive読取: OK · Journal 土〜金 {N}/{span}日 · 欠日: …
+Drive NG 時のみ Notion「Journal週次」（レガシー）をフォールバック
+
+(B) Notion — 家族会議・面談
 - 家族会議の直近の日付付き子ページ
-- 子供コーチング配下の Journal週次（最新週）
 - 必要なら円香／珠己／紗和ページ
-読めたら1行: Notion読取: OK · 家族会議 YYYY-MM-DD · Journal週次 {週}
-読めないとき: Notion読取: NG · 理由… で止めてよい（推測で埋めない）
+読めたら1行: Notion読取: OK · 家族会議 YYYY-MM-DD
 
 3. 統括が専属へ @委譲（方式C）
 @まどかコーチ @たまきコーチ @さわコーチ
-各人に Notion から要約した事実だけ渡す。親への助言と「今夜やること1つ」を返させる。
+各人に Drive／Notion から要約した事実だけ渡す。親への助言と「今夜やること1つ」を返させる。
 完了をチャンネルに1行。
 
 4. 統括が松野向けにまとめフォーマットで1通
@@ -53,7 +58,8 @@ Bot 恒久ルールの正本は `config/grok_family_manager_grok_paste.md`（こ
 - 子ども本人への説教文を Bot が送る前提
 - 学校・塾への自動メール／電話
 - 不動産・アプリ開発・パスワード
-- Notion を読めるのに「貼ってください」で止まること
+- Drive／Notion を読めるのに「貼ってください」で止まること
+- Journal を Notion 要約だけで済ませること（Drive NG 時除く）
 ```
 
 ## 役割（ルーティン / Bot 設定欄）
@@ -61,7 +67,7 @@ Bot 恒久ルールの正本は `config/grok_family_manager_grok_paste.md`（こ
 ### 家族コーチ統括
 
 ```
-家族コーチング部署の統括。週次の司令塔。Notion自己読取は自分のみ。
+家族コーチング部署の統括。週次の司令塔。Drive（★Journal）と Notion（家族会議）の自己読取は自分のみ。
 専属3本を@で委譲し、松野向けまとめ1通とマサハルQOLは自分で書く。
 日報メールは送らない。
 ```
@@ -91,4 +97,5 @@ Bot 恒久ルールの正本は `config/grok_family_manager_grok_paste.md`（こ
 
 - 任意の2本目: `config/grok_family_routine_マイルストーン.md`（水曜朝）
 - 索引: `config/grok_family_coaching_handoff_paste.md`
-- Jarvis 材料: `scripts/jarvis_family_journal_weekly.py --pull --apply`
+- Obsidian 正本: `config/kurashift_obsidian_artifacts.yaml` → `family_journal`
+- Notion 投影（フォールバック）: `scripts/jarvis_family_journal_weekly.py --pull --apply`

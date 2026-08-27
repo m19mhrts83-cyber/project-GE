@@ -2,13 +2,26 @@
 # Obsidian 共有データソース = Google Drive（Documents 経由の移し替え不要）
 
 version: 1
-updated: "2026-08-27"
+updated: "2026-08-28"
 
 # ボルトルート（admin）
 obsidian_vault_drive: >-
   /Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1
 
 artifacts:
+  # 家族コーチ — 日次 Journal（週次評価の正本）
+  family_journal:
+    relative: "01_Journaling/★Journal"
+    readers: [family_coach_manager]
+    file_patterns:
+      - "{YYYY-MM-DD}.md"
+      - "{YYYY-MM}/{YYYY-MM-DD}.md"
+    week_boundary: sat_fri_gold_close
+    delivery: drive_obsidian
+    note: >-
+      Grok 家族コーチ統括が金締（土〜金）で直読み。Notion Journal週次投影はフォールバック。
+      補助: notion_family_coaching.yaml obsidian_complements
+
   # S3 需給三次 — 問合せ返信〜三次まとめ（案件ごと）
   real_estate_pick:
     relative: "01_Journaling/☆Real_Estate_Pick"

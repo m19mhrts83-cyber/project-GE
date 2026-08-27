@@ -15,7 +15,7 @@ coaching_hub_page_url: "https://app.notion.com/p/282f6bbe5a768097bd9dc2fbbdb49a4
 coaching_hub_title: 子供コーチング
 journal_weekly_hub_page_id: "3c6f6bbe-5a76-8168-b72f-e35a7f44343c"
 journal_weekly_hub_page_url: "https://app.notion.com/p/Journal-3c6f6bbe5a768168b72fe35a7f44343c"
-journal_weekly_note: "Jarvis 週次 · 金締（土〜金）· 日曜08:00。scripts/jarvis_family_journal_weekly.py --pull --apply。Grok 家族コーチが読む"
+journal_weekly_note: "レガシー · Drive NG 時フォールバック。Grok 正本は Obsidian ★Journal（admin Drive）。投影: jarvis_family_journal_weekly.py"
 
 inventory_status: ok
 inventory_at: "2026-08-23"
@@ -116,7 +116,15 @@ sources:
     kind: meeting_consult
     child_ids: [madoka, tamaki, sawa]
 
-# 補完（Notion 外）
+# 補完（Obsidian 正本 · admin Drive。Grok 家族コーチ統括が週次で読む）
+obsidian_journal_primary:
+  drive_relative: "500_Obsidian_r1/01_Journaling/★Journal"
+  week_boundary: "土曜始まり〜金曜終わり（金締）"
+  file_patterns:
+    - "★Journal/YYYY-MM-DD.md"
+    - "★Journal/YYYY-MM/YYYY-MM-DD.md"
+  note: "2026-08-28〜 Grok 統括の Journal 正本。Notion Journal週次はフォールバック"
+
 obsidian_complements:
   - path: "01_Journaling/★Journal/"
     note: 日次 Journal・カール参謀レビュー
