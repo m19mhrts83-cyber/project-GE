@@ -24,6 +24,9 @@
 | **慎二コーチ** | `config/grok_shinji_coach_grok_paste.md` | **太田慎二** |
 | **中島アドバイザー** | `config/grok_nakajima_advisor_grok_paste.md` | **中島新**（企画・事業部リソース／遠隔地） |
 | **太田アドバイザー** | `config/grok_ota_akitsugu_advisor_grok_paste.md` | **太田章嗣**（リソース司令塔・**標準精通**） |
+| **今井部長アドバイザー** | `config/grok_imai_bucho_advisor_grok_paste.md` | 今井部長（報告・相談・部方針） |
+| **大原次長アドバイザー** | `config/grok_ohara_jicho_advisor_grok_paste.md` | 大原次長（調整・資料磨き） |
+| **蜂谷課長アドバイザー** | `config/grok_hachiya_kacho_advisor_grok_paste.md` | 蜂谷課長（八谷＝同一。課長層展開） |
 
 ## 太田の切り分け（必須）
 
@@ -35,7 +38,7 @@
 ## チャンネル（方式C）
 
 - 推奨名: **総務計画コーチングチーム**
-- メンバー: 統括＋コーチ5＋アドバイザー2（計8）
+- メンバー: 統括＋コーチ5＋アドバイザー5（計11）
 - 松野は原則 `@総務計画T統括`（または JarvisBox）
 
 ## 定型チャット
