@@ -63,6 +63,15 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: ""
+  - folder: "219_メタックス"
+    name: "メタックス"
+    emails: ["kikuchitakahito910@gmail.com"]
+    phones: ["07074842790", "070-7484-2790", "+817074842790"]
+    line: ""
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "菊池貴仁"
+    # LPガス営業・Grandole志賀本通Ⅰ・Ⅱプロパン切替（2026-08-27 手続資料依頼済み）
   - folder: "806_神大家AI推進"
     name: "神大家AI推進"
     emails: []
@@ -93,7 +102,14 @@ partners:
     line_direct_chat_mid: ""
     contact: ""
     chatwork_room_id: ["420522792", "425809560"]
+    chatwork_rooms:
+      announce: "420522792"   # ①【ライモBiz代理店】全体アナウンス
+      juku2: "425809560"      # 【起業塾 第二期】全体アナウンス
     chatwork_account_name: ""
+    # 個別ヘルプは Chatwork ではなく公式フォーム（5.やり取り.md 冒頭も参照）
+    inquiry_form_url: "https://ex-pa.net/fm/30070/rsbxa4se"  # 加盟店様 お問い合わせ
+    improvement_form_url: "https://forms.gle/C2yAAEdfsHRjpxGq6"  # 修正依頼・改善ご要望
+    help_page_url: "https://ma-kaaz1xqc93bn.chapro-app.jp/"
   - folder: "908_SHIFT AI代理店"
     name: "SHIFT AI代理店"
     emails: ["yitagaki@shift-ai.co.jp"]
