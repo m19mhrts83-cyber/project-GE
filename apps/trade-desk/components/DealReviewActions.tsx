@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
 
-type Action = "confirm" | "pass";
+type Action = "confirm" | "pass" | "pursue_add" | "pursue_remove";
 
 export default function DealReviewActions({
   dealId,
@@ -18,6 +18,8 @@ export default function DealReviewActions({
   inquiryBadges,
   inquiryChannel,
   openDealHref,
+  pursuing,
+  compactPursue,
 }: {
   dealId: string;
   status: string;
@@ -30,6 +32,10 @@ export default function DealReviewActions({
   inquiryBadges?: string[];
   inquiryChannel?: "agent_email" | "grok_handoff" | "not_applicable" | null;
   openDealHref?: string;
+  /** いま買い進め中ブロックに出ている */
+  pursuing?: boolean;
+  /** 買い進めブロック内の「外す」だけ */
+  compactPursue?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<Action | null>(null);
@@ -40,7 +46,16 @@ export default function DealReviewActions({
     if (action === "pass") {
       if (
         !window.confirm(
-          "対象外（見送り）にします。紐づく Gmail を既読にします。よろしいですか？"
+          "対象外（見送り）にします。よろしいですか？"
+        )
+      ) {
+        return;
+      }
+    }
+    if (action === "pursue_remove") {
+      if (
+        !window.confirm(
+          "「いま買い進め中」から外します（見送りにはしません）。よろしいですか？"
         )
       ) {
         return;
@@ -58,17 +73,14 @@ export default function DealReviewActions({
       if (!res.ok) {
         setMsg(data.error || "失敗しました");
       } else {
-        const readNote = data.mark_read_queued
-          ? "／Gmail既読をキュー"
-          : data.mark_read_skipped
-            ? `／既読スキップ（${data.mark_read_skipped}）`
-            : "";
-        setMsg(
-          action === "confirm"
-            ? `確認しました${readNote}`
-            : `対象外にしました${readNote}`
-        );
-        if (action === "confirm") setConfirmed(true);
+        const labels: Record<Action, string> = {
+          confirm: "確認しました",
+          pass: "対象外にしました",
+          pursue_add: "買い進め中に入れました",
+          pursue_remove: "買い進め中から外しました",
+        };
+        setMsg(labels[action]);
+        if (action === "confirm" || action === "pursue_add") setConfirmed(true);
         router.refresh();
       }
     } catch (e) {
@@ -85,6 +97,27 @@ export default function DealReviewActions({
       inquiryChannel !== "not_applicable" &&
       (confirmed || status !== "passed")
   );
+
+  if (compactPursue) {
+    return (
+      <div style={{ minWidth: 100 }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={busy !== null}
+          onClick={() => run("pursue_remove")}
+          style={{ fontSize: 12, padding: "4px 8px" }}
+        >
+          {busy === "pursue_remove" ? "…" : "外す"}
+        </button>
+        {msg ? (
+          <div className="meta" style={{ marginTop: 4 }}>
+            {msg}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div style={{ minWidth: 140 }}>
@@ -124,6 +157,29 @@ export default function DealReviewActions({
           >
             {busy === "pass" ? "…" : "対象外"}
           </button>
+          {!pursuing && status !== "passed" ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={busy !== null}
+              onClick={() => run("pursue_add")}
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              title="いま買い進め中ブロックに入れる"
+            >
+              {busy === "pursue_add" ? "…" : "買い進めへ"}
+            </button>
+          ) : null}
+          {pursuing ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={busy !== null}
+              onClick={() => run("pursue_remove")}
+              style={{ fontSize: 12, padding: "4px 8px" }}
+            >
+              {busy === "pursue_remove" ? "…" : "買い進め外す"}
+            </button>
+          ) : null}
         </div>
       ) : null}
       {showInquiryCta ? (

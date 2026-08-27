@@ -11,13 +11,14 @@
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py --apply
-  # 千三つ「確認した／対象外」後の既読
+  # 単件の手動既読（確認／対象外ジョブからも呼ばれる）
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_property_mail_match.py \\
     --mark-read-deal-id <uuid>
 
-取込時: 明らかに対象外（ノイズ件名・低スコア・区分/都内寄り・※受付終了※ 等）は
-status=passed で残し、その場で Gmail 既読にする（受付終了は固定で既読可）。境界候補は未読のまま。
-既存の受付終了掃除: --pass-uketsuke-existing --apply
+取込時（2026-08-27〜）: deals へ insert 成功したら **候補も auto_pass も Gmail 既読**
+（KURASHIFT 上で判断する運用。取込＝見た印）。
+明らかに対象外は status=passed。受付終了掃除: --pass-uketsuke-existing --apply
+既存未既読の一括: --mark-read-all-imported --apply
 """
 from __future__ import annotations
 
@@ -865,13 +866,28 @@ def mark_gmail_message_read(
         return {"ok": False, "error": f"unknown source: {source}"}
     if dry_run:
         return {"ok": True, "dry_run": True, "gmail_id": gmail_id, "source": source}
-    svc = gmail_service(token_name)
-    svc.users().messages().modify(
-        userId="me",
-        id=str(gmail_id),
-        body={"removeLabelIds": ["UNREAD"]},
-    ).execute()
-    return {"ok": True, "gmail_id": gmail_id, "source": source}
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            svc = gmail_service(token_name)
+            svc.users().messages().modify(
+                userId="me",
+                id=str(gmail_id),
+                body={"removeLabelIds": ["UNREAD"]},
+            ).execute()
+            return {"ok": True, "gmail_id": gmail_id, "source": source}
+        except Exception as e:
+            last_err = e
+            if attempt < 2:
+                import time
+
+                time.sleep(1.5 * (attempt + 1))
+    return {
+        "ok": False,
+        "error": f"{type(last_err).__name__}: {last_err}" if last_err else "unknown",
+        "gmail_id": gmail_id,
+        "source": source,
+    }
 
 
 def mark_deal_gmail_read(sb: Any, deal_id: str, *, dry_run: bool = False) -> dict[str, Any]:
@@ -930,6 +946,104 @@ def mark_deal_gmail_read(sb: Any, deal_id: str, *, dry_run: bool = False) -> dic
         "gmail_id": gid,
         "source": source,
         "gmail_read_at": read_at,
+    }
+
+
+def stamp_row_gmail_read_on_import(c: dict[str, Any]) -> dict[str, Any]:
+    """取込直前に Gmail 既読し、summary_json.gmail_read_at を付与。失敗しても行は返す。"""
+    sj = dict(c.get("summary_json") or {})
+    gid = sj.get("gmail_id")
+    if not gid:
+        return c
+    if sj.get("gmail_read_at"):
+        return c
+    source = str(c.get("source") or sj.get("account") or "mail_admin")
+    try:
+        marked = mark_gmail_message_read(source, str(gid))
+        if not marked.get("ok"):
+            print(
+                f"# import mark-read FAIL {gid}: {marked.get('error') or marked}"
+            )
+            return c
+        sj["gmail_read_at"] = datetime.now(timezone.utc).isoformat()
+        sj["gmail_read_on"] = "import"
+        sj["auto_pass_pending_read"] = False
+        return {**c, "summary_json": sj}
+    except Exception as e:
+        print(f"# import mark-read FAIL {gid}: {type(e).__name__}: {e}")
+        return c
+
+
+def mark_all_imported_gmail_read(
+    sb: Any, *, dry_run: bool = False, limit: int = 800
+) -> dict[str, Any]:
+    """既存 deals で gmail_id あり・gmail_read_at なしを一括既読。"""
+    resp = (
+        sb.table("kurashift_re_deals")
+        .select("id, title, source, summary_json, status")
+        .limit(limit)
+        .execute()
+    )
+    pending: list[str] = []
+    for row in resp.data or []:
+        sj = row.get("summary_json") if isinstance(row.get("summary_json"), dict) else {}
+        gid = sj.get("gmail_id")
+        if not gid:
+            continue
+        if sj.get("gmail_read_at"):
+            continue
+        pending.append(str(row["id"]))
+    done = 0
+    skipped = 0
+    errors: list[str] = []
+    for deal_id in pending:
+        if dry_run:
+            skipped += 1
+            continue
+        try:
+            r = mark_deal_gmail_read(sb, deal_id, dry_run=False)
+        except Exception as e:
+            errors.append(f"{deal_id}:{type(e).__name__}:{e}")
+            continue
+        if r.get("ok") and not r.get("skipped"):
+            # 既読元を import バックフィルとして印
+            try:
+                row2 = (
+                    sb.table("kurashift_re_deals")
+                    .select("summary_json")
+                    .eq("id", deal_id)
+                    .limit(1)
+                    .execute()
+                )
+                if row2.data:
+                    sj2 = dict(row2.data[0].get("summary_json") or {})
+                    sj2["gmail_read_on"] = "import_backfill"
+                    sb.table("kurashift_re_deals").update(
+                        {
+                            "summary_json": sj2,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    ).eq("id", deal_id).execute()
+            except Exception:
+                pass
+            done += 1
+            import time
+
+            time.sleep(0.15)
+        elif r.get("skipped"):
+            skipped += 1
+        else:
+            errors.append(f"{deal_id}:{r.get('error')}")
+            import time
+
+            time.sleep(0.3)
+    return {
+        "ok": len(errors) == 0,
+        "dry_run": dry_run,
+        "pending": len(pending),
+        "marked": done,
+        "skipped": skipped,
+        "errors": errors[:20],
     }
 
 
@@ -1071,6 +1185,11 @@ def main() -> int:
         action="store_true",
         help="既存候補で件名に※受付終了※があるものを passed（＋元紹介も見送り）",
     )
+    ap.add_argument(
+        "--mark-read-all-imported",
+        action="store_true",
+        help="既に deals にあるが gmail_read_at 未の案件を一括既読",
+    )
     args = ap.parse_args()
 
     if args.mark_read_deal_id:
@@ -1080,6 +1199,15 @@ def main() -> int:
         if not result.get("ok"):
             return 1
         return 0
+
+    if args.mark_read_all_imported:
+        sb = sb_client()
+        result = mark_all_imported_gmail_read(
+            sb, dry_run=args.dry_run or not args.apply
+        )
+        print(f"📎 mark_read_all_imported: {result}")
+        print("KURASHIFT_RESULT:" + json.dumps(result, ensure_ascii=False))
+        return 0 if result.get("ok") else 1
 
     if args.pass_uketsuke_existing:
         sb = sb_client()
@@ -1164,7 +1292,7 @@ def main() -> int:
     if args.dry_run and not args.apply:
         print(
             "📎 property_mail_match: dry-run（--apply で deals 反映・"
-            "auto_pass は未既読／allowlist理由のみ既読）"
+            "取込成功分は Gmail 既読）"
         )
         print(
             "KURASHIFT_RESULT:"
@@ -1181,10 +1309,14 @@ def main() -> int:
 
     seen = existing_gmail_ids(sb)
     inserted = 0
+    import_read = 0
     for c in uniq:
         gid = (c.get("summary_json") or {}).get("gmail_id")
         if gid in seen:
             continue
+        c = stamp_row_gmail_read_on_import(c)
+        if (c.get("summary_json") or {}).get("gmail_read_at"):
+            import_read += 1
         ins = sb.table("kurashift_re_deals").insert(c).execute()
         inserted += 1
         if gid:
@@ -1228,26 +1360,15 @@ def main() -> int:
         if not gid or gid in seen:
             continue
         sj = dict(c.get("summary_json") or {})
-        # Phase A: 取込時は既読にしない。学習確認後のみ既読。
-        sj["auto_pass_pending_read"] = True
-        sj.pop("gmail_read_at", None)
-        row = {**c, "summary_json": sj, "status": "passed"}
-        # allowlist 済み理由だけ自動既読（Phase C）
-        reason = str(sj.get("auto_pass_reason") or "")
-        if reason and _reason_allowlisted(sb, reason):
-            try:
-                read_at = datetime.now(timezone.utc).isoformat()
-                mark_gmail_message_read(str(c.get("source") or "mail_admin"), str(gid))
-                sj["gmail_read_at"] = read_at
-                sj["auto_pass_pending_read"] = False
-                sj["auto_pass_allowlisted_read"] = True
-                row["summary_json"] = sj
-                auto_read += 1
-            except Exception as e:
-                print(f"# allowlisted mark-read FAIL {gid}: {type(e).__name__}: {e}")
-                sj.pop("gmail_read_at", None)
-                sj["auto_pass_pending_read"] = True
-                row["summary_json"] = sj
+        sj["auto_pass_pending_read"] = False
+        row = stamp_row_gmail_read_on_import({**c, "summary_json": sj, "status": "passed"})
+        if (row.get("summary_json") or {}).get("gmail_read_at"):
+            auto_read += 1
+            reason = str((row.get("summary_json") or {}).get("auto_pass_reason") or "")
+            if reason and _reason_allowlisted(sb, reason):
+                sj2 = dict(row.get("summary_json") or {})
+                sj2["auto_pass_allowlisted_read"] = True
+                row["summary_json"] = sj2
         sb.table("kurashift_re_deals").insert(row).execute()
         auto_inserted += 1
         seen.add(gid)
@@ -1270,7 +1391,7 @@ def main() -> int:
             ).eq("id", row["id"]).execute()
             promoted += 1
     print(
-        f"📎 property_mail_match: inserted={inserted} "
+        f"📎 property_mail_match: inserted={inserted} import_marked_read={import_read} "
         f"auto_pass_inserted={auto_inserted} auto_pass_marked_read={auto_read} "
         f"uketsuke_passed={uketsuke_pass.get('passed_direct', 0)}+"
         f"{uketsuke_pass.get('passed_siblings', 0)} "
@@ -1282,6 +1403,7 @@ def main() -> int:
         + json.dumps(
             {
                 "inserted": inserted,
+                "import_marked_read": import_read,
                 "auto_pass_inserted": auto_inserted,
                 "auto_pass_marked_read": auto_read,
                 "promoted": promoted,

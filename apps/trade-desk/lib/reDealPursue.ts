@@ -2,6 +2,7 @@
  * 「いま買い進めている」物件の判定。
  * - 買付・融資・購入
  * - 内見＋（問合せ進行 / Grok「聞く」 / ユーザー確認 pursue）
+ * - summary_json.pursue_exclude === true なら一覧から外す（手動）
  */
 import { titleHasUketsukeShuryo } from "./reInquiryCandidate";
 import { isProductionInquiryDeal } from "./reInquiryProductionFilter";
@@ -62,9 +63,15 @@ export function isPursueNoiseTitle(title: string | null | undefined): boolean {
   return NOISE_TITLE.some((n) => t.includes(n));
 }
 
+/** ユーザーが明示除外（買い進めから外す） */
+export function isPursueExcluded(d: PursueDealFields): boolean {
+  return sjOf(d).pursue_exclude === true;
+}
+
 /** ユーザーが「確認した」または明示 pursue */
 export function isUserPursueFlag(d: PursueDealFields): boolean {
   const sj = sjOf(d);
+  if (sj.pursue_exclude === true) return false;
   if (sj.pursue === true || sj.user_confirmed === true) return true;
   if (typeof sj.pursue_at === "string" && sj.pursue_at) return true;
   if (typeof sj.user_confirmed_at === "string" && sj.user_confirmed_at) return true;
@@ -76,6 +83,7 @@ export function isBuyProgressDeal(d: PursueDealFields): boolean {
   if (st === "passed" || st === "archived" || st === "info") return false;
   if (isPursueNoiseTitle(d.title)) return false;
   if (!isProductionInquiryDeal(d)) return false;
+  if (isPursueExcluded(d)) return false;
 
   if (FUNNEL_ACTIVE.has(st)) return true;
 

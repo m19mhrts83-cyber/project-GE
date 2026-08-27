@@ -31,16 +31,17 @@
 
 対外問い合わせは **送信前確認必須**（`jarvis-outbound-confirm`）。
 
-## Gmail 既読（確認／対象外）
+## Gmail 既読（取込＝既読・KURASHIFT 本線）
 
 | 操作 | status | Gmail |
 |---|---|---|
-| メール取込・**明らかに対象外** | `passed`（`auto_pass_reason`・`auto_pass_pending_read`） | **当面は既読にしない**（確認後／allowlist 理由のみ） |
-| メール取込・境界／候補 | `info` / 高スコアは `viewing` | **既読にしない** |
-| **確認した** | `info`→`viewing`（以降は維持） | `re_deal_mark_gmail_read` で UNREAD 除去 |
+| **メール取込成功**（候補 `info`/`viewing`） | そのまま | **UNREAD 除去**（`gmail_read_on=import`） |
+| **メール取込・明らかに対象外** | `passed` | **同上**（取込時既読） |
+| **確認した** | `info`→`viewing` 等 | 未既読の残りだけ `re_deal_mark_gmail_read` |
 | **対象外**（手動） | `passed` | 同上 |
-| 自動見送りの「既読で正しい」 | passed 維持 | 既読ジョブ＋学習カウント |
-| 自動見送りの「誤り」 | `info` に戻す | 既読しない |
+| 既存案件の一括 | — | `--mark-read-all-imported --apply` |
+
+方針（2026-08-27〜）: 物件判断は **KURASHIFT 上**。Gmail は取込済みなら既読にしてよい。
 
 取込時 auto_pass の判定（`clearly_out_of_scope`）:
 
