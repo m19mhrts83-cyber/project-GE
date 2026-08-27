@@ -40,7 +40,7 @@ SCOPES = [
 ]
 
 CARD_BLOCK_RE = re.compile(
-    r"📎\s*Jarvis向け\s*[（(](?P<kind>実装|材料)[）)]\s*\n(?P<body>.*?)(?=\n📎\s*Jarvis向け|\n#\s|\Z)",
+    r"📎\s*Jarvis向け\s*[（(](?P<kind>実装|材料|表確認)[）)]\s*\n(?P<body>.*?)(?=\n📎\s*Jarvis向け|\n#\s|\Z)",
     re.S,
 )
 
@@ -173,11 +173,20 @@ def parse_cards(text: str, *, source: str, source_id: str = "") -> list[dict[str
         kind = m.group("kind")
         body = (m.group("body") or "").strip()
         app = parse_field(body, ["アプリ", "対象アプリ"])
-        want = parse_field(body, ["やりたいこと", "欲しいもの"])
-        where = parse_field(body, ["触りそうな場所", "用途"])
+        want = parse_field(body, ["やりたいこと", "欲しいもの", "裏の怪しさ", "怪しさ"])
+        where = parse_field(body, ["触りそうな場所", "用途", "見る画面"])
         risk_raw = parse_field(body, ["リスク"])
-        risk = "高" if "高" in risk_raw else ("低" if "低" in risk_raw else ("—" if kind == "材料" else "不明"))
-        done = parse_field(body, ["完了条件"])
+        risk = (
+            "—"
+            if kind in ("材料", "表確認")
+            else (
+                "高"
+                if "高" in risk_raw
+                else ("低" if "低" in risk_raw else "不明")
+            )
+        )
+        done = parse_field(body, ["完了条件", "確認観点"])
+        suspect = parse_field(body, ["裏の怪しさ", "怪しさ"])
         raw = m.group(0).strip()
         cid = hashlib.sha1(
             f"{kind}|{app}|{want}|{risk}|{raw[:200]}".encode("utf-8")
@@ -192,6 +201,7 @@ def parse_cards(text: str, *, source: str, source_id: str = "") -> list[dict[str
                 "where": where,
                 "risk": risk,
                 "done": done,
+                "suspect": suspect,
                 "raw": raw,
                 "source": source,
                 "source_id": source_id,
@@ -260,18 +270,26 @@ def classify(
     low: list[dict[str, Any]] = []
     high: list[dict[str, Any]] = []
     material: list[dict[str, Any]] = []
+    ui_check: list[dict[str, Any]] = []
     for c in cards:
         if c["id"] in prompted:
             continue
         if c["kind"] == "材料":
             material.append(c)
+        elif c["kind"] == "表確認":
+            ui_check.append(c)
         elif c["risk"] == "低":
             low.append(c)
         elif c["risk"] == "高":
             high.append(c)
         else:
             high.append(c)  # 不明は確認側
-    return {"low": low, "high": high, "material": material}
+    return {
+        "low": low,
+        "high": high,
+        "material": material,
+        "ui_check": ui_check,
+    }
 
 
 def render_digest(
@@ -292,11 +310,16 @@ def render_digest(
     lines.append(f"- 材料依頼: {len(groups['material'])}")
     for i, c in enumerate(groups["material"][:5], 1):
         lines.append(f"  {i}. [{c['app']}] {c['want']}")
+    ui = groups.get("ui_check") or []
+    lines.append(f"- 表確認（ログインして画面確認）: {len(ui)}")
+    for i, c in enumerate(ui[:5], 1):
+        lines.append(f"  {i}. [{c['app']}] {c['want']}")
     if not any(groups.values()):
         lines.append("- （未処理カードなし）")
     else:
         lines.append(
             "- 次: 低は「やって」で実装可。高は松野OK後。"
+            " 表確認は Jarvis が本番UIを見て結果を返す。"
             " inbox へチャンネル全文を貼っても可。"
         )
     return "\n".join(lines) + "\n"

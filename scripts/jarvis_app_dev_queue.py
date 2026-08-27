@@ -6,6 +6,7 @@ Grok は PR を切らない。Jarvis が朝バンドルで:
   · リスク低（実装）→ Cursor Cloud Agent（autoCreatePR）
   · リスク高（実装）→ gh issue（label: app-dev, risk-high）
   · 材料 → Issue（label: app-dev, material）※Cloud は起動しない
+  · 表確認 → Issue（label: app-dev, ui-check）※ログインして画面確認。Cloud は起動しない
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_app_dev_queue.py --dry-run
@@ -42,6 +43,7 @@ LABEL_APP = "app-dev"
 LABEL_HIGH = "risk-high"
 LABEL_LOW = "risk-low"
 LABEL_MAT = "material"
+LABEL_UI = "ui-check"
 
 
 def env_disabled() -> bool:
@@ -96,6 +98,7 @@ def ensure_labels(slug: str, dry_run: bool) -> None:
         (LABEL_HIGH, "needs Matsuno OK"),
         (LABEL_LOW, "low risk auto-PR"),
         (LABEL_MAT, "materials request"),
+        (LABEL_UI, "UI check after backend review"),
     ]
     for name, desc in wanted:
         if dry_run:
@@ -160,6 +163,7 @@ def build_issue_body(card: dict[str, Any]) -> str:
         "### Jarvis",
         "- 高リスク: 松野 OK 後に Cloud／対話で PR を作成",
         "- 材料: 週次パックを用意してチャンネル or メールへ",
+        "- 表確認: Jarvis がログインして該当画面を確認し、結果を Issue／チャットへ",
     ]
     return "\n".join(lines)
 
@@ -381,6 +385,27 @@ def process_card(
             "at": cards.now_iso(),
         }
         return entry, f"材料Issue [{card['id']}] {r.get('url') or '(dry-run)'}"
+
+    if kind == "表確認":
+        r = create_issue(
+            slug,
+            card,
+            labels=[LABEL_APP, LABEL_UI],
+            dry_run=dry_run,
+        )
+        if not r.get("ok"):
+            return (
+                {"status": "error", "error": r.get("error"), "kind": kind, "risk": risk},
+                f"表確認Issue失敗 [{card['id']}]: {r.get('error')}",
+            )
+        entry = {
+            "status": "issue_created",
+            "kind": kind,
+            "risk": risk,
+            "issue_url": r.get("url"),
+            "at": cards.now_iso(),
+        }
+        return entry, f"表確認Issue [{card['id']}] {r.get('url') or '(dry-run)'}"
 
     if risk == "高" or (risk not in ("低",) and kind == "実装"):
         # 不明も高扱い
