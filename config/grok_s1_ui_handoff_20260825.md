@@ -66,6 +66,22 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - 夕方 plan: `~/.cursor/plans/夕方仲介返信デイリー_a2426f31.plan.md`
 - Jarvis ルール: `.cursor/rules/jarvis-s1-grok-followup.mdc`
 
+## Jarvis ↔ Grok データ共有（admin Drive）
+
+- フォルダ: `【with Grok bot】`（inbox / outbox / shared / archive）
+- 設定: `config/kurashift_grok_bridge_folders.yaml`
+- 部長 paste に **§データ共有** あり → Instructions **再貼り推奨**
+- 対外チラシは `【仲介パートナー共有】`（別）
+
+---
+
+## at home（会員プロフィール）
+
+- ログイン: `ATHOME_LOGIN_EMAIL` + `ATHOME_PASSWORD`（空なら `PORTAL_LOGIN_*`）
+- 結論（2026-08-26）: ログイン可。**投資用の年収・棟数プロフィール欄なし**（問合せ都度）
+- 再確認（2026-08-27）: headless は Geetest でブロック。PW は共通正本に同期済み
+- スナップ正本: `config/grok_s1_inquiry_profile.yaml` の `profile_snapshot`
+
 ---
 
 ## 追記（2026-08-26）S9 管理会社開拓 · 生存確認

@@ -1,0 +1,19 @@
+account: admin@livingsupport-matsu.co.jp
+local_root: /Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/【仲介パートナー共有】
+folder_ids:
+  common: 1vMwN9qaPsf9gG5StI0Vs-Qhl47QUej8J
+  kita_parent: 1W-fWzHiDV6R4o_3ISPZ7qY_NN2BOy24O
+  kita_grandole: 1BxMxyv1GwZqgLqlEIcy9F1jGqDSToA6Y
+  midori_parent: 1Inlk-uiFP1d0woJfmS4V--UJAQxcRcEq
+  midori_caramel: 1Xg9PtXhBKmCovyvHou-UkhCc_i4eFicA
+  ops_private: 15uEj0CwVEcZGSTApseMQYPyT-Is2hkAo
+urls:
+  common: https://drive.google.com/drive/folders/1vMwN9qaPsf9gG5StI0Vs-Qhl47QUej8J
+  kita_parent: https://drive.google.com/drive/folders/1W-fWzHiDV6R4o_3ISPZ7qY_NN2BOy24O
+  kita_grandole: https://drive.google.com/drive/folders/1BxMxyv1GwZqgLqlEIcy9F1jGqDSToA6Y
+  midori_parent: https://drive.google.com/drive/folders/1Inlk-uiFP1d0woJfmS4V--UJAQxcRcEq
+  midori_caramel: https://drive.google.com/drive/folders/1Xg9PtXhBKmCovyvHou-UkhCc_i4eFicA
+template_defaults:
+  common: https://drive.google.com/drive/folders/1vMwN9qaPsf9gG5StI0Vs-Qhl47QUej8J
+  kita_shiga: https://drive.google.com/drive/folders/1W-fWzHiDV6R4o_3ISPZ7qY_NN2BOy24O
+  midori_caramel: https://drive.google.com/drive/folders/1Inlk-uiFP1d0woJfmS4V--UJAQxcRcEq

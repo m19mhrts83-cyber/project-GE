@@ -47,6 +47,7 @@ KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.
 KURASHIFT_S1_EVIDENCE = REPO / "scripts" / "jarvis_kurashift_s1_evidence_to_drive.py"
 GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
 GROK_REPAIR_APPLY = REPO / "scripts" / "jarvis_grok_repair_mail_apply.py"
+MGMT_REPLY_APPLY = REPO / "scripts" / "jarvis_grok_mgmt_reply_apply.py"
 KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
 KURASHIFT_RE_DAILY_DIGEST = REPO / "scripts" / "jarvis_kurashift_re_daily_digest.py"
@@ -597,6 +598,20 @@ def main() -> int:
             print(f"# grok_repair_mail_apply soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["grok_repair_mail_apply"] = "skipped"
+
+    # 2c1a2. 管理会社・事前確認返信候補（soft-fail · dry提案中心）
+    if MGMT_REPLY_APPLY.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "mgmt_precheck_reply",
+            [exe, str(MGMT_REPLY_APPLY), "--days", "7", "--dry-run"],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["mgmt_precheck_reply"] = rc
+        if rc != 0:
+            print(f"# mgmt_precheck_reply soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["mgmt_precheck_reply"] = "skipped"
 
     # 2c1b. 業者リスト → Supabase 投影（soft-fail）
     if KURASHIFT_VENDOR_SYNC.is_file() and not args.skip_fetch:

@@ -15,6 +15,11 @@ export const dynamic = "force-dynamic";
 
 const FILTERS: { id: string; label: string }[] = [
   { id: "followup", label: "要フォロー" },
+  { id: "vacancy_ok", label: "空室メール可" },
+  { id: "await_reply", label: "返信待ち" },
+  { id: "vacancy_ng", label: "不可" },
+  { id: "lane_kita", label: "北区" },
+  { id: "lane_midori", label: "緑区" },
   { id: "alive", label: "生存OK" },
   { id: "all", label: "すべて" },
   { id: "pending", label: "未送信" },
@@ -22,6 +27,12 @@ const FILTERS: { id: string; label: string }[] = [
   { id: "replied", label: "返信あり" },
   { id: "excluded", label: "除外" },
 ];
+
+const LANE_LABEL: Record<string, string> = {
+  kita_shiga: "北区",
+  midori_caramel: "緑区",
+  both: "両エリア",
+};
 
 function chipStyle(status: string): Record<string, string | number> {
   const base: Record<string, string | number> = {
@@ -72,16 +83,36 @@ export default async function MgmtVendorsPage({
     rows = rows.filter((v) => ["skip", "invalid"].includes(v.status || ""));
   } else if (filter === "alive") {
     rows = rows.filter((v) => vendorAliveOk(v));
+  } else if (filter === "vacancy_ok") {
+    rows = rows.filter((v) => v.vacancy_listing_ok === true);
+  } else if (filter === "vacancy_ng") {
+    rows = rows.filter(
+      (v) => v.vacancy_listing_ok === false || v.status === "skip"
+    );
+  } else if (filter === "await_reply") {
+    rows = rows.filter(
+      (v) => v.status === "contacted" && v.vacancy_listing_ok == null
+    );
+  } else if (filter === "lane_kita") {
+    rows = rows.filter((v) =>
+      ["kita_shiga", "both"].includes(v.property_lane || "kita_shiga")
+    );
+  } else if (filter === "lane_midori") {
+    rows = rows.filter((v) =>
+      ["midori_caramel", "both"].includes(v.property_lane || "")
+    );
   } else if (filter === "followup") {
     rows = rows.filter((v) => vendorNeedsFollowUp(v));
   }
 
   const counts: Record<string, number> = {};
   let aliveOk = 0;
+  let vacancyOk = 0;
   for (const v of vendors || []) {
     const st = v.status || "pending";
     counts[st] = (counts[st] || 0) + 1;
     if (vendorAliveOk(v)) aliveOk += 1;
+    if (v.vacancy_listing_ok === true) vacancyOk += 1;
   }
 
   let latestSync: string | null = null;
@@ -108,7 +139,8 @@ export default async function MgmtVendorsPage({
         </header>
         <p className="meta" style={{ marginTop: 8 }}>
           未送信 {counts.pending || 0} · 送信済 {counts.contacted || 0} · 返信{" "}
-          {counts.replied || 0} · スキップ {counts.skip || 0} · 生存OK {aliveOk}
+          {counts.replied || 0} · スキップ {counts.skip || 0} · 空室メール可{" "}
+          {vacancyOk} · 生存OK {aliveOk}
         </p>
         <p className="meta">
           最終同期{" "}
@@ -179,6 +211,8 @@ export default async function MgmtVendorsPage({
               <thead>
                 <tr>
                   <th>状態</th>
+                  <th>空室</th>
+                  <th>レーン</th>
                   <th>生存</th>
                   <th>会社名</th>
                   <th>エリア</th>
@@ -190,6 +224,12 @@ export default async function MgmtVendorsPage({
               <tbody>
                 {rows.map((v) => {
                   const alive = vendorAliveEffective(v);
+                  const vac =
+                    v.vacancy_listing_ok === true
+                      ? "可"
+                      : v.vacancy_listing_ok === false
+                        ? "不可"
+                        : "—";
                   return (
                     <tr key={v.id}>
                       <td>
@@ -197,6 +237,20 @@ export default async function MgmtVendorsPage({
                           {VENDOR_STATUS_LABEL[v.status || "pending"] ||
                             v.status}
                         </span>
+                      </td>
+                      <td>
+                        <span
+                          style={chipStyle(
+                            vac === "可" ? "ok" : vac === "不可" ? "fail" : ""
+                          )}
+                        >
+                          {vac}
+                        </span>
+                      </td>
+                      <td className="meta">
+                        {LANE_LABEL[v.property_lane || ""] ||
+                          v.property_lane ||
+                          "—"}
                       </td>
                       <td>
                         <span style={chipStyle(alive)}>
@@ -208,6 +262,7 @@ export default async function MgmtVendorsPage({
                         {[v.prefecture, v.city, v.station]
                           .filter(Boolean)
                           .join(" ") ||
+                          v.property_area ||
                           v.area ||
                           "—"}
                       </td>

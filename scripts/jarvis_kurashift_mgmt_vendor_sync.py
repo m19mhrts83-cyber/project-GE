@@ -18,7 +18,11 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-from jarvis_kurashift_mgmt_vendor_list import LIST_PATH, load_list  # noqa: E402
+from jarvis_kurashift_mgmt_vendor_list import (  # noqa: E402
+    LIST_PATH,
+    ensure_precheck_fields,
+    load_list,
+)
 from jarvis_vendor_alive_lib import alive_db_fields, ensure_alive_fields  # noqa: E402
 
 
@@ -45,6 +49,7 @@ def _parse_date(val: Any) -> str | None:
 
 def vendor_row(v: dict[str, Any], *, synced_at: str) -> dict[str, Any]:
     ensure_alive_fields(v, kind="mgmt")
+    ensure_precheck_fields(v)
     services = v.get("services") if isinstance(v.get("services"), dict) else {}
     row = {
         "id": str(v["id"]),
@@ -67,6 +72,13 @@ def vendor_row(v: dict[str, Any], *, synced_at: str) -> dict[str, Any]:
         "notes": (str(v.get("notes") or "")[:1000] or None),
         "services": services,
         "property_area": v.get("property_area") or None,
+        "property_lane": v.get("property_lane") or None,
+        "vacancy_listing_ok": (
+            None
+            if v.get("vacancy_listing_ok") is None
+            else bool(v.get("vacancy_listing_ok"))
+        ),
+        "precheck_sent_at": _parse_date(v.get("precheck_sent_at")),
         "synced_at": synced_at,
         "updated_at": synced_at,
     }
