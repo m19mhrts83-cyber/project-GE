@@ -2,6 +2,7 @@ import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import DealsDrawerHost from "@/components/DealsDrawerHost";
 import DealsListTable, { type DealsListRow } from "@/components/DealsListTable";
+import DealReviewActions from "@/components/DealReviewActions";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
 import { fmtYen } from "@/lib/format";
@@ -385,7 +386,8 @@ export default async function RealEstateDealsPage({
             <strong>いま買い進め中（{pursueDeals.length}）</strong>
           </header>
           <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
-            買付・融資・購入、または内見で問合せ進行／Grok「聞く」／「確認した」の物件。
+            入る条件: 買付・融資・購入、または内見で（問合せ進行／Grok「聞く」／「確認した」・「買い進めへ」）。
+            出る条件: 「外す」／「対象外」／受付終了・見送り。細かい条件変更は Jarvis に一声でも可。
             プラン全体は{" "}
             <Link href="/realestate/buy-plan">買い進めプラン</Link>。
           </p>
@@ -400,6 +402,7 @@ export default async function RealEstateDealsPage({
                   <th>価格</th>
                   <th>Grok</th>
                   <th>問合せ</th>
+                  <th>操作</th>
                   <th>詳細</th>
                 </tr>
               </thead>
@@ -456,6 +459,14 @@ export default async function RealEstateDealsPage({
                         </span>
                       </td>
                       <td>
+                        <DealReviewActions
+                          dealId={d.id}
+                          status={d.status}
+                          compactPursue
+                          pursuing
+                        />
+                      </td>
+                      <td>
                         <Link href={openDealHref(d.id)} className="btn">
                           開く
                         </Link>
@@ -474,7 +485,7 @@ export default async function RealEstateDealsPage({
             <strong>いま買い進め中</strong>
           </header>
           <p className="meta" style={{ marginTop: 8 }}>
-            まだ明示的な買い進め案件はありません。候補で「確認した」または問合せを進めると、ここに出ます。
+            まだ明示的な買い進め案件はありません。候補で「確認した」または「買い進めへ」、問合せ進行でここに出ます。
           </p>
         </div>
       )}

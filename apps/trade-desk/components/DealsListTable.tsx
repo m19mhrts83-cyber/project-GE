@@ -276,6 +276,7 @@ export default function DealsListTable({
                                   inquiryBadges={d.review.inquiryBadges}
                                   inquiryChannel={d.review.inquiryChannel}
                                   openDealHref={d.openHref}
+                                  pursuing={d.pursuing}
                                 />
                               </td>
                               <OpenCell href={d.openHref} />
@@ -309,6 +310,7 @@ export default function DealsListTable({
                                   status={d.status}
                                   gmailId={d.review.gmailId}
                                   gmailReadAt={d.review.gmailReadAt}
+                                  pursuing={d.pursuing}
                                 />
                               </td>
                               <OpenCell href={d.openHref} />
