@@ -15,6 +15,8 @@ settings:
 # status: pending | discovered | contacted | replied | skip | invalid
 # ops_contacted_at: 神大家運営作業の問合日（参考）。個人未送信なら status は pending のまま
 # contacted_at: 松野個人（estate）から問合せした日
+# priority: 数値が小さいほど --next / batch 先頭（仲間紹介は 0。未設定=100）
+# priority_reason / priority_until: 例 peer_referral:… / YYYY-MM-DD（過ぎたら通常ソート）
 # alive_*: 生存確認（周期 180日）。ok+期限内＝すぐ連絡可
 #   alive_status: unknown | ok | fail | stale
 #   alive_method: web | phone | both
@@ -40,4 +42,23 @@ vendors:
     alive_status: unknown
     alive_method: ""
     alive_note: ""
+    alive_due_days: 180
+  - id: peer-20260827-example
+    name: "（例）仲間紹介不動産"
+    area: "愛知県名古屋市"
+    prefecture: "愛知県"
+    city: "名古屋市"
+    url: ""
+    contact_url: ""
+    channel: web_form
+    contact_email: ""
+    phone: ""
+    status: discovered
+    source: peer_referral
+    priority: 0
+    priority_reason: "peer_referral:戸建情報良いと聞いた"
+    priority_until: "2026-09-03"
+    notes: "仲間紹介。デイリー先頭枠（Phase上限内）。URLは送信前に調査可"
+    discovered_at: "2026-08-27"
+    alive_status: unknown
     alive_due_days: 180
