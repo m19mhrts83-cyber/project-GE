@@ -14,6 +14,8 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --alive-queue --limit 2
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --grok-discovery-prompt
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --merge-append block.yaml
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --peer-add \\
+    --name "株式会社…" --area "愛知県…" --reason "peer_referral:戸建良いと聞いた" --until 2026-08-31
 """
 from __future__ import annotations
 
@@ -23,7 +25,7 @@ import hashlib
 import json
 import re
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -50,9 +52,13 @@ STATUSES = frozenset(
     {"pending", "contacted", "replied", "skip", "discovered", "invalid"}
 )
 
-REGION_ORDER = {"chubu": 0, "shiga": 1, "list": 9}
+REGION_ORDER = {"chubu": 0, "shiga": 1, "list": 9, "peer": 0}
 
 PHASE_DAILY_LIMIT = {1: 3, 2: 5, 3: 10}
+
+# 仲間紹介など明示優先。未設定・期限切れは DEFAULT。
+DEFAULT_PRIORITY = 100
+PEER_PRIORITY = 0
 
 JARVIS_PRIVATE = REPO / ".env.jarvis_private"
 
@@ -154,7 +160,46 @@ def row_to_vendor(row: dict[str, str], *, source: str = "import") -> dict[str, A
         "alive_method": (row.get("alive_method") or "").strip(),
         "alive_note": (row.get("alive_note") or "").strip(),
         "alive_due_days": int(row.get("alive_due_days") or 180),
+        "priority": _parse_priority_raw(row.get("priority")),
+        "priority_reason": (row.get("priority_reason") or "").strip(),
+        "priority_until": (row.get("priority_until") or "").strip(),
     }
+
+
+def _parse_priority_raw(raw: Any) -> int | None:
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def effective_priority(v: dict[str, Any], *, today: date | None = None) -> int:
+    """ソート用。priority_until 経過後は通常優先度に戻す。"""
+    today = today or date.today()
+    until = str(v.get("priority_until") or "").strip()
+    if until:
+        try:
+            if date.fromisoformat(until[:10]) < today:
+                return DEFAULT_PRIORITY
+        except ValueError:
+            pass
+    parsed = _parse_priority_raw(v.get("priority"))
+    if parsed is None:
+        return DEFAULT_PRIORITY
+    return parsed
+
+
+def peer_vendor_id(name: str, area: str = "", *, on: date | None = None) -> str:
+    d = (on or date.today()).isoformat().replace("-", "")
+    # マーク・JSON用に ASCII 寄りにする（日本語のみなら hash）
+    ascii_name = re.sub(r"[^a-z0-9]+", "-", name.lower())
+    ascii_name = re.sub(r"^(株式会社|有限会社|合同会社)+", "", ascii_name)
+    ascii_name = ascii_name.strip("-")
+    if len(ascii_name) < 3:
+        ascii_name = hashlib.sha256(f"{name}-{area}".encode()).hexdigest()[:10]
+    return f"peer-{d}-{ascii_name}"[:56]
 
 
 def _prefecture_label(raw: str) -> str:
@@ -447,12 +492,20 @@ def merge_vendors(new_vendors: list[dict[str, Any]], *, dry_run: bool) -> dict[s
         existing = by_id.get(v["id"])
         if existing:
             for k, val in v.items():
-                if val:
+                if k == "id":
+                    continue
+                # priority=0 を落とさない
+                if val or val == 0 or k in ("priority", "priority_reason", "priority_until"):
+                    if val is None and k == "priority":
+                        continue
                     existing[k] = val
             updated += 1
         else:
             v.setdefault("discovered_at", now_iso()[:10])
             v.setdefault("status", "discovered")
+            # None の priority キーは書かない
+            if v.get("priority") is None:
+                v.pop("priority", None)
             data.setdefault("vendors", []).append(v)
             by_id[v["id"]] = v
             added += 1
@@ -540,14 +593,130 @@ def next_pending(*, limit: int, statuses: tuple[str, ...] = ("pending", "discove
         st = str(v.get("status") or "pending")
         if st in statuses and v.get("name"):
             out.append(v)
+    today = date.today()
     out.sort(
         key=lambda x: (
+            effective_priority(x, today=today),
             REGION_ORDER.get(x.get("list_region") or "chubu", 9),
             int(x.get("list_no") or 99999),
             x.get("name") or "",
         )
     )
     return out[:limit]
+
+
+def peer_add_vendor(
+    *,
+    name: str,
+    area: str = "",
+    prefecture: str = "",
+    city: str = "",
+    url: str = "",
+    contact_url: str = "",
+    contact_email: str = "",
+    phone: str = "",
+    reason: str = "",
+    until: str = "",
+    notes: str = "",
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """仲間紹介などを priority=0 でリスト先頭に差し込む。"""
+    name = (name or "").strip()
+    if not name:
+        return {"ok": False, "error": "name required"}
+    area = (area or "").strip()
+    prefecture = (prefecture or "").strip()
+    city = (city or "").strip()
+    if not area and (prefecture or city):
+        area = f"{prefecture}{city}"
+    until_s = (until or "").strip()
+    if not until_s:
+        until_s = (date.today() + timedelta(days=7)).isoformat()
+    else:
+        try:
+            until_s = date.fromisoformat(until_s[:10]).isoformat()
+        except ValueError:
+            return {"ok": False, "error": f"invalid --until: {until}"}
+    reason_s = (reason or "").strip() or "peer_referral"
+    if not reason_s.startswith("peer_referral"):
+        reason_s = f"peer_referral:{reason_s}"
+
+    data = load_list()
+    by_id = vendor_index(data)
+    vid = peer_vendor_id(name, area)
+    # 同名+area が既にあればその id を優先更新（二重投入防止）
+    for existing in data.get("vendors") or []:
+        if not isinstance(existing, dict):
+            continue
+        if (existing.get("name") or "").strip() == name and (
+            (existing.get("area") or "").strip() == area or not area
+        ):
+            vid = str(existing.get("id") or vid)
+            break
+
+    vendor: dict[str, Any] = {
+        "id": vid,
+        "name": name,
+        "area": area,
+        "prefecture": prefecture,
+        "city": city,
+        "url": (url or "").strip(),
+        "contact_url": (contact_url or "").strip(),
+        "channel": "web_form",
+        "contact_email": (contact_email or "").strip(),
+        "phone": (phone or "").strip(),
+        "status": "discovered",
+        "source": "peer_referral",
+        "notes": (notes or "").strip()
+        or "仲間紹介。デイリー先頭枠（Phase上限内）。",
+        "discovered_at": now_iso()[:10],
+        "contacted_at": "",
+        "replied_at": "",
+        "last_result": "",
+        "priority": PEER_PRIORITY,
+        "priority_reason": reason_s,
+        "priority_until": until_s,
+        "list_region": "peer",
+        "alive_status": "unknown",
+        "alive_due_days": 180,
+    }
+    ensure_alive_fields(vendor, kind="re")
+
+    existing = by_id.get(vid)
+    action = "updated" if existing else "added"
+    if existing:
+        st = str(existing.get("status") or "")
+        if st in {"contacted", "replied"}:
+            return {
+                "ok": False,
+                "error": f"already {st}: {vid}",
+                "id": vid,
+                "name": name,
+            }
+        for k, val in vendor.items():
+            if k == "id":
+                continue
+            if val or k in ("priority", "priority_reason", "priority_until", "source", "status"):
+                existing[k] = val
+        vendor = existing
+    else:
+        data.setdefault("vendors", []).append(vendor)
+
+    if not dry_run:
+        save_list(data)
+
+    return {
+        "ok": True,
+        "action": action,
+        "id": vid,
+        "name": name,
+        "priority": PEER_PRIORITY,
+        "priority_reason": reason_s,
+        "priority_until": until_s,
+        "path": str(LIST_PATH),
+        "dry_run": dry_run,
+        "vendor": enrich_vendor(vendor),
+    }
 
 
 def _domain_key(url: str) -> str:
@@ -610,6 +779,11 @@ def enrich_vendor(v: dict[str, Any]) -> dict[str, Any]:
     out = dict(v)
     out["group_key"] = infer_group_key(v)
     out["outreach_route_key"] = outreach_route_key(v)
+    out["priority"] = _parse_priority_raw(v.get("priority"))
+    out["priority_effective"] = effective_priority(v)
+    out["priority_reason"] = str(v.get("priority_reason") or "")
+    out["priority_until"] = str(v.get("priority_until") or "")
+    out["priority_active"] = out["priority_effective"] < DEFAULT_PRIORITY
     if not vendor_has_url(v):
         out["needs_url_discovery"] = True
         out["discovery_query"] = discovery_query(v)
@@ -990,6 +1164,30 @@ def main() -> int:
         help="神大家地場リスト Excel（地場不動産業者一覧_*.xlsx）",
     )
     ap.add_argument("--merge-append", metavar="PATH", help="Grok 追記 YAML をマージ")
+    ap.add_argument(
+        "--peer-add",
+        action="store_true",
+        help="仲間紹介を priority=0 でキュー先頭に差し込む",
+    )
+    ap.add_argument("--name", default="", help="--peer-add 用 社名")
+    ap.add_argument("--area", default="", help="--peer-add 用 エリア（例: 愛知県名古屋市）")
+    ap.add_argument("--prefecture", default="", help="--peer-add 用 都道府県")
+    ap.add_argument("--city", default="", help="--peer-add 用 市区町村")
+    ap.add_argument("--url", default="", help="--peer-add 用 公式URL")
+    ap.add_argument("--contact-url", default="", help="--peer-add 用 問合せURL")
+    ap.add_argument("--email", default="", help="--peer-add 用 問合せメール")
+    ap.add_argument("--phone", default="", help="--peer-add 用 電話")
+    ap.add_argument(
+        "--reason",
+        default="",
+        help="--peer-add 用 priority_reason（例: peer_referral:戸建良いと聞いた）",
+    )
+    ap.add_argument(
+        "--until",
+        default="",
+        help="--peer-add 用 priority_until YYYY-MM-DD（省略時=今日+7日）",
+    )
+    ap.add_argument("--notes", default="", help="--peer-add 用 notes")
     ap.add_argument("--next", type=int, default=0, help="次に問合せする pending 件数表示")
     ap.add_argument(
         "--batch-week",
@@ -1119,6 +1317,25 @@ def main() -> int:
         print(json.dumps(out, ensure_ascii=False, indent=2))
         print(f"VENDOR_LIST_RESULT:{json.dumps(out, ensure_ascii=False)}")
         return 0
+
+    if args.peer_add:
+        out = peer_add_vendor(
+            name=args.name,
+            area=args.area,
+            prefecture=args.prefecture,
+            city=args.city,
+            url=args.url,
+            contact_url=args.contact_url,
+            contact_email=args.email,
+            phone=args.phone,
+            reason=args.reason,
+            until=args.until,
+            notes=args.notes,
+            dry_run=args.dry_run,
+        )
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        print(f"VENDOR_LIST_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return 0 if out.get("ok") else 1
 
     if args.mark:
         out = mark_vendor(

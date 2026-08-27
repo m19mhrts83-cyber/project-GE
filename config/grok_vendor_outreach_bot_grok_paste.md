@@ -50,6 +50,15 @@ Grok チャンネル **「不動産Dailyチーム」** に参加している。
   4. フォームに **matsuno.estate@gmail.com** を必記
 - **送信してはいけない**: draft 文面 / 利回り%・土地値% / 329社一括 / リスト外 / 具体物件の第一問合せ
 
+## 仲間紹介（priority · 先頭枠）
+
+JSON の vendor に **`priority_active: true`**（または `priority: 0` / `source: peer_referral`）があるときは:
+
+- **その日の daily_limit 内の先頭枠**として送る（上限は超えない。追加枠ではない）
+- セッション冒頭で1行宣言: `先頭は仲間紹介: {id} {name}（{priority_reason}）`
+- リスト外・JSON外は送らない（peer も JSON 内 ID のみ）
+- `needs_url_discovery: true` なら従来どおり URL 調査 → `discovered_url:` を `--mark` note に
+
 ## 段階的ペース（Phase · 自動昇格）
 
 松野が **Phase 昇格を明示**するまで、Bot は勝手に上限を上げない。日次サマリー末尾で昇格可否を **1行提案**する。

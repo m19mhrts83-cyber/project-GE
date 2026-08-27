@@ -34,6 +34,18 @@ cd ~/git-repos
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --next 3
 ```
 
+### 仲間紹介を先頭に差し込む
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --peer-add \
+  --name "株式会社〇〇" --area "愛知県…" \
+  --url "https://…" --contact-url "https://…/contact" \
+  --reason "peer_referral:戸建良いと聞いた" --until 2026-09-03
+# 確認: --next 3 の1件目が peer。その後 --batch-week --grok-kickoff を再生成
+```
+
+`priority: 0` は **その日の daily_limit 内の先頭枠**（追加枠ではない）。詳細は paste の「仲間紹介」節。
+
 2. JSON を Bot2 に渡す（週次 or 日次）。Bot2 が各社について:
 
    - `contact_url` または `url` の **Web 問合せフォーム**を開く
