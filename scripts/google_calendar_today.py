@@ -64,6 +64,7 @@ def fetch_events(*, login_hint: str = "admin@livingsupport-matsu.co.jp") -> list
                 "start": start.get("dateTime") or start.get("date") or "",
                 "end": end.get("dateTime") or end.get("date") or "",
                 "location": ev.get("location") or "",
+                "description": (ev.get("description") or "")[:4000],
             }
         )
     return out
@@ -78,6 +79,12 @@ def format_md(events: list[dict], day: str) -> str:
         t = ev["start"].replace("T", " ")[:16] if ev["start"] else "終日"
         loc = f" @ {ev['location']}" if ev.get("location") else ""
         lines.append(f"- **{t}** {ev['summary']}{loc}")
+        desc = (ev.get("description") or "").strip()
+        if desc:
+            one = " ".join(desc.split())
+            if len(one) > 160:
+                one = one[:157] + "…"
+            lines.append(f"  - メモ: {one}")
     return "\n".join(lines) + "\n"
 
 
