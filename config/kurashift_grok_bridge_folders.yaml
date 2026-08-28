@@ -2,15 +2,15 @@
 # 対外資料の【仲介パートナー共有】とは別。秘密は置かない。
 account: admin@livingsupport-matsu.co.jp
 local_root: /Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/【with Grok bot】
-# 呼び名: 部長ボックス=inbox / Jarvisボックス=outbox（ホーク振り分け前）
+# 呼び名: 部長ボックス=inbox / Jarvisボックス=outbox（ホークアイ振り分け前）
 folders:
   readme: 00_README.md
   inbox_from_grok: 10_inbox_from_grok   # Grok → Jarvis（Mac poll）
-  outbox_to_grok: 20_outbox_to_grok     # Jarvis → ホーク（target 付き · 振り分け前）
+  outbox_to_grok: 20_outbox_to_grok     # Jarvis → ホークアイ（target 付き · 振り分け前）
   shared_working: 30_shared_working
   archive: 90_archive
   outbox_to_teams_root: outbox_to_teams
-# L3: ホーク参謀が振り分けた先（部長／各統括／天気Bot）
+# L3: ホークアイ（参謀）が振り分けた先（部長／各統括／天気Bot）
 outbox_to_teams:
   hawk: hawk
   re: re
@@ -22,7 +22,7 @@ outbox_to_teams:
   weather: weather
 targets:
   hawk:
-    label: ホーク参謀
+    label: ホークアイ（参謀）
     folder: outbox_to_grok
   re:
     label: 不動産賃貸部長
@@ -52,5 +52,5 @@ notes:
   - Grok Drive コネクタは admin。anyone公開は原則しない
   - "outbox: scripts/jarvis_bucho_outbox_write.py --target（hawk|re|resource|weather|…）"
   - "inbox: jarvis_bucho_inbox_poll.py（launchd 15分）"
-  - "L2 振り分け: config/grok_hawk_routine_Jarvisボックス.md（ホーク参謀ルーティン）"
+  - "L2 振り分け: config/grok_hawk_routine_Jarvisボックス.md（ホークアイ（参謀）ルーティン）"
   - "松野 Grok UI: JarvisBox 未処理 → 30_shared_working の 00_松野向け_*.md"
