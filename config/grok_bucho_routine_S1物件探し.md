@@ -1,7 +1,7 @@
 # Grok ルーティン「不動産Daily · S1物件探し」— 指示コピペ用
 
 Grok チャンネル **不動産Dailyチーム** のルーティン UI に貼る。  
-正本: `config/grok_property_bot_grok_paste.md` · `config/grok_sanbo_bot_grok_paste.md`（§物件調査）。
+正本: `config/grok_property_bot_grok_paste.md` · `config/grok_realestate_bucho_grok_paste.md`（§物件調査）。
 
 9時「本日分」とは **時間分割**（コスト対策）。本ルーティンが **自律探索の本線**。
 
@@ -23,7 +23,7 @@ Grok チャンネル **不動産Dailyチーム** のルーティン UI に貼る
 【実行順・厳守】
 -0. **Jarvisボックス先読み**（§データ共有 · `20_outbox_to_grok/`）。未処理があれば先に処理して archive。0件ならスキップ可
 
-0. 参謀が宣言:
+0. 不動産賃貸部長が宣言:
 【S1物件探し · Phase {1|2|3}】候補ざっと → 聞くものだけ問合せ（上限=Phase）→ [Grok調査]+キャプチャ
 
 1. @物件調査 に委譲（自律探索 A）
@@ -37,7 +37,7 @@ Grok チャンネル **不動産Dailyチーム** のルーティン UI に貼る
 - [Grok調査] を matsuno.estate@gmail.com へ（問合せセクション必須 · 可能なら画像添付）
 - 聞くが1件以上なら「📌 今日一番のおすすめ（S1）」を画像付き
 
-2. 参謀が締め1行:
+2. 不動産賃貸部長が締め1行:
 S1物件探し完了: 調査N · 問合せM · Phase P · おすすめ短名またはなし
 
 【禁止】
@@ -49,7 +49,7 @@ S1物件探し完了: 調査N · 問合せM · Phase P · おすすめ短名ま�
 
 ## 役割（ルーティン / Bot 設定欄）
 
-### 参謀
+### 不動産賃貸部長
 
 ```
 不動産Dailyの統括。S1物件探しの司令塔。Phaseと上限を渡し、@物件調査に委譲する。

@@ -38,7 +38,7 @@ def bridge_root(cfg: dict[str, Any] | None = None) -> Path:
 
 
 def folder(name: str, cfg: dict[str, Any] | None = None) -> Path:
-    """name: inbox_from_grok | outbox_to_grok | shared_working | archive"""
+    """name: inbox_from_grok | outbox_to_grok | shared_working | archive | outbox_to_teams_root"""
     cfg = cfg or load_bridge_cfg()
     folders = cfg.get("folders") or {}
     rel = folders.get(name)
@@ -47,6 +47,41 @@ def folder(name: str, cfg: dict[str, Any] | None = None) -> Path:
     p = bridge_root(cfg) / str(rel)
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def team_folder(team_id: str, cfg: dict[str, Any] | None = None) -> Path:
+    """outbox_to_teams/{team_id}/ — L3 部長／統括／天気Bot 用"""
+    cfg = cfg or load_bridge_cfg()
+    teams = cfg.get("outbox_to_teams") or {}
+    rel_name = teams.get(team_id)
+    if not rel_name:
+        raise KeyError(f"outbox_to_teams.{team_id} missing in bridge yaml")
+    root_rel = (cfg.get("folders") or {}).get("outbox_to_teams_root", "outbox_to_teams")
+    p = bridge_root(cfg) / str(root_rel) / str(rel_name)
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def outbox_dir_for_target(target: str, cfg: dict[str, Any] | None = None) -> Path:
+    """target → 書込先。hawk=20_outbox_to_grok、他=outbox_to_teams/{team}/"""
+    cfg = cfg or load_bridge_cfg()
+    targets = cfg.get("targets") or {}
+    spec = targets.get(target)
+    if not spec:
+        raise KeyError(f"targets.{target} missing in bridge yaml")
+    folder_key = spec.get("folder")
+    if folder_key:
+        return folder(str(folder_key), cfg)
+    team = spec.get("team")
+    if team:
+        return team_folder(str(team), cfg)
+    raise ValueError(f"targets.{target} has neither folder nor team")
+
+
+def list_target_ids(cfg: dict[str, Any] | None = None) -> list[str]:
+    cfg = cfg or load_bridge_cfg()
+    targets = cfg.get("targets") or {}
+    return sorted(str(k) for k in targets)
 
 
 def is_queue_file(path: Path) -> bool:

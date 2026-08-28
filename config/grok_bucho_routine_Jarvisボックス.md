@@ -1,9 +1,9 @@
 # Grok ルーティン「不動産Daily · Jarvisボックス」— 指示コピペ用
 
 Grok チャンネル **不動産Dailyチーム** のルーティン UI に貼る。  
-正本: `config/grok_sanbo_bot_grok_paste.md`（§データ共有）。
+正本: `config/grok_realestate_bucho_grok_paste.md`（§データ共有）。
 
-Jarvis が Drive **Jarvisボックス**（`20_outbox_to_grok/`）に置いた依頼を拾う専用枠。  
+Jarvis が Drive **部長フォルダ**（`outbox_to_teams/re/`）および共通 Jarvisボックス（`target: re`）に置いた依頼を **不動産賃貸部長** が拾う専用枠。  
 9:00 / 10:30 / 18:00 の各ルーティン先頭でも同じ先読みをする（二重実行は完了済みスキップ）。
 
 ## ルーティン設定（推奨）
@@ -21,7 +21,8 @@ Jarvis が Drive **Jarvisボックス**（`20_outbox_to_grok/`）に置いた依
 チャンネル「不動産Dailyチーム」で Jarvisボックス（Drive）を確認する。
 
 【実行順・厳守】
-0. admin Drive「【with Grok bot】/20_outbox_to_grok/」を開く（§データ共有）
+0. admin Drive「【with Grok bot】/outbox_to_teams/re/」を開く（§データ共有 · 部長フォルダ）
+- 0件なら「20_outbox_to_grok/」内の target: re も確認
 - 対象: .md / .txt（00_ で始まる説明ファイルと .keep は無視）
 - 0件なら「Jarvisボックス: 未処理なし」と1行で終了
 
@@ -29,7 +30,7 @@ Jarvis が Drive **Jarvisボックス**（`20_outbox_to_grok/`）に置いた依
 - 先頭の priority / action / title / --- 以降の本文を読む
 - action の目安:
   - s9_precheck → @管理会社開拓（--next バランス。事前確認のみ）
-  - s2_batch → 週次JSON／送信キュー関連なら参謀が整理して @物件紹介業者開拓
+  - s2_batch → 週次JSON／送信キュー関連なら部長が整理して @物件紹介業者開拓
   - s1 → @物件調査（キュー追記または即委譲）
   - memo / ask → チャンネルに要約1〜3行。実行不要なら archive のみ
   - other → 判断して社員へ振るか「要松野」1行
@@ -48,4 +49,4 @@ Jarvis が Drive **Jarvisボックス**（`20_outbox_to_grok/`）に置いた依
 
 ## 役割
 
-参謀が Drive を読み、必要なら社員へ委譲。社員 Bot にボックス直読みを強制しない（参謀が一括）。
+不動産賃貸部長が Drive を読み、必要なら社員へ委譲。社員 Bot にボックス直読みを強制しない（部長が一括）。
