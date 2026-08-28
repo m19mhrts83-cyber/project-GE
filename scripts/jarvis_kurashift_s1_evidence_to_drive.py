@@ -8,6 +8,8 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_s1_evidence_to_drive.py --deal-id <uuid>
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_s1_evidence_to_drive.py --poll-recent
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_s1_evidence_to_drive.py --dry-run --poll-recent
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_s1_evidence_to_drive.py --verify-drive-api
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_evidence_gdrive.py --verify
 """
 from __future__ import annotations
 
@@ -41,6 +43,11 @@ from jarvis_kurashift_re_inquiry import (  # noqa: E402
     get_deal,
     header_map,
     sb_client,
+)
+from jarvis_kurashift_evidence_gdrive import (  # noqa: E402
+    drive_api_disabled,
+    upload_evidence_file,
+    verify_drive_api,
 )
 
 
@@ -144,6 +151,24 @@ def fetch_evidence_for_deal(
         mirror_path.write_bytes(buf)
 
         rel_mirror = str(mirror_path.relative_to(REPO))
+        payload: dict[str, Any] = {
+            "kind": "s1_evidence",
+            "evidence_dir": str(dest),
+            "open_url": open_url_for(dest),
+            "account": "estate",
+            "subject": subject[:200],
+        }
+        if not drive_api_disabled():
+            up = upload_evidence_file(dest, deal_id, dry_run=dry_run)
+            if up.get("drive_web_view_link"):
+                payload["drive_web_view_link"] = up["drive_web_view_link"]
+                payload["drive_file_id"] = up.get("drive_file_id")
+                payload["open_url"] = up["drive_web_view_link"]
+            elif up.get("skipped"):
+                payload["drive_api"] = up["skipped"]
+            elif up.get("error"):
+                payload["drive_api_error"] = str(up["error"])[:200]
+                print(f"  drive-api warn: {up.get('error')}", file=sys.stderr)
         row = {
             "deal_id": deal_id,
             "gmail_id": mid,
@@ -151,13 +176,7 @@ def fetch_evidence_for_deal(
             "mime_type": mime or "application/octet-stream",
             "size_bytes": len(buf),
             "storage_path": rel_mirror,
-            "payload": {
-                "kind": "s1_evidence",
-                "evidence_dir": str(dest),
-                "open_url": open_url_for(dest),
-                "account": "estate",
-                "subject": subject[:200],
-            },
+            "payload": payload,
         }
         if attachments_table_ok(sb):
             try:
@@ -201,7 +220,17 @@ def main() -> int:
     ap.add_argument("--poll-recent", action="store_true")
     ap.add_argument("--limit", type=int, default=30)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--verify-drive-api",
+        action="store_true",
+        help="admin Drive API の接続・アップロードをスモーク検証",
+    )
     args = ap.parse_args()
+
+    if args.verify_drive_api:
+        r = verify_drive_api()
+        print(r)
+        return 0 if r.get("ok") else 1
 
     print(f"# evidence_root={evidence_root()}")
     sb = sb_client()
