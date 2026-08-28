@@ -32,6 +32,7 @@ Jarvis が Drive **Jarvisボックス**（`20_outbox_to_grok/`）に置いた依
 - 先頭の target / priority / action / title / --- 以降を読む
 - target が明示されていれば、その team フォルダへ **コピーまたは移動**:
   - re → outbox_to_teams/re/（@不動産賃貸部長）
+  - resource → outbox_to_teams/resource/（@リソース経営部長）
   - family → outbox_to_teams/family/
   - app_dev → outbox_to_teams/app_dev/
   - somu → outbox_to_teams/somu/
