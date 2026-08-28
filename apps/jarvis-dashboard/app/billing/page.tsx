@@ -199,8 +199,8 @@ function CursorUsageCard({ u }: { u: CursorUsageWatch | null }) {
         {u?.updated_at ? formatJstYmdHm(u.updated_at) : "未記録"}
       </p>
       <p className="meta cursor-usage-note">
-        Grok BotはPro不可。SuperGrok Plus連携≈$100はPro+より高い →
-        必要ならPro+再上げ（連携は採用しない）
+        Grok Bot: Pro可（週次枠はPro+より小）。Bot多用で枠不足ならPro+再上げ。
+        SuperGrok連携≈$100はPro+より高い → 連携は採用しない
       </p>
     </section>
   );
