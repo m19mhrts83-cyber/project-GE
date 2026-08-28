@@ -45,8 +45,10 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ```
 
 - ローカルミラー: `.jarvis_state/kurashift_re_deal_attachments/{deal_id}/` にもコピー可（既存 PDF-0 互換）
-- `payload.open_url`: Finder/ブラウザで開ける path または https リンク
-- API アップロード（drive.file）は **後続**（現状 GDRIVE は readonly が多い → **デスクトップ同期フォルダ書き込み**が本線）
+- `payload.open_url`: 優先 **Drive webViewLink**（D3）。無いとき file://（ローカル同期フォルダ）
+- API アップロード: `scripts/jarvis_kurashift_evidence_gdrive.py`（取込時に `s1_evidence_to_drive.py` から自動呼び出し）
+- 無効化: `KURASHIFT_EVIDENCE_DRIVE_API_DISABLE=1`
+- 検証: `jarvis_kurashift_evidence_gdrive.py --verify` または `s1_evidence_to_drive.py --verify-drive-api`
 
 ## KURASHIFT UI
 
@@ -59,7 +61,7 @@ deal 詳細に「証憑」リンク一覧（`open_url` / Drive）。件数は ti
 | D0 | 本ドキュメント・フォルダ規約・S1 添付指示 | 本ファイル |
 | D1 | `jarvis_kurashift_s1_evidence_to_drive.py` | 同日実装 |
 | D2 | trade-desk 証憑リンク表示 | 同日実装 |
-| D3 | Drive API アップロード（scope 拡張時） | 未 |
+| D3 | Drive API アップロード（admin · `token_drive_admin_write.json`） | **2026-08-28** 実装済み |
 
 ## 関連
 
