@@ -36,6 +36,8 @@ node_modules/
 *.log
 .DS_Store
 _tmp/
+tmp/
+tmp_grok_*.md
 
 # Jarvis 実行時 state（ローカルのみ）
 # 残渣ファイルの削除は後でよい。ここは git status / コミットに上がらないための除外。
@@ -99,6 +101,13 @@ _tmp/
 .jarvis_state/chrome_sbi_net_transfer/
 .jarvis_state/chrome_ib_shiga/
 .jarvis_state/chrome_ib_kyoto/
+.jarvis_state/chuden_miraiz_card/
+.jarvis_state/katene_amp_check/
+.jarvis_state/app_dev_*.md
+.jarvis_state/cursor_forum_grok_notion_draft.md
+.jarvis_state/kurashift_evidence_drive_folders.json
+.jarvis_state/00_*.md
+apps/jarvis-dashboard/supabase/.temp/
 .vercel-tmp-dashboard/
 
 # --- Q&Aチャットボット／ProgramCode の実行成果物（容量大） ---

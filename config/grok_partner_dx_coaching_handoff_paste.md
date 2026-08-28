@@ -14,11 +14,11 @@
 
 ## Grok Bot 一覧
 
-| Bot | paste |
-|---|---|
-| **パートナーDX統括** | `config/grok_partner_dx_manager_grok_paste.md` |
-| **シフトAIアドバイザー** | `config/grok_shift_ai_advisor_grok_paste.md` |
-| **ワールドインテックアドバイザー** | `config/grok_world_intec_advisor_grok_paste.md` |
+| Bot | paste | Drive B1 |
+|---|---|---|
+| **パートナーDX統括** | `config/grok_partner_dx_manager_grok_paste.md` | `B1_統括_Instructions_全文.txt` |
+| **シフトAIアドバイザー** | `config/grok_shift_ai_advisor_grok_paste.md` | `B1_シフトAI_Instructions_全文.txt` |
+| **ワールドインテックアドバイザー** | `config/grok_world_intec_advisor_grok_paste.md` | `B1_ワールドインテック_Instructions_全文.txt` |
 
 ## 川畑との切り分け
 
@@ -29,7 +29,7 @@
 
 ## チャンネル
 
-- **パートナーDXコーチングチーム**（統括＋2アドバイザー）
+- **パートナーDXコーチングチーム**（統括＋2アドバイザー）— ✅ UI 反映済（2026-08-28）
 - 松野入口: `@パートナーDX統括`
 
 ## 週次

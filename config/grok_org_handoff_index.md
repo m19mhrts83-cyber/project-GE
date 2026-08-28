@@ -1,6 +1,6 @@
 # Grok 組織索引 — AI三柱＋全部署
 
-**更新**: 2026-08-28  
+**更新**: 2026-08-29  
 **方針**: 各 Bot の Instructions 正本は下表の paste。本ファイルは索引のみ。
 
 ## AI三柱（松野直属）
@@ -79,6 +79,15 @@
 設定: `config/kurashift_grok_bridge_folders.yaml`  
 ホークアイルーティン: `config/grok_hawk_routine_Jarvisボックス.md`
 
+## フォーク原則（JarvisBox 必須）
+
+| 側 | やること |
+|---|---|
+| **Grok** | Bot 内で整理・文案・委譲。Jarvis へは **`10_inbox_from_grok/`** に MD |
+| **Jarvis** | Mac 実行・取込・送信承認。Grok へは **`jarvis_bucho_outbox_write.py --target …`** |
+
+松野のチャットコピペは **運用正本にしない**。詳細: `config/grok_jarvisbox_fork_policy.md` · ルール `jarvis-grok-jarvisbox-fork.mdc`
+
 ## JarvisBox パック（Drive）
 
 | パック | パス |
@@ -92,10 +101,23 @@
 
 ## Grok UI 作業順（目安）
 
-1. **ホークアイ（参謀）** Bot → 参謀室
-2. 不動産部長 Bot（既存 sanbo UI を差し替え）
-3. 天気Bot（6:30 · ホーク傘下）
-4. **リソース経営部長** + ch
-5. **空手アドバイザー**（家族 ch に追加）
-6. 総務 2ch ＋ 11 Bot
-7. パートナーDX 1ch ＋ 3 Bot
+| # | 項目 | UI | Driveパック |
+|---|---|---|---|
+| 1 | **ホークアイ（参謀）** | ✅ 済 | `2026-08-28_組織再編_ホーク参謀/` |
+| 2 | 不動産部長 | ✅ 済 | 同 · `B1_不動産部長_Instructions_全文.txt` |
+| 3 | 天気Bot（6:30） | ✅ 済 | `2026-08-28_天気Bot/` |
+| 4 | **リソース経営部長** | ✅ 済 | `2026-08-28_リソース経営部長/` |
+| 5 | **空手・ちかげ・家族統括** | ✅ 済 | 空手 / ちかげ / 家族コーチ_Obsidian直読み |
+| 6 | **パートナーDX** 1ch＋3 Bot | ✅ 済（2026-08-28） | `2026-08-28_パートナーDXコーチング_Bot新設/` |
+| 7 | **総務計画** 2ch＋11 Bot | ✅ 済（2026-08-28） | `2026-08-28_総務計画コーチング_Bot新設/` |
+
+**並行チェックリスト**: `30_shared_working/2026-08-28_組織再編_ホーク参謀/00_残作業_並行_20260829.md`
+
+### B1 抽出（Jarvis）
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_grok_paste_to_b1_txt.py \\
+  config/grok_shift_ai_advisor_grok_paste.md -o /path/B1_シフトAI_Instructions_全文.txt
+```
+
+ネスト ``` あり（不動産部長等）は **`B1_*_全文.txt` 正本**のみ使う。

@@ -1,0 +1,44 @@
+---
+description: Grok↔Jarvisは【with Grok bot】JarvisBox必須・フォーク原則（Grok実行/Jarvis Mac）
+globs:
+alwaysApply: true
+---
+
+# Grok JarvisBox フォーク（Jarvis）
+
+## 原則（確定 2026-08-28）
+
+- **Grok Bot との運用やり取り**は admin Drive **`【with Grok bot】`** を正本とする。松野のチャットコピペに依存しない。
+- **フォーク**: Grok 側で整理・委譲・助言・文案・ルーティン。**Mac 実行・取込・DB・対外送信・秘密は Jarvis**。
+- Grok が Jarvis に渡すこと（完了報告・依頼・長メモ）は **`10_inbox_from_grok/`** へ MD。
+- Jarvis が Grok に渡すことは **`jarvis_bucho_outbox_write.py --target …`**（`20_outbox_to_grok/` または `outbox_to_teams/*/`）。
+
+正本: `config/grok_jarvisbox_fork_policy.md` · `config/kurashift_grok_bridge_folders.yaml`
+
+## Jarvis の必須動作
+
+| トリガー | 動作 |
+|---|---|
+| Grok／部長／統括へ依頼・結果を渡す | outbox 書込（チャットだけで終わらない） |
+| パートナー確認・Grok 話題・inbox 疑義 | `jarvis_bucho_inbox_poll.py`（失敗しても本題は止めない） |
+| Grok Instructions 更新 | git paste → Drive `B1_*_全文.txt` · 統括・部長は **inbox 共有節**を含む |
+
+## Grok 側（Instructions 期待）
+
+**統括・部長 Bot** の paste / B1 には次を含める（未記載なら paste 正本を直し B1 再生成）:
+
+- `outbox_to_teams/{team}/` 先読み
+- **`10_inbox_from_grok/` への完了・依頼書込**
+- 「松野にコピペを求めない」
+
+サブ Bot（コーチ等）は統括が inbox にまとめてよい。
+
+## 例外（JarvisBox 不要）
+
+- `[Grok部長]` / `[Grok調査]` → **estate Gmail**（従来どおり）
+- 天気: `weather/` → ch 直投
+- `30_shared_working/` は手順正本（日常キューではない）
+
+## ユーザーへの説明（短く）
+
+> Grok で決めたこと・Jarvis に頼むことは **【with Grok bot】の部長ボックス** に書く。Jarvis は Mac で poll する。チャット転記は不要。

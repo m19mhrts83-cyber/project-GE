@@ -60,7 +60,11 @@
 
 ## JarvisBox
 
-`【with Grok bot】/30_shared_working/2026-08-28_総務計画コーチング_Bot新設/`
+| フォルダ | 用途 |
+|---|---|
+| `outbox_to_teams/somu/` | Jarvis `--target somu` · **統括が先読み** |
+| `10_inbox_from_grok/` | 完了報告 → Jarvis |
+| セットアップ正本 | `30_shared_working/2026-08-28_総務計画コーチング_Bot新設/` |
 
 ## 関連
 
