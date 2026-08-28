@@ -2,17 +2,51 @@
 # 対外資料の【仲介パートナー共有】とは別。秘密は置かない。
 account: admin@livingsupport-matsu.co.jp
 local_root: /Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/【with Grok bot】
-# 呼び名: 部長ボックス=inbox / Jarvisボックス=outbox
+# 呼び名: 部長ボックス=inbox / Jarvisボックス=outbox（ホーク振り分け前）
 folders:
   readme: 00_README.md
-  inbox_from_grok: 10_inbox_from_grok   # 部長ボックス（部長→Jarvis）
-  outbox_to_grok: 20_outbox_to_grok     # Jarvisボックス（Jarvis→部長）
+  inbox_from_grok: 10_inbox_from_grok   # Grok → Jarvis（Mac poll）
+  outbox_to_grok: 20_outbox_to_grok     # Jarvis → ホーク（target 付き · 振り分け前）
   shared_working: 30_shared_working
   archive: 90_archive
+  outbox_to_teams_root: outbox_to_teams
+# L3: ホーク参謀が振り分けた先（部長／各統括／天気Bot）
+outbox_to_teams:
+  hawk: hawk
+  re: re
+  family: family
+  app_dev: app_dev
+  somu: somu
+  partner_dx: partner_dx
+  weather: weather
+targets:
+  hawk:
+    label: ホーク参謀
+    folder: outbox_to_grok
+  re:
+    label: 不動産賃貸部長
+    team: re
+  family:
+    label: 家族コーチ統括
+    team: family
+  app_dev:
+    label: アプリ開発統括
+    team: app_dev
+  somu:
+    label: 総務計画T統括
+    team: somu
+  partner_dx:
+    label: パートナーDX統括
+    team: partner_dx
+  weather:
+    label: 天気お知らせ
+    team: weather
 notes:
   - Bot Instructions の正本は git-repos/config の paste。このフォルダはキュー・作業 MD 用
   - 日報・[Grok調査] は estate メールのまま。急ぎ任意は [Jarvis依頼]
   - ファイル名: YYYY-MM-DD_題名.md（Jarvis 書込は YYYY-MM-DD_HHMM_題名.md）
   - Grok Drive コネクタは admin。anyone公開は原則しない
-  - "outbox: scripts/jarvis_bucho_outbox_write.py / inbox: jarvis_bucho_inbox_poll.py（launchd 15分）"
-  - "松野 Grok UI: JarvisBox 未処理 → 30_shared_working の 00_松野向け_*.md（git paste を直接開かない）"
+  - "outbox: scripts/jarvis_bucho_outbox_write.py --target（hawk|re|weather|…）"
+  - "inbox: jarvis_bucho_inbox_poll.py（launchd 15分）"
+  - "L2 振り分け: config/grok_hawk_routine_Jarvisボックス.md（ホーク参謀ルーティン）"
+  - "松野 Grok UI: JarvisBox 未処理 → 30_shared_working の 00_松野向け_*.md"
