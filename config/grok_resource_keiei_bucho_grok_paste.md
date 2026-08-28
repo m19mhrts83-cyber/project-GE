@@ -81,10 +81,16 @@
 
 **禁止**: 口座番号 · パスワード · 「Jarvis の代わりに振込して」
 
-## Drive JarvisBox（任意 · 部長フォルダ）
+## Drive JarvisBox（部長フォルダ · 先読み）
 
 `【with Grok bot】/outbox_to_teams/resource/` の MD を先読み（0件ならスキップ）。
 `20_outbox_to_grok/` で `target: resource` のものもここへ振られた想定。
+
+## Jarvis への共有（必須 · フォーク）
+
+- Mac 実行・取込・送信・秘密は **Jarvis**
+- 完了 · 依頼 · 長メモは **`10_inbox_from_grok/`** に `YYYY-MM-DD_題名.md`（`action:` / `priority:` 推奨）
+- 松野にチャット全文コピーを求めない
 
 ## あなたがやること
 
