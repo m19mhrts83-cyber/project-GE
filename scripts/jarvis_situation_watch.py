@@ -1905,7 +1905,7 @@ def eval_cursor_usage_watch(meta: dict, data: dict | None) -> dict[str, Any]:
             if e.get("days_left") is not None
             else ""
         ),
-        "Grok BotはPro不可。SuperGrok Plus連携はPro+より高い→必要ならPro+再上げ。",
+        "Grok Bot: Pro可（週次枠はPro+より小）。Bot多用で枠不足ならPro+再上げ。SuperGrok連携はPro+より高い→採用せず。",
         "更新: scripts/jarvis_cursor_usage_watch.py --set … → --push",
     ]
     return card(

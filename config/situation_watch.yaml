@@ -261,12 +261,13 @@ items:
     category: ops
     enabled: true
     never_archive: true
-    source: "方針 2026-08-22 / cursor.com/dashboard/billing"
+    source: "方針 2026-08-28 / cursor.com/dashboard/billing / grok-bot/plans"
     cursor_prompt: |
-      Cursor は Pro へ戻し月額で様子見（困ったら Pro+。年額 Pro+ は Notion 年額 9/28 の後）。
-      Billing で Schedule Downgrade を確認。ダウングレードは「請求期間の終わり」まで Pro+ が続く。
+      Cursor は Pro へ Schedule Downgrade（今日実行可。次回更新日まで Pro+ 継続→その更新から Pro $20）。
+      困ったら Adjust plan で Pro+ 再上げ（即時・日割り返金／クレジット別取引）。年額 Pro+ は Notion 年額 9/28 の後。
       枠の正: Spending タブ。Other Models $20 が先に尽きやすい。Cursor Models（Composer/Grok）は別枠。
-      Grok Bot アプリは Pro では使えない（Pro+ 再上げか SuperGrok 連携が要る）。
+      Grok Bot: Pro でも利用可（週次枠は Pro+ より小。公式 2026-08-26）。Bot ルーティンで週次枠不足なら Pro+。
+      SuperGrok 連携は Pro+ より高いので採用しない。
       ダッシュボード課金: /billing（Cursor 行）。
 
   - id: cursor_usage_watch
@@ -279,7 +280,7 @@ items:
       Cursor の枠使い切りを確認して。state: .jarvis_state/cursor_usage_watch.json
       Spending 画面を目視し、scripts/jarvis_cursor_usage_watch.py --set で％を更新 → --push。
       Other ≥70% は Composer/Cursor Grok へ寄せ、≥90% や残日少＋半分超えは Pro+ 再上げを検討。
-      SuperGrok Plus 連携は Pro+ より高いので採用しない（必要なら Pro+）。
+      Grok Bot 週次枠不足（ルーティン停止・plan 画面で枯渇）も Pro+ 検討。SuperGrok 連携は Pro+ より高いので採用しない。
       ダッシュボード: /billing の「Cursor 枠」カード。
 
   - id: jarvis_private_backup
