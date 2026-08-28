@@ -26,6 +26,7 @@
 |---|---|---|---|
 | 参謀室 | **ホーク参謀** | 参謀室 | `config/grok_sanbo_bot_grok_paste.md` |
 | 不動産賃貸 | **不動産賃貸部長** | 不動産Dailyチーム | `config/grok_realestate_bucho_grok_paste.md` |
+| **リソース経営** | **リソース経営部長** | **リソース経営チーム** | `config/grok_resource_keiei_bucho_grok_paste.md` |
 | 家族コーチ | 家族コーチ統括 | 家族コーチングチーム | `config/grok_family_manager_grok_paste.md` |
 | アプリ開発 | アプリ開発統括 | アプリ開発チーム | `config/grok_app_dev_manager_grok_paste.md` |
 | 総務計画 | 総務計画T統括 | **2ch**（下記） | `config/grok_somu_keikaku_manager_grok_paste.md` |
@@ -41,12 +42,19 @@
 
 索引: `config/grok_somu_keikaku_coaching_handoff_paste.md`
 
+## リソース経営 · 家族空手（handoff）
+
+| ブロック | handoff |
+|---|---|
+| リソース経営 | `config/grok_resource_keiei_handoff_paste.md` |
+| 家族（含 空手） | `config/grok_family_coaching_handoff_paste.md` |
+
 ## Drive 3層（JarvisBox）
 
 | 層 | パス | 誰 |
 |---|---|---|
 | L1 | `20_outbox_to_grok/` | Jarvis → ホーク |
-| L2 | ホーク振り分け | → `outbox_to_teams/{re,family,…}/` |
+| L2 | ホーク振り分け | → `outbox_to_teams/{re,resource,family,…}/` |
 | L3 | `outbox_to_teams/re/` 等 | 部長／統括／天気 |
 | 返信 | `10_inbox_from_grok/` | → Jarvis poll |
 
@@ -59,6 +67,8 @@
 |---|---|
 | 組織再編・ホーク | `30_shared_working/2026-08-28_組織再編_ホーク参謀/` |
 | 天気Bot | `30_shared_working/2026-08-28_天気Bot/` |
+| **リソース経営部長** | `30_shared_working/2026-08-28_リソース経営部長/` |
+| **空手アドバイザー** | `30_shared_working/2026-08-28_空手アドバイザー/` |
 | パートナーDX | `30_shared_working/2026-08-28_パートナーDXコーチング_Bot新設/` |
 | 総務計画 | `30_shared_working/2026-08-28_総務計画コーチング_Bot新設/` |
 
@@ -67,5 +77,7 @@
 1. ホーク参謀 Bot → 参謀室
 2. 不動産部長 Bot（既存 sanbo UI を差し替え）
 3. 天気Bot（6:30 · ホーク傘下）
-4. 総務 2ch ＋ 11 Bot
-5. パートナーDX 1ch ＋ 3 Bot
+4. **リソース経営部長** + ch
+5. **空手アドバイザー**（家族 ch に追加）
+6. 総務 2ch ＋ 11 Bot
+7. パートナーDX 1ch ＋ 3 Bot

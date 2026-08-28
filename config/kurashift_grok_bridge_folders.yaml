@@ -14,6 +14,7 @@ folders:
 outbox_to_teams:
   hawk: hawk
   re: re
+  resource: resource
   family: family
   app_dev: app_dev
   somu: somu
@@ -26,6 +27,9 @@ targets:
   re:
     label: 不動産賃貸部長
     team: re
+  resource:
+    label: リソース経営部長
+    team: resource
   family:
     label: 家族コーチ統括
     team: family
@@ -46,7 +50,7 @@ notes:
   - 日報・[Grok調査] は estate メールのまま。急ぎ任意は [Jarvis依頼]
   - ファイル名: YYYY-MM-DD_題名.md（Jarvis 書込は YYYY-MM-DD_HHMM_題名.md）
   - Grok Drive コネクタは admin。anyone公開は原則しない
-  - "outbox: scripts/jarvis_bucho_outbox_write.py --target（hawk|re|weather|…）"
+  - "outbox: scripts/jarvis_bucho_outbox_write.py --target（hawk|re|resource|weather|…）"
   - "inbox: jarvis_bucho_inbox_poll.py（launchd 15分）"
   - "L2 振り分け: config/grok_hawk_routine_Jarvisボックス.md（ホーク参謀ルーティン）"
   - "松野 Grok UI: JarvisBox 未処理 → 30_shared_working の 00_松野向け_*.md"
