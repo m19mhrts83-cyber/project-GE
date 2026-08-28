@@ -38,3 +38,19 @@ artifacts:
     writers: [human, S7_optional]
     delivery: drive_obsidian
     note: 戸建レーン等の考え方。案件ノートからはリンク。
+
+  # 空手 — 和道流の教え · 骨と筋肉（Journal 配下 · 2026-08-28）
+  karate_knowledge:
+    relative: "01_Journaling/☆Karate"
+    readers: [karate_advisor, family_coach_manager]
+    writers: [jarvis, human, karate_advisor_draft]
+    subfolders:
+      - 和道流
+      - 骨と筋肉
+    filename_patterns:
+      - "和道流/和道流_{theme}_{YYYYMMDD}.md"
+      - "骨と筋肉/{part_or_motion}_{YYYYMMDD}.md"
+    delivery: drive_obsidian
+    note: >-
+      Journal と並べて参照。Grok 空手アドバイザーは Web 検索＋既存ノート読取。
+      新規追記の実ファイル書込は Jarvis（Documents 正本 → ogd_retag）。
