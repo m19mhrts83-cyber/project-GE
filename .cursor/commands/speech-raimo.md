@@ -1,6 +1,6 @@
 # RAIMO式スピーチ作成（乾杯・祝辞・幹事挨拶）
 
-呼び出し: **`/raimo-speech`**
+呼び出し: **`/speech-raimo`**
 
 スキル正本: `~/.cursor/skills/raimo-speech-writing/SKILL.md`  
 講座出典: `~/Documents/500_Obsidian_r1/02_Clippings/D_Knowledge_Method/RAIMO講座`（第6・7章）
