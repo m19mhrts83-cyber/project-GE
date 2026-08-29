@@ -16,7 +16,9 @@
 1. Bot **リソース経営部長** 新規 → Instructions ← `grok_resource_keiei_bucho_grok_paste.md` の ``` 内
 2. チャンネル **リソース経営チーム** — メンバー: リソース経営部長のみ（最初は1体で可）
 3. **ホーク** Instructions を差分更新（`grok_sanbo_bot_grok_paste.md` · Drive `B1_ホークアイ（参謀）_Instructions.md`）
-4. （任意）ルーティン **リソース · 月次 brush-up** — 毎月1回 · 指示は paste §確定申告 または「Notion brush-up タグ検索」
+4. **ルーティン** — 詳細 `30_shared_working/2026-08-28_リソース経営部長/B0_ルーティン追加.md`
+   - **リソース経営 · 月次 brush-up** … 毎月1日 **09:00** · ✅ **設定済（2026-08-29）**
+   - **リソース経営 · 週次** … 金曜 **16:30** · 任意（未設定でも可 · 月次で制約を出す運用）
 
 ## Notion 運用（固定フォルダ不要）
 
