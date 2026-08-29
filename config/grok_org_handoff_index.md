@@ -77,7 +77,7 @@
 | 返信 | `10_inbox_from_grok/` | → Jarvis poll |
 
 設定: `config/kurashift_grok_bridge_folders.yaml`  
-ホークアイルーティン: `config/grok_hawk_routine_Jarvisボックス.md`
+ホークアイルーティン: `config/grok_hawk_routine_Jarvisボックス.md` · 週次統括 `config/grok_hawk_routine_週次統括.md`（日曜20:00）
 
 ## フォーク原則（JarvisBox 必須）
 
@@ -93,6 +93,7 @@
 | パック | パス |
 |---|---|
 | 組織再編・ホーク | `30_shared_working/2026-08-28_組織再編_ホーク参謀/`（不動産部長貼付: **`B1_不動産部長_Instructions_全文.txt`**） |
+| 参謀室・週次統括 | `30_shared_working/2026-08-30_参謀室_週次統括/`（B1 ホーク再貼 · B2 日曜20:00） |
 | 天気Bot | `30_shared_working/2026-08-28_天気Bot/` |
 | **リソース経営部長** | `30_shared_working/2026-08-28_リソース経営部長/` |
 | **空手アドバイザー** | `30_shared_working/2026-08-28_空手アドバイザー/` |
