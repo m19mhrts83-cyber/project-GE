@@ -1,7 +1,7 @@
 # Grok 物件調査 Bot — 優先エリア・ふるい（正本）
 # Jarvis property_mail_match の CITY_HINTS / スコアと整合。Bot 説明文は grok_property_report_format.md を参照。
 
-version: 1
+version: 2
 updated: "2026-08-30"
 
 priority_areas:
@@ -30,30 +30,107 @@ priority_areas:
       - 四日市
       - 津
       - 鈴鹿
+  # 一棟AP・滋賀銀行ルート向け（地主大家情報 2026-08-30）
+  apartment_shiga_hint:
+    prefectures: [滋賀県, 愛知県]
+    cities_hint_shiga:
+      - 大津
+      - 草津
+      - 守山
+      - 栗東
+      - 野洲
+      - 湖南
+      - 甲賀
+      - 近江八幡
+      - 東近江
+      - 彦根
+      - 長浜
+      - 米原
 
 exclude_default:
   - 東京23区・都心ワンルーム
   - 区分マンション単体
-  - 一棟AP（戸建が主線）
+  # 一棟APは除外しない（下の tracks.apartment 条件で候補化）
+
+# 二本線: 戸建（主）＋ 一棟アパート（副・条件付き）
+tracks:
+  detached:
+    label: 戸建
+    structure: 戸建
+    price_man_min: 500
+    price_man_max: 3500
+    # 土地積算 / 価格 ×100
+    land_value_pct_listen: 100  # 100%超え → 聞く寄り
+    land_value_pct_note: 戸建は土地値100%超を聞く判定の主軸
+    finance_hint: 名銀等（愛知）· 従来どおり
+  apartment:
+    label: 一棟アパート
+    structure: 一棟アパート
+    # 地主大家飲み会 2026-08-30 · 滋賀銀行ルート
+    price_man_min: 1000
+    price_man_max: 3000
+    # 土地積算 / 想定フルローン額(≒価格) ×100 ≈ 150%前後
+    land_value_pct_listen_min: 140
+    land_value_pct_listen_target: 150
+    land_value_pct_listen_max: 170
+    land_value_pct_note: >
+      フルローン想定価格に対する土地値%が150%前後なら遡上。
+      140未満は原則保留寄り。区分・収益のみで土地値が薄いものは対象外。
+    finance_bank: 滋賀銀行
+    finance_notes:
+      - 土地値がある一棟APでフルローン余地あり（情報ソース: 地主大家 2026-08-30）
+      - 家賃収入が給与を上回ると滋賀銀行は使えなくなる
+      - 個人APは現状2棟想定 · 追加はあと1棟まで（枠消化後は滋賀ルートを原則停止）
+    remaining_shiga_slots: 1
+    after_slot_exhausted: 滋賀銀行ルートの新規AP探索は原則停止（松野が枠を更新するまで）
 
 property_filter:
-  structure: 戸建
+  # 後方互換: 探索は tracks 両方。旧キーは戸建主線の目安
+  structures: [戸建, 一棟アパート]
   price_man_min: 500
   price_man_max: 3500
-  yield_pct_internal_min: 0.15  # Bot 内部目安。地場 outreach 文面では前面に出さない
+  # 利回り（表面）。地場 outreach 文面には出さない
+  # 旧キー yield_pct_internal_min は target の下限寄りに揃える（0.15=15%）
+  yield_pct_internal_min: 0.15
   land_value100_prefer: true
   parking_bonus: true
-  hazard_default: exclude  # OK|注意|除外 — 除外は原則見送り（高利回り例外なし）
-  # 耐震（紙屋さん情報 2026-08-29）— 調査で必ず区分。旧耐震だけで除外しない
+  hazard_default: exclude
   seismic_check_required: true
-  seismic_new_from: "1981-06-01"  # 建築確認日目安
-  # 旧耐震戸建の保険等: 年あたり約10万円級増の運用目安（見積で上書き）
-  # 買付交渉（S6）: 保有10年想定で約100万円減額を論点に載せる
+  seismic_new_from: "1981-06-01"
   old_seismic_insurance_extra_yen_per_year_hint: 100000
   old_seismic_negotiate_discount_yen_for_10y_hint: 1000000
 
-# S1 自律探索の優先ポータル（5）。ログイン問合せは楽待・健美家を特に優先。
-# 詳細ルール: config/grok_property_bot_grok_paste.md
+# 利回り・返済比率・金利（評価の正 · 2026-08-30）
+# 返済比率の定義正本: docs/KURASHIFT_不動産賃貸経営.md（年返済÷年収 · 目安50%）
+buy_economics:
+  updated: "2026-08-30"
+  source_notes:
+    - 戸建: 金利上昇を織り込むと返済比率50%付近で買う想定（松野）
+    - 表面利回り最低10%。修繕＋価格交渉で実質15〜20%に持っていける水準でないと厳しい
+    - 楽天銀行等の高金利帯は目安年7%前後（時期で変動・断定禁止）
+    - 神大家トライアングル／Notion買い進めの「築古戸建20%」は交渉後ターゲット上限側
+  # どこで評価するか
+  evaluation_stages:
+    s1_hunt: 表面利回りゲート＋交渉後15〜20%到達可能性の1行。返済比率は概算フラグのみ
+    s6_negotiate: 修繕込みで利回り15〜20%にする減額交渉の本線
+    s7_finance: 想定金利（例7%）と返済比率〜50%の整合チェック
+    roi_ui: KURASHIFT /roi が買い物評価の正（表面／実質／返済比率の確定計算）
+  detached:
+    gross_yield_pct_listen_min: 10      # 表面・ポータル記載。これ未満は原則保留|見送り
+    gross_yield_pct_target_after_deal_min: 15  # 修繕費織込＋価格交渉後
+    gross_yield_pct_target_after_deal_max: 20
+    repayment_ratio_target_pct: 50      # 年返済÷満室年収（購入時）。目安
+    assumed_loan_rate_pct_stress: 7      # 高金利帯のストレス（楽天等の目安。断定しない）
+    note: 土地値100%超と併用。利回り未達は土地値だけ良くても厳しいと明記
+  apartment:
+    gross_yield_pct_listen_min: 8       # APは土地値150%が主軸。利回りは補助
+    gross_yield_pct_target_after_deal_min: 10
+    repayment_ratio_target_pct: 50
+    assumed_loan_rate_pct_stress: null  # 滋賀条件は別。金利は案件ごと
+    note: 土地値／価格150%前後が主。利回りは最低ラインのみ
+  outreach:
+    never_write_yield_pct_in_vendor_forms: true  # 地場初回フォームに利回り%を書かない
+
 sources:
   - 楽待
   - 健美家（kenbiya.net）
