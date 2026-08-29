@@ -2,7 +2,7 @@
 # Jarvis property_mail_match の CITY_HINTS / スコアと整合。Bot 説明文は grok_property_report_format.md を参照。
 
 version: 1
-updated: "2026-08-26"
+updated: "2026-08-30"
 
 priority_areas:
   primary:
@@ -44,6 +44,13 @@ property_filter:
   land_value100_prefer: true
   parking_bonus: true
   hazard_default: exclude  # OK|注意|除外 — 除外は原則見送り（高利回り例外なし）
+  # 耐震（紙屋さん情報 2026-08-29）— 調査で必ず区分。旧耐震だけで除外しない
+  seismic_check_required: true
+  seismic_new_from: "1981-06-01"  # 建築確認日目安
+  # 旧耐震戸建の保険等: 年あたり約10万円級増の運用目安（見積で上書き）
+  # 買付交渉（S6）: 保有10年想定で約100万円減額を論点に載せる
+  old_seismic_insurance_extra_yen_per_year_hint: 100000
+  old_seismic_negotiate_discount_yen_for_10y_hint: 1000000
 
 # S1 自律探索の優先ポータル（5）。ログイン問合せは楽待・健美家を特に優先。
 # 詳細ルール: config/grok_property_bot_grok_paste.md
