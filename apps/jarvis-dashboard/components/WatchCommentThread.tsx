@@ -167,8 +167,10 @@ export default function WatchCommentThread({
   }
 
   return (
-    <div className="watch-comments">
-      <p className="watch-comments-title">コメント（エンジンを選んで聞ける）</p>
+    <div className="watch-comments" suppressHydrationWarning>
+      <p className="watch-comments-title" suppressHydrationWarning>
+        コメント（エンジンを選んで聞ける）
+      </p>
       {comments.length === 0 ? (
         <p className="meta" style={{ margin: "0 0 8px" }}>
           まだコメントはありません。要対応の日付や直し方について聞けます。
