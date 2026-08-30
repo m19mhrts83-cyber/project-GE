@@ -170,6 +170,20 @@ export function buildInquiryPreviewFromTemplate(
     } as ReturnType<typeof buildInquiryPreviewFromTemplate>;
   }
 
+  if (classified.channel === "listing_web") {
+    const listingUrl = classified.to || "";
+    return {
+      to: listingUrl,
+      subject: agentSubject,
+      body: agentBody,
+      land_method: landMethod,
+      land_method_bairitsu: bairitsu,
+      inquiry_channel: "listing_web",
+      channel_reason: classified.reason,
+      listing_url: listingUrl || null,
+    } as ReturnType<typeof buildInquiryPreviewFromTemplate>;
+  }
+
   if (classified.channel === "agent_email") {
     return {
       to: classified.to,

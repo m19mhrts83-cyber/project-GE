@@ -10,6 +10,10 @@ import {
   checkFingerprintSendGuard,
   resolveDealFingerprint,
 } from "@/lib/reDealFingerprintGuard";
+import {
+  buildInquiryPreviewFromTemplate,
+  DEFAULT_RE_INQUIRY_TEMPLATE,
+} from "@/lib/reInquiryShared";
 
 function bodySha256(body: string): string {
   return createHash("sha256").update(body, "utf8").digest("hex");
@@ -349,6 +353,86 @@ export async function POST(
     });
   }
 
+  if (action === "listing_web_submit") {
+    const channelInfo = classifyInquiryChannel({
+      title: String(row.title || ""),
+      source: row.source != null ? String(row.source) : null,
+      summaryJson: sj,
+    });
+    if (channelInfo.channel !== "listing_web") {
+      return NextResponse.json(
+        {
+          error:
+            "掲載ページ問合せ対象ではありません（Grok調査＋掲載URLが必要）",
+          inquiry_channel: channelInfo.channel,
+        },
+        { status: 400 }
+      );
+    }
+    if (
+      inquiryStatus === "awaiting_reply" ||
+      inquiryStatus === "has_reply" ||
+      inquiryStatus === "sending"
+    ) {
+      return NextResponse.json(
+        { error: "既に問い合わせ進行中です", inquiry_status: inquiryStatus },
+        { status: 409 }
+      );
+    }
+    const preview = buildInquiryPreviewFromTemplate(DEFAULT_RE_INQUIRY_TEMPLATE, {
+      title: String(row.title || ""),
+      summaryJson: sj,
+      source: row.source != null ? String(row.source) : null,
+      area: (row as { area?: string | null }).area ?? null,
+      priceMan: (row as { price_man?: number | null }).price_man ?? null,
+      dealId: id,
+      signatureName:
+        process.env.RE_INQUIRY_SIGNATURE_NAME ||
+        process.env.PERSONAL_NAME ||
+        "",
+    });
+    const listingUrl = String(
+      (preview as { listing_url?: string }).listing_url ||
+        channelInfo.to ||
+        ""
+    ).trim();
+    const bodyText = String(preview.body || "").trim();
+    if (!listingUrl || !bodyText) {
+      return NextResponse.json(
+        { error: "掲載URLまたは定型文が空です" },
+        { status: 400 }
+      );
+    }
+    const now = new Date().toISOString();
+    const nextSj = {
+      ...sj,
+      inquiry_status: "awaiting_reply",
+      inquiry_channel: "listing_web",
+      listing_web_submitted_at: now,
+      listing_web_submitted_by: user.email ?? user.id,
+      listing_web_url: listingUrl,
+    };
+    const { error: upErr } = await supabase
+      .from("kurashift_re_deals")
+      .update({
+        inquiry_status: "awaiting_reply",
+        summary_json: nextSj,
+        updated_at: now,
+      })
+      .eq("id", id);
+    if (upErr) {
+      return NextResponse.json({ error: upErr.message }, { status: 500 });
+    }
+    return NextResponse.json({
+      ok: true,
+      inquiry_status: "awaiting_reply",
+      inquiry_channel: "listing_web",
+      listing_url: listingUrl,
+      subject: preview.subject,
+      body: bodyText,
+    });
+  }
+
   if (action === "poll") {
     const { data: job, error: jobErr } = await supabase
       .from("kurashift_jobs")
@@ -441,7 +525,7 @@ export async function POST(
   return NextResponse.json(
     {
       error:
-        "action must be send | build_ops_pack | form_draft | poll | autopass_confirm | autopass_reject",
+        "action must be send | build_ops_pack | form_draft | kamiooya_form_submitted | listing_web_submit | poll | autopass_confirm | autopass_reject",
     },
     { status: 400 }
   );

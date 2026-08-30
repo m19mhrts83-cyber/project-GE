@@ -59,6 +59,7 @@ export default function DealInquiryActions({
   const [landMethodBairitsu, setLandMethodBairitsu] = useState(false);
   const [channel, setChannel] = useState<InquiryChannel | null>(null);
   const [interestFormUrl, setInterestFormUrl] = useState<string | null>(null);
+  const [listingUrl, setListingUrl] = useState<string | null>(null);
   const [statusOverride, setStatusOverride] = useState<string | null>(null);
 
   const status = statusOverride || inquiryStatus || "none";
@@ -67,6 +68,7 @@ export default function DealInquiryActions({
   const showPack = !canSend || (messages || []).length > 0;
   const isHandoff = channel === "grok_handoff";
   const isKamiooyaForm = channel === "kamiooya_form";
+  const isListingWeb = channel === "listing_web";
 
   useEffect(() => {
     setStatusOverride(null);
@@ -108,6 +110,20 @@ export default function DealInquiryActions({
         setPreviewLoaded(true);
         return;
       }
+      if (data.inquiry_channel === "listing_web") {
+        setChannel("listing_web");
+        const url =
+          typeof data.listing_url === "string"
+            ? data.listing_url
+            : typeof data.to === "string"
+              ? data.to
+              : "";
+        setListingUrl(url || null);
+        setSubject(String(data.subject || ""));
+        setBody(String(data.body || ""));
+        setPreviewLoaded(true);
+        return;
+      }
       if (data.to) setTo(String(data.to));
       setSubject(String(data.subject || ""));
       setBody(String(data.body || ""));
@@ -134,6 +150,50 @@ export default function DealInquiryActions({
     landMethodBairitsu &&
     channel === "agent_email" &&
     !body.includes(BAIRITSU_MARKER);
+
+  async function listingWebOneClick() {
+    setBusy("listing_web");
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listing_web_submit" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(data.error || "失敗");
+        return;
+      }
+      const text = String(data.body || "");
+      const url = String(data.listing_url || listingUrl || "");
+      try {
+        if (text) await navigator.clipboard.writeText(text);
+      } catch {
+        /* clipboard may be denied — still open page */
+      }
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+      setStatusOverride(
+        typeof data.inquiry_status === "string"
+          ? data.inquiry_status
+          : "awaiting_reply"
+      );
+      setMsg(
+        text
+          ? "定型文をコピーし掲載ページを開きました。フォームに貼って送信し、完了したらこのまま返信待ちでOKです"
+          : "掲載ページを開きました（クリップボードに失敗した場合は下の定型文を手動コピー）"
+      );
+      if (text) setBody(text);
+      if (url) setListingUrl(url);
+      notifyChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function send() {
     if (!checked) {
@@ -314,7 +374,42 @@ export default function DealInquiryActions({
         </div>
       ) : null}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 }}>
-        {canSend && channel !== "not_applicable" && !isKamiooyaForm ? (
+        {canSend && isListingWeb ? (
+          <div style={{ width: "100%" }}>
+            <button
+              type="button"
+              className="btn primary"
+              style={{ fontSize: 12, padding: "6px 10px" }}
+              disabled={busy !== null}
+              onClick={() => void listingWebOneClick()}
+            >
+              {busy === "listing_web"
+                ? "準備中…"
+                : "掲載ページで問合せ（定型文コピー＋開く）"}
+            </button>
+            <p className="meta" style={{ marginTop: 4, lineHeight: 1.4 }}>
+              1回で定型文をクリップボードへコピーし、掲載ページを開きます。貼り付けて送信したら、こちらは問合せ済になります。
+            </p>
+            {body ? (
+              <pre
+                style={{
+                  marginTop: 6,
+                  padding: 8,
+                  fontSize: 11,
+                  whiteSpace: "pre-wrap",
+                  background: "var(--panel, #f8fafc)",
+                  border: "1px solid var(--border, #e2e8f0)",
+                  borderRadius: 6,
+                  maxHeight: 160,
+                  overflow: "auto",
+                }}
+              >
+                {body}
+              </pre>
+            ) : null}
+          </div>
+        ) : null}
+        {canSend && channel !== "not_applicable" && !isKamiooyaForm && !isListingWeb ? (
           <button
             type="button"
             className="btn primary"
@@ -333,7 +428,7 @@ export default function DealInquiryActions({
             {isHandoff ? "詳細編集してGrok依頼" : "詳細編集して問合せ"}
           </button>
         ) : null}
-        {canSend ? (
+        {canSend && !isListingWeb ? (
           <button
             type="button"
             className="btn"

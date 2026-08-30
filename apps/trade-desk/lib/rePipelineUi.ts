@@ -337,6 +337,7 @@ export type DealNextAction = {
     | "email_inquiry"
     | "grok_handoff"
     | "kamiooya_form"
+    | "listing_web"
     | "hz_research"
     | "triage";
   line: string;
@@ -401,6 +402,24 @@ export function dealRecommendedNext(params: {
       code: "email_inquiry",
       line: "第一問合せ（メール）を送る",
       primaryCta: "メールで問合せ",
+    };
+  }
+  if (channel === "listing_web") {
+    if (
+      inquiryStatus === "awaiting_reply" ||
+      inquiryStatus === "sent" ||
+      inquiryStatus === "sending"
+    ) {
+      return {
+        code: "listing_web",
+        line: "掲載ページ問合せ済 → 仲介返信・図面待ち",
+        primaryCta: "返信待ち",
+      };
+    }
+    return {
+      code: "listing_web",
+      line: "定型文をコピーして掲載ページで問合せ（1ボタン）",
+      primaryCta: "掲載ページで問合せ",
     };
   }
   if (tier1 && channel === "grok_handoff") {

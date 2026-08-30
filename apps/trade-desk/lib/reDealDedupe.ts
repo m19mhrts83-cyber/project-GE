@@ -138,8 +138,9 @@ export function inquiryChannelOf(deal: DealDedupeFields): InquiryChannel {
 export function channelSortRank(channel: InquiryChannel): number {
   if (channel === "agent_email") return 0;
   if (channel === "kamiooya_form") return 1;
-  if (channel === "grok_handoff") return 2;
-  return 3;
+  if (channel === "listing_web") return 2;
+  if (channel === "grok_handoff") return 3;
+  return 4;
 }
 
 function inquiryProgressRank(deal: DealDedupeFields): number {

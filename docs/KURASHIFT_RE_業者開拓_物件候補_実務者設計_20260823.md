@@ -516,8 +516,9 @@ flowchart TD
 | `inquiry_channel` | 条件 | UI / 送信 |
 |---|---|---|
 | `agent_email` | From／Reply-To が **自己以外** | To＝仲介 · `awaiting_reply` |
-| `grok_handoff` | 仲介メール不可 | To＝自分 · 件名 `[KURASHIFT問合せ依頼]` · `awaiting_grok`（poll スキップ） |
-| `not_applicable` | `mail_grok` 単体／業者開拓メモ | 問合せ CTA 非表示 |
+| `listing_web` | Grok調査済＋掲載URL | 1ボタン（定型文コピー＋掲載開く＋`awaiting_reply`） |
+| `grok_handoff` | 仲介メール不可（非 Grok調査 or 掲載無し） | To＝自分 · 件名 `[KURASHIFT問合せ依頼]` · `awaiting_grok` |
+| `not_applicable` | 業者開拓メモ／Grok調査だが掲載URL無し | 問合せ CTA 非表示 |
 
 | レーン | 何をするか | 誰が送るか |
 |---|---|---|
