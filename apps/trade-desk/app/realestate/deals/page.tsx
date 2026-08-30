@@ -14,6 +14,7 @@ import {
   SOURCE_BADGE,
   dealGmailUrl,
   dealOriginChip,
+  formatLandValuePct,
   grokOneLine,
   lastActivityLine,
   parseDealsTab,
@@ -356,8 +357,8 @@ export default async function RealEstateDealsPage({
       <p className="page-kicker">③-B · 実行</p>
       <h1>千三つファネル</h1>
       <p className="sub">
-        基本線: 仕分け（残す／見送り）→ 詳細問合せ → 内見 → 価格交渉 → 買い進め（買付・融資）。
-        「残す」は内見ではありません。早期フォローは「進行中」、買付以降が「買い進め」。
+        基本線: 仕分け（確認した／見送り）→ 詳細問合せ → 内見 → 価格交渉 → 買い進め（買付・融資）。
+        「確認した」は内見ではありません。早期フォローは「進行中」、買付以降が「買い進め」。
         行の「開く」で返信・判断履歴・第一問合せ。表示は同一案件を1件にまとめ、優先はメール問合せ → Grok（Webフォーム）の順。
         「評価スコア」は買い進め条件との一致度（数値＋高/中/低）。
         業者開拓は <a href="/realestate/vendors">業者開拓ウォッチ</a>。
@@ -410,6 +411,7 @@ export default async function RealEstateDealsPage({
                   <th>物件</th>
                   <th>エリア</th>
                   <th>価格</th>
+                  <th>土地値%</th>
                   <th>Grok</th>
                   <th>問合せ</th>
                   <th>詳細</th>
@@ -461,6 +463,9 @@ export default async function RealEstateDealsPage({
                           ? fmtYen(Number(d.price_man) * 10000)
                           : "—"}
                       </td>
+                      <td className="meta" style={{ fontWeight: 600 }}>
+                        {formatLandValuePct(grok)}
+                      </td>
                       <td className="meta">{grokOneLine(grok)}</td>
                       <td>
                         <span style={inquiryChipStyle(inq)}>
@@ -496,7 +501,7 @@ export default async function RealEstateDealsPage({
           </header>
           <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
             詳細問合せ進行中・内見・「進行中に入れる」でフォローしたもの。
-            「残す」だけではここには入りません。買い進め（買付）とは別です。
+            「確認した」だけではここには入りません。買い進め（買付）とは別です。
           </p>
           <div style={{ overflowX: "auto" }}>
             <table>
@@ -507,6 +512,7 @@ export default async function RealEstateDealsPage({
                   <th>物件</th>
                   <th>エリア</th>
                   <th>価格</th>
+                  <th>土地値%</th>
                   <th>Grok</th>
                   <th>問合せ</th>
                   <th>操作</th>
@@ -558,6 +564,9 @@ export default async function RealEstateDealsPage({
                         {d.price_man != null
                           ? fmtYen(Number(d.price_man) * 10000)
                           : "—"}
+                      </td>
+                      <td className="meta" style={{ fontWeight: 600 }}>
+                        {formatLandValuePct(grok)}
                       </td>
                       <td className="meta">{grokOneLine(grok)}</td>
                       <td>
