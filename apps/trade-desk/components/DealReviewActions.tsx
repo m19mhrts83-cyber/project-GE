@@ -106,7 +106,7 @@ export default function DealReviewActions({
         setMsg(data.error || "失敗しました");
       } else {
         const labels: Record<Action, string> = {
-          confirm: "残しました（次は詳細問合せ）",
+          confirm: "確認しました（次は詳細問合せ）",
           pass: "見送りにしました",
           pursue_add: "進行中に入れました",
           pursue_remove: "進行中から外しました",
@@ -184,7 +184,7 @@ export default function DealReviewActions({
             style={{ fontSize: 12, padding: "4px 8px" }}
             title="候補に残す。次は図面・マイソクの問合せ（内見ではない）"
           >
-            {busy === "confirm" ? "…" : "残す（問合せへ）"}
+            {busy === "confirm" ? "…" : "確認した（問合せへ）"}
           </button>
           <button
             type="button"
@@ -247,7 +247,7 @@ export default function DealReviewActions({
       ) : null}
       {showActions ? (
         <p className="meta" style={{ marginTop: 6, maxWidth: 220, lineHeight: 1.4 }}>
-          「残す」＝候補に残して問合せへ。「見送り」＝候補から外す（まだ内見でも買い進めでもありません）
+          「確認した」＝候補に残して問合せへ。「見送り」＝候補から外す（まだ内見でも買い進めでもありません）
         </p>
       ) : null}
       {showInquiryCta ? (

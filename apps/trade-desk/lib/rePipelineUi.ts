@@ -91,13 +91,44 @@ export function grokOneLine(grok: Record<string, unknown> | null): string {
   if (typeof grok.hazard_eval === "string" && grok.hazard_eval) {
     parts.push(`HZ:${grok.hazard_eval}`);
   }
-  if (typeof grok.land100 === "string" && grok.land100) {
+  const landPct = formatLandValuePct(grok);
+  if (landPct !== "不明") {
+    parts.push(`土地値:${landPct}`);
+  } else if (typeof grok.land100 === "string" && grok.land100) {
     parts.push(`土地:${grok.land100}`);
   }
   if (typeof grok.population_eval === "string" && grok.population_eval) {
     parts.push(`人口:${grok.population_eval}`);
   }
   return parts.length ? parts.join(" · ") : "—";
+}
+
+/**
+ * 土地値／購入価格の比率（Grok land100_ratio 優先）。不明は「不明」。
+ */
+export function formatLandValuePct(
+  grok: Record<string, unknown> | null | undefined
+): string {
+  if (!grok) return "不明";
+  const raw = grok.land100_ratio ?? grok.land_ratio;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const n = raw <= 3 ? raw * 100 : raw; // 1.23 → 123%
+    return `${Math.round(n)}%`;
+  }
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (!t || t === "-" || t === "—" || /要確認|不明|なし|n\/?a/i.test(t)) {
+      return "不明";
+    }
+    const m = t.match(/(\d+(?:\.\d+)?)\s*%?/);
+    if (m) {
+      const n = Number(m[1]);
+      if (!Number.isFinite(n)) return "不明";
+      const pct = n <= 3 && !t.includes("%") ? n * 100 : n;
+      return `${Math.round(pct)}%`;
+    }
+  }
+  return "不明";
 }
 
 export function lastActivityLine(
@@ -368,13 +399,13 @@ export function dealRecommendedNext(params: {
     }
     return {
       code: "triage",
-      line: "調査結果を見て「残す（問合せへ）／見送り」で仕分け（次は図面・マイソク。まだ内見ではない）",
-      primaryCta: "残す／見送り",
+      line: "調査結果を見て「確認した（問合せへ）／見送り」で仕分け（次は図面・マイソク。まだ内見ではない）",
+      primaryCta: "確認した／見送り",
     };
   }
   return {
     code: "triage",
-    line: "「残す（問合せへ）／見送り」で仕分け（残す＝詳細問合せへ。内見・買い進めではない）",
-    primaryCta: "残す／見送り",
+    line: "「確認した（問合せへ）／見送り」で仕分け（確認した＝詳細問合せへ。内見・買い進めではない）",
+    primaryCta: "確認した／見送り",
   };
 }
