@@ -281,6 +281,19 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             str(REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"),
             "--apply",
         ],
+        "re_vendor_judgment": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_re_vendor_judgment.py"),
+            "--vendor-id",
+            str(payload.get("vendor_id") or ""),
+            "--note",
+            str(payload.get("note") or ""),
+            *(
+                ["--judgment", str(payload.get("judgment"))]
+                if payload.get("judgment")
+                else []
+            ),
+        ],
         "re_mgmt_vendor_sync": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_mgmt_vendor_sync.py"),

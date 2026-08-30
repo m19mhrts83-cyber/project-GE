@@ -175,6 +175,7 @@ allowed_jobs:
   - re_sync_loan_tracker  # Discover未完了時は明示エラーで止まる
   - re_revise_plan  # dry-run既定。apply は UI confirm 必須
   - re_vendor_sync  # 地場業者 YAML → kurashift_re_vendors 投影
+  - re_vendor_judgment  # Dashboard 業者返信判断 → YAML notes + sync
 
 secrets:
   store: .env.jarvis_private

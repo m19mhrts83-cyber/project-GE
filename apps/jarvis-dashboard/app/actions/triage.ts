@@ -9,6 +9,11 @@ import {
 import { markGmailReadViaEnv } from "@/lib/gmail/markReadFromEnv";
 import type { CursorAskState } from "@/lib/localHandoff";
 import type { TriageStatus } from "@/lib/triageStatus";
+import {
+  VENDOR_JUDGMENT,
+  type VendorJudgmentCode,
+} from "@/lib/vendorJudgment";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export type TriageActionResult =
   | { ok: true; message?: string }
@@ -111,6 +116,148 @@ export async function setTriageStatus(
   revalidatePath("/general");
   revalidatePath("/queue");
   revalidatePath("/archive");
+  return { ok: true, prevStatus };
+}
+
+function judgmentNoteText(code: VendorJudgmentCode, vendorId: string): string {
+  const meta = VENDOR_JUDGMENT[code];
+  const day = new Date().toISOString().slice(0, 10);
+  return `${day} ${meta.notePrefix}（Dashboard · ${vendorId}）`;
+}
+
+async function enqueueReVendorJudgment(payload: {
+  vendor_id: string;
+  judgment: VendorJudgmentCode;
+  triage_id: string;
+  note: string;
+}): Promise<string | null> {
+  const admin = createServiceClient();
+  if (!admin) return "Mac ジョブキュー未設定（JARVIS_SUPABASE_SERVICE_ROLE_KEY）";
+  const label = VENDOR_JUDGMENT[payload.judgment].label;
+  const { error } = await admin.from("kurashift_jobs").insert({
+    job_type: "re_vendor_judgment",
+    title: `業者返信判断: ${payload.vendor_id} → ${label}`,
+    payload,
+    status: "queued",
+    created_by: "jarvis-dashboard",
+  });
+  if (error) return error.message;
+  return null;
+}
+
+/** 地場業者返信メールの判断（スキップではなく理由付きで閉じる） */
+export async function applyVendorReplyJudgment(
+  id: string,
+  code: VendorJudgmentCode,
+  path: string,
+): Promise<TriageActionResult & { prevStatus?: TriageStatus; toast?: string }> {
+  const meta = VENDOR_JUDGMENT[code];
+  const supabase = await createClient();
+  const { data: row, error: fetchErr } = await supabase
+    .from("triage_items")
+    .select("status,payload,gmail_message_id,account")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!row) return { ok: false, error: "not found" };
+
+  const payload = asPayload(row.payload);
+  if (!payload.re_vendor_reply) {
+    return { ok: false, error: "not a vendor reply mail" };
+  }
+  const vendorId = String(payload.vendor_id || "").trim();
+  if (!vendorId) {
+    return { ok: false, error: "vendor_id missing in payload" };
+  }
+
+  const prevStatus = (row.status || "pending") as TriageStatus;
+  payload.vendor_judgment = {
+    code,
+    label: meta.label,
+    at: new Date().toISOString(),
+    vendor_id: vendorId,
+  };
+  if (meta.status !== "snoozed") {
+    delete payload.snooze_until;
+  }
+
+  if (MARK_READ_STATUSES.includes(meta.status)) {
+    Object.assign(
+      payload,
+      await tryMarkTriageGmailRead({
+        gmail_message_id: row.gmail_message_id,
+        account: row.account,
+        payload,
+      }),
+    );
+  }
+
+  const { error } = await supabase
+    .from("triage_items")
+    .update({
+      status: meta.status,
+      payload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  const jobErr = await enqueueReVendorJudgment({
+    vendor_id: vendorId,
+    judgment: code,
+    triage_id: id,
+    note: judgmentNoteText(code, vendorId),
+  });
+
+  revalidatePath(path);
+  revalidatePath("/");
+  revalidatePath("/partner");
+  revalidatePath("/general");
+  revalidatePath("/queue");
+  revalidatePath("/archive");
+
+  return {
+    ok: true,
+    prevStatus,
+    toast: meta.toast,
+    message: jobErr
+      ? `${meta.toast}（YAML 反映キュー: ${jobErr}）`
+      : meta.toast,
+  };
+}
+
+/** 業者返信の判断を取り消し、未読に戻す */
+export async function resetVendorReplyJudgment(
+  id: string,
+  path: string,
+): Promise<TriageActionResult & { prevStatus?: TriageStatus }> {
+  const supabase = await createClient();
+  const { data: row, error: fetchErr } = await supabase
+    .from("triage_items")
+    .select("status,payload")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!row) return { ok: false, error: "not found" };
+
+  const prevStatus = (row.status || "pending") as TriageStatus;
+  const payload = asPayload(row.payload);
+  delete payload.vendor_judgment;
+
+  const { error } = await supabase
+    .from("triage_items")
+    .update({
+      status: "pending",
+      payload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(path);
+  revalidatePath("/");
+  revalidatePath("/general");
+  revalidatePath("/queue");
   return { ok: true, prevStatus };
 }
 
