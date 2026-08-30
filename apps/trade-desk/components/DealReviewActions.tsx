@@ -71,11 +71,7 @@ export default function DealReviewActions({
 
   async function run(action: Action) {
     if (action === "pass") {
-      if (
-        !window.confirm(
-          "対象外（見送り）にします。よろしいですか？"
-        )
-      ) {
+      if (!window.confirm("見送り（候補から外す）にします。よろしいですか？")) {
         return;
       }
     }
@@ -110,8 +106,8 @@ export default function DealReviewActions({
         setMsg(data.error || "失敗しました");
       } else {
         const labels: Record<Action, string> = {
-          confirm: "仕分けしました（次は詳細問合せ）",
-          pass: "対象外にしました",
+          confirm: "残しました（次は詳細問合せ）",
+          pass: "見送りにしました",
           pursue_add: "進行中に入れました",
           pursue_remove: "進行中から外しました",
           set_viewing: "内見にしました",
@@ -186,8 +182,9 @@ export default function DealReviewActions({
             disabled={busy !== null}
             onClick={() => run("confirm")}
             style={{ fontSize: 12, padding: "4px 8px" }}
+            title="候補に残す。次は図面・マイソクの問合せ（内見ではない）"
           >
-            {busy === "confirm" ? "…" : "確認した"}
+            {busy === "confirm" ? "…" : "残す（問合せへ）"}
           </button>
           <button
             type="button"
@@ -195,8 +192,9 @@ export default function DealReviewActions({
             disabled={busy !== null || status === "passed"}
             onClick={() => run("pass")}
             style={{ fontSize: 12, padding: "4px 8px" }}
+            title="候補から外す（見送り）"
           >
-            {busy === "pass" ? "…" : "対象外"}
+            {busy === "pass" ? "…" : "見送り"}
           </button>
           {!onInProgress && status !== "passed" && !buyPush ? (
             <button
@@ -249,7 +247,7 @@ export default function DealReviewActions({
       ) : null}
       {showActions ? (
         <p className="meta" style={{ marginTop: 6, maxWidth: 220, lineHeight: 1.4 }}>
-          「確認した」＝次は図面・マイソクの問合せへ（まだ内見でも買い進めでもありません）
+          「残す」＝候補に残して問合せへ。「見送り」＝候補から外す（まだ内見でも買い進めでもありません）
         </p>
       ) : null}
       {showInquiryCta ? (
