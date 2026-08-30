@@ -172,6 +172,17 @@ def is_not_applicable(deal: dict[str, Any]) -> bool:
     return False
 
 
+def is_kamiooya_intro_form(deal: dict[str, Any]) -> bool:
+    sj = sj_of(deal)
+    if sj.get("kamiooya_intro") is True:
+        return True
+    url = str(sj.get("interest_form_url") or "").strip()
+    if url:
+        return True
+    title = str(deal.get("title") or "")
+    return "【神大家】" in title and "物件紹介" in title
+
+
 def classify_inquiry_channel(
     deal: dict[str, Any], *, explicit_to: str | None = None
 ) -> dict[str, str]:
@@ -180,6 +191,14 @@ def classify_inquiry_channel(
             "channel": "not_applicable",
             "to": "",
             "reason": "grok_report_or_vendor_outreach_memo",
+        }
+    if is_kamiooya_intro_form(deal):
+        sj = sj_of(deal)
+        form_url = str(sj.get("interest_form_url") or "").strip()
+        return {
+            "channel": "kamiooya_form",
+            "to": form_url,
+            "reason": "interest_form_url" if form_url else "kamiooya_intro_subject",
         }
     to, src = resolve_agent_to(deal, explicit_to=explicit_to)
     if to:

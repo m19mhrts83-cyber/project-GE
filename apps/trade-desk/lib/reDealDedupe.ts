@@ -134,11 +134,12 @@ export function inquiryChannelOf(deal: DealDedupeFields): InquiryChannel {
   }).channel;
 }
 
-/** 小さいほど一覧の上（メール問合せ → Grok Web → 対象外） */
+/** 小さいほど一覧の上（メール → 神大家フォーム → Grok Web → 対象外） */
 export function channelSortRank(channel: InquiryChannel): number {
   if (channel === "agent_email") return 0;
-  if (channel === "grok_handoff") return 1;
-  return 2;
+  if (channel === "kamiooya_form") return 1;
+  if (channel === "grok_handoff") return 2;
+  return 3;
 }
 
 function inquiryProgressRank(deal: DealDedupeFields): number {

@@ -211,6 +211,21 @@ export function evaluateInquiryCandidate(
     };
   }
 
+  if (ch.channel === "kamiooya_form") {
+    badges.push("紹介フォーム");
+    return {
+      tier: 1,
+      tier1: true,
+      tier2: false,
+      tier3: false,
+      canQuickSend: false,
+      revive: false,
+      badges,
+      reasons: ["kamiooya_intro_form"],
+      ...baseChannel,
+    };
+  }
+
   if (titleHasUketsukeShuryo(deal.title)) {
     return {
       tier: null,

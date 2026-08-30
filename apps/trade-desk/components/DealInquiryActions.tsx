@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BAIRITSU_MARKER } from "@/lib/reInquiryShared";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 import { INQUIRY_CHANNEL_LABEL } from "@/lib/reInquiryChannel";
@@ -55,12 +55,14 @@ export default function DealInquiryActions({
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const [landMethodBairitsu, setLandMethodBairitsu] = useState(false);
   const [channel, setChannel] = useState<InquiryChannel | null>(null);
+  const [interestFormUrl, setInterestFormUrl] = useState<string | null>(null);
 
   const status = inquiryStatus || "none";
   const canSend =
     status === "none" || status === "draft" || status === "";
   const showPack = !canSend || (messages || []).length > 0;
   const isHandoff = channel === "grok_handoff";
+  const isKamiooyaForm = channel === "kamiooya_form";
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -79,6 +81,20 @@ export default function DealInquiryActions({
         setChannel("not_applicable");
         return;
       }
+      if (data.inquiry_channel === "kamiooya_form") {
+        setChannel("kamiooya_form");
+        const url =
+          typeof data.interest_form_url === "string"
+            ? data.interest_form_url
+            : typeof data.to === "string"
+              ? data.to
+              : "";
+        setInterestFormUrl(url || null);
+        setSubject(String(data.subject || ""));
+        setBody(String(data.body || ""));
+        setPreviewLoaded(true);
+        return;
+      }
       if (data.to) setTo(String(data.to));
       setSubject(String(data.subject || ""));
       setBody(String(data.body || ""));
@@ -94,6 +110,12 @@ export default function DealInquiryActions({
       setMsg(e instanceof Error ? e.message : "下書き取得エラー");
     }
   }, [dealId]);
+
+  // 神大家フォーム経路を自動判定（メール編集 UI を出さないため）
+  useEffect(() => {
+    if (!canSend || previewLoaded || channel !== null) return;
+    void loadPreview();
+  }, [canSend, previewLoaded, channel, loadPreview]);
 
   const bairitsuMissing =
     landMethodBairitsu &&
@@ -271,7 +293,7 @@ export default function DealInquiryActions({
         </div>
       ) : null}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 }}>
-        {canSend && channel !== "not_applicable" ? (
+        {canSend && channel !== "not_applicable" && !isKamiooyaForm ? (
           <button
             type="button"
             className="btn primary"
@@ -289,6 +311,66 @@ export default function DealInquiryActions({
           >
             {isHandoff ? "詳細編集してGrok依頼" : "詳細編集して問合せ"}
           </button>
+        ) : null}
+        {canSend ? (
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 12, padding: "4px 8px" }}
+            disabled={busy !== null}
+            onClick={async () => {
+              if (!previewLoaded || channel === null) {
+                await loadPreview();
+              }
+            }}
+          >
+            経路を確認
+          </button>
+        ) : null}
+        {canSend && (isKamiooyaForm || interestFormUrl) ? (
+          <>
+            {interestFormUrl ? (
+              <a
+                className="btn primary"
+                href={interestFormUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: 12, padding: "4px 8px" }}
+              >
+                紹介フォームを開く
+              </a>
+            ) : null}
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              disabled={busy !== null}
+              onClick={async () => {
+                setBusy("kamiooya_form");
+                setMsg(null);
+                try {
+                  const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "kamiooya_form_submitted" }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    setMsg(data.error || "失敗");
+                  } else {
+                    setMsg("フォーム送信済として記録（運営返信待ち）");
+                    router.refresh();
+                  }
+                } catch (e) {
+                  setMsg(e instanceof Error ? e.message : "エラー");
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            >
+              {busy === "kamiooya_form" ? "…" : "フォーム送信した"}
+            </button>
+          </>
         ) : null}
         {showPack ? (
           <button

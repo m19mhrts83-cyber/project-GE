@@ -148,6 +148,28 @@ export function buildInquiryPreviewFromTemplate(
     };
   }
 
+  if (classified.channel === "kamiooya_form") {
+    const formUrl =
+      typeof sj.interest_form_url === "string"
+        ? sj.interest_form_url.trim()
+        : classified.to || "";
+    return {
+      to: formUrl,
+      subject: "神大家物件紹介フォーム",
+      body: [
+        "この案件はメール返信ではなく、紹介メール末尾の規定フォームで詳細請求します。",
+        formUrl ? `フォーム: ${formUrl}` : "フォームURL未取得（元メール末尾を確認）",
+        `物件名（フォーム記入用）: ${title}`,
+      ].join("\n"),
+      land_method: landMethod,
+      land_method_bairitsu: bairitsu,
+      inquiry_channel: "kamiooya_form",
+      channel_reason: classified.reason,
+      interest_form_url: formUrl || null,
+      property_label: title,
+    } as ReturnType<typeof buildInquiryPreviewFromTemplate>;
+  }
+
   if (classified.channel === "agent_email") {
     return {
       to: classified.to,

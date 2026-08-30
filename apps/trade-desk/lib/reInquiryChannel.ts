@@ -3,7 +3,11 @@
  * クライアントからも import 可（fs 非依存）。vendor contact_email は Python 側で解決。
  */
 
-export type InquiryChannel = "agent_email" | "grok_handoff" | "not_applicable";
+export type InquiryChannel =
+  | "agent_email"
+  | "grok_handoff"
+  | "kamiooya_form"
+  | "not_applicable";
 
 export type InquiryChannelResult = {
   channel: InquiryChannel;
@@ -172,6 +176,19 @@ export function isNotApplicableDeal(params: {
   return false;
 }
 
+export function isKamiooyaIntroFormDeal(params: {
+  title?: string | null;
+  summaryJson?: Record<string, unknown> | null;
+}): boolean {
+  const sj = sjOf(params.summaryJson);
+  if (sj.kamiooya_intro === true) return true;
+  if (typeof sj.interest_form_url === "string" && sj.interest_form_url.trim()) {
+    return true;
+  }
+  const title = String(params.title || "");
+  return /【神大家】\s*物件紹介/.test(title);
+}
+
 export function classifyInquiryChannel(params: {
   title?: string | null;
   source?: string | null;
@@ -191,6 +208,22 @@ export function classifyInquiryChannel(params: {
       channel: "not_applicable",
       to: "",
       reason: "grok_report_or_vendor_outreach_memo",
+    };
+  }
+
+  if (
+    isKamiooyaIntroFormDeal({
+      title: params.title,
+      summaryJson: params.summaryJson,
+    })
+  ) {
+    const sj = sjOf(params.summaryJson);
+    const formUrl =
+      typeof sj.interest_form_url === "string" ? sj.interest_form_url.trim() : "";
+    return {
+      channel: "kamiooya_form",
+      to: formUrl,
+      reason: formUrl ? "interest_form_url" : "kamiooya_intro_subject",
     };
   }
 
@@ -275,5 +308,6 @@ export function buildGrokHandoffBody(params: {
 export const INQUIRY_CHANNEL_LABEL: Record<InquiryChannel, string> = {
   agent_email: "メールで問合せ",
   grok_handoff: "Grokに依頼",
+  kamiooya_form: "紹介フォームで詳細請求",
   not_applicable: "問合せ対象外",
 };
