@@ -203,15 +203,36 @@ def messages_table_ok(sb: Any) -> bool:
 
 
 def insert_message(sb: Any, deal: dict[str, Any], row: dict[str, Any]) -> str:
-    """DB 表があれば insert。無ければ summary_json.messages に追記。"""
+    """DB 表があれば insert。無ければ summary_json.messages に追記。
+
+    kind が check 制約外（旧 DB）でも、送信後ステータス更新を止めない。
+    """
     if messages_table_ok(sb):
         try:
             ins = sb.table("kurashift_re_deal_messages").insert(row).execute()
             return (ins.data or [{}])[0].get("id") or "ok"
         except Exception as e:
+            err = str(e).lower()
             # unique gmail_id
-            if "duplicate" in str(e).lower() or "23505" in str(e):
+            if "duplicate" in err or "23505" in err:
                 return "dup"
+            # kind_check 等: grok_handoff → first_inquiry にフォールバック
+            if "23514" in err or "kind_check" in err:
+                soft = dict(row)
+                if soft.get("kind") == "grok_handoff":
+                    soft["kind"] = "first_inquiry"
+                    payload = soft.get("payload")
+                    if isinstance(payload, dict):
+                        soft["payload"] = {**payload, "handoff": True, "kind_fallback": True}
+                    try:
+                        ins = sb.table("kurashift_re_deal_messages").insert(soft).execute()
+                        print("📎 inquiry_message: kind fallback to first_inquiry")
+                        return (ins.data or [{}])[0].get("id") or "ok"
+                    except Exception as e2:
+                        print(f"📎 inquiry_message: insert skipped after fallback: {e2}")
+                        return "skipped"
+                print(f"📎 inquiry_message: insert skipped (constraint): {e}")
+                return "skipped"
             raise
     sj = sj_of(deal)
     msgs = list(sj.get("messages") or [])

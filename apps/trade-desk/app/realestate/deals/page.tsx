@@ -5,7 +5,7 @@ import DealsListTable, { type DealsListRow } from "@/components/DealsListTable";
 import DealReviewActions from "@/components/DealReviewActions";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
-import { fmtYen } from "@/lib/format";
+import { formatJstDateTime, fmtYen } from "@/lib/format";
 import { readMacWatchStatus } from "@/lib/macWatchStatus";
 import {
   DEAL_STATUS_LABEL,
@@ -324,7 +324,7 @@ export default async function RealEstateDealsPage({
       grokLine: grokOneLine(grok),
       inquiryStatus,
       activityLine: activity.at
-        ? `${activity.at.slice(0, 10)} ${activity.text.slice(0, 32)}`
+        ? `${formatJstDateTime(activity.at).slice(0, 10)} ${activity.text.slice(0, 32)}`
         : "—",
       scoreLabel: formatMatchScore(d.match_score),
       scoreBand: band,
