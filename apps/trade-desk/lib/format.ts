@@ -62,9 +62,19 @@ export function gainPct(
   return (v - c) / c;
 }
 
-export const DASHBOARD_URL =
-  process.env.NEXT_PUBLIC_DASHBOARD_URL ||
-  "https://jarvis-dashboard-amber.vercel.app";
+const DEFAULT_DASHBOARD_URL = "https://jarvis-dashboard-amber.vercel.app";
+
+/** KURASHIFT 自身を指す誤設定だと /mail/* が 404 になるため弾く。 */
+function resolveDashboardUrl(): string {
+  const raw = (process.env.NEXT_PUBLIC_DASHBOARD_URL || "")
+    .trim()
+    .replace(/\/$/, "");
+  if (!raw) return DEFAULT_DASHBOARD_URL;
+  if (/jarvis-trade-desk|localhost:3003/i.test(raw)) return DEFAULT_DASHBOARD_URL;
+  return raw;
+}
+
+export const DASHBOARD_URL = resolveDashboardUrl();
 
 /** 借入残高トラッカー（ローン正本。Google: estate） */
 export const LOAN_TRACKER_URL =
