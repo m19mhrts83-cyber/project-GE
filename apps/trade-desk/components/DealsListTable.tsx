@@ -39,6 +39,7 @@ export type DealsListRow = {
   openHref: string;
   review: {
     gmailId: string | null;
+    gmailUrl: string | null;
     gmailReadAt: string | null;
     fromRaw: string | null;
     inquiryReady: boolean;
@@ -291,6 +292,7 @@ export default function DealsListTable({
                                   dealId={d.id}
                                   status={d.status}
                                   gmailId={d.review.gmailId}
+                                  gmailUrl={d.review.gmailUrl}
                                   gmailReadAt={d.review.gmailReadAt}
                                   dealTitle={d.title}
                                   fromRaw={d.review.fromRaw}
@@ -332,6 +334,7 @@ export default function DealsListTable({
                                   dealId={d.id}
                                   status={d.status}
                                   gmailId={d.review.gmailId}
+                                  gmailUrl={d.review.gmailUrl}
                                   gmailReadAt={d.review.gmailReadAt}
                                   pursuing={d.pursuing}
                                 />

@@ -10,6 +10,7 @@ export default function DealReviewActions({
   dealId,
   status,
   gmailId,
+  gmailUrl,
   gmailReadAt,
   dealTitle,
   fromRaw,
@@ -24,6 +25,8 @@ export default function DealReviewActions({
   dealId: string;
   status: string;
   gmailId?: string | null;
+  /** authuser 付き deep link（なければ gmailId から簡易 URL） */
+  gmailUrl?: string | null;
   gmailReadAt?: string | null;
   dealTitle?: string;
   fromRaw?: string | null;
@@ -121,10 +124,13 @@ export default function DealReviewActions({
 
   return (
     <div style={{ minWidth: 140 }}>
-      {gmailId ? (
+      {gmailId || gmailUrl ? (
         <div className="meta" style={{ marginBottom: 4 }}>
           <a
-            href={`https://mail.google.com/mail/u/#all/${gmailId}`}
+            href={
+              gmailUrl ||
+              `https://mail.google.com/mail/u/0/#all/${gmailId}`
+            }
             target="_blank"
             rel="noreferrer"
           >

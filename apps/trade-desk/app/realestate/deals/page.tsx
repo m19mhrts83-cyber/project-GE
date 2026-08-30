@@ -11,6 +11,7 @@ import {
   DEAL_STATUS_LABEL,
   INQUIRY_STATUS_LABEL,
   SOURCE_BADGE,
+  dealGmailUrl,
   dealOriginChip,
   grokOneLine,
   lastActivityLine,
@@ -334,6 +335,7 @@ export default async function RealEstateDealsPage({
       openHref: openDealHref(d.id),
       review: {
         gmailId: typeof sj.gmail_id === "string" ? sj.gmail_id : null,
+        gmailUrl: dealGmailUrl(sj, d.source),
         gmailReadAt:
           typeof sj.gmail_read_at === "string" ? sj.gmail_read_at : null,
         fromRaw,
