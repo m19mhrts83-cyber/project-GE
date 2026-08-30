@@ -11,13 +11,34 @@ export const DEAL_STATUS_LABEL: Record<string, string> = {
 };
 
 export const INQUIRY_STATUS_LABEL: Record<string, string> = {
-  none: "未送信",
-  draft: "下書き",
-  sent: "送信済",
-  awaiting_reply: "返信待ち",
+  none: "未問合せ",
+  draft: "下書き（未送信）",
+  sending: "送信中",
+  sent: "問合せ済",
+  awaiting_reply: "問合せ済・返信待ち",
   awaiting_grok: "Grok依頼中",
-  has_reply: "返信あり",
+  has_reply: "問合せ済・返信あり",
 };
+
+/** 進行中などで「問合せしたか」を一目で分ける */
+export function inquiryPhase(status: string | null | undefined): {
+  inquired: boolean;
+  label: string;
+} {
+  const s = String(status || "none");
+  if (s === "none" || s === "draft" || s === "") {
+    return { inquired: false, label: "未問合せ" };
+  }
+  if (s === "sending") return { inquired: true, label: "問合せ送信中" };
+  if (s === "sent") return { inquired: true, label: "問合せ済" };
+  if (s === "awaiting_reply") return { inquired: true, label: "問合せ済・返信待ち" };
+  if (s === "awaiting_grok") return { inquired: true, label: "Grok依頼中" };
+  if (s === "has_reply") return { inquired: true, label: "問合せ済・返信あり" };
+  return {
+    inquired: true,
+    label: INQUIRY_STATUS_LABEL[s] || s,
+  };
+}
 
 export const VENDOR_STATUS_LABEL: Record<string, string> = {
   pending: "未送信",
