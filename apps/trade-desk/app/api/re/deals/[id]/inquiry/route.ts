@@ -302,6 +302,53 @@ export async function POST(
     return NextResponse.json({ ok: true, job_id: job?.id });
   }
 
+  if (action === "kamiooya_form_submitted") {
+    const channelInfo = classifyInquiryChannel({
+      title: String(row.title || ""),
+      source: row.source != null ? String(row.source) : null,
+      summaryJson: sj,
+    });
+    if (channelInfo.channel !== "kamiooya_form") {
+      return NextResponse.json(
+        { error: "神大家紹介フォーム対象の案件ではありません" },
+        { status: 400 }
+      );
+    }
+    if (
+      inquiryStatus === "awaiting_reply" ||
+      inquiryStatus === "has_reply" ||
+      inquiryStatus === "sending"
+    ) {
+      return NextResponse.json(
+        { error: "既に問い合わせ進行中です", inquiry_status: inquiryStatus },
+        { status: 409 }
+      );
+    }
+    const now = new Date().toISOString();
+    const nextSj = {
+      ...sj,
+      inquiry_status: "awaiting_reply",
+      kamiooya_form_submitted_at: now,
+      kamiooya_form_submitted_by: user.email ?? user.id,
+    };
+    const { error: upErr } = await supabase
+      .from("kurashift_re_deals")
+      .update({
+        inquiry_status: "awaiting_reply",
+        summary_json: nextSj,
+        updated_at: now,
+      })
+      .eq("id", id);
+    if (upErr) {
+      return NextResponse.json({ error: upErr.message }, { status: 500 });
+    }
+    return NextResponse.json({
+      ok: true,
+      inquiry_status: "awaiting_reply",
+      inquiry_channel: "kamiooya_form",
+    });
+  }
+
   if (action === "poll") {
     const { data: job, error: jobErr } = await supabase
       .from("kurashift_jobs")

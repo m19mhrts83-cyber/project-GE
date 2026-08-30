@@ -21,6 +21,7 @@ import {
   gmailDeepLink,
   grokOneLine,
 } from "@/lib/rePipelineUi";
+import type { InquiryChannel } from "@/lib/reInquiryChannel";
 
 type TimelineItem = {
   kind: "message" | "event";
@@ -53,7 +54,7 @@ type InquiryEval = {
   tier2: boolean;
   canQuickSend: boolean;
   hasTo: boolean;
-  inquiryChannel?: "agent_email" | "grok_handoff" | "not_applicable";
+  inquiryChannel?: InquiryChannel;
   badges: string[];
   reasons: string[];
 };
@@ -142,6 +143,10 @@ export default function DealDetailDrawer({
     : null;
   const gmailUrl = dealGmailUrl(sj, deal?.source);
   const listingUrl = dealListingUrl(sj);
+  const interestFormUrl =
+    typeof sj.interest_form_url === "string" && sj.interest_form_url.trim()
+      ? sj.interest_form_url.trim()
+      : null;
   const scoreReason = deal
     ? dealScoreReasonLine({
         matchScore: deal.match_score,
@@ -274,6 +279,22 @@ export default function DealDetailDrawer({
                   ) : (
                     <span className="meta">元メールなし</span>
                   )}
+                  {interestFormUrl ? (
+                    <a
+                      className="btn"
+                      href={interestFormUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontWeight: 600,
+                        background: "#0f766e",
+                        color: "#fff",
+                        borderColor: "#0f766e",
+                      }}
+                    >
+                      紹介フォームを開く
+                    </a>
+                  ) : null}
                   {listingUrl ? (
                     <a
                       className="btn"

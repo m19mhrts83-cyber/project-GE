@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
+import type { InquiryChannel } from "@/lib/reInquiryChannel";
 
 type Action = "confirm" | "pass" | "pursue_add" | "pursue_remove";
 
@@ -33,7 +34,7 @@ export default function DealReviewActions({
   inquiryReady?: boolean;
   inquiryHasTo?: boolean;
   inquiryBadges?: string[];
-  inquiryChannel?: "agent_email" | "grok_handoff" | "not_applicable" | null;
+  inquiryChannel?: InquiryChannel | null;
   openDealHref?: string;
   /** いま買い進め中ブロックに出ている */
   pursuing?: boolean;

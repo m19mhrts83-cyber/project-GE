@@ -43,6 +43,10 @@
 
 方針（2026-08-27〜）: 物件判断は **KURASHIFT 上**。Gmail は取込済みなら既読にしてよい。
 
+**両箱（2026-08-30〜）**: 神大家紹介など admin／estate 二重着信は、取込・既読時に **Message-ID（だめなら件名+From）で双子も UNREAD 除去**。`summary_json.gmail_read_twin` で冪等。
+
+実装: `scripts/jarvis_kurashift_property_mail_match.py`（`stamp_row_gmail_read_on_import` / `--mark-read-all-imported`）
+
 取込時 auto_pass の判定（`clearly_out_of_scope`）:
 
 - 件名ノイズ（号外・ダイジェスト・税理士 等）

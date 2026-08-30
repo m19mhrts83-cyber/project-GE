@@ -169,6 +169,13 @@ export function dealOriginLabel(params: {
   ) {
     return "Grok調査結果";
   }
+  if (
+    sj.kamiooya_intro === true ||
+    /【神大家】\s*物件紹介/.test(title) ||
+    (typeof sj.interest_form_url === "string" && sj.interest_form_url.trim())
+  ) {
+    return "神大家物件紹介";
+  }
   if (source === "mail_estate" || source === "mail_admin") {
     return "メール候補";
   }
@@ -186,6 +193,7 @@ export function dealOriginChip(params: {
 }): "Grok" | "メール" | string {
   const label = dealOriginLabel(params);
   if (label === "Grok調査結果") return "Grok";
+  if (label === "神大家物件紹介") return "神大家";
   if (label.startsWith("メール")) return "メール";
   return label.slice(0, 6);
 }
@@ -273,6 +281,7 @@ export type DealNextAction = {
     | "reply"
     | "email_inquiry"
     | "grok_handoff"
+    | "kamiooya_form"
     | "hz_research"
     | "triage";
   line: string;
@@ -287,7 +296,7 @@ export function dealRecommendedNext(params: {
   summaryJson?: Record<string, unknown> | null;
   inquiryEval?: {
     tier1?: boolean;
-    inquiryChannel?: "agent_email" | "grok_handoff" | "not_applicable" | string;
+    inquiryChannel?: "agent_email" | "grok_handoff" | "kamiooya_form" | "not_applicable" | string;
   } | null;
 }): DealNextAction {
   const sj = asSj(params.summaryJson);
@@ -308,6 +317,28 @@ export function dealRecommendedNext(params: {
       code: "reply",
       line: "返信を確認 → フォーム下書き",
       primaryCta: "返信確認",
+    };
+  }
+  if (
+    channel === "kamiooya_form" ||
+    sj.kamiooya_intro === true ||
+    (typeof sj.interest_form_url === "string" && sj.interest_form_url.trim())
+  ) {
+    if (
+      inquiryStatus === "awaiting_reply" ||
+      inquiryStatus === "sent" ||
+      inquiryStatus === "awaiting_grok"
+    ) {
+      return {
+        code: "kamiooya_form",
+        line: "紹介フォーム送信済 → 運営の物件情報返信を待つ",
+        primaryCta: "運営返信待ち",
+      };
+    }
+    return {
+      code: "kamiooya_form",
+      line: "紹介フォームで詳細請求（メール返信ではない）",
+      primaryCta: "紹介フォームを開く",
     };
   }
   if (tier1 && channel === "agent_email") {

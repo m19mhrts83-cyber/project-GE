@@ -1,0 +1,54 @@
+# 神大家「物件紹介メール」第一問合せ（メール返信ではない）
+# 本文末尾の form.os7（または mail.omc7 追跡リンク）→ 規定フォーム記入 → 運営が資料送付
+
+detect:
+  subject_re: "【神大家】\\s*物件紹介"
+  from_hints:
+    - kami.ooyasan-club@sakulife.org
+    - 神・大家さん倶楽部事務局
+
+# 第一問合せフォームではない（除外）
+excluded_form_ids:
+  - 82ccce37  # 物件紹介メール登録
+  - 1906a1a5  # 戸建て購入・運営相談（返信後レーン）
+  - 598d05a5  # 請求書提出
+
+# 学習メモ（地域ごとに form id が違う。メールごと抽出が正）
+known_form_ids:
+  tokai: 3b22776d      # 東海地域 物件紹介申込（例: 東海 No.237 追跡リンク先）
+  kyushu1: dfb3b877
+  kyushu2: e6403772
+
+# 共通フィールド（九州2 / 東海で確認）
+fields:
+  - key: member_id
+    label: 会員番号
+    source: env.KAMIOOYA_MEMBER_ID
+    required: true
+  - key: family_name
+    label: 姓
+    source: env.PERSONAL_NAME_KANA_FAMILY # 漢字姓名は PERSONAL_NAME を分割
+    required: true
+  - key: given_name
+    label: 名
+    required: true
+  - key: email
+    label: メールアドレス
+    source: matsuno.estate@gmail.com
+    required: true
+  - key: email_confirm
+    label: メールアドレス（確認）
+    source: same_as_email
+    required: true
+  - key: property_label
+    label: 情報が欲しい物件
+    source: deal.title
+    note: 紹介メールの名称欄を記載（例: 名称:福岡市新築AP8120万円）
+    required: true
+
+rules:
+  submit_requires_user_confirm: true
+  inquiry_channel: kamiooya_form
+  after_submit_status: awaiting_reply
+  not_email_inquiry: true
+  exclude_from_tier2_tier3_auto_send: true

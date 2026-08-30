@@ -106,8 +106,241 @@ TOKEN_BY_SOURCE = {
     "mail_grok": "token_estate.json",
 }
 
+# 同一配信が admin↔estate に二重着信するときの双子箱
+TWIN_SOURCE = {
+    "mail_admin": "mail_estate",
+    "mail_estate": "mail_admin",
+}
+
 GROK_QUERY = 'subject:"[Grok調査]" newer_than:{days}d'
 GROK_SUBJECT_PREFIX = "[Grok調査]"
+
+# 神大家物件紹介 → 末尾フォーム（運営相談・登録・配信停止は除外）
+FORM_OS7_RE = re.compile(
+    r"https?://form\.os7\.biz/f/([a-z0-9]+)/?", re.IGNORECASE
+)
+TRACKING_CLICK_RE = re.compile(
+    r"https?://mail\.(?:omc7|os7)\.(?:com|biz)/l/[A-Za-z0-9/_-]+/?",
+    re.IGNORECASE,
+)
+KAMIOOYA_INTRO_SUBJECT_RE = re.compile(r"【神大家】\s*物件紹介")
+KAMIOOYA_INTRO_FROM_HINTS = (
+    "kami.ooyasan-club@sakulife.org",
+    "kami.ooyasan-club@",
+    "神・大家さん倶楽部事務局",
+)
+# 登録・運営相談・懇親会等（第一問合せフォームではない）
+EXCLUDED_INTEREST_FORM_IDS = frozenset(
+    {
+        "82ccce37",  # 物件紹介メール登録
+        "1906a1a5",  # 戸建て購入・運営相談（返信後レーン）
+        "598d05a5",  # 請求書提出
+    }
+)
+
+
+def resolve_click_redirect(url: str, *, timeout: float = 8.0) -> str | None:
+    """mail.omc7 / mail.os7 クリック計測 URL を辿り form.os7 を得る。"""
+    import urllib.error
+    import urllib.request
+
+    current = (url or "").strip()
+    if not current:
+        return None
+    for _ in range(6):
+        req = urllib.request.Request(
+            current,
+            method="HEAD",
+            headers={"User-Agent": "JarvisKURASHIFT/1.0"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                final = resp.geturl() or current
+                m = FORM_OS7_RE.search(final)
+                if m and m.group(1).lower() not in EXCLUDED_INTEREST_FORM_IDS:
+                    return f"https://form.os7.biz/f/{m.group(1).lower()}/"
+                if final == current:
+                    break
+                current = final
+        except Exception:
+            # HEAD 拒否時は GET（本文は読まない）
+            try:
+                req2 = urllib.request.Request(
+                    current,
+                    method="GET",
+                    headers={"User-Agent": "JarvisKURASHIFT/1.0"},
+                )
+                with urllib.request.urlopen(req2, timeout=timeout) as resp:
+                    final = resp.geturl() or current
+                    m = FORM_OS7_RE.search(final)
+                    if m and m.group(1).lower() not in EXCLUDED_INTEREST_FORM_IDS:
+                        return f"https://form.os7.biz/f/{m.group(1).lower()}/"
+                    break
+            except (urllib.error.URLError, Exception):
+                break
+    return None
+
+
+def extract_interest_form(text: str) -> dict[str, Any]:
+    """本文から神大家紹介の興味フォーム URL を抽出。"""
+    raw = text or ""
+    for m in FORM_OS7_RE.finditer(raw):
+        fid = m.group(1).lower()
+        if fid in EXCLUDED_INTEREST_FORM_IDS:
+            continue
+        return {
+            "interest_form_url": f"https://form.os7.biz/f/{fid}/",
+            "interest_form_id": fid,
+            "interest_form_raw": m.group(0),
+        }
+    for m in TRACKING_CLICK_RE.finditer(raw):
+        track = m.group(0)
+        resolved = resolve_click_redirect(track)
+        if resolved:
+            fid_m = FORM_OS7_RE.search(resolved)
+            fid = fid_m.group(1).lower() if fid_m else ""
+            return {
+                "interest_form_url": resolved,
+                "interest_form_id": fid,
+                "interest_form_raw": track,
+            }
+        return {
+            "interest_form_url": track,
+            "interest_form_id": "",
+            "interest_form_raw": track,
+        }
+    return {}
+
+
+def is_kamiooya_intro_mail(*, subject: str, from_hdr: str, text: str = "") -> bool:
+    if KAMIOOYA_INTRO_SUBJECT_RE.search(subject or ""):
+        return True
+    fl = (from_hdr or "").lower()
+    if any(h.lower() in fl for h in KAMIOOYA_INTRO_FROM_HINTS) and (
+        extract_interest_form(text) or "物件紹介" in (subject or "")
+    ):
+        return True
+    return False
+
+
+def apply_kamiooya_intro_fields(
+    sj: dict[str, Any],
+    *,
+    subject: str,
+    from_hdr: str,
+    text: str,
+) -> dict[str, Any]:
+    if not is_kamiooya_intro_mail(subject=subject, from_hdr=from_hdr, text=text):
+        return sj
+    sj["kamiooya_intro"] = True
+    form = extract_interest_form(text)
+    if form.get("interest_form_url"):
+        sj["interest_form_url"] = form["interest_form_url"]
+        if form.get("interest_form_id"):
+            sj["interest_form_id"] = form["interest_form_id"]
+        if form.get("interest_form_raw"):
+            sj["interest_form_raw"] = form["interest_form_raw"]
+    return sj
+
+
+def _header_map_from_message(msg: dict[str, Any]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for h in (msg.get("payload") or {}).get("headers") or []:
+        name = str(h.get("name") or "").lower()
+        if name:
+            out[name] = str(h.get("value") or "")
+    return out
+
+
+def find_twin_gmail_id(
+    primary_source: str,
+    gmail_id: str,
+    *,
+    subject: str | None = None,
+    from_hdr: str | None = None,
+) -> dict[str, Any] | None:
+    """admin↔estate の同一 Message-ID（だめなら件名+From）を探す。"""
+    twin_source = TWIN_SOURCE.get(str(primary_source))
+    if not twin_source:
+        return None
+    twin_token = TOKEN_BY_SOURCE.get(twin_source)
+    primary_token = TOKEN_BY_SOURCE.get(str(primary_source))
+    if not twin_token or not primary_token:
+        return None
+    try:
+        primary_svc = gmail_service(primary_token)
+        msg = (
+            primary_svc.users()
+            .messages()
+            .get(
+                userId="me",
+                id=str(gmail_id),
+                format="metadata",
+                metadataHeaders=["Message-ID", "Subject", "From"],
+            )
+            .execute()
+        )
+        hm = _header_map_from_message(msg)
+        mid = (hm.get("message-id") or "").strip()
+        subj = subject or hm.get("subject") or ""
+        frm = from_hdr or hm.get("from") or ""
+        twin_svc = gmail_service(twin_token)
+        queries: list[str] = []
+        if mid:
+            bare = mid.strip("<>").strip()
+            if bare:
+                queries.append(f"rfc822msgid:{bare}")
+        _, from_email = parseaddr(frm)
+        from_email = (from_email or "").strip()
+        if subj and from_email:
+            safe_subj = subj.replace('"', "")[:120]
+            queries.append(f'subject:"{safe_subj}" from:{from_email} newer_than:60d')
+        for q in queries:
+            res = (
+                twin_svc.users()
+                .messages()
+                .list(userId="me", q=q, maxResults=3)
+                .execute()
+            )
+            for m in res.get("messages") or []:
+                tid = str(m.get("id") or "")
+                if tid and tid != str(gmail_id):
+                    return {
+                        "source": twin_source,
+                        "gmail_id": tid,
+                        "query": q,
+                    }
+    except Exception as e:
+        print(f"# twin lookup FAIL {primary_source}/{gmail_id}: {type(e).__name__}: {e}")
+    return None
+
+
+def mark_gmail_and_twin_read(
+    source: str,
+    gmail_id: str,
+    *,
+    subject: str | None = None,
+    from_hdr: str | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """主箱＋双子箱を既読。"""
+    primary = mark_gmail_message_read(source, gmail_id, dry_run=dry_run)
+    out: dict[str, Any] = {"primary": primary, "twin": None}
+    if not primary.get("ok"):
+        return out
+    if str(source) not in TWIN_SOURCE:
+        return out
+    twin = find_twin_gmail_id(
+        source, gmail_id, subject=subject, from_hdr=from_hdr
+    )
+    if not twin:
+        out["twin"] = {"ok": True, "skipped": "no_twin"}
+        return out
+    twin_mark = mark_gmail_message_read(
+        twin["source"], twin["gmail_id"], dry_run=dry_run
+    )
+    out["twin"] = {**twin_mark, **twin}
+    return out
 
 
 def _field_after_label(text: str, label: str) -> str:
@@ -621,6 +854,12 @@ def _deal_row_from_message(
         "snippet": text[:500],
         "account": source,
     }
+    apply_kamiooya_intro_fields(
+        sj,
+        subject=subject or "",
+        from_hdr=hm.get("from", ""),
+        text=text,
+    )
     reply_to_raw = hm.get("reply-to") or hm.get("reply_to") or ""
     if reply_to_raw:
         sj["reply_to"] = str(reply_to_raw)[:200]
@@ -891,7 +1130,7 @@ def mark_gmail_message_read(
 
 
 def mark_deal_gmail_read(sb: Any, deal_id: str, *, dry_run: bool = False) -> dict[str, Any]:
-    """案件に紐づく Gmail を既読（UNREAD 除去）。"""
+    """案件に紐づく Gmail を既読（UNREAD 除去）。admin↔estate 双子も既読。"""
     deal_id = (deal_id or "").strip()
     if not deal_id:
         return {"ok": False, "error": "deal_id required"}
@@ -910,7 +1149,8 @@ def mark_deal_gmail_read(sb: Any, deal_id: str, *, dry_run: bool = False) -> dic
     gid = sj.get("gmail_id")
     if not gid:
         return {"ok": True, "skipped": "no_gmail_id", "deal_id": deal_id}
-    if sj.get("gmail_read_at"):
+    twin_done = bool(sj.get("gmail_read_twin"))
+    if sj.get("gmail_read_at") and twin_done:
         return {
             "ok": True,
             "skipped": "already_read",
@@ -919,10 +1159,31 @@ def mark_deal_gmail_read(sb: Any, deal_id: str, *, dry_run: bool = False) -> dic
             "gmail_read_at": sj.get("gmail_read_at"),
         }
     source = row.get("source") or sj.get("account") or "mail_admin"
-    print(f"使用アカウント: {source} / Gmail API（既読）")
-    marked = mark_gmail_message_read(str(source), str(gid), dry_run=dry_run)
-    if not marked.get("ok"):
-        return {**marked, "deal_id": deal_id}
+    print(f"使用アカウント: {source} / Gmail API（既読＋双子）")
+    from_hdr = str(sj.get("from") or "")
+    title = str(row.get("title") or "")
+    if sj.get("gmail_read_at") and not twin_done:
+        twin = find_twin_gmail_id(
+            str(source), str(gid), subject=title, from_hdr=from_hdr
+        )
+        if twin:
+            twin_mark = mark_gmail_message_read(
+                twin["source"], twin["gmail_id"], dry_run=dry_run
+            )
+            twin_mark = {**twin_mark, **twin}
+        else:
+            twin_mark = {"ok": True, "skipped": "no_twin"}
+        marked = {"primary": {"ok": True, "skipped": "already_read"}, "twin": twin_mark}
+    else:
+        marked = mark_gmail_and_twin_read(
+            str(source),
+            str(gid),
+            subject=title,
+            from_hdr=from_hdr,
+            dry_run=dry_run,
+        )
+    if not (marked.get("primary") or {}).get("ok"):
+        return {**(marked.get("primary") or {}), "deal_id": deal_id}
     if dry_run:
         return {
             "ok": True,
@@ -930,44 +1191,92 @@ def mark_deal_gmail_read(sb: Any, deal_id: str, *, dry_run: bool = False) -> dic
             "deal_id": deal_id,
             "gmail_id": gid,
             "source": source,
+            "twin": marked.get("twin"),
         }
     read_at = datetime.now(timezone.utc).isoformat()
-    sj2 = {**sj, "gmail_read_at": read_at}
+    sj2 = {**sj, "gmail_read_at": sj.get("gmail_read_at") or read_at}
+    twin_info = marked.get("twin") or {}
+    if twin_info.get("ok") and twin_info.get("gmail_id"):
+        sj2["gmail_read_twin"] = {
+            "source": twin_info.get("source"),
+            "gmail_id": twin_info.get("gmail_id"),
+            "at": read_at,
+        }
+    elif twin_info.get("skipped") == "no_twin":
+        sj2["gmail_read_twin"] = {"skipped": "no_twin", "at": read_at}
     sb.table("kurashift_re_deals").update(
         {
             "summary_json": sj2,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     ).eq("id", deal_id).execute()
-    print(f"📎 mark_gmail_read: deal={deal_id} gmail_id={gid} source={source}")
+    print(
+        f"📎 mark_gmail_read: deal={deal_id} gmail_id={gid} source={source} "
+        f"twin={twin_info.get('gmail_id') or twin_info.get('skipped')}"
+    )
     return {
         "ok": True,
         "deal_id": deal_id,
         "gmail_id": gid,
         "source": source,
-        "gmail_read_at": read_at,
+        "gmail_read_at": sj2.get("gmail_read_at"),
+        "twin": twin_info,
     }
 
 
 def stamp_row_gmail_read_on_import(c: dict[str, Any]) -> dict[str, Any]:
-    """取込直前に Gmail 既読し、summary_json.gmail_read_at を付与。失敗しても行は返す。"""
+    """取込直前に Gmail 既読（admin+estate 双子）し、summary_json.gmail_read_at を付与。"""
     sj = dict(c.get("summary_json") or {})
     gid = sj.get("gmail_id")
     if not gid:
         return c
-    if sj.get("gmail_read_at"):
+    if sj.get("gmail_read_at") and sj.get("gmail_read_twin"):
         return c
     source = str(c.get("source") or sj.get("account") or "mail_admin")
+    title = str(c.get("title") or "")
+    from_hdr = str(sj.get("from") or "")
     try:
-        marked = mark_gmail_message_read(source, str(gid))
-        if not marked.get("ok"):
+        if sj.get("gmail_read_at") and not sj.get("gmail_read_twin"):
+            twin = find_twin_gmail_id(
+                source, str(gid), subject=title, from_hdr=from_hdr
+            )
+            if twin:
+                twin_mark = mark_gmail_message_read(twin["source"], twin["gmail_id"])
+                if twin_mark.get("ok"):
+                    sj["gmail_read_twin"] = {
+                        "source": twin["source"],
+                        "gmail_id": twin["gmail_id"],
+                        "at": datetime.now(timezone.utc).isoformat(),
+                    }
+            else:
+                sj["gmail_read_twin"] = {
+                    "skipped": "no_twin",
+                    "at": datetime.now(timezone.utc).isoformat(),
+                }
+            return {**c, "summary_json": sj}
+
+        marked = mark_gmail_and_twin_read(
+            source, str(gid), subject=title, from_hdr=from_hdr
+        )
+        if not (marked.get("primary") or {}).get("ok"):
             print(
-                f"# import mark-read FAIL {gid}: {marked.get('error') or marked}"
+                f"# import mark-read FAIL {gid}: "
+                f"{(marked.get('primary') or {}).get('error') or marked}"
             )
             return c
-        sj["gmail_read_at"] = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc).isoformat()
+        sj["gmail_read_at"] = now
         sj["gmail_read_on"] = "import"
         sj["auto_pass_pending_read"] = False
+        twin_info = marked.get("twin") or {}
+        if twin_info.get("ok") and twin_info.get("gmail_id"):
+            sj["gmail_read_twin"] = {
+                "source": twin_info.get("source"),
+                "gmail_id": twin_info.get("gmail_id"),
+                "at": now,
+            }
+        elif twin_info.get("skipped") == "no_twin":
+            sj["gmail_read_twin"] = {"skipped": "no_twin", "at": now}
         return {**c, "summary_json": sj}
     except Exception as e:
         print(f"# import mark-read FAIL {gid}: {type(e).__name__}: {e}")
@@ -977,7 +1286,7 @@ def stamp_row_gmail_read_on_import(c: dict[str, Any]) -> dict[str, Any]:
 def mark_all_imported_gmail_read(
     sb: Any, *, dry_run: bool = False, limit: int = 800
 ) -> dict[str, Any]:
-    """既存 deals で gmail_id あり・gmail_read_at なしを一括既読。"""
+    """既存 deals で gmail_id あり・未既読または双子未処理を一括既読。"""
     resp = (
         sb.table("kurashift_re_deals")
         .select("id, title, source, summary_json, status")
@@ -990,7 +1299,7 @@ def mark_all_imported_gmail_read(
         gid = sj.get("gmail_id")
         if not gid:
             continue
-        if sj.get("gmail_read_at"):
+        if sj.get("gmail_read_at") and sj.get("gmail_read_twin"):
             continue
         pending.append(str(row["id"]))
     done = 0
@@ -1006,7 +1315,6 @@ def mark_all_imported_gmail_read(
             errors.append(f"{deal_id}:{type(e).__name__}:{e}")
             continue
         if r.get("ok") and not r.get("skipped"):
-            # 既読元を import バックフィルとして印
             try:
                 row2 = (
                     sb.table("kurashift_re_deals")
@@ -1017,7 +1325,8 @@ def mark_all_imported_gmail_read(
                 )
                 if row2.data:
                     sj2 = dict(row2.data[0].get("summary_json") or {})
-                    sj2["gmail_read_on"] = "import_backfill"
+                    if not sj2.get("gmail_read_on"):
+                        sj2["gmail_read_on"] = "import_backfill"
                     sb.table("kurashift_re_deals").update(
                         {
                             "summary_json": sj2,
@@ -1042,6 +1351,83 @@ def mark_all_imported_gmail_read(
         "dry_run": dry_run,
         "pending": len(pending),
         "marked": done,
+        "skipped": skipped,
+        "errors": errors[:20],
+    }
+
+
+def backfill_interest_forms(
+    sb: Any, *, dry_run: bool = False, limit: int = 200
+) -> dict[str, Any]:
+    """既存の神大家紹介 deals に interest_form_url を Gmail 全文から埋める。"""
+    resp = (
+        sb.table("kurashift_re_deals")
+        .select("id, title, source, summary_json")
+        .ilike("title", "%【神大家】物件紹介%")
+        .limit(limit)
+        .execute()
+    )
+    updated = 0
+    skipped = 0
+    errors: list[str] = []
+    for row in resp.data or []:
+        sj = dict(row.get("summary_json") or {}) if isinstance(row.get("summary_json"), dict) else {}
+        if sj.get("interest_form_url") and sj.get("kamiooya_intro"):
+            skipped += 1
+            continue
+        gid = sj.get("gmail_id")
+        source = str(row.get("source") or sj.get("account") or "mail_admin")
+        token = TOKEN_BY_SOURCE.get(source)
+        if not gid or not token:
+            skipped += 1
+            continue
+        try:
+            svc = gmail_service(token)
+            full = (
+                svc.users()
+                .messages()
+                .get(userId="me", id=str(gid), format="full")
+                .execute()
+            )
+            hm = _header_map_from_message(full)
+
+            def _walk(p: dict[str, Any]) -> list[str]:
+                out: list[str] = []
+                data = (p.get("body") or {}).get("data")
+                if data:
+                    out.append(base64.urlsafe_b64decode(data).decode("utf-8", "replace"))
+                for ch in p.get("parts") or []:
+                    out.extend(_walk(ch))
+                return out
+
+            body = "\n".join(_walk(full.get("payload") or {}))
+            before = dict(sj)
+            apply_kamiooya_intro_fields(
+                sj,
+                subject=str(row.get("title") or hm.get("subject") or ""),
+                from_hdr=hm.get("from", str(sj.get("from") or "")),
+                text=body,
+            )
+            if sj == before:
+                skipped += 1
+                continue
+            if dry_run:
+                updated += 1
+                continue
+            sb.table("kurashift_re_deals").update(
+                {
+                    "summary_json": sj,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).eq("id", row["id"]).execute()
+            updated += 1
+        except Exception as e:
+            errors.append(f"{row.get('id')}:{type(e).__name__}:{e}")
+    return {
+        "ok": len(errors) == 0,
+        "dry_run": dry_run,
+        "scanned": len(resp.data or []),
+        "updated": updated,
         "skipped": skipped,
         "errors": errors[:20],
     }
@@ -1188,7 +1574,12 @@ def main() -> int:
     ap.add_argument(
         "--mark-read-all-imported",
         action="store_true",
-        help="既に deals にあるが gmail_read_at 未の案件を一括既読",
+        help="既に deals にあるが gmail_read_at 未（または双子未）の案件を一括既読",
+    )
+    ap.add_argument(
+        "--backfill-interest-forms",
+        action="store_true",
+        help="神大家物件紹介の既存 deals に interest_form_url を全文から埋める",
     )
     args = ap.parse_args()
 
@@ -1206,6 +1597,15 @@ def main() -> int:
             sb, dry_run=args.dry_run or not args.apply
         )
         print(f"📎 mark_read_all_imported: {result}")
+        print("KURASHIFT_RESULT:" + json.dumps(result, ensure_ascii=False))
+        return 0 if result.get("ok") else 1
+
+    if args.backfill_interest_forms:
+        sb = sb_client()
+        result = backfill_interest_forms(
+            sb, dry_run=args.dry_run or not args.apply
+        )
+        print(f"📎 backfill_interest_forms: {result}")
         print("KURASHIFT_RESULT:" + json.dumps(result, ensure_ascii=False))
         return 0 if result.get("ok") else 1
 
