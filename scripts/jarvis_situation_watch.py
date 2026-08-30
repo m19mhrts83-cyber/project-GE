@@ -1807,6 +1807,21 @@ def eval_grok_bridge_inbox(meta: dict, data: dict | None) -> dict[str, Any]:
     summary = str(data.get("summary") or "部長ボックス")
     detail = str(data.get("detail") or "")
     pending = data.get("pending") or []
+    pending_ui: list[dict[str, Any]] = []
+    if isinstance(pending, list):
+        for it in pending[:8]:
+            if not isinstance(it, dict):
+                continue
+            pending_ui.append(
+                {
+                    "name": str(it.get("name") or ""),
+                    "mtime": str(it.get("mtime") or ""),
+                    "action": str(it.get("action") or ""),
+                    "priority": str(it.get("priority") or ""),
+                    "title": str(it.get("title") or ""),
+                    "body_md": str(it.get("body_md") or "")[:8000],
+                }
+            )
     return card(
         item_id=meta["id"],
         title=title,
@@ -1816,7 +1831,10 @@ def eval_grok_bridge_inbox(meta: dict, data: dict | None) -> dict[str, Any]:
         detail=detail,
         cursor_prompt=prompt,
         source=src,
-        payload={"pending_count": len(pending) if isinstance(pending, list) else 0},
+        payload={
+            "pending_count": len(pending) if isinstance(pending, list) else 0,
+            "pending": pending_ui,
+        },
     )
 
 
@@ -1840,6 +1858,21 @@ def eval_hawk_weekly_summary(meta: dict, data: dict | None) -> dict[str, Any]:
     summary = str(data.get("summary") or "ホーク週次サマリー")
     detail = str(data.get("detail") or "")
     items = data.get("items") or []
+    items_ui: list[dict[str, Any]] = []
+    if isinstance(items, list):
+        for it in items[:8]:
+            if not isinstance(it, dict):
+                continue
+            items_ui.append(
+                {
+                    "name": str(it.get("name") or ""),
+                    "mtime": str(it.get("mtime") or ""),
+                    "action": str(it.get("action") or ""),
+                    "priority": str(it.get("priority") or ""),
+                    "title": str(it.get("title") or ""),
+                    "body_md": str(it.get("body_md") or "")[:8000],
+                }
+            )
     return card(
         item_id=meta["id"],
         title=title,
@@ -1849,7 +1882,10 @@ def eval_hawk_weekly_summary(meta: dict, data: dict | None) -> dict[str, Any]:
         detail=detail,
         cursor_prompt=prompt,
         source=src,
-        payload={"item_count": len(items) if isinstance(items, list) else 0},
+        payload={
+            "item_count": len(items) if isinstance(items, list) else 0,
+            "pending": items_ui,
+        },
     )
 
 

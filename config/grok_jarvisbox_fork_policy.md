@@ -32,6 +32,7 @@
 - Jarvis に伝えること（完了 · 依頼 · 長メモ）は **必ず** admin Drive
   `【with Grok bot】/10_inbox_from_grok/` に `YYYY-MM-DD_題名.md`。
 - 先頭 YAML 推奨: `action:` / `priority:` / `target: jarvis`
+- **本文は改行を残す**（1行に潰さない）。`# 見出し` · 箇条書き · 番号リスト · コードフェンス。ダッシュボード状況ウォッチがそのまま描画する
 - **ホーク Notion**: `action: notion_tasks` → Jarvis が `jarvis_hawk_notion_tasks_apply.py --apply`
 - **松野にチャット全文コピーを求めない**（JarvisBox が正本）。
 ```

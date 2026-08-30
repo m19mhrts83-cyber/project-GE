@@ -89,7 +89,7 @@
 ## Jarvis への共有（必須 · フォーク）
 
 - Mac 実行・取込・送信・秘密は **Jarvis**
-- 完了 · 依頼 · 長メモは **`10_inbox_from_grok/`** に `YYYY-MM-DD_題名.md`（`action:` / `priority:` 推奨）
+- 完了 · 依頼 · 長メモは **`10_inbox_from_grok/`** に `YYYY-MM-DD_題名.md`（`action:` / `priority:` 推奨）。本文は改行を残し見出し・箇条書きで書く（1行詰めはしない）
 - 松野にチャット全文コピーを求めない
 
 ## あなたがやること

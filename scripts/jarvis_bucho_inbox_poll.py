@@ -77,13 +77,9 @@ def save_state(state: dict[str, Any]) -> None:
     )
 
 
-def preview(path: Path, limit: int = 240) -> str:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace").strip()
-    except OSError:
-        return ""
-    text = " ".join(text.split())
-    return text[:limit] + ("…" if len(text) > limit else "")
+BODY_LIMIT = 8000
+PREVIEW_LIMIT = 160
+PENDING_UI_MAX = 8
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -100,6 +96,104 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
         k, v = line.split(":", 1)
         meta[k.strip()] = v.strip()
     return meta, text[end + 4 :].lstrip("\n")
+
+
+def first_heading(body: str) -> str:
+    for line in body.splitlines():
+        s = line.strip()
+        if s.startswith("#"):
+            return s.lstrip("#").strip()
+    return ""
+
+
+def one_line_preview(body: str, limit: int = PREVIEW_LIMIT) -> str:
+    for line in body.splitlines():
+        s = line.strip()
+        if s and not s.startswith("#"):
+            collapsed = " ".join(s.split())
+            return collapsed[:limit] + ("…" if len(collapsed) > limit else "")
+    collapsed = " ".join(body.split())
+    if not collapsed:
+        return ""
+    return collapsed[:limit] + ("…" if len(collapsed) > limit else "")
+
+
+def clip_body(body: str, limit: int = BODY_LIMIT) -> str:
+    text = body.strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "\n\n…"
+
+
+def read_inbox_item(path: Path) -> dict[str, Any]:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        st = path.stat()
+        mtime = datetime.fromtimestamp(st.st_mtime, tz=JST).isoformat()
+    except OSError:
+        text = ""
+        mtime = ""
+    meta, body = parse_frontmatter(text)
+    title = first_heading(body) or path.stem
+    return {
+        "name": path.name,
+        "path": str(path),
+        "mtime": mtime,
+        "action": (meta.get("action") or "").strip(),
+        "priority": (meta.get("priority") or "").strip(),
+        "target": (meta.get("target") or "").strip(),
+        "title": title,
+        "body_md": clip_body(body),
+        "preview": one_line_preview(body),
+        "period_key": (meta.get("period_key") or "").strip(),
+        "source": (meta.get("source") or "").strip() or "hawk",
+    }
+
+
+def preview(path: Path, limit: int = 240) -> str:
+    """互換: 1行要約。ダッシュボード本文には使わない。"""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    _, body = parse_frontmatter(text)
+    return one_line_preview(body, limit)
+
+
+def format_detail_md(items: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for it in items[:PENDING_UI_MAX]:
+        name = str(it.get("name") or "")
+        title = str(it.get("title") or name)
+        bits: list[str] = []
+        body = str(it.get("body_md") or "").strip()
+        if not body.lstrip().startswith("#"):
+            bits.append(f"### {title}")
+        if name:
+            bits.append(f"`{name}`")
+        meta_bits: list[str] = []
+        if it.get("action"):
+            meta_bits.append(f"action: {it['action']}")
+        if it.get("priority"):
+            meta_bits.append(f"priority: {it['priority']}")
+        if meta_bits:
+            bits.append(" · ".join(f"`{x}`" for x in meta_bits))
+        if body:
+            bits.append(body)
+        parts.append("\n\n".join(bits))
+    return "\n\n---\n\n".join(parts)
+
+
+def item_for_watch_payload(item: dict[str, Any]) -> dict[str, str]:
+    """Supabase 向け。ローカル path は載せない。"""
+    return {
+        "name": str(item.get("name") or ""),
+        "mtime": str(item.get("mtime") or ""),
+        "action": str(item.get("action") or ""),
+        "priority": str(item.get("priority") or ""),
+        "title": str(item.get("title") or ""),
+        "body_md": str(item.get("body_md") or "")[:BODY_LIMIT],
+    }
 
 
 def load_weekly_summary_state() -> dict[str, Any]:
@@ -142,31 +236,10 @@ def poll_weekly_summaries(seen: dict[str, Any], inbox: Path) -> dict[str, Any]:
     for p in list_queue_files(inbox):
         if p.name in seen:
             continue
-        try:
-            text = p.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        it = read_inbox_item(p)
+        if it.get("action") != "weekly_summary":
             continue
-        meta, body = parse_frontmatter(text)
-        if meta.get("action") != "weekly_summary":
-            continue
-        st = p.stat()
-        mtime = datetime.fromtimestamp(st.st_mtime, tz=JST).isoformat()
-        summary_line = ""
-        for line in body.splitlines():
-            s = line.strip()
-            if s and not s.startswith("#"):
-                summary_line = s[:200]
-                break
-        items.append(
-            {
-                "name": p.name,
-                "path": str(p),
-                "mtime": mtime,
-                "period_key": meta.get("period_key") or "",
-                "source": meta.get("source") or "hawk",
-                "preview": summary_line or preview(p, 120),
-            }
-        )
+        items.append(it)
 
     n = len(items)
     if n == 0:
@@ -177,14 +250,12 @@ def poll_weekly_summaries(seen: dict[str, Any], inbox: Path) -> dict[str, Any]:
         level = "warn"
         it = items[0]
         summary = f"ホーク週次サマリー未処理: {it['name']}"
-        detail = it.get("preview") or ""
+        detail = format_detail_md(items)
     else:
         level = "attention"
         names = ", ".join(x["name"] for x in items[:3])
         summary = f"ホーク週次サマリー未処理 {n}件: {names}"
-        detail = "\n".join(
-            f"- {x['name']}: {x.get('preview') or '(空)'}" for x in items[:5]
-        )
+        detail = format_detail_md(items)
 
     state = {
         "level": level,
@@ -203,19 +274,9 @@ def poll() -> dict[str, Any]:
     inbox = folder("inbox_from_grok")
     pending: list[dict[str, Any]] = []
     for p in list_queue_files(inbox):
-        key = p.name
-        if key in seen:
+        if p.name in seen:
             continue
-        st = p.stat()
-        mtime = datetime.fromtimestamp(st.st_mtime, tz=JST).isoformat()
-        pending.append(
-            {
-                "name": key,
-                "path": str(p),
-                "mtime": mtime,
-                "preview": preview(p),
-            }
-        )
+        pending.append(read_inbox_item(p))
 
     n = len(pending)
     if n == 0:
@@ -225,15 +286,13 @@ def poll() -> dict[str, Any]:
     elif n == 1:
         level = "warn"
         summary = f"部長ボックス未処理: {pending[0]['name']}"
-        detail = pending[0].get("preview") or ""
+        detail = format_detail_md(pending)
     else:
         level = "attention" if n >= 3 else "warn"
         names = ", ".join(x["name"] for x in pending[:5])
         more = f" 他{n - 5}件" if n > 5 else ""
         summary = f"部長ボックス未処理 {n}件: {names}{more}"
-        detail = "\n".join(
-            f"- {x['name']}: {x.get('preview') or '(空)'}" for x in pending[:8]
-        )
+        detail = format_detail_md(pending)
 
     state["level"] = level
     state["summary"] = summary
