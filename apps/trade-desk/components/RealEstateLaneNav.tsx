@@ -10,7 +10,8 @@ export type ReLaneId =
   | "b-mgmt"
   | "b-repair"
   | "c"
-  | "d";
+  | "d"
+  | "d-lenders";
 
 const LANES: {
   id: ReLaneId;
@@ -55,6 +56,12 @@ const LANES: {
     href: "/realestate/finance-pack",
     short: "D",
     label: "融資パック",
+  },
+  {
+    id: "d-lenders",
+    href: "/realestate/lenders",
+    short: "銀行",
+    label: "アプローチ先",
   },
 ];
 

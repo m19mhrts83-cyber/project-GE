@@ -54,3 +54,4 @@ notes:
   - "inbox: jarvis_bucho_inbox_poll.py（launchd 15分）"
   - "L2 振り分け: config/grok_hawk_routine_Jarvisボックス.md（ホークアイ（参謀）ルーティン）"
   - "松野 Grok UI: JarvisBox 未処理 → 30_shared_working の 00_松野向け_*.md"
+  - "グルコン材料: 40_glucon_materials/inbox → jarvis_glucon_materials_from_drive.py → /glucon"

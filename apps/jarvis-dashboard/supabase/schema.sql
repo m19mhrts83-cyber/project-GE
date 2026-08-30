@@ -575,3 +575,5 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260819_kurashift_mq_replace_year_import.sql）
 -- kurashift_household_bs_snapshots（家計B/S 月次）
 -- （migrations/20260819_kurashift_household_bs_snapshots.sql）
+-- kurashift_lenders / kurashift_lender_intel / glucon_material_items
+-- （migrations/20260830_kurashift_lenders_glucon_materials.sql）

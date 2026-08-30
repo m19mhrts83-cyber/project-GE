@@ -39,6 +39,8 @@ export default async function FinancePackPage() {
         物件購入・運転資金・フリー・教育の書類チェック。個人／法人分離、マイナは共通。
         自動送信・自動アップロードはしません。
         {" · "}
+        <a href="/realestate/lenders">銀行アプローチ先 →</a>
+        {" · "}
         <a href="/realestate">不動産ハブ →</a>
         {" · "}
         <a href="/realestate/properties">物件マスタ →</a>
