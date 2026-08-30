@@ -3,10 +3,10 @@
  * - 進行中（詳細〜内見）: 問合せ進行 / viewing / 明示フォロー（pursue）
  * - 買い進め（買付・融資）: offer | loan | purchased のみ
  * 「確認した」(user_confirmed) だけではどちらにも入れない。
+ *
+ * クライアント（DealDetailDrawer 等）からも import されるため、
+ * fs / YAML 読取（reInquiryAutoConfig）に依存しない。
  */
-import { titleHasUketsukeShuryo } from "./reInquiryCandidate";
-import { isProductionInquiryDeal } from "./reInquiryProductionFilter";
-
 export type PursueDealFields = {
   id: string;
   title?: string | null;
@@ -29,6 +29,14 @@ const INQUIRY_ACTIVE = new Set([
   "has_reply",
 ]);
 
+const UKETSUKE_MARKERS = ["※受付終了※", "＊受付終了＊", "*受付終了*"];
+const NOISE_TITLE = [
+  "業者開拓",
+  "E2E-GROK-KURASHIFT",
+  "[Grok部長] 日報",
+  "日報 20",
+];
+
 function sjOf(d: PursueDealFields): Record<string, unknown> {
   const sj = d.summary_json;
   return sj && typeof sj === "object" ? sj : {};
@@ -43,17 +51,29 @@ function inquiryOf(d: PursueDealFields): string {
   );
 }
 
-const NOISE_TITLE = [
-  "業者開拓",
-  "E2E-GROK-KURASHIFT",
-  "[Grok部長] 日報",
-  "日報 20",
-];
-
 export function isPursueNoiseTitle(title: string | null | undefined): boolean {
   const t = String(title || "");
-  if (titleHasUketsukeShuryo(t)) return true;
+  if (UKETSUKE_MARKERS.some((m) => t.includes(m))) return true;
   return NOISE_TITLE.some((n) => t.includes(n));
+}
+
+/** クライアント安全な本番フィルタ（E2E・受付終了など） */
+function isProductionOk(d: PursueDealFields): boolean {
+  if (isPursueNoiseTitle(d.title)) return false;
+  const sj = sjOf(d);
+  const grok =
+    sj.grok && typeof sj.grok === "object"
+      ? (sj.grok as Record<string, unknown>)
+      : null;
+  const blob = [
+    String(d.title || ""),
+    String(sj.e2e ?? ""),
+    String(sj.report_id ?? ""),
+    String(grok?.e2e ?? ""),
+    String(grok?.report_id ?? ""),
+  ].join("\n");
+  if (blob.includes("E2E-GROK-KURASHIFT")) return false;
+  return true;
 }
 
 /** ユーザーが明示除外（進行中から外す） */
@@ -87,8 +107,7 @@ export function isUserPursueFlag(d: PursueDealFields): boolean {
 function baseOk(d: PursueDealFields): boolean {
   const st = String(d.status || "");
   if (st === "passed" || st === "archived") return false;
-  if (isPursueNoiseTitle(d.title)) return false;
-  if (!isProductionInquiryDeal(d)) return false;
+  if (!isProductionOk(d)) return false;
   if (isPursueExcluded(d)) return false;
   return true;
 }
