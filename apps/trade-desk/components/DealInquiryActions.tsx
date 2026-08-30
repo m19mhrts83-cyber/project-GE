@@ -36,6 +36,7 @@ export default function DealInquiryActions({
   autoPassPendingRead,
   autoPassReason,
   lastSendJobFailed,
+  onInquiryChanged,
 }: {
   dealId: string;
   title: string;
@@ -45,6 +46,7 @@ export default function DealInquiryActions({
   autoPassPendingRead?: boolean;
   autoPassReason?: string | null;
   lastSendJobFailed?: string | null;
+  onInquiryChanged?: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -57,13 +59,23 @@ export default function DealInquiryActions({
   const [landMethodBairitsu, setLandMethodBairitsu] = useState(false);
   const [channel, setChannel] = useState<InquiryChannel | null>(null);
   const [interestFormUrl, setInterestFormUrl] = useState<string | null>(null);
+  const [statusOverride, setStatusOverride] = useState<string | null>(null);
 
-  const status = inquiryStatus || "none";
+  const status = statusOverride || inquiryStatus || "none";
   const canSend =
     status === "none" || status === "draft" || status === "";
   const showPack = !canSend || (messages || []).length > 0;
   const isHandoff = channel === "grok_handoff";
   const isKamiooyaForm = channel === "kamiooya_form";
+
+  useEffect(() => {
+    setStatusOverride(null);
+  }, [inquiryStatus]);
+
+  const notifyChanged = useCallback(() => {
+    onInquiryChanged?.();
+    router.refresh();
+  }, [onInquiryChanged, router]);
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -161,13 +173,21 @@ export default function DealInquiryActions({
       if (!res.ok) {
         setMsg(data.error || "失敗");
       } else {
+        const nextStatus =
+          typeof data.inquiry_status === "string"
+            ? data.inquiry_status
+            : "sending";
+        setStatusOverride(nextStatus);
         setMsg(
-          "キュー投入済み（Mac 常駐が送信します。失敗時はホームに表示されます）"
+          nextStatus === "sending"
+            ? "送信キューに入れました（問合せ：送信中）。Mac 常駐が送信します"
+            : "キュー投入済み（Mac 常駐が送信します。失敗時はホームに表示されます）"
         );
         setOpen(false);
         setStep("edit");
         setChecked(false);
-        router.refresh();
+        setPreviewLoaded(false);
+        notifyChanged();
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -194,7 +214,7 @@ export default function DealInquiryActions({
             ? `運営相談パック作成 → /consultations/${data.consultation_id}`
             : "パックをキューしました"
         );
-        router.refresh();
+        notifyChanged();
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -219,7 +239,7 @@ export default function DealInquiryActions({
         setMsg(
           "フォーム下書きをキューしました（Mac 常駐実行後、ドロワーに反映）"
         );
-        router.refresh();
+        notifyChanged();
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -249,7 +269,7 @@ export default function DealInquiryActions({
             ? "既読で正しい → 既読ジョブをキュー"
             : "誤り → 候補（info）に戻しました"
         );
-        router.refresh();
+        notifyChanged();
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -360,7 +380,8 @@ export default function DealInquiryActions({
                     setMsg(data.error || "失敗");
                   } else {
                     setMsg("フォーム送信済として記録（運営返信待ち）");
-                    router.refresh();
+                    setStatusOverride("awaiting_reply");
+                    notifyChanged();
                   }
                 } catch (e) {
                   setMsg(e instanceof Error ? e.message : "エラー");

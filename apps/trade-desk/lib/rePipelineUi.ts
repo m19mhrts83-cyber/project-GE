@@ -26,8 +26,11 @@ export function inquiryPhase(status: string | null | undefined): {
   label: string;
 } {
   const s = String(status || "none");
-  if (s === "none" || s === "draft" || s === "") {
+  if (s === "none" || s === "") {
     return { inquired: false, label: "未問合せ" };
+  }
+  if (s === "draft") {
+    return { inquired: false, label: "下書き（未送信）" };
   }
   if (s === "sending") return { inquired: true, label: "問合せ送信中" };
   if (s === "sent") return { inquired: true, label: "問合せ済" };

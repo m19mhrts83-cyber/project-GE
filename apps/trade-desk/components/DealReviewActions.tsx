@@ -29,6 +29,7 @@ export default function DealReviewActions({
   inProgress,
   buyPush,
   compactPursue,
+  onInquiryChanged,
 }: {
   dealId: string;
   status: string;
@@ -51,6 +52,7 @@ export default function DealReviewActions({
   pursuing?: boolean;
   /** 進行中／買い進めブロック内の「外す」だけ */
   compactPursue?: boolean;
+  onInquiryChanged?: () => void;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<Action | null>(null);
@@ -262,6 +264,7 @@ export default function DealReviewActions({
             badges={inquiryBadges}
             compact
             openHref={openDealHref}
+            onSent={onInquiryChanged}
           />
         </div>
       ) : null}

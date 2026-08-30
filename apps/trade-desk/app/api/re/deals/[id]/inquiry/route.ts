@@ -207,11 +207,11 @@ export async function POST(
         (row as { property_fingerprint?: string | null }).property_fingerprint ??
         null,
     });
-    sj.inquiry_status = "draft";
+    sj.inquiry_status = "sending";
     sj.property_fingerprint = fingerprint;
     const now = new Date().toISOString();
     const draftPatch: Record<string, unknown> = {
-      inquiry_status: "draft",
+      inquiry_status: "sending",
       summary_json: sj,
       updated_at: now,
       property_fingerprint: fingerprint,
@@ -226,7 +226,7 @@ export async function POST(
         updated_at: now,
       };
       if (!/property_fingerprint|column/i.test(String(draftErr.message))) {
-        soft.inquiry_status = "draft";
+        soft.inquiry_status = "sending";
       }
       await supabase.from("kurashift_re_deals").update(soft).eq("id", id);
     }
@@ -261,7 +261,7 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       job_id: job?.id,
-      inquiry_status: "draft",
+      inquiry_status: "sending",
       inquiry_channel: inquiryChannel,
     });
   }
