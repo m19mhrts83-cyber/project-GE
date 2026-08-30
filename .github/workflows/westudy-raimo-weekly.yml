@@ -54,6 +54,10 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       RAIMO_NOTIFY_MACOS: "0"
       RAIMO_FAIL_OPEN: "0"
+      # Raimo 取込は巨大 CSV を JS ヒープに載せるため、GHA では分割・スクショなし・最新化スキップ
+      RAIMO_SKIP_SCREENSHOT: "1"
+      RAIMO_TRY_COMMUNITY_REFRESH: "0"
+      RAIMO_IMPORT_CHUNK_ROWS: "80"
       # 日曜朝の WeStudy タイムアウト対策（既定より多め）
       WESTUDY_LOGIN_NAV_RETRIES: "5"
       WESTUDY_PAGE_GET_RETRIES: "4"

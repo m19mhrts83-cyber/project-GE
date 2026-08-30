@@ -20,6 +20,8 @@ Raimo アプリに管理者ログインし、CSV取込を自動実行する。
   RAIMO_TRY_COMMUNITY_REFRESH=1/0 (既定: 1) CSV取込後に「コミュニティ情報の最新化」相当の操作を試す
   RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC (既定: 300) 上記の完了待ち秒
   RAIMO_IMPORT_MAX_ATTEMPTS (既定: 3) Page crash 時のブラウザ再生成リトライ回数
+  RAIMO_IMPORT_CHUNK_ROWS (既定: 80) 大きい CSV を何行ずつ取り込むか。0 で分割しない
+  RAIMO_SKIP_SCREENSHOT=1/0 (既定: 0) 1 ならスクリーンショットしない（CI 向け）
   RAIMO_CHROMIUM_ARGS (任意) Chromium 追加引数（空白区切り）。既定で --disable-dev-shm-usage 等を付与
   RAIMO_NOTIFY_MACOS=1/0 (既定: 1) macOS のみ終了時に通知センターへ表示（osascript）
 
@@ -30,10 +32,13 @@ Raimo アプリに管理者ログインし、CSV取込を自動実行する。
 from __future__ import annotations
 
 import argparse
+import csv
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -590,6 +595,64 @@ def ensure_csv_file(path: str) -> Path:
     return p
 
 
+def split_csv_into_chunks(csv_path: Path, max_rows: int, dest_dir: Path) -> list[Path]:
+    """
+    大きい CSV を max_rows 件ずつに分割する。
+    Raimo 側は file.text() で全文を JS ヒープに載せるため、週次の巨大差分は
+    Chromium が取込中〜直後に Target crashed しやすい。
+    """
+    if max_rows <= 0:
+        return [csv_path]
+    with csv_path.open(newline="", encoding="utf-8-sig", errors="replace") as f:
+        reader = csv.reader(f)
+        try:
+            header = next(reader)
+        except StopIteration:
+            return [csv_path]
+        rows = list(reader)
+    if len(rows) <= max_rows:
+        return [csv_path]
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    out: list[Path] = []
+    total = (len(rows) + max_rows - 1) // max_rows
+    for i in range(0, len(rows), max_rows):
+        chunk_rows = rows[i : i + max_rows]
+        n = i // max_rows + 1
+        p = dest_dir / f"{csv_path.stem}.chunk{n:03d}of{total:03d}.csv"
+        with p.open("w", newline="", encoding="utf-8") as wf:
+            writer = csv.writer(wf, lineterminator="\n")
+            writer.writerow(header)
+            writer.writerows(chunk_rows)
+        out.append(p)
+        print(f"CSV chunk {n}/{total}: {p.name} rows={len(chunk_rows)}", flush=True)
+    return out
+
+
+def _merge_import_stats(total: dict, part: dict) -> None:
+    for key in ("ok", "skip", "ng"):
+        total[key] = int(total.get(key, 0)) + int(part.get(key, 0))
+
+
+def import_csv_on_page(page, csv_path: Path, timeout_sec: int) -> tuple[dict, str]:
+    """管理者タブで CSV を取り込み、#importResult の集計とトーストを返す。"""
+    app_fr = resolve_app_frame(page, timeout_ms=120000)
+    admin_tab = app_fr.locator("#adminDataTabBtn")
+    admin_tab.wait_for(state="visible", timeout=120000)
+    admin_tab.click()
+    file_input = app_fr.locator("#csvFileInput")
+    file_input.wait_for(state="attached", timeout=120000)
+    file_input.set_input_files(str(csv_path))
+    app_fr.locator("#importCsvBtn").click()
+    print(
+        "ブラウザでCSV取込を実行中（行数が多いと完了まで時間がかかります）…",
+        flush=True,
+    )
+    result_text = wait_import_finished(app_fr, timeout_sec=timeout_sec)
+    stats = parse_result_stats(result_text)
+    toast_text = _safe_inner_text(app_fr.locator("#toast"), 3000)
+    return stats, toast_text
+
+
 def _safe_inner_text(locator, timeout_ms: int) -> str:
     try:
         if locator.count() == 0:
@@ -767,169 +830,210 @@ def main() -> int:
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6_0) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     ).strip()
-    shot_dir = (
-        Path(args.screenshot_dir).expanduser().resolve()
-        if args.screenshot_dir
-        else None
-    )
-    if shot_dir:
+    skip_shot = get_env_bool("RAIMO_SKIP_SCREENSHOT", False)
+    shot_dir = None
+    if args.screenshot_dir and not skip_shot:
+        shot_dir = Path(args.screenshot_dir).expanduser().resolve()
         shot_dir.mkdir(parents=True, exist_ok=True)
 
     login_wait_ms = int(os.environ.get("RAIMO_LOGIN_WAIT_MS", "120000"))
     post_login_wait_ms = int(os.environ.get("RAIMO_POST_LOGIN_WAIT_MS", "180000"))
+    chunk_rows = int(os.environ.get("RAIMO_IMPORT_CHUNK_ROWS", "80"))
+    chunk_dir = Path(tempfile.mkdtemp(prefix="raimo_csv_chunks_"))
+    chunks = split_csv_into_chunks(csv_path, chunk_rows, chunk_dir)
+    if len(chunks) > 1:
+        print(
+            f"CSVを {len(chunks)} 分割して取り込みます（1分割あたり最大 {chunk_rows} 行）",
+            flush=True,
+        )
 
     print(f"Raimo自動取込開始: csv={csv_path}", flush=True)
 
     exit_code = 2
     notify_detail = "処理が完了しませんでした。"
     max_attempts = max(1, int(os.environ.get("RAIMO_IMPORT_MAX_ATTEMPTS", "3")))
+    total_stats = {"ok": 0, "skip": 0, "ng": 0}
+    last_toast = ""
 
-    with sync_playwright() as p:
-        last_error: BaseException | None = None
-        for attempt in range(1, max_attempts + 1):
-            browser = None
-            context = None
-            page = None
-            try:
-                if attempt > 1:
-                    print(
-                        f"🔁 Page crash 等のため再試行します（{attempt}/{max_attempts}）",
-                        flush=True,
-                    )
-                    time.sleep(2)
-
-                browser = p.chromium.launch(
-                    headless=headless,
-                    slow_mo=slow_mo,
-                    args=_chromium_launch_args(),
-                )
-                context = browser.new_context(
-                    user_agent=user_agent,
-                    locale="ja-JP",
-                    viewport={"width": 1440, "height": 900},
-                )
-                context.add_init_script(
-                    """
-                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                    Object.defineProperty(navigator, 'platform', {get: () => 'MacIntel'});
-                    Object.defineProperty(navigator, 'language', {get: () => 'ja-JP'});
-                    Object.defineProperty(navigator, 'languages', {get: () => ['ja-JP', 'ja', 'en-US']});
-                    """
-                )
-                page = context.new_page()
-                page.goto(app_url, wait_until="domcontentloaded", timeout=120000)
-
-                authenticate_raimo_page(
-                    page,
-                    app_email=app_email,
-                    app_password=app_password,
-                    portal_creds=portal_creds,
-                    login_wait_ms=login_wait_ms,
-                    post_login_wait_ms=post_login_wait_ms,
-                )
-
-                app_fr = resolve_app_frame(page, timeout_ms=120000)
-
-                # 管理者タブ（CSV取込）へ（iframe 内でも操作）
-                admin_tab = app_fr.locator("#adminDataTabBtn")
-                admin_tab.wait_for(state="visible", timeout=120000)
-                admin_tab.click()
-
-                # タブ切り替え後に file input が差し込まれるまで待つ
-                file_input = app_fr.locator("#csvFileInput")
-                file_input.wait_for(state="attached", timeout=120000)
-
-                # CSV ファイル選択と取込実行
-                file_input.set_input_files(str(csv_path))
-                app_fr.locator("#importCsvBtn").click()
+    try:
+        with sync_playwright() as p:
+            last_error: BaseException | None = None
+            for chunk_i, chunk_path in enumerate(chunks, start=1):
+                chunk_ok = False
                 print(
-                    "ブラウザでCSV取込を実行中（行数が多いと完了まで時間がかかります）…",
+                    f"==> Raimo chunk {chunk_i}/{len(chunks)}: {chunk_path.name}",
                     flush=True,
                 )
+                for attempt in range(1, max_attempts + 1):
+                    browser = None
+                    context = None
+                    page = None
+                    import_stats: dict | None = None
+                    try:
+                        if attempt > 1:
+                            print(
+                                f"🔁 Page crash 等のため再試行します"
+                                f"（chunk {chunk_i} {attempt}/{max_attempts}）",
+                                flush=True,
+                            )
+                            time.sleep(2)
 
-                result_text = wait_import_finished(app_fr, timeout_sec=args.timeout_sec)
-                stats = parse_result_stats(result_text)
-                toast_text = _safe_inner_text(app_fr.locator("#toast"), 3000)
+                        browser = p.chromium.launch(
+                            headless=headless,
+                            slow_mo=slow_mo,
+                            args=_chromium_launch_args(),
+                        )
+                        context = browser.new_context(
+                            user_agent=user_agent,
+                            locale="ja-JP",
+                            viewport={"width": 1440, "height": 900},
+                        )
+                        context.add_init_script(
+                            """
+                            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                            Object.defineProperty(navigator, 'platform', {get: () => 'MacIntel'});
+                            Object.defineProperty(navigator, 'language', {get: () => 'ja-JP'});
+                            Object.defineProperty(navigator, 'languages', {get: () => ['ja-JP', 'ja', 'en-US']});
+                            """
+                        )
+                        page = context.new_page()
+                        page.goto(app_url, wait_until="domcontentloaded", timeout=120000)
 
-                refresh_timeout = int(
-                    os.environ.get("RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC", "300")
-                )
-                try:
-                    ok_refresh, refresh_msg = try_community_info_refresh(
-                        page, timeout_sec=max(30, refresh_timeout)
-                    )
-                except Exception as e:
-                    ok_refresh, refresh_msg = (
-                        False,
-                        f"最新化操作でエラー（取込は完了）: {e}",
-                    )
-                print(f"コミュニティ最新化: {refresh_msg}", flush=True)
+                        authenticate_raimo_page(
+                            page,
+                            app_email=app_email,
+                            app_password=app_password,
+                            portal_creds=portal_creds,
+                            login_wait_ms=login_wait_ms,
+                            post_login_wait_ms=post_login_wait_ms,
+                        )
 
-                if shot_dir:
-                    ok_shot = shot_dir / f"raimo_import_ok_{int(time.time())}.png"
-                    _safe_screenshot(page, ok_shot)
+                        stats, toast_text = import_csv_on_page(
+                            page, chunk_path, args.timeout_sec
+                        )
+                        import_stats = stats
+                        _merge_import_stats(total_stats, stats)
+                        if toast_text:
+                            last_toast = toast_text
 
+                        is_last_chunk = chunk_i == len(chunks)
+                        if is_last_chunk:
+                            refresh_timeout = int(
+                                os.environ.get(
+                                    "RAIMO_COMMUNITY_REFRESH_TIMEOUT_SEC", "300"
+                                )
+                            )
+                            try:
+                                _ok_refresh, refresh_msg = try_community_info_refresh(
+                                    page, timeout_sec=max(30, refresh_timeout)
+                                )
+                            except Exception as e:
+                                refresh_msg = f"最新化操作でエラー（取込は完了）: {e}"
+                            print(f"コミュニティ最新化: {refresh_msg}", flush=True)
+
+                        if shot_dir:
+                            ok_shot = (
+                                shot_dir
+                                / f"raimo_import_ok_c{chunk_i}_{int(time.time())}.png"
+                            )
+                            _safe_screenshot(page, ok_shot)
+
+                        print(
+                            "Raimo chunk取込完了: "
+                            f"OK={stats['ok']} / SKIP={stats['skip']} / NG={stats['ng']}",
+                            flush=True,
+                        )
+                        if toast_text:
+                            print(f"トースト: {toast_text}", flush=True)
+
+                        chunk_ok = True
+                        last_error = None
+                        break
+                    except PwTimeoutError as e:
+                        last_error = e
+                        if shot_dir and page is not None:
+                            ng_shot = (
+                                shot_dir
+                                / f"raimo_import_ng_c{chunk_i}_{int(time.time())}.png"
+                            )
+                            _safe_screenshot(page, ng_shot)
+                        print(f"Raimo取込失敗(タイムアウト): {e}", file=sys.stderr)
+                        notify_detail = str(e)
+                        exit_code = 2
+                        break
+                    except Exception as e:
+                        last_error = e
+                        crashed = _is_page_crash_error(e)
+                        if import_stats is not None:
+                            print(
+                                "取込完了後の後処理で失敗しましたが結果は維持します: "
+                                f"{e}",
+                                flush=True,
+                            )
+                            chunk_ok = True
+                            last_error = None
+                            break
+                        if shot_dir and page is not None and not crashed:
+                            ng_shot = (
+                                shot_dir
+                                / f"raimo_import_ng_c{chunk_i}_{int(time.time())}.png"
+                            )
+                            _safe_screenshot(page, ng_shot)
+                        if crashed and attempt < max_attempts:
+                            print(
+                                f"Raimo取込: Page crash を検出（{e}）。"
+                                "ブラウザを作り直して再試行します。",
+                                flush=True,
+                            )
+                            continue
+                        print(f"Raimo取込失敗: {e}", file=sys.stderr)
+                        notify_detail = str(e)
+                        exit_code = 2
+                        break
+                    finally:
+                        try:
+                            if context is not None:
+                                context.close()
+                        except Exception:
+                            pass
+                        try:
+                            if browser is not None:
+                                browser.close()
+                        except Exception:
+                            pass
+
+                if not chunk_ok:
+                    exit_code = 2
+                    break
+            else:
                 print(
                     "Raimo取込完了: "
-                    f"OK={stats['ok']} / SKIP={stats['skip']} / NG={stats['ng']}",
+                    f"OK={total_stats['ok']} / SKIP={total_stats['skip']} / "
+                    f"NG={total_stats['ng']} (chunks={len(chunks)})",
                     flush=True,
                 )
-                if toast_text:
-                    print(f"トースト: {toast_text}", flush=True)
-
                 summary_bits = [
-                    f'importResult行カウント OK={stats["ok"]} SKIP={stats["skip"]} NG={stats["ng"]}',
+                    "importResult行カウント "
+                    f"OK={total_stats['ok']} SKIP={total_stats['skip']} "
+                    f"NG={total_stats['ng']}",
                 ]
-                if toast_text:
-                    summary_bits.append(toast_text.strip()[:220])
+                if last_toast:
+                    summary_bits.append(last_toast.strip()[:220])
                 notify_detail = " ".join(summary_bits)
-
-                if stats["ng"] > 0:
+                if total_stats["ng"] > 0:
                     print("NG行があるため終了コード1を返します", file=sys.stderr)
                     exit_code = 1
                 else:
                     exit_code = 0
-                last_error = None
-                break
-            except PwTimeoutError as e:
-                last_error = e
-                if shot_dir and page is not None:
-                    ng_shot = shot_dir / f"raimo_import_ng_{int(time.time())}.png"
-                    _safe_screenshot(page, ng_shot)
-                print(f"Raimo取込失敗(タイムアウト): {e}", file=sys.stderr)
-                notify_detail = str(e)
-                exit_code = 2
-                # タイムアウトは再試行しても同じになりやすいので打ち切り
-                break
-            except Exception as e:
-                last_error = e
-                if shot_dir and page is not None:
-                    ng_shot = shot_dir / f"raimo_import_ng_{int(time.time())}.png"
-                    _safe_screenshot(page, ng_shot)
-                if _is_page_crash_error(e) and attempt < max_attempts:
-                    print(
-                        f"Raimo取込: Page crash を検出（{e}）。ブラウザを作り直して再試行します。",
-                        flush=True,
-                    )
-                    continue
-                print(f"Raimo取込失敗: {e}", file=sys.stderr)
-                notify_detail = str(e)
-                exit_code = 2
-                break
-            finally:
-                try:
-                    if context is not None:
-                        context.close()
-                except Exception:
-                    pass
-                try:
-                    if browser is not None:
-                        browser.close()
-                except Exception:
-                    pass
 
-        if exit_code == 2 and last_error is not None and notify_detail == "処理が完了しませんでした。":
-            notify_detail = str(last_error)
+            if (
+                exit_code == 2
+                and last_error is not None
+                and notify_detail == "処理が完了しませんでした。"
+            ):
+                notify_detail = str(last_error)
+    finally:
+        shutil.rmtree(chunk_dir, ignore_errors=True)
 
     maybe_macos_notify_done(exit_code, notify_detail)
     return exit_code
