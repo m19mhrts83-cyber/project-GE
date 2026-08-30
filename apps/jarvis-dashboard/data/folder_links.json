@@ -1,8 +1,25 @@
 {
   "version": 1,
-  "updated": "2026-08-10",
+  "updated": "2026-08-30",
   "note": "キー: lane:<id> / partner:<フォルダ名> / page:<id> / openchat:<グループ名>。url が空のエントリは UI に出さない。OneDrive webUrl は Graph で初期取得。",
   "links": {
+    "lane:kanji": [
+      {
+        "label": "神大家 Drive・飲み会幹事",
+        "url": "https://drive.google.com/drive/folders/1t1aKu3jHADXaK2hamPXnRGAX2qDSdMrR",
+        "kind": "gdrive"
+      },
+      {
+        "label": "開催申請フォーム",
+        "url": "https://form.os7.biz/f/b46fab9a/",
+        "kind": "web"
+      },
+      {
+        "label": "Notion 幹事タスク",
+        "url": "https://app.notion.com/p/3ccf6bbe5a768147b53bcddeb1b411cf",
+        "kind": "notion"
+      }
+    ],
     "lane:kamiooya": [
       {
         "label": "パートナー相談（OneDrive）",

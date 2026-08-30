@@ -6,9 +6,11 @@ export function defaultUseKamiooyaKnowledge(
   const l = (lane || "").toLowerCase();
   return (
     l === "kamiooya" ||
+    l === "kanji" ||
     l === "kodate" ||
     l === "properties" ||
     l.includes("kamiooya") ||
+    l.includes("kanji") ||
     l.includes("kodate")
   );
 }

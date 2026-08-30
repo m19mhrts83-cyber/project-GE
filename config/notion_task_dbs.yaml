@@ -63,6 +63,20 @@ lanes:
     open_statuses: ["未着手", "進行中"]
     done_statuses: ["完了"]
     hide_done_on_board: false
+  kanji:
+    title: 飲み会幹事
+    database_id: 3ccf6bbe-5a76-8147-b53b-cddeb1b411cf
+    data_source_id: 3ccf6bbe-5a76-8182-9a58-000bc93e96aa
+    board_url: https://app.notion.com/p/3ccf6bbe5a768147b53bcddeb1b411cf
+    title_prop: プロジェクト名
+    status_prop: ステータス
+    due_prop: 終了日
+    start_prop: 開始日
+    property_prop: null
+    initial_status: 未着手
+    open_statuses: ["未着手", "進行中"]
+    done_statuses: ["完了"]
+    hide_done_on_board: false
   kazoku:
     title: 家族
     database_id: 9a5b4921-5835-49f8-b8c4-22e8caf8621a
