@@ -35,8 +35,23 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ## アプローチ先の読み方（2026-08-30 Excel）
 
-- ○ = アプローチ候補（`approach=yes`）
-- △ = 検討（`maybe`）
+- ○ = アプローチ候補（`approach=yes`）— シード上 **28**
+- △ = 検討（`maybe`）— **7**
+- 静岡など × = `no`（事例メモは intel に残しうる）— **1**
+- **画面の「36行」** = 上記合計（active 全件）。「アプローチ候補だけ」と言うときは **yes=28**
 - 全国枠のオリックス／滋賀／西京／auじぶん = 候補として載せる
-- イオ信組メモ「後回し」→ `deferred`
-- 静岡はアプローチ×だが事例メモあり → ウォッチ材料として残す
+- DDL の `deferred` / `watch` enum は **当面シード未使用**（Excel「後回し」は `maybe`/`no` に吸収）
+
+## 買い進めとの接続（点検是正 · P2）
+
+| 層 | 現状 | 是正（顧客 Q4 推奨A） |
+|---|---|---|
+| UI | `/lenders` ↔ `/finance-pack` リンクのみ | 維持 |
+| Grok | ローンBot / S7 に lenders 言及なし | 打診前に `/realestate/lenders` の `approach=yes` を見る **1行を paste に追加** |
+| 提出パック実体 | OneDrive `240_融資/finance_packs/…` | 変更なし。アプローチ順の判断材料として lenders を先に見る |
+
+**別ファイル**: `240_融資/240_融資傾向調査.xlsx` は **傾向メモ用途**（顧客 Q5 推奨A）。アプローチ先の正本は本 YAML のみ。
+
+## 点検参照
+
+`docs/アプリ点検結果_融資Grok週次_20260830.md`
