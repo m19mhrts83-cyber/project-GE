@@ -83,8 +83,8 @@ export default function DealDetailDrawer({
   const [inquiryEval, setInquiryEval] = useState<InquiryEval | null>(null);
   const [expandedBody, setExpandedBody] = useState<Set<number>>(new Set());
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setLoading(true);
     setErr(null);
     try {
       const res = await fetch(`/api/re/deals/${dealId}/timeline`);
@@ -101,12 +101,12 @@ export default function DealDetailDrawer({
     } catch (e) {
       setErr(e instanceof Error ? e.message : "エラー");
     } finally {
-      setLoading(false);
+      if (!opts?.quiet) setLoading(false);
     }
   }, [dealId]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   useEffect(() => {
@@ -604,6 +604,9 @@ export default function DealDetailDrawer({
                     inquiry_status: inquiryStatus,
                     summary_json: sj,
                   })}
+                  onInquiryChanged={() => {
+                    void load({ quiet: true });
+                  }}
                 />
               </div>
               {(deal.status === "info" || deal.status === "viewing") ? (
@@ -636,6 +639,9 @@ export default function DealDetailDrawer({
                     ? sj.auto_pass_reason
                     : null
                 }
+                onInquiryChanged={() => {
+                  void load({ quiet: true });
+                }}
               />
             </div>
           </>

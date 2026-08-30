@@ -506,30 +506,142 @@ export default async function RealEstateDealsPage({
             background: "#eff6ff",
           }}
         >
-          <header>
-            <span className="lvl">In progress</span>
-            <strong>進行中・詳細〜内見（{inProgressDeals.length}）</strong>
+          <header
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "baseline",
+              gap: 8,
+              justifyContent: "space-between",
+            }}
+          >
+            <div>
+              <span className="lvl">In progress</span>
+              <strong>進行中・詳細〜内見（{inProgressDeals.length}）</strong>
+            </div>
+            <a href="#deals-list" className="meta" style={{ fontSize: 12 }}>
+              候補一覧へ ↓
+            </a>
           </header>
           <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
             詳細問合せ進行中・内見・「進行中に入れる」でフォローしたもの。
             「確認した」だけではここには入りません。買い進め（買付）とは別です。
             <strong> 問合せ列</strong>
             で「未問合せ」（黄）と「問合せ済」（青）を分けています。内見＝問合せ済ではありません。
+            件数が多いときは枠内スクロールです。
           </p>
-          <div style={{ overflowX: "auto" }}>
-            <table>
+          <div
+            style={{
+              maxHeight: "min(42vh, 320px)",
+              overflow: "auto",
+              border: "1px solid #bfdbfe",
+              borderRadius: 6,
+              background: "#fff",
+            }}
+          >
+            <table style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th>段階</th>
-                  <th>問合せ</th>
-                  <th>評価スコア</th>
-                  <th>物件</th>
-                  <th>エリア</th>
-                  <th>価格</th>
-                  <th>土地値%</th>
-                  <th>Grok</th>
-                  <th>操作</th>
-                  <th>詳細</th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    段階
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    問合せ
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    評価スコア
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    物件
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    エリア
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    価格
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    土地値%
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    Grok
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    操作
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    詳細
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -621,11 +733,13 @@ export default async function RealEstateDealsPage({
       ) : null}
 
       <div
+        id="deals-list"
         style={{
           display: "flex",
           flexWrap: "wrap",
           gap: 8,
           marginBottom: 16,
+          scrollMarginTop: 12,
         }}
       >
         {TAB_LINKS.map((t) => {

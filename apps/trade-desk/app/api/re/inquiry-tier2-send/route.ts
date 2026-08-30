@@ -197,13 +197,13 @@ export async function POST(req: Request) {
           (deal as { property_fingerprint?: string | null })
             .property_fingerprint ?? null,
       });
-    sj.inquiry_status = "draft";
+    sj.inquiry_status = "sending";
     sj.property_fingerprint = fingerprint;
 
     await supabase
       .from("kurashift_re_deals")
       .update({
-        inquiry_status: "draft",
+        inquiry_status: "sending",
         summary_json: sj,
         updated_at: now,
         property_fingerprint: fingerprint,
