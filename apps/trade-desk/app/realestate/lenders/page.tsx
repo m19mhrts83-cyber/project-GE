@@ -15,6 +15,7 @@ type Lender = {
   approach: string;
   case_report: boolean;
   matsuno_notes: string | null;
+  region_tags?: string[] | null;
 };
 
 type Intel = {
@@ -35,6 +36,20 @@ const APPROACH_LABEL: Record<string, string> = {
   no: "対象外",
 };
 
+const REGION_LABEL: Record<string, string> = {
+  tokai: "東海",
+  aichi: "愛知",
+  gifu: "岐阜",
+  mie: "三重",
+  shizuoka: "静岡",
+  sendai: "仙台",
+  miyagi: "宮城",
+  yamagata: "山形",
+  gunma: "群馬",
+  kinki: "近畿",
+  national: "全国系",
+};
+
 export default async function LendersPage() {
   const supabase = await createClient();
   const {
@@ -44,7 +59,7 @@ export default async function LendersPage() {
   const { data: lenders } = await supabase
     .from("kurashift_lenders")
     .select(
-      "id,name,display_name,category,approach,case_report,matsuno_notes",
+      "id,name,display_name,category,approach,case_report,matsuno_notes,region_tags",
     )
     .eq("active", true)
     .order("approach")
@@ -75,8 +90,8 @@ export default async function LendersPage() {
       <p className="page-kicker">③-D · 融資</p>
       <h1>銀行アプローチ先・融資検討材料</h1>
       <p className="sub">
-        Excel「★金融機関一覧」のアプローチ先を正本シード。神大家セミナー構造＋Q&A／フォルダから
-        銀行別メモを投影。{" · "}
+        Excel「★金融機関一覧」＋ YAML を正本シード。本命＝愛知・岐阜／今後視野＝仙台・群馬はタグで分離。
+        残債は【残債】メモ（他行含むか／倍率か返済比率か）。{" · "}
         <Link href="/realestate/finance-pack">融資提出パック →</Link>
       </p>
 
@@ -112,6 +127,20 @@ export default async function LendersPage() {
                 <span className="muted">{L.category}</span>
                 <span>{APPROACH_LABEL[L.approach] || L.approach}</span>
                 {L.case_report ? <span>事例報告あり</span> : null}
+                {(L.region_tags || []).map((t) => (
+                  <span
+                    key={t}
+                    className="muted"
+                    style={{
+                      fontSize: 12,
+                      padding: "1px 6px",
+                      border: "1px solid var(--border, #ccc)",
+                      borderRadius: 4,
+                    }}
+                  >
+                    {REGION_LABEL[t] || t}
+                  </span>
+                ))}
               </header>
               {L.matsuno_notes ? (
                 <p style={{ marginTop: "0.5rem" }}>{L.matsuno_notes}</p>

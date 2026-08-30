@@ -137,3 +137,180 @@ export const SOURCE_BADGE: Record<string, string> = {
   manual: "手動",
   other: "その他",
 };
+
+function asSj(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  return {};
+}
+
+function grokOf(sj: Record<string, unknown>): Record<string, unknown> | null {
+  return sj.grok && typeof sj.grok === "object" && !Array.isArray(sj.grok)
+    ? (sj.grok as Record<string, unknown>)
+    : null;
+}
+
+/** 取込の由来（アカウント名ではなく人が読む出所） */
+export function dealOriginLabel(params: {
+  title?: string | null;
+  source?: string | null;
+  summaryJson?: Record<string, unknown> | null;
+}): string {
+  const title = String(params.title || "");
+  const source = String(params.source || "").trim();
+  const sj = asSj(params.summaryJson);
+  const grok = grokOf(sj);
+  if (
+    source === "mail_grok" ||
+    title.includes("[Grok調査]") ||
+    title.includes("Grok調査") ||
+    grok
+  ) {
+    return "Grok調査結果";
+  }
+  if (source === "mail_estate" || source === "mail_admin") {
+    return "メール候補";
+  }
+  if (typeof sj.gmail_id === "string" && sj.gmail_id.trim()) {
+    return "メール取込";
+  }
+  return SOURCE_BADGE[source] || source || "その他";
+}
+
+/** 一覧用の短い出所チップ */
+export function dealOriginChip(params: {
+  title?: string | null;
+  source?: string | null;
+  summaryJson?: Record<string, unknown> | null;
+}): "Grok" | "メール" | string {
+  const label = dealOriginLabel(params);
+  if (label === "Grok調査結果") return "Grok";
+  if (label.startsWith("メール")) return "メール";
+  return label.slice(0, 6);
+}
+
+export function dealListingUrl(
+  summaryJson?: Record<string, unknown> | null
+): string | null {
+  const sj = asSj(summaryJson);
+  const grok = grokOf(sj);
+  for (const v of [sj.listing_url, sj.url, grok?.url]) {
+    if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) {
+      return v.trim();
+    }
+  }
+  return null;
+}
+
+export function dealGmailUrl(
+  summaryJson?: Record<string, unknown> | null
+): string | null {
+  const sj = asSj(summaryJson);
+  const id = typeof sj.gmail_id === "string" ? sj.gmail_id.trim() : "";
+  if (!id) return null;
+  return `https://mail.google.com/mail/u/#all/${encodeURIComponent(id)}`;
+}
+
+export function dealScoreReasonLine(params: {
+  matchScore?: number | null;
+  summaryJson?: Record<string, unknown> | null;
+}): string {
+  const sj = asSj(params.summaryJson);
+  const grok = grokOf(sj);
+  const parts: string[] = [];
+  if (Array.isArray(sj.hits)) {
+    const hits = (sj.hits as unknown[])
+      .map((h) => String(h || "").trim())
+      .filter(Boolean)
+      .slice(0, 4);
+    if (hits.length) parts.push(hits.join("・"));
+  }
+  const grokLine = grokOneLine(grok);
+  if (grokLine !== "—") parts.push(grokLine);
+  if (parts.length) return parts.join(" · ");
+  if (params.matchScore != null && Number(params.matchScore) > 0) {
+    return "根拠データなし（スコアのみ）";
+  }
+  return "根拠データなし";
+}
+
+export type DealNextAction = {
+  code:
+    | "reply"
+    | "email_inquiry"
+    | "grok_handoff"
+    | "hz_research"
+    | "triage";
+  line: string;
+  primaryCta: string;
+};
+
+export function dealRecommendedNext(params: {
+  status?: string | null;
+  title?: string | null;
+  source?: string | null;
+  inquiryStatus?: string | null;
+  summaryJson?: Record<string, unknown> | null;
+  inquiryEval?: {
+    tier1?: boolean;
+    inquiryChannel?: "agent_email" | "grok_handoff" | "not_applicable" | string;
+  } | null;
+}): DealNextAction {
+  const sj = asSj(params.summaryJson);
+  const inquiryStatus =
+    params.inquiryStatus ||
+    (typeof sj.inquiry_status === "string" ? sj.inquiry_status : "none");
+  const channel = params.inquiryEval?.inquiryChannel;
+  const tier1 = Boolean(params.inquiryEval?.tier1);
+  const grok = grokOf(sj);
+  const origin = dealOriginLabel({
+    title: params.title,
+    source: params.source,
+    summaryJson: sj,
+  });
+
+  if (inquiryStatus === "has_reply") {
+    return {
+      code: "reply",
+      line: "返信を確認 → フォーム下書き",
+      primaryCta: "返信確認",
+    };
+  }
+  if (tier1 && channel === "agent_email") {
+    return {
+      code: "email_inquiry",
+      line: "第一問合せ（メール）を送る",
+      primaryCta: "メールで問合せ",
+    };
+  }
+  if (tier1 && channel === "grok_handoff") {
+    return {
+      code: "grok_handoff",
+      line: "Grok依頼（HP／Web問合せ）を送る",
+      primaryCta: "Grok依頼",
+    };
+  }
+  if (origin === "Grok調査結果") {
+    const hz =
+      typeof grok?.hazard_eval === "string" ? grok.hazard_eval.trim() : "";
+    const thin = !grok || !hz || hz === "不明" || hz === "保留";
+    if (thin) {
+      return {
+        code: "hz_research",
+        line: "路線価・HZ 追加調査（仲介メール問合せは不要）",
+        primaryCta: "路線価・HZ追加調査",
+      };
+    }
+    return {
+      code: "triage",
+      line: "調査結果を見て「確認した／対象外」で仕分け（仲介メール問合せは不要）",
+      primaryCta: "確認した／対象外",
+    };
+  }
+  return {
+    code: "triage",
+    line: "確認した／対象外で仕分け",
+    primaryCta: "確認した／対象外",
+  };
+}

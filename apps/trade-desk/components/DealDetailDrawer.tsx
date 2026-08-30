@@ -13,7 +13,11 @@ import {
 import {
   DEAL_STATUS_LABEL,
   INQUIRY_STATUS_LABEL,
-  SOURCE_BADGE,
+  dealGmailUrl,
+  dealListingUrl,
+  dealOriginLabel,
+  dealRecommendedNext,
+  dealScoreReasonLine,
   grokOneLine,
 } from "@/lib/rePipelineUi";
 
@@ -118,6 +122,33 @@ export default function DealDetailDrawer({
   const inquiryStatus =
     deal?.inquiry_status ||
     (typeof sj.inquiry_status === "string" ? sj.inquiry_status : "none");
+  const originLabel = deal
+    ? dealOriginLabel({
+        title: deal.title,
+        source: deal.source,
+        summaryJson: sj,
+      })
+    : "";
+  const nextAction = deal
+    ? dealRecommendedNext({
+        status: deal.status,
+        title: deal.title,
+        source: deal.source,
+        inquiryStatus,
+        summaryJson: sj,
+        inquiryEval,
+      })
+    : null;
+  const gmailUrl = dealGmailUrl(sj);
+  const listingUrl = dealListingUrl(sj);
+  const scoreReason = deal
+    ? dealScoreReasonLine({
+        matchScore: deal.match_score,
+        summaryJson: sj,
+      })
+    : "";
+  const gmailReadAt =
+    typeof sj.gmail_read_at === "string" ? sj.gmail_read_at : null;
   const opsFormDraft =
     sj.ops_form_draft && typeof sj.ops_form_draft === "object"
       ? (sj.ops_form_draft as {
@@ -189,6 +220,81 @@ export default function DealDetailDrawer({
           </p>
         ) : deal ? (
           <>
+            <div
+              style={{
+                marginBottom: 12,
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                出所: {originLabel}
+              </div>
+              {gmailReadAt ? (
+                <p className="meta" style={{ margin: "4px 0 0" }}>
+                  取込元メールは既読（問合せ送信済みではありません）
+                </p>
+              ) : null}
+              {nextAction ? (
+                <div style={{ marginTop: 10 }}>
+                  <div className="meta" style={{ marginBottom: 2 }}>
+                    いまやること
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>
+                    {nextAction.line}
+                  </div>
+                  <div className="meta" style={{ marginTop: 4 }}>
+                    主操作の目安: {nextAction.primaryCta}
+                  </div>
+                </div>
+              ) : null}
+              <div style={{ marginTop: 12 }}>
+                <div className="meta" style={{ marginBottom: 6 }}>
+                  要約と突き合わせて確認（当面推奨）
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {gmailUrl ? (
+                    <a
+                      className="btn"
+                      href={gmailUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontWeight: 600,
+                        background: "#1d4ed8",
+                        color: "#fff",
+                        borderColor: "#1d4ed8",
+                      }}
+                    >
+                      元メールを開く
+                    </a>
+                  ) : (
+                    <span className="meta">元メールなし</span>
+                  )}
+                  {listingUrl ? (
+                    <a
+                      className="btn"
+                      href={listingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontWeight: 600,
+                        background: "#0f766e",
+                        color: "#fff",
+                        borderColor: "#0f766e",
+                      }}
+                    >
+                      掲載ページを開く
+                    </a>
+                  ) : (
+                    <span className="meta">掲載URLなし</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <p className="meta">
               {DEAL_STATUS_LABEL[deal.status] || deal.status}
               {" · "}
@@ -201,8 +307,9 @@ export default function DealDetailDrawer({
                   </span>
                 ) : null;
               })()}
-              {" · "}
-              {SOURCE_BADGE[deal.source] || deal.source}
+            </p>
+            <p className="meta" style={{ marginTop: 2 }}>
+              スコア根拠: {scoreReason}
             </p>
             <p className="meta">
               {deal.area || "—"} / {deal.structure || "—"} /{" "}
@@ -432,6 +539,13 @@ export default function DealDetailDrawer({
                 第一問合せ —{" "}
                 {INQUIRY_STATUS_LABEL[inquiryStatus] || inquiryStatus}
               </strong>
+              {nextAction &&
+              (nextAction.code === "triage" ||
+                nextAction.code === "hz_research") ? (
+                <p className="meta" style={{ marginTop: 6 }}>
+                  下の問合せ／Grok依頼は任意（推奨は上の「いまやること」）
+                </p>
+              ) : null}
               <div style={{ marginTop: 8 }}>
                 <DealReviewActions
                   dealId={deal.id}
@@ -439,11 +553,7 @@ export default function DealDetailDrawer({
                   gmailId={
                     typeof sj.gmail_id === "string" ? sj.gmail_id : null
                   }
-                  gmailReadAt={
-                    typeof sj.gmail_read_at === "string"
-                      ? sj.gmail_read_at
-                      : null
-                  }
+                  gmailReadAt={gmailReadAt}
                   dealTitle={deal.title}
                   fromRaw={typeof sj.from === "string" ? sj.from : null}
                   inquiryReady={inquiryEval?.tier1}

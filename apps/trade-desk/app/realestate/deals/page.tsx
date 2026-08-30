@@ -11,6 +11,7 @@ import {
   DEAL_STATUS_LABEL,
   INQUIRY_STATUS_LABEL,
   SOURCE_BADGE,
+  dealOriginChip,
   grokOneLine,
   lastActivityLine,
   parseDealsTab,
@@ -311,6 +312,11 @@ export default async function RealEstateDealsPage({
       sourceBadge: slimTable
         ? SOURCE_BADGE[d.source] || d.source
         : d.source,
+      originChip: dealOriginChip({
+        title: d.title,
+        source: d.source,
+        summaryJson: sj,
+      }),
       area: d.area || "—",
       priceLabel:
         d.price_man != null ? fmtYen(Number(d.price_man) * 10000) : "—",
