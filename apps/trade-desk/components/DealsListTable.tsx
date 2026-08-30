@@ -33,6 +33,11 @@ export type DealsListRow = {
   scoreLabel: string;
   scoreBand: ScoreBand;
   hitsPreview: string;
+  /** 進行中（詳細〜内見） */
+  inProgress: boolean;
+  /** 買い進め（買付・融資） */
+  buyPush: boolean;
+  /** @deprecated inProgress || buyPush */
   pursuing: boolean;
   highlighted: boolean;
   badges: string[];
@@ -85,9 +90,14 @@ function ScoreCell({
           {row.hitsPreview}
         </div>
       ) : null}
-      {showPursue && row.pursuing ? (
+      {showPursue && row.buyPush ? (
         <div className="meta" style={{ color: "#047857", fontSize: 11 }}>
           買い進め中
+        </div>
+      ) : null}
+      {showPursue && row.inProgress && !row.buyPush ? (
+        <div className="meta" style={{ color: "#1d4ed8", fontSize: 11 }}>
+          進行中
         </div>
       ) : null}
     </td>
@@ -301,7 +311,8 @@ export default function DealsListTable({
                                   inquiryBadges={d.review.inquiryBadges}
                                   inquiryChannel={d.review.inquiryChannel}
                                   openDealHref={d.openHref}
-                                  pursuing={d.pursuing}
+                                  inProgress={d.inProgress}
+                                  buyPush={d.buyPush}
                                 />
                               </td>
                               <OpenCell href={d.openHref} />
@@ -310,12 +321,20 @@ export default function DealsListTable({
                             <>
                               <td>
                                 {d.statusLabel}
-                                {d.pursuing ? (
+                                {d.buyPush ? (
                                   <div
                                     className="meta"
                                     style={{ color: "#047857", fontSize: 11 }}
                                   >
                                     買い進め中
+                                  </div>
+                                ) : null}
+                                {d.inProgress && !d.buyPush ? (
+                                  <div
+                                    className="meta"
+                                    style={{ color: "#1d4ed8", fontSize: 11 }}
+                                  >
+                                    進行中
                                   </div>
                                 ) : null}
                               </td>
@@ -336,7 +355,8 @@ export default function DealsListTable({
                                   gmailId={d.review.gmailId}
                                   gmailUrl={d.review.gmailUrl}
                                   gmailReadAt={d.review.gmailReadAt}
-                                  pursuing={d.pursuing}
+                                  inProgress={d.inProgress}
+                                  buyPush={d.buyPush}
                                 />
                               </td>
                               <OpenCell href={d.openHref} />

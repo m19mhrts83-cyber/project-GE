@@ -5,7 +5,13 @@ import { useState } from "react";
 import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 
-type Action = "confirm" | "pass" | "pursue_add" | "pursue_remove";
+type Action =
+  | "confirm"
+  | "pass"
+  | "pursue_add"
+  | "pursue_remove"
+  | "set_viewing"
+  | "set_offer";
 
 export default function DealReviewActions({
   dealId,
@@ -20,7 +26,8 @@ export default function DealReviewActions({
   inquiryBadges,
   inquiryChannel,
   openDealHref,
-  pursuing,
+  inProgress,
+  buyPush,
   compactPursue,
 }: {
   dealId: string;
@@ -36,15 +43,31 @@ export default function DealReviewActions({
   inquiryBadges?: string[];
   inquiryChannel?: InquiryChannel | null;
   openDealHref?: string;
-  /** いま買い進め中ブロックに出ている */
+  /** 進行中（詳細〜内見）ブロックに出ている */
+  inProgress?: boolean;
+  /** 買い進め（買付・融資）ブロックに出ている */
+  buyPush?: boolean;
+  /** @deprecated inProgress を使う */
   pursuing?: boolean;
-  /** 買い進めブロック内の「外す」だけ */
+  /** 進行中／買い進めブロック内の「外す」だけ */
   compactPursue?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<Action | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+
+  const onInProgress = Boolean(inProgress);
+  const st = String(status || "info");
+  const showSetViewing =
+    st !== "viewing" &&
+    st !== "offer" &&
+    st !== "loan" &&
+    st !== "purchased" &&
+    st !== "passed" &&
+    st !== "archived";
+  // 買付へ: viewing 推奨。info からも可（イレギュラーはチャットで）
+  const allowOffer = st === "viewing" || st === "info";
 
   async function run(action: Action) {
     if (action === "pass") {
@@ -59,7 +82,16 @@ export default function DealReviewActions({
     if (action === "pursue_remove") {
       if (
         !window.confirm(
-          "「いま買い進め中」から外します（見送りにはしません）。よろしいですか？"
+          "「進行中」から外します（見送りにはしません）。よろしいですか？"
+        )
+      ) {
+        return;
+      }
+    }
+    if (action === "set_offer") {
+      if (
+        !window.confirm(
+          "買付へ進めます（買い進め＝買付証明・融資のフェーズ）。よろしいですか？"
         )
       ) {
         return;
@@ -78,13 +110,15 @@ export default function DealReviewActions({
         setMsg(data.error || "失敗しました");
       } else {
         const labels: Record<Action, string> = {
-          confirm: "確認しました",
+          confirm: "仕分けしました（次は詳細問合せ）",
           pass: "対象外にしました",
-          pursue_add: "買い進め中に入れました",
-          pursue_remove: "買い進め中から外しました",
+          pursue_add: "進行中に入れました",
+          pursue_remove: "進行中から外しました",
+          set_viewing: "内見にしました",
+          set_offer: "買付（買い進め）にしました",
         };
         setMsg(labels[action]);
-        if (action === "confirm" || action === "pursue_add") setConfirmed(true);
+        if (action === "confirm") setConfirmed(true);
         router.refresh();
       }
     } catch (e) {
@@ -124,7 +158,7 @@ export default function DealReviewActions({
   }
 
   return (
-    <div style={{ minWidth: 140 }}>
+    <div style={{ minWidth: 160 }}>
       {gmailId || gmailUrl ? (
         <div className="meta" style={{ marginBottom: 4 }}>
           <a
@@ -164,19 +198,19 @@ export default function DealReviewActions({
           >
             {busy === "pass" ? "…" : "対象外"}
           </button>
-          {!pursuing && status !== "passed" ? (
+          {!onInProgress && status !== "passed" && !buyPush ? (
             <button
               type="button"
               className="btn"
               disabled={busy !== null}
               onClick={() => run("pursue_add")}
               style={{ fontSize: 12, padding: "4px 8px" }}
-              title="いま買い進め中ブロックに入れる"
+              title="進行中（詳細〜内見）ブロックに入れる"
             >
-              {busy === "pursue_add" ? "…" : "買い進めへ"}
+              {busy === "pursue_add" ? "…" : "進行中に入れる"}
             </button>
           ) : null}
-          {pursuing ? (
+          {onInProgress && !buyPush ? (
             <button
               type="button"
               className="btn"
@@ -184,10 +218,39 @@ export default function DealReviewActions({
               onClick={() => run("pursue_remove")}
               style={{ fontSize: 12, padding: "4px 8px" }}
             >
-              {busy === "pursue_remove" ? "…" : "買い進め外す"}
+              {busy === "pursue_remove" ? "…" : "進行中から外す"}
+            </button>
+          ) : null}
+          {showSetViewing ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={busy !== null}
+              onClick={() => run("set_viewing")}
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              title="需給・融資を見ながら内見へ"
+            >
+              {busy === "set_viewing" ? "…" : "内見にする"}
+            </button>
+          ) : null}
+          {allowOffer ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={busy !== null}
+              onClick={() => run("set_offer")}
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              title="買付証明〜融資の買い進めフェーズへ"
+            >
+              {busy === "set_offer" ? "…" : "買付へ"}
             </button>
           ) : null}
         </div>
+      ) : null}
+      {showActions ? (
+        <p className="meta" style={{ marginTop: 6, maxWidth: 220, lineHeight: 1.4 }}>
+          「確認した」＝次は図面・マイソクの問合せへ（まだ内見でも買い進めでもありません）
+        </p>
       ) : null}
       {showInquiryCta ? (
         <div style={{ marginTop: 6 }}>

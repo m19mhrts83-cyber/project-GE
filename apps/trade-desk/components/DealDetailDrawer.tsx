@@ -10,6 +10,7 @@ import {
   scoreBand,
   scoreBandLabel,
 } from "@/lib/reDealScoreUi";
+import { isBuyPushDeal, isInProgressDeal } from "@/lib/reDealPursue";
 import {
   DEAL_STATUS_LABEL,
   INQUIRY_STATUS_LABEL,
@@ -588,6 +589,22 @@ export default function DealDetailDrawer({
                   inquiryHasTo={inquiryEval?.hasTo}
                   inquiryBadges={inquiryEval?.badges}
                   inquiryChannel={inquiryEval?.inquiryChannel}
+                  inProgress={isInProgressDeal({
+                    id: deal.id,
+                    title: deal.title,
+                    status: deal.status,
+                    source: deal.source,
+                    inquiry_status: inquiryStatus,
+                    summary_json: sj,
+                  })}
+                  buyPush={isBuyPushDeal({
+                    id: deal.id,
+                    title: deal.title,
+                    status: deal.status,
+                    source: deal.source,
+                    inquiry_status: inquiryStatus,
+                    summary_json: sj,
+                  })}
                 />
               </div>
               {(deal.status === "info" || deal.status === "viewing") ? (

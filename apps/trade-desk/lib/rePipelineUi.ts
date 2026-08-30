@@ -368,13 +368,13 @@ export function dealRecommendedNext(params: {
     }
     return {
       code: "triage",
-      line: "調査結果を見て「確認した／対象外」で仕分け（仲介メール問合せは不要）",
+      line: "調査結果を見て「確認した／対象外」で仕分け（次は図面・マイソクの問合せ。まだ内見ではない）",
       primaryCta: "確認した／対象外",
     };
   }
   return {
     code: "triage",
-    line: "確認した／対象外で仕分け",
+    line: "「確認した／対象外」で仕分け（確認した＝詳細問合せへ。内見・買い進めではない）",
     primaryCta: "確認した／対象外",
   };
 }
