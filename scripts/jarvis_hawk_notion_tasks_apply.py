@@ -26,7 +26,7 @@ source: hawk
 ## done
 - lane: kodate
   page_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  reason: 優先低下・不要
+  reason: タスク完了したよ（ホーク・週次で確認）・優先低下
 
 ## archive
 - page_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -159,14 +159,31 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
         cfg = lanes.get(lane) or {}
         done_list = list(cfg.get("done_statuses") or ["完了"])
         status = (item.get("to_status") or "").strip() or done_list[0]
-        args = ["update-status", "--lane", lane, "--page-id", page_id, "--status", status]
+        reason = (item.get("reason") or "").strip()
+        comment = reason if reason.startswith("タスク完了したよ") else (
+            f"タスク完了したよ（ホーク・週次で確認）{('・' + reason) if reason else ''}"
+        )
+        args = [
+            "complete-task",
+            "--lane",
+            lane,
+            "--page-id",
+            page_id,
+            "--status",
+            status,
+            "--who",
+            "ホーク",
+            "--comment",
+            comment,
+        ]
         results.append(
             {
                 "op": "done",
                 **_run_api(args, dry_run),
                 "page_id": page_id,
                 "status": status,
-                "reason": item.get("reason") or "",
+                "reason": reason,
+                "comment": comment,
             }
         )
 

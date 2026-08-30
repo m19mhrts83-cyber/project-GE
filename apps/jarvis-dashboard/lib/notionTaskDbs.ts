@@ -48,7 +48,7 @@ export const NOTION_TASK_LANES: Record<string, NotionLaneConfig> = {
     initial_status: "未着手",
     open_statuses: ["未着手", "エージェント待ち", "進行中"],
     done_statuses: ["完了"],
-    hide_done_on_board: false,
+    hide_done_on_board: true,
   },
   kodate: {
     title: "戸建て",

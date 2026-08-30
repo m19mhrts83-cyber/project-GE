@@ -1,0 +1,49 @@
+---
+description: plan実装の閉じ方（受け入れ・残り棚・完了コメント）
+alwaysApply: true
+---
+
+# plan / 実装の閉じ方（受け入れ）
+
+## 方針
+
+「コードがある」だけでは完了にしない。松野の **意図OK**（T）または Jarvis とホークの揃った判断（L）まで未閉じ。
+
+## 実装報告の直前（必須）
+
+1. **受け入れ条件**を1〜3行（どの画面で何ができれば意図OKか）
+2. 今回やらなかったことは [`docs/残り棚_アプリ受け入れ_20260830.md`](docs/残り棚_アプリ受け入れ_20260830.md) に **L-id** を切る（閉じた plan.md にだけ残さない）
+3. 松野に **意図OK / 変更要望** を聞く（勝手に Notion 完了しない）
+
+確認シナリオ正本: [`docs/連動確認チェックリスト_20260830.md`](docs/連動確認チェックリスト_20260830.md)
+
+## Notion 完了
+
+コメント無しのステータス完了は禁止。
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py complete-task \
+  --lane ai_raimo --page-id … \
+  --comment 'タスク完了したよ（Jarvis・松野意図OK・T-03）'
+```
+
+定型の先頭は必ず **「タスク完了したよ」**。誰と根拠（T/L 番号）を続ける。
+
+| 種類 | 閉じてよいとき |
+|---|---|
+| T-xx | 松野が意図OK |
+| L-xx | Jarvis とホークの両方 |
+| 捨て | 松野が捨てと言った（コメントに「捨て」） |
+
+完了後は AI・Raimo 看板から消える（`hide_done_on_board`）。戻す依頼 `T-03 戻して` なら進行中へ（完了コメントは残す）。
+
+## WIP
+
+Wave 1（T-01〜T-05）が未閉じのあいだ、新規アプリ機能は原則増やさず棚へ。
+
+## やらないこと
+
+- 「実装したのでタスク完了」
+- `update-status --status 完了` をコメント無しで使う
+- ホークに plan 全読を課す（要約は outbox）
