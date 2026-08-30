@@ -138,6 +138,7 @@ ProgramCode/outputs/
 !.cursor/rules/jarvis-notion-api-first.mdc
 !.cursor/rules/jarvis-kurashift-inquiry-followup.mdc
 !.cursor/rules/jarvis-s1-grok-followup.mdc
+!.cursor/rules/jarvis-plan-accept.mdc
 .obsidian/
 .vscode/
 
