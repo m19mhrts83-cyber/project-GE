@@ -18,6 +18,7 @@ import {
   dealOriginLabel,
   dealRecommendedNext,
   dealScoreReasonLine,
+  gmailDeepLink,
   grokOneLine,
 } from "@/lib/rePipelineUi";
 
@@ -139,7 +140,7 @@ export default function DealDetailDrawer({
         inquiryEval,
       })
     : null;
-  const gmailUrl = dealGmailUrl(sj);
+  const gmailUrl = dealGmailUrl(sj, deal?.source);
   const listingUrl = dealListingUrl(sj);
   const scoreReason = deal
     ? dealScoreReasonLine({
@@ -455,7 +456,12 @@ export default function DealDetailDrawer({
                         </div>
                         {m.gmail_id ? (
                           <a
-                            href={`https://mail.google.com/mail/u/#all/${m.gmail_id}`}
+                            href={gmailDeepLink(
+                              m.gmail_id,
+                              typeof sj.account === "string"
+                                ? sj.account
+                                : deal?.source
+                            )}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -553,6 +559,7 @@ export default function DealDetailDrawer({
                   gmailId={
                     typeof sj.gmail_id === "string" ? sj.gmail_id : null
                   }
+                  gmailUrl={gmailUrl}
                   gmailReadAt={gmailReadAt}
                   dealTitle={deal.title}
                   fromRaw={typeof sj.from === "string" ? sj.from : null}

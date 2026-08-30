@@ -203,13 +203,46 @@ export function dealListingUrl(
   return null;
 }
 
+/** Gmail 箱 → authuser（複数アカウント時に #all/id だけだと一覧落ちする） */
+const GMAIL_AUTHUSER: Record<string, string> = {
+  mail_admin: "admin@livingsupport-matsu.co.jp",
+  admin: "admin@livingsupport-matsu.co.jp",
+  mail_estate: "matsuno.estate@gmail.com",
+  estate: "matsuno.estate@gmail.com",
+  mail_m19m: "m19m.hrts83@gmail.com",
+  m19m: "m19m.hrts83@gmail.com",
+};
+
+/**
+ * 特定メールを開く deep link。
+ * authuser 付きでないと、ブラウザの既定 Google アカウントで id が見つからず一覧に落ちる。
+ */
+export function gmailDeepLink(
+  gmailId: string,
+  accountOrSource?: string | null
+): string {
+  const id = gmailId.trim();
+  const key = (accountOrSource || "").trim();
+  const authuser = GMAIL_AUTHUSER[key];
+  if (authuser) {
+    return `https://mail.google.com/mail/?authuser=${encodeURIComponent(authuser)}#all/${id}`;
+  }
+  return `https://mail.google.com/mail/u/0/#all/${id}`;
+}
+
 export function dealGmailUrl(
-  summaryJson?: Record<string, unknown> | null
+  summaryJson?: Record<string, unknown> | null,
+  source?: string | null
 ): string | null {
   const sj = asSj(summaryJson);
   const id = typeof sj.gmail_id === "string" ? sj.gmail_id.trim() : "";
   if (!id) return null;
-  return `https://mail.google.com/mail/u/#all/${encodeURIComponent(id)}`;
+  const accountHint =
+    (typeof sj.account === "string" && sj.account.trim()) ||
+    (source && source.trim()) ||
+    (typeof sj.source === "string" && sj.source.trim()) ||
+    null;
+  return gmailDeepLink(id, accountHint);
 }
 
 export function dealScoreReasonLine(params: {
