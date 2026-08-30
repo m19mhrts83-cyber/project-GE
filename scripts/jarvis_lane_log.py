@@ -25,6 +25,7 @@ DEFAULT_ROOT = (
 
 LANE_META: dict[str, str] = {
     "kamiooya": "神大家運営",
+    "kanji": "飲み会幹事",
     "properties": "所有物件",
     "kodate": "戸建て",
     "ai_raimo": "AI・Raimo",

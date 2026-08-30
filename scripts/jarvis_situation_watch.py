@@ -1215,6 +1215,89 @@ def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
     )
 
 
+def eval_kanji_ops(meta: dict, data: dict | None) -> dict[str, Any]:
+    """飲み会幹事: 開催後レポート期限・次回イベント立ち上げ。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="未設定または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    today_d = today()
+    level = "ok"
+    bits: list[str] = []
+
+    cur = data.get("current_event") or {}
+    nxt = data.get("next_event") or {}
+    report_deadline = cur.get("report_deadline")
+    report_status = str(cur.get("report_status") or "")
+    if report_deadline and report_status not in ("done", "submitted", "na"):
+        try:
+            dl = date.fromisoformat(str(report_deadline)[:10])
+            days = (dl - today_d).days
+            bits.append(f"レポート期限: {dl.isoformat()}（残り{days}日） status={report_status}")
+            if days < 0:
+                level = "attention"
+                bits.append("レポート期限超過")
+            elif days <= 14:
+                level = "warn" if level == "ok" else level
+                bits.append("レポート提出フォロー推奨")
+        except ValueError:
+            bits.append(f"レポート期限パース不可: {report_deadline}")
+
+    setup_deadline = nxt.get("setup_deadline")
+    nxt_status = str(nxt.get("status") or "")
+    if setup_deadline and nxt_status not in ("done", "cancelled"):
+        try:
+            sd = date.fromisoformat(str(setup_deadline)[:10])
+            days_s = (sd - today_d).days
+            bits.append(
+                f"次回: {nxt.get('name') or '—'} 立ち上げ目安 {sd.isoformat()}（残り{days_s}日）"
+            )
+            if days_s <= 30 and nxt_status in ("", "not_started"):
+                if level == "ok":
+                    level = "info"
+                bits.append("次回イベントの立ち上げ検討")
+        except ValueError:
+            pass
+
+    if not bits:
+        bits.append(str(data.get("summary") or "幹事オペ問題なし"))
+
+    summary = "／".join(bits[:2])
+    detail = "\n".join(
+        [
+            f"直近: {cur.get('name') or '—'}（{cur.get('held_on') or '—'}）",
+            f"次回: {nxt.get('name') or '—'}（{nxt.get('target_month') or '—'}）",
+            *bits,
+            "Dashboard: /kanji",
+            "マニュアル: 01_運営サポート/飲み会幹事/00_幹事標準マニュアル.md",
+        ]
+    )
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": "/kanji",
+            "report_deadline": report_deadline,
+            "show_banner": level in ("warn", "attention"),
+        },
+    )
+
+
 def count_today_thread_headings() -> int:
     base = OPENCHAT_MD_GLOB
     if not base.is_dir():
@@ -2104,6 +2187,7 @@ EVALUATORS = {
     "hawk_weekly_summary": lambda m: eval_hawk_weekly_summary(
         m, load_json(STATE / "hawk_weekly_summary.json")
     ),
+    "kanji_ops": lambda m: eval_kanji_ops(m, load_json(STATE / "kanji_ops.json")),
 }
 
 

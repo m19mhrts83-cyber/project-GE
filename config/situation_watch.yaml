@@ -322,3 +322,17 @@ items:
       取込: jarvis_bucho_inbox_poll.py（朝バンドルに含む）
       処理後: --mark-seen または --archive で inbox から退避
       設計: docs/Grok_参謀室_週次統括_設計_20260830.md
+
+  - id: kanji_ops
+    title: 飲み会幹事（レポート・次回）
+    category: kamiooya
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/kanji_ops.json
+    cursor_prompt: |
+      飲み会幹事の状況を確認して。state: .jarvis_state/kanji_ops.json
+      正本: 01_運営サポート/飲み会幹事/00_幹事標準マニュアル.md と 01_振り返り比較ログ.md
+      ダッシュボード: /kanji
+      ルール: jarvis-kamiooya-kanji.mdc
+      レポート期限・次回イベント立ち上げが近ければ先に警告。
+      Drive OAuth は estate。フォーム送信前は確認必須。

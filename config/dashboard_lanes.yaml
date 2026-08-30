@@ -27,6 +27,29 @@ lanes:
         kind: journal_recent
         tag: Journal
 
+  - id: kanji
+    title: 飲み会幹事
+    max_auto_cards: 0
+    digest_themes: 4
+    action_summary_max: 3
+    sources:
+      - path: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/01_運営サポート/飲み会幹事/00_幹事標準マニュアル.md"
+        take: 20
+        kind: note
+        tag: 標準マニュアル
+      - path: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/01_運営サポート/飲み会幹事/01_振り返り比較ログ.md"
+        take: 20
+        kind: note
+        tag: 振り返り比較
+      - path: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1d_神大家手続き自動化/懇親会開催申請_運用メモ.md"
+        take: 10
+        kind: note
+        tag: 申請運用
+      - path: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/01_運営サポート/飲み会幹事/20260829_夕涼みの会岐阜/開催報告_20260829.md"
+        take: 8
+        kind: note
+        tag: 直近イベント
+
   - id: properties
     title: 3棟・物件
     max_auto_cards: 0
