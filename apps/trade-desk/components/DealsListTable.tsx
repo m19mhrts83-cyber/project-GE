@@ -9,7 +9,7 @@ import {
   pageForDealId,
   paginateDeals,
 } from "@/lib/reDealsListUi";
-import { INQUIRY_STATUS_LABEL } from "@/lib/rePipelineUi";
+import { inquiryPhase } from "@/lib/rePipelineUi";
 import {
   scoreBandLabel,
   scoreCellStyle,
@@ -60,12 +60,24 @@ function inquiryChipStyle(status: string): Record<string, string | number> {
     padding: "2px 8px",
     borderRadius: 4,
     fontSize: 12,
+    fontWeight: 600,
     border: "1px solid var(--border, #ccc)",
   };
-  if (status === "has_reply") return { ...base, background: "#ecfdf5" };
-  if (status === "awaiting_reply" || status === "sent")
-    return { ...base, background: "#eff6ff" };
-  return base;
+  if (status === "has_reply")
+    return { ...base, background: "#d1fae5", borderColor: "#6ee7b7" };
+  if (
+    status === "awaiting_reply" ||
+    status === "sent" ||
+    status === "sending" ||
+    status === "awaiting_grok"
+  )
+    return { ...base, background: "#dbeafe", borderColor: "#93c5fd" };
+  return {
+    ...base,
+    background: "#fef3c7",
+    borderColor: "#fcd34d",
+    color: "#92400e",
+  };
 }
 
 function ScoreCell({
@@ -290,8 +302,7 @@ export default function DealsListTable({
                               </td>
                               <td>
                                 <span style={inquiryChipStyle(d.inquiryStatus)}>
-                                  {INQUIRY_STATUS_LABEL[d.inquiryStatus] ||
-                                    d.inquiryStatus}
+                                  {inquiryPhase(d.inquiryStatus).label}
                                 </span>
                               </td>
                               <td className="meta deals-clip" title={d.activityLine}>
@@ -344,8 +355,7 @@ export default function DealsListTable({
                               <td className="meta">{d.priceLabel}</td>
                               <td>
                                 <span style={inquiryChipStyle(d.inquiryStatus)}>
-                                  {INQUIRY_STATUS_LABEL[d.inquiryStatus] ||
-                                    d.inquiryStatus}
+                                  {inquiryPhase(d.inquiryStatus).label}
                                 </span>
                               </td>
                               <td className="deals-col-actions">

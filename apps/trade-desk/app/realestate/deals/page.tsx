@@ -10,12 +10,12 @@ import { formatJstDateTime, fmtYen } from "@/lib/format";
 import { readMacWatchStatus } from "@/lib/macWatchStatus";
 import {
   DEAL_STATUS_LABEL,
-  INQUIRY_STATUS_LABEL,
   SOURCE_BADGE,
   dealGmailUrl,
   dealOriginChip,
   formatLandValuePct,
   grokOneLine,
+  inquiryPhase,
   lastActivityLine,
   parseDealsTab,
   type DealsTabId,
@@ -57,12 +57,20 @@ function inquiryChipStyle(status: string): Record<string, string | number> {
     padding: "2px 8px",
     borderRadius: 4,
     fontSize: 12,
+    fontWeight: 600,
     border: "1px solid var(--border, #ccc)",
   };
-  if (status === "has_reply") return { ...base, background: "#ecfdf5" };
-  if (status === "awaiting_reply" || status === "sent")
-    return { ...base, background: "#eff6ff" };
-  return base;
+  if (status === "has_reply")
+    return { ...base, background: "#d1fae5", borderColor: "#6ee7b7" };
+  if (
+    status === "awaiting_reply" ||
+    status === "sent" ||
+    status === "sending" ||
+    status === "awaiting_grok"
+  )
+    return { ...base, background: "#dbeafe", borderColor: "#93c5fd" };
+  // none / draft = 未問合せ
+  return { ...base, background: "#fef3c7", borderColor: "#fcd34d", color: "#92400e" };
 }
 
 export default async function RealEstateDealsPage({
@@ -359,6 +367,7 @@ export default async function RealEstateDealsPage({
       <p className="sub">
         基本線: 仕分け（確認した／見送り）→ 詳細問合せ → 内見 → 価格交渉 → 買い進め（買付・融資）。
         「確認した」は内見ではありません。早期フォローは「進行中」、買付以降が「買い進め」。
+        進行中には「未問合せ」と「問合せ済」が混在します（問合せ列で区別）。
         行の「開く」で返信・判断履歴・第一問合せ。表示は同一案件を1件にまとめ、優先はメール問合せ → Grok（Webフォーム）の順。
         「評価スコア」は買い進め条件との一致度（数値＋高/中/低）。
         業者開拓は <a href="/realestate/vendors">業者開拓ウォッチ</a>。
@@ -401,19 +410,20 @@ export default async function RealEstateDealsPage({
           <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
             フェーズ5: 買付証明書〜融資の仮申請・打診・審査。長期プランは{" "}
             <Link href="/realestate/buy-plan">買い進めプラン</Link>。
+            問合せ列で未問合せ／問合せ済を区別できます。
           </p>
           <div style={{ overflowX: "auto" }}>
             <table>
               <thead>
                 <tr>
                   <th>段階</th>
+                  <th>問合せ</th>
                   <th>評価スコア</th>
                   <th>物件</th>
                   <th>エリア</th>
                   <th>価格</th>
                   <th>土地値%</th>
                   <th>Grok</th>
-                  <th>問合せ</th>
                   <th>詳細</th>
                 </tr>
               </thead>
@@ -432,6 +442,7 @@ export default async function RealEstateDealsPage({
                     (typeof sj.inquiry_status === "string"
                       ? sj.inquiry_status
                       : "none");
+                  const phase = inquiryPhase(inq);
                   const band = scoreBand(d.match_score);
                   const hits = scoreHitsPreview(sj.hits);
                   return (
@@ -440,6 +451,11 @@ export default async function RealEstateDealsPage({
                         <strong>
                           {DEAL_STATUS_LABEL[d.status] || d.status}
                         </strong>
+                      </td>
+                      <td>
+                        <span style={inquiryChipStyle(inq)}>
+                          {phase.label}
+                        </span>
                       </td>
                       <td>
                         <div style={scoreCellStyle(band)}>
@@ -467,11 +483,6 @@ export default async function RealEstateDealsPage({
                         {formatLandValuePct(grok)}
                       </td>
                       <td className="meta">{grokOneLine(grok)}</td>
-                      <td>
-                        <span style={inquiryChipStyle(inq)}>
-                          {INQUIRY_STATUS_LABEL[inq] || inq}
-                        </span>
-                      </td>
                       <td>
                         <Link href={openDealHref(d.id)} className="btn">
                           開く
@@ -502,19 +513,21 @@ export default async function RealEstateDealsPage({
           <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
             詳細問合せ進行中・内見・「進行中に入れる」でフォローしたもの。
             「確認した」だけではここには入りません。買い進め（買付）とは別です。
+            <strong> 問合せ列</strong>
+            で「未問合せ」（黄）と「問合せ済」（青）を分けています。内見＝問合せ済ではありません。
           </p>
           <div style={{ overflowX: "auto" }}>
             <table>
               <thead>
                 <tr>
                   <th>段階</th>
+                  <th>問合せ</th>
                   <th>評価スコア</th>
                   <th>物件</th>
                   <th>エリア</th>
                   <th>価格</th>
                   <th>土地値%</th>
                   <th>Grok</th>
-                  <th>問合せ</th>
                   <th>操作</th>
                   <th>詳細</th>
                 </tr>
@@ -534,6 +547,7 @@ export default async function RealEstateDealsPage({
                     (typeof sj.inquiry_status === "string"
                       ? sj.inquiry_status
                       : "none");
+                  const phase = inquiryPhase(inq);
                   const band = scoreBand(d.match_score);
                   const hits = scoreHitsPreview(sj.hits);
                   return (
@@ -542,6 +556,11 @@ export default async function RealEstateDealsPage({
                         <strong>
                           {DEAL_STATUS_LABEL[d.status] || d.status}
                         </strong>
+                      </td>
+                      <td>
+                        <span style={inquiryChipStyle(inq)}>
+                          {phase.label}
+                        </span>
                       </td>
                       <td>
                         <div style={scoreCellStyle(band)}>
@@ -569,11 +588,6 @@ export default async function RealEstateDealsPage({
                         {formatLandValuePct(grok)}
                       </td>
                       <td className="meta">{grokOneLine(grok)}</td>
-                      <td>
-                        <span style={inquiryChipStyle(inq)}>
-                          {INQUIRY_STATUS_LABEL[inq] || inq}
-                        </span>
-                      </td>
                       <td>
                         <DealReviewActions
                           dealId={d.id}

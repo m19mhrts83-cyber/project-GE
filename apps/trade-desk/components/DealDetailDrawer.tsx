@@ -13,7 +13,6 @@ import {
 import { isBuyPushDeal, isInProgressDeal } from "@/lib/reDealPursue";
 import {
   DEAL_STATUS_LABEL,
-  INQUIRY_STATUS_LABEL,
   dealGmailUrl,
   dealListingUrl,
   dealOriginLabel,
@@ -21,6 +20,7 @@ import {
   dealScoreReasonLine,
   gmailDeepLink,
   grokOneLine,
+  inquiryPhase,
 } from "@/lib/rePipelineUi";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 
@@ -564,8 +564,7 @@ export default function DealDetailDrawer({
                 </div>
               ) : null}
               <strong>
-                第一問合せ —{" "}
-                {INQUIRY_STATUS_LABEL[inquiryStatus] || inquiryStatus}
+                第一問合せ — {inquiryPhase(inquiryStatus).label}
               </strong>
               {nextAction &&
               (nextAction.code === "triage" ||

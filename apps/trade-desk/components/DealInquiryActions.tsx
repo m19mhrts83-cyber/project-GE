@@ -6,7 +6,7 @@ import { formatJstDateTime } from "@/lib/format";
 import { BAIRITSU_MARKER } from "@/lib/reInquiryShared";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 import { INQUIRY_CHANNEL_LABEL } from "@/lib/reInquiryChannel";
-import { INQUIRY_STATUS_LABEL } from "@/lib/rePipelineUi";
+import { inquiryPhase } from "@/lib/rePipelineUi";
 
 type Msg = {
   direction?: string;
@@ -261,7 +261,7 @@ export default function DealInquiryActions({
   return (
     <div style={{ minWidth: 160 }}>
       <div className="meta" style={{ marginBottom: 4 }}>
-        問合せ: {INQUIRY_STATUS_LABEL[status] || status}
+        問合せ: {inquiryPhase(status).label}
       </div>
       {lastSendJobFailed ? (
         <div className="meta" style={{ marginBottom: 4, color: "#b00020" }}>
