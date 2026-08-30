@@ -33,6 +33,7 @@ from jarvis_bucho_bridge_lib import (  # noqa: E402
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+WEEKLY_SUMMARY_STATE_PATH = STATE_DIR / "hawk_weekly_summary.json"
 
 
 def now_iso() -> str:
@@ -85,6 +86,117 @@ def preview(path: Path, limit: int = 240) -> str:
     return text[:limit] + ("…" if len(text) > limit else "")
 
 
+def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
+    if not text.startswith("---"):
+        return {}, text
+    end = text.find("\n---", 3)
+    if end < 0:
+        return {}, text
+    raw = text[3:end].strip()
+    meta: dict[str, str] = {}
+    for line in raw.splitlines():
+        if ":" not in line:
+            continue
+        k, v = line.split(":", 1)
+        meta[k.strip()] = v.strip()
+    return meta, text[end + 4 :].lstrip("\n")
+
+
+def load_weekly_summary_state() -> dict[str, Any]:
+    if not WEEKLY_SUMMARY_STATE_PATH.is_file():
+        return {
+            "level": "ok",
+            "summary": "ホーク週次サマリー: 未着",
+            "detail": "",
+            "items": [],
+            "last_poll_at": None,
+        }
+    try:
+        data = json.loads(WEEKLY_SUMMARY_STATE_PATH.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            data.setdefault("items", [])
+            return data
+    except Exception:
+        pass
+    return {
+        "level": "ok",
+        "summary": "ホーク週次サマリー: state 読取失敗",
+        "detail": "",
+        "items": [],
+        "last_poll_at": None,
+    }
+
+
+def save_weekly_summary_state(state: dict[str, Any]) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    state["last_poll_at"] = now_iso()
+    WEEKLY_SUMMARY_STATE_PATH.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def poll_weekly_summaries(seen: dict[str, Any], inbox: Path) -> dict[str, Any]:
+    """action: weekly_summary の未処理 MD を検知 → hawk_weekly_summary.json"""
+    items: list[dict[str, Any]] = []
+    for p in list_queue_files(inbox):
+        if p.name in seen:
+            continue
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        meta, body = parse_frontmatter(text)
+        if meta.get("action") != "weekly_summary":
+            continue
+        st = p.stat()
+        mtime = datetime.fromtimestamp(st.st_mtime, tz=JST).isoformat()
+        summary_line = ""
+        for line in body.splitlines():
+            s = line.strip()
+            if s and not s.startswith("#"):
+                summary_line = s[:200]
+                break
+        items.append(
+            {
+                "name": p.name,
+                "path": str(p),
+                "mtime": mtime,
+                "period_key": meta.get("period_key") or "",
+                "source": meta.get("source") or "hawk",
+                "preview": summary_line or preview(p, 120),
+            }
+        )
+
+    n = len(items)
+    if n == 0:
+        level = "ok"
+        summary = "ホーク週次サマリー: 未着"
+        detail = ""
+    elif n == 1:
+        level = "warn"
+        it = items[0]
+        summary = f"ホーク週次サマリー未処理: {it['name']}"
+        detail = it.get("preview") or ""
+    else:
+        level = "attention"
+        names = ", ".join(x["name"] for x in items[:3])
+        summary = f"ホーク週次サマリー未処理 {n}件: {names}"
+        detail = "\n".join(
+            f"- {x['name']}: {x.get('preview') or '(空)'}" for x in items[:5]
+        )
+
+    state = {
+        "level": level,
+        "summary": summary,
+        "detail": detail,
+        "items": items,
+        "inbox_dir": str(inbox),
+    }
+    save_weekly_summary_state(state)
+    return state
+
+
 def poll() -> dict[str, Any]:
     state = load_state()
     seen: dict[str, Any] = dict(state.get("seen") or {})
@@ -128,6 +240,13 @@ def poll() -> dict[str, Any]:
     state["detail"] = detail
     state["pending"] = pending
     state["inbox_dir"] = str(inbox)
+    save_state(state)
+
+    weekly = poll_weekly_summaries(seen, inbox)
+    state["weekly_summary"] = {
+        "level": weekly.get("level"),
+        "count": len(weekly.get("items") or []),
+    }
     save_state(state)
     return state
 
@@ -184,7 +303,20 @@ def print_block(state: dict[str, Any]) -> None:
     print(f"- pending: {n}")
     for it in state.get("pending") or []:
         print(f"  - {it.get('name')}")
+    ws = state.get("weekly_summary") or {}
+    if ws.get("count"):
+        print(f"- weekly_summary: {ws.get('count')}件 (level={ws.get('level')})")
     print(f"- state: {INBOX_STATE_PATH}")
+
+    weekly_state = load_weekly_summary_state()
+    wn = len(weekly_state.get("items") or [])
+    if wn:
+        print("📎 ホーク週次サマリー（weekly_summary）")
+        print(f"- level: {weekly_state.get('level')}")
+        print(f"- summary: {weekly_state.get('summary')}")
+        for it in weekly_state.get("items") or []:
+            print(f"  - {it.get('name')}")
+        print(f"- state: {WEEKLY_SUMMARY_STATE_PATH}")
 
 
 def main() -> int:

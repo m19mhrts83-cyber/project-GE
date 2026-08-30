@@ -23,6 +23,8 @@ export default async function GluconPage() {
       <h1>グルコン報告</h1>
       <p className="meta">
         定常は活動報告です。前回投稿以降の進展を Journal・パートナーやり取り・数値・入退去から下書きし、確認後に WeStudy へ投稿します。成果報告は大きな区切りのときだけ使います。
+        {" "}
+        <a href="/glucon/materials">材料・下書き一覧</a>
       </p>
       <FolderLinks links={folderLinks} />
 
