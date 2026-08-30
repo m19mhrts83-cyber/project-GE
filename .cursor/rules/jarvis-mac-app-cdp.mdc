@@ -1,0 +1,40 @@
+---
+description: Macデスクトップアプリ（Grok Bot等のElectron）はCDPで操作する。操作できないと諦めない
+alwaysApply: true
+---
+
+# Mac アプリ操作（Jarvis · CDP）
+
+「アプリを操作して」「Grok Bot でルーティンを」「Bot の Instructions を貼って」は **止まず実行**する。  
+「Mac アプリは操作できない」は **古い前提**（2026-08-30 に破った）。
+
+## 本線（Grok Bot）
+
+Electron ＝ Chromium。デバッグポートを開けばブラウザと同じ。
+
+```bash
+# 未起動 or CDPなしなら終了してから
+open -a "Grok Bot" --args --remote-debugging-port=9222 --force-renderer-accessibility
+curl -sS http://127.0.0.1:9222/json/list   # title=="Grok Bot" かつ type=="page"
+```
+
+ヘルパー: `scripts/jarvis_grok_bot_cdp.py`  
+Python: `/Users/matsunomasaharu2/selenium_env/venv/bin/python`（`websockets`）
+
+## 操作のコツ（ここが動かない原因）
+
+| 症状 | 正 |
+|---|---|
+| `element.click()` が効かない | `Input.dispatchMouseEvent` で **実座標**クリック。画面外なら `scrollIntoView` してから |
+| 入力が消える | React: native value setter + `_valueTracker` + `onChange` |
+| サブメニューが出ない | クリックではなく **hover（mouseMoved）** してから子を選ぶ |
+| 汎用「削除」を踏む | `[role=alertdialog]` 内の「削除」だけ |
+
+Cursor 内蔵ブラウザ MCP は **別プロセス**。Grok Bot には使わない。
+
+## 他アプリ
+
+同じ型で試す（Slack / VS Code / その他 Electron）。ポートは **9222 以外**（Chrome 銀行系は 9223〜）。  
+Cloud Agent からは Mac 画面は触れない → **ローカル Agent**。
+
+詳細・互助会向け: `docs/DX互助会向け_Cursorでデスクトップアプリを操作する_レッスン.md`

@@ -1,6 +1,6 @@
 # Grok 組織索引 — AI三柱＋全部署
 
-**更新**: 2026-08-29  
+**更新**: 2026-08-30  
 **方針**: 各 Bot の Instructions 正本は下表の paste。本ファイルは索引のみ。
 
 ## AI三柱（松野直属）
@@ -42,13 +42,14 @@
 
 | 部署 | 統括／部長 | チャンネル（推奨） | paste 正本 |
 |---|---|---|---|
-| 参謀室 | **ホークアイ（参謀）** | 参謀室 | `config/grok_sanbo_bot_grok_paste.md` |
+| 参謀室 | **ホークアイ（参謀）** | **参謀室**（首脳会議 · ホーク／不動産／リソース／**コーチング部長**／**アプリ**）＋ **Jarvisボックス**（履歴） | `config/grok_sanbo_bot_grok_paste.md` |
+| **コーチング部** | **コーチング部長** | **コーチング部**（家族・総務・DX統括を束ねる） | `config/grok_coaching_bucho_grok_paste.md` |
 | 不動産賃貸 | **不動産賃貸部長** | 不動産Dailyチーム | `config/grok_realestate_bucho_grok_paste.md` |
 | **リソース経営** | **リソース経営部長** | **リソース経営チーム** | `config/grok_resource_keiei_bucho_grok_paste.md` |
-| 家族コーチ | 家族コーチ統括 | 家族コーチングチーム | `config/grok_family_manager_grok_paste.md` |
-| アプリ開発 | アプリ開発統括 | アプリ開発チーム | `config/grok_app_dev_manager_grok_paste.md` |
-| 総務計画 | 総務計画T統括 | **2ch**（下記） | `config/grok_somu_keikaku_manager_grok_paste.md` |
-| パートナーDX | パートナーDX統括 | パートナーDXコーチングチーム | `config/grok_partner_dx_manager_grok_paste.md` |
+| 家族コーチ | 家族コーチ統括 | 家族コーチングチーム（報告先: コーチング部長） | `config/grok_family_manager_grok_paste.md` |
+| アプリ開発 | アプリ開発統括 | アプリ開発チーム · **参謀室の席** | `config/grok_app_dev_manager_grok_paste.md` |
+| 総務計画 | 総務計画T統括 | **2ch**（報告先: コーチング部長） | `config/grok_somu_keikaku_manager_grok_paste.md` |
+| パートナーDX | パートナーDX統括 | パートナーDXコーチングチーム（報告先: コーチング部長） | `config/grok_partner_dx_manager_grok_paste.md` |
 | 天気 | 天気お知らせ | 天気お知らせ（**ホークアイ傘下 · 直投**） | `config/grok_weather_bot_grok_paste.md` |
 
 ## 総務計画 2ch
@@ -77,7 +78,8 @@
 | 返信 | `10_inbox_from_grok/` | → Jarvis poll |
 
 設定: `config/kurashift_grok_bridge_folders.yaml`  
-ホークアイルーティン: `config/grok_hawk_routine_Jarvisボックス.md` · 週次統括 `config/grok_hawk_routine_週次統括.md`（日曜20:00）
+ホークアイルーティン: `config/grok_hawk_routine_Jarvisボックス.md` · 週次統括 `config/grok_hawk_routine_週次統括.md`（**チャンネル「参謀室」** 日曜20:00。ホーク1:1からは外した）  
+コーチング部: `config/grok_coaching_bucho_routine_週次.md`（日曜19:00 · 首脳用1ブロック）
 
 ## フォーク原則（JarvisBox 必須）
 
