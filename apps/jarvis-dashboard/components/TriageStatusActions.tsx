@@ -16,6 +16,8 @@ type Props = {
   /** 未読カード用: スキップ／後で。処理済み用: 未読に戻す */
   mode?: "unread" | "closed";
   snoozeUntil?: string | null;
+  /** 地場業者返信: 汎用スキップ／後でを隠す（VendorReplyJudgmentButtons を使う） */
+  hideGenericActions?: boolean;
 };
 
 export default function TriageStatusActions({
@@ -24,6 +26,7 @@ export default function TriageStatusActions({
   path,
   mode,
   snoozeUntil,
+  hideGenericActions,
 }: Props) {
   const router = useRouter();
   const toast = useToast();
@@ -67,17 +70,23 @@ export default function TriageStatusActions({
             → {formatSnoozeUntil(snoozeUntil)}
           </span>
         ) : null}
-        <button
-          type="button"
-          className="btn"
-          style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
-          disabled={pending}
-          onClick={() => go("pending", "未読に戻しました")}
-        >
-          未読に戻す
-        </button>
+        {!hideGenericActions ? (
+          <button
+            type="button"
+            className="btn"
+            style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--ink)" }}
+            disabled={pending}
+            onClick={() => go("pending", "未読に戻しました")}
+          >
+            未読に戻す
+          </button>
+        ) : null}
       </div>
     );
+  }
+
+  if (hideGenericActions) {
+    return null;
   }
 
   return (

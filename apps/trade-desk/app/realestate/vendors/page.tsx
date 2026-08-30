@@ -26,7 +26,31 @@ type VendorReplyMail = {
   triageId: string;
   status: string;
   summary: string;
+  judgmentLabel: string | null;
 };
+
+function judgmentBadgeStyle(label: string | null): Record<string, string | number> {
+  const base: Record<string, string | number> = {
+    display: "inline-block",
+    marginLeft: 6,
+    padding: "1px 6px",
+    borderRadius: 4,
+    fontSize: 11,
+    border: "1px solid var(--border, #ccc)",
+  };
+  if (label === "担当待ち") return { ...base, background: "#fffbeb", borderColor: "#fcd34d" };
+  if (label === "確認済") return { ...base, background: "#ecfdf5", borderColor: "#a7f3d0" };
+  if (label === "後で") return { ...base, background: "#f1f5f9" };
+  return base;
+}
+
+function parseJudgmentLabel(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const vj = (payload as { vendor_judgment?: unknown }).vendor_judgment;
+  if (!vj || typeof vj !== "object" || Array.isArray(vj)) return null;
+  const label = (vj as { label?: unknown }).label;
+  return typeof label === "string" && label.trim() ? label.trim() : null;
+}
 
 /** pending（未返信）を優先。同じ vendor に複数あるときは更新が新しい方。 */
 function pickVendorReply(
@@ -116,6 +140,7 @@ export default async function RealEstateVendorsPage({
         triageId: String(m.id),
         status: String(m.status || "pending"),
         summary: String(m.summary || "").slice(0, 80),
+        judgmentLabel: parseJudgmentLabel(m.payload),
       })
     );
   }
@@ -304,16 +329,26 @@ export default async function RealEstateVendorsPage({
                       <td className="meta">{v.replied_at || "—"}</td>
                       <td className="meta">
                         {reply ? (
-                          <a
-                            href={`${DASHBOARD_URL}/mail/${encodeURIComponent(reply.triageId)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            title={reply.summary || undefined}
-                          >
-                            {reply.status === "pending"
-                              ? "要確認 ↗"
-                              : "返信を見る ↗"}
-                          </a>
+                          <>
+                            <a
+                              href={`${DASHBOARD_URL}/mail/${encodeURIComponent(reply.triageId)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={reply.summary || undefined}
+                            >
+                              {reply.status === "pending" && !reply.judgmentLabel
+                                ? "要確認 ↗"
+                                : "返信を見る ↗"}
+                            </a>
+                            {reply.judgmentLabel ? (
+                              <span
+                                style={judgmentBadgeStyle(reply.judgmentLabel)}
+                                title={`判断: ${reply.judgmentLabel}`}
+                              >
+                                {reply.judgmentLabel}
+                              </span>
+                            ) : null}
+                          </>
                         ) : v.status === "replied" ? (
                           <a
                             href={`${DASHBOARD_URL}/general`}

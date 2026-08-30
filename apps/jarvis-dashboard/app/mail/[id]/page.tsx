@@ -6,6 +6,8 @@ import FolderLinks from "@/components/FolderLinks";
 import MailBodyView from "@/components/MailBodyView";
 import MailTaskHandoff from "@/components/MailTaskHandoff";
 import TriageStatusActions from "@/components/TriageStatusActions";
+import VendorReplyJudgmentButtons from "@/components/VendorReplyJudgmentButtons";
+import { parseVendorJudgment } from "@/lib/vendorJudgment";
 import { ensureMailJa } from "@/app/actions/triage";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
 import { fetchMailVisuals } from "@/lib/gmail/fetchMessageParts";
@@ -75,6 +77,9 @@ export default async function MailDetailPage({
   const isVendorReply = Boolean(payload.re_vendor_reply);
   const vendorId =
     typeof payload.vendor_id === "string" ? payload.vendor_id : null;
+  const vendorJudgment = parseVendorJudgment(payload.vendor_judgment);
+  const snoozeUntil =
+    typeof payload.snooze_until === "string" ? payload.snooze_until : null;
   const folderLinks = getFolderLinksMany([
     partnerFolderKey(it.folder, it.partner),
   ]);
@@ -98,7 +103,21 @@ export default async function MailDetailPage({
             {it.folder ? ` · ${it.folder}` : ""}
             {it.received_at ? ` · ${it.received_at}` : ""}
           </span>
-          <TriageStatusActions id={it.id} status={it.status} path={path} />
+          {isVendorReply ? (
+            <VendorReplyJudgmentButtons
+              id={it.id}
+              path={path}
+              vendorId={vendorId}
+              judgment={vendorJudgment}
+            />
+          ) : (
+            <TriageStatusActions
+              id={it.id}
+              status={it.status}
+              path={path}
+              snoozeUntil={snoozeUntil}
+            />
+          )}
         </header>
         <FolderLinks links={folderLinks} />
         <h1 style={{ fontSize: "1.25rem", margin: "10px 0 8px" }}>

@@ -1063,6 +1063,30 @@ def mark_vendor(
     return {"ok": True, "vendor": v, "dry_run": dry_run}
 
 
+def append_vendor_note(
+    vid: str,
+    note: str,
+    *,
+    dry_run: bool,
+) -> dict[str, Any]:
+    """status / replied_at を変えず notes のみ追記（返信判断用）。"""
+    note = (note or "").strip()
+    if not note:
+        return {"ok": False, "error": "note required"}
+    data = load_list()
+    by_id = vendor_index(data)
+    v = by_id.get(vid)
+    if not v:
+        return {"ok": False, "error": f"vendor not found: {vid}"}
+    prev = str(v.get("notes") or "").strip()
+    v["notes"] = note if not prev else f"{prev} | {note}"
+    v["updated_at"] = now_iso()
+    ensure_alive_fields(v, kind="re")
+    if not dry_run:
+        save_list(data)
+    return {"ok": True, "vendor": v, "dry_run": dry_run}
+
+
 def mark_vendor_alive(
     vid: str,
     *,
@@ -1217,6 +1241,11 @@ def main() -> int:
         help="--batch-week と併用。キックオフ文のみ（JSON なし）",
     )
     ap.add_argument("--mark", metavar="ID")
+    ap.add_argument(
+        "--append-note",
+        metavar="ID",
+        help="status を変えず notes のみ追記（返信判断用）",
+    )
     ap.add_argument("--status", default="contacted")
     ap.add_argument("--note", default="")
     ap.add_argument("--result", default="")
@@ -1333,6 +1362,12 @@ def main() -> int:
             notes=args.notes,
             dry_run=args.dry_run,
         )
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        print(f"VENDOR_LIST_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return 0 if out.get("ok") else 1
+
+    if args.append_note:
+        out = append_vendor_note(args.append_note, args.note, dry_run=args.dry_run)
         print(json.dumps(out, ensure_ascii=False, indent=2))
         print(f"VENDOR_LIST_RESULT:{json.dumps(out, ensure_ascii=False)}")
         return 0 if out.get("ok") else 1
