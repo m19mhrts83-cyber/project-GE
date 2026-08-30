@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MarkdownLite from "@/components/MarkdownLite";
 import OpsFixAckButton from "@/components/OpsFixAckButton";
 import StatusToggle from "@/components/StatusToggle";
 import WatchAckButton from "@/components/WatchAckButton";
@@ -9,6 +10,7 @@ import WatchCommentThread, {
 } from "@/components/WatchCommentThread";
 import { LEVEL_LABEL, type HomeLevel } from "@/lib/homeLevels";
 import { isOpsEphemeralId } from "@/lib/opsWatch";
+import { isMarkdownWatchId, readWatchMdItems } from "@/lib/watchMdItems";
 
 type ActionItem = {
   date?: string;
@@ -67,6 +69,8 @@ export default function WatchSituationCard(props: WatchSituationCardProps) {
   ) as HomeLevel | "ok";
   const label =
     level === "ok" ? "OK" : LEVEL_LABEL[level as HomeLevel] || rawLevel;
+  const mdItems = readWatchMdItems(payload);
+  const renderMdDetail = isMarkdownWatchId(id) || mdItems.length > 0;
 
   return (
     <details
@@ -217,13 +221,40 @@ export default function WatchSituationCard(props: WatchSituationCardProps) {
               })}
             </ul>
           </div>
+        ) : mdItems.length > 0 ? (
+          <div className="watch-inbox-md">
+            {mdItems.map((it) => (
+              <article key={it.name || it.title} className="watch-inbox-md-item">
+                <header className="watch-md-head">
+                  {it.name ? <span className="meta">{it.name}</span> : null}
+                  {it.action ? (
+                    <span className="watch-md-pill">{it.action}</span>
+                  ) : null}
+                  {it.priority ? (
+                    <span className="watch-md-pill">{it.priority}</span>
+                  ) : null}
+                </header>
+                {it.bodyMd ? (
+                  <MarkdownLite source={it.bodyMd} />
+                ) : it.title ? (
+                  <p>{it.title}</p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : detail && renderMdDetail ? (
+          <MarkdownLite source={detail} />
         ) : detail ? (
           <pre className="watch-detail">{detail}</pre>
         ) : null}
         {actions.length > 0 &&
         detail &&
         !String(detail).includes("要対応:") ? (
-          <pre className="watch-detail">{detail}</pre>
+          renderMdDetail ? (
+            <MarkdownLite source={detail} />
+          ) : (
+            <pre className="watch-detail">{detail}</pre>
+          )
         ) : null}
         {cursorPrompt ? (
           <details className="watch-prompt-details">
