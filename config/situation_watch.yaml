@@ -309,3 +309,16 @@ items:
       処理後: --archive FILE.md または --mark-seen FILE.md
       Jarvis→部長は scripts/jarvis_bucho_outbox_write.py（20_outbox_to_grok）。
       設定: config/kurashift_grok_bridge_folders.yaml
+
+  - id: hawk_weekly_summary
+    title: ホーク週次サマリー（weekly_summary）
+    category: ops
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/hawk_weekly_summary.json
+    cursor_prompt: |
+      ホーク参謀室の週次統括サマリー（action: weekly_summary）を確認。
+      state: .jarvis_state/hawk_weekly_summary.json
+      取込: jarvis_bucho_inbox_poll.py（朝バンドルに含む）
+      処理後: --mark-seen または --archive で inbox から退避
+      設計: docs/Grok_参謀室_週次統括_設計_20260830.md

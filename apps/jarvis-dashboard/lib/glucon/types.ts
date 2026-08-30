@@ -112,6 +112,8 @@ export type GluconDraftPayload = {
   covered_to?: string;
   /** 成果の神大家ポイント目安（投稿時スナップ。無ければ本文から再計算） */
   scoring?: GluconScoringSnapshot;
+  /** 下書き生成時に注入した Grok 材料 id（markGluconPosted で used 化） */
+  injected_material_ids?: string[];
 };
 
 /** 前回投稿した成果報告のカバレッジ */

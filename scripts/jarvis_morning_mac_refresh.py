@@ -50,6 +50,8 @@ BUCHO_INBOX_POLL = REPO / "scripts" / "jarvis_bucho_inbox_poll.py"
 WEATHER_MORNING_BRIEF = REPO / "scripts" / "jarvis_weather_morning_brief.py"
 GROK_REPAIR_APPLY = REPO / "scripts" / "jarvis_grok_repair_mail_apply.py"
 MGMT_REPLY_APPLY = REPO / "scripts" / "jarvis_grok_mgmt_reply_apply.py"
+GLUCON_MATERIALS_IMPORT = REPO / "scripts" / "jarvis_glucon_materials_from_drive.py"
+CARD_FEE_RESOURCE_OUTBOX = REPO / "scripts" / "jarvis_card_fee_resource_outbox.py"
 KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
 KURASHIFT_RE_DAILY_DIGEST = REPO / "scripts" / "jarvis_kurashift_re_daily_digest.py"
@@ -600,6 +602,38 @@ def main() -> int:
             print(f"# bucho_inbox_poll soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["bucho_inbox_poll"] = "skipped"
+
+    # 2c1-inbox-glucon. グルコン材料 Drive → Supabase（soft-fail）
+    if GLUCON_MATERIALS_IMPORT.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "glucon_materials_import",
+            [exe, str(GLUCON_MATERIALS_IMPORT), "--apply"],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["glucon_materials_import"] = rc
+        if rc != 0:
+            print(f"# glucon_materials_import soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["glucon_materials_import"] = "skipped"
+
+    # 2c1-inbox-fee. 日曜朝: 年会費・引落要約 → resource outbox（ホーク週次前 · soft-fail）
+    if (
+        datetime.now(JST).weekday() == 6
+        and CARD_FEE_RESOURCE_OUTBOX.is_file()
+        and not args.skip_fetch
+    ):
+        rc = run_step(
+            "card_fee_resource_outbox",
+            [exe, str(CARD_FEE_RESOURCE_OUTBOX), "--apply"],
+            timeout=60,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["card_fee_resource_outbox"] = rc
+        if rc != 0:
+            print(f"# card_fee_resource_outbox soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["card_fee_resource_outbox"] = "skipped"
 
     # 2c1b. 朝の天気＋カレンダー → JarvisBox weather（soft-fail）
     if WEATHER_MORNING_BRIEF.is_file() and not args.skip_fetch:

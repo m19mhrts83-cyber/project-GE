@@ -1820,6 +1820,39 @@ def eval_grok_bridge_inbox(meta: dict, data: dict | None) -> dict[str, Any]:
     )
 
 
+def eval_hawk_weekly_summary(meta: dict, data: dict | None) -> dict[str, Any]:
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="state なし — jarvis_bucho_inbox_poll.py を実行",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    if level not in ("ok", "info", "warn", "attention"):
+        level = "ok"
+    summary = str(data.get("summary") or "ホーク週次サマリー")
+    detail = str(data.get("detail") or "")
+    items = data.get("items") or []
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={"item_count": len(items) if isinstance(items, list) else 0},
+    )
+
+
 def eval_jarvis_private_backup(meta: dict, data: dict | None) -> dict[str, Any]:
     """`.env.jarvis_private` の age バックアップ鮮度（参照中心・平常は ok）。"""
     title = meta["title"]
@@ -2031,6 +2064,9 @@ EVALUATORS = {
     ),
     "grok_bridge_inbox": lambda m: eval_grok_bridge_inbox(
         m, load_json(STATE / "grok_bridge_inbox.json")
+    ),
+    "hawk_weekly_summary": lambda m: eval_hawk_weekly_summary(
+        m, load_json(STATE / "hawk_weekly_summary.json")
     ),
 }
 

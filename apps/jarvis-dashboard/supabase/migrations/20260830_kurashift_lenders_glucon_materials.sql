@@ -63,7 +63,7 @@ create table if not exists public.glucon_material_items (
   tags text[] not null default '{}',
   for_result boolean not null default false,
   status text not null default 'pending',
-  -- pending | used | skipped
+  -- pending | used | skipped | cycle_closed
   used_in_period_key text,
   recorded_at date,
   payload jsonb not null default '{}'::jsonb,
