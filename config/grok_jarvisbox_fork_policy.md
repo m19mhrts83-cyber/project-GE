@@ -1,6 +1,6 @@
 # Grok ↔ Jarvis — JarvisBox フォーク原則（正本）
 
-**更新**: 2026-08-28  
+**更新**: 2026-08-30  
 **Drive**: admin `【with Grok bot】/` · 設定: `config/kurashift_grok_bridge_folders.yaml`
 
 ## フォーク（基本形）
@@ -22,6 +22,17 @@
 | 済 | `90_archive/` | 処理後 | 参照 |
 
 `30_shared_working/` は **手順 · B1 正本**。日常キューは **inbox / outbox / team フォルダ**。
+
+## Grok チャンネル（履歴 · キューと別）
+
+| チャンネル | 用途 |
+|---|---|
+| **参謀室** | 首脳会議（統括メンバー · 日曜20:00 `@`） |
+| **Jarvisボックス** | Jarvis↔ホークの**作業履歴**（ホークのみ · 天気は入れない） |
+
+Drive `20_outbox_to_grok/` はこれまでどおり **仕事キュー**。チャンネルと同名だが混ぜない。
+
+**投稿の識別（Grok ch 本文）**: 松野直筆は印なし。Jarvis が書くときは先頭 **`[Jarvis]`**。Drive MD の `action:` はこの規則の対象外。
 
 ## Grok Bot Instructions に載せる一文（統括・部長）
 

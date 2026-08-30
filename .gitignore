@@ -118,6 +118,7 @@ ProgramCode/outputs/
 .cursor/projects/
 # ルールは原則コミットしない（例外: 地図・経路用の非秘密ルールのみ）
 .cursor/rules/*
+!.cursor/rules/jarvis-mac-app-cdp.mdc
 !.cursor/rules/home-address-maps.mdc
 !.cursor/rules/n1-notebooklm-mirror.mdc
 !.cursor/rules/jarvis-supabase-free-one-project.mdc
