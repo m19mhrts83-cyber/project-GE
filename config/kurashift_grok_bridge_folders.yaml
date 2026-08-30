@@ -8,6 +8,7 @@ folders:
   inbox_from_grok: 10_inbox_from_grok   # Grok → Jarvis（Mac poll）
   outbox_to_grok: 20_outbox_to_grok     # Jarvis → ホークアイ（target 付き · 振り分け前）
   shared_working: 30_shared_working
+  glucon_materials: 40_glucon_materials  # 活躍 MD → /glucon（inbox/processed）
   archive: 90_archive
   outbox_to_teams_root: outbox_to_teams
 # L3: ホークアイ（参謀）が振り分けた先（部長／各統括／天気Bot）

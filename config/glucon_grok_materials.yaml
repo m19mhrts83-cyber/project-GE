@@ -1,7 +1,8 @@
 # グルコン活動／成果報告 ← Grok Bot 材料（admin Drive）
 #
-# Grok（ホーク・部長・統括）が活躍・成果を書いたら inbox へ MD を置く。
-# Jarvis が sync → jarvis-dashboard.glucon_material_items → /glucon 下書きに注入。
+# 書き手（確定 Q2=A）: ホークのみが inbox へ書く。
+# Q6: 活動材料はグルコン日経過で cycle_closed（注入リセット）。一覧は /glucon/materials。
+# Jarvis が sync → glucon_material_items → /glucon 下書き（pending のみ）→ 投稿で used。
 
 version: 1
 account: admin@livingsupport-matsu.co.jp
