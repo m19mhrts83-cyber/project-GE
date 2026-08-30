@@ -368,13 +368,13 @@ export function dealRecommendedNext(params: {
     }
     return {
       code: "triage",
-      line: "調査結果を見て「確認した／対象外」で仕分け（次は図面・マイソクの問合せ。まだ内見ではない）",
-      primaryCta: "確認した／対象外",
+      line: "調査結果を見て「残す（問合せへ）／見送り」で仕分け（次は図面・マイソク。まだ内見ではない）",
+      primaryCta: "残す／見送り",
     };
   }
   return {
     code: "triage",
-    line: "「確認した／対象外」で仕分け（確認した＝詳細問合せへ。内見・買い進めではない）",
-    primaryCta: "確認した／対象外",
+    line: "「残す（問合せへ）／見送り」で仕分け（残す＝詳細問合せへ。内見・買い進めではない）",
+    primaryCta: "残す／見送り",
   };
 }
