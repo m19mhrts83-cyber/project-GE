@@ -442,7 +442,9 @@ Cursor ルール（ローカル）: `.cursor/rules/kamiooya-re-purchase-form.mdc
 ### Phase 3（任意）
 
 - [ ] vendor ↔ deal 自動紐付け強化（PDF 物件名）
-- [ ] 業者行から Dashboard 返信下書き deep link
+- [x] 業者行から Dashboard 返信下書き deep link（`/mail/{triageId}` · 未取込は `/general`）
+- [ ] 一覧に返信要約・要返信バッジ（案B · L-09）
+- [ ] vendors 行ドロワーで本文表示（案C · L-09）
 - [ ] deals 表 CSV export
 - [ ] 週次バッチ進捗バー（7 日 × 3 件）
 

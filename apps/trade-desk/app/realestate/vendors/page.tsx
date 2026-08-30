@@ -1,6 +1,7 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
+import { DASHBOARD_URL } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import {
   VENDOR_STATUS_LABEL,
@@ -20,6 +21,25 @@ const FILTERS: { id: string; label: string }[] = [
   { id: "replied", label: "返信あり" },
   { id: "excluded", label: "除外" },
 ];
+
+type VendorReplyMail = {
+  triageId: string;
+  status: string;
+  summary: string;
+};
+
+/** pending（未返信）を優先。同じ vendor に複数あるときは更新が新しい方。 */
+function pickVendorReply(
+  a: VendorReplyMail | undefined,
+  b: VendorReplyMail
+): VendorReplyMail {
+  if (!a) return b;
+  const aPending = a.status === "pending";
+  const bPending = b.status === "pending";
+  if (bPending && !aPending) return b;
+  if (aPending && !bPending) return a;
+  return b;
+}
 
 function chipStyle(status: string): Record<string, string | number> {
   const base: Record<string, string | number> = {
@@ -61,6 +81,13 @@ export default async function RealEstateVendorsPage({
     .select("id, summary_json")
     .limit(500);
 
+  const { data: vendorMails } = await supabase
+    .from("triage_items")
+    .select("id, status, summary, updated_at, payload")
+    .contains("payload", { re_vendor_reply: true })
+    .order("updated_at", { ascending: false })
+    .limit(200);
+
   const dealCountByVendor = new Map<string, number>();
   for (const d of deals || []) {
     const sj =
@@ -73,6 +100,24 @@ export default async function RealEstateVendorsPage({
         (dealCountByVendor.get(sj.vendor_id) || 0) + 1
       );
     }
+  }
+
+  const replyMailByVendor = new Map<string, VendorReplyMail>();
+  for (const m of vendorMails || []) {
+    const pl =
+      m.payload && typeof m.payload === "object"
+        ? (m.payload as { vendor_id?: string })
+        : {};
+    const vid = String(pl.vendor_id || "").trim();
+    if (!vid || !m.id) continue;
+    replyMailByVendor.set(
+      vid,
+      pickVendorReply(replyMailByVendor.get(vid), {
+        triageId: String(m.id),
+        status: String(m.status || "pending"),
+        summary: String(m.summary || "").slice(0, 80),
+      })
+    );
   }
 
   let rows = vendors || [];
@@ -114,7 +159,8 @@ export default async function RealEstateVendorsPage({
       <p className="sub">
         地場リストへの Web 問合せ（「物件情報をください」）の送信状況。正本は Mac の{" "}
         <code>kurashift_re_vendor_list.yaml</code>。Grok 本日分の{" "}
-        <code>--mark</code> 反映後に「リストを同期」してください。
+        <code>--mark</code> 反映後に「リストを同期」してください。返信の本文・下書きは
+        Dashboard（「返信を見る」）で確認します。
       </p>
 
       <div className="card">
@@ -206,6 +252,7 @@ export default async function RealEstateVendorsPage({
                   <th>問合せURL</th>
                   <th>送信日</th>
                   <th>返信日</th>
+                  <th>返信メール</th>
                   <th>備考</th>
                   <th>物件</th>
                 </tr>
@@ -213,6 +260,7 @@ export default async function RealEstateVendorsPage({
               <tbody>
                 {rows.map((v) => {
                   const dc = dealCountByVendor.get(v.id) || 0;
+                  const reply = replyMailByVendor.get(v.id);
                   const opsOnly =
                     v.ops_contacted_at &&
                     !v.contacted_at &&
@@ -254,6 +302,31 @@ export default async function RealEstateVendorsPage({
                       </td>
                       <td className="meta">{v.contacted_at || "—"}</td>
                       <td className="meta">{v.replied_at || "—"}</td>
+                      <td className="meta">
+                        {reply ? (
+                          <a
+                            href={`${DASHBOARD_URL}/mail/${encodeURIComponent(reply.triageId)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={reply.summary || undefined}
+                          >
+                            {reply.status === "pending"
+                              ? "要確認 ↗"
+                              : "返信を見る ↗"}
+                          </a>
+                        ) : v.status === "replied" ? (
+                          <a
+                            href={`${DASHBOARD_URL}/general`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="triage 未取込のとき general で探す"
+                          >
+                            general ↗
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="meta">
                         {(v.notes || v.last_result || "—").slice(0, 40)}
                       </td>
