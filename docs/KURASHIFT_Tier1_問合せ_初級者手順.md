@@ -19,8 +19,10 @@
 | `inquiry_channel` | 条件 | UI / 送信 |
 |---|---|---|
 | **agent_email** | 仲介の From／Reply-To が **自己以外** | 黄「問合せ」→ **To＝仲介**（estate From） |
+| **agent_email** | 仲介メールが取れる | 「メールで問合せ」 |
+| **listing_web** | Grok調査済＋掲載URLあり | **1ボタン**: 定型文コピー＋掲載ページを開く＋問合せ済記録 |
 | **grok_handoff** | 仲介メールが取れない（ポータル・宛先空等） | 「Grok依頼」→ **To＝自分**、件名 `[KURASHIFT問合せ依頼]` |
-| **not_applicable** | `[Grok調査]` メモ単体／業者開拓 A' メモ | 問合せボタン **非表示** |
+| **not_applicable** | 業者開拓 A' メモ／Grok調査だが掲載URL無し | 問合せボタン **非表示** |
 
 **To 解決順**（メール経路）: UI 明示 → Reply-To → From（自己は除外）→ vendor リスト → 無ければ grok_handoff
 

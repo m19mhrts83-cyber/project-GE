@@ -162,14 +162,35 @@ def is_not_applicable(deal: dict[str, Any]) -> bool:
     for s in NOT_APPLICABLE_TITLE_SUBSTR:
         if s in title:
             return True
+    # Grok調査でも掲載URLがあれば listing_web（classify 側）。URL無しのみ対象外。
+    if is_grok_research(deal) and not resolve_listing_url(deal):
+        return True
+    return False
+
+
+def is_grok_research(deal: dict[str, Any]) -> bool:
+    title = str(deal.get("title") or "")
+    for s in NOT_APPLICABLE_TITLE_SUBSTR:
+        if s in title:
+            return False
     source = str(deal.get("source") or "").strip()
     if source == "mail_grok":
         return True
+    if "[Grok調査]" in title or "Grok調査" in title:
+        return True
     sj = sj_of(deal)
     account = str(sj.get("account") or "")
-    if account == "mail_grok" and source not in ("mail_admin", "mail_estate"):
-        return True
-    return False
+    return account == "mail_grok" and source not in ("mail_admin", "mail_estate")
+
+
+def resolve_listing_url(deal: dict[str, Any]) -> str:
+    sj = sj_of(deal)
+    grok = sj.get("grok") if isinstance(sj.get("grok"), dict) else {}
+    for v in (sj.get("listing_url"), sj.get("url"), grok.get("url") if isinstance(grok, dict) else None):
+        s = str(v or "").strip()
+        if s.startswith("http://") or s.startswith("https://"):
+            return s
+    return ""
 
 
 def is_kamiooya_intro_form(deal: dict[str, Any]) -> bool:
@@ -186,12 +207,14 @@ def is_kamiooya_intro_form(deal: dict[str, Any]) -> bool:
 def classify_inquiry_channel(
     deal: dict[str, Any], *, explicit_to: str | None = None
 ) -> dict[str, str]:
-    if is_not_applicable(deal):
-        return {
-            "channel": "not_applicable",
-            "to": "",
-            "reason": "grok_report_or_vendor_outreach_memo",
-        }
+    title = str(deal.get("title") or "")
+    for s in NOT_APPLICABLE_TITLE_SUBSTR:
+        if s in title:
+            return {
+                "channel": "not_applicable",
+                "to": "",
+                "reason": "vendor_outreach_or_fixture_memo",
+            }
     if is_kamiooya_intro_form(deal):
         sj = sj_of(deal)
         form_url = str(sj.get("interest_form_url") or "").strip()
@@ -199,6 +222,19 @@ def classify_inquiry_channel(
             "channel": "kamiooya_form",
             "to": form_url,
             "reason": "interest_form_url" if form_url else "kamiooya_intro_subject",
+        }
+    listing = resolve_listing_url(deal)
+    if is_grok_research(deal) and listing:
+        return {
+            "channel": "listing_web",
+            "to": listing,
+            "reason": "grok_research_with_listing_url",
+        }
+    if is_not_applicable(deal):
+        return {
+            "channel": "not_applicable",
+            "to": "",
+            "reason": "grok_report_without_listing_url",
         }
     to, src = resolve_agent_to(deal, explicit_to=explicit_to)
     if to:

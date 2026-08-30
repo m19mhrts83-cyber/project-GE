@@ -226,6 +226,21 @@ export function evaluateInquiryCandidate(
     };
   }
 
+  if (ch.channel === "listing_web") {
+    badges.push("掲載Web問合せ");
+    return {
+      tier: 1,
+      tier1: true,
+      tier2: false,
+      tier3: false,
+      canQuickSend: false,
+      revive: false,
+      badges,
+      reasons: ["listing_web_form"],
+      ...baseChannel,
+    };
+  }
+
   if (titleHasUketsukeShuryo(deal.title)) {
     return {
       tier: null,

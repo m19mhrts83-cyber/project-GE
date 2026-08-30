@@ -7,6 +7,7 @@ export type InquiryChannel =
   | "agent_email"
   | "grok_handoff"
   | "kamiooya_form"
+  | "listing_web"
   | "not_applicable";
 
 export type InquiryChannelResult = {
@@ -157,6 +158,44 @@ export function resolveAgentToEmail(params: {
   return { to: "", source: "none" };
 }
 
+export function isGrokResearchDeal(params: {
+  title?: string | null;
+  source?: string | null;
+  summaryJson?: Record<string, unknown> | null;
+}): boolean {
+  const title = String(params.title || "");
+  for (const s of NOT_APPLICABLE_TITLE_SUBSTR) {
+    if (title.includes(s)) return false;
+  }
+  const source = String(params.source || "").trim();
+  if (source === "mail_grok") return true;
+  if (title.includes("[Grok調査]") || title.includes("Grok調査")) return true;
+  const sj = sjOf(params.summaryJson);
+  const account = typeof sj.account === "string" ? sj.account : "";
+  return (
+    account === "mail_grok" &&
+    source !== "mail_admin" &&
+    source !== "mail_estate"
+  );
+}
+
+/** 掲載ページ URL（summary / grok） */
+export function resolveListingUrl(
+  summaryJson?: Record<string, unknown> | null
+): string {
+  const sj = sjOf(summaryJson);
+  const grok =
+    sj.grok && typeof sj.grok === "object"
+      ? (sj.grok as Record<string, unknown>)
+      : null;
+  for (const v of [sj.listing_url, sj.url, grok?.url]) {
+    if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) {
+      return v.trim();
+    }
+  }
+  return "";
+}
+
 export function isNotApplicableDeal(params: {
   title?: string | null;
   source?: string | null;
@@ -166,11 +205,11 @@ export function isNotApplicableDeal(params: {
   for (const s of NOT_APPLICABLE_TITLE_SUBSTR) {
     if (title.includes(s)) return true;
   }
-  const source = String(params.source || "").trim();
-  if (source === "mail_grok") return true;
-  const sj = sjOf(params.summaryJson);
-  const account = typeof sj.account === "string" ? sj.account : "";
-  if (account === "mail_grok" && source !== "mail_admin" && source !== "mail_estate") {
+  // mail_grok でも掲載URLがあれば listing_web（classify 側）。URL無しのみ対象外。
+  if (
+    isGrokResearchDeal(params) &&
+    !resolveListingUrl(params.summaryJson)
+  ) {
     return true;
   }
   return false;
@@ -197,18 +236,15 @@ export function classifyInquiryChannel(params: {
   handoffTo?: string | null;
   extraSelf?: string[] | null;
 }): InquiryChannelResult {
-  if (
-    isNotApplicableDeal({
-      title: params.title,
-      source: params.source,
-      summaryJson: params.summaryJson,
-    })
-  ) {
-    return {
-      channel: "not_applicable",
-      to: "",
-      reason: "grok_report_or_vendor_outreach_memo",
-    };
+  const title = String(params.title || "");
+  for (const s of NOT_APPLICABLE_TITLE_SUBSTR) {
+    if (title.includes(s)) {
+      return {
+        channel: "not_applicable",
+        to: "",
+        reason: "vendor_outreach_or_fixture_memo",
+      };
+    }
   }
 
   if (
@@ -224,6 +260,36 @@ export function classifyInquiryChannel(params: {
       channel: "kamiooya_form",
       to: formUrl,
       reason: formUrl ? "interest_form_url" : "kamiooya_intro_subject",
+    };
+  }
+
+  const listingUrl = resolveListingUrl(params.summaryJson);
+  if (
+    isGrokResearchDeal({
+      title: params.title,
+      source: params.source,
+      summaryJson: params.summaryJson,
+    }) &&
+    listingUrl
+  ) {
+    return {
+      channel: "listing_web",
+      to: listingUrl,
+      reason: "grok_research_with_listing_url",
+    };
+  }
+
+  if (
+    isNotApplicableDeal({
+      title: params.title,
+      source: params.source,
+      summaryJson: params.summaryJson,
+    })
+  ) {
+    return {
+      channel: "not_applicable",
+      to: "",
+      reason: "grok_report_without_listing_url",
     };
   }
 
@@ -309,5 +375,6 @@ export const INQUIRY_CHANNEL_LABEL: Record<InquiryChannel, string> = {
   agent_email: "メールで問合せ",
   grok_handoff: "Grokに依頼",
   kamiooya_form: "紹介フォームで詳細請求",
+  listing_web: "掲載ページで問合せ",
   not_applicable: "問合せ対象外",
 };
