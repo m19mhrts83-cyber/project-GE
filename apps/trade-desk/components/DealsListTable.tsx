@@ -23,6 +23,8 @@ export type DealsListRow = {
   status: string;
   statusLabel: string;
   sourceBadge: string;
+  /** 人が読む出所（Grok / メール 等） */
+  originChip?: string;
   area: string;
   priceLabel: string;
   grokLine: string;
@@ -116,7 +118,28 @@ function TitleCell({ row, showBadges }: { row: DealsListRow; showBadges: boolean
           ))}
         </div>
       ) : null}
-      <div className="meta">{row.sourceBadge}</div>
+      <div className="meta">
+        {row.originChip ? (
+          <span
+            style={{
+              display: "inline-block",
+              marginRight: 6,
+              padding: "1px 6px",
+              borderRadius: 4,
+              fontSize: 11,
+              background:
+                row.originChip === "Grok"
+                  ? "#f3e8ff"
+                  : row.originChip === "メール"
+                    ? "#e0f2fe"
+                    : "#f3f4f6",
+            }}
+          >
+            {row.originChip}
+          </span>
+        ) : null}
+        <span className="meta">{row.sourceBadge}</span>
+      </div>
     </td>
   );
 }

@@ -5,7 +5,25 @@ seminar_structure_ref:
 - dx_kyouyuu/05_knowledge/神大家動画/基礎講座 STEP3/STEP3-1【効率的購入戦略１】融資情報,買い進めプランニング.md
 - dx_kyouyuu/05_knowledge/神大家動画/基礎講座 STEP3/STEP3-2 金融機関情報（2025／7時点の全国融資情報とりまとめ）part2.md
 field_schema_note: 'intel: kind / income_requirement / specialty / rate_notes / full_loan_notes / partner_realtors
-  / approach_order / matsuno_notes / sources'
+  / approach_order / matsuno_notes / sources / debt_handling(scope,metric,summary) / 【残債】in notes'
+matsuno_area_strategy:
+  primary:
+  - aichi
+  - gifu
+  primary_label: 本命（愛知・岐阜）
+  pipeline:
+  - sendai
+  - gunma
+  pipeline_label: 今後視野（仙台・群馬。ゆかり物件があれば買い進め）
+  rule: 本命レーンと今後視野レーンを銀行メモ上で混合しない。各銀行の region_tags／notes 先頭に【対象エリア】を書く。
+matsuno_debt_strategy:
+  why: 残債が自行のみか他行含むかは買い進め順序に直結する
+  rule: notes に【残債】を明記。scope=other_banks_included / repay_ratio_all / own_unclear / unknown
+  key_contrast:
+  - 'オリックス: 他行含む残債合計を年収倍率枠から控除（収入倍率型）'
+  - '静岡: 収入倍率上限は弱いが、他行含む既往負債をBS・収支で見る＋地銀協団信枠3億は他行地銀と共有'
+  - 'auじぶん: 住宅含む全返済の返済比率（残債残高倍率より返済額）'
+  - 'スルガ: 個人・法人問わず借入総額 vs 年収目安（会員例30倍）'
 lenders:
 - id: bc0010
   code: bc0010
@@ -15,54 +33,86 @@ lenders:
   case_report: false
   notes: null
   store_page_label: りそな銀行の店舗ページへ
+  region_tags:
+  - national
 - id: bc0125
   code: bc0125
   name: 七十七銀行
   category: bank
   approach: 'yes'
   case_report: false
-  notes: null
+  notes: 【対象エリア】宮城・仙台寄り（愛知・岐阜本命とは別レーン）。仙台ゆかり物件の候補。 【残債】他行合算の確定情報なし（要支店確認）。
   store_page_label: 七十七銀行の店舗ページへ
+  region_tags:
+  - sendai
+  - miyagi
+  debt_handling:
+    scope: unknown
+    metric: unknown
+    summary: 仙台レーン。残債合算の確定メモなし→要確認。
 - id: bc0149
   code: bc0149
   name: 静岡銀行
   category: bank
   approach: 'no'
   case_report: true
-  notes: 他行含め3億以内、物件：レオパレス不可、管理会社：新日本
+  notes: 【対象エリア】静岡中心（名古屋支店経由の東海案件あり）。他行含め3億以内、レオパレス不可、管理会社：新日本。名銀との包括提携・将来統合≠静銀商品で岐阜物件が自動OK。 【残債】他行含む既往負債をBS・収支で見る（硬い年収倍率型ではない）。地銀協団信3億は他行地銀と共有。他行含め総額上限の運用あり。
   store_page_label: 静岡銀行の店舗ページへ
+  region_tags:
+  - shizuoka
+  - tokai
+  debt_handling:
+    scope: other_banks_included
+    metric: balance_sheet_and_danshin
+    summary: 収入倍率の硬い上限は弱い（会員ヒアリング）。一方、他行借入を含む既往負債を審査で確認し、大きいとネック。地銀協団信枠3億は他行地銀と共有→他行で枠使用中だと減額や別団信。Excelメモの「他行含め3億以内」と整合。住宅ローン残債も影響しうる。
 - id: bc0150
   code: bc0150
   name: スルガ銀行
   category: bank
   approach: 'yes'
   case_report: false
-  notes: 管理法人：投資用不動産ローンが使いたい、不動産収益は東京支店の模様。一度名古屋へ相談か、事業者積極的に出す、事業年収✖️30倍
+  notes: 管理法人：投資用不動産ローンが使いたい、不動産収益は東京支店の模様。一度名古屋へ相談か、事業者積極的に出す、事業年収✖️30倍 【残債】個人・法人問わず借入総額（他行含む）を年収対比（会員例：年収×30倍目安）。
   store_page_label: スルガ銀行の店舗ページへ
+  region_tags:
+  - national
+  debt_handling:
+    scope: other_banks_included
+    metric: income_multiple_all_debt
+    summary: 個人・法人問わず借入総額を年収対比で見る（会員ヒアリング例：年収の30倍まで）。他行・法人残債も含む総額型。
 - id: bc0152
   code: bc0152
   name: 大垣共立銀行
   category: bank
   approach: 'yes'
   case_report: false
-  notes: null
+  notes: 【対象エリア】岐阜・愛知（本命レーン寄り）。
   store_page_label: 大垣共立銀行の店舗ページへ
+  region_tags:
+  - tokai
+  - gifu
+  - aichi
 - id: bc0154
   code: bc0154
   name: 三十三銀行
   category: bank
   approach: 'yes'
   case_report: true
-  notes: 最近融資貸し渋りあり（戸井さん）
+  notes: 【対象エリア】三重寄り（東海）。最近融資貸し渋りあり（戸井さん）
   store_page_label: 三十三銀行の店舗ページへ
+  region_tags:
+  - tokai
+  - mie
 - id: bc0155
   code: bc0155
   name: 百五銀行
   category: bank
   approach: 'yes'
   case_report: false
-  notes: null
+  notes: 【対象エリア】三重寄り。
   store_page_label: 百五銀行の店舗ページへ
+  region_tags:
+  - tokai
+  - mie
 - id: bc0158
   code: bc0158
   name: 京都銀行
@@ -71,6 +121,8 @@ lenders:
   case_report: false
   notes: null
   store_page_label: 京都銀行の店舗ページへ
+  region_tags:
+  - kinki
 - id: bc0159
   code: bc0159
   name: 関西みらい銀行
@@ -79,6 +131,8 @@ lenders:
   case_report: false
   notes: null
   store_page_label: 関西みらい銀行の店舗ページへ
+  region_tags:
+  - kinki
 - id: bc0472
   code: bc0472
   name: ＳＢＪ銀行
@@ -87,22 +141,61 @@ lenders:
   case_report: false
   notes: null
   store_page_label: ＳＢＪ銀行の店舗ページへ
+  region_tags:
+  - national
+- id: bc0501
+  code: bc0501
+  name: きらやか銀行
+  category: bank
+  approach: deferred
+  case_report: false
+  region_tags:
+  - sendai
+  - yamagata
+  notes: 【対象エリア】仙台・山形など支店エリアの物件のみ（愛知・岐阜本命とは別レーン。群馬は対象外想定→別地銀）。【条件・WeStudy】居住地＋担保が営業区域内／個人・法人（資産管理）可・MG保証アパートローン。【注意】愛知住所のままは要仙台支店確認（東京支店門前の会員例あり）。手数料は仙台・山形物件の方が安い旨の聞き取りあり。
+    【残債】MG保証審査前提・他行合算の細部は要確認。
+  store_page_label: きらやか銀行の店舗ページへ
+  debt_handling:
+    scope: unknown
+    metric: mg_guarantee
+    summary: MG保証審査が主。残債合算の細部は保証会社・支店確認。
 - id: bc0542
   code: bc0542
   name: あいち銀行
   category: bank
   approach: 'yes'
   case_report: false
-  notes: 土地値で掛け値なしで融資組めるかも
+  notes: 【対象エリア・本命】東海4県（愛知・岐阜・三重・静岡）。公式の不動産担保／アパート系手数料表で東海4県内外に料金差あり＝4県を想定枠。飲み会ヒアリング：岐阜・三重も可。静岡も枠内の可能性→案件ごとに支店確認。土地値で掛け値なしで融資組めるかも。
+    【残債】他行合算の確定情報なし（要支店確認）。
   store_page_label: あいち銀行の店舗ページへ
+  region_tags:
+  - tokai
+  - aichi
+  - gifu
+  - mie
+  - shizuoka
+  debt_handling:
+    scope: unknown
+    metric: unknown
+    summary: 残債・他行合算の公式・会員確定情報は薄い。案件時に確認。
 - id: bc0543
   code: bc0543
   name: 名古屋銀行
   category: bank
   approach: 'yes'
   case_report: true
-  notes: 法人口座設立した
+  notes: 【対象エリア・本命】公式アパートローン＝取扱店（東京支店除く）営業区域内に「居住地および担保物件」。県外店舗に岐阜・多治見・静岡・浜松あり→岐阜／静岡物件はエリア内の可能性（物件所在が支店営業区域か要確認）。静銀との包括提携・2028統合予定は取引先支援・マッチングが主で、アパートローン対象県の自動拡大とは限らない。法人口座設立済。
+    【残債】他行合算の公式明示なし（要支店確認）。オリックス型の硬い年収倍率かは未確認。
   store_page_label: 名古屋銀行の店舗ページへ
+  region_tags:
+  - tokai
+  - aichi
+  - gifu
+  - shizuoka
+  debt_handling:
+    scope: unknown
+    metric: unknown
+    summary: 公式アパートローン要件に残債合算の明示なし。地銀プロパー想定で他行負債は見る可能性が高いが、オリックス型の硬い年収倍率かは未確認→担当確認。
 - id: trunk(三井住友）
   code: null
   name: TRUNK(三井住友）
@@ -111,6 +204,8 @@ lenders:
   case_report: false
   notes: L&F法人も可能。金融機関が限られるので事前準備が必要
   store_page_label: null
+  region_tags:
+  - national
 - id: '1550'
   code: '1550'
   name: 愛知
@@ -119,6 +214,9 @@ lenders:
   case_report: false
   notes: セゾン保証+不足分は公庫で融資手配してくれる（佐藤さん）
   store_page_label: あいち
+  region_tags:
+  - tokai
+  - aichi
 - id: '1551'
   code: '1551'
   name: 豊橋
@@ -127,6 +225,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: とよはし
+  region_tags:
+  - tokai
+  - aichi
 - id: '1552'
   code: '1552'
   name: 岡崎
@@ -135,6 +236,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: おかざき
+  region_tags:
+  - tokai
+  - aichi
 - id: '1553'
   code: '1553'
   name: いちい
@@ -143,6 +247,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: いちい
+  region_tags:
+  - tokai
+  - aichi
 - id: '1554'
   code: '1554'
   name: 瀬戸
@@ -151,6 +258,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: せと
+  region_tags:
+  - tokai
+  - aichi
 - id: '1555'
   code: '1555'
   name: 半田
@@ -159,6 +269,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: はんだ
+  region_tags:
+  - tokai
+  - aichi
 - id: '1556'
   code: '1556'
   name: 知多
@@ -167,6 +280,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: ちた
+  region_tags:
+  - tokai
+  - aichi
 - id: '1557'
   code: '1557'
   name: 豊川
@@ -175,6 +291,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: とよかわ
+  region_tags:
+  - tokai
+  - aichi
 - id: '1559'
   code: '1559'
   name: 豊田
@@ -183,6 +302,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: とよた
+  region_tags:
+  - tokai
+  - aichi
 - id: '1560'
   code: '1560'
   name: 碧海
@@ -191,6 +313,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: へきかい
+  region_tags:
+  - tokai
+  - aichi
 - id: '1561'
   code: '1561'
   name: 西尾
@@ -199,6 +324,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: にしお
+  region_tags:
+  - tokai
+  - aichi
 - id: '1562'
   code: '1562'
   name: 蒲郡
@@ -207,6 +335,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: がまごおり
+  region_tags:
+  - tokai
+  - aichi
 - id: '1563'
   code: '1563'
   name: 尾西
@@ -215,6 +346,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: びさい
+  region_tags:
+  - tokai
+  - aichi
 - id: '1565'
   code: '1565'
   name: 中日
@@ -223,6 +357,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: ちゅうにち
+  region_tags:
+  - tokai
+  - aichi
 - id: '1566'
   code: '1566'
   name: 東春
@@ -231,6 +368,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: とうしゅん
+  region_tags:
+  - tokai
+  - aichi
 - id: 丸八信用組合（名古屋市中区）
   code: null
   name: 丸八信用組合（名古屋市中区）
@@ -239,6 +379,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: null
+  region_tags:
+  - tokai
+  - aichi
 - id: 信用組合愛知商銀（名古屋市中村区）
   code: null
   name: 信用組合愛知商銀（名古屋市中村区）
@@ -247,6 +390,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: null
+  region_tags:
+  - tokai
+  - aichi
 - id: 愛知県中央信用組合（碧南市）
   code: null
   name: 愛知県中央信用組合（碧南市）
@@ -255,6 +401,9 @@ lenders:
   case_report: false
   notes: null
   store_page_label: null
+  region_tags:
+  - tokai
+  - aichi
 - id: イオ信用組合（岐阜市）
   code: null
   name: イオ信用組合（岐阜市）
@@ -263,14 +412,23 @@ lenders:
   case_report: true
   notes: 母体が朝鮮総連で他融資に影響あるかも（後回し）
   store_page_label: null
+  region_tags:
+  - tokai
+  - gifu
 - id: auじぶん銀行
   code: null
   name: auじぶん銀行
   category: national
   approach: 'yes'
   case_report: true
-  notes: 1000万以上 / 個人名義 / 築古はホームインスペクション経て35年融資も可能。但し提携会社から出ないと駄目（クローズ）
+  notes: 1000万以上 / 個人名義 / 築古はホームインスペクション経て35年融資も可能。但し提携会社から出ないと駄目（クローズ） 【残債】他行・住宅含む『返済額』で比率管理（残高の年収倍率より返済比率）。年収20倍超の残債は厳しい旨のヒアリングあり。
   store_page_label: null
+  region_tags:
+  - national
+  debt_handling:
+    scope: other_banks_included
+    metric: repayment_ratio
+    summary: 残高合算というより、住宅ローン含む全ての返済額で返済比率（動画目安約40%以下）。残債が年収20倍超は厳しいとの会員ヒアリングあり。オリックスより住宅ローン併用向き、という対比がセミナーにあり。
 - id: 西京銀行
   code: null
   name: 西京銀行
@@ -279,19 +437,33 @@ lenders:
   case_report: false
   notes: null
   store_page_label: null
+  region_tags:
+  - national
 - id: 滋賀銀行
   code: null
   name: 滋賀銀行
   category: national
   approach: 'yes'
   case_report: false
-  notes: null
+  notes: 【残債】無担保枠は他行無担保の影響あり。有担保の他行収益残債合算は要確認。
   store_page_label: null
+  region_tags:
+  - kinki
+  debt_handling:
+    scope: partial_other_banks
+    metric: unguaranteed_other_banks
+    summary: ジャストサポートの無担保枠は他行無担保ローンの影響あり（会員共有）。有担保本体が他行収益残債をどう合算するかは要確認。
 - id: オリックス銀行
   code: null
   name: オリックス銀行
   category: national
   approach: 'yes'
   case_report: false
-  notes: null
+  notes: 【残債】他行含む合算→年収倍率枠から控除（約10倍目安・家賃年収の加点あり）。自行のみではない。
   store_page_label: null
+  region_tags:
+  - national
+  debt_handling:
+    scope: other_banks_included
+    metric: income_multiple
+    summary: 他行含む残債合計を枠計算に入れる。目安は（給与＋家賃年収×0.7等）×約10倍−残債合計（会員検証・公式も年収・借入状況で限度）。住宅ローン残債があっても通る事例あり。並行審査で残債増は特に厳しく見る（決済後信用情報再確認の話あり）。

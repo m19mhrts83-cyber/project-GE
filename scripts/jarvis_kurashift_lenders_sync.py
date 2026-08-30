@@ -145,9 +145,19 @@ def upsert_lenders(rows: list[dict[str, Any]], *, dry_run: bool) -> list[dict[st
                 "case_report": bool(L.get("case_report")),
                 "matsuno_notes": L.get("notes"),
                 "store_page_label": L.get("store_page_label"),
-                "region_tags": ["tokai"]
-                if (L.get("category") in ("shinkin", "shinkumi") or "名古屋" in L["name"] or "あいち" in L["name"])
-                else [],
+                "region_tags": (
+                    list(L.get("region_tags") or [])
+                    if isinstance(L.get("region_tags"), list) and L.get("region_tags")
+                    else (
+                        ["tokai"]
+                        if (
+                            L.get("category") in ("shinkin", "shinkumi")
+                            or "名古屋" in L["name"]
+                            or "あいち" in L["name"]
+                        )
+                        else []
+                    )
+                ),
                 "active": True,
                 "source_xlsx": "★金融機関一覧(アプローチ先まとめ).xlsx",
                 "updated_at": date.today().isoformat() + "T00:00:00+09:00",
