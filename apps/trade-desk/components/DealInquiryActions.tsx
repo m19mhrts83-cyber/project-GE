@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { formatJstDateTime } from "@/lib/format";
 import { BAIRITSU_MARKER } from "@/lib/reInquiryShared";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 import { INQUIRY_CHANNEL_LABEL } from "@/lib/reInquiryChannel";
@@ -535,7 +536,7 @@ export default function DealInquiryActions({
         <ul className="meta" style={{ paddingLeft: 14, marginTop: 6 }}>
           {(messages || []).slice(-3).map((m, i) => (
             <li key={i}>
-              {(m.occurred_at || "").slice(0, 10)} {m.direction}/{m.kind}:{" "}
+              {formatJstDateTime(m.occurred_at)} {m.direction}/{m.kind}:{" "}
               {(m.subject || "").slice(0, 28)}
             </li>
           ))}

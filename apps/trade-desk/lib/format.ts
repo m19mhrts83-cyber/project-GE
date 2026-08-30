@@ -1,3 +1,27 @@
+/** DB の timestamptz（UTC）を Asia/Tokyo の壁時計で表示。slice(0,16) は UTC のままなので使わない。 */
+export function formatJstDateTime(
+  iso: string | null | undefined,
+  opts?: { seconds?: boolean }
+): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 16).replace("T", " ");
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: opts?.seconds ? "2-digit" : undefined,
+    hour12: false,
+  }).formatToParts(d);
+  const g = (t: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === t)?.value || "";
+  const base = `${g("year")}-${g("month")}-${g("day")} ${g("hour")}:${g("minute")}`;
+  return opts?.seconds ? `${base}:${g("second")}` : base;
+}
+
 export function fmtYen(n: number | null | undefined): string {
   if (n == null || Number.isNaN(Number(n))) return "—";
   return `${Math.round(Number(n)).toLocaleString("ja-JP")}円`;

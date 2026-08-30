@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import DealInquiryActions from "@/components/DealInquiryActions";
 import DealReviewActions from "@/components/DealReviewActions";
 import GrokInvestigateCopy from "@/components/GrokInvestigateCopy";
-import { fmtYen } from "@/lib/format";
+import { formatJstDateTime, fmtYen } from "@/lib/format";
 import {
   formatMatchScore,
   scoreBand,
@@ -450,7 +450,7 @@ export default function DealDetailDrawer({
                       >
                         <div>
                           {m.direction === "inbound" ? "← 返信" : "→ 送信"}{" "}
-                          {(m.occurred_at || "").slice(0, 16).replace("T", " ")}
+                          {formatJstDateTime(m.occurred_at)}
                         </div>
                         <div>{m.subject || "(無題)"}</div>
                         <div style={{ marginTop: 4 }}>
@@ -529,7 +529,7 @@ export default function DealDetailDrawer({
                 <ul className="meta" style={{ paddingLeft: 18, marginTop: 8 }}>
                   {events.map((e, i) => (
                     <li key={`e-${i}`}>
-                      {(e.occurred_at || "").slice(0, 16).replace("T", " ")}{" "}
+                      {formatJstDateTime(e.occurred_at)}{" "}
                       · {e.summary || e.event_type}
                       {e.actor ? ` (${e.actor})` : ""}
                     </li>
