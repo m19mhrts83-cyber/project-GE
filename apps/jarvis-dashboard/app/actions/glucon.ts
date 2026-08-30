@@ -639,6 +639,20 @@ export async function generateGluconDrafts(
       cycle.periodKey,
       "activity",
     );
+    const {
+      loadPendingGluconMaterials,
+      formatGluconMaterialsBlock,
+    } = await import("@/lib/glucon/grokMaterials");
+    const grokActivityMats = await loadPendingGluconMaterials({
+      periodKey: cycle.periodKey,
+      kind: "activity",
+    });
+    const grokResultMats = await loadPendingGluconMaterials({
+      periodKey: cycle.periodKey,
+      kind: "result",
+    });
+    const grokActivityBlock = formatGluconMaterialsBlock(grokActivityMats);
+    const grokResultBlock = formatGluconMaterialsBlock(grokResultMats);
     // 定常は活動本線。成果は明示指定時のみ
     const requested: GluconReportKind[] = kinds?.length
       ? kinds
@@ -684,6 +698,7 @@ export async function generateGluconDrafts(
             earlyFillBlock,
             rubricSummary,
             carryMemoBlock: resultCarryBlock,
+            grokMaterialsBlock: grokResultBlock,
           }),
         );
         if (!factsRes.ok) return { ok: false, error: factsRes.error };
@@ -771,6 +786,7 @@ export async function generateGluconDrafts(
         monthlyMovesBlock,
         resultExcludedFacts,
         carryMemoBlock: activityCarryBlock,
+        grokMaterialsBlock: grokActivityBlock,
         previousPostedBody: lastActivity?.body || null,
         progressFrom: activityFrom,
         progressTo: activityTo,
@@ -996,6 +1012,16 @@ export async function generateGluconFacts(opts?: {
     const journals = await loadGluconJournalRange(range.from, range.to);
     const monthly = await buildGluconMonthlyDigest(range.from, range.to);
     const rubricSummary = formatRubricForPrompt(loadScoringRules());
+    const {
+      loadPendingGluconMaterials,
+      formatGluconMaterialsBlock,
+    } = await import("@/lib/glucon/grokMaterials");
+    const grokResultBlock = formatGluconMaterialsBlock(
+      await loadPendingGluconMaterials({
+        periodKey: cycle.periodKey,
+        kind: "result",
+      }),
+    );
     const res = await geminiReply(
       resultFactsPrompt({
         cycle,
@@ -1004,6 +1030,7 @@ export async function generateGluconFacts(opts?: {
         earlyFillBlock: monthly.occupancy.earlyFillText,
         rubricSummary,
         carryMemoBlock: await carryMemoBlockForCycle(cycle.periodKey, "result"),
+        grokMaterialsBlock: grokResultBlock,
       }),
     );
     if (!res.ok) return { ok: false, error: res.error };

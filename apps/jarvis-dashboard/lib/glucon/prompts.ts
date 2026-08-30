@@ -76,6 +76,7 @@ export function resultFactsPrompt(args: {
   earlyFillBlock?: string;
   rubricSummary?: string;
   carryMemoBlock?: string;
+  grokMaterialsBlock?: string;
 }): string {
   const moves = args.monthlyMovesBlock?.trim()
     ? `\n${args.monthlyMovesBlock.trim()}\n`
@@ -89,13 +90,16 @@ export function resultFactsPrompt(args: {
   const carry = args.carryMemoBlock?.trim()
     ? `\n${args.carryMemoBlock.trim()}\n`
     : "";
+  const grok = args.grokMaterialsBlock?.trim()
+    ? `\n${args.grokMaterialsBlock.trim()}\n`
+    : "";
 
   return `あなたは神・大家さん倶楽部の成果報告向け「事実抽出」アシスタントです。
 
 【厳守】
 - 推測・解釈・感情・「たぶん」は禁止。データに明示された事実だけを書く。
-- Journal／今月の動き／早期入居に無いことは出さない。ただし【次月から回した報告候補メモ】は候補として出してよい（完了を断定しない）。
-- 会社人事・家庭雑談は除外。神大家・不動産・融資・物件・空室・修繕関連のみ。
+- Journal／今月の動き／早期入居／Grok材料に無いことは出さない。ただし【次月から回した報告候補メモ】は候補として出してよい（完了を断定しない）。
+- 会社人事・家庭雑談は除外。神大家・不動産・融資・物件・空室・修繕・AI推進（神大家関連）のみ。
 - 出力は JSON のみ（前後の説明文・マークダウン禁止）。
 
 【神・大家さんポイント方針】
@@ -131,7 +135,7 @@ ${JSON.stringify(
     null,
     2,
   )}
-${moves}${early}${carry}`;
+${moves}${early}${carry}${grok}`;
 }
 
 /** Step2: 確認質問の生成 */
@@ -268,6 +272,8 @@ export function activityPrompt(args: {
   /** 成果報告側に採用した事実（大きな区切り。詳細は成果へ） */
   resultExcludedFacts?: string[];
   carryMemoBlock?: string;
+  /** Grok Drive 材料 */
+  grokMaterialsBlock?: string;
   /** 前回投稿本文（再掲禁止） */
   previousPostedBody?: string | null;
   /** 今回書く進展の期間 */
@@ -287,6 +293,9 @@ export function activityPrompt(args: {
     : "";
   const carry = args.carryMemoBlock?.trim()
     ? `\n${args.carryMemoBlock.trim()}\n`
+    : "";
+  const grok = args.grokMaterialsBlock?.trim()
+    ? `\n${args.grokMaterialsBlock.trim()}\n`
     : "";
 
   const exclude =
@@ -314,8 +323,9 @@ ${args.previousPostedBody.trim()}
 
 【厳守】
 - 会社の人員計画・社内DX・家庭の雑談など、神大家・不動産投資・融資・物件・空室・修繕・コミュニティ学習・AI推進（神大家関連）以外は書かない。
-- 事実のない成果を捏造しない。ジャーナル／今月の動きに無いことは「宣言」側の予定としてだけ書いてよい。
+- 事実のない成果を捏造しない。ジャーナル／今月の動き／Grok材料に無いことは「宣言」側の予定としてだけ書いてよい。
 - 定常の本線は活動報告。前回投稿以降の進展だけを書く。
+- Grok Bot の活躍（組織整備・調査・ルーティン等）も神大家関連なら活動に含めてよい。
 - 出力は投稿本文のみ（前置き・説明・マークダウン見出しの#は不要）。
 ${exclude}${previous}
 【形式】コミュニティの定型に合わせる:
@@ -343,7 +353,7 @@ ${JSON.stringify(
     null,
     2,
   )}
-${moves}${carry}`;
+${moves}${carry}${grok}`;
 }
 
 /** 聞く／直すパネル用 */

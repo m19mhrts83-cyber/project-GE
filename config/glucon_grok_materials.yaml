@@ -1,0 +1,20 @@
+# グルコン活動／成果報告 ← Grok Bot 材料（admin Drive）
+#
+# Grok（ホーク・部長・統括）が活躍・成果を書いたら inbox へ MD を置く。
+# Jarvis が sync → jarvis-dashboard.glucon_material_items → /glucon 下書きに注入。
+
+version: 1
+account: admin@livingsupport-matsu.co.jp
+drive_rel: 40_glucon_materials
+inbox: inbox
+processed: processed
+sync_script: scripts/jarvis_glucon_materials_from_drive.py
+
+# Grok 向け置き場所の絶対パス（Mac）
+# local_root は kurashift_grok_bridge_folders.yaml の local_root + drive_rel
+
+notes:
+  - ファイル名: YYYY-MM-DD_題名.md
+  - frontmatter: kind / title / for_result / period_key / tags / recorded_at
+  - 秘密・パスワードは置かない
+  - ホーク週次・部長日報の「塾生共有できる進展」をここへ写す運用可

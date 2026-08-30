@@ -258,6 +258,14 @@ export const RE_LANES: MapItem[] = [
     implemented: "商品×名義のチェックリスト・コピー用下書き",
     href: "/realestate/finance-pack",
   },
+  {
+    id: "3d-lenders",
+    code: "③-D銀行",
+    title: "銀行アプローチ先・検討材料",
+    intent: "アプローチ候補の一覧と銀行別融資メモ（セミナー／Q&A／手元メモ）",
+    implemented: "kurashift_lenders / lender_intel · sync スクリプト",
+    href: "/realestate/lenders",
+  },
 ];
 
 /**
