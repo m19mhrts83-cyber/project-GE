@@ -1,25 +1,65 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-type Action = "confirm" | "pass" | "pursue_add" | "pursue_remove";
+type Action =
+  | "confirm"
+  | "pass"
+  | "pursue_add"
+  | "pursue_remove"
+  | "set_viewing"
+  | "set_offer";
 
-const KEEP_ON_CONFIRM = new Set([
-  "viewing",
-  "offer",
-  "loan",
-  "purchased",
-]);
+const FUNNEL_KEEP = new Set(["viewing", "offer", "loan", "purchased"]);
 
 function nextStatus(action: Action, current: string): string {
   if (action === "pass") return "passed";
   if (action === "pursue_remove") return current;
-  if (action === "pursue_add") {
-    if (KEEP_ON_CONFIRM.has(current)) return current;
+  if (action === "pursue_add") return current; // フォロー印のみ。status は変えない
+  if (action === "confirm") {
+    // 仕分けのみ。内見に上げない
+    if (current === "passed") return "info";
+    return current || "info";
+  }
+  if (action === "set_viewing") {
+    if (FUNNEL_KEEP.has(current) && current !== "viewing") return current;
     return "viewing";
   }
-  if (KEEP_ON_CONFIRM.has(current)) return current;
-  // info / passed / その他 → 内見レーンへ
-  return "viewing";
+  if (action === "set_offer") {
+    if (current === "loan" || current === "purchased") return current;
+    return "offer";
+  }
+  return current;
+}
+
+function eventMeta(
+  action: Action
+): { event_type: string; summary: string } {
+  switch (action) {
+    case "confirm":
+      return {
+        event_type: "review_confirm",
+        summary: "仕分け済・詳細問合せへ",
+      };
+    case "pass":
+      return { event_type: "review_pass", summary: "対象外（見送り）" };
+    case "pursue_add":
+      return {
+        event_type: "status_change",
+        summary: "進行中（詳細〜内見）に追加",
+      };
+    case "pursue_remove":
+      return {
+        event_type: "status_change",
+        summary: "進行中から外す",
+      };
+    case "set_viewing":
+      return { event_type: "status_change", summary: "内見にする" };
+    case "set_offer":
+      return {
+        event_type: "status_change",
+        summary: "買付へ（買い進め・買付証明）",
+      };
+  }
 }
 
 export async function POST(
@@ -37,16 +77,19 @@ export async function POST(
 
   const body = await req.json().catch(() => ({}));
   const action = String(body.action || "") as Action;
-  if (
-    action !== "confirm" &&
-    action !== "pass" &&
-    action !== "pursue_add" &&
-    action !== "pursue_remove"
-  ) {
+  const allowed: Action[] = [
+    "confirm",
+    "pass",
+    "pursue_add",
+    "pursue_remove",
+    "set_viewing",
+    "set_offer",
+  ];
+  if (!allowed.includes(action)) {
     return NextResponse.json(
       {
         error:
-          "action must be confirm | pass | pursue_add | pursue_remove",
+          "action must be confirm | pass | pursue_add | pursue_remove | set_viewing | set_offer",
       },
       { status: 400 }
     );
@@ -75,11 +118,16 @@ export async function POST(
   const status = nextStatus(action, String(row.status || "info"));
   const now = new Date().toISOString();
 
-  if (action === "confirm" || action === "pursue_add") {
-    sj.pursue = true;
-    sj.pursue_at = now;
+  if (action === "confirm") {
+    // 仕分け印のみ。進行中ブロックには入れない
     sj.user_confirmed = true;
     sj.user_confirmed_at = now;
+    delete sj.pursue_exclude;
+    delete sj.pursue_exclude_at;
+  }
+  if (action === "pursue_add") {
+    sj.pursue = true;
+    sj.pursue_at = now;
     delete sj.pursue_exclude;
     delete sj.pursue_exclude_at;
   }
@@ -96,6 +144,10 @@ export async function POST(
     sj.pursue_exclude = true;
     sj.pursue_exclude_at = now;
   }
+  if (action === "set_viewing" || action === "set_offer") {
+    delete sj.pursue_exclude;
+    delete sj.pursue_exclude_at;
+  }
 
   const { data: updated, error: upErr } = await supabase
     .from("kurashift_re_deals")
@@ -111,29 +163,14 @@ export async function POST(
   }
 
   const prevStatus = String(row.status || "info");
-  const eventType =
-    action === "confirm"
-      ? "review_confirm"
-      : action === "pass"
-        ? "review_pass"
-        : action === "pursue_add"
-          ? "pursue_add"
-          : "pursue_remove";
-  const eventSummary =
-    action === "confirm"
-      ? "候補を確認（内見レーンへ）"
-      : action === "pass"
-        ? "対象外（見送り）"
-        : action === "pursue_add"
-          ? "いま買い進め中に追加"
-          : "いま買い進め中から外す";
+  const { event_type, summary } = eventMeta(action);
   await supabase.from("kurashift_re_deal_events").insert({
     deal_id: id,
-    event_type: eventType,
+    event_type,
     from_status: prevStatus,
     to_status: status,
     actor: "user",
-    summary: eventSummary,
+    summary,
     payload: { action },
   });
 
@@ -185,7 +222,7 @@ export async function POST(
       job_id = job?.id ?? null;
     }
   } else {
-    mark_read_skipped = "pursue_ui_only";
+    mark_read_skipped = "funnel_ui_only";
   }
 
   return NextResponse.json({

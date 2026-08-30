@@ -1,8 +1,8 @@
 /**
- * 「いま買い進めている」物件の判定。
- * - 買付・融資・購入
- * - 内見＋（問合せ進行 / Grok「聞く」 / ユーザー確認 pursue）
- * - summary_json.pursue_exclude === true なら一覧から外す（手動）
+ * 案件ファネルの一覧ブロック判定。
+ * - 進行中（詳細〜内見）: 問合せ進行 / viewing / 明示フォロー（pursue）
+ * - 買い進め（買付・融資）: offer | loan | purchased のみ
+ * 「確認した」(user_confirmed) だけではどちらにも入れない。
  */
 import { titleHasUketsukeShuryo } from "./reInquiryCandidate";
 import { isProductionInquiryDeal } from "./reInquiryProductionFilter";
@@ -20,7 +20,7 @@ export type PursueDealFields = {
   updated_at?: string | null;
 };
 
-const FUNNEL_ACTIVE = new Set(["offer", "loan", "purchased"]);
+const BUY_PUSH = new Set(["offer", "loan", "purchased"]);
 const INQUIRY_ACTIVE = new Set([
   "sent",
   "sending",
@@ -43,13 +43,6 @@ function inquiryOf(d: PursueDealFields): string {
   );
 }
 
-function grokListen(d: PursueDealFields): string {
-  const g = sjOf(d).grok;
-  if (!g || typeof g !== "object") return "";
-  const v = (g as Record<string, unknown>).listen_value;
-  return typeof v === "string" ? v : "";
-}
-
 const NOISE_TITLE = [
   "業者開拓",
   "E2E-GROK-KURASHIFT",
@@ -63,47 +56,79 @@ export function isPursueNoiseTitle(title: string | null | undefined): boolean {
   return NOISE_TITLE.some((n) => t.includes(n));
 }
 
-/** ユーザーが明示除外（買い進めから外す） */
+/** ユーザーが明示除外（進行中から外す） */
 export function isPursueExcluded(d: PursueDealFields): boolean {
   return sjOf(d).pursue_exclude === true;
 }
 
-/** ユーザーが「確認した」または明示 pursue */
-export function isUserPursueFlag(d: PursueDealFields): boolean {
+/** 明示フォロー印（「進行中に入れる」）。user_confirmed だけでは false */
+export function isExplicitFollowFlag(d: PursueDealFields): boolean {
   const sj = sjOf(d);
   if (sj.pursue_exclude === true) return false;
-  if (sj.pursue === true || sj.user_confirmed === true) return true;
+  if (sj.pursue === true) return true;
   if (typeof sj.pursue_at === "string" && sj.pursue_at) return true;
-  if (typeof sj.user_confirmed_at === "string" && sj.user_confirmed_at) return true;
   return false;
 }
 
-export function isBuyProgressDeal(d: PursueDealFields): boolean {
-  const st = String(d.status || "");
-  if (st === "passed" || st === "archived" || st === "info") return false;
-  if (isPursueNoiseTitle(d.title)) return false;
-  if (!isProductionInquiryDeal(d)) return false;
-  if (isPursueExcluded(d)) return false;
-
-  if (FUNNEL_ACTIVE.has(st)) return true;
-
-  if (st === "viewing") {
-    if (isUserPursueFlag(d)) return true;
-    if (INQUIRY_ACTIVE.has(inquiryOf(d))) return true;
-    if (grokListen(d) === "聞く") return true;
+/**
+ * @deprecated 旧「買い進め」判定。user_confirmed を含むため新規は isInProgressDeal / isBuyPushDeal を使う。
+ */
+export function isUserPursueFlag(d: PursueDealFields): boolean {
+  const sj = sjOf(d);
+  if (sj.pursue_exclude === true) return false;
+  if (isExplicitFollowFlag(d)) return true;
+  if (sj.user_confirmed === true) return true;
+  if (typeof sj.user_confirmed_at === "string" && sj.user_confirmed_at) {
+    return true;
   }
   return false;
 }
 
-export function filterBuyProgressDeals<T extends PursueDealFields>(
-  deals: T[]
-): T[] {
-  const list = deals.filter(isBuyProgressDeal);
+function baseOk(d: PursueDealFields): boolean {
+  const st = String(d.status || "");
+  if (st === "passed" || st === "archived") return false;
+  if (isPursueNoiseTitle(d.title)) return false;
+  if (!isProductionInquiryDeal(d)) return false;
+  if (isPursueExcluded(d)) return false;
+  return true;
+}
+
+/** フェーズ5: 買付証明〜融資・購入 */
+export function isBuyPushDeal(d: PursueDealFields): boolean {
+  if (!baseOk(d)) return false;
+  return BUY_PUSH.has(String(d.status || ""));
+}
+
+/**
+ * 進行中（詳細問合せ〜内見）。買い進め（offer以降）は含めない。
+ * user_confirmed のみでは入れない。
+ */
+export function isInProgressDeal(d: PursueDealFields): boolean {
+  if (!baseOk(d)) return false;
+  const st = String(d.status || "");
+  if (BUY_PUSH.has(st)) return false;
+
+  if (st === "viewing") return true;
+  if (INQUIRY_ACTIVE.has(inquiryOf(d))) return true;
+  if (isExplicitFollowFlag(d) && (st === "info" || st === "viewing")) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * @deprecated 互換。買い進め＝買付以降のみに狭めた isBuyPushDeal を優先。
+ */
+export function isBuyProgressDeal(d: PursueDealFields): boolean {
+  return isBuyPushDeal(d) || isInProgressDeal(d);
+}
+
+export function filterBuyPushDeals<T extends PursueDealFields>(deals: T[]): T[] {
+  const list = deals.filter(isBuyPushDeal);
   const order = (s: string) => {
     if (s === "purchased") return 0;
     if (s === "loan") return 1;
     if (s === "offer") return 2;
-    if (s === "viewing") return 3;
     return 9;
   };
   list.sort((a, b) => {
@@ -113,4 +138,32 @@ export function filterBuyProgressDeals<T extends PursueDealFields>(
     return (b.match_score ?? 0) - (a.match_score ?? 0);
   });
   return list;
+}
+
+export function filterInProgressDeals<T extends PursueDealFields>(
+  deals: T[]
+): T[] {
+  const list = deals.filter(isInProgressDeal);
+  const order = (s: string) => {
+    if (s === "viewing") return 0;
+    if (s === "info") return 1;
+    return 9;
+  };
+  list.sort((a, b) => {
+    const oa = order(String(a.status || ""));
+    const ob = order(String(b.status || ""));
+    if (oa !== ob) return oa - ob;
+    const ia = INQUIRY_ACTIVE.has(inquiryOf(a)) ? 0 : 1;
+    const ib = INQUIRY_ACTIVE.has(inquiryOf(b)) ? 0 : 1;
+    if (ia !== ib) return ia - ib;
+    return (b.match_score ?? 0) - (a.match_score ?? 0);
+  });
+  return list;
+}
+
+/** @deprecated filterInProgressDeals + filterBuyPushDeals を使う */
+export function filterBuyProgressDeals<T extends PursueDealFields>(
+  deals: T[]
+): T[] {
+  return [...filterBuyPushDeals(deals), ...filterInProgressDeals(deals)];
 }

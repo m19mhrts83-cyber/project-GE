@@ -25,7 +25,10 @@ import {
 import { loadInquiryAutoConfig } from "@/lib/reInquiryAutoConfig";
 import { getTier2QueueSummary } from "@/lib/reInquiryTier2Queue";
 import { dedupeAndPrioritizeDeals } from "@/lib/reDealDedupe";
-import { filterBuyProgressDeals } from "@/lib/reDealPursue";
+import {
+  filterBuyPushDeals,
+  filterInProgressDeals,
+} from "@/lib/reDealPursue";
 import {
   formatMatchScore,
   scoreBand,
@@ -244,16 +247,11 @@ export default async function RealEstateDealsPage({
   const tier2Summary = await getTier2QueueSummary(supabase);
   const tier2Count = tier2Summary.queue.length;
 
-  const pursueDeals = filterBuyProgressDeals(
-    dedupeAndPrioritizeDeals(
-      (deals || []).filter(
-        (d) =>
-          d.status === "viewing" ||
-          d.status === "offer" ||
-          d.status === "loan" ||
-          d.status === "purchased"
-      )
-    ).deals
+  const inProgressDeals = filterInProgressDeals(
+    dedupeAndPrioritizeDeals(deals || []).deals
+  );
+  const buyPushDeals = filterBuyPushDeals(
+    dedupeAndPrioritizeDeals(deals || []).deals
   );
 
   const counts: Record<string, number> = {};
@@ -329,7 +327,11 @@ export default async function RealEstateDealsPage({
       scoreLabel: formatMatchScore(d.match_score),
       scoreBand: band,
       hitsPreview: scoreHitsPreview(sj.hits),
-      pursuing: pursueDeals.some((p) => p.id === d.id),
+      inProgress: inProgressDeals.some((p) => p.id === d.id),
+      buyPush: buyPushDeals.some((p) => p.id === d.id),
+      pursuing:
+        inProgressDeals.some((p) => p.id === d.id) ||
+        buyPushDeals.some((p) => p.id === d.id),
       highlighted: highlightDeal === d.id,
       badges: evalInq.badges,
       openHref: openDealHref(d.id),
@@ -353,8 +355,9 @@ export default async function RealEstateDealsPage({
       <p className="page-kicker">③-B · 実行</p>
       <h1>千三つファネル</h1>
       <p className="sub">
-        検討中の物件候補は「候補」タブ。行の「開く」で返信・判断履歴・第一問合せ。
-        表示は同一案件を1件にまとめ、優先はメール問合せ → Grok（Webフォーム）の順。
+        基本線: 仕分け（確認した／対象外）→ 詳細問合せ → 内見 → 価格交渉 → 買い進め（買付・融資）。
+        「確認した」は内見ではありません。早期フォローは「進行中」、買付以降が「買い進め」。
+        行の「開く」で返信・判断履歴・第一問合せ。表示は同一案件を1件にまとめ、優先はメール問合せ → Grok（Webフォーム）の順。
         「評価スコア」は買い進め条件との一致度（数値＋高/中/低）。
         業者開拓は <a href="/realestate/vendors">業者開拓ウォッチ</a>。
       </p>
@@ -380,7 +383,7 @@ export default async function RealEstateDealsPage({
         {watch.label} · <a href="/jobs">ジョブ一覧</a>
       </p>
 
-      {pursueDeals.length > 0 ? (
+      {buyPushDeals.length > 0 ? (
         <div
           className="card"
           style={{
@@ -390,14 +393,109 @@ export default async function RealEstateDealsPage({
           }}
         >
           <header>
-            <span className="lvl">Pursue</span>
-            <strong>いま買い進め中（{pursueDeals.length}）</strong>
+            <span className="lvl">Buy</span>
+            <strong>買い進め中・買付・融資（{buyPushDeals.length}）</strong>
           </header>
           <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
-            入る条件: 買付・融資・購入、または内見で（問合せ進行／Grok「聞く」／「確認した」・「買い進めへ」）。
-            出る条件: 「外す」／「対象外」／受付終了・見送り。細かい条件変更は Jarvis に一声でも可。
-            プラン全体は{" "}
+            フェーズ5: 買付証明書〜融資の仮申請・打診・審査。長期プランは{" "}
             <Link href="/realestate/buy-plan">買い進めプラン</Link>。
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>段階</th>
+                  <th>評価スコア</th>
+                  <th>物件</th>
+                  <th>エリア</th>
+                  <th>価格</th>
+                  <th>Grok</th>
+                  <th>問合せ</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody>
+                {buyPushDeals.map((d) => {
+                  const sj =
+                    d.summary_json && typeof d.summary_json === "object"
+                      ? (d.summary_json as Record<string, unknown>)
+                      : {};
+                  const grok =
+                    sj.grok && typeof sj.grok === "object"
+                      ? (sj.grok as Record<string, unknown>)
+                      : null;
+                  const inq =
+                    d.inquiry_status ||
+                    (typeof sj.inquiry_status === "string"
+                      ? sj.inquiry_status
+                      : "none");
+                  const band = scoreBand(d.match_score);
+                  const hits = scoreHitsPreview(sj.hits);
+                  return (
+                    <tr key={`buy-${d.id}`} id={`buy-${d.id}`}>
+                      <td>
+                        <strong>
+                          {DEAL_STATUS_LABEL[d.status] || d.status}
+                        </strong>
+                      </td>
+                      <td>
+                        <div style={scoreCellStyle(band)}>
+                          {formatMatchScore(d.match_score)}
+                          {band !== "none" ? (
+                            <span className="meta" style={{ marginLeft: 6 }}>
+                              {scoreBandLabel(band)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {hits ? (
+                          <div className="meta" style={{ fontSize: 11 }}>
+                            {hits}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>{d.title}</td>
+                      <td className="meta">{d.area || "—"}</td>
+                      <td className="meta">
+                        {d.price_man != null
+                          ? fmtYen(Number(d.price_man) * 10000)
+                          : "—"}
+                      </td>
+                      <td className="meta">{grokOneLine(grok)}</td>
+                      <td>
+                        <span style={inquiryChipStyle(inq)}>
+                          {INQUIRY_STATUS_LABEL[inq] || inq}
+                        </span>
+                      </td>
+                      <td>
+                        <Link href={openDealHref(d.id)} className="btn">
+                          開く
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      {inProgressDeals.length > 0 ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            borderColor: "#93c5fd",
+            background: "#eff6ff",
+          }}
+        >
+          <header>
+            <span className="lvl">In progress</span>
+            <strong>進行中・詳細〜内見（{inProgressDeals.length}）</strong>
+          </header>
+          <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
+            詳細問合せ進行中・内見・「進行中に入れる」でフォローしたもの。
+            「確認した」だけではここには入りません。買い進め（買付）とは別です。
           </p>
           <div style={{ overflowX: "auto" }}>
             <table>
@@ -415,7 +513,7 @@ export default async function RealEstateDealsPage({
                 </tr>
               </thead>
               <tbody>
-                {pursueDeals.map((d) => {
+                {inProgressDeals.map((d) => {
                   const sj =
                     d.summary_json && typeof d.summary_json === "object"
                       ? (d.summary_json as Record<string, unknown>)
@@ -432,7 +530,7 @@ export default async function RealEstateDealsPage({
                   const band = scoreBand(d.match_score);
                   const hits = scoreHitsPreview(sj.hits);
                   return (
-                    <tr key={`pursue-${d.id}`} id={`pursue-${d.id}`}>
+                    <tr key={`prog-${d.id}`} id={`prog-${d.id}`}>
                       <td>
                         <strong>
                           {DEAL_STATUS_LABEL[d.status] || d.status}
@@ -471,7 +569,7 @@ export default async function RealEstateDealsPage({
                           dealId={d.id}
                           status={d.status}
                           compactPursue
-                          pursuing
+                          inProgress
                         />
                       </td>
                       <td>
@@ -486,17 +584,17 @@ export default async function RealEstateDealsPage({
             </table>
           </div>
         </div>
-      ) : (
+      ) : buyPushDeals.length === 0 ? (
         <div className="card" style={{ marginBottom: 16 }}>
           <header>
-            <span className="lvl">Pursue</span>
-            <strong>いま買い進め中</strong>
+            <span className="lvl">Funnel</span>
+            <strong>進行中・買い進め</strong>
           </header>
           <p className="meta" style={{ marginTop: 8 }}>
-            まだ明示的な買い進め案件はありません。候補で「確認した」または「買い進めへ」、問合せ進行でここに出ます。
+            まだ進行中・買付案件はありません。候補で仕分け→詳細問合せ→「内見にする」→「買付へ」の順が基本です。
           </p>
         </div>
-      )}
+      ) : null}
 
       <div
         style={{
