@@ -346,6 +346,15 @@ export async function POST(
     if (upErr) {
       return NextResponse.json({ error: upErr.message }, { status: 500 });
     }
+    await supabase.from("kurashift_re_deal_events").insert({
+      deal_id: id,
+      event_type: "inquiry_kamiooya_form",
+      from_status: String(row.status || "info"),
+      to_status: String(row.status || "info"),
+      actor: "user",
+      summary: "神大家紹介フォーム送信済",
+      payload: { action: "kamiooya_form_submitted" },
+    });
     return NextResponse.json({
       ok: true,
       inquiry_status: "awaiting_reply",
@@ -423,6 +432,19 @@ export async function POST(
     if (upErr) {
       return NextResponse.json({ error: upErr.message }, { status: 500 });
     }
+    await supabase.from("kurashift_re_deal_events").insert({
+      deal_id: id,
+      event_type: "inquiry_listing_web",
+      from_status: String(row.status || "info"),
+      to_status: String(row.status || "info"),
+      actor: "user",
+      summary: "掲載ページで問合せ（定型文コピー）",
+      payload: {
+        action: "listing_web_submit",
+        listing_url: listingUrl,
+        inquiry_status: "awaiting_reply",
+      },
+    });
     return NextResponse.json({
       ok: true,
       inquiry_status: "awaiting_reply",
