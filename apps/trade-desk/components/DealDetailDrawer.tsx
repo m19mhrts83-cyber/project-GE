@@ -22,6 +22,7 @@ import {
   grokOneLine,
   inquiryPhase,
 } from "@/lib/rePipelineUi";
+import { openInGoogleChrome } from "@/lib/openInChrome";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 
 type TimelineItem = {
@@ -297,20 +298,21 @@ export default function DealDetailDrawer({
                     </a>
                   ) : null}
                   {listingUrl ? (
-                    <a
+                    <button
+                      type="button"
                       className="btn"
-                      href={listingUrl}
-                      target="_blank"
-                      rel="noreferrer"
                       style={{
                         fontWeight: 600,
                         background: "#0f766e",
                         color: "#fff",
                         borderColor: "#0f766e",
                       }}
+                      onClick={() => {
+                        void openInGoogleChrome(listingUrl);
+                      }}
                     >
-                      掲載ページを開く
-                    </a>
+                      掲載ページを開く（Chrome）
+                    </button>
                   ) : (
                     <span className="meta">掲載URLなし</span>
                   )}

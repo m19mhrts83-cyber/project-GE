@@ -7,6 +7,7 @@ import { BAIRITSU_MARKER } from "@/lib/reInquiryShared";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 import { INQUIRY_CHANNEL_LABEL } from "@/lib/reInquiryChannel";
 import { inquiryPhase } from "@/lib/rePipelineUi";
+import { openInGoogleChrome } from "@/lib/openInChrome";
 
 type Msg = {
   direction?: string;
@@ -172,19 +173,24 @@ export default function DealInquiryActions({
       } catch {
         /* clipboard may be denied — still open page */
       }
+      let opened: "chrome" | "fallback" = "fallback";
       if (url) {
-        window.open(url, "_blank", "noopener,noreferrer");
+        opened = await openInGoogleChrome(url);
       }
       setStatusOverride(
         typeof data.inquiry_status === "string"
           ? data.inquiry_status
           : "awaiting_reply"
       );
-      setMsg(
-        text
-          ? "定型文をコピーし掲載ページを開きました。フォームに貼って送信し、完了したらこのまま返信待ちでOKです"
-          : "掲載ページを開きました（クリップボードに失敗した場合は下の定型文を手動コピー）"
-      );
+      if (opened === "chrome") {
+        setMsg(
+          "定型文をコピーし、Google Chrome で掲載ページを開きました。貼って送信すれば完了です（判断履歴にも記録）"
+        );
+      } else {
+        setMsg(
+          "定型文をコピーしました。掲載は中央ブラウザで開いた可能性があります。ログインが必要なら Chrome で同じURLを開くか、KURASHIFT 自体を Chrome で開いて再実行してください（Mac では open-chrome ヘルパー導入可）"
+        );
+      }
       if (text) setBody(text);
       if (url) setListingUrl(url);
       notifyChanged();

@@ -117,6 +117,7 @@ export default function DealReviewActions({
         };
         setMsg(labels[action]);
         if (action === "confirm") setConfirmed(true);
+        onInquiryChanged?.();
         router.refresh();
       }
     } catch (e) {
