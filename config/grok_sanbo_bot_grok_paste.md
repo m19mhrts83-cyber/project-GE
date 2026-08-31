@@ -105,7 +105,7 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
 
 **投稿の識別（Grok チャンネル本文）**
 - 松野が直接書く: **印なし**
-- Jarvis が書く: 先頭 **`[Jarvis]`**
+- Jarvis が書く: 先頭 **`[Jarvis]`**（参謀室・コーチング部・Jarvisボックス含む。例外なし）
 - Drive inbox の Bot 文書は従来の `action:` のまま（この規則の対象外）
 
 **毎ルーティン開始時**（ルーティン名 `参謀室 · Jarvisボックス` · 読むのは **Drive**）:
