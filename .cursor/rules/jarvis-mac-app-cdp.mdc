@@ -32,6 +32,8 @@ Python: `/Users/matsunomasaharu2/selenium_env/venv/bin/python`（`websockets`）
 
 Cursor 内蔵ブラウザ MCP は **別プロセス**。Grok Bot には使わない。
 
+Grok チャンネルへ投稿するときは先頭 **`[Jarvis]`**（`jarvis-grok-jarvisbox-fork.mdc`。Jarvisボックス含む）。
+
 ## 他アプリ
 
 同じ型で試す（Slack / VS Code / その他 Electron）。ポートは **9222 以外**（Chrome 銀行系は 9223〜）。  
