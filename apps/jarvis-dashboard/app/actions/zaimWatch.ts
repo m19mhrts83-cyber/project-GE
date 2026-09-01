@@ -2,12 +2,46 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { queueLaneActionLog } from "@/lib/laneActionLog";
+import {
+  isValidZaimCategory,
+  type ZaimCategoryReviewItem,
+  type ZaimPendingCategoryApply,
+} from "@/lib/zaimCategoryCatalog";
 
 const WATCH_ID = "zaim_quality";
 
 export type FixConfirmResult = { ok: boolean; error?: string };
 
 export type ZaimFixStatus = "confirmed" | "disputed" | "pending_confirm";
+
+export type ApplyZaimCategoryInput = {
+  rowKey: string;
+  category: string;
+  genre?: string;
+  source: "category_review" | "recent_fix";
+  fixId?: string;
+  item: ZaimCategoryReviewItem;
+};
+
+function pendingApplyId(rowKey: string, category: string): string {
+  return `dash|${rowKey}|${category}`.slice(0, 180);
+}
+
+function buildFixProposal(
+  shop: string,
+  amount: number | undefined,
+  fromCat: string,
+  toCat: string,
+  genre: string,
+): string {
+  const yen =
+    amount != null && !Number.isNaN(amount)
+      ? ` ¥${Math.round(amount).toLocaleString("ja-JP")}`
+      : "";
+  const gen = genre ? ` / ${genre}` : "";
+  return `${shop || "—"}${yen}: ${fromCat || "?"} → ${toCat}${gen}`;
+}
 
 function stampBatchId(
   row: Record<string, unknown>,
@@ -192,6 +226,163 @@ export async function acknowledgeZaimReview(
   if (uErr) return { ok: false, error: uErr.message };
 
   revalidatePath("/zaim");
+  revalidatePath("/situation");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/**
+ * ダッシュボードから費目を選択して Zaim 反映キューへ載せる。
+ * Mac の jarvis_zaim_dashboard_apply.py が Playwright 適用＋学習を行う。
+ */
+export async function applyZaimCategory(
+  input: ApplyZaimCategoryInput,
+  path = "/zaim",
+): Promise<FixConfirmResult> {
+  const rowKey = (input.rowKey || "").trim();
+  const category = (input.category || "").trim();
+  const genre = (input.genre || "").trim();
+  const source = input.source;
+  const item = input.item || {};
+
+  if (!rowKey) return { ok: false, error: "row_key が空です" };
+  if (!category || !isValidZaimCategory(category)) {
+    return { ok: false, error: "費目が不正です" };
+  }
+
+  const supabase = await createClient();
+  const { data: watch, error } = await supabase
+    .from("watch_status")
+    .select("id,payload")
+    .eq("id", WATCH_ID)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!watch) return { ok: false, error: "Zaim Watch が未 push です" };
+
+  const payload =
+    watch.payload && typeof watch.payload === "object"
+      ? ({ ...(watch.payload as Record<string, unknown>) } as Record<
+          string,
+          unknown
+        >)
+      : {};
+
+  const now = new Date().toISOString();
+  const applyId = pendingApplyId(rowKey, category);
+  const pending = Array.isArray(payload.pending_category_applies)
+    ? ([...(payload.pending_category_applies as ZaimPendingCategoryApply[])] as ZaimPendingCategoryApply[])
+    : [];
+
+  const dup = pending.some(
+    (p) =>
+      p.row_key === rowKey &&
+      (p.status === "queued" || p.status === "applying"),
+  );
+  if (dup) {
+    return { ok: false, error: "同じ明細はすでに反映待ちです" };
+  }
+
+  const entry: ZaimPendingCategoryApply = {
+    id: applyId,
+    row_key: rowKey,
+    status: "queued",
+    category,
+    genre,
+    date: item.date,
+    shop: item.shop,
+    item: item.item,
+    amount: item.amount,
+    learn_key: item.learn_key,
+    pay: item.pay,
+    method: item.method || "payment",
+    category_before: item.category,
+    source,
+    queued_at: now,
+  };
+  pending.push(entry);
+  payload.pending_category_applies = pending.slice(-50);
+
+  const batchId = String(payload.review_batch_id || "").trim();
+  const fromCat = String(item.category || "—");
+  const proposal = buildFixProposal(
+    String(item.shop || ""),
+    item.amount,
+    fromCat,
+    category,
+    genre,
+  );
+
+  const fixes = Array.isArray(payload.recent_fixes)
+    ? [...(payload.recent_fixes as Record<string, unknown>[])]
+    : [];
+  const fixRow: Record<string, unknown> = {
+    id: input.fixId || applyId,
+    date: item.date,
+    shop: item.shop,
+    amount: item.amount,
+    learn_key: item.learn_key,
+    row_key: rowKey,
+    value: category,
+    genre,
+    target: "category",
+    kind: "set_category",
+    status: "pending_confirm",
+    proposal,
+    applied_at: now,
+    ok: false,
+    message: "dashboard_queued",
+    source: "dashboard_apply",
+  };
+  if (batchId) stampBatchId(fixRow, batchId);
+  const fixIdx = fixes.findIndex((f) => String(f.id || "") === String(fixRow.id));
+  if (fixIdx >= 0) fixes[fixIdx] = { ...fixes[fixIdx], ...fixRow };
+  else fixes.push(fixRow);
+  payload.recent_fixes = fixes.slice(-40);
+
+  const reviews = Array.isArray(payload.category_reviews)
+    ? ([...(payload.category_reviews as ZaimCategoryReviewItem[])] as ZaimCategoryReviewItem[])
+    : [];
+  payload.category_reviews = reviews.map((r) => {
+    if (String(r.row_key || "") !== rowKey) return r;
+    return {
+      ...r,
+      pending_apply: true,
+      pending_category: category,
+      pending_genre: genre,
+    };
+  });
+
+  payload.pending_confirm_count = fixes.filter((f) => {
+    const st = String(f.status || "pending_confirm");
+    const bid = String(f.batch_id || batchId || "");
+    const ack = String(payload.dashboard_ack_batch_id || "");
+    if (ack && bid && ack === bid) return false;
+    return st === "pending_confirm" || st === "disputed" || !f.status;
+  }).length;
+  payload.show_banner = true;
+
+  const { error: uErr } = await supabase
+    .from("watch_status")
+    .update({ payload, updated_at: now })
+    .eq("id", WATCH_ID);
+  if (uErr) return { ok: false, error: uErr.message };
+
+  await queueLaneActionLog({
+    lane: "zaim",
+    event: "category_apply",
+    body: JSON.stringify({
+      id: applyId,
+      row_key: rowKey,
+      category,
+      genre,
+      shop: item.shop,
+      date: item.date,
+      amount: item.amount,
+      learn_key: item.learn_key,
+    }),
+  });
+
+  revalidatePath(path);
   revalidatePath("/situation");
   revalidatePath("/");
   return { ok: true };

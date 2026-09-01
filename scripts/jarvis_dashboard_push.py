@@ -344,6 +344,52 @@ def push_watch(sb) -> int:
             except Exception as e:
                 print(f"# zaim review batch ack sync skipped: {e}", file=sys.stderr)
 
+            # ダッシュボード費目反映キュー: remote queued を Mac push で消さない
+            remote_pending = remote_pl.get("pending_category_applies") or []
+            local_pending = payload.get("pending_category_applies") or []
+            if isinstance(remote_pending, list):
+                by_id: dict[str, dict[str, Any]] = {}
+                for p in local_pending:
+                    if isinstance(p, dict) and p.get("id"):
+                        by_id[str(p["id"])] = p
+                for p in remote_pending:
+                    if isinstance(p, dict) and p.get("id"):
+                        cur = by_id.get(str(p["id"]))
+                        st = str(p.get("status") or "")
+                        if cur and str(cur.get("status") or "") in (
+                            "applied",
+                            "failed",
+                        ):
+                            continue
+                        if st in ("queued", "applying") or not cur:
+                            by_id[str(p["id"])] = p
+                if by_id:
+                    payload["pending_category_applies"] = list(by_id.values())[-50:]
+
+            # category_reviews の pending_apply フラグを remote から引き継ぐ
+            remote_reviews = remote_pl.get("category_reviews") or []
+            local_reviews = payload.get("category_reviews") or []
+            if isinstance(remote_reviews, list) and isinstance(local_reviews, list):
+                remote_by_key = {
+                    str(r.get("row_key") or ""): r
+                    for r in remote_reviews
+                    if isinstance(r, dict) and r.get("row_key")
+                }
+                merged_reviews = []
+                for r in local_reviews:
+                    if not isinstance(r, dict):
+                        continue
+                    rk = str(r.get("row_key") or "")
+                    rr = remote_by_key.get(rk)
+                    if rr and rr.get("pending_apply"):
+                        r = {**r, **{k: rr[k] for k in (
+                            "pending_apply",
+                            "pending_category",
+                            "pending_genre",
+                        ) if k in rr}}
+                    merged_reviews.append(r)
+                payload["category_reviews"] = merged_reviews
+
         # ETC: ダッシュボードの「確認しました」を Mac push で潰さない
         if iid == "etc_mileage":
             remote_ack = remote_pl.get("dashboard_ack_target_month")
