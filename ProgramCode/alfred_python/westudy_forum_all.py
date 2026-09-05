@@ -386,8 +386,15 @@ def create_driver() -> webdriver.Chrome:
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-infobars")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    options.add_argument("--disable-search-engine-choice-screen")
     options.add_argument("--window-size=1366,900")
     options.add_argument("--lang=ja-JP")
+    # ヘッドレス検知/空ページ対策として標準ブラウザの User-Agent を設定
+    options.add_argument(
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    )
     # 全リソース待機で renderer timeout になりやすいため DOM 完了で打ち切る
     options.page_load_strategy = "eager"
     # GHA ヘッドレスでのハング緩和

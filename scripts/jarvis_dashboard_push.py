@@ -78,6 +78,16 @@ def refresh_watch() -> None:
     subprocess.run([exe, str(WATCH_SCRIPT)], cwd=str(REPO), check=False, timeout=60)
 
 
+def _clean_nul(val: Any) -> Any:
+    if isinstance(val, str):
+        return val.replace("\x00", "")
+    if isinstance(val, dict):
+        return {k: _clean_nul(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_clean_nul(x) for x in val]
+    return val
+
+
 def push_triage(sb) -> int:
     if not QUEUE_PATH.is_file():
         print("# triage: queue.json なし", file=sys.stderr)
@@ -139,28 +149,30 @@ def push_triage(sb) -> int:
         if remote_payload.get("web_draft_saved_at") and remote.get("draft_text"):
             draft_text = remote.get("draft_text")
         rows.append(
-            {
-                "id": iid,
-                "lane": it.get("lane") or "partner",
-                "kind": it.get("kind") or "mail",
-                "status": st,
-                "partner": it.get("partner") or None,
-                "folder": it.get("folder") or None,
-                "subject": it.get("subject") or None,
-                "received_at": it.get("received_at") or None,
-                "summary": it.get("summary") or None,
-                "draft_text": draft_text,
-                "original_body": (str(it.get("original_body") or ""))[:8000] or None,
-                "priority": it.get("priority") or None,
-                "channel": it.get("channel") or None,
-                "account": it.get("account") or None,
-                "gmail_thread_id": it.get("gmail_thread_id") or None,
-                "gmail_message_id": it.get("gmail_message_id") or None,
-                "from_email": it.get("from_email") or None,
-                "seq": it.get("seq"),
-                "payload": payload,
-                "updated_at": it.get("updated_at") or now_iso(),
-            }
+            _clean_nul(
+                {
+                    "id": iid,
+                    "lane": it.get("lane") or "partner",
+                    "kind": it.get("kind") or "mail",
+                    "status": st,
+                    "partner": it.get("partner") or None,
+                    "folder": it.get("folder") or None,
+                    "subject": it.get("subject") or None,
+                    "received_at": it.get("received_at") or None,
+                    "summary": it.get("summary") or None,
+                    "draft_text": draft_text,
+                    "original_body": (str(it.get("original_body") or ""))[:8000] or None,
+                    "priority": it.get("priority") or None,
+                    "channel": it.get("channel") or None,
+                    "account": it.get("account") or None,
+                    "gmail_thread_id": it.get("gmail_thread_id") or None,
+                    "gmail_message_id": it.get("gmail_message_id") or None,
+                    "from_email": it.get("from_email") or None,
+                    "seq": it.get("seq"),
+                    "payload": payload,
+                    "updated_at": it.get("updated_at") or now_iso(),
+                }
+            )
         )
     rows = dedupe_rows_by_id(rows, label="triage")
     if not rows:
