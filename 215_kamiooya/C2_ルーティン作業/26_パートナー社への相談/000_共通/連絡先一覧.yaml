@@ -72,6 +72,15 @@ partners:
     line_direct_chat_mid: ""
     contact: "菊池貴仁"
     # LPガス営業・Grandole志賀本通Ⅰ・Ⅱプロパン切替（2026-08-27 手続資料依頼済み）
+  - folder: "220_ブロゼロ"
+    name: "ブロゼロ"
+    emails: []
+    phones: []
+    line: "松野さん×ブロゼロ"
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "麓伊吹"
+    # お風呂・水回りリフォーム、大規模修繕（株式会社ブロード・ブロゼロ / 新部様お繋ぎ / LINE WORKS）
   - folder: "806_神大家AI推進"
     name: "神大家AI推進"
     emails: []

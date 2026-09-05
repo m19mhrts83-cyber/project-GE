@@ -29,6 +29,12 @@ routes:
     display_name: "東海DX互助会"
     group: true
     group_label: "神大家東海DX互助会"
+  - id: burozero
+    filename_hints: ["ブロゼロ", "ブロゼロ", "ブロゼロのトーク", "ブロゼロのトーク"]
+    folder: "220_ブロゼロ"
+    display_name: "ブロゼロ"
+    group: true
+    group_label: "松野さん×ブロゼロ"
 
 # Phase C 段階3: Gmail 着信 → inbox（line_export_gmail_to_inbox.py）
 # 送信: iPhone EmailMe → matsuno.estate@gmail.com（admin@ へ転送あり・取込は estate を正）
