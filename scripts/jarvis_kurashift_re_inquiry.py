@@ -380,6 +380,7 @@ def send_inquiry(
     dry_run: bool,
     handoff: bool | None = None,
     inquiry_channel: str | None = None,
+    force: bool = False,
 ) -> dict[str, Any]:
     from jarvis_kurashift_re_inquiry_channel import (
         is_self_email as channel_is_self,
@@ -434,10 +435,13 @@ def send_inquiry(
             return out
 
     fields = inquiry_fields(deal)
-    if fields.get("inquiry_status") in ("awaiting_reply", "awaiting_grok", "has_reply"):
-        out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
-        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
-        return out
+    cur_status = fields.get("inquiry_status")
+    # grok 調査完了後の第一問合せ送信（handoff is False）は awaiting_grok から送信可能
+    if not force:
+        if cur_status in ("awaiting_reply", "has_reply") or (handoff and cur_status == "awaiting_grok"):
+            out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
+            print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+            return out
 
     result = {
         "ok": True,
@@ -838,6 +842,7 @@ def main() -> int:
     ap.add_argument("--deal-id", default="", help="poll/pack の対象絞り込み")
     ap.add_argument("--build-ops-pack", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--force", action="store_true", help="強制送信（awaiting_grok からの送信等）")
     args = ap.parse_args()
     sb = sb_client()
 
@@ -863,6 +868,7 @@ def main() -> int:
             dry_run=args.dry_run,
             handoff=handoff_flag,
             inquiry_channel=args.inquiry_channel or None,
+            force=args.force,
         )
         return 0 if r.get("ok") else 1
     if args.poll_replies:
