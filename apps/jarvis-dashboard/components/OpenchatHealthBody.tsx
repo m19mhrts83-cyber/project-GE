@@ -219,6 +219,9 @@ export default async function OpenchatHealthBody() {
             {health.threads_today != null
               ? ` · 今日【スレッド】${health.threads_today}件`
               : ""}
+            {health.batch?.appended != null
+              ? ` · 直近バッチ追記 ${health.batch.appended}件`
+              : ""}
           </li>
           {square ? (
             <li>
@@ -279,6 +282,7 @@ export default async function OpenchatHealthBody() {
                   <th>グループ</th>
                   <th>登録</th>
                   <th>ok</th>
+                  <th>今回取得</th>
                   <th>deleted</th>
                   <th>14日スレ</th>
                   <th>14日返信</th>
@@ -321,6 +325,9 @@ export default async function OpenchatHealthBody() {
                       </td>
                       <td>{r.thread_mids_registered ?? "—"}</td>
                       <td>{r.ok ?? "—"}</td>
+                      <td>
+                        <strong>{r.appended_threads ?? 0}</strong>
+                      </td>
                       <td>{r.deleted ?? "—"}</td>
                       <td>{r.md_threads_14d ?? "—"}</td>
                       <td>{r.md_replies_14d ?? "—"}</td>

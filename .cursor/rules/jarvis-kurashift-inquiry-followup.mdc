@@ -36,12 +36,11 @@ alwaysApply: true
 
 | ID | 目安 | ユーザーへの依頼 |
 |---|---|---|
-| `tier1-five-sends` | **2026-08-25** | Tier1 初級者手順どおり **手動5件**送信＋poll。「5件送った」と一声 |
 | `tier2-prod-review` | **2026-09-06** | `/realestate/deals/tier2` で一括確認・日次上限5・本番候補のみ。「Tier2 OK」 |
 | `tier3-gate` | **2026-09-13**（可否）／**2026-09-27**（有効化検討） | 明示同意のうえのみ Tier3 `enabled`。勝手に ON しない |
 | `phase3-optional` | （後回し） | 触れたときだけ info |
 
-完了済み（促さない）: `tier2-finish-code` / `tier1-beginner-doc` / `research-reply-extract` / `viewing-judgment-handoff` / `tier3-worker`
+完了済み（促さない）: `tier2-finish-code` / `tier1-beginner-doc` / `research-reply-extract` / `viewing-judgment-handoff` / `tier3-worker` / `tier1-five-sends`
 
 ## いつ動くか（適切なタイミング）
 
