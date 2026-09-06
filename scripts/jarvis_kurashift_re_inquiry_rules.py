@@ -40,6 +40,12 @@ DEFAULT_INSTANT_DEATH_KEYWORDS = [
     "＊受付終了＊",
     "*受付終了*",
     "商談中",
+    "[Grok部長]",
+    "[Grok",
+    "日報",
+    "探索追報",
+    "IEDEPA",
+    "家デパ",
 ]
 
 

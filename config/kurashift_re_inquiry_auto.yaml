@@ -5,10 +5,10 @@
 version: 2
 updated: "2026-09-06"
 
-# Tier3 完全自動送信 — 2026-09-06 有効化（安全ガード装備）
+# Tier3 完全自動送信 — 安全ガード検証中（勝手に実送信ONしない。dry-runプレビュー運用）
 tier3_auto_send:
-  enabled: true
-  enable_after_note: "2026-09-06 クラウド自動化（1社1通制限・即死キーワード除外・ランダムジッター）有効化"
+  enabled: false
+  enable_after_note: "2026-09-13/09-27 ユーザー明示合意後に有効化。除外ガード（Grok日報・S2開拓・即死キーワード）検証中"
   instant_death_keywords:
     - "再建築不可"
     - "再建築できない"
@@ -21,6 +21,12 @@ tier3_auto_send:
     - "＊受付終了＊"
     - "*受付終了*"
     - "商談中"
+    - "[Grok部長]"
+    - "[Grok"
+    - "日報"
+    - "探索追報"
+    - "IEDEPA"
+    - "家デパ"
   anti_spam_jitter:
     min_seconds: 60
     max_seconds: 120
