@@ -14,6 +14,10 @@ import {
   isBuyPushDeal,
   isInProgressDeal,
   type S3InvestigationData,
+  type DealAttachmentInfo,
+  type YieldDisplayInfo,
+  getYieldDisplayInfo,
+  getDealAttachments,
 } from "@/lib/reDealPursue";
 import {
   DEAL_STATUS_LABEL,
@@ -340,12 +344,162 @@ export default function DealDetailDrawer({
             <p className="meta" style={{ marginTop: 2 }}>
               スコア根拠: {scoreReason}
             </p>
-            <p className="meta">
-              {deal.area || "—"} / {deal.structure || "—"} /{" "}
-              {deal.price_man != null
-                ? fmtYen(Number(deal.price_man) * 10000)
-                : "—"}
-            </p>
+            {(() => {
+              const yi = getYieldDisplayInfo(deal);
+              return (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 8,
+                    marginTop: 4,
+                    marginBottom: 4,
+                  }}
+                >
+                  <span className="meta" style={{ margin: 0 }}>
+                    {deal.area || "—"} / {deal.structure || "—"} /{" "}
+                    {deal.price_man != null
+                      ? fmtYen(Number(deal.price_man) * 10000)
+                      : "—"}
+                  </span>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: yi.badgeBg,
+                      color: yi.badgeColor,
+                      border: `1px solid ${yi.badgeBorder}`,
+                    }}
+                  >
+                    {yi.label}
+                  </span>
+                  {yi.monthlyRentStr ? (
+                    <span style={{ fontSize: 12, color: "#047857", fontWeight: 600 }}>
+                      （{yi.monthlyRentStr}）
+                    </span>
+                  ) : null}
+                  {yi.notes ? (
+                    <span className="meta" style={{ fontSize: 11, margin: 0 }}>
+                      [{yi.notes}]
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })()}
+
+            {(() => {
+              const allAtts =
+                attachments.length > 0 ? attachments : getDealAttachments(deal);
+              if (allAtts.length === 0 && inquiryStatus !== "has_reply") return null;
+
+              return (
+                <div
+                  className="card"
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    background: allAtts.length > 0 ? "#f0fdf4" : "#f8fafc",
+                    border: `1px solid ${allAtts.length > 0 ? "#86efac" : "#cbd5e1"}`,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <div>
+                      <span
+                        style={{
+                          background: allAtts.length > 0 ? "#10b981" : "#64748b",
+                          color: "#fff",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: 3,
+                          marginRight: 6,
+                        }}
+                      >
+                        {allAtts.length > 0 ? "返信受領・資料あり" : "返信あり"}
+                      </span>
+                      <strong style={{ fontSize: 13, color: "#1e293b" }}>
+                        受領資料・マイソクPDF（{allAtts.length}件）
+                      </strong>
+                    </div>
+                    {allAtts.length > 0 ? (
+                      <span style={{ fontSize: 11, color: "#047857", fontWeight: 600 }}>
+                        Google Drive保管済
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {allAtts.length > 0 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                      {allAtts.map((a, i) => {
+                        const isMaisoku =
+                          a.kind === "maisoku" ||
+                          a.filename.includes("中古戸建") ||
+                          a.filename.includes("マイソク") ||
+                          a.filename.includes("図面");
+                        const isContract =
+                          a.kind === "contract" || a.filename.includes("契約書");
+
+                        return (
+                          <a
+                            key={`top-att-${i}`}
+                            href={a.open_url || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              fontSize: 12,
+                              fontWeight: isMaisoku || isContract ? 700 : 500,
+                              padding: "4px 10px",
+                              borderRadius: 5,
+                              textDecoration: "none",
+                              background: isMaisoku
+                                ? "#eff6ff"
+                                : isContract
+                                ? "#f5f3ff"
+                                : "#fff",
+                              color: isMaisoku
+                                ? "#1d4ed8"
+                                : isContract
+                                ? "#6d28d9"
+                                : "#334155",
+                              border: `1px solid ${
+                                isMaisoku
+                                  ? "#3b82f6"
+                                  : isContract
+                                  ? "#8b5cf6"
+                                  : "#cbd5e1"
+                              }`,
+                            }}
+                          >
+                            <span>{isMaisoku ? "📄" : isContract ? "📑" : "📎"}</span>
+                            <span>{a.filename}</span>
+                            <span style={{ fontSize: 10, opacity: 0.7 }}>↗</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="meta" style={{ margin: "4px 0 0" }}>
+                      メール返信を受領していますが、添付資料はまだありません。
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {grok ? (
               <div className="card" style={{ marginTop: 12, padding: 12 }}>
