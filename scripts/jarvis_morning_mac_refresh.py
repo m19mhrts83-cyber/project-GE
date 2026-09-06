@@ -56,6 +56,7 @@ KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
 KURASHIFT_RE_DAILY_DIGEST = REPO / "scripts" / "jarvis_kurashift_re_daily_digest.py"
 KURASHIFT_RE_CLEANUP = REPO / "scripts" / "jarvis_kurashift_re_cleanup.py"
+KURASHIFT_OBSIDIAN_PICK_SYNC = REPO / "scripts" / "jarvis_kurashift_obsidian_pick_sync.py"
 VENDOR_REPLY_TRIAGE = REPO / "scripts" / "jarvis_kurashift_vendor_reply_triage.py"
 VENDOR_CATCHUP = REPO / "scripts" / "jarvis_triage_vendor_catchup.py"
 POC = REPO / "line_unofficial_poc"
@@ -764,6 +765,20 @@ def main() -> int:
             print(f"# kurashift_re_cleanup soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["kurashift_re_cleanup"] = "skipped"
+
+    # 2c5. KURASHIFT Obsidian S3/ペルソナ調査結果を kurashift_re_deals へ自動同期
+    if KURASHIFT_OBSIDIAN_PICK_SYNC.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "kurashift_obsidian_pick_sync",
+            [exe, str(KURASHIFT_OBSIDIAN_PICK_SYNC), "--apply"],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["kurashift_obsidian_pick_sync"] = rc
+        if rc != 0:
+            print(f"# kurashift_obsidian_pick_sync soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["kurashift_obsidian_pick_sync"] = "skipped"
 
     # 2a. 取込後の新規未返信を partner レーンへ（夜バッチ待ちだとダッシュに出ない）
     night_triage = REPO / "scripts" / "jarvis_night_triage.py"

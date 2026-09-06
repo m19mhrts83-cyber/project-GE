@@ -7,12 +7,38 @@
  * クライアント（DealDetailDrawer 等）からも import されるため、
  * fs / YAML 読取（reInquiryAutoConfig）に依存しない。
  */
+export type S3InvestigationData = {
+  filename?: string;
+  obsidian_path?: string;
+  verdict?: "go" | "hold" | "pass" | string;
+  verdict_label?: string;
+  verdict_reason?: string;
+  address?: string;
+  city?: string;
+  deal_id?: string | null;
+  s5_persona_line?: string;
+  persona?: {
+    age?: string;
+    layout?: string;
+    parking?: string;
+    rent_range?: string;
+    target_class?: string;
+  };
+  expected_rent?: string;
+  key_risk?: string;
+  structure?: string;
+  hearing_questions?: string[];
+  portal_url?: string;
+  updated_at?: string;
+};
+
 export type PursueDealFields = {
   id: string;
   title?: string | null;
   status?: string | null;
   area?: string | null;
   price_man?: number | null;
+  yield_pct?: number | null;
   match_score?: number | null;
   inquiry_status?: string | null;
   source?: string | null;
@@ -119,13 +145,28 @@ export function isBuyPushDeal(d: PursueDealFields): boolean {
 }
 
 /**
- * 進行中（詳細問合せ〜内見）。買い進め（offer以降）は含めない。
- * user_confirmed のみでは入れない。
+ * Grok詳細調査済・内見＆相談検討ステージ。
+ * Obsidian ☆Real_Estate_Pick に S3需給三次 / S5ペルソナ調査レポートが存在する案件。
+ */
+export function isDetailedInvestigationDeal(d: PursueDealFields): boolean {
+  if (!baseOk(d)) return false;
+  if (BUY_PUSH.has(String(d.status || ""))) return false;
+  const sj = sjOf(d);
+  if (sj.s3_investigation && typeof sj.s3_investigation === "object") {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 進行中（詳細問合せ中・返信待ち）。買い進め（offer以降）やS3調査済は含めない。
+ * ユーザーの「In Progressは問合せ中の状態で置いておく」方針に適合。
  */
 export function isInProgressDeal(d: PursueDealFields): boolean {
   if (!baseOk(d)) return false;
   const st = String(d.status || "");
   if (BUY_PUSH.has(st)) return false;
+  if (isDetailedInvestigationDeal(d)) return false;
 
   if (st === "viewing") return true;
   if (INQUIRY_ACTIVE.has(inquiryOf(d))) return true;
@@ -139,7 +180,22 @@ export function isInProgressDeal(d: PursueDealFields): boolean {
  * @deprecated 互換。買い進め＝買付以降のみに狭めた isBuyPushDeal を優先。
  */
 export function isBuyProgressDeal(d: PursueDealFields): boolean {
-  return isBuyPushDeal(d) || isInProgressDeal(d);
+  return isBuyPushDeal(d) || isDetailedInvestigationDeal(d) || isInProgressDeal(d);
+}
+
+export function filterDetailedInvestigationDeals<T extends PursueDealFields>(
+  deals: T[]
+): T[] {
+  const list = deals.filter(isDetailedInvestigationDeal);
+  list.sort((a, b) => {
+    const sjA = sjOf(a).s3_investigation as S3InvestigationData | undefined;
+    const sjB = sjOf(b).s3_investigation as S3InvestigationData | undefined;
+    const dateA = sjA?.updated_at || "";
+    const dateB = sjB?.updated_at || "";
+    if (dateA !== dateB) return dateB.localeCompare(dateA);
+    return (b.match_score ?? 0) - (a.match_score ?? 0);
+  });
+  return list;
 }
 
 export function filterBuyPushDeals<T extends PursueDealFields>(deals: T[]): T[] {
