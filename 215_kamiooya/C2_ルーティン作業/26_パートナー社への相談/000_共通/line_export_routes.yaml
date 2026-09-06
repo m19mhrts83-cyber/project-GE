@@ -19,7 +19,7 @@ routes:
     group_label: "東海飲み会幹事やりとり"
   - id: kneesbee_oa
     filename_hints: ["Knees", "kneesbee", "ニーズビー", "Knees bee", "Kneesbee"]
-    folder: "419_Kneesbee税理士法人"
+    folder: "519_Kneesbee税理士法人"
     display_name: "Kneesbee税理士法人"
     group: false
     group_label: "Knees bee税理士法人"
@@ -31,10 +31,22 @@ routes:
     group_label: "神大家東海DX互助会"
   - id: burozero
     filename_hints: ["ブロゼロ", "ブロゼロ", "ブロゼロのトーク", "ブロゼロのトーク"]
-    folder: "220_ブロゼロ"
+    folder: "221_ブロゼロ"
     display_name: "ブロゼロ"
     group: true
     group_label: "松野さん×ブロゼロ"
+  - id: yuuaikai_ippan
+    filename_hints: ["遊愛会 一般生", "一般生の会"]
+    folder: "722_遊愛会"
+    display_name: "遊愛会 一般生の会"
+    group: true
+    group_label: "遊愛会 一般生の会"
+  - id: yuuaikai_main
+    filename_hints: ["遊愛会のトーク", "遊愛会"]
+    folder: "722_遊愛会"
+    display_name: "遊愛会"
+    group: true
+    group_label: "遊愛会"
 
 # Phase C 段階3: Gmail 着信 → inbox（line_export_gmail_to_inbox.py）
 # 送信: iPhone EmailMe → matsuno.estate@gmail.com（admin@ へ転送あり・取込は estate を正）

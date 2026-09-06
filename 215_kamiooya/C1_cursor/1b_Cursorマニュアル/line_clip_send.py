@@ -348,7 +348,12 @@ def read_text_arg(args) -> str | None:
     if args.text_file:
         return Path(args.text_file).expanduser().read_text(encoding="utf-8")
     if not sys.stdin.isatty():
-        return sys.stdin.read()
+        try:
+            val = sys.stdin.read()
+            if val and val.strip():
+                return val
+        except Exception:
+            pass
     return None
 
 

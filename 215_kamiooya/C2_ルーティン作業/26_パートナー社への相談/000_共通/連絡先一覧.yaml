@@ -14,7 +14,7 @@
 # 実際の連絡先に置き換えてください。
 
 # フォルダ番号（確定）: 100番台＝分類、残り2桁＝登録順。次番号は既存最大+1（推測で900番台にしない）。
-# 100＝管理会社／200＝修繕／300＝保険／400＝税理士・会計／500＝銀行／600＝物件・入居者／700＝学習／800＝神大家関連／900＝代理店・その他
+# 100＝管理会社／200＝修繕／300＝保険／400＝不使用（縁起が悪いため）／500＝金融・税理士・商工会／600＝物件・入居者／700＝学習・プライベート／800＝神大家関連／900＝代理店・その他
 partners:
   - folder: "101_ホームプランナー"
     name: "ホームプランナー"
@@ -72,7 +72,7 @@ partners:
     line_direct_chat_mid: ""
     contact: "菊池貴仁"
     # LPガス営業・Grandole志賀本通Ⅰ・Ⅱプロパン切替（2026-08-27 手続資料依頼済み）
-  - folder: "220_ブロゼロ"
+  - folder: "221_ブロゼロ"
     name: "ブロゼロ"
     emails: []
     phones: []
@@ -177,7 +177,7 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "清水（和久・多田羅）"
-  - folder: "419_Kneesbee税理士法人"
+  - folder: "519_Kneesbee税理士法人"
     name: "Kneesbee税理士法人"
     emails: ["t.ohno@knees-bee.jp", "t.ohno.sogou@gmail.com"]
     email_domains: ["knees-bee.jp"]
@@ -195,6 +195,16 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "越野将志"
+  - folder: "517_豊明市商工会"
+    name: "豊明市商工会"
+    emails: ["mitsui@toyoake.net", "kamiya@toyoake.net", "info@toyoake.net"]
+    email_domains: ["toyoake.net"]
+    to_name_hints: ["豊明市商工会", "商工会", "三井", "神谷"]
+    phones: ["0562924321", "0562-92-4321"]
+    line: ""
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "三井"
   - folder: "618_Grandole志賀本通I_入居者"
     name: "Grandole志賀本通I入居者"
     emails: ["yuumee.jee@gmail.com"]
@@ -212,3 +222,12 @@ partners:
     line_group_chat_mid: "c49a9e7a307099af0831cdf1486d915c0"
     line_direct_chat_mid: ""
     contact: "本田"
+  - folder: "722_遊愛会"
+    name: "遊愛会"
+    emails: []
+    phones: []
+    line: "遊愛会 / 遊愛会 一般生の会"
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "ひろふみ先生"
+    # 豊明市 空手道場・遊愛会（ひろふみ先生・稽古・一般生LINEグループ・YouTube動画共有）

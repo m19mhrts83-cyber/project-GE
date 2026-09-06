@@ -50,7 +50,9 @@ artifacts:
     filename_patterns:
       - "和道流/和道流_{theme}_{YYYYMMDD}.md"
       - "骨と筋肉/{part_or_motion}_{YYYYMMDD}.md"
+      - "動画ストック_YouTube.md"
     delivery: drive_obsidian
     note: >-
       Journal と並べて参照。Grok 空手アドバイザーは Web 検索＋既存ノート読取。
+      ひろふみ先生・遊愛会のYouTube動画ストックは「動画ストック_YouTube.md」。
       新規追記の実ファイル書込は Jarvis（Documents 正本 → ogd_retag）。

@@ -1298,6 +1298,58 @@ def eval_kanji_ops(meta: dict, data: dict | None) -> dict[str, Any]:
     )
 
 
+def eval_grandole_201_aircon(meta: dict, data: dict | None) -> dict[str, Any]:
+    """志賀本通Ⅰ 201 エアコン故障・修理フォロー。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled") or data.get("status") == "resolved":
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "properties",
+            level="ok",
+            summary="対応完了または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    status = str(data.get("status") or "")
+    if status == "reply_received":
+        level = "warn"
+        summary = "【至急】関係者より新着返信あり！現地立ち会い・修理調整を行ってください"
+    elif status == "waiting_contractor_reply":
+        level = "attention"
+        summary = "【要フォロー】マルショウ石井様からの日程返信待ち（ミニテック林様へ一次連絡済）"
+    else:
+        level = "attention"
+        summary = f"エアコン故障対応中（status={status}）"
+
+    detail_lines = [
+        f"物件: {data.get('property', 'Grandole志賀本通Ⅰ 201号室')}",
+        f"事象: {data.get('issue', 'エラー9-4・水漏れ再発')}",
+        "施工業者: マルショウ 石井章示 様（依頼メール送信済・日程返信待ち）",
+        "管理会社: ミニテック大曽根支店 林 友貴 様（一次返信完了・Notion共有）",
+    ]
+    if data.get("notion_task_url"):
+        detail_lines.append(f"Notion: {data['notion_task_url']}")
+
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "properties",
+        level=level,
+        summary=summary,
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": "https://app.notion.com/p/Grandole-I-201-3d3f6bbe5a76817cbab4f351deeab602",
+            "show_banner": True,
+            "status": status,
+        },
+    )
+
+
 def count_today_thread_headings() -> int:
     base = OPENCHAT_MD_GLOB
     if not base.is_dir():
@@ -2188,6 +2240,9 @@ EVALUATORS = {
         m, load_json(STATE / "hawk_weekly_summary.json")
     ),
     "kanji_ops": lambda m: eval_kanji_ops(m, load_json(STATE / "kanji_ops.json")),
+    "grandole_201_aircon": lambda m: eval_grandole_201_aircon(
+        m, load_json(STATE / "grandole_201_aircon.json")
+    ),
 }
 
 
