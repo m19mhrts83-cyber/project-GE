@@ -16,11 +16,11 @@ services:
     category: ai
     status: active
     billing: monthly
-    amount_yen: 3239
-    usage_note: "2026-08-28方針: ProへSchedule Downgrade（期間末までPro+継続→次回更新からPro）。困ったらPro+再上げ。年額Pro+はNotion年額(9/28)の後。Grok Bot: Pro可（週次枠はPro+より小・cursor.com/help/grok-bot/plans 2026-08-26）。Botルーティン多用で枠不足ならPro+。SuperGrok連携≈$100はPro+より高い→採用せず。Cursor枠は /billing（手動--set）"
+    amount_yen: 9600
+    usage_note: "2026-09-06方針: Pro+($60/mo)へ引き上げ。Grok Bot複数自動運用・GitHub Actions稼働のため拡張枠運用。年額固定は手元現金を優先し、冬ボーナス期(12月)に検討。Cursor枠は /billing（手動--set）"
     next_bill: "毎月25日前後（Billingの更新日が正）"
     watch: true
-    watch_reason: "Pro様子見。枠切れ→on-demandかPro+再上げ。年額固定はNotion後"
+    watch_reason: "Pro+稼働。Grok BotおよびOther Models枠の利用状況を注視"
     cancel_candidate: false
     billing_url: "https://www.cursor.com/settings"
 
