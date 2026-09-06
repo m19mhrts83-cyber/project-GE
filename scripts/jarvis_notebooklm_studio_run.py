@@ -211,7 +211,16 @@ def _save_playwright_download(download, dest_dir: Path, stem: str) -> str:
     suggested = download.suggested_filename or f"{stem}.bin"
     ext = Path(suggested).suffix or ".pdf"
     out = dest_dir / f"{stem}{ext}"
-    download.save_as(str(out))
+    try:
+        download.save_as(str(out))
+    except Exception as e:
+        # If save_as fails (e.g. browser context closing), try path()
+        p = download.path()
+        if p:
+            import shutil
+            shutil.copy2(p, out)
+        else:
+            raise e
     print(f"# saved {out}", file=sys.stderr)
     return str(out)
 
@@ -248,7 +257,21 @@ def _snapshot_download_files(watch_dirs: list[Path]) -> set[str]:
 
 
 def _click_pdf_download_menu(page) -> None:
-    """Open viewer more_vert (last match) and click the PDF download item."""
+    """Open more_vert for slide deck and click the PDF download item."""
+    # Studio panel button more_vert (latest)
+    try:
+        panel_more = page.locator("section.studio-panel button[aria-label*=\"その他\"], section.studio-panel button:has-text(\"more_vert\")").first
+        if panel_more.count():
+            panel_more.click(timeout=2000)
+            page.wait_for_timeout(600)
+            exact = "PDF ドキュメント（.pdf）をダウンロード"
+            pdf_item = page.locator(f"[role=\"menuitem\"]:has-text(\"PDF\"), [role=\"menuitem\"]:has-text(\"ダウンロード\")").first
+            if pdf_item.count():
+                pdf_item.click(timeout=2500)
+                return
+    except Exception as e:
+        print(f"# panel more_vert try skipped: {e}", file=sys.stderr)
+
     labels = ("その他のオプション", "More options", "その他")
     opened = False
     for lab in labels:
@@ -297,7 +320,7 @@ def _download_and_save(page, selectors: dict, dest_dir: Path, stem: str) -> list
     loc, _sel = first_match(page, dl_sels, timeout_ms=1500)
 
     try:
-        with page.expect_download(timeout=15000) as di:
+        with page.expect_download(timeout=25000) as di:
             try:
                 _click_pdf_download_menu(page)
             except Exception as menu_err:
@@ -311,11 +334,15 @@ def _download_and_save(page, selectors: dict, dest_dir: Path, stem: str) -> list
     except Exception as e:
         print(f"# expect_download missed ({e}); watching folders", file=sys.stderr)
 
+    # If expect_download failed, give browser 15 seconds to finish writing native download
+    page.wait_for_timeout(15000)
+
     found = _watch_new_download(watch_dirs, before, timeout_sec=90)
     if not found:
         # retry menu once more, then watch
         try:
             _click_pdf_download_menu(page)
+            page.wait_for_timeout(15000)
         except Exception as e2:
             print(f"# menu retry failed: {e2}", file=sys.stderr)
         found = _watch_new_download(watch_dirs, before, timeout_sec=60)
@@ -428,6 +455,13 @@ def _screenshot_artifact(page, dest: Path) -> str:
 
 
 def _open_existing_slide_deck(page, selectors: dict) -> None:
+    # Check if more_vert menu in studio panel exists
+    try:
+        panel_more = page.locator("section.studio-panel button[aria-label*=\"その他\"], section.studio-panel button:has-text(\"more_vert\")").first
+        if panel_more.count():
+            return
+    except Exception:
+        pass
     open_sels = (selectors.get("open_existing") or {}).get("slide_deck") or []
     opened = False
     for sel in open_sels:
@@ -466,15 +500,16 @@ def _run_save_only(
     pages: list[int],
     state: dict,
 ) -> int:
+    _open_studio(page, selectors)
     _open_existing_slide_deck(page, selectors)
     state["phase"] = "artifact_open"
     write_run_state(state)
     shots = []
-    if pages:
-        try:
-            shots = _screenshot_slide_pages(page, out_dir, stem, pages)
-        except Exception as e:
-            print(f"# screenshot soft-fail: {e}", file=sys.stderr)
+    # if pages:
+    #     try:
+    #         shots = _screenshot_slide_pages(page, out_dir, stem, pages)
+    #     except Exception as e:
+    #         print(f"# screenshot soft-fail: {e}", file=sys.stderr)
     try:
         files = _download_and_save(page, selectors, out_dir, stem)
     except Exception as e:
