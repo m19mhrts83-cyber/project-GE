@@ -1,6 +1,6 @@
 #!/bin/zsh
-# install: 空手アドバイザー（Grok Bot）自律リサーチ自動回収（月曜 21:15 JST）
-# Grok Bot の自律ルーティンは月曜 21:00 実行。15分後に自動で Obsidian & OGD 同期。
+# install: 空手アドバイザー（Grok Bot）自律リサーチ自動回収（月曜・木曜 21:15 JST）
+# Grok Bot の自律ルーティン（月曜 21:00 和道流／木曜 21:00 骨と筋肉）の15分後に自動で Obsidian & OGD 同期。
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.karate-advisor-sync"
@@ -22,14 +22,24 @@ cat >"$PLIST" <<EOF
     <string>${RUNNER}</string>
   </array>
   <key>StartCalendarInterval</key>
-  <dict>
-    <key>Weekday</key>
-    <integer>1</integer>
-    <key>Hour</key>
-    <integer>21</integer>
-    <key>Minute</key>
-    <integer>15</integer>
-  </dict>
+  <array>
+    <dict>
+      <key>Weekday</key>
+      <integer>1</integer>
+      <key>Hour</key>
+      <integer>21</integer>
+      <key>Minute</key>
+      <integer>15</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key>
+      <integer>4</integer>
+      <key>Hour</key>
+      <integer>21</integer>
+      <key>Minute</key>
+      <integer>15</integer>
+    </dict>
+  </array>
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/launchd.out.log</string>
   <key>StandardErrorPath</key>
@@ -41,5 +51,5 @@ EOF
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
-echo "installed ${LABEL} (Mon 21:15 JST) → ${PLIST}"
+echo "installed ${LABEL} (Mon & Thu 21:15 JST) → ${PLIST}"
 echo "logs: ${LOG_DIR}/"
