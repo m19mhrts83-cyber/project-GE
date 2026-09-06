@@ -61,7 +61,7 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 1. **無効化**を確認（上記）。無効ならスキップ。
 2. **状態**を読む: `~/git-repos/.jarvis_state/etc_monthly.json`（無ければ example 参照して新規作成可）
 3. **正本**を読む: `~/git-repos/.env.jarvis_private`（`ETC_MILEAGE_ID`・カード有効期限・利用照会 ID）
-4. **サマリー**（判断の文脈）: Literature Note `ETC割引確認_Phase1サマリー.md`（パスは `etc-discount-jarvis.mdc`）
+4. **サマリー**（判断の文脈）: Literature Note `家計・ライフプラン/ETC割引確認_Phase1サマリー.md`（パスは `etc-discount-jarvis.mdc`）
 5. **自動チェック**（可能な範囲）を実行:
 
 ```bash
