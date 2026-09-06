@@ -129,7 +129,7 @@ vendor↔deal 強化、Dashboard deep link、CSV export、週次バッチバー�
 | `tier2-finish-code` | ✅ |
 | `tier1-beginner-doc` | ✅ |
 | `tier1-five-sends` | ✅ 運用（2026-08-31 松野：手動5件でOK） |
-| `tier2-prod-review` | ⬜ 運用 |
+| `tier2-prod-review` | ✅ 運用（2026-09-06 松野：日次5件運用OK・クローズ） |
 | `research-reply-extract` | 🚧 コード・migration 済／本番抽出運用 |
 | `tier3-gate` | ⬜ 同意後 |
 | `tier3-worker` | 🚧 スクリプト用意・enabled 待ち |
