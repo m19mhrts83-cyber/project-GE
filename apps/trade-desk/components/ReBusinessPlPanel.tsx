@@ -224,6 +224,145 @@ export default function ReBusinessPlPanel({
           見方の整理: 事業PLの税後利益と資金繰りCFの差は元本・償却の見え方の差。MQのGは構造評価用でゼミ税前利益の代替ではない。家計BSには事業合計を二重に載せない。
         </p>
       </div>
+
+      {model.corporateOverlay ? (
+        <>
+          <div className="card" style={{ marginTop: 12 }}>
+            <header>
+              <span className="lvl">Kneesbee</span>
+              <strong>
+                整合・KPI
+                {model.corporateOverlay.statementLabel
+                  ? ` · ${model.corporateOverlay.statementLabel}`
+                  : ""}
+              </strong>
+            </header>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
+                gap: 12,
+                marginTop: 10,
+              }}
+            >
+              <div>
+                <div className="meta">満室賃料（年）</div>
+                <strong>
+                  {model.corporateOverlay.kpis.fullRentMan != null
+                    ? fmtMqMan(model.corporateOverlay.kpis.fullRentMan)
+                    : "—"}
+                </strong>
+              </div>
+              <div>
+                <div className="meta">簿価債務超過目安</div>
+                <strong>
+                  {model.corporateOverlay.kpis.bookDebtExcessMan != null
+                    ? fmtMqMan(model.corporateOverlay.kpis.bookDebtExcessMan)
+                    : "—"}
+                </strong>
+              </div>
+              <div>
+                <div className="meta">役員借入</div>
+                <strong>
+                  {model.corporateOverlay.kpis.officerLoanMan != null
+                    ? fmtMqMan(model.corporateOverlay.kpis.officerLoanMan)
+                    : "—"}
+                </strong>
+              </div>
+            </div>
+            {model.corporateOverlay.kpis.substantiveEquityNote ? (
+              <p className="meta" style={{ marginTop: 8 }}>
+                {model.corporateOverlay.kpis.substantiveEquityNote}
+              </p>
+            ) : null}
+            {model.corporateOverlay.reconcileNotes ? (
+              <p className="meta" style={{ marginTop: 6 }}>
+                {model.corporateOverlay.reconcileNotes}
+              </p>
+            ) : null}
+          </div>
+
+          {model.corporateOverlay.plans.length > 0 ? (
+            <div className="card" style={{ marginTop: 12, overflowX: "auto" }}>
+              <header>
+                <span className="lvl">計画</span>
+                <strong>事業計画（期次見込）</strong>
+              </header>
+              <table className="data" style={{ marginTop: 10, minWidth: 480 }}>
+                <thead>
+                  <tr>
+                    <th>期</th>
+                    <th style={{ textAlign: "right" }}>売上</th>
+                    <th style={{ textAlign: "right" }}>税前</th>
+                    <th style={{ textAlign: "right" }}>手残り</th>
+                    <th style={{ textAlign: "right" }}>稼働%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {model.corporateOverlay.plans.map((p) => (
+                    <tr
+                      key={p.fiscalYear}
+                      style={
+                        p.fiscalYear === model.year
+                          ? { fontWeight: 600 }
+                          : undefined
+                      }
+                    >
+                      <td>{p.label || `${p.fiscalYear}年5月期`}</td>
+                      <td style={{ textAlign: "right" }}>
+                        {p.revenueMan != null ? fmtMqMan(p.revenueMan) : "—"}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {p.pretaxMan != null ? fmtMqMan(p.pretaxMan) : "—"}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {p.cashFlowMan != null ? fmtMqMan(p.cashFlowMan) : "—"}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {p.occupancyPct != null
+                          ? `${Number(p.occupancyPct).toFixed(1)}%`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {model.corporateOverlay.glAccountTop.length > 0 ? (
+            <div className="card" style={{ marginTop: 12, overflowX: "auto" }}>
+              <header>
+                <span className="lvl">明細</span>
+                <strong>総勘定元帳 · 科目別（件数上位）</strong>
+              </header>
+              <table className="data" style={{ marginTop: 10, minWidth: 420 }}>
+                <thead>
+                  <tr>
+                    <th>科目</th>
+                    <th style={{ textAlign: "right" }}>件数</th>
+                    <th style={{ textAlign: "right" }}>純額（万円）</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {model.corporateOverlay.glAccountTop.map((g) => (
+                    <tr key={g.account}>
+                      <td>{g.account}</td>
+                      <td style={{ textAlign: "right" }}>{g.count}</td>
+                      <td style={{ textAlign: "right" }}>
+                        {g.netMan != null ? fmtMqMan(g.netMan) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="meta" style={{ marginTop: 8 }}>
+                元帳は MyKomon 取込（kurashift_re_gl_lines）。科目突合・割り切り検証用。
+              </p>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }

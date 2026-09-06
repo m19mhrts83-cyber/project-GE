@@ -91,6 +91,12 @@ import {
   DEFAULT_RE_PL_OVERRIDES,
 } from "@/lib/reBusinessPlCompose";
 import type { ReBusinessPlModel } from "@/lib/reBusinessPlTypes";
+import {
+  applyCorporateStatementOverlay,
+  type ReAnnualPlanRow,
+  type ReGlAggRow,
+  type ReStatementRow,
+} from "@/lib/reKneesbeeOverlay";
 
 export const dynamic = "force-dynamic";
 
@@ -315,6 +321,59 @@ export default async function MqPage({
         personal: persBs?.cash ?? null,
       },
       overrides: DEFAULT_RE_PL_OVERRIDES,
+    });
+
+    // 法人税務正本（Kneesbee / MyKomon）を重ねる
+    const [{ data: stRows }, { data: planRows }, { data: glRaw }] =
+      await Promise.all([
+        supabase
+          .from("kurashift_re_statements")
+          .select(
+            "label,source,fiscal_year,period_end,revenue_jpy,operating_profit_jpy,pretax_profit_jpy,tax_jpy,net_income_jpy,capital_jpy,retained_earnings_jpy,officer_loan_jpy,bank_loan_jpy,pl_json,bs_json,reconcile_notes"
+          )
+          .eq("entity", "corporate")
+          .eq("fiscal_year", cashflowYear)
+          .order("period_end", { ascending: false })
+          .limit(1),
+        supabase
+          .from("kurashift_re_annual_plans")
+          .select(
+            "fiscal_year,label,revenue_jpy,pretax_profit_jpy,cash_flow_jpy,occupancy_pct"
+          )
+          .eq("entity", "corporate")
+          .order("fiscal_year", { ascending: true }),
+        supabase
+          .from("kurashift_re_gl_lines")
+          .select("account_name,amount_jpy")
+          .eq("entity", "corporate")
+          .eq("fiscal_year", cashflowYear)
+          .limit(5000),
+      ]);
+
+    const glMap = new Map<string, { cnt: number; net: number }>();
+    for (const row of glRaw ?? []) {
+      const name = String(
+        (row as { account_name?: string }).account_name || "（不明）"
+      );
+      const amt = Number((row as { amount_jpy?: number }).amount_jpy ?? 0);
+      const cur = glMap.get(name) || { cnt: 0, net: 0 };
+      cur.cnt += 1;
+      cur.net += Number.isFinite(amt) ? amt : 0;
+      glMap.set(name, cur);
+    }
+    const glTop: ReGlAggRow[] = [...glMap.entries()]
+      .map(([account_name, v]) => ({
+        account_name,
+        cnt: v.cnt,
+        net_jpy: v.net,
+      }))
+      .sort((a, b) => b.cnt - a.cnt)
+      .slice(0, 12);
+
+    rePlModel = applyCorporateStatementOverlay(rePlModel, {
+      statement: (stRows?.[0] as ReStatementRow | undefined) ?? null,
+      plans: (planRows ?? []) as ReAnnualPlanRow[],
+      glTop,
     });
   }
 
@@ -1018,7 +1077,8 @@ export default async function MqPage({
               </div>
             </div>
             <p className="meta" style={{ marginTop: 8 }}>
-              {entityLabel(entity)} · Zaim事業費目＋物件マスタ簿価＋ローン残高トラッカー
+              {entityLabel(entity)} · 法人は Kneesbee/MyKomon statement 優先 · 個人は
+              Zaim＋収支内訳 · 物件マスタ簿価＋ローン残高
             </p>
           </div>
           {rePlModel ? (

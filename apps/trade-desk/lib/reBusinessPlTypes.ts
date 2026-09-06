@@ -13,7 +13,9 @@ export type AmountSource =
   | "override"
   | "estimated"
   | "derived"
-  | "tax_return";
+  | "tax_return"
+  | "statement"
+  | "plan";
 
 export type SourcedAmount = {
   man: number | null;
@@ -93,6 +95,26 @@ export type ReBusinessPlModel = {
   totalBs: ReBsColumn;
   ratios: RePlRatios;
   notes: string[];
+  /** Kneesbee / MyKomon 正本オーバーレイ（法人） */
+  corporateOverlay?: {
+    statementLabel: string | null;
+    reconcileNotes: string | null;
+    plans: {
+      fiscalYear: number;
+      label: string | null;
+      revenueMan: number | null;
+      pretaxMan: number | null;
+      cashFlowMan: number | null;
+      occupancyPct: number | null;
+    }[];
+    glAccountTop: { account: string; count: number; netMan: number | null }[];
+    kpis: {
+      fullRentMan: number | null;
+      bookDebtExcessMan: number | null;
+      officerLoanMan: number | null;
+      substantiveEquityNote: string | null;
+    };
+  };
 };
 
 export const DEFAULT_TAX_RATE = 0.2;
