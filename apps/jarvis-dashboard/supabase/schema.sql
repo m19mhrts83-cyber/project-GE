@@ -557,6 +557,8 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260823_kurashift_re_deal_research_fields.sql）
 -- kurashift_re_deals.property_fingerprint（DB 重複マージ・送信ガード）
 -- （migrations/20260825_kurashift_re_deals_property_fingerprint.sql）
+-- 不動産事業 BS/PL 税務正本: kurashift_re_statements / annual_plans / actuals / gl_lines
+-- （migrations/20260830_kurashift_re_statements_plans_gl.sql）
 -- kurashift_loan_tracker_loans
 -- （migrations/20260813_kurashift_loan_tracker.sql）
 -- kurashift_tax_year_metrics（個人暦年／法人5月期の申告結果KPI）
