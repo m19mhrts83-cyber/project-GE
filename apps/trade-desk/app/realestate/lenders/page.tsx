@@ -86,7 +86,7 @@ export default async function LendersPage() {
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
-      <RealEstateLaneNav active="d" />
+      <RealEstateLaneNav active="d-lenders" />
       <p className="page-kicker">③-D · 融資</p>
       <h1>銀行アプローチ先・融資検討材料</h1>
       <p className="sub">
