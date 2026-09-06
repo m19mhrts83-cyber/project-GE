@@ -7,6 +7,26 @@
  * クライアント（DealDetailDrawer 等）からも import されるため、
  * fs / YAML 読取（reInquiryAutoConfig）に依存しない。
  */
+export type DealAttachmentInfo = {
+  id?: string;
+  filename: string;
+  open_url?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  kind?: "maisoku" | "contract" | "evidence" | string | null;
+};
+
+export type YieldDisplayInfo = {
+  type: "confirmed" | "estimated" | "none";
+  label: string;
+  rateStr?: string;
+  notes?: string;
+  monthlyRentStr?: string;
+  badgeBg: string;
+  badgeBorder: string;
+  badgeColor: string;
+};
+
 export type S3InvestigationData = {
   filename?: string;
   obsidian_path?: string;
@@ -242,3 +262,134 @@ export function filterBuyProgressDeals<T extends PursueDealFields>(
 ): T[] {
   return [...filterBuyPushDeals(deals), ...filterInProgressDeals(deals)];
 }
+
+/**
+ * 物件の利回り表示情報を解決する。
+ * 1. 確定利回り (yield_pct または summary_json.yield_info.confirmed)
+ * 2. S3想定家賃・価格からの試算利回り
+ */
+export function getYieldDisplayInfo(d: PursueDealFields): YieldDisplayInfo {
+  const sj = sjOf(d);
+  const s3 = (sj.s3_investigation as S3InvestigationData) || {};
+  const yi = sj.yield_info as Record<string, unknown> | undefined;
+
+  // 1. 確定利回り（マイソクや募集条件で明記）
+  if (d.yield_pct != null && d.yield_pct > 0) {
+    const isConfirmedMaisoku =
+      yi?.type === "confirmed" ||
+      String(sj.agent_reply ? "has_maisoku" : "").length > 0;
+    return {
+      type: "confirmed",
+      label: `表面 ${d.yield_pct}%`,
+      rateStr: `${d.yield_pct}%`,
+      notes: isConfirmedMaisoku ? "マイソク記載確定" : "登録表面利回り",
+      monthlyRentStr:
+        typeof yi?.monthly_rent_yen === "number"
+          ? `${(yi.monthly_rent_yen / 10000).toFixed(1)}万円/月`
+          : undefined,
+      badgeBg: "#ecfdf5",
+      badgeBorder: "#10b981",
+      badgeColor: "#047857",
+    };
+  }
+
+  // 2. summary_json に yield_info が保存されている場合
+  if (yi && typeof yi.label === "string" && yi.label) {
+    const isConfirmed = yi.type === "confirmed";
+    return {
+      type: isConfirmed ? "confirmed" : "estimated",
+      label: String(yi.label),
+      rateStr: String(yi.yield_range || yi.yield_pct || ""),
+      notes: typeof yi.source === "string" ? yi.source : "S3需給試算",
+      monthlyRentStr:
+        typeof yi.monthly_rent_range === "string"
+          ? yi.monthly_rent_range
+          : typeof yi.monthly_rent_yen === "number"
+          ? `${(yi.monthly_rent_yen / 10000).toFixed(1)}万円/月`
+          : undefined,
+      badgeBg: isConfirmed ? "#ecfdf5" : "#f0fdf4",
+      badgeBorder: isConfirmed ? "#10b981" : "#86efac",
+      badgeColor: isConfirmed ? "#047857" : "#15803d",
+    };
+  }
+
+  // 3. 価格と S3 想定家賃テキストからの動的試算
+  const price = d.price_man;
+  const rentText = s3.expected_rent || "";
+
+  // テキスト内に "表面18.94%" のような表記があるかチェック
+  const pctMatch = rentText.match(/表面\s*([\d.]+)%/);
+  if (pctMatch && pctMatch[1]) {
+    return {
+      type: "estimated",
+      label: `表面 ${pctMatch[1]}% (机上)`,
+      rateStr: `${pctMatch[1]}%`,
+      notes: "S3記載机上利回り",
+      badgeBg: "#f0fdf4",
+      badgeBorder: "#86efac",
+      badgeColor: "#15803d",
+    };
+  }
+
+  if (price && price > 0 && rentText) {
+    // 例: "5.0–5.5万" や "5.0-6.0万"
+    const rangeMatch = rentText.match(/([\d.]+)\s*[–〜~\-]\s*([\d.]+)万/);
+    if (rangeMatch) {
+      const minRent = parseFloat(rangeMatch[1]);
+      const maxRent = parseFloat(rangeMatch[2]);
+      if (!isNaN(minRent) && !isNaN(maxRent) && minRent > 0) {
+        const minYield = ((minRent * 12) / price) * 100;
+        const maxYield = ((maxRent * 12) / price) * 100;
+        return {
+          type: "estimated",
+          label: `想定 ${minYield.toFixed(1)}%〜${maxYield.toFixed(1)}%`,
+          rateStr: `${minYield.toFixed(1)}%〜${maxYield.toFixed(1)}%`,
+          notes: `需給試算 (家賃${minRent}〜${maxRent}万/月)`,
+          monthlyRentStr: `${minRent}〜${maxRent}万円/月`,
+          badgeBg: "#f0fdf4",
+          badgeBorder: "#86efac",
+          badgeColor: "#15803d",
+        };
+      }
+    }
+
+    // 例: "本線5.0万" や "2.5万"
+    const singleMatch = rentText.match(/(?:本線|合計)?\s*([\d.]+)万/);
+    if (singleMatch) {
+      const rent = parseFloat(singleMatch[1]);
+      if (!isNaN(rent) && rent > 0) {
+        const y = ((rent * 12) / price) * 100;
+        return {
+          type: "estimated",
+          label: `想定 ${y.toFixed(1)}%`,
+          rateStr: `${y.toFixed(1)}%`,
+          notes: `需給試算 (家賃${rent}万/月)`,
+          monthlyRentStr: `${rent}万円/月`,
+          badgeBg: "#f0fdf4",
+          badgeBorder: "#86efac",
+          badgeColor: "#15803d",
+        };
+      }
+    }
+  }
+
+  return {
+    type: "none",
+    label: "利回り未算定",
+    badgeBg: "#f1f5f9",
+    badgeBorder: "#cbd5e1",
+    badgeColor: "#64748b",
+  };
+}
+
+/**
+ * 添付資料の安全な一覧取得
+ */
+export function getDealAttachments(d: PursueDealFields): DealAttachmentInfo[] {
+  const sj = sjOf(d);
+  if (Array.isArray(sj.attachments)) {
+    return sj.attachments as DealAttachmentInfo[];
+  }
+  return [];
+}
+

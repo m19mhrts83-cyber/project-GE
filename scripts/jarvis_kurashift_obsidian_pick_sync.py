@@ -237,6 +237,70 @@ def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
             
         # Update s3_investigation payload
         sj["s3_investigation"] = data
+
+        # Fetch and cache attachments from kurashift_re_deal_attachments
+        try:
+            att_res = (
+                sb.table("kurashift_re_deal_attachments")
+                .select("id, filename, mime_type, size_bytes, storage_path, payload")
+                .eq("deal_id", deal_id)
+                .order("created_at")
+                .execute()
+            )
+            cached_atts = []
+            for a in att_res.data or []:
+                p_load = a.get("payload") or {}
+                open_url = p_load.get("drive_web_view_link") or p_load.get("drive_web_content_link")
+                cached_atts.append({
+                    "id": a.get("id"),
+                    "filename": a.get("filename"),
+                    "open_url": open_url,
+                    "mime_type": a.get("mime_type"),
+                    "size_bytes": a.get("size_bytes"),
+                    "kind": p_load.get("kind"),
+                })
+            sj["attachments"] = cached_atts
+        except Exception as e:
+            print(f"  [WARN] Failed to fetch attachments for {deal_id}: {e}")
+
+        # Compute structured yield info
+        price_man = deal.get("price_man")
+        yield_pct = deal.get("yield_pct")
+        if yield_pct and yield_pct > 0:
+            sj["yield_info"] = {
+                "type": "confirmed",
+                "yield_pct": float(yield_pct),
+                "label": f"表面 {yield_pct}%",
+                "source": "マイソク確定",
+            }
+        elif price_man and price_man > 0:
+            rent_text = data.get("expected_rent") or ""
+            # Check for range: e.g. "5.0–5.5万"
+            rm = re.search(r"([\d.]+)\s*[–〜~\-]\s*([\d.]+)万", rent_text)
+            if rm:
+                r1 = float(rm.group(1))
+                r2 = float(rm.group(2))
+                y1 = round((r1 * 12 / price_man) * 100, 1)
+                y2 = round((r2 * 12 / price_man) * 100, 1)
+                sj["yield_info"] = {
+                    "type": "estimated",
+                    "yield_range": f"{y1}%〜{y2}%",
+                    "label": f"想定 {y1}%〜{y2}%",
+                    "monthly_rent_range": f"{r1}〜{r2}万円/月",
+                    "source": f"S3需給本線試算 (家賃{r1}〜{r2}万/月)",
+                }
+            else:
+                sm = re.search(r"(?:本線|合計)?\s*([\d.]+)万", rent_text)
+                if sm:
+                    r = float(sm.group(1))
+                    y = round((r * 12 / price_man) * 100, 1)
+                    sj["yield_info"] = {
+                        "type": "estimated",
+                        "yield_pct": y,
+                        "label": f"想定 {y}%",
+                        "monthly_rent_yen": int(r * 10000),
+                        "source": f"S3需給本線試算 (家賃{r}万/月)",
+                    }
         
         # Also ensure status is 'viewing' if currently 'info'
         updates: dict[str, Any] = {
