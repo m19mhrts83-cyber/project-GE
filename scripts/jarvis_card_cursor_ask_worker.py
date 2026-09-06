@@ -94,16 +94,17 @@ def process_row(
         ).execute()
     except Exception as e:
         err_payload = dict(payload)
-        err_ask = dict(ask)
-        err_ask["status"] = "error"
-        err_ask["error"] = str(e)[:400]
-        err_ask["finished_at"] = now_iso()
-        err_payload["cursor_ask"] = err_ask
-        sb.table(table).update(
-            {"payload": err_payload, "updated_at": now_iso()}
-        ).eq(id_field, item_id).execute()
-        print(f"# error {table} id={item_id}: {e}", file=sys.stderr)
-        return "error"
+    err_ask = dict(ask)
+    err_ask["status"] = "error"
+    err_ask["error"] = str(e)[:400]
+    err_ask["finished_at"] = now_iso()
+    err_ask["retry_count"] = int(err_ask.get("retry_count") or 0) + 1
+    err_payload["cursor_ask"] = err_ask
+    sb.table(table).update(
+        {"payload": err_payload, "updated_at": now_iso()}
+    ).eq(id_field, item_id).execute()
+    print(f"# error {table} id={item_id}: {e}", file=sys.stderr)
+    return "error"
 
     ok_payload: dict[str, Any] = dict(payload)
     ok_ask = dict(ask)
@@ -158,6 +159,7 @@ def process_triage_row(
         err_ask["status"] = "error"
         err_ask["error"] = str(e)[:400]
         err_ask["finished_at"] = now_iso()
+        err_ask["retry_count"] = int(err_ask.get("retry_count") or 0) + 1
         err_payload["cursor_ask"] = err_ask
         sb.table("triage_items").update(
             {"payload": err_payload, "updated_at": now_iso()}
@@ -180,10 +182,194 @@ def process_triage_row(
     return "done"
 
 
+def recover_stale_running(sb: Any, *, timeout_minutes: int = 10) -> int:
+    """running のまま放置されたゾンビを queued に戻す"""
+    recovered = 0
+    cutoff = datetime.now(timezone.utc).timestamp() - (timeout_minutes * 60)
+    for table, id_f, title_f in [
+        ("cards", "id", "title"),
+        ("watch_status", "id", "title"),
+        ("triage_items", "id", "subject"),
+    ]:
+        try:
+            r = (
+                sb.table(table)
+                .select(f"{id_f},{title_f},payload")
+                .filter("payload->cursor_ask->>status", "eq", "running")
+                .execute()
+            )
+            for row in r.data or []:
+                payload = row.get("payload") or {}
+                ask = payload.get("cursor_ask") or {}
+                started = ask.get("started_at")
+                if not started:
+                    continue
+                try:
+                    st_ts = datetime.fromisoformat(started.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    st_ts = 0
+                if st_ts < cutoff:
+                    item_id = row[id_f]
+                    print(f"# recover stale running {table} id={item_id}")
+                    ask["status"] = "queued"
+                    ask["recovered_at"] = now_iso()
+                    ask["retry_count"] = int(ask.get("retry_count") or 0) + 1
+                    payload["cursor_ask"] = ask
+                    sb.table(table).update({"payload": payload, "updated_at": now_iso()}).eq(
+                        id_f, item_id
+                    ).execute()
+                    recovered += 1
+        except Exception as e:
+            print(f"# error recover_stale_running {table}: {e}", file=sys.stderr)
+    return recovered
+
+
+def auto_retry_errors(sb: Any, *, max_retries: int = 2, within_minutes: int = 15) -> int:
+    """直近のエラータスクで retry_count 未満のものを自動再試行"""
+    retried = 0
+    cutoff = datetime.now(timezone.utc).timestamp() - (within_minutes * 60)
+    for table, id_f, title_f in [
+        ("cards", "id", "title"),
+        ("watch_status", "id", "title"),
+        ("triage_items", "id", "subject"),
+    ]:
+        try:
+            r = (
+                sb.table(table)
+                .select(f"{id_f},{title_f},payload")
+                .filter("payload->cursor_ask->>status", "eq", "error")
+                .execute()
+            )
+            for row in r.data or []:
+                payload = row.get("payload") or {}
+                ask = payload.get("cursor_ask") or {}
+                retries = int(ask.get("retry_count") or 0)
+                if retries >= max_retries:
+                    continue
+                finished = ask.get("finished_at")
+                if not finished:
+                    continue
+                try:
+                    fn_ts = datetime.fromisoformat(finished.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    fn_ts = 0
+                if fn_ts >= cutoff:
+                    item_id = row[id_f]
+                    print(f"# auto-retry {table} id={item_id} (attempt {retries + 1})")
+                    ask["status"] = "queued"
+                    ask["last_retry_at"] = now_iso()
+                    payload["cursor_ask"] = ask
+                    sb.table(table).update({"payload": payload, "updated_at": now_iso()}).eq(
+                        id_f, item_id
+                    ).execute()
+                    retried += 1
+        except Exception as e:
+            print(f"# error auto_retry_errors {table}: {e}", file=sys.stderr)
+    return retried
+
+
+def sync_worker_status_json(sb: Any) -> dict[str, Any]:
+    """現在の Supabase 状態を集計して .jarvis_state/cursor_worker_status.json に書き出す"""
+    import json
+    state_file = REPO / ".jarvis_state" / "cursor_worker_status.json"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+
+    status_data: dict[str, Any] = {
+        "updated_at": now_iso(),
+        "worker_alive": True,
+        "last_heartbeat": now_iso(),
+        "queued_items": [],
+        "running_items": [],
+        "error_items": [],
+        "recent_done": [],
+        "counts": {
+            "queued": 0,
+            "running": 0,
+            "error": 0,
+            "done_recent": 0,
+        },
+    }
+
+    recent_cutoff = datetime.now(timezone.utc).timestamp() - (24 * 3600)
+
+    for table, id_f, title_f, kind in [
+        ("cards", "id", "title", "card"),
+        ("watch_status", "id", "title", "watch"),
+        ("triage_items", "id", "subject", "triage"),
+    ]:
+        try:
+            r = (
+                sb.table(table)
+                .select(f"{id_f},{title_f},payload,updated_at")
+                .filter("payload->cursor_ask->>status", "neq", "null")
+                .execute()
+            )
+            for row in r.data or []:
+                payload = row.get("payload") or {}
+                ask = payload.get("cursor_ask") or {}
+                st = ask.get("status")
+                item_id = str(row[id_f])
+                title = str(row.get(title_f) or item_id)
+                href = f"/situation?watch={item_id}" if kind == "watch" else "/"
+
+                item_info = {
+                    "id": item_id,
+                    "kind": kind,
+                    "title": title,
+                    "status": st,
+                    "via": ask.get("via"),
+                    "href": href,
+                }
+
+                if st == "queued":
+                    item_info["requested_at"] = ask.get("requested_at")
+                    status_data["queued_items"].append(item_info)
+                elif st == "running":
+                    item_info["started_at"] = ask.get("started_at")
+                    status_data["running_items"].append(item_info)
+                elif st == "error":
+                    item_info["error"] = ask.get("error")
+                    item_info["finished_at"] = ask.get("finished_at")
+                    item_info["retry_count"] = ask.get("retry_count")
+                    status_data["error_items"].append(item_info)
+                elif st == "done":
+                    finished = ask.get("finished_at")
+                    fn_ts = 0
+                    if finished:
+                        try:
+                            fn_ts = datetime.fromisoformat(finished.replace("Z", "+00:00")).timestamp()
+                        except Exception:
+                            pass
+                    if fn_ts >= recent_cutoff:
+                        item_info["finished_at"] = finished
+                        status_data["recent_done"].append(item_info)
+        except Exception as e:
+            print(f"# error sync_worker_status_json {table}: {e}", file=sys.stderr)
+
+    # ソート
+    status_data["recent_done"].sort(key=lambda x: str(x.get("finished_at") or ""), reverse=True)
+    status_data["recent_done"] = status_data["recent_done"][:10]
+
+    status_data["counts"]["queued"] = len(status_data["queued_items"])
+    status_data["counts"]["running"] = len(status_data["running_items"])
+    status_data["counts"]["error"] = len(status_data["error_items"])
+    status_data["counts"]["done_recent"] = len(status_data["recent_done"])
+
+    try:
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump(status_data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"# error write {state_file}: {e}", file=sys.stderr)
+
+    return status_data
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Process Cursor ask queue from dashboard cards/watch")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=3)
+    ap.add_argument("--status-only", action="store_true", help="キュー処理せず状態JSONのみ同期")
+    ap.add_argument("--retry-all-failed", action="store_true", help="失敗した全タスクを再試行キューに戻す")
     args = ap.parse_args(argv)
 
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
@@ -195,6 +381,29 @@ def main(argv: list[str] | None = None) -> int:
     from supabase import create_client
 
     sb = create_client(url, key)
+
+    if args.retry_all_failed:
+        print("# retrying all failed tasks...")
+        for table, id_f in [("cards", "id"), ("watch_status", "id"), ("triage_items", "id")]:
+            r = sb.table(table).select(f"{id_f},payload").filter("payload->cursor_ask->>status", "eq", "error").execute()
+            for row in r.data or []:
+                payload = row.get("payload") or {}
+                ask = payload.get("cursor_ask") or {}
+                ask["status"] = "queued"
+                ask["manual_retry_at"] = now_iso()
+                payload["cursor_ask"] = ask
+                sb.table(table).update({"payload": payload, "updated_at": now_iso()}).eq(id_f, row[id_f]).execute()
+                print(f"# reset {table} id={row[id_f]} to queued")
+
+    if args.status_only:
+        st = sync_worker_status_json(sb)
+        print(f"# status synced: queued={st['counts']['queued']} running={st['counts']['running']} error={st['counts']['error']}")
+        return 0
+
+    # ゾンビ回収と自動リトライ
+    recover_stale_running(sb)
+    auto_retry_errors(sb)
+
     done = 0
     failed = 0
     scanned = 0
@@ -262,6 +471,10 @@ def main(argv: list[str] | None = None) -> int:
             done += 1
         elif st == "error":
             failed += 1
+
+    # 最新状態JSONを保存
+    if not args.dry_run:
+        sync_worker_status_json(sb)
 
     print(f"# cursor ask done={done} failed={failed} scanned={scanned}")
     return 0 if failed == 0 else 2

@@ -494,6 +494,11 @@ def push_watch(sb) -> int:
         except Exception as e:
             print(f"# user_ack merge skip {iid}: {e}", file=sys.stderr)
 
+        # Web側でキューイングされた cursor_ask / ワーカー状態を Mac push で潰さない
+        for k in ("cursor_ask", "cursor_ops_fix", "mac_recipe"):
+            if k in remote_pl and k not in payload:
+                payload[k] = remote_pl[k]
+
         st = it.get("status") or "active"
         arch_at = it.get("archived_at")
         if never_archive:
