@@ -138,6 +138,12 @@ def resolve_agent_to(
     ):
         return parse_email_addr(explicit) or explicit, "explicit"
 
+    contact_email = parse_email_addr(str(sj.get("contact_email") or ""))
+    if contact_email and not is_self_email(contact_email, extra) and not is_portal_or_noreply(
+        contact_email
+    ):
+        return contact_email, "contact_email"
+
     reply_to = parse_email_addr(str(sj.get("reply_to") or ""))
     if reply_to and not is_self_email(reply_to, extra) and not is_portal_or_noreply(
         reply_to
@@ -223,6 +229,9 @@ def classify_inquiry_channel(
             "to": form_url,
             "reason": "interest_form_url" if form_url else "kamiooya_intro_subject",
         }
+    to, src = resolve_agent_to(deal, explicit_to=explicit_to)
+    if to:
+        return {"channel": "agent_email", "to": to, "reason": f"to_from_{src}"}
     listing = resolve_listing_url(deal)
     if is_grok_research(deal) and listing:
         return {
@@ -236,9 +245,6 @@ def classify_inquiry_channel(
             "to": "",
             "reason": "grok_report_without_listing_url",
         }
-    to, src = resolve_agent_to(deal, explicit_to=explicit_to)
-    if to:
-        return {"channel": "agent_email", "to": to, "reason": f"to_from_{src}"}
     return {
         "channel": "grok_handoff",
         "to": handoff_to(),

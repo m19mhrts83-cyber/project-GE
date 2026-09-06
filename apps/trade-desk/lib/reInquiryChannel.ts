@@ -132,6 +132,17 @@ export function resolveAgentToEmail(params: {
     }
   }
 
+  const contactEmail = parseEmailAddr(
+    typeof sj.contact_email === "string" ? sj.contact_email : undefined
+  );
+  if (
+    contactEmail &&
+    !isSelfEmail(contactEmail, extra) &&
+    !isPortalOrNoreplyEmail(contactEmail)
+  ) {
+    return { to: contactEmail, source: "contact_email" };
+  }
+
   const replyTo = parseEmailAddr(
     typeof sj.reply_to === "string" ? sj.reply_to : undefined
   );
@@ -263,6 +274,19 @@ export function classifyInquiryChannel(params: {
     };
   }
 
+  const agent = resolveAgentToEmail({
+    summaryJson: params.summaryJson,
+    explicitTo: params.explicitTo,
+    extraSelf: params.extraSelf,
+  });
+  if (agent.to) {
+    return {
+      channel: "agent_email",
+      to: agent.to,
+      reason: `to_from_${agent.source}`,
+    };
+  }
+
   const listingUrl = resolveListingUrl(params.summaryJson);
   if (
     isGrokResearchDeal({
@@ -290,19 +314,6 @@ export function classifyInquiryChannel(params: {
       channel: "not_applicable",
       to: "",
       reason: "grok_report_without_listing_url",
-    };
-  }
-
-  const agent = resolveAgentToEmail({
-    summaryJson: params.summaryJson,
-    explicitTo: params.explicitTo,
-    extraSelf: params.extraSelf,
-  });
-  if (agent.to) {
-    return {
-      channel: "agent_email",
-      to: agent.to,
-      reason: `to_from_${agent.source}`,
     };
   }
 

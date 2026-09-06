@@ -219,9 +219,26 @@ export default function DealDetailDrawer({
             <p className="meta" style={{ margin: 0 }}>
               案件詳細
             </p>
-            <h2 style={{ margin: "4px 0 0", fontSize: "1.1rem" }}>
-              {deal?.title || "…"}
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              {sj.s3_investigation ? (
+                <span
+                  style={{
+                    background: "#312e81",
+                    color: "#fff",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  詳細調査済
+                </span>
+              ) : null}
+              <h2 style={{ margin: 0, fontSize: "1.1rem" }}>
+                {deal?.title || "…"}
+              </h2>
+            </div>
           </div>
           <button type="button" className="btn" onClick={onClose}>
             閉じる
