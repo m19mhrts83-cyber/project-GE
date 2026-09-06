@@ -275,11 +275,13 @@ def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
             }
         elif price_man and price_man > 0:
             rent_text = data.get("expected_rent") or ""
-            # Check for range: e.g. "5.0–5.5万"
-            rm = re.search(r"([\d.]+)\s*[–〜~\-]\s*([\d.]+)万", rent_text)
-            if rm:
-                r1 = float(rm.group(1))
-                r2 = float(rm.group(2))
+            # If multi-unit / total rent is specified (e.g. 2棟合計 4.0–6.0万 or 本線5.0万), prefer total
+            total_m = re.search(r"(?:2棟合計|合計|2棟計)\s*([\d.]+)\s*[–〜~\-]\s*([\d.]+)万", rent_text)
+            single_total_m = re.search(r"(?:2棟合計|合計|2棟計)[^。\n]*?本線\s*([\d.]+)万", rent_text)
+            
+            if total_m:
+                r1 = float(total_m.group(1))
+                r2 = float(total_m.group(2))
                 y1 = round((r1 * 12 / price_man) * 100, 1)
                 y2 = round((r2 * 12 / price_man) * 100, 1)
                 sj["yield_info"] = {
@@ -287,20 +289,45 @@ def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
                     "yield_range": f"{y1}%〜{y2}%",
                     "label": f"想定 {y1}%〜{y2}%",
                     "monthly_rent_range": f"{r1}〜{r2}万円/月",
-                    "source": f"S3需給本線試算 (家賃{r1}〜{r2}万/月)",
+                    "source": f"S3需給本線試算 (2棟計{r1}〜{r2}万/月)",
+                }
+            elif single_total_m:
+                r = float(single_total_m.group(1))
+                y = round((r * 12 / price_man) * 100, 1)
+                sj["yield_info"] = {
+                    "type": "estimated",
+                    "yield_pct": y,
+                    "label": f"想定 {y}%",
+                    "monthly_rent_yen": int(r * 10000),
+                    "source": f"S3需給本線試算 (2棟計{r}万/月)",
                 }
             else:
-                sm = re.search(r"(?:本線|合計)?\s*([\d.]+)万", rent_text)
-                if sm:
-                    r = float(sm.group(1))
-                    y = round((r * 12 / price_man) * 100, 1)
+                # Check for range: e.g. "5.0–5.5万"
+                rm = re.search(r"([\d.]+)\s*[–〜~\-]\s*([\d.]+)万", rent_text)
+                if rm:
+                    r1 = float(rm.group(1))
+                    r2 = float(rm.group(2))
+                    y1 = round((r1 * 12 / price_man) * 100, 1)
+                    y2 = round((r2 * 12 / price_man) * 100, 1)
                     sj["yield_info"] = {
                         "type": "estimated",
-                        "yield_pct": y,
-                        "label": f"想定 {y}%",
-                        "monthly_rent_yen": int(r * 10000),
-                        "source": f"S3需給本線試算 (家賃{r}万/月)",
+                        "yield_range": f"{y1}%〜{y2}%",
+                        "label": f"想定 {y1}%〜{y2}%",
+                        "monthly_rent_range": f"{r1}〜{r2}万円/月",
+                        "source": f"S3需給本線試算 (家賃{r1}〜{r2}万/月)",
                     }
+                else:
+                    sm = re.search(r"(?:本線|合計)?\s*([\d.]+)万", rent_text)
+                    if sm:
+                        r = float(sm.group(1))
+                        y = round((r * 12 / price_man) * 100, 1)
+                        sj["yield_info"] = {
+                            "type": "estimated",
+                            "yield_pct": y,
+                            "label": f"想定 {y}%",
+                            "monthly_rent_yen": int(r * 10000),
+                            "source": f"S3需給本線試算 (家賃{r}万/月)",
+                        }
         
         # Also ensure status is 'viewing' if currently 'info'
         updates: dict[str, Any] = {

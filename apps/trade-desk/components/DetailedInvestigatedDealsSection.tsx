@@ -217,6 +217,7 @@ export default function DetailedInvestigatedDealsSection({
           >
             <thead>
               <tr style={{ background: "#e0e7ff", borderBottom: "2px solid #c7d2fe" }}>
+                <th style={{ padding: "8px 6px", width: 48, textAlign: "center" }}>No.</th>
                 <th style={{ padding: "8px 10px", width: 105 }}>Grok判定</th>
                 <th style={{ padding: "8px 10px", width: 200 }}>物件 / 所在地</th>
                 <th style={{ padding: "8px 10px", width: 140 }}>価格 / 利回り</th>
@@ -229,7 +230,8 @@ export default function DetailedInvestigatedDealsSection({
               </tr>
             </thead>
             <tbody>
-              {deals.map((d) => {
+              {deals.map((d, index) => {
+                const serialNo = index + 1;
                 const sj = (d.summary_json as Record<string, unknown>) || {};
                 const s3 = (sj.s3_investigation as S3InvestigationData) || {};
                 const vStyle = verdictBadge(s3.verdict);
@@ -260,6 +262,24 @@ export default function DetailedInvestigatedDealsSection({
                       background: isQuestionsExpanded ? "#f8fafc" : "#fff",
                     }}
                   >
+                    {/* 0. シリアルナンバー */}
+                    <td style={{ padding: "10px 4px", verticalAlign: "top", textAlign: "center" }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 800,
+                          background: "#312e81",
+                          color: "#fff",
+                          minWidth: 32,
+                        }}
+                      >
+                        #{serialNo}
+                      </span>
+                    </td>
+
                     {/* 1. Grok判定 */}
                     <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
                       <div
@@ -586,7 +606,8 @@ export default function DetailedInvestigatedDealsSection({
             gap: 16,
           }}
         >
-          {deals.map((d) => {
+          {deals.map((d, index) => {
+            const serialNo = index + 1;
             const sj = (d.summary_json as Record<string, unknown>) || {};
             const s3 = (sj.s3_investigation as S3InvestigationData) || {};
             const vStyle = verdictBadge(s3.verdict);
@@ -623,19 +644,33 @@ export default function DetailedInvestigatedDealsSection({
                       marginBottom: 8,
                     }}
                   >
-                    <span
-                      style={{
-                        padding: "2px 8px",
-                        borderRadius: 4,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        background: vStyle.bg,
-                        color: vStyle.color,
-                        border: `1px solid ${vStyle.border}`,
-                      }}
-                    >
-                      {vStyle.label}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span
+                        style={{
+                          background: "#312e81",
+                          color: "#fff",
+                          fontSize: 12,
+                          fontWeight: 800,
+                          padding: "2px 7px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        #{serialNo}
+                      </span>
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: vStyle.bg,
+                          color: vStyle.color,
+                          border: `1px solid ${vStyle.border}`,
+                        }}
+                      >
+                        {vStyle.label}
+                      </span>
+                    </div>
                     <div style={{ textAlign: "right" }}>
                       <span style={{ fontWeight: 700, fontSize: 16, color: "#1e1b4b" }}>
                         {d.price_man != null ? `${d.price_man}万円` : "—"}
@@ -883,6 +918,8 @@ export default function DetailedInvestigatedDealsSection({
           {(() => {
             const currentDeal = deals.find((d) => d.id === expandedQuestionsDealId);
             if (!currentDeal) return null;
+            const currentIdx = deals.findIndex((d) => d.id === expandedQuestionsDealId);
+            const serialNo = currentIdx >= 0 ? currentIdx + 1 : null;
             const sj = (currentDeal.summary_json as Record<string, unknown>) || {};
             const s3 = (sj.s3_investigation as S3InvestigationData) || {};
             const questions = s3.hearing_questions || [];
@@ -900,7 +937,7 @@ export default function DetailedInvestigatedDealsSection({
                   }}
                 >
                   <strong style={{ fontSize: 13, color: "#1e1b4b" }}>
-                    📋 {currentDeal.title} — 神大家さん運営・仲介業者へのヒアリング確認事項（{questions.length}件）
+                    📋 {serialNo ? `[#${serialNo}] ` : ""}{currentDeal.title} — 神大家さん運営・仲介業者へのヒアリング確認事項（{questions.length}件）
                   </strong>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
