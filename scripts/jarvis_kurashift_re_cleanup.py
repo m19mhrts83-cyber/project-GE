@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,12 @@ from jarvis_kurashift_deal_events import insert_deal_event  # noqa: E402
 from jarvis_kurashift_re_inquiry import sb_client  # noqa: E402
 
 UKETSUKE_SHURYO_MARKERS = ("※受付終了※", "＊受付終了＊", "*受付終了*", "商談中")
+BOT_REPORT_MARKERS = ("[Grok部長]", "日報", "探索追報")
+
+# 東海コア＋周辺のヒット語（area/title に無ければエリア外）
+CORE_AREA_RE = re.compile(
+    r"愛知|岐阜|三重|大阪|名古屋|岡崎|碧南|知多|安城|豊田|瀬戸|春日井|犬山|一宮|各務原|大垣|桑名|四日市|津|鈴鹿|門真|豊明|刈谷|西尾|蒲郡|半田|東海市|常滑|みよし|日進|長久手"
+)
 
 INQUIRY_ACTIVE_STATUSES = frozenset({
     "sending",
@@ -70,15 +77,23 @@ def is_pursued(deal: dict[str, Any]) -> bool:
     return bool(sj.get("pursue") or sj.get("user_confirmed"))
 
 
+def is_out_of_target_area(deal: dict[str, Any]) -> bool:
+    blob = f"{deal.get('area') or ''} {deal.get('title') or ''}"
+    if not blob.strip():
+        return True
+    return not bool(CORE_AREA_RE.search(blob))
+
+
 def check_cleanup_reason(
     deal: dict[str, Any],
     now: datetime.datetime,
     stale_days: int = 30,
-    low_score_days: int = 14,
-    low_score_threshold: float = 3.0,
+    low_score_threshold: float = 4.0,
 ) -> tuple[str | None, str | None]:
     """案件が自動整理対象か判定。(reason_code, reason_label) を返す。"""
-    # 安全ガード
+    # 安全ガード: 進行中・検討中・承認済案件は絶対に勝手に退避しない
+    if deal.get("status") == "viewing":
+        return None, None
     if is_active_inquiry(deal):
         return None, None
     if is_pursued(deal):
@@ -90,8 +105,24 @@ def check_cleanup_reason(
     if any(m in title for m in UKETSUKE_SHURYO_MARKERS):
         return "uketsuke_shuryo", "受付終了・商談中"
 
+    if any(m in title for m in BOT_REPORT_MARKERS):
+        return "bot_report", "Bot日報・連絡メール"
+
+    if is_out_of_target_area(deal):
+        return "out_of_area", "対象エリア外"
+
+    score_val = deal.get("match_score")
+    if score_val is None:
+        return "low_score", "スコアなし"
+    try:
+        score = float(score_val)
+        if score < low_score_threshold:
+            return "low_score", f"低スコア({score:.1f}点 < {low_score_threshold}点)"
+    except Exception:
+        return "low_score", "低スコア"
+
     dt_str = deal.get("updated_at") or deal.get("created_at")
-    age = 999
+    age = 0
     if dt_str:
         try:
             dt = datetime.datetime.fromisoformat(str(dt_str).replace("Z", "+00:00"))
@@ -99,13 +130,8 @@ def check_cleanup_reason(
         except Exception:
             pass
 
-    score = float(deal.get("match_score") or 0.0)
-
     if age >= stale_days:
-        return "stale_30d", f"{stale_days}日経過（自然退避）"
-
-    if age >= low_score_days and score < low_score_threshold:
-        return "low_score_14d", f"低スコア({score:.1f}点)・{low_score_days}日経過"
+        return "stale_30d", f"{stale_days}日放置"
 
     return None, None
 
@@ -115,20 +141,19 @@ def run_cleanup(
     *,
     dry_run: bool = True,
     stale_days: int = 30,
-    low_score_days: int = 14,
-    low_score_threshold: float = 3.0,
+    low_score_threshold: float = 4.0,
     limit: int = 200,
 ) -> dict[str, Any]:
     now = datetime.datetime.now(datetime.timezone.utc)
     now_iso = now.isoformat()
 
-    # 対象: 候補一覧に表示される status (info, viewing)
+    # 対象: 候補一覧の未処理 status (info)
     res = (
         sb.table("kurashift_re_deals")
         .select(
-            "id, title, status, inquiry_status, match_score, updated_at, created_at, summary_json"
+            "id, title, area, status, inquiry_status, match_score, updated_at, created_at, summary_json"
         )
-        .in_("status", ["info", "viewing"])
+        .in_("status", ["info"])
         .order("match_score", desc=False)
         .limit(500)
         .execute()
@@ -143,7 +168,6 @@ def run_cleanup(
             deal,
             now,
             stale_days=stale_days,
-            low_score_days=low_score_days,
             low_score_threshold=low_score_threshold,
         )
         if reason and label:
@@ -223,8 +247,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="KURASHIFT stale deal auto cleanup")
     ap.add_argument("--apply", action="store_true", help="実際に DB を更新して退避")
     ap.add_argument("--stale-days", type=int, default=30, help="放置日数（既定30日）")
-    ap.add_argument("--low-score-days", type=int, default=14, help="低スコア放置日数（既定14日）")
-    ap.add_argument("--low-score-threshold", type=float, default=3.0, help="低スコア閾値（既定3.0点）")
+    ap.add_argument("--low-score-threshold", type=float, default=4.0, help="低スコア閾値（既定4.0点）")
     ap.add_argument("--limit", type=int, default=200, help="1回の最大処理件数（既定200件）")
     args = ap.parse_args()
 
@@ -233,7 +256,6 @@ def main() -> int:
         sb,
         dry_run=not args.apply,
         stale_days=args.stale_days,
-        low_score_days=args.low_score_days,
         low_score_threshold=args.low_score_threshold,
         limit=args.limit,
     )

@@ -1811,6 +1811,14 @@ def main() -> int:
             ensure_ascii=False,
         )
     )
+    if args.apply:
+        try:
+            from jarvis_kurashift_re_cleanup import run_cleanup
+            cleanup_res = run_cleanup(sb, dry_run=False)
+            print(f"# auto_cleanup_after_ingest applied={cleanup_res.get('applied_count', 0)}")
+        except Exception as e:
+            print(f"# auto_cleanup_after_ingest soft-fail: {e}", file=sys.stderr)
+
     return 0
 
 
