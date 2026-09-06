@@ -50,3 +50,7 @@ notebooks:
     state_file: ".jarvis_state/notebooklm_sesame_tenant.json"
     revise_prompt: "docs/N1_NotebookLM/01_セサミ使用方法/08_Studio修正プロンプト_20260825.md"
     default_slide_pages: "5,8,13,14"
+  family_exam_2026_fall:
+    url: "https://notebooklm.google.com/notebook/20b6c702-1eba-4061-91e7-7dcf0592e19a"
+    drive_folder: "09_家族受験会議2026秋_円香と珠己"
+    state_file: ".jarvis_state/notebooklm_family_exam_2026_fall.json"
