@@ -58,3 +58,7 @@ notebooks:
     url: "https://notebooklm.google.com/notebook/34fb5ac0-a717-4d6a-b1a0-d09fb4a049c4"
     drive_folder: "10_神大家_幹事標準マニュアル"
     state_file: ".jarvis_state/notebooklm_kamiooya_kanji_manual.json"
+  tokai_dx_grokbot_ai_org:
+    url: "https://notebook.google.com/notebook/14e0b11d-0f16-49a8-ad05-8aa48962b53e"
+    drive_folder: "11_東海DX_GrokBot不動産AI組織"
+    state_file: ".jarvis_state/notebooklm_tokai_dx_grokbot_ai_org.json"
