@@ -466,10 +466,81 @@ def check_must_include(
     return out
 
 
+def check_must_exclude(
+    rows: list[dict[str, str]], cfg: dict[str, Any]
+) -> list[dict[str, Any]]:
+    include = cfg.get("include_label") or INCLUDE
+    exclude = cfg.get("exclude_label") or EXCLUDE
+    out: list[dict[str, Any]] = []
+    for rule in cfg.get("must_exclude") or []:
+        acct_kw = rule.get("account_keywords") or []
+        comment_kw = rule.get("comment_keywords") or []
+        cat_kw = rule.get("category_keywords") or []
+        for r in rows:
+            pay = (r.get("支払元") or "").strip()
+            inc = (r.get("入金先") or "").strip()
+            acct_blob = pay + " " + inc
+            if acct_kw and not any(k.lower() in acct_blob.lower() for k in acct_kw):
+                continue
+
+            shop = (r.get("お店") or "").strip()
+            item = (r.get("品目") or "").strip()
+            memo = (r.get("メモ") or "").strip()
+            cat = (r.get("カテゴリ") or "").strip()
+            genre = (r.get("カテゴリの内訳") or "").strip()
+            text_blob = f"{shop} {item} {memo} {cat} {genre}"
+
+            match_comment = any(k in text_blob for k in comment_kw) if comment_kw else False
+            match_cat = any(k in (cat + genre) for k in cat_kw) if cat_kw else False
+
+            if not (match_comment or match_cat):
+                continue
+
+            # 金額（payment なら 支出、income なら 収入）
+            amt = float(r.get("支出") or 0) or float(r.get("収入") or 0)
+            if amt <= 0:
+                continue
+
+            # 既に「集計に含めない」ならOK
+            if agg_label(r, include, exclude) == "exclude":
+                continue
+
+            shop_val = (r.get("お店") or "").strip()
+            if shop_val in ("", "-"):
+                shop_val = (r.get("品目") or "").strip()
+            if shop_val in ("", "-"):
+                shop_val = pay or inc
+            target_shop = shop_val or "-"
+
+            out.append(
+                {
+                    "kind": "must_exclude",
+                    "rule_id": rule.get("id"),
+                    "description": rule.get("description"),
+                    "date": r.get("日付"),
+                    "shop": target_shop,
+                    "pay": (pay or inc)[:40],
+                    "amount": amt,
+                    "proposal": f"{rule.get('description')}: 『集計に含めない』へ変更を提案",
+                    "action": {
+                        "action": "set_aggregate",
+                        "target": "must_exclude",
+                        "value": "exclude",
+                        "date": r.get("日付"),
+                        "shop": target_shop,
+                        "amount": amt,
+                        "pay": (pay or inc)[:40],
+                    },
+                }
+            )
+    return out
+
+
 def build_result(
     pairs: list[dict[str, Any]],
     amazon: list[dict[str, Any]],
     must: list[dict[str, Any]],
+    must_exclude: list[dict[str, Any]],
     cfg: dict[str, Any],
     csv_path: Path,
     category_reviews: list[dict[str, Any]] | None = None,
@@ -485,11 +556,11 @@ def build_result(
     level = "ok"
     if both_exc or amazon or (pairs and not both_inc and not ok_pairs):
         level = "warn"
-    if both_inc or must or dup_yen >= thr:
+    if both_inc or must or must_exclude or dup_yen >= thr:
         level = "attention"
     if cats and level == "ok":
         level = "info"
-    if not pairs and not amazon and not must and not cats:
+    if not pairs and not amazon and not must and not must_exclude and not cats:
         level = "ok"
 
     parts = [
@@ -501,6 +572,8 @@ def build_result(
         parts.append(f"両方除外 {len(both_exc)}")
     if must:
         parts.append(f"must含めない {len(must)}")
+    if must_exclude:
+        parts.append(f"must除外 {len(must_exclude)}")
     if amazon:
         parts.append(f"Amazon二重疑い {len(amazon)}")
     if cats:
@@ -516,6 +589,8 @@ def build_result(
         samples.append(a)
     for m in must[:5]:
         samples.append(m)
+    for me in must_exclude[:5]:
+        samples.append(me)
     for p in ok_pairs[:3]:
         samples.append({**p, "viewpoint": "rule_ok"})
 
@@ -559,7 +634,7 @@ def build_result(
     seen: set[str] = set()
     action_items: list[dict] = []
     action_lines: list[str] = []
-    for s in both_inc + both_exc + amazon + must:
+    for s in both_inc + both_exc + amazon + must + must_exclude:
         row = _action_row({**s, "viewpoint": s.get("viewpoint") or (
             "both_include" if s.get("both_include") else
             "both_exclude" if s.get("both_exclude") else
@@ -592,6 +667,8 @@ def build_result(
         detail_bits.append(f"クレカ除外でOK例あり（{len(ok_pairs)}件）")
     for m in must[:3]:
         detail_bits.append(m.get("proposal") or "")
+    for me in must_exclude[:3]:
+        detail_bits.append(me.get("proposal") or "")
 
     return {
         "updated_at": now_iso(),
@@ -608,6 +685,7 @@ def build_result(
         "dup_yen_both_include": dup_yen,
         "amazon_issues": len(amazon),
         "must_include_violations": len(must),
+        "must_exclude_violations": len(must_exclude),
         "top_shops_both_include": dict(shop_c.most_common(8)),
         "samples": samples,
         "proposed_actions": actions,
@@ -639,8 +717,9 @@ def run(year: int | None = None) -> dict[str, Any]:
     pairs = find_pairs(payments, cfg)
     amazon = check_amazon(payments, cfg)
     must = check_must_include(payments, cfg)
+    must_exclude = check_must_exclude(rows, cfg)
     cats = check_category_reviews(payments, cfg)
-    return build_result(pairs, amazon, must, cfg, csv_path, cats)
+    return build_result(pairs, amazon, must, must_exclude, cfg, csv_path, cats)
 
 
 def main(argv: list[str] | None = None) -> int:
