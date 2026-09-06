@@ -19,9 +19,9 @@ alwaysApply: true
 
 ## 使わないパス（書かない・ボルトとして開かない）
 
-`~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1`
+`~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/999_Obsidian_旧退避_202608`
 
-退避のまま残してよい。ワークスペースの「マイドライブ」は他用途用。その下の `500_Obsidian_r1` には書かない。
+（※同名衝突を避けるため、過去のGoogle Drive退避フォルダは `999_Obsidian_旧退避_202608` にリネーム済み。マイドライブ直下の `500_Obsidian_r1` はOGD本線用フォルダ1つに統一されています。ローカルの正本は常に `~/Documents/500_Obsidian_r1` です。）
 
 ## Jarvis の必須動作
 

@@ -73,6 +73,7 @@ FAMILY_JOURNAL_RUNNER = REPO / "launchd" / "family_journal_weekly_runner.sh"
 FAMILY_JOURNAL_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_family_journal"
 APP_DEV_CARDS = REPO / "scripts" / "jarvis_app_dev_cards_morning.py"
 APP_DEV_QUEUE = REPO / "scripts" / "jarvis_app_dev_queue.py"
+KARATE_ADVISOR_SYNC = REPO / "scripts" / "jarvis_karate_advisor_sync.py"
 
 
 def now_iso() -> str:
@@ -778,6 +779,20 @@ def main() -> int:
             print(f"# intent_sync soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["intent_sync"] = "skipped"
+
+    # 2b2. 空手アドバイザー Grok Bot 自律リサーチ同期（Obsidian & OGD反映）
+    if KARATE_ADVISOR_SYNC.is_file():
+        rc = run_step(
+            "karate_advisor_sync",
+            [exe, str(KARATE_ADVISOR_SYNC)],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["karate_advisor_sync"] = rc
+        if rc != 0:
+            print(f"# karate_advisor_sync soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["karate_advisor_sync"] = "skipped"
 
     # 3–4. 状況ウォッチ再集約込みの投影 push（push 内で situation_watch 実行）
     if not args.skip_push:

@@ -141,6 +141,7 @@ ProgramCode/outputs/
 !.cursor/rules/jarvis-s1-grok-followup.mdc
 !.cursor/rules/jarvis-plan-accept.mdc
 !.cursor/rules/jarvis-pm-task-notion-view.mdc
+!.cursor/rules/partner-folder-numbering.mdc
 .obsidian/
 .vscode/
 
