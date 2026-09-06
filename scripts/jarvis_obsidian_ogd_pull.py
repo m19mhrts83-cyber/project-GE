@@ -57,6 +57,15 @@ def md5_bytes(data: bytes) -> str:
     return hashlib.md5(data).hexdigest()
 
 
+def decode_path_properties(props: dict[str, str]) -> str:
+    res = props.get("path") or ""
+    idx = 2
+    while f"path{idx}" in props:
+        res += props[f"path{idx}"]
+        idx += 1
+    return res
+
+
 def list_tagged(session: requests.Session, prefix: str | None) -> list[dict]:
     out: list[dict] = []
     page = None
@@ -77,7 +86,7 @@ def list_tagged(session: requests.Session, prefix: str | None) -> list[dict]:
         r.raise_for_status()
         data = r.json()
         for f in data.get("files") or []:
-            path = (f.get("properties") or {}).get("path") or ""
+            path = decode_path_properties(f.get("properties") or {})
             if not path or path.startswith(SKIP_PREFIXES):
                 continue
             if prefix and not path.startswith(prefix):
@@ -122,7 +131,7 @@ def main() -> int:
     mapping = raw.setdefault("driveIdToPath", {})
 
     for f in files:
-        path = (f.get("properties") or {}).get("path") or ""
+        path = decode_path_properties(f.get("properties") or {})
         local = VAULT / path
         drive_mtime = parse_rfc3339(f.get("modifiedTime"))
         drive_md5 = (f.get("md5Checksum") or "").lower()
