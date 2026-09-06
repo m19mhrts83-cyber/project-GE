@@ -630,7 +630,7 @@ export default async function RealEstateDealsPage({
 
       <DetailedInvestigatedDealsSection
         deals={detailedInvestigatedDeals}
-        openDealHref={openDealHref}
+        currentTab={tab}
       />
 
       {inProgressDeals.length > 0 ? (
