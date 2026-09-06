@@ -255,19 +255,16 @@ items:
       銀行更新: Zaim Web 口座一覧。Suica 画像認証は手動。OTP は .env.jarvis_private（値は出さない）
       ETC 同額は対象外。
 
-  # 2026-08 一時 Pro Plus → 9月前に Pro へ戻す（意図しない継続課金防止）
+  # 2026-09-06 Pro+ ($60/mo) へ正式引き上げ（Grok Bot複数自動運用・Actions稼働のため）
   - id: cursor_pro_plus_downgrade
     title: Cursor Pro Plus → Pro に戻す（様子見）
     category: ops
-    enabled: true
+    enabled: false
     never_archive: true
-    source: "方針 2026-08-28 / cursor.com/dashboard/billing / grok-bot/plans"
+    source: "方針 2026-09-06 Pro+正式運用 / cursor.com/dashboard/billing / grok-bot/plans"
     cursor_prompt: |
-      Cursor は Pro へ Schedule Downgrade（今日実行可。次回更新日まで Pro+ 継続→その更新から Pro $20）。
-      困ったら Adjust plan で Pro+ 再上げ（即時・日割り返金／クレジット別取引）。年額 Pro+ は Notion 年額 9/28 の後。
-      枠の正: Spending タブ。Other Models $20 が先に尽きやすい。Cursor Models（Composer/Grok）は別枠。
-      Grok Bot: Pro でも利用可（週次枠は Pro+ より小。公式 2026-08-26）。Bot ルーティンで週次枠不足なら Pro+。
-      SuperGrok 連携は Pro+ より高いので採用しない。
+      2026-09-06 に Pro+ ($60) へ引き上げ完了。Grok Bot複数自動運用およびActions安定稼働のため。
+      年額 Pro+ の検討は手元資金・キャッシュフローを優先し、冬ボーナス期（12月）に行う。
       ダッシュボード課金: /billing（Cursor 行）。
 
   - id: cursor_usage_watch
@@ -336,3 +333,18 @@ items:
       ルール: jarvis-kamiooya-kanji.mdc
       レポート期限・次回イベント立ち上げが近ければ先に警告。
       Drive OAuth は estate。フォーム送信前は確認必須。
+
+  - id: grandole_201_aircon
+    title: 志賀本通Ⅰ 201 エアコン故障・修理
+    category: properties
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/grandole_201_aircon.json
+    cursor_prompt: |
+      Grandole志賀本通Ⅰ 201号室のエアコン故障（エラー9-4・水漏れ再発）の対応状況を確認して。
+      マルショウ石井様（naocafe398400@gmail.com）、ミニテック林様（tomoki-hayashi@minitech.co.jp）からの返信・進捗を確認。
+      返信があれば至急現地立ち会い・修理調整を行う。
+      state: .jarvis_state/grandole_201_aircon.json
+      Notion: https://app.notion.com/p/Grandole-I-201-3d3f6bbe5a76817cbab4f351deeab602
+      チェック: scripts/jarvis_grandole_201_aircon_check.py
+
