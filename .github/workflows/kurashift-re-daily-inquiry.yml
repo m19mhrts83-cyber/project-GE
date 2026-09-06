@@ -83,7 +83,16 @@ jobs:
           echo "📥 物件メール取込・スコア判定・既読化を実行中..."
           python scripts/jarvis_kurashift_property_mail_match.py --apply
 
-      - name: Step 2 - Tier3 Safe Auto Inquiry Send
+      - name: Step 2 - Auto Cleanup Stale Deals (Keep Funnel Fresh)
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          echo "🧹 候補一覧の鮮度維持（30日放置・14日低スコアの自動見送り退避）を実行中..."
+          python scripts/jarvis_kurashift_re_cleanup.py --apply
+
+      - name: Step 3 - Tier3 Safe Auto Inquiry Send
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}

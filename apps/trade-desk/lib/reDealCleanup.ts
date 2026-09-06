@@ -90,7 +90,7 @@ export function isStale(
 /** ハード除外: 一覧に出さない */
 export function isCleanupHardExcluded(d: CleanupDealFields): boolean {
   const st = String(d.status || "");
-  if (st !== "info") return true;
+  if (st !== "info" && st !== "viewing") return true;
   if (INQUIRY_ACTIVE.has(inquiryOf(d))) return true;
   if (isExplicitFollowFlag(d)) return true;
   if (listenValue(d) === "聞く") return true;

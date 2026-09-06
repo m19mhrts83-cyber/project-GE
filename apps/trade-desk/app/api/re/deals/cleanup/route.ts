@@ -21,7 +21,7 @@ async function loadInfoDeals(
   const { data, error } = await supabase
     .from("kurashift_re_deals")
     .select(SELECT_COLS)
-    .eq("status", "info")
+    .in("status", ["info", "viewing"])
     .order("match_score", { ascending: true, nullsFirst: true })
     .limit(500);
   if (error) throw new Error(error.message);
