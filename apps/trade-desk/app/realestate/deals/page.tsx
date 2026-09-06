@@ -1,7 +1,6 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import DealsDrawerHost from "@/components/DealsDrawerHost";
-import DealCleanupPanel from "@/components/DealCleanupPanel";
 import DealsListTable, { type DealsListRow } from "@/components/DealsListTable";
 import DealReviewActions from "@/components/DealReviewActions";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
@@ -938,8 +937,6 @@ export default async function RealEstateDealsPage({
           </p>
         </div>
       ) : null}
-
-      {tab === "candidates" ? <DealCleanupPanel /> : null}
 
       <div className="card">
         <header>
