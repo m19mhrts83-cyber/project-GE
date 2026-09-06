@@ -16,7 +16,9 @@ import {
   type S3InvestigationData,
   type DealAttachmentInfo,
   type YieldDisplayInfo,
+  type LandValueDisplayInfo,
   getYieldDisplayInfo,
+  getLandValueDisplayInfo,
   getDealAttachments,
 } from "@/lib/reDealPursue";
 import {
@@ -363,46 +365,100 @@ export default function DealDetailDrawer({
             </p>
             {(() => {
               const yi = getYieldDisplayInfo(deal);
+              const li = getLandValueDisplayInfo(deal);
               return (
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: 8,
-                    marginTop: 4,
-                    marginBottom: 4,
-                  }}
-                >
-                  <span className="meta" style={{ margin: 0 }}>
-                    {deal.area || "—"} / {deal.structure || "—"} /{" "}
-                    {deal.price_man != null
-                      ? fmtYen(Number(deal.price_man) * 10000)
-                      : "—"}
-                  </span>
-                  <span
+                <div style={{ marginTop: 4, marginBottom: 6 }}>
+                  <div
                     style={{
-                      display: "inline-block",
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      background: yi.badgeBg,
-                      color: yi.badgeColor,
-                      border: `1px solid ${yi.badgeBorder}`,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: 8,
                     }}
                   >
-                    {yi.label}
-                  </span>
-                  {yi.monthlyRentStr ? (
-                    <span style={{ fontSize: 12, color: "#047857", fontWeight: 600 }}>
-                      （{yi.monthlyRentStr}）
+                    <span className="meta" style={{ margin: 0 }}>
+                      {deal.area || "—"} / {deal.structure || "—"} /{" "}
+                      {deal.price_man != null
+                        ? fmtYen(Number(deal.price_man) * 10000)
+                        : "—"}
                     </span>
-                  ) : null}
-                  {yi.notes ? (
-                    <span className="meta" style={{ fontSize: 11, margin: 0 }}>
-                      [{yi.notes}]
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        background: yi.badgeBg,
+                        color: yi.badgeColor,
+                        border: `1px solid ${yi.badgeBorder}`,
+                      }}
+                    >
+                      {yi.label}
                     </span>
+                    {yi.monthlyRentStr ? (
+                      <span style={{ fontSize: 12, color: "#047857", fontWeight: 600 }}>
+                        （{yi.monthlyRentStr}）
+                      </span>
+                    ) : null}
+                    {yi.notes ? (
+                      <span className="meta" style={{ fontSize: 11, margin: 0 }}>
+                        [{yi.notes}]
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {li.hasData ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginTop: 6,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 800,
+                          background: li.badgeBg,
+                          color: li.badgeColor,
+                          border: `1px solid ${li.badgeBorder}`,
+                        }}
+                        title={li.notes || ""}
+                      >
+                        {li.badgeLabel}
+                      </span>
+                      {li.appraisalManStr ? (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#1e1b4b" }}>
+                          積算: {li.appraisalManStr}
+                        </span>
+                      ) : null}
+                      {li.tsuboPriceStr ? (
+                        <span className="meta" style={{ fontSize: 11, margin: 0 }}>
+                          [{li.tsuboPriceStr}]
+                        </span>
+                      ) : null}
+                      {li.landAreaStr ? (
+                        <span className="meta" style={{ fontSize: 11, margin: 0 }}>
+                          地積: {li.landAreaStr.split("（")[0]}
+                        </span>
+                      ) : null}
+                      {li.basisUrl ? (
+                        <a
+                          href={li.basisUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ fontSize: 11, color: "#2563eb", textDecoration: "underline" }}
+                        >
+                          国税庁路線価図 ↗
+                        </a>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               );
@@ -461,10 +517,12 @@ export default function DealDetailDrawer({
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
                       {allAtts.map((a, i) => {
                         const isMaisoku =
+                          a.kind === "mysoku" ||
                           a.kind === "maisoku" ||
                           a.filename.includes("中古戸建") ||
                           a.filename.includes("マイソク") ||
-                          a.filename.includes("図面");
+                          a.filename.includes("図面") ||
+                          a.filename.includes("概要書");
                         const isContract =
                           a.kind === "contract" || a.filename.includes("契約書");
 
@@ -520,10 +578,91 @@ export default function DealDetailDrawer({
 
             {grok ? (
               <div className="card" style={{ marginTop: 12, padding: 12 }}>
-                <strong>Grok 調査</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong>Grok 調査</strong>
+                  {(() => {
+                    const li = getLandValueDisplayInfo(deal);
+                    return li.hasData ? (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 800,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background: li.badgeBg,
+                          color: li.badgeColor,
+                          border: `1px solid ${li.badgeBorder}`,
+                        }}
+                      >
+                        {li.badgeLabel}
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
                 <p className="meta" style={{ marginTop: 6 }}>
                   {grokOneLine(grok)}
                 </p>
+
+                {(() => {
+                  const li = getLandValueDisplayInfo(deal);
+                  if (!li.hasData) return null;
+                  return (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        padding: "8px 10px",
+                        borderRadius: 6,
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        fontSize: 12,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <strong style={{ color: "#1e293b" }}>
+                          📊 土地値積算 ({li.method || "路線価"}):{" "}
+                          <span style={{ color: li.badgeColor, fontSize: 13, fontWeight: 800 }}>
+                            {li.ratioStr}
+                          </span>
+                        </strong>
+                        {li.basisUrl ? (
+                          <a
+                            href={li.basisUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ fontSize: 11, color: "#2563eb", textDecoration: "underline" }}
+                          >
+                            国税庁 路線価図 ↗
+                          </a>
+                        ) : null}
+                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                          gap: 6,
+                          marginTop: 6,
+                          color: "#475569",
+                        }}
+                      >
+                        {li.appraisalManStr ? (
+                          <div>
+                            積算額: <strong style={{ color: "#0f172a" }}>{li.appraisalManStr}</strong>
+                          </div>
+                        ) : null}
+                        {li.tsuboPriceStr ? (
+                          <div>
+                            坪単価: <strong style={{ color: "#0f172a" }}>{li.tsuboPriceStr}</strong>
+                          </div>
+                        ) : null}
+                        {li.landAreaStr ? (
+                          <div>
+                            地積: <strong style={{ color: "#0f172a" }}>{li.landAreaStr}</strong>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {typeof grok.population_table === "string" &&
                 grok.population_table ? (
                   <p className="meta" style={{ marginTop: 4 }}>

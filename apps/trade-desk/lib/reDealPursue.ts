@@ -27,6 +27,22 @@ export type YieldDisplayInfo = {
   badgeColor: string;
 };
 
+export type LandValueDisplayInfo = {
+  hasData: boolean;
+  ratioStr: string;
+  ratioNum?: number;
+  appraisalManStr?: string;
+  tsuboPriceStr?: string;
+  landAreaStr?: string;
+  method?: string;
+  badgeLabel: string;
+  badgeBg: string;
+  badgeBorder: string;
+  badgeColor: string;
+  basisUrl?: string;
+  notes?: string;
+};
+
 export type S3InvestigationData = {
   filename?: string;
   obsidian_path?: string;
@@ -376,6 +392,134 @@ export function getYieldDisplayInfo(d: PursueDealFields): YieldDisplayInfo {
   return {
     type: "none",
     label: "利回り未算定",
+    badgeBg: "#f1f5f9",
+    badgeBorder: "#cbd5e1",
+    badgeColor: "#64748b",
+  };
+}
+
+/**
+ * 物件の土地値（路線価等による積算額、比率、坪単価）情報を解決する。
+ */
+export function getLandValueDisplayInfo(d: PursueDealFields): LandValueDisplayInfo {
+  const sj = sjOf(d);
+  const grok = (sj.grok as Record<string, unknown>) || {};
+  const s3 = (sj.s3_investigation as S3InvestigationData) || {};
+  const price = d.price_man || (typeof grok.price_man === "number" ? grok.price_man : undefined);
+
+  // 1. 土地値比率
+  const rawRatio = grok.land100_ratio ?? grok.land_ratio ?? sj.land100_ratio;
+  let ratioNum: number | undefined;
+  let ratioStr = "";
+
+  if (rawRatio != null) {
+    if (typeof rawRatio === "number" && Number.isFinite(rawRatio)) {
+      ratioNum = rawRatio <= 3 ? Math.round(rawRatio * 100) : Math.round(rawRatio);
+      ratioStr = `${ratioNum}%`;
+    } else if (typeof rawRatio === "string") {
+      const m = rawRatio.match(/(\d+(?:\.\d+)?)\s*%/);
+      if (m) {
+        ratioNum = Math.round(parseFloat(m[1]));
+        ratioStr = `${ratioNum}%`;
+      }
+    }
+  }
+
+  // S3テキストからのフォールバック
+  if (!ratioStr && s3) {
+    const blob = JSON.stringify(s3);
+    const m = blob.match(/土地値\s*(\d+(?:\.\d+)?)\s*%/);
+    if (m) {
+      ratioNum = Math.round(parseFloat(m[1]));
+      ratioStr = `${ratioNum}%`;
+    }
+  }
+
+  // 2. 土地積算額 (万円)
+  const rawAppraisal = grok.land_appraisal_man ?? sj.land_appraisal_man;
+  let appraisalManStr: string | undefined;
+  if (rawAppraisal != null) {
+    const m = String(rawAppraisal).match(/([\d,]+(?:\.\d+)?)/);
+    if (m) {
+      const val = parseFloat(m[1].replace(/,/g, ""));
+      if (!isNaN(val) && val > 0) {
+        appraisalManStr = `${Math.round(val).toLocaleString()}万円`;
+      }
+    }
+  } else if (ratioNum && price && price > 0) {
+    const calc = Math.round((ratioNum / 100) * price);
+    appraisalManStr = `${calc.toLocaleString()}万円`;
+  }
+
+  // 3. 路線価・坪単価
+  const rawTsubo = grok.route_price_tsubo;
+  let tsuboPriceStr: string | undefined;
+  if (rawTsubo != null) {
+    const s = String(rawTsubo).trim();
+    const mt = s.match(/(約?[\d.]+)万?.*?（([0-9]+[A-Za-z])=/);
+    if (mt) {
+      tsuboPriceStr = `${mt[1]}万/坪 (${mt[2]})`;
+    } else {
+      tsuboPriceStr = s.length > 20 ? s.slice(0, 19) + "…" : s;
+    }
+  }
+
+  // 4. 土地面積
+  const landAreaStr = typeof grok.land_area === "string" ? grok.land_area : undefined;
+
+  // 5. 算出方式
+  const method = typeof grok.land_method === "string" ? grok.land_method : "路線価";
+  const basisUrl = typeof grok.land_basis_url === "string" ? grok.land_basis_url : undefined;
+
+  if (ratioStr || appraisalManStr) {
+    let badgeBg = "#ecfdf5";
+    let badgeBorder = "#10b981";
+    let badgeColor = "#047857";
+
+    if (ratioNum != null && ratioNum >= 150) {
+      badgeBg = "#fef3c7";
+      badgeBorder = "#f59e0b";
+      badgeColor = "#b45309";
+    } else if (ratioNum != null && ratioNum >= 100) {
+      badgeBg = "#ecfdf5";
+      badgeBorder = "#10b981";
+      badgeColor = "#047857";
+    } else if (ratioNum != null && ratioNum >= 60) {
+      badgeBg = "#eff6ff";
+      badgeBorder = "#3b82f6";
+      badgeColor = "#1d4ed8";
+    } else if (ratioNum != null) {
+      badgeBg = "#f8fafc";
+      badgeBorder = "#cbd5e1";
+      badgeColor = "#475569";
+    }
+
+    const badgeLabel = ratioStr ? `土地値 ${ratioStr}` : `積算 ${appraisalManStr}`;
+    const notesParts: string[] = [];
+    if (appraisalManStr) notesParts.push(`積算 ${appraisalManStr}`);
+    if (tsuboPriceStr) notesParts.push(tsuboPriceStr);
+
+    return {
+      hasData: true,
+      ratioStr: ratioStr || "不明",
+      ratioNum,
+      appraisalManStr,
+      tsuboPriceStr,
+      landAreaStr,
+      method,
+      badgeLabel,
+      badgeBg,
+      badgeBorder,
+      badgeColor,
+      basisUrl,
+      notes: notesParts.join(" / "),
+    };
+  }
+
+  return {
+    hasData: false,
+    ratioStr: "不明",
+    badgeLabel: "土地値未算定",
     badgeBg: "#f1f5f9",
     badgeBorder: "#cbd5e1",
     badgeColor: "#64748b",
