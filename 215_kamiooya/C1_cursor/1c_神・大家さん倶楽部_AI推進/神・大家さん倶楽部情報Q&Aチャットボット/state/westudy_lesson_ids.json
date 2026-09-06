@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "updated_at": "2026-08-18T22:53:40.700429+00:00",
+  "updated_at": "2026-09-06T00:55:14.400257+00:00",
   "lessons": {
-    "lesson_desc_kamiooya-otoiawase": "773d8cfce7769cfd",
+    "lesson_desc_kamiooya-otoiawase": "8a4e06d6d54650f8",
     "lesson_desc_link": "062d064f62968839",
     "lesson_desc_toiawase_option": "743ba786a633b005",
     "lesson_desc_step0_1": "a256047a489ef713",
@@ -10,7 +10,7 @@
     "lesson_desc_step1_1": "5c04cdc85a0959a8",
     "lesson_desc_kamiooya-kiso-step2_1": "d677f0b38ebf5fc7",
     "lesson_desc_kamiooya-kiso-step2_2": "466ff3c936d30cba",
-    "lesson_desc_step3_1": "07a3e5ca6a5976f4",
+    "lesson_desc_step3_1": "64f8f65493ce6df3",
     "lesson_desc_step3_2": "707dc85f7db9c554",
     "lesson_desc_step3_plam_intarveiw": "f8f67931277b8ebf",
     "lesson_desc_step4_1": "081896fd8722f2d3",
@@ -72,7 +72,7 @@
     "lesson_desc_kamiconcept_2_kamikanban": "cafa29da86cad486",
     "lesson_desc_kamiconcept_3_kamiconcept": "ca26658a4f5d8600",
     "lesson_desc_chatgpt_katuyou": "b0b5e728380559aa",
-    "lesson_desc_kasaihoken_kisho": "cb06ea98bad54126",
+    "lesson_desc_kasaihoken_kisho": "9f417580ec70ea29",
     "lesson_desc_theme1_jishin_kanngaekata": "c6916e3425c8f23b",
     "lesson_desc_theme2_jishin_tsukaikata": "24e8ea764ac54b63",
     "lesson_desc_consultant": "e89c6a678a2f1929",
@@ -81,7 +81,7 @@
     "lesson_desc_setuzeianken": "39e1e04fac015d25",
     "lesson_desc_seikakaitori": "3bab5a4106ddaa49",
     "lesson_desc_executive-lounge": "fad51bd2e87f8472",
-    "lesson_desc_kami_agent": "5b30922ccad2f8d9",
+    "lesson_desc_kami_agent": "a9b1f335d2213f7c",
     "lesson_desc_hellocycling": "dbbe1438cd66cbe7",
     "lesson_desc_service_form": "fe8efcc011f47351",
     "lesson_desc_studysession-startguide": "7ccc99bd2710c0f4",
@@ -256,6 +256,7 @@
     "lesson_desc_seikatushuukan6": "22330be85d18090a",
     "lesson_desc_margarine": "04a955f2a3fb8b18",
     "lesson_desc_firstgroupcon": "7d8f50db332225a8",
+    "lesson_desc_lesson-20260830_groupconsulting": "787dc66e92e93309",
     "lesson_desc_lesson-20260726_groupconsulting": "9398b51543fee6ed",
     "lesson_desc_lesson-20260628_groupconsulting": "d8baf8593e8997c5",
     "lesson_desc_lesson-20260531_groupconsulting": "e2ece1cad47cb0fc",
@@ -266,7 +267,6 @@
     "lesson_desc_lesson-20251228_groupconsulting": "a20387dff2338e75",
     "lesson_desc_lesson-20251123_groupconsulting": "a698b82ad43f4379",
     "lesson_desc_lesson-20251026_groupconsulting": "4458524cea7747fc",
-    "lesson_desc_lesson-20250928_groupconsulting": "d0c9b41868f36112",
-    "lesson_desc_lesson-20250831_groupconsulting": "f42fd080a58959db"
+    "lesson_desc_lesson-20250928_groupconsulting": "d0c9b41868f36112"
   }
 }
