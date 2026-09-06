@@ -46,6 +46,10 @@ HEADER_ALIASES: dict[str, tuple[str, ...]] = {
     "phone": ("phone", "tel", "電話"),
     "url": ("url", "hp", "サイト"),
     "sole_score": ("sole_score", "sole_proprietor_score", "score"),
+    "recommend": ("recommend", "推奨", "ランク", "評価", "レーティング", "rating"),
+    "cost_rating": ("cost_rating", "費用評価", "価格", "コスト"),
+    "service_rating": ("service_rating", "品質評価", "サービス"),
+    "rating_evidence": ("rating_evidence", "評価根拠", "根拠"),
     "notes": ("notes", "備考", "メモ"),
     "source": ("source", "出典"),
 }
@@ -287,6 +291,16 @@ def parse_candidates_from_body(
         notes = cell("notes")
         source = cell("source") or "grok_repair_mail"
         sole = cell("sole_score")
+        rec = cell("recommend") or None
+        if not rec and sole:
+            s_low = sole.lower()
+            if s_low == "high":
+                rec = "A"
+            elif s_low == "mid":
+                rec = "B"
+            elif s_low == "low":
+                rec = "C"
+
         vendors.append(
             {
                 "name": name,
@@ -296,6 +310,10 @@ def parse_candidates_from_body(
                 "url": url,
                 "contact_url": url,
                 "sole_proprietor_score": sole,
+                "recommend": rec,
+                "cost_rating": cell("cost_rating") or None,
+                "service_rating": cell("service_rating") or None,
+                "rating_evidence": cell("rating_evidence") or None,
                 "notes": notes,
                 "source": source if source.startswith("grok") else f"grok_mail:{source}",
                 "status": "discovered",

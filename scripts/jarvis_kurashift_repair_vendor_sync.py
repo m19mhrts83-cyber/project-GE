@@ -45,6 +45,16 @@ def _parse_date(val: Any) -> str | None:
 
 def vendor_row(v: dict[str, Any], *, synced_at: str) -> dict[str, Any]:
     ensure_alive_fields(v, kind="repair")
+    recommend = v.get("recommend") or None
+    if not recommend:
+        sole = str(v.get("sole_proprietor_score") or "").lower()
+        if sole == "high":
+            recommend = "A"
+        elif sole == "mid":
+            recommend = "B"
+        elif sole == "low":
+            recommend = "C"
+
     row = {
         "id": str(v["id"]),
         "name": str(v.get("name") or "").strip() or str(v["id"]),
@@ -60,6 +70,12 @@ def vendor_row(v: dict[str, Any], *, synced_at: str) -> dict[str, Any]:
         "status": str(v.get("status") or "pending"),
         "source": v.get("source") or None,
         "sole_proprietor_score": v.get("sole_proprietor_score") or None,
+        "recommend": recommend,
+        "cost_rating": v.get("cost_rating") or None,
+        "service_rating": v.get("service_rating") or None,
+        "rating_evidence": v.get("rating_evidence") or None,
+        "rating_sources": v.get("rating_sources") or None,
+        "rated_at": _parse_date(v.get("rated_at")) or _parse_date(v.get("discovered_at")),
         "discovered_at": _parse_date(v.get("discovered_at")),
         "contacted_at": _parse_date(v.get("contacted_at")),
         "replied_at": _parse_date(v.get("replied_at")),
