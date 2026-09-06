@@ -61,11 +61,11 @@ WANT_PATHS = [
     "01_Journaling/☆Karate/00_このフォルダ.md",
     "01_Journaling/☆Karate/和道流/和道流_ピンアン二段の半身と緩急_20260405.md",
     "01_Journaling/☆Karate/和道流/和道流_ピンアン四段五段とクーシャンクー_20260215.md",
+    "01_Journaling/☆Karate/和道流/和道流_逆腰と股関節回旋_20260906.md",
     "01_Journaling/☆Karate/骨と筋肉/ワンツーの足運びと全身連動_20260329.md",
     "01_Journaling/☆Karate/骨と筋肉/間合いの三原則とフットワーク_20260222.md",
     "01_Journaling/☆Karate/骨と筋肉/蹴りの速度_抱え込みと引き戻し_20260419.md",
     "01_Journaling/☆Karate/骨と筋肉/組手での打点コントロールと飛び込み_20260531.md",
-    "01_Journaling/☆Karate/骨と筋肉/逆腰_股関節回旋_20260906.md",
     "01_Journaling/☆Karate/動画ストック_YouTube.md",
 ]
 

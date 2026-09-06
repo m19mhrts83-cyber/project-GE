@@ -81,11 +81,11 @@ def parse_obsidian_draft(text: str) -> dict | None:
 
     # Category
     cat_m = re.search(r"カテゴリ[:：]\s*([^\n]+)", md_text)
-    if cat_m and "骨" in cat_m.group(1):
-        category = "骨と筋肉"
-    elif cat_m and "和道" in cat_m.group(1):
+    if cat_m and ("和道" in cat_m.group(1) or "型" in cat_m.group(1)):
         category = "和道流"
-    elif "ピンアン" in title or "クーシャンクー" in title or "セイシャン" in title:
+    elif cat_m and ("骨" in cat_m.group(1) or "筋" in cat_m.group(1) or "解剖" in cat_m.group(1)):
+        category = "骨と筋肉"
+    elif "ピンアン" in title or "クーシャンクー" in title or "セイシャン" in title or "和道" in title:
         category = "和道流"
     else:
         category = "骨と筋肉"
