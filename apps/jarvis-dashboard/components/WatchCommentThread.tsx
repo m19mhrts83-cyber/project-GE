@@ -191,6 +191,44 @@ export default function WatchCommentThread({
           ))}
         </ul>
       )}
+
+      {macPolling ? (
+        <div
+          className="callout info"
+          style={{
+            marginTop: 12,
+            marginBottom: 8,
+            padding: "10px 14px",
+            background: "#eff6ff",
+            border: "1px solid #93c5fd",
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span
+            style={{
+              display: "inline-block",
+              width: 16,
+              height: 16,
+              border: "2.5px solid #3b82f6",
+              borderTopColor: "transparent",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+              flexShrink: 0,
+            }}
+          />
+          <div>
+            <strong style={{ color: "#1d4ed8", fontSize: "0.88rem" }}>
+              ⚡️ Mac Cursor ワーカーが回答を生成中…
+            </strong>
+            <p className="meta" style={{ margin: "2px 0 0", fontSize: "0.8rem", color: "#3b82f6" }}>
+              launchd ワーカー（45秒間隔）が処理しています。完了すると自動で返答が追記されます。
+            </p>
+          </div>
+        </div>
+      ) : null}
       <fieldset className="draft-engine" style={{ marginTop: 10 }}>
         <legend>聞くエンジン</legend>
         <label className="draft-engine-opt">

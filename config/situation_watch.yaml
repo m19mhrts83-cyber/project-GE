@@ -280,6 +280,18 @@ items:
       Grok Bot 週次枠不足（ルーティン停止・plan 画面で枯渇）も Pro+ 検討。SuperGrok 連携は Pro+ より高いので採用しない。
       ダッシュボード: /billing の「Cursor 枠」カード。
 
+  - id: cursor_worker_queue
+    title: AI相談キュー・Macワーカー
+    category: ops
+    enabled: true
+    never_archive: true
+    source: .jarvis_state/cursor_worker_status.json
+    cursor_prompt: |
+      ダッシュボード「聞く」の Mac Cursor キュー（cards / watch_status / triage_items）を確認して。
+      queued（待機中）・running（処理中）・error（失敗・要見直し）の有無を検知。
+      実行: launchd com.matsunoma.jarvis.cursor-revise-worker（45秒間隔）
+      スクリプト: scripts/jarvis_card_cursor_ask_worker.py [--retry-all-failed]
+
   - id: jarvis_private_backup
     title: Jarvis Private バックアップ（.env.age）
     category: ops

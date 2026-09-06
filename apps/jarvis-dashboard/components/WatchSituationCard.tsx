@@ -193,6 +193,226 @@ export default function WatchSituationCard(props: WatchSituationCardProps) {
           </p>
         ) : null}
 
+        {id === "cursor_worker_queue" ? (
+          <div
+            className="cursor-worker-queue-box"
+            style={{
+              marginTop: 10,
+              padding: 12,
+              background: "var(--bg-subtle, #f8fafc)",
+              borderRadius: 8,
+              border: "1px solid var(--border, #e2e8f0)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                marginBottom: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background:
+                    ((payload.counts as Record<string, number>)?.queued || 0) > 0
+                      ? "#3b82f6"
+                      : "#94a3b8",
+                  color: "#fff",
+                }}
+              >
+                待機: {((payload.counts as Record<string, number>)?.queued) || 0}件
+              </span>
+              <span
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background:
+                    ((payload.counts as Record<string, number>)?.running || 0) > 0
+                      ? "#f59e0b"
+                      : "#94a3b8",
+                  color: "#fff",
+                }}
+              >
+                処理中: {((payload.counts as Record<string, number>)?.running) || 0}件
+              </span>
+              <span
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background:
+                    ((payload.counts as Record<string, number>)?.error || 0) > 0
+                      ? "#ef4444"
+                      : "#10b981",
+                  color: "#fff",
+                }}
+              >
+                エラー: {((payload.counts as Record<string, number>)?.error) || 0}件
+              </span>
+              <span
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: "#64748b",
+                  color: "#fff",
+                }}
+              >
+                直近完了: {((payload.counts as Record<string, number>)?.done_recent) || 0}件
+              </span>
+            </div>
+
+            {/* 待機中の相談リスト */}
+            {Array.isArray(payload.queued_items) && payload.queued_items.length > 0 ? (
+              <div style={{ marginTop: 8 }}>
+                <strong style={{ fontSize: "0.85rem", color: "#1e3a8a" }}>
+                  ⏳ 待機中の相談（Macワーカーが順次処理）:
+                </strong>
+                <ul style={{ margin: "4px 0 0 16px", fontSize: "0.85rem" }}>
+                  {(
+                    payload.queued_items as Array<{
+                      id: string;
+                      title: string;
+                      kind: string;
+                      requested_at?: string;
+                      href: string;
+                    }>
+                  ).map((item) => (
+                    <li key={item.id} style={{ marginTop: 3 }}>
+                      <Link
+                        href={item.href}
+                        style={{ textDecoration: "underline", fontWeight: 600, color: "#2563eb" }}
+                      >
+                        {item.title}
+                      </Link>
+                      <span className="meta" style={{ marginLeft: 6 }}>
+                        ({item.kind} / {item.requested_at ? item.requested_at.slice(11, 16) : "—"})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {/* 処理中の相談リスト */}
+            {Array.isArray(payload.running_items) && payload.running_items.length > 0 ? (
+              <div style={{ marginTop: 8 }}>
+                <strong style={{ fontSize: "0.85rem", color: "#b45309" }}>
+                  ⚡️ 処理中（回答生成中）:
+                </strong>
+                <ul style={{ margin: "4px 0 0 16px", fontSize: "0.85rem" }}>
+                  {(
+                    payload.running_items as Array<{
+                      id: string;
+                      title: string;
+                      kind: string;
+                      started_at?: string;
+                      href: string;
+                    }>
+                  ).map((item) => (
+                    <li key={item.id} style={{ marginTop: 3 }}>
+                      <Link
+                        href={item.href}
+                        style={{ textDecoration: "underline", fontWeight: 600, color: "#d97706" }}
+                      >
+                        {item.title}
+                      </Link>
+                      <span className="meta" style={{ marginLeft: 6 }}>
+                        ({item.started_at ? item.started_at.slice(11, 16) : "—"} 開始)
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {/* エラーリスト */}
+            {Array.isArray(payload.error_items) && payload.error_items.length > 0 ? (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: 8,
+                  background: "#fee2e2",
+                  borderRadius: 6,
+                  border: "1px solid #f87171",
+                }}
+              >
+                <strong style={{ fontSize: "0.85rem", color: "#b91c1c" }}>
+                  ⚠️ エラー発生（自動リトライ対象）:
+                </strong>
+                <ul style={{ margin: "4px 0 0 16px", fontSize: "0.85rem", color: "#7f1d1d" }}>
+                  {(
+                    payload.error_items as Array<{
+                      id: string;
+                      title: string;
+                      error?: string;
+                      href: string;
+                    }>
+                  ).map((item) => (
+                    <li key={item.id} style={{ marginTop: 3 }}>
+                      <Link
+                        href={item.href}
+                        style={{ textDecoration: "underline", fontWeight: 600, color: "#dc2626" }}
+                      >
+                        {item.title}
+                      </Link>
+                      : {item.error || "詳細不明"}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {/* 直近完了リスト */}
+            {Array.isArray(payload.recent_done) && payload.recent_done.length > 0 ? (
+              <div style={{ marginTop: 8 }}>
+                <strong style={{ fontSize: "0.85rem", color: "#065f46" }}>
+                  ✅ 直近完了した相談（回答確認はこちら）:
+                </strong>
+                <ul style={{ margin: "4px 0 0 16px", fontSize: "0.85rem" }}>
+                  {(
+                    payload.recent_done as Array<{
+                      id: string;
+                      title: string;
+                      finished_at?: string;
+                      href: string;
+                    }>
+                  ).map((item) => (
+                    <li key={item.id} style={{ marginTop: 3 }}>
+                      <Link
+                        href={item.href}
+                        style={{ textDecoration: "underline", fontWeight: 600, color: "#059669" }}
+                      >
+                        {item.title}
+                      </Link>
+                      <span className="meta" style={{ marginLeft: 6 }}>
+                        ({item.finished_at ? item.finished_at.slice(11, 16) : "—"} 完了)
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <p className="meta" style={{ marginTop: 10, fontSize: "0.78rem" }}>
+              ワーカー稼働: Mac launchd（45秒間隔） · 最終更新:{" "}
+              {typeof payload.last_heartbeat === "string"
+                ? payload.last_heartbeat.slice(11, 19)
+                : "—"}
+            </p>
+          </div>
+        ) : null}
+
         {actions.length > 0 ? (
           <div className="watch-actions">
             <p className="watch-actions-title">要対応（具体）</p>

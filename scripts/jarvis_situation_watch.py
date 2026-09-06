@@ -2194,6 +2194,88 @@ def eval_cursor_pro_plus_downgrade(meta: dict) -> dict[str, Any]:
     )
 
 
+def eval_cursor_worker_queue(meta: dict, data: dict | None) -> dict[str, Any]:
+    """cards / watch_status / triage_items の Mac Cursor キュー・ワーカー状況を可視化"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+
+    st = data or {}
+    counts = st.get("counts") or {}
+    q_count = counts.get("queued", 0)
+    r_count = counts.get("running", 0)
+    e_count = counts.get("error", 0)
+    d_count = counts.get("done_recent", 0)
+
+    queued_items = st.get("queued_items") or []
+    running_items = st.get("running_items") or []
+    error_items = st.get("error_items") or []
+    recent_done = st.get("recent_done") or []
+
+    # レベル判定
+    if e_count > 0:
+        level = "warn"
+    elif r_count > 0 or q_count > 0:
+        level = "attention"
+    else:
+        level = "ok"
+
+    summary_parts = []
+    if r_count > 0:
+        first_r = running_items[0]["title"] if running_items else ""
+        summary_parts.append(f"処理中 {r_count}件（{first_r}）")
+    if q_count > 0:
+        first_q = queued_items[0]["title"] if queued_items else ""
+        summary_parts.append(f"待機 {q_count}件（{first_q}）")
+    if e_count > 0:
+        first_e = error_items[0]["title"] if error_items else ""
+        summary_parts.append(f"エラー {e_count}件（{first_e}）")
+
+    if not summary_parts:
+        if d_count > 0:
+            first_d = recent_done[0]
+            summary_parts.append(f"正常待機中（直近完了: {first_d.get('title')}）")
+        else:
+            summary_parts.append("待機キューなし（正常稼働中）")
+
+    detail_lines = [
+        f"待機キュー: {q_count}件 / 処理中: {r_count}件 / 失敗: {e_count}件 / 直近完了: {d_count}件",
+        f"ワーカー最終更新: {st.get('last_heartbeat') or '—'}",
+        "Mac launchd: com.matsunoma.jarvis.cursor-revise-worker (45秒間隔)",
+        "即時実行 / リトライ: scripts/jarvis_card_cursor_ask_worker.py",
+    ]
+    if queued_items:
+        detail_lines.append("【待機中の相談】")
+        for it in queued_items[:3]:
+            req = str(it.get("requested_at") or "—")[:16]
+            detail_lines.append(f"・[{it.get('kind')}] {it.get('title')} (依頼: {req})")
+    if error_items:
+        detail_lines.append("【エラー発生中の相談】")
+        for it in error_items[:3]:
+            detail_lines.append(f"・[{it.get('kind')}] {it.get('title')}: {str(it.get('error') or '不明')[:60]}")
+
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "ops",
+        level=level,
+        summary=" · ".join(summary_parts),
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "counts": counts,
+            "queued_items": queued_items,
+            "running_items": running_items,
+            "error_items": error_items,
+            "recent_done": recent_done,
+            "last_heartbeat": st.get("last_heartbeat"),
+            "href": "/situation#watch-cursor_worker_queue",
+            "show_banner": level in ("warn", "attention"),
+        },
+    )
+
+
 EVALUATORS = {
     "etc_mileage": lambda m: eval_etc(m, load_json(STATE / "etc_monthly.json")),
     "vpoint": lambda m: eval_vpoint(m),
@@ -2229,6 +2311,9 @@ EVALUATORS = {
     "cursor_pro_plus_downgrade": lambda m: eval_cursor_pro_plus_downgrade(m),
     "cursor_usage_watch": lambda m: eval_cursor_usage_watch(
         m, load_json(STATE / "cursor_usage_watch.json")
+    ),
+    "cursor_worker_queue": lambda m: eval_cursor_worker_queue(
+        m, load_json(STATE / "cursor_worker_status.json")
     ),
     "jarvis_private_backup": lambda m: eval_jarvis_private_backup(
         m, load_json(STATE / "jarvis_private_backup.json")
