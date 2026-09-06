@@ -98,6 +98,44 @@ function autoPassReason(deal: ReDealForInquiry): string {
 /** 神大家紹介の受付終了メール */
 const UKETSUKE_SHURYO_MARKERS = ["※受付終了※", "＊受付終了＊", "*受付終了*"];
 
+export const DEFAULT_INSTANT_DEATH_KEYWORDS = [
+  "再建築不可",
+  "再建築できない",
+  "借地権",
+  "旧法借地",
+  "地上権",
+  "持分売却",
+  "共有持分",
+  "※受付終了※",
+  "＊受付終了＊",
+  "*受付終了*",
+  "商談中",
+];
+
+export function findInstantDeathKeyword(
+  deal: ReDealForInquiry,
+  cfg?: InquiryAutoConfig
+): string | null {
+  const kws =
+    cfg?.tier3_auto_send?.instant_death_keywords || DEFAULT_INSTANT_DEATH_KEYWORDS;
+  const sj = sjOf(deal);
+  const blob = [
+    deal.title || "",
+    deal.area || "",
+    typeof sj.snippet === "string" ? sj.snippet : "",
+    typeof sj.body === "string" ? sj.body : "",
+    typeof sj.memo === "string" ? sj.memo : "",
+    typeof sj.raw_text === "string" ? sj.raw_text : "",
+  ].join(" ");
+
+  for (const kw of kws) {
+    if (kw && blob.includes(kw)) {
+      return kw;
+    }
+  }
+  return null;
+}
+
 export function titleHasUketsukeShuryo(title: string | null | undefined): boolean {
   const t = String(title || "");
   return UKETSUKE_SHURYO_MARKERS.some((m) => t.includes(m));
@@ -241,6 +279,21 @@ export function evaluateInquiryCandidate(
     };
   }
 
+  const deadKw = findInstantDeathKeyword(deal, cfg);
+  if (deadKw) {
+    return {
+      tier: null,
+      tier1: false,
+      tier2: false,
+      tier3: false,
+      canQuickSend: false,
+      revive: false,
+      badges: [...badges, "即死KW除外"],
+      reasons: [`instant_death=${deadKw}`],
+      ...baseChannel,
+    };
+  }
+
   if (titleHasUketsukeShuryo(deal.title)) {
     return {
       tier: null,
@@ -317,17 +370,53 @@ export function evaluateInquiryCandidate(
 
   const t3cfg = cfg.tiers?.tier3_auto_send;
   const tier3Enabled = cfg.tier3_auto_send?.enabled === true;
-  const tier3 =
-    tier3Enabled &&
-    listenValue(deal) === (t3cfg?.grok_listen || "聞く") &&
-    scoreOf(deal) >= (t3cfg?.min_score ?? 7) &&
-    hazardEval(deal) === (t3cfg?.hazard_eval || "OK") &&
-    land100(deal) !== (t3cfg?.land100_not || "見送り");
+  const t3Min = t3cfg?.min_score ?? 7;
+
+  // ルートA: Grok承認ルート
+  const grokRoute = t3cfg?.grok_route;
+  const grokMin = grokRoute?.min_score ?? t3Min;
+  const routeAEligible =
+    listenValue(deal) === (grokRoute?.grok_listen || t3cfg?.grok_listen || "聞く") &&
+    scoreOf(deal) >= grokMin &&
+    hazardEval(deal) === (grokRoute?.hazard_eval || t3cfg?.hazard_eval || "OK") &&
+    land100(deal) !== (grokRoute?.land100_not || t3cfg?.land100_not || "見送り");
+
+  // ルートB: Gmail新着高スコアルート
+  const gmailRoute = t3cfg?.gmail_route;
+  const gmailMin = gmailRoute?.min_score ?? t3Min;
+  const allowedCh = gmailRoute?.allowed_channels || ["agent_email", "grok_handoff"];
+  const routeBEligible =
+    scoreOf(deal) >= gmailMin &&
+    allowedCh.includes(ch.channel) &&
+    hasTo;
+
+  const tier3Eligible = routeAEligible || routeBEligible;
+  const tier3 = tier3Enabled && tier3Eligible;
 
   if (ch.channel === "grok_handoff") badges.push("Grok依頼");
   else if (ch.channel === "agent_email") badges.push("メール問合せ");
+  if (routeAEligible) reasons.push("tier3_route=grok");
+  if (routeBEligible) reasons.push("tier3_route=gmail");
   if (tier2) badges.push("送信待ち");
   if (tier3) badges.push("自動可");
+  else if (tier3Eligible) badges.push("Tier3候補");
+
+  // 告知事項・心理的瑕疵・市街化調整区域の検出（除外せず価格交渉・指値材料としてバッジ化）
+  const sj = sjOf(deal);
+  const titleAndSnippet = [
+    deal.title || "",
+    deal.area || "",
+    typeof sj.snippet === "string" ? sj.snippet : "",
+    typeof sj.body === "string" ? sj.body : "",
+  ].join(" ");
+  if (titleAndSnippet.includes("告知事項") || titleAndSnippet.includes("心理的瑕疵")) {
+    badges.push("告知事項あり");
+    reasons.push("notice=has_kokuchi_jiko");
+  }
+  if (titleAndSnippet.includes("市街化調整区域") || titleAndSnippet.includes("調整区域")) {
+    badges.push("市街化調整");
+    reasons.push("notice=chosei_kuiki");
+  }
 
   const tier: 1 | 2 | 3 = tier3 ? 3 : tier2 ? 2 : 1;
 
@@ -343,3 +432,31 @@ export function evaluateInquiryCandidate(
     ...baseChannel,
   };
 }
+
+export function dealVendorKey(deal: ReDealForInquiry): string {
+  const ch = channelOf(deal);
+  const toAddr = (ch.to || "").trim().toLowerCase();
+  if (toAddr.includes("@")) {
+    const domain = toAddr.split("@")[1]?.trim();
+    if (
+      domain &&
+      [
+        "gmail.com",
+        "yahoo.co.jp",
+        "yahoo.com",
+        "hotmail.com",
+        "outlook.com",
+        "icloud.com",
+      ].includes(domain)
+    ) {
+      return `email:${toAddr}`;
+    }
+    if (domain) return `domain:${domain}`;
+  }
+  const sj = sjOf(deal);
+  if (typeof sj.vendor_id === "string" && sj.vendor_id) {
+    return `vendor:${sj.vendor_id}`;
+  }
+  return `deal:${deal.id || ""}`;
+}
+

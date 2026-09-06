@@ -1,0 +1,104 @@
+name: KURASHIFT RE Daily Inquiry (Tier3 Cloud Auto)
+
+# 毎朝 07:30 JST (22:30 UTC) に完全自走
+# 1. 仲介業者メールの新着取込・スコア判定・自動既読化
+# 2. Tier3 第一問合せ（資料請求）の安全自動送信
+#    - 1仲介会社1日1通（最高スコア優先選定）
+#    - 即死級ネガティブキーワード除外（再建築不可・借地権・事故物件等）
+#    - スパム防止ランダムジッター（60-120秒待機）
+#    - 朝刊サマリー生成（専用LINE通知 & ログ出力）
+# 3. 障害時は jarvis-ops-fail-watch が自動検知
+
+on:
+  schedule:
+    - cron: "30 22 * * *" # 07:30 JST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "実送信せずドライラン（候補・レポート確認のみ）"
+        required: false
+        type: boolean
+        default: false
+      limit:
+        description: "送信上限（0=日次cap残り）"
+        required: false
+        default: "5"
+      skip_ingest:
+        description: "メール取込をスキップして送信判定のみ実行"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: kurashift-re-daily-inquiry
+  cancel-in-progress: false
+
+jobs:
+  daily-inquiry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          pip install -q google-api-python-client google-auth-httplib2 google-auth-oauthlib supabase pyyaml
+
+      - name: Materialize Gmail credentials
+        env:
+          GMAIL_CREDENTIALS_B64: ${{ secrets.GMAIL_CREDENTIALS_B64 }}
+          GMAIL_ADMIN_TOKEN_B64: ${{ secrets.GMAIL_ADMIN_TOKEN_B64 }}
+          GMAIL_ESTATE_TOKEN_B64: ${{ secrets.GMAIL_ESTATE_TOKEN_B64 }}
+        run: |
+          set -euo pipefail
+          MANUAL="${{ github.workspace }}/215_kamiooya/C1_cursor/1b_Cursorマニュアル"
+          mkdir -p "$MANUAL"
+          if [[ -z "${GMAIL_CREDENTIALS_B64:-}" || -z "${GMAIL_ADMIN_TOKEN_B64:-}" || -z "${GMAIL_ESTATE_TOKEN_B64:-}" ]]; then
+            echo "::error::Need GMAIL_CREDENTIALS_B64, GMAIL_ADMIN_TOKEN_B64, and GMAIL_ESTATE_TOKEN_B64"
+            exit 1
+          fi
+          echo "$GMAIL_CREDENTIALS_B64" | base64 -d > "$MANUAL/credentials.json"
+          echo "$GMAIL_ADMIN_TOKEN_B64" | base64 -d > "$MANUAL/token_livingsupport.json"
+          echo "$GMAIL_ESTATE_TOKEN_B64" | base64 -d > "$MANUAL/token_estate.json"
+          test -s "$MANUAL/credentials.json"
+          test -s "$MANUAL/token_livingsupport.json"
+          test -s "$MANUAL/token_estate.json"
+          echo "Gmail credentials successfully materialized."
+
+      - name: Step 1 - Ingest property mails & mark read
+        if: ${{ github.event.inputs.skip_ingest != 'true' }}
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          echo "📥 物件メール取込・スコア判定・既読化を実行中..."
+          python scripts/jarvis_kurashift_property_mail_match.py --apply
+
+      - name: Step 2 - Tier3 Safe Auto Inquiry Send
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_TO_USER_ID: ${{ secrets.LINE_TO_USER_ID }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          LIMIT: ${{ github.event.inputs.limit || '5' }}
+        run: |
+          set -euo pipefail
+          echo "🚀 Tier3 安全自動送信（1社1通制限・即死KW除外・ジッター待機）を実行中..."
+          ARGS=(--i-confirm-send)
+          if [[ "$DRY_RUN" == "true" ]]; then
+            ARGS+=(--dry-run-send)
+          fi
+          if [[ -n "${LIMIT:-}" && "$LIMIT" != "0" ]]; then
+            ARGS+=(--limit "$LIMIT")
+          fi
+          python scripts/jarvis_kurashift_re_tier3_auto_send.py "${ARGS[@]}"

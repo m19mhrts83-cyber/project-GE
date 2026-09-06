@@ -1,14 +1,33 @@
-# KURASHIFT 第一問合せ — 閾値・自動化（Phase 2.5 正本）
+# KURASHIFT 第一問合せ — 閾値・自動化（Phase 3.0 正本：完全クラウド自走＆安全ガード）
 # UI: apps/trade-desk/lib/reInquiryCandidate.ts
 # Python: scripts/jarvis_kurashift_re_inquiry_rules.py
 
-version: 1
-updated: "2026-08-26"
+version: 2
+updated: "2026-09-06"
 
-# Tier3 完全自動送信 — 初期 OFF（E2E 10件成功後に YAML で enabled: true を検討）
+# Tier3 完全自動送信 — 2026-09-06 有効化（安全ガード装備）
 tier3_auto_send:
-  enabled: false
-  enable_after_note: "本番問合せ E2E が10件成功したら enabled を検討"
+  enabled: true
+  enable_after_note: "2026-09-06 クラウド自動化（1社1通制限・即死キーワード除外・ランダムジッター）有効化"
+  instant_death_keywords:
+    - "再建築不可"
+    - "再建築できない"
+    - "借地権"
+    - "旧法借地"
+    - "地上権"
+    - "持分売却"
+    - "共有持分"
+    - "※受付終了※"
+    - "＊受付終了＊"
+    - "*受付終了*"
+    - "商談中"
+  anti_spam_jitter:
+    min_seconds: 60
+    max_seconds: 120
+  company_rate_limit:
+    enabled: true
+    max_per_company_per_day: 1
+    strategy: highest_score_priority
 
 daily_send_cap: 5
 
@@ -32,10 +51,19 @@ tiers:
     hazard_eval_not: 除外
 
   tier3_auto_send:
+    # 条件A（Grok承認ルート）
+    grok_route:
+      min_score: 7.0
+      grok_listen: 聞く
+      hazard_eval: OK
+      land100_not: 見送り
+    # 条件B（Gmail新着高スコアルート）
+    gmail_route:
+      min_score: 7.0
+      allowed_channels: [agent_email, grok_handoff]
+      require_to: true
+    # 共通下限
     min_score: 7.0
-    grok_listen: 聞く
-    hazard_eval: OK
-    land100_not: 見送り
 
 inquiry_candidate_overrides:
   grok_listen_values: [聞く, 保留]

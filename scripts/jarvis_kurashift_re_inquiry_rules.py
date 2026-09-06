@@ -28,11 +28,51 @@ LEGACY_AP_ALT = re.compile(
 )
 DEFAULT_E2E_MARKER = "E2E-GROK-KURASHIFT"
 
+DEFAULT_INSTANT_DEATH_KEYWORDS = [
+    "再建築不可",
+    "再建築できない",
+    "借地権",
+    "旧法借地",
+    "地上権",
+    "持分売却",
+    "共有持分",
+    "※受付終了※",
+    "＊受付終了＊",
+    "*受付終了*",
+    "商談中",
+]
+
 
 def load_config() -> dict[str, Any]:
     if not CONFIG_PATH.is_file():
         return {}
     return yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+
+
+def find_instant_death_keyword(
+    deal: dict[str, Any], cfg: dict[str, Any] | None = None
+) -> str | None:
+    """即死級ネガティブキーワード（再建築不可・借地権・事故物件等）の含有を判定。"""
+    cfg = cfg or load_config()
+    t3_cfg = cfg.get("tier3_auto_send") or {}
+    kws = t3_cfg.get("instant_death_keywords") or DEFAULT_INSTANT_DEATH_KEYWORDS
+    title = str(deal.get("title") or "")
+    sj = sj_of(deal)
+    blob = " ".join(
+        [
+            title,
+            str(deal.get("area") or ""),
+            str(sj.get("snippet") or ""),
+            str(sj.get("body") or ""),
+            str(sj.get("memo") or ""),
+            str(sj.get("raw_text") or ""),
+            str(deal.get("notes") or ""),
+        ]
+    )
+    for kw in kws:
+        if kw and kw in blob:
+            return kw
+    return None
 
 
 def is_legacy_ap_text(text: str) -> bool:
@@ -202,6 +242,21 @@ def evaluate_inquiry_candidate(
         }
 
     title = str(deal.get("title") or "")
+    dead_kw = find_instant_death_keyword(deal, cfg)
+    if dead_kw:
+        badges.append("即死KW除外")
+        return {
+            "tier": None,
+            "tier1": False,
+            "tier2": False,
+            "tier3": False,
+            "can_quick_send": False,
+            "revive": False,
+            "badges": badges,
+            "reasons": [f"instant_death={dead_kw}"],
+            **_base(),
+        }
+
     if any(m in title for m in ("※受付終了※", "＊受付終了＊", "*受付終了*")):
         badges.append("受付終了")
         return {
@@ -291,24 +346,61 @@ def evaluate_inquiry_candidate(
         and score_of(deal) >= float(t2.get("min_score") or 5.0)
         and hazard != str(t2.get("hazard_eval_not") or "除外")
     )
-    tier3_eligible = (
-        listen == str(t3.get("grok_listen") or "聞く")
-        and score_of(deal) >= float(t3.get("min_score") or 7.0)
-        and hazard == str(t3.get("hazard_eval") or "OK")
-        and land100 != str(t3.get("land100_not") or "見送り")
+
+    t3_min = float(t3.get("min_score") or 7.0)
+    # ルートA: Grok承認ルート
+    grok_route = t3.get("grok_route") or {}
+    grok_min = float(grok_route.get("min_score") or t3_min)
+    route_a_eligible = (
+        listen == str(grok_route.get("grok_listen") or t3.get("grok_listen") or "聞く")
+        and score_of(deal) >= grok_min
+        and hazard == str(grok_route.get("hazard_eval") or t3.get("hazard_eval") or "OK")
+        and land100 != str(grok_route.get("land100_not") or t3.get("land100_not") or "見送り")
     )
+    # ルートB: Gmail新着高スコアルート
+    gmail_route = t3.get("gmail_route") or {}
+    gmail_min = float(gmail_route.get("min_score") or t3_min)
+    allowed_ch = gmail_route.get("allowed_channels") or ["agent_email", "grok_handoff"]
+    route_b_eligible = (
+        score_of(deal) >= gmail_min
+        and channel in allowed_ch
+        and has_to
+    )
+
+    tier3_eligible = bool(route_a_eligible or route_b_eligible)
     tier3_enabled = bool((cfg.get("tier3_auto_send") or {}).get("enabled"))
     tier3 = bool(tier3_enabled and tier3_eligible)
     if channel == "grok_handoff":
         badges.append("Grok依頼")
     elif channel == "agent_email":
         badges.append("メール問合せ")
+    if route_a_eligible:
+        reasons.append("tier3_route=grok")
+    if route_b_eligible:
+        reasons.append("tier3_route=gmail")
     if tier2:
         badges.append("送信待ち")
     if tier3:
         badges.append("自動可")
     elif tier3_eligible:
         badges.append("Tier3候補")
+
+    # 告知事項・心理的瑕疵・市街化調整区域の検出（除外せず価格交渉・指値材料としてバッジ化）
+    sj = sj_of(deal)
+    title_and_snippet = " ".join(
+        [
+            title,
+            str(deal.get("area") or ""),
+            str(sj.get("snippet") or ""),
+            str(sj.get("body") or ""),
+        ]
+    )
+    if any(k in title_and_snippet for k in ("告知事項", "心理的瑕疵")):
+        badges.append("告知事項あり")
+        reasons.append("notice=has_kokuchi_jiko")
+    if any(k in title_and_snippet for k in ("市街化調整区域", "調整区域")):
+        badges.append("市街化調整")
+        reasons.append("notice=chosei_kuiki")
 
     tier_num: int | None = 3 if tier3 else 2 if tier2 else 1
 
@@ -324,6 +416,84 @@ def evaluate_inquiry_candidate(
         "reasons": reasons,
         **_base(),
     }
+
+
+def deal_vendor_key(deal: dict[str, Any]) -> str:
+    """同一仲介会社を識別するキーを生成（1社1通制限用）。"""
+    try:
+        from jarvis_kurashift_re_inquiry_channel import classify_inquiry_channel
+        ch = classify_inquiry_channel(deal)
+        to_addr = str(ch.get("to") or "").strip().lower()
+        if "@" in to_addr:
+            domain = to_addr.split("@")[1].strip()
+            # 一般フリーメール・キャリアメールはメアド全体で判定
+            if domain in (
+                "gmail.com",
+                "yahoo.co.jp",
+                "yahoo.com",
+                "hotmail.com",
+                "outlook.com",
+                "icloud.com",
+            ):
+                return f"email:{to_addr}"
+            return f"domain:{domain}"
+    except Exception:
+        pass
+
+    sj = sj_of(deal)
+    if sj.get("vendor_id"):
+        return f"vendor:{sj.get('vendor_id')}"
+    return f"deal:{deal.get('id')}"
+
+
+def filter_tier3_by_company_rate_limit(
+    candidates: list[tuple[dict[str, Any], dict[str, Any]]],
+    cfg: dict[str, Any] | None = None,
+) -> tuple[list[tuple[dict[str, Any], dict[str, Any]]], list[dict[str, Any]]]:
+    """1仲介会社1日1通制限：同一会社で最高スコアの案件のみを採用し、他をスキップ。
+    戻り値: (採用候補リスト, スキップされた案件リスト)
+    """
+    cfg = cfg or load_config()
+    c_limit = (cfg.get("tier3_auto_send") or {}).get("company_rate_limit") or {}
+    if not c_limit.get("enabled", True):
+        sorted_cand = sorted(
+            candidates,
+            key=lambda item: score_of(item[0]),
+            reverse=True,
+        )
+        return sorted_cand, []
+
+    # 会社キーごとにグループ化
+    groups: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+    for deal, ev in candidates:
+        vk = deal_vendor_key(deal)
+        groups.setdefault(vk, []).append((deal, ev))
+
+    accepted: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    skipped_siblings: list[dict[str, Any]] = []
+
+    for vk, group in groups.items():
+        # スコア降順でソート
+        group_sorted = sorted(
+            group,
+            key=lambda item: score_of(item[0]),
+            reverse=True,
+        )
+        top = group_sorted[0]
+        accepted.append(top)
+        for deal, ev in group_sorted[1:]:
+            skipped_siblings.append({
+                "deal_id": deal.get("id"),
+                "title": deal.get("title"),
+                "score": score_of(deal),
+                "vendor_key": vk,
+                "winner_deal_id": top[0].get("id"),
+                "reason": "company_rate_limit_sibling",
+            })
+
+    # 全体としてもスコア降順
+    accepted.sort(key=lambda item: score_of(item[0]), reverse=True)
+    return accepted, skipped_siblings
 
 
 def inquiry_tier_hint(deal: dict[str, Any]) -> int | None:

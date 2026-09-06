@@ -394,6 +394,131 @@ export default async function RealEstateDealsPage({
         {watch.label} · <a href="/jobs">ジョブ一覧</a>
       </p>
 
+      {/* ☀️ 最上部：第一問合せ状況 ＆ Tier2/Tier3 サマリーカード */}
+      <div
+        className="card"
+        style={{
+          marginBottom: 20,
+          borderColor: "#3b82f6",
+          background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
+          padding: "16px 20px",
+          borderRadius: 8,
+          boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 10,
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                }}
+              >
+                CLOUD TIER3
+              </span>
+              <strong style={{ fontSize: 16, color: "#1e3a8a" }}>
+                ☀️ 第一問合せ（資料請求）自動化ステータス
+              </strong>
+            </div>
+            <p className="meta" style={{ marginTop: 4, marginBottom: 0, color: "#475569" }}>
+              朝07:30にGitHub Actionsが完全自走で優良物件に最速問合せ（上限5件）。夕方18:00にGrokBotが返信を詳細調査します。
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <Link
+              href="/realestate/deals/tier2"
+              className="btn"
+              style={{
+                background: "#2563eb",
+                color: "#fff",
+                fontWeight: 600,
+                fontSize: 13,
+                padding: "8px 14px",
+                border: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                textDecoration: "none",
+              }}
+            >
+              <span>⚡️ 送信待ち一覧（Tier2）を確認・一括送信</span>
+              <span
+                style={{
+                  background: "#1d4ed8",
+                  padding: "1px 7px",
+                  borderRadius: 10,
+                  fontSize: 12,
+                }}
+              >
+                {tier2Count}件
+              </span>
+            </Link>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 12,
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: "1px solid #dbeafe",
+          }}
+        >
+          <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+            <div className="meta" style={{ fontSize: 12 }}>本日送信実績</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#1e40af" }}>
+              {tier2Summary.sent_today}{" "}
+              <span style={{ fontSize: 13, fontWeight: 400, color: "#64748b" }}>
+                / {tier2Summary.daily_cap} 件 (残 {tier2Summary.remaining} 件)
+              </span>
+            </div>
+          </div>
+
+          <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+            <div className="meta" style={{ fontSize: 12 }}>本日送信待ち（Tier2）</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: tier2Count > 0 ? "#d97706" : "#1e40af" }}>
+              {tier2Count}{" "}
+              <span style={{ fontSize: 13, fontWeight: 400, color: "#64748b" }}>件</span>
+            </div>
+          </div>
+
+          <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+            <div className="meta" style={{ fontSize: 12 }}>安全ガード装備</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#166534", marginTop: 4 }}>
+              ✅ 1社1通最高スコア選定<br />
+              ✅ 即死KW除外（再建築不可等）<br />
+              ✅ スパム防止ジッター (60-120秒)
+            </div>
+          </div>
+
+          <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+            <div className="meta" style={{ fontSize: 12 }}>自動化設定</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#1e3a8a", marginTop: 4 }}>
+              稼働状態: <span style={{ color: "#16a34a" }}>完全クラウド自走 (有効)</span><br />
+              実行定刻: 毎朝 07:30 JST<br />
+              レポート: 専用LINE ＆ Jarvis Box
+            </div>
+          </div>
+        </div>
+      </div>
+
       {buyPushDeals.length > 0 ? (
         <div
           className="card"
