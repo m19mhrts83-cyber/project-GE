@@ -5,6 +5,11 @@
   "links": {
     "lane:kanji": [
       {
+        "label": "幹事マニュアル NotebookLM",
+        "url": "https://notebooklm.google.com/notebook/34fb5ac0-a717-4d6a-b1a0-d09fb4a049c4",
+        "kind": "web"
+      },
+      {
         "label": "神大家 Drive・飲み会幹事",
         "url": "https://drive.google.com/drive/folders/1t1aKu3jHADXaK2hamPXnRGAX2qDSdMrR",
         "kind": "gdrive"

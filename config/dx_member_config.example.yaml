@@ -1,0 +1,21 @@
+# 東海DX互助会 AI社員組織 設定ファイル (config/dx_member_config.yaml)
+# 本ファイルをコピーして config/dx_member_config.yaml を作成し、
+# あなた自身の不動産投資基準に合わせて編集してください。
+
+owner:
+  name: "山田 太郎"
+  company: "合同会社山田エステート"
+  email: "yamada.realestate@gmail.com"
+  phone: "090-0000-0000"
+
+strategy:
+  target_area: "愛知県一宮市、稲沢市、清須市周辺"
+  target_asset_types: "木造築古戸建（平屋・2階建て）または軽量鉄骨アパート"
+  target_price_max_man: 500
+  target_min_yield_pct: 15.0
+  target_min_rent_yen: 50000
+  parking_requirement: "駐車場1台以上（2台以上推奨）"
+
+grok_bot:
+  cdp_port: 9222
+  default_section: "不動産賃貸"
