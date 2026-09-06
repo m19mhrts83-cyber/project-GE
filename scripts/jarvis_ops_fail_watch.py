@@ -42,6 +42,7 @@ WATCH_WORKFLOWS = (
     "jarvis-dashboard-situation-watch.yml",
     "jarvis-dashboard-lanes.yml",
     "jarvis-dashboard-heartbeat.yml",
+    "kurashift-re-daily-inquiry.yml",
     "westudy-raimo-weekly.yml",
     "trade-desk-weekly.yml",
     "pages-docs.yml",

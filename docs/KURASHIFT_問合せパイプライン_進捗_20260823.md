@@ -116,7 +116,7 @@ vendor↔deal 強化、Dashboard deep link、CSV export、週次バッチバー�
 |---|---|---|
 | **1** | ✅ **手動導線**（1件ずつ・残す） | お試し数件 + poll 📅 8/25 |
 | **2** | ✅ **日次主線**（一括確認・deploy 済） | 運用レビュー 📅 9/6 |
-| **3** | ⬜ OFF | 可否 📅 9/13 → 有効化検討 📅 9/27 |
+| **3** | ✅ **完全クラウド自走（2026-09-06 有効化）** | 毎朝07:30 JST 自動送信（1社1通・即死KW除外・ジッター・朝刊） |
 
 **日常の押し方**: 朝 digest の Tier2 行 → https://jarvis-trade-desk.vercel.app/realestate/deals/tier2 で一括確認。個別は Tier1 ボタン。
 
@@ -131,8 +131,9 @@ vendor↔deal 強化、Dashboard deep link、CSV export、週次バッチバー�
 | `tier1-five-sends` | ✅ 運用（2026-08-31 松野：手動5件でOK） |
 | `tier2-prod-review` | ✅ 運用（2026-09-06 松野：日次5件運用OK・クローズ） |
 | `research-reply-extract` | 🚧 コード・migration 済／本番抽出運用 |
-| `tier3-gate` | ⬜ 同意後 |
-| `tier3-worker` | 🚧 スクリプト用意・enabled 待ち |
+| `tier3-gate` | ✅ 運用（2026-09-06 松野明示同意・完全自動化へ移行） |
+| `tier3-worker` | ✅ 実装完了（1社1通・即死除外・ジッター・朝刊通知） |
+| `tier3-cloud-gha` | ✅ 実装完了（kurashift-re-daily-inquiry.yml & ops-fail-watch） |
 | `viewing-judgment-handoff` | ✅ paste／進捗 |
 | `phase3-optional` | ⬜ |
 
