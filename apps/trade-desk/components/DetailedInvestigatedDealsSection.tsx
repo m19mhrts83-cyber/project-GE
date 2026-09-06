@@ -11,7 +11,7 @@ import { formatMatchScore, scoreBand } from "@/lib/reDealScoreUi";
 
 type Props = {
   deals: PursueDealFields[];
-  openDealHref: (id: string) => string;
+  currentTab?: string;
 };
 
 function verdictBadge(verdict?: string) {
@@ -50,7 +50,7 @@ function verdictBadge(verdict?: string) {
 
 export default function DetailedInvestigatedDealsSection({
   deals,
-  openDealHref,
+  currentTab,
 }: Props) {
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [expandedQuestionsDealId, setExpandedQuestionsDealId] = useState<
@@ -59,6 +59,13 @@ export default function DetailedInvestigatedDealsSection({
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   if (deals.length === 0) return null;
+
+  function getDealHref(id: string) {
+    const q = new URLSearchParams();
+    if (currentTab) q.set("tab", currentTab);
+    q.set("deal", id);
+    return `/realestate/deals?${q.toString()}`;
+  }
 
   function copyText(text: string, label: string) {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -276,7 +283,7 @@ export default function DetailedInvestigatedDealsSection({
                     <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
                       <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: 3 }}>
                         <Link
-                          href={openDealHref(d.id)}
+                          href={getDealHref(d.id)}
                           style={{ color: "#312e81", textDecoration: "none" }}
                           onMouseOver={(e) => (e.currentTarget.style.textDecoration = "underline")}
                           onMouseOut={(e) => (e.currentTarget.style.textDecoration = "none")}
@@ -447,7 +454,7 @@ export default function DetailedInvestigatedDealsSection({
                     {/* 8. 操作 */}
                     <td style={{ padding: "10px 8px", verticalAlign: "top", textAlign: "right" }}>
                       <Link
-                        href={openDealHref(d.id)}
+                        href={getDealHref(d.id)}
                         className="btn"
                         style={{
                           fontSize: 12,
@@ -527,7 +534,7 @@ export default function DetailedInvestigatedDealsSection({
                   </div>
 
                   <strong style={{ fontSize: 14, color: "#1e293b", display: "block", marginBottom: 4 }}>
-                    <Link href={openDealHref(d.id)} style={{ color: "#312e81", textDecoration: "none" }}>
+                    <Link href={getDealHref(d.id)} style={{ color: "#312e81", textDecoration: "none" }}>
                       {d.title}
                     </Link>
                   </strong>
@@ -643,7 +650,7 @@ export default function DetailedInvestigatedDealsSection({
                       </a>
                     ) : null}
                   </div>
-                  <Link href={openDealHref(d.id)} className="btn" style={{ fontSize: 12, padding: "3px 10px" }}>
+                  <Link href={getDealHref(d.id)} className="btn" style={{ fontSize: 12, padding: "3px 10px" }}>
                     開く
                   </Link>
                 </div>
