@@ -10,7 +10,11 @@ import {
   scoreBand,
   scoreBandLabel,
 } from "@/lib/reDealScoreUi";
-import { isBuyPushDeal, isInProgressDeal } from "@/lib/reDealPursue";
+import {
+  isBuyPushDeal,
+  isInProgressDeal,
+  type S3InvestigationData,
+} from "@/lib/reDealPursue";
 import {
   DEAL_STATUS_LABEL,
   dealGmailUrl,
@@ -426,6 +430,186 @@ export default function DealDetailDrawer({
                 </pre>
               </div>
             ) : null}
+
+            {(() => {
+              const s3 = (sj.s3_investigation as S3InvestigationData) || null;
+              if (!s3 || typeof s3 !== "object") return null;
+
+              const v = (s3.verdict || "").toLowerCase();
+              const vColor =
+                v === "go"
+                  ? { bg: "#d1fae5", border: "#10b981", text: "#065f46", label: "GO (推進)" }
+                  : v === "hold"
+                  ? { bg: "#fef3c7", border: "#f59e0b", text: "#92400e", label: "HOLD (保留・要確認)" }
+                  : { bg: "#fee2e2", border: "#ef4444", text: "#991b1b", label: "PASS (見送り)" };
+
+              const obsidianFile = s3.filename || "";
+              const obsidianUri = obsidianFile
+                ? `obsidian://open?vault=500_Obsidian_r1&file=${encodeURIComponent(
+                    `01_Journaling/☆Real_Estate_Pick/${obsidianFile.replace(/\.md$/, "")}`
+                  )}`
+                : null;
+
+              return (
+                <div
+                  className="card"
+                  style={{
+                    marginTop: 12,
+                    padding: 14,
+                    borderColor: "#818cf8",
+                    background: "#fdf4ff",
+                    borderWidth: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      borderBottom: "1px solid #e0e7ff",
+                      paddingBottom: 8,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div>
+                      <span
+                        style={{
+                          background: "#4f46e5",
+                          color: "#fff",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: 3,
+                          marginRight: 6,
+                        }}
+                      >
+                        Grok S3×S5
+                      </span>
+                      <strong style={{ fontSize: 14, color: "#1e1b4b" }}>
+                        Obsidian詳細調査レポート
+                      </strong>
+                    </div>
+                    <span
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        background: vColor.bg,
+                        color: vColor.text,
+                        border: `1px solid ${vColor.border}`,
+                      }}
+                    >
+                      {vColor.label}
+                    </span>
+                  </div>
+
+                  {s3.verdict_reason ? (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#334155",
+                        background: "#fff",
+                        borderLeft: `3px solid ${vColor.border}`,
+                        padding: "6px 8px",
+                        marginBottom: 10,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {s3.verdict_reason}
+                    </div>
+                  ) : null}
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12, marginBottom: 10 }}>
+                    <div style={{ background: "#fff", padding: 8, borderRadius: 4, border: "1px solid #e2e8f0" }}>
+                      <div style={{ color: "#64748b", fontSize: 11 }}>想定家賃 (需給三次)</div>
+                      <div style={{ fontWeight: 700, color: "#1e1b4b", marginTop: 2 }}>
+                        {s3.expected_rent || "—"}
+                      </div>
+                    </div>
+                    <div style={{ background: "#fff", padding: 8, borderRadius: 4, border: "1px solid #e2e8f0" }}>
+                      <div style={{ color: "#64748b", fontSize: 11 }}>ターゲット層 (ペルソナ)</div>
+                      <div style={{ fontWeight: 600, color: "#1e293b", marginTop: 2 }}>
+                        {s3.persona?.target_class || "—"}
+                        {s3.persona?.layout ? ` (${s3.persona.layout})` : ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  {s3.key_risk ? (
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#92400e",
+                        background: "#fef3c7",
+                        padding: "6px 8px",
+                        borderRadius: 4,
+                        marginBottom: 10,
+                      }}
+                    >
+                      ⚠️ <strong>本線リスク:</strong> {s3.key_risk}
+                    </div>
+                  ) : null}
+
+                  {s3.hearing_questions && s3.hearing_questions.length > 0 ? (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        background: "#fff",
+                        padding: "8px 10px",
+                        borderRadius: 4,
+                        border: "1px solid #c7d2fe",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: "#4338ca", marginBottom: 6 }}>
+                        📋 内見・業者・神大家さん運営相談ヒアリング項目（{s3.hearing_questions.length}件）:
+                      </div>
+                      <ol style={{ margin: 0, paddingLeft: 18, color: "#334155", lineHeight: 1.5 }}>
+                        {s3.hearing_questions.map((q, idx) => (
+                          <li key={idx} style={{ marginBottom: 4 }}>
+                            {q}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ) : null}
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
+                    <span style={{ color: "#64748b" }}>
+                      {s3.filename || "S3レポート"}
+                    </span>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {obsidianUri ? (
+                        <a
+                          href={obsidianUri}
+                          style={{
+                            color: "#7c3aed",
+                            textDecoration: "underline",
+                            fontWeight: 600,
+                          }}
+                        >
+                          📓 Obsidianアプリで開く ↗
+                        </a>
+                      ) : null}
+                      {s3.portal_url ? (
+                        <a
+                          href={s3.portal_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: "#2563eb",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          ポータル掲載 ↗
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="card" style={{ marginTop: 12, padding: 12 }}>
               <strong>メールタイムライン</strong>

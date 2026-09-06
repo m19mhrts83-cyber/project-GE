@@ -28,8 +28,10 @@ import { getTier2QueueSummary } from "@/lib/reInquiryTier2Queue";
 import { dedupeAndPrioritizeDeals } from "@/lib/reDealDedupe";
 import {
   filterBuyPushDeals,
+  filterDetailedInvestigationDeals,
   filterInProgressDeals,
 } from "@/lib/reDealPursue";
+import DetailedInvestigatedDealsSection from "@/components/DetailedInvestigatedDealsSection";
 import {
   formatMatchScore,
   scoreBand,
@@ -256,11 +258,15 @@ export default async function RealEstateDealsPage({
   const tier2Summary = await getTier2QueueSummary(supabase);
   const tier2Count = tier2Summary.queue.length;
 
+  const dedupedDealsList = dedupeAndPrioritizeDeals(deals || []).deals;
+  const detailedInvestigatedDeals = filterDetailedInvestigationDeals(
+    dedupedDealsList
+  );
   const inProgressDeals = filterInProgressDeals(
-    dedupeAndPrioritizeDeals(deals || []).deals
+    dedupedDealsList
   );
   const buyPushDeals = filterBuyPushDeals(
-    dedupeAndPrioritizeDeals(deals || []).deals
+    dedupedDealsList
   );
 
   const counts: Record<string, number> = {};
@@ -340,7 +346,8 @@ export default async function RealEstateDealsPage({
       buyPush: buyPushDeals.some((p) => p.id === d.id),
       pursuing:
         inProgressDeals.some((p) => p.id === d.id) ||
-        buyPushDeals.some((p) => p.id === d.id),
+        buyPushDeals.some((p) => p.id === d.id) ||
+        detailedInvestigatedDeals.some((p) => p.id === d.id),
       highlighted: highlightDeal === d.id,
       badges: evalInq.badges,
       openHref: openDealHref(d.id),
@@ -621,6 +628,11 @@ export default async function RealEstateDealsPage({
         </div>
       ) : null}
 
+      <DetailedInvestigatedDealsSection
+        deals={detailedInvestigatedDeals}
+        openDealHref={openDealHref}
+      />
+
       {inProgressDeals.length > 0 ? (
         <div
           className="card"
@@ -641,17 +653,15 @@ export default async function RealEstateDealsPage({
           >
             <div>
               <span className="lvl">In progress</span>
-              <strong>進行中・詳細〜内見（{inProgressDeals.length}）</strong>
+              <strong>進行中・詳細問合せ中（{inProgressDeals.length}）</strong>
             </div>
             <a href="#deals-list" className="meta" style={{ fontSize: 12 }}>
               候補一覧へ ↓
             </a>
           </header>
           <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
-            詳細問合せ進行中・内見・「進行中に入れる」でフォローしたもの。
-            「確認した」だけではここには入りません。買い進め（買付）とは別です。
-            <strong> 問合せ列</strong>
-            で「未問合せ」（黄）と「問合せ済」（青）を分けています。内見＝問合せ済ではありません。
+            仲介業者へ詳細問合せ中（返信待ち等）の案件です。
+            返信後にGrok botで精査・ペルソナ分析された案件は上の<strong>「詳細調査済・内見＆相談検討」</strong>に昇格します。
             件数が多いときは枠内スクロールです。
           </p>
           <div

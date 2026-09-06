@@ -1819,6 +1819,13 @@ def main() -> int:
         except Exception as e:
             print(f"# auto_cleanup_after_ingest soft-fail: {e}", file=sys.stderr)
 
+        try:
+            from jarvis_kurashift_obsidian_pick_sync import sync_obsidian_picks
+            s3_synced = sync_obsidian_picks(apply=True)
+            print(f"# auto_s3_sync_after_ingest synced={len(s3_synced)}")
+        except Exception as e:
+            print(f"# auto_s3_sync_after_ingest soft-fail: {e}", file=sys.stderr)
+
     return 0
 
 
