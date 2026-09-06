@@ -58,6 +58,20 @@ must_include:
       - ORICO
     pay_keywords: []
 
+must_exclude:
+  - id: foreign_bond_stock_valuation
+    description: "あかつき・Bloomoの外国債/株の週次評価は集計に含めない"
+    account_keywords:
+      - あかつき
+      - bloomo
+      - ブルーモ
+    comment_keywords:
+      - 週次評価
+    category_keywords:
+      - 外国債
+      - 株増収
+      - 外国株
+
 # 費目見直し（high=学習ルール count>=2 を Web 自動適用。low は提案のみ）
 category_review:
   lookback_days: 14

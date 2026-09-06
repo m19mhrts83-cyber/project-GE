@@ -34,7 +34,7 @@ EXE = str(PY) if PY.is_file() else sys.executable
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import jarvis_zaim_learn as zlearn  # noqa: E402
 
-SAFE_TARGETS = {"card", "smart", "must_include", "amazon_card", "amazon_site"}
+SAFE_TARGETS = {"card", "smart", "must_include", "must_exclude", "amazon_card", "amazon_site"}
 
 
 def now_iso() -> str:

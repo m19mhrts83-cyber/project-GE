@@ -597,6 +597,43 @@ def create_money(
     _shot(page, "before_submit")
     _submit(page)
     _shot(page, "after_submit")
+    if exclude:
+        _ensure_excluded_after_create(page, day=day, amount=amount, shop=account)
+
+
+def _ensure_excluded_after_create(
+    page: Page,
+    *,
+    day: str,
+    amount: int,
+    shop: str = "",
+) -> bool:
+    """
+    新規登録完了後、Zaim の仕様（新規入力画面では集計除外UIが効かない場合がある）に対応するため、
+    登録直後の明細を日次履歴画面から開き、集計設定を『常に含めない』に更新する。
+    """
+    try:
+        import zaim_money_edit as zedit
+
+        print(f"# exclude: 登録後の明細を集計除外（常に含めない）に更新します: {day} ¥{amount:,} ({shop})")
+        page.wait_for_timeout(1000)
+        action = {
+            "date": day,
+            "amount": amount,
+            "shop": shop,
+            "action": "set_aggregate",
+            "value": "exclude",
+        }
+        ok, msg = zedit.apply_one(page, action, shot_prefix="create_exclude")
+        if ok:
+            print(f"# exclude: 集計除外の更新に成功しました ({msg})")
+            return True
+        else:
+            print(f"# exclude: 集計除外の更新に失敗しました ({msg})", file=sys.stderr)
+            return False
+    except Exception as e:
+        print(f"# exclude: 集計除外の更新中にエラーが発生しました: {e}", file=sys.stderr)
+        return False
 
 
 def main(argv: list[str] | None = None) -> int:
