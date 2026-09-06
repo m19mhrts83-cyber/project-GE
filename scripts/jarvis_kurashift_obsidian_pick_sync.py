@@ -328,7 +328,71 @@ def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
                             "monthly_rent_yen": int(r * 10000),
                             "source": f"S3需給本線試算 (家賃{r}万/月)",
                         }
-        
+
+        # Compute structured land value info
+        grok_data = sj.get("grok") or {}
+        raw_ratio = grok_data.get("land100_ratio") or grok_data.get("land_ratio") or sj.get("land100_ratio")
+        ratio_str = None
+        ratio_num = None
+        if raw_ratio:
+            rm = re.search(r"(\d+(?:\.\d+)?)\s*%", str(raw_ratio))
+            if rm:
+                ratio_num = float(rm.group(1))
+                ratio_str = f"{int(round(ratio_num))}%"
+            elif isinstance(raw_ratio, (int, float)):
+                val = raw_ratio * 100 if raw_ratio <= 3 else raw_ratio
+                ratio_num = float(val)
+                ratio_str = f"{int(round(ratio_num))}%"
+
+        # Check s3 text if not found
+        if not ratio_str:
+            s3_blob = json.dumps(data, ensure_ascii=False)
+            rm = re.search(r"土地値\s*(\d+(?:\.\d+)?)\s*%", s3_blob)
+            if rm:
+                ratio_num = float(rm.group(1))
+                ratio_str = f"{int(round(ratio_num))}%"
+
+        raw_appraisal = grok_data.get("land_appraisal_man") or sj.get("land_appraisal_man")
+        app_str = None
+        app_num = None
+        if raw_appraisal:
+            am = re.search(r"([\d,]+(?:\.\d+)?)", str(raw_appraisal))
+            if am:
+                val_clean = am.group(1).replace(",", "")
+                app_num = float(val_clean)
+                app_str = f"{int(round(app_num)):,}万円"
+        elif ratio_num and price_man:
+            app_num = round((ratio_num / 100.0) * float(price_man))
+            app_str = f"{int(round(app_num)):,}万円"
+
+        route_tsubo = grok_data.get("route_price_tsubo")
+        tsubo_str = None
+        if route_tsubo:
+            clean_tsubo = str(route_tsubo).strip()
+            tm = re.search(r"(約?[\d.]+)万?.*?（([0-9]+[A-Za-z])=", clean_tsubo)
+            if tm:
+                tsubo_str = f"{tm.group(1)}万/坪 ({tm.group(2)})"
+            else:
+                tsubo_str = clean_tsubo[:18]
+
+        land_area = grok_data.get("land_area")
+        method = grok_data.get("land_method") or "路線価"
+        basis_url = grok_data.get("land_basis_url")
+
+        if ratio_str or app_str:
+            sj["land_info"] = {
+                "ratio_str": ratio_str,
+                "ratio_num": ratio_num,
+                "appraisal_man_str": app_str,
+                "appraisal_num": app_num,
+                "tsubo_price_str": tsubo_str,
+                "land_area": land_area,
+                "method": method,
+                "basis_url": basis_url,
+            }
+            if ratio_str:
+                sj["land100_ratio"] = ratio_str
+
         # Also ensure status is 'viewing' if currently 'info'
         updates: dict[str, Any] = {
             "summary_json": sj,

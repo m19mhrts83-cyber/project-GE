@@ -7,7 +7,9 @@ import {
   type S3InvestigationData,
   type DealAttachmentInfo,
   type YieldDisplayInfo,
+  type LandValueDisplayInfo,
   getYieldDisplayInfo,
+  getLandValueDisplayInfo,
   getDealAttachments,
 } from "@/lib/reDealPursue";
 
@@ -51,8 +53,19 @@ function verdictBadge(verdict?: string) {
 }
 
 function getAttachmentLabel(fn: string, kind?: string | null) {
-  if (kind === "maisoku" || fn.includes("中古戸建") || fn.includes("マイソク") || fn.includes("図面")) {
-    return { label: "📄 マイソク(販売図面)", highlight: true, bg: "#eff6ff", border: "#3b82f6", color: "#1d4ed8" };
+  if (
+    kind === "mysoku" ||
+    kind === "maisoku" ||
+    fn.includes("中古戸建") ||
+    fn.includes("マイソク") ||
+    fn.includes("図面") ||
+    fn.includes("概要書")
+  ) {
+    let clean = fn.replace(/\.PDF|\.pdf/gi, "");
+    if (clean.includes("向山89_物件概要書")) clean = "89番 概要書(マイソク)";
+    else if (clean.includes("向山78_物件概要書")) clean = "78番 概要書(マイソク)";
+    else if (clean.length > 16) clean = clean.slice(0, 15) + "…";
+    return { label: `📄 ${clean}`, highlight: true, bg: "#eff6ff", border: "#3b82f6", color: "#1d4ed8" };
   }
   if (kind === "contract" || fn.includes("契約書")) {
     return { label: "📑 賃貸借契約書", highlight: true, bg: "#f5f3ff", border: "#8b5cf6", color: "#6d28d9" };
@@ -61,9 +74,32 @@ function getAttachmentLabel(fn: string, kind?: string | null) {
     return { label: "📋 評価証明書", highlight: false, bg: "#ecfdf5", border: "#10b981", color: "#047857" };
   }
   if (fn.includes("謄本") || fn.includes("公図") || fn.includes("測量図")) {
-    return { label: `📐 ${fn.replace(/\(白塗り\)|\.PDF|\.pdf/g, "")}`, highlight: false, bg: "#f8fafc", border: "#cbd5e1", color: "#334155" };
+    let clean = fn.replace(/\(白塗り\)|\.PDF|\.pdf/gi, "");
+    if (clean.length > 16) clean = clean.slice(0, 15) + "…";
+    return { label: `📐 ${clean}`, highlight: false, bg: "#f8fafc", border: "#cbd5e1", color: "#334155" };
   }
-  return { label: `📎 ${fn.length > 15 ? fn.slice(0, 14) + "…" : fn}`, highlight: false, bg: "#f8fafc", border: "#cbd5e1", color: "#475569" };
+  if (fn.includes("住宅地図") || fn.includes("地図")) {
+    let clean = fn.replace(/\.PDF|\.pdf/gi, "");
+    if (clean.includes("向山89")) clean = "89番 住宅地図";
+    else if (clean.includes("向山78")) clean = "78番 住宅地図";
+    else if (clean.length > 16) clean = clean.slice(0, 15) + "…";
+    return { label: `🗺️ ${clean}`, highlight: false, bg: "#f0fdf4", border: "#86efac", color: "#166534" };
+  }
+  if (fn.includes("写真")) {
+    let clean = fn.replace(/\.PDF|\.pdf/gi, "");
+    if (clean.includes("向山89")) clean = "89番 写真PDF";
+    else if (clean.includes("向山78")) clean = "78番 写真PDF";
+    else if (clean.length > 16) clean = clean.slice(0, 15) + "…";
+    return { label: `📷 ${clean}`, highlight: false, bg: "#fffbeb", border: "#fde68a", color: "#92400e" };
+  }
+  if (fn.includes("レポート")) {
+    let clean = fn.replace(/\.PDF|\.pdf/gi, "").replace(/向山89_/, "");
+    if (clean.length > 16) clean = clean.slice(0, 15) + "…";
+    return { label: `📊 ${clean}`, highlight: false, bg: "#f5f3ff", border: "#ddd6fe", color: "#5b21b6" };
+  }
+  let clean = fn.replace(/\.PDF|\.pdf/gi, "");
+  if (clean.length > 15) clean = clean.slice(0, 14) + "…";
+  return { label: `📎 ${clean}`, highlight: false, bg: "#f8fafc", border: "#cbd5e1", color: "#475569" };
 }
 
 export default function DetailedInvestigatedDealsSection({
@@ -219,8 +255,8 @@ export default function DetailedInvestigatedDealsSection({
               <tr style={{ background: "#e0e7ff", borderBottom: "2px solid #c7d2fe" }}>
                 <th style={{ padding: "8px 6px", width: 48, textAlign: "center" }}>No.</th>
                 <th style={{ padding: "8px 10px", width: 105 }}>Grok判定</th>
-                <th style={{ padding: "8px 10px", width: 200 }}>物件 / 所在地</th>
-                <th style={{ padding: "8px 10px", width: 140 }}>価格 / 利回り</th>
+                <th style={{ padding: "8px 10px", width: 190 }}>物件 / 所在地</th>
+                <th style={{ padding: "8px 10px", width: 165 }}>価格 / 利回り / 土地値</th>
                 <th style={{ padding: "8px 10px", width: 160 }}>返信・マイソクPDF</th>
                 <th style={{ padding: "8px 10px", width: 130 }}>想定家賃 (S3需給)</th>
                 <th style={{ padding: "8px 10px", width: 130 }}>ペルソナ (S5)</th>
@@ -237,6 +273,7 @@ export default function DetailedInvestigatedDealsSection({
                 const vStyle = verdictBadge(s3.verdict);
                 const isQuestionsExpanded = expandedQuestionsDealId === d.id;
                 const yieldInfo = getYieldDisplayInfo(d);
+                const landInfo = getLandValueDisplayInfo(d);
                 const attachments = getDealAttachments(d);
                 const hasReply = d.inquiry_status === "has_reply" || attachments.length > 0;
 
@@ -366,7 +403,7 @@ export default function DetailedInvestigatedDealsSection({
                       </div>
                     </td>
 
-                    {/* 3. 価格 / 利回り */}
+                    {/* 3. 価格 / 利回り / 土地値 */}
                     <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
                       <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 14 }}>
                         {priceStr}
@@ -397,6 +434,69 @@ export default function DetailedInvestigatedDealsSection({
                           {yieldInfo.notes}
                         </div>
                       ) : null}
+
+                      {/* 土地値情報 */}
+                      {landInfo.hasData ? (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            paddingTop: 5,
+                            borderTop: "1px dashed #cbd5e1",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "1px 6px",
+                                borderRadius: 4,
+                                fontSize: 11,
+                                fontWeight: 800,
+                                background: landInfo.badgeBg,
+                                color: landInfo.badgeColor,
+                                border: `1px solid ${landInfo.badgeBorder}`,
+                              }}
+                              title={landInfo.notes || ""}
+                            >
+                              {landInfo.badgeLabel}
+                            </span>
+                            {landInfo.basisUrl ? (
+                              <a
+                                href={landInfo.basisUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: 10,
+                                  color: "#2563eb",
+                                  textDecoration: "underline",
+                                }}
+                                title="路線価図を開く"
+                              >
+                                路線図↗
+                              </a>
+                            ) : null}
+                          </div>
+                          {landInfo.appraisalManStr ? (
+                            <div style={{ fontSize: 11, color: "#1e1b4b", marginTop: 2, fontWeight: 700 }}>
+                              積算: {landInfo.appraisalManStr}
+                            </div>
+                          ) : null}
+                          {landInfo.tsuboPriceStr ? (
+                            <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>
+                              {landInfo.tsuboPriceStr}
+                            </div>
+                          ) : null}
+                          {landInfo.landAreaStr ? (
+                            <div style={{ fontSize: 10, color: "#64748b" }} title={landInfo.landAreaStr}>
+                              地積: {landInfo.landAreaStr.split("（")[0]}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: 4, fontSize: 10, color: "#94a3b8" }}>
+                          土地値: 未算定
+                        </div>
+                      )}
                     </td>
 
                     {/* 4. 返信・マイソクPDF */}
@@ -435,7 +535,16 @@ export default function DetailedInvestigatedDealsSection({
                       </div>
 
                       {attachments.length > 0 ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 3,
+                            maxHeight: 180,
+                            overflowY: "auto",
+                            paddingRight: 4,
+                          }}
+                        >
                           {attachments.map((a, idx) => {
                             const meta = getAttachmentLabel(a.filename, a.kind);
                             if (a.open_url) {
@@ -612,6 +721,7 @@ export default function DetailedInvestigatedDealsSection({
             const s3 = (sj.s3_investigation as S3InvestigationData) || {};
             const vStyle = verdictBadge(s3.verdict);
             const yieldInfo = getYieldDisplayInfo(d);
+            const landInfo = getLandValueDisplayInfo(d);
             const attachments = getDealAttachments(d);
             const hasReply = d.inquiry_status === "has_reply" || attachments.length > 0;
             const obsidianFile = s3.filename || "";
@@ -675,7 +785,7 @@ export default function DetailedInvestigatedDealsSection({
                       <span style={{ fontWeight: 700, fontSize: 16, color: "#1e1b4b" }}>
                         {d.price_man != null ? `${d.price_man}万円` : "—"}
                       </span>
-                      <div style={{ marginTop: 2 }}>
+                      <div style={{ marginTop: 2, display: "flex", gap: 4, justifyContent: "flex-end", flexWrap: "wrap" }}>
                         <span
                           style={{
                             padding: "1px 6px",
@@ -689,7 +799,29 @@ export default function DetailedInvestigatedDealsSection({
                         >
                           {yieldInfo.label}
                         </span>
+                        {landInfo.hasData ? (
+                          <span
+                            style={{
+                              padding: "1px 6px",
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 800,
+                              background: landInfo.badgeBg,
+                              color: landInfo.badgeColor,
+                              border: `1px solid ${landInfo.badgeBorder}`,
+                            }}
+                            title={landInfo.notes || ""}
+                          >
+                            {landInfo.badgeLabel}
+                          </span>
+                        ) : null}
                       </div>
+                      {landInfo.appraisalManStr ? (
+                        <div style={{ fontSize: 10, color: "#475569", marginTop: 1, fontWeight: 600 }}>
+                          積算: {landInfo.appraisalManStr}
+                          {landInfo.tsuboPriceStr ? ` (${landInfo.tsuboPriceStr.split(" ")[0]})` : ""}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
@@ -771,6 +903,44 @@ export default function DetailedInvestigatedDealsSection({
                       }}
                     >
                       {s3.verdict_reason}
+                    </div>
+                  ) : null}
+
+                  {/* 土地値・積算情報 */}
+                  {landInfo.hasData ? (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        marginBottom: 8,
+                        background: "#f8fafc",
+                        padding: "6px 8px",
+                        borderRadius: 4,
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "#475569" }}>
+                          <strong style={{ color: "#1e293b" }}>土地値: </strong>
+                          <span style={{ fontWeight: 800, color: landInfo.badgeColor }}>
+                            {landInfo.ratioStr}
+                          </span>
+                          {landInfo.appraisalManStr ? ` (積算 ${landInfo.appraisalManStr})` : ""}
+                        </span>
+                        {landInfo.basisUrl ? (
+                          <a
+                            href={landInfo.basisUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 11, color: "#2563eb", textDecoration: "underline" }}
+                          >
+                            路線価図 ↗
+                          </a>
+                        ) : null}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                        {landInfo.tsuboPriceStr ? <span>{landInfo.tsuboPriceStr}</span> : null}
+                        {landInfo.landAreaStr ? <span style={{ marginLeft: 6 }}>/ 地積: {landInfo.landAreaStr}</span> : null}
+                      </div>
                     </div>
                   ) : null}
 
