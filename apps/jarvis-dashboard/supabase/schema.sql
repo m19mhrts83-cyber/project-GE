@@ -579,3 +579,5 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260819_kurashift_household_bs_snapshots.sql）
 -- kurashift_lenders / kurashift_lender_intel / glucon_material_items
 -- （migrations/20260830_kurashift_lenders_glucon_materials.sql）
+-- kurashift_re_deals / buy_plan_* / loan_tracker_loans / ops_consult_events RLS 有効化
+-- （migrations/20260907_enable_rls_kurashift_eight_tables.sql）
