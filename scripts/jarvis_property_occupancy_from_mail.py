@@ -72,8 +72,20 @@ VACANT_STRONG = re.compile(
 )
 OCCUPIED_STRONG = re.compile(
     r"(入居決定|入居が決ま|決まりました|契約を締結|賃貸借契約を締結|"
-    r"満室とな|満室になり|入居者様と賃貸借契約|募集終了|入居確定)"
+    r"満室とな|満室になり|入居者様と賃貸借契約|募集終了|入居確定|"
+    r"新規入居申込|新規入居のお申込み|新規入居のお申\s*込|入居申込|入居のお申し込み|"
+    r"新規申込の保証会社審査が.*通りました)"
 )
+# 事後精算・原状回復の連絡（新規空室ではない）をガード
+POST_MOVEOUT_SETTLEMENT_RE = re.compile(
+    r"(解約[清精]算|退去[清精]算|未払い.*回収|退去者との折衝|原状回復工事.*完了済|"
+    r"修繕確認とリフォーム現調|精算確定|敷金精算)"
+)
+NEW_VACANCY_SIGNALS = re.compile(
+    r"(退去予告|退去届|退去連絡|退去の連絡が入|新たに退去|空室が出|空室となり|"
+    r"再募集|募集を改めて再開|募集再開|募集開始のお願い|入居キャンセル)"
+)
+MOJIBAKE_RE = re.compile(r"Ã[£Â€\w]|Â[€\w]")
 # Ambiguous
 VACANT_WEAK = re.compile(r"空室|募集|内覧")
 OCCUPIED_WEAK = re.compile(r"入居|申込|審査")
@@ -241,13 +253,20 @@ def extract_room_property_pairs(text: str) -> list[tuple[str, str, str]]:
 def classify_event(subject: str, body: str) -> tuple[str | None, str]:
     """returns (event_type|None, confidence strong|weak|none)"""
     blob = f"{subject}\n{body}"
+    is_settlement = bool(POST_MOVEOUT_SETTLEMENT_RE.search(blob))
+    has_new_vac = bool(NEW_VACANCY_SIGNALS.search(blob))
+
     if re.search(r"入居キャンセル|再募集|募集再開|募集を改めて再開", blob):
         if VACANT_STRONG.search(blob) or "募集" in blob:
             return "vacant", "strong"
     if OCCUPIED_STRONG.search(blob):
-        return "occupied", "strong"
+        if not (VACANT_STRONG.search(blob) and not is_settlement):
+            return "occupied", "strong"
     if VACANT_STRONG.search(blob):
-        return "vacant", "strong"
+        if not is_settlement or has_new_vac:
+            return "vacant", "strong"
+    if is_settlement and not has_new_vac:
+        return None, "none"
     has_o = bool(OCCUPIED_WEAK.search(blob))
     has_v = bool(VACANT_WEAK.search(blob))
     if has_o and not has_v:
@@ -294,24 +313,36 @@ def classify_event_for_room(
     """号室単位の分類。混在件名（成約＋募集再開）に対応。"""
     blob = f"{subject}\n{body}"
     local = _room_context(blob, property_id, room)
-    # ローカルに強いシグナルがあればそれを優先
-    local_has_occ = bool(OCCUPIED_STRONG.search(local))
+
+    # 事後精算・原状回復の連絡（新規空室ではない）をガード
+    is_settlement = bool(
+        POST_MOVEOUT_SETTLEMENT_RE.search(local)
+        or POST_MOVEOUT_SETTLEMENT_RE.search(subject)
+    )
+    has_new_vac = bool(
+        NEW_VACANCY_SIGNALS.search(local)
+        or NEW_VACANCY_SIGNALS.search(subject)
+    )
+
+    local_has_occ = bool(OCCUPIED_STRONG.search(local) or OCCUPIED_STRONG.search(subject))
     local_has_vac = bool(
-        VACANT_STRONG.search(local)
-        or re.search(r"入居募集|募集のお願い|募集再開|再募集", local)
+        (VACANT_STRONG.search(local) or re.search(r"入居募集|募集のお願い|募集再開|再募集", local))
+        and (not is_settlement or has_new_vac)
     )
     if local_has_occ and not local_has_vac:
         return "occupied", "strong"
     if local_has_vac and not local_has_occ:
         return "vacant", "strong"
     if local_has_occ and local_has_vac:
-        # 同じ断片に両方あるときは「入居決定／決まり」を優先、なければ募集
-        if re.search(r"入居決定|決まりました|入居確定|募集終了|契約を締結", local):
+        # 同じ断片に両方あるときは「入居決定／決まり／申込」を優先、なければ募集
+        if re.search(r"入居決定|決まりました|入居確定|募集終了|契約を締結|新規入居申込|入居のお申し込み", local):
             if not re.search(r"募集再開|再募集|入居募集のお願い", local):
                 return "occupied", "strong"
         if re.search(r"募集再開|再募集|入居募集|募集のお願い", local):
             return "vacant", "strong"
         return "occupied", "strong"
+    if is_settlement and not has_new_vac:
+        return None, "none"
     return classify_event(subject, body)
 
 
@@ -328,13 +359,14 @@ def parse_md_blocks(path: Path, since: date) -> list[dict[str, Any]]:
         nonlocal buf, subject, current_date
         if current_date and current_date >= since and buf:
             body = "\n".join(buf)
-            blocks.append(
-                {
-                    "date": current_date.isoformat(),
-                    "subject": subject,
-                    "body": body,
-                }
-            )
+            if not MOJIBAKE_RE.search(subject) and not MOJIBAKE_RE.search(body):
+                blocks.append(
+                    {
+                        "date": current_date.isoformat(),
+                        "subject": subject,
+                        "body": body,
+                    }
+                )
         buf = []
         subject = ""
 

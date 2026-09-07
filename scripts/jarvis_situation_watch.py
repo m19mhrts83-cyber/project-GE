@@ -1799,9 +1799,9 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
             pending = []
             for e in entries:
                 st = e.get("status") or "pending_confirm"
-                if st in ("confirmed", "failed"):
+                if st in ("confirmed", "failed", "disputed"):
                     continue
-                if st not in ("pending_confirm", "disputed"):
+                if st != "pending_confirm":
                     continue
                 bid = str(e.get("batch_id") or review_bid or "")
                 if ack_id and bid and ack_id == bid:
