@@ -275,10 +275,23 @@ def main() -> int:
 
     if not enabled:
         print(
-            "❌ tier3_auto_send.enabled が false です。"
-            "config/kurashift_re_inquiry_auto.yaml を確認してください。"
+            "ℹ️ tier3_auto_send.enabled が false のため、送信をスキップしました。"
+            "（自動送信を有効化する場合は config/kurashift_re_inquiry_auto.yaml の tier3_auto_send.enabled を true に設定してください）"
         )
-        return 2
+        print(
+            "KURASHIFT_RESULT:"
+            + json.dumps(
+                {
+                    "enabled": False,
+                    "candidates": len(accepted_candidates),
+                    "skipped_by_company": len(skipped_by_company),
+                    "dry_run": False,
+                    "skipped_reason": "tier3_auto_send_disabled",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
 
     sent_items: list[dict[str, Any]] = []
     sent_count = 0
