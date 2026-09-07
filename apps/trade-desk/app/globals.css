@@ -814,9 +814,11 @@ tr.sold td {
   top: 0;
   right: 0;
   z-index: 41;
-  width: min(520px, 100vw);
+  width: min(560px, 100vw);
   height: 100vh;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--card, #fff);
   border-left: 1px solid var(--border, #ddd);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
@@ -827,11 +829,24 @@ tr.sold td {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.mq-cashflow-detail-summary {
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+.mq-cashflow-detail-hint {
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  color: var(--muted, #666);
+  flex-shrink: 0;
 }
 .mq-cashflow-detail-scroll {
-  overflow: auto;
-  max-height: calc(100vh - 180px);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
 }
 .mq-cashflow-detail-table {
   font-size: 0.88rem;
@@ -854,12 +869,18 @@ tr.sold td {
 .mq-cashflow-detail-row-active {
   background: rgba(42, 94, 168, 0.1);
 }
+.mq-cashflow-detail-inline-reclassify td {
+  padding: 4px 6px 12px 6px !important;
+  background: rgba(42, 94, 168, 0.04);
+  border-bottom: 2px solid #2a5ea8;
+}
 .mq-cashflow-reclassify-menu {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--border, #ddd);
+  margin: 4px 0 0 0;
+  padding: 12px 14px;
+  border: 1px solid #c7d5e8;
   border-radius: 8px;
-  background: var(--card-soft, #f8f9fb);
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 .mq-cashflow-reclassify-menu-header {
   display: flex;

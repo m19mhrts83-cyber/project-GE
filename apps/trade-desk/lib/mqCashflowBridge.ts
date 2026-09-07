@@ -36,7 +36,7 @@ export const CASHFLOW_COLUMN_BRIDGE: Record<
   advertising: { label: "広告", mq: "f", cash: "out" },
   expense: { label: "経費", mq: "f", cash: "out" },
   management: { label: "管理費", mq: "vq", cash: "out" },
-  acquisition: { label: "取得時", mq: "f", cash: "out", bs: "fixed_assets" },
+  acquisition: { label: "取得費用", mq: "f", cash: "out", bs: "fixed_assets" },
   tax_accountant: { label: "税理士", mq: "f", cash: "out" },
   loan_repayment: {
     label: "返済",
@@ -44,9 +44,9 @@ export const CASHFLOW_COLUMN_BRIDGE: Record<
     cash: "out",
     bs: "liabilities_lt_down",
   },
-  annual_tax: { label: "年払・税", mq: "f_annual", cash: "out" },
-  interest_yearend: { label: "利息（期末）", mq: "f", cash: "out" },
-  tax_payment: { label: "税金支払", mq: null, cash: "out" },
+  annual_tax: { label: "税金", mq: "f_annual", cash: "out" },
+  interest_yearend: { label: "利息", mq: "f", cash: "out" },
+  tax_payment: { label: "税金", mq: null, cash: "out" },
   action_inflow: {
     label: "処置（計画）",
     mq: null,

@@ -157,7 +157,7 @@ const ROWS: Array<{
     section: "expense",
     sectionLabel: "出金",
     sign: "−",
-    shortLabel: "取得時",
+    shortLabel: "取得費用",
     note: "ローン手数料 / 保証料 / 登記など取得時諸費用（マイナス）",
     kind: "money",
   },
@@ -184,8 +184,8 @@ const ROWS: Array<{
     section: "expense",
     sectionLabel: "出金",
     sign: "−",
-    shortLabel: "年払・税",
-    note: "年払い・固都税 / 火災保険更新などの大口出金（マイナス）",
+    shortLabel: "税金",
+    note: "固定資産税・都市計画税・法人税などの税金（マイナス）",
     kind: "money",
   },
   {
@@ -195,15 +195,6 @@ const ROWS: Array<{
     sign: "−",
     shortLabel: "利息",
     note: "期末利息支払（12月・マイナス）",
-    kind: "money",
-  },
-  {
-    key: "taxPaymentMan",
-    section: "expense",
-    sectionLabel: "出金",
-    sign: "−",
-    shortLabel: "税金",
-    note: "法人税等の手入力（12月・マイナス）",
     kind: "money",
   },
   {
@@ -454,7 +445,12 @@ export default function MqCashflowTable(props: Props) {
                         <strong>{item.shortLabel}</strong>
                       </td>
                       {rows.map((r) => {
-                        const v = r[item.key] as number | null;
+                        const v =
+                          item.key === "annualTaxMan"
+                            ? r.annualTaxMan == null && r.taxPaymentMan == null
+                              ? null
+                              : (r.annualTaxMan ?? 0) + (r.taxPaymentMan ?? 0)
+                            : (r[item.key] as number | null);
                         const outVal =
                           item.key === "repaymentRatio" && v != null
                             ? v * 100
