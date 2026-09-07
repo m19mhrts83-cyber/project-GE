@@ -9,6 +9,7 @@ import {
   resolveCashflowColumn,
   type ClassifyReason,
 } from "./mqCashflowClassify";
+import { filterLoansByEntity } from "./mqLoanSuggest";
 
 export type CashflowLineItemSource =
   | "txn"
@@ -47,6 +48,8 @@ export type LoanTrackerLite = {
   name: string | null;
   lender: string | null;
   monthly_payment_jpy: number | string | null;
+  category_major?: string | null;
+  tags?: string[] | null;
 };
 
 function yenToManRounded(yen: number): number {
@@ -142,11 +145,26 @@ export function buildCashflowLineItems(args: {
     });
   }
 
+  // Zaim 実績取引で返済が既に存在する月を収集（実績が存在する月は手動参照行と重複させない）
+  const monthsWithTxnLoanRepayment = new Set<string>();
+  for (const it of items) {
+    if (it.columnKey === "loan_repayment" && it.source === "txn") {
+      const mo = monthKeyFromTxnDate(it.txnDate);
+      if (mo) monthsWithTxnLoanRepayment.add(mo);
+    }
+  }
+
+  // 不動産事業かつ対象 entity のローンに絞り込み（教育・太陽光等のプライベートローンを除外）
+  const eligibleLoans = filterLoansByEntity(loanTracker, entity);
+
   if (loanMonthlyPaymentMan != null && loanMonthlyPaymentMan > 0) {
     for (let m = 1; m <= 12; m++) {
       const mo = `${year}-${String(m).padStart(2, "0")}`;
-      if (loanTracker.length > 0) {
-        for (const loan of loanTracker) {
+      // 実績取引（Zaim）がすでに存在する月は、実績が正本なので loan_tracker は追加しない（重複防止）
+      if (monthsWithTxnLoanRepayment.has(mo)) continue;
+
+      if (eligibleLoans.length > 0) {
+        for (const loan of eligibleLoans) {
           const pay = yenToManRounded(Number(loan.monthly_payment_jpy) || 0);
           if (pay <= 0) continue;
           items.push({
@@ -160,7 +178,7 @@ export function buildCashflowLineItems(args: {
             amountMan: -pay,
             columnKey: "loan_repayment",
             classifyReason: "manual",
-            classifyDetail: "loan tracker 月額",
+            classifyDetail: "loan tracker 月額（計画）",
           });
         }
       } else {
@@ -175,7 +193,7 @@ export function buildCashflowLineItems(args: {
           amountMan: -loanMonthlyPaymentMan,
           columnKey: "loan_repayment",
           classifyReason: "manual",
-          classifyDetail: "loan tracker 合算月額",
+          classifyDetail: "loan tracker 合算月額（計画）",
         });
       }
     }

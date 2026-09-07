@@ -37,7 +37,7 @@ import {
   type MqBsFields,
   type MqBsRow,
 } from "@/lib/mqBs";
-import { sumLoanTrackerLt } from "@/lib/mqLoanSuggest";
+import { filterLoansByEntity, sumLoanTrackerLt } from "@/lib/mqLoanSuggest";
 import { qUnitLabel } from "@/lib/mqPolicy";
 import { computeMq, type MqComputed } from "@/lib/mqEquations";
 import type { MqAccountMapRow } from "@/lib/mqZaimMap";
@@ -232,8 +232,9 @@ export default async function MqPage({
     error = e instanceof Error ? e : new Error(String(e));
   }
   const bsRows = (bsRaw ?? []) as MqBsRow[];
-  const loanTrackerLt = sumLoanTrackerLt(loanRaw ?? []);
-  const loanMonthlyPaymentYen = (loanRaw ?? []).reduce((sum, r) => {
+  const eligibleLoans = filterLoansByEntity(loanRaw ?? [], entity);
+  const loanTrackerLt = sumLoanTrackerLt(eligibleLoans);
+  const loanMonthlyPaymentYen = eligibleLoans.reduce((sum, r) => {
     const v = Number((r as any).monthly_payment_jpy ?? 0);
     return sum + (Number.isFinite(v) ? v : 0);
   }, 0);

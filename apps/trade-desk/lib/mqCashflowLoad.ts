@@ -13,6 +13,7 @@ import {
   type MqCashflowSettingsRow,
 } from "./mqCashflowSettings";
 import { fetchFinanceTxnsRange } from "./mqIngestDb";
+import { filterLoansByEntity, type LoanTrackerRow } from "./mqLoanSuggest";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sb = any;
@@ -57,7 +58,7 @@ export async function loadCashflowEngineContext(
       .eq("approved", true),
     sb
       .from("kurashift_loan_tracker_loans")
-      .select("monthly_payment_jpy"),
+      .select("id, name, monthly_payment_jpy, category_major, tags"),
   ]);
 
   const settingsRows = (settingsRes.data ?? []) as MqCashflowSettingsRow[];
@@ -78,8 +79,12 @@ export async function loadCashflowEngineContext(
 
   const txns = await fetchFinanceTxnsRange(sb, originYear, year);
 
-  const loanYen = (loanRes.data ?? []).reduce(
-    (sum: number, r: { monthly_payment_jpy?: number }) => {
+  const eligibleLoans = filterLoansByEntity<LoanTrackerRow>(
+    loanRes.data ?? [],
+    entity
+  );
+  const loanYen = eligibleLoans.reduce(
+    (sum: number, r: LoanTrackerRow) => {
       const v = Number(r.monthly_payment_jpy ?? 0);
       return sum + (Number.isFinite(v) ? v : 0);
     },
