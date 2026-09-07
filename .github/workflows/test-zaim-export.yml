@@ -58,6 +58,17 @@ jobs:
           ls -la ./downloads || true
           find ./downloads -name "*.csv" -exec wc -l {} + || true
 
+      - name: Push Finance Metrics to Supabase
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          python scripts/jarvis_finance_metrics.py \
+            --year "${{ github.event.inputs.year || '2026' }}" \
+            --csv "./downloads/${{ github.event.inputs.year || '2026' }}年度/Zaim.${{ github.event.inputs.year || '2026' }}年度.csv" \
+            --push
+
       - name: Upload Downloaded CSV & Screenshots
         if: always()
         uses: actions/upload-artifact@v4
