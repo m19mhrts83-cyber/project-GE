@@ -8,6 +8,7 @@ import {
   buildCellDetailResponse,
   type LoanTrackerLite,
 } from "@/lib/mqCashflowLineItems";
+import { filterLoansByEntity } from "@/lib/mqLoanSuggest";
 import { fetchFinanceTxnsRange } from "@/lib/mqIngestDb";
 import type { MqCashflowSettingsRow } from "@/lib/mqCashflowSettings";
 import { DEFAULT_CORPORATE_CASHFLOW_SETTINGS } from "@/lib/mqCashflowSettings";
@@ -73,7 +74,7 @@ export async function GET(req: Request) {
     .select("txn_id,business_line,cashflow_column,note");
   const { data: loanRaw } = await supabase
     .from("kurashift_loan_tracker_loans")
-    .select("id,name,lender,monthly_payment_jpy");
+    .select("id,name,lender,monthly_payment_jpy,category_major,tags");
 
   const settingsRows = (settingsRaw ?? []) as MqCashflowSettingsRow[];
   if (
@@ -95,8 +96,13 @@ export async function GET(req: Request) {
 
   const txns = await fetchFinanceTxnsRange(supabase, originYear, year);
 
-  const loanMonthlyPaymentYen = (loanRaw ?? []).reduce((sum, r) => {
-    const v = Number((r as { monthly_payment_jpy?: number }).monthly_payment_jpy ?? 0);
+  const eligibleLoans = filterLoansByEntity<LoanTrackerLite>(
+    (loanRaw ?? []) as LoanTrackerLite[],
+    entity
+  );
+
+  const loanMonthlyPaymentYen = eligibleLoans.reduce((sum, r: LoanTrackerLite) => {
+    const v = Number(r.monthly_payment_jpy ?? 0);
     return sum + (Number.isFinite(v) ? v : 0);
   }, 0);
   const loanMonthlyPaymentMan =
@@ -111,7 +117,7 @@ export async function GET(req: Request) {
     txns,
     txnOverrides: (overridesRaw ?? []) as TxnOverrideRow[],
     classifyRules: (rulesRaw ?? []) as CashflowClassifyRuleRow[],
-    loanTracker: (loanRaw ?? []) as LoanTrackerLite[],
+    loanTracker: eligibleLoans,
     loanMonthlyPaymentMan,
   });
 
