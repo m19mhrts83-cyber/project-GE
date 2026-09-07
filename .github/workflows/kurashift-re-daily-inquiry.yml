@@ -1,17 +1,23 @@
 name: KURASHIFT RE Daily Inquiry (Tier3 Cloud Auto)
 
-# 毎朝 07:30 JST (22:30 UTC) に完全自走
+# 1日4回 (朝07:30 / 昼12:30 / 夕17:30 / 夜20:30 JST) に完全自走
 # 1. 仲介業者メールの新着取込・スコア判定・自動既読化
-# 2. Tier3 第一問合せ（資料請求）の安全自動送信
+# 2. 仲介業者返信メールの取込・添付PDF保存・返信既読化
+# 3. 候補一覧の鮮度維持（stale cleanup）
+# 4. Tier3 第一問合せ（資料請求）の安全自動送信
 #    - 1仲介会社1日1通（最高スコア優先選定）
 #    - 即死級ネガティブキーワード除外（再建築不可・借地権・事故物件等）
 #    - スパム防止ランダムジッター（60-120秒待機）
-#    - 朝刊サマリー生成（専用LINE通知 & ログ出力）
-# 3. 障害時は jarvis-ops-fail-watch が自動検知
+#    - 朝刊/夕刊サマリー生成（専用LINE通知 & ログ出力）
+# 5. 障害時は jarvis-ops-fail-watch が自動検知
 
 on:
   schedule:
-    - cron: "30 22 * * *" # 07:30 JST
+    # 07:30 JST (22:30 UTC 前日)
+    # 12:30 JST (03:30 UTC)
+    # 17:30 JST (08:30 UTC)
+    # 20:30 JST (11:30 UTC) - 夜の確認(21〜22時)の直前に自動捌き
+    - cron: "30 22,3,8,11 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -83,7 +89,16 @@ jobs:
           echo "📥 物件メール取込・スコア判定・既読化を実行中..."
           python scripts/jarvis_kurashift_property_mail_match.py --apply
 
-      - name: Step 2 - Auto Cleanup Stale Deals (Keep Funnel Fresh)
+      - name: Step 2 - Poll broker inquiry replies & save attachments
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          echo "📬 仲介業者からの返信メール・添付PDF取込＆既読化を実行中..."
+          python scripts/jarvis_kurashift_re_inquiry.py --poll-replies
+
+      - name: Step 3 - Auto Cleanup Stale Deals (Keep Funnel Fresh)
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
@@ -92,7 +107,7 @@ jobs:
           echo "🧹 候補一覧の鮮度維持（30日放置・14日低スコアの自動見送り退避）を実行中..."
           python scripts/jarvis_kurashift_re_cleanup.py --apply
 
-      - name: Step 3 - Tier3 Safe Auto Inquiry Send
+      - name: Step 4 - Tier3 Safe Auto Inquiry Send
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}

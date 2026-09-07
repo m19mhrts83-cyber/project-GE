@@ -3,12 +3,12 @@
 # Python: scripts/jarvis_kurashift_re_inquiry_rules.py
 
 version: 2
-updated: "2026-09-06"
+updated: "2026-09-07"
 
-# Tier3 完全自動送信 — 安全ガード検証中（勝手に実送信ONしない。dry-runプレビュー運用）
+# Tier3 完全自動送信 — ユーザー明示合意により完全自走有効化
 tier3_auto_send:
-  enabled: false
-  enable_after_note: "2026-09-13/09-27 ユーザー明示合意後に有効化。除外ガード（Grok日報・S2開拓・即死キーワード）検証中"
+  enabled: true
+  enable_after_note: "2026-09-07 ユーザー明示合意により完全自動送信（Tier3）を有効化。1社1日1通・最高スコア優先・即死KW除外・ジッター待機・朝昼夕夜レポート稼働"
   instant_death_keywords:
     - "再建築不可"
     - "再建築できない"

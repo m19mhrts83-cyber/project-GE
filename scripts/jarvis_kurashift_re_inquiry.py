@@ -614,7 +614,18 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
         existing = {m.get("gmail_id") for m in list_messages(sb, deal) if m.get("gmail_id")}
         for m in full.get("messages") or []:
             mid = m.get("id")
-            if not mid or mid in existing:
+            if not mid:
+                continue
+            if not dry_run and "UNREAD" in (m.get("labelIds") or []):
+                try:
+                    svc.users().messages().modify(
+                        userId="me",
+                        id=str(mid),
+                        body={"removeLabelIds": ["UNREAD"]},
+                    ).execute()
+                except Exception:
+                    pass
+            if mid in existing:
                 continue
             payload = m.get("payload") or {}
             hm = header_map(payload.get("headers"))
