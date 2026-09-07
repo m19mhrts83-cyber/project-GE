@@ -111,6 +111,36 @@ BOT_DEFS = [
     },
 ]
 
+BUY_PLAN_PRESETS = {
+    "1": {
+        "buy_plan_type": "築古戸建て",
+        "target_asset_types": "木造築古戸建（平屋・2階建て）",
+        "target_price_max_man": 500,
+        "target_min_yield_pct": 15.0,
+        "land_ratio_target_pct": 70,
+        "financing_strategy": "現金購入またはリフォームローン",
+        "summary": "200〜600万円 / 利回り15〜20%以上 / 土地値70%以上 / 手堅いCF構築・自己資金保全"
+    },
+    "2": {
+        "buy_plan_type": "築古アパート",
+        "target_asset_types": "木造または軽量鉄骨中古アパート（1棟）",
+        "target_price_max_man": 3000,
+        "target_min_yield_pct": 12.0,
+        "land_ratio_target_pct": 65,
+        "financing_strategy": "地銀・信金・信販（セゾン・トラスト等）",
+        "summary": "1,500〜4,000万円 / 利回り11〜15%前後 / 土地値60〜70%以上 / まとまったCF加速"
+    },
+    "3": {
+        "buy_plan_type": "新築アパート",
+        "target_asset_types": "木造新築アパート（建売・建築）",
+        "target_price_max_man": 10000,
+        "target_min_yield_pct": 7.5,
+        "land_ratio_target_pct": 15,
+        "financing_strategy": "アパートローン・提携ローン（フルローン活用）",
+        "summary": "6,000万〜1.5億円 / 利回り7.0〜8.5%前後 / 土地値12〜15%以上 / 規模一気拡大"
+    }
+}
+
 def load_member_config():
     target = CONFIG_PATH if CONFIG_PATH.exists() else EXAMPLE_CONFIG_PATH
     if not target.exists():
@@ -119,10 +149,78 @@ def load_member_config():
         # 簡易フォールバック
         return {
             "owner": {"name": "松野", "company": "リビングサポート松", "email": "admin@livingsupport-matsu.co.jp", "phone": ""},
-            "strategy": {"target_area": "愛知県・岐阜県", "target_asset_types": "戸建・アパート", "target_price_max_man": 500, "target_min_yield_pct": 15.0, "parking_requirement": "1台以上"}
+            "strategy": {
+                "buy_plan_type": "築古戸建て",
+                "target_area": "愛知県・岐阜県",
+                "target_asset_types": "木造築古戸建",
+                "target_price_max_man": 500,
+                "target_min_yield_pct": 15.0,
+                "land_ratio_target_pct": 70,
+                "financing_strategy": "現金購入またはリフォームローン",
+                "parking_requirement": "1台以上"
+            }
         }
     with open(target, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+def save_member_config(cfg: dict):
+    if yaml is None:
+        print("❌ PyYAMLがインストールされていないため保存できません。pip install pyyaml を実行してください。")
+        return False
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        yaml.dump(cfg, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    return True
+
+def prompt_buy_plan_selection(cfg: dict) -> dict:
+    strategy = cfg.setdefault("strategy", {})
+    current_plan = strategy.get("buy_plan_type", "築古戸建て")
+    
+    print("\n" + "=" * 60)
+    print("【神大家 STEP3連動】買い進めプラン選定ヒアリング（質問形式）")
+    print("=" * 60)
+    print("物件調査フェーズに入る前に、現在狙う「買い進めプラン」を選択してください。\n")
+    print(" [1] 築古戸建て (現金・小額融資 / 手堅いCF構築)")
+    print("     ・価格帯: 200〜600万円 (指値前提)")
+    print("     ・目標利回り: 15%〜20%以上")
+    print("     ・土地値割合目安: 70%以上 (路線価重視)")
+    print("     ・融資戦略: 現金またはリフォームローン (自己資金保全・共同担保原資)\n")
+    print(" [2] 築古アパート (地銀・信販活用 / CF加速)")
+    print("     ・価格帯: 1,500〜4,000万円")
+    print("     ・目標利回り: 11%〜15%前後")
+    print("     ・土地値割合目安: 60%〜70%以上")
+    print("     ・融資戦略: 地銀・信金・信販（セゾン・トラスト等 / 修繕再生バリューアップ)\n")
+    print(" [3] 新築アパート (フルローン・規模拡大)")
+    print("     ・価格帯: 6,000万〜1.5億円")
+    print("     ・目標利回り: 7.0%〜8.5%前後")
+    print("     ・土地値割合目安: 12%〜15%以上")
+    print("     ・融資戦略: アパートローン・提携ローン (高属性を活かした規模一気拡大)\n")
+    print("-" * 60)
+    
+    current_key = "1"
+    for k, v in BUY_PLAN_PRESETS.items():
+        if v["buy_plan_type"] == current_plan:
+            current_key = k
+            break
+            
+    choice = input(f"買い進めプランを選択してください [1-3] (現在: {current_key} {current_plan}): ").strip()
+    if not choice:
+        choice = current_key
+        
+    preset = BUY_PLAN_PRESETS.get(choice, BUY_PLAN_PRESETS["1"])
+    print(f"\n✅ 選択されたプラン: 【{preset['buy_plan_type']}】")
+    print(f"   基準概要: {preset['summary']}")
+    
+    # プリセット値を反映
+    strategy["buy_plan_type"] = preset["buy_plan_type"]
+    strategy["target_asset_types"] = preset["target_asset_types"]
+    strategy["target_price_max_man"] = preset["target_price_max_man"]
+    strategy["target_min_yield_pct"] = preset["target_min_yield_pct"]
+    strategy["land_ratio_target_pct"] = preset["land_ratio_target_pct"]
+    strategy["financing_strategy"] = preset["financing_strategy"]
+    
+    save_member_config(cfg)
+    print(f"💾 設定ファイル ({CONFIG_PATH}) を更新しました！\n")
+    return cfg
 
 def render_template(template_filename: str, cfg: dict) -> str:
     path = TEMPLATES_DIR / template_filename
@@ -139,10 +237,13 @@ def render_template(template_filename: str, cfg: dict) -> str:
         "{{COMPANY_NAME}}": str(owner.get("company", "個人")),
         "{{OWNER_EMAIL}}": str(owner.get("email", "owner@example.com")),
         "{{OWNER_PHONE}}": str(owner.get("phone", "090-0000-0000")),
+        "{{BUY_PLAN_TYPE}}": str(strategy.get("buy_plan_type", "築古戸建て")),
         "{{TARGET_AREA}}": str(strategy.get("target_area", "愛知県・岐阜県周辺")),
         "{{TARGET_ASSET_TYPES}}": str(strategy.get("target_asset_types", "木造戸建またはアパート")),
         "{{TARGET_PRICE_MAX_MAN}}": str(strategy.get("target_price_max_man", 500)),
         "{{TARGET_MIN_YIELD_PCT}}": str(strategy.get("target_min_yield_pct", 15.0)),
+        "{{LAND_RATIO_TARGET_PCT}}": str(strategy.get("land_ratio_target_pct", 70)),
+        "{{FINANCING_STRATEGY}}": str(strategy.get("financing_strategy", "現金購入またはリフォームローン")),
         "{{PARKING_REQUIREMENT}}": str(strategy.get("parking_requirement", "駐車場あり")),
     }
 
@@ -213,9 +314,33 @@ async def run_setup(args):
     print("=====================================================")
     print(" 🤖 東海DX互助会 汎用Grok Bot AI社員インストーラー")
     print("=====================================================")
+
+    if getattr(args, "set_plan", None):
+        plan_choice = str(args.set_plan).strip()
+        if plan_choice in BUY_PLAN_PRESETS:
+            preset = BUY_PLAN_PRESETS[plan_choice]
+            strategy = cfg.setdefault("strategy", {})
+            strategy["buy_plan_type"] = preset["buy_plan_type"]
+            strategy["target_asset_types"] = preset["target_asset_types"]
+            strategy["target_price_max_man"] = preset["target_price_max_man"]
+            strategy["target_min_yield_pct"] = preset["target_min_yield_pct"]
+            strategy["land_ratio_target_pct"] = preset["land_ratio_target_pct"]
+            strategy["financing_strategy"] = preset["financing_strategy"]
+            save_member_config(cfg)
+            print(f"✅ 買い進めプランを【{preset['buy_plan_type']}】に更新しました。({preset['summary']})\n")
+        else:
+            print(f"❌ 無効なプラン番号です。1: 築古戸建て, 2: 築古アパート, 3: 新築アパート から選んでください。\n")
+
+    if getattr(args, "interactive_plan", False):
+        cfg = prompt_buy_plan_selection(cfg)
+        if not args.apply and not args.dry_run:
+            print("👉 このプランでGrok Botへ反映するには: python scripts/dx_grok_bot_setup.py --apply")
+            return
+
     owner_name = cfg.get("owner", {}).get("name", "未設定")
     area = cfg.get("strategy", {}).get("target_area", "未設定")
-    print(f"オーナー: {owner_name} | 対象エリア: {area}\n")
+    current_plan = cfg.get("strategy", {}).get("buy_plan_type", "築古戸建て")
+    print(f"オーナー: {owner_name} | プラン: 【{current_plan}】 | 対象エリア: {area}\n")
 
     target_bots = BOT_DEFS
     if args.bot:
@@ -310,6 +435,8 @@ async def run_setup(args):
 
 def main():
     parser = argparse.ArgumentParser(description="東海DX互助会 汎用Grok Bot AI社員インストーラー")
+    parser.add_argument("--interactive-plan", action="store_true", help="対話形式で買い進めプラン（築古戸建て/築古AP/新築AP）を選択・設定")
+    parser.add_argument("--set-plan", type=str, choices=["1", "2", "3"], help="買い進めプランを番号で指定設定 (1: 築古戸建て, 2: 築古アパート, 3: 新築アパート)")
     parser.add_argument("--dry-run", action="store_true", help="反映せず置換プレビューを表示")
     parser.add_argument("--apply", action="store_true", help="実際にGrok Botへ反映")
     parser.add_argument("--bot", type=str, help="特定Botのみ対象 (例: bucho, S01, S10)")
