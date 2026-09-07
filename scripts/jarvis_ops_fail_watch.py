@@ -38,13 +38,16 @@ VERCEL_CONTEXTS = (
 
 # 監視する workflow ファイル名（失敗したら注意）
 WATCH_WORKFLOWS = (
+    "zaim-finance-sync.yml",
+    "kurashift-re-daily-inquiry.yml",
     "jarvis-dashboard-gmail-triage.yml",
     "jarvis-dashboard-situation-watch.yml",
     "jarvis-dashboard-lanes.yml",
     "jarvis-dashboard-heartbeat.yml",
-    "kurashift-re-daily-inquiry.yml",
     "westudy-raimo-weekly.yml",
     "trade-desk-weekly.yml",
+    "trade-desk-deploy.yml",
+    "kamiooya-qa-heartbeat.yml",
     "pages-docs.yml",
 )
 

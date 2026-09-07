@@ -2343,6 +2343,9 @@ def collect() -> dict[str, Any]:
         iid = meta.get("id") or ""
         fn = EVALUATORS.get(iid)
         if not fn:
+            # gha:ops_fail_watch のアイテム（gha_workflow_fail 等）は jarvis_ops_fail_watch.py が直接管理するためスキップ
+            if str(meta.get("source") or "").startswith("gha:ops_fail_watch"):
+                continue
             items_out.append(
                 card(
                     item_id=iid,
