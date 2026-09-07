@@ -223,6 +223,14 @@ def push_watch(sb) -> int:
         iid = str(it.get("id") or "").strip()
         if not iid:
             continue
+        # gha:ops_fail_watch のアイテム（gha_workflow_fail 等）は jarvis_ops_fail_watch.py が直接管理するので上書きしない
+        if str(it.get("source") or "").startswith("gha:ops_fail_watch") or iid in (
+            "gha_workflow_fail",
+            "vercel_deploy",
+            "ops_fix_notice",
+            "vercel_deploy_fail",
+        ):
+            continue
         payload = it.get("payload") if isinstance(it.get("payload"), dict) else {}
         payload = dict(payload)
         remote = remote_by_id.get(iid) or {}
