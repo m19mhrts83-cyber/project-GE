@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  buildWatchAckFingerprint,
+  quietUntilIso,
+  WATCH_ACK_QUIET_DAYS_DEFAULT,
+} from "@/lib/watchUserAck";
 
 const WATCH_ID = "zaim_quality";
 
@@ -138,7 +143,7 @@ export async function acknowledgeZaimReview(
   )
     .filter((f) => {
       const st = String(f.status || "pending_confirm");
-      return st === "pending_confirm" || st === "disputed" || !f.status;
+      return st === "pending_confirm" || !f.status;
     })
     .map((f) => String(f.id || ""))
     .filter(Boolean)
@@ -167,6 +172,14 @@ export async function acknowledgeZaimReview(
     .replace(/^Jarvisが直したよ（財務）[·・]\s*/, "")
     .slice(0, 180);
 
+  const fp = buildWatchAckFingerprint({
+    id: WATCH_ID,
+    level: watch.level,
+    summary: watch.summary,
+    status: "active",
+    payload: prev,
+  });
+
   const payload = {
     ...prev,
     recent_fixes: fixes,
@@ -175,6 +188,12 @@ export async function acknowledgeZaimReview(
     review_batch_id: existingBatch || ackId,
     show_banner: false,
     acknowledged_at: now,
+    user_ack: {
+      fingerprint: fp,
+      acked_at: now,
+      quiet_until: quietUntilIso(WATCH_ACK_QUIET_DAYS_DEFAULT),
+      acked_level: String(watch.level || "ok"),
+    },
   };
 
   const { error: uErr } = await supabase

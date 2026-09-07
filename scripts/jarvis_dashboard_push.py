@@ -273,8 +273,7 @@ def push_watch(sb) -> int:
                 for f in merged_fixes
                 if isinstance(f, dict)
                 and (
-                    str(f.get("status") or "pending_confirm")
-                    in ("pending_confirm", "disputed")
+                    str(f.get("status") or "pending_confirm") == "pending_confirm"
                 )
                 and not (
                     str(payload.get("dashboard_ack_batch_id") or "")
@@ -335,11 +334,11 @@ def push_watch(sb) -> int:
                 payload["acknowledged_at"] = remote_pl.get("acknowledged_at")
             pending_after = int(payload.get("pending_confirm_count") or 0)
             # 新しい確認待ちがあればピンを再表示。無ければダッシュボード確認を尊重
-            if pending_after > 0:
+            if pending_after > 0 and (not ack or not batch or str(ack) != str(batch)):
                 payload["show_banner"] = True
             elif ack and batch and str(ack) == str(batch):
                 payload["show_banner"] = False
-            elif remote_pl.get("show_banner") is False and pending_after == 0:
+            elif remote_pl.get("show_banner") is False:
                 payload["show_banner"] = False
             try:
                 rb_path = STATE / "zaim_review_batch.json"
