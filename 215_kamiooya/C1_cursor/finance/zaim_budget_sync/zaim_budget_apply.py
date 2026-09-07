@@ -236,11 +236,22 @@ def open_browser_context(
         ctx = browser.contexts[0] if browser.contexts else browser.new_context(locale="ja-JP")
         return browser, ctx, chrome_proc
 
-    browser = pw.chromium.launch(
-        headless=headless,
-        channel="chrome",
-        args=["--disable-blink-features=AutomationControlled"],
-    )
+    channel = os.environ.get("ZAIM_BROWSER_CHANNEL", "chrome")
+    launch_kwargs: dict = {
+        "headless": headless,
+        "args": ["--disable-blink-features=AutomationControlled"],
+    }
+    if channel and channel.lower() != "default":
+        launch_kwargs["channel"] = channel
+    try:
+        browser = pw.chromium.launch(**launch_kwargs)
+    except Exception as e:
+        if "channel" in launch_kwargs:
+            print(f"⚠️ channel='{channel}' 起動失敗 ({e})。標準 Chromium で再試行します...")
+            launch_kwargs.pop("channel", None)
+            browser = pw.chromium.launch(**launch_kwargs)
+        else:
+            raise
     ctx_kwargs: dict = {"locale": "ja-JP"}
     if storage_state and storage_state.exists():
         ctx_kwargs["storage_state"] = str(storage_state)
