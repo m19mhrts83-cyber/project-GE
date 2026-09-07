@@ -48,7 +48,7 @@ SHEET_CONFIGS = {
         "title": "物件案件一覧 (Deals)",
         "id_prefix": "P",
         "fieldnames": [
-            "案件ID", "物件名", "所在地", "価格(万円)", "想定利回り(%)",
+            "案件ID", "物件名", "買い進めプラン", "所在地", "価格(万円)", "想定利回り(%)",
             "構造", "築年", "ステータス", "担当Bot", "次のアクション", "神大家メモ", "最終更新日時"
         ]
     },
@@ -173,6 +173,7 @@ def add_entry(sheet_key: str, args):
     if sheet_key == "deals":
         new_row.update({
             "物件名": args.name or "",
+            "買い進めプラン": args.plan or "築古戸建て",
             "所在地": args.address or "",
             "価格(万円)": str(args.price or ""),
             "想定利回り(%)": str(args.yield_rate or ""),
@@ -251,6 +252,7 @@ def main():
     # 追加用
     parser.add_argument("--add", action="store_true", help="データを追加")
     parser.add_argument("--name", type=str, help="物件名 (deals/creative)")
+    parser.add_argument("--plan", type=str, choices=["築古戸建て", "築古アパート", "新築アパート"], default="築古戸建て", help="買い進めプラン区分 (deals: 築古戸建て/築古アパート/新築アパート)")
     parser.add_argument("--address", type=str, help="所在地 (deals)")
     parser.add_argument("--price", type=float, help="価格(万円) (deals)")
     parser.add_argument("--yield-rate", type=float, help="想定利回り(%) (deals)")
