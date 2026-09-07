@@ -21,10 +21,54 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import shutil
+import subprocess
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 OBSIDIAN_DIR = Path("/Users/matsunomasaharu2/Documents/500_Obsidian_r1/01_Journaling/☆Real_Estate_Pick")
+
+
+def import_from_google_drive() -> list[Path]:
+    """Google Drive 上の ☆Real_Estate_Pick からローカル正本に新規/更新ファイルを自動インポート"""
+    drive_candidates = [
+        Path.home() / "Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1/01_Journaling/☆Real_Estate_Pick",
+        Path.home() / "Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/999_Obsidian_旧退避_202608/01_Journaling/☆Real_Estate_Pick",
+    ]
+    imported: list[Path] = []
+    OBSIDIAN_DIR.mkdir(parents=True, exist_ok=True)
+
+    for d_dir in drive_candidates:
+        if not d_dir.exists():
+            continue
+        for src in d_dir.glob("*_S3.md"):
+            if "旧" in src.name:
+                continue
+            dst = OBSIDIAN_DIR / src.name
+            should_copy = False
+            if not dst.exists():
+                should_copy = True
+            elif src.stat().st_mtime > dst.stat().st_mtime + 2:
+                should_copy = True
+
+            if should_copy:
+                shutil.copy2(src, dst)
+                imported.append(dst)
+                print(f"# Imported from Drive to Local: {src.name}")
+                retag_py = REPO / "scripts" / "jarvis_obsidian_ogd_retag.py"
+                if retag_py.exists():
+                    try:
+                        rel_path = f"01_Journaling/☆Real_Estate_Pick/{src.name}"
+                        subprocess.run(
+                            [sys.executable, str(retag_py), rel_path],
+                            cwd=str(REPO),
+                            capture_output=True,
+                            timeout=30,
+                            check=False,
+                        )
+                    except Exception as e:
+                        print(f"  [WARN] OGD retag soft-fail: {e}")
+    return imported
 
 
 def sb_client() -> Any:
@@ -211,6 +255,9 @@ def find_matching_deal(sb: Any, s3_data: dict[str, Any]) -> dict[str, Any] | Non
 
 
 def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
+    # Google Drive 側の新規・更新ファイルをまずローカル正本へ自動インポート
+    import_from_google_drive()
+
     sb = sb_client()
     md_files = sorted(OBSIDIAN_DIR.glob("*_S3.md"))
     

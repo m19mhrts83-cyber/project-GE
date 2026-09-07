@@ -19,6 +19,7 @@ fi
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
   "$PY" "${REPO_DIR}/scripts/jarvis_bucho_inbox_poll.py" --push
+  "$PY" "${REPO_DIR}/scripts/jarvis_kurashift_obsidian_pick_sync.py" --apply || true
   echo "# end exit=$?"
 } >>"$LOG" 2>&1
 
