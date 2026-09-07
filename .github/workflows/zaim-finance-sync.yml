@@ -1,0 +1,112 @@
+name: Zaim Finance Daily Sync (06:00 JST)
+
+on:
+  schedule:
+    # 毎朝 06:00 JST（= 毎日 21:00 UTC）
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Target year"
+        required: false
+        default: "2026"
+      skip_apply:
+        description: "Skip auto apply to Zaim Web"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: zaim-finance-sync
+  cancel-in-progress: false
+
+jobs:
+  zaim-finance-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+      JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+      ZAIM_CSV_BASE_DIR: ${{ github.workspace }}/downloads
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pyyaml supabase requests
+          python -m playwright install --with-deps chromium
+
+      - name: Restore Zaim Storage State
+        run: |
+          set -euo pipefail
+          STATE_DIR="215_kamiooya/C1_cursor/finance/zaim_budget_sync"
+          mkdir -p "$STATE_DIR"
+          if [[ -z "${{ secrets.ZAIM_STORAGE_STATE_B64 }}" ]]; then
+            echo "::error::ZAIM_STORAGE_STATE_B64 secret is not set!"
+            exit 1
+          fi
+          echo "${{ secrets.ZAIM_STORAGE_STATE_B64 }}" | base64 -d > "$STATE_DIR/.zaim_storage_state.json"
+          echo "Storage state restored ($(wc -c < "$STATE_DIR/.zaim_storage_state.json") bytes)"
+
+      - name: Step 1 - Initial CSV Export (Fetch Latest Bank & Card Records)
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          python 215_kamiooya/C1_cursor/finance/zaim_budget_sync/zaim_csv_export.py \
+            --year "${{ github.event.inputs.year || '2026' }}" \
+            --output-dir ./downloads \
+            --headless \
+            --login-method email
+
+      - name: Step 2 - Zaim Watch Runner (Detect Duplicates, Learn Categories & Apply to Web)
+        run: |
+          set -euo pipefail
+          APPLY_FLAG=""
+          if [[ "${{ github.event.inputs.skip_apply }}" == "true" ]]; then
+            APPLY_FLAG="--skip-apply"
+          fi
+          python scripts/jarvis_zaim_watch_runner.py --skip-finance $APPLY_FLAG || true
+
+      - name: Step 3 - Final CSV Export (Fetch Cleaned Data with Applied Rules)
+        run: |
+          set -euo pipefail
+          python 215_kamiooya/C1_cursor/finance/zaim_budget_sync/zaim_csv_export.py \
+            --year "${{ github.event.inputs.year || '2026' }}" \
+            --output-dir ./downloads \
+            --headless \
+            --login-method email
+
+      - name: Step 4 - Push Finance Metrics to Supabase Dashboard
+        run: |
+          set -euo pipefail
+          YEAR="${{ github.event.inputs.year || '2026' }}"
+          PREV_YEAR=$((YEAR - 1))
+          python scripts/jarvis_finance_metrics.py --year "$YEAR" --push
+          python scripts/jarvis_finance_metrics.py --year "$PREV_YEAR" --push || true
+
+      - name: Step 5 - Update Situation Watch on Dashboard
+        run: |
+          set -euo pipefail
+          python scripts/jarvis_situation_watch.py --write || true
+          python scripts/jarvis_dashboard_push.py --watch-only || true
+
+      - name: Upload Cleaned CSV & Logs Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zaim-finance-artifacts
+          path: |
+            downloads/
+            .jarvis_state/zaim_*.json
+            .jarvis_state/finance_metrics.json
+            215_kamiooya/C1_cursor/finance/zaim_budget_sync/screenshots/
+          retention-days: 14

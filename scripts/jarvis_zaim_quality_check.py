@@ -44,7 +44,7 @@ def load_cfg() -> dict[str, Any]:
 
 
 def resolve_csv(cfg: dict[str, Any], year: int) -> Path:
-    base = Path(cfg.get("csv_base_dir") or "").expanduser()
+    base = Path(os.environ.get("ZAIM_CSV_BASE_DIR") or cfg.get("csv_base_dir") or "").expanduser()
     return base / f"{year}年度" / f"Zaim.{year}年度.csv"
 
 
