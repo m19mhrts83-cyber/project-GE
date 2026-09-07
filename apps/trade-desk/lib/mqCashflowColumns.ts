@@ -36,12 +36,12 @@ export const CASHFLOW_COLUMN_LABELS: Record<CashflowColumnKey, string> = {
   advertising: "広告",
   expense: "経費",
   management: "管理費",
-  acquisition: "取得時",
+  acquisition: "取得費用",
   tax_accountant: "税理士",
   loan_repayment: "返済",
-  annual_tax: "年払・税",
-  interest_yearend: "利息（期末）",
-  tax_payment: "税金支払",
+  annual_tax: "税金",
+  interest_yearend: "利息",
+  tax_payment: "税金",
   action_inflow: "処置（計画）",
 };
 
@@ -68,6 +68,7 @@ export const RECLASSIFY_COLUMN_OPTIONS: CashflowColumnKey[] = [
   "acquisition",
   "tax_accountant",
   "loan_repayment",
+  "interest_yearend",
   "annual_tax",
 ];
 

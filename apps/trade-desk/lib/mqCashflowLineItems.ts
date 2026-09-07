@@ -191,6 +191,12 @@ export function lineItemsForCell(
 ): CashflowLineItem[] {
   return items.filter((it) => {
     const mo = monthKeyFromTxnDate(it.txnDate);
+    if (columnKey === "annual_tax" || columnKey === "tax_payment") {
+      return (
+        mo === month &&
+        (it.columnKey === "annual_tax" || it.columnKey === "tax_payment")
+      );
+    }
     return mo === month && it.columnKey === columnKey;
   });
 }

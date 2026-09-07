@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { CashflowLineItem } from "@/lib/mqCashflowLineItems";
 import {
   CASHFLOW_COLUMN_LABELS,
@@ -27,6 +27,11 @@ export default function MqCashflowReclassifyMenu(props: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [learnRule, setLearnRule] = useState(true);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    menuRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
 
   async function applyColumn(column: CashflowColumnKey) {
     if (!item.txnId || column === item.columnKey) {
@@ -91,6 +96,7 @@ export default function MqCashflowReclassifyMenu(props: Props) {
 
   return (
     <div
+      ref={menuRef}
       className="mq-cashflow-reclassify-menu"
       role="dialog"
       aria-label="列を変更"
