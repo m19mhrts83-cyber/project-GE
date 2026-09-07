@@ -1,0 +1,70 @@
+name: Test Zaim CSV Export (Cloud Verification)
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Target year"
+        required: false
+        default: "2026"
+
+jobs:
+  test-zaim-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pyyaml supabase
+          python -m playwright install --with-deps chromium
+
+      - name: Restore Zaim Storage State
+        run: |
+          set -euo pipefail
+          STATE_DIR="215_kamiooya/C1_cursor/finance/zaim_budget_sync"
+          mkdir -p "$STATE_DIR"
+          if [[ -z "${{ secrets.ZAIM_STORAGE_STATE_B64 }}" ]]; then
+            echo "::error::ZAIM_STORAGE_STATE_B64 secret is not set!"
+            exit 1
+          fi
+          echo "${{ secrets.ZAIM_STORAGE_STATE_B64 }}" | base64 -d > "$STATE_DIR/.zaim_storage_state.json"
+          echo "Storage state restored ($(wc -c < "$STATE_DIR/.zaim_storage_state.json") bytes)"
+
+      - name: Run Zaim CSV Export (Headless Playwright)
+        id: export
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          python 215_kamiooya/C1_cursor/finance/zaim_budget_sync/zaim_csv_export.py \
+            --year "${{ github.event.inputs.year || '2026' }}" \
+            --output-dir ./downloads \
+            --headless \
+            --login-method email
+
+      - name: Verify CSV Download
+        if: always()
+        run: |
+          echo "=== Download Directory Content ==="
+          ls -la ./downloads || true
+          find ./downloads -name "*.csv" -exec wc -l {} + || true
+
+      - name: Upload Downloaded CSV & Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zaim-export-test-artifacts
+          path: |
+            downloads/
+            215_kamiooya/C1_cursor/finance/zaim_budget_sync/screenshots/
+            215_kamiooya/C1_cursor/finance/zaim_budget_sync/downloads/
+          retention-days: 7
