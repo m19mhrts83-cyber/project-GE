@@ -25,6 +25,16 @@ strategy:
   land_ratio_target_pct: 70
   financing_strategy: "現金購入またはリフォームローン"
 
+  # 【物件調査対象ポータルサイトの指定】
+  # 楽待、健美家、LIFULL HOME'S、アットホームが有力基本セットです。
+  portal_sites:
+    - "楽待"
+    - "健美家"
+    - "LIFULL HOME'S"
+    - "アットホーム"
+  # 追加で確認してほしいサイト（地場ポータル、不動産連合隊など）があれば記載
+  additional_portal_sites: ""
+
 grok_bot:
   cdp_port: 9222
   default_section: "不動産賃貸"

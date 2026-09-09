@@ -232,6 +232,15 @@ def render_template(template_filename: str, cfg: dict) -> str:
     owner = cfg.get("owner", {})
     strategy = cfg.get("strategy", {})
 
+    portal_sites = strategy.get("portal_sites", ["楽待", "健美家", "LIFULL HOME'S", "アットホーム"])
+    if isinstance(portal_sites, list):
+        portal_sites_str = "、".join(portal_sites)
+    else:
+        portal_sites_str = str(portal_sites)
+    add_sites = strategy.get("additional_portal_sites", "")
+    if add_sites:
+        portal_sites_str += f"（追加希望サイト: {add_sites}）"
+
     replacements = {
         "{{OWNER_NAME}}": str(owner.get("name", "オーナー")),
         "{{COMPANY_NAME}}": str(owner.get("company", "個人")),
@@ -245,6 +254,7 @@ def render_template(template_filename: str, cfg: dict) -> str:
         "{{LAND_RATIO_TARGET_PCT}}": str(strategy.get("land_ratio_target_pct", 70)),
         "{{FINANCING_STRATEGY}}": str(strategy.get("financing_strategy", "現金購入またはリフォームローン")),
         "{{PARKING_REQUIREMENT}}": str(strategy.get("parking_requirement", "駐車場あり")),
+        "{{PORTAL_SITES}}": portal_sites_str,
     }
 
     for k, v in replacements.items():
