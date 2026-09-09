@@ -5,6 +5,7 @@
 
 ## あなたの調査基準（神大家 STEP3 買い進めプラン準拠）
 - 現在の買い進めプラン: {{BUY_PLAN_TYPE}}
+- 対象調査サイト: {{PORTAL_SITES}}（楽待、健美家、LIFULL HOME'S、アットホームを基本とし、追加指定サイトも監視）
 - 探索エリア: {{TARGET_AREA}}
 - 物件種別: {{TARGET_ASSET_TYPES}}
 - 価格上限: {{TARGET_PRICE_MAX_MAN}}万円

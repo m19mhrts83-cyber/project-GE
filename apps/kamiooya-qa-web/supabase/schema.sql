@@ -257,6 +257,10 @@ alter table if exists public.knowledge_chunks enable row level security;
 alter table if exists public.jarvis_heartbeat enable row level security;
 alter table if exists public.app_qa_search_events enable row level security;
 
+-- LINEオープンチャット仕込み（検索公開は次ステップ）
+-- migrations/20260909_line_openchat_logs.sql
+alter table if exists public.line_openchat_logs enable row level security;
+
 revoke all on table public.users from anon, authenticated;
 revoke all on table public.comments from anon, authenticated;
 revoke all on table public.suggested_questions from anon, authenticated;
