@@ -29,6 +29,10 @@ jobs:
       JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
       JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
       ZAIM_CSV_BASE_DIR: ${{ github.workspace }}/downloads
+      ZAIM_LOGIN_EMAIL: ${{ secrets.ZAIM_LOGIN_EMAIL }}
+      ZAIM_PASSWORD: ${{ secrets.ZAIM_PASSWORD }}
+      # GHA は playwright 導入の Chromium を使う（Mac の channel=chrome は使わない）
+      ZAIM_BROWSER_CHANNEL: default
 
     steps:
       - name: Checkout code
@@ -56,6 +60,26 @@ jobs:
           fi
           echo "${{ secrets.ZAIM_STORAGE_STATE_B64 }}" | base64 -d > "$STATE_DIR/.zaim_storage_state.json"
           echo "Storage state restored ($(wc -c < "$STATE_DIR/.zaim_storage_state.json") bytes)"
+          # secret を更新したときは別キャッシュ空間にし、古いセッションで上書きしない
+          STATE_HASH=$(sha256sum "$STATE_DIR/.zaim_storage_state.json" | awk '{print substr($1,1,16)}')
+          echo "STATE_HASH=$STATE_HASH" >> "$GITHUB_ENV"
+          echo "Storage state hash prefix: $STATE_HASH"
+          if [[ -z "${ZAIM_PASSWORD:-}" ]]; then
+            echo "::warning::ZAIM_PASSWORD secret is empty. Session expire will fail unless cache/storage_state is still valid."
+          else
+            echo "ZAIM_PASSWORD is set (email login fallback available)"
+          fi
+          if [[ -z "${ZAIM_LOGIN_EMAIL:-}" ]]; then
+            echo "ZAIM_LOGIN_EMAIL secret is empty; export script uses its built-in default"
+          fi
+
+      - name: Restore cached Zaim session
+        uses: actions/cache/restore@v4
+        with:
+          path: 215_kamiooya/C1_cursor/finance/zaim_budget_sync/.zaim_storage_state.json
+          key: zaim-storage-state-${{ env.STATE_HASH }}-${{ github.run_id }}
+          restore-keys: |
+            zaim-storage-state-${{ env.STATE_HASH }}-
 
       - name: Step 1 - Initial CSV Export (Fetch Latest Bank & Card Records)
         run: |
@@ -98,6 +122,13 @@ jobs:
           set -euo pipefail
           python scripts/jarvis_situation_watch.py --write || true
           python scripts/jarvis_dashboard_push.py --watch-only || true
+
+      - name: Save refreshed Zaim session
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: 215_kamiooya/C1_cursor/finance/zaim_budget_sync/.zaim_storage_state.json
+          key: zaim-storage-state-${{ env.STATE_HASH }}-${{ github.run_id }}
 
       - name: Upload Cleaned CSV & Logs Artifacts
         if: always()
