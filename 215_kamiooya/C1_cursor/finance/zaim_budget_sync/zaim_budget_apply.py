@@ -43,9 +43,9 @@ ZAIM_LOGIN = "https://id.zaim.net/"
 ZAIM_BUDGET_MONTH_URL = "https://zaim.net/budgets/detail/{ym}"
 DEFAULT_CDP_URL = "http://127.0.0.1:9223"
 DEFAULT_CDP_PORT = 9223
-DEFAULT_GOOGLE_EMAIL = os.environ.get("ZAIM_GOOGLE_EMAIL", "m19m.hrts83@gmail.com")
-DEFAULT_LOGIN_EMAIL = os.environ.get("ZAIM_LOGIN_EMAIL", DEFAULT_GOOGLE_EMAIL)
-DEFAULT_LOGIN_PASSWORD = os.environ.get("ZAIM_PASSWORD", "")
+DEFAULT_GOOGLE_EMAIL = os.environ.get("ZAIM_GOOGLE_EMAIL", "").strip() or "m19m.hrts83@gmail.com"
+DEFAULT_LOGIN_EMAIL = os.environ.get("ZAIM_LOGIN_EMAIL", "").strip() or DEFAULT_GOOGLE_EMAIL
+DEFAULT_LOGIN_PASSWORD = os.environ.get("ZAIM_PASSWORD", "").strip()
 LOGIN_WAIT_MS = 300_000  # 手動完了待ち（5分）
 EMAIL_LOGIN_ATTEMPTS = 2  # 手動検証: 同一資格情報を2回入力する必要あり
 
