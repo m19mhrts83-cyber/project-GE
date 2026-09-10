@@ -71,7 +71,7 @@ Drive `20_outbox_to_grok/` はこれまでどおり **仕事キュー**。チャ
 | `[Grok部長]` 日報 / 夕方 / 週次 | **estate Gmail** → Jarvis 取込 |
 | `[Grok調査]` 等社員成果 | **estate Gmail** |
 | 急ぎ Jarvis 依頼（任意） | estate 件名 `[Jarvis依頼] …` |
-| 天気 ch 直投 | `outbox_to_teams/weather/` → 天気Bot（ホーク日次報告不要） |
+| 天気 ch 直投のみ（本人DM・通知不要） | `outbox_to_teams/weather/` → 天気Bot → ch「天気お知らせ」。松野は ch を開いて確認 |
 
 ## 関連
 
