@@ -1,0 +1,48 @@
+---
+description: Obsidian Literature Note のファイル命名（日付先頭 YYYYMMDD_）
+alwaysApply: true
+---
+
+# Obsidian Literature Note — ファイル命名（日付先頭）
+
+## 対象
+
+Jarvis が **`500_Obsidian_r1/03_Literature Note(まとめノート)/`** 配下に新規作成・保存するノート。
+
+正本は Documents ボルト（`~/Documents/500_Obsidian_r1/`）。Drive ミラー直書きはしない（`jarvis-obsidian-gdrive-sync.mdc`）。
+
+## 命名フォーマット
+
+```
+YYYYMMDD_テーマ.md
+```
+
+例: `20260910_WeStudy_愛知保証協会_種村紹介.md`
+
+| 要素 | ルール |
+|---|---|
+| **日付** | 調査日・作成日・出来事の日（**JST**）。ハイフンなし **8桁**（`20260910`） |
+| **テーマ** | 短く日本語可。`/` などパス危険文字は避ける |
+| **禁止** | 日付を末尾に置くこと（`…_20260910.md` / `…_2026-09-10.md` は不可） |
+
+## 更新方針
+
+- 同日・同テーマの再更新は **同じファイル名を上書き**（`_v2` や版番号を増やさない）
+- 保存後は `jarvis_obsidian_ogd_retag.py` で新パスを Drive に印付け
+
+## 対象外・例外
+
+| パス | 扱い |
+|---|---|
+| `01_Journaling/★Journal/` | 既存の日次命名を維持（本ルール対象外） |
+| `_unused_*` | リネーム対象にしない |
+| 末尾日付が不明瞭な既存ファイル | 推測で改名しない |
+
+## Research Clippings（参考）
+
+`02_Clippings/B_Research/` は別ルール（`jarvis-research-obsidian-save.mdc`）だが、**今後の新規は日付先頭を推奨**: `YYYYMMDD_リサーチ_人物_氏名.md`。既存の末尾日付ファイルを一括改名する義務はない。本ルールの主対象は Literature Note。
+
+## 関連
+
+- Obsidian 正本・OGD: `jarvis-obsidian-gdrive-sync.mdc`
+- リサーチ保存: `jarvis-research-obsidian-save.mdc`
