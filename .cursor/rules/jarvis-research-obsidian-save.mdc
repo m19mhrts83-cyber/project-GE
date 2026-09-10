@@ -1,0 +1,63 @@
+---
+description: リサーチ系 Cursor コマンドの結果を Obsidian B_Research に保存する
+alwaysApply: true
+---
+
+# リサーチ結果 → Obsidian 保存（Jarvis）
+
+## 方針
+
+`/reserch-person` / `/reserch-company` / `/reserch-companies-compari` など **リサーチ系 Cursor コマンド**で調査レポートを作成したら、チャット報告の**前または直後**に **Obsidian 正本へ必ず保存**する。ユーザーに「保存しますか？」と聞かない。
+
+## 正本パス
+
+| 役割 | パス |
+|---|---|
+| **保存先フォルダ** | `~/Documents/500_Obsidian_r1/02_Clippings/B_Research/` |
+| **Obsidian 同期** | 書き込み後 `jarvis_obsidian_ogd_retag.py` で Drive へ反映（`jarvis-obsidian-gdrive-sync.mdc`） |
+
+## ファイル名
+
+日付は **先頭**（`YYYYMMDD_`）。末尾日付（`…_20260910.md`）は新規では使わない。Literature Note と揃える（`jarvis-obsidian-literature-naming.mdc`）。
+
+| コマンド種別 | 命名 |
+|---|---|
+| 人物 | `YYYYMMDD_リサーチ_人物_{氏名}.md` |
+| 企業 | `YYYYMMDD_リサーチ_企業_{企業名}.md` |
+| 比較・競合 | `YYYYMMDD_リサーチ_{テーマ}.md` または既存の `リサーチ_3社比較_…` に追記 |
+
+- 同日・同対象で再調査した場合は **同じファイル名を上書き**（日付は調査日・JST・8桁）。
+- ファイル名の `{企業名}` は `/` 等を避け、既存例に合わせる。
+- 既存の末尾日付ファイルの一括改名は必須ではない（新規から日付先頭）。
+
+## 本文フォーマット
+
+既存ノート（例: `リサーチ_人物_木内翔大_20260301.md`）に揃える。
+
+1. `# 調査レポート：{タイトル}`
+2. `## 調査対象`（氏名・所属・キーワード等）
+3. コマンド定義の調査項目を `### 1.` … で列挙
+4. 各項目に **出典 URL** を付ける
+5. 確認不可は「情報なし」
+6. 末尾に `## 人物サマリー` または `## 調査サマリー`（3行以内）
+7. ユーザー質問の文脈メモ（例: 「アニメ推しか」）があれば `## 補足（依頼文脈）` に短く
+
+チャット専用の Jarvis フォローブロック（S1/Grok 等）は **Obsidian には書かない**。
+
+## Jarvis の必須動作
+
+1. リサーチ完了 → Obsidian に `Write`（Documents 正本のみ）
+2. 反映:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_obsidian_ogd_retag.py \
+  "02_Clippings/B_Research/YYYYMMDD_リサーチ_人物_例.md"
+```
+
+3. ユーザー報告に **保存先パスを1行**添える（例: `📎 Obsidian: 02_Clippings/B_Research/20260828_リサーチ_人物_小野田紀美.md`）
+
+## 関連
+
+- Obsidian 正本・OGD: `jarvis-obsidian-gdrive-sync.mdc`
+- コマンド定義: `.cursor/commands/reserch-person.md` 等
