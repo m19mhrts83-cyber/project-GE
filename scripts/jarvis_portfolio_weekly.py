@@ -1107,6 +1107,38 @@ def main() -> int:
                     )
 
     for account_id, fn in jobs:
+        # 同週で一度成功済みの口座は再取得しない（あかつき OTP 連打・Bloomo 競合防止）
+        # bloomo が落ち続けて catchup が繰り返されても、成功済み akatsuki を壊さない
+        if (
+            not args.force
+            and prev.get("iso_week") == iso_week()
+            and account_id in ("akatsuki_bond",)
+        ):
+            prior = (prev.get("sources") or {}).get(account_id) or {}
+            if prior.get("status") == "ok" and prior.get("value_jpy") is not None:
+                sources[account_id] = {
+                    **prior,
+                    "note": f"{prior.get('note') or ''} · reused same-week ok".strip(" ·"),
+                }
+                print(
+                    f"# {account_id}: reuse same-week ok "
+                    f"{int(prior['value_jpy']):,}円",
+                    flush=True,
+                )
+                if not args.dry_run:
+                    upsert_snapshot(
+                        sb,
+                        account_id,
+                        float(prior["value_jpy"]),
+                        source="weekly_web",
+                        note=sources[account_id].get("note"),
+                        cost_jpy=(
+                            float(prior["cost_jpy"])
+                            if prior.get("cost_jpy") is not None
+                            else None
+                        ),
+                    )
+                continue
         try:
             rec = fn()
         except Exception as exc:
@@ -1322,6 +1354,30 @@ def main() -> int:
             f"# bloomo_zaim: {sources['bloomo_zaim'].get('status')} "
             f"{sources['bloomo_zaim'].get('reason')}"
         )
+
+    # 同週の並行再実行で、一度成功した口座を error で上書きしない
+    # （あかつき OTP 競合など。--force 時は上書きする）
+    if not args.force and prev.get("iso_week") == iso_week():
+        for aid, old in (prev.get("sources") or {}).items():
+            if not isinstance(old, dict):
+                continue
+            new = sources.get(aid)
+            if (
+                old.get("status") == "ok"
+                and isinstance(new, dict)
+                and new.get("status") == "error"
+            ):
+                sources[aid] = {
+                    **old,
+                    "note": (
+                        f"{old.get('note') or ''} · preserved "
+                        f"(later error: {str(new.get('reason') or '')[:80]})"
+                    ).strip(" ·"),
+                }
+                print(
+                    f"# {aid}: keep prior ok (same week; later run failed)",
+                    flush=True,
+                )
 
     ok_n = sum(1 for r in sources.values() if r.get("status") == "ok")
     err_n = sum(1 for r in sources.values() if r.get("status") == "error")
