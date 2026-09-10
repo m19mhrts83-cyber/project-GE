@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""神大家 LINEオープンチャット → 1DB集約 ＆ Grok / Q&A仕込み同期
+"""神大家 LINEオープンチャット → kamiooya-qa 一本化 ＆ Grok共有
 
 役割:
   1. 815神大家オプチャの 5.やり取り.md をパース（YAMLの title_substring を chat_title 正本に）
-  2. jarvis-dashboard: kurashift_openchat_logs へ UPSERT（自分用・Grok参照の正本）
-  3. kamiooya-qa: line_openchat_logs へ UPSERT（Q&A仕込み・検索公開は次ステップ）
-  4. Grok Bot 共有: Drive 【with Grok bot】/30_shared_working/ へ知見MD＋タイトル別カタログ
+  2. kamiooya-qa: line_openchat_logs へ UPSERT（正本・当面 staging＝検索非公開）
+  3. Grok Bot 共有: Drive 【with Grok bot】/30_shared_working/ へ知見MD＋タイトル別カタログ
+
+※ jarvis-dashboard の kurashift_openchat_logs は廃止（二重管理しない）。
 
 使用例:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
-  # chatbot scripts/.env も読む（kamiooya）
-  python scripts/jarvis_kurashift_openchat_sync.py --apply --export-grok --also-qa
-  python scripts/jarvis_kurashift_openchat_sync.py --route 31_shuzen_soudan_g --apply --also-qa
+  python scripts/jarvis_kurashift_openchat_sync.py --apply --export-grok
+  python scripts/jarvis_kurashift_openchat_sync.py --route 31_shuzen_soudan_g --apply
 """
 
 from __future__ import annotations
@@ -258,7 +258,7 @@ def export_catalog(entries: list[dict[str, Any]], output_path: Path) -> None:
         f"最終更新: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
         "## 方針",
-        "- 1つのDBに集約（jarvis: `kurashift_openchat_logs` / Q&A仕込み: `line_openchat_logs`）",
+        "- 1つのDBに集約（**正本: kamiooya-qa `line_openchat_logs`**。jarvis 側テーブルは廃止）",
         "- 各行の `chat_title` でオプチャ名がわかる",
         "- Q&A検索公開は次ステップ（現状は staging 仕込み）",
         "",
@@ -374,13 +374,18 @@ def export_for_grok(entries: list[dict[str, Any]], output_path: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="LINE OpenChat → Supabase(両PJ) & Grok")
+    parser = argparse.ArgumentParser(description="LINE OpenChat → kamiooya-qa (一本化) & Grok")
     parser.add_argument("--route", help="特定 route_id / title_substring")
-    parser.add_argument("--apply", action="store_true", help="jarvis-dashboard へ投入")
-    parser.add_argument("--also-qa", action="store_true", help="kamiooya-qa line_openchat_logs へ仕込み投入")
+    parser.add_argument("--apply", action="store_true", help="kamiooya-qa line_openchat_logs へ投入（正本）")
+    parser.add_argument(
+        "--also-qa",
+        action="store_true",
+        help="互換フラグ（--apply と同じ。旧運用向け）",
+    )
     parser.add_argument("--export-grok", action="store_true", help="Grok共有MDを出力")
     parser.add_argument("--limit", type=int, default=0, help="各ルート上限（0=全件）")
     args = parser.parse_args()
+    do_apply = bool(args.apply or args.also_qa)
 
     routes_yaml = REPO / "line_unofficial_poc" / "open_chat_routes.yaml"
     if not routes_yaml.exists():
@@ -413,20 +418,11 @@ def main() -> int:
     repair_n = sum(1 for e in all_entries if e.get("is_repair_related"))
     print(f"📊 合計: {len(all_entries)} 件 (修繕関連: {repair_n})")
 
-    if args.apply:
-        cols_j = [
-            "id", "route_id", "chat_title", "chat_name", "stream_type", "thread_title",
-            "post_date", "sender_name", "content", "is_repair_related", "repair_category",
-            "source_system", "ingest_status", "metadata",
-        ]
-        n = upsert_batches(jarvis_sb(), "kurashift_openchat_logs", all_entries, cols_j)
-        print(f"✅ jarvis-dashboard kurashift_openchat_logs UPSERT: {n}")
-
-    if args.also_qa:
+    if do_apply:
         qa_rows = []
         for e in all_entries:
             row = dict(e)
-            row["ingest_status"] = "staging"  # Q&A検索公開は次ステップ
+            row["ingest_status"] = "staging"  # 検索公開は次ステップ
             qa_rows.append(row)
         cols_q = [
             "id", "route_id", "chat_title", "chat_name", "stream_type", "thread_title",
@@ -434,14 +430,14 @@ def main() -> int:
             "source_system", "ingest_status", "metadata",
         ]
         n = upsert_batches(qa_sb(), "line_openchat_logs", qa_rows, cols_q)
-        print(f"✅ kamiooya-qa line_openchat_logs UPSERT (staging): {n}")
+        print(f"✅ kamiooya-qa line_openchat_logs UPSERT (staging・正本): {n}")
 
-    if args.export_grok or args.apply or args.also_qa:
+    if args.export_grok or do_apply:
         export_for_grok(all_entries, GROK_SHARED / "神大家オプチャ_修繕業者・相談知見リスト.md")
         export_catalog(all_entries, GROK_SHARED / "神大家オプチャ_データソースカタログ.md")
 
-    if not args.apply and not args.also_qa and not args.export_grok:
-        print("ℹ️ --apply / --also-qa / --export-grok のいずれかが必要です（現状 Dry-run）")
+    if not do_apply and not args.export_grok:
+        print("ℹ️ --apply / --export-grok のいずれかが必要です（現状 Dry-run）")
 
     return 0
 

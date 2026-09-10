@@ -278,6 +278,7 @@ items:
       Spending 画面を目視し、scripts/jarvis_cursor_usage_watch.py --set で％を更新 → --push。
       Other ≥70% は Composer/Cursor Grok へ寄せ、≥90% や残日少＋半分超えは Pro+ 再上げを検討。
       Grok Bot 週次枠不足（ルーティン停止・plan 画面で枯渇）も Pro+ 検討。SuperGrok 連携は Pro+ より高いので採用しない。
+      既に Pro+ のとき: 開拓ペースは docs/Grok_ProPlus_ペース_20260910.md（送信3・探索1・S1探し月水金）。Ultra は常態枯れが続くまで見送り。
       ダッシュボード: /billing の「Cursor 枠」カード。
 
   - id: cursor_worker_queue
