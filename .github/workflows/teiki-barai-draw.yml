@@ -1,0 +1,110 @@
+# テイチャン（定期払いチャンス）— 抽選券があれば自動抽選
+#
+# 【重要】Vpass ブラウザログインが必要なため、GitHub-hosted runner では
+# データセンター IP・CAPTCHA・追加認証で失敗しやすい。
+# 本線は Mac launchd（月・木）。この workflow は「Mac 非依存の試行」用。
+# Secrets: VPASS_ID / VPASS_PASSWORD / JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY
+#
+# 失敗してもアカウントロックを避けるため、連続失敗時は schedule を止めて
+# workflow_dispatch のみにしてください。
+
+name: Teiki Barai Auto Draw (experimental)
+
+on:
+  # schedule なし: Vpass headless は定型化未達（2026-09-10 実測でログイン失敗）
+  # 本線は Mac launchd com.matsunoma.jarvis.teiki-draw
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "interval 無視で実行"
+        required: false
+        type: boolean
+        default: true
+      skip_draw:
+        description: "確認のみ（抽選しない）"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: teiki-barai-draw
+  cancel-in-progress: false
+
+jobs:
+  draw:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Playwright
+        run: |
+          pip install -q playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Prepare state dir
+        run: |
+          mkdir -p .jarvis_state/teiki_barai_chance
+          if [[ -f .jarvis_state/teiki_barai_chance.example.json ]]; then
+            cp .jarvis_state/teiki_barai_chance.example.json .jarvis_state/teiki_barai_chance.json
+          else
+            echo '{"disabled":false,"interval_days":3,"services":[],"draw_history":[]}' > .jarvis_state/teiki_barai_chance.json
+          fi
+          # 任意: 前回の Mac state を Secret で渡すと services 一覧を維持できる
+          if [[ -n "${TEIKI_STATE_B64:-}" ]]; then
+            echo "$TEIKI_STATE_B64" | base64 -d > .jarvis_state/teiki_barai_chance.json
+          fi
+        env:
+          TEIKI_STATE_B64: ${{ secrets.TEIKI_STATE_B64 }}
+
+      - name: Materialize Vpass env
+        env:
+          VPASS_ID: ${{ secrets.VPASS_ID }}
+          VPASS_PASSWORD: ${{ secrets.VPASS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${VPASS_ID:-}" || -z "${VPASS_PASSWORD:-}" ]]; then
+            echo "::error::Need secrets VPASS_ID and VPASS_PASSWORD"
+            echo "Mac launchd 本線のまま運用するか、Secrets を登録してから再実行してください。"
+            exit 1
+          fi
+          {
+            echo "VPASS_ID=${VPASS_ID}"
+            echo "VPASS_PASSWORD=${VPASS_PASSWORD}"
+          } > .env.jarvis_private
+          chmod 600 .env.jarvis_private
+
+      - name: Run teiki (headless)
+        env:
+          TEIKI_HEADLESS: "1"
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          FORCE: ${{ github.event.inputs.force || 'true' }}
+          SKIP_DRAW: ${{ github.event.inputs.skip_draw || 'false' }}
+        run: |
+          set -euo pipefail
+          ARGS=(--run --headless)
+          if [[ "$FORCE" == "true" ]]; then
+            ARGS+=(--force)
+          fi
+          if [[ "$SKIP_DRAW" == "true" ]]; then
+            ARGS+=(--skip-draw)
+          fi
+          if [[ -n "${JARVIS_SUPABASE_URL:-}" && -n "${JARVIS_SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+            ARGS+=(--push)
+          fi
+          python scripts/jarvis_teiki_barai_chance.py "${ARGS[@]}"
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teiki-shots
+          path: .jarvis_state/teiki_barai_chance/
+          if-no-files-found: ignore

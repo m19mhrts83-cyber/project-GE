@@ -186,6 +186,7 @@ lenders:
   case_report: true
   notes: 【対象エリア・本命】公式アパートローン＝取扱店（東京支店除く）営業区域内に「居住地および担保物件」。県外店舗に岐阜・多治見・静岡・浜松あり→岐阜／静岡物件はエリア内の可能性（物件所在が支店営業区域か要確認）。静銀との包括提携・2028統合予定は取引先支援・マッチングが主で、アパートローン対象県の自動拡大とは限らない。法人口座設立済。
     【残債】他行合算の公式明示なし（要支店確認）。オリックス型の硬い年収倍率かは未確認。
+    【種村2026-09-10／自社ヒアリング】運転のみは「別銀行物件」で不可の実績あり。環創・協会付き創業／修繕設備は再打診。種村は地銀は上から目線になりがち→信金信組並行を推奨。保証人なしは二の次、まず銀行アタック。
   store_page_label: 名古屋銀行の店舗ページへ
   region_tags:
   - tokai
@@ -212,7 +213,7 @@ lenders:
   category: shinkin
   approach: 'yes'
   case_report: false
-  notes: セゾン保証+不足分は公庫で融資手配してくれる（佐藤さん）
+  notes: セゾン保証+不足分は公庫で融資手配してくれる（佐藤さん）。【豊明】豊明支店あり＝本店法人の信金接点候補。【種村】信金信組＋「保証協会による融資はいけますか？」を聞く。
   store_page_label: あいち
   region_tags:
   - tokai
@@ -343,12 +344,13 @@ lenders:
   name: 尾西
   category: shinkin
   approach: maybe
-  case_report: false
-  notes: null
+  case_report: true
+  notes: 【対象エリア】一宮・稲沢・江南・岩倉・小牧・愛西・清須・北名古屋・春日井・西春日井・丹羽・あま一部・名古屋・岐阜羽島寄り。店舗は一宮／稲沢／名西／羽島のみ。**豊明は営業地区外の公算大**（会員可否は支店確認）。【種村2026-09-10】WeStudy comment=24044・羽島支店プロパーが良さそう、と幹事Gで共有。協会付き可否も同店でヒアリング候補。豊明本店法人は本命レーンではなく参考／地区内物件があるとき優先。
   store_page_label: びさい
   region_tags:
   - tokai
   - aichi
+  - gifu
 - id: '1565'
   code: '1565'
   name: 中日
@@ -365,8 +367,8 @@ lenders:
   name: 東春
   category: shinkin
   approach: 'yes'
-  case_report: false
-  notes: null
+  case_report: true
+  notes: 【対象エリア】尾張北部〜桃花台等（豊明は営業地区に含む記載あり・支店は近隣）。【WeStudy/種村】木村事例で協会保証なら可（桃花台・1.8%/15年）。種村方針＝信金信組アタック＋「保証協会による融資はいけますか？」を聞く。
   store_page_label: とうしゅん
   region_tags:
   - tokai

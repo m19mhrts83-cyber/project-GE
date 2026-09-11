@@ -36,13 +36,13 @@ alwaysApply: true
 | ウィンドウ | 日付（JST） | 目的 |
 |------------|-------------|------|
 | **A 明細**（ETC） | 毎月 **1〜8日** | 生存・前月走行の軽い確認のみ（割引サマリーは出さない） |
-| **B 還元**（ETC） | 毎月 **19〜26日** | **月1本報告**: 前月分の還元額・還元率・お得額（20日付与後） |
-| **C Vポイント** | 毎月 **25〜月末** | クレカ積立稼働・明細の `／ｉＤ` 比率・残高。Tサイトは認証後のみ |
+| **B 還元**（ETC） | 毎月 **19〜26日** | **月1本報告**: 前月分の還元額・還元率・お得額（20日付与後）。**本線は自動**: `jarvis_etc_rebate_fetch.py` + launchd（20〜26日 09:30） |
+| **C Vポイント** | 毎月 **25〜月末** | **本線は自動**: `jarvis_vpoint_routine.py`（付与サマリ＋cadence＋テイチャンdue）。人手は `jarvis_asks`（TサイトOTP等） |
 | **D 課金** | 毎月 **1〜8日** | `/billing` 先頭サマリー。新規・金額変更・注視。YAML 更新後 push |
 
 重なったら **A → B → C → D** の順で未実施分だけ行う。同一セッションで済ませてよい。
 
-**Vポイントの月次（ウィンドウC）は必須手順に載せない。** 日常の軽い差分は **パートナー確認・前半末尾のついで**（`jarvis_vpoint_cadence_check.py`・間隔2日）でよい。
+**Vポイントの月次（ウィンドウC）**: launchd（25〜31日 09:40）＋朝オープン取りこぼしが本線。チャットでは `jarvis_asks` があるときだけ促す。日常の軽い差分は **パートナー確認・前半末尾のついで**（`jarvis_vpoint_cadence_check.py`・間隔2日）でよい。
 
 **課金（ウィンドウD）**:
 
@@ -58,17 +58,28 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 
 ## 実施手順（ETC・必須）
 
-1. **無効化**を確認（上記）。無効ならスキップ。
+1. **無効化**を確認（上記）。無効ならスキップ。  
+   自動取得の停止は `JARVIS_ETC_REBATE_AUTO_DISABLE=1` も可。
 2. **状態**を読む: `~/git-repos/.jarvis_state/etc_monthly.json`（無ければ example 参照して新規作成可）
 3. **正本**を読む: `~/git-repos/.env.jarvis_private`（`ETC_MILEAGE_ID`・カード有効期限・利用照会 ID）
 4. **サマリー**（判断の文脈）: Literature Note `家計・ライフプラン/ETC割引確認_Phase1サマリー.md`（パスは `etc-discount-jarvis.mdc`）
 5. **自動チェック**（可能な範囲）を実行:
 
+**ウィンドウB（還元）本線（自動）**: 毎月20〜26日 launchd が smile-etc から前月利用分の還元額を取得し `/etc` を更新する。失敗・取りこぼし時だけ手動:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_etc_rebate_fetch.py --apply --push
+# 特定月: --target-month YYYY-MM --force
+```
+
+会話での軽い確認・ウィンドウA:
+
 ```bash
 cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_etc_monthly_check.py
 ```
 
-`--mark-done` は **確認が完了したときだけ**付ける（Gmail・利用照会・smile-etc のいずれかで判定できた、またはユーザーとハイブリッドで確認済み）。
+`--mark-done` は **確認が完了したときだけ**付ける（Gmail・利用照会・smile-etc のいずれかで判定できた、またはユーザーとハイブリッドで確認済み）。自動化で B が埋まっていれば会話での再入力は不要。
 
 6. **ウィンドウ A（軽い確認）**: 前月の走行有無・朝夕件数の目安（利用照会 or smile-etc 未確定一覧）。CAPTCHA 等で止まったら **ユーザーに協力依頼**し、結果だけ記録。**割引サマリーは出さない**。
 7. **ウィンドウ B（月1本報告）**: [smile-etc.jp](https://www.smile-etc.jp/) で **前月分**を確認:
@@ -82,18 +93,19 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 ## 実施手順（Vポイント・ウィンドウC）
 
 1. **無効化**を確認（上記 Vポイント）。無効ならスキップ。
-2. **状態**を読む: `~/git-repos/.jarvis_state/vpoint_monthly.json`
-3. 要約スクリプトを実行:
+2. **状態**を読む: `~/git-repos/.jarvis_state/vpoint_monthly.json`（`jarvis_asks`・`last_check_c`）
+3. **定例オーケストレータ**（推奨）:
 
 ```bash
-cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_vpoint_monthly_check.py
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_vpoint_routine.py --apply --push
+# 窓外で付与も更新: --force-window-c
 ```
 
-4. 軽い確認（可能な範囲）: Vpass 明細で積立9万行・`／ｉＤ` サンプル・残高（詳細は `jarvis-vpoint-audit.mdc`）。Wallet 設定は勝手に変えない。
-5. Tサイト履歴は `VPOINT_TSITE_ID` があるとき（番号＋メールOTP。PW任意）。無ければ「認証待ち」と明記。
-6. 確認完了時のみ `--mark-done`。
-7. 報告ブロック（下記 Vポイント）を本題末尾に付ける。
-8. 日常の差分・処置提案は cadence（`vpoint_cadence.json`）を正とし、月次は深い突合に寄せる。
+4. 自動範囲: 付与サマリ（既存履歴／監査）・cadence差分・テイチャンdue。OTP／Walletは触らない。
+5. `jarvis_asks` があれば本題末尾に貼る（『Tサイト取って』『Visaタッチやった』等で会話対応）。
+6. 深い監査が必要なときだけ `jarvis-vpoint-audit.mdc`（Wallet強制変更なし）。
+7. 単体サマリのみなら従来どおり `jarvis_vpoint_monthly_check.py --mark-done`。
+8. 日常の差分・処置提案は cadence（`vpoint_cadence.json`）を正とする。
 
 ## 報告フォーマット（ユーザー向け）
 

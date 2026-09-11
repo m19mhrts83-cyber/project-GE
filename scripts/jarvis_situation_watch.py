@@ -399,6 +399,26 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
     note = str(rc.get("note") or "")
     if note and not has_grant:
         parts.append(note[:80])
+
+    # ウィンドウC未実施（25日以降）
+    now = datetime.now(JST)
+    month_now = now.strftime("%Y-%m")
+    window_c_pending = now.day >= 25 and mon.get("last_check_c") != month_now and not mon.get(
+        "disabled"
+    )
+    if window_c_pending:
+        parts.append(f"ウィンドウC未実施（{month_now}）")
+
+    # 定例が書いた Jarvis 確認リスト
+    jarvis_asks = [
+        a
+        for a in (mon.get("jarvis_asks") or [])
+        if isinstance(a, dict) and a.get("level") in ("ask", "suggest")
+    ]
+    ask_asks = [a for a in jarvis_asks if a.get("level") == "ask"]
+    if ask_asks:
+        parts.append(f"要対話{len(ask_asks)}")
+
     level = "ok"
     if show_banner:
         # 未確認の月次サマリはホーム掲載（info 以上）。考察の要確認もこの期間だけ attention
@@ -413,6 +433,10 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         # cadence の未対応は確認後も状況ウォッチ／ホームに残してよい
         if level in ("ok", "info"):
             level = "warn"
+    if window_c_pending and level in ("ok", "info"):
+        level = "warn"
+    if ask_asks and level in ("ok", "info"):
+        level = "warn"
     # 抽選券残は warn（未実施）
     if (
         not teiki_disabled
@@ -441,6 +465,12 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         detail_lines.append("ダッシュボード /vpoint で付与サマリ（％別・考察）を確認できます。")
         for ins in (grant.get("insights") or [])[:4]:
             detail_lines.append(f"· {ins}")
+    if window_c_pending:
+        detail_lines.append(
+            "定例: `jarvis_vpoint_routine.py --apply --push`（または『Vポイント月次やって』）"
+        )
+    for a in jarvis_asks[:5]:
+        detail_lines.append(f"· [{a.get('level')}] {a.get('text')}")
     if teiki and not teiki_disabled:
         detail_lines.append(
             "テイチャン: "
@@ -479,6 +509,13 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         )
 
     hist = [h for h in (mon.get("grant_history") or []) if isinstance(h, dict)][:12]
+    pdca = mon.get("pdca_board") if isinstance(mon.get("pdca_board"), dict) else None
+    if pdca:
+        nw = len(pdca.get("wins") or [])
+        ng = len(pdca.get("gaps") or [])
+        parts.append(f"PDCA 良{nw}/要{ng}")
+        for n in (pdca.get("next_actions") or [])[:2]:
+            detail_lines.append(f"PDCA次: {n.get('title')} → {n.get('how')}")
     teiki_payload = None
     if teiki and not teiki_disabled:
         teiki_payload = {
@@ -501,6 +538,7 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         "show_banner": show_banner,
         "href": "/situation?watch=vpoint#watch-vpoint",
         "teiki_barai": teiki_payload,
+        "pdca_board": pdca,
     }
     if action_items:
         payload["actions"] = action_items
@@ -1314,12 +1352,17 @@ def eval_grandole_201_aircon(meta: dict, data: dict | None) -> dict[str, Any]:
             source=src,
         )
     status = str(data.get("status") or "")
+    show_banner = True
     if status == "reply_received":
         level = "warn"
         summary = "【至急】関係者より新着返信あり！現地立ち会い・修理調整を行ってください"
     elif status == "waiting_contractor_reply":
         level = "attention"
         summary = "【要フォロー】マルショウ石井様からの日程返信待ち（ミニテック林様へ一次連絡済）"
+    elif status == "repair_done_interim":
+        level = "info"
+        show_banner = False
+        summary = "修理完了（暫定）／将来交換要・林さん報告済"
     else:
         level = "attention"
         summary = f"エアコン故障対応中（status={status}）"
@@ -1327,9 +1370,11 @@ def eval_grandole_201_aircon(meta: dict, data: dict | None) -> dict[str, Any]:
     detail_lines = [
         f"物件: {data.get('property', 'Grandole志賀本通Ⅰ 201号室')}",
         f"事象: {data.get('issue', 'エラー9-4・水漏れ再発')}",
-        "施工業者: マルショウ 石井章示 様（依頼メール送信済・日程返信待ち）",
-        "管理会社: ミニテック大曽根支店 林 友貴 様（一次返信完了・Notion共有）",
+        "施工業者: マルショウ 石井章示 様",
+        "管理会社: ミニテック大曽根支店 林 友貴 様",
     ]
+    if data.get("notes"):
+        detail_lines.append(f"メモ: {data['notes']}")
     if data.get("notion_task_url"):
         detail_lines.append(f"Notion: {data['notion_task_url']}")
 
@@ -1344,8 +1389,9 @@ def eval_grandole_201_aircon(meta: dict, data: dict | None) -> dict[str, Any]:
         source=src,
         payload={
             "href": "https://app.notion.com/p/Grandole-I-201-3d3f6bbe5a76817cbab4f351deeab602",
-            "show_banner": True,
+            "show_banner": show_banner,
             "status": status,
+            "never_archive": status not in ("repair_done_interim", "resolved"),
         },
     )
 

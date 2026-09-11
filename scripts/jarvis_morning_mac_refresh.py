@@ -70,6 +70,15 @@ WESTUDY_GDRIVE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_westudy_gdri
 PORTFOLIO_WEEKLY_STATE = REPO / ".jarvis_state" / "portfolio_weekly.json"
 PORTFOLIO_WEEKLY_RUNNER = REPO / "launchd" / "portfolio_weekly_runner.sh"
 PORTFOLIO_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_portfolio"
+ETC_MONTHLY_STATE = REPO / ".jarvis_state" / "etc_monthly.json"
+ETC_REBATE_RUNNER = REPO / "launchd" / "etc_rebate_monthly_runner.sh"
+ETC_REBATE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_etc_rebate"
+VPOINT_MONTHLY_STATE = REPO / ".jarvis_state" / "vpoint_monthly.json"
+TEIKI_BARAI_STATE = REPO / ".jarvis_state" / "teiki_barai_chance.json"
+VPOINT_ROUTINE_RUNNER = REPO / "launchd" / "vpoint_routine_runner.sh"
+VPOINT_ROUTINE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_vpoint_routine"
+TEIKI_DRAW_RUNNER = REPO / "launchd" / "teiki_draw_runner.sh"
+TEIKI_DRAW_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_teiki"
 FAMILY_JOURNAL_STATE = REPO / ".jarvis_state" / "family_journal_weekly.json"
 FAMILY_JOURNAL_RUNNER = REPO / "launchd" / "family_journal_weekly_runner.sh"
 FAMILY_JOURNAL_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_family_journal"
@@ -299,6 +308,187 @@ def spawn_portfolio_weekly(*, dry_run: bool) -> str:
         return "spawned"
     except Exception as e:
         print(f"# portfolio_weekly spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
+def _ym_add(ym: str, delta: int) -> str:
+    y, m = map(int, ym.split("-"))
+    m += delta
+    while m > 12:
+        m -= 12
+        y += 1
+    while m < 1:
+        m += 12
+        y -= 1
+    return f"{y}-{m:02d}"
+
+
+def etc_rebate_needs_catchup() -> bool:
+    """毎月20〜26日窓で、前月利用分の還元が未反映なら True。"""
+    if os.environ.get("JARVIS_ETC_REBATE_AUTO_DISABLE") == "1":
+        return False
+    if os.environ.get("JARVIS_ETC_MONTHLY_DISABLE") == "1":
+        return False
+    now = datetime.now(JST)
+    if now.day < 20 or now.day > 26:
+        return False
+    target = _ym_add(now.strftime("%Y-%m"), -1)
+    if not ETC_MONTHLY_STATE.is_file():
+        return True
+    try:
+        data = json.loads(ETC_MONTHLY_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("disabled") is True:
+        return False
+    for h in data.get("rebate_history") or []:
+        if (
+            isinstance(h, dict)
+            and h.get("target_month") == target
+            and h.get("rebate_yen") is not None
+        ):
+            return False
+    return True
+
+
+def spawn_etc_rebate_monthly(*, dry_run: bool) -> str:
+    if not ETC_REBATE_RUNNER.is_file():
+        print(f"# etc_rebate: missing {ETC_REBATE_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn etc_rebate_monthly_runner.sh", flush=True)
+        return "dry_run"
+    ETC_REBATE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(ETC_REBATE_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(ETC_REBATE_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(ETC_REBATE_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# etc_rebate: spawned monthly runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# etc_rebate spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
+def vpoint_routine_needs_catchup() -> bool:
+    """ウィンドウC（25〜月末）で当月未 stamp のとき。"""
+    if os.environ.get("JARVIS_VPOINT_ROUTINE_DISABLE") == "1":
+        return False
+    if os.environ.get("JARVIS_VPOINT_MONTHLY_DISABLE") == "1":
+        return False
+    now = datetime.now(JST)
+    if now.day < 25:
+        return False
+    if not VPOINT_MONTHLY_STATE.is_file():
+        return True
+    try:
+        data = json.loads(VPOINT_MONTHLY_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("disabled") is True:
+        return False
+    return data.get("last_check_c") != now.strftime("%Y-%m")
+
+
+def teiki_draw_needs_catchup() -> bool:
+    """テイチャン interval 到来、または抽選券残あり。"""
+    if os.environ.get("JARVIS_TEIKI_BARAI_DISABLE") == "1":
+        return False
+    if not TEIKI_BARAI_STATE.is_file():
+        return False
+    try:
+        teiki = json.loads(TEIKI_BARAI_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if teiki.get("disabled") is True:
+        return False
+    tickets = teiki.get("ticket_count")
+    if isinstance(tickets, int) and tickets > 0:
+        return True
+    w = teiki.get("w_chance_tickets")
+    if isinstance(w, int) and w > 0:
+        return True
+    last_s = str(teiki.get("last_check_at") or "")
+    interval = int(teiki.get("interval_days") or 3)
+    if not last_s:
+        return True
+    try:
+        last = datetime.fromisoformat(last_s.replace("Z", "+00:00"))
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=JST)
+    except ValueError:
+        return True
+    return datetime.now(JST) - last >= timedelta(days=interval)
+
+
+def spawn_vpoint_routine(*, dry_run: bool) -> str:
+    if not VPOINT_ROUTINE_RUNNER.is_file():
+        print(f"# vpoint_routine: missing {VPOINT_ROUTINE_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn vpoint_routine_runner.sh", flush=True)
+        return "dry_run"
+    VPOINT_ROUTINE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(VPOINT_ROUTINE_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(VPOINT_ROUTINE_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(VPOINT_ROUTINE_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# vpoint_routine: spawned runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# vpoint_routine spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
+def spawn_teiki_draw(*, dry_run: bool) -> str:
+    if not TEIKI_DRAW_RUNNER.is_file():
+        print(f"# teiki_draw: missing {TEIKI_DRAW_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn teiki_draw_runner.sh", flush=True)
+        return "dry_run"
+    TEIKI_DRAW_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(TEIKI_DRAW_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(TEIKI_DRAW_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(TEIKI_DRAW_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# teiki_draw: spawned runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# teiki_draw spawn failed: {e}", file=sys.stderr)
         out.close()
         err.close()
         return "error"
@@ -915,6 +1105,29 @@ def main() -> int:
     else:
         results["steps"]["portfolio_weekly"] = "fresh"
         print("# portfolio_weekly: skip (this week's full collect already done)", flush=True)
+
+    # 8b. ETC 平日朝夕還元（翌月20日付与・20〜26日窓の取りこぼし）
+    if etc_rebate_needs_catchup():
+        results["steps"]["etc_rebate_monthly"] = spawn_etc_rebate_monthly(
+            dry_run=args.dry_run
+        )
+    else:
+        results["steps"]["etc_rebate_monthly"] = "fresh"
+        print("# etc_rebate: skip (outside 20–26 or already recorded)", flush=True)
+
+    # 8c. Vポイント定例（ウィンドウC未実施）
+    if vpoint_routine_needs_catchup():
+        results["steps"]["vpoint_routine"] = spawn_vpoint_routine(dry_run=args.dry_run)
+    else:
+        results["steps"]["vpoint_routine"] = "fresh"
+        print("# vpoint_routine: skip (outside window C or already done)", flush=True)
+
+    # 8d. テイチャン自動抽選（券残 or interval）
+    if teiki_draw_needs_catchup():
+        results["steps"]["teiki_draw"] = spawn_teiki_draw(dry_run=args.dry_run)
+    else:
+        results["steps"]["teiki_draw"] = "fresh"
+        print("# teiki_draw: skip (not due)", flush=True)
 
     # 9. 家族コーチ Journal週次 → Notion（日曜 08:00 金締・失敗／Mac スリープ時）
     if family_journal_weekly_needs_catchup():
