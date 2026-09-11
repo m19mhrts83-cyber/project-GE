@@ -10,7 +10,7 @@ CHRLINE sync の差分と getRecentMessagesV2 補完から、指定した 1:1 �
   - **1回の sync** で次をまとめて処理（別プロセスに分けると取りこぼす）:
     - Tcell: グループ「キャラメル管理G」のみ → 103_Tcell/5.やり取り.md
     - LEAF: グループ名に「Grandole志賀本通」を含むトーク → 104_LEAF/5.やり取り.md
-    - 815: グループ「東海飲み会幹事やりとり」→ 815_神大家オプチャ/東海飲み会幹事やりとり/5.やり取り.md
+    - 幹事: グループ「東海飲み会幹事やりとり」→ 823_名古屋幹事グループ/5.やり取り.md
     - 連絡先一覧.yaml の `line_group_chat_mid`（例: 神大家東海DX互助会）も自動追加
   - グループ chatMid はトーク名の部分一致で解決、または LINE_TCELL_GROUP_CHAT_MID / LINE_LEAF_GROUP_CHAT_MID / LINE_KAMIOOYA_KANJI_GROUP_CHAT_MID / 各 --*-group-chat-mid
 
@@ -96,15 +96,14 @@ _REPO_LEAF_YORITOORI = (
 _ONEDRIVE_KAMIOOYA_KANJI_YORITOORI = (
     Path.home()
     / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談"
-    / "815_神大家オプチャ/東海飲み会幹事やりとり/5.やり取り.md"
+    / "823_名古屋幹事グループ/5.やり取り.md"
 )
 _REPO_KAMIOOYA_KANJI_YORITOORI = (
     _REPO_ROOT
     / "215_kamiooya"
     / "C2_ルーティン作業"
     / "26_パートナー社への相談"
-    / "815_神大家オプチャ"
-    / "東海飲み会幹事やりとり"
+    / "823_名古屋幹事グループ"
     / "5.やり取り.md"
 )
 
@@ -130,7 +129,7 @@ def _default_leaf_yoritoori_path() -> Path:
 
 
 def _default_kamiooya_kanji_yoritoori_path() -> Path:
-    """815 東海飲み会幹事やりとり の 5.やり取り.md（OneDrive 優先）。"""
+    """823_名古屋幹事グループ の 5.やり取り.md（LINE東海飲み会幹事・OneDrive 優先）。"""
     env = (os.environ.get("LINE_KAMIOOYA_KANJI_YORITOORI_MD") or "").strip()
     if env:
         return Path(env).expanduser().resolve()

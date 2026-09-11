@@ -58,6 +58,12 @@ notebooks:
     url: "https://notebooklm.google.com/notebook/34fb5ac0-a717-4d6a-b1a0-d09fb4a049c4"
     drive_folder: "10_神大家_幹事標準マニュアル"
     state_file: ".jarvis_state/notebooklm_kamiooya_kanji_manual.json"
+    note: "作業用（admin）。Studio・検証"
+  kamiooya_kanji_manual_share:
+    url: "https://notebook.google.com/notebook/ee91b577-a06d-46bf-880d-af41c72e39cd"
+    drive_folder: "10_神大家_幹事標準マニュアル"
+    state_file: ".jarvis_state/notebooklm_kamiooya_kanji_manual_share.json"
+    note: "共有用（estate）。外部リンク共有・閲覧者＝質問可。ソースは admin Drive からミラー"
   tokai_dx_grokbot_ai_org:
     url: "https://notebook.google.com/notebook/14e0b11d-0f16-49a8-ad05-8aa48962b53e"
     drive_folder: "11_東海DX_GrokBot不動産AI組織"

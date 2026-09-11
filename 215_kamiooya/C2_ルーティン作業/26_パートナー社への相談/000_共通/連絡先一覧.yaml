@@ -222,6 +222,20 @@ partners:
     line_group_chat_mid: "c49a9e7a307099af0831cdf1486d915c0"
     line_direct_chat_mid: ""
     contact: "本田"
+  - folder: "823_名古屋幹事グループ"
+    name: "名古屋幹事グループ"
+    emails: []
+    phones: []
+    line: "東海飲み会幹事やりとり"
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "種村／千葉／松野"
+    chatwork_room_id: ["447466105"]
+    chatwork_rooms:
+      "447466105": "名古屋幹事グループ"
+    chatwork_account_name: ""
+    # 生ログ正本（2026-09-11一本化）: LINE「東海飲み会幹事やりとり」＋ Chatwork「名古屋幹事グループ」→ 5.やり取り.md
+    # 旧パス: 815_神大家オプチャ/東海飲み会幹事やりとり/
   - folder: "722_遊愛会"
     name: "遊愛会"
     emails: []

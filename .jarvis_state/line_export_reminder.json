@@ -5,37 +5,56 @@
       "route_id": "tcell_caramel_g",
       "folder": "103_Tcell",
       "interval_days": 30,
-      "last_import_at": "2026-08-13T22:36:20+09:00",
+      "last_import_at": "2026-09-06T15:59:07+09:00",
       "last_import_source": "inbox",
-      "last_prompted_at": "2026-08-13T22:25:07+09:00"
+      "last_prompted_at": "2026-09-06T06:40:08+09:00"
     },
     "leaf_grandole": {
       "route_id": "leaf_grandole",
       "folder": "104_LEAF",
       "interval_days": 30,
-      "last_import_at": "2026-07-26T23:22:03+09:00",
+      "last_import_at": "2026-09-06T15:59:07+09:00",
       "last_import_source": "inbox",
-      "last_prompted_at": "2026-08-19T12:22:25+09:00"
+      "last_prompted_at": "2026-09-06T06:40:08+09:00"
     },
     "kamiooya_kanji": {
       "route_id": "kamiooya_kanji",
-      "folder": "815_神大家オプチャ/東海飲み会幹事やりとり",
+      "folder": "823_名古屋幹事グループ",
       "interval_days": 30,
-      "last_import_at": "2026-08-13T22:36:20+09:00",
+      "last_import_at": "2026-09-11T01:49:34+09:00",
       "last_import_source": "inbox",
-      "last_prompted_at": "2026-08-13T22:25:07+09:00"
+      "last_prompted_at": "2026-09-06T06:40:08+09:00"
     },
     "kneesbee_oa": {
       "route_id": "kneesbee_oa",
-      "folder": "419_Kneesbee税理士法人",
-      "last_import_at": "2026-08-13T22:36:20+09:00",
+      "folder": "519_Kneesbee税理士法人",
+      "last_import_at": "2026-09-06T15:59:07+09:00",
       "last_import_source": "inbox",
-      "last_prompted_at": "2026-08-13T22:25:07+09:00"
+      "last_prompted_at": "2026-09-06T06:40:08+09:00"
     },
     "tokai_dx_gojokai": {
       "route_id": "tokai_dx_gojokai",
       "folder": "820_LINE_東海DX互助会",
-      "last_import_at": "2026-08-19T16:25:36+09:00",
+      "last_import_at": "2026-09-06T15:59:07+09:00",
+      "last_import_source": "inbox",
+      "last_prompted_at": "2026-09-06T06:40:08+09:00"
+    },
+    "burozero": {
+      "route_id": "burozero",
+      "folder": "221_ブロゼロ",
+      "last_import_at": "2026-09-06T06:53:10+09:00",
+      "last_import_source": "inbox"
+    },
+    "yuuaikai_ippan": {
+      "route_id": "yuuaikai_ippan",
+      "folder": "722_遊愛会",
+      "last_import_at": "2026-09-06T15:59:07+09:00",
+      "last_import_source": "inbox"
+    },
+    "yuuaikai_main": {
+      "route_id": "yuuaikai_main",
+      "folder": "722_遊愛会",
+      "last_import_at": "2026-09-06T15:59:07+09:00",
       "last_import_source": "inbox"
     }
   }

@@ -315,10 +315,18 @@ def resolve_md_for_route(route: dict) -> Path | None:
 
 
 def resolve_kanji_md() -> Path | None:
-    """815 東海飲み会幹事のやり取り（フォルダ名ゆれ対応）。"""
+    """幹事やり取り正本（823_名古屋幹事グループ。旧815配下からの移管後）。"""
+    preferred = BASE_PATH / "823_名古屋幹事グループ" / YORITOORI_FILENAME
+    if preferred.is_file():
+        return preferred
+    for p in BASE_PATH.iterdir():
+        if p.is_dir() and p.name.startswith("823") and "幹事" in p.name:
+            md = p / YORITOORI_FILENAME
+            if md.is_file():
+                return md
+    # 旧パス互換（移管前／残骸）
     base = BASE_PATH / "815_神大家オプチャ"
     if not base.is_dir():
-        # NFC/NFD ゆれ
         for p in BASE_PATH.iterdir():
             if p.is_dir() and "815" in p.name and "オプチャ" in p.name:
                 base = p
@@ -406,7 +414,7 @@ def resolve_body_and_target(args, partners: list, routes: list[dict]):
                     if md:
                         return {
                             "body": body,
-                            "display_name": "815東海飲み会幹事",
+                            "display_name": "823名古屋幹事グループ",
                             "md_path": md,
                             "draft_path": hub_path,
                             "source_label": f"ハブ(幹事) {needle}",
@@ -427,7 +435,7 @@ def resolve_body_and_target(args, partners: list, routes: list[dict]):
                 if md:
                     return {
                         "body": body,
-                        "display_name": "815東海飲み会幹事",
+                        "display_name": "823名古屋幹事グループ",
                         "md_path": md,
                         "draft_path": hub_path,
                         "source_label": f"ハブ宛先 {value}",
@@ -474,7 +482,7 @@ def resolve_body_and_target(args, partners: list, routes: list[dict]):
                 sys.exit(1)
             return {
                 "body": parse_line_body(body),
-                "display_name": "815東海飲み会幹事",
+                "display_name": "823名古屋幹事グループ",
                 "md_path": md,
                 "draft_path": None,
                 "source_label": f"--route {args.route}",

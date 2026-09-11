@@ -1,11 +1,16 @@
 {
   "version": 1,
-  "updated": "2026-08-30",
+  "updated": "2026-09-11",
   "note": "キー: lane:<id> / partner:<フォルダ名> / page:<id> / openchat:<グループ名>。url が空のエントリは UI に出さない。OneDrive webUrl は Graph で初期取得。",
   "links": {
     "lane:kanji": [
       {
-        "label": "幹事マニュアル NotebookLM",
+        "label": "幹事マニュアル Notebook（共有用・estate）",
+        "url": "https://notebook.google.com/notebook/ee91b577-a06d-46bf-880d-af41c72e39cd",
+        "kind": "web"
+      },
+      {
+        "label": "幹事マニュアル Notebook（作業用・admin）",
         "url": "https://notebooklm.google.com/notebook/34fb5ac0-a717-4d6a-b1a0-d09fb4a049c4",
         "kind": "web"
       },
