@@ -1,134 +1,628 @@
 {
-  "audited_at": "2026-07-30",
+  "audited_at": "2026-09-10",
+  "audited_at_iso": "2026-09-10T21:39:19+09:00",
   "sources": [
-    "Vpass meisai 202608 (CDP)",
-    "Gmail API m19m (SBI積立発注・利用通知・特典達成状況)",
-    "Zaim CSV 20260628",
-    "sbi_vpoint_up_checklist.json",
-    "公式: Olive Infinite クレカ積立最大6% / 対象店はVisaタッチ・モバイルオーダー（iD対象外）"
+    "Vpass WEB明細 2026年9月支払（CDP chrome_vpass_audit）",
+    "Gmail API（投信積立）",
+    "vpoint_tsite_history_20260910.json",
+    "公式: 対象店はVisaタッチ・モバイルオーダー（iD対象外）／積立最大6%は条件付き"
   ],
   "credit_tsumitate": {
     "monthly_yen_confirmed": 90000,
     "evidence": [
-      "Gmail 2026-02〜07: 〈投信積立発注結果通知〉70,000+10,000+10,000",
-      "Vpass明細 26/07/13 ＳＢＩ証券投信積立サービス 90,000円（8月支払）"
+      "Gmail: 外貨取引でVポイントを1万円以上もらうには？外貨クレカ積立でポイント上乗せのキャンペーンも実施中！ (1,800,1,800)",
+      "Gmail: 〈投信積立発注結果通知〉積立設定銘柄（クレジットカード決済）の発注処理が行われました (70,000,10,000,10,000)",
+      "Gmail: 【まもなく終了！】積立申込は9/7（月）までです！ (4,050,36,000,10,000,4,050,36,000)",
+      "Vpass: 26/08/13 ＳＢＩ証券投信積立サ－ビス（翌月買付分） 90,000円",
+      "Tサイト: 2026-09-06 三井住友カード ＳＢＩ証券 投信積立カード決済特典 Ｏｌｉｖｅ ＩＮＦ 900pt",
+      "Tサイト: 2026-07-10 三井住友カード ＳＢＩ証券 投信積立カード決済特典 プラチナプリファード 900pt"
     ],
-    "olive_inf_start": "2026-06-28頃（ランク切替・クレジットモード審査完了メール）",
-    "vpoint_balance_2026_07_29": 16377,
-    "prior_note": "2026-07-04 Vポイント投資10,000pt後 残高12,408（checklist）→ 現在16,377（+約3,969だが内訳未分解）",
     "point_history": {
-      "vsite_tsite": "ok_email_otp_2026-07-30",
-      "balance_pt": 28204,
+      "vsite_tsite": "ok_email_otp_2026-09-10",
+      "balance_pt": 41982,
       "tsumitate_bonus_recent": [
+        {
+          "date": "2026-09-06",
+          "pt": 900,
+          "rate_vs_90k": 0.01,
+          "label": "三井住友カード ＳＢＩ証券 投信積立カード決済特典 Ｏｌｉｖｅ ＩＮＦ"
+        },
         {
           "date": "2026-07-10",
           "pt": 900,
           "rate_vs_90k": 0.01,
-          "label": "プラチナプリファード"
-        },
-        {
-          "date": "2026-06-08",
-          "pt": 900,
-          "rate_vs_90k": 0.01
-        },
-        {
-          "date": "2026-05-05",
-          "pt": 900,
-          "rate_vs_90k": 0.01
+          "label": "三井住友カード ＳＢＩ証券 投信積立カード決済特典 プラチナプリファード"
         }
       ]
     },
     "effective_rate": {
-      "status": "confirmed_1pct_not_6pct",
+      "status": "monthly_1pct_by_design",
       "reason": [
-        "Tサイト履歴で投信積立カード決済特典が毎月900pt（9万円の1%）",
-        "履歴表記はプラチナプリファードのまま。Infinite最大6%の条件付与は未確認"
+        "公式は毎月基本1%付与＋年間利用額に応じた上乗せを年1回",
+        "月次Tサイト900ptは設計どおり（異常ではない）",
+        "2026-08-15時点カード利用約162万円（新規特典集計）。クレカ積立は集計対象外",
+        "INF年間帯: <300万=1% / ≥300万=2% / ≥500万=3% / ≥700万=4%。資産特典で最大+2%"
       ],
-      "expected_band_now_pct": "実績1%",
+      "expected_band_now_pct": "月次1%（設計）／年次上乗せは集計期間終了後",
       "at_90k_yen": {
-        "actual_pts": 900,
-        "actual_pct": 1.0,
-        "if_6pct_pts": 5400
+        "monthly_base_pts": 900,
+        "monthly_base_pct": 1.0,
+        "if_annual_4pct_extra_on_108man": "(年積立108万×追加3%等は年1回計算)"
       },
-      "verdict": "積立稼働OKだが付与は1%。6%には未到達"
+      "verdict": "積立設定OK。月次1%は正常。伸ばすなら年間利用帯と資産特典の可否を見る",
+      "olive_usage_email_20260815_yen": 1622299,
+      "new_member_bonus": "100000pt scheduled"
     }
   },
   "merchant_high_rate": {
-    "user_claim": "クレジットオンリー＋iDで+10%",
+    "user_claim": "クレジット払い意図",
     "official": "対象店高還元はスマホVisaタッチ／モバイルオーダー限定。iDは対象外",
-    "meisai_202608_sample": {
+    "meisai_sample": {
+      "label": "vpass_202609_payment_olive_inf",
+      "id_ratio": 0.168,
+      "id_count": 20,
+      "row_count": 119,
+      "target_shop_count": 14,
+      "target_id_count": 7,
       "correct_rail": [
         {
-          "date": "26/07/25",
+          "payment_month": "2026年9月",
+          "date": "26/08/08",
           "merchant": "マクドナルドモバイルオーダー／ＡＰ",
-          "yen": 2990
+          "yen": 2230,
+          "is_id": false,
+          "is_mobile_order": true,
+          "is_target_shop": true,
+          "is_tsumitate": false
         },
         {
-          "date": "26/07/29",
+          "payment_month": "2026年9月",
+          "date": "26/08/19",
+          "merchant": "マクドナルドモバイルオーダー／ＡＰ",
+          "yen": 2490,
+          "is_id": false,
+          "is_mobile_order": true,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/26",
           "merchant": "マクドナルドモバイルオーダー／ＡＰ",
           "yen": 2990,
-          "source": "Gmail利用通知"
+          "is_id": false,
+          "is_mobile_order": true,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 313,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 524,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 957,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
         }
       ],
       "id_rail_including_target_cvs": [
         {
-          "date": "26/07/17",
-          "merchant": "セブン－イレブン／ｉＤ",
-          "yen": 288
+          "payment_month": "2026年9月",
+          "date": "26/08/01",
+          "merchant": "ファミリーマート／ｉＤ",
+          "yen": 166,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
         },
         {
-          "date": "26/07/28",
+          "payment_month": "2026年9月",
+          "date": "26/08/05",
           "merchant": "ミンツストア名誘１号店／ｉＤ",
-          "yen": 516
+          "yen": 336,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
         },
         {
-          "date": "26/07/16",
-          "merchant": "和食さと 豊明南店／ｉＤ",
-          "yen": 3619
+          "payment_month": "2026年9月",
+          "date": "26/08/07",
+          "merchant": "ミンツストア大江／ｉＤ",
+          "yen": 356,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/15",
+          "merchant": "セブン－イレブン／ｉＤ",
+          "yen": 116,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/21",
+          "merchant": "ミンツストア大江／ｉＤ",
+          "yen": 568,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/28",
+          "merchant": "マクドナルド／ｉＤ",
+          "yen": 440,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/30",
+          "merchant": "マクドナルド／ｉＤ",
+          "yen": 1320,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
         }
       ],
-      "note": "8月支払明細のOlive INF利用はほぼ全て『／ｉＤ』表記。セブンもiD"
+      "sample_id": [
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/01",
+          "merchant": "セリア０１５０パルネス豊明店／ｉＤ",
+          "yen": 330,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": false,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/01",
+          "merchant": "ファミリーマート／ｉＤ",
+          "yen": 166,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/04",
+          "merchant": "飲料自販機／ｉＤ",
+          "yen": 140,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": false,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/05",
+          "merchant": "ミンツストア名誘１号店／ｉＤ",
+          "yen": 336,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/05",
+          "merchant": "飲料自販機／ｉＤ",
+          "yen": 140,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": false,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/07",
+          "merchant": "ミンツストア大江／ｉＤ",
+          "yen": 356,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/08",
+          "merchant": "リカーワールド２１シバタ／ｉＤ",
+          "yen": 3178,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": false,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/11",
+          "merchant": "ケンタッキーフライドチキン／ｉＤ",
+          "yen": 3410,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": false,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/14",
+          "merchant": "Ｓｑｕａｒｅ／ｉＤ",
+          "yen": 3740,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": false,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/14",
+          "merchant": "ＲＡＹＡＲＤ　Ｈｉｓａｙａ－ｏｄｏ／ｉＤ",
+          "yen": 1776,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": false,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/14",
+          "merchant": "コメダ珈琲店　伏見・日土地名古屋ビ／ｉＤ",
+          "yen": 4000,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": false,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/15",
+          "merchant": "セブン－イレブン／ｉＤ",
+          "yen": 116,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        }
+      ],
+      "seven_without_id": [
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 313,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 524,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 957,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        }
+      ],
+      "seven_with_id": [
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/15",
+          "merchant": "セブン－イレブン／ｉＤ",
+          "yen": 116,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        }
+      ],
+      "note": "2026年9月支払・Olive INF WEB明細: 119件中／ｉＤ 20件（比率 0.168）。対象店 14件うちｉＤ 7件。セブンはｉＤあり/なし混在。マクドはモバイルオーダー／ＡＰあり。ファミマ・ミンツ等はｉＤ残存。7月監査の『ほぼ全てｉＤ』からは改善。"
     },
-    "v_coupon_plus_10": "マイページの『ポイント最大+10%』はVクーポン（しゃぶ葉・ガスト等）であり、対象コンビニの基本高還元スタックとは別",
-    "verdict": "iD決済では高還元（ユーザー期待の+10%）は付かない仕様。実績としてもセブン等がiDで計上されており、高還元未達の主因は決済手段",
+    "meisai_202608_sample": {
+      "correct_rail": [
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/08",
+          "merchant": "マクドナルドモバイルオーダー／ＡＰ",
+          "yen": 2230,
+          "is_id": false,
+          "is_mobile_order": true,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/19",
+          "merchant": "マクドナルドモバイルオーダー／ＡＰ",
+          "yen": 2490,
+          "is_id": false,
+          "is_mobile_order": true,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/26",
+          "merchant": "マクドナルドモバイルオーダー／ＡＰ",
+          "yen": 2990,
+          "is_id": false,
+          "is_mobile_order": true,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 313,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 524,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/16",
+          "merchant": "セブン－イレブン",
+          "yen": 957,
+          "is_id": false,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        }
+      ],
+      "id_rail_including_target_cvs": [
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/01",
+          "merchant": "ファミリーマート／ｉＤ",
+          "yen": 166,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/05",
+          "merchant": "ミンツストア名誘１号店／ｉＤ",
+          "yen": 336,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/07",
+          "merchant": "ミンツストア大江／ｉＤ",
+          "yen": 356,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/15",
+          "merchant": "セブン－イレブン／ｉＤ",
+          "yen": 116,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/21",
+          "merchant": "ミンツストア大江／ｉＤ",
+          "yen": 568,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/28",
+          "merchant": "マクドナルド／ｉＤ",
+          "yen": 440,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        },
+        {
+          "payment_month": "2026年9月",
+          "date": "26/08/30",
+          "merchant": "マクドナルド／ｉＤ",
+          "yen": 1320,
+          "is_id": true,
+          "is_mobile_order": false,
+          "is_target_shop": true,
+          "is_tsumitate": false
+        }
+      ],
+      "note": "2026年9月支払・Olive INF WEB明細: 119件中／ｉＤ 20件（比率 0.168）。対象店 14件うちｉＤ 7件。セブンはｉＤあり/なし混在。マクドはモバイルオーダー／ＡＰあり。ファミマ・ミンツ等はｉＤ残存。7月監査の『ほぼ全てｉＤ』からは改善。"
+    },
+    "v_coupon_plus_10": "マイページの『ポイント最大+10%』はVクーポンであり、対象コンビニの基本高還元とは別",
+    "verdict": "ｉＤ比率は約16%（7月のほぼ全てｉＤから改善）。セブンはｉＤなし行あり（Visaタッチ等の可能性）。一方ファミマ・ミンツ・一部セブンはｉＤ残。対象店はVisaタッチ徹底が次の一手。",
     "tsite_evidence": {
       "mcdonalds_plus6pct_20260724": 270,
       "saizeriya_plus6pct_20260724": 234,
-      "note": "対象店＋6%特典はPP名義で付与あり。セブン等iDの高還元行は履歴上なし"
+      "note": "対象店＋6%はモバイルオーダー系で付与実績あり"
     }
   },
   "recommendations": [
-    "月次で明細の／ｉＤ比率を見る（Wallet設定は強制変更しない）",
-    "マクドナルド等はモバイルオーダー継続（正しいレール）",
-    "クレカ積立6%は付与後にTサイト履歴で実効率（認証後）",
-    "Tサイト資格は .env.jarvis_private に VPOINT_TSITE_* で追記後に再監査",
-    "Jarvis: jarvis-vpoint-audit / 月次ウィンドウC"
+    "ファミマ等のｉＤ残店舗は Visaタッチ1回→『試した』（Wallet強制変更はしない）",
+    "セブンのｉＤなし行は維持・増やせるか観察",
+    "クレカ積立6%: 年間カード利用帯＋Olive資産特典（NISA評価額）を確認",
+    "選べる特典（給与200＋還元×2）をアプリで確認"
   ],
-  "alignment_2026_07_30": {
+  "alignment_2026_09_10": {
     "visa_vs_id": {
-      "high_rate_requires": [
-        "credit_mode",
-        "visa_touch_or_mobile_order"
+      "id_ratio_sept_payment": 0.168,
+      "improved_vs_202607_almost_all_id": true,
+      "still_id_on": [
+        "ファミリーマート",
+        "ミンツ",
+        "一部セブン",
+        "自販機"
       ],
-      "id_ineligible": true,
-      "olive_id_often_debit": true,
-      "judge_by_meisai_suffix_id": true,
-      "wallet_display_line_pay_credit": "表示名とOlive INF本体は別。明細が／ｉＤなら高還元対象外",
-      "do_not_force_wallet_change": true,
-      "next_check": "月次で／ｉＤ比率の改善有無のみ"
+      "ok_rail_seen": [
+        "マクドナルドモバイルオーダー／ＡＰ",
+        "セブン（ｉＤなし）"
+      ],
+      "do_not_force_wallet_change": true
+    }
+  },
+  "vpass_raw": {
+    "payment_month": "2026年9月",
+    "row_count": 119,
+    "id_ratio": 0.168
+  },
+  "nisa_and_asset_tokuten": {
+    "checked_at": "2026-09-10T21:45:50+09:00",
+    "user_nisa_man": 100,
+    "zaim_sbi_total_jpy": 1732305,
+    "zaim_as_of": "2026-09-10",
+    "vpoint_up_program": {
+      "nisa_100man_plus_0_5pct_cvs": "achieved_or_eligible",
+      "nisa_200man_plus_0_5pct_cvs": "gap_about_100man_~11mo_at_90k",
+      "note": "コンビニ等のVポイントアップ上乗せ。クレカ積立率とは別"
     },
-    "tsite": {
-      "status": "ok_email_otp",
-      "note": "パスワード不要。VPOINT_TSITE_ID＋メール認証（estate宛）。VPOINT_TSITE_PASSWORDは未使用可",
-      "env_keys": [
-        "VPOINT_TSITE_ID"
-      ]
+    "olive_asset_tokuten_tsumitate_plus_2pct": {
+      "realistic": false,
+      "need": "SMBC円普通≥500万 + SBI≥500万 + Olive残高≥3000万（+2%は≥5000万）",
+      "current_sbi_approx": 1732305,
+      "verdict": "当面狙わない"
+    }
+  },
+  "eraberu_tokuten": {
+    "status": "ok",
+    "checked_at": "2026-09-10T22:15:59+09:00",
+    "user_says": "給与200＋還元×2",
+    "evidence": [
+      "Tサイト 2026-09-04 給与・年金受取特典 刈谷支店 200pt",
+      "Literature Note §6.5 と一致"
+    ],
+    "note": "還元×2の個別行は選べる特典名では出ないことが多い。給与200付与で設定反映を確認"
+  },
+  "olive_annual_usage": {
+    "updated_at": "2026-09-10T22:19:09+09:00",
+    "card": "Olive Flexible Pay Visa Infinite（残会員・本線）",
+    "other_cards": "単体PPは2026-08-04即時退会完了・追加年会費なし",
+    "snapshots": [
+      {
+        "as_of": "2026-07-15",
+        "usage_yen": 18274,
+        "source": "Gmail 各種特典条件達成状況 2026-07-23"
+      },
+      {
+        "as_of": "2026-08-15",
+        "usage_yen": 1622299,
+        "source": "Gmail 各種特典条件達成状況 2026-08-27"
+      }
+    ],
+    "periods": {
+      "new_member": {
+        "range": "2026-06-01〜2026-09-30",
+        "status": "100000pt 進呈予定（8/15時点で条件達成）"
+      },
+      "continuous": {
+        "range": "2026-06-01〜2027-06-30",
+        "status": "8/15時点は進呈予定なし（継続特典の閾値は別）",
+        "usage_same_as_snapshot": true
+      }
     },
-    "ops": {
-      "cadence": "vpoint_cadence.json / jarvis_vpoint_cadence_check.py",
-      "partner_side": "前半末尾ついで（必須手順外・間隔2日）",
-      "monthly_window_c": "25-EOM deep audit",
-      "tsite_login": "VPOINT_TSITE_ID + email OTP (estate); password optional"
+    "notes": [
+      "集計=デビット＋クレジット合算。ポイント払いは対象外",
+      "クレカ積立（月9万）は集計対象外",
+      "7/15→8/15で約+160万（売上到着遅延＋Olive寄せの影響大。このペースは継続しない前提で見る）",
+      "8月引落のOlive INFクレジット請求は約159.6万（card_debit_watch）— 月次請求の参考"
+    ],
+    "tsumitate_band_outlook": {
+      "current_approx_yen": 1622299,
+      "current_band": "1%（300万未満）",
+      "to_bands": [
+        {
+          "threshold": 3000000,
+          "rate": "2%",
+          "gap_yen": 1377701,
+          "needed_per_month_yen_if_10_5mo": 131209
+        },
+        {
+          "threshold": 5000000,
+          "rate": "3%",
+          "gap_yen": 3377701,
+          "needed_per_month_yen_if_10_5mo": 321685
+        },
+        {
+          "threshold": 7000000,
+          "rate": "4%",
+          "gap_yen": 5377701,
+          "needed_per_month_yen_if_10_5mo": 512162
+        }
+      ],
+      "verdict": "300万帯（2%）は、月平均およそ13万円超の集計対象利用が続けば継続期間内に届きうる。500万/700万は月32万〜51万ペースが要るため、無理に狙わない（次物件キープ優先）。"
     }
   }
 }

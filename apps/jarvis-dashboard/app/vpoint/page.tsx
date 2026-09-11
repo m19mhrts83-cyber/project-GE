@@ -72,6 +72,23 @@ type TeikiBarai = {
   interval_days?: number | null;
 };
 
+type PdcaItem = {
+  id?: string;
+  title?: string;
+  detail?: string;
+  how?: string;
+  priority?: string;
+};
+
+type PdcaBoard = {
+  at?: string | null;
+  wins?: PdcaItem[];
+  gaps?: PdcaItem[];
+  next_actions?: PdcaItem[];
+  freshness?: string[];
+  user_intent_note?: string | null;
+};
+
 function fmtPt(n: number | null | undefined) {
   if (n == null || Number.isNaN(n)) return "—";
   return `${Math.round(n).toLocaleString("ja-JP")}pt`;
@@ -146,6 +163,13 @@ export default async function VpointPage() {
   const byRate = Array.isArray(summary.by_rate) ? summary.by_rate : [];
   const insights = Array.isArray(summary.insights) ? summary.insights : [];
   const teikiServices = Array.isArray(teiki?.services) ? teiki!.services! : [];
+  const pdca =
+    payload.pdca_board && typeof payload.pdca_board === "object"
+      ? (payload.pdca_board as PdcaBoard)
+      : null;
+  const pdcaWins = Array.isArray(pdca?.wins) ? pdca!.wins! : [];
+  const pdcaGaps = Array.isArray(pdca?.gaps) ? pdca!.gaps! : [];
+  const pdcaNext = Array.isArray(pdca?.next_actions) ? pdca!.next_actions! : [];
 
   return (
     <Shell active="/vpoint">
@@ -153,7 +177,60 @@ export default async function VpointPage() {
       <p className="sub">
         月次付与サマリ（日次利用／月次条件・％別）と考察。ウィンドウC（25日〜月末）に更新。
         定期払いチャンス（テイチャン）の進捗・抽選もここに載せます。
+        獲得効率は下の PDCA（良かった点／要改善）を見ながら Jarvis と進めます。
       </p>
+
+      {pdca ? (
+        <article className="card" id="pdca">
+          <header>
+            <span className="lvl">PDCA</span>
+            <strong>獲得効率ボード</strong>
+          </header>
+          <p className="meta">更新 {pdca.at || "—"} · ステータス把握 → 会話で改善</p>
+          {pdca.user_intent_note ? (
+            <p className="sum">{pdca.user_intent_note}</p>
+          ) : null}
+          <div className="vpoint-rate-table-wrap" style={{ display: "grid", gap: "1rem", gridTemplateColumns: "1fr 1fr" }}>
+            <div>
+              <h3 className="vpoint-subh">良かった点</h3>
+              <ul>
+                {pdcaWins.length === 0 ? <li>—</li> : null}
+                {pdcaWins.map((w) => (
+                  <li key={w.id || w.title}>
+                    <strong>{w.title}</strong>
+                    {w.detail ? <span className="meta"> — {w.detail}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="vpoint-subh">要改善</h3>
+              <ul>
+                {pdcaGaps.length === 0 ? <li>—</li> : null}
+                {pdcaGaps.map((g) => (
+                  <li key={g.id || g.title}>
+                    <strong>{g.title}</strong>
+                    {g.detail ? <span className="meta"> — {g.detail}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          {pdcaNext.length > 0 ? (
+            <>
+              <h3 className="vpoint-subh">次の一手（最大2）</h3>
+              <ul>
+                {pdcaNext.map((n) => (
+                  <li key={n.id || n.title}>
+                    <strong>{n.title}</strong>
+                    {n.how ? <span className="meta"> → {n.how}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </article>
+      ) : null}
 
       {showBanner && hasGrant ? (
         <article className="card level-info etc-rebate-banner">

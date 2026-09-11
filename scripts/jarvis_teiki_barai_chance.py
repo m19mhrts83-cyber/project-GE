@@ -4,19 +4,25 @@
 ステップ:
   1. 追加で実行できる手続き候補を列挙（迷うものは confirm_needed）
   2. 抽選券の有無を確認
-  3. 券があれば抽選し「抽選したよ」を通知
+  3. 券があれば抽選し「抽選したよ」を通知（人手不要・定例で自動）
 
 使い方:
   python scripts/jarvis_teiki_barai_chance.py --status
-  python scripts/jarvis_teiki_barai_chance.py --run
+  python scripts/jarvis_teiki_barai_chance.py --run --push
   python scripts/jarvis_teiki_barai_chance.py --run --skip-draw
   python scripts/jarvis_teiki_barai_chance.py --run --force   # interval 無視
+  python scripts/jarvis_teiki_barai_chance.py --run --headless --push  # GHA / 無人向け
+
+定例: launchd/teiki_draw_runner.sh（月・木）＋朝オープン取りこぼし。
+券が溜まっていれば抽選まで自動。ユーザーが手動で回す必要はない。
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
@@ -29,7 +35,7 @@ from playwright.sync_api import Page, sync_playwright
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from car_loan.chrome_cdp import cdp_ready, start_cdp_chrome  # noqa: E402
+from car_loan.chrome_cdp import CHROME, cdp_ready, start_cdp_chrome  # noqa: E402
 from car_loan.env_state import ENV_FILE, load_env  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -37,6 +43,7 @@ REPO = Path(__file__).resolve().parents[1]
 STATE_DIR = REPO / ".jarvis_state"
 STATE_PATH = STATE_DIR / "teiki_barai_chance.json"
 EXAMPLE_PATH = STATE_DIR / "teiki_barai_chance.example.json"
+PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 
 CDP_PORT = 9235
 PROFILE = Path.home() / ".jarvis_state" / "chrome_teiki_barai"
@@ -50,7 +57,8 @@ TEIKI_GIFT = "https://teikibarai.smbc-card.com/gift_info"
 TEIKI_GUIDE = "https://teikibarai.smbc-card.com/guide"
 
 SHOT_DIR = STATE_DIR / "teiki_barai_chance"
-DEFAULT_INTERVAL_DAYS = 7
+# 券チェック頻度（券>0 なら is_due が即 True）
+DEFAULT_INTERVAL_DAYS = 3
 
 SKIP_DRAW_STATUSES = {
     "done",
@@ -460,6 +468,12 @@ def scrape_and_maybe_draw(
     if counts.get("public_landing"):
         enrolled = "unknown"
         print("⚠️ まだ公開ランディング（未ログイン）の可能性")
+    # force_login のまま＝ログイン未完了（headless/GHA で起きやすい）
+    login_incomplete = (
+        "force_login" in (page.url or "")
+        or counts.get("public_landing")
+        or ("userid" in text.lower() and "パスワード" in text)
+    )
     out: dict[str, Any] = {
         "enrolled": enrolled,
         "ticket_count": counts["ticket_count"],
@@ -468,7 +482,15 @@ def scrape_and_maybe_draw(
         "page_url": page.url,
         "draw": None,
         "public_landing": bool(counts.get("public_landing")),
+        "login_incomplete": login_incomplete,
     }
+    if login_incomplete:
+        print("⚠️ テイチャン: ログイン未完了のため券数・規約状態は更新しない")
+        out["ticket_count"] = None
+        out["w_chance_tickets"] = None
+        out["service_count"] = None
+        out["enrolled"] = None
+        return out
     tickets = counts["ticket_count"] or 0
     w = counts["w_chance_tickets"] or 0
     total = tickets + w
@@ -551,18 +573,48 @@ def format_report(
     return "\n".join(lines)
 
 
-def run_browser(*, do_draw: bool) -> dict[str, Any]:
+def run_browser(*, do_draw: bool, headless: bool = False) -> dict[str, Any]:
     env = load_env(ENV_FILE)
-    vpass_id = env.get("VPASS_ID", "")
-    vpass_pw = env.get("VPASS_PASSWORD", "")
+    # GHA / CI では Secrets を環境変数で渡す（.env.jarvis_private が無い）
+    vpass_id = env.get("VPASS_ID") or os.environ.get("VPASS_ID", "")
+    vpass_pw = env.get("VPASS_PASSWORD") or os.environ.get("VPASS_PASSWORD", "")
     if not vpass_id or not vpass_pw:
         raise RuntimeError("未設定: VPASS_ID / VPASS_PASSWORD")
 
-    start_cdp_chrome(CDP_PORT, PROFILE, TEIKI_URL)
-    if not cdp_ready(CDP_PORT):
-        raise RuntimeError(f"CDP port {CDP_PORT} not ready")
+    want_headless = (
+        headless
+        or os.environ.get("TEIKI_HEADLESS", "").strip() in ("1", "true", "yes")
+        or not Path(CHROME).exists()
+    )
 
     with sync_playwright() as p:
+        if want_headless:
+            print("📎 テイチャン: Playwright headless Chromium")
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            ctx = browser.new_context(
+                locale="ja-JP",
+                viewport={"width": 1280, "height": 900},
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"
+                ),
+            )
+            page = ctx.new_page()
+            try:
+                _login_vpass(page, vpass_id, vpass_pw)
+                return scrape_and_maybe_draw(page, do_draw=do_draw)
+            finally:
+                ctx.close()
+                browser.close()
+
+        start_cdp_chrome(CDP_PORT, PROFILE, TEIKI_URL)
+        if not cdp_ready(CDP_PORT):
+            raise RuntimeError(f"CDP port {CDP_PORT} not ready")
+
         browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
         ctx = browser.contexts[0] if browser.contexts else browser.new_context()
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
@@ -570,8 +622,30 @@ def run_browser(*, do_draw: bool) -> dict[str, Any]:
         return scrape_and_maybe_draw(page, do_draw=do_draw)
 
 
+def push_dashboard() -> dict[str, Any]:
+    py = str(PY) if PY.is_file() else sys.executable
+    cmd = [py, str(REPO / "scripts" / "jarvis_dashboard_push.py"), "--watch-only"]
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        return {"ok": proc.returncode == 0, "returncode": proc.returncode}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def apply_scrape_to_state(state: dict[str, Any], scrape: dict[str, Any]) -> None:
     state["last_check_at"] = now_iso()
+    if scrape.get("login_incomplete"):
+        state["last_login_ok"] = False
+        state["last_error"] = "login_incomplete"
+        return
+    state["last_login_ok"] = True
+    state.pop("last_error", None)
     if scrape.get("enrolled") in ("yes", "no", "unknown"):
         state["enrolled"] = scrape["enrolled"]
     for key in ("ticket_count", "w_chance_tickets", "service_count"):
@@ -631,10 +705,18 @@ def main() -> int:
     ap.add_argument("--skip-draw", action="store_true", help="抽選しない（確認のみ）")
     ap.add_argument("--force", action="store_true", help="interval 無視")
     ap.add_argument("--dry-run", action="store_true", help="ブラウザなしで Step1 だけ")
+    ap.add_argument(
+        "--headless",
+        action="store_true",
+        help="Playwright headless（GHA・無人。Mac Chrome CDP を使わない）",
+    )
+    ap.add_argument("--push", action="store_true", help="ダッシュボード /vpoint へ反映")
     args = ap.parse_args()
 
     env = load_env(ENV_FILE)
-    if env.get("JARVIS_TEIKI_BARAI_DISABLE") == "1":
+    if env.get("JARVIS_TEIKI_BARAI_DISABLE") == "1" or os.environ.get(
+        "JARVIS_TEIKI_BARAI_DISABLE"
+    ) == "1":
         print("📎 テイチャン: 無効化（JARVIS_TEIKI_BARAI_DISABLE=1）")
         return 0
 
@@ -642,6 +724,10 @@ def main() -> int:
     if state.get("disabled"):
         print("📎 テイチャン: 無効化（state disabled）")
         return 0
+
+    # interval を state に寄せ（未設定なら既定3日）
+    if not state.get("interval_days"):
+        state["interval_days"] = DEFAULT_INTERVAL_DAYS
 
     if args.status or (not args.run and not args.dry_run):
         print_status(state, env)
@@ -663,7 +749,7 @@ def main() -> int:
         return 0
 
     try:
-        scrape = run_browser(do_draw=not args.skip_draw)
+        scrape = run_browser(do_draw=not args.skip_draw, headless=args.headless)
         apply_scrape_to_state(state, scrape)
         drew = bool(scrape.get("draw") and scrape["draw"].get("ok"))
         if not args.skip_draw and not drew:
@@ -680,6 +766,9 @@ def main() -> int:
     print(format_report(actionables=actionables, scrape=scrape, state=state, drew=drew))
     if drew:
         print("\n✅ 抽選したよ — ダッシュボード /vpoint のテイチャン欄にも反映されます（push 後）")
+    if args.push:
+        pr = push_dashboard()
+        print(f"📎 dashboard push: {pr}")
     return 0
 
 
