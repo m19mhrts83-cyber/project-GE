@@ -495,6 +495,10 @@ def entry_id(folder: str, received_at: str, subject: str) -> str:
 
 def parse_yoritoori(md_path: Path, partner_folder: str, partner_name: str) -> list[dict[str, Any]]:
     text = md_path.read_text(encoding="utf-8", errors="replace")
+    return parse_yoritoori_text(text, partner_folder, partner_name)
+
+
+def parse_yoritoori_text(text: str, partner_folder: str, partner_name: str) -> list[dict[str, Any]]:
     lines = text.splitlines()
     entries: list[dict[str, Any]] = []
     i = 0
@@ -1361,6 +1365,11 @@ def main() -> int:
     ap.add_argument("--compare-engines", action="store_true")
     ap.add_argument("--judge-only", action="store_true")
     ap.add_argument("--lane", choices=("partner", "general", "all"), default="all")
+    ap.add_argument(
+        "--skip-partner-gmail",
+        action="store_true",
+        help="パートナー Gmail 未返信判定をスキップ（GHA 本線時。CW/LINE/iMessage は継続）",
+    )
     ap.add_argument("--limit", type=int, default=0, help="処理する候補の上限（0=config）")
     ap.add_argument("--lookback-days", type=int, default=0)
     ap.add_argument("--mark-sent", metavar="ID")
@@ -1432,12 +1441,18 @@ def main() -> int:
     activities: list[dict[str, Any]] = []
     activity_lookback = int(cfg.get("activity_lookback_days") or ACTIVITY_LOOKBACK_DEFAULT)
     if do_partner:
+        skip_pg = args.skip_partner_gmail or (
+            (os.environ.get("JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL") or "").strip().lower()
+            in ("1", "true", "yes", "on")
+        )
+        if skip_pg:
+            print("# skip partner Gmail unreplied (GHA / --skip-partner-gmail)")
         for folder, md in list_partner_mds(base):
             name = folder.split("_", 1)[-1] if "_" in folder else folder
             entries = parse_yoritoori(md, folder, name)
-            cands = find_unreplied(entries, lookback)
+            if not skip_pg:
+                all_cands.extend(find_unreplied(entries, lookback))
             chat_cands = find_unreplied_chat(entries, lookback)
-            all_cands.extend(cands)
             all_cands.extend(chat_cands)
             activities.extend(find_recent_chat_activity(entries, activity_lookback))
         # パートナー活動: チャットは要返信キューへ昇格済みのため通常0件

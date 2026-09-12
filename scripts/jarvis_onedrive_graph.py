@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Jarvis: OneDrive（Microsoft Graph）読取。
+Jarvis: OneDrive（Microsoft Graph）読取・書込。
 
 認証優先順:
   1) MS_GRAPH_REFRESH_TOKEN（個人用 OneDrive 向け・委任。推奨）
@@ -11,9 +11,12 @@ Jarvis: OneDrive（Microsoft Graph）読取。
   python scripts/jarvis_ms_graph_device_login.py
   → .env.jarvis_private に MS_GRAPH_* を追記
 
+書込には Azure 委任 Files.ReadWrite / Files.ReadWrite.All と再同意が必要。
+
 確認:
   python scripts/jarvis_onedrive_graph.py --dry-run
   python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/…"
+  python scripts/jarvis_onedrive_graph.py --append-text "…" --text "\\n# probe\\n"
 """
 from __future__ import annotations
 
@@ -26,11 +29,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 REPO = Path(__file__).resolve().parents[1]
 LOCAL_ONEDRIVE = Path.home() / "Library/CloudStorage/OneDrive-個人用"
 TOKEN_CACHE = Path.home() / ".jarvis_state" / "ms_graph_token_cache.json"
+
+# 読取＋書込（パートナー MD 追記用）。旧 refresh は Read のみのことがある → 再同意。
+DELEGATED_SCOPES = (
+    "offline_access Files.Read Files.Read.All "
+    "Files.ReadWrite Files.ReadWrite.All User.Read"
+)
 
 
 def _env(name: str) -> str:
@@ -73,7 +82,10 @@ def _tenant_authority() -> str:
 
 
 def refresh_access_token() -> str:
-    """委任フローの refresh → access。キャッシュあり。"""
+    """委任フローの refresh → access。キャッシュあり。
+
+    書込スコープ未同意の refresh でも読取が生きるよう、ReadWrite 失敗時は Read のみで再試行。
+    """
     if TOKEN_CACHE.is_file():
         try:
             cached = json.loads(TOKEN_CACHE.read_text(encoding="utf-8"))
@@ -89,15 +101,36 @@ def refresh_access_token() -> str:
     secret = _env("MS_GRAPH_CLIENT_SECRET")  # 公開クライアントなら空で可
     auth = _tenant_authority()
     url = f"https://login.microsoftonline.com/{auth}/oauth2/v2.0/token"
-    form: dict[str, str] = {
-        "client_id": client_id,
-        "grant_type": "refresh_token",
-        "refresh_token": refresh,
-        "scope": "offline_access Files.Read Files.Read.All User.Read",
-    }
-    if secret:
-        form["client_secret"] = secret
-    data = _post_form(url, form)
+    scopes_try = (
+        DELEGATED_SCOPES,
+        "offline_access Files.Read Files.Read.All User.Read",
+    )
+    data: dict[str, Any] | None = None
+    last_err: Exception | None = None
+    for scope in scopes_try:
+        form: dict[str, str] = {
+            "client_id": client_id,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh,
+            "scope": scope,
+        }
+        if secret:
+            form["client_secret"] = secret
+        try:
+            data = _post_form(url, form)
+            if scope != DELEGATED_SCOPES:
+                print(
+                    "# note: Graph token is read-only. "
+                    "Azure に Files.ReadWrite を足して "
+                    "jarvis_ms_graph_device_login.py で再同意してください。",
+                    file=sys.stderr,
+                )
+            break
+        except Exception as e:
+            last_err = e
+            continue
+    if data is None:
+        raise RuntimeError(f"token refresh failed: {last_err}")
     access = data["access_token"]
     expires_in = int(data.get("expires_in") or 3600)
     new_refresh = data.get("refresh_token")
@@ -241,6 +274,117 @@ def read_file(provider: str, path: str) -> bytes:
     raise ValueError(f"unknown provider: {provider}")
 
 
+def get_item_meta(rel_path: str) -> dict[str, Any]:
+    """id / eTag / size / name。無いファイルは FileNotFoundError。"""
+    token = get_access_token()
+    meta_url = (
+        _graph_item_api(rel_path)
+        + "?$select=id,name,size,eTag,cTag,@microsoft.graph.downloadUrl"
+    )
+    req = urllib.request.Request(meta_url, headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=45) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:500]
+        if e.code == 404:
+            raise FileNotFoundError(rel_path) from e
+        raise RuntimeError(f"graph meta HTTP {e.code}: {detail}") from e
+
+
+def upload_file_graph(
+    rel_path: str,
+    content: bytes,
+    *,
+    if_match: str | None = None,
+    content_type: str = "application/octet-stream",
+) -> dict[str, Any]:
+    """小ファイル（〜4MB）を PUT :/content で上書き。if_match で楽観ロック。"""
+    token = get_access_token()
+    url = _graph_item_api(rel_path) + ":/content"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": content_type,
+    }
+    if if_match:
+        headers["If-Match"] = if_match
+    req = urllib.request.Request(url, data=content, method="PUT", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            raw = r.read()
+            if not raw:
+                return {"ok": True, "bytes": len(content)}
+            try:
+                return json.loads(raw)
+            except Exception:
+                return {"ok": True, "bytes": len(content)}
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:800]
+        raise RuntimeError(f"graph upload HTTP {e.code}: {detail}") from e
+
+
+def write_file_local(rel_path: str, content: bytes) -> None:
+    p = LOCAL_ONEDRIVE / rel_path
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(content)
+
+
+def write_file(provider: str, path: str, content: bytes, *, if_match: str | None = None) -> dict[str, Any]:
+    provider = (provider or "onedrive").lower()
+    if provider in ("onedrive", "graph"):
+        if graph_configured():
+            return upload_file_graph(path, content, if_match=if_match)
+        write_file_local(path, content)
+        return {"ok": True, "bytes": len(content), "via": "local"}
+    if provider == "local":
+        write_file_local(path, content)
+        return {"ok": True, "bytes": len(content), "via": "local"}
+    raise ValueError(f"unknown provider: {provider}")
+
+
+def append_text_graph(
+    rel_path: str,
+    block: str,
+    *,
+    transform: Callable[[str, str], str] | None = None,
+    encoding: str = "utf-8",
+    retries: int = 2,
+) -> dict[str, Any]:
+    """読取 → 結合（または transform）→ PUT。412 なら再読取してリトライ。
+
+    transform(old_text, block) -> new_text。未指定時は末尾追記。
+    """
+    last_err: Exception | None = None
+    for attempt in range(max(1, retries)):
+        try:
+            meta = get_item_meta(rel_path)
+            etag = meta.get("eTag") or meta.get("cTag")
+            raw = read_file_graph(rel_path)
+            old = raw.decode(encoding, errors="replace")
+            if transform:
+                new = transform(old, block)
+            else:
+                new = old.rstrip() + "\n" + block
+            if new == old:
+                return {"ok": True, "unchanged": True, "bytes": len(raw)}
+            data = new.encode(encoding)
+            out = upload_file_graph(rel_path, data, if_match=etag)
+            return {
+                "ok": True,
+                "bytes": len(data),
+                "etag": out.get("eTag") or etag,
+                "attempt": attempt + 1,
+            }
+        except Exception as e:
+            last_err = e
+            msg = str(e)
+            if "412" in msg or "Precondition" in msg:
+                time.sleep(0.4 * (attempt + 1))
+                continue
+            raise
+    raise RuntimeError(f"append_text_graph failed after retries: {last_err}")
+
+
 def probe_me(token: str) -> dict[str, Any]:
     req = urllib.request.Request(
         "https://graph.microsoft.com/v1.0/me?$select=displayName,userPrincipalName,mail,id",
@@ -256,6 +400,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--path", default="")
     ap.add_argument("--provider", default="onedrive")
     ap.add_argument("--probe", action="store_true", help="token 取得＋ /me 確認")
+    ap.add_argument(
+        "--append-text",
+        default="",
+        help="相対パスへテキスト追記（Graph 書込。試験用）",
+    )
+    ap.add_argument("--text", default="", help="--append-text 用の本文")
     args = ap.parse_args(argv)
 
     status: dict[str, Any] = {
@@ -266,8 +416,9 @@ def main(argv: list[str] | None = None) -> int:
         "local_onedrive_exists": LOCAL_ONEDRIVE.is_dir(),
         "provider": args.provider,
         "authority": _tenant_authority() if has_refresh_auth() else (_env("MS_GRAPH_TENANT_ID") or None),
+        "scopes": DELEGATED_SCOPES,
     }
-    if args.dry_run and not args.probe and not args.path:
+    if args.dry_run and not args.probe and not args.path and not args.append_text:
         print(json.dumps(status, ensure_ascii=False, indent=2))
         if not graph_configured():
             print(
@@ -279,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
-    if args.probe or (graph_configured() and not args.path):
+    if args.probe or (graph_configured() and not args.path and not args.append_text):
         try:
             tok = get_access_token()
             me = probe_me(tok)
@@ -295,8 +446,16 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(status, ensure_ascii=False, indent=2))
             return 1
         print(json.dumps(status, ensure_ascii=False, indent=2))
-        if not args.path:
+        if not args.path and not args.append_text:
             return 0
+
+    if args.append_text:
+        if not (args.text or "").strip():
+            print("--text が空です", file=sys.stderr)
+            return 2
+        out = append_text_graph(args.append_text, args.text)
+        print(json.dumps({**status, "append": out, "path": args.append_text}, ensure_ascii=False, indent=2))
+        return 0
 
     data = read_file(args.provider, args.path)
     print(
