@@ -30,7 +30,7 @@ def _read_new_refresh() -> str:
         for line in NEW_REFRESH.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line.startswith("MS_GRAPH_REFRESH_TOKEN="):
-                return line.split("=", 1)[1].strip()
+                return line.split("=", 1)[1].strip().strip("'\"")
     return (os.environ.get("MS_GRAPH_REFRESH_TOKEN") or "").strip()
 
 
