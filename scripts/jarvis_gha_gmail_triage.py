@@ -231,6 +231,17 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"count": len(rows), "dry_run": True}, ensure_ascii=False))
         return 0
     n = push_rows(rows)
+    # 取込時点で既読（Dashboard で閉じるまで未読のままにしない）
+    try:
+        from jarvis_night_triage_general import mark_gmail_read_for_items
+
+        mr = mark_gmail_read_for_items(rows, dry_run=False)
+        print(
+            f"# gmail read-on-ingest: ok={mr.get('ok')} fail={mr.get('fail')} skip={mr.get('skip')}",
+            file=sys.stderr,
+        )
+    except Exception as e:
+        print(f"# gmail read-on-ingest skipped: {e}", file=sys.stderr)
     # 既存 pending の物件紹介を KURASHIFT 担当として除外（要確認から外す）
     try:
         from supabase import create_client
@@ -239,14 +250,10 @@ def main(argv: list[str] | None = None) -> int:
         url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
         key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
         if url and key:
-            # GHA 上ではローカル token が無いことがある → status のみ skip
-            mark_read = Path(
-                os.environ.get("GMAIL_ADMIN_TOKEN_PATH")
-                or (MANUAL / "token_livingsupport.json")
-            ).is_file()
+            # Dashboard から外すだけ。既読は KURASHIFT 取込時（ここでは付けない）
             cleaned = skip_pending_kurashift_property_triage(
                 create_client(url, key),
-                mark_gmail_read=mark_read,
+                mark_gmail_read=False,
                 dry_run=False,
             )
             print(
