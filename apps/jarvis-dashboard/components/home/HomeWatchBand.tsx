@@ -47,11 +47,14 @@ export default async function HomeWatchBand() {
         w.id === "vpoint" ||
         w.id === "rent_step" ||
         w.id === "cursor_pro_plus_downgrade" ||
-        w.id === "glucon_report_due" ||
         w.id === "mobile_plan" ||
         w.id === "card_debit_watch"
       ) {
         if (pl.show_banner === true) return true;
+      }
+      // 期限3日以内のみホーム（状況ウォッチ本体は従来どおり warn を残す）
+      if (w.id === "glucon_report_due" || w.id === "quiet_edge_due") {
+        return pl.show_banner === true;
       }
       return w.level !== "ok";
     })

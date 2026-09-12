@@ -1206,7 +1206,8 @@ def eval_mobile_plan(meta: dict, data: dict | None) -> dict[str, Any]:
 
 
 def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
-    """グルコン提出期限（開催日−10日）。期限7日以内かつ未投稿なら warn。"""
+    """グルコン提出期限（開催日−10日）。期限7日以内かつ未投稿なら warn。
+    ホームお知らせ（show_banner）は残り3日以内／超過のみ。"""
     title = meta["title"]
     prompt = meta.get("cursor_prompt") or ""
     src = meta.get("source") or ""
@@ -1223,6 +1224,10 @@ def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
     level = str(data.get("level") or "ok")
     summary = str(data.get("summary") or "—")
     days = data.get("days_until_deadline")
+    try:
+        days_i = int(days) if days is not None else None
+    except (TypeError, ValueError):
+        days_i = None
     detail = "\n".join(
         [
             f"開催: {data.get('glucon_date') or '—'}",
@@ -1232,6 +1237,10 @@ def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
             f"成果: {data.get('result_status') or '—'}",
             "Dashboard: /glucon",
         ]
+    )
+    # ホーム: 3日以内 or 超過。状況ウォッチ本体は従来どおり warn(≤7)
+    show_banner = level == "attention" or (
+        level == "warn" and days_i is not None and days_i <= 3
     )
     return card(
         item_id=meta["id"],
@@ -1247,8 +1256,53 @@ def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
             "glucon_date": data.get("glucon_date"),
             "report_deadline": data.get("report_deadline"),
             "period_key": data.get("period_key"),
-            # ホーム状況バンドで拾いやすくする（warn/attention 時）
-            "show_banner": level in ("warn", "attention"),
+            "days_until_deadline": days_i,
+            "show_banner": show_banner,
+        },
+    )
+
+
+def eval_quiet_edge_due(meta: dict, data: dict | None) -> dict[str, Any]:
+    """Quiet Edge 次回治療。残り3日以内で warn＋ホームお知らせ。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "health",
+            level="info",
+            summary="未設定または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    summary = str(data.get("summary") or "—")
+    days = data.get("days_until")
+    detail = "\n".join(
+        [
+            f"回: {data.get('label') or data.get('session_no') or '—'}",
+            f"日程: {data.get('scheduled_at_jst') or data.get('scheduled_at') or '未定'}",
+            f"残り日数: {days if days is not None else '—'}",
+            "Dashboard: /quiet-edge",
+        ]
+    )
+    show_banner = level in ("warn", "attention")
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "health",
+        level=level if level in ("ok", "info", "warn", "attention") else "ok",
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": "/quiet-edge",
+            "session_no": data.get("session_no"),
+            "days_until": days,
+            "show_banner": show_banner,
         },
     )
 
@@ -2341,6 +2395,19 @@ EVALUATORS = {
     "glucon_report_due": lambda m: eval_glucon_report(
         m, load_json(STATE / "glucon_report.json")
     ),
+    "quiet_edge_due": lambda m: (
+        __import__("subprocess").run(
+            [
+                sys.executable,
+                str(REPO / "scripts" / "jarvis_quiet_edge_due_check.py"),
+            ],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        ),
+        eval_quiet_edge_due(m, load_json(STATE / "quiet_edge_due.json")),
+    )[1],
     "mobile_plan": lambda m: eval_mobile_plan(
         m, load_json(STATE / "mobile_plan.json")
     ),

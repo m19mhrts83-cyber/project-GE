@@ -173,9 +173,22 @@ items:
     cursor_prompt: |
       グルコン提出期限を確認して。開催日−10日が期限。前回期限〜今回期限の Journal から
       活動報告・成果報告をまとめる。Dashboard /glucon。
+      ホームお知らせは期限3日以内（show_banner）。
       コマンド: scripts/jarvis_glucon_report_check.py --mark-checked
       Journal sync: scripts/jarvis_glucon_journal_sync.py
       投稿: scripts/jarvis_westudy_forum_post_worker.py --dry-run のあと --i-confirm-post
+
+  - id: quiet_edge_due
+    title: Quiet Edge 次回治療
+    category: health
+    enabled: true
+    source: .jarvis_state/quiet_edge_due.json
+    cursor_prompt: |
+      Quiet Edge 次回レーザー治療の日程を確認して。残り3日以内ならホームにお知らせ。
+      完了・予約変更はチャットで Jarvis に伝え CLI 反映。
+      コマンド: scripts/jarvis_quiet_edge_due_check.py
+      治療更新: scripts/jarvis_quiet_edge_treatment.py --list / --done / --schedule
+      Dashboard: /quiet-edge
 
   - id: openchat_threads
     title: 815スレッド健全性（常時監視）
