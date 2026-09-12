@@ -6,8 +6,10 @@ Jarvis: 個人用 OneDrive 向け Microsoft Graph デバイスコードログイ
   - アプリ登録名例: jarvis-onedrive-readonly
   - サポートされるアカウント: 「個人の Microsoft アカウント」または「両方」
   - プラットフォーム: モバイルとデスクトップ / パブリック クライアント（デバイスコード可）
-  - 委任のアクセス許可: Files.Read, Files.Read.All, offline_access, User.Read
+  - 委任のアクセス許可: Files.Read, Files.Read.All, Files.ReadWrite, Files.ReadWrite.All,
+    offline_access, User.Read
   - （個人アカウントでは「アプリケーションの許可 Files.Read.All」は使わない）
+  - 書込（パートナー MD 追記）を使うときは ReadWrite を追加したうえで **再同意** する
 
 使い方:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -35,7 +37,10 @@ import urllib.request
 from pathlib import Path
 
 OUT = Path.home() / ".jarvis_state" / "ms_graph_device_login.env"
-SCOPES = "offline_access Files.Read Files.Read.All User.Read"
+SCOPES = (
+    "offline_access Files.Read Files.Read.All "
+    "Files.ReadWrite Files.ReadWrite.All User.Read"
+)
 
 
 def _post(url: str, data: dict[str, str]) -> dict:

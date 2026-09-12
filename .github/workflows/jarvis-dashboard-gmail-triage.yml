@@ -1,7 +1,10 @@
 name: Jarvis Dashboard Gmail Triage
 
-# admin INBOX の未返信候補 → jarvis-dashboard triage_items（Mac 非依存）
-# パートナー MD / CHRLINE は対象外。
+# 05:00 JST:
+#   1) admin general → triage_items
+#   2) パートナー Gmail → OneDrive 5.やり取り.md（Graph）＋既読
+#   3) パートナー Gmail 未返信判定 → triage_items
+# LINE / iMessage / CHRLINE は Mac 残。
 # 末尾で Ops Fail Watch（Vercel/GHA）も朝1回だけ実行する。
 
 on:
@@ -10,14 +13,19 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Supabase へ書かず候補数だけ出す"
+        description: "Supabase / OneDrive へ書かず候補数だけ出す"
         required: false
         type: boolean
         default: false
       limit:
-        description: "最大スレッド数"
+        description: "最大スレッド数（general / partner 共通上限の目安）"
         required: false
         default: "20"
+      skip_partner:
+        description: "パートナー MD・判定をスキップ（general のみ）"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: jarvis-dashboard-gmail-triage
@@ -26,7 +34,7 @@ concurrency:
 jobs:
   triage:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     permissions:
       contents: read
       actions: read
@@ -62,7 +70,7 @@ jobs:
           test -s "$CRED_DIR/credentials.json"
           test -s "$CRED_DIR/token_admin.json"
 
-      - name: Run Gmail triage
+      - name: Run Gmail general triage
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
@@ -81,6 +89,65 @@ jobs:
           fi
           python scripts/jarvis_gha_gmail_triage.py "${ARGS[@]}"
 
+      - name: Partner Gmail → OneDrive MD (Graph)
+        if: ${{ github.event.inputs.skip_partner != 'true' }}
+        env:
+          GMAIL_CREDENTIALS_PATH: ${{ github.workspace }}/.credentials/credentials.json
+          GMAIL_ADMIN_TOKEN_PATH: ${{ github.workspace }}/.credentials/token_admin.json
+          MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
+          MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
+          MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
+          MS_GRAPH_REFRESH_TOKEN: ${{ secrets.MS_GRAPH_REFRESH_TOKEN }}
+          MS_GRAPH_AUTHORITY: ${{ secrets.MS_GRAPH_AUTHORITY }}
+          MS_GRAPH_USER_UPN: ${{ secrets.MS_GRAPH_USER_UPN }}
+          MS_GRAPH_DRIVE_ID: ${{ secrets.MS_GRAPH_DRIVE_ID }}
+          LIMIT: ${{ github.event.inputs.limit || '40' }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+          PYTHONPATH: ${{ github.workspace }}/scripts:${{ github.workspace }}/215_kamiooya/C1_cursor/1b_Cursorマニュアル
+        run: |
+          set -euo pipefail
+          if [[ -z "${MS_GRAPH_REFRESH_TOKEN:-}" && -z "${MS_GRAPH_CLIENT_SECRET:-}" ]]; then
+            echo "::warning::MS_GRAPH_* missing — skip partner yoritoori"
+            exit 0
+          fi
+          ARGS=(--limit "$LIMIT")
+          if [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run)
+          else
+            ARGS+=(--apply)
+          fi
+          python scripts/jarvis_gha_partner_gmail_yoritoori.py "${ARGS[@]}"
+
+      - name: Partner Gmail unreplied → triage_items
+        if: ${{ github.event.inputs.skip_partner != 'true' }}
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
+          MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
+          MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
+          MS_GRAPH_REFRESH_TOKEN: ${{ secrets.MS_GRAPH_REFRESH_TOKEN }}
+          MS_GRAPH_AUTHORITY: ${{ secrets.MS_GRAPH_AUTHORITY }}
+          MS_GRAPH_USER_UPN: ${{ secrets.MS_GRAPH_USER_UPN }}
+          MS_GRAPH_DRIVE_ID: ${{ secrets.MS_GRAPH_DRIVE_ID }}
+          LIMIT: ${{ github.event.inputs.limit || '30' }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+          PYTHONPATH: ${{ github.workspace }}/scripts
+        run: |
+          set -euo pipefail
+          if [[ -z "${MS_GRAPH_REFRESH_TOKEN:-}" && -z "${MS_GRAPH_CLIENT_SECRET:-}" ]]; then
+            echo "::warning::MS_GRAPH_* missing — skip partner triage"
+            exit 0
+          fi
+          ARGS=(--limit "$LIMIT")
+          if [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run)
+          else
+            ARGS+=(--push)
+          fi
+          python scripts/jarvis_gha_partner_triage.py "${ARGS[@]}"
+
       - name: Ops fail watch (Vercel / GHA) + autofix
         if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
@@ -91,5 +158,4 @@ jobs:
           CURSOR_CLOUD_REPO_URL: ${{ secrets.CURSOR_CLOUD_REPO_URL }}
         run: |
           set -euo pipefail
-          # CURSOR_API_KEY があれば Cloud 起動、無ければローカル queued
           python scripts/jarvis_ops_fail_watch.py --push --autofix

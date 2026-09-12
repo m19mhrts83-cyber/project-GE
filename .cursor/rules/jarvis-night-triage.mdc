@@ -2,8 +2,8 @@
 
 ## 方針
 
-- 夜間（launchd 05:00）にパートナー（**Gmail ＋ Chatwork／LINE／iMessage**）と **admin 受信箱のパートナー以外** を判定し、**下書きだけ**作る。あわせて **815神大家オプチャ** の直近更新概要を queue に載せる（下書きなし・返信提案なし）。
-- **Gmail 既読の本線は取込時点**（パートナーは `gmail_to_yoritoori`、general は night/GHA triage）。Dashboard で閉じたときの既読は取りこぼし補完。物件紹介は **KURASHIFT 取込時**に既読。
+- 夜間（launchd 05:00）に **CW／LINE／iMessage** と 815 要約を判定（**パートナー Gmail 判定は GHA 本線**・既定スキップ）。general も GHA 05:00 が本線。
+- **Gmail 既読の本線は取込時点**（パートナーは GHA yoritoori／`gmail_to_yoritoori`、general は GHA triage）。Dashboard で閉じたときの既読は取りこぼし補完。物件紹介は **KURASHIFT 取込時**に既読。
 - **自動送信はしない**。朝にダッシュボードで確認 → Cursor で「夜間下書き #N を送って」。
 - ダッシュボードは **launchd 常時起動**（`http://127.0.0.1:8765/`）。ターミナル不要。
 - タブ: **パートナー**（チャネル別要返信＋下書き）／ **神大家オプチャ**（要約のみ）／ **それ以外**（admin Gmail）／ **状況**（ウォッチ判定・アーカイブ・Cursor調査コピー）。起動時に要注意のポップアップ（1日1回）。

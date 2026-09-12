@@ -25,10 +25,15 @@ GHA レーン要約（`jarvis-dashboard-lanes.yml`）がクラウドから読む
 6. **API のアクセス許可** → Microsoft Graph → **委任されたアクセス許可**:
    - `Files.Read`
    - `Files.Read.All`
+   - `Files.ReadWrite`（パートナー MD 追記・GHA 本線）
+   - `Files.ReadWrite.All`
    - `offline_access`
    - `User.Read`
 7. **概要** の **アプリケーション (クライアント) ID** を控える  
    （クライアント シークレットは公開クライアントなら不要。機密にする場合のみ発行）
+
+> **書込を足したあと**: 既存 refresh は Read のみのことがある。  
+> `python scripts/jarvis_ms_graph_device_login.py` で **再同意** → `jarvis_ms_graph_secrets_to_gha.py` で Secrets 更新。
 
 ### B. ローカルに ID を書く
 
@@ -68,7 +73,9 @@ python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/
 |---|---|
 | `jarvis_ms_graph_setup_check.py` | 未設定時の手順表示 |
 | `jarvis_ms_graph_device_login.py` | 初回デバイスコード |
-| `jarvis_onedrive_graph.py` | refresh / app / ローカル読取（downloadUrl） |
+| `jarvis_onedrive_graph.py` | refresh / app / 読取（downloadUrl）／**書込（PUT・append）** |
+| `jarvis_gha_partner_gmail_yoritoori.py` | GHA: パートナー Gmail → MD 追記＋既読 |
+| `jarvis_gha_partner_triage.py` | GHA: MD 読取 → partner triage_items |
 | `jarvis_ms_graph_sync_refresh.py` | 回転 refresh → private（任意で GHA） |
 | `jarvis_ms_graph_secrets_to_gha.py` | GitHub Secrets 反映 |
 | `jarvis_gha_lanes.py` | GHA でレーン要約 → `cards` |
