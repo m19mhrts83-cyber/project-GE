@@ -9,6 +9,7 @@
   - Phase2: `vital_daily`（Health）
   - Phase3: `vital_journal_daily` / `vital_context_notes`
   - Reviews: `vital_quiet_reviews`（`kind`: `ingest` | `monthly`）
+- **ホームお知らせ**: 次回治療の残り **3日以内**で `quiet_edge_due`（状況ウォッチ→ホーム）。グルコン報告も期限 **3日以内**で同様
 - **診断アプリではない。** 医師に見せるための観察整理。
 
 主観の本線は毎朝の点数入力ではなく、Obsidian `★Journal`（`config/dashboard_lanes.yaml` の `obsidian_journal`）を日付でバイタルと重ねる。欠落・急変には「何がありましたか？」で補完する。観察の主線は **月次レビュー**。
