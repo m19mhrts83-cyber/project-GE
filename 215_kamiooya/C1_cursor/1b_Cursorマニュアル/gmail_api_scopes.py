@@ -33,12 +33,17 @@ def granted_scopes_from_token_record(d: dict) -> set[str]:
     return set()
 
 
-def token_satisfies_215_scopes(d: dict) -> bool:
-    """215 共通スコープが token 記録にすべて含まれるか（send のみ等で欠ける場合は False）。"""
+def token_satisfies_scopes(d: dict, required: list[str] | tuple[str, ...]) -> bool:
+    """required がすべて token 記録に含まれるか。"""
     granted = granted_scopes_from_token_record(d)
     if not granted:
         return False
-    return set(GMAIL_SCOPES_215).issubset(granted)
+    return set(required).issubset(granted)
+
+
+def token_satisfies_215_scopes(d: dict) -> bool:
+    """215 共通スコープが token 記録にすべて含まれるか（send のみ等で欠ける場合は False）。"""
+    return token_satisfies_scopes(d, GMAIL_SCOPES_215)
 
 
 GMAIL_SCOPES_READ_MODIFY = [
@@ -49,10 +54,7 @@ GMAIL_SCOPES_READ_MODIFY = [
 
 def token_satisfies_read_modify_scopes(d: dict) -> bool:
     """Gmail 読取・ラベル変更のみ（MailGates 等）。send 欠如でも可。"""
-    granted = granted_scopes_from_token_record(d)
-    if not granted:
-        return False
-    return set(GMAIL_SCOPES_READ_MODIFY).issubset(granted)
+    return token_satisfies_scopes(d, GMAIL_SCOPES_READ_MODIFY)
 
 
 def _token_file_satisfies_215(path: Path) -> bool:

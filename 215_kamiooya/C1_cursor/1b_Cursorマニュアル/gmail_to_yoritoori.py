@@ -70,7 +70,13 @@ CONTACT_YAML = BASE_DIR / "000_共通" / "連絡先一覧.yaml"
 CREDENTIALS_PATH = SCRIPT_DIR / "credentials.json"
 TOKEN_PATH = SCRIPT_DIR / "token.json"
 
-from gmail_api_scopes import GMAIL_SCOPES_215 as SCOPES, token_satisfies_215_scopes
+from gmail_api_scopes import (
+    GMAIL_SCOPES_215 as SCOPES,
+    GMAIL_SCOPES_READ_MODIFY,
+    token_satisfies_215_scopes,
+    token_satisfies_read_modify_scopes,
+    token_satisfies_scopes,
+)
 
 
 def load_env():
@@ -148,6 +154,9 @@ def resolve_sent_supplement_token_paths(primary_paths: list[Path]) -> list[Path]
     """
     admin 単独取込時でも、estate / m19m から送信トレイの漏れを拾う。
     パートナー送信は estate 等から直接送ることが多いため。
+
+    送信トレイの「読取」には gmail.send は不要。read/modify があれば拾う
+   （send 欠落でブラウザ再同意を起こさない）。
     """
     primary_resolved = {p.resolve() for p in primary_paths if p.exists()}
     out: list[Path] = []
@@ -163,15 +172,31 @@ def resolve_sent_supplement_token_paths(primary_paths: list[Path]) -> list[Path]
             continue
         try:
             d = json.loads(p.read_text(encoding="utf-8"))
-            if token_satisfies_215_scopes(d):
+            if token_satisfies_read_modify_scopes(d):
                 out.append(p)
         except Exception:
             continue
     return out
 
 
-def build_service_for_token(token_path_for_account: Path):
-    """tokenファイルごとにGmailサービスを作成し、(service, emailAddress) を返す。"""
+def build_service_for_token(
+    token_path_for_account: Path,
+    *,
+    scopes: list[str] | None = None,
+    open_browser: bool = True,
+):
+    """tokenファイルごとにGmailサービスを作成し、(service, emailAddress) を返す。
+
+    scopes:
+      - 省略時は送信込みの GMAIL_SCOPES_215（従来どおり）
+      - 取込・LINE公式エクスポート等は GMAIL_SCOPES_READ_MODIFY を渡す
+        （send 欠落の estate でもブラウザを開かない）
+    open_browser:
+      - False なら不足時に再同意せず例外（非対話向け）
+    """
+    from gmail_api_scopes import granted_scopes_from_token_record
+
+    required = list(scopes) if scopes is not None else list(SCOPES)
     creds = None
     if token_path_for_account.exists():
         token_data = json.loads(token_path_for_account.read_text(encoding="utf-8"))
@@ -185,8 +210,10 @@ def build_service_for_token(token_path_for_account: Path):
             if "access_token" in creds_data and "token" not in creds_data:
                 creds_data["token"] = creds_data["access_token"]
         try:
-            creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
-            if creds and not token_satisfies_215_scopes(creds_data):
+            # token に記録されたスコープで Credentials を構築（余剰スコープは許容）。
+            granted_list = sorted(granted_scopes_from_token_record(creds_data)) or required
+            creds = Credentials.from_authorized_user_info(creds_data, granted_list)
+            if creds and not token_satisfies_scopes(creds_data, required):
                 creds = None
         except Exception:
             creds = None
@@ -200,12 +227,20 @@ def build_service_for_token(token_path_for_account: Path):
             creds = None
 
     if not creds or not creds.valid:
-        flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
+        if not open_browser:
+            raise RuntimeError(
+                f"Gmail token 不足または失効: {token_path_for_account.name} "
+                f"（必要スコープ: {', '.join(required)}）。ブラウザ再同意が必要です。"
+            )
+        flow = InstalledAppFlow.from_client_secrets_file(
+            str(credentials_path), required
+        )
+        # include_granted_scopes は Drive/Calendar 等の既存付与と混ざり
+        # 「Scope has changed」で失敗しやすいので付けない（Gmail 専用 token を維持）。
         creds = flow.run_local_server(
             port=0,
             access_type="offline",
             prompt="consent",
-            include_granted_scopes="true",
         )
         refreshed = True
 
@@ -223,6 +258,8 @@ def build_service_for_token(token_path_for_account: Path):
     profile = service.users().getProfile(userId="me").execute()
     email_addr = profile.get("emailAddress", "")
     return service, email_addr
+
+
 
 
 from yoritoori_utils import (
@@ -780,7 +817,9 @@ def main():
     existing_sent = None
 
     for idx, tpath in enumerate(token_paths, start=1):
-        service, account_email = build_service_for_token(tpath)
+        service, account_email = build_service_for_token(
+            tpath, scopes=GMAIL_SCOPES_READ_MODIFY
+        )
         label = account_email or str(tpath)
         print(f"\n=== Gmailアカウント {idx}/{len(token_paths)}: {label} ===")
         sys.stdout.flush()
@@ -813,7 +852,9 @@ def main():
 
     supplement = resolve_sent_supplement_token_paths(token_paths)
     for tpath in supplement:
-        service, account_email = build_service_for_token(tpath)
+        service, account_email = build_service_for_token(
+            tpath, scopes=GMAIL_SCOPES_READ_MODIFY
+        )
         label = account_email or str(tpath)
         print(f"\n=== Gmail送信トレイ補完: {label} ===")
         sys.stdout.flush()
