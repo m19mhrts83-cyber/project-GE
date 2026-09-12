@@ -168,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.cleanup_re_pending:
             out["cleanup_re"] = skip_pending_kurashift_property_triage(
                 sb,
-                mark_gmail_read=True,
+                mark_gmail_read=False,  # 物件は KURASHIFT 取込時に既読
                 dry_run=args.dry_run,
             )
             print(

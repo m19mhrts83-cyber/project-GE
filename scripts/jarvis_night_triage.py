@@ -1497,6 +1497,26 @@ def main() -> int:
         judge_only=args.judge_only,
     )
 
+    # Gmail: Dashboard 取込時点で既読（閉じ待ちにしない）。物件紹介は general に載らないため未読のまま → KURASHIFT 取込時。
+    mail_items = [
+        c
+        for c in all_cands
+        if (c.get("gmail_message_id") or "").strip()
+        and (c.get("channel") or "Gmail") == "Gmail"
+    ]
+    if mail_items:
+        try:
+            from jarvis_night_triage_general import mark_gmail_read_for_items
+
+            mr = mark_gmail_read_for_items(mail_items, dry_run=args.dry_run)
+            print(
+                f"# gmail read-on-ingest: ok={mr.get('ok')} "
+                f"fail={mr.get('fail')} skip={mr.get('skip')}"
+                + (" dry-run" if args.dry_run else "")
+            )
+        except Exception as e:
+            print(f"# gmail read-on-ingest failed: {e}", file=sys.stderr)
+
     if do_partner and not args.dry_run:
         queue = load_queue()
         n_act = replace_activity_items(queue, activities)

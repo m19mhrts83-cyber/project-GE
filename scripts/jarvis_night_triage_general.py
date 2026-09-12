@@ -11,6 +11,7 @@
    → KURASHIFT（選定〜比較）。非パートナー分は Jarvis general には出さない。
 3. **その他（非パートナー）**
    → Jarvis general。取込時に `kind=mail`（要確認）／`kind=skim`（要約用）へ振り分け。
+   → **Gmail 既読は Dashboard／KURASHIFT 取込時点**（閉じたときではないのが本線）。
 """
 from __future__ import annotations
 
@@ -150,7 +151,7 @@ def mail_routing_bucket(
 def skip_pending_kurashift_property_triage(
     sb: Any,
     *,
-    mark_gmail_read: bool = True,
+    mark_gmail_read: bool = False,
     dry_run: bool = False,
     limit: int = 200,
     contact_yaml: Path | None = None,
@@ -159,6 +160,7 @@ def skip_pending_kurashift_property_triage(
 
     - lane=partner は一切触らない
     - from_email が連絡先一覧のパートナーなら触らない（誤って general に居ても保護）
+    - **既定で Gmail は既読にしない**（KURASHIFT 取込時が本線。除外＝未読残し）
     """
     emails, domains = load_partner_filters(resolve_contact_yaml(contact_yaml))
     resp = (
@@ -357,6 +359,54 @@ def build_admin_gmail_service():
     if not service:
         raise RuntimeError("failed to build Gmail service for admin")
     return service, (email or "admin@livingsupport-matsu.co.jp").lower()
+
+
+def mark_gmail_read_for_items(
+    items: list[dict[str, Any]],
+    *,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """トリアージ取込時の Gmail 既読（本線）。
+
+    gmail_message_id がある行だけ UNREAD を外す。account は admin 系のみ
+    （パートナー取込は gmail_to_yoritoori 側で既読）。冪等。
+    """
+    ok = 0
+    fail = 0
+    skip = 0
+    service = None
+    for it in items:
+        gid = str(it.get("gmail_message_id") or "").strip()
+        if not gid:
+            skip += 1
+            continue
+        account = str(it.get("account") or "admin").strip() or "admin"
+        if account not in ("", "admin", "mail_admin"):
+            skip += 1
+            continue
+        if dry_run:
+            ok += 1
+            continue
+        try:
+            if service is None:
+                service, _ = build_admin_gmail_service()
+            service.users().messages().modify(
+                userId="me",
+                id=gid,
+                body={"removeLabelIds": ["UNREAD"]},
+            ).execute()
+            ok += 1
+            pl = it.get("payload")
+            if isinstance(pl, dict):
+                pl["gmail_read_at"] = datetime.now(timezone.utc).isoformat()
+                pl["gmail_read_on"] = "ingest"
+        except Exception as e:
+            fail += 1
+            print(
+                f"# mark-read-on-ingest fail id={it.get('id')} gid={gid[:12]}: {e}",
+                file=sys.stderr,
+            )
+    return {"ok": ok, "fail": fail, "skip": skip, "dry_run": int(dry_run)}
 
 
 def _header_map(payload: dict) -> dict[str, str]:

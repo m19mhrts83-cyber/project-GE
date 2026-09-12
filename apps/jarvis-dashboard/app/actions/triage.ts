@@ -19,7 +19,7 @@ export type TriageActionResult =
   | { ok: true; message?: string }
   | { ok: false; error: string };
 
-/** 確認完了・スキップ時に Gmail を既読にする（snooze / pending 復帰は対象外） */
+/** 閉じたときの既読は取りこぼし補完。本線は取込時（night/GHA triage・KURASHIFT import）。 */
 const MARK_READ_STATUSES: TriageStatus[] = ["skipped", "sent", "done"];
 
 function asPayload(raw: unknown): Record<string, unknown> {
