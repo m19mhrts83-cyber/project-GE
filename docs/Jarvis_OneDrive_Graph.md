@@ -90,7 +90,8 @@ python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/
 python scripts/jarvis_ms_graph_sync_refresh.py --push-gha
 ```
 
-（`~/.jarvis_state/ms_graph_new_refresh.env` → `.env.jarvis_private` → GitHub Secrets）
+（`~/.jarvis_state/ms_graph_new_refresh.env` → `.env.jarvis_private` → GitHub Secrets）  
+**注意**: refresh に `$` が含まれるため、`.env.jarvis_private` では **必ずシングルクォート**で囲む（`source` 時の `$$` 展開防止）。`jarvis_ms_graph_sync_refresh.py` / device_login はクォート付きで書く。
 - 秘密は `.env.jarvis_private` と GitHub / Cloud Secrets のみ。チャット・Git 禁止
 
 ## 関連
