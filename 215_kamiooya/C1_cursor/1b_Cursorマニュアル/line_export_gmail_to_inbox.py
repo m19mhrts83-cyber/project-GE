@@ -32,6 +32,7 @@ from gmail_to_yoritoori import (
     collect_attachment_parts,
     sanitize_filename,
 )
+from gmail_api_scopes import GMAIL_SCOPES_READ_MODIFY
 from line_export_inbox_to_yoritoori import default_inbox_dir, default_routes_path
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -222,7 +223,11 @@ def fetch_line_exports_from_gmail(
         return stats
 
     try:
-        service, email_addr = build_service_for_token(token_path)
+        service, email_addr = build_service_for_token(
+            token_path,
+            scopes=GMAIL_SCOPES_READ_MODIFY,
+            open_browser=False,
+        )
     except Exception as e:
         stats.messages.append(f"Gmail認証失敗 ({token_path.name}): {e}")
         return stats

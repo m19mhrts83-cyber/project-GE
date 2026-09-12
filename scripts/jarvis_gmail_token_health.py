@@ -63,13 +63,20 @@ def main() -> int:
             continue
         full = token_satisfies_215_scopes(d)
         read_mod = token_satisfies_read_modify_scopes(d)
-        status = "OK" if full else ("read/modifyのみ" if read_mod else "要再認証")
+        status = "OK" if full else ("read/modifyのみ（取込可・送信は要再同意）" if read_mod else "要再認証")
         print(f"- {label} ({name}): {status} · refresh={'あり' if refresh else 'なし'} · scopes={len(granted)}")
         missing = set(GMAIL_SCOPES_215) - set(granted)
         if missing:
             for m in sorted(missing):
                 print(f"    不足: {m.split('/')[-1]}")
-            issues.append(label)
+            # 取込は read/modify で足りる。send 欠落は「送信したいアカウント」だけ issues にする。
+            if not read_mod:
+                issues.append(label)
+            elif label != "estate":
+                # estate 以外で send 欠落は従来どおり促す（m19m は送信にも使う）
+                issues.append(label)
+            else:
+                print("    ※パートナー取込ではブラウザ不要。estate から送信するときだけ再同意。")
         if not refresh:
             issues.append(label)
 
@@ -79,11 +86,12 @@ def main() -> int:
             if label in issues and (MANUAL / name).is_file():
                 print(REAUTH_CMD.format(token=name))
         print(
-            "\nヒント: GCP OAuth アプリを「本番」にするとテスト用7日切れを避けやすい。"
-            " send のみスクリプトで token を上書きしない（gmail_api_scopes.py 参照）。"
+            "\nヒント: GCP OAuth は本番公開済みなら7日切れは起きにくい。"
+            " 取込は read/modify で足りる（send 欠落の estate でもブラウザを開かない）。"
+            " send のみスクリプトで token を狭く上書きしない（gmail_api_scopes.py）。"
         )
         return 1
-    print("\n判定: 全 token OK")
+    print("\n判定: 取込に必要な token は OK（estate の send 欠落は送信時のみ任意で再同意）")
     return 0
 
 
