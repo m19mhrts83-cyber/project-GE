@@ -947,7 +947,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--preset",
         choices=("line-default", "tcell-both", "tcell-yuki", "leaf-grandole", "none"),
         default="line-default",
-        help="line-default: Tcell + LEAF + 815東海飲み会幹事。tcell-both: Tcell グループのみ。tcell-yuki: 1:1 のみ（互換）",
+        help="line-default: Tcell + LEAF + 823幹事LINE。tcell-both: Tcell グループのみ。tcell-yuki: 1:1 のみ（互換）",
     )
     parser.add_argument(
         "--yoritoori-md",
@@ -1015,27 +1015,27 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--kamiooya-kanji-yoritoori-md",
         type=Path,
         default=None,
-        help="815 東海飲み会幹事やりとり の 5.やり取り.md（line-default で未指定時は OneDrive または repo 既定）",
+        help="823_名古屋幹事グループ の 5.やり取り.md（line-default で未指定時は OneDrive または repo 既定）",
     )
     parser.add_argument(
         "--kamiooya-kanji-org-label",
         default=_KAMIOOYA_KANJI_ORG_LABEL_DEFAULT,
-        help="815 幹事グループ追記ブロックの組織名（見出し）",
+        help="823 幹事グループ追記ブロックの組織名（見出し）",
     )
     parser.add_argument(
         "--kamiooya-kanji-group-chat-mid",
         default="",
-        help="815 幹事グループの chatMid（部分一致）。空なら LINE_KAMIOOYA_KANJI_GROUP_CHAT_MID または --kamiooya-kanji-group-title で名前解決",
+        help="823 幹事 LINE グループの chatMid（部分一致）。空なら LINE_KAMIOOYA_KANJI_GROUP_CHAT_MID または --kamiooya-kanji-group-title で名前解決",
     )
     parser.add_argument(
         "--kamiooya-kanji-group-title",
         default=_KAMIOOYA_KANJI_GROUP_TITLE_DEFAULT,
-        help="815 幹事グループの chatMid 未指定時、トーク名にこの文字列が含まれるものを使う",
+        help="823 幹事 LINE の chatMid 未指定時、トーク名にこの文字列が含まれるものを使う",
     )
     parser.add_argument(
         "--kamiooya-kanji-group-peer-label",
         default="",
-        help="815 幹事グループの見出し表示名（空なら --kamiooya-kanji-group-title 相当）",
+        help="823 幹事グループの見出し表示名（空なら --kamiooya-kanji-group-title 相当）",
     )
     parser.add_argument(
         "--include-send",
@@ -1351,7 +1351,7 @@ def run(args: argparse.Namespace, *, client=None) -> int:
                 ) or ""
             if not kkneedle:
                 print(
-                    "警告: 815 東海飲み会幹事やりとり の chatMid を特定できませんでした。"
+                    "警告: 823 幹事 LINE（東海飲み会幹事やりとり）の chatMid を特定できませんでした。"
                     " chrline_list_chats_poc.py でトーク名を確認するか、"
                     " --kamiooya-kanji-group-chat-mid または環境変数 LINE_KAMIOOYA_KANJI_GROUP_CHAT_MID を設定してください。"
                     "（Tcell / LEAF / オープンチャット同期は続行します）",

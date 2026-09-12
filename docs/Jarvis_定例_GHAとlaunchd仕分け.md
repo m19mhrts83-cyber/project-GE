@@ -54,7 +54,7 @@
 | Zaim CSV／銀行同期 | `zaim-csv-weekly` / `zaim-bank-sync-friday` | Playwright＋OneDrive |
 | 資産週次（証券ログイン） | `portfolio-weekly` | 同上 |
 | CHRLINE／オプチャ常駐 | `line.openchat.watch` 等 | Mac 専用 |
-| **815オプチャ MD→DB→/openchat** | `openchat-md-db-sync`（07:40/20:30） | CHRLINE＋OneDrive＋kamiooya-qa。パートナー確認／朝LINEでもMDは取込済み想定 |
+| **815オプチャ MD→DB→publish→/openchat** | `openchat-md-db-sync`（07:40/20:30） | CHRLINE＋OneDrive＋kamiooya-qa（staging→ready）。パートナー確認／朝LINEでもMDは取込済み想定 |
 | 夜間フル triage | `night-triage` | ローカル path 多。Gmail general は GHA で一部代替済 |
 | 朝オープン／Mac 朝バンドル | `triage-morning-open` + `jarvis_morning_mac_refresh` | 取りこぼし回収のハブ |
 | dashboard push（投影） | `dashboard-push` | `.jarvis_state` 依存 |

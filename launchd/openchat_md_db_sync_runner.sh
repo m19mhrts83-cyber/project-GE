@@ -44,6 +44,9 @@ fi
   "$PY" "${REPO_DIR}/scripts/jarvis_kurashift_openchat_sync.py" --apply --export-grok
   db_rc=$?
 
+  # staging → ready / excluded（ノイズのみ除外・検索公開）
+  "$PY" "${REPO_DIR}/scripts/jarvis_openchat_publish.py" --apply || true
+
   # ダッシュボード /openchat（digest + thread health）
   "$PY" "${REPO_DIR}/scripts/jarvis_openchat_digest.py" --push || true
   "$PY" "${REPO_DIR}/scripts/jarvis_openchat_thread_health.py" --push || true

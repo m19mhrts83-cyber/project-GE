@@ -14,6 +14,7 @@ const App = {
     knowledgeSources: {},
     lastCitations: [],
     citationsByMessageId: {},
+    openchatLogs: [],
     forumCategoryLookup: null,
     pendingUsers: [],
     approvedUsers: [],
@@ -177,6 +178,14 @@ const App = {
     App.elements.lessonListMeta = document.getElementById('lessonListMeta');
     App.elements.lessonsBackBar = document.getElementById('lessonsBackBar');
     App.elements.lessonsBackBtn = document.getElementById('lessonsBackBtn');
+    App.elements.openchatTableBody = document.getElementById('openchatTableBody');
+    App.elements.openchatSearchInput = document.getElementById('openchatSearchInput');
+    App.elements.openchatTitleFilter = document.getElementById('openchatTitleFilter');
+    App.elements.openchatListMeta = document.getElementById('openchatListMeta');
+    App.elements.openchatBackBar = document.getElementById('openchatBackBar');
+    App.elements.openchatBackBtn = document.getElementById('openchatBackBtn');
+    App.elements.openchatBackLabel = document.getElementById('openchatBackLabel');
+    App.elements.reloadOpenchatBtn = document.getElementById('reloadOpenchatBtn');
     App.elements.lessonsBackLabel = document.getElementById('lessonsBackLabel');
     App.elements.knowledgeTableBody = document.getElementById('knowledgeTableBody');
     App.elements.knowledgeSearchInput = document.getElementById('knowledgeSearchInput');
@@ -380,6 +389,31 @@ const App = {
     }
     if (App.elements.knowledgeBackBtn) {
       App.elements.knowledgeBackBtn.addEventListener('click', App.goBackFromDbScreen);
+    }
+    if (App.elements.openchatBackBtn) {
+      App.elements.openchatBackBtn.addEventListener('click', App.goBackFromDbScreen);
+    }
+    if (App.elements.reloadOpenchatBtn) {
+      App.elements.reloadOpenchatBtn.addEventListener('click', function () {
+        App.loadOpenchatLogs().catch(function (err) {
+          App.showToast((err && err.message) || 'LINEオプチャの取得に失敗しました', 'error');
+        });
+      });
+    }
+    if (App.elements.openchatSearchInput) {
+      App.elements.openchatSearchInput.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          App.loadOpenchatLogs().catch(function (err) {
+            App.showToast((err && err.message) || 'LINEオプチャの取得に失敗しました', 'error');
+          });
+        }
+      });
+    }
+    if (App.elements.openchatTitleFilter) {
+      App.elements.openchatTitleFilter.addEventListener('change', function () {
+        App.renderOpenchatTable();
+      });
     }
   },
 
@@ -1193,6 +1227,7 @@ const App = {
       comments: 'commentsScreen',
       lessons: 'lessonsScreen',
       knowledge: 'knowledgeScreen',
+      openchat: 'openchatScreen',
       adminUsers: 'adminUsersScreen',
       adminUserList: 'adminUserListScreen',
       adminAdminList: 'adminAdminListScreen',
@@ -1238,6 +1273,11 @@ const App = {
         App.showToast((err && err.message) || '分析データの取得に失敗しました', 'error');
       });
     }
+    if (screenName === 'openchat') {
+      App.loadOpenchatLogs().catch(function (err) {
+        App.showToast((err && err.message) || 'LINEオプチャの取得に失敗しました', 'error');
+      });
+    }
   },
 
   screenLabel: (screenName) => {
@@ -1246,6 +1286,7 @@ const App = {
       comments: 'コメント一覧',
       lessons: '動画ページ説明テキスト',
       knowledge: 'セミナー動画文字起こし',
+      openchat: 'LINEオプチャ',
       adminUsers: 'ユーザ承認',
       adminUserList: 'ユーザ一覧',
       adminAdminList: '管理者一覧',
@@ -1267,6 +1308,9 @@ const App = {
     if (App.elements.knowledgeBackBar) {
       App.elements.knowledgeBackBar.classList.add('hidden');
     }
+    if (App.elements.openchatBackBar) {
+      App.elements.openchatBackBar.classList.add('hidden');
+    }
   },
 
   showDbReturnBar: (targetScreen) => {
@@ -1276,6 +1320,7 @@ const App = {
       if (App.elements.commentsBackBar) App.elements.commentsBackBar.classList.add('hidden');
       if (App.elements.lessonsBackBar) App.elements.lessonsBackBar.classList.add('hidden');
       if (App.elements.knowledgeBackBar) App.elements.knowledgeBackBar.classList.add('hidden');
+      if (App.elements.openchatBackBar) App.elements.openchatBackBar.classList.add('hidden');
     };
     hideAll();
     if (targetScreen === 'comments' && App.elements.commentsBackBar) {
@@ -1293,6 +1338,11 @@ const App = {
         App.elements.knowledgeBackLabel.textContent = label;
       }
       App.elements.knowledgeBackBar.classList.remove('hidden');
+    } else if (targetScreen === 'openchat' && App.elements.openchatBackBar) {
+      if (App.elements.openchatBackLabel) {
+        App.elements.openchatBackLabel.textContent = label;
+      }
+      App.elements.openchatBackBar.classList.remove('hidden');
     }
   },
 
@@ -1393,6 +1443,148 @@ const App = {
     const res = await App.apiClient('GET', '/suggested-questions');
     App.state.suggestedQuestions = (res && res.questions) ? res.questions : [];
     App.renderSuggestedQuestions();
+  },
+
+  loadOpenchatLogs: async () => {
+    const cfg = await App.resolveSemanticConfig();
+    const q = (App.elements.openchatSearchInput && App.elements.openchatSearchInput.value) || '';
+    const title =
+      (App.elements.openchatTitleFilter && App.elements.openchatTitleFilter.value) || '';
+    const response = await fetch(cfg.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Semantic-Shared-Secret': cfg.secret
+      },
+      body: JSON.stringify({
+        list_openchat: true,
+        query: String(q || '').trim(),
+        chat_title: String(title || '').trim() || undefined,
+        openchat_limit: 40,
+        session_id: App.state.currentSessionId || undefined,
+        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
+      })
+    });
+    const text = await response.text();
+    let data = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        data = { _rawBody: text };
+      }
+    }
+    if (!response.ok) {
+      throw new Error(
+        data.errorMessage || data.message || data.error || 'LINEオプチャ一覧の取得に失敗しました'
+      );
+    }
+    App.state.openchatLogs = App.normalizeRelatedList(data.relatedOpenchat || []);
+    App.renderOpenchatTitleFilterOptions();
+    App.renderOpenchatTable();
+  },
+
+  renderOpenchatTitleFilterOptions: () => {
+    const select = App.elements.openchatTitleFilter;
+    if (!select) return;
+    const current = select.value || '';
+    const titles = Array.from(
+      new Set(
+        (App.state.openchatLogs || [])
+          .map(function (row) {
+            return String(row.chat_title || row.chatTitle || '').trim();
+          })
+          .filter(Boolean)
+      )
+    ).sort(function (a, b) {
+      return a.localeCompare(b, 'ja');
+    });
+    select.innerHTML = '<option value="">全オプチャ</option>';
+    titles.forEach(function (t) {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      select.appendChild(opt);
+    });
+    if (current) select.value = current;
+  },
+
+  renderOpenchatTable: () => {
+    const tbody = App.elements.openchatTableBody;
+    if (!tbody) return;
+    const q = String(
+      (App.elements.openchatSearchInput && App.elements.openchatSearchInput.value) || ''
+    )
+      .trim()
+      .toLowerCase();
+    const titleFilter = String(
+      (App.elements.openchatTitleFilter && App.elements.openchatTitleFilter.value) || ''
+    ).trim();
+    let rows = App.state.openchatLogs || [];
+    if (titleFilter) {
+      rows = rows.filter(function (r) {
+        return String(r.chat_title || r.chatTitle || '').trim() === titleFilter;
+      });
+    }
+    if (q) {
+      rows = rows.filter(function (r) {
+        const blob = [
+          r.id,
+          r.chat_title,
+          r.chat_name,
+          r.stream_type,
+          r.thread_title,
+          r.sender_name,
+          r.content,
+          r.posted_at,
+          r.post_date
+        ]
+          .map(function (x) {
+            return String(x || '').toLowerCase();
+          })
+          .join(' ');
+        return blob.indexOf(q) !== -1;
+      });
+    }
+    if (App.elements.openchatListMeta) {
+      App.elements.openchatListMeta.textContent =
+        '表示 ' + rows.length + ' 件（ready・取得元／日時つき）';
+    }
+    const streamLabel = function (st) {
+      if (st === 'thread') return 'スレッド';
+      if (st === 'thread_reply') return 'スレッド返信';
+      return 'メイン';
+    };
+    tbody.innerHTML = rows
+      .map(function (r) {
+        const when = String(r.posted_at || r.postedAt || r.post_date || r.postDate || '').trim();
+        const snippet = String(r.content || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 180);
+        return (
+          '<tr class="border-t align-top">' +
+          '<td class="p-2 whitespace-nowrap text-xs">' +
+          App.escapeHtml(String(r.chat_title || r.chatTitle || '')) +
+          '</td>' +
+          '<td class="p-2 whitespace-nowrap text-xs">' +
+          App.escapeHtml(streamLabel(String(r.stream_type || r.streamType || ''))) +
+          '</td>' +
+          '<td class="p-2 text-xs">' +
+          App.escapeHtml(String(r.thread_title || r.threadTitle || '')) +
+          '</td>' +
+          '<td class="p-2 whitespace-nowrap text-xs">' +
+          App.escapeHtml(when) +
+          '</td>' +
+          '<td class="p-2 whitespace-nowrap text-xs">' +
+          App.escapeHtml(String(r.sender_name || r.senderName || '')) +
+          '</td>' +
+          '<td class="p-2 text-xs text-slate-700">' +
+          App.escapeHtml(snippet) +
+          '</td></tr>'
+        );
+      })
+      .join('');
   },
 
   loadComments: async () => {
@@ -1710,7 +1902,7 @@ const App = {
       lastId && map[lastId] ? map[lastId] : [];
   },
 
-  buildCitationsFromRelated: (relatedComments, relatedChunks, relatedSources, usedFilter) => {
+  buildCitationsFromRelated: (relatedComments, relatedChunks, relatedSources, usedFilter, relatedOpenchat) => {
     const citations = [];
     const sourcesMap = Object.assign({}, App.state.knowledgeSources || {});
     const sourcesById = {};
@@ -1726,6 +1918,7 @@ const App = {
     const filter = usedFilter || null;
     const commentIdSet = filter && filter.commentIds ? filter.commentIds : null;
     const chunkKeySet = filter && filter.chunkKeys ? filter.chunkKeys : null;
+    const openchatIdSet = filter && filter.openchatIds ? filter.openchatIds : null;
     const strict = !!(filter && filter.strict);
 
     App.normalizeRelatedList(relatedComments).forEach(function (c) {
@@ -1777,6 +1970,30 @@ const App = {
         snippet: String(ch.content || '').replace(/\s+/g, ' ').slice(0, 220)
       });
     });
+    App.normalizeRelatedList(relatedOpenchat).forEach(function (o) {
+      const oid = String(o.id || o.openchat_id || o.openchatId || '').trim();
+      if (strict && openchatIdSet) {
+        if (!oid || !openchatIdSet[oid]) return;
+      }
+      const stream = String(o.stream_type || o.streamType || '').trim();
+      const streamLabel =
+        stream === 'thread'
+          ? 'スレッド'
+          : stream === 'thread_reply'
+            ? 'スレッド返信'
+            : 'メイン';
+      citations.push({
+        kind: 'openchat',
+        sourceType: 'LINEオプチャ',
+        openchatId: oid,
+        chatTitle: String(o.chat_title || o.chatTitle || o.chat_name || o.chatName || '').trim(),
+        streamLabel: streamLabel,
+        threadTitle: String(o.thread_title || o.threadTitle || '').trim(),
+        authorName: o.sender_name || o.senderName || '',
+        postedAt: o.posted_at || o.postedAt || o.post_date || o.postDate || '',
+        snippet: String(o.content || '').replace(/\s+/g, ' ').slice(0, 220)
+      });
+    });
     return citations;
   },
 
@@ -1803,9 +2020,12 @@ const App = {
     if (!obj || typeof obj !== 'object') return { ok: false };
     const commentIds = {};
     const chunkKeys = {};
+    const openchatIds = {};
     const cList = obj.comment_ids || obj.commentIds || [];
     const kList = obj.chunk_keys || obj.chunkKeys || [];
+    const oList = obj.openchat_ids || obj.openchatIds || [];
     if (!Array.isArray(cList) || !Array.isArray(kList)) return { ok: false };
+    if (!Array.isArray(oList)) return { ok: false };
     cList.forEach(function (id) {
       const s = String(id == null ? '' : id).trim();
       if (s) commentIds[s] = 1;
@@ -1814,14 +2034,21 @@ const App = {
       const s = String(k == null ? '' : k).trim();
       if (s) chunkKeys[s] = 1;
     });
-    return { ok: true, commentIds: commentIds, chunkKeys: chunkKeys, strict: true };
+    oList.forEach(function (id) {
+      const s = String(id == null ? '' : id).trim();
+      if (s) openchatIds[s] = 1;
+    });
+    return { ok: true, commentIds: commentIds, chunkKeys: chunkKeys, openchatIds: openchatIds, strict: true };
   },
 
   openCitationInDb: (citation) => {
     if (!citation) return;
     const fromScreen = App.state.currentScreen || 'chat';
     App.state.returnScreen =
-      fromScreen === 'comments' || fromScreen === 'lessons' || fromScreen === 'knowledge'
+      fromScreen === 'comments' ||
+      fromScreen === 'lessons' ||
+      fromScreen === 'knowledge' ||
+      fromScreen === 'openchat'
         ? 'chat'
         : fromScreen;
     if (citation.kind === 'video_chunk') {
@@ -1848,6 +2075,15 @@ const App = {
       }
       return;
     }
+    if (citation.kind === 'openchat') {
+      App.switchScreen('openchat');
+      App.showDbReturnBar('openchat');
+      if (App.elements.openchatSearchInput) {
+        App.elements.openchatSearchInput.value = String(citation.openchatId || citation.chatTitle || '').trim();
+      }
+      App.loadOpenchatLogs().catch(function () {});
+      return;
+    }
     App.switchScreen('comments');
     App.showDbReturnBar('comments');
     if (App.elements.commentSearchInput) {
@@ -1865,10 +2101,15 @@ const App = {
     const videoList = [];
     const commentList = [];
     const lessonList = [];
+    const openchatList = [];
     citations.forEach(function (c) {
       if (!c) return;
       if (c.kind === 'video_chunk') {
         videoList.push(c);
+        return;
+      }
+      if (c.kind === 'openchat' || c.sourceType === 'LINEオプチャ') {
+        openchatList.push(c);
         return;
       }
       const cid = String(c.commentId || '').trim();
@@ -2057,6 +2298,40 @@ const App = {
         '<div class="font-semibold mb-1">関連動画ページ説明</div>' +
           '<ul class="citations-list mb-2">' +
           lessonLis +
+          '</ul>'
+      );
+    }
+
+    if (openchatList.length) {
+      const openchatItemHtml = function (c) {
+        const when = String(c.postedAt || '').trim();
+        const title = String(c.chatTitle || '').trim() || '（オプチャ名不明）';
+        const stream = String(c.streamLabel || '').trim();
+        const thread = String(c.threadTitle || '').trim();
+        const author = App.formatAuthorForDisplay
+          ? App.formatAuthorForDisplay(c.authorName || '')
+          : String(c.authorName || '');
+        const meta =
+          App.escapeHtml(title) +
+          (stream ? ' / ' + App.escapeHtml(stream) : '') +
+          (thread ? ' / ' + App.escapeHtml(thread) : '') +
+          (when ? ' / ' + App.escapeHtml(when) : '') +
+          (author ? ' / ' + App.escapeHtml(author) : '');
+        return (
+          '<li class="mb-1">' +
+          meta +
+          ' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="openchat" data-key="' +
+          App.escapeHtml(c.openchatId || '') +
+          '">DBで見る</button>' +
+          '<div class="text-slate-600">' +
+          App.escapeHtml(c.snippet || '') +
+          '</div></li>'
+        );
+      };
+      parts.push(
+        '<div class="font-semibold mb-1">関連LINEオプチャ</div>' +
+          '<ul class="citations-list mb-2">' +
+          openchatList.map(openchatItemHtml).join('') +
           '</ul>'
       );
     }
@@ -2840,6 +3115,8 @@ const App = {
           App.openCitationInDb({ kind: 'video_chunk', videoTitle: key, chunkKey: key });
         } else if (kind === 'lesson') {
           App.openCitationInDb({ kind: 'lesson', commentId: key });
+        } else if (kind === 'openchat') {
+          App.openCitationInDb({ kind: 'openchat', openchatId: key });
         } else {
           App.openCitationInDb({ kind: 'comment', commentId: key });
         }
@@ -3699,6 +3976,7 @@ const App = {
         query: query,
         comment_limit: 100,
         chunk_limit: 50,
+        openchat_limit: 20,
         match_threshold: 0.22,
         session_id: App.state.currentSessionId || undefined,
         user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
@@ -3755,7 +4033,8 @@ const App = {
       usedSources: (sem && sem.usedSources) || '',
       relatedComments: (sem && sem.relatedComments) || [],
       relatedChunks: (sem && sem.relatedChunks) || [],
-      relatedSources: (sem && sem.relatedSources) || []
+      relatedSources: (sem && sem.relatedSources) || [],
+      relatedOpenchat: (sem && sem.relatedOpenchat) || []
     };
   },
 
@@ -3853,8 +4132,14 @@ const App = {
         (msgRes && msgRes.relatedChunks) || [],
         (msgRes && msgRes.relatedSources) || [],
         used.ok
-          ? { commentIds: used.commentIds, chunkKeys: used.chunkKeys, strict: true }
-          : null
+          ? {
+              commentIds: used.commentIds,
+              chunkKeys: used.chunkKeys,
+              openchatIds: used.openchatIds,
+              strict: true
+            }
+          : null,
+        (msgRes && msgRes.relatedOpenchat) || []
       );
       if (msgRes && Array.isArray(msgRes.citations) && msgRes.citations.length) {
         pendingCitations = msgRes.citations;

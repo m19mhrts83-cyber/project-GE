@@ -1842,7 +1842,8 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
                 if not ts:
                     ts = _event_time(cl, ev)
                 when = _format_line_msg_when(ts)
-                date_part = when.split()[0] if when and " " in when else when or "?"
+                # 見出しに日時まで残す（例: 2026/09/12 14:35）。日付だけだと DB posted_at が埋まりにくい
+                date_part = when or "?"
                 sender = str(_msg_sender_mid(cl, msg) or "")
                 my_sm = my_square_mids.get(st.square_chat_mid, "")
                 direction = (
