@@ -121,7 +121,7 @@ def load_group_chat_targets(
 ) -> list[DirectChatTarget]:
     """line_group_chat_mid が設定されたパートナーのグループターゲット一覧。
 
-    Tcell / LEAF / 815幹事など、プリセット側で既に needle が入っている mid は
+    Tcell / LEAF / 823幹事など、プリセット側で既に needle が入っている mid は
     exclude_mids で除外する（二重追記防止）。
     """
     return _load_chat_targets(

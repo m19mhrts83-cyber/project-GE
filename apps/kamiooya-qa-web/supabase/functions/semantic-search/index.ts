@@ -18,10 +18,13 @@ const ANSWER_SNIPPET_LIMIT = 600;
 const DEFAULT_MATCH_THRESHOLD = 0.22;
 const DEFAULT_COMMENT_LIMIT = 100;
 const DEFAULT_CHUNK_LIMIT = 50;
+const DEFAULT_OPENCHAT_LIMIT = 20;
 const MAX_COMMENT_LIMIT = 150;
 const MAX_CHUNK_LIMIT = 80;
+const MAX_OPENCHAT_LIMIT = 50;
 const ANSWER_COMMENT_LIMIT = 50;
 const ANSWER_CHUNK_LIMIT = 25;
+const ANSWER_OPENCHAT_LIMIT = 15;
 const REFUSAL =
   "参照内で確証が取れないため、お答えすることができません。";
 
@@ -29,8 +32,11 @@ type SemanticSearchRequest = {
   query?: string;
   comment_limit?: number;
   chunk_limit?: number;
+  openchat_limit?: number;
   match_threshold?: number;
   skip_answer?: boolean;
+  list_openchat?: boolean;
+  chat_title?: string;
   secret?: string;
   session_id?: string;
   user_id?: string;
@@ -54,6 +60,20 @@ type ChunkRow = {
   content: string;
   similarity: number;
   source_key?: string | null;
+};
+
+type OpenchatRow = {
+  id: string;
+  route_id: string | null;
+  chat_title: string | null;
+  chat_name: string | null;
+  stream_type: string | null;
+  thread_title: string | null;
+  posted_at: string | null;
+  post_date: string | null;
+  sender_name: string | null;
+  content: string;
+  similarity: number;
 };
 
 function corsHeaders(): HeadersInit {
@@ -193,7 +213,8 @@ async function embedQuery(query: string): Promise<number[]> {
 function buildAnswerContext(
   comments: CommentRow[],
   chunks: ChunkRow[],
-  sourcesById: Map<number, Record<string, unknown>>
+  sourcesById: Map<number, Record<string, unknown>>,
+  openchats: OpenchatRow[] = []
 ): string {
   const parts: string[] = [];
   comments.forEach((row, index) => {
@@ -213,6 +234,14 @@ function buildAnswerContext(
         : asString(row.source_key);
     parts.push(
       `[セミナー${index + 1}] chunk=${asString(row.chunk_key)} title=${title || "（無題）"} start=${asString(row.start_sec)} similarity=${Number(row.similarity || 0).toFixed(3)}\n${body}`
+    );
+  });
+  openchats.forEach((row, index) => {
+    const body = buildSnippet(row.content, ANSWER_SNIPPET_LIMIT);
+    if (!body) return;
+    const when = asString(row.posted_at) || asString(row.post_date);
+    parts.push(
+      `[LINEオプチャ${index + 1}] id=${asString(row.id)} chat=${asString(row.chat_title) || asString(row.chat_name)} stream=${asString(row.stream_type)} thread=${asString(row.thread_title)} sender=${asString(row.sender_name)} posted=${when} similarity=${Number(row.similarity || 0).toFixed(3)}\n${body}`
     );
   });
   return parts.join("\n\n");
@@ -279,10 +308,64 @@ async function summarizeAnswer(query: string, answerContext: string): Promise<st
         })
         .join("\n"),
       "",
-      "※詳細は下の関連コミュニティ投稿・関連セミナーも確認してください。",
+      "※詳細は下の関連コミュニティ投稿・関連セミナー・関連LINEオプチャも確認してください。",
     ].join("\n");
   }
   return text;
+}
+
+function mapOpenchatRow(row: Record<string, unknown>): OpenchatRow {
+  return {
+    id: asString(row.id),
+    route_id: asString(row.route_id) || null,
+    chat_title: asString(row.chat_title) || null,
+    chat_name: asString(row.chat_name) || null,
+    stream_type: asString(row.stream_type) || null,
+    thread_title: asString(row.thread_title) || null,
+    posted_at: asString(row.posted_at) || null,
+    post_date: asString(row.post_date) || null,
+    sender_name: asString(row.sender_name) || null,
+    content: buildSnippet(row.content),
+    similarity: Number(row.similarity || 0),
+  };
+}
+
+async function fetchOpenchatHits(
+  // deno-lint-ignore no-explicit-any
+  sb: any,
+  query: string,
+  embedding: number[],
+  matchThreshold: number,
+  openchatLimit: number
+): Promise<OpenchatRow[]> {
+  const [semRpc, kwRpc] = await Promise.all([
+    sb.rpc("match_openchat_semantic", {
+      query_embedding: embedding,
+      match_threshold: matchThreshold,
+      match_count: openchatLimit,
+    }),
+    sb.rpc("search_openchat_keyword", {
+      query_text: query.slice(0, 80),
+      match_count: openchatLimit,
+    }),
+  ]);
+
+  const byId = new Map<string, OpenchatRow>();
+  for (const row of (semRpc.data || []) as Record<string, unknown>[]) {
+    const mapped = mapOpenchatRow(row);
+    if (mapped.id) byId.set(mapped.id, mapped);
+  }
+  for (const row of (kwRpc.data || []) as Record<string, unknown>[]) {
+    const mapped = mapOpenchatRow(row);
+    if (!mapped.id) continue;
+    const prev = byId.get(mapped.id);
+    if (!prev || mapped.similarity > prev.similarity) {
+      byId.set(mapped.id, mapped);
+    }
+  }
+  return Array.from(byId.values())
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, openchatLimit);
 }
 
 async function logSearchEvent(
@@ -313,13 +396,16 @@ Deno.serve(async (req) => {
   }
 
   const query = asString(body?.query).trim();
-  if (!query) {
+  const listOpenchat = body?.list_openchat === true;
+
+  if (!query && !listOpenchat) {
     return json({
       answer: REFUSAL,
-      usedSources: '{"comment_ids":[],"chunk_keys":[]}',
+      usedSources: '{"comment_ids":[],"chunk_keys":[],"openchat_ids":[]}',
       relatedComments: [],
       relatedChunks: [],
       relatedSources: [],
+      relatedOpenchat: [],
       answerContext: "",
       hitCount: 0,
     });
@@ -337,14 +423,14 @@ Deno.serve(async (req) => {
   const sessionId = asString(body?.session_id) || null;
   const userId = asString(body?.user_id) || null;
   const baseEvent = {
-    search_mode: "semantic",
-    query_text: query.slice(0, 2000),
+    search_mode: listOpenchat ? "openchat_list" : "semantic",
+    query_text: (query || asString(body?.chat_title)).slice(0, 2000),
     session_id: sessionId,
     user_id: userId,
   };
 
   // Phase 14-1: emergency kill switch (no redeploy needed)
-  if ((Deno.env.get("SEMANTIC_SEARCH_DISABLED") || "").trim() === "1") {
+  if ((Deno.env.get("SEMANTIC_SEARCH_DISABLED") || "").trim() === "1" && !listOpenchat) {
     await logSearchEvent(sb, {
       ...baseEvent,
       result_status: "disabled",
@@ -361,6 +447,49 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const openchatLimit = Math.max(
+      1,
+      Math.min(MAX_OPENCHAT_LIMIT, Number(body?.openchat_limit ?? DEFAULT_OPENCHAT_LIMIT))
+    );
+
+    // 一覧／KW ブラウズ（意味検索タブ用・シークレット必須は isAuthorized 済み）
+    if (listOpenchat) {
+      let q = sb
+        .from("line_openchat_logs")
+        .select(
+          "id,route_id,chat_title,chat_name,stream_type,thread_title,posted_at,post_date,sender_name,content"
+        )
+        .eq("ingest_status", "ready")
+        .order("posted_at", { ascending: false, nullsFirst: false })
+        .limit(Math.min(200, openchatLimit * 5));
+      const titleFilter = asString(body?.chat_title).trim();
+      if (titleFilter) {
+        q = q.ilike("chat_title", `%${titleFilter}%`);
+      }
+      if (query) {
+        q = q.or(
+          `content.ilike.%${query}%,chat_title.ilike.%${query}%,sender_name.ilike.%${query}%,thread_title.ilike.%${query}%`
+        );
+      }
+      const { data, error } = await q;
+      if (error) throw new Error(`openchat list failed: ${error.message}`);
+      const relatedOpenchat = ((data || []) as Record<string, unknown>[]).map((row) =>
+        mapOpenchatRow({ ...row, similarity: 0 })
+      );
+      await logSearchEvent(sb, {
+        ...baseEvent,
+        comment_hit_count: 0,
+        chunk_hit_count: 0,
+        result_status: "ok",
+        used_sources: JSON.stringify({ openchat_ids: relatedOpenchat.map((r) => r.id) }),
+      });
+      return json({
+        relatedOpenchat,
+        hitCount: relatedOpenchat.length,
+        meta: { openchatHitCount: relatedOpenchat.length, mode: "list" },
+      });
+    }
+
     const commentLimit = Math.max(
       1,
       Math.min(MAX_COMMENT_LIMIT, Number(body?.comment_limit ?? DEFAULT_COMMENT_LIMIT))
@@ -376,7 +505,7 @@ Deno.serve(async (req) => {
 
     const embedding = await embedQuery(query);
 
-    const [commentsRpc, chunksRpc] = await Promise.all([
+    const [commentsRpc, chunksRpc, openchatRows] = await Promise.all([
       sb.rpc("match_comments_semantic", {
         query_embedding: embedding,
         match_threshold: matchThreshold,
@@ -387,6 +516,7 @@ Deno.serve(async (req) => {
         match_threshold: matchThreshold,
         match_count: chunkLimit,
       }),
+      fetchOpenchatHits(sb, query, embedding, matchThreshold, openchatLimit),
     ]);
 
     if (commentsRpc.error) {
@@ -453,6 +583,11 @@ Deno.serve(async (req) => {
           : null,
     }));
 
+    const openchatsForAnswer = openchatRows
+      .slice()
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, Math.min(ANSWER_OPENCHAT_LIMIT, openchatRows.length));
+
     const commentsForAnswer = mergeSimilarityAndRecency(
       commentRows,
       Math.min(ANSWER_COMMENT_LIMIT, commentRows.length),
@@ -464,12 +599,18 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, Math.min(ANSWER_CHUNK_LIMIT, relatedChunks.length));
 
-    const answerContext = buildAnswerContext(commentsForAnswer, chunksForAnswer, sourceById);
+    const answerContext = buildAnswerContext(
+      commentsForAnswer,
+      chunksForAnswer,
+      sourceById,
+      openchatsForAnswer
+    );
     const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext);
 
     const usedSources = JSON.stringify({
       comment_ids: commentsForAnswer.map((row) => asString(row.comment_id)).filter(Boolean),
       chunk_keys: chunksForAnswer.map((row) => asString(row.chunk_key)).filter(Boolean),
+      openchat_ids: openchatsForAnswer.map((row) => asString(row.id)).filter(Boolean),
     });
 
     const commentsForUi = orderCommentsForUi(commentRows);
@@ -478,6 +619,10 @@ Deno.serve(async (req) => {
       content: buildSnippet(row.content, 240),
     }));
     const relatedChunksForClient = relatedChunks.map((row) => ({
+      ...row,
+      content: buildSnippet(row.content, 240),
+    }));
+    const relatedOpenchatForClient = openchatRows.map((row) => ({
       ...row,
       content: buildSnippet(row.content, 240),
     }));
@@ -499,12 +644,15 @@ Deno.serve(async (req) => {
       relatedComments: relatedCommentsForClient,
       relatedChunks: relatedChunksForClient,
       relatedSources,
-      hitCount: commentRows.length + relatedChunks.length,
+      relatedOpenchat: relatedOpenchatForClient,
+      hitCount: commentRows.length + relatedChunks.length + openchatRows.length,
       meta: {
         commentHitCount: commentRows.length,
         chunkHitCount: relatedChunks.length,
+        openchatHitCount: openchatRows.length,
         answerCommentCount: commentsForAnswer.length,
         answerChunkCount: chunksForAnswer.length,
+        answerOpenchatCount: openchatsForAnswer.length,
         matchThreshold,
       },
     });

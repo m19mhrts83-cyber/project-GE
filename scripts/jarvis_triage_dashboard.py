@@ -520,7 +520,7 @@ def render_html(
             engine_panel = warn_block
         howto = """
         <ol class="howto">
-          <li>パートナー: メール要返信（下書き）＋ Chatwork/LINE/メッセージの更新概要</li>
+          <li>パートナー: Gmail／Chatwork／LINE／iMessage の要返信（下書き）。815 は別タブ</li>
           <li>神大家オプチャ: 直近更新の概要のみ（返信提案・スキップなし）</li>
           <li>状況: 気にしている項目の判定。不要ならアーカイブ、「Cursorで調べる」で調査プロンプトをコピー</li>
           <li>メールを送る件は「送信指示をコピー」→ Cursor に貼る（自動送信なし）</li>
@@ -608,11 +608,15 @@ def render_html(
               <button type="button" onclick="copyCmd({json.dumps(f'夜間下書き #{seq} を送って')})">送信指示をコピー</button>
             </div>
             """
+        channel = str(it.get("channel") or "Gmail").strip() or "Gmail"
+        channel_esc = html.escape(channel)
         show = "" if serve or item_lane_raw == "partner" else "display:none"
+        orig_label = "元メール全文" if channel in ("Gmail", "") else f"元メッセージ（{channel_esc}）"
         return f"""
         <article class="card lane-{item_lane} pri-{html.escape(pri)} status-{html.escape(st)}" data-lane="{item_lane}" style="{show}">
           <header>
             <span class="seq">#{seq}</span>
+            <span class="ch">{channel_esc}</span>
             <span class="pri">{html.escape(pri)}</span>
             <span class="st">{html.escape(st)}</span>
             <strong>{partner}</strong>
@@ -622,7 +626,7 @@ def render_html(
           {summary_html}
           {f'<p class="reason">{reason}</p>' if reason else ''}
           <details open>
-            <summary>元メール全文</summary>
+            <summary>{orig_label}</summary>
             <pre class="original">{original_esc}</pre>
           </details>
           <details>
@@ -708,7 +712,7 @@ def render_html(
         """
 
     cards_p = "\n".join(card(i, True) for i in pending) or (
-        "<p>メールの要返信なし</p>"
+        "<p>要返信なし</p>"
         if lane == "partner"
         else ("<p>pending なし</p>" if lane == "general" else "")
     )
@@ -717,17 +721,22 @@ def render_html(
 
     if lane == "partner":
         lane_label = "パートナー"
+        act_block = ""
+        if partner_act_n > 0:
+            act_block = f"""
+  <h2>その他の更新概要</h2>
+  <p class="sec-note">残存の概要のみ（通常は空。Chatwork／LINE／iMessage は上の要返信キューへ昇格済み）。</p>
+  {cards_act}
+"""
         main_sections = f"""
   <div class="stats">
-    <div class="stat">メール要返信 <strong>{len(pending)}</strong></div>
-    <div class="stat">他チャネル更新 <strong>{partner_act_n}</strong></div>
+    <div class="stat">要返信 <strong>{len(pending)}</strong></div>
     <div class="stat">状況要注意 <strong>{watch_attn}</strong></div>
   </div>
-  <h2>メール要返信（古い順）</h2>
+  <h2>要返信（Gmail / Chatwork / LINE / iMessage）</h2>
+  <p class="sec-note">チャネル別に判定・下書き。815 オプチャは「神大家オプチャ」タブ（要約のみ・返信提案なし）。</p>
   {cards_p}
-  <h2>他チャネルの更新（Chatwork / LINE / メッセージ）</h2>
-  <p class="sec-note">概要のみ（スキップ・下書きなし）。取込はパートナー確認側の MD が正本。</p>
-  {cards_act}
+  {act_block}
   <h2>処理済み・スキップ（直近）</h2>
   {cards_o}
 """
@@ -888,6 +897,7 @@ def render_html(
   }}
   .card header {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; font-size: 0.85rem; }}
   .seq {{ font-weight: 700; color: var(--accent); }}
+  .ch {{ font-size: 0.75rem; padding: 1px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3; }}
   .pri {{ text-transform: uppercase; font-size: 0.75rem; padding: 1px 6px; border-radius: 4px; background: #f5f5f4; }}
   .pri-high .pri {{ background: #fee2e2; color: var(--high); }}
   .pri-medium .pri {{ background: #ffedd5; color: var(--med); }}

@@ -4,8 +4,9 @@ Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
 
 1. gmail_to_yoritoori.py で取込（パートナー）
 2. 5.やり取り.md / admin INBOX から未返信候補を抽出
-3. Gemini / Cursor Agent で要返信判定・下書き生成（メールのみ）
-4. Chatwork／LINE／iMessage・815神大家オプチャの直近更新概要を queue に載せる
+3. Gemini / Cursor Agent で要返信判定・下書き生成
+   （パートナー: Gmail ＋ Chatwork／LINE／iMessage。815 オプチャは下書きしない）
+4. 815神大家オプチャの直近更新概要を queue に載せる（kind=activity）
 5. .jarvis_state/night_triage/queue.json を更新（lane=partner|general|openchat）
 
 使い方:
@@ -82,6 +83,13 @@ SKIP_FOLDERS = {
 
 OPENCHAT_ROOT_NAME = "815_神大家オプチャ"
 PLACEHOLDER_BODY_RE = re.compile(r"(\[本文なし|E2EE|復号でき|プレースホルダ)", re.I)
+# Chatwork システム通知・スタンプのみ等（要返信判定対象外）
+CHAT_NOISE_RE = re.compile(
+    r"(\[dtext:|chatroom_member|chatroom_added|chatroom_chat_edited|chatroom_chatna|"
+    r"\[deleted\]|入室しました|退室しました|"
+    r"^\[?(画像|スタンプ|動画|ファイル|ボイスメッセージ)\]?$)",
+    re.I,
+)
 ACTIVITY_LOOKBACK_DEFAULT = 7
 ACTIVITY_PER_PARTNER = 3
 ACTIVITY_PARTNER_MAX = 30
@@ -242,6 +250,37 @@ def is_chat_inbound(channel: str) -> bool:
     return False
 
 
+def is_chat_noise(summary: str, body: str, subject: str = "") -> bool:
+    blob = f"{summary or ''}\n{subject or ''}\n{(body or '')[:500]}"
+    if CHAT_NOISE_RE.search(blob):
+        return True
+    if PLACEHOLDER_BODY_RE.search(summary or "") and PLACEHOLDER_BODY_RE.search(body or ""):
+        return True
+    text = re.sub(r"\s+", "", (summary or "") + (body or "")[:200])
+    if not text or text in ("（要約なし）", "（本文未取得）"):
+        return True
+    return False
+
+
+def chat_thread_key(folder: str, channel: str, kind: str) -> str:
+    """folder|kind|room。Chatwork はルーム名をキーに含める。"""
+    ch = channel or ""
+    room = ""
+    m = re.search(r"Chatwork[・･\s]*([^）)\]]+)", ch)
+    if m:
+        room = m.group(1).strip()
+    elif kind == "LINE":
+        m2 = re.search(r"（([^）]*LINE[^）]*)）", ch)
+        if m2:
+            room = m2.group(1).strip()
+    return f"{folder}|{kind}|{room}"
+
+
+def chat_entry_id(folder: str, received_at: str, kind: str, summary: str) -> str:
+    raw = f"chat|{folder}|{kind}|{received_at}|{(summary or '')[:80]}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
+
 def parse_received_at(s: str) -> datetime | None:
     s = (s or "").strip()
     for fmt, n in (("%Y/%m/%d %H:%M", 16), ("%Y/%m/%d", 10)):
@@ -272,55 +311,13 @@ def find_recent_chat_activity(
     *,
     per_partner: int = ACTIVITY_PER_PARTNER,
 ) -> list[dict[str, Any]]:
-    """パートナー MD から Chatwork/LINE/iMessage の直近受信を抽出。"""
-    cutoff = None
-    if lookback_days > 0:
-        from datetime import timedelta
+    """旧: パートナー Chatwork/LINE/iMessage の概要のみ。
 
-        cutoff = datetime.now(JST) - timedelta(days=lookback_days)
-    picked: list[dict[str, Any]] = []
-    # 新しい順に走査し、フォルダごとに上限
-    ordered = sorted(entries, key=lambda x: x.get("received_at") or "", reverse=True)
-    per_folder: dict[str, int] = {}
-    for e in ordered:
-        kind = chat_channel_kind(e.get("channel") or "")
-        if not kind:
-            continue
-        if not is_chat_inbound(e.get("channel") or ""):
-            continue
-        if NOISE_SUBJECT_RE.search(e.get("summary") or "") or NOISE_SUBJECT_RE.search(e.get("subject") or ""):
-            continue
-        if cutoff:
-            dt = parse_received_at(e.get("received_at") or "")
-            if dt and dt < cutoff:
-                continue
-        folder = e.get("folder") or ""
-        if per_folder.get(folder, 0) >= per_partner:
-            continue
-        per_folder[folder] = per_folder.get(folder, 0) + 1
-        summary = summarize_activity_text(e.get("summary") or "", e.get("body") or "")
-        subject = e.get("subject") or summary
-        if subject == e.get("summary") or not e.get("subject"):
-            subject = f"[{kind}] {summary[:80]}"
-        picked.append(
-            {
-                "id": activity_id("partner", folder, e.get("received_at") or "", e.get("channel") or "", summary),
-                "lane": "partner",
-                "kind": "activity",
-                "status": "info",
-                "channel": kind,
-                "channel_raw": e.get("channel") or "",
-                "partner_name": e.get("partner_name") or "",
-                "folder": folder,
-                "received_at": e.get("received_at") or "",
-                "subject": subject[:120],
-                "summary": summary,
-                "body": (e.get("body") or "")[:2000],
-                "priority": "",
-                "draft_text": "",
-            }
-        )
-    return picked
+    2026-09-12 以降は find_unreplied_chat → 要返信判定＋下書きへ昇格したため、
+    二重表示を避け空リストを返す（815 オプチャ activity は別関数のまま）。
+    """
+    _ = (entries, lookback_days, per_partner)
+    return []
 
 
 def list_openchat_mds(base: Path) -> list[tuple[str, Path]]:
@@ -581,12 +578,79 @@ def find_unreplied(entries: list[dict[str, Any]], lookback_days: int) -> list[di
             {
                 **last,
                 "lane": "partner",
+                "channel": "Gmail",
+                "channel_raw": last.get("channel") or "",
                 "context": ctx,
                 "id": entry_id(last["folder"], last["received_at"], last["subject"]),
             }
         )
     # 新しい順
     candidates.sort(key=lambda x: x["received_at"], reverse=True)
+    return candidates
+
+
+def find_unreplied_chat(entries: list[dict[str, Any]], lookback_days: int) -> list[dict[str, Any]]:
+    """Chatwork／LINE／iMessage: folder|kind|room 単位で、最後が受信のものを未返信候補にする。"""
+    from datetime import timedelta
+
+    by_key: dict[str, list[dict[str, Any]]] = {}
+    for e in entries:
+        ch_raw = e.get("channel") or ""
+        kind = chat_channel_kind(ch_raw)
+        if not kind:
+            continue
+        if is_chat_noise(e.get("summary") or "", e.get("body") or "", e.get("subject") or ""):
+            continue
+        if NOISE_SUBJECT_RE.search(e.get("summary") or "") or NOISE_SUBJECT_RE.search(e.get("subject") or ""):
+            continue
+        inbound = is_chat_inbound(ch_raw)
+        folder = e.get("folder") or ""
+        key = chat_thread_key(folder, ch_raw, kind)
+        row = {
+            **e,
+            "inbound": inbound,
+            "chat_kind": kind,
+            "channel_raw": ch_raw,
+        }
+        by_key.setdefault(key, []).append(row)
+
+    cutoff = None
+    if lookback_days > 0:
+        cutoff = datetime.now(JST) - timedelta(days=lookback_days)
+
+    candidates: list[dict[str, Any]] = []
+    for _key, items in by_key.items():
+        ordered = sorted(items, key=lambda x: x.get("received_at") or "")
+        last = ordered[-1]
+        if not last.get("inbound"):
+            continue
+        if cutoff:
+            dt = parse_received_at(last.get("received_at") or "")
+            if dt and dt < cutoff:
+                continue
+        kind = last.get("chat_kind") or "LINE"
+        summary = summarize_activity_text(last.get("summary") or "", last.get("body") or "")
+        subject = last.get("subject") or summary
+        if not last.get("subject") or subject == last.get("summary"):
+            subject = f"[{kind}] {summary[:100]}"
+        ctx = ordered[-4:]
+        candidates.append(
+            {
+                **last,
+                "lane": "partner",
+                "channel": kind,
+                "subject": subject[:160],
+                "summary": summary,
+                "context": ctx,
+                "id": chat_entry_id(
+                    last.get("folder") or "",
+                    last.get("received_at") or "",
+                    kind,
+                    summary,
+                ),
+            }
+        )
+    candidates.sort(key=lambda x: x.get("received_at") or "", reverse=True)
     return candidates
 
 
@@ -688,14 +752,23 @@ def cursor_generate(prompt: str) -> str:
 
 
 def build_judge_prompt(c: dict[str, Any]) -> str:
+    channel = (c.get("channel") or "Gmail").strip() or "Gmail"
+    media = {
+        "Gmail": "メール",
+        "Chatwork": "Chatwork",
+        "LINE": "LINE",
+        "iMessage": "iMessage/SMS",
+    }.get(channel, channel)
     ctx_lines = []
     for e in c.get("context") or []:
-        role = "相手" if e["inbound"] else "自分"
-        ctx_lines.append(f"[{e['received_at']}|{role}] {e['subject']}\n{(e['body'] or '')[:1200]}")
-    return f"""あなたは不動産オーナー（松野）の秘書です。メールについて返信が必要か判定してください。
+        role = "相手" if e.get("inbound") else "自分"
+        subj = e.get("subject") or e.get("summary") or ""
+        ctx_lines.append(f"[{e.get('received_at')}|{role}] {subj}\n{(e.get('body') or '')[:1200]}")
+    return f"""あなたは不動産オーナー（松野）の秘書です。{media} のやり取りについて返信が必要か判定してください。
 
 相手: {c['partner_name']}（{c.get('folder') or c.get('from_email') or c.get('lane') or ''}）
-最新件名: {c['subject']}
+チャネル: {media}
+最新件名／要約: {c.get('subject') or ''}
 最新受信: {c['received_at']}
 
 直近のやり取り:
@@ -706,17 +779,27 @@ def build_judge_prompt(c: dict[str, Any]) -> str:
 次の JSON のみを返してください（Markdown不可）:
 {{"needs_reply": true/false, "priority": "high"|"medium"|"low", "summary": "1行要約", "reason": "短い理由"}}
 
-返信不要の例: 単なる承知の連絡、自動通知、パスワード通知、既に完結している御礼のみ、配信メール、広告。
+返信不要の例: 単なる承知の連絡、自動通知、パスワード通知、既に完結している御礼のみ、配信メール、広告、システム入退室、スタンプのみ。
 返信要の例: 質問・依頼・署名依頼・確認待ち・期限あり・意思決定が必要。
 """
 
 
 def build_draft_prompt(c: dict[str, Any], judge: dict[str, Any]) -> str:
+    channel = (c.get("channel") or "Gmail").strip() or "Gmail"
+    media = {
+        "Gmail": "メール",
+        "Chatwork": "Chatwork",
+        "LINE": "LINE",
+        "iMessage": "iMessage/SMS",
+    }.get(channel, channel)
     ctx_lines = []
     for e in c.get("context") or []:
-        role = "相手" if e["inbound"] else "自分"
-        ctx_lines.append(f"[{e['received_at']}|{role}]\n{(e['body'] or '')[:1500]}")
-    return f"""あなたは株式会社リビングサポート松の代表・松野真治です。パートナーへの返信メール下書きを書いてください。
+        role = "相手" if e.get("inbound") else "自分"
+        ctx_lines.append(f"[{e.get('received_at')}|{role}]\n{(e.get('body') or '')[:1500]}")
+    line_hint = ""
+    if channel == "LINE":
+        line_hint = "- LINE 向け: 短め（目安200〜400字）。絵文字は相手のトーンに合わせ最小限。\n"
+    return f"""あなたは株式会社リビングサポート松の代表・松野真治です。パートナーへの返信（{media}）下書きを書いてください。
 
 ルール:
 - 日本語。丁寧だが冗長にしない。
@@ -725,9 +808,10 @@ def build_draft_prompt(c: dict[str, Any], judge: dict[str, Any]) -> str:
 - 勝手な約束・金額・日付を捏造しない。文脈にないことは書かない。不明点は確認の一文にする。
 - 件名行は書かない。本文のみ。
 - 「Re:」や引用は付けない。
-
+{line_hint}
 パートナー: {c['partner_name']}
-件名（参考）: {c['subject']}
+チャネル: {media}
+件名（参考）: {c.get('subject') or ''}
 判定要約: {judge.get('summary', '')}
 
 直近やり取り:
@@ -1003,6 +1087,8 @@ def queue_item_fields(c: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any
         "gmail_message_id": c.get("gmail_message_id") or "",
         "from_email": from_email,
         "message_id_header": c.get("message_id_header") or "",
+        "channel": c.get("channel") or ("Gmail" if (c.get("lane") or "partner") != "openchat" else ""),
+        "channel_raw": c.get("channel_raw") or "",
         "original_body": body[:8000],
         "updated_at": now_iso(),
     }
@@ -1199,6 +1285,7 @@ def apply_draft_to_partner(seq_or_id: str) -> Path | None:
         raise SystemExit("draft_text empty")
     lane = item.get("lane") or "partner"
     subject = item.get("subject") or ""
+    channel = (item.get("channel") or "Gmail").strip() or "Gmail"
     if lane == "general":
         print(f"# lane=general (Gmail Reply)")
         print(f"# to: {item.get('from_email')}")
@@ -1211,15 +1298,30 @@ def apply_draft_to_partner(seq_or_id: str) -> Path | None:
         return None
     folder = item["folder"]
     partner_dir = partner_base() / folder
-    draft_path = partner_dir / "4.送信下書き.txt"
-    if not subject.lower().startswith("re:"):
-        subject_line = f"件名：Re: {subject}"
+    partner_dir.mkdir(parents=True, exist_ok=True)
+    partner_name = str(item.get("partner") or folder)
+
+    if channel == "LINE":
+        draft_path = partner_dir / "4.LINE送信下書き.txt"
+        content = f"宛先: {partner_name}\n\n{draft}\n"
+    elif channel == "Chatwork":
+        draft_path = partner_dir / "4.Chatwork送信下書き.txt"
+        content = f"{draft}\n"
+    elif channel == "iMessage":
+        draft_path = partner_dir / "4.送信下書き.txt"
+        content = f"経路：iMessage\n\n{draft}\n"
     else:
-        subject_line = f"件名：{subject}"
-    content = f"{subject_line}\n\n{draft}\n"
+        draft_path = partner_dir / "4.送信下書き.txt"
+        if not subject.lower().startswith("re:"):
+            subject_line = f"件名：Re: {subject}"
+        else:
+            subject_line = f"件名：{subject}"
+        content = f"{subject_line}\n\n{draft}\n"
+
     draft_path.write_text(content, encoding="utf-8")
     print(f"# wrote draft -> {draft_path}")
     print(f"# partner folder: {folder}")
+    print(f"# channel: {channel}")
     print(f"# subject: {subject}")
     return draft_path
 
@@ -1334,13 +1436,17 @@ def main() -> int:
             name = folder.split("_", 1)[-1] if "_" in folder else folder
             entries = parse_yoritoori(md, folder, name)
             cands = find_unreplied(entries, lookback)
+            chat_cands = find_unreplied_chat(entries, lookback)
             all_cands.extend(cands)
+            all_cands.extend(chat_cands)
             activities.extend(find_recent_chat_activity(entries, activity_lookback))
-        # パートナー活動: 全体上限
+        # パートナー活動: チャットは要返信キューへ昇格済みのため通常0件
         activities.sort(key=lambda x: x.get("received_at") or "", reverse=True)
         activities = activities[:ACTIVITY_PARTNER_MAX]
-        print(f"# partner unreplied candidates: {sum(1 for c in all_cands if c.get('lane')=='partner')}")
-        print(f"# partner chat activity: {len(activities)}")
+        n_mail = sum(1 for c in all_cands if c.get("lane") == "partner" and (c.get("channel") or "Gmail") == "Gmail")
+        n_chat = sum(1 for c in all_cands if c.get("lane") == "partner" and (c.get("channel") or "") in ("Chatwork", "LINE", "iMessage"))
+        print(f"# partner unreplied candidates: mail={n_mail} chat={n_chat}")
+        print(f"# partner chat activity (legacy overview): {len(activities)}")
 
         oc_acts: list[dict[str, Any]] = []
         for group, md in list_openchat_mds(base):

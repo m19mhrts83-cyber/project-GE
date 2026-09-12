@@ -3,10 +3,12 @@
 
 役割:
   1. 815神大家オプチャの 5.やり取り.md をパース（YAMLの title_substring を chat_title 正本に）
-  2. kamiooya-qa: line_openchat_logs へ UPSERT（正本・当面 staging＝検索非公開）
-  3. Grok Bot 共有: Drive 【with Grok bot】/30_shared_working/ へ知見MD＋タイトル別カタログ
+  2. kamiooya-qa: line_openchat_logs へ UPSERT（正本・apply 時は staging）
+  3. 公開は jarvis_openchat_publish.py（ready / excluded）
+  4. Grok Bot 共有: Drive 【with Grok bot】/30_shared_working/ へ知見MD＋タイトル別カタログ
 
 ※ jarvis-dashboard の kurashift_openchat_logs は廃止（二重管理しない）。
+※ 見出し日時（YYYY/MM/DD HH:MM）→ post_date + posted_at を UPSERT。
 
 使用例:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -105,6 +107,26 @@ def qa_sb() -> Client:
     return create_client(url, key)
 
 
+def parse_heading_datetime(date_str: str) -> tuple[str | None, str | None]:
+    """見出し先頭の日時 → (post_date ISO date, posted_at ISO timestamptz JST)。
+
+    新規: ``YYYY/MM/DD HH:MM``。既存: ``YYYY/MM/DD``（時刻は 00:00 JST）。
+    """
+    s = (date_str or "").strip()
+    if not s or s == "?":
+        return None, None
+    for fmt in ("%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M", "%Y/%m/%d"):
+        try:
+            dt = datetime.strptime(s, fmt)
+            post_date = dt.date().isoformat()
+            # 見出し時刻は JST 前提
+            posted_at = f"{dt.strftime('%Y-%m-%dT%H:%M:%S')}+09:00"
+            return post_date, posted_at
+        except ValueError:
+            continue
+    return None, None
+
+
 def parse_heading(line: str) -> dict[str, str] | None:
     if not line.startswith("### "):
         return None
@@ -183,11 +205,7 @@ def parse_messages_from_md(md_path: Path, route_id: str, chat_title: str) -> lis
             has_vendor = any(k in content for k in VENDOR_SIGNALS)
             is_repair = is_repair_route or (matched_cat is not None and has_vendor)
 
-            p_date = None
-            try:
-                p_date = datetime.strptime(current_meta["date_str"], "%Y/%m/%d").date().isoformat()
-            except Exception:
-                pass
+            p_date, posted_at = parse_heading_datetime(current_meta.get("date_str") or "")
 
             entries.append({
                 "id": f"oc_{msg_id}",
@@ -197,16 +215,18 @@ def parse_messages_from_md(md_path: Path, route_id: str, chat_title: str) -> lis
                 "stream_type": current_meta["stream_type"],
                 "thread_title": current_meta["thread_title"] or None,
                 "post_date": p_date,
+                "posted_at": posted_at,
                 "sender_name": current_meta["sender"] or None,
                 "content": content,
                 "is_repair_related": is_repair,
                 "repair_category": matched_cat,
                 "source_system": "line_openchat",
-                "ingest_status": "active",
+                "ingest_status": "staging",
                 "metadata": {
                     "summary": current_meta.get("summary"),
                     "source_file": str(md_path),
                     "yaml_title": chat_title,
+                    "heading_datetime": current_meta.get("date_str"),
                 },
             })
 
@@ -260,7 +280,7 @@ def export_catalog(entries: list[dict[str, Any]], output_path: Path) -> None:
         "## 方針",
         "- 1つのDBに集約（**正本: kamiooya-qa `line_openchat_logs`**。jarvis 側テーブルは廃止）",
         "- 各行の `chat_title` でオプチャ名がわかる",
-        "- Q&A検索公開は次ステップ（現状は staging 仕込み）",
+        "- Q&A検索公開は `jarvis_openchat_publish.py` で ready（ノイズのみ excluded）",
         "",
         "## オプチャ別件数",
         "",
@@ -426,8 +446,8 @@ def main() -> int:
             qa_rows.append(row)
         cols_q = [
             "id", "route_id", "chat_title", "chat_name", "stream_type", "thread_title",
-            "post_date", "sender_name", "content", "is_repair_related", "repair_category",
-            "source_system", "ingest_status", "metadata",
+            "post_date", "posted_at", "sender_name", "content", "is_repair_related",
+            "repair_category", "source_system", "ingest_status", "metadata",
         ]
         n = upsert_batches(qa_sb(), "line_openchat_logs", qa_rows, cols_q)
         print(f"✅ kamiooya-qa line_openchat_logs UPSERT (staging・正本): {n}")
