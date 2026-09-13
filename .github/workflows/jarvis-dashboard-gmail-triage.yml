@@ -3,7 +3,8 @@ name: Jarvis Dashboard Gmail Triage
 # 05:00 JST:
 #   1) admin general → triage_items
 #   2) パートナー Gmail → OneDrive 5.やり取り.md（Graph）＋既読
-#   3) パートナー Gmail 未返信判定 → triage_items
+#   3) パートナー Chatwork → OneDrive 5.やり取り.md（Graph）＋添付
+#   4) パートナー Gmail／Chatwork 未返信判定 → triage_items
 # LINE / iMessage / CHRLINE は Mac 残。
 # 末尾で Ops Fail Watch（Vercel/GHA）も朝1回だけ実行する。
 
@@ -48,7 +49,7 @@ jobs:
 
       - name: Install deps
         run: |
-          pip install -q google-api-python-client google-auth-httplib2 google-auth-oauthlib supabase pyyaml
+          pip install -q google-api-python-client google-auth-httplib2 google-auth-oauthlib supabase pyyaml requests
 
       - name: Materialize Gmail credentials
         env:
@@ -118,7 +119,38 @@ jobs:
           fi
           python scripts/jarvis_gha_partner_gmail_yoritoori.py "${ARGS[@]}"
 
-      - name: Partner Gmail unreplied → triage_items
+      - name: Partner Chatwork → OneDrive MD (Graph)
+        if: ${{ github.event.inputs.skip_partner != 'true' }}
+        env:
+          CHATWORK_API_TOKEN: ${{ secrets.CHATWORK_API_TOKEN }}
+          MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
+          MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
+          MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
+          MS_GRAPH_REFRESH_TOKEN: ${{ secrets.MS_GRAPH_REFRESH_TOKEN }}
+          MS_GRAPH_AUTHORITY: ${{ secrets.MS_GRAPH_AUTHORITY }}
+          MS_GRAPH_USER_UPN: ${{ secrets.MS_GRAPH_USER_UPN }}
+          MS_GRAPH_DRIVE_ID: ${{ secrets.MS_GRAPH_DRIVE_ID }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+          PYTHONPATH: ${{ github.workspace }}/scripts:${{ github.workspace }}/215_kamiooya/C1_cursor/1b_Cursorマニュアル
+        run: |
+          set -euo pipefail
+          if [[ -z "${CHATWORK_API_TOKEN:-}" ]]; then
+            echo "::warning::CHATWORK_API_TOKEN missing — skip partner chatwork"
+            exit 0
+          fi
+          if [[ -z "${MS_GRAPH_REFRESH_TOKEN:-}" && -z "${MS_GRAPH_CLIENT_SECRET:-}" ]]; then
+            echo "::warning::MS_GRAPH_* missing — skip partner chatwork"
+            exit 0
+          fi
+          ARGS=()
+          if [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run)
+          else
+            ARGS+=(--apply)
+          fi
+          python scripts/jarvis_gha_partner_chatwork_yoritoori.py "${ARGS[@]}"
+
+      - name: Partner Gmail/Chatwork unreplied → triage_items
         if: ${{ github.event.inputs.skip_partner != 'true' }}
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}

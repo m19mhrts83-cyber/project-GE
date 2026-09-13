@@ -14,10 +14,13 @@ if [[ -f "${REPO_DIR}/.env.jarvis_private" ]]; then
   set +a
 fi
 
-# パートナー Gmail 判定は GHA 本線。未設定時もスキップ（=0 で Mac 判定に戻す）
+# パートナー Gmail／Chatwork 判定は GHA 本線。未設定時もスキップ（=0 で Mac 判定に戻す）
 EXTRA=()
 if [[ "${JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL:-1}" != "0" ]]; then
   EXTRA+=(--skip-partner-gmail)
+fi
+if [[ "${JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_CHATWORK:-1}" != "0" ]]; then
+  EXTRA+=(--skip-partner-chatwork)
 fi
 
 exec "$PY" "${REPO_DIR}/scripts/jarvis_night_triage.py" "${EXTRA[@]}" "$@"

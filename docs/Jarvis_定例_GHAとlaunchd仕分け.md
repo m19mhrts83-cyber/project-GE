@@ -22,7 +22,7 @@
 - OneDrive／Documents 直書きが正本
 - 常駐（watch）や GUI 操作
 
-**過渡**: GHA でパートナー Gmail→MD＋判定まで寄せ済み。LINE／iMessage／CHRLINE・MailGates 添付は Mac。Graph 書込には `Files.ReadWrite` 再同意が必要（`docs/Jarvis_OneDrive_Graph.md`）。
+**過渡**: GHA でパートナー Gmail／Chatwork→MD＋判定まで寄せ済み。LINE／iMessage／CHRLINE・MailGates 添付は Mac。Graph 書込には `Files.ReadWrite` 再同意が必要（`docs/Jarvis_OneDrive_Graph.md`）。
 
 ---
 
@@ -30,7 +30,7 @@
 
 | 定例 | Workflow | 備考 |
 |---|---|---|
-| admin Gmail → triage | `jarvis-dashboard-gmail-triage.yml` | 05:00 JST。general ＋ **パートナー Gmail→MD（Graph）＋partner 判定** |
+| admin Gmail → triage | `jarvis-dashboard-gmail-triage.yml` | 05:00 JST。general ＋ **パートナー Gmail／Chatwork→MD（Graph）＋partner 判定** |
 | 状況ウォッチ（軽量） | `jarvis-dashboard-situation-watch.yml` | 06:15 |
 | レーン要約 | `jarvis-dashboard-lanes.yml` | Graph 委任 |
 | Dashboard heartbeat | `jarvis-dashboard-heartbeat.yml` | |
@@ -55,7 +55,7 @@
 | 資産週次（証券ログイン） | `portfolio-weekly` | 同上 |
 | CHRLINE／オプチャ常駐 | `line.openchat.watch` 等 | Mac 専用 |
 | **815オプチャ MD→DB→publish→/openchat** | `openchat-md-db-sync`（07:40/20:30） | CHRLINE＋OneDrive＋kamiooya-qa（staging→ready）。パートナー確認／朝LINEでもMDは取込済み想定 |
-| 夜間フル triage | `night-triage` | **パートナー Gmail 判定は GHA 本線**（`JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL` 既定1）。Mac は CW/LINE/iMessage・815・取込補完 |
+| 夜間フル triage | `night-triage` | **パートナー Gmail／Chatwork 判定は GHA 本線**（`JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL`／`…_CHATWORK` 既定1）。Mac は LINE/iMessage・815・取込補完 |
 | 朝オープン／Mac 朝バンドル | `triage-morning-open` + `jarvis_morning_mac_refresh` | 取りこぼし回収のハブ（必須起動ではない） |
 | dashboard push（投影） | `dashboard-push` | `.jarvis_state` 依存 |
 | 家族 Journal 週次 | `family-journal-weekly` | Drive／Notion 補完 |

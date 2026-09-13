@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-GHA: OneDrive パートナー `5.やり取り.md`（Graph 読取）→ Gmail 未返信判定 → triage_items。
+GHA: OneDrive パートナー `5.やり取り.md`（Graph 読取）→
+Gmail／Chatwork 未返信判定 → triage_items。
 
-LINE／iMessage／Chatwork は対象外（Mac 夜間トリアージ残）。
+LINE／iMessage は対象外（Mac 夜間トリアージ残）。
 
   python scripts/jarvis_gha_partner_triage.py --dry-run --limit 10
   python scripts/jarvis_gha_partner_triage.py --push --limit 30
@@ -136,9 +137,24 @@ def maybe_gemini_judge(c: dict[str, Any]) -> dict[str, Any]:
         }
 
 
+def _has_gmail_route(p: dict[str, Any]) -> bool:
+    return bool(p.get("emails") or p.get("email_domains") or p.get("to_name_hints"))
+
+
+def _has_chatwork_route(p: dict[str, Any]) -> bool:
+    if p.get("chatwork_room_id") or p.get("chatwork_room_ids"):
+        return True
+    rooms = p.get("chatwork_rooms")
+    return isinstance(rooms, dict) and bool(rooms)
+
+
 def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[dict[str, Any]]:
     import yaml
-    from jarvis_night_triage import find_unreplied, parse_yoritoori_text
+    from jarvis_night_triage import (
+        find_unreplied,
+        find_unreplied_chat,
+        parse_yoritoori_text,
+    )
 
     with tempfile.TemporaryDirectory(prefix="jarvis_gha_pt_") as td:
         contact = materialize_contact(Path(td))
@@ -147,15 +163,17 @@ def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[d
         if not isinstance(partners, list):
             partners = []
 
-        all_entries: list[dict[str, Any]] = []
+        mail_entries: list[dict[str, Any]] = []
+        chat_entries: list[dict[str, Any]] = []
         n = 0
         for p in partners:
             folder = (p.get("folder") or "").strip()
             name = (p.get("name") or folder).strip()
             if not folder:
                 continue
-            # メール経路が無いパートナーはスキップ可（任意）
-            if not (p.get("emails") or p.get("email_domains") or p.get("to_name_hints")):
+            want_mail = _has_gmail_route(p)
+            want_cw = _has_chatwork_route(p)
+            if not want_mail and not want_cw:
                 continue
             n += 1
             if n > max_partners:
@@ -163,21 +181,34 @@ def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[d
             text = read_md(folder)
             if not text:
                 continue
-            all_entries.extend(parse_yoritoori_text(text, folder, name))
+            entries = parse_yoritoori_text(text, folder, name)
+            if want_mail:
+                mail_entries.extend(entries)
+            if want_cw:
+                chat_entries.extend(entries)
 
-        return find_unreplied(all_entries, lookback_days)
+        cands = find_unreplied(mail_entries, lookback_days)
+        # Chatwork のみ（LINE/iMessage は Mac）
+        for c in find_unreplied_chat(chat_entries, lookback_days):
+            if (c.get("channel") or "") == "Chatwork":
+                cands.append(c)
+        cands.sort(key=lambda x: x.get("received_at") or "", reverse=True)
+        return cands
 
 
 def row_from_candidate(c: dict[str, Any], judge: dict[str, Any]) -> dict[str, Any]:
     needs = bool(judge.get("needs_reply"))
+    channel = (c.get("channel") or "Gmail").strip() or "Gmail"
     iid = c.get("id") or hashlib.sha1(
-        f"{c.get('folder')}|{c.get('received_at')}|{c.get('subject')}".encode()
+        f"{c.get('folder')}|{channel}|{c.get('received_at')}|{c.get('subject')}".encode()
     ).hexdigest()[:12]
     status = "pending" if needs else "skipped"
+    kind = "chat" if channel == "Chatwork" else "mail"
+    prefix = "gha-cw-" if channel == "Chatwork" else "gha-p-"
     return {
-        "id": f"gha-p-{iid}",
+        "id": f"{prefix}{iid}",
         "lane": "partner",
-        "kind": "mail",
+        "kind": kind,
         "status": status,
         "partner": c.get("partner_name"),
         "folder": c.get("folder"),
@@ -189,7 +220,7 @@ def row_from_candidate(c: dict[str, Any], judge: dict[str, Any]) -> dict[str, An
         "priority": "high"
         if (judge.get("priority") or "").startswith("h")
         else ("low" if (judge.get("priority") or "").startswith("l") else "med"),
-        "channel": "Gmail",
+        "channel": channel,
         "account": "admin",
         "from_email": None,
         "payload": {
@@ -254,13 +285,18 @@ def main(argv: list[str] | None = None) -> int:
     cands = candidates_from_partners(
         lookback_days=args.lookback_days, max_partners=args.max_partners
     )
-    print(f"# unreplied gmail candidates: {len(cands)}", file=sys.stderr)
+    n_mail = sum(1 for c in cands if (c.get("channel") or "Gmail") == "Gmail")
+    n_cw = sum(1 for c in cands if (c.get("channel") or "") == "Chatwork")
+    print(
+        f"# unreplied candidates: total={len(cands)} gmail={n_mail} chatwork={n_cw}",
+        file=sys.stderr,
+    )
     rows: list[dict[str, Any]] = []
     for c in cands[: args.limit]:
         judge = maybe_gemini_judge(c)
         print(
-            f"# [{c.get('folder')}] needs={judge.get('needs_reply')} "
-            f"{(c.get('subject') or '')[:50]}",
+            f"# [{c.get('folder')}][{c.get('channel') or 'Gmail'}] "
+            f"needs={judge.get('needs_reply')} {(c.get('subject') or '')[:50]}",
             file=sys.stderr,
         )
         rows.append(row_from_candidate(c, judge))

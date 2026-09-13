@@ -1368,7 +1368,12 @@ def main() -> int:
     ap.add_argument(
         "--skip-partner-gmail",
         action="store_true",
-        help="パートナー Gmail 未返信判定をスキップ（GHA 本線時。CW/LINE/iMessage は継続）",
+        help="パートナー Gmail 未返信判定をスキップ（GHA 本線時）",
+    )
+    ap.add_argument(
+        "--skip-partner-chatwork",
+        action="store_true",
+        help="パートナー Chatwork 未返信判定をスキップ（GHA 本線時。LINE/iMessage は継続）",
     )
     ap.add_argument("--limit", type=int, default=0, help="処理する候補の上限（0=config）")
     ap.add_argument("--lookback-days", type=int, default=0)
@@ -1445,14 +1450,22 @@ def main() -> int:
             (os.environ.get("JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL") or "").strip().lower()
             in ("1", "true", "yes", "on")
         )
+        skip_cw = args.skip_partner_chatwork or (
+            (os.environ.get("JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_CHATWORK") or "").strip().lower()
+            in ("1", "true", "yes", "on")
+        )
         if skip_pg:
             print("# skip partner Gmail unreplied (GHA / --skip-partner-gmail)")
+        if skip_cw:
+            print("# skip partner Chatwork unreplied (GHA / --skip-partner-chatwork)")
         for folder, md in list_partner_mds(base):
             name = folder.split("_", 1)[-1] if "_" in folder else folder
             entries = parse_yoritoori(md, folder, name)
             if not skip_pg:
                 all_cands.extend(find_unreplied(entries, lookback))
             chat_cands = find_unreplied_chat(entries, lookback)
+            if skip_cw:
+                chat_cands = [c for c in chat_cands if (c.get("channel") or "") != "Chatwork"]
             all_cands.extend(chat_cands)
             activities.extend(find_recent_chat_activity(entries, activity_lookback))
         # パートナー活動: チャットは要返信キューへ昇格済みのため通常0件

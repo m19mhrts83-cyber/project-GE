@@ -75,7 +75,8 @@ python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/
 | `jarvis_ms_graph_device_login.py` | 初回デバイスコード |
 | `jarvis_onedrive_graph.py` | refresh / app / 読取（downloadUrl）／**書込（PUT・append）** |
 | `jarvis_gha_partner_gmail_yoritoori.py` | GHA: パートナー Gmail → MD 追記＋既読 |
-| `jarvis_gha_partner_triage.py` | GHA: MD 読取 → partner triage_items |
+| `jarvis_gha_partner_chatwork_yoritoori.py` | GHA: パートナー Chatwork → MD 追記＋添付（API） |
+| `jarvis_gha_partner_triage.py` | GHA: MD 読取 → partner triage_items（Gmail／Chatwork） |
 | `jarvis_ms_graph_sync_refresh.py` | 回転 refresh → private（任意で GHA） |
 | `jarvis_ms_graph_secrets_to_gha.py` | GitHub Secrets 反映 |
 | `jarvis_gha_lanes.py` | GHA でレーン要約 → `cards` |
