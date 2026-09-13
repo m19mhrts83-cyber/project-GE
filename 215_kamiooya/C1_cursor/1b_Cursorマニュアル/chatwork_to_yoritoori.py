@@ -46,7 +46,9 @@ JST = ZoneInfo("Asia/Tokyo")
 SCRIPT_DIR = Path(__file__).resolve().parent
 BASE_DIR = default_yoritoori_base_dir()
 CONTACT_YAML = BASE_DIR / "000_共通" / "連絡先一覧.yaml"
-DEFAULT_PROCESSED_JSON = Path.home() / ".cursor" / "chatwork_processed.json"
+# GHA と共有（OneDrive）。旧 ~/.cursor は初回読取時に移行。
+DEFAULT_PROCESSED_JSON = BASE_DIR / "000_共通" / ".jarvis_chatwork_processed.json"
+LEGACY_PROCESSED_JSON = Path.home() / ".cursor" / "chatwork_processed.json"
 
 
 def _load_env_from(path):
@@ -86,14 +88,23 @@ PROCESSED_JSON = Path(os.environ.get("CHATWORK_PROCESSED_PATH", DEFAULT_PROCESSE
 
 
 def load_processed():
-    if not PROCESSED_JSON.exists():
-        return {"rooms": {}}
-    try:
-        data = json.loads(PROCESSED_JSON.read_text(encoding="utf-8"))
-        if isinstance(data, dict) and isinstance(data.get("rooms"), dict):
-            return data
-    except (json.JSONDecodeError, OSError):
-        pass
+    if PROCESSED_JSON.exists():
+        try:
+            data = json.loads(PROCESSED_JSON.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("rooms"), dict):
+                return data
+        except (json.JSONDecodeError, OSError):
+            pass
+    # 旧パスから移行（GHA 共有の OneDrive 正本へ）
+    if LEGACY_PROCESSED_JSON.exists() and not PROCESSED_JSON.exists():
+        try:
+            data = json.loads(LEGACY_PROCESSED_JSON.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("rooms"), dict):
+                save_processed(data)
+                print(f"# chatwork processed: migrated {LEGACY_PROCESSED_JSON} → {PROCESSED_JSON}")
+                return data
+        except (json.JSONDecodeError, OSError):
+            pass
     return {"rooms": {}}
 
 
