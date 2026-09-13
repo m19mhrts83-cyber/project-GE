@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -69,6 +70,122 @@ def _suggest_folder_name(deal: dict[str, Any]) -> str:
     return "（物件名を決めてDriveフォルダ名と一致させる）"
 
 
+def _s3(deal: dict[str, Any]) -> dict[str, Any]:
+    s = _sj(deal).get("s3_investigation")
+    return s if isinstance(s, dict) else {}
+
+
+def _build_instructor_questions(
+    deal: dict[str, Any], form_field: dict[str, Any]
+) -> str | None:
+    """デフォルト3点 + S3ヒアリング + 戸建固有を統合。"""
+    default = str(form_field.get("default_template") or "").strip()
+    s3 = _s3(deal)
+    grok = _grok(deal)
+    hearing = s3.get("hearing_questions") or []
+    if not isinstance(hearing, list):
+        hearing = []
+
+    lines: list[str] = []
+    if default:
+        lines.append(default.rstrip())
+    if hearing:
+        lines.append("")
+        lines.append("【詳細調査（S3）ヒアリング】")
+        for i, q in enumerate(hearing, 1):
+            q = str(q).strip()
+            if q:
+                lines.append(f"{i}. {q}")
+
+    kodate_extras: list[str] = []
+    building = str(grok.get("building") or s3.get("structure") or "")
+    if "戸建" in str(deal.get("structure") or "") or "戸建" in building or "2棟" in str(
+        deal.get("title") or ""
+    ):
+        if "間取り" in " ".join(str(x) for x in hearing) or "間取" in building:
+            pass
+        else:
+            kodate_extras.append("間取り・専有・水回りが未確認の場合の修繕・家賃見立ての見方")
+        if any("旧耐震" in str(x) or "1975" in str(x) or "軽量鉄骨" in str(x) for x in hearing) or (
+            "旧耐震" in building or "1975" in building
+        ):
+            kodate_extras.append("旧耐震／軽量鉄骨戸建としての修繕目安と購入可否の数字感")
+        if any("土砂" in str(x) or "ハザード" in str(x) for x in hearing) or "注意" in str(
+            grok.get("hazard_eval") or ""
+        ):
+            kodate_extras.append("ハザード（土砂・洪水等）が内見判断にどう効くか")
+        land = str(grok.get("land100_ratio") or "")
+        if land:
+            kodate_extras.append(f"土地値{land}の見方と、買付前に確認すべき接道・境界の有無")
+
+    if kodate_extras:
+        lines.append("")
+        lines.append("【戸建固有・追加確認】")
+        for x in kodate_extras:
+            lines.append(f"・{x}")
+
+    out = "\n".join(lines).strip()
+    return out or (default or None)
+
+
+def _reply_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, Any]) -> str | None:
+    """reply tier: Grok / S3 から埋められるものを埋める。"""
+    fid = str(field.get("id") or "")
+    s3 = _s3(deal)
+    building = str(grok.get("building") or s3.get("structure") or "")
+    if fid == "nearest_station":
+        pop = str(grok.get("population_table") or "").strip()
+        if pop:
+            return pop.split("·")[0].strip() if "·" in pop else pop
+        return None
+    if fid == "building_age":
+        m = re.search(r"築(\d{4})", building)
+        if m:
+            year = int(m.group(1))
+            age = max(0, datetime.now().year - year)
+            return f"築{age}年（{year}年）"
+        m2 = re.search(r"(19\d{2}|20\d{2})", building)
+        if m2:
+            year = int(m2.group(1))
+            return f"築{max(0, datetime.now().year - year)}年（{year}年）"
+        return None
+    if fid == "occupancy":
+        if "空室" in building:
+            return "空室"
+        if "入居" in building or "満室" in building:
+            return "入居中"
+        return None
+    if fid == "land_sqm":
+        la = grok.get("land_area")
+        return str(la).strip() if la else None
+    if fid == "building_sqm":
+        m = re.search(r"([\d.]+)\s*㎡", building)
+        return f"{m.group(1)}㎡" if m else None
+    if fid == "gas":
+        # S3 / grok 本文にプロパン等があれば
+        blob = f"{building} {s3.get('structure') or ''} {s3.get('verdict_reason') or ''}"
+        if "プロパン" in blob or "LP" in blob:
+            return "プロパンガス"
+        if "都市ガス" in blob:
+            return "都市ガス"
+        return None
+    if fid == "transaction_type":
+        note = str(grok.get("inquiry_note") or _sj(deal).get("inquiry_note") or "")
+        if "売主" in note or "AlbaLink" in note or "アルバ" in note:
+            return "売主"
+        return None
+    if fid == "annual_rent" or fid == "gross_yield":
+        rent = str(s3.get("expected_rent") or "").strip()
+        return rent or None
+    if fid == "structure_rooms":
+        struct = str(deal.get("structure") or "").strip()
+        persona = s3.get("persona") if isinstance(s3.get("persona"), dict) else {}
+        layout = str((persona or {}).get("layout") or "")
+        parts = [p for p in [struct, building[:80] if building else "", layout] if p]
+        return " / ".join(parts) if parts else None
+    return None
+
+
 def _auto_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, Any]) -> str | None:
     fid = field.get("id")
     src = field.get("source")
@@ -85,8 +202,15 @@ def _auto_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, Any
         return f"{pm}万円" if pm is not None else None
     if src == "deal.yield_pct":
         y = deal.get("yield_pct")
+        yi = _sj(deal).get("yield_info")
+        if isinstance(yi, dict) and yi.get("label"):
+            return str(yi["label"])
         return f"表面利回り{y}%" if y is not None else None
     if src == "deal.structure":
+        # structure_rooms は reply_value も試す
+        rv = _reply_value({**field, "id": "structure_rooms"}, deal, grok)
+        if rv:
+            return rv
         s = str(deal.get("structure") or "").strip()
         return s or None
     if src == "deal.source":
@@ -98,12 +222,15 @@ def _auto_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, Any
         parts = []
         if grok.get("land100"):
             parts.append(str(grok["land100"]))
-        if grok.get("land100_ratio"):
-            parts.append(str(grok["land100_ratio"]))
+        ratio = grok.get("land100_ratio") or _sj(deal).get("land100_ratio")
+        if ratio:
+            parts.append(str(ratio))
         if grok.get("route_price_tsubo"):
             parts.append(f"路線価:{grok['route_price_tsubo']}")
         if grok.get("land_method"):
             parts.append(str(grok["land_method"]))
+        if grok.get("land_appraisal_man"):
+            parts.append(f"評価概算:{grok['land_appraisal_man']}万円")
         return " / ".join(parts) if parts else None
     if src == "grok.hazard_eval":
         parts = []
@@ -120,6 +247,8 @@ def _auto_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, Any
         return str(grok.get("parking") or "").strip() or None
     if fid == "property_name":
         return _suggest_folder_name(deal)
+    if fid == "gross_yield":
+        return _reply_value({"id": "gross_yield"}, deal, grok)
     return None
 
 
@@ -171,8 +300,12 @@ def build_form_draft(
         val = None
         if tier == "auto":
             val = _auto_value(f, deal, grok)
+        elif tier == "reply":
+            val = _reply_value(f, deal, grok)
+        elif tier == "research" and f.get("id") in ("annual_rent", "gross_yield"):
+            val = _reply_value(f, deal, grok)
         elif tier == "manual" and f.get("id") == "questions_for_instructor":
-            val = str(f.get("default_template") or "").strip() or None
+            val = _build_instructor_questions(deal, f)
 
         if val:
             filled.append({"id": str(f.get("id")), "label": label, "value": val})

@@ -18,6 +18,21 @@ type Props = {
   currentTab?: string;
 };
 
+async function queueOpsFormDraft(dealId: string): Promise<string> {
+  const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "form_draft" }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data?.error === "string" ? data.error : "フォーム下書きのキューに失敗"
+    );
+  }
+  return "運営相談フォーム下書きをキューしました（Mac実行後ドロワーに反映）";
+}
+
 function verdictBadge(verdict?: string) {
   const v = (verdict || "").toLowerCase();
   if (v === "go") {
@@ -111,6 +126,8 @@ export default function DetailedInvestigatedDealsSection({
     string | null
   >(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [formDraftBusyId, setFormDraftBusyId] = useState<string | null>(null);
+  const [formDraftMsg, setFormDraftMsg] = useState<string | null>(null);
 
   if (deals.length === 0) return null;
 
@@ -126,6 +143,19 @@ export default function DetailedInvestigatedDealsSection({
       navigator.clipboard.writeText(text);
       setCopyFeedback(label);
       setTimeout(() => setCopyFeedback(null), 2000);
+    }
+  }
+
+  async function onOpsFormDraft(dealId: string, title: string) {
+    setFormDraftBusyId(dealId);
+    setFormDraftMsg(null);
+    try {
+      const msg = await queueOpsFormDraft(dealId);
+      setFormDraftMsg(`${title.slice(0, 28)}… ${msg}`);
+    } catch (e) {
+      setFormDraftMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setFormDraftBusyId(null);
     }
   }
 
@@ -231,6 +261,12 @@ export default function DetailedInvestigatedDealsSection({
       <p className="meta" style={{ marginTop: 2, marginBottom: 12, color: "#475569", fontSize: 13 }}>
         問合せ返信を受け、Grok bot（S3需給三次・S5ペルソナ）で精査し、Obsidianに詳細レポートが蓄積された物件です。
         <strong>「内見に行くか」「神大家さん運営へ相談するか」</strong>の判断材料として、調査結果と<strong>マイソクPDF・利回り</strong>を横並びで比較・確認できます。
+        運営相談は各行の<strong>「運営相談フォーム」</strong>から下書きキューできます（送信は確認後のみ）。
+        {formDraftMsg ? (
+          <span style={{ display: "block", marginTop: 6, color: "#4338ca", fontSize: 12 }}>
+            {formDraftMsg}
+          </span>
+        ) : null}
       </p>
 
       {viewMode === "table" ? (
@@ -687,18 +723,39 @@ export default function DetailedInvestigatedDealsSection({
 
                     {/* 9. 操作 */}
                     <td style={{ padding: "10px 8px", verticalAlign: "top", textAlign: "right" }}>
-                      <Link
-                        href={getDealHref(d.id)}
-                        className="btn"
-                        style={{
-                          fontSize: 12,
-                          padding: "3px 10px",
-                          display: "inline-block",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        詳細開く
-                      </Link>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                        <button
+                          type="button"
+                          disabled={formDraftBusyId === d.id}
+                          onClick={() =>
+                            onOpsFormDraft(d.id, String(d.title || "物件"))
+                          }
+                          style={{
+                            fontSize: 11,
+                            padding: "3px 8px",
+                            background: formDraftBusyId === d.id ? "#c7d2fe" : "#4f46e5",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            cursor: formDraftBusyId === d.id ? "wait" : "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {formDraftBusyId === d.id ? "…" : "運営相談フォーム"}
+                        </button>
+                        <Link
+                          href={getDealHref(d.id)}
+                          className="btn"
+                          style={{
+                            fontSize: 12,
+                            padding: "3px 10px",
+                            display: "inline-block",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          詳細開く
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1063,9 +1120,29 @@ export default function DetailedInvestigatedDealsSection({
                       </a>
                     ) : null}
                   </div>
-                  <Link href={getDealHref(d.id)} className="btn" style={{ fontSize: 12, padding: "3px 12px" }}>
-                    詳細開く
-                  </Link>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button
+                      type="button"
+                      disabled={formDraftBusyId === d.id}
+                      onClick={() =>
+                        onOpsFormDraft(d.id, String(d.title || "物件"))
+                      }
+                      style={{
+                        fontSize: 11,
+                        padding: "3px 10px",
+                        background: formDraftBusyId === d.id ? "#c7d2fe" : "#4f46e5",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: formDraftBusyId === d.id ? "wait" : "pointer",
+                      }}
+                    >
+                      {formDraftBusyId === d.id ? "…" : "運営相談フォーム"}
+                    </button>
+                    <Link href={getDealHref(d.id)} className="btn" style={{ fontSize: 12, padding: "3px 12px" }}>
+                      詳細開く
+                    </Link>
+                  </div>
                 </div>
               </div>
             );
