@@ -314,6 +314,31 @@ export default function DealInquiryActions({
     }
   }
 
+  async function formFill() {
+    setBusy("form_fill");
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "form_fill" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(data.error || "失敗");
+      } else {
+        setMsg(
+          "運営フォームへ転記をキューしました（入力のみ・送信しません。Mac実行後ブラウザで確認）"
+        );
+        notifyChanged();
+      }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const showFormDraft =
     status === "has_reply" || status === "awaiting_reply" || showPack;
 
@@ -507,15 +532,32 @@ export default function DealInquiryActions({
           </button>
         ) : null}
         {showFormDraft ? (
-          <button
-            type="button"
-            className="btn"
-            style={{ fontSize: 12, padding: "4px 8px" }}
-            disabled={busy !== null}
-            onClick={formDraft}
-          >
-            {busy === "form_draft" ? "…" : "フォーム下書き"}
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn"
+              style={{
+                fontSize: 12,
+                padding: "4px 8px",
+                background: "#059669",
+                color: "#fff",
+                border: "none",
+              }}
+              disabled={busy !== null}
+              onClick={formFill}
+            >
+              {busy === "form_fill" ? "…" : "運営フォームへ転記"}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              disabled={busy !== null}
+              onClick={formDraft}
+            >
+              {busy === "form_draft" ? "…" : "フォーム下書き"}
+            </button>
+          </>
         ) : null}
       </div>
       {open && canSend ? (
