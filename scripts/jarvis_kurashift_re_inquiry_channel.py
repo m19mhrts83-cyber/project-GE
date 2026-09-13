@@ -52,7 +52,7 @@ def parse_email_addr(raw: str | None) -> str:
 
 def self_emails_extra() -> list[str]:
     out: list[str] = []
-    for k in ("PERSONAL_EMAIL", "INQUIRY_GROK_HANDOFF_TO"):
+    for k in ("PERSONAL_EMAIL", "COMPANY_EMAIL", "INQUIRY_GROK_HANDOFF_TO"):
         v = (os.environ.get(k) or "").strip().lower()
         if v:
             out.append(v)

@@ -460,6 +460,8 @@ def find_general_unreplied(
     max_threads: int = 40,
 ) -> list[dict[str, Any]]:
     """admin INBOX の未返信スレッド（パートナー除外）。"""
+    from jarvis_kurashift_re_inquiry_channel import is_self_email
+
     service, my_email = build_admin_gmail_service()
     emails, domains = load_partner_filters(contact_yaml)
     q = f"in:inbox newer_than:{max(1, lookback_days)}d -category:promotions -category:social"
@@ -497,12 +499,10 @@ def find_general_unreplied(
         dt = _parse_internal_dt(str(last.get("internalDate") or "0"))
         received_at = dt.strftime("%Y/%m/%d %H:%M") if dt else ""
 
-        # 自分が最後に送っている → 未返信ではない
-        if from_email == my_email or from_email.endswith("@livingsupport-matsu.co.jp"):
-            # 自分の送信（admin）で終わっている
-            label_ids = set(last.get("labelIds") or [])
-            if "SENT" in label_ids or from_email == my_email:
-                continue
+        # 自分発信（m19m / admin / estate / 法人ドメイン）→ 要確認対象外
+        # （BCC 控えが INBOX に入っても From が自分なら除外）
+        if is_self_email(from_email) or is_self_email(from_raw):
+            continue
 
         if is_partner_address(from_email, emails, domains):
             # 最優先: 連絡先一覧のパートナーは partner レーン担当（ここでは general に載せない）
@@ -523,7 +523,7 @@ def find_general_unreplied(
             p = m.get("payload") or {}
             h = _header_map(p)
             fr = parseaddr(h.get("from", ""))[1].lower()
-            inbound = fr != my_email and not fr.endswith("@livingsupport-matsu.co.jp")
+            inbound = not is_self_email(fr)
             ctx.append(
                 {
                     "received_at": (

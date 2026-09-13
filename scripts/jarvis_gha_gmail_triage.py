@@ -111,10 +111,13 @@ def _mail_payload(c: dict[str, Any], body_full: str, kind: str) -> dict[str, Any
 
 def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_kurashift_re_inquiry_channel import is_self_email
     from jarvis_night_triage_general import classify_general_kind
 
     rows = []
     for c in cands:
+        if is_self_email(c.get("from_email") or ""):
+            continue
         draft = maybe_gemini_draft(
             c.get("subject") or "",
             c.get("body") or "",
