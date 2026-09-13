@@ -46,15 +46,32 @@ def import_from_google_drive() -> list[Path]:
                 continue
             dst = OBSIDIAN_DIR / src.name
             should_copy = False
+            reason = ""
             if not dst.exists():
                 should_copy = True
-            elif src.stat().st_mtime > dst.stat().st_mtime + 2:
-                should_copy = True
+                reason = "missing"
+            else:
+                dst_size = dst.stat().st_size
+                src_size = src.stat().st_size
+                # 空スタブ（0byte / frontmatter無し）は mtime が新しくても Drive 本文で上書き
+                local_empty = dst_size == 0
+                if not local_empty and dst_size < 200:
+                    try:
+                        head = dst.read_text(encoding="utf-8", errors="replace")[:80]
+                        local_empty = not head.lstrip().startswith("---")
+                    except OSError:
+                        local_empty = True
+                if local_empty and src_size > dst_size:
+                    should_copy = True
+                    reason = "empty-stub override"
+                elif src.stat().st_mtime > dst.stat().st_mtime + 2:
+                    should_copy = True
+                    reason = "newer"
 
             if should_copy:
                 shutil.copy2(src, dst)
                 imported.append(dst)
-                print(f"# Imported from Drive to Local: {src.name}")
+                print(f"# Imported from Drive to Local ({reason}): {src.name}")
                 retag_py = REPO / "scripts" / "jarvis_obsidian_ogd_retag.py"
                 if retag_py.exists():
                     try:
@@ -105,7 +122,12 @@ def parse_s5_line(line: str) -> dict[str, str]:
 
 
 def parse_s3_file(path: Path) -> dict[str, Any] | None:
-    text = path.read_text(encoding="utf-8")
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("utf-8", errors="replace")
+        print(f"  [WARN] utf-8 replace: {path.name}")
     fm_match = re.match(r"^---\n(.*?)\n---\n(.*)", text, re.DOTALL)
     if not fm_match:
         return None
@@ -461,15 +483,24 @@ def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
             
             # Optionally write back deal_id to obsidian file frontmatter if missing
             if not data.get("deal_id"):
-                content = p.read_text(encoding="utf-8")
-                new_content = re.sub(
-                    r"^deal_id:.*$",
-                    f"deal_id: {deal_id}",
-                    content,
-                    flags=re.MULTILINE,
-                )
+                content = p.read_bytes().decode("utf-8", errors="replace")
+                if re.search(r"^deal_id:\s*", content, re.MULTILINE):
+                    new_content = re.sub(
+                        r"^deal_id:\s*.*$",
+                        f"deal_id: {deal_id}",
+                        content,
+                        count=1,
+                        flags=re.MULTILINE,
+                    )
+                else:
+                    new_content = re.sub(
+                        r"(^---\n)",
+                        rf"\1deal_id: {deal_id}\n",
+                        content,
+                        count=1,
+                    )
                 if new_content != content:
-                    p.write_text(new_content, encoding="utf-8")
+                    p.write_bytes(new_content.encode("utf-8"))
                     print(f"  -> Updated frontmatter deal_id in {p.name}")
 
     return results
