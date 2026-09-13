@@ -87,7 +87,7 @@ API: `GET/POST /api/re/deals/cleanup`
 
 学習: `kurashift_auto_pass_learn`（confirm≥3 かつ reject=0 で allowlist → 以降その理由のみ取込時既読）
 
-- Mac ジョブ実行: KeepAlive 常駐 `jarvis_kurashift_job_watch.py`（30s ポーリング本線）。心拍は `sync_meta.kurashift_job_watch`
+- Mac ジョブ実行: KeepAlive 常駐 `jarvis_kurashift_job_watch.py`（3s ポーリング＋Realtime 即ドレイン）。心拍は `sync_meta.kurashift_job_watch`。手動キック: `jarvis_kurashift_job_kick.py`
 - 第一問い合わせ: 2段確認 + `confirm_snapshot` + `idempotency_key`。Worker は `sending` 後に送信（at-most-once）
 - 紐づけ: `summary_json.gmail_id` ＋ `source`（`mail_admin`→admin token／`mail_estate`→estate）
 - 二重実行防止: `summary_json.gmail_read_at`

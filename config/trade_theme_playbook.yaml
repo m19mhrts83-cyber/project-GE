@@ -176,6 +176,8 @@ allowed_jobs:
   - re_revise_plan  # dry-run既定。apply は UI confirm 必須
   - re_vendor_sync  # 地場業者 YAML → kurashift_re_vendors 投影
   - re_vendor_judgment  # Dashboard 業者返信判断 → YAML notes + sync
+  - re_ops_form_draft  # 神大家運営相談フォーム下書き（送信なし）
+  - re_ops_form_fill  # 運営フォームへ転記（入力のみ・送信しない）
 
 secrets:
   store: .env.jarvis_private
