@@ -361,15 +361,26 @@ export default async function HomePage() {
     id.includes("policy_loan") ||
     (kindById.get(id) || "").includes("loan");
 
-  const assetRows = [...latestByAccount.entries()]
-    .filter(([id]) => !isLoanAccount(id))
-    .map(([id, v]) => ({
-      id,
-      name: nameById.get(id) || id,
-      ...v,
-    }))
-    .sort((a, b) => b.value_jpy - a.value_jpy);
-  const total = assetRows.reduce((s, r) => s + r.value_jpy, 0);
+  const weeklySourceById = weeklySummary?.sources ?? {};
+  const assetAccountIds = (accounts ?? [])
+    .map((a) => a.id)
+    .filter((id) => !isLoanAccount(id));
+  // 口座マスタを正にし、スナップが無い口座も一覧に出す（合計は取得済みのみ）
+  const assetRows = assetAccountIds
+    .map((id) => {
+      const snap = latestByAccount.get(id);
+      return {
+        id,
+        name: nameById.get(id) || id,
+        as_of: snap?.as_of ?? null,
+        value_jpy: snap?.value_jpy ?? null,
+        source: snap?.source ?? null,
+        weeklyStatus: weeklySourceById[id]?.status ?? null,
+      };
+    })
+    .sort((a, b) => (b.value_jpy ?? -1) - (a.value_jpy ?? -1));
+  const total = assetRows.reduce((s, r) => s + (r.value_jpy ?? 0), 0);
+  const assetKnownCount = assetRows.filter((r) => r.value_jpy != null).length;
 
   const loanRows = [...latestByAccount.entries()]
     .filter(([id]) => isLoanAccount(id))
@@ -588,10 +599,22 @@ export default async function HomePage() {
             <strong>{fmtYen(total)}</strong>
           </header>
           <p className="meta">
-            {assetRows.length}口座 · 週次スナップ（契約者貸付は含めない）
+            合計 {fmtYen(total)} · 取得済み {assetKnownCount}/{assetRows.length}口座
+            （契約者貸付は含めない）
             {partialWarn ? " · ⚠️ 一部未取得の可能性" : ""}
           </p>
-          <p className="meta">
+          <ul className="meta" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            {assetRows.slice(0, 6).map((r) => (
+              <li key={r.id}>
+                {r.name}:{" "}
+                {r.value_jpy != null ? fmtYen(r.value_jpy) : "未取得"}
+              </li>
+            ))}
+            {assetRows.length > 6 ? (
+              <li className="meta">ほか {assetRows.length - 6} 口座 → 下の一覧</li>
+            ) : null}
+          </ul>
+          <p className="meta" style={{ marginTop: 8 }}>
             保険借入合計 {fmtYen(loanTotal)}
             {loanTotal > 0 ? "（頭金枠の把握用・負債）" : ""}
             {" · "}
@@ -973,39 +996,83 @@ export default async function HomePage() {
       ) : null}
 
       <h2 style={{ marginTop: 28, fontSize: "1.1rem" }}>
-        他資産のステータス
+        他資産の一覧・合計
       </h2>
       <div className="card">
-        <table>
+        <header>
+          <span className="lvl">資産合計</span>
+          <strong>{fmtYen(total)}</strong>
+        </header>
+        <p className="meta" style={{ marginTop: 6 }}>
+          取得済み {assetKnownCount}/{assetRows.length}口座 · 契約者貸付は合計外
+          {partialWarn ? " · ⚠️ 週次の一部ソース未完了の可能性" : ""}
+        </p>
+        <table style={{ marginTop: 10 }}>
           <thead>
             <tr>
               <th>口座</th>
               <th>評価</th>
               <th>日付</th>
+              <th>週次</th>
               <th>ソース</th>
             </tr>
           </thead>
           <tbody>
             {assetRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="meta">
-                  スナップショットがありません（週次を実行）
+                <td colSpan={5} className="meta">
+                  口座がありません（週次を実行）
                 </td>
               </tr>
             ) : (
-              assetRows.slice(0, 10).map((r) => (
+              assetRows.map((r) => (
                 <tr key={r.id}>
                   <td>{r.name}</td>
-                  <td>{fmtYen(r.value_jpy)}</td>
-                  <td className="meta">{r.as_of}</td>
+                  <td>
+                    {r.value_jpy != null ? fmtYen(r.value_jpy) : "—"}
+                  </td>
+                  <td className="meta">{r.as_of ?? "—"}</td>
+                  <td className="meta">
+                    {r.weeklyStatus === "ok"
+                      ? "✅"
+                      : r.weeklyStatus === "error"
+                        ? "⚠️"
+                        : r.weeklyStatus === "skipped"
+                          ? "skip"
+                          : "—"}
+                  </td>
                   <td className="meta">{r.source ?? "—"}</td>
                 </tr>
               ))
             )}
           </tbody>
+          {assetRows.length > 0 ? (
+            <tfoot>
+              <tr>
+                <td>
+                  <strong>合計</strong>
+                </td>
+                <td>
+                  <strong>{fmtYen(total)}</strong>
+                </td>
+                <td colSpan={3} className="meta">
+                  評価合計（未取得口座は含めない）
+                </td>
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
+        {loanRows.some((r) => r.value_jpy > 0) ? (
+          <p className="meta" style={{ marginTop: 10 }}>
+            参考・負債（合計外）: 保険借入 {fmtYen(loanTotal)}
+            {activeLoanRates.length > 0
+              ? ` · ${activeLoanRates.join(" / ")}`
+              : ""}
+          </p>
+        ) : null}
         <p className="meta" style={{ marginTop: 10 }}>
-          詳細・内訳は <a href="/portfolio">資産</a>。
+          銀行・現金は上の「その週の家計・銀行」参照 · 詳細・内訳は{" "}
+          <a href="/portfolio">資産</a>。
         </p>
       </div>
     </Shell>

@@ -29,8 +29,13 @@ const SOURCE_LABEL: Record<string, string> = {
   bloomo: "Bloomo評価取得",
   bloomo_zaim: "Bloomo→Zaim財務反映",
   sbi_index: "SBIインデックス",
+  akatsuki_bond: "あかつき証券 債券",
+  mhi_stock: "三菱重工 持株会",
   liquidity_weekly: "銀行・流動性",
   axa_life: "アクサ生命",
+  prudential_life: "プルデンシャル生命（真治）",
+  prudential_life_chikage: "プルデンシャル生命（千景）",
+  tachibana_trade: "立花証券 自動売買",
 };
 
 export function parseWeeklySummary(raw: string | null | undefined): PortfolioWeeklySummary | null {
