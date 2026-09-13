@@ -15,6 +15,7 @@ import {
 } from "@/lib/laneView";
 import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
+import { isSelfEmail } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 
 /** summary が原文の先頭切り出しだけなら、カード上では出さない（全文側に寄せる） */
@@ -133,7 +134,11 @@ export default async function TriageLanePage({
       .eq("status", "pending")
       .neq("kind", "activity")
       .order("received_at", { ascending: true });
-    unread = (pending || []) as TriageRow[];
+    unread = ((pending || []) as TriageRow[]).filter((it) => {
+      // general（その他）レーンでは自分発信を未読一覧に出さない
+      if (lane === "general" && isSelfEmail(it.from_email)) return false;
+      return true;
+    });
   } else if (view === "activity") {
     const { data } = await supabase
       .from("triage_items")

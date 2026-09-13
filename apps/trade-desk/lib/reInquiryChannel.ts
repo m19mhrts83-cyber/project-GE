@@ -55,7 +55,7 @@ export function parseEmailAddr(raw: string | null | undefined): string {
 export function selfEmailsExtraFromEnv(): string[] {
   const out: string[] = [];
   if (typeof process === "undefined" || !process.env) return out;
-  for (const k of ["PERSONAL_EMAIL", "INQUIRY_GROK_HANDOFF_TO"]) {
+  for (const k of ["PERSONAL_EMAIL", "COMPANY_EMAIL", "INQUIRY_GROK_HANDOFF_TO"]) {
     const v = (process.env[k] || "").trim();
     if (v) out.push(v.toLowerCase());
   }
