@@ -93,3 +93,19 @@
 - Mac スリープ: launchd は起床後＋`jarvis_morning_mac_refresh` で回収
 - 真にノート非依存が要る launchd 仕事: **常時ON Mac**（mini 等）か self-hosted runner
 - 新規定例を足すとき: この表の判定ルール → A なら workflow、B なら `launchd/install_*.sh`＋朝取りこぼし
+
+---
+
+## D. 課題（Issue）— ローカル非依存はどこまでか（2026-09-13）
+
+詳細・調査メモ正本: Obsidian  
+`03_Literature Note(まとめノート)/仕事術・AI連携/20260912_Jarvis_データ流れ_概要と詳細.md` §5
+
+| 状態 | 内容 |
+|---|---|
+| **GHA 到達** | general／パートナー Gmail／**Chatwork** 取込＋判定 |
+| **Mac 残（構造）** | LINE（個人・CHRLINE・815）／iMessage／銀行UI |
+| **次の一手（任意）** | ① Graph refresh の GHA→Secrets 自動戻し ② 常時 ON Mac mini（self-hosted） |
+| **やらない** | CHRLINE の GHA 直行／個人 iMessage のマネージド API 依存 |
+
+**結論**: API 可能なものはクラウド化済み。残りは「ノート0」では解けないが、常時 Mac があれば実質クラウド相当にできる。現状ハイブリッドで運用可。
