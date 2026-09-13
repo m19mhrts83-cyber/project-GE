@@ -306,6 +306,40 @@ export async function POST(
     return NextResponse.json({ ok: true, job_id: job?.id });
   }
 
+  if (action === "form_fill") {
+    const draft = sj.ops_form_draft;
+    const hasDraft =
+      draft &&
+      typeof draft === "object" &&
+      (Array.isArray((draft as { filled?: unknown }).filled)
+        ? ((draft as { filled: unknown[] }).filled?.length ?? 0) > 0
+        : Boolean((draft as { markdown?: string }).markdown));
+    if (!hasDraft) {
+      return NextResponse.json(
+        {
+          error:
+            "フォーム下書きがありません。先に「フォーム下書き」または「下書き再生成」を実行してください",
+        },
+        { status: 400 }
+      );
+    }
+    const { data: job, error: jobErr } = await supabase
+      .from("kurashift_jobs")
+      .insert({
+        job_type: "re_ops_form_fill",
+        title: `運営相談フォーム転記: ${String(row.title || "").slice(0, 50)}`,
+        status: "queued",
+        payload: { deal_id: id },
+        created_by: user.email ?? user.id,
+      })
+      .select("id")
+      .single();
+    if (jobErr) {
+      return NextResponse.json({ error: jobErr.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, job_id: job?.id });
+  }
+
   if (action === "kamiooya_form_submitted") {
     const channelInfo = classifyInquiryChannel({
       title: String(row.title || ""),
@@ -547,7 +581,7 @@ export async function POST(
   return NextResponse.json(
     {
       error:
-        "action must be send | build_ops_pack | form_draft | kamiooya_form_submitted | listing_web_submit | poll | autopass_confirm | autopass_reject",
+        "action must be send | build_ops_pack | form_draft | form_fill | kamiooya_form_submitted | listing_web_submit | poll | autopass_confirm | autopass_reject",
     },
     { status: 400 }
   );

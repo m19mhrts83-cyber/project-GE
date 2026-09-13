@@ -28,7 +28,7 @@ portals:
     login_env: [HOMES_LOGIN_EMAIL, HOMES_PASSWORD]
     fallback: [PORTAL_LOGIN_EMAIL, PORTAL_LOGIN_PASSWORD]
   - id: nagoya_rengo
-    label: 名古屋不動産連合隊（表記ゆれ: 連合体）
+    label: "名古屋不動産連合隊（表記ゆれ: 連合体）"
     url_hint: https://www.rals.net/nagoya
     login_env: [NAGOYA_RENGO_LOGIN_EMAIL, NAGOYA_RENGO_PASSWORD]
     fallback: [PORTAL_LOGIN_EMAIL, PORTAL_LOGIN_PASSWORD]

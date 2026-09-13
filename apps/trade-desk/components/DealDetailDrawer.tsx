@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import DealInquiryActions from "@/components/DealInquiryActions";
 import DealReviewActions from "@/components/DealReviewActions";
 import GrokInvestigateCopy from "@/components/GrokInvestigateCopy";
+import OpsFormDraftPanel, {
+  type OpsFormDraftData,
+  type OpsFormFillData,
+} from "@/components/OpsFormDraftPanel";
 import { formatJstDateTime, fmtYen } from "@/lib/format";
 import {
   formatMatchScore,
@@ -169,14 +173,12 @@ export default function DealDetailDrawer({
     typeof sj.gmail_read_at === "string" ? sj.gmail_read_at : null;
   const opsFormDraft =
     sj.ops_form_draft && typeof sj.ops_form_draft === "object"
-      ? (sj.ops_form_draft as {
-          form_url?: string;
-          missing_count?: number;
-          markdown?: string;
-        })
+      ? (sj.ops_form_draft as OpsFormDraftData)
       : null;
-  const OPS_FORM_URL =
-    "https://form.os7.biz/f/1906a1a5/";
+  const opsFormFill =
+    sj.ops_form_fill && typeof sj.ops_form_fill === "object"
+      ? (sj.ops_form_fill as OpsFormFillData)
+      : null;
   const messages = timeline.filter((t) => t.kind === "message");
   const events = timeline.filter((t) => t.kind === "event");
 
@@ -701,45 +703,22 @@ export default function DealDetailDrawer({
                   style={{ paddingLeft: 18, marginTop: 8, marginBottom: 8 }}
                 >
                   <li>メール返信・添付 PDF を確認</li>
-                  <li>「フォーム下書き」で不足項目を洗い出し</li>
+                  <li>下の運営相談フォームで下書き確認 → 転記</li>
                   <li>神大家個人 Drive に物件フォルダ＋写真</li>
-                  <li>
-                    <a
-                      href={opsFormDraft?.form_url || OPS_FORM_URL}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      運営相談フォーム
-                    </a>
-                    （確認後に送信）
-                  </li>
+                  <li>ブラウザで最終確認して送信</li>
                   <li>809 運営回答 → 内見判断</li>
                 </ol>
               </div>
             ) : null}
 
-            {opsFormDraft?.markdown ? (
-              <div className="card" style={{ marginTop: 12, padding: 12 }}>
-                <strong>
-                  フォーム下書き
-                  {opsFormDraft.missing_count != null
-                    ? `（不足 ${opsFormDraft.missing_count} 項目）`
-                    : ""}
-                </strong>
-                <pre
-                  className="meta"
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    fontSize: 11,
-                    marginTop: 8,
-                    maxHeight: 240,
-                    overflow: "auto",
-                  }}
-                >
-                  {opsFormDraft.markdown}
-                </pre>
-              </div>
-            ) : null}
+            <OpsFormDraftPanel
+              dealId={dealId}
+              draft={opsFormDraft}
+              fill={opsFormFill}
+              onQueued={() => {
+                /* Mac job 完了後に再読込想定。即時はメッセージのみ */
+              }}
+            />
 
             {(() => {
               const s3 = (sj.s3_investigation as S3InvestigationData) || null;

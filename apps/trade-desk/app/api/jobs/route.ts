@@ -33,6 +33,7 @@ const ALLOWED = new Set([
   "re_mgmt_vendor_sync",
   "re_repair_vendor_sync",
   "re_ops_form_draft",
+  "re_ops_form_fill",
 ]);
 
 export async function POST(req: Request) {
