@@ -267,6 +267,12 @@ table {
   font-size: 0.9rem;
 }
 
+table tfoot td {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
 .table-scroll {
   overflow-x: auto;
   margin: 0 -4px;
