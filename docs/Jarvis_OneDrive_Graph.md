@@ -77,7 +77,8 @@ python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/
 | `jarvis_gha_partner_gmail_yoritoori.py` | GHA: パートナー Gmail → MD 追記＋既読 |
 | `jarvis_gha_partner_chatwork_yoritoori.py` | GHA: パートナー Chatwork → MD 追記＋添付（API） |
 | `jarvis_gha_partner_triage.py` | GHA: MD 読取 → partner triage_items（Gmail／Chatwork） |
-| `jarvis_ms_graph_sync_refresh.py` | 回転 refresh → private（任意で GHA） |
+| `jarvis_ms_graph_sync_refresh.py` | 回転 refresh → private ＋ **sync_meta**（任意で GHA Secrets） |
+| `jarvis_ms_graph_refresh_store.py` | `sync_meta.ms_graph_refresh_token` の読取・書込 |
 | `jarvis_ms_graph_secrets_to_gha.py` | GitHub Secrets 反映 |
 | `jarvis_gha_lanes.py` | GHA でレーン要約 → `cards` |
 
@@ -85,15 +86,18 @@ python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/
 
 - Obsidian Journal（Google Drive）は Graph 対象外 → GHA では `journal_recent` をスキップ（Mac push で補完）
 - 個人 OneDrive のファイル本体は `@microsoft.graph.downloadUrl`（認証なし CDN）で取得する。`/content` を Authorization 付きで 302 追従すると 401 になる
-- refresh_token が回転したら:
+- **refresh_token の耐久本線は `sync_meta.ms_graph_refresh_token`**（Vercel `graphRead.ts` と同キー）。  
+  GHA 上で回転しても次ジョブは sync_meta を優先するため、Secrets が古くても `invalid_grant` になりにくい。  
+  Mac で private を揃える／Secrets も追従するとき:
 
 ```bash
-python scripts/jarvis_ms_graph_sync_refresh.py --push-gha
+python scripts/jarvis_ms_graph_sync_refresh.py          # private + sync_meta
+python scripts/jarvis_ms_graph_sync_refresh.py --push-gha  # ＋ GitHub Secrets
 ```
 
-（`~/.jarvis_state/ms_graph_new_refresh.env` → `.env.jarvis_private` → GitHub Secrets）  
+（`~/.jarvis_state/ms_graph_new_refresh.env` → `.env.jarvis_private` → sync_meta → 任意 Secrets）  
 **注意**: refresh に `$` が含まれるため、`.env.jarvis_private` では **必ずシングルクォート**で囲む（`source` 時の `$$` 展開防止）。`jarvis_ms_graph_sync_refresh.py` / device_login はクォート付きで書く。
-- 秘密は `.env.jarvis_private` と GitHub / Cloud Secrets のみ。チャット・Git 禁止
+- 秘密は `.env.jarvis_private` と GitHub / Cloud Secrets / sync_meta（service_role のみ）のみ。チャット・Git 禁止
 
 ## 関連
 

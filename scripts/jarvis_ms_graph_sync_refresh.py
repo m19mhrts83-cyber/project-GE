@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Jarvis: 回転した MS_GRAPH_REFRESH_TOKEN を .env.jarvis_private へ反映し、任意で GHA Secrets へ。
+Jarvis: 回転した MS_GRAPH_REFRESH_TOKEN を .env.jarvis_private へ反映し、
+既定で sync_meta（耐久本線）へ。任意で GHA Secrets へ。
 
 入力:
   ~/.jarvis_state/ms_graph_new_refresh.env
@@ -21,6 +22,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+SCRIPTS = Path(__file__).resolve().parent
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 PRIVATE = REPO / ".env.jarvis_private"
 NEW_REFRESH = Path.home() / ".jarvis_state" / "ms_graph_new_refresh.env"
 
@@ -34,8 +38,17 @@ def _read_new_refresh() -> str:
     return (os.environ.get("MS_GRAPH_REFRESH_TOKEN") or "").strip()
 
 
-def apply_rotated_refresh(*, push_gha: bool = False, from_env: bool = False) -> dict[str, str]:
-    token = (os.environ.get("MS_GRAPH_REFRESH_TOKEN") or "").strip() if from_env else _read_new_refresh()
+def apply_rotated_refresh(
+    *,
+    push_gha: bool = False,
+    from_env: bool = False,
+    no_supabase: bool = False,
+) -> dict[str, str]:
+    token = (
+        (os.environ.get("MS_GRAPH_REFRESH_TOKEN") or "").strip()
+        if from_env
+        else _read_new_refresh()
+    )
     if not token:
         raise SystemExit(
             f"新しい refresh がありません（{NEW_REFRESH} または MS_GRAPH_REFRESH_TOKEN）"
@@ -60,7 +73,15 @@ def apply_rotated_refresh(*, push_gha: bool = False, from_env: bool = False) -> 
     os.environ["MS_GRAPH_REFRESH_TOKEN"] = token
     if NEW_REFRESH.is_file():
         NEW_REFRESH.unlink()
-    out = {"private": "updated", "refresh_len": str(len(token))}
+    out: dict[str, str] = {"private": "updated", "refresh_len": str(len(token))}
+
+    if not no_supabase:
+        from jarvis_ms_graph_refresh_store import fingerprint, persist_refresh
+
+        sb_ok = persist_refresh(token)
+        out["supabase"] = "ok" if sb_ok else "fail"
+        out["fp"] = fingerprint(token)
+
     if push_gha:
         r = subprocess.run(
             [sys.executable, str(REPO / "scripts" / "jarvis_ms_graph_secrets_to_gha.py")],
@@ -78,10 +99,23 @@ def apply_rotated_refresh(*, push_gha: bool = False, from_env: bool = False) -> 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--push-gha", action="store_true")
+    ap.add_argument(
+        "--push-gha",
+        action="store_true",
+        help="GitHub Secrets へも反映（任意。耐久本線は sync_meta）",
+    )
+    ap.add_argument(
+        "--no-supabase",
+        action="store_true",
+        help="sync_meta へ書かない（非推奨）",
+    )
     ap.add_argument("--from-env", action="store_true", help="state ファイルではなく現在の env")
     args = ap.parse_args(argv)
-    result = apply_rotated_refresh(push_gha=args.push_gha, from_env=args.from_env)
+    result = apply_rotated_refresh(
+        push_gha=args.push_gha,
+        from_env=args.from_env,
+        no_supabase=args.no_supabase,
+    )
     print(result)
     return 0
 

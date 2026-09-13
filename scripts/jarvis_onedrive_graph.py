@@ -32,6 +32,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 REPO = Path(__file__).resolve().parents[1]
+SCRIPTS = Path(__file__).resolve().parent
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 LOCAL_ONEDRIVE = Path.home() / "Library/CloudStorage/OneDrive-個人用"
 TOKEN_CACHE = Path.home() / ".jarvis_state" / "ms_graph_token_cache.json"
 
@@ -81,31 +84,19 @@ def _tenant_authority() -> str:
     return _env("MS_GRAPH_AUTHORITY") or "consumers"
 
 
-def refresh_access_token() -> str:
-    """委任フローの refresh → access。キャッシュあり。
-
-    書込スコープ未同意の refresh でも読取が生きるよう、ReadWrite 失敗時は Read のみで再試行。
-    """
-    if TOKEN_CACHE.is_file():
-        try:
-            cached = json.loads(TOKEN_CACHE.read_text(encoding="utf-8"))
-            if float(cached.get("expires_at") or 0) > time.time() + 60:
-                tok = cached.get("access_token") or ""
-                if tok:
-                    return tok
-        except Exception:
-            pass
-
-    client_id = _env("MS_GRAPH_CLIENT_ID")
-    refresh = _env("MS_GRAPH_REFRESH_TOKEN")
-    secret = _env("MS_GRAPH_CLIENT_SECRET")  # 公開クライアントなら空で可
-    auth = _tenant_authority()
+def _try_refresh_with_token(
+    *,
+    client_id: str,
+    refresh: str,
+    secret: str,
+    auth: str,
+) -> dict[str, Any]:
+    """1 本の refresh で access を取る。ReadWrite → Read の順で試す。"""
     url = f"https://login.microsoftonline.com/{auth}/oauth2/v2.0/token"
     scopes_try = (
         DELEGATED_SCOPES,
         "offline_access Files.Read Files.Read.All User.Read",
     )
-    data: dict[str, Any] | None = None
     last_err: Exception | None = None
     for scope in scopes_try:
         form: dict[str, str] = {
@@ -125,12 +116,86 @@ def refresh_access_token() -> str:
                     "jarvis_ms_graph_device_login.py で再同意してください。",
                     file=sys.stderr,
                 )
-            break
+            return data
         except Exception as e:
             last_err = e
             continue
+    raise RuntimeError(f"token refresh failed: {last_err}")
+
+
+def refresh_access_token() -> str:
+    """委任フローの refresh → access。キャッシュあり。
+
+    耐久ストア: jarvis-dashboard sync_meta.ms_graph_refresh_token
+    （Vercel graphRead.ts と同キー）。優先順は sync_meta → Secrets/env。
+    sync_meta が失効していても env で成功すれば sync_meta を修復する。
+    """
+    if TOKEN_CACHE.is_file():
+        try:
+            cached = json.loads(TOKEN_CACHE.read_text(encoding="utf-8"))
+            if float(cached.get("expires_at") or 0) > time.time() + 60:
+                tok = cached.get("access_token") or ""
+                if tok:
+                    return tok
+        except Exception:
+            pass
+
+    # 循環 import 回避のため遅延
+    from jarvis_ms_graph_refresh_store import (  # type: ignore
+        fingerprint,
+        load_persisted_refresh,
+        persist_refresh,
+    )
+
+    client_id = _env("MS_GRAPH_CLIENT_ID")
+    secret = _env("MS_GRAPH_CLIENT_SECRET")  # 公開クライアントなら空で可
+    auth = _tenant_authority()
+    env_refresh = _env("MS_GRAPH_REFRESH_TOKEN")
+    persisted = load_persisted_refresh()
+
+    candidates: list[tuple[str, str]] = []
+    if persisted:
+        candidates.append(("sync_meta", persisted))
+    if env_refresh and env_refresh != persisted:
+        candidates.append(("env", env_refresh))
+    elif env_refresh and not persisted:
+        candidates.append(("env", env_refresh))
+    if not candidates:
+        raise RuntimeError("MS_GRAPH_REFRESH_TOKEN 未設定（env / sync_meta とも空）")
+
+    data: dict[str, Any] | None = None
+    refresh = ""
+    source = ""
+    last_err: Exception | None = None
+    for source, refresh in candidates:
+        try:
+            data = _try_refresh_with_token(
+                client_id=client_id,
+                refresh=refresh,
+                secret=secret,
+                auth=auth,
+            )
+            print(
+                f"# ms_graph: refresh ok source={source} "
+                f"fp={fingerprint(refresh)}",
+                file=sys.stderr,
+            )
+            break
+        except Exception as e:
+            last_err = e
+            print(
+                f"# ms_graph: refresh fail source={source} "
+                f"fp={fingerprint(refresh)} err={type(e).__name__}",
+                file=sys.stderr,
+            )
+            continue
     if data is None:
         raise RuntimeError(f"token refresh failed: {last_err}")
+
+    # env で成功し sync_meta が空／古いときは耐久ストアを修復
+    if source == "env" and refresh and refresh != persisted:
+        persist_refresh(refresh)
+
     access = data["access_token"]
     expires_in = int(data.get("expires_in") or 3600)
     new_refresh = data.get("refresh_token")
@@ -149,15 +214,19 @@ def refresh_access_token() -> str:
     )
     TOKEN_CACHE.chmod(0o600)
     if new_refresh and new_refresh != refresh:
-        # プロセス内はすぐ新トークンを使う。永続化は state ＋任意で private / GHA
+        # プロセス内はすぐ新トークン。耐久は sync_meta（本線）＋ローカル state
         os.environ["MS_GRAPH_REFRESH_TOKEN"] = new_refresh
         rot = Path.home() / ".jarvis_state" / "ms_graph_new_refresh.env"
         rot.parent.mkdir(parents=True, exist_ok=True)
-        rot.write_text(f"MS_GRAPH_REFRESH_TOKEN={new_refresh}\n", encoding="utf-8")
+        # bash source 対策: クォート付き（sync_refresh が読むとき strip）
+        q = "'" + new_refresh.replace("'", "'\\''") + "'"
+        rot.write_text(f"MS_GRAPH_REFRESH_TOKEN={q}\n", encoding="utf-8")
         rot.chmod(0o600)
+        sb_ok = persist_refresh(new_refresh)
         print(
             "# note: refresh_token が回転しました。"
-            f" wrote {rot} → python scripts/jarvis_ms_graph_sync_refresh.py"
+            f" sync_meta={'ok' if sb_ok else 'fail'} wrote {rot}"
+            " → Mac: python scripts/jarvis_ms_graph_sync_refresh.py"
             " [--push-gha]",
             file=sys.stderr,
         )
