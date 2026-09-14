@@ -101,6 +101,12 @@ purchase_pre:
   view_id: 27cf6bbe-5a76-809d-b3b9-000c827f3785
   board_url: https://app.notion.com/p/25ef6bbe5a7680c7be60dd114cb0e231?v=27cf6bbe5a76809db3b9000c827f3785
   role: ops_consult_results
+  title_prop: 物件名
   field_map: config/kurashift_re_research_fields.yaml
   hide_from_dashboard_lanes: true
-  # data_source_id: 共有後に API で取得して追記
+  # 2026-09-14: Jarvisダッシュボード Integration 接続済（コメント読取・書込可）
+  integration_connected: true
+  answer_script: scripts/jarvis_kurashift_ops_consult_answer.py
+  note: |
+    運営回答は KURASHIFT deal（案件別）と本 DB のコメント（一覧概観）の両方へ
+    jarvis_kurashift_ops_consult_answer.py --apply で残す。

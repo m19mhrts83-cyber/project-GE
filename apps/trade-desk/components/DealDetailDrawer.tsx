@@ -269,6 +269,25 @@ export default function DealDetailDrawer({
                 {deal?.title || "…"}
               </h2>
             </div>
+            {typeof sj.ops_consult_notion_url === "string" &&
+            sj.ops_consult_notion_url ? (
+              <p className="meta" style={{ margin: "6px 0 0" }}>
+                Notion（購入手前）:{" "}
+                <a
+                  href={sj.ops_consult_notion_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  行を開く
+                </a>
+              </p>
+            ) : null}
+            {typeof sj.ops_consult_reply_summary === "string" &&
+            sj.ops_consult_reply_summary ? (
+              <p className="meta" style={{ margin: "4px 0 0", whiteSpace: "pre-wrap" }}>
+                運営回答: {sj.ops_consult_reply_summary}
+              </p>
+            ) : null}
           </div>
           <button type="button" className="btn" onClick={onClose}>
             閉じる

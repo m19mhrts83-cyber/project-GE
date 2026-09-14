@@ -172,6 +172,7 @@ allowed_jobs:
   - re_deal_inquiry_poll  # 第一問い合わせスレッドの返信取込
   - re_deal_ops_pack  # 運営相談パック（consultations）
   - ops_consult_ingest
+  - ops_consult_answer  # 運営回答 → KURASHIFT案件 + Notionコメント両反映
   - re_sync_loan_tracker  # Discover未完了時は明示エラーで止まる
   - re_revise_plan  # dry-run既定。apply は UI confirm 必須
   - re_vendor_sync  # 地場業者 YAML → kurashift_re_vendors 投影

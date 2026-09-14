@@ -21,6 +21,7 @@ const ALLOWED = new Set([
   "buy_plan_ingest",
   "buy_plan_export",
   "ops_consult_ingest",
+  "ops_consult_answer",
   "re_mail_match",
   "re_deal_advice",
   "re_deal_mark_gmail_read",
