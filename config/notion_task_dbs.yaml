@@ -91,3 +91,16 @@ lanes:
     open_statuses: ["未着手", "進行中"]
     done_statuses: ["完了"]
     hide_done_on_board: false
+
+# 購入手前・運営相談結果のまとめ（タスク看板 lanes とは別。ダッシュボード看板には出さない）
+# 運営に「買うべきか」を聞いた結果を蓄積する正本。KURASHIFT deal とは自動同期しない。
+# Integration「Jarvisダッシュボード」へ DB を接続（共有）すると API 読取可。未共有時は URL のみ。
+purchase_pre:
+  title: DB_物件購入検討(購入手前)
+  database_id: 25ef6bbe-5a76-80c7-be60-dd114cb0e231
+  view_id: 27cf6bbe-5a76-809d-b3b9-000c827f3785
+  board_url: https://app.notion.com/p/25ef6bbe5a7680c7be60dd114cb0e231?v=27cf6bbe5a76809db3b9000c827f3785
+  role: ops_consult_results
+  field_map: config/kurashift_re_research_fields.yaml
+  hide_from_dashboard_lanes: true
+  # data_source_id: 共有後に API で取得して追記

@@ -3,8 +3,13 @@
 # 抽出: scripts/jarvis_kurashift_re_reply_extract.py
 
 version: 1
-updated: "2026-08-25"
+updated: "2026-09-14"
 notion_database: "DB_物件購入検討(購入手前)"
+notion_database_id: "25ef6bbe-5a76-80c7-be60-dd114cb0e231"
+notion_view_id: "27cf6bbe-5a76-809d-b3b9-000c827f3785"
+notion_board_url: "https://app.notion.com/p/25ef6bbe5a7680c7be60dd114cb0e231?v=27cf6bbe5a76809db3b9000c827f3785"
+# 用途: 購入手前で運営に聞いた結果のまとめ（ops consult results）
+notion_role: ops_consult_results
 
 # 初期は suggested + source を人が verified に昇格。verified 後は自動上書きしない。
 trust_ladder:

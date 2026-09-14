@@ -22,6 +22,18 @@ ops_form:
   yaml: "config/kurashift_re_ops_form_1906a1a5.yaml"
   jobs: [re_ops_form_draft, re_ops_form_fill]
   submit: user_confirm_only  # Jarvis は送信しない
+  mark_action: ops_form_submitted
+
+# 購入手前 — 運営に聞いた結果のまとめ（Notion）
+# ※ KURASHIFT deal とは自動同期しない。回答後・判断後に人が／Jarvisが行を足す。
+purchase_pre_notion:
+  title: "DB_物件購入検討(購入手前)"
+  database_id: "25ef6bbe-5a76-80c7-be60-dd114cb0e231"
+  view_id: "27cf6bbe-5a76-809d-b3b9-000c827f3785"
+  board_url: "https://app.notion.com/p/25ef6bbe5a7680c7be60dd114cb0e231?v=27cf6bbe5a76809db3b9000c827f3785"
+  role: ops_consult_results
+  field_map: "config/kurashift_re_research_fields.yaml"
+  also_in: "config/kurashift_re_inquiry_template.yaml#ops_notion_url"
 
 stages:
   - id: research_done
@@ -37,7 +49,7 @@ stages:
       - draft: re_ops_form_draft
       - fill: re_ops_form_fill  # 入力のみ・ブラウザ残す
       - human_submit: os7
-      - mark: kamiooya_form_submitted
+      - mark: ops_form_submitted
     done_when: form_submitted
 
   - id: loan_sounding
@@ -61,6 +73,7 @@ stages:
     steps:
       - partner_check_809: true
       - ingest: jarvis_kurashift_ops_consult_ingest.py
+      - notion_update: purchase_pre_notion  # DB_物件購入検討(購入手前) に結果を残す
     done_when: ops_answer_in_deal
 
   - id: offer_plan
