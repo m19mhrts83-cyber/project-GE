@@ -29,6 +29,9 @@ signature_template: |
   {representative_name}
 
 # 運営相談パックに載せる Notion 参照（購入判断の文脈）
-ops_notion_url: "https://app.notion.com/p/25ef6bbe5a7680c7be60dd114cb0e231?v=27cf6bbe5a76809db3b9000c827f3785&source=copy_link"
+# 正本名: DB_物件購入検討(購入手前) — 運営に聞いた結果のまとめ
+ops_notion_url: "https://app.notion.com/p/25ef6bbe5a7680c7be60dd114cb0e231?v=27cf6bbe5a76809db3b9000c827f3785"
+ops_notion_database_id: "25ef6bbe-5a76-80c7-be60-dd114cb0e231"
+ops_notion_title: "DB_物件購入検討(購入手前)"
 
 title_short_max: 40
