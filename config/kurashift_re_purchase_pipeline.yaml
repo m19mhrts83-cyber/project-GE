@@ -1,0 +1,95 @@
+# KURASHIFT 買い進めパイプライン（戸建て・神大家運営相談込み）
+# 正本メモ: Obsidian 03_Literature Note/所有物件・賃貸経営/20260914_KURASHIFT_物件調査から運営相談まで.md
+# 時期の前後は案件ごと。軸はこの順。
+
+version: 1
+updated: "2026-09-14"
+
+# 神大家割当 Google Drive（運営指定・estate で書込）
+kamiooya_ops_drive:
+  root_folder_id: "1L5PM4T5AAkD5a3zWzXY_ypW38v0qhdlh"
+  root_folder_name: "1162.松野 真治"
+  root_url: "https://drive.google.com/drive/u/1/folders/1L5PM4T5AAkD5a3zWzXY_ypW38v0qhdlh"
+  login_hint: "matsuno.estate@gmail.com"
+  token_name: "token_google_workspace_estate.json"
+  # フォルダ名 = 連番_物件短名_価格(都道府県市区)
+  naming: "{next}_{short_title}_{price_man}万({pref_city})"
+  state_path: ".jarvis_state/kamiooya_ops_drive.json"
+
+ops_form:
+  form_id: "1906a1a5"
+  form_url: "https://form.os7.biz/f/1906a1a5/"
+  yaml: "config/kurashift_re_ops_form_1906a1a5.yaml"
+  jobs: [re_ops_form_draft, re_ops_form_fill]
+  submit: user_confirm_only  # Jarvis は送信しない
+
+stages:
+  - id: research_done
+    label: 詳細調査済（ペルソナ含む）
+    actor: grok_s1_s3_s5
+    done_when: detailed_investigated_ui
+
+  - id: ops_form
+    label: 運営相談フォーム（買うべきか確認）
+    actor: jarvis_ui_mac
+    steps:
+      - drive_upload: jarvis_kurashift_re_ops_drive_upload.py
+      - draft: re_ops_form_draft
+      - fill: re_ops_form_fill  # 入力のみ・ブラウザ残す
+      - human_submit: os7
+      - mark: kamiooya_form_submitted
+    done_when: form_submitted
+
+  - id: loan_sounding
+    label: 融資打診（任意・時期前後可）
+    actor: grok_s7
+    note: |
+      フロー未確定。調査結果が揃っていれば運営相談と並行／前後で打診可。
+      Jarvis は deal パックを S7（融資相談）へ渡し、打診メール文面を作らせる。
+      対外送信は jarvis-outbound-confirm。
+    handoff:
+      script: jarvis_kurashift_re_purchase_handoff.py
+      mode: loan
+      outbox_target: re
+      action: s7_loan_sounding
+      grok_paste: config/grok_loan_bot_grok_paste.md
+    done_when: user_marks_or_mail_sent
+
+  - id: ops_answer
+    label: 運営回答受領（809）
+    actor: jarvis_ingest
+    steps:
+      - partner_check_809: true
+      - ingest: jarvis_kurashift_ops_consult_ingest.py
+    done_when: ops_answer_in_deal
+
+  - id: offer_plan
+    label: 買付交渉案（運営回答後）
+    actor: grok_s6
+    note: |
+      運営メール回答を踏まえ、S6（買付交渉）が買付・交渉論点をまとめる。
+      内見前の方針メモ。送信しない。
+    handoff:
+      script: jarvis_kurashift_re_purchase_handoff.py
+      mode: offer
+      outbox_target: re
+      action: s6_offer_after_ops
+      grok_paste: config/grok_deal_negotiation_bot_grok_paste.md
+    done_when: offer_memo_ready
+
+  - id: viewing_negotiate_buy
+    label: 内見・交渉・購入決定
+    actor: human_plus_s6
+    note: 現地で仲介と価格交渉 → 購入判断。Jarvis は下書き・カレンダー・証憑のみ。
+    done_when: purchased_or_pass
+
+# 御油検証で確定した運用ルール（次物件でも守る）
+lessons_20260914:
+  - 記載は記入例レベル・改行。長文評価メモは書かない
+  - メールは matsuno.estate@gmail.com
+  - 姓名は PERSONAL_NAME_FAMILY/GIVEN → os7 seimei1/seimei2
+  - 自己資金は合計のみ（銀行合計＋契約者貸付。貯める不明時）
+  - 資料格納は神大家割当 Drive（1162）内の物件フォルダ URL（証憑 Drive ではない）
+  - 取引形態「売主」は取引態様（媒介契約ではない）
+  - 転記後ブラウザは閉じない（検証〜確認用）
+  - 運営への補足はフォーム長文ではなくメールでよい

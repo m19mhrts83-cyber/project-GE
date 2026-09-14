@@ -1,0 +1,48 @@
+# 神大家 — 戸建て購入運営相談フォーム（1906a1a5）
+
+## トリガー
+
+- KURASHIFT deal の `inquiry_status=has_reply` 以降
+- 「詳細調査済・内見＆相談検討」からの運営相談（画面の「運営相談フォーム」）
+- 「運営相談」「亀山さん相談」「フォーム送信」の依頼（**亀山さん＝神大家運営相談**）
+- 融資打診／買付案のハンドオフ依頼（パイプライン後段）
+
+## 正本
+
+| 項目 | 内容 |
+|---|---|
+| **パイプライン** | `config/kurashift_re_purchase_pipeline.yaml` |
+| フォーム URL | https://form.os7.biz/f/1906a1a5/ |
+| フィールド定義 | `config/kurashift_re_ops_form_1906a1a5.yaml` |
+| 下書き | `scripts/jarvis_kurashift_re_ops_form_draft.py` |
+| 転記（送信なし） | `scripts/jarvis_kurashift_re_ops_form_fill.py` / job `re_ops_form_fill` |
+| **資料 Drive** | 神大家割当 `1162.松野 真治`（estate）。`jarvis_kurashift_re_ops_drive_upload.py` |
+| ハンドオフ | `jarvis_kurashift_re_purchase_handoff.py`（`--mode loan` / `offer`） |
+| 809 回答 | `809_神大家運営回答/5.やり取り.md`（`jarvis_kurashift_ops_consult_ingest.py`） |
+| 人向け手順 | Obsidian `20260914_KURASHIFT_物件調査から運営相談まで.md` |
+
+## 最短手順（次物件でも同じ）
+
+1. 詳細調査済 deal を開く  
+2. **資料**: `jarvis_kurashift_re_ops_drive_upload.py --deal-id … --apply --update-deal`（1162 配下に物件フォルダ）  
+3. 下書き再生成 → research/manual を埋める（記入例レベル）  
+4. UI「運営フォームへ転記」→ ブラウザで確認 → **松野が送信**  
+5. 「フォーム送信した」マーク  
+6. （任意・前後可）`--mode loan` で S7 に打診文面依頼  
+7. 809 回答後 → `--mode offer` で S6 に買付案依頼 → 内見・交渉・購入
+
+## Jarvis の動作
+
+1. **送信は自動しない**（`jarvis-outbound-confirm`）。  
+2. 資料格納は **神大家割当 Drive**（自分用 `KURASHIFT_問合せ証憑` ではない）。  
+3. 姓名は `PERSONAL_NAME_FAMILY` / `GIVEN` → os7 `seimei1`/`seimei2`。  
+4. 自己資金は合計のみ（銀行＋契約者貸付）。  
+5. 運営への長文補足はフォームではなく **メール**。  
+6. 融資／買付は outbox `--target re`（部長）→ S7 / S6。対外メールは了承後。
+
+## 関連
+
+- E2E: `docs/KURASHIFT_re_inquiry_E2E_checklist.md` §8  
+- 設計: `docs/KURASHIFT_RE_業者開拓_物件候補_実務者設計_20260823.md` Phase 2  
+- S7 paste: `config/grok_loan_bot_grok_paste.md`  
+- S6 paste: `config/grok_deal_negotiation_bot_grok_paste.md`
