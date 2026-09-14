@@ -14,9 +14,13 @@ export type MacRecipe = {
   label?: string;
   status?: string;
   error?: string;
+  fingerprint?: string;
+  queued_at?: string;
   requested_at?: string;
   finished_at?: string;
+  queued_by?: string;
   result?: string;
+  note?: string;
 };
 
 export type Remediation = {
@@ -96,6 +100,7 @@ export default function OpenchatHealthRemediation({
         {recipe?.status === "queued" || recipe?.status === "running" ? (
           <span className="badge lvl-warn">
             Mac復旧 {recipe.status}
+            {recipe.queued_by === "auto_health" ? "（自動）" : ""}
             {recipe.route_ids?.length
               ? `（${recipe.route_ids.length}ルート）`
               : ""}

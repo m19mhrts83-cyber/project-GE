@@ -54,7 +54,10 @@ export async function queueOpenchatMacRecover(opts: {
     route_ids: routeIds,
     label: "静かな失敗の --init discover＋バックフィル",
     status: "queued",
+    fingerprint: [...routeIds].sort().join(","),
+    queued_at: new Date().toISOString(),
     requested_at: new Date().toISOString(),
+    queued_by: "dashboard_ui",
     error: null,
     result: null,
   };

@@ -6,6 +6,9 @@
 メイン鮮度（全ルートで直近N日【メイン】0＋常時監視は稼働）を検知し、
 ダッシュボード /openchat 用の JSON を push する。
 
+silent_fail_empty_mids は既定で mac_recipe を queued にし、
+launchd の jarvis_openchat_recover_worker が拾う（JARVIS_OPENCHAT_AUTO_QUEUE_RECOVER=0 で無効）。
+
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_openchat_thread_health.py
   python scripts/jarvis_openchat_thread_health.py --dry-run
@@ -52,6 +55,85 @@ MAIN_STALE_DAYS = max(1, int(os.environ.get("JARVIS_OPENCHAT_MAIN_STALE_DAYS") o
 # 常時監視「稼働中」とみなす heartbeat 上限（秒）
 WATCH_ALIVE_HB_SEC = max(60, int(os.environ.get("JARVIS_OPENCHAT_WATCH_ALIVE_HB_SEC") or "300"))
 
+
+def _env_flag_on(name: str, default: str = "1") -> bool:
+    raw = (os.environ.get(name) or default).strip()
+    return raw not in {"0", "false", "False", "no", "off"}
+
+
+def _parse_iso_dt(raw: Any) -> datetime | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=JST)
+        return dt.astimezone(JST)
+    except Exception:
+        return None
+
+
+def _recipe_in_cooldown(prev: dict[str, Any], fingerprint: str, *, hours: float) -> bool:
+    if prev.get("id") != MAC_RECIPE_ID:
+        return False
+    if str(prev.get("fingerprint") or "") != fingerprint:
+        return False
+    # Worker 完了時刻を優先（queued_at だと長時間ジョブ後に即再キューしにくい／逆に誤判定）
+    for key in ("finished_at", "started_at", "queued_at", "requested_at"):
+        dt = _parse_iso_dt(prev.get(key))
+        if dt is None:
+            continue
+        age_h = (datetime.now(tz=JST) - dt).total_seconds() / 3600.0
+        return age_h < hours
+    return False
+
+
+def fetch_remote_mac_recipe() -> dict[str, Any] | None:
+    """watch_status.openchat_threads の mac_recipe（Worker/UI 正本）。失敗時は None。"""
+    try:
+        sb = sb_client()
+        res = (
+            sb.table("watch_status")
+            .select("payload")
+            .eq("id", "openchat_threads")
+            .limit(1)
+            .execute()
+        )
+        rows = res.data or []
+        pl = rows[0].get("payload") if rows else None
+        if not isinstance(pl, dict):
+            return None
+        rem = pl.get("remediation") if isinstance(pl.get("remediation"), dict) else {}
+        mr = rem.get("mac_recipe") if isinstance(rem.get("mac_recipe"), dict) else None
+        if not mr and isinstance(pl.get("mac_recipe"), dict):
+            mr = pl.get("mac_recipe")
+        if isinstance(mr, dict) and mr.get("id") == MAC_RECIPE_ID:
+            return mr
+    except Exception as e:
+        print(f"# remote mac_recipe skip: {e}", file=sys.stderr)
+    return None
+
+
+def resolve_existing_mac_recipe(
+    local: dict[str, Any] | None,
+    remote: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """
+    Supabase（Worker/UI）を正本、ローカル last_report は fallback。
+
+    教訓: recover_worker 実行中の health --push が local に running を残し、
+    完了後の done を local queued/running で上書き → 永久 running / 無限再キューになりうる。
+    """
+    r = remote if isinstance(remote, dict) else None
+    l = local if isinstance(local, dict) else None
+    if r and r.get("id") == MAC_RECIPE_ID:
+        return r
+    if l and l.get("id") == MAC_RECIPE_ID:
+        return l
+    return r or l
 
 def now_iso() -> str:
     return datetime.now(tz=JST).isoformat(timespec="seconds")
@@ -445,10 +527,11 @@ def build_remediation(
     main_freshness: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     attention_routes = [r for r in route_evals if r.get("level") == "attention"]
-    silent = [
-        r
-        for r in attention_routes
-        if r.get("symptom") in {"silent_fail_empty_mids", "zero_append_with_main"}
+    silent_empty = [
+        r for r in attention_routes if r.get("symptom") == "silent_fail_empty_mids"
+    ]
+    silent_zero = [
+        r for r in attention_routes if r.get("symptom") == "zero_append_with_main"
     ]
     infra_symptoms: list[str] = []
     if err:
@@ -464,9 +547,9 @@ def build_remediation(
     # 優先: メイン取込停止 > スレ静かな失敗 > 基盤 > その他
     if main_stale:
         primary = "main_stale_all_routes"
-    elif silent:
+    elif silent_empty:
         primary = "silent_fail_empty_mids"
-    elif any(r.get("symptom") == "zero_append_with_main" for r in attention_routes):
+    elif silent_zero:
         primary = "zero_append_with_main"
     elif infra_symptoms:
         primary = infra_symptoms[0]
@@ -484,23 +567,81 @@ def build_remediation(
     )
 
     mac_recipe: dict[str, Any] | None = None
-    # メイン鮮度問題のときはスレ bootstrap を主役にしない
-    if silent and not main_stale:
-        route_ids = [str(r["route_id"]) for r in silent if r.get("route_id")]
-        # 進行中キューは上書きしない
+    # 自動 queue は silent_fail_empty_mids のみ（zero_append は人手／UI）
+    if silent_empty and not main_stale:
+        route_ids = sorted(
+            {str(r["route_id"]) for r in silent_empty if r.get("route_id")}
+        )
+        try:
+            max_routes = int(
+                (os.environ.get("JARVIS_OPENCHAT_AUTO_QUEUE_MAX_ROUTES") or "8").strip() or "8"
+            )
+        except ValueError:
+            max_routes = 8
+        if max_routes > 0:
+            route_ids = route_ids[:max_routes]
+        fingerprint = ",".join(route_ids)
+        try:
+            cooldown_h = float(
+                (os.environ.get("JARVIS_OPENCHAT_AUTO_QUEUE_COOLDOWN_HOURS") or "24").strip()
+                or "24"
+            )
+        except ValueError:
+            cooldown_h = 24.0
+
         prev = existing_mac_recipe if isinstance(existing_mac_recipe, dict) else {}
         prev_status = str(prev.get("status") or "")
+        # 進行中は上書きしない（正本は resolve_existing 済みの remote 優先）
         if prev_status in {"queued", "running"} and prev.get("id") == MAC_RECIPE_ID:
             mac_recipe = prev
         else:
-            mac_recipe = {
+            auto_on = _env_flag_on("JARVIS_OPENCHAT_AUTO_QUEUE_RECOVER", "1")
+            in_cooldown = _recipe_in_cooldown(prev, fingerprint, hours=cooldown_h)
+            ts = now_iso()
+            base = {
                 "id": MAC_RECIPE_ID,
                 "route_ids": route_ids,
                 "label": "静かな失敗の --init discover＋バックフィル",
-                "status": "idle",
+                "fingerprint": fingerprint,
             }
+            if auto_on and route_ids and not in_cooldown:
+                mac_recipe = {
+                    **base,
+                    "status": "queued",
+                    "queued_at": ts,
+                    "requested_at": ts,  # UI（openchatRecover）互換
+                    "queued_by": "auto_health",
+                    "error": None,
+                    "result": None,
+                }
+            elif in_cooldown and prev_status in {"done", "error"} and prev.get("id") == MAC_RECIPE_ID:
+                # クールダウン中は完了/失敗表示を残す（idle に潰して UI を消さない）
+                mac_recipe = {
+                    **base,
+                    "status": prev_status,
+                    "queued_at": prev.get("queued_at") or prev.get("requested_at"),
+                    "requested_at": prev.get("requested_at") or prev.get("queued_at"),
+                    "finished_at": prev.get("finished_at"),
+                    "result": prev.get("result"),
+                    "error": prev.get("error"),
+                    "queued_by": prev.get("queued_by"),
+                    "note": "auto-queue cooldown",
+                }
+            else:
+                mac_recipe = {
+                    **base,
+                    "status": "idle",
+                    "queued_at": prev.get("queued_at") if in_cooldown else None,
+                    "requested_at": prev.get("requested_at") if in_cooldown else None,
+                    "note": (
+                        "auto-queue cooldown"
+                        if in_cooldown
+                        else ("auto-queue off" if not auto_on else None)
+                    ),
+                }
     elif isinstance(existing_mac_recipe, dict):
         prev_status = str(existing_mac_recipe.get("status") or "")
+        # 症状が消えても進行中ジョブはキャンセルしない
         if prev_status in {"queued", "running"} and existing_mac_recipe.get("id") == MAC_RECIPE_ID:
             mac_recipe = existing_mac_recipe
 
@@ -509,8 +650,10 @@ def build_remediation(
             "メイン全体が止まっている予兆。パートナー確認／朝 --with-line／QR。"
             " スレ bootstrap は後回し。"
         )
-    elif silent:
-        hint = "棒が細い＋メインはある → 静かな失敗の予兆。下の解消パネルへ。"
+    elif silent_empty:
+        hint = "棒が細い＋メインはある → 静かな失敗の予兆。下の解消パネルへ（自動 queue 可）。"
+    elif silent_zero:
+        hint = "追記0＋メインあり。discover 後も続くなら削除済みスレ多めの可能性。"
     elif infra_symptoms and not attention_routes:
         hint = "基盤（常時監視・書込）を先に確認。スレ bootstrap は主役ではない。"
     else:
@@ -528,7 +671,11 @@ def build_remediation(
     }
 
 
-def build_report() -> dict[str, Any]:
+def build_report(
+    *,
+    existing_mac_recipe: dict[str, Any] | None = None,
+    prefer_remote_recipe: bool = False,
+) -> dict[str, Any]:
     routes = load_routes()
     health = load_json(HEALTH_PATH)
     watch = load_json(WATCH_STATUS)
@@ -613,12 +760,19 @@ def build_report() -> dict[str, Any]:
 
     summary = " · ".join(summary_parts)
 
-    # 既存 mac_recipe（queued/running）を維持するため、ローカル snapshot から読む
-    existing_recipe = None
+    # 既存 mac_recipe: push 時は Supabase 正本を優先（local running で done を潰さない）
+    local_recipe = None
     last_report = health.get("last_report") if isinstance(health.get("last_report"), dict) else {}
     rem_prev = last_report.get("remediation") if isinstance(last_report.get("remediation"), dict) else {}
     if isinstance(rem_prev.get("mac_recipe"), dict):
-        existing_recipe = rem_prev.get("mac_recipe")
+        local_recipe = rem_prev.get("mac_recipe")
+
+    if existing_mac_recipe is not None:
+        existing_recipe = existing_mac_recipe
+    elif prefer_remote_recipe:
+        existing_recipe = resolve_existing_mac_recipe(local_recipe, fetch_remote_mac_recipe())
+    else:
+        existing_recipe = local_recipe
 
     remediation = build_remediation(
         route_evals,
@@ -782,7 +936,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.dry_run and not args.push:
         args.dry_run = True
 
-    report = build_report()
+    # push / dry-run とも可能なら Supabase 正本を優先（取得失敗時は local）
+    report = build_report(prefer_remote_recipe=True)
     # ローカルにも保存（バッチ未実行でも MD 判定結果を残す）
     STATE.mkdir(parents=True, exist_ok=True)
     snapshot = {
