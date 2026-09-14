@@ -129,29 +129,30 @@ def run_recipe(route_ids: list[str], *, dry_run: bool) -> tuple[bool, str]:
         "80",
     ]
     resume = [str(RESUME)]
-    health = [
-        str(PY if PY.is_file() else sys.executable),
-        str(REPO / "scripts" / "jarvis_openchat_thread_health.py"),
-        "--push",
-    ]
+    # health --push は status=done/error 保存後に別途実行する
+    # （running 中に push すると local last_report が running のまま残り、
+    #  完了後の done を上書きして永久 running になりうる）
 
     steps = [
         ("pause", pause, 60),
         ("discover", discover, 600),
         ("backfill", backfill, 900),
         ("resume", resume, 60),
-        ("health", health, 180),
     ]
     if dry_run:
         for name, argv, _ in steps:
             print(f"# dry-run {name}: {' '.join(argv)}")
+        print(
+            f"# dry-run health: {PY if PY.is_file() else sys.executable} "
+            f"{REPO / 'scripts' / 'jarvis_openchat_thread_health.py'} --push"
+        )
         return True, "dry_run"
 
     logs: list[str] = []
     try:
         for name, argv, timeout in steps:
             print(f"# run {name}")
-            cwd = str(POC) if name in {"pause", "discover", "backfill", "resume"} else str(REPO)
+            cwd = str(POC)
             r = subprocess.run(
                 argv,
                 cwd=cwd,
@@ -182,6 +183,23 @@ def run_recipe(route_ids: list[str], *, dry_run: bool) -> tuple[bool, str]:
     except Exception as e:
         subprocess.run(resume, cwd=str(POC), capture_output=True, text=True, timeout=60)
         return False, str(e)[:400]
+
+
+def push_health_after_recipe() -> None:
+    health = [
+        str(PY if PY.is_file() else sys.executable),
+        str(REPO / "scripts" / "jarvis_openchat_thread_health.py"),
+        "--push",
+    ]
+    print("# run health")
+    subprocess.run(
+        health,
+        cwd=str(REPO),
+        capture_output=True,
+        text=True,
+        timeout=180,
+        env=os.environ.copy(),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -225,7 +243,17 @@ def main(argv: list[str] | None = None) -> int:
 
     # 最新 payload を再読して上書き衝突を減らす
     payload2, rem2, _ = load_recipe(sb)
+    # fingerprint を引き継ぎ（health のクールダウン用）
+    if finished.get("fingerprint") is None and recipe.get("fingerprint"):
+        finished["fingerprint"] = recipe.get("fingerprint")
+    if not finished.get("fingerprint") and route_ids:
+        finished["fingerprint"] = ",".join(sorted(route_ids))
     save_recipe(sb, payload2, rem2, finished)
+    # done/error 保存後に health（running 中 push を避ける）
+    try:
+        push_health_after_recipe()
+    except Exception as e:
+        print(f"# health after recipe skip: {e}", file=sys.stderr)
     print(json.dumps({"ok": ok, "status": finished["status"], "result": result}, ensure_ascii=False))
     return 0 if ok else 1
 

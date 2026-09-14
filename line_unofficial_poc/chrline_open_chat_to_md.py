@@ -1351,6 +1351,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="集計した新規 MID を routes YAML の thread_mids に追記する（--dry-run 時は YAML も未変更）",
     )
     parser.add_argument(
+        "--max-new-thread-mids",
+        type=int,
+        default=0,
+        metavar="N",
+        help="auto-append 時に追記する新規 MID の上限（ルート横断・ヒット多い順。0=無制限）",
+    )
+    parser.add_argument(
         "--min-hit-count",
         type=int,
         default=1,
@@ -1931,6 +1938,7 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
                     )
 
         route_id_to_new: dict[str, list[str]] = {}
+        ranked_new: list[tuple[int, str, str]] = []  # (-hits, rid, mid)
         for route in routes:
             cnt = discover_counts.get(route.rid) or Counter()
             existing = set(route.thread_mids)
@@ -1942,6 +1950,27 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
             if eligible:
                 sorted_mids = sorted(eligible, key=lambda m: (-cnt[m], m))
                 route_id_to_new[route.rid] = sorted_mids
+                for mid in sorted_mids:
+                    ranked_new.append((-cnt[mid], route.rid, mid))
+
+        max_new = int(getattr(args, "max_new_thread_mids", 0) or 0)
+        if max_new > 0 and ranked_new:
+            ranked_new.sort(key=lambda x: (x[0], x[1], x[2]))
+            keep: dict[str, list[str]] = {}
+            kept = 0
+            skipped = 0
+            for _neg, rid, mid in ranked_new:
+                if kept >= max_new:
+                    skipped += 1
+                    continue
+                keep.setdefault(rid, []).append(mid)
+                kept += 1
+            route_id_to_new = keep
+            if skipped:
+                print(
+                    f"# max-new-thread-mids={max_new}: 採用 {kept} / 見送り {skipped}",
+                    file=sys.stderr,
+                )
 
         print("# --- thread MID 候補（メイン履歴・yoritoori 由来）---", file=sys.stderr)
         if args.no_main:
