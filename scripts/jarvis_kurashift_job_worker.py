@@ -256,6 +256,26 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             py,
             str(REPO / "scripts" / "jarvis_kurashift_ops_consult_ingest.py"),
         ],
+        "ops_consult_answer": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_ops_consult_answer.py"),
+            "--deal-id",
+            str(payload.get("deal_id") or ""),
+            "--summary",
+            str(payload.get("summary") or ""),
+            *(
+                ["--verdict", str(payload.get("verdict"))]
+                if payload.get("verdict")
+                else []
+            ),
+            *(
+                ["--comment", str(payload.get("comment"))]
+                if payload.get("comment")
+                else []
+            ),
+            *(["--seed-awaiting"] if payload.get("seed_awaiting") else []),
+            *(["--apply"] if payload.get("apply", True) else ["--dry-run"]),
+        ],
         "re_sync_loan_tracker": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_loan_tracker_sync.py"),

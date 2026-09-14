@@ -73,7 +73,8 @@ stages:
     steps:
       - partner_check_809: true
       - ingest: jarvis_kurashift_ops_consult_ingest.py
-      - notion_update: purchase_pre_notion  # DB_物件購入検討(購入手前) に結果を残す
+      - dual_write: jarvis_kurashift_ops_consult_answer.py  # KURASHIFT案件 + Notionコメント
+      - notion_update: purchase_pre_notion
     done_when: ops_answer_in_deal
 
   - id: offer_plan
