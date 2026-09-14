@@ -11,6 +11,7 @@ import {
   getYieldDisplayInfo,
   getLandValueDisplayInfo,
   getDealAttachments,
+  getOpsConsultBadge,
 } from "@/lib/reDealPursue";
 
 type Props = {
@@ -227,7 +228,19 @@ export default function DetailedInvestigatedDealsSection({
             Grok × Obsidian 連携
           </span>
           <strong style={{ fontSize: 16, color: "#1e1b4b" }}>
-            📌 詳細調査済・内見＆相談検討（{deals.length}件）
+            📌 詳細調査済・内見＆相談検討（{deals.length}件
+            {deals.filter((x) => {
+              const s = getOpsConsultBadge(x).stage;
+              return s === "submitted" || s === "answered";
+            }).length
+              ? `／運営相談済 ${
+                  deals.filter((x) => {
+                    const s = getOpsConsultBadge(x).stage;
+                    return s === "submitted" || s === "answered";
+                  }).length
+                }`
+              : ""}
+            ）
           </strong>
         </div>
 
@@ -289,6 +302,8 @@ export default function DetailedInvestigatedDealsSection({
       <p className="meta" style={{ marginTop: 2, marginBottom: 12, color: "#475569", fontSize: 13 }}>
         問合せ返信を受け、Grok bot（S3需給三次・S5ペルソナ）で精査し、Obsidianに詳細レポートが蓄積された物件です。
         <strong>「内見に行くか」「神大家さん運営へ相談するか」</strong>の判断材料として、調査結果と<strong>マイソクPDF・利回り</strong>を横並びで比較・確認できます。
+        運営相談の段階は行の<strong>「運営相談」バッジ</strong>で区分します（まだ／下書き／転記済／相談済・回答待ち／回答あり）。
+        送信後はドロワーの<strong>「運営相談を送信した」</strong>で記録してください。
         運営相談は各行の<strong>「運営フォームへ転記」</strong>で os7 に自動入力できます（送信は手元確認後のみ。下書き再生成はドロワーから）。
         {formDraftMsg ? (
           <span style={{ display: "block", marginTop: 6, color: "#4338ca", fontSize: 12 }}>
@@ -310,7 +325,7 @@ export default function DetailedInvestigatedDealsSection({
             style={{
               margin: 0,
               width: "100%",
-              minWidth: 1160,
+              minWidth: 1280,
               borderCollapse: "collapse",
               fontSize: 13,
             }}
@@ -319,6 +334,7 @@ export default function DetailedInvestigatedDealsSection({
               <tr style={{ background: "#e0e7ff", borderBottom: "2px solid #c7d2fe" }}>
                 <th style={{ padding: "8px 6px", width: 48, textAlign: "center" }}>No.</th>
                 <th style={{ padding: "8px 10px", width: 105 }}>Grok判定</th>
+                <th style={{ padding: "8px 10px", width: 110 }}>運営相談</th>
                 <th style={{ padding: "8px 10px", width: 190 }}>物件 / 所在地</th>
                 <th style={{ padding: "8px 10px", width: 165 }}>価格 / 利回り / 土地値</th>
                 <th style={{ padding: "8px 10px", width: 160 }}>返信・マイソクPDF</th>
@@ -413,6 +429,35 @@ export default function DetailedInvestigatedDealsSection({
                             : s3.verdict_reason}
                         </div>
                       ) : null}
+                    </td>
+
+                    {/* 1b. 運営相談 */}
+                    <td style={{ padding: "10px 8px", verticalAlign: "top" }}>
+                      {(() => {
+                        const ops = getOpsConsultBadge(d);
+                        return (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "3px 8px",
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              background: ops.bg,
+                              color: ops.color,
+                              border: `1px solid ${ops.border}`,
+                              whiteSpace: "nowrap",
+                            }}
+                            title={
+                              ops.submittedAt
+                                ? `送信: ${ops.submittedAt}`
+                                : "神大家運営相談（買うべきか）"
+                            }
+                          >
+                            {ops.label}
+                          </span>
+                        );
+                      })()}
                     </td>
 
                     {/* 2. 物件 / 所在地 */}
@@ -884,6 +929,24 @@ export default function DetailedInvestigatedDealsSection({
                       >
                         {vStyle.label}
                       </span>
+                      {(() => {
+                        const ops = getOpsConsultBadge(d);
+                        return (
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              background: ops.bg,
+                              color: ops.color,
+                              border: `1px solid ${ops.border}`,
+                            }}
+                          >
+                            {ops.label}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <span style={{ fontWeight: 700, fontSize: 16, color: "#1e1b4b" }}>

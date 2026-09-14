@@ -340,6 +340,41 @@ export async function POST(
     return NextResponse.json({ ok: true, job_id: job?.id });
   }
 
+  if (action === "ops_form_submitted") {
+    // 神大家運営相談フォーム（1906a1a5）送信記録。業者問合せ inquiry_status は変えない。
+    const now = new Date().toISOString();
+    const nextSj = {
+      ...sj,
+      ops_consult_submitted_at: now,
+      ops_consult_submitted_by: user.email ?? user.id,
+      ops_consult_status: "awaiting_ops_reply",
+    };
+    const { error: upErr } = await supabase
+      .from("kurashift_re_deals")
+      .update({
+        summary_json: nextSj,
+        updated_at: now,
+      })
+      .eq("id", id);
+    if (upErr) {
+      return NextResponse.json({ error: upErr.message }, { status: 500 });
+    }
+    await supabase.from("kurashift_re_deal_events").insert({
+      deal_id: id,
+      event_type: "ops_consult_form_submitted",
+      from_status: String(row.status || "info"),
+      to_status: String(row.status || "info"),
+      actor: "user",
+      summary: "神大家運営相談フォーム送信済（買うべきか確認）",
+      payload: { action: "ops_form_submitted", form: "1906a1a5" },
+    });
+    return NextResponse.json({
+      ok: true,
+      ops_consult_status: "awaiting_ops_reply",
+      ops_consult_submitted_at: now,
+    });
+  }
+
   if (action === "kamiooya_form_submitted") {
     const channelInfo = classifyInquiryChannel({
       title: String(row.title || ""),
@@ -581,7 +616,7 @@ export async function POST(
   return NextResponse.json(
     {
       error:
-        "action must be send | build_ops_pack | form_draft | form_fill | kamiooya_form_submitted | listing_web_submit | poll | autopass_confirm | autopass_reject",
+        "action must be send | build_ops_pack | form_draft | form_fill | ops_form_submitted | kamiooya_form_submitted | listing_web_submit | poll | autopass_confirm | autopass_reject",
     },
     { status: 400 }
   );
