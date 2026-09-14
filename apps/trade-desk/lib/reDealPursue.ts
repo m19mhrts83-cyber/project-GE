@@ -195,6 +195,127 @@ export function isDetailedInvestigationDeal(d: PursueDealFields): boolean {
 }
 
 /**
+ * 神大家運営相談（os7 1906a1a5）の段階。
+ * ※ 業者への第一問合せ（inquiry_status）・神大家紹介フォーム送信とは別軸。
+ */
+export type OpsConsultStage =
+  | "none"
+  | "draft"
+  | "filled"
+  | "submitted"
+  | "answered";
+
+export type OpsConsultBadge = {
+  stage: OpsConsultStage;
+  label: string;
+  bg: string;
+  border: string;
+  color: string;
+  submittedAt?: string;
+};
+
+export function getOpsConsultStage(d: PursueDealFields): OpsConsultStage {
+  const sj = sjOf(d);
+  if (
+    sj.ops_consult_answered_at ||
+    sj.ops_consult_status === "answered" ||
+    (typeof sj.ops_consult_reply_summary === "string" &&
+      sj.ops_consult_reply_summary.trim())
+  ) {
+    return "answered";
+  }
+  if (
+    typeof sj.ops_consult_submitted_at === "string" &&
+    sj.ops_consult_submitted_at
+  ) {
+    return "submitted";
+  }
+  if (sj.ops_consult_status === "awaiting_ops_reply") {
+    return "submitted";
+  }
+  const fill =
+    sj.ops_form_fill && typeof sj.ops_form_fill === "object"
+      ? (sj.ops_form_fill as Record<string, unknown>)
+      : null;
+  if (fill && (fill.status === "filled_pending_submit" || fill.at)) {
+    return "filled";
+  }
+  const draft =
+    sj.ops_form_draft && typeof sj.ops_form_draft === "object"
+      ? (sj.ops_form_draft as Record<string, unknown>)
+      : null;
+  if (draft && (draft.markdown || draft.at || draft.filled_count)) {
+    return "draft";
+  }
+  return "none";
+}
+
+export function getOpsConsultBadge(d: PursueDealFields): OpsConsultBadge {
+  const sj = sjOf(d);
+  const stage = getOpsConsultStage(d);
+  const submittedAt =
+    typeof sj.ops_consult_submitted_at === "string"
+      ? sj.ops_consult_submitted_at
+      : undefined;
+  if (stage === "answered") {
+    return {
+      stage,
+      label: "運営回答あり",
+      bg: "#d1fae5",
+      border: "#10b981",
+      color: "#065f46",
+      submittedAt,
+    };
+  }
+  if (stage === "submitted") {
+    return {
+      stage,
+      label: "運営相談済・回答待ち",
+      bg: "#fef3c7",
+      border: "#f59e0b",
+      color: "#92400e",
+      submittedAt,
+    };
+  }
+  if (stage === "filled") {
+    return {
+      stage,
+      label: "転記済・未送信",
+      bg: "#e0e7ff",
+      border: "#818cf8",
+      color: "#3730a3",
+    };
+  }
+  if (stage === "draft") {
+    return {
+      stage,
+      label: "下書きあり",
+      bg: "#f1f5f9",
+      border: "#94a3b8",
+      color: "#475569",
+    };
+  }
+  return {
+    stage: "none",
+    label: "運営相談まだ",
+    bg: "#f8fafc",
+    border: "#cbd5e1",
+    color: "#64748b",
+  };
+}
+
+export function isOpsConsultSubmitted(d: PursueDealFields): boolean {
+  const s = getOpsConsultStage(d);
+  return s === "submitted" || s === "answered";
+}
+
+export function filterOpsConsultSubmittedDeals<T extends PursueDealFields>(
+  deals: T[]
+): T[] {
+  return deals.filter(isOpsConsultSubmitted);
+}
+
+/**
  * 進行中（詳細問合せ中・返信待ち）。買い進め（offer以降）やS3調査済は含めない。
  * ユーザーの「In Progressは問合せ中の状態で置いておく」方針に適合。
  */
@@ -223,7 +344,18 @@ export function filterDetailedInvestigationDeals<T extends PursueDealFields>(
   deals: T[]
 ): T[] {
   const list = deals.filter(isDetailedInvestigationDeal);
+  const stageRank = (d: PursueDealFields) => {
+    const s = getOpsConsultStage(d);
+    if (s === "answered") return 0;
+    if (s === "submitted") return 1;
+    if (s === "filled") return 2;
+    if (s === "draft") return 3;
+    return 4;
+  };
   list.sort((a, b) => {
+    const ra = stageRank(a);
+    const rb = stageRank(b);
+    if (ra !== rb) return ra - rb;
     const sjA = sjOf(a).s3_investigation as S3InvestigationData | undefined;
     const sjB = sjOf(b).s3_investigation as S3InvestigationData | undefined;
     const dateA = sjA?.updated_at || "";

@@ -17,6 +17,7 @@ import {
 import {
   isBuyPushDeal,
   isInProgressDeal,
+  getOpsConsultBadge,
   type S3InvestigationData,
   type DealAttachmentInfo,
   type YieldDisplayInfo,
@@ -179,6 +180,15 @@ export default function DealDetailDrawer({
     sj.ops_form_fill && typeof sj.ops_form_fill === "object"
       ? (sj.ops_form_fill as OpsFormFillData)
       : null;
+  const opsConsultBadge = deal
+    ? getOpsConsultBadge({
+        id: deal.id,
+        title: deal.title,
+        status: deal.status,
+        inquiry_status: deal.inquiry_status,
+        summary_json: sj,
+      })
+    : null;
   const messages = timeline.filter((t) => t.kind === "message");
   const events = timeline.filter((t) => t.kind === "event");
 
@@ -237,6 +247,22 @@ export default function DealDetailDrawer({
                   }}
                 >
                   詳細調査済
+                </span>
+              ) : null}
+              {opsConsultBadge && opsConsultBadge.stage !== "none" ? (
+                <span
+                  style={{
+                    background: opsConsultBadge.bg,
+                    color: opsConsultBadge.color,
+                    border: `1px solid ${opsConsultBadge.border}`,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {opsConsultBadge.label}
                 </span>
               ) : null}
               <h2 style={{ margin: 0, fontSize: "1.1rem" }}>
@@ -715,6 +741,15 @@ export default function DealDetailDrawer({
               dealId={dealId}
               draft={opsFormDraft}
               fill={opsFormFill}
+              consult={
+                opsConsultBadge
+                  ? {
+                      stage: opsConsultBadge.stage,
+                      label: opsConsultBadge.label,
+                      submittedAt: opsConsultBadge.submittedAt ?? null,
+                    }
+                  : null
+              }
               onQueued={() => {
                 /* Mac job 完了後に再読込想定。即時はメッセージのみ */
               }}

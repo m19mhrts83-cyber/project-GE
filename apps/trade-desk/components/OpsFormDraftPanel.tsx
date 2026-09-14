@@ -27,6 +27,12 @@ export type OpsFormFillData = {
   error?: string;
 };
 
+export type OpsConsultMeta = {
+  stage?: string;
+  label?: string;
+  submittedAt?: string | null;
+};
+
 const OPS_FORM_URL = "https://form.os7.biz/f/1906a1a5/";
 
 function parseFilledFromMarkdown(md: string): OpsFormFilledItem[] {
@@ -44,15 +50,18 @@ export default function OpsFormDraftPanel({
   dealId,
   draft,
   fill,
+  consult,
   onQueued,
 }: {
   dealId: string;
   draft: OpsFormDraftData | null;
   fill?: OpsFormFillData | null;
+  consult?: OpsConsultMeta | null;
   onQueued?: () => void;
 }) {
-  const [busy, setBusy] = useState<"fill" | "draft" | null>(null);
+  const [busy, setBusy] = useState<"fill" | "draft" | "submitted" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [submittedLocal, setSubmittedLocal] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -88,8 +97,21 @@ export default function OpsFormDraftPanel({
     await copyText(block, "__all__");
   }
 
-  async function queueAction(action: "form_fill" | "form_draft") {
-    setBusy(action === "form_fill" ? "fill" : "draft");
+  const isSubmitted =
+    submittedLocal ||
+    consult?.stage === "submitted" ||
+    consult?.stage === "answered";
+
+  async function queueAction(
+    action: "form_fill" | "form_draft" | "ops_form_submitted"
+  ) {
+    setBusy(
+      action === "form_fill"
+        ? "fill"
+        : action === "ops_form_submitted"
+          ? "submitted"
+          : "draft"
+    );
     setMsg(null);
     try {
       const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
@@ -100,6 +122,10 @@ export default function OpsFormDraftPanel({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setMsg(typeof data?.error === "string" ? data.error : "キュー失敗");
+      } else if (action === "ops_form_submitted") {
+        setSubmittedLocal(true);
+        setMsg("運営相談送信済として記録しました（一覧で区分表示）");
+        onQueued?.();
       } else {
         setMsg(
           action === "form_fill"
@@ -121,13 +147,14 @@ export default function OpsFormDraftPanel({
       style={{
         marginTop: 12,
         padding: 12,
-        border: "1px solid #a7f3d0",
-        background: "#f0fdf4",
+        border: isSubmitted ? "1px solid #f59e0b" : "1px solid #a7f3d0",
+        background: isSubmitted ? "#fffbeb" : "#f0fdf4",
       }}
     >
       <strong style={{ fontSize: 14 }}>
         運営相談フォーム
-        {draft?.missing_count != null
+        {consult?.label ? ` — ${consult.label}` : ""}
+        {!consult?.label && draft?.missing_count != null
           ? `（不足 ${draft.missing_count} 項目）`
           : ""}
       </strong>
@@ -141,7 +168,7 @@ export default function OpsFormDraftPanel({
           <strong>運営フォームへ転記</strong>（自動入力・送信しない）
         </li>
         <li>ブラウザで最終確認 → 送信</li>
-        <li>送信後「フォーム送信した」で記録</li>
+        <li>送信後「運営相談を送信した」で記録（一覧で区分）</li>
       </ol>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
@@ -160,6 +187,26 @@ export default function OpsFormDraftPanel({
           onClick={() => queueAction("form_fill")}
         >
           {busy === "fill" ? "…" : "運営フォームへ転記"}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          style={{
+            fontSize: 13,
+            padding: "6px 12px",
+            background: isSubmitted ? "#d97706" : "#b45309",
+            color: "#fff",
+            border: "none",
+            fontWeight: 600,
+          }}
+          disabled={busy !== null || isSubmitted}
+          onClick={() => queueAction("ops_form_submitted")}
+        >
+          {busy === "submitted"
+            ? "…"
+            : isSubmitted
+              ? "運営相談送信済"
+              : "運営相談を送信した"}
         </button>
         <button
           type="button"
