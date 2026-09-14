@@ -259,12 +259,43 @@ def merge_overrides(
     return cur
 
 
+def _kamiooya_drive_url(deal_id: str) -> str | None:
+    """神大家割当 Drive（1162）に既に上げた物件フォルダ URL。"""
+    state_path = REPO / ".jarvis_state" / "kamiooya_ops_drive.json"
+    if not state_path.is_file():
+        return None
+    try:
+        raw = json.loads(state_path.read_text(encoding="utf-8"))
+        d = (raw.get("deals") or {}).get(deal_id) or {}
+        url = str(d.get("url") or "").strip()
+        return url or None
+    except Exception:
+        return None
+
+
 def suggested_fillables(deal: dict[str, Any]) -> dict[str, str]:
     """ユーザー判断が薄い項目の提案値（記載例レベル・改行）。"""
     out: dict[str, str] = {}
     funds = _load_own_funds()
     if funds:
         out["self_funds"] = funds
+    drive = _kamiooya_drive_url(str(deal.get("id") or ""))
+    if drive:
+        out["drive_folder"] = drive
+        # property_name は Drive フォルダ名と一致させる（state にあれば）
+        try:
+            raw = json.loads(
+                (REPO / ".jarvis_state" / "kamiooya_ops_drive.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            fn = ((raw.get("deals") or {}).get(str(deal.get("id") or "")) or {}).get(
+                "folder_name"
+            )
+            if fn:
+                out["property_name"] = str(fn)
+        except Exception:
+            pass
     gas = _extract_gas_from_attachments(str(deal.get("id") or ""))
     if gas:
         out["gas"] = gas
