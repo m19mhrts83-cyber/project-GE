@@ -60,15 +60,23 @@ def _inquiry_status(deal: dict[str, Any]) -> str:
     return str(_sj(deal).get("inquiry_status") or "none")
 
 
+def _strip_grok_prefix(title: str) -> str:
+    """物件名から [Grok調査] 等の接頭辞を除く。"""
+    t = str(title or "").strip()
+    t = re.sub(r"^\[Grok調査\]\s*", "", t)
+    t = re.sub(r"^【Grok調査】\s*", "", t)
+    return t.strip() or t
+
+
 def _suggest_folder_name(deal: dict[str, Any]) -> str:
-    title = str(deal.get("title") or "").strip()
+    title = _strip_grok_prefix(str(deal.get("title") or ""))
     if title:
         return title[:80]
     area = str(deal.get("area") or "").strip()
     price = deal.get("price_man")
     if area and price is not None:
         return f"{area}{price}万円"
-    return "（物件名を決めてDriveフォルダ名と一致させる）"
+    return "物件名未定"
 
 
 def _s3(deal: dict[str, Any]) -> dict[str, Any]:
@@ -90,47 +98,102 @@ def _overrides(deal: dict[str, Any]) -> dict[str, str]:
     return out
 
 
-def _load_own_funds() -> str | None:
-    if not S1_PROFILE_YAML.is_file():
-        return None
-    text = S1_PROFILE_YAML.read_text(encoding="utf-8")
-    snap: dict[str, Any] | None = None
+def _zaim_tameru_yen() -> tuple[int | None, str]:
+    """Zaim『貯める』の金額が取れれば返す。不明なら (None, note)。
+
+    CSV からは口座名ヒットだけで残高が取れないため、現状は常に None
+    （フォールバック＝銀行残高合計）。
+    """
+    return None, "Zaim『貯める』残高不明"
+
+
+def _zaim_bank_total_yen(sb: Any | None = None) -> tuple[int, str]:
+    """liquidity_snapshots の銀行口座残高合計（money-ops と同系）。"""
     try:
-        data = yaml.safe_load(text) or {}
-        if isinstance(data, dict) and isinstance(data.get("profile_snapshot"), dict):
-            snap = data["profile_snapshot"]
-    except Exception:
-        snap = None
-    if snap is None:
-        # YAML 全体が壊れていても snapshot だけ拾う
-        m = re.search(
-            r"profile_snapshot:\s*\n((?:[ \t]+.+\n)+)",
-            text,
+        client = sb or sb_client()
+        acc_rows = (
+            client.table("liquidity_accounts")
+            .select("id,name,kind,active")
+            .eq("active", True)
+            .eq("kind", "bank")
+            .execute()
         )
-        if m:
-            try:
-                snap = yaml.safe_load("profile_snapshot:\n" + m.group(1))
-                if isinstance(snap, dict):
-                    snap = snap.get("profile_snapshot")  # type: ignore[assignment]
-            except Exception:
-                snap = None
-        if not isinstance(snap, dict):
-            m2 = re.search(r"own_funds_manyen:\s*(\d+)", text)
-            if not m2:
-                return None
-            manyen = int(m2.group(1))
-            m3 = re.search(r'checked_at:\s*"?([0-9-]+)"?', text)
-            checked = m3.group(1) if m3 else ""
-            base = f"約{manyen}万円（S1 profile snapshot）"
-            return f"{base}・確認日{checked}" if checked else base
-    if not isinstance(snap, dict):
-        return None
-    manyen = snap.get("own_funds_manyen")
-    if manyen is None:
-        return None
-    checked = str(snap.get("checked_at") or "").strip()
-    base = f"約{manyen}万円（S1 profile snapshot）"
-    return f"{base}・確認日{checked}" if checked else base
+        snap_rows = (
+            client.table("liquidity_snapshots")
+            .select("account_id,as_of,balance_jpy")
+            .order("as_of", desc=True)
+            .limit(120)
+            .execute()
+        )
+    except Exception as e:
+        return 0, f"銀行残高取得失敗:{type(e).__name__}"
+    bank_ids = {str(a["id"]): str(a.get("name") or a["id"]) for a in (acc_rows.data or [])}
+    if not bank_ids:
+        return 0, "銀行口座未登録"
+    latest: dict[str, dict[str, Any]] = {}
+    for row in snap_rows.data or []:
+        aid = str(row.get("account_id") or "")
+        if aid not in bank_ids or aid in latest:
+            continue
+        latest[aid] = row
+    total = int(sum(float(v.get("balance_jpy") or 0) for v in latest.values()))
+    as_of = max((str(v.get("as_of") or "") for v in latest.values()), default="")
+    n = len(latest)
+    note = f"銀行残高合計 約{total // 10000}万円（{n}口座"
+    if as_of:
+        note += f"・{as_of}"
+    note += "）"
+    return total, note
+
+
+def _policy_loan_usable_yen(sb: Any | None = None) -> tuple[int, str]:
+    """契約者貸付の残高（次物件キープとして使える額の目安）。"""
+    try:
+        client = sb or sb_client()
+        r = (
+            client.table("portfolio_snapshots")
+            .select("account_id,as_of,value_jpy,note")
+            .order("as_of", desc=True)
+            .limit(80)
+            .execute()
+        )
+    except Exception as e:
+        return 0, f"保険貸付スナップ取得失敗:{type(e).__name__}"
+    latest: dict[str, dict[str, Any]] = {}
+    for row in r.data or []:
+        aid = str(row.get("account_id") or "")
+        if "policy_loan" not in aid:
+            continue
+        if aid not in latest:
+            latest[aid] = row
+    total = int(sum(float(v.get("value_jpy") or 0) for v in latest.values()))
+    as_of = max((str(v.get("as_of") or "") for v in latest.values()), default="")
+    note = f"契約者貸付残高 約{total // 10000}万円"
+    if as_of:
+        note += f"（{as_of}）"
+    return total, note
+
+
+def _load_own_funds(sb: Any | None = None) -> str | None:
+    """自己資金 = （貯める or 銀行合計）＋保険契約者貸付。
+
+    フォームには合計のみ（内訳は記載しない）。
+    貯めるが不明なときは銀行口座残高合計を使う。
+    """
+    tameru_yen, _tameru_note = _zaim_tameru_yen()
+    loan_yen, _loan_note = _policy_loan_usable_yen(sb)
+    total = 0
+    if tameru_yen is not None and tameru_yen > 0:
+        total += tameru_yen
+    else:
+        bank_yen, _bank_note = _zaim_bank_total_yen(sb)
+        if bank_yen > 0:
+            total += bank_yen
+    if loan_yen > 0:
+        total += loan_yen
+    if total > 0:
+        return f"約{total // 10000}万円"
+    return "要確認"
 
 
 def _extract_gas_from_attachments(deal_id: str) -> str | None:
@@ -197,123 +260,70 @@ def merge_overrides(
 
 
 def suggested_fillables(deal: dict[str, Any]) -> dict[str, str]:
-    """ユーザー判断が薄い項目の提案値（未設定のときだけ使う）。"""
+    """ユーザー判断が薄い項目の提案値（記載例レベル・改行）。"""
     out: dict[str, str] = {}
-    folder = _suggest_folder_name(deal)
     funds = _load_own_funds()
     if funds:
         out["self_funds"] = funds
     gas = _extract_gas_from_attachments(str(deal.get("id") or ""))
     if gas:
         out["gas"] = gas
-    out["viewing_done"] = "未内見（内見しながら修繕見立てを確認していく）"
-    out["planning_aligned"] = (
-        "はい（築古戸建本線・土地値大幅超。想定利回りは本線帯の下限寄り）"
-    )
-    out["urgency"] = "本番（内見・購入判断のための運営相談）"
-    out["purchase_purpose"] = "築古戸建のCF構築・共同担保原資（神大家プランニング）"
-    out["offer_price"] = "未定（買付前・運営相談後に決定）"
+    out["viewing_done"] = "未内見"
+    out["planning_aligned"] = "はい"
+    out["urgency"] = "本番\n・競合もいるので、急ぎたいです。"
+    out["purchase_purpose"] = "a）長期所有目的（CF獲得目的）"
+    out["offer_price"] = "未定"
     out["loan_terms"] = (
-        "名古屋銀行＋愛知県信用保証協会想定（本体も名銀）。"
-        "土地値約390%／評価概算約1,873万のためフル〜オーバーローン狙い。"
-        "過去事例（WeStudy・塾内）: 名銀瀬戸・豊山町戸建 約2.375〜2.4%・20年・オーバー実行、"
-        "協会フルローン仮で20年確認（森下）、名銀高蔵寺は協会付き可・15年（金利失念）。"
-        "本案件の見立て: 金利約2.4%・期間20年・借入は購入480＋修繕150＝約630万前後"
-        "（諸経費込みで〜700万のオーバー幅を講師・名銀に確認）。保証料率目安約1.15%（豊山事例）"
+        "名古屋銀行＋愛知県信用保証協会\n"
+        "20年 2.4%\n"
+        "借入約630万円（購入480＋修繕150）\n"
+        "月返済約3.3万円"
     )
-    # 買い進めプラン（★251124）築古戸建の標準: リフォーム額150万／後利回り約15.6%
-    # 動画・事例は内訳の参考（外壁〜100万等）。2棟でも闇雲に倍積みしない。
     out["repair_exterior"] = (
-        "約50〜80万円（最低限の雨漏り・外壁・屋根。フル塗装は山積みせず。"
-        "グルコン事例の外壁塗装〜100万は上限参考）"
+        "TOTAL 50〜80万円想定\n"
+        "内訳：\n"
+        "雨漏り・屋根補修\n"
+        "外壁最低限"
     )
     out["repair_interior"] = (
-        "約70〜100万円（入居付け用水回り・クロス・床等。"
-        "AP動画の1室基本リフォーム〜80万を戸建1棟相当の上限感として参照）"
+        "TOTAL 70〜100万円想定\n"
+        "内訳：\n"
+        "水回り・クロス・床（入居付け）"
     )
     out["repair_total_yield"] = (
-        "総額約150万円（買い進めプラン築古戸建の標準想定）。"
-        "2棟だが本線は150・実額増は内見で確認（上限感〜250）。"
-        "家賃本線年60万÷(480+150)≒表面約9.5%（プラン目標15%帯には未達→要確認）"
+        "修繕費総額 約150万円\n"
+        "想定修繕後利回り 約14%"
     )
     out["monthly_cf"] = (
-        "概算＋約1.4万円/月（家賃本線5万−管理5%−名銀協会ローン630万・2.4%・20年で月約3.3万）。"
-        "本体480のみなら月返済約2.5万・CF約＋2.2万。"
-        "保証料・固都税・空室は別途。内見・仮審査後に再計算"
+        "月家賃7.4万 − 月返済約3.3万 − 諸経費0.74万\n"
+        "≒ 月CF 約＋3.4万円"
     )
-    out["building_residual"] = (
-        "ほぼ0〜僅少見立て（旧耐震・軽量鉄骨。土地値主導で建物残価値は小さく見る）"
+    out["building_residual"] = "0"
+    out["annual_rent"] = (
+        "近隣類似・住宅扶助上限より\n"
+        "単身3.7万円×2棟＝月7.4万円\n"
+        "年88.8万円"
     )
-    # drive_folder は URL が無いと提案しない
-    _ = folder
+    out["gross_yield"] = "表面利回り約18.5%、月家賃7.4万円"
     return out
+
 
 def _build_instructor_questions(
     deal: dict[str, Any], form_field: dict[str, Any]
 ) -> str | None:
-    """デフォルト3点 + S3ヒアリング + 戸建固有を統合。"""
+    """記入例どおり短く（詳細ヒアリングは運営回答後にメールで補足）。"""
+    _ = deal
     default = str(form_field.get("default_template") or "").strip()
-    s3 = _s3(deal)
-    grok = _grok(deal)
-    hearing = s3.get("hearing_questions") or []
-    if not isinstance(hearing, list):
-        hearing = []
-
-    lines: list[str] = []
-    if default:
-        lines.append(default.rstrip())
-    if hearing:
-        lines.append("")
-        lines.append("【詳細調査（S3）ヒアリング】")
-        for i, q in enumerate(hearing, 1):
-            q = str(q).strip()
-            if q:
-                lines.append(f"{i}. {q}")
-
-    kodate_extras: list[str] = []
-    building = str(grok.get("building") or s3.get("structure") or "")
-    if "戸建" in str(deal.get("structure") or "") or "戸建" in building or "2棟" in str(
-        deal.get("title") or ""
-    ):
-        if "間取り" in " ".join(str(x) for x in hearing) or "間取" in building:
-            pass
-        else:
-            kodate_extras.append("間取り・専有・水回りが未確認の場合の修繕・家賃見立ての見方")
-        if any("旧耐震" in str(x) or "1975" in str(x) or "軽量鉄骨" in str(x) for x in hearing) or (
-            "旧耐震" in building or "1975" in building
-        ):
-            kodate_extras.append("旧耐震／軽量鉄骨戸建としての修繕目安と購入可否の数字感")
-        if any("土砂" in str(x) or "ハザード" in str(x) for x in hearing) or "注意" in str(
-            grok.get("hazard_eval") or ""
-        ):
-            kodate_extras.append("ハザード（土砂・洪水等）が内見判断にどう効くか")
-        land = str(grok.get("land100_ratio") or "")
-        if land:
-            kodate_extras.append(f"土地値{land}の見方と、買付前に確認すべき接道・境界の有無")
-
-    if kodate_extras:
-        lines.append("")
-        lines.append("【戸建固有・追加確認】")
-        for x in kodate_extras:
-            lines.append(f"・{x}")
-        lines.append(
-            "・買い進めプラン標準のリフォーム約150万円前後で足りるか"
-            "（2棟でも闇雲に倍積みせず、内見で優先順位を切る前提でよいか）"
-        )
-        lines.append(
-            "・修繕後利回りがプラン目標15%帯に届かない場合、"
-            "減額・家賃上方・修繕圧縮のどれを優先すべきか"
-        )
-        lines.append(
-            "・土地値約390%を根拠に、名古屋銀行＋愛知県保証協会で"
-            "本体フル〜オーバー（購入＋修繕〜630万前後・2.4%・20年見立て）は現実的か"
-        )
-        lines.append(
-            "・協会付きの期間が15年止めになった場合のCF・買う／見送りの目安"
-        )
-
-    out = "\n".join(lines).strip()
-    return out or (default or None)
+    return default or (
+        "以下を確認したいです。\n"
+        "・戸建て初めてでやや遠い物件なので、内見に値する物件か見解を聞きたいです。\n"
+        "・土地値が高いので、共同担保に使用できるのであれば購入を進める価値があると考えています。"
+        "今回の物件は三井住友L&F（L&Fアセットファイナンス）の共同担保に使えそうでしょうか。\n"
+        "・講座で、L&Fは支店エリア外だと共同担保に使えない／評価が出ない、と理解しています。"
+        "豊川市御油は名古屋支店の対象エリアに入るかも合わせてご確認をお願い致します。\n"
+        "・概算修繕費が概ね合っているか、他に注意点はないか。\n"
+        "ご確認をお願い致します。"
+    )
 
 
 def _reply_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, Any]) -> str | None:
@@ -323,9 +333,12 @@ def _reply_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, An
     building = str(grok.get("building") or s3.get("structure") or "")
     if fid == "nearest_station":
         pop = str(grok.get("population_table") or "").strip()
-        if pop:
-            return pop.split("·")[0].strip() if "·" in pop else pop
-        return None
+        if not pop:
+            return None
+        # ｜以降の評価コメントは書かない
+        pop = pop.split("｜")[0].split("|")[0].strip()
+        pop = pop.split("·")[0].strip() if "·" in pop else pop
+        return pop or None
     if fid == "building_age":
         m = re.search(r"築(\d{4})", building)
         if m:
@@ -382,9 +395,13 @@ def _auto_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, Any
             val = (os.environ.get(str(key)) or "").strip()
             if val:
                 return val
+        # 運営フォーム用デフォルト（estate）
+        default_email = str(field.get("default_email") or "").strip()
+        if fid == "email" and default_email:
+            return default_email
         return None
     if src == "deal.title":
-        return str(deal.get("title") or "").strip() or None
+        return _suggest_folder_name(deal) or None
     if src == "deal.price_man":
         pm = deal.get("price_man")
         return f"{pm}万円" if pm is not None else None
@@ -402,35 +419,32 @@ def _auto_value(field: dict[str, Any], deal: dict[str, Any], grok: dict[str, Any
         s = str(deal.get("structure") or "").strip()
         return s or None
     if src == "deal.source":
-        src_val = str(deal.get("source") or "")
-        if src_val in ("mail_grok", "kenbiya", "rakumachi"):
-            return f"いいえ（source={src_val}。該当時のみはい）"
+        # はい／いいえのみ（source メモは書かない）
+        src_val = str(deal.get("source") or "").lower()
+        if any(x in src_val for x in ("kamiooya", "神大家", "westudy", "紹介")):
+            return "はい"
         return "いいえ"
     if src == "grok.land100":
-        parts = []
-        if grok.get("land100"):
-            parts.append(str(grok["land100"]))
+        # 記載例レベル（長文の評価メモは書かない）
         ratio = grok.get("land100_ratio") or _sj(deal).get("land100_ratio")
+        appraisal = grok.get("land_appraisal_man")
+        lines: list[str] = []
         if ratio:
-            parts.append(str(ratio))
-        if grok.get("route_price_tsubo"):
-            parts.append(f"路線価:{grok['route_price_tsubo']}")
-        if grok.get("land_method"):
-            parts.append(str(grok["land_method"]))
-        if grok.get("land_appraisal_man"):
-            parts.append(f"評価概算:{grok['land_appraisal_man']}万円")
-        return " / ".join(parts) if parts else None
+            lines.append(f"土地値 約{ratio}")
+        elif grok.get("land100"):
+            lines.append(str(grok["land100"]))
+        if appraisal:
+            lines.append(f"評価概算 約{appraisal}万円")
+        return "\n".join(lines) if lines else None
     if src == "grok.hazard_eval":
-        parts = []
-        if grok.get("hazard_eval"):
-            parts.append(f"HZ:{grok['hazard_eval']}")
-        if grok.get("hazard_flood"):
-            parts.append(f"洪水:{grok['hazard_flood']}")
+        parts: list[str] = []
         if grok.get("hazard_landslide"):
             parts.append(f"土砂:{grok['hazard_landslide']}")
-        if grok.get("reason_line"):
-            parts.append(str(grok["reason_line"])[:120])
-        return " · ".join(parts) if parts else None
+        if grok.get("hazard_flood"):
+            parts.append(f"洪水:{grok['hazard_flood']}")
+        if grok.get("hazard_eval") and not parts:
+            parts.append(str(grok["hazard_eval"]))
+        return "\n".join(parts) if parts else None
     if src == "grok.parking":
         return str(grok.get("parking") or "").strip() or None
     if fid == "property_name":
@@ -464,6 +478,7 @@ def build_form_draft(
     attach_count: int = 0,
     form_cfg: dict[str, Any] | None = None,
     use_suggestions: bool = False,
+    sb: Any | None = None,
 ) -> dict[str, Any]:
     cfg = form_cfg or load_form_config()
     form_url = str(cfg.get("form_url") or "https://form.os7.biz/f/1906a1a5/")
@@ -475,7 +490,7 @@ def build_form_draft(
     filled: list[dict[str, str]] = []
     missing: list[str] = []
     lines: list[str] = [
-        f"📎 運営相談フォーム下書き — {deal.get('title', '')[:60]}",
+        f"📎 運営相談フォーム下書き — {_strip_grok_prefix(str(deal.get('title') or ''))[:60]}",
         f"deal_id: {deal.get('id')}",
         f"問合せ: {_inquiry_status(deal)}",
         f"フォーム: {form_url}",
@@ -494,6 +509,9 @@ def build_form_draft(
         if fid and fid in overrides:
             val = overrides[fid]
             src_tag = "override"
+            # drive_folder の注釈を落とす
+            if fid == "drive_folder" and isinstance(val, str):
+                val = re.sub(r"\s*（フォルダ名＝物件名と一致させる）\s*$", "", val).strip()
         elif tier == "auto":
             val = _auto_value(f, deal, grok)
             src_tag = "auto"
@@ -505,8 +523,8 @@ def build_form_draft(
                 val = _reply_value(f, deal, grok)
                 src_tag = "reply"
             elif fid == "self_funds":
-                val = _load_own_funds()
-                src_tag = "profile"
+                val = _load_own_funds(sb=sb)
+                src_tag = "zaim_loan"
             elif fid == "loan_terms" and use_suggestions:
                 val = suggestions.get(fid)
                 src_tag = "suggest"
@@ -670,6 +688,7 @@ def main() -> int:
         deal,
         attach_count=attach_count,
         use_suggestions=False,  # 提案は --fill-suggestions で override 化済み
+        sb=sb,
     )
 
     print(draft["markdown"])

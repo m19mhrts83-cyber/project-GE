@@ -78,14 +78,34 @@ def load_filled(deal: dict[str, Any]) -> tuple[list[dict[str, str]], str]:
 
 
 def _split_name(full: str) -> tuple[str, str]:
+    """姓名を姓・名に分割。スペース無し日本語は1文字切りしない。
+
+    優先: PERSONAL_NAME_FAMILY / PERSONAL_NAME_GIVEN → 空白分割
+    → 既知の2文字姓（松野など）→ 残りを名。
+    """
+    family_env = (os.environ.get("PERSONAL_NAME_FAMILY") or "").strip()
+    given_env = (os.environ.get("PERSONAL_NAME_GIVEN") or "").strip()
+    if family_env and given_env:
+        return family_env, given_env
+
     s = full.strip()
     if not s:
         return "", ""
     if " " in s or "　" in s:
         parts = re.split(r"[\s　]+", s, maxsplit=1)
         return parts[0], parts[1] if len(parts) > 1 else ""
-    if len(s) >= 2:
-        return s[0], s[1:]
+
+    # 2文字姓のヒューリスティック（チャット固定ではなく env 優先）
+    two_char = ("松野", "佐藤", "鈴木", "高橋", "田中", "伊藤", "渡辺", "山本", "中村", "小林")
+    for sur in two_char:
+        if s.startswith(sur) and len(s) > len(sur):
+            return sur, s[len(sur) :]
+    # 3文字姓の簡易（例: 佐々木）
+    if len(s) >= 4 and s[1] == "々":
+        return s[:3], s[3:]
+    # 不明時は後半を名とみなす（2文字姓想定）
+    if len(s) >= 3:
+        return s[:2], s[2:]
     return s, ""
 
 
@@ -96,31 +116,74 @@ def fill_form(
     headed: bool,
     keep_open_sec: int,
 ) -> dict[str, Any]:
+    """入力して結果を返す。leave-open（keep_open_sec<0）時はブラウザを維持したまま戻る前に
+    呼び出し側が RESULT を書き出せるよう、closer は返さず main 側で sleep する。
+    実装: leave-open のときは結果 dict に _browser_keep を載せず、main が再起動せず
+    fill 完了直後に RESULT を出してから sleep するよう fill_and_maybe_keep を使う。
+    """
+    return fill_and_maybe_keep(
+        form_url=form_url,
+        filled=filled,
+        headed=headed,
+        keep_open_sec=keep_open_sec,
+        block_keep=False,
+    )
+
+
+def fill_and_maybe_keep(
+    *,
+    form_url: str,
+    filled: list[dict[str, str]],
+    headed: bool,
+    keep_open_sec: int,
+    block_keep: bool,
+) -> dict[str, Any]:
     from playwright.sync_api import sync_playwright
 
     ok = 0
     failed: list[str] = []
     notes: list[str] = []
+    leave_open = keep_open_sec < 0 and headed
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not headed)
+    pw = sync_playwright().start()
+    browser = pw.chromium.launch(headless=not headed)
+    try:
         context = browser.new_context(locale="ja-JP")
         page = context.new_page()
         page.goto(form_url, wait_until="domcontentloaded", timeout=90000)
         page.wait_for_timeout(1500)
 
-        # name special-case: 姓・名
         name_item = next((x for x in filled if x.get("id") == "name"), None)
         if name_item:
             family, given = _split_name(name_item["value"])
-            if _try_fill_by_labels(page, ["姓", "（姓）"], family):
-                ok += 1
-            else:
-                failed.append("姓名/姓")
-            if given and _try_fill_by_labels(page, ["名", "（名）"], given):
-                ok += 1
-            else:
-                if given:
+            # os7 フォームは id=seimei1（姓）/ seimei2（名）が正
+            filled_family = False
+            filled_given = False
+            try:
+                loc1 = page.locator("#seimei1")
+                if loc1.count() > 0 and family:
+                    loc1.first.fill(family)
+                    filled_family = True
+                    ok += 1
+            except Exception:
+                pass
+            try:
+                loc2 = page.locator("#seimei2")
+                if loc2.count() > 0 and given:
+                    loc2.first.fill(given)
+                    filled_given = True
+                    ok += 1
+            except Exception:
+                pass
+            if not filled_family:
+                if _try_fill_by_labels(page, ["姓", "（姓）"], family):
+                    ok += 1
+                else:
+                    failed.append("姓名/姓")
+            if given and not filled_given:
+                if _try_fill_by_labels(page, ["名", "（名）"], given):
+                    ok += 1
+                else:
                     failed.append("姓名/名")
 
         for item in filled:
@@ -129,40 +192,66 @@ def fill_form(
                 continue
             label = item["label"]
             value = item["value"]
-            # shorten label for matching (form labels are long)
             needles = _label_needles(label, fid)
             if _try_fill_by_labels(page, needles, value):
                 ok += 1
             else:
                 failed.append(label[:40])
 
-        # Never click 確認 / 送信
         notes.append("確認・送信ボタンは押していません")
-        if keep_open_sec > 0 and headed:
+        if leave_open:
+            notes.append("ブラウザは閉じず残しています（検証用・手動で閉じてください）")
+        elif keep_open_sec > 0 and headed:
             notes.append(f"ブラウザを{keep_open_sec}秒維持（最終確認用）")
             page.wait_for_timeout(keep_open_sec * 1000)
         else:
             page.wait_for_timeout(2000)
 
-        if headed and keep_open_sec <= 0:
-            # leave open briefly then close; worker usually uses keep_open
-            pass
-        browser.close()
+        status = "filled_pending_submit" if ok > 0 else "failed"
+        if failed and ok > 0:
+            status = "partial_pending_submit"
+            notes.append(
+                f"未入力: {', '.join(failed[:8])}" + ("…" if len(failed) > 8 else "")
+            )
+        elif failed and ok == 0:
+            notes.append(f"未入力: {', '.join(failed[:8])}")
 
-    status = "filled_pending_submit" if ok > 0 else "failed"
-    if failed and ok > 0:
-        status = "partial_pending_submit"
-        notes.append(f"未入力: {', '.join(failed[:8])}" + ("…" if len(failed) > 8 else ""))
-    elif failed and ok == 0:
-        notes.append(f"未入力: {', '.join(failed[:8])}")
+        result = {
+            "status": status,
+            "filled_count": ok,
+            "failed_count": len(failed),
+            "failed": failed,
+            "note": " / ".join(notes),
+            "_leave_open": leave_open,
+        }
 
-    return {
-        "status": status,
-        "filled_count": ok,
-        "failed_count": len(failed),
-        "failed": failed,
-        "note": " / ".join(notes),
-    }
+        if leave_open and block_keep:
+            # RESULT 出力後に main から呼ぶ想定。ここでは閉じない。
+            try:
+                while True:
+                    time.sleep(3600)
+            except KeyboardInterrupt:
+                pass
+        return result
+    finally:
+        if not leave_open:
+            try:
+                browser.close()
+            except Exception:
+                pass
+            try:
+                pw.stop()
+            except Exception:
+                pass
+        else:
+            # leave-open: browser/pw はプロセス生存中に維持。グローバルに逃がす
+            global _KEEP_BROWSER, _KEEP_PW
+            _KEEP_BROWSER = browser
+            _KEEP_PW = pw
+
+
+_KEEP_BROWSER = None
+_KEEP_PW = None
 
 
 def _label_needles(label: str, fid: str) -> list[str]:
@@ -303,11 +392,18 @@ def main() -> int:
     ap.add_argument(
         "--keep-open-sec",
         type=int,
-        default=120,
-        help="headed 時にブラウザを維持する秒数（最終確認用。既定120）",
+        default=-1,
+        help="headed 時: >0=秒数維持, -1=閉じない（検証用既定）, 0=すぐ閉じる",
+    )
+    ap.add_argument(
+        "--leave-open",
+        action="store_true",
+        help="ブラウザを閉じない（--keep-open-sec -1 と同義）",
     )
     ap.add_argument("--dry-run", action="store_true", help="入力せず項目数だけ表示")
     args = ap.parse_args()
+    if args.leave_open:
+        args.keep_open_sec = -1
 
     sys.path.insert(0, str(REPO / "scripts"))
     from jarvis_kurashift_re_inquiry import get_deal  # noqa: E402
@@ -325,12 +421,15 @@ def main() -> int:
         print("# dry-run: skip browser")
         return 0
 
-    result = fill_form(
+    result = fill_and_maybe_keep(
         form_url=form_url,
         filled=filled,
         headed=args.headed,
         keep_open_sec=args.keep_open_sec if args.headed else 0,
+        block_keep=False,
     )
+    # 内部フラグはログに出さない
+    leave_open = bool(result.pop("_leave_open", False))
     print(
         f"# result status={result['status']} filled={result['filled_count']} "
         f"failed={result['failed_count']} note={result.get('note')}"
@@ -340,6 +439,28 @@ def main() -> int:
         print(f"# ops_form_fill saved to deal {args.deal_id[:8]}…")
 
     print("KURASHIFT_RESULT:" + json.dumps(result, ensure_ascii=False))
+    sys.stdout.flush()
+
+    if leave_open and args.headed:
+        print("# leave-open: keeping browser (Ctrl+C or close window to end)")
+        sys.stdout.flush()
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            print("# leave-open interrupted")
+        finally:
+            try:
+                if _KEEP_BROWSER is not None:
+                    _KEEP_BROWSER.close()
+            except Exception:
+                pass
+            try:
+                if _KEEP_PW is not None:
+                    _KEEP_PW.stop()
+            except Exception:
+                pass
+
     return 0 if result.get("filled_count", 0) > 0 else 1
 
 
