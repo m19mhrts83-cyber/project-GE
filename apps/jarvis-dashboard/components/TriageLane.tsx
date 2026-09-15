@@ -449,9 +449,35 @@ export default async function TriageLanePage({
                     </p>
                     {st === "sent" ? (
                       <p className="meta">
-                        {appended
-                          ? "送信済み・やり取り反映済"
-                          : "送信済み（やり取り追記は Mac 同期後）"}
+                        {(() => {
+                          const pl =
+                            it.payload && typeof it.payload === "object"
+                              ? (it.payload as {
+                                  sent_at?: string;
+                                  sent_to?: string;
+                                  gmail_sent_from?: string;
+                                })
+                              : {};
+                          const when = pl.sent_at
+                            ? new Date(pl.sent_at).toLocaleString("ja-JP", {
+                                timeZone: "Asia/Tokyo",
+                                month: "2-digit",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "";
+                          const bits = [
+                            "送りました",
+                            when ? when : null,
+                            pl.sent_to ? `→ ${pl.sent_to}` : null,
+                            pl.gmail_sent_from
+                              ? `from ${pl.gmail_sent_from}`
+                              : null,
+                            appended ? "やり取り反映済" : "やり取り追記は Mac 同期後",
+                          ].filter(Boolean);
+                          return bits.join(" · ");
+                        })()}
                       </p>
                     ) : null}
                     {it.summary &&
