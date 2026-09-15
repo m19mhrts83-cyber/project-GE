@@ -496,9 +496,8 @@ function DraftActions({
         >
           <strong>投稿確認（まだコミュニティには送られません）</strong>
           <p className="meta">
-            「これで投稿してよい」は WeStudy への即送信ではありません。
-            下書きを投稿待ちに入れるだけです。最終の「コミュニティに登録する」は
-            WeStudy 側で押します。
+            「これで投稿してよい」で投稿待ちに入れます。Mac
+            常駐ワーカーが即時に WeStudy へ進みます（最終の「コミュニティに登録する」が必要な場合は画面で押します）。
             <br />
             板: {KIND_LABEL[kind]}（{forumUrl}）
             <br />
@@ -554,7 +553,7 @@ function DraftActions({
                   }
                   setStatus("queued");
                   setMsg(
-                    "投稿待ちに入れました。Mac で jarvis_westudy_forum_post_worker.py を実行してください。",
+                    "投稿待ちに入れました。Mac の常駐ワーカーがすぐ処理します（ブラウザが開くことがあります）。",
                   );
                   router.refresh();
                 });

@@ -1551,6 +1551,25 @@ export async function queueGluconPost(
     .eq("kind", kind);
 
   if (error) return { ok: false, error: error.message };
+
+  // Mac 常駐 watch を起こす（3s ポーリング＋Realtime の保険）
+  try {
+    await supabase.from("sync_meta").upsert(
+      {
+        key: "westudy_forum_post_kick",
+        value: JSON.stringify({
+          at: new Date().toISOString(),
+          period_key: periodKey,
+          kind,
+        }),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
+  } catch {
+    /* kick 失敗しても queued 自体は成功 */
+  }
+
   revalidateGlucon();
   return { ok: true };
 }
