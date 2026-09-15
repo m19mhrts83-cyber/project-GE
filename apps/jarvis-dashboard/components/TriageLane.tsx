@@ -169,7 +169,9 @@ export default async function TriageLanePage({
           unread.length - 1,
         );
   const focus = unread[idx];
-  const gmailReady = gmailSendConfigured();
+  const gmailReady = gmailSendConfigured(
+    focus?.account || (lane === "general" ? "admin" : "estate"),
+  );
   const focusPayload =
     focus?.payload && typeof focus.payload === "object"
       ? (focus.payload as Record<string, unknown>)

@@ -66,7 +66,7 @@ export default async function MailDetailPage({
   const body = (it.original_body || "").trim();
   const lanePath = laneHref(it.lane);
   const path = `/mail/${it.id}`;
-  const gmailReady = gmailSendConfigured();
+  const gmailReady = gmailSendConfigured(it.account);
   const st = it.status as TriageStatus;
   const resolved = resolvePartnerToEmail({
     fromEmail: it.from_email,
