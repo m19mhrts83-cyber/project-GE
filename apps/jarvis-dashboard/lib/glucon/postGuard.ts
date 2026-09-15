@@ -38,7 +38,7 @@ export function queueBlockReason(args: {
     return "既に投稿済みです。再投稿する場合は本文を保存し直してください。";
   }
   if (status === "queued") {
-    return "既に投稿待ちです。Mac worker の完了を待ってください。";
+    return "既に投稿待ちです。Mac 常駐ワーカーの処理を待ってください（通常すぐ開始）。";
   }
   if (status === "skipped") {
     return "スキップ済みです。実内容に書き換えて保存してから投稿してください。";
