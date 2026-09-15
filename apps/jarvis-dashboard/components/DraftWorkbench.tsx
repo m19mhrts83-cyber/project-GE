@@ -11,6 +11,7 @@ import {
   type ReviseEngine,
 } from "@/app/actions/triage";
 import { researchWithTavily } from "@/app/actions/tavilyResearch";
+import { useToast } from "@/components/Toast";
 
 type Payload = {
   draft_gemini?: string;
@@ -18,6 +19,10 @@ type Payload = {
   draft_ja?: string;
   yoritoori_appended?: boolean;
   sent_at?: string;
+  sent_to?: string;
+  gmail_sent_from?: string;
+  gmail_sent_account?: string;
+  gmail_sent_id?: string;
   cursor_revise?: CursorReviseState;
   re_vendor_reply?: boolean;
   vendor_id?: string;
@@ -54,6 +59,33 @@ function readCursorRevise(payload: Payload | null | unknown): CursorReviseState 
   return cr;
 }
 
+function formatJst(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return String(iso);
+  }
+}
+
+function gmailSentUrl(account: string | null | undefined): string {
+  const a = (account || "").toLowerCase();
+  if (a === "admin") {
+    return "https://mail.google.com/mail/u/?authuser=admin%40livingsupport-matsu.co.jp#sent";
+  }
+  if (a === "m19m") {
+    return "https://mail.google.com/mail/u/?authuser=m19m.hrts83%40gmail.com#sent";
+  }
+  return "https://mail.google.com/mail/u/?authuser=matsuno.estate%40gmail.com#sent";
+}
+
 export default function DraftWorkbench({
   id,
   path,
@@ -71,6 +103,7 @@ export default function DraftWorkbench({
   toSource,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const pl = (payload && typeof payload === "object" ? payload : {}) as Payload;
   const gemini = (pl.draft_gemini || "").trim();
   const cursor = (pl.draft_cursor || "").trim();
@@ -88,6 +121,7 @@ export default function DraftWorkbench({
       ? pl.last_send_error.trim()
       : null,
   );
+  const [justSent, setJustSent] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, start] = useTransition();
   const [tavilyQ, setTavilyQ] = useState(() =>
@@ -102,6 +136,30 @@ export default function DraftWorkbench({
     const s = (subject || "").trim() || "（件名なし）";
     return /^re:/i.test(s) ? s : `Re: ${s}`;
   }, [subject]);
+
+  const sentAccount = String(
+    pl.gmail_sent_account || (lane === "general" ? "admin" : "estate"),
+  );
+  const sentTo = String(pl.sent_to || toEmail || resolvedTo || "");
+  const sentFrom = String(pl.gmail_sent_from || "");
+  const sentAtLabel = formatJst(pl.sent_at);
+  const showSentReceipt = status === "sent" || justSent;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("justSent") !== "1") return;
+    setJustSent(true);
+    toast.push("送りました（Gmail 送信完了）", {
+      tone: "ok",
+      durationMs: 8000,
+    });
+    q.delete("justSent");
+    const next = `${window.location.pathname}${q.toString() ? `?${q}` : ""}`;
+    window.history.replaceState({}, "", next);
+    // 初回クエリ消化のみ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!polling) return;
@@ -501,6 +559,29 @@ export default function DraftWorkbench({
         </p>
       ) : null}
 
+      {showSentReceipt ? (
+        <div className="send-receipt" role="status" aria-live="polite">
+          <p className="send-receipt-title">送りました</p>
+          {sentAtLabel ? <p>送信時刻: {sentAtLabel}</p> : null}
+          {sentTo ? <p>宛先: {sentTo}</p> : null}
+          {sentFrom ? <p>差出: {sentFrom}</p> : null}
+          <p>
+            件名: {previewSubject}
+          </p>
+          <p className="send-receipt-hint">
+            ダッシュボードの確認:{" "}
+            <a href={lane === "partner" ? "/partner/sent" : "/general/sent"}>
+              {lane === "partner" ? "パートナー" : "その他メール"}の送信済み
+            </a>
+            {" · "}
+            <a href={gmailSentUrl(sentAccount)} target="_blank" rel="noreferrer">
+              Gmail 送信トレイ
+            </a>
+            でも確認できます。
+          </p>
+        </div>
+      ) : null}
+
       {msg ? <p className="draft-ok">{msg}</p> : null}
       {err ? <p className="draft-err">{err}</p> : null}
 
@@ -542,10 +623,18 @@ export default function DraftWorkbench({
                     );
                     if (!r.ok) {
                       setErr(r.error);
+                      toast.push(r.error || "送信に失敗しました", "err");
                       return;
                     }
                     setConfirmOpen(false);
-                    setMsg(r.message || "送信しました");
+                    setJustSent(true);
+                    setMsg("送りました");
+                    toast.push("送りました（Gmail 送信完了）", {
+                      tone: "ok",
+                      durationMs: 8000,
+                    });
+                    const sep = path.includes("?") ? "&" : "?";
+                    router.push(`${path}${sep}justSent=1`);
                     router.refresh();
                   })
                 }

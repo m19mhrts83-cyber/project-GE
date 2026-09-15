@@ -97,6 +97,11 @@ export default async function MailDetailPage({
           <span className={`status-badge status-${st}`}>
             {STATUS_LABEL[st] || st}
           </span>
+          {st === "sent" ? (
+            <span className="status-badge status-sent" style={{ marginLeft: 4 }}>
+              送りました
+            </span>
+          ) : null}
           <strong>{it.partner || it.from_email || "—"}</strong>
           <span className="meta">
             {laneLabel(it.lane)}
