@@ -53,8 +53,21 @@ services:
     billing: yearly
     amount_yen: 25101
     next_bill: "2027-01-09"
+    watch: true
+    watch_reason: "2027-01更新判断。SecondBrain Note購入済（Plus維持＝シナリオA）。Notion無料化方針。判断シート: Obsidian 20260915_Genspark_SecondBrainNote検討"
+    cancel_candidate: false
+    note: "Plus継続。ハード購入済 2026-09-15・注文 Genspark#3987・SecondBrain Note Grey $179（送料無料・税込表記）。到着目安 2026-09-28〜30。到着後にアプリ紐づけ＋Notion Save確認"
+
+  - id: genspark_secondbrain_note
+    name: Genspark SecondBrain Note（本体）
+    category: ai
+    status: ended
+    billing: none
+    amount_yen: 26850
+    next_bill: "—"
     watch: false
     cancel_candidate: false
+    note: "一括購入済 2026-09-15・注文 Genspark#3987・Grey $179（約¥26,850・送料無料）。配達予定 2026-09-28〜30。再課金なし。確認メール m19m"
 
   - id: chatwork
     name: Chatwork Business
