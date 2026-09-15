@@ -744,13 +744,6 @@ export async function sendTriageAfterConfirm(
   }
   const body = draftText.trim();
   if (!body) return { ok: false, error: "下書きが空です" };
-  if (!gmailSendConfigured()) {
-    return {
-      ok: false,
-      error:
-        "サーバーに Gmail 送信用シークレットがありません。ローカル Cursor / yoritoori_send で送るか、Vercel に GMAIL_*_B64 を設定してください。",
-    };
-  }
 
   const supabase = await createClient();
   const { data: it, error: fetchErr } = await supabase
@@ -760,6 +753,16 @@ export async function sendTriageAfterConfirm(
     .maybeSingle();
   if (fetchErr) return { ok: false, error: fetchErr.message };
   if (!it) return { ok: false, error: "対象が見つかりません" };
+
+  const account = String(it.account || "admin").trim() || "admin";
+  if (!gmailSendConfigured(account)) {
+    return {
+      ok: false,
+      error:
+        `サーバーに Gmail 送信用シークレットがありません（account=${account}）。` +
+        "ローカル Cursor / yoritoori_send で送るか、Vercel に GMAIL_*_TOKEN_B64 を設定してください。",
+    };
+  }
 
   const { resolvePartnerToEmail } = await import("@/lib/partnerContacts");
   const override = String(toOverride || "").trim();
@@ -786,11 +789,15 @@ export async function sendTriageAfterConfirm(
       subject,
       body,
       threadId: it.gmail_thread_id || null,
+      account,
     });
     let payload = asPayload(it.payload);
     payload.sent_at = new Date().toISOString();
     payload.gmail_sent_id = sent.id;
     payload.gmail_sent_thread_id = sent.threadId || it.gmail_thread_id;
+    payload.gmail_sent_from = sent.from;
+    payload.gmail_sent_account = sent.account;
+    delete payload.last_send_error;
     payload.yoritoori_appended = false;
     payload.web_draft_saved_at = new Date().toISOString();
     payload.sent_to = to;
@@ -819,6 +826,7 @@ export async function sendTriageAfterConfirm(
     revalidatePath(path);
     revalidatePath("/");
     revalidatePath("/partner");
+    revalidatePath("/general");
     return {
       ok: true,
       from: sent.from,
@@ -827,9 +835,24 @@ export async function sendTriageAfterConfirm(
         : "送信しました。OneDrive のやり取り追記は Mac 同期後に反映されます。",
     };
   } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    try {
+      const payload = asPayload(it.payload);
+      payload.last_send_error = errMsg;
+      payload.last_send_error_at = new Date().toISOString();
+      await supabase
+        .from("triage_items")
+        .update({
+          payload,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+    } catch {
+      /* ignore */
+    }
     return {
       ok: false,
-      error: e instanceof Error ? e.message : String(e),
+      error: errMsg,
     };
   }
 }

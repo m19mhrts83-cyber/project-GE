@@ -23,6 +23,7 @@ type Payload = {
   vendor_id?: string;
   vendor_name?: string;
   has_property_signal?: boolean;
+  last_send_error?: string;
 };
 
 type Props = {
@@ -82,7 +83,11 @@ export default function DraftWorkbench({
   const [instruction, setInstruction] = useState("");
   const [engine, setEngine] = useState<ReviseEngine>("cursor");
   const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(() =>
+    typeof pl.last_send_error === "string" && pl.last_send_error.trim()
+      ? pl.last_send_error.trim()
+      : null,
+  );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, start] = useTransition();
   const [tavilyQ, setTavilyQ] = useState(() =>
