@@ -73,21 +73,32 @@ def read_md(folder: str) -> str | None:
     return None
 
 
-def maybe_gemini_judge(c: dict[str, Any]) -> dict[str, Any]:
-    """needs_reply / priority / summary / draft_text。API 無ければヒューリスティック。"""
+def heuristic_judge(c: dict[str, Any]) -> dict[str, Any]:
+    """未返信候補の識別のみ（Gemini なし・下書きなし）。"""
+    subj = c.get("subject") or ""
+    return {
+        "needs_reply": True,
+        "priority": "medium",
+        "summary": (c.get("summary") or subj)[:120],
+        "reason": "heuristic_unreplied_inbox",
+        "draft_text": "",
+    }
+
+
+def maybe_gemini_judge(c: dict[str, Any], *, allow_gemini: bool = False) -> dict[str, Any]:
+    """needs_reply / priority / summary / draft_text。
+
+    既定はヒューリスティックのみ（課金削減 2026-09）。
+    allow_gemini=True かつ GEMINI_API_KEY があるときだけ LLM（明示オプトイン）。
+    """
+    if not allow_gemini:
+        return heuristic_judge(c)
     key = (os.environ.get("GEMINI_API_KEY") or "").strip()
     subj = c.get("subject") or ""
     body = (c.get("body") or "")[:2500]
     partner = c.get("partner_name") or c.get("folder") or ""
     if not key:
-        # 簡易: 受信で終わる未返信は要返信扱い
-        return {
-            "needs_reply": True,
-            "priority": "medium",
-            "summary": (c.get("summary") or subj)[:120],
-            "reason": "no_gemini_default_need",
-            "draft_text": "",
-        }
+        return heuristic_judge(c)
     try:
         import urllib.request
 
@@ -128,13 +139,9 @@ def maybe_gemini_judge(c: dict[str, Any]) -> dict[str, Any]:
         }
     except Exception as e:
         print(f"# gemini judge fail: {e}", file=sys.stderr)
-        return {
-            "needs_reply": True,
-            "priority": "medium",
-            "summary": (c.get("summary") or subj)[:120],
-            "reason": f"gemini_fail:{type(e).__name__}",
-            "draft_text": "",
-        }
+        out = heuristic_judge(c)
+        out["reason"] = f"gemini_fail:{type(e).__name__}"
+        return out
 
 
 def _has_gmail_route(p: dict[str, Any]) -> bool:
@@ -280,7 +287,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit", type=int, default=30, help="判定する候補の上限")
     ap.add_argument("--lookback-days", type=int, default=14)
     ap.add_argument("--max-partners", type=int, default=80)
+    ap.add_argument(
+        "--no-gemini",
+        action="store_true",
+        help="互換フラグ（既定で Gemini オフ）。明示してよい。",
+    )
+    ap.add_argument(
+        "--allow-gemini",
+        action="store_true",
+        help="明示オプトイン時のみ Gemini 判定（非推奨）",
+    )
     args = ap.parse_args(argv)
+    # 既定オフ。JARVIS_TRIAGE_NO_GEMINI=0 かつ --allow-gemini のときのみオン。
+    allow_gemini = bool(args.allow_gemini) and (
+        (os.environ.get("JARVIS_TRIAGE_NO_GEMINI") or "1").strip().lower()
+        not in ("1", "true", "yes", "on")
+    )
 
     cands = candidates_from_partners(
         lookback_days=args.lookback_days, max_partners=args.max_partners
@@ -288,19 +310,20 @@ def main(argv: list[str] | None = None) -> int:
     n_mail = sum(1 for c in cands if (c.get("channel") or "Gmail") == "Gmail")
     n_cw = sum(1 for c in cands if (c.get("channel") or "") == "Chatwork")
     print(
-        f"# unreplied candidates: total={len(cands)} gmail={n_mail} chatwork={n_cw}",
+        f"# unreplied candidates: total={len(cands)} gmail={n_mail} chatwork={n_cw} "
+        f"gemini={'on' if allow_gemini else 'off'}",
         file=sys.stderr,
     )
     rows: list[dict[str, Any]] = []
     for c in cands[: args.limit]:
-        judge = maybe_gemini_judge(c)
+        judge = maybe_gemini_judge(c, allow_gemini=allow_gemini)
         print(
             f"# [{c.get('folder')}][{c.get('channel') or 'Gmail'}] "
             f"needs={judge.get('needs_reply')} {(c.get('subject') or '')[:50]}",
             file=sys.stderr,
         )
         rows.append(row_from_candidate(c, judge))
-        if os.environ.get("GEMINI_API_KEY"):
+        if allow_gemini and os.environ.get("GEMINI_API_KEY"):
             time.sleep(1.2)
 
     if args.dry_run or not args.push:

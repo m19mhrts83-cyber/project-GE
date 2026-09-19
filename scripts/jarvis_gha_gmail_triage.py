@@ -89,14 +89,23 @@ def maybe_gemini_draft(subject: str, body: str, from_email: str) -> str | None:
         return None
 
 
-def _mail_payload(c: dict[str, Any], body_full: str, kind: str) -> dict[str, Any]:
-    from jarvis_mail_language import looks_english, translate_mail_en
-
+def _mail_payload(
+    c: dict[str, Any],
+    body_full: str,
+    kind: str,
+    *,
+    allow_gemini: bool = False,
+) -> dict[str, Any]:
     pl: dict[str, Any] = {
         "source": "gha_gmail_triage",
         "message_id_header": c.get("message_id_header"),
         "ingest_kind": kind,
     }
+    # 英語和訳は Gemini 課金のため既定オフ（課金削減 2026-09）
+    if not allow_gemini:
+        return pl
+    from jarvis_mail_language import looks_english, translate_mail_en
+
     subj = c.get("subject") or ""
     if looks_english(body_full) or looks_english(subj):
         tr = translate_mail_en(subject=subj, body=body_full)
@@ -109,7 +118,11 @@ def _mail_payload(c: dict[str, Any], body_full: str, kind: str) -> dict[str, Any
     return pl
 
 
-def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def candidates_to_rows(
+    cands: list[dict[str, Any]],
+    *,
+    allow_gemini: bool = False,
+) -> list[dict[str, Any]]:
     sys.path.insert(0, str(REPO / "scripts"))
     from jarvis_kurashift_re_inquiry_channel import is_self_email
     from jarvis_night_triage_general import classify_general_kind
@@ -118,11 +131,14 @@ def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for c in cands:
         if is_self_email(c.get("from_email") or ""):
             continue
-        draft = maybe_gemini_draft(
-            c.get("subject") or "",
-            c.get("body") or "",
-            c.get("from_email") or "",
-        )
+        # 下書きは既定オフ（課金削減）。明示 --allow-gemini 時のみ。
+        draft = None
+        if allow_gemini:
+            draft = maybe_gemini_draft(
+                c.get("subject") or "",
+                c.get("body") or "",
+                c.get("from_email") or "",
+            )
         # カード上の「要約」にはしない。全文は original_body。短いメモのみ。
         body_full = c.get("body") or ""
         summary = f"（本文 {len(body_full)} 文字・全文はカード内）" if body_full else ""
@@ -157,7 +173,7 @@ def candidates_to_rows(cands: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "gmail_thread_id": c.get("gmail_thread_id"),
                 "gmail_message_id": c.get("gmail_message_id"),
                 "from_email": c.get("from_email"),
-                "payload": _mail_payload(c, body_full, kind),
+                "payload": _mail_payload(c, body_full, kind, allow_gemini=allow_gemini),
                 "updated_at": now_iso(),
             }
         )
@@ -211,20 +227,33 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--push", action="store_true")
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--lookback-days", type=int, default=7)
+    ap.add_argument(
+        "--allow-gemini",
+        action="store_true",
+        help="下書き・英語和訳に Gemini を使う（非推奨・課金）",
+    )
     args = ap.parse_args(argv)
+    allow_gemini = bool(args.allow_gemini) and not (
+        (os.environ.get("JARVIS_TRIAGE_NO_GEMINI") or "1").strip().lower()
+        in ("1", "true", "yes", "on")
+    )
 
     sys.path.insert(0, str(REPO / "scripts"))
     from jarvis_night_triage_general import find_general_unreplied
 
     contact = resolve_contact()
-    print(f"# contact={contact} exists={contact.is_file()}", file=sys.stderr)
+    print(
+        f"# contact={contact} exists={contact.is_file()} "
+        f"gemini={'on' if allow_gemini else 'off'}",
+        file=sys.stderr,
+    )
     cands = find_general_unreplied(
         contact_yaml=contact,
         lookback_days=args.lookback_days,
         max_threads=args.limit,
     )
     print(f"# candidates={len(cands)}", file=sys.stderr)
-    rows = candidates_to_rows(cands[: args.limit])
+    rows = candidates_to_rows(cands[: args.limit], allow_gemini=allow_gemini)
     for r in rows[:5]:
         print(
             f"  - {r['received_at']} {r.get('from_email')} | {r.get('subject')}",
@@ -266,15 +295,15 @@ def main(argv: list[str] | None = None) -> int:
             )
     except Exception as e:
         print(f"# cleanup_re_pending skipped: {e}", file=sys.stderr)
-    # ダイジェスト更新（失敗しても triage push は成功扱い）
+    # ダイジェスト更新（LLM 既定オフ・課金削減）
     try:
         sys.path.insert(0, str(REPO / "scripts"))
         from jarvis_other_mail_digest import build_and_maybe_push
 
-        build_and_maybe_push(do_push=True, use_llm=True, reclassify=True)
+        build_and_maybe_push(do_push=True, use_llm=allow_gemini, reclassify=True)
     except Exception as e:
         print(f"# other_mail_digest skipped: {e}", file=sys.stderr)
-    print(json.dumps({"upserted": n, "source": "gha"}, ensure_ascii=False))
+    print(json.dumps({"upserted": n, "source": "gha", "gemini": allow_gemini}, ensure_ascii=False))
     return 0
 
 
