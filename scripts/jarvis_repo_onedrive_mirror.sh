@@ -82,6 +82,7 @@ n_lines=$(wc -l < "$tmp/all.txt" | tr -d ' ')
 # ---- 2. 秘密の明示除外（.gitignore をすり抜ける実体がある）----
 : > "$tmp/keep.txt"
 : > "$tmp/excl.txt"
+: > "$tmp/gone.txt"
 typeset -A keep_set
 
 while IFS= read -r f; do
@@ -105,6 +106,9 @@ while IFS= read -r f; do
 
   if [[ -n "$cat" ]]; then
     print -r -- "${cat}	${f}" >> "$tmp/excl.txt"
+  elif [[ ! -e "${REPO_DIR}/${f}" && ! -L "${REPO_DIR}/${f}" ]]; then
+    # index にはあるが作業ツリーに実体が無い（削除済み・壊れたリンク）
+    print -r -- "$f" >> "$tmp/gone.txt"
   else
     print -r -- "$f" >> "$tmp/keep.txt"
     keep_set["$f"]=1
@@ -126,7 +130,7 @@ while IFS= read -r f; do
   sz="${sstat%% *}"
   bytes_total=$((bytes_total + sz))
 
-  if [[ ! -e "$dst" ]]; then
+  if [[ ! -e "$dst" && ! -L "$dst" ]]; then
     n_new+=1
     bytes_copy=$((bytes_copy + sz))
     print -r -- "$f" >> "$tmp/new.txt"
@@ -146,7 +150,8 @@ if [[ -d "$DEST" ]]; then
     [[ -z "$p" ]] && continue
     rel="${p#${DEST}/}"
     [[ "$rel" == "$MARKER" ]] && continue
-    if [[ -z "${keep_set[$rel]:-}" ]]; then
+    # 添字は必ずクォート（zsh は非クォート添字をグロブ展開してしまう）
+    if [[ -z "${keep_set["$rel"]:-}" ]]; then
       print -r -- "$rel" >> "$tmp/del.txt"
     fi
   done < <(find "$DEST" -type f 2>/dev/null)
@@ -161,6 +166,7 @@ fi
 # ---- 6. 報告 --------------------------------------------------
 hr() { awk -v b="$1" 'BEGIN{ if (b>=1073741824) printf "%.1f GB", b/1073741824; else if (b>=1048576) printf "%.1f MB", b/1048576; else printf "%.1f KB", b/1024 }'; }
 n_excl=$(wc -l < "$tmp/excl.txt" | tr -d ' ')
+n_gone=$(wc -l < "$tmp/gone.txt" | tr -d ' ')
 
 print -- "[mirror] source   : ${REPO_DIR}"
 print -- "[mirror] dest     : ${DEST}"
@@ -171,6 +177,10 @@ if [[ "$n_excl" -gt 0 ]]; then
   awk -F'\t' '{c[$1]++} END{for (k in c) printf "           %-12s %d\n", k, c[k]}' "$tmp/excl.txt" | sort
   print -- "[mirror] 除外例    :"
   awk -F'\t' '{printf "           [%s] %s\n", $1, $2}' "$tmp/excl.txt" | head -8
+fi
+if [[ "$n_gone" -gt 0 ]]; then
+  print -- "[mirror] 実体なし  : ${n_gone} 件（index にあるが作業ツリーに無い）"
+  sed 's/^/           ? /' "$tmp/gone.txt" | head -5
 fi
 print -- "[mirror] 差分      : 新規 ${n_new} / 更新 ${n_upd} / 同一 ${n_same}"
 print -- "[mirror] 転送予定  : $((n_new + n_upd)) ファイル / $(hr "$bytes_copy")"
@@ -188,7 +198,8 @@ fi
 mkdir -p "$DEST"
 while IFS= read -r f; do
   mkdir -p "${DEST}/${f:h}"
-  cp -p "${REPO_DIR}/${f}" "${DEST}/${f}"
+  cp -pP "${REPO_DIR}/${f}" "${DEST}/${f}"   # -P: シンボリックリンクはリンクのまま複製
+
 done < <(cat "$tmp/new.txt" "$tmp/upd.txt")
 
 while IFS= read -r rel; do
