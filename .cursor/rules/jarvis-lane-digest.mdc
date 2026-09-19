@@ -1,0 +1,40 @@
+---
+description: 処置レーンは要約確認＋OneDrive Jarvis処置ログ。大量自動カード禁止。digest / flush / archive の正本。
+alwaysApply: true
+---
+
+# Jarvis レーン要約確認・処置ログ
+
+## 方針
+
+処置候補はソース MD を機械的に大量載せしない。`jarvis_lane_digest.py` でレーンごとに要約テーマ（目安3〜7）を出し、「タスク化する？」を確認する。  
+履歴正本は OneDrive レーン別 MD（Cursor で @ 可）。
+
+## 正本パス
+
+`…/000_共通/Jarvis処置ログ/{lane}/5.処置ログ.md`
+
+レーン: `kamiooya` / `properties` / `kodate` / `ai_raimo` / `kazoku`
+
+## コマンド
+
+```bash
+# 既存 active を一括 archived（やり直し時）
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_lane_cards_archive_active.py --apply
+
+# 要約 → 処置ログ追記 → 少数 digest カード push
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_lane_digest.py --push
+
+# ダッシュボード操作を MD へ反映
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_lane_log_flush.py
+```
+
+## ダッシュボード
+
+- 確認テーマ: 見送り / タスク化する（Notion）
+- コメント・Jarvis相談可
+- 操作は `lane_action_log` に入り、Mac の flush で処置ログへ
+
+## 無効化・抑制
+
+- 自動大量カード: `config/dashboard_lanes.yaml` の `max_auto_cards: 0`（既定）

@@ -1,0 +1,80 @@
+---
+description: NotebookLMのソースはGoogle Drive 200_NoteBookLMにノート単位で揃える。共通スタイルは00_ゼロイチマスタースタイル。NotebookLM資料作成・ソース追加・構成案スライド化のとき適用。
+alwaysApply: false
+---
+
+# NotebookLM ソース置き場（Drive・ノート単位）
+
+## 正本パス（admin Drive）
+
+`~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/`
+
+| 種別 | フォルダ | 内容 |
+|------|----------|------|
+| **共通スタイル** | `00_ゼロイチマスタースタイル/` | いけともゆるイラスト（`cute-illustration`）。ノート横断で共有 |
+| **ノート固有** | `01_…` / `02_…` / `03_…` 等 | そのノートに添付する構成案・参考PDF・メモ |
+| 成果物 | `★アウトプット/` | 生成スライド等の保管 |
+
+## ログインアカウント（必須・省略禁止）
+
+NotebookLM／Studio／ソース D&D は **必ず admin**（`admin@livingsupport-matsu.co.jp`）。
+
+| 手順 | 内容 |
+|------|------|
+| 宣言 | 着手前に「使用アカウント: admin」と1行 |
+| 確認 | ブラウザのアカウント表示が admin か見る。estate／m19m なら切り替える |
+| 切替 | Jarvis が実行する（ユーザーに「ログインし直してください」だけで止めない） |
+| URL | `AccountChooser?Email=admin@…&continue=https://notebooklm.google.com/` を優先 |
+| スクリプト | `scripts/jarvis_notebooklm_mcp_login.py`（`--profile mcp` 既定／`--profile studio` は Studio 自動化）／作業セットは `jarvis_notebooklm_workbench_open.py`／Studio 操作は `jarvis_notebooklm_studio_run.py` |
+| 秘密 | `NOTEBOOKLM_EMAIL` / `NOTEBOOKLM_PASSWORD` は `.env.jarvis_private` のみ |
+
+estate や m19m のまま Studio すると、admin Drive `200_NoteBookLM` のノート・権限と食い違う。
+
+## Jarvis の動作（必須）
+
+NotebookLM 用の資料・ソースを用意／更新するときは:
+
+1. **使用アカウント: admin** を確認。違えば上記切替を先に実行する
+2. **対象ノートのフォルダ**（例: `03_周辺MAP作成手順説明`／`06_周辺MAP自動化_単独Web検証`）を特定する
+3. NotebookLM に必要なファイルを **そのフォルダへコピー／更新して残す**（構成案・投入用 MD・参考完成例など）
+4. いけともデザイン／ゆるイラストは **`00_共通(デザイントーン）`（ゼロイチマスタースタイル）を必ず適用**する（ノートフォルダへスタイル全文を複製しない）
+5. ノートフォルダに `00_このノートのソース一覧.md` が無ければ作り、必須ソースとゼロイチ参照を書く
+6. ユーザーへ「Drive のどのフォルダを NotebookLM に上げるか」を短く案内する
+7. **ダッシュボード→ネタ→NotebookLM** の説明資料ルーティンでは、先に Drive ソースを揃えてからチャット／Studio に進む
+8. Studio 操作が必要なら Finder（対象フォルダ）＋ admin の NotebookLM を開き、マスタースタイル適用を忘れない
+9. 「Studio で直して／再生成して」等 → **専用プロファイル**で `scripts/jarvis_notebooklm_studio_run.py`（MCP プロファイルと同時起動しない）。手順: `docs/N1_NotebookLM/Jarvis_NotebookLM_Studio自動化.md`。初回は `--profile studio` ログイン → probe → `--dry-run` → `--confirm-generate --wait-and-save`
+
+## マスタースライド／スタイル（必須・省略禁止）
+
+NotebookLM で **スライド・インフォグラフィック・図解**を作る／依頼するときは、次を省略しない。
+
+| 手順 | 内容 |
+|------|------|
+| ソース | `00_共通(デザイントーン）/いけともゆるキャラプロンプト.md` または `NotebookLM_マスタースタイル_cute-illustration.md` をノートに含める |
+| チャット最初 | 「登録済みマスタースタイルに従うこと」「Studio の各画像も同一スタイル」と明示 |
+| Studio | 画像モデルは **Nano Banana Pro**（利用可能な表示名）を選ぶ |
+| 禁止見た目 | リアル人物・グラデ・ドロップシャドウ・3D・ダーク霓虹UI |
+
+他スレッドで「マスタースライドを適用して」と言われた場合も、本ルールと同じ扱いにする。
+
+## 禁止に近い避け方
+
+- NotebookLM 添付データを `AI活用相談` や `N1_NotebookLM` **だけ**に置いて Drive ノートフォルダを空のままにする
+- 共通スタイルをノートごとに別コピーして分岐させる（直すときはゼロイチを直し、必要なら N1 ミラーも同期）
+- **マスタースタイルなし**で Studio スライド／インフォグラフィックを生成する
+- チャット最初のスタイル宣言を省略する
+- **admin 以外**で NotebookLM を開いたまま作業を進める（切替せず「手動でログインして」だけ言う）
+
+## N1 / cute-illustration との関係
+
+- **Cursor 用メモ・コマンド**: `docs/N1_NotebookLM/`・`.cursor/commands/cute-illustration.md`
+- **実際に NotebookLM へ上げるファイルの置き場**: 本ルールの `200_NoteBookLM`（業務の「添付参照」はここ）
+
+N1 を編集したら従来どおり `n1-notebooklm-mirror.mdc` で OneDrive と同期し、**スタイル本文が変わったらゼロイチへも反映**する。
+
+## トリガー例
+
+- 「NotebookLM に入れて」「ソース追加」「スライド化」「03_周辺MAP」「ゼロイチマスタースタイル」
+- 運営説明構成案を NotebookLM 向けに整えるとき
+- 「NotebookLM 作業セットを開いて」→ `scripts/jarvis_notebooklm_workbench_open.py` またはダッシュボード `/notebooklm`（ヘルパー常駐: `launchd/install_notebooklm_workbench_launchd.sh`）
+- 「admin でログインし直して」「アカウントを切り替えて」

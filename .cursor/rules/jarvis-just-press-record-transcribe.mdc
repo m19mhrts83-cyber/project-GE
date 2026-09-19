@@ -1,0 +1,50 @@
+---
+description: Just Press Record の m4a 電話録音をチャット依頼で文字起こし
+alwaysApply: false
+---
+
+# Jarvis — 電話録音（Just Press Record）文字起こし
+
+## トリガー
+
+- 「この録音を文字起こしして」「m4a を起こして」
+- Just Press Record フォルダ／`.m4a` を @ 指定したとき
+- 不動産の電話内容を文章で残したいとき
+
+## 正本パス
+
+| 役割 | パス |
+|---|---|
+| 録音 | `~/Library/Mobile Documents/iCloud~com~openplanetsoftware~just-press-record/Documents/` |
+| 文字起こし出力 | 同じフォルダの `<stem>_文字起こし.md`（既定） |
+| スクリプト | `~/git-repos/scripts/jarvis_transcribe_m4a.py` |
+
+## 手段（現行）
+
+- **macOS `afconvert` → Gemini API**（`.env.jarvis_private` の `GEMINI_API_KEY`）。追加ソフト不要・無料枠。
+- 話者分離はモデル任せ（分かれば 話者A/B）。無理なら一体のまま。
+- `.m4a` に `mdat` が無い（再生不能・iCloud未展開）場合は起こせず、再同期を案内する。
+- Notta は神大家動画用。電話のチャット依頼本線には使わない。
+- **Genspark（SB／Speakly／AI Meeting Notes）で取れた電話**は `jarvis-genspark-meeting.mdc`（`gsk meeting`）が本線。JPR は取れなかったときの保険。
+- ローカル Whisper（要 ffmpeg／brew）は未導入。必要になったら別途。
+
+## Jarvis の動作
+
+1. 対象 `.m4a` を特定（日付フォルダ or ユーザー指定）
+2. 実行:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_transcribe_m4a.py \
+  --input "/Users/matsunomasaharu2/Library/Mobile Documents/iCloud~com~openplanetsoftware~just-press-record/Documents/YYYY-MM-DD/HH-MM-SS.m4a"
+```
+
+3. できた MD の **要約**をチャットに出し、全文パスを1行添える
+4. 秘密（口座・パスワード）が本文にあればチャットに再掲しない
+5. **対外送信はしない**（文字起こし＝保存まで）
+
+## 依頼の言い方（ユーザー）
+
+- 「9/4 の録音を文字起こしして」
+- 「いま開いている m4a を起こして」
+- 「Just Press Record の最新を起こして」

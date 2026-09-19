@@ -1,0 +1,65 @@
+---
+description: Raimo（LIME TOOLS）ミニアプリのバージョン管理メモ記載。Q&Aチャットボット等の publish / 本番反映後に必須。
+globs:
+  - "**/神・大家さん倶楽部情報Q&Aチャットボット/**"
+  - "**/publish_raimo_1346.py"
+  - "**/apps/kamiooya-qa-web/public/raimo/**"
+alwaysApply: false
+---
+
+# Raimo / LIME TOOLS — バージョン管理メモ（必須）
+
+神・大家さん倶楽部 Q&A チャットボット（Raimo miniApp **1346**）など、**LIME TOOLS（raimo.buzz）上でアプリを保存・本番反映したとき**は、ポータルの **バージョン管理** に変更内容を残す。
+
+スプレッドシートの `バージョン履歴`（`jarvis-version-filename.mdc`）とは別物。**Raimo 側の鉛筆メモが運用上の正**（このアプリのデプロイ履歴）。
+
+## いつ書くか
+
+次のいずれかの直後（ユーザーが明示しなくても）:
+
+- `publish_raimo_1346.py` 等で **save / deploy が成功**した
+- フロント（html/css/js）または API YAML を本番反映した
+- 分類 lookup 注入・UI 改修・バックエンド DSL 更新など、**公開アプリの見え方・挙動が変わる**反映
+
+## 書き方
+
+1. Raimo ポータル → 対象ミニアプリ → **バージョン管理**
+2. いま本番反映した行（通常は先頭の「下書き版／公開版」）の **鉛筆** をクリック
+3. メモに **何を直したか** を日本語 1〜3 行で記載（相手・運用者が読んで分かる内容）
+
+### メモの型（例）
+
+```
+関連コミュニティ投稿・コメント一覧の分類が未分類になる不具合を修正（FORUM_CATEGORY_LOOKUP 参照）。
+lookup 注入と UI の変数名を一致させ再公開。
+```
+
+- 先頭に **目的・症状**、続けて **対応** があるとよい
+- Git コミットメッセージと揃えてよいが、**Raimo メモは必須**（Git だけでは不可）
+- 秘密（パスワード・APIキー）は書かない
+
+## Jarvis の動作
+
+1. publish / 本番反映が終わったら、**チャット報告にメモ案を 1 ブロック出す**
+2. **可能なら API で当該バージョンのメモを保存する**（推奨・自動化可）
+3. UI 操作が必要な場合のみ、ユーザーにバージョン管理画面を開いてもらい、鉛筆で貼れる文面を渡す
+
+### メモ更新 API（確認済み 2026-07-21）
+
+```
+GET  https://raimo.buzz/gpt/api/miniApp/{APP_ID}/saveLog?page=1
+PUT  https://raimo.buzz/gpt/api/miniApp/{APP_ID}/saveLog/{saveLogId}/memo
+     body: {"memo": "変更内容..."}
+```
+
+- 認証: ポータルログイン後のセッション（Playwright 等。`publish_raimo_1346.py` と同系統）
+- 直近の `saveLogList[0]`（いま本番反映した行）に書くのが基本
+- APP_ID 1346 の例: `PUT .../miniApp/1346/saveLog/15907/memo`
+
+## 対象アプリ（現状）
+
+| アプリ | miniApp ID | 備考 |
+|---|---|---|
+| 神大家さん倶楽部 AI チャットボット | 1346 | `scripts/publish_raimo_1346.py` |
+
+他 Raimo アプリでも同様のバージョン管理がある場合は、同じ方針でメモする。

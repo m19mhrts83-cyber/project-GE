@@ -1,0 +1,44 @@
+# 神大家・飲み会幹事レーン（Jarvis）
+
+## 方針
+
+幹事業務の本線は **Jarvis ダッシュボード `/kanji`**（KURASHIFT ではない）。  
+マニュアルを見ながら会話し、前回／今回の反省は比較ログで見比べる。
+
+## 正本
+
+| 役割 | パス |
+|------|------|
+| 標準マニュアル | `…/01_運営サポート/飲み会幹事/00_幹事標準マニュアル.md` |
+| 振り返り比較 | `…/01_運営サポート/飲み会幹事/01_振り返り比較ログ.md` |
+| 生ログ（層A） | `…/26_パートナー社への相談/823_名古屋幹事グループ/5.やり取り.md`（LINE＋Chatwork） |
+| 申請 YAML | `…/C1_cursor/1d_神大家手続き自動化/懇親会開催申請_入力記録.yaml` |
+| 運用メモ | 同フォルダ `懇親会開催申請_運用メモ.md` |
+| state（ウォッチ） | `~/git-repos/.jarvis_state/kanji_ops.json` |
+| Drive（ソース正本） | `200_NoteBookLM/10_神大家_幹事標準マニュアル/`（admin） |
+| 共有用 Notebook（estate） | https://notebook.google.com/notebook/ee91b577-a06d-46bf-880d-af41c72e39cd |
+| 作業用 Notebook（admin） | https://notebooklm.google.com/notebook/34fb5ac0-a717-4d6a-b1a0-d09fb4a049c4 |
+| Drive（神大家・飲み会幹事） | https://drive.google.com/drive/folders/1t1aKu3jHADXaK2hamPXnRGAX2qDSdMrR |
+| フォーム | https://form.os7.biz/f/b46fab9a/ |
+| UI | https://jarvis-dashboard-amber.vercel.app/kanji |
+
+種村さん PDF（`エリア別飲み会開催マニュアル.pdf`）・千葉さん前回成果物はマニュアルの索引から辿る。生ログ全文は Notebook に入れない（層B蒸留のみ）。
+
+## トリガー
+
+- 「幹事」「懇親会申請」「飲み会幹事」「夕涼み」「新年会 in 名古屋」
+- パートナー確認のついででウォッチ `kanji_ops` が warn/attention
+- `/kanji` や状況ウォッチから Cursor 依頼
+
+## Jarvis の動作
+
+1. まず `00_幹事標準マニュアル.md` と `01_振り返り比較ログ.md` の先頭イベントを読む
+2. 申請・Drive は **estate**（`matsuno.estate@gmail.com`）。admin と取り違えない
+3. フォームは確認画面まで。送信はユーザー確認後
+4. イベント終了後は比較ログへ追記し、必要ならマニュアル § を更新
+5. state `kanji_ops.json` の `report_status` / `next_event` を実態に合わせて更新
+
+## 関連
+
+- 申請フォーム手順: `kamiooya-kansai-application.mdc`
+- 対外送信前確認: `jarvis-outbound-confirm.mdc`

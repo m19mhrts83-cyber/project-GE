@@ -1,0 +1,189 @@
+---
+description: Olive / SBI の Vポイント実績突合（クレカ積立還元・対象店高還元）。「Vポイント入った？」「クレカ積立の還元」「コンビニ還元」「iDでポイント」等の依頼時に適用。
+alwaysApply: false
+---
+
+# Vポイント実績監査（Jarvis）
+
+## 方針
+
+設定チェック（仲介・カード登録済み）と **付与実績の突合** を分けて扱う。  
+ユーザーが「ポイントが入っているか」と聞いたら、期待%を公式条件で先に宣言し、Vpass／Gmail／必要なら Zaim で数値突合する。
+
+| 層 | 頻度 | 内容 |
+|---|---|---|
+| **日常 cadence** | 約 **2日**（パートナー確認・前半末尾ついで） | Tサイト差分・処置提案。**必須手順には入れない** |
+| **月次定例（自動）** | 毎月 **25〜月末** 09:40 launchd + 朝オープン | `jarvis_vpoint_routine.py`：付与サマリ／cadence差分／テイチャンdue |
+| **Jarvis対話** | 促しが出たとき | TサイトOTP・Wallet・選べる特典など（`vpoint_monthly.json` の `jarvis_asks`） |
+
+## 自動できる／できない（切り分け・2026-09-10）
+
+| 区分 | 内容 | 実装 |
+|---|---|---|
+| **定期自動** | 既存履歴／監査から **前月付与サマリ** を生成 → `/vpoint` | `jarvis_vpoint_routine.py` → monthly_check |
+| **定期自動** | cadence の open_actions 整理（ブラウザなし） | routine 内 `--force` |
+| **定期自動** | テイチャン確認＋券があれば抽選（Vpass・interval） | routine 内 teiki `--run` |
+| **プログラム化・促し** | ウィンドウC未実施・履歴古い・open_actions | situation_watch + `jarvis_asks` |
+| **人手（Jarvis会話）** | Tサイト新規取得（メールOTP） | 『Tサイト取って』 |
+| **人手** | Visaタッチ実機／Wallet設定変更 | 『Visaタッチやった』→ cadence verify |
+| **人手** | 選べる特典・NISA評価額帯の設定変更 | open_actions の how |
+| **人手** | Vpass深い明細の再監査 | 『Vポイント監査して』 |
+| **人手** | 各サービスの公式サイトでのカード変更 | テイチャン Step1 |
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_routine.py --apply --push
+# 導入: launchd/install_vpoint_routine_launchd.sh
+# 無効化: JARVIS_VPOINT_ROUTINE_DISABLE=1
+```
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| 期待値 | `~/git-repos/.jarvis_state/vpoint_audit_expectations.json` |
+| 直近監査結果 | `~/git-repos/.jarvis_state/vpoint_audit_result.json` |
+| 月次状態 | `~/git-repos/.jarvis_state/vpoint_monthly.json` |
+| **日常 cadence** | `~/git-repos/.jarvis_state/vpoint_cadence.json` |
+| 設定チェックリスト | `~/git-repos/.jarvis_state/sbi_vpoint_up_checklist.json` |
+| **定期払いチャンス（テイチャン）** | `~/git-repos/.jarvis_state/teiki_barai_chance.json` |
+| Tサイト履歴スナップ | `.jarvis_state/vpoint_tsite_history_*.json` |
+| Literature Note §6.6 | `給与振込4口座_Oliveメイン化_サマリー.md` |
+| 秘密 | `.env.jarvis_private` の `SBI_SEC_*` / `VPASS_*` / `VPOINT_TSITE_ID`（PW任意。チャットに出さない） |
+
+## PDCA（獲得効率・2026-09-10）
+
+**進め方**: ステータスを定期把握 → `/vpoint` の PDCA ボードを見ながら Jarvis と会話で改善。
+
+| 段階 | 正 |
+|---|---|
+| **Plan** | `vpoint_cadence.json` の `open_actions` |
+| **Do** | ユーザー操作＋『〇〇 やった』／『試した』 |
+| **Check** | 月次付与サマリ・cadence差分・必要時の深い監査／Tサイト |
+| **Act** | `--mark-action-verify` → done、次の一手入れ替え |
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_pdca.py --apply --push
+# 定例でも自動更新: jarvis_vpoint_routine.py --apply --push
+```
+
+クレジット払い意図と明細の『／ｉＤ』は別物になりうる。断定は明細 Check 後。
+
+## 定期払いチャンス（テイチャン）
+
+三井住友カードの定期払いをまとめると抽選券が付くサービス（[teikibarai.smbc-card.com](https://teikibarai.smbc-card.com)）。ダッシュボード `/vpoint#teiki-barai`。
+
+### 紐づきの実態（誤解しやすい）
+
+| 段階 | 内容 |
+|---|---|
+| 1. 規約同意 | テイチャンサイトで **1回**（Vpassログイン） |
+| 2. 支払カード変更 | **各サービスの公式サイト／アプリ**で Olive 等へ変更（水道は AICITY。テイチャン詳細も「公式サイトで変更」） |
+| 3. 計上 | 対象一覧に載るだけでは不可。**選択中カードの明細に金額＞0の定期払いが載ってから** お支払い履歴・抽選券に反映（請求確定ごろ） |
+
+※ 0円明細は抽選券対象外（サイト注意書きどおり）。
+
+| 方針 | 内容 |
+|---|---|
+| ワイモバイル | **PayPayカード維持**（割引優先）。テイチャン対象外 |
+| 名古屋市上下水道（AICITY） | カード変更報告済だが **Olive 実課金待ち**（Zaim では水道が大垣共立引落。2ヶ月に1回請求）。次請求で Olive に載るか AICITY 登録を確認 |
+| 抽選 | 券があれば定例が自動抽選（手動不要）。`jarvis_teiki_barai_chance.py --run --headless --push` |
+| 頻度 | `interval_days` 既定 **3**。券残があれば即 due。launchd 月・木 10:15 ＋朝オープン |
+| GHA | 実験のみ（`.github/workflows/teiki-barai-draw.yml`）。Vpass は IP/CAPTCHA で失敗しやすい → Mac 本線 |
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_teiki_barai_chance.py --status
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_teiki_barai_chance.py --run --headless --push
+# 導入: launchd/install_teiki_draw_launchd.sh
+```
+
+ステップ: (1) 追加手続き候補 (2) 抽選券確認 (3) あれば抽選＋通知。迷う CARD_MIG は確認待ち。
+
+## 認識合わせ（2026-07-30・必読）
+
+1. 高還元 = **クレジットモード ＋ スマホVisaタッチ／モバイルオーダー**。クレジットオンリーだけでは足りない。
+2. **iDは対象外**。Olive では iD がデビット扱いになりやすい。明細店名に **`／ｉＤ`** があれば高還元未達と判定。
+3. Wallet 表示が **Visa LINE Pay クレジット**でも、明細が `／ｉＤ` なら対象外（表示名と本体を混同しない）。
+4. Wallet 設定は勝手に変えない。cadence／月次で `／ｉＤ` 比率の変化だけ見る。
+5. **Tサイト**ログイン: **`VPOINT_TSITE_ID`（V会員番号）＋メールOTP**（estate `matsuno.estate@gmail.com`）。`VPOINT_TSITE_PASSWORD` は任意。ID が無ければ自動ログインしない。
+
+## 日常 cadence（処置ループ）
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_cadence_check.py
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_cadence_check.py --mark-prompted
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_cadence_check.py --status
+# ユーザーが「〇〇した」→ 次回検証
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_cadence_check.py --mark-action-verify ACTION_ID
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_cadence_check.py --mark-action-done ACTION_ID
+```
+
+- 無効化: `vpoint_cadence.json` の `"disabled": true` または `JARVIS_VPOINT_CADENCE_DISABLE=1`
+- **間隔**: `interval_days`（既定2）。due でなければ **無出力**
+- **重大差分**（間隔無視）: 積立特典 pt 変化／INF表記変化／残高±500pt以上／`verify_next` あり
+- 報告は最大 **次の一手2件**。提案 → ユーザー手打ち → `verify_next` → 次回で証拠確認 → `done`
+- パートナー確認では **前半末尾**に `--mark-prompted`（LINE export と同様・失敗しても全体止めない）
+
+## 公式の落とし穴（先に言う）
+
+1. **クレカ積立の最大6%**は、年間カード利用帯（最大4%）＋ Olive資産運用特典（最大2%）の合算上限。仲介を Olive／SMBC にしただけでは自動6%ではない。
+2. マイページの「+10%」は多くの場合 **Vクーポン**であり、基本高還元スタックと混同しない。
+3. ポイント付与は利用月とズレる。判定は **付与月／明細確定後** で揃える。
+4. 実績（2026-07-30）: 積立特典 **900pt/月＝1%**。6%未達。
+
+## トリガー例
+
+- 「Vポイント入ってる？」「クレカ積立の還元」「6%になってる？」
+- 「コンビニ還元」「iDでポイント」「タッチ決済の還元」
+- 「Vポイント実績を確認」「Vポイント月次確認して」
+- パートナー確認の前半末尾（cadence・間隔ゲート）
+
+## 手順（深い監査・Phase）
+
+### Phase 0 — 期待値
+
+- 積立月額（既定プラン合計 90,000円）と期待帯（1〜6%）を書く
+- 対象店は Visaタッチ前提。iDなら「高還元なし」が正解
+
+### Phase 1 — 取得
+
+1. **Vpass**（通常 Chrome + CDP、`~/.jarvis_state/chrome_vpass_audit`）で残高・利用明細（店名に `／ｉＤ` があるか）
+2. **Gmail API**（`jarvis-gmail-api-first`）で積立発注通知・利用通知・特典達成状況（MCP 禁止）
+3. 必要なら **Zaim** で対象店支出を突合
+4. **Tサイト**は `VPOINT_TSITE_ID` があるとき。番号＋メールOTP（estate）。履歴は `vpoint_tsite_history_*.json` に残す
+
+### Phase 2 — 報告
+
+- A: 積立円 × 付与pt → 実効還元率と判定（6%到達／条件内／未付与）
+- B: サンプル取引の決済レール（`／ｉＤ` vs モバイルオーダー）と高還元可否
+- Wallet 強制変更はしない
+
+### Phase 3 — 正本更新
+
+- `vpoint_audit_result.json` / `vpoint_monthly.json` / `vpoint_cadence.json` を更新
+- checklist の実績キーを更新
+- Literature Note §6.6 と更新履歴を追記
+
+## コマンド（正本は運用コマンド一覧）
+
+```bash
+# 定例（推奨・自動＋促し）
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_routine.py --apply --push
+
+# 日常 cadence
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_cadence_check.py --mark-prompted
+
+# 月次リマインド要約
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_monthly_check.py
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_vpoint_monthly_check.py --mark-done
+
+# 設定状況（付与実績ではない）
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_sbi_vpoint_up_setup.py --status
+```
+
+## 関連
+
+- 月次: `jarvis-monthly-routine.mdc`（ウィンドウC）
+- パートナー前半ついで: `partner-email-check.mdc`
+- SBI Vポイントアップ設定: `docs/運用コマンド一覧.md`「SBI証券 — Vポイントアップ」
+- 選べる特典: Literature Note §6.5
+- Gmail: `jarvis-gmail-api-first.mdc`

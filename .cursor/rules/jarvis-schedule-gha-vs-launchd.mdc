@@ -1,0 +1,49 @@
+---
+description: 定期実行の置き場判定（GHA vs launchd）。定例・cron・月次自動化を足す／移すとき適用。
+alwaysApply: false
+---
+
+# 定例の置き場 — GHA vs launchd
+
+## 方針
+
+**定型化できた定期処理 → GitHub Actions。**  
+**銀行／カード UI・CDP・CHRLINE・OneDrive 正本・常駐 → launchd（Mac）。**
+
+正本表: `docs/Jarvis_定例_GHAとlaunchd仕分け.md`
+
+## 判定（新規・移設時）
+
+**GHA にする**（すべて満たす）:
+
+1. Secrets で足りる（OTP・銀行PW セッション非依存）
+2. 出力がクラウド（Supabase 等）で完結できる
+3. API／再現可能なヘッドレスで同じ結果が取れる
+4. Mac スリープ中でも動かしたい
+
+**launchd にする**（1つでも該当）:
+
+- Vpass／smile-etc／Zaim Web／証券ログイン
+- Chrome CDP・保存プロファイル
+- CHRLINE／QR
+- OneDrive／`.jarvis_state` が正本でクラウド未投影
+- 常駐 watch
+
+迷ったら **launchd**。GHA 実験は `workflow_dispatch` のみにし、成功が続くまで schedule を付けない。
+
+## 最近の例
+
+| 定例 | 置き場 |
+|---|---|
+| ETC 還元 | launchd |
+| Vポイント定例 | launchd（促しだけなら将来 GHA 候補） |
+| テイチャン抽選 | launchd（GHA headless は失敗実測） |
+| Gmail triage／状況ウォッチ軽量 | GHA |
+
+## Jarvis の動作
+
+定例を「自動化して」「定期で」と言われたら:
+
+1. 上の判定で A/B を宣言する
+2. A → `.github/workflows/`、B → `launchd/install_*.sh`＋必要なら朝取りこぼし
+3. 仕分け表を1行更新する

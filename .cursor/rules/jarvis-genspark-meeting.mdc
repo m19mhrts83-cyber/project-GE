@@ -1,0 +1,70 @@
+---
+description: Genspark AI Meeting Notes（SecondBrain／Speakly）を Jarvis がオンデマンド参照
+alwaysApply: false
+---
+
+# Jarvis — Genspark Meeting Notes 参照
+
+## トリガー
+
+- 「〇〇との電話を引き出して」「さっきの SB 録音」「Second Brain から」
+- 「今日の Genspark 録音から宿題だけ」「Speakly／AI Meeting Notes」
+- 「この要約を Notion Inbox／やり取り下書きに振って」（Meeting 文脈）
+
+## 役割分担（Hot / Warm / Cold）
+
+| 層 | 正本 | Jarvis |
+|---|---|---|
+| **Hot**（当日〜数日） | Genspark AI Meeting Notes | 本線: `jarvis_genspark_meeting_fetch.py`（`gsk meeting`） |
+| **Warm**（残す価値あり） | Notion「電話・面談録音メモ」`_Inbox` | `jarvis_notion_api.py` で検索・読取。Save to Notion は重要件のみ |
+| **Cold** | Obsidian ★Journal／`録音メモ/` の **1行索引** | 全文は載せない |
+| **Action** | OneDrive `4.送信下書き.txt`／Notion タスク | 宿題・返信骨子を接続（対外送信は了承後） |
+
+**全文の常時ミラー・launchd 全件同期は作らない。**
+
+## コマンド
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+export PATH="$HOME/.local/bin:$HOME/.genspark-tool-cli/bin:$PATH"
+~/selenium_env/venv/bin/python scripts/jarvis_genspark_meeting_fetch.py list --page-size 10
+~/selenium_env/venv/bin/python scripts/jarvis_genspark_meeting_fetch.py search --keyword 'LEAF' --date-from 2026-09-01
+~/selenium_env/venv/bin/python scripts/jarvis_genspark_meeting_fetch.py get --task-id <ID> --detail-level summary
+# 全文／話者分割が必要なときだけ
+~/selenium_env/venv/bin/python scripts/jarvis_genspark_meeting_fetch.py get --task-id <ID> --detail-level full --json --shaped
+~/selenium_env/venv/bin/python scripts/jarvis_genspark_meeting_fetch.py get --task-id <ID> --detail-level segments --json --shaped
+```
+
+秘密: `.env.jarvis_private` の `GSK_API_KEY`（チャットに出さない）。未設定時は `gsk login` 後にキーを正本へ。
+
+## Jarvis の動作
+
+1. `search`（相手名・日付）→ 候補 id を特定。曖昧なら一覧を見せて確認
+2. まず `--detail-level summary`。宿題・下書きに本文が必要なら `segments` または `full`
+3. チャットには **3行要約＋宿題リスト**（全文は再掲しない。id／`project_url` を1行）
+4. 了承後に Action（下書き・Notion タスク）。重要件は Notion Inbox に `[SB] YYYY-MM-DD 相手`（Save to Notion 手動、または要約ページ作成）
+5. Obsidian `録音メモ/` に1行索引（相手・日付・Notion URL または meeting id）
+6. **対外送信はしない**（了承フローは `jarvis-outbound-confirm`）
+
+## JPR フォールバック
+
+| 状況 | 本線 |
+|---|---|
+| SB／Speakly／AI Notes で取れた電話・対面 | **本ルール**（Genspark） |
+| 取れなかった・保険・既存 m4a | `jarvis-just-press-record-transcribe.mdc`（JPR + Gemini） |
+
+同じ通話を両方フル正本化しない。二重にあるときは索引で片方に寄せる。
+
+## やらないこと
+
+- Typeless／★Journal／`5.やり取り.md`／Notta（神大家動画）を Genspark 正本化
+- UI スクレイピング・非公式 cookie API
+- `GSK_API_KEY` をチャットや Git に貼る
+- FRIDAY に対外送信・秘密読取を任せる（アクション責任は Jarvis）
+
+## 関連
+
+- 判断シート: Obsidian `03_Literature Note…/仕事術・AI連携/20260915_Genspark_SecondBrainNote検討.md`
+- 運用コマンド: `docs/運用コマンド一覧.md` § Genspark SecondBrain／meeting fetch
+- FRIDAY（Mesh・枠切れ補助）: `docs/FRIDAY_運用キット.md`
+- Notion Inbox: 親ハブ「電話・面談録音メモ」配下 `_Inbox（未振分）`
