@@ -1,0 +1,84 @@
+---
+description: Numbers ライフプラン → Web版 Zaim 月ごと予算の年次反映。ユーザーがライフプランシート添付＋「〇〇年度の予算に反映」と依頼したときに適用。
+alwaysApply: false
+---
+
+# Zaim 予算 — ライフプラン Numbers から年次反映
+
+Jarvis の呼び名・秘密の正本は **`jarvis.mdc`** を参照。
+
+## トリガー（依頼の言い方）
+
+次に近い依頼が来たら **本ルールに従い実行する**（「できません」で終わらない）。
+
+- 「ライフプランシートを **2026年度** の Zaim 予算に反映して」
+- 「Numbers の予算を Zaim に入れて」＋ **対象年度** の明示
+- `@260418_松野家FinancePlan.numbers` 添付 ＋ 予算反映
+
+**ユーザーが伝えること（最低限）**
+
+1. **対象年度**（例: 2026 → 2026年1〜12月の Zaim「月ごと」予算）
+2. Numbers ファイル（未指定なら下記 **正本パス**）
+
+## 正本・スクリプト
+
+| 役割 | パス |
+|---|---|
+| Numbers 正本 | `~/Library/Mobile Documents/com~apple~Numbers/Documents/Life Plan/260418_松野家FinancePlan.numbers` |
+| 実行スクリプト | `~/git-repos/215_kamiooya/C1_cursor/finance/zaim_budget_sync/` |
+| カテゴリマッピング | 同フォルダ `budget_category_map.yaml` |
+| Zaim ログイン | `~/git-repos/.env.jarvis_private` の `ZAIM_LOGIN_EMAIL` / `ZAIM_PASSWORD` |
+| コマンド正本 | `~/git-repos/docs/運用コマンド一覧.md` §11 |
+
+## データ仕様（列ずれ・別表）
+
+### 本表「表1.月別予算設定」（家計費内訳）
+
+- **基準**: 2026年度の1月 = **AK 列**。毎年「計画＋実績」で **2列ずつ右**にずれる。
+- 2027年度1月 = AM、2028 = AO …（`column_utils.py` / `--year` で自動計算）
+
+### 別表「19_マンションローン・管理費〜支出計画〜」
+
+本表の「19 マンションローン・管理費」1行は Zaim に載せない。別表から **2カテゴリ** に分割:
+
+| Numbers | Zaim |
+|---|---|
+| **5. Grandole I**（22行目） | `19F.賃貸経営(法人)` |
+| **4. Glandole II + 6. Caramel + 7. 経費**（14+31+40行目） | `19F.賃貸経営(個人事業)` |
+
+別表の月列は **B〜M 固定**（本表の AK ずれとは独立）。
+
+## 実行手順（エージェント）
+
+1. **`.env.jarvis_private`** を読む（Zaim ログイン）。Google ログインは自動化しない（メール/パスワード方式）。
+2. **抽出** — `numbers_budget_extract.py --year {YYYY}`（中間 CSV 生成）
+3. **プレビュー** — `zaim_budget_apply.py --dry-run --year {YYYY} --csv budget_{YYYY}.csv` で件数・合計を確認
+4. **ログイン** — セッション切れ時のみ。`--connect-cdp http://127.0.0.1:9223 --login-method email`（CDP Chrome。メール自動入力は **最大2回**）
+5. **反映** — `--apply --yes --year {YYYY} --connect-cdp http://127.0.0.1:9223`
+6. **報告** — 更新月数、カテゴリ数、未マッピング行、スクショ `screenshots/budget_YYYY-MM.png` の有無
+
+初回・様子見は `--month YYYY-01` で1ヶ月だけ試験反映してから年間一括でもよい。
+
+## 報告フォーマット（ユーザー向け）
+
+```
+---
+📎 Zaim 予算反映 — {YYYY}年度
+- Numbers 抽出: {行数} 行
+- 反映: {成功月数}/12 ヶ月、カテゴリ {更新数}/{期待数}
+- 別表19: 法人(Grandole I) / 個人(4+6+7) 分割済み
+- 未反映・要確認: {あれば列挙}
+- スクショ: zaim_budget_sync/screenshots/
+---
+```
+
+## 注意
+
+- Zaim Web UI 変更時は `zaim_budget_apply.py` のセレクタ要メンテ。予算詳細 URL は `https://zaim.net/budgets/detail/YYYYMM`。
+- カテゴリ名を Numbers/Zaim で増減した場合は **`budget_category_map.yaml`** を更新してから再実行。
+- `.zaim_storage_state.json` / `.zaim-chrome-profile/` は Git 非共有（`.gitignore` 済み）。
+
+## 関連
+
+- 設計メモ: `~/.cursor/plans/zaim予算自動化検討_b8b243a7.plan.md`
+- 215 成果物コピー先: `50_税金,確定申告/{YYYY}年度/zaim_budget_sync/`（任意）

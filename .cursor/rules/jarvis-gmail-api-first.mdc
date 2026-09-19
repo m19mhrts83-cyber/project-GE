@@ -1,0 +1,53 @@
+---
+description: Gmail の検索・読取・下調べは MCP（user-gmail）ではなく、初動から Gmail API（既存 token）で行う。
+alwaysApply: true
+---
+
+# Gmail — API 初動（MCP 禁止・手戻り防止）
+
+## 方針
+
+メールの検索・件名一覧・本文確認・領収書探しなどは、**最初から Gmail API** で行う。  
+`user-gmail` / `user-gmail2` の MCP（`search_emails` / `read_email` 等）を**初手に使わない**。
+
+教訓（2026-07-25）: MCP 認証切れ・再認証ループのあと API に切り替える、を繰り返していた。API は既に整備済み。
+
+## 正本（認証・実行）
+
+| 項目 | 場所 |
+|---|---|
+| credentials / token | `~/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル/` |
+| Python | `/Users/matsunomasaharu2/selenium_env/venv/bin/python` |
+| アカウント選定 | `jarvis-google-accounts.mdc`（依頼 → token 対応表） |
+
+よく使う token:
+
+| アカウント | token ファイル |
+|---|---|
+| m19m | `token_m19m.json`（`token.json` と同系） |
+| admin | `token_livingsupport.json` |
+| estate | `token_estate.json` |
+
+## Jarvis の動作
+
+1. **使用アカウントを1行宣言**（例: 「使用アカウント: m19m / Gmail API」）
+2. **Shell + Python（google-api-python-client）** で `users().messages().list` / `get` を実行
+3. どの箱か不明なら、関連しそうなアカウントを **API で並列検索**（MCP に戻さない）
+4. 既存スクリプト（`gmail_to_yoritoori.py` 等）がある作業は、そちらを優先
+
+## 禁止
+
+- Gmail 探索の初手で `CallMcpTool` → `user-gmail` / `user-gmail2`
+- MCP 失敗後に「では API で」と切り替える流れ（最初から API）
+- ブラウザで Gmail Web を開いて目視検索（API で足りる場合）
+
+## 例外（MCP を使ってよいとき）
+
+- ユーザーが **明示的に MCP 経由**を指定したとき
+- API token が全滅し、かつユーザー同意のうえで MCP 再認証するとき（最終手段）
+
+## 関連
+
+- アカウント使い分け: `jarvis-google-accounts.mdc`
+- token ミラー / Secret: OneDrive 215 の `gmail-token-sync-mirror.mdc`
+- 対外送信前確認: `jarvis-outbound-confirm.mdc`

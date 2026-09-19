@@ -1,0 +1,27 @@
+---
+description: CHRLINE接続が約90秒で切れる場合にMac版LINEとの認証競合を最初に確認する
+alwaysApply: true
+---
+
+# CHRLINEとMac版LINEの認証競合
+
+## トリガー
+
+- CHRLINE / LINEオープンチャット監視が起動直後〜数分で切断
+- `V3_TOKEN_CLIENT_LOGGED_OUT` が出る
+- QR承認と `push ready` は成功するが、最初のping / `noop` で落ちる
+
+## 最初に確認すること
+
+1. Mac版LINEの起動を確認:
+   `pgrep -f 'application\.jp\.naver\.line\.mac|/Applications/LINE\.app'`
+2. 起動中ならMac版LINEを終了し、CHRLINEだけで再検証する。
+3. スマホ版LINE・iPhoneミラーリングは併用可。Mac版LINEには再ログインしない。
+4. QR再発行やトークン実装修正を繰り返す前に、90秒以上セッションが維持されるか確認する。
+
+## 確定した挙動（2026-07-20）
+
+- Mac版LINEとの同時利用では、CHRLINEが約90秒後に
+  `V3_TOKEN_CLIENT_LOGGED_OUT` となった。
+- Mac版LINE終了後は長時間接続し、保存トークンによるQRなし再起動も成功した。
+- 常駐監視はMac版LINEを検出するとトークン保護のため停止し、Mac版終了後にlaunchdで自動再開する。

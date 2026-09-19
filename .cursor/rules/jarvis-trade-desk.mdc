@@ -1,0 +1,66 @@
+---
+description: KURASHIFT（旧Trade Desk）。ライフプラン・資産運用HQ・個人申告・Theme／Lab。株・投資・保険・家計・確定申告の話のときに適用。
+globs:
+  - scripts/jarvis_trade_*.py
+  - scripts/jarvis_portfolio_*.py
+  - scripts/jarvis_kurashift_*.py
+  - config/trade_*.yaml
+  - apps/trade-desk/**
+  - apps/jarvis-dashboard/supabase/migrations/*trade*
+  - apps/jarvis-dashboard/supabase/migrations/*kurashift*
+alwaysApply: false
+---
+
+# KURASHIFT（旧 Trade Desk）
+
+## 方針
+
+- **正式名称 KURASHIFT**（暮らしを整え、資産を動かす）。コードパスは当面 `apps/trade-desk`
+- **別アプリ**。jarvis-dashboard に株UIを混ぜない
+- DB は既存 **`jarvis-dashboard`** の `kurashift_*` / `trade_*` / `portfolio_*`。**3つ目の Supabase PJ は作らない**
+- **定型ルーティン**はアプリのボタン → `kurashift_jobs` → Mac `jarvis_kurashift_job_worker.py`
+- **相談**はローカル Jarvis → `kurashift_consultations` → アプリで閲覧
+- **個人申告のみ**（弥生CSV・証憑）。法人は税理士メール閲覧
+- Theme は提案→相談→承認→完走。**未承認の実弾・振替・弥生本登録はしない**
+- Lab（平均回帰）は降格。利回り本線にしない
+- 秘密は `.env.jarvis_private` のみ。チャットに出さない
+
+## リスク（変更するときはユーザー確認）
+
+- Lab の Tranche 1 = 10万円。−10% 新規停止、−20% 全停止
+- **実弾は後回し。** 自動でライブ発注・自動でトランシェ昇格しない
+
+## 日次（Lab）
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_trade_daily.py
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_worker.py
+```
+
+正本: `docs/Trade_Desk.md` / `config/trade_theme_playbook.yaml` / `docs/運用コマンド一覧.md` §7.6
+
+ニュースは売買の主因にしない。順番は 市況 → セクター → 平均回帰リズム → ニュース加点。
+分野定義: `config/trade_research_themes.yaml`。ChatGPT週次（AI・宇宙）は inbox 横流し。
+
+## 資産全体（週次収集）
+
+ソニー生命・アクサ・SBIインデックス・三菱重工持株・あかつき債券・立花。
+
+| 経路 | 中身 |
+|---|---|
+| **GitHub Actions**（日曜 09:15 JST） | Yahoo 日足、Tavily（失敗時はキャッシュ）、ペーパー残高、週次レビュー行（持株は Zaim＝Mac） |
+| **Mac**（日曜 09:00 ＋ PC起動 RunAtLoad ＋ 朝オープン取りこぼし） | ソニー／アクサ／SBI／あかつきのサイトログイン |
+
+OTP が出たらその口座はスキップ。秘密は `.env.jarvis_private` のみ。  
+手入力の補完は `jarvis_portfolio_snapshot.py`。
+
+あかつきは Zaim 連携できないので、週次評価の差分を財務へ手登録と同じ型で入れる  
+（減収: `α.B.C.投資` / `外国債減収` / あかつき証券 / 集計に含めない）。
+
+## 関連
+
+- 手順: `docs/Trade_Desk.md`
+- コマンド: `docs/運用コマンド一覧.md` §7.6 KURASHIFT
+- playbook: `config/trade_theme_playbook.yaml`
+- 理念: `jarvis-finance-philosophy.mdc`（寝かせて増やす × 金持ち父さん）

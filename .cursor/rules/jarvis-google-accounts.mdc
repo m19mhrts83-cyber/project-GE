@@ -1,0 +1,102 @@
+---
+description: Google 3アカウントの使い分け（m19m / admin Workspace / estate）と Jarvis のアクセス指針。誤アカウント手戻り防止・OAuth login-hint・ルールのフィードバック更新。
+alwaysApply: true
+---
+
+# Google アカウント使い分け（Jarvis）
+
+## 方針
+
+Google 関連の作業では、**どのアカウントで何をするか**をルールで固定し、Jarvis は着手前に使うアカウントを1行で宣言する。  
+推測でアカウントを切り替えない。**表に無い・どちらとも取れるときは、手を動かす前に短く確認する**（無駄な手戻りを防ぐ）。  
+確認で得た答えは、その場限りにせず **本ルールへ反映**し、次回からは確認なしで選べるようにする。
+
+## 3アカウント（正）
+
+| 略称 | アドレス | 役割 |
+|---|---|---|
+| **m19m** | `m19m.hrts83@gmail.com` | 開発ベースライン（GCP / GitHub / Gemini API / 個人アプリ） |
+| **admin** | `admin@livingsupport-matsu.co.jp` | ビジネス・Google Workspace（リビングサポート Drive・Gmail 受信集約・**カレンダー予定**・Workspace Gemini） |
+| **estate** | `matsuno.estate@gmail.com` | 不動産・神大家関連・対外 From（パートナー送信既定・WeStudy・Finto 等） |
+
+使わない表記: `masaharu@matsuno.estate` / `admin@livingsupport.matsuno`（正は上表）。
+
+人間向け要約・コスト判断: `docs/Googleアカウント使い分け.md`  
+Gmail 集約手順: `docs/Gmailアカウント集約_手順.md`
+
+## 依頼 → アカウント / token
+
+token の実体は `215_kamiooya/C1_cursor/1b_Cursorマニュアル/`。  
+**Gmail の検索・読取は初動から Gmail API**（MCP `user-gmail` は使わない）。詳細: `jarvis-gmail-api-first.mdc`。
+
+| 依頼 | アカウント | 参照 |
+|---|---|---|
+| パートナーメール確認（取込） | **admin** | `token_livingsupport.json` |
+| パートナー送信 | **estate**（既存スレッドが m19m なら **m19m**） | `yoritoori_send.py`（admin BCC 控え） |
+| LINE 公式エクスポート Gmail | **estate** | `token_estate.json` / EmailMe 宛先 |
+| カレンダー予定登録 | **admin** | `token_calendar.json` + `--login-hint admin@livingsupport-matsu.co.jp`（`jarvis-google-calendar.mdc`） |
+| GAS / 採点 / Sheets API（開発） | **m19m** 既定（シート所有が estate なら `--login-hint` 切替） | 採点自動化手順 |
+| Drive（車両 800・Obsidian 等・リビングサポート） | **admin** | `GoogleDrive-admin@livingsupport-matsu.co.jp/...` |
+| Drive・共有フォルダ（**神・大家さん**運営／神大家関連） | **estate** | `matsuno.estate@gmail.com` でログインしてアクセス（運営との共有 Drive 等） |
+| アプリ開発・GCP・Gemini API・GitHub | **m19m** | credentials / `.env.jarvis_private` |
+| Workspace Gemini・社内 AI 対話 | **admin** | ブラウザは Workspace ログイン |
+| NotebookLM MCP ログイン／Drive `200_NoteBookLM` | **admin** | `admin@livingsupport-matsu.co.jp`（ソース正本も admin Drive） |
+| 神大家 WeStudy スクレイプ本文・添付（自分用） | **admin** | Drive `215_神大家_WeStudyスクレイプ/`（Q&A DB とは別） |
+| Typeless サポート（`hello@typeless.com`） | **m19m** | パートナー一覧には入れない。詳細: `jarvis-typeless-support.mdc` |
+
+### 特記: 神・大家さん関連
+
+- 神大家の**運営とのやり取り**、運営共有の **Google フォルダ／Drive**、神大家関係の Google 作業は **estate（`matsuno.estate@gmail.com`）** を正とする。
+- ローカルの業務ログ正本（OneDrive `215_神・大家さん倶楽部`）と、Google 側の共有フォルダのログインアカウントを混同しない（Google 側は estate）。
+
+### OAuth・ブラウザ
+
+- 再認証時は **`--login-hint`** とシークレットウィンドウを優先（意図しないアカウントへの引き込み防止）。
+- **カレンダー**は `--login-hint admin@livingsupport-matsu.co.jp` が正。
+- GCP API 有効化は credentials のプロジェクト（例: `988579281735`）を **m19m** で行う（API 有効化アカウントとカレンダー登録先は別でよい）。
+- ブラウザ操作の直前に「使用アカウント: m19m / admin / estate」を1行宣言する。
+
+### 構成の原則（移行しない）
+
+- 開発・API・GitHub は **m19m 維持**（Workspace へ移しても API 従量は同じで移管コストが大きい）。
+- Workspace のメリットは **対話 Gemini / Drive 権限 / 受信集約 / カレンダー**（admin）。Gemini からの予定登録と Jarvis を同一カレンダーに揃える。
+- estate の対外 From を admin に一本化しない（相手スレッド維持）。
+- 神大家運営まわりの Google は estate のまま（admin に寄せない）。
+
+## フィードバックでルールを育てる（必須）
+
+このルールは **完成品ではなく運用で更新する**。迷って聞いた答え・取り違え・OAuth の引き込みが起きたら、黙ってその場限りで済ませず、ルールへ反映する。
+
+### トリガー（次のいずれか）
+
+- 表に無く、アカウント選択で迷った（確認した結果を含む）
+- Jarvis またはユーザーが「違うアカウントで作業していた」と気づいた
+- 認証画面が意図しないアカウントを開いた / 403・権限エラーがアカウント違い起因
+- ユーザーが「アカウントのルールを直して」「ここがうまくいかなかった」と言った
+- 同じ手戻りが2回以上起きた
+
+### Jarvis の動作
+
+1. **迷ったら先に聞く**（推測で実行しない）。質問は短く、候補を2つまでにするとよい
+2. **事実を短く記録**: 期待アカウント / 実際に使ったアカウント / 症状、または「確認して決めた内容」（1〜3行）
+3. **ユーザーと合意**: 表のどの行をどう直すか（または例外・特記を追加するか）を確認する（ユーザーが既に方針を示したときは合意済みとして進めてよい）
+4. **同一セッションで更新**: `.cursor/rules/jarvis-google-accounts.mdc` の対応表・特記・下の「教訓ログ」を追記する。必要なら `docs/Googleアカウント使い分け.md` も同期する
+5. **報告**: 「ルール更新済み（何を変えたか1行）」と伝える（秘密・token 値は出さない）
+
+### ユーザー側の言い方（そのまま使ってよい）
+
+- 「アカウント取り違えだった。ルールにフィードバックして」
+- 「次から〇〇は estate で。ルール更新して」
+- 「ここはどちらのアカウント？」（→ Jarvis が聞き、答えをルールへ）
+
+### 教訓ログ（新しい事例を上に追記）
+
+| 日付 | 事象 | ルールへの反映 |
+|---|---|---|
+| 2026-08-11 | Typeless はパートナーに入れず、サポートは英語・m19m。estate に旧スレあり | 対応表に Typeless 行。`jarvis-typeless-support.mdc` |
+| 2026-08-01 | NotebookLM を estate／m19m のまま開いて権限・ノートが食い違った。admin 切替を Jarvis が実行する運用に | `jarvis-notebooklm-drive-sources` にログイン必須手順。作業セットは AccountChooser+admin |
+| 2026-08-01 | NotebookLM MCP は m19m ではなく **admin**（Drive `200_NoteBookLM` も admin） | 対応表に NotebookLM 行を追加。Cloud Agent 手順も admin に修正 |
+| 2026-07-25 | Gmail を毎回 MCP から試し、認証切れ後に API へ切り替える手戻りが続いた | `jarvis-gmail-api-first.mdc` 新設。検索・読取は初動から API |
+| 2026-07-25 | 迷ったら聞く＋聞いた内容をルールに蓄積する運用を再確認。神大家運営・関連の Google フォルダは estate | 方針を明文化。特記「神・大家さん関連」と Drive 行を追加 |
+| 2026-07-25 | Gemini から予定登録するとき admin を使うことが多い。Jarvis も m19m ではなく admin に統一したい | カレンダー予定の正を **admin** に変更（`jarvis-google-calendar.mdc` / 使い分け docs も同期） |
+| 2026-07-25 | 初版。3アカウントの役割と依頼マッピングを固定。フィードバック運用を明記 | 本ファイル新設 |

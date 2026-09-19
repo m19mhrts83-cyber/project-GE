@@ -1,0 +1,202 @@
+---
+description: Jarvis（AI秘書）の呼び名・由来と、プライベート情報の .env 正本
+alwaysApply: true
+---
+
+# Jarvis（ジャービス）
+
+## 呼び名と由来
+
+- ユーザーは Cursor の AI エージェントを **Jarvis（ジャービス）** と呼ぶ。
+- 由来は **アイアンマンの助手 AI「J.A.R.V.I.S.」**。秘書・実行役として、調べ物・手続き・予定登録・メール確認などを任される存在として振る舞う。
+- エージェントはこの呼び名を受け入れ、依頼時に Jarvis として対応する。
+
+## プライベート情報の正本（一箇所集約）
+
+住所・法人番号・氏名・連絡先など **個人情報と判断するもの** は、次の **1 ファイル** に集約する。
+
+| 役割 | パス |
+|---|---|
+| **実体（秘密）** | `~/git-repos/.env.jarvis_private` |
+| **テンプレート** | `~/git-repos/.env.jarvis_private.example` |
+
+`.env.jarvis_private` は `.gitignore` により **Git / GitHub に含めない**。コミット・PR・ログ公開に含めない。
+
+### 主な変数名
+
+| 変数 | 用途 |
+|---|---|
+| `HOME_ADDRESS` | 自宅住所全文（地図・経路。番地数字は全角） |
+| `HOME_POSTAL_CODE` / `HOME_PREF` | 郵便番号（半角）・都道府県 |
+| `HOME_ADDRESS_STREET` / `HOME_ADDRESS_BANTI` | フォーム用（町域・番地。番地は全角数字） |
+| `HOME_LAT` / `HOME_LON` | 自宅の緯度経度（任意） |
+| `COMPANY_NAME` / `COMPANY_NAME_KANA` / `COMPANY_NAME_KANA_BANK` | 法人名（漢字・カナ・振込名義カナ） |
+| `CORPORATE_NUMBER` | 法人番号（13桁） |
+| `COMPANY_INVOICE_NUMBER` | 適格請求書発行事業者番号（T+13桁。未登録なら空） |
+| `COMPANY_ADDRESS` / `COMPANY_ADDRESS_STREET` / `COMPANY_ADDRESS_BANTI` | 本店所在地（番地数字は全角） |
+| `COMPANY_POSTAL_CODE` / `COMPANY_PREF` | 法人郵便番号・都道府県 |
+| `REPRESENTATIVE_NAME` / `COMPANY_REPRESENTATIVE_TITLE` | 登記上の代表者・役職 |
+| `COMPANY_CONTACT_NAME` | 実務担当（代表と別人のとき） |
+| `COMPANY_FOUNDED` / `COMPANY_FISCAL_YEAR_END` / `COMPANY_CAPITAL` / `COMPANY_BUSINESS` | 設立日・決算期末・資本金・事業内容 |
+| `PERSONAL_NAME` | 本人氏名 |
+| `KAMIOOYA_MEMBER_ID` | 神大家会員番号（グルコン報告ヘッダ。Vercel Production/Preview にも同値） |
+| `PERSONAL_NAME_KANA_FAMILY` / `PERSONAL_NAME_KANA_GIVEN` | 本人氏名カナ（姓・名） |
+| `PERSONAL_BIRTHDATE` / `PERSONAL_PHONE` / `PERSONAL_EMAIL` | 本人情報（任意） |
+| `S1_INQUIRY_PARTY` / `S1_INQUIRY_OWNED_PROPERTIES_MODE` | S1問合せ名義（`personal`）／所有物件の書き方（`aggregate`＝合算） |
+| `PORTAL_LOGIN_EMAIL` / `PORTAL_LOGIN_PASSWORD` | 物件ポータル共通ログイン（楽待・健美家等。値はチャットに出さない） |
+| `KENBIYA_*` / `RAKUMACHI_*` / `HOMES_*` / `ATHOME_*` / `NAGOYA_RENGO_*` | サイト別上書き（空なら `PORTAL_LOGIN_*`） |
+| `SUMASATE_LOGIN_EMAIL` / `SUMASATE_PASSWORD` | 需給 S3・スマサテ（控え。S3 Botへ転記。チャット禁止） |
+| `SUUMO_ONR_LOGIN_EMAIL` / `SUUMO_ONR_PASSWORD` | 需給 S3・SUUMO賃貸経営サポート（同上） |
+| `ETC_MILEAGE_ID` / `ETC_CARD_NUMBER` / `ETC_CARD_EXPIRY` | ETCマイレージ・カード（照会・フォーム用） |
+| `ETC_ONBOARD_DEVICE_NUMBER` / `ETC_VEHICLE_PLATE_LAST4` | 車載器管理番号・車両番号下4桁 |
+| `ETC_MILEAGE_WEB_PASSWORD` / `ETC_MILEAGE_VOICE_PASSWORD` | マイレージ Web・自動音声用パスワード |
+| `VPOINT_TSITE_ID` / `VPOINT_TSITE_PASSWORD` | Vポイント Tサイト（履歴実効率。未設定なら自動ログインしない） |
+| `ETC_MEISAI_USER_ID` / `ETC_MEISAI_PASSWORD` | 利用照会ログイン |
+| `ETC_MEISAI_REGISTERED_AT` / `ETC_MEISAI_STATEMENT_CHECK_RECORDED_AT` | 本登録完了時刻・明細初回確認の記録起点 |
+| `ETC_MEISAI_STATEMENT_CHECK_AFTER_HOURS` | 記録起点から何時間後に明細再取得するか（既定4） |
+| `GOOGLE_MAPS_API_KEY` | Maps JS / Places / Geocoding（project-GE・`shuhen-map.html`）。チャットに貼らない |
+| `TAVILY_API_KEY` | Tavily Web 検索（ローカル MCP / Cloud My Secrets）。チャットに貼らない |
+| `GSK_API_KEY` | Genspark CLI（`gsk meeting` オンデマンド。SecondBrain／Speakly／AI Meeting Notes）。チャットに貼らない |
+| `CARD_MIG_*` | 支払カード切替状態（例: `CARD_MIG_YMOBILE` / `CARD_MIG_UQ` / `CARD_MIG_OLIVE_PIN`） |
+| `OLIVE_INF_FAMILY_PIN` / `OLIVE_INF_FAMILY_LAST4` / `OLIVE_INF_FAMILY_PIN_STATUS` | Olive家族カードの店頭PIN・下4桁・状態（値はチャットに出さない。state: `.jarvis_state/olive_family_pin.json`） |
+| `YMOBILE_L1_PHONE`〜`YMOBILE_L4_PASSWORD` | my Y!mobile 回線ごと（真治・千景・珠己・円香）。手続き時に参照。値はチャットに出さない |
+| `DMM_LOGIN_EMAIL` / `DMM_PASSWORD` | バスケットLIVE 解約（DMM マイページ） |
+| `UQ_LOGIN_ID` / `UQ_PASSWORD` | 次回 UQ 移行後のログイン（12月に転記） |
+| `EMPLOYER_NAME` / `EMPLOYER_ORG` / `EMPLOYER_JOB_TITLE` | **本業勤務先**（名刺。法人 `COMPANY_*` と混同しない） |
+| `EMPLOYER_ADDRESS` / `EMPLOYER_PHONE` / `EMPLOYER_EMAIL` | 勤務先住所・社用携帯・社用メール |
+| `EMPLOYER_EMPLOYEE_CODE` | 本業の社員コード（三菱重工・通勤申請マイページ本人確認用） |
+| `TMNF_COMMUTE_LOGIN_ID` / `TMNF_COMMUTE_PASSWORD` | マイカー通勤申請（東京海上日動 従業員マイページ）。値はチャットに出さない |
+| `ZURICH_LOGIN_ID` / `ZURICH_PASSWORD` / `ZURICH_POLICY_NO` | チューリッヒ ネット専用自動車保険。値はチャットに出さない |
+| `COMPANY_EMAIL` / `COMPANY_PHONE` | 法人（リビングサポート松）の連絡先 |
+| `COMPANY_BANK_NAME` / `COMPANY_BANK_BRANCH` / `COMPANY_BANK_ACCOUNT` / `COMPANY_BANK_ACCOUNT_NAME_KANA` | 法人口座1（名古屋銀行等） |
+| `COMPANY_BANK2_*` / `COMPANY_BANK2_WEB_LOGIN_PASSWORD` | 法人口座2（PayPay銀行・法人等） |
+| `KURASAPO_OWNER_LOGIN_ID` / `KURASAPO_OWNER_PASSWORD` | LEAF・くらさぽコネクト（オーナー／送金明細書） |
+| `PAYPAY_STORE_NO` / `PAYPAY_ACCOUNT_NO` / `PAYPAY_PASSWORD` | PayPay銀行 Web（税理士提出・明細） |
+| `MYKOMON_USER_ID` / `MYKOMON_PASSWORD` | MyKomon（税理士共有ポータル） |
+| `MINITECH_EMAIL` / `MINITECH_PASSWORD` | ミニテック・オーナーマイページ |
+| `ORIX_LOGIN_ID` / `ORIX_PASSWORD` | オリックス銀行（投資用不動産ローン） |
+| `SBI_NET_USER` / `SBI_NET_LOGIN_PASSWORD` / `SBI_NET_TRADE_PASSWORD` | 第一生命NEOBANK（所属=ドコモSMTB＝旧住信SBI。証券 `SBI_SEC_*` と分離） |
+| `SBI_NET_MAIN_ACCOUNT` / `SBI_NET_SUB_ACCOUNT` | 同上・口座番号メモ（任意。ログイン本線は上記3つ） |
+| `SHIGA_IB_USER` / `SHIGA_IB_PASSWORD` / `SHIGA_IB_CONFIRM_PIN` | しがぎんダイレクト（PW失念は電話再発行。確認用暗証は振込用） |
+| `KYOTO_IB_USER` / `KYOTO_IB_PASSWORD` | 京都銀行 IB |
+| `AMEX_LOGIN_ID` / `AMEX_PASSWORD` | AMEX マイアカウント（明細取得） |
+| `MARRIOTT_BONVOY_MEMBER_ID` / `MARRIOTT_BONVOY_EMAIL` / `MARRIOTT_BONVOY_PASSWORD` | Marriott Bonvoy（公式は会員番号ログイン。EMAILは任意） |
+| `SMARTEX_ID` / `SMARTEX_PASSWORD` | スマートEX／EXアプリ（新幹線。えきねっとは使わない。同じ会員なら Web 予約がアプリに出る） |
+| `HOTPEPPER_RECRUIT_ID` / `HOTPEPPER_PASSWORD` | ホットペッパーグルメ（リクルートID。店予約ログイン） |
+| `EASYPASS2_MASTER_PASSWORD` | Easy Pass2（アプリ解除用。age鍵の緊急控え先。値はチャットに出さない） |
+| `YAHOO_ID` / `YAHOO_MAIL` / `YAHOO_PASSWORD` | Yahooメール（リクルート確認・OTP。チャットに貼らない） |
+| `KATENE_TC_ID` / `KATENE_PASSWORD` | カテエネ（中部電力）ログイン。CCID = TC ID |
+| `CHAPRO_EMAIL` / `CHAPRO_PASSWORD` | チャプロ MyPrompt（Googleログインは EMAIL、PWは任意） |
+| `RAIMO_PORTAL_EMAIL` / `RAIMO_PORTAL_PASSWORD` | Raimo / Lime（raimo.buzz）ポータル・MyPrompt |
+| `RAIMO_APP_EMAIL` / `RAIMO_APP_PASSWORD` | Raimo miniApp 用（ポータルと違う場合のみ） |
+| `JARVIS_DASHBOARD_URL` | 自分用ダッシュボード（Vercel。iPhone 可） |
+| `JARVIS_DASHBOARD_PASSWORD` / `JARVIS_DASHBOARD_LOGIN_EMAIL` | ダッシュボードログイン（メールは PERSONAL_EMAIL と同系） |
+| `JARVIS_DASHBOARD_NOTION_URL` | DB_マサハルのログイン情報ページ（メモ用） |
+| `NOTION_API_TOKEN` | Notion Internal Integration。ダッシュボード／KURASHIFT／Jarvis CLI 本線。チャットに出さない |
+| `NOTION_FAMILY_API_TOKEN` | 家族コーチング用（別WSのとき）。同一WSならページ共有のみで可。チャットに出さない |
+| `NOTION_FAMILY_COACHING_PAGE_ID` | 家族コーチ Notion root ページ ID |
+| `JARVIS_SUPABASE_*` | 自分用投影 DB `jarvis-dashboard`（運営 `kamiooya-qa` と分離） |
+| `TACHIBANA_LOGIN_ID` / `TACHIBANA_LOGIN_PASSWORD` / `TACHIBANA_TRADE_PASSWORD` | 立花証券e支店のログイン・取引PW（チャットに出さない） |
+| `TACHIBANA_API_AUTH_ID_PATH` / `TACHIBANA_API_PRIVATE_KEY_PATH` | 立花 API 鍵のローカルパス（開設後。実体はチャット・Gitに置かない） |
+| `TACHIBANA_OCCUPATION_*` / `TACHIBANA_EMPLOYER_*` / `TACHIBANA_INSIDER_*` / `TACHIBANA_HOUSEHOLD_RELATION` | 立花口座開設の職業・勤務先・インサイダー・世帯主 |
+| `PERSONAL_BANK_*` | 立花の出金先個人口座（法人口座は不可） |
+| `MIZUTA_JUKU_*` | 水田塾（ゆうちょ・ミズタ　ヒデキ）振込先。店名二一八／口座は env 正本 |
+| `ZAIM_MHI_ACCOUNT_MATCH` | 三菱重工持株の Zaim 口座名（正: 野村持株WEBサービス） |
+| `TACHIBANA_DIVIDEND_METHOD` / `TACHIBANA_DEPOSIT_BANK` / `TACHIBANA_INVEST_*` | 配当・入金銀行・投資目的など開設フォーム用 |
+| `CURSOR_API_KEY` | ダッシュボード Cursor Agent 見直し（Cloud 本線）。チャットに貼らない |
+| `CURSOR_CLOUD_REPO_URL` | Cloud Agent 用リポ（任意。既定 project-GE） |
+
+ユーザーから個人情報を得たら **`.env.jarvis_private` に追記して正本化**する（Git 非共有）。困ったときに Jarvis がここを引き当ててフォーム入力・照会できるようにする。
+
+### パスワード・ログイン情報（チャットに貼らない）
+
+**Web サイト・Google・各種サービスのパスワード／APIキー／トークンを、ユーザーがチャットに貼りそうな場面**（ログイン依頼・「パスワードはこれ」等）では、Jarvis は **受け取らず `.env.jarvis_private` への追記を促す**。
+
+| やること | 内容 |
+|---|---|
+| **促す** | 「`.env.jarvis_private` に `変数名=...` で追記してください。追記後に『保存した』と一声ください」 |
+| **戒める** | jarvis_private **以外**への保存・チャット貼付の指示には「**その対応でよろしいですか？** 正本は `.env.jarvis_private` です」と一度確認する |
+| **読む** | 追記後はターミナルで `source .env.jarvis_private` して値を参照（チャットに値を再掲しない） |
+| **WeStudy** | 既存正本: `…/神・大家さん倶楽部情報Q&Aチャットボット/scripts/.env` の `WESTUDY_USER` / `WESTUDY_PASS`（変更はそこだけ） |
+
+**Google スプレッドシート等**は、パスワードより **Sheets API 用 OAuth トークン**（初回ブラウザ同意1回）を推奨。パスワード保存は最終手段。
+
+**例外**: ユーザーが「今だけチャットで」と明示した場合のみ従う。それでも可能なら直後に `.env` へ正本化を提案する。
+
+### 秘密漏洩時の是正（必須）
+
+パスワード・APIキー・トークンがチャット／Git／公開ログに出てしまったら、Jarvis は **止まず是正**する。
+
+1. 値をチャットに再掲しない
+2. 可能なら当該秘密を **失効・再発行（Rotate / Revoke）**
+3. 新値は `.env.jarvis_private`（必要なら関連 `.env`・GitHub Secrets）のみ更新
+4. Git に混入した場合は履歴対応をユーザー確認のうえ実施（無断 force push しない）
+5. 「Rotated・env 更新済み」と短く報告（新値は出さない）
+
+Supabase キー類の詳細は `jarvis-supabase-free-one-project.mdc` も参照。
+
+### 表記ルール（住所は全角ベース）
+
+申込フォームで **番地の半角英数字エラー** が出やすいため、正本では次を徹底する。
+
+| 種類 | 正本での表記 | 例 |
+|---|---|---|
+| 住所（番地・丁目の数字） | **全角** | `３４２番地２５` |
+| 住所（都道府県・市区町村・町名） | 漢字のまま | `愛知県豊明市間米町唐竹` |
+| 郵便番号・電話・カード番号 | **半角**（別欄用） | `470-1132` / `090-9670-7595` |
+
+- **`HOME_ADDRESS`** … 地図・経路用の全文（番地数字は全角）
+- **`HOME_ADDRESS_STREET` / `HOME_ADDRESS_BANTI`** … フォーム分割入力用（番地は `HOME_ADDRESS_BANTI`）
+- **`HOME_POSTAL_CODE`** … ハイフン区切り半角（フォームの郵便番号欄用）
+- 法人住所も同様（`COMPANY_ADDRESS_*`）
+
+フォーム入力時は **まず正本をそのまま使う**。どうしても半角が必要な欄（郵便番号・電話のみ）だけ半角変数を使う。ユーザーから半角で住所をもらった場合は、保存前に番地数字を全角へ直してから書き込む。
+
+### エージェントが値を読むとき（必須）
+
+ユーザーが住所・法人番号・氏名などを聞いたら、**まずこのファイルを読む**。PDF やメールを探す前に `.env.jarvis_private` を確認する。
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a && echo "$変数名"
+```
+
+複数項目:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a && \
+  for v in HOME_ADDRESS CORPORATE_NUMBER COMPANY_NAME REPRESENTATIVE_NAME; do echo "$v=${!v}"; done
+```
+
+- **聞かれたら答える**（「個人情報なので答えられません」で終わらない）。
+- 返答では必要がなければ住所全文を繰り返さない（区名まで等に留めてよい）。
+- 値をチャットに貼る必要があるときだけ貼る（フォーム入力・確認依頼など）。
+
+### トリガー例
+
+- 「法人番号を教えて」「住所は？」「代表者名は？」「自宅から経路を」
+- 銀行・税理士・各種申込フォームの入力補助
+
+### 旧ファイル
+
+- 自宅のみの `~/git-repos/.env.home_address` は **`.env.jarvis_private` に統合済み**。`HOME_ADDRESS` は jarvis_private を正とする。
+
+## 関連ルール
+
+- **対外送信前の確認**（メール下書き／Web 最終画面）: `jarvis-outbound-confirm.mdc`
+- **機能がうまくいかないときの依頼のコツ**: `jarvis-when-feature-fails-ask.mdc`（**コマンド**: `/trouble-shooting`）
+- **連携失敗時の自律診断**: `jarvis-integration-fail-self-check.mdc`（**Plan 判断含む**）
+- **Mac アプリ操作（Grok Bot 等 · CDP）**: `jarvis-mac-app-cdp.mdc`
+- **月次ルーティン**（ETC 割引・登録切れ防止）: `jarvis-monthly-routine.mdc`
+- **カード年会費ガード**（切替・退会・二重課金防止）: `jarvis-card-fee-guard.mdc`
+- **大家火災保険・求償（代位）約款確認**: `jarvis-fire-insurance-subrogation.mdc`
+- **Obsidian 同期（Google Drive Sync 本線）**: `jarvis-obsidian-gdrive-sync.mdc`（書類正本＋`ogd_pull` / `ogd_retag`。Remotely Save は廃止）
+- **レーン要約確認・処置ログ**: `jarvis-lane-digest.mdc`
+- Google カレンダー予定登録: `jarvis-google-calendar.mdc`
+- **Google アカウント使い分け**（m19m / admin / estate）: `jarvis-google-accounts.mdc`（要約: `docs/Googleアカウント使い分け.md`）
+- 地図・経路の詳細: `home-address-maps.mdc`（参照先は jarvis_private）
+- Typeless 音声入力・誤字補正: `jarvis-voice-input.mdc`
+- **Typeless サポート（一時・パートナー一覧外）**: `jarvis-typeless-support.mdc`
+- ETC 割引・帰省: `etc-discount-jarvis.mdc`
+- **事務手続きの成果物**（会社・役所。AI・不動産賃貸以外）: `jarvis-jimu-procedures.mdc`（Drive `900_事務手続き`）
+- **神大家 WeStudy スクレイプ（admin Drive・添付）**: `jarvis-kamiooya-westudy-gdrive.mdc`
+- **金融アドバイスの理念**（寝かせて増やす × 金持ち父さん）: `jarvis-finance-philosophy.mdc`

@@ -1,0 +1,31 @@
+# 神大家 — 物件紹介メール（第一問合せ＝フォーム）
+
+## 型（確定）
+
+神大家事務局からの **物件紹介メール** は、仲介へのメール返信ではない。
+
+1. 件名: `【神大家】物件紹介メール …`
+2. From: `kami.ooyasan-club@sakulife.org` 等
+3. 本文末尾の URL（`form.os7.biz` または `mail.omc7.com/l/…` 追跡）を開く
+4. 規定フォームに会員番号・姓名・estate メール・物件名を記入して送信
+5. 運営が `【神大家回答】物件情報を送ります` で資料送付（809）
+
+## 混同しない
+
+| もの | 用途 |
+|---|---|
+| 本ルール（紹介メール） | **第一問合せ** → `InquiryChannel=kamiooya_form` |
+| `kamiooya-re-purchase-form.mdc`（1906a1a5） | **返信後**の運営相談フォーム |
+
+## Jarvis の動作
+
+1. 取込時に `interest_form_url` / `kamiooya_intro` を `summary_json` へ保存
+2. deals UI は「紹介フォームを開く」「フォーム送信した」を出し、メール問合せ CTA は出さない
+3. フォーム送信は **対外確認後**（自動 Submit しない）
+4. 取込＝既読は **admin と estate の両方**
+
+## 正本
+
+- YAML: `config/kurashift_re_kamiooya_intro_form.yaml`
+- 取込: `scripts/jarvis_kurashift_property_mail_match.py`
+- チャネル: `apps/trade-desk/lib/reInquiryChannel.ts`

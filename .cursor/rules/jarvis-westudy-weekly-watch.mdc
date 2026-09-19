@@ -1,0 +1,61 @@
+---
+description: WeStudy 週次取込（GitHub Actions）の安定確認。Fail通知・日曜・パートナー確認時に結果を見る。軌道に乗るまで適用。
+alwaysApply: true
+---
+
+# WeStudy 週次取込ウォッチ（Jarvis）
+
+## 背景
+
+週次 CI（`westudy-raimo-weekly.yml`、日曜 08:00 JST）が落ちると Gmail に GitHub Actions の Fail 通知が来る。  
+安定するまで Jarvis がやり取りのついでに結果を確認する。
+
+## 無効化
+
+次のいずれか:
+
+- `~/git-repos/.jarvis_state/westudy_weekly_watch.json` に `"disabled": true`
+- または `.env.jarvis_private` に `JARVIS_WESTUDY_WEEKLY_WATCH_DISABLE=1`
+- ユーザーが「軌道に乗った／WeStudy週次ウォッチ不要」と明示 → `--mark-stable` または disabled
+
+## チェックスクリプト（正本）
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_westudy_weekly_check.py
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_westudy_weekly_check.py --mark-checked
+```
+
+## いつ実行・報告するか
+
+| トリガー | 動作 |
+|---|---|
+| **パートナー確認**（`partner-email-check.mdc`） | 前半報告の末尾付近で実行（`--mark-prompted` の LINE 促しと同タイミングで可）。出力があれば貼る |
+| **日曜（JST）** のセッション | 同一セッションで未実施なら本題の前後に実行 |
+| Gmail / チャットで **WeStudy・週次取込・Actions Fail** | 即実行。失敗ならログ要約＋再実行提案 |
+
+促しすぎ防止: 同一 run_id の再確認では連続成功カウントを増やさない（スクリプト側）。
+
+## 報告フォーマット
+
+スクリプト出力の `📎 WeStudy週次` ブロックをそのまま貼る。
+
+失敗時の一手（短く）:
+
+```bash
+gh run view <run_id> --log-failed
+# deps 修正後など
+gh workflow run westudy-raimo-weekly.yml -f force_scrape=true
+```
+
+## 安定の目安
+
+- 連続成功 **2 回**（週次 cron または手動）を state に記録
+- ユーザー合意のうえ `disabled: true` または `--mark-stable`
+
+## 関連
+
+- Workflow: `.github/workflows/westudy-raimo-weekly.yml`（文字・Supabase/Raimo）
+- Drive 添付週次（Mac）: 日曜 08:00 本線＋朝オープン取りこぼし（Zaim と同じ）。チェック出力に `Drive添付:` 行が出る
+- CI deps: `…/チャットボット/scripts/requirements-ci.txt`
+- 手順: `運用手順_WeStudy差分CSV.md` / `docs/運用コマンド一覧.md`
+- state: `~/git-repos/.jarvis_state/westudy_weekly_watch.json` / `westudy_gdrive_weekly.json`

@@ -1,0 +1,32 @@
+# BMW/MINI マイカーローン引落（学習・実績前）
+
+## 正（2026-08-23 ユーザー確認）
+
+- **引落口座**: 三菱UFJ銀行 **熱田**（`mufg_atsuta`）
+- **SBI（本・副）からは引落されない** → カード引落バッファ／SBI資金計画に BMW 月額を足さない
+- **豊明（千景）≠ マイカー返済口座**（旧バッファ案の混同に注意）
+- 月額目安: `car_loan.json` の `monthly_repayment_yen`（約32,426円）／ボーナス月 1・7
+
+## 正本（アプリ・Jarvis）
+
+| 役割 | パス |
+|---|---|
+| 機械可読 | `config/known_recurring_debits.yaml`（`bmw_mini_mufg_mycar`） |
+| 契約・返済口座 | `.jarvis_state/car_loan.json` → `settlement` |
+| env | `CAR_LOAN_SETTLEMENT_*` / `CAR_LOAN_EXCLUDE_FROM_SBI_BUFFER` |
+
+## トリガー
+
+- BMW / MINI / マイカーローン / ネットDEマイカー / Countryman の引落・資金寄せ
+- KURASHIFT money-ops・カード引落バッファ・「定期引落を実績から」
+
+## Jarvis の動作
+
+1. Zaim に実績が無くても **上記正本を優先**（`evidence_status: pending_zaim`）
+2. SBI 側の不足計算に BMW を混ぜない
+3. MUFG熱田の keep / Oliveきちんと振込側で見る
+4. Zaim に熱田からのローン引落が安定して出たら、YAML の `evidence_status` を `zaim_observed` に更新してよい
+
+## 混同しない
+
+- Zaim 店名 `口座振替ap(bmwjf` は費目学習あり得るが、**引落口座の正は MUFG熱田**

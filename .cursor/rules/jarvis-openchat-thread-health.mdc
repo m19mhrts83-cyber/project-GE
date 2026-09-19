@@ -1,0 +1,65 @@
+---
+description: 815オプチャ専用スレッド健全性の目安と、疑義時の自律確認（Jarvis）
+alwaysApply: true
+---
+
+# 815 オープンチャット・スレッド健全性（Jarvis）
+
+## 方針
+
+ユーザーに頼まれなくても、**疑義があれば健全性を確認**する。  
+「メインは動くが専用スレッドが止まっている」は不調の典型。
+
+## 指標の見分け（混同しない）
+
+| 見たいもの | 正 | 混同しやすいもの |
+|---|---|---|
+| **スレッド本数** | YAML `thread_mids` 件数（登録 MID）／MD のユニークタイトル数 | 見出し件数 |
+| **投稿・コメント数** | `【スレッド】` 見出し件数／`# thread sync: … appended=` | スレッド本数 |
+| **メイン上の返信** | `【スレッド返信】`（専用タイムラインとは別経路） | `【スレッド】` |
+
+## 不調シグナル（次のいずれか）
+
+1. **専用 `【スレッド】` が数日連続 0** かつ 同期間に **`【スレッド返信】` がある**
+2. 常時監視は heartbeat ありだが **最終追記が古い**／`TypeError`・`PermissionError`・`LOGGED_OUT` が直近ログにある
+3. パートナー確認後半で `# thread sync: appended=0` が続き、メイン追記だけ増える
+4. YAML 未登録の新スレが疑わしい（`relatedMessageId` はあるが専用見出しが無い）
+
+## 疑義時の動作（依頼なしで実施）
+
+1. **数値化**（ルート横断）: 直近14日の `【スレッド】`／`【スレッド返信】`／`【メイン】`、YAML 本数、最新専用日付
+2. **常時監視**: launchd 状態・status JSON・`watch.err.log` の例外
+3. 不調なら既知手順（`docs/運用コマンド一覧.md`）:
+   - `./launchd/open_chat_watch_pause.sh`
+   - discover（`--discover-from-yoritoori`）→ 必要なら YAML 追記
+   - `--threads-only` 復旧／常時監視 resume
+4. 報告は **本数と投稿数を分けて**書く。815 は返信提案対象外（`815-openchat-no-reply-proposal.mdc`）
+
+## 自動化（2026-09〜・整合）
+
+| 経路 | 既定 | 正本・注意 |
+|---|---|---|
+| 日常 discover | `--discover-thread-mids-dry-run` → **YAML auto-append**（上限20） | 同一プロセスの `--threads-only` は YAML 再読込。常時監視は起動時 YAML 固定のため、大量追記後は resume／再起動で反映 |
+| silent_fail | health → `mac_recipe=queued` → recover_worker | **Supabase が正本**。local `last_report` の running で done を潰さない。Worker は done 保存後に health push |
+
+無効化: `JARVIS_OPENCHAT_DISCOVER_AUTO_APPEND=0` / `JARVIS_OPENCHAT_AUTO_QUEUE_RECOVER=0`
+
+## 構造限界として割り切るもの
+
+- 閉鎖・削除済み（404）スレッド
+- 未参加で **join API が恒久失敗**するスレ（新着は常時監視 event 54 と `【スレッド返信】` で補完）
+- Square 履歴 API の一括バックフィル過多（401→トークン失効）
+
+## 教訓（2026-07-27）: 関西・全体周知の join 失敗
+
+- `getSquareThreadMid(relatedMessageId)` で得た MID でも、**スレ本体が既に削除**されていることがある（404「此討論串已被刪除」）。
+- 典型: 物件紹介の「人数に達したので案内終了」後。メイン上の `【スレッド返信】` は残るが、専用 `【スレッド】` は取れない。
+- 対策: join 404 なら state を `deleted`（日常スキップ）。YAML からは消さない。新規は常時監視＋メイン返信で拾う。
+- 切り分け: `./run_patch.sh chrline_join_thread_probe.py --allow-qr-login --try-join --route-ids …`
+
+## 関連
+
+- パートナー確認後半: `partner-email-check.mdc`
+- 連携失敗プロトコル: `jarvis-integration-fail-self-check.mdc`
+- 常時監視: `line_unofficial_poc/launchd/README.md`
+- コマンド正本: `docs/運用コマンド一覧.md`
