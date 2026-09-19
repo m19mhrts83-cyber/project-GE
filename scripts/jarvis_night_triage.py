@@ -2,12 +2,12 @@
 """
 Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
 
-1. gmail_to_yoritoori.py で取込（パートナー）
+1. gmail_to_yoritoori.py で取込（パートナー・任意）
 2. 5.やり取り.md / admin INBOX から未返信候補を抽出
-3. Gemini / Cursor Agent で要返信判定・下書き生成
+3. 既定はヒューリスティックで未返信インボックス化（Gemini/Cursor 判定・下書きなし）
    （パートナー: Gmail ＋ Chatwork／LINE／iMessage。815 オプチャは下書きしない）
 4. 815神大家オプチャの直近更新概要を queue に載せる（kind=activity）
-5. .jarvis_state/night_triage/queue.json を更新（lane=partner|general|openchat）
+5. Gmail 既読（取込時点）＋ .jarvis_state/night_triage/queue.json 更新
 
 使い方:
   python scripts/jarvis_night_triage.py --dry-run
@@ -15,6 +15,7 @@ Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
   python scripts/jarvis_night_triage.py --lane general --skip-fetch --limit 5
   python scripts/jarvis_night_triage.py --apply-draft 12
   python scripts/jarvis_night_triage.py --send-gmail 12   # general のみ・承認後
+  # LLM（非推奨・課金）: --allow-llm --engine gemini
 """
 from __future__ import annotations
 
@@ -1152,6 +1153,60 @@ def regenerate_dashboard() -> None:
         subprocess.run([str(PY), str(dash), "--write"], check=False)
 
 
+def process_candidates_heuristic(
+    candidates: list[dict[str, Any]],
+    *,
+    dry_run: bool,
+    limit: int,
+) -> tuple[int, int]:
+    """Gemini/Cursor なし: 未返信候補を pending としてキューへ（下書き空）。"""
+    queue = load_queue()
+    need = 0
+    for c in candidates[:limit]:
+        lane = c.get("lane") or "partner"
+        label = c.get("folder") or c.get("from_email") or lane
+        print(f"# candidate [heuristic/{lane}/{label}] {c['received_at']} {c['subject'][:60]}")
+        if dry_run:
+            print("  (dry-run) skip write")
+            need += 1
+            continue
+        kind = c.get("kind") or ("chat" if (c.get("channel") or "") in ("Chatwork", "LINE", "iMessage") else "mail")
+        if lane == "general":
+            try:
+                from jarvis_night_triage_general import classify_general_kind
+
+                kind = classify_general_kind(
+                    c.get("subject") or "",
+                    c.get("body") or "",
+                    c.get("from_email") or "",
+                )
+            except Exception:
+                kind = "mail"
+        priority = "high" if kind == "mail" else ("med" if lane == "partner" else "low")
+        upsert_item(
+            queue,
+            queue_item_fields(
+                c,
+                {
+                    "priority": priority,
+                    "summary": (c.get("summary") or c.get("subject") or "")[:200],
+                    "reason": "heuristic_unreplied_inbox",
+                    "draft_text": "",
+                    "draft_gemini": "",
+                    "draft_cursor": "",
+                    "status": "pending",
+                    "engine": "heuristic",
+                    "kind": kind,
+                },
+            ),
+        )
+        need += 1
+    if not dry_run:
+        assign_seqs(queue)
+        save_json(QUEUE_PATH, queue)
+    return need, 0
+
+
 def process_candidates(
     candidates: list[dict[str, Any]],
     *,
@@ -1361,9 +1416,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Jarvis night email triage")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--skip-fetch", action="store_true")
-    ap.add_argument("--engine", choices=("gemini", "cursor"), default=None)
+    ap.add_argument("--engine", choices=("gemini", "cursor", "heuristic"), default=None)
     ap.add_argument("--compare-engines", action="store_true")
     ap.add_argument("--judge-only", action="store_true")
+    ap.add_argument(
+        "--allow-llm",
+        action="store_true",
+        help="Gemini/Cursor 判定・下書きを許可（非推奨・課金）。既定はヒューリスティックのみ。",
+    )
     ap.add_argument("--lane", choices=("partner", "general", "all"), default="all")
     ap.add_argument(
         "--skip-partner-gmail",
@@ -1423,7 +1483,23 @@ def main() -> int:
         print("# night triage disabled in config.json")
         return 0
 
-    engine = args.engine or cfg.get("engine") or DEFAULT_ENGINE
+    # 課金削減 2026-09: 既定は LLM なし（heuristic）。--allow-llm または config allow_llm のみ有効。
+    allow_llm = bool(args.allow_llm) or bool(cfg.get("allow_llm"))
+    no_gemini_env = (os.environ.get("JARVIS_TRIAGE_NO_GEMINI") or "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if no_gemini_env and not args.allow_llm:
+        allow_llm = False
+    if args.compare_engines and not allow_llm:
+        print("# --compare-engines requires --allow-llm; falling back to heuristic", file=sys.stderr)
+        allow_llm = False
+
+    engine = args.engine or cfg.get("engine") or ("heuristic" if not allow_llm else DEFAULT_ENGINE)
+    if not allow_llm:
+        engine = "heuristic"
     model = cfg.get("gemini_model") or DEFAULT_GEMINI_MODEL
     api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
     limit = args.limit or int(cfg.get("max_drafts_per_run") or 15)
@@ -1440,7 +1516,10 @@ def main() -> int:
 
     base = partner_base()
     print(f"# partner base: {base}")
-    print(f"# engine: {'compare' if args.compare_engines else engine} model={model} lane={args.lane}")
+    print(
+        f"# engine: {engine} model={model} lane={args.lane} "
+        f"llm={'on' if allow_llm else 'off'}"
+    )
 
     all_cands: list[dict[str, Any]] = []
     activities: list[dict[str, Any]] = []
@@ -1514,16 +1593,23 @@ def main() -> int:
         todo.append(c)
 
     print(f"# to process: {len(todo)} (limit {limit})")
-    need, drafted = process_candidates(
-        todo,
-        engine=engine,
-        compare=args.compare_engines,
-        model=model,
-        api_key=api_key,
-        dry_run=args.dry_run,
-        limit=limit,
-        judge_only=args.judge_only,
-    )
+    if engine == "heuristic" or not allow_llm:
+        need, drafted = process_candidates_heuristic(
+            todo,
+            dry_run=args.dry_run,
+            limit=limit,
+        )
+    else:
+        need, drafted = process_candidates(
+            todo,
+            engine=engine,
+            compare=args.compare_engines,
+            model=model,
+            api_key=api_key,
+            dry_run=args.dry_run,
+            limit=limit,
+            judge_only=args.judge_only,
+        )
 
     # Gmail: Dashboard 取込時点で既読（閉じ待ちにしない）。物件紹介は general に載らないため未読のまま → KURASHIFT 取込時。
     mail_items = [
@@ -1604,7 +1690,8 @@ def main() -> int:
             json.dumps(
                 {
                     "at": now_iso(),
-                    "engine": "compare" if args.compare_engines else engine,
+                    "engine": engine if not args.compare_engines else "compare",
+                    "llm": allow_llm,
                     "lane": args.lane,
                     "candidates": len(all_cands),
                     "need": need,

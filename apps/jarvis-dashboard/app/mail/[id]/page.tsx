@@ -157,23 +157,57 @@ export default async function MailDetailPage({
           files={visuals.files}
           visualsError={visuals.error}
         />
-        <h2 style={{ fontSize: "1rem", marginTop: 16 }}>返信下書き</h2>
-        <DraftWorkbench
-          id={it.id}
-          path={path}
-          subject={it.subject}
-          toEmail={it.from_email}
-          partner={it.partner}
-          folder={it.folder}
-          lane={it.lane}
-          draftText={it.draft_text}
-          draftJa={draftJa}
-          payload={it.payload}
-          status={it.status}
-          gmailReady={gmailReady}
-          resolvedTo={resolved.to}
-          toSource={resolved.source}
-        />
+        {!(it.draft_text || "").trim() ? (
+          <p className="meta" style={{ marginTop: 16 }}>
+            夜間バッチは下書きを作りません。上のステータス操作が主。必要なときだけ下を開いて手書き。
+          </p>
+        ) : null}
+        {(it.draft_text || "").trim() ? (
+          <>
+            <h2 style={{ fontSize: "1rem", marginTop: 16 }}>返信下書き</h2>
+            <DraftWorkbench
+              id={it.id}
+              path={path}
+              subject={it.subject}
+              toEmail={it.from_email}
+              partner={it.partner}
+              folder={it.folder}
+              lane={it.lane}
+              draftText={it.draft_text}
+              draftJa={draftJa}
+              payload={it.payload}
+              status={it.status}
+              gmailReady={gmailReady}
+              resolvedTo={resolved.to}
+              toSource={resolved.source}
+            />
+          </>
+        ) : (
+          <details style={{ marginTop: 12 }}>
+            <summary
+              className="meta"
+              style={{ cursor: "pointer", userSelect: "none" }}
+            >
+              手動で返信下書きを書く（任意）
+            </summary>
+            <DraftWorkbench
+              id={it.id}
+              path={path}
+              subject={it.subject}
+              toEmail={it.from_email}
+              partner={it.partner}
+              folder={it.folder}
+              lane={it.lane}
+              draftText={it.draft_text}
+              draftJa={draftJa}
+              payload={it.payload}
+              status={it.status}
+              gmailReady={gmailReady}
+              resolvedTo={resolved.to}
+              toSource={resolved.source}
+            />
+          </details>
+        )}
         <MailTaskHandoff id={it.id} path={path} payload={it.payload} />
       </article>
     </Shell>

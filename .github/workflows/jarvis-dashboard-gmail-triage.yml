@@ -1,13 +1,14 @@
 name: Jarvis Dashboard Gmail Triage
 
 # 05:00 JST:
-#   1) admin general → triage_items
+#   1) admin general → triage_items（ルール＋既読・Gemini なし）
 #   2) パートナー Gmail → OneDrive 5.やり取り.md（Graph）＋既読
 #   3) パートナー Chatwork → OneDrive 5.やり取り.md（Graph）＋添付
-#   4) パートナー Gmail／Chatwork 未返信判定 → triage_items
+#   4) パートナー Gmail／Chatwork 未返信 → triage_items（ヒューリスティック表示・Gemini なし）
 # LINE / iMessage / CHRLINE は Mac 残。
 # Graph refresh 回転は sync_meta.ms_graph_refresh_token へ自動保存（Secrets 古くても次回OK）。
 # 末尾で Ops Fail Watch（Vercel/GHA）も朝1回だけ実行する。
+# 課金削減 2026-09: GEMINI_API_KEY は渡さない（判定・下書き・和訳オフ）。
 
 on:
   schedule:
@@ -76,7 +77,7 @@ jobs:
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          JARVIS_TRIAGE_NO_GEMINI: "1"
           GMAIL_CREDENTIALS_PATH: ${{ github.workspace }}/.credentials/credentials.json
           GMAIL_ADMIN_TOKEN_PATH: ${{ github.workspace }}/.credentials/token_admin.json
           LIMIT: ${{ github.event.inputs.limit || '20' }}
@@ -160,7 +161,7 @@ jobs:
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          JARVIS_TRIAGE_NO_GEMINI: "1"
           MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
           MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
           MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
@@ -177,7 +178,7 @@ jobs:
             echo "::warning::MS_GRAPH_* missing — skip partner triage"
             exit 0
           fi
-          ARGS=(--limit "$LIMIT")
+          ARGS=(--limit "$LIMIT" --no-gemini)
           if [[ "$DRY" == "true" ]]; then
             ARGS+=(--dry-run)
           else

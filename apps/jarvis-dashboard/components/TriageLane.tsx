@@ -375,24 +375,58 @@ export default async function TriageLanePage({
                     visualsError={focusVisuals.error}
                     open
                   />
-                  <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>
-                    返信下書き
-                  </h3>
-                  <DraftWorkbench
-                    id={focus.id}
-                    path={viewPath}
-                    subject={focus.subject}
-                    toEmail={focus.from_email}
-                    partner={focus.partner}
-                    folder={focus.folder}
-                    lane={lane}
-                    draftText={focus.draft_text}
-                    payload={focus.payload}
-                    status={focus.status}
-                    gmailReady={gmailReady}
-                    resolvedTo={focusTo.to}
-                    toSource={focusTo.source}
-                  />
+                  {!(focus.draft_text || "").trim() ? (
+                    <p className="meta" style={{ marginTop: 14 }}>
+                      夜間バッチは未返信の識別のみ（下書きなし）。重要なら Gmail
+                      → パートナー確認。上の「スキップ／後で／確認した」が主操作です。
+                    </p>
+                  ) : null}
+                  {(focus.draft_text || "").trim() ? (
+                    <>
+                      <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>
+                        返信下書き
+                      </h3>
+                      <DraftWorkbench
+                        id={focus.id}
+                        path={viewPath}
+                        subject={focus.subject}
+                        toEmail={focus.from_email}
+                        partner={focus.partner}
+                        folder={focus.folder}
+                        lane={lane}
+                        draftText={focus.draft_text}
+                        payload={focus.payload}
+                        status={focus.status}
+                        gmailReady={gmailReady}
+                        resolvedTo={focusTo.to}
+                        toSource={focusTo.source}
+                      />
+                    </>
+                  ) : (
+                    <details style={{ marginTop: 10 }}>
+                      <summary
+                        className="meta"
+                        style={{ cursor: "pointer", userSelect: "none" }}
+                      >
+                        手動で返信下書きを書く（任意）
+                      </summary>
+                      <DraftWorkbench
+                        id={focus.id}
+                        path={viewPath}
+                        subject={focus.subject}
+                        toEmail={focus.from_email}
+                        partner={focus.partner}
+                        folder={focus.folder}
+                        lane={lane}
+                        draftText={focus.draft_text}
+                        payload={focus.payload}
+                        status={focus.status}
+                        gmailReady={gmailReady}
+                        resolvedTo={focusTo.to}
+                        toSource={focusTo.source}
+                      />
+                    </details>
+                  )}
                 </article>
               </>
             )}

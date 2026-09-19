@@ -1,16 +1,23 @@
 # Jarvis 夜間メールトリアージ
 
-## 方針
+## 方針（課金削減 2026-09）
 
-- 夜間（launchd 05:00）に **LINE／iMessage** と 815 要約を判定（**パートナー Gmail／Chatwork 判定は GHA 本線**・既定スキップ）。general も GHA 05:00 が本線。
+- 夜間（GHA 05:00 JST 本線＋ Mac launchd 補完）は **未返信の識別・既読・一覧表示**まで。
+- **Gemini / Cursor による判定・下書きは既定オフ**（課金本体だったため停止）。
 - **Gmail 既読の本線は取込時点**（パートナーは GHA yoritoori／`gmail_to_yoritoori`、general は GHA triage）。Dashboard で閉じたときの既読は取りこぼし補完。物件紹介は **KURASHIFT 取込時**に既読。
-- **Chatwork 取込**は GHA `jarvis_gha_partner_chatwork_yoritoori.py`（Graph）。進捗 JSON は OneDrive `000_共通/.jarvis_chatwork_processed.json`（Mac と共有）。
-- **自動送信はしない**。朝にダッシュボードで確認 → Cursor で「夜間下書き #N を送って」。
-- ダッシュボードは **launchd 常時起動**（`http://127.0.0.1:8765/`）。ターミナル不要。
-- タブ: **パートナー**（チャネル別要返信＋下書き）／ **神大家オプチャ**（要約のみ）／ **それ以外**（admin Gmail）／ **状況**（ウォッチ判定・アーカイブ・Cursor調査コピー）。起動時に要注意のポップアップ（1日1回）。
-- サイドバーに神大家運営・3棟・戸建て・AI/Raimo・数値のプレースホルダ（Phase 2）。状況レジストリ: `config/situation_watch.yaml`、集約: `scripts/jarvis_situation_watch.py`。
-- エンジンはページ上部または `config.json` の `engine`（`gemini` / `cursor`）。Cursor 切替で未ログインなら Terminal で `agent login` が起動する。
-- **パッと表示**: 夜間バッチは判定・下書きのみ。**Mac を開いた日の最初のタイミング**（ログイン／起床後の短周期チェック）でダッシュボードを1日1回自動オープン。
+- **Chatwork 取込**は GHA `jarvis_gha_partner_chatwork_yoritoori.py`（Graph）。
+- **自動送信はしない**。処置の本線は **Gmail で重要確認 → Jarvis パートナー確認**（やり取り更新）。
+- ダッシュボードのパートナー欄は **「未返信インボックス」**（件名・相手・チャネル）。AI下書き前提の朝ルーティンはやめる。
+- タブ: **パートナー**／ **神大家オプチャ**（要約のみ）／ **それ以外**（admin・ルール仕分け）／ **状況**。
+- エンジン既定は `heuristic`。LLM が必要なときだけ `--allow-llm`（非推奨）。
+
+## レーンの意味
+
+| レーン | やること | やらないこと |
+|---|---|---|
+| パートナー | 未返信の識別・表示 | Gemini 判定・下書き |
+| それ以外 | ルール（mail/skim）＋既読 | Gemini 要約・返信案 |
+| KURASHIFT／deals | 物件取込（別経路・Geminiなし） | 夜間トリアージに寄せない |
 
 ## Mac 休止時の挙動
 
@@ -20,32 +27,17 @@
 | シャットダウン | 動かない（次の05:00または手動） | ログイン後に `RunAtLoad` で再起動 |
 | 電源オン＋ログイン済み | 05:00に実行 | 常時利用可 |
 
-スリープ中に画面表示はできない。通知・自動オープンは起床・解除後に見える。
-
 ## 朝の使い方
 
-1. **夜間に判定・下書き済み**の結果が、Mac を開いた最初のタイミングで **http://127.0.0.1:8765/** に表示される（1日1回）  
+1. ダッシュボードで **未返信一覧**を見る（下書きは空が正常）  
    （手動: `~/git-repos/.jarvis_state/night_triage/夜間トリアージ.webloc`）
-2. タブ「パートナー」「神大家オプチャ」「それ以外」「状況」を切替（起動時は要注意ポップアップ）
-3. パートナーの要返信は「スキップ／後で／送信指示」。カードにチャネルバッジ（Gmail／LINE／…）。オプチャは**概要のみ**（操作なし）。状況はアーカイブ／Cursorで調べる
-4. 送る件は「送信指示をコピー」→ Cursor に貼る → 承認後に送信
-   - パートナー Gmail: `yoritoori_send.py`（`--apply-draft` → `4.送信下書き.txt`）
-   - パートナー LINE: `--apply-draft` → `4.LINE送信下書き.txt` → `line_clip_send.py`（了承後）
-   - パートナー iMessage: `--apply-draft` → `4.送信下書き.txt`（経路：iMessage）→ `yoritoori_send --via imessage`
-   - パートナー Chatwork: `--apply-draft` → `4.Chatwork送信下書き.txt`（送信は従来どおり別導線）
-   - それ以外（general）: `jarvis_night_triage.py --send-gmail N`
+2. 重要なものは Gmail で確認 → **パートナー確認**でやり取り更新・処置
+3. カードは「スキップ／後で／確認した」中心。手動下書きが必要なときだけ Workbench を開く
 
 ## トリガー
 
-- 「夜間トリアージ」「夜間下書き」「トリアージダッシュボード」
-- 「夜間下書き #N を送って」
-
-## Jarvis の動作（#N を送って）
-
-1. `jarvis_night_triage.py --apply-draft N`
-2. `lane=partner` → チャネル別下書きファイルへ書込 → プレビュー → 了承後に各送信手段
-3. `lane=general` → プレビュー表示 → 承認後 `--send-gmail N`（admin Gmail Reply）
-4. 成功後 `--mark-sent N`（`--send-gmail` は自動で mark）
+- 「夜間トリアージ」「トリアージダッシュボード」
+- （旧）「夜間下書き #N を送って」→ 下書きが空なら手動作成が先
 
 ## 関連コマンド
 
@@ -53,17 +45,21 @@
 # ダッシュボード常時起動の再インストール
 ~/git-repos/launchd/install_triage_dashboard_launchd.sh
 
-# 朝の自動オープン（ログイン時＋約2分間隔。スリープ中は止まり、開いた後の最初で1日1回）
+# 朝の自動オープン
 ~/git-repos/launchd/install_triage_morning_open_launchd.sh
 
-# 手動バッチ
+# 手動バッチ（LLM なし・既定）
 cd ~/git-repos
 ~/selenium_env/venv/bin/python scripts/jarvis_night_triage.py --lane all
 ~/selenium_env/venv/bin/python scripts/jarvis_night_triage.py --lane general --skip-fetch --limit 5
+
+# LLM（非推奨）
+~/selenium_env/venv/bin/python scripts/jarvis_night_triage.py --allow-llm --engine gemini --limit 5
 ```
 
 - state: `~/git-repos/.jarvis_state/night_triage/`
 - 夜間バッチ: `launchd/install_night_triage_launchd.sh`（05:00）
+- GHA: `.github/workflows/jarvis-dashboard-gmail-triage.yml`（`JARVIS_TRIAGE_NO_GEMINI=1`）
 - ダッシュボード常時: `launchd/install_triage_dashboard_launchd.sh`
 - 朝の自動オープン: `launchd/install_triage_morning_open_launchd.sh`
 - 正本: `docs/運用コマンド一覧.md` §2.2
