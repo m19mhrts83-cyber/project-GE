@@ -1,10 +1,11 @@
 # FRIDAY 運用キット（Genspark・Mesh）
 
-**最終更新**: 2026-09-17  
+**最終更新**: 2026-09-19  
 **呼び名**: Genspark（Super Agent / GenTeam / GenMail 等）＝ **FRIDAY**  
 **役割**: Jarvis（Cursor）本線の**バックアップ**。調査・要約・資料下書き・指定スクリプトの実行・結果報告。
 
-関連: [`docs/運用コマンド一覧.md`](運用コマンド一覧.md) ／ Mesh 開通は PC 側 `gsk mesh`（ノード名 `matsuchan-pc`）
+関連: [`docs/運用コマンド一覧.md`](運用コマンド一覧.md) ／ Mesh 開通は PC 側 `gsk mesh`（ノード名 `matsuchan-pc`）  
+Meeting Notes の引き出し→下書き・送信準備は **Jarvis 本線**（`jarvis-genspark-meeting.mdc`／`scripts/jarvis_genspark_meeting_fetch.py`）。FRIDAY は枠切れ時の要約補助まで。
 
 ---
 
