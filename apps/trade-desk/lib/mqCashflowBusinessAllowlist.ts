@@ -33,9 +33,16 @@ function isDelta19F(c: string): boolean {
   return includesCI(c, "19F") || includesCI(c, "賃貸経営");
 }
 
-/** Δ21F AIリスキリング */
+/** Δ21F AIリスキリング（不動産資金繰りからは除外。AI ラインのみ載せる） */
+export function isDelta21FAiReskilling(c: string): boolean {
+  return (
+    (includesCI(c, "21F") && includesCI(c, "AI")) ||
+    includesCI(c, "AIリスキリング")
+  );
+}
+
 function isDelta21F(c: string): boolean {
-  return includesCI(c, "21F") && includesCI(c, "AI");
+  return isDelta21FAiReskilling(c);
 }
 
 /** γ.6.2C 自己投資・寄付 × 不動産投資関連(経費) */
@@ -54,14 +61,18 @@ function isBetaRealestateExpense(c: string, s: string): boolean {
   return includesCI(s, "不動産");
 }
 
-/** 事業ホワイトリストに当たればヒット、否则 null */
+/** 事業ホワイトリストに当たればヒット、否则 null。
+ * `businessLine: "realestate"` のとき Δ21F AIリスキリングはヒットしない（不動産に混ぜない）。
+ */
 export function matchBusinessAllowlist(
-  txn: FinanceTxnLite
+  txn: FinanceTxnLite,
+  businessLine: string = "realestate"
 ): BusinessAllowHit | null {
   const c = cat(txn);
   const s = sub(txn);
   const inc = Number(txn.income_jpy) || 0;
   const exp = Number(txn.expense_jpy) || 0;
+  const forAiLine = businessLine === "ai";
 
   // —— 収入 ——
   if (inc > 0) {
@@ -143,6 +154,8 @@ export function matchBusinessAllowlist(
       };
     }
     if (isDelta21F(c)) {
+      // 不動産資金繰り評価からは除外。AI 事業線でのみ載せる
+      if (!forAiLine) return null;
       return {
         side: "expense",
         expenseMode: "expense_flat",
@@ -172,6 +185,9 @@ export function matchBusinessAllowlist(
   return null;
 }
 
-export function isBusinessCashflowTxn(txn: FinanceTxnLite): boolean {
-  return matchBusinessAllowlist(txn) != null;
+export function isBusinessCashflowTxn(
+  txn: FinanceTxnLite,
+  businessLine: string = "realestate"
+): boolean {
+  return matchBusinessAllowlist(txn, businessLine) != null;
 }

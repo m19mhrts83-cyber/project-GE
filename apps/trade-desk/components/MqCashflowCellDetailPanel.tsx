@@ -106,7 +106,7 @@ export default function MqCashflowCellDetailPanel(props: Props) {
 
             {reclassifiable ? (
               <p className="meta mq-cashflow-detail-hint">
-                取引行をクリックすると、その場で列を変更できます。
+                取引行をクリックすると、その場で列を変更できます。「集計から除外」で不動産資金繰り合計から外せます。
               </p>
             ) : null}
 

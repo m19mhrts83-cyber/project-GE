@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import type { CashflowColumnKey } from "@/lib/mqCashflowColumns";
+import {
+  CASHFLOW_EXCLUDE_COLUMN,
+  type CashflowColumnOrExclude,
+} from "@/lib/mqCashflowColumns";
 import {
   buildLearnRuleFromTxn,
   type CashflowClassifyRuleRow,
@@ -8,6 +11,25 @@ import {
 
 const TXN_COLS =
   "id,category,subcategory,entity,kind,txn_date,income_jpy,expense_jpy";
+
+const ALLOWED_OVERRIDE_COLUMNS = new Set<string>([
+  "sales",
+  "borrow_lt",
+  "borrow_st",
+  "borrow_officer",
+  "repair",
+  "advertising",
+  "expense",
+  "management",
+  "acquisition",
+  "tax_accountant",
+  "loan_repayment",
+  "annual_tax",
+  "interest_yearend",
+  "tax_payment",
+  "action_inflow",
+  CASHFLOW_EXCLUDE_COLUMN,
+]);
 
 export async function PATCH(req: Request) {
   const supabase = await createClient();
@@ -21,11 +43,13 @@ export async function PATCH(req: Request) {
   const body = await req.json().catch(() => ({}));
   const txnId = Number(body.txnId);
   const businessLine = String(body.businessLine || "realestate");
-  const cashflowColumn = String(body.cashflowColumn || "") as CashflowColumnKey;
+  const cashflowColumn = String(
+    body.cashflowColumn || ""
+  ) as CashflowColumnOrExclude;
   const learnRule = body.learnRule !== false;
   const note = body.note ? String(body.note).slice(0, 500) : null;
 
-  if (!Number.isFinite(txnId) || !cashflowColumn) {
+  if (!Number.isFinite(txnId) || !ALLOWED_OVERRIDE_COLUMNS.has(cashflowColumn)) {
     return NextResponse.json(
       { error: "txnId and cashflowColumn required" },
       { status: 400 }

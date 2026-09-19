@@ -122,8 +122,43 @@ import { openingCashFromSettings } from "./mqCashflowSettings";
     },
     { businessLine: "realestate", overrides: new Map(), rules: [] }
   );
-  assert.equal(ai.column, "expense");
-  assert.equal(ai.reason, "allowlist");
+  assert.equal(ai.column, null);
+  assert.equal(ai.reason, "excluded");
+
+  const aiOnAiLine = resolveCashflowColumn(
+    {
+      category: "δ.21F.AIリスキリング",
+      subcategory: "加盟金",
+      entity: "personal",
+      kind: null,
+      txn_date: "2025-03-01",
+      income_jpy: 0,
+      expense_jpy: 80_000,
+    },
+    { businessLine: "ai", overrides: new Map(), rules: [] }
+  );
+  assert.equal(aiOnAiLine.column, "expense");
+  assert.equal(aiOnAiLine.reason, "allowlist");
+
+  const excludeOverride = resolveCashflowColumn(
+    {
+      id: 9001,
+      category: "δ.19F.賃貸経営(個人事業)",
+      subcategory: "雑費",
+      entity: "personal",
+      kind: null,
+      txn_date: "2025-03-01",
+      income_jpy: 0,
+      expense_jpy: 1_000,
+    },
+    {
+      businessLine: "realestate",
+      overrides: new Map([[9001, "excluded"]]),
+      rules: [],
+    }
+  );
+  assert.equal(excludeOverride.reason, "excluded");
+  assert.equal(excludeOverride.column, null);
 
   const gamma = resolveCashflowColumn(
     {

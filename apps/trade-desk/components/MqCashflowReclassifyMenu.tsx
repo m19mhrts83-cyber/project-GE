@@ -4,8 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import type { CashflowLineItem } from "@/lib/mqCashflowLineItems";
 import {
   CASHFLOW_COLUMN_LABELS,
+  CASHFLOW_EXCLUDE_COLUMN,
+  CASHFLOW_EXCLUDE_LABEL,
   RECLASSIFY_COLUMN_OPTIONS,
   type CashflowColumnKey,
+  type CashflowColumnOrExclude,
 } from "@/lib/mqCashflowColumns";
 
 const INCOME_COLUMNS = new Set<CashflowColumnKey>([
@@ -33,8 +36,12 @@ export default function MqCashflowReclassifyMenu(props: Props) {
     menuRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, []);
 
-  async function applyColumn(column: CashflowColumnKey) {
-    if (!item.txnId || column === item.columnKey) {
+  async function applyColumn(column: CashflowColumnOrExclude) {
+    if (!item.txnId) {
+      onCancel();
+      return;
+    }
+    if (column !== CASHFLOW_EXCLUDE_COLUMN && column === item.columnKey) {
       onCancel();
       return;
     }
@@ -49,6 +56,10 @@ export default function MqCashflowReclassifyMenu(props: Props) {
           businessLine,
           cashflowColumn: column,
           learnRule,
+          note:
+            column === CASHFLOW_EXCLUDE_COLUMN
+              ? "集計から除外（不動産事業以外など）"
+              : null,
         }),
       });
       const data = await res.json();
@@ -124,7 +135,7 @@ export default function MqCashflowReclassifyMenu(props: Props) {
           onChange={(e) => setLearnRule(e.target.checked)}
           disabled={busy}
         />
-        同じ科目は今後もこの列へ（学習ルール）
+        同じ科目は今後もこの扱い（学習ルール）
       </label>
       {error ? (
         <p className="meta" style={{ color: "var(--high)" }}>
@@ -171,6 +182,23 @@ export default function MqCashflowReclassifyMenu(props: Props) {
               </button>
             ))}
           </div>
+        </div>
+        <div className="mq-cashflow-reclassify-group">
+          <span className="mq-cashflow-reclassify-group-label">集計</span>
+          <div className="mq-cashflow-reclassify-options">
+            <button
+              type="button"
+              className="mq-cashflow-reclassify-option mq-cashflow-reclassify-option-exclude"
+              disabled={busy}
+              onClick={() => applyColumn(CASHFLOW_EXCLUDE_COLUMN)}
+              title="この取引を不動産資金繰りの合計から外します（学習ONなら同科目も除外）"
+            >
+              {CASHFLOW_EXCLUDE_LABEL}
+            </button>
+          </div>
+          <p className="meta" style={{ margin: "6px 0 0", fontSize: 11 }}>
+            AIリスキリング等、不動産以外の経費をここへ。合計・MQ連動から外れます。
+          </p>
         </div>
       </div>
       {item.classifyReason === "override" ? (

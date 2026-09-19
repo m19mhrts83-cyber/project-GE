@@ -1,7 +1,12 @@
 import type { FinanceTxnLite } from "./mqZaimMap";
 import type { CashflowBucketKey } from "./mqCashflowColumns";
-import { BUCKET_TO_COLUMN, type CashflowColumnKey } from "./mqCashflowColumns";
-import { matchBusinessAllowlist } from "./mqCashflowBusinessAllowlist";
+import {
+  BUCKET_TO_COLUMN,
+  CASHFLOW_EXCLUDE_COLUMN,
+  type CashflowColumnKey,
+  type CashflowColumnOrExclude,
+} from "./mqCashflowColumns";
+import { matchBusinessAllowlist, isDelta21FAiReskilling } from "./mqCashflowBusinessAllowlist";
 
 export type CashflowClassifyRuleRow = {
   id?: string;
@@ -215,15 +220,20 @@ function parseColumnKey(raw: string): CashflowColumnKey | null {
   return (allowed as string[]).includes(raw) ? (raw as CashflowColumnKey) : null;
 }
 
-/** 取引 txn_id → 列上書き */
+function parseColumnOrExclude(raw: string): CashflowColumnOrExclude | null {
+  if (raw === CASHFLOW_EXCLUDE_COLUMN) return CASHFLOW_EXCLUDE_COLUMN;
+  return parseColumnKey(raw);
+}
+
+/** 取引 txn_id → 列上書き（excluded = 集計から除外） */
 export function buildOverrideMap(
   rows: TxnOverrideRow[],
   businessLine: string
-): Map<number, CashflowColumnKey> {
-  const m = new Map<number, CashflowColumnKey>();
+): Map<number, CashflowColumnOrExclude> {
+  const m = new Map<number, CashflowColumnOrExclude>();
   for (const r of rows) {
     if (r.business_line !== businessLine) continue;
-    const col = parseColumnKey(String(r.cashflow_column));
+    const col = parseColumnOrExclude(String(r.cashflow_column));
     const id = Number(r.txn_id);
     if (col && Number.isFinite(id)) m.set(id, col);
   }
@@ -234,13 +244,22 @@ export function resolveCashflowColumn(
   txn: FinanceTxnLite,
   opts: {
     businessLine: string;
-    overrides: Map<number, CashflowColumnKey>;
+    overrides: Map<number, CashflowColumnOrExclude>;
     rules: CashflowClassifyRuleRow[];
   }
 ): ClassifyResult {
   const txnId = txn.id != null ? Number(txn.id) : NaN;
   if (Number.isFinite(txnId) && opts.overrides.has(txnId)) {
     const col = opts.overrides.get(txnId)!;
+    if (col === CASHFLOW_EXCLUDE_COLUMN) {
+      return {
+        column: null,
+        bucket: null,
+        isLoan: false,
+        reason: "excluded",
+        detail: "txn override → excluded",
+      };
+    }
     return {
       column: col,
       bucket: null,
@@ -250,8 +269,31 @@ export function resolveCashflowColumn(
     };
   }
 
+  // 不動産資金繰りでは Δ21F を既定除外（学習ルールより優先。個別上書きは上で可能）
+  if (
+    opts.businessLine !== "ai" &&
+    isDelta21FAiReskilling(String(txn.category || ""))
+  ) {
+    return {
+      column: null,
+      bucket: null,
+      isLoan: false,
+      reason: "excluded",
+      detail: "Δ21F AIリスキリング → not realestate",
+    };
+  }
+
   const learned = findLearnedRule(txn, opts.businessLine, opts.rules);
   if (learned) {
+    if (String(learned.cashflow_column) === CASHFLOW_EXCLUDE_COLUMN) {
+      return {
+        column: null,
+        bucket: null,
+        isLoan: false,
+        reason: "excluded",
+        detail: `rule exclude: ${learned.category_match}/${learned.subcategory_match}`,
+      };
+    }
     const col = parseColumnKey(learned.cashflow_column);
     if (col) {
       return {
@@ -264,7 +306,7 @@ export function resolveCashflowColumn(
     }
   }
 
-  const hit = matchBusinessAllowlist(txn);
+  const hit = matchBusinessAllowlist(txn, opts.businessLine);
   if (!hit) {
     return {
       column: null,
@@ -320,7 +362,7 @@ export function resolveCashflowColumn(
 export function buildLearnRuleFromTxn(
   txn: FinanceTxnLite,
   businessLine: string,
-  cashflowColumn: CashflowColumnKey,
+  cashflowColumn: CashflowColumnOrExclude,
   sourceTxnId?: number
 ): Omit<CashflowClassifyRuleRow, "id"> {
   return {

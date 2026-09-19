@@ -305,6 +305,11 @@ def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
             sj = {}
             
         # Update s3_investigation payload
+        data = dict(data)
+        data["synced_at"] = datetime.datetime.now(
+            datetime.timezone.utc
+        ).isoformat()
+        data["source_file"] = p.name
         sj["s3_investigation"] = data
 
         # Fetch and cache attachments from kurashift_re_deal_attachments
@@ -468,6 +473,9 @@ def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
         }
         if deal.get("status") == "info":
             updates["status"] = "viewing"
+        # Grok依頼中 → 詳細調査反映済み（返信あり扱いでパイプラインを進める）
+        if deal.get("inquiry_status") == "awaiting_grok":
+            updates["inquiry_status"] = "has_reply"
             
         results.append({
             "deal_id": deal_id,
@@ -502,6 +510,28 @@ def sync_obsidian_picks(apply: bool = False) -> list[dict[str, Any]]:
                 if new_content != content:
                     p.write_bytes(new_content.encode("utf-8"))
                     print(f"  -> Updated frontmatter deal_id in {p.name}")
+
+    if apply:
+        try:
+            newest = max(
+                (r.get("filename") or "") for r in results
+            ) if results else ""
+            sb.table("sync_meta").upsert(
+                {
+                    "key": "kurashift_obsidian_pick_sync",
+                    "value": {
+                        "at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        "matched": len(results),
+                        "newest_file": newest,
+                        "ok": True,
+                    },
+                    "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                },
+                on_conflict="key",
+            ).execute()
+            print(f"# sync_meta kurashift_obsidian_pick_sync matched={len(results)}")
+        except Exception as e:
+            print(f"# sync_meta soft-fail: {e}", file=sys.stderr)
 
     return results
 
