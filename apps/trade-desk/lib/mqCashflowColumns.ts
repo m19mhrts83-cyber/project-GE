@@ -72,6 +72,14 @@ export const RECLASSIFY_COLUMN_OPTIONS: CashflowColumnKey[] = [
   "annual_tax",
 ];
 
+/** 列以外の再分類先（資金繰り集計から落とす） */
+export const CASHFLOW_EXCLUDE_COLUMN = "excluded" as const;
+export type CashflowColumnOrExclude =
+  | CashflowColumnKey
+  | typeof CASHFLOW_EXCLUDE_COLUMN;
+
+export const CASHFLOW_EXCLUDE_LABEL = "集計から除外";
+
 export function columnToRowField(
   col: CashflowColumnKey
 ): keyof import("./mqCashflow").MqCashflowMonthRow | null {

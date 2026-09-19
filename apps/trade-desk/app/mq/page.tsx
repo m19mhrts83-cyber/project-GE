@@ -1638,6 +1638,7 @@ export default async function MqPage({
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
           承認済み科目マップで事業系だけ集計します。手入力月は既定で保護。未分類は下に出し、MQからは除外（暫定）します。
+          不動産ラインの資金繰りでは <strong>δ.21F AIリスキリング</strong>（加盟金・Cursor 等）は自動除外します。セル内訳の「列を変更」→「集計から除外」で他の非不動産経費も落とせます。
         </p>
         <div style={{ marginTop: 10 }}>
           <MqZaimIngestPanel defaultYear={planYear} />

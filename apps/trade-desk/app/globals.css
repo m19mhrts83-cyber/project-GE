@@ -942,6 +942,15 @@ tr.sold td {
   opacity: 0.55;
   cursor: default;
 }
+.mq-cashflow-reclassify-option-exclude {
+  border-color: #b45309;
+  color: #92400e;
+  font-weight: 600;
+}
+.mq-cashflow-reclassify-option-exclude:hover:not(:disabled) {
+  border-color: #92400e;
+  background: rgba(180, 83, 9, 0.08);
+}
 .mq-cashflow-reclassify-reset {
   margin-top: 10px;
   font-size: 0.85rem;

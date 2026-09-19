@@ -190,6 +190,7 @@ export default function DetailedInvestigatedDealsSection({
 
   return (
     <div
+      id="detailed-investigated"
       className="card"
       style={{
         marginBottom: 20,

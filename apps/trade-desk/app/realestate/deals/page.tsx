@@ -244,16 +244,48 @@ export default async function RealEstateDealsPage({
   let inquiryNone = 0;
   let inquiryReady = 0;
   let viewingCount = 0;
+  let awaitingGrok = 0;
+  let awaitingReply = 0;
+  let hasReplyNoS3 = 0;
   for (const d of candidateDeals) {
     if (d.status === "viewing") viewingCount++;
     const inq = d.inquiry_status || "none";
     if (inq === "has_reply") needReply++;
+    if (inq === "awaiting_grok") awaitingGrok++;
+    if (inq === "awaiting_reply") awaitingReply++;
     if (inq === "none" || inq === "draft") inquiryNone++;
     if (d.source !== "mail_grok") grokPending++;
+    const sj =
+      d.summary_json && typeof d.summary_json === "object"
+        ? (d.summary_json as Record<string, unknown>)
+        : {};
+    const hasS3 =
+      sj.s3_investigation != null && typeof sj.s3_investigation === "object";
+    if (inq === "has_reply" && !hasS3) hasReplyNoS3++;
   }
   for (const d of candidateDeals) {
     if (inquiryEval(d).tier1) inquiryReady++;
   }
+
+  const { data: pickSyncMeta } = await supabase
+    .from("sync_meta")
+    .select("value, updated_at")
+    .eq("key", "kurashift_obsidian_pick_sync")
+    .maybeSingle();
+  const pickSyncVal =
+    pickSyncMeta?.value && typeof pickSyncMeta.value === "object"
+      ? (pickSyncMeta.value as Record<string, unknown>)
+      : null;
+  const pickSyncAt =
+    typeof pickSyncVal?.at === "string"
+      ? pickSyncVal.at
+      : pickSyncMeta?.updated_at || null;
+  const pickSyncMatched =
+    typeof pickSyncVal?.matched === "number" ? pickSyncVal.matched : null;
+  const pickSyncNewest =
+    typeof pickSyncVal?.newest_file === "string"
+      ? pickSyncVal.newest_file
+      : null;
 
   const tier2Summary = await getTier2QueueSummary(supabase);
   const tier2Count = tier2Summary.queue.length;
@@ -262,6 +294,7 @@ export default async function RealEstateDealsPage({
   const detailedInvestigatedDeals = filterDetailedInvestigationDeals(
     dedupedDealsList
   );
+  const detailedCount = detailedInvestigatedDeals.length;
   const inProgressDeals = filterInProgressDeals(
     dedupedDealsList
   );
@@ -905,30 +938,82 @@ export default async function RealEstateDealsPage({
         <div className="card" style={{ marginBottom: 16 }}>
           <header>
             <span className="lvl">候補</span>
-            <strong>要対応サマリー</strong>
+            <strong>パイプライン・ステータス（Grok × Jarvis）</strong>
           </header>
-          <p className="meta" style={{ marginTop: 8 }}>
-            要返信 {needReply} · 問合せ候補 {inquiryReady} · Grok未調査{" "}
-            {grokPending} · 第一問合せ未送 {inquiryNone} · 内見候補{" "}
-            {viewingCount}
-            {needReply > 0 ? (
-              <>
-                {" "}
-                ·{" "}
-                <Link href="/realestate/deals?tab=candidates&inquiry=has_reply">
-                  要返信のみ
-                </Link>
-              </>
-            ) : null}
-            {inquiryReady > 0 ? (
-              <>
-                {" "}
-                ·{" "}
-                <Link href="/realestate/deals?tab=candidates&inquiry=ready">
-                  問合せ候補のみ
-                </Link>
-              </>
-            ) : null}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: 8,
+              marginTop: 10,
+            }}
+          >
+            {[
+              {
+                label: "詳細調査済",
+                value: detailedCount,
+                hint: "Obsidian S3 → KURASHIFT（本線の内見検討）",
+                href: "#detailed-investigated",
+              },
+              {
+                label: "返信あり・S3待ち",
+                value: hasReplyNoS3,
+                hint: "仲介返信済だが詳細調査未反映",
+              },
+              {
+                label: "Grok依頼中",
+                value: awaitingGrok,
+                hint: "inquiry=awaiting_grok（S3未着）",
+              },
+              {
+                label: "仲介返信待ち",
+                value: awaitingReply,
+                hint: "第一問合せ後の返信待ち",
+              },
+              {
+                label: "要返信",
+                value: needReply,
+                hint: "has_reply",
+                href: "/realestate/deals?tab=candidates&inquiry=has_reply",
+              },
+              {
+                label: "問合せ候補",
+                value: inquiryReady,
+                hint: "Tier1 ready",
+                href: "/realestate/deals?tab=candidates&inquiry=ready",
+              },
+            ].map((c) => (
+              <div
+                key={c.label}
+                style={{
+                  border: "1px solid var(--border, #e2e8f0)",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  background: "#fafafa",
+                }}
+              >
+                <div className="meta" style={{ fontSize: 11 }}>
+                  {c.label}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2 }}>
+                  {c.href ? (
+                    <Link href={c.href} style={{ textDecoration: "none" }}>
+                      {c.value}
+                    </Link>
+                  ) : (
+                    c.value
+                  )}
+                </div>
+                <div className="meta" style={{ fontSize: 10, marginTop: 2 }}>
+                  {c.hint}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="meta" style={{ marginTop: 10 }}>
+            参考: status=内見 {viewingCount}
+            （メールスコア自動昇格含む・詳細調査済とは別） · Grok未調査ラベル{" "}
+            {grokPending} · 第一問合せ未送 {inquiryNone}
             {tier2Summary.enabled && tier2Count > 0 ? (
               <>
                 {" "}
@@ -944,6 +1029,14 @@ export default async function RealEstateDealsPage({
                 · 本日送信 {tier2Summary.sent_today}/{tier2Summary.daily_cap}
               </span>
             ) : null}
+          </p>
+          <p className="meta" style={{ marginTop: 6 }}>
+            Jarvis pick_sync:{" "}
+            {pickSyncAt ? formatJstDateTime(pickSyncAt) : "未記録"}
+            {pickSyncMatched != null ? ` · マッチ ${pickSyncMatched}件` : null}
+            {pickSyncNewest ? ` · 最新S3 ${pickSyncNewest}` : null}
+            {" · "}
+            増えないときは Grok が ☆Real_Estate_Pick に *_S3.md を書いていないことが多いです（同期自体は15分ごと）。
           </p>
         </div>
       ) : null}
