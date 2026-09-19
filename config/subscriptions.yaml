@@ -27,13 +27,14 @@ services:
   - id: notion
     name: Notion Business
     category: ai
-    status: active
+    status: ending
     billing: yearly
     amount_yen: 37800
-    next_bill: "2026-09-28"
+    next_bill: "2026-09-28 Free適用・以降更新なし"
     watch: false
     cancel_candidate: false
-    billing_url: "https://www.notion.so/profile/integrations"
+    billing_url: "https://www.notion.so/"
+    note: "2026-09-19 Freeへダウングレード予約済（請求画面: ビジネス→フリー・2026-09-28）。Business機能は同日まで。期間終了後 status を free に更新。理由: GenSpark運用でNotion AI不要。オーナー1人・1シート確認済"
 
   - id: typeless
     name: Typeless
