@@ -1,0 +1,35 @@
+---
+description: コードの本線は GitHub。OneDrive は疎ミラー。平文 .env は OneDrive に置かない
+alwaysApply: true
+---
+
+# コード復元の3層（Jarvis）
+
+**コード本線は GitHub（`m19mhrts83-cyber/project-GE`）。OneDrive のミラーは疎コピー。秘密は age。**
+
+| 層 | 対象 | 場所 | 頻度 |
+|---|---|---|---|
+| 本線 | 追跡コード | GitHub（commit / push） | 節目ごと |
+| 疎コピー | 追跡＋未追跡(非ignore) | OneDrive `999_ドキュメント/git-repos_code_mirror/`（`.git` なし） | 週次（日曜 09:15） |
+| 秘密 | `.env.jarvis_private` | age `.age` → ローカル世代＋個人 iCloud | 週次（日曜 08:30） |
+
+## Jarvis の動作
+
+1. OneDrive 退避が必要なときは `scripts/jarvis_repo_onedrive_mirror.sh` を使う。**手作りの `cp -R` / `rsync` / `tar` / 旧フォルダ上書きをしない**
+2. 実行は **dry-run が既定**。件数・容量・除外ヒットを確認してから `--apply`
+3. 初回（宛先が無い／マーカーが無い）は dry-run 結果を報告し、了承を得てから `--apply`（必要なら `--init`）
+4. 復元テストの本線は **GitHub から clone / fetch**。ミラーは dry-run ＋ 数ファイル差分まで
+
+## やらないこと
+
+- 平文の `.env` / `.env.jarvis_private` / `token*.json` / `credentials*.json` / `*.pem` / `*.key` を OneDrive に置く
+- OneDrive 上に `.git` 付きのコピーを作る（OneDrive 上の Git は壊れる）
+- OneDrive 未マウントのまま転送・削除する（スクリプトは前提チェックで停止する）
+- 旧 `999_ドキュメント/git-repos`（2026-05 の引越し残骸）を触る
+- 秘密バックアップ（日曜 08:30）と同時刻に走らせる
+
+## 関連
+
+- 手順の正本: `docs/運用コマンド一覧.md`「コード復元の3層」
+- 節目コミット: `jarvis-commit-checkpoint.mdc`
+- ブランチ／デプロイ: `jarvis-github-branch-deploy.mdc`
