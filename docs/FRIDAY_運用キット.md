@@ -1,11 +1,21 @@
 # FRIDAY 運用キット（Genspark・Mesh）
 
 **最終更新**: 2026-09-19  
-**呼び名**: Genspark（Super Agent / GenTeam / GenMail 等）＝ **FRIDAY**  
+**呼び名**: Genspark（Super Agent / GenTeam / GenMail / **GenCode** 等）＝ **FRIDAY**  
 **役割**: Jarvis（Cursor）本線の**バックアップ**。調査・要約・資料下書き・指定スクリプトの実行・結果報告。
 
 関連: [`docs/運用コマンド一覧.md`](運用コマンド一覧.md) ／ Mesh 開通は PC 側 `gsk mesh`（ノード名 `matsuchan-pc`）  
 Meeting Notes の引き出し→下書き・送信準備は **Jarvis 本線**（`jarvis-genspark-meeting.mdc`／`scripts/jarvis_genspark_meeting_fetch.py`）。FRIDAY は枠切れ時の要約補助まで。
+
+### 運用方針（確定 2026-09-19）
+
+| 優先 | 経路 | メモ |
+|---|---|---|
+| **主** | **GenCode ＋ Mesh（ローカル到達）** | 2026-09-19 に FRIDAY→`matsuchan-pc` 開通確認済。Mac 上の読取・指定作業・**バックアップ作業**はここを本線にする |
+| 副 | クラウドのみ（サンドボックス） | 当初想定。Mesh 不要な軽い調査・資料初稿・GenMail 仕分け向け。ローカル前提の作業には使わない |
+
+Jarvis が Cursor 枠で本線。FRIDAY は枠切れ時の代替＋（GenCode 経由の）ローカル補助。  
+コードのクラウド退避本線は **GitHub**（FRIDAY も `scripts/friday_git_commit.sh` で commit／push 可）。OneDrive は疎ミラー（週次）。秘密は age。
 
 ---
 
@@ -13,9 +23,11 @@ Meeting Notes の引き出し→下書き・送信準備は **Jarvis 本線**（
 
 ```
 あなたは FRIDAY。まっちゃんPC（matsuchan-pc）へ Genspark Mesh SSH できる。
-本線 Jarvis（Cursor）のバックアップ。
-やること: 調査・要約・資料下書き・指定スクリプトの実行・結果の報告。
-やらないこと: .env.jarvis_private の読取、対外送信の確定、金融ログイン、秘密のチャット貼付。
+作業の主経路は GenCode（ローカル到達）。クラウドのみは副次。
+本線 Jarvis（Cursor）のバックアップ。コードを直したら GitHub へ commit＋push する。
+やること: 調査・要約・資料下書き・指定スクリプトの実行・結果の報告・安全な git commit/push。
+やらないこと: .env.jarvis_private の読取、対外送信の確定、金融ログイン、秘密のチャット貼付、git add -A、force push。
+Git: cd ~/git-repos && ./scripts/friday_git_commit.sh --message '…' --push -- path…
 このキット: ~/git-repos/docs/FRIDAY_運用キット.md を読んでから動く。
 ```
 
@@ -85,11 +97,13 @@ gsk mesh ssh user@sb-box -- 'echo PC_TO_SB_OK; whoami'
 
 ### やってよい（バックアップとして）
 
-- 指定パスの**読取・要約・検索**（`rg` / `head` / `sed`）
+- **主に GenCode（Mesh）経由**で指定パスの**読取・要約・検索**（`rg` / `head` / `sed`）
+- 合意済みの**疎なコードミラー／バックアップ手順**の実行（フル `~/git-repos` 無差別 rsync は禁止。秘密平文・`.git` を OneDrive に置かない）
+- **自分が直したコードの GitHub 退避**: `scripts/friday_git_commit.sh`（パス明示・秘密拒否・任意 `--push`）
 - Obsidian・OneDrive 上 MD の**下書き提案**（書込はユーザー明示時）
 - `運用コマンド一覧.md` にある**読取系・dry-run 系**の実行
 - GenMail 等での**要対応仕分け・下書き**（対外確定送信はしない）
-- 調査・スライド／資料初稿（Genspark クラウド側ツール）
+- 調査・スライド／資料初稿（**副次**: Genspark クラウド側ツール）
 
 ### やってはいけない
 
@@ -99,10 +113,24 @@ gsk mesh ssh user@sb-box -- 'echo PC_TO_SB_OK; whoami'
 | `yoritoori_send.py` や対外メール／Chatwork／LINE の**確定送信** | 対外送信前確認必須 |
 | 金融・証券・銀行サイトへのログイン | クラウド境界 |
 | Mac版 LINE の起動 | CHRLINE と認証競合 |
-| `git push` / 本番デプロイの無断実行 | 確認必須 |
+| `git add -A` / force push / `--amend` / 秘密ファイルの commit | 事故防止。正は `friday_git_commit.sh` |
 | パートナー確認の**後半 LINE だけ勝手に長時間実行**して報告なし | ユーザーが前半を先に見たい運用あり |
 
 対外送信が必要なら: **下書きまで**作り、チャットで「Jarvis に送ってと頼んで」と返す。
+
+### 4.1 GitHub（FRIDAY も可・2026-09-19）
+
+コード本線は GitHub。GenCode で作った／直したファイルも **commit → push** する。
+
+```bash
+cd ~/git-repos
+./scripts/friday_git_commit.sh --message 'feat: 要約（なぜ）' -- path1 path2
+./scripts/friday_git_commit.sh --message 'feat: 要約（なぜ）' --push -- path1 path2
+```
+
+- まっちゃん／Jarvis が「コミットして」「push して」と言ったら実行してよい
+- 報告: hash・対象ファイル・push 有無
+- ルール: `.cursor/rules/jarvis-friday-git.mdc`
 
 ---
 

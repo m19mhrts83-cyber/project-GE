@@ -1,0 +1,36 @@
+---
+description: FRIDAY（GenCode）が GitHub へ commit/push するときの安全手順
+alwaysApply: false
+---
+
+# FRIDAY → GitHub（commit / push）
+
+**コードの本線は GitHub。** Cursor（Jarvis）でも GenCode（FRIDAY）でも、作ったコードは **commit → push** して初めてクラウド退避になる。
+
+## 正本コマンド
+
+```bash
+cd ~/git-repos
+./scripts/friday_git_commit.sh --message 'feat: 要約' -- path/to/file [path…]
+# GitHub 反映
+./scripts/friday_git_commit.sh --message 'feat: 要約' --push -- path/to/file
+```
+
+## FRIDAY のルール
+
+1. **対象パスを明示**する（`git add -A` 禁止。ラッパーも全追加しない）
+2. 秘密（`.env*` 平文・`token*`・`credentials*`・鍵類）は **絶対に入れない**（スクリプトが拒否）
+3. 節目が終わったら **commit＋`--push`**（まっちゃん／Jarvis が「コミットして」と言ったら実行してよい）
+4. `force push` / `--amend` / 秘密のチャット貼付は禁止
+5. コミット後、短い報告（hash・ファイル一覧・push 有無）
+
+## Jarvis
+
+- FRIDAY 成果の未 push を見つけたら、上記スクリプトでの commit/push を促すか代行する
+- 対外送信・秘密とは別。Git 操作はローカル Mac の既存 `gh` / credential を使う
+
+## 関連
+
+- 3層退避: `jarvis-repo-onedrive-mirror.mdc`
+- 節目: `jarvis-commit-checkpoint.mdc`
+- キット: `docs/FRIDAY_運用キット.md`
