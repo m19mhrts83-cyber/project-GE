@@ -1,120 +1,153 @@
-# Todoist タスク正本（Jarvis）
-# layout: beginner_compressed | pro_normalized
-# project_id / section_ids は bootstrap --write-config で埋める（手入力可）
-# 秘密: プロジェクト転送メールはチャットに出さない。必要なら .env 側へ。
-
 version: 1
 layout: beginner_compressed
 api_base: https://api.todoist.com/api/v1
 complete_phrase: タスク完了したよ
-
-# 共通セクション名（Board 列）
 default_sections:
-  - 未着手
-  - 進行中
-  - 相手待ち
-  - オーナー確認
-  - 完了
-
-# 共通ラベル（Beginner でも可）
+- 未着手
+- 進行中
+- 相手待ち
+- オーナー確認
+- 完了
 labels:
-  - waiting
-  - inbox_review
-  - L-id
-  - ai_raimo
-  - kamiooya
-  - kanji
-  - properties
-  - kodate
-  - kazoku
-
-# 論理レーン → 実プロジェクト（圧縮時は複数レーンが同一 project を共有）
+- waiting
+- inbox_review
+- L-id
+- ai_raimo
+- kamiooya
+- kanji
+- properties
+- kodate
+- kazoku
 lanes:
   properties:
     title: 所有物件
     project_key: properties
-    project_id: ""
+    project_id: 6hXX2jxvG8ChWX7x
     lane_label: properties
     initial_section: 未着手
-    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
-    done_sections: ["完了"]
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - オーナー確認
+    done_sections:
+    - 完了
     hide_done_on_board: true
   ai_raimo:
     title: AI・Raimo
     project_key: work_bundle
-    project_id: ""
+    project_id: 6hXX2m7CJVrvmh9j
     lane_label: ai_raimo
     initial_section: 未着手
-    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
-    done_sections: ["完了"]
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - オーナー確認
+    done_sections:
+    - 完了
     hide_done_on_board: true
   kamiooya:
     title: 神大家運営
     project_key: work_bundle
-    project_id: ""
+    project_id: 6hXX2m7CJVrvmh9j
     lane_label: kamiooya
     initial_section: 未着手
-    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
-    done_sections: ["完了"]
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - オーナー確認
+    done_sections:
+    - 完了
     hide_done_on_board: true
   kanji:
     title: 飲み会幹事
     project_key: work_bundle
-    project_id: ""
+    project_id: 6hXX2m7CJVrvmh9j
     lane_label: kanji
     initial_section: 未着手
-    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
-    done_sections: ["完了"]
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - オーナー確認
+    done_sections:
+    - 完了
     hide_done_on_board: true
   kodate:
     title: 戸建て
     project_key: kodate
-    project_id: ""
+    project_id: 6hXX2mMc58ff5QH2
     lane_label: kodate
     initial_section: 未着手
-    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
-    done_sections: ["完了"]
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - オーナー確認
+    done_sections:
+    - 完了
     hide_done_on_board: false
   kazoku:
     title: 家族
     project_key: kazoku
-    project_id: ""
+    project_id: 6hXX2mWRmPJHMfR3
     lane_label: kazoku
     initial_section: 未着手
-    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
-    done_sections: ["完了"]
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - オーナー確認
+    done_sections:
+    - 完了
     hide_done_on_board: false
-
-# 物理プロジェクト定義（Beginner: 最大5）
 projects:
   properties:
     name: 所有物件
     view_style: board
-    project_id: ""
-    section_ids: {}
+    project_id: 6hXX2jxvG8ChWX7x
+    section_ids:
+      未着手: 6hXX2m59CJHWHXfQ
+      進行中: 6hXX2m4FXrw8hVCQ
+      相手待ち: 6hXX2m4vV2hwqhRx
+      オーナー確認: 6hXX2m7MJ3FchGcx
+      完了: 6hXX2m7mcJJf6wWQ
   work_bundle:
     name: 業務まとめ
     view_style: board
-    note: "ai_raimo / kamiooya / kanji を lane_label で同居（Beginner 圧縮）"
-    project_id: ""
-    section_ids: {}
+    note: ai_raimo / kamiooya / kanji を lane_label で同居（Beginner 圧縮）
+    project_id: 6hXX2m7CJVrvmh9j
+    section_ids:
+      未着手: 6hXX2m9G5vq9gQ3j
+      進行中: 6hXX2m9H2gjfx5hj
+      相手待ち: 6hXX2mFph4hpV5jC
+      オーナー確認: 6hXX2mGJJFhV6mgj
+      完了: 6hXX2mJ9fwgCMGJC
   kodate:
     name: 戸建て
     view_style: board
-    project_id: ""
-    section_ids: {}
+    project_id: 6hXX2mMc58ff5QH2
+    section_ids:
+      未着手: 6hXX2mMCjRGj7JC2
+      進行中: 6hXX2mVQr59jxhm2
+      相手待ち: 6hXX2mRgGHQ5Xg5R
+      オーナー確認: 6hXX2mQVQJrv3QVR
+      完了: 6hXX2mXvW5vMGmq2
   kazoku:
     name: 家族
     view_style: board
-    project_id: ""
-    section_ids: {}
-  # 5枠目は触感確認用に空けておく（PM窓口や Inbox レビュー用）
-  # pm_inbox:
-  #   name: PM窓口
-  #   view_style: board
-  #   project_id: ""
-  #   section_ids: {}
+    project_id: 6hXX2mWRmPJHMfR3
+    section_ids:
+      未着手: 6hXX2mg9vgCf3MQ3
+      進行中: 6hXX2mghq49PHrg3
+      相手待ち: 6hXX2mjRc93w6hm3
+      オーナー確認: 6hXX2mp7RMMcvVgV
+      完了: 6hXX2mpgfqFFRR93
+distortions_note: 'Beginner 圧縮の歪みは .jarvis_state/todoist_beginner_distortions.json
+  に追記。
 
-distortions_note: |
-  Beginner 圧縮の歪みは .jarvis_state/todoist_beginner_distortions.json に追記。
   Pro 移行時に 1レーン1プロジェクトへ正規化する。
+
+  '
