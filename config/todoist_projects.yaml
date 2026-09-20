@@ -18,6 +18,7 @@ labels:
 - properties
 - kodate
 - kazoku
+- apps
 lanes:
   properties:
     title: 所有物件
@@ -75,6 +76,20 @@ lanes:
     done_sections:
     - 完了
     hide_done_on_board: true
+  apps:
+    title: アプリ開発
+    project_key: work_bundle
+    project_id: 6hXX2m7CJVrvmh9j
+    lane_label: apps
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - オーナー確認
+    done_sections:
+    - 完了
+    hide_done_on_board: true
   kodate:
     title: 戸建て
     project_key: kodate
@@ -117,7 +132,7 @@ projects:
   work_bundle:
     name: 業務まとめ
     view_style: board
-    note: ai_raimo / kamiooya / kanji を lane_label で同居（Beginner 圧縮）
+    note: ai_raimo / kamiooya / kanji / apps を lane_label で同居（Beginner 圧縮。専用枠は後で見直し可）
     project_id: 6hXX2m7CJVrvmh9j
     section_ids:
       未着手: 6hXX2m9G5vq9gQ3j

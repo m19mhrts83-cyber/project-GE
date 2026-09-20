@@ -2600,6 +2600,30 @@ p.back {
   flex: 0 0 auto;
 }
 
+.notion-col-list li.notion-card {
+  cursor: grab;
+}
+
+.notion-col-list li.notion-card:active {
+  cursor: grabbing;
+}
+
+.notion-col-list li.notion-card--dragging {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.notion-col.notion-col--drop {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, #f5f3ef);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.notion-board-dnd-hint {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+}
+
 .notion-col-list li.overdue {
   border-color: #fecaca;
   background: #fff7f7;
