@@ -10,6 +10,21 @@ root_page_id: "26ef6bbe-5a76-8045-8a11-e7cbfb4c90cb"
 root_page_url: "https://app.notion.com/p/26ef6bbe5a7680458a11e7cbfb4c90cb"
 root_page_title: 家族会議
 
+# 週次運用（確定 2026-09-20）
+# Notion: 前週日付ページを複製して (YYYY/MM/DD) を増やす。1枚統合しない。
+# 議事録 MD・インフォは「その週の日付ページ末尾」へ添付。
+# 横断参照は NotebookLM「家族会議」1ノート（config/notebooklm_studio.yaml family_meeting_weekly）。
+weekly_log_pattern:
+  mode: duplicate_dated_child
+  title_format: "(YYYY/MM/DD)"
+  attach_minutes_to: same_week_page_end
+  attach_infographic_to: same_week_page_end
+  notebooklm_key: family_meeting_weekly
+  drive_folder: "13_家族会議_週次"
+  note: >
+    会議後 Jarvis: jarvis_family_meeting_weekly.py /
+    ルール jarvis-family-meeting-weekly.mdc
+
 coaching_hub_page_id: "282f6bbe-5a76-8097-bd9d-c2fbbdb49a49"
 coaching_hub_page_url: "https://app.notion.com/p/282f6bbe5a768097bd9dc2fbbdb49a49"
 coaching_hub_title: 子供コーチング
@@ -72,7 +87,7 @@ sources:
     title: 家族会議
     kind: family_meeting
     child_ids: [madoka, tamaki, sawa]
-    note: 日付付き会議子ページ群（2025-09〜。直近例 2026/08/23）
+    note: 日付付き会議子ページ群（前週複製で増やす。議事録・インフォは同ページ末尾。横断は NotebookLM 家族会議1ノート）
   - page_id: "282f6bbe-5a76-8097-bd9d-c2fbbdb49a49"
     title: 子供コーチング
     kind: other_meeting

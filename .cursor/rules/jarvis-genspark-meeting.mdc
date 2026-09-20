@@ -17,6 +17,7 @@ alwaysApply: false
 |---|---|---|
 | **Hot**（当日〜数日） | Genspark AI Meeting Notes | 本線: `jarvis_genspark_meeting_fetch.py`（`gsk meeting`） |
 | **Warm**（残す価値あり） | Notion「電話・面談録音メモ」`_Inbox` | `jarvis_notion_api.py` で検索・読取。Save to Notion は重要件のみ |
+| **家族会議・週次** | Notion 日付ページ＋ NotebookLM「家族会議」1ノート | `jarvis-family-meeting-weekly.mdc`（Inbox 新規子ページは使わない） |
 | **Cold** | Obsidian ★Journal／`録音メモ/` の **1行索引** | 全文は載せない |
 | **Action** | OneDrive `4.送信下書き.txt`／Notion タスク | 宿題・返信骨子を接続（対外送信は了承後） |
 
