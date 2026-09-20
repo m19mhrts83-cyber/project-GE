@@ -1,10 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import {
-  listPropertySelectOptions,
-  updateNotionTaskStatus,
-} from "@/lib/notionTasks";
+import { listPropertySelectOptions } from "@/lib/notionTasks";
+import { updateTaskStatus } from "@/lib/taskBoard";
 
 export async function updateNotionTaskStatusAction(
   lane: string,
@@ -12,7 +10,7 @@ export async function updateNotionTaskStatusAction(
   status: string,
   path: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const r = await updateNotionTaskStatus(lane, pageId, status);
+  const r = await updateTaskStatus(lane, pageId, status);
   if (!r.ok) return r;
   revalidatePath(path);
   return { ok: true };

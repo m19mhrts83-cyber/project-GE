@@ -8,9 +8,10 @@ import FolderLinks from "@/components/FolderLinks";
 import NotionBoardClient from "@/components/NotionBoardClient";
 import { getFolderLinks, laneFolderKey } from "@/lib/folderLinks";
 import {
-  queryLaneBoard,
-  type NotionBoardSummary,
-} from "@/lib/notionTasks";
+  queryTaskLaneBoard,
+  type TaskBackend,
+} from "@/lib/taskBoard";
+import type { NotionBoardSummary } from "@/lib/notionTasks";
 import { createClient } from "@/lib/supabase/server";
 
 type CardRow = {
@@ -27,20 +28,36 @@ function BoardSection({
   board,
   lane,
   path,
+  backend,
 }: {
   board: NotionBoardSummary;
   lane: string;
   path: string;
+  backend: TaskBackend;
 }) {
   const statusOrder =
     board.columnOrder?.length > 0
       ? board.columnOrder
       : Object.keys(board.byStatus || {});
+  const openLabel = backend === "todoist" ? "Todoist で開く ↗" : "Notion で開く ↗";
+  const help =
+    backend === "todoist"
+      ? "参考投影です。本線の操作は Todoist Board。カードのドラッグ＆ドロップ（または「移動」）で列を変えられます。"
+      : "枠内で縦・横スクロールします。カードのドラッグ＆ドロップ（または「移動」）でステータスを変えられます。";
+  const disconnectHint =
+    backend === "todoist"
+      ? "`.env.jarvis_private` と Vercel に TODOIST_API_TOKEN を設定してください（JARVIS_TASK_BACKEND=todoist）。"
+      : "`.env.jarvis_private` と Vercel に NOTION_API_TOKEN を設定し、対象 DB を Integration「Jarvisダッシュボード」に接続してください。";
 
   return (
     <section className="home-section notion-kanban-section">
       <div className="notion-board-head">
-        <h2 style={{ margin: 0 }}>Kanban</h2>
+        <h2 style={{ margin: 0 }}>
+          Kanban{" "}
+          <span className="meta" style={{ fontWeight: 400, fontSize: "0.85rem" }}>
+            ({backend})
+          </span>
+        </h2>
         {board.boardUrl ? (
           <a
             href={board.boardUrl}
@@ -48,20 +65,18 @@ function BoardSection({
             rel="noreferrer"
             className="btn primary"
           >
-            Notion で開く ↗
+            {openLabel}
           </a>
         ) : null}
       </div>
       <p className="sub" style={{ marginTop: 8 }}>
-        枠内で縦・横スクロールします（ページ全体を伸ばしません）。タスク名で
-        Notion を開き、列の「移動」でステータスを変えられます。
+        {help}
       </p>
       {!board.connected ? (
         <p className="empty">
           未接続
           {board.reason ? `（${board.reason}）` : ""}
-          。`.env.jarvis_private` と Vercel に NOTION_API_TOKEN を設定し、対象 DB を
-          Integration「Jarvisダッシュボード」に接続してください。
+          。{disconnectHint}
         </p>
       ) : (
         <>
@@ -144,7 +159,7 @@ export default async function TriageKanbanLane({
     }
   }
 
-  const board = await queryLaneBoard(lane);
+  const board = await queryTaskLaneBoard(lane);
   const folderLinks = getFolderLinks(laneFolderKey(lane));
 
   return (
@@ -158,14 +173,16 @@ export default async function TriageKanbanLane({
             rel="noreferrer"
             className="btn"
           >
-            Notion ↗
+            {board.backend === "todoist" ? "Todoist ↗" : "Notion ↗"}
           </a>
         ) : null}
       </div>
       <FolderLinks links={folderLinks} />
       <p className="sub">
         {subtitle ||
-          "ソースを要約した確認テーマです。コメントで方針を相談し、納得したら「タスク化する…」で内容確認のうえ Notion に1件登録。履歴は OneDrive「Jarvis処置ログ/{レーン}/5.処置ログ.md」。"}{" "}
+          (board.backend === "todoist"
+            ? "ソースを要約した確認テーマです。納得したら「タスク化する…」で Todoist に登録。本線の Board は Todoist。履歴は OneDrive「Jarvis処置ログ/{レーン}/5.処置ログ.md」。"
+            : "ソースを要約した確認テーマです。コメントで方針を相談し、納得したら「タスク化する…」で内容確認のうえ Notion に1件登録。履歴は OneDrive「Jarvis処置ログ/{レーン}/5.処置ログ.md」。")}{" "}
         {hideSkipStat ? null : (
           <>
             アーカイブは{" "}
@@ -180,7 +197,12 @@ export default async function TriageKanbanLane({
         )}
       </p>
 
-      <BoardSection board={board} lane={lane} path={active} />
+      <BoardSection
+        board={board}
+        lane={lane}
+        path={active}
+        backend={board.backend}
+      />
 
       {children}
 
@@ -189,7 +211,7 @@ export default async function TriageKanbanLane({
           確認テーマ <strong>{activeCards.length}</strong>
         </div>
         <div className="stat">
-          Notion進行中 <strong>{promotedCards.length}</strong>
+          タスク化済 <strong>{promotedCards.length}</strong>
         </div>
         {hideSkipStat ? null : (
           <div className="stat">
