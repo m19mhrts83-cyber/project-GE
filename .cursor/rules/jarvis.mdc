@@ -93,6 +93,7 @@ alwaysApply: true
 | `JARVIS_DASHBOARD_PASSWORD` / `JARVIS_DASHBOARD_LOGIN_EMAIL` | ダッシュボードログイン（メールは PERSONAL_EMAIL と同系） |
 | `JARVIS_DASHBOARD_NOTION_URL` | DB_マサハルのログイン情報ページ（メモ用） |
 | `NOTION_API_TOKEN` | Notion Internal Integration。ダッシュボード／KURASHIFT／Jarvis CLI 本線。チャットに出さない |
+| `TODOIST_API_TOKEN` | Todoist API（タスク正本・試験導入。admin アカウント）。チャットに出さない。CLI: `scripts/jarvis_todoist_api.py` |
 | `NOTION_FAMILY_API_TOKEN` | 家族コーチング用（別WSのとき）。同一WSならページ共有のみで可。チャットに出さない |
 | `NOTION_FAMILY_COACHING_PAGE_ID` | 家族コーチ Notion root ページ ID |
 | `JARVIS_SUPABASE_*` | 自分用投影 DB `jarvis-dashboard`（運営 `kamiooya-qa` と分離） |

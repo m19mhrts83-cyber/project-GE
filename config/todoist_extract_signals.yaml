@@ -1,0 +1,57 @@
+# Todoist 抽出シグナル（すり合わせ用・初版）
+# Phase 0c: 残ログ／SB をレビューしながら追加・削除する
+# L5 サイレント自動起票はしない（提案→了承が既定）
+
+version: 1
+
+self_signals:
+  # L1a: 自分が明示的にタスク化したいとき
+  - pattern: タスクにしたい
+    level: L1a
+  - pattern: タスクに入れて
+    level: L1a
+  - pattern: タスクにして
+    level: L1a
+  - pattern: Todoistに
+    level: L1a
+  - pattern: トゥードゥイストに
+    level: L1a
+
+# L1b: 任意の記号語尾（使いたくなったら有効化）
+optional_tail_markers:
+  enabled: false
+  markers:
+    - " #t"
+    - "→タスク"
+
+partner_signals:
+  # L3: 相手会話・念押し → 必ず提案
+  - pattern: 別途メールで
+    level: L3
+  - pattern: そちらに返信
+    level: L3
+  - pattern: 要確認
+    level: L3
+  - pattern: ご確認ください
+    level: L3
+  - pattern: 折り返し
+    level: L3
+
+weak_keywords:
+  # L4: 弱いヒント（パートナー確認のついで提案のみ）
+  - 見積
+  - 退去
+  - 原状回復
+  - 修繕
+  - 空室
+
+status_signals:
+  partner_done:
+    - 完了しました
+    - 対応完了
+    - 終わりました
+    - 完了いたしました
+  bulk_close:
+    - 全部終わりでいいよ
+    - 全部完了でいい
+    - まとめて完了して

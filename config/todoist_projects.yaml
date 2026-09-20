@@ -1,0 +1,120 @@
+# Todoist タスク正本（Jarvis）
+# layout: beginner_compressed | pro_normalized
+# project_id / section_ids は bootstrap --write-config で埋める（手入力可）
+# 秘密: プロジェクト転送メールはチャットに出さない。必要なら .env 側へ。
+
+version: 1
+layout: beginner_compressed
+api_base: https://api.todoist.com/api/v1
+complete_phrase: タスク完了したよ
+
+# 共通セクション名（Board 列）
+default_sections:
+  - 未着手
+  - 進行中
+  - 相手待ち
+  - オーナー確認
+  - 完了
+
+# 共通ラベル（Beginner でも可）
+labels:
+  - waiting
+  - inbox_review
+  - L-id
+  - ai_raimo
+  - kamiooya
+  - kanji
+  - properties
+  - kodate
+  - kazoku
+
+# 論理レーン → 実プロジェクト（圧縮時は複数レーンが同一 project を共有）
+lanes:
+  properties:
+    title: 所有物件
+    project_key: properties
+    project_id: ""
+    lane_label: properties
+    initial_section: 未着手
+    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
+    done_sections: ["完了"]
+    hide_done_on_board: true
+  ai_raimo:
+    title: AI・Raimo
+    project_key: work_bundle
+    project_id: ""
+    lane_label: ai_raimo
+    initial_section: 未着手
+    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
+    done_sections: ["完了"]
+    hide_done_on_board: true
+  kamiooya:
+    title: 神大家運営
+    project_key: work_bundle
+    project_id: ""
+    lane_label: kamiooya
+    initial_section: 未着手
+    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
+    done_sections: ["完了"]
+    hide_done_on_board: true
+  kanji:
+    title: 飲み会幹事
+    project_key: work_bundle
+    project_id: ""
+    lane_label: kanji
+    initial_section: 未着手
+    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
+    done_sections: ["完了"]
+    hide_done_on_board: true
+  kodate:
+    title: 戸建て
+    project_key: kodate
+    project_id: ""
+    lane_label: kodate
+    initial_section: 未着手
+    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
+    done_sections: ["完了"]
+    hide_done_on_board: false
+  kazoku:
+    title: 家族
+    project_key: kazoku
+    project_id: ""
+    lane_label: kazoku
+    initial_section: 未着手
+    open_sections: ["未着手", "進行中", "相手待ち", "オーナー確認"]
+    done_sections: ["完了"]
+    hide_done_on_board: false
+
+# 物理プロジェクト定義（Beginner: 最大5）
+projects:
+  properties:
+    name: 所有物件
+    view_style: board
+    project_id: ""
+    section_ids: {}
+  work_bundle:
+    name: 業務まとめ
+    view_style: board
+    note: "ai_raimo / kamiooya / kanji を lane_label で同居（Beginner 圧縮）"
+    project_id: ""
+    section_ids: {}
+  kodate:
+    name: 戸建て
+    view_style: board
+    project_id: ""
+    section_ids: {}
+  kazoku:
+    name: 家族
+    view_style: board
+    project_id: ""
+    section_ids: {}
+  # 5枠目は触感確認用に空けておく（PM窓口や Inbox レビュー用）
+  # pm_inbox:
+  #   name: PM窓口
+  #   view_style: board
+  #   project_id: ""
+  #   section_ids: {}
+
+distortions_note: |
+  Beginner 圧縮の歪みは .jarvis_state/todoist_beginner_distortions.json に追記。
+  Pro 移行時に 1レーン1プロジェクトへ正規化する。
