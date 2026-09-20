@@ -1,0 +1,66 @@
+---
+description: 家族会議の週次定型（Notion日付ページ複製＋Genspark議事録＋NotebookLM横断1ノート＋インフォ添付）
+alwaysApply: false
+---
+
+# 家族会議・週次定型（Jarvis）
+
+## トリガー
+
+- 「今週の家族会議に議事録とインフォ付けて」
+- 「家族会議の Genspark を Notion に」「週次インフォを付けて」
+- Notion 日付ページ URL／Genspark SharedMeetingNotes URL 付きの家族会議依頼
+
+## 役割分担（混同しない）
+
+| ツール | 増やし方 | 横断の意味 |
+|---|---|---|
+| **Notion** | **毎週**、前週ページを複製して日付付きページを残す | 週ごとのアジェンダ・見た目・その週の添付の正本。1枚に統合しない |
+| **NotebookLM** | ノートは **「家族会議」1つだけ**。毎週の結果をソース追加 | 後から横断で調べる／まとめる／インフォ生成の参照庫 |
+| **Genspark** | Hot（録音・要約） | 会議後に MD 化して Notion＋NLM へ |
+
+## 5段階フロー
+
+1. **Notion**: 前週ページを複製 → ページ名を話す日 `(YYYY/MM/DD)` に変更（原則手動）
+2. **アジェンダ編集**: 常設トグルを残し、今週分を削除・追記（松野）
+3. **会議中**: Genspark AI Meeting Notes で記録
+4. **会議後・議事録**: その週の Notion ページ末尾へ MD＋共有リンク。同じ MD を Drive `13_家族会議_週次/議事録/` へ置き、NotebookLM「家族会議」へソース追加
+5. **インフォ**: NotebookLM Studio で1枚生成（いけともゆる／Nano Banana Pro）→ 同週 Notion ページへ添付
+
+## 正本パス
+
+| 層 | 場所 |
+|---|---|
+| Notion ハブ | `config/notion_family_coaching.yaml` → `root_page_id`（家族会議） |
+| Drive | admin `200_NoteBookLM/13_家族会議_週次/` |
+| NotebookLM | `config/notebooklm_studio.yaml` → `family_meeting_weekly`（**1ノート固定**） |
+| スタイル | `00_共通(デザイントーン）`／`jarvis-notebooklm-drive-sources.mdc` |
+| Studio プロンプト | Drive `13_…/Studioプロンプト_家族会議_週次インフォ.md` または `docs/N1_NotebookLM/13_家族会議_週次/` |
+| CLI | `scripts/jarvis_family_meeting_weekly.py` |
+
+## Jarvis の動作（会議後）
+
+1. 使用アカウント: Genspark＝API／NotebookLM＝**admin**
+2. `jarvis_genspark_meeting_fetch.py` で当該週を特定（共有 URL の id＝`project_id`。list の meeting id は別）
+3. `get --detail-level full` → `YYYYMMDD_家族会議_Genspark議事録.md`
+4. Notion 日付ページ末尾に見出し＋共有リンク＋ファイル添付（MCP `create-attachment` 可）
+5. 同 MD を Drive `議事録/` へコピー → NLM 固定ノートへソース追加
+6. Studio Infographic（定型プロンプト）→ `★アウトプット/` → Notion 同ページへ画像添付
+7. チャットは3行要約＋宿題のみ（全文再掲しない）
+
+複製（段階1）は原則手動。依頼時は前週 URL を確認し「複製して日付を変えて」と案内（Notion duplicate API は自動化しない）。
+
+## やらないこと
+
+- 週ごとに新しい NotebookLM ノートを増やす
+- Notion 日付ページをやめて1枚に全部押し込む
+- 電話・面談 Inbox の「子ページ新規」パターンを家族会議に流用する
+- マスタースタイルなしでインフォ生成
+- admin 以外で NotebookLM を操作する
+
+## 関連
+
+- Genspark: `jarvis-genspark-meeting.mdc`
+- NotebookLM Drive: `jarvis-notebooklm-drive-sources.mdc`
+- 家族コーチ YAML: `config/notion_family_coaching.yaml`
+- コマンド: `docs/運用コマンド一覧.md`「家族会議・週次」

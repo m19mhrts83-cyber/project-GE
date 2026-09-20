@@ -140,7 +140,12 @@ def create_and_upload(
 
             # 3. 「新規作成」ボタンをクリック
             create_btn = page.locator(
-                "button:has-text('新規作成'), [aria-label*='新規作成'], button:has-text('ノートブックを新規作成')"
+                "button:has-text('新規作成'), "
+                "button:has-text('新しいノートブック'), "
+                "button:has-text('ノートブックを新規作成'), "
+                "button:has-text('New notebook'), "
+                "button:has-text('Create'), "
+                "[aria-label*='新規'], [aria-label*='Create'], [aria-label*='New notebook']"
             ).first
             if not create_btn.count():
                 raise RuntimeError("Could not find 'Create notebook' button on home page")
@@ -148,7 +153,14 @@ def create_and_upload(
             create_btn.click()
             page.wait_for_timeout(4000)
 
+            # notebook.google.com / notebooklm.google.com 両対応
             notebook_url = page.url.split("?")[0]
+            if "notebook.google.com" in notebook_url:
+                notebook_url = notebook_url.replace(
+                    "https://notebook.google.com/",
+                    "https://notebooklm.google.com/",
+                    1,
+                )
             print(f"# Created new notebook: {notebook_url}", file=sys.stderr)
             result["notebook_url"] = notebook_url
             if "/notebook/" in notebook_url:

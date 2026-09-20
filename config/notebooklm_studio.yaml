@@ -68,3 +68,15 @@ notebooks:
     url: "https://notebook.google.com/notebook/14e0b11d-0f16-49a8-ad05-8aa48962b53e"
     drive_folder: "11_東海DX_GrokBot不動産AI組織"
     state_file: ".jarvis_state/notebooklm_tokai_dx_grokbot_ai_org.json"
+  tokai_dx_secondbrain_cursor:
+    url: "https://notebooklm.google.com/notebook/1317efbc-632e-44a0-9e67-c6c4613eb2eb"
+    drive_folder: "12_東海DX_SecondBrain_Cursor紹介"
+    state_file: ".jarvis_state/notebooklm_tokai_dx_secondbrain_cursor.json"
+    note: "Grok Bot紹介の次。Second Brain×Cursor。admin"
+  # 家族会議・週次（横断参照用・ノートは常に1本。週ごとにソース追加のみ）
+  family_meeting_weekly:
+    url: "https://notebooklm.google.com/notebook/3b697702-45b9-417e-90fc-80a396aebc44"
+    drive_folder: "13_家族会議_週次"
+    state_file: ".jarvis_state/notebooklm_family_meeting_weekly.json"
+    revise_prompt: "docs/N1_NotebookLM/13_家族会議_週次/Studioプロンプト_家族会議_週次インフォ.md"
+    note: "横断Q&A＋週次インフォ。Notion日付ページとは別（複製履歴はNotion側）。作成2026-09-20"
