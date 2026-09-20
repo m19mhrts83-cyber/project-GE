@@ -1,0 +1,12 @@
+{
+  "layout": "beginner_compressed",
+  "updated_at": null,
+  "entries": [
+    {
+      "at": "YYYY-MM-DD",
+      "kind": "project_cap|filter_cap|history|attachment|email_assist|other",
+      "note": "何が歪んだか1行",
+      "wanted_on_pro": "Pro でどう直したいか1行"
+    }
+  ]
+}
