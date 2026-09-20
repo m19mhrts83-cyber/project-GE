@@ -1,5 +1,5 @@
 version: 1
-updated: '2026-08-02'
+updated: '2026-09-20'
 pages_base: https://m19mhrts83-cyber.github.io/project-GE/docs
 lanes:
 - id: self
@@ -60,6 +60,29 @@ items:
   title: 第1回スライド（dx-slides）
   url: https://m19mhrts83-cyber.github.io/dx-slides/
   note: Cursor × Markdown 活用入門
+- id: dx-4kai
+  lane: dx
+  title: 第4回 資料一覧（Grok Bot・Second Brain・岡田さん）
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/4kai.html
+  note: 2026-09-20。NotebookLM PDF＋前回岡田さん資料
+- id: dx-4kai-grok
+  lane: dx
+  title: Grok Bot 不動産AI組織（発表スライド）
+  filename: 東海DX勉強会_GrokBot不動産AI組織_発表スライド.pdf
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/assets/dx-4kai/東海DX勉強会_GrokBot不動産AI組織_発表スライド.pdf
+  note: NotebookLM 11_東海DX_GrokBot
+- id: dx-4kai-secondbrain
+  lane: dx
+  title: Second Brain × Cursor（発表スライド v2）
+  filename: 東海DX_SecondBrain_Cursor_スライド_20260919_v2.pdf
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/assets/dx-4kai/東海DX_SecondBrain_Cursor_スライド_20260919_v2.pdf
+  note: NotebookLM 12_東海DX_SecondBrain
+- id: dx-4kai-okada
+  lane: dx
+  title: 不動産業務自動化（岡田さん・前回）
+  filename: 不動産業務自動化_説明資料_岡田.pdf
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/assets/dx-4kai/不動産業務自動化_説明資料_岡田.pdf
+  note: 2026-08-09。LINE添付→EmailMe取込
 - id: kamiooya-hub
   lane: kamiooya
   title: 神大家 AI推進相談 資料一覧
