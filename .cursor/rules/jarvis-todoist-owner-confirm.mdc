@@ -107,7 +107,7 @@ inbox の `summary` / `links` は `jarvis_hawk_todoist_tasks_apply.py` がコメ
 - 「起票して」了承後に `create-task`（無言自動起票はしない）
 - シグナル: `config/todoist_extract_signals.yaml`
 
-FRIDAY（GenCode）も **同じ二段**。コード完了報告時に該当タスクがあればオーナー確認へ入れ、松野へ伝える。
+FRIDAY（GenCode）も **同じ二段**。Mac 上では `./scripts/friday_todoist.sh` で Jarvis 同等に Todoist 操作可（token はラッパー内部読取・cat 禁止）。コード完了報告時に該当タスクがあればオーナー確認へ入れ、松野へ伝える。
 
 ## ホーク連携
 

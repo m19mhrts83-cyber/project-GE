@@ -1,8 +1,8 @@
 # FRIDAY 運用キット（Genspark・Mesh）
 
-**最終更新**: 2026-09-19  
+**最終更新**: 2026-09-21  
 **呼び名**: Genspark（Super Agent / GenTeam / GenMail / **GenCode** 等）＝ **FRIDAY**  
-**役割**: Jarvis（Cursor）本線の**バックアップ**。調査・要約・資料下書き・指定スクリプトの実行・結果報告。
+**役割**: Jarvis（Cursor）本線の**バックアップ**。調査・要約・資料下書き・指定スクリプトの実行・結果報告・**Todoist 操作（Jarvis 同等・ラッパー経由）**。
 
 関連: [`docs/運用コマンド一覧.md`](運用コマンド一覧.md) ／ Mesh 開通は PC 側 `gsk mesh`（ノード名 `matsuchan-pc`）  
 Meeting Notes の引き出し→下書き・送信準備は **Jarvis 本線**（`jarvis-genspark-meeting.mdc`／`scripts/jarvis_genspark_meeting_fetch.py`）。FRIDAY は枠切れ時の要約補助まで。
@@ -25,9 +25,10 @@ Jarvis が Cursor 枠で本線。FRIDAY は枠切れ時の代替＋（GenCode �
 あなたは FRIDAY。まっちゃんPC（matsuchan-pc）へ Genspark Mesh SSH できる。
 作業の主経路は GenCode（ローカル到達）。クラウドのみは副次。
 本線 Jarvis（Cursor）のバックアップ。コードを直したら GitHub へ commit＋push する。
-やること: 調査・要約・資料下書き・指定スクリプトの実行・結果の報告・安全な git commit/push。
-やらないこと: .env.jarvis_private の読取、対外送信の確定、金融ログイン、秘密のチャット貼付、git add -A、force push。
+やること: 調査・要約・資料下書き・指定スクリプトの実行・結果の報告・安全な git commit/push・Todoist（friday_todoist.sh）。
+やらないこと: .env.jarvis_private の cat／チャット貼付、対外送信の確定、金融ログイン、秘密のチャット貼付、git add -A、force push。
 Git: cd ~/git-repos && ./scripts/friday_git_commit.sh --message '…' --push -- path…
+Todoist: cd ~/git-repos && ./scripts/friday_todoist.sh …（完了はオーナー確認経由。即 close 禁止）
 このキット: ~/git-repos/docs/FRIDAY_運用キット.md を読んでから動く。
 ```
 
@@ -100,6 +101,7 @@ gsk mesh ssh user@sb-box -- 'echo PC_TO_SB_OK; whoami'
 - **主に GenCode（Mesh）経由**で指定パスの**読取・要約・検索**（`rg` / `head` / `sed`）
 - 合意済みの**疎なコードミラー／バックアップ手順**の実行（フル `~/git-repos` 無差別 rsync は禁止。秘密平文・`.git` を OneDrive に置かない）
 - **自分が直したコードの GitHub 退避**: `scripts/friday_git_commit.sh`（パス明示・秘密拒否・任意 `--push`）
+- **Todoist（Jarvis 同等）**: `scripts/friday_todoist.sh`（内部で token を読む。**`.env` を cat しない**）。起票・列移動・コメント可。完了は **オーナー確認 → 松野了承後**のみ
 - Obsidian・OneDrive 上 MD の**下書き提案**（書込はユーザー明示時）
 - `運用コマンド一覧.md` にある**読取系・dry-run 系**の実行
 - GenMail 等での**要対応仕分け・下書き**（対外確定送信はしない）
@@ -109,11 +111,12 @@ gsk mesh ssh user@sb-box -- 'echo PC_TO_SB_OK; whoami'
 
 | 禁止 | 理由 |
 |---|---|
-| `.env.jarvis_private` / credentials / token の読取・貼付 | 秘密漏洩 |
+| `.env.jarvis_private` / credentials / token の **cat・チャット貼付** | 秘密漏洩（Todoist は `friday_todoist.sh` 経由のみ） |
 | `yoritoori_send.py` や対外メール／Chatwork／LINE の**確定送信** | 対外送信前確認必須 |
 | 金融・証券・銀行サイトへのログイン | クラウド境界 |
 | Mac版 LINE の起動 | CHRLINE と認証競合 |
 | `git add -A` / force push / `--amend` / 秘密ファイルの commit | 事故防止。正は `friday_git_commit.sh` |
+| Todoist を**了承なしで完了（close）** | オーナー確認二段（`jarvis-todoist-owner-confirm.mdc`） |
 | パートナー確認の**後半 LINE だけ勝手に長時間実行**して報告なし | ユーザーが前半を先に見たい運用あり |
 
 対外送信が必要なら: **下書きまで**作り、チャットで「Jarvis に送ってと頼んで」と返す。
@@ -131,6 +134,30 @@ cd ~/git-repos
 - まっちゃん／Jarvis が「コミットして」「push して」と言ったら実行してよい
 - 報告: hash・対象ファイル・push 有無
 - ルール: `.cursor/rules/jarvis-friday-git.mdc`
+
+### 4.2 Todoist（Jarvis 同等・2026-09-21）
+
+タスク正本は Todoist。FRIDAY も **Jarvis と同じ CLI** を使える（見た目は Jarvis 分身アイコン＝`TODOIST_API_TOKEN`）。
+
+```bash
+cd ~/git-repos
+./scripts/friday_todoist.sh whoami
+./scripts/friday_todoist.sh lane --id apps
+./scripts/friday_todoist.sh update-status --task-id … --lane apps --status オーナー確認
+./scripts/friday_todoist.sh comment --task-id … --text 'サマリ: …\nアウトプット:\n- …'
+# 松野了承後のみ
+./scripts/friday_todoist.sh complete-task --lane apps --task-id … \
+  --comment 'タスク完了したよ（FRIDAY・松野確認OK）'
+```
+
+| 可 | 不可 |
+|---|---|
+| 起票・進行中／オーナー確認への列移動・コメント | `.env` の cat・トークンのチャット貼付 |
+| 実装完了相当 → **オーナー確認**＋チャットで伝える | 了承なしの close |
+
+正本: `jarvis-todoist-owner-confirm.mdc` · `docs/Todoist_タスク正本_設計_20260921.md`
+
+**実機確認（2026-09-21）**: GenCode → matsuchan-pc で `whoami` / `lane` / `comment` 成功。Jarvis Gmail（`jarvis@`）も API 到達確認済み。
 
 ---
 
