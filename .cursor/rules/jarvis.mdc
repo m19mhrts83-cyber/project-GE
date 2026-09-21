@@ -96,6 +96,7 @@ alwaysApply: true
 | `TODOIST_API_TOKEN` | Todoist API 本線（**Jarvis 分身** `jarvis.livingsupport.matsu@gmail.com`）。チャットに出さない。CLI: `scripts/jarvis_todoist_api.py` |
 | `TODOIST_API_TOKEN_OWNER` | admin Todoist 退避トークン（松野 UI 用・常用しない） |
 | `JARVIS_TODOIST_EMAIL` | Jarvis 分身の Todoist／Gmail アドレス |
+| `GMAIL_TOKEN_JARVIS` | Jarvis Gmail API 用 `token_jarvis.json` のパス（他アカウントと同様） |
 | `NOTION_FAMILY_API_TOKEN` | 家族コーチング用（別WSのとき）。同一WSならページ共有のみで可。チャットに出さない |
 | `NOTION_FAMILY_COACHING_PAGE_ID` | 家族コーチ Notion root ページ ID |
 | `JARVIS_SUPABASE_*` | 自分用投影 DB `jarvis-dashboard`（運営 `kamiooya-qa` と分離） |

@@ -36,6 +36,16 @@ alwaysApply: true
 
 サブ Bot（コーチ等）は統括が inbox にまとめてよい。
 
+## Jarvis分身Gmail（Todoistコメント入口）の共有
+
+| 誰 | 見えるか |
+|---|---|
+| Jarvis | 本線（Gmail API） |
+| **ホーク** · **不動産部長** | **共有**（Drive outbox 要約 · Todoist。ログインはしない） |
+| ほか | ホーク経由 |
+
+正本: `config/grok_jarvisbox_fork_policy.md` · paste / B1。秘密・トークンは渡さない。
+
 ## 例外（JarvisBox 不要）
 
 - `[Grok部長]` / `[Grok調査]` → **estate Gmail**（従来どおり）

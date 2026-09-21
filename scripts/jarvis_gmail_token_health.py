@@ -20,6 +20,7 @@ TOKENS = (
     ("admin", "token_livingsupport.json"),
     ("estate", "token_estate.json"),
     ("m19m", "token_m19m.json"),
+    ("jarvis", "token_jarvis.json"),
     ("m19m_legacy", "token.json"),
     ("calendar", "token_calendar.json"),
 )

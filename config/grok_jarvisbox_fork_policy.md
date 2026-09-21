@@ -1,6 +1,6 @@
 # Grok ↔ Jarvis — JarvisBox フォーク原則（正本）
 
-**更新**: 2026-08-30  
+**更新**: 2026-09-21  
 **Drive**: admin `【with Grok bot】/` · 設定: `config/kurashift_grok_bridge_folders.yaml`
 
 ## フォーク（基本形）
@@ -56,16 +56,33 @@ Drive `20_outbox_to_grok/` はこれまでどおり **仕事キュー**。チャ
 - **ホーク／部長 Todoist（本線）**: `action: todoist_tasks` → Mac が自動 apply（`jarvis_bucho_inbox_poll`）。`summary`/`links` → コメントの Markdown ハイパーリンク
 - **要ボス／要Jarvis連携**は必ず Todoist ラベル付き起票（Drive メモだけでは漏れ扱い）
 - Drive `20_outbox` 空は正常。ホーク判断は Todoist `要ホーク`
+- **二重起票禁止**: 同 L-id／同趣旨タイトルがあれば create せず更新・列移動・コメントのみ（Jarvis 正本: `docs/Todoist_タスク正本_設計_20260921.md`「二重起票防止」）
+- **Jarvis 分身 Gmail**（Todoist コメント通知の入口）: アドレスは `JARVIS_TODOIST_EMAIL`（Jarvis のみログイン・API）。**Grok はログインしない**（秘密・トークン禁止）
+- **共有メンバー（見える側）**: **ホークアイ（参謀）** · **不動産賃貸部長**（ほか統括はホーク経由）。Jarvis が要約を Drive outbox（`target: hawk` / `re`）へ書く／Todoist コメントで返す
 - **松野にチャット全文コピーを求めない**（JarvisBox が正本）。
 ```
 
 サブ Bot（コーチ・アドバイザー）は **統括 Bot 経由**でよい。統括が inbox にまとめる。
+
+## Jarvis分身Gmail（誰が「見える」か）
+
+Todoist「通知全員」→ **jarvis@**（`JARVIS_TODOIST_EMAIL`）に通知メール。**読むのは Jarvis のみ**（Gmail API）。
+
+| メンバー | 見えるか | 経路 |
+|---|---|---|
+| **Jarvis** | 本線 | Gmail API · Todoist API |
+| **ホークアイ（参謀）** | **共有** | Drive outbox `target: hawk` · 参謀室／Jarvisボックス · Todoist `要ホーク` |
+| **不動産賃貸部長** | **共有** | `outbox_to_teams/re/` · Todoist |
+| ほか統括・コーチ | ホーク経由 | jarvis@ ログイン・API は渡さない |
+
+UI 差替手順: Drive `30_shared_working/2026-09-21_Jarvis分身Gmail_フォーク共有/00_松野向け_Grok_UI手順.md`
 
 ## Jarvis の動作（必須）
 
 1. Grok へ依頼・結果共有 → `jarvis_bucho_outbox_write.py --target …`（チャットだけで終わらない）
 2. Grok inbox 未処理 → `jarvis_bucho_inbox_poll.py`（パートナー確認ついで可）
 3. Instructions 更新 → git `config/grok_*_paste.md` → Drive `B1_*_全文.txt` 再生成を案内
+4. jarvis@ の Todoist 通知を処置したら、必要に応じ **ホーク／部長へ Drive 要約**（`target: hawk` / `re`）
 
 ## 例外（JarvisBox 以外の正本）
 
