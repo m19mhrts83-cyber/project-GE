@@ -19,6 +19,7 @@ Google 関連の作業では、**どのアカウントで何をするか**をル
 | **admin** | `admin@livingsupport-matsu.co.jp` | ビジネス・Google Workspace（リビングサポート Drive・Gmail 受信集約・**カレンダー予定**・Workspace Gemini） |
 | **estate** | `matsuno.estate@gmail.com` | 不動産・神大家関連・対外 From（パートナー送信既定・WeStudy・Finto 等） |
 
+**Todoist 分身（Google 3本とは別）**: `jarvis.livingsupport.matsu@gmail.com` — Todoist API／プロフィール用 Gmail（Workspace 席なし）。env: `JARVIS_TODOIST_EMAIL`。  
 使わない表記: `masaharu@matsuno.estate` / `admin@livingsupport.matsuno`（正は上表）。
 
 人間向け要約・コスト判断: `docs/Googleアカウント使い分け.md`  
@@ -43,6 +44,7 @@ token の実体は `215_kamiooya/C1_cursor/1b_Cursorマニュアル/`。
 | NotebookLM MCP ログイン／Drive `200_NoteBookLM` | **admin** | `admin@livingsupport-matsu.co.jp`（ソース正本も admin Drive） |
 | 神大家 WeStudy スクレイプ本文・添付（自分用） | **admin** | Drive `215_神大家_WeStudyスクレイプ/`（Q&A DB とは別） |
 | Typeless サポート（`hello@typeless.com`） | **m19m** | パートナー一覧には入れない。詳細: `jarvis-typeless-support.mdc` |
+| Genspark Impact アフィリエイト審査メール | **m19m** | `jarvis_genspark_impact_affiliate_check.py` / `jarvis-genspark-impact-affiliate-watch.mdc` |
 
 ### 特記: 神・大家さん関連
 
