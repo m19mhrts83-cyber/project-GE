@@ -345,9 +345,34 @@ def cmd_create_task(args: argparse.Namespace) -> int:
         body["description"] = args.note
     created = _req("POST", "/tasks", body, cfg=cfg)
     tid = created.get("id")
-    print(f"created id={tid} lane={args.lane} section={section}")
-    if args.url and created.get("url"):
-        print(f"url={created.get('url')}")
+    url = created.get("url") or ""
+    if args.comment and tid:
+        _req(
+            "POST",
+            "/comments",
+            {"task_id": tid, "content": str(args.comment)[:1900]},
+            cfg=cfg,
+        )
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "id": tid,
+                    "lane": args.lane,
+                    "section": section,
+                    "url": url,
+                    "commented": bool(args.comment),
+                },
+                ensure_ascii=False,
+            )
+        )
+    else:
+        print(f"created id={tid} lane={args.lane} section={section}")
+        if args.url and url:
+            print(f"url={url}")
+        if args.comment:
+            print(f"commented id={tid}")
     return 0
 
 
@@ -511,6 +536,8 @@ def cmd_seed_nokori(args: argparse.Namespace) -> int:
             status=None,
             label="L-id,inbox_review",
             url=False,
+            comment="",
+            json=False,
         )
         cmd_create_task(ns)
     return 0
@@ -542,6 +569,12 @@ def main() -> int:
     c.add_argument("--status", default=None, help="セクション名（既定: 未着手）")
     c.add_argument("--label", default="", help="追加ラベル（カンマ区切り）")
     c.add_argument("--url", action="store_true")
+    c.add_argument(
+        "--comment",
+        default="",
+        help="作成直後に付けるコメント（サマリ・アウトプットリンク用）",
+    )
+    c.add_argument("--json", action="store_true", help="1行 JSON で結果出力")
 
     u = sub.add_parser("update-status")
     u.add_argument("--task-id", required=True)

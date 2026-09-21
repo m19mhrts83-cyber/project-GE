@@ -56,6 +56,56 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 2. 上の報告ブロックを出す
 3. 了承後にだけ `complete-task`
 
+## コメント（処置・確認メモ）
+
+方針: **全部は書かない**。タスクに紐づく処置・確認・判断だけ残す（Jarvis も参照する）。
+
+| 誰 | 使い方 |
+|---|---|
+| 松野 | 確認依頼・処置メモ（例: `内容教えて` / `処置: …`）。`@Jarvis` は任意 |
+| Jarvis | 依頼・会話のついでにコメントを読み、説明・処置結果を **返信コメント**＋必要ならチャット |
+| ホーク／FRIDAY | 要ボス・完了候補の理由を短く。長文は inbox MD |
+
+### サマリ・アウトプットリンク（必須 2026-09-21・クリック可）
+
+Jarvis／ホーク／FRIDAY がタスクを **起票・オーナー確認へ移動・完了・処置報告**するとき、Todoist **コメント**に次を残す:
+
+```
+サマリ: （1〜3行）
+アウトプット:
+- [表示名](https://…)
+```
+
+| とき | 必須？ |
+|---|---|
+| 実装・適用・処置の報告 | **必須**（アウトプットは Markdown ハイパーリンク） |
+| 完了候補 → オーナー確認 | **必須**（何を見て了承するか） |
+| 列移動のみ・短答 | サマリ1行推奨。アウトプット無ければ省略可 |
+| 秘密・トークン | **禁止** |
+
+相対パスは `scripts/jarvis_todoist_comment_links.py` が GitHub／Pages／ダッシュボードの https に解決する。  
+inbox の `summary` / `links` は `jarvis_hawk_todoist_tasks_apply.py` がコメントへ転記する。
+
+### Jarvis → Drive outbox（書込ゲート）
+
+`20_outbox_to_grok/` へ書くのは次のときだけ:
+
+- Grok／ホークに **振り分け・Instructions・長文手渡し**が必要
+- ルーティン変更など Drive キューが正のとき
+
+日常の完了・処置報告は **Todoist コメント**で足りる。  
+ホーク判断が欲しければラベル **`要ホーク`** を付け、Drive が空でも Filter で見えるようにする（空の Jarvisボックスは正常）。
+
+**巡回**: 採用方針。実装は残アクション（パートナー確認／朝オープンのついで）。未実装でも、話題のタスクは API でコメントを読んで無視しない。
+
+参照先全体: `jarvis-reference-sources.mdc`
+
+### パートナー確認（メール／LINE／Chatwork）
+
+- 前半報告で宿題・要確認があれば **`📎 Todoist起票候補`** を必ず出す（詳細: `partner-email-check.mdc`）
+- 「起票して」了承後に `create-task`（無言自動起票はしない）
+- シグナル: `config/todoist_extract_signals.yaml`
+
 FRIDAY（GenCode）も **同じ二段**。コード完了報告時に該当タスクがあればオーナー確認へ入れ、松野へ伝える。
 
 ## ホーク連携
@@ -90,20 +140,33 @@ source: hawk   # または bucho / realestate
   status: オーナー確認   # 省略時は未着手
   due: YYYY-MM-DD
   note: 要ボス／週次由来
+  summary: 1行サマリ（コメントに残る）
+  links: https://… | docs/相対パス.md
+  labels: 要Jarvis連携,quick
 
 ## owner_confirm
 - lane: ai_raimo
   task_id: …
   reason: 実装完了候補
+  summary: …
+  links: …
 
 ## done
 - lane: ai_raimo
   task_id: …
   reason: タスク完了したよ（ホーク・松野確認済）
+  summary: …
+  links: …
+
+## comment
+- task_id: …
+  summary: 処置メモ
+  links: …
 ```
 
-- 現状の `action: notion_tasks` は移行期も可。**新分は `todoist_tasks` を正**にする（適用スクリプトは Jarvis が追随）
-- Jarvis: パートナー確認・inbox poll のついでに apply（未実装ならその場で CLI／手動追従し、スクリプト化を残す）
+- 現状の `action: notion_tasks` は移行期も可。**新分は `todoist_tasks` を正**にする
+- 適用: `scripts/jarvis_hawk_todoist_tasks_apply.py --apply`（`--archive-done` 可）
+- Jarvis: パートナー確認・inbox poll のついでに apply
 
 ## 不動産部長・API 共有の方針
 
@@ -122,9 +185,11 @@ source: hawk   # または bucho / realestate
 
 ## 関連
 
+- 参照先候補（Todoist／Notion／Supabase／WS）: `jarvis-reference-sources.mdc`
 - 受け入れ閉じ: `jarvis-plan-accept.mdc`
 - 設計: `docs/Todoist_タスク正本_設計_20260921.md`
 - CLI: `scripts/jarvis_todoist_api.py`
 - ホーク Notion 旧経路: `scripts/jarvis_hawk_notion_tasks_apply.py`（移行期）
+- Todoist 本線適用: `scripts/jarvis_hawk_todoist_tasks_apply.py`
 - FRIDAY Git: `jarvis-friday-git.mdc`
 - JarvisBox: `jarvis-grok-jarvisbox-fork.mdc`

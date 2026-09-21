@@ -152,8 +152,13 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
 
 - ミーティング／レビューから **実行が残っている決定**をタスク化（最大 **5件／週**。増やすなら松野に確認）
 - レーンを振り分ける（迷ったら `ai_raimo` かアテンションへ）
-- **Grok Notion で書けるとき** → その場で作成し、週次に「作成済」と列挙
-- **書けないとき** → `10_inbox_from_grok/` に `action: notion_tasks`（下フォーマット）
+- **要ボス**（松野判断）・**Jarvis連携希望**（Mac実行）は **必ず Todoist**（Driveメモだけでは漏れ）。ラベル必須:
+  - `要ボス` … 判断待ちなら `status: オーナー確認`、作業残なら `未着手`
+  - `要Jarvis連携` … タイトル先頭 `[要Jarvis連携]` ＋ labels
+  - 任意: `quick`（5分以内）
+- **本線** → `10_inbox_from_grok/` に `action: todoist_tasks`（下フォーマット）。Jarvis が Mac で自動 apply（開いた直後〜15分）
+- **Grok Notion 直接**は移行期のみ。新分は Todoist
+- **書けない／旧** → `action: notion_tasks` も可（移行期）
 
 ### 整理（done / archive）
 
@@ -170,13 +175,13 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
 
 **完了コメント（必須）**: ステータス完了のとき、Notion コメント先頭は必ず `タスク完了したよ（ホーク・…）`。Grok で直接完了するならその場でコメント。Jarvis 委譲なら `## done` の `reason` に同じ定型を書く（`complete-task` 経由）。コメント無し完了は禁止。
 
-### inbox フォーマット（Jarvis 反映用）
+### inbox フォーマット（Jarvis 反映用・Todoist 本線）
 
-ファイル名例: `YYYY-MM-DD_hawk_notion_tasks.md`
+ファイル名例: `YYYY-MM-DD_hawk_todoist_tasks.md`
 
 ```
 ---
-action: notion_tasks
+action: todoist_tasks
 priority: normal
 target: jarvis
 source: hawk
@@ -184,25 +189,43 @@ source: hawk
 
 ## create
 - lane: kazoku
-  title: …
+  title: [要ボス] …
   due: YYYY-MM-DD
+  status: オーナー確認
+  labels: 要ボス
   note: ミーティングメモ由来
+  summary: 1行サマリ（コメントに残る）
+  links: https://… | docs/相対.md
+
+- lane: ai_raimo
+  title: [要Jarvis連携] …
+  labels: 要Jarvis連携
+  summary: Macでやってほしいこと
+  links: https://…
+
+## owner_confirm
+- lane: ai_raimo
+  task_id: …
+  reason: 実装完了候補
+  summary: …
+  links: …
 
 ## done
 - lane: kodate
-  page_id: …
+  task_id: …
   reason: タスク完了したよ（ホーク・週次で確認）・優先低下
-
-## archive
-- page_id: …
-  reason: 重複
+  summary: …
+  links: …
 ```
 
-Jarvis: `scripts/jarvis_hawk_notion_tasks_apply.py --apply`
+Jarvis: Mac の `jarvis_bucho_inbox_poll` が自動 apply（手動なら `jarvis_hawk_todoist_tasks_apply.py --apply --archive-done`）。  
+`summary` / `links` は Todoist コメントへ Markdown ハイパーリンクとして転記（origin/main にあるパスのみ GitHub リンク）。
+
+（移行期）Notion: `action: notion_tasks` → `jarvis_hawk_notion_tasks_apply.py --apply`
 
 ### 週次への載せ方
 
-週次統括の末尾に必ず `## Notionタスク`（登録件数 · 整理 · 読取 OK/NG）を付ける。
+週次統括の末尾に必ず `## タスク（Todoist）`（登録件数 · 整理 · 読取 OK/NG）を付ける。旧見出し `## Notionタスク` も可。
 
 ## §グルコン材料（活動／成果 · Drive · 必須）
 

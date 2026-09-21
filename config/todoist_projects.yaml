@@ -19,6 +19,15 @@ labels:
 - kodate
 - kazoku
 - apps
+- 要ボス
+- 要Jarvis連携
+- 要ホーク
+- quick
+# Filter案内（Todoist UI・手作業）:
+#   要連携 = (ラベル:要Jarvis連携 | 要ボス) & !完了
+#   パッと = ラベル:quick & !完了
+#   要ホーク = ラベル:要ホーク & !完了
+# 朝レビュー順: 要連携 → パッと → オーナー確認 → その他未着手
 lanes:
   properties:
     title: 所有物件
@@ -78,8 +87,8 @@ lanes:
     hide_done_on_board: true
   apps:
     title: アプリ開発
-    project_key: work_bundle
-    project_id: 6hXX2m7CJVrvmh9j
+    project_key: apps
+    project_id: 6hXfrWj4gwv9xQj6
     lane_label: apps
     initial_section: 未着手
     open_sections:
@@ -132,7 +141,7 @@ projects:
   work_bundle:
     name: 業務まとめ
     view_style: board
-    note: ai_raimo / kamiooya / kanji / apps を lane_label で同居（Beginner 圧縮。専用枠は後で見直し可）
+    note: ai_raimo / kamiooya / kanji を lane_label で同居（Beginner 圧縮。apps は専用プロジェクトへ分離 2026-09-21）
     project_id: 6hXX2m7CJVrvmh9j
     section_ids:
       未着手: 6hXX2m9G5vq9gQ3j
@@ -140,6 +149,17 @@ projects:
       相手待ち: 6hXX2mFph4hpV5jC
       オーナー確認: 6hXX2mGJJFhV6mgj
       完了: 6hXX2mJ9fwgCMGJC
+  apps:
+    name: アプリ開発
+    view_style: board
+    note: Beginner 5本目。Todoist導入・アプリ残タスクをここだけで追う（2026-09-21）
+    project_id: 6hXfrWj4gwv9xQj6
+    section_ids:
+      未着手: 6hXfrWvX6vpjfV26
+      進行中: 6hXfrWw2r3HRX92c
+      相手待ち: 6hXfrX2g76rcc4wc
+      オーナー確認: 6hXfrX2839CrjP46
+      完了: 6hXfrWxmWRj3wcHc
   kodate:
     name: 戸建て
     view_style: board
@@ -161,8 +181,8 @@ projects:
       オーナー確認: 6hXX2mp7RMMcvVgV
       完了: 6hXX2mpgfqFFRR93
 distortions_note: 'Beginner 圧縮の歪みは .jarvis_state/todoist_beginner_distortions.json
-  に追記。
+  に追記。apps は 2026-09-21 に専用「アプリ開発」へ分離（5本目）。
 
-  Pro 移行時に 1レーン1プロジェクトへ正規化する。
+  Pro 移行時に残レーンも 1レーン1プロジェクトへ正規化する。
 
   '

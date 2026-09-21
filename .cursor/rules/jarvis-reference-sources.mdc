@@ -1,0 +1,108 @@
+---
+description: Jarvisの参照先候補（ワークスペース／Obsidian／Todoist／Notion／Supabase）とTodoistコメント運用
+alwaysApply: true
+---
+
+# Jarvis 参照先候補（明示）
+
+会話・調査・処置のとき、次を **参照先候補として認識する**。  
+全部を毎回読む必要はない。文脈に合う先を選び、足りなければ足す。
+
+## 1. ワークスペースの参照フォルダ（ローカル・クラウド）
+
+Cursor ワークスペースに載っているフォルダは参照可。主な正本:
+
+| 種別 | パス（目安） | 用途 |
+|---|---|---|
+| **コード本線** | `~/git-repos` | スクリプト・apps・ルール・config |
+| **Obsidian 正本** | `~/Documents/500_Obsidian_r1` | Journal／Literature／Research（OGD 同期。Drive ミラー直書きしない） |
+| **神大家・パートナー** | OneDrive `215_神・大家さん倶楽部` | `5.やり取り.md`・添付・連絡先 |
+| **物件調査** | OneDrive `230_物件調査` | 調査メモ・候補 |
+| **融資** | OneDrive `240_融資` | 融資関連 |
+| **AI リスキリング** | OneDrive `300_AIリスキリング講座…` | 学習・助成金 |
+| **admin Drive** | `GoogleDrive-admin@…/マイドライブ` | NotebookLM・事務・車両・Obsidian OGD 等 |
+| **Downloads** | `~/Downloads` | 一時取込（容量正本に移す） |
+
+フォルダ固有の正本ルール（OGD・800 車両・900 事務・パートナー添付など）は各 `.mdc` を優先する。
+
+## 2. Todoist（タスク正本）
+
+| 項目 | 正 |
+|---|---|
+| 役割 | **タスクの正本**（`JARVIS_TASK_BACKEND=todoist`） |
+| CLI | `scripts/jarvis_todoist_api.py` |
+| 秘密 | `TODOIST_API_TOKEN`（`.env.jarvis_private`。チャット禁止） |
+
+### コメント運用（必須 2026-09-21）
+
+- **全部をコメントに書かない**。タイトル・説明で足りることは書かない。
+- タスクに紐づく **処置メモ・確認依頼・判断メモ** を残す用途は推奨。
+- Jarvis はコメントを **参照先**として読む（API／将来の巡回）。
+
+#### サマリ・アウトプットリンク（必須・クリック可能）
+
+Jarvis／ホーク／FRIDAY がタスクを **起票・列移動（オーナー確認含む）・完了・処置報告**するとき、Todoist **コメント**に次を残す（チャットだけ・MDだけにしない）:
+
+```
+サマリ: （何をした／何を見てほしいか・1〜3行）
+アウトプット:
+- [表示名](https://…)
+```
+
+| ルール | 内容 |
+|---|---|
+| **必須** | 処置・完了候補・実装報告に紐づくとき |
+| **ハイパーリンク** | アウトプットは **Markdown** `[表示](https://…)`。相対パスは `origin/main` にあるときだけ GitHub（`jarvis_todoist_comment_links.py`）。未pushはパス表記のみ |
+| **省略可** | 列移動のみ・短答でアウトプットが無いとき（サマリ1行は残してよい） |
+| **禁止** | 全文コピペ・秘密・トークンをコメントに書く |
+| **inbox** | `action: todoist_tasks` の `summary` / `links` は適用スクリプトがコメントへ転記 |
+
+連携シグナル（タイトル／ラベル）:
+
+| ラベル | 意味 | 松野の見方 |
+|---|---|---|
+| `要Jarvis連携` | フォーク等から Jarvis に Mac 実行を頼む | Filter「要連携」→「Jarvis、連携して」 |
+| `要ボス` | 松野判断待ち | 同上／オーナー確認 |
+| `要ホーク` | Jarvis→ホーク判断・振り分け | Drive 空でもここを見る |
+| `quick` | 5分以内のパッと系 | Filter「パッと」 |
+
+- メンション `@Jarvis` は任意。トリガー例: `内容教えて` / `要連携` / `処置:`
+
+**巡回（実装予定）**: パートナー確認・朝オープン・明示依頼のついでに、未読コメント（特にオーナー確認列）を拾い、チャットで対応または返信コメントする。  
+現状は自動巡回未実装 → **会話中・依頼時は API でコメントを読んでよい**（黙って無視しない）。
+
+詳細: `jarvis-todoist-owner-confirm.mdc` · `docs/Todoist_タスク正本_設計_20260921.md`
+
+## 3. Notion
+
+| 項目 | 正 |
+|---|---|
+| 用途 | 家族コーチ・purchase_pre・戻し用タスク看板・知識ページ等 |
+| 初動 | **REST API**（`jarvis-notion-api-first.mdc`）。MCP は例外時 |
+| 秘密 | `NOTION_API_TOKEN` 等（jarvis_private） |
+
+タスク正本は Todoist。Notion タスク DB は移行期・戻し用。
+
+## 4. Supabase
+
+| プロジェクト | 用途 |
+|---|---|
+| **`jarvis-dashboard`** | 自分用投影（トリアージ／ウォッチ／カード／メトリクス） |
+| **`kamiooya-qa`** | 神大家運営・引き渡し対象（読取は可・自分用書込はしない） |
+
+詳細: `jarvis-supabase-free-one-project.mdc`。キーはチャット・Git 禁止。
+
+## Jarvis の動作（要約）
+
+1. 文脈に合う参照先を上記から選ぶ（「どこを見る？」で止まらない）。
+2. タスク関連の処置・確認は **Todoist コメント可**（全文コピペはしない）。
+3. 秘密は `.env.jarvis_private` のみ。参照結果に秘密を再掲しない。
+4. Obsidian は Documents 正本＋必要なら `ogd_pull`／書いたら `ogd_retag`。
+
+## 関連
+
+- Todoist 完了二段: `jarvis-todoist-owner-confirm.mdc`
+- Obsidian: `jarvis-obsidian-gdrive-sync.mdc`
+- Notion API: `jarvis-notion-api-first.mdc`
+- Supabase 2PJ: `jarvis-supabase-free-one-project.mdc`
+- Cloud 注入: `jarvis-cloud-agent.mdc`

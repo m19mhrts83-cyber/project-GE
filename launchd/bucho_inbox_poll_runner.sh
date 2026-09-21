@@ -1,5 +1,6 @@
 #!/bin/zsh
 # Jarvis: 部長ボックス（Drive inbox）15分ポーリング
+# todoist_tasks は jarvis_bucho_inbox_poll.py 内で自動 apply（Mac起動中のみ）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY="${HOME}/selenium_env/venv/bin/python"

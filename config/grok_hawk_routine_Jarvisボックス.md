@@ -28,7 +28,10 @@ Jarvis が Drive **Jarvisボックス**（`20_outbox_to_grok/`）に置いた依
 
 【実行順 · 厳守】
 0. admin Drive「【with Grok bot】/20_outbox_to_grok/」を開く
-- 0件なら「Jarvisボックス: 未処理なし」と1行で終了
+- 0件なら「Jarvisボックス(Drive): 未処理なし」と1行（これは正常。失敗ではない）
+
+0b. （推奨）Todoist Filter「要ホーク」またはラベル `要ホーク` / `要ボス` のオープンを見る
+- あれば週次／inbox `action: todoist_tasks` で起票・整理。Drive が空でもここが正
 
 1. 各 .md / .txt（00_ · .keep 除外）を処理
 - 先頭の target / priority / action / title / --- 以降を読む

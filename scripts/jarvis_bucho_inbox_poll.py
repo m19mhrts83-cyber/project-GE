@@ -3,10 +3,12 @@
 
 未処理 MD を検知し .jarvis_state/grok_bridge_inbox.json を更新。
 situation_watch（id: grok_bridge_inbox）→ dashboard に載る。
+`action: todoist_tasks` は既定で自動 apply（Todoist 反映＋成功時 archive）。
 
   cd ~/git-repos
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --push
+  ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --skip-todoist-apply
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --mark-seen FILE.md
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --archive FILE.md
 """
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -34,6 +37,7 @@ JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 WEEKLY_SUMMARY_STATE_PATH = STATE_DIR / "hawk_weekly_summary.json"
+TODOIST_APPLY = REPO / "scripts" / "jarvis_hawk_todoist_tasks_apply.py"
 
 
 def now_iso() -> str:
@@ -339,6 +343,41 @@ def archive_file(name: str) -> dict[str, Any]:
     return poll()
 
 
+def apply_todoist_tasks(*, dry_run: bool = False) -> dict[str, Any]:
+    """inbox の action: todoist_tasks を Todoist へ反映（成功分 archive）。soft-fail 用。"""
+    if not TODOIST_APPLY.is_file():
+        return {"ok": False, "skipped": True, "reason": "script missing"}
+    if (os.environ.get("JARVIS_TODOIST_INBOX_AUTO_APPLY") or "1").strip() in (
+        "0",
+        "false",
+        "no",
+    ):
+        return {"ok": True, "skipped": True, "reason": "JARVIS_TODOIST_INBOX_AUTO_APPLY=0"}
+    cmd = [str(PY), str(TODOIST_APPLY)]
+    if dry_run:
+        cmd.append("--dry-run")
+    else:
+        cmd.extend(["--apply", "--archive-done"])
+    try:
+        r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True, timeout=180)
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+    out = (r.stdout or "").strip()
+    err = (r.stderr or "").strip()
+    parsed: dict[str, Any] = {}
+    try:
+        parsed = json.loads(out) if out.startswith("{") else {}
+    except json.JSONDecodeError:
+        parsed = {}
+    return {
+        "ok": r.returncode == 0,
+        "returncode": r.returncode,
+        "count": parsed.get("count"),
+        "stdout_tail": out[-500:] if out else "",
+        "stderr_tail": err[-300:] if err else "",
+    }
+
+
 def push_dashboard() -> int:
     if not PY.is_file():
         print("# push skip: python venv missing", file=sys.stderr)
@@ -391,21 +430,46 @@ def main() -> int:
         metavar="FILE",
         help="90_archive へ移して seen にする",
     )
+    ap.add_argument(
+        "--skip-todoist-apply",
+        action="store_true",
+        help="action: todoist_tasks の自動 apply をしない",
+    )
     ap.add_argument("--json", action="store_true", help="state を JSON で stdout")
     args = ap.parse_args()
 
+    apply_result: dict[str, Any] | None = None
     try:
         if args.archive:
             state = archive_file(args.archive)
         elif args.mark_seen:
             state = mark_seen(args.mark_seen)
         else:
+            # Todoist 反映を先に（成功分は archive）→ その後 pending 検知
+            if not args.skip_todoist_apply:
+                apply_result = apply_todoist_tasks()
+                if apply_result.get("skipped"):
+                    print(
+                        f"📎 Todoist inbox apply: skipped ({apply_result.get('reason')})"
+                    )
+                elif apply_result.get("ok"):
+                    n = apply_result.get("count")
+                    print(f"📎 Todoist inbox apply: ok count={n}")
+                else:
+                    print(
+                        f"📎 Todoist inbox apply: FAIL rc={apply_result.get('returncode')} "
+                        f"{(apply_result.get('stderr_tail') or '')[:120]}",
+                        file=sys.stderr,
+                    )
             state = poll()
     except Exception as e:
         print(f"# inbox poll error: {e}", file=sys.stderr)
         return 1
 
     if args.json:
+        if apply_result is not None:
+            state = dict(state)
+            state["todoist_apply"] = apply_result
         print(json.dumps(state, ensure_ascii=False, indent=2))
     else:
         print_block(state)
@@ -415,6 +479,7 @@ def main() -> int:
         if rc != 0:
             print("# dashboard push soft-fail", file=sys.stderr)
             return rc
+    # apply 失敗でも poll 自体は成功扱い（soft-fail）
     return 0
 
 
