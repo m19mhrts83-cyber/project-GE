@@ -61,7 +61,10 @@ def _open_tasks_for_pm(cfg: dict[str, Any], pm: str) -> list[dict[str, Any]]:
     proj = api._project_for_lane(cfg, lane)
     pid = str(proj["project_id"])
     tasks = api._paginate_results(f"/tasks?project_id={pid}", cfg=cfg)
-    open_secs = set(lane.get("open_sections") or ["未着手", "進行中", "相手待ち", "オーナー確認"])
+    open_secs = set(
+        lane.get("open_sections")
+        or ["未着手", "進行中", "相手待ち", "HOLD", "オーナー確認"]
+    )
     sid_to_name = {
         str(v): k for k, v in (proj.get("section_ids") or {}).items() if v
     }

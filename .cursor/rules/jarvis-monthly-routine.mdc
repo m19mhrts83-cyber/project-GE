@@ -29,6 +29,13 @@ alwaysApply: true
 - `~/git-repos/.jarvis_state/vpoint_monthly.json` に `"disabled": true`
 - または `~/git-repos/.env.jarvis_private` に `JARVIS_VPOINT_MONTHLY_DISABLE=1`
 
+### HOLD（Todoist）
+
+次のいずれかで **HOLD 1ヶ月レビューを止める**:
+
+- `~/git-repos/.jarvis_state/todoist_hold_review.json` に `"disabled": true`
+- または `~/git-repos/.env.jarvis_private` に `JARVIS_TODOIST_HOLD_REVIEW_DISABLE=1`
+
 ## いつ動くか（トリガー）
 
 **ユーザーが Jarvis に何か話しかけたセッション**のうち、当日が下記 **月次ウィンドウ** に入り、**当該ウィンドウの当月チェックが未実施** なら、本題に答える **前または後** に月次確認を実行する。
@@ -39,8 +46,11 @@ alwaysApply: true
 | **B 還元**（ETC） | 毎月 **19〜26日** | **月1本報告**: 前月分の還元額・還元率・お得額（20日付与後）。**本線は自動**: `jarvis_etc_rebate_fetch.py` + launchd（20〜26日 09:30） |
 | **C Vポイント** | 毎月 **25〜月末** | **本線は自動**: `jarvis_vpoint_routine.py`（付与サマリ＋cadence＋テイチャンdue）。人手は `jarvis_asks`（TサイトOTP等） |
 | **D 課金** | 毎月 **1〜8日** | `/billing` 先頭サマリー。新規・金額変更・注視。YAML 更新後 push |
+| **HOLD**（Todoist） | 毎月 **1〜8日** | 1ヶ月超の HOLD 判断促し（`jarvis_todoist_hold_review.py`）。詳細: `jarvis-todoist-owner-confirm.mdc` |
 
-重なったら **A → B → C → D** の順で未実施分だけ行う。同一セッションで済ませてよい。
+重なったら **A → B → C → D → HOLD** の順で未実施分だけ行う。同一セッションで済ませてよい。
+
+**HOLD（Todoist）**: ウィンドウ A と同じ 1〜8日。当月未実施なら末尾に1ブロック（対象0件は省略可）。明示「HOLD確認して」は窓外でも `--force`。
 
 **Vポイントの月次（ウィンドウC）**: launchd（25〜31日 09:40）＋朝オープン取りこぼしが本線。チャットでは `jarvis_asks` があるときだけ促す。日常の軽い差分は **パートナー確認・前半末尾のついで**（`jarvis_vpoint_cadence_check.py`・間隔2日）でよい。
 

@@ -11,6 +11,31 @@ alwaysApply: true
 
 **タスク正本は Todoist。** 会話・実装で完了相当と判断したら、先に **オーナー確認** へ入れその旨を伝え、松野了承後にだけ完了（詳細: `jarvis-todoist-owner-confirm.mdc`）。FRIDAY も同じ。
 
+## 設計ゲート（新機能・自動化の着手前）
+
+AI の初手は **完全自動化ではない**。確認対象の絞り込みと、検証可能なログを先に置く。  
+plan 作成・新自動化・レーン追加の着手前に、次の **4点を各1行以上** 書く（欠けたらコードより先に埋める）。
+
+| # | 柱 | 書くこと（例） |
+|---|---|---|
+| 1 | **入口データ** | 何を読むか（inbox／Gmail／YAML／state／Drive） |
+| 2 | **確認点** | 誰が何を了承するか（outbound／オーナー確認／意図OK／提案のみ） |
+| 3 | **変更履歴** | どこに残すか（`5.やり取り.md`／Todoist コメント／git／処置ログ） |
+| 4 | **停止条件** | いつ止めるか（`disabled`／probe NG／同意なし／競合・二重課金リスク） |
+
+報告・plan への書き方例:
+
+```
+入口: …
+確認: …
+履歴: …
+停止: …
+```
+
+**やらない**: 4点が無いまま「とりあえず自動送信／自動完了／無確認 apply」。  
+関連ルール: `jarvis-outbound-confirm` · `jarvis-todoist-owner-confirm` · `jarvis-integration-fail-self-check`  
+原則メモ: Obsidian `03_Literature Note(まとめノート)/仕事術・AI連携/20260921_AI導入_入口確認履歴停止の4点.md`
+
 ## 実装報告の直前（必須）
 
 1. **受け入れ条件**を1〜3行（どの画面で何ができれば意図OKか）
@@ -40,7 +65,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | L-xx | Jarvis とホークの両方（＋オーナー確認了承） |
 | 捨て | 松野が捨てと言った（コメントに「捨て」） |
 
-完了後は看板から消える（`hide_done_on_board`）。戻す依頼なら進行中へ（完了コメントは残す）。
+完了後は看板から消える（チェック完了／`complete-task`。Board「完了」列は使わない）。戻す依頼なら進行中へ（完了コメントは残す）。
 
 ### Notion 戻し用（`JARVIS_TASK_BACKEND=notion` のときのみ）
 
@@ -58,5 +83,5 @@ Wave 1（T-01〜T-05）が未閉じのあいだ、新規アプリ機能は原則
 
 - 「実装したのでタスク完了」
 - オーナー確認なしの close（明示例外以外）
-- `update-status --status 完了` をコメント無しで使う
+- `update-status --status 完了`（**完了列は廃止**。終わるときは `complete-task`）
 - ホークに plan 全読を課す（要約は outbox）

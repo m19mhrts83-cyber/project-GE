@@ -33,6 +33,7 @@
 | admin Gmail → triage | `jarvis-dashboard-gmail-triage.yml` | 05:00 JST。general ＋ **パートナー Gmail／Chatwork→MD（Graph）＋partner 判定** |
 | 状況ウォッチ（軽量） | `jarvis-dashboard-situation-watch.yml` | 06:15 |
 | レーン要約 | `jarvis-dashboard-lanes.yml` | Graph 委任 |
+| **Todoist HOLD 印穴埋め** | `todoist-hold-stamp.yml` | 毎日 10:00 JST。UI で HOLD へ移したタスクへ `HOLD since`＋due+30。Secret `TODOIST_API_TOKEN`。朝オープン soft-fail も相乗り |
 | Dashboard heartbeat | `jarvis-dashboard-heartbeat.yml` | |
 | kamiooya-qa 心拍 | `kamiooya-qa-heartbeat.yml` | Free 休止対策 |
 | WeStudy 週次取込 | `westudy-raimo-weekly.yml` | Playwright 可だが Secrets＋再現性あり |

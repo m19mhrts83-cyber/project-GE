@@ -16,8 +16,51 @@ Notion タスク看板は戻し用。purchase_pre 等は従来どおり Notion�
 | 段階 | セクション | 誰が何をする |
 |---|---|---|
 | 1 | **オーナー確認** | Jarvis／FRIDAY／ホークが「完了候補」と判断 → ここに移す → **チャットでその旨を伝える** |
-| 2 | **完了**（＋定型コメント後 close） | 松野が確認OKと言ったあとだけ |
+| 2 | **チェック完了**（定型コメント後 `complete-task`） | 松野が確認OKと言ったあとだけ。**Board「完了」列は使わない** |
 
+**HOLD**（一時保留）は完了候補ではない。再開待ち・先送りは HOLD。終わった扱いはしない。
+
+### HOLD 移設・1ヶ月レビュー（2026-09-21）
+
+| とき | 動作 |
+|---|---|
+| `update-status --status HOLD`（または create `--status HOLD`） | コメント `HOLD since: YYYY-MM-DD` ＋ **due を +30日**（既存 due は上書き） |
+| 毎月 **1〜8日**（JST）の会話 | 未実施月なら `jarvis_todoist_hold_review.py --mark-prompted`（1ヶ月超のみ報告） |
+| 「HOLD確認して」等 | `--force --mark-prompted` で即実行 |
+
+判定の正本はコメント印。無い既存分は Activity API の `moved`→HOLD。
+
+報告フォーマット:
+
+```
+📎 HOLDレビュー（1ヶ月超）
+- [n] [lane] タイトル — HOLD since YYYY-MM-DD（N日）
+  次: 延長 / 再開(進行中|未着手) / 閉じる
+了承なら番号か方針を返信。
+```
+
+| ユーザーの返事 | Jarvis |
+|---|---|
+| 延長 | `hold-extend --task-id …`（since 更新＋due+30） |
+| 再開 | `update-status --status 進行中` または `未着手` |
+| 閉じる | オーナー確認へ → 了承後 `complete-task`（「即完了で」なら例外で close） |
+
+**UI で HOLD に移した場合**: 印は付かない。穴埋めは次のどちらか（判断はしない・印と due のみ）:
+
+- **GHA 本線**: `.github/workflows/todoist-hold-stamp.yml`（毎日 10:00 JST）
+- **朝オープン相乗り**: `jarvis_morning_mac_refresh` の soft-fail（`hold-stamp-missing`）
+
+無効化（スキャン）: `JARVIS_TODOIST_HOLD_STAMP_DISABLE=1`  
+無効化（月次レビュー）: `.jarvis_state/todoist_hold_review.json` の `"disabled": true` または `JARVIS_TODOIST_HOLD_REVIEW_DISABLE=1`
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_hold_review.py --mark-prompted
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_hold_review.py --force --mark-prompted
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py hold-extend --task-id …
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py hold-stamp-missing --dry-run
+gh workflow run todoist-hold-stamp.yml
+```
 報告の型（必須）:
 
 ```

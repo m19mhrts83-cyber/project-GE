@@ -2,12 +2,15 @@ version: 1
 layout: beginner_compressed
 api_base: https://api.todoist.com/api/v1
 complete_phrase: タスク完了したよ
+# Board列: 未着手 / 進行中 / 相手待ち / HOLD / オーナー確認
+# 「完了」列は使わない（2026-09-21）。終わったらチェック完了（complete-task）で閉じる
+# HOLD = 一時保留（再開待ち）。オーナー確認 = 完了候補（了承後 close）
 default_sections:
 - 未着手
 - 進行中
 - 相手待ち
+- HOLD
 - オーナー確認
-- 完了
 labels:
 - waiting
 - inbox_review
@@ -47,7 +50,7 @@ labels:
 # ※要ホークはラベル運用のまま。専用Filterは Pro で再開可
 # ※日本語「完了」はクエリ非対応。未完了のみはフィルター既定のため !完了 不要
 # ※「ラベル:A | 要ボス」も OR 右側修飾なしで失敗する → @ 記法を使う
-# 朝レビュー順: 要連携 → SecondBrain → パッと → オーナー確認 → その他未着手
+# 朝レビュー順: 要連携 → SecondBrain → パッと → オーナー確認 → その他未着手（HOLDは保留の見直し）
 lanes:
   properties:
     title: 所有物件
@@ -59,9 +62,9 @@ lanes:
     - 未着手
     - 進行中
     - 相手待ち
+    - HOLD
     - オーナー確認
-    done_sections:
-    - 完了
+    done_sections: []
     hide_done_on_board: true
   ai_raimo:
     title: AI・Raimo
@@ -73,9 +76,9 @@ lanes:
     - 未着手
     - 進行中
     - 相手待ち
+    - HOLD
     - オーナー確認
-    done_sections:
-    - 完了
+    done_sections: []
     hide_done_on_board: true
   kamiooya:
     title: 神大家運営
@@ -87,9 +90,9 @@ lanes:
     - 未着手
     - 進行中
     - 相手待ち
+    - HOLD
     - オーナー確認
-    done_sections:
-    - 完了
+    done_sections: []
     hide_done_on_board: true
   kanji:
     title: 飲み会幹事
@@ -101,9 +104,9 @@ lanes:
     - 未着手
     - 進行中
     - 相手待ち
+    - HOLD
     - オーナー確認
-    done_sections:
-    - 完了
+    done_sections: []
     hide_done_on_board: true
   apps:
     title: アプリ開発
@@ -115,9 +118,9 @@ lanes:
     - 未着手
     - 進行中
     - 相手待ち
+    - HOLD
     - オーナー確認
-    done_sections:
-    - 完了
+    done_sections: []
     hide_done_on_board: true
   kodate:
     title: 戸建て
@@ -129,9 +132,9 @@ lanes:
     - 未着手
     - 進行中
     - 相手待ち
+    - HOLD
     - オーナー確認
-    done_sections:
-    - 完了
+    done_sections: []
     hide_done_on_board: false
   kazoku:
     title: 家族
@@ -143,9 +146,9 @@ lanes:
     - 未着手
     - 進行中
     - 相手待ち
+    - HOLD
     - オーナー確認
-    done_sections:
-    - 完了
+    done_sections: []
     hide_done_on_board: false
 projects:
   properties:
@@ -156,8 +159,8 @@ projects:
       未着手: 6hXX2m59CJHWHXfQ
       進行中: 6hXX2m4FXrw8hVCQ
       相手待ち: 6hXX2m4vV2hwqhRx
+      HOLD: 6hXmWXhqwjvg2cGx
       オーナー確認: 6hXX2m7MJ3FchGcx
-      完了: 6hXX2m7mcJJf6wWQ
   work_bundle:
     name: 業務まとめ
     view_style: board
@@ -167,8 +170,8 @@ projects:
       未着手: 6hXX2m9G5vq9gQ3j
       進行中: 6hXX2m9H2gjfx5hj
       相手待ち: 6hXX2mFph4hpV5jC
+      HOLD: 6hXmWXmfMfMx62GC
       オーナー確認: 6hXX2mGJJFhV6mgj
-      完了: 6hXX2mJ9fwgCMGJC
   apps:
     name: アプリ開発
     view_style: board
@@ -178,8 +181,8 @@ projects:
       未着手: 6hXfrWvX6vpjfV26
       進行中: 6hXfrWw2r3HRX92c
       相手待ち: 6hXfrX2g76rcc4wc
+      HOLD: 6hXmWXwH43cgvrf6
       オーナー確認: 6hXfrX2839CrjP46
-      完了: 6hXfrWxmWRj3wcHc
   kodate:
     name: 戸建て
     view_style: board
@@ -188,8 +191,8 @@ projects:
       未着手: 6hXX2mMCjRGj7JC2
       進行中: 6hXX2mVQr59jxhm2
       相手待ち: 6hXX2mRgGHQ5Xg5R
+      HOLD: 6hXmWcJhrjHhMCG2
       オーナー確認: 6hXX2mQVQJrv3QVR
-      完了: 6hXX2mXvW5vMGmq2
   kazoku:
     name: 家族
     view_style: board
@@ -198,8 +201,8 @@ projects:
       未着手: 6hXX2mg9vgCf3MQ3
       進行中: 6hXX2mghq49PHrg3
       相手待ち: 6hXX2mjRc93w6hm3
+      HOLD: 6hXmWcRP27rfpVXV
       オーナー確認: 6hXX2mp7RMMcvVgV
-      完了: 6hXX2mpgfqFFRR93
 distortions_note: 'Beginner 圧縮の歪みは .jarvis_state/todoist_beginner_distortions.json
   に追記。apps は 2026-09-21 に専用「アプリ開発」へ分離（5本目）。
 
@@ -233,9 +236,6 @@ pm_labels:
     folder: 103_Tcell
   LEAF:
     folder: 104_LEAF
-# 廃止: LEAF京都（物件ではない。京都銀行の呼称）
-#
-# 管理会社向け共有（Guest後回し・転送メールは相手に渡さない）
 pm_share:
   email_forward_to_partner: false
   footer_max_tasks: 5
@@ -243,22 +243,20 @@ pm_share:
     ミニテック:
       folder: 102_ミニテック
       pilot: false
-      guest_project_url: ""
+      guest_project_url: ''
     ホームプランナー:
       folder: 101_ホームプランナー
       pilot: true
-      guest_project_url: ""
+      guest_project_url: ''
     Tcell:
       folder: 103_Tcell
       pilot: false
-      guest_project_url: ""
+      guest_project_url: ''
     LEAF:
       folder: 104_LEAF
       pilot: true
-      guest_project_url: ""
-# GenMail（admin 集約）→ Todoist 提案の入口
+      guest_project_url: ''
 genmail_propose:
   gmail_account: admin
   inbox_path: .jarvis_state/genmail_action_needed.md
   default_label: quick
-
