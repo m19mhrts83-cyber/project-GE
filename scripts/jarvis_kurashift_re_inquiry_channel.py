@@ -36,6 +36,24 @@ NOT_APPLICABLE_TITLE_SUBSTR = (
     "E2E-GROK-KURASHIFT",
     "approved A'",
     "approved A’",
+    # 神大家運営・購入相談（仲介第一問合せの対象外 · 2026-09-20 誤送信教訓）
+    "オレンジフォーム",
+    "戸建て購入",
+    "購入相談",
+    "運営相談",
+    "運営事務局",
+)
+
+# 神大家運営・事務局（仲介ではない）。agent_email 解決・送信で絶対に使わない
+KAMIOOYA_OPS_DOMAINS = (
+    "ooya.academy",
+    "sakulife.org",
+    "orange-cloud7.com",
+)
+KAMIOOYA_OPS_LOCAL_HINTS = (
+    "kami.ooyasan",
+    "kami-ooyasan",
+    "kamiooyasan",
 )
 
 GROK_HANDOFF_SUBJECT_PREFIX = "[KURASHIFT問合せ依頼]"
@@ -88,6 +106,17 @@ def is_portal_or_noreply(email: str) -> bool:
     return any(domain == d or domain.endswith(f".{d}") for d in PORTAL_DOMAIN_HINTS)
 
 
+def is_kamiooya_ops_email(email: str) -> bool:
+    """神大家運営・事務局アドレスか（第一問合せの仲介宛にしてはいけない）。"""
+    addr = parse_email_addr(email) or (email or "").strip().lower()
+    if "@" not in addr:
+        return False
+    local, _, domain = addr.partition("@")
+    if any(domain == d or domain.endswith(f".{d}") for d in KAMIOOYA_OPS_DOMAINS):
+        return True
+    return any(h in local for h in KAMIOOYA_OPS_LOCAL_HINTS)
+
+
 def handoff_to() -> str:
     return (
         (os.environ.get("INQUIRY_GROK_HANDOFF_TO") or "").strip()
@@ -126,6 +155,19 @@ def sj_of(deal: dict[str, Any]) -> dict[str, Any]:
     return dict(sj) if isinstance(sj, dict) else {}
 
 
+def _usable_agent_email(addr: str, extra: list[str] | None) -> bool:
+    """自己・ポータル・神大家運営以外なら True。"""
+    if not addr or "@" not in addr:
+        return False
+    if is_self_email(addr, extra):
+        return False
+    if is_portal_or_noreply(addr):
+        return False
+    if is_kamiooya_ops_email(addr):
+        return False
+    return True
+
+
 def resolve_agent_to(
     deal: dict[str, Any], *, explicit_to: str | None = None
 ) -> tuple[str, str]:
@@ -133,31 +175,23 @@ def resolve_agent_to(
     sj = sj_of(deal)
 
     explicit = (explicit_to or "").strip()
-    if "@" in explicit and not is_self_email(explicit, extra) and not is_portal_or_noreply(
-        explicit
-    ):
+    if "@" in explicit and _usable_agent_email(explicit, extra):
         return parse_email_addr(explicit) or explicit, "explicit"
 
     contact_email = parse_email_addr(str(sj.get("contact_email") or ""))
-    if contact_email and not is_self_email(contact_email, extra) and not is_portal_or_noreply(
-        contact_email
-    ):
+    if contact_email and _usable_agent_email(contact_email, extra):
         return contact_email, "contact_email"
 
     reply_to = parse_email_addr(str(sj.get("reply_to") or ""))
-    if reply_to and not is_self_email(reply_to, extra) and not is_portal_or_noreply(
-        reply_to
-    ):
+    if reply_to and _usable_agent_email(reply_to, extra):
         return reply_to, "reply_to"
 
     from_addr = parse_email_addr(str(sj.get("from") or ""))
-    if from_addr and not is_self_email(from_addr, extra) and not is_portal_or_noreply(
-        from_addr
-    ):
+    if from_addr and _usable_agent_email(from_addr, extra):
         return from_addr, "from"
 
     v_em = vendor_contact_email(str(sj.get("vendor_id") or "") or None)
-    if v_em and not is_self_email(v_em, extra) and not is_portal_or_noreply(v_em):
+    if v_em and _usable_agent_email(v_em, extra):
         return parse_email_addr(v_em) or v_em, "vendor_list"
 
     return "", "none"

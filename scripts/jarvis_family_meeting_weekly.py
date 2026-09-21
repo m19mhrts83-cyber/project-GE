@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""家族会議・週次: Genspark 議事録 → Drive ＋（任意で）Notion 向け Markdown 準備。
+"""家族会議・週次: Genspark 議事録 → Drive ＋ Notion 掲載用 Markdown 準備。
 
-Notion へのファイル添付は MCP create-attachment / insert_content が本線。
+Notion 掲載順は「インフォ画像 → 議事録要約本文」（MDファイル添付はしない）。
 本 CLI は MD 生成・Drive 配置・要約表示までを一本化する。
 
 例:
@@ -207,15 +207,14 @@ def print_notion_hint(md_path: Path, shaped: dict[str, Any], page_id: str | None
         else ""
     )
     print()
-    print("📎 Notion 添付ヒント（MCP）")
+    print("📎 Notion 掲載ヒント")
     if page_id:
         print(f"- page_id: {page_id}")
-    print(f"- ファイル: {md_path.name}")
-    print("- 末尾に追加する見出し例:")
-    print("  ## Genspark 議事録（YYYY-MM-DD）")
+    print("- 順番（必須）: 1) 週次インフォ画像 → 2) 議事録要約をページ内本文で掲載")
+    print("- 議事録は MD ファイル添付しない（Drive/NLM 用 MD のみ）")
+    print(f"- 要約元: {md_path.name}")
     if share:
-        print(f"  - 共有リンク: {share}")
-    print("  <file src=\"file-upload://…\">（create-attachment の suggested_markdown）")
+        print(f"- 共有リンク: {share}")
     print("- NotebookLM: 上記 MD を固定ノート「家族会議」へソース追加（ノートは増やさない）")
     print(
         "- インフォ: jarvis_notebooklm_studio_run.py "

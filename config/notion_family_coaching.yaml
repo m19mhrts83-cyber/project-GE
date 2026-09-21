@@ -17,13 +17,15 @@ root_page_title: 家族会議
 weekly_log_pattern:
   mode: duplicate_dated_child
   title_format: "(YYYY/MM/DD)"
-  attach_minutes_to: same_week_page_end
-  attach_infographic_to: same_week_page_end
+  attach_infographic_to: same_week_page_end_before_minutes
+  attach_minutes_to: same_week_page_end_after_infographic
+  minutes_format: inline_summary_blocks
   notebooklm_key: family_meeting_weekly
   drive_folder: "13_家族会議_週次"
   note: >
-    会議後 Jarvis: jarvis_family_meeting_weekly.py /
-    ルール jarvis-family-meeting-weekly.mdc
+    会議後 Jarvis: インフォ画像 → 議事録要約本文の順。
+    MDはDrive/NLM用。ルール jarvis-family-meeting-weekly.mdc
+
 
 coaching_hub_page_id: "282f6bbe-5a76-8097-bd9d-c2fbbdb49a49"
 coaching_hub_page_url: "https://app.notion.com/p/282f6bbe5a768097bd9dc2fbbdb49a49"

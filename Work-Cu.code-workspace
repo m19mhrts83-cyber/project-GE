@@ -47,6 +47,22 @@
 	],
 	"settings": {
 		"python.defaultInterpreterPath": "/Users/matsunomasaharu2/selenium_env/venv/bin/python",
-		"python.terminal.activateEnvironment": false
+		"python.terminal.activateEnvironment": false,
+		"npm.exclude": [
+			"**/venv/**",
+			"**/.venv/**",
+			"**/site-packages/**",
+			"**/node_modules/**"
+		],
+		"files.watcherExclude": {
+			"**/venv/**": true,
+			"**/.venv/**": true,
+			"**/site-packages/**": true
+		},
+		"search.exclude": {
+			"**/venv": true,
+			"**/.venv": true,
+			"**/site-packages": true
+		}
 	}
 }
