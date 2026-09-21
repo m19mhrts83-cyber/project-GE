@@ -23,6 +23,20 @@ alwaysApply: false
 
 **全文の常時ミラー・launchd 全件同期は作らない。**
 
+## 入口（カレンダー → 議事録起動）
+
+**本線は Speakly で会議メモ（録音）を開始すること。** トレイ常駐の Speakly から Coming Up／「会議を録音する」へ進む。Itsycal／Notion Calendar は使わない。予定の正本は **Google Calendar（admin）**＝Jarvis の予定登録と同じ。
+
+| 用途 | 操作 |
+|---|---|
+| カレンダー連携 | Speakly → 設定 → 機能 → 議事録 → **Google カレンダー接続**（admin で OAuth。Coming Up に予定を出すため） |
+| **本線：開始** | Speakly「議事録」→ **予定**から該当会議を選ぶ／または **会議を録音する・新規ノート**（オンライン・電話・対面とも同じ） |
+| 事後の引出 | 「〇〇の議事録」→ 本ルールの `jarvis_genspark_meeting_fetch.py` |
+
+**議事ロボ（Meeting Bot／自動参加）は本線にしない。** Credits を消費するため、Auto-join は OFF のまま。例外で使うときだけユーザーが明示した回に限る。
+
+参考: [AI Meeting Notes Help](https://www.genspark.ai/helpcenter/ai-meeting-notes)
+
 ## コマンド
 
 ```bash
@@ -43,9 +57,17 @@ export PATH="$HOME/.local/bin:$HOME/.genspark-tool-cli/bin:$PATH"
 1. `search`（相手名・日付）→ 候補 id を特定。曖昧なら一覧を見せて確認
 2. まず `--detail-level summary`。宿題・下書きに本文が必要なら `segments` または `full`
 3. チャットには **3行要約＋宿題リスト**（全文は再掲しない。id／`project_url` を1行）
-4. 了承後に Action（下書き・Notion タスク）。重要件は Notion Inbox に `[SB] YYYY-MM-DD 相手`（Save to Notion 手動、または要約ページ作成）
-5. Obsidian `録音メモ/` に1行索引（相手・日付・Notion URL または meeting id）
-6. **対外送信はしない**（了承フローは `jarvis-outbound-confirm`）
+4. **発話者ラベルの手動修正は Genspark UI では不要**。`Speaker N` の誤り・固有名詞の誤変換は、ユーザーの一言指示（例:「スピーカー2はマサハル」「さあ→さわ」）で Jarvis が **Drive MD／Notion 要約を補正**する（`gsk` に update API はない）。家族会議は `jarvis-family-meeting-weekly.mdc` も参照
+5. 了承後に Action（下書き・Notion タスク）。重要件は Notion Inbox に `[SB] YYYY-MM-DD 相手`（Save to Notion 手動、または要約ページ作成）
+6. **Todoist 候補（Phase 3b）**: Action Items / タスク語 / 要確認フレーズは `jarvis_todoist_sb_propose.py` で提案 → 了承後 `--apply`（無言起票しない）
+7. Obsidian `録音メモ/` に1行索引（相手・日付・Notion URL または meeting id）
+8. **対外送信はしない**（了承フローは `jarvis-outbound-confirm`）
+
+```bash
+# SB → Todoist 候補
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_sb_propose.py --latest
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_sb_propose.py --apply --select 1 --mine-only
+```
 
 ## JPR フォールバック
 

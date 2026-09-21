@@ -45,6 +45,20 @@ weak_keywords:
   - 修繕
   - 空室
 
+# L2: Genspark / SecondBrain 議事録（jarvis_todoist_sb_propose.py）
+meeting:
+  action_section_headers:
+    - Action Items
+    - Action Item
+    - アクションアイテム
+    - 宿題
+  # 自分宛判定（assignee 表記ゆれ）
+  mine_name_patterns:
+    - 松野
+    - マサハル
+    - matsuno
+    - masaharu
+
 status_signals:
   partner_done:
     - 完了しました
