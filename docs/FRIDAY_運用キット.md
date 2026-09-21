@@ -205,7 +205,10 @@ gsk mesh ssh matsuchan-pc -- 'ls ~/Documents/500_Obsidian_r1/03_Literature\ Note
 
 ### F. GenMail
 
-要対応の洗い出し・下書きまで。パートナー重要スレの**送信確定は Jarvis**。
+- 接続: **admin** Gmail（m19m / estate 集約済み）
+- 確認本線: GenMail **アプリ** → Super Agent → **Needs You**（公開 API なし／Web は補助）
+- 要対応の洗い出し・下書きまで。パートナー重要スレの**送信確定は Jarvis**
+- Todoist へ載せるとき: Needs You から選んだ件を `.jarvis_state/genmail_action_needed.md` に `##` 見出しで追記 → Jarvis `scripts/jarvis_todoist_genmail_propose.py`（了承後 `--apply`）。無言起票しない
 
 ---
 

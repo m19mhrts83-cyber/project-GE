@@ -64,6 +64,9 @@ Jarvis／ホーク／FRIDAY がタスクを **起票・列移動（オーナー�
 | `要Jarvis連携` | フォーク等から Jarvis に Mac 実行を頼む | Filter「要連携」→「Jarvis、連携して」 |
 | `要ボス` | 松野判断待ち | 同上／オーナー確認 |
 | `SecondBrain` | SB/Genspark から起票 | Filter「SecondBrain」（Beginner 3枠の1つ） |
+| GenMail要対応 | admin GenMail スクリーニング | 入口 MD → `jarvis_todoist_genmail_propose.py`（了承後 create） |
+| `GrandoleI` 等 | 所有物件 | 物件ラベル。PMラベルと併用 |
+| `ミニテック` 等 | 管理会社（主担当） | 物件ラベルと併用 |
 | `要ホーク` | Jarvis→ホーク判断・振り分け | ラベル検索。専用 Filter は **Pro 以降** |
 | `quick` | 5分以内のパッと系 | Filter「パッと」 |
 

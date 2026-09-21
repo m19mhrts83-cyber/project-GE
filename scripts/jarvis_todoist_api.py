@@ -324,6 +324,23 @@ def cmd_lane(args: argparse.Namespace) -> int:
     return 0
 
 
+def _validate_properties_labels(cfg: dict[str, Any], labels: list[str]) -> None:
+    """所有物件レーンは物件ラベル1＋PMラベル1必須。"""
+    prop_keys = set((cfg.get("property_labels") or {}).keys())
+    pm_keys = set((cfg.get("pm_labels") or {}).keys())
+    have_prop = [x for x in labels if x in prop_keys]
+    have_pm = [x for x in labels if x in pm_keys]
+    if len(have_prop) != 1 or len(have_pm) != 1:
+        print(
+            "ERROR: --lane properties では物件ラベル1つ＋管理会社ラベル1つが必須です。"
+            f" 例: --label GrandoleI,ミニテック"
+            f" / 現在 labels={labels}"
+            f" / 物件={sorted(prop_keys)} / PM={sorted(pm_keys)}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+
 def cmd_create_task(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     lane = _lane(cfg, args.lane)
@@ -333,6 +350,11 @@ def cmd_create_task(args: argparse.Namespace) -> int:
     labels = [str(lane.get("lane_label") or args.lane)]
     if args.label:
         labels.extend([x.strip() for x in args.label.split(",") if x.strip()])
+    # 重複除去（順序維持）
+    seen: set[str] = set()
+    labels = [x for x in labels if not (x in seen or seen.add(x))]
+    if args.lane == "properties":
+        _validate_properties_labels(cfg, labels)
     body: dict[str, Any] = {
         "content": args.title.strip(),
         "project_id": proj["project_id"],

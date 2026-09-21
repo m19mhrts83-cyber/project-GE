@@ -24,6 +24,22 @@ labels:
 - 要ホーク
 - quick
 - SecondBrain
+- GrandoleI
+- GrandoleII
+- キャラメル
+- ミニテック
+- ホームプランナー
+- Tcell
+- LEAF
+# --- 所有物件・区分（2026-09-21 訂正）---
+# セクション＝進捗列のまま。物件／管理会社はラベル二軸。号室はタイトルへ。
+# 「LEAF京都」は物件ではない（京都銀行呼称）→ 物件ラベルに使わない
+# GrandoleI: 主=ミニテック。LEAF・Tcell も関与可（ボールの社をPMラベル）
+# GrandoleII: ホームプランナーのみ / キャラメル: Tcellのみ
+# タイトル例: [GrandoleI][ミニテック] 202号 水漏れ手配
+# 起票: create-task --lane properties --label GrandoleI,ミニテック
+# 一覧正本: .jarvis_state/todoist_property_labels.json
+# 詳細: docs/Todoist_タスク正本_設計_20260921.md「所有物件の整理」
 # Filter案内（Todoist UI・Beginner 3枠・2026-09-21入替）:
 #   要連携 = @要Jarvis連携 | @要ボス
 #   SecondBrain = @SecondBrain   ← SB/Genspark 起票の見渡し（旧「要ホーク」枠を入替）
@@ -190,3 +206,59 @@ distortions_note: 'Beginner 圧縮の歪みは .jarvis_state/todoist_beginner_di
   Pro 移行時に残レーンも 1レーン1プロジェクトへ正規化する。
 
   '
+# 所有物件レーンの区分（ラベル二軸）。号室はタイトル。Guest用 PM_* とは別レイヤ。
+property_labels:
+  GrandoleI:
+    display: Grandole志賀本通I
+    default_pm: ミニテック
+    also_pm:
+    - LEAF
+    - Tcell
+    note: 主はミニテック。LEAF・Tcell関与時はボールの社をPMラベルに
+  GrandoleII:
+    display: Grandole志賀本通II
+    default_pm: ホームプランナー
+    also_pm: []
+    note: ホームプランナーのみ
+  キャラメル:
+    display: キャラメル
+    default_pm: Tcell
+    also_pm: []
+pm_labels:
+  ミニテック:
+    folder: 102_ミニテック
+  ホームプランナー:
+    folder: 101_ホームプランナー
+  Tcell:
+    folder: 103_Tcell
+  LEAF:
+    folder: 104_LEAF
+# 廃止: LEAF京都（物件ではない。京都銀行の呼称）
+#
+# 管理会社向け共有（Guest後回し・転送メールは相手に渡さない）
+pm_share:
+  email_forward_to_partner: false
+  footer_max_tasks: 5
+  companies:
+    ミニテック:
+      folder: 102_ミニテック
+      pilot: false
+      guest_project_url: ""
+    ホームプランナー:
+      folder: 101_ホームプランナー
+      pilot: true
+      guest_project_url: ""
+    Tcell:
+      folder: 103_Tcell
+      pilot: false
+      guest_project_url: ""
+    LEAF:
+      folder: 104_LEAF
+      pilot: true
+      guest_project_url: ""
+# GenMail（admin 集約）→ Todoist 提案の入口
+genmail_propose:
+  gmail_account: admin
+  inbox_path: .jarvis_state/genmail_action_needed.md
+  default_label: quick
+
