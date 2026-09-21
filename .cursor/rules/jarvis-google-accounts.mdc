@@ -19,7 +19,7 @@ Google 関連の作業では、**どのアカウントで何をするか**をル
 | **admin** | `admin@livingsupport-matsu.co.jp` | ビジネス・Google Workspace（リビングサポート Drive・Gmail 受信集約・**カレンダー予定**・Workspace Gemini） |
 | **estate** | `matsuno.estate@gmail.com` | 不動産・神大家関連・対外 From（パートナー送信既定・WeStudy・Finto 等） |
 
-**Todoist 分身（Google 3本とは別）**: `jarvis.livingsupport.matsu@gmail.com` — Todoist API／プロフィール用 Gmail（Workspace 席なし）。env: `JARVIS_TODOIST_EMAIL`。  
+**Todoist 分身（Google 3本とは別）**: `jarvis.livingsupport.matsu@gmail.com` — Todoist API／プロフィール用 Gmail（Workspace 席なし）。env: `JARVIS_TODOIST_EMAIL`。Gmail API: `token_jarvis.json`（他アカウントと同様）。  
 使わない表記: `masaharu@matsuno.estate` / `admin@livingsupport.matsuno`（正は上表）。
 
 人間向け要約・コスト判断: `docs/Googleアカウント使い分け.md`  
@@ -35,6 +35,7 @@ token の実体は `215_kamiooya/C1_cursor/1b_Cursorマニュアル/`。
 | パートナーメール確認（取込） | **admin** | `token_livingsupport.json` |
 | パートナー送信 | **estate**（既存スレッドが m19m なら **m19m**） | `yoritoori_send.py`（admin BCC 控え） |
 | LINE 公式エクスポート Gmail | **estate** | `token_estate.json` / EmailMe 宛先 |
+| **Jarvis 分身 Gmail**（Todoist 通知メール読取等） | **jarvis** `jarvis.livingsupport.matsu@gmail.com` | `token_jarvis.json`（`scripts/jarvis_gmail_jarvis_token_auth.py`） |
 | カレンダー予定登録 | **admin** | `token_calendar.json` + `--login-hint admin@livingsupport-matsu.co.jp`（`jarvis-google-calendar.mdc`） |
 | GAS / 採点 / Sheets API（開発） | **m19m** 既定（シート所有が estate なら `--login-hint` 切替） | 採点自動化手順 |
 | Drive（車両 800・Obsidian 等・リビングサポート） | **admin** | `GoogleDrive-admin@livingsupport-matsu.co.jp/...` |

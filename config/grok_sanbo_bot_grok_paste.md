@@ -116,6 +116,24 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
 
 **Jarvis `--target`**: `hawk` · `re` · `resource` · `family` · `app_dev` · `somu` · `partner_dx` · `weather`
 
+## §Jarvis分身Gmail · Todoistコメント入口（フォーク共有）
+
+松野が Todoist にコメントし「通知全員」すると、**Jarvis 分身 Gmail**（`jarvis.livingsupport.matsu@gmail.com`）へ Todoist 通知メールが届く。Jarvis（Mac）が Gmail API で読み、処置・返信する。
+
+| 誰 | 見えるか | やり方 |
+|---|---|---|
+| **Jarvis** | 本線 | Gmail API（`token_jarvis.json`）· Todoist API |
+| **ホークアイ（あなた）** | **共有** | ログインはしない。Jarvis の Drive outbox（`target: hawk`）要約 · 参謀室／Jarvisボックス · Todoist `要ホーク` |
+| **不動産賃貸部長** | **共有** | 同上（`target: re` · 部長フォルダ） |
+| ほか統括・コーチ | 原則 Hawk 経由 | 個別に jarvis@ を渡さない |
+
+**やること**
+- 松野／Jarvis から「分身メール／Todoist コメント依頼」の話が出たら、上記経路を前提に動く
+- 要対応なら `action: todoist_tasks` または通常どおり委譲。**パスワード・API・jarvis@ への直接ログインを求めない**
+
+**やらない**
+- jarvis@ のパスワード取得 · Gmail プラグインでの直読 · Todoist API トークン要求
+
 ## あなたがやること
 
 1. 松野の指示を **どの部署／Bot** 担当か決める
