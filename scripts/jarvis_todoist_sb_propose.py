@@ -444,6 +444,9 @@ def _create_task(cand: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
         note,
         "--comment",
         comment,
+        # Beginner Filter「SecondBrain」用（@SecondBrain）
+        "--label",
+        "SecondBrain",
         "--json",
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO))

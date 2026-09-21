@@ -23,13 +23,15 @@ labels:
 - 要Jarvis連携
 - 要ホーク
 - quick
-# Filter案内（Todoist UI・手作業）:
+- SecondBrain
+# Filter案内（Todoist UI・Beginner 3枠・2026-09-21入替）:
 #   要連携 = @要Jarvis連携 | @要ボス
+#   SecondBrain = @SecondBrain   ← SB/Genspark 起票の見渡し（旧「要ホーク」枠を入替）
 #   パッと = @quick
-#   要ホーク = @要ホーク
+# ※要ホークはラベル運用のまま。専用Filterは Pro で再開可
 # ※日本語「完了」はクエリ非対応。未完了のみはフィルター既定のため !完了 不要
 # ※「ラベル:A | 要ボス」も OR 右側修飾なしで失敗する → @ 記法を使う
-# 朝レビュー順: 要連携 → パッと → オーナー確認 → その他未着手
+# 朝レビュー順: 要連携 → SecondBrain → パッと → オーナー確認 → その他未着手
 lanes:
   properties:
     title: 所有物件
