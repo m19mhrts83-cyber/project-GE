@@ -11,13 +11,18 @@ Todoist REST API（Jarvis タスク正本・試験導入）。
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py lane --id ai_raimo
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py create-task --lane ai_raimo --title '[L-01] …'
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status --task-id … --lane ai_raimo --status 進行中
+  ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status --task-id … --lane ai_raimo --status HOLD
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py complete-task --task-id … --comment 'タスク完了したよ（Jarvis）'
+  ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py hold-review
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py seed-nokori --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py seed-nokori --apply
 
 正本トークン: .env.jarvis_private の TODOIST_API_TOKEN
 設定: config/todoist_projects.yaml
 値は標準出力に出さない。
+
+HOLD: update-status HOLD でコメント「HOLD since: YYYY-MM-DD」＋ due+30日。
+1ヶ月レビューは hold-review / jarvis_todoist_hold_review.py。
 """
 from __future__ import annotations
 
@@ -30,14 +35,19 @@ import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[1]
 YAML_PATH = REPO / "config" / "todoist_projects.yaml"
 NOKORI_MD = REPO / "docs" / "残り棚_アプリ受け入れ_20260830.md"
 COMPLETE_PHRASE = "タスク完了したよ"
 DEFAULT_API = "https://api.todoist.com/api/v1"
+JST = ZoneInfo("Asia/Tokyo")
+HOLD_SINCE_RE = re.compile(r"HOLD since:\s*(\d{4}-\d{2}-\d{2})", re.I)
+HOLD_REVIEW_DAYS = 30
 
 
 def _load_yaml() -> dict[str, Any]:
@@ -298,7 +308,8 @@ def cmd_lane(args: argparse.Namespace) -> int:
     tasks = _paginate_results(f"/tasks?project_id={urllib.parse.quote(pid)}", cfg=cfg)
     label = str(lane.get("lane_label") or args.id)
     hide_done = bool(lane.get("hide_done_on_board"))
-    done_names = set(lane.get("done_sections") or ["完了"])
+    # Board「完了」列は廃止。done_sections 空なら列フィルタなし（close 済みは API に出ない）
+    done_names = set(lane.get("done_sections") or [])
     sid_to_name = {v: k for k, v in (proj.get("section_ids") or {}).items()}
 
     filtered: list[dict[str, Any]] = []
@@ -309,7 +320,7 @@ def cmd_lane(args: argparse.Namespace) -> int:
             pkey = str(lane.get("project_key") or "")
             if pkey == "work_bundle":
                 continue
-        if hide_done:
+        if hide_done and done_names:
             sec = sid_to_name.get(str(t.get("section_id") or ""), "")
             if sec in done_names:
                 continue
@@ -375,6 +386,11 @@ def cmd_create_task(args: argparse.Namespace) -> int:
             {"task_id": tid, "content": str(args.comment)[:1900]},
             cfg=cfg,
         )
+    if section == "HOLD" and tid and not getattr(args, "no_hold_stamp", False):
+        since = _stamp_hold(str(tid), cfg=cfg)
+        due = since + timedelta(days=HOLD_REVIEW_DAYS)
+        if not args.json:
+            print(f"hold_stamp since={since.isoformat()} due={due.isoformat()}")
     if args.json:
         print(
             json.dumps(
@@ -441,13 +457,289 @@ def _move_to_section(task_id: str, section_id: str, *, cfg: dict[str, Any]) -> N
         sys.exit(1)
 
 
+def _jst_today() -> date:
+    return datetime.now(JST).date()
+
+
+def _hold_since_comment(day: date | None = None) -> str:
+    d = day or _jst_today()
+    return f"HOLD since: {d.isoformat()}"
+
+
+def _stamp_hold(task_id: str, *, cfg: dict[str, Any], day: date | None = None) -> date:
+    """HOLD 移設時: コメント印＋ due を JST 今日+30日。戻り値は since 日。"""
+    since = day or _jst_today()
+    due = since + timedelta(days=HOLD_REVIEW_DAYS)
+    _req(
+        "POST",
+        "/comments",
+        {"task_id": task_id, "content": _hold_since_comment(since)},
+        cfg=cfg,
+    )
+    _req(
+        "POST",
+        f"/tasks/{urllib.parse.quote(task_id)}",
+        {"due_date": due.isoformat()},
+        cfg=cfg,
+        allow_empty=True,
+    )
+    return since
+
+
+def _parse_hold_since_from_comments(task_id: str, *, cfg: dict[str, Any]) -> date | None:
+    comments = _paginate_results(
+        f"/comments?task_id={urllib.parse.quote(task_id)}", cfg=cfg
+    )
+    best: date | None = None
+    for c in comments:
+        text = str(c.get("content") or "")
+        m = HOLD_SINCE_RE.search(text)
+        if not m:
+            continue
+        try:
+            d = date.fromisoformat(m.group(1))
+        except ValueError:
+            continue
+        if best is None or d > best:
+            best = d
+    return best
+
+
+def _hold_since_from_activity(
+    task_id: str, hold_section_id: str, *, cfg: dict[str, Any]
+) -> date | None:
+    """Activity moved → HOLD の最新 event_date（JST 日付）。"""
+    path = (
+        f"/activities?object_type=item&object_id={urllib.parse.quote(task_id)}"
+        f"&event_type=moved&limit=50"
+    )
+    try:
+        events = _paginate_results(path, cfg=cfg)
+    except SystemExit:
+        return None
+    hold_sid = str(hold_section_id)
+    best: date | None = None
+    for e in events:
+        if str(e.get("event_type") or "") != "moved":
+            continue
+        extra = e.get("extra_data") or {}
+        if str(extra.get("section_id") or "") != hold_sid:
+            continue
+        raw = str(e.get("event_date") or "")
+        if not raw:
+            continue
+        try:
+            # 2026-09-21T13:42:03.155449Z
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            d = dt.astimezone(JST).date()
+        except ValueError:
+            continue
+        if best is None or d > best:
+            best = d
+    return best
+
+
 def cmd_update_status(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     lane = _lane(cfg, args.lane)
     proj = _project_for_lane(cfg, lane)
-    sid = _section_id(proj, args.status)
+    status = str(args.status).strip()
+    sid = _section_id(proj, status)
     _move_to_section(args.task_id, sid, cfg=cfg)
-    print(f"moved id={args.task_id} section={args.status}")
+    print(f"moved id={args.task_id} section={status}")
+    if status == "HOLD" and not getattr(args, "no_hold_stamp", False):
+        since = _stamp_hold(args.task_id, cfg=cfg)
+        due = since + timedelta(days=HOLD_REVIEW_DAYS)
+        print(f"hold_stamp since={since.isoformat()} due={due.isoformat()}")
+    return 0
+
+
+def _lane_for_project_task(
+    cfg: dict[str, Any], project_key: str, labels: list[str]
+) -> str:
+    """project_key + labels から表示用 lane id を推定。"""
+    for lid, lane in (cfg.get("lanes") or {}).items():
+        if str(lane.get("project_key") or "") != project_key:
+            continue
+        ll = str(lane.get("lane_label") or lid)
+        pkey = str(lane.get("project_key") or "")
+        if pkey == "work_bundle":
+            if ll in labels:
+                return str(lid)
+        else:
+            return str(lid)
+    return project_key
+
+
+def cmd_hold_review(args: argparse.Namespace) -> int:
+    """HOLD 列を走査し、経過 HOLD_REVIEW_DAYS 日以上を報告。"""
+    cfg = _load_yaml()
+    today = _jst_today()
+    raw_min = getattr(args, "min_days", None)
+    min_days = HOLD_REVIEW_DAYS if raw_min is None else int(raw_min)
+    due_only = bool(getattr(args, "due_only", False))
+    items: list[dict[str, Any]] = []
+
+    for pkey, proj in (cfg.get("projects") or {}).items():
+        if not isinstance(proj, dict):
+            continue
+        sid_map = proj.get("section_ids") or {}
+        hold_sid = sid_map.get("HOLD")
+        if not hold_sid:
+            continue
+        hold_sid = str(hold_sid)
+        pid = str(proj.get("project_id") or "")
+        if not pid:
+            continue
+        tasks = _paginate_results(
+            f"/tasks?project_id={urllib.parse.quote(pid)}", cfg=cfg
+        )
+        for t in tasks:
+            if str(t.get("section_id") or "") != hold_sid:
+                continue
+            if t.get("checked") or t.get("is_completed"):
+                continue
+            tid = str(t.get("id") or "")
+            labels = [str(x) for x in (t.get("labels") or [])]
+            lane_id = _lane_for_project_task(cfg, str(pkey), labels)
+            since = _parse_hold_since_from_comments(tid, cfg=cfg)
+            source = "comment"
+            if since is None:
+                since = _hold_since_from_activity(tid, hold_sid, cfg=cfg)
+                source = "activity" if since is not None else "unknown"
+            if since is None:
+                # 最終手段: added_at（新規作成直後に HOLD のケース）
+                raw = str(t.get("added_at") or "")
+                try:
+                    dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    since = dt.astimezone(JST).date()
+                    source = "added_at"
+                except ValueError:
+                    since = today
+                    source = "unknown"
+            days = (today - since).days
+            if days < min_days:
+                continue
+            items.append(
+                {
+                    "task_id": tid,
+                    "lane": lane_id,
+                    "project": proj.get("name") or pkey,
+                    "title": t.get("content") or "",
+                    "since": since.isoformat(),
+                    "days": days,
+                    "source": source,
+                    "url": t.get("url") or "",
+                }
+            )
+
+    items.sort(key=lambda x: (-int(x["days"]), str(x["title"])))
+    if getattr(args, "json", False):
+        print(json.dumps({"ok": True, "count": len(items), "items": items}, ensure_ascii=False))
+        return 0
+
+    if not items:
+        if not due_only:
+            print("📎 HOLDレビュー（1ヶ月超）: 対象なし")
+        return 0
+
+    print("📎 HOLDレビュー（1ヶ月超）")
+    for i, it in enumerate(items, 1):
+        print(
+            f"- [{i}] [{it['lane']}] {it['title']} — HOLD since {it['since']}（{it['days']}日・{it['source']}）"
+        )
+        print("  次: 延長 / 再開(進行中|未着手) / 閉じる")
+    print("了承なら番号か方針を返信。")
+    return 0
+
+
+def cmd_hold_extend(args: argparse.Namespace) -> int:
+    """延長: HOLD since を今日に更新＋ due+30。"""
+    cfg = _load_yaml()
+    since = _stamp_hold(args.task_id, cfg=cfg)
+    due = since + timedelta(days=HOLD_REVIEW_DAYS)
+    print(f"hold_extended id={args.task_id} since={since.isoformat()} due={due.isoformat()}")
+    return 0
+
+
+def cmd_hold_stamp_missing(args: argparse.Namespace) -> int:
+    """HOLD 列で since 印が無いタスクに印＋due を付ける（UI移動の穴埋め）。"""
+    if os.environ.get("JARVIS_TODOIST_HOLD_STAMP_DISABLE", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        print("hold_stamp_missing: disabled")
+        return 0
+    cfg = _load_yaml()
+    dry = bool(getattr(args, "dry_run", False))
+    stamped: list[dict[str, Any]] = []
+    skipped = 0
+
+    for pkey, proj in (cfg.get("projects") or {}).items():
+        if not isinstance(proj, dict):
+            continue
+        sid_map = proj.get("section_ids") or {}
+        hold_sid = sid_map.get("HOLD")
+        if not hold_sid:
+            continue
+        hold_sid = str(hold_sid)
+        pid = str(proj.get("project_id") or "")
+        if not pid:
+            continue
+        tasks = _paginate_results(
+            f"/tasks?project_id={urllib.parse.quote(pid)}", cfg=cfg
+        )
+        for t in tasks:
+            if str(t.get("section_id") or "") != hold_sid:
+                continue
+            if t.get("checked") or t.get("is_completed"):
+                continue
+            tid = str(t.get("id") or "")
+            if not tid:
+                continue
+            existing = _parse_hold_since_from_comments(tid, cfg=cfg)
+            if existing is not None:
+                skipped += 1
+                continue
+            since = _hold_since_from_activity(tid, hold_sid, cfg=cfg)
+            source = "activity"
+            if since is None:
+                since = _jst_today()
+                source = "today"
+            entry = {
+                "task_id": tid,
+                "project": proj.get("name") or pkey,
+                "title": t.get("content") or "",
+                "since": since.isoformat(),
+                "source": source,
+                "due": (since + timedelta(days=HOLD_REVIEW_DAYS)).isoformat(),
+            }
+            if not dry:
+                _stamp_hold(tid, cfg=cfg, day=since)
+            stamped.append(entry)
+
+    if getattr(args, "json", False):
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "dry_run": dry,
+                    "stamped": len(stamped),
+                    "skipped_has_stamp": skipped,
+                    "items": stamped,
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
+
+    mode = "dry-run" if dry else "apply"
+    print(f"hold_stamp_missing ({mode}): stamped={len(stamped)} skipped_has_stamp={skipped}")
+    for it in stamped:
+        print(
+            f"  [{it['project']}] {it['title'][:60]} since={it['since']} due={it['due']} ({it['source']})"
+        )
     return 0
 
 
@@ -473,15 +765,16 @@ def cmd_complete_task(args: argparse.Namespace) -> int:
         {"task_id": args.task_id, "content": comment},
         cfg=cfg,
     )
-    # optional: move to 完了 section before close
+    # optional: move to done_sections[0] before close（空ならスキップ＝Board「完了」列なし）
     if lane:
-        proj = _project_for_lane(cfg, lane)
-        done = (lane.get("done_sections") or ["完了"])[0]
-        try:
-            sid = _section_id(proj, done)
-            _move_to_section(args.task_id, sid, cfg=cfg)
-        except Exception:
-            pass
+        done_list = list(lane.get("done_sections") or [])
+        if done_list:
+            proj = _project_for_lane(cfg, lane)
+            try:
+                sid = _section_id(proj, done_list[0])
+                _move_to_section(args.task_id, sid, cfg=cfg)
+            except Exception:
+                pass
     _req(
         "POST",
         f"/tasks/{urllib.parse.quote(args.task_id)}/close",
@@ -597,11 +890,40 @@ def main() -> int:
         help="作成直後に付けるコメント（サマリ・アウトプットリンク用）",
     )
     c.add_argument("--json", action="store_true", help="1行 JSON で結果出力")
+    c.add_argument(
+        "--no-hold-stamp",
+        action="store_true",
+        help="--status HOLD 時に since 印・due+30 を付けない",
+    )
 
     u = sub.add_parser("update-status")
     u.add_argument("--task-id", required=True)
     u.add_argument("--lane", required=True)
     u.add_argument("--status", required=True)
+    u.add_argument(
+        "--no-hold-stamp",
+        action="store_true",
+        help="HOLD 移設時に since 印・due+30 を付けない",
+    )
+
+    hr = sub.add_parser("hold-review", help="HOLD 列の1ヶ月超一覧")
+    hr.add_argument("--min-days", type=int, default=HOLD_REVIEW_DAYS)
+    hr.add_argument("--json", action="store_true")
+    hr.add_argument(
+        "--due-only",
+        action="store_true",
+        help="対象0件なら何も出さない（月次ついで用）",
+    )
+
+    he = sub.add_parser("hold-extend", help="HOLD 延長（since 更新＋due+30）")
+    he.add_argument("--task-id", required=True)
+
+    hs = sub.add_parser(
+        "hold-stamp-missing",
+        help="HOLD 列で since 印が無いタスクに印＋due を付ける",
+    )
+    hs.add_argument("--dry-run", action="store_true")
+    hs.add_argument("--json", action="store_true")
 
     cm = sub.add_parser("comment")
     cm.add_argument("--task-id", required=True)
@@ -627,6 +949,9 @@ def main() -> int:
         "lane": cmd_lane,
         "create-task": cmd_create_task,
         "update-status": cmd_update_status,
+        "hold-review": cmd_hold_review,
+        "hold-extend": cmd_hold_extend,
+        "hold-stamp-missing": cmd_hold_stamp_missing,
         "comment": cmd_comment,
         "complete-task": cmd_complete_task,
         "seed-nokori": cmd_seed_nokori,

@@ -1,0 +1,6 @@
+{
+  "disabled": false,
+  "last_check": null,
+  "last_prompted_at": null,
+  "note": "毎月1〜8日または --force。無効化は disabled:true か JARVIS_TODOIST_HOLD_REVIEW_DISABLE=1"
+}
