@@ -63,7 +63,8 @@ Jarvis／ホーク／FRIDAY がタスクを **起票・列移動（オーナー�
 |---|---|---|
 | `要Jarvis連携` | フォーク等から Jarvis に Mac 実行を頼む | Filter「要連携」→「Jarvis、連携して」 |
 | `要ボス` | 松野判断待ち | 同上／オーナー確認 |
-| `要ホーク` | Jarvis→ホーク判断・振り分け | Drive 空でもここを見る |
+| `SecondBrain` | SB/Genspark から起票 | Filter「SecondBrain」（Beginner 3枠の1つ） |
+| `要ホーク` | Jarvis→ホーク判断・振り分け | ラベル検索。専用 Filter は **Pro 以降** |
 | `quick` | 5分以内のパッと系 | Filter「パッと」 |
 
 - メンション `@Jarvis` は任意。トリガー例: `内容教えて` / `要連携` / `処置:`

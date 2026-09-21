@@ -95,7 +95,7 @@ inbox の `summary` / `links` は `jarvis_hawk_todoist_tasks_apply.py` がコメ
 - ルーティン変更など Drive キューが正のとき
 
 日常の完了・処置報告は **Todoist コメント**で足りる。  
-ホーク判断が欲しければラベル **`要ホーク`** を付け、Drive が空でも Filter で見えるようにする（空の Jarvisボックスは正常）。
+ホーク判断が欲しければラベル **`要ホーク`** を付ける（Drive が空でもラベル検索可）。Beginner の専用 Filter 枠は **SecondBrain 優先**のため、要ホーク Filter は **Pro 以降**（空の Jarvisボックスは正常）。
 
 - **コメント巡回**: **本線は jarvis@ の Todoist 未読通知メール**（対応後に既読）。**API 巡回は保険**（`scripts/jarvis_todoist_comment_inbox.py`）。パートナー確認・会話のついでに実行してよい。
 
