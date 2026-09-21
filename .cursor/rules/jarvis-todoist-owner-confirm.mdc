@@ -1,0 +1,130 @@
+---
+description: Todoist完了はオーナー確認経由。Jarvis/FRIDAY/ホークの役割分担
+alwaysApply: true
+---
+
+# Todoist タスク完了・起票（Jarvis / FRIDAY / ホーク）
+
+タスク正本は **Todoist（admin）**。`JARVIS_TASK_BACKEND=todoist`。  
+Notion タスク看板は戻し用。purchase_pre 等は従来どおり Notion。
+
+## 完了フロー（確定・最初は二段）
+
+会話や実装結果から「終わった」と判断できても、**いきなり完了／close しない**。
+
+| 段階 | セクション | 誰が何をする |
+|---|---|---|
+| 1 | **オーナー確認** | Jarvis／FRIDAY／ホークが「完了候補」と判断 → ここに移す → **チャットでその旨を伝える** |
+| 2 | **完了**（＋定型コメント後 close） | 松野が確認OKと言ったあとだけ |
+
+報告の型（必須）:
+
+```
+📌 タスク完了候補 → オーナー確認に入れました
+- タイトル: …
+- lane / id: …
+- 確認OKなら「完了して」→ close します
+```
+
+### 完了にしてよいとき
+
+- 松野が明示: 「完了して」「オーナー確認OK」「意図OK」等
+- 受け入れルール上の T/L 閉じ条件を満たし、かつ上の明示がある
+
+### 禁止
+
+- 「実装した／動いた」だけで close
+- コメント無しの完了（定型先頭 **`タスク完了したよ`** 必須）
+- オーナー確認を飛ばして完了（松野が「即完了で」と明示したときだけ例外）
+
+### CLI（Jarvis）
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+# 候補へ
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status \
+  --task-id … --lane ai_raimo --status オーナー確認
+# 了承後
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py complete-task \
+  --lane ai_raimo --task-id … \
+  --comment 'タスク完了したよ（Jarvis・松野確認OK）'
+```
+
+## Jarvis（会話中）
+
+1. やり取りの中で当該レーンの Todoist タスクが完了相当と判断できたら、**止まず** `オーナー確認` へ移す（なければ起票してから移す）
+2. 上の報告ブロックを出す
+3. 了承後にだけ `complete-task`
+
+FRIDAY（GenCode）も **同じ二段**。コード完了報告時に該当タスクがあればオーナー確認へ入れ、松野へ伝える。
+
+## ホーク連携
+
+| 役割 | 正 |
+|---|---|
+| **週次・横断・抜け漏れ防止の起票** | **ホーク優先**（レビュー結果・要ボス・置き換え決定） |
+| **いま会話で触っている1件** | Jarvis がその場で起票／列移動してよい |
+| **二重起票** | 避けたい。同タイトル／L-id があれば更新・列移動のみ |
+
+### ホークの「要ボス」
+
+松野判断が必要な項目は **Todoist タスク化**する（レーンは内容で振分。迷ったら `ai_raimo`）。
+
+- 初期セクション: 判断待ちなら **`オーナー確認`**、作業が残るなら `未着手`／`進行中` ＋コメントに「要ボス」
+- 週次統括に載せた「要ボス」は、チャットだけで終わらせずタスク化する
+
+### 反映経路（API 直共有より先にこれ）
+
+Grok（ホーク／不動産部長）→ Drive inbox → Jarvis 適用（既存 Notion と同じ型）:
+
+```
+---
+action: todoist_tasks
+target: jarvis
+source: hawk   # または bucho / realestate
+---
+
+## create
+- lane: ai_raimo
+  title: …
+  status: オーナー確認   # 省略時は未着手
+  due: YYYY-MM-DD
+  note: 要ボス／週次由来
+
+## owner_confirm
+- lane: ai_raimo
+  task_id: …
+  reason: 実装完了候補
+
+## done
+- lane: ai_raimo
+  task_id: …
+  reason: タスク完了したよ（ホーク・松野確認済）
+```
+
+- 現状の `action: notion_tasks` は移行期も可。**新分は `todoist_tasks` を正**にする（適用スクリプトは Jarvis が追随）
+- Jarvis: パートナー確認・inbox poll のついでに apply（未実装ならその場で CLI／手動追従し、スクリプト化を残す）
+
+## 不動産部長・API 共有の方針
+
+| 案 | 内容 | 採否（当面） |
+|---|---|---|
+| A. inbox MD → Jarvis apply | 秘密を Grok に渡さない | **本線（採用確定）** |
+| B. Todoist プロジェクト転送メール | 起票のみ・Beginner 可 | 補助可 |
+| C. `TODOIST_API_TOKEN` を Grok／部長に共有 | 起票が速い | **見送り** |
+
+トークンを Bot に渡すのは、inbox 経路が回ってから再検討。渡す場合も **read/write 範囲の別トークン**とローテ前提。
+
+## 両方起票＋Jarvis 確認について
+
+- **推奨**: ホークが起票（抜け漏れ防止）→ Jarvis が会話・実装と照合して列を直し、完了はオーナー確認経由
+- **非推奨**: Jarvis とホークが同じ件を別タイトルで二重作成
+
+## 関連
+
+- 受け入れ閉じ: `jarvis-plan-accept.mdc`
+- 設計: `docs/Todoist_タスク正本_設計_20260921.md`
+- CLI: `scripts/jarvis_todoist_api.py`
+- ホーク Notion 旧経路: `scripts/jarvis_hawk_notion_tasks_apply.py`（移行期）
+- FRIDAY Git: `jarvis-friday-git.mdc`
+- JarvisBox: `jarvis-grok-jarvisbox-fork.mdc`

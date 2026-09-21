@@ -21,8 +21,9 @@ cd ~/git-repos
 1. **対象パスを明示**する（`git add -A` 禁止。ラッパーも全追加しない）
 2. 秘密（`.env*` 平文・`token*`・`credentials*`・鍵類）は **絶対に入れない**（スクリプトが拒否）
 3. 節目が終わったら **commit＋`--push`**（まっちゃん／Jarvis が「コミットして」と言ったら実行してよい）
-4. `force push` / `--amend` / 秘密のチャット貼付は禁止
-5. コミット後、短い報告（hash・ファイル一覧・push 有無）
+4. 実装完了相当の Todoist タスクがあれば、**完了にせずオーナー確認へ**入れ松野に伝える（`jarvis-todoist-owner-confirm.mdc`）
+5. `force push` / `--amend` / 秘密のチャット貼付は禁止
+6. コミット後、短い報告（hash・ファイル一覧・push 有無）
 
 ## Jarvis
 
