@@ -47,6 +47,7 @@ KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.
 KURASHIFT_S1_EVIDENCE = REPO / "scripts" / "jarvis_kurashift_s1_evidence_to_drive.py"
 GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
 BUCHO_INBOX_POLL = REPO / "scripts" / "jarvis_bucho_inbox_poll.py"
+TODOIST_COMMENT_INBOX = REPO / "scripts" / "jarvis_todoist_comment_inbox.py"
 WEATHER_MORNING_BRIEF = REPO / "scripts" / "jarvis_weather_morning_brief.py"
 GROK_REPAIR_APPLY = REPO / "scripts" / "jarvis_grok_repair_mail_apply.py"
 MGMT_REPLY_APPLY = REPO / "scripts" / "jarvis_grok_mgmt_reply_apply.py"
@@ -795,6 +796,20 @@ def main() -> int:
             print(f"# bucho_inbox_poll soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["bucho_inbox_poll"] = "skipped"
+
+    # 2c1-todoist-comment. jarvis@ 未読 Todoist 通知＋API保険（soft-fail・既読化しない）
+    if TODOIST_COMMENT_INBOX.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "todoist_comment_inbox",
+            [exe, str(TODOIST_COMMENT_INBOX)],
+            timeout=90,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["todoist_comment_inbox"] = rc
+        if rc != 0:
+            print(f"# todoist_comment_inbox soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["todoist_comment_inbox"] = "skipped"
 
     # 2c1-inbox-glucon. グルコン材料 Drive → Supabase（soft-fail）
     if GLUCON_MATERIALS_IMPORT.is_file() and not args.skip_fetch:
