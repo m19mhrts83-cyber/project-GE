@@ -17,7 +17,9 @@ Todoist REST API（Jarvis タスク正本・試験導入）。
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py seed-nokori --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py seed-nokori --apply
 
-正本トークン: .env.jarvis_private の TODOIST_API_TOKEN
+正本トークン: .env.jarvis_private の TODOIST_API_TOKEN（**Jarvis 分身**本線）
+admin 退避: TODOIST_API_TOKEN_OWNER（常用しない。松野は UI のみ）
+メール: JARVIS_TODOIST_EMAIL（例: jarvis.livingsupport.matsu@gmail.com）
 設定: config/todoist_projects.yaml
 値は標準出力に出さない。
 
@@ -197,8 +199,15 @@ def _section_id(proj: dict[str, Any], section_name: str) -> str:
 def cmd_whoami(_args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     data = _req("GET", "/user", cfg=cfg)
-    email = data.get("email") or data.get("full_name") or "?"
-    print(f"ok user={email} id={data.get('id', '')}")
+    email = data.get("email") or "?"
+    name = data.get("full_name") or ""
+    has_avatar = bool(
+        data.get("avatar_big") or data.get("avatar_medium") or data.get("image_id")
+    )
+    print(
+        f"ok user={email} name={name or '-'} id={data.get('id', '')} "
+        f"avatar={'yes' if has_avatar else 'no'} (Jarvis分身トークン)"
+    )
     return 0
 
 
