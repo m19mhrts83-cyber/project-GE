@@ -52,7 +52,10 @@ Drive `20_outbox_to_grok/` はこれまでどおり **仕事キュー**。チャ
   `【with Grok bot】/10_inbox_from_grok/` に `YYYY-MM-DD_題名.md`。
 - 先頭 YAML 推奨: `action:` / `priority:` / `target: jarvis`
 - **本文は改行を残す**（1行に潰さない）。`# 見出し` · 箇条書き · 番号リスト · コードフェンス。ダッシュボード状況ウォッチがそのまま描画する
-- **ホーク Notion**: `action: notion_tasks` → Jarvis が `jarvis_hawk_notion_tasks_apply.py --apply`
+- **ホーク Notion**: `action: notion_tasks` → Jarvis が `jarvis_hawk_notion_tasks_apply.py --apply`（移行期）
+- **ホーク／部長 Todoist（本線）**: `action: todoist_tasks` → Mac が自動 apply（`jarvis_bucho_inbox_poll`）。`summary`/`links` → コメントの Markdown ハイパーリンク
+- **要ボス／要Jarvis連携**は必ず Todoist ラベル付き起票（Drive メモだけでは漏れ扱い）
+- Drive `20_outbox` 空は正常。ホーク判断は Todoist `要ホーク`
 - **松野にチャット全文コピーを求めない**（JarvisBox が正本）。
 ```
 
