@@ -3,7 +3,7 @@
 # Excel 参考: 231_物件調査.xlsx「外的調査分析」
 
 version: 1
-updated: "2026-08-27"
+updated: "2026-09-17"
 # 成果物はメールではなく Obsidian（admin Drive）
 delivery: drive_obsidian
 obsidian_folder: "01_Journaling/☆Real_Estate_Pick"
@@ -16,6 +16,24 @@ portals:
   - "LIFULL HOME'S"
 rent_band_step_man: 0.5
 building_age_step_years: 5
+
+# Phase2 会員サイト（S3 がログインして自律調査・松野リスク許容 2026-09-17）
+sources:
+  phase2:
+    - id: sumasate
+      url: "https://owners.sumasate.jp/home"
+      login_owner: s3
+      report: avg_position
+    - id: suumo_onr
+      url: "https://www.suumo-onr.jp/"
+      login_owner: s3
+      report: competitor_band
+      alias: ["SUUMOカウンター", "SUUMO賃貸経営サポート"]
+  welfare_rent_cap:
+    scope: municipality  # 物件住所の市区町村
+    login_owner: none  # 公開情報
+    report: income_line
+permission_doc: "docs/KURASHIFT_需給調査_権限とデータ源_20260917.md"
 
 # チャプロ三次の出力ブロック
 output_sections:
@@ -39,6 +57,16 @@ output_sections:
     notes: "IPSS。現場ヒアリング需要とは別"
   - id: population_by_age
     title: 調査年度時点の世代別人口(需要その2)
+  - id: rent_sumasate
+    title: 家賃妥当性(スマサテ)
+    columns: [市町村, エリア平均家賃帯, 自物件想定家賃, 平均に対する位置, 調査日, 出典]
+  - id: rent_suumo_onr
+    title: 競合分布(SUUMO賃貸経営サポート)
+    columns: [市町村, 同価格帯競合件数, 下位帯の分布メモ, 上位帯の分布メモ, 調査日, 出典]
+  - id: welfare_rent_cap
+    title: 生活保護・住宅扶助(市町村)
+    columns: [市町村, 級地, 単身目安, 世帯目安, 想定家賃との差, 調査日, 出典URL]
+    notes: "収入ライン検討材料。捏造禁止"
   - id: verdict
     title: 需要と供給についての考察・評価
   - id: hearing_questions

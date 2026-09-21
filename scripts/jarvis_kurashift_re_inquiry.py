@@ -383,6 +383,7 @@ def send_inquiry(
     force: bool = False,
 ) -> dict[str, Any]:
     from jarvis_kurashift_re_inquiry_channel import (
+        is_kamiooya_ops_email,
         is_self_email as channel_is_self,
     )
 
@@ -410,6 +411,16 @@ def send_inquiry(
             "ok": False,
             "error": "agent_to_is_self",
             "deal_id": deal_id,
+        }
+        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return out
+    # 神大家運営・事務局へ第一問合せテンプレを送らない（2026-09-20 誤送信）
+    if not handoff and is_kamiooya_ops_email(to_email):
+        out = {
+            "ok": False,
+            "error": "agent_to_is_kamiooya_ops",
+            "deal_id": deal_id,
+            "to": to_email,
         }
         print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
         return out

@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import {
   classifyInquiryChannel,
+  isKamiooyaOpsEmail,
   isSelfEmail,
   selfEmailsExtraFromEnv,
 } from "@/lib/reInquiryChannel";
@@ -106,6 +107,15 @@ export async function POST(
         {
           error:
             "仲介向け問合せの宛先が自己アドレスです。To を修正するか Grok 依頼に切り替えてください",
+        },
+        { status: 400 }
+      );
+    }
+    if (!handoff && isKamiooyaOpsEmail(to)) {
+      return NextResponse.json(
+        {
+          error:
+            "宛先が神大家運営・事務局です。運営への物件資料依頼は禁止です（第一問合せ対象外）",
         },
         { status: 400 }
       );

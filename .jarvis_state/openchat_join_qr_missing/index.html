@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>神大家オプチャ — 欠落招待 QRキット</title>
+<style>
+  :root { --pad: 96px; --bg:#0f1115; --card:#161a22; --fg:#f2f4f8; --muted:#9aa3b2; --accent:#3d8b6e; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+  header { padding:16px 20px 8px; border-bottom:1px solid #2a3140; }
+  header h1 { font-size:1.15rem; margin:0 0 8px; font-weight:650; }
+  .hint { background:#1a2e27; border:1px solid #2f5a48; border-radius:10px;
+    padding:12px 14px; font-size:0.9rem; color:#d7e8df; }
+  .hint code { background:#0e1a16; padding:2px 6px; border-radius:4px; color:#b8f0d4; }
+  main { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:12px 16px 24px; overflow:hidden; }
+  .progress { color:var(--muted); font-size:0.95rem; margin-bottom:8px; }
+  .title { text-align:center; font-size:1.15rem; margin:0 0 12px; max-width:720px; line-height:1.4; font-weight:650; }
+  .qr-stage { background:#fff; border-radius:16px; padding:var(--pad);
+    box-shadow:0 12px 40px rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center;
+    max-width:min(92vw,640px); max-height:min(70vh,640px); }
+  .qr-stage img { width:min(42vw,280px); height:auto; display:block; image-rendering:pixelated; }
+  .link { margin-top:14px; font-size:0.85rem; }
+  .link a { color:#8ec8ff; }
+  nav { display:flex; gap:12px; align-items:center; justify-content:center;
+    padding:16px 20px 28px; border-top:1px solid #2a3140; background:var(--card); }
+  button { appearance:none; border:0; cursor:pointer; background:var(--accent); color:#fff;
+    font-size:1rem; font-weight:600; padding:14px 22px; border-radius:10px; min-width:120px; }
+  button.secondary { background:#3a4458; }
+  button:disabled { opacity:0.35; cursor:not-allowed; }
+</style>
+</head>
+<body>
+<header>
+  <h1>欠落招待 — QRキット（WeStudy再取得・実名解決済）</h1>
+  <div class="hint">
+    入力（両方の欄）: <code>1162 松野 真治</code>　／　Mac版LINEは起動しない<br>
+    対象: 02初心者 / 13-1 / 22新築 / 24DIY / 26RC / 50相続 / 200FIRE / 201独身
+  </div>
+</header>
+<main>
+  <div class="progress" id="progress">—</div>
+  <p class="title" id="name">—</p>
+  <div class="qr-stage"><img id="qr" src="" alt="QR code"></div>
+  <div class="link" id="link"></div>
+</main>
+<nav>
+  <button type="button" class="secondary" id="prev">← 前へ</button>
+  <button type="button" id="next">次へ →</button>
+</nav>
+<script>
+const slides = [{"i": 1, "name": "02初心者G【神大家】", "url": "https://line.me/ti/g2/uSBa5yceDzFVJ7AIvv_OjKYSwfmkJfNNPRYSrg", "png": "01.png"}, {"i": 2, "name": "13-1九州沖縄_物件紹介G【神大家】", "url": "https://line.me/ti/g2/BPaRnEWdfnE5bZgCVclAXIjKNJxA_VKVRWudfQ", "png": "02.png"}, {"i": 3, "name": "22新築APにﾁｬﾚﾝｼﾞ!G【神大家】", "url": "https://line.me/ti/g2/-7YS2mnK4fvujco4TbU8UDzguFsKzsjAceHzRQ", "png": "03.png"}, {"i": 4, "name": "24DIYにﾁｬﾚﾝｼﾞ!G【神大家】", "url": "https://line.me/ti/g2/aHImD-fECwQvWM8NjVLqhW-PFaPQitj-Wfi0tQ", "png": "04.png"}, {"i": 5, "name": "26RC鉄骨など大規模物件G【神大家】", "url": "https://line.me/ti/g2/RkygdBd8Ko71YKdcQ7Tu544LsDr2Z7o_CdYTiA", "png": "05.png"}, {"i": 6, "name": "50相続対策G【神大家】", "url": "https://line.me/ti/g2/obNOr3rxWht924MgpUQh2pe8ZObJwrewMLZFiQ", "png": "06.png"}, {"i": 7, "name": "200FIRE後の昼休み【神大家】", "url": "https://line.me/ti/g2/PBi8yBrCSb-arFiX3XoelurNlaowtmCYRUNacQ", "png": "07.png"}, {"i": 8, "name": "201独身組 交流G【神大家】", "url": "https://line.me/ti/g2/iT9UKLV4adMbmcjIb_Zqvl6xC-xwctSm8L81fg", "png": "08.png"}];
+let idx = 0;
+const elProgress = document.getElementById('progress');
+const elName = document.getElementById('name');
+const elQr = document.getElementById('qr');
+const elLink = document.getElementById('link');
+const btnPrev = document.getElementById('prev');
+const btnNext = document.getElementById('next');
+function render() {
+  const s = slides[idx];
+  elProgress.textContent = (idx+1) + ' / ' + slides.length;
+  elName.textContent = s.name;
+  elQr.src = s.png;
+  elLink.innerHTML = '<a href="'+s.url+'" target="_blank" rel="noopener">招待リンクを開く</a>';
+  btnPrev.disabled = idx <= 0;
+  btnNext.disabled = idx >= slides.length - 1;
+}
+btnPrev.onclick = () => { if (idx>0) { idx--; render(); } };
+btnNext.onclick = () => { if (idx<slides.length-1) { idx++; render(); } };
+document.addEventListener('keydown', (e) => {
+  if (e.key==='ArrowLeft') btnPrev.click();
+  if (e.key==='ArrowRight') btnNext.click();
+});
+render();
+</script>
+</body>
+</html>

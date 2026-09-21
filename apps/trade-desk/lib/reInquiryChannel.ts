@@ -42,6 +42,24 @@ const NOT_APPLICABLE_TITLE_SUBSTR = [
   "E2E-GROK-KURASHIFT",
   "approved A'",
   "approved A’",
+  // 神大家運営・購入相談（仲介第一問合せの対象外 · 2026-09-20 誤送信教訓）
+  "オレンジフォーム",
+  "戸建て購入",
+  "購入相談",
+  "運営相談",
+  "運営事務局",
+];
+
+/** 神大家運営・事務局（仲介ではない） */
+const KAMIOOYA_OPS_DOMAINS = [
+  "ooya.academy",
+  "sakulife.org",
+  "orange-cloud7.com",
+];
+const KAMIOOYA_OPS_LOCAL_HINTS = [
+  "kami.ooyasan",
+  "kami-ooyasan",
+  "kamiooyasan",
 ];
 
 export const GROK_HANDOFF_SUBJECT_PREFIX = "[KURASHIFT問合せ依頼]";
@@ -94,6 +112,28 @@ export function isPortalOrNoreplyEmail(email: string): boolean {
   );
 }
 
+/** 神大家運営・事務局アドレスか（第一問合せの仲介宛にしてはいけない） */
+export function isKamiooyaOpsEmail(email: string): boolean {
+  const addr = parseEmailAddr(email) || String(email || "").trim().toLowerCase();
+  if (!addr.includes("@")) return false;
+  const local = addr.split("@")[0] || "";
+  const domain = addr.split("@")[1] || "";
+  if (
+    KAMIOOYA_OPS_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))
+  ) {
+    return true;
+  }
+  return KAMIOOYA_OPS_LOCAL_HINTS.some((h) => local.includes(h));
+}
+
+function usableAgentEmail(email: string, extra?: string[] | null): boolean {
+  if (!email || !email.includes("@")) return false;
+  if (isSelfEmail(email, extra)) return false;
+  if (isPortalOrNoreplyEmail(email)) return false;
+  if (isKamiooyaOpsEmail(email)) return false;
+  return true;
+}
+
 export function handoffToFromEnv(): string {
   if (typeof process === "undefined" || !process.env) {
     return "m19m.hrts83@gmail.com";
@@ -116,7 +156,7 @@ function sjOf(
   return summaryJson && typeof summaryJson === "object" ? summaryJson : {};
 }
 
-/** 仲介宛 To を解決（自己・ポータルはスキップして次へ） */
+/** 仲介宛 To を解決（自己・ポータル・神大家運営はスキップして次へ） */
 export function resolveAgentToEmail(params: {
   summaryJson?: Record<string, unknown> | null;
   explicitTo?: string | null;
@@ -126,32 +166,26 @@ export function resolveAgentToEmail(params: {
   const sj = sjOf(params.summaryJson);
 
   const explicit = String(params.explicitTo || "").trim();
-  if (explicit.includes("@") && !isSelfEmail(explicit, extra)) {
-    if (!isPortalOrNoreplyEmail(explicit)) {
-      return { to: parseEmailAddr(explicit) || explicit, source: "explicit" };
-    }
+  if (explicit.includes("@") && usableAgentEmail(explicit, extra)) {
+    return { to: parseEmailAddr(explicit) || explicit, source: "explicit" };
   }
 
   const contactEmail = parseEmailAddr(
     typeof sj.contact_email === "string" ? sj.contact_email : undefined
   );
-  if (
-    contactEmail &&
-    !isSelfEmail(contactEmail, extra) &&
-    !isPortalOrNoreplyEmail(contactEmail)
-  ) {
+  if (contactEmail && usableAgentEmail(contactEmail, extra)) {
     return { to: contactEmail, source: "contact_email" };
   }
 
   const replyTo = parseEmailAddr(
     typeof sj.reply_to === "string" ? sj.reply_to : undefined
   );
-  if (replyTo && !isSelfEmail(replyTo, extra) && !isPortalOrNoreplyEmail(replyTo)) {
+  if (replyTo && usableAgentEmail(replyTo, extra)) {
     return { to: replyTo, source: "reply_to" };
   }
 
   const from = parseEmailAddr(typeof sj.from === "string" ? sj.from : undefined);
-  if (from && !isSelfEmail(from, extra) && !isPortalOrNoreplyEmail(from)) {
+  if (from && usableAgentEmail(from, extra)) {
     return { to: from, source: "from" };
   }
 
@@ -162,7 +196,7 @@ export function resolveAgentToEmail(params: {
         ? String(sj.vendor_id)
         : "";
   const vEmail = vendorContactEmail(vendorId);
-  if (vEmail && !isSelfEmail(vEmail, extra) && !isPortalOrNoreplyEmail(vEmail)) {
+  if (vEmail && usableAgentEmail(vEmail, extra)) {
     return { to: parseEmailAddr(vEmail) || vEmail, source: "vendor_list" };
   }
 
