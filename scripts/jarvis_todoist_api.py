@@ -10,6 +10,8 @@ Todoist REST API（Jarvis タスク正本・試験導入）。
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py bootstrap --write-config
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py lane --id ai_raimo
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py create-task --lane ai_raimo --title '[L-01] …'
+  ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py create-task --title 'レーン未指定→受信箱'
+  ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py bootstrap-inbox --write-config
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status --task-id … --lane ai_raimo --status 進行中
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status --task-id … --lane ai_raimo --status HOLD
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py complete-task --task-id … --comment 'タスク完了したよ（Jarvis）'
@@ -18,9 +20,9 @@ Todoist REST API（Jarvis タスク正本・試験導入）。
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py seed-nokori --apply
 
 正本トークン: .env.jarvis_private の TODOIST_API_TOKEN（**Jarvis 分身**本線）
-admin 退避: TODOIST_API_TOKEN_OWNER（常用しない。松野は UI のみ）
+admin 退避: TODOIST_API_TOKEN_OWNER（常用しない。松野は UI のみ／bootstrap-inbox のみ）
 メール: JARVIS_TODOIST_EMAIL（例: jarvis.livingsupport.matsu@gmail.com）
-設定: config/todoist_projects.yaml
+設定: config/todoist_projects.yaml（inbox.project_id＝共有「受信箱」。分身のシステム Inbox は使わない）
 値は標準出力に出さない。
 
 HOLD: update-status HOLD でコメント「HOLD since: YYYY-MM-DD」＋ due+30日。
@@ -183,6 +185,112 @@ def _lane(cfg: dict[str, Any], lane_id: str) -> dict[str, Any]:
     return lane
 
 
+def _inbox_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
+    inbox = cfg.get("inbox")
+    return dict(inbox) if isinstance(inbox, dict) else {}
+
+
+def _inbox_project_id(cfg: dict[str, Any]) -> str:
+    env_pid = (os.environ.get("TODOIST_INBOX_PROJECT_ID") or "").strip()
+    if env_pid:
+        return env_pid
+    return str(_inbox_cfg(cfg).get("project_id") or "").strip()
+
+
+def _inbox_project(cfg: dict[str, Any]) -> dict[str, Any]:
+    """共有『受信箱』。Jarvis 分身のシステム Inbox は松野 UI に見えないため使わない。"""
+    inbox = _inbox_cfg(cfg)
+    pid = _inbox_project_id(cfg)
+    if not pid:
+        print(
+            "ERROR: inbox.project_id 未設定。"
+            " 共有プロジェクト『受信箱』を用意し config/todoist_projects.yaml に書くか、"
+            " TODOIST_INBOX_PROJECT_ID を設定。"
+            " 作成は Mac で: jarvis_todoist_api.py bootstrap-inbox --write-config"
+            "（TODOIST_API_TOKEN_OWNER が必要）",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    return {
+        "name": str(inbox.get("name") or "受信箱"),
+        "project_id": pid,
+        "section_ids": dict(inbox.get("section_ids") or {}),
+        "view_style": inbox.get("view_style") or "list",
+        "_key": "inbox",
+    }
+
+
+def _is_inbox_lane(lane_id: str | None) -> bool:
+    return not (lane_id or "").strip() or (lane_id or "").strip() == "inbox"
+
+
+def _owner_token() -> str:
+    tok = (os.environ.get("TODOIST_API_TOKEN_OWNER") or "").strip()
+    if not tok:
+        print(
+            "ERROR: TODOIST_API_TOKEN_OWNER 未設定（admin・bootstrap-inbox 用）",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    return tok
+
+
+def _req_with_token(
+    method: str,
+    path: str,
+    body: dict[str, Any] | None = None,
+    *,
+    token: str,
+    cfg: dict[str, Any] | None = None,
+    allow_empty: bool = False,
+) -> Any:
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    url = f"{_api_base(cfg)}{path}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            raw = resp.read()
+            if allow_empty or resp.status == 204 or not raw:
+                return {"ok": True, "status": resp.status}
+            return json.loads(raw.decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")[:800]
+        print(f"ERROR: HTTP {e.code} {method} {path}: {err_body}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _paginate_with_token(
+    path: str, *, token: str, cfg: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        q = path
+        if cursor:
+            sep = "&" if "?" in path else "?"
+            q = f"{path}{sep}cursor={urllib.parse.quote(cursor)}"
+        data = _req_with_token("GET", q, token=token, cfg=cfg)
+        if isinstance(data, list):
+            out.extend(data)
+            break
+        if not isinstance(data, dict):
+            break
+        results = data.get("results")
+        if isinstance(results, list):
+            out.extend(results)
+        elif data.get("id"):
+            out.append(data)
+            break
+        cursor = data.get("next_cursor")
+        if not cursor:
+            break
+    return out
+
+
 def _project_for_lane(cfg: dict[str, Any], lane: dict[str, Any]) -> dict[str, Any]:
     key = str(lane.get("project_key") or "").strip()
     projects = cfg.get("projects") or {}
@@ -228,11 +336,132 @@ def cmd_probe(_args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     projects = _paginate_results("/projects", cfg=cfg)
     print(f"projects={len(projects)} layout={cfg.get('layout')}")
+    inbox = _inbox_cfg(cfg)
+    ipid = _inbox_project_id(cfg)
+    iname = str(inbox.get("name") or "受信箱")
+    istatus = "ready" if ipid else "NEED_INBOX_PROJECT_ID"
+    print(f"  inbox name={iname} project_id={ipid or '-'} [{istatus}]")
     for key, lane in (cfg.get("lanes") or {}).items():
         pid = str(lane.get("project_id") or "").strip()
         label = lane.get("lane_label") or key
         status = "ready" if pid else "NEED_BOOTSTRAP"
         print(f"  lane={key} label={label} project_id={pid or '-'} [{status}]")
+    return 0
+
+
+def cmd_bootstrap_inbox(args: argparse.Namespace) -> int:
+    """admin（OWNER）で共有『受信箱』を用意し、Jarvis を招待して YAML に書く。"""
+    cfg = _load_yaml()
+    inbox = _inbox_cfg(cfg)
+    name = str(inbox.get("name") or "受信箱")
+    view_style = str(inbox.get("view_style") or "list")
+    invite_env = str(inbox.get("invite_email_env") or "JARVIS_TODOIST_EMAIL")
+    invite_email = (os.environ.get(invite_env) or "").strip()
+    owner = _owner_token()
+    write = bool(args.write_config)
+    existing = {
+        p.get("name"): p for p in _paginate_with_token("/projects", token=owner, cfg=cfg)
+    }
+    found = existing.get(name)
+    pid = str((inbox.get("project_id") or "")).strip()
+    if found:
+        pid = str(found.get("id") or pid)
+        print(f"# reuse inbox name={name} id={pid}")
+    elif pid:
+        print(f"# keep inbox id={pid}")
+    elif not write:
+        print(f"# would create inbox name={name} view_style={view_style}")
+        print(f"# would invite {invite_env}={invite_email or '(unset)'}")
+        return 0
+    else:
+        created = _req_with_token(
+            "POST",
+            "/projects",
+            {"name": name, "view_style": view_style},
+            token=owner,
+            cfg=cfg,
+        )
+        pid = str(created.get("id") or "")
+        print(f"# created inbox name={name} id={pid}")
+
+    if write and invite_email and pid:
+        # REST / Sync 招待（失敗時は UI で Jarvis を編集可招待）
+        invited = False
+        for path, body in (
+            (f"/projects/{urllib.parse.quote(pid)}/invitations", {"email": invite_email}),
+            (
+                f"/projects/{urllib.parse.quote(pid)}/collaborators",
+                {"email": invite_email},
+            ),
+        ):
+            data = json.dumps(body).encode("utf-8")
+            req = urllib.request.Request(
+                f"{_api_base(cfg)}{path}",
+                data=data,
+                headers={
+                    "Authorization": f"Bearer {owner}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=45) as resp:
+                    _ = resp.read()
+                print(f"# invited {invite_email} via {path}")
+                invited = True
+                break
+            except urllib.error.HTTPError as e:
+                _ = e.read()
+                continue
+        if not invited:
+            sync_body = urllib.parse.urlencode(
+                {
+                    "commands": json.dumps(
+                        [
+                            {
+                                "type": "share_project",
+                                "uuid": str(uuid.uuid4()),
+                                "args": {"project_id": pid, "email": invite_email},
+                            }
+                        ]
+                    )
+                }
+            ).encode()
+            req = urllib.request.Request(
+                "https://api.todoist.com/api/v1/sync",
+                data=sync_body,
+                headers={
+                    "Authorization": f"Bearer {owner}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=45) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")[:400]
+                print(f"# sync share_project attempted: {raw[:120]}")
+                invited = True
+            except urllib.error.HTTPError as e:
+                err = e.read().decode("utf-8", errors="replace")[:300]
+                print(
+                    f"# WARN: 自動招待失敗（UI で Jarvis を編集可招待）: HTTP {e.code} {err}",
+                    file=sys.stderr,
+                )
+        if not invited:
+            print(
+                "# WARN: Jarvis への招待は UI で実施してください（編集可）",
+                file=sys.stderr,
+            )
+
+    if write and pid:
+        cfg.setdefault("inbox", {})
+        if not isinstance(cfg["inbox"], dict):
+            cfg["inbox"] = {}
+        cfg["inbox"]["name"] = name
+        cfg["inbox"]["project_id"] = pid
+        cfg["inbox"]["view_style"] = view_style
+        _save_yaml(cfg)
+        print(f"# wrote inbox.project_id={pid} → {YAML_PATH}")
     return 0
 
 
@@ -376,24 +605,46 @@ def _validate_properties_labels(cfg: dict[str, Any], labels: list[str]) -> None:
 
 def cmd_create_task(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
-    lane = _lane(cfg, args.lane)
-    proj = _project_for_lane(cfg, lane)
-    section = args.status or lane.get("initial_section") or "未着手"
-    sid = _section_id(proj, section)
-    labels = [str(lane.get("lane_label") or args.lane)]
-    if args.label:
-        labels.extend([x.strip() for x in args.label.split(",") if x.strip()])
+    lane_id = (args.lane or "").strip()
+    use_inbox = _is_inbox_lane(lane_id)
+    if use_inbox:
+        proj = _inbox_project(cfg)
+        section = (args.status or "").strip() or None
+        sid = None
+        if section:
+            ids = proj.get("section_ids") or {}
+            sid = str(ids.get(section) or "").strip() or None
+            if section and not sid:
+                print(
+                    f"ERROR: inbox に section_id 未設定: {section}（list の受信箱なら --status 不要）",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+        labels: list[str] = []
+        if args.label:
+            labels.extend([x.strip() for x in args.label.split(",") if x.strip()])
+        lane_label = "inbox"
+    else:
+        lane = _lane(cfg, lane_id)
+        proj = _project_for_lane(cfg, lane)
+        section = args.status or lane.get("initial_section") or "未着手"
+        sid = _section_id(proj, section)
+        labels = [str(lane.get("lane_label") or lane_id)]
+        if args.label:
+            labels.extend([x.strip() for x in args.label.split(",") if x.strip()])
+        lane_label = lane_id
+        if lane_id == "properties":
+            _validate_properties_labels(cfg, labels)
     # 重複除去（順序維持）
     seen: set[str] = set()
     labels = [x for x in labels if not (x in seen or seen.add(x))]
-    if args.lane == "properties":
-        _validate_properties_labels(cfg, labels)
     body: dict[str, Any] = {
         "content": args.title.strip(),
         "project_id": proj["project_id"],
-        "section_id": sid,
         "labels": labels,
     }
+    if sid:
+        body["section_id"] = sid
     if args.due:
         body["due_string"] = args.due
     if args.note:
@@ -408,7 +659,12 @@ def cmd_create_task(args: argparse.Namespace) -> int:
             {"task_id": tid, "content": _comment_body(args.comment)},
             cfg=cfg,
         )
-    if section == "HOLD" and tid and not getattr(args, "no_hold_stamp", False):
+    if (
+        not use_inbox
+        and section == "HOLD"
+        and tid
+        and not getattr(args, "no_hold_stamp", False)
+    ):
         since = _stamp_hold(str(tid), cfg=cfg)
         due = since + timedelta(days=HOLD_REVIEW_DAYS)
         if not args.json:
@@ -419,8 +675,9 @@ def cmd_create_task(args: argparse.Namespace) -> int:
                 {
                     "ok": True,
                     "id": tid,
-                    "lane": args.lane,
+                    "lane": lane_label,
                     "section": section,
+                    "project_id": proj["project_id"],
                     "url": url,
                     "commented": bool(args.comment),
                 },
@@ -428,7 +685,7 @@ def cmd_create_task(args: argparse.Namespace) -> int:
             )
         )
     else:
-        print(f"created id={tid} lane={args.lane} section={section}")
+        print(f"created id={tid} lane={lane_label} section={section or '-'}")
         if args.url and url:
             print(f"url={url}")
         if args.comment:
@@ -877,6 +1134,7 @@ def cmd_seed_nokori(args: argparse.Namespace) -> int:
             url=False,
             comment="",
             json=False,
+            no_hold_stamp=False,
         )
         cmd_create_task(ns)
     return 0
@@ -897,15 +1155,29 @@ def main() -> int:
         help="プロジェクト/セクション作成し YAML に ID を書く",
     )
 
+    bi = sub.add_parser(
+        "bootstrap-inbox",
+        help="admin(OWNER)で共有『受信箱』を用意し YAML の inbox.project_id を書く",
+    )
+    bi.add_argument(
+        "--write-config",
+        action="store_true",
+        help="作成／再利用して config/todoist_projects.yaml に書く",
+    )
+
     lane_p = sub.add_parser("lane")
     lane_p.add_argument("--id", required=True)
 
     c = sub.add_parser("create-task")
-    c.add_argument("--lane", required=True)
+    c.add_argument(
+        "--lane",
+        default="",
+        help="レーン id。省略または inbox なら共有『受信箱』（inbox.project_id）",
+    )
     c.add_argument("--title", required=True)
     c.add_argument("--note", default="")
     c.add_argument("--due", default=None)
-    c.add_argument("--status", default=None, help="セクション名（既定: 未着手）")
+    c.add_argument("--status", default=None, help="セクション名（既定: 未着手。inbox は不要）")
     c.add_argument("--label", default="", help="追加ラベル（カンマ区切り）")
     c.add_argument("--url", action="store_true")
     c.add_argument(
@@ -970,6 +1242,7 @@ def main() -> int:
         "whoami": cmd_whoami,
         "probe": cmd_probe,
         "bootstrap": cmd_bootstrap,
+        "bootstrap-inbox": cmd_bootstrap_inbox,
         "lane": cmd_lane,
         "create-task": cmd_create_task,
         "update-status": cmd_update_status,

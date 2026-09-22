@@ -7,6 +7,7 @@ alwaysApply: true
 
 タスク正本は **Todoist**（API 本線は **Jarvis 分身**／松野は admin UI）。`JARVIS_TASK_BACKEND=todoist`。  
 コメント・起票・列移動の見た目は Jarvis アイコン（`TODOIST_API_TOKEN`）。admin は `TODOIST_API_TOKEN_OWNER` に退避・常用しない。  
+**レーン未指定の起票**は共有『受信箱』（`config/todoist_projects.yaml` の `inbox.project_id`）。Jarvis 分身のシステム Inbox は松野 UI に見えないので使わない。  
 Notion タスク看板は戻し用。purchase_pre 等は従来どおり Notion。
 
 ## 完了フロー（確定・最初は二段）
