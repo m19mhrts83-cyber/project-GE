@@ -38,6 +38,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/quiet-edge/health/ingest") {
     return NextResponse.next({ request });
   }
+  // Todoist App Webhook（HMAC で保護。ログイン不要）
+  if (path === "/api/todoist/webhook") {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();
