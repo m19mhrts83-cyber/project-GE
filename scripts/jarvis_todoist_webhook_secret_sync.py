@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""TODOIST_APP_CLIENT_SECRET を Vercel（jarvis-dashboard）へ投影する。
+"""TODOIST_APP_CLIENT_SECRET / CLIENT_ID を Vercel（jarvis-dashboard）へ投影する。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_webhook_secret_sync.py
 
-値は標準出力に出さない。App Console で client_secret を
-.env.jarvis_private の TODOIST_APP_CLIENT_SECRET に保存したあと実行。
+値は標準出力に出さない。App Console の client_id / client_secret を
+.env.jarvis_private に保存したあと実行。
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 LOG = "📎 Todoist Webhook secret → Vercel"
-KEY = "TODOIST_APP_CLIENT_SECRET"
+KEYS = ("TODOIST_APP_CLIENT_SECRET", "TODOIST_APP_CLIENT_ID")
 
 
 def _project_ids() -> tuple[str, str]:
@@ -41,21 +41,14 @@ def _project_ids() -> tuple[str, str]:
     return project, team
 
 
-def main() -> int:
-    secret = (os.environ.get(KEY) or "").strip()
-    token = (os.environ.get("VERCEL_TOKEN") or "").strip()
-    if not secret:
-        print(f"{LOG}: FAIL {KEY} が空です（.env.jarvis_private に追記してから再実行）", file=sys.stderr)
-        return 2
-    if not token:
-        print(f"{LOG}: FAIL VERCEL_TOKEN 未設定", file=sys.stderr)
-        return 2
-
-    project_id, team_id = _project_ids()
-    if not project_id:
-        print(f"{LOG}: FAIL projectId 不明", file=sys.stderr)
-        return 2
-
+def _upsert_env(
+    *,
+    project_id: str,
+    team_id: str,
+    token: str,
+    key: str,
+    value: str,
+) -> None:
     qs = f"?teamId={team_id}" if team_id else ""
     headers = {
         "Authorization": f"Bearer {token}",
@@ -69,12 +62,12 @@ def main() -> int:
         with urllib.request.urlopen(req, timeout=60) as resp:
             body = json.loads(resp.read().decode("utf-8"))
         for env in body.get("envs") or []:
-            if env.get("key") == KEY:
+            if env.get("key") == key:
                 eid = env.get("id")
                 if eid:
                     existing_ids.append(str(eid))
     except Exception as e:  # noqa: BLE001
-        print(f"{LOG}: env list 警告 {type(e).__name__}", file=sys.stderr)
+        print(f"{LOG}: env list 警告 {key} {type(e).__name__}", file=sys.stderr)
 
     for eid in existing_ids:
         del_url = f"https://api.vercel.com/v9/projects/{project_id}/env/{eid}{qs}"
@@ -83,33 +76,65 @@ def main() -> int:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 resp.read()
         except Exception as e:  # noqa: BLE001
-            print(f"{LOG}: env delete 警告 {type(e).__name__}", file=sys.stderr)
+            print(f"{LOG}: env delete 警告 {key} {type(e).__name__}", file=sys.stderr)
 
     create_url = f"https://api.vercel.com/v10/projects/{project_id}/env{qs}"
     payload = json.dumps(
         {
-            "key": KEY,
-            "value": secret,
+            "key": key,
+            "value": value,
             "type": "sensitive",
             "target": ["production", "preview"],
         }
     ).encode("utf-8")
-    try:
-        req = urllib.request.Request(
-            create_url, data=payload, headers=headers, method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            resp.read()
-    except urllib.error.HTTPError as e:
-        err = e.read().decode("utf-8", "replace")[:300]
-        print(f"{LOG}: FAIL HTTP {e.code}: {err}", file=sys.stderr)
-        return 1
-    except Exception as e:  # noqa: BLE001
-        print(f"{LOG}: FAIL {type(e).__name__}", file=sys.stderr)
-        return 1
+    req = urllib.request.Request(
+        create_url, data=payload, headers=headers, method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        resp.read()
 
-    print(f"{LOG}: OK jarvis-dashboard production+preview（値は非表示）")
-    print("次: Vercel 再デプロイ待ち → curl GET /api/todoist/webhook で secret_configured:true")
+
+def main() -> int:
+    token = (os.environ.get("VERCEL_TOKEN") or "").strip()
+    if not token:
+        print(f"{LOG}: FAIL VERCEL_TOKEN 未設定", file=sys.stderr)
+        return 2
+
+    values: dict[str, str] = {}
+    for key in KEYS:
+        v = (os.environ.get(key) or "").strip()
+        if not v:
+            print(
+                f"{LOG}: FAIL {key} が空です（.env.jarvis_private に追記してから再実行）",
+                file=sys.stderr,
+            )
+            return 2
+        values[key] = v
+
+    project_id, team_id = _project_ids()
+    if not project_id:
+        print(f"{LOG}: FAIL projectId 不明", file=sys.stderr)
+        return 2
+
+    for key, value in values.items():
+        try:
+            _upsert_env(
+                project_id=project_id,
+                team_id=team_id,
+                token=token,
+                key=key,
+                value=value,
+            )
+        except urllib.error.HTTPError as e:
+            err = e.read().decode("utf-8", "replace")[:300]
+            print(f"{LOG}: FAIL {key} HTTP {e.code}: {err}", file=sys.stderr)
+            return 1
+        except Exception as e:  # noqa: BLE001
+            print(f"{LOG}: FAIL {key} {type(e).__name__}", file=sys.stderr)
+            return 1
+
+    print(f"{LOG}: OK jarvis-dashboard production+preview（CLIENT_ID+SECRET・値は非表示）")
+    print("次: デプロイ反映 → OAuth 再承認（トークン交換で Webhook 有効化）")
     return 0
 
 
