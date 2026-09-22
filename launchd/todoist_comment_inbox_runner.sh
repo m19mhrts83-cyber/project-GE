@@ -25,7 +25,7 @@ fi
 
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
-  OUT="$("$PY" "${REPO_DIR}/scripts/jarvis_todoist_comment_inbox.py" "${ARGS[@]+"${ARGS[@]}"}" 2>&1)" || true
+  OUT="$("$PY" "${REPO_DIR}/scripts/jarvis_todoist_comment_inbox.py" "${ARGS[@]}" 2>&1)" || true
   echo "$OUT"
   # 新規なしのときは短いログだけ残す（肥大化防止）
   if echo "$OUT" | grep -q '新規なし'; then
