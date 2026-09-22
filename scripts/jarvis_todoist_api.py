@@ -20,13 +20,17 @@ Todoist REST API（Jarvis タスク正本・試験導入）。
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py seed-nokori --apply
 
 正本トークン: .env.jarvis_private の TODOIST_API_TOKEN（**Jarvis 分身**本線）
-admin 退避: TODOIST_API_TOKEN_OWNER（常用しない。松野は UI のみ／bootstrap-inbox のみ）
+admin 退避: TODOIST_API_TOKEN_OWNER（常用しない。松野は UI のみ／bootstrap-inbox・filter-* のみ）
 メール: JARVIS_TODOIST_EMAIL（例: jarvis.livingsupport.matsu@gmail.com）
 設定: config/todoist_projects.yaml（inbox.project_id＝共有「受信箱」。分身のシステム Inbox は使わない）
 値は標準出力に出さない。
 
 HOLD: update-status HOLD でコメント「HOLD since: YYYY-MM-DD」＋ due+30日。
 1ヶ月レビューは hold-review / jarvis_todoist_hold_review.py。
+
+Filter（マイフィルター・admin UI）:
+  filter-list / filter-add / filter-update / filter-delete
+  REST 不可 → Sync filter_*。既定は OWNER（松野のマイフィルター）。
 """
 from __future__ import annotations
 
@@ -1105,6 +1109,165 @@ def _parse_nokori_open() -> list[dict[str, str]]:
     return items
 
 
+def _sync_owner(
+    *,
+    commands: list[dict[str, Any]] | None = None,
+    resource_types: list[str] | None = None,
+) -> dict[str, Any]:
+    """admin OWNER で Sync（マイフィルター操作用）。"""
+    body: dict[str, str] = {"sync_token": "*"}
+    if resource_types is not None:
+        body["resource_types"] = json.dumps(resource_types)
+    if commands is not None:
+        body["commands"] = json.dumps(commands)
+    form = urllib.parse.urlencode(body).encode("utf-8")
+    url = f"{_api_base()}/sync"
+    headers = {
+        "Authorization": f"Bearer {_owner_token()}",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    req = urllib.request.Request(url, data=form, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")[:800]
+        print(f"ERROR: HTTP {e.code} sync: {err_body}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _filters_active(data: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    d = data if data is not None else _sync_owner(resource_types=["filters"])
+    out: list[dict[str, Any]] = []
+    for f in d.get("filters") or []:
+        if not isinstance(f, dict):
+            continue
+        if f.get("is_deleted"):
+            continue
+        out.append(f)
+    out.sort(key=lambda x: str(x.get("name") or ""))
+    return out
+
+
+def cmd_filter_list(args: argparse.Namespace) -> int:
+    filters = _filters_active()
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "id": f.get("id"),
+                        "name": f.get("name"),
+                        "query": f.get("query"),
+                    }
+                    for f in filters
+                ],
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+    print(f"filters={len(filters)} (admin マイフィルター)")
+    for f in filters:
+        print(f"  {f.get('id')}  {f.get('name')}  |  {f.get('query')}")
+    return 0
+
+
+def cmd_filter_add(args: argparse.Namespace) -> int:
+    name = (args.name or "").strip()
+    query = (args.query or "").strip()
+    if not name or not query:
+        print("ERROR: --name と --query が必要です", file=sys.stderr)
+        return 2
+    existing = {str(f.get("name")): f for f in _filters_active()}
+    if name in existing and not args.force:
+        print(
+            f"ERROR: 同名あり id={existing[name].get('id')}。"
+            "上書きは filter-update、強制追加は --force",
+            file=sys.stderr,
+        )
+        return 1
+    temp_id = str(uuid.uuid4())
+    cmd_uuid = str(uuid.uuid4())
+    cmd: dict[str, Any] = {
+        "type": "filter_add",
+        "temp_id": temp_id,
+        "uuid": cmd_uuid,
+        "args": {
+            "name": name,
+            "query": query,
+            "item_order": int(args.order or 50),
+            "is_favorite": bool(args.favorite),
+        },
+    }
+    if args.color:
+        cmd["args"]["color"] = str(args.color)
+    if args.dry_run:
+        print(f"dry-run filter-add name={name!r} query={query!r}")
+        return 0
+    data = _sync_owner(commands=[cmd], resource_types=["filters"])
+    status = (data.get("sync_status") or {}).get(cmd_uuid)
+    if status != "ok":
+        print(f"ERROR: filter_add failed: {status}", file=sys.stderr)
+        return 1
+    new_id = (data.get("temp_id_mapping") or {}).get(temp_id)
+    print(f"created id={new_id} name={name} query={query}")
+    return 0
+
+
+def cmd_filter_update(args: argparse.Namespace) -> int:
+    fid = (args.filter_id or "").strip()
+    if not fid:
+        print("ERROR: --filter-id が必要です", file=sys.stderr)
+        return 2
+    args_body: dict[str, Any] = {"id": fid}
+    if args.name:
+        args_body["name"] = args.name.strip()
+    if args.query:
+        args_body["query"] = args.query.strip()
+    if args.favorite is not None:
+        args_body["is_favorite"] = bool(args.favorite)
+    if len(args_body) == 1:
+        print("ERROR: --name / --query / --favorite のいずれかを指定", file=sys.stderr)
+        return 2
+    cmd_uuid = str(uuid.uuid4())
+    cmd = {"type": "filter_update", "uuid": cmd_uuid, "args": args_body}
+    if args.dry_run:
+        print(f"dry-run filter-update {args_body}")
+        return 0
+    data = _sync_owner(commands=[cmd], resource_types=["filters"])
+    status = (data.get("sync_status") or {}).get(cmd_uuid)
+    if status != "ok":
+        print(f"ERROR: filter_update failed: {status}", file=sys.stderr)
+        return 1
+    print(f"updated id={fid}")
+    return 0
+
+
+def cmd_filter_delete(args: argparse.Namespace) -> int:
+    fid = (args.filter_id or "").strip()
+    if not fid:
+        print("ERROR: --filter-id が必要です", file=sys.stderr)
+        return 2
+    cmd_uuid = str(uuid.uuid4())
+    cmd = {
+        "type": "filter_delete",
+        "uuid": cmd_uuid,
+        "args": {"id": fid},
+    }
+    if args.dry_run:
+        print(f"dry-run filter-delete id={fid}")
+        return 0
+    data = _sync_owner(commands=[cmd], resource_types=["filters"])
+    status = (data.get("sync_status") or {}).get(cmd_uuid)
+    if status != "ok":
+        print(f"ERROR: filter_delete failed: {status}", file=sys.stderr)
+        return 1
+    print(f"deleted id={fid}")
+    return 0
+
+
 def cmd_seed_nokori(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     items = _parse_nokori_open()
@@ -1237,6 +1400,46 @@ def main() -> int:
     seed.add_argument("--lane", default="ai_raimo")
     seed.add_argument("--include-parked", action="store_true")
 
+    fl = sub.add_parser(
+        "filter-list",
+        help="admin マイフィルター一覧（Sync）",
+    )
+    fl.add_argument("--json", action="store_true")
+
+    fa = sub.add_parser(
+        "filter-add",
+        help="admin マイフィルター追加（Sync filter_add）",
+    )
+    fa.add_argument("--name", required=True)
+    fa.add_argument("--query", required=True)
+    fa.add_argument("--color", default="")
+    fa.add_argument("--order", type=int, default=50)
+    fa.add_argument("--favorite", action="store_true")
+    fa.add_argument("--force", action="store_true", help="同名があっても追加")
+    fa.add_argument("--dry-run", action="store_true")
+
+    fu = sub.add_parser(
+        "filter-update",
+        help="admin マイフィルター更新（Sync filter_update）",
+    )
+    fu.add_argument("--filter-id", required=True)
+    fu.add_argument("--name", default="")
+    fu.add_argument("--query", default="")
+    fu.add_argument(
+        "--favorite",
+        type=lambda s: str(s).lower() in ("1", "true", "yes"),
+        default=None,
+        help="true/false",
+    )
+    fu.add_argument("--dry-run", action="store_true")
+
+    fd = sub.add_parser(
+        "filter-delete",
+        help="admin マイフィルター削除（Sync filter_delete）",
+    )
+    fd.add_argument("--filter-id", required=True)
+    fd.add_argument("--dry-run", action="store_true")
+
     args = p.parse_args()
     dispatch = {
         "whoami": cmd_whoami,
@@ -1252,6 +1455,10 @@ def main() -> int:
         "comment": cmd_comment,
         "complete-task": cmd_complete_task,
         "seed-nokori": cmd_seed_nokori,
+        "filter-list": cmd_filter_list,
+        "filter-add": cmd_filter_add,
+        "filter-update": cmd_filter_update,
+        "filter-delete": cmd_filter_delete,
     }
     return dispatch[args.cmd](args)
 
