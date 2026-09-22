@@ -1,23 +1,19 @@
 version: 1
-# layout: pro_normalized = phase1b（2026-09-22）1レーン1PJ。Beginner圧縮からの分割済。
-# Filter: チーム「リビングサポート松」は3/3固定。追加はマイフィルター（Pro）。
-# レシピ: .jarvis_state/todoist_pro_filters_recipe.md
-# ロールバック: .jarvis_state/todoist_projects.yaml.rollback_before_phase1b_20260922
 layout: pro_normalized
 api_base: https://api.todoist.com/api/v1
 complete_phrase: タスク完了したよ
-# 既定 Inbox（共有PJ）。Jarvis 分身のシステム Inbox は松野 UI に見えない。
-# --lane 省略 / --lane inbox のときここへ起票。bootstrap-inbox（OWNER）で作成可。
-# 上書き: 環境変数 TODOIST_INBOX_PROJECT_ID
 inbox:
   name: 受信箱
-  project_id: ''
+  project_id: 6hc2j6cwMP9gjJ28
   view_style: list
   invite_email_env: JARVIS_TODOIST_EMAIL
-  note: |
-    admin が所有・Jarvis 編集可で共有するキャッチオール。
-    Jarvis 分身は Free のため PJ 枠が満杯なら、先に参加PJを1つ外すか Jarvis を Pro にする。
-# Board列: 未着手 / 進行中 / 相手待ち / HOLD / オーナー確認（完了列なし）
+  note: 'admin が所有・Jarvis 編集可で共有するキャッチオール。
+
+    Jarvis 分身は Free。枠満杯なら低優先PJを外して入れ替え（第2メアドは作らない）。
+
+    気づき本線は Webhook／API。入れ替え頻発なら次段は Jarvis Pro。
+
+    '
 default_sections:
 - 未着手
 - 進行中
@@ -267,7 +263,6 @@ pm_labels:
 pm_share:
   email_forward_to_partner: false
   footer_max_tasks: 5
-  # Guest 共有PJは admin アカウント上（TODOIST_API_TOKEN_OWNER）。所有物件は非共有。
   companies:
     ミニテック:
       folder: 102_ミニテック
@@ -280,7 +275,7 @@ pm_share:
       pilot: true
       guest_project_key: PM_ホームプランナー
       guest_project_url: https://app.todoist.com/app/project/6hc28xj8wcC4X442
-      project_id: '6hc28xj8wcC4X442'
+      project_id: 6hc28xj8wcC4X442
     Tcell:
       folder: 103_Tcell
       pilot: false
@@ -292,13 +287,12 @@ pm_share:
       pilot: true
       guest_project_key: PM_LEAF
       guest_project_url: https://app.todoist.com/app/project/6hc28xHhRFvr7P9H
-      project_id: '6hc28xHhRFvr7P9H'
-# Guest 窓口プロジェクト（レーンではない・admin）
+      project_id: 6hc28xHhRFvr7P9H
 pm_guest_projects:
   PM_LEAF:
     name: PM_LEAF
     view_style: board
-    project_id: '6hc28xHhRFvr7P9H'
+    project_id: 6hc28xHhRFvr7P9H
     section_ids:
       未着手: 6hc28xMvVCX7Q9MH
       進行中: 6hc28xPrpMjw82PH
@@ -309,7 +303,7 @@ pm_guest_projects:
   PM_ホームプランナー:
     name: PM_ホームプランナー
     view_style: board
-    project_id: '6hc28xj8wcC4X442'
+    project_id: 6hc28xj8wcC4X442
     section_ids:
       未着手: 6hc28xrwWM5q25XR
       進行中: 6hc28xpj3MGx2jHR
@@ -321,7 +315,6 @@ genmail_propose:
   gmail_account: admin
   inbox_path: .jarvis_state/genmail_action_needed.md
   default_label: quick
-# Phase5b（任意）— 既定オフ。有効化は env / 明示依頼のみ
 integrations:
   webhook:
     enabled: true
