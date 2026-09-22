@@ -22,11 +22,13 @@ Phase5 任意。コメント了承（2026-09-22）どおり **Webhook から実�
 
 1. [Todoist App Console](https://developer.todoist.com/appconsole.html) でアプリ作成（個人用）。
 2. **Webhook URL** に上記 Production URL を登録。購読イベント例: `item:completed`, `note:added`, `item:updated`（必要に応じて追加）。
-3. **client_secret** を `.env.jarvis_private` の `TODOIST_APP_CLIENT_SECRET` に保存（チャット禁止）。
+3. **client_id / client_secret** を `.env.jarvis_private` の `TODOIST_APP_CLIENT_ID` / `TODOIST_APP_CLIENT_SECRET` に保存（チャット禁止）。
 4. Jarvis: `scripts/jarvis_todoist_webhook_secret_sync.py` で Vercel へ投影 → Production 再デプロイ。
-5. **OAuth**: リダイレクト URI は **パス付き**（ルート `/` は Console で無効になることがある）  
+5. **OAuth（必須・トークン交換まで）**: リダイレクト URI は **パス付き**  
    `https://jarvis-dashboard-amber.vercel.app/api/todoist/oauth/callback`  
-   承認URL例: `https://app.todoist.com/oauth/authorize?client_id=…&scope=data:read_write&state=jarvis1&response_type=code&redirect_uri=（上記をURLエンコード）`
+   コールバックは `code` → `access_token` 交換まで行う（交換しないと Webhook はユーザーに届かない）。  
+   承認URL例: `https://app.todoist.com/oauth/authorize?client_id=…&scope=data:read_write&state=jarvis1&response_type=code&redirect_uri=（上記をURLエンコード）`  
+   画面に「承認完了」と出たら OK（トークンは表示しない・API 本線は既存 `TODOIST_API_TOKEN`）。
 6. DB: `apps/jarvis-dashboard/supabase/migrations/20260922_todoist_webhook_events.sql` を jarvis-dashboard PJ に適用済みであること。
 7. 疎通: `curl -sS https://jarvis-dashboard-amber.vercel.app/api/todoist/webhook` → `secret_configured: true`（ミドルウェア除外済）。
 8. Todoist でテスト完了／コメント → Supabase `todoist_webhook_events` に行が増えること。
