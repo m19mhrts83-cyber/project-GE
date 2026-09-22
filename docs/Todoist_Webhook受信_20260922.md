@@ -24,7 +24,9 @@ Phase5 任意。コメント了承（2026-09-22）どおり **Webhook から実�
 2. **Webhook URL** に上記 Production URL を登録。購読イベント例: `item:completed`, `note:added`, `item:updated`（必要に応じて追加）。
 3. **client_secret** を `.env.jarvis_private` の `TODOIST_APP_CLIENT_SECRET` に保存（チャット禁止）。
 4. Jarvis: `scripts/jarvis_todoist_webhook_secret_sync.py` で Vercel へ投影 → Production 再デプロイ。
-5. **OAuth**: 個人 Webhook はユーザーがアプリを authorize する必要あり（Console の手順どおり。redirect URI は Console 設定に合わせる）。
+5. **OAuth**: リダイレクト URI は **パス付き**（ルート `/` は Console で無効になることがある）  
+   `https://jarvis-dashboard-amber.vercel.app/api/todoist/oauth/callback`  
+   承認URL例: `https://app.todoist.com/oauth/authorize?client_id=…&scope=data:read_write&state=jarvis1&response_type=code&redirect_uri=（上記をURLエンコード）`
 6. DB: `apps/jarvis-dashboard/supabase/migrations/20260922_todoist_webhook_events.sql` を jarvis-dashboard PJ に適用済みであること。
 7. 疎通: `curl -sS https://jarvis-dashboard-amber.vercel.app/api/todoist/webhook` → `secret_configured: true`（ミドルウェア除外済）。
 8. Todoist でテスト完了／コメント → Supabase `todoist_webhook_events` に行が増えること。
