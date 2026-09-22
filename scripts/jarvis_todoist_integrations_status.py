@@ -33,9 +33,11 @@ def main() -> int:
     lines = [
         "📎 Todoist 任意連携（Phase5b）",
         f"- webhook: {'ON' if wh.get('enabled') else 'OFF（既定）'} — {wh.get('note') or ''}",
-        f"- calendar_sync: {'ON' if cal.get('enabled') else 'OFF（既定）'} — {cal.get('note') or ''}",
-        "- 予定正本は admin Googleカレンダー。Todoist Calendar レイアウトは UI 確認済。",
-        "- Webhook を使うときは Todoist App Console 登録＋本 yaml の enabled: true。",
+        f"- calendar_sync: {'ON' if cal.get('enabled') else 'OFF'} — {cal.get('note') or ''}",
+        "- 予定正本は admin Googleカレンダー。Todoist は due+@cal の片方向同期のみ。",
+        "- 同期: scripts/jarvis_todoist_calendar_sync.py（--dry-run / --apply）",
+        "- 手順: docs/Todoist_Calendar同期_20260922.md",
+        "- Webhook: Todoist App Console 登録＋ yaml integrations.webhook.enabled。",
     ]
     text = "\n".join(lines)
     if args.json:

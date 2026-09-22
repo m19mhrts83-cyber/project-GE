@@ -43,6 +43,7 @@ labels:
 - ホームプランナー
 - Tcell
 - LEAF
+- cal
 lanes:
   properties:
     title: 所有物件
@@ -321,6 +322,8 @@ integrations:
     endpoint: https://jarvis-dashboard-amber.vercel.app/api/todoist/webhook
     note: App Console「Jarvis Webhook」登録済。HMAC=TODOIST_APP_CLIENT_SECRET。手順 docs/Todoist_Webhook受信_20260922.md
   calendar_sync:
-    enabled: false
-    note: due+%cal のみ外部同期候補。予定正本は admin Googleカレンダー（Webhook完了後）
+    enabled: true
+    note: due+@cal のみ admin Googleカレンダーへ片方向同期。正本は GC。手順 docs/Todoist_Calendar同期_20260922.md
     due_label: cal
+    default_duration_minutes: 60
+    calendar_id: primary
