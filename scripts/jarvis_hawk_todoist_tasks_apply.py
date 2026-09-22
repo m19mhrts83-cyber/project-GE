@@ -248,10 +248,10 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
 
     for item in _parse_items(sections.get("create") or ""):
-        lane = (item.get("lane") or "").strip()
+        lane = (item.get("lane") or "").strip() or "inbox"
         title = (item.get("title") or "").strip()
-        if not lane or not title:
-            results.append({"op": "create", "ok": False, "error": "lane/title required", "item": item})
+        if not title:
+            results.append({"op": "create", "ok": False, "error": "title required", "item": item})
             continue
         args = ["create-task", "--lane", lane, "--title", title, "--url", "--json"]
         if item.get("due"):

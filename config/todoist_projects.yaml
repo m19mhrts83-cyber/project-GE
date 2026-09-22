@@ -6,6 +6,17 @@ version: 1
 layout: pro_normalized
 api_base: https://api.todoist.com/api/v1
 complete_phrase: タスク完了したよ
+# 既定 Inbox（共有PJ）。Jarvis 分身のシステム Inbox は松野 UI に見えない。
+# --lane 省略 / --lane inbox のときここへ起票。bootstrap-inbox（OWNER）で作成可。
+# 上書き: 環境変数 TODOIST_INBOX_PROJECT_ID
+inbox:
+  name: 受信箱
+  project_id: ''
+  view_style: list
+  invite_email_env: JARVIS_TODOIST_EMAIL
+  note: |
+    admin が所有・Jarvis 編集可で共有するキャッチオール。
+    Jarvis 分身は Free のため PJ 枠が満杯なら、先に参加PJを1つ外すか Jarvis を Pro にする。
 # Board列: 未着手 / 進行中 / 相手待ち / HOLD / オーナー確認（完了列なし）
 default_sections:
 - 未着手
