@@ -7,7 +7,23 @@ Phase5 任意。コメント了承（2026-09-22）どおり **Webhook から実�
 | 段階 | 内容 |
 |---|---|
 | **受信** | Todoist のイベント（完了・コメント・更新等）を HTTPS で受け、HMAC 検証後に `todoist_webhook_events` へ保存 |
-| **未実装** | 受信後の自動処置（相手完了→オーナー確認等）。いまは会話駆動 CLI が本線 |
+| **コメント拾い（半自動）** | `scripts/jarvis_todoist_webhook_handle.py` が未処理 `note:added`（人投稿）を列挙。`--reply` で Todoist 返信＋`processed_at` |
+| **未実装** | 受信→処置の完全自動（相手完了→オーナー確認等）。Cursor チャットへのプッシュ通知（エージェント起床が必要） |
+
+### Cursor／チャット即時の使い方
+
+Webhook だけでは Cursor は起きない。次のどちらか:
+
+1. **会話中**: 「書いた」→ Jarvis が `jarvis_todoist_webhook_handle.py` を実行 → チャット要約＋必要なら `--reply`
+2. **セッション監視**: `/loop` で数十秒おきに同スクリプトを回す（そのセッション限定）
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_webhook_handle.py
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_webhook_handle.py --reply
+```
+
+入口: `todoist_webhook_events` · 確認: Todoist 返信は分身トークン · 履歴: コメント＋`processed_at` · 停止: `JARVIS_TODOIST_WEBHOOK_HANDLE_DISABLE=1`
 
 ## エンドポイント
 

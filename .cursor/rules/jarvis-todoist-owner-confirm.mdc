@@ -143,6 +143,7 @@ inbox の `summary` / `links` は `jarvis_hawk_todoist_tasks_apply.py` がコメ
 ホーク判断が欲しければラベル **`要ホーク`** を付ける（Drive が空でもラベル検索可）。Beginner の専用 Filter 枠は **SecondBrain 優先**のため、要ホーク Filter は **Pro 以降**（空の Jarvisボックスは正常）。
 
 - **コメント巡回**: **本線は jarvis@ の Todoist 未読通知メール**（対応後に既読）。**API 巡回は保険**（`scripts/jarvis_todoist_comment_inbox.py`）。パートナー確認・会話のついでに実行してよい。
+- **Webhook コメント即時（半自動）**: ユーザーが「書いた」等と言ったら `scripts/jarvis_todoist_webhook_handle.py` を実行し、チャットに要約。必要なら `--reply` で Todoist 返信。手順: `docs/Todoist_Webhook受信_20260922.md`
 
 参照先全体: `jarvis-reference-sources.mdc`
 
