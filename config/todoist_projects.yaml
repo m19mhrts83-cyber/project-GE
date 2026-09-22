@@ -1,10 +1,12 @@
 version: 1
-layout: beginner_compressed
+# layout: pro_normalized = phase1b（2026-09-22）1レーン1PJ。Beginner圧縮からの分割済。
+# Filter: チーム「リビングサポート松」は3/3固定。追加はマイフィルター（Pro）。
+# レシピ: .jarvis_state/todoist_pro_filters_recipe.md
+# ロールバック: .jarvis_state/todoist_projects.yaml.rollback_before_phase1b_20260922
+layout: pro_normalized
 api_base: https://api.todoist.com/api/v1
 complete_phrase: タスク完了したよ
-# Board列: 未着手 / 進行中 / 相手待ち / HOLD / オーナー確認
-# 「完了」列は使わない（2026-09-21）。終わったらチェック完了（complete-task）で閉じる
-# HOLD = 一時保留（再開待ち）。オーナー確認 = 完了候補（了承後 close）
+# Board列: 未着手 / 進行中 / 相手待ち / HOLD / オーナー確認（完了列なし）
 default_sections:
 - 未着手
 - 進行中
@@ -34,23 +36,6 @@ labels:
 - ホームプランナー
 - Tcell
 - LEAF
-# --- 所有物件・区分（2026-09-21 訂正）---
-# セクション＝進捗列のまま。物件／管理会社はラベル二軸。号室はタイトルへ。
-# 「LEAF京都」は物件ではない（京都銀行呼称）→ 物件ラベルに使わない
-# GrandoleI: 主=ミニテック。LEAF・Tcell も関与可（ボールの社をPMラベル）
-# GrandoleII: ホームプランナーのみ / キャラメル: Tcellのみ
-# タイトル例: [GrandoleI][ミニテック] 202号 水漏れ手配
-# 起票: create-task --lane properties --label GrandoleI,ミニテック
-# 一覧正本: .jarvis_state/todoist_property_labels.json
-# 詳細: docs/Todoist_タスク正本_設計_20260921.md「所有物件の整理」
-# Filter案内（Todoist UI・Beginner 3枠・2026-09-21入替）:
-#   要連携 = @要Jarvis連携 | @要ボス
-#   SecondBrain = @SecondBrain   ← SB/Genspark 起票の見渡し（旧「要ホーク」枠を入替）
-#   パッと = @quick
-# ※要ホークはラベル運用のまま。専用Filterは Pro で再開可
-# ※日本語「完了」はクエリ非対応。未完了のみはフィルター既定のため !完了 不要
-# ※「ラベル:A | 要ボス」も OR 右側修飾なしで失敗する → @ 記法を使う
-# 朝レビュー順: 要連携 → SecondBrain → パッと → オーナー確認 → その他未着手（HOLDは保留の見直し）
 lanes:
   properties:
     title: 所有物件
@@ -68,8 +53,8 @@ lanes:
     hide_done_on_board: true
   ai_raimo:
     title: AI・Raimo
-    project_key: work_bundle
-    project_id: 6hXX2m7CJVrvmh9j
+    project_key: ai_raimo
+    project_id: 6hXp5cmgjR83Rj6g
     lane_label: ai_raimo
     initial_section: 未着手
     open_sections:
@@ -82,8 +67,8 @@ lanes:
     hide_done_on_board: true
   kamiooya:
     title: 神大家運営
-    project_key: work_bundle
-    project_id: 6hXX2m7CJVrvmh9j
+    project_key: kamiooya
+    project_id: 6hXp5f57rFHGPhV6
     lane_label: kamiooya
     initial_section: 未着手
     open_sections:
@@ -96,8 +81,8 @@ lanes:
     hide_done_on_board: true
   kanji:
     title: 飲み会幹事
-    project_key: work_bundle
-    project_id: 6hXX2m7CJVrvmh9j
+    project_key: kanji
+    project_id: 6hXp5fRGj5Cq4Q5q
     lane_label: kanji
     initial_section: 未着手
     open_sections:
@@ -164,7 +149,7 @@ projects:
   work_bundle:
     name: 業務まとめ
     view_style: board
-    note: ai_raimo / kamiooya / kanji を lane_label で同居（Beginner 圧縮。apps は専用プロジェクトへ分離 2026-09-21）
+    note: '2026-09-22 phase1b: 分割済。空なら archive 可。旧 id 残置。'
     project_id: 6hXX2m7CJVrvmh9j
     section_ids:
       未着手: 6hXX2m9G5vq9gQ3j
@@ -172,6 +157,7 @@ projects:
       相手待ち: 6hXX2mFph4hpV5jC
       HOLD: 6hXmWXmfMfMx62GC
       オーナー確認: 6hXX2mGJJFhV6mgj
+    archived_after_phase1b: true
   apps:
     name: アプリ開発
     view_style: board
@@ -203,13 +189,44 @@ projects:
       相手待ち: 6hXX2mjRc93w6hm3
       HOLD: 6hXmWcRP27rfpVXV
       オーナー確認: 6hXX2mp7RMMcvVgV
-distortions_note: 'Beginner 圧縮の歪みは .jarvis_state/todoist_beginner_distortions.json
-  に追記。apps は 2026-09-21 に専用「アプリ開発」へ分離（5本目）。
+  ai_raimo:
+    name: AI・Raimo
+    view_style: board
+    project_id: 6hXp5cmgjR83Rj6g
+    section_ids:
+      未着手: 6hXp5crCpR7FV5Gg
+      進行中: 6hXp5crRPm5M43C8
+      相手待ち: 6hXp5cwWWjJ6QVG8
+      HOLD: 6hXp5cwX72pFWrX8
+      オーナー確認: 6hXp5cxwr9pRPw28
+    note: phase1b 2026-09-22 業務まとめから分離
+  kamiooya:
+    name: 神大家運営
+    view_style: board
+    project_id: 6hXp5f57rFHGPhV6
+    section_ids:
+      未着手: 6hXp5f972whJ6fX6
+      進行中: 6hXp5f8wQM88Gfgc
+      相手待ち: 6hXp5fCMXj52xFXc
+      HOLD: 6hXp5fFRWrPpgHf6
+      オーナー確認: 6hXp5fHCqG85XjMc
+    note: phase1b 2026-09-22 業務まとめから分離
+  kanji:
+    name: 飲み会幹事
+    view_style: board
+    project_id: 6hXp5fRGj5Cq4Q5q
+    section_ids:
+      未着手: 6hXp5fV3qVVj2phH
+      進行中: 6hXp5fXM4qRvPXfq
+      相手待ち: 6hXp5fVJ77RJjWFH
+      HOLD: 6hXp5ffFq7J3CWVH
+      オーナー確認: 6hXp5ffjVw9fc9fH
+    note: phase1b 2026-09-22 業務まとめから分離
+distortions_note: '歪みログ: .jarvis_state/todoist_beginner_distortions.json（phase1b 完了後も履歴として残置）。
 
-  Pro 移行時に残レーンも 1レーン1プロジェクトへ正規化する。
+  phase1b 2026-09-22: ai_raimo/kamiooya/kanji 専用PJ・layout=pro_normalized。
 
-  '
-# 所有物件レーンの区分（ラベル二軸）。号室はタイトル。Guest用 PM_* とは別レイヤ。
+  phase4 2026-09-22: PM_LEAF / PM_ホームプランナー 作成（Guest招待は松野了承後）。'
 property_labels:
   GrandoleI:
     display: Grandole志賀本通I
@@ -239,24 +256,67 @@ pm_labels:
 pm_share:
   email_forward_to_partner: false
   footer_max_tasks: 5
+  # Guest 共有PJは admin アカウント上（TODOIST_API_TOKEN_OWNER）。所有物件は非共有。
   companies:
     ミニテック:
       folder: 102_ミニテック
       pilot: false
+      guest_project_key: ''
       guest_project_url: ''
+      project_id: ''
     ホームプランナー:
       folder: 101_ホームプランナー
       pilot: true
-      guest_project_url: ''
+      guest_project_key: PM_ホームプランナー
+      guest_project_url: https://app.todoist.com/app/project/6hc28xj8wcC4X442
+      project_id: '6hc28xj8wcC4X442'
     Tcell:
       folder: 103_Tcell
       pilot: false
+      guest_project_key: ''
       guest_project_url: ''
+      project_id: ''
     LEAF:
       folder: 104_LEAF
       pilot: true
-      guest_project_url: ''
+      guest_project_key: PM_LEAF
+      guest_project_url: https://app.todoist.com/app/project/6hc28xHhRFvr7P9H
+      project_id: '6hc28xHhRFvr7P9H'
+# Guest 窓口プロジェクト（レーンではない・admin）
+pm_guest_projects:
+  PM_LEAF:
+    name: PM_LEAF
+    view_style: board
+    project_id: '6hc28xHhRFvr7P9H'
+    section_ids:
+      未着手: 6hc28xMvVCX7Q9MH
+      進行中: 6hc28xPrpMjw82PH
+      相手待ち: 6hc28xVhph7987vH
+      HOLD: 6hc28xV6F29pQcmH
+      オーナー確認: 6hc28xfc5jv4C7VH
+    pilot_pm: LEAF
+  PM_ホームプランナー:
+    name: PM_ホームプランナー
+    view_style: board
+    project_id: '6hc28xj8wcC4X442'
+    section_ids:
+      未着手: 6hc28xrwWM5q25XR
+      進行中: 6hc28xpj3MGx2jHR
+      相手待ち: 6hc28xwxgM7Hhrm2
+      HOLD: 6hc28xvJR7hH26c2
+      オーナー確認: 6hc29237RjVx8q22
+    pilot_pm: ホームプランナー
 genmail_propose:
   gmail_account: admin
   inbox_path: .jarvis_state/genmail_action_needed.md
   default_label: quick
+# Phase5b（任意）— 既定オフ。有効化は env / 明示依頼のみ
+integrations:
+  webhook:
+    enabled: false
+    endpoint: https://jarvis-dashboard-amber.vercel.app/api/todoist/webhook
+    note: 受信ルート実装済。App Console 登録＋TODOIST_APP_CLIENT_SECRET 後に enabled true。手順 docs/Todoist_Webhook受信_20260922.md
+  calendar_sync:
+    enabled: false
+    note: due+%cal のみ外部同期候補。予定正本は admin Googleカレンダー（Webhook完了後）
+    due_label: cal

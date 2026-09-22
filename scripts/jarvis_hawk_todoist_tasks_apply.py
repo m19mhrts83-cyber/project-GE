@@ -61,6 +61,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jarvis_bucho_bridge_lib import folder, list_queue_files  # noqa: E402
 from jarvis_todoist_comment_links import (  # noqa: E402
+    enrich_comment_output_links,
     format_outputs_block,
     split_link_field,
 )
@@ -198,6 +199,7 @@ def _build_comment(
     if text:
         lines.append(text)
     body = "\n".join(lines).strip()
+    body = enrich_comment_output_links(body)
     return body[:1900] if body else ""
 
 

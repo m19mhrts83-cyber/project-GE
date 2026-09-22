@@ -583,3 +583,5 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260907_enable_rls_kurashift_eight_tables.sql）
 -- kurashift_openchat_logs（神大家オプチャ知見・修繕相談ログ）
 -- （migrations/20260908_kurashift_openchat_logs.sql）
+-- todoist_webhook_events（Todoist App Webhook 受信ログ）
+-- （migrations/20260922_todoist_webhook_events.sql）

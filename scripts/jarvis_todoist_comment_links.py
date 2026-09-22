@@ -139,3 +139,69 @@ def split_link_field(raw: str) -> list[str]:
         return []
     parts = re.split(r"\s*\|\s*|\s*;\s*|\n+", raw.strip())
     return [p.strip() for p in parts if p.strip()]
+
+
+_OUT_HDR_RE = re.compile(r"^アウトプット\s*[:：]\s*$")
+_BULLET_RE = re.compile(r"^(\s*[-*]\s+)(.+)$")
+# 「endpoint: https://…」「手順: docs/foo.md」形式
+_LABELED_RE = re.compile(r"^([^:：\n]{1,48})[:：]\s+(\S.+)$")
+
+
+def _enrich_one_output_payload(payload: str) -> str:
+    """1行分のアウトプット本文を Markdown リンク化する。"""
+    p = (payload or "").strip()
+    if not p:
+        return payload
+    # 既に [表示](url) なら正規化のみ
+    if re.match(r"^\[([^\]]+)\]\(([^)]+)\)\s*$", p):
+        return format_markdown_link(p) or p
+
+    labeled = _LABELED_RE.match(p)
+    if labeled:
+        hint, rest = labeled.group(1).strip(), labeled.group(2).strip()
+        # hint がパスっぽいときはラベルではなく本体
+        if "/" in hint or hint.endswith((".md", ".py", ".ts", ".tsx", ".mdc")):
+            return format_markdown_link(p) or p
+        md = format_markdown_link(rest)
+        if not md:
+            return payload
+        if md.startswith("[") and "](" in md:
+            # 表示名を hint に差し替え（URLは維持）
+            href = md[md.rfind("](") + 2 : -1]
+            if href.startswith("http"):
+                return f"[{hint}]({href})"
+            return f"{hint}: {md}"
+        return f"{hint}: {md}"
+
+    return format_markdown_link(p) or p
+
+
+def enrich_comment_output_links(text: str) -> str:
+    """コメント全文のうち「アウトプット:」配下の箇条書きを https リンク化する。
+
+    jarvis_todoist_api comment / create-task / complete-task の入口で使う。
+    未push の相対パスはクリック不可の明示表記（404リンクは作らない）。
+    """
+    if not (text or "").strip():
+        return text
+    lines = text.splitlines()
+    out: list[str] = []
+    in_outputs = False
+    for line in lines:
+        if _OUT_HDR_RE.match(line.strip()):
+            in_outputs = True
+            out.append(line)
+            continue
+        if in_outputs:
+            bm = _BULLET_RE.match(line)
+            if bm:
+                prefix, payload = bm.group(1), bm.group(2)
+                out.append(f"{prefix}{_enrich_one_output_payload(payload)}")
+                continue
+            # 箇条書き以外（空行・次セクション）でアウトプットブロック終了
+            if line.strip() == "":
+                out.append(line)
+                continue
+            in_outputs = False
+        out.append(line)
+    return "\n".join(out)

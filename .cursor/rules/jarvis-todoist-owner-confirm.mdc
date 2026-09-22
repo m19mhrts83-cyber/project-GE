@@ -128,7 +128,9 @@ Jarvis／ホーク／FRIDAY がタスクを **起票・オーナー確認へ移�
 | 秘密・トークン | **禁止** |
 
 相対パスは `scripts/jarvis_todoist_comment_links.py` が GitHub／Pages／ダッシュボードの https に解決する。  
-inbox の `summary` / `links` は `jarvis_hawk_todoist_tasks_apply.py` がコメントへ転記する。
+**CLI 入口**（`jarvis_todoist_api.py` の `comment` / `create-task --comment` / `complete-task`）は投稿直前に `enrich_comment_output_links` で自動リンク化する（平文パスのまま貼らない）。  
+inbox の `summary` / `links` は `jarvis_hawk_todoist_tasks_apply.py` がコメントへ転記する。  
+未push のファイルは GitHub 404 を避けるため **クリック不可の明示表記**（コミット＆push 後に再コメント可）。
 
 ### Jarvis → Drive outbox（書込ゲート）
 

@@ -22,7 +22,7 @@ alwaysApply: true
 3. **Step 3: Guest 共同編集（Phase 4）**  
    協力社だけ `PM_*` 共有プロジェクト（Guest）。完了メモを相手が書いてもよい、と任意で案内。全社一斉はしない。  
    **検証候補**: LEAF / ホームプランナー。**内部の物件区分はラベル二軸が正**（`所有物件` 全体は共有しない）。  
-   **再開条件**: 物件ラベル初版確定済（2026-09-21）。Guest 用 `PM_*` 新規は Beginner プロジェクト枠が満杯のため **Pro または枠空け後**。当面は要約フッター（`jarvis_todoist_pm_status_footer.py`）。**転送メールアドレスは相手に渡さない**。
+   **再開条件**: 物件ラベル初版確定済（2026-09-21）。**Pro 後に `PM_LEAF` / `PM_ホームプランナー` 骨格作成済**（2026-09-22）。招待は対外了承後。当面も要約フッター可（`jarvis_todoist_pm_status_footer.py`）。**転送メールアドレスは相手に渡さない**。
 
 ## トリガー
 
@@ -49,9 +49,14 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 --------------------------------------------------
 ```
 
-**Guest パイロット中の相手だけ**（Phase 4。候補は LEAF／ホームプランナー）かつ `guest_project_url` 設定後は、共有プロジェクト URL を付けてよい。
+**Guest パイロット（LEAF／ホームプランナー）**: `PM_*` 骨格・`guest_project_url` は設定済。**招待メールは必要なタイミングだけ**（パートナー確認で提案→了承後に admin Share）。無言送信しない。
 
-**Todoist 案内リマインド（未完了時）**: `.jarvis_state/todoist_pm_invite_remind.json` の `ask_on_partner_check` が true のあいだ、パートナー確認で管理会社が出たら **「本文に状況確認案内（要約フッター）を載せますか？」** と聞く（転送メール案内は出さない。815除外）。
+**Todoist 案内リマインド（未完了時）**: `.jarvis_state/todoist_pm_invite_remind.json` の `ask_on_partner_check: true` のあいだ、パートナー確認で管理会社が出たら:
+
+1. **要約フッター**を載せるか聞く（転送メール案内は出さない。815除外）
+2. パイロット社かつ未招待なら **Guest 招待を今送るか**も提案する（`guest_invite_pending`）
+
+フッター了承後かつ Guest URL ありなら、フッター末尾に共有ボード URL を付けてよい（招待前に URL だけ渡すのは避ける。招待後または「フッターにURLも」明示時）。
 
 ### 2. 受信・やり取り確認時
 

@@ -60,9 +60,12 @@ alwaysApply: true
 cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_billing_monthly_check.py
 # 確認後
 cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_billing_monthly_check.py --mark-done
+# Todoist Pro 年額切替（暫定・有効時）
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_todoist_pro_annual_check.py --mark-prompted
 ```
 
-無効化: `.jarvis_state/billing_monthly.json` の `"disabled": true` または `JARVIS_BILLING_MONTHLY_DISABLE=1`。
+無効化: `.jarvis_state/billing_monthly.json` の `"disabled": true` または `JARVIS_BILLING_MONTHLY_DISABLE=1`。  
+Todoist 年額: `jarvis-todoist-pro-annual-switch.mdc`。
 
 **カード年会費（ついで）**: ウィンドウ A/D のとき、`card_annual_fee.json` または `OLIVE_INF_CANCEL_DEADLINE_TO_SKIP_NEXT` まで **60日以内**なら末尾に1行（ルール: `jarvis-card-fee-guard.mdc`）。有効期限退会のままのカードがあれば即警告。
 
