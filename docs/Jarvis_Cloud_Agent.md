@@ -182,6 +182,9 @@ Environment: リポジトリ `m19mhrts83-cyber/project-GE`（Dashboard に Activ
 | `JARVIS_SUPABASE_URL` | 投影 DB |
 | `JARVIS_SUPABASE_SERVICE_ROLE_KEY` / `JARVIS_SUPABASE_SECRET_KEY` | 読取／upsert（**`sb_secret_` 新形式**） |
 | `GEMINI_API_KEY` | リサーチ（`scripts/jarvis_gemini_research.py`） |
+| `TODOIST_API_TOKEN` | **Todoist 起票**（Jarvis 分身。Mac 正本と同値。**Runtime Secret**） |
+| `JARVIS_TODOIST_EMAIL` | 参考・ログ用（任意） |
+| `JARVIS_TASK_BACKEND` | `todoist`（ダッシュボード整合。任意だが推奨） |
 | `TAVILY_API_KEY` | Web 検索（ローカル MCP / Cloud HTTP の Header 用。正本 `.env.jarvis_private`） |
 | `GMAIL_CREDENTIALS_B64` / `GMAIL_ADMIN_TOKEN_B64` | admin 取込（既存 GHA と同系） |
 | `GMAIL_ESTATE_TOKEN_B64`（または `GMAIL_M19M_TOKEN_B64`） | **Cloud 対外送信**（`jarvis_cloud_gmail_send.py`） |
@@ -194,13 +197,35 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 python scripts/jarvis_cloud_secrets_prepare.py
 # Cloud 送信も載せる場合:
 python scripts/jarvis_cloud_secrets_prepare.py --include-gmail-send
+# Todoist だけ差分追加（スマホ→Cloud 起票）:
+python scripts/jarvis_cloud_secrets_prepare.py --todoist-only
 # 生成: ~/.jarvis_state/cloud_agent_secrets.env
 open https://cursor.com/dashboard/cloud-agents
 # → My Secrets → Add Secrets → ファイル内容を貼る → Save（Runtime Secret 推奨）
+# → Apply to: 全リポ or project-GE。既存ランは古い env のまま → 新規 Agent を起動
 rm -f ~/.jarvis_state/cloud_agent_secrets.env
 ```
 
 自動化ブラウザからの貼り付けはフォーカス／クリップボード制約で失敗しやすい。**手元貼り付けを正とする。**
+
+### スマホ → Cloud Agent → Todoist 起票
+
+| 経路 | 起票 |
+|---|---|
+| スマホ → Cloud Agent（上記 Secrets 後） | `scripts/jarvis_todoist_api.py create-task` で可 |
+| スマホ → Mac Cursor（Remote Control） | 従来どおり可（Mac 常時オン） |
+| スマホ → Todoist アプリ本体 | いつでも可（API 不要） |
+| Grok／ホーク → Drive inbox → Mac apply | トークンを Cloud に載せない経路（既存本線） |
+
+Cloud 疎通確認（**新規** Agent 上・値は echo しない）:
+
+```bash
+test -n "$TODOIST_API_TOKEN" && echo TODOIST_API_TOKEN=set
+python3 scripts/jarvis_todoist_api.py whoami
+python3 scripts/jarvis_todoist_api.py create-task \
+  --lane ai_raimo --title 'Cloud疎通テスト' \
+  --comment 'サマリ: Cloud Secrets 疎通'
+```
 
 ## OneDrive Graph（レーン GHA）
 
@@ -257,7 +282,7 @@ CHRLINE／オプチャ、Zaim Playwright、パートナー MD 全文取込、One
 ## チェックリスト（初回配線）
 
 1. [ ] Cloud environment を project-GE に接続
-2. [ ] Secrets を上表どおり登録（`sb_secret_` ＋ 必要なら Gmail send B64）
+2. [ ] Secrets を上表どおり登録（`sb_secret_` ＋ Todoist ＋ 必要なら Gmail send B64）
 3. [ ] Notion MCP（HTTP）追加 → OAuth 完了 → 1 検索成功
 4. [ ] Tavily MCP（HTTP `https://mcp.tavily.com/mcp`）追加 → Login／OAuth → 1 検索成功
 5. [ ] NotebookLM MCP（stdio）追加 → `setup_auth` → list／1 問成功
