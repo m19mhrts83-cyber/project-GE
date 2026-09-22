@@ -313,9 +313,9 @@ genmail_propose:
 # Phase5b（任意）— 既定オフ。有効化は env / 明示依頼のみ
 integrations:
   webhook:
-    enabled: false
+    enabled: true
     endpoint: https://jarvis-dashboard-amber.vercel.app/api/todoist/webhook
-    note: 受信ルート実装済。App Console 登録＋TODOIST_APP_CLIENT_SECRET 後に enabled true。手順 docs/Todoist_Webhook受信_20260922.md
+    note: App Console「Jarvis Webhook」登録済。HMAC=TODOIST_APP_CLIENT_SECRET。手順 docs/Todoist_Webhook受信_20260922.md
   calendar_sync:
     enabled: false
     note: due+%cal のみ外部同期候補。予定正本は admin Googleカレンダー（Webhook完了後）
