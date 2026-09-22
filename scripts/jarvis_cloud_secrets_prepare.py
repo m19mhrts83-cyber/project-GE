@@ -5,6 +5,8 @@ Jarvis: Cloud Agents「My Secrets」貼り付け用の .env 断片を作る（�
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_cloud_secrets_prepare.py
   python scripts/jarvis_cloud_secrets_prepare.py --include-gmail-send
+  # スマホ→Cloud で Todoist 起票だけ足すとき:
+  python scripts/jarvis_cloud_secrets_prepare.py --todoist-only
   # → ~/.jarvis_state/cloud_agent_secrets.env
   # Dashboard → Cloud Agents → My Secrets → Add Secrets に中身を貼って Save
   # 終わったら: rm ~/.jarvis_state/cloud_agent_secrets.env
@@ -35,6 +37,24 @@ def _file_b64(path: Path) -> str | None:
     return base64.b64encode(path.read_bytes()).decode("ascii")
 
 
+def _append_todoist(lines: list[str], missing: list[str], *, required: bool) -> None:
+    """Todoist（Jarvis 分身）。Cloud 起票に必須。値は stdout に出さない。"""
+    tok = (os.environ.get("TODOIST_API_TOKEN") or "").strip()
+    if tok:
+        lines.append(f"TODOIST_API_TOKEN={tok}")
+    elif required:
+        missing.append("TODOIST_API_TOKEN")
+
+    email = (os.environ.get("JARVIS_TODOIST_EMAIL") or "").strip()
+    if email:
+        lines.append(f"JARVIS_TODOIST_EMAIL={email}")
+
+    backend = (os.environ.get("JARVIS_TASK_BACKEND") or "").strip() or "todoist"
+    # トークンがある／必須のときは backend も揃える（ダッシュボード整合）
+    if tok or required:
+        lines.append(f"JARVIS_TASK_BACKEND={backend}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -42,10 +62,30 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="credentials + estate/m19m token を B64 で追加（Cloud 送信用）",
     )
+    ap.add_argument(
+        "--todoist-only",
+        action="store_true",
+        help="Todoist 関連だけ出力（My Secrets に差分追加するとき）",
+    )
     args = ap.parse_args(argv)
 
     lines: list[str] = []
     missing: list[str] = []
+
+    if args.todoist_only:
+        _append_todoist(lines, missing, required=True)
+        if missing:
+            print(f"missing: {', '.join(missing)}", file=sys.stderr)
+            return 1
+        OUT.parent.mkdir(parents=True, exist_ok=True)
+        OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        OUT.chmod(0o600)
+        print(
+            f"wrote {OUT} ({len(lines)} keys, todoist-only). "
+            "Paste into Cloud Agents → My Secrets, then delete the file."
+        )
+        return 0
+
     for k in REQUIRED:
         v = (os.environ.get(k) or "").strip()
         if not v:
@@ -62,6 +102,9 @@ def main(argv: list[str] | None = None) -> int:
     tavily = (os.environ.get("TAVILY_API_KEY") or "").strip()
     if tavily:
         lines.append(f"TAVILY_API_KEY={tavily}")
+
+    # Todoist（スマホ→Cloud Agent 起票。Jarvis 分身トークン）
+    _append_todoist(lines, missing, required=True)
 
     if args.include_gmail_send:
         cred_b64 = (os.environ.get("GMAIL_CREDENTIALS_B64") or "").strip() or _file_b64(
