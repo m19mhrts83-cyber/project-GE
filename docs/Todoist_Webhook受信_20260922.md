@@ -59,5 +59,5 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ## 関連
 
 - タスク: `[Todoist導入][phase5] Webhook受信（リアルタイム）`（`6hc2Gf5Wqx39GJCc`）
-- Calendar: 別タスク `6hc2Gf8r75c2FfVc`（後回し）
+- Calendar: `docs/Todoist_Calendar同期_20260922.md` · タスク `6hc2Gf8r75c2FfVc`
 - 会話駆動（Webhook 無しでも可）: `scripts/jarvis_todoist_conv_status_propose.py`
