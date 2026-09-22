@@ -42,6 +42,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/todoist/webhook") {
     return NextResponse.next({ request });
   }
+  // Todoist OAuth リダイレクト（承認完了ページ）
+  if (path === "/api/todoist/oauth/callback") {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();
