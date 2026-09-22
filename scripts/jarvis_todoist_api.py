@@ -51,6 +51,19 @@ JST = ZoneInfo("Asia/Tokyo")
 HOLD_SINCE_RE = re.compile(r"HOLD since:\s*(\d{4}-\d{2}-\d{2})", re.I)
 HOLD_REVIEW_DAYS = 30
 
+# アウトプット行の相対パス → Markdown https（未pushは明示）
+sys.path.insert(0, str(REPO / "scripts"))
+try:
+    from jarvis_todoist_comment_links import enrich_comment_output_links  # noqa: E402
+except ImportError:  # pragma: no cover
+    def enrich_comment_output_links(text: str) -> str:  # type: ignore[misc]
+        return text
+
+
+def _comment_body(raw: str) -> str:
+    """投稿直前にアウトプットリンクを解決し、長さを切る。"""
+    return enrich_comment_output_links(str(raw or ""))[:1900]
+
 
 def _load_yaml() -> dict[str, Any]:
     try:
@@ -392,7 +405,7 @@ def cmd_create_task(args: argparse.Namespace) -> int:
         _req(
             "POST",
             "/comments",
-            {"task_id": tid, "content": str(args.comment)[:1900]},
+            {"task_id": tid, "content": _comment_body(args.comment)},
             cfg=cfg,
         )
     if section == "HOLD" and tid and not getattr(args, "no_hold_stamp", False):
@@ -757,7 +770,7 @@ def cmd_comment(args: argparse.Namespace) -> int:
     _req(
         "POST",
         "/comments",
-        {"task_id": args.task_id, "content": args.text[:1900]},
+        {"task_id": args.task_id, "content": _comment_body(args.text)},
         cfg=cfg,
     )
     print(f"commented id={args.task_id}")
@@ -767,7 +780,9 @@ def cmd_comment(args: argparse.Namespace) -> int:
 def cmd_complete_task(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     lane = _lane(cfg, args.lane) if args.lane else None
-    comment = _ensure_complete_comment(args.comment or "", args.who or "")
+    comment = _comment_body(
+        _ensure_complete_comment(args.comment or "", args.who or "")
+    )
     _req(
         "POST",
         "/comments",

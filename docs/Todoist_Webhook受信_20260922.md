@@ -1,0 +1,42 @@
+# Todoist Webhook 受信（Jarvis）
+
+Phase5 任意。コメント了承（2026-09-22）どおり **Webhook から実装**。Calendar 同期は別タスク。
+
+## できること（現状）
+
+| 段階 | 内容 |
+|---|---|
+| **受信** | Todoist のイベント（完了・コメント・更新等）を HTTPS で受け、HMAC 検証後に `todoist_webhook_events` へ保存 |
+| **未実装** | 受信後の自動処置（相手完了→オーナー確認等）。いまは会話駆動 CLI が本線 |
+
+## エンドポイント
+
+| 項目 | 値 |
+|---|---|
+| **Production** | `https://jarvis-dashboard-amber.vercel.app/api/todoist/webhook` |
+| **GET** | 疎通（`secret_configured: true/false`） |
+| **POST** | Todoist からの配信（HMAC 必須） |
+| **秘密** | `TODOIST_APP_CLIENT_SECRET`（App Console の client_secret）。Vercel + `.env.jarvis_private` |
+
+## セットアップ（人手・1回）
+
+1. [Todoist App Console](https://developer.todoist.com/appconsole.html) でアプリ作成（個人用）。
+2. **Webhook URL** に上記 Production URL を登録。購読イベント例: `item:completed`, `note:added`, `item:updated`（必要に応じて追加）。
+3. **client_secret** を `.env.jarvis_private` と Vercel（jarvis-dashboard）の `TODOIST_APP_CLIENT_SECRET` に設定（値はチャットに出さない）。
+4. **OAuth**: 個人 Webhook はユーザーがアプリを authorize する必要あり（Console の手順どおり。redirect URI は Console 設定に合わせる）。
+5. DB: `apps/jarvis-dashboard/supabase/migrations/20260922_todoist_webhook_events.sql` を jarvis-dashboard PJ に適用済みであること。
+6. 疎通: `curl -sS https://jarvis-dashboard-amber.vercel.app/api/todoist/webhook` → `secret_configured: true`。
+7. Todoist でテスト完了／コメント → Supabase `todoist_webhook_events` に行が増えること。
+8. 問題なければ `config/todoist_projects.yaml` の `integrations.webhook.enabled: true`（受信ログ用途。自動処置は別フラグ／後続）。
+
+## コード
+
+- ルート: `apps/jarvis-dashboard/app/api/todoist/webhook/route.ts`
+- 検証: `X-Todoist-Hmac-SHA256` = base64(HMAC-SHA256(client_secret, rawBody))
+- 冪等: `X-Todoist-Delivery-Id` → `delivery_id` UNIQUE upsert
+
+## 関連
+
+- タスク: `[Todoist導入][phase5] Webhook受信（リアルタイム）`（`6hc2Gf5Wqx39GJCc`）
+- Calendar: 別タスク `6hc2Gf8r75c2FfVc`（後回し）
+- 会話駆動（Webhook 無しでも可）: `scripts/jarvis_todoist_conv_status_propose.py`

@@ -1,6 +1,6 @@
 # Todoist × 管理会社共有（Guest・要約フッター・転送メール評価）
 
-更新: 2026-09-21  
+更新: 2026-09-22  
 依頼時の参照用。git 正本は同趣旨で `docs/Todoist_Guest共有_管理会社向け_20260921.md`。
 
 ## 方針（確定）
@@ -9,7 +9,7 @@
 - 相手の入力は **普段どおりのメール（estate）／LINE**（非対称ハブ）
 - Jarvis が Todoist に起票・整理し、必要ならメール／LINE末尾に **状況要約フッター** を付ける
 - **Todoist プロジェクト転送メールは相手に渡さない**（松野自分の転送専用）
-- Guest（`PM_*` 共有ボード）は Beginner のプロジェクト枠が満杯のため **後回し**（Pro または枠空け後）
+- Guest（`PM_*` 共有ボード）: **Pro 後に骨格作成済**（2026-09-22）。招待メール送信は対外了承後
 
 ## 物件 × 管理会社（ラベル）
 
@@ -21,14 +21,22 @@
 
 ※「LEAF京都」は京都銀行の呼称であり **物件ではない**。
 
-## Guest の見え方（将来）
+## Guest パイロット（Phase 4・骨格済）
+
+| プロジェクト | 管理会社 | URL（admin 上） |
+|---|---|---|
+| `PM_LEAF` | LEAF | https://app.todoist.com/app/project/6hc28xHhRFvr7P9H |
+| `PM_ホームプランナー` | ホームプランナー | https://app.todoist.com/app/project/6hc28xj8wcC4X442 |
+
+YAML: `config/todoist_projects.yaml` → `pm_share` / `pm_guest_projects`
 
 | 項目 | 内容 |
 |---|---|
-| 見えるもの | 招待された `PM_LEAF` 等のタスクだけ |
-| 見えないもの | 他プロジェクト・原価・家族タスク |
-| 条件 | `PM_*` 作成 → Share 招待 → 相手が Todoist 無料アカウント → 承認 |
-| 今のブロッカー | プロジェクト本数（Guest 席ではない） |
+| 見えるもの | 招待された `PM_*` のタスクだけ |
+| 見えないもの | 所有物件全体・原価・家族・他レーン |
+| 条件 | Share 招待 → 相手が Todoist 無料アカウント → 承認 |
+| ブロッカー（旧） | Beginner プロジェクト枠 → **解除済（Pro）** |
+| 次の一手 | **パートナー確認のついでに Jarvis が招待を提案** → 了承後に admin UI で Share。成功ゲート: 週1接触 or フッター運用が楽 |
 
 ### 初回依頼（相手向け・短文）
 
@@ -53,12 +61,12 @@
 ## 運用コマンド
 
 ```bash
-# 管理会社別・状況フッター
+# 管理会社別・状況フッター（Guest URL 設定後は末尾に共有案内可）
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_pm_status_footer.py --pm LEAF
 
-# GenMail 要対応 → 提案（了承後 apply）
-~/selenium_env/venv/bin/python scripts/jarvis_todoist_genmail_propose.py
+# 会話駆動ステータス提案（Phase5）
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_conv_status_propose.py --text '対応完了しました'
 ```
 
-パイロット候補（Guest 再開時）: LEAF／ホームプランナー。
+パイロット: LEAF／ホームプランナー（招待は了承後）。

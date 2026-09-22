@@ -52,7 +52,7 @@ Jarvis／ホーク／FRIDAY がタスクを **起票・列移動（オーナー�
 | ルール | 内容 |
 |---|---|
 | **必須** | 処置・完了候補・実装報告に紐づくとき |
-| **ハイパーリンク** | アウトプットは **Markdown** `[表示](https://…)`。相対パスは `origin/main` にあるときだけ GitHub（`jarvis_todoist_comment_links.py`）。未pushはパス表記のみ |
+| **ハイパーリンク** | アウトプットは **Markdown** `[表示](https://…)`。相対パスは `origin/main` にあるときだけ GitHub（`jarvis_todoist_comment_links.py`）。**CLI は自動解決**（`enrich_comment_output_links`）。未pushはパス表記のみ |
 | **省略可** | 列移動のみ・短答でアウトプットが無いとき（サマリ1行は残してよい） |
 | **禁止** | 全文コピペ・秘密・トークンをコメントに書く |
 | **inbox** | `action: todoist_tasks` の `summary` / `links` は適用スクリプトがコメントへ転記 |

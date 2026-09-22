@@ -1,0 +1,52 @@
+---
+description: Todoist Pro 月額→年額切替を初月更新前にやり取りで提案する
+alwaysApply: true
+---
+
+# Todoist Pro 年額切替フォロー（暫定）
+
+**終わるまで有効。** 年額へ切替済み、またはユーザーが不要と明示したら state を閉じる。
+
+## 背景
+
+admin の Todoist Pro は **月額で開始**（`premium_until` 目安 **2026-10-23**）。  
+松野意向: 高額ではないので **初月更新前に年額へ変更**。Jarvis はやり取りのついでに提案する。
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| state | `~/git-repos/.jarvis_state/todoist_pro_annual_switch.json` |
+| チェックスクリプト | `scripts/jarvis_todoist_pro_annual_check.py` |
+| アカウント | admin（Settings → Subscription） |
+
+## 無効化・完了
+
+- state `"disabled": true` / `"completed_at"` あり
+- または `.env.jarvis_private` に `JARVIS_TODOIST_PRO_ANNUAL_SWITCH_DISABLE=1`
+- ユーザーが「年額にした／年額不要」と明示 → `--mark-done`
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_todoist_pro_annual_check.py --mark-done
+```
+
+## いつ動くか
+
+| トリガー | 動作 |
+|---|---|
+| **パートナー確認**（前半末尾） | `--mark-prompted` 実行。出力があれば貼る |
+| **課金／Todoist／Pro／年額** の話題 | 即実行（`--force` 可） |
+| 目安 **2026-10-01〜**（soon）／**10-15〜**（ask） | セッションで未出なら1ブロック |
+| 月次ウィンドウ D（課金・1〜8日） | ついでに実行してよい |
+
+促しすぎ防止: 同レベルは **3日以内**再掲しない（ask は1日）。スクリプト側。
+
+## 報告フォーマット
+
+スクリプト出力の `📎 Todoist Pro 年額切替` をそのまま貼る。
+
+## 関連
+
+- Pro 状態メモ: `.jarvis_state/todoist_pro_trial.json`
+- 設計: `docs/Todoist_タスク正本_設計_20260921.md`（課金パス）
