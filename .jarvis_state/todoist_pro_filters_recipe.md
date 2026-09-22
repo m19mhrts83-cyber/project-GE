@@ -26,7 +26,9 @@
 | **要ホーク** | `@要ホーク` | ホーク判断待ち | 追加済 |
 | **相手待ち** | `/相手待ち` | 全PJの「相手待ち」列を横断 | 追加済 |
 | **オーナー確認** | `/オーナー確認` | 全PJの「オーナー確認」列を横断 | 追加済 2026-09-22 |
-| **進行中・日付なし** | `/進行中 & no date` | カレンダー配置用 | 追加済 2026-09-22 |
+| **進行中** | `/進行中` | 全PJの「進行中」列（日付の有無は問わない） | 正（2026-09-23） |
+
+※ 旧「進行中・日付なし」（`/進行中 & no date`）は日付を付けると消えるので廃止。残 Filter は 2026-09-23 削除済。
 
 ## マイフィルター（所有物件・物件別ボード）— 2026-09-23 追加済
 
@@ -62,8 +64,18 @@ Notion の「物件行 × 進捗列」は Todoist Board に無い。代替は **
 
 ## API メモ（2026-09-23）
 
-- REST `/filters` は 404／410。**Sync `filter_add`** でマイフィルター作成可（admin `TODOIST_API_TOKEN_OWNER`）
-- 上記4本はこの経路で作成済み
+- REST `/filters` は 404／410。**Sync `filter_add` / `filter_update` / `filter_delete`** でマイフィルター操作可（admin `TODOIST_API_TOKEN_OWNER`）
+- CLI（OWNER）:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py filter-list
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py filter-add --name '例' --query '@quick'
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py filter-update --filter-id … --query '/進行中'
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py filter-delete --filter-id …
+```
+
+- 物件4本はこの経路で作成済み
 
 ## Team Setup Guide
 
