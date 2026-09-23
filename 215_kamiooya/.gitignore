@@ -34,6 +34,8 @@ C1_cursor/browser_automation/.venv/
 credentials.json
 token.json
 token*.json
+# .bak / .polluted_* など token*.json の後ろに付く退避名（末尾が .json でないと上の行に当たらない）
+token*.json.*
 *.expired
 C1_cursor/1b_Cursorマニュアル/Gmail_MCP_エラー解消手順.md
 
