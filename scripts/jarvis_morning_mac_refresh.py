@@ -85,6 +85,7 @@ FAMILY_JOURNAL_STATE = REPO / ".jarvis_state" / "family_journal_weekly.json"
 FAMILY_JOURNAL_RUNNER = REPO / "launchd" / "family_journal_weekly_runner.sh"
 FAMILY_JOURNAL_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_family_journal"
 APP_DEV_CARDS = REPO / "scripts" / "jarvis_app_dev_cards_morning.py"
+APP_DEV_TODOIST = REPO / "scripts" / "jarvis_app_dev_todoist_sync.py"
 APP_DEV_QUEUE = REPO / "scripts" / "jarvis_app_dev_queue.py"
 KARATE_ADVISOR_SYNC = REPO / "scripts" / "jarvis_karate_advisor_sync.py"
 
@@ -1195,6 +1196,24 @@ def main() -> int:
     else:
         results["steps"]["app_dev_cards"] = "skipped"
         print("# app_dev_cards: skip", flush=True)
+
+    # 10b. アプリ開発カード → Todoist apps（launchd と同帯。朝でも取りこぼし防止）
+    if APP_DEV_TODOIST.is_file() and not (
+        (os.environ.get("JARVIS_APP_DEV_TODOIST_SYNC_DISABLE") or "").strip()
+        in ("1", "true", "yes")
+    ):
+        rc_td = run_step(
+            "app_dev_todoist",
+            [exe, str(APP_DEV_TODOIST), "--apply"],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["app_dev_todoist"] = rc_td
+        if rc_td != 0:
+            print(f"# app_dev_todoist soft-fail rc={rc_td}", file=sys.stderr)
+    else:
+        results["steps"]["app_dev_todoist"] = "skipped"
+        print("# app_dev_todoist: skip", flush=True)
 
     # 11. アプリ開発カード → PR／Issue キュー（低=Cloud PR、高=Issue）
     if APP_DEV_QUEUE.is_file() and not (

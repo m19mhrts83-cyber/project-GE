@@ -1,6 +1,6 @@
 # アプリ開発 — Grok 反映（索引）
 
-**更新**: 2026-08-28  
+**更新**: 2026-09-23  
 **方針**: このファイル単体を Instructions に貼らない。
 
 | Bot | ファイル |
@@ -20,9 +20,10 @@
 - 「やってみたい」→ 実装カード（リスク: 低|高）
 - **表確認（3アプリ）**: 裏（統括）→怪しさなら表確認（Jarvisがログインして画面確認）。PWは Drive に置かない
 - **受け渡し**: カード後に estate へ件名 `[Grok開発]`
-- 朝: 要約 → **キュー**（低=Cloud→PR／高=Issue／表確認=ui-check Issue）。自動マージなし
-- 処置: GitHub で目視、または Jarvis に「委任して #N」
-- スクリプト: `jarvis_app_dev_cards_morning.py` / `jarvis_app_dev_queue.py`
+- **Todoist**: Mac launchd（起動時＋最大15分）が `#アプリ開発` へ自動起票（ホーク要ボスと同帯）
+- 朝: 要約 → Todoist 取りこぼし補完 → **キュー**（低=Cloud→PR／高=Issue／表確認=ui-check Issue）。自動マージなし
+- 処置: Todoist／GitHub で目視、または Jarvis に「委任して #N」
+- スクリプト: `jarvis_app_dev_cards_morning.py` / `jarvis_app_dev_todoist_sync.py` / `jarvis_app_dev_queue.py`
 
 対象:
 1. 神・大家さんQ&Aチャットボット

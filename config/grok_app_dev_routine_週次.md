@@ -27,7 +27,7 @@ Bot 恒久ルールの正本は `config/grok_app_dev_manager_grok_paste.md`。
 - 小回り: 「やってみたい」→ 統括が実装カード（リスク低|高）→ Jarvisが実行
 - 週次: ルーティン「アプリ開発 · 週次」。提案は全部やらなくてよい（カード最大3）
 - リスク低=Jarvis即実行可 / 高=松野OK後
-- カードを出したら estate へ件名 [Grok開発] メール（Jarvis朝取り込み）
+- カードを出したら estate へ件名 [Grok開発] メール（Jarvis が Todoist 起票＋朝の PR／Issue キュー）
 - Supabaseは kamiooya-qa と jarvis-dashboard の2つのみ（3つ目禁止）
 ```
 
@@ -64,6 +64,8 @@ Bot 恒久ルールの正本は `config/grok_app_dev_manager_grok_paste.md`。
 - To: matsuno.estate@gmail.com
 - 件名: [Grok開発] 週次 YYYY-MM-DD（その週の月曜日付）
 - 本文: 週次サマリー＋Jarvis向けカード全文（📎ブロックそのまま）
+
+（Jarvis が Mac 起動中なら最大約15分で Todoist「アプリ開発」へ起票。PR／Issue は朝キュー。）
 
 神大家Q&Aでは、kamiooya-qa と WeStudy 知識の件数・埋め込み・ずれを見る。
 kamiooya-qa に Jarvis 個人用テーブルを足す提案はしない。
