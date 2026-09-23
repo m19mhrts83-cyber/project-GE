@@ -174,12 +174,11 @@ def main() -> int:
     items: list[dict[str, Any]] = []
     for row in rows:
         s = _summarize(row)
-        if not s["comment"]:
-            if args.mark_only or args.reply:
-                _mark_processed(int(s["row_id"]))
-            continue
         if s["posted_uid"] in skip_uids:
-            # 自分の配信は既定で処理済み扱いにして溜めない
+            # 自分の配信は既定で処理済み扱いにして溜めない（--reply / --mark-only を待たない）
+            _mark_processed(int(s["row_id"]))
+            continue
+        if not s["comment"]:
             if args.mark_only or args.reply:
                 _mark_processed(int(s["row_id"]))
             continue

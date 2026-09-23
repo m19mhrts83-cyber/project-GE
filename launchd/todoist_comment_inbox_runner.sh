@@ -25,7 +25,13 @@ fi
 
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
-  OUT="$("$PY" "${REPO_DIR}/scripts/jarvis_todoist_comment_inbox.py" "${ARGS[@]}" 2>&1)" || true
+  # 空配列の "${ARGS[@]+"${ARGS[@]}"}" は zsh が空文字を1引数として渡す（argparse が失敗する）。
+  # 要素があるときだけ @ を展開する（set -u でも空の添字を参照しない）。
+  if (( ${#ARGS[@]} )); then
+    OUT="$("$PY" "${REPO_DIR}/scripts/jarvis_todoist_comment_inbox.py" "${ARGS[@]}" 2>&1)" || true
+  else
+    OUT="$("$PY" "${REPO_DIR}/scripts/jarvis_todoist_comment_inbox.py" 2>&1)" || true
+  fi
   echo "$OUT"
   # 新規なしのときは短いログだけ残す（肥大化防止）
   if echo "$OUT" | grep -q '新規なし'; then
