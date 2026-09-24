@@ -31,6 +31,7 @@ labels:
 - kodate
 - kazoku
 - apps
+- theme_stock
 - 要ボス
 - 要Jarvis連携
 - 要ホーク
@@ -115,6 +116,21 @@ lanes:
     - オーナー確認
     done_sections: []
     hide_done_on_board: true
+  theme_stock:
+    title: Theme株式
+    project_key: theme_stock
+    project_id: 6hcRhvwmQP84W7CM
+    lane_label: theme_stock
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: true
+    note: KURASHIFT 株式ウォッチの判断ログ正本（2026-09-25）。提案・閾値アラート・動き履歴。admin所有・Jarvis招待要
   kodate:
     title: 戸建て
     project_key: kodate
@@ -177,6 +193,17 @@ projects:
       相手待ち: 6hXfrX2g76rcc4wc
       HOLD: 6hXmWXwH43cgvrf6
       オーナー確認: 6hXfrX2839CrjP46
+  theme_stock:
+    name: Theme株式
+    view_style: board
+    note: KURASHIFT 株式ウォッチ運用（提案・閾値・判断履歴）。admin 所有。Jarvis 分身を編集可で共有
+    project_id: 6hcRhvwmQP84W7CM
+    section_ids:
+      未着手: 6hcRhwj6RjJgJGfv
+      進行中: 6hcRhwqF7qv8FfmM
+      相手待ち: 6hcRhwpGxPRgXfgv
+      HOLD: 6hcRhwr6xWh9Whhv
+      オーナー確認: 6hcRhwvMx9hqgJfM
   kodate:
     name: 戸建て
     view_style: board

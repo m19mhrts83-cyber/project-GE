@@ -161,6 +161,7 @@ export default async function HomePage() {
         "card_debit_watch_summary",
         "mq_month_close",
         "mq_monthly_refresh",
+        "stock_watch_summary",
       ]),
     supabase
       .from("kurashift_jobs")
@@ -265,6 +266,15 @@ export default async function HomePage() {
   const cardDebit = parseCardDebitWatch(
     metaMap.get("card_debit_watch_summary")?.value ?? null
   );
+  let stockWatchSignals: number | null = null;
+  try {
+    const sw = JSON.parse(
+      metaMap.get("stock_watch_summary")?.value || "null"
+    ) as { signals?: number } | null;
+    if (sw && typeof sw.signals === "number") stockWatchSignals = sw.signals;
+  } catch {
+    stockWatchSignals = null;
+  }
   const weeklyAt = metaMap.get("portfolio_weekly_at")?.value ?? null;
 
   let mqAck: Record<string, string> = {};
@@ -338,6 +348,7 @@ export default async function HomePage() {
     },
     buyPlanMissing: !buyPlanCanon?.id,
     cardDebit,
+    stockWatchSignals,
   });
   const partialWarn = weeklySummary?.last_full_ok === false;
 

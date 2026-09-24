@@ -120,6 +120,8 @@ export function computeNextAction(input: {
   buyPlanMissing?: boolean;
   /** カード引落（Infinite 本線） */
   cardDebit?: CardDebitWatchBrief | null;
+  /** 株式ウォッチ閾値シグナル件数（sync_meta） */
+  stockWatchSignals?: number | null;
 }): NextAction {
   const debit = input.cardDebit?.top_alert;
   if (debit && (debit.level === "warn" || debit.level === "attention")) {
@@ -157,6 +159,13 @@ export function computeNextAction(input: {
       level: "warn",
       label: `ジョブが ${input.stalledQueued} 件、30分超キュー滞留（Mac worker を確認）`,
       href: "/jobs",
+    };
+  }
+  if ((input.stockWatchSignals ?? 0) > 0) {
+    return {
+      level: "info",
+      label: `株式ウォッチ: 閾値シグナル ${input.stockWatchSignals} 件（Todoist Theme株式で確認）`,
+      href: "/stock-watch",
     };
   }
   const consulting = input.themes.find((t) => t.status === "consulting");

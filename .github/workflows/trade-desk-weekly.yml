@@ -37,6 +37,7 @@ jobs:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN_OWNER || secrets.TODOIST_API_TOKEN }}
           SKIP_TAVILY: ${{ github.event.inputs.skip_tavily || 'false' }}
         run: |
           set -euo pipefail
@@ -50,3 +51,9 @@ jobs:
           fi
           # キー無しでも ingest 側がキャッシュ／既存DBで続ける（オフライン可）
           python scripts/jarvis_trade_weekly_cloud.py "${ARGS[@]}"
+          # 週次: 衛星 Theme 提案（Todoist Theme株式＋Theme下書き）。通知あり
+          if [[ -n "${TODOIST_API_TOKEN:-}" ]]; then
+            python scripts/jarvis_kurashift_stock_watch.py --propose-weekly --notify || true
+          else
+            echo "TODOIST_API_TOKEN missing: skip stock_watch propose"
+          fi

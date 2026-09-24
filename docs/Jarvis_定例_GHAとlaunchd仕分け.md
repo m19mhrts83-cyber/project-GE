@@ -37,7 +37,8 @@
 | Dashboard heartbeat | `jarvis-dashboard-heartbeat.yml` | |
 | kamiooya-qa 心拍 | `kamiooya-qa-heartbeat.yml` | Free 休止対策 |
 | WeStudy 週次取込 | `westudy-raimo-weekly.yml` | Playwright 可だが Secrets＋再現性あり |
-| Trade Desk 週次（クラウド分） | `trade-desk-weekly.yml` | Mac 資産週次と役割分担 |
+| Trade Desk 週次（クラウド分） | `trade-desk-weekly.yml` | Mac 資産週次と役割分担。末尾で株式ウォッチ提案 |
+| KURASHIFT 株式ウォッチ日次 | `kurashift-stock-watch-daily.yml` | Yahoo＋閾値→Todoist Theme株式。自動発注なし |
 | KURASHIFT 問合せ（Tier3） | `kurashift-re-daily-inquiry.yml` | 明示 enabled 時 |
 | Zaim 財務日次（API 系） | `zaim-finance-sync.yml` | Playwright CSV とは別 |
 | Ops Fail Watch | `jarvis-ops-fail-watch.yml` | 失敗監視 |
