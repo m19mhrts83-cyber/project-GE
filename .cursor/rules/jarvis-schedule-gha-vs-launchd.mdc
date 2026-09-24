@@ -10,7 +10,8 @@ alwaysApply: false
 **定型化できた定期処理 → GitHub Actions。**  
 **銀行／カード UI・CDP・CHRLINE・OneDrive 正本・常駐 → launchd（Mac）。**
 
-正本表: `docs/Jarvis_定例_GHAとlaunchd仕分け.md`
+正本表: `docs/Jarvis_定例_GHAとlaunchd仕分け.md`  
+（§E: スリープ完全無効化は現状やらない。価格・株式ウォッチは先に GHA。Mac の価値は常時ONではなく端末・セッション・正本 path）
 
 ## 判定（新規・移設時）
 
@@ -39,6 +40,7 @@ alwaysApply: false
 | Vポイント定例 | launchd（促しだけなら将来 GHA 候補） |
 | テイチャン抽選 | launchd（GHA headless は失敗実測） |
 | Gmail triage／状況ウォッチ軽量 | GHA |
+| 価格・チケット・株式ウォッチ（公開API） | GHA（CAPTCHA／ログイン必須なら Mac） |
 
 ## Jarvis の動作
 
