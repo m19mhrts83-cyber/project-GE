@@ -1,0 +1,39 @@
+# KURASHIFT 株式ウォッチ（Theme 衛星スリーブ）
+# 日次: GHA kurashift-stock-watch-daily.yml
+# 判断ログの正本: Todoist「Theme株式」（lane theme_stock）
+# 自動発注はしない（立花 API は apps 未着手棚）
+
+enabled: true
+
+notify:
+  todoist_lane: theme_stock
+  on_propose: true
+  on_threshold: true
+  dedupe_hours: 48
+  owner_confirm_kinds:
+    - near_bottom
+    - upside_ready
+    - sell_signal
+
+thresholds:
+  lookback_days: 60
+  bottom_buffer_pct: 2.0
+  near_bottom_pct: 1.5
+  upside_ready_pct: 5.0
+  sell_drawdown_pct: 8.0
+  upside_target_pct: 12.0
+
+propose:
+  max_themes: 3
+  min_score: 0.55
+  exclude_themes:
+    - index
+  exclude_asset_classes:
+    - inverse_etf
+
+kurashift:
+  base_url: https://jarvis-trade-desk.vercel.app
+  stock_watch_path: /stock-watch
+
+# 監視中は state の watches が正。seed は初回マージ用
+seed_watches: []

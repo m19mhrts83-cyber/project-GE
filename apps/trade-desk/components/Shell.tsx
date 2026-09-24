@@ -3,6 +3,7 @@ import { DASHBOARD_URL, LOAN_TRACKER_URL } from "@/lib/format";
 const NAV = [
   { href: "/", label: "ホーム" },
   { href: "/themes", label: "テーマ" },
+  { href: "/stock-watch", label: "株式ウォッチ" },
   { href: "/money-ops", label: "資金移動" },
   { href: "/portfolio", label: "資産" },
   { href: "/household-bs", label: "家計B/S" },
@@ -89,6 +90,7 @@ export default function Shell({
             [
               "/",
               "/themes",
+              "/stock-watch",
               "/money-ops",
               "/portfolio",
               "/household-bs",
