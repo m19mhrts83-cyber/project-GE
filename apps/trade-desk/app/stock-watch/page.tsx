@@ -1,3 +1,4 @@
+import EnqueueJobButton from "@/components/EnqueueJobButton";
 import Shell from "@/components/Shell";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,6 +13,26 @@ type WatchRow = {
   bottom_hint?: number;
   upside_target_pct?: number;
   sell_drawdown_pct?: number;
+};
+
+type OrderPayload = {
+  amount_jpy?: number;
+  close?: number;
+  signals?: string[];
+  odd_lot?: boolean;
+  money_path?: string;
+  theme_title?: string;
+};
+
+type OrderRow = {
+  id?: string;
+  symbol?: string;
+  side?: string;
+  qty?: number;
+  limit_price?: number;
+  status?: string;
+  created_at?: string;
+  payload?: OrderPayload | null;
 };
 
 type Summary = {
@@ -57,6 +78,15 @@ export default async function StockWatchPage() {
   const active = watches.filter((w) => w.active);
   const inactive = watches.filter((w) => !w.active);
 
+  const { data: orderRows } = await supabase
+    .from("trade_orders")
+    .select("id, symbol, side, qty, limit_price, status, created_at, payload")
+    .eq("mode", "live")
+    .in("status", ["preview", "confirmed"])
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const orders = (orderRows || []) as OrderRow[];
+
   return (
     <Shell active="/stock-watch" email={user?.email ?? null}>
       <h1>株式ウォッチ</h1>
@@ -78,8 +108,8 @@ export default async function StockWatchPage() {
             : ""}
         </p>
         <p className="meta">
-          購入アシスト: Theme 承認後、証券サイトで手動発注。Todoist
-          コメントに「買った／見送り」を残す。
+          発注前プレビュー→対外確認ゲート: プレビューを作成し、Todoist
+          Theme株式でオーナー確認後に確定。確定しても実発注はせず、手動アシスト手順を出します。
         </p>
       </div>
 
@@ -107,6 +137,16 @@ export default async function StockWatchPage() {
                       {" · "}
                       <a href={`/themes/${w.theme_id}`}>Theme</a>
                     </>
+                  ) : null}
+                  {w.symbol ? (
+                    <div style={{ marginTop: 6 }}>
+                      <EnqueueJobButton
+                        jobType="stock_order_preview"
+                        title={`[発注preview] ${w.name || w.symbol}`}
+                        payload={{ symbol: w.symbol }}
+                        label="発注プレビューを作成"
+                      />
+                    </div>
                   ) : null}
                 </li>
               ))}
@@ -141,12 +181,56 @@ export default async function StockWatchPage() {
 
       <div className="card" style={{ marginTop: 16 }}>
         <header>
+          <span className="lvl">対外確認ゲート</span>
+          <strong>発注プレビュー（承認待ち {orders.length}）</strong>
+        </header>
+        {orders.length === 0 ? (
+          <p className="meta" style={{ marginTop: 8 }}>
+            承認待ちはありません。監視中銘柄の「発注プレビューを作成」で起票します。
+          </p>
+        ) : (
+          <ul className="meta" style={{ marginTop: 8 }}>
+            {orders.map((o) => {
+              const p = o.payload || {};
+              return (
+                <li key={o.id}>
+                  <strong>
+                    {o.symbol} {o.side === "sell" ? "売り" : "買い"} {o.qty}株
+                  </strong>{" "}
+                  指値 {o.limit_price}円 / 想定{" "}
+                  {p.amount_jpy != null
+                    ? Number(p.amount_jpy).toLocaleString()
+                    : "—"}
+                  円{" "}
+                  <span className="meta">
+                    [{o.status}] {p.signals?.join(", ")}
+                    {p.odd_lot ? " · 単元未満" : ""}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="meta" style={{ marginTop: 8 }}>
+          確定はオーナー確認後のみ（CLI:{" "}
+          <code>
+            jarvis_kurashift_stock_order.py --confirm &lt;ID&gt;
+            --i-confirm-order
+          </code>
+          ）。確定しても実発注せず手動アシスト手順を出します。
+        </p>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <header>
           <span className="lvl">手順</span>
           <strong>購入アシスト（手動）</strong>
         </header>
         <ol className="meta" style={{ marginTop: 8, paddingLeft: 18 }}>
           <li>Todoist Theme株式で閾値コメントを確認</li>
           <li>Theme を承認（または <code>--activate-theme</code>）</li>
+          <li>「発注プレビューを作成」→ Todoist オーナー確認で内容を確認</li>
+          <li>確認OKなら <code>--confirm</code>（対外確認ゲート）で手順を確定</li>
           <li>立花等で単元・金額を確認して手動発注</li>
           <li>Todoist に「買った／見送り」コメント → オーナー確認経由で完了</li>
         </ol>
