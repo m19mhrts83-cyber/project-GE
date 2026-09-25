@@ -31,6 +31,32 @@ propose:
   exclude_asset_classes:
     - inverse_etf
 
+# 発注前プレビュー＋対外確認ゲート（Phase2 入口）
+# 実発注はしない。プレビューを作り、オーナー確認（Todoist Theme株式）を経て
+# 手動発注アシスト手順を出すだけ。立花API自動発注は live_api=false の間は不可。
+order:
+  enabled: true            # プレビュー機能のマスター（false で全停止）
+  live_api: false          # 立花API自動発注。将来タスク。ここでは必ず false
+  broker: tachibana
+  per_name_max_jpy: 20000  # 1銘柄あたり上限（Tranche1 想定）
+  total_capital_jpy: 100000
+  min_unit: 100            # 日本株・ETFの売買単位
+  allow_odd_lots: true     # 1単元が枠を超える場合は単元未満（かぶミニ等）にフォールバック
+  limit_buffer_pct: 0.5    # 指値は前日終値±この％
+  stale_price_pct: 3.0     # 確認時に終値が乖離していたら再プレビュー
+  core_symbols:            # NISAコア相当。提案・発注の対象外
+    - "1306.T"
+    - "1321.T"
+    - "1545.T"
+    - "1546.T"
+  buy_signal_kinds:
+    - near_bottom
+    - upside_ready
+  sell_signal_kinds:
+    - sell_signal
+  money_path: "立花証券e支店（特定口座・源泉徴収あり）"
+  otp_note: "取引パスワード／都度確認は本人。Jarvis は OTP・最終送信を代行しない"
+
 kurashift:
   base_url: https://jarvis-trade-desk.vercel.app
   stock_watch_path: /stock-watch

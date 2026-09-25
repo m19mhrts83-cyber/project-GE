@@ -187,6 +187,14 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             "--theme-id",
             str(payload.get("theme_id") or ""),
         ],
+        # 発注前プレビューのみ。確定（対外確認ゲート）はオーナーが CLI で実行する
+        "stock_order_preview": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_stock_order.py"),
+            "--preview",
+            "--symbol",
+            str(payload.get("symbol") or ""),
+        ],
         "secrets_status": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_secrets.py"),

@@ -16,6 +16,7 @@ const ALLOWED = new Set([
   "theme_propose_from_status",
   "theme_ensure_index_rb",
   "theme_execute_assist",
+  "stock_order_preview",
   "secrets_upsert",
   "secrets_status",
   "buy_plan_ingest",
