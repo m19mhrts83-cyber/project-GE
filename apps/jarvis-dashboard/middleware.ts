@@ -46,6 +46,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/todoist/oauth/callback") {
     return NextResponse.next({ request });
   }
+  // アドバイザー週次パック（ADVISOR_WEEKLY_PACK_SECRET で保護。コーチング部長 Action）
+  if (path === "/api/advisor-weekly-pack") {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();
