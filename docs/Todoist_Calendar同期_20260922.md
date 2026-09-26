@@ -36,6 +36,7 @@ Todoist 側: タスクに **期限**を付け、ラベル **`cal`** を付ける
 2. 未同期 → GC に作成（extendedProperties に task_id）
 3. due／タイトル変更 → patch 更新
 4. `@cal` 外し・完了・due 削除 → GC イベント削除＋ state から除去
+   （Mac 起動中は `bucho-inbox-poll` が15分ごと。画面ロック解除でも同じ runner が1回走る。終日も時刻付きも同じ）
 
 ## 設定
 

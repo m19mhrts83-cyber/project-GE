@@ -7,6 +7,9 @@
 履歴: `.jarvis_state/todoist_calendar_sync.json`（task_id→event_id）
 停止: yaml `integrations.calendar_sync.enabled: false`
       または `JARVIS_TODOIST_CALENDAR_SYNC_DISABLE=1`
+定期: launchd `bucho-inbox-poll`（15分・Mac起動中）が `--apply`。
+      画面ロック解除でも `screen-unlock-catchup` が同じ runner を1回走らせる。
+      完了・@cal外し・due削除は候補から外れた予定を削除する。
 
 予定正本は admin Googleカレンダー。Todoist は「カレンダーに出したい」印（@cal）。
 
