@@ -23,6 +23,16 @@
 
 `30_shared_working/` は **手順 · B1 正本**。日常キューは **inbox / outbox / team フォルダ**。
 
+## アドバイザー週次材料パック（SB · 2026-09〜）
+
+| 項目 | 正 |
+|---|---|
+| きっかけ | コーチング部長 日曜19:00 → Cloud `POST /api/advisor-weekly-pack` |
+| 秘密 | `ADVISOR_WEEKLY_PACK_SECRET`（Action）＋サーバー側 `GSK_API_KEY`。**Grok に GSK を渡さない** |
+| 材料の正 | API 応答 `markdown`（Mac スリープ可）。Drive outbox は後続・Macフォールバック |
+| Journal | **理解の正本**（全文ログではない）。アドバイザーは「Journalに無い重要」をメンション |
+| 仕様 | `docs/Grok_アドバイザー週次材料パック_仕様_20260926.md` |
+
 ## Grok チャンネル（履歴 · キューと別）
 
 | チャンネル | 用途 |
