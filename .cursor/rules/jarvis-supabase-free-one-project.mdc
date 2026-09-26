@@ -28,6 +28,12 @@ Free 枠は **アクティブ2プロジェクトまで無料**。用途を次の
 | データ流（提供） | WeStudy / Notta → CSV・inbox → Supabase は投影 |
 | 休止対策 | 週次 WeStudy で kamiooya-qa 心拍。jarvis-dashboard は夜間トリアージ push で実質回避 |
 
+## Data API 明示 GRANT（2026-10-30〜）
+
+**既存テーブルは影響なし。** 同日以降に `public` へ作る**新規テーブル**は、Data API（supabase-js）到達に明示 `GRANT` が必要。  
+jarvis-dashboard の定型・一括 SQL: `apps/jarvis-dashboard/supabase/README.md` / `migrations/20260926_data_api_explicit_grants.sql`。  
+CREATE と同じ migration に `grant … to authenticated, service_role` を書く（anon は付けない）。
+
 復習: https://claude-code-supabase-fukushu.vercel.app/
 
 ## トリガー時の動作

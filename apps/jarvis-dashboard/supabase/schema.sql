@@ -585,3 +585,29 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260908_kurashift_openchat_logs.sql）
 -- todoist_webhook_events（Todoist App Webhook 受信ログ）
 -- （migrations/20260922_todoist_webhook_events.sql）
+
+-- Data API 明示 GRANT（2026-10-30 以降の新規テーブル対策。既存も明示して reset 耐性を確保）
+-- 全テーブル分の正本: migrations/20260926_data_api_explicit_grants.sql
+-- コア表（schema.sql 直定義）だけここにも載せる。migration 追加表は各 SQL か一括 migration で GRANT。
+grant select, insert, update, delete on table public.triage_items to authenticated, service_role;
+grant select, insert, update, delete on table public.watch_status to authenticated, service_role;
+grant select, insert, update, delete on table public.cards to authenticated, service_role;
+grant select, insert, update, delete on table public.card_comments to authenticated, service_role;
+grant select, insert, update, delete on table public.lane_action_log to authenticated, service_role;
+grant select, insert, update, delete on table public.metrics to authenticated, service_role;
+grant select, insert, update, delete on table public.sync_meta to authenticated, service_role;
+grant select, insert, update, delete on table public.subscription_services to authenticated, service_role;
+grant select, insert, update, delete on table public.watch_comments to authenticated, service_role;
+grant select, insert, update, delete on table public.property_units to authenticated, service_role;
+grant select, insert, update, delete on table public.property_occupancy_events to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_snore_daily to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_treatment_events to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_daily to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_journal_daily to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_context_notes to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_quiet_reviews to authenticated, service_role;
+grant select, insert, update, delete on table public.glucon_schedule to authenticated, service_role;
+grant select, insert, update, delete on table public.glucon_journal_days to authenticated, service_role;
+grant select, insert, update, delete on table public.glucon_report_drafts to authenticated, service_role;
+grant select, insert, update, delete on table public.glucon_carry_memos to authenticated, service_role;
+grant usage, select on all sequences in schema public to authenticated, service_role;
