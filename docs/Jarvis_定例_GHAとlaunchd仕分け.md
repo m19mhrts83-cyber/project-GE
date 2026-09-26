@@ -61,7 +61,8 @@
 | 朝オープン／Mac 朝バンドル | `triage-morning-open` + `jarvis_morning_mac_refresh` | 取りこぼし回収のハブ（必須起動ではない） |
 | dashboard push（投影） | `dashboard-push` | `.jarvis_state` 依存 |
 | 家族 Journal 週次 | `family-journal-weekly` | Drive／Notion 補完 |
-| 部長ボックス poll | `bucho-inbox-poll` | Drive ローカル／CDP 系 |
+| 部長ボックス poll | `bucho-inbox-poll` | Drive ローカル。同帯で Todoist @cal → カレンダー（完了で予定削除） |
+| 画面ロック解除キャッチアップ | `screen-unlock-catchup` | 解除で15分クラスだけ即実行（部長ボックス・Todoistコメント）。時刻指定ジョブは解除では起動しない |
 | Cursor revise worker | `cursor-revise-worker` | ローカルキュー |
 | WeStudy Drive 添付 | `westudy-gdrive-archive` | admin Drive＋Mac |
 | プライベートバックアップ | `private-backup` | ローカル age |
