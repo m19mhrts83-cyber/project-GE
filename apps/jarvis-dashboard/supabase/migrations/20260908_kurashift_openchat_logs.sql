@@ -40,3 +40,6 @@ create policy kurashift_openchat_logs_auth_all
   for all to authenticated
   using (true)
   with check (true);
+
+-- 2026-10-30 以降: public 新規テーブルは Data API 用の明示 GRANT が必須
+grant select, insert, update, delete on table public.kurashift_openchat_logs to authenticated, service_role;

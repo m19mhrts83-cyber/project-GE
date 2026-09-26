@@ -24,3 +24,7 @@ alter table public.todoist_webhook_events enable row level security;
 drop policy if exists todoist_webhook_events_auth_all on public.todoist_webhook_events;
 create policy todoist_webhook_events_auth_all on public.todoist_webhook_events
   for all to authenticated using (true) with check (true);
+
+-- 2026-10-30 以降: public 新規テーブルは Data API 用の明示 GRANT が必須
+grant select, insert, update, delete on table public.todoist_webhook_events to authenticated, service_role;
+grant usage, select on sequence public.todoist_webhook_events_id_seq to authenticated, service_role;
