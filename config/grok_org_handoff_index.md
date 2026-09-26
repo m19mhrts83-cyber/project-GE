@@ -79,7 +79,8 @@
 
 設定: `config/kurashift_grok_bridge_folders.yaml`  
 ホークアイルーティン: `config/grok_hawk_routine_Jarvisボックス.md` · 週次統括 `config/grok_hawk_routine_週次統括.md`（**チャンネル「参謀室」** 日曜20:00。ホーク1:1からは外した）  
-コーチング部: `config/grok_coaching_bucho_routine_週次.md`（日曜19:00 · 首脳用1ブロック）
+コーチング部: `config/grok_coaching_bucho_routine_週次.md`（日曜19:00 · 首脳用1ブロック · **SB週次パック取得**）  
+アドバイザー週次パック仕様: `docs/Grok_アドバイザー週次材料パック_仕様_20260926.md`
 
 ## フォーク原則（JarvisBox 必須）
 
