@@ -34,6 +34,10 @@ ROUTES_YAML = REPO / "line_unofficial_poc" / "open_chat_routes.yaml"
 WATCH_STATUS = (
     REPO / "line_unofficial_poc" / ".line_auth" / ".chrline_open_chat_watch_status.json"
 )
+# 同期runnerが「pause したまま resume に失敗した」ことを示すマーカー
+WATCH_RESUME_FAILED = (
+    REPO / "line_unofficial_poc" / ".line_auth" / "WATCH_RESUME_FAILED.txt"
+)
 OPENCHAT_BASE = Path(
     "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
     "/C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
@@ -52,6 +56,8 @@ BOOTSTRAP_HINT = (
 MAC_RECIPE_ID = "openchat_init_bootstrap"
 # 全ルート【メイン】0 が続く日数（既定3）。環境変数で上書き可。
 MAIN_STALE_DAYS = max(1, int(os.environ.get("JARVIS_OPENCHAT_MAIN_STALE_DAYS") or "3"))
+# スレ活動の判定窓（既定30日）。14日だと静かな群を誤検知しやすいため広めに取る。
+THREAD_ACTIVE_DAYS = max(1, int(os.environ.get("JARVIS_OPENCHAT_THREAD_ACTIVE_DAYS") or "30"))
 # 常時監視「稼働中」とみなす heartbeat 上限（秒）
 WATCH_ALIVE_HB_SEC = max(60, int(os.environ.get("JARVIS_OPENCHAT_WATCH_ALIVE_HB_SEC") or "300"))
 
@@ -346,6 +352,7 @@ def evaluate_route(
     latest_entry: dict[str, Any] | None,
     history: dict[str, Any],
     md_counts: dict[str, int],
+    md_active_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     rid = route["id"]
     registered = len(route["thread_mids"])
@@ -353,6 +360,8 @@ def evaluate_route(
     replies_14 = int(md_counts.get("reply") or 0)
     threads_14 = int(md_counts.get("thread") or 0)
     main_14 = int(md_counts.get("main") or 0)
+    # 判定用は広めの窓（既定30日）。表示用の 14日 はそのまま残す。
+    threads_active = int((md_active_counts or md_counts).get("thread") or 0)
 
     level = "ok"
     reasons: list[str] = []
@@ -387,11 +396,12 @@ def evaluate_route(
                 days_zero += 1
             main_recent += int(ent.get("appended_main") or 0)
         # MD 側の main も参考
-        if days_zero >= 7 and (main_recent > 0 or main_14 > 0) and threads_14 == 0:
+        if days_zero >= 7 and (main_recent > 0 or main_14 > 0) and threads_active == 0:
             level = "attention"
             symptom = "zero_append_with_main"
             reasons.append(
-                f"登録{registered}件なのに7日連続スレ追記0（メインは動いている）"
+                f"登録{registered}件なのに7日連続スレ追記0"
+                f"（メインは動いている／直近{THREAD_ACTIVE_DAYS}日【スレッド】0）"
             )
             action = action or BOOTSTRAP_HINT.format(route_id=rid)
 
@@ -420,6 +430,8 @@ def evaluate_route(
         "md_threads_14d": threads_14,
         "md_replies_14d": replies_14,
         "md_main_14d": main_14,
+        "md_threads_active": threads_active,
+        "md_window_days": THREAD_ACTIVE_DAYS,
         "appended_threads": int((latest_entry or {}).get("appended_threads") or 0),
         "appended_main": int((latest_entry or {}).get("appended_main") or 0),
         "ok": ok_n,
@@ -686,12 +698,18 @@ def build_report(
     route_evals: list[dict[str, Any]] = []
     for route in routes:
         md_counts = count_md_headings(route["output_md"], days=14)
+        md_active_counts = (
+            md_counts
+            if THREAD_ACTIVE_DAYS <= 14
+            else count_md_headings(route["output_md"], days=THREAD_ACTIVE_DAYS)
+        )
         route_evals.append(
             evaluate_route(
                 route,
                 latest_routes.get(route["id"]),
                 history,
                 md_counts,
+                md_active_counts,
             )
         )
 
@@ -718,6 +736,10 @@ def build_report(
     if err:
         watch_level = "attention"
         watch_notes.append(f"書込エラー: {err[:120]}")
+    # 前回バッチの resume 失敗（pause したまま戻せなかった）痕跡
+    if WATCH_RESUME_FAILED.is_file():
+        watch_level = "attention"
+        watch_notes.append("バッチのresume失敗マーカーあり（トークン失効/QR要）")
 
     if level_rank.get(watch_level, 9) < level_rank.get(worst, 9):
         worst = watch_level
