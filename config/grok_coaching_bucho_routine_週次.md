@@ -13,12 +13,16 @@
 【コーチング · 首脳用まとめ】
 
 0. 【SB週次パック取得 · 必須・先頭】
-Cloud プロキシを叩いて金締（土〜金）の SecondBrain 要約パックを取得する。
-- URL: https://jarvis-dashboard-amber.vercel.app/api/advisor-weekly-pack
-- 方法: POST（Authorization: Bearer は Bot Action の秘密。キー名 ADVISOR_WEEKLY_PACK_SECRET。GSK_API_KEY は持たない）
-- 応答の `markdown` を材料にする（Mac 起動不要）。件数を1行: SB週次: OK · N件 · 金締 {start}〜{end}
-- 失敗時: 「SBパック取得失敗」と1行。FRIDAY Mesh フォールバック可。薄い材料で止めない。
-- Drive outbox は後続用。本ルーティンは応答ボディを正とする。
+金締（土〜金）の SecondBrain 要約パックを取得する。**チャットにシークレット値は書かない。**
+
+優先順:
+1) **Drive 本線（Mac 18:40 投下）**: Jarvisボックス / `20_outbox_to_grok/` および `outbox_to_teams/*` の最新 `週次材料パック_*.md` を読む。あればそれを正。1行: SB週次: Drive OK · 金締 {start}〜{end}
+2) **Computer Skill（Mac起動時）**: Skill `advisor-weekly-pack` は **Computer** で次だけ実行（値は `.env.jarvis_private` の変数。Skill本文に Bearer 値を埋め込まない）:
+   `cd ~/git-repos && set -a && source .env.jarvis_private && set +a && curl -sS -X POST 'https://jarvis-dashboard-amber.vercel.app/api/advisor-weekly-pack' -H "Authorization: Bearer $ADVISOR_WEEKLY_PACK_SECRET" -H 'Content-Type: application/json' -d '{}'`
+   応答 `markdown` を材料に。1行: SB週次: OK · N件 · 金締 {start}〜{end}
+3) どちらも失敗: 「SBパック取得失敗」と1行。薄い材料で止めない（FRIDAY Mesh 可）。
+
+- GSK_API_KEY は持たない。
 - ★Journal は理解の正本。全部の出来事が載っている前提にしない。
 
 1. 各統括へ（薄い人は「今週薄」1行で可）。SBパックの自チーム節があれば渡す。

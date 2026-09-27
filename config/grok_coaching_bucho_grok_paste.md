@@ -60,7 +60,8 @@ DXの各行は、松野が読んで動けること。必須4点:
 ## SecondBrain 週次パック（日曜19:00 · 必須）
 
 週次の先頭で Cloud プロキシから金締（土〜金）の SB 要約パックを取る（Mac 不要）。
-- `POST https://jarvis-dashboard-amber.vercel.app/api/advisor-weekly-pack`
+- SB週次パック: Drive outbox 本線（Mac 日曜18:40）／補助は Computer Skill（`.env` の `ADVISOR_WEEKLY_PACK_SECRET`。値はチャット禁止）
+- API（検証用）: `POST https://jarvis-dashboard-amber.vercel.app/api/advisor-weekly-pack`
 - 秘密は Action の `ADVISOR_WEEKLY_PACK_SECRET` のみ。**GSK_API_KEY は持たない**（Genspark 直APIしない）
 - 応答 `markdown` を材料の正とする。★Journal は理解の正本（全部の出来事が載っている前提にしない）
 - 詳細手順: `config/grok_coaching_bucho_routine_週次.md` / `docs/Grok_アドバイザー週次材料パック_仕様_20260926.md`
