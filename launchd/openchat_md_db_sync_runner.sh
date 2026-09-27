@@ -14,12 +14,23 @@ PAUSE="${POC}/launchd/open_chat_watch_pause.sh"
 RESUME="${POC}/launchd/open_chat_watch_resume.sh"
 
 # 監視を pause したら、成功・失敗を問わず必ず戻す（静かな停止の再発防止）
+MARKER="${POC}/.line_auth/WATCH_RESUME_FAILED.txt"
 watch_paused=0
 resume_watch() {
   if [[ "$watch_paused" -eq 1 && -x "$RESUME" ]]; then
     "$RESUME" >>"$LOG" 2>&1 || true
     echo "# [watch] resumed (trap) at $(date '+%Y-%m-%d %H:%M:%S %z')" >>"$LOG"
     watch_paused=0
+    # 「呼べた」で終わらせない: 実プロセスまで確認し、失敗を静かにしない
+    sleep 5
+    if pgrep -f 'chrline_open_chat_realtime_watch' >/dev/null 2>&1; then
+      rm -f "$MARKER" 2>/dev/null || true
+      echo "# [watch] resume verified: process running" >>"$LOG"
+    else
+      echo "# [watch] RESUME FAILED: 監視プロセス未検出（トークン失効/QR要の可能性）" >>"$LOG"
+      printf '%s 監視のresumeに失敗（トークン失効/QR要の可能性）\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S %z')" >"$MARKER" 2>/dev/null || true
+    fi
   fi
 }
 trap resume_watch EXIT
