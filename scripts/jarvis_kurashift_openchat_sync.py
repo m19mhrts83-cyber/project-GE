@@ -453,8 +453,16 @@ def main() -> int:
         print(f"✅ kamiooya-qa line_openchat_logs UPSERT (staging・正本): {n}")
 
     if args.export_grok or do_apply:
-        export_for_grok(all_entries, GROK_SHARED / "神大家オプチャ_修繕業者・相談知見リスト.md")
-        export_catalog(all_entries, GROK_SHARED / "神大家オプチャ_データソースカタログ.md")
+        # Google Drive(CloudStorage) は同期中の EDEADLK 等で書けないことがある。
+        # DB(正本)反映は済んでいるため、二次投影の失敗で全体を落とさない。
+        try:
+            export_for_grok(all_entries, GROK_SHARED / "神大家オプチャ_修繕業者・相談知見リスト.md")
+            export_catalog(all_entries, GROK_SHARED / "神大家オプチャ_データソースカタログ.md")
+        except OSError as e:
+            print(
+                f"⚠️ Grok共有の書き出しをスキップ（{type(e).__name__}: {e}）",
+                file=sys.stderr,
+            )
 
     if not do_apply and not args.export_grok:
         print("ℹ️ --apply / --export-grok のいずれかが必要です（現状 Dry-run）")
