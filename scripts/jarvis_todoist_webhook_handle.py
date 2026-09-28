@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Todoist Webhook 未処理コメントを拾って報告／返信する。
+"""Todoist Webhook 未処理イベントを拾って報告／返信／要フォロー連動する。
 
-入口: Supabase jarvis-dashboard `todoist_webhook_events`（note:added）
+入口: Supabase jarvis-dashboard `todoist_webhook_events`
+  - note:added … コメント（表示:ヒント／チャット）
+  - item:completed … 要フォロー完了 → ホームから外す（表示:抑制不要）
 確認: Jarvis 分身トークンでコメント返信（対外メールではない）
-履歴: Todoist コメント + `processed_at`
+履歴: Todoist コメント + `processed_at` + watch payload.user_ack
 停止: JARVIS_TODOIST_WEBHOOK_HANDLE_DISABLE=1 / 自分投稿はスキップ
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -102,11 +104,11 @@ def _jarvis_uids() -> set[str]:
     return {x.strip() for x in raw.split(",") if x.strip()}
 
 
-def _fetch_unprocessed(*, limit: int) -> list[dict[str, Any]]:
+def _fetch_unprocessed(*, limit: int, event_name: str = "note:added") -> list[dict[str, Any]]:
     qs = (
         "todoist_webhook_events"
         "?select=id,delivery_id,event_name,user_id,event_data,initiator,created_at,processed_at"
-        "&event_name=eq.note:added"
+        f"&event_name=eq.{urllib.parse.quote(event_name)}"
         "&processed_at=is.null"
         "&order=created_at.asc"
         f"&limit={limit}"
@@ -129,20 +131,93 @@ def _summarize(row: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(ed, dict):
         ed = {}
     item = ed.get("item") if isinstance(ed.get("item"), dict) else {}
+    # item:completed は event_data がタスク本体そのもの、のことがある
+    if not item and ed.get("content"):
+        item = ed
     initiator = row.get("initiator") if isinstance(row.get("initiator"), dict) else {}
     posted_uid = str(ed.get("posted_uid") or initiator.get("id") or "")
     return {
         "row_id": row.get("id"),
+        "event_name": str(row.get("event_name") or ""),
         "created_at": row.get("created_at"),
-        "task_id": str(ed.get("item_id") or item.get("id") or ""),
-        "task_title": str(item.get("content") or ""),
-        "task_url": str(ed.get("url") or ""),
+        "task_id": str(ed.get("item_id") or item.get("id") or ed.get("id") or ""),
+        "task_title": str(item.get("content") or ed.get("content") or ""),
+        "task_url": str(ed.get("url") or item.get("url") or ""),
         "comment_id": str(ed.get("id") or ""),
-        "comment": str(ed.get("content") or "").strip(),
+        "comment": str(ed.get("content") or "").strip()
+        if str(row.get("event_name") or "") == "note:added"
+        else "",
         "posted_uid": posted_uid,
         "from_name": str(initiator.get("full_name") or ""),
         "from_email": str(initiator.get("email") or ""),
     }
+
+
+def _process_item_completed(*, limit: int) -> int:
+    """要フォロータスクの完了 → ホームから外す（表示:抑制不要）。"""
+    try:
+        from jarvis_watch_todoist_sync import (
+            ack_watch_on_todoist_complete,
+            watch_id_from_task_title,
+            _load_yaml,
+            _sync_cfg,
+            _load_state,
+        )
+    except Exception as exc:
+        print(f"{LOG}: complete import skip: {exc}", file=sys.stderr)
+        return 0
+
+    quiet = int((_sync_cfg(_load_yaml()).get("quiet_days") or 7))
+    state = _load_state()
+    by_watch = dict(state.get("todoist_by_watch_id") or {})
+    tid_to_wid = {
+        str(v.get("task_id") or ""): wid
+        for wid, v in by_watch.items()
+        if isinstance(v, dict) and v.get("task_id")
+    }
+
+    n = 0
+    for row in _fetch_unprocessed(limit=max(1, limit), event_name="item:completed"):
+        s = _summarize(row)
+        rid = int(s["row_id"])
+        tid = s["task_id"]
+        title = s["task_title"]
+        if not title and tid:
+            try:
+                req = urllib.request.Request(
+                    f"{DEFAULT_API}/tasks/{urllib.parse.quote(tid)}",
+                    headers={
+                        "Authorization": f"Bearer {_todoist_token()}",
+                        "Accept": "application/json",
+                    },
+                    method="GET",
+                )
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    tdata = json.loads(r.read().decode("utf-8"))
+                title = str(tdata.get("content") or "")
+            except Exception:
+                # 完了済みは 404 になりうる → mapping / タイトル無しならスキップ処理済み
+                pass
+        wid = watch_id_from_task_title(title) if title else None
+        if not wid and tid:
+            wid = tid_to_wid.get(tid)
+        if not wid:
+            # 要フォロー以外の完了 → そのまま消化
+            _mark_processed(rid)
+            continue
+        try:
+            res = ack_watch_on_todoist_complete(
+                wid, task_id=tid or None, quiet_days=quiet
+            )
+            _mark_processed(rid)
+            n += 1
+            print(
+                f"{LOG}: item:completed → home外し watch={wid} "
+                f"task={tid} ok={res.get('ok')}"
+            )
+        except Exception as exc:
+            print(f"{LOG}: complete FAIL {wid}: {exc}", file=sys.stderr)
+    return n
 
 
 def main() -> int:
@@ -169,6 +244,11 @@ def main() -> int:
     )
     args = ap.parse_args()
 
+    # 要フォロー完了 → ホームから外す（何もしなくてよい本線）
+    completed_n = _process_item_completed(limit=max(1, args.limit))
+    if completed_n:
+        print(f"{LOG}: 完了連動 {completed_n}件")
+
     # 要フォロー表示学習（Phase2）— reply 待ちなしで定型コメントを処理
     try:
         from jarvis_watch_todoist_sync import (
@@ -190,7 +270,7 @@ def main() -> int:
         print(f"{LOG}: display_hint import skip: {exc}", file=sys.stderr)
 
     skip_uids = set() if args.include_self else _jarvis_uids()
-    rows = _fetch_unprocessed(limit=max(1, args.limit))
+    rows = _fetch_unprocessed(limit=max(1, args.limit), event_name="note:added")
     items: list[dict[str, Any]] = []
     for row in rows:
         s = _summarize(row)
@@ -251,7 +331,8 @@ def main() -> int:
         items.append(s)
 
     if not items:
-        print(f"{LOG}: 未処理の人コメントなし")
+        if not completed_n:
+            print(f"{LOG}: 未処理の人コメントなし")
         return 0
 
     print(f"{LOG}")
