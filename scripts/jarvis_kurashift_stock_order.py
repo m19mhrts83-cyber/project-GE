@@ -45,7 +45,9 @@ from jarvis_kurashift_stock_watch import (
     load_open_positions,
     load_state,
     now_iso,
+    remember_todoist_task,
     resolve_position,
+    resolve_todoist_task_id,
     save_state,
     todoist_comment,
     todoist_create,
@@ -434,6 +436,9 @@ def todoist_notify_preview(
     lane = str((cfg.get("notify") or {}).get("todoist_lane") or "theme_stock")
     body = preview_body(preview, cfg)
     title_key = str(preview.get("theme_title") or preview["symbol"])
+    task_id = task_id or resolve_todoist_task_id(
+        state, theme_title=title_key, symbol=str(preview.get("symbol") or "")
+    )
     if task_id:
         todoist_comment(task_id=str(task_id), comment=body, dry_run=dry_run)
         return str(task_id)
@@ -447,7 +452,12 @@ def todoist_notify_preview(
     )
     tid = created.get("id") or created.get("task_id")
     if tid:
-        state.setdefault("todoist_tasks_by_theme", {})[title_key] = str(tid)
+        remember_todoist_task(
+            state,
+            task_id=str(tid),
+            theme_title=title_key,
+            symbol=str(preview.get("symbol") or ""),
+        )
     return str(tid) if tid else None
 
 
@@ -490,6 +500,12 @@ def cmd_preview(
     task_id = (state.get("todoist_tasks_by_theme") or {}).get(
         str(preview.get("theme_title") or preview["symbol"])
     )
+    if not task_id:
+        task_id = resolve_todoist_task_id(
+            state,
+            theme_title=str(preview.get("theme_title") or ""),
+            symbol=str(preview.get("symbol") or ""),
+        )
     if not args.no_notify:
         try:
             tid = todoist_notify_preview(
