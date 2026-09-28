@@ -169,6 +169,26 @@ def main() -> int:
     )
     args = ap.parse_args()
 
+    # 要フォロー表示学習（Phase2）— reply 待ちなしで定型コメントを処理
+    try:
+        from jarvis_watch_todoist_sync import (
+            apply_display_hint,
+            parse_display_hint_comment,
+            watch_id_from_task_title,
+            _load_yaml,
+            _sync_cfg,
+        )
+
+        hint_quiet = int(
+            (_sync_cfg(_load_yaml()).get("display_hint_quiet_days") or 30)
+        )
+    except Exception as exc:
+        apply_display_hint = None  # type: ignore
+        parse_display_hint_comment = None  # type: ignore
+        watch_id_from_task_title = None  # type: ignore
+        hint_quiet = 30
+        print(f"{LOG}: display_hint import skip: {exc}", file=sys.stderr)
+
     skip_uids = set() if args.include_self else _jarvis_uids()
     rows = _fetch_unprocessed(limit=max(1, args.limit))
     items: list[dict[str, Any]] = []
@@ -182,6 +202,52 @@ def main() -> int:
             if args.mark_only or args.reply:
                 _mark_processed(int(s["row_id"]))
             continue
+
+        # 定型「表示: …」→ display_hints（要フォロータスクのみ）
+        if (
+            apply_display_hint
+            and parse_display_hint_comment
+            and watch_id_from_task_title
+        ):
+            action = parse_display_hint_comment(s["comment"])
+            title = s["task_title"]
+            if action and not title and s["task_id"]:
+                try:
+                    req = urllib.request.Request(
+                        f"{DEFAULT_API}/tasks/{urllib.parse.quote(s['task_id'])}",
+                        headers={
+                            "Authorization": f"Bearer {_todoist_token()}",
+                            "Accept": "application/json",
+                        },
+                        method="GET",
+                    )
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        tdata = json.loads(r.read().decode("utf-8"))
+                    title = str(tdata.get("content") or "")
+                    s["task_title"] = title
+                except Exception:
+                    pass
+            wid = watch_id_from_task_title(title) if action else None
+            if action and wid:
+                try:
+                    apply_display_hint(wid, action=action, quiet_days=hint_quiet)
+                    if args.reply and s["task_id"]:
+                        _todoist_comment(
+                            s["task_id"],
+                            f"サマリ: 表示ヒントを反映しました（{action} / {wid}）",
+                        )
+                    _mark_processed(int(s["row_id"]))
+                    print(
+                        f"{LOG}: display_hint {action} watch={wid} "
+                        f"task={s['task_id']}"
+                    )
+                    continue
+                except Exception as exc:
+                    print(
+                        f"{LOG}: display_hint FAIL {wid}: {exc}",
+                        file=sys.stderr,
+                    )
+
         items.append(s)
 
     if not items:
