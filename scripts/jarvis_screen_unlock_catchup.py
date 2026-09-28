@@ -26,6 +26,7 @@ LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_screen_unlock"
 LOG_PATH = LOG_DIR / "catchup.log"
 
 # 15分間隔クラス。常駐（KeepAlive）や 45秒ワーカーは対象外。
+# bucho_inbox_poll_runner 内で calendar_sync / watch_todoist_sync も走る。
 RUNNERS = (
     "launchd/bucho_inbox_poll_runner.sh",
     "launchd/todoist_comment_inbox_runner.sh",

@@ -506,6 +506,28 @@ def push_watch(sb) -> int:
             if k in remote_pl and k not in payload:
                 payload[k] = remote_pl[k]
 
+        # 要フォロー→Todoist 同期が書いた導線・表示学習を Mac push で潰さない
+        for k in (
+            "todoist_task_id",
+            "todoist_url",
+            "todoist_synced_at",
+            "todoist_complete_requested",
+            "ack_source",
+            "display_hints",
+        ):
+            if k in remote_pl and k not in payload:
+                payload[k] = remote_pl[k]
+            elif k == "display_hints" and isinstance(remote_pl.get("display_hints"), dict):
+                # ローカル payload に無いキーだけ remote から補完
+                local_dh = payload.get("display_hints")
+                if not isinstance(local_dh, dict):
+                    payload["display_hints"] = dict(remote_pl["display_hints"])
+                else:
+                    for dk, dv in remote_pl["display_hints"].items():
+                        if dk not in local_dh:
+                            local_dh[dk] = dv
+                    payload["display_hints"] = local_dh
+
         st = it.get("status") or "active"
         arch_at = it.get("archived_at")
         if never_archive:

@@ -3,6 +3,7 @@
 # todoist_tasks は jarvis_bucho_inbox_poll.py 内で自動 apply（Mac起動中のみ）
 # アプリ開発 [Grok開発] カードも同帯で Todoist apps へ起票
 # due+@cal の完了・ラベル外しは同帯で Googleカレンダー予定を削除
+# ホーム要フォロー → Todoist 受信箱（watch_id dedup）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY="${HOME}/selenium_env/venv/bin/python"
@@ -25,6 +26,7 @@ fi
   "$PY" "${REPO_DIR}/scripts/jarvis_kurashift_obsidian_pick_sync.py" --apply || true
   "$PY" "${REPO_DIR}/scripts/jarvis_app_dev_todoist_sync.py" --apply || true
   "$PY" "${REPO_DIR}/scripts/jarvis_todoist_calendar_sync.py" --apply || true
+  "$PY" "${REPO_DIR}/scripts/jarvis_watch_todoist_sync.py" --apply || true
   echo "# end exit=$?"
 } >>"$LOG" 2>&1
 

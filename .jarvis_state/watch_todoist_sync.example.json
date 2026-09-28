@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "todoist_by_watch_id": {},
+  "note": "watch_id → { task_id, fingerprint, title, url, created_at }"
+}
