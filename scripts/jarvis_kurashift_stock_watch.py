@@ -56,6 +56,7 @@ def load_state() -> dict[str, Any]:
         "disabled": False,
         "watches": {},
         "todoist_tasks_by_theme": {},
+        "todoist_tasks_by_symbol": {},
         "fired": {},
         "last_eval_at": None,
         "last_propose_at": None,
@@ -205,6 +206,60 @@ def resolve_position(
         return positions[sym]
     alt = sym + ".T" if not sym.endswith(".T") else sym[:-2]
     return positions.get(alt)
+
+
+def existing_watch_for_symbol(
+    state: dict[str, Any], symbol: str
+) -> dict[str, Any] | None:
+    """watches に同一銘柄があれば返す（active/提案待ちどちらも二重起票防止）。"""
+    sym = _norm_symbol(symbol)
+    watches = state.get("watches") or {}
+    if sym in watches:
+        return watches[sym]
+    alt = sym + ".T" if not sym.endswith(".T") else sym[:-2]
+    return watches.get(alt)
+
+
+def resolve_todoist_task_id(
+    state: dict[str, Any], *, theme_title: str | None, symbol: str | None = None
+) -> str | None:
+    """Themeタイトル → なければ銘柄キーで既存 Todoist 親タスクを返す。"""
+    by_theme = state.get("todoist_tasks_by_theme") or {}
+    if theme_title and theme_title in by_theme:
+        return str(by_theme[theme_title])
+    by_sym = state.get("todoist_tasks_by_symbol") or {}
+    if symbol:
+        sym = _norm_symbol(symbol)
+        if sym in by_sym:
+            return str(by_sym[sym])
+        alt = sym + ".T" if not sym.endswith(".T") else sym[:-2]
+        if alt in by_sym:
+            return str(by_sym[alt])
+    # theme_title が無くても watches 経由
+    if symbol:
+        w = existing_watch_for_symbol(state, symbol)
+        if w and w.get("theme_title") and w["theme_title"] in by_theme:
+            return str(by_theme[w["theme_title"]])
+    return None
+
+
+def remember_todoist_task(
+    state: dict[str, Any],
+    *,
+    task_id: str,
+    theme_title: str | None,
+    symbol: str | None = None,
+) -> None:
+    tid = str(task_id)
+    if theme_title:
+        state.setdefault("todoist_tasks_by_theme", {})[str(theme_title)] = tid
+    if symbol:
+        state.setdefault("todoist_tasks_by_symbol", {})[_norm_symbol(symbol)] = tid
+
+
+def core_symbol_set(cfg: dict[str, Any]) -> set[str]:
+    oc = cfg.get("order") or {}
+    return {_norm_symbol(s) for s in (oc.get("core_symbols") or []) if str(s).strip()}
 
 
 def eval_symbol(
@@ -671,7 +726,9 @@ def cmd_eval_notify(
             signals_out.append(item)
             if notify and notify_cfg.get("on_threshold", True):
                 theme_key = str(watch.get("theme_title") or sym)
-                task_id = (state.get("todoist_tasks_by_theme") or {}).get(theme_key)
+                task_id = resolve_todoist_task_id(
+                    state, theme_title=theme_key, symbol=sym
+                )
                 body = comment_body(
                     summary=f"{sig['kind']} {sym} {watch.get('name') or ''} {sig['message']}",
                     confirm="買う／見送り／閾値修正？",
@@ -695,8 +752,11 @@ def cmd_eval_notify(
                     )
                     tid = created.get("id") or created.get("task_id")
                     if tid:
-                        state.setdefault("todoist_tasks_by_theme", {})[theme_key] = str(
-                            tid
+                        remember_todoist_task(
+                            state,
+                            task_id=str(tid),
+                            theme_title=theme_key,
+                            symbol=sym,
                         )
                 mark_fired(
                     state,
@@ -739,9 +799,12 @@ def cmd_propose(
     max_themes = int(propose_cfg.get("max_themes") or 3)
     exclude_themes = set(propose_cfg.get("exclude_themes") or [])
     exclude_ac = set(propose_cfg.get("exclude_asset_classes") or [])
+    core_syms = core_symbol_set(cfg)
 
     sb = sb_client()
     candidates: list[dict[str, Any]] = []
+    skipped_core = 0
+    skipped_dup = 0
     for it in load_watchlist():
         if not it.get("enabled", True):
             continue
@@ -750,6 +813,9 @@ def cmd_propose(
         if (it.get("asset_class") or "") in exclude_ac:
             continue
         sym = it["symbol"]
+        if _norm_symbol(sym) in core_syms:
+            skipped_core += 1
+            continue
         closes = load_closes(sb, sym)
         levels = compute_levels(closes, thr)
         sc = score_instrument(it, levels)
@@ -763,13 +829,14 @@ def cmd_propose(
         it = c["instrument"]
         lv = c["levels"]
         title = f"衛星_{it.get('theme') or 'stock'}_{it.get('ticker_jp') or it['symbol']}"
-        # 既存監視・既存 Todoist テーマと重複回避
-        if any(
-            (w.get("symbol") == it["symbol"] and w.get("active"))
-            for w in (state.get("watches") or {}).values()
-        ):
+        # 既存監視・提案待ち・既存 Todoist 親タスクと重複回避（銘柄キー含む）
+        if existing_watch_for_symbol(state, it["symbol"]):
+            skipped_dup += 1
             continue
-        if title in (state.get("todoist_tasks_by_theme") or {}):
+        if resolve_todoist_task_id(
+            state, theme_title=title, symbol=it["symbol"]
+        ):
+            skipped_dup += 1
             continue
         hyp = (
             f"{it.get('name')}（{it['symbol']}）close={lv['close']:.1f} "
@@ -826,7 +893,12 @@ def cmd_propose(
             )
             tid = created_t.get("id") or created_t.get("task_id")
             if tid:
-                state.setdefault("todoist_tasks_by_theme", {})[title] = str(tid)
+                remember_todoist_task(
+                    state,
+                    task_id=str(tid),
+                    theme_title=title,
+                    symbol=it["symbol"],
+                )
         created.append(
             {
                 "title": title,
@@ -837,7 +909,12 @@ def cmd_propose(
         )
 
     state["last_propose_at"] = now_iso()
-    return {"created": created, "candidates_scanned": len(candidates)}
+    return {
+        "created": created,
+        "candidates_scanned": len(candidates),
+        "skipped_core": skipped_core,
+        "skipped_dup": skipped_dup,
+    }
 
 
 def cmd_activate_theme(
