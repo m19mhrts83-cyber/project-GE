@@ -67,6 +67,8 @@ export default async function StockWatchPage() {
       "stock_watch_at",
       "stock_watch_summary",
       "stock_watch_watches",
+      "tachibana_api_ready",
+      "tachibana_api_status",
     ]);
 
   const meta: Record<string, { value: string; updated_at?: string }> = {};
@@ -90,6 +92,14 @@ export default async function StockWatchPage() {
     .limit(20);
   const orders = (orderRows || []) as OrderRow[];
 
+  const tachibanaReady = meta.tachibana_api_ready?.value === "1";
+  const tachibanaStatus = parseJson<{
+    ready?: boolean;
+    env?: string;
+    checked_at?: string;
+    auth_id?: string;
+  }>(meta.tachibana_api_status?.value);
+
   return (
     <Shell active="/stock-watch" email={user?.email ?? null}>
       <h1>株式ウォッチ</h1>
@@ -110,6 +120,16 @@ export default async function StockWatchPage() {
           {summary?.kinds?.length
             ? `（${summary.kinds.join(", ")}）`
             : ""}
+        </p>
+        <p className="meta">
+          立花API認証:{" "}
+          {tachibanaReady ? "READY" : "NOT READY"}
+          {tachibanaStatus?.env ? `（${tachibanaStatus.env}）` : ""}
+          {tachibanaStatus?.checked_at
+            ? ` · ${tachibanaStatus.checked_at}`
+            : ""}
+          {" · "}
+          <code>jarvis_kurashift_tachibana_auth_check.py --push</code>
         </p>
         <p className="meta">
           発注前プレビュー→対外確認ゲート: プレビューを作成し、Todoist
@@ -246,12 +266,22 @@ export default async function StockWatchPage() {
           <li>Theme を承認（または <code>--activate-theme</code>）</li>
           <li>「発注プレビューを作成」→ Todoist オーナー確認で内容を確認</li>
           <li>確認OKなら <code>--confirm</code>（対外確認ゲート）で手順を確定</li>
-          <li>立花等で単元・金額を確認して手動発注</li>
+          <li>
+            立花標準Web（
+            <a href="https://tr2.e-shiten.jp/e-shiten" target="_blank" rel="noreferrer">
+              tr2.e-shiten.jp
+            </a>
+            ）で現物・指値・数量を確認して手動発注（OTPは本人）
+          </li>
           <li>
             約定後 <code>--record-fill</code> で保有・取得単価を記録（売りサイン精密化）
           </li>
           <li>Todoist に「買った／見送り」コメント → オーナー確認経由で完了</li>
         </ol>
+        <p className="meta" style={{ marginTop: 8 }}>
+          手順ズレ検証:{" "}
+          <code>jarvis_kurashift_stock_order.py --verify-assist</code>
+        </p>
         <p className="meta" style={{ marginTop: 8 }}>
           <a href="/themes">テーマ一覧</a>
           {" · "}

@@ -39,6 +39,8 @@ propose:
   min_score: 0.55
   exclude_themes:
     - index
+    # 大型「日本コア」は衛星Theme提案のノイズになりやすい（Core隣接）。監視リスト自体は残す。
+    - japan_core
   exclude_asset_classes:
     - inverse_etf
 

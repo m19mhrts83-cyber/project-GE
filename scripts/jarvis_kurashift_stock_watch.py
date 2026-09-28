@@ -917,6 +917,76 @@ def cmd_propose(
     }
 
 
+def cmd_diagnose_propose(cfg: dict[str, Any]) -> dict[str, Any]:
+    """週次提案のノイズ診断（掲載／除外理由を全銘柄列挙）。通知・DB書込なし。"""
+    propose_cfg = cfg.get("propose") or {}
+    thr = cfg.get("thresholds") or {}
+    min_score = float(propose_cfg.get("min_score") or 0.55)
+    exclude_themes = set(propose_cfg.get("exclude_themes") or [])
+    exclude_ac = set(propose_cfg.get("exclude_asset_classes") or [])
+    cores = core_symbol_set(cfg)
+    sb = sb_client()
+    rows: list[dict[str, Any]] = []
+    for it in load_watchlist():
+        sym = it["symbol"]
+        reasons: list[str] = []
+        if not it.get("enabled", True):
+            reasons.append("disabled")
+        if (it.get("theme") or "") in exclude_themes:
+            reasons.append("exclude_theme")
+        if (it.get("asset_class") or "") in exclude_ac:
+            reasons.append("exclude_ac")
+        if _norm_symbol(sym) in cores:
+            reasons.append("core")
+        levels = None
+        score = 0.0
+        if not reasons:
+            closes = load_closes(sb, sym)
+            levels = compute_levels(closes, thr)
+            score = score_instrument(it, levels)
+            if not levels:
+                reasons.append("no_levels")
+            elif score < min_score:
+                reasons.append(f"below_min:{score:.2f}")
+            else:
+                reasons.append("candidate")
+        rows.append(
+            {
+                "symbol": sym,
+                "name": it.get("name"),
+                "theme": it.get("theme"),
+                "asset_class": it.get("asset_class"),
+                "enabled": bool(it.get("enabled", True)),
+                "score": round(score, 3),
+                "rebound_from_low_pct": (
+                    None
+                    if not levels
+                    else round(float(levels.get("rebound_from_low_pct") or 0), 2)
+                ),
+                "close": None if not levels else levels.get("close"),
+                "reason": ",".join(reasons),
+            }
+        )
+    rows.sort(
+        key=lambda r: (
+            0 if r["reason"] == "candidate" else 1,
+            -float(r["score"] or 0),
+            str(r["symbol"]),
+        )
+    )
+    candidates = [r for r in rows if r["reason"] == "candidate"]
+    return {
+        "min_score": min_score,
+        "exclude_themes": sorted(exclude_themes),
+        "exclude_asset_classes": sorted(exclude_ac),
+        "core_symbols": sorted(cores),
+        "instruments": len(rows),
+        "candidates": len(candidates),
+        "candidate_symbols": [r["symbol"] for r in candidates],
+        "rows": rows,
+    }
+
+
 def cmd_activate_theme(
     cfg: dict[str, Any], state: dict[str, Any], theme_id: str, *, dry_run: bool
 ) -> dict[str, Any]:
@@ -970,6 +1040,11 @@ def main() -> int:
     ap.add_argument("--eval", action="store_true")
     ap.add_argument("--notify", action="store_true")
     ap.add_argument("--propose-weekly", action="store_true")
+    ap.add_argument(
+        "--diagnose-propose",
+        action="store_true",
+        help="週次提案のノイズ診断（全銘柄の score / 除外理由）",
+    )
     ap.add_argument("--activate-theme", default="", help="Theme UUID を監視ON")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--range", default="6mo")
@@ -993,6 +1068,9 @@ def main() -> int:
         if rc != 0 and not args.dry_run:
             print("# fetch failed; continue eval if prices exist", file=sys.stderr)
 
+    if args.diagnose_propose:
+        results["diagnose_propose"] = cmd_diagnose_propose(cfg)
+
     if args.propose_weekly:
         results["propose"] = cmd_propose(
             cfg, state, notify=args.notify, dry_run=args.dry_run
@@ -1003,16 +1081,16 @@ def main() -> int:
             cfg, state, args.activate_theme.strip(), dry_run=args.dry_run
         )
 
-    if args.eval or (not args.propose_weekly and not args.activate_theme and not args.fetch):
-        # default: eval when nothing else? Prefer explicit --eval
-        if args.eval:
-            results["eval"] = cmd_eval_notify(
-                cfg, state, notify=args.notify, dry_run=args.dry_run
-            )
+    if args.eval:
+        results["eval"] = cmd_eval_notify(
+            cfg, state, notify=args.notify, dry_run=args.dry_run
+        )
 
-    if not args.dry_run:
+    if not args.dry_run and (
+        args.eval or args.propose_weekly or args.activate_theme
+    ):
         save_state(state)
-    else:
+    elif args.dry_run:
         print("# dry-run: state not saved")
 
     print("📎 KURASHIFT 株式ウォッチ")
