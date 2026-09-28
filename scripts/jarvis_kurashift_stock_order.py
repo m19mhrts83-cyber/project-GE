@@ -778,6 +778,136 @@ def cmd_record_fill(
     }
 
 
+
+def cmd_verify_assist(
+    cfg: dict[str, Any], state: dict[str, Any], args: argparse.Namespace
+) -> dict[str, Any]:
+    """購入アシスト手順の静的検証＋（監視ONなら）プレビュー構築。
+
+    立花Webの実操作は本人確認。ここでは手順テキスト・ガードのズレを機械チェック。
+    """
+    checks: list[dict[str, Any]] = []
+    oc = _order_cfg(cfg)
+    sample = {
+        "symbol": "8035.T",
+        "name": "東京エレクトロン",
+        "side": "buy",
+        "qty": 100,
+        "limit_price": 10000,
+        "odd_lot": False,
+        "money_path": oc.get("money_path") or "立花証券e支店",
+    }
+    steps = assist_steps(sample)
+    joined = "\n".join(steps)
+    checks.append(
+        {"code": "steps_count", "ok": len(steps) >= 5, "detail": f"{len(steps)} steps"}
+    )
+    checks.append(
+        {
+            "code": "mentions_tachibana_login",
+            "ok": "立花" in joined and "ログイン" in joined,
+            "detail": "立花ログイン手順あり",
+        }
+    )
+    checks.append(
+        {
+            "code": "mentions_record_fill",
+            "ok": "--record-fill" in joined,
+            "detail": "約定後 record-fill あり",
+        }
+    )
+    checks.append(
+        {
+            "code": "otp_not_delegated",
+            "ok": "OTP" in joined or "代行しない" in joined,
+            "detail": "OTP代行しない旨あり",
+        }
+    )
+    checks.append(
+        {
+            "code": "live_api_off",
+            "ok": not bool(oc.get("live_api")),
+            "detail": f"live_api={bool(oc.get('live_api'))}",
+        }
+    )
+    checks.append(
+        {
+            "code": "core_symbols_configured",
+            "ok": bool(oc.get("core_symbols")),
+            "detail": f"n={len(oc.get('core_symbols') or [])}",
+        }
+    )
+
+    preview_probe: dict[str, Any] | None = None
+    active = [
+        (sym, w)
+        for sym, w in (state.get("watches") or {}).items()
+        if w.get("active", True)
+    ]
+    try_sym = (args.symbol or "").strip() or (active[0][0] if active else "")
+    if try_sym:
+        try:
+            preview_probe = build_preview(
+                state=state,
+                sb=sb_client(),
+                cfg=cfg,
+                symbol=try_sym,
+                requested_side=args.side or "",
+                qty_arg=args.qty,
+            )
+            checks.append(
+                {
+                    "code": "preview_build",
+                    "ok": True,
+                    "detail": (
+                        f"{try_sym} {preview_probe.get('side')} "
+                        f"{preview_probe.get('qty')}@{preview_probe.get('limit_price')}"
+                    ),
+                }
+            )
+        except GuardError as e:
+            checks.append(
+                {"code": "preview_build", "ok": False, "detail": f"{try_sym}: {e}"}
+            )
+    else:
+        checks.append(
+            {
+                "code": "preview_build",
+                "ok": True,
+                "detail": "監視ON銘柄なし（静的手順のみ検証）",
+            }
+        )
+
+    tachibana_web = [
+        "標準Web https://tr2.e-shiten.jp/e-shiten にパスキー／PWでログイン",
+        "銘柄検索 → 現物（特定）→ 指値・数量・当日を確認",
+        "送信は本人（OTP／パスキー）。Jarvisは代行しない",
+        "約定後 --record-fill で数量・単価を live に記録",
+        "立花画面の単元／かぶミニ可否が手順と違う場合はこのタスクへコメント",
+    ]
+    ok = all(bool(c.get("ok")) for c in checks)
+    return {
+        "ok": ok,
+        "checks": checks,
+        "assist_steps": steps,
+        "tachibana_web_checklist": tachibana_web,
+        "preview": (
+            {
+                "symbol": preview_probe.get("symbol"),
+                "side": preview_probe.get("side"),
+                "qty": preview_probe.get("qty"),
+                "limit_price": preview_probe.get("limit_price"),
+                "signals": preview_probe.get("signals"),
+            }
+            if preview_probe
+            else None
+        ),
+        "active_watches": len(active),
+        "note": "立花Webの最終クリックは本人確認（このCLIは手順ズレ検出まで）",
+    }
+
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="KURASHIFT 発注前プレビュー＋対外確認ゲート")
     ap.add_argument("--preview", action="store_true", help="発注プレビューを作成")
@@ -787,6 +917,11 @@ def main() -> int:
     ap.add_argument("--price", type=float, default=None, help="約定単価（--record-fill）")
     ap.add_argument("--mode", default="live", help="trade_positions.mode（record-fill）")
     ap.add_argument("--record-fill", action="store_true", help="手動約定をポジションに反映")
+    ap.add_argument(
+        "--verify-assist",
+        action="store_true",
+        help="購入アシスト手順の静的検証（立花Web実操作は本人）",
+    )
     ap.add_argument("--confirm", default="", help="確定する trade_orders.id")
     ap.add_argument("--cancel", default="", help="取り消す trade_orders.id")
     ap.add_argument("--list", action="store_true")
@@ -801,7 +936,9 @@ def main() -> int:
         return 0
 
     try:
-        if args.record_fill:
+        if args.verify_assist:
+            out = cmd_verify_assist(cfg, load_state(), args)
+        elif args.record_fill:
             out = cmd_record_fill(cfg, args)
         elif args.confirm:
             out = cmd_confirm(cfg, load_state(), args)
@@ -816,20 +953,23 @@ def main() -> int:
                 save_state(state)
         else:
             ap.error(
-                "--preview / --confirm / --cancel / --list / --record-fill のいずれかが必要です"
+                "--preview / --confirm / --cancel / --list / --record-fill / --verify-assist のいずれかが必要です"
             )
             return 2
     except GuardError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
 
-    label = (
-        "📎 KURASHIFT ポジション記録"
-        if args.record_fill
-        else "📎 KURASHIFT 発注プレビュー（実発注なし）"
-    )
+    if args.verify_assist:
+        label = "📎 KURASHIFT 購入アシスト検証"
+    elif args.record_fill:
+        label = "📎 KURASHIFT ポジション記録"
+    else:
+        label = "📎 KURASHIFT 発注プレビュー（実発注なし）"
     print(label)
     print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    if args.verify_assist and not out.get("ok"):
+        return 1
     return 0
 
 
