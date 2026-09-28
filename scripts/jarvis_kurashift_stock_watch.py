@@ -140,8 +140,80 @@ def compute_levels(
     }
 
 
+def _norm_symbol(symbol: str) -> str:
+    return str(symbol or "").strip().upper()
+
+
+def load_open_positions(
+    sb: Any, *, prefer_modes: list[str] | None = None
+) -> dict[str, dict[str, Any]]:
+    """trade_positions の open を symbol→1件に畳む（prefer_modes 先頭優先）。
+
+    live = 立花等の実弾記録（--record-fill）。paper = Lab／検証用。
+    """
+    modes = [str(m).strip() for m in (prefer_modes or ["live", "paper"]) if str(m).strip()]
+    if not modes:
+        modes = ["live", "paper"]
+    out: dict[str, dict[str, Any]] = {}
+    try:
+        res = (
+            sb.table("trade_positions")
+            .select("id,mode,symbol,qty,avg_price,opened_at,status,payload")
+            .eq("status", "open")
+            .in_("mode", modes)
+            .execute()
+        )
+    except Exception as e:
+        print(f"# load_open_positions soft-fail: {e}", file=sys.stderr)
+        return out
+    rank = {m: i for i, m in enumerate(modes)}
+    rows = sorted(
+        res.data or [],
+        key=lambda r: (rank.get(str(r.get("mode")), 99), str(r.get("symbol") or "")),
+    )
+    for row in rows:
+        sym = _norm_symbol(str(row.get("symbol") or ""))
+        if not sym:
+            continue
+        qty = int(row.get("qty") or 0)
+        if qty <= 0:
+            continue
+        existing = out.get(sym)
+        if existing is not None:
+            # 既に優先モードが入っている
+            continue
+        avg = float(row.get("avg_price") or 0)
+        out[sym] = {
+            "id": row.get("id"),
+            "mode": str(row.get("mode") or ""),
+            "symbol": sym,
+            "qty": qty,
+            "avg_price": avg,
+            "opened_at": row.get("opened_at"),
+            "source": "trade_positions",
+        }
+    return out
+
+
+def resolve_position(
+    positions: dict[str, dict[str, Any]], symbol: str
+) -> dict[str, Any] | None:
+    sym = _norm_symbol(symbol)
+    if not sym:
+        return None
+    if sym in positions:
+        return positions[sym]
+    alt = sym + ".T" if not sym.endswith(".T") else sym[:-2]
+    return positions.get(alt)
+
+
 def eval_symbol(
-    watch: dict[str, Any], levels: dict[str, Any], thr: dict[str, Any]
+    watch: dict[str, Any],
+    levels: dict[str, Any],
+    thr: dict[str, Any],
+    *,
+    position: dict[str, Any] | None = None,
+    position_cfg: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     signals: list[dict[str, Any]] = []
     close = float(levels["close"])
@@ -154,6 +226,12 @@ def eval_symbol(
     sell_dd = float(
         watch.get("sell_drawdown_pct") or thr.get("sell_drawdown_pct") or 8.0
     )
+    pos_cfg = position_cfg or {}
+    require_pos = bool(pos_cfg.get("require_for_sell", True))
+    tp_cost = pos_cfg.get("take_profit_from_cost_pct")
+    stop_cost = pos_cfg.get("stop_from_cost_pct")
+    take_profit_pct = float(tp_cost if tp_cost is not None else upside_target)
+    stop_pct = float(stop_cost if stop_cost is not None else sell_dd)
 
     if close <= bottom * (1.0 + near_pct):
         signals.append(
@@ -182,24 +260,119 @@ def eval_symbol(
     peak_f = float(peak) if peak is not None else float(levels["period_high"])
     peak_f = max(peak_f, close)
     watch["peak_since_watch"] = peak_f
-    if peak_f > 0:
-        dd = (peak_f - close) / peak_f * 100.0
-        if rebound >= upside_target and dd >= sell_dd * 0.5:
+
+    pos_qty = int((position or {}).get("qty") or 0)
+    pos_avg = float((position or {}).get("avg_price") or 0)
+    pos_mode = str((position or {}).get("mode") or "")
+    has_pos = pos_qty > 0 and pos_avg > 0
+
+    # 監視ピークからの押し（従来）
+    peak_dd = (peak_f - close) / peak_f * 100.0 if peak_f > 0 else 0.0
+    # 取得単価からの含み損益（ポジション連動）
+    cost_pnl_pct = ((close - pos_avg) / pos_avg * 100.0) if has_pos else None
+
+    def _pos_tail() -> str:
+        if not has_pos:
+            return ""
+        return (
+            f" 保有={pos_qty}株@{pos_avg:.1f}（{pos_mode or '—'}"
+            f" 含み{cost_pnl_pct:+.1f}%）"
+        )
+
+    if require_pos and not has_pos:
+        # 保有なしでは売りサインを出さない（価格だけの押しはノイズ）
+        return signals
+
+    if has_pos and cost_pnl_pct is not None:
+        # 利確: 取得単価から目標％到達＋監視高値から半閾値以上の押し
+        if cost_pnl_pct >= take_profit_pct and peak_dd >= sell_dd * 0.5:
+            signals.append(
+                {
+                    "kind": "sell_signal",
+                    "message": (
+                        f"取得単価から利確候補 +{cost_pnl_pct:.1f}%≥{take_profit_pct}% "
+                        f"押し={peak_dd:.1f}% close={close:.1f} peak={peak_f:.1f}"
+                        f"{_pos_tail()}"
+                    ),
+                    "position": {
+                        "qty": pos_qty,
+                        "avg_price": pos_avg,
+                        "mode": pos_mode,
+                        "cost_pnl_pct": cost_pnl_pct,
+                    },
+                }
+            )
+        # 損切り: 取得単価からの含み損
+        elif cost_pnl_pct <= -stop_pct:
+            signals.append(
+                {
+                    "kind": "sell_signal",
+                    "message": (
+                        f"取得単価から損切り候補 {cost_pnl_pct:.1f}%≤-{stop_pct}% "
+                        f"close={close:.1f} avg={pos_avg:.1f}"
+                        f"{_pos_tail()}"
+                    ),
+                    "position": {
+                        "qty": pos_qty,
+                        "avg_price": pos_avg,
+                        "mode": pos_mode,
+                        "cost_pnl_pct": cost_pnl_pct,
+                    },
+                }
+            )
+        # トレーリング: 監視高値からの下落（保有あり）
+        elif peak_dd >= sell_dd:
+            signals.append(
+                {
+                    "kind": "sell_signal",
+                    "message": (
+                        f"高値からの下落 {peak_dd:.1f}%≥{sell_dd}% "
+                        f"close={close:.1f} peak={peak_f:.1f}"
+                        f"{_pos_tail()}"
+                    ),
+                    "position": {
+                        "qty": pos_qty,
+                        "avg_price": pos_avg,
+                        "mode": pos_mode,
+                        "cost_pnl_pct": cost_pnl_pct,
+                    },
+                }
+            )
+        elif rebound >= upside_target and peak_dd >= sell_dd * 0.5:
             signals.append(
                 {
                     "kind": "sell_signal",
                     "message": (
                         f"目標近傍後の押し close={close:.1f} 監視高値={peak_f:.1f}"
-                        f" 下落={dd:.1f}%（売閾値={sell_dd}%）"
+                        f" 下落={peak_dd:.1f}%（売閾値={sell_dd}%）"
+                        f"{_pos_tail()}"
                     ),
+                    "position": {
+                        "qty": pos_qty,
+                        "avg_price": pos_avg,
+                        "mode": pos_mode,
+                        "cost_pnl_pct": cost_pnl_pct,
+                    },
                 }
             )
-        elif dd >= sell_dd:
+    elif peak_f > 0:
+        # require_for_sell=false のフォールバック（旧挙動）
+        if rebound >= upside_target and peak_dd >= sell_dd * 0.5:
             signals.append(
                 {
                     "kind": "sell_signal",
                     "message": (
-                        f"高値からの下落 {dd:.1f}%≥{sell_dd}% "
+                        f"目標近傍後の押し close={close:.1f} 監視高値={peak_f:.1f}"
+                        f" 下落={peak_dd:.1f}%（売閾値={sell_dd}%）"
+                    ),
+                }
+            )
+        elif peak_dd >= sell_dd:
+            signals.append(
+                {
+                    "kind": "sell_signal",
+                    "message": (
+                        f"高値からの下落 {peak_dd:.1f}%≥{sell_dd}% "
                         f"close={close:.1f} peak={peak_f:.1f}"
                     ),
                 }
@@ -394,6 +567,9 @@ def upsert_sync_meta(
                 "bottom_hint": v.get("bottom_hint"),
                 "upside_target_pct": v.get("upside_target_pct"),
                 "sell_drawdown_pct": v.get("sell_drawdown_pct"),
+                "position_qty": v.get("position_qty"),
+                "position_avg": v.get("position_avg"),
+                "position_mode": v.get("position_mode"),
             }
             for k, v in watches.items()
         }
@@ -440,12 +616,17 @@ def cmd_eval_notify(
 ) -> dict[str, Any]:
     thr = cfg.get("thresholds") or {}
     notify_cfg = cfg.get("notify") or {}
+    pos_cfg = cfg.get("position") or {}
     lane = str(notify_cfg.get("todoist_lane") or "theme_stock")
     dedupe_h = float(notify_cfg.get("dedupe_hours") or 48)
     owner_kinds = set(notify_cfg.get("owner_confirm_kinds") or [])
     sb = sb_client()
+    positions = load_open_positions(
+        sb, prefer_modes=list(pos_cfg.get("prefer_modes") or ["live", "paper"])
+    )
     signals_out: list[dict[str, Any]] = []
     evaluated = 0
+    with_position = 0
 
     for sym, watch in list((state.get("watches") or {}).items()):
         if not watch.get("active", True):
@@ -457,7 +638,19 @@ def cmd_eval_notify(
         evaluated += 1
         if watch.get("bottom_hint") is None:
             watch["bottom_hint"] = levels["bottom_hint"]
-        sigs = eval_symbol(watch, levels, thr)
+        pos = resolve_position(positions, sym)
+        if pos:
+            with_position += 1
+            watch["position_qty"] = pos.get("qty")
+            watch["position_avg"] = pos.get("avg_price")
+            watch["position_mode"] = pos.get("mode")
+        else:
+            watch.pop("position_qty", None)
+            watch.pop("position_avg", None)
+            watch.pop("position_mode", None)
+        sigs = eval_symbol(
+            watch, levels, thr, position=pos, position_cfg=pos_cfg
+        )
         for sig in sigs:
             day = str(levels["trade_date"])
             key = fired_key(sig["kind"], sym, day)
@@ -473,6 +666,8 @@ def cmd_eval_notify(
                 "close": levels["close"],
                 "trade_date": day,
             }
+            if sig.get("position"):
+                item["position"] = sig["position"]
             signals_out.append(item)
             if notify and notify_cfg.get("on_threshold", True):
                 theme_key = str(watch.get("theme_title") or sym)
@@ -511,6 +706,8 @@ def cmd_eval_notify(
 
     summary = {
         "evaluated": evaluated,
+        "with_position": with_position,
+        "positions_loaded": len(positions),
         "signals": len(signals_out),
         "kinds": [s["kind"] for s in signals_out],
         "at": now_iso(),
@@ -524,7 +721,7 @@ def cmd_eval_notify(
             )
         except Exception as e:
             print(f"# sync_meta soft-fail: {e}", file=sys.stderr)
-    return {"summary": summary, "signals": signals_out}
+    return {"summary": summary, "signals": signals_out, "positions": list(positions.keys())}
 
 
 def cmd_propose(

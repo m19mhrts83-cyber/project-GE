@@ -13,6 +13,9 @@ type WatchRow = {
   bottom_hint?: number;
   upside_target_pct?: number;
   sell_drawdown_pct?: number;
+  position_qty?: number;
+  position_avg?: number;
+  position_mode?: string;
 };
 
 type OrderPayload = {
@@ -93,6 +96,7 @@ export default async function StockWatchPage() {
       <p className="sub">
         Theme 衛星スリーブの閾値監視。判断・確認・動きは Todoist「Theme株式」。
         Phase1 は<strong>自動発注なし</strong>（立花 API はアプリ開発の未着手）。
+        売りサインは <code>trade_positions</code>（live／paper）の保有・取得単価と連携。
       </p>
 
       <div className="card notice" style={{ marginBottom: 16 }}>
@@ -132,6 +136,17 @@ export default async function StockWatchPage() {
                     : "—"}
                   {" / "}上昇目標 {w.upside_target_pct ?? "—"}%
                   {" / "}売下落 {w.sell_drawdown_pct ?? "—"}%
+                  {w.position_qty != null ? (
+                    <>
+                      {" / "}保有 {w.position_qty}株
+                      {w.position_avg != null
+                        ? `@${Number(w.position_avg).toFixed(1)}`
+                        : ""}
+                      {w.position_mode ? `（${w.position_mode}）` : ""}
+                    </>
+                  ) : (
+                    <>{" / "}保有未記録</>
+                  )}
                   {w.theme_id ? (
                     <>
                       {" · "}
@@ -232,6 +247,9 @@ export default async function StockWatchPage() {
           <li>「発注プレビューを作成」→ Todoist オーナー確認で内容を確認</li>
           <li>確認OKなら <code>--confirm</code>（対外確認ゲート）で手順を確定</li>
           <li>立花等で単元・金額を確認して手動発注</li>
+          <li>
+            約定後 <code>--record-fill</code> で保有・取得単価を記録（売りサイン精密化）
+          </li>
           <li>Todoist に「買った／見送り」コメント → オーナー確認経由で完了</li>
         </ol>
         <p className="meta" style={{ marginTop: 8 }}>

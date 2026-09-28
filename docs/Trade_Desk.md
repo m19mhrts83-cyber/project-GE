@@ -74,7 +74,7 @@
 | **LifePlan** | 年次4段階ルーティン・αβγ 20/60/20・計画スナップショット | 運用だけで生活／教育を食う |
 | **Core** | インデックス年1RB・SBI NISA クレカ積立月9万固定（上乗せしない）・Bloomo固定・保険（真治＋千景）・既存口座。あかつきGS劣後債5.15%は維持（売らない・これ以上増やさない）。余剰は生活防衛＋物件バッファ → 次物件キープ → Theme | 固定スリーブの無断いじり・既存債券の売却提案・SBI 9万超への追加入金推奨 |
 | **Theme** | 大きな流れ・Bloomo動的・立花等。提案→相談→承認→完走 | 日次連射・ログなし・承認後のユーザー待ち |
-| **株式ウォッチ** | Theme 衛星の閾値監視（`/stock-watch`）＋発注前プレビュー／対外確認ゲート。判断は Todoist **Theme株式** | 自動発注・NISAコア・Lab混線 |
+| **株式ウォッチ** | Theme 衛星の閾値監視（`/stock-watch`）＋発注前プレビュー／対外確認ゲート。売りサインは `trade_positions`（live／paper）の保有・取得単価連動（`--record-fill`）。判断は Todoist **Theme株式**。対象は**東証上場銘柄のみ**（立花e支店は海外株式非対応・恒久。GAFAM等は価格監視のみで watchlist `enabled: false`） | 自動発注・NISAコア・Lab混線・米国個別株の実弾化 |
 | **Lab** | 平均回帰の小額実験（旧 Trade Desk 本線） | 利回り本線にしない |
 
 支出目標: **貯蓄20%（α）／生活60%（β）／自己投資・教育20%（γ）**。**δ不動産は成長評価の分母に含めない**。
@@ -175,7 +175,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_job_worker.py --dry-run
 ```
 
-立花口座開設・API鍵の手順は従来どおり（実弾直前）。詳細コマンドは `docs/運用コマンド一覧.md` §7.6。
+立花口座開設・API鍵（公開鍵認証）の取得手順は `docs/KURASHIFT_立花API_認証設定.md`（APIはv4r10。v4r9は2026-09-27廃止。口座開設済み・認証ID/秘密鍵は未取得）。詳細コマンドは `docs/運用コマンド一覧.md` §7.6。
 
 ## 関連
 
