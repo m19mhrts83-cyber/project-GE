@@ -26,6 +26,8 @@ fi
   "$PY" "${REPO_DIR}/scripts/jarvis_kurashift_obsidian_pick_sync.py" --apply || true
   "$PY" "${REPO_DIR}/scripts/jarvis_app_dev_todoist_sync.py" --apply || true
   "$PY" "${REPO_DIR}/scripts/jarvis_todoist_calendar_sync.py" --apply || true
+  # Webhook: item:completed → ホーム外し / 表示:コメント学習
+  "$PY" "${REPO_DIR}/scripts/jarvis_todoist_webhook_handle.py" || true
   "$PY" "${REPO_DIR}/scripts/jarvis_watch_todoist_sync.py" --apply || true
   echo "# end exit=$?"
 } >>"$LOG" 2>&1

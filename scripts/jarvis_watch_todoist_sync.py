@@ -517,8 +517,51 @@ def main() -> int:
         if task_id:
             task = _get_task(cfg, task_id) if do_apply else {"id": task_id, "content": title}
             if do_apply and not _is_task_open(task):
-                # 完了済み: 同じ指紋なら ack。指紋変化（再発）なら reopen
-                if prev.get("fingerprint") == fp:
+                # 完了済み: 初回完了は必ず ack（表示:抑制不要）。
+                # 以前完了済みなのに指紋が変わって再表示されたときだけ reopen。
+                already_done = bool(prev.get("completed_at"))
+                if already_done and prev.get("fingerprint") != fp:
+                    try:
+                        _todoist_req(
+                            "POST",
+                            f"/tasks/{urllib.parse.quote(task_id)}/reopen",
+                            cfg=cfg,
+                        )
+                        body_re: dict[str, Any] = {"content": title}
+                        if due:
+                            body_re["due_string"] = due
+                        _todoist_req(
+                            "POST",
+                            f"/tasks/{urllib.parse.quote(task_id)}",
+                            cfg=cfg,
+                            body=body_re,
+                        )
+                        _todoist_req(
+                            "POST",
+                            "/comments",
+                            cfg=cfg,
+                            body={
+                                "task_id": task_id,
+                                "content": (
+                                    f"[Jarvis要フォロー同期] 再発のため reopen\n"
+                                    f"level={row.get('level')} fingerprint変化"
+                                )[:1900],
+                            },
+                        )
+                        updated += 1
+                        lines.append(f"  · [reopen] {wid}")
+                        prev["fingerprint"] = fp
+                        prev["title"] = title
+                        prev.pop("completed_at", None)
+                        mappings[wid] = prev
+                    except Exception as exc:
+                        lines.append(f"  ! reopen fail {wid}: {exc} → 新規へ")
+                        mappings.pop(wid, None)
+                        task_id = ""
+                        prev = {}
+                    if task_id:
+                        continue
+                else:
                     from jarvis_watch_user_ack import make_user_ack
 
                     def _ack(p: dict[str, Any], r: dict[str, Any]) -> None:
@@ -541,46 +584,6 @@ def main() -> int:
                         timespec="seconds"
                     )
                     mappings[wid] = prev
-                    continue
-                try:
-                    _todoist_req(
-                        "POST",
-                        f"/tasks/{urllib.parse.quote(task_id)}/reopen",
-                        cfg=cfg,
-                    )
-                    body_re: dict[str, Any] = {"content": title}
-                    if due:
-                        body_re["due_string"] = due
-                    _todoist_req(
-                        "POST",
-                        f"/tasks/{urllib.parse.quote(task_id)}",
-                        cfg=cfg,
-                        body=body_re,
-                    )
-                    _todoist_req(
-                        "POST",
-                        "/comments",
-                        cfg=cfg,
-                        body={
-                            "task_id": task_id,
-                            "content": (
-                                f"[Jarvis要フォロー同期] 再発のため reopen\n"
-                                f"level={row.get('level')} fingerprint変化"
-                            )[:1900],
-                        },
-                    )
-                    updated += 1
-                    lines.append(f"  · [reopen] {wid}")
-                    prev["fingerprint"] = fp
-                    prev["title"] = title
-                    prev.pop("completed_at", None)
-                    mappings[wid] = prev
-                except Exception as exc:
-                    lines.append(f"  ! reopen fail {wid}: {exc} → 新規へ")
-                    mappings.pop(wid, None)
-                    task_id = ""
-                    prev = {}
-                if task_id:
                     continue
 
             if task_id:
@@ -829,6 +832,68 @@ def parse_display_hint_comment(text: str) -> str | None:
 def watch_id_from_task_title(title: str) -> str | None:
     m = re.search(r"\[要フォロー\]\[([^\]]+)\]", str(title or ""))
     return m.group(1).strip() if m else None
+
+
+def ack_watch_on_todoist_complete(
+    watch_id: str,
+    *,
+    task_id: str | None = None,
+    quiet_days: int | None = None,
+) -> dict[str, Any]:
+    """Todoist 完了 → ホーム要フォローから外す（user_ack）。表示:抑制は不要。"""
+    from jarvis_watch_user_ack import build_fingerprint, make_user_ack
+
+    days = int(quiet_days) if quiet_days is not None else 7
+    wid = str(watch_id or "").strip()
+    if not wid:
+        return {"ok": False, "error": "watch_id empty"}
+
+    def mut(p: dict[str, Any], r: dict[str, Any]) -> None:
+        fp = build_fingerprint(
+            wid,
+            level=str(r.get("level") or ""),
+            summary=str(r.get("summary") or ""),
+            payload=p,
+        )
+        p["user_ack"] = make_user_ack(fp, days=days)
+        p["user_ack"]["acked_level"] = str(r.get("level") or "")
+        p["user_ack"]["ack_source"] = "todoist"
+        p["show_banner"] = False
+        p["badge_suppressed"] = True
+        if task_id:
+            p["todoist_task_id"] = str(task_id)
+            p["todoist_url"] = _task_url(str(task_id))
+
+    pl = _patch_watch_payload(wid, mut)
+    if pl is None:
+        return {"ok": False, "error": "watch not found", "watch_id": wid}
+
+    # state の fingerprint を揃えて再起票を防ぐ
+    state = _load_state()
+    mappings = dict(state.get("todoist_by_watch_id") or {})
+    prev = dict(mappings.get(wid) or {})
+    if task_id:
+        prev["task_id"] = str(task_id)
+    from jarvis_watch_user_ack import build_fingerprint
+
+    # fingerprint は patch 後 payload で再計算
+    rows = _sb_req(
+        "GET",
+        f"watch_status?id=eq.{urllib.parse.quote(wid)}&select=id,level,summary,payload",
+    )
+    if isinstance(rows, list) and rows:
+        r0 = rows[0]
+        prev["fingerprint"] = build_fingerprint(
+            wid,
+            level=str(r0.get("level") or ""),
+            summary=str(r0.get("summary") or ""),
+            payload=_as_dict(r0.get("payload")),
+        )
+    prev["completed_at"] = datetime.now(JST).isoformat(timespec="seconds")
+    mappings[wid] = prev
+    state["todoist_by_watch_id"] = mappings
+    _save_state(state)
+    return {"ok": True, "watch_id": wid, "ack_source": "todoist"}
 
 
 if __name__ == "__main__":
