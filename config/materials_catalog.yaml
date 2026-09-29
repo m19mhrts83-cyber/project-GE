@@ -55,6 +55,11 @@ items:
   title: DX互助会 勉強会資料トップ
   url: https://m19mhrts83-cyber.github.io/project-GE/docs/
   note: 回別一覧への入口
+- id: dx-new-member-line-note
+  lane: dx
+  title: 新メンバー案内（LINEノート用）
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/DX互助会_新メンバー案内_LINEノート.md
+  note: 資料・アプリ・回別リンクの貼付用まとめ
 - id: dx-slides-1
   lane: dx
   title: 第1回スライド（dx-slides）
