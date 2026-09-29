@@ -29,13 +29,14 @@ https://www.notion.so/2eff6bbe5a7680f0a165ee1457a25f2b
 ━━━━━━━━━━━━
 ■ いま共有・活用しているもの
 ━━━━━━━━━━━━
-① 周辺MAP（番号ピン地図）
-https://ma-8cfk63x74bh5.raimo-app.buzz
-予備: https://m19mhrts83-cyber.github.io/project-GE/shuhen-map.html
-
-② 神大家 Q&Aチャットボット
+① 神大家 Q&Aチャットボット
 https://ma-54t2keqdelz3.raimo-app.buzz
 （ログイン後、質問すると出典付きで答えます）
+
+② 周辺MAPシリーズ
+資料と実際のツールはここを見てね
+https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html
+（説明資料・番号ピン地図・プロンプトへの入口あり）
 
 ③ 勉強会スライド（Web・ログイン不要）
 https://m19mhrts83-cyber.github.io/project-GE/docs/
@@ -58,7 +59,8 @@ https://m19mhrts83-cyber.github.io/project-GE/docs/
 | Notion ハブ（入口の正） | `https://www.notion.so/2eff6bbe5a7680f0a165ee1457a25f2b` |
 | Drive 共有（Notion から辿る） | `https://drive.google.com/drive/folders/1ZVND1RYGYpkWrE8PaisQuuVpbk8XmgDy` |
 | Pages 資料ハブ | `https://m19mhrts83-cyber.github.io/project-GE/docs/` |
-| ノートに載せない | 回別URLの全列挙、チャプロ各Step、神大家AI推進一覧、Prompt Share 詳細 |
+| 周辺MAPシリーズ入口 | `https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html`（資料＋ツール） |
+| ノートに載せない | 回別URLの全列挙、チャプロ各Stepの直列挙、Prompt Share 詳細 |
 | Jarvis 自分用 | `/docs/jarvis-self/` は互助会向けではない |
 
 意図的に絞った理由: リンクが多いと迷子になる。過去分・協議ネタは Notion、日常で触るものだけノートに残す。
