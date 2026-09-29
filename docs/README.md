@@ -4,6 +4,7 @@
 HTML 資料を外部から閲覧・Notion でリンク共有するために使います。
 
 - **トップページ**（`index.html`）: 第1回・第2回・第3回…と分岐する一覧。第1回は外部サイト（dx-slides）、第2回は `2kai.html`（3本のスライド）、第3回は準備中。
+- **メンバー案内（LINEノート用）**: `DX互助会_メンバー案内_LINEノート.md` — 資料ハブ・Notion／Drive・アプリ・回別URLの貼付用（新メンバー＋リマインド兼用）。
 - **第2回・cute版スライド例**: `Obsidian紹介_DX互助会向け_cute.html` + 共通スタイル `css/slides-cute.css` + イラスト `assets/dx_obsidian_cute/*.svg`。正本の表は `_drafts/slides_outline_obsidian_cute.md`。
 - **NotebookLM（MCP・ソース手順）**: `N1_NotebookLM/` — インストール・Cursor連携・ソース化のメモ。Cursor では `@docs/N1_NotebookLM` で参照。
 - **神・大家さん倶楽部**: `260308_目黒さん面談_打ち合わせ用.html` — 目黒さん面談用の打ち合わせ資料（AI活用・法人サポートの選択肢など）。共有用に同じURLで公開可能。
