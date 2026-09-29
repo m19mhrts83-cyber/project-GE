@@ -47,8 +47,11 @@
 ## 材料（v1）
 
 1. Drive **Obsidian ★Journal**（admin）— `Shift AI` / `シフトAI` / `ワールドインテック` / `ロードマップ` / `ワークショップ` / `DX`
-2. 松野／ホークからの **事実要約**（チャット貼付待ち禁止）
-3. **後フェーズ**: admin Gmail · 215 yoritoori（v1 ではやらない）
+2. `outbox_to_teams/partner_dx/` の最新「週次材料パック」（あれば）。無ければ薄い材料で進む
+3. 松野／ホークからの **事実要約**（チャット貼付待ち禁止）
+4. **後フェーズ**: admin Gmail · 215 yoritoori（v1 ではやらない）
+
+★Journal は **理解の正本**。返答に **「Journalに無い重要」** を1つ（該当なしならギャップなし）。SB全文再掲禁止。**Genspark 直API・GSK_API_KEY は持たない**。
 
 ## Jarvisボックス
 

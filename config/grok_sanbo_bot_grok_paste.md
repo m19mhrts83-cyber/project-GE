@@ -162,6 +162,7 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
 1. Notion **ミーティングメモ**（直近1〜2週 · タイトル検索）
 2. 各統括・部長の **週次レビュー／結果**（チャンネル · Drive team フォルダ）
 3. オープン中の Notion タスク一覧（レーン横断でざっと）
+4. **SB週次パック**（読取のみ）: `20_outbox_to_grok/` または `outbox_to_teams/hawk/` の最新「週次材料パック」。無ければ「SBパック無し」1行。**再取得しない**。Genspark 直API・GSKキーは持たない
 
 読めたら1行: `Notion読取: OK · MTG N件 · openタスク概数`
 読めない（プラグイン障害等）: `Notion読取: NG` → **提案リストだけ**作り、下記 inbox で Jarvis に委譲（止めない）
@@ -396,6 +397,7 @@ period_key: YYYY-MM
 - 週次で各部署の長文コーチングを代行すること（要点だけ吸い上げる）
 - Notion タスクの **無制限大量作成**（週5超は確認）
 - 曖昧なタスクの **黙っての一括削除**（候補→確認）
+- **Genspark / GSK_API_KEY の直保持・SB週次の再取得**（→ コーチング部長／Jarvis。ホークはパック読取のみ）
 
 ## 管轄外（1行で返す）
 
