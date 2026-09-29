@@ -170,7 +170,7 @@ export default function DealReviewActions({
           >
             Gmail
           </a>
-          {alreadyRead ? " · 既読済" : " · 未既読"}
+          {alreadyRead ? " · 既読" : " · 未読"}
         </div>
       ) : (
         <div className="meta" style={{ marginBottom: 4 }}>
