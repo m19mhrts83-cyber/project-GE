@@ -1,6 +1,6 @@
-# 東海DX互助会 — 新メンバー案内（LINEノート用）
+# 東海DX互助会 — メンバー案内（LINEノート用）
 
-**用途**: LINEグループのノートにそのまま貼る（または短く切って貼る）用。  
+**用途**: LINEグループのノートにそのまま貼る用。新メンバー向け＋既存メンバーのリマインド兼用。  
 **更新**: 2026-09-29  
 **資料ハブ正本**: https://m19mhrts83-cyber.github.io/project-GE/docs/
 
@@ -9,19 +9,27 @@
 ## LINEノート貼付用（ここからコピー）
 
 ```
-【東海DX互助会】新メンバー向けリンク集
+【東海DX互助会】メンバー向けリンク集
 
-ようこそ！まずは「見る・触る」からでOKです。
-分からないことがあればこのグループで聞いてください。
+新メンバー歓迎／既存メンバーのリマインド兼用です。
+まずは「見る・触る」からでOK。分からないことはこのグループで聞いてください。
 
 ━━━━━━━━━━━━
-■ まずここ（資料の入り口）
+■ まずここ（3つの入り口）
 ━━━━━━━━━━━━
-勉強会資料トップ
+① 勉強会資料トップ（Web・ログイン不要）
 https://m19mhrts83-cyber.github.io/project-GE/docs/
 
-回ごとのスライド・PDFはここから選べます。
-回数の正本は Notion「東海DX互助会／勉強会協議ネタ」です（招待済みの方）。
+② Notion（議事・協議ネタの正本）
+https://www.notion.so/2eff6bbe5a7680f0a165ee1457a25f2b
+ページ名: 神大家 東海DX互助会
+
+③ Google Drive 共有フォルダ
+https://drive.google.com/drive/folders/1ZVND1RYGYpkWrE8PaisQuuVpbk8XmgDy
+フォルダ名: DX互助会_共有フォルダ
+
+※ Notion／Drive が開けない・権限がない場合は
+　松野まで連絡してください（招待を出します）。
 
 ━━━━━━━━━━━━
 ■ 触ってみるアプリ
@@ -67,6 +75,7 @@ https://m19mhrts83-cyber.github.io/project-GE/docs/7kai.html
 https://m19mhrts83-cyber.github.io/project-GE/docs/8kai.html
 
 ※第4〜6回は月1開催の議事のみ（Notion）
+※回数の正本は Notion「勉強会協議ネタ」
 
 ━━━━━━━━━━━━
 ■ 神大家AI推進（別枠・参考）
@@ -75,18 +84,18 @@ https://m19mhrts83-cyber.github.io/project-GE/docs/8kai.html
 https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html
 
 ━━━━━━━━━━━━
-■ 最初の1週間のおすすめ
+■ おすすめの進め方
 ━━━━━━━━━━━━
-1. 資料トップをブックマーク
+1. 上記①②③をブックマーク
 2. 周辺MAPを1回触る（地図ピン）
 3. Q&Aで気になる質問を1つ投げる
 4. 興味ある回のスライドを1本見る
-5. Notion／Drive共有は幹事に招待依頼
+5. Notion／Driveが開けなければ松野へ
 
 ━━━━━━━━━━━━
 ■ 補足
 ━━━━━━━━━━━━
-・Notion・Google Drive共有フォルダは招待制です（このノートにURLが無い場合は幹事へ）
+・Notion・Driveは招待制です。開けないときは松野へ
 ・個人の秘密（パスワード等）はグループに貼らないでください
 ・作りたいもの・困りごとは遠慮なく投稿を
 ```
@@ -98,8 +107,8 @@ https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html
 | 区分 | URL / 備考 |
 |---|---|
 | Pages 資料ハブ | `https://m19mhrts83-cyber.github.io/project-GE/docs/` |
-| 第7回 Notion 議事 | `https://www.notion.so/3b7f6bbe5a7680b98c64d52c6a1fd609`（権限者のみ） |
-| Drive「DX互助会_共有フォルダ」 | メンバー招待で共有（公開URLは出さない） |
+| Notion ハブ | `https://www.notion.so/2eff6bbe5a7680f0a165ee1457a25f2b`（神大家 東海DX互助会） |
+| Drive 共有 | `https://drive.google.com/drive/folders/1ZVND1RYGYpkWrE8PaisQuuVpbk8XmgDy`（Notionハブ掲載の正） |
 | Jarvis 自分用資料 | `/docs/jarvis-self/` は互助会向けではない（ノートに載せない） |
 | カタログ正本 | `config/materials_catalog.yaml` / `config/apps_prompts_catalog.yaml` |
 
