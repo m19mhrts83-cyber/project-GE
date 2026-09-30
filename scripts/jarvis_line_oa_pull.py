@@ -158,9 +158,82 @@ def build_export_txt(group_label: str, events: list[dict], cache: dict, token: s
     return "\n".join(lines)
 
 
+def oa_group_ids(routes_path: Path) -> list[tuple[str, str]]:
+    """line_export_routes.yaml の line_oa.group_ids（route id → groupId）を列挙。"""
+    data = yaml.safe_load(routes_path.read_text(encoding="utf-8")) or {}
+    gids = ((data.get("line_oa") or {}).get("group_ids")) or {}
+    out: list[tuple[str, str]] = []
+    for rid, gid in gids.items():
+        if gid:
+            out.append((str(rid).strip(), str(gid).strip()))
+    return out
+
+
+def pull_route(url: str, key: str, token: str, routes_path: Path, route_id: str, group_id: str, args) -> int:
+    cfg = route_config(routes_path, route_id)
+    group_label = str(cfg.get("group_label") or cfg.get("display_name") or route_id)
+    q = (
+        "line_oa_events?select=id,event_type,group_id,user_id,message_type,text,event_timestamp"
+        f"&group_id=eq.{group_id}&processed_at=is.null&order=event_timestamp.asc,id.asc&limit={args.limit}"
+    )
+    fetched = _rest(url, key, q)
+    if args.include_system:
+        events = fetched
+    else:
+        events = [e for e in fetched if str(e.get("event_type")) == "message"]
+    # 出力対象外（join/leave 等）は processed へ寄せて未処理の滞留を防ぐ
+    rendered_ids = {e.get("id") for e in events}
+    dropped = [str(e.get("id")) for e in fetched if e.get("id") is not None and e.get("id") not in rendered_ids]
+    if dropped and not args.dry_run:
+        _rest(
+            url,
+            key,
+            f"line_oa_events?id=in.({','.join(dropped)})",
+            method="PATCH",
+            body={"processed_at": datetime.now(JST).isoformat(timespec="seconds")},
+            prefer="return=minimal",
+        )
+    if not events:
+        print(f"# 未処理イベントなし（route={route_id} group={group_id}）")
+        return 0
+
+    cache = load_name_cache()
+    txt = build_export_txt(group_label, events, cache, token)
+    save_name_cache(cache)
+
+    if args.dry_run:
+        print(f"# dry-run: {len(events)}件 → inbox へ書き込み予定（route={route_id}）")
+        print(txt[:1500])
+        return 0
+
+    from line_export_inbox_to_yoritoori import default_inbox_dir  # noqa: E402
+
+    inbox = default_inbox_dir()
+    inbox.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
+    out = inbox / f"[LINE] {group_label}のトーク_OA{stamp}.txt"
+    out.write_text(txt, encoding="utf-8")
+
+    ids = ",".join(str(e["id"]) for e in events if e.get("id") is not None)
+    if ids:
+        _rest(
+            url,
+            key,
+            f"line_oa_events?id=in.({ids})",
+            method="PATCH",
+            body={"processed_at": datetime.now(JST).isoformat(timespec="seconds")},
+            prefer="return=minimal",
+        )
+
+    print(f"📎 LINE OA pull: {len(events)}件 → {out.name}")
+    print(f"  route={route_id} group={group_id} label={group_label}")
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="LINE OA Webhook 受信 → 公式エクスポート形式 .txt 生成")
-    p.add_argument("--route-id", help="line_export_routes.yaml の route id（例 tcell_caramel_g）")
+    p.add_argument("--route-id", help="line_export_routes.yaml の route id（例 tokai_dx_gojokai）")
+    p.add_argument("--all", action="store_true", help="line_oa.group_ids の全ルートを処理（定常向け）")
     p.add_argument("--group-id", help="LINE の groupId（未指定なら routes yaml の line_oa.group_ids から）")
     p.add_argument("--list-groups", action="store_true", help="受信済み group_id を集計して表示")
     p.add_argument("--limit", type=int, default=1000)
@@ -188,59 +261,29 @@ def main() -> int:
             print(f"  {gid}\t{total}\t{unproc}")
         return 0
 
-    if not args.route_id:
-        raise SystemExit("--route-id が必要です（--list-groups 以外）")
-
-    from line_export_inbox_to_yoritoori import default_inbox_dir, default_routes_path  # noqa: E402
+    from line_export_inbox_to_yoritoori import default_routes_path  # noqa: E402
 
     routes_path = default_routes_path()
-    cfg = route_config(routes_path, args.route_id)
-    group_label = str(cfg.get("group_label") or cfg.get("display_name") or args.route_id)
+
+    if args.all:
+        pairs = oa_group_ids(routes_path)
+        if not pairs:
+            print("# line_oa.group_ids が空です（line_export_routes.yaml）")
+            return 0
+        rc = 0
+        for rid, gid in pairs:
+            rc |= pull_route(url, key, token, routes_path, rid, gid, args)
+        return rc
+
+    if not args.route_id:
+        raise SystemExit("--route-id か --all が必要です（--list-groups 以外）")
     group_id = (args.group_id or oa_group_id(routes_path, args.route_id) or "").strip()
     if not group_id:
-        raise SystemExit(f"group_id 不明。--group-id を指定するか line_export_routes.yaml の line_oa.group_ids.{args.route_id} に追記してください")
-
-    q = (
-        "line_oa_events?select=id,event_type,group_id,user_id,message_type,text,event_timestamp"
-        f"&group_id=eq.{group_id}&processed_at=is.null&order=event_timestamp.asc,id.asc&limit={args.limit}"
-    )
-    events = _rest(url, key, q)
-    if not args.include_system:
-        events = [e for e in events if str(e.get("event_type")) == "message"]
-    if not events:
-        print(f"# 未処理イベントなし（route={args.route_id} group={group_id}）")
-        return 0
-
-    cache = load_name_cache()
-    txt = build_export_txt(group_label, events, cache, token)
-    save_name_cache(cache)
-
-    if args.dry_run:
-        print(f"# dry-run: {len(events)}件 → inbox へ書き込み予定（route={args.route_id}）")
-        print(txt[:1500])
-        return 0
-
-    inbox = default_inbox_dir()
-    inbox.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
-    out = inbox / f"[LINE] {group_label}のトーク_OA{stamp}.txt"
-    out.write_text(txt, encoding="utf-8")
-
-    ids = ",".join(str(e["id"]) for e in events if e.get("id") is not None)
-    if ids:
-        _rest(
-            url,
-            key,
-            f"line_oa_events?id=in.({ids})",
-            method="PATCH",
-            body={"processed_at": datetime.now(JST).isoformat(timespec="seconds")},
-            prefer="return=minimal",
+        raise SystemExit(
+            f"group_id 不明。--group-id を指定するか "
+            f"line_export_routes.yaml の line_oa.group_ids.{args.route_id} に追記してください"
         )
-
-    print(f"📎 LINE OA pull: {len(events)}件 → {out.name}")
-    print(f"  route={args.route_id} group={group_id} label={group_label}")
-    print("  次: line_export_inbox_to_yoritoori.py が inbox から取り込みます（line-export-poll は15分間隔）")
-    return 0
+    return pull_route(url, key, token, routes_path, args.route_id, group_id, args)
 
 
 if __name__ == "__main__":
