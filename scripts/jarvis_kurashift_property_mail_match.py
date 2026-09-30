@@ -1085,19 +1085,32 @@ def fetch_grok_mails(
 
 
 def existing_gmail_ids(sb: Any) -> set[str]:
-    rows = (
-        sb.table("kurashift_re_deals")
-        .select("summary_json")
-        .in_("source", ["mail_admin", "mail_estate", "mail_grok"])
-        .limit(500)
-        .execute()
-    )
+    """既取込 gmail_id を全件ページングで収集（PostgREST 既定上限の窓落ち防止）。"""
     ids: set[str] = set()
-    for r in rows.data or []:
-        sj = r.get("summary_json") or {}
-        gid = sj.get("gmail_id")
-        if gid:
-            ids.add(gid)
+    page_size = 1000
+    start = 0
+    # 安全弁: 約 200k 行まで（現状 ~7k）。超えたら呼び出し側で気づけるよう break。
+    max_pages = 200
+    for _ in range(max_pages):
+        resp = (
+            sb.table("kurashift_re_deals")
+            .select("summary_json")
+            .in_("source", ["mail_admin", "mail_estate", "mail_grok"])
+            .order("id")
+            .range(start, start + page_size - 1)
+            .execute()
+        )
+        rows = resp.data or []
+        for r in rows:
+            sj = r.get("summary_json") or {}
+            if not isinstance(sj, dict):
+                continue
+            gid = sj.get("gmail_id")
+            if gid:
+                ids.add(str(gid))
+        if len(rows) < page_size:
+            break
+        start += page_size
     return ids
 
 

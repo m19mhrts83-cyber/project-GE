@@ -1,0 +1,70 @@
+name: KURASHIFT Grok Mail Noon Ingest
+
+# S1 `[Grok調査]` は朝バンドル（〜08時帯）より後（〜10:30–10:45 JST）に着く。
+# 朝1日1回制限のあとを拾うため、11:00 JST に grok-only 取込だけ走らせる。
+# 通常物件メール・Tier3 送信は kurashift-re-daily-inquiry のまま。
+
+on:
+  schedule:
+    # 11:00 JST = 02:00 UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "取込せず dry-run のみ"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: kurashift-grok-mail-noon
+  cancel-in-progress: false
+
+jobs:
+  grok-mail-noon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          pip install -q google-api-python-client google-auth-httplib2 google-auth-oauthlib supabase pyyaml
+
+      - name: Materialize Gmail credentials (estate)
+        env:
+          GMAIL_CREDENTIALS_B64: ${{ secrets.GMAIL_CREDENTIALS_B64 }}
+          GMAIL_ESTATE_TOKEN_B64: ${{ secrets.GMAIL_ESTATE_TOKEN_B64 }}
+        run: |
+          set -euo pipefail
+          MANUAL="${{ github.workspace }}/215_kamiooya/C1_cursor/1b_Cursorマニュアル"
+          mkdir -p "$MANUAL"
+          if [[ -z "${GMAIL_CREDENTIALS_B64:-}" || -z "${GMAIL_ESTATE_TOKEN_B64:-}" ]]; then
+            echo "::error::Need GMAIL_CREDENTIALS_B64 and GMAIL_ESTATE_TOKEN_B64"
+            exit 1
+          fi
+          echo "$GMAIL_CREDENTIALS_B64" | base64 -d > "$MANUAL/credentials.json"
+          echo "$GMAIL_ESTATE_TOKEN_B64" | base64 -d > "$MANUAL/token_estate.json"
+          test -s "$MANUAL/credentials.json"
+          test -s "$MANUAL/token_estate.json"
+          echo "Gmail estate credentials materialized."
+
+      - name: Grok-only property mail ingest
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          echo "📥 [Grok調査] grok-only 取込（11:00 JST 帯）..."
+          if [[ "$DRY_RUN" == "true" ]]; then
+            python scripts/jarvis_kurashift_property_mail_match.py --grok-only --dry-run
+          else
+            python scripts/jarvis_kurashift_property_mail_match.py --grok-only --apply
+          fi
