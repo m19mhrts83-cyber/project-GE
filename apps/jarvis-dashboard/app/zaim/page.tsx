@@ -7,6 +7,10 @@ import WatchCommentThread, {
 } from "@/components/WatchCommentThread";
 import ZaimFixActions from "@/components/ZaimFixActions";
 import ZaimReviewAckButton from "@/components/ZaimReviewAckButton";
+import ZaimStatusBand, {
+  type BankSyncPayload,
+  type CsvWeeklyPayload,
+} from "@/components/ZaimStatusBand";
 import { LEVEL_LABEL, HomeLevel } from "@/lib/homeLevels";
 import { getFolderLinks, pageFolderKey } from "@/lib/folderLinks";
 import { createClient } from "@/lib/supabase/server";
@@ -192,6 +196,20 @@ export default async function ZaimWatchPage() {
           ready_examples?: { key?: string; category?: string; count?: number }[];
         })
       : null;
+  const bankSync =
+    payload.bank_sync && typeof payload.bank_sync === "object"
+      ? (payload.bank_sync as BankSyncPayload)
+      : null;
+  const csvWeekly =
+    payload.csv_weekly && typeof payload.csv_weekly === "object"
+      ? (payload.csv_weekly as CsvWeeklyPayload)
+      : null;
+  const refreshReq =
+    payload.refresh_request && typeof payload.refresh_request === "object"
+      ? (payload.refresh_request as { status?: string })
+      : null;
+  const refreshQueued =
+    refreshReq?.status === "queued" || refreshReq?.status === "running";
   const neverArchive = Boolean(payload.never_archive);
   const level = (
     ["attention", "warn", "info", "ok"].includes(watch?.level || "")
@@ -213,12 +231,16 @@ export default async function ZaimWatchPage() {
     <Shell active="/zaim">
       <h1>Zaim Watch</h1>
       <FolderLinks links={folderLinks} />
+      <ZaimStatusBand
+        bank={bankSync}
+        csvWeekly={csvWeekly}
+        refreshQueued={refreshQueued}
+      />
       <p className="sub">
-        財務の年間収支と、集計設定・二重取込・費目の学習結果。アーカイブせず常駐します。
-        確信度の高い直しは Jarvis が財務側へ適用し、結果をここに残します（確認したまで消えません）。
-        修正は Zaim 本体で行い、次の取込で学習します。学習が違うときだけ「おかしい」で印を付けます。
-        火・金に見直し（CSV は同曜日）。年間収支は Zaim の「集計に含めない」を除外した合計です（当年は1〜当月の
-        YTD）。詳細な月次は{" "}
+        財務の年間収支と、集計・二重取込・費目の学習結果（常駐）。確信度の高い直しは Jarvis
+        が適用し、ここは確認用です。学習は取込のたび自動。違うときだけ「おかしい」。
+        CSV はクラウド毎日＋ Mac 火金（OneDrive 正本）。開いただけでは銀行は更新されません。
+        詳細な月次は{" "}
         <Link href="/metrics" style={{ color: "var(--accent)", fontWeight: 600 }}>
           収支・数値
         </Link>
@@ -442,7 +464,7 @@ export default async function ZaimWatchPage() {
 
         {watch?.detail ? (
           <details className="watch-prompt-details">
-            <summary>詳細・銀行連携メモ</summary>
+            <summary>詳細メモ（銀行要約は冒頭ステータス帯）</summary>
             <pre className="watch-detail">{watch.detail}</pre>
           </details>
         ) : null}

@@ -117,9 +117,26 @@ jobs:
           python scripts/jarvis_finance_metrics.py --year "$YEAR" --push
           python scripts/jarvis_finance_metrics.py --year "$PREV_YEAR" --push || true
 
+      - name: Step 4b - Bank sync freshness check (no update buttons)
+        run: |
+          set -euo pipefail
+          mkdir -p .jarvis_state
+          python scripts/jarvis_zaim_bank_sync_check.py || true
+
       - name: Step 5 - Update Situation Watch on Dashboard
         run: |
           set -euo pipefail
+          python scripts/jarvis_situation_watch.py --write || true
+          python scripts/jarvis_dashboard_push.py --watch-only || true
+          python scripts/jarvis_zaim_refresh_queue_poll.py --ack-only || true
+
+      - name: Step 6 - Bank sync check (read-only, no update buttons)
+        run: |
+          set -euo pipefail
+          # 銀行「連携データを更新」は押さない。CSV ラグから stale を検知して state / Watch に載せる
+          YEAR="${{ github.event.inputs.year || '2026' }}"
+          # export は downloads/{年}年度/Zaim.{年}年度.csv
+          python scripts/jarvis_zaim_bank_sync_check.py --year "$YEAR" || true
           python scripts/jarvis_situation_watch.py --write || true
           python scripts/jarvis_dashboard_push.py --watch-only || true
 
