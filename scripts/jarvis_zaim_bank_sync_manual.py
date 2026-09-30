@@ -3,9 +3,9 @@
 Zaim 連携設定ページで、指定口座の「連携データを更新」を押す（Phase1）。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
-  cd 215_kamiooya/C1_cursor/finance/zaim_budget_sync
-  python ../../../../scripts/jarvis_zaim_bank_sync_manual.py
-  python ../../../../scripts/jarvis_zaim_bank_sync_manual.py --names '★MUFG(アパート経営)' '★三井住友銀行 刈谷'
+  /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_zaim_bank_sync_manual.py
+  /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_zaim_bank_sync_manual.py --from-stale
+  /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_zaim_bank_sync_manual.py --names '★MUFG(アパート経営)'
 
 要: 先に zaim_budget_apply.py --login（セッション切れ時）。
 """
@@ -20,6 +20,7 @@ from playwright.sync_api import sync_playwright
 
 REPO = Path(__file__).resolve().parents[1]
 ZAIM_DIR = REPO / "215_kamiooya" / "C1_cursor" / "finance" / "zaim_budget_sync"
+STATE_PATH = REPO / ".jarvis_state" / "zaim_bank_sync.json"
 sys.path.insert(0, str(ZAIM_DIR))
 import zaim_budget_apply as zaim  # noqa: E402
 
@@ -34,6 +35,27 @@ DEFAULT_NAMES = [
 def dismiss(page) -> None:
     page.keyboard.press("Escape")
     page.wait_for_timeout(300)
+
+
+def names_from_stale() -> list[str]:
+    """state の stale 口座から Zaim 画面検索用の名前を取る（match 優先）。"""
+    if not STATE_PATH.is_file():
+        return []
+    try:
+        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for row in data.get("stale") or []:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("match") or row.get("csv_name") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append(name)
+    return out
 
 
 def update_one(page, name: str) -> dict:
@@ -67,11 +89,29 @@ def update_one(page, name: str) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--names", nargs="*", default=DEFAULT_NAMES)
+    ap.add_argument(
+        "--names",
+        nargs="*",
+        default=None,
+        help="口座名（部分一致）。省略時は DEFAULT_NAMES（--from-stale 時は stale のみ）",
+    )
+    ap.add_argument(
+        "--from-stale",
+        action="store_true",
+        help=".jarvis_state/zaim_bank_sync.json の stale 口座だけ更新",
+    )
     ap.add_argument("--headed", action="store_true", default=True)
     ap.add_argument("--headless", action="store_true")
     args = ap.parse_args(argv)
     headed = not args.headless
+
+    if args.from_stale:
+        names = list(args.names) if args.names else names_from_stale()
+        if not names:
+            print(json.dumps({"ok": True, "results": [], "note": "no stale accounts"}))
+            return 0
+    else:
+        names = list(args.names) if args.names else list(DEFAULT_NAMES)
 
     if not zaim.STORAGE_STATE.is_file():
         print(f"先に login: {zaim.STORAGE_STATE}", file=sys.stderr)
@@ -89,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
             print("セッション切れ。zaim_budget_apply.py --login を先に。", file=sys.stderr)
             browser.close()
             return 2
-        for name in args.names:
+        for name in names:
             print(f"# update {name}", file=sys.stderr)
             results.append(update_one(page, name))
             if "online_accounts" not in page.url:

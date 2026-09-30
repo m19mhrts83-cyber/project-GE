@@ -7,15 +7,23 @@ mkdir -p "$LOG_DIR"
 PY="${HOME}/selenium_env/venv/bin/python"
 STATE_DIR="${REPO_DIR}/.jarvis_state"
 ENV_FILE="${REPO_DIR}/.env.jarvis_private"
+LOCK_DIR="${LOG_DIR}/zaim_bank_sync_friday.lock"
 
 ts="$(date '+%Y-%m-%dT%H:%M:%S%z')"
 echo "[$ts] zaim_bank_sync_friday start" >>"${LOG_DIR}/bank_sync.out.log"
 
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  echo "[$ts] skip: already running" >>"${LOG_DIR}/bank_sync.out.log"
+  exit 0
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+
 if [[ -f "$ENV_FILE" ]]; then
+  set +eu
   set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
+  emulate -R sh -c "source '${ENV_FILE}'" 2>>"${LOG_DIR}/env_source.err.log" || true
   set +a
+  set -euo pipefail
 fi
 
 if [[ "${JARVIS_ZAIM_BANK_SYNC_DISABLE:-}" == "1" ]]; then
@@ -31,5 +39,17 @@ cd "$REPO_DIR"
 # （finance は火・金 CSV 12:00 が本線。09:00 は二重取込直し＋費目見直し通知）
 "$PY" scripts/jarvis_zaim_watch_runner.py --skip-finance \
   >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
+
+# /zaim「今すぐ更新」キューがあれば check まで実行
+"$PY" scripts/jarvis_zaim_refresh_queue_poll.py --apply \
+  >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
+
+# stale のみ連携更新（OTP が出たら失敗して止まる。黙って無限リトライしない）
+if [[ "${JARVIS_ZAIM_BANK_AUTO_UPDATE:-1}" != "0" ]]; then
+  "$PY" scripts/jarvis_zaim_bank_sync_manual.py --from-stale --headless \
+    >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
+  "$PY" scripts/jarvis_zaim_bank_sync_check.py \
+    >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
+fi
 
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] zaim_bank_sync_friday done" >>"${LOG_DIR}/bank_sync.out.log"

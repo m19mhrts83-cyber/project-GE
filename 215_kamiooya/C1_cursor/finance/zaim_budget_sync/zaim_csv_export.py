@@ -77,6 +77,32 @@ def export_csv(page, start: date, end: date, encoding: str) -> Path:
     return tmp
 
 
+def _goto_with_retries(page, url: str, *, retries: int = 2) -> None:
+    """ERR_NETWORK_CHANGED / timeout 向けの軽い再試行。"""
+    last_err: Exception | None = None
+    for attempt in range(max(1, retries + 1)):
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+            return
+        except Exception as e:  # noqa: BLE001 — Playwright 系をまとめて再試行
+            last_err = e
+            msg = str(e)
+            retryable = any(
+                k in msg
+                for k in (
+                    "ERR_NETWORK_CHANGED",
+                    "net::ERR_",
+                    "Timeout",
+                    "NS_ERROR_NET",
+                )
+            )
+            if not retryable or attempt >= retries:
+                raise
+            page.wait_for_timeout(1500 * (attempt + 1))
+    if last_err:
+        raise last_err
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Zaim 家計簿 CSV エクスポート")
     parser.add_argument("--year", type=int, default=2026, help="対象年（1/1 起点）")
@@ -86,6 +112,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--connect-cdp", default=None)
     parser.add_argument("--login-method", choices=["email", "google"], default="email")
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=1,
+        help="ネットワーク一時障害時の goto 再試行回数（既定1）",
+    )
     args = parser.parse_args(argv)
 
     end_d = date.fromisoformat(args.end_date) if args.end_date else None
@@ -104,6 +136,14 @@ def main(argv: list[str] | None = None) -> int:
             storage_state=zaim.STORAGE_STATE if not args.connect_cdp else None,
         )
         page = zaim.get_work_page(ctx)
+        # ensure_logged_in 前に HOME へ再試行付きで到達
+        try:
+            _goto_with_retries(page, zaim.ZAIM_HOME, retries=args.retries)
+        except Exception as e:
+            print(f"# goto home failed: {e}", file=sys.stderr)
+            if browser and not args.connect_cdp:
+                browser.close()
+            return 1
         zaim.ensure_logged_in(
             page,
             login_method=args.login_method,
@@ -115,7 +155,18 @@ def main(argv: list[str] | None = None) -> int:
         if browser and not args.connect_cdp:
             browser.close()
 
-    text = dest.read_text(encoding="utf-8", errors="replace")
+    # OneDrive 直後の読取 deadlock 回避（短い再試行）
+    text = ""
+    for attempt in range(4):
+        try:
+            text = dest.read_text(encoding="utf-8", errors="replace")
+            break
+        except OSError as e:
+            if getattr(e, "errno", None) != 11 or attempt >= 3:
+                raise
+            import time
+
+            time.sleep(1.5 * (attempt + 1))
     lines = text.count("\n")
     print(f"✅ 保存: {dest}")
     print(f"   行数: {lines:,}（ヘッダ含む）")
