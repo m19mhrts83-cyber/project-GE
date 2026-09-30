@@ -170,6 +170,10 @@ export function fmtPostalCode(code: string | null | undefined): string {
 export function matchPropertyIdByNotionName(name: string): string | null {
   const n = (name || "").trim();
   if (!n) return null;
+  const isII =
+    /志賀本通\s*II/i.test(n) ||
+    /志賀本通Ⅱ/.test(n) ||
+    /Grandole.*II/i.test(n);
   // II を I より先に照合（「…I」が「…II」に部分一致するのを防ぐ）
   const order = ["grandole-ii", "grandole-i", "caramel"];
   for (const id of order) {
@@ -179,12 +183,8 @@ export function matchPropertyIdByNotionName(name: string): string | null {
       (m) => n === m || n.includes(m) || m.includes(n),
     );
     if (!hit && !(n.includes(info.name) || info.name.includes(n))) continue;
-    if (
-      id === "grandole-i" &&
-      (/志賀本通\s*II/i.test(n) || /志賀本通Ⅱ/.test(n) || /Grandole.*II/i.test(n))
-    ) {
-      continue;
-    }
+    if (id === "grandole-i" && isII) continue;
+    if (id === "grandole-ii" && !isII) continue;
     return id;
   }
   return null;
