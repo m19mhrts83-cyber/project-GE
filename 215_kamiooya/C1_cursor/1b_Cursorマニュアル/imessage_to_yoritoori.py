@@ -95,24 +95,45 @@ def save_processed(max_rowid):
 
 
 def try_parse_attributed_body(blob):
-    """attributedBody からテキストを抽出を試す。失敗時は None。"""
+    """attributedBody（NSAttributedString の typedstream）から本文を取り出す。
+
+    typedstream では ``NSString`` の直後に ``+`` (0x2b) があり、その次の1バイトが長さ:
+    0x81 なら次2バイトLE、0x82 なら次4バイトLE、それ以外はその値そのもの。
+    続くバイト列が UTF-8 の本文。
+
+    旧実装の ASCII フォールバック（``[\\x20-\\x7e]{4,}``）は
+    ``#$_NS.rangeval.length_NS.rangeval.location…`` のような化けを書き込むため廃止。
+    復元できないときは None を返し、呼び出し側でスキップさせる。
+    """
     if not blob:
         return None
+    data = blob if isinstance(blob, bytes) else str(blob).encode("utf-8", "ignore")
+    i = data.find(b"NSString")
+    if i < 0:
+        return None
+    p = data.find(b"\x2b", i)
+    if p < 0 or p + 1 >= len(data):
+        return None
+    f = data[p + 1]
+    if f < 0x80:
+        length, start = f, p + 2
+    elif f == 0x81:
+        length, start = int.from_bytes(data[p + 2 : p + 4], "little"), p + 4
+    elif f == 0x82:
+        length, start = int.from_bytes(data[p + 2 : p + 6], "little"), p + 6
+    else:
+        return None
+    raw = data[start : start + length]
+    if not raw:
+        return None
     try:
-        # NSAttributedString のバイナリから NSString 部分を簡易抽出
-        if isinstance(blob, bytes):
-            text = blob.decode("utf-8", errors="ignore")
-        else:
-            text = str(blob)
-        m = re.search(r'NSString[^"]*"([^"]*)"', text)
-        if m:
-            return m.group(1).strip()
-        ascii_match = re.findall(r"[\x20-\x7e]{4,}", text)
-        if ascii_match:
-            return " ".join(ascii_match[:5]).strip()
-    except Exception:
-        pass
-    return None
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("utf-8", errors="replace")
+    # NUL 等の制御文字を除去（改行・タブは残す）
+    text = "".join(ch for ch in text if ch in "\n\t" or ord(ch) >= 0x20)
+    text = text.replace("\uFFFD", "").strip()
+    return text or None
 
 
 def sanitize_filename(name: str) -> str:
