@@ -59,10 +59,34 @@
 | 条件 | 動作 | inquiry_action |
 |---|---|---|
 | 仲介メールが取れる（ポータルに業者メール明示等） | 調査結果を `[Grok調査]` に書き、**KURASHIFT／Jarvis 第一問合せに委ねる**（あなたは仲介へ直接メールしない） | `kurashift_handoff` |
-| 仲介メールが取れない／ポータル資料請求のみ | **公開ページの資料請求・Web問合せフォームを送信まで実行** | `portal_sent` |
+| 仲介メールが取れない／ポータル資料請求のみ（**公開フォームで送信可**） | **公開ページの資料請求・Web問合せフォームを送信まで実行** | `portal_sent` |
+| **HOME'S投資ログイン壁**（`homes_login_required` / 会員 inquire のみ） | **Grok は送らない**。`[Grok調査]`＋Drive inbox `action: homes_portal_manual` で **Jarvis Mac へ委譲**（PWは持たない） | （送信後 Jarvis が `portal_sent`） |
 | 調査のみ（保留・見送り・情報不足） | 問合せしない | `investigate_only` |
 
-- **聞く** かつスコア高 → 上記どおり **自動送信可**
+### HOME'S投資ログイン壁（2026-09-30 確定 · Grok Computer 向け）
+
+- **壁の正体**: `toushi.homes.co.jp` の資料請求は会員ログイン必須。Grok 環境に `HOMES_*`/`PORTAL_*` を載せないのが正 → Computer だけでは突破しない。
+- **URL正本**: 詳細 `/bukkendetail/index/{id}/` · 問合せ `/inquire/input/?property_id={id}/`（`/mansion/{id}` 等は404）。
+- **掲載終了**: 詳細タイトルに「掲載終了」→ 問合せ不可。inbox に `listing_ended` と書いて次候補へ。
+- **委譲テンプレ**（`10_inbox_from_grok/`）:
+
+```yaml
+---
+action: homes_portal_manual
+priority: high
+target: jarvis
+source: property_bot
+---
+blocker: homes_login_required
+homes_id: {id}
+name: {市区+短名}
+url: https://toushi.homes.co.jp/bukkendetail/index/{id}/
+```
+
+- 手順書: `docs/HOME'S投資_ログイン壁_対応_20260930.md`（Drive `30_shared_working` にも同趣旨）
+- **偽の portal_sent 禁止**（未送信なのに送ったことにしない）
+
+- **聞く** かつスコア高 → 上記どおり **自動送信可**（HOME'S壁は除く）
 - **保留|見送り** → 問合せしない（調査メールのみ）
 - すでに第一問合せ済みの再送禁止
 
