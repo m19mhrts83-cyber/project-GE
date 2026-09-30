@@ -36,8 +36,9 @@ zaim_home_url: "https://zaim.net/"
 # env_hint: .env.jarvis_private の変数名（値は出さない）。手動 OTP 時に Jarvis が読む
 # unlinkable: true → 事情で連携できない想定。注意事項に「連携不可（既知）」として出すが stale 警告にはしない
 # automation: off → stale 自動更新の対象外（検知・通知はする）
-# otp_channel: sms | gmail_api | none（再接続 --try-otp 時のみ）
+# otp_channel: sms | sms_messages | gmail | gmail_api | none（再接続 --try-otp 時。sms→sms_messages に正規化）
 # otp_sender_hint: OTP 検索ヒント（SMS 本文／Gmail from）
+# ※ 銀行「連携データを更新」ボタン押しは Mac 専有（zaim_playwright.lock）。GHA は check のみ。
 accounts:
   - id: paypay_corp
     label: "PayPay銀行（法人）"

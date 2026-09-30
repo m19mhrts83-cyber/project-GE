@@ -38,10 +38,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - GHA 毎日: CSV＋Watch＋`bank_sync_check`（更新ボタンは押さない）
 - launchd: 火・金 09:00（銀行 check＋Watch＋**stale のみ**更新＋Todoist 通知）／火・金 12:00（CSV+Watch）
 - 朝オープン: refresh_queue poll ＋ 軽量 `bank_sync_check`
-- 再接続: `scripts/jarvis_zaim_reconnect.py --from-stale [--notify] [--try-otp]`
+- 再接続: `scripts/jarvis_zaim_reconnect.py --from-stale [--notify] [--try-otp]`（OTP は画面入力まで。値はチャット禁止）
 - 通知: `scripts/jarvis_zaim_bank_notify.py`（要Jarvis連携・dedupe）
-- stale 自動更新オフ: `JARVIS_ZAIM_BANK_AUTO_UPDATE=0`
-- 口座ごと: YAML `automation: off` / `otp_channel` / cooldown
+- stale 自動更新オフ: `JARVIS_ZAIM_BANK_AUTO_UPDATE=0` ／ OTP自動オフ: `JARVIS_ZAIM_BANK_TRY_OTP=0`
+- Playwright: CSV と `zaim_playwright.lock` 共有。銀行更新ボタンは Mac 専有（GHA は check のみ）
+- 口座ごと: YAML `automation: off` / `otp_channel`（sms→sms_messages） / cooldown
 
 ```bash
 # 学習だけ（前回 snapshot × 今回 CSV）

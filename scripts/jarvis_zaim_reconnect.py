@@ -10,8 +10,8 @@ Zaim 再接続オーケストレーション（P1/P2）。
   /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_zaim_reconnect.py --from-stale --with-csv --notify
   /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_zaim_reconnect.py --from-stale --try-otp
 
-OTP 値は標準出力に出さない。--try-otp は取得成否のみ報告し、画面入力は人手／Jarvis 対話。
-画像認証は対象外。
+OTP 値は標準出力に出さない。--try-otp は manual に渡し、画面へ半自動入力する。
+画像認証は対象外。bank_sync_manual と CSV は zaim_playwright.lock を共有。
 """
 from __future__ import annotations
 
@@ -32,6 +32,20 @@ STATE = REPO / ".jarvis_state" / "zaim_bank_sync.json"
 CFG = REPO / "config" / "zaim_bank_sync_watch.yaml"
 ZAIM_DIR = REPO / "215_kamiooya" / "C1_cursor" / "finance" / "zaim_budget_sync"
 CSV_RUNNER = REPO / "launchd" / "zaim_csv_weekly_runner.sh"
+CHANNEL_ALIASES = {
+    "sms": "sms_messages",
+    "sms_messages": "sms_messages",
+    "gmail": "gmail_api",
+    "gmail_api": "gmail_api",
+    "none": "none",
+    "off": "none",
+    "": "none",
+}
+
+
+def normalize_otp_channel(raw: str | None) -> str:
+    key = str(raw or "").strip().lower()
+    return CHANNEL_ALIASES.get(key, key)
 
 
 def run(cmd: list[str], *, dry: bool) -> int:
@@ -76,9 +90,14 @@ def try_otp_for_stale(*, dry: bool) -> list[dict[str, Any]]:
                 break
         if not acc:
             continue
-        channel = str(acc.get("otp_channel") or "none").strip().lower()
+        channel = normalize_otp_channel(acc.get("otp_channel"))
         if channel in ("", "none", "off"):
             reports.append({"label": label, "otp": "skipped_no_channel"})
+            continue
+        if channel not in ("sms_messages", "gmail_api"):
+            reports.append(
+                {"label": label, "otp": "unsupported_channel", "channel": channel}
+            )
             continue
         hint = str(acc.get("otp_sender_hint") or "")
         if dry:
@@ -88,7 +107,7 @@ def try_otp_for_stale(*, dry: bool) -> list[dict[str, Any]]:
             from jarvis_transfer_otp import OtpFetchError, NeedsUserOtp, fetch_otp
 
             fetch_otp(otp_channel=channel, sender_hint=hint, timeout_sec=45)
-            # 値は出さない
+            # 値は出さない（画面入力は bank_sync_manual --try-otp）
             reports.append({"label": label, "otp": "obtained", "channel": channel})
         except NeedsUserOtp:
             reports.append({"label": label, "otp": "needs_user", "channel": channel})
@@ -120,7 +139,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--try-otp",
         action="store_true",
-        help="YAML otp_channel がある口座で SMS/Gmail OTP 取得を試す（値は出さない）",
+        help="OTP が出たら SMS/Gmail 取得→画面入力（値は出さない）。事前 probe も行う",
+    )
+    ap.add_argument(
+        "--lock-wait",
+        type=int,
+        default=120,
+        help="Playwright 共有ロック待ち秒（CSV と競合時）",
     )
     args = ap.parse_args(argv)
 
@@ -159,9 +184,35 @@ def main(argv: list[str] | None = None) -> int:
         manual.append("--from-stale")
     if args.headless:
         manual.append("--headless")
+    if args.try_otp:
+        manual.append("--try-otp")
+    if args.lock_wait:
+        manual.extend(["--lock-wait", str(args.lock_wait)])
 
     rc, out = run_capture(manual, dry=args.dry_run)
     notify_reason = ""
+    if rc == 4:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "reason": "playwright_lock_busy",
+                    "next": "CSV週次と競合。数分後に再実行",
+                },
+                ensure_ascii=False,
+            )
+        )
+        if args.notify:
+            run(
+                [
+                    str(PY),
+                    str(REPO / "scripts" / "jarvis_zaim_bank_notify.py"),
+                    "--reason",
+                    "update_failed",
+                ],
+                dry=args.dry_run,
+            )
+        return 4
     if rc == 2:
         notify_reason = "session_expired"
         print(

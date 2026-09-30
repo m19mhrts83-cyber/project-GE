@@ -44,9 +44,15 @@ cd "$REPO_DIR"
 "$PY" scripts/jarvis_zaim_refresh_queue_poll.py --apply \
   >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
 
-# stale のみ連携更新（OTP が出たら失敗して止まる。黙って無限リトライしない）
+# stale のみ連携更新（OTP が出たら --try-otp で1回試す。失敗で止める。無限リトライしない）
+# Playwright は CSV 週次と zaim_playwright.lock 共有（--lock-wait）
 if [[ "${JARVIS_ZAIM_BANK_AUTO_UPDATE:-1}" != "0" ]]; then
-  "$PY" scripts/jarvis_zaim_bank_sync_manual.py --from-stale --headless \
+  OTP_FLAG=()
+  if [[ "${JARVIS_ZAIM_BANK_TRY_OTP:-1}" != "0" ]]; then
+    OTP_FLAG=(--try-otp)
+  fi
+  "$PY" scripts/jarvis_zaim_bank_sync_manual.py --from-stale --headless --lock-wait 180 \
+    "${OTP_FLAG[@]}" \
     >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
   "$PY" scripts/jarvis_zaim_bank_sync_check.py \
     >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
