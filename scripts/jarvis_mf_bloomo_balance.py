@@ -127,6 +127,59 @@ def _logged_in_url(url: str) -> bool:
     )
 
 
+def _advance_login(page, email: str) -> bool:
+    """中間画面（MF ID のアカウント選択 / Google のアカウント選択）を一度だけ前進させる。
+
+    --save-session を無人で通すため、対象メールのアカウントや「Googleでログイン」を押す。
+    戻り値: 何かクリックしたら True。
+    """
+    url = page.url or ""
+    # 本人確認（パスワード / パスキー / 2段階認証）は自動化しない。人操作に任せる。
+    # （自動クリックすると試行回数の上限を消耗するため）
+    if "signin/challenge" in url or "/challenge/" in url:
+        return False
+    is_mf_select = "account_selector" in url or "id.moneyforward.com" in url
+    is_google_chooser = "accounts.google.com" in url and "accountchooser" in url
+    if not is_mf_select and not is_google_chooser:
+        return False
+    sels = []
+    if email:
+        sels += [
+            f'button:has-text("{email}")',
+            f'a:has-text("{email}")',
+            f'[role="button"]:has-text("{email}")',
+        ]
+    sels += [
+        'a:has-text("Googleでログイン")',
+        'button:has-text("Googleでログイン")',
+    ]
+    for sel in sels:
+        try:
+            loc = page.locator(sel).first
+            if loc.count() and loc.is_visible():
+                loc.click(timeout=5000)
+                return True
+        except Exception:
+            continue
+    if email:
+        try:
+            loc = page.get_by_text(email).first
+            if loc.count() and loc.is_visible():
+                loc.click(timeout=5000)
+                return True
+        except Exception:
+            pass
+    for label in ("Googleでログイン", "ログイン", "続行", "Continue"):
+        try:
+            loc = page.get_by_role("button", name=re.compile(label)).first
+            if loc.count() and loc.is_visible():
+                loc.click(timeout=5000)
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def browser_channel() -> str | None:
     """Google OAuth 用。既定は実 Chrome（Playwright Chromium は Google に拒否されやすい）。"""
     raw = (os.environ.get("MONEYFORWARD_BROWSER_CHANNEL") or "chrome").strip().lower()
@@ -163,14 +216,21 @@ def cmd_save_session(*, headless: bool, wait_sec: int = 300) -> int:
         context = p.chromium.launch_persistent_context(**launch_kwargs)
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(ACCOUNTS_URL, wait_until="domcontentloaded", timeout=60000)
+        email, _pw = creds()
         ok = False
+        advanced_for: set[str] = set()
         for i in range(max(1, wait_sec // 3)):
             page.wait_for_timeout(3000)
             if _logged_in_url(page.url or ""):
                 ok = True
                 break
+            url = page.url or ""
+            # アカウント選択などのワンクリック画面は自動で前進（同一 URL につき1回）
+            if url not in advanced_for and _advance_login(page, email):
+                advanced_for.add(url)
+                print(f"# login: advanced at {url[:80]}", flush=True)
             if i % 10 == 0:
-                print(f"# waiting login... url={(page.url or '')[:100]}", flush=True)
+                print(f"# waiting login... url={url[:100]}", flush=True)
         if not ok:
             save_debug(page, "save_session_timeout")
             context.close()

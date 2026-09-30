@@ -281,6 +281,15 @@ def portfolio_weekly_needs_catchup() -> bool:
         data = json.loads(PORTFOLIO_WEEKLY_STATE.read_text(encoding="utf-8"))
     except Exception:
         return True
+    # 同一 ISO 週に実収集が成功していれば catchup 不要（2026-09-30）。
+    # full_ok が立ちにくい常時エラー（例 bloomo）でも、毎朝フル実行しないため。
+    if (
+        data.get("iso_week") == this_week
+        and int(data.get("ok") or 0) > 0
+        and not data.get("hours_skip")
+        and not data.get("cloud_only")
+    ):
+        return False
     if data.get("last_full_iso_week") != this_week:
         return True
     return data.get("last_full_ok") is not True
