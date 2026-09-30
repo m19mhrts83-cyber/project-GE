@@ -194,6 +194,18 @@ def run_json_script(
         check=False,
     )
     if r.returncode != 0:
+        # 失敗時は stdout の JSON（status/reason）を優先して理由を残す。
+        # stderr の最終行は「# note: ...」等のノートのことがあり、真因を隠す。
+        for raw in reversed((r.stdout or "").strip().splitlines()):
+            raw = raw.strip()
+            if raw.startswith("{") and raw.endswith("}"):
+                try:
+                    obj = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                msg = obj.get("reason") or obj.get("status")
+                if msg:
+                    raise RuntimeError(str(msg))
         err = (r.stderr or r.stdout or "").strip().splitlines()
         raise RuntimeError(err[-1] if err else f"exit {r.returncode}")
     line = (r.stdout or "").strip().splitlines()
@@ -977,6 +989,22 @@ def main() -> int:
     ):
         print(f"# skip: full weekly already ok {iso_week()}")
         return 0
+    # 同一 ISO 週の再実行ガード（2026-09-30）:
+    # 一度でも実収集が成功していれば、同じ週に何度もフル実行しない。
+    # ただし前回が営業時間外スキップ（hours_skip）を含むときは、後刻の再取得を許す。
+    if (
+        not args.force
+        and not args.cloud_only
+        and not prev.get("cloud_only")
+        and prev.get("iso_week") == iso_week()
+        and int(prev.get("ok") or 0) > 0
+        and not prev.get("hours_skip")
+    ):
+        print(
+            f"# skip: already collected this ISO week {iso_week()} "
+            f"(ok={prev.get('ok')} err={prev.get('error')}・再実行は --force)"
+        )
+        return 0
 
     print(f"# portfolio_weekly start {now_iso()} cloud_only={args.cloud_only}")
     if args.dry_run and not args.cloud_only:
@@ -1400,6 +1428,7 @@ def main() -> int:
         "ok": ok_n,
         "error": err_n,
         "skipped": skip_n,
+        "hours_skip": hours_skip if not args.cloud_only else prev.get("hours_skip"),
         "sources": sources,
         "last_success_at": now_iso() if last_ok else prev.get("last_success_at"),
         "last_ok": last_ok,
