@@ -210,6 +210,10 @@ export default async function ZaimWatchPage() {
       : null;
   const refreshQueued =
     refreshReq?.status === "queued" || refreshReq?.status === "running";
+  const learnLine =
+    learnFb != null
+      ? `学習 差分${learnFb.learned_n ?? 0} · ルール${learnFb.rule_count ?? 0} · 自動可${learnFb.ready_auto_n ?? 0}`
+      : null;
   const neverArchive = Boolean(payload.never_archive);
   const level = (
     ["attention", "warn", "info", "ok"].includes(watch?.level || "")
@@ -235,6 +239,7 @@ export default async function ZaimWatchPage() {
         bank={bankSync}
         csvWeekly={csvWeekly}
         refreshQueued={refreshQueued}
+        learnLine={learnLine}
       />
       <p className="sub">
         財務の年間収支と、集計・二重取込・費目の学習結果（常駐）。確信度の高い直しは Jarvis

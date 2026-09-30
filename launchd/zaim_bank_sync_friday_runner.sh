@@ -50,6 +50,9 @@ if [[ "${JARVIS_ZAIM_BANK_AUTO_UPDATE:-1}" != "0" ]]; then
     >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
   "$PY" scripts/jarvis_zaim_bank_sync_check.py \
     >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
+  # 残留 stale / OTP 系は Todoist（dedupe あり）
+  "$PY" scripts/jarvis_zaim_bank_notify.py \
+    >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
 fi
 
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] zaim_bank_sync_friday done" >>"${LOG_DIR}/bank_sync.out.log"
