@@ -21,7 +21,19 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "# skip $(date +%Y-%m-%dT%H:%M:%S%z): already running" >>"${LOG_DIR}/weekly_skip.log"
   exit 0
 fi
-trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+# 銀行更新（bank_sync_manual）と共有 — 同時 Playwright でセッション破壊しない
+PW_LOCK="${LOG_DIR}/zaim_playwright.lock"
+PW_WAIT_UNTIL=$(( $(date +%s) + 180 ))
+while ! mkdir "$PW_LOCK" 2>/dev/null; do
+  if [[ $(date +%s) -ge $PW_WAIT_UNTIL ]]; then
+    echo "# skip $(date +%Y-%m-%dT%H:%M:%S%z): playwright lock busy (bank update)" >>"${LOG_DIR}/weekly_skip.log"
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+    exit 0
+  fi
+  sleep 3
+done
+echo "csv_weekly pid=$$ at=$(date +%Y-%m-%dT%H:%M:%S%z)" >"${PW_LOCK}/owner.txt"
+trap 'rm -rf "$PW_LOCK" 2>/dev/null || true; rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
 STAMP="$(date +%Y%m%d_%H%M%S)"
 LOG="${LOG_DIR}/weekly_${STAMP}.log"
 YEAR="$(date +%Y)"

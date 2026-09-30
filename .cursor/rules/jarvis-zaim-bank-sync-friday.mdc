@@ -14,9 +14,13 @@ alwaysApply: false
 ## 方針
 
 - **Phase1（検知）**: CSV 最終日とのラグで「止まっていそう」を特定
-- **Phase1.5（現行）**: 火・金 runner が **stale のみ** `jarvis_zaim_bank_sync_manual.py --from-stale` を試す（OTP 出たら失敗して止まる）。オフは `JARVIS_ZAIM_BANK_AUTO_UPDATE=0`
-- **再接続コマンド**: `scripts/jarvis_zaim_reconnect.py --from-stale`（任意 `--with-csv`）
-- 手動フォールバック: Zaim Web で更新。OTP 等は `.env.jarvis_private` を読んで Jarvis が回答（値はチャットに貼らない）
+- **Phase1.5（現行）**: 火・金 runner が **stale のみ** `jarvis_zaim_bank_sync_manual.py --from-stale`（`automation: off` / cooldown 除外）。オフは `JARVIS_ZAIM_BANK_AUTO_UPDATE=0`
+- **OTP 半自動**: `--try-otp`（既定オン・`JARVIS_ZAIM_BANK_TRY_OTP=0` でオフ）。SMS/Gmail から取得して画面入力。値はログに出さない。画像認証は対象外
+- **Playwright ロック**: CSV 週次と `~/Library/Logs/jarvis_zaim/zaim_playwright.lock` を共有（同時実行でセッション破壊しない）
+- **通知**: 残留 stale / OTP / session → `jarvis_zaim_bank_notify.py`（Todoist 要Jarvis連携・dedupe）
+- **再接続コマンド**: `scripts/jarvis_zaim_reconnect.py --from-stale [--notify] [--try-otp]`
+- 手動フォールバック: Zaim Web で更新。OTP 等は `.env.jarvis_private` / Messages を読んで Jarvis が回答（値はチャットに貼らない）
+- **GHA**: 銀行更新ボタンは押さない（Mac 専有）。毎日は check＋CSV＋Watch のみ
 
 アラート表示先は **数値タブではなく** `/zaim` 冒頭の鮮度帯＋状況ウォッチの **「Zaim集計・二重取込」**。
 
