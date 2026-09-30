@@ -1699,11 +1699,36 @@ p.back {
 }
 
 .watch-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
   margin: 0;
   padding: var(--pad-card);
   border-radius: var(--radius-card);
   transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.watch-card-main {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  flex: 1;
+}
+
+.watch-todoist {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 0.8rem;
+}
+
+.watch-todoist a {
+  color: #0f766e;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.watch-todoist a:hover {
+  text-decoration: underline;
 }
 
 .home-pin-banner {

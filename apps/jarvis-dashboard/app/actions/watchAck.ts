@@ -71,6 +71,8 @@ export async function acknowledgeWatch(id: string): Promise<WatchAckResult> {
     acked_level: level,
   };
   payload.user_ack = user_ack;
+  payload.ack_source = "dashboard";
+  payload.todoist_complete_requested = true;
   payload.show_banner = false;
   payload.badge_suppressed = true;
 
@@ -130,6 +132,8 @@ export async function acknowledgeWatchAllAttention(): Promise<WatchAckResult> {
       quiet_until: until,
       acked_level: String(row.level || ""),
     };
+    payload.ack_source = "dashboard";
+    payload.todoist_complete_requested = true;
     payload.show_banner = false;
     payload.badge_suppressed = true;
     const { error: upErr } = await supabase

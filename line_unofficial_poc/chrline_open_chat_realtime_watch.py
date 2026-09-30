@@ -50,6 +50,13 @@ DEDUP_FLUSH_EVERY = 25
 DEDUP_FLUSH_SECONDS = 60.0
 HEARTBEAT_SECONDS = 30.0
 MAC_LINE_CHECK_SECONDS = 5.0
+# PUSH が静かに止まったまま残らないよう、無イベントが続いたら自己再起動する
+# （launchd KeepAlive が再接続して張り直す。0 で無効）
+WATCH_MAX_IDLE_SECONDS = (
+    max(0, int(os.environ.get("LINE_OPEN_CHAT_WATCH_MAX_IDLE_HOURS") or "6")) * 3600
+)
+# 直近で PUSH イベントを処理した時刻（watchdog 用）
+_LAST_PUSH_ACTIVITY = [time.monotonic()]
 
 
 @dataclass
@@ -772,6 +779,8 @@ def main() -> int:
             # *args で吸収し、例外はログして監視を継続する。
             @tracer.SquareEvent(event_code)
             def _handler(*args, **_kwargs):
+                # PUSH が届いた事実を記録（watchdog の生存判定）
+                _LAST_PUSH_ACTIVITY[0] = time.monotonic()
                 try:
                     if len(args) < 2:
                         return
@@ -837,6 +846,20 @@ def main() -> int:
                         ),
                     )
                     last_heartbeat = now
+
+                # PUSH が静かに止まったまま残らないよう自己再起動（KeepAlive が再接続）
+                mono = time.monotonic()
+                if (
+                    WATCH_MAX_IDLE_SECONDS > 0
+                    and mono - _LAST_PUSH_ACTIVITY[0] >= WATCH_MAX_IDLE_SECONDS
+                ):
+                    idle_hours = (mono - _LAST_PUSH_ACTIVITY[0]) / 3600
+                    print(
+                        f"# watchdog: PUSH 無イベント {idle_hours:.1f}h のため再起動（再接続）",
+                        file=sys.stderr,
+                    )
+                    os.kill(os.getpid(), signal.SIGTERM)
+                    return
 
         guard_thread = threading.Thread(target=_runtime_guard, name="line-watch-guard", daemon=True)
         guard_thread.start()

@@ -23,11 +23,24 @@ thresholds:
   sell_drawdown_pct: 8.0
   upside_target_pct: 12.0
 
+# ポジション連動（売りサイン精密化）
+# 保有数量・取得単価は trade_positions（live 優先 → paper）を参照。
+# 立花APIの自動残高取得は未配線。手動約定後は --record-fill で live に記録。
+position:
+  require_for_sell: true          # 保有0なら sell_signal を出さない（ノイズ防止）
+  prefer_modes:                   # 同一銘柄は先頭モードを優先
+    - live
+    - paper
+  take_profit_from_cost_pct: null # null = thresholds.upside_target_pct
+  stop_from_cost_pct: null        # null = thresholds.sell_drawdown_pct
+
 propose:
   max_themes: 3
   min_score: 0.55
   exclude_themes:
     - index
+    # 大型「日本コア」は衛星Theme提案のノイズになりやすい（Core隣接）。監視リスト自体は残す。
+    - japan_core
   exclude_asset_classes:
     - inverse_etf
 
@@ -56,6 +69,8 @@ order:
     - sell_signal
   money_path: "立花証券e支店（特定口座・源泉徴収あり）"
   otp_note: "取引パスワード／都度確認は本人。Jarvis は OTP・最終送信を代行しない"
+  # 立花e支店は海外株式（米国株含む）非対応（2026-09-25 確認・恒久）。
+  # symbol が .T 以外（米株等）は発注プレビュー対象外。GAFAM等は監視のみで watchlist enabled=false のまま。
 
 kurashift:
   base_url: https://jarvis-trade-desk.vercel.app

@@ -27,9 +27,9 @@
 
 | 項目 | 正 |
 |---|---|
-| きっかけ | コーチング部長 日曜19:00 → Cloud `POST /api/advisor-weekly-pack` |
-| 秘密 | `ADVISOR_WEEKLY_PACK_SECRET`（Action）＋サーバー側 `GSK_API_KEY`。**Grok に GSK を渡さない** |
-| 材料の正 | API 応答 `markdown`（Mac スリープ可）。Drive outbox は後続・Macフォールバック |
+| きっかけ | コーチング部長 日曜〜19:00（Drive 先読み → Computer/API） |
+| 秘密 | `ADVISOR_WEEKLY_PACK_SECRET`（Computer env／検証用）＋サーバー側 `GSK_API_KEY`。**Grok に GSK を渡さない** |
+| 材料の正 | **Drive outbox**（Mac 日曜18:40 launchd）本線。Computer／Vercel API は補助 |
 | Journal | **理解の正本**（全文ログではない）。アドバイザーは「Journalに無い重要」をメンション |
 | 仕様 | `docs/Grok_アドバイザー週次材料パック_仕様_20260926.md` |
 

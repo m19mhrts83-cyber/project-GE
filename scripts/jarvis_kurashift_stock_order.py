@@ -15,7 +15,11 @@ config の `order.live_api` が true になるまで実装しない（このス�
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_stock_order.py \
     --confirm <ORDER_ID> --i-confirm-order
 
-  # 3) 取り消し・一覧
+  # 3) 手動約定をポジションへ反映（売りサイン精密化）
+  ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_stock_order.py \
+    --record-fill --symbol 8035.T --side buy --qty 100 --price 12345
+
+  # 4) 取り消し・一覧
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_stock_order.py --cancel <ORDER_ID>
   ~/selenium_env/venv/bin/python scripts/jarvis_kurashift_stock_order.py --list
 
@@ -38,8 +42,12 @@ from jarvis_kurashift_stock_watch import (
     eval_symbol,
     kurashift_urls,
     load_config,
+    load_open_positions,
     load_state,
     now_iso,
+    remember_todoist_task,
+    resolve_position,
+    resolve_todoist_task_id,
     save_state,
     todoist_comment,
     todoist_create,
@@ -143,8 +151,21 @@ def tick_round(price: float, *, up: bool) -> float:
     return round(n * tick, 4)
 
 
-def signals_of(watch: dict[str, Any], levels: dict[str, Any], thr: dict[str, Any]) -> list[dict[str, Any]]:
-    return eval_symbol(deepcopy(watch), levels, thr)
+def signals_of(
+    watch: dict[str, Any],
+    levels: dict[str, Any],
+    thr: dict[str, Any],
+    *,
+    position: dict[str, Any] | None = None,
+    position_cfg: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    return eval_symbol(
+        deepcopy(watch),
+        levels,
+        thr,
+        position=position,
+        position_cfg=position_cfg,
+    )
 
 
 def resolve_side(signals: list[dict[str, Any]], requested: str, oc: dict[str, Any]) -> str:
@@ -174,16 +195,29 @@ def build_preview(
     if not oc.get("enabled", True):
         raise GuardError("発注プレビューは config order.enabled=false で停止中です")
     thr = cfg.get("thresholds") or {}
+    pos_cfg = cfg.get("position") or {}
     watch = watch_for_symbol(state, symbol)
     sym = watch.get("symbol") or symbol
     core = {str(s).upper() for s in (oc.get("core_symbols") or [])}
     if sym.upper() in core:
         raise GuardError(f"NISAコア相当のため対象外です: {sym}")
+    if not sym.upper().endswith(".T"):
+        raise GuardError(
+            f"立花証券e支店は海外株式（米国株含む）非対応のため発注アシスト対象外です: {sym}"
+            "（東証ETF代理 1545/1546 等で代替）"
+        )
+
+    positions = load_open_positions(
+        sb, prefer_modes=list(pos_cfg.get("prefer_modes") or ["live", "paper"])
+    )
+    pos = resolve_position(positions, sym)
 
     levels = compute_levels(_closes(sb, sym), thr)
     if not levels:
         raise GuardError(f"日足不足でプレビューできません: {sym}")
-    sigs = signals_of(watch, levels, thr)
+    sigs = signals_of(
+        watch, levels, thr, position=pos, position_cfg=pos_cfg
+    )
     side = resolve_side(sigs, requested_side, oc)
 
     unit = int(oc.get("min_unit") or 100)
@@ -232,11 +266,29 @@ def build_preview(
                 "detail": "単元未満（かぶミニ等）。指値可否を立花で確認",
             }
     else:
-        if not qty_arg:
-            raise GuardError("売りは --qty で数量指定が必要です（保有数量は手動確認）")
-        qty = int(qty_arg)
+        held = int((pos or {}).get("qty") or 0)
+        if qty_arg:
+            qty = int(qty_arg)
+        elif held > 0:
+            qty = held
+        else:
+            raise GuardError(
+                "売り数量が分かりません。"
+                "trade_positions に保有が無いので --qty を指定するか、"
+                "約定後に --record-fill で保有を記録してください"
+            )
         if qty <= 0:
             raise GuardError("数量が不正です")
+        if held > 0 and qty > held:
+            raise GuardError(f"保有数量 {held}株 を超える売りです（指定 {qty}）")
+        if held > 0 and qty % unit != 0 and qty != held:
+            # 全量売りは単元未満も可。部分売りは単元推奨だが止めない
+            odd_lot = True
+            guards_extra = {
+                "code": "odd_lot_sell",
+                "ok": True,
+                "detail": f"保有{held}株中{qty}株（単元未満の可能性）",
+            }
 
     amount = qty * limit
     if side == "buy":
@@ -253,15 +305,35 @@ def build_preview(
         {"code": "order_enabled", "ok": True, "detail": "プレビュー機能有効"},
         {"code": "watch_active", "ok": True, "detail": watch.get("theme_title") or sym},
         {"code": "not_core", "ok": True, "detail": "NISAコア対象外"},
+        {"code": "domestic_only", "ok": True, "detail": "立花e支店取扱（東証上場）"},
         {"code": "signal_present", "ok": True, "detail": ",".join(sorted({s["kind"] for s in sigs}))},
         {"code": "budget_ok", "ok": True, "detail": f"{qty}×{limit:,.0f}={amount:,.0f}円"},
         {"code": "no_open_order", "ok": True, "detail": "重複なし"},
         {"code": "kill_switch_off", "ok": True, "detail": "停止していない"},
     ]
+    if pos:
+        guards.append(
+            {
+                "code": "position_linked",
+                "ok": True,
+                "detail": (
+                    f"{pos.get('mode')} {pos.get('qty')}株"
+                    f"@{float(pos.get('avg_price') or 0):.1f}"
+                ),
+            }
+        )
+    elif side == "sell":
+        guards.append(
+            {
+                "code": "position_manual_qty",
+                "ok": True,
+                "detail": "保有未記録のため --qty 指定",
+            }
+        )
     if guards_extra:
         guards.append(guards_extra)
 
-    return {
+    preview: dict[str, Any] = {
         "kind": "stock_order_preview",
         "phase": "preview",
         "symbol": sym,
@@ -287,6 +359,13 @@ def build_preview(
         "created_at": now_iso(),
         "created_by": "jarvis_kurashift_stock_order",
     }
+    if pos:
+        preview["position"] = {
+            "qty": pos.get("qty"),
+            "avg_price": pos.get("avg_price"),
+            "mode": pos.get("mode"),
+        }
+    return preview
 
 
 def _closes(sb: Any, symbol: str, limit: int = 90) -> list[dict[str, Any]]:
@@ -315,7 +394,12 @@ def assist_steps(preview: dict[str, Any]) -> list[str]:
         f"銘柄 {ticker}（{preview.get('name')}）を検索",
         f"{side_label(str(preview.get('side')))} {preview.get('qty')}株 / 指値 {preview.get('limit_price')}円 / 有効期限 当日{lot_note}",
         "注文内容を最終確認して送信（送信は本人。Jarvis は OTP・送信を代行しない）",
-        "約定後、約定数量・単価を Todoist Theme株式にコメント（ポジション連動は次タスク）",
+        (
+            "約定後: "
+            f"`jarvis_kurashift_stock_order.py --record-fill --symbol {preview.get('symbol')} "
+            f"--side {preview.get('side')} --qty <約定株数> --price <約定単価>` "
+            "で trade_positions(live) を更新（売りサイン精密化の正本）"
+        ),
     ]
 
 
@@ -352,6 +436,9 @@ def todoist_notify_preview(
     lane = str((cfg.get("notify") or {}).get("todoist_lane") or "theme_stock")
     body = preview_body(preview, cfg)
     title_key = str(preview.get("theme_title") or preview["symbol"])
+    task_id = task_id or resolve_todoist_task_id(
+        state, theme_title=title_key, symbol=str(preview.get("symbol") or "")
+    )
     if task_id:
         todoist_comment(task_id=str(task_id), comment=body, dry_run=dry_run)
         return str(task_id)
@@ -365,7 +452,12 @@ def todoist_notify_preview(
     )
     tid = created.get("id") or created.get("task_id")
     if tid:
-        state.setdefault("todoist_tasks_by_theme", {})[title_key] = str(tid)
+        remember_todoist_task(
+            state,
+            task_id=str(tid),
+            theme_title=title_key,
+            symbol=str(preview.get("symbol") or ""),
+        )
     return str(tid) if tid else None
 
 
@@ -408,6 +500,12 @@ def cmd_preview(
     task_id = (state.get("todoist_tasks_by_theme") or {}).get(
         str(preview.get("theme_title") or preview["symbol"])
     )
+    if not task_id:
+        task_id = resolve_todoist_task_id(
+            state,
+            theme_title=str(preview.get("theme_title") or ""),
+            symbol=str(preview.get("symbol") or ""),
+        )
     if not args.no_notify:
         try:
             tid = todoist_notify_preview(
@@ -536,12 +634,294 @@ def cmd_list(sb: Any) -> dict[str, Any]:
     return {"open": orders, "live_api": False}
 
 
+def _open_position_row(sb: Any, *, symbol: str, mode: str) -> dict[str, Any] | None:
+    res = (
+        sb.table("trade_positions")
+        .select("id,mode,symbol,qty,avg_price,opened_at,status,payload,realized_pnl")
+        .eq("status", "open")
+        .eq("mode", mode)
+        .eq("symbol", symbol)
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    return rows[0] if rows else None
+
+
+def cmd_record_fill(
+    cfg: dict[str, Any], args: argparse.Namespace
+) -> dict[str, Any]:
+    """手動約定を trade_positions に反映（売りサイン精密化の正本）。
+
+    立花 API 残高取得は未配線のため、約定後の人手記録が本線。
+    """
+    sym = str(args.symbol or "").strip().upper()
+    if not sym:
+        raise GuardError("--symbol が必要です")
+    side = str(args.side or "").strip().lower()
+    if side not in ("buy", "sell"):
+        raise GuardError("--side buy|sell が必要です")
+    qty = int(args.qty or 0)
+    price = float(args.price or 0)
+    if qty <= 0 or price <= 0:
+        raise GuardError("--qty と --price は正の数が必要です")
+    mode = str(args.mode or "live").strip().lower()
+    if mode not in ("live", "paper"):
+        raise GuardError("--mode は live または paper")
+
+    from datetime import date
+
+    sb = sb_client()
+    existing = _open_position_row(sb, symbol=sym, mode=mode)
+    today = date.today().isoformat()
+    note = {
+        "recorded_at": now_iso(),
+        "source": "manual_record_fill",
+        "last_fill": {"side": side, "qty": qty, "price": price},
+    }
+
+    if side == "buy":
+        if existing:
+            old_q = int(existing.get("qty") or 0)
+            old_avg = float(existing.get("avg_price") or 0)
+            new_q = old_q + qty
+            new_avg = (old_avg * old_q + price * qty) / new_q if new_q else price
+            payload = dict(existing.get("payload") or {})
+            payload.update(note)
+            row = {
+                "qty": new_q,
+                "avg_price": round(new_avg, 4),
+                "payload": payload,
+            }
+            if args.dry_run:
+                return {"dry_run": True, "action": "buy_add", "before": existing, "after": row}
+            sb.table("trade_positions").update(row).eq("id", existing["id"]).execute()
+            return {
+                "action": "buy_add",
+                "symbol": sym,
+                "mode": mode,
+                "qty": new_q,
+                "avg_price": row["avg_price"],
+                "id": existing["id"],
+            }
+        payload = {**note, "broker": (_order_cfg(cfg).get("broker") or "tachibana")}
+        insert_row = {
+            "mode": mode,
+            "symbol": sym,
+            "qty": qty,
+            "avg_price": price,
+            "opened_at": today,
+            "status": "open",
+            "payload": payload,
+        }
+        if args.dry_run:
+            return {"dry_run": True, "action": "buy_open", "after": insert_row}
+        res = sb.table("trade_positions").insert(insert_row).execute()
+        created = (res.data or [insert_row])[0]
+        return {
+            "action": "buy_open",
+            "symbol": sym,
+            "mode": mode,
+            "qty": qty,
+            "avg_price": price,
+            "id": created.get("id"),
+        }
+
+    # sell
+    if not existing:
+        raise GuardError(
+            f"売り記録する open ポジションがありません: {sym} mode={mode}"
+        )
+    old_q = int(existing.get("qty") or 0)
+    if qty > old_q:
+        raise GuardError(f"保有 {old_q}株 を超える売りです（指定 {qty}）")
+    avg = float(existing.get("avg_price") or 0)
+    pnl = (price - avg) * qty
+    prev_pnl = float(existing.get("realized_pnl") or 0)
+    payload = dict(existing.get("payload") or {})
+    payload.update(note)
+    payload["last_realized_pnl"] = pnl
+    new_q = old_q - qty
+    if new_q <= 0:
+        row = {
+            "qty": 0,
+            "status": "closed",
+            "closed_at": today,
+            "realized_pnl": prev_pnl + pnl,
+            "payload": payload,
+        }
+        action = "sell_close"
+    else:
+        row = {
+            "qty": new_q,
+            "realized_pnl": prev_pnl + pnl,
+            "payload": payload,
+        }
+        action = "sell_partial"
+    if args.dry_run:
+        return {
+            "dry_run": True,
+            "action": action,
+            "before": existing,
+            "after": row,
+            "realized_pnl_fill": pnl,
+        }
+    sb.table("trade_positions").update(row).eq("id", existing["id"]).execute()
+    return {
+        "action": action,
+        "symbol": sym,
+        "mode": mode,
+        "qty_remaining": new_q,
+        "avg_price": avg,
+        "realized_pnl_fill": pnl,
+        "id": existing["id"],
+    }
+
+
+
+def cmd_verify_assist(
+    cfg: dict[str, Any], state: dict[str, Any], args: argparse.Namespace
+) -> dict[str, Any]:
+    """購入アシスト手順の静的検証＋（監視ONなら）プレビュー構築。
+
+    立花Webの実操作は本人確認。ここでは手順テキスト・ガードのズレを機械チェック。
+    """
+    checks: list[dict[str, Any]] = []
+    oc = _order_cfg(cfg)
+    sample = {
+        "symbol": "8035.T",
+        "name": "東京エレクトロン",
+        "side": "buy",
+        "qty": 100,
+        "limit_price": 10000,
+        "odd_lot": False,
+        "money_path": oc.get("money_path") or "立花証券e支店",
+    }
+    steps = assist_steps(sample)
+    joined = "\n".join(steps)
+    checks.append(
+        {"code": "steps_count", "ok": len(steps) >= 5, "detail": f"{len(steps)} steps"}
+    )
+    checks.append(
+        {
+            "code": "mentions_tachibana_login",
+            "ok": "立花" in joined and "ログイン" in joined,
+            "detail": "立花ログイン手順あり",
+        }
+    )
+    checks.append(
+        {
+            "code": "mentions_record_fill",
+            "ok": "--record-fill" in joined,
+            "detail": "約定後 record-fill あり",
+        }
+    )
+    checks.append(
+        {
+            "code": "otp_not_delegated",
+            "ok": "OTP" in joined or "代行しない" in joined,
+            "detail": "OTP代行しない旨あり",
+        }
+    )
+    checks.append(
+        {
+            "code": "live_api_off",
+            "ok": not bool(oc.get("live_api")),
+            "detail": f"live_api={bool(oc.get('live_api'))}",
+        }
+    )
+    checks.append(
+        {
+            "code": "core_symbols_configured",
+            "ok": bool(oc.get("core_symbols")),
+            "detail": f"n={len(oc.get('core_symbols') or [])}",
+        }
+    )
+
+    preview_probe: dict[str, Any] | None = None
+    active = [
+        (sym, w)
+        for sym, w in (state.get("watches") or {}).items()
+        if w.get("active", True)
+    ]
+    try_sym = (args.symbol or "").strip() or (active[0][0] if active else "")
+    if try_sym:
+        try:
+            preview_probe = build_preview(
+                state=state,
+                sb=sb_client(),
+                cfg=cfg,
+                symbol=try_sym,
+                requested_side=args.side or "",
+                qty_arg=args.qty,
+            )
+            checks.append(
+                {
+                    "code": "preview_build",
+                    "ok": True,
+                    "detail": (
+                        f"{try_sym} {preview_probe.get('side')} "
+                        f"{preview_probe.get('qty')}@{preview_probe.get('limit_price')}"
+                    ),
+                }
+            )
+        except GuardError as e:
+            checks.append(
+                {"code": "preview_build", "ok": False, "detail": f"{try_sym}: {e}"}
+            )
+    else:
+        checks.append(
+            {
+                "code": "preview_build",
+                "ok": True,
+                "detail": "監視ON銘柄なし（静的手順のみ検証）",
+            }
+        )
+
+    tachibana_web = [
+        "標準Web https://tr2.e-shiten.jp/e-shiten にパスキー／PWでログイン",
+        "銘柄検索 → 現物（特定）→ 指値・数量・当日を確認",
+        "送信は本人（OTP／パスキー）。Jarvisは代行しない",
+        "約定後 --record-fill で数量・単価を live に記録",
+        "立花画面の単元／かぶミニ可否が手順と違う場合はこのタスクへコメント",
+    ]
+    ok = all(bool(c.get("ok")) for c in checks)
+    return {
+        "ok": ok,
+        "checks": checks,
+        "assist_steps": steps,
+        "tachibana_web_checklist": tachibana_web,
+        "preview": (
+            {
+                "symbol": preview_probe.get("symbol"),
+                "side": preview_probe.get("side"),
+                "qty": preview_probe.get("qty"),
+                "limit_price": preview_probe.get("limit_price"),
+                "signals": preview_probe.get("signals"),
+            }
+            if preview_probe
+            else None
+        ),
+        "active_watches": len(active),
+        "note": "立花Webの最終クリックは本人確認（このCLIは手順ズレ検出まで）",
+    }
+
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="KURASHIFT 発注前プレビュー＋対外確認ゲート")
     ap.add_argument("--preview", action="store_true", help="発注プレビューを作成")
     ap.add_argument("--symbol", default="", help="対象銘柄（Yahoo 記号）")
     ap.add_argument("--side", default="", choices=["", "buy", "sell"])
     ap.add_argument("--qty", type=int, default=None)
+    ap.add_argument("--price", type=float, default=None, help="約定単価（--record-fill）")
+    ap.add_argument("--mode", default="live", help="trade_positions.mode（record-fill）")
+    ap.add_argument("--record-fill", action="store_true", help="手動約定をポジションに反映")
+    ap.add_argument(
+        "--verify-assist",
+        action="store_true",
+        help="購入アシスト手順の静的検証（立花Web実操作は本人）",
+    )
     ap.add_argument("--confirm", default="", help="確定する trade_orders.id")
     ap.add_argument("--cancel", default="", help="取り消す trade_orders.id")
     ap.add_argument("--list", action="store_true")
@@ -556,7 +936,11 @@ def main() -> int:
         return 0
 
     try:
-        if args.confirm:
+        if args.verify_assist:
+            out = cmd_verify_assist(cfg, load_state(), args)
+        elif args.record_fill:
+            out = cmd_record_fill(cfg, args)
+        elif args.confirm:
             out = cmd_confirm(cfg, load_state(), args)
         elif args.cancel:
             out = cmd_cancel(cfg, args)
@@ -568,14 +952,24 @@ def main() -> int:
             if not args.dry_run:
                 save_state(state)
         else:
-            ap.error("--preview / --confirm / --cancel / --list のいずれかが必要です")
+            ap.error(
+                "--preview / --confirm / --cancel / --list / --record-fill / --verify-assist のいずれかが必要です"
+            )
             return 2
     except GuardError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
 
-    print("📎 KURASHIFT 発注プレビュー（実発注なし）")
+    if args.verify_assist:
+        label = "📎 KURASHIFT 購入アシスト検証"
+    elif args.record_fill:
+        label = "📎 KURASHIFT ポジション記録"
+    else:
+        label = "📎 KURASHIFT 発注プレビュー（実発注なし）"
+    print(label)
     print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    if args.verify_assist and not out.get("ok"):
+        return 1
     return 0
 
 

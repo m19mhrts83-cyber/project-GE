@@ -76,6 +76,13 @@
       "note": "回別一覧への入口"
     },
     {
+      "id": "dx-member-line-note",
+      "lane": "dx",
+      "title": "メンバー案内（LINEノート用）",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/DX互助会_メンバー案内_LINEノート.md",
+      "note": "資料・Notion／Drive・アプリ・回別リンク（新メンバー＋リマインド兼用）"
+    },
+    {
       "id": "dx-slides-1",
       "lane": "dx",
       "title": "第1回スライド（dx-slides）",

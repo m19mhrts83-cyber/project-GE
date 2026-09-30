@@ -56,6 +56,7 @@ def load_state() -> dict[str, Any]:
         "disabled": False,
         "watches": {},
         "todoist_tasks_by_theme": {},
+        "todoist_tasks_by_symbol": {},
         "fired": {},
         "last_eval_at": None,
         "last_propose_at": None,
@@ -140,8 +141,134 @@ def compute_levels(
     }
 
 
+def _norm_symbol(symbol: str) -> str:
+    return str(symbol or "").strip().upper()
+
+
+def load_open_positions(
+    sb: Any, *, prefer_modes: list[str] | None = None
+) -> dict[str, dict[str, Any]]:
+    """trade_positions の open を symbol→1件に畳む（prefer_modes 先頭優先）。
+
+    live = 立花等の実弾記録（--record-fill）。paper = Lab／検証用。
+    """
+    modes = [str(m).strip() for m in (prefer_modes or ["live", "paper"]) if str(m).strip()]
+    if not modes:
+        modes = ["live", "paper"]
+    out: dict[str, dict[str, Any]] = {}
+    try:
+        res = (
+            sb.table("trade_positions")
+            .select("id,mode,symbol,qty,avg_price,opened_at,status,payload")
+            .eq("status", "open")
+            .in_("mode", modes)
+            .execute()
+        )
+    except Exception as e:
+        print(f"# load_open_positions soft-fail: {e}", file=sys.stderr)
+        return out
+    rank = {m: i for i, m in enumerate(modes)}
+    rows = sorted(
+        res.data or [],
+        key=lambda r: (rank.get(str(r.get("mode")), 99), str(r.get("symbol") or "")),
+    )
+    for row in rows:
+        sym = _norm_symbol(str(row.get("symbol") or ""))
+        if not sym:
+            continue
+        qty = int(row.get("qty") or 0)
+        if qty <= 0:
+            continue
+        existing = out.get(sym)
+        if existing is not None:
+            # 既に優先モードが入っている
+            continue
+        avg = float(row.get("avg_price") or 0)
+        out[sym] = {
+            "id": row.get("id"),
+            "mode": str(row.get("mode") or ""),
+            "symbol": sym,
+            "qty": qty,
+            "avg_price": avg,
+            "opened_at": row.get("opened_at"),
+            "source": "trade_positions",
+        }
+    return out
+
+
+def resolve_position(
+    positions: dict[str, dict[str, Any]], symbol: str
+) -> dict[str, Any] | None:
+    sym = _norm_symbol(symbol)
+    if not sym:
+        return None
+    if sym in positions:
+        return positions[sym]
+    alt = sym + ".T" if not sym.endswith(".T") else sym[:-2]
+    return positions.get(alt)
+
+
+def existing_watch_for_symbol(
+    state: dict[str, Any], symbol: str
+) -> dict[str, Any] | None:
+    """watches に同一銘柄があれば返す（active/提案待ちどちらも二重起票防止）。"""
+    sym = _norm_symbol(symbol)
+    watches = state.get("watches") or {}
+    if sym in watches:
+        return watches[sym]
+    alt = sym + ".T" if not sym.endswith(".T") else sym[:-2]
+    return watches.get(alt)
+
+
+def resolve_todoist_task_id(
+    state: dict[str, Any], *, theme_title: str | None, symbol: str | None = None
+) -> str | None:
+    """Themeタイトル → なければ銘柄キーで既存 Todoist 親タスクを返す。"""
+    by_theme = state.get("todoist_tasks_by_theme") or {}
+    if theme_title and theme_title in by_theme:
+        return str(by_theme[theme_title])
+    by_sym = state.get("todoist_tasks_by_symbol") or {}
+    if symbol:
+        sym = _norm_symbol(symbol)
+        if sym in by_sym:
+            return str(by_sym[sym])
+        alt = sym + ".T" if not sym.endswith(".T") else sym[:-2]
+        if alt in by_sym:
+            return str(by_sym[alt])
+    # theme_title が無くても watches 経由
+    if symbol:
+        w = existing_watch_for_symbol(state, symbol)
+        if w and w.get("theme_title") and w["theme_title"] in by_theme:
+            return str(by_theme[w["theme_title"]])
+    return None
+
+
+def remember_todoist_task(
+    state: dict[str, Any],
+    *,
+    task_id: str,
+    theme_title: str | None,
+    symbol: str | None = None,
+) -> None:
+    tid = str(task_id)
+    if theme_title:
+        state.setdefault("todoist_tasks_by_theme", {})[str(theme_title)] = tid
+    if symbol:
+        state.setdefault("todoist_tasks_by_symbol", {})[_norm_symbol(symbol)] = tid
+
+
+def core_symbol_set(cfg: dict[str, Any]) -> set[str]:
+    oc = cfg.get("order") or {}
+    return {_norm_symbol(s) for s in (oc.get("core_symbols") or []) if str(s).strip()}
+
+
 def eval_symbol(
-    watch: dict[str, Any], levels: dict[str, Any], thr: dict[str, Any]
+    watch: dict[str, Any],
+    levels: dict[str, Any],
+    thr: dict[str, Any],
+    *,
+    position: dict[str, Any] | None = None,
+    position_cfg: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     signals: list[dict[str, Any]] = []
     close = float(levels["close"])
@@ -154,6 +281,12 @@ def eval_symbol(
     sell_dd = float(
         watch.get("sell_drawdown_pct") or thr.get("sell_drawdown_pct") or 8.0
     )
+    pos_cfg = position_cfg or {}
+    require_pos = bool(pos_cfg.get("require_for_sell", True))
+    tp_cost = pos_cfg.get("take_profit_from_cost_pct")
+    stop_cost = pos_cfg.get("stop_from_cost_pct")
+    take_profit_pct = float(tp_cost if tp_cost is not None else upside_target)
+    stop_pct = float(stop_cost if stop_cost is not None else sell_dd)
 
     if close <= bottom * (1.0 + near_pct):
         signals.append(
@@ -182,24 +315,119 @@ def eval_symbol(
     peak_f = float(peak) if peak is not None else float(levels["period_high"])
     peak_f = max(peak_f, close)
     watch["peak_since_watch"] = peak_f
-    if peak_f > 0:
-        dd = (peak_f - close) / peak_f * 100.0
-        if rebound >= upside_target and dd >= sell_dd * 0.5:
+
+    pos_qty = int((position or {}).get("qty") or 0)
+    pos_avg = float((position or {}).get("avg_price") or 0)
+    pos_mode = str((position or {}).get("mode") or "")
+    has_pos = pos_qty > 0 and pos_avg > 0
+
+    # 監視ピークからの押し（従来）
+    peak_dd = (peak_f - close) / peak_f * 100.0 if peak_f > 0 else 0.0
+    # 取得単価からの含み損益（ポジション連動）
+    cost_pnl_pct = ((close - pos_avg) / pos_avg * 100.0) if has_pos else None
+
+    def _pos_tail() -> str:
+        if not has_pos:
+            return ""
+        return (
+            f" 保有={pos_qty}株@{pos_avg:.1f}（{pos_mode or '—'}"
+            f" 含み{cost_pnl_pct:+.1f}%）"
+        )
+
+    if require_pos and not has_pos:
+        # 保有なしでは売りサインを出さない（価格だけの押しはノイズ）
+        return signals
+
+    if has_pos and cost_pnl_pct is not None:
+        # 利確: 取得単価から目標％到達＋監視高値から半閾値以上の押し
+        if cost_pnl_pct >= take_profit_pct and peak_dd >= sell_dd * 0.5:
+            signals.append(
+                {
+                    "kind": "sell_signal",
+                    "message": (
+                        f"取得単価から利確候補 +{cost_pnl_pct:.1f}%≥{take_profit_pct}% "
+                        f"押し={peak_dd:.1f}% close={close:.1f} peak={peak_f:.1f}"
+                        f"{_pos_tail()}"
+                    ),
+                    "position": {
+                        "qty": pos_qty,
+                        "avg_price": pos_avg,
+                        "mode": pos_mode,
+                        "cost_pnl_pct": cost_pnl_pct,
+                    },
+                }
+            )
+        # 損切り: 取得単価からの含み損
+        elif cost_pnl_pct <= -stop_pct:
+            signals.append(
+                {
+                    "kind": "sell_signal",
+                    "message": (
+                        f"取得単価から損切り候補 {cost_pnl_pct:.1f}%≤-{stop_pct}% "
+                        f"close={close:.1f} avg={pos_avg:.1f}"
+                        f"{_pos_tail()}"
+                    ),
+                    "position": {
+                        "qty": pos_qty,
+                        "avg_price": pos_avg,
+                        "mode": pos_mode,
+                        "cost_pnl_pct": cost_pnl_pct,
+                    },
+                }
+            )
+        # トレーリング: 監視高値からの下落（保有あり）
+        elif peak_dd >= sell_dd:
+            signals.append(
+                {
+                    "kind": "sell_signal",
+                    "message": (
+                        f"高値からの下落 {peak_dd:.1f}%≥{sell_dd}% "
+                        f"close={close:.1f} peak={peak_f:.1f}"
+                        f"{_pos_tail()}"
+                    ),
+                    "position": {
+                        "qty": pos_qty,
+                        "avg_price": pos_avg,
+                        "mode": pos_mode,
+                        "cost_pnl_pct": cost_pnl_pct,
+                    },
+                }
+            )
+        elif rebound >= upside_target and peak_dd >= sell_dd * 0.5:
             signals.append(
                 {
                     "kind": "sell_signal",
                     "message": (
                         f"目標近傍後の押し close={close:.1f} 監視高値={peak_f:.1f}"
-                        f" 下落={dd:.1f}%（売閾値={sell_dd}%）"
+                        f" 下落={peak_dd:.1f}%（売閾値={sell_dd}%）"
+                        f"{_pos_tail()}"
                     ),
+                    "position": {
+                        "qty": pos_qty,
+                        "avg_price": pos_avg,
+                        "mode": pos_mode,
+                        "cost_pnl_pct": cost_pnl_pct,
+                    },
                 }
             )
-        elif dd >= sell_dd:
+    elif peak_f > 0:
+        # require_for_sell=false のフォールバック（旧挙動）
+        if rebound >= upside_target and peak_dd >= sell_dd * 0.5:
             signals.append(
                 {
                     "kind": "sell_signal",
                     "message": (
-                        f"高値からの下落 {dd:.1f}%≥{sell_dd}% "
+                        f"目標近傍後の押し close={close:.1f} 監視高値={peak_f:.1f}"
+                        f" 下落={peak_dd:.1f}%（売閾値={sell_dd}%）"
+                    ),
+                }
+            )
+        elif peak_dd >= sell_dd:
+            signals.append(
+                {
+                    "kind": "sell_signal",
+                    "message": (
+                        f"高値からの下落 {peak_dd:.1f}%≥{sell_dd}% "
                         f"close={close:.1f} peak={peak_f:.1f}"
                     ),
                 }
@@ -394,6 +622,9 @@ def upsert_sync_meta(
                 "bottom_hint": v.get("bottom_hint"),
                 "upside_target_pct": v.get("upside_target_pct"),
                 "sell_drawdown_pct": v.get("sell_drawdown_pct"),
+                "position_qty": v.get("position_qty"),
+                "position_avg": v.get("position_avg"),
+                "position_mode": v.get("position_mode"),
             }
             for k, v in watches.items()
         }
@@ -440,12 +671,17 @@ def cmd_eval_notify(
 ) -> dict[str, Any]:
     thr = cfg.get("thresholds") or {}
     notify_cfg = cfg.get("notify") or {}
+    pos_cfg = cfg.get("position") or {}
     lane = str(notify_cfg.get("todoist_lane") or "theme_stock")
     dedupe_h = float(notify_cfg.get("dedupe_hours") or 48)
     owner_kinds = set(notify_cfg.get("owner_confirm_kinds") or [])
     sb = sb_client()
+    positions = load_open_positions(
+        sb, prefer_modes=list(pos_cfg.get("prefer_modes") or ["live", "paper"])
+    )
     signals_out: list[dict[str, Any]] = []
     evaluated = 0
+    with_position = 0
 
     for sym, watch in list((state.get("watches") or {}).items()):
         if not watch.get("active", True):
@@ -457,7 +693,19 @@ def cmd_eval_notify(
         evaluated += 1
         if watch.get("bottom_hint") is None:
             watch["bottom_hint"] = levels["bottom_hint"]
-        sigs = eval_symbol(watch, levels, thr)
+        pos = resolve_position(positions, sym)
+        if pos:
+            with_position += 1
+            watch["position_qty"] = pos.get("qty")
+            watch["position_avg"] = pos.get("avg_price")
+            watch["position_mode"] = pos.get("mode")
+        else:
+            watch.pop("position_qty", None)
+            watch.pop("position_avg", None)
+            watch.pop("position_mode", None)
+        sigs = eval_symbol(
+            watch, levels, thr, position=pos, position_cfg=pos_cfg
+        )
         for sig in sigs:
             day = str(levels["trade_date"])
             key = fired_key(sig["kind"], sym, day)
@@ -473,10 +721,14 @@ def cmd_eval_notify(
                 "close": levels["close"],
                 "trade_date": day,
             }
+            if sig.get("position"):
+                item["position"] = sig["position"]
             signals_out.append(item)
             if notify and notify_cfg.get("on_threshold", True):
                 theme_key = str(watch.get("theme_title") or sym)
-                task_id = (state.get("todoist_tasks_by_theme") or {}).get(theme_key)
+                task_id = resolve_todoist_task_id(
+                    state, theme_title=theme_key, symbol=sym
+                )
                 body = comment_body(
                     summary=f"{sig['kind']} {sym} {watch.get('name') or ''} {sig['message']}",
                     confirm="買う／見送り／閾値修正？",
@@ -500,8 +752,11 @@ def cmd_eval_notify(
                     )
                     tid = created.get("id") or created.get("task_id")
                     if tid:
-                        state.setdefault("todoist_tasks_by_theme", {})[theme_key] = str(
-                            tid
+                        remember_todoist_task(
+                            state,
+                            task_id=str(tid),
+                            theme_title=theme_key,
+                            symbol=sym,
                         )
                 mark_fired(
                     state,
@@ -511,6 +766,8 @@ def cmd_eval_notify(
 
     summary = {
         "evaluated": evaluated,
+        "with_position": with_position,
+        "positions_loaded": len(positions),
         "signals": len(signals_out),
         "kinds": [s["kind"] for s in signals_out],
         "at": now_iso(),
@@ -524,7 +781,7 @@ def cmd_eval_notify(
             )
         except Exception as e:
             print(f"# sync_meta soft-fail: {e}", file=sys.stderr)
-    return {"summary": summary, "signals": signals_out}
+    return {"summary": summary, "signals": signals_out, "positions": list(positions.keys())}
 
 
 def cmd_propose(
@@ -542,9 +799,12 @@ def cmd_propose(
     max_themes = int(propose_cfg.get("max_themes") or 3)
     exclude_themes = set(propose_cfg.get("exclude_themes") or [])
     exclude_ac = set(propose_cfg.get("exclude_asset_classes") or [])
+    core_syms = core_symbol_set(cfg)
 
     sb = sb_client()
     candidates: list[dict[str, Any]] = []
+    skipped_core = 0
+    skipped_dup = 0
     for it in load_watchlist():
         if not it.get("enabled", True):
             continue
@@ -553,6 +813,9 @@ def cmd_propose(
         if (it.get("asset_class") or "") in exclude_ac:
             continue
         sym = it["symbol"]
+        if _norm_symbol(sym) in core_syms:
+            skipped_core += 1
+            continue
         closes = load_closes(sb, sym)
         levels = compute_levels(closes, thr)
         sc = score_instrument(it, levels)
@@ -566,13 +829,14 @@ def cmd_propose(
         it = c["instrument"]
         lv = c["levels"]
         title = f"衛星_{it.get('theme') or 'stock'}_{it.get('ticker_jp') or it['symbol']}"
-        # 既存監視・既存 Todoist テーマと重複回避
-        if any(
-            (w.get("symbol") == it["symbol"] and w.get("active"))
-            for w in (state.get("watches") or {}).values()
-        ):
+        # 既存監視・提案待ち・既存 Todoist 親タスクと重複回避（銘柄キー含む）
+        if existing_watch_for_symbol(state, it["symbol"]):
+            skipped_dup += 1
             continue
-        if title in (state.get("todoist_tasks_by_theme") or {}):
+        if resolve_todoist_task_id(
+            state, theme_title=title, symbol=it["symbol"]
+        ):
+            skipped_dup += 1
             continue
         hyp = (
             f"{it.get('name')}（{it['symbol']}）close={lv['close']:.1f} "
@@ -629,7 +893,12 @@ def cmd_propose(
             )
             tid = created_t.get("id") or created_t.get("task_id")
             if tid:
-                state.setdefault("todoist_tasks_by_theme", {})[title] = str(tid)
+                remember_todoist_task(
+                    state,
+                    task_id=str(tid),
+                    theme_title=title,
+                    symbol=it["symbol"],
+                )
         created.append(
             {
                 "title": title,
@@ -640,7 +909,82 @@ def cmd_propose(
         )
 
     state["last_propose_at"] = now_iso()
-    return {"created": created, "candidates_scanned": len(candidates)}
+    return {
+        "created": created,
+        "candidates_scanned": len(candidates),
+        "skipped_core": skipped_core,
+        "skipped_dup": skipped_dup,
+    }
+
+
+def cmd_diagnose_propose(cfg: dict[str, Any]) -> dict[str, Any]:
+    """週次提案のノイズ診断（掲載／除外理由を全銘柄列挙）。通知・DB書込なし。"""
+    propose_cfg = cfg.get("propose") or {}
+    thr = cfg.get("thresholds") or {}
+    min_score = float(propose_cfg.get("min_score") or 0.55)
+    exclude_themes = set(propose_cfg.get("exclude_themes") or [])
+    exclude_ac = set(propose_cfg.get("exclude_asset_classes") or [])
+    cores = core_symbol_set(cfg)
+    sb = sb_client()
+    rows: list[dict[str, Any]] = []
+    for it in load_watchlist():
+        sym = it["symbol"]
+        reasons: list[str] = []
+        if not it.get("enabled", True):
+            reasons.append("disabled")
+        if (it.get("theme") or "") in exclude_themes:
+            reasons.append("exclude_theme")
+        if (it.get("asset_class") or "") in exclude_ac:
+            reasons.append("exclude_ac")
+        if _norm_symbol(sym) in cores:
+            reasons.append("core")
+        levels = None
+        score = 0.0
+        if not reasons:
+            closes = load_closes(sb, sym)
+            levels = compute_levels(closes, thr)
+            score = score_instrument(it, levels)
+            if not levels:
+                reasons.append("no_levels")
+            elif score < min_score:
+                reasons.append(f"below_min:{score:.2f}")
+            else:
+                reasons.append("candidate")
+        rows.append(
+            {
+                "symbol": sym,
+                "name": it.get("name"),
+                "theme": it.get("theme"),
+                "asset_class": it.get("asset_class"),
+                "enabled": bool(it.get("enabled", True)),
+                "score": round(score, 3),
+                "rebound_from_low_pct": (
+                    None
+                    if not levels
+                    else round(float(levels.get("rebound_from_low_pct") or 0), 2)
+                ),
+                "close": None if not levels else levels.get("close"),
+                "reason": ",".join(reasons),
+            }
+        )
+    rows.sort(
+        key=lambda r: (
+            0 if r["reason"] == "candidate" else 1,
+            -float(r["score"] or 0),
+            str(r["symbol"]),
+        )
+    )
+    candidates = [r for r in rows if r["reason"] == "candidate"]
+    return {
+        "min_score": min_score,
+        "exclude_themes": sorted(exclude_themes),
+        "exclude_asset_classes": sorted(exclude_ac),
+        "core_symbols": sorted(cores),
+        "instruments": len(rows),
+        "candidates": len(candidates),
+        "candidate_symbols": [r["symbol"] for r in candidates],
+        "rows": rows,
+    }
 
 
 def cmd_activate_theme(
@@ -696,6 +1040,11 @@ def main() -> int:
     ap.add_argument("--eval", action="store_true")
     ap.add_argument("--notify", action="store_true")
     ap.add_argument("--propose-weekly", action="store_true")
+    ap.add_argument(
+        "--diagnose-propose",
+        action="store_true",
+        help="週次提案のノイズ診断（全銘柄の score / 除外理由）",
+    )
     ap.add_argument("--activate-theme", default="", help="Theme UUID を監視ON")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--range", default="6mo")
@@ -719,6 +1068,9 @@ def main() -> int:
         if rc != 0 and not args.dry_run:
             print("# fetch failed; continue eval if prices exist", file=sys.stderr)
 
+    if args.diagnose_propose:
+        results["diagnose_propose"] = cmd_diagnose_propose(cfg)
+
     if args.propose_weekly:
         results["propose"] = cmd_propose(
             cfg, state, notify=args.notify, dry_run=args.dry_run
@@ -729,16 +1081,16 @@ def main() -> int:
             cfg, state, args.activate_theme.strip(), dry_run=args.dry_run
         )
 
-    if args.eval or (not args.propose_weekly and not args.activate_theme and not args.fetch):
-        # default: eval when nothing else? Prefer explicit --eval
-        if args.eval:
-            results["eval"] = cmd_eval_notify(
-                cfg, state, notify=args.notify, dry_run=args.dry_run
-            )
+    if args.eval:
+        results["eval"] = cmd_eval_notify(
+            cfg, state, notify=args.notify, dry_run=args.dry_run
+        )
 
-    if not args.dry_run:
+    if not args.dry_run and (
+        args.eval or args.propose_weekly or args.activate_theme
+    ):
         save_state(state)
-    else:
+    elif args.dry_run:
         print("# dry-run: state not saved")
 
     print("📎 KURASHIFT 株式ウォッチ")
