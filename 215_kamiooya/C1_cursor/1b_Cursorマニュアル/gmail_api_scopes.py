@@ -57,6 +57,24 @@ def token_satisfies_read_modify_scopes(d: dict) -> bool:
     return token_satisfies_scopes(d, GMAIL_SCOPES_READ_MODIFY)
 
 
+GMAIL_SCOPES_READONLY = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+]
+
+
+def resolve_read_scopes_for_token(d: dict) -> list[str]:
+    """読み取り専用の取込で使う最小スコープ。
+
+    取込・LINE公式エクスポートは読み取りしかしないため、modify を持たない
+    token（estate が readonly 単独など）でもブラウザ再同意なしで動かす。
+    """
+    if token_satisfies_read_modify_scopes(d):
+        return list(GMAIL_SCOPES_READ_MODIFY)
+    if token_satisfies_scopes(d, GMAIL_SCOPES_READONLY):
+        return list(GMAIL_SCOPES_READONLY)
+    return list(GMAIL_SCOPES_READ_MODIFY)
+
+
 def _token_file_satisfies_215(path: Path) -> bool:
     if not path.is_file():
         return False
