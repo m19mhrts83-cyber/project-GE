@@ -730,6 +730,7 @@ S1 は **新耐震／旧耐震を最初に確認**（確認日 1981-06-01 以降
 - 仲介メール可 → `inquiry_action: kurashift_handoff`（KURASHIFT／Jarvis）
 - 不可 → `portal_sent`（S1 が Web 送信）
 - 調査のみ → `investigate_only`
+- **HOME'S投資ログイン壁**（`homes_login_required`）→ S1 は送らない。Drive inbox `action: homes_portal_manual` で **Jarvis Mac** へ委譲（正本: S1 paste の HOME'S節 · `docs/HOME'S投資_ログイン壁_対応_20260930.md`）
 
 ### Phase（問合せ件数）
 

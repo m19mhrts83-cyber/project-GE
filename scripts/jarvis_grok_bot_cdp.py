@@ -117,37 +117,80 @@ class GrokCDP:
             await asyncio.sleep(0.8)
 
     async def open_settings(self) -> None:
-        has = await self.ev("""!!document.querySelector('textarea[aria-label="Botの説明"]')""")
+        """Open Bot detail pane (new UI: プロンプト CE; legacy: Botの説明 textarea)."""
+        has = await self.ev(
+            """!!(document.querySelector('textarea[aria-label="Botの説明"]')
+              || document.querySelector('[contenteditable="true"][aria-label="プロンプト"]'))"""
+        )
+        if has:
+            return
+        opened = await self.click_aria("会話の詳細を表示")
+        if opened == "clicked":
+            await asyncio.sleep(0.6)
+        await self.click_btn_text("Bot", exact=True)
+        await asyncio.sleep(0.3)
+        has = await self.ev(
+            """!!(document.querySelector('textarea[aria-label="Botの説明"]')
+              || document.querySelector('[contenteditable="true"][aria-label="プロンプト"]'))"""
+        )
         if has:
             return
         r = await self.click_aria("Botの設定")
         if r == "missing":
-            await self.click_aria("会話の詳細を表示")
-            await asyncio.sleep(0.6)
-            r = await self.click_aria("Botの設定")
-        if r == "missing":
-            raise RuntimeError("Botの設定 not found")
+            raise RuntimeError("Bot settings / プロンプト not found")
         await asyncio.sleep(0.8)
 
     async def back_from_settings(self) -> None:
-        await self.click_aria("詳細に戻る")
+        r = await self.click_aria("詳細を閉じる")
+        if r == "missing":
+            await self.click_aria("詳細に戻る")
         await asyncio.sleep(0.8)
 
-    async def read_instructions(self) -> dict:
-        return await self.ev("""(() => {
+    def _instructions_js_read(self) -> str:
+        return """(() => {
+          const ce=document.querySelector('[contenteditable="true"][aria-label="プロンプト"]');
           const ta=document.querySelector('textarea[aria-label="Botの説明"]');
-          const name=document.querySelector('input[aria-label="Bot名"]');
-          const label=document.querySelector('input[aria-label="Botのラベル"]');
-          if(!ta) return {ok:false};
-          return {ok:true, name: name && name.value, label: label && label.value, text: ta.value, len: ta.value.length};
-        })()""")
+          const nameEl=document.querySelector('input[aria-label="Bot名"]')
+            || document.querySelector('button[aria-label="Bot名"]');
+          const labelEl=document.querySelector('input[aria-label="Botのラベル"]')
+            || document.querySelector('button[aria-label="Botのラベル"]');
+          const name = nameEl && (nameEl.value || (nameEl.innerText||'').trim());
+          const label = labelEl && (labelEl.value || (labelEl.innerText||'').trim());
+          if(ce) {
+            const text = ce.innerText || '';
+            return {ok:true, via:'prompt', name, label, text, len: text.length};
+          }
+          if(ta) {
+            return {ok:true, via:'textarea', name, label, text: ta.value, len: ta.value.length};
+          }
+          return {ok:false};
+        })()"""
+
+    async def read_instructions(self) -> dict:
+        return await self.ev(self._instructions_js_read())
 
     async def set_instructions(self, text: str) -> dict:
         payload = json.dumps(text)
         return await self.ev(
             f"""(() => {{
+              const ce=document.querySelector('[contenteditable="true"][aria-label="プロンプト"]');
+              if(ce) {{
+                ce.focus();
+                const sel=window.getSelection();
+                const range=document.createRange();
+                range.selectNodeContents(ce);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                document.execCommand('insertText', false, {payload});
+                if((ce.innerText||'').length < Math.min(100, {payload}.length/4)) {{
+                  ce.innerText = {payload};
+                  ce.dispatchEvent(new InputEvent('input', {{bubbles:true, inputType:'insertText'}}));
+                }}
+                ce.blur();
+                return {{ok:true, via:'prompt', len:(ce.innerText||'').length}};
+              }}
               const ta=document.querySelector('textarea[aria-label="Botの説明"]');
-              if(!ta) return {{ok:false, reason:'NO_TA'}};
+              if(!ta) return {{ok:false, reason:'NO_EDITOR'}};
               const props=ta[Object.keys(ta).find(k=>k.startsWith('__reactProps'))];
               const tracker=ta._valueTracker;
               const native=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;
@@ -158,7 +201,7 @@ class GrokCDP:
               ta.dispatchEvent(new Event('change', {{bubbles:true}}));
               ta.blur();
               props && props.onBlur && props.onBlur({{target: ta, currentTarget: ta, persist(){{}}}});
-              return {{ok:true, len: ta.value.length}};
+              return {{ok:true, via:'textarea', len: ta.value.length}};
             }})()"""
         )
 
