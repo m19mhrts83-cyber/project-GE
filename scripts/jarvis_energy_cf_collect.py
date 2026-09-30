@@ -21,6 +21,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -67,24 +68,62 @@ def zaim_paths(cfg: dict[str, Any]) -> list[Path]:
     base = Path(cfg.get("zaim", {}).get("base_dir") or "").expanduser()
     years_back = int(cfg.get("zaim", {}).get("years_back") or 3)
     y_now = datetime.now(JST).year
+    # 呼び出し元（launchd csv 週次）が OneDrive からローカルへコピーして渡す CSV。
+    # 当年分はこれを優先し、OneDrive 直読みの Resource deadlock(Errno 11) を避ける。
+    override = (os.environ.get("ZAIM_CSV_OVERRIDE") or "").strip()
+    override_path = Path(override).expanduser() if override else None
+    if override_path is not None and not override_path.is_file():
+        override_path = None
     out: list[Path] = []
     for y in range(y_now - years_back + 1, y_now + 1):
+        if y == y_now and override_path is not None:
+            out.append(override_path)
+            continue
         p = base / f"{y}年度" / f"Zaim.{y}年度.csv"
         if p.is_file():
             out.append(p)
     return out
 
 
-def read_zaim(path: Path) -> list[dict[str, str]]:
+def _read_text_any_encoding(path: Path) -> str:
     for enc in ("utf-8-sig", "cp932", "utf-8"):
         try:
-            text = path.read_text(encoding=enc)
-            break
+            return path.read_text(encoding=enc)
         except UnicodeDecodeError:
-            text = ""
-    else:
-        return []
-    return list(csv.DictReader(text.splitlines()))
+            continue
+    return ""
+
+
+def _read_via_local_copy(path: Path, *, attempts: int = 3) -> str:
+    """OneDrive プレースホルダの Resource deadlock(Errno 11) 等の回避。
+    ローカル一時ファイルへコピーしてから読む（同期中でも読める）。"""
+    import shutil
+    import tempfile
+
+    for i in range(max(1, attempts)):
+        fd, name = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        tmp = Path(name)
+        try:
+            shutil.copyfile(path, tmp)
+            return _read_text_any_encoding(tmp)
+        except OSError:
+            time.sleep(1.0 + i)
+        finally:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+    return ""
+
+
+def read_zaim(path: Path) -> list[dict[str, str]]:
+    try:
+        text = _read_text_any_encoding(path)
+    except OSError:
+        # OneDrive 直読みが Errno 11 (Resource deadlock avoided) 等で失敗 → ローカルコピー経由
+        text = _read_via_local_copy(path)
+    return list(csv.DictReader(text.splitlines())) if text else []
 
 
 def yen_field(row: dict[str, str], field: str) -> float:
