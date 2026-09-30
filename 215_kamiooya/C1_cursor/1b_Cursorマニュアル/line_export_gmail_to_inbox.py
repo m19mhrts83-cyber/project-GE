@@ -32,7 +32,7 @@ from gmail_to_yoritoori import (
     collect_attachment_parts,
     sanitize_filename,
 )
-from gmail_api_scopes import GMAIL_SCOPES_READ_MODIFY
+from gmail_api_scopes import resolve_read_scopes_for_token
 from line_export_inbox_to_yoritoori import default_inbox_dir, default_routes_path
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -223,9 +223,14 @@ def fetch_line_exports_from_gmail(
         return stats
 
     try:
+        token_data = json.loads(token_path.read_text(encoding="utf-8"))
+    except Exception:
+        token_data = {}
+    scopes = resolve_read_scopes_for_token(token_data)
+    try:
         service, email_addr = build_service_for_token(
             token_path,
-            scopes=GMAIL_SCOPES_READ_MODIFY,
+            scopes=scopes,
             open_browser=False,
         )
     except Exception as e:

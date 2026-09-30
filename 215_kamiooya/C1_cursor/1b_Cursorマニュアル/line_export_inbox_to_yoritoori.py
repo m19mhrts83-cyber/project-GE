@@ -259,6 +259,16 @@ def process_file(
     if prev and prev.get("status") in ("imported", "repaired", "failed"):
         stats.skipped += 1
         stats.messages.append(f"スキップ（処理済み hash）: {path.name}")
+        # 取込済みの再送コピーは退避して inbox を収束させる（failed は目視のため残す）
+        if (
+            not dry_run
+            and not leave_in_inbox
+            and not no_move
+            and prev.get("status") in ("imported", "repaired")
+        ):
+            proc_dir = export_root / "processed" / datetime.now().strftime("%Y-%m-%d")
+            proc_dir.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(path), str(unique_dest(proc_dir, path.name)))
         return
 
     result = import_line_export_file(

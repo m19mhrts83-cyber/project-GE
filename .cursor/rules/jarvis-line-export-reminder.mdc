@@ -41,15 +41,23 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 ## ユーザーへの依頼（操作）
 
 1. LINE → 設定 → トーク → **トーク履歴を送信**
-2. **EmailMe** → `matsuno.estate@gmail.com`（推奨）または Mac で `000_共通/LINE公式エクスポート/inbox/` に `.txt` 保存
-3. 反映後「保存した」と一声 → パートナー確認の `line_export_gmail_to_inbox.py` / `line_export_inbox_to_yoritoori.py` で取込
+2. **EmailMe** → `matsuno.estate@gmail.com`（推奨。admin@ 転送あり）または `000_共通/LINE公式エクスポート/inbox/` に `.txt` 保存
+3. **「保存した」の一声は不要**。`line-export-poll`（15分定常）が自動で `5.やり取り.md` まで反映する（下記）
+
+## 定常自動取込（Phase 4 実装済・2026-09-30）
+
+`com.matsunoma.jarvis.line-export-poll`（launchd・15分/RunAtLoad）が段階3→段階1+2 を回す。
+- ログ: `~/Library/Logs/jarvis_line_export/poll_*.log`
+- 設置/解除: `launchd/install_line_export_poll_launchd.sh` / `uninstall_line_export_poll_launchd.sh`
+- 取込は読み取り専用で可（`token_estate.json` が readonly 単独でもブラウザ再同意しない）
+- 取込成功時は `last_import_at` が更新され、本促しの suggest/ask が下がる
 
 ## 段階ロードマップ
 
-1. **Phase 1（現在）**: 経過日数で促す（本ルール）
-2. **Phase 2**: 取込後・CHRLINE 改善状況で `interval_days` を延長（state の `routes.*.interval_days`）
-3. **Phase 3**: Gmail 取込を定常化（パートナー確認で自動）
-4. **Phase 4**: launchd 定期実行。失敗時のみ促す
+1. **Phase 1（済）**: 経過日数で促す（本ルール）
+2. **Phase 2（済）**: 取込後・CHRLINE 改善状況で `interval_days` を延長（state の `routes.*.interval_days`）
+3. **Phase 3（済）**: Gmail 取込を定常化（パートナー確認で自動）
+4. **Phase 4（済・2026-09-30）**: launchd 15分定常。失敗時のみ促す
 
 ## 関連
 
