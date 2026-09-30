@@ -72,6 +72,11 @@
           font-size:10px; color:var(--muted); display:flex; justify-content:space-between; gap:10px; }
   .badge{ display:inline-block; background:#f0f3f8; border:1px solid var(--line);
           border-radius:99px; padding:1px 8px; font-size:10px; color:var(--muted); }
+
+  @media print{
+    body{ background:#fff; }
+    .sheet{ width:auto; min-height:auto; margin:0; padding:0; box-shadow:none; }
+  }
 </style>
 </head>
 <body>
