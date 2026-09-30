@@ -121,6 +121,62 @@ def oa_group_id(routes_path: Path, route_id: str) -> str | None:
     return str(gid).strip() if gid else None
 
 
+MEDIA_TYPES = {"image", "file", "video", "audio"}
+CONTENT_API = "https://api-data.line.me/v2/bot/message/{mid}/content"
+_CT_EXT = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "video/mp4": ".mp4",
+    "audio/mp4": ".m4a",
+    "audio/x-m4a": ".m4a",
+    "application/pdf": ".pdf",
+    "text/plain": ".txt",
+    "application/zip": ".zip",
+}
+
+
+def _safe_name(name: str) -> str:
+    s = "".join(c for c in name if c not in '\\/:*?"<>|').strip()
+    return s[:120] or "file"
+
+
+def download_media(ev: dict, partner_root: Path, folder: str, token: str) -> str:
+    """画像/ファイル等の実体を `1.受信添付(Stock)/YYYY-MM-DD/` へ保存し、表示ラベルを返す。
+
+    保存名は messageId から決まる（再取得しても同じ名前＝重複しない）。
+    filename は LINE の raw.message.fileName（file のみ）を使う。
+    """
+    mtype = (ev.get("message_type") or "").lower()
+    label = {"image": "[画像]", "file": "[ファイル]", "video": "[動画]", "audio": "[音声]"}.get(mtype, f"[{mtype}]")
+    mid = str(ev.get("message_id") or "")
+    if not mid:
+        return label
+    if not token:
+        return f"{label}（未保存: LINE_OA_CHANNEL_ACCESS_TOKEN 未設定）"
+    ts = ev.get("event_timestamp")
+    dt = datetime.fromtimestamp(ts / 1000, tz=JST) if ts else datetime.now(JST)
+    day = dt.strftime("%Y-%m-%d")
+    try:
+        req = urllib.request.Request(
+            CONTENT_API.format(mid=mid), headers={"Authorization": f"Bearer {token}"}
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = resp.read()
+            ct = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    except Exception as e:  # noqa: BLE001
+        return f"{label}（取得失敗: {type(e).__name__}）"
+    raw = ev.get("raw") if isinstance(ev.get("raw"), dict) else {}
+    orig = str((raw.get("message") or {}).get("fileName") or "").strip()
+    ext = Path(orig).suffix if orig else (_CT_EXT.get(ct) or ".bin")
+    stem = f"LINE_{dt.strftime('%Y%m%d_%H%M%S')}_{mid[:8]}"
+    fname = f"{stem}_{_safe_name(orig)}" if orig else f"{stem}{ext}"
+    dest_dir = partner_root / folder / "1.受信添付(Stock)" / day
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    (dest_dir / fname).write_bytes(data)
+    return f"{label}（受信添付: {day}/{fname}）"
+
+
 def fmt_text(ev: dict) -> str:
     mtype = (ev.get("message_type") or "").lower()
     if mtype == "text" or (not mtype and ev.get("text")):
@@ -140,7 +196,9 @@ def fmt_text(ev: dict) -> str:
     return f"[{mtype or 'unknown'}]"
 
 
-def build_export_txt(group_label: str, events: list[dict], cache: dict, token: str) -> str:
+def build_export_txt(
+    group_label: str, events: list[dict], cache: dict, token: str, labels: dict | None = None
+) -> str:
     lines = [f"[LINE] {group_label}のトーク履歴", f"保存日時：{datetime.now(JST).strftime('%Y/%m/%d %H:%M')}", ""]
     cur_date = None
     for ev in events:
@@ -153,7 +211,8 @@ def build_export_txt(group_label: str, events: list[dict], cache: dict, token: s
             lines.append(f"{d}({YOUBI[dt.weekday()]})")
             cur_date = d
         name = resolve_name(str(ev.get("group_id") or ""), ev.get("user_id"), cache, token)
-        lines.append(f"{dt.strftime('%H:%M')}\t{name}\t{fmt_text(ev)}")
+        body = (labels or {}).get(ev.get("id")) or fmt_text(ev)
+        lines.append(f"{dt.strftime('%H:%M')}\t{name}\t{body}")
     lines.append("")
     return "\n".join(lines)
 
@@ -173,7 +232,8 @@ def pull_route(url: str, key: str, token: str, routes_path: Path, route_id: str,
     cfg = route_config(routes_path, route_id)
     group_label = str(cfg.get("group_label") or cfg.get("display_name") or route_id)
     q = (
-        "line_oa_events?select=id,event_type,group_id,user_id,message_type,text,event_timestamp"
+        "line_oa_events?select=id,event_type,group_id,user_id,message_type,message_id,text,"
+        "event_timestamp,raw"
         f"&group_id=eq.{group_id}&processed_at=is.null&order=event_timestamp.asc,id.asc&limit={args.limit}"
     )
     fetched = _rest(url, key, q)
@@ -197,16 +257,29 @@ def pull_route(url: str, key: str, token: str, routes_path: Path, route_id: str,
         print(f"# 未処理イベントなし（route={route_id} group={group_id}）")
         return 0
 
+    from line_export_inbox_to_yoritoori import default_common_dir, default_inbox_dir  # noqa: E402
+
+    # 画像・ファイル等は実体を 1.受信添付(Stock) へ保存し、本文には保存先を書く
+    labels: dict[int, str] = {}
+    media_events = [e for e in events if str(e.get("message_type") or "").lower() in MEDIA_TYPES]
+    if media_events:
+        if args.dry_run:
+            for ev in media_events:
+                labels[ev.get("id")] = f"{fmt_text(ev)}（dry-run: 保存予定）"
+        else:
+            partner_root = default_common_dir().parent
+            folder = str(cfg.get("folder") or "")
+            for ev in media_events:
+                labels[ev.get("id")] = download_media(ev, partner_root, folder, token)
+
     cache = load_name_cache()
-    txt = build_export_txt(group_label, events, cache, token)
+    txt = build_export_txt(group_label, events, cache, token, labels)
     save_name_cache(cache)
 
     if args.dry_run:
         print(f"# dry-run: {len(events)}件 → inbox へ書き込み予定（route={route_id}）")
         print(txt[:1500])
         return 0
-
-    from line_export_inbox_to_yoritoori import default_inbox_dir  # noqa: E402
 
     inbox = default_inbox_dir()
     inbox.mkdir(parents=True, exist_ok=True)
