@@ -16,6 +16,12 @@ STATE_DIR="${REPO_DIR}/.jarvis_state"
 STATE_JSON="${STATE_DIR}/zaim_csv_weekly.json"
 LOCAL_CSV_DIR="${ZAIM_DIR}/downloads"
 mkdir -p "$LOG_DIR" "$STATE_DIR" "$LOCAL_CSV_DIR"
+LOCK_DIR="${LOG_DIR}/zaim_csv_weekly.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  echo "# skip $(date +%Y-%m-%dT%H:%M:%S%z): already running" >>"${LOG_DIR}/weekly_skip.log"
+  exit 0
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
 STAMP="$(date +%Y%m%d_%H%M%S)"
 LOG="${LOG_DIR}/weekly_${STAMP}.log"
 YEAR="$(date +%Y)"
@@ -149,13 +155,11 @@ LOCAL_CSV="${LOCAL_CSV_DIR}/Zaim.${YEAR}年度.local_copy.csv"
   fi
 
   PUSH_OK=1
+  FM_RC=1
+  EN_RC=1
   set +e
   for attempt in 1 2 3; do
-    if [[ -n "${ZAIM_CSV_OVERRIDE:-}" ]]; then
-      ZAIM_CSV_PATH="$METRICS_CSV" "$PY" "${REPO_DIR}/scripts/jarvis_finance_metrics.py" --year "$YEAR" --push
-    else
-      "$PY" "${REPO_DIR}/scripts/jarvis_finance_metrics.py" --year "$YEAR" --push
-    fi
+    "$PY" "${REPO_DIR}/scripts/jarvis_finance_metrics.py" --year "$YEAR" --csv "$METRICS_CSV" --push
     FM_RC=$?
     if [[ "$FM_RC" -eq 0 ]]; then
       break
@@ -181,11 +185,13 @@ LOCAL_CSV="${LOCAL_CSV_DIR}/Zaim.${YEAR}年度.local_copy.csv"
     PUSH_OK=0
   fi
   "$PY" "${REPO_DIR}/scripts/jarvis_zaim_watch_runner.py" --skip-finance
+  # 銀行鮮度（更新ボタンは押さない）
+  "$PY" "${REPO_DIR}/scripts/jarvis_zaim_bank_sync_check.py" || true
   "$PY" "${REPO_DIR}/scripts/jarvis_mq_monthly_refresh.py"
   "$PY" "${REPO_DIR}/scripts/jarvis_airwallet_banks_weekly.py"
   "$PY" "${REPO_DIR}/scripts/jarvis_situation_watch.py" --write
   "$PY" "${REPO_DIR}/scripts/jarvis_dashboard_push.py" --watch-only
-  "$PY" "${REPO_DIR}/scripts/jarvis_zaim_refresh_queue_poll.py" --ack-only
+  "$PY" "${REPO_DIR}/scripts/jarvis_zaim_refresh_queue_poll.py" --ack-only || true
   set -e
 
   if [[ "$PUSH_OK" -eq 1 ]]; then
