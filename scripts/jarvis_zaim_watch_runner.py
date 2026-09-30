@@ -484,6 +484,10 @@ def main(argv: list[str] | None = None) -> int:
     year = datetime.now(JST).year
     learned_n = 0
 
+    # 0a) ダッシュボードからキューされた費目変更（Supabase → Zaim Web）
+    if not args.skip_apply and not args.dry_run:
+        run_script("jarvis_zaim_dashboard_apply.py", timeout=600)
+
     # 0) 前回 snapshot × 今回 CSV の差分学習
     if not args.skip_learn:
         extra = ["--json"]

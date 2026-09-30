@@ -1,0 +1,110 @@
+# Zaim 費目カタログ（JARVIS Dashboard 費目選択 UI 用）
+# 個人支出は β. プレフィックス。法人・投資はそのまま。
+# genres（内訳）は Zaim 側で設定しているもの。空なら大分類のみで反映可。
+
+version: 1
+
+categories:
+  # --- β 生活（個人） ---
+  - value: "β.1F.住まい"
+    label: "1F. 住まい"
+    group: "β 生活"
+    genres: []
+  - value: "β.2C.食費"
+    label: "2C. 食費"
+    group: "β 生活"
+    genres: []
+  - value: "β.3C.水道/光熱"
+    label: "3C. 水道/光熱"
+    group: "β 生活"
+    genres: []
+  - value: "β.4C.通信"
+    label: "4C. 通信"
+    group: "β 生活"
+    genres: []
+  - value: "β.5C.日用雑貨"
+    label: "5C. 日用雑貨"
+    group: "β 生活"
+    genres: []
+  - value: "β.6.1C.エ/交際/被服/趣味"
+    label: "6.1C. 交際/被服/趣味"
+    group: "β 生活"
+    genres: []
+  - value: "β.6.2C 自己投資・寄付"
+    label: "6.2C. 自己投資・寄付"
+    group: "β 生活"
+    genres: []
+  - value: "β.7C.医療費"
+    label: "7C. 医療費"
+    group: "β 生活"
+    genres: []
+  - value: "β.8C.交通"
+    label: "8C. 交通"
+    group: "β 生活"
+    genres: []
+  - value: "β.10.1C.こども服/雑貨/写真"
+    label: "10.1C. こども服/雑貨/写真"
+    group: "β 生活"
+    genres: []
+  - value: "β.10.2C.こども教育"
+    label: "10.2C. こども教育"
+    group: "β 生活"
+    genres: []
+  - value: "β.10.2F.こども学費/結婚_固定"
+    label: "10.2F. こども学費/結婚"
+    group: "β 生活"
+    genres: []
+  - value: "β.10.3F.学資保険"
+    label: "10.3F. 学資保険"
+    group: "β 生活"
+    genres: []
+  - value: "β.11.1F.クルマ維持"
+    label: "11.1F. クルマ維持"
+    group: "β 生活"
+    genres: []
+  - value: "β.11.2F.維持(他生活インフラ)"
+    label: "11.2F. 維持(他生活インフラ)"
+    group: "β 生活"
+    genres: []
+  - value: "β.12.C.その他/使途不明"
+    label: "12.C. その他/使途不明"
+    group: "β 生活"
+    genres: []
+  - value: "β.13.1F.生命保険"
+    label: "13.1F. 生命保険"
+    group: "β 生活"
+    genres: []
+  - value: "β.13.2F.自動車保険"
+    label: "13.2F. 自動車保険"
+    group: "β 生活"
+    genres: []
+  - value: "β.15F.奨学金返済"
+    label: "15F. 奨学金返済"
+    group: "β 生活"
+    genres: []
+  - value: "β.17S.帰省・旅行"
+    label: "17S. 帰省・旅行"
+    group: "β 生活"
+    genres: []
+  - value: "β.20.1S.大型出費"
+    label: "20.1S. 大型出費"
+    group: "β 生活"
+    genres: []
+  - value: "β.20.2S.ご褒美"
+    label: "20.2S. ご褒美"
+    group: "β 生活"
+    genres: []
+  - value: "β.21F.AIリスキリング"
+    label: "21F. AIリスキリング"
+    group: "β 生活"
+    genres: []
+
+  # --- 投資・法人 ---
+  - value: "B.C.投資"
+    label: "B.C. 投資"
+    group: "投資・法人"
+    genres: []
+  - value: "A.C.会社費用"
+    label: "A.C. 会社費用"
+    group: "投資・法人"
+    genres: []
