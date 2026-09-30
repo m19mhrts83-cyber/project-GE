@@ -31,7 +31,7 @@
 |---|---|---|---|
 | 1 | **楽待** | 必須 | 会員ログイン可なら **ログインして** 資料請求・Web問合せまで |
 | 2 | **健美家** | 必須 | 同上（ログイン可ならログインして問合せ） |
-| 3 | **LIFULL HOME'S** | 必須 | 公開フォーム可なら送信。ログインが必要ならログインして実行 |
+| 3 | **LIFULL HOME'S** | 必須 | 公開フォーム可なら送信。**ログイン壁**（会員 inquire のみ）は Jarvis 委譲（下記 HOME'S節） |
 | 4 | **名古屋不動産連合体** | 必須 | 同上 |
 | 5 | **at home** | 必須 | 同上 |
 
@@ -68,21 +68,9 @@
 - **壁の正体**: `toushi.homes.co.jp` の資料請求は会員ログイン必須。Grok 環境に `HOMES_*`/`PORTAL_*` を載せないのが正 → Computer だけでは突破しない。
 - **URL正本**: 詳細 `/bukkendetail/index/{id}/` · 問合せ `/inquire/input/?property_id={id}/`（`/mansion/{id}` 等は404）。
 - **掲載終了**: 詳細タイトルに「掲載終了」→ 問合せ不可。inbox に `listing_ended` と書いて次候補へ。
-- **委譲テンプレ**（`10_inbox_from_grok/`）:
-
-```yaml
----
-action: homes_portal_manual
-priority: high
-target: jarvis
-source: property_bot
----
-blocker: homes_login_required
-homes_id: {id}
-name: {市区+短名}
-url: https://toushi.homes.co.jp/bukkendetail/index/{id}/
-```
-
+- **委譲テンプレ**（`10_inbox_from_grok/` · YAML frontmatter）:
+  - `action: homes_portal_manual` / `priority: high` / `target: jarvis` / `source: property_bot`
+  - 本文: `blocker: homes_login_required` · `homes_id: {id}` · `name: {市区+短名}` · `url: https://toushi.homes.co.jp/bukkendetail/index/{id}/`
 - 手順書: `docs/HOME'S投資_ログイン壁_対応_20260930.md`（Drive `30_shared_working` にも同趣旨）
 - **偽の portal_sent 禁止**（未送信なのに送ったことにしない）
 
