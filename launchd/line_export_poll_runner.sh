@@ -39,6 +39,9 @@ fi
 cd "$MANUAL_DIR"
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
+  # LINE 公式アカウント Bot（Webhook受信分）→ 公式エクスポート形式の .txt を inbox へ
+  "$PY" -u "${REPO_DIR}/scripts/jarvis_line_oa_pull.py" --all
+  echo "# line_oa_pull exit=$?"
   "$PY" -u line_export_gmail_to_inbox.py
   echo "# gmail_to_inbox exit=$?"
   "$PY" -u line_export_inbox_to_yoritoori.py
