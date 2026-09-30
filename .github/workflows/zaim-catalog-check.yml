@@ -1,0 +1,34 @@
+name: Zaim category catalog check
+
+# Zaim 費目カタログの二重管理（YAML 正本 / dashboard TS ミラー）のズレ検出。
+# どちらかを編集した push / PR でだけ走る軽量チェック。Vercel には影響しない。
+
+on:
+  push:
+    paths:
+      - config/zaim_category_catalog.yaml
+      - apps/jarvis-dashboard/lib/zaimCategoryCatalog.ts
+      - scripts/jarvis_zaim_category_catalog_check.py
+  pull_request:
+    paths:
+      - config/zaim_category_catalog.yaml
+      - apps/jarvis-dashboard/lib/zaimCategoryCatalog.ts
+      - scripts/jarvis_zaim_category_catalog_check.py
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -q pyyaml
+
+      - name: Check catalog parity (yaml == ts)
+        run: python scripts/jarvis_zaim_category_catalog_check.py
