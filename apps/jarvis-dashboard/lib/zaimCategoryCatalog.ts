@@ -1,4 +1,12 @@
-/** Zaim 費目カタログ。正本: config/zaim_category_catalog.yaml */
+/**
+ * Zaim 費目カタログ。正本: config/zaim_category_catalog.yaml
+ *
+ * この配列は正本 YAML のミラー（Vercel は app ルート外の config/ を読めないため
+ * TS 側にも持つ）。両者が一致しているかは次で検査する:
+ *   python scripts/jarvis_zaim_category_catalog_check.py
+ * CI: .github/workflows/zaim-catalog-check.yml（該当ファイル変更時のみ）
+ * 編集したら YAML と TS の両方を同じ内容・同じ順にすること。
+ */
 export type ZaimCategoryEntry = {
   value: string;
   label: string;

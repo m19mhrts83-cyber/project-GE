@@ -47,9 +47,13 @@ type FixItem = {
 };
 
 function isCategoryFix(f: FixItem): boolean {
-  if (f.kind === "set_category" || f.target === "category") return true;
+  // 費目変更は kind/target で厳密に判定する。proposal の「→」は
+  // 費目以外の直し（金額・日付など）にも現れるためピッカー誤表示の元になる。
+  if (f.kind === "set_category") return true;
+  if (f.target === "category") return true;
+  // 旧データ（kind 無し）向けの限定フォールバック。
   const p = f.proposal || "";
-  return p.includes("費目") || p.includes("→");
+  return p.includes("費目");
 }
 
 function isVisibleLearnFix(

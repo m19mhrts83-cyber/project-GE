@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,10 @@ WATCH_ID = "zaim_quality"
 CHANGELOG_PATH = STATE / "zaim_watch_changelog.json"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 EXE = str(PY) if PY.is_file() else sys.executable
+LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_zaim"
+# CSV 週次・銀行同期（jarvis_zaim_bank_sync_manual）と同じ Playwright 共有ロック。
+# 同時に Playwright を走らせると Zaim セッションを壊すため、必ず共有ロックを取る。
+PLAYWRIGHT_LOCK = LOG_DIR / "zaim_playwright.lock"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import jarvis_zaim_learn as zlearn  # noqa: E402
@@ -36,6 +41,36 @@ import jarvis_zaim_watch_runner as zrunner  # noqa: E402
 
 def now_iso() -> str:
     return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def acquire_playwright_lock(*, wait_sec: int = 0) -> bool:
+    """mkdir ロック。CSV 週次・銀行同期と共有。取得できなければ False。"""
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    deadline = time.time() + max(0, wait_sec)
+    while True:
+        try:
+            os.mkdir(PLAYWRIGHT_LOCK)
+            (PLAYWRIGHT_LOCK / "owner.txt").write_text(
+                f"dashboard_apply pid={os.getpid()} at={now_iso()}\n",
+                encoding="utf-8",
+            )
+            return True
+        except FileExistsError:
+            if time.time() >= deadline:
+                return False
+            time.sleep(2)
+
+
+def release_playwright_lock() -> None:
+    try:
+        for p in PLAYWRIGHT_LOCK.iterdir():
+            p.unlink(missing_ok=True)
+    except Exception:
+        pass
+    try:
+        PLAYWRIGHT_LOCK.rmdir()
+    except Exception:
+        pass
 
 
 def supabase_client():
@@ -171,6 +206,12 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Dashboard Zaim category apply")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=10)
+    ap.add_argument(
+        "--lock-wait",
+        type=int,
+        default=0,
+        help="Playwright 共有ロックの待機秒（0 は即時。CSV週次と競合時は次回再試行）",
+    )
     args = ap.parse_args(argv)
 
     sb = supabase_client()
@@ -207,7 +248,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
-    entries = zrunner.apply_actions(actions, dry_run=False, limit=len(actions))
+    if not acquire_playwright_lock(wait_sec=args.lock_wait):
+        print(
+            "# playwright lock busy; 費目キューは残置（CSV週次と競合、次回再試行）",
+            flush=True,
+        )
+        return 4
+    try:
+        entries = zrunner.apply_actions(actions, dry_run=False, limit=len(actions))
+    finally:
+        release_playwright_lock()
     results: dict[str, dict[str, Any]] = {}
     cl = load_changelog()
     for p, e in zip(batch, entries):
