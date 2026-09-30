@@ -26,9 +26,11 @@
   --side-ink: #152033;
   --radius: 10px;
   --shadow: 0 1px 0 rgba(21, 32, 51, 0.04), 0 8px 24px rgba(21, 32, 51, 0.06);
-  /* メイリオ系ゴシック（明朝は使わない）。Noto Sans JP + 環境の Meiryo / 游ゴシック */
-  --font-sans: var(--font-sans-next), "Meiryo", "Yu Gothic", "YuGothic",
-    "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+  /* メイリオ系ゴシック（明朝は使わない）。環境の Noto Sans JP / Meiryo / 游ゴシックを使う。
+     next/font/google はビルド時に Google Fonts を取得し、稀に失敗して Vercel ビルドが
+     落ちる（next.js issue #99114）。ビルド時取得をやめて font-family 直指定にする。 */
+  --font-sans: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Meiryo", "Yu Gothic", "YuGothic", sans-serif;
   --font-display: var(--font-sans);
   --font-body: var(--font-sans);
 }

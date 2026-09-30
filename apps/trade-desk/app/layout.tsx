@@ -1,14 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
-
-/** メイリオ系の見え方に近い、プレゼンでも見栄えするゴシック */
-const sans = Noto_Sans_JP({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-sans-next",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "KURASHIFT｜クラシフト",
@@ -26,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja" className={sans.variable}>
+    <html lang="ja">
       <body>{children}</body>
     </html>
   );
