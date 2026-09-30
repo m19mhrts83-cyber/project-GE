@@ -1820,7 +1820,28 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
             detail=bank_detail or None,
             cursor_prompt=prompt,
             source=src,
-            payload={"bank_sync": bank} if bank else {},
+            payload={
+                "bank_sync": {
+                    "level": bank.get("level") if bank else None,
+                    "summary": bank.get("summary") if bank else None,
+                    "updated_at": bank.get("updated_at") if bank else None,
+                    "csv_max_date": bank.get("csv_max_date") if bank else None,
+                    "ok_n": len(bank.get("ok") or []) if bank else 0,
+                    "stale": (bank.get("stale") or [])[:20] if bank else [],
+                    "missing": (bank.get("missing") or [])[:20] if bank else [],
+                    "unlinkable_n": len(bank.get("unlinkable") or []) if bank else 0,
+                }
+                if bank
+                else None,
+                "csv_weekly": {
+                    "last_ok": weekly.get("last_ok"),
+                    "last_success_at": weekly.get("last_success_at"),
+                    "last_error": (str(weekly.get("last_error") or "")[:120] or None),
+                    "updated_at": weekly.get("updated_at"),
+                }
+                if weekly
+                else None,
+            },
         )
     level = str(data.get("level") or "ok")
     if level not in ("ok", "info", "warn", "attention"):
@@ -1880,9 +1901,23 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
         "bank_sync": {
             "level": bank.get("level") if bank else None,
             "summary": bank.get("summary") if bank else None,
+            "updated_at": bank.get("updated_at") if bank else None,
+            "csv_max_date": bank.get("csv_max_date") if bank else None,
+            "ok_n": len(bank.get("ok") or []) if bank else 0,
             "stale": (bank.get("stale") or [])[:20] if bank else [],
             "missing": (bank.get("missing") or [])[:20] if bank else [],
+            "unlinkable_n": len(bank.get("unlinkable") or []) if bank else 0,
         },
+        "csv_weekly": {
+            "last_ok": weekly.get("last_ok") if weekly else None,
+            "last_success_at": weekly.get("last_success_at") if weekly else None,
+            "last_error": (str(weekly.get("last_error") or "")[:120] or None)
+            if weekly
+            else None,
+            "updated_at": weekly.get("updated_at") if weekly else None,
+        }
+        if weekly
+        else None,
     }
     pending_n = 0
     review_batch: dict[str, Any] = {}
