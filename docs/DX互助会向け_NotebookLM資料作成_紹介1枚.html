@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NotebookLMで「資料づくり」を自動化する — DX互助会 紹介1枚</title>
+<style>
+  * { box-sizing: border-box; }
+  :root{
+    --ink:#1c2430; --muted:#5b6676; --line:#dfe4ec;
+    --accent:#0b6bcb; --accent-soft:#eaf2fd;
+    --teal:#0f8a7a; --teal-soft:#e6f5f2;
+    --paper:#ffffff;
+  }
+  @page { size: A4; margin: 12mm; }
+  html,body{ margin:0; }
+  body{
+    font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    color:var(--ink); background:#eef1f5; line-height:1.55;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .sheet{
+    width:210mm; min-height:297mm; margin:8mm auto; background:var(--paper);
+    padding:14mm 15mm; box-shadow:0 6px 28px rgba(0,0,0,.12);
+  }
+  header{ border-bottom:3px solid var(--accent); padding-bottom:6px; margin-bottom:12px; }
+  .kicker{ font-size:11px; letter-spacing:.12em; color:var(--accent); font-weight:700; }
+  h1{ font-size:23px; margin:4px 0 4px; line-height:1.28; }
+  h1 .hl{ color:var(--accent); }
+  .sub{ font-size:12px; color:var(--muted); }
+
+  .lead{
+    background:var(--accent-soft); border-left:5px solid var(--accent);
+    padding:9px 12px; border-radius:0 8px 8px 0; font-size:13px; margin-bottom:12px;
+  }
+  .lead b{ color:var(--accent); }
+
+  h2{ font-size:12.5px; margin:0 0 6px; color:var(--accent); letter-spacing:.04em;
+      display:flex; align-items:center; gap:6px; }
+  h2::before{ content:""; width:14px; height:3px; background:var(--accent); border-radius:2px; }
+  section{ margin-bottom:11px; }
+
+  .parts{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; }
+  .part{ border:1px solid var(--line); border-radius:8px; padding:8px 9px; font-size:11px; }
+  .part .n{ font-size:10px; color:var(--accent); font-weight:700; }
+  .part .t{ font-weight:700; font-size:11.5px; margin:1px 0 3px; }
+
+  .two{ display:grid; grid-template-columns:1.15fr .85fr; gap:14px; }
+  ol.points{ margin:0; padding-left:0; list-style:none; counter-reset:p; }
+  ol.points li{ counter-increment:p; position:relative; padding:3px 0 3px 24px; font-size:11.5px; }
+  ol.points li::before{
+    content:counter(p); position:absolute; left:0; top:3px;
+    width:17px; height:17px; border-radius:50%; background:var(--accent); color:#fff;
+    font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  }
+  ol.points b{ color:var(--ink); }
+
+  ul.use{ margin:0; padding-left:16px; font-size:11.5px; }
+  ul.use li{ margin:2px 0; }
+
+  .constraints{ background:var(--teal-soft); border-radius:8px; padding:8px 11px; font-size:11px; }
+  .constraints b{ color:var(--teal); }
+  .constraints ul{ margin:3px 0 0; padding-left:15px; }
+  .constraints li{ margin:2px 0; }
+
+  .steps{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; }
+  .step{ border:1px dashed var(--accent); border-radius:8px; padding:7px 9px; font-size:11px; }
+  .step .n{ color:var(--accent); font-weight:700; font-size:10px; }
+  .step .t{ font-weight:700; margin:1px 0 2px; }
+
+  footer{ margin-top:10px; padding-top:7px; border-top:1px solid var(--line);
+          font-size:10px; color:var(--muted); display:flex; justify-content:space-between; gap:10px; }
+  .badge{ display:inline-block; background:#f0f3f8; border:1px solid var(--line);
+          border-radius:99px; padding:1px 8px; font-size:10px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header>
+    <div class="kicker">DX互助会 ／ 取り組み紹介</div>
+    <h1>集めた資料が、そのまま<span class="hl">資料（図解・スライド）</span>になる</h1>
+    <div class="sub">NotebookLM ──「自分が入れた資料“だけ”」を根拠に答えるAIで、資料づくりを自動化する</div>
+  </header>
+
+  <div class="lead">
+    <b>ひとことで：</b>自分が集めた資料だけを根拠に、AIが答えて、そのまま図解・スライドにしてくれる。
+    一般的なチャットAIと違い<b>根拠が手元の資料に限定</b>されるため、もっともらしい嘘（ハルシネーション）が起きにくい。
+  </div>
+
+  <section>
+    <h2>仕組み — 部品は3つ</h2>
+    <div class="parts">
+      <div class="part">
+        <div class="n">①</div><div class="t">NotebookLM 本体（Google）</div>
+        資料の置き場＋回答エンジン＋資料生成（インフォグラフィック／スライド／音声解説）
+      </div>
+      <div class="part">
+        <div class="n">②</div><div class="t">つなぎ役（MCP）</div>
+        パソコンの中のAI（Cursor等）から、NotebookLM を会話で操作できるようにする
+      </div>
+      <div class="part">
+        <div class="n">③</div><div class="t">資料生成の自動操作</div>
+        図解・スライドの「生成ボタン・保存」をブラウザ自動操作で実行する別系統
+      </div>
+    </div>
+  </section>
+
+  <section class="two">
+    <div>
+      <h2>実装の要点</h2>
+      <ol class="points">
+        <li><b>ログインは最初の1回だけ。</b>専用のブラウザ環境に認証を保存し、以降は自動でつながる</li>
+        <li><b>参照情報は3通りで入る。</b>コピペ／ファイル（.md・.txt）／Googleドライブ（後から編集・同期可）</li>
+        <li><b>質問はセッション単位。</b>同じテーマを続けて深掘りできる</li>
+        <li><b>ブラウザを人間のように自動操作。</b>実在のChromeを専用プロファイルで起動して動かす</li>
+        <li><b>回答に出典が付く。</b>どの資料のどこを根拠にしたか追える＝資料の信頼性を担保しやすい</li>
+      </ol>
+    </div>
+    <div>
+      <h2>向いている用途</h2>
+      <ul class="use">
+        <li>既存資料をまとめて<b>1枚の図解</b>に</li>
+        <li>会議・提案用<b>スライドのたたき台</b></li>
+        <li><b>音声解説</b>（ポッドキャスト風）</li>
+        <li>社内ナレッジへの<b>出典付きQ&amp;A</b></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>導入に必要なもの・制約</h2>
+    <div class="constraints">
+      <ul>
+        <li><b>Googleアカウントがあれば無料で開始可</b>（目安：ノート100／ソース50・ノート／1日50クエリ）</li>
+        <li>ノートの<b>共有設定を「リンクを知っている人」以上</b>にしないと外部から参照できない</li>
+        <li>自動化する時は<b>Chromeを専用プロファイルで分ける</b>（同時起動の取り合いを防ぐ）</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>はじめの一歩（3ステップ）</h2>
+    <div class="steps">
+      <div class="step"><div class="n">STEP 1</div><div class="t">資料を入れる</div>notebooklm.google.com でノートを作り、資料を貼る／アップロードする</div>
+      <div class="step"><div class="n">STEP 2</div><div class="t">聞いてみる</div>「この資料の要点を教えて」→ 出典付きで返ってくる体験を見る</div>
+      <div class="step"><div class="n">STEP 3</div><div class="t">資料にする</div>Studioで図解／スライドを生成。その手順をAIに任せれば自動化へ</div>
+    </div>
+  </section>
+
+  <footer>
+    <div>要点はこの5語に集約：<b>根拠を限定 → 出典付き回答 → ワンクリックで資料化 → ログイン1回で自動化 → 無料枠内で開始</b></div>
+    <div><span class="badge">NotebookLM × Cursor</span></div>
+  </footer>
+</div>
+</body>
+</html>

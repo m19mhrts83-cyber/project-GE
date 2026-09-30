@@ -25,7 +25,7 @@ NotebookLM／Studio／ソース D&D は **必ず admin**（`admin@livingsupport-
 | 確認 | ブラウザのアカウント表示が admin か見る。estate／m19m なら切り替える |
 | 切替 | Jarvis が実行する（ユーザーに「ログインし直してください」だけで止めない） |
 | URL | `AccountChooser?Email=admin@…&continue=https://notebooklm.google.com/` を優先 |
-| スクリプト | `scripts/jarvis_notebooklm_mcp_login.py`（`--profile mcp` 既定／`--profile studio` は Studio 自動化）／作業セットは `jarvis_notebooklm_workbench_open.py`／Studio 操作は `jarvis_notebooklm_studio_run.py` |
+| スクリプト | `scripts/jarvis_notebooklm_mcp_login.py`（`--profile mcp` 既定／`--profile studio` は Studio 自動化）／**既存ノートへソース追加は `jarvis_notebooklm_add_source.py --notebook-url … --file …`（新規作成は空ノートが増えるので使わない）**／作業セットは `jarvis_notebooklm_workbench_open.py`／Studio 操作は `jarvis_notebooklm_studio_run.py` |
 | 秘密 | `NOTEBOOKLM_EMAIL` / `NOTEBOOKLM_PASSWORD` は `.env.jarvis_private` のみ |
 
 estate や m19m のまま Studio すると、admin Drive `200_NoteBookLM` のノート・権限と食い違う。
