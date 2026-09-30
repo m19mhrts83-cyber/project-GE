@@ -399,6 +399,26 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
     note = str(rc.get("note") or "")
     if note and not has_grant:
         parts.append(note[:80])
+
+    # ウィンドウC未実施（25日以降）
+    now = datetime.now(JST)
+    month_now = now.strftime("%Y-%m")
+    window_c_pending = now.day >= 25 and mon.get("last_check_c") != month_now and not mon.get(
+        "disabled"
+    )
+    if window_c_pending:
+        parts.append(f"ウィンドウC未実施（{month_now}）")
+
+    # 定例が書いた Jarvis 確認リスト
+    jarvis_asks = [
+        a
+        for a in (mon.get("jarvis_asks") or [])
+        if isinstance(a, dict) and a.get("level") in ("ask", "suggest")
+    ]
+    ask_asks = [a for a in jarvis_asks if a.get("level") == "ask"]
+    if ask_asks:
+        parts.append(f"要対話{len(ask_asks)}")
+
     level = "ok"
     if show_banner:
         # 未確認の月次サマリはホーム掲載（info 以上）。考察の要確認もこの期間だけ attention
@@ -413,6 +433,10 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         # cadence の未対応は確認後も状況ウォッチ／ホームに残してよい
         if level in ("ok", "info"):
             level = "warn"
+    if window_c_pending and level in ("ok", "info"):
+        level = "warn"
+    if ask_asks and level in ("ok", "info"):
+        level = "warn"
     # 抽選券残は warn（未実施）
     if (
         not teiki_disabled
@@ -441,6 +465,12 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         detail_lines.append("ダッシュボード /vpoint で付与サマリ（％別・考察）を確認できます。")
         for ins in (grant.get("insights") or [])[:4]:
             detail_lines.append(f"· {ins}")
+    if window_c_pending:
+        detail_lines.append(
+            "定例: `jarvis_vpoint_routine.py --apply --push`（または『Vポイント月次やって』）"
+        )
+    for a in jarvis_asks[:5]:
+        detail_lines.append(f"· [{a.get('level')}] {a.get('text')}")
     if teiki and not teiki_disabled:
         detail_lines.append(
             "テイチャン: "
@@ -479,6 +509,13 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         )
 
     hist = [h for h in (mon.get("grant_history") or []) if isinstance(h, dict)][:12]
+    pdca = mon.get("pdca_board") if isinstance(mon.get("pdca_board"), dict) else None
+    if pdca:
+        nw = len(pdca.get("wins") or [])
+        ng = len(pdca.get("gaps") or [])
+        parts.append(f"PDCA 良{nw}/要{ng}")
+        for n in (pdca.get("next_actions") or [])[:2]:
+            detail_lines.append(f"PDCA次: {n.get('title')} → {n.get('how')}")
     teiki_payload = None
     if teiki and not teiki_disabled:
         teiki_payload = {
@@ -501,6 +538,7 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
         "show_banner": show_banner,
         "href": "/situation?watch=vpoint#watch-vpoint",
         "teiki_barai": teiki_payload,
+        "pdca_board": pdca,
     }
     if action_items:
         payload["actions"] = action_items
@@ -1168,7 +1206,8 @@ def eval_mobile_plan(meta: dict, data: dict | None) -> dict[str, Any]:
 
 
 def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
-    """グルコン提出期限（開催日−10日）。期限7日以内かつ未投稿なら warn。"""
+    """グルコン提出期限（開催日−10日）。期限7日以内かつ未投稿なら warn。
+    ホームお知らせ（show_banner）は残り3日以内／超過のみ。"""
     title = meta["title"]
     prompt = meta.get("cursor_prompt") or ""
     src = meta.get("source") or ""
@@ -1185,6 +1224,10 @@ def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
     level = str(data.get("level") or "ok")
     summary = str(data.get("summary") or "—")
     days = data.get("days_until_deadline")
+    try:
+        days_i = int(days) if days is not None else None
+    except (TypeError, ValueError):
+        days_i = None
     detail = "\n".join(
         [
             f"開催: {data.get('glucon_date') or '—'}",
@@ -1194,6 +1237,10 @@ def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
             f"成果: {data.get('result_status') or '—'}",
             "Dashboard: /glucon",
         ]
+    )
+    # ホーム: 3日以内 or 超過。状況ウォッチ本体は従来どおり warn(≤7)
+    show_banner = level == "attention" or (
+        level == "warn" and days_i is not None and days_i <= 3
     )
     return card(
         item_id=meta["id"],
@@ -1209,8 +1256,196 @@ def eval_glucon_report(meta: dict, data: dict | None) -> dict[str, Any]:
             "glucon_date": data.get("glucon_date"),
             "report_deadline": data.get("report_deadline"),
             "period_key": data.get("period_key"),
-            # ホーム状況バンドで拾いやすくする（warn/attention 時）
+            "days_until_deadline": days_i,
+            "show_banner": show_banner,
+        },
+    )
+
+
+def eval_quiet_edge_due(meta: dict, data: dict | None) -> dict[str, Any]:
+    """Quiet Edge 次回治療。残り3日以内で warn＋ホームお知らせ。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "health",
+            level="info",
+            summary="未設定または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    summary = str(data.get("summary") or "—")
+    days = data.get("days_until")
+    detail = "\n".join(
+        [
+            f"回: {data.get('label') or data.get('session_no') or '—'}",
+            f"日程: {data.get('scheduled_at_jst') or data.get('scheduled_at') or '未定'}",
+            f"残り日数: {days if days is not None else '—'}",
+            "Dashboard: /quiet-edge",
+        ]
+    )
+    show_banner = level in ("warn", "attention")
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "health",
+        level=level if level in ("ok", "info", "warn", "attention") else "ok",
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": "/quiet-edge",
+            "session_no": data.get("session_no"),
+            "days_until": days,
+            "show_banner": show_banner,
+        },
+    )
+
+
+def eval_kanji_ops(meta: dict, data: dict | None) -> dict[str, Any]:
+    """飲み会幹事: 開催後レポート期限・次回イベント立ち上げ。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled"):
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="未設定または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    today_d = today()
+    level = "ok"
+    bits: list[str] = []
+
+    cur = data.get("current_event") or {}
+    nxt = data.get("next_event") or {}
+    report_deadline = cur.get("report_deadline")
+    report_status = str(cur.get("report_status") or "")
+    if report_deadline and report_status not in ("done", "submitted", "na"):
+        try:
+            dl = date.fromisoformat(str(report_deadline)[:10])
+            days = (dl - today_d).days
+            bits.append(f"レポート期限: {dl.isoformat()}（残り{days}日） status={report_status}")
+            if days < 0:
+                level = "attention"
+                bits.append("レポート期限超過")
+            elif days <= 14:
+                level = "warn" if level == "ok" else level
+                bits.append("レポート提出フォロー推奨")
+        except ValueError:
+            bits.append(f"レポート期限パース不可: {report_deadline}")
+
+    setup_deadline = nxt.get("setup_deadline")
+    nxt_status = str(nxt.get("status") or "")
+    if setup_deadline and nxt_status not in ("done", "cancelled"):
+        try:
+            sd = date.fromisoformat(str(setup_deadline)[:10])
+            days_s = (sd - today_d).days
+            bits.append(
+                f"次回: {nxt.get('name') or '—'} 立ち上げ目安 {sd.isoformat()}（残り{days_s}日）"
+            )
+            if days_s <= 30 and nxt_status in ("", "not_started"):
+                if level == "ok":
+                    level = "info"
+                bits.append("次回イベントの立ち上げ検討")
+        except ValueError:
+            pass
+
+    if not bits:
+        bits.append(str(data.get("summary") or "幹事オペ問題なし"))
+
+    summary = "／".join(bits[:2])
+    detail = "\n".join(
+        [
+            f"直近: {cur.get('name') or '—'}（{cur.get('held_on') or '—'}）",
+            f"次回: {nxt.get('name') or '—'}（{nxt.get('target_month') or '—'}）",
+            *bits,
+            "Dashboard: /kanji",
+            "マニュアル: 01_運営サポート/飲み会幹事/00_幹事標準マニュアル.md",
+        ]
+    )
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": "/kanji",
+            "report_deadline": report_deadline,
             "show_banner": level in ("warn", "attention"),
+        },
+    )
+
+
+def eval_grandole_201_aircon(meta: dict, data: dict | None) -> dict[str, Any]:
+    """志賀本通Ⅰ 201 エアコン故障・修理フォロー。"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data or data.get("disabled") or data.get("status") == "resolved":
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "properties",
+            level="ok",
+            summary="対応完了または無効化中",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    status = str(data.get("status") or "")
+    show_banner = True
+    if status == "reply_received":
+        level = "warn"
+        summary = "【至急】関係者より新着返信あり！現地立ち会い・修理調整を行ってください"
+    elif status == "waiting_contractor_reply":
+        level = "attention"
+        summary = "【要フォロー】マルショウ石井様からの日程返信待ち（ミニテック林様へ一次連絡済）"
+    elif status == "repair_done_interim":
+        level = "info"
+        show_banner = False
+        summary = "修理完了（暫定）／将来交換要・林さん報告済"
+    else:
+        level = "attention"
+        summary = f"エアコン故障対応中（status={status}）"
+
+    detail_lines = [
+        f"物件: {data.get('property', 'Grandole志賀本通Ⅰ 201号室')}",
+        f"事象: {data.get('issue', 'エラー9-4・水漏れ再発')}",
+        "施工業者: マルショウ 石井章示 様",
+        "管理会社: ミニテック大曽根支店 林 友貴 様",
+    ]
+    if data.get("notes"):
+        detail_lines.append(f"メモ: {data['notes']}")
+    if data.get("notion_task_url"):
+        detail_lines.append(f"Notion: {data['notion_task_url']}")
+
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "properties",
+        level=level,
+        summary=summary,
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "href": "https://app.notion.com/p/Grandole-I-201-3d3f6bbe5a76817cbab4f351deeab602",
+            "show_banner": show_banner,
+            "status": status,
+            "never_archive": status not in ("repair_done_interim", "resolved"),
         },
     )
 
@@ -1585,7 +1820,28 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
             detail=bank_detail or None,
             cursor_prompt=prompt,
             source=src,
-            payload={"bank_sync": bank} if bank else {},
+            payload={
+                "bank_sync": {
+                    "level": bank.get("level") if bank else None,
+                    "summary": bank.get("summary") if bank else None,
+                    "updated_at": bank.get("updated_at") if bank else None,
+                    "csv_max_date": bank.get("csv_max_date") if bank else None,
+                    "ok_n": len(bank.get("ok") or []) if bank else 0,
+                    "stale": (bank.get("stale") or [])[:20] if bank else [],
+                    "missing": (bank.get("missing") or [])[:20] if bank else [],
+                    "unlinkable_n": len(bank.get("unlinkable") or []) if bank else 0,
+                }
+                if bank
+                else None,
+                "csv_weekly": {
+                    "last_ok": weekly.get("last_ok"),
+                    "last_success_at": weekly.get("last_success_at"),
+                    "last_error": (str(weekly.get("last_error") or "")[:120] or None),
+                    "updated_at": weekly.get("updated_at"),
+                }
+                if weekly
+                else None,
+            },
         )
     level = str(data.get("level") or "ok")
     if level not in ("ok", "info", "warn", "attention"):
@@ -1645,9 +1901,23 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
         "bank_sync": {
             "level": bank.get("level") if bank else None,
             "summary": bank.get("summary") if bank else None,
+            "updated_at": bank.get("updated_at") if bank else None,
+            "csv_max_date": bank.get("csv_max_date") if bank else None,
+            "ok_n": len(bank.get("ok") or []) if bank else 0,
             "stale": (bank.get("stale") or [])[:20] if bank else [],
             "missing": (bank.get("missing") or [])[:20] if bank else [],
+            "unlinkable_n": len(bank.get("unlinkable") or []) if bank else 0,
         },
+        "csv_weekly": {
+            "last_ok": weekly.get("last_ok") if weekly else None,
+            "last_success_at": weekly.get("last_success_at") if weekly else None,
+            "last_error": (str(weekly.get("last_error") or "")[:120] or None)
+            if weekly
+            else None,
+            "updated_at": weekly.get("updated_at") if weekly else None,
+        }
+        if weekly
+        else None,
     }
     pending_n = 0
     review_batch: dict[str, Any] = {}
@@ -1664,9 +1934,9 @@ def eval_zaim_quality(meta: dict, data: dict | None) -> dict[str, Any]:
             pending = []
             for e in entries:
                 st = e.get("status") or "pending_confirm"
-                if st in ("confirmed", "failed"):
+                if st in ("confirmed", "failed", "disputed"):
                     continue
-                if st not in ("pending_confirm", "disputed"):
+                if st != "pending_confirm":
                     continue
                 bid = str(e.get("batch_id") or review_bid or "")
                 if ack_id and bid and ack_id == bid:
@@ -1787,6 +2057,108 @@ def refresh_zaim_quality() -> None:
             print(f"# {script_name} refresh failed: {e}", file=sys.stderr)
 
 
+def eval_grok_bridge_inbox(meta: dict, data: dict | None) -> dict[str, Any]:
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="state なし — scripts/jarvis_bucho_inbox_poll.py を実行",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    if level not in ("ok", "info", "warn", "attention"):
+        level = "ok"
+    summary = str(data.get("summary") or "部長ボックス")
+    detail = str(data.get("detail") or "")
+    pending = data.get("pending") or []
+    pending_ui: list[dict[str, Any]] = []
+    if isinstance(pending, list):
+        for it in pending[:8]:
+            if not isinstance(it, dict):
+                continue
+            pending_ui.append(
+                {
+                    "name": str(it.get("name") or ""),
+                    "mtime": str(it.get("mtime") or ""),
+                    "action": str(it.get("action") or ""),
+                    "priority": str(it.get("priority") or ""),
+                    "title": str(it.get("title") or ""),
+                    "body_md": str(it.get("body_md") or "")[:8000],
+                }
+            )
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "pending_count": len(pending) if isinstance(pending, list) else 0,
+            "pending": pending_ui,
+        },
+    )
+
+
+def eval_hawk_weekly_summary(meta: dict, data: dict | None) -> dict[str, Any]:
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+    if not data:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="info",
+            summary="state なし — jarvis_bucho_inbox_poll.py を実行",
+            cursor_prompt=prompt,
+            source=src,
+        )
+    level = str(data.get("level") or "ok")
+    if level not in ("ok", "info", "warn", "attention"):
+        level = "ok"
+    summary = str(data.get("summary") or "ホーク週次サマリー")
+    detail = str(data.get("detail") or "")
+    items = data.get("items") or []
+    items_ui: list[dict[str, Any]] = []
+    if isinstance(items, list):
+        for it in items[:8]:
+            if not isinstance(it, dict):
+                continue
+            items_ui.append(
+                {
+                    "name": str(it.get("name") or ""),
+                    "mtime": str(it.get("mtime") or ""),
+                    "action": str(it.get("action") or ""),
+                    "priority": str(it.get("priority") or ""),
+                    "title": str(it.get("title") or ""),
+                    "body_md": str(it.get("body_md") or "")[:8000],
+                }
+            )
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "",
+        level=level,
+        summary=summary,
+        detail=detail,
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "item_count": len(items) if isinstance(items, list) else 0,
+            "pending": items_ui,
+        },
+    )
+
+
 def eval_jarvis_private_backup(meta: dict, data: dict | None) -> dict[str, Any]:
     """`.env.jarvis_private` の age バックアップ鮮度（参照中心・平常は ok）。"""
     title = meta["title"]
@@ -1872,7 +2244,7 @@ def eval_cursor_usage_watch(meta: dict, data: dict | None) -> dict[str, Any]:
             if e.get("days_left") is not None
             else ""
         ),
-        "Grok BotはPro不可。SuperGrok Plus連携はPro+より高い→必要ならPro+再上げ。",
+        "Grok Bot: Pro可（週次枠はPro+より小）。Bot多用で枠不足ならPro+再上げ。SuperGrok連携はPro+より高い→採用せず。",
         "更新: scripts/jarvis_cursor_usage_watch.py --set … → --push",
     ]
     return card(
@@ -1957,6 +2329,88 @@ def eval_cursor_pro_plus_downgrade(meta: dict) -> dict[str, Any]:
     )
 
 
+def eval_cursor_worker_queue(meta: dict, data: dict | None) -> dict[str, Any]:
+    """cards / watch_status / triage_items の Mac Cursor キュー・ワーカー状況を可視化"""
+    title = meta["title"]
+    prompt = meta.get("cursor_prompt") or ""
+    src = meta.get("source") or ""
+
+    st = data or {}
+    counts = st.get("counts") or {}
+    q_count = counts.get("queued", 0)
+    r_count = counts.get("running", 0)
+    e_count = counts.get("error", 0)
+    d_count = counts.get("done_recent", 0)
+
+    queued_items = st.get("queued_items") or []
+    running_items = st.get("running_items") or []
+    error_items = st.get("error_items") or []
+    recent_done = st.get("recent_done") or []
+
+    # レベル判定
+    if e_count > 0:
+        level = "warn"
+    elif r_count > 0 or q_count > 0:
+        level = "attention"
+    else:
+        level = "ok"
+
+    summary_parts = []
+    if r_count > 0:
+        first_r = running_items[0]["title"] if running_items else ""
+        summary_parts.append(f"処理中 {r_count}件（{first_r}）")
+    if q_count > 0:
+        first_q = queued_items[0]["title"] if queued_items else ""
+        summary_parts.append(f"待機 {q_count}件（{first_q}）")
+    if e_count > 0:
+        first_e = error_items[0]["title"] if error_items else ""
+        summary_parts.append(f"エラー {e_count}件（{first_e}）")
+
+    if not summary_parts:
+        if d_count > 0:
+            first_d = recent_done[0]
+            summary_parts.append(f"正常待機中（直近完了: {first_d.get('title')}）")
+        else:
+            summary_parts.append("待機キューなし（正常稼働中）")
+
+    detail_lines = [
+        f"待機キュー: {q_count}件 / 処理中: {r_count}件 / 失敗: {e_count}件 / 直近完了: {d_count}件",
+        f"ワーカー最終更新: {st.get('last_heartbeat') or '—'}",
+        "Mac launchd: com.matsunoma.jarvis.cursor-revise-worker (45秒間隔)",
+        "即時実行 / リトライ: scripts/jarvis_card_cursor_ask_worker.py",
+    ]
+    if queued_items:
+        detail_lines.append("【待機中の相談】")
+        for it in queued_items[:3]:
+            req = str(it.get("requested_at") or "—")[:16]
+            detail_lines.append(f"・[{it.get('kind')}] {it.get('title')} (依頼: {req})")
+    if error_items:
+        detail_lines.append("【エラー発生中の相談】")
+        for it in error_items[:3]:
+            detail_lines.append(f"・[{it.get('kind')}] {it.get('title')}: {str(it.get('error') or '不明')[:60]}")
+
+    return card(
+        item_id=meta["id"],
+        title=title,
+        category=meta.get("category") or "ops",
+        level=level,
+        summary=" · ".join(summary_parts),
+        detail="\n".join(detail_lines),
+        cursor_prompt=prompt,
+        source=src,
+        payload={
+            "counts": counts,
+            "queued_items": queued_items,
+            "running_items": running_items,
+            "error_items": error_items,
+            "recent_done": recent_done,
+            "last_heartbeat": st.get("last_heartbeat"),
+            "href": "/situation#watch-cursor_worker_queue",
+            "show_banner": level in ("warn", "attention"),
+        },
+    )
+
+
 EVALUATORS = {
     "etc_mileage": lambda m: eval_etc(m, load_json(STATE / "etc_monthly.json")),
     "vpoint": lambda m: eval_vpoint(m),
@@ -1976,6 +2430,19 @@ EVALUATORS = {
     "glucon_report_due": lambda m: eval_glucon_report(
         m, load_json(STATE / "glucon_report.json")
     ),
+    "quiet_edge_due": lambda m: (
+        __import__("subprocess").run(
+            [
+                sys.executable,
+                str(REPO / "scripts" / "jarvis_quiet_edge_due_check.py"),
+            ],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        ),
+        eval_quiet_edge_due(m, load_json(STATE / "quiet_edge_due.json")),
+    )[1],
     "mobile_plan": lambda m: eval_mobile_plan(
         m, load_json(STATE / "mobile_plan.json")
     ),
@@ -1993,8 +2460,21 @@ EVALUATORS = {
     "cursor_usage_watch": lambda m: eval_cursor_usage_watch(
         m, load_json(STATE / "cursor_usage_watch.json")
     ),
+    "cursor_worker_queue": lambda m: eval_cursor_worker_queue(
+        m, load_json(STATE / "cursor_worker_status.json")
+    ),
     "jarvis_private_backup": lambda m: eval_jarvis_private_backup(
         m, load_json(STATE / "jarvis_private_backup.json")
+    ),
+    "grok_bridge_inbox": lambda m: eval_grok_bridge_inbox(
+        m, load_json(STATE / "grok_bridge_inbox.json")
+    ),
+    "hawk_weekly_summary": lambda m: eval_hawk_weekly_summary(
+        m, load_json(STATE / "hawk_weekly_summary.json")
+    ),
+    "kanji_ops": lambda m: eval_kanji_ops(m, load_json(STATE / "kanji_ops.json")),
+    "grandole_201_aircon": lambda m: eval_grandole_201_aircon(
+        m, load_json(STATE / "grandole_201_aircon.json")
     ),
 }
 
@@ -2011,6 +2491,9 @@ def collect() -> dict[str, Any]:
         iid = meta.get("id") or ""
         fn = EVALUATORS.get(iid)
         if not fn:
+            # gha:ops_fail_watch のアイテム（gha_workflow_fail 等）は jarvis_ops_fail_watch.py が直接管理するためスキップ
+            if str(meta.get("source") or "").startswith("gha:ops_fail_watch"):
+                continue
             items_out.append(
                 card(
                     item_id=iid,

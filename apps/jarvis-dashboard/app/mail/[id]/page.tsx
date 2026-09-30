@@ -6,6 +6,8 @@ import FolderLinks from "@/components/FolderLinks";
 import MailBodyView from "@/components/MailBodyView";
 import MailTaskHandoff from "@/components/MailTaskHandoff";
 import TriageStatusActions from "@/components/TriageStatusActions";
+import VendorReplyJudgmentButtons from "@/components/VendorReplyJudgmentButtons";
+import { parseVendorJudgment } from "@/lib/vendorJudgment";
 import { ensureMailJa } from "@/app/actions/triage";
 import { gmailSendConfigured } from "@/lib/gmail/sendFromEnv";
 import { fetchMailVisuals } from "@/lib/gmail/fetchMessageParts";
@@ -64,7 +66,7 @@ export default async function MailDetailPage({
   const body = (it.original_body || "").trim();
   const lanePath = laneHref(it.lane);
   const path = `/mail/${it.id}`;
-  const gmailReady = gmailSendConfigured();
+  const gmailReady = gmailSendConfigured(it.account);
   const st = it.status as TriageStatus;
   const resolved = resolvePartnerToEmail({
     fromEmail: it.from_email,
@@ -75,6 +77,9 @@ export default async function MailDetailPage({
   const isVendorReply = Boolean(payload.re_vendor_reply);
   const vendorId =
     typeof payload.vendor_id === "string" ? payload.vendor_id : null;
+  const vendorJudgment = parseVendorJudgment(payload.vendor_judgment);
+  const snoozeUntil =
+    typeof payload.snooze_until === "string" ? payload.snooze_until : null;
   const folderLinks = getFolderLinksMany([
     partnerFolderKey(it.folder, it.partner),
   ]);
@@ -92,13 +97,32 @@ export default async function MailDetailPage({
           <span className={`status-badge status-${st}`}>
             {STATUS_LABEL[st] || st}
           </span>
+          {st === "sent" ? (
+            <span className="status-badge status-sent" style={{ marginLeft: 4 }}>
+              送りました
+            </span>
+          ) : null}
           <strong>{it.partner || it.from_email || "—"}</strong>
           <span className="meta">
             {laneLabel(it.lane)}
             {it.folder ? ` · ${it.folder}` : ""}
             {it.received_at ? ` · ${it.received_at}` : ""}
           </span>
-          <TriageStatusActions id={it.id} status={it.status} path={path} />
+          {isVendorReply ? (
+            <VendorReplyJudgmentButtons
+              id={it.id}
+              path={path}
+              vendorId={vendorId}
+              judgment={vendorJudgment}
+            />
+          ) : (
+            <TriageStatusActions
+              id={it.id}
+              status={it.status}
+              path={path}
+              snoozeUntil={snoozeUntil}
+            />
+          )}
         </header>
         <FolderLinks links={folderLinks} />
         <h1 style={{ fontSize: "1.25rem", margin: "10px 0 8px" }}>
@@ -133,23 +157,57 @@ export default async function MailDetailPage({
           files={visuals.files}
           visualsError={visuals.error}
         />
-        <h2 style={{ fontSize: "1rem", marginTop: 16 }}>返信下書き</h2>
-        <DraftWorkbench
-          id={it.id}
-          path={path}
-          subject={it.subject}
-          toEmail={it.from_email}
-          partner={it.partner}
-          folder={it.folder}
-          lane={it.lane}
-          draftText={it.draft_text}
-          draftJa={draftJa}
-          payload={it.payload}
-          status={it.status}
-          gmailReady={gmailReady}
-          resolvedTo={resolved.to}
-          toSource={resolved.source}
-        />
+        {!(it.draft_text || "").trim() ? (
+          <p className="meta" style={{ marginTop: 16 }}>
+            夜間バッチは下書きを作りません。上のステータス操作が主。必要なときだけ下を開いて手書き。
+          </p>
+        ) : null}
+        {(it.draft_text || "").trim() ? (
+          <>
+            <h2 style={{ fontSize: "1rem", marginTop: 16 }}>返信下書き</h2>
+            <DraftWorkbench
+              id={it.id}
+              path={path}
+              subject={it.subject}
+              toEmail={it.from_email}
+              partner={it.partner}
+              folder={it.folder}
+              lane={it.lane}
+              draftText={it.draft_text}
+              draftJa={draftJa}
+              payload={it.payload}
+              status={it.status}
+              gmailReady={gmailReady}
+              resolvedTo={resolved.to}
+              toSource={resolved.source}
+            />
+          </>
+        ) : (
+          <details style={{ marginTop: 12 }}>
+            <summary
+              className="meta"
+              style={{ cursor: "pointer", userSelect: "none" }}
+            >
+              手動で返信下書きを書く（任意）
+            </summary>
+            <DraftWorkbench
+              id={it.id}
+              path={path}
+              subject={it.subject}
+              toEmail={it.from_email}
+              partner={it.partner}
+              folder={it.folder}
+              lane={it.lane}
+              draftText={it.draft_text}
+              draftJa={draftJa}
+              payload={it.payload}
+              status={it.status}
+              gmailReady={gmailReady}
+              resolvedTo={resolved.to}
+              toSource={resolved.source}
+            />
+          </details>
+        )}
         <MailTaskHandoff id={it.id} path={path} payload={it.payload} />
       </article>
     </Shell>

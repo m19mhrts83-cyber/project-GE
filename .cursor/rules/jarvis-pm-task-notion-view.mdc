@@ -1,0 +1,96 @@
+---
+description: 管理会社とのタスク共有・非対称ハブ（Todoist正本）。メール/LINE下書き・やり取り確認時に適用
+alwaysApply: true
+---
+
+# 管理会社 × タスク共有（非対称ハブ・Todoist）
+
+## 背景と教訓（2026-09-06 確定／2026-09-21 Todoist 正本化）
+
+- **過去の失敗**: 相手に直接ツール入力を求める運用は形骸化し、LINE／メールに戻った。
+- **正本方針**: 相手に入力を強制しない。**「相手の入力は普段どおりのメール・LINEで受け、集約・整理を松野＋Jarvis側で行う（非対称ハブ型）」**。
+- **タスク正本**: **Todoist（admin）**（`JARVIS_TASK_BACKEND=todoist`）。Notion View は移行期・戻し用。
+- **ゴール**: 閲覧 → 一緒に見ながら会話 →（将来）Guest で軽い共同編集（Phase 4）。
+
+## 3ステップ展開
+
+1. **Step 1: 閲覧ファースト（相手負担ゼロ・現行）**  
+   メール／LINEから Jarvis が Todoist（所有物件／業務）へ起票・整理。相手への文面には **進行中の要約＋「必要なら一覧を共有します」** を添える。  
+   ※ Guest 未導入のあいだは **ライブの共有URLを無理に付けない**（内部 Board を相手に晒さない）。要約テキストで足りる。
+2. **Step 2: 共通言語化**  
+   打合せで「タスク一覧の〇〇」と話し、必要ならその場で画面共有（松野側 Todoist または要約）。
+3. **Step 3: Guest 共同編集（Phase 4）**  
+   協力社だけ `PM_*` 共有プロジェクト（Guest）。完了メモを相手が書いてもよい、と任意で案内。全社一斉はしない。  
+   **検証候補**: LEAF / ホームプランナー。**内部の物件区分はラベル二軸が正**（`所有物件` 全体は共有しない）。  
+   **再開条件**: 物件ラベル初版確定済（2026-09-21）。**Pro 後に `PM_LEAF` / `PM_ホームプランナー` 骨格作成済**（2026-09-22）。招待は対外了承後。当面も要約フッター可（`jarvis_todoist_pm_status_footer.py`）。**転送メールアドレスは相手に渡さない**。
+
+## トリガー
+
+1. 管理会社（ホームプランナー、LEAF、ミニテック等）へのメール・LINE下書き
+2. パートナー確認で管理会社関連の宿題・修繕・見積が出たとき
+3. Todoist `properties`（所有物件）レーンの起票・更新時
+
+## Jarvis の必須動作
+
+### 1. 送信下書き（メール／LINE）
+
+案件が進行中なら、末尾に **状況把握用の短いサマリー** を付ける。可能なら次で生成:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_pm_status_footer.py --pm LEAF
+```
+
+```text
+--------------------------------------------------
+📌 【物件名】進行中の対応（社内整理の抜粋）
+・…（最大3〜5行）
+※詳細はこちらで更新しています。一覧の共有が必要でしたらお申し付けください。
+--------------------------------------------------
+```
+
+**Guest パイロット（LEAF／ホームプランナー）**: `PM_*` 骨格・`guest_project_url` は設定済。**招待メールは必要なタイミングだけ**（パートナー確認で提案→了承後に admin Share）。無言送信しない。
+
+**Todoist 案内リマインド（未完了時）**: `.jarvis_state/todoist_pm_invite_remind.json` の `ask_on_partner_check: true` のあいだ、パートナー確認で管理会社が出たら:
+
+1. **要約フッター**を載せるか聞く（転送メール案内は出さない。815除外）
+2. パイロット社かつ未招待なら **Guest 招待を今送るか**も提案する（`guest_invite_pending`）
+
+フッター了承後かつ Guest URL ありなら、フッター末尾に共有ボード URL を付けてよい（招待前に URL だけ渡すのは避ける。招待後または「フッターにURLも」明示時）。
+
+### 2. 受信・やり取り確認時
+
+- 新たな修繕・見積・入居者対応などの宿題 → **「Todoist（所有物件）に起票しますか？」** と提案（了承後 `create-task --lane properties`。**物件ラベル＋管理会社ラベル必須**）
+- 完了相当 → **いきなり close しない**。`オーナー確認` へ移し報告（`jarvis-todoist-owner-confirm.mdc`）
+- 退去・修繕費請求がありうるとき → 見積 A/B リマインド（`tenant-moveout-estimate-dual.mdc`）
+
+### 3. 共有の境界（機密）
+
+共有側（将来の `PM_*`）や相手向け要約に載せない:
+
+- 業者原価見積（A）・口座・融資・個人の家族／金融タスク
+- 他物件の内部メモ
+
+物件紐づけは **ラベル二軸**（物件＋管理会社）とタイトル先頭で区別する（Beginner 圧縮中は `所有物件` プロジェクト内。セクションは進捗列のまま）。
+
+| 軸 | ラベル例 | 備考 |
+|---|---|---|
+| 物件 | `GrandoleI` / `GrandoleII` / `キャラメル` | ※`LEAF京都`は物件ではない（京都銀行） |
+| 管理会社 | `ミニテック` / `ホームプランナー` / `Tcell` / `LEAF` | いまボールの社。GrandoleIは主ミニテック＋LEAF/Tcell可 |
+
+関係: GrandoleI＝主ミニテック（LEAF・Tcell関与可）／GrandoleII＝ホームプランナーのみ／キャラメル＝Tcellのみ  
+
+起票例: `--lane properties --title '[GrandoleI][ミニテック] 202号 …' --label GrandoleI,ミニテック`  
+正本: `config/todoist_projects.yaml`（`property_labels` / `pm_labels`）· `.jarvis_state/todoist_property_labels.json` · `docs/Todoist_タスク正本_設計_20260921.md`
+
+### 4. 転送メール起票（松野専用・相手には渡さない）
+
+Todoist プロジェクトの転送用アドレスは **チャット・相手への案内に出さない**（`.env`／yaml の秘密扱い）。**自分の Gmail 転送ルール専用**。管理会社に「このアドレスへ送って」はしない（非対称ハブ維持。評価: `docs/Todoist_Guest共有_管理会社向け_20260921.md`）。
+
+## 関連
+
+- 完了二段: `jarvis-todoist-owner-confirm.mdc`
+- Todoist 設定: `config/todoist_projects.yaml` · `docs/Todoist_タスク正本_設計_20260921.md`
+- CLI: `scripts/jarvis_todoist_api.py`
+- パートナー送信／確認: `partner-email-send.mdc` · `partner-email-check.mdc`
+- 旧 Notion View 運用の経緯は本ファイル履歴・設計MDを参照（戻し時のみ Notion URL）

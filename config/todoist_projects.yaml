@@ -1,0 +1,364 @@
+version: 1
+layout: pro_normalized
+api_base: https://api.todoist.com/api/v1
+complete_phrase: タスク完了したよ
+inbox:
+  name: 受信箱
+  project_id: 6hc2j6cwMP9gjJ28
+  view_style: list
+  invite_email_env: JARVIS_TODOIST_EMAIL
+  note: 'admin が所有・Jarvis 編集可で共有するキャッチオール。
+
+    Jarvis 分身は Free。枠満杯なら低優先PJを外して入れ替え（第2メアドは作らない）。
+
+    気づき本線は Webhook／API。入れ替え頻発なら次段は Jarvis Pro。
+
+    '
+default_sections:
+- 未着手
+- 進行中
+- 相手待ち
+- HOLD
+- オーナー確認
+labels:
+- waiting
+- inbox_review
+- L-id
+- ai_raimo
+- kamiooya
+- kanji
+- properties
+- kodate
+- kazoku
+- apps
+- theme_stock
+- 要ボス
+- 要Jarvis連携
+- 要ホーク
+- quick
+- SecondBrain
+- GrandoleI
+- GrandoleII
+- キャラメル
+- ミニテック
+- ホームプランナー
+- Tcell
+- LEAF
+- cal
+lanes:
+  properties:
+    title: 所有物件
+    project_key: properties
+    project_id: 6hXX2jxvG8ChWX7x
+    lane_label: properties
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: true
+  ai_raimo:
+    title: AI・Raimo
+    project_key: ai_raimo
+    project_id: 6hXp5cmgjR83Rj6g
+    lane_label: ai_raimo
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: true
+  kamiooya:
+    title: 神大家運営
+    project_key: kamiooya
+    project_id: 6hXp5f57rFHGPhV6
+    lane_label: kamiooya
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: true
+  kanji:
+    title: 飲み会幹事
+    project_key: kanji
+    project_id: 6hXp5fRGj5Cq4Q5q
+    lane_label: kanji
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: true
+  apps:
+    title: アプリ開発
+    project_key: apps
+    project_id: 6hXfrWj4gwv9xQj6
+    lane_label: apps
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: true
+  theme_stock:
+    title: Theme株式
+    project_key: theme_stock
+    project_id: 6hcRhvwmQP84W7CM
+    lane_label: theme_stock
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: true
+    note: KURASHIFT 株式ウォッチの判断ログ正本（2026-09-25）。提案・閾値アラート・動き履歴。admin所有・Jarvis招待要
+  kodate:
+    title: 戸建て
+    project_key: kodate
+    project_id: 6hXX2mMc58ff5QH2
+    lane_label: kodate
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: false
+  kazoku:
+    title: 家族
+    project_key: kazoku
+    project_id: 6hXX2mWRmPJHMfR3
+    lane_label: kazoku
+    initial_section: 未着手
+    open_sections:
+    - 未着手
+    - 進行中
+    - 相手待ち
+    - HOLD
+    - オーナー確認
+    done_sections: []
+    hide_done_on_board: false
+projects:
+  properties:
+    name: 所有物件
+    view_style: board
+    project_id: 6hXX2jxvG8ChWX7x
+    section_ids:
+      未着手: 6hXX2m59CJHWHXfQ
+      進行中: 6hXX2m4FXrw8hVCQ
+      相手待ち: 6hXX2m4vV2hwqhRx
+      HOLD: 6hXmWXhqwjvg2cGx
+      オーナー確認: 6hXX2m7MJ3FchGcx
+  work_bundle:
+    name: 業務まとめ
+    view_style: board
+    note: '2026-09-22 phase1b: 分割済。空なら archive 可。旧 id 残置。'
+    project_id: 6hXX2m7CJVrvmh9j
+    section_ids:
+      未着手: 6hXX2m9G5vq9gQ3j
+      進行中: 6hXX2m9H2gjfx5hj
+      相手待ち: 6hXX2mFph4hpV5jC
+      HOLD: 6hXmWXmfMfMx62GC
+      オーナー確認: 6hXX2mGJJFhV6mgj
+    archived_after_phase1b: true
+  apps:
+    name: アプリ開発
+    view_style: board
+    note: Beginner 5本目。Todoist導入・アプリ残タスクをここだけで追う（2026-09-21）
+    project_id: 6hXfrWj4gwv9xQj6
+    section_ids:
+      未着手: 6hXfrWvX6vpjfV26
+      進行中: 6hXfrWw2r3HRX92c
+      相手待ち: 6hXfrX2g76rcc4wc
+      HOLD: 6hXmWXwH43cgvrf6
+      オーナー確認: 6hXfrX2839CrjP46
+  theme_stock:
+    name: Theme株式
+    view_style: board
+    note: KURASHIFT 株式ウォッチ運用（提案・閾値・判断履歴）。admin 所有。Jarvis 分身を編集可で共有
+    project_id: 6hcRhvwmQP84W7CM
+    section_ids:
+      未着手: 6hcRhwj6RjJgJGfv
+      進行中: 6hcRhwqF7qv8FfmM
+      相手待ち: 6hcRhwpGxPRgXfgv
+      HOLD: 6hcRhwr6xWh9Whhv
+      オーナー確認: 6hcRhwvMx9hqgJfM
+  kodate:
+    name: 戸建て
+    view_style: board
+    project_id: 6hXX2mMc58ff5QH2
+    section_ids:
+      未着手: 6hXX2mMCjRGj7JC2
+      進行中: 6hXX2mVQr59jxhm2
+      相手待ち: 6hXX2mRgGHQ5Xg5R
+      HOLD: 6hXmWcJhrjHhMCG2
+      オーナー確認: 6hXX2mQVQJrv3QVR
+  kazoku:
+    name: 家族
+    view_style: board
+    project_id: 6hXX2mWRmPJHMfR3
+    section_ids:
+      未着手: 6hXX2mg9vgCf3MQ3
+      進行中: 6hXX2mghq49PHrg3
+      相手待ち: 6hXX2mjRc93w6hm3
+      HOLD: 6hXmWcRP27rfpVXV
+      オーナー確認: 6hXX2mp7RMMcvVgV
+  ai_raimo:
+    name: AI・Raimo
+    view_style: board
+    project_id: 6hXp5cmgjR83Rj6g
+    section_ids:
+      未着手: 6hXp5crCpR7FV5Gg
+      進行中: 6hXp5crRPm5M43C8
+      相手待ち: 6hXp5cwWWjJ6QVG8
+      HOLD: 6hXp5cwX72pFWrX8
+      オーナー確認: 6hXp5cxwr9pRPw28
+    note: phase1b 2026-09-22 業務まとめから分離
+  kamiooya:
+    name: 神大家運営
+    view_style: board
+    project_id: 6hXp5f57rFHGPhV6
+    section_ids:
+      未着手: 6hXp5f972whJ6fX6
+      進行中: 6hXp5f8wQM88Gfgc
+      相手待ち: 6hXp5fCMXj52xFXc
+      HOLD: 6hXp5fFRWrPpgHf6
+      オーナー確認: 6hXp5fHCqG85XjMc
+    note: phase1b 2026-09-22 業務まとめから分離
+  kanji:
+    name: 飲み会幹事
+    view_style: board
+    project_id: 6hXp5fRGj5Cq4Q5q
+    section_ids:
+      未着手: 6hXp5fV3qVVj2phH
+      進行中: 6hXp5fXM4qRvPXfq
+      相手待ち: 6hXp5fVJ77RJjWFH
+      HOLD: 6hXp5ffFq7J3CWVH
+      オーナー確認: 6hXp5ffjVw9fc9fH
+    note: phase1b 2026-09-22 業務まとめから分離
+distortions_note: '歪みログ: .jarvis_state/todoist_beginner_distortions.json（phase1b 完了後も履歴として残置）。
+
+  phase1b 2026-09-22: ai_raimo/kamiooya/kanji 専用PJ・layout=pro_normalized。
+
+  phase4 2026-09-22: PM_LEAF / PM_ホームプランナー 作成（Guest招待は松野了承後）。'
+property_labels:
+  GrandoleI:
+    display: Grandole志賀本通I
+    default_pm: ミニテック
+    also_pm:
+    - LEAF
+    - Tcell
+    note: 主はミニテック。LEAF・Tcell関与時はボールの社をPMラベルに
+  GrandoleII:
+    display: Grandole志賀本通II
+    default_pm: ホームプランナー
+    also_pm: []
+    note: ホームプランナーのみ
+  キャラメル:
+    display: キャラメル
+    default_pm: Tcell
+    also_pm: []
+pm_labels:
+  ミニテック:
+    folder: 102_ミニテック
+  ホームプランナー:
+    folder: 101_ホームプランナー
+  Tcell:
+    folder: 103_Tcell
+  LEAF:
+    folder: 104_LEAF
+pm_share:
+  email_forward_to_partner: false
+  footer_max_tasks: 5
+  companies:
+    ミニテック:
+      folder: 102_ミニテック
+      pilot: false
+      guest_project_key: ''
+      guest_project_url: ''
+      project_id: ''
+    ホームプランナー:
+      folder: 101_ホームプランナー
+      pilot: true
+      guest_project_key: PM_ホームプランナー
+      guest_project_url: https://app.todoist.com/app/project/6hc28xj8wcC4X442
+      project_id: 6hc28xj8wcC4X442
+    Tcell:
+      folder: 103_Tcell
+      pilot: false
+      guest_project_key: ''
+      guest_project_url: ''
+      project_id: ''
+    LEAF:
+      folder: 104_LEAF
+      pilot: true
+      guest_project_key: PM_LEAF
+      guest_project_url: https://app.todoist.com/app/project/6hc28xHhRFvr7P9H
+      project_id: 6hc28xHhRFvr7P9H
+pm_guest_projects:
+  PM_LEAF:
+    name: PM_LEAF
+    view_style: board
+    project_id: 6hc28xHhRFvr7P9H
+    section_ids:
+      未着手: 6hc28xMvVCX7Q9MH
+      進行中: 6hc28xPrpMjw82PH
+      相手待ち: 6hc28xVhph7987vH
+      HOLD: 6hc28xV6F29pQcmH
+      オーナー確認: 6hc28xfc5jv4C7VH
+    pilot_pm: LEAF
+  PM_ホームプランナー:
+    name: PM_ホームプランナー
+    view_style: board
+    project_id: 6hc28xj8wcC4X442
+    section_ids:
+      未着手: 6hc28xrwWM5q25XR
+      進行中: 6hc28xpj3MGx2jHR
+      相手待ち: 6hc28xwxgM7Hhrm2
+      HOLD: 6hc28xvJR7hH26c2
+      オーナー確認: 6hc29237RjVx8q22
+    pilot_pm: ホームプランナー
+genmail_propose:
+  gmail_account: admin
+  inbox_path: .jarvis_state/genmail_action_needed.md
+  default_label: quick
+integrations:
+  webhook:
+    enabled: true
+    endpoint: https://jarvis-dashboard-amber.vercel.app/api/todoist/webhook
+    note: App Console「Jarvis Webhook」登録済。HMAC=TODOIST_APP_CLIENT_SECRET。手順 docs/Todoist_Webhook受信_20260922.md
+  calendar_sync:
+    enabled: true
+    note: due+@cal のみ admin Googleカレンダーへ片方向同期。正本は GC。手順 docs/Todoist_Calendar同期_20260922.md
+    due_label: cal
+    default_duration_minutes: 60
+    calendar_id: primary
+  watch_todoist_sync:
+    enabled: true
+    note: ホーム要フォロー（watch_status）→共有受信箱。正本は Todoist。手順 docs/Todoist_要フォロー同期_20260928.md
+    quiet_days: 7
+    display_hint_quiet_days: 30
+    labels:
+      - 要フォロー
+      - 要Jarvis連携

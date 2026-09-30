@@ -1,0 +1,52 @@
+# Todoist HOLD: UI 移動で印が付いていないタスクへ HOLD since ＋ due+30 を付ける。
+# Mac スリープ非依存の本線。朝オープンでも soft-fail 相乗りあり。
+# 秘密: TODOIST_API_TOKEN（Jarvis 分身）
+name: Todoist HOLD stamp missing
+
+on:
+  schedule:
+    # 毎日 10:00 JST（= 01:00 UTC）
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "印を付けず候補だけ出す"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: todoist-hold-stamp
+  cancel-in-progress: true
+
+jobs:
+  stamp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install --quiet PyYAML
+
+      - name: HOLD stamp missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${TODOIST_API_TOKEN:-}" ]]; then
+            echo "::error::Missing secret TODOIST_API_TOKEN"
+            exit 1
+          fi
+          ARGS=(hold-stamp-missing)
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry_run }}" == "true" ]]; then
+            ARGS+=(--dry-run)
+          fi
+          python scripts/jarvis_todoist_api.py "${ARGS[@]}"

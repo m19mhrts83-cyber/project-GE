@@ -43,9 +43,9 @@ ZAIM_LOGIN = "https://id.zaim.net/"
 ZAIM_BUDGET_MONTH_URL = "https://zaim.net/budgets/detail/{ym}"
 DEFAULT_CDP_URL = "http://127.0.0.1:9223"
 DEFAULT_CDP_PORT = 9223
-DEFAULT_GOOGLE_EMAIL = os.environ.get("ZAIM_GOOGLE_EMAIL", "m19m.hrts83@gmail.com")
-DEFAULT_LOGIN_EMAIL = os.environ.get("ZAIM_LOGIN_EMAIL", DEFAULT_GOOGLE_EMAIL)
-DEFAULT_LOGIN_PASSWORD = os.environ.get("ZAIM_PASSWORD", "")
+DEFAULT_GOOGLE_EMAIL = os.environ.get("ZAIM_GOOGLE_EMAIL", "").strip() or "m19m.hrts83@gmail.com"
+DEFAULT_LOGIN_EMAIL = os.environ.get("ZAIM_LOGIN_EMAIL", "").strip() or DEFAULT_GOOGLE_EMAIL
+DEFAULT_LOGIN_PASSWORD = os.environ.get("ZAIM_PASSWORD", "").strip()
 LOGIN_WAIT_MS = 300_000  # 手動完了待ち（5分）
 EMAIL_LOGIN_ATTEMPTS = 2  # 手動検証: 同一資格情報を2回入力する必要あり
 
@@ -138,13 +138,27 @@ def submit_email_login_once(page: Page, email: str, password: str) -> None:
     page.wait_for_timeout(2500)
 
 
+def _screenshot_login(page: Page, name: str) -> None:
+    try:
+        SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(SCREENSHOT_DIR / name), full_page=True)
+    except Exception:
+        pass
+
+
 def login_with_email_password(page: Page, email: str, password: str) -> None:
     page.goto(ZAIM_LOGIN, wait_until="domcontentloaded")
     page.wait_for_timeout(1500)
     if is_authenticated(page):
         return
     if not password:
-        raise RuntimeError("ZAIM_PASSWORD が未設定です (.env.jarvis_private)")
+        _screenshot_login(page, "login_password_missing.png")
+        raise RuntimeError(
+            "ZAIM_PASSWORD が未設定です "
+            "(.env.jarvis_private または GitHub Secrets の ZAIM_PASSWORD / ZAIM_LOGIN_EMAIL)。"
+            " セッション切れ時は ZAIM_STORAGE_STATE_B64 を再発行するか、"
+            " ZAIM_PASSWORD を Actions secrets に入れてください。"
+        )
 
     for attempt in range(1, EMAIL_LOGIN_ATTEMPTS + 1):
         if is_authenticated(page):
@@ -236,11 +250,22 @@ def open_browser_context(
         ctx = browser.contexts[0] if browser.contexts else browser.new_context(locale="ja-JP")
         return browser, ctx, chrome_proc
 
-    browser = pw.chromium.launch(
-        headless=headless,
-        channel="chrome",
-        args=["--disable-blink-features=AutomationControlled"],
-    )
+    channel = os.environ.get("ZAIM_BROWSER_CHANNEL", "chrome")
+    launch_kwargs: dict = {
+        "headless": headless,
+        "args": ["--disable-blink-features=AutomationControlled"],
+    }
+    if channel and channel.lower() != "default":
+        launch_kwargs["channel"] = channel
+    try:
+        browser = pw.chromium.launch(**launch_kwargs)
+    except Exception as e:
+        if "channel" in launch_kwargs:
+            print(f"⚠️ channel='{channel}' 起動失敗 ({e})。標準 Chromium で再試行します...")
+            launch_kwargs.pop("channel", None)
+            browser = pw.chromium.launch(**launch_kwargs)
+        else:
+            raise
     ctx_kwargs: dict = {"locale": "ja-JP"}
     if storage_state and storage_state.exists():
         ctx_kwargs["storage_state"] = str(storage_state)
@@ -279,10 +304,14 @@ def ensure_logged_in(
     login_method: str = "email",
     manual: bool = False,
 ) -> None:
-    page.goto(ZAIM_HOME, wait_until="domcontentloaded")
-    page.wait_for_timeout(1500)
-    if is_authenticated(page):
-        return
+    for attempt in range(1, 3):
+        page.goto(ZAIM_HOME, wait_until="domcontentloaded")
+        page.wait_for_timeout(2000)
+        if is_authenticated(page):
+            return
+        if is_login_page(page):
+            break
+        print(f"  ログイン判定待ち {attempt}/2 url={page.url}")
 
     if manual:
         wait_for_manual_login(page, email)

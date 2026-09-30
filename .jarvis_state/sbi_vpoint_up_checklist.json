@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-07-30",
+  "updated_at": "2026-09-10",
   "program": "SBI証券 Vポイントアッププログラム（Olive Infinite）",
   "checklist": {
     "chuukai_smbc": {
@@ -31,20 +31,36 @@
       "note": "2026-07-04: eMAXIS Slim先進国(03319172) 金額10,000pt Vポイント買付を発注。保有pt 22408→12408。今月利用履歴は約定後反映見込み"
     },
     "nisa_eval_100man": {
-      "status": "confirm",
-      "note": "つみたてNISA銘柄保有あり"
+      "status": "ok_user_and_zaim",
+      "note": "ユーザー申告 NISA評価約100万円。Zaim証券詳細(2026-09-10) SBI合計1,732,305円。VポイントアップのNISA投信100万帯(+0.5%)は達成見込み。株式・物価連動国債は集計対象外の可能性"
     },
     "nisa_eval_200man": {
-      "status": "confirm",
-      "note": "特典2は200万円以上で+0.5%"
+      "status": "not_yet_gap_about_100man",
+      "note": "200万帯(+0.5%追加)は未達。月9万クレカ積立ペースなら約11ヶ月で到達見込み（市況・課税口座分に依存）。狙う価値あり"
     },
     "credit_tsumitate_rate_actual": {
-      "status": "confirmed_1pct_not_6pct",
-      "note": "Tサイト 2026-07-10: 投信積立カード決済特典900pt（9万の1%）。PP表記。cadence open_actions で帯上げ監視"
+      "status": "monthly_1pct_by_design_annual_uplift_pending",
+      "note": "公式: 毎月の積立に対し基本1%を翌々月付与。年間カード利用額に応じた上乗せは年間積立合計に対し年1回。月次900ptは異常ではない。INF帯: <300万1% / 300万2% / 500万3% / 700万4% +資産特典最大+2%。特典達成メール2026-08-15時点 カードご利用金額 約162万円（新規特典期間）。クレカ積立は集計対象外。資産特典はOlive残高条件（高額）要確認。"
     },
     "cvs_rail_note": {
-      "status": "id_dominant_high_rate_ineligible",
-      "note": "2026-07-29: Vpass 8月支払明細でセブン等を含む多数が『／ｉＤ』。高還元対象外。マクドナルドモバイルオーダーは正しいレール。是正=Visaタッチ"
+      "status": "improved_mixed_id_ratio_16pct",
+      "note": "2026-09-10監査: ／ｉＤ比率約16%。ユーザーVisaタッチテスト済。cadence visa_touch_not_id=done"
+    },
+    "olive_new_member_100man": {
+      "status": "ok_scheduled_100k_pts",
+      "note": "2026-08-27メール: 新規入会＆利用特典 進呈予定100,000pt。集計期間2026-06-01〜09-30。利用額約162万円"
+    },
+    "olive_asset_tokuten_tsumitate": {
+      "status": "not_realistic_now",
+      "note": "クレカ積立の資産運用特典(+最大2%)は Olive残高=円普通+SBI ≥3000万 かつ SMBC≥500万・SBI≥500万が必要。現SBI約173万では非現実的。狙わない"
+    },
+    "eraberu_tokuten": {
+      "status": "ok_user_confirmed_salary_grant_evidence",
+      "note": "ユーザー申告: アプリで給与200＋還元×2。Tサイト証拠: 2026-09-04「三井住友銀行 給与・年金受取特典 刈谷支店」200pt付与済＝給与枠は実効。還元×2は別途「ＶポイントＵＰプログラム特典」行あり（8/29 120pt Olive INF）。画面スクショなしでも運用上完了扱い。"
+    },
+    "annual_usage_band": {
+      "status": "tracked_below_300man",
+      "note": "8/15時点 1,622,299円。300万まで残り1,377,701円。詳細 .jarvis_state/olive_annual_usage.json"
     }
   },
   "commands": {

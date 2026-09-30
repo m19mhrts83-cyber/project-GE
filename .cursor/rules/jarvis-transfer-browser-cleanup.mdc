@@ -1,0 +1,57 @@
+# 送金アシスト — Chrome 後片付け（Jarvis）
+
+## 方針
+
+資金移動（IB／送金アシスト）で開いた **専用 Chrome（CDP profile）は、レール完了・中断・今夜終了のあと必ず閉じる**。  
+窓が増えるとユーザーが迷いやすいので、**実行後の整理までが作業の一部**。
+
+## 対象（閉じる）
+
+`~/.jarvis_state/` 配下の送金用プロファイル例:
+
+- `chrome_ib_shiga` / `chrome_ib_kyoto` / `chrome_ib_mufg_chikage`
+- `chrome_sbi_net_transfer` / `chrome_sbi_chuukai`
+- Playwright 一時 `playwright_chromiumdev_profile-*`
+- CDP ポート例: **9241 / 9242 / 9243 / 9244**
+
+## 対象外（閉じない）
+
+- ユーザー日常の Chrome（通常プロファイル）
+- Vpass 監査／支払用（`chrome_vpass_*`・9231/9233）※送金セッションと無関係なら触らない
+- 他タスク用（amex / paypal / card_mig 等）
+
+## トリガー（止まず実行）
+
+次のいずれかで cleanup する:
+
+1. **レールが done / failed / blocked**（OTP 完了・時間外中断含む）
+2. ユーザーが「終わった」「寝る」「明日やる」「ブラウザ閉じて」
+3. 送金セッションの報告を出す直前（残窓があると明記して閉じる）
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_transfer_chrome_cleanup.py
+# 残るとき
+…/python scripts/jarvis_transfer_chrome_cleanup.py --force
+```
+
+## UX 鉄板（資金移動）
+
+ユーザーがやるのは次の3つだけ:
+
+1. **プラン承認**（money-ops）
+2. **最終画面の確認**（金額・宛先が意図どおりか）
+3. **OTP 入力＋実行ボタン**
+
+Jarvis は入力・遷移・照合まで。承認なしの実行クリックはしない（`jarvis-outbound-confirm` 同型）。
+
+## 経路の優先（10万以下）
+
+- **≤10万円**かつ AW 紐づけ可 → **エアウォレット優先**（`jarvis-airwallet-prefer.mdc`）。IB を先に立ち上げない。
+- AW 完了時も IB 用 Chrome が残っていれば cleanup する。
+
+## 関連
+
+- レール定義: `config/kurashift_transfer_rails.yaml`
+- 実務: `docs/KURASHIFT_送金アシスト_実務者設計_20260814.md`
+- Mac版LINE 競合は別ルール（送金 Chrome とは無関係）

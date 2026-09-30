@@ -1,8 +1,35 @@
 {
   "version": 1,
-  "updated": "2026-08-10",
+  "updated": "2026-09-11",
   "note": "キー: lane:<id> / partner:<フォルダ名> / page:<id> / openchat:<グループ名>。url が空のエントリは UI に出さない。OneDrive webUrl は Graph で初期取得。",
   "links": {
+    "lane:kanji": [
+      {
+        "label": "幹事マニュアル Notebook（共有用・estate）",
+        "url": "https://notebook.google.com/notebook/ee91b577-a06d-46bf-880d-af41c72e39cd",
+        "kind": "web"
+      },
+      {
+        "label": "幹事マニュアル Notebook（作業用・admin）",
+        "url": "https://notebooklm.google.com/notebook/34fb5ac0-a717-4d6a-b1a0-d09fb4a049c4",
+        "kind": "web"
+      },
+      {
+        "label": "神大家 Drive・飲み会幹事",
+        "url": "https://drive.google.com/drive/folders/1t1aKu3jHADXaK2hamPXnRGAX2qDSdMrR",
+        "kind": "gdrive"
+      },
+      {
+        "label": "開催申請フォーム",
+        "url": "https://form.os7.biz/f/b46fab9a/",
+        "kind": "web"
+      },
+      {
+        "label": "Notion 幹事タスク",
+        "url": "https://app.notion.com/p/3ccf6bbe5a768147b53bcddeb1b411cf",
+        "kind": "notion"
+      }
+    ],
     "lane:kamiooya": [
       {
         "label": "パートナー相談（OneDrive）",
@@ -175,7 +202,7 @@
         "kind": "onedrive"
       }
     ],
-    "partner:419_Kneesbee税理士法人": [
+    "partner:519_Kneesbee税理士法人": [
       {
         "label": "Kneesbee税理士法人",
         "url": "https://onedrive.live.com?cid=D30BC199FDF2B527&id=D30BC199FDF2B527!s8f6d8d96213b48e2b8478d0ab180e0bb",

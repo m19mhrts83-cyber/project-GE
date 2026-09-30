@@ -9,6 +9,9 @@ Notion REST API（Jarvis 本線）。MCP には頼らない。
   ~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py search --query 'マイカー通勤'
   ~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py lane --id kazoku
   ~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py update-status --page-id ... --lane kazoku --status 進行中
+  ~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py create-task --lane kazoku --title '例'
+  ~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py complete-task --lane ai_raimo --page-id ... --comment 'タスク完了したよ（Jarvis・松野意図OK・T-03）'
+  ~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py archive-page --page-id ...
   # 家族コーチ（別WS／別 Integration のとき）
   ~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py --token-env NOTION_FAMILY_API_TOKEN whoami
   ~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py --token-env NOTION_FAMILY_API_TOKEN get-page
@@ -34,9 +37,32 @@ YAML_PATH = REPO / "config" / "notion_task_dbs.yaml"
 FAMILY_YAML_PATH = REPO / "config" / "notion_family_coaching.yaml"
 NOTION_VERSION = "2022-06-28"
 API = "https://api.notion.com/v1"
+COMPLETE_PHRASE = "タスク完了したよ"
 
 # main() が --token-env で上書き
 _TOKEN_ENV = "NOTION_API_TOKEN"
+
+
+def _ensure_complete_comment(raw: str, who: str = "") -> str:
+    text = (raw or "").strip()
+    who = (who or "").strip()
+    if text.startswith(COMPLETE_PHRASE):
+        return text[:1900]
+    extra = f"（{who}）" if who else ""
+    if text:
+        return f"{COMPLETE_PHRASE}{extra} {text}"[:1900]
+    return f"{COMPLETE_PHRASE}{extra}"[:1900]
+
+
+def _post_page_comment(page_id: str, text: str) -> dict[str, Any]:
+    return _req(
+        "POST",
+        "/comments",
+        {
+            "parent": {"page_id": page_id},
+            "rich_text": [{"type": "text", "text": {"content": text[:1900]}}],
+        },
+    )
 
 
 def _token() -> str:
@@ -243,6 +269,14 @@ def cmd_update_status(args: argparse.Namespace) -> int:
     if args.status not in allowed:
         print(f"ERROR: 未対応ステータス: {args.status}（{allowed}）", file=sys.stderr)
         return 2
+    done_list = list(cfg.get("done_statuses") or [])
+    if args.status in done_list and not getattr(args, "allow_no_comment", False):
+        print(
+            "ERROR: 完了系ステータスは complete-task（コメント「タスク完了したよ」必須）を使う。"
+            "黙って完了する場合のみ --allow-no-comment",
+            file=sys.stderr,
+        )
+        return 2
     page_id = _normalize_page_id(args.page_id)
     _req(
         "PATCH",
@@ -250,6 +284,129 @@ def cmd_update_status(args: argparse.Namespace) -> int:
         {"properties": {cfg["status_prop"]: {"status": {"name": args.status}}}},
     )
     print(json.dumps({"ok": True, "page_id": page_id, "status": args.status}, ensure_ascii=False))
+    return 0
+
+
+def cmd_comment(args: argparse.Namespace) -> int:
+    page_id = _normalize_page_id(args.page_id)
+    text = (args.comment or "").strip()
+    if not page_id or not text:
+        print("ERROR: --page-id と --comment が必要です", file=sys.stderr)
+        return 2
+    posted = _post_page_comment(page_id, text)
+    print(
+        json.dumps(
+            {"ok": True, "page_id": page_id, "comment_id": posted.get("id")},
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
+def cmd_complete_task(args: argparse.Namespace) -> int:
+    lanes = _load_lanes()
+    cfg = lanes.get(args.lane)
+    if not cfg:
+        print(f"ERROR: 未知の lane: {args.lane}", file=sys.stderr)
+        return 2
+    page_id = _normalize_page_id(args.page_id)
+    raw = (args.comment or "").strip()
+    if not page_id or not raw:
+        print("ERROR: --page-id と --comment が必要です（定型「タスク完了したよ」）", file=sys.stderr)
+        return 2
+    comment = _ensure_complete_comment(raw, getattr(args, "who", "") or "Jarvis")
+    done_list = list(cfg.get("done_statuses") or ["完了"])
+    status = (args.status or "").strip() or done_list[0]
+    allowed = list(cfg.get("open_statuses") or []) + done_list
+    if status not in allowed:
+        print(f"ERROR: 未対応ステータス: {status}（{allowed}）", file=sys.stderr)
+        return 2
+    posted = _post_page_comment(page_id, comment)
+    _req(
+        "PATCH",
+        f"/pages/{page_id}",
+        {"properties": {cfg["status_prop"]: {"status": {"name": status}}}},
+    )
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "page_id": page_id,
+                "status": status,
+                "comment": comment,
+                "comment_id": posted.get("id"),
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
+def cmd_create_task(args: argparse.Namespace) -> int:
+    lanes = _load_lanes()
+    cfg = lanes.get(args.lane)
+    if not cfg:
+        print(f"ERROR: 未知の lane: {args.lane}", file=sys.stderr)
+        return 2
+    title = (args.title or "").strip()
+    if not title:
+        print("ERROR: --title が空です", file=sys.stderr)
+        return 2
+    title_prop = cfg.get("title_prop") or "名前"
+    status_prop = cfg.get("status_prop") or "ステータス"
+    initial = (args.status or "").strip() or (cfg.get("initial_status") or "未着手")
+    props: dict[str, Any] = {
+        title_prop: {"title": [{"text": {"content": title[:2000]}}]},
+        status_prop: {"status": {"name": initial}},
+    }
+    due_prop = cfg.get("due_prop")
+    due = (args.due or "").strip()
+    if due_prop and due:
+        props[due_prop] = {"date": {"start": due}}
+    body: dict[str, Any] = {
+        "parent": {"database_id": cfg["database_id"]},
+        "properties": props,
+    }
+    note = (args.note or "").strip()
+    if note:
+        body["children"] = [
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"type": "text", "text": {"content": note[:1900]}}]
+                },
+            }
+        ]
+    page = _req("POST", "/pages", body)
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "lane": args.lane,
+                "page_id": page.get("id"),
+                "url": page.get("url"),
+                "title": title,
+                "status": initial,
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
+def cmd_archive_page(args: argparse.Namespace) -> int:
+    page_id = _normalize_page_id(args.page_id)
+    if not page_id:
+        print("ERROR: --page-id が必要", file=sys.stderr)
+        return 2
+    page = _req("PATCH", f"/pages/{page_id}", {"archived": True})
+    print(
+        json.dumps(
+            {"ok": True, "page_id": page_id, "archived": True, "url": page.get("url")},
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 
@@ -382,6 +539,32 @@ def main() -> int:
     s.add_argument("--page-id", required=True)
     s.add_argument("--lane", required=True)
     s.add_argument("--status", required=True)
+    s.add_argument(
+        "--allow-no-comment",
+        action="store_true",
+        help="完了系でもコメント無し（通常は complete-task）",
+    )
+
+    s = sub.add_parser("comment", help="ページにコメント")
+    s.add_argument("--page-id", required=True)
+    s.add_argument("--comment", required=True)
+
+    s = sub.add_parser("complete-task", help="定型コメントのあと完了（コメント必須）")
+    s.add_argument("--lane", required=True)
+    s.add_argument("--page-id", required=True)
+    s.add_argument("--comment", required=True, help="先頭は「タスク完了したよ」")
+    s.add_argument("--status", default="", help="省略時は lane の done 先頭")
+    s.add_argument("--who", default="Jarvis", help="定型に付ける名義")
+
+    s = sub.add_parser("create-task", help="レーン看板にタスク新規")
+    s.add_argument("--lane", required=True)
+    s.add_argument("--title", required=True)
+    s.add_argument("--status", default="", help="省略時は lane の initial_status")
+    s.add_argument("--due", default="", help="YYYY-MM-DD（due_prop があるレーンのみ）")
+    s.add_argument("--note", default="", help="本文1段落")
+
+    s = sub.add_parser("archive-page", help="ページをアーカイブ（削除に近い整理）")
+    s.add_argument("--page-id", required=True)
 
     s = sub.add_parser("get-page", help="ページメタ＋直下ブロック一覧（家族コーチ棚卸し用）")
     s.add_argument("--page-id", default="", help="省略時は FAMILY page id / yaml")
@@ -399,6 +582,14 @@ def main() -> int:
         return cmd_lane(args)
     if args.cmd == "update-status":
         return cmd_update_status(args)
+    if args.cmd == "comment":
+        return cmd_comment(args)
+    if args.cmd == "complete-task":
+        return cmd_complete_task(args)
+    if args.cmd == "create-task":
+        return cmd_create_task(args)
+    if args.cmd == "archive-page":
+        return cmd_archive_page(args)
     if args.cmd == "get-page":
         return cmd_get_page(args)
     if args.cmd == "family-probe":

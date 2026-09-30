@@ -24,7 +24,7 @@ export default async function PartnerPage({
     active: "/partner",
     view,
     subtitle:
-      "初稿は OneDrive「5.やり取り.md」の直近を踏まえて夜間に用意。見直し（こう直して）はいまの下書き＋指示のみで、やり取りは再読しません。",
+      "未返信インボックス（件名・相手・チャネル）。夜間は判定・下書きなし。処置は Gmail → パートナー確認。",
     searchParams: Promise.resolve(sp),
   });
 }

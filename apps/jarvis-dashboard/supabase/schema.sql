@@ -549,6 +549,16 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260816_kurashift_job_watch_autopass_learn.sql）
 -- kurashift_re_vendors, kurashift_re_deal_events（業者開拓投影・案件イベント）
 -- （migrations/20260823_kurashift_re_vendors_events.sql）
+-- kurashift_re_vendors.alive_* / kurashift_re_mgmt_vendors / kurashift_re_repair_vendors
+-- （migrations/20260826_kurashift_vendor_alive_mgmt_repair.sql）
+-- kurashift_re_mgmt_vendors.property_lane / vacancy_listing_ok / precheck_sent_at
+-- （migrations/20260827_kurashift_mgmt_precheck_lanes.sql）
+-- kurashift_re_deal_field_values（物件調査シート・返信抽出 suggested）
+-- （migrations/20260823_kurashift_re_deal_research_fields.sql）
+-- kurashift_re_deals.property_fingerprint（DB 重複マージ・送信ガード）
+-- （migrations/20260825_kurashift_re_deals_property_fingerprint.sql）
+-- 不動産事業 BS/PL 税務正本: kurashift_re_statements / annual_plans / actuals / gl_lines
+-- （migrations/20260830_kurashift_re_statements_plans_gl.sql）
 -- kurashift_loan_tracker_loans
 -- （migrations/20260813_kurashift_loan_tracker.sql）
 -- kurashift_tax_year_metrics（個人暦年／法人5月期の申告結果KPI）
@@ -567,3 +577,37 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260819_kurashift_mq_replace_year_import.sql）
 -- kurashift_household_bs_snapshots（家計B/S 月次）
 -- （migrations/20260819_kurashift_household_bs_snapshots.sql）
+-- kurashift_lenders / kurashift_lender_intel / glucon_material_items
+-- （migrations/20260830_kurashift_lenders_glucon_materials.sql）
+-- kurashift_re_deals / buy_plan_* / loan_tracker_loans / ops_consult_events RLS 有効化
+-- （migrations/20260907_enable_rls_kurashift_eight_tables.sql）
+-- kurashift_openchat_logs（神大家オプチャ知見・修繕相談ログ）
+-- （migrations/20260908_kurashift_openchat_logs.sql）
+-- todoist_webhook_events（Todoist App Webhook 受信ログ）
+-- （migrations/20260922_todoist_webhook_events.sql）
+
+-- Data API 明示 GRANT（2026-10-30 以降の新規テーブル対策。既存も明示して reset 耐性を確保）
+-- 全テーブル分の正本: migrations/20260926_data_api_explicit_grants.sql
+-- コア表（schema.sql 直定義）だけここにも載せる。migration 追加表は各 SQL か一括 migration で GRANT。
+grant select, insert, update, delete on table public.triage_items to authenticated, service_role;
+grant select, insert, update, delete on table public.watch_status to authenticated, service_role;
+grant select, insert, update, delete on table public.cards to authenticated, service_role;
+grant select, insert, update, delete on table public.card_comments to authenticated, service_role;
+grant select, insert, update, delete on table public.lane_action_log to authenticated, service_role;
+grant select, insert, update, delete on table public.metrics to authenticated, service_role;
+grant select, insert, update, delete on table public.sync_meta to authenticated, service_role;
+grant select, insert, update, delete on table public.subscription_services to authenticated, service_role;
+grant select, insert, update, delete on table public.watch_comments to authenticated, service_role;
+grant select, insert, update, delete on table public.property_units to authenticated, service_role;
+grant select, insert, update, delete on table public.property_occupancy_events to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_snore_daily to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_treatment_events to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_daily to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_journal_daily to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_context_notes to authenticated, service_role;
+grant select, insert, update, delete on table public.vital_quiet_reviews to authenticated, service_role;
+grant select, insert, update, delete on table public.glucon_schedule to authenticated, service_role;
+grant select, insert, update, delete on table public.glucon_journal_days to authenticated, service_role;
+grant select, insert, update, delete on table public.glucon_report_drafts to authenticated, service_role;
+grant select, insert, update, delete on table public.glucon_carry_memos to authenticated, service_role;
+grant usage, select on all sequences in schema public to authenticated, service_role;

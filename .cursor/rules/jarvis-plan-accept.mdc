@@ -1,0 +1,87 @@
+---
+description: plan実装の閉じ方（受け入れ・残り棚・完了コメント）
+alwaysApply: true
+---
+
+# plan / 実装の閉じ方（受け入れ）
+
+## 方針
+
+「コードがある」だけでは完了にしない。松野の **意図OK**（T）または Jarvis とホークの揃った判断（L）まで未閉じ。
+
+**タスク正本は Todoist。** 会話・実装で完了相当と判断したら、先に **オーナー確認** へ入れその旨を伝え、松野了承後にだけ完了（詳細: `jarvis-todoist-owner-confirm.mdc`）。FRIDAY も同じ。
+
+## 設計ゲート（新機能・自動化の着手前）
+
+AI の初手は **完全自動化ではない**。確認対象の絞り込みと、検証可能なログを先に置く。  
+plan 作成・新自動化・レーン追加の着手前に、次の **4点を各1行以上** 書く（欠けたらコードより先に埋める）。
+
+| # | 柱 | 書くこと（例） |
+|---|---|---|
+| 1 | **入口データ** | 何を読むか（inbox／Gmail／YAML／state／Drive） |
+| 2 | **確認点** | 誰が何を了承するか（outbound／オーナー確認／意図OK／提案のみ） |
+| 3 | **変更履歴** | どこに残すか（`5.やり取り.md`／Todoist コメント／git／処置ログ） |
+| 4 | **停止条件** | いつ止めるか（`disabled`／probe NG／同意なし／競合・二重課金リスク） |
+
+報告・plan への書き方例:
+
+```
+入口: …
+確認: …
+履歴: …
+停止: …
+```
+
+**やらない**: 4点が無いまま「とりあえず自動送信／自動完了／無確認 apply」。  
+関連ルール: `jarvis-outbound-confirm` · `jarvis-todoist-owner-confirm` · `jarvis-integration-fail-self-check`  
+原則メモ: Obsidian `03_Literature Note(まとめノート)/仕事術・AI連携/20260921_AI導入_入口確認履歴停止の4点.md`
+
+## 実装報告の直前（必須）
+
+1. **受け入れ条件**を1〜3行（どの画面で何ができれば意図OKか）
+2. 今回やらなかったことは [`docs/残り棚_アプリ受け入れ_20260830.md`](docs/残り棚_アプリ受け入れ_20260830.md) に **L-id** を切る（閉じた plan.md にだけ残さない）
+3. 松野に **意図OK / 変更要望** を聞く（勝手に完了しない）
+4. 該当 Todoist があれば **オーナー確認** へ移し、報告ブロックを出す
+
+確認シナリオ正本: [`docs/連動確認チェックリスト_20260830.md`](docs/連動確認チェックリスト_20260830.md)
+
+## 完了（Todoist 本線）
+
+コメント無しの完了は禁止。定型先頭は必ず **「タスク完了したよ」**。
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status \
+  --task-id … --lane ai_raimo --status オーナー確認
+# 松野了承後
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py complete-task \
+  --lane ai_raimo --task-id … \
+  --comment 'タスク完了したよ（Jarvis・松野意図OK・T-03）'
+```
+
+| 種類 | 閉じてよいとき |
+|---|---|
+| T-xx | 松野が意図OK（＋オーナー確認了承） |
+| L-xx | Jarvis とホークの両方（＋オーナー確認了承） |
+| 捨て | 松野が捨てと言った（コメントに「捨て」） |
+
+完了後は看板から消える（チェック完了／`complete-task`。Board「完了」列は使わない）。戻す依頼なら進行中へ（完了コメントは残す）。
+
+### Notion 戻し用（`JARVIS_TASK_BACKEND=notion` のときのみ）
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_notion_api.py complete-task \
+  --lane ai_raimo --page-id … \
+  --comment 'タスク完了したよ（Jarvis・松野意図OK・T-03）'
+```
+
+## WIP
+
+Wave 1（T-01〜T-05）が未閉じのあいだ、新規アプリ機能は原則増やさず棚へ。
+
+## やらないこと
+
+- 「実装したのでタスク完了」
+- オーナー確認なしの close（明示例外以外）
+- `update-status --status 完了`（**完了列は廃止**。終わるときは `complete-task`）
+- ホークに plan 全読を課す（要約は outbox）

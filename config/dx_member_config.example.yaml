@@ -1,0 +1,40 @@
+# 東海DX互助会 AI社員組織 設定ファイル (config/dx_member_config.yaml)
+# 本ファイルをコピーして config/dx_member_config.yaml を作成し、
+# あなた自身の不動産投資基準に合わせて編集してください。
+
+owner:
+  name: "山田 太郎"
+  company: "合同会社山田エステート"
+  email: "yamada.realestate@gmail.com"
+  phone: "090-0000-0000"
+
+strategy:
+  target_area: "愛知県一宮市、稲沢市、清須市周辺"
+  
+  # 【神大家 STEP3連動 買い進めプラン 3大選択肢】
+  # 1. "築古戸建て" (200〜600万円 / 利回り15〜20%以上 / 土地値70%以上 / 現金・手堅いCF)
+  # 2. "築古アパート" (1,500〜4,000万円 / 利回り11〜15%前後 / 土地値60〜70%以上 / 地銀・信金・信販)
+  # 3. "新築アパート" (6,000万〜1.5億円 / 利回り7.0〜8.5%前後 / 土地値12〜15%以上 / フルローン規模拡大)
+  buy_plan_type: "築古戸建て"
+  
+  target_asset_types: "木造築古戸建（平屋・2階建て）"
+  target_price_max_man: 500
+  target_min_yield_pct: 15.0
+  target_min_rent_yen: 50000
+  parking_requirement: "駐車場1台以上（2台以上推奨）"
+  land_ratio_target_pct: 70
+  financing_strategy: "現金購入またはリフォームローン"
+
+  # 【物件調査対象ポータルサイトの指定】
+  # 楽待、健美家、LIFULL HOME'S、アットホームが有力基本セットです。
+  portal_sites:
+    - "楽待"
+    - "健美家"
+    - "LIFULL HOME'S"
+    - "アットホーム"
+  # 追加で確認してほしいサイト（地場ポータル、不動産連合隊など）があれば記載
+  additional_portal_sites: ""
+
+grok_bot:
+  cdp_port: 9222
+  default_section: "不動産賃貸"

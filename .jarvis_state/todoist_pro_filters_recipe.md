@@ -1,0 +1,82 @@
+# 設定完了 2026-09-22（マイフィルター追加済）／物件別 2026-09-23
+
+# Pro Filter 追加レシピ（admin UI・2026-09-22）
+
+## 重要（スクショ確認）
+
+| 場所 | 枠 | 使い方 |
+|---|---|---|
+| **リビングサポート松 のフィルター** | **使用中 3/3**（チーム／無料枠） | 既存の 要連携／パッと／SecondBrain を維持。**ここに増やせない** |
+| **マイ フィルター** | Pro 個人（最大150） | **要ホーク・物件別等の追加はここ** |
+
+→ 「マイフィルターを追加する」理解で **正しい**。
+
+## 既存3本（チーム側・維持）
+
+| Filter | クエリ |
+|---|---|
+| 要連携 | `@要Jarvis連携 \| @要ボス` |
+| SecondBrain | `@SecondBrain` |
+| パッと | `@quick` |
+
+## マイフィルター（横断・進捗）
+
+| Filter名 | クエリ（そのまま貼る） | 用途 | 状態 |
+|---|---|---|---|
+| **要ホーク** | `@要ホーク` | ホーク判断待ち | 追加済 |
+| **相手待ち** | `/相手待ち` | 全PJの「相手待ち」列を横断 | 追加済 |
+| **オーナー確認** | `/オーナー確認` | 全PJの「オーナー確認」列を横断 | 追加済 2026-09-22 |
+| **進行中** | `/進行中` | 全PJの「進行中」列（日付の有無は問わない） | 正（2026-09-23） |
+
+※ 旧「進行中・日付なし」（`/進行中 & no date`）は日付を付けると消えるので廃止。残 Filter は 2026-09-23 削除済。
+
+## マイフィルター（所有物件・物件別ボード）— 2026-09-23 追加済
+
+Notion の「物件行 × 進捗列」は Todoist Board に無い。代替は **物件ラベル Filter を Board 表示**（列＝既存セクション＝進捗のまま）。
+
+| Filter名 | クエリ | id | 相当する Notion 行 |
+|---|---|---|---|
+| **物件・GrandoleI** | `#所有物件 & @GrandoleI` | `2374019950` | 02_Grandole志賀本通I |
+| **物件・GrandoleII** | `#所有物件 & @GrandoleII` | `2374019951` | 01_Grandole志賀本通II |
+| **物件・キャラメル** | `#所有物件 & @キャラメル` | `2374019952` | 03_キャラメル |
+| **物件・ラベルなし** | `#所有物件 & !@GrandoleI & !@GrandoleII & !@キャラメル` | `2374019953` | 物件名なし |
+
+### Board の開き方（admin UI・1回）
+
+1. 左サイドバー **フィルター** → **マイフィルター** → 例: `物件・GrandoleI`
+2. 右上の表示（View）→ **ボード**
+3. 列は既存どおり: 未着手 / 進行中 / 相手待ち / HOLD / オーナー確認
+4. 他物件も同様（Filter を切り替える＝Notion の行を切り替えるイメージ）
+
+※ セクション（進捗列）は変えない。物件はラベル `@GrandoleI` 等のまま。
+
+### よくある失敗
+
+| NG | OK | 理由 |
+|---|---|---|
+| `セクション: 相手待ち` | `/相手待ち` | セクションは **先頭スラッシュ**（公式: `/支払い`） |
+| `ラベル: 相手待ち` / `ラベル: オーナー確認` | （使わない） | Board列＝セクション。進捗用ラベルは作らない |
+| セクションを物件名にする | 物件は `@GrandoleI` 等 | 進捗ワークフローと Jarvis `update-status` が壊れる |
+
+特定PJだけ見る例: `#所有物件 & /相手待ち` / `#アプリ開発 & /オーナー確認`
+
+朝レビュー順案: 要連携 → 要ホーク → SecondBrain → パッと → 相手待ち → **オーナー確認** → 物件別（必要時）→ その他
+
+## API メモ（2026-09-23）
+
+- REST `/filters` は 404／410。**Sync `filter_add` / `filter_update` / `filter_delete`** でマイフィルター操作可（admin `TODOIST_API_TOKEN_OWNER`）
+- CLI（OWNER）:
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py filter-list
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py filter-add --name '例' --query '@quick'
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py filter-update --filter-id … --query '/進行中'
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py filter-delete --filter-id …
+```
+
+- 物件4本はこの経路で作成済み
+
+## Team Setup Guide
+
+学習用。不要ならアーカイブ可。

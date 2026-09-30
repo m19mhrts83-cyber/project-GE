@@ -36,7 +36,8 @@ def load_map() -> dict[str, Any]:
 
 
 def resolve_csv(year: int) -> Path:
-    p = DEFAULT_CSV / f"{year}年度" / f"Zaim.{year}年度.csv"
+    base = Path(os.environ.get("ZAIM_CSV_BASE_DIR") or DEFAULT_CSV).expanduser()
+    p = base / f"{year}年度" / f"Zaim.{year}年度.csv"
     return p
 
 

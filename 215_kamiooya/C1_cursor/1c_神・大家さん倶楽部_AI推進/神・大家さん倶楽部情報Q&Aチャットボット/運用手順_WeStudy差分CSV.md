@@ -206,6 +206,7 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 | `No module named 'requests'` 等 | `requirements-ci.txt` と workflow Install を確認 → push 後に再実行 |
 | WeStudy ログイン失敗 | Secrets `WESTUDY_USER` / `WESTUDY_PASS` |
 | Raimo 取込失敗 | Artifact の `raimo_import_ng_*.png` とログ。Secrets `RAIMO_*` |
+| `Page.screenshot: Target crashed` / `Page crashed`（Raimo） | WeStudy ログイン失敗ではない。巨大 CSV をミニアプリが `file.text()` で載せたあとに Chromium が落ちる。CI は CSV 分割（`RAIMO_IMPORT_CHUNK_ROWS`）・スクショなし・最新化スキップ。ログに `Raimo取込完了` があれば Q&A（Supabase）は済んでいる |
 | 再実行 | `gh workflow run westudy-raimo-weekly.yml -f force_scrape=true` |
 
 Gmail の「Fail」はワークフロー内メールではなく **GitHub Actions 失敗通知**であることが多い。

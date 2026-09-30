@@ -36,6 +36,24 @@ NOT_APPLICABLE_TITLE_SUBSTR = (
     "E2E-GROK-KURASHIFT",
     "approved A'",
     "approved A’",
+    # 神大家運営・購入相談（仲介第一問合せの対象外 · 2026-09-20 誤送信教訓）
+    "オレンジフォーム",
+    "戸建て購入",
+    "購入相談",
+    "運営相談",
+    "運営事務局",
+)
+
+# 神大家運営・事務局（仲介ではない）。agent_email 解決・送信で絶対に使わない
+KAMIOOYA_OPS_DOMAINS = (
+    "ooya.academy",
+    "sakulife.org",
+    "orange-cloud7.com",
+)
+KAMIOOYA_OPS_LOCAL_HINTS = (
+    "kami.ooyasan",
+    "kami-ooyasan",
+    "kamiooyasan",
 )
 
 GROK_HANDOFF_SUBJECT_PREFIX = "[KURASHIFT問合せ依頼]"
@@ -52,7 +70,7 @@ def parse_email_addr(raw: str | None) -> str:
 
 def self_emails_extra() -> list[str]:
     out: list[str] = []
-    for k in ("PERSONAL_EMAIL", "INQUIRY_GROK_HANDOFF_TO"):
+    for k in ("PERSONAL_EMAIL", "COMPANY_EMAIL", "INQUIRY_GROK_HANDOFF_TO"):
         v = (os.environ.get(k) or "").strip().lower()
         if v:
             out.append(v)
@@ -86,6 +104,17 @@ def is_portal_or_noreply(email: str) -> bool:
     ):
         return True
     return any(domain == d or domain.endswith(f".{d}") for d in PORTAL_DOMAIN_HINTS)
+
+
+def is_kamiooya_ops_email(email: str) -> bool:
+    """神大家運営・事務局アドレスか（第一問合せの仲介宛にしてはいけない）。"""
+    addr = parse_email_addr(email) or (email or "").strip().lower()
+    if "@" not in addr:
+        return False
+    local, _, domain = addr.partition("@")
+    if any(domain == d or domain.endswith(f".{d}") for d in KAMIOOYA_OPS_DOMAINS):
+        return True
+    return any(h in local for h in KAMIOOYA_OPS_LOCAL_HINTS)
 
 
 def handoff_to() -> str:
@@ -126,6 +155,19 @@ def sj_of(deal: dict[str, Any]) -> dict[str, Any]:
     return dict(sj) if isinstance(sj, dict) else {}
 
 
+def _usable_agent_email(addr: str, extra: list[str] | None) -> bool:
+    """自己・ポータル・神大家運営以外なら True。"""
+    if not addr or "@" not in addr:
+        return False
+    if is_self_email(addr, extra):
+        return False
+    if is_portal_or_noreply(addr):
+        return False
+    if is_kamiooya_ops_email(addr):
+        return False
+    return True
+
+
 def resolve_agent_to(
     deal: dict[str, Any], *, explicit_to: str | None = None
 ) -> tuple[str, str]:
@@ -133,25 +175,23 @@ def resolve_agent_to(
     sj = sj_of(deal)
 
     explicit = (explicit_to or "").strip()
-    if "@" in explicit and not is_self_email(explicit, extra) and not is_portal_or_noreply(
-        explicit
-    ):
+    if "@" in explicit and _usable_agent_email(explicit, extra):
         return parse_email_addr(explicit) or explicit, "explicit"
 
+    contact_email = parse_email_addr(str(sj.get("contact_email") or ""))
+    if contact_email and _usable_agent_email(contact_email, extra):
+        return contact_email, "contact_email"
+
     reply_to = parse_email_addr(str(sj.get("reply_to") or ""))
-    if reply_to and not is_self_email(reply_to, extra) and not is_portal_or_noreply(
-        reply_to
-    ):
+    if reply_to and _usable_agent_email(reply_to, extra):
         return reply_to, "reply_to"
 
     from_addr = parse_email_addr(str(sj.get("from") or ""))
-    if from_addr and not is_self_email(from_addr, extra) and not is_portal_or_noreply(
-        from_addr
-    ):
+    if from_addr and _usable_agent_email(from_addr, extra):
         return from_addr, "from"
 
     v_em = vendor_contact_email(str(sj.get("vendor_id") or "") or None)
-    if v_em and not is_self_email(v_em, extra) and not is_portal_or_noreply(v_em):
+    if v_em and _usable_agent_email(v_em, extra):
         return parse_email_addr(v_em) or v_em, "vendor_list"
 
     return "", "none"
@@ -162,28 +202,83 @@ def is_not_applicable(deal: dict[str, Any]) -> bool:
     for s in NOT_APPLICABLE_TITLE_SUBSTR:
         if s in title:
             return True
+    # Grok調査でも掲載URLがあれば listing_web（classify 側）。URL無しのみ対象外。
+    if is_grok_research(deal) and not resolve_listing_url(deal):
+        return True
+    return False
+
+
+def is_grok_research(deal: dict[str, Any]) -> bool:
+    title = str(deal.get("title") or "")
+    for s in NOT_APPLICABLE_TITLE_SUBSTR:
+        if s in title:
+            return False
     source = str(deal.get("source") or "").strip()
     if source == "mail_grok":
         return True
+    if "[Grok調査]" in title or "Grok調査" in title:
+        return True
     sj = sj_of(deal)
     account = str(sj.get("account") or "")
-    if account == "mail_grok" and source not in ("mail_admin", "mail_estate"):
+    return account == "mail_grok" and source not in ("mail_admin", "mail_estate")
+
+
+def resolve_listing_url(deal: dict[str, Any]) -> str:
+    sj = sj_of(deal)
+    grok = sj.get("grok") if isinstance(sj.get("grok"), dict) else {}
+    for v in (sj.get("listing_url"), sj.get("url"), grok.get("url") if isinstance(grok, dict) else None):
+        s = str(v or "").strip()
+        if s.startswith("http://") or s.startswith("https://"):
+            return s
+    return ""
+
+
+def is_kamiooya_intro_form(deal: dict[str, Any]) -> bool:
+    sj = sj_of(deal)
+    if sj.get("kamiooya_intro") is True:
         return True
-    return False
+    url = str(sj.get("interest_form_url") or "").strip()
+    if url:
+        return True
+    title = str(deal.get("title") or "")
+    return "【神大家】" in title and "物件紹介" in title
 
 
 def classify_inquiry_channel(
     deal: dict[str, Any], *, explicit_to: str | None = None
 ) -> dict[str, str]:
-    if is_not_applicable(deal):
+    title = str(deal.get("title") or "")
+    for s in NOT_APPLICABLE_TITLE_SUBSTR:
+        if s in title:
+            return {
+                "channel": "not_applicable",
+                "to": "",
+                "reason": "vendor_outreach_or_fixture_memo",
+            }
+    if is_kamiooya_intro_form(deal):
+        sj = sj_of(deal)
+        form_url = str(sj.get("interest_form_url") or "").strip()
         return {
-            "channel": "not_applicable",
-            "to": "",
-            "reason": "grok_report_or_vendor_outreach_memo",
+            "channel": "kamiooya_form",
+            "to": form_url,
+            "reason": "interest_form_url" if form_url else "kamiooya_intro_subject",
         }
     to, src = resolve_agent_to(deal, explicit_to=explicit_to)
     if to:
         return {"channel": "agent_email", "to": to, "reason": f"to_from_{src}"}
+    listing = resolve_listing_url(deal)
+    if is_grok_research(deal) and listing:
+        return {
+            "channel": "listing_web",
+            "to": listing,
+            "reason": "grok_research_with_listing_url",
+        }
+    if is_not_applicable(deal):
+        return {
+            "channel": "not_applicable",
+            "to": "",
+            "reason": "grok_report_without_listing_url",
+        }
     return {
         "channel": "grok_handoff",
         "to": handoff_to(),

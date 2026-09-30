@@ -76,6 +76,9 @@ def client():
 
 
 def fetch_pending_other(sb) -> list[dict[str, Any]]:
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_kurashift_re_inquiry_channel import is_self_email
+
     r = (
         sb.table("triage_items")
         .select(
@@ -89,7 +92,43 @@ def fetch_pending_other(sb) -> list[dict[str, Any]]:
         .limit(100)
         .execute()
     )
-    return list(r.data or [])
+    # 自分発信は「その他メール」対象外（表示・要約とも）
+    return [
+        row
+        for row in (r.data or [])
+        if not is_self_email(row.get("from_email") or "")
+    ]
+
+
+def skip_self_sent_pending(sb, *, dry_run: bool = False) -> int:
+    """pending の自アドレス差出を skipped にする（既存ゴミ掃除）。"""
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_kurashift_re_inquiry_channel import is_self_email
+
+    r = (
+        sb.table("triage_items")
+        .select("id,from_email,lane,kind,status")
+        .eq("status", "pending")
+        .neq("lane", "partner")
+        .neq("kind", "activity")
+        .limit(200)
+        .execute()
+    )
+    n = 0
+    for row in r.data or []:
+        if not is_self_email(row.get("from_email") or ""):
+            continue
+        n += 1
+        if dry_run:
+            continue
+        sb.table("triage_items").update(
+            {
+                "status": "skipped",
+                "updated_at": now_iso(),
+                "summary": "自送信のためスキップ",
+            }
+        ).eq("id", row["id"]).execute()
+    return n
 
 
 def reclassify_pending_kinds(sb, *, dry_run: bool = False) -> dict[str, int]:
@@ -377,9 +416,16 @@ def push_digest(sb, digest: dict[str, Any]) -> None:
 
 
 def build_and_maybe_push(
-    *, do_push: bool, use_llm: bool, reclassify: bool = False
+    *, do_push: bool, use_llm: bool, reclassify: bool = False, skip_self: bool = True
 ) -> dict[str, Any]:
     sb = client()
+    if skip_self:
+        n_self = skip_self_sent_pending(sb, dry_run=not do_push)
+        if n_self:
+            print(
+                f"# skip self-sent pending={n_self} dry={not do_push}",
+                file=sys.stderr,
+            )
     if reclassify:
         counts = reclassify_pending_kinds(sb, dry_run=not do_push)
         print(f"# reclassify kinds={counts}", file=sys.stderr)
@@ -420,9 +466,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="pending を mail/skim に再分類してから digest",
     )
+    ap.add_argument(
+        "--no-skip-self",
+        action="store_true",
+        help="自送信 pending の skipped 化をしない",
+    )
     args = ap.parse_args(argv)
     digest = build_and_maybe_push(
-        do_push=args.push, use_llm=not args.no_llm, reclassify=args.reclassify
+        do_push=args.push,
+        use_llm=not args.no_llm,
+        reclassify=args.reclassify,
+        skip_self=not args.no_skip_self,
     )
     print(json.dumps(digest, ensure_ascii=False))
     return 0

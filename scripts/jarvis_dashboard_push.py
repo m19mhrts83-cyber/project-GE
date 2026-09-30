@@ -78,6 +78,16 @@ def refresh_watch() -> None:
     subprocess.run([exe, str(WATCH_SCRIPT)], cwd=str(REPO), check=False, timeout=60)
 
 
+def _clean_nul(val: Any) -> Any:
+    if isinstance(val, str):
+        return val.replace("\x00", "")
+    if isinstance(val, dict):
+        return {k: _clean_nul(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_clean_nul(x) for x in val]
+    return val
+
+
 def push_triage(sb) -> int:
     if not QUEUE_PATH.is_file():
         print("# triage: queue.json なし", file=sys.stderr)
@@ -139,28 +149,30 @@ def push_triage(sb) -> int:
         if remote_payload.get("web_draft_saved_at") and remote.get("draft_text"):
             draft_text = remote.get("draft_text")
         rows.append(
-            {
-                "id": iid,
-                "lane": it.get("lane") or "partner",
-                "kind": it.get("kind") or "mail",
-                "status": st,
-                "partner": it.get("partner") or None,
-                "folder": it.get("folder") or None,
-                "subject": it.get("subject") or None,
-                "received_at": it.get("received_at") or None,
-                "summary": it.get("summary") or None,
-                "draft_text": draft_text,
-                "original_body": (str(it.get("original_body") or ""))[:8000] or None,
-                "priority": it.get("priority") or None,
-                "channel": it.get("channel") or None,
-                "account": it.get("account") or None,
-                "gmail_thread_id": it.get("gmail_thread_id") or None,
-                "gmail_message_id": it.get("gmail_message_id") or None,
-                "from_email": it.get("from_email") or None,
-                "seq": it.get("seq"),
-                "payload": payload,
-                "updated_at": it.get("updated_at") or now_iso(),
-            }
+            _clean_nul(
+                {
+                    "id": iid,
+                    "lane": it.get("lane") or "partner",
+                    "kind": it.get("kind") or "mail",
+                    "status": st,
+                    "partner": it.get("partner") or None,
+                    "folder": it.get("folder") or None,
+                    "subject": it.get("subject") or None,
+                    "received_at": it.get("received_at") or None,
+                    "summary": it.get("summary") or None,
+                    "draft_text": draft_text,
+                    "original_body": (str(it.get("original_body") or ""))[:8000] or None,
+                    "priority": it.get("priority") or None,
+                    "channel": it.get("channel") or None,
+                    "account": it.get("account") or None,
+                    "gmail_thread_id": it.get("gmail_thread_id") or None,
+                    "gmail_message_id": it.get("gmail_message_id") or None,
+                    "from_email": it.get("from_email") or None,
+                    "seq": it.get("seq"),
+                    "payload": payload,
+                    "updated_at": it.get("updated_at") or now_iso(),
+                }
+            )
         )
     rows = dedupe_rows_by_id(rows, label="triage")
     if not rows:
@@ -210,6 +222,14 @@ def push_watch(sb) -> int:
     for it in items:
         iid = str(it.get("id") or "").strip()
         if not iid:
+            continue
+        # gha:ops_fail_watch のアイテム（gha_workflow_fail 等）は jarvis_ops_fail_watch.py が直接管理するので上書きしない
+        if str(it.get("source") or "").startswith("gha:ops_fail_watch") or iid in (
+            "gha_workflow_fail",
+            "vercel_deploy",
+            "ops_fix_notice",
+            "vercel_deploy_fail",
+        ):
             continue
         payload = it.get("payload") if isinstance(it.get("payload"), dict) else {}
         payload = dict(payload)
@@ -261,8 +281,7 @@ def push_watch(sb) -> int:
                 for f in merged_fixes
                 if isinstance(f, dict)
                 and (
-                    str(f.get("status") or "pending_confirm")
-                    in ("pending_confirm", "disputed")
+                    str(f.get("status") or "pending_confirm") == "pending_confirm"
                 )
                 and not (
                     str(payload.get("dashboard_ack_batch_id") or "")
@@ -323,11 +342,11 @@ def push_watch(sb) -> int:
                 payload["acknowledged_at"] = remote_pl.get("acknowledged_at")
             pending_after = int(payload.get("pending_confirm_count") or 0)
             # 新しい確認待ちがあればピンを再表示。無ければダッシュボード確認を尊重
-            if pending_after > 0:
+            if pending_after > 0 and (not ack or not batch or str(ack) != str(batch)):
                 payload["show_banner"] = True
             elif ack and batch and str(ack) == str(batch):
                 payload["show_banner"] = False
-            elif remote_pl.get("show_banner") is False and pending_after == 0:
+            elif remote_pl.get("show_banner") is False:
                 payload["show_banner"] = False
             try:
                 rb_path = STATE / "zaim_review_batch.json"
@@ -481,6 +500,33 @@ def push_watch(sb) -> int:
             )
         except Exception as e:
             print(f"# user_ack merge skip {iid}: {e}", file=sys.stderr)
+
+        # Web側でキューイングされた cursor_ask / ワーカー状態を Mac push で潰さない
+        for k in ("cursor_ask", "cursor_ops_fix", "mac_recipe"):
+            if k in remote_pl and k not in payload:
+                payload[k] = remote_pl[k]
+
+        # 要フォロー→Todoist 同期が書いた導線・表示学習を Mac push で潰さない
+        for k in (
+            "todoist_task_id",
+            "todoist_url",
+            "todoist_synced_at",
+            "todoist_complete_requested",
+            "ack_source",
+            "display_hints",
+        ):
+            if k in remote_pl and k not in payload:
+                payload[k] = remote_pl[k]
+            elif k == "display_hints" and isinstance(remote_pl.get("display_hints"), dict):
+                # ローカル payload に無いキーだけ remote から補完
+                local_dh = payload.get("display_hints")
+                if not isinstance(local_dh, dict):
+                    payload["display_hints"] = dict(remote_pl["display_hints"])
+                else:
+                    for dk, dv in remote_pl["display_hints"].items():
+                        if dk not in local_dh:
+                            local_dh[dk] = dv
+                    payload["display_hints"] = local_dh
 
         st = it.get("status") or "active"
         arch_at = it.get("archived_at")

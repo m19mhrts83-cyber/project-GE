@@ -39,10 +39,30 @@
 		{
 			"name": "240_融資",
 			"path": "../Library/CloudStorage/OneDrive-個人用/240_融資"
+		},
+		{
+			"name": "230_物件調査",
+			"path": "../Library/CloudStorage/OneDrive-個人用/230_物件調査"
 		}
 	],
 	"settings": {
 		"python.defaultInterpreterPath": "/Users/matsunomasaharu2/selenium_env/venv/bin/python",
-		"python.terminal.activateEnvironment": false
+		"python.terminal.activateEnvironment": false,
+		"npm.exclude": [
+			"**/venv/**",
+			"**/.venv/**",
+			"**/site-packages/**",
+			"**/node_modules/**"
+		],
+		"files.watcherExclude": {
+			"**/venv/**": true,
+			"**/.venv/**": true,
+			"**/site-packages/**": true
+		},
+		"search.exclude": {
+			"**/venv": true,
+			"**/.venv": true,
+			"**/site-packages": true
+		}
 	}
 }

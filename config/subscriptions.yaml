@@ -16,24 +16,25 @@ services:
     category: ai
     status: active
     billing: monthly
-    amount_yen: 3239
-    usage_note: "2026-08-22方針: Proへ戻し月額で様子見。困ったらPro+。年額Pro+はNotion年額(9/28)の後。Grok BotはPro不可。SuperGrok Plus連携≈$100はPro+より高い→採用せず、必要ならPro+再上げ。枠は /billing Cursor枠カード（手動--set）"
+    amount_yen: 9600
+    usage_note: "2026-09-06方針: Pro+($60/mo)へ引き上げ。Grok Bot複数自動運用・GitHub Actions稼働のため拡張枠運用。年額固定は手元現金を優先し、冬ボーナス期(12月)に検討。Cursor枠は /billing（手動--set）"
     next_bill: "毎月25日前後（Billingの更新日が正）"
     watch: true
-    watch_reason: "Pro様子見。枠切れ→on-demandかPro+再上げ。年額固定はNotion後"
+    watch_reason: "Pro+稼働。Grok BotおよびOther Models枠の利用状況を注視"
     cancel_candidate: false
     billing_url: "https://www.cursor.com/settings"
 
   - id: notion
     name: Notion Business
     category: ai
-    status: active
+    status: ending
     billing: yearly
     amount_yen: 37800
-    next_bill: "2026-09-28"
+    next_bill: "2026-09-28 Free適用・以降更新なし"
     watch: false
     cancel_candidate: false
-    billing_url: "https://www.notion.so/profile/integrations"
+    billing_url: "https://www.notion.so/"
+    note: "2026-09-19 Freeへダウングレード予約済（請求画面: ビジネス→フリー・2026-09-28）。Business機能は同日まで。期間終了後 status を free に更新。理由: GenSpark運用でNotion AI不要。オーナー1人・1シート確認済"
 
   - id: typeless
     name: Typeless
@@ -53,8 +54,21 @@ services:
     billing: yearly
     amount_yen: 25101
     next_bill: "2027-01-09"
+    watch: true
+    watch_reason: "2027-01更新判断。SecondBrain Note購入済（Plus維持＝シナリオA）。Notion無料化方針。判断シート: Obsidian 20260915_Genspark_SecondBrainNote検討"
+    cancel_candidate: false
+    note: "Plus継続。ハード購入済 2026-09-15・注文 Genspark#3987・SecondBrain Note Grey $179（送料無料・税込表記）。到着目安 2026-09-28〜30。到着後にアプリ紐づけ＋Notion Save確認"
+
+  - id: genspark_secondbrain_note
+    name: Genspark SecondBrain Note（本体）
+    category: ai
+    status: ended
+    billing: none
+    amount_yen: 26850
+    next_bill: "—"
     watch: false
     cancel_candidate: false
+    note: "一括購入済 2026-09-15・注文 Genspark#3987・Grey $179（約¥26,850・送料無料）。配達予定 2026-09-28〜30。再課金なし。確認メール m19m"
 
   - id: chatwork
     name: Chatwork Business

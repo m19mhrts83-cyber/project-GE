@@ -45,4 +45,9 @@ vendors: []
 #   status: discovered|contacted|skip|invalid
 #   notes: ""
 #   source: iタウンページ|Googleマップ
+#   alive_checked_at: ""
+#   alive_status: unknown   # unknown|ok|fail|stale
+#   alive_method: ""        # web|phone|both
+#   alive_note: ""
+#   alive_due_days: 90      # 修繕は90日
 #   updated_at: "2026-08-24"

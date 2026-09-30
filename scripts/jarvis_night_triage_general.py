@@ -11,6 +11,7 @@
    → KURASHIFT（選定〜比較）。非パートナー分は Jarvis general には出さない。
 3. **その他（非パートナー）**
    → Jarvis general。取込時に `kind=mail`（要確認）／`kind=skim`（要約用）へ振り分け。
+   → **Gmail 既読は Dashboard／KURASHIFT 取込時点**（閉じたときではないのが本線）。
 """
 from __future__ import annotations
 
@@ -150,7 +151,7 @@ def mail_routing_bucket(
 def skip_pending_kurashift_property_triage(
     sb: Any,
     *,
-    mark_gmail_read: bool = True,
+    mark_gmail_read: bool = False,
     dry_run: bool = False,
     limit: int = 200,
     contact_yaml: Path | None = None,
@@ -159,6 +160,7 @@ def skip_pending_kurashift_property_triage(
 
     - lane=partner は一切触らない
     - from_email が連絡先一覧のパートナーなら触らない（誤って general に居ても保護）
+    - **既定で Gmail は既読にしない**（KURASHIFT 取込時が本線。除外＝未読残し）
     """
     emails, domains = load_partner_filters(resolve_contact_yaml(contact_yaml))
     resp = (
@@ -359,6 +361,54 @@ def build_admin_gmail_service():
     return service, (email or "admin@livingsupport-matsu.co.jp").lower()
 
 
+def mark_gmail_read_for_items(
+    items: list[dict[str, Any]],
+    *,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """トリアージ取込時の Gmail 既読（本線）。
+
+    gmail_message_id がある行だけ UNREAD を外す。account は admin 系のみ
+    （パートナー取込は gmail_to_yoritoori 側で既読）。冪等。
+    """
+    ok = 0
+    fail = 0
+    skip = 0
+    service = None
+    for it in items:
+        gid = str(it.get("gmail_message_id") or "").strip()
+        if not gid:
+            skip += 1
+            continue
+        account = str(it.get("account") or "admin").strip() or "admin"
+        if account not in ("", "admin", "mail_admin"):
+            skip += 1
+            continue
+        if dry_run:
+            ok += 1
+            continue
+        try:
+            if service is None:
+                service, _ = build_admin_gmail_service()
+            service.users().messages().modify(
+                userId="me",
+                id=gid,
+                body={"removeLabelIds": ["UNREAD"]},
+            ).execute()
+            ok += 1
+            pl = it.get("payload")
+            if isinstance(pl, dict):
+                pl["gmail_read_at"] = datetime.now(timezone.utc).isoformat()
+                pl["gmail_read_on"] = "ingest"
+        except Exception as e:
+            fail += 1
+            print(
+                f"# mark-read-on-ingest fail id={it.get('id')} gid={gid[:12]}: {e}",
+                file=sys.stderr,
+            )
+    return {"ok": ok, "fail": fail, "skip": skip, "dry_run": int(dry_run)}
+
+
 def _header_map(payload: dict) -> dict[str, str]:
     out: dict[str, str] = {}
     for h in payload.get("headers") or []:
@@ -410,6 +460,8 @@ def find_general_unreplied(
     max_threads: int = 40,
 ) -> list[dict[str, Any]]:
     """admin INBOX の未返信スレッド（パートナー除外）。"""
+    from jarvis_kurashift_re_inquiry_channel import is_self_email
+
     service, my_email = build_admin_gmail_service()
     emails, domains = load_partner_filters(contact_yaml)
     q = f"in:inbox newer_than:{max(1, lookback_days)}d -category:promotions -category:social"
@@ -447,12 +499,10 @@ def find_general_unreplied(
         dt = _parse_internal_dt(str(last.get("internalDate") or "0"))
         received_at = dt.strftime("%Y/%m/%d %H:%M") if dt else ""
 
-        # 自分が最後に送っている → 未返信ではない
-        if from_email == my_email or from_email.endswith("@livingsupport-matsu.co.jp"):
-            # 自分の送信（admin）で終わっている
-            label_ids = set(last.get("labelIds") or [])
-            if "SENT" in label_ids or from_email == my_email:
-                continue
+        # 自分発信（m19m / admin / estate / 法人ドメイン）→ 要確認対象外
+        # （BCC 控えが INBOX に入っても From が自分なら除外）
+        if is_self_email(from_email) or is_self_email(from_raw):
+            continue
 
         if is_partner_address(from_email, emails, domains):
             # 最優先: 連絡先一覧のパートナーは partner レーン担当（ここでは general に載せない）
@@ -473,7 +523,7 @@ def find_general_unreplied(
             p = m.get("payload") or {}
             h = _header_map(p)
             fr = parseaddr(h.get("from", ""))[1].lower()
-            inbound = fr != my_email and not fr.endswith("@livingsupport-matsu.co.jp")
+            inbound = not is_self_email(fr)
             ctx.append(
                 {
                     "received_at": (

@@ -148,6 +148,42 @@ export function buildInquiryPreviewFromTemplate(
     };
   }
 
+  if (classified.channel === "kamiooya_form") {
+    const formUrl =
+      typeof sj.interest_form_url === "string"
+        ? sj.interest_form_url.trim()
+        : classified.to || "";
+    return {
+      to: formUrl,
+      subject: "神大家物件紹介フォーム",
+      body: [
+        "この案件はメール返信ではなく、紹介メール末尾の規定フォームで詳細請求します。",
+        formUrl ? `フォーム: ${formUrl}` : "フォームURL未取得（元メール末尾を確認）",
+        `物件名（フォーム記入用）: ${title}`,
+      ].join("\n"),
+      land_method: landMethod,
+      land_method_bairitsu: bairitsu,
+      inquiry_channel: "kamiooya_form",
+      channel_reason: classified.reason,
+      interest_form_url: formUrl || null,
+      property_label: title,
+    } as ReturnType<typeof buildInquiryPreviewFromTemplate>;
+  }
+
+  if (classified.channel === "listing_web") {
+    const listingUrl = classified.to || "";
+    return {
+      to: listingUrl,
+      subject: agentSubject,
+      body: agentBody,
+      land_method: landMethod,
+      land_method_bairitsu: bairitsu,
+      inquiry_channel: "listing_web",
+      channel_reason: classified.reason,
+      listing_url: listingUrl || null,
+    } as ReturnType<typeof buildInquiryPreviewFromTemplate>;
+  }
+
   if (classified.channel === "agent_email") {
     return {
       to: classified.to,
@@ -218,7 +254,7 @@ export function buildGrokInvestigatePrompt(params: {
     url ? `URL: ${url}` : null,
     params.dealId ? `deal_id: ${params.dealId}` : null,
     "",
-    "（以下は不動産賃貸チーム / 参謀向け。@物件調査 に振って路線価・ハザードを調査）",
+    "（以下は不動産Dailyチーム / 参謀向け。@物件調査 に振って路線価・ハザードを調査）",
     "",
     "【物件調査 — 必須2調査】",
     "",

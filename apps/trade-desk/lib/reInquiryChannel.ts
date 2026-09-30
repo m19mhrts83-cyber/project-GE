@@ -3,7 +3,12 @@
  * クライアントからも import 可（fs 非依存）。vendor contact_email は Python 側で解決。
  */
 
-export type InquiryChannel = "agent_email" | "grok_handoff" | "not_applicable";
+export type InquiryChannel =
+  | "agent_email"
+  | "grok_handoff"
+  | "kamiooya_form"
+  | "listing_web"
+  | "not_applicable";
 
 export type InquiryChannelResult = {
   channel: InquiryChannel;
@@ -37,6 +42,24 @@ const NOT_APPLICABLE_TITLE_SUBSTR = [
   "E2E-GROK-KURASHIFT",
   "approved A'",
   "approved A’",
+  // 神大家運営・購入相談（仲介第一問合せの対象外 · 2026-09-20 誤送信教訓）
+  "オレンジフォーム",
+  "戸建て購入",
+  "購入相談",
+  "運営相談",
+  "運営事務局",
+];
+
+/** 神大家運営・事務局（仲介ではない） */
+const KAMIOOYA_OPS_DOMAINS = [
+  "ooya.academy",
+  "sakulife.org",
+  "orange-cloud7.com",
+];
+const KAMIOOYA_OPS_LOCAL_HINTS = [
+  "kami.ooyasan",
+  "kami-ooyasan",
+  "kamiooyasan",
 ];
 
 export const GROK_HANDOFF_SUBJECT_PREFIX = "[KURASHIFT問合せ依頼]";
@@ -50,7 +73,7 @@ export function parseEmailAddr(raw: string | null | undefined): string {
 export function selfEmailsExtraFromEnv(): string[] {
   const out: string[] = [];
   if (typeof process === "undefined" || !process.env) return out;
-  for (const k of ["PERSONAL_EMAIL", "INQUIRY_GROK_HANDOFF_TO"]) {
+  for (const k of ["PERSONAL_EMAIL", "COMPANY_EMAIL", "INQUIRY_GROK_HANDOFF_TO"]) {
     const v = (process.env[k] || "").trim();
     if (v) out.push(v.toLowerCase());
   }
@@ -89,6 +112,28 @@ export function isPortalOrNoreplyEmail(email: string): boolean {
   );
 }
 
+/** 神大家運営・事務局アドレスか（第一問合せの仲介宛にしてはいけない） */
+export function isKamiooyaOpsEmail(email: string): boolean {
+  const addr = parseEmailAddr(email) || String(email || "").trim().toLowerCase();
+  if (!addr.includes("@")) return false;
+  const local = addr.split("@")[0] || "";
+  const domain = addr.split("@")[1] || "";
+  if (
+    KAMIOOYA_OPS_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))
+  ) {
+    return true;
+  }
+  return KAMIOOYA_OPS_LOCAL_HINTS.some((h) => local.includes(h));
+}
+
+function usableAgentEmail(email: string, extra?: string[] | null): boolean {
+  if (!email || !email.includes("@")) return false;
+  if (isSelfEmail(email, extra)) return false;
+  if (isPortalOrNoreplyEmail(email)) return false;
+  if (isKamiooyaOpsEmail(email)) return false;
+  return true;
+}
+
 export function handoffToFromEnv(): string {
   if (typeof process === "undefined" || !process.env) {
     return "m19m.hrts83@gmail.com";
@@ -111,7 +156,7 @@ function sjOf(
   return summaryJson && typeof summaryJson === "object" ? summaryJson : {};
 }
 
-/** 仲介宛 To を解決（自己・ポータルはスキップして次へ） */
+/** 仲介宛 To を解決（自己・ポータル・神大家運営はスキップして次へ） */
 export function resolveAgentToEmail(params: {
   summaryJson?: Record<string, unknown> | null;
   explicitTo?: string | null;
@@ -121,21 +166,26 @@ export function resolveAgentToEmail(params: {
   const sj = sjOf(params.summaryJson);
 
   const explicit = String(params.explicitTo || "").trim();
-  if (explicit.includes("@") && !isSelfEmail(explicit, extra)) {
-    if (!isPortalOrNoreplyEmail(explicit)) {
-      return { to: parseEmailAddr(explicit) || explicit, source: "explicit" };
-    }
+  if (explicit.includes("@") && usableAgentEmail(explicit, extra)) {
+    return { to: parseEmailAddr(explicit) || explicit, source: "explicit" };
+  }
+
+  const contactEmail = parseEmailAddr(
+    typeof sj.contact_email === "string" ? sj.contact_email : undefined
+  );
+  if (contactEmail && usableAgentEmail(contactEmail, extra)) {
+    return { to: contactEmail, source: "contact_email" };
   }
 
   const replyTo = parseEmailAddr(
     typeof sj.reply_to === "string" ? sj.reply_to : undefined
   );
-  if (replyTo && !isSelfEmail(replyTo, extra) && !isPortalOrNoreplyEmail(replyTo)) {
+  if (replyTo && usableAgentEmail(replyTo, extra)) {
     return { to: replyTo, source: "reply_to" };
   }
 
   const from = parseEmailAddr(typeof sj.from === "string" ? sj.from : undefined);
-  if (from && !isSelfEmail(from, extra) && !isPortalOrNoreplyEmail(from)) {
+  if (from && usableAgentEmail(from, extra)) {
     return { to: from, source: "from" };
   }
 
@@ -146,11 +196,49 @@ export function resolveAgentToEmail(params: {
         ? String(sj.vendor_id)
         : "";
   const vEmail = vendorContactEmail(vendorId);
-  if (vEmail && !isSelfEmail(vEmail, extra) && !isPortalOrNoreplyEmail(vEmail)) {
+  if (vEmail && usableAgentEmail(vEmail, extra)) {
     return { to: parseEmailAddr(vEmail) || vEmail, source: "vendor_list" };
   }
 
   return { to: "", source: "none" };
+}
+
+export function isGrokResearchDeal(params: {
+  title?: string | null;
+  source?: string | null;
+  summaryJson?: Record<string, unknown> | null;
+}): boolean {
+  const title = String(params.title || "");
+  for (const s of NOT_APPLICABLE_TITLE_SUBSTR) {
+    if (title.includes(s)) return false;
+  }
+  const source = String(params.source || "").trim();
+  if (source === "mail_grok") return true;
+  if (title.includes("[Grok調査]") || title.includes("Grok調査")) return true;
+  const sj = sjOf(params.summaryJson);
+  const account = typeof sj.account === "string" ? sj.account : "";
+  return (
+    account === "mail_grok" &&
+    source !== "mail_admin" &&
+    source !== "mail_estate"
+  );
+}
+
+/** 掲載ページ URL（summary / grok） */
+export function resolveListingUrl(
+  summaryJson?: Record<string, unknown> | null
+): string {
+  const sj = sjOf(summaryJson);
+  const grok =
+    sj.grok && typeof sj.grok === "object"
+      ? (sj.grok as Record<string, unknown>)
+      : null;
+  for (const v of [sj.listing_url, sj.url, grok?.url]) {
+    if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) {
+      return v.trim();
+    }
+  }
+  return "";
 }
 
 export function isNotApplicableDeal(params: {
@@ -162,14 +250,27 @@ export function isNotApplicableDeal(params: {
   for (const s of NOT_APPLICABLE_TITLE_SUBSTR) {
     if (title.includes(s)) return true;
   }
-  const source = String(params.source || "").trim();
-  if (source === "mail_grok") return true;
-  const sj = sjOf(params.summaryJson);
-  const account = typeof sj.account === "string" ? sj.account : "";
-  if (account === "mail_grok" && source !== "mail_admin" && source !== "mail_estate") {
+  // mail_grok でも掲載URLがあれば listing_web（classify 側）。URL無しのみ対象外。
+  if (
+    isGrokResearchDeal(params) &&
+    !resolveListingUrl(params.summaryJson)
+  ) {
     return true;
   }
   return false;
+}
+
+export function isKamiooyaIntroFormDeal(params: {
+  title?: string | null;
+  summaryJson?: Record<string, unknown> | null;
+}): boolean {
+  const sj = sjOf(params.summaryJson);
+  if (sj.kamiooya_intro === true) return true;
+  if (typeof sj.interest_form_url === "string" && sj.interest_form_url.trim()) {
+    return true;
+  }
+  const title = String(params.title || "");
+  return /【神大家】\s*物件紹介/.test(title);
 }
 
 export function classifyInquiryChannel(params: {
@@ -180,17 +281,30 @@ export function classifyInquiryChannel(params: {
   handoffTo?: string | null;
   extraSelf?: string[] | null;
 }): InquiryChannelResult {
+  const title = String(params.title || "");
+  for (const s of NOT_APPLICABLE_TITLE_SUBSTR) {
+    if (title.includes(s)) {
+      return {
+        channel: "not_applicable",
+        to: "",
+        reason: "vendor_outreach_or_fixture_memo",
+      };
+    }
+  }
+
   if (
-    isNotApplicableDeal({
+    isKamiooyaIntroFormDeal({
       title: params.title,
-      source: params.source,
       summaryJson: params.summaryJson,
     })
   ) {
+    const sj = sjOf(params.summaryJson);
+    const formUrl =
+      typeof sj.interest_form_url === "string" ? sj.interest_form_url.trim() : "";
     return {
-      channel: "not_applicable",
-      to: "",
-      reason: "grok_report_or_vendor_outreach_memo",
+      channel: "kamiooya_form",
+      to: formUrl,
+      reason: formUrl ? "interest_form_url" : "kamiooya_intro_subject",
     };
   }
 
@@ -204,6 +318,36 @@ export function classifyInquiryChannel(params: {
       channel: "agent_email",
       to: agent.to,
       reason: `to_from_${agent.source}`,
+    };
+  }
+
+  const listingUrl = resolveListingUrl(params.summaryJson);
+  if (
+    isGrokResearchDeal({
+      title: params.title,
+      source: params.source,
+      summaryJson: params.summaryJson,
+    }) &&
+    listingUrl
+  ) {
+    return {
+      channel: "listing_web",
+      to: listingUrl,
+      reason: "grok_research_with_listing_url",
+    };
+  }
+
+  if (
+    isNotApplicableDeal({
+      title: params.title,
+      source: params.source,
+      summaryJson: params.summaryJson,
+    })
+  ) {
+    return {
+      channel: "not_applicable",
+      to: "",
+      reason: "grok_report_without_listing_url",
     };
   }
 
@@ -275,5 +419,7 @@ export function buildGrokHandoffBody(params: {
 export const INQUIRY_CHANNEL_LABEL: Record<InquiryChannel, string> = {
   agent_email: "メールで問合せ",
   grok_handoff: "Grokに依頼",
+  kamiooya_form: "紹介フォームで詳細請求",
+  listing_web: "掲載ページで問合せ",
   not_applicable: "問合せ対象外",
 };

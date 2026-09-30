@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  buildWatchAckFingerprint,
+  quietUntilIso,
+  WATCH_ACK_QUIET_DAYS_DEFAULT,
+} from "@/lib/watchUserAck";
 
 const WATCH_ID = "zaim_quality";
 
@@ -138,7 +143,7 @@ export async function acknowledgeZaimReview(
   )
     .filter((f) => {
       const st = String(f.status || "pending_confirm");
-      return st === "pending_confirm" || st === "disputed" || !f.status;
+      return st === "pending_confirm" || !f.status;
     })
     .map((f) => String(f.id || ""))
     .filter(Boolean)
@@ -167,6 +172,14 @@ export async function acknowledgeZaimReview(
     .replace(/^Jarvisが直したよ（財務）[·・]\s*/, "")
     .slice(0, 180);
 
+  const fp = buildWatchAckFingerprint({
+    id: WATCH_ID,
+    level: watch.level,
+    summary: watch.summary,
+    status: "active",
+    payload: prev,
+  });
+
   const payload = {
     ...prev,
     recent_fixes: fixes,
@@ -175,6 +188,12 @@ export async function acknowledgeZaimReview(
     review_batch_id: existingBatch || ackId,
     show_banner: false,
     acknowledged_at: now,
+    user_ack: {
+      fingerprint: fp,
+      acked_at: now,
+      quiet_until: quietUntilIso(WATCH_ACK_QUIET_DAYS_DEFAULT),
+      acked_level: String(watch.level || "ok"),
+    },
   };
 
   const { error: uErr } = await supabase
@@ -195,4 +214,113 @@ export async function acknowledgeZaimReview(
   revalidatePath("/situation");
   revalidatePath("/");
   return { ok: true };
+}
+
+export type QueueZaimSyncResult = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  queued?: boolean;
+};
+
+/**
+ * 「今すぐ更新」— 即 Playwright はしない。watch payload にキューを書く。
+ * Mac / GHA が拾って CSV＋bank_sync_check まで進める（完了は数分後の投影）。
+ */
+export async function queueZaimFinanceSync(): Promise<QueueZaimSyncResult> {
+  const supabase = await createClient();
+  const { data: watch, error } = await supabase
+    .from("watch_status")
+    .select("id,payload")
+    .eq("id", WATCH_ID)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!watch) return { ok: false, error: "Zaim Watch が未 push です" };
+
+  const payload =
+    watch.payload && typeof watch.payload === "object"
+      ? ({ ...(watch.payload as Record<string, unknown>) } as Record<
+          string,
+          unknown
+        >)
+      : {};
+  const prev =
+    payload.refresh_request && typeof payload.refresh_request === "object"
+      ? (payload.refresh_request as Record<string, unknown>)
+      : {};
+  const st = String(prev.status || "");
+  if (st === "queued" || st === "running") {
+    return {
+      ok: true,
+      queued: true,
+      message: `すでに ${st} です。完了までお待ちください`,
+    };
+  }
+
+  const now = new Date().toISOString();
+  payload.refresh_request = {
+    status: "queued",
+    kind: "csv_and_bank_check",
+    note: "UI 今すぐ更新（Playwright 即時なし・キューのみ）",
+    queued_at: now,
+    queued_by: "dashboard_ui",
+    error: null,
+    result: null,
+  };
+
+  const { error: upErr } = await supabase
+    .from("watch_status")
+    .update({ payload, updated_at: now })
+    .eq("id", WATCH_ID);
+  if (upErr) return { ok: false, error: upErr.message };
+
+  // 任意: GitHub workflow_dispatch（Secrets があるときだけ）
+  const token = (process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "").trim();
+  const repo =
+    (process.env.GITHUB_REPOSITORY || "m19mhrts83-cyber/project-GE").trim();
+  let dispatchNote = "";
+  if (token) {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${repo}/actions/workflows/zaim-finance-sync.yml/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+          body: JSON.stringify({ ref: "main" }),
+        },
+      );
+      if (res.ok || res.status === 204) {
+        dispatchNote = " · GHA も起動しました";
+        payload.refresh_request = {
+          ...(payload.refresh_request as Record<string, unknown>),
+          gha_dispatched: true,
+          gha_dispatched_at: new Date().toISOString(),
+        };
+        await supabase
+          .from("watch_status")
+          .update({
+            payload,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", WATCH_ID);
+      } else {
+        dispatchNote = ` · GHA dispatch ${res.status}（キューのみ残置）`;
+      }
+    } catch {
+      dispatchNote = " · GHA 起動はスキップ（キューのみ）";
+    }
+  }
+
+  revalidatePath("/zaim");
+  revalidatePath("/situation");
+  revalidatePath("/");
+  return {
+    ok: true,
+    queued: true,
+    message: `裏でキューに載せました。完了まで数分。開いただけでは走りません${dispatchNote}`,
+  };
 }

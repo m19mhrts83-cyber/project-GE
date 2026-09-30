@@ -1,20 +1,51 @@
 # KURASHIFT — 買い進め Job（千三つファネル）仕様
 
-最終更新: 2026-08-15  
-対象: Sprint 2 骨格（実装境界の固定）
+最終更新: 2026-08-30  
+対象: Sprint 2 骨格（実装境界の固定）＋ファネル語彙（仕分け〜買い進め）
 
 ## 目的
 
-長期目標 **CF 月50万** に向け、条件に合う物件を **情報→内見→買付→融資→購入** で積み上げる。  
+長期目標 **CF 月50万** に向け、条件に合う物件を積み上げる。  
 「買えない＝失敗」にせず、**件数と転換率**で千三つを可視化する。
+
+**案件の基本線（2026-08-30 正）:**
+
+1. **仕分け** — 見送りか、次に詳細を取りに行くか（UI「残す（問合せへ）」＝後者。まだ内見ではない）
+2. **詳細情報請求** — 図面・マイソク等（問合せ／Grok依頼／神大家フォーム）
+3. **内見** — 需給・融資状況も見ながら（status=`viewing`。「内見にする」）
+4. **価格交渉** — 内見結果をもとに（当面は viewing＋メモ）
+5. **買い進め** — **買付証明書** → 融資仮申請・打診・審査（`offer`→`loan`→`purchased`）
+
+※ プロダクト名「買い進めプラン」（長期CF）と、フェーズ5の「買い進め」は別。早期の問合せ・内見は UI 上 **進行中** と呼ぶ。
+
+### 仕分けボタン（UI）
+
+| ボタン | 意味 |
+|---|---|
+| **残す（問合せへ）** | 候補に残す。`info` 維持＋`user_confirmed`。次は図面・マイソク問合せ |
+| **見送り** | 候補から外す（`passed`） |
+
+### 候補の一括整理（L-15）
+
+候補タブ「整理候補を出す」→ チェック → 一括見送り。
+
+| 項目 | 内容 |
+|---|---|
+| 対象 | `status=info` のみ |
+| 除外 | 問合せ進行中・進行中フォロー・Grok「聞く」・内見以降 |
+| 理由（既定ON） | 低スコア（4未満）／エリア外／30日以上更新なし |
+| 上限 | 1回20件 |
+| 戻す | 同一 batch・24時間以内 |
+
+API: `GET/POST /api/re/deals/cleanup`
 
 ## ステータス（`kurashift_re_deals.status`）
 
 | status | 意味 | 千三つ対応 |
 |---|---|---|
-| `info` | 情報収集・メール候補 | 情報 1000 |
+| `info` | 情報収集・仕分け・詳細問合せ前／中 | 情報 1000 |
 | `viewing` | 内見予定／実施 | 内見 100 |
-| `offer` | 買付・交渉 | 引っかかり 10 |
+| `offer` | 買付・交渉（＝買い進めフェーズ開始） | 引っかかり 10 |
 | `loan` | 融資審査中 | — |
 | `purchased` | 購入完了 | 購入 3 |
 | `passed` | 見送り（学習として残す） | 非失敗 |
@@ -31,16 +62,21 @@
 
 対外問い合わせは **送信前確認必須**（`jarvis-outbound-confirm`）。
 
-## Gmail 既読（確認／対象外）
+## Gmail 既読（取込＝既読・KURASHIFT 本線）
 
 | 操作 | status | Gmail |
 |---|---|---|
-| メール取込・**明らかに対象外** | `passed`（`auto_pass_reason`・`auto_pass_pending_read`） | **当面は既読にしない**（確認後／allowlist 理由のみ） |
-| メール取込・境界／候補 | `info` / 高スコアは `viewing` | **既読にしない** |
-| **確認した** | `info`→`viewing`（以降は維持） | `re_deal_mark_gmail_read` で UNREAD 除去 |
-| **対象外**（手動） | `passed` | 同上 |
-| 自動見送りの「既読で正しい」 | passed 維持 | 既読ジョブ＋学習カウント |
-| 自動見送りの「誤り」 | `info` に戻す | 既読しない |
+| **メール取込成功**（候補 `info`/`viewing`） | そのまま | **UNREAD 除去**（`gmail_read_on=import`） |
+| **メール取込・明らかに対象外** | `passed` | **同上**（取込時既読） |
+| **残す（問合せへ）** | **`info` 維持**（内見に上げない）。`user_confirmed` | 未既読の残りだけ `re_deal_mark_gmail_read` |
+| **見送り**（手動／一括整理） | `passed` | 同上 |
+| 既存案件の一括 | — | `--mark-read-all-imported --apply` |
+
+方針（2026-08-27〜）: 物件判断は **KURASHIFT 上**。Gmail は取込済みなら既読にしてよい。
+
+**両箱（2026-08-30〜）**: 神大家紹介など admin／estate 二重着信は、取込・既読時に **Message-ID（だめなら件名+From）で双子も UNREAD 除去**。`summary_json.gmail_read_twin` で冪等。
+
+実装: `scripts/jarvis_kurashift_property_mail_match.py`（`stamp_row_gmail_read_on_import` / `--mark-read-all-imported`）
 
 取込時 auto_pass の判定（`clearly_out_of_scope`）:
 
@@ -51,7 +87,7 @@
 
 学習: `kurashift_auto_pass_learn`（confirm≥3 かつ reject=0 で allowlist → 以降その理由のみ取込時既読）
 
-- Mac ジョブ実行: KeepAlive 常駐 `jarvis_kurashift_job_watch.py`（30s ポーリング本線）。心拍は `sync_meta.kurashift_job_watch`
+- Mac ジョブ実行: KeepAlive 常駐 `jarvis_kurashift_job_watch.py`（3s ポーリング＋Realtime 即ドレイン）。心拍は `sync_meta.kurashift_job_watch`。手動キック: `jarvis_kurashift_job_kick.py`
 - 第一問い合わせ: 2段確認 + `confirm_snapshot` + `idempotency_key`。Worker は `sending` 後に送信（at-most-once）
 - 紐づけ: `summary_json.gmail_id` ＋ `source`（`mail_admin`→admin token／`mail_estate`→estate）
 - 二重実行防止: `summary_json.gmail_read_at`

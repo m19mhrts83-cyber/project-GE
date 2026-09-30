@@ -24,3 +24,11 @@
 
 # 出力形式
 各項目を見出し付きで整理し、最後に「人物サマリー（3行以内）」をつけてください。
+
+# Obsidian 保存（必須）
+調査完了後、チャット報告の前後で Obsidian 正本へ保存する（`jarvis-research-obsidian-save.mdc`）。
+
+- 保存先: `~/Documents/500_Obsidian_r1/02_Clippings/B_Research/`
+- ファイル名: `リサーチ_人物_{氏名}_{YYYYMMDD}.md`
+- 書き込み後: `jarvis_obsidian_ogd_retag.py` で OGD 反映
+- 報告末尾に保存パスを1行添える

@@ -1,3 +1,27 @@
+/** DB の timestamptz（UTC）を Asia/Tokyo の壁時計で表示。slice(0,16) は UTC のままなので使わない。 */
+export function formatJstDateTime(
+  iso: string | null | undefined,
+  opts?: { seconds?: boolean }
+): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 16).replace("T", " ");
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: opts?.seconds ? "2-digit" : undefined,
+    hour12: false,
+  }).formatToParts(d);
+  const g = (t: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === t)?.value || "";
+  const base = `${g("year")}-${g("month")}-${g("day")} ${g("hour")}:${g("minute")}`;
+  return opts?.seconds ? `${base}:${g("second")}` : base;
+}
+
 export function fmtYen(n: number | null | undefined): string {
   if (n == null || Number.isNaN(Number(n))) return "—";
   return `${Math.round(Number(n)).toLocaleString("ja-JP")}円`;
@@ -62,9 +86,19 @@ export function gainPct(
   return (v - c) / c;
 }
 
-export const DASHBOARD_URL =
-  process.env.NEXT_PUBLIC_DASHBOARD_URL ||
-  "https://jarvis-dashboard-amber.vercel.app";
+const DEFAULT_DASHBOARD_URL = "https://jarvis-dashboard-amber.vercel.app";
+
+/** KURASHIFT 自身を指す誤設定だと /mail/* が 404 になるため弾く。 */
+function resolveDashboardUrl(): string {
+  const raw = (process.env.NEXT_PUBLIC_DASHBOARD_URL || "")
+    .trim()
+    .replace(/\/$/, "");
+  if (!raw) return DEFAULT_DASHBOARD_URL;
+  if (/jarvis-trade-desk|localhost:3003/i.test(raw)) return DEFAULT_DASHBOARD_URL;
+  return raw;
+}
+
+export const DASHBOARD_URL = resolveDashboardUrl();
 
 /** 借入残高トラッカー（ローン正本。Google: estate） */
 export const LOAN_TRACKER_URL =

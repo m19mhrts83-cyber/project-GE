@@ -16,11 +16,13 @@ const ALLOWED = new Set([
   "theme_propose_from_status",
   "theme_ensure_index_rb",
   "theme_execute_assist",
+  "stock_order_preview",
   "secrets_upsert",
   "secrets_status",
   "buy_plan_ingest",
   "buy_plan_export",
   "ops_consult_ingest",
+  "ops_consult_answer",
   "re_mail_match",
   "re_deal_advice",
   "re_deal_mark_gmail_read",
@@ -30,7 +32,10 @@ const ALLOWED = new Set([
   "re_sync_loan_tracker",
   "re_revise_plan",
   "re_vendor_sync",
+  "re_mgmt_vendor_sync",
+  "re_repair_vendor_sync",
   "re_ops_form_draft",
+  "re_ops_form_fill",
 ]);
 
 export async function POST(req: Request) {

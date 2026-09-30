@@ -222,8 +222,24 @@ export const RE_LANES: MapItem[] = [
     code: "③-B開",
     title: "業者開拓ウォッチ",
     intent: "地場リストへの Web 問合せ送信状況を一覧で把握する",
-    implemented: "YAML 投影・要フォローフィルタ・deals 紐付け件数",
+    implemented: "YAML 投影・生存OK・要フォロー・deals 紐付け件数",
     href: "/realestate/vendors",
+  },
+  {
+    id: "3b-mgmt",
+    code: "③-B管",
+    title: "管理会社開拓（S9）",
+    intent: "賃貸管理・戸別管理の開拓キュー（Excel 投影）",
+    implemented: "mgmt YAML・alive・sync・フィルタ",
+    href: "/realestate/mgmt-vendors",
+  },
+  {
+    id: "3b-repair",
+    code: "③-B修",
+    title: "修繕業者（S4）",
+    intent: "一人親方候補・alive_ok 優先の連絡先",
+    implemented: "repair YAML・職種フィルタ・生存OK先頭",
+    href: "/realestate/repair-vendors",
   },
   {
     id: "3c",
@@ -241,6 +257,14 @@ export const RE_LANES: MapItem[] = [
     intent: "銀行へ出す書類を一覧化し、不足確認・下書きまで（送信はしない）",
     implemented: "商品×名義のチェックリスト・コピー用下書き",
     href: "/realestate/finance-pack",
+  },
+  {
+    id: "3d-lenders",
+    code: "③-D銀行",
+    title: "銀行アプローチ先・検討材料",
+    intent: "アプローチ候補の一覧と銀行別融資メモ（セミナー／Q&A／手元メモ）",
+    implemented: "kurashift_lenders / lender_intel · sync スクリプト",
+    href: "/realestate/lenders",
   },
 ];
 

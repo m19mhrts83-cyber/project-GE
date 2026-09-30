@@ -1,0 +1,71 @@
+---
+description: 家族コーチング — Journal は Obsidian 正本（Grok Drive 直読み）。Notion 投影はフォールバック。
+alwaysApply: true
+---
+
+# 家族コーチング週次材料（Jarvis）
+
+**2026-08-28〜**: Grok 家族コーチ統括は **Obsidian ★Journal** を admin Google Drive から **自分で読む**（正本）。  
+Jarvis の Notion 投影（`jarvis_family_journal_weekly.py`）は **フォールバック**（Drive 読取 NG 時・移行期の並行）。
+
+## 正本の置き場
+
+| 材料 | 正本 |
+|---|---|
+| 日次 Journal | Drive `500_Obsidian_r1/01_Journaling/★Journal/` |
+| 家族会議・面談 | Notion（`config/notion_family_coaching.yaml`） |
+
+パス定義: `config/kurashift_obsidian_artifacts.yaml` → `family_journal`
+
+## 週の区切り（金締）
+
+- **土曜始まり〜金曜終わり**
+- 土日は後追いで月曜に書くことが多い → 日曜 21:00 週次は **金曜まで** を正とする
+- ラベル例: `金締-2026-08-22`
+
+## Grok（評価）
+
+| 経路 | 内容 |
+|---|---|
+| Grok 統括 | Drive ★Journal（金締）＋ Notion 家族会議を自己読取 |
+| ルーティン | チャンネル「家族コーチングチーム」**日曜 21:00** |
+
+## Jarvis（フォールバック投影 · 移行期）
+
+| 経路 | 内容 |
+|---|---|
+| launchd | `com.matsunoma.jarvis.family-journal-weekly` … **日曜 08:00**（並行可） |
+| 朝オープン | `jarvis_morning_mac_refresh` が日曜 08:00 枠の取りこぼしを裏起動 |
+
+**Phase 3（2〜3週 Drive 読取 OK 後）**: state `"notion_projection": "disabled"` または launchd 解除。
+
+```bash
+~/git-repos/launchd/install_family_journal_weekly_launchd.sh
+# 解除: ~/git-repos/launchd/uninstall_family_journal_weekly_launchd.sh
+```
+
+## 無効化
+
+- Notion 投影: `~/git-repos/.jarvis_state/family_journal_weekly.json` に `"notion_projection": "disabled"`
+- または `.env.jarvis_private` に `JARVIS_FAMILY_JOURNAL_WEEKLY_DISABLE=1`
+
+## 松野 Grok UI（JarvisBox）
+
+Instructions 差し替えは **JarvisBox → shared_working**（git を直接開かない）:
+
+- 入口: `【with Grok bot】/20_outbox_to_grok/` 未処理 MD
+- 手順: `30_shared_working/2026-08-28_家族コーチ_Obsidian直読み/00_松野向け_Grok_UI手順.md`
+
+## 手動コマンド（フォールバック投影）
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_family_journal_weekly.py --pull --apply
+```
+
+## 関連
+
+- 索引: `config/grok_family_coaching_handoff_paste.md`
+- 統括 paste: `config/grok_family_manager_grok_paste.md`
+- Notion: `config/notion_family_coaching.yaml`
+- ログ: `~/Library/Logs/jarvis_family_journal/`

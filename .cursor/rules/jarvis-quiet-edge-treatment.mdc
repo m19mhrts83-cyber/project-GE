@@ -1,0 +1,33 @@
+---
+description: Quiet Edge レーザー治療スケジュール更新（Jarvisチャット本線）
+globs:
+alwaysApply: false
+---
+
+# Quiet Edge 治療スケジュール（Jarvis）
+
+## 方針
+
+- **総回数の目安**: 最大9回（経過を見て判断）
+- **更新本線**: ユーザーがチャットで伝えた内容を Jarvis が CLI で反映
+- **作らない**: アプリ内の治療日フォーム、Journal からの日程自動抽出
+- **ホーム**: 次回予定の残り **3日以内**でお知らせ（`quiet_edge_due` / 状況ウォッチ）。神大家グルコン報告も期限3日以内で同様
+
+## トリガー
+
+- 「第N回終わった」「次回は〇月〇日」「治療日更新して」
+- Quiet Edge のカウントダウン／タイムラインが古いとき
+
+## 動作
+
+```bash
+cd ~/git-repos
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_treatment.py --list
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_treatment.py --done N --at YYYY-MM-DDTHH:MM --note "…"
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_treatment.py --schedule N --at YYYY-MM-DDTHH:MM --note "…"
+/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_quiet_edge_due_check.py
+```
+
+- 日次のグラフマーク（治療当日／直後）は取込フォーム＋**完了セッションからグラフ用に自動付与**（直後＝+1〜+2日、色は当日と区別）
+- 正本: `vital_treatment_events`（`jarvis-dashboard`）
+- 手順詳細: `docs/Quiet_Edge_運用.md`

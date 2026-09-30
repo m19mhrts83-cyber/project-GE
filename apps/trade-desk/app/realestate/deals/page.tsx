@@ -1,16 +1,20 @@
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
-import DealReviewActions from "@/components/DealReviewActions";
 import DealsDrawerHost from "@/components/DealsDrawerHost";
+import DealsListTable, { type DealsListRow } from "@/components/DealsListTable";
+import DealReviewActions from "@/components/DealReviewActions";
 import RealEstateLaneNav from "@/components/RealEstateLaneNav";
 import { createClient } from "@/lib/supabase/server";
-import { fmtYen } from "@/lib/format";
+import { formatJstDateTime, fmtYen } from "@/lib/format";
 import { readMacWatchStatus } from "@/lib/macWatchStatus";
 import {
   DEAL_STATUS_LABEL,
-  INQUIRY_STATUS_LABEL,
   SOURCE_BADGE,
+  dealGmailUrl,
+  dealOriginChip,
+  formatLandValuePct,
   grokOneLine,
+  inquiryPhase,
   lastActivityLine,
   parseDealsTab,
   type DealsTabId,
@@ -21,6 +25,20 @@ import {
 } from "@/lib/reInquiryCandidate";
 import { loadInquiryAutoConfig } from "@/lib/reInquiryAutoConfig";
 import { getTier2QueueSummary } from "@/lib/reInquiryTier2Queue";
+import { dedupeAndPrioritizeDeals } from "@/lib/reDealDedupe";
+import {
+  filterBuyPushDeals,
+  filterDetailedInvestigationDeals,
+  filterInProgressDeals,
+} from "@/lib/reDealPursue";
+import DetailedInvestigatedDealsSection from "@/components/DetailedInvestigatedDealsSection";
+import {
+  formatMatchScore,
+  scoreBand,
+  scoreBandLabel,
+  scoreCellStyle,
+  scoreHitsPreview,
+} from "@/lib/reDealScoreUi";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -40,12 +58,20 @@ function inquiryChipStyle(status: string): Record<string, string | number> {
     padding: "2px 8px",
     borderRadius: 4,
     fontSize: 12,
+    fontWeight: 600,
     border: "1px solid var(--border, #ccc)",
   };
-  if (status === "has_reply") return { ...base, background: "#ecfdf5" };
-  if (status === "awaiting_reply" || status === "sent")
-    return { ...base, background: "#eff6ff" };
-  return base;
+  if (status === "has_reply")
+    return { ...base, background: "#d1fae5", borderColor: "#6ee7b7" };
+  if (
+    status === "awaiting_reply" ||
+    status === "sent" ||
+    status === "sending" ||
+    status === "awaiting_grok"
+  )
+    return { ...base, background: "#dbeafe", borderColor: "#93c5fd" };
+  // none / draft = 未問合せ
+  return { ...base, background: "#fef3c7", borderColor: "#fcd34d", color: "#92400e" };
 }
 
 export default async function RealEstateDealsPage({
@@ -78,7 +104,7 @@ export default async function RealEstateDealsPage({
         )
         .order("match_score", { ascending: false, nullsFirst: false })
         .order("updated_at", { ascending: false })
-        .limit(120),
+        .limit(200),
       supabase
         .from("kurashift_buy_plan_criteria")
         .select("kind, raw_text, sort_order, version_id")
@@ -127,11 +153,27 @@ export default async function RealEstateDealsPage({
       return true;
     }
     if (tab === "candidates") {
-      return d.status === "info" || d.status === "viewing";
+      if (d.status !== "info" && d.status !== "viewing") return false;
+      // 受付終了メールは候補から外す（見送り反映前の保険）
+      const title = String(d.title || "");
+      if (
+        title.includes("※受付終了※") ||
+        title.includes("＊受付終了＊") ||
+        title.includes("*受付終了*")
+      ) {
+        return false;
+      }
+      return true;
     }
     if (tab === "passed") return d.status === "passed";
     return d.status !== "archived";
   });
+
+  const dedupedVisible = dedupeAndPrioritizeDeals(visibleDeals, {
+    preferId: highlightDeal,
+  });
+  visibleDeals = dedupedVisible.deals;
+  const dedupeHiddenCount = dedupedVisible.hiddenCount;
 
   const allDealIds = (deals || []).map((d) => d.id);
 
@@ -194,27 +236,71 @@ export default async function RealEstateDealsPage({
     eventsByDeal.set(row.deal_id, list);
   }
 
-  const candidateDeals = (deals || []).filter(
-    (d) => d.status === "info" || d.status === "viewing"
-  );
+  const candidateDeals = dedupeAndPrioritizeDeals(
+    (deals || []).filter((d) => d.status === "info" || d.status === "viewing")
+  ).deals;
   let needReply = 0;
   let grokPending = 0;
   let inquiryNone = 0;
   let inquiryReady = 0;
   let viewingCount = 0;
+  let awaitingGrok = 0;
+  let awaitingReply = 0;
+  let hasReplyNoS3 = 0;
   for (const d of candidateDeals) {
     if (d.status === "viewing") viewingCount++;
     const inq = d.inquiry_status || "none";
     if (inq === "has_reply") needReply++;
+    if (inq === "awaiting_grok") awaitingGrok++;
+    if (inq === "awaiting_reply") awaitingReply++;
     if (inq === "none" || inq === "draft") inquiryNone++;
     if (d.source !== "mail_grok") grokPending++;
+    const sj =
+      d.summary_json && typeof d.summary_json === "object"
+        ? (d.summary_json as Record<string, unknown>)
+        : {};
+    const hasS3 =
+      sj.s3_investigation != null && typeof sj.s3_investigation === "object";
+    if (inq === "has_reply" && !hasS3) hasReplyNoS3++;
   }
-  for (const d of deals || []) {
+  for (const d of candidateDeals) {
     if (inquiryEval(d).tier1) inquiryReady++;
   }
 
+  const { data: pickSyncMeta } = await supabase
+    .from("sync_meta")
+    .select("value, updated_at")
+    .eq("key", "kurashift_obsidian_pick_sync")
+    .maybeSingle();
+  const pickSyncVal =
+    pickSyncMeta?.value && typeof pickSyncMeta.value === "object"
+      ? (pickSyncMeta.value as Record<string, unknown>)
+      : null;
+  const pickSyncAt =
+    typeof pickSyncVal?.at === "string"
+      ? pickSyncVal.at
+      : pickSyncMeta?.updated_at || null;
+  const pickSyncMatched =
+    typeof pickSyncVal?.matched === "number" ? pickSyncVal.matched : null;
+  const pickSyncNewest =
+    typeof pickSyncVal?.newest_file === "string"
+      ? pickSyncVal.newest_file
+      : null;
+
   const tier2Summary = await getTier2QueueSummary(supabase);
   const tier2Count = tier2Summary.queue.length;
+
+  const dedupedDealsList = dedupeAndPrioritizeDeals(deals || []).deals;
+  const detailedInvestigatedDeals = filterDetailedInvestigationDeals(
+    dedupedDealsList
+  );
+  const detailedCount = detailedInvestigatedDeals.length;
+  const inProgressDeals = filterInProgressDeals(
+    dedupedDealsList
+  );
+  const buyPushDeals = filterBuyPushDeals(
+    dedupedDealsList
+  );
 
   const counts: Record<string, number> = {};
   for (const s of Object.keys(DEAL_STATUS_LABEL)) counts[s] = 0;
@@ -247,13 +333,82 @@ export default async function RealEstateDealsPage({
     return `/realestate/deals?${q.toString()}`;
   }
 
+  const listRows: DealsListRow[] = visibleDeals.map((d) => {
+    const sj =
+      d.summary_json && typeof d.summary_json === "object"
+        ? (d.summary_json as Record<string, unknown>)
+        : {};
+    const grok =
+      sj.grok && typeof sj.grok === "object"
+        ? (sj.grok as Record<string, unknown>)
+        : null;
+    const inquiryStatus =
+      d.inquiry_status ||
+      (typeof sj.inquiry_status === "string" ? sj.inquiry_status : "none");
+    const evalInq = inquiryEval(d);
+    const fromRaw = typeof sj.from === "string" ? sj.from : null;
+    const msgs = messagesByDeal.get(d.id) || [];
+    const evs = eventsByDeal.get(d.id) || [];
+    const activity = lastActivityLine(msgs, evs);
+    const band = scoreBand(d.match_score);
+    return {
+      id: d.id,
+      title: d.title || "",
+      status: d.status,
+      statusLabel: DEAL_STATUS_LABEL[d.status] || d.status,
+      sourceBadge: slimTable
+        ? SOURCE_BADGE[d.source] || d.source
+        : d.source,
+      originChip: dealOriginChip({
+        title: d.title,
+        source: d.source,
+        summaryJson: sj,
+      }),
+      area: d.area || "—",
+      priceLabel:
+        d.price_man != null ? fmtYen(Number(d.price_man) * 10000) : "—",
+      grokLine: grokOneLine(grok),
+      inquiryStatus,
+      activityLine: activity.at
+        ? `${formatJstDateTime(activity.at).slice(0, 10)} ${activity.text.slice(0, 32)}`
+        : "—",
+      scoreLabel: formatMatchScore(d.match_score),
+      scoreBand: band,
+      hitsPreview: scoreHitsPreview(sj.hits),
+      inProgress: inProgressDeals.some((p) => p.id === d.id),
+      buyPush: buyPushDeals.some((p) => p.id === d.id),
+      pursuing:
+        inProgressDeals.some((p) => p.id === d.id) ||
+        buyPushDeals.some((p) => p.id === d.id) ||
+        detailedInvestigatedDeals.some((p) => p.id === d.id),
+      highlighted: highlightDeal === d.id,
+      badges: evalInq.badges,
+      openHref: openDealHref(d.id),
+      review: {
+        gmailId: typeof sj.gmail_id === "string" ? sj.gmail_id : null,
+        gmailUrl: dealGmailUrl(sj, d.source),
+        gmailReadAt:
+          typeof sj.gmail_read_at === "string" ? sj.gmail_read_at : null,
+        fromRaw,
+        inquiryReady: evalInq.tier1,
+        inquiryHasTo: evalInq.hasTo,
+        inquiryBadges: evalInq.badges,
+        inquiryChannel: evalInq.inquiryChannel,
+      },
+    };
+  });
+
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <RealEstateLaneNav active="b-funnel" />
       <p className="page-kicker">③-B · 実行</p>
       <h1>千三つファネル</h1>
       <p className="sub">
-        検討中の物件候補は「候補」タブ。行の「開く」で返信・判断履歴・第一問合せ。
+        基本線: 仕分け（確認した／見送り）→ 詳細問合せ → 内見 → 価格交渉 → 買い進め（買付・融資）。
+        「確認した」は内見ではありません。早期フォローは「進行中」、買付以降が「買い進め」。
+        進行中には「未問合せ」と「問合せ済」が混在します（問合せ列で区別）。
+        行の「開く」で返信・判断履歴・第一問合せ。表示は同一案件を1件にまとめ、優先はメール問合せ → Grok（Webフォーム）の順。
+        「評価スコア」は買い進め条件との一致度（数値＋高/中/低）。
         業者開拓は <a href="/realestate/vendors">業者開拓ウォッチ</a>。
       </p>
       {vendorFilter ? (
@@ -278,12 +433,480 @@ export default async function RealEstateDealsPage({
         {watch.label} · <a href="/jobs">ジョブ一覧</a>
       </p>
 
+      {/* ☀️ 最上部：第一問合せ状況 ＆ Tier2/Tier3 サマリーカード */}
       <div
+        className="card"
+        style={{
+          marginBottom: 20,
+          borderColor: "#3b82f6",
+          background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
+          padding: "16px 20px",
+          borderRadius: 8,
+          boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 10,
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                }}
+              >
+                CLOUD TIER3
+              </span>
+              <strong style={{ fontSize: 16, color: "#1e3a8a" }}>
+                ☀️ 第一問合せ（資料請求）自動化ステータス
+              </strong>
+            </div>
+            <p className="meta" style={{ marginTop: 4, marginBottom: 0, color: "#475569" }}>
+              朝07:30にGitHub Actionsが完全自走で優良物件に最速問合せ（上限5件）。夕方18:00にGrokBotが返信を詳細調査します。
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <Link
+              href="/realestate/deals/tier2"
+              className="btn"
+              style={{
+                background: "#2563eb",
+                color: "#fff",
+                fontWeight: 600,
+                fontSize: 13,
+                padding: "8px 14px",
+                border: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                textDecoration: "none",
+              }}
+            >
+              <span>⚡️ 送信待ち一覧（Tier2）を確認・一括送信</span>
+              <span
+                style={{
+                  background: "#1d4ed8",
+                  padding: "1px 7px",
+                  borderRadius: 10,
+                  fontSize: 12,
+                }}
+              >
+                {tier2Count}件
+              </span>
+            </Link>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 12,
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: "1px solid #dbeafe",
+          }}
+        >
+          <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+            <div className="meta" style={{ fontSize: 12 }}>本日送信実績</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#1e40af" }}>
+              {tier2Summary.sent_today}{" "}
+              <span style={{ fontSize: 13, fontWeight: 400, color: "#64748b" }}>
+                / {tier2Summary.daily_cap} 件 (残 {tier2Summary.remaining} 件)
+              </span>
+            </div>
+          </div>
+
+          <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+            <div className="meta" style={{ fontSize: 12 }}>本日送信待ち（Tier2）</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: tier2Count > 0 ? "#d97706" : "#1e40af" }}>
+              {tier2Count}{" "}
+              <span style={{ fontSize: 13, fontWeight: 400, color: "#64748b" }}>件</span>
+            </div>
+          </div>
+
+          <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+            <div className="meta" style={{ fontSize: 12 }}>安全ガード装備</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#166534", marginTop: 4 }}>
+              ✅ 1社1通最高スコア選定<br />
+              ✅ 即死KW除外（再建築不可等）<br />
+              ✅ スパム防止ジッター (60-120秒)
+            </div>
+          </div>
+
+          <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 6, border: "1px solid #bfdbfe" }}>
+            <div className="meta" style={{ fontSize: 12 }}>自動化設定</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#1e3a8a", marginTop: 4 }}>
+              稼働状態: <span style={{ color: "#16a34a" }}>完全クラウド自走 (有効)</span><br />
+              実行定刻: 毎朝 07:30 JST<br />
+              レポート: 専用LINE ＆ Jarvis Box
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {buyPushDeals.length > 0 ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            borderColor: "#86efac",
+            background: "#f0fdf4",
+          }}
+        >
+          <header>
+            <span className="lvl">Buy</span>
+            <strong>買い進め中・買付・融資（{buyPushDeals.length}）</strong>
+          </header>
+          <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
+            フェーズ5: 買付証明書〜融資の仮申請・打診・審査。長期プランは{" "}
+            <Link href="/realestate/buy-plan">買い進めプラン</Link>。
+            問合せ列で未問合せ／問合せ済を区別できます。
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>段階</th>
+                  <th>問合せ</th>
+                  <th>評価スコア</th>
+                  <th>物件</th>
+                  <th>エリア</th>
+                  <th>価格</th>
+                  <th>土地値%</th>
+                  <th>Grok</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody>
+                {buyPushDeals.map((d) => {
+                  const sj =
+                    d.summary_json && typeof d.summary_json === "object"
+                      ? (d.summary_json as Record<string, unknown>)
+                      : {};
+                  const grok =
+                    sj.grok && typeof sj.grok === "object"
+                      ? (sj.grok as Record<string, unknown>)
+                      : null;
+                  const inq =
+                    d.inquiry_status ||
+                    (typeof sj.inquiry_status === "string"
+                      ? sj.inquiry_status
+                      : "none");
+                  const phase = inquiryPhase(inq);
+                  const band = scoreBand(d.match_score);
+                  const hits = scoreHitsPreview(sj.hits);
+                  return (
+                    <tr key={`buy-${d.id}`} id={`buy-${d.id}`}>
+                      <td>
+                        <strong>
+                          {DEAL_STATUS_LABEL[d.status] || d.status}
+                        </strong>
+                      </td>
+                      <td>
+                        <span style={inquiryChipStyle(inq)}>
+                          {phase.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={scoreCellStyle(band)}>
+                          {formatMatchScore(d.match_score)}
+                          {band !== "none" ? (
+                            <span className="meta" style={{ marginLeft: 6 }}>
+                              {scoreBandLabel(band)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {hits ? (
+                          <div className="meta" style={{ fontSize: 11 }}>
+                            {hits}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>{d.title}</td>
+                      <td className="meta">{d.area || "—"}</td>
+                      <td className="meta">
+                        {d.price_man != null
+                          ? fmtYen(Number(d.price_man) * 10000)
+                          : "—"}
+                      </td>
+                      <td className="meta" style={{ fontWeight: 600 }}>
+                        {formatLandValuePct(grok)}
+                      </td>
+                      <td className="meta">{grokOneLine(grok)}</td>
+                      <td>
+                        <Link href={openDealHref(d.id)} className="btn">
+                          開く
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      <DetailedInvestigatedDealsSection
+        deals={detailedInvestigatedDeals}
+        currentTab={tab}
+      />
+
+      {inProgressDeals.length > 0 ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            borderColor: "#93c5fd",
+            background: "#eff6ff",
+          }}
+        >
+          <header
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "baseline",
+              gap: 8,
+              justifyContent: "space-between",
+            }}
+          >
+            <div>
+              <span className="lvl">In progress</span>
+              <strong>進行中・詳細問合せ中（{inProgressDeals.length}）</strong>
+            </div>
+            <a href="#deals-list" className="meta" style={{ fontSize: 12 }}>
+              候補一覧へ ↓
+            </a>
+          </header>
+          <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
+            仲介業者へ詳細問合せ中（返信待ち等）の案件です。
+            返信後にGrok botで精査・ペルソナ分析された案件は上の<strong>「詳細調査済・内見＆相談検討」</strong>に昇格します。
+            件数が多いときは枠内スクロールです。
+          </p>
+          <div
+            style={{
+              maxHeight: "min(42vh, 320px)",
+              overflow: "auto",
+              border: "1px solid #bfdbfe",
+              borderRadius: 6,
+              background: "#fff",
+            }}
+          >
+            <table style={{ margin: 0 }}>
+              <thead>
+                <tr>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    段階
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    問合せ
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    評価スコア
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    物件
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    エリア
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    価格
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    土地値%
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    Grok
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    操作
+                  </th>
+                  <th
+                    style={{
+                      position: "sticky",
+                      top: 0,
+                      background: "#eff6ff",
+                      zIndex: 1,
+                    }}
+                  >
+                    詳細
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {inProgressDeals.map((d) => {
+                  const sj =
+                    d.summary_json && typeof d.summary_json === "object"
+                      ? (d.summary_json as Record<string, unknown>)
+                      : {};
+                  const grok =
+                    sj.grok && typeof sj.grok === "object"
+                      ? (sj.grok as Record<string, unknown>)
+                      : null;
+                  const inq =
+                    d.inquiry_status ||
+                    (typeof sj.inquiry_status === "string"
+                      ? sj.inquiry_status
+                      : "none");
+                  const phase = inquiryPhase(inq);
+                  const band = scoreBand(d.match_score);
+                  const hits = scoreHitsPreview(sj.hits);
+                  return (
+                    <tr key={`prog-${d.id}`} id={`prog-${d.id}`}>
+                      <td>
+                        <strong>
+                          {DEAL_STATUS_LABEL[d.status] || d.status}
+                        </strong>
+                      </td>
+                      <td>
+                        <span style={inquiryChipStyle(inq)}>
+                          {phase.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={scoreCellStyle(band)}>
+                          {formatMatchScore(d.match_score)}
+                          {band !== "none" ? (
+                            <span className="meta" style={{ marginLeft: 6 }}>
+                              {scoreBandLabel(band)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {hits ? (
+                          <div className="meta" style={{ fontSize: 11 }}>
+                            {hits}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>{d.title}</td>
+                      <td className="meta">{d.area || "—"}</td>
+                      <td className="meta">
+                        {d.price_man != null
+                          ? fmtYen(Number(d.price_man) * 10000)
+                          : "—"}
+                      </td>
+                      <td className="meta" style={{ fontWeight: 600 }}>
+                        {formatLandValuePct(grok)}
+                      </td>
+                      <td className="meta">{grokOneLine(grok)}</td>
+                      <td>
+                        <DealReviewActions
+                          dealId={d.id}
+                          status={d.status}
+                          compactPursue
+                          inProgress
+                        />
+                      </td>
+                      <td>
+                        <Link href={openDealHref(d.id)} className="btn">
+                          開く
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : buyPushDeals.length === 0 ? (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <header>
+            <span className="lvl">Funnel</span>
+            <strong>進行中・買い進め</strong>
+          </header>
+          <p className="meta" style={{ marginTop: 8 }}>
+            まだ進行中・買付案件はありません。候補で仕分け→詳細問合せ→「内見にする」→「買付へ」の順が基本です。
+          </p>
+        </div>
+      ) : null}
+
+      <div
+        id="deals-list"
         style={{
           display: "flex",
           flexWrap: "wrap",
           gap: 8,
           marginBottom: 16,
+          scrollMarginTop: 12,
         }}
       >
         {TAB_LINKS.map((t) => {
@@ -315,30 +938,82 @@ export default async function RealEstateDealsPage({
         <div className="card" style={{ marginBottom: 16 }}>
           <header>
             <span className="lvl">候補</span>
-            <strong>要対応サマリー</strong>
+            <strong>パイプライン・ステータス（Grok × Jarvis）</strong>
           </header>
-          <p className="meta" style={{ marginTop: 8 }}>
-            要返信 {needReply} · 問合せ候補 {inquiryReady} · Grok未調査{" "}
-            {grokPending} · 第一問合せ未送 {inquiryNone} · 内見候補{" "}
-            {viewingCount}
-            {needReply > 0 ? (
-              <>
-                {" "}
-                ·{" "}
-                <Link href="/realestate/deals?tab=candidates&inquiry=has_reply">
-                  要返信のみ
-                </Link>
-              </>
-            ) : null}
-            {inquiryReady > 0 ? (
-              <>
-                {" "}
-                ·{" "}
-                <Link href="/realestate/deals?tab=candidates&inquiry=ready">
-                  問合せ候補のみ
-                </Link>
-              </>
-            ) : null}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: 8,
+              marginTop: 10,
+            }}
+          >
+            {[
+              {
+                label: "詳細調査済",
+                value: detailedCount,
+                hint: "Obsidian S3 → KURASHIFT（本線の内見検討）",
+                href: "#detailed-investigated",
+              },
+              {
+                label: "返信あり・S3待ち",
+                value: hasReplyNoS3,
+                hint: "仲介返信済だが詳細調査未反映",
+              },
+              {
+                label: "Grok依頼中",
+                value: awaitingGrok,
+                hint: "inquiry=awaiting_grok（S3未着）",
+              },
+              {
+                label: "仲介返信待ち",
+                value: awaitingReply,
+                hint: "第一問合せ後の返信待ち",
+              },
+              {
+                label: "要返信",
+                value: needReply,
+                hint: "has_reply",
+                href: "/realestate/deals?tab=candidates&inquiry=has_reply",
+              },
+              {
+                label: "問合せ候補",
+                value: inquiryReady,
+                hint: "Tier1 ready",
+                href: "/realestate/deals?tab=candidates&inquiry=ready",
+              },
+            ].map((c) => (
+              <div
+                key={c.label}
+                style={{
+                  border: "1px solid var(--border, #e2e8f0)",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  background: "#fafafa",
+                }}
+              >
+                <div className="meta" style={{ fontSize: 11 }}>
+                  {c.label}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2 }}>
+                  {c.href ? (
+                    <Link href={c.href} style={{ textDecoration: "none" }}>
+                      {c.value}
+                    </Link>
+                  ) : (
+                    c.value
+                  )}
+                </div>
+                <div className="meta" style={{ fontSize: 10, marginTop: 2 }}>
+                  {c.hint}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="meta" style={{ marginTop: 10 }}>
+            参考: status=内見 {viewingCount}
+            （メールスコア自動昇格含む・詳細調査済とは別） · Grok未調査ラベル{" "}
+            {grokPending} · 第一問合せ未送 {inquiryNone}
             {tier2Summary.enabled && tier2Count > 0 ? (
               <>
                 {" "}
@@ -354,6 +1029,14 @@ export default async function RealEstateDealsPage({
                 · 本日送信 {tier2Summary.sent_today}/{tier2Summary.daily_cap}
               </span>
             ) : null}
+          </p>
+          <p className="meta" style={{ marginTop: 6 }}>
+            Jarvis pick_sync:{" "}
+            {pickSyncAt ? formatJstDateTime(pickSyncAt) : "未記録"}
+            {pickSyncMatched != null ? ` · マッチ ${pickSyncMatched}件` : null}
+            {pickSyncNewest ? ` · 最新S3 ${pickSyncNewest}` : null}
+            {" · "}
+            増えないときは Grok が ☆Real_Estate_Pick に *_S3.md を書いていないことが多いです（同期自体は15分ごと）。
           </p>
         </div>
       ) : null}
@@ -441,224 +1124,11 @@ export default async function RealEstateDealsPage({
         </>
       ) : null}
 
-      <div className="card">
-        <header>
-          <span className="lvl">Deals</span>
-          <strong>
-            案件一覧（{visibleDeals.length} 件）
-          </strong>
-        </header>
-        {visibleDeals.length === 0 ? (
-          <p className="meta" style={{ marginTop: 8 }}>
-            該当案件がありません。「メール候補を更新」で取込してください。
-          </p>
-        ) : slimTable ? (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>優先</th>
-                  <th>状態</th>
-                  <th>物件</th>
-                  <th>エリア</th>
-                  <th>価格</th>
-                  <th>Grok</th>
-                  <th>問合せ</th>
-                  <th>最終動き</th>
-                  <th>操作</th>
-                  <th>詳細</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDeals.map((d) => {
-                  const sj =
-                    d.summary_json && typeof d.summary_json === "object"
-                      ? (d.summary_json as Record<string, unknown>)
-                      : {};
-                  const grok =
-                    sj.grok && typeof sj.grok === "object"
-                      ? (sj.grok as Record<string, unknown>)
-                      : null;
-                  const inquiryStatus =
-                    d.inquiry_status ||
-                    (typeof sj.inquiry_status === "string"
-                      ? sj.inquiry_status
-                      : "none");
-                  const evalInq = inquiryEval(d);
-                  const fromRaw =
-                    typeof sj.from === "string" ? sj.from : null;
-                  const msgs = messagesByDeal.get(d.id) || [];
-                  const evs = eventsByDeal.get(d.id) || [];
-                  const activity = lastActivityLine(msgs, evs);
-                  const dealOpenHref = openDealHref(d.id);
-                  return (
-                    <tr
-                      key={d.id}
-                      id={`deal-${d.id}`}
-                      style={
-                        highlightDeal === d.id
-                          ? {
-                              outline: "2px solid var(--danger, #b45309)",
-                              outlineOffset: 2,
-                            }
-                          : undefined
-                      }
-                    >
-                      <td className="meta">{d.match_score ?? "—"}</td>
-                      <td>{DEAL_STATUS_LABEL[d.status] || d.status}</td>
-                      <td>
-                        {d.title}
-                        {evalInq.badges.length > 0 ? (
-                          <div className="meta">
-                            {evalInq.badges.map((b) => (
-                              <span
-                                key={b}
-                                style={{
-                                  display: "inline-block",
-                                  marginRight: 4,
-                                  padding: "1px 6px",
-                                  borderRadius: 4,
-                                  fontSize: 11,
-                                  background:
-                                    b === "再検討" ? "#fef3c7" : "#eff6ff",
-                                }}
-                              >
-                                {b}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        <div className="meta">
-                          {SOURCE_BADGE[d.source] || d.source}
-                        </div>
-                      </td>
-                      <td className="meta">{d.area || "—"}</td>
-                      <td className="meta">
-                        {d.price_man != null
-                          ? fmtYen(Number(d.price_man) * 10000)
-                          : "—"}
-                      </td>
-                      <td className="meta">{grokOneLine(grok)}</td>
-                      <td>
-                        <span style={inquiryChipStyle(inquiryStatus)}>
-                          {INQUIRY_STATUS_LABEL[inquiryStatus] ||
-                            inquiryStatus}
-                        </span>
-                      </td>
-                      <td className="meta">
-                        {activity.at
-                          ? `${activity.at.slice(0, 10)} ${activity.text.slice(0, 32)}`
-                          : "—"}
-                      </td>
-                      <td>
-                        <DealReviewActions
-                          dealId={d.id}
-                          status={d.status}
-                          gmailId={
-                            typeof sj.gmail_id === "string"
-                              ? sj.gmail_id
-                              : null
-                          }
-                          gmailReadAt={
-                            typeof sj.gmail_read_at === "string"
-                              ? sj.gmail_read_at
-                              : null
-                          }
-                          dealTitle={d.title}
-                          fromRaw={fromRaw}
-                          inquiryReady={evalInq.tier1}
-                          inquiryHasTo={evalInq.hasTo}
-                          inquiryBadges={evalInq.badges}
-                          inquiryChannel={evalInq.inquiryChannel}
-                          openDealHref={dealOpenHref}
-                        />
-                      </td>
-                      <td>
-                        <Link href={dealOpenHref} className="btn">
-                          開く
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>状態</th>
-                  <th>スコア</th>
-                  <th>タイトル</th>
-                  <th>エリア</th>
-                  <th>価格</th>
-                  <th>問合せ</th>
-                  <th>操作</th>
-                  <th>詳細</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDeals.map((d) => {
-                  const sj =
-                    d.summary_json && typeof d.summary_json === "object"
-                      ? (d.summary_json as Record<string, unknown>)
-                      : {};
-                  const inquiryStatus =
-                    d.inquiry_status ||
-                    (typeof sj.inquiry_status === "string"
-                      ? sj.inquiry_status
-                      : "none");
-                  return (
-                    <tr key={d.id}>
-                      <td>{DEAL_STATUS_LABEL[d.status] || d.status}</td>
-                      <td className="meta">{d.match_score ?? "—"}</td>
-                      <td>
-                        {d.title}
-                        <div className="meta">{d.source}</div>
-                      </td>
-                      <td className="meta">{d.area || "—"}</td>
-                      <td className="meta">
-                        {d.price_man != null
-                          ? fmtYen(Number(d.price_man) * 10000)
-                          : "—"}
-                      </td>
-                      <td>
-                        <span style={inquiryChipStyle(inquiryStatus)}>
-                          {INQUIRY_STATUS_LABEL[inquiryStatus] ||
-                            inquiryStatus}
-                        </span>
-                      </td>
-                      <td>
-                        <DealReviewActions
-                          dealId={d.id}
-                          status={d.status}
-                          gmailId={
-                            typeof sj.gmail_id === "string"
-                              ? sj.gmail_id
-                              : null
-                          }
-                          gmailReadAt={
-                            typeof sj.gmail_read_at === "string"
-                              ? sj.gmail_read_at
-                              : null
-                          }
-                        />
-                      </td>
-                      <td>
-                        <Link href={openDealHref(d.id)} className="btn">
-                          開く
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DealsListTable
+        variant={slimTable ? "slim" : "full"}
+        rows={listRows}
+        dedupeHiddenCount={dedupeHiddenCount}
+      />
 
       <Suspense fallback={null}>
         <DealsDrawerHost dealId={highlightDeal || null} />

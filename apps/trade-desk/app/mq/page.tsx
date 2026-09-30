@@ -37,7 +37,7 @@ import {
   type MqBsFields,
   type MqBsRow,
 } from "@/lib/mqBs";
-import { sumLoanTrackerLt } from "@/lib/mqLoanSuggest";
+import { filterLoansByEntity, sumLoanTrackerLt } from "@/lib/mqLoanSuggest";
 import { qUnitLabel } from "@/lib/mqPolicy";
 import { computeMq, type MqComputed } from "@/lib/mqEquations";
 import type { MqAccountMapRow } from "@/lib/mqZaimMap";
@@ -91,6 +91,12 @@ import {
   DEFAULT_RE_PL_OVERRIDES,
 } from "@/lib/reBusinessPlCompose";
 import type { ReBusinessPlModel } from "@/lib/reBusinessPlTypes";
+import {
+  applyCorporateStatementOverlay,
+  type ReAnnualPlanRow,
+  type ReGlAggRow,
+  type ReStatementRow,
+} from "@/lib/reKneesbeeOverlay";
 
 export const dynamic = "force-dynamic";
 
@@ -226,8 +232,9 @@ export default async function MqPage({
     error = e instanceof Error ? e : new Error(String(e));
   }
   const bsRows = (bsRaw ?? []) as MqBsRow[];
-  const loanTrackerLt = sumLoanTrackerLt(loanRaw ?? []);
-  const loanMonthlyPaymentYen = (loanRaw ?? []).reduce((sum, r) => {
+  const eligibleLoans = filterLoansByEntity(loanRaw ?? [], entity);
+  const loanTrackerLt = sumLoanTrackerLt(eligibleLoans);
+  const loanMonthlyPaymentYen = eligibleLoans.reduce((sum, r) => {
     const v = Number((r as any).monthly_payment_jpy ?? 0);
     return sum + (Number.isFinite(v) ? v : 0);
   }, 0);
@@ -315,6 +322,59 @@ export default async function MqPage({
         personal: persBs?.cash ?? null,
       },
       overrides: DEFAULT_RE_PL_OVERRIDES,
+    });
+
+    // 法人税務正本（Kneesbee / MyKomon）を重ねる
+    const [{ data: stRows }, { data: planRows }, { data: glRaw }] =
+      await Promise.all([
+        supabase
+          .from("kurashift_re_statements")
+          .select(
+            "label,source,fiscal_year,period_end,revenue_jpy,operating_profit_jpy,pretax_profit_jpy,tax_jpy,net_income_jpy,capital_jpy,retained_earnings_jpy,officer_loan_jpy,bank_loan_jpy,pl_json,bs_json,reconcile_notes"
+          )
+          .eq("entity", "corporate")
+          .eq("fiscal_year", cashflowYear)
+          .order("period_end", { ascending: false })
+          .limit(1),
+        supabase
+          .from("kurashift_re_annual_plans")
+          .select(
+            "fiscal_year,label,revenue_jpy,pretax_profit_jpy,cash_flow_jpy,occupancy_pct"
+          )
+          .eq("entity", "corporate")
+          .order("fiscal_year", { ascending: true }),
+        supabase
+          .from("kurashift_re_gl_lines")
+          .select("account_name,amount_jpy")
+          .eq("entity", "corporate")
+          .eq("fiscal_year", cashflowYear)
+          .limit(5000),
+      ]);
+
+    const glMap = new Map<string, { cnt: number; net: number }>();
+    for (const row of glRaw ?? []) {
+      const name = String(
+        (row as { account_name?: string }).account_name || "（不明）"
+      );
+      const amt = Number((row as { amount_jpy?: number }).amount_jpy ?? 0);
+      const cur = glMap.get(name) || { cnt: 0, net: 0 };
+      cur.cnt += 1;
+      cur.net += Number.isFinite(amt) ? amt : 0;
+      glMap.set(name, cur);
+    }
+    const glTop: ReGlAggRow[] = [...glMap.entries()]
+      .map(([account_name, v]) => ({
+        account_name,
+        cnt: v.cnt,
+        net_jpy: v.net,
+      }))
+      .sort((a, b) => b.cnt - a.cnt)
+      .slice(0, 12);
+
+    rePlModel = applyCorporateStatementOverlay(rePlModel, {
+      statement: (stRows?.[0] as ReStatementRow | undefined) ?? null,
+      plans: (planRows ?? []) as ReAnnualPlanRow[],
+      glTop,
     });
   }
 
@@ -1018,7 +1078,8 @@ export default async function MqPage({
               </div>
             </div>
             <p className="meta" style={{ marginTop: 8 }}>
-              {entityLabel(entity)} · Zaim事業費目＋物件マスタ簿価＋ローン残高トラッカー
+              {entityLabel(entity)} · 法人は Kneesbee/MyKomon statement 優先 · 個人は
+              Zaim＋収支内訳 · 物件マスタ簿価＋ローン残高
             </p>
           </div>
           {rePlModel ? (
@@ -1577,6 +1638,7 @@ export default async function MqPage({
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
           承認済み科目マップで事業系だけ集計します。手入力月は既定で保護。未分類は下に出し、MQからは除外（暫定）します。
+          不動産ラインの資金繰りでは <strong>δ.21F AIリスキリング</strong>（加盟金・Cursor 等）は自動除外します。セル内訳の「列を変更」→「集計から除外」で他の非不動産経費も落とせます。
         </p>
         <div style={{ marginTop: 10 }}>
           <MqZaimIngestPanel defaultYear={planYear} />

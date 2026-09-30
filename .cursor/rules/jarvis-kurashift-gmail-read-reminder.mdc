@@ -1,0 +1,44 @@
+---
+description: 千三つ物件メールは取込完了で Gmail 既読（KURASHIFT 本線）。旧「確認した→既読」習慣の取り違え防止
+alwaysApply: true
+---
+
+# 千三つ Gmail 既読（取込＝既読）
+
+## 結論（方針 2026-08-27〜）
+
+物件判断は **Gmail ではなく KURASHIFT**（`/realestate/deals`）。  
+**deals へ取込成功したら、その Gmail を自動既読**する（`gmail_read_on=import`）。
+
+旧 plan **`千三つgmail既読_7dd50f8a`**（確認した／対象外だけ既読）は **上書き済み**。混同しない。
+
+## ユーザー向けの正
+
+| 操作 | Gmail |
+|---|---|
+| **メール取込完了**（候補／auto_pass とも） | **既読** |
+| **確認した／対象外** | 取込時に既読済みなら何もしない（残り未読だけ補完） |
+| 既存の未既読一括 | `property_mail_match.py --mark-read-all-imported --apply` |
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| 仕様 | `docs/KURASHIFT_買い進めJob仕様.md`（Gmail 既読節） |
+| 取込 | `scripts/jarvis_kurashift_property_mail_match.py`（`stamp_row_gmail_read_on_import`） |
+| UI | `/realestate/deals` |
+| state | `~/git-repos/.jarvis_state/kurashift_gmail_read_reminder.json` |
+
+## 無効化
+
+- state `"disabled": true`（促し不要なら）
+- または `JARVIS_KURASHIFT_GMAIL_READ_REMINDER_DISABLE=1`
+
+## いつ触れるか
+
+「取込なのに未読が残る」と言われたら診断。日常の「確認した→既読」促しは **出さない**（方針変更済み）。
+
+## 関連
+
+- 問合せフォロー: `jarvis-kurashift-inquiry-followup.mdc`
+- 受付終了除外: 件名 `※受付終了※`

@@ -44,10 +44,17 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ## Dashboard 操作
 
-1. ホーム / **general（その他）** または `/mail/{id}` を開く
-2. ラベル **「地場業者返信（milestone）」** を確認
-3. テンプレ初稿を編集 → Gemini/Cursor 見直し可
-4. **送信確認モーダル** → estate から返信
+1. **KURASHIFT** `/realestate/vendors` の「返信あり」行 → **返信を見る ↗**（または **要確認 ↗**）
+2. またはホーム / **general（その他）** または `/mail/{id}` を開く
+3. ラベル **「地場業者返信（milestone）」** を確認
+4. テンプレ初稿を編集 → Gemini/Cursor 見直し可
+5. **送信確認モーダル** → estate から返信
+
+`vendors` に triage が無いときは **general ↗**（一覧で探す）。Mac で triage push が必要なら:
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_reply_triage.py --push --mark-inbound-replied
+```
 
 ## 正本
 

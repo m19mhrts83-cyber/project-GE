@@ -6,6 +6,7 @@ import {
   fallbackOtherMailDigest,
   parseOtherMailDigest,
 } from "@/lib/otherMailDigest";
+import { isSelfEmail } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 import { fmtSync } from "./homeHelpers";
 
@@ -26,13 +27,17 @@ export default async function HomeOtherBand() {
   ]);
   const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
 
-  const otherMails = (mailRows || []).slice().sort((a, b) => {
-    const order = { attention: 0, warn: 1, info: 2 } as const;
-    return (
-      order[mailPriorityToLevel(a.priority)] -
-      order[mailPriorityToLevel(b.priority)]
-    );
-  });
+  // 自分発信（BCC控え等）は要確認・要約の対象外
+  const otherMails = (mailRows || [])
+    .filter((m) => !isSelfEmail(m.from_email))
+    .slice()
+    .sort((a, b) => {
+      const order = { attention: 0, warn: 1, info: 2 } as const;
+      return (
+        order[mailPriorityToLevel(a.priority)] -
+        order[mailPriorityToLevel(b.priority)]
+      );
+    });
 
   const needConfirm = otherMails.filter((m) => (m.kind || "mail") === "mail");
   const skimOnly = otherMails.filter((m) => m.kind === "skim");

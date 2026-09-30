@@ -1,0 +1,38 @@
+---
+description: SMS OTP は Mac メッセージ DB から Jarvis が止まず取得・入力する
+alwaysApply: true
+---
+
+# Jarvis — SMS OTP（Mac メッセージから取得）
+
+## 方針（確定・ユーザー合意 2026-07-11）
+
+メール OTP と同様、**SMS OTP も Jarvis が止まず取得・入力する**。  
+ユーザーに「貼ってください」で止めない（届かない・権限エラーのときだけ依頼）。
+
+## 正本経路
+
+Mac の **メッセージ** DB:
+
+```bash
+sqlite3 "$HOME/Library/Messages/chat.db" \
+  "SELECT datetime(message.date/1000000000 + strftime('%s','2001-01-01'), 'unixepoch', 'localtime') as dt, text
+   FROM message
+   WHERE text IS NOT NULL
+     AND (text LIKE '%認証コード%' OR text LIKE '%ワンタイム%' OR text LIKE '%Chatwork%' OR text LIKE '%があなたの%')
+   ORDER BY message.date DESC LIMIT 15;"
+```
+
+- 直近・該当サービス名（例: Chatwork）の本文から **6桁コード** を抽出
+- Full Disk Access が無いと `unable to open` になる → そのときだけユーザーに権限 or 手動入力を依頼
+
+## 運用
+
+1. SMS 画面を検出したら **すぐ Messages DB を読む**
+2. コードを入力して送信（チャットにコードを長く残さない）
+3. 必要なら「このブラウザで30日スキップ」は **ユーザー明示時のみ**（勝手に付けない）
+
+## 関連
+
+- メール OTP: Gmail API（例: `from:payment.vpass.ne.jp`）
+- iMessage パートナー取込: `imessage_to_yoritoori.py`（OTP 用途とは別）

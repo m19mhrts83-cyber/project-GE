@@ -72,6 +72,9 @@ export default async function HomeTodayQueue() {
       ) {
         if (pl.show_banner === true) return true;
       }
+      if (w.id === "glucon_report_due" || w.id === "quiet_edge_due") {
+        return pl.show_banner === true;
+      }
       return w.level !== "ok";
     })
     .sort((a, b) => {

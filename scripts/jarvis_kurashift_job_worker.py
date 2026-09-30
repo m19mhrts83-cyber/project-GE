@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -186,6 +187,14 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             "--theme-id",
             str(payload.get("theme_id") or ""),
         ],
+        # 発注前プレビューのみ。確定（対外確認ゲート）はオーナーが CLI で実行する
+        "stock_order_preview": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_stock_order.py"),
+            "--preview",
+            "--symbol",
+            str(payload.get("symbol") or ""),
+        ],
         "secrets_status": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_secrets.py"),
@@ -255,6 +264,26 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             py,
             str(REPO / "scripts" / "jarvis_kurashift_ops_consult_ingest.py"),
         ],
+        "ops_consult_answer": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_ops_consult_answer.py"),
+            "--deal-id",
+            str(payload.get("deal_id") or ""),
+            "--summary",
+            str(payload.get("summary") or ""),
+            *(
+                ["--verdict", str(payload.get("verdict"))]
+                if payload.get("verdict")
+                else []
+            ),
+            *(
+                ["--comment", str(payload.get("comment"))]
+                if payload.get("comment")
+                else []
+            ),
+            *(["--seed-awaiting"] if payload.get("seed_awaiting") else []),
+            *(["--apply"] if payload.get("apply", True) else ["--dry-run"]),
+        ],
         "re_sync_loan_tracker": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_loan_tracker_sync.py"),
@@ -281,12 +310,44 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             str(REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"),
             "--apply",
         ],
+        "re_vendor_judgment": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_re_vendor_judgment.py"),
+            "--vendor-id",
+            str(payload.get("vendor_id") or ""),
+            "--note",
+            str(payload.get("note") or ""),
+            *(
+                ["--judgment", str(payload.get("judgment"))]
+                if payload.get("judgment")
+                else []
+            ),
+        ],
+        "re_mgmt_vendor_sync": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_mgmt_vendor_sync.py"),
+            "--apply",
+        ],
+        "re_repair_vendor_sync": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_repair_vendor_sync.py"),
+            "--apply",
+        ],
         "re_ops_form_draft": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_re_ops_form_draft.py"),
             "--deal-id",
             str(payload.get("deal_id") or ""),
             "--apply",
+        ],
+        "re_ops_form_fill": [
+            py,
+            str(REPO / "scripts" / "jarvis_kurashift_re_ops_form_fill.py"),
+            "--deal-id",
+            str(payload.get("deal_id") or ""),
+            "--apply",
+            "--headed",
+            "--leave-open",
         ],
     }
     cmd = mapping.get(job_type)
@@ -458,7 +519,65 @@ def run_one(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
         return "skipped"
 
     cmd = command_for(job_type, payload)
+    leave_open_job = job_type == "re_ops_form_fill" and "--leave-open" in cmd
     try:
+        if leave_open_job:
+            # ブラウザ常駐: RESULT 行を読んだらジョブ成功にし、子プロセスは切り離す
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(REPO),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                start_new_session=True,
+                env={**os.environ, "KURASHIFT_JOB_ID": str(job_id)},
+            )
+            log_lines: list[str] = []
+            parsed: dict[str, Any] | None = None
+            deadline = time.time() + int(payload.get("timeout_sec") or 300)
+            assert proc.stdout is not None
+            while time.time() < deadline:
+                line = proc.stdout.readline()
+                if not line and proc.poll() is not None:
+                    break
+                if not line:
+                    time.sleep(0.2)
+                    continue
+                log_lines.append(line.rstrip("\n"))
+                print(line.rstrip("\n"), flush=True)
+                if line.startswith("KURASHIFT_RESULT:"):
+                    try:
+                        parsed = json.loads(line[len("KURASHIFT_RESULT:") :])
+                    except json.JSONDecodeError:
+                        parsed = None
+                    break
+            log = "\n".join(log_lines)
+            ok = parsed is not None and int((parsed or {}).get("filled_count") or 0) > 0
+            if parsed is None and proc.poll() is not None:
+                ok = proc.returncode == 0
+            result = {
+                "returncode": 0 if ok else (proc.returncode or 1),
+                "cmd": cmd,
+                "leave_open": True,
+                "pid": proc.pid,
+            }
+            if parsed:
+                result["parsed"] = parsed
+            result = merge_result_preserving_ack(sb, job_id, result, payload)
+            sb.table("kurashift_jobs").update(
+                {
+                    "status": "succeeded" if ok else "failed",
+                    "log_text": log[-50000:],
+                    "result": result,
+                    "error_text": None
+                    if ok
+                    else (log[-2000:] or "no KURASHIFT_RESULT")[:4000],
+                    "artifacts": (result.get("parsed") or {}).get("artifacts") or [],
+                    "finished_at": now_iso(),
+                }
+            ).eq("id", job_id).execute()
+            return "ok" if ok else "fail"
+
         proc = subprocess.run(
             cmd,
             cwd=str(REPO),
@@ -469,7 +588,7 @@ def run_one(sb: Any, row: dict[str, Any], *, dry_run: bool) -> str:
         )
         log = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
         ok = proc.returncode == 0
-        result: dict[str, Any] = {"returncode": proc.returncode, "cmd": cmd}
+        result = {"returncode": proc.returncode, "cmd": cmd}
         # Optional JSON line from child: KURASHIFT_RESULT:{...}
         for line in (proc.stdout or "").splitlines():
             if line.startswith("KURASHIFT_RESULT:"):

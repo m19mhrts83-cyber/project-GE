@@ -14,7 +14,7 @@
 # 実際の連絡先に置き換えてください。
 
 # フォルダ番号（確定）: 100番台＝分類、残り2桁＝登録順。次番号は既存最大+1（推測で900番台にしない）。
-# 100＝管理会社／200＝修繕／300＝保険／400＝税理士・会計／500＝銀行／600＝物件・入居者／700＝学習／800＝神大家関連／900＝代理店・その他
+# 100＝管理会社／200＝修繕／300＝保険／400＝不使用（縁起が悪いため）／500＝金融・税理士・商工会／600＝物件・入居者／700＝学習・プライベート／800＝神大家関連／900＝代理店・その他
 partners:
   - folder: "101_ホームプランナー"
     name: "ホームプランナー"
@@ -63,6 +63,24 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: ""
+  - folder: "219_メタックス"
+    name: "メタックス"
+    emails: ["kikuchitakahito910@gmail.com"]
+    phones: ["07074842790", "070-7484-2790", "+817074842790"]
+    line: ""
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "菊池貴仁"
+    # LPガス営業・Grandole志賀本通Ⅰ・Ⅱプロパン切替（2026-08-27 手続資料依頼済み）
+  - folder: "221_ブロゼロ"
+    name: "ブロゼロ"
+    emails: []
+    phones: []
+    line: "松野さん×ブロゼロ"
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "麓伊吹"
+    # お風呂・水回りリフォーム、大規模修繕（株式会社ブロード・ブロゼロ / 新部様お繋ぎ / LINE WORKS）
   - folder: "806_神大家AI推進"
     name: "神大家AI推進"
     emails: []
@@ -93,7 +111,14 @@ partners:
     line_direct_chat_mid: ""
     contact: ""
     chatwork_room_id: ["420522792", "425809560"]
+    chatwork_rooms:
+      announce: "420522792"   # ①【ライモBiz代理店】全体アナウンス
+      juku2: "425809560"      # 【起業塾 第二期】全体アナウンス
     chatwork_account_name: ""
+    # 個別ヘルプは Chatwork ではなく公式フォーム（5.やり取り.md 冒頭も参照）
+    inquiry_form_url: "https://ex-pa.net/fm/30070/rsbxa4se"  # 加盟店様 お問い合わせ
+    improvement_form_url: "https://forms.gle/C2yAAEdfsHRjpxGq6"  # 修正依頼・改善ご要望
+    help_page_url: "https://ma-kaaz1xqc93bn.chapro-app.jp/"
   - folder: "908_SHIFT AI代理店"
     name: "SHIFT AI代理店"
     emails: ["yitagaki@shift-ai.co.jp"]
@@ -152,7 +177,7 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "清水（和久・多田羅）"
-  - folder: "419_Kneesbee税理士法人"
+  - folder: "519_Kneesbee税理士法人"
     name: "Kneesbee税理士法人"
     emails: ["t.ohno@knees-bee.jp", "t.ohno.sogou@gmail.com"]
     email_domains: ["knees-bee.jp"]
@@ -170,6 +195,16 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "越野将志"
+  - folder: "517_豊明市商工会"
+    name: "豊明市商工会"
+    emails: ["mitsui@toyoake.net", "kamiya@toyoake.net", "info@toyoake.net", "stardream321@yahoo.co.jp"]
+    email_domains: ["toyoake.net"]
+    to_name_hints: ["豊明市商工会", "商工会", "三井", "神谷"]
+    phones: ["0562924321", "0562-92-4321"]
+    line: ""
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "三井"
   - folder: "618_Grandole志賀本通I_入居者"
     name: "Grandole志賀本通I入居者"
     emails: ["yuumee.jee@gmail.com"]
@@ -187,3 +222,26 @@ partners:
     line_group_chat_mid: "c49a9e7a307099af0831cdf1486d915c0"
     line_direct_chat_mid: ""
     contact: "本田"
+  - folder: "823_名古屋幹事グループ"
+    name: "名古屋幹事グループ"
+    emails: []
+    phones: []
+    line: "東海飲み会幹事やりとり"
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "種村／千葉／松野"
+    chatwork_room_id: ["447466105"]
+    chatwork_rooms:
+      "447466105": "名古屋幹事グループ"
+    chatwork_account_name: ""
+    # 生ログ正本（2026-09-11一本化）: LINE「東海飲み会幹事やりとり」＋ Chatwork「名古屋幹事グループ」→ 5.やり取り.md
+    # 旧パス: 815_神大家オプチャ/東海飲み会幹事やりとり/
+  - folder: "722_遊愛会"
+    name: "遊愛会"
+    emails: []
+    phones: []
+    line: "遊愛会 / 遊愛会 一般生の会"
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "ひろふみ先生"
+    # 豊明市 空手道場・遊愛会（ひろふみ先生・稽古・一般生LINEグループ・YouTube動画共有）

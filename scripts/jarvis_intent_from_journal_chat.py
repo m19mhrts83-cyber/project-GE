@@ -124,7 +124,10 @@ def read_recent_journals(days: int = JOURNAL_DAYS) -> list[dict[str, str]]:
         return out
     for i in range(days):
         d = (today_jst() - timedelta(days=i)).strftime("%Y-%m-%d")
-        path = JOURNAL_DIR / f"{d}.md"
+        # monthly folders: ★Journal/YYYY-MM/YYYY-MM-DD.md (flat fallback)
+        path = JOURNAL_DIR / d[:7] / f"{d}.md"
+        if not path.is_file():
+            path = JOURNAL_DIR / f"{d}.md"
         if not path.is_file():
             continue
         text = path.read_text(encoding="utf-8", errors="replace")

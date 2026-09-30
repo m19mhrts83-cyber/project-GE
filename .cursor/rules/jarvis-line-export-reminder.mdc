@@ -1,0 +1,60 @@
+---
+description: LINE 公式エクスポート（Phase C）— 経過日数に応じて Jarvis が能動的にエクスポートを促す。パートナー確認・月次・Tcell/LEAF 言及時に適用。
+alwaysApply: true
+---
+
+# LINE 公式エクスポート促し（Jarvis）
+
+グループ LINE（Tcell / LEAF / 823 幹事等）の**本文**は CHRLINE だけでは E2EE 未復号になりやすい。**Phase C（公式トーク履歴エクスポート）を正本**とし、ユーザーが覚えなくてよいよう Jarvis が促す。
+
+## 無効化
+
+- `~/git-repos/.jarvis_state/line_export_reminder.json` に `"disabled": true`
+- または `.env.jarvis_private` に `JARVIS_LINE_EXPORT_REMINDER_DISABLE=1`
+
+## チェックスクリプト（正本）
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_line_export_check.py
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_line_export_check.py --mark-prompted
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_line_export_check.py --bootstrap
+```
+
+## いつ実行・報告するか
+
+| トリガー | 動作 |
+|---------|------|
+| **パートナー確認**（`partner-email-check.mdc`） | 前半報告の**末尾**に `--mark-prompted` 付きで実行。suggest/ask があればブロックを貼る |
+| **毎月 1〜5 日** | 同一セッションで未実施なら、本題の前後にまとめて促す |
+| **Tcell / LEAF / 東海DX互助会 / グループ LINE** の話題 | 該当ルートの経過日数を1行添える |
+
+促しすぎ防止: 同一ルートは **7 日以内** に ask/suggest を再表示しない（`last_prompted_at`）。
+
+## 促しレベル
+
+| レベル | 目安 | Jarvis の言い方 |
+|--------|------|----------------|
+| info | 14 日未満 | 報告に含めない |
+| suggest | 14〜29 日 | 「前回から N 日。本文が必要ならエクスポートを」 |
+| ask | 30 日以上・プレースホルダー残存 | 「1 ヶ月超。エクスポート反映をお願いします」 |
+
+## ユーザーへの依頼（操作）
+
+1. LINE → 設定 → トーク → **トーク履歴を送信**
+2. **EmailMe** → `matsuno.estate@gmail.com`（推奨）または Mac で `000_共通/LINE公式エクスポート/inbox/` に `.txt` 保存
+3. 反映後「保存した」と一声 → パートナー確認の `line_export_gmail_to_inbox.py` / `line_export_inbox_to_yoritoori.py` で取込
+
+## 段階ロードマップ
+
+1. **Phase 1（現在）**: 経過日数で促す（本ルール）
+2. **Phase 2**: 取込後・CHRLINE 改善状況で `interval_days` を延長（state の `routes.*.interval_days`）
+3. **Phase 3**: Gmail 取込を定常化（パートナー確認で自動）
+4. **Phase 4**: launchd 定期実行。失敗時のみ促す
+
+## 関連
+
+- ルート定義: `000_共通/line_export_routes.yaml`
+- state: `~/git-repos/.jarvis_state/line_export_reminder.json`
+- 取込成功時: `line_export_inbox_to_yoritoori.py` が `last_import_at` を更新
+- パートナー確認: `partner-email-check.mdc`
+- CHRLINE 限界: `docs/運用コマンド一覧.md` §1 LINE sync

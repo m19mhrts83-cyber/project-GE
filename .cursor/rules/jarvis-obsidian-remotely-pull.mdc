@@ -1,0 +1,16 @@
+# Obsidian Remotely Save プル（廃止・参照のみ）
+
+## 状態
+
+**2026-08-02 廃止。** 同期本線は **Google Drive Sync**。  
+正: `jarvis-obsidian-gdrive-sync.mdc`
+
+## やらないこと
+
+- パートナー確認で `jarvis_obsidian_remotely_pull.py` を実行しない
+- Remotely Save / OneDrive 橋を前提にした促しをしない
+
+## 残置
+
+- スクリプト・state は履歴用に残す（`disabled: true`）
+- 明示的に「旧 OneDrive 橋を確認して」と依頼されたときだけ dry-run 可

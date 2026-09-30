@@ -1,5 +1,5 @@
 #!/bin/zsh
-# install: KURASHIFT job watch（KeepAlive 常駐・30s ドレイン）
+# install: KURASHIFT job watch（KeepAlive 常駐・3s＋Realtime 即ドレイン）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.kurashift-job-worker"

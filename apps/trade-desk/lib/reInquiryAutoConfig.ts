@@ -4,7 +4,16 @@ import path from "path";
 export type InquiryAutoConfig = {
   version?: number;
   daily_send_cap?: number;
-  tier3_auto_send?: { enabled?: boolean };
+  tier3_auto_send?: {
+    enabled?: boolean;
+    instant_death_keywords?: string[];
+    anti_spam_jitter?: { min_seconds?: number; max_seconds?: number };
+    company_rate_limit?: {
+      enabled?: boolean;
+      max_per_company_per_day?: number;
+      strategy?: string;
+    };
+  };
   tiers?: {
     tier0_exclude_inquiry_status?: string[];
     tier1_candidate?: {
@@ -23,6 +32,17 @@ export type InquiryAutoConfig = {
       grok_listen?: string;
       hazard_eval?: string;
       land100_not?: string;
+      grok_route?: {
+        min_score?: number;
+        grok_listen?: string;
+        hazard_eval?: string;
+        land100_not?: string;
+      };
+      gmail_route?: {
+        min_score?: number;
+        allowed_channels?: string[];
+        require_to?: boolean;
+      };
     };
   };
   inquiry_candidate_overrides?: {
@@ -71,7 +91,20 @@ const DEFAULT_CONFIG: InquiryAutoConfig = {
   inquiry_candidate_overrides: {
     grok_listen_values: ["聞く", "保留"],
     revive_passed_status: true,
-    exclude_auto_pass_reasons: ["mansion_unit", "subject_noise"],
+    exclude_auto_pass_reasons: [
+      "mansion_unit",
+      "subject_noise",
+      "uketsuke_shuryo",
+      "uketsuke_shuryo_sibling",
+    ],
+  },
+  production_filter: {
+    exclude_title_substrings: [
+      "E2E-GROK-KURASHIFT",
+      "※受付終了※",
+      "＊受付終了＊",
+    ],
+    exclude_e2e_markers: ["E2E-GROK-KURASHIFT"],
   },
   grok_handoff: {
     subject_prefix: "[KURASHIFT問合せ依頼]",

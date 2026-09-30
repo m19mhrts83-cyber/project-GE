@@ -5,7 +5,7 @@
 目的:
   - やり取り確認1回につき QR 再認証を **厳密に最大1回**（フェーズ間で第2 QR は出さない）
   - sync 後にセッションが死んだ場合は open-chat をスキップし、`--skip-sync` での別プロセス再実行を案内
-  - thread MID 候補の dry-run も同一セッション内で実行可能
+  - thread MID discover も同一セッション内で実行（既定は YAML 自動追記・上限あり）
   - 既定は LINE sync → オープンチャットの順
 
 使い方（パートナー確認の LINE / オプチャ同期・正本は Patch）:
@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -50,7 +51,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--discover-thread-mids-dry-run",
         action="store_true",
-        help="オープンチャット同期後に thread MID 候補を --discover-thread-mids --dry-run で確認",
+        help=(
+            "オープンチャット同期後に thread MID を discover する。"
+            " 既定は YAML へ自動追記（上限あり）。"
+            " 候補のみなら --discover-thread-mids-dry-only または "
+            "JARVIS_OPENCHAT_DISCOVER_AUTO_APPEND=0"
+        ),
+    )
+    parser.add_argument(
+        "--discover-thread-mids-dry-only",
+        action="store_true",
+        help="discover を dry-run のみ（YAML 追記しない・旧挙動）",
     )
     parser.add_argument(
         "--discover-init",
@@ -194,6 +205,7 @@ def _run_open_chat_phases(
     heal_degraded_threads: bool = True,
     thread_catchup_pages: int = 8,
     force_open_chat: bool = False,
+    discover_dry_only: bool = False,
 ) -> tuple[Any, int]:
     """オープンチャット同期（メイン → discover → スレッド）。exit_code を返す。"""
     from chrline_client_utils import format_square_probe_report, probe_square_session_detail
@@ -234,7 +246,28 @@ def _run_open_chat_phases(
         return cl, exit_code
 
     if discover_thread_mids_dry_run:
-        discover_argv = ["--discover-thread-mids", "--dry-run", "--no-threads"]
+        # フラグ名は互換のため残す。既定は YAML 自動追記（上限付き）。
+        env_auto = (os.environ.get("JARVIS_OPENCHAT_DISCOVER_AUTO_APPEND") or "1").strip()
+        auto_append = (not discover_dry_only) and env_auto not in {"0", "false", "False", "no"}
+        discover_argv = ["--discover-thread-mids", "--no-threads"]
+        if auto_append:
+            discover_argv.append("--auto-append-thread-mids")
+            try:
+                max_new = int(
+                    (os.environ.get("JARVIS_OPENCHAT_DISCOVER_MAX_NEW_MIDS") or "20").strip()
+                    or "20"
+                )
+            except ValueError:
+                max_new = 20
+            if max_new > 0:
+                discover_argv.extend(["--max-new-thread-mids", str(max_new)])
+            print(
+                f"# discover: auto-append ON (max_new={max_new})",
+                file=sys.stderr,
+            )
+        else:
+            discover_argv.append("--dry-run")
+            print("# discover: dry-run only（YAML 追記なし）", file=sys.stderr)
         if discover_init:
             discover_argv.append("--init")
             discover_argv.append("--max-pages-per-stream=50")
@@ -322,6 +355,7 @@ def main(argv: list[str] | None = None) -> int:
                 heal_degraded_threads=heal_threads,
                 thread_catchup_pages=catchup_pages,
                 force_open_chat=bool(args.force_open_chat),
+                discover_dry_only=bool(args.discover_thread_mids_dry_only),
             )
             if oc_rc != 0:
                 exit_code = oc_rc
@@ -361,6 +395,7 @@ def main(argv: list[str] | None = None) -> int:
                 heal_degraded_threads=heal_threads,
                 thread_catchup_pages=catchup_pages,
                 force_open_chat=bool(args.force_open_chat),
+                discover_dry_only=bool(args.discover_thread_mids_dry_only),
             )
             if oc_rc != 0 and exit_code == 0:
                 exit_code = oc_rc

@@ -1,0 +1,36 @@
+#!/bin/zsh
+# Jarvis: 部長ボックス（Drive inbox）15分ポーリング
+# todoist_tasks は jarvis_bucho_inbox_poll.py 内で自動 apply（Mac起動中のみ）
+# アプリ開発 [Grok開発] カードも同帯で Todoist apps へ起票
+# due+@cal の完了・ラベル外しは同帯で Googleカレンダー予定を削除
+# ホーム要フォロー → Todoist 受信箱（watch_id dedup）
+set -euo pipefail
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PY="${HOME}/selenium_env/venv/bin/python"
+LOG_DIR="${HOME}/Library/Logs/jarvis_bucho_bridge"
+mkdir -p "$LOG_DIR"
+STAMP="$(date +%Y%m%d_%H%M%S)"
+LOG="${LOG_DIR}/inbox_poll_${STAMP}.log"
+
+cd "$REPO_DIR"
+if [[ -f "${REPO_DIR}/.env.jarvis_private" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${REPO_DIR}/.env.jarvis_private"
+  set +a
+fi
+
+{
+  echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
+  "$PY" "${REPO_DIR}/scripts/jarvis_bucho_inbox_poll.py" --push
+  "$PY" "${REPO_DIR}/scripts/jarvis_kurashift_obsidian_pick_sync.py" --apply || true
+  "$PY" "${REPO_DIR}/scripts/jarvis_app_dev_todoist_sync.py" --apply || true
+  "$PY" "${REPO_DIR}/scripts/jarvis_todoist_calendar_sync.py" --apply || true
+  # Webhook: item:completed → ホーム外し / 表示:コメント学習
+  "$PY" "${REPO_DIR}/scripts/jarvis_todoist_webhook_handle.py" || true
+  "$PY" "${REPO_DIR}/scripts/jarvis_watch_todoist_sync.py" --apply || true
+  echo "# end exit=$?"
+} >>"$LOG" 2>&1
+
+# ログ肥大化防止: 14日超を削除
+find "$LOG_DIR" -name 'inbox_poll_*.log' -mtime +14 -delete 2>/dev/null || true

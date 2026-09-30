@@ -29,8 +29,13 @@ const SOURCE_LABEL: Record<string, string> = {
   bloomo: "Bloomo評価取得",
   bloomo_zaim: "Bloomo→Zaim財務反映",
   sbi_index: "SBIインデックス",
+  akatsuki_bond: "あかつき証券 債券",
+  mhi_stock: "三菱重工 持株会",
   liquidity_weekly: "銀行・流動性",
   axa_life: "アクサ生命",
+  prudential_life: "プルデンシャル生命（真治）",
+  prudential_life_chikage: "プルデンシャル生命（千景）",
+  tachibana_trade: "立花証券 自動売買",
 };
 
 export function parseWeeklySummary(raw: string | null | undefined): PortfolioWeeklySummary | null {
@@ -115,6 +120,8 @@ export function computeNextAction(input: {
   buyPlanMissing?: boolean;
   /** カード引落（Infinite 本線） */
   cardDebit?: CardDebitWatchBrief | null;
+  /** 株式ウォッチ閾値シグナル件数（sync_meta） */
+  stockWatchSignals?: number | null;
 }): NextAction {
   const debit = input.cardDebit?.top_alert;
   if (debit && (debit.level === "warn" || debit.level === "attention")) {
@@ -152,6 +159,13 @@ export function computeNextAction(input: {
       level: "warn",
       label: `ジョブが ${input.stalledQueued} 件、30分超キュー滞留（Mac worker を確認）`,
       href: "/jobs",
+    };
+  }
+  if ((input.stockWatchSignals ?? 0) > 0) {
+    return {
+      level: "info",
+      label: `株式ウォッチ: 閾値シグナル ${input.stockWatchSignals} 件（Todoist Theme株式で確認）`,
+      href: "/stock-watch",
     };
   }
   const consulting = input.themes.find((t) => t.status === "consulting");

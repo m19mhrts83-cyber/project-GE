@@ -1,0 +1,58 @@
+# Grok / Jarvis — Obsidian 成果物の置き場（admin Google Drive 正本）
+# Obsidian 共有データソース = Google Drive（Documents 経由の移し替え不要）
+
+version: 1
+updated: "2026-08-28"
+
+# ボルトルート（admin）
+obsidian_vault_drive: >-
+  /Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/500_Obsidian_r1
+
+artifacts:
+  # 家族コーチ — 日次 Journal（週次評価の正本）
+  family_journal:
+    relative: "01_Journaling/★Journal"
+    readers: [family_coach_manager]
+    file_patterns:
+      - "{YYYY-MM-DD}.md"
+      - "{YYYY-MM}/{YYYY-MM-DD}.md"
+    week_boundary: sat_fri_gold_close
+    delivery: drive_obsidian
+    note: >-
+      Grok 家族コーチ統括が金締（土〜金）で直読み。Notion Journal週次投影はフォールバック。
+      補助: notion_family_coaching.yaml obsidian_complements
+
+  # S3 需給三次 — 問合せ返信〜三次まとめ（案件ごと）
+  real_estate_pick:
+    relative: "01_Journaling/☆Real_Estate_Pick"
+    writers: [S3]
+    filename_pattern: "{YYYY-MM-DD}_{市区町村}_{物件短名}_S3.md"
+    delivery: drive_obsidian  # メール禁止（旧 [Grok需給] はレガシ）
+    note: >-
+      個別具体の候補パック。買い進め・内見以降の実務束はここではなく
+      KURASHIFT deals / OneDrive・Drive 案件フォルダ。
+
+  # 融資の横断知識（既運用）
+  financing_literature:
+    relative: "03_Literature Note(まとめノート)/融資"
+    writers: [human, S7_optional]
+    delivery: drive_obsidian
+    note: 戸建レーン等の考え方。案件ノートからはリンク。
+
+  # 空手 — 和道流の教え · 骨と筋肉（Journal 配下 · 2026-08-28）
+  karate_knowledge:
+    relative: "01_Journaling/☆Karate"
+    readers: [karate_advisor, family_coach_manager]
+    writers: [jarvis, human, karate_advisor_draft]
+    subfolders:
+      - 和道流
+      - 骨と筋肉
+    filename_patterns:
+      - "和道流/和道流_{theme}_{YYYYMMDD}.md"
+      - "骨と筋肉/{part_or_motion}_{YYYYMMDD}.md"
+      - "動画ストック_YouTube.md"
+    delivery: drive_obsidian
+    note: >-
+      Journal と並べて参照。Grok 空手アドバイザーは Web 検索＋既存ノート読取。
+      ひろふみ先生・遊愛会のYouTube動画ストックは「動画ストック_YouTube.md」。
+      新規追記の実ファイル書込は Jarvis（Documents 正本 → ogd_retag）。

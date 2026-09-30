@@ -2,7 +2,8 @@ name: Jarvis Dashboard Lanes
 
 # レーン要約確認 digest（少数 kind=digest）→ cards。機械的大量カードは出さない。
 # 委任 Graph（MS_GRAPH_CLIENT_ID + REFRESH_TOKEN + AUTHORITY=consumers）必須。
-# refresh 回転後は Mac で: python scripts/jarvis_ms_graph_sync_refresh.py --push-gha
+# refresh 回転は sync_meta.ms_graph_refresh_token に自動保存（Secrets は任意追従）。
+# Mac で private も揃えるとき: python scripts/jarvis_ms_graph_sync_refresh.py [--push-gha]
 
 
 on:

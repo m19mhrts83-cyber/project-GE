@@ -12,6 +12,37 @@ import { zaimWatchVisibleOnHome } from "@/lib/zaimWatchPin";
 import { createClient } from "@/lib/supabase/server";
 import { watchHref } from "./homeHelpers";
 
+function displayHints(
+  pl: Record<string, unknown>
+): Record<string, unknown> {
+  const dh = pl.display_hints;
+  return dh && typeof dh === "object"
+    ? (dh as Record<string, unknown>)
+    : {};
+}
+
+/** display_hints.suppress_home（quiet_until 前）ならホームから外す */
+function isDisplayHintSuppressed(pl: Record<string, unknown>): boolean {
+  const dh = displayHints(pl);
+  if (dh.suppress_home !== true) return false;
+  const until = String(dh.quiet_until || "");
+  if (!until) return true;
+  const t = Date.parse(until);
+  if (Number.isNaN(t)) return true;
+  return Date.now() < t;
+}
+
+function effectiveLevel(
+  level: string | null | undefined,
+  pl: Record<string, unknown>
+): HomeLevel {
+  const dh = displayHints(pl);
+  if (dh.demote === true) return "info";
+  const lv = String(level || "info");
+  if (lv === "attention" || lv === "warn" || lv === "info") return lv;
+  return "info";
+}
+
 export default async function HomeWatchBand() {
   const supabase = await createClient();
   const { data: watchRows } = await supabase
@@ -21,13 +52,14 @@ export default async function HomeWatchBand() {
 
   const watchNeed = (watchRows || [])
     .filter((w) => {
-      if (isOpsEphemeralId(String(w.id))) {
-        return opsWatchVisibleOnHome(w);
-      }
       const pl =
         w.payload && typeof w.payload === "object"
           ? (w.payload as Record<string, unknown>)
           : {};
+      if (isDisplayHintSuppressed(pl)) return false;
+      if (isOpsEphemeralId(String(w.id))) {
+        return opsWatchVisibleOnHome(w);
+      }
       const fp = buildWatchAckFingerprint({
         id: String(w.id),
         level: w.level,
@@ -47,11 +79,14 @@ export default async function HomeWatchBand() {
         w.id === "vpoint" ||
         w.id === "rent_step" ||
         w.id === "cursor_pro_plus_downgrade" ||
-        w.id === "glucon_report_due" ||
         w.id === "mobile_plan" ||
         w.id === "card_debit_watch"
       ) {
         if (pl.show_banner === true) return true;
+      }
+      // 期限3日以内のみホーム（状況ウォッチ本体は従来どおり warn を残す）
+      if (w.id === "glucon_report_due" || w.id === "quiet_edge_due") {
+        return pl.show_banner === true;
       }
       return w.level !== "ok";
     })
@@ -64,26 +99,35 @@ export default async function HomeWatchBand() {
         b.payload && typeof b.payload === "object"
           ? (b.payload as Record<string, unknown>)
           : {};
+      const dha = displayHints(pa);
+      const dhb = displayHints(pb);
       const pinA =
         pa.pin_top === true ||
         pa.pin_home_top === true ||
+        dha.pin_home_top === true ||
         a.id === "cursor_pro_plus_downgrade" ||
         a.id === "card_debit_watch";
       const pinB =
         pb.pin_top === true ||
         pb.pin_home_top === true ||
+        dhb.pin_home_top === true ||
         b.id === "cursor_pro_plus_downgrade" ||
         b.id === "card_debit_watch";
       if (pinA !== pinB) return pinA ? -1 : 1;
       return (
-        watchSortKey(a.level) - watchSortKey(b.level) ||
+        watchSortKey(effectiveLevel(a.level, pa)) -
+          watchSortKey(effectiveLevel(b.level, pb)) ||
         String(b.updated_at || "").localeCompare(String(a.updated_at || ""))
       );
     });
 
   const counts = { attention: 0, warn: 0, info: 0 };
   for (const w of watchNeed) {
-    const lv = (w.level || "info") as HomeLevel;
+    const pl =
+      w.payload && typeof w.payload === "object"
+        ? (w.payload as Record<string, unknown>)
+        : {};
+    const lv = effectiveLevel(w.level, pl);
     if (lv in counts) counts[lv] += 1;
   }
 
@@ -120,28 +164,47 @@ export default async function HomeWatchBand() {
           ) : (
             <div className="watch-grid">
               {watchNeed.map((it) => {
-                const level = (
-                  ["attention", "warn", "info"].includes(it.level)
-                    ? it.level
-                    : "info"
-                ) as HomeLevel;
-                const { href, external } = watchHref(String(it.id));
+                const pl =
+                  it.payload && typeof it.payload === "object"
+                    ? (it.payload as Record<string, unknown>)
+                    : {};
+                const level = effectiveLevel(it.level, pl);
+                const { href, external } = watchHref(String(it.id), pl);
+                const todoistUrl =
+                  typeof pl.todoist_url === "string" && pl.todoist_url
+                    ? pl.todoist_url
+                    : null;
                 return (
-                  <a
+                  <div
                     key={it.id}
-                    href={href}
                     className={`card watch-card level-${level}`}
-                    {...(external
-                      ? { target: "_blank", rel: "noopener noreferrer" }
-                      : {})}
                   >
-                    <header>
-                      <span className="lvl">{LEVEL_LABEL[level]}</span>
-                      <strong title={it.title}>{it.title}</strong>
-                    </header>
-                    <p className="sum">{it.summary}</p>
-                    {it.source ? <p className="meta">{it.source}</p> : null}
-                  </a>
+                    <a
+                      href={href}
+                      className="watch-card-main"
+                      {...(external
+                        ? { target: "_blank", rel: "noopener noreferrer" }
+                        : {})}
+                    >
+                      <header>
+                        <span className="lvl">{LEVEL_LABEL[level]}</span>
+                        <strong title={it.title}>{it.title}</strong>
+                      </header>
+                      <p className="sum">{it.summary}</p>
+                      {it.source ? <p className="meta">{it.source}</p> : null}
+                    </a>
+                    {todoistUrl ? (
+                      <p className="watch-todoist">
+                        <a
+                          href={todoistUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Todoist で開く →
+                        </a>
+                      </p>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>

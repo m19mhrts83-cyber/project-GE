@@ -1,0 +1,69 @@
+---
+description: Grok Bot×Notion OAuth の Cursor Forum 投稿を、公式返信まで追い続ける
+alwaysApply: true
+---
+
+# Cursor Forum — Grok Bot × Notion OAuth 追従（Jarvis）
+
+## 背景
+
+Grok Bot の Notion プラグインが「追加済み」でも OAuth が
+`Invalid redirect_uri for OAuth client`（`mcp.notion.com/callback`）で失敗する。
+Cursor Forum（**Bug Reports**）へ報告済み。**公式の返信／解決まで追従を続ける。**
+
+家族コーチング／Grok Bot のやり取りの中でも、回答が来るまで確認を止めない。
+
+## 無効化（終了条件）
+
+次のいずれかで止める:
+
+- state に `"disabled": true` または `"status": "resolved"`
+- ユーザーが「フォーラム追従不要／解決した」と明示
+- フォーラムで修正完了・回避策が公式に確定し、ユーザーがクローズ同意
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| state | `~/git-repos/.jarvis_state/cursor_forum_grok_notion.json` |
+| 投稿URL | state の `forum_topic_url`（投稿後に必ず記入） |
+| 関連 | 家族コーチング Notion / Grok Bot チャンネル運用 |
+
+## いつ確認するか（必須）
+
+次のセッションで、**本題の前後に1回**フォーラムを確認する（同一セッション1回まで）:
+
+1. **家族コーチング／Grok Bot／Notionコネクタ** の話題
+2. **パートナー確認**のついで（失敗しても確認全体は止めない）
+3. 前回確認から **24時間以上**空いているとき（state `last_checked_at`）
+
+## Jarvis の動作
+
+1. state を読む。`disabled` / `resolved` ならスキップ
+2. `forum_topic_url` が空なら「URL未登録」と1行。投稿をユーザーに依頼 or ブラウザで投稿を完了させる
+3. URL があれば Forum トピックを開き（WebFetch 可）、**スタッフ／他ユーザーの新規返信**の有無を見る
+4. 新規返信があれば:
+   - 要約をチャットに出す
+   - state の `last_reply_at` / `last_reported_reply_id` を更新
+   - 解決なら `status: resolved` 提案（勝手に disabled にしない。ユーザー確認）
+5. 返信なしなら短い1行: `📎 Cursor Forum（Notion OAuth）: 未返信（最終確認 YYYY-MM-DD）`
+6. 促しすぎ防止: **重大な新規返信が無い限り、同一日内に再掲しない**
+
+## 報告フォーマット
+
+```
+📎 Cursor Forum（Grok Bot × Notion OAuth）
+- 状態: waiting_reply | replied | resolved
+- URL: …
+- 新規: なし / あり（要約1〜3行）
+```
+
+## 当面の運用メモ（解決まで）
+
+- Grok Bot 直読は不可前提
+- 週次材料は Jarvis `family-probe` / Notion API 抽出 → チャンネル貼付
+
+## 関連
+
+- 家族コーチ索引: `config/grok_family_coaching_handoff_paste.md`
+- Notion 正本: `config/notion_family_coaching.yaml`

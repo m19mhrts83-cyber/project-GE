@@ -119,17 +119,21 @@
 | 値 | 意味 | 主なソース（案） |
 |---|---|---|
 | `personal` | 個人の賃貸収支 | Zaim 19.x／δ（既存 `jarvis_kurashift_lifeplan`） |
-| `corporate` | 法人（リビングサポート松等） | MyKomon／税理士CSV／手入力（要すり合わせ） |
-| `combined` | 表示用集計 | 上記の合算（DB 行ではなくビュー） |
+| `corporate` | 法人（リビングサポート松等） | **正本**: MyKomon／Kneesbee → `kurashift_re_statements` / `gl_lines`（2026-08-30〜）。Zaim は補助 |
+| `combined` | 表示用集計 | 個人 Zaim＋法人 statement 列（DB 行ではなくビュー） |
 
-### テーブル（Phase 2 以降で migration）
+### テーブル（実装済み 2026-08-30）
+
+`kurashift_re_statements` / `kurashift_re_annual_plans` / `kurashift_re_actuals` / `kurashift_re_gl_lines`  
+migration: `apps/jarvis-dashboard/supabase/migrations/20260830_kurashift_re_statements_plans_gl.sql`  
+画面: `/mq?view=re-pl` · 設計: `docs/KURASHIFT_不動産事業BS_PL_設計_20260824.md`
 
 ```sql
--- 年間計画（月次12行 or 科目×月）
+-- 年間計画（月次12行 or 科目×月）※便利列＋plan_json
 kurashift_re_annual_plans (
   id, fiscal_year, entity, label,
   plan_json,          -- { months: [{month, income, expense, by_category}], totals }
-  source,             -- numbers | manual | revised
+  source,             -- numbers | manual | revised | mykomon
   created_at, notes
 )
 
@@ -140,6 +144,15 @@ kurashift_re_actuals (
   breakdown_json,     -- Zaim/MyKomon 科目内訳
   source, ingested_at
 )
+
+-- 期次確定決算（法人 Kneesbee R8 等）
+kurashift_re_statements (
+  id, entity, fiscal_year, period_end, source,
+  revenue_jpy, pretax_profit_jpy, …, pl_json, bs_json, reconcile_notes
+)
+
+-- 総勘定元帳
+kurashift_re_gl_lines ( … )
 
 -- 新規物件検討（Phase 3）
 kurashift_re_deals (

@@ -1,0 +1,38 @@
+---
+description: Jarvis（Cursor AI）の呼び名と Google カレンダー予定登録の扱い
+alwaysApply: true
+---
+
+# Google カレンダー予定登録（Jarvis）
+
+Jarvis の呼び名・由来・プライベート情報の正本は **`jarvis.mdc`** を参照。
+
+## Google カレンダーに予定を登録できるか
+
+**できる。** ユーザーから予定登録を依頼されたら、登録まで実行する（「できません」で終わらない）。
+
+### 現状の環境
+
+- **登録先アカウント（正）**: `admin@livingsupport-matsu.co.jp`（Gemini からの登録と揃える。詳細: `jarvis-google-accounts.mdc`）
+- **登録スクリプト**: `215_kamiooya/C1_cursor/1b_Cursorマニュアル/google_calendar_create.py`
+- **認証**: 同フォルダの `credentials.json` + `token_calendar.json`（Gmail 用 `token.json` とは分離）
+- **GCP 前提**: Google Cloud プロジェクトで **Google Calendar API が有効**であること（未有効だと 403）。有効化: https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview
+- **Python**: `/Users/matsunomasaharu2/selenium_env/venv/bin/python`（`google-api-python-client` 入り）
+
+### 依頼時の動作（優先順）
+
+1. **Google Calendar API** — `google_calendar_create.py` を実行（既定 `--login-hint admin@livingsupport-matsu.co.jp`）。初回・再認証はブラウザ OAuth（`token_calendar.json` 作成）。終了時刻省略時は 60 分。
+2. **クイック追加 URL** — API 整備前や確認用。`https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=...` を組み立て、ブラウザで開くか保存前に内容を提示する（このときも **admin** でログインしていることを確認）。
+3. **不足情報は先に聞く** — タイトル、開始・終了日時（タイムゾーン `Asia/Tokyo`）、場所、説明、リマインダー、登録先カレンダー（primary / 名前指定）。
+
+### 依頼のトリガー例
+
+- 「カレンダーに入れて」「Googleカレンダーに予定を登録して」「〇日の〇時に予定を入れて」
+
+### 注意
+
+- 着手前に「使用アカウント: admin」と1行宣言する。
+- 本番登録前に日時・タイトルを確認する（`--dry-run` や URL プレビューがあれば使う）。
+- 登録完了後、タイトル・日時・カレンダー名を短く報告する。
+- **API 登録が成功すればブラウザは不要**（保存ボタンも不要）。ブラウザが開いて保存を求めるのは API 失敗時のクイック追加 URL フォールバック。
+- **m19m 等の別アカウントに引っ張られた／古い token が別アカウントのとき**: `token_calendar.json` を削除し、`--auth-console --login-hint admin@livingsupport-matsu.co.jp` でシークレットウィンドウ認証し直す。GCP の API 有効化は **credentials.json のプロジェクト `988579281735`** を **m19m** で行う（API 有効化のオーナーと、カレンダー登録先アカウントは別でよい）。

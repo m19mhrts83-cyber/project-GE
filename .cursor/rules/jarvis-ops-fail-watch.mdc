@@ -1,0 +1,28 @@
+# Ops Fail Watch（Vercel / GHA → 直したよ）
+
+## 方針
+
+- **失敗は問題があるときだけ**ホーム／状況ウォッチに出す（アーカイブに溜めない）
+- Jarvis が直したら `--note` で **「Jarvisが直したよ」** に切り替え、失敗ピンは消える
+- ユーザーはホーム／詳細の **「確認しました」** でお知らせを消す（都度確認）
+
+## コマンド
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+python scripts/jarvis_ops_fail_watch.py --push
+python scripts/jarvis_ops_fail_watch.py --push --note '直した内容（1〜2文）'
+python scripts/jarvis_ops_fail_watch.py --push --autofix
+```
+
+## watch_status IDs
+
+| id | 表示 |
+|---|---|
+| `gha_workflow_fail` / `vercel_deploy` | 失敗時のみ（要確認）。`--note` または成功検知で消える |
+| `ops_fix_notice` | 「直したよ」。`確認しました` で消える |
+
+## 禁止に近い避け方
+
+- これらをアーカイブへ送って「処理済み」積み上げにしない
+- 直したあとも失敗を「要確認」のまま残さない（`--note` を忘れない）

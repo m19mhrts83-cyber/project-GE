@@ -9,6 +9,10 @@ import {
   type ReDealForInquiry,
 } from "@/lib/reInquiryCandidate";
 import { loadInquiryAutoConfig } from "@/lib/reInquiryAutoConfig";
+import {
+  checkFingerprintSendGuard,
+  resolveDealFingerprint,
+} from "@/lib/reDealFingerprintGuard";
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 
@@ -80,7 +84,7 @@ export async function POST(req: Request) {
   const { data: deals, error: dealsErr } = await supabase
     .from("kurashift_re_deals")
     .select(
-      "id, title, status, match_score, inquiry_status, summary_json"
+      "id, title, area, price_man, status, source, match_score, inquiry_status, summary_json, property_fingerprint"
     )
     .in("id", dealIds);
   if (dealsErr) {
@@ -156,14 +160,53 @@ export async function POST(req: Request) {
             unknown
           >)
         : {};
-    sj.inquiry_status = "draft";
+
+    const fpGuard = await checkFingerprintSendGuard(supabase, {
+      id: dealId,
+      title: deal.title,
+      area: (deal as { area?: string | null }).area ?? null,
+      price_man: (deal as { price_man?: number | null }).price_man ?? null,
+      status: deal.status,
+      source: (deal as { source?: string | null }).source ?? null,
+      inquiry_status: inquiryStatus,
+      summary_json: sj,
+      property_fingerprint:
+        (deal as { property_fingerprint?: string | null })
+          .property_fingerprint ?? null,
+    });
+    if (fpGuard.blocked) {
+      errors.push(
+        `${dealId}: fingerprint block (${fpGuard.reason}` +
+          (fpGuard.sibling_deal_id
+            ? `; sibling=${fpGuard.sibling_deal_id}`
+            : "") +
+          `)`
+      );
+      continue;
+    }
+
+    const fingerprint =
+      fpGuard.fingerprint ||
+      resolveDealFingerprint({
+        id: dealId,
+        title: deal.title,
+        area: (deal as { area?: string | null }).area ?? null,
+        price_man: (deal as { price_man?: number | null }).price_man ?? null,
+        summary_json: sj,
+        property_fingerprint:
+          (deal as { property_fingerprint?: string | null })
+            .property_fingerprint ?? null,
+      });
+    sj.inquiry_status = "sending";
+    sj.property_fingerprint = fingerprint;
 
     await supabase
       .from("kurashift_re_deals")
       .update({
-        inquiry_status: "draft",
+        inquiry_status: "sending",
         summary_json: sj,
         updated_at: now,
+        property_fingerprint: fingerprint,
       })
       .eq("id", dealId);
 

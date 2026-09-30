@@ -43,6 +43,36 @@ vendors:
     notes: "戸建賃貸の取扱いページあり"
 ```
 
+## 仲間紹介（優先差し込み · Jarvis）
+
+探索 YAML ではなく **`--peer-add`** が正（デイリーの先頭枠・Phase上限内）:
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --peer-add \
+  --name "株式会社サンプル不動産" --area "愛知県名古屋市" \
+  --url "https://example.co.jp/" --contact-url "https://example.co.jp/contact" \
+  --reason "peer_referral:戸建情報良いと聞いた" --until 2026-09-03
+```
+
+手動 YAML で `--merge-append` する場合の例:
+
+```yaml
+vendors:
+  - name: "株式会社サンプル不動産"
+    area: "愛知県名古屋市"
+    prefecture: "愛知県"
+    city: "名古屋市"
+    url: "https://example.co.jp/"
+    contact_url: "https://example.co.jp/contact"
+    channel: web_form
+    status: discovered
+    source: peer_referral
+    priority: 0
+    priority_reason: "peer_referral:戸建情報良いと聞いた"
+    priority_until: "2026-09-03"
+    notes: "仲間紹介。デイリー先頭枠"
+```
+
 ## Jarvis 取込
 
 **本線（部長日報メール）**:

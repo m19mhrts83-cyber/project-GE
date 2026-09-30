@@ -1,0 +1,61 @@
+# SecondBrain 週次パック — チーム振分語彙（複数ラベル可）
+# タイトル＋summary に部分一致したらその team へ抜粋。hawk は常に索引行を持つ。
+
+teams:
+  family:
+    keywords:
+      - 家族会議
+      - 千景
+      - 珠己
+      - 円香
+      - 紗和
+      - まどか
+      - 塾
+      - 日能研
+      - 空手
+      - 遊愛会
+      - 夫婦
+      - QOL
+      - 高校
+      - 国際教養
+  somu:
+    keywords:
+      - 総務
+      - 企画
+      - 作戦タイム
+      - 今井
+      - 大原
+      - 蜂谷
+      - 八谷
+      - 中島
+      - 太田章嗣
+      - 宇製造
+      - 上司
+      - 部門横断
+      - 組織運営
+  partner_dx:
+    keywords:
+      - Shift
+      - シフトAI
+      - ワールドインテック
+      - WI
+      - WT
+      - 代理店
+      - AI推進
+      - BI推進
+      - DX業務委託
+      - 板垣
+  app_dev:
+    keywords:
+      - アプリ
+      - ダッシュボード
+      - KURASHIFT
+      - Vercel
+      - Todoist
+      - 実装
+      - PR
+      - GitHub
+      - Next.js
+
+# どれにも当たらないノートは hawk の「未分類」に残す
+unclassified_team: hawk

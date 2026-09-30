@@ -1,10 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { formatJstDateTime } from "@/lib/format";
 import { BAIRITSU_MARKER } from "@/lib/reInquiryShared";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 import { INQUIRY_CHANNEL_LABEL } from "@/lib/reInquiryChannel";
+import { inquiryPhase } from "@/lib/rePipelineUi";
+import { openInGoogleChrome } from "@/lib/openInChrome";
 
 type Msg = {
   direction?: string;
@@ -34,6 +37,7 @@ export default function DealInquiryActions({
   autoPassPendingRead,
   autoPassReason,
   lastSendJobFailed,
+  onInquiryChanged,
 }: {
   dealId: string;
   title: string;
@@ -43,6 +47,7 @@ export default function DealInquiryActions({
   autoPassPendingRead?: boolean;
   autoPassReason?: string | null;
   lastSendJobFailed?: string | null;
+  onInquiryChanged?: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -54,12 +59,26 @@ export default function DealInquiryActions({
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const [landMethodBairitsu, setLandMethodBairitsu] = useState(false);
   const [channel, setChannel] = useState<InquiryChannel | null>(null);
+  const [interestFormUrl, setInterestFormUrl] = useState<string | null>(null);
+  const [listingUrl, setListingUrl] = useState<string | null>(null);
+  const [statusOverride, setStatusOverride] = useState<string | null>(null);
 
-  const status = inquiryStatus || "none";
+  const status = statusOverride || inquiryStatus || "none";
   const canSend =
     status === "none" || status === "draft" || status === "";
   const showPack = !canSend || (messages || []).length > 0;
   const isHandoff = channel === "grok_handoff";
+  const isKamiooyaForm = channel === "kamiooya_form";
+  const isListingWeb = channel === "listing_web";
+
+  useEffect(() => {
+    setStatusOverride(null);
+  }, [inquiryStatus]);
+
+  const notifyChanged = useCallback(() => {
+    onInquiryChanged?.();
+    router.refresh();
+  }, [onInquiryChanged, router]);
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -78,6 +97,34 @@ export default function DealInquiryActions({
         setChannel("not_applicable");
         return;
       }
+      if (data.inquiry_channel === "kamiooya_form") {
+        setChannel("kamiooya_form");
+        const url =
+          typeof data.interest_form_url === "string"
+            ? data.interest_form_url
+            : typeof data.to === "string"
+              ? data.to
+              : "";
+        setInterestFormUrl(url || null);
+        setSubject(String(data.subject || ""));
+        setBody(String(data.body || ""));
+        setPreviewLoaded(true);
+        return;
+      }
+      if (data.inquiry_channel === "listing_web") {
+        setChannel("listing_web");
+        const url =
+          typeof data.listing_url === "string"
+            ? data.listing_url
+            : typeof data.to === "string"
+              ? data.to
+              : "";
+        setListingUrl(url || null);
+        setSubject(String(data.subject || ""));
+        setBody(String(data.body || ""));
+        setPreviewLoaded(true);
+        return;
+      }
       if (data.to) setTo(String(data.to));
       setSubject(String(data.subject || ""));
       setBody(String(data.body || ""));
@@ -94,10 +141,65 @@ export default function DealInquiryActions({
     }
   }, [dealId]);
 
+  // 神大家フォーム経路を自動判定（メール編集 UI を出さないため）
+  useEffect(() => {
+    if (!canSend || previewLoaded || channel !== null) return;
+    void loadPreview();
+  }, [canSend, previewLoaded, channel, loadPreview]);
+
   const bairitsuMissing =
     landMethodBairitsu &&
     channel === "agent_email" &&
     !body.includes(BAIRITSU_MARKER);
+
+  async function listingWebOneClick() {
+    setBusy("listing_web");
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listing_web_submit" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(data.error || "失敗");
+        return;
+      }
+      const text = String(data.body || "");
+      const url = String(data.listing_url || listingUrl || "");
+      try {
+        if (text) await navigator.clipboard.writeText(text);
+      } catch {
+        /* clipboard may be denied — still open page */
+      }
+      let opened: "chrome" | "fallback" = "fallback";
+      if (url) {
+        opened = await openInGoogleChrome(url);
+      }
+      setStatusOverride(
+        typeof data.inquiry_status === "string"
+          ? data.inquiry_status
+          : "awaiting_reply"
+      );
+      if (opened === "chrome") {
+        setMsg(
+          "定型文をコピーし、Google Chrome で掲載ページを開きました。貼って送信すれば完了です（判断履歴にも記録）"
+        );
+      } else {
+        setMsg(
+          "定型文をコピーしました。掲載は中央ブラウザで開いた可能性があります。ログインが必要なら Chrome で同じURLを開くか、KURASHIFT 自体を Chrome で開いて再実行してください（Mac では open-chrome ヘルパー導入可）"
+        );
+      }
+      if (text) setBody(text);
+      if (url) setListingUrl(url);
+      notifyChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function send() {
     if (!checked) {
@@ -137,13 +239,21 @@ export default function DealInquiryActions({
       if (!res.ok) {
         setMsg(data.error || "失敗");
       } else {
+        const nextStatus =
+          typeof data.inquiry_status === "string"
+            ? data.inquiry_status
+            : "sending";
+        setStatusOverride(nextStatus);
         setMsg(
-          "キュー投入済み（Mac 常駐が送信します。失敗時はホームに表示されます）"
+          nextStatus === "sending"
+            ? "送信キューに入れました（問合せ：送信中）。Mac 常駐が送信します"
+            : "キュー投入済み（Mac 常駐が送信します。失敗時はホームに表示されます）"
         );
         setOpen(false);
         setStep("edit");
         setChecked(false);
-        router.refresh();
+        setPreviewLoaded(false);
+        notifyChanged();
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -170,7 +280,7 @@ export default function DealInquiryActions({
             ? `運営相談パック作成 → /consultations/${data.consultation_id}`
             : "パックをキューしました"
         );
-        router.refresh();
+        notifyChanged();
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -195,7 +305,32 @@ export default function DealInquiryActions({
         setMsg(
           "フォーム下書きをキューしました（Mac 常駐実行後、ドロワーに反映）"
         );
-        router.refresh();
+        notifyChanged();
+      }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function formFill() {
+    setBusy("form_fill");
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "form_fill" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(data.error || "失敗");
+      } else {
+        setMsg(
+          "運営フォームへ転記をキューしました（入力のみ・送信しません。Mac実行後ブラウザで確認）"
+        );
+        notifyChanged();
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -225,7 +360,7 @@ export default function DealInquiryActions({
             ? "既読で正しい → 既読ジョブをキュー"
             : "誤り → 候補（info）に戻しました"
         );
-        router.refresh();
+        notifyChanged();
       }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -237,7 +372,7 @@ export default function DealInquiryActions({
   return (
     <div style={{ minWidth: 160 }}>
       <div className="meta" style={{ marginBottom: 4 }}>
-        問合せ: {status}
+        問合せ: {inquiryPhase(status).label}
       </div>
       {lastSendJobFailed ? (
         <div className="meta" style={{ marginBottom: 4, color: "#b00020" }}>
@@ -270,7 +405,42 @@ export default function DealInquiryActions({
         </div>
       ) : null}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 }}>
-        {canSend && channel !== "not_applicable" ? (
+        {canSend && isListingWeb ? (
+          <div style={{ width: "100%" }}>
+            <button
+              type="button"
+              className="btn primary"
+              style={{ fontSize: 12, padding: "6px 10px" }}
+              disabled={busy !== null}
+              onClick={() => void listingWebOneClick()}
+            >
+              {busy === "listing_web"
+                ? "準備中…"
+                : "掲載ページで問合せ（定型文コピー＋開く）"}
+            </button>
+            <p className="meta" style={{ marginTop: 4, lineHeight: 1.4 }}>
+              1回で定型文をクリップボードへコピーし、掲載ページを開きます。貼り付けて送信したら、こちらは問合せ済になります。
+            </p>
+            {body ? (
+              <pre
+                style={{
+                  marginTop: 6,
+                  padding: 8,
+                  fontSize: 11,
+                  whiteSpace: "pre-wrap",
+                  background: "var(--panel, #f8fafc)",
+                  border: "1px solid var(--border, #e2e8f0)",
+                  borderRadius: 6,
+                  maxHeight: 160,
+                  overflow: "auto",
+                }}
+              >
+                {body}
+              </pre>
+            ) : null}
+          </div>
+        ) : null}
+        {canSend && channel !== "not_applicable" && !isKamiooyaForm && !isListingWeb ? (
           <button
             type="button"
             className="btn primary"
@@ -289,6 +459,67 @@ export default function DealInquiryActions({
             {isHandoff ? "詳細編集してGrok依頼" : "詳細編集して問合せ"}
           </button>
         ) : null}
+        {canSend && !isListingWeb ? (
+          <button
+            type="button"
+            className="btn"
+            style={{ fontSize: 12, padding: "4px 8px" }}
+            disabled={busy !== null}
+            onClick={async () => {
+              if (!previewLoaded || channel === null) {
+                await loadPreview();
+              }
+            }}
+          >
+            経路を確認
+          </button>
+        ) : null}
+        {canSend && (isKamiooyaForm || interestFormUrl) ? (
+          <>
+            {interestFormUrl ? (
+              <a
+                className="btn primary"
+                href={interestFormUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: 12, padding: "4px 8px" }}
+              >
+                紹介フォームを開く
+              </a>
+            ) : null}
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              disabled={busy !== null}
+              onClick={async () => {
+                setBusy("kamiooya_form");
+                setMsg(null);
+                try {
+                  const res = await fetch(`/api/re/deals/${dealId}/inquiry`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "kamiooya_form_submitted" }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    setMsg(data.error || "失敗");
+                  } else {
+                    setMsg("フォーム送信済として記録（運営返信待ち）");
+                    setStatusOverride("awaiting_reply");
+                    notifyChanged();
+                  }
+                } catch (e) {
+                  setMsg(e instanceof Error ? e.message : "エラー");
+                } finally {
+                  setBusy(null);
+                }
+              }}
+            >
+              {busy === "kamiooya_form" ? "…" : "フォーム送信した"}
+            </button>
+          </>
+        ) : null}
         {showPack ? (
           <button
             type="button"
@@ -301,15 +532,32 @@ export default function DealInquiryActions({
           </button>
         ) : null}
         {showFormDraft ? (
-          <button
-            type="button"
-            className="btn"
-            style={{ fontSize: 12, padding: "4px 8px" }}
-            disabled={busy !== null}
-            onClick={formDraft}
-          >
-            {busy === "form_draft" ? "…" : "フォーム下書き"}
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn"
+              style={{
+                fontSize: 12,
+                padding: "4px 8px",
+                background: "#059669",
+                color: "#fff",
+                border: "none",
+              }}
+              disabled={busy !== null}
+              onClick={formFill}
+            >
+              {busy === "form_fill" ? "…" : "運営フォームへ転記"}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              disabled={busy !== null}
+              onClick={formDraft}
+            >
+              {busy === "form_draft" ? "…" : "フォーム下書き"}
+            </button>
+          </>
         ) : null}
       </div>
       {open && canSend ? (
@@ -452,7 +700,7 @@ export default function DealInquiryActions({
         <ul className="meta" style={{ paddingLeft: 14, marginTop: 6 }}>
           {(messages || []).slice(-3).map((m, i) => (
             <li key={i}>
-              {(m.occurred_at || "").slice(0, 10)} {m.direction}/{m.kind}:{" "}
+              {formatJstDateTime(m.occurred_at)} {m.direction}/{m.kind}:{" "}
               {(m.subject || "").slice(0, 28)}
             </li>
           ))}

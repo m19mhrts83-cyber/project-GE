@@ -107,6 +107,15 @@ category_rules:
   - match: "利息"
     entity: personal
     kind: interest
+  # 外国債・外国株の評価損益（値動き記録用・個人の収支からは除外）
+  - match: "外国債減収"
+    entity: skip
+  - match: "外国債増収"
+    entity: skip
+  - match: "株増収"
+    entity: skip
+  - match: "外国株減収"
+    entity: skip
 
 # カテゴリ kind が未設定のときの収入/支出の既定
 defaults:

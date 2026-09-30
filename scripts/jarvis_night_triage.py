@@ -2,11 +2,12 @@
 """
 Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
 
-1. gmail_to_yoritoori.py で取込（パートナー）
+1. gmail_to_yoritoori.py で取込（パートナー・任意）
 2. 5.やり取り.md / admin INBOX から未返信候補を抽出
-3. Gemini / Cursor Agent で要返信判定・下書き生成（メールのみ）
-4. Chatwork／LINE／iMessage・815神大家オプチャの直近更新概要を queue に載せる
-5. .jarvis_state/night_triage/queue.json を更新（lane=partner|general|openchat）
+3. 既定はヒューリスティックで未返信インボックス化（Gemini/Cursor 判定・下書きなし）
+   （パートナー: Gmail ＋ Chatwork／LINE／iMessage。815 オプチャは下書きしない）
+4. 815神大家オプチャの直近更新概要を queue に載せる（kind=activity）
+5. Gmail 既読（取込時点）＋ .jarvis_state/night_triage/queue.json 更新
 
 使い方:
   python scripts/jarvis_night_triage.py --dry-run
@@ -14,6 +15,7 @@ Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
   python scripts/jarvis_night_triage.py --lane general --skip-fetch --limit 5
   python scripts/jarvis_night_triage.py --apply-draft 12
   python scripts/jarvis_night_triage.py --send-gmail 12   # general のみ・承認後
+  # LLM（非推奨・課金）: --allow-llm --engine gemini
 """
 from __future__ import annotations
 
@@ -82,6 +84,13 @@ SKIP_FOLDERS = {
 
 OPENCHAT_ROOT_NAME = "815_神大家オプチャ"
 PLACEHOLDER_BODY_RE = re.compile(r"(\[本文なし|E2EE|復号でき|プレースホルダ)", re.I)
+# Chatwork システム通知・スタンプのみ等（要返信判定対象外）
+CHAT_NOISE_RE = re.compile(
+    r"(\[dtext:|chatroom_member|chatroom_added|chatroom_chat_edited|chatroom_chatna|"
+    r"\[deleted\]|入室しました|退室しました|"
+    r"^\[?(画像|スタンプ|動画|ファイル|ボイスメッセージ)\]?$)",
+    re.I,
+)
 ACTIVITY_LOOKBACK_DEFAULT = 7
 ACTIVITY_PER_PARTNER = 3
 ACTIVITY_PARTNER_MAX = 30
@@ -242,6 +251,37 @@ def is_chat_inbound(channel: str) -> bool:
     return False
 
 
+def is_chat_noise(summary: str, body: str, subject: str = "") -> bool:
+    blob = f"{summary or ''}\n{subject or ''}\n{(body or '')[:500]}"
+    if CHAT_NOISE_RE.search(blob):
+        return True
+    if PLACEHOLDER_BODY_RE.search(summary or "") and PLACEHOLDER_BODY_RE.search(body or ""):
+        return True
+    text = re.sub(r"\s+", "", (summary or "") + (body or "")[:200])
+    if not text or text in ("（要約なし）", "（本文未取得）"):
+        return True
+    return False
+
+
+def chat_thread_key(folder: str, channel: str, kind: str) -> str:
+    """folder|kind|room。Chatwork はルーム名をキーに含める。"""
+    ch = channel or ""
+    room = ""
+    m = re.search(r"Chatwork[・･\s]*([^）)\]]+)", ch)
+    if m:
+        room = m.group(1).strip()
+    elif kind == "LINE":
+        m2 = re.search(r"（([^）]*LINE[^）]*)）", ch)
+        if m2:
+            room = m2.group(1).strip()
+    return f"{folder}|{kind}|{room}"
+
+
+def chat_entry_id(folder: str, received_at: str, kind: str, summary: str) -> str:
+    raw = f"chat|{folder}|{kind}|{received_at}|{(summary or '')[:80]}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
+
 def parse_received_at(s: str) -> datetime | None:
     s = (s or "").strip()
     for fmt, n in (("%Y/%m/%d %H:%M", 16), ("%Y/%m/%d", 10)):
@@ -272,55 +312,13 @@ def find_recent_chat_activity(
     *,
     per_partner: int = ACTIVITY_PER_PARTNER,
 ) -> list[dict[str, Any]]:
-    """パートナー MD から Chatwork/LINE/iMessage の直近受信を抽出。"""
-    cutoff = None
-    if lookback_days > 0:
-        from datetime import timedelta
+    """旧: パートナー Chatwork/LINE/iMessage の概要のみ。
 
-        cutoff = datetime.now(JST) - timedelta(days=lookback_days)
-    picked: list[dict[str, Any]] = []
-    # 新しい順に走査し、フォルダごとに上限
-    ordered = sorted(entries, key=lambda x: x.get("received_at") or "", reverse=True)
-    per_folder: dict[str, int] = {}
-    for e in ordered:
-        kind = chat_channel_kind(e.get("channel") or "")
-        if not kind:
-            continue
-        if not is_chat_inbound(e.get("channel") or ""):
-            continue
-        if NOISE_SUBJECT_RE.search(e.get("summary") or "") or NOISE_SUBJECT_RE.search(e.get("subject") or ""):
-            continue
-        if cutoff:
-            dt = parse_received_at(e.get("received_at") or "")
-            if dt and dt < cutoff:
-                continue
-        folder = e.get("folder") or ""
-        if per_folder.get(folder, 0) >= per_partner:
-            continue
-        per_folder[folder] = per_folder.get(folder, 0) + 1
-        summary = summarize_activity_text(e.get("summary") or "", e.get("body") or "")
-        subject = e.get("subject") or summary
-        if subject == e.get("summary") or not e.get("subject"):
-            subject = f"[{kind}] {summary[:80]}"
-        picked.append(
-            {
-                "id": activity_id("partner", folder, e.get("received_at") or "", e.get("channel") or "", summary),
-                "lane": "partner",
-                "kind": "activity",
-                "status": "info",
-                "channel": kind,
-                "channel_raw": e.get("channel") or "",
-                "partner_name": e.get("partner_name") or "",
-                "folder": folder,
-                "received_at": e.get("received_at") or "",
-                "subject": subject[:120],
-                "summary": summary,
-                "body": (e.get("body") or "")[:2000],
-                "priority": "",
-                "draft_text": "",
-            }
-        )
-    return picked
+    2026-09-12 以降は find_unreplied_chat → 要返信判定＋下書きへ昇格したため、
+    二重表示を避け空リストを返す（815 オプチャ activity は別関数のまま）。
+    """
+    _ = (entries, lookback_days, per_partner)
+    return []
 
 
 def list_openchat_mds(base: Path) -> list[tuple[str, Path]]:
@@ -498,6 +496,10 @@ def entry_id(folder: str, received_at: str, subject: str) -> str:
 
 def parse_yoritoori(md_path: Path, partner_folder: str, partner_name: str) -> list[dict[str, Any]]:
     text = md_path.read_text(encoding="utf-8", errors="replace")
+    return parse_yoritoori_text(text, partner_folder, partner_name)
+
+
+def parse_yoritoori_text(text: str, partner_folder: str, partner_name: str) -> list[dict[str, Any]]:
     lines = text.splitlines()
     entries: list[dict[str, Any]] = []
     i = 0
@@ -581,12 +583,79 @@ def find_unreplied(entries: list[dict[str, Any]], lookback_days: int) -> list[di
             {
                 **last,
                 "lane": "partner",
+                "channel": "Gmail",
+                "channel_raw": last.get("channel") or "",
                 "context": ctx,
                 "id": entry_id(last["folder"], last["received_at"], last["subject"]),
             }
         )
     # 新しい順
     candidates.sort(key=lambda x: x["received_at"], reverse=True)
+    return candidates
+
+
+def find_unreplied_chat(entries: list[dict[str, Any]], lookback_days: int) -> list[dict[str, Any]]:
+    """Chatwork／LINE／iMessage: folder|kind|room 単位で、最後が受信のものを未返信候補にする。"""
+    from datetime import timedelta
+
+    by_key: dict[str, list[dict[str, Any]]] = {}
+    for e in entries:
+        ch_raw = e.get("channel") or ""
+        kind = chat_channel_kind(ch_raw)
+        if not kind:
+            continue
+        if is_chat_noise(e.get("summary") or "", e.get("body") or "", e.get("subject") or ""):
+            continue
+        if NOISE_SUBJECT_RE.search(e.get("summary") or "") or NOISE_SUBJECT_RE.search(e.get("subject") or ""):
+            continue
+        inbound = is_chat_inbound(ch_raw)
+        folder = e.get("folder") or ""
+        key = chat_thread_key(folder, ch_raw, kind)
+        row = {
+            **e,
+            "inbound": inbound,
+            "chat_kind": kind,
+            "channel_raw": ch_raw,
+        }
+        by_key.setdefault(key, []).append(row)
+
+    cutoff = None
+    if lookback_days > 0:
+        cutoff = datetime.now(JST) - timedelta(days=lookback_days)
+
+    candidates: list[dict[str, Any]] = []
+    for _key, items in by_key.items():
+        ordered = sorted(items, key=lambda x: x.get("received_at") or "")
+        last = ordered[-1]
+        if not last.get("inbound"):
+            continue
+        if cutoff:
+            dt = parse_received_at(last.get("received_at") or "")
+            if dt and dt < cutoff:
+                continue
+        kind = last.get("chat_kind") or "LINE"
+        summary = summarize_activity_text(last.get("summary") or "", last.get("body") or "")
+        subject = last.get("subject") or summary
+        if not last.get("subject") or subject == last.get("summary"):
+            subject = f"[{kind}] {summary[:100]}"
+        ctx = ordered[-4:]
+        candidates.append(
+            {
+                **last,
+                "lane": "partner",
+                "channel": kind,
+                "subject": subject[:160],
+                "summary": summary,
+                "context": ctx,
+                "id": chat_entry_id(
+                    last.get("folder") or "",
+                    last.get("received_at") or "",
+                    kind,
+                    summary,
+                ),
+            }
+        )
+    candidates.sort(key=lambda x: x.get("received_at") or "", reverse=True)
     return candidates
 
 
@@ -688,14 +757,23 @@ def cursor_generate(prompt: str) -> str:
 
 
 def build_judge_prompt(c: dict[str, Any]) -> str:
+    channel = (c.get("channel") or "Gmail").strip() or "Gmail"
+    media = {
+        "Gmail": "メール",
+        "Chatwork": "Chatwork",
+        "LINE": "LINE",
+        "iMessage": "iMessage/SMS",
+    }.get(channel, channel)
     ctx_lines = []
     for e in c.get("context") or []:
-        role = "相手" if e["inbound"] else "自分"
-        ctx_lines.append(f"[{e['received_at']}|{role}] {e['subject']}\n{(e['body'] or '')[:1200]}")
-    return f"""あなたは不動産オーナー（松野）の秘書です。メールについて返信が必要か判定してください。
+        role = "相手" if e.get("inbound") else "自分"
+        subj = e.get("subject") or e.get("summary") or ""
+        ctx_lines.append(f"[{e.get('received_at')}|{role}] {subj}\n{(e.get('body') or '')[:1200]}")
+    return f"""あなたは不動産オーナー（松野）の秘書です。{media} のやり取りについて返信が必要か判定してください。
 
 相手: {c['partner_name']}（{c.get('folder') or c.get('from_email') or c.get('lane') or ''}）
-最新件名: {c['subject']}
+チャネル: {media}
+最新件名／要約: {c.get('subject') or ''}
 最新受信: {c['received_at']}
 
 直近のやり取り:
@@ -706,17 +784,27 @@ def build_judge_prompt(c: dict[str, Any]) -> str:
 次の JSON のみを返してください（Markdown不可）:
 {{"needs_reply": true/false, "priority": "high"|"medium"|"low", "summary": "1行要約", "reason": "短い理由"}}
 
-返信不要の例: 単なる承知の連絡、自動通知、パスワード通知、既に完結している御礼のみ、配信メール、広告。
+返信不要の例: 単なる承知の連絡、自動通知、パスワード通知、既に完結している御礼のみ、配信メール、広告、システム入退室、スタンプのみ。
 返信要の例: 質問・依頼・署名依頼・確認待ち・期限あり・意思決定が必要。
 """
 
 
 def build_draft_prompt(c: dict[str, Any], judge: dict[str, Any]) -> str:
+    channel = (c.get("channel") or "Gmail").strip() or "Gmail"
+    media = {
+        "Gmail": "メール",
+        "Chatwork": "Chatwork",
+        "LINE": "LINE",
+        "iMessage": "iMessage/SMS",
+    }.get(channel, channel)
     ctx_lines = []
     for e in c.get("context") or []:
-        role = "相手" if e["inbound"] else "自分"
-        ctx_lines.append(f"[{e['received_at']}|{role}]\n{(e['body'] or '')[:1500]}")
-    return f"""あなたは株式会社リビングサポート松の代表・松野真治です。パートナーへの返信メール下書きを書いてください。
+        role = "相手" if e.get("inbound") else "自分"
+        ctx_lines.append(f"[{e.get('received_at')}|{role}]\n{(e.get('body') or '')[:1500]}")
+    line_hint = ""
+    if channel == "LINE":
+        line_hint = "- LINE 向け: 短め（目安200〜400字）。絵文字は相手のトーンに合わせ最小限。\n"
+    return f"""あなたは株式会社リビングサポート松の代表・松野真治です。パートナーへの返信（{media}）下書きを書いてください。
 
 ルール:
 - 日本語。丁寧だが冗長にしない。
@@ -725,9 +813,10 @@ def build_draft_prompt(c: dict[str, Any], judge: dict[str, Any]) -> str:
 - 勝手な約束・金額・日付を捏造しない。文脈にないことは書かない。不明点は確認の一文にする。
 - 件名行は書かない。本文のみ。
 - 「Re:」や引用は付けない。
-
+{line_hint}
 パートナー: {c['partner_name']}
-件名（参考）: {c['subject']}
+チャネル: {media}
+件名（参考）: {c.get('subject') or ''}
 判定要約: {judge.get('summary', '')}
 
 直近やり取り:
@@ -1003,6 +1092,8 @@ def queue_item_fields(c: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any
         "gmail_message_id": c.get("gmail_message_id") or "",
         "from_email": from_email,
         "message_id_header": c.get("message_id_header") or "",
+        "channel": c.get("channel") or ("Gmail" if (c.get("lane") or "partner") != "openchat" else ""),
+        "channel_raw": c.get("channel_raw") or "",
         "original_body": body[:8000],
         "updated_at": now_iso(),
     }
@@ -1060,6 +1151,60 @@ def regenerate_dashboard() -> None:
     dash = REPO / "scripts" / "jarvis_triage_dashboard.py"
     if dash.is_file():
         subprocess.run([str(PY), str(dash), "--write"], check=False)
+
+
+def process_candidates_heuristic(
+    candidates: list[dict[str, Any]],
+    *,
+    dry_run: bool,
+    limit: int,
+) -> tuple[int, int]:
+    """Gemini/Cursor なし: 未返信候補を pending としてキューへ（下書き空）。"""
+    queue = load_queue()
+    need = 0
+    for c in candidates[:limit]:
+        lane = c.get("lane") or "partner"
+        label = c.get("folder") or c.get("from_email") or lane
+        print(f"# candidate [heuristic/{lane}/{label}] {c['received_at']} {c['subject'][:60]}")
+        if dry_run:
+            print("  (dry-run) skip write")
+            need += 1
+            continue
+        kind = c.get("kind") or ("chat" if (c.get("channel") or "") in ("Chatwork", "LINE", "iMessage") else "mail")
+        if lane == "general":
+            try:
+                from jarvis_night_triage_general import classify_general_kind
+
+                kind = classify_general_kind(
+                    c.get("subject") or "",
+                    c.get("body") or "",
+                    c.get("from_email") or "",
+                )
+            except Exception:
+                kind = "mail"
+        priority = "high" if kind == "mail" else ("med" if lane == "partner" else "low")
+        upsert_item(
+            queue,
+            queue_item_fields(
+                c,
+                {
+                    "priority": priority,
+                    "summary": (c.get("summary") or c.get("subject") or "")[:200],
+                    "reason": "heuristic_unreplied_inbox",
+                    "draft_text": "",
+                    "draft_gemini": "",
+                    "draft_cursor": "",
+                    "status": "pending",
+                    "engine": "heuristic",
+                    "kind": kind,
+                },
+            ),
+        )
+        need += 1
+    if not dry_run:
+        assign_seqs(queue)
+        save_json(QUEUE_PATH, queue)
+    return need, 0
 
 
 def process_candidates(
@@ -1199,6 +1344,7 @@ def apply_draft_to_partner(seq_or_id: str) -> Path | None:
         raise SystemExit("draft_text empty")
     lane = item.get("lane") or "partner"
     subject = item.get("subject") or ""
+    channel = (item.get("channel") or "Gmail").strip() or "Gmail"
     if lane == "general":
         print(f"# lane=general (Gmail Reply)")
         print(f"# to: {item.get('from_email')}")
@@ -1211,15 +1357,30 @@ def apply_draft_to_partner(seq_or_id: str) -> Path | None:
         return None
     folder = item["folder"]
     partner_dir = partner_base() / folder
-    draft_path = partner_dir / "4.送信下書き.txt"
-    if not subject.lower().startswith("re:"):
-        subject_line = f"件名：Re: {subject}"
+    partner_dir.mkdir(parents=True, exist_ok=True)
+    partner_name = str(item.get("partner") or folder)
+
+    if channel == "LINE":
+        draft_path = partner_dir / "4.LINE送信下書き.txt"
+        content = f"宛先: {partner_name}\n\n{draft}\n"
+    elif channel == "Chatwork":
+        draft_path = partner_dir / "4.Chatwork送信下書き.txt"
+        content = f"{draft}\n"
+    elif channel == "iMessage":
+        draft_path = partner_dir / "4.送信下書き.txt"
+        content = f"経路：iMessage\n\n{draft}\n"
     else:
-        subject_line = f"件名：{subject}"
-    content = f"{subject_line}\n\n{draft}\n"
+        draft_path = partner_dir / "4.送信下書き.txt"
+        if not subject.lower().startswith("re:"):
+            subject_line = f"件名：Re: {subject}"
+        else:
+            subject_line = f"件名：{subject}"
+        content = f"{subject_line}\n\n{draft}\n"
+
     draft_path.write_text(content, encoding="utf-8")
     print(f"# wrote draft -> {draft_path}")
     print(f"# partner folder: {folder}")
+    print(f"# channel: {channel}")
     print(f"# subject: {subject}")
     return draft_path
 
@@ -1255,10 +1416,25 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Jarvis night email triage")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--skip-fetch", action="store_true")
-    ap.add_argument("--engine", choices=("gemini", "cursor"), default=None)
+    ap.add_argument("--engine", choices=("gemini", "cursor", "heuristic"), default=None)
     ap.add_argument("--compare-engines", action="store_true")
     ap.add_argument("--judge-only", action="store_true")
+    ap.add_argument(
+        "--allow-llm",
+        action="store_true",
+        help="Gemini/Cursor 判定・下書きを許可（非推奨・課金）。既定はヒューリスティックのみ。",
+    )
     ap.add_argument("--lane", choices=("partner", "general", "all"), default="all")
+    ap.add_argument(
+        "--skip-partner-gmail",
+        action="store_true",
+        help="パートナー Gmail 未返信判定をスキップ（GHA 本線時）",
+    )
+    ap.add_argument(
+        "--skip-partner-chatwork",
+        action="store_true",
+        help="パートナー Chatwork 未返信判定をスキップ（GHA 本線時。LINE/iMessage は継続）",
+    )
     ap.add_argument("--limit", type=int, default=0, help="処理する候補の上限（0=config）")
     ap.add_argument("--lookback-days", type=int, default=0)
     ap.add_argument("--mark-sent", metavar="ID")
@@ -1307,7 +1483,23 @@ def main() -> int:
         print("# night triage disabled in config.json")
         return 0
 
-    engine = args.engine or cfg.get("engine") or DEFAULT_ENGINE
+    # 課金削減 2026-09: 既定は LLM なし（heuristic）。--allow-llm または config allow_llm のみ有効。
+    allow_llm = bool(args.allow_llm) or bool(cfg.get("allow_llm"))
+    no_gemini_env = (os.environ.get("JARVIS_TRIAGE_NO_GEMINI") or "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if no_gemini_env and not args.allow_llm:
+        allow_llm = False
+    if args.compare_engines and not allow_llm:
+        print("# --compare-engines requires --allow-llm; falling back to heuristic", file=sys.stderr)
+        allow_llm = False
+
+    engine = args.engine or cfg.get("engine") or ("heuristic" if not allow_llm else DEFAULT_ENGINE)
+    if not allow_llm:
+        engine = "heuristic"
     model = cfg.get("gemini_model") or DEFAULT_GEMINI_MODEL
     api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
     limit = args.limit or int(cfg.get("max_drafts_per_run") or 15)
@@ -1324,23 +1516,44 @@ def main() -> int:
 
     base = partner_base()
     print(f"# partner base: {base}")
-    print(f"# engine: {'compare' if args.compare_engines else engine} model={model} lane={args.lane}")
+    print(
+        f"# engine: {engine} model={model} lane={args.lane} "
+        f"llm={'on' if allow_llm else 'off'}"
+    )
 
     all_cands: list[dict[str, Any]] = []
     activities: list[dict[str, Any]] = []
     activity_lookback = int(cfg.get("activity_lookback_days") or ACTIVITY_LOOKBACK_DEFAULT)
     if do_partner:
+        skip_pg = args.skip_partner_gmail or (
+            (os.environ.get("JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL") or "").strip().lower()
+            in ("1", "true", "yes", "on")
+        )
+        skip_cw = args.skip_partner_chatwork or (
+            (os.environ.get("JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_CHATWORK") or "").strip().lower()
+            in ("1", "true", "yes", "on")
+        )
+        if skip_pg:
+            print("# skip partner Gmail unreplied (GHA / --skip-partner-gmail)")
+        if skip_cw:
+            print("# skip partner Chatwork unreplied (GHA / --skip-partner-chatwork)")
         for folder, md in list_partner_mds(base):
             name = folder.split("_", 1)[-1] if "_" in folder else folder
             entries = parse_yoritoori(md, folder, name)
-            cands = find_unreplied(entries, lookback)
-            all_cands.extend(cands)
+            if not skip_pg:
+                all_cands.extend(find_unreplied(entries, lookback))
+            chat_cands = find_unreplied_chat(entries, lookback)
+            if skip_cw:
+                chat_cands = [c for c in chat_cands if (c.get("channel") or "") != "Chatwork"]
+            all_cands.extend(chat_cands)
             activities.extend(find_recent_chat_activity(entries, activity_lookback))
-        # パートナー活動: 全体上限
+        # パートナー活動: チャットは要返信キューへ昇格済みのため通常0件
         activities.sort(key=lambda x: x.get("received_at") or "", reverse=True)
         activities = activities[:ACTIVITY_PARTNER_MAX]
-        print(f"# partner unreplied candidates: {sum(1 for c in all_cands if c.get('lane')=='partner')}")
-        print(f"# partner chat activity: {len(activities)}")
+        n_mail = sum(1 for c in all_cands if c.get("lane") == "partner" and (c.get("channel") or "Gmail") == "Gmail")
+        n_chat = sum(1 for c in all_cands if c.get("lane") == "partner" and (c.get("channel") or "") in ("Chatwork", "LINE", "iMessage"))
+        print(f"# partner unreplied candidates: mail={n_mail} chat={n_chat}")
+        print(f"# partner chat activity (legacy overview): {len(activities)}")
 
         oc_acts: list[dict[str, Any]] = []
         for group, md in list_openchat_mds(base):
@@ -1380,16 +1593,43 @@ def main() -> int:
         todo.append(c)
 
     print(f"# to process: {len(todo)} (limit {limit})")
-    need, drafted = process_candidates(
-        todo,
-        engine=engine,
-        compare=args.compare_engines,
-        model=model,
-        api_key=api_key,
-        dry_run=args.dry_run,
-        limit=limit,
-        judge_only=args.judge_only,
-    )
+    if engine == "heuristic" or not allow_llm:
+        need, drafted = process_candidates_heuristic(
+            todo,
+            dry_run=args.dry_run,
+            limit=limit,
+        )
+    else:
+        need, drafted = process_candidates(
+            todo,
+            engine=engine,
+            compare=args.compare_engines,
+            model=model,
+            api_key=api_key,
+            dry_run=args.dry_run,
+            limit=limit,
+            judge_only=args.judge_only,
+        )
+
+    # Gmail: Dashboard 取込時点で既読（閉じ待ちにしない）。物件紹介は general に載らないため未読のまま → KURASHIFT 取込時。
+    mail_items = [
+        c
+        for c in all_cands
+        if (c.get("gmail_message_id") or "").strip()
+        and (c.get("channel") or "Gmail") == "Gmail"
+    ]
+    if mail_items:
+        try:
+            from jarvis_night_triage_general import mark_gmail_read_for_items
+
+            mr = mark_gmail_read_for_items(mail_items, dry_run=args.dry_run)
+            print(
+                f"# gmail read-on-ingest: ok={mr.get('ok')} "
+                f"fail={mr.get('fail')} skip={mr.get('skip')}"
+                + (" dry-run" if args.dry_run else "")
+            )
+        except Exception as e:
+            print(f"# gmail read-on-ingest failed: {e}", file=sys.stderr)
 
     if do_partner and not args.dry_run:
         queue = load_queue()
@@ -1450,7 +1690,8 @@ def main() -> int:
             json.dumps(
                 {
                     "at": now_iso(),
-                    "engine": "compare" if args.compare_engines else engine,
+                    "engine": engine if not args.compare_engines else "compare",
+                    "llm": allow_llm,
                     "lane": args.lane,
                     "candidates": len(all_cands),
                     "need": need,

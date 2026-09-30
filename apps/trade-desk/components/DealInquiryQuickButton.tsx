@@ -24,6 +24,7 @@ export default function DealInquiryQuickButton({
   badges,
   compact,
   openHref,
+  onSent,
 }: {
   dealId: string;
   title: string;
@@ -34,6 +35,7 @@ export default function DealInquiryQuickButton({
   badges?: string[];
   compact?: boolean;
   openHref?: string;
+  onSent?: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -128,6 +130,9 @@ export default function DealInquiryQuickButton({
       } else {
         setOpen(false);
         setChecked(false);
+        setLoaded(false);
+        setMsg("送信キューに入れました（問合せ：送信中）");
+        onSent?.();
         router.refresh();
       }
     } catch (e) {

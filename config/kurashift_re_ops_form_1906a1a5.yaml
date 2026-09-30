@@ -15,11 +15,14 @@ fields:
   - id: name
     label: 姓名
     tier: auto
+    # 転記時は PERSONAL_NAME_FAMILY / PERSONAL_NAME_GIVEN を優先（無ければ PERSONAL_NAME を分割）
     env: [PERSONAL_NAME]
   - id: email
     label: メールアドレス
     tier: auto
-    env: [PERSONAL_EMAIL]
+    # 運営フォームは estate 宛（個人 m19m ではない）
+    env: [OPS_FORM_EMAIL]
+    default_email: matsuno.estate@gmail.com
   - id: planning_aligned
     label: プランニングにおおむね沿っている物件ですか
     tier: manual
@@ -120,7 +123,8 @@ fields:
     tier: manual
     default_template: |
       以下を確認したいです。
-      ・概算修繕費が概ね合っているかどうか。
-      ・他に注意点はないかどうか。
-      ・購入すべき数字かどうか
+      ・戸建て初めてでやや遠い物件なので、内見に値する物件か見解を聞きたいです。
+      ・土地値が高いので、共同担保に使用できるのであれば購入を進める価値があると考えています。今回の物件は三井住友L&F（L&Fアセットファイナンス）の共同担保に使えそうでしょうか。
+      ・講座で、L&Fは支店エリア外だと共同担保に使えない／評価が出ない、と理解しています。豊川市御油は名古屋支店の対象エリアに入るかも合わせてご確認をお願い致します。
+      ・概算修繕費が概ね合っているか、他に注意点はないか。
       ご確認をお願い致します。

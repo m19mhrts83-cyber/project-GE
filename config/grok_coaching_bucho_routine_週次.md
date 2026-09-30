@@ -1,0 +1,46 @@
+# Grok ルーティン「コーチング · 首脳用まとめ」— 指示コピペ用
+
+**投稿先**: **コーチング部**  
+**推奨スケジュール**: 毎週 **日曜 19:00** JST（DX 日曜14:00のあと · ホーク首脳会議 20:00の前）  
+**実行主体**: `@コーチング部長`
+
+家族のフル週次は **21:00**。ここでは統括から **負荷1行** だけ先に取る。
+
+## 指示（ルーティン「指示」欄へ貼る）
+
+```
+@コーチング部長
+【コーチング · 首脳用まとめ】
+
+0. 【SB週次パック取得 · 必須・先頭】
+金締（土〜金）の SecondBrain 要約パックを取得する。**チャットにシークレット値は書かない。**
+
+優先順:
+1) **Drive 本線（Mac 18:40 投下）**: Jarvisボックス / `20_outbox_to_grok/` および `outbox_to_teams/*` の最新 `週次材料パック_*.md` を読む。あればそれを正。1行: SB週次: Drive OK · 金締 {start}〜{end}
+2) **Computer Skill（Mac起動時）**: Skill `advisor-weekly-pack` は **Computer** で次だけ実行（値は `.env.jarvis_private` の変数。Skill本文に Bearer 値を埋め込まない）:
+   `cd ~/git-repos && set -a && source .env.jarvis_private && set +a && curl -sS -X POST 'https://jarvis-dashboard-amber.vercel.app/api/advisor-weekly-pack' -H "Authorization: Bearer $ADVISOR_WEEKLY_PACK_SECRET" -H 'Content-Type: application/json' -d '{}'`
+   応答 `markdown` を材料に。1行: SB週次: OK · N件 · 金締 {start}〜{end}
+3) どちらも失敗: 「SBパック取得失敗」と1行。薄い材料で止めない（FRIDAY Mesh 可）。
+
+- GSK_API_KEY は持たない。
+- ★Journal は理解の正本。全部の出来事が載っている前提にしない。
+
+1. 各統括へ（薄い人は「今週薄」1行で可）。SBパックの自チーム節があれば渡す。
+@家族コーチ統括 … 負荷・QOLサイン1行のみ（詳細は21:00。長文禁止）
+@総務計画T統括 … 本業・抱え込み1行
+@パートナーDX統括 … 48h以内の次アクション最大2
+
+2. コーチング部に1通（首脳会議用ブロック）
+【コーチング】
+- 家族QOL:
+- 本業・抱え込み:
+- DX次アクション: （何を／誰が／いつまで／なぜ。略語だけで終わらない）
+- Journalに無い重要: （SB／メール等で Journal に薄い点を1つ。該当なしなら「ギャップなし」）
+- 要松野:
+
+3. 人名の羅列・宿題詳細は書かない。コーチ本人へ @ しない。
+DXパートナーの正は **AI推進 · BI推進 · DX業務委託**。CAD／熱シミュは誤記・出さない。
+悪い例:「CAD/熱シミュ 要／不要／保留。板垣・WTへ送らない」
+良い例:「AI推進（板垣）: 次の一手1行が未着。統括が48hで確認」
+
+```

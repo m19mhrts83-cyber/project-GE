@@ -1,0 +1,26 @@
+---
+description: 神大家幹事の懇親会・現地会開催申請フォーム（年2回）。「懇親会申請」「飲み会幹事」「form.os7.biz」等の依頼時に適用。
+alwaysApply: false
+---
+
+# 神大家 — 懇親会開催申請フォーム
+
+## 正本（入力記録・テンプレ）
+
+| 役割 | パス |
+|------|------|
+| **入力記録 YAML** | `~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1d_神大家手続き自動化/懇親会開催申請_入力記録.yaml` |
+| **運用手順** | 同フォルダ `懇親会開催申請_運用メモ.md` |
+
+## 依頼時
+
+1. **YAML** の `applicant`（会員番号・氏名・メール）と `applications` 最新履歴を参照
+2. **備考**は Notion「神大家さん幹事(案内)」配下の当該イベントページから要点を抽出（`templates.remarks` 参照）
+3. **課題・動画**は依頼時の進捗に合わせ `templates.kadai_status` / `video_status` 形式で記載
+4. **進捗シート**は `westudy_common/kadai_sheet_fetch.py` / `kadai_sheet_update.py`
+5. フォーム URL: `https://form.os7.biz/f/b46fab9a/`（WeStudy 問い合わせフォーム１経由）
+6. **送信（確認→完了）はユーザー確認後**。Jarvis は入力・確認画面まで
+
+## 申請後
+
+新規イベント分を `applications` に追記して YAML を更新する。

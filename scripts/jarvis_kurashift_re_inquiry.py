@@ -203,15 +203,36 @@ def messages_table_ok(sb: Any) -> bool:
 
 
 def insert_message(sb: Any, deal: dict[str, Any], row: dict[str, Any]) -> str:
-    """DB 表があれば insert。無ければ summary_json.messages に追記。"""
+    """DB 表があれば insert。無ければ summary_json.messages に追記。
+
+    kind が check 制約外（旧 DB）でも、送信後ステータス更新を止めない。
+    """
     if messages_table_ok(sb):
         try:
             ins = sb.table("kurashift_re_deal_messages").insert(row).execute()
             return (ins.data or [{}])[0].get("id") or "ok"
         except Exception as e:
+            err = str(e).lower()
             # unique gmail_id
-            if "duplicate" in str(e).lower() or "23505" in str(e):
+            if "duplicate" in err or "23505" in err:
                 return "dup"
+            # kind_check 等: grok_handoff → first_inquiry にフォールバック
+            if "23514" in err or "kind_check" in err:
+                soft = dict(row)
+                if soft.get("kind") == "grok_handoff":
+                    soft["kind"] = "first_inquiry"
+                    payload = soft.get("payload")
+                    if isinstance(payload, dict):
+                        soft["payload"] = {**payload, "handoff": True, "kind_fallback": True}
+                    try:
+                        ins = sb.table("kurashift_re_deal_messages").insert(soft).execute()
+                        print("📎 inquiry_message: kind fallback to first_inquiry")
+                        return (ins.data or [{}])[0].get("id") or "ok"
+                    except Exception as e2:
+                        print(f"📎 inquiry_message: insert skipped after fallback: {e2}")
+                        return "skipped"
+                print(f"📎 inquiry_message: insert skipped (constraint): {e}")
+                return "skipped"
             raise
     sj = sj_of(deal)
     msgs = list(sj.get("messages") or [])
@@ -359,8 +380,10 @@ def send_inquiry(
     dry_run: bool,
     handoff: bool | None = None,
     inquiry_channel: str | None = None,
+    force: bool = False,
 ) -> dict[str, Any]:
     from jarvis_kurashift_re_inquiry_channel import (
+        is_kamiooya_ops_email,
         is_self_email as channel_is_self,
     )
 
@@ -391,6 +414,16 @@ def send_inquiry(
         }
         print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
         return out
+    # 神大家運営・事務局へ第一問合せテンプレを送らない（2026-09-20 誤送信）
+    if not handoff and is_kamiooya_ops_email(to_email):
+        out = {
+            "ok": False,
+            "error": "agent_to_is_kamiooya_ops",
+            "deal_id": deal_id,
+            "to": to_email,
+        }
+        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return out
     if not confirm and not dry_run:
         return {"ok": False, "error": "need --i-confirm-send or --dry-run"}
 
@@ -413,10 +446,13 @@ def send_inquiry(
             return out
 
     fields = inquiry_fields(deal)
-    if fields.get("inquiry_status") in ("awaiting_reply", "awaiting_grok", "has_reply"):
-        out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
-        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
-        return out
+    cur_status = fields.get("inquiry_status")
+    # grok 調査完了後の第一問合せ送信（handoff is False）は awaiting_grok から送信可能
+    if not force:
+        if cur_status in ("awaiting_reply", "has_reply") or (handoff and cur_status == "awaiting_grok"):
+            out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
+            print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+            return out
 
     result = {
         "ok": True,
@@ -477,13 +513,34 @@ def send_inquiry(
         },
     )
     next_status = "awaiting_grok" if handoff else "awaiting_reply"
+    fp_patch: dict[str, Any] = {
+        "inquiry_channel": "grok_handoff" if handoff else "agent_email"
+    }
+    try:
+        # 送信時に fingerprint を正本化（ガード・マージ用）
+        from jarvis_kurashift_re_deal_dedupe_merge import deal_fingerprint
+
+        fp = deal_fingerprint(deal)
+        if fp and not str(fp).startswith("id:"):
+            fp_patch["property_fingerprint"] = fp
+            try:
+                sb.table("kurashift_re_deals").update(
+                    {
+                        "property_fingerprint": fp,
+                        "updated_at": now_iso(),
+                    }
+                ).eq("id", deal_id).execute()
+            except Exception:
+                pass
+    except Exception:
+        pass
     update_inquiry(
         sb,
         deal,
         inquiry_status=next_status,
         inquiry_thread_id=thread_id,
         inquiry_sent_at=now_iso(),
-        summary_json={"inquiry_channel": "grok_handoff" if handoff else "agent_email"},
+        summary_json=fp_patch,
     )
     if not handoff and deal.get("status") == "info":
         try:
@@ -568,7 +625,18 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
         existing = {m.get("gmail_id") for m in list_messages(sb, deal) if m.get("gmail_id")}
         for m in full.get("messages") or []:
             mid = m.get("id")
-            if not mid or mid in existing:
+            if not mid:
+                continue
+            if not dry_run and "UNREAD" in (m.get("labelIds") or []):
+                try:
+                    svc.users().messages().modify(
+                        userId="me",
+                        id=str(mid),
+                        body={"removeLabelIds": ["UNREAD"]},
+                    ).execute()
+                except Exception:
+                    pass
+            if mid in existing:
                 continue
             payload = m.get("payload") or {}
             hm = header_map(payload.get("headers"))
@@ -642,6 +710,23 @@ def poll_replies(sb: Any, *, deal_id: str | None = None, dry_run: bool = False) 
                                     )
                         except Exception as e:
                             print(f"# pdf_fetch soft-fail: {type(e).__name__}: {e}")
+                        try:
+                            from jarvis_kurashift_re_reply_extract import (
+                                extract_deal,
+                                load_fields_cfg,
+                                emit_grok_mail_draft,
+                            )
+
+                            er = extract_deal(
+                                sb, deal, load_fields_cfg(), dry_run=False
+                            )
+                            emit_grok_mail_draft(deal, er)
+                            print(
+                                f"# reply_extract deal={str(deal['id'])[:8]}… "
+                                f"{er.get('stats')}"
+                            )
+                        except Exception as e:
+                            print(f"# reply_extract soft-fail: {type(e).__name__}: {e}")
     out = {"ok": True, "scanned_threads": scanned, "appended": appended, "dry_run": dry_run}
     print(f"📎 inquiry_poll: scanned={scanned} appended={appended}")
     print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
@@ -779,6 +864,7 @@ def main() -> int:
     ap.add_argument("--deal-id", default="", help="poll/pack の対象絞り込み")
     ap.add_argument("--build-ops-pack", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--force", action="store_true", help="強制送信（awaiting_grok からの送信等）")
     args = ap.parse_args()
     sb = sb_client()
 
@@ -804,6 +890,7 @@ def main() -> int:
             dry_run=args.dry_run,
             handoff=handoff_flag,
             inquiry_channel=args.inquiry_channel or None,
+            force=args.force,
         )
         return 0 if r.get("ok") else 1
     if args.poll_replies:

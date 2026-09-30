@@ -38,6 +38,18 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/quiet-edge/health/ingest") {
     return NextResponse.next({ request });
   }
+  // Todoist App Webhook（HMAC で保護。ログイン不要）
+  if (path === "/api/todoist/webhook") {
+    return NextResponse.next({ request });
+  }
+  // Todoist OAuth リダイレクト（承認完了ページ）
+  if (path === "/api/todoist/oauth/callback") {
+    return NextResponse.next({ request });
+  }
+  // アドバイザー週次パック（ADVISOR_WEEKLY_PACK_SECRET で保護。コーチング部長 Action）
+  if (path === "/api/advisor-weekly-pack") {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();

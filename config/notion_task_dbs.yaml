@@ -34,7 +34,7 @@ lanes:
     initial_status: 未着手
     open_statuses: ["未着手", "エージェント待ち", "進行中"]
     done_statuses: ["完了"]
-    hide_done_on_board: false
+    hide_done_on_board: true
   kodate:
     title: 戸建て
     database_id: 656aa175-2371-4b14-a704-3aa965b2619a
@@ -63,6 +63,20 @@ lanes:
     open_statuses: ["未着手", "進行中"]
     done_statuses: ["完了"]
     hide_done_on_board: false
+  kanji:
+    title: 飲み会幹事
+    database_id: 3ccf6bbe-5a76-8147-b53b-cddeb1b411cf
+    data_source_id: 3ccf6bbe-5a76-8182-9a58-000bc93e96aa
+    board_url: https://app.notion.com/p/3ccf6bbe5a768147b53bcddeb1b411cf
+    title_prop: プロジェクト名
+    status_prop: ステータス
+    due_prop: 終了日
+    start_prop: 開始日
+    property_prop: null
+    initial_status: 未着手
+    open_statuses: ["未着手", "進行中"]
+    done_statuses: ["完了"]
+    hide_done_on_board: false
   kazoku:
     title: 家族
     database_id: 9a5b4921-5835-49f8-b8c4-22e8caf8621a
@@ -77,3 +91,22 @@ lanes:
     open_statuses: ["未着手", "進行中"]
     done_statuses: ["完了"]
     hide_done_on_board: false
+
+# 購入手前・運営相談結果のまとめ（タスク看板 lanes とは別。ダッシュボード看板には出さない）
+# 運営に「買うべきか」を聞いた結果を蓄積する正本。KURASHIFT deal とは自動同期しない。
+# Integration「Jarvisダッシュボード」へ DB を接続（共有）すると API 読取可。未共有時は URL のみ。
+purchase_pre:
+  title: DB_物件購入検討(購入手前)
+  database_id: 25ef6bbe-5a76-80c7-be60-dd114cb0e231
+  view_id: 27cf6bbe-5a76-809d-b3b9-000c827f3785
+  board_url: https://app.notion.com/p/25ef6bbe5a7680c7be60dd114cb0e231?v=27cf6bbe5a76809db3b9000c827f3785
+  role: ops_consult_results
+  title_prop: 物件名
+  field_map: config/kurashift_re_research_fields.yaml
+  hide_from_dashboard_lanes: true
+  # 2026-09-14: Jarvisダッシュボード Integration 接続済（コメント読取・書込可）
+  integration_connected: true
+  answer_script: scripts/jarvis_kurashift_ops_consult_answer.py
+  note: |
+    運営回答は KURASHIFT deal（案件別）と本 DB のコメント（一覧概観）の両方へ
+    jarvis_kurashift_ops_consult_answer.py --apply で残す。

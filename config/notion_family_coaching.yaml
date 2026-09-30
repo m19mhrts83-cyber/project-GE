@@ -10,9 +10,29 @@ root_page_id: "26ef6bbe-5a76-8045-8a11-e7cbfb4c90cb"
 root_page_url: "https://app.notion.com/p/26ef6bbe5a7680458a11e7cbfb4c90cb"
 root_page_title: 家族会議
 
+# 週次運用（確定 2026-09-20）
+# Notion: 前週日付ページを複製して (YYYY/MM/DD) を増やす。1枚統合しない。
+# 議事録 MD・インフォは「その週の日付ページ末尾」へ添付。
+# 横断参照は NotebookLM「家族会議」1ノート（config/notebooklm_studio.yaml family_meeting_weekly）。
+weekly_log_pattern:
+  mode: duplicate_dated_child
+  title_format: "(YYYY/MM/DD)"
+  attach_infographic_to: same_week_page_end_before_minutes
+  attach_minutes_to: same_week_page_end_after_infographic
+  minutes_format: inline_summary_blocks
+  notebooklm_key: family_meeting_weekly
+  drive_folder: "13_家族会議_週次"
+  note: >
+    会議後 Jarvis: インフォ画像 → 議事録要約本文の順。
+    MDはDrive/NLM用。ルール jarvis-family-meeting-weekly.mdc
+
+
 coaching_hub_page_id: "282f6bbe-5a76-8097-bd9d-c2fbbdb49a49"
 coaching_hub_page_url: "https://app.notion.com/p/282f6bbe5a768097bd9dc2fbbdb49a49"
 coaching_hub_title: 子供コーチング
+journal_weekly_hub_page_id: "3c6f6bbe-5a76-8168-b72f-e35a7f44343c"
+journal_weekly_hub_page_url: "https://app.notion.com/p/Journal-3c6f6bbe5a768168b72fe35a7f44343c"
+journal_weekly_note: "レガシー · Drive NG 時フォールバック。Grok 正本は Obsidian ★Journal（admin Drive）。投影: jarvis_family_journal_weekly.py"
 
 inventory_status: ok
 inventory_at: "2026-08-23"
@@ -69,7 +89,7 @@ sources:
     title: 家族会議
     kind: family_meeting
     child_ids: [madoka, tamaki, sawa]
-    note: 日付付き会議子ページ群（2025-09〜。直近例 2026/08/23）
+    note: 日付付き会議子ページ群（前週複製で増やす。議事録・インフォは同ページ末尾。横断は NotebookLM 家族会議1ノート）
   - page_id: "282f6bbe-5a76-8097-bd9d-c2fbbdb49a49"
     title: 子供コーチング
     kind: other_meeting
@@ -113,7 +133,15 @@ sources:
     kind: meeting_consult
     child_ids: [madoka, tamaki, sawa]
 
-# 補完（Notion 外）
+# 補完（Obsidian 正本 · admin Drive。Grok 家族コーチ統括が週次で読む）
+obsidian_journal_primary:
+  drive_relative: "500_Obsidian_r1/01_Journaling/★Journal"
+  week_boundary: "土曜始まり〜金曜終わり（金締）"
+  file_patterns:
+    - "★Journal/YYYY-MM-DD.md"
+    - "★Journal/YYYY-MM/YYYY-MM-DD.md"
+  note: "2026-08-28〜 Grok 統括の Journal 正本。Notion Journal週次はフォールバック"
+
 obsidian_complements:
   - path: "01_Journaling/★Journal/"
     note: 日次 Journal・カール参謀レビュー
@@ -123,7 +151,7 @@ obsidian_complements:
     note: 思春期対応・優先順位
   - path: "01_Journaling/★Note/背景_Chappy行動フィードバック_準拠ログ.md"
     note: たまき中学受験ミッションB
-  - path: "03_Literature Note(まとめノート)/★Journal_統合ログ_Geminiコーチング用.md"
+  - path: "03_Literature Note(まとめノート)/仕事術・AI連携/★Journal_統合ログ_Geminiコーチング用.md"
     note: 自分向けコーチの型
 
 partner_mail_note: >

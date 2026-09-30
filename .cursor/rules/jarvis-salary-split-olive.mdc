@@ -1,0 +1,55 @@
+---
+description: 給与・賞与の4口座振分（Oliveメイン化）。Literature Noteを@指定、「この参照ファイルから読み取って」、第1案／第2案／年次見直しの依頼時に適用。
+alwaysApply: false
+---
+
+# 給与振込4口座（Olive メイン化）— Jarvis
+
+## 正本（必ず最初に読む）
+
+| 役割 | パス |
+|------|------|
+| **サマリー・依頼テンプレ・会話紐付け** | Obsidian Literature Note `給与振込4口座_Oliveメイン化_サマリー.md`（`500_Obsidian_r1/03_Literature Note(まとめノート)/家計・ライフプラン/`） |
+| **金額・会社提出・設定手順** | `~/git-repos/.jarvis_state/salary_split_olive_proposal.json` ほか同フォルダの `salary_split_*.md` |
+| **秘密（店番・口座番号）** | `~/git-repos/.env.jarvis_private`（`SMBC_OLIVE_BANK_*` 等。チャットに貼らない） |
+
+ユーザーが「この参照ファイルから読み取って」と給与振分・Olive 口座・第1案／第2案の文脈で依頼したら、**上記サマリーを Read してから**回答・作業する。
+
+## 採用方針（意図の固定）
+
+- **当面は第1案**: Olive 余り／大垣 17万／名銀 16.5万／**東海労金 7万**
+- **第2案**: 東海労金を給与枠から外す（**大垣は残す**）。学資・コパン・固都税を名銀等へ移した後
+- 豊明市の固定資産税口座振替は **大垣・Olive（三井住友）不可** → 名銀等へ
+- 「東海農協をなくす」＝ **東海労金** の誤変換として扱う
+
+## トリガー例
+
+- `@給与振込4口座_Oliveメイン化_サマリー.md`
+- 「第1案で会社届出」「第2案に切り替え」「給与振分の年次見直し」
+- 「この参照ファイルから読み取って」（本サマリー添付時）
+
+## 着金カレンダー（ルーティン・カード引落連携）
+
+| 項目 | 正 |
+|---|---|
+| **給与名目日** | 毎月 **20日** |
+| **前倒し** | 20日が土日祝 → **直前の営業日**（金曜が多い。例: 2026-07-20 海の日 → 7/17 金曜着金） |
+| **余り着金先** | **三井住友 Olive／刈谷**（2026-08〜）。固定3口座（大垣・名銀・労金）は触らない |
+| **Amex** | 当面 SBI 本から引落。給与余りは SMBC に入るため **同日でも相殺されない** |
+| **大型寄せ** | **余り着金を確認してから**実行（`wait_for_salary_before_xfer`） |
+| **賞与** | 名目は **1日払い**想定だが、**実績は Zaim 正**（2026夏: 6/24 に SBI へ 1,720,746） |
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_salary_pay_calendar.py
+~/selenium_env/venv/bin/python scripts/jarvis_salary_pay_calendar.py --month 2026-08 --json
+```
+
+設定: `config/salary_pay_calendar.yaml`  
+余り見積: 先月の可変余り実績を優先（残業が大きく増えない前提）。
+
+## 作業時の注意
+
+- 会社届出・きちんと振込の**実行前**は内容を提示して確認（`jarvis-outbound-confirm` に準ずる対外手続）
+- 金額変更したら Literature Note §進捗・§更新履歴と `salary_split_olive_proposal.json` を同期する
+- カード引落の寄せ計画では本カレンダーと Amex（SBI）をセットで見る（`jarvis-finance-philosophy`／money-ops）

@@ -40,7 +40,10 @@ CONTACT_YAML = BASE_DIR / "000_共通" / "連絡先一覧.yaml"
 CREDENTIALS_PATH = SCRIPT_DIR / "credentials.json"
 TOKEN_PATH = SCRIPT_DIR / "token.json"
 
-from gmail_api_scopes import GMAIL_SCOPES_215 as SCOPES, token_satisfies_215_scopes
+from gmail_api_scopes import (
+    GMAIL_SCOPES_READ_MODIFY as SCOPES,
+    token_satisfies_read_modify_scopes,
+)
 from yoritoori_utils import (
     YORITOORI_FILENAME,
     parse_received_date_folder,
@@ -62,10 +65,16 @@ def _load_env_token() -> Path:
     p = os.environ.get("GMAIL_TOKEN_PATH")
     if p:
         return Path(p)
-    for name in ("token_estate.json", "token.json"):
+    # 受信集約後: admin 優先。estate 直受信フォールバック。
+    for name in ("token_livingsupport.json", "token_estate.json", "token_m19m.json", "token.json"):
         cand = SCRIPT_DIR / name
         if cand.exists():
-            return cand
+            try:
+                d = json.loads(cand.read_text(encoding="utf-8"))
+                if token_satisfies_read_modify_scopes(d):
+                    return cand
+            except Exception:
+                continue
     return TOKEN_PATH
 
 
@@ -139,8 +148,11 @@ def _get_gmail_service():
         print(f"エラー: Gmail token が見つかりません: {token_path}", file=sys.stderr)
         sys.exit(1)
     token_data = json.loads(token_path.read_text(encoding="utf-8"))
-    if not token_satisfies_215_scopes(token_data):
-        print("エラー: Gmail token のスコープが不足しています。", file=sys.stderr)
+    if not token_satisfies_read_modify_scopes(token_data):
+        print(
+            "エラー: Gmail token のスコープが不足しています（readonly+modify が必要）。",
+            file=sys.stderr,
+        )
         sys.exit(1)
     creds = Credentials.from_authorized_user_info(token_data, SCOPES)
     return build("gmail", "v1", credentials=creds)

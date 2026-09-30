@@ -1,0 +1,47 @@
+---
+description: Genspark（MainFunc）Impact アフィリエイト審査メール監視。パートナー確認・関連依頼時に m19m Gmail を見て「来た／まだ」を報告。
+alwaysApply: true
+---
+
+# Genspark Impact アフィリエイト審査ウォッチ（Jarvis）
+
+## 背景
+
+2026-09-20 に Impact 経由で **MainFunc PTE.LTD（Genspark）** アフィリエイト申請済み（アカウント: `m19m.hrts83@gmail.com`、状態 In Review）。  
+承認・却下メールが来るまで、パートナー確認などのついでに結果を報告する。
+
+## 無効化
+
+次のいずれか:
+
+- `~/git-repos/.jarvis_state/genspark_impact_affiliate_watch.json` に `"disabled": true`
+- または `.env.jarvis_private` に `JARVIS_GENSPARK_IMPACT_AFFILIATE_WATCH_DISABLE=1`
+- 承認済みを確認したら `python scripts/jarvis_genspark_impact_affiliate_check.py --mark-approved`
+- ユーザーが「ウォッチ不要」と明示 → `--mark-disabled`
+
+## チェックスクリプト（正本）
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_genspark_impact_affiliate_check.py
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_genspark_impact_affiliate_check.py --mark-checked
+```
+
+使用アカウント: **m19m** / Gmail API（MCP 禁止。`jarvis-gmail-api-first.mdc`）
+
+## いつ実行・報告するか
+
+| トリガー | 動作 |
+|---|---|
+| **パートナー確認**（`partner-email-check.mdc`） | 前半報告の末尾付近で `--mark-checked` 実行。出力ブロックを貼る |
+| 「アフィリエイト」「Impact」「Genspark 紹介」「審査来た？」等 | 即実行して **来た／まだ** を1ブロックで報告 |
+| 承認メールを確認した直後 | トラッキングリンク取得を続け、`--mark-approved` |
+
+## 報告フォーマット
+
+スクリプト出力の `📎 Genspark Impact アフィリエイト` ブロックをそのまま貼る。
+
+## 関連
+
+- state: `~/git-repos/.jarvis_state/genspark_impact_affiliate_watch.json`
+- アカウント表: `jarvis-google-accounts.mdc`
+- Impact ダッシュボード: `https://app.impact.com/secure/member/home/mview.ihtml`

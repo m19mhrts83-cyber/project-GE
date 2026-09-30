@@ -339,12 +339,25 @@ def _maybe_complete_email_otp(page) -> None:
     if "メール認証" not in (page.title() or "") and "認証コード" not in body:
         return
 
-    send = page.locator("button.btn-proceed, button:has-text('送信')")
+    if "ロックしました" in body or "WPIE020291" in body:
+        raise RuntimeError("あかつき証券: メール認証の試行過多により認証コードが一時ロックされています。解除までしばらくお待ちください。(WPIE020291)")
+
+    # すでに認証コード入力欄がある場合は送信済み（ステップ2）
+    otp_input = page.locator("input[name='mailOtp'], input[placeholder*='認証コード']")
     sent_ms = int(time.time() * 1000)
-    if send.count() > 0:
-        send.first.click()
-        page.wait_for_load_state("domcontentloaded")
-        page.wait_for_timeout(1500)
+    if otp_input.count() == 0:
+        send = page.locator("button:has-text('送信'), button[value*='Send' i]")
+        if send.count() > 0:
+            send.first.click()
+            page.wait_for_load_state("domcontentloaded")
+            page.wait_for_timeout(2000)
+            body_after = ""
+            try:
+                body_after = page.inner_text("body")
+            except Exception:
+                pass
+            if "ロックしました" in body_after or "WPIE020291" in body_after:
+                raise RuntimeError("あかつき証券: メール認証の試行過多により認証コードが一時ロックされています。解除までしばらくお待ちください。(WPIE020291)")
 
     to_email = (
         os.environ.get("AKATSUKI_OTP_GMAIL")
@@ -361,7 +374,7 @@ def _maybe_complete_email_otp(page) -> None:
 
         code = poll_solar_otp_from_gmail(
             to_email=to_email,
-            min_internal_date_ms=sent_ms,
+            min_internal_date_ms=sent_ms - 60_000,
             max_wait_s=180,
         )
     finally:
@@ -371,19 +384,26 @@ def _maybe_complete_email_otp(page) -> None:
             os.environ["SOLAR_LOAN_OTP_GMAIL_QUERY"] = prev_q
 
     box = page.locator(
-        "input[name*='otp' i], input[name*='code' i], input[name*='auth' i], "
+        "input[name='mailOtp'], input[name*='otp' i], input[name*='code' i], input[name*='auth' i], "
         "input[type='tel'], input[type='text'], input[inputmode='numeric']"
     )
     if box.count() == 0:
         raise RuntimeError("メール認証の入力欄が見つかりません")
     box.first.fill(code)
+    try:
+        box.first.dispatch_event("input")
+        box.first.dispatch_event("change")
+    except Exception:
+        pass
+
     go = page.locator(
-        "button[type='submit'], button:has-text('認証'), button:has-text('次へ'), button.btn-proceed"
+        "button[value='buttonAccept'], button:has-text('認証'), button.btn-proceed"
     )
     if go.count() == 0:
         raise RuntimeError("メール認証の送信ボタンが見つかりません")
     go.first.click()
     page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(1500)
 
 
 def fetch_bond_balance(

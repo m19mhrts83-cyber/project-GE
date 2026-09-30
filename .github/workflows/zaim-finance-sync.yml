@@ -1,0 +1,160 @@
+name: Zaim Finance Daily Sync (06:00 JST)
+
+on:
+  schedule:
+    # 毎朝 06:00 JST（= 毎日 21:00 UTC）
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Target year"
+        required: false
+        default: "2026"
+      skip_apply:
+        description: "Skip auto apply to Zaim Web"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: zaim-finance-sync
+  cancel-in-progress: false
+
+jobs:
+  zaim-finance-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+      JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+      ZAIM_CSV_BASE_DIR: ${{ github.workspace }}/downloads
+      ZAIM_LOGIN_EMAIL: ${{ secrets.ZAIM_LOGIN_EMAIL }}
+      ZAIM_PASSWORD: ${{ secrets.ZAIM_PASSWORD }}
+      # GHA は playwright 導入の Chromium を使う（Mac の channel=chrome は使わない）
+      ZAIM_BROWSER_CHANNEL: default
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pyyaml supabase requests
+          python -m playwright install --with-deps chromium
+
+      - name: Restore Zaim Storage State
+        run: |
+          set -euo pipefail
+          STATE_DIR="215_kamiooya/C1_cursor/finance/zaim_budget_sync"
+          mkdir -p "$STATE_DIR"
+          if [[ -z "${{ secrets.ZAIM_STORAGE_STATE_B64 }}" ]]; then
+            echo "::error::ZAIM_STORAGE_STATE_B64 secret is not set!"
+            exit 1
+          fi
+          echo "${{ secrets.ZAIM_STORAGE_STATE_B64 }}" | base64 -d > "$STATE_DIR/.zaim_storage_state.json"
+          echo "Storage state restored ($(wc -c < "$STATE_DIR/.zaim_storage_state.json") bytes)"
+          # secret を更新したときは別キャッシュ空間にし、古いセッションで上書きしない
+          STATE_HASH=$(sha256sum "$STATE_DIR/.zaim_storage_state.json" | awk '{print substr($1,1,16)}')
+          echo "STATE_HASH=$STATE_HASH" >> "$GITHUB_ENV"
+          echo "Storage state hash prefix: $STATE_HASH"
+          if [[ -z "${ZAIM_PASSWORD:-}" ]]; then
+            echo "::warning::ZAIM_PASSWORD secret is empty. Session expire will fail unless cache/storage_state is still valid."
+          else
+            echo "ZAIM_PASSWORD is set (email login fallback available)"
+          fi
+          if [[ -z "${ZAIM_LOGIN_EMAIL:-}" ]]; then
+            echo "ZAIM_LOGIN_EMAIL secret is empty; export script uses its built-in default"
+          fi
+
+      - name: Restore cached Zaim session
+        uses: actions/cache/restore@v4
+        with:
+          path: 215_kamiooya/C1_cursor/finance/zaim_budget_sync/.zaim_storage_state.json
+          key: zaim-storage-state-${{ env.STATE_HASH }}-${{ github.run_id }}
+          restore-keys: |
+            zaim-storage-state-${{ env.STATE_HASH }}-
+
+      - name: Step 1 - Initial CSV Export (Fetch Latest Bank & Card Records)
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          python 215_kamiooya/C1_cursor/finance/zaim_budget_sync/zaim_csv_export.py \
+            --year "${{ github.event.inputs.year || '2026' }}" \
+            --output-dir ./downloads \
+            --headless \
+            --login-method email
+
+      - name: Step 2 - Zaim Watch Runner (Detect Duplicates, Learn Categories & Apply to Web)
+        run: |
+          set -euo pipefail
+          APPLY_FLAG=""
+          if [[ "${{ github.event.inputs.skip_apply }}" == "true" ]]; then
+            APPLY_FLAG="--skip-apply"
+          fi
+          python scripts/jarvis_zaim_watch_runner.py --skip-finance $APPLY_FLAG || true
+
+      - name: Step 3 - Final CSV Export (Fetch Cleaned Data with Applied Rules)
+        run: |
+          set -euo pipefail
+          python 215_kamiooya/C1_cursor/finance/zaim_budget_sync/zaim_csv_export.py \
+            --year "${{ github.event.inputs.year || '2026' }}" \
+            --output-dir ./downloads \
+            --headless \
+            --login-method email
+
+      - name: Step 4 - Push Finance Metrics to Supabase Dashboard
+        run: |
+          set -euo pipefail
+          YEAR="${{ github.event.inputs.year || '2026' }}"
+          PREV_YEAR=$((YEAR - 1))
+          python scripts/jarvis_finance_metrics.py --year "$YEAR" --push
+          python scripts/jarvis_finance_metrics.py --year "$PREV_YEAR" --push || true
+
+      - name: Step 4b - Bank sync freshness check (no update buttons)
+        run: |
+          set -euo pipefail
+          mkdir -p .jarvis_state
+          python scripts/jarvis_zaim_bank_sync_check.py || true
+
+      - name: Step 5 - Update Situation Watch on Dashboard
+        run: |
+          set -euo pipefail
+          python scripts/jarvis_situation_watch.py --write || true
+          python scripts/jarvis_dashboard_push.py --watch-only || true
+          python scripts/jarvis_zaim_refresh_queue_poll.py --ack-only || true
+
+      - name: Step 6 - Bank sync check (read-only, no update buttons)
+        run: |
+          set -euo pipefail
+          # 銀行「連携データを更新」は押さない。CSV ラグから stale を検知して state / Watch に載せる
+          YEAR="${{ github.event.inputs.year || '2026' }}"
+          # export は downloads/{年}年度/Zaim.{年}年度.csv
+          python scripts/jarvis_zaim_bank_sync_check.py --year "$YEAR" || true
+          python scripts/jarvis_situation_watch.py --write || true
+          python scripts/jarvis_dashboard_push.py --watch-only || true
+
+      - name: Save refreshed Zaim session
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: 215_kamiooya/C1_cursor/finance/zaim_budget_sync/.zaim_storage_state.json
+          key: zaim-storage-state-${{ env.STATE_HASH }}-${{ github.run_id }}
+
+      - name: Upload Cleaned CSV & Logs Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zaim-finance-artifacts
+          path: |
+            downloads/
+            .jarvis_state/zaim_*.json
+            .jarvis_state/finance_metrics.json
+            215_kamiooya/C1_cursor/finance/zaim_budget_sync/screenshots/
+          retention-days: 14

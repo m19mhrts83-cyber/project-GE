@@ -1,0 +1,47 @@
+# エアウォレット資金移動（Jarvis）
+
+## 方針（2026-08-15 確定）
+
+- **10万円以下**で、**同一名義・AW に紐づけ済み**の口座なら **エアウォレットを優先**する。
+- 理由: ことら経由の即時出金が簡単で、IB の OTP／最終確認と同程度の操作なら AW の方が早いことが多い。
+- **使える口座は限られる**（名義違い・公式一覧外は不可）。千景名義の MUFG 豊明は真治 AW に付けられない。
+
+## トリガー
+
+- カード引落バッファの寄せ・資金移動・「エアウォレットで」
+- 10万以下の他行送金を IB で始めようとしているとき
+- 週次調査・状況ウォッチ `airwallet_banks`
+
+## Jarvis の動作
+
+1. 金額 ≤ `prefer_airwallet_max_jpy`（既定 100,000）かつ AW 可なら、**先に AW 手順を提案**（IB を既定にしない）。
+2. 紐づけ可否が不明なら `config/kurashift_airwallet_banks.yaml` と state を見る。
+3. 週次で公式一覧を取り、**今使っている銀行が新たに対応**したらお知らせする。
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_airwallet_banks_weekly.py
+```
+
+## 確認済み（真治 AW）
+
+| 口座 | メモ |
+|---|---|
+| 滋賀銀行 | 2026-08-15 出金実績 |
+| 京都銀行 | 2026-08-15 出金実績 |
+| 三菱UFJ 熱田 | AW で使える（豊明・千景と別） |
+| 三井住友 刈谷 | 出金先 |
+
+## やらないこと
+
+- 名義違い口座を AW に強引に載せる提案
+- 一覧外（例: 東海労金・大垣共立・名古屋）を AW 前提にする
+- 秘密（口座番号・パスワード）をチャットに出す
+
+## 関連
+
+- 設定: `config/kurashift_airwallet_banks.yaml`
+- state: `.jarvis_state/airwallet_banks_weekly.json`
+- レール: `config/kurashift_transfer_rails.yaml`
+- Chrome 片付け: `jarvis-transfer-browser-cleanup.mdc`（IB 時）
+- 金融助言順: `jarvis-finance-philosophy.mdc`

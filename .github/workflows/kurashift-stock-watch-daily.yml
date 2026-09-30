@@ -1,0 +1,56 @@
+name: KURASHIFT stock watch daily
+
+# 東証引け後に Yahoo 日足 → 閾値評価 → Todoist Theme株式へ通知。
+# 自動発注はしない。
+
+on:
+  schedule:
+    - cron: "5 7 * * 1-5" # 平日 16:05 JST
+  workflow_dispatch:
+    inputs:
+      skip_notify:
+        description: "Todoist 通知をスキップ（eval のみ）"
+        required: false
+        type: boolean
+        default: false
+      propose_weekly:
+        description: "週次提案も実行"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: kurashift-stock-watch-daily
+  cancel-in-progress: true
+
+jobs:
+  stock-watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -q supabase pyyaml
+
+      - name: Daily fetch + eval (+ notify)
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN_OWNER || secrets.TODOIST_API_TOKEN }}
+          SKIP_NOTIFY: ${{ github.event.inputs.skip_notify || 'false' }}
+          PROPOSE_WEEKLY: ${{ github.event.inputs.propose_weekly || 'false' }}
+        run: |
+          set -euo pipefail
+          ARGS=(--fetch --eval --range 6mo)
+          if [ "${SKIP_NOTIFY}" != "true" ]; then
+            ARGS+=(--notify)
+          fi
+          if [ "${PROPOSE_WEEKLY}" = "true" ]; then
+            ARGS+=(--propose-weekly)
+          fi
+          python scripts/jarvis_kurashift_stock_watch.py "${ARGS[@]}"

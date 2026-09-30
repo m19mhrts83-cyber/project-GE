@@ -15,6 +15,7 @@ import {
 } from "@/lib/laneView";
 import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
+import { isSelfEmail } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 
 /** summary が原文の先頭切り出しだけなら、カード上では出さない（全文側に寄せる） */
@@ -133,7 +134,11 @@ export default async function TriageLanePage({
       .eq("status", "pending")
       .neq("kind", "activity")
       .order("received_at", { ascending: true });
-    unread = (pending || []) as TriageRow[];
+    unread = ((pending || []) as TriageRow[]).filter((it) => {
+      // general（その他）レーンでは自分発信を未読一覧に出さない
+      if (lane === "general" && isSelfEmail(it.from_email)) return false;
+      return true;
+    });
   } else if (view === "activity") {
     const { data } = await supabase
       .from("triage_items")
@@ -164,7 +169,9 @@ export default async function TriageLanePage({
           unread.length - 1,
         );
   const focus = unread[idx];
-  const gmailReady = gmailSendConfigured();
+  const gmailReady = gmailSendConfigured(
+    focus?.account || (lane === "general" ? "admin" : "estate"),
+  );
   const focusPayload =
     focus?.payload && typeof focus.payload === "object"
       ? (focus.payload as Record<string, unknown>)
@@ -368,24 +375,58 @@ export default async function TriageLanePage({
                     visualsError={focusVisuals.error}
                     open
                   />
-                  <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>
-                    返信下書き
-                  </h3>
-                  <DraftWorkbench
-                    id={focus.id}
-                    path={viewPath}
-                    subject={focus.subject}
-                    toEmail={focus.from_email}
-                    partner={focus.partner}
-                    folder={focus.folder}
-                    lane={lane}
-                    draftText={focus.draft_text}
-                    payload={focus.payload}
-                    status={focus.status}
-                    gmailReady={gmailReady}
-                    resolvedTo={focusTo.to}
-                    toSource={focusTo.source}
-                  />
+                  {!(focus.draft_text || "").trim() ? (
+                    <p className="meta" style={{ marginTop: 14 }}>
+                      夜間バッチは未返信の識別のみ（下書きなし）。重要なら Gmail
+                      → パートナー確認。上の「スキップ／後で／確認した」が主操作です。
+                    </p>
+                  ) : null}
+                  {(focus.draft_text || "").trim() ? (
+                    <>
+                      <h3 style={{ fontSize: "0.95rem", marginTop: 14 }}>
+                        返信下書き
+                      </h3>
+                      <DraftWorkbench
+                        id={focus.id}
+                        path={viewPath}
+                        subject={focus.subject}
+                        toEmail={focus.from_email}
+                        partner={focus.partner}
+                        folder={focus.folder}
+                        lane={lane}
+                        draftText={focus.draft_text}
+                        payload={focus.payload}
+                        status={focus.status}
+                        gmailReady={gmailReady}
+                        resolvedTo={focusTo.to}
+                        toSource={focusTo.source}
+                      />
+                    </>
+                  ) : (
+                    <details style={{ marginTop: 10 }}>
+                      <summary
+                        className="meta"
+                        style={{ cursor: "pointer", userSelect: "none" }}
+                      >
+                        手動で返信下書きを書く（任意）
+                      </summary>
+                      <DraftWorkbench
+                        id={focus.id}
+                        path={viewPath}
+                        subject={focus.subject}
+                        toEmail={focus.from_email}
+                        partner={focus.partner}
+                        folder={focus.folder}
+                        lane={lane}
+                        draftText={focus.draft_text}
+                        payload={focus.payload}
+                        status={focus.status}
+                        gmailReady={gmailReady}
+                        resolvedTo={focusTo.to}
+                        toSource={focusTo.source}
+                      />
+                    </details>
+                  )}
                 </article>
               </>
             )}
@@ -442,9 +483,35 @@ export default async function TriageLanePage({
                     </p>
                     {st === "sent" ? (
                       <p className="meta">
-                        {appended
-                          ? "送信済み・やり取り反映済"
-                          : "送信済み（やり取り追記は Mac 同期後）"}
+                        {(() => {
+                          const pl =
+                            it.payload && typeof it.payload === "object"
+                              ? (it.payload as {
+                                  sent_at?: string;
+                                  sent_to?: string;
+                                  gmail_sent_from?: string;
+                                })
+                              : {};
+                          const when = pl.sent_at
+                            ? new Date(pl.sent_at).toLocaleString("ja-JP", {
+                                timeZone: "Asia/Tokyo",
+                                month: "2-digit",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "";
+                          const bits = [
+                            "送りました",
+                            when ? when : null,
+                            pl.sent_to ? `→ ${pl.sent_to}` : null,
+                            pl.gmail_sent_from
+                              ? `from ${pl.gmail_sent_from}`
+                              : null,
+                            appended ? "やり取り反映済" : "やり取り追記は Mac 同期後",
+                          ].filter(Boolean);
+                          return bits.join(" · ");
+                        })()}
                       </p>
                     ) : null}
                     {it.summary &&

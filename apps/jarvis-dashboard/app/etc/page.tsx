@@ -144,8 +144,9 @@ export default async function EtcPage() {
       ) : (
         <article className="card">
           <p className="sum">
-            まだ還元サマリがありません。毎月19〜26日（付与は翌月20日）に
-            smile-etc で確認し、Jarvis が更新します。
+            まだ還元サマリがありません。毎月20日（利用月の翌月）に smile-etc
+            へ還元額が付与され、Jarvis が 20〜26日に自動で /etc
+            を更新します。
           </p>
         </article>
       )}

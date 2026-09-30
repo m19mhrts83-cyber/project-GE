@@ -37,12 +37,37 @@ PARENTS = {
 WANT_PATHS = [
     "03_Literature Note(まとめノート)/家族,Yearly/家族お出かけ_20260813_ホワイトウェイブ21.md",
     "03_Literature Note(まとめノート)/家族,Yearly/家族お出かけ_20260814_名古屋市美術館_HARBS.md",
-    "03_Literature Note(まとめノート)/ETC割引確認_Phase1サマリー.md",
-    "03_Literature Note(まとめノート)/ETC割引確認_実施計画.md",
-    "03_Literature Note(まとめノート)/OraMemoRing_Watch外し睡眠運用.md",
-    "03_Literature Note(まとめノート)/給与振込4口座_Oliveメイン化_サマリー.md",
+    "03_Literature Note(まとめノート)/家計・ライフプラン/ETC割引確認_Phase1サマリー.md",
+    "03_Literature Note(まとめノート)/家計・ライフプラン/ETC割引確認_実施計画.md",
+    "03_Literature Note(まとめノート)/家計・ライフプラン/OraMemoRing_Watch外し睡眠運用.md",
+    "03_Literature Note(まとめノート)/家計・ライフプラン/キッチン保護シート_切り貼り計画_20260813.md",
+    "03_Literature Note(まとめノート)/家計・ライフプラン/給与振込4口座_Oliveメイン化_サマリー.md",
+    "03_Literature Note(まとめノート)/仕事術・AI連携/Jarvis_Cursor_Cloud_GrokBot_使い分け.md",
+    "03_Literature Note(まとめノート)/仕事術・AI連携/アプリとJarvisの仕事分け_20260830.md",
+    "03_Literature Note(まとめノート)/仕事術・AI連携/★Journal_統合ログ_Geminiコーチング用.md",
+    "03_Literature Note(まとめノート)/仕事術・AI連携/ジャーナルまとめの進め方.md",
+    "03_Literature Note(まとめノート)/仕事術・AI連携/2026年2月-3月_ジャーナル1ヶ月まとめ.md",
+    "03_Literature Note(まとめノート)/所有物件・賃貸経営/所有3棟_修繕履歴短表_20260904.md",
+    "03_Literature Note(まとめノート)/融資/Grok融資_三タメ契約_銀行注意_2026-09-06.md",
+    "03_Literature Note(まとめノート)/融資/Grok融資_補完レーン_アキカツ公庫BF_auじぶん_LF_2026-09-05.md",
+    "03_Literature Note(まとめノート)/融資/Grok融資_戸建レーンと公庫運転_2026-08-27.md",
     "03_Literature Note(まとめノート)/研修,Yearly/大阪ワクワクMG_20260815-16.md",
     "02_Clippings/D_Knowledge_Method/RAIMO講座/AIリスキリング講座を聞いて.md",
+    "01_Journaling/☆Real_Estate_Pick/00_このフォルダ.md",
+    "01_Journaling/☆Real_Estate_Pick/2026-08-28_名古屋市名東区_牧の里2丁目_S3.md",
+    "01_Journaling/☆Real_Estate_Pick/2026-09-02_豊川市_御油町向山2棟_S3.md",
+    "01_Journaling/☆Real_Estate_Pick/2026-09-03_豊川市_御油町向山2棟_S3.md",
+    "01_Journaling/☆Real_Estate_Pick/2026-09-03_豊川市_伊奈町南山新田_S3.md",
+    "01_Journaling/☆Karate/00_このフォルダ.md",
+    "01_Journaling/☆Karate/和道流/和道流_ピンアン二段の半身と緩急_20260405.md",
+    "01_Journaling/☆Karate/和道流/和道流_ピンアン四段五段とクーシャンクー_20260215.md",
+    "01_Journaling/☆Karate/和道流/和道流_逆腰と股関節回旋_20260906.md",
+    "01_Journaling/☆Karate/骨と筋肉/肩甲骨と前鋸筋_突きのリーチ_20260906.md",
+    "01_Journaling/☆Karate/骨と筋肉/ワンツーの足運びと全身連動_20260329.md",
+    "01_Journaling/☆Karate/骨と筋肉/間合いの三原則とフットワーク_20260222.md",
+    "01_Journaling/☆Karate/骨と筋肉/蹴りの速度_抱え込みと引き戻し_20260419.md",
+    "01_Journaling/☆Karate/骨と筋肉/組手での打点コントロールと飛び込み_20260531.md",
+    "01_Journaling/☆Karate/動画ストック_YouTube.md",
 ]
 
 
@@ -53,6 +78,32 @@ def access_token(refresh_token: str) -> str:
     if not token:
         raise SystemExit("no access_token from OGD")
     return token
+
+
+def encode_path_properties(path: str) -> dict[str, str]:
+    """OGD plugin compatible path splitter (100 byte chunks in UTF-8)."""
+    parts = {}
+    current = ""
+    idx = 1
+    for char in path:
+        if len((current + char).encode("utf-8")) > 100:
+            key = "path" if idx == 1 else f"path{idx}"
+            parts[key] = current
+            current = ""
+            idx += 1
+        current += char
+    key = "path" if idx == 1 else f"path{idx}"
+    parts[key] = current
+    return parts
+
+
+def decode_path_properties(props: dict[str, str]) -> str:
+    res = props.get("path") or ""
+    idx = 2
+    while f"path{idx}" in props:
+        res += props[f"path{idx}"]
+        idx += 1
+    return res
 
 
 def ogd_get(session: requests.Session, file_id: str) -> dict | None:
@@ -68,27 +119,34 @@ def ogd_get(session: requests.Session, file_id: str) -> dict | None:
 
 
 def find_by_path(session: requests.Session, path: str) -> dict | None:
+    path_props = encode_path_properties(path)
+    first_chunk = path_props["path"].replace("'", "\\'")
     r = session.get(
         DRIVE,
         params={
-            "q": f"trashed=false and properties has {{ key='path' and value='{path}' }}",
+            "q": f"trashed=false and properties has {{ key='vault' and value='{VAULT_NAME}' }} and properties has {{ key='path' and value='{first_chunk}' }}",
             "fields": "files(id,name,properties,md5Checksum)",
         },
         timeout=30,
     )
     r.raise_for_status()
     files = r.json().get("files") or []
-    return files[0] if files else None
+    for f in files:
+        props = f.get("properties") or {}
+        if decode_path_properties(props) == path:
+            return f
+    return None
 
 
 def create_folder(session: requests.Session, name: str, parent_id: str, path: str) -> str:
+    props = {"vault": VAULT_NAME, **encode_path_properties(path)}
     r = session.post(
         DRIVE,
         json={
             "name": name,
             "mimeType": "application/vnd.google-apps.folder",
             "parents": [parent_id],
-            "properties": {"vault": VAULT_NAME, "path": path},
+            "properties": props,
         },
         timeout=30,
     )
@@ -118,11 +176,12 @@ def ensure_parent(session: requests.Session, parent_path: str) -> str:
 
 
 def upload_file(session: requests.Session, local: Path, parent_id: str, vault_path: str) -> str:
+    props = {"vault": VAULT_NAME, **encode_path_properties(vault_path)}
     meta = {
         "name": local.name,
         "mimeType": "text/markdown",
         "parents": [parent_id],
-        "properties": {"vault": VAULT_NAME, "path": vault_path},
+        "properties": props,
     }
     boundary = "=======ogd_jarvis======="
     body = (
@@ -144,10 +203,11 @@ def upload_file(session: requests.Session, local: Path, parent_id: str, vault_pa
 
 
 def update_file(session: requests.Session, file_id: str, local: Path, vault_path: str) -> str:
+    props = {"vault": VAULT_NAME, **encode_path_properties(vault_path)}
     meta = {
         "name": local.name,
         "mimeType": "text/markdown",
-        "properties": {"vault": VAULT_NAME, "path": vault_path},
+        "properties": props,
     }
     boundary = "=======ogd_jarvis======="
     body = (

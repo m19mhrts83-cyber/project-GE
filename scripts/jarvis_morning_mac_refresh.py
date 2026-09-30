@@ -44,10 +44,21 @@ GMAIL_READ_CATCHUP = REPO / "scripts" / "jarvis_triage_gmail_read_catchup.py"
 INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
+KURASHIFT_S1_EVIDENCE = REPO / "scripts" / "jarvis_kurashift_s1_evidence_to_drive.py"
 GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
+BUCHO_INBOX_POLL = REPO / "scripts" / "jarvis_bucho_inbox_poll.py"
+TODOIST_COMMENT_INBOX = REPO / "scripts" / "jarvis_todoist_comment_inbox.py"
+TODOIST_API = REPO / "scripts" / "jarvis_todoist_api.py"
+WEATHER_MORNING_BRIEF = REPO / "scripts" / "jarvis_weather_morning_brief.py"
+GROK_REPAIR_APPLY = REPO / "scripts" / "jarvis_grok_repair_mail_apply.py"
+MGMT_REPLY_APPLY = REPO / "scripts" / "jarvis_grok_mgmt_reply_apply.py"
+GLUCON_MATERIALS_IMPORT = REPO / "scripts" / "jarvis_glucon_materials_from_drive.py"
+CARD_FEE_RESOURCE_OUTBOX = REPO / "scripts" / "jarvis_card_fee_resource_outbox.py"
 KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
 KURASHIFT_RE_DAILY_DIGEST = REPO / "scripts" / "jarvis_kurashift_re_daily_digest.py"
+KURASHIFT_RE_CLEANUP = REPO / "scripts" / "jarvis_kurashift_re_cleanup.py"
+KURASHIFT_OBSIDIAN_PICK_SYNC = REPO / "scripts" / "jarvis_kurashift_obsidian_pick_sync.py"
 VENDOR_REPLY_TRIAGE = REPO / "scripts" / "jarvis_kurashift_vendor_reply_triage.py"
 VENDOR_CATCHUP = REPO / "scripts" / "jarvis_triage_vendor_catchup.py"
 POC = REPO / "line_unofficial_poc"
@@ -61,6 +72,22 @@ WESTUDY_GDRIVE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_westudy_gdri
 PORTFOLIO_WEEKLY_STATE = REPO / ".jarvis_state" / "portfolio_weekly.json"
 PORTFOLIO_WEEKLY_RUNNER = REPO / "launchd" / "portfolio_weekly_runner.sh"
 PORTFOLIO_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_portfolio"
+ETC_MONTHLY_STATE = REPO / ".jarvis_state" / "etc_monthly.json"
+ETC_REBATE_RUNNER = REPO / "launchd" / "etc_rebate_monthly_runner.sh"
+ETC_REBATE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_etc_rebate"
+VPOINT_MONTHLY_STATE = REPO / ".jarvis_state" / "vpoint_monthly.json"
+TEIKI_BARAI_STATE = REPO / ".jarvis_state" / "teiki_barai_chance.json"
+VPOINT_ROUTINE_RUNNER = REPO / "launchd" / "vpoint_routine_runner.sh"
+VPOINT_ROUTINE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_vpoint_routine"
+TEIKI_DRAW_RUNNER = REPO / "launchd" / "teiki_draw_runner.sh"
+TEIKI_DRAW_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_teiki"
+FAMILY_JOURNAL_STATE = REPO / ".jarvis_state" / "family_journal_weekly.json"
+FAMILY_JOURNAL_RUNNER = REPO / "launchd" / "family_journal_weekly_runner.sh"
+FAMILY_JOURNAL_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_family_journal"
+APP_DEV_CARDS = REPO / "scripts" / "jarvis_app_dev_cards_morning.py"
+APP_DEV_TODOIST = REPO / "scripts" / "jarvis_app_dev_todoist_sync.py"
+APP_DEV_QUEUE = REPO / "scripts" / "jarvis_app_dev_queue.py"
+KARATE_ADVISOR_SYNC = REPO / "scripts" / "jarvis_karate_advisor_sync.py"
 
 
 def now_iso() -> str:
@@ -289,6 +316,258 @@ def spawn_portfolio_weekly(*, dry_run: bool) -> str:
         return "error"
 
 
+def _ym_add(ym: str, delta: int) -> str:
+    y, m = map(int, ym.split("-"))
+    m += delta
+    while m > 12:
+        m -= 12
+        y += 1
+    while m < 1:
+        m += 12
+        y -= 1
+    return f"{y}-{m:02d}"
+
+
+def etc_rebate_needs_catchup() -> bool:
+    """毎月20〜26日窓で、前月利用分の還元が未反映なら True。"""
+    if os.environ.get("JARVIS_ETC_REBATE_AUTO_DISABLE") == "1":
+        return False
+    if os.environ.get("JARVIS_ETC_MONTHLY_DISABLE") == "1":
+        return False
+    now = datetime.now(JST)
+    if now.day < 20 or now.day > 26:
+        return False
+    target = _ym_add(now.strftime("%Y-%m"), -1)
+    if not ETC_MONTHLY_STATE.is_file():
+        return True
+    try:
+        data = json.loads(ETC_MONTHLY_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("disabled") is True:
+        return False
+    for h in data.get("rebate_history") or []:
+        if (
+            isinstance(h, dict)
+            and h.get("target_month") == target
+            and h.get("rebate_yen") is not None
+        ):
+            return False
+    return True
+
+
+def spawn_etc_rebate_monthly(*, dry_run: bool) -> str:
+    if not ETC_REBATE_RUNNER.is_file():
+        print(f"# etc_rebate: missing {ETC_REBATE_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn etc_rebate_monthly_runner.sh", flush=True)
+        return "dry_run"
+    ETC_REBATE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(ETC_REBATE_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(ETC_REBATE_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(ETC_REBATE_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# etc_rebate: spawned monthly runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# etc_rebate spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
+def vpoint_routine_needs_catchup() -> bool:
+    """ウィンドウC（25〜月末）で当月未 stamp のとき。"""
+    if os.environ.get("JARVIS_VPOINT_ROUTINE_DISABLE") == "1":
+        return False
+    if os.environ.get("JARVIS_VPOINT_MONTHLY_DISABLE") == "1":
+        return False
+    now = datetime.now(JST)
+    if now.day < 25:
+        return False
+    if not VPOINT_MONTHLY_STATE.is_file():
+        return True
+    try:
+        data = json.loads(VPOINT_MONTHLY_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("disabled") is True:
+        return False
+    return data.get("last_check_c") != now.strftime("%Y-%m")
+
+
+def teiki_draw_needs_catchup() -> bool:
+    """テイチャン interval 到来、または抽選券残あり。"""
+    if os.environ.get("JARVIS_TEIKI_BARAI_DISABLE") == "1":
+        return False
+    if not TEIKI_BARAI_STATE.is_file():
+        return False
+    try:
+        teiki = json.loads(TEIKI_BARAI_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if teiki.get("disabled") is True:
+        return False
+    tickets = teiki.get("ticket_count")
+    if isinstance(tickets, int) and tickets > 0:
+        return True
+    w = teiki.get("w_chance_tickets")
+    if isinstance(w, int) and w > 0:
+        return True
+    last_s = str(teiki.get("last_check_at") or "")
+    interval = int(teiki.get("interval_days") or 3)
+    if not last_s:
+        return True
+    try:
+        last = datetime.fromisoformat(last_s.replace("Z", "+00:00"))
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=JST)
+    except ValueError:
+        return True
+    return datetime.now(JST) - last >= timedelta(days=interval)
+
+
+def spawn_vpoint_routine(*, dry_run: bool) -> str:
+    if not VPOINT_ROUTINE_RUNNER.is_file():
+        print(f"# vpoint_routine: missing {VPOINT_ROUTINE_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn vpoint_routine_runner.sh", flush=True)
+        return "dry_run"
+    VPOINT_ROUTINE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(VPOINT_ROUTINE_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(VPOINT_ROUTINE_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(VPOINT_ROUTINE_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# vpoint_routine: spawned runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# vpoint_routine spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
+def spawn_teiki_draw(*, dry_run: bool) -> str:
+    if not TEIKI_DRAW_RUNNER.is_file():
+        print(f"# teiki_draw: missing {TEIKI_DRAW_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn teiki_draw_runner.sh", flush=True)
+        return "dry_run"
+    TEIKI_DRAW_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(TEIKI_DRAW_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(TEIKI_DRAW_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(TEIKI_DRAW_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# teiki_draw: spawned runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# teiki_draw spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
+def this_week_family_journal_slot() -> datetime:
+    """今週日曜 08:00 JST（金締 Journal 投影。WeStudy Drive と同刻）。"""
+    now = datetime.now(JST)
+    days_since_sun = (now.weekday() + 1) % 7
+    return now.replace(hour=8, minute=0, second=0, microsecond=0) - timedelta(
+        days=days_since_sun
+    )
+
+
+def family_journal_weekly_needs_catchup() -> bool:
+    """日曜 08:00 枠が未成功なら True（月曜以降の朝オープンで拾う）。"""
+    if os.environ.get("JARVIS_FAMILY_JOURNAL_WEEKLY_DISABLE") == "1":
+        return False
+    now = datetime.now(JST)
+    slot = this_week_family_journal_slot()
+    if now < slot:
+        return False
+    if not FAMILY_JOURNAL_STATE.is_file():
+        return True
+    try:
+        data = json.loads(FAMILY_JOURNAL_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    if data.get("disabled") is True:
+        return False
+    if data.get("last_ok") is False:
+        return True
+    if not data.get("page_id"):
+        return True
+    # 金締ラベルが直近金曜と一致し、かつ slot 以降成功
+    fri = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    fri = fri - timedelta(days=(fri.weekday() - 4) % 7)
+    expect_week = f"金締-{fri.strftime('%Y-%m-%d')}"
+    if str(data.get("week") or "") != expect_week:
+        return True
+    ts = _parse_state_ts(str(data.get("last_success_at") or ""))
+    if ts is None:
+        return True
+    return ts < slot
+
+
+def spawn_family_journal_weekly(*, dry_run: bool) -> str:
+    if not FAMILY_JOURNAL_RUNNER.is_file():
+        print(f"# family_journal: missing {FAMILY_JOURNAL_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn family_journal_weekly_runner.sh", flush=True)
+        return "dry_run"
+    FAMILY_JOURNAL_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(FAMILY_JOURNAL_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(FAMILY_JOURNAL_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(FAMILY_JOURNAL_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# family_journal: spawned weekly runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# family_journal spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
+
+
 def spawn_zaim_csv_weekly(*, dry_run: bool) -> str:
     """週次 CSV をバックグラウンド起動（朝バンドルをブロックしない）。"""
     if not ZAIM_WEEKLY_RUNNER.is_file():
@@ -473,6 +752,22 @@ def main() -> int:
         results["steps"]["kurashift_grok_mail"] = rc
         if rc != 0:
             print(f"# kurashift_grok_mail soft-fail rc={rc}", file=sys.stderr)
+        # 証憑（Grok調査添付 → Drive/OneDrive フォルダ）soft-fail
+        if KURASHIFT_S1_EVIDENCE.is_file():
+            rc_ev = run_step(
+                "kurashift_s1_evidence",
+                [exe, str(KURASHIFT_S1_EVIDENCE), "--poll-recent"],
+                timeout=180,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["kurashift_s1_evidence"] = rc_ev
+            if rc_ev != 0:
+                print(
+                    f"# kurashift_s1_evidence soft-fail rc={rc_ev}",
+                    file=sys.stderr,
+                )
+        else:
+            results["steps"]["kurashift_s1_evidence"] = "skipped"
     else:
         results["steps"]["kurashift_grok_mail"] = "skipped"
 
@@ -489,6 +784,129 @@ def main() -> int:
             print(f"# grok_bucho_mail_apply soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["grok_bucho_mail_apply"] = "skipped"
+
+    # 2c1-inbox. 部長ボックス Drive poll（soft-fail · push は朝の dashboard に任せる）
+    if BUCHO_INBOX_POLL.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "bucho_inbox_poll",
+            [exe, str(BUCHO_INBOX_POLL)],
+            timeout=60,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["bucho_inbox_poll"] = rc
+        if rc != 0:
+            print(f"# bucho_inbox_poll soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["bucho_inbox_poll"] = "skipped"
+
+    # 2c1-todoist-comment. jarvis@ 未読 Todoist 通知＋API保険（soft-fail・既読化しない）
+    if TODOIST_COMMENT_INBOX.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "todoist_comment_inbox",
+            [exe, str(TODOIST_COMMENT_INBOX)],
+            timeout=90,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["todoist_comment_inbox"] = rc
+        if rc != 0:
+            print(f"# todoist_comment_inbox soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["todoist_comment_inbox"] = "skipped"
+
+    # 2c1-todoist-hold-stamp. UI で HOLD へ移したタスクの since 印穴埋め（soft-fail）
+    if TODOIST_API.is_file() and not args.skip_fetch:
+        if os.environ.get("JARVIS_TODOIST_HOLD_STAMP_DISABLE", "").strip() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            results["steps"]["todoist_hold_stamp"] = "skipped"
+        else:
+            rc = run_step(
+                "todoist_hold_stamp",
+                [exe, str(TODOIST_API), "hold-stamp-missing"],
+                timeout=120,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["todoist_hold_stamp"] = rc
+            if rc != 0:
+                print(f"# todoist_hold_stamp soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["todoist_hold_stamp"] = "skipped"
+
+    # 2c1-inbox-glucon. グルコン材料 Drive → Supabase（soft-fail）
+    if GLUCON_MATERIALS_IMPORT.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "glucon_materials_import",
+            [exe, str(GLUCON_MATERIALS_IMPORT), "--apply"],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["glucon_materials_import"] = rc
+        if rc != 0:
+            print(f"# glucon_materials_import soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["glucon_materials_import"] = "skipped"
+
+    # 2c1-inbox-fee. 日曜朝: 年会費・引落要約 → resource outbox（ホーク週次前 · soft-fail）
+    if (
+        datetime.now(JST).weekday() == 6
+        and CARD_FEE_RESOURCE_OUTBOX.is_file()
+        and not args.skip_fetch
+    ):
+        rc = run_step(
+            "card_fee_resource_outbox",
+            [exe, str(CARD_FEE_RESOURCE_OUTBOX), "--apply"],
+            timeout=60,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["card_fee_resource_outbox"] = rc
+        if rc != 0:
+            print(f"# card_fee_resource_outbox soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["card_fee_resource_outbox"] = "skipped"
+
+    # 2c1b. 朝の天気＋カレンダー → JarvisBox weather（soft-fail）
+    if WEATHER_MORNING_BRIEF.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "weather_morning_brief",
+            [exe, str(WEATHER_MORNING_BRIEF)],
+            timeout=90,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["weather_morning_brief"] = rc
+        if rc != 0:
+            print(f"# weather_morning_brief soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["weather_morning_brief"] = "skipped"
+
+    # 2c1a. Grok [Grok修繕候補] → 修繕 YAML / sync（soft-fail）
+    if GROK_REPAIR_APPLY.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "grok_repair_mail_apply",
+            [exe, str(GROK_REPAIR_APPLY), "--apply"],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["grok_repair_mail_apply"] = rc
+        if rc != 0:
+            print(f"# grok_repair_mail_apply soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["grok_repair_mail_apply"] = "skipped"
+
+    # 2c1a2. 管理会社・事前確認返信候補（soft-fail · dry提案中心）
+    if MGMT_REPLY_APPLY.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "mgmt_precheck_reply",
+            [exe, str(MGMT_REPLY_APPLY), "--days", "7", "--dry-run"],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["mgmt_precheck_reply"] = rc
+        if rc != 0:
+            print(f"# mgmt_precheck_reply soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["mgmt_precheck_reply"] = "skipped"
 
     # 2c1b. 業者リスト → Supabase 投影（soft-fail）
     if KURASHIFT_VENDOR_SYNC.is_file() and not args.skip_fetch:
@@ -562,6 +980,34 @@ def main() -> int:
     else:
         results["steps"]["kurashift_re_daily_digest"] = "skipped"
 
+    # 2c4. KURASHIFT 候補自動クリーンアップ（低スコア・エリア外・放置物件の自然退避）
+    if KURASHIFT_RE_CLEANUP.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "kurashift_re_cleanup",
+            [exe, str(KURASHIFT_RE_CLEANUP), "--apply"],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["kurashift_re_cleanup"] = rc
+        if rc != 0:
+            print(f"# kurashift_re_cleanup soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["kurashift_re_cleanup"] = "skipped"
+
+    # 2c5. KURASHIFT Obsidian S3/ペルソナ調査結果を kurashift_re_deals へ自動同期
+    if KURASHIFT_OBSIDIAN_PICK_SYNC.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "kurashift_obsidian_pick_sync",
+            [exe, str(KURASHIFT_OBSIDIAN_PICK_SYNC), "--apply"],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["kurashift_obsidian_pick_sync"] = rc
+        if rc != 0:
+            print(f"# kurashift_obsidian_pick_sync soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["kurashift_obsidian_pick_sync"] = "skipped"
+
     # 2a. 取込後の新規未返信を partner レーンへ（夜バッチ待ちだとダッシュに出ない）
     night_triage = REPO / "scripts" / "jarvis_night_triage.py"
     if night_triage.is_file():
@@ -591,6 +1037,20 @@ def main() -> int:
             print(f"# intent_sync soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["intent_sync"] = "skipped"
+
+    # 2b2. 空手アドバイザー Grok Bot 自律リサーチ同期（Obsidian & OGD反映）
+    if KARATE_ADVISOR_SYNC.is_file():
+        rc = run_step(
+            "karate_advisor_sync",
+            [exe, str(KARATE_ADVISOR_SYNC)],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["karate_advisor_sync"] = rc
+        if rc != 0:
+            print(f"# karate_advisor_sync soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["karate_advisor_sync"] = "skipped"
 
     # 3–4. 状況ウォッチ再集約込みの投影 push（push 内で situation_watch 実行）
     if not args.skip_push:
@@ -683,6 +1143,95 @@ def main() -> int:
     else:
         results["steps"]["portfolio_weekly"] = "fresh"
         print("# portfolio_weekly: skip (this week's full collect already done)", flush=True)
+
+    # 8b. ETC 平日朝夕還元（翌月20日付与・20〜26日窓の取りこぼし）
+    if etc_rebate_needs_catchup():
+        results["steps"]["etc_rebate_monthly"] = spawn_etc_rebate_monthly(
+            dry_run=args.dry_run
+        )
+    else:
+        results["steps"]["etc_rebate_monthly"] = "fresh"
+        print("# etc_rebate: skip (outside 20–26 or already recorded)", flush=True)
+
+    # 8c. Vポイント定例（ウィンドウC未実施）
+    if vpoint_routine_needs_catchup():
+        results["steps"]["vpoint_routine"] = spawn_vpoint_routine(dry_run=args.dry_run)
+    else:
+        results["steps"]["vpoint_routine"] = "fresh"
+        print("# vpoint_routine: skip (outside window C or already done)", flush=True)
+
+    # 8d. テイチャン自動抽選（券残 or interval）
+    if teiki_draw_needs_catchup():
+        results["steps"]["teiki_draw"] = spawn_teiki_draw(dry_run=args.dry_run)
+    else:
+        results["steps"]["teiki_draw"] = "fresh"
+        print("# teiki_draw: skip (not due)", flush=True)
+
+    # 9. 家族コーチ Journal週次 → Notion（日曜 08:00 金締・失敗／Mac スリープ時）
+    if family_journal_weekly_needs_catchup():
+        results["steps"]["family_journal_weekly"] = spawn_family_journal_weekly(
+            dry_run=args.dry_run
+        )
+    else:
+        results["steps"]["family_journal_weekly"] = "fresh"
+        print(
+            "# family_journal: skip (this week's Sunday 08:00 金締 slot already done)",
+            flush=True,
+        )
+
+    # 10. アプリ開発 Jarvis向けカード要約（[Grok開発]メール / inbox）
+    if APP_DEV_CARDS.is_file() and not (
+        (os.environ.get("JARVIS_APP_DEV_CARDS_DISABLE") or "").strip()
+        in ("1", "true", "yes")
+    ):
+        rc_ad = run_step(
+            "app_dev_cards",
+            [exe, str(APP_DEV_CARDS)],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["app_dev_cards"] = rc_ad
+        if rc_ad != 0:
+            failures += 1
+    else:
+        results["steps"]["app_dev_cards"] = "skipped"
+        print("# app_dev_cards: skip", flush=True)
+
+    # 10b. アプリ開発カード → Todoist apps（launchd と同帯。朝でも取りこぼし防止）
+    if APP_DEV_TODOIST.is_file() and not (
+        (os.environ.get("JARVIS_APP_DEV_TODOIST_SYNC_DISABLE") or "").strip()
+        in ("1", "true", "yes")
+    ):
+        rc_td = run_step(
+            "app_dev_todoist",
+            [exe, str(APP_DEV_TODOIST), "--apply"],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["app_dev_todoist"] = rc_td
+        if rc_td != 0:
+            print(f"# app_dev_todoist soft-fail rc={rc_td}", file=sys.stderr)
+    else:
+        results["steps"]["app_dev_todoist"] = "skipped"
+        print("# app_dev_todoist: skip", flush=True)
+
+    # 11. アプリ開発カード → PR／Issue キュー（低=Cloud PR、高=Issue）
+    if APP_DEV_QUEUE.is_file() and not (
+        (os.environ.get("JARVIS_APP_DEV_QUEUE_DISABLE") or "").strip()
+        in ("1", "true", "yes")
+    ):
+        rc_q = run_step(
+            "app_dev_queue",
+            [exe, str(APP_DEV_QUEUE)],
+            timeout=300,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["app_dev_queue"] = rc_q
+        if rc_q != 0:
+            failures += 1
+    else:
+        results["steps"]["app_dev_queue"] = "skipped"
+        print("# app_dev_queue: skip", flush=True)
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()

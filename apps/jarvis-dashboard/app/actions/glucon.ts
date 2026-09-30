@@ -61,6 +61,7 @@ import { createClient } from "@/lib/supabase/server";
 
 function revalidateGlucon() {
   revalidatePath("/glucon");
+  revalidatePath("/glucon/materials");
 }
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -639,6 +640,20 @@ export async function generateGluconDrafts(
       cycle.periodKey,
       "activity",
     );
+    const {
+      loadPendingGluconMaterials,
+      formatGluconMaterialsBlock,
+    } = await import("@/lib/glucon/grokMaterials");
+    const grokActivityMats = await loadPendingGluconMaterials({
+      periodKey: cycle.periodKey,
+      kind: "activity",
+    });
+    const grokResultMats = await loadPendingGluconMaterials({
+      periodKey: cycle.periodKey,
+      kind: "result",
+    });
+    const grokActivityBlock = formatGluconMaterialsBlock(grokActivityMats);
+    const grokResultBlock = formatGluconMaterialsBlock(grokResultMats);
     // 定常は活動本線。成果は明示指定時のみ
     const requested: GluconReportKind[] = kinds?.length
       ? kinds
@@ -684,6 +699,7 @@ export async function generateGluconDrafts(
             earlyFillBlock,
             rubricSummary,
             carryMemoBlock: resultCarryBlock,
+            grokMaterialsBlock: grokResultBlock,
           }),
         );
         if (!factsRes.ok) return { ok: false, error: factsRes.error };
@@ -735,6 +751,7 @@ export async function generateGluconDrafts(
           clarify: [],
           consult: [],
           resultCandidates: resultExcludedFacts,
+          injected_material_ids: grokResultMats.map((m) => m.id),
         };
         const title = `${cycle.periodKey} 成果報告`;
         const status = resolveDraftSaveStatus({ kind, body });
@@ -771,6 +788,7 @@ export async function generateGluconDrafts(
         monthlyMovesBlock,
         resultExcludedFacts,
         carryMemoBlock: activityCarryBlock,
+        grokMaterialsBlock: grokActivityBlock,
         previousPostedBody: lastActivity?.body || null,
         progressFrom: activityFrom,
         progressTo: activityTo,
@@ -804,6 +822,7 @@ export async function generateGluconDrafts(
             ...asPayload(existingAct?.payload),
             covered_from: activityFrom,
             covered_to: activityTo,
+            injected_material_ids: grokActivityMats.map((m) => m.id),
           },
           updated_at: new Date().toISOString(),
           },
@@ -960,6 +979,18 @@ export async function markGluconPosted(
     .select("*")
     .maybeSingle();
   if (error) return { ok: false, error: error.message };
+
+  const injectedIds = pl.injected_material_ids || [];
+  if (injectedIds.length) {
+    const { markGluconMaterialsUsed } = await import(
+      "@/lib/glucon/grokMaterials"
+    );
+    await markGluconMaterialsUsed({
+      materialIds: injectedIds,
+      periodKey,
+    });
+  }
+
   revalidateGlucon();
   return {
     ok: true,
@@ -996,6 +1027,16 @@ export async function generateGluconFacts(opts?: {
     const journals = await loadGluconJournalRange(range.from, range.to);
     const monthly = await buildGluconMonthlyDigest(range.from, range.to);
     const rubricSummary = formatRubricForPrompt(loadScoringRules());
+    const {
+      loadPendingGluconMaterials,
+      formatGluconMaterialsBlock,
+    } = await import("@/lib/glucon/grokMaterials");
+    const grokResultBlock = formatGluconMaterialsBlock(
+      await loadPendingGluconMaterials({
+        periodKey: cycle.periodKey,
+        kind: "result",
+      }),
+    );
     const res = await geminiReply(
       resultFactsPrompt({
         cycle,
@@ -1004,6 +1045,7 @@ export async function generateGluconFacts(opts?: {
         earlyFillBlock: monthly.occupancy.earlyFillText,
         rubricSummary,
         carryMemoBlock: await carryMemoBlockForCycle(cycle.periodKey, "result"),
+        grokMaterialsBlock: grokResultBlock,
       }),
     );
     if (!res.ok) return { ok: false, error: res.error };
@@ -1509,6 +1551,25 @@ export async function queueGluconPost(
     .eq("kind", kind);
 
   if (error) return { ok: false, error: error.message };
+
+  // Mac 常駐 watch を起こす（3s ポーリング＋Realtime の保険）
+  try {
+    await supabase.from("sync_meta").upsert(
+      {
+        key: "westudy_forum_post_kick",
+        value: JSON.stringify({
+          at: new Date().toISOString(),
+          period_key: periodKey,
+          kind,
+        }),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
+  } catch {
+    /* kick 失敗しても queued 自体は成功 */
+  }
+
   revalidateGlucon();
   return { ok: true };
 }
@@ -1531,6 +1592,15 @@ export async function getGluconPageState(): Promise<{
 }> {
   const memberHeader = getMemberHeaderStatus();
   try {
+    try {
+      const { closeExpiredGluconMaterials } = await import(
+        "@/lib/glucon/grokMaterials"
+      );
+      await closeExpiredGluconMaterials();
+    } catch {
+      /* 材料 close はページ表示を止めない */
+    }
+
     let schedules = await loadGluconSchedules();
     if (!schedules.length) {
       const refreshed = await refreshGluconScheduleFromKamiooya();
@@ -1648,4 +1718,89 @@ export async function getGluconPageState(): Promise<{
       loadError: msg,
     };
   }
+}
+
+export async function getGluconMaterialsPageState(filters?: {
+  tab?: "activity" | "result";
+  periodKey?: string;
+  status?: string;
+}): Promise<{
+  materials: import("@/lib/glucon/grokMaterials").GluconMaterialItem[];
+  drafts: GluconDraftRow[];
+  periodKeys: string[];
+  loadError?: string;
+}> {
+  try {
+    const { loadAllGluconMaterials, closeExpiredGluconMaterials } =
+      await import("@/lib/glucon/grokMaterials");
+    await closeExpiredGluconMaterials();
+
+    const tab = filters?.tab || "activity";
+    const statusFilter =
+      filters?.status &&
+      ["pending", "used", "skipped", "cycle_closed"].includes(filters.status)
+        ? (filters.status as import("@/lib/glucon/grokMaterials").GluconMaterialStatus)
+        : undefined;
+
+    const materials = await loadAllGluconMaterials({
+      kind: tab,
+      periodKey: filters?.periodKey || undefined,
+      status: statusFilter,
+    });
+
+    const supabase = await createClient();
+    let draftQuery = supabase
+      .from("glucon_report_drafts")
+      .select("*")
+      .order("period_key", { ascending: false })
+      .limit(48);
+    if (filters?.periodKey) {
+      draftQuery = draftQuery.eq("period_key", filters.periodKey);
+    }
+    draftQuery = draftQuery.eq("kind", tab);
+    const { data: draftRows } = await draftQuery;
+
+    const drafts = (draftRows || []).map((r) =>
+      mapDraft(r as Record<string, unknown>),
+    );
+
+    const periodKeys = [
+      ...new Set(
+        materials
+          .map((m) => m.period_key)
+          .filter((pk): pk is string => !!pk)
+          .concat(drafts.map((d) => d.period_key)),
+      ),
+    ].sort((a, b) => b.localeCompare(a));
+
+    return { materials, drafts, periodKeys };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { materials: [], drafts: [], periodKeys: [], loadError: msg };
+  }
+}
+
+export async function skipGluconMaterial(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("glucon_material_items")
+    .update({
+      status: "skipped",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "pending");
+  if (error) return { ok: false, error: error.message };
+  revalidateGlucon();
+  return { ok: true };
+}
+
+export async function skipGluconMaterialForm(
+  formData: FormData,
+): Promise<void> {
+  const id = String(formData.get("id") || "");
+  if (!id) return;
+  await skipGluconMaterial(id);
 }

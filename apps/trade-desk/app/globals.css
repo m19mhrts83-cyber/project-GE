@@ -180,6 +180,10 @@ main:has(.roi-page) {
   max-width: 1320px;
 }
 
+main:has(.deals-list) {
+  max-width: none;
+}
+
 .page-kicker {
   display: inline-flex;
   align-items: center;
@@ -261,6 +265,12 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+}
+
+table tfoot td {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .table-scroll {
@@ -810,9 +820,11 @@ tr.sold td {
   top: 0;
   right: 0;
   z-index: 41;
-  width: min(520px, 100vw);
+  width: min(560px, 100vw);
   height: 100vh;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--card, #fff);
   border-left: 1px solid var(--border, #ddd);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
@@ -823,11 +835,24 @@ tr.sold td {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.mq-cashflow-detail-summary {
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+.mq-cashflow-detail-hint {
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  color: var(--muted, #666);
+  flex-shrink: 0;
 }
 .mq-cashflow-detail-scroll {
-  overflow: auto;
-  max-height: calc(100vh - 180px);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
 }
 .mq-cashflow-detail-table {
   font-size: 0.88rem;
@@ -850,12 +875,18 @@ tr.sold td {
 .mq-cashflow-detail-row-active {
   background: rgba(42, 94, 168, 0.1);
 }
+.mq-cashflow-detail-inline-reclassify td {
+  padding: 4px 6px 12px 6px !important;
+  background: rgba(42, 94, 168, 0.04);
+  border-bottom: 2px solid #2a5ea8;
+}
 .mq-cashflow-reclassify-menu {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--border, #ddd);
+  margin: 4px 0 0 0;
+  padding: 12px 14px;
+  border: 1px solid #c7d5e8;
   border-radius: 8px;
-  background: var(--card-soft, #f8f9fb);
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 .mq-cashflow-reclassify-menu-header {
   display: flex;
@@ -910,6 +941,15 @@ tr.sold td {
 .mq-cashflow-reclassify-option-current {
   opacity: 0.55;
   cursor: default;
+}
+.mq-cashflow-reclassify-option-exclude {
+  border-color: #b45309;
+  color: #92400e;
+  font-weight: 600;
+}
+.mq-cashflow-reclassify-option-exclude:hover:not(:disabled) {
+  border-color: #92400e;
+  background: rgba(180, 83, 9, 0.08);
 }
 .mq-cashflow-reclassify-reset {
   margin-top: 10px;
@@ -1949,4 +1989,128 @@ code {
   .lp-milestones {
     grid-template-columns: 1fr;
   }
+}
+
+/* 千三つ案件一覧: ページング＋検索＋詳細列の固定 */
+.deals-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 16px;
+  margin: 8px 0 12px;
+}
+
+.deals-list-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+.deals-list-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.deals-list-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.deals-list-table {
+  margin: 0;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.deals-list-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--card);
+  box-shadow: 0 1px 0 var(--line-strong);
+}
+
+.deals-list-table .deals-col-open {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--card);
+  white-space: nowrap;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.28);
+}
+
+.deals-list-table .deals-col-actions {
+  position: sticky;
+  right: 72px;
+  z-index: 2;
+  background: var(--card);
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.18);
+}
+
+.deals-list-table thead th.deals-col-open,
+.deals-list-table thead th.deals-col-actions {
+  z-index: 4;
+}
+
+.deals-list-table .deals-title-cell {
+  max-width: 16rem;
+}
+
+.deals-list-table .deals-title-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deals-list-table .deals-clip {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deals-list-table tr.deals-row-pursue td {
+  background: #f0fdf4;
+}
+
+.deals-list-table tr.deals-row-pursue td.deals-col-open,
+.deals-list-table tr.deals-row-pursue td.deals-col-actions {
+  background: #f0fdf4;
+}
+
+.deals-list-table tr.deals-row-highlight {
+  outline: 2px solid var(--danger, #b45309);
+  outline-offset: -2px;
+}
+
+.deals-list-table tr:hover td.deals-col-open,
+.deals-list-table tr:hover td.deals-col-actions {
+  background: var(--card-soft);
+}
+
+.deals-list-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
 }

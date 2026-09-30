@@ -1,0 +1,168 @@
+# Jarvis 定例 — GitHub Actions と launchd の仕分け
+
+**方針（2026-09-10）**: 定期実行のうち **定型化できたもの（API・トークン・再現可能なヘッドレス）は GHA**。  
+**ブラウザ銀行／カード・CDP・ローカル path・常駐**は **launchd（Mac）**。朝オープン取りこぼしでスリープを吸収する。
+
+関連: `docs/運用コマンド一覧.md`「最新化マトリクス」／`AGENTS.md`（Cloud で動くアプリ）
+
+## 判定ルール（新規定例を足すとき）
+
+次を **すべて満たす** → **GHA 本線**
+
+1. 秘密は Secrets で足りる（銀行PW・OTP 必須でない）
+2. 出力先がクラウド（Supabase／Vercel／GitHub／API）で、OneDrive／`.jarvis_state` 必須でない（または結果だけクラウドへ書ける）
+3. ヘッドレス／API で同じ結果が繰り返し取れる（CAPTCHA・端末セッション非依存）
+4. Mac スリープ中でも動かしたい
+
+次が **1つでもある** → **launchd 本線**（GHA は実験のみ／やらない）
+
+- Vpass／smile-etc／Zaim Web／証券ログイン等の **銀行・カード UI**
+- Chrome CDP・保存プロファイル必須
+- CHRLINE／Square／QR
+- OneDrive／Documents 直書きが正本
+- 常駐（watch）や GUI 操作
+
+**過渡**: GHA でパートナー Gmail／Chatwork→MD＋判定まで寄せ済み。LINE／iMessage／CHRLINE・MailGates 添付は Mac。Graph 書込には `Files.ReadWrite` 再同意が必要（`docs/Jarvis_OneDrive_Graph.md`）。
+
+---
+
+## A. GHA 本線（定型化済み／寄せたい）
+
+| 定例 | Workflow | 備考 |
+|---|---|---|
+| admin Gmail → triage | `jarvis-dashboard-gmail-triage.yml` | 05:00 JST。general ＋ **パートナー Gmail／Chatwork→MD（Graph）＋partner 判定** |
+| 状況ウォッチ（軽量） | `jarvis-dashboard-situation-watch.yml` | 06:15 |
+| レーン要約 | `jarvis-dashboard-lanes.yml` | Graph 委任 |
+| **Todoist HOLD 印穴埋め** | `todoist-hold-stamp.yml` | 毎日 10:00 JST。UI で HOLD へ移したタスクへ `HOLD since`＋due+30。Secret `TODOIST_API_TOKEN`。朝オープン soft-fail も相乗り |
+| Dashboard heartbeat | `jarvis-dashboard-heartbeat.yml` | |
+| kamiooya-qa 心拍 | `kamiooya-qa-heartbeat.yml` | Free 休止対策 |
+| WeStudy 週次取込 | `westudy-raimo-weekly.yml` | Playwright 可だが Secrets＋再現性あり |
+| Trade Desk 週次（クラウド分） | `trade-desk-weekly.yml` | Mac 資産週次と役割分担。末尾で株式ウォッチ提案 |
+| KURASHIFT 株式ウォッチ日次 | `kurashift-stock-watch-daily.yml` | Yahoo＋閾値→Todoist Theme株式。自動発注なし |
+| KURASHIFT 問合せ（Tier3） | `kurashift-re-daily-inquiry.yml` | 明示 enabled 時 |
+| Zaim 財務日次（API 系） | `zaim-finance-sync.yml` | Playwright CSV とは別 |
+| Ops Fail Watch | `jarvis-ops-fail-watch.yml` | 失敗監視 |
+| Pages / deploy | `pages-docs.yml` / `trade-desk-deploy.yml` | 定例というよりデプロイ |
+
+---
+
+## B. launchd 本線（GHA に寄せない／寄せられない）
+
+| 定例 | launchd / 経路 | 理由 |
+|---|---|---|
+| **ETC 還元取得** | `etc-rebate-monthly` | smile-etc ブラウザ |
+| **Vポイント定例**（付与サマリ＋促し） | `vpoint-routine` | ローカル state＋任意でテイチャン相乗り。TサイトOTPは人手 |
+| **テイチャン抽選** | `teiki-draw` | Vpass＋Chrome CDP。headless/GHA はログイン失敗（実測） |
+| Zaim CSV／銀行同期 | `zaim-csv-weekly` / `zaim-bank-sync-friday` | Playwright＋OneDrive |
+| 資産週次（証券ログイン） | `portfolio-weekly` | 同上 |
+| CHRLINE／オプチャ常駐 | `line.openchat.watch` 等 | Mac 専用 |
+| **815オプチャ MD→DB→publish→/openchat** | `openchat-md-db-sync`（07:40/20:30） | CHRLINE＋OneDrive＋kamiooya-qa（staging→ready）。パートナー確認／朝LINEでもMDは取込済み想定 |
+| 夜間フル triage | `night-triage` | **パートナー Gmail／Chatwork 判定は GHA 本線**（`JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL`／`…_CHATWORK` 既定1）。Mac は LINE/iMessage・815・取込補完 |
+| 朝オープン／Mac 朝バンドル | `triage-morning-open` + `jarvis_morning_mac_refresh` | 取りこぼし回収のハブ（必須起動ではない） |
+| dashboard push（投影） | `dashboard-push` | `.jarvis_state` 依存 |
+| 家族 Journal 週次 | `family-journal-weekly` | Drive／Notion 補完 |
+| 部長ボックス poll | `bucho-inbox-poll` | Drive ローカル。同帯で Todoist @cal → カレンダー（完了で予定削除） |
+| 画面ロック解除キャッチアップ | `screen-unlock-catchup` | 解除で15分クラスだけ即実行（部長ボックス・Todoistコメント）。時刻指定ジョブは解除では起動しない |
+| Cursor revise worker | `cursor-revise-worker` | ローカルキュー |
+| WeStudy Drive 添付 | `westudy-gdrive-archive` | admin Drive＋Mac |
+| プライベートバックアップ | `private-backup` | ローカル age |
+| 天気朝ブリーフ等 | `weather-morning-brief` 等 | Mac／ローカル前提のもの |
+
+---
+
+## C. 実験・やらない（GHA）
+
+| 定例 | 状態 | メモ |
+|---|---|---|
+| テイチャン GHA | `teiki-barai-draw.yml` は **workflow_dispatch のみ** | 定型化未達。Secrets 実験用。本線は launchd |
+| ETC / Vポイント 付与 | GHA 化しない | 銀行 UI |
+| Zaim Playwright CSV | GHA 化しない | 明記済み |
+
+---
+
+## 最近増やした定例の位置づけ
+
+| もの | 置き場 | 根拠 |
+|---|---|---|
+| ETC 月次還元 | **launchd** | smile-etc |
+| Vポイント月次オーケストレータ | **launchd**（サマリは既存ファイルのみなら将来 GHA 可） | 現状は state＋テイチャン相乗り |
+| テイチャン自動抽選 | **launchd** | Vpass CDP |
+| Vポイント「促しだけ」 | 将来 **GHA** 候補 | Supabase に `jarvis_asks` を書くだけなら API 化できる |
+
+---
+
+## 運用メモ
+
+- Mac スリープ: launchd は起床後＋`jarvis_morning_mac_refresh` で回収
+- 真にノート非依存が要る launchd 仕事: **常時ON Mac**（mini 等）か self-hosted runner
+- 新規定例を足すとき: この表の判定ルール → A なら workflow、B なら `launchd/install_*.sh`＋朝取りこぼし
+
+---
+
+## D. 課題（Issue）— ローカル非依存はどこまでか（2026-09-13）
+
+詳細・調査メモ正本: Obsidian  
+`03_Literature Note(まとめノート)/仕事術・AI連携/20260912_Jarvis_データ流れ_概要と詳細.md` §5
+
+| 状態 | 内容 |
+|---|---|
+| **GHA 到達** | general／パートナー Gmail／**Chatwork** 取込＋判定 |
+| **Mac 残（構造）** | LINE（個人・CHRLINE・815）／iMessage／銀行UI |
+| **次の一手（任意）** | ① Graph refresh の GHA→Secrets 自動戻し ② 常時 ON Mac mini（self-hosted） |
+| **やらない** | CHRLINE の GHA 直行／個人 iMessage のマネージド API 依存 |
+
+**結論**: API 可能なものはクラウド化済み。残りは「ノート0」では解けないが、常時 Mac があれば実質クラウド相当にできる。現状ハイブリッドで運用可。
+
+---
+
+## E. Mac スリープ無効化とローカル定例の旨み（2026-09-25）
+
+**結論**: 現状の GHA＋朝回収ハイブリッドなら、**スリープ完全無効化の旨みは薄い**。無効化自体は可能だが、やらない。
+
+### スリープ対策の段階（優先順）
+
+| やり方 | 向く場面 |
+|---|---|
+| **現状維持**（スリープ＋朝取りこぼし） | 既定。数時間〜半日遅れを許容する Mac 定例 |
+| `caffeinate`（ジョブ実行中だけ） | 長時間スクレイプ1本（既存: WeStudy Drive 等） |
+| AC接続時のみスリープ防止／時刻起床 | 夜間ぴったりが実害になったとき |
+| **常時ON専用機**（mini 等）／self-hosted | 815常駐・Remote Control・秒単位キューが本当に要るとき |
+
+ノート持ち歩き運用では完全無効より「AC時だけ／朝回収」が正。コスト（電力・発熱・バッテリー・外出時セキュリティ）を払う理由が薄い。
+
+### スリープOFFの旨みが出る仕事（現状「今すぐ秒単位」でなければ不要）
+
+- 815 オプチャ常時監視（event 54）
+- KURASHIFT job worker（スリープ中キュー滞留）
+- iPhone Remote Control／Cursor 常時受け
+- 夜 05:00 ぴったりの通知
+- 銀行・カード UI を「寝ているあいだに必ず」動かしたい場合（現状は朝回収で設計済み）
+
+### 価格・チケット・株式ウォッチ（Rebuild型）
+
+**原則 GHA。** 公開API／再現可能なヘッドレスなら仕分け4条件を満たしやすい。通知は Todoist／Gmail／dashboard watch。前回価格は artifact または Supabase。
+
+| 対象 | 置き場 |
+|---|---|
+| 株式・指数・為替（公開API） | **GHA** |
+| ホテル・航空券・ライブ券（公開価格） | **GHA**（CAPTCHA・ログイン必須ならそのサイトだけ Mac 実験） |
+| 証券ログイン画面が必須 | **launchd** |
+
+「便利そう」だけでは常時ON Mac にしない。ウォッチ系を増やすときは **先に GHA**。
+
+### Mac ローカルの価値（常時ONではない）
+
+ローカルのメリットは「端末・セッション・ファイル正本に触れられること」:
+
+1. 銀行・カード・証券のブラウザ UI（Vpass／smile-etc／Zaim／portfolio）
+2. CHRLINE・Square・QR・オプチャ常駐
+3. Chrome CDP＋保存プロファイル（テイチャン、Grok Bot）
+4. OneDrive／Documents／`.jarvis_state` 正本書き込み
+5. Messages DB（SMS OTP）・Full Disk Access
+6. age 秘密バックアップ・repo 疎ミラー
+7. 会話中 Jarvis の即時実行（パートナー確認 CHRLINE 等）
+
+開いているあいだ＋朝回収で成立する。スリープ無効化で増えるのは「ぴったり時刻」と「常駐の連続性」だけ。
+
+人向け要約: Obsidian  
+`03_Literature Note(まとめノート)/仕事術・AI連携/20260925_Macスリープと定例_GHA仕分け.md`

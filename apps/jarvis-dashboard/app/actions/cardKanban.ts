@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createNotionTask, loadNotionLaneConfig } from "@/lib/notionTasks";
+import { createTask, laneRequiresPropertyName } from "@/lib/taskBoard";
 import { queueLaneActionLog } from "@/lib/laneActionLog";
 import {
   formatAskReplyBody,
@@ -90,12 +90,11 @@ export async function promoteCardToNotion(
   }
 
   const propertyName = (opts?.propertyName || "").trim() || null;
-  const cfg = loadNotionLaneConfig(lane);
-  if (cfg?.property_prop && !propertyName) {
+  if (laneRequiresPropertyName(lane) && !propertyName) {
     return { ok: false, error: "物件名（サブグループ）を選択してください" };
   }
 
-  const created = await createNotionTask(lane, {
+  const created = await createTask(lane, {
     title,
     summary: summary || undefined,
     due,
@@ -107,6 +106,8 @@ export async function promoteCardToNotion(
     ...payload,
     notion_url: created.url,
     notion_page_id: created.id,
+    todoist_task_id: created.id,
+    task_url: created.url,
     promoted_at: new Date().toISOString(),
     promoted_title: title,
     notion_property_name: propertyName,
@@ -124,7 +125,7 @@ export async function promoteCardToNotion(
   await queueLaneActionLog({
     lane,
     event: "タスク登録",
-    body: `- ${title}\n- 物件名: ${propertyName || "—"}\n- Notion: ${created.url}`,
+    body: `- ${title}\n- 物件名: ${propertyName || "—"}\n- タスク: ${created.url}`,
     cardId,
   });
 

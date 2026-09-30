@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """KURASHIFT job watch — KeepAlive 常駐。
 
-本線: 30秒ポーリングで queued をドレイン。
-加速: Supabase Realtime（publication 済み時のみ・失敗しても落ちない）。
+本線: 短いポーリング（既定 3秒）で queued をドレイン。
+加速: Supabase Realtime（async・INSERT）でキュー直後に起こす。
+手動キック: SIGUSR1 または scripts/jarvis_kurashift_job_kick.py
 起動／再接続時は即ドレイン。heartbeat を .jarvis_state に書く。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -11,11 +12,13 @@
 from __future__ import annotations
 
 import atexit
+import asyncio
 import json
 import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,11 +28,14 @@ PY = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
 STATE_PATH = REPO / ".jarvis_state" / "kurashift_job_watch.json"
 LOCK_PATH = REPO / ".jarvis_state" / "kurashift_job_watch.pid"
 WORKER = REPO / "scripts" / "jarvis_kurashift_job_worker.py"
-POLL_SEC = 30
+# Mac 操作時は「キューしたらすぐ」が欲しい。30s だと遅いので 3s。
+POLL_SEC = int(os.environ.get("JARVIS_KURASHIFT_JOB_POLL_SEC") or "3")
 DRAIN_LIMIT = 8
 WAKE_NETWORK_WAIT_SEC = 4
 
 _stop = False
+_wake = threading.Event()
+_drain_lock = threading.Lock()
 
 
 def now_iso() -> str:
@@ -41,7 +47,7 @@ def write_heartbeat(**extra: object) -> None:
     payload = {
         "last_heartbeat_at": now_iso(),
         "pid": os.getpid(),
-        "mode": "keepalive_poll",
+        "mode": "keepalive_poll_plus_realtime",
         "poll_sec": POLL_SEC,
         **extra,
     }
@@ -53,7 +59,6 @@ def write_heartbeat(**extra: object) -> None:
             prev = {}
     prev.update(payload)
     STATE_PATH.write_text(json.dumps(prev, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    # Vercel UI 用に DB にも投影（ファイルは Mac ローカルのみ）
     try:
         from supabase import create_client
 
@@ -99,97 +104,133 @@ def release_lock() -> None:
         pass
 
 
-def drain_once() -> int:
-    py = str(PY if PY.exists() else sys.executable)
-    env = os.environ.copy()
-    proc = subprocess.run(
-        [py, str(WORKER), "--limit", str(DRAIN_LIMIT)],
-        cwd=str(REPO),
-        capture_output=True,
-        text=True,
-        timeout=1900,
-        env=env,
-    )
-    out = (proc.stdout or "") + (proc.stderr or "")
-    for line in out.splitlines()[-20:]:
-        print(line, flush=True)
-    write_heartbeat(
-        last_drain_at=now_iso(),
-        last_drain_exit=proc.returncode,
-        last_drain_tail=out[-1500:],
-    )
-    return proc.returncode
-
-
-def try_realtime_loop() -> None:
-    """任意加速。失敗したらすぐ戻ってポーリング本線へ。"""
+def drain_once(*, reason: str = "poll") -> int:
+    """同時ドレインを1本にまとめる。"""
+    if not _drain_lock.acquire(blocking=False):
+        print(f"# drain skipped (busy) reason={reason}", flush=True)
+        return -1
     try:
-        from supabase import create_client
+        print(f"# drain start reason={reason}", flush=True)
+        py = str(PY if PY.exists() else sys.executable)
+        env = os.environ.copy()
+        proc = subprocess.run(
+            [py, str(WORKER), "--limit", str(DRAIN_LIMIT)],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=1900,
+            env=env,
+        )
+        out = (proc.stdout or "") + (proc.stderr or "")
+        for line in out.splitlines()[-20:]:
+            print(line, flush=True)
+        write_heartbeat(
+            last_drain_at=now_iso(),
+            last_drain_exit=proc.returncode,
+            last_drain_reason=reason,
+            last_drain_tail=out[-1500:],
+        )
+        return proc.returncode
+    finally:
+        _drain_lock.release()
+
+
+def request_drain(reason: str) -> None:
+    """メインループ／Realtime／SIGUSR1 から起こす。"""
+    _wake.reason = reason  # type: ignore[attr-defined]
+    _wake.set()
+
+
+def realtime_thread_main() -> None:
+    """async Realtime INSERT → 即ドレイン要求。失敗してもスレッド終了のみ。"""
+    try:
+        asyncio.run(_realtime_async())
     except Exception as e:
-        print(f"# realtime unavailable: {type(e).__name__}: {e}", flush=True)
-        return
+        print(f"# realtime thread end: {type(e).__name__}: {e}", flush=True)
+        write_heartbeat(realtime=f"end:{type(e).__name__}")
+
+
+async def _realtime_async() -> None:
+    from supabase import create_async_client
 
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
     key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     if not url or not key:
+        write_heartbeat(realtime="skip:no_env")
         return
 
+    sb = await create_async_client(url, key)
+    ch = sb.channel("kurashift_jobs_watch")
+
+    def _on_change(_payload: object) -> None:
+        print("# realtime change → wake", flush=True)
+        request_drain("realtime")
+
+    # realtime-py: event は文字列 'INSERT' 等
+    ch.on_postgres_changes(
+        "INSERT",  # type: ignore[arg-type]
+        callback=_on_change,
+        schema="public",
+        table="kurashift_jobs",
+    )
+    await ch.subscribe()
+    write_heartbeat(realtime="subscribed")
+    print("# realtime subscribed (accel)", flush=True)
+    while not _stop:
+        await asyncio.sleep(1)
     try:
-        sb = create_client(url, key)
-        # supabase-py realtime API は版差が大きい。subscribe できなければ無視。
-        channel = sb.channel("kurashift_jobs_watch")
-
-        def _on_insert(payload: dict) -> None:  # noqa: ARG001
-            print("# realtime insert → drain", flush=True)
-            time.sleep(0.5)
-            drain_once()
-
-        # 新しめのクライアント想定（無ければ except）
-        channel.on_postgres_changes(
-            "INSERT",
-            schema="public",
-            table="kurashift_jobs",
-            callback=_on_insert,
-        )
-        channel.subscribe()
-        write_heartbeat(realtime="subscribed")
-        print("# realtime subscribed (accel)", flush=True)
-        while not _stop:
-            time.sleep(1)
-    except Exception as e:
-        print(f"# realtime skip: {type(e).__name__}: {e}", flush=True)
-        write_heartbeat(realtime=f"skip:{type(e).__name__}")
+        await sb.remove_channel(ch)
+    except Exception:
+        pass
 
 
 def on_signal(signum: int, _frame: object) -> None:
     global _stop
-    print(f"# signal {signum} stop", flush=True)
-    _stop = True
+    if signum in (signal.SIGTERM, signal.SIGINT):
+        print(f"# signal {signum} stop", flush=True)
+        _stop = True
+        _wake.set()
+    elif signum == signal.SIGUSR1:
+        print("# SIGUSR1 kick → wake", flush=True)
+        request_drain("sigusr1")
 
 
 def main() -> int:
     global _stop
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
+    try:
+        signal.signal(signal.SIGUSR1, on_signal)
+    except (ValueError, OSError):
+        pass
     acquire_lock()
     atexit.register(release_lock)
 
-    # 起床直後の DNS 待ち
     time.sleep(WAKE_NETWORK_WAIT_SEC)
-    write_heartbeat(started_at=now_iso())
-    print(f"# kurashift job watch start pid={os.getpid()} poll={POLL_SEC}s", flush=True)
-    drain_once()
+    write_heartbeat(started_at=now_iso(), realtime="starting")
+    print(
+        f"# kurashift job watch start pid={os.getpid()} poll={POLL_SEC}s",
+        flush=True,
+    )
+    drain_once(reason="startup")
 
-    # Realtime は別スレッドで試すが、本線はポーリング（簡易: 同期ポーリングのみ）
-    # ※ Realtime の安定版差を避けるため、本実装はポーリング本線に寄せる。
-    next_poll = 0.0
+    rt = threading.Thread(target=realtime_thread_main, name="realtime", daemon=True)
+    rt.start()
+
+    next_poll = time.time() + POLL_SEC
     while not _stop:
-        now = time.time()
-        if now >= next_poll:
-            drain_once()
-            write_heartbeat()
-            next_poll = time.time() + POLL_SEC
-        time.sleep(1)
+        # ポーリング or Realtime/SIGUSR1 のどちらかで起こす
+        timeout = max(0.2, next_poll - time.time())
+        woke = _wake.wait(timeout=timeout)
+        reason = "poll"
+        if woke:
+            reason = getattr(_wake, "reason", "wake")
+            _wake.clear()
+        elif time.time() < next_poll:
+            continue
+        drain_once(reason=reason)
+        write_heartbeat()
+        next_poll = time.time() + POLL_SEC
     release_lock()
     return 0
 

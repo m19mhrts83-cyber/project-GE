@@ -113,8 +113,14 @@ def create_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
+    opts.add_argument("--no-first-run")
+    opts.add_argument("--no-default-browser-check")
+    opts.add_argument("--disable-search-engine-choice-screen")
     opts.add_argument("--window-size=1280,1024")
-    opts.add_argument("--lang=ja")
+    opts.add_argument("--lang=ja-JP")
+    opts.add_argument(
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    )
     opts.add_argument("--disable-background-networking")
     opts.add_argument("--disable-renderer-backgrounding")
     # 全リソース待機で renderer timeout になりやすいため DOM 完了で打ち切る

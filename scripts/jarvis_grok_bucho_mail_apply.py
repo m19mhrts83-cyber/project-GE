@@ -70,7 +70,11 @@ def gmail_service():
 
 
 def decode_body(payload: dict) -> str:
-    texts: list[str] = []
+    """Prefer text/plain. HTML is fallback only (avoids &quot; winning over clean --mark notes)."""
+    import html as html_lib
+
+    plains: list[str] = []
+    htmls: list[str] = []
 
     def walk(part: dict) -> None:
         mime = (part.get("mimeType") or "").lower()
@@ -80,14 +84,20 @@ def decode_body(payload: dict) -> str:
             raw = base64.urlsafe_b64decode(data + "==")
             text = raw.decode("utf-8", errors="replace")
             if mime == "text/html":
+                text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+                text = re.sub(r"</p>", "\n", text, flags=re.I)
                 text = re.sub(r"<[^>]+>", " ", text)
-                text = re.sub(r"\s+", " ", text)
-            texts.append(text)
+                text = html_lib.unescape(text)
+                text = re.sub(r"[ \t]+", " ", text)
+                htmls.append(text)
+            else:
+                plains.append(text)
         for ch in part.get("parts") or []:
             walk(ch)
 
     walk(payload)
-    return "\n".join(texts)[:50000]
+    chosen = plains if plains else htmls
+    return "\n".join(chosen)[:50000]
 
 
 def header_map(headers: list[dict]) -> dict[str, str]:
