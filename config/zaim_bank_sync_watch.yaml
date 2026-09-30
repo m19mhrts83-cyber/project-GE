@@ -3,7 +3,8 @@
 # 状況ウォッチ「Zaim集計・二重取込」に銀行連携の注意を合流（jarvis_situation_watch）
 #
 # Phase1: CSV の最終日付ラグで「更新が止まっていそう」を特定 → 手動更新を Jarvis と一緒に
-# Phase2: 手動手順が固まってから Playwright 等で定期自動更新（未実装）
+# Phase1.5: stale のみ Playwright 更新（automation: off / cooldown で抑制）
+# Phase2: OTP 半自動（検知→Todoist／任意で SMS/Gmail OTP 試行。画像認証は対象外）
 
 version: 1
 
@@ -16,6 +17,17 @@ default_stale_days: 12
 friday_weekday: 5  # mon=0 … fri=5
 prompt_interval_days: 6
 
+# 自動「連携データを更新」のクールダウン（同一 match への連続押し防止）
+auto_update_cooldown_hours: 20
+
+# stale / OTP / session 失敗時の Todoist 通知（レーン ai_raimo・ラベル 要Jarvis連携）
+todoist_notify:
+  enabled: true
+  lane: ai_raimo
+  label: "要Jarvis連携,quick"
+  # 同じ fingerprint で再起票しない間隔（日）
+  dedupe_days: 5
+
 # Zaim Web（手動更新の入口）
 zaim_accounts_url: "https://zaim.net/online_accounts"
 zaim_home_url: "https://zaim.net/"
@@ -23,6 +35,10 @@ zaim_home_url: "https://zaim.net/"
 # match: CSV の 支払元 / 入金先 に部分一致（先に長い match を置く）
 # env_hint: .env.jarvis_private の変数名（値は出さない）。手動 OTP 時に Jarvis が読む
 # unlinkable: true → 事情で連携できない想定。注意事項に「連携不可（既知）」として出すが stale 警告にはしない
+# automation: off → stale 自動更新の対象外（検知・通知はする）
+# otp_channel: sms | sms_messages | gmail | gmail_api | none（再接続 --try-otp 時。sms→sms_messages に正規化）
+# otp_sender_hint: OTP 検索ヒント（SMS 本文／Gmail from）
+# ※ 銀行「連携データを更新」ボタン押しは Mac 専有（zaim_playwright.lock）。GHA は check のみ。
 accounts:
   - id: paypay_corp
     label: "PayPay銀行（法人）"
@@ -30,12 +46,15 @@ accounts:
     stale_days: 10
     env_hint: ["PAYPAY_STORE_NO", "PAYPAY_ACCOUNT_NO", "PAYPAY_PASSWORD"]
     note: "法人。Zaim 口座一覧で手動更新"
+    otp_channel: none
   - id: mufg_ap
     label: "MUFG アパート経営"
     match: "★MUFG(アパート経営)"
     stale_days: 14
     env_hint: []
     note: "家賃入金系。止まっていたら要確認"
+    otp_channel: sms
+    otp_sender_hint: "三菱UFJ|ＭＵＦＧ|認証"
   - id: shiga
     label: "滋賀銀行"
     match: "★滋賀銀行"
@@ -62,6 +81,8 @@ accounts:
     match: "★住信SBIネット銀行"
     stale_days: 10
     env_hint: []
+    otp_channel: sms
+    otp_sender_hint: "住信|SBI|認証"
   - id: sbi_hybrid
     label: "住信SBI ハイブリッド"
     match: "★住信 SBI ネット銀行 SBIハイブリッド"
@@ -88,6 +109,8 @@ accounts:
     match: "MARRIOTT BONVOY"
     stale_days: 10
     env_hint: ["AMEX_LOGIN_ID", "AMEX_PASSWORD"]
+    automation: off
+    note: "カード系。自動更新は慎重に手動優先"
   - id: paypay_card
     label: "PayPayカード"
     match: "PayPayカード"
@@ -100,14 +123,15 @@ accounts:
     env_hint: ["ORIX_LOGIN_ID", "ORIX_PASSWORD"]
     note: "引き落としは他銀行経由のため Zaim 連携不要"
     unlinkable: true
+    automation: off
 
-# 事情で Zaim 連携しない口座（注意事項に常時載せる）
   - id: mhi_espp
     label: "三菱重工 持株会（野村マイ・ターゲット）"
     match: "野村持株WEBサービス"
     stale_days: 40
     env_hint: ["ZAIM_MHI_ACCOUNT_MATCH"]
     note: "毎月買い足し。資産ビューの評価額は Zaim 口座残高が正（Yahoo口数固定にしない）"
+    automation: off
 
 unlinkable_notes:
   - "オリックス銀行ローンは他銀行引き落としのため Zaim 未連携でOK"

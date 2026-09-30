@@ -82,10 +82,12 @@ export default function ZaimStatusBand({
   bank,
   csvWeekly,
   refreshQueued,
+  learnLine,
 }: {
   bank: BankSyncPayload | null;
   csvWeekly: CsvWeeklyPayload | null;
   refreshQueued?: boolean;
+  learnLine?: string | null;
 }) {
   const { line, tone } = buildStatusLine(bank, csvWeekly);
   const [msg, setMsg] = useState<string | null>(
@@ -131,6 +133,7 @@ export default function ZaimStatusBand({
       <p className="meta" style={{ marginTop: 6, marginBottom: 0 }}>
         開いただけでは銀行連携は更新されません。学習は取込のたび自動。違うときだけ「おかしい」。
         {bank?.updated_at ? ` · 口座検知 ${shortDate(bank.updated_at)}` : ""}
+        {learnLine ? ` · ${learnLine}` : ""}
       </p>
       {msg ? (
         <p className="meta" style={{ marginTop: 4, marginBottom: 0 }}>

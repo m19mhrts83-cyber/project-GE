@@ -1128,6 +1128,34 @@ def main() -> int:
         results["steps"]["zaim_csv_weekly"] = "fresh"
         print("# zaim_csv: skip (success within 6 days)", flush=True)
 
+    # 6b. /zaim「今すぐ更新」キュー＋軽量 bank_sync_check
+    try:
+        refresh_py = REPO / "scripts" / "jarvis_zaim_refresh_queue_poll.py"
+        check_py = REPO / "scripts" / "jarvis_zaim_bank_sync_check.py"
+        if refresh_py.is_file():
+            if args.dry_run:
+                print("# dry-run: zaim_refresh_queue_poll --apply", flush=True)
+                results["steps"]["zaim_refresh_queue"] = "dry-run"
+            else:
+                rc_q = subprocess.call(
+                    [exe, str(refresh_py), "--apply"],
+                    cwd=str(REPO),
+                    timeout=600,
+                )
+                results["steps"]["zaim_refresh_queue"] = rc_q
+                print(f"# zaim_refresh_queue: rc={rc_q}", flush=True)
+        if check_py.is_file() and not args.dry_run:
+            rc_b = subprocess.call(
+                [exe, str(check_py)],
+                cwd=str(REPO),
+                timeout=180,
+            )
+            results["steps"]["zaim_bank_sync_check"] = rc_b
+            print(f"# zaim_bank_sync_check: rc={rc_b}", flush=True)
+    except Exception as e:
+        print(f"# zaim morning extras failed: {e}", file=sys.stderr)
+        results["steps"]["zaim_refresh_queue"] = -1
+
     # 7. WeStudy Drive 添付の取りこぼし（日曜 08:00 失敗／Mac スリープ時）
     if westudy_gdrive_needs_catchup():
         results["steps"]["westudy_gdrive_weekly"] = spawn_westudy_gdrive_weekly(

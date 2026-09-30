@@ -118,6 +118,8 @@ jobs:
           python scripts/jarvis_finance_metrics.py --year "$PREV_YEAR" --push || true
 
       - name: Step 4b - Bank sync freshness check (no update buttons)
+        # 銀行「連携データを更新」は Mac 専有（zaim_playwright.lock / OTP）。
+        # GHA ではチェックのみ。stale 更新は launchd 火・金 or jarvis_zaim_reconnect.py。
         run: |
           set -euo pipefail
           mkdir -p .jarvis_state
