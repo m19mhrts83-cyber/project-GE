@@ -42,6 +42,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/todoist/webhook") {
     return NextResponse.next({ request });
   }
+  // LINE Messaging API Webhook（X-Line-Signature で保護。ログイン不要）
+  if (path === "/api/line/webhook") {
+    return NextResponse.next({ request });
+  }
   // Todoist OAuth リダイレクト（承認完了ページ）
   if (path === "/api/todoist/oauth/callback") {
     return NextResponse.next({ request });
