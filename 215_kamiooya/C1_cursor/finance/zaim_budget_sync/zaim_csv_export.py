@@ -12,8 +12,10 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
+import time
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from playwright.sync_api import sync_playwright
 
@@ -47,14 +49,155 @@ def select_date(page, prefix: str, d: date) -> None:
     page.locator(f'select[name="{prefix}_day"]').select_option(f"{d.day:02d}")
 
 
-def export_csv(page, start: date, end: date, encoding: str) -> Path:
-    page.goto(ZAIM_FILE_IO_URL, wait_until="networkidle")
+# 折りたたみのトグルは h3[href] 以外（a / data-bs-target）のことがある
+_DOWNLOAD_TOGGLES = (
+    'h3[href="#collapseDownload"]',
+    'a[href="#collapseDownload"]',
+    '[data-bs-target="#collapseDownload"]',
+    'h3.title:has-text("記録データをダウンロード")',
+)
+
+
+def _safe_url(url: str) -> str:
+    parts = urlsplit(url or "")
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+
+
+def _snapshot(page) -> tuple[str, str]:
+    url = page.url or ""
+    try:
+        title = page.title() or ""
+    except Exception:
+        title = ""
+    return url, title
+
+
+def _download_ui_present(page) -> bool:
+    if page.locator("#collapseDownload").count():
+        return True
+    if page.locator('input[value="この条件でダウンロード"]').count():
+        return True
+    for sel in _DOWNLOAD_TOGGLES:
+        if page.locator(sel).count():
+            return True
+    return False
+
+
+def _page_is_auth_wall(page) -> bool:
+    url, title = _snapshot(page)
+    if zaim.is_auth_wall_url(url):
+        return True
+    if "ログイン" in title or "くふうアカウント" in title:
+        return True
+    password = page.locator('input[type="password"]')
+    try:
+        return bool(password.count() and password.first.is_visible())
+    except Exception:
+        return False
+
+
+def _page_is_blocked(page) -> bool:
+    _, title = _snapshot(page)
+    return "could not be satisfied" in title or "Request blocked" in title
+
+
+def _goto_money_page(page) -> None:
+    page.goto(ZAIM_FILE_IO_URL, wait_until="domcontentloaded", timeout=60_000)
     page.wait_for_timeout(1500)
 
+
+def _wait_download_or_wall(page, timeout_ms: int = 20_000) -> str:
+    """ui / wall / blocked / missing"""
+    deadline = time.time() + timeout_ms / 1000
+    while time.time() < deadline:
+        if _download_ui_present(page):
+            return "ui"
+        if _page_is_blocked(page):
+            return "blocked"
+        if _page_is_auth_wall(page):
+            return "wall"
+        page.wait_for_timeout(500)
+    if _download_ui_present(page):
+        return "ui"
+    if _page_is_blocked(page):
+        return "blocked"
+    if _page_is_auth_wall(page):
+        return "wall"
+    return "missing"
+
+
+def _open_download_panel(page) -> None:
     collapse = page.locator("#collapseDownload")
-    if not collapse.is_visible():
-        page.locator('h3[href="#collapseDownload"]').click()
-        page.wait_for_timeout(800)
+    if collapse.count() and collapse.is_visible():
+        return
+    for sel in _DOWNLOAD_TOGGLES:
+        loc = page.locator(sel).first
+        try:
+            if loc.count() and loc.is_visible():
+                loc.click()
+                page.wait_for_timeout(800)
+                return
+        except Exception:
+            continue
+    page.locator('h3[href="#collapseDownload"], a[href="#collapseDownload"]').first.click(
+        timeout=10_000
+    )
+    page.wait_for_timeout(800)
+
+
+def _fail_screenshot(page, name: str) -> None:
+    try:
+        zaim.SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(zaim.SCREENSHOT_DIR / name), full_page=True)
+    except Exception:
+        pass
+
+
+def _force_email_login(page) -> None:
+    """zaim.net の URL だけ残って content 側が切れているとき、ログインをやり直す。"""
+    print("  ファイル入出力が認証壁のため、メールログインをやり直します")
+    try:
+        page.context.clear_cookies()
+    except Exception as e:
+        print(f"  cookie clear skipped: {e}")
+    zaim.login_with_email_password(page, zaim.DEFAULT_LOGIN_EMAIL, zaim.DEFAULT_LOGIN_PASSWORD)
+
+
+def export_csv(page, start: date, end: date, encoding: str, *, login_method: str = "email") -> Path:
+    _goto_money_page(page)
+    state = _wait_download_or_wall(page)
+    if state == "blocked":
+        url, title = _snapshot(page)
+        print(f"  ダウンロードページがブロック url={_safe_url(url)} title={title!r} → reload")
+        page.reload(wait_until="domcontentloaded", timeout=60_000)
+        page.wait_for_timeout(1500)
+        state = _wait_download_or_wall(page, timeout_ms=15_000)
+    if state == "wall" and login_method == "email":
+        url, title = _snapshot(page)
+        print(f"  ダウンロードUIなし url={_safe_url(url)} title={title!r}")
+        _force_email_login(page)
+        _goto_money_page(page)
+        state = _wait_download_or_wall(page)
+    elif state == "missing":
+        url, title = _snapshot(page)
+        print(f"  ダウンロードUI待ち url={_safe_url(url)} title={title!r} → reload")
+        page.reload(wait_until="domcontentloaded", timeout=60_000)
+        page.wait_for_timeout(1500)
+        state = _wait_download_or_wall(page, timeout_ms=15_000)
+        if state == "wall" and login_method == "email":
+            _force_email_login(page)
+            _goto_money_page(page)
+            state = _wait_download_or_wall(page)
+
+    if state != "ui":
+        url, title = _snapshot(page)
+        _fail_screenshot(page, "csv_export_no_download_ui.png")
+        raise RuntimeError(
+            "ZaimのダウンロードUIが見つかりません "
+            f"url={_safe_url(url)} title={title!r}"
+        )
+
+    _open_download_panel(page)
 
     select_date(page, "start", start)
     select_date(page, "end", end)
@@ -149,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
             login_method=args.login_method,
         )
         print(f"▶ CSV ダウンロード: {start} 〜 {end} ({args.encoding})")
-        tmp = export_csv(page, start, end, args.encoding)
+        tmp = export_csv(page, start, end, args.encoding, login_method=args.login_method)
         shutil.copy2(tmp, dest)
         zaim.save_storage_state(ctx)
         if browser and not args.connect_cdp:
