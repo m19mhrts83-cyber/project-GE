@@ -30,6 +30,7 @@ import sys
 import time
 from collections import defaultdict
 from pathlib import Path
+from urllib.parse import urlparse
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
@@ -93,22 +94,56 @@ def print_dry_run(grouped: dict[str, list[dict]]) -> None:
     print(f"\n📊 全体: {len(grouped)} ヶ月, {sum(len(v) for v in grouped.values())} 行, 合計 {total:,} 円")
 
 
+def _page_title(page: Page) -> str:
+    try:
+        return page.title() or ""
+    except Exception:
+        return ""
+
+
+def is_auth_wall_url(url: str) -> bool:
+    """くふう OAuth / Zaim ログイン / Google。content.zaim.net/home は含めない。"""
+    raw = url or ""
+    host = urlparse(raw).netloc.lower()
+    if host in ("id.zaim.net", "id.kufu.jp", "accounts.google.com"):
+        return True
+    if host == "kufu.jp" or host.endswith(".kufu.jp"):
+        return True
+    lowered = raw.lower()
+    return any(token in lowered for token in ("user_session", "sign_in", "oauth2/auth", "/signin"))
+
+
+def title_rejects_session(title: str) -> bool:
+    """URL が /home のまま 404 やログイン壁になることがある。"""
+    text = title or ""
+    return any(
+        token in text
+        for token in ("見つかりません", "ログイン", "くふうアカウント", "could not be satisfied")
+    )
+
+
 def is_login_page(page: Page) -> bool:
-    url = page.url
-    if "id.zaim.net" in url or "user_session" in url or "sign_in" in url:
+    url = page.url or ""
+    if is_auth_wall_url(url):
+        return True
+    title = _page_title(page)
+    if "ログイン" in title or "くふうアカウント" in title:
         return True
     return page.locator('a:has-text("Google でログイン"), a:has-text("利用規約に同意して Google でログイン")').count() > 0
 
 
 def is_authenticated(page: Page) -> bool:
-    url = page.url
-    if "id.zaim.net" in url or "user_session" in url or "sign_in" in url:
+    url = page.url or ""
+    if is_auth_wall_url(url) or "accounts.google.com" in url:
         return False
-    if "accounts.google.com" in url:
+    if title_rejects_session(_page_title(page)):
         return False
-    if "zaim.net/home" in url:
+    host = urlparse(url).netloc.lower()
+    path = urlparse(url).path or ""
+    # content.zaim.net/home は "zaim.net/home" を部分一致で含む。ホストで見る。
+    if host in ("zaim.net", "www.zaim.net") and (path.startswith("/home") or path in ("", "/")):
         return True
-    if url.rstrip("/") == "https://zaim.net":
+    if host == "content.zaim.net" and path.startswith("/home"):
         return True
     return page.locator('text="HOME"').count() > 0
 
@@ -266,7 +301,14 @@ def open_browser_context(
             browser = pw.chromium.launch(**launch_kwargs)
         else:
             raise
-    ctx_kwargs: dict = {"locale": "ja-JP"}
+    ctx_kwargs: dict = {
+        "locale": "ja-JP",
+        # HeadlessChrome の UA は content.zaim.net / id.kufu.jp で弾かれることがある
+        "user_agent": (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+        ),
+    }
     if storage_state and storage_state.exists():
         ctx_kwargs["storage_state"] = str(storage_state)
     ctx = browser.new_context(**ctx_kwargs)
