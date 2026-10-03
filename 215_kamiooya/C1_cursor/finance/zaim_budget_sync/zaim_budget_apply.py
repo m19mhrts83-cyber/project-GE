@@ -95,18 +95,25 @@ def print_dry_run(grouped: dict[str, list[dict]]) -> None:
 
 def is_login_page(page: Page) -> bool:
     url = page.url
-    if "id.zaim.net" in url or "user_session" in url or "sign_in" in url:
+    # Zaim は content.zaim.net 未認証時に id.kufu.jp OAuth へ飛ぶ（2026-10 確認）
+    if (
+        "id.zaim.net" in url
+        or "id.kufu.jp" in url
+        or "user_session" in url
+        or "sign_in" in url
+        or "/oauth2/auth" in url
+    ):
         return True
     return page.locator('a:has-text("Google でログイン"), a:has-text("利用規約に同意して Google でログイン")').count() > 0
 
 
 def is_authenticated(page: Page) -> bool:
     url = page.url
-    if "id.zaim.net" in url or "user_session" in url or "sign_in" in url:
+    if is_login_page(page):
         return False
     if "accounts.google.com" in url:
         return False
-    if "zaim.net/home" in url:
+    if "zaim.net/home" in url or "content.zaim.net/home" in url:
         return True
     if url.rstrip("/") == "https://zaim.net":
         return True
