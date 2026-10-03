@@ -47,34 +47,109 @@ def select_date(page, prefix: str, d: date) -> None:
     page.locator(f'select[name="{prefix}_day"]').select_option(f"{d.day:02d}")
 
 
-def export_csv(page, start: date, end: date, encoding: str) -> Path:
-    page.goto(ZAIM_FILE_IO_URL, wait_until="networkidle")
-    page.wait_for_timeout(1500)
+def _open_download_panel(page) -> None:
+    """ダウンロードアコーディオンを開く。既にフォームが見えていれば何もしない。"""
+    form = page.locator(
+        '#collapseDownload form.download-money, form.download-money'
+    ).first
+    if form.count() and form.is_visible():
+        return
 
     collapse = page.locator("#collapseDownload")
-    if not collapse.is_visible():
-        page.locator('h3[href="#collapseDownload"]').click()
-        page.wait_for_timeout(800)
+    if collapse.count() and collapse.is_visible():
+        return
 
-    select_date(page, "start", start)
-    select_date(page, "end", end)
-    page.locator('select[name="charset"]').select_option(encoding)
+    openers = [
+        'h3[href="#collapseDownload"]',
+        'a[href="#collapseDownload"]',
+        '[href="#collapseDownload"]',
+        'h3:has-text("ダウンロード")',
+        'a:has-text("ダウンロード")',
+    ]
+    for sel in openers:
+        loc = page.locator(sel).first
+        if not loc.count():
+            continue
+        try:
+            loc.click(timeout=8_000)
+            page.wait_for_timeout(800)
+            if form.count() and form.is_visible():
+                return
+            if collapse.count() and collapse.is_visible():
+                return
+        except Exception:
+            continue
 
+    raise RuntimeError(
+        "CSVダウンロードパネルを開けませんでした "
+        f"(url={page.url!r}; tried={openers})"
+    )
+
+
+def _screenshot_export_fail(page, name: str = "csv_export_fail.png") -> None:
+    try:
+        zaim.SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(zaim.SCREENSHOT_DIR / name), full_page=True)
+        print(f"# screenshot: {zaim.SCREENSHOT_DIR / name} url={page.url}", file=sys.stderr)
+    except Exception as e:  # noqa: BLE001
+        print(f"# screenshot failed: {e}", file=sys.stderr)
+
+
+def export_csv(page, start: date, end: date, encoding: str, *, login_method: str = "email") -> Path:
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     zaim.SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
-    submit = page.locator(
-        '#collapseDownload form.download-money input[value="この条件でダウンロード"]'
-    )
-    submit.wait_for(state="visible", timeout=10_000)
+    last_err: Exception | None = None
+    for attempt in range(1, 3):
+        try:
+            page.goto(ZAIM_FILE_IO_URL, wait_until="domcontentloaded", timeout=60_000)
+            page.wait_for_timeout(1500)
 
-    with page.expect_download(timeout=180_000) as dl_info:
-        submit.click()
+            # content.zaim.net は HOME と別ホスト。未認証なら Kufu/Zaim ログインへ飛ぶ
+            if zaim.is_login_page(page) or not zaim.is_authenticated(page):
+                print(
+                    f"  CSV画面が未認証のため再ログイン (attempt {attempt}/2) url={page.url}",
+                    file=sys.stderr,
+                )
+                zaim.ensure_logged_in(page, login_method=login_method)
+                page.goto(ZAIM_FILE_IO_URL, wait_until="domcontentloaded", timeout=60_000)
+                page.wait_for_timeout(1500)
+                if zaim.is_login_page(page):
+                    raise RuntimeError(f"再ログイン後も CSV 画面が未認証: {page.url}")
 
-    download = dl_info.value
-    tmp = DOWNLOAD_DIR / (download.suggested_filename or "zaim_export.csv")
-    download.save_as(str(tmp))
-    return tmp
+            _open_download_panel(page)
+
+            select_date(page, "start", start)
+            select_date(page, "end", end)
+            page.locator('select[name="charset"]').select_option(encoding)
+
+            submit = page.locator(
+                '#collapseDownload form.download-money input[value="この条件でダウンロード"], '
+                'form.download-money input[value="この条件でダウンロード"]'
+            ).first
+            submit.wait_for(state="visible", timeout=10_000)
+
+            with page.expect_download(timeout=180_000) as dl_info:
+                submit.click()
+
+            download = dl_info.value
+            tmp = DOWNLOAD_DIR / (download.suggested_filename or "zaim_export.csv")
+            download.save_as(str(tmp))
+            return tmp
+        except Exception as e:  # noqa: BLE001 — 1回だけ再試行／失敗時スクショ
+            last_err = e
+            print(f"# export_csv attempt {attempt}/2 failed: {e}", file=sys.stderr)
+            _screenshot_export_fail(page, f"csv_export_fail_attempt{attempt}.png")
+            if attempt >= 2:
+                break
+            # セレクタ／認証の一時ずれ向けに HOME 経由で立て直す
+            try:
+                zaim.ensure_logged_in(page, login_method=login_method)
+            except Exception as login_err:  # noqa: BLE001
+                print(f"# ensure_logged_in retry failed: {login_err}", file=sys.stderr)
+
+    assert last_err is not None
+    raise last_err
 
 
 def _goto_with_retries(page, url: str, *, retries: int = 2) -> None:
@@ -149,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
             login_method=args.login_method,
         )
         print(f"▶ CSV ダウンロード: {start} 〜 {end} ({args.encoding})")
-        tmp = export_csv(page, start, end, args.encoding)
+        tmp = export_csv(page, start, end, args.encoding, login_method=args.login_method)
         shutil.copy2(tmp, dest)
         zaim.save_storage_state(ctx)
         if browser and not args.connect_cdp:
