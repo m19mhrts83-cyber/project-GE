@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -28,7 +29,42 @@ for name in (
     sys.modules.setdefault(name, MagicMock())
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import westudy_chrome as chrome  # noqa: E402
 import westudy_forum_all as w  # noqa: E402
+
+
+class TestCiChromePin(unittest.TestCase):
+    def setUp(self):
+        self._saved = {
+            key: os.environ.get(key) for key in ("GITHUB_ACTIONS", "WESTUDY_CHROME_VERSION")
+        }
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def test_not_pinned_outside_gha(self):
+        os.environ.pop("GITHUB_ACTIONS", None)
+        os.environ.pop("WESTUDY_CHROME_VERSION", None)
+        self.assertIsNone(chrome.ci_chrome_browser_version())
+
+    def test_default_pin_on_gha(self):
+        os.environ["GITHUB_ACTIONS"] = "true"
+        os.environ.pop("WESTUDY_CHROME_VERSION", None)
+        self.assertEqual(chrome.ci_chrome_browser_version(), "153")
+
+    def test_override(self):
+        os.environ["GITHUB_ACTIONS"] = "true"
+        os.environ["WESTUDY_CHROME_VERSION"] = "154"
+        self.assertEqual(chrome.ci_chrome_browser_version(), "154")
+
+    def test_stable_disables_pin(self):
+        os.environ["GITHUB_ACTIONS"] = "true"
+        os.environ["WESTUDY_CHROME_VERSION"] = "stable"
+        self.assertIsNone(chrome.ci_chrome_browser_version())
 
 
 class TestPartialLoadUsable(unittest.TestCase):

@@ -62,6 +62,8 @@ from selenium.common.exceptions import (
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+from westudy_chrome import apply_ci_chrome_pin
+
 
 # -------------------------
 # 定数・グローバル
@@ -410,6 +412,11 @@ def create_driver() -> webdriver.Chrome:
         options.add_experimental_option("useAutomationExtension", False)
     except Exception:
         pass
+
+    # Chrome 154 は GHA でログインが data:, のまま止まる（westudy_chrome.py）
+    pinned = apply_ci_chrome_pin(options)
+    if pinned:
+        log(f"🌐 CI Chrome pin: {pinned}")
 
     drv = webdriver.Chrome(options=options)
     try:

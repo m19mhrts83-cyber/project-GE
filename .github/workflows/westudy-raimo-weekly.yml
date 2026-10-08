@@ -62,6 +62,9 @@ jobs:
       WESTUDY_LOGIN_NAV_RETRIES: "5"
       WESTUDY_PAGE_GET_RETRIES: "4"
       WESTUDY_LOGIN_FORM_ATTEMPTS: "5"
+      # Chrome 154.0.8037.57（2026-10-04 run 37171011849）はログインが
+      # data:, のまま renderer timeout。成功週の 153 に固定。外すときは stable。
+      WESTUDY_CHROME_VERSION: "153"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
