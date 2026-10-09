@@ -64,6 +64,8 @@ gmail:
 # 受信: /api/line/webhook → line_oa_events → jarvis_line_oa_pull.py が .txt 化して inbox へ
 # group_ids: route id → LINE の groupId（招待直後の join イベント等で確認）
 #   2026-09-30: 「まつの秘書(bot)」を 820 神大家東海DX互助会 に招待して取得開始（PoC）
+#   2026-10-02: 同 Bot を 103 キャラメル管理G に招待（2026-10-08 group_ids 登録）
 line_oa:
   group_ids:
     tokai_dx_gojokai: "C9782a3129b99246c6a2ccb3f619520e5"
+    tcell_caramel_g: "C09e653a9684fdb9f2a22908b6f7e77d3"

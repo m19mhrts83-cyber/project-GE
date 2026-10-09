@@ -101,16 +101,17 @@ household_banks:
     label: "ドコモSMTB／第一生命NEOBANK"
     match_names: ["ドコモSMTBネット銀行"]
     owner: shinji
-    aw_status: watch
+    aw_status: confirmed  # 2026-10-09 ユーザー: SBI本がAW出金先登録済み
     prefer_aw_under_100k: true
-    note: "無料レール（NEOBANK↔SMBC）がある場合はそちら優先"
+    note: "Amex寄せなど自分名義はAW優先可。NEOBANK↔SMBC無料レールもある"
 
   - id: paypay
     label: "PayPay銀行"
     match_names: ["PayPay銀行"]
-    owner: shinji
-    aw_status: watch
-    prefer_aw_under_100k: true
+    owner: corporate  # リビングサポート松・法人名義
+    aw_status: blocked_corporate
+    prefer_aw_under_100k: false
+    note: "法人名義のため真治AWに紐づけ不可（2026-10-09）。寄せはPayPay銀行アプリ／IB"
 
   - id: tokairokin
     label: "東海労金"

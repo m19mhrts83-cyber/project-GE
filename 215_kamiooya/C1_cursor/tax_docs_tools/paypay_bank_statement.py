@@ -72,25 +72,44 @@ def _go_to_paypay_home(page) -> None:
 
 def _navigate_to_corporate_login(page) -> None:
     """公式トップから 法人・個人事業主 → ログイン へ進む（手順書 Step 1）。"""
-    corp_tab = page.get_by_role("tab", name="法人・個人事業主").or_(
-        page.get_by_text("法人・個人事業主", exact=False)
+    # 既にビジネス導線にいるときはタブ切替をスキップ（display:none の重複見出しで scroll 失敗しやすい）
+    if "/business" not in (page.url or ""):
+        corp_tab = page.get_by_role("tab", name="法人・個人事業主").or_(
+            page.get_by_text("法人・個人事業主", exact=False)
+        )
+        if corp_tab.count() > 0:
+            try:
+                corp_tab.first.click(timeout=3000)
+                _wait_ready(page)
+                print("  「法人・個人事業主のお客さま」タブを選択")
+            except Exception:
+                page.goto(
+                    "https://www.paypay-bank.co.jp/business/index.html",
+                    wait_until="domcontentloaded",
+                )
+                _wait_ready(page)
+                print("  ビジネスTOPへ直接遷移")
+
+    # 見える「口座をお持ちの方はこちら」だけスクロール（hidden 複製を踏まない）
+    holder_visible = page.locator("div, section, dl").filter(
+        has_text="口座をお持ちの方はこちら"
     )
-    if corp_tab.count() > 0:
-        corp_tab.first.click()
-        _wait_ready(page)
-        print("  「法人・個人事業主のお客さま」タブを選択")
+    for i in range(min(holder_visible.count(), 8)):
+        el = holder_visible.nth(i)
+        try:
+            if el.is_visible():
+                el.scroll_into_view_if_needed(timeout=5000)
+                page.wait_for_timeout(400)
+                break
+        except Exception:
+            continue
 
-    # ログインリンクはページ下部「口座をお持ちの方はこちら」付近にある
-    holder_section = page.get_by_text("口座をお持ちの方はこちら", exact=False)
-    if holder_section.count() > 0:
-        holder_section.first.scroll_into_view_if_needed()
-        page.wait_for_timeout(800)
-
-    login_link = page.locator('a:visible').filter(has_text="ログイン").filter(
+    # 「ログイン」単体（BA-PLUS / マニュアル等を除外）
+    login_link = page.locator("a:visible").filter(has_text="ログイン").filter(
         has_not_text="BA-PLUS"
-    )
+    ).filter(has_not_text="方法").filter(has_not_text="パスワード")
     if login_link.count() == 0:
-        login_link = page.get_by_role("link", name="ログイン").filter(has_not_text="BA-PLUS")
+        login_link = page.get_by_role("link", name="ログイン", exact=True)
 
     if login_link.count() == 0:
         raise RuntimeError("法人向けログインリンクが見つかりませんでした")

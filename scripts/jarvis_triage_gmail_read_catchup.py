@@ -45,12 +45,22 @@ def sb_client() -> Any:
 
 def gmail_service(token_name: str) -> Any:
     sys.path.insert(0, str(MANUAL))
+    import json
+
+    from gmail_api_scopes import GMAIL_SCOPES_READ_MODIFY  # type: ignore
     from gmail_to_yoritoori import build_service_for_token  # type: ignore
 
     token = MANUAL / token_name
     if not token.is_file():
         raise FileNotFoundError(f"token missing: {token}")
-    service, _ = build_service_for_token(token)
+    # 既読化は modify が必要。非対話ではブラウザ同意を開かない。
+    try:
+        _ = json.loads(token.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    service, _ = build_service_for_token(
+        token, scopes=list(GMAIL_SCOPES_READ_MODIFY), open_browser=False
+    )
     if not service:
         raise RuntimeError(f"failed gmail service for {token_name}")
     return service
