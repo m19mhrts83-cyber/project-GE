@@ -176,3 +176,10 @@ dx_kyouyuu/03_outputs/mail_automation/テスト*.xlsx
 config/kurashift_re_vendor_list.yaml
 config/kurashift_mgmt_vendor_list.yaml
 config/kurashift_repair_vendor_list.yaml
+
+# ローカル専用WIP（残すが git status / コミット一覧に出さない。本線化したら除外を外す）
+scripts/jarvis_sbi_internal_xfer.py
+215_kamiooya/C1_cursor/browser_automation/run_phase1_sbi_alt_to_main.sh
+215_kamiooya/C1_cursor/1b_Cursorマニュアル/reauth_estate_gmail_send.py
+# Gmail取込で付く「ファイル名.pdf(123 KB)」形式（*.pdf にマッチせず status に出る）
+**/*.[pP][dD][fF](*
