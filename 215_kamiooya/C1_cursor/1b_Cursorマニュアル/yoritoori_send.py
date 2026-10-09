@@ -448,11 +448,34 @@ def resolve_partner_gmail_service(partner_emails, email_domains=None, prefer_sub
         print("エラー: パートナー送信用 token（token_estate.json 等）が見つかりません", file=sys.stderr)
         sys.exit(1)
 
+    # estate が readonly 単独だと送信スコープ不足で毎回ブラウザ同意になる。
+    # 非対話では先に止めて、対話時だけ同意フローを開く。
+    interactive = sys.stdin is not None and sys.stdin.isatty()
+    open_browser = interactive
+
     fallback_service = None
     fallback_email = ""
 
     for tpath in token_paths:
-        service, email_addr = build_service_for_token(tpath)
+        try:
+            # パートナー送信は estate 優先。login_hint でアカウント取り違えを減らす。
+            if tpath.name == "token_estate.json":
+                os.environ.setdefault("GMAIL_LOGIN_HINT", "matsuno.estate@gmail.com")
+            service, email_addr = build_service_for_token(
+                tpath, open_browser=open_browser
+            )
+        except RuntimeError as e:
+            print(f"エラー: {e}", file=sys.stderr)
+            print(
+                "是正: estate をフルスコープで再同意してください。\n"
+                "  cd ~/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル && \\\n"
+                "  GMAIL_LOGIN_HINT=matsuno.estate@gmail.com \\\n"
+                "  ~/selenium_env/venv/bin/python -c \"from pathlib import Path; "
+                "from gmail_to_yoritoori import build_service_for_token, credentials_path; "
+                "build_service_for_token(Path('token_estate.json'), open_browser=True)\"",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         if not fallback_service:
             fallback_service = service
             fallback_email = email_addr

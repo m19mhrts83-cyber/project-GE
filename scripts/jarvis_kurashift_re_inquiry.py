@@ -427,11 +427,12 @@ def send_inquiry(
     if not confirm and not dry_run:
         return {"ok": False, "error": "need --i-confirm-send or --dry-run"}
 
-    # at-most-once: 既に送信済みならスキップ
+    # at-most-once: 同種のみスキップ（grok_handoff 済でも仲介への first_inquiry は送る）
+    target_kind = "grok_handoff" if handoff else "first_inquiry"
     existing = list_messages(sb, deal)
     for m in existing:
         if (
-            m.get("kind") in ("first_inquiry", "grok_handoff")
+            m.get("kind") == target_kind
             and m.get("direction") == "outbound"
             and m.get("gmail_id")
         ):

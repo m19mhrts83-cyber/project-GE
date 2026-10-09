@@ -37,6 +37,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -73,6 +74,7 @@ TOKEN_PATH = SCRIPT_DIR / "token.json"
 from gmail_api_scopes import (
     GMAIL_SCOPES_215 as SCOPES,
     GMAIL_SCOPES_READ_MODIFY,
+    resolve_read_scopes_for_token,
     token_satisfies_215_scopes,
     token_satisfies_read_modify_scopes,
     token_satisfies_scopes,
@@ -232,16 +234,68 @@ def build_service_for_token(
                 f"Gmail token 不足または失効: {token_path_for_account.name} "
                 f"（必要スコープ: {', '.join(required)}）。ブラウザ再同意が必要です。"
             )
+        # スコープ不足のとき毎回ブラウザ同意になる（estate が readonly 単独だと送信で頻発）。
+        # 非対話・エージェント経由では先に明示メッセージを出し、ハングに見えないようにする。
+        print(
+            f"📎 Gmail 再同意が必要: {token_path_for_account.name}\n"
+            f"   必要スコープ: {', '.join(required)}\n"
+            f"   ブラウザが開いたら対象アカウントで許可してください"
+            f"（estate なら matsuno.estate@gmail.com）。\n"
+            f"   一度フルスコープで同意すれば、以後は毎回聞かれません。",
+            file=sys.stderr,
+            flush=True,
+        )
         flow = InstalledAppFlow.from_client_secrets_file(
             str(credentials_path), required
         )
         # include_granted_scopes は Drive/Calendar 等の既存付与と混ざり
         # 「Scope has changed」で失敗しやすいので付けない（Gmail 専用 token を維持）。
-        creds = flow.run_local_server(
-            port=0,
-            access_type="offline",
-            prompt="consent",
-        )
+        login_hint = os.environ.get("GMAIL_LOGIN_HINT", "").strip() or None
+        # webbrowser がエージェント環境で失敗することがあるため URL を明示し
+        # macOS の open でも開く。timeout で無限ハングを防ぐ。
+        auth_kwargs = dict(access_type="offline", prompt="consent")
+        if login_hint:
+            auth_kwargs["login_hint"] = login_hint
+
+        import webbrowser
+
+        # run_local_server は webbrowser.get(...).open を使う（open 直呼びではない）
+        _wb_get = webbrowser.get
+
+        def _get_and_wrap(using=None):
+            ctrl = _wb_get(using)
+            _ctrl_open = ctrl.open
+
+            def _open_and_echo(url, new=0, autoraise=True):
+                print(f"   認可URL: {url}", file=sys.stderr, flush=True)
+                if sys.platform == "darwin":
+                    try:
+                        subprocess.run(
+                            ["open", url],
+                            check=False,
+                            capture_output=True,
+                            timeout=10,
+                        )
+                    except Exception:
+                        pass
+                try:
+                    return _ctrl_open(url, new=new, autoraise=autoraise)
+                except Exception:
+                    return False
+
+            ctrl.open = _open_and_echo  # type: ignore[method-assign]
+            return ctrl
+
+        webbrowser.get = _get_and_wrap  # type: ignore[assignment]
+        try:
+            creds = flow.run_local_server(
+                port=0,
+                open_browser=True,
+                timeout_seconds=300,
+                **auth_kwargs,
+            )
+        finally:
+            webbrowser.get = _wb_get  # type: ignore[assignment]
         refreshed = True
 
     if refreshed:
@@ -815,11 +869,28 @@ def main():
     token_paths = resolve_token_paths()
     existing = None
     existing_sent = None
+    # 取込は読取中心。estate が readonly 単独でもブラウザ同意を開かない。
+    # 非対話（launchd / エージェント）では不足時にハングさせず fail-fast。
+    interactive = sys.stdin is not None and sys.stdin.isatty()
+
+    def _import_service(tpath: Path):
+        token_data = {}
+        if tpath.is_file():
+            try:
+                token_data = json.loads(tpath.read_text(encoding="utf-8"))
+            except Exception:
+                token_data = {}
+        scopes = resolve_read_scopes_for_token(token_data)
+        return build_service_for_token(
+            tpath, scopes=scopes, open_browser=interactive
+        )
 
     for idx, tpath in enumerate(token_paths, start=1):
-        service, account_email = build_service_for_token(
-            tpath, scopes=GMAIL_SCOPES_READ_MODIFY
-        )
+        try:
+            service, account_email = _import_service(tpath)
+        except RuntimeError as e:
+            print(f"スキップ（認証）: {tpath.name}: {e}", file=sys.stderr)
+            continue
         label = account_email or str(tpath)
         print(f"\n=== Gmailアカウント {idx}/{len(token_paths)}: {label} ===")
         sys.stdout.flush()
@@ -852,9 +923,11 @@ def main():
 
     supplement = resolve_sent_supplement_token_paths(token_paths)
     for tpath in supplement:
-        service, account_email = build_service_for_token(
-            tpath, scopes=GMAIL_SCOPES_READ_MODIFY
-        )
+        try:
+            service, account_email = _import_service(tpath)
+        except RuntimeError as e:
+            print(f"スキップ（認証・補完）: {tpath.name}: {e}", file=sys.stderr)
+            continue
         label = account_email or str(tpath)
         print(f"\n=== Gmail送信トレイ補完: {label} ===")
         sys.stdout.flush()
