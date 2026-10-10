@@ -112,6 +112,7 @@ def main() -> int:
     print(f"📎 day_pipeline counts: gmail={gmail_n} chatwork={cw_n} fails={fails or 'なし'}")
 
     if not args.push and not args.dry_run_slack:
+        # 取込失敗は非ゼロ。Slack を出さないモードでも失敗は検知する
         return rc
 
     if not REPORT.is_file():
@@ -132,9 +133,15 @@ def main() -> int:
     ]
     if args.dry_run_slack:
         report_cmd.append("--dry-run")
+    # 片方失敗でも件数>0 なら報告は出す（失敗行に残す）
+    if fails and (gmail_n + cw_n) == 0:
+        report_cmd.append("--force")
 
     code, _ = _run_capture(report_cmd, env=env)
-    return rc if rc else code
+    # Slack まで進んだあとは: 取込失敗があれば非ゼロ、なければ Slack 結果
+    if rc:
+        return rc
+    return code
 
 
 if __name__ == "__main__":
