@@ -1,0 +1,294 @@
+# AIエージェントチーム — 社員登記簿（パスはここを正とする）
+# プログラム・外部ツールはフォルダパスをベタ書きせず、id で引く。
+# フォルダを移動したら path だけ直し、id は変えない。
+#
+# 任意キー（ツール割当・07_実行ツール動向_割当指針.md）:
+#   tool_assigned: jarvis | gencode | claude_code | codex | grok_bot
+#   tool_fit: A | B | C | D | A+B …（俯瞰提案 / 定期 / 実装 / 指揮）
+#   tool_notes: 短い理由
+#
+# ミックスアップ識別（16_GrokBot対応_ミックスアップ識別_20261010.md）:
+#   mixup_kind: lane | mac_twin | none
+#   grok_counterpart: s1 | s7 | hawk | bucho_re | family | …（複数は + で連結）
+#   builder_tag: Builder表示用印（例: 〔Grok:S1〕 / 〔ミックスレーン〕）
+
+hub: docs/AIエージェントチーム
+builder_source:
+  title: 物件と連絡の見守り隊
+  share_id: eHKHNixTpIF4G5WN
+  url: https://agent-team-builder-teal.vercel.app/s/eHKHNixTpIF4G5WN
+  previous_share_id: B8cQ9Q5XHtfrl2kF
+updated: "2026-10-10"
+builder_sync_note: "2026-10-10 部門をハブ8室に合わせて再編（4束ね）。同日 builder_tag を社員名末尾に付与（Grok同種17体）。旧share B8cQ9Q5XHtfrl2kF は参照用。"
+mixup_doc: 16_GrokBot対応_ミックスアップ識別_20261010.md
+
+numbering: |
+  3桁固定ID。百の位＝部門、十の位＝まとまり、一の位＝社員。
+  統合・移動しても id は採番し直さない（path のみ更新）。
+
+departments:
+  "100":
+    name: 連絡・物件動向把握室
+    path: 100_連絡・物件動向把握室
+  "200":
+    name: 返信・案内文面制作室
+    path: 200_返信・案内文面制作室
+  "300":
+    name: 品質・タスク運用管理室
+    path: 300_品質・タスク運用管理室
+  "400":
+    name: ミックス・取捨判断室
+    path: 400_ミックス・取捨判断室
+  "500":
+    name: 不動産パイプライン実行室
+    path: 500_不動産パイプライン実行室
+  "600":
+    name: リソース・家計室
+    path: 600_リソース・家計室
+  "700":
+    name: コーチング支援室
+    path: 700_コーチング支援室
+  "800":
+    name: 俯瞰UI・投影更新室
+    path: 800_俯瞰UI・投影更新室
+
+agents:
+  "111":
+    name: パートナー連絡整理係
+    path: 100_連絡・物件動向把握室/111_パートナー連絡整理係
+    status: 運用確認
+    report: report
+    note: 初版開発完了（昼GHA11:50／夜launchd20:30／更新時のみ#report）。運用確認中。LLM不使用。
+  "112":
+    name: LINE同期監視係
+    path: 100_連絡・物件動向把握室/112_LINE同期監視係
+    status: 候補
+    report: ops
+  "113":
+    name: 物件買進め確認係
+    path: 100_連絡・物件動向把握室/113_物件買進め確認係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: bucho_re
+    builder_tag: "〔Grok:Bucho-RE〕"
+    note: ミックスは弱対応。主はKURASHIFT／部長Daily
+  "114":
+    name: 物件一次判定係
+    path: 100_連絡・物件動向把握室/114_物件一次判定係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: s1
+    builder_tag: "〔Grok:S1〕"
+    note: S1ゲートと重複しやすい。511と役割分担
+  "115":
+    name: 修繕進捗要約係
+    path: 100_連絡・物件動向把握室/115_修繕進捗要約係
+    status: 候補
+    report: report
+  "211":
+    name: 返信案内下書き係
+    path: 200_返信・案内文面制作室/211_返信案内下書き係
+    status: 候補
+    report: report
+  "311":
+    name: 送信前品質係
+    path: 300_品質・タスク運用管理室/311_送信前品質係
+    status: 候補
+    report: report
+    note: 1体目候補A。旧 10_
+  "312":
+    name: Todoist起票整理係
+    path: 300_品質・タスク運用管理室/312_Todoist起票整理係
+    status: 候補
+    report: report
+  "313":
+    name: 完了候補確認係
+    path: 300_品質・タスク運用管理室/313_完了候補確認係
+    status: 候補
+    report: report
+  "314":
+    name: 業務品質監査係
+    path: 300_品質・タスク運用管理室/314_業務品質監査係
+    status: 候補
+    report: ops
+  "315":
+    name: 連携健全性点検係
+    path: 300_品質・タスク運用管理室/315_連携健全性点検係
+    status: 候補
+    report: ops
+    note: ビルダー「週次取込点検係」を拡張。1体目候補B。旧 20_
+  "316":
+    name: データアナリスト
+    path: 300_品質・タスク運用管理室/316_データアナリスト
+    status: 候補
+    report: ops
+  "411":
+    name: Grok材料取込係
+    path: 400_ミックス・取捨判断室/411_Grok材料取込係
+    status: 候補
+    report: consult
+    tool_fit: A
+    mixup_kind: lane
+    grok_counterpart: hawk
+    builder_tag: "〔ミックスレーン〕"
+  "412":
+    name: 両系統比較係
+    path: 400_ミックス・取捨判断室/412_両系統比較係
+    status: 候補
+    report: consult
+    tool_fit: A
+    mixup_kind: lane
+    builder_tag: "〔ミックスレーン〕"
+  "413":
+    name: 取捨判断ドラフト係
+    path: 400_ミックス・取捨判断室/413_取捨判断ドラフト係
+    status: 候補
+    report: consult
+    tool_fit: A
+    mixup_kind: lane
+    builder_tag: "〔ミックスレーン〕"
+  "414":
+    name: フィードバック返送係
+    path: 400_ミックス・取捨判断室/414_フィードバック返送係
+    status: 候補
+    report: report
+    tool_fit: A
+    mixup_kind: lane
+    builder_tag: "〔ミックスレーン〕"
+  "415":
+    name: 二重起票・競合監視係
+    path: 400_ミックス・取捨判断室/415_二重起票・競合監視係
+    status: 候補
+    report: ops
+    tool_fit: A+B
+    mixup_kind: lane
+    builder_tag: "〔ミックスレーン〕"
+  "511":
+    name: 問合せ送信準備係
+    path: 500_不動産パイプライン実行室/511_問合せ送信準備係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: s1
+    builder_tag: "〔Grok:S1〕"
+  "512":
+    name: 仲介返信取込係
+    path: 500_不動産パイプライン実行室/512_仲介返信取込係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: bucho_re_evening
+    builder_tag: "〔Grok:仲介返信〕"
+  "513":
+    name: 需給・ペルソナ材料係
+    path: 500_不動産パイプライン実行室/513_需給・ペルソナ材料係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: s3+s5
+    builder_tag: "〔Grok:S3+S5〕"
+  "514":
+    name: 融資打診準備係
+    path: 500_不動産パイプライン実行室/514_融資打診準備係
+    status: 候補
+    report: consult
+    mixup_kind: mac_twin
+    grok_counterpart: s7
+    builder_tag: "〔Grok:S7〕"
+  "515":
+    name: 購入後クリエイティブ係
+    path: 500_不動産パイプライン実行室/515_購入後クリエイティブ係
+    status: 候補
+    report: ops
+    mixup_kind: mac_twin
+    grok_counterpart: s10-s13
+    builder_tag: "〔Grok:S10–S13〕"
+  "516":
+    name: 業者開拓フォロー係
+    path: 500_不動産パイプライン実行室/516_業者開拓フォロー係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: s2+s4+s9
+    builder_tag: "〔Grok:S2+S4+S9〕"
+  "611":
+    name: リソース制約要約係
+    path: 600_リソース・家計室/611_リソース制約要約係
+    status: 候補
+    report: ops
+    mixup_kind: mac_twin
+    grok_counterpart: resource
+    builder_tag: "〔Grok:Resource〕"
+    note: AI使用状況把握＋レビュー連動で社員頻度の減増を提案（本番変更は人確認後）。813と連携
+  "612":
+    name: 課金・年会費ガード係
+    path: 600_リソース・家計室/612_課金・年会費ガード係
+    status: 候補
+    report: ops
+    mixup_kind: none
+  "613":
+    name: Zaim鮮度・二重取込係
+    path: 600_リソース・家計室/613_Zaim鮮度・二重取込係
+    status: 候補
+    report: ops
+    mixup_kind: none
+  "711":
+    name: 家族Journal週次材料係
+    path: 700_コーチング支援室/711_家族Journal週次材料係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: family
+    builder_tag: "〔Grok:Family〕"
+  "712":
+    name: アドバイザー週次パック係
+    path: 700_コーチング支援室/712_アドバイザー週次パック係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: coaching
+    builder_tag: "〔Grok:Coaching〕"
+  "713":
+    name: 総務・DXコーチ材料係
+    path: 700_コーチング支援室/713_総務・DXコーチ材料係
+    status: 候補
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: somu
+    builder_tag: "〔Grok:Somu〕"
+  "811":
+    name: ダッシュボード受け入れ係
+    path: 800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係
+    status: 候補
+    report: ops
+  "812":
+    name: 残り棚棚卸し係
+    path: 800_俯瞰UI・投影更新室/812_残り棚棚卸し係
+    status: 候補
+    report: ops
+  "813":
+    name: 代行指揮枠切替係
+    path: 800_俯瞰UI・投影更新室/813_代行指揮枠切替係
+    status: 候補
+    report: ops
+    note: 枠切れ代行チェーン＋611の頻度コントロール案を承認経由で反映。Jarvisは候補外で俯瞰
+  "814":
+    name: Jarvisダッシュボード更新係
+    path: 800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係
+    status: 候補
+    report: ops
+    note: 定周期でダッシュボード投影を更新。松野は俯瞰、更新は社員
+  "815":
+    name: KURASHIFT更新係
+    path: 800_俯瞰UI・投影更新室/815_KURASHIFT更新係
+    status: 候補
+    report: ops
+    note: 定周期でKURASHIFT/deals等を更新。松野は俯瞰、更新は社員
+  "816":
+    name: Slack俯瞰連携係
+    path: 800_俯瞰UI・投影更新室/816_Slack俯瞰連携係
+    status: 候補
+    report: ops
+    note: Slack報告整形。将来Slackアプリの窓口

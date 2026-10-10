@@ -2,34 +2,39 @@
 
 作業再開時は **このファイル → `CLAUDE.md`** の順で読む。
 
+## フェーズ区切り（2026-10-10）
+
+| フェーズ | 状態 |
+|---|---|
+| **初版開発（本開発／初動）** | **完了** — Webhook／昼GHA／夜launchd／件数テンプレ Slack |
+| **運用確認** | **進行中** — Todoist タスクで区切り。レポート形・判断しやすさ・実走ログを見る |
+
+### 運用確認で見るもの
+
+1. 昼 11:50 に更新がある日 → `#report` が判断しやすい文面か
+2. 夜 20:30 → LINE 取込＋更新時投稿（Mac版LINEは終了）
+3. 更新ゼロの日 → Slack が来ないこと
+4. 失敗時 → 失敗行と「次」が分かること
+
+### 効率・トークン（初版に入れた方針）
+
+- **LLM 不使用**（取込＋件数テンプレのみ → Cursor／API トークンを食わない）
+- 昼: Gmail∥Chatwork **並列**、Gmail `limit=25` / `newer_days=2`（朝 triage との二度取り軽減）
+- 夜: 公式エクスポートは poll 新鮮なら **スキップ**、launchd は **ダッシュボード非表示**
+- GHA: pip cache、timeout 20分
+
+任意の仕上げ（運用確認の外でも可）: flow HTML 図の実装同期。
+
+---
+
 ## 2026-10-10（Phase 3・夜枠）
 
-- **やったこと**: `jarvis_partner_night_pipeline.py`（ダッシュボード open → 公式エクスポート → CHRLINE sync・`--skip-open-chat` → 更新時 #report）。launchd 20:30（`install_partner_111_night_launchd.sh`）。当日1回ガード（`.jarvis_state/partner_111_night.json`）。
-- **完了判定**: `--force --skip-line --dry-run-slack` で本文形OK／実LINEは Mac版LINE終了後に `--apply --push` か launchd
-- **次の一手**: launchd インストール → 今夜以降の自動。全フロー安定後に flow HTML 図
+- `jarvis_partner_night_pipeline.py` ＋ launchd 20:30。当日1回ガード。
 
 ## 2026-10-10（Phase 2 完了・dry_run 緑）
 
-- dry_run `38039937891` **success**（Gmail token 展開後）。更新0 → Slack スキップ確認。schedule 11:50 運用中。
-- 修正コミット: `ecb44f30`
+- dry_run `38039937891` success。`ecb44f30`（Gmail token 展開）。
 
-## 2026-10-10（Phase 2 修正・Gmail token 展開）
+## 2026-10-10（Phase 1・Webhook）
 
-- **現象**: dry_run `38039815107` が失敗（`token_livingsupport.json` 不足）。CW は OK・Slack ゼロ更新スキップも動いた。
-- **やったこと**: GHA に朝 triage と同型の `Materialize Gmail credentials` を追加。
-
-## 2026-10-10（Phase 2 着手・昼パイプライン）
-
-- **やったこと**: `jarvis_partner_day_pipeline.py`（Gmail+CW→件数→更新時のみ #report）。GHA `jarvis-partner-day-report.yml`（11:50 JST）。GitHub Secrets に Webhook 3本を投影。
-- **完了判定**: `workflow_dispatch`（dry_run=true）が緑／本番は更新がある日に #report が来る
-- **次の一手**: 手動 dry_run 1回 → OKなら schedule 運用。朝 triage のパートナー取込との二度取りは当面許容（追記は idempotent）
-
-## 2026-10-10（続き・Webhook実装）
-
-- Slack アプリ `Jarvis AI Team`・Webhook 3本・テスト投稿 OK・`jarvis_partner_slack_report.py`
-- コミット: `ec0536ff`
-
-## 2026-10-10（開始）
-
-- 伴走開始。Phase 1＝更新時だけ Slack `#report`。
-- 取込は既存。Webhook は当時未設定 → 上記で解消。
+- Incoming Webhook 3本・テストOK。`ec0536ff`

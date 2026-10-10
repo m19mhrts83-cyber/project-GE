@@ -21,9 +21,9 @@ on:
         type: boolean
         default: false
       limit:
-        description: "Gmail 最大スレッド数"
+        description: "Gmail 最大スレッド数（既定25・朝 triage と二度取り軽減）"
         required: false
-        default: "40"
+        default: "25"
 
 concurrency:
   group: jarvis-partner-day-report
@@ -32,13 +32,14 @@ concurrency:
 jobs:
   day-report:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
 
       - name: Install deps
         run: |

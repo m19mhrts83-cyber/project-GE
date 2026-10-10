@@ -5,6 +5,8 @@
   ダッシュボードを開く → LINE 公式エクスポート取込 → CHRLINE sync（オプチャ除外）
   → 更新があるときだけ Slack #report（frame=night）
 
+LLM 不使用。公式エクスポートは 15分 poll が新鮮ならスキップして短縮。
+
 例:
   set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_partner_night_pipeline.py --apply --dry-run-slack
@@ -19,6 +21,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -26,10 +29,12 @@ from zoneinfo import ZoneInfo
 REPO = Path(__file__).resolve().parents[1]
 PY = sys.executable
 STATE = REPO / ".jarvis_state" / "partner_111_night.json"
+EXPORT_REMINDER = REPO / ".jarvis_state" / "line_export_reminder.json"
 REPORT = REPO / "scripts" / "jarvis_partner_slack_report.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
 MANUAL = REPO / "215_kamiooya" / "C1_cursor" / "1b_Cursorマニュアル"
+EXPORT_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_line_export"
 JST = ZoneInfo("Asia/Tokyo")
 
 _LINE_APPEND_RE = re.compile(r"#\s*やり取り追記:\s*(\d+)\s*件")
@@ -105,6 +110,40 @@ def _parse_line_appended(blob: str) -> int:
     return n
 
 
+def _export_poll_fresh(max_age_sec: int = 7200) -> bool:
+    """line-export-poll の直近ログ／last_import が新しければ True（再取込スキップ）。"""
+    try:
+        if EXPORT_REMINDER.is_file():
+            data = json.loads(EXPORT_REMINDER.read_text(encoding="utf-8"))
+            # routes 内 last_import_at の最新
+            newest = None
+            for route in (data.get("routes") or {}).values():
+                if not isinstance(route, dict):
+                    continue
+                ts = route.get("last_import_at") or data.get("last_import_at")
+                if not ts:
+                    continue
+                try:
+                    dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=JST)
+                    if newest is None or dt > newest:
+                        newest = dt
+                except ValueError:
+                    continue
+            if newest is not None:
+                age = (_now() - newest.astimezone(JST)).total_seconds()
+                if age <= max_age_sec:
+                    return True
+    except (OSError, json.JSONDecodeError, TypeError):
+        pass
+    if EXPORT_LOG_DIR.is_dir():
+        logs = sorted(EXPORT_LOG_DIR.glob("poll_*.log"), key=lambda p: p.stat().st_mtime)
+        if logs and (time.time() - logs[-1].stat().st_mtime) <= max_age_sec:
+            return True
+    return False
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--apply", action="store_true", help="取込を実行（無いと dry）")
@@ -118,6 +157,12 @@ def main() -> int:
     ap.add_argument("--skip-dashboard", action="store_true")
     ap.add_argument("--skip-line", action="store_true")
     ap.add_argument("--skip-export", action="store_true")
+    ap.add_argument(
+        "--export-fresh-hours",
+        type=float,
+        default=2.0,
+        help="公式エクスポート poll がこの時間以内ならスキップ（既定2h）",
+    )
     ap.add_argument(
         "--after-hour",
         type=int,
@@ -147,11 +192,24 @@ def main() -> int:
     export_n = 0
     rc = 0
 
-    if not args.skip_dashboard:
+    # launchd 無人時はブラウザを開かない（速度・邪魔防止）
+    skip_dash = args.skip_dashboard or os.environ.get(
+        "JARVIS_PARTNER_111_SKIP_DASHBOARD", ""
+    ).strip() in ("1", "true", "yes")
+    if not skip_dash:
         _open_dashboard()
+    else:
+        print("# dashboard: skipped (launchd/headless)")
 
-    # 公式エクスポート（Gmail inbox → yoritoori）— 定常 poll の取りこぼし保険
-    if args.apply and not args.skip_export:
+    # 公式エクスポート — 15分 poll が新鮮ならスキップ（二重取込・時間短縮）
+    do_export = args.apply and not args.skip_export
+    if do_export and _export_poll_fresh(int(args.export_fresh_hours * 3600)):
+        print(
+            f"# export: skip（poll が {args.export_fresh_hours}h 以内に新鮮）",
+            flush=True,
+        )
+        do_export = False
+    if do_export:
         gmail_ex = MANUAL / "line_export_gmail_to_inbox.py"
         inbox_ex = MANUAL / "line_export_inbox_to_yoritoori.py"
         for label, path in (("export_gmail", gmail_ex), ("export_inbox", inbox_ex)):

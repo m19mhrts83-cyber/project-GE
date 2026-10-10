@@ -13,6 +13,6 @@
 | 指示書 | [CLAUDE.md](./CLAUDE.md) · [エージェント指示.md](./エージェント指示.md) |
 | フロー | [flow.md](./flow.md) |
 | FlowForge | https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AZNxdNkT5-DNZyL5pK4AMrbj |
-| 状態 | FlowForge最終確認OK・エージェント指示同期済（GHA/launchd 実装は次） |
+| 状態 | **初版開発完了** → **運用確認中**（昼GHA／夜launchd／更新時のみ `#report`） |
 
 更新: 2026-10-10
