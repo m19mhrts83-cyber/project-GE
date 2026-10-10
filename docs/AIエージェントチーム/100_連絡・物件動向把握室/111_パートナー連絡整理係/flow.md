@@ -26,7 +26,7 @@
 | # | 内容 | 方法 | 人/AI | ツール例 |
 |---|---|---|---|---|
 | 1a | **昼トリガー** 11:50 JST（GHA） | 時間 | AI | GitHub Actions |
-| 1b | **夜トリガー** 20:30以降に Mac を開いたとき（未実施なら） | 時間＋起動 | AI | launchd / 朝オープンと同型 |
+| 1b | **夜トリガー** 20:30 JST（launchd）／未実施なら Jarvis 会話でも可 | 時間＋起動 | AI | `com.matsunoma.jarvis.partner-111-night` |
 | 1c | （副）合図「パートナー確認して」 | 1 | AI | Cursor / Jarvis |
 | 2 | 昼: Gmail＋Chatwork → `5.やり取り.md` | 2+3 | AI | `jarvis_gha_partner_*`（Graph） |
 | 3 | 夜: ダッシュボードを開く | 2 | AI（表示）／人が見る | Jarvis dashboard |
