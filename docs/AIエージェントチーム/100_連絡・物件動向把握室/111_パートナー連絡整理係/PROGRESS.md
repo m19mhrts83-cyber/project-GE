@@ -2,12 +2,16 @@
 
 作業再開時は **このファイル → `CLAUDE.md`** の順で読む。
 
+## 2026-10-10（Phase 2 着手・昼パイプライン）
+
+- **やったこと**: `jarvis_partner_day_pipeline.py`（Gmail+CW→件数→更新時のみ #report）。GHA `jarvis-partner-day-report.yml`（11:50 JST）。GitHub Secrets に Webhook 3本を投影。
+- **完了判定**: `workflow_dispatch`（dry_run=true）が緑／本番は更新がある日に #report が来る
+- **次の一手**: 手動 dry_run 1回 → OKなら schedule 運用。朝 triage のパートナー取込との二度取りは当面許容（追記は idempotent）
+
 ## 2026-10-10（続き・Webhook実装）
 
-- **やったこと**: Slack アプリ `Jarvis AI Team` 作成。`#report`/`#consult`/`#ops` Incoming Webhook を取得し `.env.jarvis_private` に保存。3チャネルへテスト投稿 OK。更新時のみ投稿スクリプト追加。
-- **できたファイル**: `scripts/jarvis_partner_slack_report.py`／本 PROGRESS・`01_Slackセットアップ/00_手順.md` 更新
-- **完了判定**: `#report` にテスト文が届いていれば Webhook 段は成功
-- **次の一手**: 昼取込件数をこのスクリプトに渡す配線（GHA 11:50 分離は Phase 2）
+- Slack アプリ `Jarvis AI Team`・Webhook 3本・テスト投稿 OK・`jarvis_partner_slack_report.py`
+- コミット: `ec0536ff`
 
 ## 2026-10-10（開始）
 
