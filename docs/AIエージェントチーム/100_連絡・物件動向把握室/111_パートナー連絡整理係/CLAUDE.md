@@ -76,3 +76,4 @@ FlowForge（定義・一本合流）: https://flowforge-259747770348.asia-northe
 | 2026-10-10 | 人が見る場所: MD正本＋Slack受動＋Gmail能動。Notionワークログ不要 |
 | 2026-10-10 | FlowForge 一本合流・Notion削除確定。エージェント指示を最終フローに同期 |
 | 2026-10-10 | Slack Incoming Webhook 3本（REPORT/CONSULT/OPS）設定・テストOK。`jarvis_partner_slack_report.py` 追加 |
+| 2026-10-10 | 昼パイプライン＋GHA 11:50（`jarvis_partner_day_pipeline` / `jarvis-partner-day-report.yml`） |
