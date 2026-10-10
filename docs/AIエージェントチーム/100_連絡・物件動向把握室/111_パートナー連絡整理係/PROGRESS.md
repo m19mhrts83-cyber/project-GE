@@ -2,11 +2,21 @@
 
 作業再開時は **このファイル → `CLAUDE.md`** の順で読む。
 
+## 2026-10-10（Phase 3・夜枠）
+
+- **やったこと**: `jarvis_partner_night_pipeline.py`（ダッシュボード open → 公式エクスポート → CHRLINE sync・`--skip-open-chat` → 更新時 #report）。launchd 20:30（`install_partner_111_night_launchd.sh`）。当日1回ガード（`.jarvis_state/partner_111_night.json`）。
+- **完了判定**: `--force --skip-line --dry-run-slack` で本文形OK／実LINEは Mac版LINE終了後に `--apply --push` か launchd
+- **次の一手**: launchd インストール → 今夜以降の自動。全フロー安定後に flow HTML 図
+
+## 2026-10-10（Phase 2 完了・dry_run 緑）
+
+- dry_run `38039937891` **success**（Gmail token 展開後）。更新0 → Slack スキップ確認。schedule 11:50 運用中。
+- 修正コミット: `ecb44f30`
+
 ## 2026-10-10（Phase 2 修正・Gmail token 展開）
 
 - **現象**: dry_run `38039815107` が失敗（`token_livingsupport.json` 不足）。CW は OK・Slack ゼロ更新スキップも動いた。
 - **やったこと**: GHA に朝 triage と同型の `Materialize Gmail credentials` を追加。
-- **次の一手**: dry_run 再実行が緑 → Phase 3（夜枠・LINE／ダッシュボード）へ。
 
 ## 2026-10-10（Phase 2 着手・昼パイプライン）
 

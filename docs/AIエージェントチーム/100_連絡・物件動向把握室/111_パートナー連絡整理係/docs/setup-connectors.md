@@ -13,5 +13,5 @@
 
 **この環境で難しいもの（後回し）**
 
-- 夜枠 LINE（CHRLINE／QR）は **Mac 専用**。Phase 1 では触らない。
+- 夜枠 LINE（CHRLINE／QR）は **Mac 専用** → `jarvis_partner_night_pipeline.py` ＋ launchd 20:30。
 - FlowForge 定義は設計同期済。実行ランナーは未接続前提。
