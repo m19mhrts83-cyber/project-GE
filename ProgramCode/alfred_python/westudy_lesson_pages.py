@@ -41,6 +41,8 @@ from selenium.common.exceptions import (
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+from westudy_chrome import apply_ci_chrome_pin
+
 _SCRIPT_DIR = Path(__file__).resolve().parent
 
 _DEFAULT_LOGIN_URL = "https://westudy.co.jp/login"
@@ -125,6 +127,10 @@ def create_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--disable-renderer-backgrounding")
     # 全リソース待機で renderer timeout になりやすいため DOM 完了で打ち切る
     opts.page_load_strategy = "eager"
+    # Chrome 154 は GHA でログインが data:, のまま止まる（westudy_chrome.py）
+    pinned = apply_ci_chrome_pin(opts)
+    if pinned:
+        log(f"🌐 CI Chrome pin: {pinned}")
     d = webdriver.Chrome(options=opts)
     d.set_page_load_timeout(60)
     d.implicitly_wait(5)
