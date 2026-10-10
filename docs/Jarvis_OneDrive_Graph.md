@@ -99,8 +99,30 @@ python scripts/jarvis_ms_graph_sync_refresh.py --push-gha  # ＋ GitHub Secrets
 **注意**: refresh に `$` が含まれるため、`.env.jarvis_private` では **必ずシングルクォート**で囲む（`source` 時の `$$` 展開防止）。`jarvis_ms_graph_sync_refresh.py` / device_login はクォート付きで書く。
 - 秘密は `.env.jarvis_private` と GitHub / Cloud Secrets / sync_meta（service_role のみ）のみ。チャット・Git 禁止
 
+## 211 朝便（管理会社向け下書き）— GHA 本線
+
+Mac の OneDrive 同期 path なしで、毎朝 Graph 経由で正本へ書く。
+
+| 項目 | 正 |
+|---|---|
+| Workflow | `.github/workflows/jarvis-reply-draft-211.yml`（07:30 JST / `30 22 * * *`） |
+| エントリ | `scripts/jarvis_gha_reply_draft_211.py` |
+| 正本書込 | `apply_draft_to_partner` → `upload_file_graph`（ローカル併写は Mac 時のみ） |
+| 停止 | Secrets `JARVIS_REPLY_DRAFT_211_GHA_DISABLE=1` または schedule 外し |
+| Mac launchd | 保険（`com.matsunoma.jarvis.reply-draft-211`）。GHA 緑化後に uninstall |
+
+```bash
+# ローカル疎通（書込＋一覧）
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+python scripts/jarvis_onedrive_graph.py --probe
+PYTHONPATH=scripts python scripts/jarvis_gha_reply_draft_211.py --dry-run
+# GHA（要 push 後）
+gh workflow run jarvis-reply-draft-211.yml -f dry_run=true
+```
+
 ## 関連
 
 - `config/onedrive_graph.example.yaml`
-- `docs/運用コマンド一覧.md`（ダッシュボード節）
+- `docs/運用コマンド一覧.md`（§2.3 211 朝便）
 - `docs/Jarvis_Cloud_Agent.md`
+- Hub: Drive `★AIエージェントチーム/…/211_返信案内下書き係/`

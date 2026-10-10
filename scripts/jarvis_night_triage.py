@@ -49,6 +49,10 @@ ONEDRIVE_PARTNER = (
     / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
     / "C2_ルーティン作業/26_パートナー社への相談"
 )
+# Graph 相対パス（jarvis_onedrive_graph / GHA 共用）
+PARTNER_BASE_REL = (
+    "215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談"
+)
 
 HEADING_RE = re.compile(
     r"^###\s+(\d{4}/\d{2}/\d{2}(?:\s+\d{2}:\d{2})?)\s*｜\s*([^｜]+)\s*｜\s*([^｜]+)\s*｜\s*(.*)$"
@@ -1357,28 +1361,55 @@ def apply_draft_to_partner(seq_or_id: str) -> Path | None:
         return None
     folder = item["folder"]
     partner_dir = partner_base() / folder
-    partner_dir.mkdir(parents=True, exist_ok=True)
     partner_name = str(item.get("partner") or folder)
 
     if channel == "LINE":
-        draft_path = partner_dir / "4.LINE送信下書き.txt"
+        draft_name = "4.LINE送信下書き.txt"
         content = f"宛先: {partner_name}\n\n{draft}\n"
     elif channel == "Chatwork":
-        draft_path = partner_dir / "4.Chatwork送信下書き.txt"
+        draft_name = "4.Chatwork送信下書き.txt"
         content = f"{draft}\n"
     elif channel == "iMessage":
-        draft_path = partner_dir / "4.送信下書き.txt"
+        draft_name = "4.送信下書き.txt"
         content = f"経路：iMessage\n\n{draft}\n"
     else:
-        draft_path = partner_dir / "4.送信下書き.txt"
+        draft_name = "4.送信下書き.txt"
         if not subject.lower().startswith("re:"):
             subject_line = f"件名：Re: {subject}"
         else:
             subject_line = f"件名：{subject}"
         content = f"{subject_line}\n\n{draft}\n"
 
-    draft_path.write_text(content, encoding="utf-8")
-    print(f"# wrote draft -> {draft_path}")
+    rel = f"{PARTNER_BASE_REL}/{folder}/{draft_name}"
+    data = content.encode("utf-8")
+    draft_path = partner_dir / draft_name
+    wrote_graph = False
+    try:
+        from jarvis_onedrive_graph import graph_configured, upload_file_graph
+
+        if graph_configured():
+            upload_file_graph(
+                rel, data, content_type="text/plain; charset=utf-8"
+            )
+            wrote_graph = True
+            print(f"# wrote draft (graph) -> {rel}")
+    except Exception as e:
+        print(f"# graph write fail: {e}", file=sys.stderr)
+        if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+            raise
+
+    # ローカル併写（Mac 同期フォルダ）。GHA では親が無いことが多い
+    try:
+        partner_dir.mkdir(parents=True, exist_ok=True)
+        draft_path.write_text(content, encoding="utf-8")
+        print(f"# wrote draft (local) -> {draft_path}")
+    except Exception as e:
+        if wrote_graph:
+            print(f"# local mirror skip: {e}")
+            draft_path = Path(rel)
+        else:
+            raise
+
     print(f"# partner folder: {folder}")
     print(f"# channel: {channel}")
     print(f"# subject: {subject}")

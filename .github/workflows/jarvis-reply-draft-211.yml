@@ -1,0 +1,79 @@
+# 211 返信案内下書き係 — 管理会社向け朝便（Graph）
+# 毎日 07:30 JST: materialize → night_triage(partner) → 正本 PUT → Slack
+#
+# 送信はしない。Mac launchd は保険（GHA 緑化後に uninstall）。
+# 停止: Secrets JARVIS_REPLY_DRAFT_211_GHA_DISABLE=1 または本 schedule を外す。
+
+name: Jarvis Reply Draft 211 Morning
+
+on:
+  schedule:
+    - cron: "30 22 * * *" # 07:30 JST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "正本書込・Slack なし（判定のみ）"
+        required: false
+        type: boolean
+        default: true
+      limit:
+        description: "triage 上限"
+        required: false
+        default: "30"
+
+concurrency:
+  group: jarvis-reply-draft-211
+  cancel-in-progress: true
+
+jobs:
+  morning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          pip install -q supabase pyyaml requests msal
+
+      - name: 211 morning (Graph)
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
+          MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
+          MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
+          MS_GRAPH_REFRESH_TOKEN: ${{ secrets.MS_GRAPH_REFRESH_TOKEN }}
+          MS_GRAPH_AUTHORITY: ${{ secrets.MS_GRAPH_AUTHORITY }}
+          MS_GRAPH_USER_UPN: ${{ secrets.MS_GRAPH_USER_UPN }}
+          MS_GRAPH_DRIVE_ID: ${{ secrets.MS_GRAPH_DRIVE_ID }}
+          SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
+          SLACK_WEBHOOK_AI_TEAM_CONSULT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_CONSULT }}
+          SLACK_WEBHOOK_AI_TEAM_OPS: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_OPS }}
+          JARVIS_REPLY_DRAFT_211_GHA_DISABLE: ${{ secrets.JARVIS_REPLY_DRAFT_211_GHA_DISABLE }}
+          JARVIS_TRIAGE_NO_GEMINI: "1"
+          LIMIT: ${{ github.event.inputs.limit || '30' }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+          PYTHONPATH: ${{ github.workspace }}/scripts
+        run: |
+          set -euo pipefail
+          if [[ "${JARVIS_REPLY_DRAFT_211_GHA_DISABLE:-}" == "1" ]]; then
+            echo "Disabled via JARVIS_REPLY_DRAFT_211_GHA_DISABLE"
+            exit 0
+          fi
+          if [[ -z "${MS_GRAPH_REFRESH_TOKEN:-}" && -z "${MS_GRAPH_CLIENT_SECRET:-}" ]]; then
+            echo "::error::MS_GRAPH_* missing"
+            exit 1
+          fi
+          ARGS=(--limit "$LIMIT")
+          # schedule 実行時は inputs が空 → DRY=false で本番
+          # workflow_dispatch 既定 dry_run=true
+          if [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run)
+          fi
+          python scripts/jarvis_gha_reply_draft_211.py "${ARGS[@]}"

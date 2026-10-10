@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>211 返信案内下書き係 — 流れ</title>
+<style>
+  :root { --ai:#2563eb; --prog:#7c3aed; --ext:#059669; --human:#ca8a04; }
+  body { font-family: "Meiryo", "メイリオ", sans-serif; margin: 0; padding: 16px; background:#f8fafc; color:#0f172a; }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  .sub { color:#475569; font-size: .9rem; margin-bottom: 16px; }
+  .legend { display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 16px; font-size:.85rem; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; }
+  .box { flex:1 1 140px; min-width:120px; border-radius:8px; padding:12px; border:2px solid; background:#fff; }
+  .box.ai { border-color:var(--ai); }
+  .box.prog { border-color:var(--prog); }
+  .box.ext { border-color:var(--ext); }
+  .box.human { border-color:var(--human); background:#fffbeb; }
+  .role { font-size:.7rem; font-weight:bold; text-transform:uppercase; margin-bottom:4px; }
+  .ai .role { color:var(--ai); }
+  .prog .role { color:var(--prog); }
+  .ext .role { color:var(--ext); }
+  .human .role { color:var(--human); }
+  .what { font-size:.9rem; font-weight:600; }
+  .tool { font-size:.75rem; color:#64748b; margin-top:6px; }
+  .arrow { align-self:center; color:#94a3b8; font-weight:bold; }
+  .future { margin-top:20px; padding:12px; border:1px dashed #94a3b8; border-radius:8px; background:#fff; }
+  .future h2 { font-size:1rem; margin:0 0 8px; }
+  .grow { margin-top:16px; padding:12px; background:#eff6ff; border-radius:8px; }
+  .grow h2 { font-size:1rem; margin:0 0 8px; color:var(--ai); }
+  ul { margin:0; padding-left:1.2rem; font-size:.9rem; }
+  @media (max-width:700px) {
+    .flow { flex-direction:column; }
+    .arrow { transform:rotate(90deg); text-align:center; }
+  }
+</style>
+</head>
+<body>
+  <h1>管理会社向け朝便 — 返信案内下書き係（211）</h1>
+  <p class="sub">目的: 未返信を拾い、OneDrive正本へ起案。送信は人が承認してから。本線は GHA＋Microsoft Graph（毎朝7:30）。</p>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--ai)"></i>AI</span>
+    <span><i class="dot" style="background:var(--prog)"></i>プログラム</span>
+    <span><i class="dot" style="background:var(--ext)"></i>外部ツール</span>
+    <span><i class="dot" style="background:var(--human)"></i>人間の確認</span>
+  </div>
+  <div class="flow">
+    <div class="box ext">
+      <div class="role">外部ツール</div>
+      <div class="what">新着を正本へ取込</div>
+      <div class="tool">Gmail API / LINE公式エクスポート → 5.やり取り.md</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box prog">
+      <div class="role">プログラム</div>
+      <div class="what">GHA 朝便（Graph materialize）</div>
+      <div class="tool">jarvis_gha_reply_draft_211 → night_triage（101〜104）</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box ai">
+      <div class="role">AI</div>
+      <div class="what">返信文を起案</div>
+      <div class="tool">heuristic＋211テンプレ（人手で調整）</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box ext">
+      <div class="role">外部ツール</div>
+      <div class="what">正本下書きに保存</div>
+      <div class="tool">Microsoft Graph PUT → 4.送信下書き.txt / 4.LINE送信下書き.txt</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box ext">
+      <div class="role">外部ツール</div>
+      <div class="what">件数だけ知らせる</div>
+      <div class="tool">Slack #report（起案あり時のみ）</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box human">
+      <div class="role">人間</div>
+      <div class="what">内容確認 → 送信了承</div>
+      <div class="tool">「これで送ってOK」まで送信しない</div>
+    </div>
+  </div>
+  <div class="future">
+    <h2>Phase 3（実装済・2026-10-11）</h2>
+    <ul>
+      <li>毎朝 7:30 JST: GitHub Actions（<code>jarvis-reply-draft-211.yml</code>）</li>
+      <li>正本は Graph PUT（Mac スリープでも可）。Mac launchd は保険</li>
+      <li>見積B無し → Slack #consult。停止: <code>JARVIS_REPLY_DRAFT_211_GHA_DISABLE=1</code></li>
+    </ul>
+  </div>
+  <div class="grow">
+    <h2>AIを育てるポイント</h2>
+    <ul>
+      <li>選定: 要返信／不要の判断を人が直したら、次の朝便に反映</li>
+      <li>書き方: 敬語・物件名・宛名の好みを下書き差分でフィードバック</li>
+      <li>例外: 見積B待ち・From例外（m19m）は `#consult` へ</li>
+    </ul>
+  </div>
+</body>
+</html>
