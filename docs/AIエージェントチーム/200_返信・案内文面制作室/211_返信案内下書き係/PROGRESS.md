@@ -11,8 +11,9 @@
   - `jarvis_onedrive_graph.list_children_graph*`
   - `apply_draft_to_partner` Graph 本線
 - **疎通**: probe_ok / PUT `.jarvis_graph_write_probe.txt` / PM4フォルダ materialize dry-run
-- **次の一手**: push 後 `gh workflow run … -f dry_run=true` → 緑なら本番1回 → Mac launchd uninstall
-- **状態**: Phase3 実装済。作業フロー（flow.md／FlowForge貼付／全体系進捗）へ反映済
+- **GHA dry-run**: 成功（[run 38094845121](https://github.com/m19mhrts83-cyber/project-GE/actions/runs/38094845121)）— 起案候補2／見積B待ち1／書込なし
+- **次の一手**: 明朝の schedule 本番、または `gh workflow run … -f dry_run=false`。緑が続いたら Mac launchd uninstall
+- **状態**: Phase3 本線稼働前（dry-run 緑）。作業フロー反映済
 
 ## 2026-10-11（Phase2 朝便定常＋見積B）
 
