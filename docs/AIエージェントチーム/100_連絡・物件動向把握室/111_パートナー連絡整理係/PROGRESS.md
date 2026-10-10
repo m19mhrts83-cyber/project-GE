@@ -2,6 +2,12 @@
 
 作業再開時は **このファイル → `CLAUDE.md`** の順で読む。
 
+## 2026-10-10（Phase 2 修正・Gmail token 展開）
+
+- **現象**: dry_run `38039815107` が失敗（`token_livingsupport.json` 不足）。CW は OK・Slack ゼロ更新スキップも動いた。
+- **やったこと**: GHA に朝 triage と同型の `Materialize Gmail credentials` を追加。
+- **次の一手**: dry_run 再実行が緑 → Phase 3（夜枠・LINE／ダッシュボード）へ。
+
 ## 2026-10-10（Phase 2 着手・昼パイプライン）
 
 - **やったこと**: `jarvis_partner_day_pipeline.py`（Gmail+CW→件数→更新時のみ #report）。GHA `jarvis-partner-day-report.yml`（11:50 JST）。GitHub Secrets に Webhook 3本を投影。
