@@ -42,6 +42,7 @@
 | KURASHIFT 問合せ（Tier3） | `kurashift-re-daily-inquiry.yml` | 明示 enabled 時 |
 | Zaim 財務日次（API 系） | `zaim-finance-sync.yml` | Playwright CSV とは別 |
 | Ops Fail Watch | `jarvis-ops-fail-watch.yml` | 失敗監視 |
+| **211 管理会社朝便** | `jarvis-reply-draft-211.yml` | 07:30 JST。Graph materialize→正本 PUT→Slack。Mac launchd は保険 |
 | Pages / deploy | `pages-docs.yml` / `trade-desk-deploy.yml` | 定例というよりデプロイ |
 
 ---
@@ -58,6 +59,7 @@
 | CHRLINE／オプチャ常駐 | `line.openchat.watch` 等 | Mac 専用 |
 | **815オプチャ MD→DB→publish→/openchat** | `openchat-md-db-sync`（07:40/20:30） | CHRLINE＋OneDrive＋kamiooya-qa（staging→ready）。パートナー確認／朝LINEでもMDは取込済み想定 |
 | 夜間フル triage | `night-triage` | **パートナー Gmail／Chatwork 判定は GHA 本線**（`JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL`／`…_CHATWORK` 既定1）。Mac は LINE/iMessage・815・取込補完 |
+| 211 朝便（保険） | `reply-draft-211` | **本線は GHA**。ローカル path 保険。緑化後 uninstall |
 | 朝オープン／Mac 朝バンドル | `triage-morning-open` + `jarvis_morning_mac_refresh` | 取りこぼし回収のハブ（必須起動ではない） |
 | dashboard push（投影） | `dashboard-push` | `.jarvis_state` 依存 |
 | 家族 Journal 週次 | `family-journal-weekly` | Drive／Notion 補完 |
