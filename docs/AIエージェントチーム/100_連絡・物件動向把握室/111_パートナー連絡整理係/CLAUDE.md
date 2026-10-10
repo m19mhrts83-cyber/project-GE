@@ -78,3 +78,4 @@ FlowForge（定義・一本合流）: https://flowforge-259747770348.asia-northe
 | 2026-10-10 | Slack Incoming Webhook 3本（REPORT/CONSULT/OPS）設定・テストOK。`jarvis_partner_slack_report.py` 追加 |
 | 2026-10-10 | 昼パイプライン＋GHA 11:50（`jarvis_partner_day_pipeline` / `jarvis-partner-day-report.yml`） |
 | 2026-10-10 | GHA に Gmail credentials 展開を追加（dry_run 失敗の修正） |
+| 2026-10-10 | 昼 dry_run 緑。夜枠パイプライン＋launchd 20:30（`jarvis_partner_night_pipeline`） |
