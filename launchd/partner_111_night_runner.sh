@@ -15,6 +15,8 @@ LOG="${LOG_DIR}/night_${STAMP}.log"
   # shellcheck disable=SC1091
   source "${REPO_DIR}/.env.jarvis_private"
   set +a
+  # 無人起動ではブラウザを開かない（速度）
+  export JARVIS_PARTNER_111_SKIP_DASHBOARD=1
   PY="${HOME}/selenium_env/venv/bin/python"
   if [[ ! -x "$PY" ]]; then
     PY="python3"

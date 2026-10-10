@@ -79,3 +79,4 @@ FlowForge（定義・一本合流）: https://flowforge-259747770348.asia-northe
 | 2026-10-10 | 昼パイプライン＋GHA 11:50（`jarvis_partner_day_pipeline` / `jarvis-partner-day-report.yml`） |
 | 2026-10-10 | GHA に Gmail credentials 展開を追加（dry_run 失敗の修正） |
 | 2026-10-10 | 昼 dry_run 緑。夜枠パイプライン＋launchd 20:30（`jarvis_partner_night_pipeline`） |
+| 2026-10-10 | **初版開発完了**→運用確認フェーズ。並列取込・Gmail絞り・export skip・報告文面判断向け・LLM不使用 |

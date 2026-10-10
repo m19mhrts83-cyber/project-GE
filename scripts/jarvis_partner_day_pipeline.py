@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """パートナー連絡整理係・昼枠パイプライン（111）
 
-Gmail＋Chatwork 取込 → 追記件数を集計 → 更新があるときだけ Slack #report。
+Gmail＋Chatwork 取込（並列）→ 追記件数を集計 → 更新があるときだけ Slack #report。
+LLM は使わない（件数テンプレのみ・トークン節約）。
 
 例（ローカル）:
   set -a && source .env.jarvis_private && set +a
@@ -16,6 +17,7 @@ import os
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -56,10 +58,44 @@ def _parse_appended(blob: str, kind: str) -> int:
     return 0
 
 
+def _job_gmail(
+    *, apply: bool, limit: int, newer_days: int, env: dict[str, str]
+) -> tuple[str, int, int, str]:
+    cmd = [
+        PY,
+        str(GMAIL),
+        "--limit",
+        str(limit),
+        "--newer-days",
+        str(newer_days),
+    ]
+    cmd.append("--apply" if apply else "--dry-run")
+    code, blob = _run_capture(cmd, env=env)
+    return "gmail", _parse_appended(blob, "gmail"), code, blob
+
+
+def _job_chatwork(*, apply: bool, env: dict[str, str]) -> tuple[str, int, int, str]:
+    cmd = [PY, str(CHATWORK)]
+    cmd.append("--apply" if apply else "--dry-run")
+    code, blob = _run_capture(cmd, env=env)
+    return "chatwork", _parse_appended(blob, "chatwork"), code, blob
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--apply", action="store_true", help="OneDrive へ追記（無いと dry-run 取込）")
-    ap.add_argument("--limit", type=int, default=40)
+    ap.add_argument(
+        "--limit",
+        type=int,
+        default=25,
+        help="Gmail 最大件数（朝 triage と二度取りするため既定25・狭め）",
+    )
+    ap.add_argument(
+        "--newer-days",
+        type=int,
+        default=2,
+        help="Gmail newer_than 日数（既定2・スキャン短縮）",
+    )
     ap.add_argument("--skip-gmail", action="store_true")
     ap.add_argument("--skip-chatwork", action="store_true")
     ap.add_argument(
@@ -76,7 +112,6 @@ def main() -> int:
     args = ap.parse_args()
 
     env = os.environ.copy()
-    # GHA と同型: 1b マニュアルを import path に
     man = REPO / "215_kamiooya" / "C1_cursor" / "1b_Cursorマニュアル"
     env["PYTHONPATH"] = f"{REPO / 'scripts'}:{man}:{env.get('PYTHONPATH', '')}"
 
@@ -85,34 +120,62 @@ def main() -> int:
     fails: list[str] = []
     rc = 0
 
+    jobs = []
     if not args.skip_gmail:
         if not GMAIL.is_file():
             print(f"❌ missing {GMAIL}", file=sys.stderr)
             return 2
-        cmd = [PY, str(GMAIL), "--limit", str(args.limit)]
-        cmd.append("--apply" if args.apply else "--dry-run")
-        code, blob = _run_capture(cmd, env=env)
-        gmail_n = _parse_appended(blob, "gmail")
-        if code != 0:
-            fails.append(f"gmail exit={code}")
-            rc = code
-
+        jobs.append(
+            (
+                "gmail",
+                lambda: _job_gmail(
+                    apply=args.apply,
+                    limit=args.limit,
+                    newer_days=args.newer_days,
+                    env=env,
+                ),
+            )
+        )
     if not args.skip_chatwork:
         if not CHATWORK.is_file():
             print(f"❌ missing {CHATWORK}", file=sys.stderr)
             return 2
-        cmd = [PY, str(CHATWORK)]
-        cmd.append("--apply" if args.apply else "--dry-run")
-        code, blob = _run_capture(cmd, env=env)
-        cw_n = _parse_appended(blob, "chatwork")
-        if code != 0:
-            fails.append(f"chatwork exit={code}")
-            rc = code or rc
+        jobs.append(
+            (
+                "chatwork",
+                lambda: _job_chatwork(apply=args.apply, env=env),
+            )
+        )
 
-    print(f"📎 day_pipeline counts: gmail={gmail_n} chatwork={cw_n} fails={fails or 'なし'}")
+    # I/O 待ちが主なので並列（Gmail API と Chatwork API）
+    if len(jobs) == 1:
+        kind, n, code, _ = jobs[0][1]()
+        if kind == "gmail":
+            gmail_n = n
+        else:
+            cw_n = n
+        if code != 0:
+            fails.append(f"{kind} exit={code}")
+            rc = code
+    elif jobs:
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            futs = {ex.submit(fn): name for name, fn in jobs}
+            for fut in as_completed(futs):
+                kind, n, code, _ = fut.result()
+                if kind == "gmail":
+                    gmail_n = n
+                else:
+                    cw_n = n
+                if code != 0:
+                    fails.append(f"{kind} exit={code}")
+                    rc = code or rc
+
+    print(
+        f"📎 day_pipeline counts: gmail={gmail_n} chatwork={cw_n} "
+        f"fails={fails or 'なし'} (limit={args.limit} newer_days={args.newer_days})"
+    )
 
     if not args.push and not args.dry_run_slack:
-        # 取込失敗は非ゼロ。Slack を出さないモードでも失敗は検知する
         return rc
 
     if not REPORT.is_file():
@@ -133,12 +196,10 @@ def main() -> int:
     ]
     if args.dry_run_slack:
         report_cmd.append("--dry-run")
-    # 片方失敗でも件数>0 なら報告は出す（失敗行に残す）
     if fails and (gmail_n + cw_n) == 0:
         report_cmd.append("--force")
 
     code, _ = _run_capture(report_cmd, env=env)
-    # Slack まで進んだあとは: 取込失敗があれば非ゼロ、なければ Slack 結果
     if rc:
         return rc
     return code
