@@ -25,6 +25,8 @@ HUB = REPO / "docs" / "AIエージェントチーム"
 REG = HUB / "agents_registry.yaml"
 GROK_REG = REPO / "config" / "grok_bots_registry.yaml"
 DASH_JSON = REPO / "apps" / "jarvis-dashboard" / "data" / "agentTeam.json"
+FLOWFORGE_SHARE_STATE = REPO / ".jarvis_state" / "flowforge_share_urls.json"
+FLOWFORGE_LOGIN_EMAIL = "m19m.hrts83@gmail.com"
 DRIVE_HUB = (
     Path.home()
     / "Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp"
@@ -215,6 +217,40 @@ def load_grok_registry() -> dict:
     return yaml.safe_load(GROK_REG.read_text(encoding="utf-8")) or {}
 
 
+def load_flowforge_share_map() -> dict[str, str]:
+    """agent_id / flow_id → share URL（閲覧専用・外部ブラウザ向け）."""
+    if not FLOWFORGE_SHARE_STATE.is_file():
+        return {}
+    raw = json.loads(FLOWFORGE_SHARE_STATE.read_text(encoding="utf-8"))
+    out: dict[str, str] = {}
+    for k, v in (raw.get("by_agent_id") or {}).items():
+        if isinstance(v, str) and "/share/" in v:
+            out[str(k)] = v
+    by_flow = dict(raw.get("by_flow_id") or {})
+    for k, v in raw.items():
+        if str(k).startswith("flow_") and isinstance(v, str) and "/share/" in v:
+            by_flow[str(k)] = v
+    # flow_id keys also indexed for lookup in write_dashboard_json
+    for k, v in by_flow.items():
+        if isinstance(v, str) and "/share/" in v:
+            out[f"flow:{k}"] = v
+    return out
+
+
+def flowforge_edit_via_account_chooser(flow_url: str) -> str:
+    """外部ブラウザ向け: m19m を選ばせる AccountChooser 経由."""
+    from urllib.parse import quote
+
+    if not flow_url:
+        return ""
+    cont = quote(flow_url, safe="")
+    email = quote(FLOWFORGE_LOGIN_EMAIL, safe="")
+    return (
+        "https://accounts.google.com/AccountChooser?"
+        f"Email={email}&continue={cont}"
+    )
+
+
 def build_grok_payload(agents_reg: dict, grok_reg: dict) -> dict:
     """Grok 組織・一覧・AIチーム対応表をダッシュ用に組み立てる."""
     if not grok_reg:
@@ -328,6 +364,7 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
     builder = data.get("builder_source") or {}
     now = datetime.now(JST).isoformat(timespec="seconds")
     grok_payload = build_grok_payload(data, load_grok_registry())
+    share_map = load_flowforge_share_map()
 
     dept_list = []
     for did, dept in sorted(depts.items(), key=lambda x: str(x[0])):
@@ -361,6 +398,14 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
         dept_name = (depts.get(dept_id) or depts.get(str(dept_id)) or {}).get(
             "name"
         ) or ""
+        ff_id = a.get("flowforge_id") or ""
+        ff_url = a.get("flowforge_url") or ""
+        share = (
+            share_map.get(str(aid))
+            or a.get("flowforge_share_url")
+            or (share_map.get(f"flow:{ff_id}") if ff_id else "")
+            or ""
+        )
         agent_list.append(
             {
                 "id": str(aid),
@@ -382,8 +427,10 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
                 "builder_tag": a.get("builder_tag") or "",
                 "mixup_kind": a.get("mixup_kind") or "",
                 "grok_counterpart": a.get("grok_counterpart") or "",
-                "flowforge_id": a.get("flowforge_id") or "",
-                "flowforge_url": a.get("flowforge_url") or "",
+                "flowforge_id": ff_id,
+                "flowforge_url": ff_url,
+                "flowforge_share_url": share,
+                "flowforge_edit_url": flowforge_edit_via_account_chooser(ff_url),
             }
         )
 
@@ -392,10 +439,11 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
         "registry_updated": data.get("updated") or "",
         "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
         "flowforge_login_hint": FLOWFORGE_LOGIN_HINT,
+        "flowforge_login_email": FLOWFORGE_LOGIN_EMAIL,
         "flowforge_open_note": (
-            "作業フローの作り込み・拡大・要素詳細は Cursor インブラウザの "
-            "FlowForge で行う。ダッシュは状況確認と深リンク用。"
-            f" FlowForge は {FLOWFORGE_LOGIN_HINT} でログインしたブラウザで開く。"
+            "Safari／Chrome で編集URLを開くと「同期失敗」「新しいフロー」になりやすいです。"
+            "見るだけなら共有（閲覧）リンクを使う。"
+            f" 編集は Cursor インブラウザで {FLOWFORGE_LOGIN_HINT}（{FLOWFORGE_LOGIN_EMAIL}）ログイン。"
         ),
         "builder": {
             "title": builder.get("title") or "",

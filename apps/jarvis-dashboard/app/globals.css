@@ -4936,6 +4936,41 @@ p.back {
   background: #0d9488;
 }
 
+.at-ff-cta-secondary {
+  background: #fff;
+  color: #0f766e !important;
+  border: 1px solid #0f766e;
+}
+
+.at-ff-cta-secondary:hover {
+  background: #f0fdfa;
+}
+
+.at-ff-warn {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  font-size: 0.88rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1.45;
+}
+
+.at-ff-steps {
+  margin: 10px 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.at-ff-steps li + li {
+  margin-top: 6px;
+}
+
 @media (max-width: 700px) {
   .at-org {
     grid-template-columns: 1fr;

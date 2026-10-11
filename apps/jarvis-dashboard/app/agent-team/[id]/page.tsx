@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Shell from "@/components/Shell";
 import {
+  flowforgeOpenLabel,
+  flowforgeOpenUrl,
   getAgentById,
   getAgentTeam,
   getMappingsForAgent,
@@ -24,6 +26,9 @@ export default async function AgentTeamDetailPage({
   if (!agent) notFound();
   const team = getAgentTeam();
   const mapping = getMappingsForAgent(id);
+  const viewUrl = agent.flowforge_share_url || "";
+  const editUrl = agent.flowforge_edit_url || agent.flowforge_url || "";
+  const primaryUrl = flowforgeOpenUrl(agent);
 
   return (
     <Shell active="/agent-team">
@@ -129,27 +134,61 @@ export default async function AgentTeamDetailPage({
           ) : (
             <p className="meta">flow.md の結論行は未整備です。</p>
           )}
-          {agent.flowforge_url ? (
-            <p style={{ marginTop: 14 }}>
-              <a
-                className="at-ff-cta"
-                href={agent.flowforge_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                AIオートメーションを開く ↗
-              </a>
+
+          <div className="at-ff-warn" role="note">
+            <strong>Safari／Chrome で編集URLを開くと「同期失敗」「新しいフロー」になりやすいです。</strong>
+            <span>
+              原因はログインアカウント違い（正は{" "}
+              {team.flowforge_login_email || "m19m.hrts83@gmail.com"}
+              ）。ダッシュの admin とは別です。
+            </span>
+          </div>
+
+          {primaryUrl ? (
+            <p style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {viewUrl ? (
+                <a
+                  className="at-ff-cta"
+                  href={viewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  閲覧で開く（推奨） ↗
+                </a>
+              ) : null}
+              {editUrl ? (
+                <a
+                  className="at-ff-cta at-ff-cta-secondary"
+                  href={editUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="m19m を選んでください"
+                >
+                  {viewUrl ? "編集（m19m選択） ↗" : `${flowforgeOpenLabel(agent)} ↗`}
+                </a>
+              ) : null}
             </p>
           ) : (
             <p className="meta">FlowForge URL 未設定</p>
           )}
+
           <p className="at-hint" style={{ marginTop: 12 }}>
             {team.flowforge_open_note}
           </p>
-          <p className="meta" style={{ marginTop: 8 }}>
-            作り込み・ズーム・ノード詳細は Cursor インブラウザで開いて作業してください。
-            このダッシュ画面への埋め込みは FlowForge 側の制限（X-Frame DENY）のためできません。
-          </p>
+          <ol className="at-ff-steps">
+            <li>
+              <strong>見るだけ</strong> → 「閲覧で開く」。ログイン不要でノード構成が見えます（編集不可）。
+            </li>
+            <li>
+              <strong>直す・作り込む</strong> → Cursor の Simple Browser（インブラウザ）で FlowForge を開き、
+              {team.flowforge_login_hint || "m19m"} でログイン。チャットで「〇〇のフローを開いて」でも可。
+            </li>
+            <li>
+              外部ブラウザで編集するなら「編集（m19m選択）」→ Google で{" "}
+              <code>{team.flowforge_login_email || "m19m.hrts83@gmail.com"}</code>{" "}
+              を選ぶ。admin のままだと空フローになります。
+            </li>
+          </ol>
         </section>
       </div>
 

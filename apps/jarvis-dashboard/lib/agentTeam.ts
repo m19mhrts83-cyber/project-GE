@@ -24,6 +24,8 @@ export type AgentTeamAgent = {
   grok_counterpart: string;
   flowforge_id: string;
   flowforge_url: string;
+  flowforge_share_url?: string;
+  flowforge_edit_url?: string;
 };
 
 export type AgentTeamDept = {
@@ -90,6 +92,7 @@ export type AgentTeamPayload = {
   registry_updated: string;
   flowforge_base: string;
   flowforge_login_hint: string;
+  flowforge_login_email?: string;
   flowforge_open_note: string;
   builder: { title: string; url: string; share_id: string };
   counts: Record<string, number>;
@@ -175,4 +178,20 @@ export function mixupKindLabel(kind: string): string {
     default:
       return kind || "—";
   }
+}
+
+/** 外部ブラウザ向け。共有があれば閲覧URL、なければ編集（AccountChooser） */
+export function flowforgeOpenUrl(agent: AgentTeamAgent): string {
+  return (
+    agent.flowforge_share_url ||
+    agent.flowforge_edit_url ||
+    agent.flowforge_url ||
+    ""
+  );
+}
+
+export function flowforgeOpenLabel(agent: AgentTeamAgent): string {
+  if (agent.flowforge_share_url) return "閲覧で開く";
+  if (agent.flowforge_edit_url || agent.flowforge_url) return "編集で開く（m19m）";
+  return "—";
 }
