@@ -281,7 +281,7 @@ export async function POST(request: NextRequest) {
           );
           if (action && m) {
             const result = await applyGate(m[1], action, "slack_thread");
-            return NextResponse.json({ ok: result.ok, ...result, thread });
+            return NextResponse.json({ ...result, thread });
           }
         }
         return NextResponse.json({ ok: true, ignored: true });
