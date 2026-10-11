@@ -54,6 +54,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/advisor-weekly-pack") {
     return NextResponse.next({ request });
   }
+  // 物件進行ゲート Yes/No（PROPERTY_GATE_ACTION_TOKEN / Slack Signing で保護。ログイン不要）
+  if (path === "/api/slack/consult-action") {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();
