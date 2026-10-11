@@ -1,5 +1,7 @@
 # 211_返信案内下書き係
 
+- **AIオートメーション（FlowForge）**: [flow_gvDWblu8H38otZzGm66S4Znv](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_gvDWblu8H38otZzGm66S4Znv)
+
 | 項目 | 内容 |
 |---|---|
 | ID | `211` |

@@ -1,5 +1,7 @@
 # 連携健全性点検係 — 一目でわかる1枚
 
+- **AIオートメーション（FlowForge）**: [flow_zYjp6A4HDURefJhSm0h_zUtX](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX)
+
 | 項目 | 内容 |
 |---|---|
 | 役割 | WeStudy/GHA と LINEオプチャ取込の健全性点検・是正 |

@@ -2,6 +2,12 @@
 
 作業を始めたら、まず `PROGRESS.md` を読む。
 
+## AIオートメーション（作業フロー）
+
+- **FlowForge（開く）**: [flow_gvDWblu8H38otZzGm66S4Znv](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_gvDWblu8H38otZzGm66S4Znv)
+- 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
+- 設計の流れ図（あれば）: [`flow.md`](./flow.md)
+
 ## 0. 置き場（二層）
 
 | 層 | パス | 役割 |

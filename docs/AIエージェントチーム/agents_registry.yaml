@@ -6,6 +6,8 @@
 #   tool_assigned: jarvis | gencode | claude_code | codex | grok_bot
 #   tool_fit: A | B | C | D | A+B …（俯瞰提案 / 定期 / 実装 / 指揮）
 #   tool_notes: 短い理由
+# FlowForge（作業フロー）:
+#   flowforge_id / flowforge_url … 各社員 CLAUDE.md・README・00索引 FF列と同期。一覧は 15_FlowForge全体系_進捗_*.md
 #
 # ミックスアップ識別（16_GrokBot対応_ミックスアップ識別_20261010.md）:
 #   mixup_kind: lane | mac_twin | none
@@ -18,7 +20,7 @@ builder_source:
   share_id: eHKHNixTpIF4G5WN
   url: https://agent-team-builder-teal.vercel.app/s/eHKHNixTpIF4G5WN
   previous_share_id: B8cQ9Q5XHtfrl2kF
-updated: "2026-10-10"
+updated: "2026-10-11"
 builder_sync_note: "2026-10-10 部門をハブ8室に合わせて再編（4束ね）。同日 builder_tag を社員名末尾に付与（Grok同種17体）。旧share B8cQ9Q5XHtfrl2kF は参照用。"
 mixup_doc: 16_GrokBot対応_ミックスアップ識別_20261010.md
 
@@ -56,17 +58,23 @@ agents:
   "111":
     name: パートナー連絡整理係
     path: 100_連絡・物件動向把握室/111_パートナー連絡整理係
+    flowforge_id: flow_AZNxdNkT5-DNZyL5pK4AMrbj
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AZNxdNkT5-DNZyL5pK4AMrbj"
     status: 運用確認
     report: report
     note: 初版開発完了（昼GHA11:50／夜launchd20:30／更新時のみ#report）。運用確認中。LLM不使用。
   "112":
     name: LINE同期監視係
     path: 100_連絡・物件動向把握室/112_LINE同期監視係
+    flowforge_id: flow_OOxjAupKzLROOX30fZVV6Mzo
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_OOxjAupKzLROOX30fZVV6Mzo"
     status: 候補
     report: ops
   "113":
     name: 物件買進め確認係
     path: 100_連絡・物件動向把握室/113_物件買進め確認係
+    flowforge_id: flow_RM18Xwo_pNXzMLpYwB9mU-pM
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_RM18Xwo_pNXzMLpYwB9mU-pM"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -76,6 +84,8 @@ agents:
   "114":
     name: 物件一次判定係
     path: 100_連絡・物件動向把握室/114_物件一次判定係
+    flowforge_id: flow_O1OMOoN2vkVf9SKLD9T_mvBy
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_O1OMOoN2vkVf9SKLD9T_mvBy"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -85,48 +95,66 @@ agents:
   "115":
     name: 修繕進捗要約係
     path: 100_連絡・物件動向把握室/115_修繕進捗要約係
+    flowforge_id: flow_8Oz3uZqP3nmvAm9-3S4MjiaR
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8Oz3uZqP3nmvAm9-3S4MjiaR"
     status: 候補
     report: report
   "211":
     name: 返信案内下書き係
     path: 200_返信・案内文面制作室/211_返信案内下書き係
+    flowforge_id: flow_gvDWblu8H38otZzGm66S4Znv
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_gvDWblu8H38otZzGm66S4Znv"
     status: 候補
     report: report
   "311":
     name: 送信前品質係
     path: 300_品質・タスク運用管理室/311_送信前品質係
+    flowforge_id: flow_AKQv6lgUEtudWlE5fQUhQnh2
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2"
     status: 候補
     report: report
     note: 1体目候補A。旧 10_
   "312":
     name: Todoist起票整理係
     path: 300_品質・タスク運用管理室/312_Todoist起票整理係
+    flowforge_id: flow_M8SvKC1IDTDi496Vw-DgGjpD
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD"
     status: 候補
     report: report
   "313":
     name: 完了候補確認係
     path: 300_品質・タスク運用管理室/313_完了候補確認係
+    flowforge_id: flow_6s1nyBIKzluSsdgR-hs9IolD
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD"
     status: 候補
     report: report
   "314":
     name: 業務品質監査係
     path: 300_品質・タスク運用管理室/314_業務品質監査係
+    flowforge_id: flow_AzrNV2o5gb9M2JMFxeX5aZSa
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AzrNV2o5gb9M2JMFxeX5aZSa"
     status: 候補
     report: ops
   "315":
     name: 連携健全性点検係
     path: 300_品質・タスク運用管理室/315_連携健全性点検係
+    flowforge_id: flow_zYjp6A4HDURefJhSm0h_zUtX
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX"
     status: 候補
     report: ops
     note: ビルダー「週次取込点検係」を拡張。1体目候補B。旧 20_
   "316":
     name: データアナリスト
     path: 300_品質・タスク運用管理室/316_データアナリスト
+    flowforge_id: flow_4UWa-0dMnQxDDf3ZFZXlPSd7
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_4UWa-0dMnQxDDf3ZFZXlPSd7"
     status: 候補
     report: ops
   "411":
     name: Grok材料取込係
     path: 400_ミックス・取捨判断室/411_Grok材料取込係
+    flowforge_id: flow_0CETz0AjmFUkUarpofjGHAp0
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_0CETz0AjmFUkUarpofjGHAp0"
     status: 候補
     report: consult
     tool_fit: A
@@ -136,6 +164,8 @@ agents:
   "412":
     name: 両系統比較係
     path: 400_ミックス・取捨判断室/412_両系統比較係
+    flowforge_id: flow_-9F4-5weQBcdsima3vddp_BQ
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_-9F4-5weQBcdsima3vddp_BQ"
     status: 候補
     report: consult
     tool_fit: A
@@ -144,6 +174,8 @@ agents:
   "413":
     name: 取捨判断ドラフト係
     path: 400_ミックス・取捨判断室/413_取捨判断ドラフト係
+    flowforge_id: flow_ke1371iDffRaTdOwDs6WJAtC
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_ke1371iDffRaTdOwDs6WJAtC"
     status: 候補
     report: consult
     tool_fit: A
@@ -152,6 +184,8 @@ agents:
   "414":
     name: フィードバック返送係
     path: 400_ミックス・取捨判断室/414_フィードバック返送係
+    flowforge_id: flow_y_dlQIKJ1HHXApQeHD8pBaov
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_y_dlQIKJ1HHXApQeHD8pBaov"
     status: 候補
     report: report
     tool_fit: A
@@ -160,6 +194,8 @@ agents:
   "415":
     name: 二重起票・競合監視係
     path: 400_ミックス・取捨判断室/415_二重起票・競合監視係
+    flowforge_id: flow_bfH_iUwm7JmE7XLpfzGIRXL0
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_bfH_iUwm7JmE7XLpfzGIRXL0"
     status: 候補
     report: ops
     tool_fit: A+B
@@ -168,6 +204,8 @@ agents:
   "511":
     name: 問合せ送信準備係
     path: 500_不動産パイプライン実行室/511_問合せ送信準備係
+    flowforge_id: flow_Gr7OKXW7L1ElR7yW_XbBCbNH
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Gr7OKXW7L1ElR7yW_XbBCbNH"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -176,6 +214,8 @@ agents:
   "512":
     name: 仲介返信取込係
     path: 500_不動産パイプライン実行室/512_仲介返信取込係
+    flowforge_id: flow_guoe9DBEATd6KvkKT_Jki0Kf
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_guoe9DBEATd6KvkKT_Jki0Kf"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -184,6 +224,8 @@ agents:
   "513":
     name: 需給・ペルソナ材料係
     path: 500_不動産パイプライン実行室/513_需給・ペルソナ材料係
+    flowforge_id: flow_dd86n-D2nu5pFF1iiQiqRcoc
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dd86n-D2nu5pFF1iiQiqRcoc"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -192,6 +234,8 @@ agents:
   "514":
     name: 融資打診準備係
     path: 500_不動産パイプライン実行室/514_融資打診準備係
+    flowforge_id: flow_P0B-nu1re0B-l0ngWfHNCIpv
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_P0B-nu1re0B-l0ngWfHNCIpv"
     status: 候補
     report: consult
     mixup_kind: mac_twin
@@ -200,6 +244,8 @@ agents:
   "515":
     name: 購入後クリエイティブ係
     path: 500_不動産パイプライン実行室/515_購入後クリエイティブ係
+    flowforge_id: flow_d4e_RNt_JmLxU7eqAEB2laAX
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_d4e_RNt_JmLxU7eqAEB2laAX"
     status: 候補
     report: ops
     mixup_kind: mac_twin
@@ -208,6 +254,8 @@ agents:
   "516":
     name: 業者開拓フォロー係
     path: 500_不動産パイプライン実行室/516_業者開拓フォロー係
+    flowforge_id: flow_dCheumorewDolXnfpksSuWKu
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dCheumorewDolXnfpksSuWKu"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -216,6 +264,8 @@ agents:
   "611":
     name: リソース制約要約係
     path: 600_リソース・家計室/611_リソース制約要約係
+    flowforge_id: flow_azD9MyV6Lk3Pn63YMzf9uIFo
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_azD9MyV6Lk3Pn63YMzf9uIFo"
     status: 候補
     report: ops
     mixup_kind: mac_twin
@@ -225,18 +275,24 @@ agents:
   "612":
     name: 課金・年会費ガード係
     path: 600_リソース・家計室/612_課金・年会費ガード係
+    flowforge_id: flow_1SiiCbmQIq7YL560XmunCwBY
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_1SiiCbmQIq7YL560XmunCwBY"
     status: 候補
     report: ops
     mixup_kind: none
   "613":
     name: Zaim鮮度・二重取込係
     path: 600_リソース・家計室/613_Zaim鮮度・二重取込係
+    flowforge_id: flow_5GzzES3EaIqhlotG9IGGNXjF
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_5GzzES3EaIqhlotG9IGGNXjF"
     status: 候補
     report: ops
     mixup_kind: none
   "711":
     name: 家族Journal週次材料係
     path: 700_コーチング支援室/711_家族Journal週次材料係
+    flowforge_id: flow_RG36AFjCWVCR-1j3cp2GeLut
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_RG36AFjCWVCR-1j3cp2GeLut"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -245,6 +301,8 @@ agents:
   "712":
     name: アドバイザー週次パック係
     path: 700_コーチング支援室/712_アドバイザー週次パック係
+    flowforge_id: flow_IiBZKm1hgAZJ5AH7Vv6p9ZLl
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_IiBZKm1hgAZJ5AH7Vv6p9ZLl"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -253,6 +311,8 @@ agents:
   "713":
     name: 総務・DXコーチ材料係
     path: 700_コーチング支援室/713_総務・DXコーチ材料係
+    flowforge_id: flow_kQekwhhUuGTiEJJGOFu-b2zK
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_kQekwhhUuGTiEJJGOFu-b2zK"
     status: 候補
     report: report
     mixup_kind: mac_twin
@@ -261,34 +321,46 @@ agents:
   "811":
     name: ダッシュボード受け入れ係
     path: 800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係
+    flowforge_id: flow_ju7-AkIAiaWd0Wustr5WjV-R
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_ju7-AkIAiaWd0Wustr5WjV-R"
     status: 候補
     report: ops
   "812":
     name: 残り棚棚卸し係
     path: 800_俯瞰UI・投影更新室/812_残り棚棚卸し係
+    flowforge_id: flow_Bg6KgS6OkPTWMeQZ1DnJLf59
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Bg6KgS6OkPTWMeQZ1DnJLf59"
     status: 候補
     report: ops
   "813":
     name: 代行指揮枠切替係
     path: 800_俯瞰UI・投影更新室/813_代行指揮枠切替係
+    flowforge_id: flow_whqVaN6KcGoUZnFpJKJjL7jN
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_whqVaN6KcGoUZnFpJKJjL7jN"
     status: 候補
     report: ops
     note: 枠切れ代行チェーン＋611の頻度コントロール案を承認経由で反映。Jarvisは候補外で俯瞰
   "814":
     name: Jarvisダッシュボード更新係
     path: 800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係
+    flowforge_id: flow_wkFbA0v6bq3ouq9dmpX-cxc1
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_wkFbA0v6bq3ouq9dmpX-cxc1"
     status: 候補
     report: ops
     note: 定周期でダッシュボード投影を更新。松野は俯瞰、更新は社員
   "815":
     name: KURASHIFT更新係
     path: 800_俯瞰UI・投影更新室/815_KURASHIFT更新係
+    flowforge_id: flow_Xy85GrVwta9qwVlLQcHAwNjI
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Xy85GrVwta9qwVlLQcHAwNjI"
     status: 候補
     report: ops
     note: 定周期でKURASHIFT/deals等を更新。松野は俯瞰、更新は社員
   "816":
     name: Slack俯瞰連携係
     path: 800_俯瞰UI・投影更新室/816_Slack俯瞰連携係
+    flowforge_id: flow_YzSnhByHLBiMDfPvLPcY7NRM
+    flowforge_url: "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_YzSnhByHLBiMDfPvLPcY7NRM"
     status: 候補
     report: ops
     note: Slack報告整形。将来Slackアプリの窓口

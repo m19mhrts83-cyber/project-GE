@@ -1,5 +1,7 @@
 # （AI社員名）— 一目でわかる1枚
 
+- **AIオートメーション（FlowForge）**: （URL）
+
 | 項目 | 内容 |
 |---|---|
 | 役割 | |
@@ -8,6 +10,6 @@
 | 報告 | Slack `#…` |
 | 相談 | Slack `#consult` |
 | 指示書 | [CLAUDE.md](./CLAUDE.md) |
-| フロー | [flow.md](./flow.md) |
+| フロー | [flow.md](./flow.md) / FlowForge 上記リンク |
 
 詳細・チェックリストは `CLAUDE.md`。

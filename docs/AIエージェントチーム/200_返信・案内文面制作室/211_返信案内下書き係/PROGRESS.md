@@ -14,6 +14,7 @@
 - **GHA dry-run**: 成功（[run 38094845121](https://github.com/m19mhrts83-cyber/project-GE/actions/runs/38094845121)）— 起案候補2／見積B待ち1／書込なし
 - **次の一手**: 明朝の schedule 本番、または `gh workflow run … -f dry_run=false`。緑が続いたら Mac launchd uninstall
 - **状態**: Phase3 本線稼働前（dry-run 緑）。作業フロー反映済
+- **2026-10-11 追記**: FlowForge 開始トリガー「どこで起動」を Claude Code / Codex → **GitHub Actions** に変更（クラウド同期済）
 
 ## 2026-10-11（Phase2 朝便定常＋見積B）
 
