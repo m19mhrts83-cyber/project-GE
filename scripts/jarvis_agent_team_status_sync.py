@@ -5,25 +5,32 @@
 ルール: docs/AIエージェントチーム/22_運用状態の識別_20261011.md
 
 社員フォルダ作成・status 変更のあと必ず実行（Drive 写しも任意で可）。
+ダッシュ投影: apps/jarvis-dashboard/data/agentTeam.json（commit/push で本番反映）
 """
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import shutil
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 HUB = REPO / "docs" / "AIエージェントチーム"
 REG = HUB / "agents_registry.yaml"
+DASH_JSON = REPO / "apps" / "jarvis-dashboard" / "data" / "agentTeam.json"
 DRIVE_HUB = (
     Path.home()
     / "Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp"
     / "マイドライブ"
     / "★AIエージェントチーム"
 )
+JST = ZoneInfo("Asia/Tokyo")
+FLOWFORGE_LOGIN_HINT = "m19m"  # FlowForge 作成アカウント（セミナー・作成文脈）
 
 MARKER = {
     "設計中": "00_🔵設計中.md",
@@ -175,6 +182,127 @@ def sync_drive(rel: Path, dry: bool) -> None:
     # for markers we copy file-by-file from callers
 
 
+def _extract_readme_role(readme: Path) -> str:
+    if not readme.is_file():
+        return ""
+    text = readme.read_text(encoding="utf-8")
+    m = re.search(r"\|\s*役割\s*\|\s*(.+?)\s*\|", text)
+    if m:
+        return re.sub(r"\s+", " ", m.group(1)).strip()
+    return ""
+
+
+def _extract_flow_summary(flow_md: Path) -> str:
+    if not flow_md.is_file():
+        return ""
+    text = flow_md.read_text(encoding="utf-8")
+    m = re.search(
+        r"##\s*いまの結論[^\n]*\n+(.+?)(?:\n\n|\n## |\Z)",
+        text,
+        re.DOTALL,
+    )
+    if m:
+        line = m.group(1).strip().splitlines()[0].strip()
+        return re.sub(r"\s+", " ", line)[:240]
+    return ""
+
+
+def write_dashboard_json(data: dict, dry: bool) -> Path:
+    """registry → jarvis-dashboard 投影 JSON."""
+    depts = data.get("departments") or {}
+    agents = data.get("agents") or {}
+    builder = data.get("builder_source") or {}
+    now = datetime.now(JST).isoformat(timespec="seconds")
+
+    dept_list = []
+    for did, dept in sorted(depts.items(), key=lambda x: str(x[0])):
+        dept_list.append(
+            {
+                "id": str(did),
+                "name": dept.get("name") or "",
+                "path": dept.get("path") or "",
+            }
+        )
+
+    counts: dict[str, int] = {
+        "候補": 0,
+        "設計中": 0,
+        "運用確認": 0,
+        "運用": 0,
+        "停止": 0,
+    }
+    agent_list = []
+    for aid, a in sorted(agents.items(), key=lambda x: str(x[0])):
+        st = a.get("status") or "候補"
+        counts[st] = counts.get(st, 0) + 1
+        folder = HUB / (a.get("path") or "")
+        role = _extract_readme_role(folder / "README.md")
+        flow_summary = _extract_flow_summary(folder / "flow.md")
+        summary = role or (a.get("note") or "") or flow_summary
+        top = Path(a.get("path") or "").parts[0] if a.get("path") else ""
+        dept_id = (
+            top[:3] if len(top) >= 3 and top[:3].isdigit() else str(aid)[:1] + "00"
+        )
+        dept_name = (depts.get(dept_id) or depts.get(str(dept_id)) or {}).get(
+            "name"
+        ) or ""
+        agent_list.append(
+            {
+                "id": str(aid),
+                "name": a.get("name") or "",
+                "path": a.get("path") or "",
+                "department_id": str(dept_id),
+                "department_name": dept_name,
+                "status": st,
+                "status_icon": ICON.get(st, "⚪"),
+                "report": a.get("report") or "",
+                "trigger": a.get("trigger") or "",
+                "schedule": a.get("schedule") or "",
+                "tool_assigned": a.get("tool_assigned") or "",
+                "tool_fit": a.get("tool_fit") or "",
+                "tool_notes": a.get("tool_notes") or "",
+                "note": a.get("note") or "",
+                "summary": summary,
+                "flow_summary": flow_summary,
+                "builder_tag": a.get("builder_tag") or "",
+                "mixup_kind": a.get("mixup_kind") or "",
+                "grok_counterpart": a.get("grok_counterpart") or "",
+                "flowforge_id": a.get("flowforge_id") or "",
+                "flowforge_url": a.get("flowforge_url") or "",
+            }
+        )
+
+    payload = {
+        "updated": now,
+        "registry_updated": data.get("updated") or "",
+        "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
+        "flowforge_login_hint": FLOWFORGE_LOGIN_HINT,
+        "flowforge_open_note": (
+            "作業フローの作り込み・拡大・要素詳細は Cursor インブラウザの "
+            "FlowForge で行う。ダッシュは状況確認と深リンク用。"
+            f" FlowForge は {FLOWFORGE_LOGIN_HINT} でログインしたブラウザで開く。"
+        ),
+        "builder": {
+            "title": builder.get("title") or "",
+            "url": builder.get("url") or "",
+            "share_id": builder.get("share_id") or "",
+        },
+        "counts": counts,
+        "departments": dept_list,
+        "agents": agent_list,
+    }
+    if dry:
+        print(f"  dashboard JSON (dry): {len(agent_list)} agents → {DASH_JSON}")
+        return DASH_JSON
+    DASH_JSON.parent.mkdir(parents=True, exist_ok=True)
+    DASH_JSON.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(f"  dashboard: {DASH_JSON.relative_to(REPO)} ({len(agent_list)} agents)")
+    return DASH_JSON
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true")
@@ -224,6 +352,8 @@ def main() -> int:
             old_drive = DRIVE_HUB / dept["path"] / "00_部門.md"
             if not args.dry_run:
                 old_drive.unlink(missing_ok=True)
+
+    write_dashboard_json(data, args.dry_run)
 
     if not args.dry_run and not args.no_drive:
         for rel in (

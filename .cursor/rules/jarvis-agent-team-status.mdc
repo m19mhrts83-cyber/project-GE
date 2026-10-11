@@ -32,12 +32,25 @@ Jarvis が作業した結果として status を変えるときは、**黙って
 cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_agent_team_status_sync.py
 ```
 
-（マーカー `00_🟢運用.md` 等・部門 `00_状態ボード.md`・README接頭辞・Drive写し）
+（マーカー `00_🟢運用.md` 等・部門 `00_状態ボード.md`・README接頭辞・Drive写し・**`apps/jarvis-dashboard/data/agentTeam.json`**）
+
+ダッシュ `/agent-team` に反映するには、上記 JSON を **commit＋push** する（Vercel Production）。
+
+## ダッシュと FlowForge の役割
+
+| 場所 | 用途 |
+|---|---|
+| Jarvis `/agent-team` | 作成状況（表・組織図・status）。確認用 |
+| Cursor インブラウザの FlowForge | 作業フローの作り込み・拡大・要素詳細 |
+| FlowForge ログイン | **m19m**（ダッシュの admin ログインとは別） |
+
+埋め込み不可（FlowForge `X-Frame-Options: DENY`）。深リンクで別タブ／インブラウザを開く。
 
 ## 正本
 
 - ルール詳細: `docs/AIエージェントチーム/22_運用状態の識別_20261011.md`
 - 全ツール共通: `docs/AIエージェントチーム/CLAUDE.md`（AGENTS.md は互換入口）
+- ダッシュ投影: `apps/jarvis-dashboard/data/agentTeam.json`
 
 ## やらないこと
 
