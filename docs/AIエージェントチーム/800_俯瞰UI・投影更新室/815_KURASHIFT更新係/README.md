@@ -1,4 +1,4 @@
-# KURASHIFT更新係 — 一目でわかる1枚
+# 【設計中】KURASHIFT更新係 — 一目でわかる1枚
 
 - **AIオートメーション（FlowForge）**: [flow_Xy85GrVwta9qwVlLQcHAwNjI](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Xy85GrVwta9qwVlLQcHAwNjI)
 

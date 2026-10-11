@@ -1,0 +1,32 @@
+# AIエージェントチーム — 運用状態の同期
+
+## トリガー
+
+次のいずれかのとき **作業の締めに必ず** 状態同期する:
+
+- 社員フォルダを新規作成した（`_template` コピー含む）
+- `agents_registry.yaml` の `status` / path / 社員行を変えた
+- 「運用開始」「設計中にした」「候補のまま」等の状態変更
+- 部門ボードやマーカーが古いと言われた
+
+## 必須動作
+
+1. registry の `status` を正として直す（フォルダ名は変えない）
+2. 必要なら `00_チーム索引.md` を揃える
+3. 実行:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_agent_team_status_sync.py
+```
+
+（マーカー `00_🟢運用.md` 等・部門 `00_状態ボード.md`・README接頭辞・Drive写し）
+
+## 正本
+
+- ルール詳細: `docs/AIエージェントチーム/22_運用状態の識別_20261011.md`
+- 全ツール共通: `docs/AIエージェントチーム/CLAUDE.md`（AGENTS.md は互換入口）
+
+## やらないこと
+
+- 状態を理由に `NNN_名前` フォルダをリネームする
+- マーカーや部門ボードだけ手書きして registry を放置する
