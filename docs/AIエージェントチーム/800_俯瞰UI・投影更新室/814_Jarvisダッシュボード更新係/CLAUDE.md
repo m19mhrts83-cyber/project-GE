@@ -52,8 +52,20 @@
 3. 成功・失敗・要対応を Slack #ops へ
 4. 失敗は logs/ に残す
 
+### 一括（Phase L）
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_ui_cycle_814_815.py --agent 814 --post
+# 投影も回す: --push --post
+```
+
+本線時間: launchd `dashboard-push` **12:30**（成功後に ui_cycle が `#ops` へ）。  
+停止: `JARVIS_UI_CYCLE_DISABLE=1`
+
 ## 7. 改善ログ
 
 | 日付 | 変更 |
 |---|---|
 | 2026-10-09 | スタブ作成（俯瞰UI更新担当） |
+| 2026-10-11 | Phase L: `jarvis_ui_cycle_814_815.py`＋dashboard-push 後 `#ops` |

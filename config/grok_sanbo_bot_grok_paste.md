@@ -176,6 +176,7 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
   - `要Jarvis連携` … タイトル先頭 `[要Jarvis連携]` ＋ labels
   - 任意: `quick`（5分以内）
 - **本線** → `10_inbox_from_grok/` に `action: todoist_tasks`（下フォーマット）。Jarvis が Mac で自動 apply（開いた直後〜15分）
+- **定型報告（週次統括・完了サマリ）** → 同 inbox に `action: slack_report`（`channel: report`）。都度の相談は参謀室チャットのまま。Jarvis が Slack へ投稿（正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md`）
 - **Grok Notion 直接**は移行期のみ。新分は Todoist
 - **書けない／旧** → `action: notion_tasks` も可（移行期）
 
@@ -302,7 +303,7 @@ Jarvis: `scripts/jarvis_glucon_materials_from_drive.py --apply`
 |---|---|---|
 | 1 | **矛盾検知** | `## 横断のつまずき` を **必ず1行以上**（例: リソース制約 vs 買い進め件数 / 本業繁忙 vs 家族）。該当なしなら「今週なし」と明記 |
 | 2 | **カード年会費・大型引落** | `@リソース経営部長` から確認。**常設アテンション候補**。該当あれば `## アテンション` に載せる（年会費期限・二重課金・引落不足） |
-| 3 | **10_inbox 1枚** | 参謀室投稿後、`10_inbox_from_grok/` に週次サマリー MD を **1枚**（下フォーマット） |
+| 3 | **10_inbox** | 参謀室投稿後、`10_inbox_from_grok/` に (a) 週次サマリー MD（`action: weekly_summary`）＋ (b) Slack 用 **もう1枚**（`action: slack_report` · `channel: report` · 要約5〜15行） |
 | 4 | **コーチング分離** | `@コーチング部長` の1ブロックだけ。子ども別・宿題・塾は **21:00 家族コーチ**。ホーク週次に長文コピーしない |
 | 5 | **受け入れ棚** | 未閉じ T（実装済なのに意図OKが無い）・来週やる L 最大3・捨て候補。正本 `docs/残り棚_アプリ受け入れ_20260830.md`。完了はコメント「タスク完了したよ」必須 |
 
@@ -331,6 +332,30 @@ period_key: YYYY-MM
 ## next_week
 - …（来週の優先 · 最大3）
 ```
+
+### 週次 Slack 用（同日 · 別ファイル）
+
+ファイル名: `YYYY-MM-DD_hawk_slack_weekly.md`
+
+```
+---
+action: slack_report
+channel: report
+source: hawk
+bot: ホークアイ（参謀）
+kind: 週次統括
+title: 週次統括 YYYY-MM-DD
+target: jarvis
+---
+
+# 週次統括 YYYY-MM-DD
+
+- できたこと: …
+- 見てほしい点: …
+- 次: …
+```
+
+Jarvis が `#report` へ投稿（Webhook 設定後）。都度相談は参謀室チャットのまま。
 
 ### 松野への週次アドバイス（厳守フォーマット）
 

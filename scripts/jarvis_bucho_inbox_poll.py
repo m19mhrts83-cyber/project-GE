@@ -4,11 +4,13 @@
 未処理 MD を検知し .jarvis_state/grok_bridge_inbox.json を更新。
 situation_watch（id: grok_bridge_inbox）→ dashboard に載る。
 `action: todoist_tasks` は既定で自動 apply（Todoist 反映＋成功時 archive）。
+`action: slack_report` も既定で自動 apply（Slack 定型報告＋成功時 archive）。
 
   cd ~/git-repos
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --push
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --skip-todoist-apply
+  ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --skip-slack-report-apply
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --mark-seen FILE.md
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --archive FILE.md
 """
@@ -38,6 +40,7 @@ REPO = Path(__file__).resolve().parents[1]
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 WEEKLY_SUMMARY_STATE_PATH = STATE_DIR / "hawk_weekly_summary.json"
 TODOIST_APPLY = REPO / "scripts" / "jarvis_hawk_todoist_tasks_apply.py"
+SLACK_REPORT_APPLY = REPO / "scripts" / "jarvis_grok_slack_report_apply.py"
 
 
 def now_iso() -> str:
@@ -378,6 +381,51 @@ def apply_todoist_tasks(*, dry_run: bool = False) -> dict[str, Any]:
     }
 
 
+def apply_slack_reports(*, dry_run: bool = False) -> dict[str, Any]:
+    """inbox の action: slack_report を Slack へ投稿（成功分 archive）。soft-fail 用。"""
+    if not SLACK_REPORT_APPLY.is_file():
+        return {"ok": False, "skipped": True, "reason": "script missing"}
+    if (os.environ.get("JARVIS_GROK_SLACK_REPORT_DISABLE") or "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return {"ok": True, "skipped": True, "reason": "JARVIS_GROK_SLACK_REPORT_DISABLE"}
+    if (os.environ.get("JARVIS_SLACK_REPORT_INBOX_AUTO_APPLY") or "1").strip() in (
+        "0",
+        "false",
+        "no",
+    ):
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "JARVIS_SLACK_REPORT_INBOX_AUTO_APPLY=0",
+        }
+    cmd = [str(PY), str(SLACK_REPORT_APPLY), "--json"]
+    if dry_run:
+        cmd.append("--dry-run")
+    else:
+        cmd.extend(["--apply", "--archive-done"])
+    try:
+        r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True, timeout=180)
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+    out = (r.stdout or "").strip()
+    err = (r.stderr or "").strip()
+    parsed: dict[str, Any] = {}
+    try:
+        parsed = json.loads(out) if out.startswith("{") else {}
+    except json.JSONDecodeError:
+        parsed = {}
+    return {
+        "ok": r.returncode == 0,
+        "returncode": r.returncode,
+        "count": parsed.get("count"),
+        "stdout_tail": out[-500:] if out else "",
+        "stderr_tail": err[-300:] if err else "",
+    }
+
+
 def push_dashboard() -> int:
     if not PY.is_file():
         print("# push skip: python venv missing", file=sys.stderr)
@@ -435,17 +483,23 @@ def main() -> int:
         action="store_true",
         help="action: todoist_tasks の自動 apply をしない",
     )
+    ap.add_argument(
+        "--skip-slack-report-apply",
+        action="store_true",
+        help="action: slack_report の自動 apply をしない",
+    )
     ap.add_argument("--json", action="store_true", help="state を JSON で stdout")
     args = ap.parse_args()
 
     apply_result: dict[str, Any] | None = None
+    slack_apply_result: dict[str, Any] | None = None
     try:
         if args.archive:
             state = archive_file(args.archive)
         elif args.mark_seen:
             state = mark_seen(args.mark_seen)
         else:
-            # Todoist 反映を先に（成功分は archive）→ その後 pending 検知
+            # Todoist / Slack 定型報告を先に（成功分は archive）→ その後 pending 検知
             if not args.skip_todoist_apply:
                 apply_result = apply_todoist_tasks()
                 if apply_result.get("skipped"):
@@ -461,15 +515,33 @@ def main() -> int:
                         f"{(apply_result.get('stderr_tail') or '')[:120]}",
                         file=sys.stderr,
                     )
+            if not args.skip_slack_report_apply:
+                slack_apply_result = apply_slack_reports()
+                if slack_apply_result.get("skipped"):
+                    print(
+                        f"📎 Slack report apply: skipped ({slack_apply_result.get('reason')})"
+                    )
+                elif slack_apply_result.get("ok"):
+                    n = slack_apply_result.get("count")
+                    print(f"📎 Slack report apply: ok count={n}")
+                else:
+                    print(
+                        f"📎 Slack report apply: FAIL rc={slack_apply_result.get('returncode')} "
+                        f"{(slack_apply_result.get('stderr_tail') or '')[:120]}",
+                        file=sys.stderr,
+                    )
             state = poll()
     except Exception as e:
         print(f"# inbox poll error: {e}", file=sys.stderr)
         return 1
 
     if args.json:
-        if apply_result is not None:
+        if apply_result is not None or slack_apply_result is not None:
             state = dict(state)
-            state["todoist_apply"] = apply_result
+            if apply_result is not None:
+                state["todoist_apply"] = apply_result
+            if slack_apply_result is not None:
+                state["slack_report_apply"] = slack_apply_result
         print(json.dumps(state, ensure_ascii=False, indent=2))
     else:
         print_block(state)

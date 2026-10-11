@@ -9,5 +9,6 @@
 | 権限の境界 | チェック・既知復旧＝可／QR・大量YAML＝人 |
 | 報告 | Slack `#ops` |
 | 相談 | Slack `#consult` |
+| 実行 | `scripts/jarvis_ops_health_315.py --post` |
 | 指示書 | [CLAUDE.md](./CLAUDE.md) |
 | フロー | [flow.md](./flow.md) |

@@ -3,27 +3,34 @@
 """画面ロック解除で、間隔ポーリング系の launchd を1回走らせる。
 
 入口: macOS 通知 com.apple.screenIsUnlocked（スリープ後のロック解除を含む）
-確認: 解除のたびに下の RUNNERS だけ。時刻指定ジョブは起動しない
+確認: 解除のたびに下の RUNNERS だけ。時刻指定ジョブは原則起動しない
+例外: 111 夜枠（20:30以降・未実施）だけ「Macを開いたとき」回収（計画どおり）
 履歴: ~/Library/Logs/jarvis_screen_unlock/catchup.log
 停止: JARVIS_SCREEN_UNLOCK_CATCHUP_DISABLE=1 のあと launchd を入れ直す
       または launchd/uninstall_screen_unlock_catchup_launchd.sh
 
 時刻指定（Zaim・週次・朝定時）は、スリープで時刻を逃すと macOS が
-復帰時に1回実行する。ロック解除のたびにそこへは足さない。
+復帰時に1回実行する。ロック解除のたびにそこへは足さない（111夜以外）。
 """
 from __future__ import annotations
 
 import ctypes
+import json
 import os
 import select
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[1]
 LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_screen_unlock"
 LOG_PATH = LOG_DIR / "catchup.log"
+JST = ZoneInfo("Asia/Tokyo")
+PARTNER_111_NIGHT_STATE = REPO / ".jarvis_state" / "partner_111_night.json"
+PARTNER_111_NIGHT_RUNNER = REPO / "launchd" / "partner_111_night_runner.sh"
 
 # 15分間隔クラス。常駐（KeepAlive）や 45秒ワーカーは対象外。
 # bucho_inbox_poll_runner 内で calendar_sync / watch_todoist_sync も走る。
@@ -82,6 +89,48 @@ def _drain(fd: int) -> None:
             return
 
 
+def _partner_111_night_due() -> bool:
+    """20:30 JST 以降かつ今夜未実施なら True。"""
+    if (os.environ.get("JARVIS_PARTNER_111_NIGHT_DISABLE") or "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return False
+    now = datetime.now(JST)
+    if (now.hour, now.minute) < (20, 30):
+        return False
+    today = now.strftime("%Y-%m-%d")
+    if not PARTNER_111_NIGHT_STATE.is_file():
+        return True
+    try:
+        data = json.loads(PARTNER_111_NIGHT_STATE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return True
+    return data.get("last_ok_date") != today
+
+
+def _maybe_partner_111_night() -> None:
+    if not _partner_111_night_due():
+        return
+    if not PARTNER_111_NIGHT_RUNNER.is_file():
+        _log("missing partner_111_night_runner.sh")
+        return
+    _log("start partner_111_night (20:30窓・未実施)")
+    try:
+        proc = subprocess.run(
+            ["/bin/zsh", str(PARTNER_111_NIGHT_RUNNER)],
+            cwd=str(REPO),
+            timeout=RUN_TIMEOUT_SEC,
+            check=False,
+        )
+        _log(f"end partner_111_night exit={proc.returncode}")
+    except subprocess.TimeoutExpired:
+        _log("timeout partner_111_night")
+    except OSError as exc:
+        _log(f"fail partner_111_night: {exc}")
+
+
 def _run_catchup() -> None:
     for rel in RUNNERS:
         path = REPO / rel
@@ -101,6 +150,7 @@ def _run_catchup() -> None:
             _log(f"timeout {rel}")
         except OSError as exc:
             _log(f"fail {rel}: {exc}")
+    _maybe_partner_111_night()
 
 
 def main() -> int:

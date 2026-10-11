@@ -2,7 +2,8 @@
 
 ## 概要
 
-`gmail_ai_news_save.py` は、Gmail から「注目AIニュース」（ikeda@workstyle-evolution.co.jp）を取得し、指定フォルダ直下に Markdown と画像を保存します。
+`gmail_ai_news_save.py` は、Gmail からいけともAIニュース（ikeda@workstyle-evolution.co.jp）を取得し、指定フォルダ直下に Markdown と画像を保存します。  
+件名は **旧「注目AIニュース」** と **新「【いけともAIニュース …週】」** の両方を検索する（2026-09〜の件名変更対応）。
 
 ## 前提
 
