@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   flowforgeOpenLabel,
   flowforgeOpenUrl,
+  mappingSideLabel,
   mixupKindLabel,
   reportLabel,
   sortAgents,
@@ -42,6 +43,7 @@ export default function AgentTeamClient({
   const [statusFilter, setStatusFilter] = useState<string>("すべて");
   const [deptFilter, setDeptFilter] = useState<string>("すべて");
   const [grokDeptFilter, setGrokDeptFilter] = useState<string>("すべて");
+  const [mapFilter, setMapFilter] = useState<string>("すべて");
 
   const filtered = useMemo(() => {
     let list = agents;
@@ -81,6 +83,27 @@ export default function AgentTeamClient({
     return map;
   }, [grok.bots, grok.departments]);
 
+  const mapCounts = grok.mapping_counts || {
+    paired: 0,
+    ai_only: 0,
+    grok_only: 0,
+    all: grok.mappings.length,
+  };
+
+  const mappingsFiltered = useMemo(() => {
+    if (mapFilter === "すべて") return grok.mappings;
+    if (mapFilter === "対応あり") {
+      return grok.mappings.filter((m) => m.side === "paired");
+    }
+    if (mapFilter === "AIのみ") {
+      return grok.mappings.filter((m) => m.side === "ai_only");
+    }
+    if (mapFilter === "Grokのみ") {
+      return grok.mappings.filter((m) => m.side === "grok_only");
+    }
+    return grok.mappings;
+  }, [grok.mappings, mapFilter]);
+
   return (
     <>
       <p className="sub">
@@ -102,7 +125,7 @@ export default function AgentTeamClient({
           [
             ["ai", "AIエージェントチーム", agents.length],
             ["grok", "Grok Bot", grok.bots.length],
-            ["map", "対応表", grok.mappings.length],
+            ["map", "対応表", grok.mapping_counts?.all ?? grok.mappings.length],
           ] as const
         ).map(([id, label, n]) => (
           <button
@@ -402,56 +425,113 @@ export default function AgentTeamClient({
       {tab === "map" ? (
         <>
           <p className="at-hint">
-            同じ仕事系統の対応です。〔Grok:◯◯〕は置き換えではなく
-            <strong> 並べて比較する相手</strong>。ミックスレーンは比較する側。
+            {grok.note ||
+              "対応表は全件（対応あり／AIのみ／Grokのみ）。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"}
             {grok.mixup_doc ? ` 詳細: ${grok.mixup_doc}` : null}
           </p>
+          <div className="at-counts" aria-label="対応表フィルタ">
+            {(
+              [
+                ["すべて", mapCounts.all],
+                ["対応あり", mapCounts.paired],
+                ["AIのみ", mapCounts.ai_only],
+                ["Grokのみ", mapCounts.grok_only],
+              ] as const
+            ).map(([label, n]) => (
+              <button
+                key={label}
+                type="button"
+                className={`at-count ${mapFilter === label ? "is-on" : ""}`}
+                onClick={() => setMapFilter(label)}
+              >
+                <span>{label}</span>
+                <strong>{n}</strong>
+              </button>
+            ))}
+          </div>
           <section className="home-section">
             <div className="home-section-head">
               <h2 style={{ fontSize: "1.08rem", margin: 0 }}>
                 AIエージェントチーム ↔ Grok Bot
               </h2>
-              <span className="meta">{grok.mappings.length}行</span>
+              <span className="meta">{mappingsFiltered.length}行</span>
             </div>
             <div className="at-table-wrap">
               <table className="at-table">
                 <thead>
                   <tr>
+                    <th>側</th>
                     <th>AI社員</th>
                     <th>印</th>
                     <th>種別</th>
                     <th>対応 Grok</th>
-                    <th>役割分担</th>
+                    <th>役割／実施</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {grok.mappings.map((m) => (
-                    <tr key={m.agent_id}>
-                      <td>
-                        <Link href={`/agent-team/${m.agent_id}`}>
-                          {m.agent_id} {m.agent_name}
-                        </Link>
-                      </td>
-                      <td>
-                        {m.builder_tag ? (
-                          <span className="at-tag">{m.builder_tag}</span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="meta">{mixupKindLabel(m.mixup_kind)}</td>
-                      <td>
-                        {m.mixup_kind === "lane" ? (
-                          <span className="meta">全Grok／比較レーン</span>
-                        ) : m.grok_labels.length ? (
-                          m.grok_labels.join(" · ")
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="meta">{m.role_split || "—"}</td>
-                    </tr>
-                  ))}
+                  {mappingsFiltered.map((m, i) => {
+                    const rowKey =
+                      m.side === "grok_only"
+                        ? `g-${m.grok_ids[0] || i}`
+                        : `a-${m.agent_id || i}`;
+                    return (
+                      <tr
+                        key={rowKey}
+                        className={
+                          m.side === "grok_only"
+                            ? "at-map-grok-only"
+                            : m.side === "ai_only"
+                              ? "at-map-ai-only"
+                              : undefined
+                        }
+                      >
+                        <td>
+                          <span
+                            className={`at-map-side at-map-side-${m.side || "paired"}`}
+                          >
+                            {mappingSideLabel(m.side || "paired")}
+                          </span>
+                        </td>
+                        <td>
+                          {m.side === "grok_only" ? (
+                            <span className="at-map-missing">AI社員対応なし</span>
+                          ) : (
+                            <Link href={`/agent-team/${m.agent_id}`}>
+                              {m.agent_id} {m.agent_name}
+                            </Link>
+                          )}
+                        </td>
+                        <td>
+                          {m.builder_tag ? (
+                            <span className="at-tag">{m.builder_tag}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="meta">{mixupKindLabel(m.mixup_kind)}</td>
+                        <td>
+                          {m.side === "ai_only" ? (
+                            <span className="at-map-missing">Grok対応なし</span>
+                          ) : m.mixup_kind === "lane" ? (
+                            <span className="meta">全Grok／比較レーン</span>
+                          ) : m.grok_labels.length ? (
+                            <>
+                              {m.grok_labels.join(" · ")}
+                              {m.grok_department ? (
+                                <span className="meta">
+                                  {" "}
+                                  （{m.grok_department}）
+                                </span>
+                              ) : null}
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="meta">{m.role_split || "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

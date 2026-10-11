@@ -65,7 +65,10 @@ export type GrokDept = {
   bot_count: number;
 };
 
+export type GrokMappingSide = "paired" | "ai_only" | "grok_only" | string;
+
 export type GrokMapping = {
+  side: GrokMappingSide;
   agent_id: string;
   agent_name: string;
   builder_tag: string;
@@ -73,6 +76,7 @@ export type GrokMapping = {
   grok_counterpart: string;
   grok_ids: string[];
   grok_labels: string[];
+  grok_department?: string;
   role_split: string;
 };
 
@@ -84,6 +88,12 @@ export type GrokPayload = {
   departments: GrokDept[];
   bots: GrokBot[];
   mappings: GrokMapping[];
+  mapping_counts?: {
+    paired: number;
+    ai_only: number;
+    grok_only: number;
+    all: number;
+  };
   note?: string;
 };
 
@@ -173,10 +183,27 @@ export function mixupKindLabel(kind: string): string {
       return "Mac側ツイン";
     case "lane":
       return "ミックスレーン";
+    case "ai_only":
+      return "AI社員のみ";
+    case "grok_only":
+      return "Grokのみ";
     case "none":
       return "対応なし";
     default:
       return kind || "—";
+  }
+}
+
+export function mappingSideLabel(side: string): string {
+  switch (side) {
+    case "paired":
+      return "対応あり";
+    case "ai_only":
+      return "AIのみ";
+    case "grok_only":
+      return "Grokのみ";
+    default:
+      return side || "—";
   }
 }
 

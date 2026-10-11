@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-11T18:37:06+09:00",
+  "updated": "2026-10-11T18:40:15+09:00",
   "registry_updated": "2026-10-11",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
   "flowforge_login_hint": "m19m",
@@ -1632,6 +1632,31 @@
     ],
     "mappings": [
       {
+        "side": "ai_only",
+        "agent_id": "111",
+        "agent_name": "パートナー連絡整理係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "定時実装済（昼GHA11:50／夜launchd20:30＋ダッシュボード／links・reports／更新時のみ#report）。運用確認中。LLM不使用。"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "112",
+        "agent_name": "LINE同期監視係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "paired",
         "agent_id": "113",
         "agent_name": "物件買進め確認係",
         "builder_tag": "〔Grok:Bucho-RE〕",
@@ -1643,9 +1668,11 @@
         "grok_labels": [
           "Bucho-RE 不動産賃貸部長"
         ],
+        "grok_department": "",
         "role_split": "主はKURASHIFT／部長Daily。Grok部長と弱対応"
       },
       {
+        "side": "paired",
         "agent_id": "114",
         "agent_name": "物件一次判定係",
         "builder_tag": "〔Grok:S1〕",
@@ -1657,9 +1684,107 @@
         "grok_labels": [
           "S1 物件調査"
         ],
+        "grok_department": "",
         "role_split": "S1ゲートと重複しやすい。ミックス時は511と役割分担"
       },
       {
+        "side": "ai_only",
+        "agent_id": "115",
+        "agent_name": "修繕進捗要約係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "211",
+        "agent_name": "返信案内下書き係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "運用確認（7営業日観察）。報告=毎日ゼロ日も。運用後=起案時＋週1月曜「返信案件なし」"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "311",
+        "agent_name": "送信前品質係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2体目候補。人依頼トリガー。旧10_"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "312",
+        "agent_name": "Todoist起票整理係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "313",
+        "agent_name": "完了候補確認係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "314",
+        "agent_name": "業務品質監査係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "315",
+        "agent_name": "連携健全性点検係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "本線=GHA日曜21:00（--cloud）。Mac補完=日曜21:45 --remediate-once。#ops／未解決は#consult。運用確認中"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "316",
+        "agent_name": "データアナリスト",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "paired",
         "agent_id": "411",
         "agent_name": "Grok材料取込係",
         "builder_tag": "〔ミックスレーン〕",
@@ -1667,9 +1792,11 @@
         "grok_counterpart": "hawk",
         "grok_ids": [],
         "grok_labels": [],
+        "grok_department": "",
         "role_split": "全Grok inbox／チャンネル要約の入口（比較レーン）"
       },
       {
+        "side": "paired",
         "agent_id": "412",
         "agent_name": "両系統比較係",
         "builder_tag": "〔ミックスレーン〕",
@@ -1677,9 +1804,11 @@
         "grok_counterpart": "",
         "grok_ids": [],
         "grok_labels": [],
+        "grok_department": "",
         "role_split": "411＋AI社員成果を並べて比較"
       },
       {
+        "side": "paired",
         "agent_id": "413",
         "agent_name": "取捨判断ドラフト係",
         "builder_tag": "〔ミックスレーン〕",
@@ -1687,9 +1816,11 @@
         "grok_counterpart": "",
         "grok_ids": [],
         "grok_labels": [],
+        "grok_department": "",
         "role_split": "412の差分から取捨ドラフト"
       },
       {
+        "side": "paired",
         "agent_id": "414",
         "agent_name": "フィードバック返送係",
         "builder_tag": "〔ミックスレーン〕",
@@ -1697,9 +1828,11 @@
         "grok_counterpart": "",
         "grok_ids": [],
         "grok_labels": [],
+        "grok_department": "",
         "role_split": "採用結果を Grok outbox へ返送"
       },
       {
+        "side": "paired",
         "agent_id": "415",
         "agent_name": "二重起票・競合監視係",
         "builder_tag": "〔ミックスレーン〕",
@@ -1707,9 +1840,11 @@
         "grok_counterpart": "",
         "grok_ids": [],
         "grok_labels": [],
+        "grok_department": "",
         "role_split": "Todoist／inbox の二重起票・競合監視"
       },
       {
+        "side": "paired",
         "agent_id": "511",
         "agent_name": "問合せ送信準備係",
         "builder_tag": "〔Grok:S1〕",
@@ -1721,9 +1856,11 @@
         "grok_labels": [
           "S1 物件調査"
         ],
+        "grok_department": "",
         "role_split": "Grok=調査・問合せ文案／社員=送信準備・対外了承前の整形"
       },
       {
+        "side": "paired",
         "agent_id": "512",
         "agent_name": "仲介返信取込係",
         "builder_tag": "〔Grok:仲介返信〕",
@@ -1735,9 +1872,11 @@
         "grok_labels": [
           "Bucho-RE 不動産賃貸部長"
         ],
+        "grok_department": "",
         "role_split": "Grok=S5/S3判断／社員=取込・整理・停滞見回り"
       },
       {
+        "side": "paired",
         "agent_id": "513",
         "agent_name": "需給・ペルソナ材料係",
         "builder_tag": "〔Grok:S3+S5〕",
@@ -1751,9 +1890,11 @@
           "S3 需給三次判断",
           "S5 ペルソナ二次判断"
         ],
+        "grok_department": "",
         "role_split": "Grok=判断本文／社員=Obsidian・deals突合"
       },
       {
+        "side": "paired",
         "agent_id": "514",
         "agent_name": "融資打診準備係",
         "builder_tag": "〔Grok:S7〕",
@@ -1765,9 +1906,11 @@
         "grok_labels": [
           "S7 融資相談"
         ],
+        "grok_department": "",
         "role_split": "Grok=打診論点／社員=書類・下書き検収（送信は人）"
       },
       {
+        "side": "paired",
         "agent_id": "515",
         "agent_name": "購入後クリエイティブ係",
         "builder_tag": "〔Grok:S10–S13〕",
@@ -1785,9 +1928,11 @@
           "S12 ウェルカムボード職人",
           "S13 神コンセプト命名"
         ],
+        "grok_department": "",
         "role_split": "Grok=文案・Canva下準備／社員=Drive・Prompt同期点検"
       },
       {
+        "side": "paired",
         "agent_id": "516",
         "agent_name": "業者開拓フォロー係",
         "builder_tag": "〔Grok:S2+S4+S9〕",
@@ -1803,9 +1948,11 @@
           "S4 修繕業者開拓",
           "S9 管理会社開拓"
         ],
+        "grok_department": "",
         "role_split": "Grok=開拓・文案／社員=メール・ステータスフォロー"
       },
       {
+        "side": "paired",
         "agent_id": "611",
         "agent_name": "リソース制約要約係",
         "builder_tag": "〔Grok:Resource〕",
@@ -1817,9 +1964,35 @@
         "grok_labels": [
           "Resource リソース経営部長"
         ],
+        "grok_department": "",
         "role_split": "Grok=制約伝達／社員=週次要約のMac側"
       },
       {
+        "side": "ai_only",
+        "agent_id": "612",
+        "agent_name": "課金・年会費ガード係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "613",
+        "agent_name": "Zaim鮮度・二重取込係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "paired",
         "agent_id": "711",
         "agent_name": "家族Journal週次材料係",
         "builder_tag": "〔Grok:Family〕",
@@ -1831,9 +2004,11 @@
         "grok_labels": [
           "Family 家族コーチ統括"
         ],
+        "grok_department": "",
         "role_split": "Grok=週次評価／社員=Journal材料抽出"
       },
       {
+        "side": "paired",
         "agent_id": "712",
         "agent_name": "アドバイザー週次パック係",
         "builder_tag": "〔Grok:Coaching〕",
@@ -1845,9 +2020,11 @@
         "grok_labels": [
           "Coaching コーチング部長"
         ],
+        "grok_department": "",
         "role_split": "Grok=パック利用／社員=材料整形"
       },
       {
+        "side": "paired",
         "agent_id": "713",
         "agent_name": "総務・DXコーチ材料係",
         "builder_tag": "〔Grok:Somu〕",
@@ -1859,9 +2036,456 @@
         "grok_labels": [
           "Somu 総務計画T統括"
         ],
+        "grok_department": "",
         "role_split": "Grok=振り分け・助言／社員=週次材料整理"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "811",
+        "agent_name": "ダッシュボード受け入れ係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "812",
+        "agent_name": "残り棚棚卸し係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "813",
+        "agent_name": "代行指揮枠切替係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "枠切れ代行チェーン＋611の頻度コントロール案を承認経由で反映。Jarvisは候補外で俯瞰"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "814",
+        "agent_name": "Jarvisダッシュボード更新係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "定周期でダッシュボード投影を更新。松野は俯瞰、更新は社員"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "815",
+        "agent_name": "KURASHIFT更新係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "定周期でKURASHIFT/deals等を更新。松野は俯瞰、更新は社員"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "816",
+        "agent_name": "Slack俯瞰連携係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "Slack報告整形。将来Slackアプリの窓口"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "app_dev",
+        "grok_ids": [
+          "app_dev"
+        ],
+        "grok_labels": [
+          "App アプリ開発統括"
+        ],
+        "grok_department": "アプリ開発",
+        "role_split": "週次点検・怪しさ・壁打ち（コード実装はJarvis）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "chikage",
+        "grok_ids": [
+          "chikage"
+        ],
+        "grok_labels": [
+          "ちかげアドバイザー"
+        ],
+        "grok_department": "家族コーチ",
+        "role_split": "配偶者・夫婦コミュニケーション"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "hachiya",
+        "grok_ids": [
+          "hachiya"
+        ],
+        "grok_labels": [
+          "蜂谷課長アドバイザー"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "蜂谷課長（課長層展開）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "hawk",
+        "grok_ids": [
+          "hawk"
+        ],
+        "grok_labels": [
+          "Hawk ホークアイ（参謀）"
+        ],
+        "grok_department": "参謀室",
+        "role_split": "横断優先・QOL・委譲・週次統括・Jarvisボックス振り分け"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "imai",
+        "grok_ids": [
+          "imai"
+        ],
+        "grok_labels": [
+          "今井部長アドバイザー"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "今井部長（報告・部方針）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "isozaki",
+        "grok_ids": [
+          "isozaki"
+        ],
+        "grok_labels": [
+          "磯崎コーチ"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "磯崎向けコーチング"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "karate",
+        "grok_ids": [
+          "karate"
+        ],
+        "grok_labels": [
+          "空手アドバイザー"
+        ],
+        "grok_department": "家族コーチ",
+        "role_split": "空手・遊愛会・Journal"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "kawabata",
+        "grok_ids": [
+          "kawabata"
+        ],
+        "grok_labels": [
+          "川畑コーチ"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "川畑向けコーチング"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "madoka",
+        "grok_ids": [
+          "madoka"
+        ],
+        "grok_labels": [
+          "まどかコーチ"
+        ],
+        "grok_department": "家族コーチ",
+        "role_split": "まどか専属コーチング"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "nakajima",
+        "grok_ids": [
+          "nakajima"
+        ],
+        "grok_labels": [
+          "中島アドバイザー"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "中島新（企画・遠隔地）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "ohara",
+        "grok_ids": [
+          "ohara"
+        ],
+        "grok_labels": [
+          "大原次長アドバイザー"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "大原次長（調整・資料）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "ota_akitsugu",
+        "grok_ids": [
+          "ota_akitsugu"
+        ],
+        "grok_labels": [
+          "太田アドバイザー"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "太田章嗣（リソース司令塔）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "partner_dx",
+        "grok_ids": [
+          "partner_dx"
+        ],
+        "grok_labels": [
+          "PDX パートナーDX統括"
+        ],
+        "grok_department": "パートナーDX",
+        "role_split": "パートナーDX振り分け・入口"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "s6",
+        "grok_ids": [
+          "s6"
+        ],
+        "grok_labels": [
+          "S6 買付交渉"
+        ],
+        "grok_department": "不動産賃貸",
+        "role_split": "買付交渉論点"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "s8",
+        "grok_ids": [
+          "s8"
+        ],
+        "grok_labels": [
+          "S8 物件ライフライン"
+        ],
+        "grok_department": "不動産賃貸",
+        "role_split": "ライフライン手続き材料"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "sawa",
+        "grok_ids": [
+          "sawa"
+        ],
+        "grok_labels": [
+          "さわコーチ"
+        ],
+        "grok_department": "家族コーチ",
+        "role_split": "さわ専属コーチング"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "shift_ai",
+        "grok_ids": [
+          "shift_ai"
+        ],
+        "grok_labels": [
+          "シフトAIアドバイザー"
+        ],
+        "grok_department": "パートナーDX",
+        "role_split": "Shift AI 向け"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "shinji",
+        "grok_ids": [
+          "shinji"
+        ],
+        "grok_labels": [
+          "慎二コーチ"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "太田慎二（DX直属）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "tamaki",
+        "grok_ids": [
+          "tamaki"
+        ],
+        "grok_labels": [
+          "たまきコーチ"
+        ],
+        "grok_department": "家族コーチ",
+        "role_split": "たまき専属コーチング"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "tanaka",
+        "grok_ids": [
+          "tanaka"
+        ],
+        "grok_labels": [
+          "田中コーチ"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "田中（安全担当・安全DX）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "weather",
+        "grok_ids": [
+          "weather"
+        ],
+        "grok_labels": [
+          "Weather 天気お知らせ"
+        ],
+        "grok_department": "天気",
+        "role_split": "朝の天気 ch 直投（ホーク傘下）"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "world_intec",
+        "grok_ids": [
+          "world_intec"
+        ],
+        "grok_labels": [
+          "ワールドインテックアドバイザー"
+        ],
+        "grok_department": "パートナーDX",
+        "role_split": "ワールドインテック向け"
+      },
+      {
+        "side": "grok_only",
+        "agent_id": "",
+        "agent_name": "AI社員対応なし",
+        "builder_tag": "",
+        "mixup_kind": "grok_only",
+        "grok_counterpart": "yamashita",
+        "grok_ids": [
+          "yamashita"
+        ],
+        "grok_labels": [
+          "山下コーチ"
+        ],
+        "grok_department": "総務計画",
+        "role_split": "山下向けコーチング"
       }
     ],
-    "note": "Grokは整理・文案・委譲。Mac実行・対外送信はJarvis。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
+    "mapping_counts": {
+      "paired": 17,
+      "ai_only": 18,
+      "grok_only": 23,
+      "all": 58
+    },
+    "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   }
 }
