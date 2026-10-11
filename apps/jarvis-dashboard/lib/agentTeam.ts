@@ -32,6 +32,59 @@ export type AgentTeamDept = {
   path: string;
 };
 
+export type GrokPillar = {
+  id: string;
+  name: string;
+  role: string;
+  note?: string;
+};
+
+export type GrokBot = {
+  id: string;
+  code: string;
+  name: string;
+  kind: string;
+  work: string;
+  schedule: string;
+  drive_target: string;
+  paste: string;
+  department_id: string;
+  department_name: string;
+  channel: string;
+  exec_level: string;
+};
+
+export type GrokDept = {
+  id: string;
+  name: string;
+  channel: string;
+  exec_level: string;
+  bot_ids: string[];
+  bot_count: number;
+};
+
+export type GrokMapping = {
+  agent_id: string;
+  agent_name: string;
+  builder_tag: string;
+  mixup_kind: string;
+  grok_counterpart: string;
+  grok_ids: string[];
+  grok_labels: string[];
+  role_split: string;
+};
+
+export type GrokPayload = {
+  updated: string;
+  index_doc?: string;
+  mixup_doc?: string;
+  pillars: GrokPillar[];
+  departments: GrokDept[];
+  bots: GrokBot[];
+  mappings: GrokMapping[];
+  note?: string;
+};
+
 export type AgentTeamPayload = {
   updated: string;
   registry_updated: string;
@@ -42,6 +95,7 @@ export type AgentTeamPayload = {
   counts: Record<string, number>;
   departments: AgentTeamDept[];
   agents: AgentTeamAgent[];
+  grok?: GrokPayload;
 };
 
 const STATUS_RANK: Record<string, number> = {
@@ -58,6 +112,26 @@ export function getAgentTeam(): AgentTeamPayload {
 
 export function getAgentById(id: string): AgentTeamAgent | undefined {
   return getAgentTeam().agents.find((a) => a.id === id);
+}
+
+export function getGrok(): GrokPayload {
+  return (
+    getAgentTeam().grok || {
+      updated: "",
+      pillars: [],
+      departments: [],
+      bots: [],
+      mappings: [],
+    }
+  );
+}
+
+export function getGrokBotById(id: string): GrokBot | undefined {
+  return getGrok().bots.find((b) => b.id === id);
+}
+
+export function getMappingsForAgent(agentId: string): GrokMapping | undefined {
+  return getGrok().mappings.find((m) => m.agent_id === agentId);
 }
 
 export function sortAgents(agents: AgentTeamAgent[]): AgentTeamAgent[] {
@@ -87,5 +161,18 @@ export function statusClass(status: string): string {
       return "at-st at-st-stop";
     default:
       return "at-st at-st-cand";
+  }
+}
+
+export function mixupKindLabel(kind: string): string {
+  switch (kind) {
+    case "mac_twin":
+      return "Mac側ツイン";
+    case "lane":
+      return "ミックスレーン";
+    case "none":
+      return "対応なし";
+    default:
+      return kind || "—";
   }
 }

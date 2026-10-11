@@ -4641,6 +4641,73 @@ p.back {
 }
 
 /* AIエージェントチーム /agent-team */
+.at-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.at-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.at-tab:hover {
+  background: #f1f5f9;
+}
+
+.at-tab.is-on {
+  background: #fff;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 1px #0f766e inset;
+  font-weight: 600;
+}
+
+.at-tab-n {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+.at-pillars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.at-pillar {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #fff;
+}
+
+.at-org-meta {
+  margin: 2px 0 8px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.at-org-work {
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 2px;
+  opacity: 0.75;
+}
+
 .at-counts {
   display: flex;
   flex-wrap: wrap;
