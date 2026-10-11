@@ -307,40 +307,90 @@ def build_grok_payload(agents_reg: dict, grok_reg: dict) -> dict:
         str(k): str(v) for k, v in (grok_reg.get("role_splits") or {}).items()
     }
     agents = agents_reg.get("agents") or {}
-    mappings = []
+    mappings: list[dict] = []
+    covered_grok: set[str] = set()
+
+    def _grok_labels(gids: list[str]) -> list[str]:
+        labels = []
+        for gid in gids:
+            gb = bot_by_id.get(gid)
+            if gb:
+                label = gb.get("code") or gid
+                labels.append(f"{label} {gb.get('name') or ''}".strip())
+            else:
+                labels.append(gid)
+        return labels
+
+    # 1) 全 AI社員（対応あり / AIのみ）
     for aid, a in sorted(agents.items(), key=lambda x: str(x[0])):
         kind = (a.get("mixup_kind") or "").strip()
         cp = (a.get("grok_counterpart") or "").strip()
         tag = (a.get("builder_tag") or "").strip()
-        if not kind and not cp and not tag:
-            continue
-        if kind == "none":
-            continue
         grok_ids: list[str] = []
         if kind == "lane":
-            grok_ids = []
-        elif cp:
-            grok_ids = [str(x) for x in (aliases.get(cp) or [cp])]
-        grok_names = []
-        for gid in grok_ids:
-            gb = bot_by_id.get(gid)
-            if gb:
-                label = gb.get("code") or gid
-                grok_names.append(f"{label} {gb.get('name') or ''}".strip())
-            else:
-                grok_names.append(gid)
+            # レーンは特定Botのツインではない（covered に含めない）
+            side = "paired"
+            mix = "lane"
+            role = role_splits.get(str(aid), a.get("note") or "両系統の比較レーン")
+            g_labels: list[str] = []
+        elif kind == "mac_twin" or cp:
+            side = "paired"
+            mix = kind or "mac_twin"
+            grok_ids = [str(x) for x in (aliases.get(cp) or ([cp] if cp else []))]
+            covered_grok.update(grok_ids)
+            g_labels = _grok_labels(grok_ids)
+            role = role_splits.get(str(aid), a.get("note") or "")
+        else:
+            side = "ai_only"
+            mix = "ai_only"
+            g_labels = []
+            role = a.get("note") or "Grok同型なし（Jarvis／Slack／Mac本線）"
+            tag = tag or ""
         mappings.append(
             {
+                "side": side,
                 "agent_id": str(aid),
                 "agent_name": a.get("name") or "",
                 "builder_tag": tag,
-                "mixup_kind": kind or ("mac_twin" if cp else ""),
+                "mixup_kind": mix,
                 "grok_counterpart": cp,
                 "grok_ids": grok_ids,
-                "grok_labels": grok_names,
-                "role_split": role_splits.get(str(aid), a.get("note") or ""),
+                "grok_labels": g_labels,
+                "grok_department": "",
+                "role_split": role,
             }
         )
+
+    # 2) Grok Bot で AI社員のツイン未割当 → AI社員対応なし
+    for bid, gb in sorted(bot_by_id.items(), key=lambda x: x[0]):
+        if bid in covered_grok:
+            continue
+        code = gb.get("code") or ""
+        label = f"{code} {gb.get('name') or ''}".strip() if code and code != "—" else (
+            gb.get("name") or bid
+        )
+        mappings.append(
+            {
+                "side": "grok_only",
+                "agent_id": "",
+                "agent_name": "AI社員対応なし",
+                "builder_tag": "",
+                "mixup_kind": "grok_only",
+                "grok_counterpart": bid,
+                "grok_ids": [bid],
+                "grok_labels": [label],
+                "grok_department": gb.get("department_name") or "",
+                "role_split": gb.get("work")
+                or "AIエージェントチーム側に同系統の社員が未配置",
+            }
+        )
+
+    counts = {
+        "paired": sum(1 for m in mappings if m["side"] == "paired"),
+        "ai_only": sum(1 for m in mappings if m["side"] == "ai_only"),
+        "grok_only": sum(1 for m in mappings if m["side"] == "grok_only"),
+        "all": len(mappings),
+    }
 
     return {
         "updated": grok_reg.get("updated") or "",
@@ -350,8 +400,9 @@ def build_grok_payload(agents_reg: dict, grok_reg: dict) -> dict:
         "departments": dept_out,
         "bots": bots_out,
         "mappings": mappings,
+        "mapping_counts": counts,
         "note": (
-            "Grokは整理・文案・委譲。Mac実行・対外送信はJarvis。"
+            "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。"
             "〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
         ),
     }

@@ -4971,6 +4971,40 @@ p.back {
   margin-top: 6px;
 }
 
+.at-map-side {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.at-map-side-paired {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.at-map-side-ai_only {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.at-map-side-grok_only {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.at-map-missing {
+  color: #9a3412;
+  font-weight: 600;
+}
+
+tr.at-map-ai-only .at-map-missing {
+  color: #3730a3;
+}
+
 @media (max-width: 700px) {
   .at-org {
     grid-template-columns: 1fr;
