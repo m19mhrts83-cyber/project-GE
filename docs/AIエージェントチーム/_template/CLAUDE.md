@@ -53,6 +53,17 @@
 2.
 3. 報告を Slack に送る
 
+## 状態（作成・status変更時）
+
+フォルダ名は変えない。`agents_registry.yaml` の `status` を直したあと:
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_status_sync.py
+```
+
+→ このフォルダに `00_🟢運用.md` 等（設計中以上）＋親部門の `00_状態ボード.md` が同期される。  
+詳細: ハブ [`CLAUDE.md`](../../CLAUDE.md) / [`22_運用状態の識別`](../../22_運用状態の識別_20261011.md)
+
 ## 7. 改善ログ
 
 | 日付 | 変更 |

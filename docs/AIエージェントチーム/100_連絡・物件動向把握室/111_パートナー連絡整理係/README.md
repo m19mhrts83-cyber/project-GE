@@ -1,4 +1,4 @@
-# パートナー連絡整理係 — 一目でわかる1枚
+# 【運用確認】パートナー連絡整理係 — 一目でわかる1枚
 
 - **AIオートメーション（FlowForge）**: [flow_AZNxdNkT5-DNZyL5pK4AMrbj](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AZNxdNkT5-DNZyL5pK4AMrbj)
 

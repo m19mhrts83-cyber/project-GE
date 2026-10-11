@@ -6,9 +6,10 @@
 #   tool_assigned: jarvis | gencode | claude_code | codex | grok_bot | gha
 #   tool_fit: A | B | C | D | A+B …
 #   tool_notes / trigger / schedule
+# 状態 status: 候補 | 設計中 | 運用確認 | 運用 | 停止
+#   → フォルダ名は変えない。00_🟢運用.md 等 + README【接頭辞】（22_運用状態の識別）
 # FlowForge: flowforge_id / flowforge_url
 # ミックス: mixup_kind / grok_counterpart / builder_tag
-# Phase H/I: 18_ / 19_ （2026-10-11）
 
 hub: docs/AIエージェントチーム
 builder_source:
@@ -125,13 +126,14 @@ agents:
     path: 200_返信・案内文面制作室/211_返信案内下書き係
     flowforge_id: flow_gvDWblu8H38otZzGm66S4Znv
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_gvDWblu8H38otZzGm66S4Znv
-    status: 候補
+    status: 設計中
     report: report
     trigger: 時間
     tool_assigned: gha
     tool_fit: A+B
     tool_notes: 07:30 GHA本線。文面提案
     schedule: 07:30GHA
+    note: ' 実行本線=GHA+Graph（2026-10-11）'
   '311':
     name: 送信前品質係
     path: 300_品質・タスク運用管理室/311_送信前品質係
@@ -532,3 +534,4 @@ agents:
     schedule: 報告後
 phase_h_note: '2026-10-11: 315自律起動(launchd)。trigger/scheduleを登記。'
 phase_i_note: '2026-10-11: tool_assigned/tool_fit初版を全社員に充填（07_準拠）。'
+status_marker_doc: 22_運用状態の識別_20261011.md
