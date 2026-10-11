@@ -6,4 +6,5 @@
 - 正本: ./CLAUDE.md
 - 人向け1枚: ./README.md
 - フロー: ./flow.md
-- 本線: 日曜 21:00 JST / GitHub Actions `ops-health-315.yml` → Slack `#ops`
+- 本線: 日曜 21:00 JST / GHA `--cloud` → Slack `#ops`
+- Mac補完: 日曜 21:45 / `--remediate-once` → `#ops`（未解決は `#consult`）

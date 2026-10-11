@@ -1,5 +1,6 @@
 #!/bin/zsh
-# 315 連携健全性点検係 — 日曜 09:15 JST（WeStudy 08:00 のあと・ずらし）
+# 315 連携健全性点検係 — Mac補完 日曜 21:45 JST（GHA 21:00 のあと）
+# 検知→異常なら既知復旧1回→再点検→Slack #ops（未解決は #consult）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY="${HOME}/selenium_env/venv/bin/python"
@@ -23,6 +24,7 @@ fi
 
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
-  "$PY" "${REPO_DIR}/scripts/jarvis_ops_health_315.py" --post --mark-checked
+  "$PY" "${REPO_DIR}/scripts/jarvis_ops_health_315.py" \
+    --remediate-once --post --mark-checked
   echo "# end exit=$?"
 } >>"$LOG" 2>&1

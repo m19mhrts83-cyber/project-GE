@@ -1,5 +1,5 @@
 #!/bin/zsh
-# install: 315 連携健全性 → Slack #ops（日曜 09:15 JST）
+# install: 315 Mac補完 — 日曜 21:45 JST（GHA 21:00 のあと・--remediate-once）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.ops-health-315"
@@ -25,9 +25,9 @@ cat >"$PLIST" <<EOF
     <key>Weekday</key>
     <integer>0</integer>
     <key>Hour</key>
-    <integer>9</integer>
+    <integer>21</integer>
     <key>Minute</key>
-    <integer>15</integer>
+    <integer>45</integer>
   </dict>
   <key>RunAtLoad</key>
   <false/>
@@ -42,7 +42,7 @@ EOF
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
-echo "installed ${LABEL} (Sun 09:15 JST) → ${PLIST}"
+echo "installed ${LABEL} (Sun 21:45 JST · remediate-once) → ${PLIST}"
 echo "logs: ${LOG_DIR}/"
 echo "manual: ${RUNNER}"
 echo "disable: JARVIS_OPS_HEALTH_315_DISABLE=1"
