@@ -41,7 +41,7 @@
 
 | 種別 | 行き先 |
 |---|---|
-| 完了報告 | Slack `#report`（**更新があるときだけ**） |
+| 完了報告 | Slack `#report`（通常は更新時のみ。運用確認〜10/18はゼロ日も「出なかった」） |
 | 要判断・相談 | Slack `#consult` |
 | Webhook（秘密） | env キー名のみ（URLは書かない）: `SLACK_WEBHOOK_REPORT` 系 |
 
