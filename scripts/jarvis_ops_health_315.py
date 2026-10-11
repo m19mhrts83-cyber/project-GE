@@ -5,9 +5,11 @@
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_ops_health_315.py
   ~/selenium_env/venv/bin/python scripts/jarvis_ops_health_315.py --post
-  ~/selenium_env/venv/bin/python scripts/jarvis_ops_health_315.py --post --mark-checked
+  ~/selenium_env/venv/bin/python scripts/jarvis_ops_health_315.py --cloud --post --mark-checked
+  # Mac補完（日曜21:45）: 異常時に既知復旧を1回だけ試す
+  ~/selenium_env/venv/bin/python scripts/jarvis_ops_health_315.py --remediate-once --post --mark-checked
 
-秘密は .env.jarvis_private（SLACK_WEBHOOK_AI_TEAM_OPS）。フォルダに URL を書かない。
+秘密は .env.jarvis_private（SLACK_WEBHOOK_AI_TEAM_OPS / CONSULT）。フォルダに URL を書かない。
 """
 from __future__ import annotations
 
@@ -40,6 +42,7 @@ OPENCHAT_BASE = Path(
     "/C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
 ).expanduser()
 WATCH_ERR = Path.home() / "Library/Logs/line_open_chat/watch.err.log"
+WATCH_RESUME = REPO / "line_unofficial_poc" / "launchd" / "open_chat_watch_resume.sh"
 FLOW_URL = (
     "https://flowforge-259747770348.asia-northeast1.run.app"
     "/flows/flow_zYjp6A4HDURefJhSm0h_zUtX"
@@ -100,7 +103,7 @@ def openchat_snapshot(*, cloud: bool = False) -> tuple[str, list[str]]:
     if cloud:
         lines.append("実行環境: GitHub Actions（--cloud）")
         lines.append("オプチャ詳細: スキップ（Mac専用・launchd/OneDrive）")
-        lines.append("補完: パートナー確認ついで／手動でフル点検可")
+        lines.append("補完: Mac launchd 日曜21:45（--remediate-once）")
         return "スキップ(cloud)", lines
 
     # launchd
@@ -179,6 +182,102 @@ def openchat_snapshot(*, cloud: bool = False) -> tuple[str, list[str]]:
     return level, lines
 
 
+def _westudy_bad(westudy_line: str) -> bool:
+    return "⚠️" in westudy_line or "Fail" in westudy_line or "失敗" in westudy_line
+
+
+def _oc_bad(oc_level: str) -> bool:
+    return oc_level not in ("OK", "スキップ(cloud)")
+
+
+def overall_status(westudy_line: str, oc_level: str) -> str:
+    if _westudy_bad(westudy_line) or _oc_bad(oc_level):
+        return "要フォロー"
+    return "OK"
+
+
+def try_remediate_once(
+    *,
+    westudy_line: str,
+    oc_level: str,
+    oc_lines: list[str],
+    dry_run: bool,
+) -> dict[str, str]:
+    """既知の安全な復旧を最大1回。戻り値は報告用メタ。"""
+    meta = {
+        "try": "スキップ",
+        "detail": "異常なし（トライ不要）",
+        "result": "n/a",
+        "need_consult": "no",
+    }
+    w_bad = _westudy_bad(westudy_line)
+    o_bad = _oc_bad(oc_level)
+    if not w_bad and not o_bad:
+        return meta
+
+    parts: list[str] = []
+    need_consult = False
+
+    if w_bad:
+        parts.append("WeStudy Fail — 自動再実行なし（人が gh 判断）")
+        need_consult = True
+
+    if o_bad:
+        launchd_line = next((x for x in oc_lines if x.startswith("launchd:")), "")
+        launchd_not_running = "running" not in launchd_line or "取得失敗" in launchd_line
+
+        if dry_run:
+            parts.append(
+                "オプチャ: dry-run（health --push → recover_worker / 必要なら watch resume）"
+            )
+            meta["try"] = "dry-run"
+            meta["detail"] = "；".join(parts)
+            meta["result"] = "未実施"
+            meta["need_consult"] = "yes" if need_consult else "no"
+            return meta
+
+        meta["try"] = "実施"
+        # 1) health push で silent_fail があれば mac_recipe を queue
+        py = _python()
+        h_code, h_out = _run(
+            [py, str(REPO / "scripts" / "jarvis_openchat_thread_health.py"), "--push"],
+            timeout=180,
+        )
+        parts.append(f"health --push rc={h_code}")
+
+        # 2) recover_worker（queued 時のみ実作業）
+        r_code, r_out = _run(
+            [py, str(REPO / "scripts" / "jarvis_openchat_recover_worker.py")],
+            timeout=1200,
+        )
+        r_tail = (r_out or "").replace("\n", " ")[-200:]
+        if "no openchat_init_bootstrap" in (r_out or "") or "skip status=" in (r_out or ""):
+            parts.append(f"recover: キューなし／スキップ（{r_tail[:80]}）")
+            # 3) launchd が止まっているときだけ resume を1回
+            if launchd_not_running and WATCH_RESUME.is_file():
+                rs_code, rs_out = _run([str(WATCH_RESUME)], timeout=60)
+                parts.append(f"watch resume rc={rs_code}")
+                if rs_code != 0:
+                    need_consult = True
+                    parts.append((rs_out or "")[:80])
+            else:
+                # 復旧レシピが無い／対象外 → 人判断
+                need_consult = True
+        elif r_code == 0:
+            parts.append(f"recover: ok（{r_tail[:100]}）")
+        else:
+            need_consult = True
+            if re.search(r"QR|logged_out|LOGGED_OUT", r_out or "", re.I):
+                parts.append("recover: QR要・打ち切り（人がスキャン）")
+            else:
+                parts.append(f"recover: 失敗 rc={r_code}（{r_tail[:100]}）")
+
+    meta["detail"] = "；".join(parts) if parts else "—"
+    meta["need_consult"] = "yes" if need_consult else "no"
+    meta["result"] = "pending_recheck"
+    return meta
+
+
 def build_message(
     westudy_line: str,
     westudy_block: str,
@@ -186,15 +285,19 @@ def build_message(
     oc_lines: list[str],
     *,
     cloud: bool = False,
+    remediate_meta: dict[str, str] | None = None,
+    overall_override: str | None = None,
 ) -> str:
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
-    overall = "OK"
-    if "⚠️" in westudy_line or "Fail" in westudy_line or "失敗" in westudy_line:
-        overall = "要フォロー"
-    if oc_level not in ("OK", "スキップ(cloud)"):
-        overall = "要フォロー"
+    overall = overall_override or overall_status(westudy_line, oc_level)
 
-    engine = "GHA ops-health-315（日曜21:00 JST）" if cloud else "Mac手動／launchd補完"
+    if cloud:
+        engine = "GHA ops-health-315（日曜21:00 JST）"
+    elif remediate_meta is not None:
+        engine = "Mac launchd 日曜21:45（--remediate-once）"
+    else:
+        engine = "Mac手動／launchd補完"
+
     body = [
         f"【社員報告】連携健全性点検係（315） / 点検1回",
         f"- 時刻: {now} JST",
@@ -207,8 +310,18 @@ def build_message(
     ]
     for ln in oc_lines:
         body.append(f"  · {ln}")
-    if overall == "要フォロー":
-        body.append("- 見てほしい点: 要フォロー。QR/YAML大量は人が確かめる → 必要なら #consult")
+
+    if remediate_meta is not None:
+        body.append(f"- トライ: {remediate_meta.get('try', '—')}")
+        body.append(f"  · {remediate_meta.get('detail', '—')[:240]}")
+        body.append(f"- トライ結果: {remediate_meta.get('result', '—')}")
+
+    if overall in ("要フォロー", "未解決"):
+        body.append(
+            "- 見てほしい点: 未解決。QR/YAML大量は人が確かめる → #consult"
+        )
+    elif overall == "修正済":
+        body.append("- 見てほしい点: なし（修正済）。異常時のみ対応")
     else:
         body.append("- 見てほしい点: なし（OK）。異常時のみ対応")
     # keep Slack message readable; full westudy block in log
@@ -218,14 +331,14 @@ def build_message(
     return "\n".join(body)
 
 
-def post_ops(text: str) -> int:
+def post_slack(channel: str, text: str) -> int:
     py = _python()
     code, out = _run(
         [
             py,
             str(REPO / "scripts" / "jarvis_slack_webhook_post.py"),
             "--channel",
-            "ops",
+            channel,
             "--username",
             "315 連携健全性点検係",
             "--text",
@@ -235,6 +348,10 @@ def post_ops(text: str) -> int:
     )
     print(out)
     return code
+
+
+def post_ops(text: str) -> int:
+    return post_slack("ops", text)
 
 
 def main() -> int:
@@ -250,12 +367,67 @@ def main() -> int:
         action="store_true",
         help="GHA用。オプチャのMac専用点検をスキップ",
     )
-    ap.add_argument("--dry-run", action="store_true", help="投稿せず本文のみ表示")
+    ap.add_argument(
+        "--remediate-once",
+        action="store_true",
+        help="Mac用。異常時に既知復旧を1回だけ試し再点検して報告",
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="投稿せず本文のみ。--remediate-once 時は復旧も実行しない",
+    )
     args = ap.parse_args()
+
+    if args.remediate_once and args.cloud:
+        print("⚠ --remediate-once は --cloud と併用不可（Mac専用）。cloudのみで続行。", file=sys.stderr)
+        args.remediate_once = False
 
     w_line, w_block = westudy_block(mark_checked=args.mark_checked)
     oc_level, oc_lines = openchat_snapshot(cloud=args.cloud)
-    msg = build_message(w_line, w_block, oc_level, oc_lines, cloud=args.cloud)
+
+    remediate_meta: dict[str, str] | None = None
+    overall_override: str | None = None
+
+    if args.remediate_once:
+        before = overall_status(w_line, oc_level)
+        remediate_meta = try_remediate_once(
+            westudy_line=w_line,
+            oc_level=oc_level,
+            oc_lines=oc_lines,
+            dry_run=bool(args.dry_run),
+        )
+        if before == "OK":
+            overall_override = "OK"
+            remediate_meta["result"] = "不要"
+        elif args.dry_run:
+            overall_override = "要フォロー"
+            remediate_meta["result"] = "dry-run（未実施）"
+        else:
+            # 再点検（WeStudy は mark 済みなので再取得。重くない）
+            w_line2, w_block2 = westudy_block(mark_checked=False)
+            oc_level2, oc_lines2 = openchat_snapshot(cloud=False)
+            after = overall_status(w_line2, oc_level2)
+            w_line, w_block = w_line2, w_block2
+            oc_level, oc_lines = oc_level2, oc_lines2
+            if after == "OK":
+                overall_override = "修正済"
+                remediate_meta["result"] = "修正済"
+                remediate_meta["need_consult"] = "no"
+            else:
+                overall_override = "未解決"
+                remediate_meta["result"] = "未解決（1回トライ済）"
+                remediate_meta["need_consult"] = "yes"
+
+    msg = build_message(
+        w_line,
+        w_block,
+        oc_level,
+        oc_lines,
+        cloud=args.cloud,
+        remediate_meta=remediate_meta,
+        overall_override=overall_override,
+    )
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
@@ -268,7 +440,24 @@ def main() -> int:
         if not args.post:
             print("\n（--post なし → Slack未投稿。投稿するときは --post）")
         return 0
-    return post_ops(msg)
+
+    rc = post_ops(msg)
+    if (
+        remediate_meta
+        and remediate_meta.get("need_consult") == "yes"
+        and (overall_override or "") in ("未解決", "要フォロー")
+    ):
+        consult = (
+            "【315 要判断】連携健全性 — 1回トライ後も未解決\n"
+            f"- 判定: {overall_override}\n"
+            f"- トライ: {remediate_meta.get('detail', '')[:200]}\n"
+            "- 見てほしい点: QR／YAML大量／WeStudy再実行の要否\n"
+            f"- フロー: {FLOW_URL}"
+        )
+        crc = post_slack("consult", consult)
+        if crc != 0 and rc == 0:
+            rc = crc
+    return rc
 
 
 if __name__ == "__main__":

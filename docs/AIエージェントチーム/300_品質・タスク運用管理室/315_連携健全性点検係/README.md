@@ -4,12 +4,12 @@
 
 | 項目 | 内容 |
 |---|---|
-| 役割 | WeStudy/GHA と（Mac時）LINEオプチャ取込の健全性点検 |
-| きっかけ | **本線: 日曜 21:00 JST / GitHub Actions**（副: Fail時・手動） |
-| ゴール報告 | Slack **`#ops`** 1通（要判断は `#consult`。チャット報告なし） |
-| 権限の境界 | チェック・既知復旧＝可／QR・大量YAML＝人 |
-| 実行 | `scripts/jarvis_ops_health_315.py --cloud --post`（GHA本線） |
+| 役割 | WeStudy/GHA 点検＋（Mac）オプチャ1回トライ復旧 |
+| きっかけ | **本線: 日曜 21:00 GHA**／**補完: 日曜 21:45 Mac** |
+| ゴール報告 | Slack **`#ops`**（未解決は `#consult`。チャット報告なし） |
+| 権限の境界 | 既知復旧1回＝可／QR・大量YAML・WeStudy再実行＝人 |
+| 実行 | `--cloud --post`（GHA）／`--remediate-once --post`（Mac） |
 | Workflow | `.github/workflows/ops-health-315.yml` |
 | 指示書 | [CLAUDE.md](./CLAUDE.md) |
 | フロー | [flow.md](./flow.md) |
-| FF貼付 | [flowforge_エージェントへの指示.md](./flowforge_エージェントへの指示.md) |
+| 異常時 | [docs/incident-flow.md](./docs/incident-flow.md) |
