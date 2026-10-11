@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import subprocess
@@ -13,6 +15,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover
+    fcntl = None  # type: ignore
 
 REPO = Path(__file__).resolve().parents[1]
 JST = ZoneInfo("Asia/Tokyo")
@@ -51,18 +58,49 @@ def py() -> str:
 
 def load_state() -> dict[str, Any]:
     if not STATE_PATH.is_file():
-        return {"deals": {}, "digest_c_date": "", "disabled": False}
+        return {"deals": {}, "by_fp": {}, "digest_c_date": "", "disabled": False}
     try:
-        return json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        st = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        if not isinstance(st.get("deals"), dict):
+            st["deals"] = {}
+        if not isinstance(st.get("by_fp"), dict):
+            st["by_fp"] = {}
+        return st
     except Exception:
-        return {"deals": {}, "digest_c_date": "", "disabled": False}
+        return {"deals": {}, "by_fp": {}, "digest_c_date": "", "disabled": False}
 
 
 def save_state(st: dict[str, Any]) -> None:
+    """並列 114 実行でも潰さないよう排他付きで保存。"""
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    STATE_PATH.write_text(
-        json.dumps(st, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    payload = json.dumps(st, ensure_ascii=False, indent=2) + "\n"
+    if fcntl is None:
+        STATE_PATH.write_text(payload, encoding="utf-8")
+        return
+    lock_path = STATE_PATH.with_suffix(".json.lock")
+    with open(lock_path, "a+", encoding="utf-8") as lf:
+        fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+        try:
+            # 他プロセスが先に書いた内容をマージ（deals / by_fp）
+            cur = load_state()
+            deals = dict(cur.get("deals") or {})
+            deals.update(st.get("deals") or {})
+            by_fp = dict(cur.get("by_fp") or {})
+            by_fp.update(st.get("by_fp") or {})
+            merged = {
+                **cur,
+                **{k: v for k, v in st.items() if k not in ("deals", "by_fp")},
+                "deals": deals,
+                "by_fp": by_fp,
+            }
+            STATE_PATH.write_text(
+                json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            st.clear()
+            st.update(merged)
+        finally:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
 
 
 def sj_of(deal: dict[str, Any]) -> dict[str, Any]:
@@ -114,17 +152,26 @@ def inquiry_action(deal: dict[str, Any]) -> str:
 
 
 def deal_url(deal_id: str) -> str:
-    return f"{DEALS_UI}?deal={deal_id}"
+    """詳細は短縮リダイレクト（長い trade-desk URL を Slack に出さない）。"""
+    return f"{DASHBOARD}/api/g/d/{deal_id}"
+
+
+def action_sig(deal_id: str, action: str) -> str:
+    token = (os.environ.get("PROPERTY_GATE_ACTION_TOKEN") or "").strip()
+    act = "yes" if str(action).lower() in ("yes", "y") else "no"
+    return hmac.new(
+        token.encode("utf-8"),
+        f"{deal_id}:{act}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:10]
 
 
 def action_url(deal_id: str, action: str) -> str:
-    """Slack Free 向け: リンククリックで Yes/No（token 付き）。"""
-    token = (os.environ.get("PROPERTY_GATE_ACTION_TOKEN") or "").strip()
-    base = f"{DASHBOARD}/api/slack/consult-action"
-    q = f"deal_id={deal_id}&action={action}"
-    if token:
-        q += f"&token={token}"
-    return f"{base}?{q}"
+    """Slack Free 向け短縮リンク（HMAC。フル token を URL に載せない）。"""
+    act = "yes" if str(action).lower() in ("yes", "y") else "no"
+    kind = "y" if act == "yes" else "n"
+    sig = action_sig(deal_id, act)
+    return f"{DASHBOARD}/api/g/{kind}/{deal_id}?s={sig}"
 
 
 def post_slack(channel: str, text: str, *, dry_run: bool = False) -> dict[str, Any]:
@@ -296,8 +343,8 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
         *[f"・{p}" for p in pts],
         f"詳細: {deal_url(deal_id)}",
         "",
-        f"👉 Yes（問合せする）: {action_url(deal_id, 'yes')}",
-        f"👉 No（見送り）: {action_url(deal_id, 'no')}",
+        f"👉 問合せする: {action_url(deal_id, 'yes')}",
+        f"👉 見送り: {action_url(deal_id, 'no')}",
         "",
         "（フォールバック）このスレに `Yes` / `No` と返信でも可。"
         " CLI: jarvis_property_gate_511.py --deal-id … --yes|--no",
@@ -324,7 +371,22 @@ def format_c_digest(items: list[tuple[dict[str, Any], dict[str, Any]]]) -> str:
     return "\n".join(lines)
 
 
-def already_gated(st: dict[str, Any], deal_id: str, lane: str) -> bool:
+def deal_fp_key(deal: dict[str, Any]) -> str:
+    try:
+        from jarvis_kurashift_re_deal_dedupe_merge import deal_fingerprint
+
+        return deal_fingerprint(deal) or ""
+    except Exception:
+        return str(deal.get("property_fingerprint") or "")
+
+
+def already_gated(
+    st: dict[str, Any],
+    deal_id: str,
+    lane: str,
+    *,
+    deal: dict[str, Any] | None = None,
+) -> bool:
     d = (st.get("deals") or {}).get(deal_id) or {}
     if d.get("decision") in ("yes", "no", "sent", "skipped"):
         return True
@@ -332,14 +394,51 @@ def already_gated(st: dict[str, Any], deal_id: str, lane: str) -> bool:
         return True
     if lane == "A" and d.get("a_done_at"):
         return True
+    # 同一 fingerprint の別 deal が既に B 投稿済みなら再掲しない
+    if lane == "B" and deal is not None:
+        fp = deal_fp_key(deal)
+        if fp:
+            prev = (st.get("by_fp") or {}).get(fp) or {}
+            if prev.get("b_card_posted_at") or prev.get("decision") in (
+                "yes",
+                "no",
+                "sent",
+            ):
+                return True
+        sj = sj_of(deal)
+        gate = sj.get("property_gate") if isinstance(sj.get("property_gate"), dict) else {}
+        if gate.get("decision") in ("yes", "no", "sent"):
+            return True
+        if sj.get("inquiry_sent_at") or inquiry_status(deal) in (
+            "awaiting_reply",
+            "has_reply",
+            "sending",
+        ):
+            return True
     return False
 
 
-def mark_deal_state(st: dict[str, Any], deal_id: str, **fields: Any) -> None:
+def mark_deal_state(
+    st: dict[str, Any],
+    deal_id: str,
+    *,
+    deal: dict[str, Any] | None = None,
+    **fields: Any,
+) -> None:
     deals = st.setdefault("deals", {})
     cur = dict(deals.get(deal_id) or {})
     cur.update(fields)
     cur["updated_at"] = now_iso()
+    if deal is not None:
+        fp = deal_fp_key(deal)
+        if fp:
+            cur["fingerprint"] = fp
+            by_fp = st.setdefault("by_fp", {})
+            fp_cur = dict(by_fp.get(fp) or {})
+            fp_cur.update(fields)
+            fp_cur["deal_id"] = deal_id
+            fp_cur["updated_at"] = cur["updated_at"]
+            by_fp[fp] = fp_cur
     deals[deal_id] = cur
 
 
