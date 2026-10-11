@@ -44,7 +44,10 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 | Cursor インブラウザの FlowForge | 作業フローの作り込み・拡大・要素詳細 |
 | FlowForge ログイン | **m19m**（ダッシュの admin ログインとは別） |
 
-埋め込み不可（FlowForge `X-Frame-Options: DENY`）。深リンクで別タブ／インブラウザを開く。
+埋め込み不可（FlowForge `X-Frame-Options: DENY`）。
+
+**外部ブラウザ注意（2026-10-11）**: Safari／Chrome で `/flows/flow_…` を開くと **同期失敗／新しいフロー** になりやすい（admin 等・所有者 m19m と別セッション）。  
+ダッシュは **閲覧＝`flowforge_share_url`（`/share/…`）優先**、編集は Cursor インブラウザ＋m19m、または AccountChooser。共有URL正本: `.jarvis_state/flowforge_share_urls.json`（sync で `agentTeam.json` へ）。
 
 Grok 組織の正本は `config/grok_bots_registry.yaml`（索引 `config/grok_org_handoff_index.md`・対応 `16_GrokBot対応…`）。sync が `agentTeam.json` の `grok` 節へ投影する。
 

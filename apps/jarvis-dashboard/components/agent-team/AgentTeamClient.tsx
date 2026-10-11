@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  flowforgeOpenLabel,
+  flowforgeOpenUrl,
   mixupKindLabel,
   reportLabel,
   sortAgents,
@@ -259,20 +261,24 @@ export default function AgentTeamClient({
                       <td className="meta">
                         {a.builder_tag || a.grok_counterpart || "—"}
                       </td>
-                      <td>
-                        {a.flowforge_url ? (
-                          <a
-                            href={a.flowforge_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Cursorインブラウザ推奨"
-                          >
-                            開く ↗
-                          </a>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
+                  <td>
+                    {flowforgeOpenUrl(a) ? (
+                      <a
+                        href={flowforgeOpenUrl(a)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={
+                          a.flowforge_share_url
+                            ? "閲覧専用（外部ブラウザOK）"
+                            : "編集は m19m。同期失敗なら詳細の案内を見て"
+                        }
+                      >
+                        {flowforgeOpenLabel(a)} ↗
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                     </tr>
                   ))}
                 </tbody>
