@@ -1,0 +1,49 @@
+# 315 連携健全性点検係 — 本線は GitHub Actions（日曜 21:00 JST）
+name: Ops Health 315
+
+permissions:
+  actions: read
+  contents: read
+
+on:
+  schedule:
+    # 毎週 日曜 21:00 JST = 日曜 12:00 UTC
+    - cron: "0 12 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: ops-health-315
+  cancel-in-progress: false
+
+jobs:
+  ops-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Slack Incoming Webhook（#ops）。未設定なら投稿スキップで失敗にしない（本文はログ）
+      SLACK_WEBHOOK_AI_TEAM_OPS: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_OPS }}
+      SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install gh CLI deps (none) / ensure state dir
+        run: mkdir -p .jarvis_state
+
+      - name: Run 315 ops health (cloud)
+        id: run315
+        run: |
+          set -euo pipefail
+          POST_FLAG=()
+          if [[ -n "${SLACK_WEBHOOK_AI_TEAM_OPS:-}" ]]; then
+            POST_FLAG=(--post --mark-checked)
+          else
+            echo "::warning::SLACK_WEBHOOK_AI_TEAM_OPS 未設定 → Slack未投稿（本文のみ）"
+          fi
+          python scripts/jarvis_ops_health_315.py --cloud "${POST_FLAG[@]}"
