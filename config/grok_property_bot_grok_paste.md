@@ -58,7 +58,7 @@
 
 | 条件 | 動作 | inquiry_action |
 |---|---|---|
-| 仲介メールが取れる（ポータルに業者メール明示等） | 調査結果を `[Grok調査]` に書き、**KURASHIFT／Jarvis 第一問合せに委ねる**（あなたは仲介へ直接メールしない） | `kurashift_handoff` |
+| 仲介メールが取れる（ポータルに業者メール明示等） | 調査結果を `[Grok調査]` に書き、**KURASHIFT／Jarvis 第一問合せに委ねる**（あなたは仲介へ直接メールしない）。Jarvis 取込後は `awaiting_first_inquiry`（Tier／進行ゲート対象）。`awaiting_grok` にはしない | `kurashift_handoff` |
 | 仲介メールが取れない／ポータル資料請求のみ（**公開フォームで送信可**） | **公開ページの資料請求・Web問合せフォームを送信まで実行** | `portal_sent` |
 | **HOME'S投資ログイン壁**（`homes_login_required` / 会員 inquire のみ） | **Grok は送らない**。`[Grok調査]`＋Drive inbox `action: homes_portal_manual` で **Jarvis Mac へ委譲**（PWは持たない） | （送信後 Jarvis が `portal_sent`） |
 | 調査のみ（保留・見送り・情報不足） | 問合せしない | `investigate_only` |
@@ -281,6 +281,7 @@ report_id: {YYYYMMDD-HHMM}
 
 ## 問合せ
 - inquiry_action: portal_sent|kurashift_handoff|investigate_only
+- （任意）lane_hint: A|B|C — 省略時は Jarvis 114 が score／聞く価値から判定。A=自動問合せ可、B=松野Yes/No、C=報告のみ
 - agent_email_available: yes|no|unknown
 - inquiry_url:
 - portal: rakumachi|kenbiya|homes|nagoya_rengo|athome|other|none

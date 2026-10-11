@@ -98,17 +98,17 @@ agents:
     path: 100_連絡・物件動向把握室/114_物件一次判定係
     flowforge_id: flow_O1OMOoN2vkVf9SKLD9T_mvBy
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_O1OMOoN2vkVf9SKLD9T_mvBy
-    status: 候補
-    report: report
+    status: 運用確認中
+    report: consult
     mixup_kind: mac_twin
     grok_counterpart: s1
     builder_tag: 〔Grok:S1〕
-    note: S1ゲートと重複しやすい。511と役割分担
+    note: 進行ゲートA/B/C振分。CLI jarvis_property_gate_114。送信は511
     trigger: イベント
     tool_assigned: jarvis
     tool_fit: A
-    tool_notes: 一次判定。511と分担
-    schedule: 新着時
+    tool_notes: Grok調査後レーン振分→Slack
+    schedule: 取込後・手動
   '115':
     name: 修繕進捗要約係
     path: 100_連絡・物件動向把握室/115_修繕進捗要約係
@@ -284,16 +284,17 @@ agents:
     path: 500_不動産パイプライン実行室/511_問合せ送信準備係
     flowforge_id: flow_Gr7OKXW7L1ElR7yW_XbBCbNH
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Gr7OKXW7L1ElR7yW_XbBCbNH
-    status: 候補
-    report: report
+    status: 運用確認中
+    report: consult
     mixup_kind: mac_twin
     grok_counterpart: s1
     builder_tag: 〔Grok:S1〕
     trigger: 人依頼
     tool_assigned: jarvis
     tool_fit: B
-    tool_notes: 問合せ準備。対外は人
-    schedule: 依頼時
+    tool_notes: Slack Yes後にre_inquiry送信。BのYes＝了承
+    schedule: Yes時・手動
+    note: CLI jarvis_property_gate_511。正本23_物件進行ゲート
   '512':
     name: 仲介返信取込係
     path: 500_不動産パイプライン実行室/512_仲介返信取込係

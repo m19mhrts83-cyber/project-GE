@@ -142,6 +142,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 3. 同じ物件を再度開くと `inquiry_status` が次のいずれか:
    - **awaiting_reply** … 仲介へメール送信済（返信 poll 対象）
+   - **awaiting_first_inquiry** … S1 `kurashift_handoff` 後の第一問合せ待ち（Tier／進行ゲート対象）
    - **awaiting_grok** … 自分宛 Grok 依頼済（**poll 対象外**。Grok が Web/調査）
 
 ---

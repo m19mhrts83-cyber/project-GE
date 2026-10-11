@@ -1,50 +1,59 @@
 # 問合せ送信準備係
 
-ID: **511**。部門: 不動産パイプライン実行室（500）。  
-Grok S系の **Mac側検収・適用・停滞見回り**（調査本文の再発明はしない）。候補スタブ。
+ID: **511**。Slack **Yes**（または Aレーン）のあと、既存 KURASHIFT 問合せ送信を実行する。  
+Grok 調査の再発明はしない。
 
-## AIオートメーション（作業フロー）
+## AIオートメーション
 
-- **FlowForge（開く）**: [flow_Gr7OKXW7L1ElR7yW_XbBCbNH](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Gr7OKXW7L1ElR7yW_XbBCbNH)
-- 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
-- 設計の流れ図（あれば）: [`flow.md`](./flow.md)
+- FlowForge: [flow_Gr7OKXW7L1ElR7yW_XbBCbNH](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Gr7OKXW7L1ElR7yW_XbBCbNH)
+- 正本: [`23_物件進行ゲート_Grok調査_20261012.md`](../../23_物件進行ゲート_Grok調査_20261012.md)
+- CLI: `scripts/jarvis_property_gate_511.py`
 
 ## 1. 役割
 
-- やること: S1 Tier／対外確認前の問合せ送信準備
-- やらないこと: 対外送信の無断実行／Grok調査の丸写し再実装／秘密の再掲
+- やること:
+  - Yes／A → `jarvis_kurashift_re_inquiry.py --send-deal-id … --i-confirm-send`（B の Yes＝了承）
+  - No → inquiry クローズ（見送り）
+  - 失敗（To 未解決等）を Slack スレ／`#consult` に短く返す
+  - 二重送信防止
+- やらないこと: 調査やり直し・Yes なしの送信（A／Tier3 除く）
 
 ## 2. 動き出す合図
 
-- [ ] 人が頼む
+- [x] 何かが届いたら（Slack Yes／dashboard consult-action）
+- [x] 人が頼む（`--deal-id --yes`）
 - [ ] 時間
-- [ ] 何かが届いたら
-- [ ] 変化・失敗を見回ったら:
 
 ## 3. 実行権限
 
 | 方法 | 使う？ | 内容 |
 |---|---|---|
-| チャット・検索 | ○ | |
-| CLI | ○ | KURASHIFT／yoritoori 系（ゲート遵守） |
-| ブラウザ | △ | |
-| 画面操作 | × | 送信は人 |
-
-**人が確かめる**: 対外送信・金・削除。
+| CLI | ○ | gate_511／re_inquiry |
+| Gmail API | ○ | 問合せ送信（既存） |
+| Slack | ○ | 結果1行 |
 
 ## 4. 報告先
 
 | 種別 | 行き先 |
 |---|---|
-| 完了報告 | Slack `#report` |
-| 要判断 | Slack `#consult` |
+| 送信結果 | `#consult` スレ or `#report` |
+| 要判断（To 欠落） | `#consult` |
 
-## 5–6. 成果物・手順
+## 5–6. 手順
 
-（設計時に埋める。対応Grok: プラン Phase C 表）
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+# Yes（送信）
+~/selenium_env/venv/bin/python scripts/jarvis_property_gate_511.py --deal-id UUID --yes
+# No（見送り）
+~/selenium_env/venv/bin/python scripts/jarvis_property_gate_511.py --deal-id UUID --no
+# ドライラン
+~/selenium_env/venv/bin/python scripts/jarvis_property_gate_511.py --deal-id UUID --yes --dry-run
+```
 
 ## 7. 改善ログ
 
-| 日付 | 内容 |
+| 日付 | 変更 |
 |---|---|
-| 2026-10-09 | Phase C スタブ作成（ID 511） |
+| 2026-10-09 | Phase C スタブ |
+| 2026-10-12 | Yes/No → 既存 re_inquiry 接続。状態＝運用確認中 |

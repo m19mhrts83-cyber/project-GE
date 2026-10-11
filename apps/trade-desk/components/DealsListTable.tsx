@@ -72,6 +72,8 @@ function inquiryChipStyle(status: string): Record<string, string | number> {
     status === "awaiting_grok"
   )
     return { ...base, background: "#dbeafe", borderColor: "#93c5fd" };
+  if (status === "awaiting_first_inquiry")
+    return { ...base, background: "#e0e7ff", borderColor: "#a5b4fc", color: "#3730a3" };
   return {
     ...base,
     background: "#fef3c7",

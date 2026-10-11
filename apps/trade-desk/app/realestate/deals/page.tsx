@@ -70,6 +70,8 @@ function inquiryChipStyle(status: string): Record<string, string | number> {
     status === "awaiting_grok"
   )
     return { ...base, background: "#dbeafe", borderColor: "#93c5fd" };
+  if (status === "awaiting_first_inquiry")
+    return { ...base, background: "#e0e7ff", borderColor: "#a5b4fc", color: "#3730a3" };
   // none / draft = 未問合せ
   return { ...base, background: "#fef3c7", borderColor: "#fcd34d", color: "#92400e" };
 }
@@ -253,7 +255,8 @@ export default async function RealEstateDealsPage({
     if (inq === "has_reply") needReply++;
     if (inq === "awaiting_grok") awaitingGrok++;
     if (inq === "awaiting_reply") awaitingReply++;
-    if (inq === "none" || inq === "draft") inquiryNone++;
+    if (inq === "none" || inq === "draft" || inq === "awaiting_first_inquiry")
+      inquiryNone++;
     if (d.source !== "mail_grok") grokPending++;
     const sj =
       d.summary_json && typeof d.summary_json === "object"
