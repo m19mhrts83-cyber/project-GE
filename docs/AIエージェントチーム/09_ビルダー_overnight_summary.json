@@ -1,0 +1,34 @@
+{
+  "title": "物件と連絡の見守り隊",
+  "created": "2026-10-10",
+  "source": "agent-team-builder-teal.vercel.app localStorage atb:plan",
+  "teams": [
+    {
+      "name": "連絡と物件の見守り",
+      "agents": [
+        "メール見守り係",
+        "管理会社返信起案係"
+      ]
+    },
+    {
+      "name": "支出契約監査支援班",
+      "agents": [
+        "契約更新検知係",
+        "修繕見積比較係"
+      ]
+    },
+    {
+      "name": "家賃収支監査管理班",
+      "agents": [
+        "送金明細照合係"
+      ]
+    },
+    {
+      "name": "財務機関折衝支援班",
+      "agents": [
+        "融資報告折衝起案係"
+      ]
+    }
+  ],
+  "agentCount": 6
+}

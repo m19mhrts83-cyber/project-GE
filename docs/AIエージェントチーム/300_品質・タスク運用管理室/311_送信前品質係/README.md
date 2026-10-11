@@ -1,5 +1,7 @@
 # 送信前品質係 — 一目でわかる1枚
 
+- **AIオートメーション（FlowForge）**: [flow_AKQv6lgUEtudWlE5fQUhQnh2](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2)
+
 | 項目 | 内容 |
 |---|---|
 | 役割 | 対外文面の送信前チェック（送信はしない） |

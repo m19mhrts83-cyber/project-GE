@@ -2,10 +2,15 @@
 
 **作業を始めたら、まず [`PROGRESS.md`](./PROGRESS.md) を読む**（続き・未完了 TODO がここにある）。
 
+## AIオートメーション（作業フロー）
+
+- **FlowForge（開く）**: [flow_AZNxdNkT5-DNZyL5pK4AMrbj](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AZNxdNkT5-DNZyL5pK4AMrbj)
+- 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
+- 設計の流れ図（あれば）: [`flow.md`](./flow.md)
+
 複数ツール（Claude Code / Cursor / Codex / FlowForge 等）から同じフォルダを開いて使う指示書。  
 直した運用知見は**このファイルに追記**する（チャットだけの修正にしない）。
 
-FlowForge（定義・一本合流）: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AZNxdNkT5-DNZyL5pK4AMrbj  
 人が見る場所: [`運用メモ_人が見る場所.md`](./運用メモ_人が見る場所.md)（Jarvis／代行AI必読）
 
 ## 1. 役割

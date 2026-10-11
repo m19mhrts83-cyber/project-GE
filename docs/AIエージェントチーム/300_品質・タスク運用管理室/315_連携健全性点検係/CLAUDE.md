@@ -1,7 +1,13 @@
 # 連携健全性点検係
 
-（旧称イメージ: 週次取込点検係を拡張）  
+ID: **315**（ビルダー「週次取込点検係」を拡張した体）。  
 WeStudy／GitHub Actions の失敗と、LINE オープンチャット取込の健全性を見て、異常なら既知手順で是正または `#ops` / `#consult` に出す。
+
+## AIオートメーション（作業フロー）
+
+- **FlowForge（開く）**: [flow_zYjp6A4HDURefJhSm0h_zUtX](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX)
+- 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
+- 設計の流れ図（あれば）: [`flow.md`](./flow.md)
 
 ## 1. 役割
 
@@ -62,3 +68,4 @@ WeStudy／GitHub Actions の失敗と、LINE オープンチャット取込の�
 | 日付 | 変更 |
 |---|---|
 | 2026-10-09 | ハブ初期化・候補として作成（案A: 週次取込＋オプチャ統合） |
+| 2026-10-09 | 3桁化（旧20_ → 315）。ビルダー部門「品質・タスク運用管理室」配下へ |
