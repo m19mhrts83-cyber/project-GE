@@ -202,11 +202,14 @@ def main() -> int:
         fname = write_marker(folder, str(aid), a.get("name") or "", st, args.dry_run)
         if not args.dry_run:
             ensure_readme_prefix(folder / "README.md", st, False)
-            if fname and not args.no_drive:
-                sync_drive(Path(a["path"]) / fname, False)
-                # remove old STATUS on drive
-                old = DRIVE_HUB / a["path"] / "STATUS.md"
-                old.unlink(missing_ok=True)
+            if not args.no_drive:
+                # Drive 側もマーカーを一旦消してから正を写す（旧印の二重残し防止）
+                drive_folder = DRIVE_HUB / a["path"]
+                wipe_markers(drive_folder)
+                if fname:
+                    sync_drive(Path(a["path"]) / fname, False)
+                sync_drive(Path(a["path"]) / "README.md", False)
+                (drive_folder / "STATUS.md").unlink(missing_ok=True)
         mark = fname or "—"
         print(f"  [{aid}] {st} → {mark}")
 

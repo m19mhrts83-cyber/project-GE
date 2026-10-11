@@ -12,8 +12,9 @@
   - `apply_draft_to_partner` Graph 本線
 - **疎通**: probe_ok / PUT `.jarvis_graph_write_probe.txt` / PM4フォルダ materialize dry-run
 - **GHA dry-run**: 成功（[run 38094845121](https://github.com/m19mhrts83-cyber/project-GE/actions/runs/38094845121)）— 起案候補2／見積B待ち1／書込なし
-- **次の一手**: 明朝の schedule 本番、または `gh workflow run … -f dry_run=false`。緑が続いたら Mac launchd uninstall
-- **状態**: Phase3 本線稼働前（dry-run 緑）。作業フロー反映済
+- **GHA 本番**: 成功（[run 38124886926](https://github.com/m19mhrts83-cyber/project-GE/actions/runs/38124886926)）— ミニテック Gmail／Tcell LINE を Graph PUT。見積B待ち→`#consult`。`#report` 送信OK
+- **状態**: **運用確認**（`agents_registry.yaml` / `00_🟡運用確認.md`）
+- **次の一手**: 明朝 schedule（07:30）を数日観察。緑が続いたら Mac launchd uninstall → 運用へ
 - **2026-10-11 追記**: FlowForge 開始トリガー「どこで起動」を Claude Code / Codex → **GitHub Actions** に変更（クラウド同期済）
 
 ## 2026-10-11（Phase2 朝便定常＋見積B）
