@@ -1,58 +1,58 @@
 # 物件一次判定係
 
-ビルダー「物件と連絡の見守り隊」由来の**候補**。手順・権限・報告を埋めてから Flowforge／運用に進む。
+ID: **114**。Grok S1 調査後の **進行ゲート（3レーン振分）**。  
+調査本文の再発明はしない。問合せ送信は **511**。
 
-## AIオートメーション（作業フロー）
+## AIオートメーション
 
-- **FlowForge（開く）**: [flow_O1OMOoN2vkVf9SKLD9T_mvBy](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_O1OMOoN2vkVf9SKLD9T_mvBy)
-- 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
-- 設計の流れ図（あれば）: [`flow.md`](./flow.md)
+- FlowForge: [flow_O1OMOoN2vkVf9SKLD9T_mvBy](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_O1OMOoN2vkVf9SKLD9T_mvBy)
+- 正本: [`23_物件進行ゲート_Grok調査_20261012.md`](../../23_物件進行ゲート_Grok調査_20261012.md)
+- CLI: `scripts/jarvis_property_gate_114.py`
 
 ## 1. 役割
 
-- やること: （ビルダー上の担当をここに具体化）
-- やらないこと: 了承なしの対外送信・秘密の再掲・勝手な完了 close
+- やること:
+  - deals／`[Grok調査]` 要約からレーン **A / B / C** を振る
+  - B → Slack `#consult` カード（deal_id・見てほしい3点・Yes/No）
+  - C → `#report` ダイジェスト（1日まとめて可）
+  - A → `#report` 1行＋511／Tier へ渡す合図
+- やらないこと: Web 再調査・対外送信・了承なしの close
 
 ## 2. 動き出す合図
 
-- 目安: 新着物件メール／deals
-- [ ] 人が頼む
-- [ ] 時間
-- [ ] 何かが届いたら
-- [ ] 変化・失敗を見回ったら
+- [x] 何かが届いたら（Grok 取込後・deals 更新）
+- [x] 人が頼む（`--deal-id` / `--scan`）
+- [ ] 時間（将来 GHA）
 
 ## 3. 実行権限
 
 | 方法 | 使う？ | 内容 |
 |---|---|---|
-| チャット・検索 | ○ | |
-| 外部連携（API/MCP） | △ | |
-| CLI | △ | |
-| ブラウザ | △ | |
-| 画面操作 | × | 送信・課金は人 |
-
-**人が確かめる**: 外に出す・金・削除。
+| CLI | ○ | `jarvis_property_gate_114.py` |
+| Slack Webhook | ○ | `#consult` / `#report` |
+| ブラウザ | × | |
 
 ## 4. 報告先
 
 | 種別 | 行き先 |
 |---|---|
-| 完了報告 | Slack `#report` |
-| 要判断 | Slack `#consult` |
+| B 要判断 | Slack `#consult` |
+| A/C | Slack `#report` |
 
-## 5. 成果物の置き場
+## 5–6. 成果物・手順
 
-- このフォルダ: `logs/`
-- 外部正本: （OneDrive / git-repos — 実装時に記入）
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_property_gate_114.py --scan --post
+# 1件
+~/selenium_env/venv/bin/python scripts/jarvis_property_gate_114.py --deal-id UUID --post
+```
 
-## 6. 作業手順（チェックリスト）
-
-1. 対象データを読む
-2. 手順どおり処理（未定義なら止めて `#consult`）
-3. Slack に報告
+ログ: このフォルダ `logs/`
 
 ## 7. 改善ログ
 
 | 日付 | 変更 |
 |---|---|
-| 2026-10-09 | ビルダー構成に合わせ候補フォルダ作成（ID 114） |
+| 2026-10-09 | 候補フォルダ作成 |
+| 2026-10-12 | 進行ゲート具体化（3レーン・Slack）。状態＝運用確認中 |

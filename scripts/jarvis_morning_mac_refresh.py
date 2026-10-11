@@ -45,6 +45,7 @@ INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
 KURASHIFT_S1_EVIDENCE = REPO / "scripts" / "jarvis_kurashift_s1_evidence_to_drive.py"
+PROPERTY_GATE_DEGRADED = REPO / "scripts" / "jarvis_property_gate_degraded.py"
 GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
 BUCHO_INBOX_POLL = REPO / "scripts" / "jarvis_bucho_inbox_poll.py"
 TODOIST_COMMENT_INBOX = REPO / "scripts" / "jarvis_todoist_comment_inbox.py"
@@ -844,6 +845,27 @@ def main() -> int:
                 )
         else:
             results["steps"]["kurashift_s1_evidence"] = "skipped"
+        # 2c0b. 物件進行ゲート 114（Jarvis 不要・soft-fail。上限時もプログラムで Bカードまで）
+        if PROPERTY_GATE_DEGRADED.is_file() and (
+            os.environ.get("JARVIS_PROPERTY_GATE_DISABLE") or ""
+        ).strip() != "1":
+            gate_cmd = [exe, str(PROPERTY_GATE_DEGRADED)]
+            if args.dry_run:
+                gate_cmd.append("--dry-run")
+            rc_gate = run_step(
+                "property_gate_114",
+                gate_cmd,
+                timeout=180,
+                dry_run=False,
+            )
+            results["steps"]["property_gate_114"] = rc_gate
+            if rc_gate != 0:
+                print(
+                    f"# property_gate_114 soft-fail rc={rc_gate}",
+                    file=sys.stderr,
+                )
+        else:
+            results["steps"]["property_gate_114"] = "skipped"
     else:
         results["steps"]["kurashift_grok_mail"] = "skipped"
 

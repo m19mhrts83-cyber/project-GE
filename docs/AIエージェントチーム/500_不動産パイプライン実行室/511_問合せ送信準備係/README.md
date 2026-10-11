@@ -1,10 +1,9 @@
-# 問合せ送信準備係
-
-- **AIオートメーション（FlowForge）**: [flow_Gr7OKXW7L1ElR7yW_XbBCbNH](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Gr7OKXW7L1ElR7yW_XbBCbNH)
+# 【設計中】問合せ送信準備係 — 一目でわかる1枚
 
 | 項目 | 内容 |
 |---|---|
-| ID | 511 |
-| 役割 | S1 Tier／対外確認前の問合せ送信準備 |
-| 報告 | #report |
-| 状態 | 候補（Phase C スタブ） |
+| 役割 | Slack Yes／A のあと第一問合せを送る |
+| きっかけ | consult-action／手動 |
+| 報告 | `#consult` / `#report` |
+| 実行 | `jarvis_property_gate_511.py --deal-id … --yes` |
+| 正本 | [23_物件進行ゲート…](../../23_物件進行ゲート_Grok調査_20261012.md) |

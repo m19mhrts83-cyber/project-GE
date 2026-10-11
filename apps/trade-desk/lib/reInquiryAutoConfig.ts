@@ -73,7 +73,7 @@ const DEFAULT_CONFIG: InquiryAutoConfig = {
     tier1_candidate: {
       min_score: 2.0,
       grok_listen_values: ["聞く", "保留"],
-      require_inquiry_status: ["none", "draft", ""],
+      require_inquiry_status: ["none", "draft", "awaiting_first_inquiry", ""],
     },
     tier2_daily_queue: {
       enabled: true,

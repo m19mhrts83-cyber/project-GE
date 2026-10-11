@@ -219,7 +219,12 @@ def evaluate_inquiry_candidate(
             **_base(),
         }
 
-    allowed_inq = t1.get("require_inquiry_status") or ["none", "draft", ""]
+    allowed_inq = t1.get("require_inquiry_status") or [
+        "none",
+        "draft",
+        "awaiting_first_inquiry",
+        "",
+    ]
     if inq not in allowed_inq:
         return {
             "tier": None,

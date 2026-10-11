@@ -18,5 +18,10 @@ fi
 {
   echo "# kurashift_grok_mail_noon ${STAMP}"
   "$PY" -u "${REPO_DIR}/scripts/jarvis_kurashift_property_mail_match.py" --grok-only --apply
+  # 取込直後に進行ゲート（Jarvis 不要）。専用 launchd 11:15 と二重でも冪等
+  if [[ "${JARVIS_PROPERTY_GATE_DISABLE:-}" != "1" ]]; then
+    echo "# property_gate_degraded (after noon grok mail)"
+    "$PY" -u "${REPO_DIR}/scripts/jarvis_property_gate_degraded.py" || true
+  fi
 } 2>&1 | tee "$LOG"
 find "$LOG_DIR" -name 'grok_mail_noon_*.log' -mtime +14 -delete 2>/dev/null || true

@@ -448,9 +448,14 @@ def send_inquiry(
 
     fields = inquiry_fields(deal)
     cur_status = fields.get("inquiry_status")
-    # grok 調査完了後の第一問合せ送信（handoff is False）は awaiting_grok から送信可能
+    # awaiting_first_inquiry = S1 handoff 後の送信待ち（送信してよい）
+    # awaiting_grok = 自分宛 Grok 依頼済（再送しない。force 時のみ）
     if not force:
-        if cur_status in ("awaiting_reply", "has_reply") or (handoff and cur_status == "awaiting_grok"):
+        if cur_status in ("awaiting_reply", "has_reply", "sending"):
+            out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
+            print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+            return out
+        if handoff and cur_status == "awaiting_grok":
             out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
             print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
             return out

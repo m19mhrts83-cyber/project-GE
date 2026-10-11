@@ -71,6 +71,7 @@
 | WeStudy Drive 添付 | `westudy-gdrive-archive` | admin Drive＋Mac |
 | プライベートバックアップ | `private-backup` | ローカル age |
 | **LINE 公式エクスポート定常取込** | `line-export-poll`（15分/RunAtLoad） | EmailMe→Gmail(estate)→inbox→`5.やり取り.md` を自動化。OneDrive 正本＋`.jarvis_state`。2026-09-30 |
+| **物件進行ゲート 114** | `property-gate-114`（11:15）＋朝バンドル／昼 Grok取込後 | Supabase＋Slack Webhook。Cursor不要の次善本線。2026-10-12 |
 | 天気朝ブリーフ等 | `weather-morning-brief` 等 | Mac／ローカル前提のもの |
 
 ---
