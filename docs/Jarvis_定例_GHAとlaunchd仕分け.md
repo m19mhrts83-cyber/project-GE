@@ -43,6 +43,7 @@
 | Zaim 財務日次（API 系） | `zaim-finance-sync.yml` | Playwright CSV とは別 |
 | Ops Fail Watch | `jarvis-ops-fail-watch.yml` | 失敗監視 |
 | **211 管理会社朝便** | `jarvis-reply-draft-211.yml` | 07:30 JST。Graph materialize→正本 PUT→Slack。Mac launchd は保険 |
+| **111 パートナー昼枠** | `jarvis-partner-day-report.yml` | 11:50 JST。Gmail＋Chatwork→MD→更新時のみ Slack `#report`（LINEなし） |
 | Pages / deploy | `pages-docs.yml` / `trade-desk-deploy.yml` | 定例というよりデプロイ |
 
 ---
@@ -64,7 +65,8 @@
 | dashboard push（投影） | `dashboard-push` | `.jarvis_state` 依存 |
 | 家族 Journal 週次 | `family-journal-weekly` | Drive／Notion 補完 |
 | 部長ボックス poll | `bucho-inbox-poll` | Drive ローカル。同帯で Todoist @cal → カレンダー（完了で予定削除） |
-| 画面ロック解除キャッチアップ | `screen-unlock-catchup` | 解除で15分クラスだけ即実行（部長ボックス・Todoistコメント）。時刻指定ジョブは解除では起動しない |
+| 画面ロック解除キャッチアップ | `screen-unlock-catchup` | 解除で15分クラス即実行（部長ボックス・Todoistコメント）。**例外**: 111夜枠（20:30以降・未実施）も回収 |
+| **111 パートナー夜枠** | `partner-111-night`（20:30） | CHRLINE＋公式エクスポート＋ダッシュボード開く→更新時 `#report`。GHA不可 |
 | Cursor revise worker | `cursor-revise-worker` | ローカルキュー |
 | WeStudy Drive 添付 | `westudy-gdrive-archive` | admin Drive＋Mac |
 | プライベートバックアップ | `private-backup` | ローカル age |

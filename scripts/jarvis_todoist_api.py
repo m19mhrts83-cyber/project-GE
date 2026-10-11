@@ -96,12 +96,63 @@ def _save_yaml(data: dict[str, Any]) -> None:
     )
 
 
+# レーン単位で OWNER トークンに切替（Jarvis Free の共有PJ枠外の admin 専用レーン用）
+_ACTIVE_TOKEN: str | None = None
+
+
 def _token() -> str:
+    if _ACTIVE_TOKEN:
+        return _ACTIVE_TOKEN
     tok = (os.environ.get("TODOIST_API_TOKEN") or "").strip()
     if not tok:
         print("ERROR: TODOIST_API_TOKEN 未設定（.env.jarvis_private）", file=sys.stderr)
         sys.exit(2)
     return tok
+
+
+def _set_active_token(tok: str | None) -> None:
+    global _ACTIVE_TOKEN
+    _ACTIVE_TOKEN = (tok or "").strip() or None
+
+
+def _use_lane_token(cfg: dict[str, Any], lane_id: str | None) -> None:
+    """lane.use_owner_token なら TODOIST_API_TOKEN_OWNER を使う。"""
+    lid = (lane_id or "").strip()
+    if not lid or lid == "inbox":
+        _set_active_token(None)
+        return
+    lane = (cfg.get("lanes") or {}).get(lid)
+    if isinstance(lane, dict) and lane.get("use_owner_token"):
+        _set_active_token(_owner_token())
+        return
+    _set_active_token(None)
+
+
+def _use_token_for_task(cfg: dict[str, Any], task_id: str) -> None:
+    """タスクの project_id が use_owner_token レーンなら OWNER に切替。"""
+    _set_active_token(None)
+    tid = (task_id or "").strip()
+    if not tid:
+        return
+    try:
+        # まず Jarvis、だめなら OWNER で取得して判定
+        t = _req("GET", f"/tasks/{urllib.parse.quote(tid)}", cfg=cfg, raise_http=True)
+    except urllib.error.HTTPError:
+        t = _req_with_token(
+            "GET",
+            f"/tasks/{urllib.parse.quote(tid)}",
+            token=_owner_token(),
+            cfg=cfg,
+        )
+    pid = str((t or {}).get("project_id") or "").strip()
+    if not pid:
+        return
+    for lid, lane in (cfg.get("lanes") or {}).items():
+        if not isinstance(lane, dict):
+            continue
+        if str(lane.get("project_id") or "") == pid and lane.get("use_owner_token"):
+            _set_active_token(_owner_token())
+            return
 
 
 def _api_base(cfg: dict[str, Any] | None = None) -> str:
@@ -557,6 +608,7 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
 
 def cmd_lane(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
+    _use_lane_token(cfg, args.id)
     lane = _lane(cfg, args.id)
     proj = _project_for_lane(cfg, lane)
     pid = proj["project_id"]
@@ -610,6 +662,7 @@ def _validate_properties_labels(cfg: dict[str, Any], labels: list[str]) -> None:
 def cmd_create_task(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     lane_id = (args.lane or "").strip()
+    _use_lane_token(cfg, lane_id)
     use_inbox = _is_inbox_lane(lane_id)
     if use_inbox:
         proj = _inbox_project(cfg)
@@ -824,6 +877,7 @@ def _hold_since_from_activity(
 
 def cmd_update_status(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
+    _use_lane_token(cfg, args.lane)
     lane = _lane(cfg, args.lane)
     proj = _project_for_lane(cfg, lane)
     status = str(args.status).strip()
@@ -1028,6 +1082,7 @@ def cmd_hold_stamp_missing(args: argparse.Namespace) -> int:
 
 def cmd_comment(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
+    _use_token_for_task(cfg, args.task_id)
     _req(
         "POST",
         "/comments",
@@ -1040,6 +1095,10 @@ def cmd_comment(args: argparse.Namespace) -> int:
 
 def cmd_complete_task(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
+    if args.lane:
+        _use_lane_token(cfg, args.lane)
+    else:
+        _use_token_for_task(cfg, args.task_id)
     lane = _lane(cfg, args.lane) if args.lane else None
     comment = _comment_body(
         _ensure_complete_comment(args.comment or "", args.who or "")

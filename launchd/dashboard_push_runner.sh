@@ -27,5 +27,11 @@ fi
     echo "# situation_watch exit=$? (continue)"
   fi
   "$PY" "${REPO_DIR}/scripts/jarvis_dashboard_push.py"
+  # Phase L: 814/815 鮮度を Slack #ops へ（失敗しても push 本体は成功扱い）
+  if [[ "${JARVIS_UI_CYCLE_DISABLE:-}" != "1" ]]; then
+    if ! "$PY" "${REPO_DIR}/scripts/jarvis_ui_cycle_814_815.py" --agent both --post; then
+      echo "# ui_cycle_814_815 exit=$? (continue)"
+    fi
+  fi
   echo "# end exit=$?"
 } >>"$LOG" 2>&1

@@ -63,9 +63,20 @@ WeStudy／GitHub Actions の失敗と、LINE オープンチャット取込の�
 4. Slack `#ops` に結果（OK／要フォロー）
 5. QR や大量YAMLが必要なら `#consult` に1行
 
+### 一括（推奨）
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_ops_health_315.py --post --mark-checked
+```
+
+ログ: このフォルダ `logs/`
+
 ## 7. 改善ログ
 
 | 日付 | 変更 |
 |---|---|
 | 2026-10-09 | ハブ初期化・候補として作成（案A: 週次取込＋オプチャ統合） |
 | 2026-10-09 | 3桁化（旧20_ → 315）。ビルダー部門「品質・タスク運用管理室」配下へ |
+| 2026-10-11 | 下準備プラン1体目として具体化。`jarvis_ops_health_315.py` → Slack `#ops` 報告1通 |
+| 2026-10-11 | Phase H: launchd `ops-health-315` 日曜 09:15 自律起動。状態＝運用 |

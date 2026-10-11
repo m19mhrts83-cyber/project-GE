@@ -64,6 +64,7 @@ Drive `20_outbox_to_grok/` はこれまでどおり **仕事キュー**。チャ
 - **本文は改行を残す**（1行に潰さない）。`# 見出し` · 箇条書き · 番号リスト · コードフェンス。ダッシュボード状況ウォッチがそのまま描画する
 - **ホーク Notion**: `action: notion_tasks` → Jarvis が `jarvis_hawk_notion_tasks_apply.py --apply`（移行期）
 - **ホーク／部長 Todoist（本線）**: `action: todoist_tasks` → Mac が自動 apply（`jarvis_bucho_inbox_poll`）。`summary`/`links` → コメントの Markdown ハイパーリンク
+- **定型報告 → Slack**: `action: slack_report`（`channel: report|consult|ops`）→ Mac が Webhook 投稿（都度相談は Grok チャットのまま。正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md`）
 - **要ボス／要Jarvis連携**は必ず Todoist ラベル付き起票（Drive メモだけでは漏れ扱い）
 - Drive `20_outbox` 空は正常。ホーク判断は Todoist `要ホーク`
 - **二重起票禁止**: 同 L-id／同趣旨タイトルがあれば create せず更新・列移動・コメントのみ（Jarvis 正本: `docs/Todoist_タスク正本_設計_20260921.md`「二重起票防止」）

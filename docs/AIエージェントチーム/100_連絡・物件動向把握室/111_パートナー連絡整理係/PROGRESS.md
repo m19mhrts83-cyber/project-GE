@@ -6,7 +6,7 @@
 
 | フェーズ | 状態 |
 |---|---|
-| **初版開発（本開発／初動）** | **完了** — Webhook／昼GHA／夜launchd／件数テンプレ Slack |
+| **初版開発（本開発／初動）** | **完了** — Webhook／昼GHA／夜launchd／件数テンプレ Slack／links・reports |
 | **運用確認** | **進行中** — Todoist タスクで区切り。レポート形・判断しやすさ・実走ログを見る |
 
 ### 運用確認で見るもの
@@ -20,12 +20,21 @@
 
 - **LLM 不使用**（取込＋件数テンプレのみ → Cursor／API トークンを食わない）
 - 昼: Gmail∥Chatwork **並列**、Gmail `limit=25` / `newer_days=2`（朝 triage との二度取り軽減）
-- 夜: 公式エクスポートは poll 新鮮なら **スキップ**、launchd は **ダッシュボード非表示**
+- 夜: 公式エクスポートは poll 新鮮なら **スキップ**、**ダッシュボードを開く**（抑止は env）
+- 夜取りこぼし: screen-unlock＋朝バンドル soft-fail
 - GHA: pip cache、timeout 20分
+- フォルダ: `links.md`／`reports/`（Slack 控え）
 
 任意の仕上げ（運用確認の外でも可）: flow HTML 図の実装同期。
 
 ---
+
+## 2026-10-11（計画実装クローズ）
+
+- `links.md`／`reports/` 追加。Slack 投稿時に控え保存
+- 夜 runner でダッシュボード同梱（SKIP 既定オフ）
+- 取りこぼし: `jarvis_screen_unlock_catchup` ＋ `jarvis_morning_mac_refresh`
+- 後続競合は [`後続_競合棚卸し.md`](./後続_競合棚卸し.md)
 
 ## 2026-10-10（Phase 3・夜枠）
 

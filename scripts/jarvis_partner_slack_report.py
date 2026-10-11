@@ -19,8 +19,34 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
 PY = sys.executable
+REPORTS_DIR = (
+    REPO
+    / "docs"
+    / "AIエージェントチーム"
+    / "100_連絡・物件動向把握室"
+    / "111_パートナー連絡整理係"
+    / "reports"
+)
 
 _FRAME_JA = {"day": "昼", "night": "夜", "manual": "副合図"}
+
+
+def _archive_report(frame: str, text: str) -> Path | None:
+    """係フォルダ reports/ に控えを残す（やり取り正本は 26 のまま）。"""
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        day = datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m-%d")
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        path = REPORTS_DIR / f"{day}_{frame}.md"
+        body = f"# Slack #report 控え — {day} / {frame}\n\n```\n{text}\n```\n"
+        path.write_text(body, encoding="utf-8")
+        print(f"📎 report archive: {path.relative_to(REPO)}")
+        return path
+    except OSError as e:
+        print(f"⚠️ report archive failed: {e}", file=sys.stderr)
+        return None
 
 
 def _total(args: argparse.Namespace) -> int:
@@ -94,6 +120,7 @@ def main() -> int:
         print("--- dry-run ---")
         print(text)
         print("---")
+        _archive_report(args.frame, text)
         return 0
 
     if not POST.is_file():
@@ -105,6 +132,8 @@ def main() -> int:
         cwd=str(REPO),
         check=False,
     )
+    if int(proc.returncode) == 0:
+        _archive_report(args.frame, text)
     return int(proc.returncode)
 
 

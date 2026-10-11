@@ -1,0 +1,82 @@
+---
+description: 実行ツール（Claude Code／Codex／Cursor／GenCode／Grok）動向を週1で調査・報告し、社員→ツール割当の材料にする
+alwaysApply: true
+---
+
+# 実行ツール動向ウォッチ（週次）
+
+## 方針
+
+AIエージェントチームの実行候補・周辺（**Claude Code / Codex / Cursor=Jarvis / GenCode / Grok Bot**、参考で ChatGPT Bot）は更新が速い。  
+会話のついでに動向を調べ、**週1くらい**で短く共有し、[`07_実行ツール動向_割当指針`](docs/AIエージェントチーム/07_実行ツール動向_割当指針_20261009.md) に蓄積する。
+
+目的は「**この社員ならこのツール**」を、長所・短所・**定期実行 vs 俯瞰提案**から提案できるようにすること。
+
+**いけともAIニュース**（週次・Drive `DX互助会_共有フォルダ/05_knowledge/いけともAIニュース/`）も毎回引き当てる。GHA `AI News Save`（`DX-_-`）の成否・「0件成功」も見る。
+
+## 無効化
+
+- `~/git-repos/.jarvis_state/agent_tools_weekly.json` に `"disabled": true`
+- または `.env.jarvis_private` に `JARVIS_AGENT_TOOLS_WEEKLY_DISABLE=1`
+- ユーザーが「ツール動向ウォッチ不要」と明示
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| 蓄積 MD | `docs/AIエージェントチーム/07_実行ツール動向_割当指針_20261009.md` |
+| state | `~/git-repos/.jarvis_state/agent_tools_weekly.json` |
+| 割当 | `docs/AIエージェントチーム/agents_registry.yaml`（`tool_assigned` 等） |
+
+## いつ動くか（同一セッション1回まで）
+
+state が無効でないとき、次のいずれか:
+
+1. **前回報告から 7日以上**空いている（`last_reported_at`）
+2. 話題が **エージェントチーム／ツール割当／Claude Code／Codex／GenCode／Grok Bot／Phase I** のとき（経過中なら1ブロック）
+3. パートナー確認のついで（失敗しても確認全体は止めない。7日未満ならスキップ可）
+4. ユーザーが「ツール動向」「割当どうする」等と明示 → 即調査
+
+促しすぎ防止: 重大アップデートが無い限り、**同一週に再掲しない**。
+
+## Jarvis の動作
+
+1. state を読む。`disabled` ならスキップ
+2. **いけともAIニュース**の最新 MD を読み、ツール割当に効く見出しを1〜3行抜く（無ければ「今週なし」）
+3. `gh run list --repo m19mhrts83-cyber/DX-_- --workflow "AI News Save" --limit 3` で GHA。success でもログが「該当なし」なら **要調査**（件名変更・token）
+4. Tavily 等で直近の公開アップデートを短く調べる（各ツール1〜3行）
+5. **07 MD** の該当カード／履歴表を更新（割当表に影響があれば「見直し提案」を書く）
+6. state の `last_reported_at` / `last_findings` を更新
+7. チャットに報告ブロックを出す（07 の「週次アップデートの型」・いけとも／GHA行を含む）
+
+報告では必ず:
+
+- 長所・短所・特徴（**A俯瞰提案 / B定期 / C実装 / D指揮**）
+- 「社員○○は△△向き」の**提案が1つ以上**あるとよい（無ければ「割当変更なし」）
+
+## 報告フォーマット
+
+```
+📎 実行ツール動向（週次）— YYYY-MM-DD
+- Claude Code: …
+- Codex: …
+- Cursor/Jarvis: …
+- GenCode: …
+- Grok Bot: …
+- いけともAIニュース: …
+- AI News Save（GHA）: …
+- 割当への影響: …
+- 正本: docs/AIエージェントチーム/07_実行ツール動向_割当指針_20261009.md
+```
+
+## やらないこと
+
+- 秘密・APIキーを動向メモに書く
+- ツール移行で社員の合図・権限・報告条件を変える（Phase I の同一条件を壊す）
+- 同じ仕事を複数ツールにフル自動化する提案
+
+## 関連
+
+- 作り方二段階: `06_社員の作り方_二段階_20261009.md`
+- 機密二層: `jarvis-agent-team-secrets.mdc`
+- プラン Phase I: `grok混成エージェント拡張_f5cbfb3a.plan.md`

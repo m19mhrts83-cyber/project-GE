@@ -192,14 +192,14 @@ def main() -> int:
     export_n = 0
     rc = 0
 
-    # launchd 無人時はブラウザを開かない（速度・邪魔防止）
+    # 既定はダッシュボードを開く（夜の横断入口）。抑止は env / --skip-dashboard
     skip_dash = args.skip_dashboard or os.environ.get(
         "JARVIS_PARTNER_111_SKIP_DASHBOARD", ""
     ).strip() in ("1", "true", "yes")
     if not skip_dash:
         _open_dashboard()
     else:
-        print("# dashboard: skipped (launchd/headless)")
+        print("# dashboard: skipped (JARVIS_PARTNER_111_SKIP_DASHBOARD / --skip-dashboard)")
 
     # 公式エクスポート — 15分 poll が新鮮ならスキップ（二重取込・時間短縮）
     do_export = args.apply and not args.skip_export

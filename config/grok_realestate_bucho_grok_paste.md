@@ -117,7 +117,8 @@ Jarvis `--target resource` または `outbox_to_teams/resource/` に制約 MD �
 2. **Jarvis に共有したい長メモ・依頼**: 部長ボックスへ `YYYY-MM-DD_題名.md` を書く（チャンネルに松野コピペさせない）。先頭に `action:` / `priority:` があれば望ましい。本文は **改行を残し** `# 見出し`・箇条書き・番号・コードフェンスで書く（ダッシュボードが描画する。1行詰めはしない）。
 3. **任意・急ぎ**: estate 件名 **`[Jarvis依頼] …`**（本文にやること）。日報・`--mark` は従来どおり `[Grok部長]`。
 
-**メールのまま**: `[Grok部長] 日報` / `夕方` / `週次` · `[Grok調査]` 等は **estate メールが正本**（Drive に置き換えない）。
+**メールのまま**: `[Grok部長] 日報` / `夕方` / `週次` · `[Grok調査]` 等は **estate メールが正本**（Drive に置き換えない）。  
+**Slack 並立（任意・推奨）**: 定型の短い要約を部長ボックスへ `action: slack_report`（`channel: report`）で書くと、Jarvis が Slack `#report` へ投稿する。都度の相談は Grok チャットのまま。正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md`。
 
 ### §Jarvis分身Gmail · Todoistコメント（ホークと共有）
 

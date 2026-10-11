@@ -52,8 +52,19 @@
 3. Slack #ops に差分サマリ
 4. 要判断は #consult
 
+### 一括（Phase L）
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_ui_cycle_814_815.py --agent 815 --post
+```
+
+朝: `jarvis_morning_mac_refresh` の kurashift vendor / obsidian pick。  
+報告は 12:30 dashboard-push 相乗り（`--agent both`）。停止: `JARVIS_UI_CYCLE_DISABLE=1`
+
 ## 7. 改善ログ
 
 | 日付 | 変更 |
 |---|---|
 | 2026-10-09 | スタブ作成（俯瞰UI更新担当） |
+| 2026-10-11 | Phase L: ui_cycle 報告経路。朝refresh＋12:30相乗り |

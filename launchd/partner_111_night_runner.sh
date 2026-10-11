@@ -1,6 +1,7 @@
 #!/bin/zsh
 # 111 パートナー連絡整理係・夜枠（20:30 JST）
-# CHRLINE＋公式エクスポート → 更新時のみ Slack #report
+# ダッシュボードを開く → CHRLINE＋公式エクスポート → 更新時のみ Slack #report
+# （計画どおり夜はダッシュボード同梱。SKIP したいときだけ JARVIS_PARTNER_111_SKIP_DASHBOARD=1）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${HOME}/Library/Logs/jarvis_partner_111_night"
@@ -15,8 +16,6 @@ LOG="${LOG_DIR}/night_${STAMP}.log"
   # shellcheck disable=SC1091
   source "${REPO_DIR}/.env.jarvis_private"
   set +a
-  # 無人起動ではブラウザを開かない（速度）
-  export JARVIS_PARTNER_111_SKIP_DASHBOARD=1
   PY="${HOME}/selenium_env/venv/bin/python"
   if [[ ! -x "$PY" ]]; then
     PY="python3"

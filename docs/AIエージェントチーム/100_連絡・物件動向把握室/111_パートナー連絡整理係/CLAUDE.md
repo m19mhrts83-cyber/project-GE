@@ -53,7 +53,7 @@
 - **人が動く入口**: Slack `#report`（受動）＋ **Gmail 要対応**（能動）→ 指示は Jarvis／代行へ
 - **横断俯瞰（夜）**: Jarvis ダッシュボード（815は `/openchat`・返信提案しない）
 - **Notion**: **使わない**（要約ログ・ワークログノードなし）
-- **このフォルダ**: `flow.md` / `report_consult.md` / `運用メモ_人が見る場所.md`
+- **このフォルダ**: `flow.md` / `report_consult.md` / `運用メモ_人が見る場所.md` / `links.md` / `reports/`
 
 ## 6. 作業手順（一本の流れ・必ずこの順）
 
@@ -80,6 +80,7 @@
 | 2026-10-10 | 定時レポート（昼GHA／夜Mac）へ FlowForge・正本 MD 見直し |
 | 2026-10-10 | 人が見る場所: MD正本＋Slack受動＋Gmail能動。Notionワークログ不要 |
 | 2026-10-10 | FlowForge 一本合流・Notion削除確定。エージェント指示を最終フローに同期 |
+| 2026-10-11 | 定時実装クローズ: links/reports・夜ダッシュボード同梱・unlock/朝取りこぼし |
 | 2026-10-10 | Slack Incoming Webhook 3本（REPORT/CONSULT/OPS）設定・テストOK。`jarvis_partner_slack_report.py` 追加 |
 | 2026-10-10 | 昼パイプライン＋GHA 11:50（`jarvis_partner_day_pipeline` / `jarvis-partner-day-report.yml`） |
 | 2026-10-10 | GHA に Gmail credentials 展開を追加（dry_run 失敗の修正） |
