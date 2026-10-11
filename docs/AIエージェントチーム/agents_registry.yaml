@@ -126,14 +126,14 @@ agents:
     path: 200_返信・案内文面制作室/211_返信案内下書き係
     flowforge_id: flow_gvDWblu8H38otZzGm66S4Znv
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_gvDWblu8H38otZzGm66S4Znv
-    status: 設計中
+    status: 運用確認
     report: report
     trigger: 時間
     tool_assigned: gha
     tool_fit: A+B
     tool_notes: 07:30 GHA本線。文面提案
     schedule: 07:30GHA
-    note: ' 実行本線=GHA+Graph（2026-10-11）'
+    note: '運用確認（2026-10-11 GHA本番書込OK・#report/#consult）'
   '311':
     name: 送信前品質係
     path: 300_品質・タスク運用管理室/311_送信前品質係
@@ -190,12 +190,12 @@ agents:
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX
     status: 運用確認
     report: ops
-    tool_assigned: gencode
-    note: 下準備1体目→Phase H自律。launchd Sun 09:15。CLI jarvis_ops_health_315.py。運用確認中（松野内容確認待ち 2026-10-11）。旧20_
+    tool_assigned: gha
+    note: 本線=GHA日曜21:00（ops-health-315）。CLI --cloud→#ops。運用確認中。旧20_/旧launchd09:15は本線外
     trigger: 時間＋Fail
     tool_fit: B
-    tool_notes: launchd日曜09:15→#ops。本番CLIはMac
-    schedule: Sun 09:15 launchd
+    tool_notes: GHA日曜21:00→#ops。オプチャ詳細はMac補完
+    schedule: Sun 21:00 JST GHA
   '316':
     name: データアナリスト
     path: 300_品質・タスク運用管理室/316_データアナリスト
@@ -532,6 +532,6 @@ agents:
     tool_fit: A+B
     tool_notes: Slack整形。将来アプリ窓口
     schedule: 報告後
-phase_h_note: '2026-10-11: 315自律起動(launchd)。trigger/scheduleを登記。'
+phase_h_note: '2026-10-11: 315本線をGHA日曜21:00へ（旧launchd09:15は本線外）。'
 phase_i_note: '2026-10-11: tool_assigned/tool_fit初版を全社員に充填（07_準拠）。'
 status_marker_doc: 22_運用状態の識別_20261011.md

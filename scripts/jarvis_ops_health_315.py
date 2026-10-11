@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
-PYTHON = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
+PYTHON_MAC = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
 LOG_DIR = (
     REPO
     / "docs"
@@ -62,9 +62,15 @@ def _run(cmd: list[str], *, timeout: int = 120) -> tuple[int, str]:
     return p.returncode, out
 
 
+def _python() -> str:
+    if PYTHON_MAC.is_file():
+        return str(PYTHON_MAC)
+    return sys.executable
+
+
 def westudy_block(*, mark_checked: bool) -> tuple[str, str]:
     """Return (summary_line, full_block)."""
-    py = str(PYTHON if PYTHON.is_file() else sys.executable)
+    py = _python()
     cmd = [py, str(REPO / "scripts" / "jarvis_westudy_weekly_check.py"), "--force"]
     if mark_checked:
         cmd.append("--mark-checked")
@@ -82,10 +88,20 @@ def westudy_block(*, mark_checked: bool) -> tuple[str, str]:
     return line, block
 
 
-def openchat_snapshot() -> tuple[str, list[str]]:
-    """Light health: watch status + today's 【スレッド】 counts. No QR / no YAML writes."""
+def openchat_snapshot(*, cloud: bool = False) -> tuple[str, list[str]]:
+    """Light health: watch status + today's 【スレッド】 counts. No QR / no YAML writes.
+
+    cloud=True（GHA）: Mac専用（launchd / OneDrive / watchログ）はスキップし、
+    判定を「要フォロー」にしない（本線は WeStudy/GHA）。
+    """
     lines: list[str] = []
     level = "OK"
+
+    if cloud:
+        lines.append("実行環境: GitHub Actions（--cloud）")
+        lines.append("オプチャ詳細: スキップ（Mac専用・launchd/OneDrive）")
+        lines.append("補完: パートナー確認ついで／手動でフル点検可")
+        return "スキップ(cloud)", lines
 
     # launchd
     uid = os.getuid()
@@ -163,26 +179,38 @@ def openchat_snapshot() -> tuple[str, list[str]]:
     return level, lines
 
 
-def build_message(westudy_line: str, westudy_block: str, oc_level: str, oc_lines: list[str]) -> str:
+def build_message(
+    westudy_line: str,
+    westudy_block: str,
+    oc_level: str,
+    oc_lines: list[str],
+    *,
+    cloud: bool = False,
+) -> str:
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
     overall = "OK"
     if "⚠️" in westudy_line or "Fail" in westudy_line or "失敗" in westudy_line:
         overall = "要フォロー"
-    if oc_level != "OK":
+    if oc_level not in ("OK", "スキップ(cloud)"):
         overall = "要フォロー"
 
+    engine = "GHA ops-health-315（日曜21:00 JST）" if cloud else "Mac手動／launchd補完"
     body = [
         f"【社員報告】連携健全性点検係（315） / 点検1回",
-        f"- 状態: 初回実装・報告1通（{now} JST）",
+        f"- 時刻: {now} JST",
+        f"- 起動: {engine}",
         f"- 判定: {overall}",
+        f"- 報告先: Slack #ops（要判断のみ #consult。#report には出さない）",
         f"- フロー: {FLOW_URL}",
         f"- WeStudy/GHA: {westudy_line}",
         f"- オプチャ: {oc_level}",
     ]
     for ln in oc_lines:
         body.append(f"  · {ln}")
-    body.append("- 見てほしい点: #ops に健全性レポートが届くこと（送信・YAML大量追記はしない）")
-    body.append("- 次: 週次／パートナー確認ついでに同コマンド。異常時のみ #consult")
+    if overall == "要フォロー":
+        body.append("- 見てほしい点: 要フォロー。QR/YAML大量は人が確かめる → 必要なら #consult")
+    else:
+        body.append("- 見てほしい点: なし（OK）。異常時のみ対応")
     # keep Slack message readable; full westudy block in log
     if westudy_block and len(westudy_block) < 900:
         body.append("")
@@ -191,7 +219,7 @@ def build_message(westudy_line: str, westudy_block: str, oc_level: str, oc_lines
 
 
 def post_ops(text: str) -> int:
-    py = str(PYTHON if PYTHON.is_file() else sys.executable)
+    py = _python()
     code, out = _run(
         [
             py,
@@ -217,12 +245,17 @@ def main() -> int:
         action="store_true",
         help="WeStudy watch の --mark-checked を付ける",
     )
+    ap.add_argument(
+        "--cloud",
+        action="store_true",
+        help="GHA用。オプチャのMac専用点検をスキップ",
+    )
     ap.add_argument("--dry-run", action="store_true", help="投稿せず本文のみ表示")
     args = ap.parse_args()
 
     w_line, w_block = westudy_block(mark_checked=args.mark_checked)
-    oc_level, oc_lines = openchat_snapshot()
-    msg = build_message(w_line, w_block, oc_level, oc_lines)
+    oc_level, oc_lines = openchat_snapshot(cloud=args.cloud)
+    msg = build_message(w_line, w_block, oc_level, oc_lines, cloud=args.cloud)
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
