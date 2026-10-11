@@ -188,10 +188,10 @@ agents:
     path: 300_品質・タスク運用管理室/315_連携健全性点検係
     flowforge_id: flow_zYjp6A4HDURefJhSm0h_zUtX
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX
-    status: 運用
+    status: 運用確認
     report: ops
     tool_assigned: gencode
-    note: 下準備1体目→Phase H自律。launchd Sun 09:15。CLI jarvis_ops_health_315.py。旧20_
+    note: 下準備1体目→Phase H自律。launchd Sun 09:15。CLI jarvis_ops_health_315.py。運用確認中（松野内容確認待ち 2026-10-11）。旧20_
     trigger: 時間＋Fail
     tool_fit: B
     tool_notes: launchd日曜09:15→#ops。本番CLIはMac
