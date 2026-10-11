@@ -103,12 +103,12 @@ agents:
     mixup_kind: mac_twin
     grok_counterpart: s1
     builder_tag: 〔Grok:S1〕
-    note: 進行ゲートA/B/C振分。CLI jarvis_property_gate_114。送信は511
-    trigger: イベント
+    note: 進行ゲートA/B/C振分。CLI jarvis_property_gate_114／degraded。送信は511
+    trigger: イベント＋時間
     tool_assigned: jarvis
     tool_fit: A
-    tool_notes: Grok調査後レーン振分→Slack
-    schedule: 取込後・手動
+    tool_notes: Grok調査後レーン振分→Slack。上限時もCLI可
+    schedule: 取込後・毎日11:15・手動
   '115':
     name: 修繕進捗要約係
     path: 100_連絡・物件動向把握室/115_修繕進捗要約係
@@ -289,11 +289,11 @@ agents:
     mixup_kind: mac_twin
     grok_counterpart: s1
     builder_tag: 〔Grok:S1〕
-    trigger: 人依頼
+    trigger: イベント
     tool_assigned: jarvis
     tool_fit: B
-    tool_notes: Slack Yes後にre_inquiry送信。BのYes＝了承
-    schedule: Yes時・手動
+    tool_notes: Slack Yes後にre_inquiry送信。BのYes＝了承。consult-action本線
+    schedule: Yes/No時・手動
     note: CLI jarvis_property_gate_511。正本23_物件進行ゲート
   '512':
     name: 仲介返信取込係
