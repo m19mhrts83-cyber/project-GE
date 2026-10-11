@@ -16,6 +16,7 @@ Supabase public.comments へ WeStudy 管理者形式 CSV を upsert する。
 
 終了時に次の行を stdout へ出力（ログパース用）:
   Supabase取込完了: upserted=N skipped=M failed=K mode=delta|bootstrap
+  emb未付与: N   （--since 指定時のみ。新規 upsert 分のうち embedding が null の件数）
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,17 +36,6 @@ try:
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from forum_category_map import enrich_comment_meta
-
-try:
-    from supabase import Client, create_client
-except ImportError as e:  # pragma: no cover
-    print(
-        "supabase パッケージが必要です: pip install supabase\n"
-        f"detail: {e}",
-        file=sys.stderr,
-    )
-    raise SystemExit(2)
-
 
 CSV_CELL_ALIASES: dict[str, tuple[str, ...]] = {
     "comment_id": ("comment_id", "commentId", "コメントID", "コメントid"),
@@ -91,6 +82,59 @@ def normalize_posted_at(raw: str) -> str | None:
     if re.match(r"^\d{4}-\d{2}-\d{2}T", s):
         return s
     return s
+
+
+def parse_since(raw: str | None) -> datetime | None:
+    """YYYY-MM-DD または ISO。日付のみは UTC 0:00。空なら None。"""
+    s = (raw or "").strip()
+    if not s:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+        return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+    dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def posted_at_as_utc(value: str | None) -> datetime | None:
+    s = (value or "").strip()
+    if not s:
+        return None
+    if re.match(r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", s):
+        s = s[:19].replace(" ", "T") + "+00:00"
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+        s = s + "T00:00:00+00:00"
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def select_records_since(
+    records: list[dict[str, Any]],
+    since: datetime | None,
+    *,
+    bootstrap: bool,
+) -> tuple[list[dict[str, Any]], int]:
+    """posted_at >= since だけ残す。日時なし・解釈不能・since より前はスキップ。
+
+    bootstrap（全件）では床を無視する。
+    """
+    if since is None or bootstrap:
+        return records, 0
+    kept: list[dict[str, Any]] = []
+    skipped = 0
+    for rec in records:
+        posted = posted_at_as_utc(str(rec.get("posted_at") or ""))
+        if posted is None or posted < since:
+            skipped += 1
+            continue
+        kept.append(rec)
+    return kept, skipped
 
 
 def row_to_record(row: dict[str, str], row_index: int, import_batch_ts: int) -> dict[str, Any] | None:
@@ -161,7 +205,16 @@ def read_csv_records(csv_path: Path) -> list[dict[str, Any]]:
     return records
 
 
-def get_supabase_client() -> Client:
+def get_supabase_client():
+    try:
+        from supabase import create_client
+    except ImportError as e:  # pragma: no cover
+        print(
+            "supabase パッケージが必要です: pip install supabase\n"
+            f"detail: {e}",
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from e
     url = os.environ.get("SUPABASE_URL", "").strip()
     if not url:
         raise RuntimeError("環境変数 SUPABASE_URL が未設定です")
@@ -174,6 +227,24 @@ def get_supabase_client() -> Client:
             "SUPABASE_SERVICE_ROLE_KEY（推奨）または SUPABASE_ANON_KEY を設定してください"
         )
     return create_client(url, key)
+
+
+def count_missing_embeddings(client, comment_ids: list[str]) -> int:
+    """upsert 済み comment_id のうち embedding が null の件数。"""
+    ids = [cid for cid in comment_ids if cid]
+    total = 0
+    for start in range(0, len(ids), 80):
+        chunk = ids[start : start + 80]
+        res = (
+            client.table("comments")
+            .select("comment_id")
+            .in_("comment_id", chunk)
+            .is_("embedding", "null")
+            .limit(len(chunk))
+            .execute()
+        )
+        total += len(res.data or [])
+    return total
 
 
 def upsert_chunk(client: Client, chunk: list[dict[str, Any]], retries: int = 3) -> None:
@@ -190,31 +261,37 @@ def upsert_chunk(client: Client, chunk: list[dict[str, Any]], retries: int = 3) 
 
 
 def upload_records(
-    client: Client,
+    client,
     records: list[dict[str, Any]],
     *,
     chunk_size: int,
     dry_run: bool,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, list[str]]:
     if dry_run:
         print(f"[dry-run] rows={len(records)} chunk_size={chunk_size}")
         for rec in records[:3]:
             print(f"[dry-run] sample comment_id={rec.get('comment_id')}")
-        return 0, 0, 0
+        return 0, 0, 0, []
 
     upserted = 0
     failed = 0
+    ok_ids: list[str] = []
     for start in range(0, len(records), chunk_size):
         chunk = records[start : start + chunk_size]
         try:
             upsert_chunk(client, chunk)
             upserted += len(chunk)
+            ok_ids.extend(
+                str(rec.get("comment_id") or "")
+                for rec in chunk
+                if rec.get("comment_id")
+            )
             print(f"  chunk ok: {start + 1}-{start + len(chunk)} / {len(records)}")
         except Exception as e:
             failed += len(chunk)
             print(f"  chunk NG: {start + 1}-{start + len(chunk)}: {e}", file=sys.stderr)
     skipped = 0
-    return upserted, skipped, failed
+    return upserted, skipped, failed, ok_ids
 
 
 def parse_args() -> argparse.Namespace:
@@ -227,7 +304,27 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--dry-run", action="store_true", help="接続・マッピングのみ確認")
     p.add_argument("--chunk-size", type=int, default=300, help="1回の upsert 件数（既定 300）")
+    p.add_argument(
+        "--since",
+        default="",
+        help="この日付（UTC・含む）より前、または投稿日時なしは取り込まない。例: 2026-09-27。--bootstrap では無視",
+    )
     return p.parse_args()
+
+
+def report_missing_embeddings(client, comment_ids: list[str], *, since_active: bool) -> None:
+    """週次ログ用。--since のときだけ `emb未付与: N` を1行出す。"""
+    if not since_active:
+        return
+    if not comment_ids:
+        print("emb未付与: 0")
+        return
+    try:
+        missing = count_missing_embeddings(client, comment_ids)
+    except Exception as e:
+        print(f"emb未付与の照会に失敗: {e}", file=sys.stderr)
+        return
+    print(f"emb未付与: {missing}")
 
 
 def main() -> int:
@@ -237,26 +334,46 @@ def main() -> int:
         print(f"CSV が見つかりません: {csv_path}", file=sys.stderr)
         return 2
 
+    try:
+        since = parse_since(args.since)
+    except ValueError:
+        print(f"--since を解釈できません: {args.since}", file=sys.stderr)
+        return 2
+
     mode = "bootstrap" if args.bootstrap else "delta"
     records = read_csv_records(csv_path)
+    records, skipped_since = select_records_since(
+        records, since, bootstrap=bool(args.bootstrap)
+    )
+    since_active = since is not None and not args.bootstrap
+    if skipped_since:
+        print(f"since 床でスキップ: {skipped_since} 件（posted_at < {since.isoformat()} または日時なし）")
     print(f"==> Supabase CSV取込 mode={mode} file={csv_path} rows={len(records)}")
 
     if len(records) == 0:
-        print("Supabase取込完了: upserted=0 skipped=0 failed=0 mode=" + mode + " (empty)")
+        print(
+            f"Supabase取込完了: upserted=0 skipped={skipped_since} failed=0 mode={mode} (empty)"
+        )
+        if since_active:
+            print("emb未付与: 0")
         return 0
 
     if args.dry_run:
-        upload_records(None, records, chunk_size=args.chunk_size, dry_run=True)  # type: ignore[arg-type]
-        print(f"Supabase取込完了: upserted=0 skipped=0 failed=0 mode={mode} dry_run=1")
+        upload_records(None, records, chunk_size=args.chunk_size, dry_run=True)
+        print(
+            f"Supabase取込完了: upserted=0 skipped={skipped_since} failed=0 mode={mode} dry_run=1"
+        )
         return 0
 
     client = get_supabase_client()
-    upserted, skipped, failed = upload_records(
+    upserted, skipped_upload, failed, ok_ids = upload_records(
         client, records, chunk_size=max(1, args.chunk_size), dry_run=False
     )
+    skipped = skipped_since + skipped_upload
     print(
         f"Supabase取込完了: upserted={upserted} skipped={skipped} failed={failed} mode={mode}"
     )
+    report_missing_embeddings(client, ok_ids, since_active=since_active)
     return 0 if failed == 0 else 1
 
 
