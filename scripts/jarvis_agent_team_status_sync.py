@@ -144,8 +144,13 @@ def write_dept_board(
     if not dry:
         dpath.mkdir(parents=True, exist_ok=True)
         out.write_text(body, encoding="utf-8")
-        # link from 00_部門.md if present
-        dept_md = dpath / "00_部門.md"
+        # link from 01_部門.md if present（並び: 00_状態ボード → 01_部門）
+        dept_md = dpath / "01_部門.md"
+        legacy = dpath / "00_部門.md"
+        if legacy.is_file() and not dept_md.is_file():
+            legacy.rename(dept_md)
+        elif legacy.is_file() and dept_md.is_file():
+            legacy.unlink()
         if dept_md.is_file():
             t = dept_md.read_text(encoding="utf-8")
             if "00_状態ボード.md" not in t:
@@ -211,7 +216,11 @@ def main() -> int:
         print(f"  board {did}: {out.relative_to(HUB)} ({len(alist)} agents)")
         if not args.dry_run and not args.no_drive:
             sync_drive(Path(dept["path"]) / "00_状態ボード.md", False)
-            sync_drive(Path(dept["path"]) / "00_部門.md", False)
+            sync_drive(Path(dept["path"]) / "01_部門.md", False)
+            # 旧名の残骸を Drive から消す
+            old_drive = DRIVE_HUB / dept["path"] / "00_部門.md"
+            if not args.dry_run:
+                old_drive.unlink(missing_ok=True)
 
     if not args.dry_run and not args.no_drive:
         for rel in (
