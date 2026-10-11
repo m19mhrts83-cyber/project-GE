@@ -64,6 +64,142 @@ export function parseAction(raw: string | null | undefined): GateAction | null {
   return null;
 }
 
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function cleanListingUrl(raw: string): string {
+  let s = (raw || "").trim().split("（")[0].split("(")[0].trim();
+  try {
+    const u = new URL(s);
+    if (
+      (u.hostname === "www.google.com" || u.hostname === "google.com") &&
+      u.pathname === "/url"
+    ) {
+      const q = u.searchParams.get("q") || u.searchParams.get("url");
+      if (q) return q.trim();
+    }
+  } catch {
+    /* ignore */
+  }
+  return s;
+}
+
+type DealRow = {
+  id: string;
+  title?: string | null;
+  price_man?: number | null;
+  match_score?: number | null;
+  area?: string | null;
+  summary_json?: Record<string, unknown> | null;
+};
+
+/** ログイン不要の判断材料表（Slack カードと同項目）。 */
+export function judgmentDetailHtml(deal: DealRow): string {
+  const sj =
+    deal.summary_json && typeof deal.summary_json === "object"
+      ? deal.summary_json
+      : {};
+  const g =
+    sj.grok && typeof sj.grok === "object"
+      ? (sj.grok as Record<string, unknown>)
+      : {};
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = g[k] ?? sj[k];
+      if (v !== undefined && v !== null && String(v).trim()) return String(v).trim();
+    }
+    return "—";
+  };
+  let price = "—";
+  const pm = deal.price_man ?? g.price_man;
+  if (pm !== undefined && pm !== null && pm !== "") {
+    const n = Number(pm);
+    price = Number.isFinite(n) ? `${Math.round(n)}万` : `${pm}万`;
+  }
+  const url = cleanListingUrl(pick("url", "listing_url", "inquiry_url"));
+  const locRaw = pick("location");
+  const loc = locRaw !== "—" ? locRaw : String(deal.area || "—");
+  const rows: [string, string][] = [
+    ["所在", loc],
+    ["価格", price],
+    ["土地", pick("land_area")],
+    ["土地値倍率", pick("land100_ratio", "land100", "land_ratio")],
+    ["土地評価(万)", pick("land_appraisal_man")],
+    ["路線価手法", pick("land_method")],
+    ["建物", pick("building")],
+    ["ハザード総合", pick("hazard_eval")],
+    ["洪水", pick("hazard_flood")],
+    ["高潮", pick("hazard_storm_surge")],
+    ["急傾斜", pick("hazard_landslide")],
+    ["内水", pick("hazard_inland")],
+    ["聞く/保留", pick("listen_value")],
+    ["問合せ経路", pick("inquiry_action")],
+    ["score", deal.match_score != null ? String(deal.match_score) : "—"],
+  ];
+  if (url && url !== "—") rows.push(["掲載URL", url]);
+
+  const tr = rows
+    .map(
+      ([k, v]) =>
+        `<tr><th>${esc(k)}</th><td>${
+          k === "掲載URL" && v.startsWith("http")
+            ? `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`
+            : esc(v)
+        }</td></tr>`,
+    )
+    .join("\n");
+
+  const yes = `/api/g/y/${deal.id}?s=${actionSig(deal.id, "yes")}`;
+  const no = `/api/g/n/${deal.id}?s=${actionSig(deal.id, "no")}`;
+  const title = esc(String(deal.title || "物件").slice(0, 100));
+
+  return `<!doctype html><html lang="ja"><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>判断材料 — ${title}</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;margin:0;padding:1.25rem;background:#f8fafc;color:#0f172a}
+  .wrap{max-width:40rem;margin:0 auto;background:#fff;border-radius:12px;padding:1.25rem 1.25rem 1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  h1{font-size:1.1rem;margin:0 0 .75rem;line-height:1.4}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th,td{border-bottom:1px solid #e2e8f0;padding:.55rem .4rem;vertical-align:top;text-align:left}
+  th{width:7.5rem;color:#64748b;font-weight:600;white-space:nowrap}
+  td{word-break:break-word}
+  .actions{display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap}
+  .actions a{display:inline-block;padding:.7rem 1.1rem;border-radius:8px;text-decoration:none;font-weight:600;font-size:.95rem}
+  .yes{background:#059669;color:#fff}
+  .no{background:#e2e8f0;color:#334155}
+  .note{margin-top:1rem;font-size:.8rem;color:#64748b}
+</style>
+<body><div class="wrap">
+<h1>${title}</h1>
+<table><tbody>${tr}</tbody></table>
+<div class="actions">
+  <a class="yes" href="${yes}">問合せする（Yes）</a>
+  <a class="no" href="${no}">見送り（No）</a>
+</div>
+<p class="note">ログイン不要の判断ページです。KURASHIFT本体の詳細画面とは別です。</p>
+</div></body></html>`;
+}
+
+export async function fetchDealForJudgment(
+  dealId: string,
+): Promise<DealRow | null> {
+  const sb = createServiceClient();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from("kurashift_re_deals")
+    .select("id, title, price_man, match_score, area, summary_json")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as DealRow;
+}
+
 export async function applyGate(
   dealId: string,
   action: GateAction,

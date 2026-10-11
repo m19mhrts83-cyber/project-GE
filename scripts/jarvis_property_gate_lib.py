@@ -242,10 +242,18 @@ def classify_lane(deal: dict[str, Any]) -> dict[str, Any]:
     except (TypeError, ValueError):
         score = 0.0
 
+    land_disp = (
+        g.get("land100_ratio")
+        or g.get("land100")
+        or sj.get("land100_ratio")
+        or sj.get("land100")
+        or "—"
+    )
+    haz_disp = g.get("hazard_eval") or sj.get("hazard_eval") or "—"
     three = [
-        f"土地値: {g.get('land100') or sj.get('land100') or '—'}",
-        f"ハザード: {g.get('hazard_eval') or sj.get('hazard_eval') or '—'}",
-        f"価格帯/スコア: {deal.get('price_man') or '—'}万 / score={score}",
+        f"土地値: {land_disp}",
+        f"ハザード: {haz_disp}",
+        f"価格帯/スコア: {deal.get('price_man') or g.get('price_man') or '—'}万 / score={score}",
     ]
 
     # C: 保留・見送り・investigate_only
@@ -326,28 +334,121 @@ def classify_lane(deal: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _clean_listing_url(raw: str) -> str:
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    # 「URL （注釈）」形式を落とす
+    s = s.split("（")[0].split("(")[0].strip()
+    try:
+        from urllib.parse import parse_qs, urlparse
+
+        u = urlparse(s)
+        if u.hostname in ("www.google.com", "google.com") and u.path == "/url":
+            q = (parse_qs(u.query).get("q") or [None])[0]
+            if q:
+                return str(q).strip()
+    except Exception:
+        pass
+    return s
+
+
+def judgment_rows(
+    deal: dict[str, Any], *, max_cell: int = 120
+) -> list[tuple[str, str]]:
+    """Slack／詳細ページ共通の判断材料行（項目, 値）。"""
+    g = grok_of(deal)
+    sj = sj_of(deal)
+
+    def pick(*keys: str, default: str = "—") -> str:
+        for k in keys:
+            v = g.get(k)
+            if v is None or v == "":
+                v = sj.get(k)
+            if v is None or v == "":
+                continue
+            s = str(v).strip()
+            if s:
+                return s
+        return default
+
+    price = deal.get("price_man")
+    if price is None:
+        price = g.get("price_man")
+    try:
+        price_s = f"{int(round(float(price)))}万" if price is not None else "—"
+    except (TypeError, ValueError):
+        price_s = f"{price}万" if price is not None else "—"
+
+    url = _clean_listing_url(pick("url", "listing_url", "inquiry_url", default=""))
+    loc = pick("location")
+    if loc == "—":
+        loc = str(deal.get("area") or "—")
+    lv = pick("listen_value")
+    if lv == "—":
+        lv = listen_value(deal) or "—"
+    ia = pick("inquiry_action")
+    if ia == "—":
+        ia = inquiry_action(deal) or "—"
+    rows: list[tuple[str, str]] = [
+        ("所在", loc),
+        ("価格", price_s),
+        ("土地", pick("land_area")),
+        ("土地値倍率", pick("land100_ratio", "land100", "land_ratio")),
+        ("土地評価(万)", pick("land_appraisal_man")),
+        ("路線価手法", pick("land_method")),
+        ("建物", pick("building")),
+        ("ハザード総合", pick("hazard_eval")),
+        ("洪水", pick("hazard_flood")),
+        ("高潮", pick("hazard_storm_surge")),
+        ("急傾斜", pick("hazard_landslide")),
+        ("内水", pick("hazard_inland")),
+        ("聞く/保留", lv),
+        ("問合せ経路", ia),
+        ("score", str(deal.get("match_score") if deal.get("match_score") is not None else "—")),
+    ]
+    if url:
+        rows.append(("掲載URL", url))
+
+    out: list[tuple[str, str]] = []
+    for label, val in rows:
+        v = val.replace("\n", " ").strip() or "—"
+        if max_cell and len(v) > max_cell:
+            v = v[: max_cell - 1] + "…"
+        out.append((label, v))
+    return out
+
+
+def format_judgment_table(
+    rows: list[tuple[str, str]], *, label_width: int = 10
+) -> list[str]:
+    """Slack テキスト向けの簡易表（等幅っぽく揃える）。"""
+    lines = ["```", f"{'項目'.ljust(label_width)} | 内容"]
+    lines.append(f"{'-' * label_width}-+-{'-' * 24}")
+    for label, val in rows:
+        lines.append(f"{label.ljust(label_width)} | {val}")
+    lines.append("```")
+    return lines
+
+
 def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
     deal_id = str(deal["id"])
     title = str(deal.get("title") or "物件")[:80]
-    price = deal.get("price_man")
-    price_s = f"{price}万" if price is not None else "—"
-    pts = lane.get("three_points") or []
+    rows = judgment_rows(deal, max_cell=90)
     lines = [
         "【物件進行ゲート】B 要判断",
-        f"タイトル: {title}／{price_s}",
-        f"deal_id: `{deal_id}`",
-        f"判定: {lane.get('listen') or '—'}・score={deal.get('match_score')}・"
-        f"inquiry_action={lane.get('inquiry_action') or '—'}",
-        f"理由: {lane.get('reason')}",
-        "見てほしい3点:",
-        *[f"・{p}" for p in pts],
-        f"詳細: {deal_url(deal_id)}",
+        f"{title}",
+        f"理由: {lane.get('reason')}／listen={lane.get('listen') or '—'}",
+        "",
+        "■ 判断材料（この表で Yes/No してOK）",
+        *format_judgment_table(rows),
+        "",
+        f"詳細（表の全文・ログイン不要）: {deal_url(deal_id)}",
         "",
         f"👉 問合せする: {action_url(deal_id, 'yes')}",
         f"👉 見送り: {action_url(deal_id, 'no')}",
         "",
-        "（フォールバック）このスレに `Yes` / `No` と返信でも可。"
-        " CLI: jarvis_property_gate_511.py --deal-id … --yes|--no",
+        "（フォールバック）このスレに `Yes` / `No` と返信でも可。",
     ]
     return "\n".join(lines)
 

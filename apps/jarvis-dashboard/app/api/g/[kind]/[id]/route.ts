@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   applyGate,
+  fetchDealForJudgment,
   htmlPage,
+  judgmentDetailHtml,
   parseAction,
   sigOk,
   type GateAction,
@@ -13,10 +15,8 @@ export const runtime = "nodejs";
  * 短縮ゲート URL
  *   Yes: /api/g/y/{deal_id}?s={hmac10}
  *   No:  /api/g/n/{deal_id}?s={hmac10}
- *   詳細: /api/g/d/{deal_id} → trade-desk deals
+ *   詳細: /api/g/d/{deal_id} → ログイン不要の判断材料表（Yes/No 付き）
  */
-
-const DEALS_UI = "https://jarvis-trade-desk.vercel.app/realestate/deals";
 
 function kindToAction(kind: string): GateAction | null {
   const k = kind.trim().toLowerCase();
@@ -38,7 +38,17 @@ export async function GET(
   }
 
   if (k === "d") {
-    return NextResponse.redirect(`${DEALS_UI}?deal=${dealId}`, 302);
+    const deal = await fetchDealForJudgment(dealId);
+    if (!deal) {
+      return htmlPage("エラー", "案件が見つかりません", false);
+    }
+    return new NextResponse(judgmentDetailHtml(deal), {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-store",
+      },
+    });
   }
 
   const action = kindToAction(k) || parseAction(k);
