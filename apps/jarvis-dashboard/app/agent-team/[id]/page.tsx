@@ -4,6 +4,8 @@ import Shell from "@/components/Shell";
 import {
   getAgentById,
   getAgentTeam,
+  getMappingsForAgent,
+  mixupKindLabel,
   reportLabel,
   statusClass,
 } from "@/lib/agentTeam";
@@ -21,6 +23,7 @@ export default async function AgentTeamDetailPage({
   const agent = getAgentById(id);
   if (!agent) notFound();
   const team = getAgentTeam();
+  const mapping = getMappingsForAgent(id);
 
   return (
     <Shell active="/agent-team">
@@ -78,6 +81,43 @@ export default async function AgentTeamDetailPage({
               </div>
             ) : null}
           </dl>
+        </section>
+
+        <section className="card at-detail-card">
+          <header>
+            <strong>Grok Bot 対応</strong>
+          </header>
+          {mapping ? (
+            <dl className="at-dl">
+              <div>
+                <dt>種別</dt>
+                <dd>{mixupKindLabel(mapping.mixup_kind)}</dd>
+              </div>
+              <div>
+                <dt>印</dt>
+                <dd>{mapping.builder_tag || "—"}</dd>
+              </div>
+              <div>
+                <dt>対応 Grok</dt>
+                <dd>
+                  {mapping.mixup_kind === "lane"
+                    ? "全Grok／比較レーン"
+                    : mapping.grok_labels.join(" · ") || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>役割分担</dt>
+                <dd>{mapping.role_split || "—"}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="meta">
+              Grok 同型なし（Jarvis／Slack／Mac 本線）。対応表タブにも載りません。
+            </p>
+          )}
+          <p className="meta" style={{ marginTop: 10 }}>
+            <Link href="/agent-team">対応表タブで一覧</Link>
+          </p>
         </section>
 
         <section className="card at-detail-card">

@@ -1,0 +1,424 @@
+# Grok Bot 組織・社員正本（ダッシュ /agent-team 投影用）
+# 人向け索引: config/grok_org_handoff_index.md
+# AIチーム対応: docs/AIエージェントチーム/16_GrokBot対応_ミックスアップ識別_20261010.md
+# agents_registry.yaml の grok_counterpart はこの id を参照する
+
+updated: "2026-10-11"
+index_doc: config/grok_org_handoff_index.md
+mixup_doc: docs/AIエージェントチーム/16_GrokBot対応_ミックスアップ識別_20261010.md
+
+pillars:
+  - id: jarvis
+    name: Jarvis
+    role: 右腕（Mac 実行 · Cursor）
+    note: Grok 外。松野直属
+  - id: hawk
+    name: ホークアイ（参謀）
+    role: 左腕（Grok 指揮 · 参謀室）
+    note: Grok 主入口
+  - id: karl
+    name: カール
+    role: 第三柱（Gemini · Journal 振り返り）
+    note: Grok 外
+
+# agents_registry.grok_counterpart → bots[].id の展開
+counterpart_aliases:
+  hawk: [hawk]
+  bucho_re: [bucho_re]
+  bucho_re_evening: [bucho_re]
+  s1: [s1]
+  s3+s5: [s3, s5]
+  s7: [s7]
+  s10-s13: [s10, s11, s12, s13]
+  s2+s4+s9: [s2, s4, s9]
+  resource: [resource]
+  family: [family]
+  coaching: [coaching]
+  somu: [somu]
+
+# AI社員 ID → 役割分担1行（16_ より）
+role_splits:
+  "113": "主はKURASHIFT／部長Daily。Grok部長と弱対応"
+  "114": "S1ゲートと重複しやすい。ミックス時は511と役割分担"
+  "411": "全Grok inbox／チャンネル要約の入口（比較レーン）"
+  "412": "411＋AI社員成果を並べて比較"
+  "413": "412の差分から取捨ドラフト"
+  "414": "採用結果を Grok outbox へ返送"
+  "415": "Todoist／inbox の二重起票・競合監視"
+  "511": "Grok=調査・問合せ文案／社員=送信準備・対外了承前の整形"
+  "512": "Grok=S5/S3判断／社員=取込・整理・停滞見回り"
+  "513": "Grok=判断本文／社員=Obsidian・deals突合"
+  "514": "Grok=打診論点／社員=書類・下書き検収（送信は人）"
+  "515": "Grok=文案・Canva下準備／社員=Drive・Prompt同期点検"
+  "516": "Grok=開拓・文案／社員=メール・ステータスフォロー"
+  "611": "Grok=制約伝達／社員=週次要約のMac側"
+  "711": "Grok=週次評価／社員=Journal材料抽出"
+  "712": "Grok=パック利用／社員=材料整形"
+  "713": "Grok=振り分け・助言／社員=週次材料整理"
+
+departments:
+  - id: sanbo
+    name: 参謀室
+    channel: 参謀室 · Jarvisボックス
+    exec_level: 低（振り分け中心）
+    bots:
+      - id: hawk
+        code: Hawk
+        name: ホークアイ（参謀）
+        kind: manager
+        work: 横断優先・QOL・委譲・週次統括・Jarvisボックス振り分け
+        schedule: 日曜 20:00 週次統括（参謀室）
+        drive_target: hawk
+        paste: config/grok_sanbo_bot_grok_paste.md
+
+  - id: coaching
+    name: コーチング部
+    channel: コーチング部
+    exec_level: 中（助言・委譲）
+    bots:
+      - id: coaching
+        code: Coaching
+        name: コーチング部長
+        kind: manager
+        work: 家族・総務・DX統括を束ねる首脳用まとめ・SB週次パック
+        schedule: 日曜 19:00 週次
+        drive_target: ""
+        paste: config/grok_coaching_bucho_grok_paste.md
+
+  - id: re
+    name: 不動産賃貸
+    channel: 不動産Dailyチーム
+    exec_level: 高（Grok内実務）
+    bots:
+      - id: bucho_re
+        code: Bucho-RE
+        name: 不動産賃貸部長
+        kind: manager
+        work: Daily・S1–S13振り分け・日報・本日分／仲介返信パック
+        schedule: 日次（本日分・夕方等）
+        drive_target: re
+        paste: config/grok_realestate_bucho_grok_paste.md
+      - id: s1
+        code: S1
+        name: 物件調査
+        kind: specialist
+        work: 物件調査・問合せ文案・本日分ゲート
+        schedule: Daily／依頼時
+        drive_target: re
+        paste: config/grok_property_bot_grok_paste.md
+      - id: s2
+        code: S2
+        name: 物件業者開拓
+        kind: specialist
+        work: 仲介・業者開拓文案
+        schedule: フォロー時
+        drive_target: re
+        paste: config/grok_vendor_outreach_bot_grok_paste.md
+      - id: s3
+        code: S3
+        name: 需給三次判断
+        kind: specialist
+        work: 需給三次判断
+        schedule: 仲介返信パック等
+        drive_target: re
+        paste: config/grok_supply_bot_grok_paste.md
+      - id: s4
+        code: S4
+        name: 修繕業者開拓
+        kind: specialist
+        work: 修繕業者開拓
+        schedule: フォロー時
+        drive_target: re
+        paste: config/grok_repair_vendor_bot_grok_paste.md
+      - id: s5
+        code: S5
+        name: ペルソナ二次判断
+        kind: specialist
+        work: ペルソナ二次判断
+        schedule: 仲介返信パック等
+        drive_target: re
+        paste: config/grok_persona_bot_grok_paste.md
+      - id: s6
+        code: S6
+        name: 買付交渉
+        kind: specialist
+        work: 買付交渉論点
+        schedule: 案件時
+        drive_target: re
+        paste: config/grok_deal_negotiation_bot_grok_paste.md
+      - id: s7
+        code: S7
+        name: 融資相談
+        kind: specialist
+        work: 融資打診論点
+        schedule: 依頼時
+        drive_target: re
+        paste: config/grok_loan_bot_grok_paste.md
+      - id: s8
+        code: S8
+        name: 物件ライフライン
+        kind: specialist
+        work: ライフライン手続き材料
+        schedule: 購入後等
+        drive_target: re
+        paste: config/grok_property_util_bot_grok_paste.md
+      - id: s9
+        code: S9
+        name: 管理会社開拓
+        kind: specialist
+        work: 管理会社開拓
+        schedule: フォロー時
+        drive_target: re
+        paste: config/grok_mgmt_vendor_bot_grok_paste.md
+      - id: s10
+        code: S10
+        name: 周辺マップ作成職人
+        kind: specialist
+        work: 周辺MAP文案・材料
+        schedule: 購入後クリエイティブ
+        drive_target: re
+        paste: config/grok_shuhen_map_bot_paste.md
+      - id: s11
+        code: S11
+        name: マイソク職人
+        kind: specialist
+        work: マイソク文案
+        schedule: 購入後クリエイティブ
+        drive_target: re
+        paste: config/grok_maisoku_bot_grok_paste.md
+      - id: s12
+        code: S12
+        name: ウェルカムボード職人
+        kind: specialist
+        work: ウェルカムボード文案
+        schedule: 購入後クリエイティブ
+        drive_target: re
+        paste: config/grok_welcome_board_bot_grok_paste.md
+      - id: s13
+        code: S13
+        name: 神コンセプト命名
+        kind: specialist
+        work: 神コンセプト命名
+        schedule: 購入後クリエイティブ
+        drive_target: re
+        paste: config/grok_kamiconcept_bot_grok_paste.md
+
+  - id: resource
+    name: リソース経営
+    channel: リソース経営チーム
+    exec_level: 中（論点・制約）
+    bots:
+      - id: resource
+        code: Resource
+        name: リソース経営部長
+        kind: manager
+        work: brush-up・MQ・税務論点・今月のリソース制約
+        schedule: 月次／逼迫時
+        drive_target: resource
+        paste: config/grok_resource_keiei_bucho_grok_paste.md
+
+  - id: family
+    name: 家族コーチ
+    channel: 家族コーチングチーム
+    exec_level: 中（助言・委譲）
+    bots:
+      - id: family
+        code: Family
+        name: 家族コーチ統括
+        kind: manager
+        work: Journal／家族会議読取・振り分け・週次評価
+        schedule: 日曜 21:00 週次
+        drive_target: family
+        paste: config/grok_family_manager_grok_paste.md
+      - id: madoka
+        code: —
+        name: まどかコーチ
+        kind: coach
+        work: まどか専属コーチング
+        schedule: 統括経由
+        drive_target: family
+        paste: config/grok_madoka_coach_grok_paste.md
+      - id: tamaki
+        code: —
+        name: たまきコーチ
+        kind: coach
+        work: たまき専属コーチング
+        schedule: 統括経由
+        drive_target: family
+        paste: config/grok_tamaki_coach_grok_paste.md
+      - id: sawa
+        code: —
+        name: さわコーチ
+        kind: coach
+        work: さわ専属コーチング
+        schedule: 統括経由
+        drive_target: family
+        paste: config/grok_sawa_coach_grok_paste.md
+      - id: chikage
+        code: —
+        name: ちかげアドバイザー
+        kind: advisor
+        work: 配偶者・夫婦コミュニケーション
+        schedule: 統括経由
+        drive_target: family
+        paste: config/grok_chikage_advisor_grok_paste.md
+      - id: karate
+        code: —
+        name: 空手アドバイザー
+        kind: advisor
+        work: 空手・遊愛会・Journal
+        schedule: 統括経由
+        drive_target: family
+        paste: config/grok_karate_advisor_grok_paste.md
+
+  - id: app_dev
+    name: アプリ開発
+    channel: アプリ開発チーム · 参謀室
+    exec_level: 低（提案まで）
+    bots:
+      - id: app_dev
+        code: App
+        name: アプリ開発統括
+        kind: manager
+        work: 週次点検・怪しさ・壁打ち（コード実装はJarvis）
+        schedule: 週次
+        drive_target: app_dev
+        paste: config/grok_app_dev_manager_grok_paste.md
+
+  - id: somu
+    name: 総務計画
+    channel: コーチ ch · アドバイザー ch
+    exec_level: 中
+    bots:
+      - id: somu
+        code: Somu
+        name: 総務計画T統括
+        kind: manager
+        work: 分身・振り分け・宇製造リソース実務・標準学習
+        schedule: 週次まとめ
+        drive_target: somu
+        paste: config/grok_somu_keikaku_manager_grok_paste.md
+      - id: isozaki
+        code: —
+        name: 磯崎コーチ
+        kind: coach
+        work: 磯崎向けコーチング
+        schedule: 統括経由
+        drive_target: somu
+        paste: config/grok_isozaki_coach_grok_paste.md
+      - id: tanaka
+        code: —
+        name: 田中コーチ
+        kind: coach
+        work: 田中（安全担当・安全DX）
+        schedule: 統括経由
+        drive_target: somu
+        paste: config/grok_tanaka_coach_grok_paste.md
+      - id: yamashita
+        code: —
+        name: 山下コーチ
+        kind: coach
+        work: 山下向けコーチング
+        schedule: 統括経由
+        drive_target: somu
+        paste: config/grok_yamashita_coach_grok_paste.md
+      - id: kawabata
+        code: —
+        name: 川畑コーチ
+        kind: coach
+        work: 川畑向けコーチング
+        schedule: 統括経由
+        drive_target: somu
+        paste: config/grok_kawabata_coach_grok_paste.md
+      - id: shinji
+        code: —
+        name: 慎二コーチ
+        kind: coach
+        work: 太田慎二（DX直属）
+        schedule: 統括経由
+        drive_target: somu
+        paste: config/grok_shinji_coach_grok_paste.md
+      - id: nakajima
+        code: —
+        name: 中島アドバイザー
+        kind: advisor
+        work: 中島新（企画・遠隔地）
+        schedule: アドバイザー ch
+        drive_target: somu
+        paste: config/grok_nakajima_advisor_grok_paste.md
+      - id: ota_akitsugu
+        code: —
+        name: 太田アドバイザー
+        kind: advisor
+        work: 太田章嗣（リソース司令塔）
+        schedule: アドバイザー ch
+        drive_target: somu
+        paste: config/grok_ota_akitsugu_advisor_grok_paste.md
+      - id: imai
+        code: —
+        name: 今井部長アドバイザー
+        kind: advisor
+        work: 今井部長（報告・部方針）
+        schedule: アドバイザー ch
+        drive_target: somu
+        paste: config/grok_imai_bucho_advisor_grok_paste.md
+      - id: ohara
+        code: —
+        name: 大原次長アドバイザー
+        kind: advisor
+        work: 大原次長（調整・資料）
+        schedule: アドバイザー ch
+        drive_target: somu
+        paste: config/grok_ohara_jicho_advisor_grok_paste.md
+      - id: hachiya
+        code: —
+        name: 蜂谷課長アドバイザー
+        kind: advisor
+        work: 蜂谷課長（課長層展開）
+        schedule: アドバイザー ch
+        drive_target: somu
+        paste: config/grok_hachiya_kacho_advisor_grok_paste.md
+
+  - id: partner_dx
+    name: パートナーDX
+    channel: パートナーDXコーチングチーム
+    exec_level: 中
+    bots:
+      - id: partner_dx
+        code: PDX
+        name: パートナーDX統括
+        kind: manager
+        work: パートナーDX振り分け・入口
+        schedule: 依頼時
+        drive_target: partner_dx
+        paste: config/grok_partner_dx_manager_grok_paste.md
+      - id: shift_ai
+        code: —
+        name: シフトAIアドバイザー
+        kind: advisor
+        work: Shift AI 向け
+        schedule: 統括経由
+        drive_target: partner_dx
+        paste: config/grok_shift_ai_advisor_grok_paste.md
+      - id: world_intec
+        code: —
+        name: ワールドインテックアドバイザー
+        kind: advisor
+        work: ワールドインテック向け
+        schedule: 統括経由
+        drive_target: partner_dx
+        paste: config/grok_world_intec_advisor_grok_paste.md
+
+  - id: weather
+    name: 天気
+    channel: 天気お知らせ
+    exec_level: 低（定型）
+    bots:
+      - id: weather
+        code: Weather
+        name: 天気お知らせ
+        kind: utility
+        work: 朝の天気 ch 直投（ホーク傘下）
+        schedule: 毎日 6:30
+        drive_target: weather
+        paste: config/grok_weather_bot_grok_paste.md

@@ -3,6 +3,7 @@
 
 正本: docs/AIエージェントチーム/agents_registry.yaml の status
 ルール: docs/AIエージェントチーム/22_運用状態の識別_20261011.md
+Grok: config/grok_bots_registry.yaml（組織・社員・対応表）
 
 社員フォルダ作成・status 変更のあと必ず実行（Drive 写しも任意で可）。
 ダッシュ投影: apps/jarvis-dashboard/data/agentTeam.json（commit/push で本番反映）
@@ -22,6 +23,7 @@ import yaml
 REPO = Path(__file__).resolve().parents[1]
 HUB = REPO / "docs" / "AIエージェントチーム"
 REG = HUB / "agents_registry.yaml"
+GROK_REG = REPO / "config" / "grok_bots_registry.yaml"
 DASH_JSON = REPO / "apps" / "jarvis-dashboard" / "data" / "agentTeam.json"
 DRIVE_HUB = (
     Path.home()
@@ -207,12 +209,125 @@ def _extract_flow_summary(flow_md: Path) -> str:
     return ""
 
 
+def load_grok_registry() -> dict:
+    if not GROK_REG.is_file():
+        return {}
+    return yaml.safe_load(GROK_REG.read_text(encoding="utf-8")) or {}
+
+
+def build_grok_payload(agents_reg: dict, grok_reg: dict) -> dict:
+    """Grok 組織・一覧・AIチーム対応表をダッシュ用に組み立てる."""
+    if not grok_reg:
+        return {
+            "updated": "",
+            "pillars": [],
+            "departments": [],
+            "bots": [],
+            "mappings": [],
+            "note": "config/grok_bots_registry.yaml がありません",
+        }
+
+    bot_by_id: dict[str, dict] = {}
+    dept_out = []
+    bots_out = []
+    for dept in grok_reg.get("departments") or []:
+        did = str(dept.get("id") or "")
+        dname = dept.get("name") or ""
+        bot_ids = []
+        for b in dept.get("bots") or []:
+            bid = str(b.get("id") or "")
+            if not bid:
+                continue
+            row = {
+                "id": bid,
+                "code": b.get("code") or "",
+                "name": b.get("name") or "",
+                "kind": b.get("kind") or "",
+                "work": b.get("work") or "",
+                "schedule": b.get("schedule") or "",
+                "drive_target": b.get("drive_target") or "",
+                "paste": b.get("paste") or "",
+                "department_id": did,
+                "department_name": dname,
+                "channel": dept.get("channel") or "",
+                "exec_level": dept.get("exec_level") or "",
+            }
+            bot_by_id[bid] = row
+            bots_out.append(row)
+            bot_ids.append(bid)
+        dept_out.append(
+            {
+                "id": did,
+                "name": dname,
+                "channel": dept.get("channel") or "",
+                "exec_level": dept.get("exec_level") or "",
+                "bot_ids": bot_ids,
+                "bot_count": len(bot_ids),
+            }
+        )
+
+    aliases: dict[str, list[str]] = grok_reg.get("counterpart_aliases") or {}
+    role_splits: dict[str, str] = {
+        str(k): str(v) for k, v in (grok_reg.get("role_splits") or {}).items()
+    }
+    agents = agents_reg.get("agents") or {}
+    mappings = []
+    for aid, a in sorted(agents.items(), key=lambda x: str(x[0])):
+        kind = (a.get("mixup_kind") or "").strip()
+        cp = (a.get("grok_counterpart") or "").strip()
+        tag = (a.get("builder_tag") or "").strip()
+        if not kind and not cp and not tag:
+            continue
+        if kind == "none":
+            continue
+        grok_ids: list[str] = []
+        if kind == "lane":
+            grok_ids = []
+        elif cp:
+            grok_ids = [str(x) for x in (aliases.get(cp) or [cp])]
+        grok_names = []
+        for gid in grok_ids:
+            gb = bot_by_id.get(gid)
+            if gb:
+                label = gb.get("code") or gid
+                grok_names.append(f"{label} {gb.get('name') or ''}".strip())
+            else:
+                grok_names.append(gid)
+        mappings.append(
+            {
+                "agent_id": str(aid),
+                "agent_name": a.get("name") or "",
+                "builder_tag": tag,
+                "mixup_kind": kind or ("mac_twin" if cp else ""),
+                "grok_counterpart": cp,
+                "grok_ids": grok_ids,
+                "grok_labels": grok_names,
+                "role_split": role_splits.get(str(aid), a.get("note") or ""),
+            }
+        )
+
+    return {
+        "updated": grok_reg.get("updated") or "",
+        "index_doc": grok_reg.get("index_doc") or "",
+        "mixup_doc": grok_reg.get("mixup_doc") or "",
+        "pillars": grok_reg.get("pillars") or [],
+        "departments": dept_out,
+        "bots": bots_out,
+        "mappings": mappings,
+        "note": (
+            "Grokは整理・文案・委譲。Mac実行・対外送信はJarvis。"
+            "〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
+        ),
+    }
+
+
 def write_dashboard_json(data: dict, dry: bool) -> Path:
     """registry → jarvis-dashboard 投影 JSON."""
     depts = data.get("departments") or {}
     agents = data.get("agents") or {}
     builder = data.get("builder_source") or {}
     now = datetime.now(JST).isoformat(timespec="seconds")
+    grok_payload = build_grok_payload(data, load_grok_registry())
 
     dept_list = []
     for did, dept in sorted(depts.items(), key=lambda x: str(x[0])):
@@ -290,16 +405,23 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
         "counts": counts,
         "departments": dept_list,
         "agents": agent_list,
+        "grok": grok_payload,
     }
     if dry:
-        print(f"  dashboard JSON (dry): {len(agent_list)} agents → {DASH_JSON}")
+        print(
+            f"  dashboard JSON (dry): {len(agent_list)} agents / "
+            f"{len(grok_payload.get('bots') or [])} grok bots → {DASH_JSON}"
+        )
         return DASH_JSON
     DASH_JSON.parent.mkdir(parents=True, exist_ok=True)
     DASH_JSON.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"  dashboard: {DASH_JSON.relative_to(REPO)} ({len(agent_list)} agents)")
+    print(
+        f"  dashboard: {DASH_JSON.relative_to(REPO)} "
+        f"({len(agent_list)} agents / {len(grok_payload.get('bots') or [])} grok)"
+    )
     return DASH_JSON
 
 

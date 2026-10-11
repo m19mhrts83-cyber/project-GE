@@ -40,17 +40,20 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 
 | 場所 | 用途 |
 |---|---|
-| Jarvis `/agent-team` | 作成状況（表・組織図・status）。確認用 |
+| Jarvis `/agent-team` | AIチーム状況＋**Grok Bot 組織／一覧／対応表**（タブ）。確認用 |
 | Cursor インブラウザの FlowForge | 作業フローの作り込み・拡大・要素詳細 |
 | FlowForge ログイン | **m19m**（ダッシュの admin ログインとは別） |
 
 埋め込み不可（FlowForge `X-Frame-Options: DENY`）。深リンクで別タブ／インブラウザを開く。
+
+Grok 組織の正本は `config/grok_bots_registry.yaml`（索引 `config/grok_org_handoff_index.md`・対応 `16_GrokBot対応…`）。sync が `agentTeam.json` の `grok` 節へ投影する。
 
 ## 正本
 
 - ルール詳細: `docs/AIエージェントチーム/22_運用状態の識別_20261011.md`
 - 全ツール共通: `docs/AIエージェントチーム/CLAUDE.md`（AGENTS.md は互換入口）
 - ダッシュ投影: `apps/jarvis-dashboard/data/agentTeam.json`
+- Grok 社員: `config/grok_bots_registry.yaml`
 
 ## やらないこと
 
