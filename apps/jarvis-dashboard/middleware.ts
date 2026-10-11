@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request });
   }
   // 物件進行ゲート Yes/No（PROPERTY_GATE_ACTION_TOKEN / Slack Signing で保護。ログイン不要）
-  if (path === "/api/slack/consult-action") {
+  if (path === "/api/slack/consult-action" || path.startsWith("/api/g/")) {
     return NextResponse.next({ request });
   }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");

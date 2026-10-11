@@ -87,7 +87,7 @@ def process_deal(
         "inquiry_action": lane.get("inquiry_action"),
         "inquiry_status": lane.get("inquiry_status"),
     }
-    if already_gated(st, deal_id, lane["lane"]) and not force:
+    if already_gated(st, deal_id, lane["lane"], deal=deal) and not force:
         out["skipped"] = "already_gated"
         return out
 
@@ -100,10 +100,15 @@ def process_deal(
                 mark_deal_state(
                     st,
                     deal_id,
+                    deal=deal,
                     lane="B",
                     b_card_posted_at=now_iso(),
                     reason=lane.get("reason"),
                 )
+                # 並列実行の再掲防止: 1件ごとに state を即保存
+                from jarvis_property_gate_lib import save_state
+
+                save_state(st)
         else:
             out["preview"] = text
         return out
@@ -126,10 +131,14 @@ def process_deal(
             mark_deal_state(
                 st,
                 deal_id,
+                deal=deal,
                 lane="A",
                 a_done_at=now_iso(),
                 reason=lane.get("reason"),
             )
+            from jarvis_property_gate_lib import save_state
+
+            save_state(st)
         return out
 
     # C — digest later
@@ -225,6 +234,7 @@ def main() -> int:
                     mark_deal_state(
                         st,
                         str(deal["id"]),
+                        deal=deal,
                         lane="C",
                         c_digested_at=now_iso(),
                         reason=lane.get("reason"),

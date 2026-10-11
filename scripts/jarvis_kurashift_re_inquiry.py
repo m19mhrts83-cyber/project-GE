@@ -352,10 +352,14 @@ def build_preview(deal: dict[str, Any], *, to_email: str | None = None) -> dict[
             "channel_reason": classified["reason"],
         }
 
-    # grok_handoff
+    # listing_web / grok_handoff: 仲介メールが無いので handoff 先へ依頼メール
+    # （classified["to"] が掲載URLのままだと Gmail 送信が落ちる）
+    from jarvis_kurashift_re_inquiry_channel import handoff_to
+
+    handoff_addr = handoff_to()
     return {
         "deal_id": deal["id"],
-        "to": classified["to"],
+        "to": handoff_addr,
         "subject": build_grok_handoff_subject(title, max_len),
         "body": build_grok_handoff_body(
             deal, inquiry_subject=agent_subject, inquiry_body=agent_body
@@ -366,6 +370,7 @@ def build_preview(deal: dict[str, Any], *, to_email: str | None = None) -> dict[
         "land_method_bairitsu": bairitsu,
         "inquiry_channel": "grok_handoff",
         "channel_reason": classified["reason"],
+        "listing_url": classified["to"] if channel == "listing_web" else "",
     }
 
 
@@ -404,8 +409,18 @@ def send_inquiry(
     body = (body or prev["body"]).strip()
     if not handoff and is_land_method_bairitsu(grok_land_method(deal)):
         body = append_bairitsu_block(body, load_template())
+    # listing_web 等で To が URL のまま来たら handoff 先へ差し替え
+    if to_email and "@" not in to_email and (
+        handoff or (prev.get("inquiry_channel") == "grok_handoff")
+    ):
+        from jarvis_kurashift_re_inquiry_channel import handoff_to as _handoff_to
+
+        to_email = _handoff_to()
+        handoff = True
     if not to_email or "@" not in to_email:
-        return {"ok": False, "error": "to email required"}
+        out = {"ok": False, "error": "to email required", "deal_id": deal_id, "to": to_email}
+        print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+        return out
     if not handoff and channel_is_self(to_email):
         out = {
             "ok": False,
