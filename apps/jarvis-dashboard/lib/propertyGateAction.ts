@@ -93,6 +93,8 @@ type DealRow = {
   id: string;
   title?: string | null;
   price_man?: number | null;
+  yield_pct?: number | null;
+  structure?: string | null;
   match_score?: number | null;
   area?: string | null;
   summary_json?: Record<string, unknown> | null;
@@ -165,29 +167,98 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
     return Number.isFinite(n) ? n : null;
   };
   const priceMan = num(price);
-  const landValMan = num(pick("land_appraisal_man"));
-  const ratioNum = num(pick("land100_ratio", "land_ratio", "land100"));
-  const landRatioPct =
-    landValMan != null && priceMan
-      ? Math.round((landValMan / priceMan) * 100)
-      : ratioNum == null
-        ? null
-        : Math.round(ratioNum < 10 ? ratioNum * 100 : ratioNum);
-  const landValDerived =
-    landValMan ??
-    (landRatioPct != null && priceMan ? (landRatioPct / 100) * priceMan : null);
+  const appraisalRaw = pick("land_appraisal_man");
+  const ratioRaw = pick("land100_ratio", "land_ratio", "land100");
+  // 複数シナリオ「1,494（91E）／1,805（110E）」をそのまま見せる
   const landValText =
-    landValDerived != null
-      ? `約${Math.round(landValDerived).toLocaleString()}万`
-      : "—";
+    appraisalRaw !== "—"
+      ? appraisalRaw
+      : (() => {
+          const landValMan = num(appraisalRaw);
+          const ratioNum = num(ratioRaw);
+          const landRatioPct =
+            landValMan != null && priceMan
+              ? Math.round((landValMan / priceMan) * 100)
+              : ratioNum == null
+                ? null
+                : Math.round(ratioNum < 10 ? ratioNum * 100 : ratioNum);
+          const landValDerived =
+            landValMan ??
+            (landRatioPct != null && priceMan
+              ? (landRatioPct / 100) * priceMan
+              : null);
+          return landValDerived != null
+            ? `約${Math.round(landValDerived).toLocaleString()}万`
+            : "—";
+        })();
   const landRatioText =
-    landRatioPct != null ? `${landRatioPct}%（＝土地値÷価格）` : "—";
+    ratioRaw !== "—"
+      ? `${ratioRaw}（＝土地値÷価格）`
+      : (() => {
+          const landValMan = num(appraisalRaw);
+          const ratioNum = num(ratioRaw);
+          const landRatioPct =
+            landValMan != null && priceMan
+              ? Math.round((landValMan / priceMan) * 100)
+              : ratioNum == null
+                ? null
+                : Math.round(ratioNum < 10 ? ratioNum * 100 : ratioNum);
+          return landRatioPct != null
+            ? `${landRatioPct}%（＝土地値÷価格）`
+            : "—";
+        })();
+
+  const isAp = /AP|アパート|一棟|マンション|収益/i.test(
+    `${deal.structure || ""} ${deal.title || ""}`,
+  );
+  const landThreshold = isAp ? 150 : 100;
+  const landPrimary = num(landRatioText);
+  // land100_ratio が「1.87」倍率表記のとき % に直す
+  const landPrimaryPct =
+    landPrimary == null
+      ? null
+      : landPrimary < 10
+        ? Math.round(landPrimary * 100)
+        : Math.round(landPrimary);
+  let landVerdict = "材料不足";
+  if (landPrimaryPct != null) {
+    if (landPrimaryPct >= landThreshold) {
+      landVerdict = `クリア（${landPrimaryPct}% ≥ ${landThreshold}%）→ 積算で価格を説明しやすい`;
+    } else if (landPrimaryPct >= landThreshold * 0.85) {
+      landVerdict = `惜しい（${landPrimaryPct}%／基準${landThreshold}%）→ 交渉・補正で届くか`;
+    } else {
+      landVerdict = `未達（${landPrimaryPct}% ＜ ${landThreshold}%）→ 土地値だけでは弱い`;
+    }
+  }
+
+  const yRaw = deal.yield_pct;
+  let yPct: number | null = null;
+  if (yRaw != null && Number.isFinite(Number(yRaw))) {
+    const n = Number(yRaw);
+    yPct = n < 1.5 ? n * 100 : n;
+  }
+  const yGate = isAp ? 8 : 10;
+  let yVerdict = "材料不足（賃料・表面利回りが無い）";
+  let yText = "—";
+  if (yPct != null) {
+    yText = `${Number(yPct.toFixed(2))}%`;
+    if (yPct >= yGate) {
+      yVerdict = `クリア（${yPct.toFixed(1)}% ≥ ${yGate}%）→ 利回り条件は通過`;
+    } else if (yPct >= yGate - 1.5) {
+      yVerdict = `惜しい（${yPct.toFixed(1)}%／基準${yGate}%）→ 賃料・価格交渉で届くか`;
+    } else {
+      yVerdict = `未達（${yPct.toFixed(1)}% ＜ ${yGate}%）→ 利回り単体では弱い`;
+    }
+  }
 
   const rows: [string, string][] = [
     ["所在", loc],
     ["価格", price],
     ["土地値", landValText],
     ["土地値率", landRatioText],
+    ["土地値の判定", landVerdict],
+    ["表面利回り", yText],
+    ["利回りの判定", yVerdict],
     ["土地", pick("land_area")],
     ["路線価手法", pick("land_method")],
     ["建物", pick("building")],
@@ -231,6 +302,9 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
         .join("\n")
     : `<li class="note">履歴はまだありません。</li>`;
 
+  const landKind = isAp ? "AP（目安150%前後）" : "戸建（目安100%超）";
+  const yKind = isAp ? "AP（聞くゲート≥8%）" : "戸建（聞くゲート≥10%）";
+
   return `<!doctype html><html lang="ja"><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>判断材料 — ${title}</title>
@@ -250,6 +324,12 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
   .note{margin-top:1rem;font-size:.8rem;color:#64748b}
   .who{background:#f1f5f9;border-radius:8px;padding:.75rem .9rem;margin:0 0 1rem;font-size:.82rem;line-height:1.55;color:#334155}
   .who strong{color:#0f172a}
+  .axis{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:0 0 1rem}
+  .axis .card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:.65rem .75rem;font-size:.82rem;line-height:1.45}
+  .axis .lab{font-size:.72rem;color:#64748b;font-weight:600;margin-bottom:.2rem}
+  .axis .val{font-weight:700;font-size:.95rem}
+  .axis .vd{margin-top:.25rem;color:#334155}
+  @media (max-width:420px){.axis{grid-template-columns:1fr}}
   ul.ev{list-style:none;margin:0;padding:0;font-size:.85rem}
   ul.ev li{padding:.35rem 0;border-bottom:1px solid #f1f5f9;line-height:1.5}
   ul.ev .t{color:#64748b;font-variant-numeric:tabular-nums;margin-right:.35rem}
@@ -261,6 +341,18 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
   Grok Bot のチャットでも、Cursor 本人でもありません。
 </div>
 <h1>${title}</h1>
+<div class="axis">
+  <div class="card">
+    <div class="lab">土地値の評価（${esc(landKind)}）</div>
+    <div class="val">${esc(landPrimaryPct != null ? `${landPrimaryPct}%` : landRatioText === "—" ? "率未記載" : landRatioText.split("（")[0])}</div>
+    <div class="vd">${esc(landVerdict)}</div>
+  </div>
+  <div class="card">
+    <div class="lab">利回りの評価（${esc(yKind)}）</div>
+    <div class="val">${esc(yText === "—" ? "未記載" : yText)}</div>
+    <div class="vd">${esc(yVerdict)}</div>
+  </div>
+</div>
 <table><tbody>${tr}</tbody></table>
 <div class="actions">
   <a class="yes" href="${yes}">問合せする（Yes）</a>
@@ -279,7 +371,7 @@ export async function fetchDealForJudgment(
   if (!sb) return null;
   const { data, error } = await sb
     .from("kurashift_re_deals")
-    .select("id, title, price_man, match_score, area, summary_json")
+    .select("id, title, price_man, yield_pct, structure, match_score, area, summary_json")
     .eq("id", dealId)
     .maybeSingle();
   if (error || !data) return null;
