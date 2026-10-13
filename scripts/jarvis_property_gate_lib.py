@@ -808,12 +808,7 @@ def format_judgment_card(
         if label in d and d[label] != "—":
             prop.append(f"• {label}：{d[label]}")
 
-    risk = ["*■ リスク（足切り）*"]
-    if "ハザード総合" in d:
-        risk.append(f"• ハザード総合：{d['ハザード総合']}")
-    indiv = [f"{k}={d[k]}" for k in ("洪水", "高潮", "急傾斜", "内水") if k in d]
-    if indiv:
-        risk.append("• 個別：" + "・".join(indiv))
+    risk = hazard_eval_lines(deal, d)
 
     tail = ["*■ 判定材料*"]
     tail += [f"• {k}：{d[k]}" for k in ("聞く/保留", "問合せ経路", "score") if k in d]
@@ -826,6 +821,107 @@ def format_judgment_card(
         if i:
             lines.append("")
         lines += sec
+    return lines
+
+
+def hazard_eval_lines(
+    deal: dict[str, Any], row_map: dict[str, str] | None = None
+) -> list[str]:
+    """ハザード節。未調査／部分／完了をステータスで明示（—だけの羅列を避ける）。"""
+    g = grok_of(deal)
+    sj = sj_of(deal)
+    d = row_map or {}
+
+    def _v(*keys: str) -> str:
+        for k in keys:
+            if k in d and d[k] not in ("", "—", "None"):
+                return d[k]
+        for k in keys:
+            for src in (g, sj):
+                v = src.get(k)
+                if v not in (None, "", "—"):
+                    return str(v).strip()
+        return ""
+
+    # judgment_rows ラベル ↔ grok キー
+    eval_s = _v("ハザード総合", "hazard_eval")
+    flood = _v("洪水", "hazard_flood")
+    storm = _v("高潮", "hazard_storm_surge")
+    slide = _v("急傾斜", "hazard_landslide")
+    inland = _v("内水", "hazard_inland")
+    survey = _v("hazard_survey_url")
+    basis = _v("hazard_basis_url")
+    parts = [x for x in (flood, storm, slide, inland) if x]
+    lines = ["*■ ハザード（足切り・先に確認）*"]
+
+    if eval_s:
+        status = f"調査済（総合={eval_s}）"
+        if eval_s.upper() == "OK" or eval_s == "問題なし":
+            status += " → ハザード足切りは通過"
+        elif "除外" in eval_s:
+            status += " → 原則見送り候補"
+        elif "注意" in eval_s or "要確認" in eval_s:
+            status += " → 番地確定後に再確認推奨"
+        lines.append(f"• ステータス：{status}")
+        lines.append(f"• 総合：{eval_s}")
+        if parts:
+            lines.append(
+                "• 個別："
+                + "・".join(
+                    f"{lab}={val}"
+                    for lab, val in (
+                        ("洪水", flood),
+                        ("高潮", storm),
+                        ("急傾斜", slide),
+                        ("内水", inland),
+                    )
+                    if val
+                )
+            )
+    elif parts:
+        lines.append(
+            "• ステータス：部分のみ（総合判定なし。個別項目だけ取込済み）"
+        )
+        lines.append(
+            "• 個別："
+            + "・".join(
+                f"{lab}={val}"
+                for lab, val in (
+                    ("洪水", flood),
+                    ("高潮", storm),
+                    ("急傾斜", slide),
+                    ("内水", inland),
+                )
+                if val
+            )
+        )
+        lines.append("• 次：総合評価（OK/注意/除外）がレポートに無い → 番地確定後に再調査")
+    else:
+        # 土地等はあるがハザードが空＝レポートに節が無かった／取込漏れ
+        has_land = bool(
+            g.get("land_appraisal_man")
+            or g.get("land100_ratio")
+            or sj.get("land_appraisal_man")
+        )
+        if has_land:
+            lines.append(
+                "• ステータス：*未着*（土地値はあるが、Grok調査にハザード項目が無い）"
+            )
+            lines.append(
+                "• 意味：調べて「なし」ではなく、*レポート未記載／取込漏れ*の可能性"
+            )
+        else:
+            lines.append("• ステータス：*未調査*（ハザード材料そのものが無い）")
+        lines.append(
+            "• 方針：基本はハザードを先に確認。Yes前に重ねるハザードマップ再確認を推奨"
+        )
+        lines.append(
+            "• 参照：https://disaportal.gsi.go.jp/maps/"
+        )
+    if survey:
+        lines.append(f"• 調査URL：{survey[:90]}")
+    if basis and basis != survey:
+        lines.append(f"• 根拠URL：{basis[:90]}")
     return lines
 
 
@@ -847,6 +943,13 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
     est_rng, _, _ = _yield_estimate(deal)
     y_all = f"表面 {y_s}" + (f" ／ 想定 {est_rng}" if est_rng else "")
     land_s = rb or "未記載"
+    # ハザード一行サマリ
+    haz_lines = hazard_eval_lines(deal)
+    haz_status = "—"
+    for ln in haz_lines:
+        if ln.startswith("• ステータス："):
+            haz_status = ln.replace("• ステータス：", "").strip()
+            break
     lines = [
         "【AIチーム・114】物件一次判定 — 要あなたの判断",
         "調査=Grok S1 → 振分=114 → Yes後=511 ／ ※BotチャットでもCursorでもない",
@@ -854,12 +957,16 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
         f"*{title_disp}*",
         f"理由：{lane.get('reason')} ・ listen={lane.get('listen') or '—'}",
         f"*判断軸*　土地値率 {land_s} ／ 利回り {y_all}",
+        f"*ハザード*　{haz_status}",
         "",
         *format_judgment_card(deal, rows),
         "",
-        "*■ 判断（Yes＝この内容で第一問合せを了承）*",
+        "*■ 判断（押し間違え防止のため、間を空けています）*",
+        "",
         f"✅ <{action_url(deal_id, 'yes')}|問合せする（Yes）>",
+        "",
         f"🚫 <{action_url(deal_id, 'no')}|見送り（No）>",
+        "",
         f"🔎 <{deal_url(deal_id)}|表で全部見る（ログイン不要・推奨）>",
         "",
         "（このスレに `Yes` / `No` と返信でもOK）",

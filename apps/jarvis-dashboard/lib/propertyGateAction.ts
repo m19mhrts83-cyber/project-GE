@@ -288,15 +288,36 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
     ["土地", pick("land_area")],
     ["路線価手法", pick("land_method")],
     ["建物", pick("building")],
-    ["ハザード総合", pick("hazard_eval")],
-    ["洪水", pick("hazard_flood")],
-    ["高潮", pick("hazard_storm_surge")],
-    ["急傾斜", pick("hazard_landslide")],
-    ["内水", pick("hazard_inland")],
     ["聞く/保留", pick("listen_value")],
     ["問合せ経路", pick("inquiry_action")],
     ["score", deal.match_score != null ? String(deal.match_score) : "—"],
   ];
+  const hazEval = pick("hazard_eval");
+  const hazParts: [string, string][] = [
+    ["洪水", pick("hazard_flood")],
+    ["高潮", pick("hazard_storm_surge")],
+    ["急傾斜", pick("hazard_landslide")],
+    ["内水", pick("hazard_inland")],
+  ];
+  const hazFilled = hazParts.filter(([, v]) => v && v !== "—");
+  const hasLand =
+    pick("land_appraisal_man") !== "—" || pick("land100_ratio") !== "—";
+  let hazStatus = "未調査";
+  if (hazEval !== "—") {
+    hazStatus = `調査済（総合=${hazEval}）`;
+  } else if (hazFilled.length) {
+    hazStatus = "部分のみ（総合判定なし）";
+  } else if (hasLand) {
+    hazStatus =
+      "未着（土地値はあるがGrok調査にハザード項目なし＝調べて無しではなく未記載／取込漏れの可能性）";
+  }
+  rows.splice(
+    8,
+    0,
+    ["ハザード状態", hazStatus],
+    ["ハザード総合", hazEval],
+    ...hazFilled,
+  );
   if (url && url !== "—") rows.push(["掲載URL", url]);
 
   const tr = rows
@@ -343,10 +364,11 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
   th,td{border-bottom:1px solid #e2e8f0;padding:.55rem .4rem;vertical-align:top;text-align:left}
   th{width:7.5rem;color:#64748b;font-weight:600;white-space:nowrap}
   td{word-break:break-word}
-  .actions{display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap}
-  .actions a{display:inline-block;padding:.7rem 1.1rem;border-radius:8px;text-decoration:none;font-weight:600;font-size:.95rem}
+  .actions{display:flex;flex-direction:column;gap:1.1rem;margin-top:1.25rem;align-items:stretch}
+  .actions a{display:block;padding:.85rem 1.1rem;border-radius:8px;text-decoration:none;font-weight:600;font-size:.95rem;text-align:center}
   .yes{background:#059669;color:#fff}
   .no{background:#e2e8f0;color:#334155}
+  .detail{background:#fff;color:#334155;border:1px solid #cbd5e1}
   .note{margin-top:1rem;font-size:.8rem;color:#64748b}
   .who{background:#f1f5f9;border-radius:8px;padding:.75rem .9rem;margin:0 0 1rem;font-size:.82rem;line-height:1.55;color:#334155}
   .who strong{color:#0f172a}
@@ -384,6 +406,7 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
   <a class="yes" href="${yes}">問合せする（Yes）</a>
   <a class="no" href="${no}">見送り（No）</a>
 </div>
+<p class="note">押し間違え防止のため、ボタンは縦に間を空けています。</p>
 <h2>問合せ・判断履歴</h2>
 <ul class="ev">${eventsHtml}</ul>
 <p class="note">ログイン不要の判断ページです。KURASHIFT本体の詳細画面とは別です。</p>
@@ -478,22 +501,27 @@ export async function applyGate(
     return { ok: true, message: `見送りにしました: ${title}` };
   }
 
-  // yes
-  if (
-    prevDecision === "yes" ||
-    prevDecision === "sent" ||
-    inq === "sending" ||
-    inq === "awaiting_reply" ||
-    inq === "has_reply" ||
-    alreadySent
-  ) {
-    return {
-      ok: true,
-      message: `既に進行中/送信済 (inq=${inq}): ${title}`,
-    };
+  // yes（No/passed のあともやり直し可）
+  if (prevDecision !== "no") {
+    if (
+      prevDecision === "yes" ||
+      prevDecision === "sent" ||
+      inq === "sending" ||
+      inq === "awaiting_reply" ||
+      inq === "has_reply" ||
+      alreadySent
+    ) {
+      return {
+        ok: true,
+        message: `既に進行中/送信済 (inq=${inq}): ${title}`,
+      };
+    }
   }
 
-  const idempotencyKey = `${dealId}:first_inquiry`;
+  const idempotencyKey =
+    prevDecision === "no"
+      ? `${dealId}:first_inquiry:retry_after_no`
+      : `${dealId}:first_inquiry`;
   const { data: existingJobs } = await sb
     .from("kurashift_jobs")
     .select("id, status, payload")
@@ -509,7 +537,8 @@ export async function applyGate(
         : {};
     return p.deal_id === dealId || p.idempotency_key === idempotencyKey;
   });
-  if (dup) {
+  // Noやり直し時は旧ジョブがあっても新規キューを積む
+  if (dup && prevDecision !== "no") {
     return {
       ok: true,
       message: `送信ジョブ既存 (${dup.status}): ${title}`,
@@ -522,11 +551,15 @@ export async function applyGate(
     sj.inquiry_status = "awaiting_first_inquiry";
   }
 
+  delete sj.auto_pass_reason;
   sj.inquiry_status = "sending";
   sj.property_gate = { ...prevGate, decision: "yes", at: now, source };
+  const reopen =
+    String(row.status || "") === "passed" || prevDecision === "no";
   await sb
     .from("kurashift_re_deals")
     .update({
+      ...(reopen ? { status: "info" } : {}),
       inquiry_status: "sending",
       summary_json: sj,
       updated_at: now,
