@@ -71,6 +71,7 @@ def process_deal(
     dry_run: bool,
     force: bool,
     run_a511: bool,
+    post_b: bool = True,
 ) -> dict:
     healed = heal_handoff_status(sb, deal)
     if healed:
@@ -93,8 +94,13 @@ def process_deal(
 
     if lane["lane"] == "B":
         text = format_b_card(deal, lane)
-        if post:
-            pr = post_slack("consult", text, dry_run=dry_run)
+        if post and post_b:
+            pr = post_slack(
+                "consult",
+                text,
+                dry_run=dry_run,
+                username="114 物件一次判定",
+            )
             out["slack"] = pr
             if pr.get("ok") and not dry_run:
                 mark_deal_state(
@@ -106,6 +112,21 @@ def process_deal(
                     reason=lane.get("reason"),
                 )
                 # 並列実行の再掲防止: 1件ごとに state を即保存
+                from jarvis_property_gate_lib import save_state
+
+                save_state(st)
+        elif post and not post_b:
+            # 上限で今回出せない分は「保留」として記録（リマインドが拾う）
+            out["deferred"] = True
+            if not dry_run:
+                mark_deal_state(
+                    st,
+                    deal_id,
+                    deal=deal,
+                    lane="B",
+                    b_deferred_at=now_iso(),
+                    reason=lane.get("reason"),
+                )
                 from jarvis_property_gate_lib import save_state
 
                 save_state(st)
@@ -164,6 +185,12 @@ def main() -> int:
         help="awaiting_grok 誤ラベルを awaiting_first_inquiry へ一括修復",
     )
     ap.add_argument("--limit", type=int, default=60)
+    ap.add_argument(
+        "--max-b",
+        type=int,
+        default=5,
+        help="1回で出す Bカードの上限（超過分は保留として記録し翌回へ）",
+    )
     args = ap.parse_args()
 
     if os_disabled():
@@ -196,6 +223,7 @@ def main() -> int:
 
     results: list[dict] = []
     c_pairs: list = []
+    b_posted = 0
     for deal in deals:
         r = process_deal(
             sb,
@@ -205,7 +233,10 @@ def main() -> int:
             dry_run=args.dry_run,
             force=args.force,
             run_a511=args.auto_a_send,
+            post_b=b_posted < args.max_b,
         )
+        if (r.get("slack") or {}).get("ok"):
+            b_posted += 1
         if "_c_pair" in r:
             c_pairs.append(r.pop("_c_pair"))
             r["lane"] = "C"
@@ -213,6 +244,8 @@ def main() -> int:
         extra = ""
         if r.get("skipped"):
             extra += f" skipped={r['skipped']}"
+        if r.get("deferred"):
+            extra += " deferred=1"
         if r.get("slack"):
             extra += f" slack_ok={r['slack'].get('ok')}"
         print(
@@ -255,6 +288,8 @@ def main() -> int:
                     "B": sum(1 for r in results if r.get("lane") == "B"),
                     "C": sum(1 for r in results if r.get("lane") == "C"),
                 },
+                "b_posted": b_posted,
+                "b_deferred": sum(1 for r in results if r.get("deferred")),
             },
             ensure_ascii=False,
         )
