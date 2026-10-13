@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -419,14 +420,116 @@ def judgment_rows(
     return out
 
 
-def format_judgment_card(rows: list[tuple[str, str]]) -> list[str]:
+_NUM = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
+_SCEN = re.compile(r"([\d,]+(?:\.\d+)?)\s*[（(]\s*([^）)]*)\s*[）)]")
+
+
+def _first_number(raw: Any) -> float | None:
+    m = _NUM.search(str(raw or ""))
+    if not m:
+        return None
+    try:
+        return float(m.group(0).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _area_m2(raw: Any) -> float | None:
+    """面積文字列を㎡へ。㎡表記優先、無ければ坪を㎡換算。"""
+    s = str(raw or "")
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(?:㎡|m2|平米|m²)", s)
+    if m:
+        return float(m.group(1).replace(",", ""))
+    m = re.search(r"([\d,]+(?:\.\d+)?)\s*坪", s)
+    if m:
+        return float(m.group(1).replace(",", "")) * 3.30578
+    return _first_number(s)
+
+
+def _scenarios(raw: Any) -> list[tuple[float, str]]:
+    """「参考1,494（91E）／1,805（110E）」→ [(1494.0,'91E'), (1805.0,'110E')]。"""
+    s = str(raw or "")
+    out: list[tuple[float, str]] = []
+    for num, tag in _SCEN.findall(s):
+        try:
+            out.append((float(num.replace(",", "")), tag.strip()))
+        except ValueError:
+            continue
+    if not out:
+        n = _first_number(s)
+        if n is not None:
+            out.append((n, ""))
+    return out
+
+
+def land_value_lines(deal: dict[str, Any]) -> list[str]:
+    """概要用: 土地値（相続税路線価×面積）と土地値率（＝土地値÷価格）。"""
+    g = grok_of(deal)
+    sj = sj_of(deal)
+
+    def pick(*keys: str) -> str:
+        for k in keys:
+            v = g.get(k)
+            if v in (None, ""):
+                v = sj.get(k)
+            if v not in (None, ""):
+                return str(v).strip()
+        return ""
+
+    price = _first_number(
+        deal.get("price_man")
+        if deal.get("price_man") is not None
+        else pick("price_man")
+    )
+    vals = _scenarios(pick("land_appraisal_man"))
+    if not vals:  # 相続税路線価(万円/坪) × 面積(㎡) から算出
+        rp = _first_number(pick("route_price_tsubo"))
+        area = _area_m2(pick("land_area"))
+        if rp and area:
+            vals = [(rp * area / 3.30578, "")]
+    ratios = _scenarios(pick("land100_ratio", "land_ratio", "land100"))
+    if not vals and ratios and price:  # 率しか無い時は価格×率で金額を逆算
+        vals = [
+            (price * (n / 100) if n >= 10 else price * n, t) for n, t in ratios
+        ]
+
+    value_s = "／".join(
+        f"約{v:,.0f}万" + (f"（{t}）" if t else "") for v, t in vals
+    )
+    if price and vals:
+        ratio_s = "／".join(f"{v / price * 100:.0f}%" for v, _ in vals)
+    elif ratios:
+        ratio_s = "／".join(
+            f"{n * 100:.0f}%" if n < 10 else f"{n:.0f}%" for n, _ in ratios
+        )
+    else:
+        ratio_s = ""
+
+    out: list[str] = []
+    if value_s:
+        out.append(f"• 土地値：{value_s}")
+    if ratio_s:
+        out.append(f"• 土地値率：{ratio_s}（＝土地値÷価格）")
+    return out
+
+
+def format_judgment_card(
+    deal: dict[str, Any], rows: list[tuple[str, str]]
+) -> list[str]:
     """モバイル優先の判断材料カード（等幅表を使わず、iPhone で折返しても崩れない）。"""
     d: dict[str, str] = {}
     for label, val in rows:
         d[label] = (val or "").replace("\n", " ").strip() or "—"
 
+    summary = ["*■ 概要*"]
+    if "価格" in d:
+        summary.append(f"• 価格：{d['価格']}")
+    summary += land_value_lines(deal)
+    if "所在" in d:
+        summary.append(f"• 所在：{d['所在']}")
+
     prop = ["*■ 物件*"]
-    for label in ("所在", "価格", "土地", "土地値倍率", "土地評価(万)", "路線価手法", "建物"):
+    for label in ("土地", "路線価手法", "建物"):
         if label in d:
             prop.append(f"• {label}：{d[label]}")
 
@@ -437,12 +540,12 @@ def format_judgment_card(rows: list[tuple[str, str]]) -> list[str]:
     if indiv:
         risk.append("• 個別：" + "・".join(indiv))
 
-    tail = [f"*■ 判定材料*"]
+    tail = ["*■ 判定材料*"]
     tail += [f"• {k}：{d[k]}" for k in ("聞く/保留", "問合せ経路", "score") if k in d]
     if d.get("掲載URL"):
         tail.append(f"• 掲載URL：{d['掲載URL']}")
 
-    sections = [prop, risk] + ([tail] if len(tail) > 1 else [])
+    sections = [summary, prop, risk] + ([tail] if len(tail) > 1 else [])
     lines: list[str] = []
     for i, sec in enumerate(sections):
         if i:
@@ -460,7 +563,7 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
         f"*{title}*",
         f"理由：{lane.get('reason')} ・ listen={lane.get('listen') or '—'}",
         "",
-        *format_judgment_card(rows),
+        *format_judgment_card(deal, rows),
         "",
         "*■ 判断（Yes＝この内容で第一問合せを了承）*",
         f"✅ <{action_url(deal_id, 'yes')}|問合せする（Yes）>",

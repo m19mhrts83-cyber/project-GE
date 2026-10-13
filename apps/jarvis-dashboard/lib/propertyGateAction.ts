@@ -124,12 +124,38 @@ export function judgmentDetailHtml(deal: DealRow): string {
   const url = cleanListingUrl(pick("url", "listing_url", "inquiry_url"));
   const locRaw = pick("location");
   const loc = locRaw !== "—" ? locRaw : String(deal.area || "—");
+
+  const num = (s: string): number | null => {
+    const m = String(s).match(/-?\d[\d,]*(?:\.\d+)?/);
+    if (!m) return null;
+    const n = Number(m[0].replace(/,/g, ""));
+    return Number.isFinite(n) ? n : null;
+  };
+  const priceMan = num(price);
+  const landValMan = num(pick("land_appraisal_man"));
+  const ratioNum = num(pick("land100_ratio", "land_ratio", "land100"));
+  const landRatioPct =
+    landValMan != null && priceMan
+      ? Math.round((landValMan / priceMan) * 100)
+      : ratioNum == null
+        ? null
+        : Math.round(ratioNum < 10 ? ratioNum * 100 : ratioNum);
+  const landValDerived =
+    landValMan ??
+    (landRatioPct != null && priceMan ? (landRatioPct / 100) * priceMan : null);
+  const landValText =
+    landValDerived != null
+      ? `約${Math.round(landValDerived).toLocaleString()}万`
+      : "—";
+  const landRatioText =
+    landRatioPct != null ? `${landRatioPct}%（＝土地値÷価格）` : "—";
+
   const rows: [string, string][] = [
     ["所在", loc],
     ["価格", price],
+    ["土地値", landValText],
+    ["土地値率", landRatioText],
     ["土地", pick("land_area")],
-    ["土地値倍率", pick("land100_ratio", "land100", "land_ratio")],
-    ["土地評価(万)", pick("land_appraisal_man")],
     ["路線価手法", pick("land_method")],
     ["建物", pick("building")],
     ["ハザード総合", pick("hazard_eval")],
