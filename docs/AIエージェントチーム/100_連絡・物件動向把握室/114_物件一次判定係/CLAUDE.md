@@ -15,7 +15,7 @@ ID: **114**。Grok S1 調査後の **進行ゲート（3レーン振分）**。
 
 - やること:
   - deals／`[Grok調査]` 要約からレーン **A / B / C** を振る
-  - B → Slack `#consult` カード（deal_id・見てほしい3点・Yes/No URL）
+  - B → Slack `#consult` カード（位置づけ明記・要点箇条書き・詳細HTML表・Yes/No URL。コードブロック表は使わない）
   - C → `#report` ダイジェスト（1日まとめて可）
   - A → `#report` 1行＋511／Tier へ渡す合図
   - handoff 誤ラベルを `awaiting_first_inquiry` へ heal

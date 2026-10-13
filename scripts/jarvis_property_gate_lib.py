@@ -9,10 +9,9 @@ import hashlib
 import hmac
 import json
 import os
-import re
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -420,180 +419,107 @@ def judgment_rows(
     return out
 
 
-_NUM = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
-_SCEN = re.compile(r"([\d,]+(?:\.\d+)?)\s*[（(]\s*([^）)]*)\s*[）)]")
+def _slack_short(val: str, *, limit: int = 72) -> str:
+    """モバイル1〜2行向けに短縮（建物の長い連結は先頭だけ）。"""
+    s = str(val or "").replace("\n", " ").strip()
+    if " · " in s and len(s) > limit:
+        s = s.split(" · ")[0].strip()
+    if len(s) > limit:
+        s = s[: limit - 1] + "…"
+    return s or "—"
 
 
-def _first_number(raw: Any) -> float | None:
-    m = _NUM.search(str(raw or ""))
-    if not m:
-        return None
-    try:
-        return float(m.group(0).replace(",", ""))
-    except ValueError:
-        return None
+def format_judgment_slack_lines(rows: list[tuple[str, str]]) -> list[str]:
+    """Slack モバイル向け。コードブロック表は使わない（折り返しで崩れる）。
 
-
-def _area_m2(raw: Any) -> float | None:
-    """面積文字列を㎡へ。㎡表記優先、無ければ坪を㎡換算。"""
-    s = str(raw or "")
-    m = re.search(r"([\d,]+(?:\.\d+)?)\s*(?:㎡|m2|平米|m²)", s)
-    if m:
-        return float(m.group(1).replace(",", ""))
-    m = re.search(r"([\d,]+(?:\.\d+)?)\s*坪", s)
-    if m:
-        return float(m.group(1).replace(",", "")) * 3.30578
-    return _first_number(s)
-
-
-def _scenarios(raw: Any) -> list[tuple[float, str]]:
-    """「参考1,494（91E）／1,805（110E）」→ [(1494.0,'91E'), (1805.0,'110E')]。"""
-    s = str(raw or "")
-    out: list[tuple[float, str]] = []
-    for num, tag in _SCEN.findall(s):
-        try:
-            out.append((float(num.replace(",", "")), tag.strip()))
-        except ValueError:
-            continue
-    if not out:
-        n = _first_number(s)
-        if n is not None:
-            out.append((n, ""))
-    return out
-
-
-def _land_display(deal: dict[str, Any]) -> tuple[str, str]:
-    """(土地値の表示, 土地値率の表示)。無い項目は空文字。"""
-    g = grok_of(deal)
-    sj = sj_of(deal)
-
-    def pick(*keys: str) -> str:
-        for k in keys:
-            v = g.get(k)
-            if v in (None, ""):
-                v = sj.get(k)
-            if v not in (None, ""):
-                return str(v).strip()
-        return ""
-
-    price = _first_number(
-        deal.get("price_man")
-        if deal.get("price_man") is not None
-        else pick("price_man")
+    ラベル行＋値行の縦積み。要点だけカードに載せ、全文は詳細HTMLへ。
+    """
+    # カードに出す順・項目（長文ハザード内訳は詳細へ）
+    order = (
+        "所在",
+        "価格",
+        "土地",
+        "土地値倍率",
+        "ハザード総合",
+        "建物",
+        "聞く/保留",
     )
-    vals = _scenarios(pick("land_appraisal_man"))
-    if not vals:  # 相続税路線価(万円/坪) × 面積(㎡) から算出
-        rp = _first_number(pick("route_price_tsubo"))
-        area = _area_m2(pick("land_area"))
-        if rp and area:
-            vals = [(rp * area / 3.30578, "")]
-    ratios = _scenarios(pick("land100_ratio", "land_ratio", "land100"))
-    if not vals and ratios and price:  # 率しか無い時は価格×率で金額を逆算
-        vals = [
-            (price * (n / 100) if n >= 10 else price * n, t) for n, t in ratios
-        ]
-
-    value_s = "／".join(
-        f"約{v:,.0f}万" + (f"（{t}）" if t else "") for v, t in vals
-    )
-    if price and vals:
-        ratio_s = "／".join(f"{v / price * 100:.0f}%" for v, _ in vals)
-    elif ratios:
-        ratio_s = "／".join(
-            f"{n * 100:.0f}%" if n < 10 else f"{n:.0f}%" for n, _ in ratios
-        )
-    else:
-        ratio_s = ""
-    return value_s, ratio_s
-
-
-def land_value_lines(deal: dict[str, Any]) -> list[str]:
-    """概要用: 土地値（相続税路線価×面積）と土地値率（＝土地値÷価格）。"""
-    value_s, ratio_s = _land_display(deal)
-    out: list[str] = []
-    if value_s:
-        out.append(f"• 土地値：{value_s}")
-    if ratio_s:
-        out.append(f"• 土地値率：{ratio_s}（＝土地値÷価格）")
-    return out
-
-
-def land_ratio_brief(deal: dict[str, Any]) -> str:
-    _, ratio_s = _land_display(deal)
-    return ratio_s.split("／")[0] if ratio_s else ""
-
-
-def format_judgment_card(
-    deal: dict[str, Any], rows: list[tuple[str, str]]
-) -> list[str]:
-    """モバイル優先の判断材料カード（等幅表を使わず、iPhone で折返しても崩れない）。"""
-    d: dict[str, str] = {}
-    for label, val in rows:
-        d[label] = (val or "").replace("\n", " ").strip() or "—"
-
-    summary = ["*■ 概要*"]
-    if "価格" in d:
-        summary.append(f"• 価格：{d['価格']}")
-    summary += land_value_lines(deal)
-    if "所在" in d:
-        summary.append(f"• 所在：{d['所在']}")
-
-    prop = ["*■ 物件*"]
-    for label in ("土地", "路線価手法", "建物"):
-        if label in d:
-            prop.append(f"• {label}：{d[label]}")
-
-    risk = ["*■ リスク（足切り）*"]
-    if "ハザード総合" in d:
-        risk.append(f"• ハザード総合：{d['ハザード総合']}")
-    indiv = [f"{k}={d[k]}" for k in ("洪水", "高潮", "急傾斜", "内水") if k in d]
-    if indiv:
-        risk.append("• 個別：" + "・".join(indiv))
-
-    tail = ["*■ 判定材料*"]
-    tail += [f"• {k}：{d[k]}" for k in ("聞く/保留", "問合せ経路", "score") if k in d]
-    if d.get("掲載URL"):
-        tail.append(f"• 掲載URL：{d['掲載URL']}")
-
-    sections = [summary, prop, risk] + ([tail] if len(tail) > 1 else [])
+    by = {k: v for k, v in rows}
     lines: list[str] = []
-    for i, sec in enumerate(sections):
-        if i:
-            lines.append("")
-        lines += sec
+    for label in order:
+        if label not in by:
+            continue
+        lim = 100 if label == "所在" else 72
+        lines.append(f"*{label}*")
+        lines.append(_slack_short(by[label], limit=lim))
+        lines.append("")
+    # 末尾の空行は1つに
+    while lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def format_judgment_table(
+    rows: list[tuple[str, str]], *, label_width: int = 10
+) -> list[str]:
+    """互換用。Slack には使わない（詳細HTML／ログ向け）。"""
+    lines = [f"{'項目'.ljust(label_width)} | 内容"]
+    lines.append(f"{'-' * label_width}-+-{'-' * 24}")
+    for label, val in rows:
+        lines.append(f"{label.ljust(label_width)} | {val}")
     return lines
 
 
 def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
+    """#consult 向け Bカード（モバイル可読・社員位置づけ明記）。"""
     deal_id = str(deal["id"])
     title = str(deal.get("title") or "物件")[:80]
-    rows = judgment_rows(deal, max_cell=160)
+    # 表示用タイトル: [Grok調査] を落として読みやすく
+    title_disp = title.replace("[Grok調査]", "").strip() or title
+    rows = judgment_rows(deal, max_cell=200)
+    reason = str(lane.get("reason") or "—")
+    listen = str(lane.get("listen") or "—")
     lines = [
-        "【物件進行ゲート】B 要判断",
-        f"*{title}*",
-        f"理由：{lane.get('reason')} ・ listen={lane.get('listen') or '—'}",
+        "【AIチーム・114】物件一次判定 — 要あなたの判断",
+        "━━━━━━━━━━━━━━━━",
+        "*位置づけ*",
+        "・調査元: Grok S1（[Grok調査] メール）",
+        "・この通知: *114 物件一次判定係*（振分・カード投稿）",
+        "・Yesのあと: *511 問合せ送信準備係* が第一問合せ",
+        "・あなたの役割: Bレーンの Yes / No だけ（GrokでもCursorでもない）",
         "",
-        *format_judgment_card(deal, rows),
+        f"*{title_disp}*",
+        f"理由: {reason}（listen={listen}）",
         "",
-        "*■ 判断（Yes＝この内容で第一問合せを了承）*",
-        f"✅ <{action_url(deal_id, 'yes')}|問合せする（Yes）>",
-        f"🚫 <{action_url(deal_id, 'no')}|見送り（No）>",
-        f"🔎 <{deal_url(deal_id)}|全文を見る（ログイン不要）>",
+        "■ 要点（スマホで読める形）",
+        *format_judgment_slack_lines(rows),
         "",
-        "（このスレに `Yes` / `No` と返信でもOK）",
+        "📄 *表で全部見る*（ログイン不要・推奨）",
+        deal_url(deal_id),
+        "",
+        "👉 *問合せする（Yes）*",
+        action_url(deal_id, "yes"),
+        "",
+        "👉 *見送り（No）*",
+        action_url(deal_id, "no"),
+        "",
+        "_フォールバック: このスレに Yes / No と返信でも可_",
     ]
     return "\n".join(lines)
 
 
 def format_a_line(deal: dict[str, Any], lane: dict[str, Any]) -> str:
     return (
-        f"【物件進行ゲート】A 自動 — {str(deal.get('title') or '')[:50]} "
-        f"deal_id=`{deal['id']}` reason={lane.get('reason')}"
+        f"【AIチーム・114】A 自動 — {str(deal.get('title') or '')[:50]} "
+        f"reason={lane.get('reason')}（続く処理は511）"
     )
 
 
 def format_c_digest(items: list[tuple[dict[str, Any], dict[str, Any]]]) -> str:
-    lines = [f"【物件進行ゲート】C 報告のみ（{now_jst_date()}・{len(items)}件）"]
+    lines = [
+        f"【AIチーム・114】C 報告のみ（{now_jst_date()}・{len(items)}件）",
+        "調査元=Grok S1／振分=114／人判断不要",
+    ]
     for deal, lane in items[:30]:
         lines.append(
             f"・{str(deal.get('title') or '')[:40]} "
@@ -602,204 +528,6 @@ def format_c_digest(items: list[tuple[dict[str, Any], dict[str, Any]]]) -> str:
     if len(items) > 30:
         lines.append(f"…他 {len(items) - 30} 件")
     return "\n".join(lines)
-
-
-# --- 保留リマインド・問合せ履歴 -------------------------------------------
-
-EVENT_LABEL = {
-    "created": "登録",
-    "status_change": "状態変更",
-    "inquiry_sent": "問合せ送信",
-    "inquiry_reply": "返信受信",
-    "grok_applied": "Grok反映",
-    "grok_handoff_sent": "KURASHIFTへ引継ぎ",
-    "grok_handoff_ready": "引継ぎ準備",
-    "review_confirm": "確認",
-    "review_pass": "見送り",
-    "note": "メモ",
-}
-
-_OPEN_DECISIONS = ("yes", "no", "sent", "skipped")
-
-
-def inquiry_done(deal: dict[str, Any]) -> bool:
-    """問合せ送信済み／判断済み（＝リマインド対象外）か。"""
-    sj = sj_of(deal)
-    if sj.get("inquiry_sent_at"):
-        return True
-    if str(deal.get("status") or "") in ("passed", "archived"):
-        return True
-    gate = sj.get("property_gate") if isinstance(sj.get("property_gate"), dict) else {}
-    if str(gate.get("decision") or "") in ("yes", "no", "sent"):
-        return True
-    return inquiry_status(deal) in ("sending", "awaiting_reply", "has_reply")
-
-
-def fetch_deals_by_ids(sb: Any, ids: list[str]) -> dict[str, dict[str, Any]]:
-    out: dict[str, dict[str, Any]] = {}
-    uniq = [i for i in dict.fromkeys(ids) if i]
-    for i in range(0, len(uniq), 100):
-        try:
-            r = (
-                sb.table("kurashift_re_deals")
-                .select("*")
-                .in_("id", uniq[i : i + 100])
-                .execute()
-            )
-        except Exception:
-            continue
-        for d in r.data or []:
-            out[str(d.get("id"))] = d
-    return out
-
-
-def reconcile_pending(
-    sb: Any, st: dict[str, Any]
-) -> tuple[dict[str, int], dict[str, dict[str, Any]]]:
-    """保留B のうち「問合せ済み」「重複」を decision 付与で除外（履歴は消さない）。"""
-    deals = st.setdefault("deals", {})
-    ids = [
-        did
-        for did, d in deals.items()
-        if (d or {}).get("b_card_posted_at")
-        and (d or {}).get("decision") not in _OPEN_DECISIONS
-    ]
-    deal_map = fetch_deals_by_ids(sb, ids)
-    cleaned = {"already_inquired": 0, "duplicate": 0}
-    for did in ids:
-        cur = dict(deals.get(did) or {})
-        deal = deal_map.get(did)
-        if deal is None:
-            continue
-        if inquiry_done(deal):
-            gate = sj_of(deal).get("property_gate")
-            dec = str(gate.get("decision") or "") if isinstance(gate, dict) else ""
-            cur["decision"] = dec if dec in ("yes", "no", "sent") else "sent"
-            cur["cleaned_reason"] = "already_inquired"
-            cur["cleaned_at"] = now_iso()
-            deals[did] = cur
-            cleaned["already_inquired"] += 1
-            continue
-        fp = deal_fp_key(deal)
-        if fp:
-            prev = (st.get("by_fp") or {}).get(fp) or {}
-            if prev.get("decision") in _OPEN_DECISIONS and str(prev.get("deal_id")) != did:
-                cur["decision"] = "skipped"
-                cur["cleaned_reason"] = "duplicate"
-                cur["cleaned_at"] = now_iso()
-                deals[did] = cur
-                cleaned["duplicate"] += 1
-    return cleaned, deal_map
-
-
-def pending_b_items(
-    sb: Any,
-    st: dict[str, Any],
-    *,
-    min_age_hours: float = 12.0,
-    deal_map: dict[str, dict[str, Any]] | None = None,
-) -> list[dict[str, Any]]:
-    """未判断のBカード（古い順）。min_age_hours 未満の新着は除く。"""
-    deals = st.get("deals") or {}
-    rows = [
-        (did, d)
-        for did, d in deals.items()
-        if (d or {}).get("b_card_posted_at")
-        and (d or {}).get("decision") not in _OPEN_DECISIONS
-    ]
-    if deal_map is None:
-        deal_map = fetch_deals_by_ids(sb, [did for did, _ in rows])
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=min_age_hours)
-    items: list[dict[str, Any]] = []
-    for did, d in rows:
-        deal = deal_map.get(did)
-        if deal is None or inquiry_done(deal):
-            continue
-        ts = str((d or {}).get("b_card_posted_at") or "")
-        try:
-            posted = datetime.fromisoformat(ts)
-        except ValueError:
-            posted = None
-        if posted is not None and posted.tzinfo is None:
-            posted = posted.replace(tzinfo=timezone.utc)
-        if posted is not None and posted > cutoff:
-            continue
-        items.append(
-            {"deal_id": did, "deal": deal, "posted_at": ts, "reason": (d or {}).get("reason")}
-        )
-    items.sort(key=lambda x: x["posted_at"])
-    return items
-
-
-def format_reminder(
-    items: list[dict[str, Any]],
-    *,
-    cleaned: dict[str, int] | None = None,
-    date_str: str | None = None,
-    limit: int = 10,
-) -> str:
-    date_str = date_str or now_jst_date()
-    lines = [
-        f"【物件進行ゲート】保留リマインド（{date_str}・{len(items)}件）",
-        "未判断のBカードです（古い順）。Yes/No をお願いします。",
-        "",
-    ]
-    for i, it in enumerate(items[:limit], 1):
-        deal = it["deal"]
-        did = str(deal["id"])
-        title = str(deal.get("title") or "物件")[:60]
-        rb = land_ratio_brief(deal)
-        meta = f"｜土地値率 {rb}" if rb else ""
-        lines.append(f"{i}) {title}")
-        lines.append(f"   理由：{it.get('reason') or '—'}{meta}")
-        lines.append(
-            f"   ✅ <{action_url(did, 'yes')}|問合せYes> ／ "
-            f"🚫 <{action_url(did, 'no')}|見送りNo> ／ "
-            f"🔎 <{deal_url(did)}|全文>"
-        )
-    if len(items) > limit:
-        lines.append(f"…他 {len(items) - limit} 件")
-    if cleaned:
-        parts = []
-        if cleaned.get("already_inquired"):
-            parts.append(f"問合せ済み {cleaned['already_inquired']}")
-        if cleaned.get("duplicate"):
-            parts.append(f"重複 {cleaned['duplicate']}")
-        if parts:
-            lines += ["", "（保留から外したもの: " + "／".join(parts) + "）"]
-    return "\n".join(lines)
-
-
-def fetch_deal_events(sb: Any, deal_id: str, *, limit: int = 20) -> list[dict[str, Any]]:
-    try:
-        r = (
-            sb.table("kurashift_re_deal_events")
-            .select("event_type,actor,summary,occurred_at,payload")
-            .eq("deal_id", deal_id)
-            .order("occurred_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        return list(r.data or [])
-    except Exception:
-        return []
-
-
-def format_event_line(e: dict[str, Any]) -> str:
-    t = str(e.get("occurred_at") or "")
-    try:
-        t = datetime.fromisoformat(t).astimezone(JST).strftime("%m-%d %H:%M")
-    except ValueError:
-        t = t[:16]
-    label = EVENT_LABEL.get(str(e.get("event_type")), str(e.get("event_type")))
-    src = str(e.get("actor") or "")
-    summ = str(e.get("summary") or "").replace("\n", " ").strip()
-    out = f"・{t} {label}"
-    if src:
-        out += f"（{src}）"
-    if summ:
-        out += f" {summ}"
-    return out
 
 
 def deal_fp_key(deal: dict[str, Any]) -> str:
