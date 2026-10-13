@@ -688,7 +688,7 @@ def reconcile_pending(
     ids = [
         did
         for did, d in deals.items()
-        if (d or {}).get("b_card_posted_at")
+        if ((d or {}).get("b_card_posted_at") or (d or {}).get("b_deferred_at"))
         and (d or {}).get("decision") not in _OPEN_DECISIONS
     ]
     deal_map = fetch_deals_by_ids(sb, ids)
@@ -731,7 +731,7 @@ def pending_b_items(
     rows = [
         (did, d)
         for did, d in deals.items()
-        if (d or {}).get("b_card_posted_at")
+        if ((d or {}).get("b_card_posted_at") or (d or {}).get("b_deferred_at"))
         and (d or {}).get("decision") not in _OPEN_DECISIONS
     ]
     if deal_map is None:
@@ -742,7 +742,9 @@ def pending_b_items(
         deal = deal_map.get(did)
         if deal is None or inquiry_done(deal):
             continue
-        ts = str((d or {}).get("b_card_posted_at") or "")
+        ts = str(
+            (d or {}).get("b_card_posted_at") or (d or {}).get("b_deferred_at") or ""
+        )
         try:
             posted = datetime.fromisoformat(ts)
         except ValueError:
