@@ -98,8 +98,41 @@ type DealRow = {
   summary_json?: Record<string, unknown> | null;
 };
 
+export type DealEvent = {
+  event_type?: string | null;
+  actor?: string | null;
+  summary?: string | null;
+  occurred_at?: string | null;
+};
+
+const EVENT_LABEL: Record<string, string> = {
+  created: "登録",
+  status_change: "状態変更",
+  inquiry_sent: "問合せ送信",
+  inquiry_reply: "返信受信",
+  grok_applied: "Grok反映",
+  grok_handoff_sent: "KURASHIFTへ引継ぎ",
+  grok_handoff_ready: "引継ぎ準備",
+  review_confirm: "確認",
+  review_pass: "見送り",
+  note: "メモ",
+};
+
+function fmtWhen(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 16);
+  return d.toLocaleString("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Tokyo",
+  });
+}
+
 /** ログイン不要の判断材料表（Slack カードと同項目）。 */
-export function judgmentDetailHtml(deal: DealRow): string {
+export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): string {
   const sj =
     deal.summary_json && typeof deal.summary_json === "object"
       ? deal.summary_json
@@ -184,6 +217,20 @@ export function judgmentDetailHtml(deal: DealRow): string {
   const no = `/api/g/n/${deal.id}?s=${actionSig(deal.id, "no")}`;
   const title = esc(String(deal.title || "物件").slice(0, 100));
 
+  const eventsHtml = events.length
+    ? events
+        .map((e) => {
+          const label =
+            EVENT_LABEL[String(e.event_type || "")] || String(e.event_type || "");
+          const src = e.actor ? `（${esc(String(e.actor))}）` : "";
+          const s = e.summary
+            ? ` ${esc(String(e.summary).replace(/\n/g, " "))}`
+            : "";
+          return `<li><span class="t">${esc(fmtWhen(e.occurred_at))}</span> ${esc(label)}${src}${s}</li>`;
+        })
+        .join("\n")
+    : `<li class="note">履歴はまだありません。</li>`;
+
   return `<!doctype html><html lang="ja"><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>判断材料 — ${title}</title>
@@ -191,6 +238,7 @@ export function judgmentDetailHtml(deal: DealRow): string {
   body{font-family:system-ui,-apple-system,sans-serif;margin:0;padding:1.25rem;background:#f8fafc;color:#0f172a}
   .wrap{max-width:40rem;margin:0 auto;background:#fff;border-radius:12px;padding:1.25rem 1.25rem 1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.08)}
   h1{font-size:1.1rem;margin:0 0 .75rem;line-height:1.4}
+  h2{font-size:.95rem;margin:1.4rem 0 .5rem;color:#334155}
   table{width:100%;border-collapse:collapse;font-size:.9rem}
   th,td{border-bottom:1px solid #e2e8f0;padding:.55rem .4rem;vertical-align:top;text-align:left}
   th{width:7.5rem;color:#64748b;font-weight:600;white-space:nowrap}
@@ -200,6 +248,9 @@ export function judgmentDetailHtml(deal: DealRow): string {
   .yes{background:#059669;color:#fff}
   .no{background:#e2e8f0;color:#334155}
   .note{margin-top:1rem;font-size:.8rem;color:#64748b}
+  ul.ev{list-style:none;margin:0;padding:0;font-size:.85rem}
+  ul.ev li{padding:.35rem 0;border-bottom:1px solid #f1f5f9;line-height:1.5}
+  ul.ev .t{color:#64748b;font-variant-numeric:tabular-nums;margin-right:.35rem}
 </style>
 <body><div class="wrap">
 <h1>${title}</h1>
@@ -208,6 +259,8 @@ export function judgmentDetailHtml(deal: DealRow): string {
   <a class="yes" href="${yes}">問合せする（Yes）</a>
   <a class="no" href="${no}">見送り（No）</a>
 </div>
+<h2>問合せ・判断履歴</h2>
+<ul class="ev">${eventsHtml}</ul>
 <p class="note">ログイン不要の判断ページです。KURASHIFT本体の詳細画面とは別です。</p>
 </div></body></html>`;
 }
@@ -224,6 +277,22 @@ export async function fetchDealForJudgment(
     .maybeSingle();
   if (error || !data) return null;
   return data as DealRow;
+}
+
+export async function fetchDealEvents(
+  dealId: string,
+  limit = 20,
+): Promise<DealEvent[]> {
+  const sb = createServiceClient();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("kurashift_re_deal_events")
+    .select("event_type, actor, summary, occurred_at")
+    .eq("deal_id", dealId)
+    .order("occurred_at", { ascending: false })
+    .limit(limit);
+  if (error) return [];
+  return (data || []) as DealEvent[];
 }
 
 export async function applyGate(
