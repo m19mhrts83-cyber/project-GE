@@ -237,17 +237,42 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
     const n = Number(yRaw);
     yPct = n < 1.5 ? n * 100 : n;
   }
+  // 独自調査（S3需給・ペルソナ）の想定利回り
+  const yi =
+    sj.yield_info && typeof sj.yield_info === "object"
+      ? (sj.yield_info as Record<string, unknown>)
+      : {};
+  const isEst =
+    String(yi.type || "") === "estimated" ||
+    Boolean(yi.yield_range) ||
+    Boolean(yi.monthly_rent_range);
+  let estText = isEst && yi.yield_range ? String(yi.yield_range) : "";
+  if (isEst && !estText && yi.yield_pct != null) {
+    estText = `${Number(yi.yield_pct)}%`;
+  }
+  const estRent = yi.monthly_rent_range ? String(yi.monthly_rent_range) : "";
+  const estSrc = yi.source ? String(yi.source) : "";
+  const estDisplay = estText
+    ? estText +
+      (estRent ? `（想定家賃 ${estRent}）` : "") +
+      (estSrc ? `／${estSrc}` : "")
+    : "—";
+  const estMatch = estText.match(/\d+(?:\.\d+)?/);
+  const estPct = estMatch ? Number(estMatch[0]) : null;
+
   const yGate = isAp ? 8 : 10;
-  let yVerdict = "材料不足（賃料・表面利回りが無い）";
+  const verdictVal = estPct != null ? estPct : yPct;
+  const verdictLabel = estPct != null ? "想定" : "表面";
+  let yVerdict = "材料不足（賃料・利回りが無い）";
   let yText = "—";
-  if (yPct != null) {
-    yText = `${Number(yPct.toFixed(2))}%`;
-    if (yPct >= yGate) {
-      yVerdict = `クリア（${yPct.toFixed(1)}% ≥ ${yGate}%）→ 利回り条件は通過`;
-    } else if (yPct >= yGate - 1.5) {
-      yVerdict = `惜しい（${yPct.toFixed(1)}%／基準${yGate}%）→ 賃料・価格交渉で届くか`;
+  if (yPct != null) yText = `${Number(yPct.toFixed(2))}%`;
+  if (verdictVal != null) {
+    if (verdictVal >= yGate) {
+      yVerdict = `クリア（${verdictLabel} ${verdictVal.toFixed(1)}% ≥ ${yGate}%）→ 利回り条件は通過`;
+    } else if (verdictVal >= yGate - 1.5) {
+      yVerdict = `惜しい（${verdictLabel} ${verdictVal.toFixed(1)}%／基準${yGate}%）→ 賃料・価格交渉で届くか`;
     } else {
-      yVerdict = `未達（${yPct.toFixed(1)}% ＜ ${yGate}%）→ 利回り単体では弱い`;
+      yVerdict = `未達（${verdictLabel} ${verdictVal.toFixed(1)}% ＜ ${yGate}%）→ 利回り単体では弱い`;
     }
   }
 
@@ -257,7 +282,8 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
     ["土地値", landValText],
     ["土地値率", landRatioText],
     ["土地値の判定", landVerdict],
-    ["表面利回り", yText],
+    ["表面利回り（マイソク）", yText],
+    ["想定利回り（独自調査）", estDisplay],
     ["利回りの判定", yVerdict],
     ["土地", pick("land_area")],
     ["路線価手法", pick("land_method")],
