@@ -577,13 +577,11 @@ def main() -> int:
     write_dashboard_json(data, args.dry_run)
 
     if not args.dry_run and not args.no_drive:
-        for rel in (
-            "22_運用状態の識別_20261011.md",
-            "agents_registry.yaml",
-            "00_チーム索引.md",
-            "AGENTS.md",
-            "CLAUDE.md",
-        ):
+        # ハブ直下の MD は Git 正本を Drive へ丸ごと写す（設計メモ・表紙含む。
+        # Drive 側だけのメモは消さない＝上書きコピーのみ）
+        for src in sorted(HUB.glob("*.md")):
+            sync_drive(Path(src.name), False)
+        for rel in ("agents_registry.yaml",):
             if (HUB / rel).exists():
                 sync_drive(Path(rel), False)
         print(f"  drive: {DRIVE_HUB}")
