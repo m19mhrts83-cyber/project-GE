@@ -633,20 +633,102 @@ def land_eval_lines(deal: dict[str, Any]) -> list[str]:
     return lines
 
 
-def yield_eval_lines(deal: dict[str, Any]) -> list[str]:
-    """利回りの評価（判断に使う段落）。"""
+def _fmt_pct(x: float) -> str:
+    return f"{x:.2f}".rstrip("0").rstrip(".") + "%"
+
+
+def _annual_rent_man(deal: dict[str, Any]) -> float | None:
     g = grok_of(deal)
     sj = sj_of(deal)
-    y = _yield_pct_number(deal)
+    for src in (g, sj):
+        for k in (
+            "annual_rent_man",
+            "満室年収_万",
+            "満室想定年収_万",
+            "rent_annual_man",
+            "満室年収",
+        ):
+            v = src.get(k)
+            if v not in (None, ""):
+                n = _first_number(v)
+                if n is not None:
+                    return n
+    return None
+
+
+def _yield_info_dict(deal: dict[str, Any]) -> dict[str, Any]:
+    sj = sj_of(deal)
+    yi = sj.get("yield_info")
+    return dict(yi) if isinstance(yi, dict) else {}
+
+
+def _yield_estimate(deal: dict[str, Any]) -> tuple[str, str, str]:
+    """(想定利回り表示, 想定家賃表示, 出典)。無ければ空文字。"""
+    g = grok_of(deal)
+    sj = sj_of(deal)
+    yi = _yield_info_dict(deal)
+    is_est = (
+        str(yi.get("type") or "") == "estimated"
+        or bool(yi.get("yield_range"))
+        or bool(yi.get("monthly_rent_range"))
+    )
+    rng = str(yi.get("yield_range") or "").strip()
+    rent = str(yi.get("monthly_rent_range") or "").strip()
+    src = str(yi.get("source") or "").strip()
+    if not is_est:
+        rng = ""
+    if not rng and is_est and yi.get("yield_pct") not in (None, ""):
+        n = _first_number(yi.get("yield_pct"))
+        if n is not None:
+            rng = _fmt_pct(n)
+    if not rng:  # 満室年収（想定）から
+        ann = _annual_rent_man(deal)
+        price = _first_number(
+            deal.get("price_man")
+            if deal.get("price_man") is not None
+            else (g.get("price_man") or sj.get("price_man"))
+        )
+        if ann and price:
+            rng = _fmt_pct(ann / price * 100)
+            if not rent:
+                rent = f"{ann / 12:.1f}万/月（満室年収{ann:g}万）"
+    return rng, rent, src
+
+
+def _yield_summary_line(deal: dict[str, Any]) -> str:
+    surf = _yield_pct_number(deal)
+    est, _, _ = _yield_estimate(deal)
+    left = f"表面 {_fmt_pct(surf)}" if surf is not None else "表面 —"
+    right = f"想定 {est}" if est else "想定 —"
+    return f"• 利回り：{left} ／ {right}"
+
+
+def yield_eval_lines(deal: dict[str, Any]) -> list[str]:
+    """利回りの評価: ①マイソク賃料ベース（表面）と②独自調査ベース（想定）。"""
+    g = grok_of(deal)
+    sj = sj_of(deal)
+    yi = _yield_info_dict(deal)
+    price = _first_number(
+        deal.get("price_man")
+        if deal.get("price_man") is not None
+        else (g.get("price_man") or sj.get("price_man"))
+    )
     is_ap = _is_apartment(deal)
     gate = 8.0 if is_ap else 10.0
-    kind = "AP（聞くゲート≥8%）" if is_ap else "戸建（聞くゲート≥10%）"
-    annual = str(
-        g.get("annual_rent_man")
-        or g.get("満室年収_万")
-        or sj.get("annual_rent_man")
-        or ""
-    ).strip()
+    kind = "AP（目安≥8%）" if is_ap else "戸建（目安≥10%）"
+
+    surf = _yield_pct_number(deal)
+    surf_rent = ""
+    mr = yi.get("monthly_rent_yen")
+    if mr not in (None, ""):
+        m = _first_number(mr)
+        if m:
+            surf_rent = f"（家賃 {m / 10000:.1f}万/月）"
+    elif surf is not None and price:
+        surf_rent = f"（家賃 約{price * surf / 100 / 12:.1f}万/月・逆算）"
+
+    est_rng, est_rent, est_src = _yield_estimate(deal)
+
     target = str(
         g.get("negotiate_target")
         or g.get("交渉後ターゲット")
@@ -661,29 +743,37 @@ def yield_eval_lines(deal: dict[str, Any]) -> list[str]:
     ).strip()
     reason = str(g.get("reason_line") or sj.get("reason_line") or "").strip()
 
-    lines = ["*■ 利回りの評価*"]
-    if y is not None:
-        y_disp = f"{y:.2f}".rstrip("0").rstrip(".")
-        lines.append(f"• 表面利回り：{y_disp}%")
-        lines.append(f"• 聞くゲート：{kind}")
-        if y >= gate:
-            lines.append(f"• 判定：クリア（{y:.1f}% ≥ {gate:.0f}%）→ 利回り条件は通過")
-        elif y >= gate - 1.5:
+    lines = ["*■ 利回り*"]
+    lines.append(
+        f"• 表面（マイソク賃料）：{_fmt_pct(surf)}{surf_rent}"
+        if surf is not None
+        else "• 表面（マイソク賃料）：未記載"
+    )
+    if est_rng:
+        extra = f"｜想定家賃 {est_rent}" if est_rent else ""
+        src = f"｜{est_src}" if est_src else ""
+        lines.append(f"• 想定（独自調査）：{est_rng}{extra}{src}")
+    else:
+        lines.append("• 想定（独自調査）：未取得（S3需給／ペルソナ待ち）")
+    lines.append(f"• 聞くゲート：{kind}")
+
+    v = _first_number(est_rng) if est_rng else surf
+    label = "想定" if est_rng else "表面"
+    if v is not None:
+        if v >= gate:
+            lines.append(f"• 判定：クリア（{label} {_fmt_pct(v)} ≥ {gate:g}%）")
+        elif v >= gate - 1.5:
             lines.append(
-                f"• 判定：惜しい（{y:.1f}%／基準{gate:.0f}%）→ 賃料・価格交渉で届くか"
+                f"• 判定：惜しい（{label} {_fmt_pct(v)}／基準{gate:g}%）→ 賃料・価格交渉で届くか"
             )
         else:
             lines.append(
-                f"• 判定：未達（{y:.1f}% ＜ {gate:.0f}%）→ 利回り単体では弱い"
+                f"• 判定：未達（{label} {_fmt_pct(v)} ＜ {gate:g}%）→ 利回り単体では弱い"
             )
     else:
-        lines.append("• 表面利回り：未記載")
-        lines.append(f"• 聞くゲート：{kind}")
         lines.append(
-            "• 判定：材料不足（賃料・表面利回りが無い。古家・更地寄りは土地値側を優先）"
+            "• 判定：材料不足（賃料・利回りが無い。古家・更地寄りは土地値側を優先）"
         )
-    if annual:
-        lines.append(f"• 満室年収：{annual}万" if annual[-1].isdigit() else f"• 満室年収：{annual}")
     if target:
         lines.append(f"• 交渉後ターゲット：{target}")
     if repay:
@@ -704,6 +794,9 @@ def format_judgment_card(
     summary = ["*■ 概要*"]
     if "価格" in d:
         summary.append(f"• 価格：{d['価格']}")
+    if "土地値率" in d and d["土地値率"] != "—":
+        summary.append(f"• 土地値率：{d['土地値率']}（＝土地値÷価格）")
+    summary.append(_yield_summary_line(deal))
     if "所在" in d:
         summary.append(f"• 所在：{d['所在']}")
 
@@ -750,7 +843,9 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
     # 先頭に土地値率・利回りの一行サマリ（スクロール前に判断軸が見える）
     rb = land_ratio_brief(deal)
     y = _yield_pct_number(deal)
-    y_s = f"{y:.1f}%" if y is not None else "未記載"
+    y_s = _fmt_pct(y) if y is not None else "未記載"
+    est_rng, _, _ = _yield_estimate(deal)
+    y_all = f"表面 {y_s}" + (f" ／ 想定 {est_rng}" if est_rng else "")
     land_s = rb or "未記載"
     lines = [
         "【AIチーム・114】物件一次判定 — 要あなたの判断",
@@ -758,7 +853,7 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
         "",
         f"*{title_disp}*",
         f"理由：{lane.get('reason')} ・ listen={lane.get('listen') or '—'}",
-        f"*判断軸*　土地値率 {land_s} ／ 表面利回り {y_s}",
+        f"*判断軸*　土地値率 {land_s} ／ 利回り {y_all}",
         "",
         *format_judgment_card(deal, rows),
         "",
