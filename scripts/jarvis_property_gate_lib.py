@@ -400,9 +400,19 @@ def judgment_rows(
     ia = pick("inquiry_action")
     if ia == "—":
         ia = inquiry_action(deal) or "—"
+    value_s, ratio_s = _land_display(deal)
+    y_num = _yield_pct_number(deal)
+    y_s = (
+        f"{f'{y_num:.2f}'.rstrip('0').rstrip('.')}%"
+        if y_num is not None
+        else "—"
+    )
     rows: list[tuple[str, str]] = [
         ("所在", loc),
         ("価格", price_s),
+        ("土地値", value_s or "—"),
+        ("土地値率", ratio_s or "—"),
+        ("表面利回り", y_s),
         ("土地", pick("land_area")),
         ("土地値倍率", pick("land100_ratio", "land100", "land_ratio")),
         ("土地評価(万)", pick("land_appraisal_man")),
@@ -532,6 +542,157 @@ def land_ratio_brief(deal: dict[str, Any]) -> str:
     return ratio_s.split("／")[0] if ratio_s else ""
 
 
+def _is_apartment(deal: dict[str, Any]) -> bool:
+    struct = str(deal.get("structure") or "")
+    title = str(deal.get("title") or "")
+    blob = f"{struct} {title}"
+    return bool(re.search(r"AP|アパート|一棟|マンション|収益", blob, re.I))
+
+
+def _yield_pct_number(deal: dict[str, Any]) -> float | None:
+    """表面利回りを % 単位で返す（DBが 0.08 でも 8.0 でも可）。"""
+    g = grok_of(deal)
+    sj = sj_of(deal)
+    raw = deal.get("yield_pct")
+    if raw in (None, ""):
+        for k in (
+            "surface_yield_pct",
+            "gross_yield_pct",
+            "yield_pct",
+            "表面利回り_%",
+            "表面利回り",
+        ):
+            if g.get(k) not in (None, ""):
+                raw = g.get(k)
+                break
+            if sj.get(k) not in (None, ""):
+                raw = sj.get(k)
+                break
+    n = _first_number(raw)
+    if n is None:
+        return None
+    return n * 100.0 if n < 1.5 else n
+
+
+def _primary_land_ratio_pct(deal: dict[str, Any]) -> float | None:
+    _, ratio_s = _land_display(deal)
+    if not ratio_s:
+        return None
+    return _first_number(ratio_s.split("／")[0])
+
+
+def land_eval_lines(deal: dict[str, Any]) -> list[str]:
+    """土地値の評価（判断に使う段落）。"""
+    g = grok_of(deal)
+    sj = sj_of(deal)
+    value_s, ratio_s = _land_display(deal)
+    method = str(g.get("land_method") or sj.get("land_method") or "").strip()
+    route = str(g.get("route_price_tsubo") or sj.get("route_price_tsubo") or "").strip()
+    land100 = str(g.get("land100") or sj.get("land100") or "").strip()
+    appraisal_note = str(g.get("land_appraisal_man") or "").strip()
+    is_ap = _is_apartment(deal)
+    threshold = 150.0 if is_ap else 100.0
+    kind = "AP（目安150%前後）" if is_ap else "戸建（目安100%超）"
+    primary = _primary_land_ratio_pct(deal)
+
+    lines = ["*■ 土地値の評価*"]
+    if value_s:
+        lines.append(f"• 評価額：{value_s}")
+    else:
+        lines.append("• 評価額：—（路線価×面積が取れていない）")
+    if ratio_s:
+        lines.append(f"• 土地値率：{ratio_s}（＝土地値÷価格）")
+    else:
+        lines.append("• 土地値率：—")
+    lines.append(f"• 判定基準：{kind}")
+    if primary is not None:
+        if primary >= threshold:
+            verdict = f"クリア（{primary:.0f}% ≥ {threshold:.0f}%）→ 積算で価格を説明しやすい"
+        elif primary >= threshold * 0.85:
+            verdict = f"惜しい（{primary:.0f}%／基準{threshold:.0f}%）→ 交渉・補正で届くか確認"
+        else:
+            verdict = f"未達（{primary:.0f}% ＜ {threshold:.0f}%）→ 土地値だけでは弱い"
+        lines.append(f"• 判定：{verdict}")
+    elif land100:
+        lines.append(f"• 判定（Grok）：{land100}")
+    else:
+        lines.append("• 判定：材料不足（率・判定が無い）")
+    if method or route:
+        extra = method or "—"
+        if route:
+            extra += f"／路線価 {route}万/坪"
+        lines.append(f"• 手法：{extra}")
+    if "擁壁" in appraisal_note or "高台" in appraisal_note or "補正" in appraisal_note:
+        # 長文は切る
+        note = appraisal_note
+        if "※" in note:
+            note = "※" + note.split("※", 1)[1]
+        if len(note) > 80:
+            note = note[:79] + "…"
+        lines.append(f"• 注意：{note}")
+    return lines
+
+
+def yield_eval_lines(deal: dict[str, Any]) -> list[str]:
+    """利回りの評価（判断に使う段落）。"""
+    g = grok_of(deal)
+    sj = sj_of(deal)
+    y = _yield_pct_number(deal)
+    is_ap = _is_apartment(deal)
+    gate = 8.0 if is_ap else 10.0
+    kind = "AP（聞くゲート≥8%）" if is_ap else "戸建（聞くゲート≥10%）"
+    annual = str(
+        g.get("annual_rent_man")
+        or g.get("満室年収_万")
+        or sj.get("annual_rent_man")
+        or ""
+    ).strip()
+    target = str(
+        g.get("negotiate_target")
+        or g.get("交渉後ターゲット")
+        or sj.get("negotiate_target")
+        or ""
+    ).strip()
+    repay = str(
+        g.get("debt_service_note")
+        or g.get("返済比率メモ")
+        or sj.get("debt_service_note")
+        or ""
+    ).strip()
+    reason = str(g.get("reason_line") or sj.get("reason_line") or "").strip()
+
+    lines = ["*■ 利回りの評価*"]
+    if y is not None:
+        y_disp = f"{y:.2f}".rstrip("0").rstrip(".")
+        lines.append(f"• 表面利回り：{y_disp}%")
+        lines.append(f"• 聞くゲート：{kind}")
+        if y >= gate:
+            lines.append(f"• 判定：クリア（{y:.1f}% ≥ {gate:.0f}%）→ 利回り条件は通過")
+        elif y >= gate - 1.5:
+            lines.append(
+                f"• 判定：惜しい（{y:.1f}%／基準{gate:.0f}%）→ 賃料・価格交渉で届くか"
+            )
+        else:
+            lines.append(
+                f"• 判定：未達（{y:.1f}% ＜ {gate:.0f}%）→ 利回り単体では弱い"
+            )
+    else:
+        lines.append("• 表面利回り：未記載")
+        lines.append(f"• 聞くゲート：{kind}")
+        lines.append(
+            "• 判定：材料不足（賃料・表面利回りが無い。古家・更地寄りは土地値側を優先）"
+        )
+    if annual:
+        lines.append(f"• 満室年収：{annual}万" if annual[-1].isdigit() else f"• 満室年収：{annual}")
+    if target:
+        lines.append(f"• 交渉後ターゲット：{target}")
+    if repay:
+        lines.append(f"• 返済メモ：{repay[:90]}")
+    if reason and ("利回" in reason or "賃料" in reason or "年収" in reason):
+        lines.append(f"• 理由：{reason[:100]}")
+    return lines
+
+
 def format_judgment_card(
     deal: dict[str, Any], rows: list[tuple[str, str]]
 ) -> list[str]:
@@ -543,13 +704,15 @@ def format_judgment_card(
     summary = ["*■ 概要*"]
     if "価格" in d:
         summary.append(f"• 価格：{d['価格']}")
-    summary += land_value_lines(deal)
     if "所在" in d:
         summary.append(f"• 所在：{d['所在']}")
 
+    land = land_eval_lines(deal)
+    yld = yield_eval_lines(deal)
+
     prop = ["*■ 物件*"]
-    for label in ("土地", "路線価手法", "建物"):
-        if label in d:
+    for label in ("土地", "建物"):
+        if label in d and d[label] != "—":
             prop.append(f"• {label}：{d[label]}")
 
     risk = ["*■ リスク（足切り）*"]
@@ -564,7 +727,7 @@ def format_judgment_card(
     if d.get("掲載URL"):
         tail.append(f"• 掲載URL：{d['掲載URL']}")
 
-    sections = [summary, prop, risk] + ([tail] if len(tail) > 1 else [])
+    sections = [summary, land, yld, prop, risk] + ([tail] if len(tail) > 1 else [])
     lines: list[str] = []
     for i, sec in enumerate(sections):
         if i:
@@ -584,18 +747,18 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
         if lab == "建物" and " · " in val:
             rows[i] = (lab, val.split(" · ")[0].strip())
             break
+    # 先頭に土地値率・利回りの一行サマリ（スクロール前に判断軸が見える）
+    rb = land_ratio_brief(deal)
+    y = _yield_pct_number(deal)
+    y_s = f"{y:.1f}%" if y is not None else "未記載"
+    land_s = rb or "未記載"
     lines = [
         "【AIチーム・114】物件一次判定 — 要あなたの判断",
-        "━━━━━━━━━━━━━━━━",
-        "*位置づけ（誰の仕事か）*",
-        "・調査元: *Grok S1*（[Grok調査] メールを作成）",
-        "・この通知: *114 物件一次判定係*（振分・#consult 投稿）",
-        "・Yesのあと: *511 問合せ送信準備係* が第一問合せ",
-        "・あなたの役割: Bレーンの Yes / No だけ",
-        "・※ Grok Bot のチャットでも、Cursor 本人でもありません",
+        "調査=Grok S1 → 振分=114 → Yes後=511 ／ ※BotチャットでもCursorでもない",
         "",
         f"*{title_disp}*",
         f"理由：{lane.get('reason')} ・ listen={lane.get('listen') or '—'}",
+        f"*判断軸*　土地値率 {land_s} ／ 表面利回り {y_s}",
         "",
         *format_judgment_card(deal, rows),
         "",
