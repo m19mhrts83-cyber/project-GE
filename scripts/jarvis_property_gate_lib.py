@@ -12,7 +12,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -462,8 +462,8 @@ def _scenarios(raw: Any) -> list[tuple[float, str]]:
     return out
 
 
-def land_value_lines(deal: dict[str, Any]) -> list[str]:
-    """概要用: 土地値（相続税路線価×面積）と土地値率（＝土地値÷価格）。"""
+def _land_display(deal: dict[str, Any]) -> tuple[str, str]:
+    """(土地値の表示, 土地値率の表示)。無い項目は空文字。"""
     g = grok_of(deal)
     sj = sj_of(deal)
 
@@ -504,13 +504,23 @@ def land_value_lines(deal: dict[str, Any]) -> list[str]:
         )
     else:
         ratio_s = ""
+    return value_s, ratio_s
 
+
+def land_value_lines(deal: dict[str, Any]) -> list[str]:
+    """概要用: 土地値（相続税路線価×面積）と土地値率（＝土地値÷価格）。"""
+    value_s, ratio_s = _land_display(deal)
     out: list[str] = []
     if value_s:
         out.append(f"• 土地値：{value_s}")
     if ratio_s:
         out.append(f"• 土地値率：{ratio_s}（＝土地値÷価格）")
     return out
+
+
+def land_ratio_brief(deal: dict[str, Any]) -> str:
+    _, ratio_s = _land_display(deal)
+    return ratio_s.split("／")[0] if ratio_s else ""
 
 
 def format_judgment_card(
@@ -592,6 +602,204 @@ def format_c_digest(items: list[tuple[dict[str, Any], dict[str, Any]]]) -> str:
     if len(items) > 30:
         lines.append(f"…他 {len(items) - 30} 件")
     return "\n".join(lines)
+
+
+# --- 保留リマインド・問合せ履歴 -------------------------------------------
+
+EVENT_LABEL = {
+    "created": "登録",
+    "status_change": "状態変更",
+    "inquiry_sent": "問合せ送信",
+    "inquiry_reply": "返信受信",
+    "grok_applied": "Grok反映",
+    "grok_handoff_sent": "KURASHIFTへ引継ぎ",
+    "grok_handoff_ready": "引継ぎ準備",
+    "review_confirm": "確認",
+    "review_pass": "見送り",
+    "note": "メモ",
+}
+
+_OPEN_DECISIONS = ("yes", "no", "sent", "skipped")
+
+
+def inquiry_done(deal: dict[str, Any]) -> bool:
+    """問合せ送信済み／判断済み（＝リマインド対象外）か。"""
+    sj = sj_of(deal)
+    if sj.get("inquiry_sent_at"):
+        return True
+    if str(deal.get("status") or "") in ("passed", "archived"):
+        return True
+    gate = sj.get("property_gate") if isinstance(sj.get("property_gate"), dict) else {}
+    if str(gate.get("decision") or "") in ("yes", "no", "sent"):
+        return True
+    return inquiry_status(deal) in ("sending", "awaiting_reply", "has_reply")
+
+
+def fetch_deals_by_ids(sb: Any, ids: list[str]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    uniq = [i for i in dict.fromkeys(ids) if i]
+    for i in range(0, len(uniq), 100):
+        try:
+            r = (
+                sb.table("kurashift_re_deals")
+                .select("*")
+                .in_("id", uniq[i : i + 100])
+                .execute()
+            )
+        except Exception:
+            continue
+        for d in r.data or []:
+            out[str(d.get("id"))] = d
+    return out
+
+
+def reconcile_pending(
+    sb: Any, st: dict[str, Any]
+) -> tuple[dict[str, int], dict[str, dict[str, Any]]]:
+    """保留B のうち「問合せ済み」「重複」を decision 付与で除外（履歴は消さない）。"""
+    deals = st.setdefault("deals", {})
+    ids = [
+        did
+        for did, d in deals.items()
+        if (d or {}).get("b_card_posted_at")
+        and (d or {}).get("decision") not in _OPEN_DECISIONS
+    ]
+    deal_map = fetch_deals_by_ids(sb, ids)
+    cleaned = {"already_inquired": 0, "duplicate": 0}
+    for did in ids:
+        cur = dict(deals.get(did) or {})
+        deal = deal_map.get(did)
+        if deal is None:
+            continue
+        if inquiry_done(deal):
+            gate = sj_of(deal).get("property_gate")
+            dec = str(gate.get("decision") or "") if isinstance(gate, dict) else ""
+            cur["decision"] = dec if dec in ("yes", "no", "sent") else "sent"
+            cur["cleaned_reason"] = "already_inquired"
+            cur["cleaned_at"] = now_iso()
+            deals[did] = cur
+            cleaned["already_inquired"] += 1
+            continue
+        fp = deal_fp_key(deal)
+        if fp:
+            prev = (st.get("by_fp") or {}).get(fp) or {}
+            if prev.get("decision") in _OPEN_DECISIONS and str(prev.get("deal_id")) != did:
+                cur["decision"] = "skipped"
+                cur["cleaned_reason"] = "duplicate"
+                cur["cleaned_at"] = now_iso()
+                deals[did] = cur
+                cleaned["duplicate"] += 1
+    return cleaned, deal_map
+
+
+def pending_b_items(
+    sb: Any,
+    st: dict[str, Any],
+    *,
+    min_age_hours: float = 12.0,
+    deal_map: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """未判断のBカード（古い順）。min_age_hours 未満の新着は除く。"""
+    deals = st.get("deals") or {}
+    rows = [
+        (did, d)
+        for did, d in deals.items()
+        if (d or {}).get("b_card_posted_at")
+        and (d or {}).get("decision") not in _OPEN_DECISIONS
+    ]
+    if deal_map is None:
+        deal_map = fetch_deals_by_ids(sb, [did for did, _ in rows])
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=min_age_hours)
+    items: list[dict[str, Any]] = []
+    for did, d in rows:
+        deal = deal_map.get(did)
+        if deal is None or inquiry_done(deal):
+            continue
+        ts = str((d or {}).get("b_card_posted_at") or "")
+        try:
+            posted = datetime.fromisoformat(ts)
+        except ValueError:
+            posted = None
+        if posted is not None and posted.tzinfo is None:
+            posted = posted.replace(tzinfo=timezone.utc)
+        if posted is not None and posted > cutoff:
+            continue
+        items.append(
+            {"deal_id": did, "deal": deal, "posted_at": ts, "reason": (d or {}).get("reason")}
+        )
+    items.sort(key=lambda x: x["posted_at"])
+    return items
+
+
+def format_reminder(
+    items: list[dict[str, Any]],
+    *,
+    cleaned: dict[str, int] | None = None,
+    date_str: str | None = None,
+    limit: int = 10,
+) -> str:
+    date_str = date_str or now_jst_date()
+    lines = [
+        f"【物件進行ゲート】保留リマインド（{date_str}・{len(items)}件）",
+        "未判断のBカードです（古い順）。Yes/No をお願いします。",
+        "",
+    ]
+    for i, it in enumerate(items[:limit], 1):
+        deal = it["deal"]
+        did = str(deal["id"])
+        title = str(deal.get("title") or "物件")[:60]
+        rb = land_ratio_brief(deal)
+        meta = f"｜土地値率 {rb}" if rb else ""
+        lines.append(f"{i}) {title}")
+        lines.append(f"   理由：{it.get('reason') or '—'}{meta}")
+        lines.append(
+            f"   ✅ <{action_url(did, 'yes')}|問合せYes> ／ "
+            f"🚫 <{action_url(did, 'no')}|見送りNo> ／ "
+            f"🔎 <{deal_url(did)}|全文>"
+        )
+    if len(items) > limit:
+        lines.append(f"…他 {len(items) - limit} 件")
+    if cleaned:
+        parts = []
+        if cleaned.get("already_inquired"):
+            parts.append(f"問合せ済み {cleaned['already_inquired']}")
+        if cleaned.get("duplicate"):
+            parts.append(f"重複 {cleaned['duplicate']}")
+        if parts:
+            lines += ["", "（保留から外したもの: " + "／".join(parts) + "）"]
+    return "\n".join(lines)
+
+
+def fetch_deal_events(sb: Any, deal_id: str, *, limit: int = 20) -> list[dict[str, Any]]:
+    try:
+        r = (
+            sb.table("kurashift_re_deal_events")
+            .select("event_type,actor,summary,occurred_at,payload")
+            .eq("deal_id", deal_id)
+            .order("occurred_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return list(r.data or [])
+    except Exception:
+        return []
+
+
+def format_event_line(e: dict[str, Any]) -> str:
+    t = str(e.get("occurred_at") or "")
+    try:
+        t = datetime.fromisoformat(t).astimezone(JST).strftime("%m-%d %H:%M")
+    except ValueError:
+        t = t[:16]
+    label = EVENT_LABEL.get(str(e.get("event_type")), str(e.get("event_type")))
+    src = str(e.get("actor") or "")
+    summ = str(e.get("summary") or "").replace("\n", " ").strip()
+    out = f"・{t} {label}"
+    if src:
+        out += f"（{src}）"
+    if summ:
+        out += f" {summ}"
+    return out
 
 
 def deal_fp_key(deal: dict[str, Any]) -> str:

@@ -75,6 +75,12 @@ def main() -> int:
         scan.append("--dry-run")
     rc |= _run(scan, dry_run=False)
 
+    # 保留リマインド（未判断Bを1日1回 #consult へ。問合せ済み/重複は自動で外す）
+    remind = [str(REPO / "scripts" / "jarvis_property_gate_remind.py")]
+    if args.no_post:
+        remind.append("--no-post")
+    rc |= _run(remind, dry_run=args.dry_run)
+
     print(
         """
 ---

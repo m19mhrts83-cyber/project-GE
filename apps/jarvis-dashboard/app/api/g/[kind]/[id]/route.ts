@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   applyGate,
+  fetchDealEvents,
   fetchDealForJudgment,
   htmlPage,
   judgmentDetailHtml,
@@ -42,7 +43,8 @@ export async function GET(
     if (!deal) {
       return htmlPage("エラー", "案件が見つかりません", false);
     }
-    return new NextResponse(judgmentDetailHtml(deal), {
+    const events = await fetchDealEvents(dealId);
+    return new NextResponse(judgmentDetailHtml(deal, events), {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
