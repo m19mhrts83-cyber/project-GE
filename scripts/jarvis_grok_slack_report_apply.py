@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -72,6 +73,74 @@ def normalize_channel(raw: str) -> str:
     return "report"
 
 
+_TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
+_SEP_CELL = re.compile(r":?-{2,}:?$")
+
+
+def _inline_marks(s: str) -> str:
+    s = re.sub(r"\*\*(.+?)\*\*", r"*\1*", s)
+    s = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r"<\2|\1>", s)
+    return s
+
+
+def _is_sep_row(cells: list[str]) -> bool:
+    return bool(cells) and all(_SEP_CELL.fullmatch(c or "") for c in cells)
+
+
+def _render_table(block: list[str]) -> list[str]:
+    """Markdown 表（| a | b |）を Slack 向けの箇条へ。iPhone の折返しでも崩れない。"""
+    rows: list[list[str]] = []
+    has_header = False
+    for ln in block:
+        cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+        if _is_sep_row(cells):
+            has_header = True
+            continue
+        rows.append(cells)
+    if has_header and rows:
+        rows = rows[1:]
+    out: list[str] = []
+    for cells in rows:
+        cells = [_inline_marks(c) for c in cells]
+        if len(cells) == 1:
+            out.append(f"• {cells[0]}")
+        elif len(cells) == 2:
+            out.append(f"• {cells[0]}：{cells[1]}")
+        else:
+            out.append(f"• {cells[0]}：{' ／ '.join(cells[1:])}")
+    return out
+
+
+def _inline(line: str) -> str:
+    m = re.match(r"^\s*(#{1,6})\s+(.*)$", line)
+    if m:
+        return f"*{_inline_marks(m.group(2))}*"
+    if re.match(r"^\s*(-{3,}|\*{3,}|_{3,})\s*$", line):
+        return "———"
+    m2 = re.match(r"^(\s*)[-*]\s+(.*)$", line)
+    if m2:
+        return f"{m2.group(1)}• {_inline_marks(m2.group(2))}"
+    return _inline_marks(line)
+
+
+def markdown_to_slack(text: str) -> str:
+    """Markdown を Slack mrkdwn へ（表→箇条、# → 太字、[t](u) → リンク）。"""
+    lines = text.splitlines()
+    out: list[str] = []
+    i, n = 0, len(lines)
+    while i < n:
+        if _TABLE_ROW.match(lines[i]):
+            block: list[str] = []
+            while i < n and _TABLE_ROW.match(lines[i]):
+                block.append(lines[i])
+                i += 1
+            out += _render_table(block)
+            continue
+        out.append(_inline(lines[i]))
+        i += 1
+    return "\n".join(out)
+
+
 def build_text(meta: dict[str, str], body: str, name: str) -> str:
     bot = meta.get("bot") or meta.get("source") or "Grok"
     title = meta.get("title") or first_heading(body) or name
@@ -99,6 +168,7 @@ def build_text(meta: dict[str, str], body: str, name: str) -> str:
             continue
         filtered.append(line)
     body_clean = "\n".join(filtered).strip() or "（本文なし）"
+    body_clean = markdown_to_slack(body_clean)
     return (
         f"【Grok定型報告】{bot}\n"
         f"・種別: {kind}\n"

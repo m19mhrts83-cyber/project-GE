@@ -419,36 +419,55 @@ def judgment_rows(
     return out
 
 
-def format_judgment_table(
-    rows: list[tuple[str, str]], *, label_width: int = 10
-) -> list[str]:
-    """Slack テキスト向けの簡易表（等幅っぽく揃える）。"""
-    lines = ["```", f"{'項目'.ljust(label_width)} | 内容"]
-    lines.append(f"{'-' * label_width}-+-{'-' * 24}")
+def format_judgment_card(rows: list[tuple[str, str]]) -> list[str]:
+    """モバイル優先の判断材料カード（等幅表を使わず、iPhone で折返しても崩れない）。"""
+    d: dict[str, str] = {}
     for label, val in rows:
-        lines.append(f"{label.ljust(label_width)} | {val}")
-    lines.append("```")
+        d[label] = (val or "").replace("\n", " ").strip() or "—"
+
+    prop = ["*■ 物件*"]
+    for label in ("所在", "価格", "土地", "土地値倍率", "土地評価(万)", "路線価手法", "建物"):
+        if label in d:
+            prop.append(f"• {label}：{d[label]}")
+
+    risk = ["*■ リスク（足切り）*"]
+    if "ハザード総合" in d:
+        risk.append(f"• ハザード総合：{d['ハザード総合']}")
+    indiv = [f"{k}={d[k]}" for k in ("洪水", "高潮", "急傾斜", "内水") if k in d]
+    if indiv:
+        risk.append("• 個別：" + "・".join(indiv))
+
+    tail = [f"*■ 判定材料*"]
+    tail += [f"• {k}：{d[k]}" for k in ("聞く/保留", "問合せ経路", "score") if k in d]
+    if d.get("掲載URL"):
+        tail.append(f"• 掲載URL：{d['掲載URL']}")
+
+    sections = [prop, risk] + ([tail] if len(tail) > 1 else [])
+    lines: list[str] = []
+    for i, sec in enumerate(sections):
+        if i:
+            lines.append("")
+        lines += sec
     return lines
 
 
 def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
     deal_id = str(deal["id"])
     title = str(deal.get("title") or "物件")[:80]
-    rows = judgment_rows(deal, max_cell=90)
+    rows = judgment_rows(deal, max_cell=160)
     lines = [
         "【物件進行ゲート】B 要判断",
-        f"{title}",
-        f"理由: {lane.get('reason')}／listen={lane.get('listen') or '—'}",
+        f"*{title}*",
+        f"理由：{lane.get('reason')} ・ listen={lane.get('listen') or '—'}",
         "",
-        "■ 判断材料（この表で Yes/No してOK）",
-        *format_judgment_table(rows),
+        *format_judgment_card(rows),
         "",
-        f"詳細（表の全文・ログイン不要）: {deal_url(deal_id)}",
+        "*■ 判断（Yes＝この内容で第一問合せを了承）*",
+        f"✅ <{action_url(deal_id, 'yes')}|問合せする（Yes）>",
+        f"🚫 <{action_url(deal_id, 'no')}|見送り（No）>",
+        f"🔎 <{deal_url(deal_id)}|全文を見る（ログイン不要）>",
         "",
-        f"👉 問合せする: {action_url(deal_id, 'yes')}",
-        f"👉 見送り: {action_url(deal_id, 'no')}",
-        "",
-        "（フォールバック）このスレに `Yes` / `No` と返信でも可。",
+        "（このスレに `Yes` / `No` と返信でもOK）",
     ]
     return "\n".join(lines)
 
