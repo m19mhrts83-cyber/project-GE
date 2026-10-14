@@ -27,6 +27,8 @@ REG = HUB / "agents_registry.yaml"
 GROK_REG = REPO / "config" / "grok_bots_registry.yaml"
 GENRE_REG = REPO / "config" / "agent_team_genres.yaml"
 DASH_JSON = REPO / "apps" / "jarvis-dashboard" / "data" / "agentTeam.json"
+# 閲覧共有URLの正本（git追跡）。ローカル上書きは .jarvis_state 側
+FLOWFORGE_SHARE_CONFIG = REPO / "config" / "flowforge_share_urls.json"
 FLOWFORGE_SHARE_STATE = REPO / ".jarvis_state" / "flowforge_share_urls.json"
 FLOWFORGE_LOGIN_EMAIL = "m19m.hrts83@gmail.com"
 DRIVE_HUB = (
@@ -317,12 +319,7 @@ def enrich_genres_with_members(
     return genres
 
 
-def load_flowforge_share_map() -> dict[str, str]:
-    """agent_id / flow_id → share URL（閲覧専用・外部ブラウザ向け）."""
-    if not FLOWFORGE_SHARE_STATE.is_file():
-        return {}
-    raw = json.loads(FLOWFORGE_SHARE_STATE.read_text(encoding="utf-8"))
-    out: dict[str, str] = {}
+def _merge_flowforge_share_raw(raw: dict, out: dict[str, str]) -> None:
     for k, v in (raw.get("by_agent_id") or {}).items():
         if isinstance(v, str) and "/share/" in v:
             out[str(k)] = v
@@ -330,10 +327,27 @@ def load_flowforge_share_map() -> dict[str, str]:
     for k, v in raw.items():
         if str(k).startswith("flow_") and isinstance(v, str) and "/share/" in v:
             by_flow[str(k)] = v
-    # flow_id keys also indexed for lookup in write_dashboard_json
     for k, v in by_flow.items():
         if isinstance(v, str) and "/share/" in v:
             out[f"flow:{k}"] = v
+
+
+def load_flowforge_share_map() -> dict[str, str]:
+    """agent_id / flow_id → share URL（閲覧専用・外部ブラウザ向け）.
+
+    正本は config/flowforge_share_urls.json（git追跡）。
+    .jarvis_state にあれば上書きマージ（ローカル再取得分）。
+    """
+    out: dict[str, str] = {}
+    for path in (FLOWFORGE_SHARE_CONFIG, FLOWFORGE_SHARE_STATE):
+        if not path.is_file():
+            continue
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(raw, dict):
+            _merge_flowforge_share_raw(raw, out)
     return out
 
 

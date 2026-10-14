@@ -147,8 +147,12 @@ export default function AgentTeamClient({
         最終同期: {updated}
         {" · "}
         <a href={builderUrl} target="_blank" rel="noopener noreferrer">
-          {builderTitle || "ビルダー"} ↗
+          ビルダー参考: {builderTitle || "物件と連絡の見守り隊"} ↗
         </a>
+        {" · "}
+        <span title="組織図の正は agents_registry → 本画面。ビルダー共有は編成の参考（localStorage依存）">
+          組織図正＝registry
+        </span>
         {grok.updated ? ` · Grok正本: ${grok.updated}` : null}
       </p>
 
