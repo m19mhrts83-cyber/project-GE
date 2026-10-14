@@ -4641,6 +4641,131 @@ p.back {
 }
 
 /* AIエージェントチーム /agent-team */
+.at-genres {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.at-genre-card {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  background: #fff;
+}
+
+.at-genre-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.at-genre-head h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+}
+
+.at-genre-head .meta {
+  margin: 0;
+  max-width: 42rem;
+  line-height: 1.45;
+}
+
+.at-genre-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: baseline;
+  font-size: 0.88rem;
+}
+
+.at-genre-stats strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.at-genre-leaders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.at-genre-leaders > div {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.at-genre-leader-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: #64748b;
+  text-transform: none;
+}
+
+.at-genre-nav {
+  margin: 0 0 12px;
+}
+
+.at-genre-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.at-genre-col {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.at-genre-col h3 {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.at-genre-sub {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.at-genre-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.at-genre-col li + li {
+  margin-top: 4px;
+}
+
+.at-genre-col a {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.at-genre-col a:hover {
+  color: #0f766e;
+}
+
 .at-tabs {
   display: flex;
   flex-wrap: wrap;

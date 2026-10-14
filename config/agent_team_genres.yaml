@@ -1,0 +1,65 @@
+# AIエージェントチーム × Grok — ダッシュ上位ジャンル（投影用）
+# フォルダ構成・社員 ID は変えない。sync → agentTeam.json.genres[]
+# 正本の室: docs/AIエージェントチーム/agents_registry.yaml
+# Grok 部署: config/grok_bots_registry.yaml
+
+updated: "2026-10-14"
+note: >
+  Jarvis は横断の束ね。各ジャンルは Grok 部（リーダー付き）と AI 室が並行し、
+  ダッシュ /agent-team のジャンルビューで横並びにする。
+
+genres:
+  - id: property
+    name: 物件
+    order: 1
+    summary: 連絡・文面・買い進めパイプライン。Grok 不動産部と AI 100/200/500 室
+    leaders:
+      grok: 不動産賃貸部長（Bucho-RE）＋ S1–S13
+      ai: 連絡・物件動向／返信制作／不動産パイプライン
+    ai_department_ids: ["100", "200", "500"]
+    grok_department_ids: ["re"]
+    nav_hints: ["所有物件", "パートナー", "KURASHIFT"]
+
+  - id: resource
+    name: リソース・家計
+    order: 2
+    summary: 家計 Zaim・課金ガード・AI 枠の見える化。Grok リソース経営と 600 室
+    leaders:
+      grok: リソース経営部長
+      ai: リソース・家計室（611–613）
+    ai_department_ids: ["600"]
+    grok_department_ids: ["resource"]
+    nav_hints: ["Zaim Watch", "課金", "ETC", "Vポイント"]
+
+  - id: coaching
+    name: コーチング
+    order: 3
+    summary: 家族・総務・パートナーDX の助言材料。Grok コーチ系と 700 室
+    leaders:
+      grok: コーチング部長／家族コーチ統括／総務計画T統括
+      ai: コーチング支援室（711–713）
+    ai_department_ids: ["700"]
+    grok_department_ids: ["coaching", "family", "somu", "partner_dx"]
+    nav_hints: ["家族タスク"]
+
+  - id: apps
+    name: アプリ・俯瞰
+    order: 4
+    summary: ダッシュ・KURASHIFT・Slack 俯瞰の更新。Grok アプリ統括と 800 室
+    leaders:
+      grok: アプリ開発統括
+      ai: 俯瞰UI・投影更新室（811–816）
+    ai_department_ids: ["800"]
+    grok_department_ids: ["app_dev"]
+    nav_hints: ["資料ハブ", "アプリ・プロンプト集", "agent-team"]
+
+  - id: jarvis_cross
+    name: Jarvis横断
+    order: 5
+    summary: 品質・ミックス取捨・参謀。Jarvis（Mac）× ホークが横のつながり
+    leaders:
+      grok: ホークアイ（参謀）
+      ai: 品質・タスク運用／ミックス・取捨判断（＋ Jarvis 右腕）
+    ai_department_ids: ["300", "400"]
+    grok_department_ids: ["sanbo", "weather"]
+    nav_hints: ["ホーム", "状況ウォッチ", "対応表"]

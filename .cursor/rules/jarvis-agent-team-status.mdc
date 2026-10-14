@@ -40,7 +40,7 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/j
 
 | 場所 | 用途 |
 |---|---|
-| Jarvis `/agent-team` | AIチーム状況＋**Grok Bot 組織／一覧／対応表**（タブ）。確認用 |
+| Jarvis `/agent-team` | **ジャンル**（物件／リソース／コーチング／アプリ／横断）＋AI室＋Grok＋対応表。正本: `config/agent_team_genres.yaml` |
 | Cursor インブラウザの FlowForge | 作業フローの作り込み・拡大・要素詳細 |
 | FlowForge ログイン | **m19m**（ダッシュの admin ログインとは別） |
 

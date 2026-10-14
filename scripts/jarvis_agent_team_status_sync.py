@@ -4,6 +4,7 @@
 正本: docs/AIエージェントチーム/agents_registry.yaml の status
 ルール: docs/AIエージェントチーム/22_運用状態の識別_20261011.md
 Grok: config/grok_bots_registry.yaml（組織・社員・対応表）
+ジャンル: config/agent_team_genres.yaml（上位分類・ダッシュ投影）
 
 社員フォルダ作成・status 変更のあと必ず実行（Drive 写しも任意で可）。
 ダッシュ投影: apps/jarvis-dashboard/data/agentTeam.json（commit/push で本番反映）
@@ -24,6 +25,7 @@ REPO = Path(__file__).resolve().parents[1]
 HUB = REPO / "docs" / "AIエージェントチーム"
 REG = HUB / "agents_registry.yaml"
 GROK_REG = REPO / "config" / "grok_bots_registry.yaml"
+GENRE_REG = REPO / "config" / "agent_team_genres.yaml"
 DASH_JSON = REPO / "apps" / "jarvis-dashboard" / "data" / "agentTeam.json"
 FLOWFORGE_SHARE_STATE = REPO / ".jarvis_state" / "flowforge_share_urls.json"
 FLOWFORGE_LOGIN_EMAIL = "m19m.hrts83@gmail.com"
@@ -215,6 +217,104 @@ def load_grok_registry() -> dict:
     if not GROK_REG.is_file():
         return {}
     return yaml.safe_load(GROK_REG.read_text(encoding="utf-8")) or {}
+
+
+def load_genre_registry() -> dict:
+    if not GENRE_REG.is_file():
+        return {}
+    return yaml.safe_load(GENRE_REG.read_text(encoding="utf-8")) or {}
+
+
+def build_genre_maps(genre_reg: dict) -> tuple[dict[str, str], dict[str, str], list[dict]]:
+    """ai_dept_id → genre_id, grok_dept_id → genre_id, genres list (skeleton)."""
+    ai_map: dict[str, str] = {}
+    grok_map: dict[str, str] = {}
+    genres_out: list[dict] = []
+    for g in sorted(genre_reg.get("genres") or [], key=lambda x: int(x.get("order") or 99)):
+        gid = str(g.get("id") or "")
+        if not gid:
+            continue
+        for did in g.get("ai_department_ids") or []:
+            ai_map[str(did)] = gid
+        for did in g.get("grok_department_ids") or []:
+            grok_map[str(did)] = gid
+        leaders = g.get("leaders") or {}
+        genres_out.append(
+            {
+                "id": gid,
+                "name": g.get("name") or gid,
+                "order": int(g.get("order") or 99),
+                "summary": g.get("summary") or "",
+                "leaders": {
+                    "grok": leaders.get("grok") or "",
+                    "ai": leaders.get("ai") or "",
+                },
+                "ai_department_ids": [str(x) for x in (g.get("ai_department_ids") or [])],
+                "grok_department_ids": [str(x) for x in (g.get("grok_department_ids") or [])],
+                "nav_hints": list(g.get("nav_hints") or []),
+                # filled in write_dashboard_json
+                "ai_agent_ids": [],
+                "grok_bot_ids": [],
+                "counts": {
+                    "ai": 0,
+                    "grok": 0,
+                    "paired": 0,
+                    "ai_only": 0,
+                    "grok_only": 0,
+                },
+            }
+        )
+    return ai_map, grok_map, genres_out
+
+
+def enrich_genres_with_members(
+    genres: list[dict],
+    agents: list[dict],
+    grok_bots: list[dict],
+    mappings: list[dict],
+) -> list[dict]:
+    by_id = {g["id"]: g for g in genres}
+    for a in agents:
+        gid = a.get("genre_id") or ""
+        g = by_id.get(gid)
+        if not g:
+            continue
+        g["ai_agent_ids"].append(a["id"])
+        g["counts"]["ai"] += 1
+    for b in grok_bots:
+        gid = b.get("genre_id") or ""
+        g = by_id.get(gid)
+        if not g:
+            continue
+        g["grok_bot_ids"].append(b["id"])
+        g["counts"]["grok"] += 1
+    agent_genre = {a["id"]: a.get("genre_id") or "" for a in agents}
+    bot_genre = {b["id"]: b.get("genre_id") or "" for b in grok_bots}
+    for m in mappings:
+        side = m.get("side") or ""
+        gids: set[str] = set()
+        aid = m.get("agent_id") or ""
+        if aid and agent_genre.get(aid):
+            gids.add(agent_genre[aid])
+        for bid in m.get("grok_ids") or []:
+            bg = bot_genre.get(str(bid))
+            if bg:
+                gids.add(bg)
+        # ミックスレーンのみ横断へ（ジャンル不明の全件は載せない）
+        if not gids and m.get("mixup_kind") == "lane":
+            if "jarvis_cross" in by_id:
+                gids.add("jarvis_cross")
+        for gid in gids:
+            g = by_id.get(gid)
+            if not g:
+                continue
+            if side == "paired":
+                g["counts"]["paired"] += 1
+            elif side == "ai_only":
+                g["counts"]["ai_only"] += 1
+            elif side == "grok_only":
+                g["counts"]["grok_only"] += 1
+    return genres
 
 
 def load_flowforge_share_map() -> dict[str, str]:
@@ -414,16 +514,32 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
     agents = data.get("agents") or {}
     builder = data.get("builder_source") or {}
     now = datetime.now(JST).isoformat(timespec="seconds")
+    genre_reg = load_genre_registry()
+    ai_genre_map, grok_genre_map, genres_skel = build_genre_maps(genre_reg)
+    genre_name = {g["id"]: g["name"] for g in genres_skel}
     grok_payload = build_grok_payload(data, load_grok_registry())
     share_map = load_flowforge_share_map()
 
+    for b in grok_payload.get("bots") or []:
+        gid = grok_genre_map.get(str(b.get("department_id") or ""), "")
+        b["genre_id"] = gid
+        b["genre_name"] = genre_name.get(gid, "")
+    for d in grok_payload.get("departments") or []:
+        gid = grok_genre_map.get(str(d.get("id") or ""), "")
+        d["genre_id"] = gid
+        d["genre_name"] = genre_name.get(gid, "")
+
     dept_list = []
     for did, dept in sorted(depts.items(), key=lambda x: str(x[0])):
+        sid = str(did)
+        gid = ai_genre_map.get(sid, "")
         dept_list.append(
             {
-                "id": str(did),
+                "id": sid,
                 "name": dept.get("name") or "",
                 "path": dept.get("path") or "",
+                "genre_id": gid,
+                "genre_name": genre_name.get(gid, ""),
             }
         )
 
@@ -457,6 +573,7 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
             or (share_map.get(f"flow:{ff_id}") if ff_id else "")
             or ""
         )
+        gid = ai_genre_map.get(str(dept_id), "")
         agent_list.append(
             {
                 "id": str(aid),
@@ -464,6 +581,8 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
                 "path": a.get("path") or "",
                 "department_id": str(dept_id),
                 "department_name": dept_name,
+                "genre_id": gid,
+                "genre_name": genre_name.get(gid, ""),
                 "status": st,
                 "status_icon": ICON.get(st, "⚪"),
                 "report": a.get("report") or "",
@@ -485,6 +604,13 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
             }
         )
 
+    genres = enrich_genres_with_members(
+        genres_skel,
+        agent_list,
+        list(grok_payload.get("bots") or []),
+        list(grok_payload.get("mappings") or []),
+    )
+
     payload = {
         "updated": now,
         "registry_updated": data.get("updated") or "",
@@ -502,6 +628,8 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
             "share_id": builder.get("share_id") or "",
         },
         "counts": counts,
+        "genres": genres,
+        "genre_note": genre_reg.get("note") or "",
         "departments": dept_list,
         "agents": agent_list,
         "grok": grok_payload,
@@ -509,7 +637,8 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
     if dry:
         print(
             f"  dashboard JSON (dry): {len(agent_list)} agents / "
-            f"{len(grok_payload.get('bots') or [])} grok bots → {DASH_JSON}"
+            f"{len(grok_payload.get('bots') or [])} grok bots / "
+            f"{len(genres)} genres → {DASH_JSON}"
         )
         return DASH_JSON
     DASH_JSON.parent.mkdir(parents=True, exist_ok=True)
@@ -519,7 +648,8 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
     )
     print(
         f"  dashboard: {DASH_JSON.relative_to(REPO)} "
-        f"({len(agent_list)} agents / {len(grok_payload.get('bots') or [])} grok)"
+        f"({len(agent_list)} agents / {len(grok_payload.get('bots') or [])} grok / "
+        f"{len(genres)} genres)"
     )
     return DASH_JSON
 
