@@ -410,8 +410,9 @@ agents:
     trigger: 時間
     tool_assigned: gencode
     tool_fit: B
-    tool_notes: Zaim火金
-    schedule: 火金ずらす
+    tool_notes: 鮮度＋費目学習。Mac Playwright／GHAはcheckのみ
+    schedule: 火金09鮮度／火金12CSV
+    note: 指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。
   '711':
     name: 家族Journal週次材料係
     path: 700_コーチング支援室/711_家族Journal週次材料係
