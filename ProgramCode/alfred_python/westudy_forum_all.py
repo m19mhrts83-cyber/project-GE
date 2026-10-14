@@ -376,6 +376,26 @@ def get_env_or_raise(key: str) -> str:
 # -------------------------
 # ドライバ生成・制御
 # -------------------------
+def _launch_chrome(options: ChromeOptions) -> webdriver.Chrome:
+    """WESTUDY_CHROME_BINARY / WESTUDY_CHROMEDRIVER があればその版で起動する。
+
+    GHA ubuntu-24.04 image 20260927.320 の Chrome 154.0.8037.57 は
+    westudy.co.jp/login が data: の空 DOM のまま page load timeout になる。
+    直前イメージの 153.0.8010.52 では同じワークフローが成功していた。
+    """
+    binary = (os.environ.get("WESTUDY_CHROME_BINARY") or os.environ.get("CHROME_BIN") or "").strip()
+    driver_path = (os.environ.get("WESTUDY_CHROMEDRIVER") or "").strip()
+    if binary:
+        options.binary_location = binary
+        log(f"🌐 Chrome binary (pinned): {binary}")
+    if driver_path:
+        from selenium.webdriver.chrome.service import Service
+
+        log(f"🌐 ChromeDriver (pinned): {driver_path}")
+        return webdriver.Chrome(options=options, service=Service(executable_path=driver_path))
+    return webdriver.Chrome(options=options)
+
+
 def create_driver() -> webdriver.Chrome:
     options = ChromeOptions()
     if is_headless():
@@ -411,7 +431,7 @@ def create_driver() -> webdriver.Chrome:
     except Exception:
         pass
 
-    drv = webdriver.Chrome(options=options)
+    drv = _launch_chrome(options)
     try:
         drv.execute_cdp_cmd(
             "Page.addScriptToEvaluateOnNewDocument",

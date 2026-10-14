@@ -107,6 +107,28 @@ jobs:
           python -m pip install -r "$CHATBOT_DIR/scripts/requirements-ci.txt"
           python -m playwright install --with-deps chromium
 
+      # Chrome 154.0.8037.57（image ubuntu24/20260927.320 以降）は
+      # westudy.co.jp/login を 45s 待っても data: の空 DOM のまま
+      # "Timed out receiving message from renderer" になる。
+      # 直前イメージの 153.0.8010.52（20260920.314）では同じジョブが成功している。
+      - name: Pin Chrome 153 for WeStudy login
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver="153.0.8010.52"
+          base="https://storage.googleapis.com/chrome-for-testing-public/${ver}/linux64"
+          dest="${RUNNER_TEMP}/chrome-for-testing-${ver}"
+          mkdir -p "$dest"
+          curl -fsSL -o "$dest/chrome.zip" "${base}/chrome-linux64.zip"
+          curl -fsSL -o "$dest/chromedriver.zip" "${base}/chromedriver-linux64.zip"
+          unzip -q -o "$dest/chrome.zip" -d "$dest"
+          unzip -q -o "$dest/chromedriver.zip" -d "$dest"
+          chmod +x "$dest/chrome-linux64/chrome" "$dest/chromedriver-linux64/chromedriver"
+          "$dest/chrome-linux64/chrome" --version
+          "$dest/chromedriver-linux64/chromedriver" --version
+          echo "WESTUDY_CHROME_BINARY=$dest/chrome-linux64/chrome" >> "$GITHUB_ENV"
+          echo "WESTUDY_CHROMEDRIVER=$dest/chromedriver-linux64/chromedriver" >> "$GITHUB_ENV"
+
       - name: Run scrape + delta + auto import
         shell: bash
         run: |
