@@ -45,6 +45,7 @@ INTENT_SYNC = REPO / "scripts" / "jarvis_intent_from_journal_chat.py"
 PUSH = REPO / "scripts" / "jarvis_dashboard_push.py"
 KURASHIFT_GROK_MATCH = REPO / "scripts" / "jarvis_kurashift_property_mail_match.py"
 KURASHIFT_S1_EVIDENCE = REPO / "scripts" / "jarvis_kurashift_s1_evidence_to_drive.py"
+PROPERTY_GATE_DEGRADED = REPO / "scripts" / "jarvis_property_gate_degraded.py"
 GROK_BUCHO_APPLY = REPO / "scripts" / "jarvis_grok_bucho_mail_apply.py"
 BUCHO_INBOX_POLL = REPO / "scripts" / "jarvis_bucho_inbox_poll.py"
 TODOIST_COMMENT_INBOX = REPO / "scripts" / "jarvis_todoist_comment_inbox.py"
@@ -88,6 +89,9 @@ APP_DEV_CARDS = REPO / "scripts" / "jarvis_app_dev_cards_morning.py"
 APP_DEV_TODOIST = REPO / "scripts" / "jarvis_app_dev_todoist_sync.py"
 APP_DEV_QUEUE = REPO / "scripts" / "jarvis_app_dev_queue.py"
 KARATE_ADVISOR_SYNC = REPO / "scripts" / "jarvis_karate_advisor_sync.py"
+PARTNER_111_NIGHT_STATE = REPO / ".jarvis_state" / "partner_111_night.json"
+PARTNER_111_NIGHT_RUNNER = REPO / "launchd" / "partner_111_night_runner.sh"
+PARTNER_111_NIGHT_LOG = Path.home() / "Library" / "Logs" / "jarvis_partner_111_night"
 
 
 def now_iso() -> str:
@@ -515,6 +519,56 @@ def this_week_family_journal_slot() -> datetime:
     )
 
 
+def partner_111_night_needs_catchup() -> bool:
+    """20:30 JST 以降で今夜の 111 夜枠が未実施なら True。"""
+    if (os.environ.get("JARVIS_PARTNER_111_NIGHT_DISABLE") or "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return False
+    now = datetime.now(JST)
+    if (now.hour, now.minute) < (20, 30):
+        return False
+    today = today_jst()
+    if not PARTNER_111_NIGHT_STATE.is_file():
+        return True
+    try:
+        data = json.loads(PARTNER_111_NIGHT_STATE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return True
+    return data.get("last_ok_date") != today
+
+
+def spawn_partner_111_night(*, dry_run: bool) -> str:
+    """夜枠 runner を裏起動（soft-fail）。"""
+    if dry_run:
+        print("# dry-run: would spawn partner_111_night", flush=True)
+        return "dry-run"
+    if not PARTNER_111_NIGHT_RUNNER.is_file():
+        print("# partner_111_night: runner missing", file=sys.stderr, flush=True)
+        return "missing"
+    PARTNER_111_NIGHT_LOG.mkdir(parents=True, exist_ok=True)
+    out = open(PARTNER_111_NIGHT_LOG / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(PARTNER_111_NIGHT_LOG / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        subprocess.Popen(
+            ["/bin/zsh", str(PARTNER_111_NIGHT_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# partner_111_night: spawned (20:30窓取りこぼし)", flush=True)
+        return "spawned"
+    except OSError as e:
+        print(f"# partner_111_night spawn failed: {e}", file=sys.stderr, flush=True)
+        out.close()
+        err.close()
+        return "fail"
+
+
 def family_journal_weekly_needs_catchup() -> bool:
     """日曜 08:00 枠が未成功なら True（月曜以降の朝オープンで拾う）。"""
     if os.environ.get("JARVIS_FAMILY_JOURNAL_WEEKLY_DISABLE") == "1":
@@ -684,6 +738,20 @@ def main() -> int:
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+    # 朝バンドル済でも、20:30以降に未実施の 111 夜枠だけ回収（Mac 再開）
+    if (
+        not args.force
+        and already_refreshed_today()
+        and partner_111_night_needs_catchup()
+    ):
+        print(
+            f"# morning refresh already done; partner_111_night catchup only "
+            f"({today_jst()})",
+            flush=True,
+        )
+        spawn_partner_111_night(dry_run=args.dry_run)
+        return 0
+
     if not args.force and already_refreshed_today():
         print(f"# skip: already refreshed today ({today_jst()})")
         return 0
@@ -777,6 +845,27 @@ def main() -> int:
                 )
         else:
             results["steps"]["kurashift_s1_evidence"] = "skipped"
+        # 2c0b. 物件進行ゲート 114（Jarvis 不要・soft-fail。上限時もプログラムで Bカードまで）
+        if PROPERTY_GATE_DEGRADED.is_file() and (
+            os.environ.get("JARVIS_PROPERTY_GATE_DISABLE") or ""
+        ).strip() != "1":
+            gate_cmd = [exe, str(PROPERTY_GATE_DEGRADED)]
+            if args.dry_run:
+                gate_cmd.append("--dry-run")
+            rc_gate = run_step(
+                "property_gate_114",
+                gate_cmd,
+                timeout=180,
+                dry_run=False,
+            )
+            results["steps"]["property_gate_114"] = rc_gate
+            if rc_gate != 0:
+                print(
+                    f"# property_gate_114 soft-fail rc={rc_gate}",
+                    file=sys.stderr,
+                )
+        else:
+            results["steps"]["property_gate_114"] = "skipped"
     else:
         results["steps"]["kurashift_grok_mail"] = "skipped"
 
@@ -1269,6 +1358,15 @@ def main() -> int:
     else:
         results["steps"]["app_dev_queue"] = "skipped"
         print("# app_dev_queue: skip", flush=True)
+
+    # 12. 111 夜枠（20:30〜・初回オープンが夜のとき）
+    if partner_111_night_needs_catchup():
+        results["steps"]["partner_111_night"] = spawn_partner_111_night(
+            dry_run=args.dry_run
+        )
+    else:
+        results["steps"]["partner_111_night"] = "fresh"
+        print("# partner_111_night: skip (before 20:30 or already done)", flush=True)
 
     results["ok"] = failures == 0
     results["finished_at"] = now_iso()

@@ -71,7 +71,7 @@ alwaysApply: true
 | `COMPANY_BANK_NAME` / `COMPANY_BANK_BRANCH` / `COMPANY_BANK_ACCOUNT` / `COMPANY_BANK_ACCOUNT_NAME_KANA` | 法人口座1（名古屋銀行等） |
 | `COMPANY_BANK2_*` / `COMPANY_BANK2_WEB_LOGIN_PASSWORD` | 法人口座2（PayPay銀行・法人等） |
 | `KURASAPO_OWNER_LOGIN_ID` / `KURASAPO_OWNER_PASSWORD` | LEAF・くらさぽコネクト（オーナー／送金明細書） |
-| `PAYPAY_STORE_NO` / `PAYPAY_ACCOUNT_NO` / `PAYPAY_PASSWORD` | PayPay銀行 Web（税理士提出・明細） |
+| `PAYPAY_STORE_NO` / `PAYPAY_ACCOUNT_NO` / `PAYPAY_PASSWORD` | PayPay銀行 Web（税理士提出・明細・振込）。振込OTPは**カード型トークン**（メール不可） |
 | `MYKOMON_USER_ID` / `MYKOMON_PASSWORD` | MyKomon（税理士共有ポータル） |
 | `MINITECH_EMAIL` / `MINITECH_PASSWORD` | ミニテック・オーナーマイページ |
 | `ORIX_LOGIN_ID` / `ORIX_PASSWORD` | オリックス銀行（投資用不動産ローン） |

@@ -350,12 +350,29 @@ def build_admin_gmail_service():
     """
     _ensure_manual_path()
     from gmail_to_yoritoori import build_service_for_token  # type: ignore
+    from gmail_api_scopes import (  # type: ignore
+        GMAIL_SCOPES_READ_MODIFY,
+        resolve_read_scopes_for_token,
+    )
+    import json
 
     token_env = (os.environ.get("GMAIL_ADMIN_TOKEN_PATH") or "").strip()
     token = Path(token_env) if token_env else (MANUAL_DIR / "token_livingsupport.json")
     if not token.is_file():
         raise RuntimeError(f"admin token missing: {token}")
-    service, email = build_service_for_token(token)
+    # launchd / 非対話ではブラウザ同意を開かず fail-fast（12日ハング防止）
+    try:
+        token_data = json.loads(token.read_text(encoding="utf-8"))
+    except Exception:
+        token_data = {}
+    scopes = resolve_read_scopes_for_token(token_data) or list(GMAIL_SCOPES_READ_MODIFY)
+    # 既読化（modify）が必要なので、readonly 単独なら modify を要求しつつ
+    # 非対話ではブラウザを開かない
+    if "https://www.googleapis.com/auth/gmail.modify" not in scopes:
+        scopes = list(GMAIL_SCOPES_READ_MODIFY)
+    service, email = build_service_for_token(
+        token, scopes=scopes, open_browser=False
+    )
     if not service:
         raise RuntimeError("failed to build Gmail service for admin")
     return service, (email or "admin@livingsupport-matsu.co.jp").lower()

@@ -16,6 +16,7 @@ export const INQUIRY_STATUS_LABEL: Record<string, string> = {
   sending: "送信中",
   sent: "問合せ済",
   awaiting_reply: "問合せ済・返信待ち",
+  awaiting_first_inquiry: "第一問合せ待ち",
   awaiting_grok: "Grok依頼中",
   has_reply: "問合せ済・返信あり",
 };
@@ -31,6 +32,9 @@ export function inquiryPhase(status: string | null | undefined): {
   }
   if (s === "draft") {
     return { inquired: false, label: "下書き（未送信）" };
+  }
+  if (s === "awaiting_first_inquiry") {
+    return { inquired: false, label: "第一問合せ待ち" };
   }
   if (s === "sending") return { inquired: true, label: "問合せ送信中" };
   if (s === "sent") return { inquired: true, label: "問合せ済" };

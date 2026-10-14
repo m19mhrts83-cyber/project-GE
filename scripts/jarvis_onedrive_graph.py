@@ -392,6 +392,65 @@ def upload_file_graph(
         raise RuntimeError(f"graph upload HTTP {e.code}: {detail}") from e
 
 
+def list_children_graph(rel_path: str) -> list[dict[str, Any]]:
+    """フォルダ直下の子（1階層）。各要素: name / path / is_folder / size / id。"""
+    token = get_access_token()
+    base = rel_path.strip("/")
+    url = (
+        _graph_item_api(base)
+        + ":/children?$select=id,name,size,folder,file&$top=200"
+    )
+    out: list[dict[str, Any]] = []
+    while url:
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = json.load(r)
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")[:500]
+            if e.code == 404:
+                raise FileNotFoundError(rel_path) from e
+            raise RuntimeError(f"graph children HTTP {e.code}: {detail}") from e
+        for it in data.get("value") or []:
+            name = str(it.get("name") or "")
+            child_path = f"{base}/{name}" if base else name
+            out.append(
+                {
+                    "id": it.get("id"),
+                    "name": name,
+                    "path": child_path,
+                    "is_folder": bool(it.get("folder")),
+                    "size": it.get("size"),
+                }
+            )
+        url = data.get("@odata.nextLink") or ""
+    return out
+
+
+def list_children_graph_depth(
+    rel_path: str,
+    *,
+    max_depth: int = 2,
+) -> list[dict[str, Any]]:
+    """フォルダを深さ優先で列挙（ファイルのみ返す）。max_depth=2 なら Stock/日付/ファイル。"""
+    files: list[dict[str, Any]] = []
+
+    def _walk(folder: str, depth: int) -> None:
+        try:
+            children = list_children_graph(folder)
+        except FileNotFoundError:
+            return
+        for ch in children:
+            if ch.get("is_folder"):
+                if depth < max_depth:
+                    _walk(str(ch["path"]), depth + 1)
+            else:
+                files.append(ch)
+
+    _walk(rel_path.strip("/"), 0)
+    return files
+
+
 def write_file_local(rel_path: str, content: bytes) -> None:
     p = LOCAL_ONEDRIVE / rel_path
     p.parent.mkdir(parents=True, exist_ok=True)

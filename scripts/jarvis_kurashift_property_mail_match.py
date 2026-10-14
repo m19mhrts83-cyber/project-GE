@@ -537,29 +537,32 @@ def apply_s1_inquiry_fields(
         )
         result["inquiry_status"] = "awaiting_reply"
     elif action == "kurashift_handoff":
+        # 正: KURASHIFT／Jarvis が仲介へ第一問合せ待ち（Tier 対象）。
+        # 旧バグ: awaiting_grok にすると Tier 除外され「止まって見える」。
         update_inquiry(
             sb,
             deal,
-            inquiry_status="awaiting_grok",
+            inquiry_status="awaiting_first_inquiry",
             summary_json={
-                "inquiry_channel": "grok_handoff",
+                "inquiry_channel": "agent_email",
                 "inquiry_url": grok.get("inquiry_url"),
                 "portal": grok.get("portal"),
                 "s1_inquiry_note": grok.get("inquiry_note"),
                 "s1_gmail_id": gmail_id,
                 "awaiting_kurashift_first_inquiry": True,
+                "s1_inquiry_action": "kurashift_handoff",
             },
         )
         insert_deal_event(
             sb,
             deal_id=deal_id,
             event_type="grok_handoff_ready",
-            summary="S1: 仲介メール可 → KURASHIFT第一問合せ待ち",
+            summary="S1: 仲介メール可 → KURASHIFT第一問合せ待ち（awaiting_first_inquiry）",
             actor="s1",
-            to_status="awaiting_grok",
+            to_status="awaiting_first_inquiry",
             payload={"inquiry_action": action, "gmail_id": gmail_id},
         )
-        result["inquiry_status"] = "awaiting_grok"
+        result["inquiry_status"] = "awaiting_first_inquiry"
     elif action == "investigate_only":
         insert_deal_event(
             sb,
@@ -1054,7 +1057,7 @@ def fetch_grok_mails(
             row["inquiry_status"] = "awaiting_reply"
             sj["inquiry_channel"] = "s1_portal"
         elif action == "kurashift_handoff":
-            row["inquiry_status"] = "awaiting_grok"
+            row["inquiry_status"] = "awaiting_first_inquiry"
             sj["inquiry_channel"] = "grok_handoff"
             sj["awaiting_kurashift_first_inquiry"] = True
         row["summary_json"] = sj

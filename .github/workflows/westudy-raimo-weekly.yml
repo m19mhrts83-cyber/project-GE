@@ -58,13 +58,12 @@ jobs:
       RAIMO_SKIP_SCREENSHOT: "1"
       RAIMO_TRY_COMMUNITY_REFRESH: "0"
       RAIMO_IMPORT_CHUNK_ROWS: "80"
+      # 2026-09-27 の成功週次より前の投稿は comments に足さない（差分の床）
+      WESTUDY_COMMENTS_SINCE: "2026-09-27"
       # 日曜朝の WeStudy タイムアウト対策（既定より多め）
       WESTUDY_LOGIN_NAV_RETRIES: "5"
       WESTUDY_PAGE_GET_RETRIES: "4"
       WESTUDY_LOGIN_FORM_ATTEMPTS: "5"
-      # Chrome 154.0.8037.57（2026-10-04 run 37171011849）はログインが
-      # data:, のまま renderer timeout。成功週の 153 に固定。外すときは stable。
-      WESTUDY_CHROME_VERSION: "153"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,6 +109,28 @@ jobs:
           python -m pip install -r "$CHATBOT_DIR/scripts/requirements-ci.txt"
           python -m playwright install --with-deps chromium
 
+      # Chrome 154.0.8037.57（image ubuntu24/20260927.320 以降）は
+      # westudy.co.jp/login を 45s 待っても data: の空 DOM のまま
+      # "Timed out receiving message from renderer" になる。
+      # 直前イメージの 153.0.8010.52（20260920.314）では同じジョブが成功している。
+      - name: Pin Chrome 153 for WeStudy login
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver="153.0.8010.52"
+          base="https://storage.googleapis.com/chrome-for-testing-public/${ver}/linux64"
+          dest="${RUNNER_TEMP}/chrome-for-testing-${ver}"
+          mkdir -p "$dest"
+          curl -fsSL -o "$dest/chrome.zip" "${base}/chrome-linux64.zip"
+          curl -fsSL -o "$dest/chromedriver.zip" "${base}/chromedriver-linux64.zip"
+          unzip -q -o "$dest/chrome.zip" -d "$dest"
+          unzip -q -o "$dest/chromedriver.zip" -d "$dest"
+          chmod +x "$dest/chrome-linux64/chrome" "$dest/chromedriver-linux64/chromedriver"
+          "$dest/chrome-linux64/chrome" --version
+          "$dest/chromedriver-linux64/chromedriver" --version
+          echo "WESTUDY_CHROME_BINARY=$dest/chrome-linux64/chrome" >> "$GITHUB_ENV"
+          echo "WESTUDY_CHROMEDRIVER=$dest/chromedriver-linux64/chromedriver" >> "$GITHUB_ENV"
+
       - name: Run scrape + delta + auto import
         shell: bash
         run: |
@@ -151,6 +172,7 @@ jobs:
           echo "delta_rows=$rows" >> "$GITHUB_OUTPUT"
           upload_note="n/a"
           supabase_note="n/a"
+          emb_note="n/a"
           health_note="n/a"
           latest_log=""
           shopt -s nullglob
@@ -168,6 +190,9 @@ jobs:
               supabase_note="skipped (env missing)"
             elif rg -q "Supabase取込失敗" "$latest_log" 2>/dev/null; then
               supabase_note="failed (ログ参照)"
+            fi
+            if rg -q "^emb未付与:" "$latest_log" 2>/dev/null; then
+              emb_note="$(rg "^emb未付与:" "$latest_log" | head -n 1)"
             fi
             if rg -q "Raimo取込完了:" "$latest_log" 2>/dev/null; then
               upload_note="$(rg "Raimo取込完了:" "$latest_log" | tail -n 1)"
@@ -192,12 +217,14 @@ jobs:
               echo "- 疎通/心拍: \`$health_note\`"
               echo "- supabase: n/a"
               echo "- raimo: n/a"
+              echo "- emb: \`$emb_note\`"
             else
               echo "- delta: \`$latest_delta\`"
               echo "- rows: \`$rows\`"
               echo "- 疎通/心拍: \`$health_note\`"
               echo "- supabase: \`$supabase_note\`"
               echo "- raimo: \`$upload_note\`"
+              echo "- emb: \`$emb_note\`"
             fi
             if [[ -n "$latest_log" ]]; then
               echo "- log: \`$latest_log\`"

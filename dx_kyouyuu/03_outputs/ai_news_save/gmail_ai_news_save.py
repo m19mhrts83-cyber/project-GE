@@ -66,7 +66,14 @@ CREDENTIALS_PATH = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", str(DEFAULT_CRE
 TOKEN_PATH = Path(os.environ.get("GMAIL_TOKEN_PATH", str(DEFAULT_CREDENTIALS_DIR / "token.json")))
 
 AI_NEWS_FROM = "ikeda@workstyle-evolution.co.jp"
+# 旧: 「注目AIニュース…」／新（2026-09〜）: 「【いけともAIニュース M/D週】…」
 AI_NEWS_SUBJECT = "注目AIニュース"
+AI_NEWS_SUBJECT_ALT = "いけともAIニュース"
+
+
+def _ai_news_subject_clause() -> str:
+    """Gmail 検索用。旧件名・新件名の両方にヒットさせる。"""
+    return f'(subject:"{AI_NEWS_SUBJECT}" OR subject:"{AI_NEWS_SUBJECT_ALT}")'
 
 
 def load_env():
@@ -448,7 +455,7 @@ def main():
     out_dir = Path(args.output) if args.output else save_path
     if args.dry_run:
         print(f"[dry-run] 保存先: {out_dir}")
-        print(f"[dry-run] 検索: from:{AI_NEWS_FROM} subject:\"{AI_NEWS_SUBJECT}\" newer_than:7d")
+        print(f"[dry-run] 検索: from:{AI_NEWS_FROM} {_ai_news_subject_clause()} newer_than:7d")
 
     if not credentials_path.exists():
         print("エラー: credentials.json が見つかりません", file=sys.stderr)
@@ -518,15 +525,17 @@ def main():
         day_after = day + timedelta(days=2)
         after_str = f"{day_before.year}/{day_before.month}/{day_before.day}"
         before_str = f"{day_after.year}/{day_after.month}/{day_after.day}"
+        subj = _ai_news_subject_clause()
         if args.allow_forwarded:
-            query = f'subject:"{AI_NEWS_SUBJECT}" after:{after_str} before:{before_str}'
+            query = f'{subj} after:{after_str} before:{before_str}'
         else:
-            query = f'from:{AI_NEWS_FROM} subject:"{AI_NEWS_SUBJECT}" after:{after_str} before:{before_str}'
+            query = f'from:{AI_NEWS_FROM} {subj} after:{after_str} before:{before_str}'
     else:
+        subj = _ai_news_subject_clause()
         if args.allow_forwarded:
-            query = f'subject:"{AI_NEWS_SUBJECT}" newer_than:7d'
+            query = f'{subj} newer_than:7d'
         else:
-            query = f'from:{AI_NEWS_FROM} subject:"{AI_NEWS_SUBJECT}" newer_than:7d'
+            query = f'from:{AI_NEWS_FROM} {subj} newer_than:7d'
 
     result = service.users().messages().list(userId="me", q=query, maxResults=20).execute()
     messages = result.get("messages", [])

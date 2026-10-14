@@ -42,6 +42,8 @@
 | KURASHIFT 問合せ（Tier3） | `kurashift-re-daily-inquiry.yml` | 明示 enabled 時 |
 | Zaim 財務日次（API 系） | `zaim-finance-sync.yml` | Playwright CSV とは別 |
 | Ops Fail Watch | `jarvis-ops-fail-watch.yml` | 失敗監視 |
+| **211 管理会社朝便** | `jarvis-reply-draft-211.yml` | 07:30 JST。Graph materialize→正本 PUT→Slack。Mac launchd は保険 |
+| **111 パートナー昼枠** | `jarvis-partner-day-report.yml` | 11:50 JST。Gmail＋Chatwork→MD→更新時のみ Slack `#report`（LINEなし） |
 | Pages / deploy | `pages-docs.yml` / `trade-desk-deploy.yml` | 定例というよりデプロイ |
 
 ---
@@ -58,15 +60,18 @@
 | CHRLINE／オプチャ常駐 | `line.openchat.watch` 等 | Mac 専用 |
 | **815オプチャ MD→DB→publish→/openchat** | `openchat-md-db-sync`（07:40/20:30） | CHRLINE＋OneDrive＋kamiooya-qa（staging→ready）。パートナー確認／朝LINEでもMDは取込済み想定 |
 | 夜間フル triage | `night-triage` | **パートナー Gmail／Chatwork 判定は GHA 本線**（`JARVIS_NIGHT_TRIAGE_SKIP_PARTNER_GMAIL`／`…_CHATWORK` 既定1）。Mac は LINE/iMessage・815・取込補完 |
+| 211 朝便（保険） | `reply-draft-211` | **本線は GHA**。ローカル path 保険。緑化後 uninstall |
 | 朝オープン／Mac 朝バンドル | `triage-morning-open` + `jarvis_morning_mac_refresh` | 取りこぼし回収のハブ（必須起動ではない） |
 | dashboard push（投影） | `dashboard-push` | `.jarvis_state` 依存 |
 | 家族 Journal 週次 | `family-journal-weekly` | Drive／Notion 補完 |
 | 部長ボックス poll | `bucho-inbox-poll` | Drive ローカル。同帯で Todoist @cal → カレンダー（完了で予定削除） |
-| 画面ロック解除キャッチアップ | `screen-unlock-catchup` | 解除で15分クラスだけ即実行（部長ボックス・Todoistコメント）。時刻指定ジョブは解除では起動しない |
+| 画面ロック解除キャッチアップ | `screen-unlock-catchup` | 解除で15分クラス即実行（部長ボックス・Todoistコメント）。**例外**: 111夜枠（20:30以降・未実施）も回収 |
+| **111 パートナー夜枠** | `partner-111-night`（20:30） | CHRLINE＋公式エクスポート＋ダッシュボード開く→更新時 `#report`。GHA不可 |
 | Cursor revise worker | `cursor-revise-worker` | ローカルキュー |
 | WeStudy Drive 添付 | `westudy-gdrive-archive` | admin Drive＋Mac |
 | プライベートバックアップ | `private-backup` | ローカル age |
 | **LINE 公式エクスポート定常取込** | `line-export-poll`（15分/RunAtLoad） | EmailMe→Gmail(estate)→inbox→`5.やり取り.md` を自動化。OneDrive 正本＋`.jarvis_state`。2026-09-30 |
+| **物件進行ゲート 114** | `property-gate-114`（11:15）＋朝バンドル／昼 Grok取込後 | Supabase＋Slack Webhook。Cursor不要の次善本線。2026-10-12 |
 | 天気朝ブリーフ等 | `weather-morning-brief` 等 | Mac／ローカル前提のもの |
 
 ---

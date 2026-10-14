@@ -1,0 +1,106 @@
+# パートナー連絡整理係（111）昼枠
+# 11:50 JST: Gmail＋Chatwork → 5.やり取り.md → 更新時のみ Slack #report
+#
+# 朝の triage（05:00）とは別。初回は workflow_dispatch で確認してから schedule 運用。
+
+name: Jarvis Partner Day Report (111)
+
+on:
+  schedule:
+    - cron: "50 2 * * *" # 11:50 JST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "OneDrive 書込なし・Slack も dry-run"
+        required: false
+        type: boolean
+        default: false
+      skip_slack:
+        description: "取込のみ（Slack 投稿しない）"
+        required: false
+        type: boolean
+        default: false
+      limit:
+        description: "Gmail 最大スレッド数（既定25・朝 triage と二度取り軽減）"
+        required: false
+        default: "25"
+
+concurrency:
+  group: jarvis-partner-day-report
+  cancel-in-progress: true
+
+jobs:
+  day-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          pip install -q google-api-python-client google-auth-httplib2 google-auth-oauthlib \
+            supabase pyyaml requests msal
+
+      # 朝 triage と同型（admin Gmail token を 1b マニュアルへ展開）
+      - name: Materialize Gmail credentials
+        env:
+          GMAIL_CREDENTIALS_B64: ${{ secrets.GMAIL_CREDENTIALS_B64 }}
+          GMAIL_ADMIN_TOKEN_B64: ${{ secrets.GMAIL_ADMIN_TOKEN_B64 }}
+        run: |
+          set -euo pipefail
+          CRED_DIR="${{ github.workspace }}/.credentials"
+          MANUAL="${{ github.workspace }}/215_kamiooya/C1_cursor/1b_Cursorマニュアル"
+          mkdir -p "$CRED_DIR"
+          if [[ -z "${GMAIL_CREDENTIALS_B64:-}" || -z "${GMAIL_ADMIN_TOKEN_B64:-}" ]]; then
+            echo "::error::Need GMAIL_CREDENTIALS_B64 and GMAIL_ADMIN_TOKEN_B64"
+            exit 1
+          fi
+          echo "$GMAIL_CREDENTIALS_B64" | base64 -d > "$CRED_DIR/credentials.json"
+          echo "$GMAIL_ADMIN_TOKEN_B64" | base64 -d > "$CRED_DIR/token_admin.json"
+          cp "$CRED_DIR/credentials.json" "$MANUAL/credentials.json"
+          cp "$CRED_DIR/token_admin.json" "$MANUAL/token_livingsupport.json"
+          test -s "$CRED_DIR/credentials.json"
+          test -s "$CRED_DIR/token_admin.json"
+
+      - name: Day pipeline (Gmail+CW → Slack if updates)
+        env:
+          GMAIL_CREDENTIALS_PATH: ${{ github.workspace }}/.credentials/credentials.json
+          GMAIL_ADMIN_TOKEN_PATH: ${{ github.workspace }}/.credentials/token_admin.json
+          CHATWORK_API_TOKEN: ${{ secrets.CHATWORK_API_TOKEN }}
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
+          MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
+          MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
+          MS_GRAPH_REFRESH_TOKEN: ${{ secrets.MS_GRAPH_REFRESH_TOKEN }}
+          MS_GRAPH_AUTHORITY: ${{ secrets.MS_GRAPH_AUTHORITY }}
+          MS_GRAPH_USER_UPN: ${{ secrets.MS_GRAPH_USER_UPN }}
+          MS_GRAPH_DRIVE_ID: ${{ secrets.MS_GRAPH_DRIVE_ID }}
+          SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
+          SLACK_WEBHOOK_AI_TEAM_CONSULT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_CONSULT }}
+          SLACK_WEBHOOK_AI_TEAM_OPS: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_OPS }}
+          LIMIT: ${{ github.event.inputs.limit || '40' }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+          SKIP_SLACK: ${{ github.event.inputs.skip_slack || 'false' }}
+          PYTHONPATH: ${{ github.workspace }}/scripts:${{ github.workspace }}/215_kamiooya/C1_cursor/1b_Cursorマニュアル
+        run: |
+          set -euo pipefail
+          if [[ -z "${MS_GRAPH_REFRESH_TOKEN:-}" && -z "${MS_GRAPH_CLIENT_SECRET:-}" ]]; then
+            echo "::warning::MS_GRAPH_* missing — abort day pipeline"
+            exit 0
+          fi
+          ARGS=(--frame day --limit "$LIMIT")
+          if [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run-slack)
+          else
+            ARGS+=(--apply)
+            if [[ "$SKIP_SLACK" != "true" ]]; then
+              ARGS+=(--push)
+            fi
+          fi
+          python scripts/jarvis_partner_day_pipeline.py "${ARGS[@]}"
