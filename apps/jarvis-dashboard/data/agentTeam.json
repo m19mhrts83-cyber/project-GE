@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-14T18:09:19+09:00",
+  "updated": "2026-10-14T18:20:17+09:00",
   "registry_updated": "2026-10-11",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
   "flowforge_login_hint": "m19m",
@@ -18,46 +18,305 @@
     "停止": 0,
     "運用確認中": 2
   },
+  "genres": [
+    {
+      "id": "property",
+      "name": "物件",
+      "order": 1,
+      "summary": "連絡・文面・買い進めパイプライン。Grok 不動産部と AI 100/200/500 室",
+      "leaders": {
+        "grok": "不動産賃貸部長（Bucho-RE）＋ S1–S13",
+        "ai": "連絡・物件動向／返信制作／不動産パイプライン"
+      },
+      "ai_department_ids": [
+        "100",
+        "200",
+        "500"
+      ],
+      "grok_department_ids": [
+        "re"
+      ],
+      "nav_hints": [
+        "所有物件",
+        "パートナー",
+        "KURASHIFT"
+      ],
+      "ai_agent_ids": [
+        "111",
+        "112",
+        "113",
+        "114",
+        "115",
+        "211",
+        "511",
+        "512",
+        "513",
+        "514",
+        "515",
+        "516"
+      ],
+      "grok_bot_ids": [
+        "bucho_re",
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5",
+        "s6",
+        "s7",
+        "s8",
+        "s9",
+        "s10",
+        "s11",
+        "s12",
+        "s13"
+      ],
+      "counts": {
+        "ai": 12,
+        "grok": 14,
+        "paired": 8,
+        "ai_only": 4,
+        "grok_only": 2
+      }
+    },
+    {
+      "id": "resource",
+      "name": "リソース・家計",
+      "order": 2,
+      "summary": "家計 Zaim・課金ガード・AI 枠の見える化。Grok リソース経営と 600 室",
+      "leaders": {
+        "grok": "リソース経営部長",
+        "ai": "リソース・家計室（611–613）"
+      },
+      "ai_department_ids": [
+        "600"
+      ],
+      "grok_department_ids": [
+        "resource"
+      ],
+      "nav_hints": [
+        "Zaim Watch",
+        "課金",
+        "ETC",
+        "Vポイント"
+      ],
+      "ai_agent_ids": [
+        "611",
+        "612",
+        "613"
+      ],
+      "grok_bot_ids": [
+        "resource"
+      ],
+      "counts": {
+        "ai": 3,
+        "grok": 1,
+        "paired": 1,
+        "ai_only": 2,
+        "grok_only": 0
+      }
+    },
+    {
+      "id": "coaching",
+      "name": "コーチング",
+      "order": 3,
+      "summary": "家族・総務・パートナーDX の助言材料。Grok コーチ系と 700 室",
+      "leaders": {
+        "grok": "コーチング部長／家族コーチ統括／総務計画T統括",
+        "ai": "コーチング支援室（711–713）"
+      },
+      "ai_department_ids": [
+        "700"
+      ],
+      "grok_department_ids": [
+        "coaching",
+        "family",
+        "somu",
+        "partner_dx"
+      ],
+      "nav_hints": [
+        "家族タスク"
+      ],
+      "ai_agent_ids": [
+        "711",
+        "712",
+        "713"
+      ],
+      "grok_bot_ids": [
+        "coaching",
+        "family",
+        "madoka",
+        "tamaki",
+        "sawa",
+        "chikage",
+        "karate",
+        "somu",
+        "isozaki",
+        "tanaka",
+        "yamashita",
+        "kawabata",
+        "shinji",
+        "nakajima",
+        "ota_akitsugu",
+        "imai",
+        "ohara",
+        "hachiya",
+        "partner_dx",
+        "shift_ai",
+        "world_intec"
+      ],
+      "counts": {
+        "ai": 3,
+        "grok": 21,
+        "paired": 3,
+        "ai_only": 0,
+        "grok_only": 18
+      }
+    },
+    {
+      "id": "apps",
+      "name": "アプリ・俯瞰",
+      "order": 4,
+      "summary": "ダッシュ・KURASHIFT・Slack 俯瞰の更新。Grok アプリ統括と 800 室",
+      "leaders": {
+        "grok": "アプリ開発統括",
+        "ai": "俯瞰UI・投影更新室（811–816）"
+      },
+      "ai_department_ids": [
+        "800"
+      ],
+      "grok_department_ids": [
+        "app_dev"
+      ],
+      "nav_hints": [
+        "資料ハブ",
+        "アプリ・プロンプト集",
+        "agent-team"
+      ],
+      "ai_agent_ids": [
+        "811",
+        "812",
+        "813",
+        "814",
+        "815",
+        "816"
+      ],
+      "grok_bot_ids": [
+        "app_dev"
+      ],
+      "counts": {
+        "ai": 6,
+        "grok": 1,
+        "paired": 0,
+        "ai_only": 6,
+        "grok_only": 1
+      }
+    },
+    {
+      "id": "jarvis_cross",
+      "name": "Jarvis横断",
+      "order": 5,
+      "summary": "品質・ミックス取捨・参謀。Jarvis（Mac）× ホークが横のつながり",
+      "leaders": {
+        "grok": "ホークアイ（参謀）",
+        "ai": "品質・タスク運用／ミックス・取捨判断（＋ Jarvis 右腕）"
+      },
+      "ai_department_ids": [
+        "300",
+        "400"
+      ],
+      "grok_department_ids": [
+        "sanbo",
+        "weather"
+      ],
+      "nav_hints": [
+        "ホーム",
+        "状況ウォッチ",
+        "対応表"
+      ],
+      "ai_agent_ids": [
+        "311",
+        "312",
+        "313",
+        "314",
+        "315",
+        "316",
+        "411",
+        "412",
+        "413",
+        "414",
+        "415"
+      ],
+      "grok_bot_ids": [
+        "hawk",
+        "weather"
+      ],
+      "counts": {
+        "ai": 11,
+        "grok": 2,
+        "paired": 5,
+        "ai_only": 6,
+        "grok_only": 2
+      }
+    }
+  ],
+  "genre_note": "Jarvis は横断の束ね。各ジャンルは Grok 部（リーダー付き）と AI 室が並行し、 ダッシュ /agent-team のジャンルビューで横並びにする。\n",
   "departments": [
     {
       "id": "100",
       "name": "連絡・物件動向把握室",
-      "path": "100_連絡・物件動向把握室"
+      "path": "100_連絡・物件動向把握室",
+      "genre_id": "property",
+      "genre_name": "物件"
     },
     {
       "id": "200",
       "name": "返信・案内文面制作室",
-      "path": "200_返信・案内文面制作室"
+      "path": "200_返信・案内文面制作室",
+      "genre_id": "property",
+      "genre_name": "物件"
     },
     {
       "id": "300",
       "name": "品質・タスク運用管理室",
-      "path": "300_品質・タスク運用管理室"
+      "path": "300_品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断"
     },
     {
       "id": "400",
       "name": "ミックス・取捨判断室",
-      "path": "400_ミックス・取捨判断室"
+      "path": "400_ミックス・取捨判断室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断"
     },
     {
       "id": "500",
       "name": "不動産パイプライン実行室",
-      "path": "500_不動産パイプライン実行室"
+      "path": "500_不動産パイプライン実行室",
+      "genre_id": "property",
+      "genre_name": "物件"
     },
     {
       "id": "600",
       "name": "リソース・家計室",
-      "path": "600_リソース・家計室"
+      "path": "600_リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計"
     },
     {
       "id": "700",
       "name": "コーチング支援室",
-      "path": "700_コーチング支援室"
+      "path": "700_コーチング支援室",
+      "genre_id": "coaching",
+      "genre_name": "コーチング"
     },
     {
       "id": "800",
       "name": "俯瞰UI・投影更新室",
-      "path": "800_俯瞰UI・投影更新室"
+      "path": "800_俯瞰UI・投影更新室",
+      "genre_id": "apps",
+      "genre_name": "アプリ・俯瞰"
     }
   ],
   "agents": [
@@ -67,6 +326,8 @@
       "path": "100_連絡・物件動向把握室/111_パートナー連絡整理係",
       "department_id": "100",
       "department_name": "連絡・物件動向把握室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "運用確認",
       "status_icon": "🟡",
       "report": "report",
@@ -92,6 +353,8 @@
       "path": "100_連絡・物件動向把握室/112_LINE同期監視係",
       "department_id": "100",
       "department_name": "連絡・物件動向把握室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -117,6 +380,8 @@
       "path": "100_連絡・物件動向把握室/113_物件買進め確認係",
       "department_id": "100",
       "department_name": "連絡・物件動向把握室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -142,6 +407,8 @@
       "path": "100_連絡・物件動向把握室/114_物件一次判定係",
       "department_id": "100",
       "department_name": "連絡・物件動向把握室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "運用確認中",
       "status_icon": "⚪",
       "report": "consult",
@@ -167,6 +434,8 @@
       "path": "100_連絡・物件動向把握室/115_修繕進捗要約係",
       "department_id": "100",
       "department_name": "連絡・物件動向把握室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -192,6 +461,8 @@
       "path": "200_返信・案内文面制作室/211_返信案内下書き係",
       "department_id": "200",
       "department_name": "返信・案内文面制作室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "運用確認",
       "status_icon": "🟡",
       "report": "report",
@@ -217,6 +488,8 @@
       "path": "300_品質・タスク運用管理室/311_送信前品質係",
       "department_id": "300",
       "department_name": "品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -242,6 +515,8 @@
       "path": "300_品質・タスク運用管理室/312_Todoist起票整理係",
       "department_id": "300",
       "department_name": "品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -267,6 +542,8 @@
       "path": "300_品質・タスク運用管理室/313_完了候補確認係",
       "department_id": "300",
       "department_name": "品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -292,6 +569,8 @@
       "path": "300_品質・タスク運用管理室/314_業務品質監査係",
       "department_id": "300",
       "department_name": "品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -317,6 +596,8 @@
       "path": "300_品質・タスク運用管理室/315_連携健全性点検係",
       "department_id": "300",
       "department_name": "品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "運用確認",
       "status_icon": "🟡",
       "report": "ops",
@@ -342,6 +623,8 @@
       "path": "300_品質・タスク運用管理室/316_データアナリスト",
       "department_id": "300",
       "department_name": "品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -367,6 +650,8 @@
       "path": "400_ミックス・取捨判断室/411_Grok材料取込係",
       "department_id": "400",
       "department_name": "ミックス・取捨判断室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "consult",
@@ -392,6 +677,8 @@
       "path": "400_ミックス・取捨判断室/412_両系統比較係",
       "department_id": "400",
       "department_name": "ミックス・取捨判断室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "consult",
@@ -417,6 +704,8 @@
       "path": "400_ミックス・取捨判断室/413_取捨判断ドラフト係",
       "department_id": "400",
       "department_name": "ミックス・取捨判断室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "consult",
@@ -442,6 +731,8 @@
       "path": "400_ミックス・取捨判断室/414_フィードバック返送係",
       "department_id": "400",
       "department_name": "ミックス・取捨判断室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -467,6 +758,8 @@
       "path": "400_ミックス・取捨判断室/415_二重起票・競合監視係",
       "department_id": "400",
       "department_name": "ミックス・取捨判断室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -492,6 +785,8 @@
       "path": "500_不動産パイプライン実行室/511_問合せ送信準備係",
       "department_id": "500",
       "department_name": "不動産パイプライン実行室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "運用確認中",
       "status_icon": "⚪",
       "report": "consult",
@@ -517,6 +812,8 @@
       "path": "500_不動産パイプライン実行室/512_仲介返信取込係",
       "department_id": "500",
       "department_name": "不動産パイプライン実行室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -542,6 +839,8 @@
       "path": "500_不動産パイプライン実行室/513_需給・ペルソナ材料係",
       "department_id": "500",
       "department_name": "不動産パイプライン実行室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -567,6 +866,8 @@
       "path": "500_不動産パイプライン実行室/514_融資打診準備係",
       "department_id": "500",
       "department_name": "不動産パイプライン実行室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "候補",
       "status_icon": "⚪",
       "report": "consult",
@@ -592,6 +893,8 @@
       "path": "500_不動産パイプライン実行室/515_購入後クリエイティブ係",
       "department_id": "500",
       "department_name": "不動産パイプライン実行室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -617,6 +920,8 @@
       "path": "500_不動産パイプライン実行室/516_業者開拓フォロー係",
       "department_id": "500",
       "department_name": "不動産パイプライン実行室",
+      "genre_id": "property",
+      "genre_name": "物件",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -642,6 +947,8 @@
       "path": "600_リソース・家計室/611_リソース制約要約係",
       "department_id": "600",
       "department_name": "リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -667,6 +974,8 @@
       "path": "600_リソース・家計室/612_課金・年会費ガード係",
       "department_id": "600",
       "department_name": "リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -692,6 +1001,8 @@
       "path": "600_リソース・家計室/613_Zaim鮮度・二重取込係",
       "department_id": "600",
       "department_name": "リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -717,6 +1028,8 @@
       "path": "700_コーチング支援室/711_家族Journal週次材料係",
       "department_id": "700",
       "department_name": "コーチング支援室",
+      "genre_id": "coaching",
+      "genre_name": "コーチング",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -742,6 +1055,8 @@
       "path": "700_コーチング支援室/712_アドバイザー週次パック係",
       "department_id": "700",
       "department_name": "コーチング支援室",
+      "genre_id": "coaching",
+      "genre_name": "コーチング",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -767,6 +1082,8 @@
       "path": "700_コーチング支援室/713_総務・DXコーチ材料係",
       "department_id": "700",
       "department_name": "コーチング支援室",
+      "genre_id": "coaching",
+      "genre_name": "コーチング",
       "status": "候補",
       "status_icon": "⚪",
       "report": "report",
@@ -792,6 +1109,8 @@
       "path": "800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係",
       "department_id": "800",
       "department_name": "俯瞰UI・投影更新室",
+      "genre_id": "apps",
+      "genre_name": "アプリ・俯瞰",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -817,6 +1136,8 @@
       "path": "800_俯瞰UI・投影更新室/812_残り棚棚卸し係",
       "department_id": "800",
       "department_name": "俯瞰UI・投影更新室",
+      "genre_id": "apps",
+      "genre_name": "アプリ・俯瞰",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -842,6 +1163,8 @@
       "path": "800_俯瞰UI・投影更新室/813_代行指揮枠切替係",
       "department_id": "800",
       "department_name": "俯瞰UI・投影更新室",
+      "genre_id": "apps",
+      "genre_name": "アプリ・俯瞰",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -867,6 +1190,8 @@
       "path": "800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係",
       "department_id": "800",
       "department_name": "俯瞰UI・投影更新室",
+      "genre_id": "apps",
+      "genre_name": "アプリ・俯瞰",
       "status": "設計中",
       "status_icon": "🔵",
       "report": "ops",
@@ -892,6 +1217,8 @@
       "path": "800_俯瞰UI・投影更新室/815_KURASHIFT更新係",
       "department_id": "800",
       "department_name": "俯瞰UI・投影更新室",
+      "genre_id": "apps",
+      "genre_name": "アプリ・俯瞰",
       "status": "設計中",
       "status_icon": "🔵",
       "report": "ops",
@@ -917,6 +1244,8 @@
       "path": "800_俯瞰UI・投影更新室/816_Slack俯瞰連携係",
       "department_id": "800",
       "department_name": "俯瞰UI・投影更新室",
+      "genre_id": "apps",
+      "genre_name": "アプリ・俯瞰",
       "status": "候補",
       "status_icon": "⚪",
       "report": "ops",
@@ -970,7 +1299,9 @@
         "bot_ids": [
           "hawk"
         ],
-        "bot_count": 1
+        "bot_count": 1,
+        "genre_id": "jarvis_cross",
+        "genre_name": "Jarvis横断"
       },
       {
         "id": "coaching",
@@ -980,7 +1311,9 @@
         "bot_ids": [
           "coaching"
         ],
-        "bot_count": 1
+        "bot_count": 1,
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "re",
@@ -1003,7 +1336,9 @@
           "s12",
           "s13"
         ],
-        "bot_count": 14
+        "bot_count": 14,
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "resource",
@@ -1013,7 +1348,9 @@
         "bot_ids": [
           "resource"
         ],
-        "bot_count": 1
+        "bot_count": 1,
+        "genre_id": "resource",
+        "genre_name": "リソース・家計"
       },
       {
         "id": "family",
@@ -1028,7 +1365,9 @@
           "chikage",
           "karate"
         ],
-        "bot_count": 6
+        "bot_count": 6,
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "app_dev",
@@ -1038,7 +1377,9 @@
         "bot_ids": [
           "app_dev"
         ],
-        "bot_count": 1
+        "bot_count": 1,
+        "genre_id": "apps",
+        "genre_name": "アプリ・俯瞰"
       },
       {
         "id": "somu",
@@ -1058,7 +1399,9 @@
           "ohara",
           "hachiya"
         ],
-        "bot_count": 11
+        "bot_count": 11,
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "partner_dx",
@@ -1070,7 +1413,9 @@
           "shift_ai",
           "world_intec"
         ],
-        "bot_count": 3
+        "bot_count": 3,
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "weather",
@@ -1080,7 +1425,9 @@
         "bot_ids": [
           "weather"
         ],
-        "bot_count": 1
+        "bot_count": 1,
+        "genre_id": "jarvis_cross",
+        "genre_name": "Jarvis横断"
       }
     ],
     "bots": [
@@ -1096,7 +1443,9 @@
         "department_id": "sanbo",
         "department_name": "参謀室",
         "channel": "参謀室 · Jarvisボックス",
-        "exec_level": "低（振り分け中心）"
+        "exec_level": "低（振り分け中心）",
+        "genre_id": "jarvis_cross",
+        "genre_name": "Jarvis横断"
       },
       {
         "id": "coaching",
@@ -1110,7 +1459,9 @@
         "department_id": "coaching",
         "department_name": "コーチング部",
         "channel": "コーチング部",
-        "exec_level": "中（助言・委譲）"
+        "exec_level": "中（助言・委譲）",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "bucho_re",
@@ -1124,7 +1475,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s1",
@@ -1138,7 +1491,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s2",
@@ -1152,7 +1507,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s3",
@@ -1166,7 +1523,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s4",
@@ -1180,7 +1539,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s5",
@@ -1194,7 +1555,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s6",
@@ -1208,7 +1571,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s7",
@@ -1222,7 +1587,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s8",
@@ -1236,7 +1603,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s9",
@@ -1250,7 +1619,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s10",
@@ -1264,7 +1635,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s11",
@@ -1278,7 +1651,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s12",
@@ -1292,7 +1667,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "s13",
@@ -1306,7 +1683,9 @@
         "department_id": "re",
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
-        "exec_level": "高（Grok内実務）"
+        "exec_level": "高（Grok内実務）",
+        "genre_id": "property",
+        "genre_name": "物件"
       },
       {
         "id": "resource",
@@ -1320,7 +1699,9 @@
         "department_id": "resource",
         "department_name": "リソース経営",
         "channel": "リソース経営チーム",
-        "exec_level": "中（論点・制約）"
+        "exec_level": "中（論点・制約）",
+        "genre_id": "resource",
+        "genre_name": "リソース・家計"
       },
       {
         "id": "family",
@@ -1334,7 +1715,9 @@
         "department_id": "family",
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
-        "exec_level": "中（助言・委譲）"
+        "exec_level": "中（助言・委譲）",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "madoka",
@@ -1348,7 +1731,9 @@
         "department_id": "family",
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
-        "exec_level": "中（助言・委譲）"
+        "exec_level": "中（助言・委譲）",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "tamaki",
@@ -1362,7 +1747,9 @@
         "department_id": "family",
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
-        "exec_level": "中（助言・委譲）"
+        "exec_level": "中（助言・委譲）",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "sawa",
@@ -1376,7 +1763,9 @@
         "department_id": "family",
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
-        "exec_level": "中（助言・委譲）"
+        "exec_level": "中（助言・委譲）",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "chikage",
@@ -1390,7 +1779,9 @@
         "department_id": "family",
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
-        "exec_level": "中（助言・委譲）"
+        "exec_level": "中（助言・委譲）",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "karate",
@@ -1404,7 +1795,9 @@
         "department_id": "family",
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
-        "exec_level": "中（助言・委譲）"
+        "exec_level": "中（助言・委譲）",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "app_dev",
@@ -1418,7 +1811,9 @@
         "department_id": "app_dev",
         "department_name": "アプリ開発",
         "channel": "アプリ開発チーム · 参謀室",
-        "exec_level": "低（提案まで）"
+        "exec_level": "低（提案まで）",
+        "genre_id": "apps",
+        "genre_name": "アプリ・俯瞰"
       },
       {
         "id": "somu",
@@ -1432,7 +1827,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "isozaki",
@@ -1446,7 +1843,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "tanaka",
@@ -1460,7 +1859,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "yamashita",
@@ -1474,7 +1875,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "kawabata",
@@ -1488,7 +1891,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "shinji",
@@ -1502,7 +1907,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "nakajima",
@@ -1516,7 +1923,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "ota_akitsugu",
@@ -1530,7 +1939,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "imai",
@@ -1544,7 +1955,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "ohara",
@@ -1558,7 +1971,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "hachiya",
@@ -1572,7 +1987,9 @@
         "department_id": "somu",
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "partner_dx",
@@ -1586,7 +2003,9 @@
         "department_id": "partner_dx",
         "department_name": "パートナーDX",
         "channel": "パートナーDXコーチングチーム",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "shift_ai",
@@ -1600,7 +2019,9 @@
         "department_id": "partner_dx",
         "department_name": "パートナーDX",
         "channel": "パートナーDXコーチングチーム",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "world_intec",
@@ -1614,7 +2035,9 @@
         "department_id": "partner_dx",
         "department_name": "パートナーDX",
         "channel": "パートナーDXコーチングチーム",
-        "exec_level": "中"
+        "exec_level": "中",
+        "genre_id": "coaching",
+        "genre_name": "コーチング"
       },
       {
         "id": "weather",
@@ -1628,7 +2051,9 @@
         "department_id": "weather",
         "department_name": "天気",
         "channel": "天気お知らせ",
-        "exec_level": "低（定型）"
+        "exec_level": "低（定型）",
+        "genre_id": "jarvis_cross",
+        "genre_name": "Jarvis横断"
       }
     ],
     "mappings": [

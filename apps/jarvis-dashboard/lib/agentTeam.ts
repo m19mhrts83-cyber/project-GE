@@ -8,6 +8,8 @@ export type AgentTeamAgent = {
   path: string;
   department_id: string;
   department_name: string;
+  genre_id?: string;
+  genre_name?: string;
   status: AgentStatus;
   status_icon: string;
   report: string;
@@ -32,6 +34,28 @@ export type AgentTeamDept = {
   id: string;
   name: string;
   path: string;
+  genre_id?: string;
+  genre_name?: string;
+};
+
+export type AgentTeamGenre = {
+  id: string;
+  name: string;
+  order: number;
+  summary: string;
+  leaders: { grok: string; ai: string };
+  ai_department_ids: string[];
+  grok_department_ids: string[];
+  nav_hints: string[];
+  ai_agent_ids: string[];
+  grok_bot_ids: string[];
+  counts: {
+    ai: number;
+    grok: number;
+    paired: number;
+    ai_only: number;
+    grok_only: number;
+  };
 };
 
 export type GrokPillar = {
@@ -54,6 +78,8 @@ export type GrokBot = {
   department_name: string;
   channel: string;
   exec_level: string;
+  genre_id?: string;
+  genre_name?: string;
 };
 
 export type GrokDept = {
@@ -63,6 +89,8 @@ export type GrokDept = {
   exec_level: string;
   bot_ids: string[];
   bot_count: number;
+  genre_id?: string;
+  genre_name?: string;
 };
 
 export type GrokMappingSide = "paired" | "ai_only" | "grok_only" | string;
@@ -106,6 +134,8 @@ export type AgentTeamPayload = {
   flowforge_open_note: string;
   builder: { title: string; url: string; share_id: string };
   counts: Record<string, number>;
+  genres?: AgentTeamGenre[];
+  genre_note?: string;
   departments: AgentTeamDept[];
   agents: AgentTeamAgent[];
   grok?: GrokPayload;
@@ -137,6 +167,11 @@ export function getGrok(): GrokPayload {
       mappings: [],
     }
   );
+}
+
+export function getGenres(): AgentTeamGenre[] {
+  const list = getAgentTeam().genres || [];
+  return list.slice().sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
 }
 
 export function getGrokBotById(id: string): GrokBot | undefined {
