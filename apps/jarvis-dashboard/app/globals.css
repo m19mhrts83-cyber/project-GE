@@ -4833,6 +4833,39 @@ p.back {
   opacity: 0.75;
 }
 
+.at-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 16px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #475569;
+}
+
+.at-legend-title {
+  font-weight: 700;
+  color: #0f172a;
+  margin-right: 4px;
+}
+
+.at-legend-item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+}
+
+.at-legend-mean {
+  color: #64748b;
+  font-weight: 400;
+}
+
 .at-counts {
   display: flex;
   flex-wrap: wrap;
