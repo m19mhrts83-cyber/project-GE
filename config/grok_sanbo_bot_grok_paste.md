@@ -176,7 +176,8 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
   - `要Jarvis連携` … タイトル先頭 `[要Jarvis連携]` ＋ labels
   - 任意: `quick`（5分以内）
 - **本線** → `10_inbox_from_grok/` に `action: todoist_tasks`（下フォーマット）。Jarvis が Mac で自動 apply（開いた直後〜15分）
-- **定型報告（週次統括・完了サマリ）** → 同 inbox に `action: slack_report`（`channel: report`）。都度の相談は参謀室チャットのまま。Jarvis が Slack へ投稿（正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md`）
+- **定型報告（週次統括・完了サマリ）** → 同 inbox に `action: slack_report`（`channel: report`）
+- **松野の判断が要る材料** → 同 inbox に `action: slack_report`（`channel: consult`）。**チャットだけに閉じない**（2026-10-15 確定）。壁打ち・雑談は参謀室チャット可。正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md` · 物件Bは `25_`／shared_working 物件進行ゲート
 - **Grok Notion 直接**は移行期のみ。新分は Todoist
 - **書けない／旧** → `action: notion_tasks` も可（移行期）
 
