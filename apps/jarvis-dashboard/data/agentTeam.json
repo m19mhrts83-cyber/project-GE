@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-14T17:44:24+09:00",
+  "updated": "2026-10-14T18:20:17+09:00",
   "registry_updated": "2026-10-11",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
   "flowforge_login_hint": "m19m",
@@ -1007,13 +1007,13 @@
       "status_icon": "⚪",
       "report": "ops",
       "trigger": "時間",
-      "schedule": "火金ずらす",
+      "schedule": "火金09鮮度／火金12CSV",
       "tool_assigned": "gencode",
       "tool_fit": "B",
-      "tool_notes": "Zaim火金",
-      "note": "",
-      "summary": "",
-      "flow_summary": "",
+      "tool_notes": "鮮度＋費目学習。Mac Playwright／GHAはcheckのみ",
+      "note": "指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。",
+      "summary": "銀行連携の鮮度・二重取込の安全直し・費目学習。開いたとき `/zaim` が整っている状態へ",
+      "flow_summary": "開始（火金09／火金12／キュー／人）→ **鮮度 check→（Mac）stale更新** と **CSV→learn→費目・集計 apply** を分岐 → **同じ `/zaim` 投影**に合流 → 異常時だけ `#ops`。",
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
@@ -2415,7 +2415,7 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+        "role_split": "指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。"
       },
       {
         "side": "paired",
