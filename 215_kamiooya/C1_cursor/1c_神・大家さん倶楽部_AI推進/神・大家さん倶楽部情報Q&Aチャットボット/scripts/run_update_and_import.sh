@@ -213,7 +213,13 @@ fi
 
 if [[ "$SUPABASE_CONFIGURED" -eq 1 ]]; then
   echo "==> step2: Supabaseへ差分CSVを upsert"
-  if ! "$PYTHON" "$UPLOAD_SUPABASE_SCRIPT" --csv "$LATEST_DELTA"; then
+  # 週次は WESTUDY_COMMENTS_SINCE（例: 2026-09-27）より前を comments に足さない。
+  # lesson 取込（step4）には渡さない。
+  supabase_cmd=( "$PYTHON" "$UPLOAD_SUPABASE_SCRIPT" --csv "$LATEST_DELTA" )
+  if [[ -n "${WESTUDY_COMMENTS_SINCE:-}" ]]; then
+    supabase_cmd+=( --since "$WESTUDY_COMMENTS_SINCE" )
+  fi
+  if ! "${supabase_cmd[@]}"; then
     if [[ "${SUPABASE_FAIL_OPEN:-0}" == "1" ]]; then
       echo "警告: Supabase取込に失敗しましたが、SUPABASE_FAIL_OPEN=1 のため処理を継続します。" >&2
     else
