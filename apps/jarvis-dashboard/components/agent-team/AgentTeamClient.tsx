@@ -19,6 +19,15 @@ import {
 const STATUS_FILTERS = ["すべて", "運用確認", "設計中", "運用", "候補", "停止"] as const;
 type Tab = "genre" | "ai" | "grok" | "map";
 
+/** AI社員の状態シグナル（色・印）— docs/AIエージェントチーム/22_運用状態の識別 */
+const STATUS_LEGEND = [
+  { status: "運用確認", icon: "🟡", meaning: "定時が動いている仕上げ中" },
+  { status: "設計中", icon: "🔵", meaning: "FlowForge／実装着手〜" },
+  { status: "運用", icon: "🟢", meaning: "意図OK済みの定常運用" },
+  { status: "候補", icon: "⚪", meaning: "指示書スタブのみ（未着手）" },
+  { status: "停止", icon: "⛔", meaning: "止めている" },
+] as const;
+
 type Props = {
   departments: AgentTeamDept[];
   agents: AgentTeamAgent[];
@@ -179,6 +188,19 @@ export default function AgentTeamClient({
         ))}
       </div>
 
+      <p className="at-legend" aria-label="AI社員ステータスの凡例">
+        <span className="at-legend-title">状態シグナル</span>
+        {STATUS_LEGEND.map((row) => (
+          <span key={row.status} className="at-legend-item" title={row.meaning}>
+            <span className={statusClass(row.status)} aria-hidden>
+              {row.icon}
+            </span>
+            <span className={statusClass(row.status)}>{row.status}</span>
+            <span className="at-legend-mean">{row.meaning}</span>
+          </span>
+        ))}
+      </p>
+
       {tab === "genre" ? (
         <>
           {genreNote ? <p className="at-hint">{genreNote}</p> : null}
@@ -328,21 +350,27 @@ export default function AgentTeamClient({
           <div className="at-counts" aria-label="状態別件数">
             {(
               [
-                ["運用確認", counts["運用確認"] ?? 0],
-                ["設計中", counts["設計中"] ?? 0],
-                ["運用", counts["運用"] ?? 0],
-                ["候補", counts["候補"] ?? 0],
-                ["停止", counts["停止"] ?? 0],
+                ["運用確認", "🟡", counts["運用確認"] ?? 0],
+                ["設計中", "🔵", counts["設計中"] ?? 0],
+                ["運用", "🟢", counts["運用"] ?? 0],
+                ["候補", "⚪", counts["候補"] ?? 0],
+                ["停止", "⛔", counts["停止"] ?? 0],
               ] as const
-            ).map(([label, n]) => (
+            ).map(([label, icon, n]) => (
               <button
                 key={label}
                 type="button"
                 className={`at-count ${statusFilter === label ? "is-on" : ""}`}
+                title={
+                  STATUS_LEGEND.find((r) => r.status === label)?.meaning || label
+                }
                 onClick={() =>
                   setStatusFilter(statusFilter === label ? "すべて" : label)
                 }
               >
+                <span className={statusClass(label)} aria-hidden>
+                  {icon}
+                </span>
                 <span className={statusClass(label)}>{label}</span>
                 <strong>{n}</strong>
               </button>
