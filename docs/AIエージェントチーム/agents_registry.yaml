@@ -191,10 +191,10 @@ agents:
     status: 運用確認
     report: ops
     tool_assigned: gha
-    note: 本線=GHA日曜21:00（--cloud）。Mac補完=日曜21:45 --remediate-once。#ops／未解決は#consult。運用確認中
+    note: 本線=GHA日曜21:00（--cloud）。Mac補完=日曜21:45 --remediate-once（WeStudy＋オプチャ＋Gmail token）。#ops／未解決は#consult。運用確認中
     trigger: 時間＋Fail
     tool_fit: B
-    tool_notes: GHA21:00検知→Mac21:45で1回トライ→結果報告
+    tool_notes: GHA21:00検知→Mac21:45で1回トライ→結果報告。Gmail再同意は人
     schedule: Sun 21:00 GHA / 21:45 Mac
   '316':
     name: データアナリスト
@@ -360,7 +360,7 @@ agents:
     path: 500_不動産パイプライン実行室/516_業者開拓フォロー係
     flowforge_id: flow_dCheumorewDolXnfpksSuWKu
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dCheumorewDolXnfpksSuWKu
-    status: 設計中
+    status: 運用確認
     report: report
     mixup_kind: mac_twin
     grok_counterpart: s2+s4+s9
@@ -370,7 +370,7 @@ agents:
     tool_fit: A+B
     tool_notes: 見守り本線=GHA平日16:00（skip-refill）。Macは補給保険。実行はGrok。定型は都度許可不要
     schedule: "GHA平日16:00＋Mac朝/夕補給"
-    note: "実行=Grok S2/S4/S9／見守り=516。定型は都度許可不要。Phase D apply済。設計中"
+    note: "運用確認（2026-10-15）。格上げ=週1健全×連続2週→運用。実行=Grok／見守り=516"
   '611':
     name: リソース制約要約係
     path: 600_リソース・家計室/611_リソース制約要約係

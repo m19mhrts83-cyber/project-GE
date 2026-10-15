@@ -2,10 +2,10 @@
 
 作業再開時は **このファイル → `CLAUDE.md`** の順で読む。
 
-## いまの位置（2026-10-11）
+## いまの位置（2026-10-15）
 
 - 状態: **運用確認**（`00_🟡運用確認.md`）。日曜 schedule 成功後に Jarvis が sync で `運用` へ（方式1）
-- 済: GHA本線・手動GHA緑・`#ops`・`--remediate-once`・launchd 日曜21:45
+- 済: GHA本線・手動GHA緑・`#ops`・`--remediate-once`・launchd 日曜21:45・**Gmail token モニター**
 - 残り: 日曜 cron（schedule）着弾待ち → 運用引き上げ
 
 ## ログ
@@ -18,9 +18,10 @@
 | 2026-10-11 | 日曜cron1回＝運用OK（方式1） | promote-to-ops | schedule待ち |
 | 2026-10-11 | **検知→1回トライ→結果** 実装 | `--remediate-once`／launchd 21:45／incident-flow | dry-run確認・schedule待ち |
 | 2026-10-11 | smoke: `--remediate-once --dry-run` → 判定OK・トライ不要 | `logs/20261011_180441_ops_health.md` | 日曜 schedule＋21:45 着弾 |
+| 2026-10-15 | Gmail token を 315 点検に追加 | `gmail_token_snapshot`／CLAUDE・incident-flow | Mac dry-runで行確認 |
 
 ## 禁止メモ
 
-- トークン破壊の自動復旧・QR無人完了・YAML大量無確認追記・WeStudy自動再実行
+- トークン破壊の自動復旧・**Gmail 無人ブラウザ再同意**・QR無人完了・YAML大量無確認追記・WeStudy自動再実行
 - 状態を無言で `運用` に上げる（schedule成功確認後の sync は了承済み）
 - `#report`／チャットへの定時報告
