@@ -54,6 +54,16 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 3. 各 UI で stall／キュー残が見える  
 4. Mac 未接続時は送信を捏造せず `#ops`  
 
+## 運用開始ログ（Phase D · 2026-10-15）
+
+| 項目 | 結果 |
+|---|---|
+| `--apply --lane all --evening` | 実施済。sync_meta 3キー更新。Slack `#report` OK |
+| S2 / S4 | `stall=ok`（queue_ready 21 / 6） |
+| S9 | `stall=stale_marks` → `#ops` 投稿済（最終 contacted 2026-08-27）。**送信再開が本線** |
+| B1 手渡し | Drive `30_shared_working/2026-10-15_業者開拓閉ループ_S2S4S9/` |
+| 516 status | **設計中のまま**（松野方針）。FlowForge 作業フロー確認 → 実行指示後に運用確認予定 |
+
 ## 関連
 
 - 社員: `docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/`
