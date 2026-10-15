@@ -1,8 +1,9 @@
-# FlowForge「エージェントへの指示」（生成 2026-10-11）
+# FlowForge「エージェントへの指示」（更新 2026-10-15）
 
 > 出典: AI Automation flow_zYjp6… 「エージェントへの指示」ボタン。たたき台。
 > **実装の正本**は同フォルダの `CLAUDE.md` / `scripts/jarvis_ops_health_315.py` / `.github/workflows/ops-health-315.yml`。
-> 備考: 本線（GHA `--cloud`）では Square probe / CHRLINE health はスキップ。オプチャ詳細は Mac 補完。
+> **流れ図**: [`docs/flow-overview.html`](./docs/flow-overview.html)（WeStudy／オプチャ／**Gmail token** の3系統）
+> 備考: 本線（GHA `--cloud`）では Square／CHRLINE／**Gmail token** はスキップ。詳細は Mac 日曜21:45。
 
 ---
 
@@ -16,9 +17,14 @@
 
 ## 対象の業務フロー
 
-# 連携異常の夜間点検ワークフロー
+# 連携異常の定期点検ワークフロー（3系統）
 
-WeStudy・GitHub Actions・LINEオープンチャットの連携状態を夜間に定期巡回し、実行ログやエラーを突合して連携健全性レポートを作成・報告します。連携先への変更操作は行わず参照・点検に特化します。
+1. **WeStudy / GitHub Actions** — 週次取込の成否  
+2. **LINE オープンチャット** — 常時監視・スレッド健全性（Mac）  
+3. **Gmail OAuth token** — スコープ欠落・refresh 欠如・estate の send 欠落（Mac・2026-10-15〜）  
+
+定期巡回し、突合して連携健全性レポートを Slack `#ops` へ出す。  
+**Gmail のブラウザ再同意・QR・トークン破壊は人がやる**（自動再同意禁止）。参照・点検＋オプチャの安全な1回トライのみ。
 
 ---
 
@@ -27,62 +33,61 @@ WeStudy・GitHub Actions・LINEオープンチャットの連携状態を夜間�
 ・起動する場所：GitHub Actions / workflow ops-health-315.yml
 ・夜間定時バッチ
 ・本線は毎週日曜21:00 JSTに起動（cron: UTC日曜12:00）。副トリガーはWeStudy週次Fail時と手動workflow_dispatch。旧の曖昧な「21時」およびlaunchd日曜09:15は本線から除外。
+・**Mac補完**: 毎週日曜21:45 JST — `--remediate-once`（オプチャ1回トライ ＋ **Gmail token 点検**）
 
 ---
 
 ## 1. 連携ログ収集（フェーズ1）
 
-各外部サービスから本日の稼働状況およびログを取得
-読み取り専用アクセスでデータを安全に収集
+各系統から稼働状況およびログを取得
+読み取り専用アクセスでデータを安全に収集（Gmail token JSON の中身・秘密値はレポートに出さない）
 
-### 詳細1-1. ツール/MCP：GHA実行結果の取得
-・利用MCP：GitHub Actions
-・workflow ops-health-315.yml の実行履歴
-・project-GEの正本 workflow ops-health-315.yml と jarvis_ops_health_315.py --cloud --post の実行結果を取得します。秘密情報やトークン値は取得・記録しません。
+### 詳細1-1. ツール/CLI：WeStudy / GHA実行結果の取得
+・利用CLI：`jarvis_westudy_weekly_check.py`（ops-health-315 内）
+・週次 workflow の成功／Fail を取得。秘密情報やトークン値は取得・記録しません。
 
-### 詳細1-2. ツール/CLI：Square probeで稼働状態を確認
-・利用CLI：project-GE / 既存 Square probe
-・既存 health の Square probe
-・既存のhealth確認にあるSquare probeを実行し、稼働状態を確認します。秘密情報やトークン値をログ・レポートに含めません。
+### 詳細1-2. ツール/CLI：LINEオプチャ健全性（Mac）
+・利用CLI：openchat watch status / thread health / recover_worker
+・GHA（`--cloud`）ではスキップ。Mac 21:45 で launchd・heartbeat・【スレッド】件数・例外を確認。
 
-### 詳細1-3. ツール/CLI：CHRLINE healthで連携状態を確認
-・利用CLI：project-GE / chrline_line_health
-・既存 health の chrline_line_health
-・既存healthの正本 chrline_line_health でLINE連携状態を確認します。LINE Messaging公式APIや自動QRログインは使用せず、秘密情報・トークン値を出力しません。
+### 詳細1-3. ツール/CLI：Gmail token ヘルス（Mac・重要）
+・利用CLI：`jarvis_gmail_token_health.py`（ops-health-315 経由）
+・admin / estate / m19m 等の token_*.json で **readonly・modify・send** と refresh の有無を点検。
+・estate の send 欠落時は是正コマンド `reauth_estate_gmail_send.py` を報告文に載せる（**実行は人**）。
+・GHA（`--cloud`）ではスキップ（Mac に token が無いため）。
 
 ---
 
 ## 2. 健全性判定（フェーズ2）
 
-収集した3系統のログを突合し、不整合や障害を分類
+3系統の結果を突合し、不整合や障害を分類
 失敗要因と影響度を整理してレポートを自動生成
 
-### 詳細2-1. AIエージェント：異常相関の分析と分類
-・GHA・Square probe・CHRLINE healthの突合
-・GHA（workflow ops-health-315.yml / jarvis_ops_health_315.py --cloud --post）、既存Square probe、chrline_line_healthの結果を突合して異常を分類します。秘密・トークンは扱わず、トークンを破壊する自動復旧操作は提案・実行しません。
+### 詳細2-1. プログラム：異常分類
+・WeStudy Fail／オプチャ要フォロー／**Gmail token 要フォロー** を判定。
+・秘密・トークン値は扱わず、Gmail・WeStudy の自動復旧はしない。オプチャのみ既知手順を1回まで。
 
-### 詳細2-2. AIエージェント：健全性レポートのドラフト生成
-・異常・通常結果と要判断事項を整理
-・収集元の結果をもとに報告案を作成します。異常・通常の結果はいずれも最終報告先をSlack #opsとし、要判断事項はSlack #consultへの通知対象として明示します。秘密・トークン値は記載しません。
+### 詳細2-2. プログラム：健全性レポート生成
+・`jarvis_ops_health_315.py` が本文生成。報告先は Slack `#ops`。要判断（Gmail再同意・QR・WeStudy再実行）は `#consult`。
 
 ---
 
 ## 3. 人間：点検結果と復旧要否を人が確認
 ・要判断事項・復旧操作の承認
-・点検結果と要判断事項を人が確認します。自動復旧は行わず、復旧が必要な場合も人の確認・承認後に限ります。トークンを破壊する操作は禁止し、秘密・トークン値を共有しません。
+・**Gmail ブラウザ再同意**・QR・YAML大量・WeStudy再実行は人が確認・実行。秘密・トークン値は共有しない。
 
 ---
 
 ## 4. ツール/通知：要判断事項をSlack #consultへ通知
 ・報告先：Slack #consult
-・人の確認で要判断事項がある場合に限り、判断に必要な要約をSlack #consultへ通知します。秘密・トークン値は含めず、自動復旧やトークンを破壊する操作は行いません。
+・1回トライ後も未解決、または Gmail token NG のとき。是正コマンド要約のみ（秘密なし）。
 
 ---
 
 ## 終了報告：連携健全性点検結果をSlack #opsへ報告
 ・報告先：Slack #ops
 ・通常・異常ともSlack #opsのみ
-・点検結果と対応状況をSlack #opsへ報告します。異常・通常のいずれも報告先は#opsのみとし、チャットや#reportには報告しません。秘密・トークン値は含めません。
+・本文に WeStudy／オプチャ／**Gmail token** の各行を含める。チャットや#reportには報告しません。
 
 ---
 
