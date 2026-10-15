@@ -12,15 +12,27 @@ import {
   statusClass,
   type AgentTeamAgent,
   type AgentTeamDept,
+  type AgentTeamGenre,
   type GrokPayload,
 } from "@/lib/agentTeam";
 
 const STATUS_FILTERS = ["すべて", "運用確認", "設計中", "運用", "候補", "停止"] as const;
-type Tab = "ai" | "grok" | "map";
+type Tab = "genre" | "ai" | "grok" | "map";
+
+/** AI社員の状態シグナル（色・印）— docs/AIエージェントチーム/22_運用状態の識別 */
+const STATUS_LEGEND = [
+  { status: "運用確認", icon: "🟡", meaning: "定時が動いている仕上げ中" },
+  { status: "設計中", icon: "🔵", meaning: "FlowForge／実装着手〜" },
+  { status: "運用", icon: "🟢", meaning: "意図OK済みの定常運用" },
+  { status: "候補", icon: "⚪", meaning: "指示書スタブのみ（未着手）" },
+  { status: "停止", icon: "⛔", meaning: "止めている" },
+] as const;
 
 type Props = {
   departments: AgentTeamDept[];
   agents: AgentTeamAgent[];
+  genres: AgentTeamGenre[];
+  genreNote?: string;
   counts: Record<string, number>;
   updated: string;
   flowforgeNote: string;
@@ -32,6 +44,8 @@ type Props = {
 export default function AgentTeamClient({
   departments,
   agents,
+  genres,
+  genreNote,
   counts,
   updated,
   flowforgeNote,
@@ -39,11 +53,24 @@ export default function AgentTeamClient({
   builderTitle,
   grok,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("ai");
+  const [tab, setTab] = useState<Tab>("genre");
+  const [genreFilter, setGenreFilter] = useState<string>("すべて");
   const [statusFilter, setStatusFilter] = useState<string>("すべて");
   const [deptFilter, setDeptFilter] = useState<string>("すべて");
   const [grokDeptFilter, setGrokDeptFilter] = useState<string>("すべて");
   const [mapFilter, setMapFilter] = useState<string>("すべて");
+
+  const agentsById = useMemo(() => {
+    const m = new Map<string, AgentTeamAgent>();
+    for (const a of agents) m.set(a.id, a);
+    return m;
+  }, [agents]);
+
+  const botsById = useMemo(() => {
+    const m = new Map<string, (typeof grok.bots)[0]>();
+    for (const b of grok.bots) m.set(b.id, b);
+    return m;
+  }, [grok.bots]);
 
   const filtered = useMemo(() => {
     let list = agents;
@@ -53,8 +80,11 @@ export default function AgentTeamClient({
     if (deptFilter !== "すべて") {
       list = list.filter((a) => a.department_id === deptFilter);
     }
+    if (genreFilter !== "すべて" && tab === "ai") {
+      list = list.filter((a) => a.genre_id === genreFilter);
+    }
     return sortAgents(list);
-  }, [agents, statusFilter, deptFilter]);
+  }, [agents, statusFilter, deptFilter, genreFilter, tab]);
 
   const byDept = useMemo(() => {
     const map = new Map<string, AgentTeamAgent[]>();
@@ -68,9 +98,15 @@ export default function AgentTeamClient({
   }, [agents, departments]);
 
   const grokBotsFiltered = useMemo(() => {
-    if (grokDeptFilter === "すべて") return grok.bots;
-    return grok.bots.filter((b) => b.department_id === grokDeptFilter);
-  }, [grok.bots, grokDeptFilter]);
+    let list = grok.bots;
+    if (grokDeptFilter !== "すべて") {
+      list = list.filter((b) => b.department_id === grokDeptFilter);
+    }
+    if (genreFilter !== "すべて" && tab === "grok") {
+      list = list.filter((b) => b.genre_id === genreFilter);
+    }
+    return list;
+  }, [grok.bots, grokDeptFilter, genreFilter, tab]);
 
   const grokByDept = useMemo(() => {
     const map = new Map<string, typeof grok.bots>();
@@ -104,10 +140,15 @@ export default function AgentTeamClient({
     return grok.mappings;
   }, [grok.mappings, mapFilter]);
 
+  const genresShown = useMemo(() => {
+    if (genreFilter === "すべて") return genres;
+    return genres.filter((g) => g.id === genreFilter);
+  }, [genres, genreFilter]);
+
   return (
     <>
       <p className="sub">
-        AIエージェントチーム（FlowForge）と Grok Bot の俯瞰です。作り込みは{" "}
+        上位ジャンルで Grok Bot 組織と AIエージェントチームを横並びで俯瞰します。作り込みは{" "}
         <strong>Cursor インブラウザの FlowForge</strong>、Grok の作業は Bot
         チャンネルで行います。
       </p>
@@ -115,14 +156,19 @@ export default function AgentTeamClient({
         最終同期: {updated}
         {" · "}
         <a href={builderUrl} target="_blank" rel="noopener noreferrer">
-          {builderTitle || "ビルダー"} ↗
+          ビルダー参考: {builderTitle || "物件と連絡の見守り隊"} ↗
         </a>
+        {" · "}
+        <span title="組織図の正は agents_registry → 本画面。ビルダー共有は編成の参考（localStorage依存）">
+          組織図正＝registry
+        </span>
         {grok.updated ? ` · Grok正本: ${grok.updated}` : null}
       </p>
 
       <div className="at-tabs" role="tablist" aria-label="俯瞰ビュー">
         {(
           [
+            ["genre", "ジャンル", genres.length],
             ["ai", "AIエージェントチーム", agents.length],
             ["grok", "Grok Bot", grok.bots.length],
             ["map", "対応表", grok.mapping_counts?.all ?? grok.mappings.length],
@@ -142,26 +188,189 @@ export default function AgentTeamClient({
         ))}
       </div>
 
+      <p className="at-legend" aria-label="AI社員ステータスの凡例">
+        <span className="at-legend-title">状態シグナル</span>
+        {STATUS_LEGEND.map((row) => (
+          <span key={row.status} className="at-legend-item" title={row.meaning}>
+            <span className={statusClass(row.status)} aria-hidden>
+              {row.icon}
+            </span>
+            <span className={statusClass(row.status)}>{row.status}</span>
+            <span className="at-legend-mean">{row.meaning}</span>
+          </span>
+        ))}
+      </p>
+
+      {tab === "genre" ? (
+        <>
+          {genreNote ? <p className="at-hint">{genreNote}</p> : null}
+          <div className="at-filters" style={{ marginBottom: 14 }}>
+            <label>
+              ジャンル{" "}
+              <select
+                value={genreFilter}
+                onChange={(e) => setGenreFilter(e.target.value)}
+              >
+                <option value="すべて">すべて</option>
+                {genres.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}（AI {g.counts.ai} / Grok {g.counts.grok}）
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="at-genres">
+            {genresShown.map((g) => {
+              const aiList = sortAgents(
+                g.ai_agent_ids
+                  .map((id) => agentsById.get(id))
+                  .filter(Boolean) as AgentTeamAgent[],
+              );
+              const grokList = g.grok_bot_ids
+                .map((id) => botsById.get(id))
+                .filter(Boolean) as typeof grok.bots;
+              const aiRooms = departments.filter((d) =>
+                g.ai_department_ids.includes(d.id),
+              );
+              const grokDepts = grok.departments.filter((d) =>
+                g.grok_department_ids.includes(d.id),
+              );
+              return (
+                <section key={g.id} className="at-genre-card" id={`genre-${g.id}`}>
+                  <header className="at-genre-head">
+                    <div>
+                      <h2>{g.name}</h2>
+                      <p className="meta">{g.summary}</p>
+                    </div>
+                    <div className="at-genre-stats" aria-label="件数">
+                      <span>
+                        AI <strong>{g.counts.ai}</strong>
+                      </span>
+                      <span>
+                        Grok <strong>{g.counts.grok}</strong>
+                      </span>
+                      <span>
+                        対応 <strong>{g.counts.paired}</strong>
+                      </span>
+                      <span className="meta">
+                        AIのみ {g.counts.ai_only} · Grokのみ {g.counts.grok_only}
+                      </span>
+                    </div>
+                  </header>
+
+                  <div className="at-genre-leaders">
+                    <div>
+                      <span className="at-genre-leader-label">Grok リーダー</span>
+                      <strong>{g.leaders.grok || "—"}</strong>
+                    </div>
+                    <div>
+                      <span className="at-genre-leader-label">AI 側</span>
+                      <strong>{g.leaders.ai || "—"}</strong>
+                    </div>
+                  </div>
+
+                  {g.nav_hints?.length ? (
+                    <p className="at-genre-nav meta">
+                      ナビ目安: {g.nav_hints.join(" · ")}
+                    </p>
+                  ) : null}
+
+                  <div className="at-genre-cols">
+                    <div className="at-genre-col">
+                      <h3>
+                        AIエージェントチーム
+                        <span className="at-org-n">{aiList.length}</span>
+                      </h3>
+                      {aiRooms.length ? (
+                        <p className="meta at-genre-sub">
+                          室:{" "}
+                          {aiRooms
+                            .map((d) => `${d.id} ${d.name}`)
+                            .join(" · ")}
+                        </p>
+                      ) : null}
+                      <ul>
+                        {aiList.map((a) => (
+                          <li key={a.id}>
+                            <Link href={`/agent-team/${a.id}`}>
+                              <span
+                                className={statusClass(a.status)}
+                                title={a.status}
+                              >
+                                {a.status_icon}
+                              </span>
+                              <span className="at-org-name">
+                                {a.id} {a.name}
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                        {!aiList.length ? (
+                          <li className="meta">AI社員なし</li>
+                        ) : null}
+                      </ul>
+                    </div>
+                    <div className="at-genre-col">
+                      <h3>
+                        Grok Bot
+                        <span className="at-org-n">{grokList.length}</span>
+                      </h3>
+                      {grokDepts.length ? (
+                        <p className="meta at-genre-sub">
+                          部: {grokDepts.map((d) => d.name).join(" · ")}
+                        </p>
+                      ) : null}
+                      <ul>
+                        {grokList.map((b) => (
+                          <li key={b.id}>
+                            <span className="at-org-name">
+                              {b.code && b.code !== "—" ? `${b.code} ` : ""}
+                              {b.name}
+                            </span>
+                            <span className="meta at-org-work">{b.work}</span>
+                          </li>
+                        ))}
+                        {!grokList.length ? (
+                          <li className="meta">Grok Bot なし</li>
+                        ) : null}
+                      </ul>
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+
       {tab === "ai" ? (
         <>
           <div className="at-counts" aria-label="状態別件数">
             {(
               [
-                ["運用確認", counts["運用確認"] ?? 0],
-                ["設計中", counts["設計中"] ?? 0],
-                ["運用", counts["運用"] ?? 0],
-                ["候補", counts["候補"] ?? 0],
-                ["停止", counts["停止"] ?? 0],
+                ["運用確認", "🟡", counts["運用確認"] ?? 0],
+                ["設計中", "🔵", counts["設計中"] ?? 0],
+                ["運用", "🟢", counts["運用"] ?? 0],
+                ["候補", "⚪", counts["候補"] ?? 0],
+                ["停止", "⛔", counts["停止"] ?? 0],
               ] as const
-            ).map(([label, n]) => (
+            ).map(([label, icon, n]) => (
               <button
                 key={label}
                 type="button"
                 className={`at-count ${statusFilter === label ? "is-on" : ""}`}
+                title={
+                  STATUS_LEGEND.find((r) => r.status === label)?.meaning || label
+                }
                 onClick={() =>
                   setStatusFilter(statusFilter === label ? "すべて" : label)
                 }
               >
+                <span className={statusClass(label)} aria-hidden>
+                  {icon}
+                </span>
                 <span className={statusClass(label)}>{label}</span>
                 <strong>{n}</strong>
               </button>
@@ -184,6 +393,9 @@ export default function AgentTeamClient({
                       {d.name}
                       <span className="at-org-n">{list.length}</span>
                     </h3>
+                    {d.genre_name ? (
+                      <p className="meta at-org-meta">{d.genre_name}</p>
+                    ) : null}
                     <ul>
                       {list.map((a) => (
                         <li key={a.id}>
@@ -213,6 +425,20 @@ export default function AgentTeamClient({
               <span className="meta">{filtered.length}件</span>
             </div>
             <div className="at-filters">
+              <label>
+                ジャンル{" "}
+                <select
+                  value={genreFilter}
+                  onChange={(e) => setGenreFilter(e.target.value)}
+                >
+                  <option value="すべて">すべて</option>
+                  {genres.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label>
                 状態{" "}
                 <select
@@ -247,6 +473,7 @@ export default function AgentTeamClient({
                   <tr>
                     <th>ID</th>
                     <th>名前</th>
+                    <th>ジャンル</th>
                     <th>部門</th>
                     <th>状態</th>
                     <th>合図</th>
@@ -270,6 +497,7 @@ export default function AgentTeamClient({
                           ) : null}
                         </Link>
                       </td>
+                      <td className="meta">{a.genre_name || "—"}</td>
                       <td className="meta">
                         {a.department_id} {a.department_name}
                       </td>
@@ -284,24 +512,24 @@ export default function AgentTeamClient({
                       <td className="meta">
                         {a.builder_tag || a.grok_counterpart || "—"}
                       </td>
-                  <td>
-                    {flowforgeOpenUrl(a) ? (
-                      <a
-                        href={flowforgeOpenUrl(a)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={
-                          a.flowforge_share_url
-                            ? "閲覧専用（外部ブラウザOK）"
-                            : "編集は m19m。同期失敗なら詳細の案内を見て"
-                        }
-                      >
-                        {flowforgeOpenLabel(a)} ↗
-                      </a>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
+                      <td>
+                        {flowforgeOpenUrl(a) ? (
+                          <a
+                            href={flowforgeOpenUrl(a)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={
+                              a.flowforge_share_url
+                                ? "閲覧専用（外部ブラウザOK）"
+                                : "編集は m19m。同期失敗なら詳細の案内を見て"
+                            }
+                          >
+                            {flowforgeOpenLabel(a)} ↗
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -348,7 +576,9 @@ export default function AgentTeamClient({
                       <span className="at-org-n">{list.length}</span>
                     </h3>
                     <p className="at-org-meta meta">
-                      {d.exec_level || d.channel || ""}
+                      {[d.genre_name, d.exec_level || d.channel]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                     <ul>
                       {list.map((b) => (
@@ -374,6 +604,20 @@ export default function AgentTeamClient({
             </div>
             <div className="at-filters">
               <label>
+                ジャンル{" "}
+                <select
+                  value={genreFilter}
+                  onChange={(e) => setGenreFilter(e.target.value)}
+                >
+                  <option value="すべて">すべて</option>
+                  {genres.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
                 部署{" "}
                 <select
                   value={grokDeptFilter}
@@ -394,6 +638,7 @@ export default function AgentTeamClient({
                   <tr>
                     <th>コード</th>
                     <th>名前</th>
+                    <th>ジャンル</th>
                     <th>部署</th>
                     <th>種別</th>
                     <th>実施内容</th>
@@ -408,6 +653,7 @@ export default function AgentTeamClient({
                       <td>
                         <strong>{b.name}</strong>
                       </td>
+                      <td className="meta">{b.genre_name || "—"}</td>
                       <td className="meta">{b.department_name}</td>
                       <td className="meta">{b.kind || "—"}</td>
                       <td>{b.work || "—"}</td>

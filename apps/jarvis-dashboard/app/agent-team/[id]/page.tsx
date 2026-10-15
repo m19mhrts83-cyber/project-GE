@@ -34,6 +34,14 @@ export default async function AgentTeamDetailPage({
     <Shell active="/agent-team">
       <p className="meta" style={{ marginBottom: 8 }}>
         <Link href="/agent-team">← AIエージェントチーム</Link>
+        {agent.genre_name ? (
+          <>
+            {" · "}
+            <Link href={`/agent-team#genre-${agent.genre_id}`}>
+              {agent.genre_name}
+            </Link>
+          </>
+        ) : null}
         {" · "}
         {agent.department_id} {agent.department_name}
       </p>
@@ -54,6 +62,10 @@ export default async function AgentTeamDetailPage({
           </header>
           <p className="sum">{agent.summary || agent.note || "（要約なし）"}</p>
           <dl className="at-dl">
+            <div>
+              <dt>ジャンル</dt>
+              <dd>{agent.genre_name || "—"}</dd>
+            </div>
             <div>
               <dt>合図</dt>
               <dd>{agent.trigger || "—"}</dd>

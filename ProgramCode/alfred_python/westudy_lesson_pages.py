@@ -106,6 +106,25 @@ def get_env_or_raise(key: str) -> str:
     return v
 
 
+def _launch_chrome(opts: ChromeOptions) -> webdriver.Chrome:
+    """WESTUDY_CHROME_BINARY / WESTUDY_CHROMEDRIVER があればその版で起動する。
+
+    週次 GHA のシステム Chrome 154 はログイン遷移が空 DOM のまま止まる。
+    ワークフローが 153.0.8010.52 を渡す（westudy_forum_all.py と同じ契約）。
+    """
+    binary = (os.environ.get("WESTUDY_CHROME_BINARY") or os.environ.get("CHROME_BIN") or "").strip()
+    driver_path = (os.environ.get("WESTUDY_CHROMEDRIVER") or "").strip()
+    if binary:
+        opts.binary_location = binary
+        log(f"🌐 Chrome binary (pinned): {binary}")
+    if driver_path:
+        from selenium.webdriver.chrome.service import Service
+
+        log(f"🌐 ChromeDriver (pinned): {driver_path}")
+        return webdriver.Chrome(options=opts, service=Service(executable_path=driver_path))
+    return webdriver.Chrome(options=opts)
+
+
 def create_driver(headless: bool = True) -> webdriver.Chrome:
     opts = ChromeOptions()
     if headless:
@@ -125,7 +144,7 @@ def create_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--disable-renderer-backgrounding")
     # 全リソース待機で renderer timeout になりやすいため DOM 完了で打ち切る
     opts.page_load_strategy = "eager"
-    d = webdriver.Chrome(options=opts)
+    d = _launch_chrome(opts)
     d.set_page_load_timeout(60)
     d.implicitly_wait(5)
     return d
