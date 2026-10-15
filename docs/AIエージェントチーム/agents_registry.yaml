@@ -368,8 +368,9 @@ agents:
     trigger: 時間
     tool_assigned: jarvis
     tool_fit: A+B
-    tool_notes: S2 stall runner・日次Slack・自律refill（S4/S9後追い）
+    tool_notes: S2/S4/S9 stall runner・日次Slack・自律refill（--lane all）
     schedule: 朝refresh相乗り＋夕方--evening
+    note: '2026-10-15 Phase D apply済・#report/#ops。statusは設計中のまま。FlowForge作業フロー確認→実行指示後に運用確認予定'
   '611':
     name: リソース制約要約係
     path: 600_リソース・家計室/611_リソース制約要約係

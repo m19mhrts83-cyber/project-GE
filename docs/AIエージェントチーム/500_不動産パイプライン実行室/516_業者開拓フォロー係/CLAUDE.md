@@ -94,3 +94,5 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-09 | Phase C スタブ作成（ID 516） |
 | 2026-10-15 | 閉ループ設計実装。stall runner・合図・日次 Slack・設計中へ |
 | 2026-10-15 | S4/S9 を同型追加（`--lane` · sync_meta 分割 · UI stall 行） |
+| 2026-10-15 | Phase D: `--apply --lane all --evening`・sync_meta・#report/#ops。B1 手渡しフォルダ |
+| 2026-10-15 | status は **設計中のまま**。松野が FlowForge 作業フロー確認→実行指示後に運用確認予定 |
