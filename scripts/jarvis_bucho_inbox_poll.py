@@ -393,7 +393,7 @@ def run_vendor_outreach_stall(*, dry_run: bool = False) -> dict[str, Any]:
     if not VENDOR_OUTREACH_STALL.is_file():
         return {"ok": True, "skipped": True, "reason": "script missing"}
     exe = str(PY if PY.is_file() else sys.executable)
-    cmd = [exe, str(VENDOR_OUTREACH_STALL)]
+    cmd = [exe, str(VENDOR_OUTREACH_STALL), "--lane", "all"]
     if dry_run:
         cmd.append("--dry-run")
     else:

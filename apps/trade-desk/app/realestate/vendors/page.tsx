@@ -289,7 +289,7 @@ export default async function RealEstateVendorsPage({
             jobType="re_vendor_stall_check"
             title="S2 キュー補給・stall確認（Mac）"
             label="stall確認"
-            payload={{}}
+            payload={{ lane: "s2" }}
           />
         </p>
       </div>

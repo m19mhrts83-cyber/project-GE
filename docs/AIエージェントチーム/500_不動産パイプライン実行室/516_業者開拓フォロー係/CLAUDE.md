@@ -1,7 +1,7 @@
 # 業者開拓フォロー係
 
 ID: **516**。部門: 不動産パイプライン実行室（500）。  
-Grok S系（S2 本線／S4・S9 は同型後追い）の **Mac側検収・適用・停滞見回り**（調査本文の再発明はしない）。
+Grok S系（**S2 / S4 / S9**）の **Mac側検収・適用・停滞見回り**（調査本文の再発明はしない）。
 
 ## AIオートメーション（作業フロー）
 
@@ -13,19 +13,19 @@ Grok S系（S2 本線／S4・S9 は同型後追い）の **Mac側検収・適用
 ## 1. 役割
 
 - やること:
-  - S2 キュー枯渇・`--next` 未着の検知と **自律 refill**（`--batch-week --grok-kickoff` → `outbox_to_teams/re`）
-  - inbox の「S2週次キュー再生成」依頼の消化（archive）
-  - 部長日報 `--mark` 反映後の **vendor_sync**／`sync_meta` 更新確認
-  - 日次 Slack `#report` サマリ（件数・要フォロー・KURASHIFT URL）
+  - **S2/S4/S9** キュー枯渇・`--next` 未着の検知と **自律 refill**（outbox `s2_batch` / `s4_queue` / `s9_precheck`）
+  - inbox の「週次キュー再生成」等依頼の消化（archive）
+  - 部長日報 `--mark` 反映後の **各 vendor_sync**／`sync_meta` 更新確認
+  - 日次 Slack `#report` サマリ（レーン横断・要フォロー・KURASHIFT URL）
   - 連携障害時の Slack `#ops`
   - 要ボス（返信方針）だけ `#consult`／Todoist（業者専用レーンは作らない）
 - やらないこと: 対外送信の無断実行／Grok調査の丸写し再実装／秘密の再掲／探索の再スクレイプ
 
 ## 2. 動き出す合図
 
-- [x] 人が頼む — 「業者開拓フォローして」→ `…stall_runner.py --apply --force-refill`（必要なら `--daily-report`）
-- [x] 時間 — 平日 **朝**（`jarvis_morning_mac_refresh` soft-fail）／**夕方 18:10 相当**（`--apply --evening`）
-- [x] 何かが届いたら — `jarvis_bucho_inbox_poll` 成功後フック（S2 再生成依頼・`--next 3` 依頼 MD）
+- [x] 人が頼む — 「業者開拓フォローして」→ `…stall_runner.py --apply --lane all --force-refill`（必要なら `--daily-report`）
+- [x] 時間 — 平日 **朝**（`jarvis_morning_mac_refresh` soft-fail・`--lane all`）／**夕方 18:10 相当**（`--apply --evening --lane all`）
+- [x] 何かが届いたら — `jarvis_bucho_inbox_poll` 成功後フック（再生成依頼・`--next` 依頼 MD）
 - [x] 変化・失敗を見回ったら:
   - `needs_refill`（送信可能件数が日次枠未満）
   - `no_marks` / stale（最終 contacted から平日2日以上・本日 mark なし）
@@ -38,8 +38,8 @@ Grok S系（S2 本線／S4・S9 は同型後追い）の **Mac側検収・適用
 | 方法 | 使う？ | 内容 |
 |---|---|---|
 | チャット・検索 | ○ | 状況説明・要フォロー要約 |
-| CLI | ○ | stall runner／vendor_list／vendor_sync／bucho_mail_apply（ゲート遵守） |
-| ブラウザ | △ | KURASHIFT `/realestate/vendors` 確認 |
+| CLI | ○ | stall runner／各 vendor_list／vendor_sync／bucho_mail_apply（ゲート遵守） |
+| ブラウザ | △ | KURASHIFT vendors / repair-vendors / mgmt-vendors |
 | 画面操作 | × | 送信は人／Grok |
 
 **人が確かめる**: 対外送信・金・削除。
@@ -52,16 +52,20 @@ Grok S系（S2 本線／S4・S9 は同型後追い）の **Mac側検収・適用
 | 連携障害 | Slack `#ops` |
 | 要判断（返信方針） | Slack `#consult` ＋ Todoist（要ボスのみ） |
 
-KURASHIFT UI: https://jarvis-trade-desk.vercel.app/realestate/vendors
+| レーン | UI |
+|---|---|
+| S2 | https://jarvis-trade-desk.vercel.app/realestate/vendors |
+| S4 | https://jarvis-trade-desk.vercel.app/realestate/repair-vendors |
+| S9 | https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors |
 
 ## 5. 成果物
 
 | 成果物 | 置き場 |
 |---|---|
-| 週次バッチ JSON＋キックオフ | `【with Grok bot】/outbox_to_teams/re/`（`action: s2_batch`） |
-| stall state | `.jarvis_state/vendor_outreach_stall.json` |
-| UI サマリ | Supabase `sync_meta.key=vendor_outreach_stall` |
-| YAML 正本 | `config/kurashift_re_vendor_list.yaml`（gitignore） |
+| 週次バッチ／キュー kickoff | `【with Grok bot】/outbox_to_teams/re/`（`s2_batch` / `s4_queue` / `s9_precheck`） |
+| stall state | `.jarvis_state/vendor_outreach_stall.json`（`lanes.s2|s4|s9`） |
+| UI サマリ | `sync_meta`: `vendor_outreach_stall` / `_s4` / `_s9` |
+| YAML 正本 | `kurashift_re_vendor_list.yaml` · `kurashift_repair_vendor_list.yaml` · `kurashift_mgmt_vendor_list.yaml`（gitignore） |
 
 ## 6. 手順（正）
 
@@ -69,16 +73,16 @@ KURASHIFT UI: https://jarvis-trade-desk.vercel.app/realestate/vendors
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 # 朝・inbox 相乗り相当（補給＋sync_meta＋必要時 #ops）
-~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --lane all
 
 # 夕方日次 #report
-~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --evening
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --evening --lane all
 
-# 強制 refill
-~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --force-refill
+# 強制 refill（レーン指定）
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --lane s4 --force-refill
 
 # KURASHIFT ジョブ（任意）
-# job_type=re_vendor_stall_check  payload: { "daily_report": true }
+# job_type=re_vendor_stall_check  payload: { "lane": "all", "daily_report": true }
 ```
 
 詳細: `docs/運用コマンド一覧.md`「業者開拓閉ループ」節。
@@ -89,3 +93,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 |---|---|
 | 2026-10-09 | Phase C スタブ作成（ID 516） |
 | 2026-10-15 | 閉ループ設計実装。stall runner・合図・日次 Slack・設計中へ |
+| 2026-10-15 | S4/S9 を同型追加（`--lane` · sync_meta 分割 · UI stall 行） |

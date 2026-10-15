@@ -29,6 +29,7 @@ JST = ZoneInfo("Asia/Tokyo")
 ACTIONS = (
     "s9_precheck",
     "s2_batch",
+    "s4_queue",
     "s1",
     "memo",
     "ask",

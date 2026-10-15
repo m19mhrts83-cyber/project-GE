@@ -202,6 +202,67 @@ export default async function RepairVendorsPage({
     if (s && (!latestSync || s > latestSync)) latestSync = s;
   }
 
+  const { data: stallMetaRow } = await supabase
+    .from("sync_meta")
+    .select("key, value, updated_at")
+    .eq("key", "vendor_outreach_stall_s4")
+    .maybeSingle();
+
+  type StallMeta = {
+    stall_status?: string;
+    daily_limit?: number;
+    queue_ready?: number;
+    pending_discovered?: number;
+    followup?: number;
+    contacted_today?: number;
+    last_contacted?: string | null;
+    last_refill_at?: string | null;
+    last_sync_at?: string | null;
+    bridge_ok?: boolean;
+  };
+  let stallMeta: StallMeta | null = null;
+  if (stallMetaRow?.value) {
+    try {
+      const parsed = JSON.parse(String(stallMetaRow.value)) as StallMeta;
+      if (parsed && typeof parsed === "object") stallMeta = parsed;
+    } catch {
+      stallMeta = null;
+    }
+  }
+  const stallStatus = stallMeta?.stall_status || "—";
+  const stallLabel =
+    stallStatus === "ok"
+      ? "正常"
+      : stallStatus === "needs_refill"
+        ? "キュー補給待ち"
+        : stallStatus === "bridge_down"
+          ? "Mac未接続"
+          : stallStatus === "stale_marks"
+            ? "送信停滞（markなし）"
+            : stallStatus;
+  const fmtMetaTs = (raw: string | null | undefined) => {
+    if (!raw) return "—";
+    const s = String(raw);
+    if (s.length >= 16) return s.slice(0, 16).replace("T", " ");
+    return s;
+  };
+  const dailyLimit =
+    typeof stallMeta?.daily_limit === "number" && stallMeta.daily_limit > 0
+      ? stallMeta.daily_limit
+      : 2;
+  const queueReady =
+    typeof stallMeta?.queue_ready === "number"
+      ? stallMeta.queue_ready
+      : (counts.pending || 0) + (counts.discovered || 0);
+  const pendingDiscovered =
+    typeof stallMeta?.pending_discovered === "number"
+      ? stallMeta.pending_discovered
+      : (counts.pending || 0) + (counts.discovered || 0);
+  const followupN =
+    typeof stallMeta?.followup === "number"
+      ? stallMeta.followup
+      : (vendors || []).filter((v) => vendorNeedsFollowUp(v)).length;
+
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <RealEstateLaneNav active="b-repair" />
@@ -210,6 +271,7 @@ export default async function RepairVendorsPage({
       <p className="sub">
         Grok S4（修繕業者開拓）が探索した業者台帳です。
         <strong>一人親方・地域密着のレーティング評価（推奨A〜C）</strong>および生存確認（90日以内）を管理します。
+        キュー補給は 516／stall runner（S4）が自律実行します。
       </p>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -278,18 +340,37 @@ export default async function RepairVendorsPage({
           </span>
         </div>
         <p className="meta" style={{ marginTop: 6 }}>
-          最終同期:{" "}
-          {latestSync
-            ? latestSync.slice(0, 16).replace("T", " ")
-            : "—（未同期）"}
+          本日上限 {dailyLimit}/日 · キュー残 {pendingDiscovered}（送信可能先頭{" "}
+          {queueReady}）· 要フォロー {followupN}
+        </p>
+        <p className="meta">
+          stall: {stallLabel}
+          {stallMeta?.contacted_today != null
+            ? ` · 本日contacted ${stallMeta.contacted_today}`
+            : ""}
+          {stallMeta?.last_contacted
+            ? ` · 最終contacted ${stallMeta.last_contacted}`
+            : ""}
+          {stallMeta?.bridge_ok === false ? " · bridge NG" : ""}
+        </p>
+        <p className="meta">
+          最終 refill {fmtMetaTs(stallMeta?.last_refill_at)} · 最終 sync{" "}
+          {fmtMetaTs(stallMeta?.last_sync_at || latestSync)} · stall更新{" "}
+          {fmtMetaTs(stallMetaRow?.updated_at as string | undefined)}
           （正本: Mac <code>config/kurashift_repair_vendor_list.yaml</code>）
         </p>
-        <p style={{ marginTop: 10 }}>
+        <p style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <EnqueueJobButton
             jobType="re_repair_vendor_sync"
             title="修繕業者リストを Supabase へ投影"
             label="リストを再同期"
             payload={{}}
+          />
+          <EnqueueJobButton
+            jobType="re_vendor_stall_check"
+            title="S4 キュー補給・stall確認（Mac）"
+            label="stall確認"
+            payload={{ lane: "s4" }}
           />
         </p>
       </div>

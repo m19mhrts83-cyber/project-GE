@@ -1019,8 +1019,8 @@ def main() -> int:
         else:
             rc = run_step(
                 "vendor_outreach_stall",
-                [exe, str(VENDOR_OUTREACH_STALL), "--apply"],
-                timeout=180,
+                [exe, str(VENDOR_OUTREACH_STALL), "--apply", "--lane", "all"],
+                timeout=300,
                 dry_run=args.dry_run,
             )
             results["steps"]["vendor_outreach_stall"] = rc

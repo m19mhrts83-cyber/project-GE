@@ -314,6 +314,8 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             py,
             str(REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"),
             "--apply",
+            "--lane",
+            str(payload.get("lane") or "all"),
             *(
                 ["--force-refill"]
                 if payload.get("force_refill")
