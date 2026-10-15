@@ -262,12 +262,12 @@ export default function AgentTeamClient({
 
                   <div className="at-genre-leaders">
                     <div>
-                      <span className="at-genre-leader-label">Grok リーダー</span>
-                      <strong>{g.leaders.grok || "—"}</strong>
-                    </div>
-                    <div>
                       <span className="at-genre-leader-label">AI 側</span>
                       <strong>{g.leaders.ai || "—"}</strong>
+                    </div>
+                    <div>
+                      <span className="at-genre-leader-label">Grok リーダー</span>
+                      <strong>{g.leaders.grok || "—"}</strong>
                     </div>
                   </div>
 
