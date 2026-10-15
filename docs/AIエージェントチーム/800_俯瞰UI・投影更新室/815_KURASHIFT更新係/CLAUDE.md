@@ -36,7 +36,8 @@
 
 | 種別 | 行き先 |
 |---|---|
-| 完了報告 | Slack `#ops` |
+| 問題あり（投影失敗・鮮度48h超等） | Slack `#ops`（1〜2行） |
+| 問題なし | **投稿しない**（`logs/` のみ） |
 | 要判断・相談 | Slack `#consult` |
 | Webhook（秘密） | env キー名のみ |
 
@@ -49,7 +50,7 @@
 
 1. deals/候補/取込の鮮度を確認
 2. 更新スクリプトまたは定められたジョブを実行
-3. Slack #ops に差分サマリ
+3. **要フォロー時だけ** Slack #ops へ短文。OKは logs のみ
 4. 要判断は #consult
 
 ### 一括（Phase L）
@@ -60,7 +61,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ```
 
 朝: `jarvis_morning_mac_refresh` の kurashift vendor / obsidian pick。  
-報告は 12:30 dashboard-push 相乗り（`--agent both`）。停止: `JARVIS_UI_CYCLE_DISABLE=1`
+12:30 dashboard-push 相乗り（`--agent both`）。`#ops` は問題時のみ。停止: `JARVIS_UI_CYCLE_DISABLE=1`
 
 ## 7. 改善ログ
 
@@ -68,3 +69,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 |---|---|
 | 2026-10-09 | スタブ作成（俯瞰UI更新担当） |
 | 2026-10-11 | Phase L: ui_cycle 報告経路。朝refresh＋12:30相乗り |
+| 2026-10-16 | `#ops` は要フォロー時のみ（OKは投稿スキップ） |
