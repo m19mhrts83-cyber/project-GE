@@ -45,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "調べる・作る",
     items: [
       { href: "/materials", label: "資料ハブ" },
+      { href: "/kiso-transcripts", label: "基礎講座・文字起こし" },
       { href: "/apps", label: "アプリ・プロンプト集" },
       { href: "/agent-team", label: "AIエージェントチーム" },
       { href: "/notebooklm", label: "NotebookLM" },

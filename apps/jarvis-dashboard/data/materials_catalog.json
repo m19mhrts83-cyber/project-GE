@@ -142,6 +142,13 @@
       "note": "講座・学習環境の検討ネタ索引（Grok Bot事例等）。継続更新"
     },
     {
+      "id": "kamiooya-kiso-transcripts",
+      "lane": "kamiooya",
+      "title": "基礎講座・文字起こし（把握・突き合わせ）",
+      "url": "https://jarvis-dashboard-amber.vercel.app/kiso-transcripts",
+      "note": "Jarvis把握サマリー＋今村正本との比較進捗。ファイル正本は OneDrive"
+    },
+    {
       "id": "shuhen-map-pages",
       "lane": "kamiooya",
       "title": "周辺MAP Step2（公開デモ）",

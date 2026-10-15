@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "updated": "2026-10-16T01:11:49+09:00",
+  "policy": {
+    "chatbot_truth": "imamura",
+    "jarvis_role": "compare_only",
+    "note": "今村さん字幕を knowledge_sources / knowledge_chunks の正とする。 Jarvis 取得分は精度・表記ゆれの突き合わせ用。松野確認後にのみ正本側へ反映。\n"
+  },
+  "onedrive_root": "C1_cursor/1c_神・大家さん倶楽部_AI推進/基礎講座_文字起こし",
+  "lessons": [
+    {
+      "slug": "step0_1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step0_1.md",
+      "imamura_file": null,
+      "bytes": 41159,
+      "title": "STEP0　学習ルール・講座の使い方／進め方",
+      "mtime": "2026-10-16T01:04:48"
+    },
+    {
+      "slug": "step1_1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step1_1.md",
+      "imamura_file": null,
+      "bytes": 123513,
+      "title": "STEP1　神スキル【マインドセット編】",
+      "mtime": "2026-10-16T01:05:15"
+    },
+    {
+      "slug": "kamiooya-kiso-step2_1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step2_1.md",
+      "imamura_file": null,
+      "bytes": 3371,
+      "title": "STEP2【不動産の基本】不動産投資成功イメージ、借入／金利等の考え方",
+      "mtime": "2026-10-16T01:05:29"
+    },
+    {
+      "slug": "kamiooya-kiso-step2_2",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step2_2.md",
+      "imamura_file": null,
+      "bytes": 225715,
+      "title": "STEP2【不動産の基本】利回り・土地、購入の流れ",
+      "mtime": "2026-10-16T01:05:49"
+    },
+    {
+      "slug": "step3_1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step3_1.md",
+      "imamura_file": null,
+      "bytes": 85089,
+      "title": "STEP3　神スキル【購入編】プランニング",
+      "mtime": "2026-10-16T01:06:28"
+    },
+    {
+      "slug": "step3_2",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step3_2.md",
+      "imamura_file": null,
+      "bytes": 13099,
+      "title": "STEP3　神スキル【購入編】プランニング補足集",
+      "mtime": "2026-10-16T01:06:53"
+    },
+    {
+      "slug": "step3_plam_intarveiw",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step3_plam_intarveiw.md",
+      "imamura_file": null,
+      "bytes": 119549,
+      "title": "STEP3　神スキル【購入編】プランニング補足集2 ～成功者インタビュー～",
+      "mtime": "2026-10-16T01:07:53"
+    },
+    {
+      "slug": "step4_1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step4_1.md",
+      "imamura_file": null,
+      "bytes": 61385,
+      "title": "STEP4　神スキル【購入編】未公開物件の入手法",
+      "mtime": "2026-10-16T01:07:13"
+    },
+    {
+      "slug": "kamiooya-kiso-step5-1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step5-1.md",
+      "imamura_file": null,
+      "bytes": 109892,
+      "title": "STEP5　神スキル【トライアングル投資】1 築古AP２０％購入",
+      "mtime": "2026-10-16T01:07:27"
+    },
+    {
+      "slug": "kamiooya-kiso-step5-2",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step5-2.md",
+      "imamura_file": null,
+      "bytes": 137900,
+      "title": "STEP5　神スキル【トライアングル投資】2  築古戸建て２０％購入",
+      "mtime": "2026-10-16T01:01:15"
+    },
+    {
+      "slug": "step5_3",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step5_3.md",
+      "imamura_file": null,
+      "bytes": 144357,
+      "title": "STEP5　神スキル【トライアングル投資】3 新築１０％購入＆築浅の見極め",
+      "mtime": "2026-10-16T01:08:13"
+    },
+    {
+      "slug": "step5-5",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step5-5.md",
+      "imamura_file": null,
+      "bytes": 2893,
+      "title": "～ アプローチ補足・実践者インタビュー(STEP4、5) ～",
+      "mtime": "2026-10-16T01:08:26"
+    },
+    {
+      "slug": "step6_1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step6_1.md",
+      "imamura_file": null,
+      "bytes": 197168,
+      "title": "STEP6　神スキル【空室対策編】ステージング",
+      "mtime": "2026-10-16T01:08:51"
+    },
+    {
+      "slug": "kamiooya-kiso-step7-1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step7-1.md",
+      "imamura_file": null,
+      "bytes": 64104,
+      "title": "STEP7　神スキル【空室対策編】募集チラシ・室内写真撮影・POP",
+      "mtime": "2026-10-16T01:09:07"
+    },
+    {
+      "slug": "kamiooya-kiso-step8",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step8.md",
+      "imamura_file": null,
+      "bytes": 101158,
+      "title": "STEP8　神スキル【空室対策編】周辺MAP、営業効率化",
+      "mtime": "2026-10-16T01:09:27"
+    },
+    {
+      "slug": "step8-youtube",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step8-youtube.md",
+      "imamura_file": null,
+      "bytes": 46082,
+      "title": "【オプション】 神大家 空室対策YOUTUBEをフル活用!!",
+      "mtime": "2026-10-16T01:09:41"
+    },
+    {
+      "slug": "kamiooya-kiso-step9",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step9.md",
+      "imamura_file": null,
+      "bytes": 134736,
+      "title": "STEP9　神スキル【修繕編】リフォーム単価表、家賃UPの基礎",
+      "mtime": "2026-10-16T01:09:55"
+    },
+    {
+      "slug": "step10_2",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step10_2.md",
+      "imamura_file": null,
+      "bytes": 217863,
+      "title": "STEP10 神スキル【修繕編】コスト大幅削減",
+      "mtime": "2026-10-16T01:10:10"
+    },
+    {
+      "slug": "kamiooya-kiso-step11",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step11.md",
+      "imamura_file": null,
+      "bytes": 72253,
+      "title": "STEP11 神スキル【売却編】",
+      "mtime": "2026-10-16T01:10:26"
+    },
+    {
+      "slug": "step12_1",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step12_1.md",
+      "imamura_file": null,
+      "bytes": 88917,
+      "title": "STEP12 神スキル【減価償却】1 法人活用編",
+      "mtime": "2026-10-16T01:10:50"
+    },
+    {
+      "slug": "step12_2",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_step12_2.md",
+      "imamura_file": null,
+      "bytes": 63575,
+      "title": "STEP12 神スキル【減価償却】2 デッドクロス対策",
+      "mtime": "2026-10-16T01:11:07"
+    },
+    {
+      "slug": "kamiooya-otoiawase",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiooya-otoiawase.md",
+      "imamura_file": null,
+      "bytes": 818,
+      "title": "kamiooya-otoiawase",
+      "mtime": "2026-10-16T01:01:15"
+    },
+    {
+      "slug": "baikyaku_maisoku",
+      "title": "【実践】物件売却：売却用マイソク（募集チラシ）の作り方",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_baikyaku_maisoku.md",
+      "imamura_file": null,
+      "bytes": 907,
+      "mtime": "2026-10-16T01:01:15",
+      "extra": true
+    },
+    {
+      "slug": "homestaging_daikou",
+      "title": "【オプション】空室対策：「ステージング現地設置代行」サービス",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_homestaging_daikou.md",
+      "imamura_file": null,
+      "bytes": 669,
+      "mtime": "2026-10-16T01:01:15",
+      "extra": true
+    },
+    {
+      "slug": "kamiconcept_1_bukkenmei",
+      "title": "第一部　[どこでも教えていない]【『神』物件名】で圧倒的世界観を創り出せ！",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiconcept_1_bukkenmei.md",
+      "imamura_file": null,
+      "bytes": 265561,
+      "mtime": "2026-10-16T01:01:15",
+      "extra": true
+    },
+    {
+      "slug": "kamiconcept_2_kamikanban",
+      "title": "第二部　[どこでも教えていない]【『神』看板】で外観イメージを差別化しろ!",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiconcept_2_kamikanban.md",
+      "imamura_file": null,
+      "bytes": 125708,
+      "mtime": "2026-10-16T01:01:15",
+      "extra": true
+    },
+    {
+      "slug": "kamiconcept_3_kamiconcept",
+      "title": "第三部　[どこでも教えていない]【『神』ｺﾝｾﾌﾟﾄ】で唯一無二の大家になれ!",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kamiconcept_3_kamiconcept.md",
+      "imamura_file": null,
+      "bytes": 243034,
+      "mtime": "2026-10-16T01:01:15",
+      "extra": true
+    },
+    {
+      "slug": "pop_board",
+      "title": "センス抜群POP業者／看板業者紹介",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_pop_board.md",
+      "imamura_file": null,
+      "bytes": 1143,
+      "mtime": "2026-10-16T01:01:15",
+      "extra": true
+    }
+  ]
+}
