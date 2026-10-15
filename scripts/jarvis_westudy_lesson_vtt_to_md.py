@@ -106,16 +106,47 @@ def fetch_lesson_vtts(slug: str, *, headless: bool = True) -> dict:
             seen.add(vid)
 
             wlp.driver.switch_to.frame(frame)
-            time.sleep(1.5)
-            tracks = wlp.driver.execute_script(
-                """
-                return [...document.querySelectorAll('track')].map(t => ({
-                  kind: t.kind,
-                  label: t.label,
-                  src: t.src
-                }));
-                """
-            ) or []
+            tracks: list[dict] = []
+            for _try in range(4):
+                time.sleep(1.2 if _try == 0 else 1.5)
+                tracks = wlp.driver.execute_script(
+                    """
+                    return [...document.querySelectorAll('track')].map(t => ({
+                      kind: t.kind,
+                      label: t.label,
+                      src: t.src,
+                      srclang: t.srclang
+                    }));
+                    """
+                ) or []
+                if tracks:
+                    break
+            # Vimeo config API（track が空のときのフォールバック）
+            if not tracks:
+                try:
+                    cfg = requests.get(
+                        f"https://player.vimeo.com/video/{vid}/config",
+                        headers={"Referer": url},
+                        timeout=45,
+                    )
+                    if cfg.ok:
+                        data = cfg.json()
+                        for tt in (
+                            (data.get("request") or {}).get("text_tracks") or []
+                        ):
+                            src = tt.get("url") or ""
+                            if src.startswith("/"):
+                                src = "https://player.vimeo.com" + src
+                            tracks.append(
+                                {
+                                    "kind": "subtitles",
+                                    "label": tt.get("label") or tt.get("lang"),
+                                    "src": src,
+                                    "srclang": tt.get("lang"),
+                                }
+                            )
+                except Exception:
+                    pass
             wlp.driver.switch_to.default_content()
 
             if not tracks:
@@ -129,8 +160,24 @@ def fetch_lesson_vtts(slug: str, *, headless: bool = True) -> dict:
                 )
                 continue
 
-            track = tracks[0]
+            def _track_score(t: dict) -> tuple:
+                label = f"{t.get('label') or ''} {t.get('srclang') or ''}".lower()
+                ja = 1 if ("ja" in label or "日本" in label) else 0
+                auto = 1 if ("自動" in label or "auto" in label) else 0
+                return (ja, auto, 1 if t.get("src") else 0)
+
+            track = sorted(tracks, key=_track_score, reverse=True)[0]
             vtt_url = track.get("src") or ""
+            if not vtt_url:
+                out["videos"].append(
+                    {
+                        "video_id": vid,
+                        "caption_label": track.get("label"),
+                        "cues": [],
+                        "error": "empty track src",
+                    }
+                )
+                continue
             resp = requests.get(
                 vtt_url,
                 headers={"Referer": f"https://player.vimeo.com/video/{vid}"},
@@ -145,6 +192,7 @@ def fetch_lesson_vtts(slug: str, *, headless: bool = True) -> dict:
                     "vtt_url": vtt_url[:120],
                     "cue_count": len(cues),
                     "cues": cues,
+                    "tracks_seen": len(tracks),
                 }
             )
     finally:
