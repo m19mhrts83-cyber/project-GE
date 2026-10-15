@@ -1,4 +1,11 @@
 # 315 連携健全性点検係 — 本線は GitHub Actions（日曜 21:00 JST）
+#
+# 点検3系統:
+#   1) WeStudy/GHA … この workflow（--cloud）で本線点検 → #ops
+#   2) LINE オプチャ … Mac 専用（日曜 21:45 --remediate-once）
+#   3) Gmail OAuth token … Mac 専用（同上。token_*.json。再同意は人）
+# cloud では 2)(3) はスキップし、#ops 本文に「Mac 21:45 で補完」と出す。
+# 流れ図: docs/AIエージェントチーム/…/315_…/docs/flow-overview.html
 name: Ops Health 315
 
 permissions:
@@ -36,10 +43,12 @@ jobs:
       - name: Install gh CLI deps (none) / ensure state dir
         run: mkdir -p .jarvis_state
 
-      - name: Run 315 ops health (cloud)
+      # WeStudy 本線。Gmail token / オプチャ詳細は Mac 21:45（--cloud でスキップ）
+      - name: Run 315 ops health (cloud — WeStudy; Gmail/openchat deferred to Mac)
         id: run315
         run: |
           set -euo pipefail
+          echo "::notice::315 cloud: WeStudy点検。Gmail token とオプチャは Mac 日曜21:45 --remediate-once"
           POST_FLAG=()
           if [[ -n "${SLACK_WEBHOOK_AI_TEAM_OPS:-}" ]]; then
             POST_FLAG=(--post --mark-checked)

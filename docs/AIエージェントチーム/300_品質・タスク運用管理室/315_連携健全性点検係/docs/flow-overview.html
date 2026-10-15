@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>315 連携健全性点検係 — 流れ</title>
+<style>
+  :root { --ai:#2563eb; --prog:#7c3aed; --ext:#059669; --human:#ca8a04; --gmail:#dc2626; }
+  body { font-family: "Meiryo", "メイリオ", sans-serif; margin: 0; padding: 16px; background:#f8fafc; color:#0f172a; }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  .sub { color:#475569; font-size: .9rem; margin-bottom: 16px; }
+  .legend { display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 16px; font-size:.85rem; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .pillars { display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 20px; }
+  .pillar { flex:1 1 180px; border-radius:8px; padding:12px; background:#fff; border:2px solid #cbd5e1; }
+  .pillar.hl { border-color:var(--gmail); box-shadow:0 0 0 3px #fecaca; }
+  .pillar h3 { margin:0 0 6px; font-size:.95rem; }
+  .pillar .when { font-size:.75rem; color:#64748b; }
+  .pillar ul { margin:8px 0 0; padding-left:1.1rem; font-size:.85rem; }
+  .badge { display:inline-block; font-size:.65rem; font-weight:bold; padding:2px 6px; border-radius:4px; background:#fee2e2; color:#991b1b; }
+  .flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; }
+  .box { flex:1 1 130px; min-width:110px; border-radius:8px; padding:12px; border:2px solid; background:#fff; }
+  .box.ai { border-color:var(--ai); }
+  .box.prog { border-color:var(--prog); }
+  .box.ext { border-color:var(--ext); }
+  .box.human { border-color:var(--human); background:#fffbeb; }
+  .role { font-size:.7rem; font-weight:bold; margin-bottom:4px; }
+  .ai .role { color:var(--ai); }
+  .prog .role { color:var(--prog); }
+  .ext .role { color:var(--ext); }
+  .human .role { color:var(--human); }
+  .what { font-size:.9rem; font-weight:600; }
+  .tool { font-size:.75rem; color:#64748b; margin-top:6px; }
+  .arrow { align-self:center; color:#94a3b8; font-weight:bold; }
+  .future { margin-top:20px; padding:12px; border:1px dashed #94a3b8; border-radius:8px; background:#fff; }
+  .future h2 { font-size:1rem; margin:0 0 8px; }
+  .grow { margin-top:16px; padding:12px; background:#eff6ff; border-radius:8px; }
+  .grow h2 { font-size:1rem; margin:0 0 8px; color:var(--ai); }
+  ul { margin:0; padding-left:1.2rem; font-size:.9rem; }
+  @media (max-width:700px) {
+    .flow { flex-direction:column; }
+    .arrow { transform:rotate(90deg); text-align:center; }
+  }
+</style>
+</head>
+<body>
+  <h1>連携健全性点検係（315）— 流れ</h1>
+  <p class="sub">目的: WeStudy／LINEオプチャ／<strong>Gmail OAuth token</strong> の切れ・欠落を定期点検し、Slack #ops へ報告。再同意・QRは人がやる。</p>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--ai)"></i>AI（設計・報告文）</span>
+    <span><i class="dot" style="background:var(--prog)"></i>プログラム</span>
+    <span><i class="dot" style="background:var(--ext)"></i>外部ツール</span>
+    <span><i class="dot" style="background:var(--human)"></i>人間の確認</span>
+    <span><i class="dot" style="background:var(--gmail)"></i>今回追加（Gmail）</span>
+  </div>
+
+  <h2 style="font-size:1rem;margin:0 0 8px;">点検する3系統</h2>
+  <div class="pillars">
+    <div class="pillar">
+      <h3>① WeStudy / GHA</h3>
+      <div class="when">本線: 日曜 21:00 GHA（--cloud）</div>
+      <ul>
+        <li>週次取込の成功／Fail</li>
+        <li>自動再実行はしない</li>
+      </ul>
+    </div>
+    <div class="pillar">
+      <h3>② LINE オプチャ</h3>
+      <div class="when">Mac: 日曜 21:45（--remediate-once）</div>
+      <ul>
+        <li>常時監視・スレッド健全性</li>
+        <li>異常時は既知復旧を1回</li>
+      </ul>
+    </div>
+    <div class="pillar hl">
+      <h3>③ Gmail token <span class="badge">2026-10-15〜</span></h3>
+      <div class="when">Mac: 日曜 21:45（token_*.json）</div>
+      <ul>
+        <li>スコープ不足・refresh 欠如</li>
+        <li>estate の send 欠落を検知</li>
+        <li>ブラウザ再同意は<strong>人のみ</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 style="font-size:1rem;margin:0 0 8px;">処理の順番</h2>
+  <div class="flow">
+    <div class="box ext">
+      <div class="role">外部ツール</div>
+      <div class="what">定時起動</div>
+      <div class="tool">GHA 21:00／Mac launchd 21:45</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box prog">
+      <div class="role">プログラム</div>
+      <div class="what">3系統を点検</div>
+      <div class="tool">jarvis_ops_health_315<br/>＋ gmail_token_health<br/>＋ westudy / openchat</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box prog">
+      <div class="role">プログラム</div>
+      <div class="what">安全なら1回トライ</div>
+      <div class="tool">オプチャ recover のみ<br/>Gmail・WeStudyは自動復旧しない</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box ext">
+      <div class="role">外部ツール</div>
+      <div class="what">結果を #ops</div>
+      <div class="tool">Slack Webhook（常に）</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box human">
+      <div class="role">人間</div>
+      <div class="what">未解決・再同意</div>
+      <div class="tool">#consult／reauth_estate_gmail_send.py／QR</div>
+    </div>
+  </div>
+
+  <div class="future">
+    <h2>実装済み（2026-10-15）</h2>
+    <ul>
+      <li>Gmail token を 315 の点検対象に追加（Mac）。GHA cloud ではスキップ → Mac に委譲</li>
+      <li>日常の朝オープン／パートナー確認でも <code>jarvis_gmail_token_health</code> が相乗り</li>
+      <li>停止: <code>JARVIS_OPS_HEALTH_315_DISABLE=1</code>／Gmail単体 <code>JARVIS_GMAIL_TOKEN_HEALTH_DISABLE=1</code></li>
+    </ul>
+  </div>
+  <div class="grow">
+    <h2>AIを育てるポイント</h2>
+    <ul>
+      <li>選定: 「要フォロー」と構造限界（Square 401 等）を混ぜない</li>
+      <li>書き方: #ops に是正コマンドを短く（秘密・token値は出さない）</li>
+      <li>例外: Gmail 再同意・QRは必ず人。自動ブラウザ禁止</li>
+    </ul>
+  </div>
+</body>
+</html>
