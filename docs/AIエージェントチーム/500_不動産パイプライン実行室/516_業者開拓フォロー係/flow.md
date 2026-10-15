@@ -4,7 +4,7 @@
 作り方: [`06_社員の作り方_二段階_20261009.md`](../../06_社員の作り方_二段階_20261009.md)
 
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
-- **この体のフロー**: [flow_dCheumorewDolXnfpksSuWKu](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dCheumorewDolXnfpksSuWKu)
+- **この体のフロー**: [業者開拓 見守り（516／GHA16:00）](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dCheumorewDolXnfpksSuWKu)（設計図。実行エンジンではない）
 - **役割分担（B'）**: 実行=Grok（S2/S4/S9）／見守り=516（検知・報告）。二重実行しない
 - **見守り本線**: GHA `kurashift-vendor-outreach-stall.yml`（平日16:00 JST・`--skip-refill`）
 - **補給保険（Mac）**: `scripts/jarvis_vendor_outreach_stall_runner.py --lane all`（Drive outbox）
