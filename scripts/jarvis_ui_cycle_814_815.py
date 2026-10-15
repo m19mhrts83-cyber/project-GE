@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""814/815 俯瞰UI更新サイクル — 投影鮮度確認＋任意 push＋Slack #ops。
+"""814/815 俯瞰UI更新サイクル — 投影鮮度確認＋任意 push＋Slack #ops（問題時のみ）。
 
 使い方:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_ui_cycle_814_815.py
   ~/selenium_env/venv/bin/python scripts/jarvis_ui_cycle_814_815.py --push --post
   ~/selenium_env/venv/bin/python scripts/jarvis_ui_cycle_814_815.py --agent 814 --post
+  ~/selenium_env/venv/bin/python scripts/jarvis_ui_cycle_814_815.py --post --force-post  # OKでも投稿
 
 入口: sync_meta / 既存 runner
-確認: Slack は自動可。UI破壊的変更は人
-履歴: 各係 logs/ ＋ Slack #ops
+確認: Slack は問題時のみ自動。UI破壊的変更は人
+履歴: 各係 logs/（常時）＋ Slack #ops（要フォロー時のみ）
 停止: JARVIS_UI_CYCLE_DISABLE=1
 """
 from __future__ import annotations
@@ -34,6 +35,12 @@ LOG815 = (
     REPO
     / "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/logs"
 )
+
+AGENT_LABEL = {
+    "814": "814 ダッシュ更新",
+    "815": "815 KURASHIFT更新",
+    "both": "814/815 UI更新",
+}
 
 
 def _run(cmd: list[str], *, timeout: int = 300) -> tuple[int, str]:
@@ -80,25 +87,40 @@ def fetch_sync_meta() -> dict:
     return out
 
 
-def build_message(agent: str, meta: dict, push_rc: int | None) -> str:
-    now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
+def evaluate(meta: dict, push_rc: int | None) -> tuple[str, str]:
+    """Return (overall, reason). overall is OK or 要フォロー…"""
     dash = meta.get("last_dashboard_log") or {}
     mtime = dash.get("mtime") or "—"
     overall = "OK"
-    # stale if no log in 2 days
+    reason = ""
     try:
         if mtime != "—":
             dt = datetime.fromisoformat(str(mtime))
             age_h = (datetime.now(tz=JST) - dt.astimezone(JST)).total_seconds() / 3600
             if age_h > 48:
                 overall = "要フォロー（投影ログ48h超）"
+                reason = f"最終 push ログが約{age_h:.0f}h前（{dash.get('name', '—')} @ {mtime}）"
     except Exception:
         pass
     if push_rc is not None and push_rc != 0:
         overall = "要フォロー（push失敗）"
+        reason = f"今回 push exit={push_rc}"
+    if overall == "OK" and not meta.get("last_dashboard_log"):
+        overall = "要フォロー（投影ログなし）"
+        reason = "Library/Logs/jarvis_dashboard に push_*.log が無い"
+    return overall, reason
+
+
+def build_message(agent: str, meta: dict, push_rc: int | None) -> str:
+    """Full log text (always written to logs/)."""
+    now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
+    dash = meta.get("last_dashboard_log") or {}
+    mtime = dash.get("mtime") or "—"
+    overall, _ = evaluate(meta, push_rc)
+    label = AGENT_LABEL.get(agent, "814/815 UI更新")
 
     lines = [
-        f"【社員報告】{'814 ダッシュ更新' if agent == '814' else '815 KURASHIFT更新' if agent == '815' else '814/815 UI更新'} / 定周期",
+        f"【社員報告】{label} / 定周期",
         f"- 状態: Phase L サイクル（{now} JST）",
         f"- 判定: {overall}",
         f"- 最終 dashboard push ログ: {dash.get('name', '—')} @ {mtime}",
@@ -106,13 +128,27 @@ def build_message(agent: str, meta: dict, push_rc: int | None) -> str:
     if push_rc is not None:
         lines.append(f"- 今回 push: exit={push_rc}")
     lines.append("- 見てほしい点: Dash/KURASHIFT の鮮度。破壊的UI変更はしない")
-    lines.append("- 次: launchd dashboard-push（12:30）＋本コマンド --post。将来は816アプリ")
-    lines.append(
-        "- フロー814: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_wkFbA0v6bq3ouq9dmpX-cxc1"
-    )
-    lines.append(
-        "- フロー815: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Xy85GrVwta9qwVlLQcHAwNjI"
-    )
+    lines.append("- 次: launchd dashboard-push（12:30）。#ops は要フォロー時のみ")
+    return "\n".join(lines)
+
+
+def build_ops_alert(agent: str, meta: dict, push_rc: int | None) -> str | None:
+    """Short #ops text when problem; None when OK (skip post)."""
+    overall, reason = evaluate(meta, push_rc)
+    if overall == "OK":
+        return None
+    now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
+    label = AGENT_LABEL.get(agent, "814/815 UI更新")
+    dash = meta.get("last_dashboard_log") or {}
+    lines = [
+        f"⚠️ 【要確認】{label}",
+        f"- 判定: {overall}",
+        f"- 理由: {reason or '—'}",
+        f"- 時刻: {now} JST",
+    ]
+    if dash.get("name"):
+        lines.append(f"- 最終ログ: {dash.get('name')} @ {dash.get('mtime', '—')}")
+    lines.append("- 次: Dash/KURASHIFT鮮度を確認。破壊的UI変更はしない")
     return "\n".join(lines)
 
 
@@ -143,7 +179,16 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--agent", choices=("814", "815", "both"), default="both")
     ap.add_argument("--push", action="store_true", help="jarvis_dashboard_push.py を実行")
-    ap.add_argument("--post", action="store_true", help="Slack #ops に投稿")
+    ap.add_argument(
+        "--post",
+        action="store_true",
+        help="Slack #ops に投稿（既定: 要フォロー時のみ）",
+    )
+    ap.add_argument(
+        "--force-post",
+        action="store_true",
+        help="判定OKでも #ops に投稿（検証用）",
+    )
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -160,8 +205,14 @@ def main() -> int:
             print(out[-2000:])
 
     meta = fetch_sync_meta()
+    overall, _ = evaluate(meta, push_rc)
     msg = build_message(args.agent, meta, push_rc)
+    alert = build_ops_alert(args.agent, meta, push_rc)
     print(msg)
+    if overall == "OK":
+        print("\n📎 #ops: 問題なし → 投稿スキップ（logs のみ）")
+    else:
+        print("\n📎 #ops 投稿予定:\n" + (alert or msg))
 
     stamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
     for log_dir, who in ((LOG814, "814"), (LOG815, "815")):
@@ -174,7 +225,12 @@ def main() -> int:
         if not args.post:
             print("\n（--post なし → Slack未投稿）")
         return 0 if push_rc in (None, 0) else push_rc
-    return post_ops(msg)
+
+    to_post = msg if args.force_post and alert is None else alert
+    if to_post is None:
+        print("📎 Slack #ops: skipped (OK)")
+        return 0 if push_rc in (None, 0) else push_rc
+    return post_ops(to_post)
 
 
 if __name__ == "__main__":
