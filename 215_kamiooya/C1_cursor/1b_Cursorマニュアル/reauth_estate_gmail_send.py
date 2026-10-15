@@ -18,7 +18,12 @@ from pathlib import Path
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-from gmail_api_scopes import GMAIL_SCOPES_215, granted_scopes_from_token_record
+from gmail_api_scopes import (
+    GMAIL_SCOPES_215,
+    granted_scopes_from_token_record,
+    merge_gmail_scopes_for_persist,
+    resolve_scopes_for_oauth_flow,
+)
 from gmail_to_yoritoori import credentials_path
 
 # gmail_token_sync は mail_automation 配下（yoritoori_send / gmail_to_yoritoori と同じ）
@@ -61,8 +66,16 @@ def main() -> int:
         flush=True,
     )
 
+    existing: dict | None = None
+    if TOKEN.is_file():
+        try:
+            existing = json.loads(TOKEN.read_text(encoding="utf-8"))
+        except Exception:
+            existing = None
+    flow_scopes = resolve_scopes_for_oauth_flow(GMAIL_SCOPES_215, existing)
+
     flow = InstalledAppFlow.from_client_secrets_file(
-        str(credentials_path), list(GMAIL_SCOPES_215)
+        str(credentials_path), list(flow_scopes)
     )
     _wb_get = webbrowser.get
 
@@ -103,7 +116,13 @@ def main() -> int:
     finally:
         webbrowser.get = _wb_get  # type: ignore[assignment]
 
-    save_token_json_and_sync(TOKEN, creds.to_json())
+    payload = merge_gmail_scopes_for_persist(
+        creds.to_json(),
+        existing_token_path=TOKEN,
+        existing_record=existing,
+    )
+    # 保存＋ミラー。フルスコープなら GMAIL_ESTATE_TOKEN_B64 も追従（失敗しても送信は止めない）
+    save_token_json_and_sync(TOKEN, payload)
     data = json.loads(TOKEN.read_text(encoding="utf-8"))
     scopes = sorted(granted_scopes_from_token_record(data))
     missing = sorted(set(GMAIL_SCOPES_215) - set(scopes))
@@ -116,6 +135,7 @@ def main() -> int:
         print("警告: refresh_token がありません。再度 prompt=consent で実行してください。", file=sys.stderr)
         return 1
     print("✅ 完了。パートナー送信は以後ブラウザ同意なしで動きます。")
+    print("   （GMAIL_ESTATE_TOKEN_B64 は gmail_token_sync 経由で追従。失敗時は手動 gh secret）")
     return 0
 
 

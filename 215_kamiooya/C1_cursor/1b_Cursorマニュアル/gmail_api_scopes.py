@@ -61,6 +61,80 @@ GMAIL_SCOPES_READONLY = [
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
 
+# Gmail API のスコープだけを識別（Drive/Calendar 等は合流させない）
+GMAIL_SCOPE_PREFIX = "https://www.googleapis.com/auth/gmail."
+
+
+def gmail_scopes_only(scopes: set[str] | list[str] | tuple[str, ...]) -> set[str]:
+    """gmail.* スコープだけを残す（include_granted_scopes 相当の混入を避ける）。"""
+    out: set[str] = set()
+    for s in scopes:
+        s = (s or "").strip()
+        if s.startswith(GMAIL_SCOPE_PREFIX):
+            out.add(s)
+    return out
+
+
+def resolve_scopes_for_oauth_flow(
+    required: list[str] | tuple[str, ...],
+    existing_record: dict | None = None,
+) -> list[str]:
+    """再同意フローに渡すスコープ。
+
+    既存 token に付いていた gmail.*（特に send）を落とさないよう、
+    required と既存 Gmail スコープの和集合を返す。
+    Drive/Calendar 等は含めない。
+    """
+    merged = gmail_scopes_only(required)
+    if existing_record:
+        merged |= gmail_scopes_only(granted_scopes_from_token_record(existing_record))
+    # 安定した並び（215 既知順 → その他）
+    known_order = list(GMAIL_SCOPES_215)
+    ordered = [s for s in known_order if s in merged]
+    ordered.extend(sorted(merged - set(ordered)))
+    return ordered or list(required)
+
+
+def merge_gmail_scopes_for_persist(
+    creds_json: str,
+    *,
+    existing_token_path: Path | None = None,
+    existing_record: dict | None = None,
+) -> str:
+    """token 保存直前に、既存の gmail.* スコープ（特に send）を落さない。
+
+    include_granted_scopes は付けない方針のまま、JSON 上の scopes だけ合流する。
+    再同意フロー側は resolve_scopes_for_oauth_flow で実グラントも合流すること。
+    """
+    try:
+        data = json.loads(creds_json)
+    except (json.JSONDecodeError, TypeError):
+        return creds_json
+
+    existing = existing_record
+    if existing is None and existing_token_path is not None:
+        path = Path(existing_token_path)
+        if path.is_file():
+            try:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                existing = None
+
+    new_scopes = gmail_scopes_only(granted_scopes_from_token_record(data))
+    old_scopes = gmail_scopes_only(granted_scopes_from_token_record(existing or {}))
+    merged = new_scopes | old_scopes
+    if not merged:
+        return creds_json
+
+    known_order = list(GMAIL_SCOPES_215)
+    ordered = [s for s in known_order if s in merged]
+    ordered.extend(sorted(merged - set(ordered)))
+    data["scopes"] = ordered
+    # 一部ライブラリは space 区切り scope も見る
+    if "scope" in data and isinstance(data.get("scope"), str):
+        data["scope"] = " ".join(ordered)
+    return json.dumps(data)
+
 
 def resolve_read_scopes_for_token(d: dict) -> list[str]:
     """読み取り専用の取込で使う最小スコープ。

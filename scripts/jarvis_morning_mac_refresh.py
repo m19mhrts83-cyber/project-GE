@@ -93,6 +93,7 @@ KARATE_ADVISOR_SYNC = REPO / "scripts" / "jarvis_karate_advisor_sync.py"
 PARTNER_111_NIGHT_STATE = REPO / ".jarvis_state" / "partner_111_night.json"
 PARTNER_111_NIGHT_RUNNER = REPO / "launchd" / "partner_111_night_runner.sh"
 PARTNER_111_NIGHT_LOG = Path.home() / "Library" / "Logs" / "jarvis_partner_111_night"
+GMAIL_TOKEN_HEALTH = REPO / "scripts" / "jarvis_gmail_token_health.py"
 
 
 def now_iso() -> str:
@@ -795,6 +796,28 @@ def main() -> int:
             failures += 1
     else:
         results["steps"]["triage_gmail_read"] = "skipped"
+
+    # 1c. Gmail token ヘルス（soft-fail・スコープ欠落の早期検知）
+    if GMAIL_TOKEN_HEALTH.is_file():
+        if os.environ.get("JARVIS_GMAIL_TOKEN_HEALTH_DISABLE", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            results["steps"]["gmail_token_health"] = "skipped"
+        else:
+            rc = run_step(
+                "gmail_token_health",
+                [exe, str(GMAIL_TOKEN_HEALTH), "--mark-prompted"],
+                timeout=60,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["gmail_token_health"] = rc
+            if rc != 0:
+                print(f"# gmail_token_health soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["gmail_token_health"] = "skipped"
 
     # 2. パートナー Gmail → OneDrive（軽量=通常差分）
     if not args.skip_fetch:

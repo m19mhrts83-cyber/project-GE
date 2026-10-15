@@ -1,0 +1,9 @@
+{
+  "disabled": false,
+  "last_checked_at": null,
+  "last_prompted_at": null,
+  "last_issues": [],
+  "ng_events": [],
+  "ng_count_7d": 0,
+  "notes": "JARVIS_GMAIL_TOKEN_HEALTH_DISABLE=1 でも停止可。社員化は ng_count_7d>=2 または『まだ切れる』のとき検討"
+}

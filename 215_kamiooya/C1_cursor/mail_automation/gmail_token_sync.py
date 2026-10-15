@@ -5,10 +5,13 @@ Gmail のトークンファイル保存後、バックアップ先と GitHub Act
 
 - token.json / token_estate.json / token_m19m.json / token_livingsupport.json 等について、git-repos の 1b と OneDrive 215 の同フォルダへ相互ミラー
 - GITHUB_GMAIL_SECRET_REPO と gh CLI が使えるとき、保存したファイルが token.json または token_m19m.json の場合のみ GMAIL_TOKEN_B64 を更新（estate 単体の更新で Secret を潰さない）
+- token_estate.json が 215 フルスコープのとき、別途 GMAIL_ESTATE_TOKEN_B64 を project-GE へ追従
+  （失敗しても呼び出し元の送信は止めない）
 
 無効化:
   GMAIL_TOKEN_SYNC_DISABLE=1  … ミラー・GitHub 更新の両方をスキップ
   GMAIL_TOKEN_SKIP_GITHUB_SYNC=1 … GitHub だけスキップ（OneDrive 等は実施）
+  GMAIL_ESTATE_TOKEN_SKIP_GITHUB_SYNC=1 … estate → GMAIL_ESTATE_TOKEN_B64 だけオフ
 追加ミラー（任意）:
   GMAIL_TOKEN_EXTRA_MIRRORS=/path/a/token.json,/path/b/token.json
 """
@@ -16,6 +19,7 @@ Gmail のトークンファイル保存後、バックアップ先と GitHub Act
 from __future__ import annotations
 
 import base64
+import json
 import os
 import shutil
 import subprocess
@@ -119,28 +123,91 @@ def sync_token_mirrors(
             print(f"{log_prefix}: ミラー失敗 {dest}: {e}", file=sys.stderr)
 
     if skip_github or _truthy_env("GMAIL_TOKEN_SKIP_GITHUB_SYNC"):
-        # admin → Vercel は GitHub スキップ時も実施（別系統）
+        # admin → Vercel は GitHub スキップ時も実施（別系統）。estate Secret はスキップに従う
         _maybe_sync_admin_to_vercel(primary)
         return
 
-    # GitHub Actions（いけとも AI ニュース等）は m19m 系トークンを想定。estate だけの再保存で Secret を上書きしない
-    if primary.name not in ("token.json", "token_m19m.json"):
-        _maybe_sync_admin_to_vercel(primary)
+    # GitHub Actions（いけとも AI ニュース等）は m19m 系トークンを想定。estate だけの再保存で GMAIL_TOKEN_B64 を潰さない
+    if primary.name in ("token.json", "token_m19m.json") and shutil.which("gh") is not None:
+        repo = os.environ.get("GITHUB_GMAIL_SECRET_REPO", "m19mhrts83-cyber/DX-_-").strip()
+        if "/" in repo:
+            token_b64 = base64.b64encode(primary.read_bytes()).decode("ascii").replace("\n", "")
+            try:
+                proc = subprocess.run(
+                    ["gh", "secret", "set", "GMAIL_TOKEN_B64", "--repo", repo],
+                    input=token_b64,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                if proc.returncode == 0:
+                    print(
+                        f"{log_prefix}: GitHub Secret GMAIL_TOKEN_B64 を更新しました（{repo}）",
+                        file=sys.stderr,
+                    )
+                else:
+                    err = (proc.stderr or proc.stdout or "").strip()
+                    print(
+                        f"{log_prefix}: gh secret set 失敗（exit {proc.returncode}）{': ' + err if err else ''}",
+                        file=sys.stderr,
+                    )
+            except (subprocess.TimeoutExpired, OSError) as e:
+                print(f"{log_prefix}: gh 実行エラー: {e}", file=sys.stderr)
+
+    _maybe_sync_estate_to_github(primary, log_prefix=log_prefix)
+    _maybe_sync_admin_to_vercel(primary)
+
+
+def _maybe_sync_estate_to_github(primary: Path, *, log_prefix: str) -> None:
+    """token_estate.json が 215 フルスコープのとき GMAIL_ESTATE_TOKEN_B64 を追従。
+
+    失敗しても例外を上げない（送信・再同意の本線を止めない）。
+    """
+    if primary.name != "token_estate.json":
+        return
+    if _truthy_env("GMAIL_ESTATE_TOKEN_SKIP_GITHUB_SYNC"):
+        return
+    if _truthy_env("GMAIL_TOKEN_SYNC_DISABLE"):
+        return
+
+    try:
+        data = json.loads(primary.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"{log_prefix}: estate Secret スキップ（読取失敗: {e}）", file=sys.stderr)
+        return
+
+    # gmail_api_scopes は 1b 配下。mail_automation から相対で import
+    try:
+        manual = Path(__file__).resolve().parent.parent / "1b_Cursorマニュアル"
+        if str(manual) not in sys.path:
+            sys.path.insert(0, str(manual))
+        from gmail_api_scopes import token_satisfies_215_scopes  # noqa: WPS433
+    except Exception as e:
+        print(f"{log_prefix}: estate Secret スキップ（scopes 判定不可: {e}）", file=sys.stderr)
+        return
+
+    if not token_satisfies_215_scopes(data):
+        print(
+            f"{log_prefix}: estate Secret スキップ（send 等不足・フル再同意後に追従）",
+            file=sys.stderr,
+        )
         return
 
     if shutil.which("gh") is None:
-        _maybe_sync_admin_to_vercel(primary)
+        print(f"{log_prefix}: estate Secret スキップ（gh なし）", file=sys.stderr)
         return
 
-    repo = os.environ.get("GITHUB_GMAIL_SECRET_REPO", "m19mhrts83-cyber/DX-_-").strip()
+    # いけとも DX-_- の GMAIL_TOKEN_B64 とは別。既定は project-GE（KURASHIFT / Cloud 送信）
+    repo = os.environ.get(
+        "GITHUB_GMAIL_ESTATE_SECRET_REPO", "m19mhrts83-cyber/project-GE"
+    ).strip()
     if "/" not in repo:
-        _maybe_sync_admin_to_vercel(primary)
         return
 
     token_b64 = base64.b64encode(primary.read_bytes()).decode("ascii").replace("\n", "")
     try:
         proc = subprocess.run(
-            ["gh", "secret", "set", "GMAIL_TOKEN_B64", "--repo", repo],
+            ["gh", "secret", "set", "GMAIL_ESTATE_TOKEN_B64", "--repo", repo],
             input=token_b64,
             capture_output=True,
             text=True,
@@ -148,19 +215,21 @@ def sync_token_mirrors(
         )
         if proc.returncode == 0:
             print(
-                f"{log_prefix}: GitHub Secret GMAIL_TOKEN_B64 を更新しました（{repo}）",
+                f"{log_prefix}: GitHub Secret GMAIL_ESTATE_TOKEN_B64 を更新しました（{repo}）",
                 file=sys.stderr,
             )
         else:
             err = (proc.stderr or proc.stdout or "").strip()
             print(
-                f"{log_prefix}: gh secret set 失敗（exit {proc.returncode}）{': ' + err if err else ''}",
+                f"{log_prefix}: GMAIL_ESTATE_TOKEN_B64 更新失敗（exit {proc.returncode}）"
+                f"{': ' + err if err else ''} ※送信は続行可",
                 file=sys.stderr,
             )
     except (subprocess.TimeoutExpired, OSError) as e:
-        print(f"{log_prefix}: gh 実行エラー: {e}", file=sys.stderr)
-
-    _maybe_sync_admin_to_vercel(primary)
+        print(
+            f"{log_prefix}: GMAIL_ESTATE_TOKEN_B64 gh エラー: {e} ※送信は続行可",
+            file=sys.stderr,
+        )
 
 
 def _maybe_sync_admin_to_vercel(primary: Path) -> None:
