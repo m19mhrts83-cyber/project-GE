@@ -99,7 +99,9 @@ export default function MaterialsPage() {
       })}
 
       <p className="meta" style={{ marginTop: 24 }}>
-        関連: <a href="/notebooklm">NotebookLM</a>
+        関連: <a href="/kiso-transcripts">基礎講座・文字起こし</a>
+        {" · "}
+        <a href="/notebooklm">NotebookLM</a>
         {" · "}
         <a href="/apps">アプリ・プロンプト集</a>
       </p>
