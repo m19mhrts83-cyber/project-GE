@@ -4,6 +4,7 @@ import {
   getAgentTeam,
   getGenres,
   getGrok,
+  getOpsMeta,
   getPermissionsMeta,
 } from "@/lib/agentTeam";
 
@@ -12,6 +13,7 @@ export default function AgentTeamPage() {
   const grok = getGrok();
   const genres = getGenres();
   const permissionsMeta = getPermissionsMeta();
+  const opsMeta = getOpsMeta();
 
   return (
     <Shell active="/agent-team">
@@ -29,6 +31,7 @@ export default function AgentTeamPage() {
         grok={grok}
         permissionsMeta={permissionsMeta}
         permissionsUpdated={team.permissions_updated}
+        opsMeta={opsMeta}
       />
     </Shell>
   );

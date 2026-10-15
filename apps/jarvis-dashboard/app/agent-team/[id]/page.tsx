@@ -10,8 +10,11 @@ import {
   mixupKindHint,
   mixupKindLabel,
   permissionLevelClass,
+  reportChannelLabel,
   reportLabel,
   statusClass,
+  triggerKindLabel,
+  getOpsMeta,
 } from "@/lib/agentTeam";
 
 export function generateStaticParams() {
@@ -27,10 +30,12 @@ export default async function AgentTeamDetailPage({
   const agent = getAgentById(id);
   if (!agent) notFound();
   const team = getAgentTeam();
+  const opsMeta = getOpsMeta();
   const mapping = getMappingsForAgent(id);
   const viewUrl = agent.flowforge_share_url || "";
   const editUrl = agent.flowforge_edit_url || agent.flowforge_url || "";
   const primaryUrl = flowforgeOpenUrl(agent);
+  const ops = agent.ops;
 
   return (
     <Shell active="/agent-team">
@@ -144,6 +149,84 @@ export default async function AgentTeamDetailPage({
           <p className="meta" style={{ marginTop: 10 }}>
             <Link href="/agent-team">対応表タブで一覧</Link>
           </p>
+        </section>
+
+        <section className="card at-detail-card">
+          <header>
+            <strong>合図・報告・手順</strong>
+          </header>
+          {ops ? (
+            <>
+              <p className="sum">{ops.when || "（具体タイミング未記入）"}</p>
+              <div style={{ marginBottom: 10 }}>
+                {(ops.trigger_kinds || [])
+                  .filter((t) => t.on)
+                  .map((t) => (
+                    <span
+                      key={t.id}
+                      className={`at-trig at-trig-${t.id}`}
+                      title={t.detail || ""}
+                    >
+                      {triggerKindLabel(t.id, opsMeta.trigger_kinds)}
+                    </span>
+                  ))}
+                {!ops.trigger_kinds_on?.length ? (
+                  <span className="at-perm-stub">合図未記入</span>
+                ) : null}
+              </div>
+              <dl className="at-dl">
+                <div>
+                  <dt>主報告</dt>
+                  <dd>{reportLabel(ops.primary_report || agent.report)}</dd>
+                </div>
+                <div>
+                  <dt>チャンネル</dt>
+                  <dd>
+                    {(ops.report_channels || []).length
+                      ? ops.report_channels
+                          .map((c) => reportChannelLabel(c))
+                          .join(" · ")
+                      : "—"}
+                  </dd>
+                </div>
+              </dl>
+              {(ops.trigger_kinds || []).some((t) => t.on && t.detail) ? (
+                <ul className="at-proc-list" style={{ marginTop: 10 }}>
+                  {ops.trigger_kinds
+                    .filter((t) => t.on)
+                    .map((t) => (
+                      <li key={t.id}>
+                        <span className={`at-trig at-trig-${t.id}`}>
+                          {triggerKindLabel(t.id, opsMeta.trigger_kinds)}
+                        </span>{" "}
+                        {t.detail || "—"}
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
+              {(ops.procedures || []).length ? (
+                <ul className="at-proc-list" style={{ marginTop: 10 }}>
+                  {ops.procedures.map((p) => (
+                    <li key={`${p.kind}-${p.title}`}>
+                      {p.url ? (
+                        <a href={p.url} target="_blank" rel="noopener noreferrer">
+                          {p.title}
+                          {p.kind === "flowforge" ? " ↗" : ""}
+                        </a>
+                      ) : (
+                        p.title
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="meta" style={{ marginTop: 10 }}>
+                <Link href="/agent-team">運用タブで一覧</Link>
+              </p>
+            </>
+          ) : (
+            <p className="meta">運用データなし（sync 後に反映）</p>
+          )}
         </section>
 
         <section className="card at-detail-card">

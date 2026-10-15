@@ -55,6 +55,61 @@ export type PermissionsMeta = {
   note?: string;
 };
 
+export type TriggerKindId = "human" | "schedule" | "event" | "watch" | string;
+
+export type TriggerKindMeta = {
+  id: TriggerKindId;
+  label: string;
+  short?: string;
+  meaning?: string;
+};
+
+export type TriggerKindState = {
+  id: TriggerKindId;
+  on: boolean;
+  detail?: string;
+  raw?: string;
+  from_registry?: boolean;
+};
+
+export type ProcedureLink = {
+  title: string;
+  path?: string;
+  url?: string;
+  kind?: string;
+};
+
+export type ReportRow = {
+  kind: string;
+  destination: string;
+  channels?: string[];
+};
+
+export type AgentOps = {
+  trigger_kinds: TriggerKindState[];
+  trigger_kinds_on: TriggerKindId[];
+  trigger_kinds_label: string;
+  triggers_filled?: boolean;
+  when: string;
+  registry_trigger?: string;
+  registry_schedule?: string;
+  primary_report: string;
+  report_channels: string[];
+  reports: ReportRow[];
+  procedures: ProcedureLink[];
+  procedure_count: number;
+  source?: string;
+};
+
+export type OpsMeta = {
+  updated?: string;
+  trigger_kinds?: TriggerKindMeta[];
+  slack_channels?: Record<string, { label?: string; meaning?: string }>;
+  doc?: string;
+  yaml?: string;
+  note?: string;
+};
+
 export type AgentTeamAgent = {
   id: string;
   name: string;
@@ -82,6 +137,7 @@ export type AgentTeamAgent = {
   flowforge_share_url?: string;
   flowforge_edit_url?: string;
   permissions?: AgentPermissions;
+  ops?: AgentOps;
 };
 
 export type AgentTeamDept = {
@@ -135,6 +191,7 @@ export type GrokBot = {
   genre_id?: string;
   genre_name?: string;
   permissions?: BotPermissions;
+  ops?: AgentOps;
 };
 
 export type GrokDept = {
@@ -196,10 +253,29 @@ export type AgentTeamPayload = {
   agents: AgentTeamAgent[];
   grok?: GrokPayload;
   permissions_meta?: PermissionsMeta;
+  ops_meta?: OpsMeta;
 };
 
 export function getPermissionsMeta(): PermissionsMeta {
   return getAgentTeam().permissions_meta || {};
+}
+
+export function getOpsMeta(): OpsMeta {
+  return getAgentTeam().ops_meta || {};
+}
+
+export function triggerKindLabel(
+  id: string,
+  meta?: TriggerKindMeta[]
+): string {
+  const hit = (meta || []).find((k) => k.id === id);
+  return hit?.short || hit?.label || id;
+}
+
+export function reportChannelLabel(ch: string): string {
+  const c = (ch || "").replace(/^#/, "");
+  if (!c) return "—";
+  return `#${c}`;
 }
 
 export function permissionLevelClass(level: string): string {

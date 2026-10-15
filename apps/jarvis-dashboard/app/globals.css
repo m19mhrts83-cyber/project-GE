@@ -5201,6 +5201,49 @@ tr.at-map-ai-only .at-map-missing {
   font-size: 0.9rem;
 }
 
+.at-trig {
+  display: inline-block;
+  margin: 0 4px 4px 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.at-trig-human {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.at-trig-schedule {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.at-trig-event {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.at-trig-watch {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.at-proc-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.at-report-ch {
+  font-weight: 600;
+  color: #0f766e;
+}
+
 @media (max-width: 700px) {
   .at-org {
     grid-template-columns: 1fr;

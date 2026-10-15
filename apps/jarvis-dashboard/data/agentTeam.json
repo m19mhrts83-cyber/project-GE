@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-16T07:16:14+09:00",
+  "updated": "2026-10-16T07:34:31+09:00",
   "registry_updated": "2026-10-11",
   "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -395,6 +395,121 @@
         "human_gate": "報告材料の読み直し・返信要否・送信了承。お金・外に出す・消す。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「パートナー確認して」",
+            "raw": "**人が頼む（副）**: 「パートナー確認して」"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "11:50 JST（GitHub Actions） / 20:30 以降に Mac を開いたとき（未実施なら）",
+            "raw": "**時間（本線・昼）**: 11:50 JST（GitHub Actions）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら（将来）",
+            "raw": "何かが届いたら（将来）"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間",
+        "triggers_filled": true,
+        "when": "11:50GHA / 20:30launchd",
+        "registry_trigger": "時間＋変化",
+        "registry_schedule": "11:50GHA / 20:30launchd",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`（通常は更新時のみ。運用確認〜10/18はゼロ日も**1行**生存確認）",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断・相談",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook（秘密）",
+            "destination": "env キー名のみ（URLは書かない）: `SLACK_WEBHOOK_REPORT` 系",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/Ss4t4l_MR9p80CVH",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "PROGRESS.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/PROGRESS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/PROGRESS.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/AGENTS.md",
+            "kind": "doc"
+          },
+          {
+            "title": "setup-connectors.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/docs/setup-connectors.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/docs/setup-connectors.md",
+            "kind": "doc"
+          },
+          {
+            "title": "setup-slack-ai-team-webhooks.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/docs/setup-slack-ai-team-webhooks.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/docs/setup-slack-ai-team-webhooks.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 8,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -460,6 +575,112 @@
         "human_gate": "外に出す・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "パートナー確認ついで",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "パートナー確認ついで",
+            "raw": "",
+            "from_registry": true
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "時間 · 見回り",
+        "triggers_filled": true,
+        "when": "パートナー確認ついで",
+        "registry_trigger": "時間＋異常",
+        "registry_schedule": "パートナー確認ついで",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/LPTt0kOkzNIsshqx",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -525,6 +746,112 @@
         "human_gate": "外に出す・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "deals進捗時",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "deals進捗時",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule",
+          "event"
+        ],
+        "trigger_kinds_label": "時間 · イベント",
+        "triggers_filled": true,
+        "when": "deals進捗時",
+        "registry_trigger": "イベント＋時間",
+        "registry_schedule": "deals進捗時",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/ldfexQlYPR_rboUN",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -590,6 +917,99 @@
         "human_gate": "お金・外に出す・消す",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "人が頼む（--deal-id / --scan / degraded.py）",
+            "raw": "人が頼む（`--deal-id` / `--scan` / `degraded.py`）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "15 launchd）",
+            "raw": "時間（毎日 11:15 launchd）"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "何かが届いたら（Grok 取込後・朝バンドル／昼 noon）",
+            "raw": "何かが届いたら（Grok 取込後・朝バンドル／昼 noon）"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "event"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · イベント",
+        "triggers_filled": true,
+        "when": "取込後・毎日11:15・手動",
+        "registry_trigger": "イベント＋時間",
+        "registry_schedule": "取込後・毎日11:15・手動",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult",
+          "report"
+        ],
+        "reports": [
+          {
+            "kind": "B 要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "A/C",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/QIh18CyrhBFyM8Q4",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -655,6 +1075,104 @@
         "human_gate": "外に出す・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "パートナー確認",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら"
+          }
+        ],
+        "trigger_kinds_on": [
+          "event"
+        ],
+        "trigger_kinds_label": "イベント",
+        "triggers_filled": true,
+        "when": "パートナー確認",
+        "registry_trigger": "イベント",
+        "registry_schedule": "パートナー確認",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/VD6WQKft9SS4uRN6",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -694,6 +1212,112 @@
         "human_gate": "お金・外に出す・消す",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "07:30GHA",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "07:30GHA",
+        "registry_trigger": "時間",
+        "registry_schedule": "07:30GHA",
+        "primary_report": "report",
+        "report_channels": [
+          "report"
+        ],
+        "reports": [],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/NoPD9-z7LzE1j9i4",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "PROGRESS.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/PROGRESS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/PROGRESS.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/AGENTS.md",
+            "kind": "doc"
+          },
+          {
+            "title": "draft-format.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/docs/draft-format.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/docs/draft-format.md",
+            "kind": "doc"
+          },
+          {
+            "title": "phase1-pilot.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/docs/phase1-pilot.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/docs/phase1-pilot.md",
+            "kind": "doc"
+          },
+          {
+            "title": "runbook-211.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/docs/runbook-211.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/docs/runbook-211.md",
+            "kind": "doc"
+          },
+          {
+            "title": "setup-connectors.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/docs/setup-connectors.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/docs/setup-connectors.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 10,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -759,6 +1383,102 @@
         "human_gate": "外に出す（送信・投稿）。金・削除も人。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "人が頼む（「送信前チェックして」「この下書き見て」）",
+            "raw": "人が頼む（「送信前チェックして」「この下書き見て」）"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human"
+        ],
+        "trigger_kinds_label": "人依頼",
+        "triggers_filled": true,
+        "when": "依頼時",
+        "registry_trigger": "人依頼",
+        "registry_schedule": "依頼時",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook",
+            "destination": "`SLACK_WEBHOOK_AI_TEAM_REPORT`（URLは env のみ）",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/LAPAAYJTXS-4Opu8",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -824,6 +1544,104 @@
         "human_gate": "外に出す・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "宿題検知",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら"
+          }
+        ],
+        "trigger_kinds_on": [
+          "event"
+        ],
+        "trigger_kinds_label": "イベント",
+        "triggers_filled": true,
+        "when": "宿題検知",
+        "registry_trigger": "イベント",
+        "registry_schedule": "宿題検知",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -889,6 +1707,104 @@
         "human_gate": "外に出す・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "完了相当時",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら"
+          }
+        ],
+        "trigger_kinds_on": [
+          "event"
+        ],
+        "trigger_kinds_label": "イベント",
+        "triggers_filled": true,
+        "when": "完了相当時",
+        "registry_trigger": "イベント",
+        "registry_schedule": "完了相当時",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/ihP48FmIDAoWdX7L",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -954,6 +1870,104 @@
         "human_gate": "外に出す・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "週次ずらす",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "週次ずらす",
+        "registry_trigger": "時間",
+        "registry_schedule": "週次ずらす",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/48jyB5R23LwIF8rZ",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1019,6 +2033,111 @@
         "human_gate": "QR 再ログイン、**Gmail ブラウザ再同意**（`reauth_estate_gmail_send.py` 等）、YAML 大量追記、構造限界の受容判断、WeStudy 再実行。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む（手動・workflowdispatch）",
+            "raw": "人が頼む（手動・`workflow_dispatch`）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "毎週日曜 21:00 JST — GitHub Actions `ops-health-315.yml`** / 毎週日曜 21:45 JST — launchd `--remediate-once`**",
+            "raw": "**時間（本線）: 毎週日曜 21:00 JST — GitHub Actions `ops-health-315.yml`**"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "Sun 21:00 GHA / 21:45 Mac",
+        "registry_trigger": "時間＋Fail",
+        "registry_schedule": "Sun 21:00 GHA / 21:45 Mac",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops"
+        ],
+        "reports": [],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/7yRpKP0SB8QufwBL",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "PROGRESS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/PROGRESS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/PROGRESS.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/AGENTS.md",
+            "kind": "doc"
+          },
+          {
+            "title": "incident-flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/incident-flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/incident-flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "mac-complement-policy.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/mac-complement-policy.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/mac-complement-policy.md",
+            "kind": "doc"
+          },
+          {
+            "title": "promote-to-ops.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/promote-to-ops.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/promote-to-ops.md",
+            "kind": "doc"
+          },
+          {
+            "title": "verify-gha-dispatch.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/verify-gha-dispatch.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/verify-gha-dispatch.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 10,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1084,6 +2203,104 @@
         "human_gate": "外に出す・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "夜間ずらす",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "夜間ずらす",
+        "registry_trigger": "時間",
+        "registry_schedule": "夜間ずらす",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/fAyxjk7cr2ZMu2Fj",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1151,6 +2368,108 @@
         "human_gate": "採用／却下の最終、対外送信、金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "（週次ミックス想定）",
+            "raw": "時間（スケジュール）: （週次ミックス想定）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "日次／週次",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "Grok inbox／社員報告",
+            "raw": "何かが届いたら（イベント）: Grok inbox／社員報告"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "日次／週次",
+        "registry_trigger": "時間",
+        "registry_schedule": "日次／週次",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook",
+            "destination": "env キー名のみ",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/AxPinebyYlSm-EaH",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1218,6 +2537,116 @@
         "human_gate": "採用／却下の最終、対外送信、金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "human",
+            "on": true,
+            "detail": "ミックス時",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "（週次ミックス想定）",
+            "raw": "時間（スケジュール）: （週次ミックス想定）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "ミックス時",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "Grok inbox／社員報告",
+            "raw": "何かが届いたら（イベント）: Grok inbox／社員報告"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間",
+        "triggers_filled": true,
+        "when": "ミックス時",
+        "registry_trigger": "人依頼＋時間",
+        "registry_schedule": "ミックス時",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook",
+            "destination": "env キー名のみ",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/JyMgvujv9f1NW1wx",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1285,6 +2714,108 @@
         "human_gate": "採用／却下の最終、対外送信、金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "human",
+            "on": true,
+            "detail": "比較後",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "（週次ミックス想定）",
+            "raw": "時間（スケジュール）: （週次ミックス想定）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "Grok inbox／社員報告",
+            "raw": "何かが届いたら（イベント）: Grok inbox／社員報告"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human"
+        ],
+        "trigger_kinds_label": "人依頼",
+        "triggers_filled": true,
+        "when": "比較後",
+        "registry_trigger": "人依頼",
+        "registry_schedule": "比較後",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook",
+            "destination": "env キー名のみ",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/NCCCuCP0Xu4j6JwN",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1352,6 +2883,109 @@
         "human_gate": "採用／却下の最終、対外送信、金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "human",
+            "on": true,
+            "detail": "採用後",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "（週次ミックス想定）",
+            "raw": "時間（スケジュール）: （週次ミックス想定）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "Grok inbox／社員報告",
+            "raw": "何かが届いたら（イベント）: Grok inbox／社員報告"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human"
+        ],
+        "trigger_kinds_label": "人依頼",
+        "triggers_filled": true,
+        "when": "採用後",
+        "registry_trigger": "人依頼",
+        "registry_schedule": "採用後",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook",
+            "destination": "env キー名のみ",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/1JDfXix5qWm3XVux",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1419,6 +3053,109 @@
         "human_gate": "採用／却下の最終、対外送信、金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "（週次ミックス想定）",
+            "raw": "時間（スケジュール）: （週次ミックス想定）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "見回りずらす",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "Grok inbox／社員報告",
+            "raw": "何かが届いたら（イベント）: Grok inbox／社員報告"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "見回りずらす",
+        "registry_trigger": "時間",
+        "registry_schedule": "見回りずらす",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook",
+            "destination": "env キー名のみ",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/593ki59o01-pDzeV",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1492,6 +3229,99 @@
         "human_gate": "お金・外に出す・消す",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "人が頼む（--deal-id --yes / --no）",
+            "raw": "人が頼む（`--deal-id --yes` / `--no`）"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間（送信自体はイベント駆動）",
+            "raw": "時間（送信自体はイベント駆動）"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "何かが届いたら（Slack Yes／consult-action）",
+            "raw": "何かが届いたら（Slack Yes／consult-action）"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "event"
+        ],
+        "trigger_kinds_label": "人依頼 · イベント",
+        "triggers_filled": true,
+        "when": "Yes/No時・手動",
+        "registry_trigger": "イベント",
+        "registry_schedule": "Yes/No時・手動",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult",
+          "report"
+        ],
+        "reports": [
+          {
+            "kind": "送信結果",
+            "destination": "`#consult`（主）／`#report`",
+            "channels": [
+              "report",
+              "consult"
+            ]
+          },
+          {
+            "kind": "要判断（To 欠落）",
+            "destination": "`#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/dGqN792qAaebcXmW",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1554,6 +3384,104 @@
         "human_gate": "対外送信・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "イベント",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "event"
+        ],
+        "trigger_kinds_label": "イベント",
+        "triggers_filled": true,
+        "when": "イベント",
+        "registry_trigger": "イベント",
+        "registry_schedule": "イベント",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/21BcD2OM1XfI-P30",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1616,6 +3544,104 @@
         "human_gate": "対外送信・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "時間ずらす",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "時間ずらす",
+        "registry_trigger": "時間",
+        "registry_schedule": "時間ずらす",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/JEmliuimy5D_ypKt",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1678,6 +3704,103 @@
         "human_gate": "対外送信・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "human",
+            "on": true,
+            "detail": "依頼時",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human"
+        ],
+        "trigger_kinds_label": "人依頼",
+        "triggers_filled": true,
+        "when": "依頼時",
+        "registry_trigger": "人依頼",
+        "registry_schedule": "依頼時",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/cSRAHaqC5m7AuA6B",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1740,6 +3863,104 @@
         "human_gate": "対外送信・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "時間",
+            "raw": "時間"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "点検ずらす",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら",
+            "raw": "何かが届いたら"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "点検ずらす",
+        "registry_trigger": "時間",
+        "registry_schedule": "点検ずらす",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/IREb96M-CuHts57R",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1802,6 +4023,128 @@
         "human_gate": "対外送信・金・削除。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "人が頼む — 「業者開拓フォローして」→ …stallrunner.py --apply --lane all --force-refill（必要なら --daily-report）",
+            "raw": "人が頼む — 「業者開拓フォローして」→ `…stall_runner.py --apply --lane all --force-refill`（必要なら `--daily-report`）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "00**（`kurashift-vendor-outreach-stall.yml`・見守り／`--skip-refill`）／Mac **朝** soft-fail・**夕方** `--evening`（補給保険）",
+            "raw": "時間 — **GHA 平日16:00**（`kurashift-vendor-outreach-stall.yml`・見守り／`--skip-refill`）／Mac **朝** soft-fail・**夕方** `--evening`（補給保険）"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "何かが届いたら — jarvisbuchoinboxpoll 成功後フック（再生成依頼・--next 依頼 MD）",
+            "raw": "何かが届いたら — `jarvis_bucho_inbox_poll` 成功後フック（再生成依頼・`--next` 依頼 MD）"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "event",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · イベント · 見回り",
+        "triggers_filled": true,
+        "when": "GHA平日16:00＋Mac朝/夕補給",
+        "registry_trigger": "時間",
+        "registry_schedule": "GHA平日16:00＋Mac朝/夕補給",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告（週次・healthy）",
+            "destination": "Slack `#report`（`--evening` 枠内の週次ゲート）",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "連携障害・枯渇",
+            "destination": "Slack `#ops`（即時）",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断（返信方針）",
+            "destination": "Slack `#consult` ＋ Todoist（要ボスのみ）",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "レーン",
+            "destination": "UI",
+            "channels": []
+          },
+          {
+            "kind": "S2",
+            "destination": "https://jarvis-trade-desk.vercel.app/realestate/vendors",
+            "channels": []
+          },
+          {
+            "kind": "S4",
+            "destination": "https://jarvis-trade-desk.vercel.app/realestate/repair-vendors",
+            "channels": []
+          },
+          {
+            "kind": "S9",
+            "destination": "https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/WtPrc_hWAMHTvY3g",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1864,6 +4207,106 @@
         "human_gate": "頻度の本番変更、ツール有料枠の増減、代行チェーン切替（813と連携）。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「リソース見て」「頻度調整して」",
+            "raw": "人が頼む: 「リソース見て」「頻度調整して」"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "**週次**（既存週次に相乗り。専用スケジューラ乱立禁止）",
+            "raw": "時間: **週次**（既存週次に相乗り。専用スケジューラ乱立禁止）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "枠逼迫・連続 Fail・「社員が動きすぎ／止まっている」指摘",
+            "raw": "変化・失敗を見回ったら: 枠逼迫・連続 Fail・「社員が動きすぎ／止まっている」指摘"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · 見回り",
+        "triggers_filled": true,
+        "when": "週次",
+        "registry_trigger": "時間＋逼迫",
+        "registry_schedule": "週次",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "週次サマリー・使用状況",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "頻度の増減案・要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "813 への枠切替連携",
+            "destination": "`#ops` ＋必要なら Todoist `要Jarvis連携`",
+            "channels": [
+              "ops"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/3K1I4izRqz4gwrD_",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1905,6 +4348,82 @@
         "human_gate": "お金・外に出す・消す",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "月次窓",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "月次窓",
+        "registry_trigger": "時間",
+        "registry_schedule": "月次窓",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops"
+        ],
+        "reports": [],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/lC6FOFZumyQNRtaq",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -1983,6 +4502,108 @@
         "human_gate": "`/zaim` の「確認した」「おかしい」、曖昧費目のピッカー、OTP が取れない口座の手動更新。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「Zaim 見て」「再接続して」「費目直して」等 → runner／reconnect",
+            "raw": "**人が頼む（副）**: 「Zaim 見て」「再接続して」「費目直して」等 → runner／reconnect"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "火・金 **09:00** JST — bank check ＋（設定時）stale 更新 ＋ Watch（`--skip-finance`） / 火・金 **12:00** JST — CSV 取込 → learn → Watch → snapshot / GHA `zaim-finance-sync` — check と Watch（**更新ボタンは押さない**）",
+            "raw": "**時間（本線・朝）**: 火・金 **09:00** JST — bank check ＋（設定時）stale 更新 ＋ Watch（`--skip-finance`）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間",
+        "triggers_filled": true,
+        "when": "火金09鮮度／火金12CSV",
+        "registry_trigger": "時間",
+        "registry_schedule": "火金09鮮度／火金12CSV",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "定時・健全性",
+            "destination": "Slack `#ops`（失敗・残留 stale・学習衝突があるとき。ゼロ報告は連投しない）",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`（費目方針・閾値変更・口座 automation 変更）",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "人が見る画面",
+            "destination": "Jarvis `/zaim`（ピン・学習一覧）",
+            "channels": []
+          },
+          {
+            "kind": "Webhook",
+            "destination": "env キー名のみ: `SLACK_WEBHOOK_OPS` 系",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/v2D2xrS4Gm9bY0bP",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2024,6 +4645,82 @@
         "human_gate": "お金・外に出す・消す",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "金締／日曜",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "金締／日曜",
+        "registry_trigger": "時間",
+        "registry_schedule": "金締／日曜",
+        "primary_report": "report",
+        "report_channels": [
+          "report"
+        ],
+        "reports": [],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/QLtPohyVvplCNYxC",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2065,6 +4762,82 @@
         "human_gate": "お金・外に出す・消す",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "週次",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "週次",
+        "registry_trigger": "時間",
+        "registry_schedule": "週次",
+        "primary_report": "report",
+        "report_channels": [
+          "report"
+        ],
+        "reports": [],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/zoaTBOwNhI2dxilt",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2106,6 +4879,82 @@
         "human_gate": "お金・外に出す・消す",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "週次",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "週次",
+        "registry_trigger": "時間",
+        "registry_schedule": "週次",
+        "primary_report": "report",
+        "report_channels": [
+          "report"
+        ],
+        "reports": [],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/Cd2BWvlQSUkmcggP",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2171,6 +5020,111 @@
         "human_gate": "お金・外に出す・消す。その他:",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "human",
+            "on": true,
+            "detail": "依頼時",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "（例: 毎朝9時）",
+            "raw": "時間（スケジュール）: （例: 毎朝9時）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら（イベント）",
+            "raw": "何かが届いたら（イベント）:"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human"
+        ],
+        "trigger_kinds_label": "人依頼",
+        "triggers_filled": true,
+        "when": "依頼時",
+        "registry_trigger": "人依頼",
+        "registry_schedule": "依頼時",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report` または `#ops`（体による）",
+            "channels": [
+              "report",
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断・相談",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook（秘密）",
+            "destination": "env キー名のみ記す（URLは書かない）: `SLACK_WEBHOOK_…`",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/1QCq20LMom0NXais",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2236,6 +5190,111 @@
         "human_gate": "お金・外に出す・消す。その他:",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "（例: 毎朝9時）",
+            "raw": "時間（スケジュール）: （例: 毎朝9時）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "週次",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら（イベント）",
+            "raw": "何かが届いたら（イベント）:"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "変化・失敗を見回ったら",
+            "raw": "変化・失敗を見回ったら:"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "週次",
+        "registry_trigger": "時間",
+        "registry_schedule": "週次",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "report",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report` または `#ops`（体による）",
+            "channels": [
+              "report",
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断・相談",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook（秘密）",
+            "destination": "env キー名のみ記す（URLは書かない）: `SLACK_WEBHOOK_…`",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/T0sBAYB6aiUdY2Mi",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2296,6 +5355,104 @@
         "human_gate": "代行チェーンの本番切替、有料枠の増減、複数社員の頻度一括変更。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「代行に切り替えて」「枠がヤバい」",
+            "raw": "人が頼む: 「代行に切り替えて」「枠がヤバい」"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "日次固定は必須にしない（既存見回りに相乗り可）",
+            "raw": "時間: 日次固定は必須にしない（既存見回りに相乗り可）"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "611 から「頻度・枠コントロール要」の申し送り",
+            "raw": "イベント: 611 から「頻度・枠コントロール要」の申し送り"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "枠逼迫・429／利用上限・連続 Fail",
+            "raw": "変化・失敗: 枠逼迫・429／利用上限・連続 Fail"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "event",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · イベント · 見回り",
+        "triggers_filled": true,
+        "when": "枠切れ時",
+        "registry_trigger": "枠切れ",
+        "registry_schedule": "枠切れ時",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "検知・切替結果",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "切替／頻度の承認",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Jarvis 実行依頼",
+            "destination": "Todoist `要Jarvis連携`（了承後）",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/rEX1fW_70HpOd1fN",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2361,6 +5518,108 @@
         "human_gate": "お金・外に出す・消す。UIの破壊的変更。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "時間（例: 朝・パートナー確認後・夜間）。失敗見回り。",
+            "raw": "時間（スケジュール）: 時間（例: 朝・パートナー確認後・夜間）。失敗見回り。"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら（イベント）",
+            "raw": "何かが届いたら（イベント）:"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "投影失敗・鮮度切れ",
+            "raw": "変化・失敗を見回ったら: 投影失敗・鮮度切れ"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "時間 · 見回り",
+        "triggers_filled": true,
+        "when": "12:30 launchd",
+        "registry_trigger": "時間＋失敗",
+        "registry_schedule": "12:30 launchd",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "問題あり（投影失敗・鮮度48h超等）",
+            "destination": "Slack `#ops`（1〜2行）",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "問題なし",
+            "destination": "**投稿しない**（`logs/` のみ）",
+            "channels": []
+          },
+          {
+            "kind": "要判断・相談",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook（秘密）",
+            "destination": "env キー名のみ",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/XY-L9PStHQBvqw74",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2426,6 +5685,108 @@
         "human_gate": "お金・外に出す・消す。UIの破壊的変更。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "時間（日次／買い進め関連の後）。deals停滞・取込失敗の見回り。",
+            "raw": "時間（スケジュール）: 時間（日次／買い進め関連の後）。deals停滞・取込失敗の見回り。"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら（イベント）",
+            "raw": "何かが届いたら（イベント）:"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "投影失敗・鮮度切れ",
+            "raw": "変化・失敗を見回ったら: 投影失敗・鮮度切れ"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "時間 · 見回り",
+        "triggers_filled": true,
+        "when": "朝＋12:30相乗り",
+        "registry_trigger": "時間＋停滞",
+        "registry_schedule": "朝＋12:30相乗り",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "問題あり（投影失敗・鮮度48h超等）",
+            "destination": "Slack `#ops`（1〜2行）",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "問題なし",
+            "destination": "**投稿しない**（`logs/` のみ）",
+            "channels": []
+          },
+          {
+            "kind": "要判断・相談",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook（秘密）",
+            "destination": "env キー名のみ",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/nLogx2WnuLg8E6N3",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -2491,6 +5852,104 @@
         "human_gate": "お金・外に出す・消す。UIの破壊的変更。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "人が頼む",
+            "raw": "人が頼む"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "814/815の報告後、または人が頼む。将来はアプリイベント。",
+            "raw": "時間（スケジュール）: 814/815の報告後、または人が頼む。将来はアプリイベント。"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "何かが届いたら（イベント）",
+            "raw": "何かが届いたら（イベント）:"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "投影失敗・鮮度切れ",
+            "raw": "変化・失敗を見回ったら: 投影失敗・鮮度切れ"
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "時間 · 見回り",
+        "triggers_filled": true,
+        "when": "報告後",
+        "registry_trigger": "814/815後",
+        "registry_schedule": "報告後",
+        "primary_report": "ops",
+        "report_channels": [
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#ops / #consult`",
+            "channels": [
+              "consult",
+              "ops"
+            ]
+          },
+          {
+            "kind": "要判断・相談",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "Webhook（秘密）",
+            "destination": "env キー名のみ",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/aQIrSpSaOyYhEuUi",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
       }
     }
   ],
@@ -2683,6 +6142,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "日曜 20:00 週次統括（参謀室）"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "日曜 20:00 週次統括（参謀室）",
+          "primary_report": "参謀室 · Jarvisボックス",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "参謀室 · Jarvisボックス",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_sanbo_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_sanbo_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "jarvis_cross",
         "genre_name": "Jarvis横断"
       },
@@ -2709,6 +6216,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "日曜 19:00 週次"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "日曜 19:00 週次",
+          "primary_report": "コーチング部",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチング部",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_coaching_bucho_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_coaching_bucho_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -2737,6 +6292,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "日次（本日分・夕方等）"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "日次（本日分・夕方等）",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_realestate_bucho_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_realestate_bucho_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -2763,6 +6366,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "Daily／依頼時"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "Daily／依頼時",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_property_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_property_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "property",
         "genre_name": "物件"
@@ -2791,6 +6442,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "フォロー時"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "フォロー時",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_vendor_outreach_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_vendor_outreach_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -2817,6 +6516,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "仲介返信パック等"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "仲介返信パック等",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_supply_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_supply_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "property",
         "genre_name": "物件"
@@ -2845,6 +6592,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "フォロー時"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "フォロー時",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_repair_vendor_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_repair_vendor_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -2871,6 +6666,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "仲介返信パック等"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "仲介返信パック等",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_persona_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_persona_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "property",
         "genre_name": "物件"
@@ -2899,6 +6742,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "案件時"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "案件時",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_deal_negotiation_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_deal_negotiation_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -2925,6 +6816,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "依頼時"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "依頼時",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_loan_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_loan_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "property",
         "genre_name": "物件"
@@ -2953,6 +6892,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "購入後等"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "購入後等",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_property_util_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_property_util_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -2979,6 +6966,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "フォロー時"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "フォロー時",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_mgmt_vendor_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_mgmt_vendor_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "property",
         "genre_name": "物件"
@@ -3007,6 +7042,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "購入後クリエイティブ"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "購入後クリエイティブ",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_shuhen_map_bot_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_shuhen_map_bot_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -3033,6 +7116,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "購入後クリエイティブ"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "購入後クリエイティブ",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_maisoku_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_maisoku_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "property",
         "genre_name": "物件"
@@ -3061,6 +7192,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "購入後クリエイティブ"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "購入後クリエイティブ",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_welcome_board_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_welcome_board_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -3087,6 +7266,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "購入後クリエイティブ"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "購入後クリエイティブ",
+          "primary_report": "不動産Dailyチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "不動産Dailyチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_kamiconcept_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_kamiconcept_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "property",
         "genre_name": "物件"
@@ -3115,6 +7342,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": true,
+              "detail": "brush-up・MQ・税務論点・今月のリソース制約"
+            }
+          ],
+          "trigger_kinds_on": [
+            "watch"
+          ],
+          "trigger_kinds_label": "見回り",
+          "when": "月次／逼迫時",
+          "primary_report": "リソース経営チーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "リソース経営チーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_resource_keiei_bucho_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_resource_keiei_bucho_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "resource",
         "genre_name": "リソース・家計"
       },
@@ -3141,6 +7416,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "日曜 21:00 週次"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "日曜 21:00 週次",
+          "primary_report": "家族コーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "家族コーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_family_manager_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_family_manager_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3169,6 +7492,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "家族コーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "家族コーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_madoka_coach_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_madoka_coach_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3195,6 +7566,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "家族コーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "家族コーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_tamaki_coach_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_tamaki_coach_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3223,6 +7642,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "家族コーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "家族コーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_sawa_coach_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_sawa_coach_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3249,6 +7716,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "家族コーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "家族コーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_chikage_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_chikage_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3277,6 +7792,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "家族コーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "家族コーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_karate_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_karate_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3303,6 +7866,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "週次"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "週次",
+          "primary_report": "アプリ開発チーム · 参謀室",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "アプリ開発チーム · 参謀室",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_app_dev_manager_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_app_dev_manager_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "apps",
         "genre_name": "アプリ・俯瞰"
@@ -3331,6 +7942,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "週次まとめ"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "週次まとめ",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_somu_keikaku_manager_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_somu_keikaku_manager_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3357,6 +8016,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_isozaki_coach_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_isozaki_coach_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3385,6 +8092,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_tanaka_coach_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_tanaka_coach_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3411,6 +8166,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_yamashita_coach_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_yamashita_coach_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3439,6 +8242,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_kawabata_coach_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_kawabata_coach_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3465,6 +8316,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_shinji_coach_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_shinji_coach_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3493,6 +8392,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "アドバイザー ch"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "アドバイザー ch",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_nakajima_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_nakajima_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3519,6 +8466,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "アドバイザー ch"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "アドバイザー ch",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_ota_akitsugu_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_ota_akitsugu_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3547,6 +8542,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "アドバイザー ch"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "アドバイザー ch",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_imai_bucho_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_imai_bucho_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3573,6 +8616,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "アドバイザー ch"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "アドバイザー ch",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_ohara_jicho_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_ohara_jicho_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3601,6 +8692,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "アドバイザー ch"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "アドバイザー ch",
+          "primary_report": "コーチ ch · アドバイザー ch",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "コーチ ch · アドバイザー ch",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_hachiya_kacho_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_hachiya_kacho_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3627,6 +8766,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "依頼時"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "依頼時",
+          "primary_report": "パートナーDXコーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "パートナーDXコーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_partner_dx_manager_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_partner_dx_manager_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "coaching",
         "genre_name": "コーチング"
@@ -3655,6 +8842,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "パートナーDXコーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "パートナーDXコーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_shift_ai_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_shift_ai_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3682,6 +8917,54 @@
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
         },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "統括経由"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "統括経由",
+          "primary_report": "パートナーDXコーチングチーム",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "パートナーDXコーチングチーム",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_world_intec_advisor_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_world_intec_advisor_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -3708,6 +8991,54 @@
           "has_site_logins": false,
           "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
           "source": "grok_registry+permissions_yaml"
+        },
+        "ops": {
+          "trigger_kinds": [
+            {
+              "id": "human",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "schedule",
+              "on": true,
+              "detail": "毎日 6:30"
+            },
+            {
+              "id": "event",
+              "on": false,
+              "detail": ""
+            },
+            {
+              "id": "watch",
+              "on": false,
+              "detail": ""
+            }
+          ],
+          "trigger_kinds_on": [
+            "schedule"
+          ],
+          "trigger_kinds_label": "時間",
+          "when": "毎日 6:30",
+          "primary_report": "天気お知らせ",
+          "report_channels": [],
+          "reports": [
+            {
+              "kind": "Grok チャンネル",
+              "destination": "天気お知らせ",
+              "channels": []
+            }
+          ],
+          "procedures": [
+            {
+              "title": "paste 正本",
+              "path": "config/grok_weather_bot_grok_paste.md",
+              "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/config/grok_weather_bot_grok_paste.md",
+              "kind": "paste"
+            }
+          ],
+          "procedure_count": 1,
+          "source": "grok_registry+ops_yaml"
         },
         "genre_id": "jarvis_cross",
         "genre_name": "Jarvis横断"
@@ -4592,5 +9923,51 @@
     "doc": "docs/AIエージェントチーム/25_実行権限一覧_20261015.md",
     "yaml": "config/agent_team_permissions.yaml",
     "note": "サイトID／パスワードを渡したら config/agent_team_permissions.yaml を更新し、本 sync → agentTeam.json を push すること。"
+  },
+  "ops_meta": {
+    "updated": "2026-10-15",
+    "trigger_kinds": [
+      {
+        "id": "human",
+        "label": "人が頼む",
+        "short": "人依頼",
+        "meaning": "松野や Jarvis が明示依頼したときだけ動く"
+      },
+      {
+        "id": "schedule",
+        "label": "時間（スケジュール）",
+        "short": "時間",
+        "meaning": "定時・cron／launchd／GHA など時刻で動く"
+      },
+      {
+        "id": "event",
+        "label": "何かが届いたら（イベント）",
+        "short": "イベント",
+        "meaning": "メール・inbox・Slack 操作・取込完了など「届いた／起きた」で動く"
+      },
+      {
+        "id": "watch",
+        "label": "変化・失敗を見回ったら",
+        "short": "見回り",
+        "meaning": "鮮度切れ・Fail・枠逼迫・停滞などを見回って動く"
+      }
+    ],
+    "slack_channels": {
+      "report": {
+        "label": "#report",
+        "meaning": "定時・完了・生存確認など通常報告"
+      },
+      "consult": {
+        "label": "#consult",
+        "meaning": "要判断・相談・ゲート"
+      },
+      "ops": {
+        "label": "#ops",
+        "meaning": "健全性・障害・運用アラート"
+      }
+    },
+    "doc": "docs/AIエージェントチーム/26_合図手順報告一覧_20261015.md",
+    "yaml": "config/agent_team_ops.yaml",
+    "note": "CLAUDE.md のチェックが正。registry の trigger／schedule／report は要約。\nダッシュ「運用」タブで合図・手順書・報告先を切り替えて見る。\n"
   }
 }

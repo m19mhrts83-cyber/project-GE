@@ -8,13 +8,16 @@ import {
   mappingSideLabel,
   mixupKindLabel,
   permissionLevelClass,
+  reportChannelLabel,
   reportLabel,
   sortAgents,
   statusClass,
+  triggerKindLabel,
   type AgentTeamAgent,
   type AgentTeamDept,
   type AgentTeamGenre,
   type GrokPayload,
+  type OpsMeta,
   type PermissionsMeta,
 } from "@/lib/agentTeam";
 
@@ -27,8 +30,9 @@ function genreHashDomId(): string | null {
 }
 
 const STATUS_FILTERS = ["すべて", "運用確認", "設計中", "運用", "候補", "停止"] as const;
-type Tab = "genre" | "ai" | "grok" | "map" | "perms";
+type Tab = "genre" | "ai" | "grok" | "map" | "perms" | "ops";
 type PermsSide = "ai" | "grok" | "site";
+type OpsView = "triggers" | "procedures" | "reports";
 
 /** AI社員の状態シグナル（色・印）— docs/AIエージェントチーム/22_運用状態の識別 */
 const STATUS_LEGEND = [
@@ -52,6 +56,7 @@ type Props = {
   grok: GrokPayload;
   permissionsMeta?: PermissionsMeta;
   permissionsUpdated?: string;
+  opsMeta?: OpsMeta;
 };
 
 export default function AgentTeamClient({
@@ -67,6 +72,7 @@ export default function AgentTeamClient({
   grok,
   permissionsMeta,
   permissionsUpdated,
+  opsMeta,
 }: Props) {
   const [tab, setTab] = useState<Tab>("genre");
   const [genreFilter, setGenreFilter] = useState<string>("すべて");
@@ -75,6 +81,9 @@ export default function AgentTeamClient({
   const [grokDeptFilter, setGrokDeptFilter] = useState<string>("すべて");
   const [mapFilter, setMapFilter] = useState<string>("すべて");
   const [permsSide, setPermsSide] = useState<PermsSide>("ai");
+  const [opsView, setOpsView] = useState<OpsView>("triggers");
+  const [opsKindFilter, setOpsKindFilter] = useState<string>("すべて");
+  const [opsReportFilter, setOpsReportFilter] = useState<string>("すべて");
 
   useEffect(() => {
     let cancelled = false;
@@ -202,6 +211,22 @@ export default function AgentTeamClient({
     return genres.filter((g) => g.id === genreFilter);
   }, [genres, genreFilter]);
 
+  const opsAgentsFiltered = useMemo(() => {
+    let list = sortAgents(agents);
+    if (opsKindFilter !== "すべて") {
+      list = list.filter((a) =>
+        (a.ops?.trigger_kinds_on || []).includes(opsKindFilter)
+      );
+    }
+    if (opsReportFilter !== "すべて") {
+      list = list.filter((a) =>
+        (a.ops?.report_channels || []).includes(opsReportFilter) ||
+        (a.ops?.primary_report || "").replace(/^#/, "") === opsReportFilter
+      );
+    }
+    return list;
+  }, [agents, opsKindFilter, opsReportFilter]);
+
   return (
     <>
       <p className="sub">
@@ -236,6 +261,7 @@ export default function AgentTeamClient({
               (permissionsMeta?.site_login_agent_ids?.length || 0) +
                 (permissionsMeta?.site_login_bot_ids?.length || 0),
             ],
+            ["ops", "運用", agents.length],
           ] as const
         ).map(([id, label, n]) => (
           <button
@@ -1071,6 +1097,353 @@ export default function AgentTeamClient({
               )}
             </section>
           ) : null}
+        </>
+      ) : null}
+
+      {tab === "ops" ? (
+        <>
+          <p className="at-hint">
+            {opsMeta?.note ||
+              "友利さん／いけとも資料の合図4種・手順書・報告先を一覧します。"}
+            {opsMeta?.yaml ? (
+              <>
+                {" "}
+                メタ: <code>{opsMeta.yaml}</code>
+              </>
+            ) : null}
+            {opsMeta?.doc ? (
+              <>
+                {" · "}
+                <code>{opsMeta.doc}</code>
+              </>
+            ) : null}
+          </p>
+
+          {opsMeta?.trigger_kinds?.length ? (
+            <p className="at-legend" aria-label="合図4種の凡例">
+              <span className="at-legend-title">合図4種</span>
+              {opsMeta.trigger_kinds.map((k) => (
+                <span
+                  key={k.id}
+                  className="at-legend-item"
+                  title={k.meaning || ""}
+                >
+                  <span className={`at-trig at-trig-${k.id}`}>
+                    {k.short || k.label}
+                  </span>
+                  <span className="at-legend-mean">{k.meaning}</span>
+                </span>
+              ))}
+            </p>
+          ) : null}
+
+          <div className="at-counts" aria-label="運用ビュー切替">
+            {(
+              [
+                ["triggers", "合図", agents.length],
+                ["procedures", "手順書", agents.length],
+                ["reports", "報告先", agents.length],
+              ] as const
+            ).map(([id, label, n]) => (
+              <button
+                key={id}
+                type="button"
+                className={`at-count ${opsView === id ? "is-on" : ""}`}
+                onClick={() => setOpsView(id)}
+              >
+                <span>{label}</span>
+                <strong>{n}</strong>
+              </button>
+            ))}
+          </div>
+
+          <div className="at-filters">
+            <label>
+              合図種別{" "}
+              <select
+                value={opsKindFilter}
+                onChange={(e) => setOpsKindFilter(e.target.value)}
+              >
+                <option value="すべて">すべて</option>
+                {(opsMeta?.trigger_kinds || []).map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              主報告{" "}
+              <select
+                value={opsReportFilter}
+                onChange={(e) => setOpsReportFilter(e.target.value)}
+              >
+                <option value="すべて">すべて</option>
+                <option value="report">#report</option>
+                <option value="consult">#consult</option>
+                <option value="ops">#ops</option>
+              </select>
+            </label>
+          </div>
+
+          {opsView === "triggers" ? (
+            <section className="home-section">
+              <div className="home-section-head">
+                <h2 style={{ fontSize: "1.08rem", margin: 0 }}>
+                  いつ動くか（合図）
+                </h2>
+                <span className="meta">{opsAgentsFiltered.length}件</span>
+              </div>
+              <div className="at-table-wrap">
+                <table className="at-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>名前</th>
+                      <th>合図（4種）</th>
+                      <th>具体的に動くとき</th>
+                      <th>registry</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {opsAgentsFiltered.map((a) => {
+                      const o = a.ops;
+                      return (
+                        <tr key={a.id}>
+                          <td>
+                            <Link href={`/agent-team/${a.id}`}>{a.id}</Link>
+                          </td>
+                          <td>
+                            <Link href={`/agent-team/${a.id}`}>{a.name}</Link>
+                          </td>
+                          <td>
+                            {(o?.trigger_kinds || [])
+                              .filter((t) => t.on)
+                              .map((t) => (
+                                <span
+                                  key={t.id}
+                                  className={`at-trig at-trig-${t.id}`}
+                                  title={t.detail || ""}
+                                >
+                                  {triggerKindLabel(
+                                    t.id,
+                                    opsMeta?.trigger_kinds
+                                  )}
+                                </span>
+                              ))}
+                            {!o?.trigger_kinds_on?.length ? (
+                              <span className="at-perm-stub">未記入</span>
+                            ) : null}
+                          </td>
+                          <td>{o?.when || a.schedule || "—"}</td>
+                          <td className="meta">
+                            {[a.trigger, a.schedule].filter(Boolean).join(" · ") ||
+                              "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {opsView === "procedures" ? (
+            <section className="home-section">
+              <div className="home-section-head">
+                <h2 style={{ fontSize: "1.08rem", margin: 0 }}>手順書リンク</h2>
+                <span className="meta">{opsAgentsFiltered.length}件</span>
+              </div>
+              <div className="at-table-wrap">
+                <table className="at-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>名前</th>
+                      <th>手順・フロー</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {opsAgentsFiltered.map((a) => {
+                      const procs = a.ops?.procedures || [];
+                      return (
+                        <tr key={a.id}>
+                          <td>
+                            <Link href={`/agent-team/${a.id}`}>{a.id}</Link>
+                          </td>
+                          <td>
+                            <Link href={`/agent-team/${a.id}`}>{a.name}</Link>
+                          </td>
+                          <td>
+                            {procs.length ? (
+                              <ul className="at-proc-list">
+                                {procs.map((p) => (
+                                  <li key={`${p.kind}-${p.title}-${p.path}`}>
+                                    {p.url ? (
+                                      <a
+                                        href={p.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        {p.title}
+                                        {p.kind === "flowforge" ? " ↗" : ""}
+                                      </a>
+                                    ) : (
+                                      <span>{p.title}</span>
+                                    )}
+                                    {p.path && p.kind !== "flowforge" ? (
+                                      <span className="meta">
+                                        {" "}
+                                        <code>{p.path.split("/").slice(-2).join("/")}</code>
+                                      </span>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {opsView === "reports" ? (
+            <section className="home-section">
+              <div className="home-section-head">
+                <h2 style={{ fontSize: "1.08rem", margin: 0 }}>報告先</h2>
+                <span className="meta">{opsAgentsFiltered.length}件</span>
+              </div>
+              {opsMeta?.slack_channels ? (
+                <p className="at-hint">
+                  {Object.entries(opsMeta.slack_channels).map(([id, ch]) => (
+                    <span key={id} style={{ marginRight: 12 }}>
+                      <strong>{ch.label || `#${id}`}</strong>
+                      {ch.meaning ? ` — ${ch.meaning}` : ""}
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+              <div className="at-table-wrap">
+                <table className="at-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>名前</th>
+                      <th>主報告</th>
+                      <th>チャンネル</th>
+                      <th>CLAUDE 報告先</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {opsAgentsFiltered.map((a) => {
+                      const o = a.ops;
+                      return (
+                        <tr key={a.id}>
+                          <td>
+                            <Link href={`/agent-team/${a.id}`}>{a.id}</Link>
+                          </td>
+                          <td>
+                            <Link href={`/agent-team/${a.id}`}>{a.name}</Link>
+                          </td>
+                          <td>
+                            <span className="at-report-ch">
+                              {reportLabel(o?.primary_report || a.report || "")}
+                            </span>
+                          </td>
+                          <td className="meta">
+                            {(o?.report_channels || []).length
+                              ? o!.report_channels
+                                  .map((c) => reportChannelLabel(c))
+                                  .join(" · ")
+                              : "—"}
+                          </td>
+                          <td>
+                            {(o?.reports || []).length ? (
+                              <ul className="at-proc-list">
+                                {o!.reports.map((r) => (
+                                  <li key={`${r.kind}-${r.destination}`}>
+                                    <span className="meta">{r.kind}</span>
+                                    {" → "}
+                                    {r.destination}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="meta">（§4 未記入／registryのみ）</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          <section className="home-section">
+            <div className="home-section-head">
+              <h2 style={{ fontSize: "1.08rem", margin: 0 }}>
+                Grok Bot（参考・スケジュール／ch）
+              </h2>
+              <span className="meta">{grok.bots.length}件</span>
+            </div>
+            <div className="at-table-wrap">
+              <table className="at-table">
+                <thead>
+                  <tr>
+                    <th>コード</th>
+                    <th>名前</th>
+                    <th>合図</th>
+                    <th>スケジュール</th>
+                    <th>チャンネル</th>
+                    <th>paste</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grok.bots.map((b) => {
+                    const o = b.ops;
+                    const paste = (o?.procedures || []).find(
+                      (p) => p.kind === "paste"
+                    );
+                    return (
+                      <tr key={b.id}>
+                        <td className="meta">{b.code || "—"}</td>
+                        <td>
+                          <strong>{b.name}</strong>
+                        </td>
+                        <td className="meta">
+                          {o?.trigger_kinds_label || "—"}
+                        </td>
+                        <td className="meta">{o?.when || b.schedule || "—"}</td>
+                        <td className="meta">{b.channel || "—"}</td>
+                        <td className="meta">
+                          {paste?.url ? (
+                            <a
+                              href={paste.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              paste ↗
+                            </a>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </>
       ) : null}
     </>

@@ -50,5 +50,6 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
 ## 関連
 
 - 機密二層: `jarvis-agent-team-secrets.mdc` / `docs/AIエージェントチーム/05_機密とenv二層_20261009.md`
+- 合図・手順・報告: `jarvis-agent-team-ops.mdc`（ダッシュ「運用」）
 - 状態 sync: `jarvis-agent-team-status.mdc`
 - JarvisBox: `jarvis-grok-jarvisbox-fork.mdc`（秘密は Jarvis）
