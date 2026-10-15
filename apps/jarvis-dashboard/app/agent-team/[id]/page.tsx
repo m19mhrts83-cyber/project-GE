@@ -295,7 +295,7 @@ export default async function AgentTeamDetailPage({
                 </ul>
               ) : null}
               <p className="meta" style={{ marginTop: 10 }}>
-                <Link href="/agent-team">権限タブで一覧</Link>
+                <Link href="/agent-team">実行権限タブで一覧</Link>
               </p>
             </>
           ) : (

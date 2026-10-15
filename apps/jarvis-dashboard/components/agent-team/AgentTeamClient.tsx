@@ -257,7 +257,7 @@ export default function AgentTeamClient({
             ["map", "対応表", grok.mapping_counts?.all ?? grok.mappings.length],
             [
               "perms",
-              "権限",
+              "実行権限",
               (permissionsMeta?.site_login_agent_ids?.length || 0) +
                 (permissionsMeta?.site_login_bot_ids?.length || 0),
             ],
