@@ -5,7 +5,7 @@
 > **運用引き上げ**: 日曜 cron（schedule）成功を Jarvis がセッションついでに確認→sync（`docs/promote-to-ops.md`）。手動dispatchだけでは上げない。
 
 ID: **315**（ビルダー「週次取込点検係」を拡張した体）。  
-WeStudy／GitHub Actions の失敗と、LINE オープンチャット取込の健全性を見て、異常なら既知手順を1回試し、`#ops` / `#consult` に出す。
+WeStudy／GitHub Actions の失敗、LINE オープンチャット取込、**Gmail OAuth token（スコープ・refresh）** の健全性を見て、異常なら既知手順を1回試し、`#ops` / `#consult` に出す。
 
 ## AIオートメーション（作業フロー）
 
@@ -22,9 +22,10 @@ WeStudy／GitHub Actions の失敗と、LINE オープンチャット取込の�
 | 開始トリガー 日曜21:00 | GHA `ops-health-315.yml`（cron UTC 日曜12:00） |
 | GHA実行結果取得 | 本線CLI内で `jarvis_westudy_weekly_check.py`（週次workflowの成否） |
 | Square probe / CHRLINE health | **GHA（`--cloud`）ではスキップ**。Mac 日曜21:45 `--remediate-once` |
+| Gmail token ヘルス | **GHAではスキップ**。Mac: `jarvis_gmail_token_health`（send欠落・refresh欠如を検知） |
 | 健全性レポート | `jarvis_ops_health_315.py` が本文生成 → `#ops` |
-| 1回トライ | Mac: health push → recover_worker／watch resume（WeStudy再実行なし） |
-| 要判断通知 | `#consult`（1回トライ後も未解決。流れ: `docs/incident-flow.md`） |
+| 1回トライ | Mac: オプチャ health push → recover_worker／watch resume。**Gmail・WeStudyは自動復旧しない** |
+| 要判断通知 | `#consult`（1回トライ後も未解決／Gmail再同意要。流れ: `docs/incident-flow.md`） |
 | 終了報告 | **常に `#ops`**（成功も異常も。チャット／`#report` なし） |
 
 ## 1. 役割
@@ -32,11 +33,12 @@ WeStudy／GitHub Actions の失敗と、LINE オープンチャット取込の�
 - やること:
   - WeStudy 週次: `jarvis_westudy_weekly_check.py` 等で成功／Fail を確認
   - LINE オプチャ（**Mac 21:45**）: 健全性数値化＋異常時は既知復旧を**1回**
+  - **Gmail token（Mac）**: スコープ不足・refresh 欠如を検知し `#ops` に載せる（estate send 欠落時は `reauth_estate_gmail_send.py` を案内）
   - 成功なら `#ops` に修正済、ダメなら `#ops` 未解決＋`#consult`
 - やらないこと:
   - 815 の返信提案
   - 構造限界（Square 401・削除済みスレ）を無理に「直した」ことにする
-  - YAML 大量追記・QR 本番再認証を無確認で進める
+  - YAML 大量追記・QR／**Gmail ブラウザ再同意**を無確認で進める
   - WeStudy 週次の自動再実行
   - `#report` やチャットへの定時報告
 
@@ -59,7 +61,7 @@ WeStudy／GitHub Actions の失敗と、LINE オープンチャット取込の�
 | ブラウザ | △ | 必要時のみ |
 | 画面操作 | △ | QR は人がスキャン |
 
-**人が確かめる**: QR 再ログイン、トークン失効の本番再認証、YAML 大量追記、構造限界の受容判断、WeStudy 再実行。
+**人が確かめる**: QR 再ログイン、**Gmail ブラウザ再同意**（`reauth_estate_gmail_send.py` 等）、YAML 大量追記、構造限界の受容判断、WeStudy 再実行。
 
 ## 4. 報告先（具体）
 
@@ -71,9 +73,10 @@ WeStudy／GitHub Actions の失敗と、LINE オープンチャット取込の�
 
 ## 5. 成果物の置き場
 
-- スクリプト: `scripts/jarvis_ops_health_315.py` / `jarvis_westudy_weekly_check.py` / `jarvis_openchat_recover_worker.py`
+- スクリプト: `scripts/jarvis_ops_health_315.py` / `jarvis_westudy_weekly_check.py` / `jarvis_gmail_token_health.py` / `jarvis_openchat_recover_worker.py`
 - launchd: `launchd/install_ops_health_315_launchd.sh`（Sun 21:45）
 - ルール: `jarvis-openchat-thread-health.mdc` / `jarvis-westudy-weekly-watch.mdc`
+- Gmail: `docs/GCP_OAuth本番移行_Jarvis_20260826.md` / `reauth_estate_gmail_send.py`
 - コマンド正本: `docs/運用コマンド一覧.md`
 - ログ: このフォルダ `logs/` ／ `~/Library/Logs/jarvis_ops_health_315/`
 
@@ -112,3 +115,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-11 | FlowForgeきっかけ／報告確定＋「エージェントへの指示」生成・具体化表を追記 |
 | 2026-10-11 | 伴走再開: `PROGRESS.md`・GHA手動検証／Mac補完方針の docs。状態は運用確認のまま |
 | 2026-10-11 | **検知→1回トライ→結果**: `--remediate-once`＋launchd 日曜21:45。パートナー確認依存をやめる |
+| 2026-10-15 | **Gmail token モニター**を役割に追加（Mac 点検・`#ops`／欠落時 `#consult`。自動再同意なし） |

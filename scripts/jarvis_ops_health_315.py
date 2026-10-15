@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""315 連携健全性点検係 — WeStudy/GHA ＋ オプチャ健全性をまとめ Slack #ops へ。
+"""315 連携健全性点検係 — WeStudy/GHA ＋ オプチャ ＋ Gmail token をまとめ Slack #ops へ。
 
 使い方:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -10,6 +10,7 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_ops_health_315.py --remediate-once --post --mark-checked
 
 秘密は .env.jarvis_private（SLACK_WEBHOOK_AI_TEAM_OPS / CONSULT）。フォルダに URL を書かない。
+Gmail token 点検は Mac 上の token_*.json が正（--cloud ではスキップ→Mac 21:45）。
 """
 from __future__ import annotations
 
@@ -89,6 +90,86 @@ def westudy_block(*, mark_checked: bool) -> tuple[str, str]:
     if "failure" in block.lower() or "Fail" in block:
         line = "⚠️ Fail疑い — 詳細はブロック参照"
     return line, block
+
+
+def gmail_token_snapshot(
+    *,
+    cloud: bool = False,
+    mark_prompted: bool = False,
+) -> tuple[str, list[str], list[str]]:
+    """Gmail OAuth token スコープ・refresh 点検。
+
+    Returns (level, detail_lines, issues).
+    cloud=True: Mac の token JSON が無いのでスキップ（本線は Mac 21:45）。
+    """
+    if cloud:
+        return (
+            "スキップ(cloud)",
+            [
+                "Gmail token: スキップ（Mac専用・token_*.json）",
+                "補完: Mac launchd 日曜21:45（--remediate-once）",
+            ],
+            [],
+        )
+
+    if os.environ.get("JARVIS_GMAIL_TOKEN_HEALTH_DISABLE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return "スキップ(disabled)", ["Gmail token: JARVIS_GMAIL_TOKEN_HEALTH_DISABLE=1"], []
+
+    py = _python()
+    cmd = [
+        py,
+        str(REPO / "scripts" / "jarvis_gmail_token_health.py"),
+        "--json",
+        "--force",
+    ]
+    if mark_prompted:
+        cmd.append("--mark-prompted")
+    code, out = _run(cmd, timeout=60)
+    # --json は stdout に JSON。混在時は最後の {…} を拾う
+    payload: dict = {}
+    raw = (out or "").strip()
+    try:
+        # 末尾から JSON オブジェクトを探す
+        idx = raw.rfind("{")
+        if idx >= 0:
+            payload = json.loads(raw[idx:])
+    except json.JSONDecodeError:
+        payload = {}
+
+    if not payload and code != 0:
+        return "要フォロー", [f"Gmail token: 点検失敗 rc={code}"], ["health_fail"]
+
+    issues = [str(x) for x in (payload.get("issues") or [])]
+    estate_send = bool(payload.get("estate_send_missing"))
+    detail: list[str] = []
+    if not issues:
+        detail.append("Gmail token: OK（admin/estate/m19m 等・send含む）")
+        return "OK", detail, []
+
+    detail.append(f"Gmail token: 要フォロー（issues={','.join(issues)}）")
+    if estate_send or "estate_send" in issues:
+        detail.append(
+            "是正: cd ~/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル "
+            "&& ~/selenium_env/venv/bin/python reauth_estate_gmail_send.py"
+        )
+    else:
+        detail.append(
+            "是正: ~/selenium_env/venv/bin/python scripts/jarvis_gmail_token_health.py"
+            "（表示コマンドでブラウザ再同意）"
+        )
+    # ログ用に短い行も
+    for ln in payload.get("lines") or []:
+        s = str(ln).strip()
+        if s.startswith("- ") and ("要再" in s or "read/modify" in s or "不足" in s):
+            detail.append(s[:120])
+            if len(detail) >= 6:
+                break
+    return "要フォロー", detail, issues
 
 
 def openchat_snapshot(*, cloud: bool = False) -> tuple[str, list[str]]:
@@ -190,8 +271,12 @@ def _oc_bad(oc_level: str) -> bool:
     return oc_level not in ("OK", "スキップ(cloud)")
 
 
-def overall_status(westudy_line: str, oc_level: str) -> str:
-    if _westudy_bad(westudy_line) or _oc_bad(oc_level):
+def _gmail_bad(gmail_level: str) -> bool:
+    return gmail_level not in ("OK", "スキップ(cloud)", "スキップ(disabled)")
+
+
+def overall_status(westudy_line: str, oc_level: str, gmail_level: str = "OK") -> str:
+    if _westudy_bad(westudy_line) or _oc_bad(oc_level) or _gmail_bad(gmail_level):
         return "要フォロー"
     return "OK"
 
@@ -201,9 +286,14 @@ def try_remediate_once(
     westudy_line: str,
     oc_level: str,
     oc_lines: list[str],
+    gmail_level: str = "OK",
+    gmail_lines: list[str] | None = None,
     dry_run: bool,
 ) -> dict[str, str]:
-    """既知の安全な復旧を最大1回。戻り値は報告用メタ。"""
+    """既知の安全な復旧を最大1回。戻り値は報告用メタ。
+
+    Gmail token NG はブラウザ再同意が必要なため自動復旧しない（#consult）。
+    """
     meta = {
         "try": "スキップ",
         "detail": "異常なし（トライ不要）",
@@ -212,7 +302,8 @@ def try_remediate_once(
     }
     w_bad = _westudy_bad(westudy_line)
     o_bad = _oc_bad(oc_level)
-    if not w_bad and not o_bad:
+    g_bad = _gmail_bad(gmail_level)
+    if not w_bad and not o_bad and not g_bad:
         return meta
 
     parts: list[str] = []
@@ -220,6 +311,15 @@ def try_remediate_once(
 
     if w_bad:
         parts.append("WeStudy Fail — 自動再実行なし（人が gh 判断）")
+        need_consult = True
+
+    if g_bad:
+        # トークン破壊の自動復旧は禁止。是正コマンドを人が実行
+        hint = next(
+            (x for x in (gmail_lines or []) if x.startswith("是正:")),
+            "是正: jarvis_gmail_token_health.py / reauth_estate_gmail_send.py",
+        )
+        parts.append(f"Gmail token NG — 自動再同意なし（人がブラウザ）。{hint[:160]}")
         need_consult = True
 
     if o_bad:
@@ -284,12 +384,14 @@ def build_message(
     oc_level: str,
     oc_lines: list[str],
     *,
+    gmail_level: str = "OK",
+    gmail_lines: list[str] | None = None,
     cloud: bool = False,
     remediate_meta: dict[str, str] | None = None,
     overall_override: str | None = None,
 ) -> str:
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
-    overall = overall_override or overall_status(westudy_line, oc_level)
+    overall = overall_override or overall_status(westudy_line, oc_level, gmail_level)
 
     if cloud:
         engine = "GHA ops-health-315（日曜21:00 JST）"
@@ -311,6 +413,10 @@ def build_message(
     for ln in oc_lines:
         body.append(f"  · {ln}")
 
+    body.append(f"- Gmail token: {gmail_level}")
+    for ln in gmail_lines or []:
+        body.append(f"  · {ln}")
+
     if remediate_meta is not None:
         body.append(f"- トライ: {remediate_meta.get('try', '—')}")
         body.append(f"  · {remediate_meta.get('detail', '—')[:240]}")
@@ -318,7 +424,7 @@ def build_message(
 
     if overall in ("要フォロー", "未解決"):
         body.append(
-            "- 見てほしい点: 未解決。QR/YAML大量は人が確かめる → #consult"
+            "- 見てほしい点: 未解決。QR/YAML大量／Gmail再同意は人が確かめる → #consult"
         )
     elif overall == "修正済":
         body.append("- 見てほしい点: なし（修正済）。異常時のみ対応")
@@ -385,16 +491,22 @@ def main() -> int:
 
     w_line, w_block = westudy_block(mark_checked=args.mark_checked)
     oc_level, oc_lines = openchat_snapshot(cloud=args.cloud)
+    g_level, g_lines, _g_issues = gmail_token_snapshot(
+        cloud=args.cloud,
+        mark_prompted=bool(args.mark_checked),
+    )
 
     remediate_meta: dict[str, str] | None = None
     overall_override: str | None = None
 
     if args.remediate_once:
-        before = overall_status(w_line, oc_level)
+        before = overall_status(w_line, oc_level, g_level)
         remediate_meta = try_remediate_once(
             westudy_line=w_line,
             oc_level=oc_level,
             oc_lines=oc_lines,
+            gmail_level=g_level,
+            gmail_lines=g_lines,
             dry_run=bool(args.dry_run),
         )
         if before == "OK":
@@ -407,9 +519,13 @@ def main() -> int:
             # 再点検（WeStudy は mark 済みなので再取得。重くない）
             w_line2, w_block2 = westudy_block(mark_checked=False)
             oc_level2, oc_lines2 = openchat_snapshot(cloud=False)
-            after = overall_status(w_line2, oc_level2)
+            g_level2, g_lines2, _ = gmail_token_snapshot(
+                cloud=False, mark_prompted=False
+            )
+            after = overall_status(w_line2, oc_level2, g_level2)
             w_line, w_block = w_line2, w_block2
             oc_level, oc_lines = oc_level2, oc_lines2
+            g_level, g_lines = g_level2, g_lines2
             if after == "OK":
                 overall_override = "修正済"
                 remediate_meta["result"] = "修正済"
@@ -417,13 +533,19 @@ def main() -> int:
             else:
                 overall_override = "未解決"
                 remediate_meta["result"] = "未解決（1回トライ済）"
-                remediate_meta["need_consult"] = "yes"
+                # Gmail NG は自動では直らない → consult 維持
+                if _gmail_bad(g_level):
+                    remediate_meta["need_consult"] = "yes"
+                else:
+                    remediate_meta["need_consult"] = "yes"
 
     msg = build_message(
         w_line,
         w_block,
         oc_level,
         oc_lines,
+        gmail_level=g_level,
+        gmail_lines=g_lines,
         cloud=args.cloud,
         remediate_meta=remediate_meta,
         overall_override=overall_override,
@@ -451,7 +573,7 @@ def main() -> int:
             "【315 要判断】連携健全性 — 1回トライ後も未解決\n"
             f"- 判定: {overall_override}\n"
             f"- トライ: {remediate_meta.get('detail', '')[:200]}\n"
-            "- 見てほしい点: QR／YAML大量／WeStudy再実行の要否\n"
+            "- 見てほしい点: QR／YAML大量／WeStudy再実行／Gmail再同意の要否\n"
             f"- フロー: {FLOW_URL}"
         )
         crc = post_slack("consult", consult)

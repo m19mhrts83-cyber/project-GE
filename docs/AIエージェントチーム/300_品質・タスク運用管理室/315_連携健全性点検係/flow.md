@@ -22,7 +22,7 @@
 | **報告先** | Slack **`#ops`**（Webhook `SLACK_WEBHOOK_AI_TEAM_OPS`） |
 | **要判断** | Slack **`#consult`**（1回トライ後も未解決） |
 | **出さない** | `#report`／「チャットに報告」 |
-| **1通の中身** | 判定・WeStudy・オプチャ・トライ結果（Mac時）・フローURL |
+| **1通の中身** | 判定・WeStudy・オプチャ・**Gmail token**・トライ結果（Mac時）・フローURL |
 | **ログ** | 社員フォルダ `logs/` ／ Mac `~/Library/Logs/jarvis_ops_health_315/` |
 
 ## 型
@@ -48,3 +48,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-11 | CLI 実装・#ops 報告1通まで |
 | 2026-10-11 | **本線を GHA 日曜21:00 に確定** |
 | 2026-10-11 | Mac 21:45 `--remediate-once`（検知→1回トライ→結果） |
+| 2026-10-15 | Gmail token ヘルスを Mac 点検に追加（cloud はスキップ） |
