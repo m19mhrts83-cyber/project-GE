@@ -61,12 +61,24 @@
 - プロジェクト `yaritori-gmail-487109`（client `988579281735-…`）の **公開ステータス: 本番環境（外部）** を Console で確認済み。
 - 7日 refresh 切れ対策としての Publish は済。残る再同意は主に **スコープ不一致**（下記）。
 
-### 再同意が頻発する別原因（コード側・2026-09-12 対策済）
+### 再同意が頻発する別原因（コード側）
 
-| 症状 | 原因 | 対策 |
-|---|---|---|
-| パートナー確認のたびブラウザ | `token_estate` に `gmail.send` が無く、取込が 215 全スコープを要求 | 取込・LINE公式エクスポートは **read/modify のみ**要求 |
-| `Scope has changed` | `include_granted_scopes=true` で Drive/Calendar が混入 | 再同意時は **付けない**（Gmail 専用を維持） |
+| 症状 | 原因 | 対策 | 状態 |
+|---|---|---|---|
+| パートナー確認のたびブラウザ | `token_estate` に `gmail.send` が無く、取込が 215 全スコープを要求 | 取込・LINE公式エクスポートは **read/modify のみ**要求 | 2026-09-12 済 |
+| `Scope has changed` | `include_granted_scopes=true` で Drive/Calendar が混入 | 再同意時は **付けない**（Gmail 専用を維持） | 2026-09-12 済 |
+| 取込後に send が消える | 狭い scopes での再同意／保存で JSON の scopes が上書き | `merge_gmail_scopes_for_persist` ＋再同意時は既存 gmail.* を合流（`resolve_scopes_for_oauth_flow`） | **2026-10-15 済** |
+| Cloud／GHA 送信だけ古い | Mac で estate 再同意しても `GMAIL_ESTATE_TOKEN_B64` が追従しない | `gmail_token_sync` がフルスコープ時に project-GE Secret を更新 | **2026-10-15 済** |
+| 切れに気づかない | ヘルスが手動のみ | 朝オープン＋パートナー確認前半に `jarvis_gmail_token_health --mark-prompted` | **2026-10-15 済** |
+
+**estate 送信不足の是正（必須コマンド）**:
+
+```bash
+cd ~/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル
+~/selenium_env/venv/bin/python reauth_estate_gmail_send.py
+```
+
+ヘルス相乗りの停止: `JARVIS_GMAIL_TOKEN_HEALTH_DISABLE=1` または `.jarvis_state/gmail_token_health.json` の `"disabled": true`。
 
 ### Gmail token ステート図（2026-09-12）
 
@@ -105,17 +117,11 @@ stateDiagram-v2
 | FailNoBrowser | 非対話で止める | LINE公式エクスポート等。勝手にブラウザを開かない |
 | estate + send 欠落 | 取込は ApiOk、送信だけ不足 | ヘルスは「取込可・送信は要再同意」 |
 
-estate で **送信**も安定させたいときは、一度だけ `gmail.send` 込みで再同意:
+estate で **送信**も安定させたいときは、一度だけ `gmail.send` 込みで再同意（**正本は `reauth_estate_gmail_send.py`**。Secret 追従込み）:
 
 ```bash
 cd ~/git-repos/215_kamiooya/C1_cursor/1b_Cursorマニュアル
-~/selenium_env/venv/bin/python - <<'PY'
-from pathlib import Path
-from gmail_to_yoritoori import build_service_for_token
-from gmail_api_scopes import GMAIL_SCOPES_215
-svc, email = build_service_for_token(Path("token_estate.json"), scopes=GMAIL_SCOPES_215)
-print("OK", email)
-PY
+~/selenium_env/venv/bin/python reauth_estate_gmail_send.py
 ```
 
 ---
@@ -163,6 +169,9 @@ export YORITOORI_BASE_PATH="$HOME/Library/CloudStorage/OneDrive-個人用/215_�
 
 ## 関連
 
-- token ヘルス: `scripts/jarvis_gmail_token_health.py`
+- token ヘルス: `scripts/jarvis_gmail_token_health.py`（`--mark-prompted` / `--quiet-ok`）
+- スコープ合流: `215_kamiooya/C1_cursor/1b_Cursorマニュアル/gmail_api_scopes.py`（`merge_gmail_scopes_for_persist`）
+- estate 再同意: `215_kamiooya/C1_cursor/1b_Cursorマニュアル/reauth_estate_gmail_send.py`
+- token ミラー／Secret: `215_kamiooya/C1_cursor/mail_automation/gmail_token_sync.py`
 - Gmail 初回設定: `215_kamiooya/C1_cursor/1b_Cursorマニュアル/Gmail_API_設定手順.md`
 - Google アカウント使い分け: `docs/Googleアカウント使い分け.md`

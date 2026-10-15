@@ -74,7 +74,9 @@ TOKEN_PATH = SCRIPT_DIR / "token.json"
 from gmail_api_scopes import (
     GMAIL_SCOPES_215 as SCOPES,
     GMAIL_SCOPES_READ_MODIFY,
+    merge_gmail_scopes_for_persist,
     resolve_read_scopes_for_token,
+    resolve_scopes_for_oauth_flow,
     token_satisfies_215_scopes,
     token_satisfies_read_modify_scopes,
     token_satisfies_scopes,
@@ -200,8 +202,10 @@ def build_service_for_token(
 
     required = list(scopes) if scopes is not None else list(SCOPES)
     creds = None
+    existing_record: dict | None = None
     if token_path_for_account.exists():
         token_data = json.loads(token_path_for_account.read_text(encoding="utf-8"))
+        existing_record = dict(token_data)
         creds_data = dict(token_data)
         if "client_id" not in creds_data and credentials_path.exists():
             cred_data = json.loads(credentials_path.read_text(encoding="utf-8"))
@@ -234,11 +238,13 @@ def build_service_for_token(
                 f"Gmail token 不足または失効: {token_path_for_account.name} "
                 f"（必要スコープ: {', '.join(required)}）。ブラウザ再同意が必要です。"
             )
+        # 既存に send 等があれば再同意でも落とさない（取込の狭い required だけだと消失する）。
+        flow_scopes = resolve_scopes_for_oauth_flow(required, existing_record)
         # スコープ不足のとき毎回ブラウザ同意になる（estate が readonly 単独だと送信で頻発）。
         # 非対話・エージェント経由では先に明示メッセージを出し、ハングに見えないようにする。
         print(
             f"📎 Gmail 再同意が必要: {token_path_for_account.name}\n"
-            f"   必要スコープ: {', '.join(required)}\n"
+            f"   必要スコープ: {', '.join(flow_scopes)}\n"
             f"   ブラウザが開いたら対象アカウントで許可してください"
             f"（estate なら matsuno.estate@gmail.com）。\n"
             f"   一度フルスコープで同意すれば、以後は毎回聞かれません。",
@@ -246,7 +252,7 @@ def build_service_for_token(
             flush=True,
         )
         flow = InstalledAppFlow.from_client_secrets_file(
-            str(credentials_path), required
+            str(credentials_path), flow_scopes
         )
         # include_granted_scopes は Drive/Calendar 等の既存付与と混ざり
         # 「Scope has changed」で失敗しやすいので付けない（Gmail 専用 token を維持）。
@@ -299,7 +305,13 @@ def build_service_for_token(
         refreshed = True
 
     if refreshed:
-        save_token_json_and_sync(token_path_for_account, creds.to_json())
+        # 既存 gmail.*（特に send）を JSON 上でも落とさない
+        payload = merge_gmail_scopes_for_persist(
+            creds.to_json(),
+            existing_token_path=token_path_for_account,
+            existing_record=existing_record,
+        )
+        save_token_json_and_sync(token_path_for_account, payload)
         if not getattr(creds, "refresh_token", None):
             print(
                 f"警告: refresh_token が取得できていません: {token_path_for_account.name}",
