@@ -160,7 +160,13 @@ def run_batch(cfg: dict, *, slugs: list[str], headless: bool, force: bool) -> in
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--priority", action="store_true", help="config の priority_slugs を取得")
+    ap.add_argument(
+        "--from-course",
+        action="store_true",
+        help="apps/jarvis-dashboard/data/kiso_course_lessons.json の全 slug",
+    )
     ap.add_argument("--slug", action="append", default=[], help="個別 slug（複数可）")
+    ap.add_argument("--slug-file", help="slug を1行1件のファイルから読む")
     ap.add_argument("--catalog-only", action="store_true", help="取得せずカタログだけ更新")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--show", action="store_true")
@@ -169,8 +175,25 @@ def main() -> int:
     if args.catalog_only:
         return refresh_catalog_only(cfg)
     slugs = list(args.slug)
-    if args.priority or not slugs:
+    if args.slug_file:
+        slugs.extend(
+            ln.strip()
+            for ln in Path(args.slug_file).read_text(encoding="utf-8").splitlines()
+            if ln.strip() and not ln.strip().startswith("#")
+        )
+    if args.from_course:
+        course_path = (
+            REPO / "apps" / "jarvis-dashboard" / "data" / "kiso_course_lessons.json"
+        )
+        course = json.loads(course_path.read_text(encoding="utf-8"))
+        slugs.extend(
+            L["slug"] for L in course.get("lessons") or [] if L.get("slug")
+        )
+    if args.priority and not slugs:
         slugs = list(cfg.get("priority_slugs") or [])
+    # dedupe preserve order
+    seen: set[str] = set()
+    slugs = [s for s in slugs if not (s in seen or seen.add(s))]
     if not slugs:
         print("no slugs", file=sys.stderr)
         return 2

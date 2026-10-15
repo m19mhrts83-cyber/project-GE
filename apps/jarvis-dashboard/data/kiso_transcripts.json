@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-10-16T01:11:49+09:00",
+  "updated": "2026-10-16T01:34:54+09:00",
   "policy": {
     "chatbot_truth": "imamura",
     "jarvis_role": "compare_only",
@@ -34,9 +34,9 @@
       "imamura_status": "missing",
       "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step2_1.md",
       "imamura_file": null,
-      "bytes": 3371,
-      "title": "STEP2【不動産の基本】不動産投資成功イメージ、借入／金利等の考え方",
-      "mtime": "2026-10-16T01:05:29"
+      "bytes": 3492,
+      "title": "STEP2【不動産の基本】不動産投資成功イメージ、借入／金利等の考え方 開始",
+      "mtime": "2026-10-16T01:32:41"
     },
     {
       "slug": "kamiooya-kiso-step2_2",
@@ -64,9 +64,9 @@
       "imamura_status": "missing",
       "jarvis_file": "基礎講座文字起こし_step3_2.md",
       "imamura_file": null,
-      "bytes": 13099,
-      "title": "STEP3　神スキル【購入編】プランニング補足集",
-      "mtime": "2026-10-16T01:06:53"
+      "bytes": 12652,
+      "title": "STEP3 神スキル【購入編】プランニング補足集 開始",
+      "mtime": "2026-10-16T01:32:46"
     },
     {
       "slug": "step3_plam_intarveiw",
@@ -124,9 +124,9 @@
       "imamura_status": "missing",
       "jarvis_file": "基礎講座文字起こし_step5-5.md",
       "imamura_file": null,
-      "bytes": 2893,
-      "title": "～ アプローチ補足・実践者インタビュー(STEP4、5) ～",
-      "mtime": "2026-10-16T01:08:26"
+      "bytes": 3120,
+      "title": "～ アプローチ補足・実践者インタビュー(STEP4、5) ～ （20:27） 開始",
+      "mtime": "2026-10-16T01:32:51"
     },
     {
       "slug": "step6_1",
@@ -229,6 +229,72 @@
       "mtime": "2026-10-16T01:01:15"
     },
     {
+      "slug": "0enkounyu-0enshuzen",
+      "title": "【実践】戸建購入補足　【0円不動産】購入&【0円修繕】入居者DIY",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_0enkounyu-0enshuzen.md",
+      "imamura_file": null,
+      "bytes": 45270,
+      "mtime": "2026-10-16T01:14:07",
+      "extra": true
+    },
+    {
+      "slug": "_hosoku_trouble",
+      "title": "【実践】戸建、アパート補足 購入時トラブル集と対処法 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし__hosoku_trouble.md",
+      "imamura_file": null,
+      "bytes": 1662,
+      "mtime": "2026-10-16T01:33:17",
+      "extra": true
+    },
+    {
+      "slug": "accent-cross",
+      "title": "【実践】アクセントクロス選び効率化ツール",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_accent-cross.md",
+      "imamura_file": null,
+      "bytes": 23238,
+      "mtime": "2026-10-16T01:14:38",
+      "extra": true
+    },
+    {
+      "slug": "approach_chintaiheiyou",
+      "title": "～ アプローチ補足 賃貸併用住宅実現の流れ・考え方 ～ 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_approach_chintaiheiyou.md",
+      "imamura_file": null,
+      "bytes": 2189,
+      "mtime": "2026-10-16T01:32:57",
+      "extra": true
+    },
+    {
+      "slug": "approach_enkakuchi",
+      "title": "～ アプローチ補足 遠隔地投資の壁の壊し方・セゾン融資エリア～",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_approach_enkakuchi.md",
+      "imamura_file": null,
+      "bytes": 37110,
+      "mtime": "2026-10-16T01:15:21",
+      "extra": true
+    },
+    {
+      "slug": "baikyaku",
+      "title": "【実践シミュレーション】高値売却シミュレーション 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_baikyaku.md",
+      "imamura_file": null,
+      "bytes": 1430,
+      "mtime": "2026-10-16T01:33:43",
+      "extra": true
+    },
+    {
       "slug": "baikyaku_maisoku",
       "title": "【実践】物件売却：売却用マイソク（募集チラシ）の作り方",
       "jarvis_status": "ready",
@@ -240,6 +306,160 @@
       "extra": true
     },
     {
+      "slug": "baikyaku_timing_urikata",
+      "title": "【実践】物件売却（出口）のタイミングと売り方（アパート・戸建て編）",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_baikyaku_timing_urikata.md",
+      "imamura_file": null,
+      "bytes": 98414,
+      "mtime": "2026-10-16T01:15:52",
+      "extra": true
+    },
+    {
+      "slug": "broadenterprise",
+      "title": "ブロードエンタープライズ社セミナー",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_broadenterprise.md",
+      "imamura_file": null,
+      "bytes": 39646,
+      "mtime": "2026-10-16T01:16:07",
+      "extra": true
+    },
+    {
+      "slug": "bukkakoutou_kinrijousyou",
+      "title": "【実践】物価高騰 金利上昇時の不動産投資",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_bukkakoutou_kinrijousyou.md",
+      "imamura_file": null,
+      "bytes": 34635,
+      "mtime": "2026-10-16T01:16:20",
+      "extra": true
+    },
+    {
+      "slug": "bukkenkaenai_taisyo",
+      "title": "[物件が買えない悩み]への対処法10選",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_bukkenkaenai_taisyo.md",
+      "imamura_file": null,
+      "bytes": 194690,
+      "mtime": "2026-10-16T01:16:33",
+      "extra": true
+    },
+    {
+      "slug": "canva",
+      "title": "【実践】初心者でもできる！canvaで看板製作",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_canva.md",
+      "imamura_file": null,
+      "bytes": 49786,
+      "mtime": "2026-10-16T01:16:46",
+      "extra": true
+    },
+    {
+      "slug": "casa",
+      "title": "保証会社（casaさん）のセミナー",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_casa.md",
+      "imamura_file": null,
+      "bytes": 83596,
+      "mtime": "2026-10-16T01:16:59",
+      "extra": true
+    },
+    {
+      "slug": "chatgpt_katuyou",
+      "title": "【実践】神スキル×AI (ChatGPT) 活用法",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_chatgpt_katuyou.md",
+      "imamura_file": null,
+      "bytes": 116238,
+      "mtime": "2026-10-16T01:17:13",
+      "extra": true
+    },
+    {
+      "slug": "consultant",
+      "title": "保険代理店紹介 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_consultant.md",
+      "imamura_file": null,
+      "bytes": 1603,
+      "mtime": "2026-10-16T01:34:09",
+      "extra": true
+    },
+    {
+      "slug": "executive-lounge",
+      "title": "神大家 Executive Lounge（エグゼラウンジ）",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_executive-lounge.md",
+      "imamura_file": null,
+      "bytes": 63269,
+      "mtime": "2026-10-16T01:17:46",
+      "extra": true
+    },
+    {
+      "slug": "flower-arrangement",
+      "title": "【実践】フラワーアレンジ（造花）を自作して差別化",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_flower-arrangement.md",
+      "imamura_file": null,
+      "bytes": 108108,
+      "mtime": "2026-10-16T01:18:00",
+      "extra": true
+    },
+    {
+      "slug": "gas_horitsu_henkou240702",
+      "title": "【実践】2024年7月2日よりプロパンガスの法律変更",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_gas_horitsu_henkou240702.md",
+      "imamura_file": null,
+      "bytes": 23511,
+      "mtime": "2026-10-16T01:18:13",
+      "extra": true
+    },
+    {
+      "slug": "gekiyasu-shuzengyousha",
+      "title": "【実践】修繕：【超貴重!!】激安[多能工]修繕業者の探し方",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_gekiyasu-shuzengyousha.md",
+      "imamura_file": null,
+      "bytes": 32256,
+      "mtime": "2026-10-16T01:18:26",
+      "extra": true
+    },
+    {
+      "slug": "handankijyun",
+      "title": "【実践】★重要★：物件購入時の、選定・判断基準",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_handankijyun.md",
+      "imamura_file": null,
+      "bytes": 115201,
+      "mtime": "2026-10-16T01:18:39",
+      "extra": true
+    },
+    {
+      "slug": "hellocycling",
+      "title": "シェアサイクリング（HELLO CYCLING）",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_hellocycling.md",
+      "imamura_file": null,
+      "bytes": 14234,
+      "mtime": "2026-10-16T01:18:53",
+      "extra": true
+    },
+    {
       "slug": "homestaging_daikou",
       "title": "【オプション】空室対策：「ステージング現地設置代行」サービス",
       "jarvis_status": "ready",
@@ -248,6 +468,28 @@
       "imamura_file": null,
       "bytes": 669,
       "mtime": "2026-10-16T01:01:15",
+      "extra": true
+    },
+    {
+      "slug": "houtekikashi",
+      "title": "【実践】戸建、アパート補足 再建築不可/市街化調整など法的瑕疵 （26:03） 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_houtekikashi.md",
+      "imamura_file": null,
+      "bytes": 1595,
+      "mtime": "2026-10-16T01:33:07",
+      "extra": true
+    },
+    {
+      "slug": "kami_agent",
+      "title": "神大家 認定エージェント",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kami_agent.md",
+      "imamura_file": null,
+      "bytes": 150455,
+      "mtime": "2026-10-16T01:20:51",
       "extra": true
     },
     {
@@ -284,14 +526,443 @@
       "extra": true
     },
     {
+      "slug": "kaniejapan_toshigasu_puropan",
+      "title": "カニエジャパン様　都市ガス→プロパン切替セミナー（2026/6）",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kaniejapan_toshigasu_puropan.md",
+      "imamura_file": null,
+      "bytes": 69262,
+      "mtime": "2026-10-16T01:21:28",
+      "extra": true
+    },
+    {
+      "slug": "kasaihoken_henkou_youken",
+      "title": "火災保険会社の加入要件変更 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kasaihoken_henkou_youken.md",
+      "imamura_file": null,
+      "bytes": 836,
+      "mtime": "2026-10-16T01:34:15",
+      "extra": true
+    },
+    {
+      "slug": "kasaihoken_kaitei2026",
+      "title": "【緊急開催】2026年10月火災保険改定 解説セミナー（アイリック様）",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kasaihoken_kaitei2026.md",
+      "imamura_file": null,
+      "bytes": 60183,
+      "mtime": "2026-10-16T01:22:00",
+      "extra": true
+    },
+    {
+      "slug": "kasaihoken_kisho",
+      "title": "火災保険地震保険の基礎～金額設定・活用 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kasaihoken_kisho.md",
+      "imamura_file": null,
+      "bytes": 912,
+      "mtime": "2026-10-16T01:34:04",
+      "extra": true
+    },
+    {
+      "slug": "keiyakufutekigo_taisyo",
+      "title": "【実践】売却時注意点～契約不適合(瑕疵）と対処法～ 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_keiyakufutekigo_taisyo.md",
+      "imamura_file": null,
+      "bytes": 867,
+      "mtime": "2026-10-16T01:33:59",
+      "extra": true
+    },
+    {
+      "slug": "kenchikuclub",
+      "title": "～神大家建築クラブの募集について～",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kenchikuclub.md",
+      "imamura_file": null,
+      "bytes": 14754,
+      "mtime": "2026-10-16T01:23:25",
+      "extra": true
+    },
+    {
+      "slug": "kodate_4pattern",
+      "title": "【実践】戸建購入補足　激安戸建ての買い方４パターン",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kodate_4pattern.md",
+      "imamura_file": null,
+      "bytes": 23338,
+      "mtime": "2026-10-16T01:23:39",
+      "extra": true
+    },
+    {
+      "slug": "kokoronokabe",
+      "title": "【実践】★重要★：心の壁の外し方 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kokoronokabe.md",
+      "imamura_file": null,
+      "bytes": 816,
+      "mtime": "2026-10-16T01:33:02",
+      "extra": true
+    },
+    {
+      "slug": "kuusitu_keiyakuhenkou",
+      "title": "【実践】空室対策：【会社員にも出来る!!】管理会社契約変更スキーム",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_kuusitu_keiyakuhenkou.md",
+      "imamura_file": null,
+      "bytes": 36315,
+      "mtime": "2026-10-16T01:24:09",
+      "extra": true
+    },
+    {
+      "slug": "naphtha-shock",
+      "title": "【緊急】イラン戦争、ナフサショック影響と対策",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_naphtha-shock.md",
+      "imamura_file": null,
+      "bytes": 38199,
+      "mtime": "2026-10-16T01:24:22",
+      "extra": true
+    },
+    {
+      "slug": "option_bukken_syoukai",
+      "title": "【オプション】物件紹介サービス",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_option_bukken_syoukai.md",
+      "imamura_file": null,
+      "bytes": 13148,
+      "mtime": "2026-10-16T01:24:35",
+      "extra": true
+    },
+    {
+      "slug": "option_hudousan_listup",
+      "title": "【オプション】不動産業者リストアップ代行サービス",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_option_hudousan_listup.md",
+      "imamura_file": null,
+      "bytes": 5346,
+      "mtime": "2026-10-16T01:24:49",
+      "extra": true
+    },
+    {
+      "slug": "option_shuuzen_listup",
+      "title": "【オプション】修繕業者探し代行サービス",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_option_shuuzen_listup.md",
+      "imamura_file": null,
+      "bytes": 7763,
+      "mtime": "2026-10-16T01:25:02",
+      "extra": true
+    },
+    {
       "slug": "pop_board",
-      "title": "センス抜群POP業者／看板業者紹介",
+      "title": "センス抜群POP業者／看板業者紹介 開始",
       "jarvis_status": "ready",
       "imamura_status": "missing",
       "jarvis_file": "基礎講座文字起こし_pop_board.md",
       "imamura_file": null,
-      "bytes": 1143,
-      "mtime": "2026-10-16T01:01:15",
+      "bytes": 1442,
+      "mtime": "2026-10-16T01:33:38",
+      "extra": true
+    },
+    {
+      "slug": "qa_baikyaku",
+      "title": "【実践】物件売却：Q＆A集 実需売却用の不動産業者調査方法 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_qa_baikyaku.md",
+      "imamura_file": null,
+      "bytes": 853,
+      "mtime": "2026-10-16T01:33:53",
+      "extra": true
+    },
+    {
+      "slug": "qa_kaikata",
+      "title": "【実践】戸建、アパート補足 Q＆A集 物件の見極め関連 （37:32） 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_qa_kaikata.md",
+      "imamura_file": null,
+      "bytes": 2002,
+      "mtime": "2026-10-16T01:33:12",
+      "extra": true
+    },
+    {
+      "slug": "reformloan_riyoukachi",
+      "title": "【実践】広域のリフォームローンの利用価値を知る",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_reformloan_riyoukachi.md",
+      "imamura_file": null,
+      "bytes": 17209,
+      "mtime": "2026-10-16T01:26:07",
+      "extra": true
+    },
+    {
+      "slug": "satsueitekunikku",
+      "title": "【実践】空室が埋まる！高く売れる！プロ写真撮影テクニックを学ぶ",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_satsueitekunikku.md",
+      "imamura_file": null,
+      "bytes": 145359,
+      "mtime": "2026-10-16T01:26:21",
+      "extra": true
+    },
+    {
+      "slug": "seikakaitori",
+      "title": "成果買取サービスのご説明",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_seikakaitori.md",
+      "imamura_file": null,
+      "bytes": 39321,
+      "mtime": "2026-10-16T01:31:06",
+      "extra": true
+    },
+    {
+      "slug": "seminar-lf",
+      "title": "L＆Fアセットファイナンス様セミナー（2026/4） 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_seminar-lf.md",
+      "imamura_file": null,
+      "bytes": 5408,
+      "mtime": "2026-10-16T01:34:25",
+      "extra": true
+    },
+    {
+      "slug": "seminar-orix",
+      "title": "オリックス銀行様セミナー（2026/6） 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_seminar-orix.md",
+      "imamura_file": null,
+      "bytes": 5353,
+      "mtime": "2026-10-16T01:34:30",
+      "extra": true
+    },
+    {
+      "slug": "seminar_aiconnect",
+      "title": "アイコネクトさん セミナー",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_seminar_aiconnect.md",
+      "imamura_file": null,
+      "bytes": 76816,
+      "mtime": "2026-10-16T01:29:24",
+      "extra": true
+    },
+    {
+      "slug": "seminar_echoes",
+      "title": "ECHOESさん セミナー",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_seminar_echoes.md",
+      "imamura_file": null,
+      "bytes": 86199,
+      "mtime": "2026-10-16T01:29:10",
+      "extra": true
+    },
+    {
+      "slug": "service_form",
+      "title": "８つのサービス解説動画、申込フォーム 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_service_form.md",
+      "imamura_file": null,
+      "bytes": 5513,
+      "mtime": "2026-10-16T01:34:20",
+      "extra": true
+    },
+    {
+      "slug": "setuzeianken",
+      "title": "節税案件についての考え方",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_setuzeianken.md",
+      "imamura_file": null,
+      "bytes": 23200,
+      "mtime": "2026-10-16T01:30:51",
+      "extra": true
+    },
+    {
+      "slug": "shouene_kaisei",
+      "title": "【実践】建築基準法、省エネ法改正の理解と対策",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_shouene_kaisei.md",
+      "imamura_file": null,
+      "bytes": 42818,
+      "mtime": "2026-10-16T01:29:37",
+      "extra": true
+    },
+    {
+      "slug": "simyu1",
+      "title": "【実践シミュレーション】1 利回り20%戸建て購入編",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_simyu1.md",
+      "imamura_file": null,
+      "bytes": 219734,
+      "mtime": "2026-10-16T01:26:45",
+      "extra": true
+    },
+    {
+      "slug": "simyu2",
+      "title": "【実践シミュレーション】2 利回り20％アパート購入編",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_simyu2.md",
+      "imamura_file": null,
+      "bytes": 141097,
+      "mtime": "2026-10-16T01:27:02",
+      "extra": true
+    },
+    {
+      "slug": "simyu3",
+      "title": "【実践シミュレーション】3 利回り10％新築アパート編",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_simyu3.md",
+      "imamura_file": null,
+      "bytes": 121862,
+      "mtime": "2026-10-16T01:27:23",
+      "extra": true
+    },
+    {
+      "slug": "sisannseiri",
+      "title": "【実践】物件売却：転売＝資産整理をどう考えるか 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_sisannseiri.md",
+      "imamura_file": null,
+      "bytes": 6214,
+      "mtime": "2026-10-16T01:33:48",
+      "extra": true
+    },
+    {
+      "slug": "smartroom",
+      "title": "～【実践】物件の利回り0.5％UP!! スマートルーム化解説～",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_smartroom.md",
+      "imamura_file": null,
+      "bytes": 48130,
+      "mtime": "2026-10-16T01:27:36",
+      "extra": true
+    },
+    {
+      "slug": "souzoku_kounyuu",
+      "title": "【実践】相続物件を手に入れる方法",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_souzoku_kounyuu.md",
+      "imamura_file": null,
+      "bytes": 24713,
+      "mtime": "2026-10-16T01:28:07",
+      "extra": true
+    },
+    {
+      "slug": "studysession-startguide",
+      "title": "会員サイトの操作・講座の進め方",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_studysession-startguide.md",
+      "imamura_file": null,
+      "bytes": 111092,
+      "mtime": "2026-10-16T01:31:39",
+      "extra": true
+    },
+    {
+      "slug": "theme1_jishin_kanngaekata",
+      "title": "テーマ1【災害対策】地震に対する備え方・考え方・投資の仕方",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_theme1_jishin_kanngaekata.md",
+      "imamura_file": null,
+      "bytes": 96202,
+      "mtime": "2026-10-16T01:30:11",
+      "extra": true
+    },
+    {
+      "slug": "theme2_jishin_tsukaikata",
+      "title": "テーマ2  【災害対策】地震保険の使い方",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_theme2_jishin_tsukaikata.md",
+      "imamura_file": null,
+      "bytes": 13025,
+      "mtime": "2026-10-16T01:30:24",
+      "extra": true
+    },
+    {
+      "slug": "theme3_jishin_kasai_zenshou",
+      "title": "テーマ3  【災害対策】火災保険 全焼時の対応[2022年10月～ ver.]",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_theme3_jishin_kasai_zenshou.md",
+      "imamura_file": null,
+      "bytes": 24758,
+      "mtime": "2026-10-16T01:30:38",
+      "extra": true
+    },
+    {
+      "slug": "water_quality_test",
+      "title": "【実践】井戸水物件の水質検査と水道利用料の考え方",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_water_quality_test.md",
+      "imamura_file": null,
+      "bytes": 8949,
+      "mtime": "2026-10-16T01:28:40",
+      "extra": true
+    },
+    {
+      "slug": "yoheki_taisyo",
+      "title": "【実践】擁壁のリスクと対処、活用法 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_yoheki_taisyo.md",
+      "imamura_file": null,
+      "bytes": 1061,
+      "mtime": "2026-10-16T01:33:22",
+      "extra": true
+    },
+    {
+      "slug": "youtube2",
+      "title": "【オプション】YOUTUBE動画の簡単マイソク活用法＆売却への応用 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_youtube2.md",
+      "imamura_file": null,
+      "bytes": 850,
+      "mtime": "2026-10-16T01:33:33",
+      "extra": true
+    },
+    {
+      "slug": "zenku_taisaku",
+      "title": "【実践】空室対策：[全空] ,[空室多い],[新築]物件への空室対策シミュレーション （17:43） 開始",
+      "jarvis_status": "ready",
+      "imamura_status": "missing",
+      "jarvis_file": "基礎講座文字起こし_zenku_taisaku.md",
+      "imamura_file": null,
+      "bytes": 890,
+      "mtime": "2026-10-16T01:33:28",
       "extra": true
     }
   ]
