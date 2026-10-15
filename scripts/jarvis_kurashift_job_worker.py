@@ -310,6 +310,21 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
             str(REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"),
             "--apply",
         ],
+        "re_vendor_stall_check": [
+            py,
+            str(REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"),
+            "--apply",
+            *(
+                ["--force-refill"]
+                if payload.get("force_refill")
+                else []
+            ),
+            *(
+                ["--daily-report"]
+                if payload.get("daily_report")
+                else []
+            ),
+        ],
         "re_vendor_judgment": [
             py,
             str(REPO / "scripts" / "jarvis_kurashift_re_vendor_judgment.py"),

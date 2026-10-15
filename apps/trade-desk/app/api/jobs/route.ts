@@ -32,6 +32,7 @@ const ALLOWED = new Set([
   "re_sync_loan_tracker",
   "re_revise_plan",
   "re_vendor_sync",
+  "re_vendor_stall_check",
   "re_mgmt_vendor_sync",
   "re_repair_vendor_sync",
   "re_ops_form_draft",

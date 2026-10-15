@@ -56,6 +56,7 @@ MGMT_REPLY_APPLY = REPO / "scripts" / "jarvis_grok_mgmt_reply_apply.py"
 GLUCON_MATERIALS_IMPORT = REPO / "scripts" / "jarvis_glucon_materials_from_drive.py"
 CARD_FEE_RESOURCE_OUTBOX = REPO / "scripts" / "jarvis_card_fee_resource_outbox.py"
 KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
+VENDOR_OUTREACH_STALL = REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
 KURASHIFT_RE_DAILY_DIGEST = REPO / "scripts" / "jarvis_kurashift_re_daily_digest.py"
 KURASHIFT_RE_CLEANUP = REPO / "scripts" / "jarvis_kurashift_re_cleanup.py"
@@ -1005,6 +1006,28 @@ def main() -> int:
             print(f"# mgmt_precheck_reply soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["mgmt_precheck_reply"] = "skipped"
+
+    # 2c1a3. S2 業者開拓 stall（キュー補給・sync_meta・必要時 #ops · soft-fail）
+    # vendor_sync は runner 内でも走るが、従来どおり単独 sync も維持
+    if VENDOR_OUTREACH_STALL.is_file() and not args.skip_fetch:
+        if os.environ.get("JARVIS_VENDOR_OUTREACH_STALL_DISABLE", "").strip() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            results["steps"]["vendor_outreach_stall"] = "skipped"
+        else:
+            rc = run_step(
+                "vendor_outreach_stall",
+                [exe, str(VENDOR_OUTREACH_STALL), "--apply"],
+                timeout=180,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["vendor_outreach_stall"] = rc
+            if rc != 0:
+                print(f"# vendor_outreach_stall soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["vendor_outreach_stall"] = "skipped"
 
     # 2c1b. 業者リスト → Supabase 投影（soft-fail）
     if KURASHIFT_VENDOR_SYNC.is_file() and not args.skip_fetch:

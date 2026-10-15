@@ -41,6 +41,7 @@ PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 WEEKLY_SUMMARY_STATE_PATH = STATE_DIR / "hawk_weekly_summary.json"
 TODOIST_APPLY = REPO / "scripts" / "jarvis_hawk_todoist_tasks_apply.py"
 SLACK_REPORT_APPLY = REPO / "scripts" / "jarvis_grok_slack_report_apply.py"
+VENDOR_OUTREACH_STALL = REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"
 
 
 def now_iso() -> str:
@@ -381,6 +382,44 @@ def apply_todoist_tasks(*, dry_run: bool = False) -> dict[str, Any]:
     }
 
 
+def run_vendor_outreach_stall(*, dry_run: bool = False) -> dict[str, Any]:
+    """S2 キュー補給（inbox 再生成依頼の消化含む）。soft-fail 用。"""
+    if os.environ.get("JARVIS_VENDOR_OUTREACH_STALL_DISABLE", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return {"ok": True, "skipped": True, "reason": "disabled"}
+    if not VENDOR_OUTREACH_STALL.is_file():
+        return {"ok": True, "skipped": True, "reason": "script missing"}
+    exe = str(PY if PY.is_file() else sys.executable)
+    cmd = [exe, str(VENDOR_OUTREACH_STALL)]
+    if dry_run:
+        cmd.append("--dry-run")
+    else:
+        cmd.append("--apply")
+    try:
+        r = subprocess.run(
+            cmd,
+            cwd=str(REPO),
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    if r.stdout:
+        print(r.stdout.rstrip())
+    if r.returncode != 0:
+        return {
+            "ok": False,
+            "returncode": r.returncode,
+            "stderr_tail": (r.stderr or "")[-400:],
+        }
+    return {"ok": True, "returncode": 0}
+
+
 def apply_slack_reports(*, dry_run: bool = False) -> dict[str, Any]:
     """inbox の action: slack_report を Slack へ投稿（成功分 archive）。soft-fail 用。"""
     if not SLACK_REPORT_APPLY.is_file():
@@ -488,11 +527,17 @@ def main() -> int:
         action="store_true",
         help="action: slack_report の自動 apply をしない",
     )
+    ap.add_argument(
+        "--skip-vendor-stall",
+        action="store_true",
+        help="S2 業者開拓 stall runner を呼ばない",
+    )
     ap.add_argument("--json", action="store_true", help="state を JSON で stdout")
     args = ap.parse_args()
 
     apply_result: dict[str, Any] | None = None
     slack_apply_result: dict[str, Any] | None = None
+    stall_result: dict[str, Any] | None = None
     try:
         if args.archive:
             state = archive_file(args.archive)
@@ -531,17 +576,39 @@ def main() -> int:
                         file=sys.stderr,
                     )
             state = poll()
+            # S2 再生成依頼の消化・キュー補給（soft-fail）
+            if not args.skip_vendor_stall:
+                stall_result = run_vendor_outreach_stall()
+                if stall_result.get("skipped"):
+                    print(
+                        f"📎 vendor_outreach_stall: skipped ({stall_result.get('reason')})"
+                    )
+                elif stall_result.get("ok"):
+                    print("📎 vendor_outreach_stall: ok")
+                else:
+                    print(
+                        f"📎 vendor_outreach_stall: FAIL "
+                        f"rc={stall_result.get('returncode')} "
+                        f"{(stall_result.get('stderr_tail') or stall_result.get('error') or '')[:120]}",
+                        file=sys.stderr,
+                    )
     except Exception as e:
         print(f"# inbox poll error: {e}", file=sys.stderr)
         return 1
 
     if args.json:
-        if apply_result is not None or slack_apply_result is not None:
+        if (
+            apply_result is not None
+            or slack_apply_result is not None
+            or stall_result is not None
+        ):
             state = dict(state)
             if apply_result is not None:
                 state["todoist_apply"] = apply_result
             if slack_apply_result is not None:
                 state["slack_report_apply"] = slack_apply_result
+            if stall_result is not None:
+                state["vendor_outreach_stall"] = stall_result
         print(json.dumps(state, ensure_ascii=False, indent=2))
     else:
         print_block(state)

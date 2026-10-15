@@ -169,6 +169,7 @@ Mac が `--batch-week` で渡す JSON（`mode: batch_week`）を受け取った�
    - Phase 昇格提案1行
    - **Mac 同期**: 部長 Bot が **`[Grok部長] 週次 YYYY-MM-DD`** メール（本文に `📎 Jarvis 用` + `--mark` 全行）を estate へ送信。Jarvis が `jarvis_grok_bucho_mail_apply.py --apply` で反映。**Bot2 単体で週次メールを送らない** · 松野への手動コピー不要
    - 部長スレッド内で社員 S2 として実行している場合も、**週次は必ず部長日報メール1通**にまとめる（§部長 Instructions · 部長日報メール）
+6. **キューが無い・薄いとき**: 部長ボックスへの「再生成して」再依頼は **しない**。516／Jarvis の **自律 refill**（`jarvis_vendor_outreach_stall_runner`）を待つ。探索は続行可。**2営業日空いたら Slack `#ops` を見る**（松野／ホーク）。
 
 **トリガー例**: `本日分` / `今日の分` / 週次キックオフ直後は「1日目を開始」
 
