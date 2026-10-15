@@ -43,6 +43,7 @@
 | Zaim 財務日次（API 系） | `zaim-finance-sync.yml` | Playwright CSV とは別 |
 | Ops Fail Watch | `jarvis-ops-fail-watch.yml` | 失敗監視 |
 | **211 管理会社朝便** | `jarvis-reply-draft-211.yml` | 07:30 JST。Graph materialize→正本 PUT→Slack。Mac launchd は保険 |
+| **516 業者開拓見守り** | `kurashift-vendor-outreach-stall.yml` | 平日16:00 JST。YAML Secrets（gzip\|B64）→stall `--skip-refill`→sync_meta／Slack。Drive補給は Mac |
 | **111 パートナー昼枠** | `jarvis-partner-day-report.yml` | 11:50 JST。Gmail＋Chatwork→MD→更新時のみ Slack `#report`（LINEなし） |
 | Pages / deploy | `pages-docs.yml` / `trade-desk-deploy.yml` | 定例というよりデプロイ |
 

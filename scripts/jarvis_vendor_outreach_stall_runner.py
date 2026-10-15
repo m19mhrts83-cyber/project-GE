@@ -587,10 +587,13 @@ def should_ops_alert(
     q: dict[str, Any],
     lst: dict[str, Any],
     bridge_ok: bool,
+    skip_refill: bool = False,
 ) -> tuple[bool, str]:
     reasons: list[str] = []
-    if not bridge_ok:
+    if not bridge_ok and not skip_refill:
         reasons.append("Mac/Drive ブリッジ未接続（outbox 書けず）")
+    if skip_refill and q.get("needs_refill"):
+        reasons.append("GHA見守り · キュー不足 · Mac補給待ち")
     last_c = q.get("last_contacted")
     if last_c:
         try:
@@ -619,6 +622,7 @@ def run_lane(
     dry: bool,
     force_refill: bool,
     skip_sync: bool,
+    skip_refill: bool,
     state: dict[str, Any],
     inbox_hits: list[Path],
     archive_inbox: bool,
@@ -635,6 +639,7 @@ def run_lane(
         f"daily={q['daily_limit']} needs_refill={q['needs_refill']} "
         f"followup={q['followup']} contacted_today={q['contacted_today']} "
         f"bridge={'ok' if bridge_ok else 'NG'}"
+        f"{' skip_refill' if skip_refill else ''}"
     )
 
     needs_refill = bool(
@@ -643,7 +648,15 @@ def run_lane(
     refill_result: dict[str, Any] | None = None
     archived: list[str] = []
 
-    if needs_refill:
+    if skip_refill:
+        refill_result = {
+            "ok": True,
+            "skipped": True,
+            "reason": "skip_refill · Mac補給待ち" if needs_refill else "skip_refill",
+        }
+        if needs_refill:
+            print(f"# {lane} refill skipped: GHA/skip_refill（Mac補給待ち）")
+    elif needs_refill:
         last_refill = parse_iso(lst.get("last_refill_at"))
         cooldown_ok = True
         if (
@@ -692,17 +705,17 @@ def run_lane(
                     state["last_sync_at"] = lst["last_sync_at"]
 
     ops_needed, ops_reason = should_ops_alert(
-        q=q, lst=lst, bridge_ok=bridge_ok
+        q=q, lst=lst, bridge_ok=bridge_ok, skip_refill=skip_refill
     )
     if refill_result and not refill_result.get("ok") and not refill_result.get("skipped"):
         ops_needed = True
         ops_reason = ops_reason or str(refill_result.get("error") or "refill failed")
-    if not bridge_ok and needs_refill:
+    if not bridge_ok and needs_refill and not skip_refill:
         ops_needed = True
         ops_reason = ops_reason or "Mac未接続・補給スキップ"
 
     stall_status = "ok"
-    if not bridge_ok:
+    if not bridge_ok and not skip_refill:
         stall_status = "bridge_down"
     elif q["needs_refill"]:
         stall_status = "needs_refill"
@@ -815,7 +828,16 @@ def run(*, args: argparse.Namespace) -> int:
         dry = True
 
     lanes = parse_lanes(args.lane)
-    inbox_hits = find_inbox_refill_requests() if "s2" in lanes else []
+    skip_refill = bool(args.skip_refill) or (
+        (os.environ.get("JARVIS_VENDOR_OUTREACH_STALL_SKIP_REFILL") or "").strip()
+        in ("1", "true", "yes", "on")
+    )
+    # GHA 見守りでは Drive outbox を書かない（inbox も触らない）
+    inbox_hits = (
+        []
+        if skip_refill
+        else (find_inbox_refill_requests() if "s2" in lanes else [])
+    )
     results: list[dict[str, Any]] = []
 
     for i, lane in enumerate(lanes):
@@ -830,11 +852,12 @@ def run(*, args: argparse.Namespace) -> int:
         r = run_lane(
             lane,
             dry=dry,
-            force_refill=bool(args.force_refill),
+            force_refill=bool(args.force_refill) and not skip_refill,
             skip_sync=bool(args.skip_sync),
+            skip_refill=skip_refill,
             state=state,
             inbox_hits=inbox_hits,
-            archive_inbox=(lane == "s2" and i == 0),
+            archive_inbox=(lane == "s2" and i == 0 and not skip_refill),
         )
         results.append(r)
 
@@ -906,6 +929,11 @@ def main() -> int:
         help="s2 | s4 | s9 | all（カンマ可）。既定 all",
     )
     ap.add_argument("--force-refill", action="store_true", help="キューに余裕があっても再投入")
+    ap.add_argument(
+        "--skip-refill",
+        action="store_true",
+        help="outbox 補給をしない（GHA見守り用。env JARVIS_VENDOR_OUTREACH_STALL_SKIP_REFILL=1 でも可）",
+    )
     ap.add_argument("--daily-report", action="store_true", help="Slack #report に日次サマリ")
     ap.add_argument("--evening", action="store_true", help="夕方枠（= --daily-report）")
     ap.add_argument("--force-report", action="store_true", help="同日再投稿を許可")

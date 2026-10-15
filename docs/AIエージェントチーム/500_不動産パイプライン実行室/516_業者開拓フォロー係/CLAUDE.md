@@ -26,7 +26,7 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
 ## 2. 動き出す合図
 
 - [x] 人が頼む — 「業者開拓フォローして」→ `…stall_runner.py --apply --lane all --force-refill`（必要なら `--daily-report`）
-- [x] 時間 — 平日 **朝**（`jarvis_morning_mac_refresh` soft-fail・`--lane all`）／**夕方 18:10 相当**（`--apply --evening --lane all`）
+- [x] 時間 — **GHA 平日16:00**（`kurashift-vendor-outreach-stall.yml`・見守り／`--skip-refill`）／Mac **朝** soft-fail・**夕方** `--evening`（補給保険）
 - [x] 何かが届いたら — `jarvis_bucho_inbox_poll` 成功後フック（再生成依頼・`--next` 依頼 MD）
 - [x] 変化・失敗を見回ったら:
   - `needs_refill`（送信可能件数が日次枠未満）
