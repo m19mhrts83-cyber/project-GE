@@ -15,7 +15,9 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -224,6 +226,41 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
     return summary
 
 
+def _soft_stall_evening_after_marks(marks_applied: int) -> None:
+    """S2 --mark 反映後に stall runner（sync + 日次 #report）。失敗しても本処理は止めない。"""
+    if marks_applied <= 0:
+        return
+    if os.environ.get("JARVIS_VENDOR_OUTREACH_STALL_DISABLE", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return
+    stall = REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"
+    if not stall.is_file():
+        return
+    py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+    exe = str(py if py.is_file() else sys.executable)
+    try:
+        r = subprocess.run(
+            [exe, str(stall), "--apply", "--evening"],
+            cwd=str(REPO),
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        if r.stdout:
+            print(r.stdout.rstrip())
+        if r.returncode != 0:
+            print(
+                f"# vendor_outreach_stall after marks soft-fail rc={r.returncode}",
+                file=sys.stderr,
+            )
+    except Exception as e:
+        print(f"# vendor_outreach_stall after marks soft-fail: {e}", file=sys.stderr)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="YAML に反映")
@@ -244,6 +281,8 @@ def main() -> int:
         days=args.days,
         reprocess=args.reprocess,
     )
+    if args.apply and out.get("ok"):
+        _soft_stall_evening_after_marks(int(out.get("marks_applied") or 0))
     return 0 if out.get("ok") else 1
 
 

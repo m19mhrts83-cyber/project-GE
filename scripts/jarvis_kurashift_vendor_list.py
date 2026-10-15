@@ -950,7 +950,7 @@ def grok_weekly_kickoff(payload: dict[str, Any]) -> str:
 - 送信ごとに --mark 行を報告
 - その日終了時: 「本日完了（成功X / skipY / 失敗Z）」+ 日次 [Grok部長] 日報メール
 - 土曜 or 日曜: 週次 [Grok部長] 週次 メール + 全 --mark 行一覧再掲
-- キュー残り0または不足: 松野へ Jarvis で --batch-week --grok-kickoff 再生成を依頼（Instructions §週次バッチ）
+- キュー残り0または不足: 部長ボックスへの再依頼は不要。516／Jarvis の自律 refill（stall runner）を待つ。2営業日空いたら Slack #ops を確認
 
 既 contact 済み: {contacted_n} 社（JSON の contacted_vendors 参照）。
 キュー先頭: {first_id} から。

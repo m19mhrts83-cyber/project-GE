@@ -112,6 +112,35 @@ export default async function RealEstateVendorsPage({
     .order("updated_at", { ascending: false })
     .limit(200);
 
+  const { data: stallMetaRow } = await supabase
+    .from("sync_meta")
+    .select("key, value, updated_at")
+    .eq("key", "vendor_outreach_stall")
+    .maybeSingle();
+
+  type StallMeta = {
+    stall_status?: string;
+    daily_limit?: number;
+    queue_ready?: number;
+    pending_discovered?: number;
+    followup?: number;
+    contacted_today?: number;
+    last_contacted?: string | null;
+    last_refill_at?: string | null;
+    last_sync_at?: string | null;
+    bridge_ok?: boolean;
+    day?: string;
+  };
+  let stallMeta: StallMeta | null = null;
+  if (stallMetaRow?.value) {
+    try {
+      const parsed = JSON.parse(String(stallMetaRow.value)) as StallMeta;
+      if (parsed && typeof parsed === "object") stallMeta = parsed;
+    } catch {
+      stallMeta = null;
+    }
+  }
+
   const dealCountByVendor = new Map<string, number>();
   for (const d of deals || []) {
     const sj =
@@ -174,7 +203,39 @@ export default async function RealEstateVendorsPage({
     if (s && (!latestSync || s > latestSync)) latestSync = s;
   }
 
-  const dailyLimit = 3;
+  const dailyLimit =
+    typeof stallMeta?.daily_limit === "number" && stallMeta.daily_limit > 0
+      ? stallMeta.daily_limit
+      : 3;
+  const queueReady =
+    typeof stallMeta?.queue_ready === "number"
+      ? stallMeta.queue_ready
+      : (counts.pending || 0) + (counts.discovered || 0);
+  const pendingDiscovered =
+    typeof stallMeta?.pending_discovered === "number"
+      ? stallMeta.pending_discovered
+      : (counts.pending || 0) + (counts.discovered || 0);
+  const followupN =
+    typeof stallMeta?.followup === "number"
+      ? stallMeta.followup
+      : (vendors || []).filter((v) => vendorNeedsFollowUp(v)).length;
+  const stallStatus = stallMeta?.stall_status || "—";
+  const stallLabel =
+    stallStatus === "ok"
+      ? "正常"
+      : stallStatus === "needs_refill"
+        ? "キュー補給待ち"
+        : stallStatus === "bridge_down"
+          ? "Mac未接続"
+          : stallStatus === "stale_marks"
+            ? "送信停滞（markなし）"
+            : stallStatus;
+  const fmtMetaTs = (raw: string | null | undefined) => {
+    if (!raw) return "—";
+    const s = String(raw);
+    if (s.length >= 16) return s.slice(0, 16).replace("T", " ");
+    return s;
+  };
 
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
@@ -185,7 +246,7 @@ export default async function RealEstateVendorsPage({
         地場リストへの Web 問合せ（「物件情報をください」）の送信状況。正本は Mac の{" "}
         <code>kurashift_re_vendor_list.yaml</code>。Grok 本日分の{" "}
         <code>--mark</code> 反映後に「リストを同期」してください。返信の本文・下書きは
-        Dashboard（「返信を見る」）で確認します。
+        Dashboard（「返信を見る」）で確認します。キュー補給は 516／stall runner が自律実行します。
       </p>
 
       <div className="card">
@@ -199,16 +260,35 @@ export default async function RealEstateVendorsPage({
           {counts.skip || 0}
         </p>
         <p className="meta">
-          本日上限 {dailyLimit}/日 · 最終同期{" "}
-          {latestSync
-            ? latestSync.slice(0, 16).replace("T", " ")
-            : "—（未同期）"}
+          本日上限 {dailyLimit}/日 · キュー残 {pendingDiscovered}（送信可能先頭{" "}
+          {queueReady}）· 要フォロー {followupN}
         </p>
-        <p style={{ marginTop: 10 }}>
+        <p className="meta">
+          stall: {stallLabel}
+          {stallMeta?.contacted_today != null
+            ? ` · 本日contacted ${stallMeta.contacted_today}`
+            : ""}
+          {stallMeta?.last_contacted
+            ? ` · 最終contacted ${stallMeta.last_contacted}`
+            : ""}
+          {stallMeta?.bridge_ok === false ? " · bridge NG" : ""}
+        </p>
+        <p className="meta">
+          最終 refill {fmtMetaTs(stallMeta?.last_refill_at)} · 最終 sync{" "}
+          {fmtMetaTs(stallMeta?.last_sync_at || latestSync)} · stall更新{" "}
+          {fmtMetaTs(stallMetaRow?.updated_at as string | undefined)}
+        </p>
+        <p style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <EnqueueJobButton
             jobType="re_vendor_sync"
             title="業者リストを Supabase へ投影"
             label="リストを同期"
+            payload={{}}
+          />
+          <EnqueueJobButton
+            jobType="re_vendor_stall_check"
+            title="S2 キュー補給・stall確認（Mac）"
+            label="stall確認"
             payload={{}}
           />
         </p>
