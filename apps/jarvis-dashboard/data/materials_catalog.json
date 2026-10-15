@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-20",
+  "updated": "2026-10-16",
   "pages_base": "https://m19mhrts83-cyber.github.io/project-GE/docs",
   "lanes": [
     {
@@ -19,7 +19,7 @@
       "id": "kamiooya",
       "title": "神大家運営",
       "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html",
-      "note": "運営向け説明資料一覧"
+      "note": "運営向け説明資料＋スクールAI提案ストック"
     }
   ],
   "items": [
@@ -135,6 +135,13 @@
       "note": "運営向け・回ごとの PDF/PNG"
     },
     {
+      "id": "kamiooya-school-ai-stock",
+      "lane": "kamiooya",
+      "title": "スクールAI活用・提案ストック",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/神大家_スクールAI活用_提案ストック_20261016.md",
+      "note": "講座・学習環境の検討ネタ索引（Grok Bot事例等）。継続更新"
+    },
+    {
       "id": "shuhen-map-pages",
       "lane": "kamiooya",
       "title": "周辺MAP Step2（公開デモ）",
@@ -148,5 +155,6 @@
       "url": "https://m19mhrts83-cyber.github.io/project-GE/shuhen-auto.html",
       "note": "Pages 版（API なし）"
     }
-  ]
+  ],
+  "onedrive_self": "N1_NotebookLM/jarvis-self/"
 }
