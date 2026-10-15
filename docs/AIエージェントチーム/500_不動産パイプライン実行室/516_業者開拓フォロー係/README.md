@@ -1,6 +1,6 @@
 # 【設計中】業者開拓フォロー係
 
-- **AIオートメーション（FlowForge）**: [flow_dCheumorewDolXnfpksSuWKu](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dCheumorewDolXnfpksSuWKu)
+- **AIオートメーション（FlowForge）**: [業者開拓 見守り（516／GHA16:00）](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dCheumorewDolXnfpksSuWKu)（設計図・実行エンジンではない）
 - **本線**: `scripts/jarvis_vendor_outreach_stall_runner.py --lane all`
 - **UI**: vendors · repair-vendors · mgmt-vendors
 - **Grok 関係**: 〔Grok:S2+S4+S9〕— **実行は Grok／見守り・補給は 516**（開拓の二重実行はしない）
