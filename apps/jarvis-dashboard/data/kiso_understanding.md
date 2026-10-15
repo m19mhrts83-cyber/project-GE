@@ -13,7 +13,8 @@
 | 字幕不可→説明文フォールバック | 22 |
 | 未取得 | 0 |
 
-詳細ギャップ: `compare/20261016_コース全件_ギャップと対応.md`
+**今村さん依頼リスト（22本・優先P1〜P3）**: ダッシュボード `/kiso-transcripts#imamura-ask`  
+データ: `data/kiso_course_gaps.json`
 
 ## 方針
 

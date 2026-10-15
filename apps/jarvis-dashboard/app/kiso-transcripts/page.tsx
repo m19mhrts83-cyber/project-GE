@@ -3,6 +3,7 @@ import path from "path";
 import Shell from "@/components/Shell";
 import catalog from "@/data/kiso_transcripts.json";
 import courseStatus from "@/data/kiso_course_status.json";
+import courseGaps from "@/data/kiso_course_gaps.json";
 
 function loadUnderstanding(): string {
   try {
@@ -15,16 +16,16 @@ function loadUnderstanding(): string {
   }
 }
 
-function loadGaps(): string {
-  try {
-    return readFileSync(
-      path.join(process.cwd(), "data", "kiso_course_gaps.md"),
-      "utf8"
-    );
-  } catch {
-    return "";
-  }
-}
+type GapLesson = {
+  slug: string;
+  title?: string;
+  url?: string;
+  ask_priority?: string;
+  ask_band?: string;
+  ask_rank?: number;
+  gap_reason?: string;
+  ask_note?: string;
+};
 
 type Lesson = {
   slug: string;
@@ -80,7 +81,6 @@ export default function KisoTranscriptsPage() {
     (l) => l.imamura_status && l.imamura_status !== "missing"
   ).length;
   const understanding = loadUnderstanding();
-  const gapsMd = loadGaps();
   const cs = courseStatus as {
     total?: number;
     vtt_ready?: number;
@@ -93,16 +93,28 @@ export default function KisoTranscriptsPage() {
       status?: string;
       cue_count?: number;
       section?: string;
+      url?: string;
     }>;
   };
   const courseLessons = cs.lessons || [];
+  const gaps = courseGaps as {
+    count?: number;
+    purpose?: string;
+    handoff_hint?: string;
+    updated?: string;
+    bands?: Array<{ id: string; label: string; count: number }>;
+    lessons?: GapLesson[];
+  };
+  const gapLessons = (gaps.lessons || []) as GapLesson[];
+  const gapByBand = (id: string) =>
+    gapLessons.filter((g) => g.ask_priority === id);
 
   return (
     <Shell active="/kiso-transcripts">
       <h1>基礎講座・文字起こし</h1>
       <p className="sub">
         チャットボットの正本は<strong>今村さん字幕</strong>。Jarvis の
-        Vimeo自動字幕は突き合わせ用。方針・把握サマリーを白いカードに、進捗を一覧に出します。
+        Vimeo自動字幕は突き合わせ用。字幕が取れなかった分は下の「今村さん依頼」一覧から渡せます。
         コース:{" "}
         <a
           href="https://westudy.co.jp/course/kami-ooyasan-club"
@@ -135,8 +147,17 @@ export default function KisoTranscriptsPage() {
         </div>
         <div className="card watch-card">
           <header>
+            <span className="lvl warn">字幕依頼</span>
+            <strong>{gaps.count ?? gapLessons.length} 本</strong>
+          </header>
+          <p className="sum">
+            Vimeo自動字幕なし → 今村さんへSRT依頼（下の一覧）
+          </p>
+        </div>
+        <div className="card watch-card">
+          <header>
             <span className={statusClass(imamuraReady ? "ready" : "missing")}>
-              今村
+              今村受領
             </span>
             <strong>{imamuraReady} 本（inbox/正本）</strong>
           </header>
@@ -144,13 +165,80 @@ export default function KisoTranscriptsPage() {
         </div>
       </div>
 
+      <section className="home-section" id="imamura-ask">
+        <div className="home-section-head">
+          <h2 style={{ fontSize: "1.15rem", margin: 0 }}>
+            今村さん依頼：字幕未取得（{gaps.count ?? gapLessons.length}本）
+          </h2>
+        </div>
+        <div
+          style={{
+            padding: "1rem 1.25rem",
+            background: "#fff7ed",
+            border: "1px solid #fdba74",
+            borderRadius: 12,
+            marginBottom: 16,
+            lineHeight: 1.6,
+            color: "#9a3412",
+            fontSize: "0.92rem",
+          }}
+        >
+          <p style={{ margin: "0 0 0.5rem" }}>
+            {gaps.handoff_hint ||
+              "特に P1 を優先で SRT 等いただけると助かります。"}
+          </p>
+          <p style={{ margin: 0 }} className="meta">
+            更新: {gaps.updated || "—"} · 置き場:{" "}
+            <code>基礎講座_文字起こし/imamura/inbox/</code>
+          </p>
+        </div>
+        {(["P1", "P2", "P3"] as const).map((bandId) => {
+          const band = (gaps.bands || []).find((b) => b.id === bandId);
+          const rows = gapByBand(bandId);
+          if (!rows.length) return null;
+          return (
+            <div key={bandId} style={{ marginBottom: 20 }}>
+              <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>
+                {bandId} {band?.label || ""}（{rows.length}）
+              </h3>
+              <ul className="mail-skim">
+                {rows.map((g) => (
+                  <li key={g.slug}>
+                    <div className="mail-row" style={{ cursor: "default" }}>
+                      <span className="mail-row-main">
+                        <span className="mail-subject">
+                          #{g.ask_rank} {g.title || g.slug}
+                        </span>
+                        <span className="mail-preview">
+                          {g.gap_reason || ""}
+                          {g.ask_note ? ` · ${g.ask_note}` : ""}
+                          {" · "}
+                          <span className="meta">({g.slug})</span>
+                          {g.url ? (
+                            <>
+                              {" · "}
+                              <a
+                                href={g.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                WeStudy
+                              </a>
+                            </>
+                          ) : null}
+                        </span>
+                      </span>
+                      <span className="lvl warn">{bandId}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </section>
+
       <UnderstandingBlock text={understanding} />
-      {gapsMd ? (
-        <>
-          <h2 style={{ fontSize: "1.08rem" }}>ギャップと対応策</h2>
-          <UnderstandingBlock text={gapsMd} />
-        </>
-      ) : null}
 
       <section className="home-section">
         <div className="home-section-head">
@@ -164,9 +252,12 @@ export default function KisoTranscriptsPage() {
               status?: string;
               cue_count?: number;
               section?: string;
+              url?: string;
             };
             const st = row.status || row.jarvis_status || "—";
             const ok = st === "vtt_ready" || st === "ready";
+            const url =
+              row.url || `https://westudy.co.jp/lesson/${row.slug}`;
             return (
               <li key={row.slug}>
                 <div className="mail-row" style={{ cursor: "default" }}>
@@ -182,6 +273,10 @@ export default function KisoTranscriptsPage() {
                         ? ` · cues ${row.cue_count}`
                         : ""}
                       {row.jarvis_file ? ` · ${row.jarvis_file}` : ""}
+                      {" · "}
+                      <a href={url} target="_blank" rel="noopener noreferrer">
+                        WeStudy
+                      </a>
                     </span>
                   </span>
                   <span className={statusClass(ok ? "ready" : "missing")}>
