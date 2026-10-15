@@ -7,6 +7,7 @@ import {
   flowforgeOpenUrl,
   mappingSideLabel,
   mixupKindLabel,
+  permissionLevelClass,
   reportLabel,
   sortAgents,
   statusClass,
@@ -14,6 +15,7 @@ import {
   type AgentTeamDept,
   type AgentTeamGenre,
   type GrokPayload,
+  type PermissionsMeta,
 } from "@/lib/agentTeam";
 
 /** 詳細パンくず `/agent-team#genre-{id}` — Next.js はハッシュ着地が弱いので再試行してスクロール */
@@ -25,7 +27,8 @@ function genreHashDomId(): string | null {
 }
 
 const STATUS_FILTERS = ["すべて", "運用確認", "設計中", "運用", "候補", "停止"] as const;
-type Tab = "genre" | "ai" | "grok" | "map";
+type Tab = "genre" | "ai" | "grok" | "map" | "perms";
+type PermsSide = "ai" | "grok" | "site";
 
 /** AI社員の状態シグナル（色・印）— docs/AIエージェントチーム/22_運用状態の識別 */
 const STATUS_LEGEND = [
@@ -47,6 +50,8 @@ type Props = {
   builderUrl: string;
   builderTitle: string;
   grok: GrokPayload;
+  permissionsMeta?: PermissionsMeta;
+  permissionsUpdated?: string;
 };
 
 export default function AgentTeamClient({
@@ -60,6 +65,8 @@ export default function AgentTeamClient({
   builderUrl,
   builderTitle,
   grok,
+  permissionsMeta,
+  permissionsUpdated,
 }: Props) {
   const [tab, setTab] = useState<Tab>("genre");
   const [genreFilter, setGenreFilter] = useState<string>("すべて");
@@ -67,6 +74,7 @@ export default function AgentTeamClient({
   const [deptFilter, setDeptFilter] = useState<string>("すべて");
   const [grokDeptFilter, setGrokDeptFilter] = useState<string>("すべて");
   const [mapFilter, setMapFilter] = useState<string>("すべて");
+  const [permsSide, setPermsSide] = useState<PermsSide>("ai");
 
   useEffect(() => {
     let cancelled = false;
@@ -212,6 +220,7 @@ export default function AgentTeamClient({
           組織図正＝registry
         </span>
         {grok.updated ? ` · Grok正本: ${grok.updated}` : null}
+        {permissionsUpdated ? ` · 権限正本: ${permissionsUpdated}` : null}
       </p>
 
       <div className="at-tabs" role="tablist" aria-label="俯瞰ビュー">
@@ -221,6 +230,12 @@ export default function AgentTeamClient({
             ["ai", "AIエージェントチーム", agents.length],
             ["grok", "Grok Bot", grok.bots.length],
             ["map", "対応表", grok.mapping_counts?.all ?? grok.mappings.length],
+            [
+              "perms",
+              "権限",
+              (permissionsMeta?.site_login_agent_ids?.length || 0) +
+                (permissionsMeta?.site_login_bot_ids?.length || 0),
+            ],
           ] as const
         ).map(([id, label, n]) => (
           <button
@@ -834,6 +849,228 @@ export default function AgentTeamClient({
               </table>
             </div>
           </section>
+        </>
+      ) : null}
+
+      {tab === "perms" ? (
+        <>
+          <p className="at-hint">
+            {permissionsMeta?.note ||
+              "各社員が何ができるか・サイトID／パスワードに触れるかを俯瞰します。値は表示しません。"}
+            {permissionsMeta?.yaml ? (
+              <>
+                {" "}
+                正本: <code>{permissionsMeta.yaml}</code>
+              </>
+            ) : null}
+            {permissionsMeta?.doc ? (
+              <>
+                {" · "}
+                <code>{permissionsMeta.doc}</code>
+              </>
+            ) : null}
+          </p>
+          {permissionsMeta?.defaults?.grok?.secrets_note ? (
+            <p className="at-hint">
+              Grok 既定: {permissionsMeta.defaults.grok.secrets_note}
+            </p>
+          ) : null}
+
+          <div className="at-counts" aria-label="権限ビュー切替">
+            {(
+              [
+                ["ai", "AI社員", agents.length],
+                ["grok", "Grok Bot", grok.bots.length],
+                [
+                  "site",
+                  "サイトログインあり",
+                  (permissionsMeta?.site_login_agent_ids?.length || 0) +
+                    (permissionsMeta?.site_login_bot_ids?.length || 0),
+                ],
+              ] as const
+            ).map(([id, label, n]) => (
+              <button
+                key={id}
+                type="button"
+                className={`at-count ${permsSide === id ? "is-on" : ""}`}
+                onClick={() => setPermsSide(id)}
+              >
+                <span>{label}</span>
+                <strong>{n}</strong>
+              </button>
+            ))}
+          </div>
+
+          {permsSide === "ai" || permsSide === "site" ? (
+            <section className="home-section">
+              <div className="home-section-head">
+                <h2 style={{ fontSize: "1.08rem", margin: 0 }}>
+                  {permsSide === "site"
+                    ? "サイト／ログインに触れる AI社員"
+                    : "AI社員の実行権限"}
+                </h2>
+                <span className="meta">
+                  {permsSide === "site"
+                    ? agents.filter((a) => a.permissions?.has_site_logins).length
+                    : agents.length}
+                  件
+                </span>
+              </div>
+              <div className="at-table-wrap">
+                <table className="at-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>名前</th>
+                      <th>できること</th>
+                      <th>手段（抜粋）</th>
+                      <th>サイト／ログイン</th>
+                      <th>envキー</th>
+                      <th>人が確かめる</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(permsSide === "site"
+                      ? agents.filter((a) => a.permissions?.has_site_logins)
+                      : sortAgents(agents)
+                    ).map((a) => {
+                      const p = a.permissions;
+                      const methods = (p?.methods || [])
+                        .filter((m) => (m.level || "").trim())
+                        .slice(0, 4);
+                      return (
+                        <tr key={a.id}>
+                          <td>
+                            <Link href={`/agent-team/${a.id}`}>{a.id}</Link>
+                          </td>
+                          <td>
+                            <Link href={`/agent-team/${a.id}`}>{a.name}</Link>
+                          </td>
+                          <td>{p?.can_do || a.summary || "—"}</td>
+                          <td className="meta">
+                            {p && !p.methods_filled ? (
+                              <span className="at-perm-stub">CLAUDE未記入</span>
+                            ) : methods.length ? (
+                              <ul className="at-perm-methods">
+                                {methods.map((m) => (
+                                  <li key={m.name}>
+                                    <span
+                                      className={permissionLevelClass(m.level)}
+                                    >
+                                      {m.level || "—"}
+                                    </span>{" "}
+                                    {m.name}
+                                    {m.detail ? (
+                                      <span className="meta">
+                                        {" "}
+                                        — {m.detail}
+                                      </span>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td>
+                            {p?.has_site_logins ? (
+                              <span className="at-perm-site">
+                                {p.site_logins_summary}
+                              </span>
+                            ) : (
+                              <span className="meta">なし</span>
+                            )}
+                          </td>
+                          <td className="meta">
+                            {(p?.env_keys || []).length
+                              ? p!.env_keys.join(" · ")
+                              : "—"}
+                          </td>
+                          <td className="meta">{p?.human_gate || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+
+          {permsSide === "grok" || permsSide === "site" ? (
+            <section className="home-section">
+              <div className="home-section-head">
+                <h2 style={{ fontSize: "1.08rem", margin: 0 }}>
+                  {permsSide === "site"
+                    ? "サイト／ログイン例外の Grok Bot"
+                    : "Grok Bot の実行権限"}
+                </h2>
+                <span className="meta">
+                  {permsSide === "site"
+                    ? grok.bots.filter((b) => b.permissions?.has_site_logins)
+                        .length
+                    : grok.bots.length}
+                  件
+                </span>
+              </div>
+              {permsSide === "site" &&
+              !grok.bots.some((b) => b.permissions?.has_site_logins) ? (
+                <p className="meta">
+                  現時点でサイトID／パスワードを渡している Grok Bot
+                  はありません（既定どおり Jarvis 側のみ）。
+                </p>
+              ) : (
+                <div className="at-table-wrap">
+                  <table className="at-table">
+                    <thead>
+                      <tr>
+                        <th>コード</th>
+                        <th>名前</th>
+                        <th>できること</th>
+                        <th>実行レベル</th>
+                        <th>秘密ポリシー</th>
+                        <th>サイト／ログイン</th>
+                        <th>人が確かめる</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(permsSide === "site"
+                        ? grok.bots.filter((b) => b.permissions?.has_site_logins)
+                        : grok.bots
+                      ).map((b) => {
+                        const p = b.permissions;
+                        return (
+                          <tr key={b.id}>
+                            <td className="meta">{b.code || "—"}</td>
+                            <td>
+                              <strong>{b.name}</strong>
+                            </td>
+                            <td>{p?.can_do || b.work || "—"}</td>
+                            <td className="meta">
+                              {p?.exec_level || b.exec_level || "—"}
+                            </td>
+                            <td className="meta">
+                              {p?.secrets_policy || "none"}
+                            </td>
+                            <td>
+                              {p?.has_site_logins ? (
+                                <span className="at-perm-site">
+                                  {p.site_logins_summary}
+                                </span>
+                              ) : (
+                                <span className="meta">なし</span>
+                              )}
+                            </td>
+                            <td className="meta">{p?.human_gate || "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          ) : null}
         </>
       ) : null}
     </>

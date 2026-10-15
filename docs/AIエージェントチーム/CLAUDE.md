@@ -35,8 +35,11 @@ Drive `★AIエージェントチーム` へも写す（`--no-drive` でオフ�
 
 - [ ] registry に id / path / status を追加  
 - [ ] `00_チーム索引.md` に1行  
-- [ ] `jarvis_agent_team_status_sync.py` を実行（マーカー＋部門ボード）  
-- [ ] 社員の `CLAUDE.md`（正本）を埋める。`AGENTS.md` は日付同期のみ  
+- [ ] `config/agent_team_permissions.yaml` に `can_do`（サイトPWを渡すなら `site_logins` も）  
+- [ ] 社員の `CLAUDE.md` §3 実行権限・必要なら `.env.example` を埋める  
+- [ ] `jarvis_agent_team_status_sync.py` を実行（マーカー＋部門ボード＋権限投影）  
+- [ ] `agentTeam.json` を commit／push（ダッシュ「権限」タブ）  
+- [ ] `AGENTS.md` は日付同期のみ  
 
 ## 報告・対外
 

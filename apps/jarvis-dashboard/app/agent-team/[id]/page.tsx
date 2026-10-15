@@ -9,6 +9,7 @@ import {
   getMappingsForAgent,
   mixupKindHint,
   mixupKindLabel,
+  permissionLevelClass,
   reportLabel,
   statusClass,
 } from "@/lib/agentTeam";
@@ -143,6 +144,82 @@ export default async function AgentTeamDetailPage({
           <p className="meta" style={{ marginTop: 10 }}>
             <Link href="/agent-team">対応表タブで一覧</Link>
           </p>
+        </section>
+
+        <section className="card at-detail-card">
+          <header>
+            <strong>実行権限</strong>
+          </header>
+          {agent.permissions ? (
+            <>
+              <p className="sum">{agent.permissions.can_do || "（未記入）"}</p>
+              <dl className="at-dl">
+                <div>
+                  <dt>サイト／ログイン</dt>
+                  <dd>
+                    {agent.permissions.has_site_logins ? (
+                      <span className="at-perm-site">
+                        {agent.permissions.site_logins_summary}
+                      </span>
+                    ) : (
+                      "なし"
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>envキー（名前のみ）</dt>
+                  <dd>
+                    {(agent.permissions.env_keys || []).length
+                      ? agent.permissions.env_keys.join(" · ")
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>人が確かめる</dt>
+                  <dd>{agent.permissions.human_gate || "—"}</dd>
+                </div>
+              </dl>
+              {agent.permissions.methods?.length ? (
+                <ul className="at-perm-methods" style={{ marginTop: 12 }}>
+                  {agent.permissions.methods.map((m) => (
+                    <li key={m.name}>
+                      <span className={permissionLevelClass(m.level)}>
+                        {m.level || "—"}
+                      </span>{" "}
+                      {m.name}
+                      {m.detail ? (
+                        <span className="meta"> — {m.detail}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="meta" style={{ marginTop: 8 }}>
+                  CLAUDE.md「## 3. 実行権限」が未記入です。
+                </p>
+              )}
+              {agent.permissions.has_site_logins ? (
+                <ul className="at-perm-site-list">
+                  {agent.permissions.site_logins.map((s) => (
+                    <li key={s.service}>
+                      <strong>{s.service}</strong>
+                      {s.access ? ` · ${s.access}` : ""}
+                      {s.note ? (
+                        <span className="meta"> — {s.note}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="meta" style={{ marginTop: 10 }}>
+                <Link href="/agent-team">権限タブで一覧</Link>
+              </p>
+            </>
+          ) : (
+            <p className="meta">
+              権限データがありません。sync 後に agentTeam.json を更新してください。
+            </p>
+          )}
         </section>
 
         <section className="card at-detail-card">

@@ -1,0 +1,54 @@
+# AIエージェントチーム — 実行権限一覧の同期（ダッシュ）
+
+## 方針
+
+社員／Grok Bot が **何ができるか**・**どのサイトの ID／パスワードに触れるか** は、Jarvis ダッシュボード `/agent-team` の **「権限」タブ** で俯瞰する。  
+値（パスワード・トークン本文）は書かない。キー名・サービス名・アクセス種別のみ。
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| 権限俯瞰 YAML | `config/agent_team_permissions.yaml` |
+| 手段の詳細 | 各社員 `CLAUDE.md` の `## 3. 実行権限` |
+| env キー名 | 各社員 `.env.example` |
+| Grok できること | `config/grok_bots_registry.yaml` の `work` / `exec_level` |
+| 投影 | `apps/jarvis-dashboard/data/agentTeam.json`（sync） |
+| 人向け MD | `docs/AIエージェントチーム/25_実行権限一覧_20261015.md`（sync 再生成） |
+
+## トリガー（止まず更新）
+
+次のいずれかで **権限一覧を更新**する（チャットだけで終わらない）:
+
+- AI社員／Grok Bot を **新規追加**した
+- サイトへの **ID・パスワード**／API トークンを渡した・足した・外した
+- `CLAUDE.md` §3 や `.env.example` を変えた
+- 「権限一覧」「何ができるか」「誰がログインできる」と聞かれた
+
+## Jarvis の動作
+
+1. `config/agent_team_permissions.yaml` を直す  
+   - AI: `agents."<id>".can_do` / `site_logins`（サービス名・access・note。**値禁止**）  
+   - Grok: 既定はサイトPWなし。例外だけ `bots."<id>".site_logins` を追記
+2. 社員側は `CLAUDE.md` §3 と `.env.example`（キー名のみ）も揃える（`jarvis-agent-team-secrets.mdc`）
+3. sync:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_agent_team_status_sync.py
+```
+
+4. `apps/jarvis-dashboard/data/agentTeam.json` を **commit＋push**（本番 `/agent-team` 反映）
+5. 報告に「権限タブ更新済み（サイトログインあり: ID一覧）」を1行
+
+## やらないこと
+
+- パスワード・トークン値を YAML／MD／ダッシュ／チャットに書く
+- 権限を渡したのに YAML・sync・push を省略する
+- Grok にサイトPWを渡したのに `bots:` 例外を書かない
+
+## 関連
+
+- 機密二層: `jarvis-agent-team-secrets.mdc` / `docs/AIエージェントチーム/05_機密とenv二層_20261009.md`
+- 状態 sync: `jarvis-agent-team-status.mdc`
+- JarvisBox: `jarvis-grok-jarvisbox-fork.mdc`（秘密は Jarvis）

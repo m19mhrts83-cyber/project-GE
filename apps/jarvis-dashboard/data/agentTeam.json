@@ -1,6 +1,7 @@
 {
-  "updated": "2026-10-15T22:09:44+09:00",
+  "updated": "2026-10-16T07:16:14+09:00",
   "registry_updated": "2026-10-11",
+  "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
   "flowforge_login_hint": "m19m",
   "flowforge_login_email": "m19m.hrts83@gmail.com",
@@ -12,8 +13,8 @@
   },
   "counts": {
     "候補": 27,
-    "設計中": 3,
-    "運用確認": 3,
+    "設計中": 2,
+    "運用確認": 4,
     "運用": 0,
     "停止": 0,
     "運用確認中": 2
@@ -345,7 +346,56 @@
       "flowforge_id": "flow_AZNxdNkT5-DNZyL5pK4AMrbj",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AZNxdNkT5-DNZyL5pK4AMrbj",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/Ss4t4l_MR9p80CVH",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_AZNxdNkT5-DNZyL5pK4AMrbj"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_AZNxdNkT5-DNZyL5pK4AMrbj",
+      "permissions": {
+        "can_do": "パートナー連絡の差分取込・要約・#report 材料（送信は人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "差分要約・報告文面"
+          },
+          {
+            "name": "外部連携（API/GHA）",
+            "level": "○",
+            "detail": "昼: Gmail＋Chatwork → `5.やり取り.md`"
+          },
+          {
+            "name": "CLI / Mac",
+            "level": "○",
+            "detail": "夜: LINEグループ等（CHRLINE／公式エクスポート）。QR時は人"
+          },
+          {
+            "name": "画面操作",
+            "level": "△",
+            "detail": "夜: ダッシュボードを開く（表示）。送信・課金は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [
+          {
+            "service": "Gmail（admin 取込）",
+            "access": "API token",
+            "note": "token_livingsupport 経由。値はチャット禁止"
+          },
+          {
+            "service": "Chatwork",
+            "access": "API／取込スクリプト",
+            "note": "秘密は jarvis_private"
+          },
+          {
+            "service": "LINE（グループ）",
+            "access": "CHRLINE／公式エクスポート",
+            "note": "Mac。QR 時は人"
+          }
+        ],
+        "site_logins_summary": "Gmail（admin 取込）（API token） · Chatwork（API／取込スクリプト） · LINE（グループ）（CHRLINE／公式エクスポート）",
+        "has_site_logins": true,
+        "human_gate": "報告材料の読み直し・返信要否・送信了承。お金・外に出す・消す。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "112",
@@ -372,7 +422,45 @@
       "flowforge_id": "flow_OOxjAupKzLROOX30fZVV6Mzo",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_OOxjAupKzLROOX30fZVV6Mzo",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/LPTt0kOkzNIsshqx",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_OOxjAupKzLROOX30fZVV6Mzo"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_OOxjAupKzLROOX30fZVV6Mzo",
+      "permissions": {
+        "can_do": "LINE 同期・健全性の見回り（候補）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信・課金は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "外に出す・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "113",
@@ -399,7 +487,45 @@
       "flowforge_id": "flow_RM18Xwo_pNXzMLpYwB9mU-pM",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_RM18Xwo_pNXzMLpYwB9mU-pM",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/ldfexQlYPR_rboUN",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_RM18Xwo_pNXzMLpYwB9mU-pM"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_RM18Xwo_pNXzMLpYwB9mU-pM",
+      "permissions": {
+        "can_do": "KURASHIFT 買い進め進捗の見回り（Grok部長と弱対応）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信・課金は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "外に出す・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "114",
@@ -426,7 +552,45 @@
       "flowforge_id": "flow_O1OMOoN2vkVf9SKLD9T_mvBy",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_O1OMOoN2vkVf9SKLD9T_mvBy",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/QIh18CyrhBFyM8Q4",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_O1OMOoN2vkVf9SKLD9T_mvBy"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_O1OMOoN2vkVf9SKLD9T_mvBy",
+      "permissions": {
+        "can_do": "物件一次判定ゲート A/B/C 振分 → Slack（送信は 511）",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`gate_114` / `degraded`"
+          },
+          {
+            "name": "launchd",
+            "level": "○",
+            "detail": "`property-gate-114` 11:15"
+          },
+          {
+            "name": "Slack Webhook",
+            "level": "○",
+            "detail": "`#consult` / `#report`"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "×",
+            "detail": ""
+          },
+          {
+            "name": "Cursor 会話",
+            "level": "△",
+            "detail": "あってもよいが必須ではない"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "115",
@@ -453,7 +617,45 @@
       "flowforge_id": "flow_8Oz3uZqP3nmvAm9-3S4MjiaR",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8Oz3uZqP3nmvAm9-3S4MjiaR",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/VD6WQKft9SS4uRN6",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_8Oz3uZqP3nmvAm9-3S4MjiaR"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_8Oz3uZqP3nmvAm9-3S4MjiaR",
+      "permissions": {
+        "can_do": "修繕進捗の要約（パートナー確認ついで・候補）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信・課金は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "外に出す・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "211",
@@ -480,7 +682,19 @@
       "flowforge_id": "flow_gvDWblu8H38otZzGm66S4Znv",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_gvDWblu8H38otZzGm66S4Znv",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/NoPD9-z7LzE1j9i4",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_gvDWblu8H38otZzGm66S4Znv"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_gvDWblu8H38otZzGm66S4Znv",
+      "permissions": {
+        "can_do": "返信・案内文面の下書き提案（07:30 GHA・送信は人）",
+        "methods": [],
+        "methods_filled": false,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "311",
@@ -507,7 +721,45 @@
       "flowforge_id": "flow_AKQv6lgUEtudWlE5fQUhQnh2",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/LAPAAYJTXS-4Opu8",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_AKQv6lgUEtudWlE5fQUhQnh2"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_AKQv6lgUEtudWlE5fQUhQnh2",
+      "permissions": {
+        "can_do": "送信前の文面・添付チェック（送信クリックは人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "下書き・やり取り.md を読む"
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": "必要なら Gmail 下書き読取（送信はしない）"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "下書きパスの確認"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "最終画面の目視補助まで"
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信クリックは人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "外に出す（送信・投稿）。金・削除も人。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "312",
@@ -534,7 +786,45 @@
       "flowforge_id": "flow_M8SvKC1IDTDi496Vw-DgGjpD",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_M8SvKC1IDTDi496Vw-DgGjpD"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_M8SvKC1IDTDi496Vw-DgGjpD",
+      "permissions": {
+        "can_do": "Todoist 起票・整理の補助（候補）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信・課金は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "外に出す・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "313",
@@ -561,7 +851,45 @@
       "flowforge_id": "flow_6s1nyBIKzluSsdgR-hs9IolD",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/ihP48FmIDAoWdX7L",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_6s1nyBIKzluSsdgR-hs9IolD"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_6s1nyBIKzluSsdgR-hs9IolD",
+      "permissions": {
+        "can_do": "完了候補の確認補助（オーナー確認ゲート維持）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信・課金は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "外に出す・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "314",
@@ -588,7 +916,45 @@
       "flowforge_id": "flow_AzrNV2o5gb9M2JMFxeX5aZSa",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AzrNV2o5gb9M2JMFxeX5aZSa",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/48jyB5R23LwIF8rZ",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_AzrNV2o5gb9M2JMFxeX5aZSa"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_AzrNV2o5gb9M2JMFxeX5aZSa",
+      "permissions": {
+        "can_do": "業務品質の監査メモ（候補）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信・課金は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "外に出す・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "315",
@@ -605,9 +971,9 @@
       "schedule": "Sun 21:00 GHA / 21:45 Mac",
       "tool_assigned": "gha",
       "tool_fit": "B",
-      "tool_notes": "GHA21:00検知→Mac21:45で1回トライ→結果報告",
-      "note": "本線=GHA日曜21:00（--cloud）。Mac補完=日曜21:45 --remediate-once。#ops／未解決は#consult。運用確認中",
-      "summary": "WeStudy/GHA 点検＋（Mac）オプチャ1回トライ復旧",
+      "tool_notes": "GHA21:00検知→Mac21:45で1回トライ→結果報告。Gmail再同意は人",
+      "note": "本線=GHA日曜21:00（--cloud）。Mac補完=日曜21:45 --remediate-once（WeStudy＋オプチャ＋Gmail token）。#ops／未解決は#consult。運用確認中",
+      "summary": "WeStudy/GHA ＋（Mac）オプチャ1回トライ ＋ **Gmail token 切れ／send欠落**",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "",
@@ -615,7 +981,45 @@
       "flowforge_id": "flow_zYjp6A4HDURefJhSm0h_zUtX",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/7yRpKP0SB8QufwBL",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_zYjp6A4HDURefJhSm0h_zUtX"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_zYjp6A4HDURefJhSm0h_zUtX",
+      "permissions": {
+        "can_do": "連携健全性点検・軽微リカバリ提案（QR／Gmail再同意は人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "ログ・MD 件数"
+          },
+          {
+            "name": "外部連携",
+            "level": "○",
+            "detail": "`gh`（週次結果）・Slack Webhook"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`jarvis_ops_health_315.py`（GHAは `--cloud`／Macは `--remediate-once`）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "必要時のみ"
+          },
+          {
+            "name": "画面操作",
+            "level": "△",
+            "detail": "QR は人がスキャン"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "QR 再ログイン、**Gmail ブラウザ再同意**（`reauth_estate_gmail_send.py` 等）、YAML 大量追記、構造限界の受容判断、WeStudy 再実行。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "316",
@@ -642,7 +1046,45 @@
       "flowforge_id": "flow_4UWa-0dMnQxDDf3ZFZXlPSd7",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_4UWa-0dMnQxDDf3ZFZXlPSd7",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/fAyxjk7cr2ZMu2Fj",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_4UWa-0dMnQxDDf3ZFZXlPSd7"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_4UWa-0dMnQxDDf3ZFZXlPSd7",
+      "permissions": {
+        "can_do": "データ分析・集計メモ（候補）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信・課金は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "外に出す・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "411",
@@ -669,7 +1111,47 @@
       "flowforge_id": "flow_0CETz0AjmFUkUarpofjGHAp0",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_0CETz0AjmFUkUarpofjGHAp0",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/AxPinebyYlSm-EaH",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_0CETz0AjmFUkUarpofjGHAp0"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_0CETz0AjmFUkUarpofjGHAp0",
+      "permissions": {
+        "can_do": "Grok inbox／チャンネル材料の取込・要約入口",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "Drive inbox／Todoist／ハブMD"
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": "読取中心"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "inbox poll／Todoistコメント等（送信ゲートは守る）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "採用／却下の最終、対外送信、金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "412",
@@ -696,7 +1178,47 @@
       "flowforge_id": "flow_-9F4-5weQBcdsima3vddp_BQ",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_-9F4-5weQBcdsima3vddp_BQ",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/JyMgvujv9f1NW1wx",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_-9F4-5weQBcdsima3vddp_BQ"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_-9F4-5weQBcdsima3vddp_BQ",
+      "permissions": {
+        "can_do": "AI社員成果と Grok 材料の両系統比較",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "Drive inbox／Todoist／ハブMD"
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": "読取中心"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "inbox poll／Todoistコメント等（送信ゲートは守る）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "採用／却下の最終、対外送信、金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "413",
@@ -723,7 +1245,47 @@
       "flowforge_id": "flow_ke1371iDffRaTdOwDs6WJAtC",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_ke1371iDffRaTdOwDs6WJAtC",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/NCCCuCP0Xu4j6JwN",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_ke1371iDffRaTdOwDs6WJAtC"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_ke1371iDffRaTdOwDs6WJAtC",
+      "permissions": {
+        "can_do": "取捨判断ドラフト（採用最終は人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "Drive inbox／Todoist／ハブMD"
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": "読取中心"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "inbox poll／Todoistコメント等（送信ゲートは守る）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "採用／却下の最終、対外送信、金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "414",
@@ -750,7 +1312,47 @@
       "flowforge_id": "flow_y_dlQIKJ1HHXApQeHD8pBaov",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_y_dlQIKJ1HHXApQeHD8pBaov",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/1JDfXix5qWm3XVux",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_y_dlQIKJ1HHXApQeHD8pBaov"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_y_dlQIKJ1HHXApQeHD8pBaov",
+      "permissions": {
+        "can_do": "採用結果の Grok outbox 返送準備",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "Drive inbox／Todoist／ハブMD"
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": "読取中心"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "inbox poll／Todoistコメント等（送信ゲートは守る）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "採用／却下の最終、対外送信、金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "415",
@@ -777,7 +1379,47 @@
       "flowforge_id": "flow_bfH_iUwm7JmE7XLpfzGIRXL0",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_bfH_iUwm7JmE7XLpfzGIRXL0",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/593ki59o01-pDzeV",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_bfH_iUwm7JmE7XLpfzGIRXL0"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_bfH_iUwm7JmE7XLpfzGIRXL0",
+      "permissions": {
+        "can_do": "Todoist／inbox の二重起票・競合監視",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "Drive inbox／Todoist／ハブMD"
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "△",
+            "detail": "読取中心"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "inbox poll／Todoistコメント等（送信ゲートは守る）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "採用／却下の最終、対外送信、金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "511",
@@ -804,7 +1446,53 @@
       "flowforge_id": "flow_Gr7OKXW7L1ElR7yW_XbBCbNH",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Gr7OKXW7L1ElR7yW_XbBCbNH",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/dGqN792qAaebcXmW",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_Gr7OKXW7L1ElR7yW_XbBCbNH"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_Gr7OKXW7L1ElR7yW_XbBCbNH",
+      "permissions": {
+        "can_do": "問合せ送信準備・ゲート後の Gmail 送信（job／了承ゲート）",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "gate_511"
+          },
+          {
+            "name": "Gmail API",
+            "level": "○",
+            "detail": "問合せ送信（job worker）"
+          },
+          {
+            "name": "Slack",
+            "level": "○",
+            "detail": "結果1行"
+          },
+          {
+            "name": "Vercel API",
+            "level": "○",
+            "detail": "consult-action"
+          },
+          {
+            "name": "Cursor 会話",
+            "level": "△",
+            "detail": "必須ではない"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [
+          {
+            "service": "Gmail（estate 対外）",
+            "access": "API token",
+            "note": "送信は outbound 了承後。token_estate"
+          }
+        ],
+        "site_logins_summary": "Gmail（estate 対外）（API token）",
+        "has_site_logins": true,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "512",
@@ -831,7 +1519,42 @@
       "flowforge_id": "flow_guoe9DBEATd6KvkKT_Jki0Kf",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_guoe9DBEATd6KvkKT_Jki0Kf",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/21BcD2OM1XfI-P30",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_guoe9DBEATd6KvkKT_Jki0Kf"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_guoe9DBEATd6KvkKT_Jki0Kf",
+      "permissions": {
+        "can_do": "仲介返信の取込・整理・停滞見回り（送信は人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "KURASHIFT／yoritoori 系（ゲート遵守）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "対外送信・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "513",
@@ -858,7 +1581,42 @@
       "flowforge_id": "flow_dd86n-D2nu5pFF1iiQiqRcoc",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dd86n-D2nu5pFF1iiQiqRcoc",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/JEmliuimy5D_ypKt",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_dd86n-D2nu5pFF1iiQiqRcoc"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_dd86n-D2nu5pFF1iiQiqRcoc",
+      "permissions": {
+        "can_do": "需給・ペルソナ材料の突合・整形",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "KURASHIFT／yoritoori 系（ゲート遵守）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "対外送信・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "514",
@@ -885,7 +1643,42 @@
       "flowforge_id": "flow_P0B-nu1re0B-l0ngWfHNCIpv",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_P0B-nu1re0B-l0ngWfHNCIpv",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/cSRAHaqC5m7AuA6B",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_P0B-nu1re0B-l0ngWfHNCIpv"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_P0B-nu1re0B-l0ngWfHNCIpv",
+      "permissions": {
+        "can_do": "融資打診の書類・下書き検収（送信は人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "KURASHIFT／yoritoori 系（ゲート遵守）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "対外送信・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "515",
@@ -912,7 +1705,42 @@
       "flowforge_id": "flow_d4e_RNt_JmLxU7eqAEB2laAX",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_d4e_RNt_JmLxU7eqAEB2laAX",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/IREb96M-CuHts57R",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_d4e_RNt_JmLxU7eqAEB2laAX"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_d4e_RNt_JmLxU7eqAEB2laAX",
+      "permissions": {
+        "can_do": "購入後クリエイティブの Drive／Prompt 同期点検",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "KURASHIFT／yoritoori 系（ゲート遵守）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信は人"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "対外送信・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "516",
@@ -922,16 +1750,16 @@
       "department_name": "不動産パイプライン実行室",
       "genre_id": "property",
       "genre_name": "物件",
-      "status": "設計中",
-      "status_icon": "🔵",
+      "status": "運用確認",
+      "status_icon": "🟡",
       "report": "report",
       "trigger": "時間",
-      "schedule": "朝refresh相乗り＋夕方--evening（予定: GHA平日16:00検知）",
-      "tool_assigned": "jarvis",
+      "schedule": "GHA平日16:00＋Mac朝/夕補給",
+      "tool_assigned": "gha",
       "tool_fit": "A+B",
-      "tool_notes": "見守り本線=stall_runner。実行はGrok。定型送信は都度許可不要・非定型は松野確認。二重実行しない",
-      "note": "実行=Grok S2/S4/S9／見守り=516。定型は都度許可不要。Phase D apply済。設計中",
-      "summary": "S2/S4/S9 の見守り（枯渇検知・Drive補給・sync_meta・日次 Slack）。開拓実行はしない",
+      "tool_notes": "見守り本線=GHA平日16:00（skip-refill）。Macは補給保険。実行はGrok。定型は都度許可不要",
+      "note": "運用確認（2026-10-15）。格上げ=週1健全×連続2週→運用。実行=Grok／見守り=516",
+      "summary": "S2/S4/S9 の見守り（枯渇検知・Drive補給・sync_meta・週次 Slack）。開拓実行はしない",
       "flow_summary": "",
       "builder_tag": "〔Grok:S2+S4+S9〕",
       "mixup_kind": "mac_twin",
@@ -939,7 +1767,42 @@
       "flowforge_id": "flow_dCheumorewDolXnfpksSuWKu",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dCheumorewDolXnfpksSuWKu",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/WtPrc_hWAMHTvY3g",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_dCheumorewDolXnfpksSuWKu"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_dCheumorewDolXnfpksSuWKu",
+      "permissions": {
+        "can_do": "業者開拓の枯渇検知・補給・sync（定型送信の正は Grok）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "状況説明・要フォロー要約"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "stall runner／各 vendor_list／vendor_sync／bucho_mail_apply（ゲート遵守）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "KURASHIFT vendors / repair-vendors / mgmt-vendors"
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "送信は人／Grok"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "対外送信・金・削除。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "611",
@@ -966,7 +1829,42 @@
       "flowforge_id": "flow_azD9MyV6Lk3Pn63YMzf9uIFo",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_azD9MyV6Lk3Pn63YMzf9uIFo",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/3K1I4izRqz4gwrD_",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_azD9MyV6Lk3Pn63YMzf9uIFo"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_azD9MyV6Lk3Pn63YMzf9uIFo",
+      "permissions": {
+        "can_do": "リソース制約の週次要約（枠の本番変更は人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "✅",
+            "detail": "週次材料・レビューコメント"
+          },
+          {
+            "name": "CLI",
+            "level": "✅",
+            "detail": "状態 JSON・ログ・`agents_registry` 読取（書込は提案→人確認）"
+          },
+          {
+            "name": "外部連携",
+            "level": "△",
+            "detail": "Slack 投稿は Webhook 配線後。秘密は env のみ"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "利用枠ダッシュボードの目視（値はチャットに貼らない）"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "頻度の本番変更、ツール有料枠の増減、代行チェーン切替（813と連携）。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "612",
@@ -993,7 +1891,21 @@
       "flowforge_id": "flow_1SiiCbmQIq7YL560XmunCwBY",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_1SiiCbmQIq7YL560XmunCwBY",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/lC6FOFZumyQNRtaq",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_1SiiCbmQIq7YL560XmunCwBY"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_1SiiCbmQIq7YL560XmunCwBY",
+      "permissions": {
+        "can_do": "課金・年会費カレンダーのガード見回り",
+        "methods": [],
+        "methods_filled": false,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "613",
@@ -1020,7 +1932,58 @@
       "flowforge_id": "flow_5GzzES3EaIqhlotG9IGGNXjF",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_5GzzES3EaIqhlotG9IGGNXjF",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/v2D2xrS4Gm9bY0bP",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_5GzzES3EaIqhlotG9IGGNXjF"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_5GzzES3EaIqhlotG9IGGNXjF",
+      "permissions": {
+        "can_do": "Zaim 鮮度・二重取込・高確信度学習適用（OTP／曖昧費目は人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "鮮度・学習件数の要約、`#ops` 文面"
+          },
+          {
+            "name": "外部連携（API）",
+            "level": "○",
+            "detail": "Supabase `watch_status`（`zaim_quality`）投影"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`jarvis_zaim_*` 一式（下記）"
+          },
+          {
+            "name": "ブラウザ／Playwright",
+            "level": "○",
+            "detail": "Mac 専有。CSV export・銀行更新ボタン。GHA は check のみ"
+          },
+          {
+            "name": "画面操作（OTP）",
+            "level": "△",
+            "detail": "Messages DB／メール OTP。値はチャットに出さない"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS",
+          "JARVIS_SUPABASE_URL",
+          "JARVIS_SUPABASE_SERVICE_ROLE_KEY",
+          "JARVIS_ZAIM_BANK_SYNC_DISABLE",
+          "JARVIS_ZAIM_BANK_AUTO_UPDATE",
+          "JARVIS_ZAIM_BANK_TRY_OTP"
+        ],
+        "site_logins": [
+          {
+            "service": "Zaim Web",
+            "access": "Playwright・Mac専有",
+            "note": "CSV／銀行更新。OTP は Messages／メール。値はチャット禁止"
+          }
+        ],
+        "site_logins_summary": "Zaim Web（Playwright・Mac専有）",
+        "has_site_logins": true,
+        "human_gate": "`/zaim` の「確認した」「おかしい」、曖昧費目のピッカー、OTP が取れない口座の手動更新。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "711",
@@ -1047,7 +2010,21 @@
       "flowforge_id": "flow_RG36AFjCWVCR-1j3cp2GeLut",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_RG36AFjCWVCR-1j3cp2GeLut",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/QLtPohyVvplCNYxC",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_RG36AFjCWVCR-1j3cp2GeLut"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_RG36AFjCWVCR-1j3cp2GeLut",
+      "permissions": {
+        "can_do": "家族 Journal 週次材料の抽出（評価の正は Grok）",
+        "methods": [],
+        "methods_filled": false,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "712",
@@ -1074,7 +2051,21 @@
       "flowforge_id": "flow_IiBZKm1hgAZJ5AH7Vv6p9ZLl",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_IiBZKm1hgAZJ5AH7Vv6p9ZLl",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/zoaTBOwNhI2dxilt",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_IiBZKm1hgAZJ5AH7Vv6p9ZLl"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_IiBZKm1hgAZJ5AH7Vv6p9ZLl",
+      "permissions": {
+        "can_do": "アドバイザー週次パック材料の整形",
+        "methods": [],
+        "methods_filled": false,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "713",
@@ -1101,7 +2092,21 @@
       "flowforge_id": "flow_kQekwhhUuGTiEJJGOFu-b2zK",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_kQekwhhUuGTiEJJGOFu-b2zK",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/Cd2BWvlQSUkmcggP",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_kQekwhhUuGTiEJJGOFu-b2zK"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_kQekwhhUuGTiEJJGOFu-b2zK",
+      "permissions": {
+        "can_do": "総務・DX コーチ材料の週次整理",
+        "methods": [],
+        "methods_filled": false,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "811",
@@ -1128,7 +2133,45 @@
       "flowforge_id": "flow_ju7-AkIAiaWd0Wustr5WjV-R",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_ju7-AkIAiaWd0Wustr5WjV-R",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/1QCq20LMom0NXais",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_ju7-AkIAiaWd0Wustr5WjV-R"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_ju7-AkIAiaWd0Wustr5WjV-R",
+      "permissions": {
+        "can_do": "ダッシュボード受け入れ確認（設計中〜候補）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "",
+            "detail": ""
+          }
+        ],
+        "methods_filled": false,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す。その他:",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "812",
@@ -1155,7 +2198,45 @@
       "flowforge_id": "flow_Bg6KgS6OkPTWMeQZ1DnJLf59",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Bg6KgS6OkPTWMeQZ1DnJLf59",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/T0sBAYB6aiUdY2Mi",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_Bg6KgS6OkPTWMeQZ1DnJLf59"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_Bg6KgS6OkPTWMeQZ1DnJLf59",
+      "permissions": {
+        "can_do": "残り棚の棚卸し（設計中〜候補）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "",
+            "detail": ""
+          },
+          {
+            "name": "CLI",
+            "level": "",
+            "detail": ""
+          },
+          {
+            "name": "ブラウザ",
+            "level": "",
+            "detail": ""
+          },
+          {
+            "name": "画面操作",
+            "level": "",
+            "detail": ""
+          }
+        ],
+        "methods_filled": false,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す。その他:",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "813",
@@ -1182,7 +2263,40 @@
       "flowforge_id": "flow_whqVaN6KcGoUZnFpJKJjL7jN",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_whqVaN6KcGoUZnFpJKJjL7jN",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/rEX1fW_70HpOd1fN",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_whqVaN6KcGoUZnFpJKJjL7jN"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_whqVaN6KcGoUZnFpJKJjL7jN",
+      "permissions": {
+        "can_do": "代行指揮枠の切替提案（本番切替は人）",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "✅",
+            "detail": "611サマリー・Failログ"
+          },
+          {
+            "name": "CLI",
+            "level": "✅",
+            "detail": "GHA／state 読取"
+          },
+          {
+            "name": "外部連携",
+            "level": "△",
+            "detail": "Slack `#ops`／`#consult`"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "各ツールの利用枠確認（値はチャット禁止）"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "代行チェーンの本番切替、有料枠の増減、複数社員の頻度一括変更。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "814",
@@ -1209,7 +2323,45 @@
       "flowforge_id": "flow_wkFbA0v6bq3ouq9dmpX-cxc1",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_wkFbA0v6bq3ouq9dmpX-cxc1",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/XY-L9PStHQBvqw74",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_wkFbA0v6bq3ouq9dmpX-cxc1"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_wkFbA0v6bq3ouq9dmpX-cxc1",
+      "permissions": {
+        "can_do": "Jarvis ダッシュボード投影の更新ランナー",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "○",
+            "detail": "Supabase投影・所定API"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "定めた runner / push"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "確認用"
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "原則しない"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す。UIの破壊的変更。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "815",
@@ -1236,7 +2388,45 @@
       "flowforge_id": "flow_Xy85GrVwta9qwVlLQcHAwNjI",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Xy85GrVwta9qwVlLQcHAwNjI",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/nLogx2WnuLg8E6N3",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_Xy85GrVwta9qwVlLQcHAwNjI"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_Xy85GrVwta9qwVlLQcHAwNjI",
+      "permissions": {
+        "can_do": "KURASHIFT 投影・UI 更新ランナー",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "○",
+            "detail": "Supabase投影・所定API"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "定めた runner / push"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "確認用"
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "原則しない"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す。UIの破壊的変更。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     },
     {
       "id": "816",
@@ -1263,7 +2453,45 @@
       "flowforge_id": "flow_YzSnhByHLBiMDfPvLPcY7NRM",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_YzSnhByHLBiMDfPvLPcY7NRM",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/aQIrSpSaOyYhEuUi",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_YzSnhByHLBiMDfPvLPcY7NRM"
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_YzSnhByHLBiMDfPvLPcY7NRM",
+      "permissions": {
+        "can_do": "Slack 俯瞰連携・Webhook 投稿補助",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": ""
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "○",
+            "detail": "Supabase投影・所定API"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "定めた runner / push"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "確認用"
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "原則しない"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す。UIの破壊的変更。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      }
     }
   ],
   "grok": {
@@ -1444,6 +2672,17 @@
         "department_name": "参謀室",
         "channel": "参謀室 · Jarvisボックス",
         "exec_level": "低（振り分け中心）",
+        "permissions": {
+          "can_do": "横断優先・QOL・委譲・週次統括・Jarvisボックス振り分け",
+          "exec_level": "低（振り分け中心）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "jarvis_cross",
         "genre_name": "Jarvis横断"
       },
@@ -1460,6 +2699,17 @@
         "department_name": "コーチング部",
         "channel": "コーチング部",
         "exec_level": "中（助言・委譲）",
+        "permissions": {
+          "can_do": "家族・総務・DX統括を束ねる首脳用まとめ・SB週次パック",
+          "exec_level": "中（助言・委譲）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1476,6 +2726,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "Daily・S1–S13振り分け・日報・本日分／仲介返信パック",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1492,6 +2753,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "物件調査・問合せ文案・本日分ゲート",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1508,6 +2780,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "仲介・業者開拓文案",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1524,6 +2807,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "需給三次判断",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1540,6 +2834,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "修繕業者開拓",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1556,6 +2861,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "ペルソナ二次判断",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1572,6 +2888,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "買付交渉論点",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1588,6 +2915,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "融資打診論点",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1604,6 +2942,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "ライフライン手続き材料",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1620,6 +2969,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "管理会社開拓",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1636,6 +2996,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "周辺MAP文案・材料",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1652,6 +3023,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "マイソク文案",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1668,6 +3050,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "ウェルカムボード文案",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1684,6 +3077,17 @@
         "department_name": "不動産賃貸",
         "channel": "不動産Dailyチーム",
         "exec_level": "高（Grok内実務）",
+        "permissions": {
+          "can_do": "神コンセプト命名",
+          "exec_level": "高（Grok内実務）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "property",
         "genre_name": "物件"
       },
@@ -1700,6 +3104,17 @@
         "department_name": "リソース経営",
         "channel": "リソース経営チーム",
         "exec_level": "中（論点・制約）",
+        "permissions": {
+          "can_do": "brush-up・MQ・税務論点・今月のリソース制約",
+          "exec_level": "中（論点・制約）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "resource",
         "genre_name": "リソース・家計"
       },
@@ -1716,6 +3131,17 @@
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
         "exec_level": "中（助言・委譲）",
+        "permissions": {
+          "can_do": "Journal／家族会議読取・振り分け・週次評価",
+          "exec_level": "中（助言・委譲）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1732,6 +3158,17 @@
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
         "exec_level": "中（助言・委譲）",
+        "permissions": {
+          "can_do": "まどか専属コーチング",
+          "exec_level": "中（助言・委譲）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1748,6 +3185,17 @@
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
         "exec_level": "中（助言・委譲）",
+        "permissions": {
+          "can_do": "たまき専属コーチング",
+          "exec_level": "中（助言・委譲）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1764,6 +3212,17 @@
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
         "exec_level": "中（助言・委譲）",
+        "permissions": {
+          "can_do": "さわ専属コーチング",
+          "exec_level": "中（助言・委譲）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1780,6 +3239,17 @@
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
         "exec_level": "中（助言・委譲）",
+        "permissions": {
+          "can_do": "配偶者・夫婦コミュニケーション",
+          "exec_level": "中（助言・委譲）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1796,6 +3266,17 @@
         "department_name": "家族コーチ",
         "channel": "家族コーチングチーム",
         "exec_level": "中（助言・委譲）",
+        "permissions": {
+          "can_do": "空手・遊愛会・Journal",
+          "exec_level": "中（助言・委譲）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1812,6 +3293,17 @@
         "department_name": "アプリ開発",
         "channel": "アプリ開発チーム · 参謀室",
         "exec_level": "低（提案まで）",
+        "permissions": {
+          "can_do": "週次点検・怪しさ・壁打ち（コード実装はJarvis）",
+          "exec_level": "低（提案まで）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "apps",
         "genre_name": "アプリ・俯瞰"
       },
@@ -1828,6 +3320,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "分身・振り分け・宇製造リソース実務・標準学習",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1844,6 +3347,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "磯崎向けコーチング",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1860,6 +3374,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "田中（安全担当・安全DX）",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1876,6 +3401,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "山下向けコーチング",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1892,6 +3428,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "川畑向けコーチング",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1908,6 +3455,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "太田慎二（DX直属）",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1924,6 +3482,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "中島新（企画・遠隔地）",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1940,6 +3509,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "太田章嗣（リソース司令塔）",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1956,6 +3536,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "今井部長（報告・部方針）",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1972,6 +3563,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "大原次長（調整・資料）",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -1988,6 +3590,17 @@
         "department_name": "総務計画",
         "channel": "コーチ ch · アドバイザー ch",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "蜂谷課長（課長層展開）",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -2004,6 +3617,17 @@
         "department_name": "パートナーDX",
         "channel": "パートナーDXコーチングチーム",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "パートナーDX振り分け・入口",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -2020,6 +3644,17 @@
         "department_name": "パートナーDX",
         "channel": "パートナーDXコーチングチーム",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "Shift AI 向け",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -2036,6 +3671,17 @@
         "department_name": "パートナーDX",
         "channel": "パートナーDXコーチングチーム",
         "exec_level": "中",
+        "permissions": {
+          "can_do": "ワールドインテック向け",
+          "exec_level": "中",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "coaching",
         "genre_name": "コーチング"
       },
@@ -2052,6 +3698,17 @@
         "department_name": "天気",
         "channel": "天気お知らせ",
         "exec_level": "低（定型）",
+        "permissions": {
+          "can_do": "朝の天気 ch 直投（ホーク傘下）",
+          "exec_level": "低（定型）",
+          "secrets_policy": "none",
+          "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+          "site_logins": [],
+          "site_logins_summary": "なし",
+          "has_site_logins": false,
+          "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート",
+          "source": "grok_registry+permissions_yaml"
+        },
         "genre_id": "jarvis_cross",
         "genre_name": "Jarvis横断"
       }
@@ -2195,7 +3852,7 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "本線=GHA日曜21:00（--cloud）。Mac補完=日曜21:45 --remediate-once。#ops／未解決は#consult。運用確認中"
+        "role_split": "本線=GHA日曜21:00（--cloud）。Mac補完=日曜21:45 --remediate-once（WeStudy＋オプチャ＋Gmail token）。#ops／未解決は#consult。運用確認中"
       },
       {
         "side": "ai_only",
@@ -2913,5 +4570,27 @@
       "all": 58
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
+  },
+  "permissions_meta": {
+    "defaults": {
+      "ai": {
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private"
+      },
+      "grok": {
+        "secrets_policy": "none",
+        "secrets_note": "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）",
+        "human_gate": "対外送信・金・削除は松野了承／Jarvis ゲート"
+      }
+    },
+    "site_login_agent_ids": [
+      "111",
+      "511",
+      "613"
+    ],
+    "site_login_bot_ids": [],
+    "doc": "docs/AIエージェントチーム/25_実行権限一覧_20261015.md",
+    "yaml": "config/agent_team_permissions.yaml",
+    "note": "サイトID／パスワードを渡したら config/agent_team_permissions.yaml を更新し、本 sync → agentTeam.json を push すること。"
   }
 }

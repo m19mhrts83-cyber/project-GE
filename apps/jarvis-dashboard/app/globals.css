@@ -5163,6 +5163,44 @@ tr.at-map-ai-only .at-map-missing {
   color: #3730a3;
 }
 
+.at-perm-methods {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.at-perm-ok {
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.at-perm-mid {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.at-perm-no {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.at-perm-stub {
+  color: #b45309;
+  font-size: 0.82rem;
+}
+
+.at-perm-site {
+  color: #9a3412;
+  font-weight: 600;
+}
+
+.at-perm-site-list {
+  margin: 10px 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 700px) {
   .at-org {
     grid-template-columns: 1fr;

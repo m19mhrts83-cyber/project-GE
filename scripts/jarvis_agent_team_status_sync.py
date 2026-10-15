@@ -5,8 +5,9 @@
 ルール: docs/AIエージェントチーム/22_運用状態の識別_20261011.md
 Grok: config/grok_bots_registry.yaml（組織・社員・対応表）
 ジャンル: config/agent_team_genres.yaml（上位分類・ダッシュ投影）
+権限: config/agent_team_permissions.yaml（実行権限・サイトログイン俯瞰）
 
-社員フォルダ作成・status 変更のあと必ず実行（Drive 写しも任意で可）。
+社員フォルダ作成・status 変更・権限／秘密の追加のあと必ず実行（Drive 写しも任意で可）。
 ダッシュ投影: apps/jarvis-dashboard/data/agentTeam.json（commit/push で本番反映）
 """
 from __future__ import annotations
@@ -26,6 +27,8 @@ HUB = REPO / "docs" / "AIエージェントチーム"
 REG = HUB / "agents_registry.yaml"
 GROK_REG = REPO / "config" / "grok_bots_registry.yaml"
 GENRE_REG = REPO / "config" / "agent_team_genres.yaml"
+PERMS_REG = REPO / "config" / "agent_team_permissions.yaml"
+PERM_MD = HUB / "25_実行権限一覧_20261015.md"
 DASH_JSON = REPO / "apps" / "jarvis-dashboard" / "data" / "agentTeam.json"
 # 閲覧共有URLの正本（git追跡）。ローカル上書きは .jarvis_state 側
 FLOWFORGE_SHARE_CONFIG = REPO / "config" / "flowforge_share_urls.json"
@@ -215,6 +218,283 @@ def _extract_flow_summary(flow_md: Path) -> str:
     return ""
 
 
+def load_permissions_registry() -> dict:
+    if not PERMS_REG.is_file():
+        return {}
+    return yaml.safe_load(PERMS_REG.read_text(encoding="utf-8")) or {}
+
+
+def _parse_claude_permission_methods(claude: Path) -> tuple[list[dict], str]:
+    """CLAUDE.md「## 3. 実行権限」表と人が確かめる行を抽出."""
+    if not claude.is_file():
+        return [], ""
+    text = claude.read_text(encoding="utf-8")
+    m = re.search(
+        r"##\s*3\.\s*実行権限\s*\n(.*?)(?=\n##\s*\d|\n##\s*状態|\Z)",
+        text,
+        re.DOTALL,
+    )
+    if not m:
+        return [], ""
+    body = m.group(1)
+    methods: list[dict] = []
+    for line in body.splitlines():
+        line = line.strip()
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        name, level = cells[0], cells[1]
+        detail = cells[2] if len(cells) > 2 else ""
+        if name in ("方法", "---") or set(name) <= {"-", "—", "–"}:
+            continue
+        if not name:
+            continue
+        # 空の level/detail だけの雛形行は「未記入」扱いのため残す
+        methods.append(
+            {
+                "name": name,
+                "level": level or "",
+                "detail": detail or "",
+            }
+        )
+    human = ""
+    hm = re.search(
+        r"\*\*人が確かめる[^*]*\*\*\s*[:：]?\s*(.+)",
+        body,
+    )
+    if hm:
+        human = re.sub(r"\s+", " ", hm.group(1)).strip()
+    return methods, human
+
+
+def _parse_env_example_keys(folder: Path) -> list[str]:
+    """`.env.example` のキー名のみ（値は捨てる・例コメント含む未設定キーも拾う）."""
+    path = folder / ".env.example"
+    if not path.is_file():
+        return []
+    keys: list[str] = []
+    seen: set[str] = set()
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("# この社員") or line.startswith("# 追加"):
+            continue
+        # "# KEY=" or "KEY=" or "# 例:" skipped
+        if line.startswith("# 例"):
+            continue
+        m = re.match(r"^#?\s*([A-Z][A-Z0-9_]*)\s*=", line)
+        if not m:
+            continue
+        key = m.group(1)
+        if key in ("SOME_API_KEY",):
+            continue
+        if key not in seen:
+            seen.add(key)
+            keys.append(key)
+    return keys
+
+
+def _methods_filled(methods: list[dict]) -> bool:
+    """level か detail が1つでも埋まっていれば記入済み."""
+    for row in methods:
+        if (row.get("level") or "").strip() or (row.get("detail") or "").strip():
+            return True
+    return False
+
+
+def _site_logins_summary(logins: list[dict]) -> str:
+    if not logins:
+        return "なし"
+    parts = []
+    for s in logins:
+        svc = (s.get("service") or "").strip()
+        acc = (s.get("access") or "").strip()
+        if svc and acc:
+            parts.append(f"{svc}（{acc}）")
+        elif svc:
+            parts.append(svc)
+    return " · ".join(parts) if parts else "なし"
+
+
+def build_agent_permissions(
+    aid: str,
+    folder: Path,
+    perms_reg: dict,
+    registry_note: str = "",
+) -> dict:
+    """AI社員1体の権限オブジェクト（ダッシュ投影用）."""
+    defaults = (perms_reg.get("defaults") or {}).get("ai") or {}
+    override = ((perms_reg.get("agents") or {}).get(str(aid)) or {})
+    methods, human_from_md = _parse_claude_permission_methods(folder / "CLAUDE.md")
+    env_keys = _parse_env_example_keys(folder)
+    site_logins = list(override.get("site_logins") or [])
+    can_do = (
+        (override.get("can_do") or "").strip()
+        or (registry_note or "").strip()
+        or ""
+    )
+    human_gate = (
+        (override.get("human_gate") or "").strip()
+        or human_from_md
+        or (defaults.get("human_gate") or "お金・外に出す・消す")
+    )
+    filled = _methods_filled(methods)
+    has_site = bool(site_logins)
+    return {
+        "can_do": can_do[:280],
+        "methods": methods,
+        "methods_filled": filled,
+        "env_keys": env_keys,
+        "site_logins": site_logins,
+        "site_logins_summary": _site_logins_summary(site_logins),
+        "has_site_logins": has_site,
+        "human_gate": human_gate[:320],
+        "secrets_note": (override.get("secrets_note") or defaults.get("secrets_note") or ""),
+        "source": "claude+permissions_yaml",
+    }
+
+
+def build_bot_permissions(bid: str, bot_row: dict, perms_reg: dict) -> dict:
+    """Grok Bot 1体の権限オブジェクト."""
+    defaults = (perms_reg.get("defaults") or {}).get("grok") or {}
+    override = ((perms_reg.get("bots") or {}).get(str(bid)) or {})
+    site_logins = list(override.get("site_logins") or [])
+    can_do = (
+        (override.get("can_do") or "").strip()
+        or (bot_row.get("work") or "").strip()
+    )
+    secrets_policy = (
+        (override.get("secrets_policy") or "").strip()
+        or (defaults.get("secrets_policy") or "none")
+    )
+    return {
+        "can_do": can_do[:280],
+        "exec_level": bot_row.get("exec_level") or "",
+        "secrets_policy": secrets_policy,
+        "secrets_note": (
+            override.get("secrets_note")
+            or defaults.get("secrets_note")
+            or ""
+        ),
+        "site_logins": site_logins,
+        "site_logins_summary": _site_logins_summary(site_logins),
+        "has_site_logins": bool(site_logins),
+        "human_gate": (
+            (override.get("human_gate") or "").strip()
+            or (defaults.get("human_gate") or "")
+        ),
+        "source": "grok_registry+permissions_yaml",
+    }
+
+
+def write_permissions_md(
+    agent_list: list[dict],
+    grok_bots: list[dict],
+    perms_reg: dict,
+    dry: bool,
+) -> Path:
+    """人向け一覧 MD を sync で再生成."""
+    today = date.today().isoformat()
+    lines = [
+        "# 実行権限・秘密アクセス一覧",
+        "",
+        f"**更新**: {today}（`jarvis_agent_team_status_sync.py` が再生成）",
+        f"**正本 YAML**: [`config/agent_team_permissions.yaml`](../../config/agent_team_permissions.yaml)",
+        f"**ダッシュ**: `/agent-team` →「権限」タブ",
+        "",
+        "## 方針",
+        "",
+        "- **値は書かない**（キー名・サービス名・アクセス種別のみ）",
+        "- AI社員: `CLAUDE.md` §3 ＋ 本 YAML の `can_do`／`site_logins` ＋ `.env.example`",
+        "- Grok Bot: 既定はサイトID／PWなし（JarvisBox フォーク）。例外だけ YAML `bots:` に追記",
+        "",
+        "## AIエージェントチーム",
+        "",
+        "| ID | 名前 | できること | サイト／ログイン | envキー | 人が確かめる |",
+        "|---|---|---|---|---|---|",
+    ]
+    for a in agent_list:
+        p = a.get("permissions") or {}
+        keys = " · ".join(p.get("env_keys") or []) or "—"
+        lines.append(
+            "| `{id}` | {name} | {can} | {site} | {keys} | {gate} |".format(
+                id=a.get("id") or "",
+                name=a.get("name") or "",
+                can=(p.get("can_do") or "—").replace("|", "/"),
+                site=(p.get("site_logins_summary") or "なし").replace("|", "/"),
+                keys=keys.replace("|", "/"),
+                gate=(p.get("human_gate") or "—").replace("|", "/")[:80],
+            )
+        )
+    lines += [
+        "",
+        "## Grok Bot（秘密は原則なし）",
+        "",
+        f"> {(perms_reg.get('defaults') or {}).get('grok', {}).get('secrets_note') or ''}",
+        "",
+        "| コード | 名前 | できること | 実行レベル | サイト／ログイン |",
+        "|---|---|---|---|---|",
+    ]
+    for b in grok_bots:
+        p = b.get("permissions") or {}
+        code = b.get("code") or "—"
+        lines.append(
+            "| {code} | {name} | {can} | {lvl} | {site} |".format(
+                code=code,
+                name=b.get("name") or "",
+                can=(p.get("can_do") or "—").replace("|", "/"),
+                lvl=(p.get("exec_level") or b.get("exec_level") or "—").replace("|", "/"),
+                site=(p.get("site_logins_summary") or "なし").replace("|", "/"),
+            )
+        )
+    lines += [
+        "",
+        "## サイトログインあり（要注目）",
+        "",
+    ]
+    flagged = [
+        a
+        for a in agent_list
+        if (a.get("permissions") or {}).get("has_site_logins")
+    ] + [
+        b
+        for b in grok_bots
+        if (b.get("permissions") or {}).get("has_site_logins")
+    ]
+    if not flagged:
+        lines.append("（現時点で Grok 側の例外なし。AI社員は上表の「サイト／ログイン」列）")
+    else:
+        lines.append("| 側 | ID | サービス |")
+        lines.append("|---|---|---|")
+        for row in flagged:
+            side = "AI" if "department_id" in row and str(row.get("id", "")).isdigit() else "Grok"
+            # AI ids are numeric strings; bots are not
+            rid = str(row.get("id") or "")
+            side = "AI" if rid.isdigit() else "Grok"
+            p = row.get("permissions") or {}
+            for s in p.get("site_logins") or []:
+                lines.append(
+                    f"| {side} | `{rid}` | {(s.get('service') or '').replace('|', '/')} |"
+                )
+    lines += [
+        "",
+        "## 更新手順",
+        "",
+        "1. `config/agent_team_permissions.yaml` と社員 `CLAUDE.md` / `.env.example` を直す",
+        "2. `python scripts/jarvis_agent_team_status_sync.py`",
+        "3. `apps/jarvis-dashboard/data/agentTeam.json` を commit＋push（本番ダッシュ反映）",
+        "",
+    ]
+    body = "\n".join(lines)
+    if not dry:
+        PERM_MD.write_text(body, encoding="utf-8")
+        print(f"  permissions MD: {PERM_MD.relative_to(REPO)}")
+    else:
+        print(f"  permissions MD (dry): → {PERM_MD}")
+    return PERM_MD
+
+
 def load_grok_registry() -> dict:
     if not GROK_REG.is_file():
         return {}
@@ -365,7 +645,9 @@ def flowforge_edit_via_account_chooser(flow_url: str) -> str:
     )
 
 
-def build_grok_payload(agents_reg: dict, grok_reg: dict) -> dict:
+def build_grok_payload(
+    agents_reg: dict, grok_reg: dict, perms_reg: dict | None = None
+) -> dict:
     """Grok 組織・一覧・AIチーム対応表をダッシュ用に組み立てる."""
     if not grok_reg:
         return {
@@ -377,6 +659,7 @@ def build_grok_payload(agents_reg: dict, grok_reg: dict) -> dict:
             "note": "config/grok_bots_registry.yaml がありません",
         }
 
+    perms_reg = perms_reg if perms_reg is not None else load_permissions_registry()
     bot_by_id: dict[str, dict] = {}
     dept_out = []
     bots_out = []
@@ -402,6 +685,7 @@ def build_grok_payload(agents_reg: dict, grok_reg: dict) -> dict:
                 "channel": dept.get("channel") or "",
                 "exec_level": dept.get("exec_level") or "",
             }
+            row["permissions"] = build_bot_permissions(bid, row, perms_reg)
             bot_by_id[bid] = row
             bots_out.append(row)
             bot_ids.append(bid)
@@ -529,9 +813,10 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
     builder = data.get("builder_source") or {}
     now = datetime.now(JST).isoformat(timespec="seconds")
     genre_reg = load_genre_registry()
+    perms_reg = load_permissions_registry()
     ai_genre_map, grok_genre_map, genres_skel = build_genre_maps(genre_reg)
     genre_name = {g["id"]: g["name"] for g in genres_skel}
-    grok_payload = build_grok_payload(data, load_grok_registry())
+    grok_payload = build_grok_payload(data, load_grok_registry(), perms_reg)
     share_map = load_flowforge_share_map()
 
     for b in grok_payload.get("bots") or []:
@@ -588,6 +873,12 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
             or ""
         )
         gid = ai_genre_map.get(str(dept_id), "")
+        permissions = build_agent_permissions(
+            str(aid),
+            folder,
+            perms_reg,
+            registry_note=a.get("note") or "",
+        )
         agent_list.append(
             {
                 "id": str(aid),
@@ -615,6 +906,7 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
                 "flowforge_url": ff_url,
                 "flowforge_share_url": share,
                 "flowforge_edit_url": flowforge_edit_via_account_chooser(ff_url),
+                "permissions": permissions,
             }
         )
 
@@ -625,9 +917,19 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
         list(grok_payload.get("mappings") or []),
     )
 
+    site_login_agent_ids = [
+        a["id"] for a in agent_list if (a.get("permissions") or {}).get("has_site_logins")
+    ]
+    site_login_bot_ids = [
+        b["id"]
+        for b in (grok_payload.get("bots") or [])
+        if (b.get("permissions") or {}).get("has_site_logins")
+    ]
+
     payload = {
         "updated": now,
         "registry_updated": data.get("updated") or "",
+        "permissions_updated": perms_reg.get("updated") or "",
         "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
         "flowforge_login_hint": FLOWFORGE_LOGIN_HINT,
         "flowforge_login_email": FLOWFORGE_LOGIN_EMAIL,
@@ -647,7 +949,21 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
         "departments": dept_list,
         "agents": agent_list,
         "grok": grok_payload,
+        "permissions_meta": {
+            "defaults": perms_reg.get("defaults") or {},
+            "site_login_agent_ids": site_login_agent_ids,
+            "site_login_bot_ids": site_login_bot_ids,
+            "doc": "docs/AIエージェントチーム/25_実行権限一覧_20261015.md",
+            "yaml": "config/agent_team_permissions.yaml",
+            "note": (
+                "サイトID／パスワードを渡したら config/agent_team_permissions.yaml を更新し、"
+                "本 sync → agentTeam.json を push すること。"
+            ),
+        },
     }
+    write_permissions_md(
+        agent_list, list(grok_payload.get("bots") or []), perms_reg, dry
+    )
     if dry:
         print(
             f"  dashboard JSON (dry): {len(agent_list)} agents / "
@@ -663,7 +979,8 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
     print(
         f"  dashboard: {DASH_JSON.relative_to(REPO)} "
         f"({len(agent_list)} agents / {len(grok_payload.get('bots') or [])} grok / "
-        f"{len(genres)} genres)"
+        f"{len(genres)} genres / site_logins AI={len(site_login_agent_ids)} "
+        f"Grok={len(site_login_bot_ids)})"
     )
     return DASH_JSON
 

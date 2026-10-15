@@ -2,6 +2,59 @@ import data from "@/data/agentTeam.json";
 
 export type AgentStatus = "候補" | "設計中" | "運用確認" | "運用" | "停止" | string;
 
+export type PermissionMethod = {
+  name: string;
+  level: string;
+  detail: string;
+};
+
+export type SiteLogin = {
+  service: string;
+  access?: string;
+  note?: string;
+};
+
+export type AgentPermissions = {
+  can_do: string;
+  methods: PermissionMethod[];
+  methods_filled: boolean;
+  env_keys: string[];
+  site_logins: SiteLogin[];
+  site_logins_summary: string;
+  has_site_logins: boolean;
+  human_gate: string;
+  secrets_note?: string;
+  source?: string;
+};
+
+export type BotPermissions = {
+  can_do: string;
+  exec_level: string;
+  secrets_policy: string;
+  secrets_note?: string;
+  site_logins: SiteLogin[];
+  site_logins_summary: string;
+  has_site_logins: boolean;
+  human_gate: string;
+  source?: string;
+};
+
+export type PermissionsMeta = {
+  defaults?: {
+    ai?: { human_gate?: string; secrets_note?: string };
+    grok?: {
+      secrets_policy?: string;
+      secrets_note?: string;
+      human_gate?: string;
+    };
+  };
+  site_login_agent_ids?: string[];
+  site_login_bot_ids?: string[];
+  doc?: string;
+  yaml?: string;
+  note?: string;
+};
+
 export type AgentTeamAgent = {
   id: string;
   name: string;
@@ -28,6 +81,7 @@ export type AgentTeamAgent = {
   flowforge_url: string;
   flowforge_share_url?: string;
   flowforge_edit_url?: string;
+  permissions?: AgentPermissions;
 };
 
 export type AgentTeamDept = {
@@ -80,6 +134,7 @@ export type GrokBot = {
   exec_level: string;
   genre_id?: string;
   genre_name?: string;
+  permissions?: BotPermissions;
 };
 
 export type GrokDept = {
@@ -128,6 +183,7 @@ export type GrokPayload = {
 export type AgentTeamPayload = {
   updated: string;
   registry_updated: string;
+  permissions_updated?: string;
   flowforge_base: string;
   flowforge_login_hint: string;
   flowforge_login_email?: string;
@@ -139,7 +195,20 @@ export type AgentTeamPayload = {
   departments: AgentTeamDept[];
   agents: AgentTeamAgent[];
   grok?: GrokPayload;
+  permissions_meta?: PermissionsMeta;
 };
+
+export function getPermissionsMeta(): PermissionsMeta {
+  return getAgentTeam().permissions_meta || {};
+}
+
+export function permissionLevelClass(level: string): string {
+  const t = (level || "").trim();
+  if (t === "○" || t === "✅" || t === "〇") return "at-perm-ok";
+  if (t === "△") return "at-perm-mid";
+  if (t === "×" || t === "✕" || t === "✗") return "at-perm-no";
+  return "";
+}
 
 const STATUS_RANK: Record<string, number> = {
   運用確認: 0,
