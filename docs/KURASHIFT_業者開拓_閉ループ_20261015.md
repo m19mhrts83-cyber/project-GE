@@ -29,7 +29,7 @@ S4（修繕）・S9（管理会社）も同じ「Mac 側手渡し」がボトル
 | 誰 | やること |
 |---|---|
 | **stall runner（Jarvis）** | 枯渇検知・outbox へ kickoff・inbox 依頼 archive・各 sync・`sync_meta`・障害 `#ops` |
-| **516 業者開拓フォロー係** | 合図（時間／届いた／失敗見回り）・日次 `#report`・手順正本 |
+| **516 業者開拓フォロー係** | 合図（時間／届いた／失敗見回り）・**週次** `#report`（healthy）／即時 `#ops`・手順正本 |
 | **Grok S2/S4/S9** | 定型の Web 送信・`--mark`（都度許可不要）。非定型は松野確認後。キュー薄いときは **再依頼しない**（自律 refill 待ち） |
 | **不動産部長** | 日報メールに `--mark` 集約。再生成依頼 MD を書かない |
 | **ホーク** | 週次横断。日次件数は 516 |
@@ -50,7 +50,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ## 受け入れ
 
 1. キューが薄くても依頼 MD なしで outbox に kickoff が載る（S2/S4/S9）  
-2. 夕方 `#report` に件数サマリ（レーン横断）  
+2. 夕方見回り。healthy なら週次 `#report`（Grokサポート見守り）。異常は即時 `#ops`   
 3. 各 UI で stall／キュー残が見える  
 4. Mac 未接続時は送信を捏造せず `#ops`  
 

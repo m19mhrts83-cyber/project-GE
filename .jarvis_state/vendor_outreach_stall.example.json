@@ -3,6 +3,7 @@
   "last_refill_at": null,
   "last_ops_alert_at": null,
   "last_daily_report_at": null,
+  "last_weekly_report_at": null,
   "last_sync_at": null,
   "last_run_at": null,
   "last_result": null,
@@ -23,5 +24,5 @@
       "last_sync_at": null
     }
   },
-  "notes": "S2/S4/S9 stall。disabled:true で補給・日次 Slack を止める"
+  "notes": "S2/S4/S9 stall。disabled:true で補給・週次 Slack を止める。#report は週次ゲート（healthy）"
 }

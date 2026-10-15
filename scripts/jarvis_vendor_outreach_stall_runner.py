@@ -541,7 +541,7 @@ def post_slack(*, channel: str, text: str, dry_run: bool) -> dict[str, Any]:
         "--text",
         text,
         "--username",
-        "516業者開拓フォロー係",
+        "516 業者開拓フォロー係",
     ]
     r = subprocess.run(
         cmd, cwd=str(REPO), env=os.environ.copy(), capture_output=True, text=True
@@ -766,9 +766,90 @@ def run_lane(
     }
 
 
-def build_multi_report(results: list[dict[str, Any]]) -> str:
-    day = now_jst().strftime("%Y-%m-%d")
-    lines = [f"*業者開拓デイリー* {day}（516）"]
+_STALL_STATUS_JA = {
+    "ok": "正常",
+    "needs_refill": "キュー補給待ち",
+    "bridge_down": "Mac未接続",
+    "stale_marks": "送信停滞（markなし）",
+}
+
+
+def _stall_status_ja(status: str) -> str:
+    return _STALL_STATUS_JA.get(status, status or "—")
+
+
+def _week_period_label(state: dict[str, Any]) -> str:
+    """週次レポートの期間表示（最終週次〜今日、無ければ直近7日）。"""
+    today = now_jst().date()
+    raw = (
+        state.get("last_weekly_report_at")
+        or state.get("last_daily_report_at")
+        or ""
+    )
+    start: date | None = None
+    if raw:
+        try:
+            start = date.fromisoformat(str(raw)[:10]) + timedelta(days=1)
+        except ValueError:
+            start = None
+    if start is None or start > today:
+        start = today - timedelta(days=6)
+    return f"{start.isoformat()} 〜 {today.isoformat()}"
+
+
+def all_lanes_healthy(results: list[dict[str, Any]]) -> bool:
+    if not results:
+        return False
+    return all(r.get("stall_status") == "ok" and not r.get("ops_needed") for r in results)
+
+
+def should_post_weekly_report(
+    state: dict[str, Any],
+    results: list[dict[str, Any]],
+    *,
+    force: bool = False,
+) -> tuple[bool, str]:
+    """healthy なときだけ週次 #report。月曜 or 最終から7日以上。"""
+    if force:
+        return True, "force"
+    if not all_lanes_healthy(results):
+        return False, "not_healthy（異常は #ops のみ）"
+    today = now_jst().date()
+    last_raw = (
+        state.get("last_weekly_report_at")
+        or state.get("last_daily_report_at")
+        or ""
+    )
+    last_d: date | None = None
+    if last_raw:
+        try:
+            last_d = date.fromisoformat(str(last_raw)[:10])
+        except ValueError:
+            last_d = None
+    if last_d == today:
+        return False, "already_sent_today"
+    if last_d is None:
+        return True, "first"
+    if (today - last_d).days >= 7:
+        return True, "elapsed_7d"
+    # 月曜（weekday 0）かつ最終が前週以前
+    if today.weekday() == 0 and last_d < today:
+        return True, "monday"
+    return False, f"wait（last={last_d.isoformat()} weekday={today.weekday()}）"
+
+
+def build_support_weekly_report(
+    results: list[dict[str, Any]], *, state: dict[str, Any] | None = None
+) -> str:
+    """Grokサポート見守り・週次サマリ（レーン擬似表）。"""
+    st = state or {}
+    period = _week_period_label(st)
+    lines = [
+        "[516] *Grokサポート見守り｜業者開拓*",
+        "発信: 516業者開拓フォロー係（開拓の送信・文案は Grok S2/S4/S9）。",
+        f"期間: {period}",
+        "",
+    ]
     for r in results:
         q = r["q"]
         by = q.get("by_status") or {}
@@ -784,20 +865,43 @@ def build_multi_report(results: list[dict[str, Any]]) -> str:
             if r.get("sync_ok") is True
             else ("失敗" if r.get("sync_ok") is False else "—")
         )
+        status_ja = _stall_status_ja(str(r.get("stall_status") or ""))
         lines.extend(
             [
-                f"*{r['label']}* stall={r['stall_status']}",
-                f"・本日contacted {q.get('contacted_today', 0)} · "
-                f"キュー残 {q.get('pending_discovered', 0)} "
-                f"（先頭{q.get('queue_ready', 0)}/枠{q.get('daily_limit', 0)}）· "
+                f"*{r['label']}*  状態: {status_ja}",
+                f"・接触 {q.get('contacted_today', 0)}／"
+                f"キュー残 {q.get('pending_discovered', 0)}"
+                f"（先頭{q.get('queue_ready', 0)}/枠{q.get('daily_limit', 0)}）／"
                 f"要フォロー {q.get('followup', 0)}",
-                f"・status 未送{by.get('pending', 0)} 探索{by.get('discovered', 0)} "
-                f"済{by.get('contacted', 0)} 返信{by.get('replied', 0)}",
+                f"・未送{by.get('pending', 0)}／探索{by.get('discovered', 0)}／"
+                f"済{by.get('contacted', 0)}／返信{by.get('replied', 0)}",
                 f"・refill {refill_line} · sync {sync_line}",
-                f"・UI {r['url']}",
+                f"・<{r['url']}|UIを開く>",
+                "",
             ]
         )
-    return "\n".join(lines)
+    lines.append("次: 異常時は #ops。詳細は KURASHIFT 各レーン。")
+    return "\n".join(lines).rstrip()
+
+
+def build_multi_report(results: list[dict[str, Any]], *, state: dict[str, Any] | None = None) -> str:
+    """後方互換エイリアス → 週次サポート報告。"""
+    return build_support_weekly_report(results, state=state)
+
+
+def build_ops_alert(r: dict[str, Any]) -> str:
+    lane = r.get("lane") or "?"
+    return (
+        f"[516] *Grokサポート見守り｜要確認*（{r.get('label') or lane}）\n"
+        "発信: 516業者開拓フォロー係（連携障害／送信停滞の見守り。開拓送信は Grok）。\n"
+        f"・理由: {r.get('ops_reason') or '—'}\n"
+        f"・状態: {_stall_status_ja(str(r.get('stall_status') or ''))}\n"
+        f"・キュー残: {r['q']['pending_discovered']} "
+        f"（送信可能 {r['q']['queue_ready']}）\n"
+        f"・最終 contacted: {r['q'].get('last_contacted') or '—'}\n"
+        f"・<{r['url']}|UIを開く>\n"
+        f"・処置: `--apply --lane {lane} --force-refill`"
+    )
 
 
 def parse_lanes(raw: str) -> list[str]:
@@ -862,32 +966,28 @@ def run(*, args: argparse.Namespace) -> int:
         results.append(r)
 
         if r["ops_needed"] and (args.apply or args.dry_run or args.ops_alert):
-            ops_text = (
-                f"*{r['label']} · 連携障害*\n"
-                f"・理由: {r['ops_reason']}\n"
-                f"・キュー残: {r['q']['pending_discovered']} "
-                f"（送信可能 {r['q']['queue_ready']}）\n"
-                f"・最終 contacted: {r['q'].get('last_contacted') or '—'}\n"
-                f"・UI: {r['url']}\n"
-                f"・処置: `--apply --lane {lane} --force-refill`"
-            )
+            ops_text = build_ops_alert(r)
             pr = post_slack(channel="ops", text=ops_text, dry_run=dry)
             if pr.get("ok") and not dry:
                 r["lst"]["last_ops_alert_at"] = now_iso()
                 if lane == "s2":
                     state["last_ops_alert_at"] = r["lst"]["last_ops_alert_at"]
 
-    do_daily = bool(args.daily_report or args.evening)
-    if do_daily and results:
-        last_daily = str(state.get("last_daily_report_at") or "")[:10]
-        today = now_jst().strftime("%Y-%m-%d")
-        if last_daily == today and not args.force_report and not dry:
-            print("# daily report skipped: already sent today")
+    # evening／daily-report: 見回りは毎日。#report は週次ゲート（healthy のみ）
+    do_weekly_slot = bool(args.daily_report or args.evening)
+    if do_weekly_slot and results:
+        ok_post, reason = should_post_weekly_report(
+            state, results, force=bool(args.force_report)
+        )
+        if not ok_post:
+            print(f"# weekly report skipped: {reason}")
         else:
-            text = build_multi_report(results)
+            text = build_support_weekly_report(results, state=state)
             pr = post_slack(channel="report", text=text, dry_run=dry)
             if pr.get("ok") and not dry:
-                state["last_daily_report_at"] = now_iso()
+                state["last_weekly_report_at"] = now_iso()
+                # 互換: 旧キーも更新
+                state["last_daily_report_at"] = state["last_weekly_report_at"]
 
     state["last_result"] = {
         "lanes": {
@@ -934,9 +1034,21 @@ def main() -> int:
         action="store_true",
         help="outbox 補給をしない（GHA見守り用。env JARVIS_VENDOR_OUTREACH_STALL_SKIP_REFILL=1 でも可）",
     )
-    ap.add_argument("--daily-report", action="store_true", help="Slack #report に日次サマリ")
-    ap.add_argument("--evening", action="store_true", help="夕方枠（= --daily-report）")
-    ap.add_argument("--force-report", action="store_true", help="同日再投稿を許可")
+    ap.add_argument(
+        "--daily-report",
+        action="store_true",
+        help="夕方枠の別名。見回り後、healthy なら週次 #report を検討",
+    )
+    ap.add_argument(
+        "--evening",
+        action="store_true",
+        help="夕方枠（見回り＋週次 #report ゲート。異常は #ops）",
+    )
+    ap.add_argument(
+        "--force-report",
+        action="store_true",
+        help="週次ゲートを無視して #report を投稿（デバッグ）",
+    )
     ap.add_argument("--ops-alert", action="store_true", help="条件時に #ops")
     ap.add_argument("--skip-sync", action="store_true", help="vendor_sync をしない")
     ap.add_argument("--json", action="store_true", help="詳細 JSON を stdout")

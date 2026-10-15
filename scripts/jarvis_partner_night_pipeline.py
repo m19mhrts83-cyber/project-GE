@@ -271,6 +271,13 @@ def main() -> int:
         print(f"❌ missing {REPORT}", file=sys.stderr)
         return 2
 
+    # 人間語の失敗＋次の一手（特記があるときだけ next を渡す）
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_partner_slack_report import format_partner_failures  # noqa: E402
+
+    fail_text, fail_next = format_partner_failures(fails)
+    next_arg = fail_next if fails else ""
+
     report_cmd = [
         PY,
         str(REPORT),
@@ -283,9 +290,9 @@ def main() -> int:
         "--line",
         str(total_line),
         "--failures",
-        "／".join(fails) if fails else "なし",
+        fail_text,
         "--next",
-        "ダッシュボードと 5.やり取り.md を確認",
+        next_arg,
     ]
     if args.dry_run_slack:
         report_cmd.append("--dry-run")

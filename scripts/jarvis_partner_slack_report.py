@@ -2,9 +2,10 @@
 """パートナー連絡整理係（111）— Slack #report へ短報。
 
 通常は更新があるときだけ投稿。運用確認期間（既定〜2026-10-18）は
-更新ゼロでも「出なかった」を投稿して生存確認する。
+更新ゼロでも1行の生存確認を投稿する。
+失敗は人間語＋次の一手。定型の「見る／次」は繰り返さない（特記のみ）。
 投稿本体は jarvis_slack_webhook_post.py（Incoming Webhook）。
-LLM 不使用（定型テンプレのみ）。
+LLM 不使用。
 
 例:
   python scripts/jarvis_partner_slack_report.py --frame day \\
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 from datetime import date, datetime
@@ -38,6 +40,80 @@ JST = ZoneInfo("Asia/Tokyo")
 _REPORT_ZERO_UNTIL = date(2026, 10, 18)
 
 _FRAME_JA = {"day": "昼", "night": "夜", "manual": "副合図"}
+
+# 機械語失敗 →（人間語, 次の一手）
+_FAIL_HUMAN: list[tuple[re.Pattern[str], str, str]] = [
+    (
+        re.compile(r"^line exit=(\d+)$", re.I),
+        "LINE取込が異常終了（CHRLINE／認証まわり・exit={g1}）",
+        "Mac版LINE終了を確認 → run_patch.sh 再実行 or #ops",
+    ),
+    (
+        re.compile(r"^Mac版LINE起動中"),
+        "Mac版LINEと競合のため LINE をスキップ",
+        "Mac版LINEを終了して夜枠を再実行",
+    ),
+    (
+        re.compile(r"^export_gmail exit=(\d+)$", re.I),
+        "LINE公式エクスポートの Gmail→inbox 取込失敗（exit={g1}）",
+        "estate Gmail／inbox を確認",
+    ),
+    (
+        re.compile(r"^export_inbox exit=(\d+)$", re.I),
+        "LINE公式エクスポートの inbox→やり取り 取込失敗（exit={g1}）",
+        "000_共通/LINE公式エクスポート/inbox を確認",
+    ),
+    (
+        re.compile(r"^run_patch\.sh missing$", re.I),
+        "LINE実行環境の run_patch.sh が無い",
+        "git-repos/line_unofficial_poc を確認",
+    ),
+    (
+        re.compile(r"^gmail exit=(\d+)$", re.I),
+        "Gmail→やり取り 取込失敗（exit={g1}）",
+        "admin token／scripts を確認 or #ops",
+    ),
+    (
+        re.compile(r"^chatwork exit=(\d+)$", re.I),
+        "Chatwork→やり取り 取込失敗（exit={g1}）",
+        "CHATWORK_API_TOKEN／scripts を確認 or #ops",
+    ),
+]
+
+
+def humanize_partner_fail(raw: str) -> tuple[str, str]:
+    """機械語の失敗1件 →（人間語, 次の一手）。未知はそのまま。"""
+    s = (raw or "").strip()
+    if not s or s in ("なし", "none", "-"):
+        return "なし", ""
+    for pat, msg, nxt in _FAIL_HUMAN:
+        m = pat.search(s)
+        if m:
+            out = msg
+            for i, g in enumerate(m.groups(), start=1):
+                out = out.replace(f"{{g{i}}}", g)
+            return out, nxt
+    m2 = re.match(r"^(\w+)\s+exit=(\d+)$", s, re.I)
+    if m2:
+        return (
+            f"{m2.group(1)} が異常終了（exit={m2.group(2)}）",
+            "ログ確認 → 再実行 or #ops",
+        )
+    return s, ""
+
+
+def format_partner_failures(fails: list[str]) -> tuple[str, str]:
+    """失敗リスト → Slack 用（結合文, 代表の次の一手）。"""
+    if not fails:
+        return "なし", ""
+    msgs: list[str] = []
+    nexts: list[str] = []
+    for f in fails:
+        msg, nxt = humanize_partner_fail(f)
+        msgs.append(msg)
+        if nxt and nxt not in nexts:
+            nexts.append(nxt)
+    return "／".join(msgs), "／".join(nexts)
 
 
 def _archive_report(frame: str, text: str) -> Path | None:
@@ -72,38 +148,55 @@ def _report_zero_alive() -> bool:
 
 
 def _build_text(args: argparse.Namespace, total: int) -> str:
-    """判断しやすい短報（番号先頭・スマホ1画面）。"""
+    """特記のみ。ゼロ・失敗なしは1行。定型の「見る／次」は繰り返さない。"""
     frame = (args.frame or "manual").strip()
     frame_ja = _FRAME_JA.get(frame, frame)
-    fail = (args.failures or "なし").strip() or "なし"
-    fail_ok = fail in ("なし", "none", "-")
-
-    lines = [
-        f"【報告】{AGENT_ID} {AGENT_NAME}・{frame_ja}",
-        f"・件数: Gmail+{args.gmail} / Chatwork+{args.chatwork}",
-    ]
-    if int(args.line) or frame in ("night", "manual"):
-        lines[-1] = lines[-1] + f" / LINE+{args.line}"
-    if int(args.other):
-        lines.append(f"・その他: +{args.other}")
-    if total <= 0:
-        lines.append("・結果: 更新なし（出なかった）")
-    else:
-        lines.append(f"・合計追記: {total}")
-    lines.append(f"・失敗: {'なし' if fail_ok else fail}")
-    if frame == "night":
-        lines.append("・見る: ダッシュボード → 要対応は 5.やり取り.md / Gmail")
-    else:
-        lines.append("・見る: Gmail 要対応 → 詳細は 5.やり取り.md（LINEは夜枠）")
+    fail_raw = (args.failures or "なし").strip() or "なし"
+    fail_ok = fail_raw in ("なし", "none", "-")
+    note = (args.note or "").strip()
     next_ = (args.next or "").strip()
-    if total <= 0 and not next_ and fail_ok:
-        next_ = "対応不要（生存確認のみ）"
-    if next_:
-        lines.append(f"・次: {next_}")
+
+    # 機械語が残っていたら人間語化（パイプライン経由でも CLI 直でも）
+    if not fail_ok:
+        parts = [p.strip() for p in re.split(r"[／/]", fail_raw) if p.strip()]
+        msgs: list[str] = []
+        auto_nexts: list[str] = []
+        for p in parts:
+            msg, nxt = humanize_partner_fail(p)
+            msgs.append(msg)
+            if nxt and nxt not in auto_nexts:
+                auto_nexts.append(nxt)
+        fail = "／".join(msgs)
+        if not next_ and auto_nexts:
+            next_ = "／".join(auto_nexts)
+    else:
+        fail = fail_raw
+
+    # 更新ゼロ・失敗なし → 1行（生存確認）
+    if total <= 0 and fail_ok and not note and not next_:
+        return f"【{AGENT_ID}・{frame_ja}】更新なし（生存確認）"
+
+    lines = [f"【{AGENT_ID} {AGENT_NAME}・{frame_ja}】"]
+    if total > 0:
+        parts = [f"Gmail+{args.gmail}", f"Chatwork+{args.chatwork}"]
+        if int(args.line) or frame in ("night", "manual"):
+            parts.append(f"LINE+{args.line}")
+        if int(args.other):
+            parts.append(f"その他+{args.other}")
+        lines.append(f"・件数: {' / '.join(parts)}（合計+{total}）")
     elif not fail_ok:
-        lines.append("・次: 失敗行を確認（再実行 or #ops）")
-    if args.note:
-        lines.append(f"・メモ: {args.note.strip()}")
+        lines.append("・件数: 更新なし")
+
+    if not fail_ok:
+        lines.append(f"・失敗: {fail}")
+        if next_:
+            lines.append(f"・次: {next_}")
+        else:
+            lines.append("・次: 失敗内容を確認（再実行 or #ops）")
+    if note:
+        lines.append(f"・特記: {note}")
+    if next_ and fail_ok:
+        lines.append(f"・次: {next_}")
     return "\n".join(lines)
 
 
