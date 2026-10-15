@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""S2 業者開拓 — キュー枯渇・未着を検知し、自律 refill / sync / Slack 報告。
+"""業者開拓 stall — S2/S4/S9 のキュー枯渇・未着を検知し、自律 refill / sync / Slack。
 
 対外 Web 送信はしない（Grok／人が送る）。Mac 側の補給・投影・報告だけ。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --dry-run
-  ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply
-  ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --force-refill
-  ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --daily-report
+  ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --lane all
+  ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --lane s9 --force-refill
   ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --evening
 """
 from __future__ import annotations
@@ -21,7 +20,7 @@ import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[1]
@@ -34,37 +33,69 @@ from jarvis_bucho_bridge_lib import (  # noqa: E402
     sanitize_title,
 )
 from jarvis_kurashift_vendor_list import (  # noqa: E402
-    LIST_PATH,
+    LIST_PATH as S2_LIST,
     build_batch_week_payload,
     grok_weekly_kickoff,
-    load_list,
-    next_pending,
+    load_list as load_s2,
+    next_pending as s2_next_pending,
     outreach_phase_settings,
-    summary as vendor_summary,
+    summary as s2_summary,
+)
+from jarvis_kurashift_mgmt_vendor_list import (  # noqa: E402
+    LIST_PATH as S9_LIST,
+    load_list as load_s9,
+    next_pending as s9_next_pending,
+    summary as s9_summary,
+)
+from jarvis_kurashift_repair_vendor_list import (  # noqa: E402
+    LIST_PATH as S4_LIST,
+    load_list as load_s4,
+    next_for_contact as s4_next_for_contact,
+    summary as s4_summary,
 )
 
 JST = ZoneInfo("Asia/Tokyo")
 STATE_PATH = REPO / ".jarvis_state" / "vendor_outreach_stall.json"
 EXAMPLE_PATH = REPO / ".jarvis_state" / "vendor_outreach_stall.example.json"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
-VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 SLACK_POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
-KURASHIFT_VENDORS_URL = "https://jarvis-trade-desk.vercel.app/realestate/vendors"
-SYNC_META_KEY = "vendor_outreach_stall"
 
-# inbox ファイル名／本文に出る再生成依頼のシグナル
+LANE_CFG: dict[str, dict[str, Any]] = {
+    "s2": {
+        "label": "S2地場紹介",
+        "sync": REPO / "scripts" / "jarvis_kurashift_vendor_sync.py",
+        "meta_key": "vendor_outreach_stall",
+        "url": "https://jarvis-trade-desk.vercel.app/realestate/vendors",
+        "list_path": S2_LIST,
+    },
+    "s4": {
+        "label": "S4修繕",
+        "sync": REPO / "scripts" / "jarvis_kurashift_repair_vendor_sync.py",
+        "meta_key": "vendor_outreach_stall_s4",
+        "url": "https://jarvis-trade-desk.vercel.app/realestate/repair-vendors",
+        "list_path": S4_LIST,
+    },
+    "s9": {
+        "label": "S9管理会社",
+        "sync": REPO / "scripts" / "jarvis_kurashift_mgmt_vendor_sync.py",
+        "meta_key": "vendor_outreach_stall_s9",
+        "url": "https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors",
+        "list_path": S9_LIST,
+    },
+}
+
 REFILL_NAME_RE = re.compile(
-    r"S2.*(週次|キュー|再生成|next\s*3|--next)|週次キュー再生成|--next\s*3",
+    r"S2.*(週次|キュー|再生成|next\s*3|--next)|週次キュー再生成|--next\s*3|"
+    r"S9.*(事前|キュー|再生成|--next)|S4.*(キュー|生存|再生成)",
     re.I,
 )
 REFILL_BODY_RE = re.compile(
-    r"(--batch-week|--next\s*3|S2週次キュー再生成|週次バッチ.*再生成)",
+    r"(--batch-week|--next\s*3|S2週次キュー再生成|週次バッチ.*再生成|"
+    r"s9_precheck|--next\s*2\s*--balanced|S4.*生存キュー)",
     re.I,
 )
 
-# 同じ日に二重 refill しない（force 除く）
 REFILL_COOLDOWN_HOURS = 12
-# contacted/mark が無い日が続いたら #ops
 STALE_MARK_BUSINESS_DAYS = 2
 
 
@@ -81,6 +112,7 @@ def load_state() -> dict[str, Any]:
         try:
             data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
             if isinstance(data, dict):
+                data.setdefault("lanes", {})
                 return data
         except Exception:
             pass
@@ -88,10 +120,11 @@ def load_state() -> dict[str, Any]:
         try:
             data = json.loads(EXAMPLE_PATH.read_text(encoding="utf-8"))
             if isinstance(data, dict):
+                data.setdefault("lanes", {})
                 return dict(data)
         except Exception:
             pass
-    return {"disabled": False}
+    return {"disabled": False, "lanes": {}}
 
 
 def save_state(state: dict[str, Any]) -> None:
@@ -116,7 +149,6 @@ def parse_iso(s: str | None) -> datetime | None:
 
 
 def business_days_between(start: date, end: date) -> int:
-    """start 翌日〜end までの平日数（土日のみ除外）。"""
     if end <= start:
         return 0
     n = 0
@@ -128,10 +160,27 @@ def business_days_between(start: date, end: date) -> int:
     return n
 
 
-def count_followup(data: dict[str, Any]) -> int:
+def lane_state(state: dict[str, Any], lane: str) -> dict[str, Any]:
+    lanes = state.setdefault("lanes", {})
+    if not isinstance(lanes, dict):
+        lanes = {}
+        state["lanes"] = lanes
+    cur = lanes.get(lane)
+    if not isinstance(cur, dict):
+        cur = {}
+        # migrate s2 top-level keys
+        if lane == "s2":
+            for k in ("last_refill_at", "last_ops_alert_at", "last_sync_at"):
+                if state.get(k) and not cur.get(k):
+                    cur[k] = state[k]
+        lanes[lane] = cur
+    return cur
+
+
+def count_followup(vendors: list[Any]) -> int:
     today = date.today()
     n = 0
-    for v in data.get("vendors") or []:
+    for v in vendors:
         if not isinstance(v, dict):
             continue
         st = str(v.get("status") or "")
@@ -152,23 +201,22 @@ def count_followup(data: dict[str, Any]) -> int:
     return n
 
 
-def contacted_today(data: dict[str, Any]) -> int:
+def contacted_today(vendors: list[Any]) -> int:
     today = date.today().isoformat()
     n = 0
-    for v in data.get("vendors") or []:
+    for v in vendors:
         if not isinstance(v, dict):
             continue
         if str(v.get("status") or "") not in {"contacted", "replied"}:
             continue
-        ca = str(v.get("contacted_at") or "")[:10]
-        if ca == today:
+        if str(v.get("contacted_at") or "")[:10] == today:
             n += 1
     return n
 
 
-def last_contacted_date(data: dict[str, Any]) -> date | None:
+def last_contacted_date(vendors: list[Any]) -> date | None:
     latest: date | None = None
-    for v in data.get("vendors") or []:
+    for v in vendors:
         if not isinstance(v, dict):
             continue
         if str(v.get("status") or "") not in {"contacted", "replied"}:
@@ -185,28 +233,109 @@ def last_contacted_date(data: dict[str, Any]) -> date | None:
     return latest
 
 
-def assess_queue(data: dict[str, Any]) -> dict[str, Any]:
+def assess_s2() -> dict[str, Any]:
+    data = load_s2()
     settings = data.get("settings") or {}
     phase, daily = outreach_phase_settings(settings)
-    pending = next_pending(limit=max(daily * 7, daily))
-    queue_n = len(pending)
-    summ = vendor_summary(data)
+    pending = s2_next_pending(limit=max(daily * 7, daily))
+    summ = s2_summary(data)
     by = summ.get("by_status") or {}
+    vendors = list(data.get("vendors") or [])
     pending_n = int(by.get("pending") or 0) + int(by.get("discovered") or 0)
     return {
+        "lane": "s2",
         "phase": phase,
         "daily_limit": daily,
-        "queue_ready": queue_n,
+        "queue_ready": len(pending),
         "pending_discovered": pending_n,
-        "needs_refill": queue_n < daily,
-        "followup": count_followup(data),
-        "contacted_today": contacted_today(data),
+        "needs_refill": len(pending) < daily,
+        "followup": count_followup(vendors),
+        "contacted_today": contacted_today(vendors),
         "last_contacted": (
-            last_contacted_date(data).isoformat() if last_contacted_date(data) else None
+            last_contacted_date(vendors).isoformat()
+            if last_contacted_date(vendors)
+            else None
         ),
         "by_status": by,
         "total": summ.get("total") or 0,
+        "extra": {},
     }
+
+
+def assess_s9() -> dict[str, Any]:
+    data = load_s9()
+    settings = data.get("settings") or {}
+    daily = int(settings.get("daily_outreach_limit") or 2)
+    if daily < 1:
+        daily = 2
+    items = s9_next_pending(limit=max(daily * 3, daily), balanced=True)
+    summ = s9_summary()
+    by = summ.get("by_status") or {}
+    vendors = list(data.get("vendors") or [])
+    pending_n = int(by.get("pending") or 0) + int(by.get("discovered") or 0)
+    return {
+        "lane": "s9",
+        "phase": None,
+        "daily_limit": daily,
+        "queue_ready": len(items),
+        "pending_discovered": pending_n,
+        "needs_refill": len(items) < daily,
+        "followup": count_followup(vendors),
+        "contacted_today": contacted_today(vendors),
+        "last_contacted": (
+            last_contacted_date(vendors).isoformat()
+            if last_contacted_date(vendors)
+            else None
+        ),
+        "by_status": by,
+        "total": summ.get("total") or 0,
+        "extra": {
+            "alive_ok": summ.get("alive_ok"),
+            "vacancy_listing_ok": summ.get("vacancy_listing_ok"),
+        },
+    }
+
+
+def assess_s4() -> dict[str, Any]:
+    data = load_s4()
+    settings = data.get("settings") or {}
+    daily = int(settings.get("daily_outreach_limit") or data.get("daily_limit") or 2)
+    if daily < 1:
+        daily = 2
+    items = s4_next_for_contact(limit=max(daily * 3, daily), alive_ok_first=True)
+    summ = s4_summary()
+    by = summ.get("by_status") or {}
+    vendors = [v for v in (data.get("vendors") or []) if isinstance(v, dict)]
+    pending_n = int(by.get("pending") or 0) + int(by.get("discovered") or 0)
+    alive_queue = len(
+        [v for v in items if str(v.get("alive_status") or "") == "ok"]
+    )
+    return {
+        "lane": "s4",
+        "phase": None,
+        "daily_limit": daily,
+        "queue_ready": len(items),
+        "pending_discovered": pending_n,
+        # S4 は探索中心のため「薄い」＝生存OK連絡候補が日次枠未満
+        "needs_refill": alive_queue < daily and pending_n < daily,
+        "followup": count_followup(vendors),
+        "contacted_today": contacted_today(vendors),
+        "last_contacted": (
+            last_contacted_date(vendors).isoformat()
+            if last_contacted_date(vendors)
+            else None
+        ),
+        "by_status": by,
+        "total": summ.get("total") or 0,
+        "extra": {"alive_ok": summ.get("alive_ok"), "alive_queue": alive_queue},
+    }
+
+
+ASSESSORS: dict[str, Callable[[], dict[str, Any]]] = {
+    "s2": assess_s2,
+    "s4": assess_s4,
+    "s9": assess_s9,
+}
 
 
 def find_inbox_refill_requests() -> list[Path]:
@@ -261,19 +390,14 @@ def bridge_available() -> bool:
         return False
 
 
-def write_s2_batch_outbox(*, dry_run: bool) -> dict[str, Any]:
-    payload = build_batch_week_payload(batch_days=7)
-    kickoff = grok_weekly_kickoff(payload)
-    # 自律 refill 後は再依頼ループを止める文言に差し替え
-    kickoff = kickoff.replace(
-        "キュー残り0または不足: 松野へ Jarvis で --batch-week --grok-kickoff 再生成を依頼（Instructions §週次バッチ）",
-        "キュー残り0または不足: 部長ボックスへの再依頼は不要。"
-        "516／Jarvis の自律 refill（stall runner）を待つ。"
-        "2営業日空いたら Slack #ops を確認",
-    )
-    body = kickoff + "\n\n" + json.dumps(payload, ensure_ascii=False, indent=2)
-    batch_id = str(payload.get("batch_id") or iso_week_fallback())
-    title = f"S2週次バッチ_{batch_id}_自律refill"
+def write_outbox_md(
+    *,
+    action: str,
+    title: str,
+    body: str,
+    dry_run: bool,
+    priority: str = "high",
+) -> dict[str, Any]:
     day = now_jst().strftime("%Y-%m-%d")
     hm = now_jst().strftime("%H%M")
     name = f"{day}_{hm}_{sanitize_title(title)}.md"
@@ -285,46 +409,115 @@ def write_s2_batch_outbox(*, dry_run: bool) -> dict[str, Any]:
     text = (
         f"# Jarvis → Grok\n"
         f"target: re\n"
-        f"priority: high\n"
-        f"action: s2_batch\n"
+        f"priority: {priority}\n"
+        f"action: {action}\n"
         f"title: {title}\n"
         f"---\n"
         f"{body}\n"
     )
     if dry_run:
         print(f"# dry-run outbox → {path}")
-        print(text[:800] + ("…" if len(text) > 800 else ""))
-        return {
-            "ok": True,
-            "dry_run": True,
-            "path": str(path),
-            "batch_id": batch_id,
-            "vendors": len(payload.get("vendors") or []),
-        }
+        print(text[:600] + ("…" if len(text) > 600 else ""))
+        return {"ok": True, "dry_run": True, "path": str(path)}
     path.write_text(text, encoding="utf-8")
-    print(f"📎 S2 refill outbox: {path} vendors={len(payload.get('vendors') or [])}")
-    return {
+    print(f"📎 refill outbox: {path}")
+    return {"ok": True, "path": str(path)}
+
+
+def write_s2_refill(*, dry_run: bool) -> dict[str, Any]:
+    payload = build_batch_week_payload(batch_days=7)
+    kickoff = grok_weekly_kickoff(payload)
+    kickoff = kickoff.replace(
+        "キュー残り0または不足: 松野へ Jarvis で --batch-week --grok-kickoff 再生成を依頼（Instructions §週次バッチ）",
+        "キュー残り0または不足: 部長ボックスへの再依頼は不要。"
+        "516／Jarvis の自律 refill（stall runner）を待つ。"
+        "2営業日空いたら Slack #ops を確認",
+    )
+    body = kickoff + "\n\n" + json.dumps(payload, ensure_ascii=False, indent=2)
+    batch_id = str(payload.get("batch_id") or "")
+    title = f"S2週次バッチ_{batch_id}_自律refill"
+    out = write_outbox_md(action="s2_batch", title=title, body=body, dry_run=dry_run)
+    out["batch_id"] = batch_id
+    out["vendors"] = len(payload.get("vendors") or [])
+    return out
+
+
+def write_s9_refill(*, dry_run: bool) -> dict[str, Any]:
+    items = s9_next_pending(limit=2, balanced=True)
+    payload = {
         "ok": True,
-        "path": str(path),
-        "batch_id": batch_id,
-        "vendors": len(payload.get("vendors") or []),
+        "mode": "s9_precheck",
+        "count": len(items),
+        "balanced": True,
+        "vendors": items,
+        "note": (
+            "自律 refill。再依頼不要。"
+            "本日分で事前確認メール下書き〜送信（ゲート遵守）。"
+        ),
     }
+    body = (
+        "【S9 事前確認キュー · 自律 refill】\n"
+        "`--next 2 --balanced` 相当。キュー不足時の再依頼 MD は不要"
+        "（516／stall runner が補給）。2営業日空いたら Slack #ops。\n\n"
+        + json.dumps(payload, ensure_ascii=False, indent=2)
+    )
+    out = write_outbox_md(
+        action="s9_precheck",
+        title="S9事前確認_自律refill",
+        body=body,
+        dry_run=dry_run,
+    )
+    out["vendors"] = len(items)
+    out["batch_id"] = f"s9-{date.today().isoformat()}"
+    return out
 
 
-def iso_week_fallback() -> str:
-    iso = date.today().isocalendar()
-    return f"{iso.year}-W{iso.week:02d}"
+def write_s4_refill(*, dry_run: bool) -> dict[str, Any]:
+    items = s4_next_for_contact(limit=4, alive_ok_first=True)
+    payload = {
+        "ok": True,
+        "mode": "s4_alive_queue",
+        "count": len(items),
+        "vendors": items,
+        "note": (
+            "生存OK優先の連絡候補。探索は別途可。"
+            "再依頼不要（stall runner 補給）。"
+        ),
+    }
+    body = (
+        "【S4 修繕生存キュー · 自律 refill】\n"
+        "alive_ok 優先の連絡候補。再依頼 MD は不要。"
+        "2営業日空いたら Slack #ops。\n\n"
+        + json.dumps(payload, ensure_ascii=False, indent=2)
+    )
+    out = write_outbox_md(
+        action="s4_queue",
+        title="S4修繕生存キュー_自律refill",
+        body=body,
+        dry_run=dry_run,
+    )
+    out["vendors"] = len(items)
+    out["batch_id"] = f"s4-{date.today().isoformat()}"
+    return out
 
 
-def run_vendor_sync(*, dry_run: bool) -> dict[str, Any]:
-    if not VENDOR_SYNC.is_file():
-        return {"ok": False, "error": "vendor_sync missing"}
+REFILLERS: dict[str, Callable[..., dict[str, Any]]] = {
+    "s2": write_s2_refill,
+    "s4": write_s4_refill,
+    "s9": write_s9_refill,
+}
+
+
+def run_sync(script: Path, *, dry_run: bool) -> dict[str, Any]:
+    if not script.is_file():
+        return {"ok": False, "error": f"missing {script.name}"}
     if dry_run:
-        print("# dry-run vendor_sync --apply")
+        print(f"# dry-run {script.name} --apply")
         return {"ok": True, "dry_run": True}
-    cmd = [str(PY if PY.is_file() else sys.executable), str(VENDOR_SYNC), "--apply"]
-    env = os.environ.copy()
-    r = subprocess.run(cmd, cwd=str(REPO), env=env, capture_output=True, text=True)
+    cmd = [str(PY if PY.is_file() else sys.executable), str(script), "--apply"]
+    r = subprocess.run(
+        cmd, cwd=str(REPO), env=os.environ.copy(), capture_output=True, text=True
+    )
     if r.stdout:
         print(r.stdout.rstrip())
     if r.returncode != 0:
@@ -336,11 +529,10 @@ def run_vendor_sync(*, dry_run: bool) -> dict[str, Any]:
 
 def post_slack(*, channel: str, text: str, dry_run: bool) -> dict[str, Any]:
     if dry_run:
-        print(f"# dry-run slack #{channel}\n{text[:600]}")
+        print(f"# dry-run slack #{channel}\n{text[:800]}")
         return {"ok": True, "dry_run": True, "channel": channel}
     if not SLACK_POST.is_file():
         return {"ok": False, "error": "slack post script missing"}
-    # env 必須
     cmd = [
         str(PY if PY.is_file() else sys.executable),
         str(SLACK_POST),
@@ -351,7 +543,9 @@ def post_slack(*, channel: str, text: str, dry_run: bool) -> dict[str, Any]:
         "--username",
         "516業者開拓フォロー係",
     ]
-    r = subprocess.run(cmd, cwd=str(REPO), env=os.environ.copy(), capture_output=True, text=True)
+    r = subprocess.run(
+        cmd, cwd=str(REPO), env=os.environ.copy(), capture_output=True, text=True
+    )
     if r.stdout:
         print(r.stdout.rstrip())
     if r.returncode != 0:
@@ -361,29 +555,29 @@ def post_slack(*, channel: str, text: str, dry_run: bool) -> dict[str, Any]:
     return {"ok": True, "channel": channel}
 
 
-def push_sync_meta(summary: dict[str, Any], *, dry_run: bool) -> None:
+def push_sync_meta(key: str, summary: dict[str, Any], *, dry_run: bool) -> None:
     if dry_run:
-        print(f"# dry-run sync_meta {SYNC_META_KEY}")
+        print(f"# dry-run sync_meta {key}")
         return
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
-    key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
-    if not url or not key:
+    skey = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    if not url or not skey:
         print("# sync_meta skip: JARVIS_SUPABASE_* missing", file=sys.stderr)
         return
     try:
         from supabase import create_client
 
-        sb = create_client(url, key)
+        sb = create_client(url, skey)
         now = now_iso()
         sb.table("sync_meta").upsert(
             {
-                "key": SYNC_META_KEY,
+                "key": key,
                 "value": json.dumps(summary, ensure_ascii=False),
                 "updated_at": now,
             },
             on_conflict="key",
         ).execute()
-        print(f"📎 sync_meta upserted: {SYNC_META_KEY}")
+        print(f"📎 sync_meta upserted: {key}")
     except Exception as e:
         print(f"# sync_meta upsert failed: {e}", file=sys.stderr)
 
@@ -391,7 +585,7 @@ def push_sync_meta(summary: dict[str, Any], *, dry_run: bool) -> None:
 def should_ops_alert(
     *,
     q: dict[str, Any],
-    state: dict[str, Any],
+    lst: dict[str, Any],
     bridge_ok: bool,
 ) -> tuple[bool, str]:
     reasons: list[str] = []
@@ -408,12 +602,10 @@ def should_ops_alert(
                 )
         except ValueError:
             pass
-    else:
-        # 一度も contacted が無いがキューはある → 初回待機はアラートしない
-        if q.get("needs_refill") and (q.get("total") or 0) > 0:
-            reasons.append("送信可能キュー不足かつ contacted 履歴なし")
+    elif q.get("needs_refill") and (q.get("total") or 0) > 0:
+        reasons.append("送信可能キュー不足かつ contacted 履歴なし")
 
-    last_ops = parse_iso(state.get("last_ops_alert_at"))
+    last_ops = parse_iso(lst.get("last_ops_alert_at"))
     if last_ops and (datetime.now(timezone.utc) - last_ops) < timedelta(hours=20):
         return False, ""
     if not reasons:
@@ -421,91 +613,42 @@ def should_ops_alert(
     return True, "; ".join(reasons)
 
 
-def build_daily_report_text(
+def run_lane(
+    lane: str,
     *,
-    q: dict[str, Any],
-    refill: dict[str, Any] | None,
-    sync_ok: bool | None,
-    archived: list[str],
-    stall_status: str,
-) -> str:
-    day = now_jst().strftime("%Y-%m-%d")
-    refill_line = "不要"
-    if refill:
-        if refill.get("skipped"):
-            refill_line = f"スキップ（{refill.get('reason') or '—'}）"
-        elif refill.get("ok"):
-            refill_line = (
-                f"実施 batch={refill.get('batch_id')} "
-                f"vendors={refill.get('vendors')} "
-                f"{'(dry-run)' if refill.get('dry_run') else ''}"
-            ).strip()
-        else:
-            refill_line = f"失敗: {refill.get('error') or refill}"
-    sync_line = "—（未実行）"
-    if sync_ok is True:
-        sync_line = "OK"
-    elif sync_ok is False:
-        sync_line = "失敗"
-
-    by = q.get("by_status") or {}
-    lines = [
-        f"*S2業者開拓* {day}",
-        f"・本日送信相当（contacted 当日）: {q.get('contacted_today', 0)}",
-        f"・キュー残（pending+discovered）: {q.get('pending_discovered', 0)} "
-        f"（送信可能先頭 {q.get('queue_ready', 0)} / 日次枠 {q.get('daily_limit', 3)}）",
-        f"・要フォロー: {q.get('followup', 0)}",
-        f"・status: 未送信 {by.get('pending', 0)} · 探索 {by.get('discovered', 0)} · "
-        f"送信済 {by.get('contacted', 0)} · 返信 {by.get('replied', 0)}",
-        f"・自律 refill: {refill_line}",
-        f"・vendor_sync: {sync_line}",
-        f"・stall: {stall_status}",
-    ]
-    if archived:
-        lines.append(f"・inbox 再生成依頼を archive: {len(archived)} 件")
-    lines.append(f"・KURASHIFT: {KURASHIFT_VENDORS_URL}")
-    return "\n".join(lines)
-
-
-def run(*, args: argparse.Namespace) -> int:
-    state = load_state()
-    if state.get("disabled") and not args.force_refill:
-        print("📎 vendor_outreach_stall: disabled（state.disabled=true）")
-        return 0
-    if os.environ.get("JARVIS_VENDOR_OUTREACH_STALL_DISABLE") == "1" and not args.force_refill:
-        print("📎 vendor_outreach_stall: disabled（env）")
-        return 0
-
-    dry = bool(args.dry_run) and not args.apply
-    if not args.apply and not args.dry_run:
-        dry = True
-
-    if not LIST_PATH.is_file():
-        print(f"❌ YAML なし: {LIST_PATH}", file=sys.stderr)
-        return 1
-
-    data = load_list()
-    q = assess_queue(data)
-    inbox_hits = find_inbox_refill_requests()
+    dry: bool,
+    force_refill: bool,
+    skip_sync: bool,
+    state: dict[str, Any],
+    inbox_hits: list[Path],
+    archive_inbox: bool,
+) -> dict[str, Any]:
+    cfg = LANE_CFG[lane]
+    lst = lane_state(state, lane)
+    assess = ASSESSORS[lane]
+    q = assess()
     bridge_ok = bridge_available()
+    label = cfg["label"]
 
     print(
-        f"📎 S2 stall assess: queue_ready={q['queue_ready']} "
+        f"📎 {lane} stall assess: queue_ready={q['queue_ready']} "
         f"daily={q['daily_limit']} needs_refill={q['needs_refill']} "
         f"followup={q['followup']} contacted_today={q['contacted_today']} "
-        f"inbox_refill={len(inbox_hits)} bridge={'ok' if bridge_ok else 'NG'}"
+        f"bridge={'ok' if bridge_ok else 'NG'}"
     )
 
-    needs_refill = bool(args.force_refill or q["needs_refill"] or inbox_hits)
+    needs_refill = bool(
+        force_refill or q["needs_refill"] or (archive_inbox and inbox_hits)
+    )
     refill_result: dict[str, Any] | None = None
     archived: list[str] = []
 
     if needs_refill:
-        last_refill = parse_iso(state.get("last_refill_at"))
+        last_refill = parse_iso(lst.get("last_refill_at"))
         cooldown_ok = True
         if (
             last_refill
-            and not args.force_refill
+            and not force_refill
             and (datetime.now(timezone.utc) - last_refill)
             < timedelta(hours=REFILL_COOLDOWN_HOURS)
         ):
@@ -515,7 +658,7 @@ def run(*, args: argparse.Namespace) -> int:
                 "skipped": True,
                 "reason": f"cooldown {REFILL_COOLDOWN_HOURS}h",
             }
-            print(f"# refill skipped: cooldown since {state.get('last_refill_at')}")
+            print(f"# {lane} refill skipped: cooldown")
 
         if cooldown_ok:
             if not bridge_ok:
@@ -524,30 +667,33 @@ def run(*, args: argparse.Namespace) -> int:
                     "skipped": True,
                     "reason": "Mac未接続・outbox不可",
                 }
-                print("# refill skipped: bridge unavailable", file=sys.stderr)
             else:
-                refill_result = write_s2_batch_outbox(dry_run=dry)
+                refill_result = REFILLERS[lane](dry_run=dry)
                 if refill_result.get("ok") and not dry:
-                    state["last_refill_at"] = now_iso()
-                if inbox_hits:
+                    lst["last_refill_at"] = now_iso()
+                    if lane == "s2":
+                        state["last_refill_at"] = lst["last_refill_at"]
+                if archive_inbox and inbox_hits:
                     archived = archive_inbox_files(inbox_hits, dry_run=dry)
     else:
         refill_result = {"ok": True, "skipped": True, "reason": "queue_ok"}
 
     sync_ok: bool | None = None
-    if args.skip_sync:
-        sync_ok = None
-    else:
-        # YAML がある日は投影を更新（朝／夕方の定例）
-        sr = run_vendor_sync(dry_run=dry)
-        sync_ok = bool(sr.get("ok"))
-        if sync_ok and not dry:
-            state["last_sync_at"] = now_iso()
+    if not skip_sync:
+        if not cfg["list_path"].is_file():
+            print(f"# {lane} YAML missing: {cfg['list_path']}", file=sys.stderr)
+            sync_ok = False
+        else:
+            sr = run_sync(cfg["sync"], dry_run=dry)
+            sync_ok = bool(sr.get("ok"))
+            if sync_ok and not dry:
+                lst["last_sync_at"] = now_iso()
+                if lane == "s2":
+                    state["last_sync_at"] = lst["last_sync_at"]
 
     ops_needed, ops_reason = should_ops_alert(
-        q=q, state=state, bridge_ok=bridge_ok
+        q=q, lst=lst, bridge_ok=bridge_ok
     )
-    # refill 失敗かつ bridge NG は必ず ops
     if refill_result and not refill_result.get("ok") and not refill_result.get("skipped"):
         ops_needed = True
         ops_reason = ops_reason or str(refill_result.get("error") or "refill failed")
@@ -566,19 +712,21 @@ def run(*, args: argparse.Namespace) -> int:
     meta = {
         "at": now_iso(),
         "day": now_jst().strftime("%Y-%m-%d"),
+        "lane": lane,
         "stall_status": stall_status,
-        "phase": q["phase"],
+        "phase": q.get("phase"),
         "daily_limit": q["daily_limit"],
         "queue_ready": q["queue_ready"],
         "pending_discovered": q["pending_discovered"],
         "followup": q["followup"],
         "contacted_today": q["contacted_today"],
         "last_contacted": q["last_contacted"],
-        "last_refill_at": state.get("last_refill_at"),
-        "last_sync_at": state.get("last_sync_at"),
+        "last_refill_at": lst.get("last_refill_at"),
+        "last_sync_at": lst.get("last_sync_at"),
         "bridge_ok": bridge_ok,
         "by_status": q["by_status"],
-        "kurashift_url": KURASHIFT_VENDORS_URL,
+        "kurashift_url": cfg["url"],
+        "extra": q.get("extra") or {},
         "refill": {
             "skipped": bool((refill_result or {}).get("skipped")),
             "ok": bool((refill_result or {}).get("ok")),
@@ -587,63 +735,164 @@ def run(*, args: argparse.Namespace) -> int:
             or (refill_result or {}).get("error"),
         },
     }
-    push_sync_meta(meta, dry_run=dry)
+    push_sync_meta(cfg["meta_key"], meta, dry_run=dry)
+
+    return {
+        "lane": lane,
+        "label": label,
+        "q": q,
+        "meta": meta,
+        "refill": refill_result,
+        "sync_ok": sync_ok,
+        "ops_needed": ops_needed,
+        "ops_reason": ops_reason,
+        "stall_status": stall_status,
+        "archived": archived,
+        "url": cfg["url"],
+        "lst": lst,
+    }
+
+
+def build_multi_report(results: list[dict[str, Any]]) -> str:
+    day = now_jst().strftime("%Y-%m-%d")
+    lines = [f"*業者開拓デイリー* {day}（516）"]
+    for r in results:
+        q = r["q"]
+        by = q.get("by_status") or {}
+        refill = r.get("refill") or {}
+        if refill.get("skipped"):
+            refill_line = f"skip({refill.get('reason') or '—'})"
+        elif refill.get("ok"):
+            refill_line = f"ok vendors={refill.get('vendors')}"
+        else:
+            refill_line = f"fail:{refill.get('error') or '—'}"
+        sync_line = (
+            "OK"
+            if r.get("sync_ok") is True
+            else ("失敗" if r.get("sync_ok") is False else "—")
+        )
+        lines.extend(
+            [
+                f"*{r['label']}* stall={r['stall_status']}",
+                f"・本日contacted {q.get('contacted_today', 0)} · "
+                f"キュー残 {q.get('pending_discovered', 0)} "
+                f"（先頭{q.get('queue_ready', 0)}/枠{q.get('daily_limit', 0)}）· "
+                f"要フォロー {q.get('followup', 0)}",
+                f"・status 未送{by.get('pending', 0)} 探索{by.get('discovered', 0)} "
+                f"済{by.get('contacted', 0)} 返信{by.get('replied', 0)}",
+                f"・refill {refill_line} · sync {sync_line}",
+                f"・UI {r['url']}",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def parse_lanes(raw: str) -> list[str]:
+    s = (raw or "all").strip().lower()
+    if s in ("all", "*", "s2,s4,s9"):
+        return ["s2", "s4", "s9"]
+    parts = [p.strip() for p in s.split(",") if p.strip()]
+    out: list[str] = []
+    for p in parts:
+        if p not in LANE_CFG:
+            raise SystemExit(f"unknown lane: {p} (s2|s4|s9|all)")
+        if p not in out:
+            out.append(p)
+    return out or ["s2"]
+
+
+def run(*, args: argparse.Namespace) -> int:
+    state = load_state()
+    if state.get("disabled") and not args.force_refill:
+        print("📎 vendor_outreach_stall: disabled（state.disabled=true）")
+        return 0
+    if os.environ.get("JARVIS_VENDOR_OUTREACH_STALL_DISABLE") == "1" and not args.force_refill:
+        print("📎 vendor_outreach_stall: disabled（env）")
+        return 0
+
+    dry = bool(args.dry_run) and not args.apply
+    if not args.apply and not args.dry_run:
+        dry = True
+
+    lanes = parse_lanes(args.lane)
+    inbox_hits = find_inbox_refill_requests() if "s2" in lanes else []
+    results: list[dict[str, Any]] = []
+
+    for i, lane in enumerate(lanes):
+        if not LANE_CFG[lane]["list_path"].is_file() and lane != "s2":
+            print(f"# skip {lane}: YAML missing", file=sys.stderr)
+            continue
+        if lane == "s2" and not S2_LIST.is_file():
+            print(f"❌ S2 YAML なし: {S2_LIST}", file=sys.stderr)
+            if len(lanes) == 1:
+                return 1
+            continue
+        r = run_lane(
+            lane,
+            dry=dry,
+            force_refill=bool(args.force_refill),
+            skip_sync=bool(args.skip_sync),
+            state=state,
+            inbox_hits=inbox_hits,
+            archive_inbox=(lane == "s2" and i == 0),
+        )
+        results.append(r)
+
+        if r["ops_needed"] and (args.apply or args.dry_run or args.ops_alert):
+            ops_text = (
+                f"*{r['label']} · 連携障害*\n"
+                f"・理由: {r['ops_reason']}\n"
+                f"・キュー残: {r['q']['pending_discovered']} "
+                f"（送信可能 {r['q']['queue_ready']}）\n"
+                f"・最終 contacted: {r['q'].get('last_contacted') or '—'}\n"
+                f"・UI: {r['url']}\n"
+                f"・処置: `--apply --lane {lane} --force-refill`"
+            )
+            pr = post_slack(channel="ops", text=ops_text, dry_run=dry)
+            if pr.get("ok") and not dry:
+                r["lst"]["last_ops_alert_at"] = now_iso()
+                if lane == "s2":
+                    state["last_ops_alert_at"] = r["lst"]["last_ops_alert_at"]
 
     do_daily = bool(args.daily_report or args.evening)
-    if do_daily:
+    if do_daily and results:
         last_daily = str(state.get("last_daily_report_at") or "")[:10]
         today = now_jst().strftime("%Y-%m-%d")
         if last_daily == today and not args.force_report and not dry:
             print("# daily report skipped: already sent today")
         else:
-            text = build_daily_report_text(
-                q=q,
-                refill=refill_result,
-                sync_ok=sync_ok,
-                archived=archived,
-                stall_status=stall_status,
-            )
+            text = build_multi_report(results)
             pr = post_slack(channel="report", text=text, dry_run=dry)
             if pr.get("ok") and not dry:
                 state["last_daily_report_at"] = now_iso()
 
-    if ops_needed and (args.apply or args.dry_run or args.ops_alert):
-        ops_text = (
-            f"*S2業者開拓 · 連携障害*\n"
-            f"・理由: {ops_reason}\n"
-            f"・キュー残: {q['pending_discovered']}（送信可能 {q['queue_ready']}）\n"
-            f"・最終 contacted: {q.get('last_contacted') or '—'}\n"
-            f"・bridge: {'ok' if bridge_ok else 'NG'}\n"
-            f"・UI: {KURASHIFT_VENDORS_URL}\n"
-            f"・処置: Mac 接続後に "
-            f"`jarvis_vendor_outreach_stall_runner.py --apply --force-refill`"
-        )
-        pr = post_slack(channel="ops", text=ops_text, dry_run=dry)
-        if pr.get("ok") and not dry:
-            state["last_ops_alert_at"] = now_iso()
-
     state["last_result"] = {
-        "stall_status": stall_status,
-        "needs_refill": q["needs_refill"],
-        "queue_ready": q["queue_ready"],
-        "refill": refill_result,
-        "sync_ok": sync_ok,
-        "ops_needed": ops_needed,
-        "ops_reason": ops_reason,
-        "archived": archived,
+        "lanes": {
+            r["lane"]: {
+                "stall_status": r["stall_status"],
+                "needs_refill": r["q"]["needs_refill"],
+                "queue_ready": r["q"]["queue_ready"],
+                "ops_needed": r["ops_needed"],
+                "ops_reason": r["ops_reason"],
+            }
+            for r in results
+        }
     }
     if not dry:
         save_state(state)
     else:
         print("# dry-run: state not saved")
 
-    print(
-        "📎 vendor_outreach_stall done: "
-        f"status={stall_status} refill="
-        f"{(refill_result or {}).get('skipped') and 'skip' or (refill_result or {}).get('ok')}"
-    )
+    statuses = ",".join(f"{r['lane']}={r['stall_status']}" for r in results) or "none"
+    print(f"📎 vendor_outreach_stall done: {statuses}")
     if args.json:
-        print(json.dumps({"queue": q, "meta": meta, "state": state.get("last_result")}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {"results": [{"lane": r["lane"], "meta": r["meta"]} for r in results]},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     return 0
 
 
@@ -651,15 +900,16 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true", help="書込・投稿なし（既定）")
     ap.add_argument("--apply", action="store_true", help="outbox / sync / Slack を実行")
-    ap.add_argument("--force-refill", action="store_true", help="キューに余裕があっても週次 JSON を再投入")
-    ap.add_argument("--daily-report", action="store_true", help="Slack #report に日次サマリ")
     ap.add_argument(
-        "--evening",
-        action="store_true",
-        help="夕方枠（= --daily-report）。部長日報帯向け",
+        "--lane",
+        default="all",
+        help="s2 | s4 | s9 | all（カンマ可）。既定 all",
     )
+    ap.add_argument("--force-refill", action="store_true", help="キューに余裕があっても再投入")
+    ap.add_argument("--daily-report", action="store_true", help="Slack #report に日次サマリ")
+    ap.add_argument("--evening", action="store_true", help="夕方枠（= --daily-report）")
     ap.add_argument("--force-report", action="store_true", help="同日再投稿を許可")
-    ap.add_argument("--ops-alert", action="store_true", help="条件時に #ops（apply 時は自動）")
+    ap.add_argument("--ops-alert", action="store_true", help="条件時に #ops")
     ap.add_argument("--skip-sync", action="store_true", help="vendor_sync をしない")
     ap.add_argument("--json", action="store_true", help="詳細 JSON を stdout")
     args = ap.parse_args()

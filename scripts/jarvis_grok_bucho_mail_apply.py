@@ -243,7 +243,7 @@ def _soft_stall_evening_after_marks(marks_applied: int) -> None:
     exe = str(py if py.is_file() else sys.executable)
     try:
         r = subprocess.run(
-            [exe, str(stall), "--apply", "--evening"],
+            [exe, str(stall), "--apply", "--evening", "--lane", "all"],
             cwd=str(REPO),
             env=os.environ.copy(),
             capture_output=True,

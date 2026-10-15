@@ -607,20 +607,23 @@ JSON の `outreach_phase` / `daily_limit` を正とする。セッション冒�
 
 ### 送信キューが尽きるとき（自律 refill · 再依頼しない）
 
-`vendors` キューが **0件**、または **残り < daily_limit** で本日分の S2 送信が足りないとき:
+S2 / S4 / S9 のいずれかで、キューが **0件**、または **残り < daily_limit** で本日分の送信が足りないとき:
 
-1. **部長ボックスへの「週次バッチ再生成して」再依頼 MD は書かない**（洪水防止）。516／Jarvis の `jarvis_vendor_outreach_stall_runner` が `outbox_to_teams/re` に `action: s2_batch` を自律投入する。
-2. 新 JSON が届くまで: **送信可能な残りだけ** 実行 · 不足分は `--mark` 不要（未送信）。探索・S1・S4 は本日分どおり続行可。
+1. **部長ボックスへの「週次バッチ再生成して」再依頼 MD は書かない**（洪水防止）。516／Jarvis の `jarvis_vendor_outreach_stall_runner` が `outbox_to_teams/re` へ自律投入する:
+   - S2 → `action: s2_batch`
+   - S4 → `action: s4_queue`
+   - S9 → `action: s9_precheck`
+2. 新 JSON／キューが届くまで: **送信可能な残りだけ** 実行 · 不足分は `--mark` 不要（未送信）。他レーン・探索・S1 は本日分どおり続行可。
 3. チャットへは任意で1行だけ（松野向け通知・依頼ではない）:
 
 ```
-📎 週次キュー残り N 社（batch_id: …）。自律 refill 待ち（再依頼不要）。
+📎 {S2|S4|S9} キュー残り N 社。自律 refill 待ち（再依頼不要）。
 2営業日空いたら Slack #ops を確認。
 ```
 
 4. **禁止**: リスト外の勝手追加送信 · キュー空で skip 分を別店で埋める · inbox への連続再生成依頼
 
-探索で `discovered` が増えても **送信キュー（batch JSON）とは別**。送信再開には **新 batch JSON**（stall runner または Jarvis 手動 `--force-refill`）が必要。
+探索で `discovered` が増えても **送信キュー（batch JSON）とは別**。送信再開には **stall runner の refill**（または Jarvis 手動 `--force-refill --lane …`）が必要。
 
 ### 各社完了報告（必須）
 
