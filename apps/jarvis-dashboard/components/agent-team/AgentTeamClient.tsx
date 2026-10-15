@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   flowforgeOpenLabel,
   flowforgeOpenUrl,
@@ -15,6 +15,14 @@ import {
   type AgentTeamGenre,
   type GrokPayload,
 } from "@/lib/agentTeam";
+
+/** 詳細パンくず `/agent-team#genre-{id}` — Next.js はハッシュ着地が弱いので再試行してスクロール */
+function genreHashDomId(): string | null {
+  if (typeof window === "undefined") return null;
+  const hash = decodeURIComponent(window.location.hash.replace(/^#/, "").trim());
+  if (!hash.startsWith("genre-")) return null;
+  return hash;
+}
 
 const STATUS_FILTERS = ["すべて", "運用確認", "設計中", "運用", "候補", "停止"] as const;
 type Tab = "genre" | "ai" | "grok" | "map";
@@ -59,6 +67,47 @@ export default function AgentTeamClient({
   const [deptFilter, setDeptFilter] = useState<string>("すべて");
   const [grokDeptFilter, setGrokDeptFilter] = useState<string>("すべて");
   const [mapFilter, setMapFilter] = useState<string>("すべて");
+
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer: number | undefined;
+    let tries = 0;
+
+    const apply = () => {
+      if (cancelled) return;
+      const domId = genreHashDomId();
+      if (!domId) return;
+      setTab("genre");
+      const el = document.getElementById(domId);
+      if (!el) {
+        if (tries++ < 40) {
+          retryTimer = window.setTimeout(apply, 50);
+        }
+        return;
+      }
+      tries = 0;
+      window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+
+    const restart = () => {
+      tries = 0;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      apply();
+    };
+
+    restart();
+    window.addEventListener("hashchange", restart);
+    window.addEventListener("popstate", restart);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("hashchange", restart);
+      window.removeEventListener("popstate", restart);
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
+  }, []);
 
   const agentsById = useMemo(() => {
     const m = new Map<string, AgentTeamAgent>();
