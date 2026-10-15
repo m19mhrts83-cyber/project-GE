@@ -240,13 +240,14 @@ export default async function RealEstateVendorsPage({
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <RealEstateLaneNav active="b-vendors" />
-      <p className="page-kicker">③-B開 · 業者開拓</p>
+      <p className="page-kicker">③-B開 · 業者開拓 · Grokサポート見守り</p>
       <h1>業者開拓ウォッチ</h1>
       <p className="sub">
+        <strong>実行は Grok S2</strong>。516（stall runner）が見守り・キュー補給します。
         地場リストへの Web 問合せ（「物件情報をください」）の送信状況。正本は Mac の{" "}
         <code>kurashift_re_vendor_list.yaml</code>。Grok 本日分の{" "}
         <code>--mark</code> 反映後に「リストを同期」してください。返信の本文・下書きは
-        Dashboard（「返信を見る」）で確認します。キュー補給は 516／stall runner が自律実行します。
+        Dashboard（「返信を見る」）で確認します。
       </p>
 
       <div className="card">

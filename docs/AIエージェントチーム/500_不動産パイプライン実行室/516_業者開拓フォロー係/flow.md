@@ -19,7 +19,7 @@
 ## 手順メモ
 
 1. **起動**
-   - 時間: **GHA 平日16:00**（見守り・Slack／sync_meta）／Mac 朝 soft-fail・夕方 `--evening`（補給＋日次）
+   - 時間: **GHA 平日16:00**（見守り・sync_meta）／Mac 朝 soft-fail・夕方 `--evening`（補給＋週次ゲート）
    - 届いたら: inbox poll 後フック（S2/S4/S9 再生成依頼）
    - 失敗見回り: `needs_refill` / stale marks / bridge NG
 2. **取得・確認**
@@ -33,8 +33,8 @@
      - S9 → `action: s9_precheck`
    - 対外送信はしない（定型送信は Grok）
 4. **Slack**
-   - 日次: `#report`（レーン横断・要フォロー・UI URL・refill 有無）
-   - 障害: `#ops`
+   - **週次** `#report`（healthy・タイトル「Grokサポート見守り｜業者開拓」・レーン擬似表）
+   - **即時** `#ops`（異常・枯渇）
    - 要ボスのみ `#consult`
 
 ## やらないこと

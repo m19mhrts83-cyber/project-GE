@@ -182,6 +182,10 @@ def main() -> int:
         print(f"❌ missing {REPORT}", file=sys.stderr)
         return 2
 
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_partner_slack_report import format_partner_failures  # noqa: E402
+
+    fail_text, fail_next = format_partner_failures(fails)
     report_cmd = [
         PY,
         str(REPORT),
@@ -192,8 +196,10 @@ def main() -> int:
         "--chatwork",
         str(cw_n),
         "--failures",
-        "／".join(fails) if fails else "なし",
+        fail_text,
     ]
+    if fail_next:
+        report_cmd.extend(["--next", fail_next])
     if args.dry_run_slack:
         report_cmd.append("--dry-run")
     if fails and (gmail_n + cw_n) == 0:

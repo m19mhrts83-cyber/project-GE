@@ -266,12 +266,12 @@ export default async function RepairVendorsPage({
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <RealEstateLaneNav active="b-repair" />
-      <p className="page-kicker">③-B開 · 修繕業者</p>
+      <p className="page-kicker">③-B開 · 修繕業者 · Grokサポート見守り</p>
       <h1>修繕業者台帳（S4）</h1>
       <p className="sub">
-        Grok S4（修繕業者開拓）が探索した業者台帳です。
+        <strong>実行は Grok S4</strong>。516（stall runner）が見守り・キュー補給します。
+        修繕業者開拓が探索した業者台帳です。
         <strong>一人親方・地域密着のレーティング評価（推奨A〜C）</strong>および生存確認（90日以内）を管理します。
-        キュー補給は 516／stall runner（S4）が自律実行します。
       </p>
 
       <div className="card" style={{ marginBottom: 16 }}>

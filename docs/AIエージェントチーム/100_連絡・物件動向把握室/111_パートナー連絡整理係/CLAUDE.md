@@ -41,11 +41,12 @@
 
 | 種別 | 行き先 |
 |---|---|
-| 完了報告 | Slack `#report`（通常は更新時のみ。運用確認〜10/18はゼロ日も「出なかった」） |
+| 完了報告 | Slack `#report`（通常は更新時のみ。運用確認〜10/18はゼロ日も**1行**生存確認） |
 | 要判断・相談 | Slack `#consult` |
 | Webhook（秘密） | env キー名のみ（URLは書かない）: `SLACK_WEBHOOK_REPORT` 系 |
 
-文面・項目の正本: [`report_consult.md`](./report_consult.md)
+文面・項目の正本: [`report_consult.md`](./report_consult.md)（特記のみ・失敗人間語）  
+ダメ出しの繋ぎ: [`28_Slackダメ出しの繋ぎ_20261015.md`](../../28_Slackダメ出しの繋ぎ_20261015.md)
 
 ## 5. 成果物の置き場
 
@@ -86,3 +87,4 @@
 | 2026-10-10 | GHA に Gmail credentials 展開を追加（dry_run 失敗の修正） |
 | 2026-10-10 | 昼 dry_run 緑。夜枠パイプライン＋launchd 20:30（`jarvis_partner_night_pipeline`） |
 | 2026-10-10 | **初版開発完了**→運用確認フェーズ。並列取込・Gmail絞り・export skip・報告文面判断向け・LLM不使用 |
+| 2026-10-15 | ゼロ日は1行／特記のみ。失敗を人間語化（`line exit=N` 等） |

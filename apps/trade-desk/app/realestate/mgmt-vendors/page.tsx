@@ -185,12 +185,13 @@ export default async function MgmtVendorsPage({
   return (
     <Shell active="/realestate" email={user?.email ?? null}>
       <RealEstateLaneNav active="b-mgmt" />
-      <p className="page-kicker">③-B開 · 管理会社</p>
+      <p className="page-kicker">③-B開 · 管理会社 · Grokサポート見守り</p>
       <h1>管理会社開拓（S9）</h1>
       <p className="sub">
+        <strong>実行は Grok S9</strong>。516（stall runner）が見守り・キュー補給します。
         正本は Mac の <code>kurashift_mgmt_vendor_list.yaml</code>（Excel{" "}
         <code>★管理会社一覧.xlsx</code> からの投影）。空室一括送信の Excel
-        は別経路のまま。キュー補給は 516／stall runner（S9）が自律実行します。
+        は別経路のまま。
       </p>
 
       <div className="card">

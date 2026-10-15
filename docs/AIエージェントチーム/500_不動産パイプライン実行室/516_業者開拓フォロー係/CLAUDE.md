@@ -18,8 +18,8 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
   - **S2/S4/S9** キュー枯渇・`--next` 未着の検知と **自律 refill**（outbox `s2_batch` / `s4_queue` / `s9_precheck`）
   - inbox の「週次キュー再生成」等依頼の消化（archive）
   - 部長日報 `--mark` 反映後の **各 vendor_sync**／`sync_meta` 更新確認
-  - 日次 Slack `#report` サマリ（レーン横断・要フォロー・KURASHIFT URL）
-  - 連携障害時の Slack `#ops`
+  - **週次** Slack `#report`（healthy 時のみ・Grokサポート見守りタイトル・レーン擬似表）
+  - 連携障害・枯渇は **即時** Slack `#ops`（日次見回りは毎日継続）
   - 要ボス（返信方針）だけ `#consult`／Todoist（業者専用レーンは作らない）
 - やらないこと: 対外送信の無断実行／Grok調査の丸写し再実装／秘密の再掲／探索の再スクレイプ
 
@@ -50,8 +50,8 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
 
 | 種別 | 行き先 |
 |---|---|
-| 完了報告（日次件数） | Slack `#report`（`--daily-report` / `--evening`） |
-| 連携障害 | Slack `#ops` |
+| 完了報告（週次・healthy） | Slack `#report`（`--evening` 枠内の週次ゲート） |
+| 連携障害・枯渇 | Slack `#ops`（即時） |
 | 要判断（返信方針） | Slack `#consult` ＋ Todoist（要ボスのみ） |
 
 | レーン | UI |
@@ -77,7 +77,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 # 朝・inbox 相乗り相当（補給＋sync_meta＋必要時 #ops）
 ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --lane all
 
-# 夕方日次 #report
+# 夕方見回り（#report は週次ゲート・healthy 時のみ）
 ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --evening --lane all
 
 # 強制 refill（レーン指定）
@@ -97,4 +97,6 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-15 | 閉ループ設計実装。stall runner・合図・日次 Slack・設計中へ |
 | 2026-10-15 | S4/S9 を同型追加（`--lane` · sync_meta 分割 · UI stall 行） |
 | 2026-10-15 | Phase D: `--apply --lane all --evening`・sync_meta・#report/#ops。B1 手渡しフォルダ |
-| 2026-10-15 | status は **設計中のまま**。松野が FlowForge 作業フロー確認→実行指示後に運用確認予定 |
+| 2026-10-15 | Phase1〜3 伴走確認。一度運用へ上げたが、格上げ条件確定で **運用確認** に戻す（週1健全×2週） |
+| 2026-10-15 | Slack本文先頭 `[516]`。格上げ正本: `docs/promote-to-ops.md` |
+| 2026-10-15 | Slack: Grokサポート見守りタイトル・週次 #report／即時 #ops。KURASHIFT kicker 揃え |
