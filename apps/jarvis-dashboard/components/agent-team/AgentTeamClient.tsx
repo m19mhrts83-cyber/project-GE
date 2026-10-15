@@ -673,6 +673,9 @@ export default function AgentTeamClient({
           <p className="at-hint">
             {grok.note ||
               "対応表は全件（対応あり／AIのみ／Grokのみ）。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"}
+            {" "}
+            <strong>Mac側ツイン</strong>
+            ＝実行の正は対応Grok／AI社員は見守り・検収・補給・Slack（二重実行しない）。
             {grok.mixup_doc ? ` 詳細: ${grok.mixup_doc}` : null}
           </p>
           <div className="at-counts" aria-label="対応表フィルタ">

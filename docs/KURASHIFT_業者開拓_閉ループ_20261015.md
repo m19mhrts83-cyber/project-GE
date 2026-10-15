@@ -10,7 +10,7 @@ S4（修繕）・S9（管理会社）も同じ「Mac 側手渡し」がボトル
 | 柱 | 内容 |
 |---|---|
 | 入口 | YAML（S2/S4/S9 各リスト）／部長 `--mark`／outbox `s2_batch` · `s4_queue` · `s9_precheck` |
-| 確認 | 対外送信は人／Grok。キュー補給・sync・Slack は自律可 |
+| 確認 | **開拓定型**（承認テンプレ・リスト内・改変なし）は都度許可不要。**非定型**は松野が一度必ず見る。キュー補給・sync・Slack は自律可 |
 | 履歴 | YAML status · KURASHIFT · Slack `#report` · 要ボスのみ Todoist |
 | 停止 | `vendor_outreach_stall.json` disabled / `JARVIS_VENDOR_OUTREACH_STALL_DISABLE=1` |
 
@@ -30,7 +30,7 @@ S4（修繕）・S9（管理会社）も同じ「Mac 側手渡し」がボトル
 |---|---|
 | **stall runner（Jarvis）** | 枯渇検知・outbox へ kickoff・inbox 依頼 archive・各 sync・`sync_meta`・障害 `#ops` |
 | **516 業者開拓フォロー係** | 合図（時間／届いた／失敗見回り）・日次 `#report`・手順正本 |
-| **Grok S2/S4/S9** | Web 送信・`--mark`。キュー薄いときは **再依頼しない**（自律 refill 待ち） |
+| **Grok S2/S4/S9** | 定型の Web 送信・`--mark`（都度許可不要）。非定型は松野確認後。キュー薄いときは **再依頼しない**（自律 refill 待ち） |
 | **不動産部長** | 日報メールに `--mark` 集約。再生成依頼 MD を書かない |
 | **ホーク** | 週次横断。日次件数は 516 |
 

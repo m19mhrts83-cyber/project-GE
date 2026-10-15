@@ -6,12 +6,13 @@
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - **この体のフロー**: [flow_dCheumorewDolXnfpksSuWKu](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_dCheumorewDolXnfpksSuWKu)
 - **Mac 本線**: `scripts/jarvis_vendor_outreach_stall_runner.py --lane all`（ノードはこれを呼ぶだけ）
+- **関係**: 実行ループ＝Grok S2/S4/S9 ／ 見守りループ＝本フロー（516）。送信ノードは置かない
 
 ## 型（Day2サンプルと同型）
 
 1. 起動（合図）
-2. 取得・確認
-3. まとめ
+2. 取得・確認（YAML キュー）
+3. まとめ（補給・sync、送信はしない）
 4. Slack へ報告
 
 ## 手順メモ
