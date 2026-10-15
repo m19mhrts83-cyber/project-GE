@@ -1,0 +1,76 @@
+# 516 業者開拓フォロー係 — 見守り本線（平日 16:00 JST）
+# 検知・sync_meta・Slack。Drive outbox 補給は Mac（skip-refill）。
+#
+# Secrets: JARVIS_SUPABASE_* / SLACK_WEBHOOK_AI_TEAM_* /
+#   KURASHIFT_*_VENDOR_LIST_B64（gzip -9 | base64。平文B64は64KB超で不可）
+# 停止: JARVIS_VENDOR_OUTREACH_STALL_GHA_DISABLE=1
+
+name: KURASHIFT Vendor Outreach Stall (516)
+
+on:
+  schedule:
+    # 平日 16:00 JST = 07:00 UTC
+    - cron: "0 7 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "書込・Slack なし"
+        required: false
+        type: boolean
+        default: true
+      lane:
+        description: "s2 | s4 | s9 | all"
+        required: false
+        default: "all"
+      evening:
+        description: "日次 #report 相当"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: kurashift-vendor-outreach-stall
+  cancel-in-progress: false
+
+jobs:
+  stall:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -q supabase pyyaml requests
+
+      - name: Vendor outreach stall (watch)
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
+          SLACK_WEBHOOK_AI_TEAM_OPS: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_OPS }}
+          KURASHIFT_RE_VENDOR_LIST_B64: ${{ secrets.KURASHIFT_RE_VENDOR_LIST_B64 }}
+          KURASHIFT_REPAIR_VENDOR_LIST_B64: ${{ secrets.KURASHIFT_REPAIR_VENDOR_LIST_B64 }}
+          KURASHIFT_MGMT_VENDOR_LIST_B64: ${{ secrets.KURASHIFT_MGMT_VENDOR_LIST_B64 }}
+          JARVIS_VENDOR_OUTREACH_STALL_GHA_DISABLE: ${{ secrets.JARVIS_VENDOR_OUTREACH_STALL_GHA_DISABLE }}
+          JARVIS_VENDOR_OUTREACH_STALL_SKIP_REFILL: "1"
+        run: |
+          set -euo pipefail
+          DRY="${{ github.event.inputs.dry_run }}"
+          LANE="${{ github.event.inputs.lane || 'all' }}"
+          EVE="${{ github.event.inputs.evening }}"
+          # schedule 実行時は inputs 空 → 本番 apply（夕方報告はしない＝朝見守り相当）
+          ARGS=(--lane "$LANE")
+          if [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            ARGS+=(--evening)
+          elif [[ "$DRY" == "true" ]]; then
+            ARGS+=(--dry-run)
+          fi
+          if [[ "$EVE" == "true" ]]; then
+            ARGS+=(--evening)
+          fi
+          python scripts/jarvis_gha_vendor_outreach_stall.py "${ARGS[@]}"
