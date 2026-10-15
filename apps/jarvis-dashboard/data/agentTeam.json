@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-15T21:41:57+09:00",
+  "updated": "2026-10-15T22:09:44+09:00",
   "registry_updated": "2026-10-11",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
   "flowforge_login_hint": "m19m",
@@ -926,12 +926,12 @@
       "status_icon": "🔵",
       "report": "report",
       "trigger": "時間",
-      "schedule": "朝refresh相乗り＋夕方--evening",
+      "schedule": "朝refresh相乗り＋夕方--evening（予定: GHA平日16:00検知）",
       "tool_assigned": "jarvis",
       "tool_fit": "A+B",
-      "tool_notes": "S2/S4/S9 stall runner・日次Slack・自律refill（--lane all）",
-      "note": "2026-10-15 Phase D apply済・#report/#ops。statusは設計中のまま。FlowForge作業フロー確認→実行指示後に運用確認予定",
-      "summary": "S2/S4/S9 のキュー補給・ステータス投影・日次 Slack",
+      "tool_notes": "見守り本線=stall_runner。実行はGrok。定型送信は都度許可不要・非定型は松野確認。二重実行しない",
+      "note": "実行=Grok S2/S4/S9／見守り=516。定型は都度許可不要。Phase D apply済。設計中",
+      "summary": "S2/S4/S9 の見守り（枯渇検知・Drive補給・sync_meta・日次 Slack）。開拓実行はしない",
       "flow_summary": "",
       "builder_tag": "〔Grok:S2+S4+S9〕",
       "mixup_kind": "mac_twin",
@@ -2375,7 +2375,7 @@
           "S9 管理会社開拓"
         ],
         "grok_department": "",
-        "role_split": "Grok=開拓・文案／社員=メール・ステータスフォロー"
+        "role_split": "実行=Grok S2/S4/S9（検索・定型送信・mark）／見守り=516（枯渇検知・Drive補給・sync_meta・#report）。定型は都度許可不要・非定型は松野確認。二重実行しない"
       },
       {
         "side": "paired",

@@ -7,6 +7,7 @@ import {
   getAgentById,
   getAgentTeam,
   getMappingsForAgent,
+  mixupKindHint,
   mixupKindLabel,
   reportLabel,
   statusClass,
@@ -105,28 +106,35 @@ export default async function AgentTeamDetailPage({
             <strong>Grok Bot 対応</strong>
           </header>
           {mapping ? (
-            <dl className="at-dl">
-              <div>
-                <dt>種別</dt>
-                <dd>{mixupKindLabel(mapping.mixup_kind)}</dd>
-              </div>
-              <div>
-                <dt>印</dt>
-                <dd>{mapping.builder_tag || "—"}</dd>
-              </div>
-              <div>
-                <dt>対応 Grok</dt>
-                <dd>
-                  {mapping.mixup_kind === "lane"
-                    ? "全Grok／比較レーン"
-                    : mapping.grok_labels.join(" · ") || "—"}
-                </dd>
-              </div>
-              <div>
-                <dt>役割分担</dt>
-                <dd>{mapping.role_split || "—"}</dd>
-              </div>
-            </dl>
+            <>
+              {mixupKindHint(mapping.mixup_kind) ? (
+                <p className="sum" style={{ marginBottom: 12 }}>
+                  {mixupKindHint(mapping.mixup_kind)}
+                </p>
+              ) : null}
+              <dl className="at-dl">
+                <div>
+                  <dt>種別</dt>
+                  <dd>{mixupKindLabel(mapping.mixup_kind)}</dd>
+                </div>
+                <div>
+                  <dt>印</dt>
+                  <dd>{mapping.builder_tag || "—"}</dd>
+                </div>
+                <div>
+                  <dt>対応 Grok</dt>
+                  <dd>
+                    {mapping.mixup_kind === "lane"
+                      ? "全Grok／比較レーン"
+                      : mapping.grok_labels.join(" · ") || "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>役割分担</dt>
+                  <dd>{mapping.role_split || "—"}</dd>
+                </div>
+              </dl>
+            </>
           ) : (
             <p className="meta">
               Grok 同型なし（Jarvis／Slack／Mac 本線）。対応表タブにも載りません。

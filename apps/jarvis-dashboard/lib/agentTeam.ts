@@ -229,6 +229,22 @@ export function mixupKindLabel(kind: string): string {
   }
 }
 
+/** 対応表・詳細で種別の読み方を補足する短文 */
+export function mixupKindHint(kind: string): string {
+  switch (kind) {
+    case "mac_twin":
+      return "実行の正＝対応Grok。このAI社員＝見守り・検収・補給・Slack（同じ仕事の二重実行はしない）";
+    case "lane":
+      return "特定Botの代替ではない。両系統の材料を並べて比較するレーン";
+    case "ai_only":
+      return "対応するGrok同型なし（Jarvis／Slack／Mac本線）";
+    case "grok_only":
+      return "対応するAI社員なし（Grok側のみ）";
+    default:
+      return "";
+  }
+}
+
 export function mappingSideLabel(side: string): string {
   switch (side) {
     case "paired":
