@@ -8,6 +8,8 @@
 - 実装・定時・Slack報告など、status を上げ／下げしうる成果が出た
 - 「運用開始」「設計中にした」「候補のまま」等の状態変更依頼
 - 部門ボードやマーカーが古いと言われた
+- 実行権限・サイトログインを渡した／変えた（あわせて `jarvis-agent-team-permissions.mdc`）
+- 合図・スケジュール・報告先・手順書を変えた（あわせて `jarvis-agent-team-ops.mdc`）
 
 ## 状態変更は提案が先（必須・2026-10-11）
 
@@ -32,15 +34,15 @@ Jarvis が作業した結果として status を変えるときは、**黙って
 cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_agent_team_status_sync.py
 ```
 
-（マーカー `00_🟢運用.md` 等・部門 `00_状態ボード.md`・README接頭辞・Drive写し・**`apps/jarvis-dashboard/data/agentTeam.json`**）
+（マーカー `00_🟢運用.md` 等・部門 `00_状態ボード.md`・README接頭辞・Drive写し・**`apps/jarvis-dashboard/data/agentTeam.json`**・権限 MD `25_…`・運用 MD `26_合図手順報告一覧_…`）
 
-ダッシュ `/agent-team` に反映するには、上記 JSON を **commit＋push** する（Vercel Production）。
+ダッシュ `/agent-team`（ジャンル／AI／Grok／対応表／**権限**／**運用**）に反映するには、上記 JSON を **commit＋push** する（Vercel Production）。
 
 ## ダッシュと FlowForge の役割
 
 | 場所 | 用途 |
 |---|---|
-| Jarvis `/agent-team` | **ジャンル**（物件／リソース／コーチング／アプリ／横断）＋AI室＋Grok＋対応表。正本: `config/agent_team_genres.yaml` |
+| Jarvis `/agent-team` | **ジャンル**＋AI室＋Grok＋対応表＋**権限**＋**運用**（合図4種・手順・報告）。正本: genres / permissions / `config/agent_team_ops.yaml` |
 | Cursor インブラウザの FlowForge | 作業フローの作り込み・拡大・要素詳細 |
 | FlowForge ログイン | **m19m**（ダッシュの admin ログインとは別） |
 
