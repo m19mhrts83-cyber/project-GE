@@ -1,11 +1,19 @@
 import Shell from "@/components/Shell";
 import AgentTeamClient from "@/components/agent-team/AgentTeamClient";
-import { getAgentTeam, getGenres, getGrok } from "@/lib/agentTeam";
+import {
+  getAgentTeam,
+  getGenres,
+  getGrok,
+  getOpsMeta,
+  getPermissionsMeta,
+} from "@/lib/agentTeam";
 
 export default function AgentTeamPage() {
   const team = getAgentTeam();
   const grok = getGrok();
   const genres = getGenres();
+  const permissionsMeta = getPermissionsMeta();
+  const opsMeta = getOpsMeta();
 
   return (
     <Shell active="/agent-team">
@@ -21,6 +29,9 @@ export default function AgentTeamPage() {
         builderUrl={team.builder.url}
         builderTitle={team.builder.title}
         grok={grok}
+        permissionsMeta={permissionsMeta}
+        permissionsUpdated={team.permissions_updated}
+        opsMeta={opsMeta}
       />
     </Shell>
   );

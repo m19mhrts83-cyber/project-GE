@@ -1,0 +1,58 @@
+# AIエージェントチーム — 合図・手順書・報告先（ダッシュ運用タブ）
+
+## 方針
+
+友利さん／いけとも資料の **動き出す合図4種**（人が頼む／時間／届いたら／変化・失敗）と、**手順書リンク**・**報告先**は、Jarvis ダッシュボード `/agent-team` の **「運用」タブ** で俯瞰する。
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| 合図4種メタ | `config/agent_team_ops.yaml` |
+| 各社員の合図・報告 | 各社員 `CLAUDE.md` §2／§4 |
+| registry 要約 | `config/agents_registry.yaml` の `trigger` / `schedule` / `report` |
+| 投影 | `apps/jarvis-dashboard/data/agentTeam.json`（sync） |
+| 人向け MD | `docs/AIエージェントチーム/26_合図手順報告一覧_20261015.md`（sync 再生成） |
+
+## 4種（ID）
+
+| ID | 呼び名 | 例 |
+|---|---|---|
+| `human` | 人が頼む | 「〇〇して」・手動実行 |
+| `schedule` | 時間 | GHA／launchd／cron |
+| `event` | 何かが届いたら | メール・inbox・取込完了 |
+| `watch` | 変化・失敗を見回ったら | Fail・鮮度切れ・枠逼迫 |
+
+## トリガー（止まず更新）
+
+次のいずれかで **運用一覧を更新**する（チャットだけで終わらない）:
+
+- 社員の合図・スケジュール・報告先を変えた
+- 手順 MD（`CLAUDE.md` / `flow.md` 等）を追加・改名・移動した
+- AI社員／Grok Bot を新規追加した
+- 「いつ動く」「合図の種類」「手順書どこ」「報告先は」と聞かれた
+
+## Jarvis の動作
+
+1. 社員 `CLAUDE.md` §2（合図）／§4（報告）と必要なら `agents_registry.yaml` を直す
+2. メタ定義が変わるときだけ `config/agent_team_ops.yaml` を直す
+3. sync:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_agent_team_status_sync.py
+```
+
+4. `apps/jarvis-dashboard/data/agentTeam.json` を **commit＋push**
+5. 報告に「運用タブ更新済み（合図／手順／報告）」を1行
+
+## やらないこと
+
+- 合図を変えたのに registry／CLAUDE／sync／push を省略する
+- パスワード・トークン値を手順 MD やダッシュに書く
+
+## 関連
+
+- 権限タブ: `jarvis-agent-team-permissions.mdc`
+- 状態 sync: `jarvis-agent-team-status.mdc`
+- Slack チャンネル: `#report` / `#consult` / `#ops`

@@ -2,6 +2,114 @@ import data from "@/data/agentTeam.json";
 
 export type AgentStatus = "候補" | "設計中" | "運用確認" | "運用" | "停止" | string;
 
+export type PermissionMethod = {
+  name: string;
+  level: string;
+  detail: string;
+};
+
+export type SiteLogin = {
+  service: string;
+  access?: string;
+  note?: string;
+};
+
+export type AgentPermissions = {
+  can_do: string;
+  methods: PermissionMethod[];
+  methods_filled: boolean;
+  env_keys: string[];
+  site_logins: SiteLogin[];
+  site_logins_summary: string;
+  has_site_logins: boolean;
+  human_gate: string;
+  secrets_note?: string;
+  source?: string;
+};
+
+export type BotPermissions = {
+  can_do: string;
+  exec_level: string;
+  secrets_policy: string;
+  secrets_note?: string;
+  site_logins: SiteLogin[];
+  site_logins_summary: string;
+  has_site_logins: boolean;
+  human_gate: string;
+  source?: string;
+};
+
+export type PermissionsMeta = {
+  defaults?: {
+    ai?: { human_gate?: string; secrets_note?: string };
+    grok?: {
+      secrets_policy?: string;
+      secrets_note?: string;
+      human_gate?: string;
+    };
+  };
+  site_login_agent_ids?: string[];
+  site_login_bot_ids?: string[];
+  doc?: string;
+  yaml?: string;
+  note?: string;
+};
+
+export type TriggerKindId = "human" | "schedule" | "event" | "watch" | string;
+
+export type TriggerKindMeta = {
+  id: TriggerKindId;
+  label: string;
+  short?: string;
+  meaning?: string;
+};
+
+export type TriggerKindState = {
+  id: TriggerKindId;
+  on: boolean;
+  detail?: string;
+  raw?: string;
+  from_registry?: boolean;
+};
+
+export type ProcedureLink = {
+  title: string;
+  path?: string;
+  url?: string;
+  kind?: string;
+};
+
+export type ReportRow = {
+  kind: string;
+  destination: string;
+  channels?: string[];
+};
+
+export type AgentOps = {
+  trigger_kinds: TriggerKindState[];
+  trigger_kinds_on: TriggerKindId[];
+  trigger_kinds_label: string;
+  triggers_filled?: boolean;
+  when: string;
+  registry_trigger?: string;
+  registry_schedule?: string;
+  primary_report: string;
+  report_channels: string[];
+  reports: ReportRow[];
+  procedures: ProcedureLink[];
+  procedure_count: number;
+  source?: string;
+};
+
+export type OpsMeta = {
+  updated?: string;
+  trigger_kinds?: TriggerKindMeta[];
+  slack_channels?: Record<string, { label?: string; meaning?: string }>;
+  doc?: string;
+  yaml?: string;
+  note?: string;
+};
+
 export type AgentTeamAgent = {
   id: string;
   name: string;
@@ -28,6 +136,8 @@ export type AgentTeamAgent = {
   flowforge_url: string;
   flowforge_share_url?: string;
   flowforge_edit_url?: string;
+  permissions?: AgentPermissions;
+  ops?: AgentOps;
 };
 
 export type AgentTeamDept = {
@@ -80,6 +190,8 @@ export type GrokBot = {
   exec_level: string;
   genre_id?: string;
   genre_name?: string;
+  permissions?: BotPermissions;
+  ops?: AgentOps;
 };
 
 export type GrokDept = {
@@ -128,6 +240,7 @@ export type GrokPayload = {
 export type AgentTeamPayload = {
   updated: string;
   registry_updated: string;
+  permissions_updated?: string;
   flowforge_base: string;
   flowforge_login_hint: string;
   flowforge_login_email?: string;
@@ -139,7 +252,39 @@ export type AgentTeamPayload = {
   departments: AgentTeamDept[];
   agents: AgentTeamAgent[];
   grok?: GrokPayload;
+  permissions_meta?: PermissionsMeta;
+  ops_meta?: OpsMeta;
 };
+
+export function getPermissionsMeta(): PermissionsMeta {
+  return getAgentTeam().permissions_meta || {};
+}
+
+export function getOpsMeta(): OpsMeta {
+  return getAgentTeam().ops_meta || {};
+}
+
+export function triggerKindLabel(
+  id: string,
+  meta?: TriggerKindMeta[]
+): string {
+  const hit = (meta || []).find((k) => k.id === id);
+  return hit?.short || hit?.label || id;
+}
+
+export function reportChannelLabel(ch: string): string {
+  const c = (ch || "").replace(/^#/, "");
+  if (!c) return "—";
+  return `#${c}`;
+}
+
+export function permissionLevelClass(level: string): string {
+  const t = (level || "").trim();
+  if (t === "○" || t === "✅" || t === "〇") return "at-perm-ok";
+  if (t === "△") return "at-perm-mid";
+  if (t === "×" || t === "✕" || t === "✗") return "at-perm-no";
+  return "";
+}
 
 const STATUS_RANK: Record<string, number> = {
   運用確認: 0,
