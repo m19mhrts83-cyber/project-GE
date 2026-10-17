@@ -210,6 +210,29 @@ def _apply_one(seq_or_id: str) -> Path | None:
     return nt.apply_draft_to_partner(seq_or_id)
 
 
+def _enqueue_311(draft: Path) -> None:
+    """正本下書き後に 311 input/ へキック（poll がゲート）。soft-fail。"""
+    if (os.environ.get("JARVIS_SEND_GATE_311_ENQUEUE_DISABLE") or "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        print("# 311 enqueue skip: JARVIS_SEND_GATE_311_ENQUEUE_DISABLE")
+        return
+    try:
+        from jarvis_send_gate_311 import enqueue_request  # type: ignore
+
+        out = enqueue_request(
+            draft,
+            source="211",
+            partner_or_thread=draft.parent.name,
+            note="211 朝便／apply 後キック",
+        )
+        print(f"# 311 enqueue -> {out}")
+    except Exception as e:
+        print(f"# 311 enqueue soft-fail: {e}", file=sys.stderr)
+
+
 def _slack(channel: str, lines: list[str]) -> int:
     text = "\n".join(lines)
     cmd = [
@@ -316,6 +339,7 @@ def main() -> int:
             if path:
                 written.append((str(tid), str(path)))
                 print(f"# wrote {tid} -> {path}")
+                _enqueue_311(Path(path))
 
     if b_waiting and not args.dry_run and (args.morning or args.report):
         lines = [

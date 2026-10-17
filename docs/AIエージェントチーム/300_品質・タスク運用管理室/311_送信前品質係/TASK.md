@@ -4,27 +4,28 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | （Todoist id または run_id） |
+| task_id | phase3-upstream-enqueue-20261018 |
 | agent_id | 311 |
-| executor | cursor / claude_code / gencode / launchd / gha / … |
-| status | queued |
-| started_at | |
-| finished_at | |
+| executor | cursor |
+| status | done |
+| started_at | 2026-10-18 |
+| finished_at | 2026-10-18 |
 
 ## 依頼
 
-（何をするか。入力は `input/` または外部パス）
+Phase 3: 上流（211／ホーク／S9）から `input/` への自動キック。
 
 ## 完了条件
 
-- [ ] 期待する成果物が `output/`（または記した外部パス）にある
-- [ ] `tests/` のチェックを通す
-- [ ] 必要なとき Slack `#report`／`#consult`／`#ops` に報告
+- [x] `--enqueue` / `enqueue_request()` 
+- [x] 211 朝便 apply 後に enqueue
+- [x] ホーク `action: send_gate_311` → bucho poll apply
+- [x] docs（phase3-upstream・PROGRESS・CLAUDE）
 
 ## 成果物
 
-- 
-
-## メモ・障害
-
-- 
+- `scripts/jarvis_send_gate_311.py`（enqueue）
+- `scripts/jarvis_hawk_send_gate_311_apply.py`
+- `scripts/jarvis_reply_draft_211.py`（配線）
+- `scripts/jarvis_bucho_inbox_poll.py`（配線）
+- `docs/phase3-upstream.md`
