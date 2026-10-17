@@ -46,6 +46,10 @@ ID: **114**。Grok S1 調査後の **進行ゲート（3レーン振分）**。
 
 ## 5–6. 成果物・手順
 
+- 依頼・完了条件: [`TASK.md`](./TASK.md)
+- 検証: [`tests/checklist.md`](./tests/checklist.md)
+- 規格: [`30_共通Agentフォルダ規格_BCP`](../../30_共通Agentフォルダ規格_BCP_20261017.md)
+
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_property_gate_degraded.py
@@ -64,3 +68,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-12 | **作業フロー更新**: launchd／degraded 本線・上限時手順を `flow.md` に反映 |
 | 2026-10-13 | Slack Bカード: コードブロック表廃止→箇条書き＋詳細HTML。カード先頭に位置づけ（Grok S1／114／511）を明記。表示名「114 物件一次判定」 |
 | 2026-10-13 | Bカードに **土地値の評価**／**利回りの評価** を独立節として詳述（基準・クリア/惜しい/未達）。先頭に判断軸1行。詳細HTMLも同軸カード |
+| 2026-10-17 | 共通フォルダ規格パイロット: TASK.md / config / input / output / tests / scripts |

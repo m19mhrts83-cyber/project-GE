@@ -41,6 +41,7 @@ slack_channels:
 # 手順書としてダッシュに載せるファイル名（社員フォルダ相対）
 procedure_basenames:
   - CLAUDE.md
+  - TASK.md
   - flow.md
   - README.md
   - PROGRESS.md

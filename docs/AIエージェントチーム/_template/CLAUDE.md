@@ -44,14 +44,21 @@
 
 ## 5. 成果物の置き場
 
-- このフォルダ内: `logs/` など
-- 外部正本: （OneDrive / git-repos パス）
+- 依頼・完了条件: [`TASK.md`](./TASK.md)（作業のたびに更新）
+- 入力: `input/`（または外部パスを TASK に記す）
+- 成果: `output/`（大きいものは Drive／OneDrive 正本＋パスメモ）
+- 検証: `tests/`
+- 設定: `config/`（秘密の値は置かない）
+- 履歴: `logs/`
+- 外部正本: （OneDrive / Drive / git-repos パス）
+- 規格: [`30_共通Agentフォルダ規格_BCP`](../30_共通Agentフォルダ規格_BCP_20261017.md)
 
 ## 6. 作業手順（チェックリスト）
 
-1.
-2.
-3. 報告を Slack に送る
+1. `TASK.md` に依頼・完了条件・executor を書く（status=running）
+2. `input/` を確認して処理する
+3. 成果を `output/`（または外部正本）へ。`tests/` を通す
+4. 報告を Slack に送る。`TASK.md` を done／failed に更新
 
 ## 状態（作成・status変更時）
 
