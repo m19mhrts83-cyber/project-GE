@@ -12,6 +12,20 @@ Claude Code / Cursor（Jarvis）/ Codex / GenCode / Grok Bot など、**どの�
 | [`22_運用状態の識別_20261011.md`](22_運用状態の識別_20261011.md) | 状態の見え方・更新手順 |
 | [`06_社員の作り方_二段階_20261009.md`](06_社員の作り方_二段階_20261009.md) | 新規作成の二段階 |
 | [`05_機密とenv二層_20261009.md`](05_機密とenv二層_20261009.md) | 秘密は二層。MDに値を書かない |
+| [`30_共通Agentフォルダ規格_BCP`](30_共通Agentフォルダ規格_BCP_20261017.md) | TASK／input／output／tests（ツール切替BCP） |
+| [`31_作業ロック`](31_作業ロック_二重起動防止_20261017.md) | 二重起動防止。CLI `jarvis_agent_run_lock.py` |
+
+## 作業開始前（必須・短い）
+
+1. 当該社員の **`TASK.md`** に依頼・完了条件・executor を書く（`status=running`）
+2. Todoist／run 単位で **ロック取得**（失敗＝実行中 → 止める）:
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_run_lock.py acquire \
+  --task-id … --agent-id NNN --executor cursor --folder 'docs/AIエージェントチーム/…'
+```
+
+3. 終了後 `release` ＋ `TASK.md` を done／failed。Cursor ルール: `.cursor/rules/jarvis-agent-run-lock.mdc`
 
 ## 状態識別（必須）
 

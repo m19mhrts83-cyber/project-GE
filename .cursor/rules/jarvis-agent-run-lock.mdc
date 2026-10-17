@@ -1,0 +1,50 @@
+# AI社員 作業ロック（二重起動防止）
+
+## 方針
+
+複数 Agent（Cursor／Claude Code／GenCode／launchd）が同じ Todoist タスクや同じ社員フォルダを同時にいじらない。  
+**判断よりロック**。大規模オーケストレーションは作らない。
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| 設計 | `docs/AIエージェントチーム/31_作業ロック_二重起動防止_20261017.md` |
+| CLI | `scripts/jarvis_agent_run_lock.py` |
+| state | `~/git-repos/.jarvis_state/agent_run_locks.json` |
+| 共通規格 | `docs/AIエージェントチーム/30_共通Agentフォルダ規格_BCP_20261017.md` |
+
+## トリガー
+
+次のいずれかで **作業を始めるとき**:
+
+- AIエージェントチームの社員フォルダ（`docs/AIエージェントチーム/**/NNN_*`）を実行・更新する
+- 同一 Todoist タスク（特に `agent_team` レーン）を別ツールでも回しうる
+- ChatGPT／ホーク提案の「二重起動」「作業ロック」に触れた
+
+## Jarvis／実行ツールの必須動作
+
+1. 開始前にロック取得（失敗＝既に実行中 → 二重起動しない）:
+
+```bash
+cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_run_lock.py acquire \
+  --task-id <TodoistIdまたはrun_id> --agent-id <NNN> --executor cursor \
+  --folder 'docs/AIエージェントチーム/…/NNN_…'
+```
+
+exit `2` なら **止めて報告**（勝手に上書きしない）。
+
+2. 社員フォルダの `TASK.md` を `status=running` に更新する。
+3. 終了後:
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_agent_run_lock.py release --task-id <同上>
+```
+
+`TASK.md` を `done`／`failed` に更新。古い running の掃除は `stale-clear --hours 6`。
+
+## やらないこと
+
+- ロックなしで同じ task_id を並列実行する
+- Redis 等の分散基盤を先に作る
+- 秘密を state／TASK.md に書く
