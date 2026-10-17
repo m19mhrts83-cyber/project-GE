@@ -4,31 +4,30 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | （実行ごとに Todoist／run_id を記入） |
+| task_id | 6hmrRCwjPjGQ43Mv |
 | agent_id | 114 |
-| executor | launchd / jarvis_property_gate_degraded.py（本線）／cursor（診断） |
-| status | queued |
-| started_at | |
-| finished_at | |
+| executor | cursor（比較・後追い）／gencode（先に完了） |
+| status | done |
+| started_at | 2026-10-17T23:08:04+09:00（gencode） |
+| finished_at | 2026-10-17T23:10:42+09:00（cursor 比較完了） |
 
-## 依頼（定常）
+## 依頼（今回）
 
-Grok調査取込後の deals を A/B/C 振分し、人判断が要る B を Slack `#consult` に出す。  
-上限時も CLI／launchd で回す（[`24_Jarvis上限時`](../../24_Jarvis上限時_物件進行ゲート_次善策_20261012.md)）。
+Cursor×GenCode 比較実験（dry-run）。本番 Slack 投稿なし。
 
 ## 完了条件
 
-- [ ] 振分結果が deals／ログに残っている
-- [ ] B カードが必要な件数だけ `#consult` に出ている（または「対象0」がログにある）
-- [ ] `tests/checklist.md` を通す
-- [ ] 障害時は `#ops` またはログに理由
+- [x] 振分結果がログに残っている（双方 A=1/B=33/C=119）
+- [x] `tests/checklist.md` を通す（B投稿は dry-run で N/A）
+- [x] 比較ログを残す（gencode／cursor）
 
 ## 成果物
 
-- `logs/` … 実行メモ
-- `output/` … 要約・パスメモ（大きい正本は KURASHIFT deals）
-- 外部: KURASHIFT `/realestate/deals` · Slack `#consult`
+- `logs/20261017_compare_gencode.md`
+- `logs/20261017_compare_cursor.md`
+- `logs/20261017_230821_gate114.md` / `20261017_231042_gate114.md`
+- 正本表: [`32_`](../../32_Cursor×別Agent比較実験_手順_20261017.md)
 
 ## メモ・障害
 
-- 
+- なし
