@@ -157,6 +157,11 @@ export default function WatchSituationCard(props: WatchSituationCardProps) {
             <Link href="/vpoint">Vポイントページ（付与サマリ・考察）→</Link>
           </p>
         ) : null}
+        {id === "yen_rate" ? (
+          <p className="meta">
+            <Link href="/yen">円動向ページ（USD/JPY・見立て）→</Link>
+          </p>
+        ) : null}
         {id === "rent_step" ? (
           <p className="meta">
             <Link href="/rent-step">家賃ステップ（+4,000・変動）→</Link>

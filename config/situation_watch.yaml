@@ -42,6 +42,16 @@ items:
       抽選券があれば scripts/jarvis_teiki_barai_chance.py --run で回して通知して。
       ルール: jarvis-vpoint-audit.mdc。state: .jarvis_state/vpoint_*.json / teiki_barai_chance.json
 
+  - id: yen_rate
+    title: 円動向（USD/JPY）
+    category: finance
+    enabled: true
+    source: .jarvis_state/yen_rate_watch.json
+    cursor_prompt: |
+      円動向（615）を確認して。state: ~/git-repos/.jarvis_state/yen_rate_watch.json。
+      コマンド: scripts/jarvis_yen_rate_watch.py --apply --with-news（Slack は --push）。
+      ダッシュ /yen。売買・ポジション指図はしない（見立て・円換算感度のみ）。
+
   - id: rent_step
     title: Grandole家賃ステップ（+4,000）
     category: finance

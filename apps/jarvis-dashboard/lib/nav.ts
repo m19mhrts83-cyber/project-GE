@@ -58,6 +58,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: KURASHIFT_URL, label: "KURASHIFT", external: true },
       { href: "/etc", label: "ETC" },
       { href: "/vpoint", label: "Vポイント" },
+      { href: "/yen", label: "円動向" },
       { href: "/rent-step", label: "家賃ステップ" },
       { href: "/metrics", label: "収支・数値" },
       { href: "/billing", label: "サブスク・課金" },
