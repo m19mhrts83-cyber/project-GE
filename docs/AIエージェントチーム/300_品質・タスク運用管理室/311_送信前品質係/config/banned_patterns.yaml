@@ -1,0 +1,24 @@
+# 禁止宛先・運営混入（値は秘密にしないパターンのみ）
+# 大文字小文字無視・部分一致
+
+email_substrings:
+  - noreply@
+  - no-reply@
+  - donotreply@
+  - do-not-reply@
+  - mailer-daemon@
+  - postmaster@
+
+text_keywords:
+  - ポータル運営
+  - サイト管理者
+  - 運営事務局宛
+  - お問い合わせフォーム運営
+
+# 本人名義として許容する From / Reply-To（env 名。実値は .env.jarvis_private）
+allowed_from_env_keys:
+  - PERSONAL_EMAIL
+  - COMPANY_EMAIL
+# 固定で許容するアドレス（公開してよい対外From）
+allowed_from_emails:
+  - matsuno.estate@gmail.com
