@@ -20,4 +20,7 @@
   - 211: 正本書込後に自動 enqueue
   - ホーク: `action: send_gate_311` → bucho poll → enqueue
   - 手順: `docs/phase3-upstream.md`
-- 次: 運用観察（誤キック抑制・S9 定型の enqueue 追加は必要時）
+- Grok Instructions 反映（CDP・2026-10-18）: ★[H]／★[S]／[S9] に §311／`send_gate_311` 確認済
+- **格上げ**: 2026-10-18 松野了承 → **`運用確認`**（運用前フェーズ）。次は **2026-10-26 前後**に `運用` 提案
+  - state: `~/git-repos/.jarvis_state/agent_311_promote.json`
+- 観測の見方: Slack `#report`/`#consult`・`input/processed/`・launchd ログ・誤キック有無

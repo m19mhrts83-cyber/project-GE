@@ -136,16 +136,18 @@ agents:
   '311':
     name: 送信前品質係
     path: 300_品質・タスク運用管理室/311_送信前品質係
-    flowforge_id: flow_AKQv6lgUEtudWlE5fQUhQnh2
-    flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2
-    status: 候補
+    flowforge_id: flow_x4Sw8mVvuGVme1fXz9JGfs3v
+    flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_x4Sw8mVvuGVme1fXz9JGfs3v
+    flowforge_demo_id: flow_AKQv6lgUEtudWlE5fQUhQnh2
+    flowforge_demo_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2
+    status: 運用確認
     report: report
-    note: 2体目候補。人依頼トリガー。旧10_
-    trigger: 人依頼
+    note: Phase1〜3済（CLI／15分poll／上流enqueue）。運用確認中（〜10/26前後に運用へ）。デモ flow_AKQv6… 残置。旧10_
+    trigger: イベント
     tool_assigned: jarvis
     tool_fit: B
-    tool_notes: 送信前ゲート。人確認必須
-    schedule: 依頼時
+    tool_notes: 送信前3点ゲート。上流S9/211/ホーク。送信は人
+    schedule: 下書きパス受領時
   '312':
     name: Todoist起票整理係
     path: 300_品質・タスク運用管理室/312_Todoist起票整理係

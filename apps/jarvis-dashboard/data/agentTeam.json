@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-17T13:32:08+09:00",
+  "updated": "2026-10-18T03:23:27+09:00",
   "registry_updated": "2026-10-17",
   "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -12,9 +12,9 @@
     "share_id": "uksxiDIzE1AEckKH"
   },
   "counts": {
-    "候補": 27,
+    "候補": 26,
     "設計中": 5,
-    "運用確認": 4,
+    "運用確認": 5,
     "運用": 0,
     "停止": 0,
     "運用確認中": 2
@@ -475,6 +475,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/111_パートナー連絡整理係/flow.md",
@@ -511,7 +517,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 8,
+        "procedure_count": 9,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -664,6 +670,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/112_LINE同期監視係/flow.md",
@@ -682,7 +694,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -835,6 +847,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/flow.md",
@@ -853,7 +871,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -993,6 +1011,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/114_物件一次判定係/flow.md",
@@ -1011,7 +1035,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -1156,6 +1180,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/115_修繕進捗要約係/flow.md",
@@ -1174,7 +1204,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -1271,6 +1301,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/200_返信・案内文面制作室/211_返信案内下書き係/flow.md",
@@ -1319,7 +1355,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 10,
+        "procedure_count": 11,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -1331,41 +1367,41 @@
       "department_name": "品質・タスク運用管理室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
-      "status_icon": "⚪",
+      "status": "運用確認",
+      "status_icon": "🟡",
       "report": "report",
-      "trigger": "人依頼",
-      "schedule": "依頼時",
+      "trigger": "イベント",
+      "schedule": "下書きパス受領時",
       "tool_assigned": "jarvis",
       "tool_fit": "B",
-      "tool_notes": "送信前ゲート。人確認必須",
-      "note": "2体目候補。人依頼トリガー。旧10_",
-      "summary": "対外文面の送信前チェック（送信はしない）",
+      "tool_notes": "送信前3点ゲート。上流S9/211/ホーク。送信は人",
+      "note": "Phase1〜3済（CLI／15分poll／上流enqueue）。運用確認中（〜10/26前後に運用へ）。デモ flow_AKQv6… 残置。旧10_",
+      "summary": "対外文面の送信前ゲート（宛先等のOK／NGのみ。送信しない）",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
-      "flowforge_id": "flow_AKQv6lgUEtudWlE5fQUhQnh2",
-      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2",
+      "flowforge_id": "flow_x4Sw8mVvuGVme1fXz9JGfs3v",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_x4Sw8mVvuGVme1fXz9JGfs3v",
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/LAPAAYJTXS-4Opu8",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_AKQv6lgUEtudWlE5fQUhQnh2",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_x4Sw8mVvuGVme1fXz9JGfs3v",
       "permissions": {
         "can_do": "送信前の文面・添付チェック（送信クリックは人）",
         "methods": [
           {
             "name": "チャット・検索",
             "level": "○",
-            "detail": "下書き・やり取り.md を読む"
+            "detail": "渡された下書き・やり取り.md を読む"
           },
           {
             "name": "外部連携（API/MCP）",
             "level": "△",
-            "detail": "必要なら Gmail 下書き読取（送信はしない）"
+            "detail": "必要なら読取のみ（送信しない）"
           },
           {
             "name": "CLI",
             "level": "○",
-            "detail": "下書きパスの確認"
+            "detail": "パス受領 B・点検本体"
           },
           {
             "name": "ブラウザ",
@@ -1383,7 +1419,7 @@
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "外に出す（送信・投稿）。金・削除も人。",
+        "human_gate": "外に出す（送信・投稿）。金・削除も人。ゲート途中の承認待ちは置かない。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -1391,37 +1427,37 @@
         "trigger_kinds": [
           {
             "id": "human",
-            "on": true,
-            "detail": "人が頼む（「送信前チェックして」「この下書き見て」）",
-            "raw": "人が頼む（「送信前チェックして」「この下書き見て」）"
+            "on": false,
+            "detail": "人が頼む（副・手動のみ。本線ではない）",
+            "raw": "人が頼む（副・手動のみ。本線ではない）"
           },
           {
             "id": "schedule",
             "on": false,
-            "detail": "時間",
-            "raw": "時間"
+            "detail": "00は捨てた）",
+            "raw": "時間（**使わない**。旧デモの毎日18:00は捨てた）"
           },
           {
             "id": "event",
-            "on": false,
-            "detail": "何かが届いたら",
-            "raw": "何かが届いたら"
+            "on": true,
+            "detail": "何かが届いたら／きっかけ — 上流が下書きパスを渡したとき → 人間ノードを挟まず AI が点検",
+            "raw": "**何かが届いたら／きっかけ** — 上流が下書きパスを渡したとき → **人間ノードを挟まず AI が点検**"
           },
           {
             "id": "watch",
             "on": false,
-            "detail": "変化・失敗を見回ったら",
-            "raw": "変化・失敗を見回ったら"
+            "detail": "",
+            "raw": ""
           }
         ],
         "trigger_kinds_on": [
-          "human"
+          "event"
         ],
-        "trigger_kinds_label": "人依頼",
+        "trigger_kinds_label": "イベント",
         "triggers_filled": true,
-        "when": "依頼時",
-        "registry_trigger": "人依頼",
-        "registry_schedule": "依頼時",
+        "when": "下書きパス受領時",
+        "registry_trigger": "イベント",
+        "registry_schedule": "下書きパス受領時",
         "primary_report": "report",
         "report_channels": [
           "report",
@@ -1429,14 +1465,14 @@
         ],
         "reports": [
           {
-            "kind": "完了報告",
+            "kind": "通過（件数）",
             "destination": "Slack `#report`",
             "channels": [
               "report"
             ]
           },
           {
-            "kind": "要判断",
+            "kind": "NG・要判断",
             "destination": "Slack `#consult`",
             "channels": [
               "consult"
@@ -1462,6 +1498,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/flow.md",
@@ -1474,13 +1516,31 @@
             "kind": "doc"
           },
           {
+            "title": "PROGRESS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/PROGRESS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/PROGRESS.md",
+            "kind": "doc"
+          },
+          {
             "title": "AGENTS.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/AGENTS.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/AGENTS.md",
             "kind": "doc"
+          },
+          {
+            "title": "phase1-kickoff.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/docs/phase1-kickoff.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/docs/phase1-kickoff.md",
+            "kind": "doc"
+          },
+          {
+            "title": "phase3-upstream.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/docs/phase3-upstream.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/docs/phase3-upstream.md",
+            "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 9,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -1625,6 +1685,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/flow.md",
@@ -1643,7 +1709,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -1788,6 +1854,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/flow.md",
@@ -1806,7 +1878,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -1951,6 +2023,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/flow.md",
@@ -1969,7 +2047,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2091,6 +2169,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/flow.md",
@@ -2139,7 +2223,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 10,
+        "procedure_count": 11,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2284,6 +2368,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/flow.md",
@@ -2302,7 +2392,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2453,6 +2543,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/411_Grok材料取込係/flow.md",
@@ -2471,7 +2567,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2630,6 +2726,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/412_両系統比較係/flow.md",
@@ -2648,7 +2750,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2799,6 +2901,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/413_取捨判断ドラフト係/flow.md",
@@ -2817,7 +2925,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2969,6 +3077,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/414_フィードバック返送係/flow.md",
@@ -2987,7 +3101,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -3139,6 +3253,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/400_ミックス・取捨判断室/415_二重起票・競合監視係/flow.md",
@@ -3157,7 +3277,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -3305,6 +3425,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/511_問合せ送信準備係/flow.md",
@@ -3323,7 +3449,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -3465,6 +3591,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/512_仲介返信取込係/flow.md",
@@ -3483,7 +3615,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -3625,6 +3757,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/513_需給・ペルソナ材料係/flow.md",
@@ -3643,7 +3781,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -3784,6 +3922,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/514_融資打診準備係/flow.md",
@@ -3802,7 +3946,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -3944,6 +4088,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/515_購入後クリエイティブ係/flow.md",
@@ -3962,7 +4112,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -4128,6 +4278,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/flow.md",
@@ -4146,7 +4302,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -4290,6 +4446,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/611_リソース制約要約係/flow.md",
@@ -4308,7 +4470,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -4407,6 +4569,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/612_課金・年会費ガード係/flow.md",
@@ -4425,7 +4593,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -4587,6 +4755,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/613_Zaim鮮度・二重取込係/flow.md",
@@ -4605,7 +4779,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -4634,7 +4808,144 @@
       "flowforge_id": "",
       "flowforge_url": "",
       "flowforge_share_url": "",
-      "flowforge_edit_url": ""
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "上記本線＋ `jarvis_points_rebate_slack_report.py`"
+          },
+          {
+            "name": "ブラウザ／CDP",
+            "level": "○",
+            "detail": "Mac Chrome 専用プロファイル（終了時 auto-quit）"
+          },
+          {
+            "name": "Slack Webhook",
+            "level": "○",
+            "detail": "`#report`（失敗時 `#ops`）"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "VPASS_ID",
+          "VPASS_PASSWORD",
+          "ETC_MILEAGE_ID",
+          "ETC_MILEAGE_WEB_PASSWORD",
+          "SLACK_WEBHOOK_AI_TEAM_REPORT",
+          "SLACK_WEBHOOK_AI_TEAM_OPS",
+          "JARVIS_TEIKI_BARAI_DISABLE",
+          "JARVIS_ETC_REBATE_AUTO_DISABLE",
+          "JARVIS_POINTS_REBATE_SLACK_REPORT_DISABLE",
+          "JARVIS_TEIKI_SLACK_REPORT_DISABLE",
+          "JARVIS_ETC_SLACK_REPORT_DISABLE",
+          "JARVIS_VPOINT_SLACK_REPORT_DISABLE"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「テイチャン」「ETC還元」「Vポイント定例」",
+            "raw": "人が頼む: 「テイチャン」「ETC還元」「Vポイント定例」"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "human"
+        ],
+        "trigger_kinds_label": "人依頼",
+        "triggers_filled": true,
+        "when": "月木テイチャン／毎月20-26ETC／窓CVポイント",
+        "registry_trigger": "時間",
+        "registry_schedule": "月木テイチャン／毎月20-26ETC／窓CVポイント",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "定時・結果",
+            "destination": "Slack `#report`（【614 ポイント・還元ウォッチ係｜…】）",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "失敗",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "人が見る画面",
+            "destination": "`/vpoint` · `/etc`",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/614_ポイント・還元ウォッチ係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
     },
     {
       "id": "615",
@@ -4654,14 +4965,174 @@
       "tool_notes": "USD/JPY 推移グラフ＋短報。売買指図なし。正本 jarvis_yen_rate_watch.py",
       "note": "2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。",
       "summary": "2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。",
-      "flow_summary": "開始（GHA月木／人）→ Yahoo/Frankfurter 取得 → グラフ＋短報 → Slack `#report`【615｜USDJPY】と `reports/`。売買文言は出さない。",
+      "flow_summary": "開始（GHA月木08:00／人）→ Yahoo/Frankfurter で USD/JPY 取得 → グラフ＋短報＋見立て → **Slack `#report`【615｜USDJPY】**・`reports/`・**ダッシュ `/yen`**（Supabase）。売買文言・発注は出さない。失敗は `#ops`。",
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
       "flowforge_id": "",
       "flowforge_url": "",
       "flowforge_share_url": "",
-      "flowforge_edit_url": ""
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`jarvis_yen_rate_watch.py`"
+          },
+          {
+            "name": "外部API",
+            "level": "○",
+            "detail": "Yahoo chart／Frankfurter／Tavily（任意）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "×",
+            "detail": ""
+          },
+          {
+            "name": "柱",
+            "level": "内容",
+            "detail": ""
+          },
+          {
+            "name": "入口",
+            "level": "Yahoo `USDJPY=X`（`jarvis_trade_common`）。失敗時 Frankfurter",
+            "detail": ""
+          },
+          {
+            "name": "確認",
+            "level": "自動報告のみ。売買なし",
+            "detail": ""
+          },
+          {
+            "name": "履歴",
+            "level": "`reports/` ＋ `.jarvis_state/yen_rate_watch.json`",
+            "detail": ""
+          },
+          {
+            "name": "停止",
+            "level": "`disabled` / `JARVIS_YEN_RATE_WATCH_DISABLE=1`",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "JARVIS_YEN_RATE_WATCH_DISABLE",
+          "SLACK_WEBHOOK_AI_TEAM_REPORT",
+          "SLACK_WEBHOOK_AI_TEAM_OPS",
+          "TAVILY_API_KEY"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "急変時の解釈・保有資産への影響判断。売買は人のみ。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「円どう？／ドル円」",
+            "raw": "人が頼む: 「円どう？／ドル円」"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "GHA 月・木 08:00 JST",
+            "raw": "時間: GHA 月・木 08:00 JST"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "（将来・急変閾値で `#ops`）",
+            "raw": "イベント: （将来・急変閾値で `#ops`）"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間",
+        "triggers_filled": true,
+        "when": "GHA月木08:00",
+        "registry_trigger": "時間",
+        "registry_schedule": "GHA月木08:00",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "定例",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "失敗",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "控え",
+            "destination": "`reports/YYYY-MM-DD.md`・`reports/charts/`",
+            "channels": []
+          },
+          {
+            "kind": "ダッシュ",
+            "destination": "`/yen`（`yen_rate_daily`＋`watch_status.yen_rate`）",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
     },
     {
       "id": "711",
@@ -4758,6 +5229,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/711_家族Journal週次材料係/flow.md",
@@ -4776,7 +5253,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -4875,6 +5352,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/712_アドバイザー週次パック係/flow.md",
@@ -4893,7 +5376,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -4992,6 +5475,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/713_総務・DXコーチ材料係/flow.md",
@@ -5010,7 +5499,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -5032,14 +5521,156 @@
       "tool_notes": "Genspark/JPR→Notion電話面談Inbox提案。了承後のみ作成。家族会議除外",
       "note": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml",
       "summary": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml",
-      "flow_summary": "スキャン → 候補提案（無言作成なし）→ 了承後に Notion Inbox ＋ 索引。家族会議は除外。",
+      "flow_summary": "スキャン → **候補提案のみ**（無言 Notion 作成なし）→ 了承後に Notion 電話面談 `_Inbox` ＋ Obsidian 索引1行。家族会議は除外（週次パスのまま）。",
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
       "flowforge_id": "",
       "flowforge_url": "",
       "flowforge_share_url": "",
-      "flowforge_edit_url": ""
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "curate / genspark fetch / notion API"
+          },
+          {
+            "name": "秘密",
+            "level": "○",
+            "detail": "`GSK_API_KEY`・`NOTION_API_TOKEN`（jarvis_private）"
+          },
+          {
+            "name": "柱",
+            "level": "内容",
+            "detail": ""
+          },
+          {
+            "name": "入口",
+            "level": "Genspark list ＋ JPR 未処理",
+            "detail": ""
+          },
+          {
+            "name": "確認",
+            "level": "提案のみ。了承後 apply",
+            "detail": ""
+          },
+          {
+            "name": "履歴",
+            "level": "`.jarvis_state/meeting_minutes_curate.json` ＋ `reports/`",
+            "detail": ""
+          },
+          {
+            "name": "停止",
+            "level": "`disabled` / `JARVIS_MEETING_MINUTES_CURATE_DISABLE=1`",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "JARVIS_MEETING_MINUTES_CURATE_DISABLE",
+          "GSK_API_KEY",
+          "NOTION_API_TOKEN"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "Notion に残すかの了承。対外送信はしない。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「議事録整理して」",
+            "raw": "人が頼む: 「議事録整理して」"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "朝オープン相乗り（launchd soft-fail 想定）",
+            "raw": "朝オープン相乗り（launchd soft-fail 想定）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "パートナー確認前半のついで（失敗しても止めない）",
+            "raw": "パートナー確認前半のついで（失敗しても止めない）"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · 見回り",
+        "triggers_filled": true,
+        "when": "パートナー確認ついで／朝オープン／明示依頼",
+        "registry_trigger": "人依頼",
+        "registry_schedule": "パートナー確認ついで／朝オープン／明示依頼",
+        "primary_report": "report",
+        "report_channels": [
+          "report"
+        ],
+        "reports": [
+          {
+            "kind": "提案",
+            "destination": "チャット／必要なら Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "正本",
+            "destination": "Notion 電話・面談 `_Inbox`",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
     },
     {
       "id": "811",
@@ -5189,6 +5820,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係/flow.md",
@@ -5207,7 +5844,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -5359,6 +5996,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/812_残り棚棚卸し係/flow.md",
@@ -5377,7 +6020,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -5517,6 +6160,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/813_代行指揮枠切替係/flow.md",
@@ -5535,7 +6184,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -5684,6 +6333,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_Jarvisダッシュボード更新係/flow.md",
@@ -5702,7 +6357,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -5851,6 +6506,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_KURASHIFT更新係/flow.md",
@@ -5869,7 +6530,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -6014,6 +6675,12 @@
             "kind": "doc"
           },
           {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/TASK.md",
+            "kind": "doc"
+          },
+          {
             "title": "flow.md",
             "path": "docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/800_俯瞰UI・投影更新室/816_Slack俯瞰連携係/flow.md",
@@ -6032,7 +6699,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     }
@@ -9219,7 +9886,7 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "2体目候補。人依頼トリガー。旧10_"
+        "role_split": "Phase1〜3済（CLI／15分poll／上流enqueue）。運用確認中（〜10/26前後に運用へ）。デモ flow_AKQv6… 残置。旧10_"
       },
       {
         "side": "ai_only",
