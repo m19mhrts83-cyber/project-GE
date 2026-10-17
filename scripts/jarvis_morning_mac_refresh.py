@@ -59,6 +59,7 @@ KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 VENDOR_OUTREACH_STALL = REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
 KURASHIFT_RE_DAILY_DIGEST = REPO / "scripts" / "jarvis_kurashift_re_daily_digest.py"
+AGENT_TEAM_DAILY_DIGEST = REPO / "scripts" / "jarvis_agent_team_daily_digest.py"
 KURASHIFT_RE_CLEANUP = REPO / "scripts" / "jarvis_kurashift_re_cleanup.py"
 KURASHIFT_OBSIDIAN_PICK_SYNC = REPO / "scripts" / "jarvis_kurashift_obsidian_pick_sync.py"
 MEETING_MINUTES_CURATE = REPO / "scripts" / "jarvis_meeting_minutes_curate.py"
@@ -1124,6 +1125,25 @@ def main() -> int:
             print(f"# kurashift_re_daily_digest soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["kurashift_re_daily_digest"] = "skipped"
+
+    # 2c3b. AIエージェントチーム Slack 日次集約（#report・1日1通・soft-fail）
+    if AGENT_TEAM_DAILY_DIGEST.is_file() and not args.skip_fetch:
+        digest_args = [exe, str(AGENT_TEAM_DAILY_DIGEST)]
+        if args.dry_run:
+            digest_args.append("--dry-run")
+        else:
+            digest_args.append("--post")
+        rc = run_step(
+            "agent_team_daily_digest",
+            digest_args,
+            timeout=90,
+            dry_run=False,  # 上で --dry-run/--post を付けたので二重にしない
+        )
+        results["steps"]["agent_team_daily_digest"] = rc
+        if rc != 0:
+            print(f"# agent_team_daily_digest soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["agent_team_daily_digest"] = "skipped"
 
     # 2c4. KURASHIFT 候補自動クリーンアップ（低スコア・エリア外・放置物件の自然退避）
     if KURASHIFT_RE_CLEANUP.is_file() and not args.skip_fetch:
