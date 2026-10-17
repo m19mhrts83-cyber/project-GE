@@ -184,13 +184,14 @@ def write_dept_board(
     return out
 
 
-def sync_drive(rel: Path, dry: bool) -> None:
+def sync_drive(rel: Path, dry: bool, *, dst_rel: Path | None = None) -> None:
+    """HUB/rel → DRIVE_HUB/(dst_rel or rel)。dst_rel で Drive 側だけ別パスに写せる。"""
     if dry or not DRIVE_HUB.is_dir():
         return
     src = HUB / rel
     if not src.exists():
         return
-    dst = DRIVE_HUB / rel
+    dst = DRIVE_HUB / (dst_rel if dst_rel is not None else rel)
     dst.parent.mkdir(parents=True, exist_ok=True)
     if src.is_file():
         shutil.copy2(src, dst)
@@ -1494,10 +1495,11 @@ def main() -> int:
         }
         docs_subdir = Path("90_ハブ文書")
         for src in sorted(HUB.glob("*.md")):
+            name = Path(src.name)
             if src.name in drive_root_keep:
-                sync_drive(Path(src.name), False)
+                sync_drive(name, False)
             else:
-                sync_drive(docs_subdir / src.name, False)
+                sync_drive(name, False, dst_rel=docs_subdir / src.name)
                 # 旧配置（Drive直下）の残骸を消す
                 stale = DRIVE_HUB / src.name
                 if stale.is_file():
@@ -1505,16 +1507,15 @@ def main() -> int:
         for rel in ("agents_registry.yaml",):
             if (HUB / rel).exists():
                 sync_drive(Path(rel), False)
-        # Drive 側の 90_ 案内（Git に無い場合のみ作る／更新は上書きしない方針なら skip）
         guide = DRIVE_HUB / docs_subdir / "00_このフォルダ.md"
-        if not guide.is_file():
-            guide.parent.mkdir(parents=True, exist_ok=True)
-            guide.write_text(
-                "# 90_ハブ文書（Drive）\n\n"
-                "番号付き設計・進捗 MD の置き場。"
-                "Git 正本は `docs/AIエージェントチーム/` 直下。\n",
-                encoding="utf-8",
-            )
+        guide.parent.mkdir(parents=True, exist_ok=True)
+        guide.write_text(
+            "# 90_ハブ文書（Drive）\n\n"
+            "番号付き設計・進捗 MD の置き場（2026-10-17）。"
+            "Git 正本は `docs/AIエージェントチーム/` 直下（相対リンク維持）。"
+            "写しは `jarvis_agent_team_status_sync.py`。\n",
+            encoding="utf-8",
+        )
         print(f"  drive: {DRIVE_HUB}（ハブMD→90_ハブ文書／入口は直下）")
     return 0
 
