@@ -10,5 +10,6 @@ Genspark／JPR の録音から「Notion に残す価値あり」を提案し、�
 | 除外 | 家族会議週次（711／`jarvis-family-meeting-weekly`） |
 | 確認 | **無言作成禁止**。提案 → 了承 → `--apply` |
 | 組織図 | [ビルダー共有](https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH) |
+| 作業フロー素案 | [`flow.md`](./flow.md)（FlowForge 未作成） |
 | 指示書 | [`CLAUDE.md`](./CLAUDE.md) |
 | 停止 | `JARVIS_MEETING_MINUTES_CURATE_DISABLE=1` |

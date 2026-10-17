@@ -44,9 +44,14 @@ ID: **615**。リソース・家計室。
 | 定例 | Slack `#report` |
 | 失敗 | Slack `#ops` |
 | 控え | `reports/YYYY-MM-DD.md`・`reports/charts/` |
+| ダッシュ | `/yen`（`yen_rate_daily`＋`watch_status.yen_rate`） |
 
 ## 7. 改善ログ
 
 | 日付 | 内容 |
 |---|---|
 | 2026-10-17 | 新設。Stage A/B 実装 |
+| 2026-10-17 | Builder 組織図反映確認（不動産・家計室・共有 `uksxiDIzE1AEckKH`・38体） |
+| 2026-10-17 | `flow.md` を614型に拡充（ステップ一覧・FF作り込みメモ）。FFノードは次波 |
+| 2026-10-17 | 短報に前日比＋約1ヶ月前＋約1年前の表形式。`reports/` は Markdown 表 |
+| 2026-10-17 | Stage C: `/yen`・Supabase日次投影・見立てコメント（売買指図なし） |
