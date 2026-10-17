@@ -191,6 +191,11 @@ def main() -> int:
         default=5,
         help="1回で出す Bカードの上限（超過分は保留として記録し翌回へ）",
     )
+    ap.add_argument(
+        "--c-list",
+        action="store_true",
+        help="C を件数サマリではなくタイトル羅列（旧挙動。通常は使わない）",
+    )
     args = ap.parse_args()
 
     if os_disabled():
@@ -258,7 +263,7 @@ def main() -> int:
         if st.get("digest_c_date") == now_jst_date() and not args.force:
             print("C digest: already posted today")
         else:
-            text = format_c_digest(c_pairs)
+            text = format_c_digest(c_pairs, detail=bool(args.c_list))
             pr = post_slack("report", text, dry_run=args.dry_run)
             print(f"C digest: {pr}")
             if pr.get("ok") and not args.dry_run:
