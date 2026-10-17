@@ -4,6 +4,9 @@
 Todoist `agent_team` の列件数＋物件ゲート（114）の未判断Bを集計し、
 `#report` に1通投稿する。指示・承認ボタンは後段（第2/3段階）。
 
+レイアウト方針（2026-10-18）: iPhone 幅前提。件数を先頭1行、優先は最大5件・
+タイトルは短く省略、深いネスト・長パスは出さない。
+
 例:
   python scripts/jarvis_agent_team_daily_digest.py --dry-run
   python scripts/jarvis_agent_team_daily_digest.py --post
@@ -16,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.parse
@@ -34,9 +38,25 @@ PY = sys.executable
 
 _OPEN_DECISIONS = ("yes", "no", "sent", "skipped")
 
+# iPhone Slack 1行目安（全角換算）。超えたら末尾を省略
+_TITLE_MAX_CELLS = 22
+_PRIORITY_SHOW = 5
+# Todoist プロジェクト表示名（config lanes.agent_team / projects.agent_team.name）
+_TODOIST_PJ_SHORT = "AIチーム"
+_TODOIST_PJ_FULL = "AIエージェントチーム"
+_PREFIX_RE = re.compile(
+    r"^(\[AIエージェントチーム\]|【AIエージェントチーム】|AIエージェントチーム[｜|]\s*)"
+)
+
 
 def _today() -> str:
     return datetime.now(JST).date().isoformat()
+
+
+def _today_short() -> str:
+    """M/D（iPhone 見出し用。ゼロ埋めなし）。"""
+    now = datetime.now(JST)
+    return f"{now.month}/{now.day}"
 
 
 def _disabled() -> bool:
@@ -64,8 +84,44 @@ def _save_state(st: dict) -> None:
     )
 
 
+def _cell_width(ch: str) -> int:
+    """Rough display cells: CJK/fullwidth ≈ 2, else 1."""
+    o = ord(ch)
+    if (
+        0x1100 <= o <= 0x115F
+        or 0x2E80 <= o <= 0xA4CF
+        or 0xAC00 <= o <= 0xD7A3
+        or 0xF900 <= o <= 0xFAFF
+        or 0xFE10 <= o <= 0xFE6F
+        or 0xFF01 <= o <= 0xFF60
+        or 0xFFE0 <= o <= 0xFFE6
+        or 0x1F300 <= o <= 0x1FAFF
+    ):
+        return 2
+    return 1
+
+
+def shorten_title(raw: str, *, max_cells: int = _TITLE_MAX_CELLS) -> str:
+    """Strip lane prefix and truncate for mobile one-line."""
+    t = (raw or "").strip()
+    t = _PREFIX_RE.sub("", t).strip()
+    t = re.sub(r"\s+", " ", t)
+    if not t:
+        return "（無題）"
+    cells = 0
+    out: list[str] = []
+    for ch in t:
+        w = _cell_width(ch)
+        if cells + w > max_cells:
+            out.append("…")
+            break
+        out.append(ch)
+        cells += w
+    return "".join(out)
+
+
 def _todoist_section_counts() -> tuple[Counter[str], list[str]]:
-    """agent_team レーンのセクション別件数と、オーナー確認タイトル先頭。"""
+    """agent_team レーンのセクション別件数と、オーナー確認タイトル（全件・短縮前）。"""
     sys.path.insert(0, str(SCRIPTS))
     import jarvis_todoist_api as td  # noqa: WPS433
 
@@ -87,8 +143,8 @@ def _todoist_section_counts() -> tuple[Counter[str], list[str]]:
         if sec == "オーナー確認":
             title = str(t.get("content") or "").strip()
             if title:
-                owner_titles.append(title[:60])
-    return counts, owner_titles[:8]
+                owner_titles.append(title)
+    return counts, owner_titles
 
 
 def _gate_open_b() -> tuple[int, int]:
@@ -122,6 +178,7 @@ def _gate_open_b() -> tuple[int, int]:
 
 
 def build_digest() -> tuple[str, dict]:
+    """iPhone向け短文。件数の出所（Todoist PJ／列）を明示→優先最大5件。"""
     counts, owner_titles = _todoist_section_counts()
     open_b, deferred_b = _gate_open_b()
     owner_n = int(counts.get("オーナー確認", 0))
@@ -130,34 +187,42 @@ def build_digest() -> tuple[str, dict]:
     hold_n = int(counts.get("HOLD", 0))
     consult_n = owner_n + open_b  # 人が見る優先枠
 
+    # 件数はすべて Todoist「AIエージェントチーム」Board の各列
+    # B未決だけは物件ゲート（ダッシュ）— Todoist ではない
+    b_bit = f"物件B未決{open_b}"
+    if deferred_b:
+        b_bit += f"(保留{deferred_b})"
+    b_bit += "＝ダッシュ(Todoist外)"
+
     lines = [
-        f"【AIチーム・日次集約】{_today()}",
-        "通知のみ（第1段階）。判断は #consult／オーナー確認へ。",
+        f"【日次】{_today_short()}",
+        f"場所: Todoist「{_TODOIST_PJ_FULL}」",
+        f"列件数: 確認{owner_n}／進行{progress_n}／未着手{todo_n}／HOLD{hold_n}",
+        b_bit,
         "",
-        "*■ 今日見てほしい（優先）*",
-        f"• 要確認（Todoist オーナー確認）: {owner_n}件",
-        f"• 要判断（114 Bカード未決）: {open_b}件"
-        + (f"（保留キュー {deferred_b}）" if deferred_b else ""),
     ]
-    if owner_titles:
-        lines.append("• オーナー確認の先頭:")
-        for t in owner_titles:
-            lines.append(f"  – {t}")
-    if consult_n == 0:
-        lines.append("• （優先枠ゼロ。定常のみ）")
+
+    if owner_n == 0 and open_b == 0:
+        lines.append("今日見る: なし（オーナー確認列＝0）")
+    else:
+        lines.append(f"今日見る→同PJの「オーナー確認」列")
+        shown = owner_titles[:_PRIORITY_SHOW]
+        for i, raw in enumerate(shown, 1):
+            lines.append(f"{i}. {shorten_title(raw)}")
+        rest = max(0, owner_n - len(shown))
+        if rest:
+            lines.append(f"（他{rest}件→Todoist同PJ・同列）")
+        if open_b:
+            lines.append(f"＋物件B {open_b}件はカードで判断(#consult)")
 
     lines += [
         "",
-        "*■ 進捗サマリ（Todoist agent_team）*",
-        f"• 進行中 {progress_n} ／ 未着手 {todo_n} ／ HOLD {hold_n}",
-        "",
-        "*■ エラー*",
-        "• 本ダイジェストは件数通知のみ。障害は各係が #ops へ即時投稿（集約しない）",
-        "",
-        "詳細: docs/AIエージェントチーム/33_Slack日次集約_第1段階_20261017.md",
+        "障害→#ops（本通は件数のみ）",
     ]
     meta = {
         "date": _today(),
+        "todoist_project": _TODOIST_PJ_FULL,
+        "todoist_project_short": _TODOIST_PJ_SHORT,
         "owner_confirm": owner_n,
         "open_b": open_b,
         "deferred_b": deferred_b,
@@ -165,8 +230,12 @@ def build_digest() -> tuple[str, dict]:
         "todo": todo_n,
         "hold": hold_n,
         "consult_priority": consult_n,
+        "priority_shown": min(_PRIORITY_SHOW, len(owner_titles)),
+        "layout": "iphone_v2",
     }
     return "\n".join(lines), meta
+
+
 
 
 def post_slack(text: str, *, dry_run: bool) -> dict:
