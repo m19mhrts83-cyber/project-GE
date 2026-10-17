@@ -975,24 +975,92 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
 
 
 def format_a_line(deal: dict[str, Any], lane: dict[str, Any]) -> str:
-    return (
-        f"【AIチーム・114】A 自動 — {str(deal.get('title') or '')[:50]} "
-        f"reason={lane.get('reason')}（続く処理は511／調査元=Grok S1）"
+    """#report A報告（詳細）。Cの羅列よりこちらを読む想定（2026-10-17 松野）。"""
+    deal_id = str(deal["id"])
+    title = str(deal.get("title") or "物件")[:80]
+    title_disp = title.replace("[Grok調査]", "").strip() or title
+    rows = judgment_rows(deal, max_cell=160)
+    for i, (lab, val) in enumerate(rows):
+        if lab == "建物" and " · " in val:
+            rows[i] = (lab, val.split(" · ")[0].strip())
+            break
+    rb = land_ratio_brief(deal)
+    y = _yield_pct_number(deal)
+    y_s = _fmt_pct(y) if y is not None else "未記載"
+    est_rng, _, _ = _yield_estimate(deal)
+    y_all = f"表面 {y_s}" + (f" ／ 想定 {est_rng}" if est_rng else "")
+    land_s = rb or "未記載"
+    haz_status = "—"
+    for ln in hazard_eval_lines(deal):
+        if ln.startswith("• ステータス："):
+            haz_status = ln.replace("• ステータス：", "").strip()
+            break
+    reason = str(lane.get("reason") or "—")
+    next_step = (
+        "ポータル送信済 → 返信待ち（511は送らない）"
+        if reason == "portal_sent"
+        else "511 が第一問合せを自動準備（要送信ジョブ）"
+        if lane.get("auto_send")
+        else "511／Tier 側へ自動進行"
     )
-
-
-def format_c_digest(items: list[tuple[dict[str, Any], dict[str, Any]]]) -> str:
     lines = [
-        f"【AIチーム・114】C 報告のみ（{now_jst_date()}・{len(items)}件）",
-        "調査元=Grok S1／振分=114／人判断不要",
+        "【AIチーム・114】A 自動進行 — 判断不要（ここを読む）",
+        "調査=Grok S1 → 振分=114 → 次=511 ／ ※人の Yes/No は不要",
+        "",
+        f"*{title_disp}*",
+        f"理由：{reason} ・ listen={lane.get('listen') or '—'}",
+        f"*判断軸*　土地値率 {land_s} ／ 利回り {y_all}",
+        f"*ハザード*　{haz_status}",
+        "",
+        *format_judgment_card(deal, rows),
+        "",
+        f"*■ 次の一手*　{next_step}",
+        f"🔎 <{deal_url(deal_id)}|表で全部見る（ログイン不要）>",
     ]
-    for deal, lane in items[:30]:
-        lines.append(
-            f"・{str(deal.get('title') or '')[:40]} "
-            f"[{lane.get('listen') or '—'}] {lane.get('reason')}"
-        )
-    if len(items) > 30:
-        lines.append(f"…他 {len(items) - 30} 件")
+    return "\n".join(lines)
+
+
+def _c_reason_bucket(lane: dict[str, Any]) -> str:
+    listen = str(lane.get("listen") or "")
+    reason = str(lane.get("reason") or "")
+    action = str(lane.get("inquiry_action") or "")
+    if listen in ("見送り", "見送り候補") or "見送り" in reason:
+        return "見送り"
+    if listen == "保留" or "保留" in reason:
+        return "保留"
+    if action == "investigate_only" or "investigate_only" in reason:
+        return "調査のみ"
+    if "判定材料不足" in reason:
+        return "判定材料不足"
+    return "その他"
+
+
+def format_c_digest(
+    items: list[tuple[dict[str, Any], dict[str, Any]]],
+    *,
+    detail: bool = False,
+) -> str:
+    """#report Cサマリ。既定は件数のみ（羅列しない）。detail=True で旧タイトル列挙。"""
+    from collections import Counter
+
+    buckets = Counter(_c_reason_bucket(lane) for _, lane in items)
+    order = ("見送り", "保留", "調査のみ", "判定材料不足", "その他")
+    lines = [
+        f"【AIチーム・114】C サマリ（{now_jst_date()}・{len(items)}件）",
+        "人判断不要・一覧は読まなくてよい。詳細が必要なら deals／ログへ。",
+        "内訳: "
+        + "／".join(f"{k} {buckets[k]}" for k in order if buckets.get(k)),
+    ]
+    if detail:
+        lines.append("")
+        lines.append("（詳細モード）")
+        for deal, lane in items[:30]:
+            lines.append(
+                f"・{str(deal.get('title') or '')[:40]} "
+                f"[{lane.get('listen') or '—'}] {lane.get('reason')}"
+            )
+        if len(items) > 30:
+            lines.append(f"…他 {len(items) - 30} 件")
     return "\n".join(lines)
 
 
