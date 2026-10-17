@@ -641,6 +641,53 @@ def push_dashboard() -> dict[str, Any]:
         return {"ok": False, "error": str(e)}
 
 
+def push_slack_report(
+    *,
+    outcome: str,
+    state: dict[str, Any],
+    scrape: dict[str, Any] | None = None,
+    reason: str = "",
+    error: str = "",
+    note: str = "",
+) -> dict[str, Any]:
+    """614 係 → Slack #report（失敗時は script 側で #ops）。"""
+    py = str(PY) if PY.is_file() else sys.executable
+    script = REPO / "scripts" / "jarvis_teiki_slack_report.py"
+    if not script.is_file():
+        return {"ok": False, "error": "jarvis_teiki_slack_report.py missing"}
+    cmd = [
+        py,
+        str(script),
+        "--outcome",
+        outcome,
+        "--from-state",
+    ]
+    if reason:
+        cmd.extend(["--reason", reason])
+    if error:
+        cmd.extend(["--error", error[:200]])
+    if note:
+        cmd.extend(["--note", note[:200]])
+    draw = (scrape or {}).get("draw") if scrape else None
+    if isinstance(draw, dict) and draw.get("results_summary"):
+        cmd.extend(["--drew-summary", str(draw.get("results_summary"))[:120]])
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if proc.stdout:
+            print(proc.stdout.rstrip())
+        if proc.stderr:
+            print(proc.stderr.rstrip(), file=sys.stderr)
+        return {"ok": proc.returncode == 0, "returncode": proc.returncode}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def apply_scrape_to_state(state: dict[str, Any], scrape: dict[str, Any]) -> None:
     state["last_check_at"] = now_iso()
     if scrape.get("login_incomplete"):
@@ -714,18 +761,33 @@ def main() -> int:
         help="Playwright headless（GHA・無人。Mac Chrome CDP を使わない）",
     )
     ap.add_argument("--push", action="store_true", help="ダッシュボード /vpoint へ反映")
+    ap.add_argument(
+        "--slack",
+        action="store_true",
+        help="Slack #report へ短報（614）。--push 時は既定で付く",
+    )
+    ap.add_argument(
+        "--no-slack",
+        action="store_true",
+        help="Slack 短報を付けない（--push 時の既定を打ち消す）",
+    )
     args = ap.parse_args()
+    want_slack = (args.slack or args.push) and not args.no_slack
 
     env = load_env(ENV_FILE)
     if env.get("JARVIS_TEIKI_BARAI_DISABLE") == "1" or os.environ.get(
         "JARVIS_TEIKI_BARAI_DISABLE"
     ) == "1":
         print("📎 テイチャン: 無効化（JARVIS_TEIKI_BARAI_DISABLE=1）")
+        if want_slack:
+            print(f"📎 slack: {push_slack_report(outcome='disabled', state={})}")
         return 0
 
     state = load_state()
     if state.get("disabled"):
         print("📎 テイチャン: 無効化（state disabled）")
+        if want_slack:
+            print(f"📎 slack: {push_slack_report(outcome='disabled', state=state)}")
         return 0
 
     # interval を state に寄せ（未設定なら既定3日）
@@ -741,6 +803,10 @@ def main() -> int:
     if not due and args.run and not args.force:
         print(f"📎 テイチャン: 間隔内のためスキップ（{reason}）。--force で実行可")
         print_status(state, env)
+        if want_slack:
+            print(
+                f"📎 slack: {push_slack_report(outcome='skipped', state=state, reason=reason)}"
+            )
         return 0
 
     actionables = step1_actionables(state, env)
@@ -764,6 +830,10 @@ def main() -> int:
     except Exception as e:
         print(f"⚠️ テイチャン取得失敗: {e}", file=sys.stderr)
         print(format_report(actionables=actionables, scrape=None, state=state, drew=False))
+        if want_slack:
+            print(
+                f"📎 slack: {push_slack_report(outcome='failed', state=state, error=str(e))}"
+            )
         return 1
 
     print(format_report(actionables=actionables, scrape=scrape, state=state, drew=drew))
@@ -772,6 +842,14 @@ def main() -> int:
     if args.push:
         pr = push_dashboard()
         print(f"📎 dashboard push: {pr}")
+    if want_slack:
+        outcome = "drew" if drew else "checked"
+        note = ""
+        if actionables:
+            note = f"Step1候補{len(actionables)}件"
+        print(
+            f"📎 slack: {push_slack_report(outcome=outcome, state=state, scrape=scrape, note=note)}"
+        )
     return 0
 
 

@@ -24,6 +24,7 @@ fi
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
   # Mac 本線: Chrome CDP（セッション維持）。券があれば抽選まで自動。
+  # --push でダッシュボード＋ Slack #report（614 Vポイント・テイチャン係）
   # GHA だけ --headless（Vpass は失敗しやすい）
   "$PY" -u "${REPO_DIR}/scripts/jarvis_teiki_barai_chance.py" --run --push
   echo "# end exit=$?"

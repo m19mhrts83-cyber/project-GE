@@ -413,7 +413,21 @@ agents:
     tool_fit: B
     tool_notes: 鮮度＋費目学習。Mac Playwright／GHAはcheckのみ
     schedule: 火金09鮮度／火金12CSV
-    note: 指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。
+    note: 指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。Slack短報は次波（異常時#ops）。
+  '614':
+    name: Vポイント・テイチャン係
+    path: 600_リソース・家計室/614_Vポイント・テイチャン係
+    flowforge_id: ''
+    flowforge_url: ''
+    status: 設計中
+    report: report
+    mixup_kind: none
+    trigger: 時間
+    tool_assigned: jarvis
+    tool_fit: B
+    tool_notes: テイチャン確認・抽選→/vpoint＋Slack#report。Vポイントcadence短報は次波
+    schedule: 月木10:15launchd＋朝取りこぼし
+    note: 2026-10-17 新設。本線は jarvis_teiki_barai_chance.py --push（Slack相乗り）。FlowForge作り込み待ち。
   '711':
     name: 家族Journal週次材料係
     path: 700_コーチング支援室/711_家族Journal週次材料係
