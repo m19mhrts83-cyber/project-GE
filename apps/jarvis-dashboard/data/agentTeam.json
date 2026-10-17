@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-16T07:34:31+09:00",
+  "updated": "2026-10-17T12:15:43+09:00",
   "registry_updated": "2026-10-11",
   "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -13,7 +13,7 @@
   },
   "counts": {
     "候補": 27,
-    "設計中": 2,
+    "設計中": 3,
     "運用確認": 4,
     "運用": 0,
     "停止": 0,
@@ -104,16 +104,17 @@
       "ai_agent_ids": [
         "611",
         "612",
-        "613"
+        "613",
+        "614"
       ],
       "grok_bot_ids": [
         "resource"
       ],
       "counts": {
-        "ai": 3,
+        "ai": 4,
         "grok": 1,
         "paired": 1,
-        "ai_only": 2,
+        "ai_only": 3,
         "grok_only": 0
       }
     },
@@ -4442,7 +4443,7 @@
       "tool_assigned": "gencode",
       "tool_fit": "B",
       "tool_notes": "鮮度＋費目学習。Mac Playwright／GHAはcheckのみ",
-      "note": "指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。",
+      "note": "指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。Slack短報は次波（異常時#ops）。",
       "summary": "銀行連携の鮮度・二重取込の安全直し・費目学習。開いたとき `/zaim` が整っている状態へ",
       "flow_summary": "開始（火金09／火金12／キュー／人）→ **鮮度 check→（Mac）stale更新** と **CSV→learn→費目・集計 apply** を分岐 → **同じ `/zaim` 投影**に合流 → 異常時だけ `#ops`。",
       "builder_tag": "",
@@ -4605,6 +4606,33 @@
         "procedure_count": 5,
         "source": "claude+registry+ops_yaml"
       }
+    },
+    {
+      "id": "614",
+      "name": "Vポイント・テイチャン係",
+      "path": "600_リソース・家計室/614_Vポイント・テイチャン係",
+      "department_id": "600",
+      "department_name": "リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "report",
+      "trigger": "時間",
+      "schedule": "月木10:15launchd＋朝取りこぼし",
+      "tool_assigned": "jarvis",
+      "tool_fit": "B",
+      "tool_notes": "テイチャン確認・抽選→/vpoint＋Slack#report。Vポイントcadence短報は次波",
+      "note": "2026-10-17 新設。本線は jarvis_teiki_barai_chance.py --push（Slack相乗り）。FlowForge作り込み待ち。",
+      "summary": "2026-10-17 新設。本線は jarvis_teiki_barai_chance.py --push（Slack相乗り）。FlowForge作り込み待ち。",
+      "flow_summary": "",
+      "builder_tag": "",
+      "mixup_kind": "none",
+      "grok_counterpart": "",
+      "flowforge_id": "",
+      "flowforge_url": "",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": ""
     },
     {
       "id": "711",
@@ -9403,7 +9431,19 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。"
+        "role_split": "指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。Slack短報は次波（異常時#ops）。"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "614",
+        "agent_name": "Vポイント・テイチャン係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-10-17 新設。本線は jarvis_teiki_barai_chance.py --push（Slack相乗り）。FlowForge作り込み待ち。"
       },
       {
         "side": "paired",
@@ -9896,9 +9936,9 @@
     ],
     "mapping_counts": {
       "paired": 17,
-      "ai_only": 18,
+      "ai_only": 19,
       "grok_only": 23,
-      "all": 58
+      "all": 59
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },
