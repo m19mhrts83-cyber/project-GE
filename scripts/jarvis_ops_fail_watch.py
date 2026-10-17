@@ -15,6 +15,8 @@ Jarvis: Vercel / GitHub Actions の Fail を検知し watch_status へ反映。
 
 環境: JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY
 任意: gh 認証（GITHUB_TOKEN）/ CURSOR_API_KEY（--autofix）/ CURSOR_CLOUD_REPO_URL
+ゲート: JARVIS_OPS_FAIL_AUTOFIX_DISABLE=1 なら --autofix を無視（通知・push のみ）
+正本: docs/AIエージェントチーム/34_定期実行とAI使用量_20261017.md
 """
 from __future__ import annotations
 
@@ -26,6 +28,16 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
+
+
+def _autofix_disabled() -> bool:
+    return os.environ.get("JARVIS_OPS_FAIL_AUTOFIX_DISABLE", "").strip() in (
+        "1",
+        "true",
+        "TRUE",
+        "yes",
+        "YES",
+    )
 
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -759,18 +771,24 @@ def main(argv: list[str] | None = None) -> int:
     if rc != 0:
         return rc
     if args.autofix:
-        try:
-            extra = run_autofix(items)
-        except Exception as e:
-            print(f"# autofix error: {e}", file=sys.stderr)
-            extra = [
-                make_fix_notice(
-                    f"自動修復の起動に失敗: {e}",
-                    level="warn",
-                )
-            ]
-        if extra:
-            push_items(extra)
+        if _autofix_disabled():
+            print(
+                "# autofix skipped: JARVIS_OPS_FAIL_AUTOFIX_DISABLE=1",
+                file=sys.stderr,
+            )
+        else:
+            try:
+                extra = run_autofix(items)
+            except Exception as e:
+                print(f"# autofix error: {e}", file=sys.stderr)
+                extra = [
+                    make_fix_notice(
+                        f"自動修復の起動に失敗: {e}",
+                        level="warn",
+                    )
+                ]
+            if extra:
+                push_items(extra)
     return 0
 
 

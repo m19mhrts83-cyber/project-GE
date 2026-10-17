@@ -186,6 +186,8 @@ jobs:
           fi
           python scripts/jarvis_gha_partner_triage.py "${ARGS[@]}"
 
+      # Autofix は Fail(attention/warn) のときだけ Cloud Agent。抑制: repo Variable/Secret
+      # JARVIS_OPS_FAIL_AUTOFIX_DISABLE=1（了承後）。正本: docs/AIエージェントチーム/34_定期実行とAI使用量_20261017.md
       - name: Ops fail watch (Vercel / GHA) + autofix
         if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
@@ -194,6 +196,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           CURSOR_CLOUD_REPO_URL: ${{ secrets.CURSOR_CLOUD_REPO_URL }}
+          JARVIS_OPS_FAIL_AUTOFIX_DISABLE: ${{ vars.JARVIS_OPS_FAIL_AUTOFIX_DISABLE || secrets.JARVIS_OPS_FAIL_AUTOFIX_DISABLE || '' }}
         run: |
           set -euo pipefail
           python scripts/jarvis_ops_fail_watch.py --push --autofix
