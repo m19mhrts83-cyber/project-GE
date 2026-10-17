@@ -17,6 +17,7 @@
 | 完了条件 | [`114/tests/checklist.md`](100_連絡・物件動向把握室/114_物件一次判定係/tests/checklist.md) |
 | 依頼正本 | [`114/TASK.md`](100_連絡・物件動向把握室/114_物件一次判定係/TASK.md) |
 | 作業 | dry-run または本番相当1回（Slack投稿の有無は事前に決める） |
+| **対戦相手** | **GenCode（Friday）**（2026-10-17 確定） |
 
 ## 比較軸
 
@@ -45,15 +46,27 @@
 | Claude Code（既存枠があれば） | BCP 本命の一つ | Pro 新規は実験後 |
 | Cursor 内 Grok Bot | 参考 | フォルダ直編集は弱い場合あり |
 
-## 結果表（記入用）
+## 結果表（2026-10-17・dry-run）
 
-| 項目 | Cursor | 相手（　　） |
+| 項目 | Cursor（Jarvis） | GenCode（Friday） |
 |---|---|---|
-| 所要時間 | | |
-| checklist 通過 | | |
-| 修正回数 | | |
-| メモ | | |
+| 所要時間 | 約2秒（acquire〜release） | コマンド約4.7秒／全体約40秒（記録込み） |
+| checklist 通過 | 5/6（B投稿は dry-run で N/A） | 5/6（同） |
+| 振分結果 | A=1 / B=33 / C=119（153件） | **同値** |
+| 修正回数 | 0 | 0 |
+| メモ | 手順は Jarvis 側が既知 | 必読→ロック→実行→ログまで一発完走 |
+
+ログ:
+
+- GenCode: [`logs/20261017_compare_gencode.md`](100_連絡・物件動向把握室/114_物件一次判定係/logs/20261017_compare_gencode.md)
+- Cursor: [`logs/20261017_compare_cursor.md`](100_連絡・物件動向把握室/114_物件一次判定係/logs/20261017_compare_cursor.md)
+
+### 結論（この実験）
+
+- **共通フォルダ規格＋CLI本線**なら、実行ツールを変えても成果物（振分）は揃う。
+- GenCode は追加課金なしで BCP 代行として使える目安が立った。
+- Claude Code Pro は「必須」ではなく、別観点（編集体験・長期コスト）が欲しいときだけ検討でよい。
 
 ## 次
 
-結果を見て [`Claude Code Pro課金判断`](Todoist `6hmrRF3QrgQr6fhv`) へ。
+結果を見て Todoist [`Claude Code Pro課金判断`](../04_Todoist進捗_20261009.md) `6hmrRF3QrgQr6fhv` へ（要ボス）。
