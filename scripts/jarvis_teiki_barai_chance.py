@@ -35,7 +35,7 @@ from playwright.sync_api import Page, sync_playwright
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from car_loan.chrome_cdp import CHROME, cdp_ready, start_cdp_chrome  # noqa: E402
+from car_loan.chrome_cdp import CHROME, cdp_ready, start_cdp_chrome, stop_cdp_chrome  # noqa: E402
 from car_loan.env_state import ENV_FILE, load_env  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -615,11 +615,14 @@ def run_browser(*, do_draw: bool, headless: bool = False) -> dict[str, Any]:
         if not cdp_ready(CDP_PORT):
             raise RuntimeError(f"CDP port {CDP_PORT} not ready")
 
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
-        ctx = browser.contexts[0] if browser.contexts else browser.new_context()
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        _login_vpass(page, vpass_id, vpass_pw)
-        return scrape_and_maybe_draw(page, do_draw=do_draw)
+        try:
+            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
+            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            _login_vpass(page, vpass_id, vpass_pw)
+            return scrape_and_maybe_draw(page, do_draw=do_draw)
+        finally:
+            stop_cdp_chrome(PROFILE, CDP_PORT, force=True)
 
 
 def push_dashboard() -> dict[str, Any]:

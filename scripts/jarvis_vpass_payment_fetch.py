@@ -27,7 +27,7 @@ from playwright.sync_api import Page, sync_playwright
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from car_loan.chrome_cdp import start_cdp_chrome  # noqa: E402
+from car_loan.chrome_cdp import start_cdp_chrome, stop_cdp_chrome  # noqa: E402
 from car_loan.env_state import ENV_FILE, load_env  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -332,49 +332,52 @@ def fetch_olive_payment(*, headed: bool = False, wait_sec: int = 0) -> dict[str,
     start_cdp_chrome(CDP_PORT, PROFILE, LOGIN_URL)
     result: dict[str, Any] = {"ok": False}
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
-        ctx = browser.contexts[0] if browser.contexts else browser.new_context(locale="ja-JP")
-        page = ctx.new_page()
-        try:
-            _login(page, vpass_id, vpass_pw)
-            _select_olive_inf_if_needed(page)
-            _goto_mypage(page)
-            _select_olive_inf_if_needed(page)
-            # カード切替後に確定額が載るので Myページを再読込
-            page.goto(MYPAGE_URL, wait_until="domcontentloaded", timeout=90000)
-            time.sleep(1.5)
-            text = _body(page, 12000)
-            _shot(page, "after_login")
-            parsed = parse_payment_from_text(text)
-            opened = parsed.get("amount_jpy") is not None
-            if not opened:
-                opened = _open_payment_page(page)
-                _select_olive_inf_if_needed(page)
-                text = _body(page, 12000)
-                if "アクセス集中" in text or "つながりにくい" in text:
-                    raise RuntimeError("Vpass アクセス集中（支払画面）")
-                _shot(page, "payment_page")
-                parsed = parse_payment_from_text(text)
-            result = {
-                "ok": parsed.get("amount_jpy") is not None,
-                "card_id": "olive_infinite",
-                "url": page.url,
-                "opened_payment_nav": opened,
-                **parsed,
-                "fetched_at": datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z"),
-            }
-            if not result["ok"]:
-                result["error"] = "金額を画面から抽出できず"
-                result["text_sample"] = text[:800]
-        except Exception as e:
-            result = {"ok": False, "error": str(e)}
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
+            ctx = browser.contexts[0] if browser.contexts else browser.new_context(locale="ja-JP")
+            page = ctx.new_page()
             try:
-                _shot(page, "error")
-            except Exception:
-                pass
-        if wait_sec > 0:
-            time.sleep(wait_sec)
+                _login(page, vpass_id, vpass_pw)
+                _select_olive_inf_if_needed(page)
+                _goto_mypage(page)
+                _select_olive_inf_if_needed(page)
+                # カード切替後に確定額が載るので Myページを再読込
+                page.goto(MYPAGE_URL, wait_until="domcontentloaded", timeout=90000)
+                time.sleep(1.5)
+                text = _body(page, 12000)
+                _shot(page, "after_login")
+                parsed = parse_payment_from_text(text)
+                opened = parsed.get("amount_jpy") is not None
+                if not opened:
+                    opened = _open_payment_page(page)
+                    _select_olive_inf_if_needed(page)
+                    text = _body(page, 12000)
+                    if "アクセス集中" in text or "つながりにくい" in text:
+                        raise RuntimeError("Vpass アクセス集中（支払画面）")
+                    _shot(page, "payment_page")
+                    parsed = parse_payment_from_text(text)
+                result = {
+                    "ok": parsed.get("amount_jpy") is not None,
+                    "card_id": "olive_infinite",
+                    "url": page.url,
+                    "opened_payment_nav": opened,
+                    **parsed,
+                    "fetched_at": datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z"),
+                }
+                if not result["ok"]:
+                    result["error"] = "金額を画面から抽出できず"
+                    result["text_sample"] = text[:800]
+            except Exception as e:
+                result = {"ok": False, "error": str(e)}
+                try:
+                    _shot(page, "error")
+                except Exception:
+                    pass
+            if wait_sec > 0:
+                time.sleep(wait_sec)
+    finally:
+        stop_cdp_chrome(PROFILE, CDP_PORT, force=True)
     return result
 
 
