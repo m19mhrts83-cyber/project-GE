@@ -650,14 +650,16 @@ def push_slack_report(
     error: str = "",
     note: str = "",
 ) -> dict[str, Any]:
-    """614 係 → Slack #report（失敗時は script 側で #ops）。"""
+    """614 ポイント・還元ウォッチ係 → Slack #report（失敗時は script 側で #ops）。"""
     py = str(PY) if PY.is_file() else sys.executable
-    script = REPO / "scripts" / "jarvis_teiki_slack_report.py"
+    script = REPO / "scripts" / "jarvis_points_rebate_slack_report.py"
     if not script.is_file():
-        return {"ok": False, "error": "jarvis_teiki_slack_report.py missing"}
+        return {"ok": False, "error": "jarvis_points_rebate_slack_report.py missing"}
     cmd = [
         py,
         str(script),
+        "--kind",
+        "teiki",
         "--outcome",
         outcome,
         "--from-state",
@@ -764,7 +766,7 @@ def main() -> int:
     ap.add_argument(
         "--slack",
         action="store_true",
-        help="Slack #report へ短報（614）。--push 時は既定で付く",
+        help="Slack #report へ短報（614ポイント・還元ウォッチ）。--push 時は既定で付く",
     )
     ap.add_argument(
         "--no-slack",

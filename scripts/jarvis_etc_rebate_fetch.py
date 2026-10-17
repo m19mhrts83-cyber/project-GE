@@ -13,6 +13,7 @@ ETC 平日朝夕・還元額の自動取得（smile-etc）→ etc_monthly → �
   python scripts/jarvis_etc_rebate_fetch.py --dry-run
   python scripts/jarvis_etc_rebate_fetch.py --apply --push
   python scripts/jarvis_etc_rebate_fetch.py --target-month 2026-07 --apply --push --force
+  # --push → /etc 投影 ＋ Slack #report（614）。Slackだけ切る: --no-slack
 """
 
 from __future__ import annotations
@@ -337,11 +338,77 @@ def push_dashboard() -> dict[str, Any]:
     }
 
 
+def push_slack_report(
+    *,
+    outcome: str,
+    target_month: str = "",
+    rebate_yen: int | None = None,
+    asayu_trip_count: int | None = None,
+    asayu_rate_pct: int | None = None,
+    savings_yen: int | None = None,
+    reason: str = "",
+    error: str = "",
+    note: str = "",
+) -> dict[str, Any]:
+    """614 ポイント・還元ウォッチ係 → Slack #report。"""
+    script = REPO / "scripts" / "jarvis_points_rebate_slack_report.py"
+    if not script.is_file():
+        return {"ok": False, "error": "jarvis_points_rebate_slack_report.py missing"}
+    py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+    if not py.is_file():
+        py = Path(sys.executable)
+    cmd = [
+        str(py),
+        str(script),
+        "--kind",
+        "etc",
+        "--outcome",
+        outcome,
+    ]
+    if target_month:
+        cmd.extend(["--target-month", target_month])
+    if rebate_yen is not None:
+        cmd.extend(["--rebate-yen", str(rebate_yen)])
+    if asayu_trip_count is not None:
+        cmd.extend(["--asayu-trip-count", str(asayu_trip_count)])
+    if asayu_rate_pct is not None:
+        cmd.extend(["--asayu-rate-pct", str(asayu_rate_pct)])
+    if savings_yen is not None:
+        cmd.extend(["--savings-yen", str(savings_yen)])
+    if reason:
+        cmd.extend(["--reason", reason[:200]])
+    if error:
+        cmd.extend(["--error", error[:200]])
+    if note:
+        cmd.extend(["--note", note[:200]])
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if proc.stdout:
+            print(proc.stdout.rstrip())
+        if proc.stderr:
+            print(proc.stderr.rstrip(), file=sys.stderr)
+        return {"ok": proc.returncode == 0, "returncode": proc.returncode}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="ETC 平日朝夕還元額の自動取得")
     ap.add_argument("--dry-run", action="store_true", help="取得のみ（state/push しない）")
     ap.add_argument("--apply", action="store_true", help="etc_monthly.json に反映")
-    ap.add_argument("--push", action="store_true", help="dashboard_push --watch-only")
+    ap.add_argument("--push", action="store_true", help="dashboard_push --watch-only（Slack 相乗り）")
+    ap.add_argument(
+        "--slack",
+        action="store_true",
+        help="Slack #report へ短報（614）。--push 時は既定で付く",
+    )
+    ap.add_argument("--no-slack", action="store_true", help="Slack 短報を付けない")
     ap.add_argument("--force", action="store_true", help="履歴にあっても再取得・上書き")
     ap.add_argument(
         "--target-month",
@@ -350,6 +417,7 @@ def main() -> int:
     )
     ap.add_argument("--headed", action="store_true", help="ブラウザ表示")
     args = ap.parse_args()
+    want_slack = (args.slack or args.push) and not args.no_slack
 
     now = datetime.now(JST)
     env = load_dotenv(PRIVATE_ENV)
@@ -367,6 +435,8 @@ def main() -> int:
     }
     if disabled and not args.force:
         report["skipped"] = "disabled"
+        if want_slack:
+            report["slack"] = push_slack_report(outcome="disabled", reason="disabled")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
@@ -376,6 +446,7 @@ def main() -> int:
             f"定例窓外（本日{now.day}日）。付与は利用月の翌月20日。"
             "手動は --target-month YYYY-MM"
         )
+        # 窓外の定例ポーリングでは Slack しない（ノイズ防止）
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
@@ -392,6 +463,12 @@ def main() -> int:
     if not mid or not pw:
         report["ok"] = False
         report["error"] = "ETC_MILEAGE_ID / ETC_MILEAGE_WEB_PASSWORD 未設定"
+        if want_slack:
+            report["slack"] = push_slack_report(
+                outcome="failed",
+                target_month=target,
+                error=str(report["error"]),
+            )
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 2
 
@@ -405,12 +482,24 @@ def main() -> int:
     except Exception as e:
         report["ok"] = False
         report["error"] = str(e)
+        if want_slack:
+            report["slack"] = push_slack_report(
+                outcome="failed",
+                target_month=target,
+                error=str(e),
+            )
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1
 
     report["scrape"] = scraped
     if not scraped.get("ok"):
         report["ok"] = False
+        if want_slack:
+            report["slack"] = push_slack_report(
+                outcome="failed",
+                target_month=target,
+                error=str(scraped.get("error") or scraped.get("note") or "scrape not ok"),
+            )
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1
 
@@ -427,6 +516,25 @@ def main() -> int:
 
     if args.push:
         report["push"] = push_dashboard()
+
+    if want_slack:
+        report["slack"] = push_slack_report(
+            outcome="checked",
+            target_month=str(result.get("target_month") or target),
+            rebate_yen=result.get("rebate_yen")
+            if isinstance(result.get("rebate_yen"), int)
+            else None,
+            asayu_trip_count=result.get("asayu_trip_count")
+            if isinstance(result.get("asayu_trip_count"), int)
+            else None,
+            asayu_rate_pct=result.get("asayu_rate_pct")
+            if isinstance(result.get("asayu_rate_pct"), int)
+            else None,
+            savings_yen=result.get("savings_yen")
+            if isinstance(result.get("savings_yen"), int)
+            else None,
+            note=str(result.get("note") or "")[:200],
+        )
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
