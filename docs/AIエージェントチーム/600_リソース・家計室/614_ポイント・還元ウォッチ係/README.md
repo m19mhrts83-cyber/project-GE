@@ -9,4 +9,6 @@
 | ETC還元 | 毎月20〜26日 → `/etc` ＋ Slack |
 | Vポイント | 窓C定例 → `/vpoint` ＋ Slack |
 | Slack見出し | `【614 ポイント・還元ウォッチ係｜…】` |
+| 組織図 | [ビルダー共有](https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH)（不動産・家計室） |
+| 作業フロー素案 | [`flow.md`](./flow.md)（FlowForgeノードは未作成） |
 | 指示書 | [`CLAUDE.md`](./CLAUDE.md) |

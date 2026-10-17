@@ -14,12 +14,11 @@
 hub: docs/AIエージェントチーム
 builder_source:
   title: 物件と連絡の見守り隊
-  share_id: eHKHNixTpIF4G5WN
-  url: https://agent-team-builder-teal.vercel.app/s/eHKHNixTpIF4G5WN
-  previous_share_id: B8cQ9Q5XHtfrl2kF
-updated: '2026-10-11'
-builder_sync_note: 2026-10-10 部門をハブ8室に合わせて再編（4束ね）。同日 builder_tag を社員名末尾に付与（Grok同種17体）。旧share B8cQ9Q5XHtfrl2kF
-  は参照用。
+  share_id: uksxiDIzE1AEckKH
+  url: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
+  previous_share_id: eHKHNixTpIF4G5WN
+updated: '2026-10-17'
+builder_sync_note: 2026-10-17 614ポイント・還元ウォッチ係を不動産・家計室に追加し共有を再発行（旧 eHKHNixTpIF4G5WN／さらに旧 B8cQ9Q5XHtfrl2kF は参照用）。2026-10-10 部門4束ね・builder_tag。
 mixup_doc: 16_GrokBot対応_ミックスアップ識別_20261010.md
 numbering: '3桁固定ID。百の位＝部門、十の位＝まとまり、一の位＝社員。
 

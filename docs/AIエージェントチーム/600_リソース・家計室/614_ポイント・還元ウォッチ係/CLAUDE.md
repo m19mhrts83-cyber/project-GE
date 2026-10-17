@@ -8,7 +8,8 @@
 
 ## AIオートメーション（作業フロー）
 
-- **FlowForge**: 作り込み待ち（registry に URL を追記する）
+- **FlowForge**: ノード未作成。**素案の正は [`flow.md`](./flow.md)**（作り込み後に registry URL を追記）
+- ビルダー（組織図）: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)
 - Slack 短報正本: `scripts/jarvis_points_rebate_slack_report.py`（`--kind teiki|etc|vpoint`）
@@ -98,3 +99,4 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_statu
 |---|---|
 | 2026-10-17 | 係新設（旧名・テイチャン単体）→ Slack #report |
 | 2026-10-17 | **ポイント・還元ウォッチ**に改名・拡大。ETC／Vポイント定例も `#report` 相乗り。612（払う側）と分離 |
+| 2026-10-17 | ビルダー組織図に追加（共有 `uksxiDIzE1AEckKH`）。`flow.md` 素案を613型で充填 |
