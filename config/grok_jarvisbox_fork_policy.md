@@ -65,6 +65,7 @@ Drive `20_outbox_to_grok/` はこれまでどおり **仕事キュー**。チャ
 - **ホーク Notion**: `action: notion_tasks` → Jarvis が `jarvis_hawk_notion_tasks_apply.py --apply`（移行期）
 - **ホーク／部長 Todoist（本線）**: `action: todoist_tasks` → Mac が自動 apply（`jarvis_bucho_inbox_poll`）。`summary`/`links` → コメントの Markdown ハイパーリンク
 - **定型報告 → Slack**: `action: slack_report`（`channel: report|consult|ops`）→ Mac が Webhook 投稿。**壁打ちは Grok チャット可。松野判断に必要な材料は `#consult`（チャットだけに閉じない · 2026-10-15）**。正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md`
+- **送信前ゲート（311）**: `action: send_gate_311`（`draft_path` 必須）→ Mac が 311 `input/` へ enqueue → 機械点検 → Slack `#report`/`#consult`。**通過 ≠ 送信OK**（outbound-confirm は別）。正本: `docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/docs/phase3-upstream.md`
 - **要ボス／要Jarvis連携**は必ず Todoist ラベル付き起票（Drive メモだけでは漏れ扱い）
 - Drive `20_outbox` 空は正常。ホーク判断は Todoist `要ホーク`
 - **二重起票禁止**: 同 L-id／同趣旨タイトルがあれば create せず更新・列移動・コメントのみ（Jarvis 正本: `docs/Todoist_タスク正本_設計_20260921.md`「二重起票防止」）
@@ -88,12 +89,27 @@ Todoist「通知全員」→ **jarvis@**（`JARVIS_TODOIST_EMAIL`）に通知メ
 
 UI 差替手順: Drive `30_shared_working/2026-09-21_Jarvis分身Gmail_フォーク共有/00_松野向け_Grok_UI手順.md`
 
+## 作業セット秘密（Drive・TTL · 2026-10-17）
+
+松野了承のときだけ、**中等級**のログイン等を Drive に一時写ししてよい。
+
+| 等級 | 例 | Drive |
+|---|---|---|
+| 低 | 住所・物件ハブパス・Googleの**メール役割のみ** | 可（TTL推奨） |
+| 中 | 物件ポータル／Dashboard／管理会社マイページの ID・PW | **一時写しのみ**・`expires_on`（既定14日 or 作業完了） |
+| 高 | Google/Yahoo **パスワード**・銀行・カード・保険・API/OAuth | **載せない**（Jarvis／`.env.jarvis_private`） |
+
+- 正本は常に Mac `.env.jarvis_private`
+- **ホーク**: 期限到来または作業完了で削除。自前不可なら inbox で Jarvis に削除依頼
+- チャンネルへの PW・フル秘密の再貼り禁止
+
 ## Jarvis の動作（必須）
 
 1. Grok へ依頼・結果共有 → `jarvis_bucho_outbox_write.py --target …`（チャットだけで終わらない）
 2. Grok inbox 未処理 → `jarvis_bucho_inbox_poll.py`（パートナー確認ついで可）
 3. Instructions 更新 → git `config/grok_*_paste.md` → Drive `B1_*_全文.txt` 再生成を案内
 4. jarvis@ の Todoist 通知を処置したら、必要に応じ **ホーク／部長へ Drive 要約**（`target: hawk` / `re`）
+5. ホークから「作業セット削除依頼」が来たら Drive の当該フォルダ／MD を削除する
 
 ## 例外（JarvisBox 以外の正本）
 
