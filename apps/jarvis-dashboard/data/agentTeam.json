@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-17T12:15:43+09:00",
+  "updated": "2026-10-17T12:20:53+09:00",
   "registry_updated": "2026-10-11",
   "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -4609,8 +4609,8 @@
     },
     {
       "id": "614",
-      "name": "Vポイント・テイチャン係",
-      "path": "600_リソース・家計室/614_Vポイント・テイチャン係",
+      "name": "ポイント・還元ウォッチ係",
+      "path": "600_リソース・家計室/614_ポイント・還元ウォッチ係",
       "department_id": "600",
       "department_name": "リソース・家計室",
       "genre_id": "resource",
@@ -4619,12 +4619,12 @@
       "status_icon": "🔵",
       "report": "report",
       "trigger": "時間",
-      "schedule": "月木10:15launchd＋朝取りこぼし",
+      "schedule": "月木テイチャン／毎月20-26ETC／窓CVポイント",
       "tool_assigned": "jarvis",
       "tool_fit": "B",
-      "tool_notes": "テイチャン確認・抽選→/vpoint＋Slack#report。Vポイントcadence短報は次波",
-      "note": "2026-10-17 新設。本線は jarvis_teiki_barai_chance.py --push（Slack相乗り）。FlowForge作り込み待ち。",
-      "summary": "2026-10-17 新設。本線は jarvis_teiki_barai_chance.py --push（Slack相乗り）。FlowForge作り込み待ち。",
+      "tool_notes": "得る側（テイチャン／ETC還元／Vポイント定例）→/vpoint・/etc＋Slack#report。612（払う側）と分離",
+      "note": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。",
+      "summary": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "none",
@@ -9436,14 +9436,14 @@
       {
         "side": "ai_only",
         "agent_id": "614",
-        "agent_name": "Vポイント・テイチャン係",
+        "agent_name": "ポイント・還元ウォッチ係",
         "builder_tag": "",
         "mixup_kind": "ai_only",
         "grok_counterpart": "",
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "2026-10-17 新設。本線は jarvis_teiki_barai_chance.py --push（Slack相乗り）。FlowForge作り込み待ち。"
+        "role_split": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。"
       },
       {
         "side": "paired",
