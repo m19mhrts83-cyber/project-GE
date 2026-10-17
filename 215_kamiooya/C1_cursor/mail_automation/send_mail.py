@@ -52,6 +52,7 @@ if _1B_MANUAL.is_dir() and str(_1B_MANUAL) not in sys.path:
     sys.path.insert(0, str(_1B_MANUAL))
 from gmail_api_scopes import (
     GMAIL_SCOPES_215 as SCOPES,
+    merge_gmail_scopes_for_persist,
     resolve_single_token_path_215,
     token_satisfies_215_scopes,
 )
@@ -77,6 +78,18 @@ CREDENTIALS_FILE_LEGACY = SCRIPT_DIR / 'credentials.json'
 TOKEN_FILE_LEGACY = SCRIPT_DIR / 'token.pickle'
 
 
+def _persist_gmail_token(token_path: Path, creds, *, existing_record: dict | None = None) -> None:
+    """既存 gmail.*（特に send）を落とさず保存＋ミラー。"""
+    if token_path.suffix != ".json":
+        return
+    payload = merge_gmail_scopes_for_persist(
+        creds.to_json(),
+        existing_token_path=token_path,
+        existing_record=existing_record,
+    )
+    save_token_json_and_sync(token_path, payload)
+
+
 def authenticate_gmail():
     """Gmail APIの認証を行う（1b_Cursorマニュアルの token.json を使用。未設定時は旧 token.pickle にフォールバック）"""
     credentials_path = CREDENTIALS_FILE
@@ -88,9 +101,11 @@ def authenticate_gmail():
 
     # 現在の設定: token.json（1b_Cursorマニュアル）で認証
     creds = None
+    existing_record: dict | None = None
     if token_path.exists() and token_path.suffix == '.json':
         try:
             token_data = json.loads(token_path.read_text(encoding='utf-8'))
+            existing_record = dict(token_data)
             creds_data = dict(token_data)
             if 'client_id' not in creds_data and credentials_path.exists():
                 cred_data = json.loads(credentials_path.read_text(encoding='utf-8'))
@@ -111,8 +126,7 @@ def authenticate_gmail():
     if creds and creds.expired and creds.refresh_token:
         print("認証情報を更新しています...")
         creds.refresh(Request())
-        if token_path.suffix == '.json':
-            save_token_json_and_sync(token_path, creds.to_json())
+        _persist_gmail_token(token_path, creds, existing_record=existing_record)
         print("認証が完了しました。")
         return creds
     if credentials_path.exists():
@@ -120,8 +134,7 @@ def authenticate_gmail():
         print("ブラウザが開きますので、Googleアカウントで認証してください。")
         flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
         creds = flow.run_local_server(port=0)
-        if token_path.suffix == '.json':
-            save_token_json_and_sync(token_path, creds.to_json())
+        _persist_gmail_token(token_path, creds, existing_record=existing_record)
         print("認証が完了しました。")
         return creds
 
