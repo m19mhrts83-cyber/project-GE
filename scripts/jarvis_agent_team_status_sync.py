@@ -1484,14 +1484,38 @@ def main() -> int:
     write_dashboard_json(data, args.dry_run)
 
     if not args.dry_run and not args.no_drive:
-        # ハブ直下の MD は Git 正本を Drive へ丸ごと写す（設計メモ・表紙含む。
-        # Drive 側だけのメモは消さない＝上書きコピーのみ）
+        # Drive ハブ直下は入口だけ。番号付き設計MDは 90_ハブ文書/ へ写す
+        # （Git 正本は docs/AIエージェントチーム/ 直下のまま＝相対リンク維持）
+        drive_root_keep = {
+            "00_このフォルダ.md",
+            "00_チーム索引.md",
+            "CLAUDE.md",
+            "AGENTS.md",
+        }
+        docs_subdir = Path("90_ハブ文書")
         for src in sorted(HUB.glob("*.md")):
-            sync_drive(Path(src.name), False)
+            if src.name in drive_root_keep:
+                sync_drive(Path(src.name), False)
+            else:
+                sync_drive(docs_subdir / src.name, False)
+                # 旧配置（Drive直下）の残骸を消す
+                stale = DRIVE_HUB / src.name
+                if stale.is_file():
+                    stale.unlink(missing_ok=True)
         for rel in ("agents_registry.yaml",):
             if (HUB / rel).exists():
                 sync_drive(Path(rel), False)
-        print(f"  drive: {DRIVE_HUB}")
+        # Drive 側の 90_ 案内（Git に無い場合のみ作る／更新は上書きしない方針なら skip）
+        guide = DRIVE_HUB / docs_subdir / "00_このフォルダ.md"
+        if not guide.is_file():
+            guide.parent.mkdir(parents=True, exist_ok=True)
+            guide.write_text(
+                "# 90_ハブ文書（Drive）\n\n"
+                "番号付き設計・進捗 MD の置き場。"
+                "Git 正本は `docs/AIエージェントチーム/` 直下。\n",
+                encoding="utf-8",
+            )
+        print(f"  drive: {DRIVE_HUB}（ハブMD→90_ハブ文書／入口は直下）")
     return 0
 
 
