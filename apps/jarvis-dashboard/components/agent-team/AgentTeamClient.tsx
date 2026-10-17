@@ -581,7 +581,7 @@ export default function AgentTeamClient({
                       </td>
                       <td>
                         <Link href={`/agent-team/${a.id}`}>
-                          {a.name}
+                          {a.id} {a.name}
                           {a.builder_tag ? (
                             <span className="at-tag">{a.builder_tag}</span>
                           ) : null}

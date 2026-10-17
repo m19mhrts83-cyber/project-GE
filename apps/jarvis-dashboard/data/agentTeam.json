@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-17T12:28:55+09:00",
+  "updated": "2026-10-17T13:32:08+09:00",
   "registry_updated": "2026-10-17",
   "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -13,7 +13,7 @@
   },
   "counts": {
     "候補": 27,
-    "設計中": 3,
+    "設計中": 5,
     "運用確認": 4,
     "運用": 0,
     "停止": 0,
@@ -105,16 +105,17 @@
         "611",
         "612",
         "613",
-        "614"
+        "614",
+        "615"
       ],
       "grok_bot_ids": [
         "resource"
       ],
       "counts": {
-        "ai": 4,
+        "ai": 5,
         "grok": 1,
         "paired": 1,
-        "ai_only": 3,
+        "ai_only": 4,
         "grok_only": 0
       }
     },
@@ -142,7 +143,8 @@
       "ai_agent_ids": [
         "711",
         "712",
-        "713"
+        "713",
+        "714"
       ],
       "grok_bot_ids": [
         "coaching",
@@ -168,10 +170,10 @@
         "world_intec"
       ],
       "counts": {
-        "ai": 3,
+        "ai": 4,
         "grok": 21,
         "paired": 3,
-        "ai_only": 0,
+        "ai_only": 1,
         "grok_only": 18
       }
     },
@@ -703,7 +705,7 @@
       "note": "ミックスは弱対応。主はKURASHIFT／部長Daily",
       "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
       "flow_summary": "",
-      "builder_tag": "〔Grok:Bucho-RE〕",
+      "builder_tag": "〔Grok:S〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "bucho_re",
       "flowforge_id": "flow_RM18Xwo_pNXzMLpYwB9mU-pM",
@@ -3344,7 +3346,7 @@
       "note": "",
       "summary": "仲介返信・本日分のMac取込",
       "flow_summary": "",
-      "builder_tag": "〔Grok:仲介返信〕",
+      "builder_tag": "〔Grok:S/S5〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "bucho_re_evening",
       "flowforge_id": "flow_guoe9DBEATd6KvkKT_Jki0Kf",
@@ -4167,7 +4169,7 @@
       "note": "AI使用状況把握＋レビュー連動で社員頻度の減増を提案（本番変更は人確認後）。813と連携",
       "summary": "AI使用状況把握＋レビュー連動で社員頻度の減増を提案（本番変更は人確認後）。813と連携",
       "flow_summary": "",
-      "builder_tag": "〔Grok:Resource〕",
+      "builder_tag": "〔Grok:R〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "resource",
       "flowforge_id": "flow_azD9MyV6Lk3Pn63YMzf9uIFo",
@@ -4635,6 +4637,33 @@
       "flowforge_edit_url": ""
     },
     {
+      "id": "615",
+      "name": "円動向報告係",
+      "path": "600_リソース・家計室/615_円動向報告係",
+      "department_id": "600",
+      "department_name": "リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "report",
+      "trigger": "時間",
+      "schedule": "GHA月木08:00",
+      "tool_assigned": "jarvis",
+      "tool_fit": "B",
+      "tool_notes": "USD/JPY 推移グラフ＋短報。売買指図なし。正本 jarvis_yen_rate_watch.py",
+      "note": "2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。",
+      "summary": "2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。",
+      "flow_summary": "開始（GHA月木／人）→ Yahoo/Frankfurter 取得 → グラフ＋短報 → Slack `#report`【615｜USDJPY】と `reports/`。売買文言は出さない。",
+      "builder_tag": "",
+      "mixup_kind": "none",
+      "grok_counterpart": "",
+      "flowforge_id": "",
+      "flowforge_url": "",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": ""
+    },
+    {
       "id": "711",
       "name": "家族Journal週次材料係",
       "path": "700_コーチング支援室/711_家族Journal週次材料係",
@@ -4653,7 +4682,7 @@
       "note": "",
       "summary": "",
       "flow_summary": "",
-      "builder_tag": "〔Grok:Family〕",
+      "builder_tag": "〔Grok:F〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "family",
       "flowforge_id": "flow_RG36AFjCWVCR-1j3cp2GeLut",
@@ -4770,7 +4799,7 @@
       "note": "",
       "summary": "",
       "flow_summary": "",
-      "builder_tag": "〔Grok:Coaching〕",
+      "builder_tag": "〔Grok:C〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "coaching",
       "flowforge_id": "flow_IiBZKm1hgAZJ5AH7Vv6p9ZLl",
@@ -4887,7 +4916,7 @@
       "note": "",
       "summary": "",
       "flow_summary": "",
-      "builder_tag": "〔Grok:Somu〕",
+      "builder_tag": "〔Grok:M〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "somu",
       "flowforge_id": "flow_kQekwhhUuGTiEJJGOFu-b2zK",
@@ -4984,6 +5013,33 @@
         "procedure_count": 5,
         "source": "claude+registry+ops_yaml"
       }
+    },
+    {
+      "id": "714",
+      "name": "議事録整理係",
+      "path": "700_コーチング支援室/714_議事録整理係",
+      "department_id": "700",
+      "department_name": "コーチング支援室",
+      "genre_id": "coaching",
+      "genre_name": "コーチング",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "report",
+      "trigger": "人依頼",
+      "schedule": "パートナー確認ついで／朝オープン／明示依頼",
+      "tool_assigned": "jarvis",
+      "tool_fit": "B",
+      "tool_notes": "Genspark/JPR→Notion電話面談Inbox提案。了承後のみ作成。家族会議除外",
+      "note": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml",
+      "summary": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml",
+      "flow_summary": "スキャン → 候補提案（無言作成なし）→ 了承後に Notion Inbox ＋ 索引。家族会議は除外。",
+      "builder_tag": "",
+      "mixup_kind": "none",
+      "grok_counterpart": "",
+      "flowforge_id": "",
+      "flowforge_url": "",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": ""
     },
     {
       "id": "811",
@@ -5982,7 +6038,7 @@
     }
   ],
   "grok": {
-    "updated": "2026-10-11",
+    "updated": "2026-10-17",
     "index_doc": "config/grok_org_handoff_index.md",
     "mixup_doc": "docs/AIエージェントチーム/16_GrokBot対応_ミックスアップ識別_20261010.md",
     "pillars": [
@@ -6148,7 +6204,7 @@
     "bots": [
       {
         "id": "hawk",
-        "code": "Hawk",
+        "code": "H",
         "name": "ホークアイ（参謀）",
         "kind": "manager",
         "work": "横断優先・QOL・委譲・週次統括・Jarvisボックス振り分け",
@@ -6223,7 +6279,7 @@
       },
       {
         "id": "coaching",
-        "code": "Coaching",
+        "code": "C",
         "name": "コーチング部長",
         "kind": "manager",
         "work": "家族・総務・DX統括を束ねる首脳用まとめ・SB週次パック",
@@ -6298,7 +6354,7 @@
       },
       {
         "id": "bucho_re",
-        "code": "Bucho-RE",
+        "code": "S",
         "name": "不動産賃貸部長",
         "kind": "manager",
         "work": "Daily・S1–S13振り分け・日報・本日分／仲介返信パック",
@@ -7348,7 +7404,7 @@
       },
       {
         "id": "resource",
-        "code": "Resource",
+        "code": "R",
         "name": "リソース経営部長",
         "kind": "manager",
         "work": "brush-up・MQ・税務論点・今月のリソース制約",
@@ -7423,7 +7479,7 @@
       },
       {
         "id": "family",
-        "code": "Family",
+        "code": "F",
         "name": "家族コーチ統括",
         "kind": "manager",
         "work": "Journal／家族会議読取・振り分け・週次評価",
@@ -7498,7 +7554,7 @@
       },
       {
         "id": "madoka",
-        "code": "—",
+        "code": "F1",
         "name": "まどかコーチ",
         "kind": "coach",
         "work": "まどか専属コーチング",
@@ -7573,7 +7629,7 @@
       },
       {
         "id": "tamaki",
-        "code": "—",
+        "code": "F2",
         "name": "たまきコーチ",
         "kind": "coach",
         "work": "たまき専属コーチング",
@@ -7648,7 +7704,7 @@
       },
       {
         "id": "sawa",
-        "code": "—",
+        "code": "F3",
         "name": "さわコーチ",
         "kind": "coach",
         "work": "さわ専属コーチング",
@@ -7723,7 +7779,7 @@
       },
       {
         "id": "chikage",
-        "code": "—",
+        "code": "F4",
         "name": "ちかげアドバイザー",
         "kind": "advisor",
         "work": "配偶者・夫婦コミュニケーション",
@@ -7798,7 +7854,7 @@
       },
       {
         "id": "karate",
-        "code": "—",
+        "code": "F5",
         "name": "空手アドバイザー",
         "kind": "advisor",
         "work": "空手・遊愛会・Journal",
@@ -7873,7 +7929,7 @@
       },
       {
         "id": "app_dev",
-        "code": "App",
+        "code": "A",
         "name": "アプリ開発統括",
         "kind": "manager",
         "work": "週次点検・怪しさ・壁打ち（コード実装はJarvis）",
@@ -7948,7 +8004,7 @@
       },
       {
         "id": "somu",
-        "code": "Somu",
+        "code": "M",
         "name": "総務計画T統括",
         "kind": "manager",
         "work": "分身・振り分け・宇製造リソース実務・標準学習",
@@ -8023,7 +8079,7 @@
       },
       {
         "id": "isozaki",
-        "code": "—",
+        "code": "M1",
         "name": "磯崎コーチ",
         "kind": "coach",
         "work": "磯崎向けコーチング",
@@ -8098,7 +8154,7 @@
       },
       {
         "id": "tanaka",
-        "code": "—",
+        "code": "M2",
         "name": "田中コーチ",
         "kind": "coach",
         "work": "田中（安全担当・安全DX）",
@@ -8173,7 +8229,7 @@
       },
       {
         "id": "yamashita",
-        "code": "—",
+        "code": "M3",
         "name": "山下コーチ",
         "kind": "coach",
         "work": "山下向けコーチング",
@@ -8248,7 +8304,7 @@
       },
       {
         "id": "kawabata",
-        "code": "—",
+        "code": "M4",
         "name": "川畑コーチ",
         "kind": "coach",
         "work": "川畑向けコーチング",
@@ -8323,7 +8379,7 @@
       },
       {
         "id": "shinji",
-        "code": "—",
+        "code": "M5",
         "name": "慎二コーチ",
         "kind": "coach",
         "work": "太田慎二（DX直属）",
@@ -8398,7 +8454,7 @@
       },
       {
         "id": "nakajima",
-        "code": "—",
+        "code": "M6",
         "name": "中島アドバイザー",
         "kind": "advisor",
         "work": "中島新（企画・遠隔地）",
@@ -8473,7 +8529,7 @@
       },
       {
         "id": "ota_akitsugu",
-        "code": "—",
+        "code": "M7",
         "name": "太田アドバイザー",
         "kind": "advisor",
         "work": "太田章嗣（リソース司令塔）",
@@ -8548,7 +8604,7 @@
       },
       {
         "id": "imai",
-        "code": "—",
+        "code": "M8",
         "name": "今井部長アドバイザー",
         "kind": "advisor",
         "work": "今井部長（報告・部方針）",
@@ -8623,7 +8679,7 @@
       },
       {
         "id": "ohara",
-        "code": "—",
+        "code": "M9",
         "name": "大原次長アドバイザー",
         "kind": "advisor",
         "work": "大原次長（調整・資料）",
@@ -8698,7 +8754,7 @@
       },
       {
         "id": "hachiya",
-        "code": "—",
+        "code": "M10",
         "name": "蜂谷課長アドバイザー",
         "kind": "advisor",
         "work": "蜂谷課長（課長層展開）",
@@ -8773,7 +8829,7 @@
       },
       {
         "id": "partner_dx",
-        "code": "PDX",
+        "code": "P",
         "name": "パートナーDX統括",
         "kind": "manager",
         "work": "パートナーDX振り分け・入口",
@@ -8848,7 +8904,7 @@
       },
       {
         "id": "shift_ai",
-        "code": "—",
+        "code": "P1",
         "name": "シフトAIアドバイザー",
         "kind": "advisor",
         "work": "Shift AI 向け",
@@ -8923,7 +8979,7 @@
       },
       {
         "id": "world_intec",
-        "code": "—",
+        "code": "P2",
         "name": "ワールドインテックアドバイザー",
         "kind": "advisor",
         "work": "ワールドインテック向け",
@@ -8998,7 +9054,7 @@
       },
       {
         "id": "weather",
-        "code": "Weather",
+        "code": "W",
         "name": "天気お知らせ",
         "kind": "utility",
         "work": "朝の天気 ch 直投（ホーク傘下）",
@@ -9101,14 +9157,14 @@
         "side": "paired",
         "agent_id": "113",
         "agent_name": "物件買進め確認係",
-        "builder_tag": "〔Grok:Bucho-RE〕",
+        "builder_tag": "〔Grok:S〕",
         "mixup_kind": "mac_twin",
         "grok_counterpart": "bucho_re",
         "grok_ids": [
           "bucho_re"
         ],
         "grok_labels": [
-          "Bucho-RE 不動産賃貸部長"
+          "S 不動産賃貸部長"
         ],
         "grok_department": "",
         "role_split": "主はKURASHIFT／部長Daily。Grok部長と弱対応"
@@ -9305,14 +9361,14 @@
         "side": "paired",
         "agent_id": "512",
         "agent_name": "仲介返信取込係",
-        "builder_tag": "〔Grok:仲介返信〕",
+        "builder_tag": "〔Grok:S/S5〕",
         "mixup_kind": "mac_twin",
         "grok_counterpart": "bucho_re_evening",
         "grok_ids": [
           "bucho_re"
         ],
         "grok_labels": [
-          "Bucho-RE 不動産賃貸部長"
+          "S 不動産賃貸部長"
         ],
         "grok_department": "",
         "role_split": "Grok=S5/S3判断／社員=取込・整理・停滞見回り"
@@ -9397,14 +9453,14 @@
         "side": "paired",
         "agent_id": "611",
         "agent_name": "リソース制約要約係",
-        "builder_tag": "〔Grok:Resource〕",
+        "builder_tag": "〔Grok:R〕",
         "mixup_kind": "mac_twin",
         "grok_counterpart": "resource",
         "grok_ids": [
           "resource"
         ],
         "grok_labels": [
-          "Resource リソース経営部長"
+          "R リソース経営部長"
         ],
         "grok_department": "",
         "role_split": "Grok=制約伝達／社員=週次要約のMac側"
@@ -9446,17 +9502,29 @@
         "role_split": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。"
       },
       {
+        "side": "ai_only",
+        "agent_id": "615",
+        "agent_name": "円動向報告係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。"
+      },
+      {
         "side": "paired",
         "agent_id": "711",
         "agent_name": "家族Journal週次材料係",
-        "builder_tag": "〔Grok:Family〕",
+        "builder_tag": "〔Grok:F〕",
         "mixup_kind": "mac_twin",
         "grok_counterpart": "family",
         "grok_ids": [
           "family"
         ],
         "grok_labels": [
-          "Family 家族コーチ統括"
+          "F 家族コーチ統括"
         ],
         "grok_department": "",
         "role_split": "Grok=週次評価／社員=Journal材料抽出"
@@ -9465,14 +9533,14 @@
         "side": "paired",
         "agent_id": "712",
         "agent_name": "アドバイザー週次パック係",
-        "builder_tag": "〔Grok:Coaching〕",
+        "builder_tag": "〔Grok:C〕",
         "mixup_kind": "mac_twin",
         "grok_counterpart": "coaching",
         "grok_ids": [
           "coaching"
         ],
         "grok_labels": [
-          "Coaching コーチング部長"
+          "C コーチング部長"
         ],
         "grok_department": "",
         "role_split": "Grok=パック利用／社員=材料整形"
@@ -9481,17 +9549,29 @@
         "side": "paired",
         "agent_id": "713",
         "agent_name": "総務・DXコーチ材料係",
-        "builder_tag": "〔Grok:Somu〕",
+        "builder_tag": "〔Grok:M〕",
         "mixup_kind": "mac_twin",
         "grok_counterpart": "somu",
         "grok_ids": [
           "somu"
         ],
         "grok_labels": [
-          "Somu 総務計画T統括"
+          "M 総務計画T統括"
         ],
         "grok_department": "",
         "role_split": "Grok=振り分け・助言／社員=週次材料整理"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "714",
+        "agent_name": "議事録整理係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml"
       },
       {
         "side": "ai_only",
@@ -9576,7 +9656,7 @@
           "app_dev"
         ],
         "grok_labels": [
-          "App アプリ開発統括"
+          "A アプリ開発統括"
         ],
         "grok_department": "アプリ開発",
         "role_split": "週次点検・怪しさ・壁打ち（コード実装はJarvis）"
@@ -9592,7 +9672,7 @@
           "chikage"
         ],
         "grok_labels": [
-          "ちかげアドバイザー"
+          "F4 ちかげアドバイザー"
         ],
         "grok_department": "家族コーチ",
         "role_split": "配偶者・夫婦コミュニケーション"
@@ -9608,7 +9688,7 @@
           "hachiya"
         ],
         "grok_labels": [
-          "蜂谷課長アドバイザー"
+          "M10 蜂谷課長アドバイザー"
         ],
         "grok_department": "総務計画",
         "role_split": "蜂谷課長（課長層展開）"
@@ -9624,7 +9704,7 @@
           "hawk"
         ],
         "grok_labels": [
-          "Hawk ホークアイ（参謀）"
+          "H ホークアイ（参謀）"
         ],
         "grok_department": "参謀室",
         "role_split": "横断優先・QOL・委譲・週次統括・Jarvisボックス振り分け"
@@ -9640,7 +9720,7 @@
           "imai"
         ],
         "grok_labels": [
-          "今井部長アドバイザー"
+          "M8 今井部長アドバイザー"
         ],
         "grok_department": "総務計画",
         "role_split": "今井部長（報告・部方針）"
@@ -9656,7 +9736,7 @@
           "isozaki"
         ],
         "grok_labels": [
-          "磯崎コーチ"
+          "M1 磯崎コーチ"
         ],
         "grok_department": "総務計画",
         "role_split": "磯崎向けコーチング"
@@ -9672,7 +9752,7 @@
           "karate"
         ],
         "grok_labels": [
-          "空手アドバイザー"
+          "F5 空手アドバイザー"
         ],
         "grok_department": "家族コーチ",
         "role_split": "空手・遊愛会・Journal"
@@ -9688,7 +9768,7 @@
           "kawabata"
         ],
         "grok_labels": [
-          "川畑コーチ"
+          "M4 川畑コーチ"
         ],
         "grok_department": "総務計画",
         "role_split": "川畑向けコーチング"
@@ -9704,7 +9784,7 @@
           "madoka"
         ],
         "grok_labels": [
-          "まどかコーチ"
+          "F1 まどかコーチ"
         ],
         "grok_department": "家族コーチ",
         "role_split": "まどか専属コーチング"
@@ -9720,7 +9800,7 @@
           "nakajima"
         ],
         "grok_labels": [
-          "中島アドバイザー"
+          "M6 中島アドバイザー"
         ],
         "grok_department": "総務計画",
         "role_split": "中島新（企画・遠隔地）"
@@ -9736,7 +9816,7 @@
           "ohara"
         ],
         "grok_labels": [
-          "大原次長アドバイザー"
+          "M9 大原次長アドバイザー"
         ],
         "grok_department": "総務計画",
         "role_split": "大原次長（調整・資料）"
@@ -9752,7 +9832,7 @@
           "ota_akitsugu"
         ],
         "grok_labels": [
-          "太田アドバイザー"
+          "M7 太田アドバイザー"
         ],
         "grok_department": "総務計画",
         "role_split": "太田章嗣（リソース司令塔）"
@@ -9768,7 +9848,7 @@
           "partner_dx"
         ],
         "grok_labels": [
-          "PDX パートナーDX統括"
+          "P パートナーDX統括"
         ],
         "grok_department": "パートナーDX",
         "role_split": "パートナーDX振り分け・入口"
@@ -9816,7 +9896,7 @@
           "sawa"
         ],
         "grok_labels": [
-          "さわコーチ"
+          "F3 さわコーチ"
         ],
         "grok_department": "家族コーチ",
         "role_split": "さわ専属コーチング"
@@ -9832,7 +9912,7 @@
           "shift_ai"
         ],
         "grok_labels": [
-          "シフトAIアドバイザー"
+          "P1 シフトAIアドバイザー"
         ],
         "grok_department": "パートナーDX",
         "role_split": "Shift AI 向け"
@@ -9848,7 +9928,7 @@
           "shinji"
         ],
         "grok_labels": [
-          "慎二コーチ"
+          "M5 慎二コーチ"
         ],
         "grok_department": "総務計画",
         "role_split": "太田慎二（DX直属）"
@@ -9864,7 +9944,7 @@
           "tamaki"
         ],
         "grok_labels": [
-          "たまきコーチ"
+          "F2 たまきコーチ"
         ],
         "grok_department": "家族コーチ",
         "role_split": "たまき専属コーチング"
@@ -9880,7 +9960,7 @@
           "tanaka"
         ],
         "grok_labels": [
-          "田中コーチ"
+          "M2 田中コーチ"
         ],
         "grok_department": "総務計画",
         "role_split": "田中（安全担当・安全DX）"
@@ -9896,7 +9976,7 @@
           "weather"
         ],
         "grok_labels": [
-          "Weather 天気お知らせ"
+          "W 天気お知らせ"
         ],
         "grok_department": "天気",
         "role_split": "朝の天気 ch 直投（ホーク傘下）"
@@ -9912,7 +9992,7 @@
           "world_intec"
         ],
         "grok_labels": [
-          "ワールドインテックアドバイザー"
+          "P2 ワールドインテックアドバイザー"
         ],
         "grok_department": "パートナーDX",
         "role_split": "ワールドインテック向け"
@@ -9928,7 +10008,7 @@
           "yamashita"
         ],
         "grok_labels": [
-          "山下コーチ"
+          "M3 山下コーチ"
         ],
         "grok_department": "総務計画",
         "role_split": "山下向けコーチング"
@@ -9936,9 +10016,9 @@
     ],
     "mapping_counts": {
       "paired": 17,
-      "ai_only": 19,
+      "ai_only": 21,
       "grok_only": 23,
-      "all": 59
+      "all": 61
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },

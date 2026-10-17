@@ -78,6 +78,22 @@ export PATH="$HOME/.local/bin:$HOME/.genspark-tool-cli/bin:$PATH"
 
 同じ通話を両方フル正本化しない。二重にあるときは索引で片方に寄せる。
 
+## 定期提案（714 議事録整理係）
+
+オンデマンド参照に加え、**残す価値あり**の候補提案は社員 **714** が担う。
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+export PATH="$HOME/.local/bin:$HOME/.genspark-tool-cli/bin:$PATH"
+~/selenium_env/venv/bin/python scripts/jarvis_meeting_minutes_curate.py scan --mark-prompted
+# 了承後のみ
+~/selenium_env/venv/bin/python scripts/jarvis_meeting_minutes_curate.py apply --select 1
+```
+
+- 親 Inbox 正本: `config/notion_phone_meeting.yaml`
+- 家族会議は除外（週次パスのまま）
+- 無言の Notion 作成はしない
+
 ## やらないこと
 
 - Typeless／★Journal／`5.やり取り.md`／Notta（神大家動画）を Genspark 正本化
@@ -90,4 +106,6 @@ export PATH="$HOME/.local/bin:$HOME/.genspark-tool-cli/bin:$PATH"
 - 判断シート: Obsidian `03_Literature Note…/仕事術・AI連携/20260915_Genspark_SecondBrainNote検討.md`
 - 運用コマンド: `docs/運用コマンド一覧.md` § Genspark SecondBrain／meeting fetch
 - FRIDAY（Mesh・枠切れ補助）: `docs/FRIDAY_運用キット.md`
-- Notion Inbox: 親ハブ「電話・面談録音メモ」配下 `_Inbox（未振分）`
+- Notion Inbox: 親ハブ「電話・面談録音メモ」配下 `_Inbox（未振分）`（YAML: `config/notion_phone_meeting.yaml`）
+- 社員: `docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/`
+
