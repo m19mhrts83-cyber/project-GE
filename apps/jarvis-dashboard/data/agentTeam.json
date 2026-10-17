@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-17T12:20:53+09:00",
-  "registry_updated": "2026-10-11",
+  "updated": "2026-10-17T12:28:55+09:00",
+  "registry_updated": "2026-10-17",
   "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
   "flowforge_login_hint": "m19m",
@@ -8,8 +8,8 @@
   "flowforge_open_note": "Safari／Chrome で編集URLを開くと「同期失敗」「新しいフロー」になりやすいです。見るだけなら共有（閲覧）リンクを使う。 編集は Cursor インブラウザで m19m（m19m.hrts83@gmail.com）ログイン。",
   "builder": {
     "title": "物件と連絡の見守り隊",
-    "url": "https://agent-team-builder-teal.vercel.app/s/eHKHNixTpIF4G5WN",
-    "share_id": "eHKHNixTpIF4G5WN"
+    "url": "https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH",
+    "share_id": "uksxiDIzE1AEckKH"
   },
   "counts": {
     "候補": 27,
@@ -4625,7 +4625,7 @@
       "tool_notes": "得る側（テイチャン／ETC還元／Vポイント定例）→/vpoint・/etc＋Slack#report。612（払う側）と分離",
       "note": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。",
       "summary": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。",
-      "flow_summary": "",
+      "flow_summary": "開始（月木テイチャン／20–26日ETC／窓CVポイント／朝取りこぼし／人）→ 各取得・確認 → **ダッシュ投影** と **Slack `#report`【614｜種別】** に合流。失敗は `#ops`。払う側は **612** に渡さない。",
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
