@@ -1,0 +1,24 @@
+# 電話・面談録音メモ（Warm）— 714 議事録整理係 / Genspark Save 先
+# 家族会議は notion_family_coaching.yaml（Inbox 流用禁止）
+#
+# admin＝松野家 WS。Integration を親ハブに接続すること。
+
+hub_page_id: "3d7f6bbe-5a76-8118-9583-ebfe90edf0e1"
+hub_url: "https://app.notion.com/p/Just-Press-Record-3d7f6bbe5a7681189583ebfe90edf0e1"
+
+inbox_page_id: "3ddf6bbe-5a76-811b-a4c5-ce0a3b3527ca"
+inbox_url: "https://app.notion.com/p/_Inbox-3ddf6bbe5a76811ba4c5ce0a3b3527ca"
+inbox_title: "_Inbox（未振分）"
+
+# 子ページタイトル接頭辞（運用コマンド一覧と揃える）
+title_prefixes:
+  - "[SB]"
+  - "[議事録]"
+  - "[JPR]"
+
+# Notion API トークン env（家族コーチ別WSのときは上書き可）
+token_env: NOTION_API_TOKEN
+
+notes: |
+  着地の型: Inbox 配下に子ページ新規（本文追記ではない）。
+  Cold: Obsidian 録音メモ/ に1行索引。全文ミラーしない。
