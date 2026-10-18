@@ -73,6 +73,26 @@ notebooks:
     drive_folder: "12_東海DX_SecondBrain_Cursor紹介"
     state_file: ".jarvis_state/notebooklm_tokai_dx_secondbrain_cursor.json"
     note: "Grok Bot紹介の次。Second Brain×Cursor。admin"
+  tokai_dx_benkyokai9:
+    url: "https://notebooklm.google.com/notebook/42ce15b4-ef92-4835-b383-7ab9a8ed0538"
+    drive_folder: "15_東海DX_勉強会9_20261018"
+    state_file: ".jarvis_state/notebooklm_tokai_dx_benkyokai9.json"
+    note: "勉強会⑨ 旧・一括ノート（参考）。独立PDFは下記3キー。admin 2026-10-17"
+  tokai_dx_benkyokai9_todoist:
+    url: "https://notebooklm.google.com/notebook/ea892d0e-5f65-4bd2-aa26-ddf0fb407b02"
+    drive_folder: "15_東海DX_勉強会9_20261018"
+    state_file: ".jarvis_state/notebooklm_tokai_dx_benkyokai9_todoist.json"
+    note: "勉強会⑨ Todoist独立。admin 2026-10-17"
+  tokai_dx_benkyokai9_ai_agent:
+    url: "https://notebooklm.google.com/notebook/80d48fc4-06d3-476e-86cc-89bf31c043bf"
+    drive_folder: "15_東海DX_勉強会9_20261018"
+    state_file: ".jarvis_state/notebooklm_tokai_dx_benkyokai9_ai_agent.json"
+    note: "勉強会⑨ AIエージェント独立。Grok前回インフォは連結PDF。admin 2026-10-17"
+  tokai_dx_benkyokai9_cursor:
+    url: "https://notebooklm.google.com/notebook/28a1fc90-4bc3-4486-9473-8daa4419d87a"
+    drive_folder: "15_東海DX_勉強会9_20261018"
+    state_file: ".jarvis_state/notebooklm_tokai_dx_benkyokai9_cursor.json"
+    note: "勉強会⑨ Cursor独立。admin 2026-10-17"
   # 家族会議・週次（横断参照用・ノートは常に1本。週ごとにソース追加のみ）
   family_meeting_weekly:
     url: "https://notebooklm.google.com/notebook/3b697702-45b9-417e-90fc-80a396aebc44"
