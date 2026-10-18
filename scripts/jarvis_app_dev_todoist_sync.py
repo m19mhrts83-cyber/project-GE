@@ -2,7 +2,11 @@
 # -*- coding: utf-8 -*-
 """アプリ開発カード → Todoist `#アプリ開発`（apps）へ起票。
 
-入口は既存どおり estate 件名 [Grok開発]／ローカル inbox。
+入口:
+  1) Drive 10_inbox `action: app_dev_cards`（apply は jarvis_app_dev_cards_apply／poll）
+  2) estate 件名 [Grok開発]（〜2026-10-25 並立）
+  3) ローカル `.jarvis_state/app_dev_cards_inbox.md`
+
 要ボス（Drive `todoist_tasks`）と同帯の launchd（起動時＋最大15分）で拾う。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
