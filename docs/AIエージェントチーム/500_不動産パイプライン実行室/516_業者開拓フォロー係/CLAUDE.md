@@ -21,8 +21,8 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
   - **週次** Slack `#report`（healthy 時のみ・Grokサポート見守りタイトル・レーン擬似表）
   - 連携障害・枯渇は **即時** Slack `#ops`（日次見回りは毎日継続）
   - 要ボス（返信方針）だけ `#consult`／Todoist（業者専用レーンは作らない）
-  - **定期情報確認（nurture）**: 初回コンタクト済み社の **約60日** due を見守り。Phase1 は due 抽出のみ（送信は Phase2・Grok 定型）
-- やらないこと: 対外送信の無断実行／Grok調査の丸写し再実装／秘密の再掲／探索の再スクレイプ／nurture の非定型を勝手に送る
+  - **定期情報確認（nurture）**: 初回コンタクト済み社の **約60日** due。Phase2 は定型送信（`template.approved` 後・1日最大3社）
+- やらないこと: 対外送信の無断実行／Grok調査の丸写し再実装／秘密の再掲／探索の再スクレイプ／nurture の非定型・`approved: false` での送信
 
 ## 2. 動き出す合図
 
@@ -82,16 +82,17 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
 | YAML 正本 | `kurashift_re_vendor_list.yaml` · `kurashift_repair_vendor_list.yaml` · `kurashift_mgmt_vendor_list.yaml`（gitignore） |
 | 定期情報（nurture） | 設計 `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · 設定 `config/kurashift_vendor_nurture.yaml` · due `scripts/jarvis_vendor_nurture_due.py` · state `.jarvis_state/vendor_nurture_due.json` |
 
-### 定期情報確認（nurture · Phase1）
+### 定期情報確認（nurture · Phase2）
 
 | 項目 | 正 |
 |---|---|
 | 対象 | 初回 `contacted_at` あり（S2 地場） |
 | due | `max(contacted_at, nurture_last_sent_at)` から **60日以上** |
-| 反響 | `nurture_last_reply_*` **最新のみ**（Phase2 で mark） |
-| 516 の今 | due 件数の把握・週次 `#report` に載せる準備。**送信はしない**（Grok Phase2） |
-| Grok S2 | Phase2 で定型 nurture 送信・`--mark`。非定型は松野確認 |
-| 停止 | `kurashift_vendor_nurture.yaml` の `disabled` / `JARVIS_VENDOR_NURTURE_DISABLE=1` |
+| 定型 | `config/kurashift_vendor_nurture.yaml`（`approved: true` 後のみ送信） |
+| 反響 | `nurture_last_reply_*` **最新のみ**（Phase3 triage） |
+| 516 の今 | due／soon 把握・週次 `#report`。送信は Grok（approved 後） |
+| Grok S2 | outbox キュー → 定型送信 → `--mark`。非定型は松野確認 |
+| 停止 | `disabled` / `JARVIS_VENDOR_NURTURE_DISABLE=1` / `approved: false` |
 
 ## 6. 手順（正）
 
@@ -107,9 +108,12 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 # 強制 refill（レーン指定）
 ~/selenium_env/venv/bin/python scripts/jarvis_vendor_outreach_stall_runner.py --apply --lane s4 --force-refill
 
-# 定期情報 due（送信しない・Phase1）
+# 定期情報 due / preview / next / mark / queue
 ~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --dry-run
-# ~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --apply
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --preview --vendor-name '〇〇' --list-region chubu
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --next 3
+# ~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --mark chubu-001
+# ~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --queue-outbox
 
 # KURASHIFT ジョブ（任意）
 # job_type=re_vendor_stall_check  payload: { "lane": "all", "daily_report": true }
@@ -128,4 +132,5 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-15 | Phase1〜3 伴走確認。一度運用へ上げたが、格上げ条件確定で **運用確認** に戻す（週1健全×2週） |
 | 2026-10-15 | Slack本文先頭 `[516]`。格上げ正本: `docs/promote-to-ops.md` |
 | 2026-10-15 | Slack: Grokサポート見守りタイトル・週次 #report／即時 #ops。KURASHIFT kicker 揃え |
-| 2026-10-19 | 定期情報確認（nurture）Phase1: due 抽出・設定・設計正本。送信は Phase2 |
+| 2026-10-19 | 定期情報確認（nurture）Phase1: due 抽出・設定・設計正本 |
+| 2026-10-19 | nurture Phase2: 定型全文・preview／next／mark／queue-outbox（approved 後に送信） |

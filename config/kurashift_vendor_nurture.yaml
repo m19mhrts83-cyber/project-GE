@@ -5,10 +5,10 @@
 disabled: false
 
 settings:
-  interval_days: 60          # 最終アウトバウンドからこの日数以上で due
-  lane: s2                   # Phase1 は地場物件紹介のみ
+  interval_days: 60
+  lane: s2
   list_yaml: config/kurashift_re_vendor_list.yaml
-  daily_send_limit: 3        # Phase2 送信枠（due 抽出の参考表示）
+  daily_send_limit: 3
   include_statuses:
     - contacted
     - replied
@@ -18,12 +18,38 @@ settings:
     - pending
     - discovered
 
-# 定型文面（Phase2 で Grok／送信に渡す。Phase1 は参照のみ）
+# 定型文面（Grok S2 / Webフォーム／メール共用）
+# approved: false のあいだは --queue-outbox しない（松野が文面OKするまで）
 template:
   id: vendor_nurture_v1
+  approved: false
+  approved_note: "2026-10-19 Phase2 初稿。松野確認後に approved: true"
+  from_name: 松野真治
+  from_email: matsuno.estate@gmail.com
   subject: "物件情報のご案内有無について（定期確認）"
-  body_outline: |
-    以前お問い合わせ／ご連絡いただいた件です。
-    現在、お客様へご紹介できる物件情報がございましたら
-    ご共有いただけますと幸いです。
-    （定型・改変なしで送る。非定型は松野確認）
+  # 変数: {vendor_name} {area_line}
+  body: |
+    {vendor_name} 様
+
+    以前お問い合わせいたしました、松野真治です。
+    その節はありがとうございました。
+
+    現在も、{area_line}の賃貸運用向け戸建てを探しております。
+    築古・ボロ戸建て・空き家・要修繕でも構いません。
+    予算は500万〜3,000万円程度で、お値打ちの物件を優先したいです。
+
+    ご紹介いただける物件情報がございましたら、
+    概要資料（PDF等）を matsuno.estate@gmail.com 宛にご送付いただけますと幸いです。
+    また、今後未公開・特殊な物件が入りましたらご連絡いただけますと助かります。
+
+    ハザードリスクが大きい物件は除外希望です。
+
+    よろしくお願いいたします。
+    松野真治
+    matsuno.estate@gmail.com
+  body_short: |
+    松野真治です。以前お問い合わせしました。現在も{area_line}の賃貸用戸建てを探しています。ボロ・空き家・要修繕可。予算500万〜3,000万円。資料は matsuno.estate@gmail.com まで。
+  area_lines:
+    chubu: "愛知・岐阜・静岡"
+    shiga: "滋賀"
+    default: "愛知・岐阜・静岡"
