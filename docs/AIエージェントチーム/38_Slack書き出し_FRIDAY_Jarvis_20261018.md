@@ -65,16 +65,16 @@
 
 正本の読み方: [`36_Slack_consult手渡し_次の担当_20261018.md`](./36_Slack_consult手渡し_次の担当_20261018.md)
 
-## 投稿の手段（Webhook 必須 · 2026-10-18）
+## 投稿の手段（Webhook 本線 · 2026-10-18）
 
-**残す報告（`#ops` 是正結果・`#report`／`#consult`／`#ai-hub`）は Incoming Webhook 経由で送る。**  
-理由: Webhook 投稿は端末通知が入り、「何か来た」が分かる。Slack MCP の `slack_send_message` は読取確認や下書き向きで、**通知が弱い／入らないことがある**ため本線にしない。
+**残す報告（`#ops` 是正結果・`#report`／`#consult`／`#ai-hub`）は Incoming Webhook を本線にする。**  
+理由: Webhook 投稿は端末通知が入り、「何か来た」が分かる。Slack MCP の `slack_send_message` は読取向きで、通知が弱い／入らないことがある。
 
 | 用途 | 正 |
 |---|---|
 | **投稿（本線）** | `scripts/jarvis_slack_webhook_post.py`（`SLACK_WEBHOOK_AI_TEAM_*`） |
 | **読取** | Cursor Slack MCP（`slack_read_channel` 等） |
-| **禁止に近い** | 是正結果・定型報告を MCP `slack_send_message` だけで済ませる |
+| **例外** | Webhook 未設定（Cloud Secrets 無し等）のときは MCP 投稿可。あるのに MCP だけで済ませない |
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
