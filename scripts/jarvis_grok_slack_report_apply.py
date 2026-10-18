@@ -2,7 +2,7 @@
 """Grok 定型報告 → Slack（Drive inbox `action: slack_report`）。
 
 都度の相談は Grok チャットのまま。定型（デイリー／夕方／週次／完了サマリ）だけ
-`10_inbox_from_grok/` に MD を置くと、Jarvis が `#report` / `#consult` / `#ops` へ投稿する。
+`10_inbox_from_grok/` に MD を置くと、Jarvis が `#report` / `#consult` / `#ops` / `#ai-hub` へ投稿する。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_grok_slack_report_apply.py --dry-run
@@ -71,7 +71,9 @@ def first_heading(body: str) -> str:
 
 def normalize_channel(raw: str) -> str:
     ch = (raw or "report").strip().lstrip("#").lower()
-    if ch in ("report", "consult", "ops"):
+    if ch in ("ai-hub", "ai_hub"):
+        return "hub"
+    if ch in ("report", "consult", "ops", "hub"):
         return ch
     return "report"
 
