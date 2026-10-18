@@ -198,13 +198,13 @@ Cloud から `#ops` 等へ書くとき、Slack MCP の `slack_send_message` だ�
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
-# My Secrets へ差分追加（値はファイルのみ・チャット禁止）:
-python scripts/jarvis_cloud_secrets_prepare.py --slack-only
-# → ~/.jarvis_state/cloud_agent_secrets.env を Dashboard → My Secrets に貼付 → Save
-# → 既存ランは古い env のまま → 新規 Agent を起動してから疎通
-rm -f ~/.jarvis_state/cloud_agent_secrets.env
+# 推奨: Cursor API で My Secrets へ直接反映（CURSOR_API_KEY・手貼り不要）
+python scripts/jarvis_cloud_secrets_prepare.py --slack-only --apply
+# 手貼りする場合のみ:
+# python scripts/jarvis_cloud_secrets_prepare.py --slack-only
+# → ~/.jarvis_state/cloud_agent_secrets.env を Dashboard に貼付 → Save → rm
 
-# 疎通（新規 Agent 上・URL は echo しない）:
+# 疎通（新規 Agent 上・URL は echo しない。既存ランは古い env のまま）:
 test -n "$SLACK_WEBHOOK_AI_TEAM_OPS" && echo SLACK_WEBHOOK_AI_TEAM_OPS=set
 python3 scripts/jarvis_slack_webhook_post.py \
   --channel ops \
@@ -225,15 +225,11 @@ python scripts/jarvis_cloud_secrets_prepare.py --include-gmail-send
 # Todoist だけ差分追加（スマホ→Cloud 起票）:
 python scripts/jarvis_cloud_secrets_prepare.py --todoist-only
 # Slack Webhook だけ差分追加（Cloud から通知付き投稿）:
-python scripts/jarvis_cloud_secrets_prepare.py --slack-only
-# 生成: ~/.jarvis_state/cloud_agent_secrets.env
-open https://cursor.com/dashboard/cloud-agents
-# → My Secrets → Add Secrets → ファイル内容を貼る → Save（Runtime Secret 推奨）
-# → Apply to: 全リポ or project-GE。既存ランは古い env のまま → 新規 Agent を起動
-rm -f ~/.jarvis_state/cloud_agent_secrets.env
+python scripts/jarvis_cloud_secrets_prepare.py --slack-only --apply
+# 手貼り用ファイルだけ: --apply を外す → Dashboard に貼る → rm
 ```
 
-自動化ブラウザからの貼り付けはフォーカス／クリップボード制約で失敗しやすい。**手元貼り付けを正とする。**
+`--apply` は `PUT /v1/me/secrets/{name}`（Runtime Secret）。手貼りはフォーカス制約で失敗しやすいので **API 反映を正**とする。
 
 ### スマホ → Cloud Agent → Todoist 起票
 
