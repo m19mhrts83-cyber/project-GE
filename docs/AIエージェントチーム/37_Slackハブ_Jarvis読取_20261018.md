@@ -4,7 +4,8 @@
 
 | 層 | 正 | 理由 |
 |---|---|---|
-| **見える共有・残す報告** | Slack `#report` / `#consult` / `#ops` | 人・Jarvis・FRIDAY・Grok が同じタイムラインを見られる |
+| **エージェント同士の共有** | Slack `#ai-hub` | Hawk／FRIDAY／Jarvis の進捗・手渡し（立ち上げ期） |
+| **見える共有・残す報告（人向け）** | Slack `#report` / `#consult` / `#ops` | 松野・定型・要判断・障害 |
 | **Mac 実行の手渡し** | Drive `【with Grok bot】` inbox／outbox | 秘密・長文・スクリプトキックは Drive のまま（フォーク維持） |
 | **Cursor 本題** | Jarvis がセッションで Slack を読んで気づく | 都度「Slack見て」と言わなくてよい |
 
@@ -17,7 +18,7 @@
 
 ルール: `.cursor/rules/jarvis-slack-hub-watch.mdc`
 
-1. トリガー時に Slack MCP で `#consult` → `#ops` → `#report` を読む  
+1. トリガー時に Slack MCP で `#ai-hub` → `#consult` → `#ops` → `#report` を読む  
 2. 前回以降の新規があれば、本題の前後に **1ブロック**で「こういった更新もあります」  
 3. `jarvis_slack_hub_watch.py --mark-prompted` で再掲抑制
 
@@ -37,8 +38,8 @@ state: `.jarvis_state/slack_hub_watch.json`
 
 | 誰 | Slack に載せるもの |
 |---|---|
-| **FRIDAY** | 実装完了・要判断・Jarvis に渡す要点（`#report`／迷い `#consult`） |
-| **Grok** | 定型・要ボス（既存 `slack_report`）。末尾「次の担当」は [`36_`](36_Slack_consult手渡し_次の担当_20261018.md) |
+| **FRIDAY** | エージェント共有→`#ai-hub`。完了の人向け→`#report`。迷い→`#consult` |
+| **Grok** | 横断共有→`#ai-hub`（`channel: hub`）。定型人向け→`#report`。要ボス→`#consult`（末尾は [`36_`](36_Slack_consult手渡し_次の担当_20261018.md)） |
 | **Jarvis** | 同上＋セッションで差分をチャットに相乗り |
 
 **どの ch・末尾型の書き方1節（正本）**: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](./38_Slack書き出し_FRIDAY_Jarvis_20261018.md)

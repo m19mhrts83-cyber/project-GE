@@ -6,22 +6,26 @@
 
 | ch | いつ書く | 誰向け |
 |---|---|---|
+| **`#ai-hub`** | Hawk／FRIDAY／Jarvis 同士の進捗・共有・手渡し | **エージェント同士**（立ち上げ期の共有本線） |
 | **`#report`** | 完了・定型サマリ・「動いている」生存確認 | 松野が流し見 |
 | **`#consult`** | 要判断・迷い・Yes/No・次の一手が人／他ツール | 松野の確認トレイ |
 | **`#ops`** | 障害・失敗・認証切れ・枠切れ・健全性アラート | すぐ手当て |
 
 | 実行者 | 残すもの |
 |---|---|
-| **Jarvis（Cursor）** | 実装完了・ゲート結果・要判断・FRIDAY からの引き継ぎ要約 |
-| **FRIDAY（GenCode）** | Jarvis／松野と共有すべき完了・要判断（チャットだけに閉じない） |
-| **AI社員（定期／イベント）** | 各 `CLAUDE.md` の報告先どおり（同じ3ch） |
+| **Jarvis（Cursor）** | エージェント共有→`#ai-hub`。松野向け完了→`#report`。要判断→`#consult` |
+| **FRIDAY（GenCode）** | 同上（チャットだけに閉じない） |
+| **ホーク（Grok）** | エージェント同士の共有→`#ai-hub`（または `slack_report` channel: hub）。要ボス→`#consult` |
+| **AI社員（定期／イベント）** | 各 `CLAUDE.md` の報告先どおり（人向けは従来3ch。横断共有は `#ai-hub` 可） |
 
-壁打ち・長考は Grok チャンネル可。**残す報告は Slack**（Drive は Mac 実行手渡し用・併用）。
+壁打ち・長考は Grok チャンネル可。**残す報告は Slack**（Drive は Mac 実行手渡し用・併用）。  
+`#ai-hub` に「決めて」と書かない。松野判断は `#consult`。
 
 ## 先頭1行（必須）
 
-番号＋短い役割語。例:
+番号＋短い役割語／ツール名。例:
 
+- `【共有】Jarvis アプリ開発 Drive取込完了`
 - `【報告】211 返信案内下書き・朝便`
 - `【相談】311 送信前品質`
 - `【ops】315 連携健全性`
@@ -51,11 +55,13 @@
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_slack_webhook_post.py \
-  --channel report --text '【報告】…'
-# consult / ops も同様（--channel consult|ops）
+  --channel hub --text '【共有】…'
+# report / consult / ops も同様（--channel report|consult|ops|hub）
+# hub の別名: --channel ai-hub
 ```
 
-秘密・Webhook URL・トークンは本文に書かない。
+秘密・Webhook URL・トークンは本文に書かない。  
+`#ai-hub` 用 Webhook: `.env.jarvis_private` の `SLACK_WEBHOOK_AI_TEAM_HUB`（未設定時は `#report` へフォールバック＋`【#ai-hub】` 印）。
 
 ## Jarvis が読む側
 

@@ -4,18 +4,23 @@
 workspace_hint: aiwsnetwork.slack.com
 
 channels:
+  hub:
+    id: C0CA3M5SNNS
+    slack_name: ai-hub
+    purpose: Hawk／FRIDAY／Jarvis 同士の共有・進捗手渡し（人の判断トレイではない）
   consult:
     id: C0C7R0UF3MM
-    purpose: 要判断・手渡し（次の担当）・FRIDAY/Jarvis/Grok の迷い
+    purpose: 要判断・手渡し（次の担当）・松野の確認トレイ
   report:
     id: C0C866FNU3C
-    purpose: 完了・定型報告・共有して残す成果
+    purpose: 完了・定型報告・松野が流し見する成果
   ops:
     id: C0C88A6CWQH
     purpose: 障害・健全性・枠切れ
 
 # Cursor セッションで優先して読む順
 read_priority:
+  - hub
   - consult
   - ops
   - report

@@ -36,7 +36,7 @@ Slack（共有が要る完了・要判断）: チャットだけで終わらせ�
 ### 0.1 セッション冒頭に足す3行（Slack 強調・コピペ用）
 
 ```
-共有が要る完了・要判断は Slack に残す（#report／迷い #consult／障害 #ops）。
+エージェント同士の共有は Slack #ai-hub。松野向け定型は #report、要判断は #consult、障害は #ops。
 #consult 末尾は必須: 次: … / 担当メモ: … / 橋渡し: …（自動実行ではない）。
 正本: ~/git-repos/docs/FRIDAY_運用キット.md §6.1 と docs/AIエージェントチーム/38_Slack書き出し_FRIDAY_Jarvis_20261018.md
 ```
@@ -248,11 +248,12 @@ gsk mesh ssh matsuchan-pc -- 'ls ~/Documents/500_Obsidian_r1/03_Literature\ Note
 
 | ch | いつ |
 |---|---|
-| `#report` | 完了・定型サマリ |
+| `#ai-hub` | Hawk／Jarvis との進捗・共有（エージェント同士） |
+| `#report` | 完了・定型サマリ（松野向け） |
 | `#consult` | 要判断・迷い。**末尾に次の担当3行** |
 | `#ops` | 障害・失敗 |
 
-先頭例: `【報告】（FRIDAY）要約1行` ／ 社員作業なら `【報告】NNN 役割語`
+先頭例: `【共有】（FRIDAY）…`（`#ai-hub`）／ `【報告】（FRIDAY）要約1行` ／ 社員作業なら `【報告】NNN 役割語`
 
 `#consult` 末尾:
 
@@ -265,7 +266,8 @@ gsk mesh ssh matsuchan-pc -- 'ls ~/Documents/500_Obsidian_r1/03_Literature\ Note
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_slack_webhook_post.py \
-  --channel report --text '【報告】（FRIDAY）…'
+  --channel hub --text '【共有】（FRIDAY）…'
+# 松野向け定型: --channel report
 ```
 
 正本: `docs/AIエージェントチーム/38_Slack書き出し_FRIDAY_Jarvis_20261018.md`  

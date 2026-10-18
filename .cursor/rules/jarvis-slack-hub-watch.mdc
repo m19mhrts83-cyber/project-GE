@@ -11,7 +11,8 @@ Cursor（Jarvis）がメインの作業場。**FRIDAY／Grok／他経路が Slac
 
 | 正 | 内容 |
 |---|---|
-| **見える共有** | Slack `#consult` / `#ops` / `#report` |
+| **エージェント同士** | Slack `#ai-hub`（Hawk／FRIDAY／Jarvis） |
+| **見える共有（人向け）** | Slack `#consult` / `#ops` / `#report` |
 | **Mac 実行手渡し** | Drive JarvisBox（捨てない） |
 | **読取本線** | Cursor **Slack MCP**（`slack_read_channel`） |
 
@@ -29,6 +30,7 @@ state: `~/git-repos/.jarvis_state/slack_hub_watch.json`
 
 | ch | id |
 |---|---|
+| `#ai-hub` | `C0CA3M5SNNS` |
 | `#consult` | `C0C7R0UF3MM` |
 | `#report` | `C0C866FNU3C` |
 | `#ops` | `C0C88A6CWQH` |
@@ -53,26 +55,28 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
   scripts/jarvis_slack_hub_watch.py --hints
 ```
 
-2. **Slack MCP** で YAML の `read_priority` 順に読む（既定: consult → ops → report）。  
+2. **Slack MCP** で YAML の `read_priority` 順に読む（既定: hub → consult → ops → report）。  
    `limit` は YAML の `limit_per_channel`（目安8）。  
    state の `channels.*.last_ts` より新しいものだけに注目。
 3. 新規があればチャットに報告ブロック。**全部貼らない**（各ch最大3件・1行要約）。  
-   `#consult` に `次: Jarvisに依頼` があれば本題や次手に接続してよい。
+   `#consult` に `次: Jarvisに依頼` があれば本題や次手に接続してよい。  
+   `#ai-hub` はエージェント共有の相乗り提案向き。
 4. 記録:
 
 ```bash
 cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
-  scripts/jarvis_slack_hub_watch.py --mark-prompted \
-  --summary 'consult: … / ops: … / report: …'
+ scripts/jarvis_slack_hub_watch.py --mark-prompted \
+ --summary 'hub: … / consult: … / ops: … / report: …'
 ```
 
-5. 既読 ts を進めるとき: `--set-ts consult <ts>`（MCP で得た最新 ts）
+5. 既読 ts を進めるとき: `--set-ts hub <ts>`（MCP で得た最新 ts）
 
 ## 報告フォーマット
 
 ```
 📎 Slackハブ差分
-- #consult: …（なければ「新規なし」）
+- #ai-hub: …（なければ「新規なし」）
+- #consult: …
 - #ops: …
 - #report: …
 - 提案: （あれば1行。なければ省略可）
@@ -87,8 +91,8 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
 
 ## FRIDAY／Grok
 
-- **FRIDAY**: 共有が必要な完了・要判断は Slack に残す（`#report`／`#consult`）。詳細: `37_` · `jarvis-friday-git.mdc`
-- **Grok**: 定型は既存 `slack_report`。`#consult` 末尾は `36_`（次の担当）
+- **FRIDAY**: エージェント共有は `#ai-hub`。人向け完了・要判断は `#report`／`#consult`。詳細: `37_` · `38_`
+- **Grok**: 横断共有は `#ai-hub`（`channel: hub`）。定型人向けは `slack_report`。`#consult` 末尾は `36_`
 
 ## 関連
 
