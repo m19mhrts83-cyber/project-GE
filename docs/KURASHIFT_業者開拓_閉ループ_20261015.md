@@ -64,9 +64,15 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | B1 手渡し | Drive `30_shared_working/2026-10-15_業者開拓閉ループ_S2S4S9/` |
 | 516 status | **設計中のまま**（松野方針）。FlowForge 作業フロー確認 → 実行指示後に運用確認予定 |
 
+## 定期情報確認（nurture · 後続）
+
+初回コンタクト済み社への **約2ヶ月ごと**の情報有無確認。due 抽出は Phase1 実装済。送信・反響 mark は Phase2。  
+正本: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · `scripts/jarvis_vendor_nurture_due.py`
+
 ## 関連
 
 - 社員: `docs/AIエージェントチーム/500_不動産パイプライン実行室/516_業者開拓フォロー係/`
 - paste: `config/grok_vendor_outreach_bot_grok_paste.md` · `config/grok_realestate_bucho_grok_paste.md`
 - 運用: `docs/運用コマンド一覧.md`「業者開拓閉ループ」
 - 実務設計（既存）: `docs/KURASHIFT_RE_業者開拓_物件候補_実務者設計_20260823.md`
+- 定期情報: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md`
