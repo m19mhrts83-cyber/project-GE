@@ -173,11 +173,42 @@ Mac が `--batch-week` で渡す JSON（`mode: batch_week`）を受け取った�
    - 部長スレッド内で社員 S2 として実行している場合も、**週次は必ず部長日報メール1通**にまとめる（§部長 Instructions · 部長日報メール）
 6. **キューが無い・薄いとき**: 部長ボックスへの「再生成して」再依頼は **しない**。516／Jarvis の **自律 refill**（`jarvis_vendor_outreach_stall_runner` · outbox `s2_batch`）を待つ。探索は続行可。**2営業日空いたら Slack `#ops` を見る**（松野／ホーク）。S4/S9 も同型（`s4_queue` / `s9_precheck`）。
 7. **定期情報確認（nurture · 2026-10-19）**: 初回コンタクト済み社へ **約60日ごと**「物件情報はありますか？」系の確認。  
-   - 期限: `max(contacted_at, nurture_last_sent_at)` から60日以上（Jarvis `jarvis_vendor_nurture_due.py` が due 抽出）  
-   - **Phase1（今）**: due 一覧のみ。S2 は **まだ送らない**（Jarvis／516 が見守り）  
-   - **Phase2（予定）**: 承認定型 nurture 文面で送信 → `--mark` 相当で `nurture_last_sent_at`。反響は `nurture_last_reply_*` **最新のみ**  
-   - 正本: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · 設定 `config/kurashift_vendor_nurture.yaml` · 社員 516 CLAUDE  
-   - 非定型・個別事情は松野確認。初回開拓の A'-v2 とは **別レーン**（混ぜない）
+   - 期限: `max(contacted_at, nurture_last_sent_at)` から60日以上（Jarvis `jarvis_vendor_nurture_due.py`）  
+   - **Phase2**: 下記 **approved nurture 定型**（`config/kurashift_vendor_nurture.yaml`）。A'-v2 とは **別レーン・混ぜない**  
+   - Jarvis が `--queue-outbox` で `outbox_to_teams/re/` にキューを書いたら、**1日最大3社**・改変なしで Webフォーム（または email）送信  
+   - 送信後: `jarvis_vendor_nurture_due.py --mark <id>`。反響は `nurture_last_reply_*` **最新のみ**（Phase3）  
+   - `template.approved: false` のあいだはキューも送らない（松野が文面OKするまで）  
+   - 正本: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · 社員 516 CLAUDE  
+   - 非定型・個別事情は松野確認
+
+### approved nurture 定型（vendor_nurture_v1 · 松野確認後に送信）
+
+件名: 物件情報のご案内有無について（定期確認）
+
+```
+{vendor_name} 様
+
+以前お問い合わせいたしました、松野真治です。
+その節はありがとうございました。
+
+現在も、{area_line}の賃貸運用向け戸建てを探しております。
+築古・ボロ戸建て・空き家・要修繕でも構いません。
+予算は500万〜3,000万円程度で、お値打ちの物件を優先したいです。
+
+ご紹介いただける物件情報がございましたら、
+概要資料（PDF等）を matsuno.estate@gmail.com 宛にご送付いただけますと幸いです。
+また、今後未公開・特殊な物件が入りましたらご連絡いただけますと助かります。
+
+ハザードリスクが大きい物件は除外希望です。
+
+よろしくお願いいたします。
+松野真治
+matsuno.estate@gmail.com
+```
+
+- `area_line`: chubu=`愛知・岐阜・静岡` / shiga=`滋賀`
+- 狭い欄: YAML の `body_short`
+- mark: `--mark {id}`（nurture 用。初回開拓の `--status contacted` とは別）
 
 **トリガー例**: `本日分` / `今日の分` / 週次キックオフ直後は「1日目を開始」
 

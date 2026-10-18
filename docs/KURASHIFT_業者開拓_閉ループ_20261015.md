@@ -64,10 +64,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | B1 手渡し | Drive `30_shared_working/2026-10-15_業者開拓閉ループ_S2S4S9/` |
 | 516 status | **設計中のまま**（松野方針）。FlowForge 作業フロー確認 → 実行指示後に運用確認予定 |
 
-## 定期情報確認（nurture · 後続）
+## 定期情報確認（nurture · Phase2）
 
-初回コンタクト済み社への **約2ヶ月ごと**の情報有無確認。due 抽出は Phase1 実装済。送信・反響 mark は Phase2。  
-正本: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · `scripts/jarvis_vendor_nurture_due.py`
+初回コンタクト済み社への **約2ヶ月ごと**の情報有無確認。  
+due／定型／mark／queue-outbox は Phase2。反響 triage は Phase3。  
+正本: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · `config/kurashift_vendor_nurture.yaml` · `scripts/jarvis_vendor_nurture_due.py`
 
 ## 関連
 

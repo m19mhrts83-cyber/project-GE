@@ -45,22 +45,33 @@ max(contacted_at, nurture_last_sent_at)
 | Grok S2 | 定型送信・`--mark`（初回開拓と同型） |
 | 516 | 見守り相乗り（将来: stall に nurture due 件数） |
 
-## コマンド（Phase 1）
+## コマンド
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+# due 一覧
 ~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --dry-run
 ~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --apply
+# 定型プレビュー
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py \
+  --preview --vendor-name '〇〇不動産' --list-region chubu
+# 次に送る候補（due 優先。0なら soon）
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --next 3
+# 送信後 mark
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --mark chubu-001
+# Grok キュー（template.approved: true のときのみ）
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_nurture_due.py --queue-outbox
 ```
 
-`--apply` は due 一覧を state に書くだけ（**送信しない**）。送信キューは Phase 2。
+`--apply` は due 一覧を state に書くだけ（**送信しない**）。  
+`--queue-outbox` は Drive `outbox_to_teams/re/` へ Grok S2 用キューを書く（実送信は Grok）。
 
 ## フェーズ
 
 | Phase | 内容 | 状態 |
 |---|---|---|
-| **1** | 設計・設定・due 抽出・state | **本ドキュメント／スクリプト** |
-| **2** | 定型文面＋ outbox／Grok 送信・`nurture_last_sent_at` mark | 未 |
+| **1** | 設計・設定・due 抽出・state | **済** |
+| **2** | 定型文面＋ preview／next／mark／queue-outbox | **本ドキュメント（文面は松野確認後 `approved: true`）** |
 | **3** | 返信 triage → `nurture_last_reply_*` 自動更新・UI 列 | 未 |
 | **4** | S9（管理会社）同型 | 未 |
 
