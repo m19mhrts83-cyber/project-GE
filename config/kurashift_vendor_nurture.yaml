@@ -1,0 +1,29 @@
+# 業者開拓 — 定期情報確認（nurture）
+# 正本手順: docs/KURASHIFT_業者開拓_定期情報確認_20261019.md
+# 無効化: disabled: true または JARVIS_VENDOR_NURTURE_DISABLE=1
+
+disabled: false
+
+settings:
+  interval_days: 60          # 最終アウトバウンドからこの日数以上で due
+  lane: s2                   # Phase1 は地場物件紹介のみ
+  list_yaml: config/kurashift_re_vendor_list.yaml
+  daily_send_limit: 3        # Phase2 送信枠（due 抽出の参考表示）
+  include_statuses:
+    - contacted
+    - replied
+  exclude_statuses:
+    - skip
+    - invalid
+    - pending
+    - discovered
+
+# 定型文面（Phase2 で Grok／送信に渡す。Phase1 は参照のみ）
+template:
+  id: vendor_nurture_v1
+  subject: "物件情報のご案内有無について（定期確認）"
+  body_outline: |
+    以前お問い合わせ／ご連絡いただいた件です。
+    現在、お客様へご紹介できる物件情報がございましたら
+    ご共有いただけますと幸いです。
+    （定型・改変なしで送る。非定型は松野確認）
