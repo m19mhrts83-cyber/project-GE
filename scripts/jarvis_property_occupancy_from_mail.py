@@ -27,6 +27,9 @@ REPO = Path(__file__).resolve().parents[1]
 OUT_PATH = REPO / ".jarvis_state" / "property_occupancy_mail.json"
 STATE_PATH = REPO / ".jarvis_state" / "property_occupancy_mail_seen.json"
 
+sys.path.insert(0, str(REPO / "scripts"))
+from jarvis_partner_folder import folder_aliases, resolve_existing_dir  # noqa: E402
+
 ONEDRIVE_PARTNERS = Path(
     "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
     "/C2_ルーティン作業/26_パートナー社への相談"
@@ -38,10 +41,10 @@ CAMPAIGN_MAIL_DIR = Path(
 ).expanduser()
 
 PARTNER_FOLDERS = [
-    "102_ミニテック",
-    "104_LEAF",
-    "103_Tcell",
-    "101_ホームプランナー",
+    "P102_ミニテック",
+    "P104_LEAF",
+    "P103_Tcell",
+    "P101_ホームプランナー",
 ]
 
 PROPERTY_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
@@ -450,9 +453,18 @@ def scan(days: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     applied: list[dict[str, Any]] = []
     pending: list[dict[str, Any]] = []
 
-    # 1) パートナーやり取り
+    # 1) パートナーやり取り（P付き正本・旧形式ディレクトリ互換）
     for folder in PARTNER_FOLDERS:
-        md = ONEDRIVE_PARTNERS / folder / "5.やり取り.md"
+        d = resolve_existing_dir(ONEDRIVE_PARTNERS, folder)
+        if d is None:
+            for alias in folder_aliases(folder):
+                cand = ONEDRIVE_PARTNERS / alias
+                if cand.is_dir():
+                    d = cand
+                    break
+        if d is None:
+            continue
+        md = d / "5.やり取り.md"
         for block in parse_md_blocks(md, since):
             blob = f"{block['subject']}\n{block['body']}"
             pairs = extract_room_property_pairs(blob)

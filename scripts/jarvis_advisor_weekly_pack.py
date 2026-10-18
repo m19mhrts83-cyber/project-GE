@@ -220,7 +220,7 @@ def fetch_partner_diff(start: date, end: date) -> tuple[list[str], str | None]:
         for folder in sorted(PARTNERS_ROOT.iterdir()):
             if not folder.is_dir() or folder.name.startswith("000_") or folder.name.startswith("."):
                 continue
-            if folder.name.startswith("815_"):
+            if folder.name.startswith(("815_", "P815_")):
                 continue
             md = folder / "5.やり取り.md"
             if not md.is_file():

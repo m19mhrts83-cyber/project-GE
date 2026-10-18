@@ -32,11 +32,16 @@ ARCHIVE_PATH = STATE / "situation_watch_archive.json"
 WATCH_STATUS = (
     REPO / "line_unofficial_poc" / ".line_auth" / ".chrline_open_chat_watch_status.json"
 )
-OPENCHAT_MD_GLOB = (
+# P815 正本・旧815 互換（実行時に存在側を選ぶ）
+_OPENCHAT_CANDS = [
     Path.home()
     / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
-    / "C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
-)
+    / "C2_ルーティン作業/26_パートナー社への相談/P815_神大家オプチャ",
+    Path.home()
+    / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+    / "C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ",
+]
+OPENCHAT_MD_GLOB = next((p for p in _OPENCHAT_CANDS if p.is_dir()), _OPENCHAT_CANDS[0])
 
 
 def now_iso() -> str:

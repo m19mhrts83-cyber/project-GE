@@ -33,9 +33,11 @@ ONEDRIVE_PARTNER = (
     / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
     / "C2_ルーティン作業/26_パートナー社への相談"
 )
-LEAF_FOLDER = "104_LEAF"
 STOCK_NAME = "1.受信添付(Stock)"
 PDF_RE = re.compile(r"^LEAF_送金明細書_(\d{4})年(\d{1,2})月\.pdf$")
+
+sys.path.insert(0, str(REPO / "scripts"))
+from jarvis_partner_folder import LEAF_FOLDER, resolve_existing_dir  # noqa: E402
 
 
 def partner_base() -> Path:
@@ -52,7 +54,9 @@ def partner_base() -> Path:
 
 
 def leaf_stock_dir() -> Path:
-    return partner_base() / LEAF_FOLDER / STOCK_NAME
+    base = partner_base()
+    leaf = resolve_existing_dir(base, LEAF_FOLDER) or (base / LEAF_FOLDER)
+    return leaf / STOCK_NAME
 
 
 def ym_label(ym: tuple[int, int]) -> str:

@@ -83,10 +83,12 @@ SUBJECT_SUFFIX_PAREN_RE = re.compile(r"[\s　]*[（(][^）)]{1,40}[）)]\s*$")
 SKIP_FOLDERS = {
     "000_共通",
     "815_神大家オプチャ",
+    "P815_神大家オプチャ",
     "809_神大家運営回答",  # 一斉配信中心・返信義務なし
+    "P809_神大家運営回答",
 }
 
-OPENCHAT_ROOT_NAME = "815_神大家オプチャ"
+OPENCHAT_ROOT_NAME = "P815_神大家オプチャ"
 PLACEHOLDER_BODY_RE = re.compile(r"(\[本文なし|E2EE|復号でき|プレースホルダ)", re.I)
 # Chatwork システム通知・スタンプのみ等（要返信判定対象外）
 CHAT_NOISE_RE = re.compile(
@@ -670,7 +672,7 @@ def list_partner_mds(base: Path) -> list[tuple[str, Path]]:
     for p in sorted(base.iterdir()):
         if not p.is_dir() or p.name.startswith(".") or p.name in SKIP_FOLDERS:
             continue
-        if p.name.startswith("815_"):
+        if p.name.startswith(("815_", "P815_")):
             continue
         md = p / "5.やり取り.md"
         if md.is_file():

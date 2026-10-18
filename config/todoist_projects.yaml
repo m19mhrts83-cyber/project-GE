@@ -309,37 +309,37 @@ property_labels:
     also_pm: []
 pm_labels:
   ミニテック:
-    folder: 102_ミニテック
+    folder: P102_ミニテック
   ホームプランナー:
-    folder: 101_ホームプランナー
+    folder: P101_ホームプランナー
   Tcell:
-    folder: 103_Tcell
+    folder: P103_Tcell
   LEAF:
-    folder: 104_LEAF
+    folder: P104_LEAF
 pm_share:
   email_forward_to_partner: false
   footer_max_tasks: 5
   companies:
     ミニテック:
-      folder: 102_ミニテック
+      folder: P102_ミニテック
       pilot: false
       guest_project_key: ''
       guest_project_url: ''
       project_id: ''
     ホームプランナー:
-      folder: 101_ホームプランナー
+      folder: P101_ホームプランナー
       pilot: true
       guest_project_key: PM_ホームプランナー
       guest_project_url: https://app.todoist.com/app/project/6hc28xj8wcC4X442
       project_id: 6hc28xj8wcC4X442
     Tcell:
-      folder: 103_Tcell
+      folder: P103_Tcell
       pilot: false
       guest_project_key: ''
       guest_project_url: ''
       project_id: ''
     LEAF:
-      folder: 104_LEAF
+      folder: P104_LEAF
       pilot: true
       guest_project_key: PM_LEAF
       guest_project_url: https://app.todoist.com/app/project/6hc28xHhRFvr7P9H

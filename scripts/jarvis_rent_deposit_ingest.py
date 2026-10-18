@@ -44,6 +44,13 @@ PARTNER = ONEDRIVE_215 / "C2_ルーティン作業" / "26_パートナー社へ�
 TAX = ONEDRIVE_215 / "50_税金,確定申告"
 ZAIM_CSV = TAX / "2026年度" / "Zaim.2026年度.csv"
 
+sys.path.insert(0, str(REPO / "scripts"))
+from jarvis_partner_folder import (  # noqa: E402
+    LEAF_FOLDER,
+    TCELL_FOLDER,
+    resolve_existing_dir,
+)
+
 LEAF_NAME_RE = re.compile(r"LEAF_送金明細書_(\d{4})年(\d{1,2})月\.pdf$", re.I)
 MINI_NAME_RE = re.compile(r"ミニテック_送金のご案内_(\d{4})年(\d{1,2})月\.pdf$")
 TCELL_YM_RE = re.compile(r"(\d{4})年(\d{1,2})月分|(\d{1,2})月分")
@@ -262,7 +269,8 @@ def parse_tcell(path: Path, text: str) -> list[dict[str, Any]]:
 
 
 def iter_leaf_pdfs() -> list[Path]:
-    root = PARTNER / "104_LEAF" / "1.受信添付(Stock)"
+    leaf = resolve_existing_dir(PARTNER, LEAF_FOLDER) or (PARTNER / LEAF_FOLDER)
+    root = leaf / "1.受信添付(Stock)"
     if not root.is_dir():
         return []
     return sorted(root.rglob("LEAF_送金明細書_*.pdf"))
@@ -275,7 +283,8 @@ def iter_minitech_pdfs() -> list[Path]:
 
 
 def iter_tcell_pdfs() -> list[Path]:
-    root = PARTNER / "103_Tcell" / "1.受信添付(Stock)"
+    tcell = resolve_existing_dir(PARTNER, TCELL_FOLDER) or (PARTNER / TCELL_FOLDER)
+    root = tcell / "1.受信添付(Stock)"
     if not root.is_dir():
         return []
     files: list[Path] = []
