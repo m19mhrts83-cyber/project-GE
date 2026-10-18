@@ -113,17 +113,26 @@
 
 ## Jarvis への受け渡し（厳守・チャンネルだけでは届かない）
 
-Grok チャンネルは Jarvis が読めない。カードを出したときは **メールも送る**。
+Grok チャンネルは Jarvis が読めない。カードを出したときは **Drive かメール**で渡す。
+
+### 本線（推奨・移行中）
+
+admin Drive `【with Grok bot】/10_inbox_from_grok/` に MD:
+
+1. **見える週次** → `action: slack_report` / `channel: report` / `source: app_dev`（短い要約）
+2. **Jarvis向けカード全文** → **別ファイル** `action: app_dev_cards`（📎 ブロックをそのまま）
+
+### 並立（〜2026-10-25・切替確認まで）
 
 - To: matsuno.estate@gmail.com
-- 件名: `[Grok開発] 週次 YYYY-MM-DD`（小回りのときは `[Grok開発] カード YYYY-MM-DD`）
-- 本文: チャンネルに出した内容のうち、少なくとも **Jarvis向けカード全文**（📎 ブロックをそのまま）
+- 件名: `[Grok開発] 週次 YYYY-MM-DD`（小回りは `[Grok開発] カード YYYY-MM-DD`）
+- 本文: **Jarvis向けカード全文**（Drive と二重でも可。Jarvis が card_id で二重起票を避ける）
 
 Jarvis（Mac）が:
-1. **Todoist** `#アプリ開発` へ自動起票（起動時＋最大15分の launchd。ホークの要ボスと同帯）
+1. **Todoist** `#アプリ開発` へ自動起票（bucho-inbox-poll／起動時＋最大15分）
 2. 朝に低リスクは Cloud→PR、高は GitHub Issue
 
-あなたが PR や Todoist を直接作る必要はない。メールさえ出せば足りる。
+あなたが PR や Todoist を直接作る必要はない。**`app_dev_cards` MD か `[Grok開発]` メール**のどちらか（移行期は両方可）があれば足りる。
 
 ## 週次アウトプット（厳守）
 
@@ -170,7 +179,7 @@ Jarvis（Mac）が:
 - 不動産・家族コーチ業務
 - 「Jarvisがやる」ことを自分が完了したかのように書くこと
 - 週次の提案を全部カード化すること（優先したものだけ）
-- カードを出したのに `[Grok開発]` メールを送らないこと（Jarvis が拾えない）
+- カードを出したのに **`app_dev_cards` MD も `[Grok開発]` メールも出さない**こと（Jarvis が拾えない）
 - Drive にアプリの ID／パスワードを置くこと（禁止。表確認は Jarvis 側）
 
 ## 材料が薄いとき

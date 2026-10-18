@@ -6,6 +6,7 @@ situation_watch（id: grok_bridge_inbox）→ dashboard に載る。
 `action: todoist_tasks` は既定で自動 apply（Todoist 反映＋成功時 archive）。
 `action: slack_report` も既定で自動 apply（Slack 定型報告＋成功時 archive）。
 `action: send_gate_311` も既定で自動 apply（311 input/ へ enqueue＋成功時 archive）。
+`action: app_dev_cards` も既定で自動 apply（Todoist apps 起票＋成功時 archive）。
 
   cd ~/git-repos
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py
@@ -13,6 +14,7 @@ situation_watch（id: grok_bridge_inbox）→ dashboard に載る。
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --skip-todoist-apply
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --skip-slack-report-apply
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --skip-send-gate-311-apply
+  ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --skip-app-dev-cards-apply
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --mark-seen FILE.md
   ~/selenium_env/venv/bin/python scripts/jarvis_bucho_inbox_poll.py --archive FILE.md
 """
@@ -44,6 +46,7 @@ WEEKLY_SUMMARY_STATE_PATH = STATE_DIR / "hawk_weekly_summary.json"
 TODOIST_APPLY = REPO / "scripts" / "jarvis_hawk_todoist_tasks_apply.py"
 SLACK_REPORT_APPLY = REPO / "scripts" / "jarvis_grok_slack_report_apply.py"
 SEND_GATE_311_APPLY = REPO / "scripts" / "jarvis_hawk_send_gate_311_apply.py"
+APP_DEV_CARDS_APPLY = REPO / "scripts" / "jarvis_app_dev_cards_apply.py"
 VENDOR_OUTREACH_STALL = REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"
 
 
@@ -517,6 +520,56 @@ def apply_slack_reports(*, dry_run: bool = False) -> dict[str, Any]:
     }
 
 
+def apply_app_dev_cards(*, dry_run: bool = False) -> dict[str, Any]:
+    """inbox の action: app_dev_cards を Todoist へ（成功分 archive）。soft-fail 用。"""
+    if not APP_DEV_CARDS_APPLY.is_file():
+        return {"ok": False, "skipped": True, "reason": "script missing"}
+    if (os.environ.get("JARVIS_APP_DEV_CARDS_DRIVE_APPLY_DISABLE") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "JARVIS_APP_DEV_CARDS_DRIVE_APPLY_DISABLE",
+        }
+    if (os.environ.get("JARVIS_APP_DEV_CARDS_INBOX_AUTO_APPLY") or "1").strip() in (
+        "0",
+        "false",
+        "no",
+    ):
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "JARVIS_APP_DEV_CARDS_INBOX_AUTO_APPLY=0",
+        }
+    cmd = [str(PY), str(APP_DEV_CARDS_APPLY), "--json"]
+    if dry_run:
+        cmd.append("--dry-run")
+    else:
+        cmd.extend(["--apply", "--archive-done"])
+    try:
+        r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True, timeout=180)
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+    out = (r.stdout or "").strip()
+    err = (r.stderr or "").strip()
+    parsed: dict[str, Any] = {}
+    try:
+        parsed = json.loads(out) if out.startswith("{") else {}
+    except json.JSONDecodeError:
+        parsed = {}
+    return {
+        "ok": r.returncode == 0,
+        "returncode": r.returncode,
+        "count": parsed.get("count"),
+        "created": parsed.get("created"),
+        "stdout_tail": out[-500:] if out else "",
+        "stderr_tail": err[-300:] if err else "",
+    }
+
+
 def push_dashboard() -> int:
     if not PY.is_file():
         print("# push skip: python venv missing", file=sys.stderr)
@@ -585,6 +638,11 @@ def main() -> int:
         help="action: send_gate_311 の自動 apply をしない",
     )
     ap.add_argument(
+        "--skip-app-dev-cards-apply",
+        action="store_true",
+        help="action: app_dev_cards の自動 apply をしない",
+    )
+    ap.add_argument(
         "--skip-vendor-stall",
         action="store_true",
         help="S2 業者開拓 stall runner を呼ばない",
@@ -595,6 +653,7 @@ def main() -> int:
     apply_result: dict[str, Any] | None = None
     slack_apply_result: dict[str, Any] | None = None
     send_gate_311_result: dict[str, Any] | None = None
+    app_dev_cards_result: dict[str, Any] | None = None
     stall_result: dict[str, Any] | None = None
     try:
         if args.archive:
@@ -648,6 +707,22 @@ def main() -> int:
                         f"{(send_gate_311_result.get('stderr_tail') or '')[:120]}",
                         file=sys.stderr,
                     )
+            if not args.skip_app_dev_cards_apply:
+                app_dev_cards_result = apply_app_dev_cards()
+                if app_dev_cards_result.get("skipped"):
+                    print(
+                        f"📎 app_dev_cards apply: skipped ({app_dev_cards_result.get('reason')})"
+                    )
+                elif app_dev_cards_result.get("ok"):
+                    n = app_dev_cards_result.get("count")
+                    c = app_dev_cards_result.get("created")
+                    print(f"📎 app_dev_cards apply: ok files={n} created={c}")
+                else:
+                    print(
+                        f"📎 app_dev_cards apply: FAIL rc={app_dev_cards_result.get('returncode')} "
+                        f"{(app_dev_cards_result.get('stderr_tail') or '')[:120]}",
+                        file=sys.stderr,
+                    )
             state = poll()
             # S2 再生成依頼の消化・キュー補給（soft-fail）
             if not args.skip_vendor_stall:
@@ -674,6 +749,7 @@ def main() -> int:
             apply_result is not None
             or slack_apply_result is not None
             or send_gate_311_result is not None
+            or app_dev_cards_result is not None
             or stall_result is not None
         ):
             state = dict(state)
@@ -683,6 +759,8 @@ def main() -> int:
                 state["slack_report_apply"] = slack_apply_result
             if send_gate_311_result is not None:
                 state["send_gate_311_apply"] = send_gate_311_result
+            if app_dev_cards_result is not None:
+                state["app_dev_cards_apply"] = app_dev_cards_result
             if stall_result is not None:
                 state["vendor_outreach_stall"] = stall_result
         print(json.dumps(state, ensure_ascii=False, indent=2))
