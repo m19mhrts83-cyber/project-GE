@@ -95,7 +95,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | `#deal-active` | `SLACK_WEBHOOK_AI_TEAM_DEAL_ACTIVE` |
 
 秘密・Webhook URL・トークンは本文に書かない。  
-**Cloud Agent**: 上記 Secrets が環境に無いときは MCP 投稿に逃げず、Secrets 追加を依頼するか Mac で Webhook 投稿する。
+**Cloud Agent**: Secrets があれば Webhook。無いときは MCP で投稿してよい（可能なら Secrets／Mac Webhook も提案）。
 
 ## Jarvis が読む側
 
