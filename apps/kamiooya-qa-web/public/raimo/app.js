@@ -1445,25 +1445,39 @@ const App = {
     App.renderSuggestedQuestions();
   },
 
-  loadOpenchatLogs: async () => {
+  looksLikeOpenchatId: (value) => {
+    return /^oc_[0-9a-f]{16,64}$/i.test(String(value || '').trim());
+  },
+
+  loadOpenchatLogs: async (opts) => {
+    const options = opts && typeof opts === 'object' ? opts : {};
     const cfg = await App.resolveSemanticConfig();
     const q = (App.elements.openchatSearchInput && App.elements.openchatSearchInput.value) || '';
     const title =
       (App.elements.openchatTitleFilter && App.elements.openchatTitleFilter.value) || '';
+    const openchatId = String(
+      options.openchatId ||
+        (App.looksLikeOpenchatId(q) ? String(q).trim() : '') ||
+        ''
+    ).trim();
+    const body = {
+      list_openchat: true,
+      query: openchatId ? openchatId : String(q || '').trim(),
+      chat_title: openchatId ? undefined : String(title || '').trim() || undefined,
+      openchat_limit: 40,
+      session_id: App.state.currentSessionId || undefined,
+      user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
+    };
+    if (openchatId) {
+      body.openchat_id = openchatId;
+    }
     const response = await fetch(cfg.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Semantic-Shared-Secret': cfg.secret
       },
-      body: JSON.stringify({
-        list_openchat: true,
-        query: String(q || '').trim(),
-        chat_title: String(title || '').trim() || undefined,
-        openchat_limit: 40,
-        session_id: App.state.currentSessionId || undefined,
-        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
-      })
+      body: JSON.stringify(body)
     });
     const text = await response.text();
     let data = {};
@@ -1480,8 +1494,9 @@ const App = {
       );
     }
     App.state.openchatLogs = App.normalizeRelatedList(data.relatedOpenchat || []);
+    App.state.openchatHighlightId = openchatId || '';
     App.renderOpenchatTitleFilterOptions();
-    App.renderOpenchatTable();
+    App.renderOpenchatTable({ exactOpenchatId: openchatId || undefined });
   },
 
   renderOpenchatTitleFilterOptions: () => {
@@ -1509,9 +1524,13 @@ const App = {
     if (current) select.value = current;
   },
 
-  renderOpenchatTable: () => {
+  renderOpenchatTable: (opts) => {
+    const options = opts && typeof opts === 'object' ? opts : {};
     const tbody = App.elements.openchatTableBody;
     if (!tbody) return;
+    const exactId = String(
+      options.exactOpenchatId || App.state.openchatHighlightId || ''
+    ).trim();
     const q = String(
       (App.elements.openchatSearchInput && App.elements.openchatSearchInput.value) || ''
     )
@@ -1521,34 +1540,46 @@ const App = {
       (App.elements.openchatTitleFilter && App.elements.openchatTitleFilter.value) || ''
     ).trim();
     let rows = App.state.openchatLogs || [];
-    if (titleFilter) {
-      rows = rows.filter(function (r) {
-        return String(r.chat_title || r.chatTitle || '').trim() === titleFilter;
+    if (exactId) {
+      const hit = rows.filter(function (r) {
+        return String(r.id || '').trim() === exactId;
       });
-    }
-    if (q) {
-      rows = rows.filter(function (r) {
-        const blob = [
-          r.id,
-          r.chat_title,
-          r.chat_name,
-          r.stream_type,
-          r.thread_title,
-          r.sender_name,
-          r.content,
-          r.posted_at,
-          r.post_date
-        ]
-          .map(function (x) {
-            return String(x || '').toLowerCase();
-          })
-          .join(' ');
-        return blob.indexOf(q) !== -1;
-      });
+      if (hit.length) {
+        rows = hit;
+      }
+    } else {
+      if (titleFilter) {
+        rows = rows.filter(function (r) {
+          return String(r.chat_title || r.chatTitle || '').trim() === titleFilter;
+        });
+      }
+      if (q) {
+        rows = rows.filter(function (r) {
+          const blob = [
+            r.id,
+            r.chat_title,
+            r.chat_name,
+            r.stream_type,
+            r.thread_title,
+            r.sender_name,
+            r.content,
+            r.posted_at,
+            r.post_date
+          ]
+            .map(function (x) {
+              return String(x || '').toLowerCase();
+            })
+            .join(' ');
+          return blob.indexOf(q) !== -1;
+        });
+      }
     }
     if (App.elements.openchatListMeta) {
-      App.elements.openchatListMeta.textContent =
-        '表示 ' + rows.length + ' 件（ready・取得元／日時つき）';
+      App.elements.openchatListMeta.textContent = exactId
+        ? rows.length
+          ? '該当メッセージ 1 件（id: ' + exactId + '）'
+          : '該当メッセージなし（id: ' + exactId + '）'
+        : '表示 ' + rows.length + ' 件（ready・取得元／日時つき）';
     }
     const streamLabel = function (st) {
       if (st === 'thread') return 'スレッド';
@@ -1562,8 +1593,15 @@ const App = {
           .replace(/\s+/g, ' ')
           .trim()
           .slice(0, 180);
+        const rowId = String(r.id || '').trim();
+        const highlight =
+          exactId && rowId === exactId ? ' bg-amber-50 ring-1 ring-amber-200' : '';
         return (
-          '<tr class="border-t align-top">' +
+          '<tr class="border-t align-top' +
+          highlight +
+          '" data-openchat-id="' +
+          App.escapeHtml(rowId) +
+          '">' +
           '<td class="p-2 whitespace-nowrap text-xs">' +
           App.escapeHtml(String(r.chat_title || r.chatTitle || '')) +
           '</td>' +
@@ -2078,10 +2116,16 @@ const App = {
     if (citation.kind === 'openchat') {
       App.switchScreen('openchat');
       App.showDbReturnBar('openchat');
+      const oid = String(citation.openchatId || '').trim();
       if (App.elements.openchatSearchInput) {
-        App.elements.openchatSearchInput.value = String(citation.openchatId || citation.chatTitle || '').trim();
+        App.elements.openchatSearchInput.value = oid || String(citation.chatTitle || '').trim();
       }
-      App.loadOpenchatLogs().catch(function () {});
+      if (App.elements.openchatTitleFilter) {
+        App.elements.openchatTitleFilter.value = '';
+      }
+      App.loadOpenchatLogs({ openchatId: oid || undefined }).catch(function (err) {
+        App.showToast((err && err.message) || 'LINEオプチャの取得に失敗しました', 'error');
+      });
       return;
     }
     App.switchScreen('comments');

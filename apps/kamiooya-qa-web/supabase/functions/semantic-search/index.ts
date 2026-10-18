@@ -36,6 +36,8 @@ type SemanticSearchRequest = {
   match_threshold?: number;
   skip_answer?: boolean;
   list_openchat?: boolean;
+  /** 「DBで見る」用: line_openchat_logs.id を正確に取得（query の KW 検索ではヒットしない） */
+  openchat_id?: string;
   chat_title?: string;
   secret?: string;
   session_id?: string;
@@ -95,6 +97,14 @@ function json(data: unknown, status = 200): Response {
 function asString(value: unknown): string {
   return typeof value === "string" ? value : value == null ? "" : String(value);
 }
+
+/** sync が付与する id（例: oc_df0b7a57e622c765a1c39c6e）かどうかを判定 */
+function looksLikeOpenchatId(value: string): boolean {
+  return /^oc_[0-9a-f]{16,64}$/i.test(value.trim());
+}
+
+const OPENCHAT_LIST_SELECT =
+  "id,route_id,chat_title,chat_name,stream_type,thread_title,posted_at,post_date,sender_name,content";
 
 function asNullableNumber(value: unknown): number | null {
   if (value == null || value === "") return null;
@@ -454,11 +464,44 @@ Deno.serve(async (req) => {
 
     // 一覧／KW ブラウズ（意味検索タブ用・シークレット必須は isAuthorized 済み）
     if (listOpenchat) {
+      const openchatId =
+        asString(body?.openchat_id).trim() ||
+        (looksLikeOpenchatId(query) ? query.trim() : "");
+
+      // 「DBで見る」: id は本文 KW に出ないため、eq で1件取得する
+      if (openchatId) {
+        const { data, error } = await sb
+          .from("line_openchat_logs")
+          .select(OPENCHAT_LIST_SELECT)
+          .eq("ingest_status", "ready")
+          .eq("id", openchatId)
+          .limit(1);
+        if (error) throw new Error(`openchat by id failed: ${error.message}`);
+        const relatedOpenchat = ((data || []) as Record<string, unknown>[]).map((row) =>
+          mapOpenchatRow({ ...row, similarity: 0 })
+        );
+        await logSearchEvent(sb, {
+          ...baseEvent,
+          query_text: openchatId.slice(0, 2000),
+          comment_hit_count: 0,
+          chunk_hit_count: 0,
+          result_status: "ok",
+          used_sources: JSON.stringify({ openchat_ids: relatedOpenchat.map((r) => r.id) }),
+        });
+        return json({
+          relatedOpenchat,
+          hitCount: relatedOpenchat.length,
+          meta: {
+            openchatHitCount: relatedOpenchat.length,
+            mode: "by_id",
+            openchatId,
+          },
+        });
+      }
+
       let q = sb
         .from("line_openchat_logs")
-        .select(
-          "id,route_id,chat_title,chat_name,stream_type,thread_title,posted_at,post_date,sender_name,content"
-        )
+        .select(OPENCHAT_LIST_SELECT)
         .eq("ingest_status", "ready")
         .order("posted_at", { ascending: false, nullsFirst: false })
         .limit(Math.min(200, openchatLimit * 5));
@@ -467,8 +510,9 @@ Deno.serve(async (req) => {
         q = q.ilike("chat_title", `%${titleFilter}%`);
       }
       if (query) {
+        // id.eq も併用（oc_ 以外の旧 id や手貼り対策）
         q = q.or(
-          `content.ilike.%${query}%,chat_title.ilike.%${query}%,sender_name.ilike.%${query}%,thread_title.ilike.%${query}%`
+          `id.eq.${query},content.ilike.%${query}%,chat_title.ilike.%${query}%,sender_name.ilike.%${query}%,thread_title.ilike.%${query}%`
         );
       }
       const { data, error } = await q;
