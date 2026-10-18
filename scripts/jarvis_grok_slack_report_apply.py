@@ -73,7 +73,9 @@ def normalize_channel(raw: str) -> str:
     ch = (raw or "report").strip().lstrip("#").lower()
     if ch in ("ai-hub", "ai_hub"):
         return "hub"
-    if ch in ("report", "consult", "ops", "hub"):
+    if ch in ("deal-active", "deal_active"):
+        return "deal"
+    if ch in ("report", "consult", "ops", "hub", "deal"):
         return ch
     return "report"
 

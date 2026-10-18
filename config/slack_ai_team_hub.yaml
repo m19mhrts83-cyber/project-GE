@@ -17,8 +17,12 @@ channels:
   ops:
     id: C0C88A6CWQH
     purpose: 障害・健全性・枠切れ
+  deal:
+    id: C0CAJQT7QQY
+    slack_name: deal-active
+    purpose: 物件進行・deals 活況（114／買い進め等）。Webhook: SLACK_WEBHOOK_AI_TEAM_DEAL_ACTIVE
 
-# Cursor セッションで優先して読む順
+# Cursor セッションで優先して読む順（deal は件数多めのため既定は読取対象外）
 read_priority:
   - hub
   - consult
