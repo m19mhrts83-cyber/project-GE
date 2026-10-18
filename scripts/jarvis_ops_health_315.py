@@ -38,10 +38,19 @@ LOG_DIR = (
 WATCH_STATUS = (
     REPO / "line_unofficial_poc" / ".line_auth" / ".chrline_open_chat_watch_status.json"
 )
-OPENCHAT_BASE = Path(
-    "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
-    "/C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
-).expanduser()
+_OPENCHAT_CANDIDATES = [
+    Path(
+        "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+        "/C2_ルーティン作業/26_パートナー社への相談/P815_神大家オプチャ"
+    ).expanduser(),
+    Path(
+        "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+        "/C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
+    ).expanduser(),
+]
+OPENCHAT_BASE = next(
+    (p for p in _OPENCHAT_CANDIDATES if p.is_dir()), _OPENCHAT_CANDIDATES[0]
+)
 WATCH_ERR = Path.home() / "Library/Logs/line_open_chat/watch.err.log"
 WATCH_RESUME = REPO / "line_unofficial_poc" / "launchd" / "open_chat_watch_resume.sh"
 FLOW_URL = (
@@ -80,6 +89,9 @@ def westudy_block(*, mark_checked: bool) -> tuple[str, str]:
         cmd.append("--mark-checked")
     code, out = _run(cmd, timeout=90)
     block = out.strip() or "📎 WeStudy週次\n- 状態: 出力なし"
+    # gh 未検出は「WeStudy の失敗」ではなく「点検できない」。混同すると誤報になる。
+    if "gh コマンドが見つかりません" in block:
+        return "確認不能（点検ツール: gh 未検出）", block
     # 1行要約
     line = "確認失敗" if code != 0 else "OK"
     for m in re.finditer(r"^- .+$", block, re.M):
@@ -267,6 +279,11 @@ def _westudy_bad(westudy_line: str) -> bool:
     return "⚠️" in westudy_line or "Fail" in westudy_line or "失敗" in westudy_line
 
 
+def _westudy_unknown(westudy_line: str) -> bool:
+    """WeStudy の成否が「点検不能」（gh 未検出等）。失敗とは区別する。"""
+    return "確認不能" in westudy_line
+
+
 def _oc_bad(oc_level: str) -> bool:
     return oc_level not in ("OK", "スキップ(cloud)")
 
@@ -276,7 +293,12 @@ def _gmail_bad(gmail_level: str) -> bool:
 
 
 def overall_status(westudy_line: str, oc_level: str, gmail_level: str = "OK") -> str:
-    if _westudy_bad(westudy_line) or _oc_bad(oc_level) or _gmail_bad(gmail_level):
+    if (
+        _westudy_bad(westudy_line)
+        or _westudy_unknown(westudy_line)
+        or _oc_bad(oc_level)
+        or _gmail_bad(gmail_level)
+    ):
         return "要フォロー"
     return "OK"
 
@@ -301,9 +323,10 @@ def try_remediate_once(
         "need_consult": "no",
     }
     w_bad = _westudy_bad(westudy_line)
+    w_unknown = _westudy_unknown(westudy_line)
     o_bad = _oc_bad(oc_level)
     g_bad = _gmail_bad(gmail_level)
-    if not w_bad and not o_bad and not g_bad:
+    if not w_bad and not w_unknown and not o_bad and not g_bad:
         return meta
 
     parts: list[str] = []
@@ -311,6 +334,11 @@ def try_remediate_once(
 
     if w_bad:
         parts.append("WeStudy Fail — 自動再実行なし（人が gh 判断）")
+        need_consult = True
+    elif w_unknown:
+        parts.append(
+            "点検ツール異常 — gh が見つからない（PATH/設置先）。WeStudy の成否は未確認"
+        )
         need_consult = True
 
     if g_bad:
