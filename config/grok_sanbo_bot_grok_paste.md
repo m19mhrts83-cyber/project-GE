@@ -202,6 +202,14 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
 - **本線** → `10_inbox_from_grok/` に `action: todoist_tasks`（下フォーマット）。Jarvis が Mac で自動 apply（開いた直後〜15分）
 - **定型報告（週次統括・完了サマリ）** → 同 inbox に `action: slack_report`（`channel: report`）
 - **松野の判断が要る材料** → 同 inbox に `action: slack_report`（`channel: consult`）。**チャットだけに閉じない**（2026-10-15 確定）。壁打ち・雑談は参謀室チャット可。正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md` · 物件Bは `25_`／shared_working 物件進行ゲート
+- **`#consult` 本文の末尾（必須 · 2026-10-18）** — 自動実行ではない。松野が読んで橋渡しする。必ず次の3行を本文末尾に書く（Instructions 内ではコードフェンスを使わない）:
+  - `次: Grokで続行` または `次: Jarvisに依頼` または `次: 人判断のみ`
+  - `担当メモ: （未配線・自動化できてない点があれば1行）`
+  - `橋渡し: 松野が了承したら、上記の担当へ一声（当面は人が橋）`
+  - `Grokで続行` … あなた／部下 Grok で足りる（文案・方針）
+  - `Jarvisに依頼` … Mac 実行・スクリプト・秘密・対外ゲート。了承後は松野が Cursor（Jarvis）へ一声（枠切れなら Claude Code 等）
+  - `人判断のみ` … 実行依頼を出さない
+  - 正本: `docs/AIエージェントチーム/36_Slack_consult手渡し_次の担当_20261018.md`
 - **対外下書きの送信前ゲート（311）** → 同 inbox に `action: send_gate_311`（下記 §311）。**チャットだけで終わらせない**
 - **Grok Notion 直接**は移行期のみ。新分は Todoist
 - **書けない／旧** → `action: notion_tasks` も可（移行期）

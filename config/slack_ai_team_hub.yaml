@@ -1,0 +1,27 @@
+# AIエージェントチーム — Slack ハブ（読取・監視用）
+# 投稿は既存 Webhook（SLACK_WEBHOOK_AI_TEAM_*）。読取は Cursor Slack MCP 本線。
+
+workspace_hint: aiwsnetwork.slack.com
+
+channels:
+  consult:
+    id: C0C7R0UF3MM
+    purpose: 要判断・手渡し（次の担当）・FRIDAY/Jarvis/Grok の迷い
+  report:
+    id: C0C866FNU3C
+    purpose: 完了・定型報告・共有して残す成果
+  ops:
+    id: C0C88A6CWQH
+    purpose: 障害・健全性・枠切れ
+
+# Cursor セッションで優先して読む順
+read_priority:
+  - consult
+  - ops
+  - report
+
+# 1回の読取上限（チャンネルごと）
+limit_per_channel: 8
+
+# 促しすぎ防止（同一セッション以外でも、同レベル再掲の最短間隔・時間）
+min_hours_between_prompts: 4
