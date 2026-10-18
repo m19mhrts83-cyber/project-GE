@@ -50,8 +50,19 @@ HEADER_FROM = re.compile(
     r"(?im)^(?:From|Reply-To|送信者|返信先)\s*[:：]\s*(.+)$"
 )
 LINE_DEST = re.compile(r"(?im)^宛先\s*[:：]\s*(.+)$")
-# パス区切り付き（215_神大家… 等の親フォルダ誤検出を防ぐ）
-FOLDER_RE = re.compile(r"[/\\](?P<code>\d{3}_[^/\\]+)[/\\]")
+# 本文冒頭の宛名（清水様 等）。長すぎる誤検出を避ける
+GREET_SAMA_RE = re.compile(
+    r"(?<![一-龥ぁ-んァ-ンA-Za-z0-9])([一-龥ぁ-んァ-ン]{1,8})様"
+)
+YORITOORI_TO_RE = re.compile(r"(?m)^\s*To:\s*(.+)$")
+YORITOORI_CC_RE = re.compile(r"(?m)^\s*Cc:\s*(.+)$")
+# パートナーフォルダ（P101_ / 旧101_ 互換）
+from jarvis_partner_folder import (  # noqa: E402
+    codes_from_path,
+    is_partner_folder_name,
+    lookup_partner_by_folder,
+    partner_hint_from_path,
+)
 
 
 @dataclass
@@ -101,14 +112,14 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 def _partner_from_path(draft: Path) -> dict[str, Any] | None:
     data = _load_yaml(CONTACT_YAML)
     partners = [p for p in (data.get("partners") or []) if isinstance(p, dict)]
-    known = {str(p.get("folder") or ""): p for p in partners if p.get("folder")}
-    candidates = [m.group("code") for m in FOLDER_RE.finditer(str(draft))]
+    candidates = codes_from_path(draft)
     for folder in candidates:
-        if folder in known:
-            return known[folder]
-    # 連絡先未登録でも三桁フォルダらしきものがあればメモだけ返す
+        hit = lookup_partner_by_folder(folder, partners)
+        if hit:
+            return hit
+    # 連絡先未登録でもパートナーフォルダらしきものがあればメモだけ返す
     for folder in candidates:
-        if folder.startswith(("1", "2", "3", "5", "6", "7", "8", "9")):
+        if is_partner_folder_name(folder):
             return {"folder": folder, "name": folder, "emails": [], "line": ""}
     return None
 
@@ -127,12 +138,8 @@ def _list_inbox_mds(inbox: Path) -> list[Path]:
 
 
 def _partner_hint_from_path(draft: Path) -> str:
-    """パス中の三桁フォルダ。親の 215_神大家… より深い側（103_Tcell 等）を優先。"""
-    codes = [m.group("code") for m in FOLDER_RE.finditer(str(draft))]
-    if not codes:
-        return draft.parent.name if draft.parent.name else ""
-    # 末尾がパートナー本線（26_配下）であることが多い
-    return codes[-1]
+    """パス中のパートナーフォルダ。親の 215_神大家… より深い側（P103_Tcell 等）を優先。"""
+    return partner_hint_from_path(draft)
 
 
 def enqueue_request(
@@ -225,6 +232,87 @@ def _emails_in(text: str) -> list[str]:
     return [e.lower() for e in EMAIL_RE.findall(text or "")]
 
 
+def _parse_email_list(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    return _emails_in(raw.replace(";", ","))
+
+
+def _greet_names(body: str, *, max_lines: int = 20) -> list[str]:
+    """本文先頭付近の「〇〇様」を抽出（署名ブロックは除外目安）。"""
+    head = "\n".join((body or "").splitlines()[:max_lines])
+    names: list[str] = []
+    for m in GREET_SAMA_RE.finditer(head):
+        n = m.group(1).strip()
+        if n and n not in names:
+            names.append(n)
+    return names
+
+
+def _yoritoori_preview_recipients(
+    partner: str,
+    *,
+    via: str = "gmail",
+) -> tuple[list[str], list[str], str]:
+    """yoritoori_send --dry-run の To/Cc を取る。戻り: to, cc, raw_stdout末尾."""
+    manual = (
+        Path.home()
+        / "git-repos"
+        / "215_kamiooya"
+        / "C1_cursor"
+        / "1b_Cursorマニュアル"
+        / "yoritoori_send.py"
+    )
+    if not manual.is_file():
+        raise FileNotFoundError(f"yoritoori_send.py がありません: {manual}")
+    env = os.environ.copy()
+    env.setdefault(
+        "YORITOORI_BASE_PATH",
+        str(
+            Path.home()
+            / "Library/CloudStorage/OneDrive-個人用"
+            / "215_神・大家さん倶楽部"
+            / "C2_ルーティン作業/26_パートナー社への相談"
+        ),
+    )
+    token = (
+        Path.home()
+        / "git-repos"
+        / "215_kamiooya"
+        / "C1_cursor"
+        / "1b_Cursorマニュアル"
+        / "token_estate.json"
+    )
+    if token.is_file():
+        env.setdefault("GMAIL_TOKEN_PATH", str(token))
+    cmd = [
+        sys.executable,
+        str(manual),
+        "--partner",
+        partner,
+        "--via",
+        via,
+        "--dry-run",
+        "--skip-confirm",
+        "--skip-chrline",
+    ]
+    p = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(manual.parent))
+    out = (p.stdout or "") + "\n" + (p.stderr or "")
+    to: list[str] = []
+    cc: list[str] = []
+    m_to = YORITOORI_TO_RE.search(out)
+    if m_to:
+        to = _parse_email_list(m_to.group(1))
+    m_cc = YORITOORI_CC_RE.search(out)
+    if m_cc:
+        cc = _parse_email_list(m_cc.group(1))
+    if p.returncode != 0 and not to:
+        raise RuntimeError(
+            f"yoritoori dry-run 失敗 (exit={p.returncode}): {out[-800:]}"
+        )
+    return to, cc, out[-1200:]
+
+
 def run_checks(
     *,
     draft_path: Path,
@@ -232,6 +320,8 @@ def run_checks(
     source: str,
     partner: dict[str, Any] | None,
     cfg: dict[str, Any],
+    resolved_to: list[str] | None = None,
+    resolved_cc: list[str] | None = None,
 ) -> GateResult:
     checks: list[CheckResult] = []
     to_lines = [m.group(1).strip() for m in HEADER_TO.finditer(body)]
@@ -244,6 +334,11 @@ def run_checks(
     to_blob = "\n".join(to_lines) if to_lines else ""
     # ヘッダが無いメール下書きは本文全体からアドレス抽出（誤爆防止のためヘッダ優先）
     to_emails = _emails_in(to_blob) if to_blob else []
+    # 送信直前プレビュー（yoritoori dry-run）があれば実Toを優先して宛先点検に使う
+    resolved_to_l = [e.lower() for e in (resolved_to or []) if e]
+    resolved_cc_l = [e.lower() for e in (resolved_cc or []) if e]
+    if resolved_to_l:
+        to_emails = list(resolved_to_l)
     from_emails = _emails_in("\n".join(from_lines))
     all_emails = _emails_in(body)
 
@@ -312,6 +407,56 @@ def run_checks(
             )
         )
 
+    # --- 点検1b: 本文宛名 ↔ 実To（送信直前プレビューがあるとき）---
+    # 教訓 2026-10-18: 日本総険・本文「清水様」なのに Reply-All で To=和久・清水はCc
+    greets = _greet_names(body)
+    greet_hints = cfg.get("greet_email_hints") or {}
+    if not isinstance(greet_hints, dict):
+        greet_hints = {}
+    greet_hints_norm = {
+        str(k).strip(): str(v).strip().lower()
+        for k, v in greet_hints.items()
+        if str(k).strip() and str(v).strip()
+    }
+    if resolved_to_l and greets and greet_hints_norm:
+        mismatches: list[str] = []
+        for name in greets:
+            email = ""
+            for hint_name, hint_email in greet_hints_norm.items():
+                if name == hint_name or name.startswith(hint_name) or hint_name in name:
+                    email = hint_email
+                    break
+            if not email:
+                continue
+            if email in resolved_to_l:
+                continue
+            where = "Cc" if email in resolved_cc_l else "To/Cc外"
+            mismatches.append(f"{name}様→期待To {email}（実To={resolved_to_l}／{where}）")
+        if mismatches:
+            checks.append(
+                CheckResult(
+                    False,
+                    "dest",
+                    "本文宛名と実To不一致: " + "；".join(mismatches[:3]),
+                )
+            )
+        else:
+            checks.append(
+                CheckResult(
+                    True,
+                    "dest",
+                    f"本文宛名と実To整合（greet={greets} to={resolved_to_l}）",
+                )
+            )
+    elif resolved_to_l and greets and not greet_hints_norm:
+        checks.append(
+            CheckResult(
+                True,
+                "dest",
+                f"実Toあり・宛名ありだが greet_email_hints 未設定（greet={greets}）",
+            )
+        )
+
     # --- 点検2: 送信者名義 ---
     allowed = set()
     for k in cfg.get("allowed_from_env_keys") or []:
@@ -372,6 +517,9 @@ def run_checks(
             "partner_name": partner_name,
             "line_dest": line_dest,
             "to_emails": to_emails,
+            "resolved_to": resolved_to_l,
+            "resolved_cc": resolved_cc_l,
+            "greet_names": greets,
         },
     )
 
@@ -384,7 +532,7 @@ def _ng_hint(res: GateResult) -> str:
     if "dest" in codes:
         hints.append(
             "宛先点検NG: 下書きの宛先／To と、紐づけたパートナーフォルダが食い違っています。"
-            "まずパス内の三桁フォルダ（例: 103_Tcell）が意図どおりか確認。"
+            "まずパス内のパートナーフォルダ（例: P103_Tcell）が意図どおりか確認。"
             "partner が 215_ など親フォルダ名だけなら紐づけ誤り（ゲート側の取り違え）を疑う。"
         )
     if "sender" in codes:
@@ -474,11 +622,19 @@ def _process_one(
     dry_run: bool,
     post: bool,
     cfg: dict[str, Any],
+    resolved_to: list[str] | None = None,
+    resolved_cc: list[str] | None = None,
 ) -> int:
     body = _read_draft(draft)
     partner = _partner_from_path(draft)
     res = run_checks(
-        draft_path=draft, body=body, source=source, partner=partner, cfg=cfg
+        draft_path=draft,
+        body=body,
+        source=source,
+        partner=partner,
+        cfg=cfg,
+        resolved_to=resolved_to,
+        resolved_cc=resolved_cc,
     )
     out_path = _write_output(res)
     print(f"overall={res.overall}")
@@ -546,8 +702,48 @@ def main() -> int:
         default=DEFAULT_CONFIG,
         help="banned_patterns.yaml",
     )
+    ap.add_argument(
+        "--resolved-to",
+        default="",
+        help="送信直前の実To（カンマ区切り）。yoritoori dry-run の To を渡す",
+    )
+    ap.add_argument(
+        "--resolved-cc",
+        default="",
+        help="送信直前の実Cc（カンマ区切り）",
+    )
+    ap.add_argument(
+        "--yoritoori-partner",
+        default="",
+        help="指定時: yoritoori_send --dry-run で To/Cc を自動取得してからゲート",
+    )
+    ap.add_argument(
+        "--yoritoori-via",
+        default="gmail",
+        choices=["gmail", "imessage"],
+        help="--yoritoori-partner 時の --via（既定 gmail）",
+    )
     args = ap.parse_args()
     cfg = _load_yaml(args.config)
+
+    resolved_to = _parse_email_list(args.resolved_to)
+    resolved_cc = _parse_email_list(args.resolved_cc)
+    if args.yoritoori_partner.strip():
+        try:
+            resolved_to, resolved_cc, preview_tail = _yoritoori_preview_recipients(
+                args.yoritoori_partner.strip(),
+                via=args.yoritoori_via,
+            )
+            print(f"yoritoori_preview To={resolved_to} Cc={resolved_cc}")
+            if not resolved_to:
+                print(
+                    "⚠ yoritoori dry-run から To を取れませんでした（ゲートは下書きのみ）",
+                    file=sys.stderr,
+                )
+                print(preview_tail[-400:], file=sys.stderr)
+        except Exception as e:
+            print(f"❌ yoritoori preview 失敗: {e}", file=sys.stderr)
+            return 2
 
     if args.enqueue:
         if not args.draft:
@@ -597,7 +793,13 @@ def main() -> int:
                     print(f"inbox_error={bad}")
                 continue
             code = _process_one(
-                draft, source, dry_run=args.dry_run, post=args.post, cfg=cfg
+                draft,
+                source,
+                dry_run=args.dry_run,
+                post=args.post,
+                cfg=cfg,
+                resolved_to=resolved_to or None,
+                resolved_cc=resolved_cc or None,
             )
             worst = max(worst, code)
             if not args.keep_inbox:
@@ -621,6 +823,8 @@ def main() -> int:
         dry_run=args.dry_run,
         post=args.post,
         cfg=cfg,
+        resolved_to=resolved_to or None,
+        resolved_cc=resolved_cc or None,
     )
 
 
