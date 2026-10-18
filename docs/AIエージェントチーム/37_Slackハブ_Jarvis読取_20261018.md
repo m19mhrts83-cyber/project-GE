@@ -41,6 +41,8 @@ state: `.jarvis_state/slack_hub_watch.json`
 | **Grok** | 定型・要ボス（既存 `slack_report`）。末尾「次の担当」は [`36_`](36_Slack_consult手渡し_次の担当_20261018.md) |
 | **Jarvis** | 同上＋セッションで差分をチャットに相乗り |
 
+**どの ch・末尾型の書き方1節（正本）**: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](./38_Slack書き出し_FRIDAY_Jarvis_20261018.md)
+
 ## Drive との役割分担（移行の実態）
 
 ```

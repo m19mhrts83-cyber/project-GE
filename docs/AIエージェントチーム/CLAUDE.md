@@ -57,7 +57,8 @@ Drive `★AIエージェントチーム` へも写す（`--no-drive` でオフ�
 
 ## 報告・対外
 
-Slack `#report` / `#consult` / `#ops`。外に出す・金・削除は人の了承。詳細は各社員 `CLAUDE.md`。
+Slack `#report` / `#consult` / `#ops`。外に出す・金・削除は人の了承。詳細は各社員 `CLAUDE.md`。  
+**FRIDAY／Jarvis／AI社員の書き出し1節（どの ch・末尾型）**: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](./38_Slack書き出し_FRIDAY_Jarvis_20261018.md)
 
 ### Slack 書き出し（必須・2026-10-18）
 
@@ -74,4 +75,18 @@ Slack `#report` / `#consult` / `#ops`。外に出す・金・削除は人の了�
 | ops | `【ops】211 返信案内下書き・朝便` |
 | Webhook 表示名 | `211 返信案内下書き` |
 
-Cursor ルール: `.cursor/rules/jarvis-agent-team-slack-report.mdc`
+| ch | いつ |
+|---|---|
+| `#report` | 完了・定型・生存確認 |
+| `#consult` | 要判断。**末尾に「次の担当」3行必須**（[`36_`](./36_Slack_consult手渡し_次の担当_20261018.md)） |
+| `#ops` | 障害・失敗・枠切れ |
+
+`#consult` 末尾型:
+
+```
+次: Grokで続行 | Jarvisに依頼 | 人判断のみ
+担当メモ: …
+橋渡し: 松野が了承したら、上記の担当へ一声（当面は人が橋）
+```
+
+Cursor ルール: `.cursor/rules/jarvis-agent-team-slack-report.mdc` · 読取: `jarvis-slack-hub-watch.mdc`

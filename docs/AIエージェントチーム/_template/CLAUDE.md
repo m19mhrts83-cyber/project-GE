@@ -38,11 +38,29 @@
 
 | 種別 | 行き先 |
 |---|---|
-| 完了報告 | Slack `#report` または `#ops`（体による） |
+| 完了報告 | Slack `#report`（障害は `#ops`） |
 | 要判断・相談 | Slack `#consult` |
-
-**書き出し**: 最初の1行に **`【報告】NNN 短い役割語`**（番号＋何をするか。「係」不要）。例: `【報告】211 返信案内下書き・朝便`。詳細: ハブ `CLAUDE.md`／`.cursor/rules/jarvis-agent-team-slack-report.mdc`
 | Webhook（秘密） | env キー名のみ記す（URLは書かない）: `SLACK_WEBHOOK_…` |
+
+**書き出し**: 最初の1行に **`【報告】NNN 短い役割語`**（番号＋何をするか。「係」不要）。例: `【報告】211 返信案内下書き・朝便`。
+
+### Slack 書き出し（FRIDAY／Jarvis 共通）
+
+| ch | いつ |
+|---|---|
+| `#report` | 完了・定型・生存確認 |
+| `#consult` | 要判断。末尾「次の担当」3行必須 |
+| `#ops` | 障害・失敗・枠切れ |
+
+`#consult` 末尾:
+
+```
+次: Grokで続行 | Jarvisに依頼 | 人判断のみ
+担当メモ: …
+橋渡し: 松野が了承したら、上記の担当へ一声（当面は人が橋）
+```
+
+正本: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](../38_Slack書き出し_FRIDAY_Jarvis_20261018.md) · [`36_`](../36_Slack_consult手渡し_次の担当_20261018.md) · ハブ `CLAUDE.md` · `.cursor/rules/jarvis-agent-team-slack-report.mdc`
 
 ## 5. 成果物の置き場
 

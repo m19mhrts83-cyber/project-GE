@@ -14,6 +14,8 @@ Slack `#report` / `#consult` / `#ops` への投稿は、**最初の1行に次の
 
 「係」は付けなくてよい。正式フォルダ名をそのまま長く書かず、**単語〜短いフレーズに要約**してよい。
 
+**パートナー社フォルダ（`P311_…` 等）と混同しないこと。** 社員は数字＋役割語、パートナーは必ず `P` 接頭辞（`jarvis-numbering-disambiguation.mdc`）。番号単独（例: 「815」だけ）は禁止。
+
 ## 正の型
 
 | 用途 | 書き出し例 |
@@ -55,6 +57,8 @@ Slack `#report` / `#consult` / `#ops` への投稿は、**最初の1行に次の
 
 ## 関連
 
+- どの ch・`#consult` 末尾型（FRIDAY／Jarvis／社員）: `docs/AIエージェントチーム/38_Slack書き出し_FRIDAY_Jarvis_20261018.md`
 - 合図・報告先: `jarvis-agent-team-ops.mdc`
+- 読取ハブ: `jarvis-slack-hub-watch.mdc`
 - 社員一覧: `docs/AIエージェントチーム/agents_registry.yaml`
 - 投稿ヘルパー: `scripts/jarvis_slack_webhook_post.py`

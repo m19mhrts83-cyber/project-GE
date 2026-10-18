@@ -24,7 +24,8 @@ cd ~/git-repos
 4. 実装完了相当の Todoist タスクがあれば、**完了にせずオーナー確認へ**入れ松野に伝える（`./scripts/friday_todoist.sh` · `jarvis-todoist-owner-confirm.mdc`）
 5. `force push` / `--amend` / 秘密のチャット貼付は禁止
 6. コミット後、短い報告（hash・ファイル一覧・push 有無）
-7. **Jarvis／松野と共有すべき完了・要判断**は Slack にも残す（`#report`／迷い `#consult`）。Drive だけ・チャットだけに閉じない（正本: `docs/AIエージェントチーム/37_Slackハブ_Jarvis読取_20261018.md`）
+7. **Jarvis／松野と共有すべき完了・要判断**は Slack にも残す（`#report`／迷い `#consult`・末尾「次の担当」）。Drive だけ・チャットだけに閉じない。  
+   どの ch・末尾型: `docs/AIエージェントチーム/38_Slack書き出し_FRIDAY_Jarvis_20261018.md` · キット §6.1 · 読取: `37_`
 
 ## Todoist（Jarvis 同等）
 

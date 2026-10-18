@@ -71,6 +71,17 @@ WeStudy／GitHub Actions の失敗、LINE オープンチャット取込、**Gma
 | 要判断（1回トライ後未解決） | Slack **`#consult`** | 同スクリプト `--channel consult` |
 | 出さない | `#report`・FlowForge「チャットに報告」 | 業務報告と混ぜない |
 
+### Slack 書き出し（FRIDAY／Jarvis 共通）
+
+| ch | いつ |
+|---|---|
+| `#report` | 完了・定型・生存確認 |
+| `#consult` | 要判断。末尾「次の担当」3行必須 |
+| `#ops` | 障害・失敗・枠切れ |
+
+`#consult` 末尾: `次: Grokで続行 | Jarvisに依頼 | 人判断のみ` ＋ `担当メモ` ＋ `橋渡し`  
+正本: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](../../38_Slack書き出し_FRIDAY_Jarvis_20261018.md) · [`36_`](../../36_Slack_consult手渡し_次の担当_20261018.md)
+
 ## 5. 成果物の置き場
 
 - スクリプト: `scripts/jarvis_ops_health_315.py` / `jarvis_westudy_weekly_check.py` / `jarvis_gmail_token_health.py` / `jarvis_openchat_recover_worker.py`
