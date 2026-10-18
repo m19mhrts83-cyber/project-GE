@@ -1,0 +1,101 @@
+---
+description: Slack #consult/#ops/#report の更新を Cursor セッションで読み、都度言われなくても差分を相乗り提案する（FRIDAY・Grok・Jarvis 共有ハブ）
+alwaysApply: true
+---
+
+# Slack ハブ監視（Jarvis · Cursor 本線）
+
+## 方針
+
+Cursor（Jarvis）がメインの作業場。**FRIDAY／Grok／他経路が Slack に残した更新**は、ユーザーに「Slack見て」と言われる前に、セッションで読み **短い相乗り提案**をする。
+
+| 正 | 内容 |
+|---|---|
+| **エージェント同士** | Slack `#ai-hub`（Hawk／FRIDAY／Jarvis） |
+| **見える共有（人向け）** | Slack `#consult` / `#ops` / `#report` |
+| **Mac 実行手渡し** | Drive JarvisBox（捨てない） |
+| **読取本線** | Cursor **Slack MCP**（`slack_read_channel`） |
+
+正本: `docs/AIエージェントチーム/37_Slackハブ_Jarvis読取_20261018.md`  
+設定: `config/slack_ai_team_hub.yaml`  
+state: `~/git-repos/.jarvis_state/slack_hub_watch.json`
+
+## 無効化
+
+- state `"disabled": true`
+- または `.env.jarvis_private` に `JARVIS_SLACK_HUB_WATCH_DISABLE=1`
+- ユーザーが「Slackハブ監視不要」と明示
+
+## チャンネル ID（YAML 正・欠落時の控え）
+
+| ch | id |
+|---|---|
+| `#ai-hub` | `C0CA3M5SNNS` |
+| `#consult` | `C0C7R0UF3MM` |
+| `#report` | `C0C866FNU3C` |
+| `#ops` | `C0C88A6CWQH` |
+
+## いつ動くか（同一セッション1回まで）
+
+state が無効でないとき、次のいずれか:
+
+1. **セッション開始直後**（本題の前でも可）— 前回 `last_prompted_at` から **4時間以上**空いている、または `--force` 相当の明示
+2. 話題が **AIエージェント／FRIDAY／Grok／#consult／社員／Slack** のとき
+3. **パートナー確認**の前半末尾のついで（失敗しても確認全体は止めない）
+4. ユーザーが「Slack見て」「ハブ差分」等と明示 → 即実行
+
+促しすぎ防止: 重大な新規が無い限り、**4時間以内に同ブロックを再掲しない**（スクリプトの `min_hours`）。
+
+## Jarvis の動作（必須順）
+
+1. ヒント確認（任意・失敗してよい）:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_slack_hub_watch.py --hints
+```
+
+2. **Slack MCP** で YAML の `read_priority` 順に読む（既定: hub → consult → ops → report）。  
+   `limit` は YAML の `limit_per_channel`（目安8）。  
+   state の `channels.*.last_ts` より新しいものだけに注目。
+3. 新規があればチャットに報告ブロック。**全部貼らない**（各ch最大3件・1行要約）。  
+   `#consult` に `次: Jarvisに依頼` があれば本題や次手に接続してよい。  
+   `#ai-hub` はエージェント共有の相乗り提案向き。
+4. 記録:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+ scripts/jarvis_slack_hub_watch.py --mark-prompted \
+ --summary 'hub: … / consult: … / ops: … / report: …'
+```
+
+5. 既読 ts を進めるとき: `--set-ts hub <ts>`（MCP で得た最新 ts）
+
+## 報告フォーマット
+
+```
+📎 Slackハブ差分
+- #ai-hub: …（なければ「新規なし」）
+- #consult: …
+- #ops: …
+- #report: …
+- 提案: （あれば1行。なければ省略可）
+```
+
+## やらないこと
+
+- 秘密・トークンを Slack／チャットに再掲
+- Drive inbox を廃止して Slack だけにする（実行手渡しは Drive）
+- 差分ゼロのとき長文で「監視しました」だけ出す（スキップ可）
+- Webhook 投稿だけの確認で読取したつもりになる
+
+## FRIDAY／Grok
+
+- **FRIDAY**: エージェント共有は `#ai-hub`。人向け完了・要判断は `#report`／`#consult`。詳細: `37_` · `38_`
+- **Grok**: 横断共有は `#ai-hub`（`channel: hub`）。定型人向けは `slack_report`。`#consult` 末尾は `36_`
+
+## 関連
+
+- consult 手渡し: `36_Slack_consult手渡し_次の担当_20261018.md`
+- Slack 書き出し: `jarvis-agent-team-slack-report.mdc`
+- パートナー確認: `partner-email-check.mdc`

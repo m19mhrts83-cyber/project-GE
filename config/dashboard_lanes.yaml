@@ -17,7 +17,7 @@ lanes:
     digest_themes: 5
     action_summary_max: 5
     sources:
-      - path: "{partner_base}/806_神大家AI推進/5.やり取り.md"
+      - path: "{partner_base}/P806_神大家AI推進/5.やり取り.md"
         take: 12
       - path: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/フェーズ管理.md"
         take: 5
@@ -56,16 +56,16 @@ lanes:
     digest_themes: 5
     action_summary_max: 5
     sources:
-      - path: "{partner_base}/102_ミニテック/5.やり取り.md"
+      - path: "{partner_base}/P102_ミニテック/5.やり取り.md"
         take: 6
         tag: GrandoleⅠ・ミニテック
-      - path: "{partner_base}/103_Tcell/5.やり取り.md"
+      - path: "{partner_base}/P103_Tcell/5.やり取り.md"
         take: 6
         tag: Tcell・キャラメル
-      - path: "{partner_base}/104_LEAF/5.やり取り.md"
+      - path: "{partner_base}/P104_LEAF/5.やり取り.md"
         take: 6
         tag: LEAF
-      - path: "{partner_base}/101_ホームプランナー/5.やり取り.md"
+      - path: "{partner_base}/P101_ホームプランナー/5.やり取り.md"
         take: 6
         tag: GrandoleⅡ・HP
       - path: "{partner_base}/000_共通/Grandole志賀本通_号室×管理会社_整理.md"
@@ -88,7 +88,7 @@ lanes:
     digest_themes: 5
     action_summary_max: 5
     sources:
-      - path: "{partner_base}/907_Raimo代理店/5.やり取り.md"
+      - path: "{partner_base}/P907_Raimo代理店/5.やり取り.md"
         take: 10
         tag: Raimo
       - path: "{obsidian_journal}"

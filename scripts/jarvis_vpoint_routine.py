@@ -477,6 +477,25 @@ def main() -> int:
             [str(REPO / "scripts" / "jarvis_dashboard_push.py"), "--watch-only"],
             timeout=180,
         )
+        # 614 ポイント・還元ウォッチ係 → Slack #report（失敗しても本線は止めない）
+        asks = (report.get("manual") or {}).get("jarvis_asks") or []
+        if not isinstance(asks, list):
+            asks = []
+        note_bits = ["窓C定例"]
+        if report.get("auto", {}).get("grant_summary", {}).get("status"):
+            note_bits.append(f"付与={report['auto']['grant_summary']['status']}")
+        slack_cmd = [
+            str(REPO / "scripts" / "jarvis_points_rebate_slack_report.py"),
+            "--kind",
+            "vpoint",
+            "--outcome",
+            "checked",
+            "--asks",
+            str(len(asks)),
+            "--note",
+            " · ".join(note_bits)[:200],
+        ]
+        report["slack"] = run_py(slack_cmd, timeout=60)
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

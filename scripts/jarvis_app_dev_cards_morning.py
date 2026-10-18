@@ -3,9 +3,10 @@
 """アプリ開発統括の Jarvis向けカードを朝に要約する。
 
 Grok チャンネルは API で読めないため、次を正とする:
-  1) estate Gmail 件名 [Grok開発]（ルーティン末尾で統括が送る）
-  2) ローカル inbox（チャンネルからコピペ可）
-     ~/.jarvis_state ではなく repo: .jarvis_state/app_dev_cards_inbox.md
+  1) Drive 10_inbox `action: app_dev_cards`（本線化中・〜2026-10-25 までメール並立）
+  2) estate Gmail 件名 [Grok開発]（並行・フォールバック）
+  3) ローカル inbox（チャンネルからコピペ可）
+     repo: .jarvis_state/app_dev_cards_inbox.md
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_app_dev_cards_morning.py
@@ -13,6 +14,7 @@ Grok チャンネルは API で読めないため、次を正とする:
   ~/selenium_env/venv/bin/python scripts/jarvis_app_dev_cards_morning.py --dry-run
 
 朝バンドル: jarvis_morning_mac_refresh.py から呼ばれる。
+Drive 起票: scripts/jarvis_app_dev_cards_apply.py（bucho inbox poll 相乗り）
 """
 from __future__ import annotations
 
@@ -216,11 +218,51 @@ def load_inbox_text() -> str:
     return INBOX_PATH.read_text(encoding="utf-8", errors="replace")
 
 
+def _parse_frontmatter_simple(text: str) -> tuple[dict[str, str], str]:
+    if not text.startswith("---"):
+        return {}, text
+    end = text.find("\n---", 3)
+    if end < 0:
+        return {}, text
+    raw = text[3:end].strip()
+    meta: dict[str, str] = {}
+    for line in raw.splitlines():
+        if ":" not in line:
+            continue
+        k, v = line.split(":", 1)
+        meta[k.strip()] = v.strip().strip("\"'")
+    return meta, text[end + 4 :].lstrip("\n")
+
+
+def fetch_drive_app_dev_card_bodies() -> list[tuple[str, str]]:
+    """Drive 10_inbox の action: app_dev_cards → (source_id, body)。"""
+    try:
+        from jarvis_bucho_bridge_lib import folder, list_queue_files
+    except Exception:
+        return []
+    try:
+        inbox_dir = folder("inbox_from_grok")
+    except Exception:
+        return []
+    out: list[tuple[str, str]] = []
+    for p in list_queue_files(inbox_dir):
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        meta, body = _parse_frontmatter_simple(text)
+        if (meta.get("action") or "").strip() != "app_dev_cards":
+            continue
+        out.append((p.name, body))
+    return out
+
+
 def collect_cards(
     *,
     days: int,
     skip_gmail: bool,
     state: dict[str, Any],
+    skip_drive: bool = False,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     notes: list[str] = []
     cards: list[dict[str, Any]] = []
@@ -232,6 +274,17 @@ def collect_cards(
                 continue
             seen.add(c["id"])
             cards.append(c)
+
+    if not skip_drive:
+        drive_files = fetch_drive_app_dev_card_bodies()
+        drive_n = 0
+        for name, body in drive_files:
+            got = parse_cards(body, source="drive", source_id=name)
+            drive_n += len(got)
+            add_all(got)
+        notes.append(f"drive={len(drive_files)}ファイル/{drive_n}カード")
+    else:
+        notes.append("drive=skip")
 
     inbox = load_inbox_text()
     if inbox.strip():

@@ -194,6 +194,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a && \
 - **Mac アプリ操作（Grok Bot 等 · CDP）**: `jarvis-mac-app-cdp.mdc`
 - **月次ルーティン**（ETC 割引・登録切れ防止）: `jarvis-monthly-routine.mdc`
 - **カード年会費ガード**（切替・退会・二重課金防止）: `jarvis-card-fee-guard.mdc`
+- **資金移動キープ**（解約済Preferred残債10,860円等）: `jarvis-fund-transfer-keep.mdc`
 - **大家火災保険・求償（代位）約款確認**: `jarvis-fire-insurance-subrogation.mdc`
 - **Obsidian 同期（Google Drive Sync 本線）**: `jarvis-obsidian-gdrive-sync.mdc`（書類正本＋`ogd_pull` / `ogd_retag`。Remotely Save は廃止）
 - **レーン要約確認・処置ログ**: `jarvis-lane-digest.mdc`

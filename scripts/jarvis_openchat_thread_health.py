@@ -38,10 +38,17 @@ WATCH_STATUS = (
 WATCH_RESUME_FAILED = (
     REPO / "line_unofficial_poc" / ".line_auth" / "WATCH_RESUME_FAILED.txt"
 )
-OPENCHAT_BASE = Path(
-    "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
-    "/C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
-).expanduser()
+_OPENCHAT_CANDS = [
+    Path(
+        "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+        "/C2_ルーティン作業/26_パートナー社への相談/P815_神大家オプチャ"
+    ).expanduser(),
+    Path(
+        "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+        "/C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
+    ).expanduser(),
+]
+OPENCHAT_BASE = next((p for p in _OPENCHAT_CANDS if p.is_dir()), _OPENCHAT_CANDS[0])
 
 BOOTSTRAP_HINT = (
     "cd ~/git-repos/line_unofficial_poc && ./launchd/open_chat_watch_pause.sh && "

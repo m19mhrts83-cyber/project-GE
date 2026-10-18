@@ -59,8 +59,10 @@ KURASHIFT_VENDOR_SYNC = REPO / "scripts" / "jarvis_kurashift_vendor_sync.py"
 VENDOR_OUTREACH_STALL = REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"
 KURASHIFT_INQUIRY_POLL = REPO / "scripts" / "jarvis_kurashift_re_inquiry.py"
 KURASHIFT_RE_DAILY_DIGEST = REPO / "scripts" / "jarvis_kurashift_re_daily_digest.py"
+AGENT_TEAM_DAILY_DIGEST = REPO / "scripts" / "jarvis_agent_team_daily_digest.py"
 KURASHIFT_RE_CLEANUP = REPO / "scripts" / "jarvis_kurashift_re_cleanup.py"
 KURASHIFT_OBSIDIAN_PICK_SYNC = REPO / "scripts" / "jarvis_kurashift_obsidian_pick_sync.py"
+MEETING_MINUTES_CURATE = REPO / "scripts" / "jarvis_meeting_minutes_curate.py"
 VENDOR_REPLY_TRIAGE = REPO / "scripts" / "jarvis_kurashift_vendor_reply_triage.py"
 VENDOR_CATCHUP = REPO / "scripts" / "jarvis_triage_vendor_catchup.py"
 POC = REPO / "line_unofficial_poc"
@@ -1124,6 +1126,25 @@ def main() -> int:
     else:
         results["steps"]["kurashift_re_daily_digest"] = "skipped"
 
+    # 2c3b. AIエージェントチーム Slack 日次集約（#report・1日1通・soft-fail）
+    if AGENT_TEAM_DAILY_DIGEST.is_file() and not args.skip_fetch:
+        digest_args = [exe, str(AGENT_TEAM_DAILY_DIGEST)]
+        if args.dry_run:
+            digest_args.append("--dry-run")
+        else:
+            digest_args.append("--post")
+        rc = run_step(
+            "agent_team_daily_digest",
+            digest_args,
+            timeout=90,
+            dry_run=False,  # 上で --dry-run/--post を付けたので二重にしない
+        )
+        results["steps"]["agent_team_daily_digest"] = rc
+        if rc != 0:
+            print(f"# agent_team_daily_digest soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["agent_team_daily_digest"] = "skipped"
+
     # 2c4. KURASHIFT 候補自動クリーンアップ（低スコア・エリア外・放置物件の自然退避）
     if KURASHIFT_RE_CLEANUP.is_file() and not args.skip_fetch:
         rc = run_step(
@@ -1195,6 +1216,22 @@ def main() -> int:
             print(f"# karate_advisor_sync soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["karate_advisor_sync"] = "skipped"
+
+    # 2b3. 議事録整理 714（提案のみ・soft-fail。Notion 作成は人了承後）
+    if MEETING_MINUTES_CURATE.is_file() and not os.environ.get(
+        "JARVIS_MEETING_MINUTES_CURATE_DISABLE", ""
+    ).strip() in ("1", "true", "yes"):
+        rc = run_step(
+            "meeting_minutes_curate",
+            [exe, str(MEETING_MINUTES_CURATE), "scan", "--mark-prompted"],
+            timeout=180,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["meeting_minutes_curate"] = rc
+        if rc != 0:
+            print(f"# meeting_minutes_curate soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["meeting_minutes_curate"] = "skipped"
 
     # 3–4. 状況ウォッチ再集約込みの投影 push（push 内で situation_watch 実行）
     if not args.skip_push:

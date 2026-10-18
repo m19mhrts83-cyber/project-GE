@@ -82,7 +82,8 @@ alwaysApply: true
 助言の型（チャット）: 用途ラベル → 比較表 → チェックリスト → 1行推奨 → 禁止リスト → 次の具体手。  
 詳細: `docs/Jarvis_金融相談の出し方_20260814.md`
 
-UI 正本: KURASHIFT `/money-ops`（`cardSettlementBuffer.ts`）。気づきは Jarvis ダッシュボード `card_debit_watch`。
+UI 正本: KURASHIFT `/money-ops`（`cardSettlementBuffer.ts`）。気づきは Jarvis ダッシュボード `card_debit_watch`。  
+寄せ時の固定キープ（解約済 Preferred 月次 10,860円→ドコモSMTB イチゴ 等）: `jarvis-fund-transfer-keep.mdc` / `config/known_recurring_debits.yaml`。
 
 ### カード引落の金額把握（確実ライン）
 

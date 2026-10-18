@@ -189,7 +189,7 @@ def _md_path(route: ExportRoute) -> Path:
 
 
 def _health_folder_key(route: ExportRoute) -> str:
-    if route.folder.startswith("815_"):
+    if route.folder.startswith(("815_", "P815_")):
         return route.folder.split("/")[-1]
     return route.folder.split("/")[0]
 
@@ -297,7 +297,13 @@ def check_route(route: ExportRoute, *, now: datetime, state: dict, health: dict)
         if days >= ask_threshold:
             level = "ask"
 
-    if queue_total >= 30 and health_key in ("104_LEAF", "103_Tcell", "東海飲み会幹事やりとり"):
+    if queue_total >= 30 and health_key in (
+        "104_LEAF",
+        "P104_LEAF",
+        "103_Tcell",
+        "P103_Tcell",
+        "東海飲み会幹事やりとり",
+    ):
         reasons.append(f"retry キュー {queue_total} 件（全体）")
         if level == "info" and days is not None and days >= suggest_threshold:
             level = "suggest"

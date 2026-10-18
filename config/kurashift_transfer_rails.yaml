@@ -27,6 +27,8 @@ rails:
     order: 10
     # 2026-08-20 給与確認後寄せ（PayPayカード26万＋バッファ5万）
     amount_jpy: 138183
+    # keep に解約済 Preferred 残債 10,860円を含むこと（〜2027-07）
+    # → config/known_recurring_debits.yaml#smcc_preferred_residual_docomo_smtb
     keep_floor_jpy: 310000
     from_account_id: sbi_net_main
     to_account_id: smbc_kariya

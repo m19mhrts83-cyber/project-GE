@@ -1,0 +1,32 @@
+# 禁止宛先・運営混入（値は秘密にしないパターンのみ）
+# 大文字小文字無視・部分一致
+
+email_substrings:
+  - noreply@
+  - no-reply@
+  - donotreply@
+  - do-not-reply@
+  - mailer-daemon@
+  - postmaster@
+
+text_keywords:
+  - ポータル運営
+  - サイト管理者
+  - 運営事務局宛
+  - お問い合わせフォーム運営
+
+# 本人名義として許容する From / Reply-To（env 名。実値は .env.jarvis_private）
+allowed_from_env_keys:
+  - PERSONAL_EMAIL
+  - COMPANY_EMAIL
+# 固定で許容するアドレス（公開してよい対外From）
+allowed_from_emails:
+  - matsuno.estate@gmail.com
+
+# 本文「〇〇様」↔ 実To 照合（yoritoori dry-run の To を渡したとき）
+# キーは敬称なしの呼び（先頭一致）。値は正規化済み小文字メール
+greet_email_hints:
+  清水: ayanori.shimizu@iba-ns.co.jp
+  和久: naomi.waku@iba-ns.co.jp
+  多田羅: hozen@iba-ns.co.jp
+  福田: yohei.fukuda@iba-ns.co.jp

@@ -587,6 +587,8 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260922_todoist_webhook_events.sql）
 -- line_oa_events（LINE公式アカウント Messaging API Webhook 受信ログ・グループ本文）
 -- （migrations/20260930_line_oa_events.sql）
+-- yen_rate_daily（615 円動向・USD/JPY 日次投影）
+-- （migrations/20261017_yen_rate_daily.sql）
 
 -- Data API 明示 GRANT（2026-10-30 以降の新規テーブル対策。既存も明示して reset 耐性を確保）
 -- 全テーブル分の正本: migrations/20260926_data_api_explicit_grants.sql

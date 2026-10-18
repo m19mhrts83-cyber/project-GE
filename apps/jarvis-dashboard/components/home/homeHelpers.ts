@@ -23,6 +23,9 @@ export function watchHref(
     };
   }
   if (id === "zaim_quality") return { href: "/zaim", external: false };
+  if (id === "etc_mileage") return { href: "/etc", external: false };
+  if (id === "vpoint") return { href: "/vpoint", external: false };
+  if (id === "yen_rate") return { href: "/yen", external: false };
   if (id === "openchat_threads") return { href: "/openchat", external: false };
   if (id === "cursor_pro_plus_downgrade") {
     return { href: "https://www.cursor.com/settings", external: true };

@@ -72,7 +72,7 @@ export default async function OpenchatGroupPage({
   const prompt = yoritooriCursorPrompt(displayName);
   const folderLinks = getFolderLinksMany([
     openchatFolderKey(displayName),
-    partnerFolderKey("815_神大家オプチャ", null),
+    partnerFolderKey("P815_神大家オプチャ", null),
   ]);
 
   return (

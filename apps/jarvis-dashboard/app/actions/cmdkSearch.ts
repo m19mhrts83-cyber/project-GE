@@ -59,11 +59,13 @@ export async function searchCmdk(q: string): Promise<CmdkSearchHit[]> {
           ? "/etc"
           : w.id === "vpoint"
             ? "/vpoint"
-            : w.id === "rent_step"
-              ? "/rent-step"
-              : w.id === "openchat_threads"
-                ? "/openchat"
-                : `/situation?watch=${encodeURIComponent(String(w.id))}#watch-${encodeURIComponent(String(w.id))}`;
+            : w.id === "yen_rate"
+              ? "/yen"
+              : w.id === "rent_step"
+                ? "/rent-step"
+                : w.id === "openchat_threads"
+                  ? "/openchat"
+                  : `/situation?watch=${encodeURIComponent(String(w.id))}#watch-${encodeURIComponent(String(w.id))}`;
     hits.push({
       id: `watch:${w.id}`,
       kind: "watch",

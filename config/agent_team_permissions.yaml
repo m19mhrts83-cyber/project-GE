@@ -1,0 +1,159 @@
+# AIエージェントチーム／Grok Bot — 実行権限・秘密アクセス俯瞰
+# 値（パスワード・トークン本文）は書かない。キー名とアクセス種別のみ。
+#
+# 更新タイミング（必須）:
+#   - 社員／Grok Bot を新規追加したとき
+#   - サイトへの ID・パスワード／API を渡した・足したとき
+#   - CLAUDE.md「## 3. 実行権限」や .env.example を変えたとき
+# → 本ファイルを直し → jarvis_agent_team_status_sync.py → agentTeam.json を commit/push
+#
+# ダッシュ: /agent-team の「権限」タブ
+# 人向け: docs/AIエージェントチーム/25_実行権限一覧_20261015.md（sync が再生成可）
+# 機密二層: docs/AIエージェントチーム/05_機密とenv二層_20261009.md
+
+updated: "2026-10-15"
+
+defaults:
+  ai:
+    human_gate: "お金・外に出す・消す"
+    secrets_note: "社員 .env は最小セット。マスターは .env.jarvis_private"
+  grok:
+    secrets_policy: none
+    secrets_note: "サイトID／パスワード・APIトークンは持たない。Mac実行・秘密は Jarvis（JarvisBox フォーク）"
+    human_gate: "対外送信・金・削除は松野了承／Jarvis ゲート"
+
+# AI社員（agents_registry の id）
+# methods は CLAUDE.md §3 から sync が自動抽出。ここは上書き・補足用。
+# site_logins: ブラウザ／Playwright 等でログインしうるサービス（値は書かない）
+agents:
+  "111":
+    can_do: "パートナー連絡の差分取込・要約・#report 材料（送信は人）"
+    site_logins:
+      - service: Gmail（admin 取込）
+        access: API token
+        note: token_livingsupport 経由。値はチャット禁止
+      - service: Chatwork
+        access: API／取込スクリプト
+        note: 秘密は jarvis_private
+      - service: LINE（グループ）
+        access: CHRLINE／公式エクスポート
+        note: Mac。QR 時は人
+  "112":
+    can_do: "LINE 同期・健全性の見回り（候補）"
+    site_logins: []
+  "113":
+    can_do: "KURASHIFT 買い進め進捗の見回り（Grok部長と弱対応）"
+    site_logins: []
+  "114":
+    can_do: "物件一次判定ゲート A/B/C 振分 → Slack（送信は 511）"
+    site_logins: []
+  "115":
+    can_do: "修繕進捗の要約（パートナー確認ついで・候補）"
+    site_logins: []
+  "211":
+    can_do: "返信・案内文面の下書き提案（07:30 GHA・送信は人）"
+    site_logins: []
+  "311":
+    can_do: "送信前の文面・添付チェック（送信クリックは人）"
+    site_logins: []
+  "312":
+    can_do: "Todoist 起票・整理の補助（候補）"
+    site_logins: []
+  "313":
+    can_do: "完了候補の確認補助（オーナー確認ゲート維持）"
+    site_logins: []
+  "314":
+    can_do: "業務品質の監査メモ（候補）"
+    site_logins: []
+  "315":
+    can_do: "連携健全性点検・軽微リカバリ提案（QR／Gmail再同意は人）"
+    site_logins: []
+  "316":
+    can_do: "データ分析・集計メモ（候補）"
+    site_logins: []
+  "411":
+    can_do: "Grok inbox／チャンネル材料の取込・要約入口"
+    site_logins: []
+  "412":
+    can_do: "AI社員成果と Grok 材料の両系統比較"
+    site_logins: []
+  "413":
+    can_do: "取捨判断ドラフト（採用最終は人）"
+    site_logins: []
+  "414":
+    can_do: "採用結果の Grok outbox 返送準備"
+    site_logins: []
+  "415":
+    can_do: "Todoist／inbox の二重起票・競合監視"
+    site_logins: []
+  "511":
+    can_do: "問合せ送信準備・ゲート後の Gmail 送信（job／了承ゲート）"
+    site_logins:
+      - service: Gmail（estate 対外）
+        access: API token
+        note: 送信は outbound 了承後。token_estate
+  "512":
+    can_do: "仲介返信の取込・整理・停滞見回り（送信は人）"
+    site_logins: []
+  "513":
+    can_do: "需給・ペルソナ材料の突合・整形"
+    site_logins: []
+  "514":
+    can_do: "融資打診の書類・下書き検収（送信は人）"
+    site_logins: []
+  "515":
+    can_do: "購入後クリエイティブの Drive／Prompt 同期点検"
+    site_logins: []
+  "516":
+    can_do: "業者開拓の枯渇検知・補給・sync（定型送信の正は Grok）"
+    site_logins: []
+  "611":
+    can_do: "リソース制約の週次要約（枠の本番変更は人）"
+    site_logins: []
+  "612":
+    can_do: "課金・年会費カレンダーのガード見回り"
+    site_logins: []
+  "613":
+    can_do: "Zaim 鮮度・二重取込・高確信度学習適用（OTP／曖昧費目は人）"
+    site_logins:
+      - service: Zaim Web
+        access: Playwright・Mac専有
+        note: CSV／銀行更新。OTP は Messages／メール。値はチャット禁止
+  "711":
+    can_do: "家族 Journal 週次材料の抽出（評価の正は Grok）"
+    site_logins: []
+  "712":
+    can_do: "アドバイザー週次パック材料の整形"
+    site_logins: []
+  "713":
+    can_do: "総務・DX コーチ材料の週次整理"
+    site_logins: []
+  "811":
+    can_do: "ダッシュボード受け入れ確認（設計中〜候補）"
+    site_logins: []
+  "812":
+    can_do: "残り棚の棚卸し（設計中〜候補）"
+    site_logins: []
+  "813":
+    can_do: "代行指揮枠の切替提案（本番切替は人）"
+    site_logins: []
+  "814":
+    can_do: "Jarvis ダッシュボード投影の更新ランナー"
+    site_logins: []
+  "815":
+    can_do: "KURASHIFT 投影・UI 更新ランナー"
+    site_logins: []
+  "816":
+    can_do: "Slack 俯瞰連携・Webhook 投稿補助"
+    site_logins: []
+
+# Grok Bot — 例外のみ記載（未記載＝defaults.grok）
+# can_do は grok_bots_registry の work を正とする。
+# サイトID／パスワードを渡したら、必ずここに id を追記して site_logins を書く。
+bots: {}
+# 例（渡したとき）:
+#   s2:
+#     site_logins:
+#       - service: 某ポータル
+#         access: Grok Computer env（キー名のみ）
+#         note: 値は jarvis_private にも同期。チャット禁止

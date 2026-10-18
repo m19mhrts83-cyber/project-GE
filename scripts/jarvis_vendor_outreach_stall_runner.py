@@ -541,7 +541,7 @@ def post_slack(*, channel: str, text: str, dry_run: bool) -> dict[str, Any]:
         "--text",
         text,
         "--username",
-        "516 業者開拓フォロー係",
+        "516 業者開拓フォロー",
     ]
     r = subprocess.run(
         cmd, cwd=str(REPO), env=os.environ.copy(), capture_output=True, text=True
@@ -845,8 +845,8 @@ def build_support_weekly_report(
     st = state or {}
     period = _week_period_label(st)
     lines = [
-        "[516] *Grokサポート見守り｜業者開拓*",
-        "発信: 516業者開拓フォロー係（開拓の送信・文案は Grok S2/S4/S9）。",
+        "[516 業者開拓フォロー] *Grokサポート見守り｜業者開拓*",
+        "発信: 516 業者開拓フォロー（開拓の送信・文案は Grok S2/S4/S9）。",
         f"期間: {period}",
         "",
     ]
@@ -892,8 +892,8 @@ def build_multi_report(results: list[dict[str, Any]], *, state: dict[str, Any] |
 def build_ops_alert(r: dict[str, Any]) -> str:
     lane = r.get("lane") or "?"
     return (
-        f"[516] *Grokサポート見守り｜要確認*（{r.get('label') or lane}）\n"
-        "発信: 516業者開拓フォロー係（連携障害／送信停滞の見守り。開拓送信は Grok）。\n"
+        f"[516 業者開拓フォロー] *Grokサポート見守り｜要確認*（{r.get('label') or lane}）\n"
+        "発信: 516 業者開拓フォロー（連携障害／送信停滞の見守り。開拓送信は Grok）。\n"
         f"・理由: {r.get('ops_reason') or '—'}\n"
         f"・状態: {_stall_status_ja(str(r.get('stall_status') or ''))}\n"
         f"・キュー残: {r['q']['pending_discovered']} "

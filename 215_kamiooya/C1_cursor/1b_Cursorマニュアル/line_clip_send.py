@@ -320,7 +320,9 @@ def resolve_kanji_md() -> Path | None:
     if preferred.is_file():
         return preferred
     for p in BASE_PATH.iterdir():
-        if p.is_dir() and p.name.startswith("823") and "幹事" in p.name:
+        if p.is_dir() and (
+            p.name.startswith(("823", "P823")) and "幹事" in p.name
+        ):
             md = p / YORITOORI_FILENAME
             if md.is_file():
                 return md

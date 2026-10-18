@@ -1,0 +1,48 @@
+name: Yen rate watch (615)
+
+# 615 円動向報告係 — USD/JPY 公開API取得・グラフ・Slack短報（売買指図なし）
+
+on:
+  schedule:
+    # 月・木 08:00 JST = 日・水 23:00 UTC
+    - cron: "0 23 * * 0,3"
+  workflow_dispatch:
+
+concurrency:
+  group: yen-rate-watch
+  cancel-in-progress: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -q matplotlib pyyaml
+
+      - name: Fetch chart and report
+        env:
+          SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
+          SLACK_WEBHOOK_AI_TEAM_OPS: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_OPS }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          JARVIS_YEN_RATE_WATCH_DISABLE: ${{ vars.JARVIS_YEN_RATE_WATCH_DISABLE }}
+        run: |
+          set -euo pipefail
+          # --apply で reports + /yen 投影（Secret 無ければ soft-skip）
+          python scripts/jarvis_yen_rate_watch.py --apply --push --with-news
+
+      - name: Upload chart artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yen-rate-charts
+          path: docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/reports/
+          if-no-files-found: ignore

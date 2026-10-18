@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -61,9 +62,34 @@ def save_state(data: dict) -> None:
     )
 
 
+def _gh_bin() -> str:
+    """gh の実体を解決する。
+
+    launchd から起動すると PATH に $HOME/bin が入らず、gh が「見つからない」
+    ＝点検が確認不能になる（WeStudy 障害と誤判定）。PATH 依存を減らすため
+    よくある設置先も直接探す。
+    """
+    found = shutil.which("gh")
+    if found:
+        return found
+    for cand in (
+        Path.home() / "bin" / "gh",
+        Path.home() / ".local" / "bin" / "gh",
+        Path("/opt/homebrew/bin/gh"),
+        Path("/usr/local/bin/gh"),
+    ):
+        if cand.is_file() and os.access(cand, os.X_OK):
+            return str(cand)
+    raise RuntimeError("gh コマンドが見つかりません")
+
+
 def gh_run_list(limit: int = 3) -> list[dict]:
+    try:
+        gh = _gh_bin()
+    except RuntimeError as e:
+        raise RuntimeError(str(e)) from e
     cmd = [
-        "gh",
+        gh,
         "run",
         "list",
         f"--workflow={WORKFLOW}",

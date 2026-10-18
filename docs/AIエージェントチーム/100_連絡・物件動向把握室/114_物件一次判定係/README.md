@@ -13,3 +13,5 @@
 | 上限時 | [24_次善策…](../../24_Jarvis上限時_物件進行ゲート_次善策_20261012.md) |
 | 作業フロー | [flow.md](./flow.md) · [FlowForge](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_O1OMOoN2vkVf9SKLD9T_mvBy) |
 | 指示 | [CLAUDE.md](./CLAUDE.md) |
+| 今回の依頼 | [TASK.md](./TASK.md)（共通規格パイロット） |
+| 検証 | [tests/checklist.md](./tests/checklist.md) |

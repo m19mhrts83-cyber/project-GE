@@ -1,6 +1,6 @@
 # FRIDAY 運用キット（Genspark・Mesh）
 
-**最終更新**: 2026-09-21  
+**最終更新**: 2026-10-18  
 **呼び名**: Genspark（Super Agent / GenTeam / GenMail / **GenCode** 等）＝ **FRIDAY**  
 **役割**: Jarvis（Cursor）本線の**バックアップ**。調査・要約・資料下書き・指定スクリプトの実行・結果報告・**Todoist 操作（Jarvis 同等・ラッパー経由）**。
 
@@ -30,6 +30,15 @@ Jarvis が Cursor 枠で本線。FRIDAY は枠切れ時の代替＋（GenCode �
 Git: cd ~/git-repos && ./scripts/friday_git_commit.sh --message '…' --push -- path…
 Todoist: cd ~/git-repos && ./scripts/friday_todoist.sh …（完了はオーナー確認経由。即 close 禁止）
 このキット: ~/git-repos/docs/FRIDAY_運用キット.md を読んでから動く。
+Slack（共有が要る完了・要判断）: チャットだけで終わらせず #report / #consult / #ops に残す。§6.1 と docs/AIエージェントチーム/38_ に従う。#consult は末尾「次の担当」3行必須。Cursor の .mdc は自動では効かない——このキットと開いた CLAUDE.md が正。
+```
+
+### 0.1 セッション冒頭に足す3行（Slack 強調・コピペ用）
+
+```
+エージェント同士の共有は Slack #ai-hub。松野向け定型は #report、要判断は #consult、障害は #ops。
+#consult 末尾は必須: 次: … / 担当メモ: … / 橋渡し: …（自動実行ではない）。
+正本: ~/git-repos/docs/FRIDAY_運用キット.md §6.1 と docs/AIエージェントチーム/38_Slack書き出し_FRIDAY_Jarvis_20261018.md
 ```
 
 ---
@@ -233,6 +242,37 @@ gsk mesh ssh matsuchan-pc -- 'ls ~/Documents/500_Obsidian_r1/03_Literature\ Note
 【読まなかった／触らなかった秘密】あり
 ```
 
+### 6.1 Slack への残し方（Jarvis／松野と共有するとき・必須）
+
+チャットや SSH 結果だけで終わらせず、**共有が必要な完了・要判断は Slack** にも残す。
+
+| ch | いつ |
+|---|---|
+| `#ai-hub` | Hawk／Jarvis との進捗・共有（エージェント同士） |
+| `#report` | 完了・定型サマリ（松野向け） |
+| `#consult` | 要判断・迷い。**末尾に次の担当3行** |
+| `#ops` | 障害・失敗 |
+
+先頭例: `【共有】（FRIDAY）…`（`#ai-hub`）／ `【報告】（FRIDAY）要約1行` ／ 社員作業なら `【報告】NNN 役割語`
+
+`#consult` 末尾:
+
+```
+次: Grokで続行 | Jarvisに依頼 | 人判断のみ
+担当メモ: …
+橋渡し: 松野が了承したら、上記の担当へ一声（当面は人が橋）
+```
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_slack_webhook_post.py \
+  --channel hub --text '【共有】（FRIDAY）…'
+# 松野向け定型: --channel report
+```
+
+正本: `docs/AIエージェントチーム/38_Slack書き出し_FRIDAY_Jarvis_20261018.md`  
+Jarvis が読む: `37_Slackハブ_Jarvis読取_20261018.md` · `.cursor/rules/jarvis-slack-hub-watch.mdc`
+
 ---
 
 ## 7. 第1依頼文（実地テスト用・そのまま貼れる）
@@ -260,6 +300,18 @@ matsuchan-pc に SSH して次だけやって。秘密ファイルは触らな�
 
 Cursor 枠切れ時の方針（2026-09-16 確定）: **on-demand ＋ Genspark クラウド**。  
 Claude Code 未課金のため GenTeam×Claude は使わない。Cursor CLI 経由は枠を食うのでバックアップに数えない。
+
+### 8.1 依頼ルーティング（2026-10-17）
+
+GHA／launchd の定例は **エージェント使用量をほぼ食わない**（本番を GenCode 定期に移さない）。
+
+| 向いている依頼 | 先 |
+|---|---|
+| スクリプト実行・取込・点検・dry-run | **GenCode（本キット／Mesh）** |
+| 方針・例外・対外了承・設計 | **Cursor／Jarvis** |
+
+正本: [`docs/AIエージェントチーム/34_定期実行とAI使用量_20261017.md`](AIエージェントチーム/34_定期実行とAI使用量_20261017.md)  
+枠切れ1枚: [`35_枠切れBCP_1枚_20261017.md`](AIエージェントチーム/35_枠切れBCP_1枚_20261017.md)
 
 ---
 

@@ -259,4 +259,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: update WeStudy state ($(date -u '+%Y-%m-%d'))"
-          git push
+          # 取込は 20 分超かかる。その間に main が進む（他エージェントや別 workflow の push）と
+          # そのまま push すると rejected になり state が失われ、次週に同じ差分を
+          # 再取込して重複投稿になる。fetch → rebase して最大5回まで再試行する。
+          for i in 1 2 3 4 5; do
+            if git push; then
+              echo "state pushed (attempt $i)"
+              exit 0
+            fi
+            echo "::warning::push rejected (attempt $i) — rebasing on origin/main"
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort 2>/dev/null || true
+              echo "::error::state rebase conflict — manual fix needed"
+              exit 1
+            fi
+            sleep $((i * 3))
+          done
+          echo "::error::state push failed after 5 attempts"
+          exit 1

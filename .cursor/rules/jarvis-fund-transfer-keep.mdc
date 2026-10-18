@@ -1,0 +1,58 @@
+---
+description: 資金移動時の口座キープ（解約済Preferred残債10,860円等）。寄せ・振込・money-ops・カード引落バッファで適用。
+alwaysApply: true
+---
+
+# 資金移動キープ（Jarvis）
+
+## 方針
+
+資金を口座から出すとき、**「カードが使えない＝もう引落がない」とみなさない**。  
+解約・切替後も続く固定引落は、寄せ計画の **keep（先に残す）** に入れる。
+
+正本（金額・口座）: `config/known_recurring_debits.yaml`  
+UI写し: `apps/trade-desk/lib/knownRecurringDebits.ts`  
+レール: `config/kurashift_transfer_rails.yaml` / KURASHIFT `/money-ops`
+
+## 必須キープ（2026-10-18〜・期限付き）
+
+| ID | 内容 | 引落口座 | 月額 | 引落日 | 目安終了 |
+|---|---|---|---|---|---|
+| `smcc_preferred_residual_docomo_smtb` | 解約済 Preferred（Visa）残債 | **ドコモSMTBネット銀行 イチゴ支店**（`sbi_net_main`／第一生命NEOBANK本） | **10,860円** | **毎月26日** | **2027-06〜07**（`active_until: 2027-07`） |
+
+対象カードの呼び方（いずれも解約済でも引落あり）:
+
+- Olive フレキシブルペイ プリファード
+- 三井住友カード プラチナプリファード
+- その他「プリファード」系で解約済みのもの
+
+**年会費（33,000／Olive INF 99,000）とは別枠。** 年会費ガードは `jarvis-card-fee-guard.mdc`。
+
+## トリガー（次のいずれか）
+
+- 資金移動・寄せ・振込・ことら・エアウォレット・IB
+- カード引落バッファ／`/money-ops`／`card_debit_watch`
+- ドコモSMTB／第一生命NEOBANK／住信SBI／イチゴ支店から出す話
+- 解約済カード・プリファード・「カード使えないのに引落」
+
+## Jarvis の必須動作
+
+1. **ドコモSMTB（`sbi_net_main`）から出す**案を出す前に、usable を  
+   `残高 − keep_floor − 10,860（Preferred残債・active_until前）` で見る。
+2. 寄せプラン・レール金額を出すときは、**残債を抜いたあと**の余剰だけを送る案にする。
+3. 「解約したから SBI は空にしてよい」とは言わない（期限まで毎月引落）。
+4. `active_until`（2027-07）を過ぎたら、Zaim／明細で停止を確認してからキープを外す提案をする（勝手に YAML 削除しない）。
+5. 金額・終了月が変わったら **YAML を正**に直し、TS 写しと本ルール表を同期する。
+
+## やらないこと
+
+- 解約済 Preferred を「もうゼロ」として SBI本を空にする寄せ
+- 年会費カレンダーだけ見て残債 10,860円を忘れる
+- 引落口座を SMBC刈谷や SBI副に誤って割り当てる（正はドコモSMTB イチゴ／本）
+
+## 関連
+
+- 定期引落正本: `config/known_recurring_debits.yaml`
+- 年会費: `jarvis-card-fee-guard.mdc`
+- AW優先: `jarvis-airwallet-prefer.mdc`
+- 金融助言順: `jarvis-finance-philosophy.mdc`

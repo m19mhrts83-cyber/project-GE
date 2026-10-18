@@ -1,0 +1,69 @@
+# AIエージェントチーム — 合図（4種）・手順書・報告先の俯瞰メタ
+# 友利さん／いけとも資料の「動き出す合図」4種に揃える。
+# 詳細の正は各社員 CLAUDE.md §2／§4／§6 と agents_registry の trigger・schedule・report。
+# sync → agentTeam.json → ダッシュ /agent-team「運用」タブ
+#
+# 更新タイミング: 合図・スケジュール・報告先・手順書を変えた／社員を追加したとき
+# → CLAUDE.md と registry を直し → jarvis_agent_team_status_sync.py → push
+
+updated: "2026-10-15"
+
+# いけとも／友利さんの4種（テンプレ CLAUDE.md §2 と同順）
+trigger_kinds:
+  - id: human
+    label: 人が頼む
+    short: 人依頼
+    meaning: 松野や Jarvis が明示依頼したときだけ動く
+  - id: schedule
+    label: 時間（スケジュール）
+    short: 時間
+    meaning: 定時・cron／launchd／GHA など時刻で動く
+  - id: event
+    label: 何かが届いたら（イベント）
+    short: イベント
+    meaning: メール・inbox・Slack 操作・取込完了など「届いた／起きた」で動く
+  - id: watch
+    label: 変化・失敗を見回ったら
+    short: 見回り
+    meaning: 鮮度切れ・Fail・枠逼迫・停滞などを見回って動く
+
+slack_channels:
+  report:
+    label: "#report"
+    meaning: 定時・完了・生存確認など通常報告
+  consult:
+    label: "#consult"
+    meaning: 要判断・相談・ゲート
+  ops:
+    label: "#ops"
+    meaning: 健全性・障害・運用アラート
+
+# 手順書としてダッシュに載せるファイル名（社員フォルダ相対）
+procedure_basenames:
+  - CLAUDE.md
+  - TASK.md
+  - flow.md
+  - README.md
+  - PROGRESS.md
+  - AGENTS.md
+
+procedure_doc_globs:
+  - "docs/*.md"
+
+# registry.trigger 文字列 → 4種への補完マップ（CLAUDE 未記入時）
+trigger_hint_map:
+  人依頼: [human]
+  時間: [schedule]
+  イベント: [event]
+  変化: [watch]
+  Fail: [watch]
+  失敗: [watch]
+  異常: [watch]
+  停滞: [watch]
+  逼迫: [watch]
+  枠切れ: [watch]
+  見回り: [watch]
+
+note: |
+  CLAUDE.md のチェックが正。registry の trigger／schedule／report は要約。
+  ダッシュ「運用」タブで合図・手順書・報告先を切り替えて見る。

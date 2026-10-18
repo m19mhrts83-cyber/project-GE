@@ -51,6 +51,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           CURSOR_CLOUD_REPO_URL: ${{ secrets.CURSOR_CLOUD_REPO_URL }}
+          JARVIS_OPS_FAIL_AUTOFIX_DISABLE: ${{ vars.JARVIS_OPS_FAIL_AUTOFIX_DISABLE || secrets.JARVIS_OPS_FAIL_AUTOFIX_DISABLE || '' }}
           DRY: ${{ github.event.inputs.dry_run || 'false' }}
           NOTE: ${{ github.event.inputs.note || '' }}
           AUTOFIX: ${{ github.event.inputs.autofix || 'true' }}
