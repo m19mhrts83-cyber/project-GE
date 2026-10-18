@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-10-16",
+  "updated": "2026-10-15",
   "pages_base": "https://m19mhrts83-cyber.github.io/project-GE/docs",
   "lanes": [
     {
@@ -20,6 +20,12 @@
       "title": "神大家運営",
       "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html",
       "note": "運営向け説明資料＋スクールAI提案ストック"
+    },
+    {
+      "id": "iketomo",
+      "title": "いけともWS",
+      "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/いけとも_WS資料索引.md",
+      "note": "受講済みワークショップ一覧。容量正本は admin Drive 240_いけとも"
     }
   ],
   "items": [
@@ -161,6 +167,90 @@
       "title": "周辺MAP 自動（公開 UI）",
       "url": "https://m19mhrts83-cyber.github.io/project-GE/shuhen-auto.html",
       "note": "Pages 版（API なし）"
+    },
+    {
+      "id": "iketomo-hub",
+      "lane": "iketomo",
+      "title": "いけともWS資料索引（一覧）",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/いけとも_WS資料索引.md",
+      "note": "受講済み回＋Drive／Notion／動画リンクのハブ"
+    },
+    {
+      "id": "iketomo-drive-root",
+      "lane": "iketomo",
+      "title": "Drive 240_いけとも（容量正本）",
+      "url": "https://drive.google.com/drive/folders/1UrfAzlxQDVkQBkIeyGNWmWZ1RYAjNHsr",
+      "note": "1セミナー＝1フォルダ。入口は各 00_参照一覧.md"
+    },
+    {
+      "id": "iketomo-drive-index",
+      "lane": "iketomo",
+      "title": "Drive セミナー索引（00_セミナー索引.md）",
+      "url": "https://drive.google.com/file/d/1pgGGBclfyBYUvX67ux2bLQZsBk9-mggQ/view",
+      "note": "受講確認済み回の正本表"
+    },
+    {
+      "id": "iketomo-20260214",
+      "lane": "iketomo",
+      "title": "2026-02-14 資料・ツール制作ハンズオン",
+      "url": "https://drive.google.com/drive/folders/1DWZ1V9_Muix2I_rSGb3P5iqJgEYiRV29",
+      "note": "動画・資料・かわいい資料プロンプト"
+    },
+    {
+      "id": "iketomo-20260228",
+      "lane": "iketomo",
+      "title": "2026-02-28 Excel自動化（1クリック化）",
+      "url": "https://drive.google.com/drive/folders/1oUhNh9yJ7YDIW-zPmsmxRhd5HlAHAGMm",
+      "note": "動画・資料・ワーク用データ。Notionメモあり"
+    },
+    {
+      "id": "iketomo-20260311",
+      "lane": "iketomo",
+      "title": "2026-03-11 Google AI Studio 自分専用ツール制作",
+      "url": "https://drive.google.com/drive/folders/1TrR94bLgY6k4Z-XzUtHa3KjwEGv1gVlE",
+      "note": "資料・アイデアツール。Luma iketomo260311"
+    },
+    {
+      "id": "iketomo-20260321",
+      "lane": "iketomo",
+      "title": "2026-03-21 Nano Banana 2 × Google AI Studio",
+      "url": "https://drive.google.com/drive/folders/10zP_bd3HXTRz5A3yWi2kDsc81A0q9Kky",
+      "note": "動画・資料・Studio Tips。Luma iketomo260321"
+    },
+    {
+      "id": "iketomo-202610-agent-team",
+      "lane": "iketomo",
+      "title": "2026-10 自分専用AIエージェントチーム構築術（Day1+Day2）",
+      "url": "https://drive.google.com/drive/folders/1twbJWxVRnVv--ntYYtDS-5apqR0rYUL2",
+      "note": "Day1/Day2 PDF・プロンプト。持ち帰り→docs/AIエージェントチーム"
+    },
+    {
+      "id": "iketomo-20261003-day1",
+      "lane": "iketomo",
+      "title": "2026-10-03 Day1 基礎編（資料PDF）",
+      "url": "https://drive.google.com/file/d/10gO1nvtGGM7zIxsA-cXDdKtm_89K_URd/view",
+      "note": "Luma iketomo261003"
+    },
+    {
+      "id": "iketomo-20261004-day2",
+      "lane": "iketomo",
+      "title": "2026-10-04 Day2 実践編（資料PDF）",
+      "url": "https://drive.google.com/file/d/1jlXVsJIQ2UjyPRTlgoDocj8su8GnqpKu/view",
+      "note": "Luma iketomo261004"
+    },
+    {
+      "id": "iketomo-notion-archive",
+      "lane": "iketomo",
+      "title": "Notion いけともアーカイブ（DX互助会）",
+      "url": "https://www.notion.so/365f6bbe5a768027a2e1d98c08b05c73",
+      "note": "記事メモ・子ページの入口"
+    },
+    {
+      "id": "iketomo-handson-store",
+      "lane": "iketomo",
+      "title": "公式ハンズオン・アーカイブ店（未受講含む）",
+      "url": "https://handson.workstyle-evolution.co.jp/",
+      "note": "受講済みとは別。参考一覧は Drive _参考_未受講アーカイブ一覧"
     }
   ],
   "onedrive_self": "N1_NotebookLM/jarvis-self/"
