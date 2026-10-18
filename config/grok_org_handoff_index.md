@@ -1,7 +1,7 @@
 # Grok 組織索引 — AI三柱＋全部署
 
-**更新**: 2026-08-30  
-**方針**: 各 Bot の Instructions 正本は下表の paste。本ファイルは索引のみ。
+**更新**: 2026-10-17（Grok記号 H/C/S/S1–S13/R/F*/M*/P*/A/W（リーダー1文字） — [`29_Grok記号割当`](../docs/AIエージェントチーム/29_Grok記号割当_20261017.md)）  
+**方針**: 各 Bot の Instructions 正本は下表の paste。本ファイルは索引のみ。記号の正本は `config/grok_bots_registry.yaml` の `code:`。
 
 ## AI三柱（松野直属）
 
