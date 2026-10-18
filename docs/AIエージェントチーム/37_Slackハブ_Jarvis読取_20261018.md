@@ -5,7 +5,7 @@
 | 層 | 正 | 理由 |
 |---|---|---|
 | **エージェント同士の共有** | Slack `#ai-hub` | Hawk／FRIDAY／Jarvis の進捗・手渡し（立ち上げ期） |
-| **見える共有・残す報告（人向け）** | Slack `#report` / `#consult` / `#ops` | 松野・定型・要判断・障害 |
+| **見える共有・残す報告（人向け）** | Slack `#report` / `#consult` / `#ops`（**投稿は Webhook**・通知） | 松野・定型・要判断・障害・是正結果 |
 | **Mac 実行の手渡し** | Drive `【with Grok bot】` inbox／outbox | 秘密・長文・スクリプトキックは Drive のまま（フォーク維持） |
 | **Cursor 本題** | Jarvis がセッションで Slack を読んで気づく | 都度「Slack見て」と言わなくてよい |
 

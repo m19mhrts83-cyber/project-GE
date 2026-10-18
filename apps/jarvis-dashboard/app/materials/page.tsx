@@ -17,7 +17,7 @@ type Item = {
   filename?: string;
 };
 
-const LANE_ORDER = ["self", "dx", "kamiooya"];
+const LANE_ORDER = ["self", "dx", "kamiooya", "iketomo"];
 
 export default function MaterialsPage() {
   const lanes = (catalog.lanes as Lane[]).slice().sort((a, b) => {
@@ -31,10 +31,10 @@ export default function MaterialsPage() {
     <Shell active="/materials">
       <h1>資料</h1>
       <p className="sub">
-        自分用・DX互助会・神大家運営の入口です。NotebookLM で確認 → Downloads
-        保存 →{" "}
-        <code>jarvis_materials_ingest_downloads.py</code> → git push で Pages
-        反映。
+        自分用・DX互助会・神大家運営・いけともWSの入口です。NotebookLM で確認 →
+        Downloads 保存 → <code>jarvis_materials_ingest_downloads.py</code> →
+        git push で Pages 反映。いけとも受講資料の容量正本は admin Drive{" "}
+        <code>240_いけとも</code>。
       </p>
 
       <div className="watch-grid" style={{ marginBottom: 28 }}>
