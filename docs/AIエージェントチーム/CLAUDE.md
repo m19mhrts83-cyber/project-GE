@@ -84,7 +84,7 @@ Cursor／Jarvis の正本ルール: `.cursor/rules/jarvis-multi-agent-share.mdc`
 |---|---|
 | `#report` | 完了・定型・生存確認 |
 | `#consult` | 要判断。**末尾に「次の担当」3行必須**（[`36_`](./36_Slack_consult手渡し_次の担当_20261018.md)） |
-| `#ops` | 障害・失敗・枠切れ |
+| `#ops` | 障害・失敗・枠切れ **＋是正結果（振り返り用）**。投稿は **Webhook** 本線（通知）。未設定時は MCP 可 |
 
 `#consult` 末尾型:
 
