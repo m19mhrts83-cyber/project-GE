@@ -200,8 +200,9 @@ admin Drive **`【with Grok bot】`**（`config/kurashift_grok_bridge_folders.ya
   - `要Jarvis連携` … タイトル先頭 `[要Jarvis連携]` ＋ labels
   - 任意: `quick`（5分以内）
 - **本線** → `10_inbox_from_grok/` に `action: todoist_tasks`（下フォーマット）。Jarvis が Mac で自動 apply（開いた直後〜15分）
-- **定型報告（週次統括・完了サマリ）** → 同 inbox に `action: slack_report`（`channel: report`）
-- **松野の判断が要る材料** → 同 inbox に `action: slack_report`（`channel: consult`）。**チャットだけに閉じない**（2026-10-15 確定）。壁打ち・雑談は参謀室チャット可。正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md` · 物件Bは `25_`／shared_working 物件進行ゲート
+- **エージェント同士の進捗共有（Jarvis／FRIDAY）** → 同 inbox に `action: slack_report`（`channel: hub` または `ai-hub`）→ Slack **`#ai-hub`**（2026-10-19）。Drive outbox は長文・Instructions 用
+- **定型報告（週次統括・完了サマリ・人向け）** → 同 inbox に `action: slack_report`（`channel: report`）
+- **松野の判断が要る材料** → 同 inbox に `action: slack_report`（`channel: consult`）。**チャットだけに閉じない**（2026-10-15 確定）。壁打ち・雑談は参謀室チャット可。正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md` · `#ai-hub`: `39_` · 物件Bは `25_`／shared_working 物件進行ゲート
 - **`#consult` 本文の末尾（必須 · 2026-10-18）** — 自動実行ではない。松野が読んで橋渡しする。必ず次の3行を本文末尾に書く（Instructions 内ではコードフェンスを使わない）:
   - `次: Grokで続行` または `次: Jarvisに依頼` または `次: 人判断のみ`
   - `担当メモ: （未配線・自動化できてない点があれば1行）`
