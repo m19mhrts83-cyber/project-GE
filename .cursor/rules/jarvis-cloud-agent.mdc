@@ -46,12 +46,34 @@ alwaysApply: true
 2. **「これで送っていいですか？」** と聞き、承認後だけ `--i-confirm-send`
 3. Secrets に `GMAIL_ESTATE_TOKEN_B64` 等が無い／失敗 → Mac `yoritoori_send.py` へフォールバックを明示
 
+## Slack 投稿（Cloud · 通知）
+
+AIチーム `#report` / `#consult` / `#ops` / `#ai-hub` / `#deal-active` への**書き込み**は Incoming Webhook 本線。
+
+| 経路 | 見え方 | プッシュ通知 |
+|---|---|---|
+| **`jarvis_slack_webhook_post.py`**（Webhook） | Bot「Jarvis AI Team」 | **出る**（本線） |
+| Slack MCP `slack_send_message` | 松野本人として投稿 | **出ない**（自分投稿扱い） |
+
+```bash
+# Secrets に SLACK_WEBHOOK_AI_TEAM_* があること（無いときだけ Mac で prepare → My Secrets 貼付）
+python3 scripts/jarvis_slack_webhook_post.py --channel ops --text '【ops】…'
+# Self-hosted で Secrets 未注入でも Mac 正本があるとき:
+# set -a && source .env.jarvis_private && set +a のあと同上
+```
+
+- **読取**は従来どおり Slack MCP（`jarvis-slack-hub-watch.mdc`）
+- Webhook 未設定時の MCP 投稿は**最終手段**（通知ゼロをチャットで明示）
+- Secrets 準備: `python scripts/jarvis_cloud_secrets_prepare.py --slack-only`  
+  詳細: `docs/Jarvis_Cloud_Agent.md`「Slack Incoming Webhook」
+
 ## やらない
 
 - Web ダッシュボードからの **無確認** メール自動送信（確認モーダルなし）
 - Workspace **Gemini アプリ会話履歴**の自動フル同期（対象外。API リサーチは `GEMINI_API_KEY`）
 - 秘密をチャットや Git に貼る
 - ユーザー確認なしの対外送信
+- Cloud から Slack 報告するのに **MCP 本人投稿を第一選択**する（通知が出ない）
 
 ## Notion 切断時
 

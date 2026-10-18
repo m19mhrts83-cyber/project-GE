@@ -7,6 +7,8 @@ Jarvis: Cloud Agents「My Secrets」貼り付け用の .env 断片を作る（�
   python scripts/jarvis_cloud_secrets_prepare.py --include-gmail-send
   # スマホ→Cloud で Todoist 起票だけ足すとき:
   python scripts/jarvis_cloud_secrets_prepare.py --todoist-only
+  # Slack Incoming Webhook だけ差分追加（Cloud から #ops 等へ通知付き投稿）:
+  python scripts/jarvis_cloud_secrets_prepare.py --slack-only
   # → ~/.jarvis_state/cloud_agent_secrets.env
   # Dashboard → Cloud Agents → My Secrets → Add Secrets に中身を貼って Save
   # 終わったら: rm ~/.jarvis_state/cloud_agent_secrets.env
@@ -28,6 +30,14 @@ REQUIRED = (
     "JARVIS_SUPABASE_URL",
     "JARVIS_SUPABASE_SERVICE_ROLE_KEY",
     "GEMINI_API_KEY",
+)
+# AIチーム Slack（Incoming Webhook）。Cloud 投稿の本線。URL は stdout に出さない。
+SLACK_WEBHOOK_KEYS = (
+    "SLACK_WEBHOOK_AI_TEAM_REPORT",
+    "SLACK_WEBHOOK_AI_TEAM_CONSULT",
+    "SLACK_WEBHOOK_AI_TEAM_OPS",
+    "SLACK_WEBHOOK_AI_TEAM_HUB",
+    "SLACK_WEBHOOK_AI_TEAM_DEAL_ACTIVE",
 )
 
 
@@ -55,6 +65,22 @@ def _append_todoist(lines: list[str], missing: list[str], *, required: bool) -> 
         lines.append(f"JARVIS_TASK_BACKEND={backend}")
 
 
+def _append_slack_webhooks(
+    lines: list[str], missing: list[str], *, required: bool
+) -> int:
+    """Slack Incoming Webhook。Cloud から Bot 投稿（プッシュ通知用）。値は出さない。"""
+    n = 0
+    for k in SLACK_WEBHOOK_KEYS:
+        v = (os.environ.get(k) or "").strip()
+        if v:
+            lines.append(f"{k}={v}")
+            n += 1
+        elif required and k == "SLACK_WEBHOOK_AI_TEAM_REPORT":
+            # REPORT だけ必須（他 ch は REPORT フォールバック可）
+            missing.append(k)
+    return n
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -67,10 +93,19 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Todoist 関連だけ出力（My Secrets に差分追加するとき）",
     )
+    ap.add_argument(
+        "--slack-only",
+        action="store_true",
+        help="Slack Incoming Webhook だけ出力（My Secrets に差分追加するとき）",
+    )
     args = ap.parse_args(argv)
 
     lines: list[str] = []
     missing: list[str] = []
+
+    if args.todoist_only and args.slack_only:
+        print("use either --todoist-only or --slack-only, not both", file=sys.stderr)
+        return 2
 
     if args.todoist_only:
         _append_todoist(lines, missing, required=True)
@@ -82,6 +117,20 @@ def main(argv: list[str] | None = None) -> int:
         OUT.chmod(0o600)
         print(
             f"wrote {OUT} ({len(lines)} keys, todoist-only). "
+            "Paste into Cloud Agents → My Secrets, then delete the file."
+        )
+        return 0
+
+    if args.slack_only:
+        n = _append_slack_webhooks(lines, missing, required=True)
+        if missing:
+            print(f"missing: {', '.join(missing)}", file=sys.stderr)
+            return 1
+        OUT.parent.mkdir(parents=True, exist_ok=True)
+        OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        OUT.chmod(0o600)
+        print(
+            f"wrote {OUT} ({n} slack webhook keys, slack-only). "
             "Paste into Cloud Agents → My Secrets, then delete the file."
         )
         return 0
@@ -105,6 +154,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # Todoist（スマホ→Cloud Agent 起票。Jarvis 分身トークン）
     _append_todoist(lines, missing, required=True)
+
+    # Slack Incoming Webhook（Cloud から #report/#consult/#ops 等へ Bot 投稿＝通知が出る）
+    _append_slack_webhooks(lines, missing, required=False)
 
     if args.include_gmail_send:
         cred_b64 = (os.environ.get("GMAIL_CREDENTIALS_B64") or "").strip() or _file_b64(
