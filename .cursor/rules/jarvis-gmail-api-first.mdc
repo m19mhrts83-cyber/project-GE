@@ -51,3 +51,4 @@ alwaysApply: true
 - アカウント使い分け: `jarvis-google-accounts.mdc`
 - token ミラー / Secret: OneDrive 215 の `gmail-token-sync-mirror.mdc`
 - 対外送信前確認: `jarvis-outbound-confirm.mdc`
+- メール起点の着手前共有（要約＋ほぼ全文・パートナー確認除外）: `jarvis-email-source-share.mdc`
