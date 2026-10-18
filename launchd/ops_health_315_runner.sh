@@ -2,6 +2,9 @@
 # 315 連携健全性点検係 — Mac補完 日曜 21:45 JST（GHA 21:00 のあと）
 # 検知→異常なら既知復旧1回→再点検→Slack #ops（未解決は #consult）
 set -euo pipefail
+# launchd の既定 PATH は /usr/bin:/bin:/usr/sbin:/sbin のみ。
+# gh（$HOME/bin）等のローカル CLI が見えず WeStudy 点検が「確認不能」になるため明示する。
+export PATH="$HOME/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY="${HOME}/selenium_env/venv/bin/python"
 LOG_DIR="${HOME}/Library/Logs/jarvis_ops_health_315"
