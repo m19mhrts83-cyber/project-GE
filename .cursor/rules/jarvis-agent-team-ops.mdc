@@ -56,3 +56,4 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
 - 権限タブ: `jarvis-agent-team-permissions.mdc`
 - 状態 sync: `jarvis-agent-team-status.mdc`
 - Slack チャンネル: `#report` / `#consult` / `#ops`
+- Slack 書き出し（番号＋短い役割語）: `jarvis-agent-team-slack-report.mdc`

@@ -37,9 +37,9 @@ LOG815 = (
 )
 
 AGENT_LABEL = {
-    "814": "814 ダッシュ更新",
+    "814": "814 Dash更新",
     "815": "815 KURASHIFT更新",
-    "both": "814/815 UI更新",
+    "both": "814/815 Dash・KURASHIFT更新",
 }
 
 
@@ -120,7 +120,7 @@ def build_message(agent: str, meta: dict, push_rc: int | None) -> str:
     label = AGENT_LABEL.get(agent, "814/815 UI更新")
 
     lines = [
-        f"【社員報告】{label} / 定周期",
+        f"【{label}】定周期",
         f"- 状態: Phase L サイクル（{now} JST）",
         f"- 判定: {overall}",
         f"- 最終 dashboard push ログ: {dash.get('name', '—')} @ {mtime}",
@@ -141,7 +141,7 @@ def build_ops_alert(agent: str, meta: dict, push_rc: int | None) -> str | None:
     label = AGENT_LABEL.get(agent, "814/815 UI更新")
     dash = meta.get("last_dashboard_log") or {}
     lines = [
-        f"⚠️ 【要確認】{label}",
+        f"⚠️ 【ops】{label} — 要確認",
         f"- 判定: {overall}",
         f"- 理由: {reason or '—'}",
         f"- 時刻: {now} JST",
@@ -161,7 +161,7 @@ def post_ops(text: str) -> int:
             "--channel",
             "ops",
             "--username",
-            "814/815 UI更新",
+            "814/815 Dash・KURASHIFT更新",
             "--text",
             text,
         ],

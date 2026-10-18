@@ -40,7 +40,7 @@ REPORTS_DIR = (
 )
 JST = ZoneInfo("Asia/Tokyo")
 AGENT_ID = "614"
-AGENT_NAME = "ポイント・還元ウォッチ係"
+AGENT_NAME = "ポイント還元"
 DASH_VPOINT = "https://jarvis-dashboard-amber.vercel.app/vpoint"
 DASH_ETC = "https://jarvis-dashboard-amber.vercel.app/etc"
 

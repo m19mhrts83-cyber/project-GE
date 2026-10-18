@@ -68,6 +68,8 @@
 | 起動・投稿失敗 | Slack `#ops` |
 | 補助 | Todoist／Dashboard／伴走中のみ Cursor チャット |
 
+書き出しは **`【報告】211 返信案内下書き・…`**（番号＋短い役割語。「係」不要）。Webhook 表示名も `211 返信案内下書き`。
+
 ## 6. 成果物の置き場
 
 - このフォルダ: `logs/` / `docs/` / `outbox/` / `PROGRESS.md`
@@ -115,3 +117,4 @@ Phase1 人向け: `docs/phase1-pilot.md`
 | 2026-10-11 | 運用ハブを Drive `211_…` に同期。下書き形式 `docs/draft-format.md` 追加 |
 | 2026-10-11 | Phase1送信クローズ。Phase2（複数社・見積B・lookback21）＋launchd雛形 |
 | 2026-10-11 | Phase3: Graph PUT＋GHA `jarvis-reply-draft-211`。Mac launchd は保険 |
+| 2026-10-18 | Slack書き出し＝番号＋短い役割語（`【報告】211 返信案内下書き`。「係」不要） |

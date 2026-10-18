@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""211 返信案内下書き係 — 管理会社向け朝便（正本下書き＋Slack報告）.
+"""211 返信案内下書き — 管理会社向け朝便（正本下書き＋Slack報告）.
 
 Phase2: 管理会社101〜104横断・見積B分岐・古い候補の自動起案抑制。
 
@@ -241,7 +241,7 @@ def _slack(channel: str, lines: list[str]) -> int:
         "--channel",
         channel,
         "--username",
-        "返信案内下書き係",
+        "211 返信案内下書き",
         "--text",
         text,
     ]
@@ -288,7 +288,7 @@ def main() -> int:
                 _slack(
                     "ops",
                     [
-                        "【ops】返信案内下書き係・朝便",
+                        "【ops】211 返信案内下書き・朝便",
                         f"・失敗: night_triage rc={rc}",
                         "・正本書込は中止",
                     ],
@@ -343,7 +343,7 @@ def main() -> int:
 
     if b_waiting and not args.dry_run and (args.morning or args.report):
         lines = [
-            "【相談】返信案内下書き係",
+            "【相談】211 返信案内下書き",
             "・決めてほしいこと: 退去/修繕/見積案件で提示用見積Bが見つからない。起案を止めています",
         ]
         for it in b_waiting[:5]:
@@ -365,7 +365,7 @@ def main() -> int:
         today = datetime.now(JST).strftime("%Y-%m-%d")
         partners = [Path(p).parent.name for _, p in written if p != "(dry-run)"]
         lines = [
-            "【報告】返信案内下書き係・朝便",
+            "【報告】211 返信案内下書き・朝便",
             f"・日付: {today}",
             f"・起案: {n}" + (f"（{'／'.join(partners)}）" if partners else ""),
             f"・見積B待ち: {b_n}",
