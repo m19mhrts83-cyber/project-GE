@@ -4,9 +4,42 @@
 # 実績が十分溜まったら source を zaim_observed に上げ、この override を薄くしてよい。
 
 version: 1
-updated_at: "2026-08-23"
+updated_at: "2026-10-18"
 
 debits:
+  # 解約済 Preferred（Visa）の残債・分割相当。カードは使えないが引落は続く。
+  # 資金移動でドコモSMTB（イチゴ）から出すとき、月額を keep に必ず残す。
+  - id: smcc_preferred_residual_docomo_smtb
+    label: "解約済 Preferred（Visa）残債引落"
+    aliases:
+      - プリファード
+      - プラチナプリファード
+      - Olive フレキシブルペイ プリファード
+      - Olive Flexible Pay Preferred
+      - 三井住友カード プラチナプリファード
+      - 解約済Visa
+    source: user_confirm
+    evidence_status: user_confirm
+    settlement_account_id: sbi_net_main
+    settlement_bank_label: "ドコモSMTBネット銀行 イチゴ支店（第一生命NEOBANK本／旧住信SBI）"
+    not_settlement_account_ids: [sbi_net_sub, smbc_kariya, mufg_atsuta, mufg_toyoake]
+    day_of_month: 26  # ユーザー明示（2026-10-18）
+    amount_jpy_approx: 10860
+    amount_source: user_confirm_20261018
+    active_until: "2027-07"  # 約1年・2027年6〜7月まで続く想定（ユーザー明示）
+    zaim_match_hints:
+      - "三井住友カード"
+      - "パソコン振込"
+      - "10860"
+      - "プラチナプリファード"
+    funding_note: >
+      解約済みでも毎月 10,860円がドコモSMTB（イチゴ／sbi_net_main）から引かれる。
+      資金移動・寄せ計画では SBI本の usable から 10,860円を先に残す（カード利用停止≠引落停止）。
+      年会費ガード（33,000／99,000）とは別枠。2027-07 経過後に停止確認してから本エントリを薄くする。
+    refs:
+      - .cursor/rules/jarvis-fund-transfer-keep.mdc
+      - .cursor/rules/jarvis-card-fee-guard.mdc
+
   - id: bmw_mini_mufg_mycar
     label: "BMW/MINI ネットDEマイカーローン"
     aliases: [BMW, MINI, マイカーローン, Countryman, ネットDEマイカー]

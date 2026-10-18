@@ -43,5 +43,6 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
 - 設定: `config/kurashift_airwallet_banks.yaml`
 - state: `.jarvis_state/airwallet_banks_weekly.json`
 - レール: `config/kurashift_transfer_rails.yaml`
+- **口座キープ（解約済Preferred残債 10,860円等）**: `jarvis-fund-transfer-keep.mdc`
 - Chrome 片付け: `jarvis-transfer-browser-cleanup.mdc`（IB 時）
 - 金融助言順: `jarvis-finance-philosophy.mdc`
