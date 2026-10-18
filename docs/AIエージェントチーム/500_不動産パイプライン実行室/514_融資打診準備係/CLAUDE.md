@@ -39,6 +39,17 @@ Grok S系の **Mac側検収・適用・停滞見回り**（調査本文の再発
 | 完了報告 | Slack `#consult` |
 | 要判断 | Slack `#consult` |
 
+### Slack 書き出し（FRIDAY／Jarvis 共通）
+
+| ch | いつ |
+|---|---|
+| `#report` | 完了・定型・生存確認 |
+| `#consult` | 要判断。末尾「次の担当」3行必須 |
+| `#ops` | 障害・失敗・枠切れ |
+
+`#consult` 末尾: `次: Grokで続行 | Jarvisに依頼 | 人判断のみ` ＋ `担当メモ` ＋ `橋渡し`  
+正本: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](../../38_Slack書き出し_FRIDAY_Jarvis_20261018.md) · [`36_`](../../36_Slack_consult手渡し_次の担当_20261018.md)
+
 ## 5–6. 成果物・手順
 
 （設計時に埋める。対応Grok: プラン Phase C 表）

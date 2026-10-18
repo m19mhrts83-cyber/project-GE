@@ -233,6 +233,35 @@ gsk mesh ssh matsuchan-pc -- 'ls ~/Documents/500_Obsidian_r1/03_Literature\ Note
 【読まなかった／触らなかった秘密】あり
 ```
 
+### 6.1 Slack への残し方（Jarvis／松野と共有するとき・必須）
+
+チャットや SSH 結果だけで終わらせず、**共有が必要な完了・要判断は Slack** にも残す。
+
+| ch | いつ |
+|---|---|
+| `#report` | 完了・定型サマリ |
+| `#consult` | 要判断・迷い。**末尾に次の担当3行** |
+| `#ops` | 障害・失敗 |
+
+先頭例: `【報告】（FRIDAY）要約1行` ／ 社員作業なら `【報告】NNN 役割語`
+
+`#consult` 末尾:
+
+```
+次: Grokで続行 | Jarvisに依頼 | 人判断のみ
+担当メモ: …
+橋渡し: 松野が了承したら、上記の担当へ一声（当面は人が橋）
+```
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+~/selenium_env/venv/bin/python scripts/jarvis_slack_webhook_post.py \
+  --channel report --text '【報告】（FRIDAY）…'
+```
+
+正本: `docs/AIエージェントチーム/38_Slack書き出し_FRIDAY_Jarvis_20261018.md`  
+Jarvis が読む: `37_Slackハブ_Jarvis読取_20261018.md` · `.cursor/rules/jarvis-slack-hub-watch.mdc`
+
 ---
 
 ## 7. 第1依頼文（実地テスト用・そのまま貼れる）

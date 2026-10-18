@@ -45,6 +45,17 @@ ID: **813**。報告先: Slack `#ops`（切替承認は `#consult`）。Jarvis �
 | 切替／頻度の承認 | Slack `#consult` |
 | Jarvis 実行依頼 | Todoist `要Jarvis連携`（了承後） |
 
+### Slack 書き出し（FRIDAY／Jarvis 共通）
+
+| ch | いつ |
+|---|---|
+| `#report` | 完了・定型・生存確認 |
+| `#consult` | 要判断。末尾「次の担当」3行必須 |
+| `#ops` | 障害・失敗・枠切れ |
+
+`#consult` 末尾: `次: Grokで続行 | Jarvisに依頼 | 人判断のみ` ＋ `担当メモ` ＋ `橋渡し`  
+正本: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](../../38_Slack書き出し_FRIDAY_Jarvis_20261018.md) · [`36_`](../../36_Slack_consult手渡し_次の担当_20261018.md)
+
 ## 5. 成果物の置き場
 
 - 本フォルダ `logs/`

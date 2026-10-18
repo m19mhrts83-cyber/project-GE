@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-18T03:23:27+09:00",
+  "updated": "2026-10-18T23:26:14+09:00",
   "registry_updated": "2026-10-17",
   "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -459,6 +459,26 @@
             "kind": "Webhook（秘密）",
             "destination": "env キー名のみ（URLは書かない）: `SLACK_WEBHOOK_REPORT` 系",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -654,6 +674,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -831,6 +871,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -995,6 +1055,26 @@
             "channels": [
               "report"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -1164,6 +1244,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -1482,6 +1582,26 @@
             "kind": "Webhook",
             "destination": "`SLACK_WEBHOOK_AI_TEAM_REPORT`（URLは env のみ）",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -1669,6 +1789,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -1838,6 +1978,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -2007,6 +2167,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -2352,6 +2532,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -2526,6 +2726,26 @@
           {
             "kind": "Webhook",
             "destination": "env キー名のみ",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
             "channels": []
           }
         ],
@@ -2710,6 +2930,26 @@
             "kind": "Webhook",
             "destination": "env キー名のみ",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -2884,6 +3124,26 @@
           {
             "kind": "Webhook",
             "destination": "env キー名のみ",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
             "channels": []
           }
         ],
@@ -3061,6 +3321,26 @@
             "kind": "Webhook",
             "destination": "env キー名のみ",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -3237,6 +3517,26 @@
             "kind": "Webhook",
             "destination": "env キー名のみ",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -3409,6 +3709,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -3575,6 +3895,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -3741,6 +4081,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -3906,6 +4266,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -4072,6 +4452,26 @@
             "channels": [
               "consult"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -4262,6 +4662,26 @@
             "kind": "S9",
             "destination": "https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -4430,6 +4850,26 @@
             "channels": [
               "ops"
             ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -4739,6 +5179,26 @@
             "kind": "Webhook",
             "destination": "env キー名のみ: `SLACK_WEBHOOK_OPS` 系",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -4893,7 +5353,7 @@
         "reports": [
           {
             "kind": "定時・結果",
-            "destination": "Slack `#report`（【614 ポイント・還元ウォッチ係｜…】）",
+            "destination": "Slack `#report`（【614 ポイント還元｜…】）",
             "channels": [
               "report"
             ]
@@ -4908,6 +5368,26 @@
           {
             "kind": "人が見る画面",
             "destination": "`/vpoint` · `/etc`",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
             "channels": []
           }
         ],
@@ -5095,6 +5575,26 @@
           {
             "kind": "ダッシュ",
             "destination": "`/yen`（`yen_rate_daily`＋`watch_status.yen_rate`）",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
             "channels": []
           }
         ],
@@ -5634,6 +6134,26 @@
             "kind": "正本",
             "destination": "Notion 電話・面談 `_Inbox`",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -5803,6 +6323,26 @@
           {
             "kind": "Webhook（秘密）",
             "destination": "env キー名のみ記す（URLは書かない）: `SLACK_WEBHOOK_…`",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
             "channels": []
           }
         ],
@@ -5980,6 +6520,26 @@
             "kind": "Webhook（秘密）",
             "destination": "env キー名のみ記す（URLは書かない）: `SLACK_WEBHOOK_…`",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -6143,6 +6703,26 @@
           {
             "kind": "Jarvis 実行依頼",
             "destination": "Todoist `要Jarvis連携`（了承後）",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
             "channels": []
           }
         ],
@@ -6317,6 +6897,26 @@
             "kind": "Webhook（秘密）",
             "destination": "env キー名のみ",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -6490,6 +7090,26 @@
             "kind": "Webhook（秘密）",
             "destination": "env キー名のみ",
             "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
+            "channels": []
           }
         ],
         "procedures": [
@@ -6658,6 +7278,26 @@
           {
             "kind": "Webhook（秘密）",
             "destination": "env キー名のみ",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "完了・定型・生存確認",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要判断。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "障害・失敗・枠切れ",
             "channels": []
           }
         ],

@@ -40,13 +40,19 @@ ID: **311**（旧フォルダ `10_` → 3桁化）。
   - 了承なしの本番送信
   - 秘密の再掲
 
-### 初版チェック（3点だけ）
+### 初版チェック（3点＋宛名整合）
 
 1. **宛先** — アドレス／フォームURLが対象の会社・スレッドと一致。返信なら元スレッド相手と同じか
 2. **本人名** — 送信者が松野真治、返信先が `matsuno.estate@gmail.com`。相手担当者名の食い違い
 3. **運営宛禁止** — ポータル運営・サイト管理者・noreply 等になっていないか
+4. **本文宛名 ↔ 実To**（送信直前・`--resolved-to` または `--yoritoori-partner` があるとき）— 例: 本文「清水様」なのに Reply-All で To=和久のみ → **NG**（`greet_email_hints`）
 
 物件名照合は2版以降（KURASHIFT deals の識別が埋まってから）。
+
+### Jarvis 会話送信との接続（2026-10-18）
+
+松野が「送ってOK」と言ったあと、Jarvis は **送信実行の直前に本ゲート**を走らせる（`jarvis-outbound-confirm.mdc`）。  
+OK→送信／NG→送らず再確認。311自体は送信ボタンを押さない。
 
 ## 2. 動き出す合図
 
@@ -85,6 +91,17 @@ ID: **311**（旧フォルダ `10_` → 3桁化）。
 | NG・要判断 | Slack `#consult` |
 | Webhook | `SLACK_WEBHOOK_AI_TEAM_REPORT`（URLは env のみ） |
 
+### Slack 書き出し（FRIDAY／Jarvis 共通）
+
+| ch | いつ |
+|---|---|
+| `#report` | 完了・定型・生存確認 |
+| `#consult` | 要判断。末尾「次の担当」3行必須 |
+| `#ops` | 障害・失敗・枠切れ |
+
+`#consult` 末尾: `次: Grokで続行 | Jarvisに依頼 | 人判断のみ` ＋ `担当メモ` ＋ `橋渡し`  
+正本: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](../../38_Slack書き出し_FRIDAY_Jarvis_20261018.md) · [`36_`](../../36_Slack_consult手渡し_次の担当_20261018.md)
+
 ## 5. 成果物の置き場
 
 - 下書き正本: OneDrive 各パートナー `4.送信下書き.txt` 等（**きっかけで渡されたパスのみ**）
@@ -111,3 +128,4 @@ ID: **311**（旧フォルダ `10_` → 3桁化）。
 | 2026-10-17 | FlowForge に経路A／B分岐＋合流（次の担当=AI）を明示 |
 | 2026-10-18 | Phase1 CLI＋Slack。Phase2 inbox poll（15分 launchd） |
 | 2026-10-18 | Phase3 上流キック（enqueue・211配線・ホーク action） |
+| 2026-10-18 | 本文宛名↔実To（yoritoori dry-run）。Jarvis「了承後→311→送信」ルール接続 |
