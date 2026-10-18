@@ -3,7 +3,7 @@
   "partners": [
     {
       "name": "ホームプランナー",
-      "folder": "101_ホームプランナー",
+      "folder": "P101_ホームプランナー",
       "emails": [
         "suzuki@homeplanner.co.jp"
       ],
@@ -12,7 +12,7 @@
     },
     {
       "name": "ミニテック",
-      "folder": "102_ミニテック",
+      "folder": "P102_ミニテック",
       "emails": [
         "tomoki-hayashi@minitech.co.jp",
         "hayashi@minitech.co.jp"
@@ -22,7 +22,7 @@
     },
     {
       "name": "LEAF",
-      "folder": "104_LEAF",
+      "folder": "P104_LEAF",
       "emails": [
         "ngy_fudousan@leaf-eco.com",
         "ngy_kanri@leaf-eco.com"
@@ -36,7 +36,7 @@
     },
     {
       "name": "立木",
-      "folder": "205_立木",
+      "folder": "P205_立木",
       "emails": [],
       "phones": [
         "080-4140-9026"
@@ -45,7 +45,7 @@
     },
     {
       "name": "神大家運営回答",
-      "folder": "809_神大家運営回答",
+      "folder": "P809_神大家運営回答",
       "emails": [
         "kami.ooyasan-club@ooya.academy"
       ],
@@ -54,7 +54,7 @@
     },
     {
       "name": "SHIFT AI代理店",
-      "folder": "908_SHIFT AI代理店",
+      "folder": "P908_SHIFT AI代理店",
       "emails": [
         "yitagaki@shift-ai.co.jp"
       ],
@@ -63,7 +63,7 @@
     },
     {
       "name": "Workstyle-evolution代理店",
-      "folder": "914_Workstyle-evolution代理店",
+      "folder": "P914_Workstyle-evolution代理店",
       "emails": [
         "k.miyamoto@g.workstyle-evolution.co.jp"
       ],
@@ -72,7 +72,7 @@
     },
     {
       "name": "水田塾",
-      "folder": "710_水田塾",
+      "folder": "P710_水田塾",
       "emails": [],
       "phones": [
         "09014188136",
@@ -83,7 +83,7 @@
     },
     {
       "name": "グッドウィン",
-      "folder": "311_グッドウィン",
+      "folder": "P311_グッドウィン",
       "emails": [
         "RJS30_8080@aioinissaydowa.co.jp"
       ],
@@ -96,7 +96,7 @@
     },
     {
       "name": "Newtus",
-      "folder": "312_Newtus",
+      "folder": "P312_Newtus",
       "emails": [
         "t-naito@newtus.com"
       ],
@@ -105,7 +105,7 @@
     },
     {
       "name": "アイリック",
-      "folder": "313_アイリック",
+      "folder": "P313_アイリック",
       "emails": [
         "tomohito_oishi@irrc.co.jp"
       ],
@@ -114,7 +114,7 @@
     },
     {
       "name": "日本総険",
-      "folder": "317_日本総険",
+      "folder": "P317_日本総険",
       "emails": [
         "ayanori.shimizu@iba-ns.co.jp",
         "naomi.waku@iba-ns.co.jp",
@@ -127,7 +127,7 @@
     },
     {
       "name": "Kneesbee税理士法人",
-      "folder": "519_Kneesbee税理士法人",
+      "folder": "P519_Kneesbee税理士法人",
       "emails": [
         "t.ohno@knees-bee.jp",
         "t.ohno.sogou@gmail.com"
@@ -137,7 +137,7 @@
     },
     {
       "name": "名古屋銀行",
-      "folder": "516_名古屋銀行",
+      "folder": "P516_名古屋銀行",
       "emails": [
         "koshino_masashi@ex.meigin.co.jp"
       ],
@@ -150,7 +150,7 @@
     },
     {
       "name": "Grandole志賀本通I入居者",
-      "folder": "618_Grandole志賀本通I_入居者",
+      "folder": "P618_Grandole志賀本通I_入居者",
       "emails": [
         "yuumee.jee@gmail.com"
       ],

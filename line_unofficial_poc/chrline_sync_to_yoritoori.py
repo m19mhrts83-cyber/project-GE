@@ -69,74 +69,62 @@ from chrline_yoritoori_routes_from_contacts import (
 )
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_ONEDRIVE_TCELL_YORITOORI = (
+_ONEDRIVE_PARTNER_BASE = (
     Path.home()
-    / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談/103_Tcell/5.やり取り.md"
+    / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+    / "C2_ルーティン作業/26_パートナー社への相談"
 )
-_REPO_TCELL_YORITOORI = (
-    _REPO_ROOT
-    / "215_kamiooya"
-    / "C2_ルーティン作業"
-    / "26_パートナー社への相談"
-    / "103_Tcell"
-    / "5.やり取り.md"
+_REPO_PARTNER_BASE = (
+    _REPO_ROOT / "215_kamiooya" / "C2_ルーティン作業" / "26_パートナー社への相談"
 )
-_ONEDRIVE_LEAF_YORITOORI = (
-    Path.home()
-    / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談/104_LEAF/5.やり取り.md"
-)
-_REPO_LEAF_YORITOORI = (
-    _REPO_ROOT
-    / "215_kamiooya"
-    / "C2_ルーティン作業"
-    / "26_パートナー社への相談"
-    / "104_LEAF"
-    / "5.やり取り.md"
-)
-_ONEDRIVE_KAMIOOYA_KANJI_YORITOORI = (
-    Path.home()
-    / "Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談"
-    / "823_名古屋幹事グループ/5.やり取り.md"
-)
-_REPO_KAMIOOYA_KANJI_YORITOORI = (
-    _REPO_ROOT
-    / "215_kamiooya"
-    / "C2_ルーティン作業"
-    / "26_パートナー社への相談"
-    / "823_名古屋幹事グループ"
-    / "5.やり取り.md"
-)
+
+
+def _partner_yoritoori_candidates(folder: str) -> list[Path]:
+    """P付き正本＋旧形式の 5.やり取り.md 候補（OneDrive → repo）。"""
+    aliases = [folder]
+    if folder.startswith("P") and len(folder) > 1 and folder[1].isdigit():
+        aliases.append(folder[1:])  # P103_… → 103_…
+    elif folder[:1].isdigit():
+        aliases.append("P" + folder)
+    out: list[Path] = []
+    for base in (_ONEDRIVE_PARTNER_BASE, _REPO_PARTNER_BASE):
+        for name in aliases:
+            out.append(base / name / "5.やり取り.md")
+    return out
+
+
+def _first_existing_yoritoori(candidates: list[Path], fallback: Path) -> Path:
+    for p in candidates:
+        if p.is_file():
+            return p.resolve()
+    return fallback.resolve()
 
 
 def _default_tcell_yoritoori_path() -> Path:
-    """実際に編集している 5.やり取り.md（OneDrive 優先）。"""
+    """実際に編集している 5.やり取り.md（OneDrive 優先・P103/旧103 互換）。"""
     env = (os.environ.get("LINE_TCELL_YORITOORI_MD") or "").strip()
     if env:
         return Path(env).expanduser().resolve()
-    if _ONEDRIVE_TCELL_YORITOORI.is_file():
-        return _ONEDRIVE_TCELL_YORITOORI.resolve()
-    return _REPO_TCELL_YORITOORI.resolve()
+    cands = _partner_yoritoori_candidates("P103_Tcell")
+    return _first_existing_yoritoori(cands, cands[0])
 
 
 def _default_leaf_yoritoori_path() -> Path:
-    """104_LEAF の 5.やり取り.md（OneDrive 優先）。"""
+    """P104_LEAF の 5.やり取り.md（OneDrive 優先・旧104 互換）。"""
     env = (os.environ.get("LINE_LEAF_YORITOORI_MD") or "").strip()
     if env:
         return Path(env).expanduser().resolve()
-    if _ONEDRIVE_LEAF_YORITOORI.is_file():
-        return _ONEDRIVE_LEAF_YORITOORI.resolve()
-    return _REPO_LEAF_YORITOORI.resolve()
+    cands = _partner_yoritoori_candidates("P104_LEAF")
+    return _first_existing_yoritoori(cands, cands[0])
 
 
 def _default_kamiooya_kanji_yoritoori_path() -> Path:
-    """823_名古屋幹事グループ の 5.やり取り.md（LINE東海飲み会幹事・OneDrive 優先）。"""
+    """P823_名古屋幹事グループ の 5.やり取り.md（旧823 互換）。"""
     env = (os.environ.get("LINE_KAMIOOYA_KANJI_YORITOORI_MD") or "").strip()
     if env:
         return Path(env).expanduser().resolve()
-    if _ONEDRIVE_KAMIOOYA_KANJI_YORITOORI.is_file():
-        return _ONEDRIVE_KAMIOOYA_KANJI_YORITOORI.resolve()
-    return _REPO_KAMIOOYA_KANJI_YORITOORI.resolve()
-
+    cands = _partner_yoritoori_candidates("P823_名古屋幹事グループ")
+    return _first_existing_yoritoori(cands, cands[0])
 
 _YUKI_CHAT_NEEDLE_DEFAULT = "uc2410d38412ff86926c56af265f2a577"
 _DEFAULT_GROUP_TITLE = "キャラメル管理G"

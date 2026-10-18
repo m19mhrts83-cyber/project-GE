@@ -33,10 +33,10 @@ DRAFT_NAME = "4.送信下書き_家賃入金フォロー.txt"
 SEND_NAME = "4.送信下書き.txt"
 
 MANAGER_FOLDERS = {
-    "ミニテック": "102_ミニテック",
-    "LEAF": "104_LEAF",
-    "ホームプランナー": "101_ホームプランナー",
-    "Tcell": "103_Tcell",
+    "ミニテック": "P102_ミニテック",
+    "LEAF": "P104_LEAF",
+    "ホームプランナー": "P101_ホームプランナー",
+    "Tcell": "P103_Tcell",
 }
 
 MANAGER_GREETING = {

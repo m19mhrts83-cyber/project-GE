@@ -67,7 +67,7 @@ export function resolvePartnerFolder(opts: {
   }
   // よくある略称（連絡先 JSON に無い管理会社）
   if (/Tcell|キャラメル/i.test(hay)) {
-    return "103_Tcell";
+    return "P103_Tcell";
   }
   if (/Grandole\s*[ⅠI1]/i.test(hay) || /志賀本通\s*[ⅠI1]/i.test(hay)) {
     const g = list.find((p) => /Grandole|志賀本通/i.test(p.folder + p.name));

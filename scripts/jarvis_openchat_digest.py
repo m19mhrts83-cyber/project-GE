@@ -23,10 +23,17 @@ from zoneinfo import ZoneInfo
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 OUT_PATH = REPO / ".jarvis_state" / "night_triage" / "openchat_digest.json"
-OPENCHAT_BASE = Path(
-    "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
-    "/C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
-).expanduser()
+_OPENCHAT_CANDS = [
+    Path(
+        "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+        "/C2_ルーティン作業/26_パートナー社への相談/P815_神大家オプチャ"
+    ).expanduser(),
+    Path(
+        "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部"
+        "/C2_ルーティン作業/26_パートナー社への相談/815_神大家オプチャ"
+    ).expanduser(),
+]
+OPENCHAT_BASE = next((p for p in _OPENCHAT_CANDS if p.is_dir()), _OPENCHAT_CANDS[0])
 
 # 815-openchat-no-reply-proposal.mdc 準拠（キーワード粗いフィルタ）
 THEME_HINTS: dict[str, tuple[str, ...]] = {

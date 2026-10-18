@@ -109,7 +109,7 @@ export function bundleByGroup(
 }
 
 export function yoritooriRelPath(groupName: string): string {
-  return `815_神大家オプチャ/${groupName}/5.やり取り.md`;
+  return `P815_神大家オプチャ/${groupName}/5.やり取り.md`;
 }
 
 /** Mac／Cursor 向け。Web から OneDrive は直接開けない */
