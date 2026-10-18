@@ -131,9 +131,10 @@ export const RAIL_STATUS_LABEL: Record<TransferRailStatus, string> = {
 };
 
 /**
- * 定期引落の学習（BMW=MUFG熱田など実績前）は
+ * 定期引落の学習は
  * `knownRecurringDebits.ts` / `config/known_recurring_debits.yaml` を正とする。
- * SBI keep にマイカー月額を足さないこと。
+ * - BMW=MUFG熱田 → SBI keep にマイカー月額を足さない
+ * - 解約済 Preferred 残債 10,860円 → ドコモSMTB（sbi_net_main）の keep に必ず残す（〜2027-07）
  */
 /** Phase1 既定（config/kurashift_transfer_rails.yaml と同期） */
 export const DEFAULT_TRANSFER_RAILS: TransferRail[] = [

@@ -17,7 +17,25 @@ export type KnownRecurringDebit = {
 };
 
 /** 2026-08-23 ユーザー学習: BMW/MINI は三菱UFJ熱田。SBIではない。 */
+/** 2026-10-18: 解約済 Preferred 残債 10,860円／月 → ドコモSMTB イチゴ（〜2027-07想定） */
 export const KNOWN_RECURRING_DEBITS: KnownRecurringDebit[] = [
+  {
+    id: "smcc_preferred_residual_docomo_smtb",
+    label: "解約済 Preferred（Visa）残債引落",
+    settlementAccountId: "sbi_net_main",
+    settlementBankLabel: "ドコモSMTBネット銀行 イチゴ支店",
+    excludeFromAccountIds: [
+      "sbi_net_sub",
+      "smbc_kariya",
+      "mufg_atsuta",
+      "mufg_toyoake",
+    ],
+    dayOfMonth: 26,
+    amountJpyApprox: 10_860,
+    evidenceStatus: "user_confirm",
+    note:
+      "解約済みでも毎月26日に10,860円。active_until≈2027-07。SBI本からの資金移動で先に残す。年会費とは別。",
+  },
   {
     id: "bmw_mini_mufg_mycar",
     label: "BMW/MINI ネットDEマイカーローン",

@@ -53,12 +53,22 @@ PP→Olive Infinite 移行で、支払先切替（`CARD_MIG_*`）は進めたが
 - Olive INF を解約する話で、単体 PP と取り違える／逆も同様
 - 秘密（カード番号・パスワード）をチャットに再掲する
 
-## 現状の正（2026-08-04 時点）
+## 現状の正（2026-08-04 時点／残債追記 2026-10-18）
 
 | カード | 状態 | 次回／期限 |
 |---|---|---|
-| 単体 PP | Vpass **即時退会完了**（既払 33,000 は返金不可） | 追加年会費なし想定 |
+| 単体 PP | Vpass **即時退会完了**（既払 33,000 は返金不可） | **追加年会費なし**。ただし解約済 Preferred の **月次残債 10,860円** は別枠で継続（下表） |
 | Olive INF | 継続 | 次回年会費目安 **2027-08-02**／回避なら **2027-06-30** までにランク変更・解約 |
+
+### 解約済 Preferred の月次残債（年会費ではない）
+
+| 項目 | 正 |
+|---|---|
+| 金額 | **毎月 10,860円** |
+| 引落日 | **毎月26日** |
+| 引落口座 | ドコモSMTBネット銀行 **イチゴ支店**（`sbi_net_main`） |
+| 期間目安 | **〜2027年6〜7月**（約1年） |
+| 資金移動 | 寄せ時に SBI本で先に残す → `jarvis-fund-transfer-keep.mdc` / `config/known_recurring_debits.yaml` |
 
 ## 参照
 
@@ -66,3 +76,4 @@ PP→Olive Infinite 移行で、支払先切替（`CARD_MIG_*`）は進めたが
 - 秘密・モード: `.env.jarvis_private`（`PP_CANCEL_*` / `OLIVE_INF_NEXT_FEE_DATE` / `CARD_FEE_GUARD_*`）
 - ウォッチ: `config/situation_watch.yaml` → `card_annual_fee`
 - 退会スクリプト: `scripts/jarvis_vpass_pp_cancel.py`（PP 専用。INF は触らない）
+- 残債キープ: `jarvis-fund-transfer-keep.mdc` · `config/known_recurring_debits.yaml`
