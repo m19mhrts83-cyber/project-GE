@@ -26,7 +26,7 @@ REPO = Path(__file__).resolve().parents[1]
 POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
 PY = sys.executable
 AGENT_ID = "111"
-AGENT_NAME = "パートナー連絡整理係"
+AGENT_NAME = "パートナー連絡整理"
 REPORTS_DIR = (
     REPO
     / "docs"
@@ -174,7 +174,7 @@ def _build_text(args: argparse.Namespace, total: int) -> str:
 
     # 更新ゼロ・失敗なし → 1行（生存確認）
     if total <= 0 and fail_ok and not note and not next_:
-        return f"【{AGENT_ID}・{frame_ja}】更新なし（生存確認）"
+        return f"【{AGENT_ID} {AGENT_NAME}・{frame_ja}】更新なし（生存確認）"
 
     lines = [f"【{AGENT_ID} {AGENT_NAME}・{frame_ja}】"]
     if total > 0:

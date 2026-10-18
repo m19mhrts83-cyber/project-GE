@@ -401,7 +401,7 @@ def build_message(
         engine = "Mac手動／launchd補完"
 
     body = [
-        f"【社員報告】連携健全性点検係（315） / 点検1回",
+        f"【315 連携健全性】点検1回",
         f"- 時刻: {now} JST",
         f"- 起動: {engine}",
         f"- 判定: {overall}",
@@ -446,7 +446,7 @@ def post_slack(channel: str, text: str) -> int:
             "--channel",
             channel,
             "--username",
-            "315 連携健全性点検係",
+            "315 連携健全性",
             "--text",
             text,
         ],
@@ -570,7 +570,7 @@ def main() -> int:
         and (overall_override or "") in ("未解決", "要フォロー")
     ):
         consult = (
-            "【315 要判断】連携健全性 — 1回トライ後も未解決\n"
+            "【相談】315 連携健全性 — 1回トライ後も未解決\n"
             f"- 判定: {overall_override}\n"
             f"- トライ: {remediate_meta.get('detail', '')[:200]}\n"
             "- 見てほしい点: QR／YAML大量／WeStudy再実行／Gmail再同意の要否\n"

@@ -447,7 +447,7 @@ def _post_slack(channel: str, text: str) -> int:
         "--channel",
         channel,
         "--username",
-        "311 送信前品質係",
+        "311 送信前品質",
         "--text",
         text,
     ]

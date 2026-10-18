@@ -45,7 +45,7 @@ REPORTS_DIR = (
 CHARTS_DIR = REPORTS_DIR / "charts"
 POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
 AGENT_ID = "615"
-AGENT_NAME = "円動向報告係"
+AGENT_NAME = "円動向報告"
 SYMBOL_YAHOO = "USDJPY=X"
 FRANKFURTER = "https://api.frankfurter.app"
 

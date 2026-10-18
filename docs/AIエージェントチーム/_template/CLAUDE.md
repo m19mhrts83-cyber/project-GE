@@ -40,6 +40,8 @@
 |---|---|
 | 完了報告 | Slack `#report` または `#ops`（体による） |
 | 要判断・相談 | Slack `#consult` |
+
+**書き出し**: 最初の1行に **`【報告】NNN 短い役割語`**（番号＋何をするか。「係」不要）。例: `【報告】211 返信案内下書き・朝便`。詳細: ハブ `CLAUDE.md`／`.cursor/rules/jarvis-agent-team-slack-report.mdc`
 | Webhook（秘密） | env キー名のみ記す（URLは書かない）: `SLACK_WEBHOOK_…` |
 
 ## 5. 成果物の置き場
