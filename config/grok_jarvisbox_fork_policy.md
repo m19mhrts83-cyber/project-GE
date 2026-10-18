@@ -65,6 +65,7 @@ Drive `20_outbox_to_grok/` はこれまでどおり **仕事キュー**。チャ
 - **ホーク Notion**: `action: notion_tasks` → Jarvis が `jarvis_hawk_notion_tasks_apply.py --apply`（移行期）
 - **ホーク／部長 Todoist（本線）**: `action: todoist_tasks` → Mac が自動 apply（`jarvis_bucho_inbox_poll`）。`summary`/`links` → コメントの Markdown ハイパーリンク
 - **定型報告 → Slack**: `action: slack_report`（`channel: report|consult|ops`）→ Mac が Webhook 投稿。**壁打ちは Grok チャット可。松野判断に必要な材料は `#consult`（チャットだけに閉じない · 2026-10-15）**。正本: `docs/AIエージェントチーム/17_Grok定型報告_Slack_20261010.md`
+- **`#consult` 末尾（必須 · 2026-10-18）**: `次: Grokで続行 | Jarvisに依頼 | 人判断のみ` ＋ `担当メモ` ＋ `橋渡し`（人が了承して一声。リアクション自動は後続）。正本: `docs/AIエージェントチーム/36_Slack_consult手渡し_次の担当_20261018.md`
 - **送信前ゲート（311）**: `action: send_gate_311`（`draft_path` 必須）→ Mac が 311 `input/` へ enqueue → 機械点検 → Slack `#report`/`#consult`。**通過 ≠ 送信OK**（outbound-confirm は別）。正本: `docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/docs/phase3-upstream.md`
 - **要ボス／要Jarvis連携**は必ず Todoist ラベル付き起票（Drive メモだけでは漏れ扱い）
 - Drive `20_outbox` 空は正常。ホーク判断は Todoist `要ホーク`

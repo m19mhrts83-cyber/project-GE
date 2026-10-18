@@ -20,6 +20,9 @@ title: 週次統括 YYYY-MM-DD
 ---
 
 本文（短く。秘密・トークン禁止）
+
+channel: consult のとき本文末尾に「次:」が無いと、橋渡し3行を補完する
+（正本: docs/AIエージェントチーム/36_Slack_consult手渡し_次の担当_20261018.md）
 """
 from __future__ import annotations
 
@@ -141,12 +144,30 @@ def markdown_to_slack(text: str) -> str:
     return "\n".join(out)
 
 
+_CONSULT_NEXT_RE = re.compile(r"(?m)^\s*次\s*[:：]")
+
+
+def ensure_consult_handoff_footer(body: str) -> str:
+    """#consult 用。末尾に「次:」が無いとき橋渡し3行を補完（忘却防止）。"""
+    text = (body or "").rstrip()
+    if _CONSULT_NEXT_RE.search(text):
+        return text
+    stub = (
+        "\n\n次: 人判断のみ\n"
+        "担当メモ: （Grok未記入・Jarvisが補完）了承後に担当を決めて一声\n"
+        "橋渡し: 松野が了承したら Grok／Jarvis へ一声（当面は人が橋）"
+    )
+    return text + stub
+
+
 def build_text(meta: dict[str, str], body: str, name: str) -> str:
     bot = meta.get("bot") or meta.get("source") or "Grok"
     title = meta.get("title") or first_heading(body) or name
     channel = normalize_channel(meta.get("channel") or "report")
     kind = meta.get("kind") or "定型報告"
     body_clean = body.strip()
+    if channel == "consult":
+        body_clean = ensure_consult_handoff_footer(body_clean)
     if len(body_clean) > BODY_LIMIT:
         body_clean = body_clean[: BODY_LIMIT - 1] + "…"
     # 秘密っぽい行を落とす（値は出さない）
