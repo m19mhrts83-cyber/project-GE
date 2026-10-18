@@ -134,24 +134,50 @@ def create_and_upload(
             # 1. ログイン確認
             login_if_needed(page, email, password)
 
-            # 2. トップページへ移動
-            page.goto("https://notebooklm.google.com/", wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(3000)
+            # 2. トップページへ移動（UI改称後は notebook.google.com にリダイレクトされうる）
+            page.goto("https://notebooklm.google.com/", wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(4000)
+            if "trynow" in page.url or "accounts.google" in page.url:
+                raise RuntimeError(
+                    f"Not logged into NotebookLM home (url={page.url}). "
+                    "Run: jarvis_notebooklm_mcp_login.py --profile studio --headed"
+                )
 
-            # 3. 「新規作成」ボタンをクリック
-            create_btn = page.locator(
-                "button:has-text('新規作成'), "
-                "button:has-text('新しいノートブック'), "
-                "button:has-text('ノートブックを新規作成'), "
-                "button:has-text('New notebook'), "
-                "button:has-text('Create'), "
-                "[aria-label*='新規'], [aria-label*='Create'], [aria-label*='New notebook']"
-            ).first
-            if not create_btn.count():
-                raise RuntimeError("Could not find 'Create notebook' button on home page")
+            # 3. 「新しいノートブック」をクリック（2026-10 UI: aria-label / add_2 付き）
+            create_selectors = (
+                "button[aria-label='新しいノートブック']",
+                "button[aria-label*='新しいノートブック']",
+                "button:has-text('新しいノートブック')",
+                "button:has-text('新規作成')",
+                "button:has-text('New notebook')",
+                "[aria-label*='New notebook']",
+                "button:has-text('ノートブックを新規作成')",
+            )
+            create_btn = None
+            for sel in create_selectors:
+                loc = page.locator(sel)
+                try:
+                    if loc.count() and loc.first.is_visible():
+                        create_btn = loc.first
+                        print(f"# create button via: {sel}", file=sys.stderr)
+                        break
+                except Exception:
+                    continue
+            if create_btn is None:
+                dbg = Path("/tmp/notebooklm_create_fail")
+                dbg.mkdir(parents=True, exist_ok=True)
+                try:
+                    (dbg / "home.png").write_bytes(page.screenshot(full_page=True))
+                    (dbg / "home.html").write_text(page.content(), encoding="utf-8")
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    f"Could not find '新しいノートブック' on home (url={page.url}). "
+                    f"See {dbg}"
+                )
 
             create_btn.click()
-            page.wait_for_timeout(4000)
+            page.wait_for_timeout(5000)
 
             # notebook.google.com / notebooklm.google.com 両対応
             notebook_url = page.url.split("?")[0]
@@ -167,20 +193,50 @@ def create_and_upload(
                 result["notebook_id"] = notebook_url.split("/notebook/")[1].split("/")[0]
 
             # 4. ファイルアップロード
-            # 白紙の新規ノートでは、モーダル「ソースを追加」が自動で開いている
-            upload_btn = page.locator("button:has-text('ファイルをアップロード'), [aria-label*='ファイルをアップロード']").first
-            if not upload_btn.count():
-                # 開いていない場合は「ソースを追加」をクリック
-                add_src_btn = page.locator("button:has-text('ソースを追加')").first
-                if add_src_btn.count():
-                    add_src_btn.click()
-                    page.wait_for_timeout(2000)
-                upload_btn = page.locator("button:has-text('ファイルをアップロード'), [aria-label*='ファイルをアップロード']").first
+            # 白紙の新規ノートでは、モーダル「ソースを追加」が自動で開いていることがある
+            def _first_visible(selectors: tuple[str, ...]):
+                for sel in selectors:
+                    loc = page.locator(sel)
+                    try:
+                        if loc.count() and loc.first.is_visible():
+                            return loc.first
+                    except Exception:
+                        continue
+                return None
 
-            if not upload_btn.count():
-                raise RuntimeError("Could not find 'ファイルをアップロード' button in modal")
+            upload_sels = (
+                "button:has-text('ファイルをアップロード')",
+                "[aria-label*='ファイルをアップロード']",
+                "button:has-text('Upload files')",
+                "[aria-label*='Upload files']",
+                "button:has-text('パソコンからアップロード')",
+            )
+            upload_btn = _first_visible(upload_sels)
+            if upload_btn is None:
+                add_src = _first_visible(
+                    (
+                        "button:has-text('ソースを追加')",
+                        "button:has-text('Add source')",
+                        "[aria-label*='ソースを追加']",
+                        "[aria-label*='Add source']",
+                    )
+                )
+                if add_src is not None:
+                    add_src.click()
+                    page.wait_for_timeout(2500)
+                upload_btn = _first_visible(upload_sels)
 
-            with page.expect_file_chooser() as fc_info:
+            if upload_btn is None:
+                dbg = Path("/tmp/notebooklm_create_fail")
+                dbg.mkdir(parents=True, exist_ok=True)
+                try:
+                    (dbg / "after_create.png").write_bytes(page.screenshot(full_page=True))
+                    (dbg / "after_create.html").write_text(page.content(), encoding="utf-8")
+                except Exception:
+                    pass
+                raise RuntimeError(f"Could not find upload button (url={page.url}). See {dbg}")
+
+            with page.expect_file_chooser(timeout=15000) as fc_info:
                 upload_btn.click()
             file_chooser = fc_info.value
             file_chooser.set_files(upload_files)
