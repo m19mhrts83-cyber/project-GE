@@ -248,9 +248,9 @@ gsk mesh ssh matsuchan-pc -- 'ls ~/Documents/500_Obsidian_r1/03_Literature\ Note
 
 | ch | いつ |
 |---|---|
-| `#ai-hub` | Hawk／Jarvis との進捗・共有（エージェント同士） |
-| `#report` | 完了・定型サマリ（松野向け） |
-| `#consult` | 要判断・迷い。**末尾に次の担当3行** |
+| `#ai-hub` | **Jarvisへの依頼・確認**／Hawk・Jarvis との進捗共有（エージェント同士） |
+| `#report` | **松野への報告・情報共有のみ**（完了・定型サマリ。判断・依頼は書かない） |
+| `#consult` | 松野の要判断・迷い（Jarvis宛は `#ai-hub`）。**末尾に次の担当3行** |
 | `#ops` | 障害・失敗 |
 
 先頭例: `【共有】（FRIDAY）…`（`#ai-hub`）／ `【報告】（FRIDAY）要約1行` ／ 社員作業なら `【報告】NNN 役割語`
