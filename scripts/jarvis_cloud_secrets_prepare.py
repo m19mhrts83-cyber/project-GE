@@ -1,33 +1,47 @@
 #!/usr/bin/env python3
 """
-Jarvis: Cloud Agents「My Secrets」貼り付け用の .env 断片を作る（値は表示しない）。
+Jarvis: Cloud Agents「My Secrets」へ載せる（値は表示しない）。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
-  python scripts/jarvis_cloud_secrets_prepare.py
-  python scripts/jarvis_cloud_secrets_prepare.py --include-gmail-send
-  # スマホ→Cloud で Todoist 起票だけ足すとき:
-  python scripts/jarvis_cloud_secrets_prepare.py --todoist-only
-  # → ~/.jarvis_state/cloud_agent_secrets.env
-  # Dashboard → Cloud Agents → My Secrets → Add Secrets に中身を貼って Save
-  # 終わったら: rm ~/.jarvis_state/cloud_agent_secrets.env
+  # 推奨: API で直接反映（CURSOR_API_KEY 必要。手貼り不要）
+  python scripts/jarvis_cloud_secrets_prepare.py --slack-only --apply
+  python scripts/jarvis_cloud_secrets_prepare.py --todoist-only --apply
+  python scripts/jarvis_cloud_secrets_prepare.py --apply
+  # 手貼り用 .env 断片だけ作るとき（--apply なし）:
+  python scripts/jarvis_cloud_secrets_prepare.py --slack-only
+  # → ~/.jarvis_state/cloud_agent_secrets.env → Dashboard My Secrets → Save
+  # → rm ~/.jarvis_state/cloud_agent_secrets.env
 
+API: PUT https://api.cursor.com/v1/me/secrets/{name}（Runtime Secret）
 Git にコミットしないこと。
 """
 from __future__ import annotations
 
 import argparse
 import base64
+import json
 import os
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 OUT = Path.home() / ".jarvis_state" / "cloud_agent_secrets.env"
 REPO = Path(__file__).resolve().parents[1]
 MANUAL = REPO / "215_kamiooya" / "C1_cursor" / "1b_Cursorマニュアル"
+CURSOR_ME_SECRETS = "https://api.cursor.com/v1/me/secrets"
 REQUIRED = (
     "JARVIS_SUPABASE_URL",
     "JARVIS_SUPABASE_SERVICE_ROLE_KEY",
     "GEMINI_API_KEY",
+)
+# AIチーム Slack（Incoming Webhook）。Cloud 投稿の本線。URL は stdout に出さない。
+SLACK_WEBHOOK_KEYS = (
+    "SLACK_WEBHOOK_AI_TEAM_REPORT",
+    "SLACK_WEBHOOK_AI_TEAM_CONSULT",
+    "SLACK_WEBHOOK_AI_TEAM_OPS",
+    "SLACK_WEBHOOK_AI_TEAM_HUB",
+    "SLACK_WEBHOOK_AI_TEAM_DEAL_ACTIVE",
 )
 
 
@@ -55,6 +69,92 @@ def _append_todoist(lines: list[str], missing: list[str], *, required: bool) -> 
         lines.append(f"JARVIS_TASK_BACKEND={backend}")
 
 
+def _append_slack_webhooks(
+    lines: list[str], missing: list[str], *, required: bool
+) -> int:
+    """Slack Incoming Webhook。Cloud から Bot 投稿（プッシュ通知用）。値は出さない。"""
+    n = 0
+    for k in SLACK_WEBHOOK_KEYS:
+        v = (os.environ.get(k) or "").strip()
+        if v:
+            lines.append(f"{k}={v}")
+            n += 1
+        elif required and k == "SLACK_WEBHOOK_AI_TEAM_REPORT":
+            # REPORT だけ必須（他 ch は REPORT フォールバック可）
+            missing.append(k)
+    return n
+
+
+def _lines_to_kv(lines: list[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for ln in lines:
+        if not ln.strip() or ln.startswith("#") or "=" not in ln:
+            continue
+        k, v = ln.split("=", 1)
+        out[k] = v
+    return out
+
+
+def _apply_to_cursor_me(kv: dict[str, str]) -> int:
+    """PUT /v1/me/secrets/{name}。値は stdout に出さない。失敗時は非0。"""
+    api_key = (os.environ.get("CURSOR_API_KEY") or "").strip()
+    if not api_key:
+        print("missing: CURSOR_API_KEY（My Secrets API 反映に必要）", file=sys.stderr)
+        return 2
+    auth = "Basic " + base64.b64encode(f"{api_key}:".encode()).decode()
+    ok = 0
+    failed = 0
+    for name, value in kv.items():
+        if not value:
+            print(f"skip {name}: empty", file=sys.stderr)
+            failed += 1
+            continue
+        body = json.dumps(
+            {"value": value, "type": "runtime_secret", "repos": []}
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            f"{CURSOR_ME_SECRETS}/{name}",
+            data=body,
+            method="PUT",
+            headers={
+                "Authorization": auth,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as res:
+                _ = res.read()
+                status = res.status
+        except urllib.error.HTTPError as e:
+            err = e.read().decode("utf-8", errors="replace")[:160]
+            print(f"❌ {name} HTTP {e.code}: {err}", file=sys.stderr)
+            failed += 1
+            continue
+        except Exception as e:
+            print(f"❌ {name}: {e}", file=sys.stderr)
+            failed += 1
+            continue
+        print(f"✅ {name} http={status}")
+        ok += 1
+    print(f"applied {ok}/{ok + failed} secrets via Cursor My Secrets API")
+    return 1 if failed else 0
+
+
+def _finish(lines: list[str], *, label: str, apply: bool) -> int:
+    if apply:
+        return _apply_to_cursor_me(_lines_to_kv(lines))
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    OUT.chmod(0o600)
+    print(
+        f"wrote {OUT} ({len(lines)} keys{', ' + label if label else ''}). "
+        "Paste into Cloud Agents → My Secrets, then delete the file. "
+        "Or re-run with --apply (CURSOR_API_KEY)."
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -65,26 +165,41 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--todoist-only",
         action="store_true",
-        help="Todoist 関連だけ出力（My Secrets に差分追加するとき）",
+        help="Todoist 関連だけ（手貼り or --apply）",
+    )
+    ap.add_argument(
+        "--slack-only",
+        action="store_true",
+        help="Slack Incoming Webhook だけ（手貼り or --apply）",
+    )
+    ap.add_argument(
+        "--apply",
+        action="store_true",
+        help="手貼りせず Cursor API（PUT /v1/me/secrets）で My Secrets に反映",
     )
     args = ap.parse_args(argv)
 
     lines: list[str] = []
     missing: list[str] = []
 
+    if args.todoist_only and args.slack_only:
+        print("use either --todoist-only or --slack-only, not both", file=sys.stderr)
+        return 2
+
     if args.todoist_only:
         _append_todoist(lines, missing, required=True)
         if missing:
             print(f"missing: {', '.join(missing)}", file=sys.stderr)
             return 1
-        OUT.parent.mkdir(parents=True, exist_ok=True)
-        OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        OUT.chmod(0o600)
-        print(
-            f"wrote {OUT} ({len(lines)} keys, todoist-only). "
-            "Paste into Cloud Agents → My Secrets, then delete the file."
-        )
-        return 0
+        return _finish(lines, label="todoist-only", apply=args.apply)
+
+    if args.slack_only:
+        n = _append_slack_webhooks(lines, missing, required=True)
+        if missing:
+            print(f"missing: {', '.join(missing)}", file=sys.stderr)
+            return 1
+        _ = n
+        return _finish(lines, label="slack-only", apply=args.apply)
 
     for k in REQUIRED:
         v = (os.environ.get(k) or "").strip()
@@ -105,6 +220,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # Todoist（スマホ→Cloud Agent 起票。Jarvis 分身トークン）
     _append_todoist(lines, missing, required=True)
+
+    # Slack Incoming Webhook（Cloud から #report/#consult/#ops 等へ Bot 投稿＝通知が出る）
+    _append_slack_webhooks(lines, missing, required=False)
 
     if args.include_gmail_send:
         cred_b64 = (os.environ.get("GMAIL_CREDENTIALS_B64") or "").strip() or _file_b64(
@@ -151,15 +269,12 @@ def main(argv: list[str] | None = None) -> int:
     if missing:
         print(f"missing: {', '.join(missing)}", file=sys.stderr)
         return 1
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    OUT.chmod(0o600)
-    print(f"wrote {OUT} ({len(lines)} keys). Paste into Cloud Agents → My Secrets, then delete the file.")
-    print(
-        "Note: jarvis-dashboard uses sb_secret_; legacy JWT service_role is disabled.",
-        file=sys.stderr,
-    )
-    return 0
+    if not args.apply:
+        print(
+            "Note: jarvis-dashboard uses sb_secret_; legacy JWT service_role is disabled.",
+            file=sys.stderr,
+        )
+    return _finish(lines, label="", apply=args.apply)
 
 
 if __name__ == "__main__":

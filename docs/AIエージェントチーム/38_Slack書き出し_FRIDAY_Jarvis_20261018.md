@@ -76,6 +76,9 @@
 | **読取** | Cursor Slack MCP（`slack_read_channel` 等） |
 | **例外** | Webhook 未設定（Cloud Secrets 無し等）のときは MCP 投稿可。あるのに MCP だけで済ませない |
 
+**本線は Incoming Webhook**（Bot 投稿 → プッシュ通知が出る）。  
+Slack MCP の本人投稿は通知が出ないので、報告／ops／consult の第一選択にしない。
+
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_slack_webhook_post.py \
@@ -94,8 +97,14 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | `#ai-hub` | `SLACK_WEBHOOK_AI_TEAM_HUB`（未設定時は REPORT フォールバック＋`【#ai-hub】`） |
 | `#deal-active` | `SLACK_WEBHOOK_AI_TEAM_DEAL_ACTIVE` |
 
+| 実行場所 | env の取り方 |
+|---|---|
+| Mac / Self-hosted | `.env.jarvis_private` を `source` |
+| **Cloud Agent** | My Secrets の `SLACK_WEBHOOK_AI_TEAM_*`（`jarvis_cloud_secrets_prepare.py --slack-only --apply`） |
+
 秘密・Webhook URL・トークンは本文に書かない。  
-**Cloud Agent**: Secrets があれば Webhook。無いときは MCP で投稿してよい（可能なら Secrets／Mac Webhook も提案）。
+**Cloud Agent**: Secrets があれば Webhook。無いときは MCP で投稿してよい（可能なら Secrets／Mac Webhook も提案）。  
+Cloud 詳細: [`docs/Jarvis_Cloud_Agent.md`](../../Jarvis_Cloud_Agent.md)「Slack Incoming Webhook」。
 
 ## Jarvis が読む側
 
