@@ -23,23 +23,25 @@ settings:
 template:
   id: vendor_nurture_v1
   approved: false
-  approved_note: "2026-10-19 Phase2 初稿。松野確認後に approved: true"
+  approved_note: "2026-10-19 Phase2。件名は『最近の物件情報』伺い（定期確認は使わない）。松野確認後 approved: true"
   from_name: 松野真治
   from_email: matsuno.estate@gmail.com
-  subject: "物件情報のご案内有無について（定期確認）"
+  subject: "最近の物件情報について"
   # 変数: {vendor_name} {area_line}
+  # 対外文面に「定期確認」は使わない（伺いのニュアンス）
   body: |
     {vendor_name} 様
 
     以前お問い合わせいたしました、松野真治です。
     その節はありがとうございました。
 
-    現在も、{area_line}の賃貸運用向け戸建てを探しております。
+    その後も、{area_line}の賃貸運用向け戸建てを探しております。
+    最近ご案内できる物件情報がございましたら、お伺いできますでしょうか。
     築古・ボロ戸建て・空き家・要修繕でも構いません。
     予算は500万〜3,000万円程度で、お値打ちの物件を優先したいです。
 
-    ご紹介いただける物件情報がございましたら、
-    概要資料（PDF等）を matsuno.estate@gmail.com 宛にご送付いただけますと幸いです。
+    概要資料（PDF等）がございましたら、
+    matsuno.estate@gmail.com 宛にご送付いただけますと幸いです。
     また、今後未公開・特殊な物件が入りましたらご連絡いただけますと助かります。
 
     ハザードリスクが大きい物件は除外希望です。
@@ -48,7 +50,7 @@ template:
     松野真治
     matsuno.estate@gmail.com
   body_short: |
-    松野真治です。以前お問い合わせしました。現在も{area_line}の賃貸用戸建てを探しています。ボロ・空き家・要修繕可。予算500万〜3,000万円。資料は matsuno.estate@gmail.com まで。
+    松野真治です。以前お問い合わせしました。その後も{area_line}の賃貸用戸建てを探しており、最近のご案内物件があればお伺いできれば幸いです。ボロ・空き家・要修繕可。予算500万〜3,000万円。資料は matsuno.estate@gmail.com まで。
   area_lines:
     chubu: "愛知・岐阜・静岡"
     shiga: "滋賀"
