@@ -1,0 +1,75 @@
+---
+description: 616寄せリマインド係。不足検知・Slack促しはルール＋CLAUDE.md本線（スキル不要）。送金はJarvisのみ。
+alwaysApply: true
+---
+
+# 616 寄せリマインド係（ルール本線・スキル不要）
+
+## 方針（確定 2026-10-19）
+
+**検知・促しはルール＋社員 `CLAUDE.md` を読めば、どの実行ツールでも同じ動きをする。**  
+Cursor スキル／スラッシュ（`/adjust_cash`）に振り分けない。
+
+| 層 | 正 | 誰でも可？ |
+|---|---|---|
+| **616** | 不足検知 → Slack／チャット促し | **はい**（Jarvis／FRIDAY／GenCode／Claude Code／Codex 等） |
+| **送金・OTP** | 人了承のうえ **Jarvis** が寄せ実行 | 616 ではやらない |
+
+正本指示: `docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/CLAUDE.md`  
+Cursor ルール: 本ファイル  
+寄せ実行（別）: `.cursor/skills/adjust-cash/`（**送金のときだけ**。リマインドの入口にしない）
+
+## トリガー（次のいずれか）
+
+- 「寄せリマインド」「支払いに足りるか」「Olive／カード引落のバッファ」
+- `card_debit_watch`／due 接近／shortfall
+- パートナー確認の前半末尾のついで（失敗しても確認全体は止めない）
+- 朝オープン・月次窓で引落が近いとき
+
+## エージェントの必須動作（ツール共通）
+
+1. **読取のみ**でギャップを出す（秘密・銀行ログインはしない）
+   - `.jarvis_state/card_debit_watch.json`
+   - `config/known_recurring_debits.yaml`（Preferred **10,860** → `sbi_net_main`）
+   - Zaim 年度 CSV で **settled を除外**（人に「済み？」と聞かない）
+   - 給与余り: `jarvis_salary_pay_calendar.py`（あれば）
+2. 不足あり → Slack `#consult`（またはチャット）に短報。書き出しは **番号＋役割語**（`【相談】616 寄せリマインド｜…`）
+3. 末尾に手渡し:
+
+```
+次: Jarvisに依頼
+担当メモ: 寄せ実行（ギャップ表→了承→OTP）。スキル名に依存しない
+橋渡し: 松野了承後に Jarvis へ一声
+```
+
+4. **送金・`--go`／OTP／IB／AW 実行はしない**（Jarvis＋人了承のルートへ渡す）
+
+## 促しレベル（目安）
+
+| レベル | 条件 | 動作 |
+|---|---|---|
+| info | due>7日 or shortfall≤0 | 出さない／ログのみ |
+| suggest | due≤7日 and shortfall>0 | `#consult` |
+| ask | due≤3日 and shortfall大 | `#consult`＋強調 |
+
+同一 `card_id+due` は **3日以内に同レベル再掲しない**（state 実装後。当面はチャットで重複に注意）。
+
+## 無効化
+
+- `.env.jarvis_private` に `JARVIS_ADJUST_CASH_REMIND_DISABLE=1`
+- または将来 `.jarvis_state/adjust_cash_remind.json` の `"disabled": true`
+
+## やらないこと
+
+- `/adjust_cash` スキルが無いと 616 が動けない、と案内する
+- 616 の仕事をスキルコマンドに閉じ込める
+- 銀行 PW／OTP／口座フルをチャットや社員 env に書く
+- SBI本を Preferred 残債無視で空にする案を促しに含める
+
+## 関連
+
+- 社員: `docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/`
+- キープ: `jarvis-fund-transfer-keep.mdc`
+- 年会費（別枠）: `jarvis-card-fee-guard.mdc`
+- 送金 UX（Jarvis のみ）: skill `adjust-cash`
+- Slack 書き出し: `jarvis-agent-team-slack-report.mdc`
