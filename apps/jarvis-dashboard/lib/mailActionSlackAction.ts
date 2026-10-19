@@ -253,7 +253,7 @@ async function saveMuteRegistry(reg: MuteRegistry): Promise<void> {
   );
 }
 
-/** 見送り連続 → 送信者ミュート（Slack 再掲除外）。削除ではなく通知除外。 */
+/** 見送り連続 streak → 送信者ミュート（Slack 再掲除外）。削除ではなく通知除外。 */
 export async function recordMailSkipLearn(
   fromEmail: string,
   subject: string,
@@ -262,6 +262,7 @@ export async function recordMailSkipLearn(
   if (!key) return { muted: false, skips: 0, key: null };
   const reg = await loadMuteRegistry();
   const prev = reg.entries[key] || { skips: 0, muted: false };
+  // skips = 連続見送り回数（返信／Todoist で resetMailSkipStreak）
   const skips = (prev.skips || 0) + 1;
   const muted = skips >= reg.threshold || Boolean(prev.muted);
   reg.entries[key] = {
@@ -272,6 +273,24 @@ export async function recordMailSkipLearn(
   };
   await saveMuteRegistry(reg);
   return { muted, skips, key };
+}
+
+/** 返信／Todoist 成功時に連続カウントをリセット（muted は維持＝明示 unmute のみ解除）。 */
+export async function resetMailSkipStreak(
+  fromEmail: string,
+): Promise<{ key: string | null; resets: boolean }> {
+  const key = muteKeyFromEmail(fromEmail);
+  if (!key) return { key: null, resets: false };
+  const reg = await loadMuteRegistry();
+  const prev = reg.entries[key];
+  if (!prev || (prev.skips || 0) === 0) return { key, resets: false };
+  reg.entries[key] = {
+    ...prev,
+    skips: 0,
+    last_at: new Date().toISOString(),
+  };
+  await saveMuteRegistry(reg);
+  return { key, resets: true };
 }
 
 export async function isMailSenderMuted(fromEmail: string): Promise<boolean> {
@@ -354,27 +373,42 @@ export async function applyMailActionSlack(
 
   if (action === "todoist") {
     const subject = String(row.subject || "").trim() || "(件名なし)";
-    const summaryParts = [
-      row.summary || "",
-      `From: ${row.from_email || ""}`,
-      `lane=${row.lane || ""} kind=${row.kind || ""}`,
-      `triage_id=${id}`,
-      (row.original_body || "").slice(0, 800),
-    ].filter(Boolean);
+    const partner = String(row.partner || "").trim();
+    const fromEmail = String(row.from_email || "");
     const lane = guessMailTodoistLane(
       subject,
-      summaryParts.join("\n"),
-      String(row.from_email || ""),
-      String(row.partner || ""),
+      [row.summary || "", fromEmail, partner].join("\n"),
+      fromEmail,
+      partner,
     );
-    const title = `[メール要対応] ${subject}`.slice(0, 200);
+    const titleBase = partner
+      ? `[メール要対応][${partner}] ${subject}`
+      : `[メール要対応] ${subject}`;
+    const title = titleBase.slice(0, 200);
+    const outLinks = [
+      `triage_id=${id}`,
+      row.gmail_thread_id ? `gmail_thread=${row.gmail_thread_id}` : "",
+      row.gmail_message_id ? `gmail_message=${row.gmail_message_id}` : "",
+    ].filter(Boolean);
+    const summaryBlock = [
+      "【Jarvis】",
+      `サマリ: ${(row.summary || subject).replace(/\s+/g, " ").slice(0, 280)}`,
+      "アウトプット:",
+      ...outLinks.map((l) => `- ${l}`),
+      "",
+      `From: ${fromEmail}`,
+      `lane=${row.lane || ""} kind=${row.kind || ""}`,
+      (row.original_body || "").slice(0, 600),
+    ].join("\n").slice(0, 4000);
     const created = await createTodoistTask(lane, {
       title,
-      summary: summaryParts.join("\n").slice(0, 4000),
+      summary: summaryBlock,
+      labels: ["quick"],
     });
     if (!created.ok) {
       return { ok: false, message: `Todoist 起票失敗: ${created.error}` };
     }
+    await resetMailSkipStreak(fromEmail);
     payload.slack_ma_action = { action: "todoist", at: now, source };
     payload.todoist_task_id = created.id;
     payload.todoist_url = created.url;
@@ -435,6 +469,7 @@ export async function applyMailActionSlack(
       })
       .eq("id", id);
     if (error) return { ok: false, message: error.message };
+    await resetMailSkipStreak(to);
     return {
       ok: true,
       message: `送信しました → ${to}（${row.partner || id}）`,

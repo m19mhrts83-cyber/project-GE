@@ -50,6 +50,9 @@ agents:
   "115":
     can_do: "修繕進捗の要約（パートナー確認ついで・候補）"
     site_logins: []
+  "116":
+    can_do: "メール要対応を Slack #consult に投稿・健全性監視（送信／見送り／Todoistは人のボタン）"
+    site_logins: []
   "211":
     can_do: "返信・案内文面の下書き提案（07:30 GHA・送信は人）"
     site_logins: []

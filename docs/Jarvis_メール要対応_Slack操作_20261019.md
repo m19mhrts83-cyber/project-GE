@@ -29,8 +29,19 @@
 - ミュートは **削除しない**（可逆・スキップ Inbox 相当）
 - 狭い鍵（`from:addr`）を優先。ドメイン一括は誤爆しやすいので当面しない
 - 閾値を越えたら通知除外（既定 **2 回**連続見送り）
+- **返信する／Todoist追加**で連続カウント（streak）をリセット。`muted` の解除は明示 unmute のみ
 
 実装: `sync_meta` キー `mail_action_skip_mute`（JSON 文字列）。閾値は `JARVIS_MAIL_ACTION_MUTE_THRESHOLD`（既定 2）。
+
+## 合図（116・T1〜T5）
+
+| ID | 内容 |
+|---|---|
+| T1 | 朝バンドル soft-fail |
+| T2 | 平日 12:30 JST GHA `jarvis-mail-action-noon.yml` |
+| T3 | `jarvis_night_triage` 末尾相乗り |
+| T4 | 手動 `--from-triage` |
+| T5 | 朝 `--health --notify-ops`（異常時 `#ops`） |
 
 ## コマンド
 
@@ -40,9 +51,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_slack_post.py --from-triage
 # 強制 URL ボタン
 ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_slack_post.py --from-triage --url-buttons
+# 見送り学習
+~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --list
+~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --unmute 'from:addr@example.com'
+~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --health --notify-ops
 ```
-
-朝バンドル: `jarvis_morning_mac_refresh` が soft-fail で相乗り可。
 
 ## 秘密
 
@@ -50,13 +63,15 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 |---|---|
 | `SLACK_BOT_TOKEN` / `SLACK_SIGNING_SECRET` | 投稿・Interactivity（業者返信と共用） |
 | `SLACK_WEBHOOK_AI_TEAM_CONSULT` | Bot 無し時 |
-| `PROPERTY_GATE_ACTION_TOKEN` | 予備 URL 署名 |
+| `PROPERTY_GATE_ACTION_TOKEN` / `MAIL_ACTION_TOKEN` | 予備 URL 署名 |
 | `TODOIST_API_TOKEN` | Dashboard からの Todoist 起票（Vercel） |
 | `JARVIS_MAIL_ACTION_MUTE_THRESHOLD` | 見送り→ミュート閾値（既定 2） |
 | `JARVIS_MAIL_ACTION_SLACK_DISABLE` | 投稿停止 |
+| `JARVIS_MAIL_ACTION_REPOST` | 既投稿でも再掲（任意） |
 
 ## 関連
 
-- 業者返信同型: `docs/KURASHIFT_業者返信_Slack操作_20261019.md`
+- 社員: `docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/`
+- 業者返信同型: `docs/KURASHIFT_業者返信_Slack操作_20261019.md`（516）
 - GenMail レーン推定: `scripts/jarvis_todoist_genmail_propose.py`
-- Todoist タスク: 「メール自動返信システムの開発」
+- 要フォロー: Todoist `[要フォロー][night_triage]`

@@ -1114,6 +1114,18 @@ def main() -> int:
         results["steps"]["mail_action_slack"] = rc
         if rc != 0:
             print(f"# mail_action_slack soft-fail rc={rc}", file=sys.stderr)
+        # T5: 見送り学習／pending 健全性（#ops は異常時のみ）
+        mute_cli = REPO / "scripts" / "jarvis_mail_action_mute.py"
+        if mute_cli.is_file():
+            rc_h = run_step(
+                "mail_action_health",
+                [exe, str(mute_cli), "--health", "--notify-ops"],
+                timeout=60,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["mail_action_health"] = rc_h
+            if rc_h not in (0, "skipped"):
+                print(f"# mail_action_health soft-fail rc={rc_h}", file=sys.stderr)
     else:
         results["steps"]["mail_action_slack"] = "skipped"
 

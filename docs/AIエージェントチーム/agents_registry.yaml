@@ -18,7 +18,7 @@ builder_source:
   url: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
   previous_share_id: eHKHNixTpIF4G5WN
 updated: '2026-10-19'
-builder_sync_note: 2026-10-19 715家族会議週次係をBuilder反映（運用確認・FRIDAY launchd）。616寄せリマインド係も同日追加。Drive旧614_Vポイント・テイチャン係は_unused退避。共有 uksxiDIzE1AEckKH。
+builder_sync_note: 2026-10-19 116メール要対応係を追加（設計中・T1〜T5）。715／616は同日反映済。共有 uksxiDIzE1AEckKH。
 mixup_doc: 16_GrokBot対応_ミックスアップ識別_20261010.md
 numbering: '3桁固定ID。百の位＝部門、十の位＝まとまり、一の位＝社員。
 
@@ -120,6 +120,17 @@ agents:
     tool_fit: A
     tool_notes: 修繕要約。パートナー確認ついで
     schedule: パートナー確認
+  '116':
+    name: メール要対応係
+    path: 100_連絡・物件動向把握室/116_メール要対応係
+    status: 設計中
+    report: consult
+    trigger: 時間＋イベント＋人＋健全性
+    tool_assigned: jarvis
+    tool_fit: A+B
+    tool_notes: triage→#consult 返信／見送り／Todoist。VRは516。mute学習あり
+    schedule: 朝バンドル／昼12:30GHA／night後／手動
+    note: '設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md'
   '211':
     name: 返信案内下書き係
     path: 200_返信・案内文面制作室/211_返信案内下書き係
