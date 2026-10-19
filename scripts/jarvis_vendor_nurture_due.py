@@ -84,7 +84,7 @@ def render_template(
     short: bool = False,
 ) -> tuple[str, str]:
     """Return (subject, body)."""
-    subject = str(template.get("subject") or "物件情報のご案内有無について（定期確認）")
+    subject = str(template.get("subject") or "最近の物件情報について")
     key = "body_short" if short else "body"
     raw = str(template.get(key) or template.get("body") or "").rstrip() + "\n"
     body = raw.format(
