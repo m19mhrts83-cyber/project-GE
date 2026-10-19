@@ -387,18 +387,16 @@ def reminder_blocks(
 
 
 def prefer_url_buttons() -> bool:
-    """Bot / Signing が無いときは URL ボタンに落とす。"""
-    if (os.environ.get("JARVIS_PROPERTY_GATE_URL_BUTTONS") or "").strip() in (
+    """本線は action_id。URL は JARVIS_PROPERTY_GATE_URL_BUTTONS=1 のときだけ。
+
+    Incoming Webhook でも interactive ボタンは Interactivity URL に届く。
+    Bot 投稿は post_slack 側で優先（無ければ Webhook）。
+    """
+    return (os.environ.get("JARVIS_PROPERTY_GATE_URL_BUTTONS") or "").strip() in (
         "1",
         "true",
         "yes",
-    ):
-        return True
-    if _bot_token():
-        return False
-    if (os.environ.get("SLACK_SIGNING_SECRET") or "").strip():
-        return False
-    return True
+    )
 
 
 def _post_slack_bot(
