@@ -8,6 +8,7 @@
     - バッチ1回あたりスコア上位 N 件（既定5）
     - ダイジェスト1本（要旨一覧）＋ コンパクトカード（要旨＋ボタン、本文全文なし）
     - 要約は抽出（Plan A・LLMなし）。品質不足なら後続で Plan B（トップNのみLLM）
+    - Slack に出した件は Gmail 既読（物件取込と同型。失敗時は morning catchup）
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_slack_post.py --from-triage --dry-run
@@ -34,10 +35,21 @@ from zoneinfo import ZoneInfo
 
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
+MANUAL_DIR = REPO / "215_kamiooya" / "C1_cursor" / "1b_Cursorマニュアル"
 MUTE_META_KEY = "mail_action_skip_mute"
 DEFAULT_CONSULT_CHANNEL = "C0C7R0UF3MM"
 DEFAULT_MUTE_THRESHOLD = 2
 DEFAULT_LIMIT = 5
+
+# アカウント → Gmail token（物件取込・triage catchup と同系）
+TOKEN_BY_ACCOUNT = {
+    "admin": "token_livingsupport.json",
+    "mail_admin": "token_livingsupport.json",
+    "estate": "token_estate.json",
+    "mail_estate": "token_estate.json",
+    "m19m": "token_m19m.json",
+    "mail_m19m": "token_m19m.json",
+}
 
 # Slack 再掲前の軽いノイズ除外（見送り学習の前段・GenMail/night_triage と同趣旨）
 NOISE_SUBJECT_RE = re.compile(
@@ -663,7 +675,8 @@ def fetch_one(tid: str) -> dict[str, Any] | None:
         sb.table("triage_items")
         .select(
             "id,status,subject,draft_text,original_body,from_email,partner,"
-            "account,lane,kind,summary,payload,received_at,priority"
+            "account,lane,kind,summary,payload,received_at,priority,"
+            "gmail_message_id"
         )
         .eq("id", tid)
         .limit(1)
@@ -671,6 +684,127 @@ def fetch_one(tid: str) -> dict[str, Any] | None:
     )
     rows = r.data or []
     return rows[0] if rows else None
+
+
+def _gmail_service(token_name: str) -> Any:
+    """Mac / GHA（token 展開後）で Gmail modify 用 service を返す。"""
+    sys.path.insert(0, str(MANUAL_DIR))
+    from gmail_api_scopes import GMAIL_SCOPES_READ_MODIFY  # type: ignore
+    from gmail_to_yoritoori import build_service_for_token  # type: ignore
+
+    token_env = (os.environ.get("GMAIL_ADMIN_TOKEN_PATH") or "").strip()
+    if token_env and token_name in (
+        "token_livingsupport.json",
+        "token_admin.json",
+    ):
+        token = Path(token_env)
+    else:
+        token = MANUAL_DIR / token_name
+    if not token.is_file():
+        raise FileNotFoundError(f"token missing: {token}")
+    service, _ = build_service_for_token(
+        token, scopes=list(GMAIL_SCOPES_READ_MODIFY), open_browser=False
+    )
+    if not service:
+        raise RuntimeError(f"failed gmail service for {token_name}")
+    return service
+
+
+def mark_gmail_read_after_slack(
+    sb: Any,
+    rows: list[dict[str, Any]],
+    *,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """Slack ダイジェスト／カードに出した件を Gmail 既読（物件取込と同型）。
+
+    gmail_message_id がある行だけ。失敗しても Slack 投稿は成功のまま（soft-fail）。
+    取りこぼしは morning の triage_gmail_read_catchup が埋める。
+    """
+    if os.environ.get("JARVIS_MAIL_ACTION_GMAIL_READ_DISABLE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        print("# gmail_read: disabled via JARVIS_MAIL_ACTION_GMAIL_READ_DISABLE")
+        return {"ok": 0, "fail": 0, "skip": len(rows), "disabled": 1}
+
+    ok = 0
+    fail = 0
+    skip = 0
+    services: dict[str, Any] = {}
+
+    for row in rows:
+        tid = str(row.get("id") or "")
+        gid = str(row.get("gmail_message_id") or "").strip()
+        pl0 = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+        if pl0.get("gmail_read_at"):
+            skip += 1
+            continue
+        if not gid:
+            skip += 1
+            continue
+        account = (str(row.get("account") or "admin").strip().lower() or "admin")
+        token_name = TOKEN_BY_ACCOUNT.get(account, "token_livingsupport.json")
+        if dry_run:
+            print(
+                f"# dry-run gmail_read id={tid} gmail={gid} account={account}"
+            )
+            ok += 1
+            continue
+        try:
+            if token_name not in services:
+                services[token_name] = _gmail_service(token_name)
+            services[token_name].users().messages().modify(
+                userId="me",
+                id=gid,
+                body={"removeLabelIds": ["UNREAD"]},
+            ).execute()
+            # payload を再読して slack_ma_* を潰さない
+            r = (
+                sb.table("triage_items")
+                .select("payload")
+                .eq("id", tid)
+                .limit(1)
+                .execute()
+            )
+            raw = (r.data or [{}])[0].get("payload")
+            pl = dict(raw) if isinstance(raw, dict) else {}
+            pl["gmail_read_at"] = datetime.now(timezone.utc).isoformat()
+            pl["gmail_read_on"] = "slack_ma_digest"
+            pl.pop("gmail_read_pending", None)
+            pl.pop("gmail_read_error", None)
+            sb.table("triage_items").update(
+                {"payload": pl, "updated_at": now_iso()}
+            ).eq("id", tid).execute()
+            ok += 1
+            print(f"📎 gmail_read: id={tid} gmail={gid} account={account}")
+        except Exception as e:
+            fail += 1
+            print(
+                f"# gmail_read soft-fail id={tid} gid={gid[:16]}: {e}",
+                file=sys.stderr,
+            )
+            try:
+                r = (
+                    sb.table("triage_items")
+                    .select("payload")
+                    .eq("id", tid)
+                    .limit(1)
+                    .execute()
+                )
+                raw = (r.data or [{}])[0].get("payload")
+                pl = dict(raw) if isinstance(raw, dict) else {}
+                pl["gmail_read_pending"] = True
+                pl["gmail_read_error"] = str(e)[:200]
+                pl["gmail_read_on"] = "slack_ma_digest"
+                sb.table("triage_items").update({"payload": pl}).eq(
+                    "id", tid
+                ).execute()
+            except Exception:
+                pass
+
+    return {"ok": ok, "fail": fail, "skip": skip, "dry_run": int(dry_run)}
 
 
 def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -681,7 +815,8 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         sb.table("triage_items")
         .select(
             "id,status,subject,draft_text,original_body,from_email,partner,"
-            "account,lane,kind,summary,payload,received_at,priority"
+            "account,lane,kind,summary,payload,received_at,priority,"
+            "gmail_message_id"
         )
         .eq("status", "pending")
         .order("received_at", desc=True)
@@ -874,7 +1009,18 @@ def main() -> int:
                 score=int(row.get("_score") or 0),
                 summary=str(row.get("_extract_summary") or ""),
             )
-    print(f"# posted_cards={posted} digest={'no' if args.no_digest else 'yes'}")
+
+    # Slack に出した＝目を通す動線に載せたので Gmail 既読（物件取込と同型）
+    if args.dry_run:
+        read_stats = mark_gmail_read_after_slack(None, rows, dry_run=True)
+    elif sb is not None:
+        read_stats = mark_gmail_read_after_slack(sb, rows, dry_run=False)
+    else:
+        read_stats = {"ok": 0, "fail": 0, "skip": 0}
+    print(
+        f"# posted_cards={posted} digest={'no' if args.no_digest else 'yes'} "
+        f"gmail_read={json.dumps(read_stats, ensure_ascii=False)}"
+    )
     return 0
 
 

@@ -39,10 +39,11 @@ flowchart TD
 | 2 | ノイズ／mute／VR 除外 | フィルタ | AI | sync_meta `mail_action_skip_mute` |
 | 3 | スコア順・上位N選抜＋抽出要旨 | ルール | AI | Plan A（LLMなし） |
 | 4 | ダイジェスト＋コンパクトカード | Bot／Webhook | AI | Block Kit |
-| 5 | 返信／見送り／Todoist | ボタン | **人** | consult-action / `/api/g/ma` |
-| 6 | 健全性（T5） | health | AI | `jarvis_mail_action_mute.py --health` |
+| 5 | Gmail 既読 | API modify | AI | 物件取込と同型（soft-fail→morning catchup） |
+| 6 | 返信／見送り／Todoist | ボタン | **人** | consult-action / `/api/g/ma` |
+| 7 | 健全性（T5） | health | AI | `jarvis_mail_action_mute.py --health` |
 
-**人が確かめる印**: ステップ5（ボタン＝対外了承／見送り／手配タスク）。  
+**人が確かめる印**: ステップ6（ボタン＝対外了承／見送り／手配タスク）。  
 **やらない**: 了承なし送信・VR混在・ドメイン一括ミュート・無言 Todoist・本文全文のSlack貼付（詳細は Dashboard）。
 
 ## FlowForge 作り込みメモ（別チャットへ渡す用）

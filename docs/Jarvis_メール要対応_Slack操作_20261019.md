@@ -20,6 +20,7 @@
 | **Slack形** | **ダイジェスト1本**（要旨一覧）＋ **コンパクトカード**（要旨＋ボタン。本文全文は貼らない） |
 | **詳細** | Dashboard `/mail/{id}`（「詳細を見る」） |
 | **要約** | **Plan A（抽出・LLMなし）**。負荷／品質が足りなければ Plan B（トップNのみ Flash Lite）→ それでも多いなら件数3へ |
+| **Gmail既読** | Slack ダイジェスト／カードに出した件は **Gmail 既読**（物件メール取込と同型）。`gmail_message_id` がある行のみ。`payload.gmail_read_on=slack_ma_digest`。失敗時は morning `jarvis_triage_gmail_read_catchup` が取りこぼしを埋める |
 
 スコアの上げ下げ（抜粋）: `priority=high`・`kind=mail`・partner・「ご確認／お願い／期限」等・下書きありを加点。物件紹介定例・skim・ノイズ件名を減点。  
 投稿前除外（下書きが無いとき）: OTP／請求通知／申込完了／Apple Pay完了／販促・メルマガ件名など（運用で徐々に追加）。
@@ -81,6 +82,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | `JARVIS_MAIL_ACTION_MUTE_THRESHOLD` | 見送り→ミュート閾値（既定 2） |
 | `JARVIS_MAIL_ACTION_LIMIT` | バッチ最大件数（既定 5） |
 | `JARVIS_MAIL_ACTION_SLACK_DISABLE` | 投稿停止 |
+| `JARVIS_MAIL_ACTION_GMAIL_READ_DISABLE` | Slack 投稿後の Gmail 既読をオフ |
 | `JARVIS_MAIL_ACTION_REPOST` | 既投稿でも再掲（任意） |
 
 ## 関連

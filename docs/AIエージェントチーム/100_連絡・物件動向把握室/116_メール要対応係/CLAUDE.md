@@ -80,5 +80,5 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 | 日付 | 変更 |
 |---|---|
-| 2026-10-20 | スコア上位5・ダイジェスト＋抽出要約（Plan A）。本文全文は Dashboard |
+| 2026-10-20 | スコア上位5・ダイジェスト＋抽出要約（Plan A）。本文全文は Dashboard。Slack出した件はGmail既読 |
 | 2026-10-19 | 新設（設計中）。T1〜T5 確定。硬化（連続見送り・unmute CLI・Todoist GenMail型） |
