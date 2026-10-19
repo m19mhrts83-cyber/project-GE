@@ -69,11 +69,11 @@ export async function GET(
       : action === "todoist"
         ? "Todoist"
         : "完了";
-  return htmlPage(
-    result.ok ? title : "失敗",
-    result.message,
-    result.ok,
-  );
+  const msg =
+    action === "skip" && result.ok
+      ? `${result.message}\n\nSlack 上のカードは削除しました（または削除済み）。`
+      : result.message;
+  return htmlPage(result.ok ? title : "失敗", msg, result.ok);
 }
 
 export async function POST(

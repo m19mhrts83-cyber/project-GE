@@ -306,7 +306,237 @@ export type MaApplyResult = {
   status?: string;
   todoist_url?: string;
   muted?: boolean;
+  slack_deleted?: boolean;
+  digest_deleted?: boolean;
+  digest_updated?: boolean;
+  digest_remaining?: number;
 };
+
+/** 見送り後に Slack カードを消す（Bot が投稿したメッセージのみ） */
+export async function deleteSlackMaMessage(opts: {
+  channel?: string | null;
+  ts?: string | null;
+}): Promise<boolean> {
+  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
+  const channel = String(opts.channel || "").trim();
+  const ts = String(opts.ts || "").trim();
+  if (!bot || !channel || !ts) return false;
+  try {
+    const res = await fetch("https://slack.com/api/chat.delete", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${bot}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({ channel, ts }),
+    });
+    const j = (await res.json()) as { ok?: boolean; error?: string };
+    return Boolean(j.ok);
+  } catch {
+    return false;
+  }
+}
+
+async function updateSlackMaMessage(opts: {
+  channel: string;
+  ts: string;
+  text: string;
+  blocks: unknown[];
+}): Promise<boolean> {
+  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
+  if (!bot) return false;
+  try {
+    const res = await fetch("https://slack.com/api/chat.update", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${bot}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        channel: opts.channel,
+        ts: opts.ts,
+        text: opts.text,
+        blocks: opts.blocks,
+      }),
+    });
+    const j = (await res.json()) as { ok?: boolean; error?: string };
+    return Boolean(j.ok);
+  } catch {
+    return false;
+  }
+}
+
+type DigestSibling = {
+  id: string;
+  subject: string | null;
+  partner: string | null;
+  summary: string | null;
+  payload: Record<string, unknown>;
+};
+
+function digestScoreOf(pl: Record<string, unknown>): number {
+  const d = pl.slack_ma_digest;
+  if (d && typeof d === "object" && !Array.isArray(d)) {
+    const s = (d as Record<string, unknown>).score;
+    if (typeof s === "number") return s;
+    if (typeof s === "string" && s.trim()) return Number(s) || 0;
+  }
+  return 0;
+}
+
+function digestSummaryOf(
+  row: DigestSibling,
+  pl: Record<string, unknown>,
+): string {
+  const d = pl.slack_ma_digest;
+  if (d && typeof d === "object" && !Array.isArray(d)) {
+    const s = String((d as Record<string, unknown>).summary || "").trim();
+    if (s) return s.slice(0, 200);
+  }
+  return String(row.summary || "").trim().slice(0, 200) || "（要旨なし）";
+}
+
+function buildDigestUpdatePayload(rows: DigestSibling[]): {
+  text: string;
+  blocks: unknown[];
+} {
+  const n = rows.length;
+  const when = new Date().toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const base = dashboardBase();
+  const lines = rows.map((row, i) => {
+    const pl = row.payload;
+    const partner = String(row.partner || "").trim() || "—";
+    const subject = String(row.subject || "(件名なし)").trim();
+    const summary = digestSummaryOf(row, pl);
+    const score = digestScoreOf(pl);
+    const detail = `${base}/mail/${encodeURIComponent(row.id)}`;
+    return (
+      `*${i + 1}. [${partner}]* score=${score}\n` +
+      `件名: ${subject.slice(0, 100)}\n` +
+      `要旨: ${summary}\n` +
+      `<${detail}|詳細を見る>`
+    );
+  });
+  const body = lines.join("\n\n").slice(0, 2900) || "(対象なし)";
+  return {
+    text: `【メール要対応ダイジェスト】残${n}件（${when}）`,
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: `メール要対応ダイジェスト — 残${n}件`,
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text:
+            `*${when}* · 対応後に更新 · 要旨（抽出・AIなし）\n` +
+            "気になったら下のカードで返信／見送り／Todoist、" +
+            "または「詳細を見る」で本文確認。",
+        },
+      },
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: body },
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: "見送り／返信／Todoist のあと自動更新。残0でダイジェスト削除",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * 同一バッチのダイジェストを同期する。
+ * - 残 pending あり → chat.update（一覧を残件だけに）
+ * - 残 0 → chat.delete（ダイジェストごと消す）
+ */
+export async function syncMailActionDigest(opts: {
+  digestChannel?: string | null;
+  digestTs?: string | null;
+}): Promise<{
+  deleted?: boolean;
+  updated?: boolean;
+  remaining?: number;
+}> {
+  const channel = String(opts.digestChannel || "").trim();
+  const ts = String(opts.digestTs || "").trim();
+  if (!channel || !ts) return {};
+
+  const sb = createServiceClient();
+  if (!sb) return {};
+
+  const { data, error } = await sb
+    .from("triage_items")
+    .select("id,status,subject,partner,summary,payload")
+    .eq("status", "pending")
+    .filter("payload->>slack_ma_digest_ts", "eq", ts)
+    .limit(20);
+
+  if (error) {
+    return {};
+  }
+
+  const remaining: DigestSibling[] = (data || [])
+    .map((r) => ({
+      id: String(r.id),
+      subject: r.subject as string | null,
+      partner: r.partner as string | null,
+      summary: r.summary as string | null,
+      payload: asPayload(r.payload),
+    }))
+    .filter((r) => String(r.payload.slack_ma_digest_ts || "") === ts)
+    .sort((a, b) => digestScoreOf(b.payload) - digestScoreOf(a.payload));
+
+  if (remaining.length === 0) {
+    const deleted = await deleteSlackMaMessage({ channel, ts });
+    return { deleted, remaining: 0 };
+  }
+
+  const payload = buildDigestUpdatePayload(remaining);
+  const updated = await updateSlackMaMessage({
+    channel,
+    ts,
+    text: payload.text,
+    blocks: payload.blocks,
+  });
+  return { updated, remaining: remaining.length };
+}
+
+async function syncDigestFromPayload(
+  payload: Record<string, unknown>,
+): Promise<{
+  digest_deleted?: boolean;
+  digest_updated?: boolean;
+  digest_remaining?: number;
+}> {
+  const sync = await syncMailActionDigest({
+    digestChannel: String(payload.slack_ma_digest_channel || ""),
+    digestTs: String(payload.slack_ma_digest_ts || ""),
+  });
+  if (sync.remaining === undefined) return {};
+  return {
+    digest_deleted: sync.deleted,
+    digest_updated: sync.updated,
+    digest_remaining: sync.remaining,
+  };
+}
 
 export async function applyMailActionSlack(
   id: string,
@@ -322,7 +552,19 @@ export async function applyMailActionSlack(
     return { ok: false, message: "すでに送信済みです" };
   }
   if (action === "skip" && (st === "skipped" || st === "done")) {
-    return { ok: true, message: "すでに見送り済みです", status: st };
+    const pl = asPayload(row.payload);
+    const slackDeleted = await deleteSlackMaMessage({
+      channel: String(pl.slack_ma_channel || ""),
+      ts: String(pl.slack_ma_ts || ""),
+    });
+    const digestSync = await syncDigestFromPayload(pl);
+    return {
+      ok: true,
+      message: "すでに見送り済みです",
+      status: st,
+      slack_deleted: slackDeleted,
+      ...digestSync,
+    };
   }
   if (action === "todoist" && st === "todoist") {
     const url = String(asPayload(row.payload).todoist_url || "");
@@ -363,11 +605,20 @@ export async function applyMailActionSlack(
       : learn.key
         ? ` · 見送りカウント ${learn.skips}`
         : "";
+    // チャット上からカードを消す（振り返り不要）
+    const slackDeleted = await deleteSlackMaMessage({
+      channel: String(payload.slack_ma_channel || ""),
+      ts: String(payload.slack_ma_ts || ""),
+    });
+    // 同一バッチのダイジェスト: 残 pending で更新／0件なら削除
+    const digestSync = await syncDigestFromPayload(payload);
     return {
       ok: true,
       message: `見送りにしました（${row.partner || row.from_email || id}）${muteNote}`,
       status: "skipped",
       muted: learn.muted,
+      slack_deleted: slackDeleted,
+      ...digestSync,
     };
   }
 
@@ -422,11 +673,13 @@ export async function applyMailActionSlack(
       })
       .eq("id", id);
     if (error) return { ok: false, message: error.message };
+    const digestSync = await syncDigestFromPayload(payload);
     return {
       ok: true,
       message: `Todoist に登録しました [${lane}]: ${created.url}`,
       status: "todoist",
       todoist_url: created.url,
+      ...digestSync,
     };
   }
 
@@ -470,10 +723,12 @@ export async function applyMailActionSlack(
       .eq("id", id);
     if (error) return { ok: false, message: error.message };
     await resetMailSkipStreak(to);
+    const digestSync = await syncDigestFromPayload(payload);
     return {
       ok: true,
       message: `送信しました → ${to}（${row.partner || id}）`,
       status: "sent",
+      ...digestSync,
     };
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);

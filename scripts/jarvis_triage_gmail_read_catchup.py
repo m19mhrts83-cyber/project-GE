@@ -74,18 +74,13 @@ def mark_one(svc: Any, message_id: str) -> None:
     ).execute()
 
 
-def catchup_closed(*, dry_run: bool = False, limit: int = 80) -> dict[str, Any]:
-    sb = sb_client()
-    resp = (
-        sb.table("triage_items")
-        .select("id,status,gmail_message_id,account,payload,updated_at")
-        .in_("status", ["skipped", "sent", "done"])
-        .not_.is_("gmail_message_id", "null")
-        .order("updated_at", desc=True)
-        .limit(limit)
-        .execute()
-    )
-    rows = resp.data or []
+def _mark_rows(
+    sb: Any,
+    rows: list[dict[str, Any]],
+    *,
+    dry_run: bool,
+    label: str,
+) -> dict[str, Any]:
     ok = 0
     skip = 0
     fail = 0
@@ -103,7 +98,10 @@ def catchup_closed(*, dry_run: bool = False, limit: int = 80) -> dict[str, Any]:
         account = (row.get("account") or "admin").strip().lower() or "admin"
         token_name = TOKEN_BY_ACCOUNT.get(account, "token_livingsupport.json")
         if dry_run:
-            print(f"# dry-run mark-read id={row.get('id')} gmail={gid} account={account}")
+            print(
+                f"# dry-run mark-read [{label}] id={row.get('id')} "
+                f"gmail={gid} account={account}"
+            )
             ok += 1
             continue
         try:
@@ -114,6 +112,8 @@ def catchup_closed(*, dry_run: bool = False, limit: int = 80) -> dict[str, Any]:
                 **payload,
                 "gmail_read_at": datetime.now(timezone.utc).isoformat(),
             }
+            if not payload.get("gmail_read_on"):
+                payload["gmail_read_on"] = label
             payload.pop("gmail_read_pending", None)
             payload.pop("gmail_read_error", None)
             sb.table("triage_items").update(
@@ -123,7 +123,10 @@ def catchup_closed(*, dry_run: bool = False, limit: int = 80) -> dict[str, Any]:
                 }
             ).eq("id", row["id"]).execute()
             ok += 1
-            print(f"📎 triage_gmail_read: id={row['id']} gmail={gid} account={account}")
+            print(
+                f"📎 triage_gmail_read [{label}]: id={row['id']} "
+                f"gmail={gid} account={account}"
+            )
         except Exception as e:
             fail += 1
             payload = {
@@ -140,6 +143,46 @@ def catchup_closed(*, dry_run: bool = False, limit: int = 80) -> dict[str, Any]:
             print(f"# fail id={row.get('id')}: {e}", file=sys.stderr)
 
     return {"ok": ok, "skipped_already": skip, "fail": fail, "dry_run": dry_run}
+
+
+def catchup_closed(*, dry_run: bool = False, limit: int = 80) -> dict[str, Any]:
+    """スキップ／送信済／対応済で未既読の取りこぼし。"""
+    sb = sb_client()
+    resp = (
+        sb.table("triage_items")
+        .select("id,status,gmail_message_id,account,payload,updated_at")
+        .in_("status", ["skipped", "sent", "done"])
+        .not_.is_("gmail_message_id", "null")
+        .order("updated_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return _mark_rows(sb, resp.data or [], dry_run=dry_run, label="catchup_closed")
+
+
+def catchup_slack_ma_digest(*, dry_run: bool = False, limit: int = 40) -> dict[str, Any]:
+    """Slack メール要対応に出したのに Gmail 未既読の取りこぼし（昼GHA等）。"""
+    sb = sb_client()
+    resp = (
+        sb.table("triage_items")
+        .select("id,status,gmail_message_id,account,payload,updated_at")
+        .eq("status", "pending")
+        .not_.is_("gmail_message_id", "null")
+        .order("updated_at", desc=True)
+        .limit(max(limit * 3, 60))
+        .execute()
+    )
+    rows: list[dict[str, Any]] = []
+    for row in resp.data or []:
+        pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+        if not pl.get("slack_ma_posted_at"):
+            continue
+        if pl.get("gmail_read_at") and not pl.get("gmail_read_pending"):
+            continue
+        rows.append(row)
+        if len(rows) >= limit:
+            break
+    return _mark_rows(sb, rows, dry_run=dry_run, label="slack_ma_digest")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -188,7 +231,15 @@ def main(argv: list[str] | None = None) -> int:
 
     out["catchup"] = catchup_closed(dry_run=args.dry_run, limit=args.limit)
     print("📎 triage_gmail_read_catchup:", json.dumps(out["catchup"], ensure_ascii=False))
-    return 0 if out["catchup"].get("fail", 0) == 0 else 1
+    out["slack_ma"] = catchup_slack_ma_digest(dry_run=args.dry_run, limit=min(40, args.limit))
+    print(
+        "📎 triage_gmail_read_slack_ma:",
+        json.dumps(out["slack_ma"], ensure_ascii=False),
+    )
+    fails = int(out["catchup"].get("fail", 0) or 0) + int(
+        out["slack_ma"].get("fail", 0) or 0
+    )
+    return 0 if fails == 0 else 1
 
 
 if __name__ == "__main__":
