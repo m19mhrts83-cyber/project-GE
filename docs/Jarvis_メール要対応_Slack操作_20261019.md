@@ -11,6 +11,19 @@
 | **履歴** | triage `status`（sent / skipped / todoist）＋ `payload.slack_ma_*`／見送り学習は `sync_meta.mail_action_skip_mute` |
 | **停止** | `JARVIS_MAIL_ACTION_SLACK_DISABLE=1`／投稿経路未設定 |
 
+## バッチ投稿（件数・要約・2026-10-20）
+
+| 項目 | 正 |
+|---|---|
+| **件数** | 1バッチあたり **スコア上位最大5件**（`--limit` / `JARVIS_MAIL_ACTION_LIMIT`）。残り pending は次バッチで再評価 |
+| **並び** | 新しい順ではなく **対応優先スコア**（priority / kind / lane / 依頼シグナル / 下書き有無 / 物件定例ペナルティ / 鮮度） |
+| **Slack形** | **ダイジェスト1本**（要旨一覧）＋ **コンパクトカード**（要旨＋ボタン。本文全文は貼らない） |
+| **詳細** | Dashboard `/mail/{id}`（「詳細を見る」） |
+| **要約** | **Plan A（抽出・LLMなし）**。負荷／品質が足りなければ Plan B（トップNのみ Flash Lite）→ それでも多いなら件数3へ |
+
+スコアの上げ下げ（抜粋）: `priority=high`・`kind=mail`・partner・「ご確認／お願い／期限」等・下書きありを加点。物件紹介定例・skim・ノイズ件名を減点。  
+投稿前除外（下書きが無いとき）: OTP／請求通知／申込完了／Apple Pay完了／販促・メルマガ件名など（運用で徐々に追加）。
+
 ## ボタン
 
 | 操作 | 意味 |
@@ -66,6 +79,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | `PROPERTY_GATE_ACTION_TOKEN` / `MAIL_ACTION_TOKEN` | 予備 URL 署名 |
 | `TODOIST_API_TOKEN` | Dashboard からの Todoist 起票（Vercel） |
 | `JARVIS_MAIL_ACTION_MUTE_THRESHOLD` | 見送り→ミュート閾値（既定 2） |
+| `JARVIS_MAIL_ACTION_LIMIT` | バッチ最大件数（既定 5） |
 | `JARVIS_MAIL_ACTION_SLACK_DISABLE` | 投稿停止 |
 | `JARVIS_MAIL_ACTION_REPOST` | 既投稿でも再掲（任意） |
 

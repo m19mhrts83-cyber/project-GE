@@ -7,11 +7,11 @@
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - 動きの例（型参考）: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_uGZ3apXgbHVdZJfnuqYA8_QZ
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH（**116 追加済・41体**）
-- 更新: 2026-10-19（初回叩き台・T1〜T5 確定・ATB反映）
+- 更新: 2026-10-20（スコア上位5・ダイジェスト＋抽出要約 Plan A）
 
 ## いまの結論（文字1行）
 
-pending triage → Slack `#consult`（返信／見送り／Todoist）→ 人がボタン了承。送信了承なし・VR混在なし。
+pending triage → **スコア上位5**をダイジェスト＋コンパクトカードで `#consult` → 人がボタン了承。送信了承なし・VR混在なし。
 
 ## 合流の考え方
 
@@ -37,12 +37,13 @@ flowchart TD
 |---|---|---|---|---|
 | 1 | 合図（T1〜T4） | 朝／GHA／night／手動 | AI | `jarvis_mail_action_slack_post.py` |
 | 2 | ノイズ／mute／VR 除外 | フィルタ | AI | sync_meta `mail_action_skip_mute` |
-| 3 | `#consult` カード投稿 | Bot／Webhook | AI | Block Kit |
-| 4 | 返信／見送り／Todoist | ボタン | **人** | consult-action / `/api/g/ma` |
-| 5 | 健全性（T5） | health | AI | `jarvis_mail_action_mute.py --health` |
+| 3 | スコア順・上位N選抜＋抽出要旨 | ルール | AI | Plan A（LLMなし） |
+| 4 | ダイジェスト＋コンパクトカード | Bot／Webhook | AI | Block Kit |
+| 5 | 返信／見送り／Todoist | ボタン | **人** | consult-action / `/api/g/ma` |
+| 6 | 健全性（T5） | health | AI | `jarvis_mail_action_mute.py --health` |
 
-**人が確かめる印**: ステップ4（ボタン＝対外了承／見送り／手配タスク）。  
-**やらない**: 了承なし送信・VR混在・ドメイン一括ミュート・無言 Todoist。
+**人が確かめる印**: ステップ5（ボタン＝対外了承／見送り／手配タスク）。  
+**やらない**: 了承なし送信・VR混在・ドメイン一括ミュート・無言 Todoist・本文全文のSlack貼付（詳細は Dashboard）。
 
 ## FlowForge 作り込みメモ（別チャットへ渡す用）
 
