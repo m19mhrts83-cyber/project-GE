@@ -1,6 +1,8 @@
 /**
  * Microsoft Graph（委任 refresh）で OneDrive ファイルを読む。
- * refresh が回転したら sync_meta に保存（次回以降の Vercel 用）。
+ *
+ * 耐久本線: env MS_GRAPH_REFRESH_TOKEN（Vercel / GHA Secrets）。
+ * sync_meta は JARVIS_MS_GRAPH_USE_SYNC_META=1 のときだけ（env 優先）。
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -22,6 +24,13 @@ function jarvisAdminOrNull(): SupabaseClient | null {
   });
 }
 
+function useSyncMeta(): boolean {
+  const v = (process.env.JARVIS_MS_GRAPH_USE_SYNC_META || "")
+    .trim()
+    .toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
 export function graphConfigured(): boolean {
   return Boolean(
     (process.env.MS_GRAPH_CLIENT_ID || "").trim() &&
@@ -35,6 +44,7 @@ export function partnerYoritooriRelPath(folder: string): string {
 }
 
 async function loadPersistedRefresh(): Promise<string> {
+  if (!useSyncMeta()) return "";
   const sb = jarvisAdminOrNull();
   if (!sb) return "";
   try {
@@ -51,6 +61,7 @@ async function loadPersistedRefresh(): Promise<string> {
 }
 
 async function persistRefresh(token: string): Promise<void> {
+  if (!useSyncMeta()) return;
   const sb = jarvisAdminOrNull();
   if (!sb || !token) return;
   try {
@@ -70,9 +81,10 @@ async function persistRefresh(token: string): Promise<void> {
 async function getAccessToken(): Promise<string> {
   const clientId = (process.env.MS_GRAPH_CLIENT_ID || "").trim();
   const authority = (process.env.MS_GRAPH_AUTHORITY || "consumers").trim();
-  let refresh =
-    (await loadPersistedRefresh()) ||
-    (process.env.MS_GRAPH_REFRESH_TOKEN || "").trim();
+  const envRefresh = (process.env.MS_GRAPH_REFRESH_TOKEN || "").trim();
+  const persisted = await loadPersistedRefresh();
+  // env 本線。opt-in sync_meta はフォールバックのみ
+  let refresh = envRefresh || persisted;
   if (!clientId || !refresh) {
     throw new Error("MS_GRAPH_CLIENT_ID / MS_GRAPH_REFRESH_TOKEN 未設定");
   }

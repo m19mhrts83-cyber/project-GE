@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Jarvis: 回転した MS_GRAPH_REFRESH_TOKEN を .env.jarvis_private へ反映し、
-既定で sync_meta（耐久本線）へ。任意で GHA Secrets へ。
+Jarvis: 回転した MS_GRAPH_REFRESH_TOKEN を .env.jarvis_private へ反映。
+任意で GHA Secrets／（opt-in）sync_meta へ。
+
+既定の耐久本線は private ＋ Secrets。sync_meta は --supabase または
+JARVIS_MS_GRAPH_USE_SYNC_META=1 のときだけ。
 
 入力:
   ~/.jarvis_state/ms_graph_new_refresh.env
@@ -11,6 +14,7 @@ Jarvis: 回転した MS_GRAPH_REFRESH_TOKEN を .env.jarvis_private へ反映し
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_ms_graph_sync_refresh.py
   python scripts/jarvis_ms_graph_sync_refresh.py --push-gha
+  python scripts/jarvis_ms_graph_sync_refresh.py --delete-sync-meta
 """
 from __future__ import annotations
 
@@ -42,7 +46,7 @@ def apply_rotated_refresh(
     *,
     push_gha: bool = False,
     from_env: bool = False,
-    no_supabase: bool = False,
+    supabase: bool = False,
 ) -> dict[str, str]:
     token = (
         (os.environ.get("MS_GRAPH_REFRESH_TOKEN") or "").strip()
@@ -73,14 +77,22 @@ def apply_rotated_refresh(
     os.environ["MS_GRAPH_REFRESH_TOKEN"] = token
     if NEW_REFRESH.is_file():
         NEW_REFRESH.unlink()
-    out: dict[str, str] = {"private": "updated", "refresh_len": str(len(token))}
 
-    if not no_supabase:
-        from jarvis_ms_graph_refresh_store import fingerprint, persist_refresh
+    from jarvis_ms_graph_refresh_store import fingerprint, persist_refresh, use_sync_meta
 
+    out: dict[str, str] = {
+        "private": "updated",
+        "refresh_len": str(len(token)),
+        "fp": fingerprint(token),
+    }
+
+    if supabase or use_sync_meta():
+        if supabase and not use_sync_meta():
+            os.environ["JARVIS_MS_GRAPH_USE_SYNC_META"] = "1"
         sb_ok = persist_refresh(token)
         out["supabase"] = "ok" if sb_ok else "fail"
-        out["fp"] = fingerprint(token)
+    else:
+        out["supabase"] = "skipped"
 
     if push_gha:
         r = subprocess.run(
@@ -102,19 +114,32 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--push-gha",
         action="store_true",
-        help="GitHub Secrets へも反映（任意。耐久本線は sync_meta）",
+        help="GitHub Secrets へも反映（推奨・耐久本線の一部）",
     )
     ap.add_argument(
-        "--no-supabase",
+        "--supabase",
         action="store_true",
-        help="sync_meta へ書かない（非推奨）",
+        help="sync_meta へも書く（非推奨・opt-in。JARVIS_MS_GRAPH_USE_SYNC_META=1 相当）",
+    )
+    ap.add_argument(
+        "--delete-sync-meta",
+        action="store_true",
+        help="sync_meta.ms_graph_refresh_token を削除して終了",
     )
     ap.add_argument("--from-env", action="store_true", help="state ファイルではなく現在の env")
     args = ap.parse_args(argv)
+
+    if args.delete_sync_meta:
+        from jarvis_ms_graph_refresh_store import delete_persisted_refresh
+
+        ok = delete_persisted_refresh()
+        print({"delete_sync_meta": "ok" if ok else "fail"})
+        return 0 if ok else 1
+
     result = apply_rotated_refresh(
         push_gha=args.push_gha,
         from_env=args.from_env,
-        no_supabase=args.no_supabase,
+        supabase=args.supabase,
     )
     print(result)
     return 0
