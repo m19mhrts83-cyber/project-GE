@@ -282,9 +282,9 @@ def assess_s2() -> dict[str, Any]:
 def assess_s9() -> dict[str, Any]:
     data = load_s9()
     settings = data.get("settings") or {}
-    daily = int(settings.get("daily_outreach_limit") or 2)
+    daily = int(settings.get("daily_outreach_limit") or 1)
     if daily < 1:
-        daily = 2
+        daily = 1
     items = s9_next_pending(limit=max(daily * 3, daily), balanced=True)
     summ = s9_summary()
     by = summ.get("by_status") or {}
