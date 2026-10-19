@@ -200,6 +200,7 @@ export async function createTodoistTask(
     title: string;
     summary?: string;
     due?: string | null;
+    labels?: string[];
   },
 ): Promise<{ ok: true; url: string; id: string } | { ok: false; error: string }> {
   const cfg = loadTodoistLaneConfig(lane);
@@ -210,11 +211,16 @@ export async function createTodoistTask(
   const sectionId = cfg.sectionIds[cfg.initialSection];
   if (!sectionId) return { ok: false, error: "初期セクション未設定" };
 
+  const extra = (input.labels || [])
+    .map((x) => String(x || "").trim())
+    .filter(Boolean);
+  const labels = Array.from(new Set([cfg.laneLabel, ...extra].filter(Boolean)));
+
   const body: Record<string, unknown> = {
     content: input.title.slice(0, 500),
     project_id: cfg.projectId,
     section_id: sectionId,
-    labels: [cfg.laneLabel],
+    labels,
   };
   if (input.summary?.trim()) {
     body.description = input.summary.trim().slice(0, 16000);

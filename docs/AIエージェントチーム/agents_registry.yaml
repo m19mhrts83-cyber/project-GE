@@ -17,8 +17,8 @@ builder_source:
   share_id: uksxiDIzE1AEckKH
   url: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
   previous_share_id: eHKHNixTpIF4G5WN
-updated: '2026-10-17'
-builder_sync_note: 2026-10-17 ビルダー38体に同期（615円動向報告係・714議事録整理係追加済。修繕見積比較・送金明細照合は削除済み）。表示名は3桁ID＋Grok記号。部長格の★は Grok 記号側（〔Grok:★S〕等。社員番号には付けない）。共有 uksxiDIzE1AEckKH。詳細 29_Grok記号割当_20261017.md。
+updated: '2026-10-19'
+builder_sync_note: 2026-10-19 JarvisがATB共有 uksxiDIzE1AEckKH に116メール要対応係を追加（41体・連絡室）。715／616同日反映済。
 mixup_doc: 16_GrokBot対応_ミックスアップ識別_20261010.md
 numbering: '3桁固定ID。百の位＝部門、十の位＝まとまり、一の位＝社員。
 
@@ -120,6 +120,17 @@ agents:
     tool_fit: A
     tool_notes: 修繕要約。パートナー確認ついで
     schedule: パートナー確認
+  '116':
+    name: メール要対応係
+    path: 100_連絡・物件動向把握室/116_メール要対応係
+    status: 設計中
+    report: consult
+    trigger: 時間＋イベント＋人＋健全性
+    tool_assigned: jarvis
+    tool_fit: A+B
+    tool_notes: triage→#consult 返信／見送り／Todoist。VRは516。mute学習あり
+    schedule: 朝バンドル／昼12:30GHA／night後／手動
+    note: '設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md'
   '211':
     name: 返信案内下書き係
     path: 200_返信・案内文面制作室/211_返信案内下書き係
@@ -443,6 +454,20 @@ agents:
     tool_notes: USD/JPY 推移グラフ＋短報。売買指図なし。正本 jarvis_yen_rate_watch.py
     schedule: GHA月木08:00
     note: 2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。
+  '616':
+    name: 寄せリマインド係
+    path: 600_リソース・家計室/616_寄せリマインド係
+    flowforge_id: ''
+    flowforge_url: ''
+    status: 設計中
+    report: consult
+    mixup_kind: none
+    trigger: 時間＋変化
+    tool_assigned: gencode
+    tool_fit: A+B
+    tool_notes: 検知・促しはルール＋CLAUDE.md（スキル不要・他ツール可）。送金だけ Jarvis＋人了承。銀行秘密なし
+    schedule: due7日以内／watch悪化／人依頼
+    note: 2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。
   '711':
     name: 家族Journal週次材料係
     path: 700_コーチング支援室/711_家族Journal週次材料係
@@ -502,6 +527,22 @@ agents:
     tool_notes: Genspark/JPR→Notion電話面談Inbox提案。了承後のみ作成。家族会議除外
     schedule: パートナー確認ついで／朝オープン／明示依頼
     note: 2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml
+  '715':
+    name: 家族会議週次係
+    path: 700_コーチング支援室/715_家族会議週次係
+    flowforge_id: ''
+    flowforge_url: ''
+    status: 運用確認
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: family
+    builder_tag: 〔Grok:F〕
+    trigger: 時間
+    tool_assigned: launchd
+    tool_fit: A
+    tool_notes: Genspark/Speakly議事録→NotebookLM1ノート→Studioインフォ→Notion当日ページ（インフォ→議事録）。ページ複製は人
+    schedule: 日曜21:30／月曜07:00リトライ
+    note: 2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation
   '811':
     name: ダッシュボード受け入れ係
     path: 800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係

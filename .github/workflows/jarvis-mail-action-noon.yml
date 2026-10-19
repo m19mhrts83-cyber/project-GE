@@ -1,0 +1,55 @@
+name: Jarvis Mail Action Noon (116)
+
+# T2: 平日 12:30 JST — メール要対応を Slack #consult に再掲（朝取りこぼし・日中到着）
+# 社員: 116 メール要対応係
+
+on:
+  schedule:
+    - cron: "30 3 * * 1-5" # 12:30 JST weekdays
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "投稿せず候補だけ"
+        required: false
+        type: boolean
+        default: false
+      limit:
+        description: "最大件数"
+        required: false
+        default: "5"
+
+concurrency:
+  group: jarvis-mail-action-noon
+  cancel-in-progress: true
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Post mail-action cards
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_WEBHOOK_AI_TEAM_CONSULT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_CONSULT }}
+          PROPERTY_GATE_ACTION_TOKEN: ${{ secrets.PROPERTY_GATE_ACTION_TOKEN }}
+          MAIL_ACTION_TOKEN: ${{ secrets.MAIL_ACTION_TOKEN }}
+          JARVIS_DASHBOARD_URL: ${{ secrets.JARVIS_DASHBOARD_URL }}
+          JARVIS_MAIL_ACTION_SLACK_DISABLE: ${{ secrets.JARVIS_MAIL_ACTION_SLACK_DISABLE }}
+        run: |
+          set -euo pipefail
+          if [[ "${JARVIS_MAIL_ACTION_SLACK_DISABLE:-}" == "1" ]]; then
+            echo "disabled"
+            exit 0
+          fi
+          LIMIT="${{ github.event.inputs.limit || '5' }}"
+          ARGS=(scripts/jarvis_mail_action_slack_post.py --from-triage --limit "$LIMIT")
+          if [[ "${{ github.event.inputs.dry_run || 'false' }}" == "true" ]]; then
+            ARGS+=(--dry-run)
+          fi
+          python3 "${ARGS[@]}"

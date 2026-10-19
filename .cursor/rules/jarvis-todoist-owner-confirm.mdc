@@ -10,6 +10,21 @@ alwaysApply: true
 **レーン未指定の起票**は共有『受信箱』（`config/todoist_projects.yaml` の `inbox.project_id`）。Jarvis 分身のシステム Inbox は松野 UI に見えないので使わない。  
 Notion タスク看板は戻し用。purchase_pre 等は従来どおり Notion。
 
+## 書き込み識別（【Jarvis】必須・2026-10-19）
+
+Jarvis／ホーク／FRIDAY は共通の Jarvis 分身トークンで書くため、**どのツールが編集したか判別できるよう、Todoist コメントの1行目先頭に話者名を付ける**。
+
+| 書き手 | 接頭辞 |
+|---|---|
+| Jarvis（Cursor） | **`【Jarvis】`** |
+| FRIDAY（GenCode） | **`【FRIDAY】`** |
+| ホーク（Grok） | **`【ホーク】`** |
+
+- 対象: 起票・列移動・完了・処置のすべてのコメント（`comment` / `create-task --comment` / `complete-task --comment`）
+- 完了定型: `【Jarvis】タスク完了したよ`／`【Jarvis】タスク完了したよ（確認のみクローズ）`
+- タスク本文・タイトルへの接頭辞は付けない（コメントで識別）
+- 秘密・トークンは従来どおり禁止
+
 ## 完了フロー（確定・最初は二段）
 
 会話や実装結果から「終わった」と判断できても、**いきなり完了／close しない**。
@@ -88,12 +103,12 @@ gh workflow run todoist-hold-stamp.yml
 | launchd resume 等、結果が観測できる復旧 | 対外送信・振込・解約・課金 |
 | 正本で既完了と分かるフォローのクローズ | 自信がない・クリティカル・曖昧 |
 
-手順: 必ず一度 **オーナー確認**へ移す → コメント（先頭 **`タスク完了したよ（Jarvis・確認のみクローズ）`**）→ すぐ `complete-task`。チャットではバッチ末尾に「Jarvis完了」一覧を出す（都度了承待ちしない）。
+手順: 必ず一度 **オーナー確認**へ移す → コメント（先頭 **`【Jarvis】タスク完了したよ（確認のみクローズ）`**）→ すぐ `complete-task`。チャットではバッチ末尾に「Jarvis完了」一覧を出す（都度了承待ちしない）。
 
 ### 禁止
 
 - 「実装した／動いた」だけで close（確認のみ例外以外）
-- コメント無しの完了（定型先頭 **`タスク完了したよ`** 必須）
+- コメント無しの完了（定型先頭 **`【Jarvis】タスク完了したよ`** 必須）
 - オーナー確認を飛ばして完了（「即完了で」明示、または **確認のみクローズ例外**以外）
 - 要判断・対外・金を確認のみとして close
 
@@ -107,7 +122,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 # 了承後
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py complete-task \
   --lane ai_raimo --task-id … \
-  --comment 'タスク完了したよ（Jarvis・松野確認OK）'
+  --comment '【Jarvis】タスク完了したよ（松野確認OK）'
 ```
 
 ## Jarvis（会話中）
@@ -128,9 +143,10 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ### サマリ・アウトプットリンク（必須 2026-09-21・クリック可）
 
-Jarvis／ホーク／FRIDAY がタスクを **起票・オーナー確認へ移動・完了・処置報告**するとき、Todoist **コメント**に次を残す:
+Jarvis／ホーク／FRIDAY、および AIエージェントチーム **312 起票整理係／313 完了候補確認係** がタスクを **起票・オーナー確認へ移動・完了・処置報告**するとき、Todoist **コメント**に次を残す（チャット／Slack だけでは不足）:
 
 ```
+【Jarvis】
 サマリ: （1〜3行）
 アウトプット:
 - [表示名](https://…)
