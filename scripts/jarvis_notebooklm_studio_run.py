@@ -234,7 +234,7 @@ def _watch_new_download(watch_dirs: list[Path], before: set[str], timeout_sec: i
             for p in d.iterdir():
                 if not p.is_file():
                     continue
-                if p.suffix.lower() not in {".pdf", ".pptx"}:
+                if p.suffix.lower() not in {".pdf", ".pptx", ".png", ".jpg", ".jpeg", ".webp"}:
                     continue
                 if str(p) in before:
                     continue
