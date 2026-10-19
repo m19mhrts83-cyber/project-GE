@@ -41,6 +41,7 @@ automation:
   drive_folder: "13_家族会議_週次"
   prompt_file: "docs/N1_NotebookLM/13_家族会議_週次/Studioプロンプト_家族会議_週次インフォ.md"
   page_duplicate: human
+  cleanup_old_sections: true   # 複製で残った旧週のインフォ/議事録を削除してから挿入
   insert_order: [infographic, minutes]
   speaker_aliases:
     さあちゃん: さわ
