@@ -6,16 +6,26 @@ import {
   parseAction,
   tokenOk,
 } from "@/lib/propertyGateAction";
+import {
+  extractVrModalBody,
+  handleVrBlockAction,
+  handleVrModalSubmit,
+  parseVrButtonValue,
+  parseVrModalMeta,
+  postResponseUrl,
+  VR_MODAL_CALLBACK,
+} from "@/lib/vendorReplySlackInteract";
 
 export const runtime = "nodejs";
 
 /**
- * Slack 物件進行ゲート Yes/No（互換・フル token）
+ * Slack 物件進行ゲート Yes/No ＋ 業者返信ボタン（block_actions / view_submission）
  *
  * GET  ?deal_id=&action=yes|no&token=PROPERTY_GATE_ACTION_TOKEN
  * POST Slack Interactivity（Signing Secret）または JSON {deal_id,action,token}
  *
  * 短縮 URL 本線: /api/g/y|n/{deal_id}?s=…
+ * 業者返信 URL 予備: /api/g/vr/{action}/{id}?s=…
  */
 
 function verifySlackSignature(
@@ -140,9 +150,88 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ ok: false, error: "bad payload" }, { status: 400 });
     }
+
+    const payloadType = String(payload.type || "");
+
+    // --- 業者返信: 編集モーダル送信 ---
+    if (payloadType === "view_submission") {
+      const view = (payload.view || {}) as Record<string, unknown>;
+      const callbackId = String(view.callback_id || "");
+      if (callbackId !== VR_MODAL_CALLBACK) {
+        return NextResponse.json({ ok: false, error: "unknown modal" }, { status: 400 });
+      }
+      const meta = parseVrModalMeta(String(view.private_metadata || ""));
+      if (!meta) {
+        return NextResponse.json({
+          response_action: "errors",
+          errors: { vendor_reply_body: "対象 ID が不正です" },
+        });
+      }
+      const body = extractVrModalBody(view);
+      const result = await handleVrModalSubmit({
+        triageId: meta.id,
+        body,
+        channelId: meta.channel,
+        messageTs: meta.message_ts,
+      });
+      if (!result.ok && result.response_action === "errors") {
+        return NextResponse.json({
+          response_action: "errors",
+          errors: result.errors || { vendor_reply_body: result.text },
+        });
+      }
+      if (!result.ok) {
+        return NextResponse.json({
+          response_action: "errors",
+          errors: { vendor_reply_body: result.text.slice(0, 100) },
+        });
+      }
+      return NextResponse.json({ response_action: "clear" });
+    }
+
+    // --- block_actions（業者返信 or 物件ゲート）---
     const actions = Array.isArray(payload.actions) ? payload.actions : [];
     const act = (actions[0] || {}) as Record<string, unknown>;
     const value = String(act.value || "");
+    const responseUrl = String(payload.response_url || "");
+    const triggerId = String(payload.trigger_id || "");
+    const channelObj = (payload.channel || {}) as Record<string, unknown>;
+    const messageObj = (payload.message || {}) as Record<string, unknown>;
+    const container = (payload.container || {}) as Record<string, unknown>;
+    const channelId =
+      String(channelObj.id || container.channel_id || "").trim() || undefined;
+    const messageTs =
+      String(messageObj.ts || container.message_ts || "").trim() || undefined;
+
+    const vr = parseVrButtonValue(value);
+    if (vr) {
+      const result = await handleVrBlockAction({
+        action: vr.action,
+        triageId: vr.id,
+        triggerId,
+        channelId,
+        messageTs,
+      });
+      if (result.kind === "modal_opened") {
+        return new NextResponse("", { status: 200 });
+      }
+      if (result.kind === "ephemeral" || result.kind === "error") {
+        return NextResponse.json({
+          response_type: "ephemeral",
+          text: result.text,
+        });
+      }
+      const body = {
+        replace_original: true,
+        text: result.text,
+        blocks: result.blocks,
+      };
+      if (responseUrl) {
+        await postResponseUrl(responseUrl, body);
+      }
+      return NextResponse.json(body);
+    }
+
     const m = value.match(/^(yes|no):([0-9a-f-]{36})$/i);
     if (!m) {
       return NextResponse.json({ ok: false, error: "bad action value" }, { status: 400 });
