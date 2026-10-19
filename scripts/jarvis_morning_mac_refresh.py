@@ -1091,8 +1091,9 @@ def main() -> int:
                 str(VENDOR_REPLY_TRIAGE),
                 "--push",
                 "--mark-inbound-replied",
+                "--slack",
             ],
-            timeout=120,
+            timeout=180,
             dry_run=args.dry_run,
         )
         results["steps"]["vendor_reply_triage"] = rc
