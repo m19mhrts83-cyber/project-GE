@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-18T23:26:14+09:00",
+  "updated": "2026-10-19T20:41:32+09:00",
   "registry_updated": "2026-10-17",
   "permissions_updated": "2026-10-15",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -14,7 +14,7 @@
   "counts": {
     "候補": 26,
     "設計中": 5,
-    "運用確認": 5,
+    "運用確認": 6,
     "運用": 0,
     "停止": 0,
     "運用確認中": 2
@@ -144,7 +144,8 @@
         "711",
         "712",
         "713",
-        "714"
+        "714",
+        "715"
       ],
       "grok_bot_ids": [
         "coaching",
@@ -170,9 +171,9 @@
         "world_intec"
       ],
       "counts": {
-        "ai": 4,
+        "ai": 5,
         "grok": 21,
-        "paired": 3,
+        "paired": 4,
         "ai_only": 1,
         "grok_only": 18
       }
@@ -1885,22 +1886,22 @@
           {
             "name": "チャット・検索",
             "level": "○",
-            "detail": ""
+            "detail": "仕分け結果の報告"
           },
           {
             "name": "外部連携（API/MCP）",
-            "level": "△",
-            "detail": ""
+            "level": "○",
+            "detail": "Todoist API（分身トークン）"
           },
           {
             "name": "CLI",
-            "level": "△",
-            "detail": ""
+            "level": "○",
+            "detail": "`scripts/jarvis_todoist_api.py`"
           },
           {
             "name": "ブラウザ",
             "level": "△",
-            "detail": ""
+            "detail": "画面照合（表確認）"
           },
           {
             "name": "画面操作",
@@ -1913,7 +1914,7 @@
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "外に出す・金・削除。",
+        "human_gate": "外に出す・金・削除・方針選択・自信なし。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -1921,40 +1922,34 @@
         "trigger_kinds": [
           {
             "id": "human",
-            "on": false,
-            "detail": "人が頼む",
-            "raw": "人が頼む"
+            "on": true,
+            "detail": "人が頼む（「Todoist掃除」「確認だけで消せるものは完了」）",
+            "raw": "人が頼む（「Todoist掃除」「確認だけで消せるものは完了」）"
           },
           {
             "id": "schedule",
             "on": false,
-            "detail": "時間",
-            "raw": "時間"
+            "detail": "週次でオーナー確認列を仕分け）",
+            "raw": "時間（将来: 週次でオーナー確認列を仕分け）"
           },
           {
             "id": "event",
             "on": false,
-            "detail": "何かが届いたら",
-            "raw": "何かが届いたら"
-          },
-          {
-            "id": "event",
-            "on": true,
-            "detail": "完了相当時",
-            "raw": "",
-            "from_registry": true
+            "detail": "何かが届いたら（hawk ownerconfirm / done）",
+            "raw": "何かが届いたら（hawk `owner_confirm` / `done`）"
           },
           {
             "id": "watch",
-            "on": false,
-            "detail": "変化・失敗を見回ったら",
-            "raw": "変化・失敗を見回ったら"
+            "on": true,
+            "detail": "変化・失敗を見回ったら（表確認カード・要フォローの事実確認）",
+            "raw": "変化・失敗を見回ったら（表確認カード・要フォローの事実確認）"
           }
         ],
         "trigger_kinds_on": [
-          "event"
+          "human",
+          "watch"
         ],
-        "trigger_kinds_label": "イベント",
+        "trigger_kinds_label": "人依頼 · 見回り",
         "triggers_filled": true,
         "when": "完了相当時",
         "registry_trigger": "イベント",
@@ -1966,15 +1961,15 @@
         ],
         "reports": [
           {
-            "kind": "完了報告",
-            "destination": "Slack `#report`",
+            "kind": "完了報告（確認のみ一括）",
+            "destination": "Slack `#report` または司令塔チャット",
             "channels": [
               "report"
             ]
           },
           {
             "kind": "要判断",
-            "destination": "Slack `#consult`",
+            "destination": "Slack `#consult` またはチャット「オーナー判断待ち」",
             "channels": [
               "consult"
             ]
@@ -1986,7 +1981,7 @@
           },
           {
             "kind": "`#report`",
-            "destination": "完了・定型・生存確認",
+            "destination": "確認のみ完了一覧",
             "channels": []
           },
           {
@@ -1996,7 +1991,7 @@
           },
           {
             "kind": "`#ops`",
-            "destination": "障害・失敗・枠切れ",
+            "destination": "API失敗・二重起票疑い",
             "channels": []
           }
         ],
@@ -6189,6 +6184,153 @@
           }
         ],
         "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
+    },
+    {
+      "id": "715",
+      "name": "家族会議週次係",
+      "path": "700_コーチング支援室/715_家族会議週次係",
+      "department_id": "700",
+      "department_name": "コーチング支援室",
+      "genre_id": "coaching",
+      "genre_name": "コーチング",
+      "status": "運用確認",
+      "status_icon": "🟡",
+      "report": "report",
+      "trigger": "時間",
+      "schedule": "日曜21:30／月曜07:00リトライ",
+      "tool_assigned": "launchd",
+      "tool_fit": "A",
+      "tool_notes": "Genspark/Speakly議事録→NotebookLM1ノート→Studioインフォ→Notion当日ページ（インフォ→議事録）。ページ複製は人",
+      "note": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
+      "summary": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
+      "flow_summary": "",
+      "builder_tag": "〔Grok:F〕",
+      "mixup_kind": "mac_twin",
+      "grok_counterpart": "family",
+      "flowforge_id": "",
+      "flowforge_url": "",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`gsk meeting`／Notion REST／Playwright（Studio）"
+          },
+          {
+            "name": "秘密",
+            "level": "○",
+            "detail": "`GSK_API_KEY`・`NOTION_API_TOKEN`（`.env.jarvis_private`）"
+          },
+          {
+            "name": "対外送信",
+            "level": "×",
+            "detail": "しない（Slack 内部報告のみ）"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "Notion ページの複製・アジェンダ。話者名の最終確認（自動補正は要確認フラグ付き）。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「家族会議の議事録とインフォ付けて」（`--date` / `--meeting-id`）",
+            "raw": "人依頼: 「家族会議の議事録とインフォ付けて」（`--date` / `--meeting-id`）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "**日曜 21:30**（launchd `com.matsunoma.friday.family-meeting-weekly`）",
+            "raw": "時間: **日曜 21:30**（launchd `com.matsunoma.friday.family-meeting-weekly`）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "**月曜 07:00** `--retry`（未完了時のみ） / 枠切れ・Studio 失敗・ページ未作成 → `#ops`",
+            "raw": "見回り: **月曜 07:00** `--retry`（未完了時のみ）"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · 見回り",
+        "triggers_filled": true,
+        "when": "日曜21:30／月曜07:00リトライ",
+        "registry_trigger": "時間",
+        "registry_schedule": "日曜21:30／月曜07:00リトライ",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "完了",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "失敗・枠切れ",
+            "destination": "Slack `#ops`（翌朝リトライ→だめなら FRIDAY 手当て）",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "正本",
+            "destination": "Notion 家族会議 `(YYYY/MM/DD)` ページ／Drive `13_家族会議_週次/`",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/README.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 4,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -10881,6 +11023,22 @@
         "role_split": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml"
       },
       {
+        "side": "paired",
+        "agent_id": "715",
+        "agent_name": "家族会議週次係",
+        "builder_tag": "〔Grok:F〕",
+        "mixup_kind": "mac_twin",
+        "grok_counterpart": "family",
+        "grok_ids": [
+          "family"
+        ],
+        "grok_labels": [
+          "F 家族コーチ統括"
+        ],
+        "grok_department": "",
+        "role_split": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation"
+      },
+      {
         "side": "ai_only",
         "agent_id": "811",
         "agent_name": "ダッシュボード受け入れ係",
@@ -11322,10 +11480,10 @@
       }
     ],
     "mapping_counts": {
-      "paired": 17,
+      "paired": 18,
       "ai_only": 21,
       "grok_only": 23,
-      "all": 61
+      "all": 62
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },
