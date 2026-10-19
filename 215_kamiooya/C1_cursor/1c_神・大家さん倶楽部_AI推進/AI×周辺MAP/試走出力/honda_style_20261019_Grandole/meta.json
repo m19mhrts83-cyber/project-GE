@@ -1,0 +1,89 @@
+{
+  "property": {
+    "name": "Grandole志賀本通",
+    "address": "愛知県名古屋市北区長田町4丁目69番地5",
+    "area_line": "名城線と瀬戸線に挟まれた生活至便な立地。平日は栄へスマート通勤、休日はSAKUMACHI商店街でカフェ巡りを楽しめる街です。",
+    "persona_note": "サキ向け（紙面には出さない）"
+  },
+  "prop_geocode": {
+    "lat": 35.1912938,
+    "lng": 136.9229688,
+    "formatted": "日本、〒462-0834 愛知県名古屋市北区長田町４丁目６９"
+  },
+  "pins": [
+    {
+      "n": 1,
+      "name": "志賀本通駅",
+      "ok": true,
+      "lat": 35.1962927,
+      "lng": 136.9212505,
+      "walk_min_print": 7,
+      "places_name": "志賀本通駅"
+    },
+    {
+      "n": 2,
+      "name": "尼ヶ坂駅",
+      "ok": true,
+      "lat": 35.1878906,
+      "lng": 136.9192182,
+      "walk_min_print": 8,
+      "places_name": "尼ヶ坂駅"
+    },
+    {
+      "n": 3,
+      "name": "ナフコトミダ 杉栄店",
+      "ok": true,
+      "lat": 35.1912162,
+      "lng": 136.9244367,
+      "walk_min_print": 3,
+      "places_name": "ナフコトミダ 杉栄店"
+    },
+    {
+      "n": 4,
+      "name": "ドラッグスギヤマ 杉栄店",
+      "ok": true,
+      "lat": 35.1912209,
+      "lng": 136.9241023,
+      "walk_min_print": 3,
+      "places_name": "ドラッグスギヤマ 杉栄店"
+    },
+    {
+      "n": 5,
+      "name": "天然酵母の食パン専門店つばめパン＆Milk 尼ヶ坂本店",
+      "ok": true,
+      "lat": 35.18727790000001,
+      "lng": 136.9175487,
+      "walk_min_print": 8,
+      "places_name": "天然酵母の食パン専門店つばめパン＆Milk 尼ヶ坂本店"
+    },
+    {
+      "n": 6,
+      "name": "Cafe de Lyon Palette",
+      "ok": true,
+      "lat": 35.1876365,
+      "lng": 136.918581,
+      "walk_min_print": 8,
+      "places_name": "Cafe de Lyon Palette"
+    },
+    {
+      "n": 7,
+      "name": "つけそば神宮寺",
+      "ok": true,
+      "lat": 35.1965103,
+      "lng": 136.9226837,
+      "walk_min_print": 9,
+      "places_name": "つけそば神宮寺"
+    },
+    {
+      "n": 8,
+      "name": "コノズコーヒー",
+      "ok": true,
+      "lat": 35.1961456,
+      "lng": 136.9206125,
+      "walk_min_print": 9,
+      "places_name": "コノズコーヒー"
+    }
+  ],
+  "oral": "",
+  "out": "/Users/matsunomasaharu2/git-repos/215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/AI×周辺MAP/試走出力/honda_style_20261019_Grandole"
+}
