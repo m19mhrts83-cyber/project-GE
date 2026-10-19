@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-19T20:55:35+09:00",
+  "updated": "2026-10-19T23:03:38+09:00",
   "registry_updated": "2026-10-19",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -13,7 +13,7 @@
   },
   "counts": {
     "候補": 26,
-    "設計中": 6,
+    "設計中": 7,
     "運用確認": 6,
     "運用": 0,
     "停止": 0,
@@ -48,6 +48,7 @@
         "113",
         "114",
         "115",
+        "116",
         "211",
         "511",
         "512",
@@ -73,10 +74,10 @@
         "s13"
       ],
       "counts": {
-        "ai": 12,
+        "ai": 13,
         "grok": 14,
         "paired": 8,
-        "ai_only": 4,
+        "ai_only": 5,
         "grok_only": 2
       }
     },
@@ -1313,6 +1314,192 @@
       }
     },
     {
+      "id": "116",
+      "name": "メール要対応係",
+      "path": "100_連絡・物件動向把握室/116_メール要対応係",
+      "department_id": "100",
+      "department_name": "連絡・物件動向把握室",
+      "genre_id": "property",
+      "genre_name": "物件",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "consult",
+      "trigger": "時間＋イベント＋人＋健全性",
+      "schedule": "朝バンドル／昼12:30GHA／night後／手動",
+      "tool_assigned": "jarvis",
+      "tool_fit": "A+B",
+      "tool_notes": "triage→#consult 返信／見送り／Todoist。VRは516。mute学習あり",
+      "note": "設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md",
+      "summary": "要返信メールを `#consult` で返信／見送り／Todoist",
+      "flow_summary": "pending triage → Slack `#consult`（返信／見送り／Todoist）→ 人がボタン了承。送信了承なし・VR混在なし。",
+      "builder_tag": "",
+      "mixup_kind": "",
+      "grok_counterpart": "",
+      "flowforge_id": "",
+      "flowforge_url": "",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "メール要対応を Slack #consult に投稿・健全性監視（送信／見送り／Todoistは人のボタン）",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`jarvis_mail_action_slack_post.py` / `jarvis_mail_action_mute.py`"
+          },
+          {
+            "name": "launchd／朝バンドル",
+            "level": "○",
+            "detail": "morning soft-fail（T1・T5）"
+          },
+          {
+            "name": "GHA",
+            "level": "○",
+            "detail": "noon（T2）"
+          },
+          {
+            "name": "Slack Bot／Webhook",
+            "level": "○",
+            "detail": "`#consult` 投稿・Interactivity は Dashboard"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "×",
+            "detail": ""
+          },
+          {
+            "name": "Cursor 会話",
+            "level": "△",
+            "detail": "手動依頼・unmute"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "Slack ボタン（返信本文・見送り・Todoist）。お金・外に出す・消す。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「メール要対応出して」→ `jarvis_mail_action_slack_post.py --from-triage`",
+            "raw": "**T4 人が頼む**: 「メール要対応出して」→ `jarvis_mail_action_slack_post.py --from-triage`"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "`jarvis_morning_mac_refresh` soft-fail で `--from-triage --limit 5` / 平日 12:30 JST GHA `jarvis-mail-action-noon.yml`",
+            "raw": "**T1 時間＋朝バンドル**: `jarvis_morning_mac_refresh` soft-fail で `--from-triage --limit 5`"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "`jarvis_night_triage` 成功後に相乗り投稿",
+            "raw": "**T3 イベント**: `jarvis_night_triage` 成功後に相乗り投稿"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "朝バンドルで `--health --notify-ops`（異常時のみ `#ops`）",
+            "raw": "**T5 変化・失敗を見回る**: 朝バンドルで `--health --notify-ops`（異常時のみ `#ops`）"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "event",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · イベント · 見回り",
+        "triggers_filled": true,
+        "when": "朝バンドル／昼12:30GHA／night後／手動",
+        "registry_trigger": "時間＋イベント＋人＋健全性",
+        "registry_schedule": "朝バンドル／昼12:30GHA／night後／手動",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "要判断カード",
+            "destination": "Slack `#consult`（本線）",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "障害・健全性異常",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "完了・生存",
+            "destination": "通常不要（カード自体が入口）",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要返信カード。末尾「次の担当」はボタンUIのため省略可",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "投稿失敗・pending過多・mute過多",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
+    },
+    {
       "id": "211",
       "name": "返信案内下書き係",
       "path": "200_返信・案内文面制作室/211_返信案内下書き係",
@@ -1685,7 +1872,7 @@
       "tool_fit": "B",
       "tool_notes": "Todoist起票整理",
       "note": "",
-      "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
+      "summary": "起票候補整理・了承後 create・レーン／ラベル／二重起票防止。**コメントにサマリ＋アウトプット必須**",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "",
@@ -1700,22 +1887,22 @@
           {
             "name": "チャット・検索",
             "level": "○",
-            "detail": ""
+            "detail": "候補提示・了承待ち"
           },
           {
             "name": "外部連携（API/MCP）",
-            "level": "△",
-            "detail": ""
+            "level": "○",
+            "detail": "Todoist API（分身トークン）"
           },
           {
             "name": "CLI",
-            "level": "△",
-            "detail": ""
+            "level": "○",
+            "detail": "`scripts/jarvis_todoist_api.py create-task`"
           },
           {
             "name": "ブラウザ",
             "level": "△",
-            "detail": ""
+            "detail": "画面照合が必要なとき"
           },
           {
             "name": "画面操作",
@@ -1728,7 +1915,7 @@
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "外に出す・金・削除。",
+        "human_gate": "外に出す・金・削除・「起票して」了承（候補提示までは自動可）。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -1736,28 +1923,21 @@
         "trigger_kinds": [
           {
             "id": "human",
-            "on": false,
-            "detail": "人が頼む",
-            "raw": "人が頼む"
+            "on": true,
+            "detail": "人が頼む（/todoist・「起票候補出して」「起票して」）",
+            "raw": "人が頼む（`/todoist`・「起票候補出して」「起票して」）"
           },
           {
             "id": "schedule",
             "on": false,
-            "detail": "時間",
-            "raw": "時間"
-          },
-          {
-            "id": "event",
-            "on": false,
-            "detail": "何かが届いたら",
-            "raw": "何かが届いたら"
+            "detail": "定時で候補スキャン→`#consult`／チャット。了承後のみ create）",
+            "raw": "時間（将来: 定時で候補スキャン→`#consult`／チャット。了承後のみ create）"
           },
           {
             "id": "event",
             "on": true,
-            "detail": "宿題検知",
-            "raw": "",
-            "from_registry": true
+            "detail": "何かが届いたら（hawk todoisttasks create／パートナー確認シグナル）",
+            "raw": "何かが届いたら（hawk `todoist_tasks` create／パートナー確認シグナル）"
           },
           {
             "id": "watch",
@@ -1767,54 +1947,19 @@
           }
         ],
         "trigger_kinds_on": [
+          "human",
           "event"
         ],
-        "trigger_kinds_label": "イベント",
+        "trigger_kinds_label": "人依頼 · イベント",
         "triggers_filled": true,
         "when": "宿題検知",
         "registry_trigger": "イベント",
         "registry_schedule": "宿題検知",
         "primary_report": "report",
         "report_channels": [
-          "report",
-          "consult"
+          "report"
         ],
-        "reports": [
-          {
-            "kind": "完了報告",
-            "destination": "Slack `#report`",
-            "channels": [
-              "report"
-            ]
-          },
-          {
-            "kind": "要判断",
-            "destination": "Slack `#consult`",
-            "channels": [
-              "consult"
-            ]
-          },
-          {
-            "kind": "ch",
-            "destination": "いつ",
-            "channels": []
-          },
-          {
-            "kind": "`#report`",
-            "destination": "完了・定型・生存確認",
-            "channels": []
-          },
-          {
-            "kind": "`#consult`",
-            "destination": "要判断。末尾「次の担当」3行必須",
-            "channels": []
-          },
-          {
-            "kind": "`#ops`",
-            "destination": "障害・失敗・枠切れ",
-            "channels": []
-          }
-        ],
+        "reports": [],
         "procedures": [
           {
             "title": "FlowForge（作業フロー）",
@@ -1874,7 +2019,7 @@
       "tool_fit": "B",
       "tool_notes": "オーナー確認二段",
       "note": "",
-      "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
+      "summary": "確認のみ close／要判断はオーナー残し。**処置・完了は Todoist コメント必須**",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "",
@@ -1926,14 +2071,14 @@
           {
             "id": "human",
             "on": true,
-            "detail": "人が頼む（「Todoist掃除」「確認だけで消せるものは完了」）",
-            "raw": "人が頼む（「Todoist掃除」「確認だけで消せるものは完了」）"
+            "detail": "人が頼む（/todoist-batch・「Todoist掃除」「確認だけで消せるものは完了」）",
+            "raw": "人が頼む（`/todoist-batch`・「Todoist掃除」「確認だけで消せるものは完了」）"
           },
           {
             "id": "schedule",
             "on": false,
-            "detail": "週次でオーナー確認列を仕分け）",
-            "raw": "時間（将来: 週次でオーナー確認列を仕分け）"
+            "detail": "定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）",
+            "raw": "時間（将来: 定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）"
           },
           {
             "id": "event",
@@ -5650,7 +5795,7 @@
       "tool_notes": "検知・促しはルール＋CLAUDE.md（スキル不要・他ツール可）。送金だけ Jarvis＋人了承。銀行秘密なし",
       "note": "2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。",
       "summary": "不足検知 → Slack／チャット → Jarvis へ手渡し",
-      "flow_summary": "開始（due接近／人／watch悪化）→ need・残高・Zaim済確認 → 不足なら **Slack `#consult`【616】** → 次は **Jarvis 寄せ実行（人了承）**。ルール本線・スキル不要。送金ノードなし。",
+      "flow_summary": "開始（due接近／人／watch悪化）→ need・残高・Zaim済確認 → 不足なら **Slack `#consult`【616】** → 次は **Jarvis 寄せ実行（人了承）**。ルール本線・スキル／スラッシュ不要。送金ノードなし。",
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
@@ -6422,7 +6567,7 @@
       "tool_notes": "Genspark/Speakly議事録→NotebookLM1ノート→Studioインフォ→Notion当日ページ（インフォ→議事録）。ページ複製は人",
       "note": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
       "summary": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
-      "flow_summary": "",
+      "flow_summary": "松野が当日ページを複製 → 日曜21:30「議事録MD → NLMソース → インフォ → Notion（インフォ→議事録順）」→ **Slack `#report`【715】**。失敗は `#ops`＋月曜 `--retry`。",
       "builder_tag": "〔Grok:F〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "family",
@@ -6504,7 +6649,7 @@
         "reports": [
           {
             "kind": "完了",
-            "destination": "Slack `#report`",
+            "destination": "Slack `#report`（**松野への情報共有のみ**。判断・依頼は書かない）",
             "channels": [
               "report"
             ]
@@ -10873,6 +11018,18 @@
       },
       {
         "side": "ai_only",
+        "agent_id": "116",
+        "agent_name": "メール要対応係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md"
+      },
+      {
+        "side": "ai_only",
         "agent_id": "211",
         "agent_name": "返信案内下書き係",
         "builder_tag": "",
@@ -11718,9 +11875,9 @@
     ],
     "mapping_counts": {
       "paired": 18,
-      "ai_only": 22,
+      "ai_only": 23,
       "grok_only": 23,
-      "all": 63
+      "all": 64
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },

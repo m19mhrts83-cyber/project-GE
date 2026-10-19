@@ -23,7 +23,7 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
   - 要ボス（返信方針）だけ `#consult`／Todoist（業者専用レーンは作らない）
   - **定期情報確認（nurture）**: 初回コンタクト済み社の **約60日** due。Phase2 は定型送信（`template.approved` 後・1日最大3社）
   - **業者返信 Slack**: `#consult` の草案カード件数を見守り（送信判断は松野）。正本 `docs/KURASHIFT_業者返信_Slack操作_20261019.md`
-- やらないこと: 対外送信の無断実行／Grok調査の丸写し再実装／秘密の再掲／探索の再スクレイプ／nurture の非定型・`approved: false` での送信／業者返信草案の無断改変
+- やらないこと: 対外送信の無断実行／Grok調査の丸写し再実装／秘密の再掲／探索の再スクレイプ／nurture の非定型・`approved: false` での送信／業者返信草案の無断改変／**一般メール要対応（MA・116）**
 
 ## 2. 動き出す合図
 
@@ -136,3 +136,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-19 | 定期情報確認（nurture）Phase1: due 抽出・設定・設計正本 |
 | 2026-10-19 | nurture Phase2: 定型全文・preview／next／mark／queue-outbox（approved 後に送信） |
 | 2026-10-19 | 業者返信 Slack 操作（#consult 草案＋送信／編集／返信なし）。見守りのみ |
+| 2026-10-19 | 一般メール要対応（MA）は **116** と明記（VR と分離） |
