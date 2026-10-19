@@ -126,6 +126,7 @@ partner_or_thread: （三桁フォルダ名）
 ## キューが無い・薄いとき（自律 refill · 再依頼しない）
 
 参謀ボックスへの「`--next` 再生成して」再依頼 MD は **書かない**。516／Jarvis の `jarvis_vendor_outreach_stall_runner`（outbox `s9_precheck`）を待つ。残り候補だけで本日分を実行。**2営業日空いたら Slack `#ops` を見る**（最終 mark 停滞も同様）。
+`action: s9_send_resume` が部長ボックスに来たら **本日分だけ事前確認送信＋`--mark`**（キュー再生成ではない）。
 
 ## 禁止
 

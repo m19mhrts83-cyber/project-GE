@@ -137,3 +137,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-19 | nurture Phase2: 定型全文・preview／next／mark／queue-outbox（approved 後に送信） |
 | 2026-10-19 | 業者返信 Slack 操作（#consult 草案＋送信／編集／返信なし）。見守りのみ |
 | 2026-10-19 | 一般メール要対応（MA）は **116** と明記（VR と分離） |
+| 2026-10-20 | stale_marks 時は週次 refill ではなく **本日送信再開**（`*_send_resume`）。ops クールダウン中も stall を ok と誤表示しない |
