@@ -186,9 +186,34 @@ Environment: リポジトリ `m19mhrts83-cyber/project-GE`（Dashboard に Activ
 | `JARVIS_TODOIST_EMAIL` | 参考・ログ用（任意） |
 | `JARVIS_TASK_BACKEND` | `todoist`（ダッシュボード整合。任意だが推奨） |
 | `TAVILY_API_KEY` | Web 検索（ローカル MCP / Cloud HTTP の Header 用。正本 `.env.jarvis_private`） |
+| `SLACK_WEBHOOK_AI_TEAM_REPORT` / `CONSULT` / `OPS` / `HUB` / `DEAL_ACTIVE` | **Slack 投稿本線**（Incoming Webhook。Bot 投稿＝プッシュ通知が出る） |
 | `GMAIL_CREDENTIALS_B64` / `GMAIL_ADMIN_TOKEN_B64` | admin 取込（既存 GHA と同系） |
 | `GMAIL_ESTATE_TOKEN_B64`（または `GMAIL_M19M_TOKEN_B64`） | **Cloud 対外送信**（`jarvis_cloud_gmail_send.py`） |
 | `MS_GRAPH_*` | OneDrive レーン収集（GHA／Cloud）。**委任＋REFRESH_TOKEN**（`AUTHORITY=consumers`）
+
+### Slack Incoming Webhook（Cloud 投稿・通知）
+
+Cloud から `#ops` 等へ書くとき、Slack MCP の `slack_send_message` だと**本人投稿**になり、スマホのプッシュ通知が出ない。  
+**Incoming Webhook（Bot「Jarvis AI Team」）** が本線。読取は MCP のまま。
+
+```bash
+cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+# 推奨: Cursor API で My Secrets へ直接反映（CURSOR_API_KEY・手貼り不要）
+python scripts/jarvis_cloud_secrets_prepare.py --slack-only --apply
+# 手貼りする場合のみ:
+# python scripts/jarvis_cloud_secrets_prepare.py --slack-only
+# → ~/.jarvis_state/cloud_agent_secrets.env を Dashboard に貼付 → Save → rm
+
+# 疎通（新規 Agent 上・URL は echo しない。既存ランは古い env のまま）:
+test -n "$SLACK_WEBHOOK_AI_TEAM_OPS" && echo SLACK_WEBHOOK_AI_TEAM_OPS=set
+python3 scripts/jarvis_slack_webhook_post.py \
+  --channel ops \
+  --username "Jarvis Cloud" \
+  --text '【テスト】Cloud Webhook 疎通'
+```
+
+Self-hosted（Mac ワーカー）で Secrets 未注入でも、`.env.jarvis_private` を `source` できれば同じスクリプトで投稿可。  
+ルール: `jarvis-cloud-agent.mdc` · `jarvis-agent-team-slack-report.mdc`
 
 ### 登録手順（手動・約1分）
 
@@ -199,14 +224,12 @@ python scripts/jarvis_cloud_secrets_prepare.py
 python scripts/jarvis_cloud_secrets_prepare.py --include-gmail-send
 # Todoist だけ差分追加（スマホ→Cloud 起票）:
 python scripts/jarvis_cloud_secrets_prepare.py --todoist-only
-# 生成: ~/.jarvis_state/cloud_agent_secrets.env
-open https://cursor.com/dashboard/cloud-agents
-# → My Secrets → Add Secrets → ファイル内容を貼る → Save（Runtime Secret 推奨）
-# → Apply to: 全リポ or project-GE。既存ランは古い env のまま → 新規 Agent を起動
-rm -f ~/.jarvis_state/cloud_agent_secrets.env
+# Slack Webhook だけ差分追加（Cloud から通知付き投稿）:
+python scripts/jarvis_cloud_secrets_prepare.py --slack-only --apply
+# 手貼り用ファイルだけ: --apply を外す → Dashboard に貼る → rm
 ```
 
-自動化ブラウザからの貼り付けはフォーカス／クリップボード制約で失敗しやすい。**手元貼り付けを正とする。**
+`--apply` は `PUT /v1/me/secrets/{name}`（Runtime Secret）。手貼りはフォーカス制約で失敗しやすいので **API 反映を正**とする。
 
 ### スマホ → Cloud Agent → Todoist 起票
 
