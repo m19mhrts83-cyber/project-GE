@@ -6,9 +6,8 @@
 - FlowForge（閲覧／編集）: **未作成**（作り込み待ち。本 MD が当面の正）
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - 動きの例（型参考）: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_uGZ3apXgbHVdZJfnuqYA8_QZ
-- ビルダー共有（閲覧のみ）: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
-- Builder 組織図への 116 追加: **編集画面で手作業**（`TASK.md` 参照。共有ビューからは不可）
-- 更新: 2026-10-19（初回叩き台・T1〜T5 確定）
+- ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH（**116 追加済・41体**）
+- 更新: 2026-10-19（初回叩き台・T1〜T5 確定・ATB反映）
 
 ## いまの結論（文字1行）
 
