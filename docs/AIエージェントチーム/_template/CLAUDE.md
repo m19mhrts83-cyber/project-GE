@@ -7,7 +7,7 @@
 
 - **FlowForge（開く）**: （`agents_registry.yaml` の `flowforge_url` をここに貼る）
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
-- 設計の流れ図（あれば）: [`flow.md`](./flow.md)
+- 作業フロー初回叩き台（必須・空禁止）: [`flow.md`](./flow.md)
 
 ## 1. 役割
 

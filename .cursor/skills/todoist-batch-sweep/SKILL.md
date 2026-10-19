@@ -3,7 +3,7 @@ name: todoist-batch-sweep
 description: >-
   Todoist残タスクを並列バッチで掃除し、確認のみはJarvisが完了、要判断だけオーナーに残す。
   Use when the user asks for Todoist掃除、並列モード、簡単タスク順次、オーナー確認の負荷削減、
-  「確認だけで消せる」、または /todoist-batch。
+  「確認だけで消せる」、または /todoist-batch（入口俯瞰は /todoist）。
 ---
 
 # Todoist 掃除・並列バッチ
@@ -46,19 +46,25 @@ description: >-
 - 対外メール／LINE 送信
 - 実装方針が複数ある／失敗リスクが高い
 
+## コメント（必須・省略不可）
+
+バッチでも単件でも、やったことは **Todoist コメント**に残す（チャット／Slack は要約）。  
+形式は `jarvis-todoist-owner-confirm.mdc` と同型（サマリ＋アウトプット）。コメント無しの close 禁止。
+**1行目先頭に `【Jarvis】` を必ず付ける**（FRIDAY は `【FRIDAY】`・ホークは `【ホーク】`／共通トークンのため編集ツール識別用）。
+
 ## 手順
 
 1. 対象ラベル／レーンから最大 N 件を選ぶ（簡単・Jarvis可優先）
 2. 並列可ならレーンを分けて処置（対外・金は触らない）
-3. 各タスクにコメント（サマリ＋アウトプットリンク）
+3. 各タスクにコメント（サマリ＋アウトプットリンク）— **必須**
 4. **確認のみ** → `オーナー確認` 経由で即 `complete-task`（定型コメント必須）
-5. **要判断** → `オーナー確認` に残し、報告ブロックにだけ載せる
+5. **要判断** → `オーナー確認` に残し、聞きたいことをコメント＋報告ブロック
 6. チャット報告は **最後に1ブロック**（途中の都度確認はしない）
 
 ### complete-task コメント（確認のみ）
 
 ```
-タスク完了したよ（Jarvis・確認のみクローズ）
+【Jarvis】タスク完了したよ（確認のみクローズ）
 サマリ: …
 アウトプット:
 - […](https://…)
@@ -78,9 +84,11 @@ description: >-
 
 ## 共有正本
 
+- Cursor コマンド: `.cursor/commands/todoist-batch.md`／入口 `.cursor/commands/todoist.md`
 - Cursor ルール: `.cursor/rules/jarvis-todoist-batch-sweep.mdc`
-- 完了二段の例外: `.cursor/rules/jarvis-todoist-owner-confirm.mdc`（確認のみクローズ）
-- 社員（他ツール共有）: `docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/CLAUDE.md`
+- 完了二段・コメント必須: `.cursor/rules/jarvis-todoist-owner-confirm.mdc`
+- 社員 313: `docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/CLAUDE.md`
+- 社員 312（起票）: `docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/CLAUDE.md`
 
 ## やらないこと
 

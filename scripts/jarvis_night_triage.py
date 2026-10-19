@@ -1718,6 +1718,31 @@ def main() -> int:
                 print("# supabase push: skipped (JARVIS_SUPABASE_SERVICE_ROLE_KEY unset)")
         except Exception as e:
             print(f"# supabase push failed: {e}")
+        # T3: メール要対応 → Slack #consult（116・失敗しても本処理は止めない）
+        try:
+            ma = REPO / "scripts" / "jarvis_mail_action_slack_post.py"
+            if ma.is_file() and not (
+                os.environ.get("JARVIS_MAIL_ACTION_SLACK_DISABLE") or ""
+            ).strip():
+                m = subprocess.run(
+                    [
+                        sys.executable,
+                        str(ma),
+                        "--from-triage",
+                        "--limit",
+                        "5",
+                    ],
+                    cwd=str(REPO),
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                print(
+                    f"# mail_action_slack: exit={m.returncode} "
+                    f"{(m.stderr or m.stdout or '')[-200:]}"
+                )
+        except Exception as e:
+            print(f"# mail_action_slack soft-fail: {e}")
         logf = LOG_DIR / f"run_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.log"
         logf.write_text(
             json.dumps(

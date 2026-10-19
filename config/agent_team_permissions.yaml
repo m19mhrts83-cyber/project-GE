@@ -11,7 +11,7 @@
 # 人向け: docs/AIエージェントチーム/25_実行権限一覧_20261015.md（sync が再生成可）
 # 機密二層: docs/AIエージェントチーム/05_機密とenv二層_20261009.md
 
-updated: "2026-10-15"
+updated: "2026-10-19"
 
 defaults:
   ai:
@@ -49,6 +49,9 @@ agents:
     site_logins: []
   "115":
     can_do: "修繕進捗の要約（パートナー確認ついで・候補）"
+    site_logins: []
+  "116":
+    can_do: "メール要対応を Slack #consult に投稿・健全性監視（送信／見送り／Todoistは人のボタン）"
     site_logins: []
   "211":
     can_do: "返信・案内文面の下書き提案（07:30 GHA・送信は人）"
@@ -119,6 +122,15 @@ agents:
       - service: Zaim Web
         access: Playwright・Mac専有
         note: CSV／銀行更新。OTP は Messages／メール。値はチャット禁止
+  "614":
+    can_do: "テイチャン／ETC還元／Vポイント定例の取得・Slack報告（払う側は612）"
+    site_logins: []
+  "615":
+    can_do: "USD/JPY 取得・グラフ・短報（売買指図なし）"
+    site_logins: []
+  "616":
+    can_do: "カード引落バッファ不足の検知・Slack促し（ルール＋CLAUDE.md・スキル不要。送金・銀行ログインはしない。寄せ実行は Jarvis＋人了承）"
+    site_logins: []
   "711":
     can_do: "家族 Journal 週次材料の抽出（評価の正は Grok）"
     site_logins: []
@@ -127,6 +139,12 @@ agents:
     site_logins: []
   "713":
     can_do: "総務・DX コーチ材料の週次整理"
+    site_logins: []
+  "714":
+    can_do: "Genspark／JPR 議事録の Notion 電話面談 Inbox 候補提案（了承後のみ作成。家族会議除外）"
+    site_logins: []
+  "715":
+    can_do: "家族会議の議事録MD→NLM→Studioインフォ→Notion当日ページ挿入・Slack報告（ページ複製は人）"
     site_logins: []
   "811":
     can_do: "ダッシュボード受け入れ確認（設計中〜候補）"

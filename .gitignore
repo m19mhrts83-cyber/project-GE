@@ -182,3 +182,7 @@ scripts/jarvis_sbi_internal_xfer.py
 215_kamiooya/C1_cursor/browser_automation/run_phase1_sbi_alt_to_main.sh
 # Gmail取込で付く「ファイル名.pdf(123 KB)」形式（*.pdf にマッチせず status に出る）
 **/*.[pP][dD][fF](*
+
+# FRIDAY 715: ページ削除前バックアップと実行ロックは追跡しない
+.jarvis_state/backups/
+.jarvis_state/*.lock

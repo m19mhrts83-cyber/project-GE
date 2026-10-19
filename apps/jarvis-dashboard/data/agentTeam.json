@@ -1,7 +1,7 @@
 {
-  "updated": "2026-10-18T23:26:14+09:00",
-  "registry_updated": "2026-10-17",
-  "permissions_updated": "2026-10-15",
+  "updated": "2026-10-19T23:03:38+09:00",
+  "registry_updated": "2026-10-19",
+  "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
   "flowforge_login_hint": "m19m",
   "flowforge_login_email": "m19m.hrts83@gmail.com",
@@ -13,8 +13,8 @@
   },
   "counts": {
     "候補": 26,
-    "設計中": 5,
-    "運用確認": 5,
+    "設計中": 7,
+    "運用確認": 6,
     "運用": 0,
     "停止": 0,
     "運用確認中": 2
@@ -48,6 +48,7 @@
         "113",
         "114",
         "115",
+        "116",
         "211",
         "511",
         "512",
@@ -73,10 +74,10 @@
         "s13"
       ],
       "counts": {
-        "ai": 12,
+        "ai": 13,
         "grok": 14,
         "paired": 8,
-        "ai_only": 4,
+        "ai_only": 5,
         "grok_only": 2
       }
     },
@@ -87,7 +88,7 @@
       "summary": "家計 Zaim・課金ガード・AI 枠の見える化。Grok リソース経営と 600 室",
       "leaders": {
         "grok": "リソース経営部長",
-        "ai": "リソース・家計室（611–613）"
+        "ai": "リソース・家計室（611–616）"
       },
       "ai_department_ids": [
         "600"
@@ -99,23 +100,26 @@
         "Zaim Watch",
         "課金",
         "ETC",
-        "Vポイント"
+        "Vポイント",
+        "寄せ",
+        "money-ops"
       ],
       "ai_agent_ids": [
         "611",
         "612",
         "613",
         "614",
-        "615"
+        "615",
+        "616"
       ],
       "grok_bot_ids": [
         "resource"
       ],
       "counts": {
-        "ai": 5,
+        "ai": 6,
         "grok": 1,
         "paired": 1,
-        "ai_only": 4,
+        "ai_only": 5,
         "grok_only": 0
       }
     },
@@ -126,7 +130,7 @@
       "summary": "家族・総務・パートナーDX の助言材料。Grok コーチ系と 700 室",
       "leaders": {
         "grok": "コーチング部長／家族コーチ統括／総務計画T統括",
-        "ai": "コーチング支援室（711–713）"
+        "ai": "コーチング支援室（711–715）"
       },
       "ai_department_ids": [
         "700"
@@ -144,7 +148,8 @@
         "711",
         "712",
         "713",
-        "714"
+        "714",
+        "715"
       ],
       "grok_bot_ids": [
         "coaching",
@@ -170,9 +175,9 @@
         "world_intec"
       ],
       "counts": {
-        "ai": 4,
+        "ai": 5,
         "grok": 21,
-        "paired": 3,
+        "paired": 4,
         "ai_only": 1,
         "grok_only": 18
       }
@@ -1309,6 +1314,192 @@
       }
     },
     {
+      "id": "116",
+      "name": "メール要対応係",
+      "path": "100_連絡・物件動向把握室/116_メール要対応係",
+      "department_id": "100",
+      "department_name": "連絡・物件動向把握室",
+      "genre_id": "property",
+      "genre_name": "物件",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "consult",
+      "trigger": "時間＋イベント＋人＋健全性",
+      "schedule": "朝バンドル／昼12:30GHA／night後／手動",
+      "tool_assigned": "jarvis",
+      "tool_fit": "A+B",
+      "tool_notes": "triage→#consult 返信／見送り／Todoist。VRは516。mute学習あり",
+      "note": "設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md",
+      "summary": "要返信メールを `#consult` で返信／見送り／Todoist",
+      "flow_summary": "pending triage → Slack `#consult`（返信／見送り／Todoist）→ 人がボタン了承。送信了承なし・VR混在なし。",
+      "builder_tag": "",
+      "mixup_kind": "",
+      "grok_counterpart": "",
+      "flowforge_id": "",
+      "flowforge_url": "",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "メール要対応を Slack #consult に投稿・健全性監視（送信／見送り／Todoistは人のボタン）",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`jarvis_mail_action_slack_post.py` / `jarvis_mail_action_mute.py`"
+          },
+          {
+            "name": "launchd／朝バンドル",
+            "level": "○",
+            "detail": "morning soft-fail（T1・T5）"
+          },
+          {
+            "name": "GHA",
+            "level": "○",
+            "detail": "noon（T2）"
+          },
+          {
+            "name": "Slack Bot／Webhook",
+            "level": "○",
+            "detail": "`#consult` 投稿・Interactivity は Dashboard"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "×",
+            "detail": ""
+          },
+          {
+            "name": "Cursor 会話",
+            "level": "△",
+            "detail": "手動依頼・unmute"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "Slack ボタン（返信本文・見送り・Todoist）。お金・外に出す・消す。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「メール要対応出して」→ `jarvis_mail_action_slack_post.py --from-triage`",
+            "raw": "**T4 人が頼む**: 「メール要対応出して」→ `jarvis_mail_action_slack_post.py --from-triage`"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "`jarvis_morning_mac_refresh` soft-fail で `--from-triage --limit 5` / 平日 12:30 JST GHA `jarvis-mail-action-noon.yml`",
+            "raw": "**T1 時間＋朝バンドル**: `jarvis_morning_mac_refresh` soft-fail で `--from-triage --limit 5`"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "`jarvis_night_triage` 成功後に相乗り投稿",
+            "raw": "**T3 イベント**: `jarvis_night_triage` 成功後に相乗り投稿"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "朝バンドルで `--health --notify-ops`（異常時のみ `#ops`）",
+            "raw": "**T5 変化・失敗を見回る**: 朝バンドルで `--health --notify-ops`（異常時のみ `#ops`）"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "event",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · イベント · 見回り",
+        "triggers_filled": true,
+        "when": "朝バンドル／昼12:30GHA／night後／手動",
+        "registry_trigger": "時間＋イベント＋人＋健全性",
+        "registry_schedule": "朝バンドル／昼12:30GHA／night後／手動",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "要判断カード",
+            "destination": "Slack `#consult`（本線）",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "障害・健全性異常",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "完了・生存",
+            "destination": "通常不要（カード自体が入口）",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "要返信カード。末尾「次の担当」はボタンUIのため省略可",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "投稿失敗・pending過多・mute過多",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
+    },
+    {
       "id": "211",
       "name": "返信案内下書き係",
       "path": "200_返信・案内文面制作室/211_返信案内下書き係",
@@ -1681,7 +1872,7 @@
       "tool_fit": "B",
       "tool_notes": "Todoist起票整理",
       "note": "",
-      "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
+      "summary": "起票候補整理・了承後 create・レーン／ラベル／二重起票防止。**コメントにサマリ＋アウトプット必須**",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "",
@@ -1696,22 +1887,22 @@
           {
             "name": "チャット・検索",
             "level": "○",
-            "detail": ""
+            "detail": "候補提示・了承待ち"
           },
           {
             "name": "外部連携（API/MCP）",
-            "level": "△",
-            "detail": ""
+            "level": "○",
+            "detail": "Todoist API（分身トークン）"
           },
           {
             "name": "CLI",
-            "level": "△",
-            "detail": ""
+            "level": "○",
+            "detail": "`scripts/jarvis_todoist_api.py create-task`"
           },
           {
             "name": "ブラウザ",
             "level": "△",
-            "detail": ""
+            "detail": "画面照合が必要なとき"
           },
           {
             "name": "画面操作",
@@ -1724,7 +1915,7 @@
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "外に出す・金・削除。",
+        "human_gate": "外に出す・金・削除・「起票して」了承（候補提示までは自動可）。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -1732,28 +1923,21 @@
         "trigger_kinds": [
           {
             "id": "human",
-            "on": false,
-            "detail": "人が頼む",
-            "raw": "人が頼む"
+            "on": true,
+            "detail": "人が頼む（/todoist・「起票候補出して」「起票して」）",
+            "raw": "人が頼む（`/todoist`・「起票候補出して」「起票して」）"
           },
           {
             "id": "schedule",
             "on": false,
-            "detail": "時間",
-            "raw": "時間"
-          },
-          {
-            "id": "event",
-            "on": false,
-            "detail": "何かが届いたら",
-            "raw": "何かが届いたら"
+            "detail": "定時で候補スキャン→`#consult`／チャット。了承後のみ create）",
+            "raw": "時間（将来: 定時で候補スキャン→`#consult`／チャット。了承後のみ create）"
           },
           {
             "id": "event",
             "on": true,
-            "detail": "宿題検知",
-            "raw": "",
-            "from_registry": true
+            "detail": "何かが届いたら（hawk todoisttasks create／パートナー確認シグナル）",
+            "raw": "何かが届いたら（hawk `todoist_tasks` create／パートナー確認シグナル）"
           },
           {
             "id": "watch",
@@ -1763,54 +1947,19 @@
           }
         ],
         "trigger_kinds_on": [
+          "human",
           "event"
         ],
-        "trigger_kinds_label": "イベント",
+        "trigger_kinds_label": "人依頼 · イベント",
         "triggers_filled": true,
         "when": "宿題検知",
         "registry_trigger": "イベント",
         "registry_schedule": "宿題検知",
         "primary_report": "report",
         "report_channels": [
-          "report",
-          "consult"
+          "report"
         ],
-        "reports": [
-          {
-            "kind": "完了報告",
-            "destination": "Slack `#report`",
-            "channels": [
-              "report"
-            ]
-          },
-          {
-            "kind": "要判断",
-            "destination": "Slack `#consult`",
-            "channels": [
-              "consult"
-            ]
-          },
-          {
-            "kind": "ch",
-            "destination": "いつ",
-            "channels": []
-          },
-          {
-            "kind": "`#report`",
-            "destination": "完了・定型・生存確認",
-            "channels": []
-          },
-          {
-            "kind": "`#consult`",
-            "destination": "要判断。末尾「次の担当」3行必須",
-            "channels": []
-          },
-          {
-            "kind": "`#ops`",
-            "destination": "障害・失敗・枠切れ",
-            "channels": []
-          }
-        ],
+        "reports": [],
         "procedures": [
           {
             "title": "FlowForge（作業フロー）",
@@ -1870,7 +2019,7 @@
       "tool_fit": "B",
       "tool_notes": "オーナー確認二段",
       "note": "",
-      "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
+      "summary": "確認のみ close／要判断はオーナー残し。**処置・完了は Todoist コメント必須**",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "",
@@ -1885,22 +2034,22 @@
           {
             "name": "チャット・検索",
             "level": "○",
-            "detail": ""
+            "detail": "仕分け結果の報告"
           },
           {
             "name": "外部連携（API/MCP）",
-            "level": "△",
-            "detail": ""
+            "level": "○",
+            "detail": "Todoist API（分身トークン）"
           },
           {
             "name": "CLI",
-            "level": "△",
-            "detail": ""
+            "level": "○",
+            "detail": "`scripts/jarvis_todoist_api.py`"
           },
           {
             "name": "ブラウザ",
             "level": "△",
-            "detail": ""
+            "detail": "画面照合（表確認）"
           },
           {
             "name": "画面操作",
@@ -1913,7 +2062,7 @@
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "外に出す・金・削除。",
+        "human_gate": "外に出す・金・削除・方針選択・自信なし。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -1921,40 +2070,34 @@
         "trigger_kinds": [
           {
             "id": "human",
-            "on": false,
-            "detail": "人が頼む",
-            "raw": "人が頼む"
+            "on": true,
+            "detail": "人が頼む（/todoist-batch・「Todoist掃除」「確認だけで消せるものは完了」）",
+            "raw": "人が頼む（`/todoist-batch`・「Todoist掃除」「確認だけで消せるものは完了」）"
           },
           {
             "id": "schedule",
             "on": false,
-            "detail": "時間",
-            "raw": "時間"
+            "detail": "定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）",
+            "raw": "時間（将来: 定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）"
           },
           {
             "id": "event",
             "on": false,
-            "detail": "何かが届いたら",
-            "raw": "何かが届いたら"
-          },
-          {
-            "id": "event",
-            "on": true,
-            "detail": "完了相当時",
-            "raw": "",
-            "from_registry": true
+            "detail": "何かが届いたら（hawk ownerconfirm / done）",
+            "raw": "何かが届いたら（hawk `owner_confirm` / `done`）"
           },
           {
             "id": "watch",
-            "on": false,
-            "detail": "変化・失敗を見回ったら",
-            "raw": "変化・失敗を見回ったら"
+            "on": true,
+            "detail": "変化・失敗を見回ったら（表確認カード・要フォローの事実確認）",
+            "raw": "変化・失敗を見回ったら（表確認カード・要フォローの事実確認）"
           }
         ],
         "trigger_kinds_on": [
-          "event"
+          "human",
+          "watch"
         ],
-        "trigger_kinds_label": "イベント",
+        "trigger_kinds_label": "人依頼 · 見回り",
         "triggers_filled": true,
         "when": "完了相当時",
         "registry_trigger": "イベント",
@@ -1966,15 +2109,15 @@
         ],
         "reports": [
           {
-            "kind": "完了報告",
-            "destination": "Slack `#report`",
+            "kind": "完了報告（確認のみ一括）",
+            "destination": "Slack `#report` または司令塔チャット",
             "channels": [
               "report"
             ]
           },
           {
             "kind": "要判断",
-            "destination": "Slack `#consult`",
+            "destination": "Slack `#consult` またはチャット「オーナー判断待ち」",
             "channels": [
               "consult"
             ]
@@ -1986,7 +2129,7 @@
           },
           {
             "kind": "`#report`",
-            "destination": "完了・定型・生存確認",
+            "destination": "確認のみ完了一覧",
             "channels": []
           },
           {
@@ -1996,7 +2139,7 @@
           },
           {
             "kind": "`#ops`",
-            "destination": "障害・失敗・枠切れ",
+            "destination": "API失敗・二重起票疑い",
             "channels": []
           }
         ],
@@ -5270,7 +5413,7 @@
       "flowforge_share_url": "",
       "flowforge_edit_url": "",
       "permissions": {
-        "can_do": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。",
+        "can_do": "テイチャン／ETC還元／Vポイント定例の取得・Slack報告（払う側は612）",
         "methods": [
           {
             "name": "CLI",
@@ -5454,7 +5597,7 @@
       "flowforge_share_url": "",
       "flowforge_edit_url": "",
       "permissions": {
-        "can_do": "2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。",
+        "can_do": "USD/JPY 取得・グラフ・短報（売買指図なし）",
         "methods": [
           {
             "name": "CLI",
@@ -5627,6 +5770,220 @@
             "title": "AGENTS.md",
             "path": "docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/AGENTS.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/615_円動向報告係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
+    },
+    {
+      "id": "616",
+      "name": "寄せリマインド係",
+      "path": "600_リソース・家計室/616_寄せリマインド係",
+      "department_id": "600",
+      "department_name": "リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "consult",
+      "trigger": "時間＋変化",
+      "schedule": "due7日以内／watch悪化／人依頼",
+      "tool_assigned": "gencode",
+      "tool_fit": "A+B",
+      "tool_notes": "検知・促しはルール＋CLAUDE.md（スキル不要・他ツール可）。送金だけ Jarvis＋人了承。銀行秘密なし",
+      "note": "2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。",
+      "summary": "不足検知 → Slack／チャット → Jarvis へ手渡し",
+      "flow_summary": "開始（due接近／人／watch悪化）→ need・残高・Zaim済確認 → 不足なら **Slack `#consult`【616】** → 次は **Jarvis 寄せ実行（人了承）**。ルール本線・スキル／スラッシュ不要。送金ノードなし。",
+      "builder_tag": "",
+      "mixup_kind": "none",
+      "grok_counterpart": "",
+      "flowforge_id": "",
+      "flowforge_url": "",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "カード引落バッファ不足の検知・Slack促し（ルール＋CLAUDE.md・スキル不要。送金・銀行ログインはしない。寄せ実行は Jarvis＋人了承）",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`jarvis_card_debit_watch.py`（読取）／Zaim CSV 読取／将来 `jarvis_adjust_cash_remind.py`"
+          },
+          {
+            "name": "外部API",
+            "level": "△",
+            "detail": "Slack Webhook（報告のみ）"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "×",
+            "detail": "銀行・カード Web ログインはしない（Vpass 取得が要るときは Jarvis に渡す）"
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": ""
+          },
+          {
+            "name": "スキル／スラッシュ",
+            "level": "×",
+            "detail": "**本係の入口にしない**"
+          },
+          {
+            "name": "柱",
+            "level": "内容",
+            "detail": ""
+          },
+          {
+            "name": "**入口**",
+            "level": "`card_debit_watch.json`・`known_recurring_debits.yaml`・給与着金カレンダー・Zaim 年度 CSV（済確認）",
+            "detail": ""
+          },
+          {
+            "name": "**確認**",
+            "level": "不足があるとき Slack。送金は人了承＋Jarvis。済は Zaim で自己確認",
+            "detail": ""
+          },
+          {
+            "name": "**履歴**",
+            "level": "`reports/`・Slack・state（将来 `.jarvis_state/adjust_cash_remind.json`）",
+            "detail": ""
+          },
+          {
+            "name": "**停止**",
+            "level": "`disabled`／`JARVIS_ADJUST_CASH_REMIND_DISABLE=1`／二重促し（同 due は N 日以内再掲しない）",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_AI_TEAM_CONSULT",
+          "SLACK_WEBHOOK_AI_TEAM_OPS",
+          "JARVIS_ADJUST_CASH_REMIND_DISABLE"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "寄せプラン了承・送金 OTP／実行ボタン（Jarvis）。本係はリマインドまで。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「寄せリマインド」「支払いに足りるか」",
+            "raw": "人が頼む: 「寄せリマインド」「支払いに足りるか」"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "引落 **7日以内**かつ不足ありのとき（目安: 毎朝／パートナー確認前半末尾のついで）",
+            "raw": "時間: 引落 **7日以内**かつ不足ありのとき（目安: 毎朝／パートナー確認前半末尾のついで）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "money-ops 未完了が due 接近（将来）",
+            "raw": "イベント: money-ops 未完了が due 接近（将来）"
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "`card_debit_watch` の shortfall 悪化・Vpass 新請求",
+            "raw": "変化: `card_debit_watch` の shortfall 悪化・Vpass 新請求"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · 見回り",
+        "triggers_filled": true,
+        "when": "due7日以内／watch悪化／人依頼",
+        "registry_trigger": "時間＋変化",
+        "registry_schedule": "due7日以内／watch悪化／人依頼",
+        "primary_report": "consult",
+        "report_channels": [
+          "consult",
+          "report",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "定例・不足あり",
+            "destination": "Slack `#consult`（次: Jarvisに依頼＝寄せ実行）または `#report`（軽微）",
+            "channels": [
+              "report",
+              "consult"
+            ]
+          },
+          {
+            "kind": "失敗",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "控え",
+            "destination": "`reports/YYYY-MM-DD.md`",
+            "channels": []
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "不足なし・生存確認のみ",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "不足あり・寄せ判断が要る。末尾「次の担当」3行必須",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "スクリプト失敗",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/AGENTS.md",
             "kind": "doc"
           }
         ],
@@ -6030,7 +6387,7 @@
       "flowforge_share_url": "",
       "flowforge_edit_url": "",
       "permissions": {
-        "can_do": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml",
+        "can_do": "Genspark／JPR 議事録の Notion 電話面談 Inbox 候補提案（了承後のみ作成。家族会議除外）",
         "methods": [
           {
             "name": "CLI",
@@ -6189,6 +6546,161 @@
           }
         ],
         "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
+    },
+    {
+      "id": "715",
+      "name": "家族会議週次係",
+      "path": "700_コーチング支援室/715_家族会議週次係",
+      "department_id": "700",
+      "department_name": "コーチング支援室",
+      "genre_id": "coaching",
+      "genre_name": "コーチング",
+      "status": "運用確認",
+      "status_icon": "🟡",
+      "report": "report",
+      "trigger": "時間",
+      "schedule": "日曜21:30／月曜07:00リトライ",
+      "tool_assigned": "launchd",
+      "tool_fit": "A",
+      "tool_notes": "Genspark/Speakly議事録→NotebookLM1ノート→Studioインフォ→Notion当日ページ（インフォ→議事録）。ページ複製は人",
+      "note": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
+      "summary": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
+      "flow_summary": "松野が当日ページを複製 → 日曜21:30「議事録MD → NLMソース → インフォ → Notion（インフォ→議事録順）」→ **Slack `#report`【715】**。失敗は `#ops`＋月曜 `--retry`。",
+      "builder_tag": "〔Grok:F〕",
+      "mixup_kind": "mac_twin",
+      "grok_counterpart": "family",
+      "flowforge_id": "",
+      "flowforge_url": "",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "家族会議の議事録MD→NLM→Studioインフォ→Notion当日ページ挿入・Slack報告（ページ複製は人）",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`gsk meeting`／Notion REST／Playwright（Studio）"
+          },
+          {
+            "name": "秘密",
+            "level": "○",
+            "detail": "`GSK_API_KEY`・`NOTION_API_TOKEN`（`.env.jarvis_private`）"
+          },
+          {
+            "name": "対外送信",
+            "level": "×",
+            "detail": "しない（Slack 内部報告のみ）"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "Notion ページの複製・アジェンダ。話者名の最終確認（自動補正は要確認フラグ付き）。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「家族会議の議事録とインフォ付けて」（`--date` / `--meeting-id`）",
+            "raw": "人依頼: 「家族会議の議事録とインフォ付けて」（`--date` / `--meeting-id`）"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "**日曜 21:30**（launchd `com.matsunoma.friday.family-meeting-weekly`）",
+            "raw": "時間: **日曜 21:30**（launchd `com.matsunoma.friday.family-meeting-weekly`）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": true,
+            "detail": "**月曜 07:00** `--retry`（未完了時のみ） / 枠切れ・Studio 失敗・ページ未作成 → `#ops`",
+            "raw": "見回り: **月曜 07:00** `--retry`（未完了時のみ）"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "watch"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · 見回り",
+        "triggers_filled": true,
+        "when": "日曜21:30／月曜07:00リトライ",
+        "registry_trigger": "時間",
+        "registry_schedule": "日曜21:30／月曜07:00リトライ",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "ops",
+          "consult"
+        ],
+        "reports": [
+          {
+            "kind": "完了",
+            "destination": "Slack `#report`（**松野への情報共有のみ**。判断・依頼は書かない）",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "失敗・枠切れ",
+            "destination": "Slack `#ops`（翌朝リトライ→だめなら FRIDAY 手当て）",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "Jarvisへの依頼・確認",
+            "destination": "Slack **`#ai-hub`**（`#consult` は松野の要判断専用）",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "正本",
+            "destination": "Notion 家族会議 `(YYYY/MM/DD)` ページ／Drive `13_家族会議_週次/`",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/715_家族会議週次係/README.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 4,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -10506,6 +11018,18 @@
       },
       {
         "side": "ai_only",
+        "agent_id": "116",
+        "agent_name": "メール要対応係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md"
+      },
+      {
+        "side": "ai_only",
         "agent_id": "211",
         "agent_name": "返信案内下書き係",
         "builder_tag": "",
@@ -10821,6 +11345,18 @@
         "role_split": "2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。"
       },
       {
+        "side": "ai_only",
+        "agent_id": "616",
+        "agent_name": "寄せリマインド係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。"
+      },
+      {
         "side": "paired",
         "agent_id": "711",
         "agent_name": "家族Journal週次材料係",
@@ -10879,6 +11415,22 @@
         "grok_labels": [],
         "grok_department": "",
         "role_split": "2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml"
+      },
+      {
+        "side": "paired",
+        "agent_id": "715",
+        "agent_name": "家族会議週次係",
+        "builder_tag": "〔Grok:F〕",
+        "mixup_kind": "mac_twin",
+        "grok_counterpart": "family",
+        "grok_ids": [
+          "family"
+        ],
+        "grok_labels": [
+          "F 家族コーチ統括"
+        ],
+        "grok_department": "",
+        "role_split": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation"
       },
       {
         "side": "ai_only",
@@ -11322,10 +11874,10 @@
       }
     ],
     "mapping_counts": {
-      "paired": 17,
-      "ai_only": 21,
+      "paired": 18,
+      "ai_only": 23,
       "grok_only": 23,
-      "all": 61
+      "all": 64
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },

@@ -64,6 +64,7 @@ KURASHIFT_RE_CLEANUP = REPO / "scripts" / "jarvis_kurashift_re_cleanup.py"
 KURASHIFT_OBSIDIAN_PICK_SYNC = REPO / "scripts" / "jarvis_kurashift_obsidian_pick_sync.py"
 MEETING_MINUTES_CURATE = REPO / "scripts" / "jarvis_meeting_minutes_curate.py"
 VENDOR_REPLY_TRIAGE = REPO / "scripts" / "jarvis_kurashift_vendor_reply_triage.py"
+MAIL_ACTION_SLACK = REPO / "scripts" / "jarvis_mail_action_slack_post.py"
 VENDOR_CATCHUP = REPO / "scripts" / "jarvis_triage_vendor_catchup.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
@@ -1091,8 +1092,9 @@ def main() -> int:
                 str(VENDOR_REPLY_TRIAGE),
                 "--push",
                 "--mark-inbound-replied",
+                "--slack",
             ],
-            timeout=120,
+            timeout=180,
             dry_run=args.dry_run,
         )
         results["steps"]["vendor_reply_triage"] = rc
@@ -1100,6 +1102,32 @@ def main() -> int:
             print(f"# vendor_reply_triage soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["vendor_reply_triage"] = "skipped"
+
+    # 2c2b. メール要対応 → Slack #consult（返信／見送り／Todoist）
+    if MAIL_ACTION_SLACK.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "mail_action_slack",
+            [exe, str(MAIL_ACTION_SLACK), "--from-triage", "--limit", "5"],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["mail_action_slack"] = rc
+        if rc != 0:
+            print(f"# mail_action_slack soft-fail rc={rc}", file=sys.stderr)
+        # T5: 見送り学習／pending 健全性（#ops は異常時のみ）
+        mute_cli = REPO / "scripts" / "jarvis_mail_action_mute.py"
+        if mute_cli.is_file():
+            rc_h = run_step(
+                "mail_action_health",
+                [exe, str(mute_cli), "--health", "--notify-ops"],
+                timeout=60,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["mail_action_health"] = rc_h
+            if rc_h not in (0, "skipped"):
+                print(f"# mail_action_health soft-fail rc={rc_h}", file=sys.stderr)
+    else:
+        results["steps"]["mail_action_slack"] = "skipped"
 
     if VENDOR_CATCHUP.is_file():
         rc = run_step(

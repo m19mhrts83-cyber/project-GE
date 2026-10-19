@@ -51,9 +51,13 @@ Drive `★AIエージェントチーム` へも写す（`--no-drive` でオフ�
 - [ ] `00_チーム索引.md` に1行  
 - [ ] `config/agent_team_permissions.yaml` に `can_do`（サイトPWを渡すなら `site_logins` も）  
 - [ ] 社員の `CLAUDE.md` §2 合図／§3 実行権限／§4 報告・必要なら `.env.example` を埋める  
+- [ ] **`flow.md` 初回叩き台**（文字1行・Mermaid・ステップ一覧・やらないこと。`_template/flow.md` 型。空禁止。FlowForge URL は後追い可）  
+- [ ] Builder 組織図に追加  
 - [ ] `jarvis_agent_team_status_sync.py` を実行（マーカー＋部門ボード＋権限・運用投影）  
 - [ ] `agentTeam.json` を commit／push（ダッシュ「権限」「運用」タブ）  
 - [ ] `AGENTS.md` は日付同期のみ  
+
+詳細: [`06_社員の作り方_二段階_20261009.md`](06_社員の作り方_二段階_20261009.md)「新規作成時の必須」
 
 ## 報告・対外
 

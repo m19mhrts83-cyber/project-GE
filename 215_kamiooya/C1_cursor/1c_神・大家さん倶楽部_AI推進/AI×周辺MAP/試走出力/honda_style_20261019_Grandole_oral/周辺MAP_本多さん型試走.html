@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>Grandole志賀本通 周辺MAP（本多さん型試走）</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: #1e293b; background: #f8fafc;
+  }
+  .sheet {
+    max-width: 210mm; margin: 0 auto; background: #fff;
+    padding: 16px 18px 20px; border: 1px solid #e2e8f0;
+  }
+  header {
+    border-bottom: 3px solid #0f766e; padding-bottom: 10px; margin-bottom: 12px;
+  }
+  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 900; color: #0f766e; }
+  .area { margin: 0; font-size: 13px; font-weight: 700; color: #475569; line-height: 1.45; }
+  .grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 12px; }
+  h2 { margin: 0 0 6px; font-size: 13px; font-weight: 900; color: #0f766e; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th, td { border: 1px solid #e2e8f0; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #ecfdf5; font-weight: 900; }
+  .map-wrap {
+    border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #f1f5f9;
+  }
+  .map-wrap img { display: block; width: 100%; height: auto; }
+  .here {
+    font-size: 11px; font-weight: 800; color: #0f766e; margin: 4px 0 0;
+  }
+  .bubbles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .bubble {
+    background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px;
+    padding: 6px 8px; font-size: 11px; line-height: 1.35;
+  }
+  .bubble b { display: block; color: #115e59; margin-bottom: 2px; }
+  .note {
+    margin-top: 10px; font-size: 10.5px; color: #64748b; font-weight: 700;
+  }
+  .pin-table { margin-top: 10px; }
+  @media print {
+    body { background: #fff; }
+    .sheet { border: none; max-width: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="sheet">
+    <header>
+      <h1>Grandole志賀本通 周辺MAP</h1>
+      <p class="area">名城線と瀬戸線に挟まれた生活至便な立地。平日は栄へスマート通勤、休日はSAKUMACHI商店街でカフェ巡りを楽しめる街です。</p>
+    </header>
+    <div class="grid">
+      <section>
+        <h2>Access（徒歩目安）</h2>
+        <table>
+          <tr><th>#</th><th>施設</th><th>徒歩</th></tr>
+          <tr><td>1</td><td>地下鉄名城線「志賀本通駅」</td><td>約7分</td></tr><tr><td>2</td><td>名鉄瀬戸線「尼ケ坂駅」</td><td>約8分</td></tr><tr><td>3</td><td>ナフコトミダ杉栄店（生鮮スーパー）</td><td>約3分</td></tr><tr><td>4</td><td>ドラッグスギヤマ杉栄店</td><td>約3分</td></tr><tr><td>5</td><td>名古屋市北区役所</td><td>約18分</td></tr><tr><td>6</td><td>ゲオ辻本通店</td><td>約14分</td></tr>
+        </table>
+        <p class="here">HERE = 物件位置（地図上の緑 H）</p>
+      </section>
+      <section>
+        <h2>地図（実地図・番号ピン）</h2>
+        <div class="map-wrap"><img src="map_static.png" alt="周辺地図" /></div>
+      </section>
+    </div>
+    <div class="bubbles"><div class="bubble"><b>1. 志賀本通駅</b><span>栄まで地下鉄で直通。通勤に使いやすい…</span></div><div class="bubble"><b>2. 尼ヶ坂駅</b><span>高架下におしゃれな店が並ぶ休日の散策…</span></div><div class="bubble"><b>3. ナフコトミダ 杉栄店</b><span>徒歩3分で大抵の買い物が済みます</span></div><div class="bubble"><b>4. ドラッグスギヤマ 杉栄店</b><span>日用品やコスメがすぐ揃います</span></div></div>
+    <section class="pin-table">
+      <h2>地図の番号（徒歩ピン）</h2>
+      <table>
+        <tr><th>#</th><th>施設</th><th>徒歩</th><th>ひとこと</th></tr>
+        <tr><td>1</td><td>志賀本通駅</td><td>約7分</td><td>栄まで地下鉄で直通。通勤に使いやすい…</td></tr><tr><td>2</td><td>尼ヶ坂駅</td><td>約8分</td><td>高架下におしゃれな店が並ぶ休日の散策…</td></tr><tr><td>3</td><td>ナフコトミダ 杉栄店</td><td>約3分</td><td>徒歩3分で大抵の買い物が済みます</td></tr><tr><td>4</td><td>ドラッグスギヤマ 杉栄店</td><td>約3分</td><td>日用品やコスメがすぐ揃います</td></tr><tr><td>5</td><td>天然酵母の食パン専門店つばめパン＆Milk 尼ヶ坂本店</td><td>約8分</td><td>ふわもち食パンのモーニングが人気です</td></tr><tr><td>6</td><td>Cafe de Lyon Palette</td><td>約8分</td><td>旬のフルーツを使ったパフェが楽しめま…</td></tr><tr><td>7</td><td>つけそば神宮寺</td><td>約9分</td><td>仕事帰りに寄れる、評判のつけそば店で…</td></tr><tr><td>8</td><td>コノズコーヒー</td><td>約9分</td><td>駅前でモーニングやランチが取れます</td></tr>
+      </table>
+    </section>
+    <p class="note">試走 2026-10-19 19:40｜本多さん型 Phase A/B（Cursor作業机）｜地図=Google Static／施設=Places｜紙面徒歩分は06確定値｜描写の作り込み（Phase C / Opus）は未実施｜口頭指示: 吹き出しをもっと短く</p>
+  </div>
+</body>
+</html>

@@ -177,11 +177,11 @@ Mac が `--batch-week` で渡す JSON（`mode: batch_week`）を受け取った�
    - **Phase2**: 下記 **approved nurture 定型**（`config/kurashift_vendor_nurture.yaml`）。A'-v2 とは **別レーン・混ぜない**  
    - Jarvis が `--queue-outbox` で `outbox_to_teams/re/` にキューを書いたら、**1日最大3社**・改変なしで Webフォーム（または email）送信  
    - 送信後: `jarvis_vendor_nurture_due.py --mark <id>`。反響は `nurture_last_reply_*` **最新のみ**（Phase3）  
-   - `template.approved: false` のあいだはキューも送らない（松野が文面OKするまで）  
+   - `template.approved: true`（2026-10-19 松野OK）。false に戻したらキューも送らない  
    - 正本: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · 社員 516 CLAUDE  
    - 非定型・個別事情は松野確認
 
-### approved nurture 定型（vendor_nurture_v1 · 松野確認後に送信）
+### approved nurture 定型（vendor_nurture_v1 · 送信可）
 
 **対外文面に「定期確認」は使わない**（最近の物件情報の伺い）。
 
@@ -279,11 +279,12 @@ matsuno.estate@gmail.com
 滋賀県：大津市、草津市、守山市、栗東市、野洲市、湖南市、甲賀市、近江八幡市、東近江市、彦根市、長浜市、米原市
 （近隣も可。京都・大阪の都心は不要）
 
-## 返信が来たとき（Bot2 は触らない）
+## 返信が来たとき（Bot2 / S2 は触らない）
 
 業者から質問・物件PDFが matsuno.estate@gmail.com に届くのは **成功（milestone）**。
-ブロックしない。Jarvis が `property_mail_match` で deals に載せ、物件は Bot1 調査 → ファネル。
-Bot2 は **追加の問合せ送信のみ**（未 contact の `--next` 対象）。
+ブロックしない。Jarvis が triage → **Slack `#consult` 業者返信カード**（送信／編集／返信なし）で松野が返す。  
+正本: `docs/KURASHIFT_業者返信_Slack操作_20261019.md`。物件PDFは `property_mail_match` → deals → Bot1。  
+**S2 は返信草案を書かない・送らない**（初回 A'-v2／nurture 定型のみ）。
 
 ## 新規探索（別タスク・問合せは送らない）
 

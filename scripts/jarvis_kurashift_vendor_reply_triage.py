@@ -303,6 +303,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="取込時に YAML status=replied（受信 milestone）",
     )
+    ap.add_argument(
+        "--slack",
+        action="store_true",
+        help="push 後、pending を Slack #consult に草案＋操作ボタン投稿",
+    )
+    ap.add_argument("--slack-limit", type=int, default=5)
     args = ap.parse_args(argv)
 
     print("使用アカウント: estate / Gmail API（業者返信 triage）")
@@ -328,9 +334,25 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.dry_run:
         print("# dry-run: push skipped")
+        if args.slack:
+            print("# dry-run: --slack もスキップ（実 push 後に投稿）")
         return 0
     n = push_rows(rows)
     print(f"# pushed={n}")
+    if args.slack:
+        import subprocess
+
+        cmd = [
+            sys.executable,
+            str(REPO / "scripts" / "jarvis_vendor_reply_slack_post.py"),
+            "--from-triage",
+            "--limit",
+            str(max(1, args.slack_limit)),
+        ]
+        r = subprocess.run(cmd, cwd=str(REPO), env=os.environ.copy())
+        print(f"# slack post rc={r.returncode}")
+        if r.returncode != 0:
+            return r.returncode
     return 0
 
 
