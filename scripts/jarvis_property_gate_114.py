@@ -98,6 +98,16 @@ def process_deal(
         url_mode = prefer_url_buttons()
         text = format_b_card(deal, lane, include_action_links=url_mode)
         blocks = b_card_blocks(deal, lane, url_mode=url_mode)
+        if post and post_b and not url_mode and not dry_run:
+            # Bot 無しでも Webhook + action_id で Interactivity 確認可
+            import os
+
+            if not (os.environ.get("SLACK_BOT_TOKEN") or "").strip():
+                print(
+                    "ℹ️ SLACK_BOT_TOKEN なし → Webhook で action_id 投稿"
+                    "（Interactivity 本線）",
+                    file=sys.stderr,
+                )
         if post and post_b:
             pr = post_slack(
                 "consult",
