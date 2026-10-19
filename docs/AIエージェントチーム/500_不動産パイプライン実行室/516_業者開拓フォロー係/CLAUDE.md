@@ -32,7 +32,7 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
 - [x] 何かが届いたら — `jarvis_bucho_inbox_poll` 成功後フック（再生成依頼・`--next` 依頼 MD）
 - [x] 変化・失敗を見回ったら:
   - `needs_refill`（送信可能件数が日次枠未満）
-  - `no_marks` / stale（最終 contacted から **平日5日以上**・本日 mark なし。毎日送信必須ではない。閾値変更可）
+  - `no_marks` / stale（最終 contacted から **平日2日以上**・本日 mark なし。本線は毎日09:00本日分。閾値変更可）
   - Mac／Drive ブリッジ未接続（outbox 不可）
 
 無効化: `.jarvis_state/vendor_outreach_stall.json` の `"disabled": true` または `JARVIS_VENDOR_OUTREACH_STALL_DISABLE=1`
@@ -138,4 +138,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-19 | 業者返信 Slack 操作（#consult 草案＋送信／編集／返信なし）。見守りのみ |
 | 2026-10-19 | 一般メール要対応（MA）は **116** と明記（VR と分離） |
 | 2026-10-20 | stale_marks 時は週次 refill ではなく **本日送信再開**（`*_send_resume`）。ops クールダウン中も stall を ok と誤表示しない |
-| 2026-10-20 | Grok非日次前提。stale 閾値を平日2→**5**（毎日必須ではない）。確認は Slack `#ai-hub` |
+| 2026-10-20 | 一時的に stale 閾値を平日5へ緩和（非日次想定）→ Hawk/部長確認後 **平日2に戻す**。本線は毎日09:00本日分。確認は Slack `#ai-hub` |

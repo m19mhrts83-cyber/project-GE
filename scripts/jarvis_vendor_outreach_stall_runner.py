@@ -97,10 +97,9 @@ REFILL_BODY_RE = re.compile(
 
 REFILL_COOLDOWN_HOURS = 12
 SEND_RESUME_COOLDOWN_HOURS = 6
-# Grok Bot は使用量節約で毎日起動しない想定。
-# 「毎日 mark 無し＝障害」ではない。既定は平日5日（おおよそ週1運用の猶予）。
-# 上書き: state stale_marks_business_days / env JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS
-STALE_MARK_BUSINESS_DAYS_DEFAULT = 5
+# 本線は毎日 09:00「不動産Daily · 本日分」（Hawk/部長 2026-10-20）。
+# mark が平日2日以上空いたら #ops 見守り。上書き: state / env JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS
+STALE_MARK_BUSINESS_DAYS_DEFAULT = 2
 
 
 def stale_marks_threshold_days(state: dict[str, Any] | None = None) -> int:
@@ -605,7 +604,7 @@ def stale_marks_reason(
 ) -> str:
     """mark 停滞の理由文（ops クールダウンとは独立）。空なら停滞なし。
 
-    毎日送信必須ではない。threshold（既定5平日）を超えたら見守り対象。
+    threshold（既定2平日＝日次運用）を超えたら見守り対象。
     """
     thr = (
         threshold_days
@@ -621,7 +620,6 @@ def stale_marks_reason(
                 return (
                     f"最終 contacted から平日{gap}日"
                     f"（閾値{thr}平日）・本日 mark なし（{last_c}）"
-                    " ※毎日送信必須ではない／Grok非日次運用の見守り"
                 )
         except ValueError:
             return ""
