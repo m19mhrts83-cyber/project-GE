@@ -287,6 +287,17 @@ export async function POST(request: NextRequest) {
           text: result.text,
         });
       }
+      // 見送り: 元カードを削除（チャンネル上に残さない）
+      if (result.kind === "delete") {
+        const body = {
+          delete_original: true,
+          text: result.text,
+        };
+        if (responseUrl) {
+          await postResponseUrl(responseUrl, body);
+        }
+        return NextResponse.json(body);
+      }
       const body = {
         replace_original: true,
         text: result.text,

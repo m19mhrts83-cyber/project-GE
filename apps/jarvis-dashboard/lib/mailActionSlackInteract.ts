@@ -3,6 +3,7 @@
  */
 import {
   applyMailActionSlack,
+  deleteSlackMaMessage,
   fetchMailActionTriage,
   isMailActionTriageId,
   maActionUrl,
@@ -197,9 +198,10 @@ export async function handleMaBlockAction(opts: {
   channelId?: string;
   messageTs?: string;
 }): Promise<{
-  kind: "replace" | "ephemeral" | "modal_opened" | "error";
+  kind: "replace" | "delete" | "ephemeral" | "modal_opened" | "error";
   text: string;
   blocks?: ReturnType<typeof maDoneBlocks>;
+  slack_deleted?: boolean;
 }> {
   const { action, triageId, triggerId, channelId, messageTs } = opts;
 
@@ -237,14 +239,21 @@ export async function handleMaBlockAction(opts: {
   const result = await applyMailActionSlack(triageId, action, {
     source: "slack_block_actions",
   });
-  const title =
-    action === "skip"
-      ? result.ok
-        ? "見送り"
-        : "見送り失敗"
-      : result.ok
-        ? "Todoist 登録"
-        : "Todoist 登録失敗";
+
+  // 見送り成功 → カードをチャットから削除（残す必要なし）
+  if (action === "skip" && result.ok) {
+    const deletedNow = await deleteSlackMaMessage({
+      channel: channelId,
+      ts: messageTs,
+    });
+    return {
+      kind: "delete",
+      text: result.message,
+      slack_deleted: deletedNow || result.slack_deleted,
+    };
+  }
+
+  const title = result.ok ? "Todoist 登録" : "Todoist 登録失敗";
   return {
     kind: result.ok ? "replace" : "error",
     text: result.message,

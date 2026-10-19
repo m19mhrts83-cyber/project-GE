@@ -2,6 +2,7 @@ name: Jarvis Mail Action Noon (116)
 
 # T2: 平日 12:30 JST — メール要対応を Slack #consult に再掲（朝取りこぼし・日中到着）
 # 社員: 116 メール要対応係
+# Slack 投稿後に Gmail 既読（物件取込と同型）するため admin token を展開する
 
 on:
   schedule:
@@ -31,6 +32,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install deps
+        run: |
+          python3 -m pip install --quiet supabase google-api-python-client google-auth-httplib2 google-auth-oauthlib
+      - name: Expand Gmail admin token
+        env:
+          GMAIL_CREDENTIALS_B64: ${{ secrets.GMAIL_CREDENTIALS_B64 }}
+          GMAIL_ADMIN_TOKEN_B64: ${{ secrets.GMAIL_ADMIN_TOKEN_B64 }}
+        run: |
+          set -euo pipefail
+          MANUAL="215_kamiooya/C1_cursor/1b_Cursorマニュアル"
+          mkdir -p "$MANUAL"
+          if [[ -n "${GMAIL_CREDENTIALS_B64:-}" ]]; then
+            echo "$GMAIL_CREDENTIALS_B64" | base64 -d > "$MANUAL/credentials.json"
+          fi
+          if [[ -n "${GMAIL_ADMIN_TOKEN_B64:-}" ]]; then
+            echo "$GMAIL_ADMIN_TOKEN_B64" | base64 -d > "$MANUAL/token_livingsupport.json"
+            echo "📎 Gmail admin token expanded for mail-action mark-read"
+          else
+            echo "::warning::GMAIL_ADMIN_TOKEN_B64 missing — Slack post continues; Gmail mark-read soft-fails (morning catchup)"
+          fi
       - name: Post mail-action cards
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
