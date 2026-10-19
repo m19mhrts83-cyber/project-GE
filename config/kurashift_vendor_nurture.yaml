@@ -19,11 +19,11 @@ settings:
     - discovered
 
 # 定型文面（Grok S2 / Webフォーム／メール共用）
-# approved: false のあいだは --queue-outbox しない（松野が文面OKするまで）
+# approved: true（2026-10-19 松野OK）。false に戻すと --queue-outbox 停止
 template:
   id: vendor_nurture_v1
-  approved: false
-  approved_note: "2026-10-19 Phase2。件名は『最近の物件情報』伺い（定期確認は使わない）。松野確認後 approved: true"
+  approved: true
+  approved_note: "2026-10-19 松野OK。件名『最近の物件情報について』・伺いトーン（定期確認は使わない）"
   from_name: 松野真治
   from_email: matsuno.estate@gmail.com
   subject: "最近の物件情報について"
