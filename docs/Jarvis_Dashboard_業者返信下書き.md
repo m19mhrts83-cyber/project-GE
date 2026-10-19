@@ -33,14 +33,19 @@ flowchart LR
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
-# estate 返信 → Dashboard general（下書き付き）
-~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_reply_triage.py --push --mark-inbound-replied
+# estate 返信 → Dashboard general（下書き付き）＋ Slack #consult 操作カード
+~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_reply_triage.py \
+  --push --mark-inbound-replied --slack
+
+# Slack だけ再投稿（pending・未投稿分）
+~/selenium_env/venv/bin/python scripts/jarvis_vendor_reply_slack_post.py --from-triage
 
 # Web 送信後 → 業者 YAML synced
 ~/selenium_env/venv/bin/python scripts/jarvis_triage_vendor_catchup.py
 ```
 
-朝バンドル `jarvis_morning_mac_refresh.py` に組込済み。
+朝バンドル `jarvis_morning_mac_refresh.py` に組込済み（`--slack` 付き）。  
+**Slack 本線**: `docs/KURASHIFT_業者返信_Slack操作_20261019.md`（送信／編集／返信なしボタン）。
 
 ## Dashboard 操作
 
