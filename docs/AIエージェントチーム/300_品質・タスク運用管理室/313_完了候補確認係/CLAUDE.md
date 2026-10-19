@@ -85,6 +85,7 @@
 正本: `.cursor/rules/jarvis-todoist-owner-confirm.mdc`「サマリ・アウトプットリンク」。
 
 ```
+【Jarvis】
 サマリ: （何を確認したか／なぜ閉じるか・残すか・1〜3行）
 アウトプット:
 - [表示名](https://…)
@@ -93,8 +94,8 @@
 | とき | 必須？ |
 |---|---|
 | オーナー確認へ移動 | **必須**（何を見て了承するか） |
-| 確認のみ `complete-task` | **必須**（先頭 `タスク完了したよ（Jarvis・確認のみクローズ）` ＋サマリ＋アウトプット） |
-| 通常完了（人了承後） | **必須**（先頭 `タスク完了したよ`） |
+| 確認のみ `complete-task` | **必須**（先頭 `【Jarvis】タスク完了したよ（確認のみクローズ）` ＋サマリ＋アウトプット） |
+| 通常完了（人了承後） | **必須**（先頭 `【Jarvis】タスク完了したよ`） |
 | 処置・事実確認の途中報告 | **必須**（クローズしないときもコメント） |
 | 秘密・トークン | **禁止** |
 
@@ -120,7 +121,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   --task-id … --lane apps --status オーナー確認
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py complete-task \
   --lane apps --task-id … \
-  --comment 'タスク完了したよ（Jarvis・確認のみクローズ）
+  --comment '【Jarvis】タスク完了したよ（確認のみクローズ）
 サマリ: …
 アウトプット:
 - [表示](https://…)'
@@ -133,3 +134,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-09 | ビルダー構成に合わせ候補フォルダ作成（ID 313） |
 | 2026-10-19 | 確認のみクローズ／並列バッチ方針を本係の正本に具体化。Cursor skill・ルールと同期 |
 | 2026-10-19 | 「コメント必須」節を独立。`/todoist-batch` 合図・チャットだけでは不足を明記 |
+| 2026-10-19 | コメント先頭に書き手識別 `【Jarvis】` 必須（FRIDAY=`【FRIDAY】`・ホーク=`【ホーク】`） |
