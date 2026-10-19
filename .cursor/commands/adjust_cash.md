@@ -15,6 +15,7 @@
 ## 第1ターン — 確認表まで出す
 
 1. 対象支払いが文脈に無ければ1行聞く（Olive／Amex／全般・due・寄せ先）。分かるなら省略。
+1b. **済んだ支払いは Zaim CSV 等で自分で確認**（「済みましたか？」と聞かない）。確認できたらプラン外＋「Zaimで確認済」1行。分からなければそのときだけ聞く。
 2. 止まずに必要額・キープ・usable を集める:
    - `jarvis_card_debit_watch.py --fetch-vpass`
    - `jarvis_salary_pay_calendar.py`（大型寄せゲート）

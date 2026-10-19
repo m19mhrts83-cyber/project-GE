@@ -17,8 +17,8 @@ builder_source:
   share_id: uksxiDIzE1AEckKH
   url: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
   previous_share_id: eHKHNixTpIF4G5WN
-updated: '2026-10-17'
-builder_sync_note: 2026-10-17 ビルダー38体に同期（615円動向報告係・714議事録整理係追加済。修繕見積比較・送金明細照合は削除済み）。表示名は3桁ID＋Grok記号。部長格の★は Grok 記号側（〔Grok:★S〕等。社員番号には付けない）。共有 uksxiDIzE1AEckKH。詳細 29_Grok記号割当_20261017.md。
+updated: '2026-10-19'
+builder_sync_note: 2026-10-19 715家族会議週次係をBuilder反映（運用確認・FRIDAY launchd）。616寄せリマインド係も同日追加。Drive旧614_Vポイント・テイチャン係は_unused退避。共有 uksxiDIzE1AEckKH。
 mixup_doc: 16_GrokBot対応_ミックスアップ識別_20261010.md
 numbering: '3桁固定ID。百の位＝部門、十の位＝まとまり、一の位＝社員。
 
@@ -443,6 +443,20 @@ agents:
     tool_notes: USD/JPY 推移グラフ＋短報。売買指図なし。正本 jarvis_yen_rate_watch.py
     schedule: GHA月木08:00
     note: 2026-10-17 新設。Yahoo USDJPY=X／Frankfurter。Stage C=/yen は後続。
+  '616':
+    name: 寄せリマインド係
+    path: 600_リソース・家計室/616_寄せリマインド係
+    flowforge_id: ''
+    flowforge_url: ''
+    status: 設計中
+    report: consult
+    mixup_kind: none
+    trigger: 時間＋変化
+    tool_assigned: gencode
+    tool_fit: A+B
+    tool_notes: 検知・促しはルール＋CLAUDE.md（スキル不要・他ツール可）。送金だけ Jarvis＋人了承。銀行秘密なし
+    schedule: due7日以内／watch悪化／人依頼
+    note: 2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。
   '711':
     name: 家族Journal週次材料係
     path: 700_コーチング支援室/711_家族Journal週次材料係

@@ -26,10 +26,10 @@ genres:
     summary: 家計 Zaim・課金ガード・AI 枠の見える化。Grok リソース経営と 600 室
     leaders:
       grok: リソース経営部長
-      ai: リソース・家計室（611–613）
+      ai: リソース・家計室（611–616）
     ai_department_ids: ["600"]
     grok_department_ids: ["resource"]
-    nav_hints: ["Zaim Watch", "課金", "ETC", "Vポイント"]
+    nav_hints: ["Zaim Watch", "課金", "ETC", "Vポイント", "寄せ", "money-ops"]
 
   - id: coaching
     name: コーチング
@@ -37,7 +37,7 @@ genres:
     summary: 家族・総務・パートナーDX の助言材料。Grok コーチ系と 700 室
     leaders:
       grok: コーチング部長／家族コーチ統括／総務計画T統括
-      ai: コーチング支援室（711–713）
+      ai: コーチング支援室（711–715）
     ai_department_ids: ["700"]
     grok_department_ids: ["coaching", "family", "somu", "partner_dx"]
     nav_hints: ["家族タスク"]
