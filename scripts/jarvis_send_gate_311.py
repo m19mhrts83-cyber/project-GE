@@ -498,6 +498,19 @@ def run_checks(
     else:
         checks.append(CheckResult(True, "banned", "禁止宛先なし"))
 
+    # --- 点検4: Gmail ラップURL（教訓 2026-10-16 Life Partner）---
+    # Gmail 画面からコピーすると google.com/url?q=… になり、そのまま送ると相手にも届く
+    if re.search(r"https?://(?:www\.)?google\.com/url\?q=", body, re.I):
+        checks.append(
+            CheckResult(
+                False,
+                "wrapped_url",
+                "本文に google.com/url?q= ラップURLあり（素の drive.google.com 等に直す）",
+            )
+        )
+    else:
+        checks.append(CheckResult(True, "wrapped_url", "GmailラップURLなし"))
+
     ng = [c for c in checks if not c.ok]
     if ng:
         reason = "／".join(c.detail for c in ng)

@@ -1,5 +1,6 @@
 {
   "disabled": false,
+  "stale_marks_business_days": 2,
   "last_refill_at": null,
   "last_ops_alert_at": null,
   "last_daily_report_at": null,
@@ -24,5 +25,5 @@
       "last_sync_at": null
     }
   },
-  "notes": "S2/S4/S9 stall。disabled:true で補給・週次 Slack を止める。#report は週次ゲート（healthy）"
+  "notes": "S2/S4/S9 stall。本線は毎日09:00本日分。stale 閾値は平日N日（既定2）。disabled:true で補給・週次 Slack を止める。#report は週次ゲート（healthy）"
 }

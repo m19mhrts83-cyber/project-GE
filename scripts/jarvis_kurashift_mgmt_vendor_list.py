@@ -484,7 +484,7 @@ def import_mgmt_xlsx(
     vendors = list(by_id.values())
     vendors.sort(key=lambda v: str(v.get("id") or ""))
     settings = existing.get("settings") or {}
-    settings.setdefault("daily_outreach_limit", 2)
+    settings.setdefault("daily_outreach_limit", 1)
     settings.setdefault("alive_due_days", 180)
     settings.setdefault("source_xlsx", str(path))
     out_data = {"settings": settings, "vendors": vendors}
@@ -573,11 +573,9 @@ def next_pending(
                 "area_phrase": AREA_PHRASE.get(pl, AREA_PHRASE["kita_shiga"]),
                 "property_folder_url": prop_url,
                 "common_folder_url": share.get("common") or "",
-                "subject": (
-                    "【空室対策のご相談】名古屋市緑区にアパートを所有している松野です"
-                    if pl == "midori_caramel"
-                    else "【空室対策のご相談】名古屋市北区にアパートを所有している松野です"
-                ),
+                # 2026-10-20 承認テンプレは緑区・北区共通件名（資料フォルダ行は本文に載せない）
+                "subject": "【空室対策のご相談】名古屋市緑区・北区にアパートを所有している松野です",
+                "include_folder_urls_in_body": False,
             },
         }
 
@@ -805,7 +803,7 @@ def main() -> int:
     ap.add_argument("--alive-status", default="ok")
     ap.add_argument("--alive-method", default="phone")
     ap.add_argument("--alive-queue", action="store_true")
-    ap.add_argument("--limit", type=int, default=2)
+    ap.add_argument("--limit", type=int, default=1)
     ap.add_argument("--merge-append", metavar="PATH")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
