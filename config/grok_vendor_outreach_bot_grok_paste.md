@@ -177,11 +177,11 @@ Mac が `--batch-week` で渡す JSON（`mode: batch_week`）を受け取った�
    - **Phase2**: 下記 **approved nurture 定型**（`config/kurashift_vendor_nurture.yaml`）。A'-v2 とは **別レーン・混ぜない**  
    - Jarvis が `--queue-outbox` で `outbox_to_teams/re/` にキューを書いたら、**1日最大3社**・改変なしで Webフォーム（または email）送信  
    - 送信後: `jarvis_vendor_nurture_due.py --mark <id>`。反響は `nurture_last_reply_*` **最新のみ**（Phase3）  
-   - `template.approved: false` のあいだはキューも送らない（松野が文面OKするまで）  
+   - `template.approved: true`（2026-10-19 松野OK）。false に戻したらキューも送らない  
    - 正本: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · 社員 516 CLAUDE  
    - 非定型・個別事情は松野確認
 
-### approved nurture 定型（vendor_nurture_v1 · 松野確認後に送信）
+### approved nurture 定型（vendor_nurture_v1 · 送信可）
 
 **対外文面に「定期確認」は使わない**（最近の物件情報の伺い）。
 
