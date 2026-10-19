@@ -239,10 +239,35 @@ export async function POST(request: NextRequest) {
     const action = parseAction(m[1])!;
     const dealId = m[2];
     const result = await applyGate(dealId, action, "slack_button");
-    return NextResponse.json({
-      response_type: "ephemeral",
-      text: result.ok ? `✅ ${result.message}` : `❌ ${result.message}`,
-    });
+    const ok = result.ok;
+    const icon = ok ? "✅" : "❌";
+    const title =
+      action === "yes"
+        ? ok
+          ? "問合せ送信を受け付けました"
+          : "問合せ受付に失敗"
+        : ok
+          ? "見送りにしました"
+          : "見送り更新に失敗";
+    const replaceBody = {
+      replace_original: true,
+      text: `${icon} ${result.message}`,
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn" as const,
+            text: `${icon} *${title}*\n${result.message}${
+              result.job_id ? `\njob_id=\`${result.job_id}\`` : ""
+            }`,
+          },
+        },
+      ],
+    };
+    if (responseUrl) {
+      await postResponseUrl(responseUrl, replaceBody);
+    }
+    return NextResponse.json(replaceBody);
   }
 
   return NextResponse.json({ ok: false, error: "unsupported content-type" }, { status: 415 });

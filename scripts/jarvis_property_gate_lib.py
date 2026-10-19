@@ -12,6 +12,8 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -175,16 +177,315 @@ def action_url(deal_id: str, action: str) -> str:
     return f"{DASHBOARD}/api/g/{kind}/{deal_id}?s={sig}"
 
 
-def post_slack(
+DEFAULT_CONSULT_CHANNEL_ID = "C0C7R0UF3MM"
+
+GATE_ACTION_IDS = {
+    "yes": "property_gate_yes",
+    "no": "property_gate_no",
+}
+
+
+def _bot_token() -> str:
+    return (os.environ.get("SLACK_BOT_TOKEN") or "").strip()
+
+
+def _consult_channel_id() -> str:
+    return (
+        (os.environ.get("SLACK_CONSULT_CHANNEL_ID") or "").strip()
+        or DEFAULT_CONSULT_CHANNEL_ID
+    )
+
+
+def gate_action_buttons(deal_id: str, *, url_mode: bool = False) -> list[dict[str, Any]]:
+    """Yes/No。本線は action_id（アプリ内）。url_mode はブラウザ予備。"""
+    yes_u = action_url(deal_id, "yes")
+    no_u = action_url(deal_id, "no")
+    if url_mode:
+        return [
+            {
+                "type": "button",
+                "text": {"type": "plain_text", "text": "問合せする（Yes）", "emoji": True},
+                "style": "primary",
+                "url": yes_u,
+            },
+            {
+                "type": "button",
+                "text": {"type": "plain_text", "text": "見送り（No）", "emoji": True},
+                "style": "danger",
+                "url": no_u,
+            },
+        ]
+    return [
+        {
+            "type": "button",
+            "text": {"type": "plain_text", "text": "問合せする（Yes）", "emoji": True},
+            "style": "primary",
+            "action_id": GATE_ACTION_IDS["yes"],
+            "value": f"yes:{deal_id}",
+        },
+        {
+            "type": "button",
+            "text": {"type": "plain_text", "text": "見送り（No）", "emoji": True},
+            "style": "danger",
+            "action_id": GATE_ACTION_IDS["no"],
+            "value": f"no:{deal_id}",
+        },
+    ]
+
+
+def _chunk_mrkdwn(text: str, limit: int = 2800) -> list[str]:
+    text = (text or "").strip()
+    if not text:
+        return []
+    if len(text) <= limit:
+        return [text]
+    parts: list[str] = []
+    rest = text
+    while rest:
+        if len(rest) <= limit:
+            parts.append(rest)
+            break
+        cut = rest.rfind("\n", 0, limit)
+        if cut < limit // 2:
+            cut = limit
+        parts.append(rest[:cut].rstrip())
+        rest = rest[cut:].lstrip("\n")
+    return parts
+
+
+def b_card_blocks(
+    deal: dict[str, Any],
+    lane: dict[str, Any],
+    *,
+    url_mode: bool = False,
+) -> list[dict[str, Any]]:
+    """#consult Bカード用 Block Kit（Yes/No は action_id 本線）。"""
+    deal_id = str(deal["id"])
+    body = format_b_card(deal, lane, include_action_links=False)
+    yes_u = action_url(deal_id, "yes")
+    no_u = action_url(deal_id, "no")
+    detail = deal_url(deal_id)
+    mode = "アプリ内ボタン" if not url_mode else "URLボタン"
+    blocks: list[dict[str, Any]] = []
+    for i, chunk in enumerate(_chunk_mrkdwn(body)):
+        blocks.append(
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": chunk},
+            }
+        )
+        if i >= 4:
+            # Slack メッセージはブロック数上限があるので打ち切り
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"…続きは <{detail}|全文ページ>",
+                    },
+                }
+            )
+            break
+    blocks.append(
+        {
+            "type": "actions",
+            "block_id": f"gate_{deal_id[:20]}",
+            "elements": gate_action_buttons(deal_id, url_mode=url_mode),
+        }
+    )
+    blocks.append(
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"{mode} · deal=`{deal_id}`\n"
+                        f"予備URL: <{yes_u}|Yes> · <{no_u}|No> · <{detail}|全文>"
+                    ),
+                }
+            ],
+        }
+    )
+    return blocks
+
+
+def reminder_blocks(
+    items: list[dict[str, Any]],
+    *,
+    cleaned: dict[str, int] | None = None,
+    date_str: str | None = None,
+    limit: int = 10,
+    url_mode: bool = False,
+) -> list[dict[str, Any]]:
+    """保留リマインド用。各案件に Yes/No ボタン。"""
+    date_str = date_str or now_jst_date()
+    header = (
+        f"*【物件進行ゲート】保留リマインド（{date_str}・{len(items)}件）*\n"
+        "未判断のBカードです（古い順）。ボタンで Yes/No。"
+    )
+    blocks: list[dict[str, Any]] = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": header}}
+    ]
+    for i, it in enumerate(items[:limit], 1):
+        deal = it["deal"]
+        did = str(deal["id"])
+        title = str(deal.get("title") or "物件")[:60]
+        rb = land_ratio_brief(deal)
+        meta = f"｜土地値率 {rb}" if rb else ""
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*{i}) {title}*\n"
+                        f"理由：{it.get('reason') or '—'}{meta}\n"
+                        f"<{deal_url(did)}|全文>"
+                    ),
+                },
+            }
+        )
+        blocks.append(
+            {
+                "type": "actions",
+                "block_id": f"gate_rm_{did[:18]}_{i}",
+                "elements": gate_action_buttons(did, url_mode=url_mode),
+            }
+        )
+    if len(items) > limit:
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"…他 {len(items) - limit} 件",
+                    }
+                ],
+            }
+        )
+    if cleaned:
+        parts = []
+        if cleaned.get("already_inquired"):
+            parts.append(f"問合せ済み {cleaned['already_inquired']}")
+        if cleaned.get("duplicate"):
+            parts.append(f"重複 {cleaned['duplicate']}")
+        if parts:
+            blocks.append(
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": "保留から外したもの: " + "／".join(parts),
+                        }
+                    ],
+                }
+            )
+    return blocks
+
+
+def prefer_url_buttons() -> bool:
+    """本線は action_id。URL は JARVIS_PROPERTY_GATE_URL_BUTTONS=1 のときだけ。
+
+    Incoming Webhook でも interactive ボタンは Interactivity URL に届く。
+    Bot 投稿は post_slack 側で優先（無ければ Webhook）。
+    """
+    return (os.environ.get("JARVIS_PROPERTY_GATE_URL_BUTTONS") or "").strip() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _post_slack_bot(
+    text: str,
+    blocks: list[dict[str, Any]] | None,
+    *,
+    dry_run: bool,
+) -> dict[str, Any]:
+    token = _bot_token()
+    channel = _consult_channel_id()
+    body: dict[str, Any] = {
+        "channel": channel,
+        "text": text or "物件進行ゲート",
+    }
+    if blocks:
+        body["blocks"] = blocks
+    if dry_run:
+        print(f"[dry-run] chat.postMessage #{channel} blocks={len(blocks or [])}")
+        print(json.dumps(body, ensure_ascii=False)[:1200])
+        return {"ok": True, "dry_run": True, "via": "bot"}
+    if not token:
+        return {"ok": False, "error": "no_bot_token"}
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        "https://slack.com/api/chat.postMessage",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json; charset=utf-8",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            j = json.loads(resp.read().decode("utf-8", errors="replace"))
+            if not j.get("ok"):
+                return {"ok": False, "error": j.get("error") or "slack_api", "via": "bot"}
+            return {"ok": True, "via": "bot", "ts": j.get("ts"), "channel": channel}
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="replace")
+        return {"ok": False, "error": f"http_{e.code}", "out": err, "via": "bot"}
+
+
+def _post_slack_webhook(
     channel: str,
     text: str,
+    blocks: list[dict[str, Any]] | None,
     *,
-    dry_run: bool = False,
-    username: str | None = None,
+    dry_run: bool,
+    username: str | None,
 ) -> dict[str, Any]:
     if dry_run:
-        print(f"[dry-run] slack #{channel}:\n{text[:800]}")
-        return {"ok": True, "dry_run": True}
+        print(f"[dry-run] slack webhook #{channel} blocks={len(blocks or [])}:\n{text[:800]}")
+        return {"ok": True, "dry_run": True, "via": "webhook"}
+    # blocks 付きは webhook へ直接 POST（CLI は text のみ）
+    if blocks:
+        env_map = {
+            "report": "SLACK_WEBHOOK_AI_TEAM_REPORT",
+            "consult": "SLACK_WEBHOOK_AI_TEAM_CONSULT",
+            "ops": "SLACK_WEBHOOK_AI_TEAM_OPS",
+            "hub": "SLACK_WEBHOOK_AI_TEAM_HUB",
+            "deal": "SLACK_WEBHOOK_AI_TEAM_DEAL_ACTIVE",
+        }
+        ch = (channel or "report").strip().lstrip("#").lower()
+        url = (os.environ.get(env_map.get(ch, "SLACK_WEBHOOK_AI_TEAM_REPORT")) or "").strip()
+        if not url:
+            url = (os.environ.get("SLACK_WEBHOOK_AI_TEAM_REPORT") or "").strip()
+        if not url:
+            return {"ok": False, "error": "webhook_missing", "via": "webhook"}
+        payload: dict[str, Any] = {
+            "text": text,
+            "blocks": blocks,
+            "username": username or "114 物件一次判定",
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = resp.read().decode("utf-8", errors="replace")
+                return {"ok": True, "via": "webhook", "out": body}
+        except urllib.error.HTTPError as e:
+            err = e.read().decode("utf-8", errors="replace")
+            return {"ok": False, "error": f"http_{e.code}", "out": err, "via": "webhook"}
+
     script = REPO / "scripts" / "jarvis_slack_webhook_post.py"
     if not script.is_file():
         return {"ok": False, "error": "webhook_post missing"}
@@ -200,7 +501,34 @@ def post_slack(
         timeout=60,
     )
     out = ((r.stdout or "") + (r.stderr or "")).strip()
-    return {"ok": r.returncode == 0, "code": r.returncode, "out": out}
+    return {"ok": r.returncode == 0, "code": r.returncode, "out": out, "via": "webhook"}
+
+
+def post_slack(
+    channel: str,
+    text: str,
+    *,
+    dry_run: bool = False,
+    username: str | None = None,
+    blocks: list[dict[str, Any]] | None = None,
+    force_webhook: bool = False,
+) -> dict[str, Any]:
+    """Slack 投稿。consult + blocks は Bot chat.postMessage 優先。"""
+    ch = (channel or "report").strip().lstrip("#").lower()
+    use_bot = (
+        ch == "consult"
+        and bool(blocks)
+        and bool(_bot_token())
+        and not force_webhook
+    )
+    if use_bot:
+        pr = _post_slack_bot(text, blocks, dry_run=dry_run)
+        if pr.get("ok") or dry_run:
+            return pr
+        # Bot 失敗時は Webhook へ
+    return _post_slack_webhook(
+        channel, text, blocks, dry_run=dry_run, username=username
+    )
 
 
 def heal_handoff_status(sb: Any, deal: dict[str, Any]) -> dict[str, Any] | None:
@@ -925,8 +1253,16 @@ def hazard_eval_lines(
     return lines
 
 
-def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
-    """#consult Bカード。コードブロック表は使わない（モバイル崩れ防止）。"""
+def format_b_card(
+    deal: dict[str, Any],
+    lane: dict[str, Any],
+    *,
+    include_action_links: bool = True,
+) -> str:
+    """#consult Bカード。コードブロック表は使わない（モバイル崩れ防止）。
+
+    include_action_links=False のとき本文は判断材料のみ（ボタンは Block Kit）。
+    """
     deal_id = str(deal["id"])
     title = str(deal.get("title") or "物件")[:80]
     title_disp = title.replace("[Grok調査]", "").strip() or title
@@ -961,11 +1297,17 @@ def format_b_card(deal: dict[str, Any], lane: dict[str, Any]) -> str:
         "",
         *format_judgment_card(deal, rows),
         "",
-        "*■ 判断（押し間違え防止のため、間を空けています）*",
-        "",
-        f"✅ <{action_url(deal_id, 'yes')}|問合せする（Yes）>",
-        "",
-        f"🚫 <{action_url(deal_id, 'no')}|見送り（No）>",
+        "*■ 判断*",
+        "下のボタンで問合せ送信（Yes）／見送り（No）。押し間違え防止のため間を空けています。",
+    ]
+    if include_action_links:
+        lines += [
+            "",
+            f"✅ <{action_url(deal_id, 'yes')}|問合せする（Yes）>",
+            "",
+            f"🚫 <{action_url(deal_id, 'no')}|見送り（No）>",
+        ]
+    lines += [
         "",
         f"🔎 <{deal_url(deal_id)}|表で全部見る（ログイン不要・推奨）>",
         "",
