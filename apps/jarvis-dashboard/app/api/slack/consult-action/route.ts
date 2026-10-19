@@ -15,17 +15,27 @@ import {
   postResponseUrl,
   VR_MODAL_CALLBACK,
 } from "@/lib/vendorReplySlackInteract";
+import {
+  extractMaModalBody,
+  handleMaBlockAction,
+  handleMaModalSubmit,
+  MA_MODAL_CALLBACK,
+  parseMaButtonValue,
+  parseMaModalMeta,
+} from "@/lib/mailActionSlackInteract";
 
 export const runtime = "nodejs";
 
 /**
- * Slack 物件進行ゲート Yes/No ＋ 業者返信ボタン（block_actions / view_submission）
+ * Slack 物件進行ゲート Yes/No ＋ 業者返信 ＋ メール要対応
+ * （block_actions / view_submission）
  *
  * GET  ?deal_id=&action=yes|no&token=PROPERTY_GATE_ACTION_TOKEN
  * POST Slack Interactivity（Signing Secret）または JSON {deal_id,action,token}
  *
  * 短縮 URL 本線: /api/g/y|n/{deal_id}?s=…
  * 業者返信 URL 予備: /api/g/vr/{action}/{id}?s=…
+ * メール要対応 URL: /api/g/ma/{reply|skip|todoist}/{id}?s=…
  */
 
 function verifySlackSignature(
@@ -153,10 +163,37 @@ export async function POST(request: NextRequest) {
 
     const payloadType = String(payload.type || "");
 
-    // --- 業者返信: 編集モーダル送信 ---
+    // --- 業者返信 / メール要対応: モーダル送信 ---
     if (payloadType === "view_submission") {
       const view = (payload.view || {}) as Record<string, unknown>;
       const callbackId = String(view.callback_id || "");
+
+      if (callbackId === MA_MODAL_CALLBACK) {
+        const meta = parseMaModalMeta(String(view.private_metadata || ""));
+        if (!meta) {
+          return NextResponse.json({
+            response_action: "errors",
+            errors: { mail_reply_body: "対象 ID が不正です" },
+          });
+        }
+        const body = extractMaModalBody(payload);
+        const result = await handleMaModalSubmit({
+          triageId: meta.id,
+          body,
+          channelId: meta.channel,
+          messageTs: meta.message_ts,
+        });
+        if (!result.ok) {
+          return NextResponse.json({
+            response_action: "errors",
+            errors: result.errors || {
+              mail_reply_body: result.text.slice(0, 100),
+            },
+          });
+        }
+        return NextResponse.json({ response_action: "clear" });
+      }
+
       if (callbackId !== VR_MODAL_CALLBACK) {
         return NextResponse.json({ ok: false, error: "unknown modal" }, { status: 400 });
       }
@@ -189,7 +226,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ response_action: "clear" });
     }
 
-    // --- block_actions（業者返信 or 物件ゲート）---
+    // --- block_actions（業者返信 / メール要対応 / 物件ゲート）---
     const actions = Array.isArray(payload.actions) ? payload.actions : [];
     const act = (actions[0] || {}) as Record<string, unknown>;
     const value = String(act.value || "");
@@ -208,6 +245,35 @@ export async function POST(request: NextRequest) {
       const result = await handleVrBlockAction({
         action: vr.action,
         triageId: vr.id,
+        triggerId,
+        channelId,
+        messageTs,
+      });
+      if (result.kind === "modal_opened") {
+        return new NextResponse("", { status: 200 });
+      }
+      if (result.kind === "ephemeral" || result.kind === "error") {
+        return NextResponse.json({
+          response_type: "ephemeral",
+          text: result.text,
+        });
+      }
+      const body = {
+        replace_original: true,
+        text: result.text,
+        blocks: result.blocks,
+      };
+      if (responseUrl) {
+        await postResponseUrl(responseUrl, body);
+      }
+      return NextResponse.json(body);
+    }
+
+    const ma = parseMaButtonValue(value);
+    if (ma) {
+      const result = await handleMaBlockAction({
+        action: ma.action,
+        triageId: ma.id,
         triggerId,
         channelId,
         messageTs,
