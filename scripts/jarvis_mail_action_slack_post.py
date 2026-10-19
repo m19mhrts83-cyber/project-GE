@@ -585,7 +585,10 @@ def build_compact_payload(
     return {"text": text, "blocks": blocks, "username": "Jarvis メール要対応"}
 
 
-def post_bot_message(payload: dict[str, Any], *, dry_run: bool) -> int:
+def post_bot_message(
+    payload: dict[str, Any], *, dry_run: bool
+) -> tuple[int, str | None, str | None]:
+    """Returns (rc, channel_id, message_ts). ts は見送り時の chat.delete 用。"""
     token = _bot_token()
     channel = _consult_channel()
     body = {
@@ -596,9 +599,9 @@ def post_bot_message(payload: dict[str, Any], *, dry_run: bool) -> int:
     if dry_run:
         print("# dry-run chat.postMessage")
         print(json.dumps(body, ensure_ascii=False, indent=2)[:4000])
-        return 0
+        return 0, channel, None
     if not token:
-        return 3
+        return 3, None, None
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
         "https://slack.com/api/chat.postMessage",
@@ -614,24 +617,26 @@ def post_bot_message(payload: dict[str, Any], *, dry_run: bool) -> int:
             j = json.loads(resp.read().decode("utf-8", errors="replace"))
             if not j.get("ok"):
                 print(f"❌ chat.postMessage: {j.get('error')}", file=sys.stderr)
-                return 1
-            print(f"✅ Slack mail-action Bot OK channel={channel} ts={j.get('ts')}")
-            return 0
+                return 1, None, None
+            ts = str(j.get("ts") or "") or None
+            ch = str(j.get("channel") or channel) or channel
+            print(f"✅ Slack mail-action Bot OK channel={ch} ts={ts}")
+            return 0, ch, ts
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="replace")
         print(f"❌ Slack HTTP {e.code}: {err}", file=sys.stderr)
-        return 1
+        return 1, None, None
 
 
-def post_webhook(payload: dict[str, Any], *, dry_run: bool) -> int:
+def post_webhook(payload: dict[str, Any], *, dry_run: bool) -> tuple[int, str | None, str | None]:
     url = _webhook_consult()
     if dry_run:
         print("# dry-run Slack webhook payload")
         print(json.dumps(payload, ensure_ascii=False, indent=2)[:4000])
-        return 0
+        return 0, None, None
     if not url:
         print("❌ SLACK_WEBHOOK_AI_TEAM_CONSULT（or REPORT）未設定", file=sys.stderr)
-        return 2
+        return 2, None, None
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"
@@ -640,22 +645,25 @@ def post_webhook(payload: dict[str, Any], *, dry_run: bool) -> int:
         with urllib.request.urlopen(req, timeout=30) as resp:
             body = resp.read().decode("utf-8", errors="replace")
             print(f"✅ Slack mail-action Webhook OK status={resp.status} body={body!r}")
-            return 0
+            # Incoming Webhook は ts が取れない → 見送り削除はアプリ内ボタン本線
+            return 0, None, None
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="replace")
         print(f"❌ Slack HTTP {e.code}: {err}", file=sys.stderr)
-        return 1
+        return 1, None, None
 
 
-def post_slack(payload: dict[str, Any], *, dry_run: bool, force_webhook: bool) -> int:
+def post_slack(
+    payload: dict[str, Any], *, dry_run: bool, force_webhook: bool
+) -> tuple[int, str | None, str | None]:
     if not _action_secret():
         print("⚠️ PROPERTY_GATE_ACTION_TOKEN 未設定（予備 URL 署名なし）", file=sys.stderr)
     use_bot = bool(_bot_token()) and not force_webhook
     if use_bot:
-        rc = post_bot_message(payload, dry_run=dry_run)
+        rc, ch, ts = post_bot_message(payload, dry_run=dry_run)
         if rc == 3:
             return post_webhook(payload, dry_run=dry_run)
-        return rc
+        return rc, ch, ts
     return post_webhook(payload, dry_run=dry_run)
 
 
@@ -894,7 +902,15 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
     return ranked, stats
 
 
-def mark_posted(sb: Any, tid: str, *, score: int | None = None, summary: str = "") -> None:
+def mark_posted(
+    sb: Any,
+    tid: str,
+    *,
+    score: int | None = None,
+    summary: str = "",
+    slack_channel: str | None = None,
+    slack_ts: str | None = None,
+) -> None:
     try:
         r = (
             sb.table("triage_items")
@@ -915,6 +931,10 @@ def mark_posted(sb: Any, tid: str, *, score: int | None = None, summary: str = "
             "summary_plan": "A_extractive",
             "summary": (summary or "")[:200],
         }
+        if slack_channel:
+            pl["slack_ma_channel"] = slack_channel
+        if slack_ts:
+            pl["slack_ma_ts"] = slack_ts
         sb.table("triage_items").update(
             {"payload": pl, "updated_at": now_iso()}
         ).eq("id", tid).execute()
@@ -988,7 +1008,9 @@ def main() -> int:
 
     if len(rows) >= 1 and not args.no_digest and (args.from_triage or len(rows) > 1):
         digest = build_digest_payload(rows)
-        rc = post_slack(digest, dry_run=args.dry_run, force_webhook=args.webhook)
+        rc, _, _ = post_slack(
+            digest, dry_run=args.dry_run, force_webhook=args.webhook
+        )
         if rc != 0:
             return rc
 
@@ -998,7 +1020,9 @@ def main() -> int:
         payload = build_compact_payload(
             row, url_mode=url_mode, rank=i, total=total
         )
-        rc = post_slack(payload, dry_run=args.dry_run, force_webhook=args.webhook)
+        rc, ch, ts = post_slack(
+            payload, dry_run=args.dry_run, force_webhook=args.webhook
+        )
         if rc != 0:
             return rc
         posted += 1
@@ -1008,6 +1032,8 @@ def main() -> int:
                 tid,
                 score=int(row.get("_score") or 0),
                 summary=str(row.get("_extract_summary") or ""),
+                slack_channel=ch,
+                slack_ts=ts,
             )
 
     # Slack に出した＝目を通す動線に載せたので Gmail 既読（物件取込と同型）

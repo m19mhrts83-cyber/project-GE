@@ -306,7 +306,33 @@ export type MaApplyResult = {
   status?: string;
   todoist_url?: string;
   muted?: boolean;
+  slack_deleted?: boolean;
 };
+
+/** 見送り後に Slack カードを消す（Bot が投稿したメッセージのみ） */
+export async function deleteSlackMaMessage(opts: {
+  channel?: string | null;
+  ts?: string | null;
+}): Promise<boolean> {
+  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
+  const channel = String(opts.channel || "").trim();
+  const ts = String(opts.ts || "").trim();
+  if (!bot || !channel || !ts) return false;
+  try {
+    const res = await fetch("https://slack.com/api/chat.delete", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${bot}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({ channel, ts }),
+    });
+    const j = (await res.json()) as { ok?: boolean; error?: string };
+    return Boolean(j.ok);
+  } catch {
+    return false;
+  }
+}
 
 export async function applyMailActionSlack(
   id: string,
@@ -322,7 +348,17 @@ export async function applyMailActionSlack(
     return { ok: false, message: "すでに送信済みです" };
   }
   if (action === "skip" && (st === "skipped" || st === "done")) {
-    return { ok: true, message: "すでに見送り済みです", status: st };
+    const pl = asPayload(row.payload);
+    const slackDeleted = await deleteSlackMaMessage({
+      channel: String(pl.slack_ma_channel || ""),
+      ts: String(pl.slack_ma_ts || ""),
+    });
+    return {
+      ok: true,
+      message: "すでに見送り済みです",
+      status: st,
+      slack_deleted: slackDeleted,
+    };
   }
   if (action === "todoist" && st === "todoist") {
     const url = String(asPayload(row.payload).todoist_url || "");
@@ -363,11 +399,17 @@ export async function applyMailActionSlack(
       : learn.key
         ? ` · 見送りカウント ${learn.skips}`
         : "";
+    // チャット上からカードを消す（振り返り不要）
+    const slackDeleted = await deleteSlackMaMessage({
+      channel: String(payload.slack_ma_channel || ""),
+      ts: String(payload.slack_ma_ts || ""),
+    });
     return {
       ok: true,
       message: `見送りにしました（${row.partner || row.from_email || id}）${muteNote}`,
       status: "skipped",
       muted: learn.muted,
+      slack_deleted: slackDeleted,
     };
   }
 
