@@ -34,6 +34,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import date as Date
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -96,6 +97,11 @@ DEFAULT_ALIASES = {
     "さーちゃん": "さわ",
     "まーくん": "たまき",
 }
+
+# 複製で残る旧週の見出し（当該週以外を削除してから挿入する）
+WEEKLY_HEADING_RE = re.compile(
+    r"^(週次インフォグラフィック|Genspark 議事録要約)（(\d{4}-\d{2}-\d{2})）"
+)
 
 
 # --------------------------------------------------------------------------
@@ -438,6 +444,63 @@ def _pdf_to_png(pdf: Path, png: Path) -> None:
 # --------------------------------------------------------------------------
 # Notion 挿入
 # --------------------------------------------------------------------------
+def cleanup_old_weekly_sections(
+    page_id: str, target_iso: str, *, dry_run: bool
+) -> list[dict[str, Any]]:
+    """前週複製で残った旧週の『インフォ／議事録要約』を削除する。
+
+    当該週（target_iso）の見出しは残す（再実行時の二重挿入防止）。
+    旧見出しから次の heading_1/2 までを1かたまりとして消す。
+    直前に divider があれば一緒に消す。
+    """
+    kids = nops.list_children(page_id)
+    if not dry_run:
+        backup_dir = REPO / ".jarvis_state" / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        (backup_dir / f"family_meeting_{target_iso}_before.json").write_text(
+            json.dumps(kids, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+
+    doomed: dict[int, dict[str, Any]] = {}
+    i = 0
+    while i < len(kids):
+        b = kids[i]
+        if b.get("type") != "heading_2":
+            i += 1
+            continue
+        text = nops.plain_text(b).strip()
+        m = WEEKLY_HEADING_RE.match(text)
+        is_old = False
+        if m:
+            is_old = m.group(2) != target_iso
+        elif text.startswith(("週次インフォグラフィック", "Genspark 議事録要約")):
+            is_old = True  # 日付なしの旧形式
+        if not is_old:
+            i += 1
+            continue
+
+        if i > 0 and kids[i - 1].get("type") == "divider":
+            doomed[i - 1] = kids[i - 1]
+        j = i
+        while j < len(kids):
+            if j > i and kids[j].get("type") in ("heading_1", "heading_2"):
+                break
+            doomed[j] = kids[j]
+            j += 1
+        i = j
+
+    removed = [
+        {"index": idx, "type": b.get("type"), "text": nops.plain_text(b).strip()[:80]}
+        for idx, b in sorted(doomed.items())
+    ]
+    if dry_run:
+        return removed
+    for idx, b in sorted(doomed.items()):
+        nops.delete_block(b["id"])
+        time.sleep(0.2)
+    return removed
+
+
 def insert_into_notion(
     target: Date,
     shaped: dict[str, Any],
@@ -457,6 +520,7 @@ def insert_into_notion(
             " 先に前週ページを複製して日付を変えてください。"
         )
     iso = target.isoformat()
+    removed = cleanup_old_weekly_sections(page["id"], iso, dry_run=dry_run)
     info_heading = f"週次インフォグラフィック（{iso}）"
     minutes_heading = f"Genspark 議事録要約（{iso}）"
     have_info = nops.has_heading(page["id"], info_heading)
@@ -502,6 +566,7 @@ def insert_into_notion(
         "page_url": nops.page_url(page["id"]),
         "have_info": have_info,
         "have_minutes": have_min,
+        "removed_old": removed,
         "blocks": len(blocks),
         "inserted": inserted,
         "upload_id": upload_id,
@@ -592,6 +657,9 @@ def run(args: argparse.Namespace) -> int:
     if args.dry_run:
         page = nops.find_dated_child(s["hub_page_id"], target.year, target.month, target.day)
         blocks = nops.md_to_blocks(summary_md)
+        removed = (
+            cleanup_old_weekly_sections(page["id"], iso, dry_run=True) if page else []
+        )
         plan = {
             "date": iso,
             "meeting": {"id": mid, "title": shaped.get("title"), "score": shaped.get("score")},
@@ -599,6 +667,7 @@ def run(args: argparse.Namespace) -> int:
             "corrections": corrections,
             "notebook_url": s["notebook_url"],
             "page": page,
+            "removed_old_blocks": removed,
             "summary_blocks": len(blocks),
             "summary_head": blocks[:6],
         }

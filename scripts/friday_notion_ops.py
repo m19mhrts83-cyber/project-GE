@@ -313,3 +313,8 @@ def upload_file(path: Path, *, content_type: str | None = None) -> str:
     if sent.get("status") not in (None, "uploaded", "pending"):
         raise NotionError(f"file_upload send status={sent.get('status')}")
     return upload_id
+
+
+def delete_block(block_id: str) -> dict[str, Any]:
+    """ブロックをアーカイブ（Notion のゴミ箱へ）。"""
+    return _request("DELETE", f"/blocks/{normalize_page_id(block_id)}")
