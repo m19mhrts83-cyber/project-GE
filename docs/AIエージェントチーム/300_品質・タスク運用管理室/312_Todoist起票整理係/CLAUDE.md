@@ -49,6 +49,7 @@
 正本: `.cursor/rules/jarvis-todoist-owner-confirm.mdc`「サマリ・アウトプットリンク」。
 
 ```
+【Jarvis】
 サマリ: （何を起票したか／出典・期限・ボール・1〜3行）
 アウトプット:
 - [表示名](https://…)
@@ -101,7 +102,8 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py create-task \
   --lane properties --title '[GrandoleI][ミニテック] …' \
   --label GrandoleI,ミニテック \
-  --comment 'サマリ: …
+  --comment '【Jarvis】
+サマリ: …
 アウトプット:
 - [出典](https://…)'
 ```
@@ -112,3 +114,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 |---|---|
 | 2026-10-09 | ビルダー構成に合わせ候補フォルダ作成（ID 312） |
 | 2026-10-19 | コメント必須（サマリ＋アウトプット）・`/todoist` 合図・CLI を本係正本に具体化。Jarvis `owner-confirm` と同型 |
+| 2026-10-19 | コメント先頭に書き手識別 `【Jarvis】` 必須（FRIDAY=`【FRIDAY】`・ホーク=`【ホーク】`） |

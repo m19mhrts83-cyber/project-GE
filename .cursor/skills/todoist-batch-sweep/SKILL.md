@@ -50,6 +50,7 @@ description: >-
 
 バッチでも単件でも、やったことは **Todoist コメント**に残す（チャット／Slack は要約）。  
 形式は `jarvis-todoist-owner-confirm.mdc` と同型（サマリ＋アウトプット）。コメント無しの close 禁止。
+**1行目先頭に `【Jarvis】` を必ず付ける**（FRIDAY は `【FRIDAY】`・ホークは `【ホーク】`／共通トークンのため編集ツール識別用）。
 
 ## 手順
 
@@ -63,7 +64,7 @@ description: >-
 ### complete-task コメント（確認のみ）
 
 ```
-タスク完了したよ（Jarvis・確認のみクローズ）
+【Jarvis】タスク完了したよ（確認のみクローズ）
 サマリ: …
 アウトプット:
 - […](https://…)
