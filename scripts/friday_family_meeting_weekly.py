@@ -341,7 +341,11 @@ def summary_for_notion(shaped: dict[str, Any], aliases: dict[str, str]) -> tuple
     summary = shaped.get("summary") or ""
     if not isinstance(summary, str):
         summary = json.dumps(summary, ensure_ascii=False, indent=2)
-    return correct_text(summary.strip(), aliases)
+    out, used = correct_text(summary.strip(), aliases)
+    # 実名へ直せなかった話者ラベルは、勝手に推測せず要確認として残す（Jarvis回答 2026-10-19）
+    if re.search(r"(?:Speaker|スピーカー)\s*\d+", out):
+        used.append("Speaker N が残存（実名補正は要確認）")
+    return out, used
 
 
 # --------------------------------------------------------------------------
