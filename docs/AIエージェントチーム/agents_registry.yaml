@@ -502,6 +502,22 @@ agents:
     tool_notes: Genspark/JPR→Notion電話面談Inbox提案。了承後のみ作成。家族会議除外
     schedule: パートナー確認ついで／朝オープン／明示依頼
     note: 2026-10-17 新設。正本 jarvis_meeting_minutes_curate.py。config/notion_phone_meeting.yaml
+  '715':
+    name: 家族会議週次係
+    path: 700_コーチング支援室/715_家族会議週次係
+    flowforge_id: ''
+    flowforge_url: ''
+    status: 運用確認
+    report: report
+    mixup_kind: mac_twin
+    grok_counterpart: family
+    builder_tag: 〔Grok:F〕
+    trigger: 時間
+    tool_assigned: launchd
+    tool_fit: A
+    tool_notes: Genspark/Speakly議事録→NotebookLM1ノート→Studioインフォ→Notion当日ページ（インフォ→議事録）。ページ複製は人
+    schedule: 日曜21:30／月曜07:00リトライ
+    note: 2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation
   '811':
     name: ダッシュボード受け入れ係
     path: 800_俯瞰UI・投影更新室/811_ダッシュボード受け入れ係
