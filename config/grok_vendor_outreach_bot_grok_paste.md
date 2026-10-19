@@ -177,13 +177,15 @@ Mac が `--batch-week` で渡す JSON（`mode: batch_week`）を受け取った�
    - **Phase2**: 下記 **approved nurture 定型**（`config/kurashift_vendor_nurture.yaml`）。A'-v2 とは **別レーン・混ぜない**  
    - Jarvis が `--queue-outbox` で `outbox_to_teams/re/` にキューを書いたら、**1日最大3社**・改変なしで Webフォーム（または email）送信  
    - 送信後: `jarvis_vendor_nurture_due.py --mark <id>`。反響は `nurture_last_reply_*` **最新のみ**（Phase3）  
-   - `template.approved: false` のあいだはキューも送らない（松野が文面OKするまで）  
+   - `template.approved: true`（2026-10-19 松野OK）。false に戻したらキューも送らない  
    - 正本: `docs/KURASHIFT_業者開拓_定期情報確認_20261019.md` · 社員 516 CLAUDE  
    - 非定型・個別事情は松野確認
 
-### approved nurture 定型（vendor_nurture_v1 · 松野確認後に送信）
+### approved nurture 定型（vendor_nurture_v1 · 送信可）
 
-件名: 物件情報のご案内有無について（定期確認）
+**対外文面に「定期確認」は使わない**（最近の物件情報の伺い）。
+
+件名: 最近の物件情報について
 
 ```
 {vendor_name} 様
@@ -191,12 +193,13 @@ Mac が `--batch-week` で渡す JSON（`mode: batch_week`）を受け取った�
 以前お問い合わせいたしました、松野真治です。
 その節はありがとうございました。
 
-現在も、{area_line}の賃貸運用向け戸建てを探しております。
+その後も、{area_line}の賃貸運用向け戸建てを探しております。
+最近ご案内できる物件情報がございましたら、お伺いできますでしょうか。
 築古・ボロ戸建て・空き家・要修繕でも構いません。
 予算は500万〜3,000万円程度で、お値打ちの物件を優先したいです。
 
-ご紹介いただける物件情報がございましたら、
-概要資料（PDF等）を matsuno.estate@gmail.com 宛にご送付いただけますと幸いです。
+概要資料（PDF等）がございましたら、
+matsuno.estate@gmail.com 宛にご送付いただけますと幸いです。
 また、今後未公開・特殊な物件が入りましたらご連絡いただけますと助かります。
 
 ハザードリスクが大きい物件は除外希望です。
