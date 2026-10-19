@@ -69,10 +69,22 @@ export async function GET(
       : action === "todoist"
         ? "Todoist"
         : "完了";
-  const msg =
-    action === "skip" && result.ok
-      ? `${result.message}\n\nSlack 上のカードは削除しました（または削除済み）。`
-      : result.message;
+  let msg = result.message;
+  if (action === "skip" && result.ok) {
+    if (result.slack_deleted) {
+      msg += "\n\nSlack 上のカードは削除しました。";
+    } else {
+      msg +=
+        "\n\n※ Slack カードの自動削除はできませんでした" +
+        "（Bot 未設定／Webhook 投稿で ts 無し）。" +
+        "チャンネル上のカードは手動で削除してください。";
+    }
+    if (result.digest_deleted) {
+      msg += "\nダイジェストも削除しました。";
+    } else if (result.digest_updated) {
+      msg += `\nダイジェストを残 ${result.digest_remaining ?? "?"} 件に更新しました。`;
+    }
+  }
   return htmlPage(result.ok ? title : "失敗", msg, result.ok);
 }
 

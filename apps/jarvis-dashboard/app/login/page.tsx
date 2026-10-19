@@ -1,13 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+
+/** middleware が付けた ?next=/mail/... をログイン後に戻す（open redirect 防止） */
+function resolveNextPath(): string {
+  try {
+    const n = new URLSearchParams(window.location.search).get("next");
+    if (n && n.startsWith("/") && !n.startsWith("//")) return n;
+  } catch {
+    /* ignore */
+  }
+  return "/";
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [nextHint, setNextHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    const n = resolveNextPath();
+    if (n !== "/") setNextHint(n);
+  }, []);
 
   async function signInPassword(e: React.FormEvent) {
     e.preventDefault();
@@ -20,7 +37,7 @@ export default function LoginPage() {
       setMsg(error.message);
       return;
     }
-    window.location.href = "/";
+    window.location.href = resolveNextPath();
   }
 
   async function signInGoogle() {
@@ -30,10 +47,15 @@ export default function LoginPage() {
     const supabase = createClient();
     const origin =
       process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    const next = resolveNextPath();
+    const callback =
+      next && next !== "/"
+        ? `${origin}/auth/callback?next=${encodeURIComponent(next)}`
+        : `${origin}/auth/callback`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${origin}/auth/callback`,
+        redirectTo: callback,
         queryParams: { prompt: "select_account" },
       },
     });
@@ -45,6 +67,11 @@ export default function LoginPage() {
       <div className="login-card">
         <h1>Jarvis Dashboard</h1>
         <p className="sub">自分用（運営提供 kamiooya-qa とは別）</p>
+        {nextHint ? (
+          <p className="sub" style={{ marginBottom: 12, color: "var(--fg, #111)" }}>
+            ログイン後に開く: <code>{nextHint}</code>
+          </p>
+        ) : null}
         <form onSubmit={signInPassword} style={{ textAlign: "left" }}>
           <label style={{ display: "block", fontSize: "0.85rem", marginBottom: 4 }}>
             メール

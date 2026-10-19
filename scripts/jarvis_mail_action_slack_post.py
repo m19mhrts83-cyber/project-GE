@@ -979,6 +979,18 @@ def main() -> int:
         return 0
 
     url_mode = bool(args.url_buttons)
+    # 業者返信と同型: Bot / Signing が無いとアプリ内ボタンは無反応になる
+    # （Webhook 投稿は ts が取れず見送り削除も不可 → URL ボタンへフォールバック）
+    if not url_mode and (
+        not _bot_token()
+        or not (os.environ.get("SLACK_SIGNING_SECRET") or "").strip()
+    ):
+        print(
+            "⚠️ SLACK_BOT_TOKEN / SLACK_SIGNING_SECRET なし "
+            "→ URL ボタンにフォールバック（ブラウザで操作）",
+            file=sys.stderr,
+        )
+        url_mode = True
     rows: list[dict[str, Any]] = []
     stats: dict[str, Any] = {}
     if args.id:
