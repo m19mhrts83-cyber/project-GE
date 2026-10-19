@@ -27,6 +27,27 @@ weekly_log_pattern:
     MDはDrive/NLM用。ルール jarvis-family-meeting-weekly.mdc
 
 
+# 自動化（715 家族会議週次係 / FRIDAY）
+# 松野さんが当日 (YYYY/MM/DD) ページを前週複製で用意 → 会議後に下記を順に挿入。
+automation:
+  enabled: true
+  agent_id: "715"
+  schedule: "日曜 21:30"
+  retry: "月曜 07:00"
+  keyword: "家族会議"
+  window_start_hour: 17
+  window_end_hour: 24
+  notebook_key: family_meeting_weekly
+  drive_folder: "13_家族会議_週次"
+  prompt_file: "docs/N1_NotebookLM/13_家族会議_週次/Studioプロンプト_家族会議_週次インフォ.md"
+  page_duplicate: human
+  cleanup_old_sections: true   # 複製で残った旧週のインフォ/議事録を削除してから挿入
+  insert_order: [infographic, minutes]
+  speaker_aliases:
+    さあちゃん: さわ
+    さーちゃん: さわ
+    まーくん: たまき
+
 coaching_hub_page_id: "282f6bbe-5a76-8097-bd9d-c2fbbdb49a49"
 coaching_hub_page_url: "https://app.notion.com/p/282f6bbe5a768097bd9dc2fbbdb49a49"
 coaching_hub_title: 子供コーチング

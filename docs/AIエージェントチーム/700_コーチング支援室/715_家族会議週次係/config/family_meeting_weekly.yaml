@@ -1,0 +1,29 @@
+# 715 家族会議週次係 — 係ローカル設定
+# 全体設定の正本: config/notion_family_coaching.yaml（automation）
+#                 config/notebooklm_studio.yaml（family_meeting_weekly）
+
+agent_id: "715"
+room: "700_コーチング支援室"
+status: 稼働中
+
+executor: launchd
+schedule:
+  primary: "日曜 21:30"
+  retry: "月曜 07:00"
+
+paths:
+  orchestrator: "scripts/friday_family_meeting_weekly.py"
+  notion_ops: "scripts/friday_notion_ops.py"
+  state: ".jarvis_state/friday_family_meeting_weekly.json"
+  logs: "~/Library/Logs/friday_family_meeting_weekly"
+  drive_folder: "13_家族会議_週次"
+
+guards:
+  page_duplicate: human        # 松野さんが前週複製
+  notebook_count: 1
+  insert_order: [infographic, minutes]
+  disable_env: FRIDAY_FAMILY_MEETING_WEEKLY_DISABLE
+
+report:
+  success: report
+  failure: ops
