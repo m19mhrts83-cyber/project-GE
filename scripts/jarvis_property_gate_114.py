@@ -26,7 +26,9 @@ from jarvis_property_gate_lib import (  # noqa: E402
     classify_lane,
     fetch_gate_candidates,
     format_a_line,
+    b_card_blocks,
     format_b_card,
+    prefer_url_buttons,
     format_c_digest,
     heal_handoff_status,
     load_state,
@@ -93,13 +95,16 @@ def process_deal(
         return out
 
     if lane["lane"] == "B":
-        text = format_b_card(deal, lane)
+        url_mode = prefer_url_buttons()
+        text = format_b_card(deal, lane, include_action_links=url_mode)
+        blocks = b_card_blocks(deal, lane, url_mode=url_mode)
         if post and post_b:
             pr = post_slack(
                 "consult",
                 text,
                 dry_run=dry_run,
                 username="114 物件一次判定",
+                blocks=blocks,
             )
             out["slack"] = pr
             if pr.get("ok") and not dry_run:
