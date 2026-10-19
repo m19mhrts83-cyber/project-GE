@@ -17,7 +17,7 @@
 
 - [x] フォルダ／CLAUDE／flow.md／registry／permissions／索引
 - [x] 硬化（streak／Todoist GenMail型／mute CLI／T2 GHA／T3 night／T5 health）
-- [ ] Builder 組織図に 116 を追加（下記手作業・API無し）
+- [x] Builder 組織図に 116 を追加（Jarvis・2026-10-19）
 - [x] status_sync → agentTeam.json 更新済（ダッシュ `/agent-team` は push 後反映）
 - [x] night_triage Todoist をオーナー確認へ＋コメント
 
@@ -27,14 +27,7 @@
 - `.github/workflows/jarvis-mail-action-noon.yml`
 - Dashboard `mailActionSlackAction.ts` streak／Todoist
 
-## Builder 手作業（起床後 2分）
+## Builder（済）
 
-共有ビュー `https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH` は **閲覧のみ**（API 書込なし・404）。編集はオーナー画面で:
-
-1. Builder 編集URLを開く（松野アカウント・共有リンクではない方）
-2. 部門「100 連絡・物件動向把握室」に社員追加
-3. ID `116`／名前 `メール要対応係`／状態 `設計中`
-4. 合図: 朝／昼GHA／night／手動／健全性（T1〜T5）
-5. 追加後、本 TASK のチェックを `[x]` に
-
-ダッシュ `/agent-team` は `agentTeam.json` 由来なので **Builder未追加でも一覧には出る**（push後）。
+- 共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH（**41体**・連絡室に `116 メール要対応係`）
+- 手順: 編集画面の `atb:plan` に挿入 → `/api/share` 再公開（同一 shareId）
