@@ -18,6 +18,8 @@
 | **件数** | 1バッチあたり **スコア上位最大5件**（`--limit` / `JARVIS_MAIL_ACTION_LIMIT`）。残り pending は次バッチで再評価 |
 | **並び** | 新しい順ではなく **対応優先スコア**（priority / kind / lane / 依頼シグナル / 下書き有無 / 物件定例ペナルティ / 鮮度） |
 | **Slack形** | **ダイジェスト1本**（要旨一覧）＋ **コンパクトカード**（要旨＋ボタン。本文全文は貼らない） |
+| **ボタン** | Bot＋Signing あり→アプリ内。**無い／Webhookのみ→署名URLボタン**（ブラウザ。見送りカード自動削除は Bot 投稿時のみ） |
+| **Dashboard詳細** | 「詳細を見る」→ `/mail/{id}`。未ログイン時は `/login?next=/mail/...` → ログイン後に同じメールへ戻る |
 | **ダイジェスト定義** | バッチ投稿時の **要約ヘッダ1通**（上位N件の partner／件名／要旨／詳細リンク）。個別カードとは別メッセージ |
 | **ダイジェスト同期** | 見送り／返信／Todoist のあと、同一バッチ（`payload.slack_ma_digest_ts`）の **残 pending だけで chat.update**。残0なら **chat.delete**（ダイジェストごと消す） |
 | **詳細** | Dashboard `/mail/{id}`（「詳細を見る」） |
@@ -77,8 +79,8 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 | 変数 | 用途 |
 |---|---|
-| `SLACK_BOT_TOKEN` / `SLACK_SIGNING_SECRET` | 投稿・Interactivity（業者返信と共用） |
-| `SLACK_WEBHOOK_AI_TEAM_CONSULT` | Bot 無し時 |
+| `SLACK_BOT_TOKEN` / `SLACK_SIGNING_SECRET` | **アプリ内ボタン本線**（Mac・GitHub Secrets・Vercel の3箇所）。無いと URL ボタンに自動フォールバック |
+| `SLACK_WEBHOOK_AI_TEAM_CONSULT` | Bot 無し時の投稿（カード自動削除・モーダルは不可） |
 | `PROPERTY_GATE_ACTION_TOKEN` / `MAIL_ACTION_TOKEN` | 予備 URL 署名 |
 | `TODOIST_API_TOKEN` | Dashboard からの Todoist 起票（Vercel） |
 | `JARVIS_MAIL_ACTION_MUTE_THRESHOLD` | 見送り→ミュート閾値（既定 2） |
