@@ -6,7 +6,7 @@ name: Jarvis Dashboard Gmail Triage
 #   3) パートナー Chatwork → OneDrive 5.やり取り.md（Graph）＋添付
 #   4) パートナー Gmail／Chatwork 未返信 → triage_items（ヒューリスティック表示・Gemini なし）
 # LINE / iMessage / CHRLINE は Mac 残。
-# Graph refresh 回転は sync_meta.ms_graph_refresh_token へ自動保存（Secrets 古くても次回OK）。
+# Graph refresh 回転は Secrets / private が本線（sync_meta は opt-in。回転後は --push-gha）。
 # 末尾で Ops Fail Watch（Vercel/GHA）も朝1回だけ実行する。
 # 課金削減 2026-09: GEMINI_API_KEY は渡さない（判定・下書き・和訳オフ）。
 
