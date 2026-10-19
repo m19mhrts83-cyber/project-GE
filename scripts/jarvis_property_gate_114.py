@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -100,8 +101,6 @@ def process_deal(
         blocks = b_card_blocks(deal, lane, url_mode=url_mode)
         if post and post_b and not url_mode and not dry_run:
             # Bot 無しでも Webhook + action_id で Interactivity 確認可
-            import os
-
             if not (os.environ.get("SLACK_BOT_TOKEN") or "").strip():
                 print(
                     "ℹ️ SLACK_BOT_TOKEN なし → Webhook で action_id 投稿"
