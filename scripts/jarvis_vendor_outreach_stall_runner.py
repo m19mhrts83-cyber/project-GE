@@ -97,7 +97,24 @@ REFILL_BODY_RE = re.compile(
 
 REFILL_COOLDOWN_HOURS = 12
 SEND_RESUME_COOLDOWN_HOURS = 6
-STALE_MARK_BUSINESS_DAYS = 2
+# Grok Bot は使用量節約で毎日起動しない想定。
+# 「毎日 mark 無し＝障害」ではない。既定は平日5日（おおよそ週1運用の猶予）。
+# 上書き: state stale_marks_business_days / env JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS
+STALE_MARK_BUSINESS_DAYS_DEFAULT = 5
+
+
+def stale_marks_threshold_days(state: dict[str, Any] | None = None) -> int:
+    raw = (os.environ.get("JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS") or "").strip()
+    if not raw and isinstance(state, dict):
+        raw = str(state.get("stale_marks_business_days") or "").strip()
+    if raw:
+        try:
+            n = int(raw)
+            if n >= 1:
+                return n
+        except ValueError:
+            pass
+    return STALE_MARK_BUSINESS_DAYS_DEFAULT
 
 
 def now_jst() -> datetime:
@@ -583,15 +600,29 @@ def push_sync_meta(key: str, summary: dict[str, Any], *, dry_run: bool) -> None:
         print(f"# sync_meta upsert failed: {e}", file=sys.stderr)
 
 
-def stale_marks_reason(q: dict[str, Any]) -> str:
-    """mark 停滞の理由文（ops クールダウンとは独立）。空なら停滞なし。"""
+def stale_marks_reason(
+    q: dict[str, Any], *, threshold_days: int | None = None
+) -> str:
+    """mark 停滞の理由文（ops クールダウンとは独立）。空なら停滞なし。
+
+    毎日送信必須ではない。threshold（既定5平日）を超えたら見守り対象。
+    """
+    thr = (
+        threshold_days
+        if threshold_days is not None
+        else STALE_MARK_BUSINESS_DAYS_DEFAULT
+    )
     last_c = q.get("last_contacted")
     if last_c:
         try:
             lc = date.fromisoformat(str(last_c))
             gap = business_days_between(lc, date.today())
-            if gap >= STALE_MARK_BUSINESS_DAYS and int(q.get("contacted_today") or 0) == 0:
-                return f"最終 contacted から平日{gap}日・本日 mark なし（{last_c}）"
+            if gap >= thr and int(q.get("contacted_today") or 0) == 0:
+                return (
+                    f"最終 contacted から平日{gap}日"
+                    f"（閾値{thr}平日）・本日 mark なし（{last_c}）"
+                    " ※毎日送信必須ではない／Grok非日次運用の見守り"
+                )
         except ValueError:
             return ""
     elif q.get("needs_refill") and (q.get("total") or 0) > 0:
@@ -605,13 +636,14 @@ def should_ops_alert(
     lst: dict[str, Any],
     bridge_ok: bool,
     skip_refill: bool = False,
+    threshold_days: int | None = None,
 ) -> tuple[bool, str]:
     reasons: list[str] = []
     if not bridge_ok and not skip_refill:
         reasons.append("Mac/Drive ブリッジ未接続（outbox 書けず）")
     if skip_refill and q.get("needs_refill"):
         reasons.append("GHA見守り · キュー不足 · Mac補給待ち")
-    stale = stale_marks_reason(q)
+    stale = stale_marks_reason(q, threshold_days=threshold_days)
     if stale:
         reasons.append(stale)
 
@@ -758,7 +790,8 @@ def run_lane(
         f"{' skip_refill' if skip_refill else ''}"
     )
 
-    stale_reason = stale_marks_reason(q)
+    thr = stale_marks_threshold_days(state)
+    stale_reason = stale_marks_reason(q, threshold_days=thr)
     is_stale = bool(stale_reason)
     needs_refill = bool(
         force_refill or q["needs_refill"] or (archive_inbox and inbox_hits)
@@ -855,7 +888,11 @@ def run_lane(
                     state["last_sync_at"] = lst["last_sync_at"]
 
     ops_needed, ops_reason = should_ops_alert(
-        q=q, lst=lst, bridge_ok=bridge_ok, skip_refill=skip_refill
+        q=q,
+        lst=lst,
+        bridge_ok=bridge_ok,
+        skip_refill=skip_refill,
+        threshold_days=thr,
     )
     if refill_result and not refill_result.get("ok") and not refill_result.get("skipped"):
         ops_needed = True
@@ -885,6 +922,7 @@ def run_lane(
         "followup": q["followup"],
         "contacted_today": q["contacted_today"],
         "last_contacted": q["last_contacted"],
+        "stale_marks_business_days": thr,
         "last_refill_at": lst.get("last_refill_at"),
         "last_sync_at": lst.get("last_sync_at"),
         "bridge_ok": bridge_ok,

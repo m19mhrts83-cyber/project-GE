@@ -53,16 +53,17 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 2. 夕方見回り。healthy なら週次 `#report`（Grokサポート見守り）。異常は即時 `#ops`   
 3. 各 UI で stall／キュー残が見える  
 4. Mac 未接続時は送信を捏造せず `#ops`  
-5. **キュー充足＋mark 停滞**（平日2日以上・本日 mark なし）なら outbox に **`{lane}_send_resume`（本日分のみ）** を書く。週次 `force-refill` と混同しない  
+5. **キュー充足＋mark 停滞**（既定 **平日5日**以上・本日 mark なし）なら outbox に **`{lane}_send_resume`（本日分のみ）** を書く。週次 `force-refill` と混同しない  
+6. **毎日送信は必須ではない**（Grok Bot 使用量節約で非日次可）。`#ops` はハードエラーではなく見守り。閾値: state `stale_marks_business_days` または `JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS`  
 
 ### stall と処置の対応（2026-10-20）
 
 | stall_status | 意味 | 処置 |
 |---|---|---|
 | `needs_refill` | 送信可能件数が日次枠未満 | `--force-refill`／自律 `s2_batch` 等 |
-| `stale_marks` | キューはあるが Grok が送信・mark していない | **`send_resume`（本日分）** → Grok が送信＋`--mark` |
+| `stale_marks` | キューはあるが、閾値超えて mark なし（非日次の猶予超え） | **`send_resume`（本日分）** → Grok が送信＋`--mark` |
 | `bridge_down` | Mac／Drive 未接続 | ブリッジ復旧 |
-| `ok` | 健全 | 週次 `#report` のみ |
+| `ok` | 健全（1〜数日の非送信は許容） | 週次 `#report` のみ |
 
 ## 運用開始ログ（Phase D · 2026-10-15）
 
