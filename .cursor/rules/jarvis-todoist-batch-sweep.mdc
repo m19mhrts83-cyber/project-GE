@@ -9,15 +9,16 @@ alwaysApply: false
 
 - 「Todoist掃除」「並列モード」「簡単タスクから消して」
 - 「確認だけで消せるものは完了して」
-- `/todoist-batch` または skill `todoist-batch-sweep`
+- `/todoist-batch`（コマンド）または skill `todoist-batch-sweep`（入口俯瞰・起票は `/todoist`）
 - 残タスクが多く、オーナー確認の往復を減らしたいとき
 
 ## 方針
 
 松野の判断は **クリティカル／自信なし／方針選択** に集中する。  
-**確認のみ**は Jarvis がオーナー確認経由で **すぐ `complete-task`** してよい（都度チャット了承不要）。
+**確認のみ**は Jarvis がオーナー確認経由で **すぐ `complete-task`** してよい（都度チャット了承不要）。  
+**処置・列移動・完了はすべて Todoist コメントにサマリ＋アウトプット**（チャット報告だけでは不足。`jarvis-todoist-owner-confirm.mdc`）。
 
-詳細手順・依頼テンプレ: skill `todoist-batch-sweep`  
+詳細手順・依頼テンプレ: skill `todoist-batch-sweep`／`.cursor/commands/todoist-batch.md`  
 他ツール共有の正本: `docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/CLAUDE.md`
 
 ## 分類
