@@ -31,7 +31,9 @@ from jarvis_property_gate_lib import (  # noqa: E402
     now_jst_date,
     pending_b_items,
     post_slack,
+    prefer_url_buttons,
     reconcile_pending,
+    reminder_blocks,
     save_state,
     sb_client,
 )
@@ -105,12 +107,22 @@ def main() -> int:
         print(f"本日分は投稿済み（{today}）。保留 {len(items)}件。--force で再投稿。")
         return 0
 
+    url_mode = prefer_url_buttons()
     text = format_reminder(items, cleaned=cleaned, limit=args.limit)
+    blocks = reminder_blocks(
+        items, cleaned=cleaned, limit=args.limit, url_mode=url_mode
+    )
     if args.no_post:
         print(text)
         print(f"# no-post（保留 {len(items)}件・{dropped}）")
         return 0
-    pr = post_slack("consult", text, dry_run=args.dry_run)
+    pr = post_slack(
+        "consult",
+        text,
+        dry_run=args.dry_run,
+        username="114 物件一次判定",
+        blocks=blocks,
+    )
     print(pr)
     print(f"# 保留 {len(items)}件・{dropped}")
     if pr.get("ok") and not args.dry_run:
