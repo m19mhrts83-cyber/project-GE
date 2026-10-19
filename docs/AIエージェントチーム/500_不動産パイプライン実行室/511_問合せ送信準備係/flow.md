@@ -58,7 +58,7 @@ launchctl kickstart -k "gui/$(id -u)/com.matsunoma.jarvis.kurashift-job-worker"
 ```
 
 Slack リンク: `PROPERTY_GATE_ACTION_TOKEN`（jarvis_private ＋ Vercel）  
-任意ボタン: `SLACK_SIGNING_SECRET` ＋ Interactivity URL = `/api/slack/consult-action`
+本線ボタン: `#consult` の action_id Yes/No → `/api/slack/consult-action`（`SLACK_SIGNING_SECRET`）。Bot 投稿優先。
 
 ## 改善ログ（フロー側）
 
