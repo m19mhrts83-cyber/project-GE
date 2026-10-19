@@ -26,7 +26,7 @@ flowchart TD
   T5[健全性見回し] --> Ops["Slack #ops"]
   Post --> Consult["Slack #consult カード"]
   Consult --> Reply[返信する]
-  Consult --> Skip[見送り＋連続学習]
+  Consult --> Skip[見送り＋カード削除＋ダイジェスト同期]
   Consult --> Todo[Todoist追加]
   Post -->|failed| Ops
 ```

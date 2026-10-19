@@ -9,6 +9,7 @@
     - ダイジェスト1本（要旨一覧）＋ コンパクトカード（要旨＋ボタン、本文全文なし）
     - 要約は抽出（Plan A・LLMなし）。品質不足なら後続で Plan B（トップNのみLLM）
     - Slack に出した件は Gmail 既読（物件取込と同型。失敗時は morning catchup）
+    - 各カードに digest_ts/channel を保存。見送り等で残 pending 更新／残0でダイジェスト削除
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_slack_post.py --from-triage --dry-run
@@ -910,6 +911,8 @@ def mark_posted(
     summary: str = "",
     slack_channel: str | None = None,
     slack_ts: str | None = None,
+    digest_channel: str | None = None,
+    digest_ts: str | None = None,
 ) -> None:
     try:
         r = (
@@ -935,6 +938,11 @@ def mark_posted(
             pl["slack_ma_channel"] = slack_channel
         if slack_ts:
             pl["slack_ma_ts"] = slack_ts
+        # 見送り等でダイジェストを更新／削除するためのバッチキー
+        if digest_channel:
+            pl["slack_ma_digest_channel"] = digest_channel
+        if digest_ts:
+            pl["slack_ma_digest_ts"] = digest_ts
         sb.table("triage_items").update(
             {"payload": pl, "updated_at": now_iso()}
         ).eq("id", tid).execute()
@@ -1005,10 +1013,12 @@ def main() -> int:
 
     sb = None if args.dry_run else _sb()
     posted = 0
+    digest_ch: str | None = None
+    digest_ts: str | None = None
 
     if len(rows) >= 1 and not args.no_digest and (args.from_triage or len(rows) > 1):
         digest = build_digest_payload(rows)
-        rc, _, _ = post_slack(
+        rc, digest_ch, digest_ts = post_slack(
             digest, dry_run=args.dry_run, force_webhook=args.webhook
         )
         if rc != 0:
@@ -1034,6 +1044,8 @@ def main() -> int:
                 summary=str(row.get("_extract_summary") or ""),
                 slack_channel=ch,
                 slack_ts=ts,
+                digest_channel=digest_ch,
+                digest_ts=digest_ts,
             )
 
     # Slack に出した＝目を通す動線に載せたので Gmail 既読（物件取込と同型）
