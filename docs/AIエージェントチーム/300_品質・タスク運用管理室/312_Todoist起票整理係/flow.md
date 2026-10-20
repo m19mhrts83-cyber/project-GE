@@ -6,11 +6,18 @@
 - FlowForge（閲覧／編集）: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
-- 更新: 2026-10-21（合図・いい塩梅3段・即時提案・JarvisBox／AI同士）
+- 更新: 2026-10-21（合図・いい塩梅3段・即時提案・JarvisBox／AI同士／確定2点）
 
 ## いまの結論（文字1行）
 
 材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult` → 採用時だけ Todoist create。ホーク・AI同士の直入れは L0 で維持。close は 313。
+
+## 確定（2026-10-21）
+
+| # | 内容 |
+|---|---|
+| 1 | **投稿先**: 即時の **L1／L2 とも Slack `#consult`**（定期ダイジェストも同 ch） |
+| 2 | **AI同士の完了**: 312は「完了疑いをダイジェストに載せる」まで。**実際の close は 313＋オーナー確認二段**（`jarvis-todoist-owner-confirm`） |
 
 ## 合流の考え方
 
@@ -80,8 +87,8 @@ flowchart TD
 | 3 | 塩梅仕分け L0／L1／L2 | ルール | AI | signals YAML |
 | 4 | L1 ダイジェスト or L2 カードを `#consult` | Slack | AI | Webhook／Bot（116同型を将来） |
 | 5 | L2 採用 → create＋コメント。見送り → 抑制 | ボタン／一言 | **人**＋AI | Todoist API |
-| 6 | L0／既存のラベル・二重整理。完了疑いは列挙のみ | CLI | AI | 312。**close はしない** |
-| 7 | 完了仕分け・確認のみ close | — | 313 | `/todoist-batch` |
+| 6 | L0／既存のラベル・二重整理。**完了疑いは L1 ダイジェスト等に列挙のみ** | CLI／Slack | AI | 312。**close はしない** |
+| 7 | 完了仕分け → オーナー確認 → 了承後 close（確認のみ例外含む） | — | **313**＋人 | `/todoist-batch`・二段完了 |
 
 **人が確かめる印**: ステップ5（L2採用／見送り）。L1は把握のみ。116の返信了承は116。金・対外・削除。  
 **やらない**: 全件個別ボタン、L1一括 create、815自動起票、了承なし対外送信、312による close、秘密の再掲。
@@ -95,16 +102,16 @@ flowchart TD
 | 116 | メール判断（返信UI）。Todoist追加＝共有レール |
 | 111 | 取込・差分。宿題は即312へ（自ら create しない） |
 | 714 | 会議／Notion残し。Action → 312 |
-| **312** | 即時／定期の整理・塩梅・認定・ラベル／二重 |
-| 313 | 完了仕分け・確認のみ close |
+| **312** | 即時／定期の整理・塩梅・認定・ラベル／二重。完了疑いはダイジェスト列挙まで |
+| **313** | 完了仕分け・確認のみ close（＋オーナー確認二段） |
 
-## FlowForge 作り込みメモ（別チャットへ渡す用）
+## FlowForge 作り込みメモ
 
-- [ ] 即時トリガー（ソース別）→ 塩梅 → `#consult` 合流
-- [ ] L0（ホーク）は create 分岐で人待ちなし
-- [ ] 停止条件（env／disabled）をガード
-- [ ] 作成後: registry と本ファイル先頭リンクを同期 → `jarvis_agent_team_status_sync.py`
-- [ ] 共有URLを `config/flowforge_share_urls.json` に追記
+- [x] 即時トリガー（ソース別）→ 塩梅 → `#consult` 合流（2026-10-21・キャンバス反映済）
+- [x] L0（ホーク）は create 分岐で人待ちなし（L0ノード＝ラベル・二重のみ）
+- [ ] 停止条件（env／disabled）をガード（コード／運用側）
+- [x] 作成後: registry と本ファイル先頭リンクを同期 → `jarvis_agent_team_status_sync.py`
+- [ ] 共有URLを `config/flowforge_share_urls.json` に追記（要確認）
 
 ## 手順メモ（実装本線・いま動くもの）
 
