@@ -113,6 +113,7 @@ tmp_grok_*.md
 .jarvis_state/app_dev_*.md
 .jarvis_state/chat_open_tasks_inbox.md
 !.jarvis_state/chat_open_tasks_inbox.example.md
+.jarvis_state/todoist_313_digest.json
 .jarvis_state/cursor_forum_grok_notion_draft.md
 .jarvis_state/kurashift_evidence_drive_folders.json
 .jarvis_state/00_*.md
