@@ -1,8 +1,11 @@
 # Todoist起票整理係（312）
 
+**作業を始めたら、まず [`PROGRESS.md`](./PROGRESS.md) を読む**（続き・Phase 状態がここにある）。
+
 **タスク認定・起票整理の入口**。宿題・要対応を塩梅つきで整え、了承後（または L0）に Todoist へ載せる。  
 **完了仕分け・確認のみクローズ**は [`313_完了候補確認係`](../313_完了候補確認係/CLAUDE.md)。  
-作業フロー正本: [`flow.md`](./flow.md)
+作業フロー正本: [`flow.md`](./flow.md)  
+伴走 Phase1: [`docs/phase1-l1-digest.md`](./docs/phase1-l1-digest.md)
 
 ## AIオートメーション（作業フロー）
 
@@ -136,3 +139,5 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-21 | flow 本線化。認定入口・いい塩梅3段・材料即時・JarvisBox／AI同士 L0・116ボタン区別・closeは313 |
 | 2026-10-21 | 確定: L1/L2投稿先=`#consult`／AI完了疑いは312列挙のみ・closeは313＋オーナー確認二段 |
 | 2026-10-21 | C確定: 起票本線=312／111は渡しのみ／GenMailをソースに。登録動線①②③を正本に明示 |
+| 2026-10-21 | Phase1: `jarvis_todoist_312_digest.py`（L1→#consult→了承後①create） |
+| 2026-10-21 | Phase1.5a: チャット残→L1候補ルール `jarvis-chat-open-tasks-312.mdc`（ノイズ抑制・無言create禁止） |
