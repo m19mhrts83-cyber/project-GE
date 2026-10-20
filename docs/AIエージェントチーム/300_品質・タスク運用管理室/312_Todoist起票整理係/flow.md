@@ -6,35 +6,59 @@
 - FlowForge（閲覧／編集）: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
-- 更新: 2026-10-21（合図・いい塩梅3段・即時提案・JarvisBox／AI同士／確定2点）
+- 更新: 2026-10-21（C境界確定・Todoist登録動線を明示）
 
 ## いまの結論（文字1行）
 
-材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult` → 採用時だけ Todoist create。ホーク・AI同士の直入れは L0 で維持。close は 313。
+材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult` → **採用時に Todoist へ create**。ホーク・AI同士の直入れは L0 で維持。**Todoist起票の本線は312**。close は 313。
+
+## Todoistへの登録動線（出口・必読）
+
+タスク正本は **Todoist**。312まわりの **登録経路は次の3本**（どれも最終的に Todoist に載る）。
+
+| 経路 | いつ | 人操作 | 実行 |
+|---|---|---|---|
+| **① L2採用 → create** | SB／111／GenMail／会話など、塩梅で L2 になった候補 | `#consult` で **採用**（当面はチャット了承可） | `create-task` ＋コメント（312） |
+| **② L0 直登録** | ホーク／AI同士の `todoist_tasks` apply。116で既に **Todoist追加**済み | なし（後からラベル・二重整理のみ） | 既に Todoist 上。312は整理のみ |
+| **③ 116 Todoist追加** | メール要対応カード | ボタン **Todoist追加** | Dashboard／116レール（共有）。結果は L0 扱い |
+
+- **L1（ダイジェスト）からは create しない**（見るだけ。必要なら L2 化→①）
+- **111は create しない**。宿題シグナルを312へ渡すだけ
+- close／完了仕分けは **313**（登録動線の外）
+
+```text
+[材料] → スキャン → 塩梅
+   ├─ L0 ──(整理)──→ Todoist（②・③）
+   ├─ L1 → #consult（見るだけ）──→ （createしない）
+   └─ L2 → #consult 採用 ──→ create-task ──→ Todoist（①）
+```
 
 ## 確定（2026-10-21）
 
 | # | 内容 |
 |---|---|
 | 1 | **投稿先**: 即時の **L1／L2 とも Slack `#consult`**（定期ダイジェストも同 ch） |
-| 2 | **AI同士の完了**: 312は「完了疑いをダイジェストに載せる」まで。**実際の close は 313＋オーナー確認二段**（`jarvis-todoist-owner-confirm`） |
+| 2 | **AI同士の完了**: 312は「完了疑いをダイジェストに載せる」まで。**実際の close は 313＋オーナー確認二段** |
+| 3 | **起票本線は312**。111は取込・宿題渡しのみ（再検討で111側を要すれば変更） |
+| 4 | **GenMail要対応**も312ソースに含める（当面チャット提案→将来 L1/L2） |
 
 ## 合流の考え方
 
-ソースは複数（メール・SB・111・JarvisBox・Slack・チャット・ホーク）だが、**出口は一本**: 塩梅仕分け → `#consult`（L1/L2）または L0 直 Todoist。定期は取りこぼし保険。全部を個別ボタンにしない。
+ソースは複数だが、**Todoist登録の出口は上表の3本**。提案の見せ方は塩梅仕分け → `#consult`（L1/L2）または L0。定期は取りこぼし保険。全部を個別ボタンにしない。
 
 ## ソース（入口）
 
 | ID | ソース | 扱い |
 |---|---|---|
-| S-hawk | ホーク／部長 `todoist_tasks` apply | **L0 直 create 維持**。完了確認・実行の正本にも使う |
-| S-box | JarvisBox `10_inbox_from_grok/` | 整理対象。poll 後すぐスキャン |
-| S-mail | 116 メール `#consult` | UIは返信／見送り／Todoist追加（タスク可否だけではない） |
-| S-sb | SecondBrain／会議 Action（714材料） | 材料できたとき即 → L1 or L2 |
-| S-111 | パートナー宿題シグナル | 同上 |
+| S-hawk | ホーク／部長 `todoist_tasks` apply | **② L0 直 create 維持** |
+| S-box | JarvisBox `10_inbox_from_grok/` | 整理対象。poll 後すぐスキャン → ①寄り |
+| S-mail | 116 メール `#consult` | **③ Todoist追加**（返信／見送りも同カード） |
+| S-sb | SecondBrain／会議 Action（714材料） | 材料即 → L1 or L2 → **①** |
+| S-111 | パートナー宿題シグナル | 111は渡すだけ。312が L1/L2 → **①** |
+| S-genmail | GenMail要対応 | 312ソース。当面チャット提案 → 将来 L1/L2 → **①** |
 | S-slack | Slack `#consult`／`#ai-hub` | 定期・即時のスキャン対象 |
-| S-chat | Cursor 会話の宿題 | 人依頼 or 相乗り |
-| S-man | 「起票整理して」「認定して」 | いつでも |
+| S-chat | Cursor 会話の宿題 | 人依頼 or 相乗り → **①** |
+| S-man | 「起票整理して」「認定して」 | いつでも → **①** |
 
 ## いい塩梅（3段）
 
@@ -57,22 +81,21 @@
 
 ```mermaid
 flowchart TD
-  Hawk["ホーク・AI同士 L0直create"] --> Td[(Todoist)]
   Box["JarvisBox"] --> Immediate["材料できたとき即"]
-  Partner["111 宿題"] --> Immediate
-  SB["SB・会議"] --> Immediate
+  Partner["111 宿題渡し"] --> Immediate
+  SB["SB・会議・GenMail"] --> Immediate
   SlackCh["Slack・チャット"] --> Immediate
-  Mail["116 メールUI"] --> Td
   Immediate --> Rank{"塩梅仕分け"}
   Periodic["定期・取りこぼし保険"] --> Rank
-  Rank -->|L0| Org["ラベル・二重整理"]
-  Rank -->|L1| Digest["#consult ダイジェスト"]
+  Hawk["ホーク・AI同士"] -->|② L0直| Td[(Todoist 登録)]
+  Mail["116 メール"] -->|③ Todoist追加| Td
+  Rank -->|L0 整理| Td
+  Rank -->|L1| Digest["#consult ダイジェスト<br/>createしない"]
   Rank -->|L2| Card["#consult 採用/見送り"]
-  Card -->|採用| Create["create-task + コメント"]
+  Card -->|採用 ①| Create["create-task + コメント"]
   Card -->|見送り| Skip["再提案抑制"]
   Create --> Td
-  Org --> Td
-  Td --> Done313["完了仕分けは313"]
+  Td --> Done313["完了仕分けは313<br/>登録ではない"]
   Create -->|失敗| Ops["#ops"]
 ```
 
@@ -86,9 +109,10 @@ flowchart TD
 | 2 | 二重起票・レーン／ラベル点検（properties＝物件＋PM） | CLI／API | AI | `jarvis_todoist_api.py` |
 | 3 | 塩梅仕分け L0／L1／L2 | ルール | AI | signals YAML |
 | 4 | L1 ダイジェスト or L2 カードを `#consult` | Slack | AI | Webhook／Bot（116同型を将来） |
-| 5 | L2 採用 → create＋コメント。見送り → 抑制 | ボタン／一言 | **人**＋AI | Todoist API |
-| 6 | L0／既存のラベル・二重整理。**完了疑いは L1 ダイジェスト等に列挙のみ** | CLI／Slack | AI | 312。**close はしない** |
-| 7 | 完了仕分け → オーナー確認 → 了承後 close（確認のみ例外含む） | — | **313**＋人 | `/todoist-batch`・二段完了 |
+| 5 | **① Todoist登録**: L2 採用 → `create-task`＋コメント。見送り → 抑制 | ボタン／一言 | **人**＋AI | Todoist API |
+| 5b | **②③**: L0整理／116 Todoist追加結果のラベル・二重 | CLI／Dashboard | AI／人 | 既に Todoist 上 |
+| 6 | 完了疑いは L1 ダイジェスト等に列挙のみ | CLI／Slack | AI | 312。**close はしない** |
+| 7 | 完了仕分け → オーナー確認 → 了承後 close | — | **313**＋人 | `/todoist-batch`・二段完了 |
 
 **人が確かめる印**: ステップ5（L2採用／見送り）。L1は把握のみ。116の返信了承は116。金・対外・削除。  
 **やらない**: 全件個別ボタン、L1一括 create、815自動起票、了承なし対外送信、312による close、秘密の再掲。
@@ -100,10 +124,10 @@ flowchart TD
 | ホーク／AI | Todoist 直登録（L0）。完了もコメントで残す |
 | JarvisBox poll | 材料取込。認定・整理は312 |
 | 116 | メール判断（返信UI）。Todoist追加＝共有レール |
-| 111 | 取込・差分。宿題は即312へ（自ら create しない） |
+| 111 | 取込・差分。宿題は即312へ。**create しない**（111側は再検討で要すれば変更） |
 | 714 | 会議／Notion残し。Action → 312 |
-| **312** | 即時／定期の整理・塩梅・認定・ラベル／二重。完了疑いはダイジェスト列挙まで |
-| **313** | 完了仕分け・確認のみ close（＋オーナー確認二段） |
+| **312** | **Todoist起票の本線**（①）。整理・塩梅・認定・ラベル／二重。完了疑いはダイジェスト列挙まで |
+| **313** | 完了仕分け・確認のみ close（＋オーナー確認二段）。**新規登録はしない** |
 
 ## FlowForge 作り込みメモ
 
