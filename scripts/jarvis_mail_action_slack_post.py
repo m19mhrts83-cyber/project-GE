@@ -4,12 +4,14 @@
   Block Kit action_id → consult-action（業者返信・物件ゲートと同型）
   見送りが続く送信者は sync_meta mail_action_skip_mute で Slack 再掲除外。
 
-  投稿形（2026-10-20〜）:
+  投稿形（2026-10-20〜 / スレ縮約 2026-10-20）:
     - バッチ1回あたりスコア上位 N 件（既定5）
-    - ダイジェスト1本（要旨一覧）＋ コンパクトカード（要旨＋ボタン、本文全文なし）
-    - 要約は抽出（Plan A・LLMなし）。品質不足なら後続で Plan B（トップNのみLLM）
+    - 本線ダイジェストは短索引のみ（partner＋件名）。要旨・ボタンはスレのカードへ
+    - Bot 投稿時はカードを digest の thread_ts 配下へ（Webhook 時は本線に短カード）
+    - 要約は抽出（Plan A・LLMなし）。本文全文は Dashboard。下書き全文はカードに載せない
     - Slack に出した件は Gmail 既読（物件取込と同型。失敗時は morning catchup）
     - 各カードに digest_ts/channel を保存。見送り等で残 pending 更新／残0でダイジェスト削除
+    - スレ投稿オフ: JARVIS_MAIL_ACTION_THREAD_CARDS=0
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_slack_post.py --from-triage --dry-run
@@ -445,31 +447,37 @@ def rank_candidates(rows: list[dict[str, Any]], *, limit: int) -> list[dict[str,
     return enriched[: max(0, limit)]
 
 
+def _thread_cards_enabled() -> bool:
+    return (os.environ.get("JARVIS_MAIL_ACTION_THREAD_CARDS") or "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+def digest_index_line(row: dict[str, Any], *, index: int) -> str:
+    """本線ダイジェスト用の1行索引（要旨・本文は載せない）。"""
+    partner = str(row.get("partner") or "").strip() or "—"
+    subject = str(row.get("subject") or "(件名なし)").strip()
+    if len(subject) > 48:
+        subject = subject[:47] + "…"
+    return f"{index}. *{partner}* — {subject}"
+
+
 def build_digest_payload(ranked: list[dict[str, Any]]) -> dict[str, Any]:
+    """本線は短索引のみ。要旨・操作はスレのカード側。"""
     n = len(ranked)
     when = datetime.now(JST).strftime("%m/%d %H:%M")
-    lines: list[str] = []
-    for i, row in enumerate(ranked, 1):
-        partner = str(row.get("partner") or "").strip() or "—"
-        subject = str(row.get("subject") or "(件名なし)").strip()
-        summary = str(row.get("_extract_summary") or "").strip()
-        tid = str(row.get("id") or "")
-        score = int(row.get("_score") or 0)
-        detail = mail_detail_url(tid)
-        lines.append(
-            f"*{i}. [{partner}]* score={score}\n"
-            f"件名: {subject[:100]}\n"
-            f"要旨: {summary}\n"
-            f"<{detail}|詳細を見る>"
-        )
-    body = "\n\n".join(lines) if lines else "(対象なし)"
-    text = f"【メール要対応ダイジェスト】上位{n}件（{when}）"
+    lines = [digest_index_line(row, index=i) for i, row in enumerate(ranked, 1)]
+    body = "\n".join(lines) if lines else "(対象なし)"
+    text = f"【メール要対応】{n}件（{when}）— スレを開いて操作"
     blocks: list[dict[str, Any]] = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"メール要対応ダイジェスト — 上位{n}件",
+                "text": f"メール要対応 — {n}件",
                 "emoji": True,
             },
         },
@@ -478,9 +486,9 @@ def build_digest_payload(ranked: list[dict[str, Any]]) -> dict[str, Any]:
             "text": {
                 "type": "mrkdwn",
                 "text": (
-                    f"*{when}* · スコア順 · 要旨（抽出・AIなし）\n"
-                    "気になったら下のカードで返信／見送り／Todoist、"
-                    "または「詳細を見る」で本文確認。"
+                    f"*{when}* · スコア順\n"
+                    "👉 *スレッドを開く* → 各カードで返信／見送り／Todoist\n"
+                    "本文全文はカード内「詳細を見る」（Dashboard）"
                 ),
             },
         },
@@ -494,8 +502,8 @@ def build_digest_payload(ranked: list[dict[str, Any]]) -> dict[str, Any]:
                 {
                     "type": "mrkdwn",
                     "text": (
-                        "Plan A（抽出要約）· 件数既定5 · "
-                        "残り pending は次バッチで再評価"
+                        "本線は索引のみ · カードはスレ · 件数既定5 · "
+                        "残り pending は次バッチ"
                     ),
                 }
             ],
@@ -511,55 +519,38 @@ def build_compact_payload(
     rank: int,
     total: int,
 ) -> dict[str, Any]:
+    """スレ用コンパクトカード。下書き全文・長いメタは載せない。"""
     tid = str(row.get("id") or "")
     partner = str(row.get("partner") or "").strip() or "—"
     subject = str(row.get("subject") or "(件名なし)").strip()
     from_email = str(row.get("from_email") or "").strip()
     summary = str(row.get("_extract_summary") or extract_summary(row)).strip()
+    if len(summary) > 280:
+        summary = summary[:279] + "…"
     draft = str(row.get("draft_text") or "").strip()
-    lane = str(row.get("lane") or "")
-    kind = str(row.get("kind") or "")
-    account = str(row.get("account") or "admin")
     score = int(row.get("_score") or 0)
-    draft_preview = draft[:400] if draft else "（下書きなし — 返信でモーダル編集）"
+    draft_note = "下書きあり → 返信で編集" if draft else "下書きなし → 返信で作成"
     mode_note = "アプリ内ボタン" if not url_mode else "URLボタン"
     detail = mail_detail_url(tid)
+    from_short = from_email
+    if len(from_short) > 42:
+        from_short = from_short[:41] + "…"
     text = (
         f"【メール要対応 {rank}/{total}】{partner}\n件名: {subject}\n"
         f"要旨: {summary}"
     )
     blocks: list[dict[str, Any]] = [
         {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": f"メール要対応 {rank}/{total} — {partner[:36]}",
-                "emoji": True,
-            },
-        },
-        {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
                 "text": (
-                    f"*件名:* {subject[:120]}\n"
-                    f"*From:* `{from_email}` · score=`{score}` · "
-                    f"lane=`{lane}` kind=`{kind}` account=`{account}`"
+                    f"*{rank}/{total} · {partner}*\n"
+                    f"*件名:* {subject[:100]}\n"
+                    f"*From:* `{from_short}` · score=`{score}`\n"
+                    f"*要旨:* {summary}\n"
+                    f"<{detail}|本文の詳細（Dashboard）> · {draft_note}"
                 ),
-            },
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*要旨*\n{summary}\n<{detail}|本文の詳細（Dashboard）>",
-            },
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*返信下書き*\n```{draft_preview}```",
             },
         },
         {
@@ -573,11 +564,10 @@ def build_compact_payload(
                 {
                     "type": "mrkdwn",
                     "text": (
-                        f"id=`{tid}` · {mode_note}\n"
-                        f"予備URL: <{ma_url(tid, 'reply')}|返信> · "
+                        f"{mode_note} · Todoist＝電話・ポータル等の手配\n"
+                        f"予備: <{ma_url(tid, 'reply')}|返信> · "
                         f"<{ma_url(tid, 'skip')}|見送り> · "
-                        f"<{ma_url(tid, 'todoist')}|Todoist>\n"
-                        "Todoist＝メール返信以外の手配（電話・ポータル等）"
+                        f"<{ma_url(tid, 'todoist')}|Todoist>"
                     ),
                 }
             ],
@@ -587,20 +577,26 @@ def build_compact_payload(
 
 
 def post_bot_message(
-    payload: dict[str, Any], *, dry_run: bool
+    payload: dict[str, Any],
+    *,
+    dry_run: bool,
+    thread_ts: str | None = None,
 ) -> tuple[int, str | None, str | None]:
     """Returns (rc, channel_id, message_ts). ts は見送り時の chat.delete 用。"""
     token = _bot_token()
     channel = _consult_channel()
-    body = {
+    body: dict[str, Any] = {
         "channel": channel,
         "text": payload.get("text") or "メール要対応",
         "blocks": payload.get("blocks") or [],
     }
+    if thread_ts:
+        body["thread_ts"] = thread_ts
     if dry_run:
-        print("# dry-run chat.postMessage")
+        where = f"thread_ts={thread_ts}" if thread_ts else "channel"
+        print(f"# dry-run chat.postMessage ({where})")
         print(json.dumps(body, ensure_ascii=False, indent=2)[:4000])
-        return 0, channel, None
+        return 0, channel, ("dry-run-ts" if not thread_ts else f"dry-run-card-{thread_ts}")
     if not token:
         return 3, None, None
     data = json.dumps(body).encode("utf-8")
@@ -621,7 +617,8 @@ def post_bot_message(
                 return 1, None, None
             ts = str(j.get("ts") or "") or None
             ch = str(j.get("channel") or channel) or channel
-            print(f"✅ Slack mail-action Bot OK channel={ch} ts={ts}")
+            thr = f" thread={thread_ts}" if thread_ts else ""
+            print(f"✅ Slack mail-action Bot OK channel={ch} ts={ts}{thr}")
             return 0, ch, ts
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="replace")
@@ -655,14 +652,21 @@ def post_webhook(payload: dict[str, Any], *, dry_run: bool) -> tuple[int, str | 
 
 
 def post_slack(
-    payload: dict[str, Any], *, dry_run: bool, force_webhook: bool
+    payload: dict[str, Any],
+    *,
+    dry_run: bool,
+    force_webhook: bool,
+    thread_ts: str | None = None,
 ) -> tuple[int, str | None, str | None]:
     if not _action_secret():
         print("⚠️ PROPERTY_GATE_ACTION_TOKEN 未設定（予備 URL 署名なし）", file=sys.stderr)
     use_bot = bool(_bot_token()) and not force_webhook
     if use_bot:
-        rc, ch, ts = post_bot_message(payload, dry_run=dry_run)
+        rc, ch, ts = post_bot_message(
+            payload, dry_run=dry_run, thread_ts=thread_ts
+        )
         if rc == 3:
+            # Webhook は thread_ts 非対応 → 本線に短カード
             return post_webhook(payload, dry_run=dry_run)
         return rc, ch, ts
     return post_webhook(payload, dry_run=dry_run)
@@ -1014,11 +1018,14 @@ def main() -> int:
         ap.print_help()
         return 2
 
+    use_bot = bool(_bot_token()) and not args.webhook
+    thread_ok = bool(use_bot and _thread_cards_enabled())
     print(
         f"📎 mail action slack — candidates={len(rows)} "
         f"limit={args.limit} score_rank=1 "
         f"mode={'url' if url_mode else 'interactive'} "
-        f"via={'webhook' if args.webhook or not _bot_token() else 'bot'} "
+        f"via={'webhook' if not use_bot else 'bot'} "
+        f"thread_cards={'yes' if thread_ok else 'no'} "
         f"stats={json.dumps(stats, ensure_ascii=False)}"
     )
     if not rows:
@@ -1037,13 +1044,21 @@ def main() -> int:
     digest_ch: str | None = None
     digest_ts: str | None = None
 
-    if len(rows) >= 1 and not args.no_digest and (args.from_triage or len(rows) > 1):
+    want_digest = (
+        len(rows) >= 1
+        and not args.no_digest
+        and (args.from_triage or len(rows) > 1)
+    )
+    if want_digest:
         digest = build_digest_payload(rows)
         rc, digest_ch, digest_ts = post_slack(
             digest, dry_run=args.dry_run, force_webhook=args.webhook
         )
         if rc != 0:
             return rc
+
+    # Bot＋ダイジェストあり → カードはスレへ。Webhook／ダイジェスト無しは本線。
+    card_thread_ts = digest_ts if (thread_ok and digest_ts) else None
 
     total = len(rows)
     for i, row in enumerate(rows, 1):
@@ -1052,7 +1067,10 @@ def main() -> int:
             row, url_mode=url_mode, rank=i, total=total
         )
         rc, ch, ts = post_slack(
-            payload, dry_run=args.dry_run, force_webhook=args.webhook
+            payload,
+            dry_run=args.dry_run,
+            force_webhook=args.webhook,
+            thread_ts=card_thread_ts,
         )
         if rc != 0:
             return rc
@@ -1077,7 +1095,8 @@ def main() -> int:
     else:
         read_stats = {"ok": 0, "fail": 0, "skip": 0}
     print(
-        f"# posted_cards={posted} digest={'no' if args.no_digest else 'yes'} "
+        f"# posted_cards={posted} digest={'no' if not want_digest else 'yes'} "
+        f"thread_cards={'yes' if card_thread_ts else 'no'} "
         f"gmail_read={json.dumps(read_stats, ensure_ascii=False)}"
     )
     return 0

@@ -384,18 +384,6 @@ function digestScoreOf(pl: Record<string, unknown>): number {
   return 0;
 }
 
-function digestSummaryOf(
-  row: DigestSibling,
-  pl: Record<string, unknown>,
-): string {
-  const d = pl.slack_ma_digest;
-  if (d && typeof d === "object" && !Array.isArray(d)) {
-    const s = String((d as Record<string, unknown>).summary || "").trim();
-    if (s) return s.slice(0, 200);
-  }
-  return String(row.summary || "").trim().slice(0, 200) || "（要旨なし）";
-}
-
 function buildDigestUpdatePayload(rows: DigestSibling[]): {
   text: string;
   blocks: unknown[];
@@ -408,30 +396,22 @@ function buildDigestUpdatePayload(rows: DigestSibling[]): {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const base = dashboardBase();
+  // 本線は短索引のみ（要旨・詳細リンクはスレのカード側）
   const lines = rows.map((row, i) => {
-    const pl = row.payload;
     const partner = String(row.partner || "").trim() || "—";
-    const subject = String(row.subject || "(件名なし)").trim();
-    const summary = digestSummaryOf(row, pl);
-    const score = digestScoreOf(pl);
-    const detail = `${base}/mail/${encodeURIComponent(row.id)}`;
-    return (
-      `*${i + 1}. [${partner}]* score=${score}\n` +
-      `件名: ${subject.slice(0, 100)}\n` +
-      `要旨: ${summary}\n` +
-      `<${detail}|詳細を見る>`
-    );
+    let subject = String(row.subject || "(件名なし)").trim();
+    if (subject.length > 48) subject = `${subject.slice(0, 47)}…`;
+    return `${i + 1}. *${partner}* — ${subject}`;
   });
-  const body = lines.join("\n\n").slice(0, 2900) || "(対象なし)";
+  const body = lines.join("\n").slice(0, 2900) || "(対象なし)";
   return {
-    text: `【メール要対応ダイジェスト】残${n}件（${when}）`,
+    text: `【メール要対応】残${n}件（${when}）— スレを開いて操作`,
     blocks: [
       {
         type: "header",
         text: {
           type: "plain_text",
-          text: `メール要対応ダイジェスト — 残${n}件`,
+          text: `メール要対応 — 残${n}件`,
           emoji: true,
         },
       },
@@ -440,9 +420,9 @@ function buildDigestUpdatePayload(rows: DigestSibling[]): {
         text: {
           type: "mrkdwn",
           text:
-            `*${when}* · 対応後に更新 · 要旨（抽出・AIなし）\n` +
-            "気になったら下のカードで返信／見送り／Todoist、" +
-            "または「詳細を見る」で本文確認。",
+            `*${when}* · 対応後に更新\n` +
+            "👉 *スレッドを開く* → 各カードで返信／見送り／Todoist\n" +
+            "本文全文はカード内「詳細を見る」（Dashboard）",
         },
       },
       {
@@ -454,7 +434,7 @@ function buildDigestUpdatePayload(rows: DigestSibling[]): {
         elements: [
           {
             type: "mrkdwn",
-            text: "見送り／返信／Todoist のあと自動更新。残0でダイジェスト削除",
+            text: "本線は索引のみ · 見送り／返信／Todoist 後に更新 · 残0で削除",
           },
         ],
       },
