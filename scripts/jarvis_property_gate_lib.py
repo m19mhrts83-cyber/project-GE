@@ -387,16 +387,27 @@ def reminder_blocks(
 
 
 def prefer_url_buttons() -> bool:
-    """本線は action_id。URL は JARVIS_PROPERTY_GATE_URL_BUTTONS=1 のときだけ。
+    """Yes/No ボタン形式。
 
-    Incoming Webhook でも interactive ボタンは Interactivity URL に届く。
-    Bot 投稿は post_slack 側で優先（無ければ Webhook）。
+    - 明示 `JARVIS_PROPERTY_GATE_URL_BUTTONS=1` → URL
+    - `SLACK_BOT_TOKEN` と `SLACK_SIGNING_SECRET` が揃う → アプリ内 action_id
+    - どちらか欠ける（現状 Mac は Webhook のみ）→ URL 自動フォールバック
+
+    Webhook＋action_id は Slack 上で無反応になりやすい（メール要対応と同型の教訓）。
+    成功時のカード置換（✅/❌）はアプリ内ボタン＋ Interactivity 本線のときだけ。
+    URL ボタンはブラウザで判定完了（カードは手動で消す／次回投稿で更新）。
     """
-    return (os.environ.get("JARVIS_PROPERTY_GATE_URL_BUTTONS") or "").strip() in (
+    if (os.environ.get("JARVIS_PROPERTY_GATE_URL_BUTTONS") or "").strip() in (
         "1",
         "true",
         "yes",
-    )
+    ):
+        return True
+    has_bot = bool(_bot_token())
+    has_signing = bool((os.environ.get("SLACK_SIGNING_SECRET") or "").strip())
+    if has_bot and has_signing:
+        return False
+    return True
 
 
 def _post_slack_bot(
