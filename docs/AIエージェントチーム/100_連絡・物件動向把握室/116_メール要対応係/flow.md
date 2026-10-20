@@ -7,11 +7,11 @@
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - 動きの例（型参考）: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_uGZ3apXgbHVdZJfnuqYA8_QZ
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH（**116 追加済・41体**）
-- 更新: 2026-10-20（スコア上位5・ダイジェスト＋抽出要約 Plan A）
+- 更新: 2026-10-20（本線短索引＋スレカード）
 
 ## いまの結論（文字1行）
 
-pending triage → **スコア上位5**をダイジェスト＋コンパクトカードで `#consult` → 人がボタン了承。送信了承なし・VR混在なし。
+pending triage → **スコア上位5**を `#consult`（本線＝短索引／カード＝スレ）→ 人がボタン了承。送信了承なし・VR混在なし。
 
 ## 合流の考え方
 
@@ -24,10 +24,11 @@ flowchart TD
   T3[night_triage後] --> Post
   T4[人依頼] --> Post
   T5[健全性見回し] --> Ops["Slack #ops"]
-  Post --> Consult["Slack #consult カード"]
-  Consult --> Reply[返信する]
-  Consult --> Skip[見送り＋カード削除＋ダイジェスト同期]
-  Consult --> Todo[Todoist追加]
+  Post --> Digest["#consult 本線・短索引"]
+  Digest --> Thread["スレ・コンパクトカード"]
+  Thread --> Reply[返信する]
+  Thread --> Skip[見送り＋カード削除＋ダイジェスト同期]
+  Thread --> Todo[Todoist追加]
   Post -->|failed| Ops
 ```
 
@@ -38,7 +39,7 @@ flowchart TD
 | 1 | 合図（T1〜T4） | 朝／GHA／night／手動 | AI | `jarvis_mail_action_slack_post.py` |
 | 2 | ノイズ／mute／VR 除外 | フィルタ | AI | sync_meta `mail_action_skip_mute` |
 | 3 | スコア順・上位N選抜＋抽出要旨 | ルール | AI | Plan A（LLMなし） |
-| 4 | ダイジェスト＋コンパクトカード | Bot／Webhook | AI | Block Kit |
+| 4 | 本線短索引＋スレにコンパクトカード | Bot（Webhook時は本線短カード） | AI | Block Kit · thread_ts |
 | 5 | Gmail 既読 | API modify | AI | 物件取込と同型（soft-fail→morning catchup） |
 | 6 | 返信／見送り／Todoist | ボタン | **人** | consult-action / `/api/g/ma` |
 | 7 | 健全性（T5） | health | AI | `jarvis_mail_action_mute.py --health` |

@@ -12,7 +12,7 @@
 ## 1. 役割
 
 - やること:
-  - `triage_items` pending → **スコア上位5**をダイジェスト＋コンパクトカードで `#consult`（要旨は抽出・LLMなし）
+  - `triage_items` pending → **スコア上位5**を `#consult` へ。**本線は短索引**、**カード（要旨＋ボタン）はスレ**（Bot時。Webhookは本線に短カード）
   - 見送り連続学習の監視／unmute 案内
   - 障害・枠切れは `#ops`
 - やらないこと:
@@ -80,6 +80,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 | 日付 | 変更 |
 |---|---|
+| 2026-10-20 | 本線ダイジェスト＝短索引、カードはスレ（Bot）。下書き全文をSlackから外す。見るストレス低減 |
 | 2026-10-20 | Bot/Signing 無しは URL ボタン自動フォールバック。Dashboard ログイン後に `/mail/{id}` へ復帰 |
 | 2026-10-20 | スコア上位5・ダイジェスト＋抽出要約（Plan A）。本文全文は Dashboard。Slack出した件はGmail既読。見送りでカード削除。ダイジェストは残 pending で更新／残0で削除 |
 | 2026-10-19 | 新設（設計中）。T1〜T5 確定。硬化（連続見送り・unmute CLI・Todoist GenMail型） |
