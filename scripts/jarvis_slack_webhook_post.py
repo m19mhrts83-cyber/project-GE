@@ -5,6 +5,9 @@ Secrets (`.env.jarvis_private`):
   SLACK_WEBHOOK_AI_TEAM_REPORT / CONSULT / OPS / HUB（#ai-hub）
   / DEAL_ACTIVE（#deal-active）
 未設定チャンネルは REPORT にフォールバック（本文先頭に 【#consult】等を付ける）。
+
+report/consult は末尾に FB スレ案内を自動付与（Phase 0）。
+オフ: --no-fb-footer / JARVIS_SLACK_FB_FOOTER_DISABLE=1
 """
 from __future__ import annotations
 
@@ -14,6 +17,10 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from jarvis_slack_report_fb_lib import append_fb_footer  # noqa: E402
 
 # 論理名 → 正規キー
 _CHANNEL_ALIASES = {
@@ -79,6 +86,11 @@ def main() -> int:
         default="Jarvis AI Team",
         help="表示名（Incoming Webhook が許可する場合）",
     )
+    ap.add_argument(
+        "--no-fb-footer",
+        action="store_true",
+        help="report/consult 末尾の FB スレ案内を付けない",
+    )
     args = ap.parse_args()
 
     requested = _normalize_channel(args.channel)
@@ -96,6 +108,9 @@ def main() -> int:
     text = args.text
     if fallback and requested != resolved:
         text = f"【#{display}】\n{text}"
+    # FB 案内は論理チャンネル（requested）基準。fallback で #report に落ちても consult なら付ける
+    if not args.no_fb_footer:
+        text = append_fb_footer(text, channel=requested)
     resolved_display = _display_name(resolved)
 
     payload = {"text": text, "username": args.username}

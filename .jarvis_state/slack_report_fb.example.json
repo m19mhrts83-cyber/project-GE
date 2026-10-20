@@ -1,0 +1,7 @@
+{
+  "disabled": false,
+  "processed": {},
+  "last_run_at": null,
+  "last_found": 0,
+  "note": "Phase 1: scripts/jarvis_slack_report_fb_poll.py。停止は disabled または JARVIS_SLACK_FB_THREAD_DISABLE=1"
+}

@@ -71,6 +71,17 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
 ```
 
 5. 既読 ts を進めるとき: `--set-ts hub <ts>`（MCP で得た最新 ts）
+6. **報告 FB スレ（Phase 1・任意相乗り）**: `#report` / `#consult` のスレ返信を拾うときは:
+
+```bash
+cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
+  scripts/jarvis_slack_report_fb_poll.py --dry-run
+# Ack するとき
+# …/jarvis_slack_report_fb_poll.py --apply
+```
+
+正本: `docs/AIエージェントチーム/40_Slack報告FB_スレ拾い_20261020.md`  
+朝オープンでも soft-fail で `--apply`。停止: `JARVIS_SLACK_FB_THREAD_DISABLE=1`
 
 ## 報告フォーマット
 

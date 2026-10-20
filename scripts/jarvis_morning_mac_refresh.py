@@ -65,6 +65,7 @@ KURASHIFT_OBSIDIAN_PICK_SYNC = REPO / "scripts" / "jarvis_kurashift_obsidian_pic
 MEETING_MINUTES_CURATE = REPO / "scripts" / "jarvis_meeting_minutes_curate.py"
 VENDOR_REPLY_TRIAGE = REPO / "scripts" / "jarvis_kurashift_vendor_reply_triage.py"
 MAIL_ACTION_SLACK = REPO / "scripts" / "jarvis_mail_action_slack_post.py"
+SLACK_REPORT_FB_POLL = REPO / "scripts" / "jarvis_slack_report_fb_poll.py"
 VENDOR_CATCHUP = REPO / "scripts" / "jarvis_triage_vendor_catchup.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
@@ -1128,6 +1129,20 @@ def main() -> int:
                 print(f"# mail_action_health soft-fail rc={rc_h}", file=sys.stderr)
     else:
         results["steps"]["mail_action_slack"] = "skipped"
+
+    # 2c2c. 報告スレ FB 拾い（Phase 1 · soft-fail · Bot token 必要）
+    if SLACK_REPORT_FB_POLL.is_file() and not args.skip_fetch:
+        rc = run_step(
+            "slack_report_fb_poll",
+            [exe, str(SLACK_REPORT_FB_POLL), "--apply"],
+            timeout=120,
+            dry_run=args.dry_run,
+        )
+        results["steps"]["slack_report_fb_poll"] = rc
+        if rc != 0:
+            print(f"# slack_report_fb_poll soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["slack_report_fb_poll"] = "skipped"
 
     if VENDOR_CATCHUP.is_file():
         rc = run_step(
