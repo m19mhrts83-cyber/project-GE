@@ -991,6 +991,15 @@ def main() -> int:
             file=sys.stderr,
         )
         url_mode = True
+    # URL ボタンは HMAC 必須。秘密が空だと s=nosig になり Vercel が「認証エラー」を返す
+    if url_mode and not _action_secret():
+        print(
+            "ERROR: PROPERTY_GATE_ACTION_TOKEN（または MAIL_ACTION_TOKEN）が未設定です。"
+            " URL ボタンを署名できないため投稿を中止します"
+            "（GHA Secrets / .env.jarvis_private を確認）。",
+            file=sys.stderr,
+        )
+        return 2
     rows: list[dict[str, Any]] = []
     stats: dict[str, Any] = {}
     if args.id:
