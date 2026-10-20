@@ -68,6 +68,11 @@ jobs:
             echo "disabled"
             exit 0
           fi
+          if [[ -z "${PROPERTY_GATE_ACTION_TOKEN:-}" && -z "${MAIL_ACTION_TOKEN:-}" ]]; then
+            echo "::error::PROPERTY_GATE_ACTION_TOKEN（または MAIL_ACTION_TOKEN）が Secrets にありません。"
+            echo "未設定のまま投稿すると Slack リンクが s=nosig になり、ブラウザで認証エラーになります。"
+            exit 1
+          fi
           LIMIT="${{ github.event.inputs.limit || '5' }}"
           ARGS=(scripts/jarvis_mail_action_slack_post.py --from-triage --limit "$LIMIT")
           if [[ "${{ github.event.inputs.dry_run || 'false' }}" == "true" ]]; then
