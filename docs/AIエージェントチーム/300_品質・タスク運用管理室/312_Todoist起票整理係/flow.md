@@ -6,7 +6,7 @@
 - FlowForge（閲覧／編集）: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
-- 更新: 2026-10-21（C境界確定・Todoist登録動線を明示）
+- 更新: 2026-10-21（運用格上げタイミング確定・PROGRESS正本）
 
 ## いまの結論（文字1行）
 
@@ -42,6 +42,7 @@
 | 3 | **起票本線は312**。111は取込・宿題渡しのみ（再検討で111側を要すれば変更） |
 | 4 | **GenMail要対応**も312ソースに含める（当面チャット提案→将来 L1/L2） |
 | 5 | **チャット残**: Cursor/Planはルールで L1候補化。**ノイズ抑制**（受け入れ済・未完了・最大5・無言create禁止）。定期transcriptは1.5b後続 |
+| 6 | **運用格上げ**: A今ルール／B翌朝ソフト／C定時=初回apply翌日or10/28／D=1.5bはC安定1週後。詳細は [`PROGRESS.md`](./PROGRESS.md) |
 
 ## 合流の考え方
 

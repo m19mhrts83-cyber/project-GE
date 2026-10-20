@@ -414,6 +414,14 @@ def main(argv: list[str] | None = None) -> int:
         help="--select all の明示了承（通常は番号指定）",
     )
     args = p.parse_args(argv)
+    # 停止: ノイズ時は digest／Slack投稿を止める（applyは了承済み番号の消化のため許可）
+    if not args.apply and os.environ.get("JARVIS_TODOIST_312_DIGEST_DISABLE", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        print("📎 312 digest: disabled (JARVIS_TODOIST_312_DIGEST_DISABLE=1)")
+        return 0
     if args.apply:
         return cmd_apply(args)
     return cmd_digest(args)

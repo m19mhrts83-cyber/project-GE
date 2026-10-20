@@ -21,14 +21,24 @@
 - state: `.jarvis_state/todoist_312_digest.json`
 - 引数なし＝収集＋`#consult` 投稿 / `--dry-run`＝未投稿 / `--apply --select N`＝①create
 
-## 通し確認（残り）
+## 通し確認
 
-1. Slack `#consult` に「【相談】312 … L1ダイジェスト」がある ← 済
-2. 番号を決めて「起票して N」→ apply
-3. Todoist に1件増える → Phase 1 成功
+1. Slack `#consult` に「【相談】312 … L1ダイジェスト」がある ← **済**
+2. 番号を決めて「起票して N」→ apply ← **運用時任意**（意図OK 2026-10-21。必須ゲートではない）
+3. Todoist に1件増える ← 2のとき確認
+
+## 運用格上げ（抄・正本は PROGRESS）
+
+| 段階 | 開始目安 |
+|---|---|
+| A ルール常時 | **今（済）** |
+| B ソフト（相乗りdigest） | **2026-10-22〜** |
+| C 定時digest | 初回apply成功翌日 or **2026-10-28** |
+| D 1.5b / E Phase2–3 | C安定1週後〜 |
 
 ## やらない（Phase 1外）
 
 - L2 ボタンUI（→ Phase 2）
 - 材料即時常駐（→ Phase 3）
 - close（→ 313）
+- ノイズ未確認での毎日自動 digest
