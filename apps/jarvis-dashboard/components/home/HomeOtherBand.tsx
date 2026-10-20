@@ -3,6 +3,10 @@ import OtherMailDigestGenres from "@/components/home/OtherMailDigestGenres";
 import { LEVEL_LABEL, laneLabel, mailPriorityToLevel } from "@/lib/homeLevels";
 import { parseIntentDigest } from "@/lib/intentDigest";
 import {
+  filterOutMutedSenders,
+  muteRegistryFromMetaMap,
+} from "@/lib/mailActionSkipMute";
+import {
   fallbackOtherMailDigest,
   parseOtherMailDigest,
 } from "@/lib/otherMailDigest";
@@ -22,14 +26,17 @@ export default async function HomeOtherBand() {
       .neq("lane", "partner")
       .neq("kind", "activity")
       .order("received_at", { ascending: false })
-      .limit(60),
+      .limit(80),
     supabase.from("sync_meta").select("key,value"),
   ]);
   const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
+  const muteReg = muteRegistryFromMetaMap(metaMap);
 
-  // 自分発信（BCC控え等）は要確認・要約の対象外
-  const otherMails = (mailRows || [])
-    .filter((m) => !isSelfEmail(m.from_email))
+  // 自分発信・Slack見送り学習（ミュート送信者）は要確認・要約の対象外
+  const otherMails = filterOutMutedSenders(
+    (mailRows || []).filter((m) => !isSelfEmail(m.from_email)),
+    muteReg,
+  )
     .slice()
     .sort((a, b) => {
       const order = { attention: 0, warn: 1, info: 2 } as const;
@@ -37,7 +44,8 @@ export default async function HomeOtherBand() {
         order[mailPriorityToLevel(a.priority)] -
         order[mailPriorityToLevel(b.priority)]
       );
-    });
+    })
+    .slice(0, 60);
 
   const needConfirm = otherMails.filter((m) => (m.kind || "mail") === "mail");
   const skimOnly = otherMails.filter((m) => m.kind === "skim");

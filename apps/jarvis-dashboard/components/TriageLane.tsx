@@ -15,6 +15,10 @@ import {
 } from "@/lib/laneView";
 import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
+import {
+  filterOutMutedSenders,
+  muteRegistryFromMetaMap,
+} from "@/lib/mailActionSkipMute";
 import { isSelfEmail } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 
@@ -114,17 +118,43 @@ export default async function TriageLanePage({
     return count ?? 0;
   };
 
-  const [unreadN, sentN, skipN, snoozeN, activityN] = await Promise.all([
-    countFor({ status: "pending" }),
-    countFor({ status: "sent" }),
-    countFor({ status: "skipped" }),
-    countFor({ status: "snoozed" }),
-    countFor({ kindActivity: true }),
-  ]);
+  const [{ data: muteMeta }, sentN, skipN, snoozeN, activityN] =
+    await Promise.all([
+      supabase
+        .from("sync_meta")
+        .select("value")
+        .eq("key", "mail_action_skip_mute")
+        .maybeSingle(),
+      countFor({ status: "sent" }),
+      countFor({ status: "skipped" }),
+      countFor({ status: "snoozed" }),
+      countFor({ kindActivity: true }),
+    ]);
+  const muteReg = muteRegistryFromMetaMap({
+    mail_action_skip_mute: muteMeta?.value,
+  });
 
   let unread: TriageRow[] = [];
   let closedList: TriageRow[] = [];
   let activities: TriageRow[] = [];
+
+  // 未読件数は Slack 見送り学習（ミュート）＋自分発信を除いた実数
+  let unreadN = 0;
+  {
+    const { data: pendingLite } = await supabase
+      .from("triage_items")
+      .select("id,from_email")
+      .eq("lane", lane)
+      .eq("status", "pending")
+      .neq("kind", "activity");
+    const visible = filterOutMutedSenders(
+      ((pendingLite || []) as { id: string; from_email: string | null }[]).filter(
+        (it) => !(lane === "general" && isSelfEmail(it.from_email)),
+      ),
+      muteReg,
+    );
+    unreadN = visible.length;
+  }
 
   if (view === "unread") {
     const { data: pending } = await supabase
@@ -134,11 +164,15 @@ export default async function TriageLanePage({
       .eq("status", "pending")
       .neq("kind", "activity")
       .order("received_at", { ascending: true });
-    unread = ((pending || []) as TriageRow[]).filter((it) => {
-      // general（その他）レーンでは自分発信を未読一覧に出さない
-      if (lane === "general" && isSelfEmail(it.from_email)) return false;
-      return true;
-    });
+    unread = filterOutMutedSenders(
+      ((pending || []) as TriageRow[]).filter((it) => {
+        // general（その他）レーンでは自分発信を未読一覧に出さない
+        if (lane === "general" && isSelfEmail(it.from_email)) return false;
+        return true;
+      }),
+      muteReg,
+    );
+    unreadN = unread.length;
   } else if (view === "activity") {
     const { data } = await supabase
       .from("triage_items")

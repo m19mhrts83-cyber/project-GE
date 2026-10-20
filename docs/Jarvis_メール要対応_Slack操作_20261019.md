@@ -51,6 +51,16 @@
 
 実装: `sync_meta` キー `mail_action_skip_mute`（JSON 文字列）。閾値は `JARVIS_MAIL_ACTION_MUTE_THRESHOLD`（既定 2）。
 
+### Dashboard 共有（2026-10-21）
+
+| 項目 | 正 |
+|---|---|
+| **共有** | Slack 見送り学習と同じ `mail_action_skip_mute` を Dashboard 未読でも読む |
+| **除外先** | `/general`・`/partner` の未読一覧／1通フォーカス、ホーム「その他メール」 |
+| **判断済み** | Slack／Dashboard で見送り・返信・Todoist にした行は `status` 更新＋ `revalidatePath` でフォーカス／ラジオ相当 UI から消える |
+| **ミュート到達時** | 同 From の残 `pending` も `skipped`（`payload.mail_skip_mute_auto`）。unmute は `jarvis_mail_action_mute.py --unmute` |
+| **Dashboard スキップ** | 連続見送りカウントも同じレジストリへ学習（Slack と双方向） |
+
 ## 合図（116・T1〜T5）
 
 | ID | 内容 |
@@ -72,6 +82,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 # 見送り学習
 ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --list
 ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --unmute 'from:addr@example.com'
+~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --close-muted-pending
 ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --health --notify-ops
 ```
 
