@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-19T23:03:38+09:00",
+  "updated": "2026-10-21T00:12:40+09:00",
   "registry_updated": "2026-10-19",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -12,8 +12,8 @@
     "share_id": "uksxiDIzE1AEckKH"
   },
   "counts": {
-    "候補": 26,
-    "設計中": 7,
+    "候補": 25,
+    "設計中": 8,
     "運用確認": 6,
     "運用": 0,
     "停止": 0,
@@ -1331,7 +1331,7 @@
       "tool_notes": "triage→#consult 返信／見送り／Todoist。VRは516。mute学習あり",
       "note": "設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md",
       "summary": "要返信メールを `#consult` で返信／見送り／Todoist",
-      "flow_summary": "pending triage → Slack `#consult`（返信／見送り／Todoist）→ 人がボタン了承。送信了承なし・VR混在なし。",
+      "flow_summary": "pending triage → **スコア上位5**をダイジェスト＋コンパクトカードで `#consult` → 人がボタン了承。送信了承なし・VR混在なし。",
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
@@ -1863,17 +1863,17 @@
       "department_name": "品質・タスク運用管理室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
-      "status_icon": "⚪",
-      "report": "report",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "consult",
       "trigger": "イベント",
-      "schedule": "宿題検知",
+      "schedule": "材料できたとき即＋取りこぼし保険",
       "tool_assigned": "jarvis",
       "tool_fit": "B",
-      "tool_notes": "Todoist起票整理",
-      "note": "",
-      "summary": "起票候補整理・了承後 create・レーン／ラベル／二重起票防止。**コメントにサマリ＋アウトプット必須**",
-      "flow_summary": "",
+      "tool_notes": "認定入口・塩梅L0/L1/L2・材料即時・JarvisBox。closeは313",
+      "note": "2026-10-21 flow本線化。Slack L1/L2カード実装は後続",
+      "summary": "タスク認定・起票整理の入口。材料即時＋取りこぼし定期。塩梅 L0/L1/L2",
+      "flow_summary": "材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult` → 採用時だけ Todoist create。ホーク・AI同士の直入れは L0 で維持。close は 313。",
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
@@ -1882,32 +1882,52 @@
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_M8SvKC1IDTDi496Vw-DgGjpD",
       "permissions": {
-        "can_do": "Todoist 起票・整理の補助（候補）",
+        "can_do": "Todoist 起票整理の入口（L0整理／L1ダイジェスト／L2採用後create。closeはしない）",
         "methods": [
           {
             "name": "チャット・検索",
             "level": "○",
-            "detail": "候補提示・了承待ち"
+            "detail": "候補・認定"
           },
           {
             "name": "外部連携（API/MCP）",
             "level": "○",
-            "detail": "Todoist API（分身トークン）"
+            "detail": "Todoist／Slack"
           },
           {
             "name": "CLI",
             "level": "○",
-            "detail": "`scripts/jarvis_todoist_api.py create-task`"
+            "detail": "`jarvis_todoist_api.py`／`jarvis_todoist_sb_propose.py`／inbox poll"
           },
           {
             "name": "ブラウザ",
             "level": "△",
-            "detail": "画面照合が必要なとき"
+            "detail": "画面照合"
           },
           {
             "name": "画面操作",
             "level": "×",
             "detail": "送信・課金は人"
+          },
+          {
+            "name": "段",
+            "level": "操作",
+            "detail": ""
+          },
+          {
+            "name": "L0",
+            "level": "なし（ホーク／AI直入れ・116 Todoist追加済）",
+            "detail": ""
+          },
+          {
+            "name": "L1",
+            "level": "ダイジェストを見るだけ（一括 create しない）",
+            "detail": ""
+          },
+          {
+            "name": "L2",
+            "level": "採用／見送り（最大3件/回）。投稿先 `#consult`",
+            "detail": ""
           }
         ],
         "methods_filled": true,
@@ -1915,7 +1935,7 @@
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "外に出す・金・削除・「起票して」了承（候補提示までは自動可）。",
+        "human_gate": "L2 採用／見送り、116の返信了承、金・対外・削除。L1は把握のみ。L0は操作なし。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -1924,40 +1944,41 @@
           {
             "id": "human",
             "on": true,
-            "detail": "人が頼む（/todoist・「起票候補出して」「起票して」）",
-            "raw": "人が頼む（`/todoist`・「起票候補出して」「起票して」）"
+            "detail": "人が頼む（/todoist・「起票整理して」「認定して」「起票して」）",
+            "raw": "人が頼む（`/todoist`・「起票整理して」「認定して」「起票して」）"
           },
           {
             "id": "schedule",
-            "on": false,
-            "detail": "定時で候補スキャン→`#consult`／チャット。了承後のみ create）",
-            "raw": "時間（将来: 定時で候補スキャン→`#consult`／チャット。了承後のみ create）"
+            "on": true,
+            "detail": "時間（取りこぼし保険・当面は相乗り。専用定時は後続）",
+            "raw": "時間（取りこぼし保険・当面は相乗り。専用定時は後続）"
           },
           {
             "id": "event",
             "on": true,
-            "detail": "何かが届いたら（hawk todoisttasks create／パートナー確認シグナル）",
-            "raw": "何かが届いたら（hawk `todoist_tasks` create／パートナー確認シグナル）"
+            "detail": "SB／111／JarvisBox／hawk create）",
+            "raw": "何かが届いたら（材料できたとき即: SB／111／JarvisBox／hawk create）"
           },
           {
             "id": "watch",
             "on": false,
-            "detail": "変化・失敗を見回ったら",
-            "raw": "変化・失敗を見回ったら"
+            "detail": "変化・失敗を見回ったら（二重疑い・API失敗 → #ops）",
+            "raw": "変化・失敗を見回ったら（二重疑い・API失敗 → `#ops`）"
           }
         ],
         "trigger_kinds_on": [
           "human",
+          "schedule",
           "event"
         ],
-        "trigger_kinds_label": "人依頼 · イベント",
+        "trigger_kinds_label": "人依頼 · 時間 · イベント",
         "triggers_filled": true,
-        "when": "宿題検知",
+        "when": "材料できたとき即＋取りこぼし保険",
         "registry_trigger": "イベント",
-        "registry_schedule": "宿題検知",
-        "primary_report": "report",
+        "registry_schedule": "材料できたとき即＋取りこぼし保険",
+        "primary_report": "consult",
         "report_channels": [
-          "report"
+          "consult"
         ],
         "reports": [],
         "procedures": [
@@ -11062,7 +11083,7 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+        "role_split": "2026-10-21 flow本線化。Slack L1/L2カード実装は後続"
       },
       {
         "side": "ai_only",

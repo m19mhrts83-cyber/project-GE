@@ -1,15 +1,20 @@
-# 完了候補確認係
+# 完了候補確認係（313）
 
-ビルダー「物件と連絡の見守り隊」由来。Todoist の完了候補を仕分けし、**確認のみは自動クローズ**、**要判断だけ人に残す**。
+**作業を始めたら、まず [`PROGRESS.md`](./PROGRESS.md) を読む**（続き・運用格上げがここにある）。
+
+ビルダー「物件と連絡の見守り隊」由来。Todoist の完了候補を仕分けし、**確認のみは自動クローズ**、**要判断だけ人に残す**。  
+**Todoist完了の本線は313**（起票は312）。作業フロー正本: [`flow.md`](./flow.md)
 
 ## AIオートメーション（作業フロー）
 
 - **FlowForge（開く）**: [flow_6s1nyBIKzluSsdgR-hs9IolD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD)
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
-- 設計の流れ図（あれば）: [`flow.md`](./flow.md)
+- 設計の流れ図: [`flow.md`](./flow.md)（微修正はここを見て人が直す）
+- Phase1: [`docs/phase1-l1-digest.md`](./docs/phase1-l1-digest.md)
+- CLI: `scripts/jarvis_todoist_313_digest.py`
 - Cursor skill: `todoist-batch-sweep`（`.cursor/skills/todoist-batch-sweep/`）
 - Cursor コマンド: `/todoist-batch`（掃除・並列）／入口俯瞰は `/todoist`
-- Cursor ルール: `jarvis-todoist-batch-sweep.mdc` / `jarvis-todoist-owner-confirm.mdc`
+- Cursor ルール: `jarvis-todoist-batch-sweep.mdc` / `jarvis-todoist-owner-confirm.mdc` / `jarvis-chat-open-complete-313.mdc`
 - 起票側: [`312_Todoist起票整理係`](../312_Todoist起票整理係/CLAUDE.md)
 
 ## 1. 役割
@@ -29,9 +34,10 @@
 ## 2. 動き出す合図
 
 - 目安: 実装・会話で完了相当／Todoist掃除・並列モード依頼
-- [x] 人が頼む（`/todoist-batch`・「Todoist掃除」「確認だけで消せるものは完了」）
-- [ ] 時間（将来: 定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）
-- [ ] 何かが届いたら（hawk `owner_confirm` / `done`）
+- [x] 人が頼む（`/todoist-batch`・「Todoist掃除」「確認だけで消せるものは完了」「閉じて N」）
+- [x] ダイジェスト（`jarvis_todoist_313_digest.py` → `#consult`）
+- [ ] 時間（運用C: 定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）
+- [x] 何かが届いたら（hawk `owner_confirm` / `done` → スキャン合流）
 - [x] 変化・失敗を見回ったら（表確認カード・要フォローの事実確認）
 
 ## 3. 実行権限
@@ -117,6 +123,14 @@
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+# L1ダイジェスト（#consult）
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --dry-run
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py
+# 確認のみ一括 close
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --auto-close-confirm
+# 要判断（了承後）
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select 1
+
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status \
   --task-id … --lane apps --status オーナー確認
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py complete-task \
@@ -135,3 +149,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-19 | 確認のみクローズ／並列バッチ方針を本係の正本に具体化。Cursor skill・ルールと同期 |
 | 2026-10-19 | 「コメント必須」節を独立。`/todoist-batch` 合図・チャットだけでは不足を明記 |
 | 2026-10-19 | コメント先頭に書き手識別 `【Jarvis】` 必須（FRIDAY=`【FRIDAY】`・ホーク=`【ホーク】`） |
+| 2026-10-21 | 312同型: flow本線・`313_digest`・運用格上げA〜E・`jarvis-chat-open-complete-313.mdc` |
