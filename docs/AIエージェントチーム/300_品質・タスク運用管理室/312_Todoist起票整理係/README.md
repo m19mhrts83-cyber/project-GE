@@ -1,4 +1,4 @@
-# 【設計中】Todoist起票整理係 — 一目でわかる1枚
+# 【運用確認】Todoist起票整理係 — 一目でわかる1枚
 
 - **AIオートメーション（FlowForge）**: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
 - **人の依頼**: Cursor `/todoist`・「起票整理して」「認定して」

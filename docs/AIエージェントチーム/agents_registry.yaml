@@ -17,8 +17,8 @@ builder_source:
   share_id: uksxiDIzE1AEckKH
   url: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
   previous_share_id: eHKHNixTpIF4G5WN
-updated: '2026-10-19'
-builder_sync_note: 2026-10-19 JarvisがATB共有 uksxiDIzE1AEckKH に116メール要対応係を追加（41体・連絡室）。715／616同日反映済。
+updated: '2026-10-21'
+builder_sync_note: 2026-10-21 Jarvisが617資金移動係（J専）をregistry追加（42体・人が頼む／実行はJarvis専属）。Builder組織図反映は次（表示名に（J専））。
 mixup_doc: 16_GrokBot対応_ミックスアップ識別_20261010.md
 numbering: '3桁固定ID。百の位＝部門、十の位＝まとまり、一の位＝社員。
 
@@ -97,7 +97,7 @@ agents:
     path: 100_連絡・物件動向把握室/114_物件一次判定係
     flowforge_id: flow_O1OMOoN2vkVf9SKLD9T_mvBy
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_O1OMOoN2vkVf9SKLD9T_mvBy
-    status: 運用確認中
+    status: 運用確認
     report: consult
     mixup_kind: mac_twin
     grok_counterpart: s1
@@ -164,26 +164,27 @@ agents:
     path: 300_品質・タスク運用管理室/312_Todoist起票整理係
     flowforge_id: flow_M8SvKC1IDTDi496Vw-DgGjpD
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD
-    status: 設計中
+    status: 運用確認
     report: consult
     trigger: イベント
     tool_assigned: jarvis
     tool_fit: B
     tool_notes: 認定入口・塩梅L0/L1/L2・材料即時・JarvisBox。closeは313
-    schedule: 材料できたとき即＋取りこぼし保険
-    note: 2026-10-21 flow本線化。Slack L1/L2カード実装は後続
+    schedule: 材料できたとき即＋取りこぼし保険（ソフト相乗り）
+    note: 2026-10-21 Phase1+1.5a意図OK・運用確認。digest→#consult→了承後create。L2ボタン／定時は後続
   '313':
-    name: 完了候補確認係
+    name: Todoist完了候補確認係
     path: 300_品質・タスク運用管理室/313_完了候補確認係
     flowforge_id: flow_6s1nyBIKzluSsdgR-hs9IolD
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD
-    status: 候補
+    status: 運用確認
     report: report
-    trigger: イベント
+    trigger: 時間＋イベント
     tool_assigned: jarvis
     tool_fit: B
-    tool_notes: オーナー確認二段
-    schedule: 完了相当時
+    tool_notes: L0確認のみclose／L1ダイジェスト把握／L2閉じてN。FlowForge実装同型済
+    schedule: 毎日20:00（＋完了相当の即時）
+    note: 2026-10-21 運用確認。launchd 20:00 digest（自動closeなし）。L1＝残件把握、closeは明示了承または確認のみ
   '314':
     name: 業務品質監査係
     path: 300_品質・タスク運用管理室/314_業務品質監査係
@@ -297,7 +298,7 @@ agents:
     path: 500_不動産パイプライン実行室/511_問合せ送信準備係
     flowforge_id: flow_Gr7OKXW7L1ElR7yW_XbBCbNH
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_Gr7OKXW7L1ElR7yW_XbBCbNH
-    status: 運用確認中
+    status: 運用確認
     report: consult
     mixup_kind: mac_twin
     grok_counterpart: s1
@@ -468,7 +469,21 @@ agents:
     tool_fit: A+B
     tool_notes: 検知・促しはルール＋CLAUDE.md（スキル不要・他ツール可）。送金だけ Jarvis＋人了承。銀行秘密なし
     schedule: due7日以内／watch悪化／人依頼
-    note: 2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。
+    note: 2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。実行型は617。
+  '617':
+    name: 資金移動係（J専）
+    path: 600_リソース・家計室/617_資金移動係（J専）
+    flowforge_id: flow_duOrNmGET7-E_c7AAQE9fLfO
+    flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_duOrNmGET7-E_c7AAQE9fLfO
+    status: 候補
+    report: report
+    mixup_kind: none
+    trigger: 人依頼
+    tool_assigned: jarvis
+    tool_fit: C
+    tool_notes: 定型の型（プレイブック）のみ。実行はJarvis専属（/adjust_cash）。FRIDAY等は送金しない。616は促し
+    schedule: 人依頼／616手渡しのみ（自動送金なし）
+    note: 2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。
   '711':
     name: 家族Journal週次材料係
     path: 700_コーチング支援室/711_家族Journal週次材料係

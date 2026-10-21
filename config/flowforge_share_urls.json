@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-15",
+  "updated": "2026-10-21T22:14:16+09:00",
   "note": "FlowForge「フローを共有」の閲覧専用URL。外部ブラウザで /flows/… を開くと同期失敗しやすいので、ダッシュはこちらを優先。 · 正本は config/（git追跡）。.jarvis_state はローカル上書き可",
   "by_flow_id": {
     "flow_zYjp6A4HDURefJhSm0h_zUtX": "https://flowforge-259747770348.asia-northeast1.run.app/share/7yRpKP0SB8QufwBL",
@@ -36,7 +36,8 @@
     "flow_kQekwhhUuGTiEJJGOFu-b2zK": "https://flowforge-259747770348.asia-northeast1.run.app/share/Cd2BWvlQSUkmcggP",
     "flow_ke1371iDffRaTdOwDs6WJAtC": "https://flowforge-259747770348.asia-northeast1.run.app/share/NCCCuCP0Xu4j6JwN",
     "flow_whqVaN6KcGoUZnFpJKJjL7jN": "https://flowforge-259747770348.asia-northeast1.run.app/share/rEX1fW_70HpOd1fN",
-    "flow_wkFbA0v6bq3ouq9dmpX-cxc1": "https://flowforge-259747770348.asia-northeast1.run.app/share/XY-L9PStHQBvqw74"
+    "flow_wkFbA0v6bq3ouq9dmpX-cxc1": "https://flowforge-259747770348.asia-northeast1.run.app/share/XY-L9PStHQBvqw74",
+    "flow_duOrNmGET7-E_c7AAQE9fLfO": "https://flowforge-259747770348.asia-northeast1.run.app/share/NYLpUySk0tY27PvI"
   },
   "by_agent_id": {
     "111": "https://flowforge-259747770348.asia-northeast1.run.app/share/Ss4t4l_MR9p80CVH",
@@ -73,6 +74,7 @@
     "813": "https://flowforge-259747770348.asia-northeast1.run.app/share/rEX1fW_70HpOd1fN",
     "814": "https://flowforge-259747770348.asia-northeast1.run.app/share/XY-L9PStHQBvqw74",
     "815": "https://flowforge-259747770348.asia-northeast1.run.app/share/nLogx2WnuLg8E6N3",
-    "816": "https://flowforge-259747770348.asia-northeast1.run.app/share/aQIrSpSaOyYhEuUi"
+    "816": "https://flowforge-259747770348.asia-northeast1.run.app/share/aQIrSpSaOyYhEuUi",
+    "617": "https://flowforge-259747770348.asia-northeast1.run.app/share/NYLpUySk0tY27PvI"
   }
 }

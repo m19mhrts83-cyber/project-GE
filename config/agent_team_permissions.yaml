@@ -60,10 +60,10 @@ agents:
     can_do: "送信前の文面・添付チェック（送信クリックは人）"
     site_logins: []
   "312":
-    can_do: "Todoist 起票整理の入口（L0整理／L1ダイジェスト／L2採用後create。closeはしない）"
+    can_do: "Todoist起票の本線（L0整理／L1ダイジェスト見るだけ／L2了承後create。closeはしない）"
     site_logins: []
   "313":
-    can_do: "完了候補の確認補助（オーナー確認ゲート維持）"
+    can_do: "Todoist完了の本線（L0確認のみclose／L1残件ダイジェスト／L2閉じてN。新規createはしない）"
     site_logins: []
   "314":
     can_do: "業務品質の監査メモ（候補）"
@@ -130,6 +130,9 @@ agents:
     site_logins: []
   "616":
     can_do: "カード引落バッファ不足の検知・Slack促し（ルール＋CLAUDE.md・スキル不要。送金・銀行ログインはしない。寄せ実行は Jarvis＋人了承）"
+    site_logins: []
+  "617":
+    can_do: "資金移動係（J専）— 定型手順の保持。実行は Jarvis のみ（/adjust_cash・人が頼む）。他ツールは送金・銀行ログインしない"
     site_logins: []
   "711":
     can_do: "家族 Journal 週次材料の抽出（評価の正は Grok）"
