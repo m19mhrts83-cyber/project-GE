@@ -29,6 +29,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -89,6 +90,11 @@ CHAIN_PATTERNS: tuple[tuple[str, str], ...] = (
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def today_jst() -> str:
+    """業務日（contacted_at 等）。UTC 日付だと JST 0時台に前日になり stall の contacted_today がずれる。"""
+    return datetime.now(ZoneInfo("Asia/Tokyo")).date().isoformat()
 
 
 def slug_id(name: str, area: str = "") -> str:
@@ -988,7 +994,7 @@ def apply_marks_from_text(text: str, *, dry_run: bool) -> dict[str, Any]:
     applied: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     url_updates: list[dict[str, str]] = []
-    today = now_iso()[:10]
+    today = today_jst()
     for cmd in cmds:
         vid = cmd["id"]
         status = cmd["status"]
@@ -1044,7 +1050,7 @@ def mark_vendor(
     v = by_id.get(vid)
     if not v:
         return {"ok": False, "error": f"vendor not found: {vid}"}
-    today = now_iso()[:10]
+    today = today_jst()
     v["status"] = status
     if note:
         v["notes"] = note if not v.get("notes") else f"{v['notes']} | {note}"

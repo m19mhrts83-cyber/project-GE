@@ -138,3 +138,5 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-19 | 業者返信 Slack 操作（#consult 草案＋送信／編集／返信なし）。見守りのみ |
 | 2026-10-19 | 一般メール要対応（MA）は **116** と明記（VR と分離） |
 | 2026-10-22 | 送信停滞再発: PR #101（send_resume）が main 未マージだったため再適用。`stale_marks` を ops クールダウンから分離＋本日分 kick 自動投入 |
+| 2026-10-22 | S2: 日報で送信済みなのに mark 欠落 → Jarvis が `--mark` 後追いで stall=ok。S9 は本日送信待ち。`--mark` の日付は **JST**（UTC 前日ずれ防止） |
+| 2026-10-22 | **禁止**: Grok が対外メール送信中に Jarvis CDP でコンポーザ／クリップボードを触る（ナカジツ誤送）。kick は outbox＋Slack のみ |
