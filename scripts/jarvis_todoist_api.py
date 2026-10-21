@@ -223,6 +223,8 @@ def _ensure_complete_comment(raw: str, who: str = "") -> str:
     text = (raw or "").strip()
     who = (who or "").strip()
     phrase = COMPLETE_PHRASE
+    if re.match(r"^【[^】]+】", text):
+        return text[:1900]
     if text.startswith(phrase):
         return text[:1900]
     extra = f"（{who}）" if who else ""

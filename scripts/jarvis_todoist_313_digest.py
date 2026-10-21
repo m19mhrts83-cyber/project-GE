@@ -175,41 +175,67 @@ def _collect(lanes: list[str]) -> list[dict[str, Any]]:
     return capped
 
 
+def _short_title(raw: str, width: int = 46) -> str:
+    """Slack で折り返して読みにくくならないよう、タイトルを頭だけにする。"""
+    t = " ".join(str(raw or "").split())
+    t = re.sub(r"\s*\[[0-9a-f]{8,}\]\s*", " ", t)
+    t = re.sub(r"\s*·\s*更新\s*\d{4}-\d{2}-\d{2}T\S*", "", t)
+    t = t.strip(" -—·")
+    if len(t) <= width:
+        return t
+    head = t[:width]
+    for sep in ("：", "。", " — ", " - ", " "):
+        i = head.rfind(sep)
+        if i >= width * 0.5:
+            return head[:i].rstrip("：。 -—") + "…"
+    return head.rstrip() + "…"
+
+
+
+def _item_line(it: dict[str, Any]) -> str:
+    """1件＝タイトルを Todoist へのリンクにする（タップで説明・コメントまで見える）。"""
+    title = _short_title(it.get("title"))
+    task_id = str(it.get("task_id") or "")
+    label = (
+        f"<https://app.todoist.com/app/task/{task_id}|{title}>"
+        if task_id
+        else title
+    )
+    lane = str(it.get("lane") or "").replace("_", " ")
+    return f"*{it['n']}.* {label}  _({lane})_"
+
+
 def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
     confirm = [i for i in items if i.get("kind") == "confirm_only"]
     need = [i for i in items if i.get("kind") == "need_owner"]
+    stamp = datetime.now(JST).strftime("%m/%d %H:%M")
     lines = [
-        "【相談】313 完了候補確認｜L1ダイジェスト（見るだけ）",
-        "",
-        "📌 要ボス: 要判断のみ（確認のみは Jarvis 可）",
-        "",
-        f"確認のみ（最大・Jarvis可 / --auto-close-confirm）: {len(confirm)}件",
+        "📋 *Todoist完了候補確認*",
+        f"要判断 *{len(need)}件* ／ 確認のみ {len(confirm)}件 ／ {stamp}",
     ]
-    if not confirm:
-        lines.append("- （なし）")
-    else:
-        for it in confirm:
-            lines.append(
-                f"- #{it['n']} [{it.get('lane')}] {str(it.get('title') or '')[:70]} — id={it.get('task_id')}"
-            )
-    lines.extend(["", f"要オーナー判断（閉じて N）: {len(need)}件"])
-    if not need:
-        lines.append("- （なし）")
-    else:
-        for it in need:
-            lines.append(
-                f"- #{it['n']} [{it.get('lane')}] {str(it.get('title') or '')[:70]} — id={it.get('task_id')}"
-            )
+    if need:
+        lines.extend(["", "*判断してほしいもの*", ""])
+        lines.append("\n\n".join(_item_line(it) for it in need))
+    if confirm:
+        lines.extend(["", "*確認のみ（返事不要・閉じてOK）*", ""])
+        lines.append("\n\n".join(_item_line(it) for it in confirm))
+    if not items:
+        lines.extend(["", "対象なし（オーナー確認は空です）"])
     lines.extend(
         [
             "",
-            "次: Jarvisに依頼",
-            "担当メモ: 確認のみ→313 --apply --auto-close-confirm／要判断→「閉じて N」→ --apply --select N",
-            "橋渡し: 新規起票は312。313は close のみ",
+            "*返信の書き方*",
+            "「閉じて 3,7」→ その番号だけコメント付きで完了",
+            "「全部残す」→ 何もしない（次回また出ます）",
+            "タイトルをタップ → Todoist の詳細（説明・コメント）",
+            "",
+            "次: 人判断（閉じて N）",
+            "担当メモ: 確認のみは自動クローズ対象・要判断は据え置き",
+            "橋渡し: 新規起票は312（この係は閉じるだけ）",
         ]
     )
     if note:
-        lines.extend(["", f"参考: {note}"])
+        lines.extend(["", f"_{note}_"])
     return "\n".join(lines)
 
 
@@ -230,7 +256,7 @@ def _post_webhook(text: str, *, channel: str = "consult") -> int:
     body_text = text
     if fallback:
         body_text = "【#consult】\n" + text
-    payload = {"text": body_text, "username": "313 完了候補確認"}
+    payload = {"text": body_text, "username": "Todoist完了候補確認"}
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -261,20 +287,20 @@ def _complete_task(it: dict[str, Any], *, dry_run: bool, reason: str) -> dict[st
     if not lane or not tid:
         return {"ok": False, "error": "missing lane/task_id", "title": title}
 
+    author = (os.environ.get("TODOIST_313_AUTHOR") or "Jarvis").strip()
+    out_link = f"https://app.todoist.com/app/task/{tid}"
     if kind == "confirm_only":
-        comment = (
-            "【Jarvis】タスク完了したよ（確認のみクローズ）\n"
-            f"サマリ: 313 digest 確認のみ（{reason}）— {title[:80]}\n"
-            "アウトプット:\n"
-            "- [313 flow](docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/flow.md)\n"
-        )
+        head = f"【{author}】タスク完了したよ（確認のみクローズ）"
+        why = "確認のみ"
     else:
-        comment = (
-            "【Jarvis】タスク完了したよ（松野確認OK）\n"
-            f"サマリ: 313 digest 了承後 close（{reason}）— {title[:80]}\n"
-            "アウトプット:\n"
-            "- [313 flow](docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/flow.md)\n"
-        )
+        head = f"【{author}】タスク完了したよ（松野確認OK）"
+        why = "了承後 close"
+    comment = (
+        f"{head}\n"
+        f"サマリ: Todoist完了候補確認 — {why}（{reason}）: {title[:80]}\n"
+        "アウトプット:\n"
+        f"- [該当タスク]({out_link})\n"
+    )
 
     if dry_run:
         return {
@@ -394,7 +420,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
     state["last_apply_results"] = results
     _save_state(state)
 
-    print("📎 Todoist完了（313 digest）" + (" DRY-RUN" if dry else ""))
+    print("📎 Todoist完了候補確認（313 digest）" + (" DRY-RUN" if dry else ""))
     for r in results:
         if r.get("ok"):
             prefix = "[dry] " if dry else ""
@@ -408,7 +434,6 @@ def cmd_apply(args: argparse.Namespace) -> int:
     # 確認のみ一括のとき #report に短報
     if (
         not dry
-        and args.auto_close_confirm
         and any(x.get("ok") for x in results)
         and not args.skip_report
     ):
@@ -417,18 +442,22 @@ def cmd_apply(args: argparse.Namespace) -> int:
             for x in results
             if x.get("ok")
         ]
+        mode = (
+            "確認のみを閉じました"
+            if args.auto_close_confirm
+            else "了承（閉じて N）で閉じました"
+        )
         report = (
-            "【報告】313 完了候補確認・確認のみクローズ\n\n"
-            "📌 要ボス: なし\n\n"
+            f"📋 *Todoist完了候補確認*｜{mode}\n\n"
             + "\n".join(ok_lines)
-            + "\n\n参考: 313 digest --auto-close-confirm"
+            + "\n\nコメント付きで完了。次回ダイジェストから外れます"
         )
         _post_webhook(report, channel="report")
 
     if not dry and any(not x.get("ok") for x in results):
         ops = (os.environ.get("SLACK_WEBHOOK_AI_TEAM_OPS") or "").strip()
         if ops:
-            msg = "【ops】313 完了候補確認 — close失敗\n" + "\n".join(
+            msg = "【ops】Todoist完了候補確認 — close失敗\n" + "\n".join(
                 f"- {x.get('error')}" for x in results if not x.get("ok")
             )
             try:
@@ -436,7 +465,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
                     urllib.request.Request(
                         ops,
                         data=json.dumps(
-                            {"text": msg, "username": "313 完了候補確認"}
+                            {"text": msg, "username": "Todoist完了候補確認"}
                         ).encode("utf-8"),
                         headers={"Content-Type": "application/json"},
                         method="POST",
