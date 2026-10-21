@@ -102,7 +102,11 @@ begin
     'kurashift_re_actuals',
     'kurashift_re_gl_lines',
     'kurashift_openchat_logs',
-    'todoist_webhook_events'
+    'todoist_webhook_events',
+    -- 20260926 以降（個別 migration にも GRANT あり。reset 耐性のためここにも）
+    'line_oa_events'
+    -- yen_rate_daily / westudy_transcript_compare は権限が特殊
+    -- → migrations/20261021_data_api_grants_followup.sql
   ]
   loop
     if to_regclass('public.' || t) is null then
