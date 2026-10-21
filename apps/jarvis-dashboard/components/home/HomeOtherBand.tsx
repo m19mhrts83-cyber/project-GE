@@ -10,7 +10,7 @@ import {
   fallbackOtherMailDigest,
   parseOtherMailDigest,
 } from "@/lib/otherMailDigest";
-import { isSelfEmail } from "@/lib/selfEmails";
+import { isMailActionExcluded } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 import { fmtSync } from "./homeHelpers";
 
@@ -20,7 +20,7 @@ export default async function HomeOtherBand() {
     supabase
       .from("triage_items")
       .select(
-        "id,lane,kind,status,partner,folder,subject,received_at,summary,priority,from_email",
+        "id,lane,kind,status,partner,folder,subject,received_at,summary,priority,from_email,original_body",
       )
       .eq("status", "pending")
       .neq("lane", "partner")
@@ -32,9 +32,15 @@ export default async function HomeOtherBand() {
   const metaMap = Object.fromEntries((meta || []).map((m) => [m.key, m.value]));
   const muteReg = muteRegistryFromMetaMap(metaMap);
 
-  // 自分発信・Slack見送り学習（ミュート送信者）は要確認・要約の対象外
+  // 自分発信（estate BCC 誤ラベル含む）・Slack見送り学習は要確認・要約の対象外
   const otherMails = filterOutMutedSenders(
-    (mailRows || []).filter((m) => !isSelfEmail(m.from_email)),
+    (mailRows || []).filter(
+      (m) =>
+        !isMailActionExcluded({
+          fromEmail: m.from_email,
+          body: m.original_body,
+        }),
+    ),
     muteReg,
   )
     .slice()

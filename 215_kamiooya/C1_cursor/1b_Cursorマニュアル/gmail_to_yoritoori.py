@@ -14,6 +14,10 @@ Gmail の未読メールを取得し、送信元メールアドレスで連絡�
   2. From のドメイン ∈ email_domains（例: leaf-eco.com）
   3. To/Cc に to_name_hints（例: LEAF / リーフ / leaf-eco）
 
+※ From が自分（estate / admin / m19m / 法人ドメイン）のときは受信追記しない。
+  estate 送信の BCC 控えが to_name_hints で「相手から返信」になるのを防ぐ
+  （送信履歴は SENT 経路の「自分から送信」が正）。
+
 email_domains で拾った新規 From は、既定で連絡先一覧.yaml の emails へ自動追記
 （無効化: --no-learn-emails または YORITOORI_LEARN_EMAILS=0）。
 
@@ -780,6 +784,28 @@ def append_to_yoritoori(folder_path, partner_name, date_str, body, attachment_na
     return True
 
 
+# 自分発信（BCC 控えを「相手から返信」にしない）。scripts/is_self_email と同値
+_KNOWN_SELF_SENDERS = {
+    "matsuno.estate@gmail.com",
+    "admin@livingsupport-matsu.co.jp",
+    "m19m.hrts83@gmail.com",
+}
+
+
+def _is_self_sender(email: str | None, from_raw: str | None = None) -> bool:
+    e = (email or "").strip().lower()
+    if e.endswith("@livingsupport-matsu.co.jp"):
+        return True
+    if e in _KNOWN_SELF_SENDERS:
+        return True
+    raw = (from_raw or "").strip().lower()
+    if raw and any(s in raw for s in _KNOWN_SELF_SENDERS):
+        return True
+    if "@livingsupport-matsu.co.jp" in raw:
+        return True
+    return False
+
+
 def process_message(service, msg, resolver, mark_read=True):
     """1件のメールを処理し、やり取りに追記。追記したら True。"""
     full = service.users().messages().get(userId="me", id=msg["id"], format="full").execute()
@@ -793,6 +819,10 @@ def process_message(service, msg, resolver, mark_read=True):
 
     email = extract_email(from_val)
     if not email and not (to_val or cc_val):
+        return False
+
+    # estate 等の送信 BCC 控えは SENT（自分から送信）が正。to_hint で受信扱いにしない
+    if _is_self_sender(email, from_val):
         return False
 
     partner, match_kind = resolver.resolve(email, to_header=to_val or "", cc_header=cc_val or "")
