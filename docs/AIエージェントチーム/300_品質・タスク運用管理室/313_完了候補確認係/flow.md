@@ -1,15 +1,28 @@
-# フロー — 完了候補確認係（313）
+# フロー — Todoist完了候補確認（313）
 
 第2段階の作業フロー正本（312と同型コンセプト・2026-10-21）。  
 作り方: [`06_社員の作り方_二段階_20261009.md`](../../06_社員の作り方_二段階_20261009.md)
 
 - FlowForge（閲覧／編集）: [flow_6s1nyBIKzluSsdgR-hs9IolD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
-- 更新: 2026-10-21（完了動線・塩梅・運用格上げを明示）
+- 更新: 2026-10-21（**毎日20:00のL1ダイジェストを本線化**／完了動線・塩梅・運用格上げ／FlowForgeキャンバスを実装同型に同期）
 
 ## いまの結論（文字1行）
 
 完了相当をスキャン → 塩梅（L0確認のみ静かに／L1ダイジェスト見るだけ／L2個別了承）→ Slack → **了承または確認のみ例外で Todoist close**。新規起票は312。
+
+## 開始トリガー（いつ動くか）
+
+| きっかけ | 時刻 | 何が起きる | 実装 |
+|---|---|---|---|
+| **定時ダイジェスト（本線）** | **毎日 20:00** | 9レーン横断でオーナー確認を読み、L1ダイジェストを `#consult` へ（0件なら投稿しない・**自動closeなし**） | launchd `com.matsunoma.jarvis.todoist-313-digest`／[`runner`](../../../../launchd/jarvis_todoist_313_digest_runner.sh) |
+| 人の依頼 | 随時 | `/todoist-batch`・「掃除して」→ L1/L0 | skill `todoist-batch-sweep` |
+| 完了相当 | 随時 | 会話で完了相当 → 即スキャン | 313_digest |
+| 312／hawk | 随時 | 完了疑い・`owner_confirm` を合流 | 同上 |
+
+- 20:00 の投稿は**見るだけ**。閉じるのは人の「閉じて N」（①）か、確認のみの自動close（②）だけ
+- 停止: `JARVIS_TODOIST_313_DIGEST_DISABLE=1`（Slack投稿のみ停止／`--apply` は可）
+- ログ: `~/Library/Logs/jarvis_todoist_313_digest/`
 
 ## Todoistへの完了動線（出口・必読）
 
@@ -22,6 +35,8 @@
 | **③ バッチ／skill** | `/todoist-batch`・会話掃除 | 依頼のみ | skill／CLI。報告は末尾1ブロック |
 
 - **L1（ダイジェスト）からは一括 close しない**（見るだけ。確認のみは②、要判断は①）
+- **L1 の各件はタイトルが Todoist へのリンク**（`https://app.todoist.com/app/task/<id>`）。タップで説明・コメント・期限まで見える
+- 返信は「閉じて 3,7」／「全部残す」。番号は投稿の並び順
 - **312は create しない／close しない**。完了疑いは312が列挙するだけ → 実際の仕分けは313
 - **新規 create はしない**（登録動線の外）
 
@@ -39,9 +54,9 @@
 | 1 | **投稿先**: 要判断 L1／L2 は Slack **`#consult`**。確認のみ一括の結果は **`#report`** |
 | 2 | **確認のみ**は Jarvis が close 可（オーナー確認列を一度経由＋定型コメント） |
 | 3 | **要判断**は人了承まで残す。一括 close 禁止 |
-| 4 | **コメント必須**（先頭 `【Jarvis】`／完了定型）。チャットだけは不足 |
+| 4 | **コメント必須**（先頭に書き手 `【FRIDAY】`／`【Jarvis】`／`【ホーク】`＋完了定型）。チャットだけは不足 |
 | 5 | **起票は312**。313は close／仕分けのみ |
-| 6 | **運用格上げ**: A今／B翌朝ソフト／C定時=初回通し翌日or10/28。詳細は [`PROGRESS.md`](./PROGRESS.md) |
+| 6 | **運用**: 2026-10-21 夜から **毎日20:00のL1ダイジェスト**（ソフト運用＝自動closeなし）。格上げ履歴は [`PROGRESS.md`](./PROGRESS.md) |
 
 ## ソース（入口）
 
@@ -141,4 +156,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select 1
 ```
 
-**未実装（フロー正・後続）**: Slack 採用ボタン、分類ML、専用定時ジョブ。微修正は本 flow を見て人が直す。
+**未実装（後続）**: Slack 採用ボタン（L2）、分類ML。※定時ジョブは 2026-10-21 に実装（毎日20:00）。微修正は本 flow を見て人が直す。
+
+## FlowForge 作り込みメモ
+
+- [x] キャンバスを実装同型（L0/L1/L2・完了動線①②③・313_digest）に差し替え（2026-10-21・localStorage注入）
+- [x] 旧「家賃収支監査・毎日11:00」ノードを除去
+- [ ] 見た目の微調整は人がキャンバスで（整列・文言）
+- 貼付用: [`エージェント指示_FlowForge貼付.md`](./エージェント指示_FlowForge貼付.md)

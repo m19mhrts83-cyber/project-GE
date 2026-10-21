@@ -1,4 +1,4 @@
-# 完了候補確認係（313）
+# Todoist完了候補確認（313）
 
 **作業を始めたら、まず [`PROGRESS.md`](./PROGRESS.md) を読む**（続き・運用格上げがここにある）。
 
@@ -36,7 +36,7 @@
 - 目安: 実装・会話で完了相当／Todoist掃除・並列モード依頼
 - [x] 人が頼む（`/todoist-batch`・「Todoist掃除」「確認だけで消せるものは完了」「閉じて N」）
 - [x] ダイジェスト（`jarvis_todoist_313_digest.py` → `#consult`）
-- [ ] 時間（運用C: 定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）
+- [x] 時間（**毎日20:00** launchd `com.matsunoma.jarvis.todoist-313-digest` → L1 `#consult`。自動closeなし＝ソフト運用）
 - [x] 何かが届いたら（hawk `owner_confirm` / `done` → スキャン合流）
 - [x] 変化・失敗を見回ったら（表確認カード・要フォローの事実確認）
 
@@ -129,7 +129,8 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 # 確認のみ一括 close
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --auto-close-confirm
 # 要判断（了承後）
-~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select 1
+TODOIST_313_AUTHOR=FRIDAY ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select 1
+# FRIDAY が実行する時は TODOIST_313_AUTHOR=FRIDAY（先頭が【FRIDAY】。既定は Jarvis）
 
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status \
   --task-id … --lane apps --status オーナー確認
@@ -150,3 +151,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-19 | 「コメント必須」節を独立。`/todoist-batch` 合図・チャットだけでは不足を明記 |
 | 2026-10-19 | コメント先頭に書き手識別 `【Jarvis】` 必須（FRIDAY=`【FRIDAY】`・ホーク=`【ホーク】`） |
 | 2026-10-21 | 312同型: flow本線・`313_digest`・運用格上げA〜E・`jarvis-chat-open-complete-313.mdc` |
+| 2026-10-21 | 名称を **Todoist完了候補確認** に統一。Slack整形（件ごと空行）・タイトル＝Todoistリンク。**毎日20:00** のL1をlaunchd本線に |
