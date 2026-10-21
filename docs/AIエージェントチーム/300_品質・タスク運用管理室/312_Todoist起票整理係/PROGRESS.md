@@ -2,6 +2,11 @@
 
 作業を再開したらこのファイルを先に読む。
 
+## 2026-10-21 — 運用確認へ格上げ
+
+- registry `status`: 設計中 → **運用確認**（松野「ステータス更新して」）
+- ダッシュ: `jarvis_agent_team_status_sync.py` → `agentTeam.json`
+
 ## 2026-10-21 — 意図OK（Phase1＋1.5a）
 
 - 受け入れ: 松野「意図オーケー」→ Phase1（digest本線）＋1.5a（ノイズ抑制ルール）を **意図OK**

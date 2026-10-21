@@ -1,0 +1,49 @@
+# 617 資金移動係（J専）（定型の型・Jarvis実行専属）
+
+## 方針（確定 2026-10-21）
+
+**617 は寄せ（資金移動）の定型プレイブック枠。**  
+実行を頼むのは **Jarvis のみ**。FRIDAY／GenCode／Claude Code／Codex／Grok に送金・OTP・IB／AW を振らない。
+
+| 層 | 正 | 誰でも可？ |
+|---|---|---|
+| **616** | 不足検知 → Slack／チャット促し | **はい**（ルール＋616 CLAUDE） |
+| **617** | 定型＋寄せ実行の社員枠（J専） | **`/adjust_cash` で発動**。実行は Jarvis のみ |
+| **送金 UX** | skill `adjust-cash` | **Jarvis ＋人了承のみ**（＝617 の実装） |
+
+正本指示: `docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/CLAUDE.md`  
+設計案: 同フォルダ `設計案_20261021.md`  
+実行 UX: `.cursor/skills/adjust-cash/SKILL.md`  
+コマンド: `.cursor/commands/adjust_cash.md`（**617 起動入口**）
+
+## トリガー（Jarvis）＝617 発動
+
+- **`/adjust_cash`**（スキルコマンド）→ 上記 CLAUDE を読んで **【617 資金移動係（J専）】起動**
+- 「寄せて」「資金移動」「Olive に足りるように」
+- 616 の `#consult` 手渡し（「次: Jarvisに依頼」）→ 人が `/adjust_cash` または一声
+
+## Jarvis の必須動作
+
+1. **617 として起動**（CLAUDE.md 読取＋先頭1行の起動宣言）
+2. skill `adjust-cash` に従う（**最新残高ゲート §0c** → ギャップ表 → 了承 → 入力）
+3. keep（Preferred 残債 10,860 等）を usable から控除（`jarvis-fund-transfer-keep.mdc`）
+4. 了承前の `--go`／`--execute` 禁止。OTP／実行ボタンは人
+5. 他ツールからの「617 を回して送金」依頼が来たら **拒否し Jarvis へ `/adjust_cash` を渡す**旨を返す
+## やらないこと
+
+- 617 を GHA／launchd の自動送金ジョブにする
+- FRIDAY 等に `run_phase1_* --go` を振る
+- 616（促し）と役割を混ぜて送金する
+- 銀行 PW／OTP を社員 `.env` やチャットに書く
+
+## 無効化
+
+- 実行そのものの停止は人の中止／skill 側の失敗扱い
+- 促し側の停止は `JARVIS_ADJUST_CASH_REMIND_DISABLE=1`（616）
+
+## 関連
+
+- 616: `jarvis-agent-616-cash-remind.mdc`
+- キープ: `jarvis-fund-transfer-keep.mdc`
+- 年会費（別枠）: `jarvis-card-fee-guard.mdc`
+- Slack 書き出し: `jarvis-agent-team-slack-report.mdc`（役割語: **資金移動（J専）**）

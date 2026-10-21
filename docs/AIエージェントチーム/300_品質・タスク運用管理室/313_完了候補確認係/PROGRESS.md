@@ -1,6 +1,27 @@
+## 2026-10-21 — 夜20:00ソフト運用開始（FRIDAY 実行）
+
+- 稼働: launchd `com.matsunoma.jarvis.todoist-313-digest`（毎日20:00・0件なら投稿しない・自動closeなし）
+- runner: `launchd/jarvis_todoist_313_digest_runner.sh`（`TODOIST_313_AUTHOR=FRIDAY`）
+- flow.md に「開始トリガー」節を新設。未実装から「専用定時ジョブ」を削除
+- 組織図（ダッシュ）: 313 を 運用確認 / 時間＋イベント / 「毎日20:00（＋完了相当の即時）」に更新
+
+## 2026-10-21 — Phase2: 「閉じて N」実弾テスト（#5）
+
+- `--apply --select 5` で1件をコメント付き close（checked=true を API で確認）／`#report` 通知
+- 修正: 完了コメント先頭の自動前置で `【FRIDAY】` が2番目にずれていた → `jarvis_todoist_api.py` を修正＋既存コメント更新
+
+## 2026-10-21 — Slack可読性・詳細動線
+
+- 名称を Todoist完了候補確認に統一。1件ごとに空行、タイトル＝Todoistリンク、番号返信の型
+
 # PROGRESS — 完了候補確認係（313）
 
 作業を再開したらこのファイルを先に読む。
+
+## 2026-10-21 — ステータス再確認（運用確認維持）
+
+- registry: **運用確認**維持。FlowForgeを実装同型に同期。L1＝残件把握（見てもcloseしない）を明文化
+- ダッシュ: status sync で `agentTeam.json` 更新
 
 ## 2026-10-21 — Phase1＋flow正本（312同型）
 

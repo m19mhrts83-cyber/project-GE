@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-21T00:12:40+09:00",
-  "registry_updated": "2026-10-19",
+  "updated": "2026-10-21T22:51:20+09:00",
+  "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
   "flowforge_login_hint": "m19m",
@@ -13,11 +13,10 @@
   },
   "counts": {
     "候補": 25,
-    "設計中": 8,
-    "運用確認": 6,
+    "設計中": 7,
+    "運用確認": 10,
     "運用": 0,
-    "停止": 0,
-    "運用確認中": 2
+    "停止": 0
   },
   "genres": [
     {
@@ -110,16 +109,17 @@
         "613",
         "614",
         "615",
-        "616"
+        "616",
+        "617"
       ],
       "grok_bot_ids": [
         "resource"
       ],
       "counts": {
-        "ai": 6,
+        "ai": 7,
         "grok": 1,
         "paired": 1,
-        "ai_only": 5,
+        "ai_only": 6,
         "grok_only": 0
       }
     },
@@ -948,8 +948,8 @@
       "department_name": "連絡・物件動向把握室",
       "genre_id": "property",
       "genre_name": "物件",
-      "status": "運用確認中",
-      "status_icon": "⚪",
+      "status": "運用確認",
+      "status_icon": "🟡",
       "report": "consult",
       "trigger": "イベント＋時間",
       "schedule": "取込後・毎日11:15・手動",
@@ -1331,7 +1331,7 @@
       "tool_notes": "triage→#consult 返信／見送り／Todoist。VRは516。mute学習あり",
       "note": "設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md",
       "summary": "要返信メールを `#consult` で返信／見送り／Todoist",
-      "flow_summary": "pending triage → **スコア上位5**をダイジェスト＋コンパクトカードで `#consult` → 人がボタン了承。送信了承なし・VR混在なし。",
+      "flow_summary": "pending triage → **スコア上位5**を `#consult`（本線＝短索引／カード＝スレ）→ 人がボタン了承。送信了承なし・VR混在なし。",
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
@@ -1863,17 +1863,17 @@
       "department_name": "品質・タスク運用管理室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "設計中",
-      "status_icon": "🔵",
+      "status": "運用確認",
+      "status_icon": "🟡",
       "report": "consult",
       "trigger": "イベント",
-      "schedule": "材料できたとき即＋取りこぼし保険",
+      "schedule": "材料できたとき即＋取りこぼし保険（ソフト相乗り）",
       "tool_assigned": "jarvis",
       "tool_fit": "B",
       "tool_notes": "認定入口・塩梅L0/L1/L2・材料即時・JarvisBox。closeは313",
-      "note": "2026-10-21 flow本線化。Slack L1/L2カード実装は後続",
-      "summary": "タスク認定・起票整理の入口。材料即時＋取りこぼし定期。塩梅 L0/L1/L2",
-      "flow_summary": "材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult` → 採用時だけ Todoist create。ホーク・AI同士の直入れは L0 で維持。close は 313。",
+      "note": "2026-10-21 Phase1+1.5a意図OK・運用確認。digest→#consult→了承後create。L2ボタン／定時は後続",
+      "summary": "**Todoist起票本線**。登録動線①L2採用create／②L0直／③116追加。塩梅 L0/L1/L2",
+      "flow_summary": "材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult` → **採用時に Todoist へ create**。ホーク・AI同士の直入れは L0 で維持。**Todoist起票の本線は312**。close は 313。",
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
@@ -1882,7 +1882,7 @@
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_M8SvKC1IDTDi496Vw-DgGjpD",
       "permissions": {
-        "can_do": "Todoist 起票整理の入口（L0整理／L1ダイジェスト／L2採用後create。closeはしない）",
+        "can_do": "Todoist起票の本線（L0整理／L1ダイジェスト見るだけ／L2了承後create。closeはしない）",
         "methods": [
           {
             "name": "チャット・検索",
@@ -1973,9 +1973,9 @@
         ],
         "trigger_kinds_label": "人依頼 · 時間 · イベント",
         "triggers_filled": true,
-        "when": "材料できたとき即＋取りこぼし保険",
+        "when": "材料できたとき即＋取りこぼし保険（ソフト相乗り）",
         "registry_trigger": "イベント",
-        "registry_schedule": "材料できたとき即＋取りこぼし保険",
+        "registry_schedule": "材料できたとき即＋取りこぼし保険（ソフト相乗り）",
         "primary_report": "consult",
         "report_channels": [
           "consult"
@@ -2013,35 +2013,53 @@
             "kind": "doc"
           },
           {
+            "title": "PROGRESS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/PROGRESS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/PROGRESS.md",
+            "kind": "doc"
+          },
+          {
             "title": "AGENTS.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/AGENTS.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/AGENTS.md",
             "kind": "doc"
+          },
+          {
+            "title": "phase1-l1-digest.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/phase1-l1-digest.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/phase1-l1-digest.md",
+            "kind": "doc"
+          },
+          {
+            "title": "research-chat-task-capture.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/research-chat-task-capture.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/research-chat-task-capture.md",
+            "kind": "doc"
           }
         ],
-        "procedure_count": 6,
+        "procedure_count": 9,
         "source": "claude+registry+ops_yaml"
       }
     },
     {
       "id": "313",
-      "name": "完了候補確認係",
+      "name": "Todoist完了候補確認係",
       "path": "300_品質・タスク運用管理室/313_完了候補確認係",
       "department_id": "300",
       "department_name": "品質・タスク運用管理室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
-      "status_icon": "⚪",
+      "status": "運用確認",
+      "status_icon": "🟡",
       "report": "report",
-      "trigger": "イベント",
-      "schedule": "完了相当時",
+      "trigger": "時間＋イベント",
+      "schedule": "毎日20:00（＋完了相当の即時）",
       "tool_assigned": "jarvis",
       "tool_fit": "B",
-      "tool_notes": "オーナー確認二段",
-      "note": "",
+      "tool_notes": "L0確認のみclose／L1ダイジェスト把握／L2閉じてN。FlowForge実装同型済",
+      "note": "2026-10-21 運用確認。launchd 20:00 digest（自動closeなし）。L1＝残件把握、closeは明示了承または確認のみ",
       "summary": "確認のみ close／要判断はオーナー残し。**処置・完了は Todoist コメント必須**",
-      "flow_summary": "",
+      "flow_summary": "完了相当をスキャン → 塩梅（L0確認のみ静かに／L1ダイジェスト見るだけ／L2個別了承）→ Slack → **了承または確認のみ例外で Todoist close**。新規起票は312。",
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
@@ -2050,7 +2068,7 @@
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/ihP48FmIDAoWdX7L",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_6s1nyBIKzluSsdgR-hs9IolD",
       "permissions": {
-        "can_do": "完了候補の確認補助（オーナー確認ゲート維持）",
+        "can_do": "Todoist完了の本線（L0確認のみclose／L1残件ダイジェスト／L2閉じてN。新規createはしない）",
         "methods": [
           {
             "name": "チャット・検索",
@@ -2092,20 +2110,20 @@
           {
             "id": "human",
             "on": true,
-            "detail": "人が頼む（/todoist-batch・「Todoist掃除」「確認だけで消せるものは完了」）",
-            "raw": "人が頼む（`/todoist-batch`・「Todoist掃除」「確認だけで消せるものは完了」）"
+            "detail": "人が頼む（/todoist-batch・「Todoist掃除」「確認だけで消せるものは完了」「閉じて N」）",
+            "raw": "人が頼む（`/todoist-batch`・「Todoist掃除」「確認だけで消せるものは完了」「閉じて N」）"
           },
           {
             "id": "schedule",
-            "on": false,
-            "detail": "定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）",
-            "raw": "時間（将来: 定時でオーナー確認列を仕分け→確認のみ close／要判断は `#consult`）"
+            "on": true,
+            "detail": "00** launchd `com.matsunoma.jarvis.todoist-313-digest` → L1 `#consult`。自動closeなし＝ソフト運用）",
+            "raw": "時間（**毎日20:00** launchd `com.matsunoma.jarvis.todoist-313-digest` → L1 `#consult`。自動closeなし＝ソフト運用）"
           },
           {
             "id": "event",
-            "on": false,
-            "detail": "何かが届いたら（hawk ownerconfirm / done）",
-            "raw": "何かが届いたら（hawk `owner_confirm` / `done`）"
+            "on": true,
+            "detail": "何かが届いたら（hawk ownerconfirm / done → スキャン合流）",
+            "raw": "何かが届いたら（hawk `owner_confirm` / `done` → スキャン合流）"
           },
           {
             "id": "watch",
@@ -2116,13 +2134,15 @@
         ],
         "trigger_kinds_on": [
           "human",
+          "schedule",
+          "event",
           "watch"
         ],
-        "trigger_kinds_label": "人依頼 · 見回り",
+        "trigger_kinds_label": "人依頼 · 時間 · イベント · 見回り",
         "triggers_filled": true,
-        "when": "完了相当時",
-        "registry_trigger": "イベント",
-        "registry_schedule": "完了相当時",
+        "when": "毎日20:00（＋完了相当の即時）",
+        "registry_trigger": "時間＋イベント",
+        "registry_schedule": "毎日20:00（＋完了相当の即時）",
         "primary_report": "report",
         "report_channels": [
           "report",
@@ -2196,13 +2216,25 @@
             "kind": "doc"
           },
           {
+            "title": "PROGRESS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/PROGRESS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/PROGRESS.md",
+            "kind": "doc"
+          },
+          {
             "title": "AGENTS.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/AGENTS.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/AGENTS.md",
             "kind": "doc"
+          },
+          {
+            "title": "phase1-l1-digest.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/docs/phase1-l1-digest.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/docs/phase1-l1-digest.md",
+            "kind": "doc"
           }
         ],
-        "procedure_count": 6,
+        "procedure_count": 8,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -3753,8 +3785,8 @@
       "department_name": "不動産パイプライン実行室",
       "genre_id": "property",
       "genre_name": "物件",
-      "status": "運用確認中",
-      "status_icon": "⚪",
+      "status": "運用確認",
+      "status_icon": "🟡",
       "report": "consult",
       "trigger": "イベント",
       "schedule": "Yes/No時・手動",
@@ -5814,7 +5846,7 @@
       "tool_assigned": "gencode",
       "tool_fit": "A+B",
       "tool_notes": "検知・促しはルール＋CLAUDE.md（スキル不要・他ツール可）。送金だけ Jarvis＋人了承。銀行秘密なし",
-      "note": "2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。",
+      "note": "2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。実行型は617。",
       "summary": "不足検知 → Slack／チャット → Jarvis へ手渡し",
       "flow_summary": "開始（due接近／人／watch悪化）→ need・残高・Zaim済確認 → 不足なら **Slack `#consult`【616】** → 次は **Jarvis 寄せ実行（人了承）**。ルール本線・スキル／スラッシュ不要。送金ノードなし。",
       "builder_tag": "",
@@ -6009,6 +6041,225 @@
           }
         ],
         "procedure_count": 5,
+        "source": "claude+registry+ops_yaml"
+      }
+    },
+    {
+      "id": "617",
+      "name": "資金移動係（J専）",
+      "path": "600_リソース・家計室/617_資金移動係（J専）",
+      "department_id": "600",
+      "department_name": "リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計",
+      "status": "候補",
+      "status_icon": "⚪",
+      "report": "report",
+      "trigger": "人依頼",
+      "schedule": "人依頼／616手渡しのみ（自動送金なし）",
+      "tool_assigned": "jarvis",
+      "tool_fit": "C",
+      "tool_notes": "定型の型（プレイブック）のみ。実行はJarvis専属（/adjust_cash）。FRIDAY等は送金しない。616は促し",
+      "note": "2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。",
+      "summary": "2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。",
+      "flow_summary": "**人が頼む**（または 616 手渡し）→ Jarvis が最新残高→ギャップ表→了承→レール実行（OTPは人）。**他ツールは送金しない**。定期自動は置かない。",
+      "builder_tag": "",
+      "mixup_kind": "none",
+      "grok_counterpart": "",
+      "flowforge_id": "flow_duOrNmGET7-E_c7AAQE9fLfO",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_duOrNmGET7-E_c7AAQE9fLfO",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/NYLpUySk0tY27PvI",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_duOrNmGET7-E_c7AAQE9fLfO",
+      "permissions": {
+        "can_do": "資金移動係（J専）— 定型手順の保持。実行は Jarvis のみ（/adjust_cash・人が頼む）。他ツールは送金・銀行ログインしない",
+        "methods": [
+          {
+            "name": "CLI",
+            "level": "○（**Jarvisのみ**）",
+            "detail": "`run_phase1_*`／transfer 系（了承後）。読取は watch／Zaim／給与カレンダー"
+          },
+          {
+            "name": "ブラウザ／画面操作",
+            "level": "○（**Jarvisのみ**）",
+            "detail": "IB／AW 入力・遷移。実行クリックは人"
+          },
+          {
+            "name": "外部API",
+            "level": "△",
+            "detail": "Slack 完了報告（任意）。Webhook キー名のみ"
+          },
+          {
+            "name": "スキル／スラッシュ",
+            "level": "○",
+            "detail": "**`/adjust_cash`** が実行入口（Jarvis）"
+          },
+          {
+            "name": "他ツールからの実行",
+            "level": "×",
+            "detail": "禁止"
+          },
+          {
+            "name": "柱",
+            "level": "内容",
+            "detail": ""
+          },
+          {
+            "name": "**入口**",
+            "level": "人依頼 or 616 手渡し。`card_debit_watch`・`known_recurring_debits.yaml`・最新口座残高（§0c）・給与カレンダー・Zaim 済確認",
+            "detail": ""
+          },
+          {
+            "name": "**確認**",
+            "level": "ギャップ表の了承 → 最終画面 → OTP／実行は人。了承前 `--go` 禁止",
+            "detail": ""
+          },
+          {
+            "name": "**履歴**",
+            "level": "transfer_audit／money-ops／`reports/`／チャットの完了1行",
+            "detail": ""
+          },
+          {
+            "name": "**停止**",
+            "level": "人の中止・残高ゲート失敗・Mac版LINE競合等の銀行側失敗・`JARVIS_ADJUST_CASH_*` 系無効化（あれば）",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_AI_TEAM_REPORT",
+          "SLACK_WEBHOOK_AI_TEAM_CONSULT",
+          "SLACK_WEBHOOK_AI_TEAM_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "プラン了承・最終画面・OTP／アプリ承認・実行ボタン。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「寄せて」「資金移動」「Olive に足りるように」→ 同上（スキル／617 として扱う）",
+            "raw": "**人が頼む（同義）**: 「寄せて」「資金移動」「Olive に足りるように」→ 同上（スキル／617 として扱う）"
+          },
+          {
+            "id": "schedule",
+            "on": false,
+            "detail": "**付けない**（自動送金しない。促しは 616）",
+            "raw": "時間: **付けない**（自動送金しない。促しは 616）"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "**付けない**（616 の仕事）",
+            "raw": "変化の見回り単独: **付けない**（616 の仕事）"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human"
+        ],
+        "trigger_kinds_label": "人依頼",
+        "triggers_filled": true,
+        "when": "人依頼／616手渡しのみ（自動送金なし）",
+        "registry_trigger": "人依頼",
+        "registry_schedule": "人依頼／616手渡しのみ（自動送金なし）",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "完了・生存",
+            "destination": "Slack `#report`（任意）またはチャット",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断（レール選択・金額）",
+            "destination": "Slack `#consult` またはチャット（**実行は Jarvis**）",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "失敗",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          },
+          {
+            "kind": "ch",
+            "destination": "いつ",
+            "channels": []
+          },
+          {
+            "kind": "`#report`",
+            "destination": "寄せ完了の短報",
+            "channels": []
+          },
+          {
+            "kind": "`#consult`",
+            "destination": "プランで判断が要るとき（了承前）。末尾は Jarvis",
+            "channels": []
+          },
+          {
+            "kind": "`#ops`",
+            "destination": "送金失敗・ロック・残高不一致",
+            "channels": []
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/NYLpUySk0tY27PvI",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/617_資金移動係（J専）/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -11083,19 +11334,19 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "2026-10-21 flow本線化。Slack L1/L2カード実装は後続"
+        "role_split": "2026-10-21 Phase1+1.5a意図OK・運用確認。digest→#consult→了承後create。L2ボタン／定時は後続"
       },
       {
         "side": "ai_only",
         "agent_id": "313",
-        "agent_name": "完了候補確認係",
+        "agent_name": "Todoist完了候補確認係",
         "builder_tag": "",
         "mixup_kind": "ai_only",
         "grok_counterpart": "",
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+        "role_split": "2026-10-21 運用確認。launchd 20:00 digest（自動closeなし）。L1＝残件把握、closeは明示了承または確認のみ"
       },
       {
         "side": "ai_only",
@@ -11375,7 +11626,19 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。"
+        "role_split": "2026-10-19 新設。スキル振分廃止。正本 CLAUDE.md／jarvis-agent-616-cash-remind.mdc。612年会費・614還元と分離。実行型は617。"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "617",
+        "agent_name": "資金移動係（J専）",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。"
       },
       {
         "side": "paired",
@@ -11896,9 +12159,9 @@
     ],
     "mapping_counts": {
       "paired": 18,
-      "ai_only": 23,
+      "ai_only": 24,
       "grok_only": 23,
-      "all": 64
+      "all": 65
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },
