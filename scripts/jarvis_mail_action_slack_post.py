@@ -563,11 +563,17 @@ def build_compact_payload(
             "elements": [
                 {
                     "type": "mrkdwn",
+                    # Bot 本線では予備URLを載せない（Slackのリンク展開が GET 見送りを踏んで
+                    # カードごと消える事故があった。URLモード時のみ予備を付ける）
                     "text": (
-                        f"{mode_note} · Todoist＝電話・ポータル等の手配\n"
-                        f"予備: <{ma_url(tid, 'reply')}|返信> · "
-                        f"<{ma_url(tid, 'skip')}|見送り> · "
-                        f"<{ma_url(tid, 'todoist')}|Todoist>"
+                        (
+                            f"{mode_note} · Todoist＝電話・ポータル等の手配\n"
+                            f"予備: <{ma_url(tid, 'reply')}|返信> · "
+                            f"<{ma_url(tid, 'skip')}|見送り> · "
+                            f"<{ma_url(tid, 'todoist')}|Todoist>"
+                        )
+                        if url_mode
+                        else f"{mode_note} · Todoist＝電話・ポータル等の手配"
                     ),
                 }
             ],
