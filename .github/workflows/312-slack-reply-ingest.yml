@@ -1,0 +1,33 @@
+name: "312 Slack返信 → Todoist起票"
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "投稿・起票せず結果だけ表示"
+        type: boolean
+        default: false
+
+concurrency:
+  group: "312-slack-ingest"
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run ingest
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN_312 }}
+          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN_312 }}
+        run: |
+          EXTRA=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA="--dry-run"; fi
+          python scripts/jarvis_todoist_312_slack_ingest.py $EXTRA
