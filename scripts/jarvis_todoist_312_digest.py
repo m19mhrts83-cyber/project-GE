@@ -205,40 +205,26 @@ def _short_title(title: Any, limit: int = 44) -> str:
 
 
 def _item_line(it: dict[str, Any]) -> str:
-    """1件＝タイトル＋出典を1行に。件ごとの空行で読みやすく（313と同型）。"""
-    lane = str(it.get("lane") or "?").replace("_", " ")
-    origin = str(it.get("origin") or "?").upper()
-    meta = f"{lane}・{origin}"
-    who = str(it.get("assignee") or "").strip()
-    if who:
-        meta += f"・{who}"
+    """1件＝タイトル1行。件ごとの空行で読みやすく（313と同型）。"""
     url = str(it.get("project_url") or "").strip()
-    tail = f"  _{meta}_"
-    if url:
-        tail += f" · <{url}|元の会議>"
+    tail = f" · <{url}|会議>" if url else ""
     return f"*{it['n']}.* {_short_title(it.get('title'))}{tail}"
 
 
 def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
-    stamp = datetime.now(JST).strftime("%m/%d %H:%M")
-    origins = sorted({str(i.get("origin") or "?").upper() for i in items})
-    src = "・".join(origins) if origins else "SB・GenMail"
-    lines = [
-        "📋 *Todoist起票整理*（L1＝見るだけ）",
-        f"候補 *{len(items)}件* ／ {src} ／ {stamp}",
-    ]
+    lines: list[str] = []
     if items:
-        lines.extend(["", "*起票してよければ番号で返信*", ""])
+        lines.extend(["*起票してよければ番号で返信*", ""])
         lines.append("\n\n".join(_item_line(it) for it in items))
     else:
-        lines.extend(["", "候補なし（今回の登録はありません）"])
+        lines.append("候補なし（今回の登録はありません）")
     lines.extend(
         [
             "",
             "*返信の書き方*",
             "「起票して 1,3」→ その番号だけ Todoist に登録",
             "「全部見送り」→ 何もしない（次回また出ます）",
-            "「元の会議」をタップ → 出典を確認",
+            "「会議」をタップ → 出典を確認",
             "",
             "次: 人判断（起票して N）",
             "担当メモ: 採用分だけ create＋コメント。L1のままでは登録しない",
