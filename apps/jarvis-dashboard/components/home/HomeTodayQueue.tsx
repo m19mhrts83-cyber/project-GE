@@ -10,6 +10,7 @@ import {
   isWatchAckActive,
 } from "@/lib/watchUserAck";
 import { zaimWatchVisibleOnHome } from "@/lib/zaimWatchPin";
+import { isMailActionExcluded } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 import { wakeDueSnoozes } from "@/app/actions/triage";
 import { watchHref } from "./homeHelpers";
@@ -33,7 +34,7 @@ export default async function HomeTodayQueue() {
     supabase
       .from("triage_items")
       .select(
-        "id,lane,kind,status,partner,folder,subject,received_at,summary,priority,from_email",
+        "id,lane,kind,status,partner,folder,subject,received_at,summary,priority,from_email,original_body",
       )
       .eq("status", "pending")
       .neq("kind", "activity")
@@ -103,12 +104,21 @@ export default async function HomeTodayQueue() {
       );
     });
 
-  const mails = (mailRows || []).slice().sort((a, b) => {
-    const la = mailPriorityToLevel(a.priority);
-    const lb = mailPriorityToLevel(b.priority);
-    const order = { attention: 0, warn: 1, info: 2 } as const;
-    return order[la] - order[lb];
-  });
+  const mails = (mailRows || [])
+    .filter(
+      (m) =>
+        !isMailActionExcluded({
+          fromEmail: m.from_email,
+          body: m.original_body,
+        }),
+    )
+    .slice()
+    .sort((a, b) => {
+      const la = mailPriorityToLevel(a.priority);
+      const lb = mailPriorityToLevel(b.priority);
+      const order = { attention: 0, warn: 1, info: 2 } as const;
+      return order[la] - order[lb];
+    });
   const partnerMails = mails.filter((m) => m.lane === "partner");
   const attentionWatch = watchNeed.filter(
     (w) =>

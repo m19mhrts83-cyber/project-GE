@@ -40,3 +40,31 @@ export function isSelfEmail(
   }
   return false;
 }
+
+/** estate 送信の BCC 控えが「相手から返信」誤ラベルされたときの本文判定 */
+const SELF_OUTBOUND_VOICE =
+  /オーナーの松野です|Grandole志賀本通[ⅠI一二]*\s*オーナーの松野|リビングサポート\s*松|松野（0\d{1,4}-/;
+const PARTNER_VOICE_HEAD =
+  /^(LEAFの|株式会社LEAFの|神野です|竹田です|松野\s*真治\s*様|松野様)/m;
+
+/** 自分発信本文か（相手返信の引用は先頭声で除外）。Python is_mail_action_excluded と同期 */
+export function looksLikeSelfOutboundBody(
+  body: string | null | undefined,
+): boolean {
+  const text = String(body || "").trim();
+  if (!text) return false;
+  const head = text.slice(0, 400);
+  if (PARTNER_VOICE_HEAD.test(head)) return false;
+  return SELF_OUTBOUND_VOICE.test(head);
+}
+
+/** Slack／Dashboard 要対応から除外（自分 From または自分発信誤ラベル本文） */
+export function isMailActionExcluded(opts: {
+  fromEmail?: string | null;
+  body?: string | null;
+  extra?: string[] | null;
+}): boolean {
+  if (isSelfEmail(opts.fromEmail, opts.extra)) return true;
+  if (looksLikeSelfOutboundBody(opts.body)) return true;
+  return false;
+}

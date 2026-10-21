@@ -31,10 +31,12 @@ Free 枠は **アクティブ2プロジェクトまで無料**。用途を次の
 ## Data API 明示 GRANT（2026-10-30〜）
 
 **既存テーブルは影響なし。** 同日以降に `public` へ作る**新規テーブル**は、Data API（supabase-js）到達に明示 `GRANT` が必要。  
-jarvis-dashboard の定型・一括 SQL: `apps/jarvis-dashboard/supabase/README.md` / `migrations/20260926_data_api_explicit_grants.sql`。  
-CREATE と同じ migration に `grant … to authenticated, service_role` を書く（anon は付けない）。
+jarvis-dashboard の定型・一括 SQL: `apps/jarvis-dashboard/supabase/README.md` / `migrations/20260926_data_api_explicit_grants.sql` / `20261021_data_api_grants_followup.sql`。  
+CREATE と同じ migration に `grant … to authenticated, service_role` を書く（anon は付けない。kamiooya は主に `service_role`）。  
+**移行前チェックリスト:** `docs/Supabase_Data_API_明示GRANT_チェックリスト_20261021.md`
 
-復習: https://claude-code-supabase-fukushu.vercel.app/
+復習: https://claude-code-supabase-fukushu.vercel.app/  
+公式: https://github.com/orgs/supabase/discussions/45329
 
 ## トリガー時の動作
 
