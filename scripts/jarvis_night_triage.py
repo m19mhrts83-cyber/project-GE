@@ -573,6 +573,23 @@ def find_unreplied(entries: list[dict[str, Any]], lookback_days: int) -> list[di
         last = ordered[-1]
         if not last["inbound"]:
             continue
+        # BCC 誤ラベル: 同時刻に「自分から送信」がある受信は未返信にしない
+        ts = (last.get("received_at") or "")[:16]
+        if ts and any(
+            (not x.get("inbound")) and (x.get("received_at") or "")[:16] == ts
+            for x in ordered
+        ):
+            continue
+        # 自分発信本文が「相手から返信」として残っている場合も除外
+        try:
+            from jarvis_kurashift_re_inquiry_channel import (  # type: ignore
+                looks_like_self_outbound_body,
+            )
+
+            if looks_like_self_outbound_body(last.get("body") or ""):
+                continue
+        except Exception:
+            pass
         if cutoff:
             try:
                 dt = datetime.strptime(last["received_at"][:16], "%Y/%m/%d %H:%M").replace(tzinfo=JST)

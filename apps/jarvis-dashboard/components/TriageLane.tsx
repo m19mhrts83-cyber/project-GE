@@ -19,7 +19,7 @@ import {
   filterOutMutedSenders,
   muteRegistryFromMetaMap,
 } from "@/lib/mailActionSkipMute";
-import { isSelfEmail } from "@/lib/selfEmails";
+import { isMailActionExcluded } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 
 /** summary が原文の先頭切り出しだけなら、カード上では出さない（全文側に寄せる） */
@@ -143,13 +143,21 @@ export default async function TriageLanePage({
   {
     const { data: pendingLite } = await supabase
       .from("triage_items")
-      .select("id,from_email")
+      .select("id,from_email,original_body")
       .eq("lane", lane)
       .eq("status", "pending")
       .neq("kind", "activity");
     const visible = filterOutMutedSenders(
-      ((pendingLite || []) as { id: string; from_email: string | null }[]).filter(
-        (it) => !(lane === "general" && isSelfEmail(it.from_email)),
+      ((pendingLite || []) as {
+        id: string;
+        from_email: string | null;
+        original_body?: string | null;
+      }[]).filter(
+        (it) =>
+          !isMailActionExcluded({
+            fromEmail: it.from_email,
+            body: it.original_body,
+          }),
       ),
       muteReg,
     );
@@ -166,8 +174,15 @@ export default async function TriageLanePage({
       .order("received_at", { ascending: true });
     unread = filterOutMutedSenders(
       ((pending || []) as TriageRow[]).filter((it) => {
-        // general（その他）レーンでは自分発信を未読一覧に出さない
-        if (lane === "general" && isSelfEmail(it.from_email)) return false;
+        // 自分発信（estate BCC 誤ラベル含む）は未読一覧に出さない
+        if (
+          isMailActionExcluded({
+            fromEmail: it.from_email,
+            body: it.original_body,
+          })
+        ) {
+          return false;
+        }
         return true;
       }),
       muteReg,

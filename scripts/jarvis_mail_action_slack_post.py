@@ -832,11 +832,14 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         .limit(pool)
         .execute()
     )
+    from jarvis_kurashift_re_inquiry_channel import is_mail_action_excluded
+
     pool_rows: list[dict[str, Any]] = []
     muted_n = 0
     skipped_vendor = 0
     skipped_skim = 0
     skipped_posted = 0
+    skipped_self = 0
     for row in r.data or []:
         tid = str(row.get("id") or "")
         if tid.startswith("re-vendor-"):
@@ -845,6 +848,13 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
         if pl.get("re_vendor_reply"):
             skipped_vendor += 1
+            continue
+        # estate 送信・BCC 誤ラベルの自分発信は要対応に出さない
+        if is_mail_action_excluded(
+            from_email=str(row.get("from_email") or ""),
+            body=str(row.get("original_body") or ""),
+        ):
+            skipped_self += 1
             continue
         kind = str(row.get("kind") or "").lower()
         lane = str(row.get("lane") or "").lower()
@@ -889,6 +899,7 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         "muted": muted_n,
         "vendor_skip": skipped_vendor,
         "skim_skip": skipped_skim,
+        "self_skip": skipped_self,
         "already_posted": skipped_posted,
         "mute_entries": len(mute.get("entries") or {}),
         "top_scores": [
