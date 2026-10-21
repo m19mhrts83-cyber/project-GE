@@ -15,14 +15,23 @@
 
 | きっかけ | 時刻 | 何が起きる | 実装 |
 |---|---|---|---|
-| **定時ダイジェスト（本線）** | **毎日 20:00** | 9レーン横断でオーナー確認を読み、L1ダイジェストを `#consult` へ（0件なら投稿しない・**自動closeなし**） | launchd `com.matsunoma.jarvis.todoist-313-digest`／[`runner`](../../../../launchd/jarvis_todoist_313_digest_runner.sh) |
+| **定時ダイジェスト（本線）** | **毎日 20:00** | ①9レーン横断の完了候補 → `#consult`（0件なら投稿しない）②**期日超過の整理**（上位10件＋新期日案）→ `#consult`。どちらも**自動変更なし** | launchd `com.matsunoma.jarvis.todoist-313-digest`／[`runner`](../../../../launchd/jarvis_todoist_313_digest_runner.sh) |
 | 人の依頼 | 随時 | `/todoist-batch`・「掃除して」→ L1/L0 | skill `todoist-batch-sweep` |
 | 完了相当 | 随時 | 会話で完了相当 → 即スキャン | 313_digest |
 | 312／hawk | 随時 | 完了疑い・`owner_confirm` を合流 | 同上 |
 
 - 20:00 の投稿は**見るだけ**。閉じるのは人の「閉じて N」（①）か、確認のみの自動close（②）だけ
+- 期日は人の「**リスケ 3,5**」でだけ動く（自動リスケなし）
 - 停止: `JARVIS_TODOIST_313_DIGEST_DISABLE=1`（Slack投稿のみ停止／`--apply` は可）
 - ログ: `~/Library/Logs/jarvis_todoist_313_digest/`
+
+## 期日超過の整理（313の第2機能）
+
+- 対象: **期限日が今日より前**のタスク（期限なしは対象外）
+- 順位: 重要ラベル（要ボス/優先1/高/緊急）→ 超過日数 → 実装/調査 → すぐ終わる → レーン（properties/apps/kamiooya）
+- 新期日案: 超過7日以内=**+2営業日**／8〜30日=**+7日**／31日以上=**+14日**（土日は翌営業日）
+- 実行: `scripts/jarvis_todoist_313_overdue.py`（既定は提案のみ／`--apply --select 3,5` で移動＋コメント）
+- 報告: `#consult`。返信「リスケ N」→ 期日移動のみ。完了は本体フロー
 
 ## Todoistへの完了動線（出口・必読）
 

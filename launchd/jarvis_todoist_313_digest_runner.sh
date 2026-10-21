@@ -18,4 +18,11 @@ fi
 export TODOIST_313_AUTHOR="${TODOIST_313_AUTHOR:-FRIDAY}"
 
 # 確認のみの自動 close はしない（L1＝見るだけ／close は人の「閉じて N」）
-exec "$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_digest.py" "$@"
+if [[ $# -gt 0 ]]; then
+  # 手動テスト（--dry-run 等）は本体だけ
+  exec "$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_digest.py" "$@"
+fi
+
+# 定時: ①完了候補ダイジェスト → ②期日超過の整理（どちらも見るだけ）
+"$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_digest.py"
+"$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_overdue.py" --refresh
