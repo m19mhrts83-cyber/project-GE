@@ -24,7 +24,8 @@ from zoneinfo import ZoneInfo
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-PM_FOLDER_PREFIXES = ("101_", "102_", "103_", "104_")
+# 管理会社（100番台）— P接頭辞正本＋旧 `101_` 互換
+PM_CODES = frozenset({"101", "102", "103", "104"})
 ESTIMATE_RE = re.compile(r"(退去|原状回復|修繕費|見積|請求|精算)")
 B_NAME_RE = re.compile(r"(提示用|見積B|見積_B|_B_|退去者提示)", re.I)
 JST = ZoneInfo("Asia/Tokyo")
@@ -44,7 +45,10 @@ def _partner_base() -> Path:
 
 
 def _is_pm_folder(folder: str) -> bool:
-    return any((folder or "").startswith(p) for p in PM_FOLDER_PREFIXES)
+    from jarvis_partner_folder import CODE_RE  # type: ignore
+
+    m = CODE_RE.match((folder or "").strip())
+    return bool(m and m.group(1) in PM_CODES)
 
 
 def _parse_received(s: str) -> datetime | None:

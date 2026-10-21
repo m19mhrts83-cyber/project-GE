@@ -26,9 +26,17 @@ PARTNER_BASE_REL = (
     "215_神・大家さん倶楽部/C2_ルーティン作業/26_パートナー社への相談"
 )
 CONTACT_REL = f"{PARTNER_BASE_REL}/000_共通/連絡先一覧.yaml"
-PM_PREFIXES = ("101_", "102_", "103_", "104_")
+# 管理会社（100番台）— P接頭辞正本＋旧 `101_` 互換
+PM_CODES = frozenset({"101", "102", "103", "104"})
 MANUAL = REPO / "215_kamiooya" / "C1_cursor" / "1b_Cursorマニュアル"
 CONTACT_CI = MANUAL / "連絡先一覧.snapshot.yaml"
+
+
+def _is_pm_folder_name(name: str) -> bool:
+    from jarvis_partner_folder import CODE_RE  # type: ignore
+
+    m = CODE_RE.match((name or "").strip())
+    return bool(m and m.group(1) in PM_CODES)
 
 
 def _disabled() -> bool:
@@ -77,8 +85,7 @@ def _materialize_partners(tmp: Path) -> Path:
     folders = [
         str(c["name"])
         for c in children
-        if c.get("is_folder")
-        and any(str(c.get("name") or "").startswith(p) for p in PM_PREFIXES)
+        if c.get("is_folder") and _is_pm_folder_name(str(c.get("name") or ""))
     ]
     folders.sort()
     print(f"# PM folders: {len(folders)} ({', '.join(folders)})", file=sys.stderr)
