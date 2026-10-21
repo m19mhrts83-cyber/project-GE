@@ -312,12 +312,16 @@ def _create_task(it: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
         return {"ok": False, "error": "empty title"}
     if not title.startswith("["):
         title = f"[{lane}] {title}"
+    if not title.startswith("[312]"):
+        title = f"[312]{title}"
+    title = title.rstrip("。．.")
     origin = it.get("origin") or "312"
     note = f"出典: 312 digest ({origin})"
     if it.get("summary"):
         note += f" / {it['summary']}"
+    author = (os.environ.get("TODOIST_312_AUTHOR") or "FRIDAY").strip() or "FRIDAY"
     comment = (
-        "【Jarvis】\n"
+        f"【{author}】\n"
         f"サマリ: 312 L1了承後の①create（origin={origin}）\n"
         "アウトプット:\n"
     )
