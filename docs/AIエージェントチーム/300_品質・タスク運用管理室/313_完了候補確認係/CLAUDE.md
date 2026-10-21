@@ -11,11 +11,17 @@
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)（微修正はここを見て人が直す）
 - Phase1: [`docs/phase1-l1-digest.md`](./docs/phase1-l1-digest.md)
-- CLI: `scripts/jarvis_todoist_313_digest.py`
+- CLI: `scripts/jarvis_todoist_313_digest.py`（完了候補）／`scripts/jarvis_todoist_313_overdue.py`（期日超過の整理）
 - Cursor skill: `todoist-batch-sweep`（`.cursor/skills/todoist-batch-sweep/`）
 - Cursor コマンド: `/todoist-batch`（掃除・並列）／入口俯瞰は `/todoist`
 - Cursor ルール: `jarvis-todoist-batch-sweep.mdc` / `jarvis-todoist-owner-confirm.mdc` / `jarvis-chat-open-complete-313.mdc`
 - 起票側: [`312_Todoist起票整理係`](../312_Todoist起票整理係/CLAUDE.md)
+
+## 0. 期日超過の整理（2026-10-22〜）
+
+- 毎日20:00の2通目。**期限が今日より前**のタスクを上位10件に順位づけし、新期日案を `#consult` へ
+- 期日は **「リスケ N」了承後だけ**動かす（`--apply --select N`）。コメント必須
+- 期限なしは対象外。完了（close）は本体フロー（下記）
 
 ## 1. 役割
 
