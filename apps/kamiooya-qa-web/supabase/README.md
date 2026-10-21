@@ -33,5 +33,6 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   apps/kamiooya-qa-web/supabase/migrations/20261021_data_api_grants_verify.sql
 ```
 
+作成ルール（Cursor 常時）: `.cursor/rules/jarvis-supabase-data-api-grant.mdc`  
 チェックリスト正本: `docs/Supabase_Data_API_明示GRANT_チェックリスト_20261021.md`  
 公式: https://github.com/orgs/supabase/discussions/45329

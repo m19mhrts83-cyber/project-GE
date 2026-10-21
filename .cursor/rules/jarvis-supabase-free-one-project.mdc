@@ -30,26 +30,29 @@ Free 枠は **アクティブ2プロジェクトまで無料**。用途を次の
 
 ## Data API 明示 GRANT（2026-10-30〜）
 
+**作成ルールの正本:** `jarvis-supabase-data-api-grant.mdc`（常時適用）。
+
 **既存テーブルは影響なし。** 同日以降に `public` へ作る**新規テーブル**は、Data API（supabase-js）到達に明示 `GRANT` が必要。  
-jarvis-dashboard の定型・一括 SQL: `apps/jarvis-dashboard/supabase/README.md` / `migrations/20260926_data_api_explicit_grants.sql` / `20261021_data_api_grants_followup.sql`。  
-CREATE と同じ migration に `grant … to authenticated, service_role` を書く（anon は付けない。kamiooya は主に `service_role`）。  
-**移行前チェックリスト:** `docs/Supabase_Data_API_明示GRANT_チェックリスト_20261021.md`
+CREATE と同じ migration に書く。jarvis → `authenticated, service_role`（anon 禁止）。kamiooya → 主に `service_role`。  
+チェックリスト: `docs/Supabase_Data_API_明示GRANT_チェックリスト_20261021.md`
 
 復習: https://claude-code-supabase-fukushu.vercel.app/  
 公式: https://github.com/orgs/supabase/discussions/45329
 
 ## トリガー時の動作
 
-- 「DB作って」「神大家用テーブル」→ **`kamiooya-qa` に追加**
-- 「ダッシュボード用」「自分用ウォッチ／トリアージ」→ **`jarvis-dashboard` に追加**
+- 「DB作って」「神大家用テーブル」→ **`kamiooya-qa` に追加** ＋ **明示 GRANT**（`jarvis-supabase-data-api-grant.mdc`）
+- 「ダッシュボード用」「自分用ウォッチ／トリアージ」→ **`jarvis-dashboard` に追加** ＋ **明示 GRANT**
 - 「第3プロジェクト」→ **拒否して確認**（Free 枠超過・有料化）
 
 ## 禁止
 
 - Free で **3つ目**のプロジェクトを作る
 - `kamiooya-qa` に Jarvis 個人ダッシュボード用テーブルを混在させる（引き渡し境界を壊す）
+- **GRANT なしの `CREATE TABLE`**（Data API 到達不可。作成ルール参照）
 - Service Role Key を公開リポジトリ・チャットに貼る
 - Raimo 等との双方向同期（一方向ミラーのみ）
+
 
 ## 逸脱時の戒め（必須）
 

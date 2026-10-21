@@ -12,6 +12,7 @@ Supabase は **2026-10-30** 以降、既存プロジェクトでも `public` の
 | **10/30 以降に作る新規テーブル** | `GRANT` 無しだと API が permission denied |
 | **migration / db reset / preview** | CREATE と同じ migration に GRANT を書く |
 
+**作成ルール（Cursor 常時）:** `.cursor/rules/jarvis-supabase-data-api-grant.mdc`  
 **移行前チェックリスト（正本）:** [`docs/Supabase_Data_API_明示GRANT_チェックリスト_20261021.md`](../../../docs/Supabase_Data_API_明示GRANT_チェックリスト_20261021.md)
 
 ### 新規テーブル時の定型（この PJ）

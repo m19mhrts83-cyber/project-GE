@@ -1,0 +1,72 @@
+---
+description: Supabase 新規テーブル作成時は Data API 用の明示 GRANT 必須（2026-10-30〜）。CREATE と同じ migration に書く。
+globs: "**/supabase/**/*.{sql,md}"
+alwaysApply: true
+---
+
+# Supabase 新規テーブル — Data API 明示 GRANT（作成ルール）
+
+**2026-10-30 以降**、`public` の新規テーブルは自動 GRANT されない。Data API（`supabase-js` / PostgREST）から見えるには **明示 `GRANT` が必須**。
+
+既存テーブルは影響なし。本ルールは **これから作る表** の正。
+
+## トリガー（次のいずれかで必ず適用）
+
+- `create table` / migration / schema.sql への表追加
+- 「テーブル作って」「migration 足して」「Supabase に表」
+- `apps/*/supabase/**` の編集
+
+## Jarvis の必須動作（止まず）
+
+1. **PJ を決める**（`jarvis-supabase-free-one-project.mdc`）  
+   自分用 → `jarvis-dashboard`／提供・prompt-share → `kamiooya-qa`
+2. **CREATE と同じファイル**に RLS（必要なら）と **GRANT** を書く。別 PR・後回し禁止
+3. identity / serial なら **sequence** にも `usage, select`
+4. jarvis-dashboard で UI から触る表なら、可能なら `migrations/20260926_data_api_explicit_grants.sql` の一覧にも表名を追記（reset 耐性）
+5. 報告に「GRANT 付き」と1行書く
+
+## 定型（コピー用）
+
+### jarvis-dashboard（ログイン後 UI）
+
+```sql
+create table if not exists public.your_table ( ... );
+alter table public.your_table enable row level security;
+-- policy ...
+
+grant select, insert, update, delete on table public.your_table
+  to authenticated, service_role;
+grant usage, select on sequence public.your_table_id_seq
+  to authenticated, service_role;
+```
+
+- **anon には付けない**（例外はユーザー明示＋RLS 最小権限）
+- サーバ専用表は `service_role` のみ（例: `westudy_transcript_compare`）
+
+### kamiooya-qa / prompt-share（サーバ本線）
+
+```sql
+create table if not exists public.your_table ( ... );
+alter table public.your_table enable row level security;
+
+grant select, insert, update, delete on table public.your_table to service_role;
+grant usage, select on sequence public.your_table_id_seq to service_role;
+```
+
+## 禁止
+
+- `CREATE TABLE` だけで migration を終わらせる（GRANT なし）
+- 「あとで GRANT」と先送りする
+- 理由なく `anon` に全権限
+- Free 第3プロジェクトに表を作る（`jarvis-supabase-free-one-project.mdc`）
+
+## 正本
+
+| 役割 | パス |
+|---|---|
+| チェックリスト | `docs/Supabase_Data_API_明示GRANT_チェックリスト_20261021.md` |
+| jarvis README / 定型 | `apps/jarvis-dashboard/supabase/README.md` |
+| kamiooya README | `apps/kamiooya-qa-web/supabase/README.md` |
+| 一括 GRANT | `apps/jarvis-dashboard/supabase/migrations/20260926_data_api_explicit_grants.sql` |
+| 2PJ 方針 | `jarvis-supabase-free-one-project.mdc` |
+| 公式 | https://github.com/orgs/supabase/discussions/45329 |
