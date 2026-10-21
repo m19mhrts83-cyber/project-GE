@@ -221,10 +221,15 @@ def _humanize_date(text: str) -> str:
     )
 
 
-def _short_title(title: Any, limit: int = 44) -> str:
-    t = re.sub(r"\s+", " ", _humanize_date(str(title or ""))).strip().rstrip("。．.")
+def _clean_title(text: Any) -> str:
+    t = re.sub(r"\s+", " ", _humanize_date(str(text or ""))).strip()
     t = re.sub(r"\s*[—–-]\s*状況[:：].*$", "", t)
-    t = re.sub(r"[（(]状況[:：][^）)]*[）)]", "", t).strip()
+    t = re.sub(r"[（(]状況[:：][^）)]*[）)]", "", t)
+    return t.strip().rstrip("。．.")
+
+
+def _short_title(title: Any, limit: int = 44) -> str:
+    t = _clean_title(title)
     if len(t) > limit:
         cut = t[: limit - 1]
         sep = cut.rfind(" — ")
@@ -242,7 +247,7 @@ def _item_line(it: dict[str, Any]) -> str:
 
 
 def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
-    lines: list[str] = ["📋 *Todoist起票整理*", ""]
+    lines: list[str] = ["📋 *312 Todoist起票整理*", ""]
     if items:
         lines.extend(["*起票してよければ番号で返信*", ""])
         lines.append("\n\n".join(_item_line(it) for it in items))
@@ -307,7 +312,7 @@ def _post_consult(text: str) -> int:
 
 def _create_task(it: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
     lane = str(it.get("lane") or "ai_raimo")
-    title = str(it.get("title") or "").strip()
+    title = _clean_title(it.get("title"))
     if not title:
         return {"ok": False, "error": "empty title"}
     if not title.startswith("["):
