@@ -173,6 +173,20 @@ def normalize_consult_handoff_spacing(body: str) -> str:
     return text
 
 
+def normalize_report_item_spacing(body: str) -> str:
+    """箇条書き項目のあいだに空行（天気お知らせ等・Slack UI FB 2026-10-22）。"""
+    text = (body or "").rstrip()
+    # • / ・ / - で始まる行の直前に空行が無いとき挿入（先頭行は除く）
+    text = re.sub(
+        r"(?<!\n)\n(?=[ \t]*[•・\-\*][ \t]*\S)",
+        "\n\n",
+        text,
+    )
+    # 三重以上の空行は2つに
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text
+
+
 def ensure_consult_handoff_footer(body: str) -> str:
     """#consult 用。末尾に「次:」が無いとき橋渡し3行を補完（忘却防止）。"""
     text = (body or "").rstrip()
@@ -194,6 +208,9 @@ def build_text(meta: dict[str, str], body: str, name: str) -> str:
     body_clean = body.strip()
     if channel == "consult":
         body_clean = ensure_consult_handoff_footer(body_clean)
+    # 天気・定型の箇条書きは項目間空行（見やすさ）
+    if channel in {"report", "consult"} or "天気" in (meta.get("bot") or "") + title:
+        body_clean = normalize_report_item_spacing(body_clean)
     if len(body_clean) > BODY_LIMIT:
         body_clean = body_clean[: BODY_LIMIT - 1] + "…"
     # 秘密っぽい行を落とす（値は出さない）
