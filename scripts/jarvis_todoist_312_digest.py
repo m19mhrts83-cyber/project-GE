@@ -135,10 +135,34 @@ def _collect_genmail() -> list[dict[str, Any]]:
     return out
 
 
+DISMISS_DAYS = 14
+
+
+def _dismiss_key(title: Any) -> str:
+    return re.sub(r"\s+", " ", str(title or "").strip().lower())
+
+
+def _active_dismissed(state: dict[str, Any], *, days: int = DISMISS_DAYS) -> set[str]:
+    """見送り済みのキー（直近 days 日ぶんだけ再提案を抑える）。"""
+    cutoff = datetime.now(JST) - timedelta(days=days)
+    keys: set[str] = set()
+    for row in state.get("dismissed") or []:
+        try:
+            at = datetime.fromisoformat(str(row.get("at")))
+        except Exception:
+            continue
+        if at >= cutoff and row.get("key"):
+            keys.add(str(row["key"]))
+    return keys
+
+
 def _merge(
-    items: list[dict[str, Any]], *, max_items: int = MAX_L1
+    items: list[dict[str, Any]],
+    *,
+    max_items: int = MAX_L1,
+    dismissed: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    seen: set[str] = set()
+    seen: set[str] = set(dismissed or set())
     merged: list[dict[str, Any]] = []
     for it in items:
         title = (it.get("title") or "").strip()
@@ -199,8 +223,14 @@ def _humanize_date(text: str) -> str:
 
 def _short_title(title: Any, limit: int = 44) -> str:
     t = re.sub(r"\s+", " ", _humanize_date(str(title or ""))).strip().rstrip("。．.")
+    t = re.sub(r"\s*[—–-]\s*状況[:：].*$", "", t)
+    t = re.sub(r"[（(]状況[:：][^）)]*[）)]", "", t).strip()
     if len(t) > limit:
-        t = t[: limit - 1].rstrip() + "…"
+        cut = t[: limit - 1]
+        sep = cut.rfind(" — ")
+        if sep >= limit // 2:
+            cut = cut[:sep]
+        t = cut.rstrip().rstrip(" —、・,.:：-") + "…"
     return t
 
 
@@ -212,7 +242,7 @@ def _item_line(it: dict[str, Any]) -> str:
 
 
 def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
-    lines: list[str] = []
+    lines: list[str] = ["📋 *Todoist起票整理*", ""]
     if items:
         lines.extend(["*起票してよければ番号で返信*", ""])
         lines.append("\n\n".join(_item_line(it) for it in items))
@@ -343,19 +373,23 @@ def _create_task(it: dict[str, Any], *, dry_run: bool) -> dict[str, Any]:
 
 
 def cmd_digest(args: argparse.Namespace) -> int:
+    state = _load_state()
     items: list[dict[str, Any]] = []
     if not args.skip_sb:
         items.extend(_collect_sb(mine_only=bool(args.mine_only)))
     if not args.skip_genmail:
         items.extend(_collect_genmail())
-    merged = _merge(items, max_items=int(args.limit))
+    merged = _merge(
+        items,
+        max_items=int(args.limit),
+        dismissed=_active_dismissed(state),
+    )
     note = "" if (not args.skip_sb and not args.skip_genmail) else (
         f"出典の一部をスキップ: SB={'on' if not args.skip_sb else 'off'} "
         f"GenMail={'on' if not args.skip_genmail else 'off'}"
     )
     text = _format_slack(merged, note=note)
 
-    state = _load_state()
     state["proposals"] = merged
     state["last_digest_at"] = _now_iso()
     state["last_digest_text"] = text
@@ -452,6 +486,32 @@ def cmd_apply(args: argparse.Namespace) -> int:
     return 0 if all(x.get("ok") for x in results) else 1
 
 
+def cmd_dismiss(args: argparse.Namespace) -> int:
+    state = _load_state()
+    proposals = list(state.get("proposals") or [])
+    if not proposals:
+        raise SystemExit("見送る候補がありません（先に digest を実行）")
+    sel = str(args.dismiss or "").strip().lower()
+    if sel in ("all", "*"):
+        chosen = proposals
+    else:
+        nums = {int(x) for x in re.split(r"[,\s]+", sel) if x.isdigit()}
+        chosen = [c for c in proposals if int(c.get("n") or 0) in nums]
+        if not chosen:
+            raise SystemExit(f"番号に一致する候補がありません: {sel}")
+    dismissed = list(state.get("dismissed") or [])
+    now = _now_iso()
+    for c in chosen:
+        dismissed.append({"key": _dismiss_key(c.get("title")), "at": now})
+    state["dismissed"] = dismissed
+    state["proposals"] = [p for p in proposals if p not in chosen]
+    _save_state(state)
+    print(f"📎 見送り {len(chosen)}件（{DISMISS_DAYS}日は再提案しません）")
+    for c in chosen:
+        print(f"  - #{c.get('n')} {_short_title(c.get('title'))}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="312 L1ダイジェスト → #consult → 了承後 create")
     p.add_argument("--dry-run", action="store_true", help="Slack未投稿 / apply時はcreateしない")
@@ -460,6 +520,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--mine-only", action="store_true", help="SBの自分宛のみ")
     p.add_argument("--limit", type=int, default=MAX_L1)
     p.add_argument("--post-empty", action="store_true", help="候補0でも投稿")
+    p.add_argument("--dismiss", default=None, help="見送り: all または 1,3（14日再提案しない）")
     p.add_argument("--apply", action="store_true")
     p.add_argument("--select", default=None)
     p.add_argument(
@@ -476,6 +537,8 @@ def main(argv: list[str] | None = None) -> int:
     ):
         print("📎 312 digest: disabled (JARVIS_TODOIST_312_DIGEST_DISABLE=1)")
         return 0
+    if args.dismiss:
+        return cmd_dismiss(args)
     if args.apply:
         return cmd_apply(args)
     return cmd_digest(args)
