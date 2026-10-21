@@ -13,6 +13,11 @@ import {
   VENDOR_JUDGMENT,
   type VendorJudgmentCode,
 } from "@/lib/vendorJudgment";
+import {
+  recordMailSkipLearn,
+  resetMailSkipStreak,
+  skipPendingFromMutedSender,
+} from "@/lib/mailActionSkipMute";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export type TriageActionResult =
@@ -79,7 +84,7 @@ export async function setTriageStatus(
   const supabase = await createClient();
   const { data: row, error: fetchErr } = await supabase
     .from("triage_items")
-    .select("status,payload,gmail_message_id,account")
+    .select("status,payload,gmail_message_id,account,from_email,subject,kind")
     .eq("id", id)
     .maybeSingle();
   if (fetchErr) return { ok: false, error: fetchErr.message };
@@ -99,6 +104,25 @@ export async function setTriageStatus(
       account: row.account,
       payload,
     });
+  }
+
+  // Slack と同系の見送り学習（activity は対象外）
+  const kind = String(row.kind || "mail");
+  if (next === "skipped" && prevStatus === "pending" && kind !== "activity") {
+    const learn = await recordMailSkipLearn(
+      String(row.from_email || ""),
+      String(row.subject || ""),
+    );
+    payload.mail_skip_learn = learn;
+    if (learn.muted) {
+      await skipPendingFromMutedSender({
+        fromEmail: String(row.from_email || ""),
+        excludeId: id,
+        source: "dashboard_mute",
+      });
+    }
+  } else if (next === "sent" && kind !== "activity") {
+    await resetMailSkipStreak(String(row.from_email || ""));
   }
 
   const { error } = await supabase

@@ -28,7 +28,8 @@
 | **Gmail既読** | Slack ダイジェスト／カードに出した件は **Gmail 既読**（物件メール取込と同型）。`gmail_message_id` がある行のみ。`payload.gmail_read_on=slack_ma_digest`。失敗時は morning `jarvis_triage_gmail_read_catchup` が取りこぼしを埋める |
 
 スコアの上げ下げ（抜粋）: `priority=high`・`kind=mail`・partner・「ご確認／お願い／期限」等・下書きありを加点。物件紹介定例・skim・ノイズ件名を減点。  
-投稿前除外（下書きが無いとき）: OTP／請求通知／申込完了／Apple Pay完了／販促・メルマガ件名など（運用で徐々に追加）。
+投稿前除外（下書きが無いとき）: OTP／請求通知／申込完了／Apple Pay完了／販促・メルマガ件名など（運用で徐々に追加）。  
+**自分発信除外（2026-10-21）**: From が estate／admin／m19m／法人ドメイン、または estate 送信の BCC 控えが「相手から返信」誤ラベルされた本文は、Slack 投稿・Dashboard 未読の両方から除外。取込側（`gmail_to_yoritoori`）も From 自己は受信追記しない（SENT＝自分から送信が正）。
 
 ## ボタン
 
@@ -52,6 +53,16 @@
 
 実装: `sync_meta` キー `mail_action_skip_mute`（JSON 文字列）。閾値は `JARVIS_MAIL_ACTION_MUTE_THRESHOLD`（既定 2）。
 
+### Dashboard 共有（2026-10-21）
+
+| 項目 | 正 |
+|---|---|
+| **共有** | Slack 見送り学習と同じ `mail_action_skip_mute` を Dashboard 未読でも読む |
+| **除外先** | `/general`・`/partner` の未読一覧／1通フォーカス、ホーム「その他メール」 |
+| **判断済み** | Slack／Dashboard で見送り・返信・Todoist にした行は `status` 更新＋ `revalidatePath` でフォーカス／ラジオ相当 UI から消える |
+| **ミュート到達時** | 同 From の残 `pending` も `skipped`（`payload.mail_skip_mute_auto`）。unmute は `jarvis_mail_action_mute.py --unmute` |
+| **Dashboard スキップ** | 連続見送りカウントも同じレジストリへ学習（Slack と双方向） |
+
 ## 合図（116・T1〜T5）
 
 | ID | 内容 |
@@ -73,6 +84,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 # 見送り学習
 ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --list
 ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --unmute 'from:addr@example.com'
+~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --close-muted-pending
 ~/selenium_env/venv/bin/python scripts/jarvis_mail_action_mute.py --health --notify-ops
 ```
 

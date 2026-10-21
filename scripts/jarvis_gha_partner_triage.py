@@ -203,7 +203,12 @@ def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[d
         return cands
 
 
-def row_from_candidate(c: dict[str, Any], judge: dict[str, Any]) -> dict[str, Any]:
+def row_from_candidate(c: dict[str, Any], judge: dict[str, Any]) -> dict[str, Any] | None:
+    from jarvis_kurashift_re_inquiry_channel import looks_like_self_outbound_body
+
+    # estate 送信の BCC 誤ラベル等は pending に載せない
+    if looks_like_self_outbound_body(c.get("body") or ""):
+        return None
     needs = bool(judge.get("needs_reply"))
     channel = (c.get("channel") or "Gmail").strip() or "Gmail"
     iid = c.get("id") or hashlib.sha1(
@@ -315,6 +320,7 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
     rows: list[dict[str, Any]] = []
+    skipped_self = 0
     for c in cands[: args.limit]:
         judge = maybe_gemini_judge(c, allow_gemini=allow_gemini)
         print(
@@ -322,9 +328,19 @@ def main(argv: list[str] | None = None) -> int:
             f"needs={judge.get('needs_reply')} {(c.get('subject') or '')[:50]}",
             file=sys.stderr,
         )
-        rows.append(row_from_candidate(c, judge))
+        row = row_from_candidate(c, judge)
+        if row is None:
+            skipped_self += 1
+            print(
+                f"# skip self-outbound {(c.get('subject') or '')[:50]}",
+                file=sys.stderr,
+            )
+            continue
+        rows.append(row)
         if allow_gemini and os.environ.get("GEMINI_API_KEY"):
             time.sleep(1.2)
+    if skipped_self:
+        print(f"# self-outbound skipped={skipped_self}", file=sys.stderr)
 
     if args.dry_run or not args.push:
         print(f"📎 partner triage dry-run rows={len(rows)}")

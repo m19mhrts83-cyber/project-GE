@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from email.utils import parseaddr
 from pathlib import Path
 from typing import Any
@@ -88,6 +89,44 @@ def is_self_email(email: str, extra: list[str] | None = None) -> bool:
     for e in extra or self_emails_extra():
         if e and addr == e.strip().lower():
             return True
+    return False
+
+
+# estate/admin 送信の BCC 控えが「相手から返信」誤ラベルされたときの本文判定
+# （引用内の自分文は頭400字に現れにくい／相手返信は先頭が相手の声）
+_SELF_OUTBOUND_VOICE = re.compile(
+    r"オーナーの松野です|Grandole志賀本通[ⅠI一二]*\s*オーナーの松野|"
+    r"リビングサポート\s*松|松野（0\d{1,4}-",
+)
+_PARTNER_VOICE_HEAD = re.compile(
+    r"^(LEAFの|株式会社LEAFの|神野です|竹田です|"
+    r"松野\s*真治\s*様|松野様)",
+    re.M,
+)
+
+
+def looks_like_self_outbound_body(body: str | None) -> bool:
+    """自分発信（estate 等）の本文か。相手返信の引用は先頭声で除外する。"""
+    text = (body or "").strip()
+    if not text:
+        return False
+    head = text[:400]
+    if _PARTNER_VOICE_HEAD.search(head):
+        return False
+    return bool(_SELF_OUTBOUND_VOICE.search(head))
+
+
+def is_mail_action_excluded(
+    *,
+    from_email: str | None = None,
+    body: str | None = None,
+    extra: list[str] | None = None,
+) -> bool:
+    """Slack／Dashboard 要対応から除外するか（自分 From または自分発信誤ラベル本文）。"""
+    if is_self_email(from_email or "", extra=extra):
+        return True
+    if looks_like_self_outbound_body(body):
+        return True
     return False
 
 

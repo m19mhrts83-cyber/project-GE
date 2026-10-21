@@ -17,7 +17,9 @@ import json
 import os
 import subprocess
 import sys
+import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -187,6 +189,82 @@ def _pending_count() -> int | None:
         return None
 
 
+def _parse_from_addr(raw: str) -> str:
+    s = (raw or "").strip().lower()
+    m = re.search(r"<([^>]+)>", s)
+    return (m.group(1) if m else s).strip().lower()
+
+
+def cmd_close_muted_pending(reg: dict[str, Any], *, dry_run: bool) -> int:
+    """ミュート済み From の残 pending を skipped（Dashboard 未読から消す）。"""
+    creds = _sb()
+    if not creds:
+        raise SystemExit("JARVIS_SUPABASE_URL / SERVICE_ROLE_KEY が必要です")
+    url, key = creds
+    muted_addrs: set[str] = set()
+    for k, v in (reg.get("entries") or {}).items():
+        if not (v or {}).get("muted"):
+            continue
+        if str(k).startswith("from:"):
+            muted_addrs.add(str(k)[5:].lower())
+    if not muted_addrs:
+        print("📎 close-muted-pending: ミュート送信者なし")
+        return 0
+    req = urllib.request.Request(
+        f"{url}/rest/v1/triage_items?status=eq.pending&kind=neq.activity"
+        f"&select=id,from_email,payload&limit=500",
+        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+    )
+    with urllib.request.urlopen(req, timeout=45) as r:
+        rows = json.loads(r.read().decode("utf-8"))
+    now = datetime.now(timezone.utc).isoformat()
+    closed = 0
+    for row in rows or []:
+        addr = _parse_from_addr(str(row.get("from_email") or ""))
+        if addr not in muted_addrs:
+            continue
+        rid = str(row.get("id") or "")
+        if not rid:
+            continue
+        pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+        pl = dict(pl)
+        pl["mail_skip_mute_auto"] = {
+            "at": now,
+            "source": "mute_cli_close",
+            "key": f"from:{addr}",
+        }
+        body = json.dumps(
+            {"status": "skipped", "payload": pl, "updated_at": now},
+            ensure_ascii=False,
+        ).encode("utf-8")
+        if dry_run:
+            print(f"# dry-run would skip {rid}  from={addr}")
+            closed += 1
+            continue
+        ureq = urllib.request.Request(
+            f"{url}/rest/v1/triage_items?id=eq.{urllib.parse.quote(rid, safe='')}",
+            data=body,
+            method="PATCH",
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+        )
+        try:
+            with urllib.request.urlopen(ureq, timeout=30) as r:
+                r.read()
+            closed += 1
+        except Exception as e:
+            print(f"# skip failed {rid}: {e}", file=sys.stderr)
+    print(
+        f"📎 close-muted-pending: muted_senders={len(muted_addrs)} closed={closed}"
+        + (" (dry-run)" if dry_run else "")
+    )
+    return 0
+
+
 def cmd_health(reg: dict[str, Any], *, notify_ops: bool) -> int:
     muted_n = sum(1 for v in (reg.get("entries") or {}).values() if (v or {}).get("muted"))
     pending = _pending_count()
@@ -238,10 +316,15 @@ def main() -> int:
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--unmute", metavar="KEY", help="from:addr@… または email")
     ap.add_argument("--health", action="store_true")
+    ap.add_argument(
+        "--close-muted-pending",
+        action="store_true",
+        help="ミュート済み From の残 pending を skipped（Dashboard 未読から消す）",
+    )
     ap.add_argument("--notify-ops", action="store_true", help="health 異常時 #ops")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
-    if not (args.list or args.unmute or args.health):
+    if not (args.list or args.unmute or args.health or args.close_muted_pending):
         ap.print_help()
         return 2
     reg = load_registry()
@@ -250,6 +333,8 @@ def main() -> int:
         rc = max(rc, cmd_list(reg))
     if args.unmute:
         rc = max(rc, cmd_unmute(reg, args.unmute, dry_run=args.dry_run))
+    if args.close_muted_pending:
+        rc = max(rc, cmd_close_muted_pending(reg, dry_run=args.dry_run))
     if args.health:
         rc = max(rc, cmd_health(reg, notify_ops=args.notify_ops))
     return rc

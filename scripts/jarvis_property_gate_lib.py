@@ -1298,7 +1298,7 @@ def format_b_card(
             haz_status = ln.replace("• ステータス：", "").strip()
             break
     lines = [
-        "【AIチーム・114】物件一次判定 — 要あなたの判断",
+        "【114・物件一次判定】Bレーン（要人判断）— 要あなたの判断",
         "調査=Grok S1 → 振分=114 → Yes後=511 ／ ※BotチャットでもCursorでもない",
         "",
         f"*{title_disp}*",
@@ -1357,7 +1357,7 @@ def format_a_line(deal: dict[str, Any], lane: dict[str, Any]) -> str:
         else "511／Tier 側へ自動進行"
     )
     lines = [
-        "【AIチーム・114】A 自動進行 — 判断不要（ここを読む）",
+        "【114・物件一次判定】Aレーン（自動進行）— 判断不要（ここを読む）",
         "調査=Grok S1 → 振分=114 → 次=511 ／ ※人の Yes/No は不要",
         "",
         f"*{title_disp}*",
@@ -1393,13 +1393,13 @@ def format_c_digest(
     *,
     detail: bool = False,
 ) -> str:
-    """#report Cサマリ。既定は件数のみ（羅列しない）。detail=True で旧タイトル列挙。"""
+    """#report Cサマリ（報告のみレーン）。既定は件数のみ（羅列しない）。detail=True で旧タイトル列挙。"""
     from collections import Counter
 
     buckets = Counter(_c_reason_bucket(lane) for _, lane in items)
     order = ("見送り", "保留", "調査のみ", "判定材料不足", "その他")
     lines = [
-        f"【AIチーム・114】C サマリ（{now_jst_date()}・{len(items)}件）",
+        f"【114・物件一次判定】Cレーン（報告のみ・見送り等）サマリ（{now_jst_date()}・{len(items)}件）",
         "人判断不要・一覧は読まなくてよい。詳細が必要なら deals／ログへ。",
         "内訳: "
         + "／".join(f"{k} {buckets[k]}" for k in order if buckets.get(k)),

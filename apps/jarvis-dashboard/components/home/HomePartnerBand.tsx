@@ -1,4 +1,5 @@
 import { LEVEL_LABEL, mailPriorityToLevel } from "@/lib/homeLevels";
+import { isMailActionExcluded } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePartnerBand() {
@@ -6,7 +7,7 @@ export default async function HomePartnerBand() {
   const { data: mailRows } = await supabase
     .from("triage_items")
     .select(
-      "id,lane,kind,status,partner,folder,subject,received_at,summary,priority,from_email",
+      "id,lane,kind,status,partner,folder,subject,received_at,summary,priority,from_email,original_body",
     )
     .eq("status", "pending")
     .eq("lane", "partner")
@@ -14,13 +15,22 @@ export default async function HomePartnerBand() {
     .order("received_at", { ascending: false })
     .limit(40);
 
-  const partnerMails = (mailRows || []).slice().sort((a, b) => {
-    const order = { attention: 0, warn: 1, info: 2 } as const;
-    return (
-      order[mailPriorityToLevel(a.priority)] -
-      order[mailPriorityToLevel(b.priority)]
-    );
-  });
+  const partnerMails = (mailRows || [])
+    .filter(
+      (m) =>
+        !isMailActionExcluded({
+          fromEmail: m.from_email,
+          body: m.original_body,
+        }),
+    )
+    .slice()
+    .sort((a, b) => {
+      const order = { attention: 0, warn: 1, info: 2 } as const;
+      return (
+        order[mailPriorityToLevel(a.priority)] -
+        order[mailPriorityToLevel(b.priority)]
+      );
+    });
 
   return (
     <div className="home-band home-band-mail">

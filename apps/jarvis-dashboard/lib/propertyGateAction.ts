@@ -384,7 +384,7 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
 </style>
 <body><div class="wrap">
 <div class="who">
-  <strong>AIチーム・114</strong>（物件一次判定係）の判断ページです。<br/>
+  <strong>114・物件一次判定係</strong>の判断ページです。<br/>
   調査元=<strong>Grok S1</strong> → 振分・通知=<strong>114</strong> → あなたの Yes/No → 送信=<strong>511</strong>。<br/>
   Grok Bot のチャットでも、Cursor 本人でもありません。
 </div>
