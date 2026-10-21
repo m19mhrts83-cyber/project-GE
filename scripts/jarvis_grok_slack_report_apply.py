@@ -155,17 +155,35 @@ def markdown_to_slack(text: str) -> str:
 _CONSULT_NEXT_RE = re.compile(r"(?m)^\s*次\s*[:：]")
 
 
+def normalize_consult_handoff_spacing(body: str) -> str:
+    """次／担当メモ／橋渡しの間に空行を入れる（Slack UI FB 2026-10-22）。"""
+    text = (body or "").rstrip()
+    # 次 → 担当メモ
+    text = re.sub(
+        r"(?m)^([ \t]*次\s*[:：][^\n]*)\n+(?=[ \t]*担当メモ\s*[:：])",
+        r"\1\n\n",
+        text,
+    )
+    # 担当メモ → 橋渡し
+    text = re.sub(
+        r"(?m)^([ \t]*担当メモ\s*[:：][^\n]*)\n+(?=[ \t]*橋渡し\s*[:：])",
+        r"\1\n\n",
+        text,
+    )
+    return text
+
+
 def ensure_consult_handoff_footer(body: str) -> str:
     """#consult 用。末尾に「次:」が無いとき橋渡し3行を補完（忘却防止）。"""
     text = (body or "").rstrip()
     if _CONSULT_NEXT_RE.search(text):
-        return text
+        return normalize_consult_handoff_spacing(text)
     stub = (
         "\n\n次: 人判断のみ\n"
-        "担当メモ: （Grok未記入・Jarvisが補完）了承後に担当を決めて一声\n"
-        "橋渡し: 松野が了承したら Grok／Jarvis へ一声（当面は人が橋）"
+        "\n担当メモ: （Grok未記入・Jarvisが補完）了承後に担当を決めて一声\n"
+        "\n橋渡し: 松野が了承したら Grok／Jarvis へ一声（当面は人が橋）"
     )
-    return text + stub
+    return normalize_consult_handoff_spacing(text + stub)
 
 
 def build_text(meta: dict[str, str], body: str, name: str) -> str:

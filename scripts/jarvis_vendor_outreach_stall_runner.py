@@ -63,6 +63,8 @@ SLACK_POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
 LANE_CFG: dict[str, dict[str, Any]] = {
     "s2": {
         "label": "S2地場紹介",
+        # Slack UI: 状態行に担当を必ず添える（2026-10-22 FB）
+        "role": "地場の管理会社・仲介への紹介依頼",
         "sync": REPO / "scripts" / "jarvis_kurashift_vendor_sync.py",
         "meta_key": "vendor_outreach_stall",
         "url": "https://jarvis-trade-desk.vercel.app/realestate/vendors",
@@ -70,6 +72,7 @@ LANE_CFG: dict[str, dict[str, Any]] = {
     },
     "s4": {
         "label": "S4修繕",
+        "role": "修繕業者の開拓・見積依頼",
         "sync": REPO / "scripts" / "jarvis_kurashift_repair_vendor_sync.py",
         "meta_key": "vendor_outreach_stall_s4",
         "url": "https://jarvis-trade-desk.vercel.app/realestate/repair-vendors",
@@ -77,12 +80,42 @@ LANE_CFG: dict[str, dict[str, Any]] = {
     },
     "s9": {
         "label": "S9管理会社",
+        "role": "管理会社の事前確認・開拓",
         "sync": REPO / "scripts" / "jarvis_kurashift_mgmt_vendor_sync.py",
         "meta_key": "vendor_outreach_stall_s9",
         "url": "https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors",
         "list_path": S9_LIST,
     },
 }
+
+
+def lane_role(lane: str) -> str:
+    return str((LANE_CFG.get(str(lane or "").lower()) or {}).get("role") or "")
+
+
+def format_lane_heading(r: dict[str, Any]) -> str:
+    """週次／ops 見出し。例: *S2地場紹介*（地場の…）"""
+    label = str(r.get("label") or r.get("lane") or "?").strip()
+    role = str(r.get("role") or lane_role(str(r.get("lane") or ""))).strip()
+    if role:
+        return f"*{label}*（{role}）"
+    return f"*{label}*"
+
+
+def build_ops_status_block(results: list[dict[str, Any]]) -> str:
+    """複数レーンの現状。担当役割を必ず書く（Slack UI FB 2026-10-22）。"""
+    lines = ["*現状*"]
+    for r in results:
+        label = str(r.get("label") or r.get("lane") or "?").strip()
+        role = str(r.get("role") or lane_role(str(r.get("lane") or ""))).strip()
+        status = _stall_status_ja(str(r.get("stall_status") or ""))
+        detail = str(r.get("ops_reason") or "").strip()
+        role_bit = f"／{role}" if role else ""
+        line = f"・{label}{role_bit}: {status}"
+        if detail and str(r.get("stall_status") or "") not in ("ok", ""):
+            line += f"（{detail}）"
+        lines.append(line)
+    return "\n".join(lines)
 
 REFILL_NAME_RE = re.compile(
     r"S2.*(週次|キュー|再生成|next\s*3|--next)|週次キュー再生成|--next\s*3|"
@@ -779,6 +812,7 @@ def run_lane(
     q = assess()
     bridge_ok = bridge_available()
     label = cfg["label"]
+    role = str(cfg.get("role") or "")
 
     print(
         f"📎 {lane} stall assess: queue_ready={q['queue_ready']} "
@@ -940,6 +974,7 @@ def run_lane(
     return {
         "lane": lane,
         "label": label,
+        "role": role,
         "q": q,
         "meta": meta,
         "refill": refill_result,
@@ -1055,7 +1090,7 @@ def build_support_weekly_report(
         status_ja = _stall_status_ja(str(r.get("stall_status") or ""))
         lines.extend(
             [
-                f"*{r['label']}*  状態: {status_ja}",
+                f"{format_lane_heading(r)}  状態: {status_ja}",
                 f"・接触 {q.get('contacted_today', 0)}／"
                 f"キュー残 {q.get('pending_discovered', 0)}"
                 f"（先頭{q.get('queue_ready', 0)}/枠{q.get('daily_limit', 0)}）／"
@@ -1099,9 +1134,14 @@ def build_ops_alert(r: dict[str, Any]) -> str:
         remedy = "Mac／Drive ブリッジ復旧後に `--apply --lane all`"
     else:
         remedy = f"`--apply --lane {lane}`"
+    role = str(r.get("role") or lane_role(str(lane))).strip()
+    label = str(r.get("label") or lane).strip()
+    title = f"{label}（{role}）" if role else label
+    role_line = f"・担当: {role}\n" if role else ""
     return (
-        f"[516 業者開拓フォロー] *Grokサポート見守り｜要確認*（{r.get('label') or lane}）\n"
+        f"[516 業者開拓フォロー] *Grokサポート見守り｜要確認*（{title}）\n"
         "発信: 516 業者開拓フォロー（連携障害／送信停滞の見守り。開拓送信は Grok）。\n"
+        f"{role_line}"
         f"・理由: {r.get('ops_reason') or '—'}\n"
         f"・状態: {_stall_status_ja(stall)}\n"
         f"・キュー残: {q.get('pending_discovered')} "
