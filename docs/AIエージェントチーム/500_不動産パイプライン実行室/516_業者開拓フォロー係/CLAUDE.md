@@ -56,11 +56,15 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
 | 連携障害・枯渇 | Slack `#ops`（即時） |
 | 要判断（返信方針） | Slack `#consult` ＋ Todoist（要ボスのみ） |
 
-| レーン | UI |
-|---|---|
-| S2 | https://jarvis-trade-desk.vercel.app/realestate/vendors |
-| S4 | https://jarvis-trade-desk.vercel.app/realestate/repair-vendors |
-| S9 | https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors |
+| レーン | 担当（Slackに必ず書く） | UI |
+|---|---|---|
+| S2 | 地場の管理会社・仲介への紹介依頼 | https://jarvis-trade-desk.vercel.app/realestate/vendors |
+| S4 | 修繕業者の開拓・見積依頼 | https://jarvis-trade-desk.vercel.app/realestate/repair-vendors |
+| S9 | 管理会社の事前確認・開拓 | https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors |
+
+**Slack UI（必須 · 2026-10-22）**: `#ops` / `#report` で S2・S4・S9 の現状を書くとき、状態だけでなく **上記の担当**を添える。  
+例: `・S2地場紹介／地場の管理会社・仲介への紹介依頼: 正常`  
+ヘルパー: `build_ops_status_block` / `format_lane_heading`（`jarvis_vendor_outreach_stall_runner.py`）
 
 ### Slack 書き出し（FRIDAY／Jarvis 共通）
 
@@ -140,3 +144,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-22 | 送信停滞再発: PR #101（send_resume）が main 未マージだったため再適用。`stale_marks` を ops クールダウンから分離＋本日分 kick 自動投入 |
 | 2026-10-22 | S2: 日報で送信済みなのに mark 欠落 → Jarvis が `--mark` 後追いで stall=ok。S9 は本日送信待ち。`--mark` の日付は **JST**（UTC 前日ずれ防止） |
 | 2026-10-22 | **禁止**: Grok が対外メール送信中に Jarvis CDP でコンポーザ／クリップボードを触る（ナカジツ誤送）。kick は outbox＋Slack のみ |
+| 2026-10-22 | Slack UI: S2/S4/S9 現状行に **担当役割**を必ず添える（#ops FB） |

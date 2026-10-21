@@ -5,7 +5,7 @@ Cursor / Codex / その他エージェントは `CLAUDE.md` を読んで同じ�
 
 `CLAUDE.md` を更新したら、このファイルの「最終同期」日付だけ直す（本文の二重管理はしない）。
 
-- 最終同期: 2026-10-22（send_resume・mark JST・CDP禁止・S2 mark後追い）
+- 最終同期: 2026-10-22（Slack UI・S2/S4/S9担当表示・send_resume・mark JST）
 - 正本: ./CLAUDE.md
 - 人向け1枚: ./README.md
 - フロー: ./flow.md

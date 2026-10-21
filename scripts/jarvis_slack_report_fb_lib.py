@@ -129,13 +129,32 @@ def build_ack_text(kind: str, *, reply_preview: str = "") -> str:
 
 
 def is_ack_or_bot_reply(msg: dict[str, Any]) -> bool:
-    """自分の Ack・Bot 投稿は再処理しない。"""
+    """自分の Ack・対応済・Bot 投稿は再処理しない。"""
     if msg.get("bot_id") or msg.get("app_id"):
         return True
     text = str(msg.get("text") or "")
-    if text.startswith("【Jarvis】受けた") or "【Jarvis】受けた（" in text[:40]:
+    head = text[:60]
+    if text.startswith("【Jarvis】") and any(
+        m in head
+        for m in (
+            "受けた",
+            "対応した",
+            "対応済み",
+            "起票した",
+            "完了した",
+            "反映した",
+        )
+    ):
         return True
     subtype = str(msg.get("subtype") or "")
     if subtype in {"bot_message", "message_changed", "message_deleted"}:
         return True
     return False
+
+
+def build_done_text(*, summary: str, next_line: str = "") -> str:
+    """実装・起票など処置完了時のスレ返信（受けただけと区別する）。"""
+    lines = ["【Jarvis】対応したよ", (summary or "").strip()]
+    if next_line.strip():
+        lines.append(next_line.strip())
+    return "\n".join(x for x in lines if x)
