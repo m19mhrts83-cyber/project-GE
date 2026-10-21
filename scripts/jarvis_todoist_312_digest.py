@@ -156,32 +156,97 @@ def _merge(
     return merged
 
 
+_JP_D = {"〇": 0, "零": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
+         "六": 6, "七": 7, "八": 8, "九": 9}
+_JP_U = {"十": 10, "百": 100, "千": 1000}
+
+
+def _jp_num(s: str) -> int | None:
+    total = cur = 0
+    for ch in s:
+        if ch in _JP_D:
+            cur = _JP_D[ch]
+        elif ch in _JP_U:
+            total += (cur or 1) * _JP_U[ch]
+            cur = 0
+        else:
+            return None
+    return total + cur
+
+
+def _humanize_date(text: str) -> str:
+    """年月日が漢数字のときだけ数字に（二千二十六年十月三十一日 → 2026/10/31）。"""
+
+    def rep(m: re.Match[str]) -> str:
+        y = _jp_num(m.group(1))
+        if not y:
+            return m.group(0)
+        mo = _jp_num(m.group(2)) if m.group(2) else None
+        day = _jp_num(m.group(3)) if m.group(3) else None
+        if mo and day:
+            return f"{y}/{mo}/{day}"
+        if mo:
+            return f"{y}年{mo}月"
+        return f"{y}年"
+
+    return re.sub(
+        r"([〇一二三四五六七八九十百千]+)年"
+        r"(?:([〇一二三四五六七八九十]+)月(?:([〇一二三四五六七八九十]+)日)?)?",
+        rep,
+        text,
+    )
+
+
+def _short_title(title: Any, limit: int = 44) -> str:
+    t = re.sub(r"\s+", " ", _humanize_date(str(title or ""))).strip().rstrip("。．.")
+    if len(t) > limit:
+        t = t[: limit - 1].rstrip() + "…"
+    return t
+
+
+def _item_line(it: dict[str, Any]) -> str:
+    """1件＝タイトル＋出典を1行に。件ごとの空行で読みやすく（313と同型）。"""
+    lane = str(it.get("lane") or "?").replace("_", " ")
+    origin = str(it.get("origin") or "?").upper()
+    meta = f"{lane}・{origin}"
+    who = str(it.get("assignee") or "").strip()
+    if who:
+        meta += f"・{who}"
+    url = str(it.get("project_url") or "").strip()
+    tail = f"  _{meta}_"
+    if url:
+        tail += f" · <{url}|元の会議>"
+    return f"*{it['n']}.* {_short_title(it.get('title'))}{tail}"
+
+
 def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
+    stamp = datetime.now(JST).strftime("%m/%d %H:%M")
+    origins = sorted({str(i.get("origin") or "?").upper() for i in items})
+    src = "・".join(origins) if origins else "SB・GenMail"
     lines = [
-        "【相談】312 Todoist起票整理｜L1ダイジェスト（見るだけ）",
-        "",
-        "📌 要ボス: なし（L1＝把握のみ。一括createしない）",
-        "",
-        "候補（最大7・了承番号だけ①create）:",
+        "📋 *Todoist起票整理*（L1＝見るだけ）",
+        f"候補 *{len(items)}件* ／ {src} ／ {stamp}",
     ]
-    if not items:
-        lines.append("- （候補なし）")
+    if items:
+        lines.extend(["", "*起票してよければ番号で返信*", ""])
+        lines.append("\n\n".join(_item_line(it) for it in items))
     else:
-        for it in items:
-            lane = it.get("lane") or "?"
-            origin = it.get("origin") or "?"
-            title = (it.get("title") or "")[:80]
-            lines.append(f"- #{it.get('n')} [{lane}/{origin}] {title}")
+        lines.extend(["", "候補なし（今回の登録はありません）"])
     lines.extend(
         [
             "",
-            "次: Jarvisに依頼",
-            "担当メモ: 番号了承→312 digest --apply --select N（create）",
-            "橋渡し: チャットで「起票して N」でも可",
+            "*返信の書き方*",
+            "「起票して 1,3」→ その番号だけ Todoist に登録",
+            "「全部見送り」→ 何もしない（次回また出ます）",
+            "「元の会議」をタップ → 出典を確認",
+            "",
+            "次: 人判断（起票して N）",
+            "担当メモ: 採用分だけ create＋コメント。L1のままでは登録しない",
+            "橋渡し: 新規起票は312 ／ 完了closeは313",
         ]
     )
     if note:
-        lines.extend(["", f"参考: {note}"])
+        lines.extend(["", f"_{note}_"])
     return "\n".join(lines)
 
 
@@ -298,7 +363,10 @@ def cmd_digest(args: argparse.Namespace) -> int:
     if not args.skip_genmail:
         items.extend(_collect_genmail())
     merged = _merge(items, max_items=int(args.limit))
-    note = f"SB={'on' if not args.skip_sb else 'off'} GenMail={'on' if not args.skip_genmail else 'off'}"
+    note = "" if (not args.skip_sb and not args.skip_genmail) else (
+        f"出典の一部をスキップ: SB={'on' if not args.skip_sb else 'off'} "
+        f"GenMail={'on' if not args.skip_genmail else 'off'}"
+    )
     text = _format_slack(merged, note=note)
 
     state = _load_state()
