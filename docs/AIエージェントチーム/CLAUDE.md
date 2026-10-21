@@ -67,7 +67,8 @@ Slack `#report` / `#consult` / `#ops`。外に出す・金・削除は人の了�
 
 新機能・運用変更は **チャットだけで終わらせない**。担当社員 `CLAUDE.md`・`docs/運用コマンド一覧.md`・必要なら Grok paste／B1 を同じ作業で更新する。  
 Cursor／Jarvis の正本ルール: `.cursor/rules/jarvis-multi-agent-share.mdc`。  
-**FRIDAY／Jarvis／AI社員の書き出し1節（どの ch・末尾型）**: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](./38_Slack書き出し_FRIDAY_Jarvis_20261018.md)
+**FRIDAY／Jarvis／AI社員の書き出し1節（どの ch・末尾型）**: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](./38_Slack書き出し_FRIDAY_Jarvis_20261018.md)  
+**スマホレイアウト（草案・行長／空行／過去見栄えFB）**: [`41_Slackスマホレイアウト_草案_20261022.md`](./41_Slackスマホレイアウト_草案_20261022.md)
 
 ### Slack 書き出し（必須・2026-10-18）
 
