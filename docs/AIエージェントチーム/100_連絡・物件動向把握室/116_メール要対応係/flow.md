@@ -36,7 +36,7 @@ flowchart TD
 | # | 内容 | 方法 | 人/AI | ツール例 |
 |---|---|---|---|---|
 | 1 | 合図（T1〜T4） | 朝／GHA／night／手動 | AI | `jarvis_mail_action_slack_post.py` |
-| 2 | ノイズ／mute／VR 除外 | フィルタ | AI | sync_meta `mail_action_skip_mute` |
+| 2 | ノイズ／mute／VR／自分発信除外 | フィルタ | AI | sync_meta `mail_action_skip_mute`＋estate 送信 BCC 誤ラベル除外（Slack 再掲＋Dashboard 未読） |
 | 3 | スコア順・上位N選抜＋抽出要旨 | ルール | AI | Plan A（LLMなし） |
 | 4 | ダイジェスト＋コンパクトカード | Bot／Webhook | AI | Block Kit |
 | 5 | Gmail 既読 | API modify | AI | 物件取込と同型（soft-fail→morning catchup） |

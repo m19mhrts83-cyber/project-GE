@@ -3,15 +3,24 @@
  * 署名は PROPERTY_GATE_ACTION_TOKEN（物件ゲートと同系）
  */
 import { createHmac, timingSafeEqual } from "crypto";
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { sendGmailViaEnv } from "@/lib/gmail/sendFromEnv";
+import {
+  recordMailSkipLearn,
+  resetMailSkipStreak,
+  skipPendingFromMutedSender,
+} from "@/lib/mailActionSkipMute";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { createTodoistTask } from "@/lib/todoistTasks";
 
 export type MailActionSlackAction = "reply" | "skip" | "todoist";
 
-const MUTE_META_KEY = "mail_action_skip_mute";
-const DEFAULT_MUTE_THRESHOLD = 2;
+export {
+  isMailSenderMuted,
+  recordMailSkipLearn,
+  resetMailSkipStreak,
+} from "@/lib/mailActionSkipMute";
 
 /** 業者返信 ID は別レーン。それ以外の triage id を対象。 */
 export function isMailActionTriageId(id: string): boolean {
@@ -183,134 +192,30 @@ export function editFormHtml(row: TriageRow, sig: string): string {
 </body></html>`;
 }
 
-type MuteEntry = {
-  skips: number;
-  muted: boolean;
-  last_at?: string;
-  last_subject?: string;
-};
-
-type MuteRegistry = {
-  threshold: number;
-  entries: Record<string, MuteEntry>;
-};
-
-function muteKeyFromEmail(fromEmail: string): string | null {
-  const e = (fromEmail || "").trim().toLowerCase();
-  if (!e || !e.includes("@")) return null;
-  return `from:${e}`;
-}
-
-async function loadMuteRegistry(): Promise<MuteRegistry> {
-  const sb = createServiceClient();
-  const threshold = Number(
-    process.env.JARVIS_MAIL_ACTION_MUTE_THRESHOLD || DEFAULT_MUTE_THRESHOLD,
-  );
-  const base: MuteRegistry = {
-    threshold: Number.isFinite(threshold) && threshold > 0 ? threshold : DEFAULT_MUTE_THRESHOLD,
-    entries: {},
-  };
-  if (!sb) return base;
-  const { data } = await sb
-    .from("sync_meta")
-    .select("value")
-    .eq("key", MUTE_META_KEY)
-    .maybeSingle();
-  const raw = data?.value;
-  let obj: Record<string, unknown> | null = null;
-  if (typeof raw === "string" && raw.trim()) {
-    try {
-      obj = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      obj = null;
-    }
-  } else if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    obj = raw as Record<string, unknown>;
-  }
-  if (!obj) return base;
-  const entries =
-    obj.entries && typeof obj.entries === "object" && !Array.isArray(obj.entries)
-      ? (obj.entries as Record<string, MuteEntry>)
-      : {};
-  const th = Number(obj.threshold);
-  return {
-    threshold: Number.isFinite(th) && th > 0 ? th : base.threshold,
-    entries,
-  };
-}
-
-async function saveMuteRegistry(reg: MuteRegistry): Promise<void> {
-  const sb = createServiceClient();
-  if (!sb) return;
-  const now = new Date().toISOString();
-  await sb.from("sync_meta").upsert(
-    {
-      key: MUTE_META_KEY,
-      value: JSON.stringify(reg),
-      updated_at: now,
-    },
-    { onConflict: "key" },
-  );
-}
-
-/** 見送り連続 streak → 送信者ミュート（Slack 再掲除外）。削除ではなく通知除外。 */
-export async function recordMailSkipLearn(
-  fromEmail: string,
-  subject: string,
-): Promise<{ muted: boolean; skips: number; key: string | null }> {
-  const key = muteKeyFromEmail(fromEmail);
-  if (!key) return { muted: false, skips: 0, key: null };
-  const reg = await loadMuteRegistry();
-  const prev = reg.entries[key] || { skips: 0, muted: false };
-  // skips = 連続見送り回数（返信／Todoist で resetMailSkipStreak）
-  const skips = (prev.skips || 0) + 1;
-  const muted = skips >= reg.threshold || Boolean(prev.muted);
-  reg.entries[key] = {
-    skips,
-    muted,
-    last_at: new Date().toISOString(),
-    last_subject: (subject || "").slice(0, 120),
-  };
-  await saveMuteRegistry(reg);
-  return { muted, skips, key };
-}
-
-/** 返信／Todoist 成功時に連続カウントをリセット（muted は維持＝明示 unmute のみ解除）。 */
-export async function resetMailSkipStreak(
-  fromEmail: string,
-): Promise<{ key: string | null; resets: boolean }> {
-  const key = muteKeyFromEmail(fromEmail);
-  if (!key) return { key: null, resets: false };
-  const reg = await loadMuteRegistry();
-  const prev = reg.entries[key];
-  if (!prev || (prev.skips || 0) === 0) return { key, resets: false };
-  reg.entries[key] = {
-    ...prev,
-    skips: 0,
-    last_at: new Date().toISOString(),
-  };
-  await saveMuteRegistry(reg);
-  return { key, resets: true };
-}
-
-export async function isMailSenderMuted(fromEmail: string): Promise<boolean> {
-  const key = muteKeyFromEmail(fromEmail);
-  if (!key) return false;
-  const reg = await loadMuteRegistry();
-  return Boolean(reg.entries[key]?.muted);
-}
-
 export type MaApplyResult = {
   ok: boolean;
   message: string;
   status?: string;
   todoist_url?: string;
   muted?: boolean;
+  muted_siblings_skipped?: number;
   slack_deleted?: boolean;
   digest_deleted?: boolean;
   digest_updated?: boolean;
   digest_remaining?: number;
 };
+
+function revalidateMailActionPaths() {
+  try {
+    revalidatePath("/");
+    revalidatePath("/general");
+    revalidatePath("/partner");
+    revalidatePath("/queue");
+    revalidatePath("/archive");
+  } catch {
+    /* API route 以外では無視 */
+  }
+}
 
 /** 見送り後に Slack カードを消す（Bot が投稿したメッセージのみ） */
 export async function deleteSlackMaMessage(opts: {
@@ -600,8 +505,17 @@ export async function applyMailActionSlack(
       })
       .eq("id", id);
     if (error) return { ok: false, message: error.message };
+    let siblings = 0;
+    if (learn.muted) {
+      siblings = await skipPendingFromMutedSender({
+        fromEmail: String(row.from_email || ""),
+        excludeId: id,
+        source: "slack_ma_mute",
+      });
+    }
     const muteNote = learn.muted
-      ? ` · 送信者を Slack 通知から除外（見送り ${learn.skips} 回）`
+      ? ` · 送信者を Slack／Dashboard 未読から除外（見送り ${learn.skips} 回）` +
+        (siblings ? ` · 同送信者の未読 ${siblings} 件も閉じました` : "")
       : learn.key
         ? ` · 見送りカウント ${learn.skips}`
         : "";
@@ -612,11 +526,13 @@ export async function applyMailActionSlack(
     });
     // 同一バッチのダイジェスト: 残 pending で更新／0件なら削除
     const digestSync = await syncDigestFromPayload(payload);
+    revalidateMailActionPaths();
     return {
       ok: true,
       message: `見送りにしました（${row.partner || row.from_email || id}）${muteNote}`,
       status: "skipped",
       muted: learn.muted,
+      muted_siblings_skipped: siblings || undefined,
       slack_deleted: slackDeleted,
       ...digestSync,
     };
@@ -674,6 +590,7 @@ export async function applyMailActionSlack(
       .eq("id", id);
     if (error) return { ok: false, message: error.message };
     const digestSync = await syncDigestFromPayload(payload);
+    revalidateMailActionPaths();
     return {
       ok: true,
       message: `Todoist に登録しました [${lane}]: ${created.url}`,
@@ -724,6 +641,7 @@ export async function applyMailActionSlack(
     if (error) return { ok: false, message: error.message };
     await resetMailSkipStreak(to);
     const digestSync = await syncDigestFromPayload(payload);
+    revalidateMailActionPaths();
     return {
       ok: true,
       message: `送信しました → ${to}（${row.partner || id}）`,

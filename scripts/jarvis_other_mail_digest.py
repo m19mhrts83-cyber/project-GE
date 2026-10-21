@@ -101,31 +101,39 @@ def fetch_pending_other(sb) -> list[dict[str, Any]]:
 
 
 def skip_self_sent_pending(sb, *, dry_run: bool = False) -> int:
-    """pending の自アドレス差出を skipped にする（既存ゴミ掃除）。"""
+    """pending の自分発信（From 自己／estate BCC 誤ラベル本文）を skipped にする。
+
+    general に加え partner レーンも対象（Slack／Dashboard 要対応の掃除）。
+    """
     sys.path.insert(0, str(REPO / "scripts"))
-    from jarvis_kurashift_re_inquiry_channel import is_self_email
+    from jarvis_kurashift_re_inquiry_channel import is_mail_action_excluded
 
     r = (
         sb.table("triage_items")
-        .select("id,from_email,lane,kind,status")
+        .select("id,from_email,lane,kind,status,original_body,payload")
         .eq("status", "pending")
-        .neq("lane", "partner")
         .neq("kind", "activity")
-        .limit(200)
+        .limit(300)
         .execute()
     )
     n = 0
     for row in r.data or []:
-        if not is_self_email(row.get("from_email") or ""):
+        if not is_mail_action_excluded(
+            from_email=row.get("from_email") or "",
+            body=row.get("original_body") or "",
+        ):
             continue
         n += 1
         if dry_run:
             continue
+        pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+        pl = {**pl, "mail_skip_self_outbound": True}
         sb.table("triage_items").update(
             {
                 "status": "skipped",
                 "updated_at": now_iso(),
-                "summary": "自送信のためスキップ",
+                "summary": "自送信（estate等）のためスキップ",
+                "payload": pl,
             }
         ).eq("id", row["id"]).execute()
     return n

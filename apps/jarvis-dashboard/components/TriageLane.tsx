@@ -15,7 +15,11 @@ import {
 } from "@/lib/laneView";
 import { resolvePartnerToEmail } from "@/lib/partnerContacts";
 import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
-import { isSelfEmail } from "@/lib/selfEmails";
+import {
+  filterOutMutedSenders,
+  muteRegistryFromMetaMap,
+} from "@/lib/mailActionSkipMute";
+import { isMailActionExcluded } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
 
 /** summary が原文の先頭切り出しだけなら、カード上では出さない（全文側に寄せる） */
@@ -114,17 +118,51 @@ export default async function TriageLanePage({
     return count ?? 0;
   };
 
-  const [unreadN, sentN, skipN, snoozeN, activityN] = await Promise.all([
-    countFor({ status: "pending" }),
-    countFor({ status: "sent" }),
-    countFor({ status: "skipped" }),
-    countFor({ status: "snoozed" }),
-    countFor({ kindActivity: true }),
-  ]);
+  const [{ data: muteMeta }, sentN, skipN, snoozeN, activityN] =
+    await Promise.all([
+      supabase
+        .from("sync_meta")
+        .select("value")
+        .eq("key", "mail_action_skip_mute")
+        .maybeSingle(),
+      countFor({ status: "sent" }),
+      countFor({ status: "skipped" }),
+      countFor({ status: "snoozed" }),
+      countFor({ kindActivity: true }),
+    ]);
+  const muteReg = muteRegistryFromMetaMap({
+    mail_action_skip_mute: muteMeta?.value,
+  });
 
   let unread: TriageRow[] = [];
   let closedList: TriageRow[] = [];
   let activities: TriageRow[] = [];
+
+  // 未読件数は Slack 見送り学習（ミュート）＋自分発信を除いた実数
+  let unreadN = 0;
+  {
+    const { data: pendingLite } = await supabase
+      .from("triage_items")
+      .select("id,from_email,original_body")
+      .eq("lane", lane)
+      .eq("status", "pending")
+      .neq("kind", "activity");
+    const visible = filterOutMutedSenders(
+      ((pendingLite || []) as {
+        id: string;
+        from_email: string | null;
+        original_body?: string | null;
+      }[]).filter(
+        (it) =>
+          !isMailActionExcluded({
+            fromEmail: it.from_email,
+            body: it.original_body,
+          }),
+      ),
+      muteReg,
+    );
+    unreadN = visible.length;
+  }
 
   if (view === "unread") {
     const { data: pending } = await supabase
@@ -134,11 +172,22 @@ export default async function TriageLanePage({
       .eq("status", "pending")
       .neq("kind", "activity")
       .order("received_at", { ascending: true });
-    unread = ((pending || []) as TriageRow[]).filter((it) => {
-      // general（その他）レーンでは自分発信を未読一覧に出さない
-      if (lane === "general" && isSelfEmail(it.from_email)) return false;
-      return true;
-    });
+    unread = filterOutMutedSenders(
+      ((pending || []) as TriageRow[]).filter((it) => {
+        // 自分発信（estate BCC 誤ラベル含む）は未読一覧に出さない
+        if (
+          isMailActionExcluded({
+            fromEmail: it.from_email,
+            body: it.original_body,
+          })
+        ) {
+          return false;
+        }
+        return true;
+      }),
+      muteReg,
+    );
+    unreadN = unread.length;
   } else if (view === "activity") {
     const { data } = await supabase
       .from("triage_items")
