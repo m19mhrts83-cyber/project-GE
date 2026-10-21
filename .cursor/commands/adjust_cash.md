@@ -16,9 +16,13 @@
 
 1. 対象支払いが文脈に無ければ1行聞く（Olive／Amex／全般・due・寄せ先）。分かるなら省略。
 1b. **済んだ支払いは Zaim CSV 等で自分で確認**（「済みましたか？」と聞かない）。確認できたらプラン外＋「Zaimで確認済」1行。分からなければそのときだけ聞く。
-2. 止まずに必要額・キープ・usable を集める:
+1c. **最新残高ゲート（必須・プラン金額の前）** — スキル §0c  
+   - 古い Zaim／liquidity だけで寄せ金額を決めない  
+   - 寄せ先＋送出候補を、Zaim 連携更新→`jarvis_liquidity_weekly`、または IB／アプリ目視で最新化  
+   - ギャップ表に **残高の出典・時刻**を書く。食い違いはアプリ／IB を正  
+2. 止まずに必要額・キープ・usable を集める（usable は **§1c の最新残高**のみ）:
    - `jarvis_card_debit_watch.py --fetch-vpass`
-   - `jarvis_salary_pay_calendar.py`（大型寄せゲート）
+   - `jarvis_salary_pay_calendar.py`（大型寄せゲート。余りは寄せ先残高でも確認）
    - `config/known_recurring_debits.yaml`（Preferred 10,860・マイカー等）
    - `config/kurashift_transfer_rails.yaml`
 3. チャットに **`📎 資金確認（adjust-cash）`** ギャップ表＋寄せプラン案を出す。
@@ -46,6 +50,7 @@ money-ops: https://jarvis-trade-desk.vercel.app/money-ops
 
 ## やらないこと
 
+- **最新残高未確認のまま**ギャップ表・寄せ金額を確定する
 - 了承前の `--go` / `--execute`
 - Preferred 残債・マイカー引落を無視した寄せ
 - 秘密・OTP をチャットに再掲

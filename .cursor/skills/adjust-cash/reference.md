@@ -48,12 +48,26 @@
 - 横断キュー: `scripts/jarvis_transfer_queue.py --money-ops-id <UUID>`
 - 設計: `docs/KURASHIFT_送金アシスト_実務者設計_20260814.md`
 
+## 最新残高の取り方（プラン前・SKILL §0c）
+
+| 手段 | コマンド／手順 | 備考 |
+|---|---|---|
+| Zaim 連携更新 | `scripts/jarvis_zaim_bank_sync_manual.py --try-otp --names …` | SBI 表記は画面どおり（例: `住信 SBI ネット銀行`）。親「ドコモ SMTB」は not found になりやすい |
+| liquidity 再取得 | `scripts/jarvis_liquidity_weekly.py --json` | 更新クリック後、数十秒置いてから |
+| 滋賀 IB | `config/kurashift_ib_shiga.yaml` ＋ `SHIGA_IB_*` | 合言葉・**強制ログイン**・端末登録「しない」 |
+| 京都 IB | `config/kurashift_ib_kyoto.yaml` ＋ `KYOTO_IB_*` | 同上系 |
+| 東海労金 | `TOKAIROKIN_*` ＋ `browser_automation` | 合言葉 env |
+| ユーザーアプリ | Olive／NEOBANK 等のスクショ | Jarvis が取れないとき。アプリ／IB を Zaim より優先 |
+
+食い違い時は **アプリ／IB を正**にし、`card_debit_watch.json` の live 残高メモを更新してよい。
+
 ## よくある失敗
 
 | 症状 | 対処 |
 |---|---|
+| 古い Zaim 残高でプランを組んだ | §0c。連携更新＋liquidity／IB／アプリで再確認してから金額確定 |
 | スクリプト終了＝送金完了と思った | 完了画面・残高で確認 |
 | SBI を空にしたら Preferred 残債で不足 | usable から 10,860 を先に残す |
 | Cursor ターミナルで OTP が進まない | Terminal.app で同じコマンド |
 | 千景 MUFG を AW 提案した | IB（または本人 AW）。真治 AW 直結不可 |
-| 給与前に大型寄せ | `jarvis_salary_pay_calendar.py` で余り待ち |
+| 給与前に大型寄せ | `jarvis_salary_pay_calendar.py` ＋ **寄せ先の最新残高**で余り着金を見る |
