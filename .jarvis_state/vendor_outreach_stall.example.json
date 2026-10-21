@@ -1,5 +1,6 @@
 {
   "disabled": false,
+  "stale_marks_business_days": 2,
   "last_refill_at": null,
   "last_ops_alert_at": null,
   "last_daily_report_at": null,
