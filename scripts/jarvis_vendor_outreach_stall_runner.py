@@ -96,7 +96,24 @@ REFILL_BODY_RE = re.compile(
 )
 
 REFILL_COOLDOWN_HOURS = 12
-STALE_MARK_BUSINESS_DAYS = 2
+SEND_RESUME_COOLDOWN_HOURS = 6
+# 本線は毎日 09:00「不動産Daily · 本日分」（Hawk/部長 2026-10-20）。
+# mark が平日2日以上空いたら #ops 見守り。上書き: state / env JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS
+STALE_MARK_BUSINESS_DAYS_DEFAULT = 2
+
+
+def stale_marks_threshold_days(state: dict[str, Any] | None = None) -> int:
+    raw = (os.environ.get("JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS") or "").strip()
+    if not raw and isinstance(state, dict):
+        raw = str(state.get("stale_marks_business_days") or "").strip()
+    if raw:
+        try:
+            n = int(raw)
+            if n >= 1:
+                return n
+        except ValueError:
+            pass
+    return STALE_MARK_BUSINESS_DAYS_DEFAULT
 
 
 def now_jst() -> datetime:
@@ -265,9 +282,9 @@ def assess_s2() -> dict[str, Any]:
 def assess_s9() -> dict[str, Any]:
     data = load_s9()
     settings = data.get("settings") or {}
-    daily = int(settings.get("daily_outreach_limit") or 2)
+    daily = int(settings.get("daily_outreach_limit") or 1)
     if daily < 1:
-        daily = 2
+        daily = 1
     items = s9_next_pending(limit=max(daily * 3, daily), balanced=True)
     summ = s9_summary()
     by = summ.get("by_status") or {}
@@ -582,38 +599,167 @@ def push_sync_meta(key: str, summary: dict[str, Any], *, dry_run: bool) -> None:
         print(f"# sync_meta upsert failed: {e}", file=sys.stderr)
 
 
+def stale_marks_reason(
+    q: dict[str, Any], *, threshold_days: int | None = None
+) -> str:
+    """mark 停滞の理由文（ops クールダウンとは独立）。空なら停滞なし。
+
+    threshold（既定2平日＝日次運用）を超えたら見守り対象。
+    """
+    thr = (
+        threshold_days
+        if threshold_days is not None
+        else STALE_MARK_BUSINESS_DAYS_DEFAULT
+    )
+    last_c = q.get("last_contacted")
+    if last_c:
+        try:
+            lc = date.fromisoformat(str(last_c))
+            gap = business_days_between(lc, date.today())
+            if gap >= thr and int(q.get("contacted_today") or 0) == 0:
+                return (
+                    f"最終 contacted から平日{gap}日"
+                    f"（閾値{thr}平日）・本日 mark なし（{last_c}）"
+                )
+        except ValueError:
+            return ""
+    elif q.get("needs_refill") and (q.get("total") or 0) > 0:
+        return "送信可能キュー不足かつ contacted 履歴なし"
+    return ""
+
+
 def should_ops_alert(
     *,
     q: dict[str, Any],
     lst: dict[str, Any],
     bridge_ok: bool,
     skip_refill: bool = False,
+    threshold_days: int | None = None,
 ) -> tuple[bool, str]:
     reasons: list[str] = []
     if not bridge_ok and not skip_refill:
         reasons.append("Mac/Drive ブリッジ未接続（outbox 書けず）")
     if skip_refill and q.get("needs_refill"):
         reasons.append("GHA見守り · キュー不足 · Mac補給待ち")
-    last_c = q.get("last_contacted")
-    if last_c:
-        try:
-            lc = date.fromisoformat(str(last_c))
-            gap = business_days_between(lc, date.today())
-            if gap >= STALE_MARK_BUSINESS_DAYS and q.get("contacted_today", 0) == 0:
-                reasons.append(
-                    f"最終 contacted から平日{gap}日・本日 mark なし（{last_c}）"
-                )
-        except ValueError:
-            pass
-    elif q.get("needs_refill") and (q.get("total") or 0) > 0:
-        reasons.append("送信可能キュー不足かつ contacted 履歴なし")
+    stale = stale_marks_reason(q, threshold_days=threshold_days)
+    if stale:
+        reasons.append(stale)
 
     last_ops = parse_iso(lst.get("last_ops_alert_at"))
     if last_ops and (datetime.now(timezone.utc) - last_ops) < timedelta(hours=20):
+        # Slack 連投は抑止するが、呼び出し側の stall_status 判定では stale を別途見る
         return False, ""
     if not reasons:
         return False, ""
     return True, "; ".join(reasons)
+
+
+def _slim_vendor_for_kick(v: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "id",
+        "name",
+        "area",
+        "prefecture",
+        "city",
+        "url",
+        "contact_url",
+        "channel",
+        "contact_email",
+        "email",
+        "phone",
+        "status",
+        "list_region",
+        "alive_status",
+    )
+    return {k: v.get(k) for k in keys if v.get(k) not in (None, "")}
+
+
+def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
+    """キュー充足なのに mark 停滞 → 本日分だけ送る kickoff（週次バッチの再投下ではない）。"""
+    daily = 3
+    vendors: list[dict[str, Any]] = []
+    action = f"{lane}_send_resume"
+    if lane == "s2":
+        data = load_s2()
+        settings = data.get("settings") or {}
+        _, daily = outreach_phase_settings(settings)
+        vendors = [_slim_vendor_for_kick(v) for v in s2_next_pending(limit=daily)]
+        how = (
+            f"本日分 **{daily}社** を定型テンプレで Web／メール送信し、"
+            "各社 `--mark ID --status contacted` を報告。"
+            "週次バッチ JSON の再読は不要（キュー先頭から本日分のみ）。"
+        )
+    elif lane == "s9":
+        data = load_s9()
+        settings = data.get("settings") or {}
+        daily = int(settings.get("daily_outreach_limit") or 2)
+        if daily < 1:
+            daily = 1
+        vendors = [
+            _slim_vendor_for_kick(v)
+            for v in s9_next_pending(limit=daily, balanced=True)
+        ]
+        how = (
+            f"本日分 **{daily}社** の事前確認メール（定型）を送信し、"
+            "`--mark ID --status contacted` を報告。"
+            "キュー補給（s9_precheck）の再投下待ちではない。"
+        )
+    elif lane == "s4":
+        data = load_s4()
+        settings = data.get("settings") or {}
+        daily = int(settings.get("daily_outreach_limit") or data.get("daily_limit") or 2)
+        if daily < 1:
+            daily = 2
+        vendors = [
+            _slim_vendor_for_kick(v)
+            for v in s4_next_for_contact(limit=daily, alive_ok_first=True)
+        ]
+        how = (
+            f"本日分 **{daily}社**（生存OK優先）へ定型連絡し、"
+            "`--mark` を報告。探索レポートだけでは mark にならない。"
+        )
+    else:
+        return {"ok": False, "error": f"unknown lane {lane}"}
+
+    if not vendors:
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": "send_resume: 本日候補0件",
+        }
+
+    payload = {
+        "ok": True,
+        "mode": "send_resume",
+        "lane": lane,
+        "day": date.today().isoformat(),
+        "daily_limit": daily,
+        "count": len(vendors),
+        "vendors": vendors,
+        "note": (
+            "516 stall: mark 停滞のため本日送信を再開。"
+            "キューは足りている。週次 refill ではなく **今日の送信＋mark** が本線。"
+        ),
+    }
+    body = (
+        f"【{lane.upper()} 送信再開 · 本日分】\n"
+        "発信: 516／jarvis_vendor_outreach_stall_runner（stale_marks）。\n"
+        f"{how}\n"
+        "非定型は松野確認。定型は都度許可不要。\n"
+        "完了後: 部長日報に --mark 行を集約。\n\n"
+        + json.dumps(payload, ensure_ascii=False, indent=2)
+    )
+    out = write_outbox_md(
+        action=action,
+        title=f"{lane.upper()}送信再開_本日分",
+        body=body,
+        dry_run=dry_run,
+        priority="high",
+    )
+    out["vendors"] = len(vendors)
+    out["batch_id"] = f"{lane}-resume-{date.today().isoformat()}"
+    out["mode"] = "send_resume"
+    return out
 
 
 def run_lane(
@@ -642,8 +788,15 @@ def run_lane(
         f"{' skip_refill' if skip_refill else ''}"
     )
 
+    thr = stale_marks_threshold_days(state)
+    stale_reason = stale_marks_reason(q, threshold_days=thr)
+    is_stale = bool(stale_reason)
     needs_refill = bool(
         force_refill or q["needs_refill"] or (archive_inbox and inbox_hits)
+    )
+    # キューは足りるが mark 停滞 → 本日送信再開キック（週次 refill とは別）
+    needs_send_resume = bool(
+        is_stale and not q["needs_refill"] and not force_refill
     )
     refill_result: dict[str, Any] | None = None
     archived: list[str] = []
@@ -654,8 +807,8 @@ def run_lane(
             "skipped": True,
             "reason": "skip_refill · Mac補給待ち" if needs_refill else "skip_refill",
         }
-        if needs_refill:
-            print(f"# {lane} refill skipped: GHA/skip_refill（Mac補給待ち）")
+        if needs_refill or needs_send_resume:
+            print(f"# {lane} refill/resume skipped: GHA/skip_refill（Mac補給待ち）")
     elif needs_refill:
         last_refill = parse_iso(lst.get("last_refill_at"))
         cooldown_ok = True
@@ -688,6 +841,34 @@ def run_lane(
                         state["last_refill_at"] = lst["last_refill_at"]
                 if archive_inbox and inbox_hits:
                     archived = archive_inbox_files(inbox_hits, dry_run=dry)
+    elif needs_send_resume:
+        last_resume = parse_iso(lst.get("last_send_resume_at"))
+        cooldown_ok = True
+        if (
+            last_resume
+            and (datetime.now(timezone.utc) - last_resume)
+            < timedelta(hours=SEND_RESUME_COOLDOWN_HOURS)
+        ):
+            cooldown_ok = False
+            refill_result = {
+                "ok": True,
+                "skipped": True,
+                "reason": f"send_resume cooldown {SEND_RESUME_COOLDOWN_HOURS}h",
+                "mode": "send_resume",
+            }
+            print(f"# {lane} send_resume skipped: cooldown")
+        elif not bridge_ok:
+            refill_result = {
+                "ok": False,
+                "skipped": True,
+                "reason": "Mac未接続・送信再開キック不可",
+                "mode": "send_resume",
+            }
+        else:
+            print(f"# {lane} send_resume: {stale_reason}")
+            refill_result = write_send_resume(lane, dry_run=dry)
+            if refill_result.get("ok") and not dry:
+                lst["last_send_resume_at"] = now_iso()
     else:
         refill_result = {"ok": True, "skipped": True, "reason": "queue_ok"}
 
@@ -705,21 +886,26 @@ def run_lane(
                     state["last_sync_at"] = lst["last_sync_at"]
 
     ops_needed, ops_reason = should_ops_alert(
-        q=q, lst=lst, bridge_ok=bridge_ok, skip_refill=skip_refill
+        q=q,
+        lst=lst,
+        bridge_ok=bridge_ok,
+        skip_refill=skip_refill,
+        threshold_days=thr,
     )
     if refill_result and not refill_result.get("ok") and not refill_result.get("skipped"):
         ops_needed = True
         ops_reason = ops_reason or str(refill_result.get("error") or "refill failed")
-    if not bridge_ok and needs_refill and not skip_refill:
+    if not bridge_ok and (needs_refill or needs_send_resume) and not skip_refill:
         ops_needed = True
         ops_reason = ops_reason or "Mac未接続・補給スキップ"
 
+    # stall_status は ops クールダウンと独立（クールダウン中に ok と誤表示しない）
     stall_status = "ok"
     if not bridge_ok and not skip_refill:
         stall_status = "bridge_down"
     elif q["needs_refill"]:
         stall_status = "needs_refill"
-    elif ops_needed:
+    elif is_stale:
         stall_status = "stale_marks"
 
     meta = {
@@ -734,6 +920,7 @@ def run_lane(
         "followup": q["followup"],
         "contacted_today": q["contacted_today"],
         "last_contacted": q["last_contacted"],
+        "stale_marks_business_days": thr,
         "last_refill_at": lst.get("last_refill_at"),
         "last_sync_at": lst.get("last_sync_at"),
         "bridge_ok": bridge_ok,
@@ -891,16 +1078,37 @@ def build_multi_report(results: list[dict[str, Any]], *, state: dict[str, Any] |
 
 def build_ops_alert(r: dict[str, Any]) -> str:
     lane = r.get("lane") or "?"
+    q = r.get("q") or {}
+    stall = str(r.get("stall_status") or "")
+    refill = r.get("refill") or {}
+    if stall == "needs_refill" or q.get("needs_refill"):
+        remedy = f"`--apply --lane {lane} --force-refill`（キュー補給）"
+    elif stall == "stale_marks":
+        mode = refill.get("mode") or ""
+        if mode == "send_resume" and refill.get("ok") and not refill.get("skipped"):
+            remedy = (
+                f"本日送信再開キック済（outbox `{lane}_send_resume`）。"
+                "Grok が本日分を送信＋`--mark` すること"
+            )
+        else:
+            remedy = (
+                f"キューは足りている。Grok が本日 `--next` 送信＋`--mark`。"
+                f"Mac: `--apply --lane {lane}`（send_resume 自動）"
+            )
+    elif stall == "bridge_down":
+        remedy = "Mac／Drive ブリッジ復旧後に `--apply --lane all`"
+    else:
+        remedy = f"`--apply --lane {lane}`"
     return (
         f"[516 業者開拓フォロー] *Grokサポート見守り｜要確認*（{r.get('label') or lane}）\n"
         "発信: 516 業者開拓フォロー（連携障害／送信停滞の見守り。開拓送信は Grok）。\n"
         f"・理由: {r.get('ops_reason') or '—'}\n"
-        f"・状態: {_stall_status_ja(str(r.get('stall_status') or ''))}\n"
-        f"・キュー残: {r['q']['pending_discovered']} "
-        f"（送信可能 {r['q']['queue_ready']}）\n"
-        f"・最終 contacted: {r['q'].get('last_contacted') or '—'}\n"
-        f"・<{r['url']}|UIを開く>\n"
-        f"・処置: `--apply --lane {lane} --force-refill`"
+        f"・状態: {_stall_status_ja(stall)}\n"
+        f"・キュー残: {q.get('pending_discovered')} "
+        f"（送信可能 {q.get('queue_ready')}）\n"
+        f"・最終 contacted: {q.get('last_contacted') or '—'}\n"
+        f"・<{r.get('url')}|UIを開く>\n"
+        f"・処置: {remedy}"
     )
 
 

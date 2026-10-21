@@ -25,6 +25,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -63,6 +64,11 @@ AREA_PHRASE = {
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def today_jst() -> str:
+    """業務日（contacted_at 等）。UTC 日付だと JST 0時台に前日ずれする。"""
+    return datetime.now(ZoneInfo("Asia/Tokyo")).date().isoformat()
 
 
 def load_share_urls() -> dict[str, str]:
@@ -643,7 +649,7 @@ def mark_vendor(
     v = by_id.get(vid)
     if not v:
         return {"ok": False, "error": f"vendor not found: {vid}"}
-    today = now_iso()[:10]
+    today = today_jst()
     v["status"] = status
     if note:
         v["notes"] = note if not v.get("notes") else f"{v['notes']} | {note}"
