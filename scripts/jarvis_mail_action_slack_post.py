@@ -465,12 +465,72 @@ def digest_index_line(row: dict[str, Any], *, index: int) -> str:
     return f"{index}. *{partner}* — {subject}"
 
 
+def digest_fingerprint(ranked: list[dict[str, Any]]) -> str:
+    """同一案件セットの再投稿を防ぐ指紋（id 昇順）。"""
+    ids = sorted(str(r.get("id") or "") for r in ranked if r.get("id"))
+    raw = "|".join(ids)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+DIGEST_DEDUPE_PATH = REPO / ".jarvis_state" / "mail_action_slack_digest.json"
+DIGEST_DEDUPE_HOURS = 6
+
+
+def should_skip_duplicate_digest(ranked: list[dict[str, Any]]) -> tuple[bool, str]:
+    """直近に同じ id セットを出していればスキップ（同一メッセージ連投防止）。"""
+    if os.environ.get("JARVIS_MAIL_ACTION_REPOST"):
+        return False, "repost_env"
+    fp = digest_fingerprint(ranked)
+    if not fp:
+        return False, "empty"
+    try:
+        if DIGEST_DEDUPE_PATH.is_file():
+            data = json.loads(DIGEST_DEDUPE_PATH.read_text(encoding="utf-8"))
+        else:
+            data = {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    last_fp = str(data.get("fingerprint") or "")
+    last_at = str(data.get("at") or "")
+    if last_fp == fp and last_at:
+        try:
+            ts = datetime.fromisoformat(last_at.replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            age_h = (datetime.now(timezone.utc) - ts.astimezone(timezone.utc)).total_seconds() / 3600
+            if age_h < DIGEST_DEDUPE_HOURS:
+                return True, f"same_set age={age_h:.1f}h fp={fp}"
+        except ValueError:
+            pass
+    return False, fp
+
+
+def remember_digest_fingerprint(ranked: list[dict[str, Any]]) -> None:
+    fp = digest_fingerprint(ranked)
+    if not fp:
+        return
+    DIGEST_DEDUPE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "fingerprint": fp,
+        "at": datetime.now(timezone.utc).isoformat(),
+        "ids": [str(r.get("id") or "") for r in ranked],
+        "count": len(ranked),
+    }
+    DIGEST_DEDUPE_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def build_digest_payload(ranked: list[dict[str, Any]]) -> dict[str, Any]:
-    """本線は短索引のみ。要旨・操作はスレのカード側。"""
+    """本線は短索引のみ。要旨・操作はスレのカード側。案件間は空行（見やすさ FB）。"""
     n = len(ranked)
     when = datetime.now(JST).strftime("%m/%d %H:%M")
     lines = [digest_index_line(row, index=i) for i, row in enumerate(ranked, 1)]
-    body = "\n".join(lines) if lines else "(対象なし)"
+    # 案件の間は一行空けてダイジェストを読みやすくする（Slack FB 2026-10-22）
+    body = "\n\n".join(lines) if lines else "(対象なし)"
     text = f"【メール要対応】{n}件（{when}）— スレを開いて操作"
     blocks: list[dict[str, Any]] = [
         {
@@ -1067,12 +1127,25 @@ def main() -> int:
         and (args.from_triage or len(rows) > 1)
     )
     if want_digest:
+        skip_dup, dup_reason = should_skip_duplicate_digest(rows)
+        if skip_dup:
+            print(
+                f"⏭ digest skip（同一案件セットの再投稿防止）: {dup_reason}",
+                file=sys.stderr,
+            )
+            print("投稿対象なし（直近ダイジェストと同一セット）")
+            return 0
         digest = build_digest_payload(rows)
         rc, digest_ch, digest_ts = post_slack(
             digest, dry_run=args.dry_run, force_webhook=args.webhook
         )
         if rc != 0:
             return rc
+        if not args.dry_run:
+            try:
+                remember_digest_fingerprint(rows)
+            except OSError as e:
+                print(f"# digest fingerprint save skip: {e}", file=sys.stderr)
 
     # Bot＋ダイジェストあり → カードはスレへ。Webhook／ダイジェスト無しは本線。
     card_thread_ts = digest_ts if (thread_ok and digest_ts) else None

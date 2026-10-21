@@ -16,6 +16,7 @@ Slack でも「自動で動いた」と把握できるようにする。
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -30,6 +31,7 @@ TEIKI_STATE = REPO / ".jarvis_state" / "teiki_barai_chance.json"
 ETC_STATE = REPO / ".jarvis_state" / "etc_monthly.json"
 VPOINT_MONTHLY = REPO / ".jarvis_state" / "vpoint_monthly.json"
 VPOINT_CADENCE = REPO / ".jarvis_state" / "vpoint_cadence.json"
+DEDUPE_STATE = REPO / ".jarvis_state" / "points_rebate_slack_dedupe.json"
 REPORTS_DIR = (
     REPO
     / "docs"
@@ -182,7 +184,65 @@ def build_vpoint(*, outcome: str, reason: str, error: str, note: str, asks_n: in
     return "\n".join(lines)
 
 
-def _post(channel: str, text: str, *, dry_run: bool, archive_tag: str) -> int:
+def _text_fingerprint(text: str) -> str:
+    norm = "\n".join(line.rstrip() for line in (text or "").splitlines()).strip()
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()[:20]
+
+
+def _should_skip_duplicate(kind: str, text: str, *, force: bool) -> bool:
+    """同一本文の同日再投稿を防ぐ（Slack UI FB: 同じメッセージ連投）。"""
+    if force or (os.environ.get("JARVIS_POINTS_REBATE_SLACK_REPOST") or "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return False
+    day = datetime.now(JST).strftime("%Y-%m-%d")
+    fp = _text_fingerprint(text)
+    try:
+        data = json.loads(DEDUPE_STATE.read_text(encoding="utf-8")) if DEDUPE_STATE.is_file() else {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    entry = data.get(kind) if isinstance(data.get(kind), dict) else {}
+    if entry.get("day") == day and entry.get("fingerprint") == fp:
+        print(f"⏭ {kind} Slack skip（同日・同一本文の再投稿防止） fp={fp}")
+        return True
+    return False
+
+
+def _remember_post(kind: str, text: str) -> None:
+    day = datetime.now(JST).strftime("%Y-%m-%d")
+    fp = _text_fingerprint(text)
+    try:
+        data = json.loads(DEDUPE_STATE.read_text(encoding="utf-8")) if DEDUPE_STATE.is_file() else {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    data[kind] = {"day": day, "fingerprint": fp, "at": datetime.now(JST).isoformat()}
+    try:
+        DEDUPE_STATE.parent.mkdir(parents=True, exist_ok=True)
+        DEDUPE_STATE.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as e:
+        print(f"⚠️ dedupe state save failed: {e}", file=sys.stderr)
+
+
+def _post(
+    channel: str,
+    text: str,
+    *,
+    dry_run: bool,
+    archive_tag: str,
+    kind: str,
+    force: bool = False,
+) -> int:
+    if _should_skip_duplicate(kind, text, force=force):
+        return 0
     if dry_run:
         print("--- dry-run ---")
         print(text)
@@ -199,6 +259,7 @@ def _post(channel: str, text: str, *, dry_run: bool, archive_tag: str) -> int:
     )
     if int(proc.returncode) == 0:
         _archive(text, archive_tag)
+        _remember_post(kind, text)
     return int(proc.returncode)
 
 
@@ -265,7 +326,14 @@ def main() -> int:
             error=args.error,
             note=args.note,
         )
-        return _post(channel, text, dry_run=args.dry_run, archive_tag=f"teiki_{args.outcome}")
+        return _post(
+            channel,
+            text,
+            dry_run=args.dry_run,
+            archive_tag=f"teiki_{args.outcome}",
+            kind="teiki",
+            force=args.force,
+        )
 
     if args.kind == "etc":
         st = _load_json(ETC_STATE) if args.from_state else {}
@@ -302,7 +370,14 @@ def main() -> int:
             error=args.error,
             note=args.note or (str(last_b.get("note") or "") if args.from_state else ""),
         )
-        return _post(channel, text, dry_run=args.dry_run, archive_tag=f"etc_{args.outcome}")
+        return _post(
+            channel,
+            text,
+            dry_run=args.dry_run,
+            archive_tag=f"etc_{args.outcome}",
+            kind="etc",
+            force=args.force,
+        )
 
     # vpoint
     asks_n = args.asks
@@ -319,7 +394,14 @@ def main() -> int:
         note=args.note,
         asks_n=asks_n,
     )
-    return _post(channel, text, dry_run=args.dry_run, archive_tag=f"vpoint_{args.outcome}")
+    return _post(
+        channel,
+        text,
+        dry_run=args.dry_run,
+        archive_tag=f"vpoint_{args.outcome}",
+        kind="vpoint",
+        force=args.force,
+    )
 
 
 if __name__ == "__main__":
