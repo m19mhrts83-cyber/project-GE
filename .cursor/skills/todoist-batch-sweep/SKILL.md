@@ -85,9 +85,10 @@ description: >-
 ## 共有正本
 
 - Cursor コマンド: `.cursor/commands/todoist-batch.md`／入口 `.cursor/commands/todoist.md`
-- Cursor ルール: `.cursor/rules/jarvis-todoist-batch-sweep.mdc`
+- Cursor ルール: `.cursor/rules/jarvis-todoist-batch-sweep.mdc`／`jarvis-chat-open-complete-313.mdc`
 - 完了二段・コメント必須: `.cursor/rules/jarvis-todoist-owner-confirm.mdc`
-- 社員 313: `docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/CLAUDE.md`
+- 社員 313: `docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/`（`flow.md`・`PROGRESS.md`）
+- CLI: `scripts/jarvis_todoist_313_digest.py`（L1→#consult→了承後close）
 - 社員 312（起票）: `docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/CLAUDE.md`
 
 ## やらないこと

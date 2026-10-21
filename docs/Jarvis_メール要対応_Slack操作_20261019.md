@@ -80,7 +80,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 | 変数 | 用途 |
 |---|---|
-| `SLACK_BOT_TOKEN` / `SLACK_SIGNING_SECRET` | **アプリ内ボタン本線**（Mac・GitHub Secrets・Vercel の3箇所）。無いと URL ボタンに自動フォールバック |
+| `SLACK_BOT_TOKEN` / `SLACK_SIGNING_SECRET` | **アプリ内ボタン本線**（Mac・GitHub Secrets・Vercel の3箇所）。無いと URL ボタンに自動フォールバック。取得: `api.slack.com/apps` → **Jarvis AI Team**（Bot User OAuth + Signing Secret）。3先同期: `scripts/jarvis_slack_bot_secrets_sync.py` |
 | `SLACK_WEBHOOK_AI_TEAM_CONSULT` | Bot 無し時の投稿（カード自動削除・モーダルは不可） |
 | `PROPERTY_GATE_ACTION_TOKEN` / `MAIL_ACTION_TOKEN` | 予備 URL 署名 |
 | `TODOIST_API_TOKEN` | Dashboard からの Todoist 起票（Vercel） |

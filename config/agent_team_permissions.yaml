@@ -60,7 +60,7 @@ agents:
     can_do: "送信前の文面・添付チェック（送信クリックは人）"
     site_logins: []
   "312":
-    can_do: "Todoist 起票・整理の補助（候補）"
+    can_do: "Todoist 起票整理の入口（L0整理／L1ダイジェスト／L2採用後create。closeはしない）"
     site_logins: []
   "313":
     can_do: "完了候補の確認補助（オーナー確認ゲート維持）"
