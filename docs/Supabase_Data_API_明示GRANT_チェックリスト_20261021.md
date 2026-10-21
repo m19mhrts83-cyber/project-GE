@@ -5,7 +5,8 @@
 
 - 公式ディスカッション: https://github.com/orgs/supabase/discussions/45329
 - 復習: https://claude-code-supabase-fukushu.vercel.app/
-- ルール: `.cursor/rules/jarvis-supabase-free-one-project.mdc`
+- **作成ルール（常時）:** `.cursor/rules/jarvis-supabase-data-api-grant.mdc`
+- 2PJ 方針: `.cursor/rules/jarvis-supabase-free-one-project.mdc`
 
 ## 影響サマリ（このリポ）
 
