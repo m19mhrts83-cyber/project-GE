@@ -351,11 +351,21 @@ def main() -> int:
         rid = int(s["row_id"])
         tid = s["task_id"]
         if args.reply and tid:
-            body = (
-                "サマリ: コメントを受信しました（Webhook）。"
-                f"「{s['comment'][:80]}」を確認しました。"
-                "チャットでも対応します。"
-            )
+            try:
+                from jarvis_slack_report_fb_lib import build_todoist_seen_text
+            except Exception:
+                build_todoist_seen_text = None  # type: ignore
+            if build_todoist_seen_text:
+                body = build_todoist_seen_text(
+                    comment_preview=s["comment"][:80],
+                    source="317/Webhook",
+                )
+            else:
+                body = (
+                    "【Jarvis】見たよ（受けた）\n"
+                    f"引用: {s['comment'][:80]}\n"
+                    "チャット／次セッションでも続きを見るよ"
+                )
             try:
                 _todoist_comment(tid, body)
             except urllib.error.HTTPError as e:

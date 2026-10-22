@@ -158,3 +158,23 @@ def build_done_text(*, summary: str, next_line: str = "") -> str:
     if next_line.strip():
         lines.append(next_line.strip())
     return "\n".join(x for x in lines if x)
+
+
+def build_todoist_seen_text(*, comment_preview: str = "", source: str = "317") -> str:
+    """Todoist コメントを見終わったときの可視返信（Slack の「受けた」と同コンセプト）。"""
+    prev = (comment_preview or "").replace("\n", " ").strip()
+    if len(prev) > 80:
+        prev = prev[:79] + "…"
+    lines = [
+        "【Jarvis】見たよ（受けた）",
+        f"経路: {source}",
+    ]
+    if prev:
+        lines.append(f"引用: {prev}")
+    lines.append("チャット／次セッションでも続きを見るよ")
+    return "\n".join(lines)
+
+
+# Slack リアクション名（reactions.add 用・: なし）
+REACTION_SEEN = "eyes"  # 見た／受けた
+REACTION_DONE = "white_check_mark"  # 対応した

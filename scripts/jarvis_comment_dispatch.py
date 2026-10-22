@@ -509,11 +509,12 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
         if local_res == "local_ok":
             _todoist_phase_b_comment(
                 tid,
-                "【Jarvis】\nサマリ: 317 Phase B（Local Agent）処置しました。"
+                "【Jarvis】対応したよ\n"
+                "サマリ: 317 Phase B（Local Agent）処置しました。"
                 f" kind={item.get('kind')}\nアウトプット:\n- 317 Local Agent",
             )
             post_slack_report(
-                f"【報告】317 コメント起動｜やりましたよ（Local）\n"
+                f"【報告】317 コメント起動｜対応したよ（Local）\n"
                 f"- task: {item.get('task_title') or tid}\n"
                 f"- comment: {(comment or '')[:80]}",
                 dry_run=False,
@@ -532,11 +533,12 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
     if cloud_res.startswith("cloud_ok"):
         _todoist_phase_b_comment(
             tid,
-            "【Jarvis】\nサマリ: 317 Phase B（Cloud Agent・failover）起動しました。"
+            "【Jarvis】対応したよ\n"
+            "サマリ: 317 Phase B（Cloud Agent・failover）起動しました。"
             f" {cloud_res}\nアウトプット:\n- 317 Cloud Agent",
         )
         post_slack_report(
-            f"【報告】317 コメント起動｜やりましたよ（failover/Cloud）\n"
+            f"【報告】317 コメント起動｜対応したよ（failover/Cloud）\n"
             f"- task: {item.get('task_title') or tid}\n"
             f"- {cloud_res}",
             dry_run=False,
