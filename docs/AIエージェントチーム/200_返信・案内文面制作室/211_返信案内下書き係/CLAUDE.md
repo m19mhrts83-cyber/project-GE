@@ -121,6 +121,7 @@ Phase1 人向け: `docs/phase1-pilot.md`
 
 | 日付 | 変更 |
 |---|---|
+| 2026-10-23 | 見積B待ち Slack の同一 folder／空件名の二重掲載を dedupe |
 | 2026-10-09 | ビルダー候補フォルダ作成 |
 | 2026-10-11 | 朝便伴走開始。既存 Jarvis スタック採用・Phase1=手動1社に決定 |
 | 2026-10-11 | 終了報告を Slack `#report` 本線に変更。`report_consult.md` 追加 |

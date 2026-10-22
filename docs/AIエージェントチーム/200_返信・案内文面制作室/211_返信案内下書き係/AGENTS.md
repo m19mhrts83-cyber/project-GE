@@ -7,7 +7,7 @@ Cursor / Codex / その他エージェントは `CLAUDE.md` を読んで同じ�
 
 `CLAUDE.md` を更新したら、このファイルの「最終同期」日付だけ直す（本文の二重管理はしない）。
 
-- 最終同期: 2026-10-11（終了報告=Slack `#report` 本線）
+- 最終同期: 2026-10-23（見積B待ち dedupe）
 - 正本: ./CLAUDE.md
 - 進捗: ./PROGRESS.md
 - 報告文面: ./report_consult.md

@@ -205,7 +205,40 @@ def _pm_candidates(items: list[dict], lookback_days: int) -> tuple[list[dict], l
             continue
         seen_folders.add(folder)
         deduped.append(it)
+    # 見積B待ちも同一案件の二重掲載を防ぐ（folder+件名+日付、または folder 最新1）
+    b_waiting = _dedupe_b_waiting(b_waiting)
     return deduped, b_waiting, skipped_old
+
+
+def _dedupe_b_waiting(items: list[dict]) -> list[dict]:
+    """同一 partner フォルダ＋件名＋日付の重複、および folder 内の同内容を1件に。"""
+    if not items:
+        return items
+    items_sorted = sorted(
+        items,
+        key=lambda x: str(x.get("received_at") or ""),
+        reverse=True,
+    )
+    seen_exact: set[str] = set()
+    seen_folder: set[str] = set()
+    out: list[dict] = []
+    for it in items_sorted:
+        folder = str(it.get("folder") or "").strip()
+        subject = str(it.get("subject") or "").strip()
+        if subject in {"(件名なし)", "(no subject)", "件名なし"}:
+            subject = ""
+        received = str(it.get("received_at") or "").strip()[:16]
+        exact = f"{folder}|{subject}|{received}"
+        if exact in seen_exact:
+            continue
+        # 件名が空のときは folder 単位で最新1件（同日の空件名が複数並ぶのを防ぐ）
+        if not subject and folder in seen_folder:
+            continue
+        seen_exact.add(exact)
+        if folder:
+            seen_folder.add(folder)
+        out.append(it)
+    return out
 
 
 def _apply_one(seq_or_id: str) -> Path | None:

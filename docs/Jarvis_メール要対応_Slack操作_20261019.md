@@ -18,7 +18,7 @@
 | **件数** | 1バッチあたり **スコア上位最大5件**（`--limit` / `JARVIS_MAIL_ACTION_LIMIT`）。残り pending は次バッチで再評価 |
 | **並び** | 新しい順ではなく **対応優先スコア**（priority / kind / lane / 依頼シグナル / 下書き有無 / 物件定例ペナルティ / 鮮度） |
 | **Slack形（見るストレス低減）** | **本線ダイジェスト＝短索引のみ**（partner＋件名）。**案件の間は空行1つ**。**コンパクトカードはスレ**（要旨＋ボタン。下書き全文・本文全文は貼らない） |
-| **再投稿防止** | 直近6時間に **同一 id セット**のダイジェストがあればスキップ（`mail_action_slack_digest.json`）。強制は `JARVIS_MAIL_ACTION_REPOST=1` |
+| **再投稿防止** | (1) バッチ内で **同一 gmail_message_id**（`id` / `gha-*` 二重）や同一 partner+件名+日付 を1件に潰す (2) 直近6時間に **同一 id セット**のダイジェストがあればスキップ（`sync_meta.mail_action_slack_digest` ＋ローカル JSON）。強制は `JARVIS_MAIL_ACTION_REPOST=1` (3) 投稿印付け時に同一 gmail_id の姉妹 pending も `slack_ma_posted_at` |
 | **スレ投稿** | Bot あり＋ダイジェストあり → カードを `thread_ts` 配下へ。Webhook のみ／`JARVIS_MAIL_ACTION_THREAD_CARDS=0` → 本線に短カード |
 | **ボタン** | Bot＋Signing あり→アプリ内。**無い／Webhookのみ→署名URLボタン**（ブラウザ。見送りカード自動削除は Bot 投稿時のみ） |
 | **Dashboard詳細** | 「詳細を見る」→ `/mail/{id}`。未ログイン時は `/login?next=/mail/...` → ログイン後に同じメールへ戻る |
@@ -72,7 +72,7 @@
 | T2 | 平日 12:30 JST GHA `jarvis-mail-action-noon.yml` |
 | T3 | `jarvis_night_triage` 末尾相乗り |
 | T4 | 手動 `--from-triage` |
-| T5 | 朝 `--health --notify-ops`（異常時 `#ops`） |
+| T5 | 朝 `--health --notify-ops`（異常時 `#ops`）。同一種別アラートは6時間クールダウン（`sync_meta.mail_action_health_notify`。強制は `JARVIS_MAIL_ACTION_HEALTH_REPOST=1`） |
 
 ## コマンド
 
