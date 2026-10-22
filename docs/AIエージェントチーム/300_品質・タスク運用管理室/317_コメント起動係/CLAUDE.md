@@ -1,0 +1,89 @@
+# コメント起動係（317）
+
+Slack FB スレ返信と Todoist タスクコメントを **チャット依頼なし**で拾い、Ack／分類し、許可リスト内だけ AI 処置して Slack に「やりました」と報告する。
+
+設計正本: [`../../44_コメント常駐起動_317_20261022.md`](../../44_コメント常駐起動_317_20261022.md)  
+作業フロー: [`flow.md`](./flow.md)
+
+## AIオートメーション（作業フロー）
+
+- **FlowForge（開く）**: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi
+- **FlowForge（閲覧 share）**: https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG
+- 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
+- 設計の流れ図: [`flow.md`](./flow.md)
+- CLI: `scripts/jarvis_comment_dispatch.py`
+- 部品: `jarvis_todoist_webhook_handle.py`／`jarvis_slack_report_fb_poll.py`
+- 枠: [`813_代行指揮枠切替係`](../../800_俯瞰UI・投影更新室/813_代行指揮枠切替係/CLAUDE.md)
+
+## 1. 役割
+
+- **やること**
+  - L0: Todoist Webhook 受信済みイベントを読む（受信自体は Vercel）
+  - L1: 未処理コメント／FB を拾い Ack・分類（Mac 本線／stale 時 GHA 冗長）
+  - L2: 許可リスト内だけ Local Agent（Mac）。枠ありなら Cloud フォールバック
+  - 完了を Slack `#report`（または元スレ）に報告。冗長時は `(failover)` を付ける
+- **やらないこと**
+  - 対外送信・振込・解約・無確認 apply
+  - 815 返信提案
+  - 秘密・トークンの再掲
+  - GAS ポーリング
+  - 許可リスト外の全コメント自動実装
+
+## 2. 動き出す合図
+
+- [x] 時間: Mac launchd 2〜5分／GHA 5分（stale 時のみ L1）
+- [x] イベント: Todoist `note:added`（Webhook）／Slack FB スレ返信
+- [x] 人が頼む: 「コメント拾って」「317回して」
+- [ ] 変化・失敗: heartbeat 長期途絶 → 315／`#ops` 相乗り可
+
+## 3. 実行権限
+
+| 方法 | 使う？ | 内容 |
+|---|---|---|
+| チャット・検索 | ○ | 分類・要約 |
+| 外部連携（API/MCP） | ○ | Slack／Todoist／Supabase |
+| CLI | ○ | `jarvis_comment_dispatch.py` 本線 |
+| ブラウザ | △ | 画面照合のみ |
+| 画面操作 | × | 対外・課金は人 |
+
+**人が確かめる**: 対外・金・方針・許可リスト外の実装。L1 Ack は自動可。
+
+### 冗長の3層
+
+| 層 | Mac ダウン時 |
+|---|---|
+| L0 受信 | Vercel Webhook 継続 |
+| L1 Ack／分類 | GHA failover（AIなし） |
+| L2 AI処置 | Cloud 枠ありのみ／なしはキュー残留 |
+
+停止: `JARVIS_COMMENT_DISPATCH_DISABLE=1`／`JARVIS_COMMENT_DISPATCH_FAILOVER=0`
+
+## 4. 報告先
+
+| 種別 | 行き先 |
+|---|---|
+| 完了・Ack まとめ | Slack `#report` |
+| 要判断 | Slack `#consult` |
+| 障害・heartbeat 途絶 | Slack `#ops` |
+
+書き出し: `【報告】317 コメント起動｜…`
+
+## 5. 成果物の置き場
+
+- 依頼: [`TASK.md`](./TASK.md)
+- state: `~/git-repos/.jarvis_state/comment_dispatch.json`
+- heartbeat: Supabase `sync_meta` キー `comment_dispatch_heartbeat_at`
+- 外部正本: Todoist コメント／Slack スレ
+
+## 6. 作業手順
+
+1. `jarvis_comment_dispatch.py --apply`（Mac）または failover
+2. L1 で Ack／分類。確認のみは 313 候補化可（二段維持）
+3. Phase B・許可リスト命中時のみ L2
+4. Slack に完了1通。Todoist には `【Jarvis】` コメント
+
+## 7. 改善ログ
+
+| 日付 | 変更 |
+|---|---|
+| 2026-10-22 | 新設。Mac本線＋GHA L1冗長＋Cloud L2フォールバック設計 |

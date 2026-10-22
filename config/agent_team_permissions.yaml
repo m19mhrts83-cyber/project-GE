@@ -74,6 +74,9 @@ agents:
   "316":
     can_do: "データ分析・集計メモ（候補）"
     site_logins: []
+  "317":
+    can_do: "Slack FB／Todoistコメントの常駐拾い・Ack・許可リスト内AI処置（対外・金は人）。冗長はGHA L1／Cloud L2"
+    site_logins: []
   "411":
     can_do: "Grok inbox／チャンネル材料の取込・要約入口"
     site_logins: []

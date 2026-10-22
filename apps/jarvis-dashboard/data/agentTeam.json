@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-21T22:51:20+09:00",
+  "updated": "2026-10-22T23:05:30+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -13,7 +13,7 @@
   },
   "counts": {
     "候補": 25,
-    "設計中": 7,
+    "設計中": 8,
     "運用確認": 10,
     "運用": 0,
     "停止": 0
@@ -250,6 +250,7 @@
         "314",
         "315",
         "316",
+        "317",
         "411",
         "412",
         "413",
@@ -261,10 +262,10 @@
         "weather"
       ],
       "counts": {
-        "ai": 11,
+        "ai": 12,
         "grok": 2,
         "paired": 5,
-        "ai_only": 6,
+        "ai_only": 7,
         "grok_only": 2
       }
     }
@@ -1407,8 +1408,8 @@
           {
             "id": "watch",
             "on": true,
-            "detail": "朝バンドルで `--health --notify-ops`（異常時のみ `#ops`）",
-            "raw": "**T5 変化・失敗を見回る**: 朝バンドルで `--health --notify-ops`（異常時のみ `#ops`）"
+            "detail": "朝バンドルで `--health --notify-ops`（**mute過多など本当の異常のみ `#ops`**。pending 件数だけでは通知しない。山は `--sweep-noise`）",
+            "raw": "**T5 変化・失敗を見回る**: 朝バンドルで `--health --notify-ops`（**mute過多など本当の異常のみ `#ops`**。pending 件数だけでは通知しない。山は `--sweep-noise`）"
           }
         ],
         "trigger_kinds_on": [
@@ -1459,7 +1460,7 @@
           },
           {
             "kind": "`#ops`",
-            "destination": "投稿失敗・pending過多・mute過多",
+            "destination": "投稿失敗・mute過多（pending 件数だけでは出さない）",
             "channels": []
           }
         ],
@@ -2035,9 +2036,21 @@
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/research-chat-task-capture.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/research-chat-task-capture.md",
             "kind": "doc"
+          },
+          {
+            "title": "setup-cloud-chain.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/setup-cloud-chain.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/setup-cloud-chain.md",
+            "kind": "doc"
+          },
+          {
+            "title": "setup-slack-scope.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/setup-slack-scope.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/setup-slack-scope.md",
+            "kind": "doc"
           }
         ],
-        "procedure_count": 9,
+        "procedure_count": 11,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2785,6 +2798,200 @@
             "title": "AGENTS.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/AGENTS.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/316_データアナリスト/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 6,
+        "source": "claude+registry+ops_yaml"
+      }
+    },
+    {
+      "id": "317",
+      "name": "コメント起動係",
+      "path": "300_品質・タスク運用管理室/317_コメント起動係",
+      "department_id": "300",
+      "department_name": "品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "report",
+      "trigger": "時間＋イベント",
+      "schedule": "launchd 2〜5分 / GHA stale 5分",
+      "tool_assigned": "jarvis",
+      "tool_fit": "B",
+      "tool_notes": "Slack FB／Todoistコメント常駐。Mac本線＋GHA L1冗長＋Cloud L2（枠あり）。GAS不使用",
+      "note": "2026-10-22 新設。設計正本 44_コメント常駐起動_317。Phase A=Ack／Phase B=許可リストAI。Builder／FlowForge／share反映済",
+      "summary": "Slack FB／Todoistコメントを常駐で拾い Ack→許可リスト AI→Slack報告",
+      "flow_summary": "Slack FB／Todoistコメントを Mac が常駐で拾い Ack→許可リストだけ AI 処置→`#report`。Mac ダウン時は GHA が L1、枠ありなら Cloud が L2。対外・金は人。",
+      "builder_tag": "",
+      "mixup_kind": "",
+      "grok_counterpart": "",
+      "flowforge_id": "flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_8mwIkbI0S9kV2u5kSwl2I-Oi",
+      "permissions": {
+        "can_do": "Slack FB／Todoistコメントの常駐拾い・Ack・許可リスト内AI処置（対外・金は人）。冗長はGHA L1／Cloud L2",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "分類・要約"
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "○",
+            "detail": "Slack／Todoist／Supabase"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`jarvis_comment_dispatch.py` 本線"
+          },
+          {
+            "name": "ブラウザ",
+            "level": "△",
+            "detail": "画面照合のみ"
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": "対外・課金は人"
+          },
+          {
+            "name": "層",
+            "level": "Mac ダウン時",
+            "detail": ""
+          },
+          {
+            "name": "L0 受信",
+            "level": "Vercel Webhook 継続",
+            "detail": ""
+          },
+          {
+            "name": "L1 Ack／分類",
+            "level": "GHA failover（AIなし）",
+            "detail": ""
+          },
+          {
+            "name": "L2 AI処置",
+            "level": "Cloud 枠ありのみ／なしはキュー残留",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "対外・金・方針・許可リスト外の実装。L1 Ack は自動可。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「コメント拾って」「317回して」",
+            "raw": "人が頼む: 「コメント拾って」「317回して」"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "Mac launchd 2〜5分／GHA 5分（stale 時のみ L1）",
+            "raw": "時間: Mac launchd 2〜5分／GHA 5分（stale 時のみ L1）"
+          },
+          {
+            "id": "event",
+            "on": true,
+            "detail": "Todoist `note:added`（Webhook）／Slack FB スレ返信",
+            "raw": "イベント: Todoist `note:added`（Webhook）／Slack FB スレ返信"
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "heartbeat 長期途絶 → 315／`#ops` 相乗り可",
+            "raw": "変化・失敗: heartbeat 長期途絶 → 315／`#ops` 相乗り可"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule",
+          "event"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間 · イベント",
+        "triggers_filled": true,
+        "when": "launchd 2〜5分 / GHA stale 5分",
+        "registry_trigger": "時間＋イベント",
+        "registry_schedule": "launchd 2〜5分 / GHA stale 5分",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "完了・Ack まとめ",
+            "destination": "Slack `#report`",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "要判断",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "障害・heartbeat 途絶",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
+            "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/317_コメント起動係/AGENTS.md",
             "kind": "doc"
           }
         ],
@@ -11385,6 +11592,18 @@
         "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
       },
       {
+        "side": "ai_only",
+        "agent_id": "317",
+        "agent_name": "コメント起動係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-10-22 新設。設計正本 44_コメント常駐起動_317。Phase A=Ack／Phase B=許可リストAI。Builder／FlowForge／share反映済"
+      },
+      {
         "side": "paired",
         "agent_id": "411",
         "agent_name": "Grok材料取込係",
@@ -12159,9 +12378,9 @@
     ],
     "mapping_counts": {
       "paired": 18,
-      "ai_only": 24,
+      "ai_only": 25,
       "grok_only": 23,
-      "all": 65
+      "all": 66
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },
