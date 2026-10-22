@@ -2,8 +2,9 @@
 """313 期日超過の整理 — 優先順位づけとリスケ提案（L1）.
 
 - 既定: 期日超過を読み、上位N件の「新期日案」を Slack #consult へ（書き込みなし）
-- `--apply --select 3,5`: その番号だけ due_date を未来へ移動（コメント付き）
-- 自動では動かさない（人の「リスケ N」が条件）
+- `--apply --select 📅3,📅5`: その番号だけ due_date を未来へ移動（コメント付き）
+- 自動では動かさない（人の「リスケ 📅N」が条件）
+- 番号は **📅N**（完了候補の ✅N と区別・別投稿）
 """
 from __future__ import annotations
 
@@ -21,7 +22,11 @@ from zoneinfo import ZoneInfo
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO / ".jarvis_state" / "todoist_313_overdue.json"
-MAX_TOP = 10
+MAX_TOP = 5
+AGENT_ID = "313"
+AGENT_ROLE = "完了候補確認"
+ITEM_MARK = "📅"  # 完了候補は ✅（別投稿・記号で区別）
+USERNAME = f"{AGENT_ID} {AGENT_ROLE}"
 
 IMPORTANT_RE = re.compile(r"(要ボス|優先1|優先２|優先2|緊急|高)", re.I)
 IMPLEMENT_RE = re.compile(r"(実装|設計|調査)", re.I)
@@ -155,10 +160,19 @@ def _items(tasks: list[dict], top: int) -> list[dict]:
     return rows[:top]
 
 
+def _parse_select_nums(select: str) -> set[int]:
+    """「📅1,📅3」「リスケ 📅2」「1,3」を番号集合に。"""
+    nums: set[int] = set()
+    for m in re.finditer(rf"(?:{re.escape(ITEM_MARK)})?\s*(\d+)", select or ""):
+        nums.add(int(m.group(1)))
+    return nums
+
+
 def _format(items: list[dict], total: int) -> str:
     stamp = datetime.now(JST).strftime("%m/%d %H:%M")
     lines = [
-        "📅 *期日超過の整理*（Todoist完了候補確認）",
+        f"【相談】{AGENT_ID} {AGENT_ROLE}｜期日超過",
+        f"{ITEM_MARK} *期日超過の整理*（{ITEM_MARK}番号・最大{MAX_TOP}）",
         f"超過 *{total}件* ／ 上位{len(items)}件 ／ {stamp}",
         "",
         "*この順番で見ています*",
@@ -172,22 +186,23 @@ def _format(items: list[dict], total: int) -> str:
         meta = "・".join(x for x in [lane.replace("_", " "), f"{it['days_over']}日超過",
                                      "/".join(it["why"])] if x)
         lines.append(
-            f"*{it['n']}.* <https://app.todoist.com/app/task/{it['task_id']}|{_short(it['title'])}>"
+            f"*{ITEM_MARK}{it['n']}.* <https://app.todoist.com/app/task/{it['task_id']}|{_short(it['title'])}>"
             f"  _({meta})_"
         )
         lines.append(f"→ *{it['new_due']}* へ")
         lines.append("")
     lines.extend(
         [
-            "*返信の書き方*",
-            "「リスケ 3,5」→ その番号の期日を案の日付へ移動",
+            f"*リスケしてよければ {ITEM_MARK}番号で返信*",
+            f"「リスケ {ITEM_MARK}3,{ITEM_MARK}5」または「{ITEM_MARK}3,5」→ その番号の期日を案へ",
             "「全部そのまま」→ 何もしない（次回また出ます）",
+            "※完了候補は別投稿の ✅番号（このスレではリスケのみ）",
             "",
-            "次: 人判断（リスケ N）",
+            f"次: 人判断（リスケ {ITEM_MARK}N）",
             "",
             "担当メモ: 新期日＝超過が浅い+2営業日／中+7日／深い+14日（土日は翌営業日）",
             "",
-            "橋渡し: 期日変更のみ。完了は313本体",
+            "橋渡し: 期日変更のみ。完了は313本体の ✅番号",
         ]
     )
     return "\n".join(lines)
@@ -198,7 +213,7 @@ def _post(text: str) -> int:
     if not url:
         print("❌ SLACK_WEBHOOK_AI_TEAM_CONSULT がありません", file=sys.stderr)
         return 2
-    payload = {"text": text, "username": "Todoist完了候補確認"}
+    payload = {"text": text, "username": USERNAME}
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -246,7 +261,7 @@ def _apply(items: list[dict], nums: set[int], dry: bool) -> list[dict]:
                     "content": (
                         f"【{author}】\n"
                         f"サマリ: 期日を {it['due']} → {it['new_due']} にリスケ"
-                        f"（{it['days_over']}日超過・「リスケ {it['n']}」了承）\n"
+                        f"（{it['days_over']}日超過・「リスケ {ITEM_MARK}{it['n']}」了承）\n"
                         "アウトプット:\n"
                         f"- [該当タスク](https://app.todoist.com/app/task/{it['task_id']})\n"
                     ),
@@ -265,26 +280,41 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--top", type=int, default=MAX_TOP)
-    ap.add_argument("--select", default=None, help="リスケする番号（例 3,5）")
+    ap.add_argument(
+        "--select",
+        default=None,
+        help=f"リスケする番号（例 {ITEM_MARK}3,{ITEM_MARK}5 または 3,5）",
+    )
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--refresh", action="store_true")
     args = ap.parse_args(argv)
 
+    top_n = max(1, min(args.top, MAX_TOP))
     state = _load_state()
     items = list(state.get("proposals") or [])
+    total = int(state.get("scanned") or len(items))
+    # apply は既存提案を使う（--refresh で再収集可）。投稿時も空なら収集。
     if args.refresh or not items:
         tasks = _fetch_overdue()
-        items = _items(tasks, max(1, min(args.top, MAX_TOP)))
-        state = {"proposals": items, "scanned": len(tasks), "at": datetime.now(JST).isoformat(timespec="seconds")}
+        items = _items(tasks, top_n)
+        state = {
+            "proposals": items,
+            "scanned": len(tasks),
+            "at": datetime.now(JST).isoformat(timespec="seconds"),
+        }
         _save_state(state)
         total = len(tasks)
-    else:
-        total = int(state.get("scanned") or len(items))
+    elif len(items) > top_n:
+        items = items[:top_n]
+        for i, r in enumerate(items, 1):
+            r["n"] = i
+        state["proposals"] = items
+        _save_state(state)
 
     if args.apply:
         if not args.select:
-            raise SystemExit("--select 3,5 が必要です（一括は不可）")
-        nums = {int(x) for x in re.split(r"[,\s]+", args.select.strip()) if x.isdigit()}
+            raise SystemExit(f"--select {ITEM_MARK}3,{ITEM_MARK}5 が必要です（一括は不可）")
+        nums = _parse_select_nums(args.select.strip())
         results = _apply(items, nums, args.dry_run)
         for r in results:
             mark = "[dry] " if r.get("dry") else ""
