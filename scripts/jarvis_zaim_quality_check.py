@@ -426,19 +426,28 @@ def check_category_reviews(
         pay = (r.get("支払元") or "")[:40]
         method = (r.get("方法") or "payment").strip()
         genre = (r.get("カテゴリの内訳") or "").strip()
+        suspicious_hit = zlearn.is_suspicious(cat, suspicious)
         resolved = zlearn.resolve_suggestion(
             shop,
             item,
             amount=amount,
+            current_category=cat,
             yaml_rules=yaml_rules,
             rules=learn_rules,
+            cfg=cfg,
         )
-        suspicious_hit = zlearn.is_suspicious(cat, suspicious)
         learn_mismatch = (
             resolved.get("confidence") == "high"
             and resolved.get("suggest")
             and str(resolved.get("suggest")).strip() != cat
         )
+        # 店名キー学習は「その他」等にだけ自動適用（食費の店一律上書きはしない）
+        if (
+            learn_mismatch
+            and resolved.get("source") == "learn_shop"
+            and not suspicious_hit
+        ):
+            learn_mismatch = False
         if not suspicious_hit and not learn_mismatch:
             continue
         kind = "learned_mismatch" if learn_mismatch and not suspicious_hit else "category_review"

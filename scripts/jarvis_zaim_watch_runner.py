@@ -501,7 +501,7 @@ def build_category_slack_report(
         "📌 要ボス: なし（違う行があれば /zaim で「おかしい」）",
         "",
         f"・自動直し {category_applied}件 / 新規学習 {learned_n}件",
-        "・キー: 店+金額（count≥2で自動）",
+        "・キー: その他→店名／他→店+金額（count≥2）",
     ]
     for e in (applied_entries or [])[:8]:
         if not e.get("ok"):

@@ -72,10 +72,10 @@ must_exclude:
       - 株増収
       - 外国株
 
-# 費目見直し
-# - 学習キー: 店+金額（CSV前後で同一取引の費目変化を累積。count>=2 で自動）
-# - high: 学習ルール一致かつ現費目≠提案 → Web 自動適用（食費など「自信あり誤分類」も含む）
-# - low: その他／使途不明など + YAML キーワード提案のみ
+# 費目見直し（二段キー）
+# - その他／使途不明／未分類 → 店名キー（「この店ならこれ」8〜9割）。count>=2 で自動
+# - 食費など自信あり誤分類 → 店+金額キー（Amazon 等の店単独誤爆を避ける）
+# - shop_only_exclude: 物によって費目が違う店は店名キー学習しない
 # - Slack #report: 直し／学習が1件以上のときだけ（JARVIS_ZAIM_CATEGORY_SLACK_REPORT_DISABLE=1 でオフ）
 category_review:
   lookback_days: 14
@@ -85,6 +85,14 @@ category_review:
     - その他
     - 使途不明
     - 未分類
+  shop_only_exclude_keywords:
+    - Amazon
+    - amazon
+    - アオキ
+    - イオン
+    - オークワ
+    - ハロー
+    - hallo
   # 品目・店名からの提案（Zaim のカテゴリ名そのまま）。学習ルールが無いときの low のみ
   suggest_rules:
     - suggest: "β.2C.食費"
