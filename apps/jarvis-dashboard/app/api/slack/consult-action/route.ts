@@ -23,11 +23,13 @@ import {
   parseMaButtonValue,
   parseMaModalMeta,
 } from "@/lib/mailActionSlackInteract";
+import { parseT313ButtonValue } from "@/lib/todoist313SlackAction";
+import { handleT313BlockAction } from "@/lib/todoist313SlackInteract";
 
 export const runtime = "nodejs";
 
 /**
- * Slack 物件進行ゲート Yes/No ＋ 業者返信 ＋ メール要対応
+ * Slack 物件進行ゲート Yes/No ＋ 業者返信 ＋ メール要対応 ＋ 313完了/延期
  * （block_actions / view_submission）
  *
  * GET  ?deal_id=&action=yes|no&token=PROPERTY_GATE_ACTION_TOKEN
@@ -36,6 +38,7 @@ export const runtime = "nodejs";
  * 短縮 URL 本線: /api/g/y|n/{deal_id}?s=…
  * 業者返信 URL 予備: /api/g/vr/{action}/{id}?s=…
  * メール要対応 URL: /api/g/ma/{reply|skip|todoist}/{id}?s=…
+ * 313 URL: /api/g/t313/close|reschedule/{task_id}?s=…
  */
 
 function verifySlackSignature(
@@ -226,7 +229,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ response_action: "clear" });
     }
 
-    // --- block_actions（業者返信 / メール要対応 / 物件ゲート）---
+    // --- block_actions（業者返信 / メール要対応 / 313 / 物件ゲート）---
     const actions = Array.isArray(payload.actions) ? payload.actions : [];
     const act = (actions[0] || {}) as Record<string, unknown>;
     const value = String(act.value || "");
@@ -239,6 +242,17 @@ export async function POST(request: NextRequest) {
       String(channelObj.id || container.channel_id || "").trim() || undefined;
     const messageTs =
       String(messageObj.ts || container.message_ts || "").trim() || undefined;
+
+    if (parseT313ButtonValue(value)) {
+      const result = await handleT313BlockAction({
+        value,
+        responseUrl,
+      });
+      return NextResponse.json({
+        response_type: "ephemeral",
+        text: result.text,
+      });
+    }
 
     const vr = parseVrButtonValue(value);
     if (vr) {
