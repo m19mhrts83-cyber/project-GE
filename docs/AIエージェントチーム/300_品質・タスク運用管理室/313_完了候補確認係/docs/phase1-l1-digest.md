@@ -8,7 +8,7 @@
 オーナー確認列の候補を **見るだけ** の一覧で Slack `#consult` に出し、
 
 - **確認のみ** → `--auto-close-confirm` で Jarvis が close（コメント必須）
-- **要判断** → 松野が「閉じて N」→ `--apply --select N`
+- **要判断** → 松野が「閉じて ✅N」→ `--apply --select ✅N`
 
 新規 create はしない（312側）。
 
@@ -29,9 +29,9 @@
 ## 通し確認
 
 1. `--dry-run` でオーナー確認が列挙される
-2. `#consult` に「【相談】313 …」が出る
+2. `#consult` に「【相談】313 完了候補確認」が出る（✅番号・最大5。期日超過は別投稿の📅）
 3. 確認のみがあれば `--auto-close-confirm`（dry で先に確認）
-4. 要判断は「閉じて N」後に `--apply --select N`
+4. 要判断は「閉じて ✅N」後に `--apply --select ✅N`
 
 ## 運用格上げ
 

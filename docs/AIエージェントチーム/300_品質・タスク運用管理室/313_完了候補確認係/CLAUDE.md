@@ -19,8 +19,10 @@
 
 ## 0. 期日超過の整理（2026-10-22〜）
 
-- 毎日20:00の2通目。**期限が今日より前**のタスクを上位10件に順位づけし、新期日案を `#consult` へ
-- 期日は **「リスケ N」了承後だけ**動かす（`--apply --select N`）。コメント必須
+- 毎日20:00の2通目。**期限が今日より前**のタスクを上位**5件**に順位づけし、新期日案を `#consult` へ（完了候補とは**別投稿**）
+- 番号は **📅N**（完了候補の **✅N** と区別）。返信「リスケ 📅3,📅5」
+- 期日は了承後だけ動かす（`--apply --select 📅N`）。コメント必須
+- Slack返信拾い: `scripts/jarvis_todoist_313_slack_ingest.py`（✅→close／📅→リスケ）
 - 期限なしは対象外。完了（close）は本体フロー（下記）
 
 ## 1. 役割
@@ -83,11 +85,18 @@
 
 | ch | いつ |
 |---|---|
-| `#report` | 確認のみ完了一覧 |
-| `#consult` | 要判断。末尾「次の担当」3行必須 |
-| `#ops` | API失敗・二重起票疑い |
+| `#report` | 確認のみ完了一覧（先頭 `【報告】313 完了候補確認`） |
+| `#consult` | 要判断／期日超過（先頭 `【相談】313 完了候補確認`。Webhook表示名も `313 完了候補確認`） |
+| `#ops` | API失敗・二重起票疑い（`【ops】313 完了候補確認`） |
 
-`#consult` 末尾: `次: Grokで続行 | Jarvisに依頼 | 人判断のみ` ＋ `担当メモ` ＋ `橋渡し`  
+番号体系（スレ返信の取り違え防止）:
+
+| 投稿 | 記号 | 返信例 | 上限 |
+|---|---|---|---|
+| 完了候補 | **✅N** | `閉じて ✅1,✅3` ／ `✅1,3` | 最大5 |
+| 期日超過 | **📅N** | `リスケ 📅2,📅4` ／ `📅2,4` | 最大5 |
+
+`#consult` 末尾: `次: …` ＋ `担当メモ` ＋ `橋渡し`  
 正本: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](../../38_Slack書き出し_FRIDAY_Jarvis_20261018.md) · [`36_`](../../36_Slack_consult手渡し_次の担当_20261018.md)
 
 ## 5. コメント必須（Jarvis ルールと同型）
@@ -134,8 +143,12 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py
 # 確認のみ一括 close
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --auto-close-confirm
-# 要判断（了承後）
-TODOIST_313_AUTHOR=FRIDAY ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select 1
+# 要判断（了承後・✅番号）
+TODOIST_313_AUTHOR=FRIDAY ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select '✅1'
+# 期日超過（了承後・📅番号）
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_overdue.py --apply --select '📅3,📅5'
+# Slack返信拾い（クラウド）
+python3 scripts/jarvis_todoist_313_slack_ingest.py --dry-run
 # FRIDAY が実行する時は TODOIST_313_AUTHOR=FRIDAY（先頭が【FRIDAY】。既定は Jarvis）
 
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_api.py update-status \
@@ -158,3 +171,4 @@ TODOIST_313_AUTHOR=FRIDAY ~/selenium_env/venv/bin/python scripts/jarvis_todoist_
 | 2026-10-19 | コメント先頭に書き手識別 `【Jarvis】` 必須（FRIDAY=`【FRIDAY】`・ホーク=`【ホーク】`） |
 | 2026-10-21 | 312同型: flow本線・`313_digest`・運用格上げA〜E・`jarvis-chat-open-complete-313.mdc` |
 | 2026-10-21 | 名称を **Todoist完了候補確認** に統一。Slack整形（件ごと空行）・タイトル＝Todoistリンク。**毎日20:00** のL1をlaunchd本線に |
+| 2026-10-22 | Slackに **313番号＋役割語**。完了✅／期日📅で記号区別・各最大5件・別投稿。`313_slack_ingest` で番号返信を拾う |

@@ -5,6 +5,8 @@
 Phase 1: ボタンUIなし。投稿は Webhook。close は `--apply --select` /
 `--auto-close-confirm`（確認のみ）。
 
+番号は **✅N**（期日超過の 📅N と区別）。返信拾い: `jarvis_todoist_313_slack_ingest.py`。
+
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
   # オーナー確認列を収集＋#consult 投稿（既定）
@@ -16,8 +18,8 @@ Phase 1: ボタンUIなし。投稿は Webhook。close は `--apply --select` /
   # 確認のみを Jarvis 完了（コメント必須）
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --auto-close-confirm
 
-  # 要判断を人了承後に close（番号はダイジェストの #）
-  ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select 1
+  # 要判断を人了承後に close（番号はダイジェストの ✅N）
+  ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select '✅1'
 """
 from __future__ import annotations
 
@@ -35,9 +37,14 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO / ".jarvis_state" / "todoist_313_digest.json"
-PY = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
+_MAC_PY = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
+PY = _MAC_PY if _MAC_PY.is_file() else Path(sys.executable)
 JST = timezone(timedelta(hours=9))
-MAX_L1 = 10
+MAX_L1 = 5
+AGENT_ID = "313"
+AGENT_ROLE = "完了候補確認"
+ITEM_MARK = "✅"  # 期日超過は 📅（別投稿・記号で区別）
+USERNAME = f"{AGENT_ID} {AGENT_ROLE}"
 
 DEFAULT_LANES = [
     "ai_raimo",
@@ -192,8 +199,16 @@ def _short_title(raw: str, width: int = 46) -> str:
 
 
 
+def _parse_select_nums(select: str) -> set[int]:
+    """「✅1,✅3」「閉じて ✅2」「1,3」を番号集合に。"""
+    nums: set[int] = set()
+    for m in re.finditer(rf"(?:{re.escape(ITEM_MARK)})?\s*(\d+)", select or ""):
+        nums.add(int(m.group(1)))
+    return nums
+
+
 def _item_line(it: dict[str, Any]) -> str:
-    """1件＝タイトルを Todoist へのリンクにする（タップで説明・コメントまで見える）。"""
+    """1件＝✅番号＋タイトルを Todoist リンク（タップで詳細）。"""
     title = _short_title(it.get("title"))
     task_id = str(it.get("task_id") or "")
     label = (
@@ -202,7 +217,7 @@ def _item_line(it: dict[str, Any]) -> str:
         else title
     )
     lane = str(it.get("lane") or "").replace("_", " ")
-    return f"*{it['n']}.* {label}  _({lane})_"
+    return f"*{ITEM_MARK}{it['n']}.* {label}  _({lane})_"
 
 
 def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
@@ -210,7 +225,8 @@ def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
     need = [i for i in items if i.get("kind") == "need_owner"]
     stamp = datetime.now(JST).strftime("%m/%d %H:%M")
     lines = [
-        "📋 *Todoist完了候補確認*",
+        f"【相談】{AGENT_ID} {AGENT_ROLE}",
+        f"📋 *完了候補*（{ITEM_MARK}番号・最大{MAX_L1}）",
         f"要判断 *{len(need)}件* ／ 確認のみ {len(confirm)}件 ／ {stamp}",
     ]
     if need:
@@ -224,12 +240,13 @@ def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
     lines.extend(
         [
             "",
-            "*返信の書き方*",
-            "「閉じて 3,7」→ その番号だけコメント付きで完了",
+            f"*閉じてよければ {ITEM_MARK}番号で返信*",
+            f"「閉じて {ITEM_MARK}1,{ITEM_MARK}3」または「{ITEM_MARK}1,3」→ その番号だけ完了",
             "「全部残す」→ 何もしない（次回また出ます）",
             "タイトルをタップ → Todoist の詳細（説明・コメント）",
+            "※期日超過は別投稿の 📅番号（このスレでは完了のみ）",
             "",
-            "次: 人判断（閉じて N）",
+            f"次: 人判断（閉じて {ITEM_MARK}N）",
             "",
             "担当メモ: 確認のみは自動クローズ対象・要判断は据え置き",
             "",
@@ -258,7 +275,7 @@ def _post_webhook(text: str, *, channel: str = "consult") -> int:
     body_text = text
     if fallback:
         body_text = "【#consult】\n" + text
-    payload = {"text": body_text, "username": "Todoist完了候補確認"}
+    payload = {"text": body_text, "username": USERNAME}
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -390,17 +407,16 @@ def cmd_apply(args: argparse.Namespace) -> int:
             return 0
         reason = "auto-close-confirm"
     else:
-        select = (args.select or "").strip().lower()
+        select = (args.select or "").strip()
         if not select:
-            raise SystemExit("--select 1,2 または --auto-close-confirm が必要です")
-        if select in ("all", "*"):
+            raise SystemExit(
+                f"--select {ITEM_MARK}1,{ITEM_MARK}2 または --auto-close-confirm が必要です"
+            )
+        if select.lower() in ("all", "*"):
             raise SystemExit(
                 "L1は一括closeしません。番号指定か --auto-close-confirm（確認のみ）を使ってください。"
             )
-        nums = set()
-        for part in re.split(r"[,\s]+", select):
-            if part.isdigit():
-                nums.add(int(part))
+        nums = _parse_select_nums(select)
         for c in cands:
             if int(c.get("n") or 0) in nums:
                 chosen.append(c)
@@ -450,7 +466,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
             else "了承（閉じて N）で閉じました"
         )
         report = (
-            f"📋 *Todoist完了候補確認*｜{mode}\n\n"
+            f"【報告】{AGENT_ID} {AGENT_ROLE}｜{mode}\n\n"
             + "\n".join(ok_lines)
             + "\n\nコメント付きで完了。次回ダイジェストから外れます"
         )
@@ -459,7 +475,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
     if not dry and any(not x.get("ok") for x in results):
         ops = (os.environ.get("SLACK_WEBHOOK_AI_TEAM_OPS") or "").strip()
         if ops:
-            msg = "【ops】Todoist完了候補確認 — close失敗\n" + "\n".join(
+            msg = f"【ops】{AGENT_ID} {AGENT_ROLE} — close失敗\n" + "\n".join(
                 f"- {x.get('error')}" for x in results if not x.get("ok")
             )
             try:
@@ -467,7 +483,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
                     urllib.request.Request(
                         ops,
                         data=json.dumps(
-                            {"text": msg, "username": "Todoist完了候補確認"}
+                            {"text": msg, "username": USERNAME}
                         ).encode("utf-8"),
                         headers={"Content-Type": "application/json"},
                         method="POST",
@@ -486,7 +502,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--lanes", default=",".join(DEFAULT_LANES), help="カンマ区切り lane id")
     p.add_argument("--post-empty", action="store_true")
     p.add_argument("--apply", action="store_true")
-    p.add_argument("--select", default=None, help="了承番号（要判断の close）")
+    p.add_argument(
+        "--select",
+        default=None,
+        help=f"了承番号（要判断の close。例 {ITEM_MARK}1,{ITEM_MARK}3 または 1,3）",
+    )
     p.add_argument(
         "--auto-close-confirm",
         action="store_true",
