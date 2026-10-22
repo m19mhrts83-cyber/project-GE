@@ -246,6 +246,82 @@ export async function createTodoistTask(
   return { ok: true, id, url };
 }
 
+/** 313 Slack ボタン等 — レーン不問で task_id 直指定 close */
+export async function closeTodoistTaskById(
+  taskId: string,
+  comment?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = String(taskId || "").trim();
+  if (!id) return { ok: false, error: "task_id が空です" };
+  if (!todoistTokenConfigured()) {
+    return { ok: false, error: "TODOIST_API_TOKEN 未設定" };
+  }
+  if (comment?.trim()) {
+    const c = await fetch(`${API}/comments`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        task_id: id,
+        content: comment.trim().slice(0, 1900),
+      }),
+    });
+    if (!c.ok) {
+      const text = await c.text();
+      return { ok: false, error: `comment ${c.status}: ${text.slice(0, 200)}` };
+    }
+  }
+  const res = await fetch(`${API}/tasks/${encodeURIComponent(id)}/close`, {
+    method: "POST",
+    headers: headers(),
+  });
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text();
+    return { ok: false, error: `close ${res.status}: ${text.slice(0, 240)}` };
+  }
+  return { ok: true };
+}
+
+/** 313 期日超過 — due_date のみ更新＋任意コメント */
+export async function rescheduleTodoistTaskById(
+  taskId: string,
+  dueDate: string,
+  comment?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = String(taskId || "").trim();
+  const due = String(dueDate || "").trim().slice(0, 10);
+  if (!id) return { ok: false, error: "task_id が空です" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) {
+    return { ok: false, error: "due_date は YYYY-MM-DD" };
+  }
+  if (!todoistTokenConfigured()) {
+    return { ok: false, error: "TODOIST_API_TOKEN 未設定" };
+  }
+  if (comment?.trim()) {
+    const c = await fetch(`${API}/comments`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        task_id: id,
+        content: comment.trim().slice(0, 1900),
+      }),
+    });
+    if (!c.ok) {
+      const text = await c.text();
+      return { ok: false, error: `comment ${c.status}: ${text.slice(0, 200)}` };
+    }
+  }
+  const res = await fetch(`${API}/tasks/${encodeURIComponent(id)}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ due_date: due }),
+  });
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text();
+    return { ok: false, error: `due ${res.status}: ${text.slice(0, 240)}` };
+  }
+  return { ok: true };
+}
+
 export async function updateTodoistTaskStatus(
   lane: string,
   taskId: string,

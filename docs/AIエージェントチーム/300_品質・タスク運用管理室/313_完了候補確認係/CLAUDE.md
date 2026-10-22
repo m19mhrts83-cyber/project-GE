@@ -91,10 +91,18 @@
 
 番号体系（スレ返信の取り違え防止）:
 
-| 投稿 | 記号 | 返信例 | 上限 |
-|---|---|---|---|
-| 完了候補 | **✅N** | `閉じて ✅1,✅3` ／ `✅1,3` | 最大5 |
-| 期日超過 | **📅N** | `リスケ 📅2,📅4` ／ `📅2,4` | 最大5 |
+| 投稿 | 記号 | 返信例 | ボタン | 上限 |
+|---|---|---|---|---|
+| 完了候補 | **✅N** | `閉じて ✅1,✅3` ／ `✅1,3` | **完了する** | 最大5 |
+| 期日超過 | **📅N** | `リスケ 📅2,📅4` ／ `📅2,4` | **→MM-DD へ延期** | 最大5 |
+
+### Slack ボタン（L2・2026-10-22〜）
+
+- 本線: Bot `chat.postMessage` ＋ Block Kit（`action_id` → `/api/slack/consult-action`）
+- 予備: 署名付き URL（`/api/g/t313/close|reschedule/{task_id}`・開いただけでは実行せず確認画面）
+- Todoist タイトルリンクは **詳細確認のみ**（押しても完了／延期しない）
+- 秘密: `PROPERTY_GATE_ACTION_TOKEN`（署名）／`SLACK_BOT_TOKEN`（Bot投稿）／`TODOIST_API_TOKEN`（Vercel 実行）
+- ヘルパー: `scripts/jarvis_todoist_313_slack_blocks.py`
 
 `#consult` 末尾: `次: …` ＋ `担当メモ` ＋ `橋渡し`  
 正本: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](../../38_Slack書き出し_FRIDAY_Jarvis_20261018.md) · [`36_`](../../36_Slack_consult手渡し_次の担当_20261018.md)
@@ -172,3 +180,4 @@ python3 scripts/jarvis_todoist_313_slack_ingest.py --dry-run
 | 2026-10-21 | 312同型: flow本線・`313_digest`・運用格上げA〜E・`jarvis-chat-open-complete-313.mdc` |
 | 2026-10-21 | 名称を **Todoist完了候補確認** に統一。Slack整形（件ごと空行）・タイトル＝Todoistリンク。**毎日20:00** のL1をlaunchd本線に |
 | 2026-10-22 | Slackに **313番号＋役割語**。完了✅／期日📅で記号区別・各最大5件・別投稿。`313_slack_ingest` で番号返信を拾う |
+| 2026-10-22 | L2ボタン: 完了／提案日へ延期（Block Kit＋`/api/g/t313`）。タイトルリンクは詳細のみ |
