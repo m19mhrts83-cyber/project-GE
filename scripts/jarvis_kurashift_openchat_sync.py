@@ -3,17 +3,19 @@
 
 役割:
   1. 815神大家オプチャの 5.やり取り.md をパース（YAMLの title_substring を chat_title 正本に）
-  2. kamiooya-qa: line_openchat_logs へ UPSERT（正本・apply 時は staging）
-  3. 公開は jarvis_openchat_publish.py（ready / excluded）
+  2. kamiooya-qa: line_openchat_logs へ **差分のみ** UPSERT（新規／内容変更 → staging）
+  3. 公開は jarvis_openchat_publish.py（staging のみ ready / excluded）
   4. Grok Bot 共有: Drive 【with Grok bot】/30_shared_working/ へ知見MD＋タイトル別カタログ
 
 ※ jarvis-dashboard の kurashift_openchat_logs は廃止（二重管理しない）。
 ※ 見出し日時（YYYY/MM/DD HH:MM）→ post_date + posted_at を UPSERT。
+※ 変更なし行は触らない（egress 抑制。embedding を毎回返さない）。
 
 使用例:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_kurashift_openchat_sync.py --apply --export-grok
   python scripts/jarvis_kurashift_openchat_sync.py --route 31_shuzen_soudan_g --apply
+  python scripts/jarvis_kurashift_openchat_sync.py --apply --full  # 復旧用・全件
 """
 
 from __future__ import annotations
@@ -253,17 +255,142 @@ def parse_messages_from_md(md_path: Path, route_id: str, chat_title: str) -> lis
     return entries
 
 
-def upsert_batches(sb: Client, table: str, rows: list[dict[str, Any]], cols: list[str]) -> int:
+# DB 照合に使う列（embedding / metadata / updated_at は見ない）
+COMPARE_FIELDS = (
+    "content",
+    "sender_name",
+    "posted_at",
+    "post_date",
+    "chat_title",
+    "chat_name",
+    "stream_type",
+    "thread_title",
+    "is_repair_related",
+    "repair_category",
+)
+
+UPSERT_COLS = [
+    "id",
+    "route_id",
+    "chat_title",
+    "chat_name",
+    "stream_type",
+    "thread_title",
+    "post_date",
+    "posted_at",
+    "sender_name",
+    "content",
+    "is_repair_related",
+    "repair_category",
+    "source_system",
+    "ingest_status",
+    "metadata",
+]
+
+EXISTING_SELECT = "id," + ",".join(COMPARE_FIELDS)
+
+
+def _norm_val(v: Any) -> Any:
+    """比較用に空相当を揃える。"""
+    if v is None:
+        return None
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    if isinstance(v, bool):
+        return bool(v)
+    return v
+
+
+def row_fingerprint(row: dict[str, Any]) -> tuple[Any, ...]:
+    return tuple(_norm_val(row.get(k)) for k in COMPARE_FIELDS)
+
+
+def partition_diff_rows(
+    parsed: list[dict[str, Any]],
+    existing_by_id: dict[str, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
+    """新規・変更・変更なしに分ける。
+
+    Returns:
+        (to_upsert, unchanged_ids_count_proxy as list unused, unchanged_count)
+        to_upsert は ingest_status=staging を付けた行のみ。
+    """
+    unique: dict[str, dict[str, Any]] = {}
+    for e in parsed:
+        rid = str(e.get("id") or "")
+        if not rid:
+            continue
+        unique[rid] = e
+
+    to_upsert: list[dict[str, Any]] = []
+    unchanged = 0
+    for rid, e in unique.items():
+        row = {k: e.get(k) for k in UPSERT_COLS}
+        row["id"] = rid
+        row["ingest_status"] = "staging"
+        prev = existing_by_id.get(rid)
+        if prev is None:
+            to_upsert.append(row)
+            continue
+        if row_fingerprint(row) != row_fingerprint(prev):
+            to_upsert.append(row)
+        else:
+            unchanged += 1
+    return to_upsert, [], unchanged
+
+
+def fetch_existing_fingerprints(sb: Client, table: str = "line_openchat_logs") -> dict[str, dict[str, Any]]:
+    """embedding を除いた照合用マップをページング取得。"""
+    out: dict[str, dict[str, Any]] = {}
+    page = 1000
+    offset = 0
+    while True:
+        res = (
+            sb.table(table)
+            .select(EXISTING_SELECT)
+            .range(offset, offset + page - 1)
+            .execute()
+        )
+        chunk = list(res.data or [])
+        for r in chunk:
+            rid = str(r.get("id") or "")
+            if rid:
+                out[rid] = r
+        if len(chunk) < page:
+            break
+        offset += page
+    return out
+
+
+def _upsert_returning_minimal(sb: Client, table: str, chunk: list[dict[str, Any]]) -> int:
+    """PostgREST に return=minimal を付けて upsert（応答ボディを空に近づける）。"""
+    try:
+        from postgrest.types import ReturnMethod  # type: ignore
+
+        sb.table(table).upsert(
+            chunk, on_conflict="id", returning=ReturnMethod.minimal
+        ).execute()
+        return len(chunk)
+    except TypeError:
+        # 古いクライアントは returning 未対応 → 件数だけ返す（差分化が本線）
+        res = sb.table(table).upsert(chunk, on_conflict="id").execute()
+        return len(res.data or chunk)
+    except Exception:
+        res = sb.table(table).upsert(chunk, on_conflict="id").execute()
+        return len(res.data or chunk)
+
+
+def upsert_batches(sb: Client, table: str, rows: list[dict[str, Any]], cols: list[str] | None = None) -> int:
+    use_cols = cols or UPSERT_COLS
     unique: dict[str, dict[str, Any]] = {}
     for e in rows:
-        unique[e["id"]] = {k: e.get(k) for k in cols}
+        unique[str(e["id"])] = {k: e.get(k) for k in use_cols}
     items = list(unique.values())
     upserted = 0
     batch = 50
     for i in range(0, len(items), batch):
-        chunk = items[i:i + batch]
-        res = sb.table(table).upsert(chunk, on_conflict="id").execute()
-        upserted += len(res.data or [])
+        chunk = items[i : i + batch]
+        upserted += _upsert_returning_minimal(sb, table, chunk)
     return upserted
 
 
@@ -404,6 +531,16 @@ def main() -> int:
     )
     parser.add_argument("--export-grok", action="store_true", help="Grok共有MDを出力")
     parser.add_argument("--limit", type=int, default=0, help="各ルート上限（0=全件）")
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="差分を無視して全件 staging upsert（復旧・再取込用）",
+    )
+    parser.add_argument(
+        "--dry-run-diff",
+        action="store_true",
+        help="DB照合して新規/変更/変更なし件数だけ表示（書込なし）",
+    )
     args = parser.parse_args()
     do_apply = bool(args.apply or args.also_qa)
 
@@ -438,19 +575,39 @@ def main() -> int:
     repair_n = sum(1 for e in all_entries if e.get("is_repair_related"))
     print(f"📊 合計: {len(all_entries)} 件 (修繕関連: {repair_n})")
 
-    if do_apply:
-        qa_rows = []
-        for e in all_entries:
-            row = dict(e)
-            row["ingest_status"] = "staging"  # 検索公開は次ステップ
-            qa_rows.append(row)
-        cols_q = [
-            "id", "route_id", "chat_title", "chat_name", "stream_type", "thread_title",
-            "post_date", "posted_at", "sender_name", "content", "is_repair_related",
-            "repair_category", "source_system", "ingest_status", "metadata",
-        ]
-        n = upsert_batches(qa_sb(), "line_openchat_logs", qa_rows, cols_q)
-        print(f"✅ kamiooya-qa line_openchat_logs UPSERT (staging・正本): {n}")
+    if do_apply or args.dry_run_diff:
+        sb = qa_sb()
+        if args.full:
+            to_upsert = []
+            for e in all_entries:
+                row = {k: e.get(k) for k in UPSERT_COLS}
+                row["id"] = e.get("id")
+                row["ingest_status"] = "staging"
+                to_upsert.append(row)
+            unchanged = 0
+            existing_n = -1
+            new_n = len(to_upsert)
+            changed_n = 0
+            mode = "FULL"
+        else:
+            existing = fetch_existing_fingerprints(sb)
+            existing_n = len(existing)
+            to_upsert, _, unchanged = partition_diff_rows(all_entries, existing)
+            existing_ids = set(existing.keys())
+            new_n = sum(1 for r in to_upsert if r["id"] not in existing_ids)
+            changed_n = len(to_upsert) - new_n
+            mode = "DIFF"
+        print(
+            f"📎 openchat sync — mode={mode}"
+            f" existing={existing_n if existing_n >= 0 else 'n/a'}"
+            f" new={new_n} changed={changed_n if mode == 'DIFF' else 'n/a(full)'}"
+            f" unchanged={unchanged} upsert={len(to_upsert)}"
+        )
+        if args.dry_run_diff and not do_apply:
+            print("ℹ️ --dry-run-diff のみ（DB未書込）")
+        elif do_apply:
+            n = upsert_batches(sb, "line_openchat_logs", to_upsert)
+            print(f"✅ kamiooya-qa line_openchat_logs UPSERT (staging・差分): {n}")
 
     if args.export_grok or do_apply:
         # Google Drive(CloudStorage) は同期中の EDEADLK 等で書けないことがある。
@@ -464,8 +621,8 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    if not do_apply and not args.export_grok:
-        print("ℹ️ --apply / --export-grok のいずれかが必要です（現状 Dry-run）")
+    if not do_apply and not args.export_grok and not args.dry_run_diff:
+        print("ℹ️ --apply / --export-grok / --dry-run-diff のいずれかが必要です")
 
     return 0
 
