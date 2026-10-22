@@ -58,6 +58,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/slack/consult-action" || path.startsWith("/api/g/")) {
     return NextResponse.next({ request });
   }
+  // 物件問合せ Mac 未処理の Vercel 冗長（Bearer CRON_SECRET 等で保護）
+  if (path === "/api/inquiry-send-failover") {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();
