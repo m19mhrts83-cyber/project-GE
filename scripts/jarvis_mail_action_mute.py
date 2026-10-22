@@ -27,6 +27,9 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 MUTE_META_KEY = "mail_action_skip_mute"
+HEALTH_NOTIFY_META_KEY = "mail_action_health_notify"
+# 同じ健全性アラートの #ops 連投防止（朝バンドル再実行対策）
+HEALTH_NOTIFY_COOLDOWN_HOURS = 6
 JST = timezone(timedelta(hours=9))
 
 
@@ -265,6 +268,110 @@ def cmd_close_muted_pending(reg: dict[str, Any], *, dry_run: bool) -> int:
     return 0
 
 
+def _health_fingerprint(issues: list[str]) -> str:
+    """件数の微小変動では再通知しないよう、種別だけを鍵にする。"""
+    kinds: list[str] = []
+    for i in issues:
+        if "pending triage" in i:
+            kinds.append("pending_high")
+        elif "ミュート送信者" in i:
+            kinds.append("muted_high")
+        else:
+            kinds.append(i)
+    return "|".join(sorted(set(kinds)))
+
+
+def _load_health_notify_state() -> dict[str, Any]:
+    creds = _sb()
+    if not creds:
+        return {}
+    url, key = creds
+    req = urllib.request.Request(
+        f"{url}/rest/v1/sync_meta?key=eq.{HEALTH_NOTIFY_META_KEY}&select=value",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            rows = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        print(f"# health notify state load skip: {e}", file=sys.stderr)
+        return {}
+    if not rows:
+        return {}
+    raw = rows[0].get("value")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+    elif isinstance(raw, dict):
+        obj = raw
+    else:
+        return {}
+    return obj if isinstance(obj, dict) else {}
+
+
+def _save_health_notify_state(state: dict[str, Any]) -> None:
+    creds = _sb()
+    if not creds:
+        return
+    url, key = creds
+    now = datetime.now(timezone.utc).isoformat()
+    body = json.dumps(
+        {
+            "key": HEALTH_NOTIFY_META_KEY,
+            "value": json.dumps(state, ensure_ascii=False),
+            "updated_at": now,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"{url}/rest/v1/sync_meta",
+        data=body,
+        method="POST",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            r.read()
+    except Exception as e:
+        print(f"# health notify state save skip: {e}", file=sys.stderr)
+
+
+def _should_skip_health_notify(issues: list[str]) -> tuple[bool, str]:
+    """同一 issues を cooldown 内に再掲しない。JARVIS_MAIL_ACTION_HEALTH_REPOST=1 で強制。"""
+    if os.environ.get("JARVIS_MAIL_ACTION_HEALTH_REPOST", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return False, "repost_env"
+    fp = _health_fingerprint(issues)
+    state = _load_health_notify_state()
+    last_fp = str(state.get("fingerprint") or "")
+    last_at = str(state.get("at") or "")
+    if last_fp != fp or not last_at:
+        return False, fp
+    try:
+        ts = datetime.fromisoformat(last_at.replace("Z", "+00:00"))
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        age_h = (datetime.now(timezone.utc) - ts.astimezone(timezone.utc)).total_seconds() / 3600
+        if age_h < HEALTH_NOTIFY_COOLDOWN_HOURS:
+            return True, f"same_issues age={age_h:.1f}h"
+    except ValueError:
+        pass
+    return False, fp
+
+
 def cmd_health(reg: dict[str, Any], *, notify_ops: bool) -> int:
     muted_n = sum(1 for v in (reg.get("entries") or {}).values() if (v or {}).get("muted"))
     pending = _pending_count()
@@ -285,29 +392,43 @@ def cmd_health(reg: dict[str, Any], *, notify_ops: bool) -> int:
     for i in issues:
         print(f"⚠️ {i}")
     if notify_ops:
-        text = (
-            "【ops】116 メール要対応 — 健全性\n"
-            + "\n".join(f"・{i}" for i in issues)
-            + "\n参考: scripts/jarvis_mail_action_mute.py --list"
-        )
-        post = REPO / "scripts" / "jarvis_slack_webhook_post.py"
-        if post.is_file():
-            subprocess.run(
-                [
-                    sys.executable,
-                    str(post),
-                    "--channel",
-                    "ops",
-                    "--text",
-                    text,
-                    "--username",
-                    "116 メール要対応",
-                ],
-                cwd=str(REPO),
-                check=False,
+        skip, reason = _should_skip_health_notify(issues)
+        if skip:
+            print(
+                f"⏭ #ops notify skip（同一健全性アラートの連投防止）: {reason}",
+                file=sys.stderr,
             )
         else:
-            print("# notify skipped: jarvis_slack_webhook_post.py なし", file=sys.stderr)
+            text = (
+                "【ops】116 メール要対応 — 健全性\n"
+                + "\n".join(f"・{i}" for i in issues)
+                + "\n参考: scripts/jarvis_mail_action_mute.py --list"
+            )
+            post = REPO / "scripts" / "jarvis_slack_webhook_post.py"
+            if post.is_file():
+                subprocess.run(
+                    [
+                        sys.executable,
+                        str(post),
+                        "--channel",
+                        "ops",
+                        "--text",
+                        text,
+                        "--username",
+                        "116 メール要対応",
+                    ],
+                    cwd=str(REPO),
+                    check=False,
+                )
+                _save_health_notify_state(
+                    {
+                        "fingerprint": _health_fingerprint(issues),
+                        "at": datetime.now(timezone.utc).isoformat(),
+                        "issues": issues,
+                    }
+                )
+            else:
+                print("# notify skipped: jarvis_slack_webhook_post.py なし", file=sys.stderr)
     return 0 if not issues else 2
 
 

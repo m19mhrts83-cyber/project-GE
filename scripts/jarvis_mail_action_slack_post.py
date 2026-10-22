@@ -444,7 +444,8 @@ def rank_candidates(rows: list[dict[str, Any]], *, limit: int) -> list[dict[str,
             str(r.get("received_at") or ""),
         ),
     )
-    return enriched[: max(0, limit)]
+    deduped, _dropped = dedupe_candidates(enriched)
+    return deduped[: max(0, limit)]
 
 
 def _thread_cards_enabled() -> bool:
@@ -473,25 +474,117 @@ def digest_fingerprint(ranked: list[dict[str, Any]]) -> str:
 
 
 DIGEST_DEDUPE_PATH = REPO / ".jarvis_state" / "mail_action_slack_digest.json"
+DIGEST_DEDUPE_META_KEY = "mail_action_slack_digest"
 DIGEST_DEDUPE_HOURS = 6
 
 
-def should_skip_duplicate_digest(ranked: list[dict[str, Any]]) -> tuple[bool, str]:
+def content_dedupe_key(row: dict[str, Any]) -> str:
+    """同一メールの二重投稿を防ぐ鍵。
+
+    優先: gmail_message_id（GHA と night_triage の id / gha-* 二重行を潰す）
+    次点: partner + subject + received_at + from（LINE 等で gmail_id が空のとき）
+    """
+    gid = str(row.get("gmail_message_id") or "").strip()
+    if gid:
+        return f"gid:{gid}"
+    partner = str(row.get("partner") or "").strip().lower()
+    subject = str(row.get("subject") or "").strip().lower()
+    if subject in {"(件名なし)", "(no subject)", "件名なし"}:
+        subject = ""
+    received = str(row.get("received_at") or "").strip()[:16]
+    from_e = str(row.get("from_email") or "").strip().lower()
+    body = str(row.get("original_body") or "").strip()
+    body_fp = hashlib.sha256(body[:800].encode("utf-8")).hexdigest()[:12] if body else ""
+    raw = f"{partner}|{subject}|{received}|{from_e}|{body_fp}"
+    return f"body:{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _prefer_canonical_id(tid: str) -> int:
+    """同一内容のとき残す優先度（高いほど残す）。gha- より本体 id を優先。"""
+    t = (tid or "").strip()
+    if t.startswith("gha-"):
+        return 0
+    if t.startswith("re-"):
+        return 1
+    return 2
+
+
+def dedupe_candidates(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """同じ content_dedupe_key はスコア高い1件だけ残す。戻り値 (rows, dropped)。"""
+    best: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    dropped = 0
+    for row in rows:
+        key = content_dedupe_key(row)
+        prev = best.get(key)
+        if prev is None:
+            best[key] = row
+            order.append(key)
+            continue
+        dropped += 1
+        cur_score = int(row.get("_score") or 0)
+        prev_score = int(prev.get("_score") or 0)
+        cur_id = str(row.get("id") or "")
+        prev_id = str(prev.get("id") or "")
+        # スコア優先。同点なら非 gha- id、さらに received_at が新しい方
+        replace = False
+        if cur_score > prev_score:
+            replace = True
+        elif cur_score == prev_score:
+            if _prefer_canonical_id(cur_id) > _prefer_canonical_id(prev_id):
+                replace = True
+            elif _prefer_canonical_id(cur_id) == _prefer_canonical_id(prev_id):
+                if str(row.get("received_at") or "") > str(prev.get("received_at") or ""):
+                    replace = True
+        if replace:
+            best[key] = row
+    return [best[k] for k in order if k in best], dropped
+
+
+def _load_digest_dedupe_state(sb: Any | None = None) -> dict[str, Any]:
+    """sync_meta を正本、ローカル JSON をフォールバック（Mac↔GHA 共有）。"""
+    if sb is not None:
+        try:
+            r = (
+                sb.table("sync_meta")
+                .select("value")
+                .eq("key", DIGEST_DEDUPE_META_KEY)
+                .limit(1)
+                .execute()
+            )
+            rows = r.data or []
+            if rows:
+                raw = rows[0].get("value")
+                if isinstance(raw, str) and raw.strip():
+                    obj = json.loads(raw)
+                elif isinstance(raw, dict):
+                    obj = raw
+                else:
+                    obj = {}
+                if isinstance(obj, dict):
+                    return obj
+        except Exception as e:
+            print(f"# digest dedupe meta load skip: {e}", file=sys.stderr)
+    try:
+        if DIGEST_DEDUPE_PATH.is_file():
+            data = json.loads(DIGEST_DEDUPE_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def should_skip_duplicate_digest(
+    ranked: list[dict[str, Any]], *, sb: Any | None = None
+) -> tuple[bool, str]:
     """直近に同じ id セットを出していればスキップ（同一メッセージ連投防止）。"""
     if os.environ.get("JARVIS_MAIL_ACTION_REPOST"):
         return False, "repost_env"
     fp = digest_fingerprint(ranked)
     if not fp:
         return False, "empty"
-    try:
-        if DIGEST_DEDUPE_PATH.is_file():
-            data = json.loads(DIGEST_DEDUPE_PATH.read_text(encoding="utf-8"))
-        else:
-            data = {}
-    except (OSError, json.JSONDecodeError):
-        data = {}
-    if not isinstance(data, dict):
-        data = {}
+    data = _load_digest_dedupe_state(sb)
     last_fp = str(data.get("fingerprint") or "")
     last_at = str(data.get("at") or "")
     if last_fp == fp and last_at:
@@ -507,21 +600,36 @@ def should_skip_duplicate_digest(ranked: list[dict[str, Any]]) -> tuple[bool, st
     return False, fp
 
 
-def remember_digest_fingerprint(ranked: list[dict[str, Any]]) -> None:
+def remember_digest_fingerprint(
+    ranked: list[dict[str, Any]], *, sb: Any | None = None
+) -> None:
     fp = digest_fingerprint(ranked)
     if not fp:
         return
-    DIGEST_DEDUPE_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "fingerprint": fp,
         "at": datetime.now(timezone.utc).isoformat(),
         "ids": [str(r.get("id") or "") for r in ranked],
         "count": len(ranked),
     }
+    DIGEST_DEDUPE_PATH.parent.mkdir(parents=True, exist_ok=True)
     DIGEST_DEDUPE_PATH.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    if sb is None:
+        return
+    try:
+        sb.table("sync_meta").upsert(
+            {
+                "key": DIGEST_DEDUPE_META_KEY,
+                "value": json.dumps(payload, ensure_ascii=False),
+                "updated_at": now_iso(),
+            },
+            on_conflict="key",
+        ).execute()
+    except Exception as e:
+        print(f"# digest dedupe meta save skip: {e}", file=sys.stderr)
 
 
 def build_digest_payload(ranked: list[dict[str, Any]]) -> dict[str, Any]:
@@ -962,6 +1070,8 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
             continue
         pool_rows.append(row)
 
+    keys = [content_dedupe_key(r) for r in pool_rows]
+    content_dupes = max(0, len(keys) - len(set(keys)))
     ranked = rank_candidates(pool_rows, limit=limit)
     stats = {
         "pool": len(pool_rows),
@@ -971,17 +1081,52 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         "skim_skip": skipped_skim,
         "self_skip": skipped_self,
         "already_posted": skipped_posted,
+        "content_dupes": content_dupes,
         "mute_entries": len(mute.get("entries") or {}),
         "top_scores": [
             {
                 "id": str(x.get("id")),
                 "score": x.get("_score"),
                 "reasons": x.get("_score_reasons"),
+                "dedupe": content_dedupe_key(x),
             }
             for x in ranked
         ],
     }
     return ranked, stats
+
+
+def _stamp_posted_payload(
+    pl: dict[str, Any],
+    *,
+    score: int | None,
+    summary: str,
+    slack_channel: str | None,
+    slack_ts: str | None,
+    digest_channel: str | None,
+    digest_ts: str | None,
+    sibling_of: str | None = None,
+) -> dict[str, Any]:
+    out = dict(pl)
+    out["slack_ma_posted_at"] = now_iso()
+    out["slack_ma_digest"] = {
+        "at": now_iso(),
+        "score": score,
+        "summary_plan": "A_extractive",
+        "summary": (summary or "")[:200],
+    }
+    if sibling_of:
+        out["slack_ma_dedupe_sibling_of"] = sibling_of
+    if slack_channel:
+        out["slack_ma_channel"] = slack_channel
+    if slack_ts:
+        out["slack_ma_ts"] = slack_ts
+    # 見送り等でダイジェストを更新／削除するためのバッチキー
+    if digest_channel:
+        out["slack_ma_digest_channel"] = digest_channel
+    if digest_ts:
+        out["slack_ma_digest_ts"] = digest_ts
+    return out
 
 
 def mark_posted(
@@ -994,11 +1139,13 @@ def mark_posted(
     slack_ts: str | None = None,
     digest_channel: str | None = None,
     digest_ts: str | None = None,
+    gmail_message_id: str | None = None,
 ) -> None:
+    """投稿済み印。同一 gmail_message_id の姉妹行（gha-* 二重など）も一緒に印付け。"""
     try:
         r = (
             sb.table("triage_items")
-            .select("payload")
+            .select("id,payload,gmail_message_id,status")
             .eq("id", tid)
             .limit(1)
             .execute()
@@ -1006,27 +1153,53 @@ def mark_posted(
         rows = r.data or []
         if not rows:
             return
-        pl = rows[0].get("payload") if isinstance(rows[0].get("payload"), dict) else {}
-        pl = dict(pl)
-        pl["slack_ma_posted_at"] = now_iso()
-        pl["slack_ma_digest"] = {
-            "at": now_iso(),
-            "score": score,
-            "summary_plan": "A_extractive",
-            "summary": (summary or "")[:200],
-        }
-        if slack_channel:
-            pl["slack_ma_channel"] = slack_channel
-        if slack_ts:
-            pl["slack_ma_ts"] = slack_ts
-        # 見送り等でダイジェストを更新／削除するためのバッチキー
-        if digest_channel:
-            pl["slack_ma_digest_channel"] = digest_channel
-        if digest_ts:
-            pl["slack_ma_digest_ts"] = digest_ts
+        primary = rows[0]
+        pl = primary.get("payload") if isinstance(primary.get("payload"), dict) else {}
+        pl = _stamp_posted_payload(
+            pl if isinstance(pl, dict) else {},
+            score=score,
+            summary=summary,
+            slack_channel=slack_channel,
+            slack_ts=slack_ts,
+            digest_channel=digest_channel,
+            digest_ts=digest_ts,
+        )
         sb.table("triage_items").update(
             {"payload": pl, "updated_at": now_iso()}
         ).eq("id", tid).execute()
+
+        gid = (gmail_message_id or str(primary.get("gmail_message_id") or "")).strip()
+        if not gid:
+            return
+        sib = (
+            sb.table("triage_items")
+            .select("id,payload,status")
+            .eq("gmail_message_id", gid)
+            .eq("status", "pending")
+            .limit(20)
+            .execute()
+        )
+        for srow in sib.data or []:
+            sid = str(srow.get("id") or "")
+            if not sid or sid == tid:
+                continue
+            spl = srow.get("payload") if isinstance(srow.get("payload"), dict) else {}
+            if isinstance(spl, dict) and spl.get("slack_ma_posted_at"):
+                continue
+            stamped = _stamp_posted_payload(
+                spl if isinstance(spl, dict) else {},
+                score=score,
+                summary=summary,
+                slack_channel=slack_channel,
+                slack_ts=slack_ts,
+                digest_channel=digest_channel,
+                digest_ts=digest_ts,
+                sibling_of=tid,
+            )
+            sb.table("triage_items").update(
+                {"payload": stamped, "updated_at": now_iso()}
+            ).eq("id", sid).execute()
+            print(f"# mark posted sibling id={sid} of={tid} gid={gid[:24]}")
     except Exception as e:
         print(f"# mark posted skip {tid}: {e}", file=sys.stderr)
 
@@ -1127,7 +1300,7 @@ def main() -> int:
         and (args.from_triage or len(rows) > 1)
     )
     if want_digest:
-        skip_dup, dup_reason = should_skip_duplicate_digest(rows)
+        skip_dup, dup_reason = should_skip_duplicate_digest(rows, sb=sb)
         if skip_dup:
             print(
                 f"⏭ digest skip（同一案件セットの再投稿防止）: {dup_reason}",
@@ -1143,7 +1316,7 @@ def main() -> int:
             return rc
         if not args.dry_run:
             try:
-                remember_digest_fingerprint(rows)
+                remember_digest_fingerprint(rows, sb=sb)
             except OSError as e:
                 print(f"# digest fingerprint save skip: {e}", file=sys.stderr)
 
@@ -1175,6 +1348,7 @@ def main() -> int:
                 slack_ts=ts,
                 digest_channel=digest_ch,
                 digest_ts=digest_ts,
+                gmail_message_id=str(row.get("gmail_message_id") or "") or None,
             )
 
     # Slack に出した＝目を通す動線に載せたので Gmail 既読（物件取込と同型）
