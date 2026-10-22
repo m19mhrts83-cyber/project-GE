@@ -15,8 +15,17 @@ const KAMIOOYA_OPS = new Set([
 ]);
 
 function sb(): SupabaseClient | null {
-  const url = (process.env.JARVIS_SUPABASE_URL || "").trim();
-  const key = (process.env.JARVIS_SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  const url = (
+    process.env.JARVIS_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    ""
+  ).trim();
+  // Vercel 本番は JARVIS_SUPABASE_SECRET_KEY（SERVICE_ROLE 別名）が多い
+  const key = (
+    process.env.JARVIS_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.JARVIS_SUPABASE_SECRET_KEY ||
+    ""
+  ).trim();
   if (!url || !key) return null;
   return createClient(url, key, { auth: { persistSession: false } });
 }
