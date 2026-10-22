@@ -1,5 +1,5 @@
 #!/bin/zsh
-# install: 317 コメント起動（180秒）
+# install: 317 コメント起動（300秒）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.comment-dispatch"
@@ -20,7 +20,7 @@ cat >"$PLIST" <<EOF
     <string>${RUNNER}</string>
   </array>
   <key>StartInterval</key>
-  <integer>180</integer>
+  <integer>300</integer>
   <key>RunAtLoad</key>
   <true/>
   <key>StandardOutPath</key>
@@ -34,6 +34,6 @@ EOF
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
-echo "installed ${LABEL} (every 180s) → ${PLIST}"
+echo "installed ${LABEL} (every 300s) → ${PLIST}"
 echo "stop all: JARVIS_COMMENT_DISPATCH_DISABLE=1"
 echo "stop failover only: JARVIS_COMMENT_DISPATCH_FAILOVER=0"
