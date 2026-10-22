@@ -1,0 +1,38 @@
+name: Inquiry send failover ping
+
+# Hobby の Vercel Cron は日次のみ。5分間隔の冗長トリガは GHA から叩く。
+# 本線は Mac worker。ここは stale queued のときだけ Vercel が送信する。
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: inquiry-send-failover
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: GET /api/inquiry-send-failover
+        env:
+          PROPERTY_GATE_ACTION_TOKEN: ${{ secrets.PROPERTY_GATE_ACTION_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PROPERTY_GATE_ACTION_TOKEN:-}" ]]; then
+            echo "Secrets missing: PROPERTY_GATE_ACTION_TOKEN"
+            exit 1
+          fi
+          BASE="https://jarvis-dashboard-amber.vercel.app"
+          CODE=$(curl -sS -o /tmp/failover.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${PROPERTY_GATE_ACTION_TOKEN}" \
+            "${BASE}/api/inquiry-send-failover")
+          echo "http=${CODE}"
+          head -c 800 /tmp/failover.json || true
+          echo
+          if [[ "${CODE}" != "200" && "${CODE}" != "204" ]]; then
+            exit 1
+          fi
