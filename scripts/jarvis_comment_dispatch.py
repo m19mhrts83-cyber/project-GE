@@ -14,6 +14,8 @@
 停止: JARVIS_COMMENT_DISPATCH_DISABLE=1
 冗長だけ止める: JARVIS_COMMENT_DISPATCH_FAILOVER=0
 stale 閾値分: JARVIS_COMMENT_DISPATCH_STALE_MIN（既定10）
+夜間除外（JST）: 既定 0:00〜6:00。JARVIS_COMMENT_DISPATCH_QUIET_START/END（時 0-23）
+  除外をやめる: JARVIS_COMMENT_DISPATCH_QUIET_DISABLE=1
 
 正本: docs/AIエージェントチーム/44_コメント常駐起動_317_20261022.md
 """
@@ -44,6 +46,9 @@ JST = timezone(timedelta(hours=9))
 LOG = "📎 317 コメント起動"
 HEARTBEAT_KEY = "comment_dispatch_heartbeat_at"
 META_KEY = "comment_dispatch_last"
+# 就寝帯（JST）: [start, end) — 既定 0:00 以上 6:00 未満
+QUIET_START_DEFAULT = 0
+QUIET_END_DEFAULT = 6
 
 # Phase B 許可リスト（コメント本文の部分一致・小文字化後）
 ALLOWLIST_PATTERNS = (
@@ -93,6 +98,49 @@ def _stale_minutes() -> int:
         return max(1, int(os.environ.get("JARVIS_COMMENT_DISPATCH_STALE_MIN") or "10"))
     except ValueError:
         return 10
+
+
+def _quiet_hours_disabled() -> bool:
+    return (os.environ.get("JARVIS_COMMENT_DISPATCH_QUIET_DISABLE") or "").strip() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _quiet_hour_bounds() -> tuple[int, int]:
+    """Return (start, end) hours in JST; window is [start, end) with wrap support."""
+    try:
+        start = int(os.environ.get("JARVIS_COMMENT_DISPATCH_QUIET_START") or QUIET_START_DEFAULT)
+    except ValueError:
+        start = QUIET_START_DEFAULT
+    try:
+        end = int(os.environ.get("JARVIS_COMMENT_DISPATCH_QUIET_END") or QUIET_END_DEFAULT)
+    except ValueError:
+        end = QUIET_END_DEFAULT
+    start = max(0, min(23, start))
+    end = max(0, min(24, end))
+    return start, end
+
+
+def in_quiet_hours(now: datetime | None = None) -> bool:
+    """True while JST local time is in the sleeping window (default 00:00–06:00)."""
+    if _quiet_hours_disabled():
+        return False
+    dt = now or _now()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=JST)
+    else:
+        dt = dt.astimezone(JST)
+    hour = dt.hour
+    start, end = _quiet_hour_bounds()
+    if start == end:
+        return False
+    if start < end:
+        return start <= hour < end
+    # wrap past midnight e.g. 22–6
+    return hour >= start or hour < end
 
 
 def load_state() -> dict[str, Any]:
@@ -562,6 +610,21 @@ def main() -> int:
     st = load_state()
     if st.get("disabled"):
         print(f"{LOG}: state disabled")
+        return 0
+
+    if in_quiet_hours():
+        start, end = _quiet_hour_bounds()
+        print(
+            f"{LOG}: quiet hours JST {start:02d}:00–{end:02d}:00 — skip "
+            f"(now {_now().strftime('%H:%M')})"
+        )
+        # Mac が生きている印だけ残し、夜間の GHA stale 発火を防ぐ
+        if args.apply and not args.failover_only:
+            push_heartbeat(
+                dry_run=False,
+                path="mac_quiet",
+                summary={"quiet": True, "skip": True},
+            )
         return 0
 
     path = "mac"

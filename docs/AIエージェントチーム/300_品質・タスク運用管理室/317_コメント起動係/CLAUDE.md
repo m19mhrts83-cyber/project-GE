@@ -31,7 +31,7 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 
 ## 2. 動き出す合図
 
-- [x] 時間: Mac launchd 2〜5分／GHA 5分（stale 時のみ L1）
+- [x] 時間: Mac launchd 300秒／GHA 5分（stale 時のみ L1）。JST 0–6時除外
 - [x] イベント: Todoist `note:added`（Webhook）／Slack FB スレ返信
 - [x] 人が頼む: 「コメント拾って」「317回して」
 - [ ] 変化・失敗: heartbeat 長期途絶 → 315／`#ops` 相乗り可
@@ -56,7 +56,8 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 | L1 Ack／分類 | GHA failover（AIなし） |
 | L2 AI処置 | Cloud 枠ありのみ／なしはキュー残留 |
 
-停止: `JARVIS_COMMENT_DISPATCH_DISABLE=1`／`JARVIS_COMMENT_DISPATCH_FAILOVER=0`
+停止: `JARVIS_COMMENT_DISPATCH_DISABLE=1`／`JARVIS_COMMENT_DISPATCH_FAILOVER=0`  
+夜間除外（JST）: 既定 **0:00〜6:00** スキップ（`QUIET_START`／`END`／`QUIET_DISABLE=1`）
 
 ## 4. 報告先
 

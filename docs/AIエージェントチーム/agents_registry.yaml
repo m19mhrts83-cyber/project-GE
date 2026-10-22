@@ -233,7 +233,7 @@ agents:
     tool_assigned: jarvis
     tool_fit: B
     tool_notes: Slack FB／Todoistコメント常駐。Mac本線＋GHA L1冗長＋Cloud L2（枠あり）。GAS不使用
-    schedule: launchd 2〜5分 / GHA stale 5分
+    schedule: launchd 300秒 / GHA stale 5分（JST 0–6時除外）
     note: 2026-10-22 新設。設計正本 44_コメント常駐起動_317。Phase A=Ack／Phase B=許可リストAI。Builder／FlowForge／share反映済
   '411':
     name: Grok材料取込係

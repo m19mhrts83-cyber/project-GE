@@ -1,5 +1,5 @@
 #!/bin/zsh
-# 317 コメント起動 — Mac 本線（2〜5分間隔）
+# 317 コメント起動 — Mac 本線（300秒間隔）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"

@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-22T23:05:30+09:00",
+  "updated": "2026-10-22T23:40:04+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -1408,8 +1408,8 @@
           {
             "id": "watch",
             "on": true,
-            "detail": "朝バンドルで `--health --notify-ops`（**mute過多など本当の異常のみ `#ops`**。pending 件数だけでは通知しない。山は `--sweep-noise`）",
-            "raw": "**T5 変化・失敗を見回る**: 朝バンドルで `--health --notify-ops`（**mute過多など本当の異常のみ `#ops`**。pending 件数だけでは通知しない。山は `--sweep-noise`）"
+            "detail": "朝バンドルで `--health --notify-ops`（異常時のみ `#ops`）",
+            "raw": "**T5 変化・失敗を見回る**: 朝バンドルで `--health --notify-ops`（異常時のみ `#ops`）"
           }
         ],
         "trigger_kinds_on": [
@@ -1460,7 +1460,7 @@
           },
           {
             "kind": "`#ops`",
-            "destination": "投稿失敗・mute過多（pending 件数だけでは出さない）",
+            "destination": "投稿失敗・pending過多・mute過多",
             "channels": []
           }
         ],
@@ -2026,6 +2026,12 @@
             "kind": "doc"
           },
           {
+            "title": "cloud-jarvis-proposals-for-local_20261022.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/cloud-jarvis-proposals-for-local_20261022.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/cloud-jarvis-proposals-for-local_20261022.md",
+            "kind": "doc"
+          },
+          {
             "title": "phase1-l1-digest.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/phase1-l1-digest.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/phase1-l1-digest.md",
@@ -2036,21 +2042,9 @@
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/research-chat-task-capture.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/research-chat-task-capture.md",
             "kind": "doc"
-          },
-          {
-            "title": "setup-cloud-chain.md",
-            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/setup-cloud-chain.md",
-            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/setup-cloud-chain.md",
-            "kind": "doc"
-          },
-          {
-            "title": "setup-slack-scope.md",
-            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/setup-slack-scope.md",
-            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/setup-slack-scope.md",
-            "kind": "doc"
           }
         ],
-        "procedure_count": 11,
+        "procedure_count": 10,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2183,17 +2177,32 @@
           },
           {
             "kind": "`#report`",
-            "destination": "確認のみ完了一覧",
+            "destination": "確認のみ完了一覧（先頭 `【報告】313 完了候補確認`）",
             "channels": []
           },
           {
             "kind": "`#consult`",
-            "destination": "要判断。末尾「次の担当」3行必須",
+            "destination": "要判断／期日超過（先頭 `【相談】313 完了候補確認`。Webhook表示名も `313 完了候補確認`）",
             "channels": []
           },
           {
             "kind": "`#ops`",
-            "destination": "API失敗・二重起票疑い",
+            "destination": "API失敗・二重起票疑い（`【ops】313 完了候補確認`）",
+            "channels": []
+          },
+          {
+            "kind": "投稿",
+            "destination": "記号",
+            "channels": []
+          },
+          {
+            "kind": "完了候補",
+            "destination": "**✅N**",
+            "channels": []
+          },
+          {
+            "kind": "期日超過",
+            "destination": "**📅N**",
             "channels": []
           }
         ],
@@ -2817,7 +2826,7 @@
       "status_icon": "🔵",
       "report": "report",
       "trigger": "時間＋イベント",
-      "schedule": "launchd 2〜5分 / GHA stale 5分",
+      "schedule": "launchd 300秒 / GHA stale 5分（JST 0–6時除外）",
       "tool_assigned": "jarvis",
       "tool_fit": "B",
       "tool_notes": "Slack FB／Todoistコメント常駐。Mac本線＋GHA L1冗長＋Cloud L2（枠あり）。GAS不使用",
@@ -2902,8 +2911,8 @@
           {
             "id": "schedule",
             "on": true,
-            "detail": "Mac launchd 2〜5分／GHA 5分（stale 時のみ L1）",
-            "raw": "時間: Mac launchd 2〜5分／GHA 5分（stale 時のみ L1）"
+            "detail": "Mac launchd 300秒／GHA 5分（stale 時のみ L1）。JST 0–6時除外",
+            "raw": "時間: Mac launchd 300秒／GHA 5分（stale 時のみ L1）。JST 0–6時除外"
           },
           {
             "id": "event",
@@ -2925,9 +2934,9 @@
         ],
         "trigger_kinds_label": "人依頼 · 時間 · イベント",
         "triggers_filled": true,
-        "when": "launchd 2〜5分 / GHA stale 5分",
+        "when": "launchd 300秒 / GHA stale 5分（JST 0–6時除外）",
         "registry_trigger": "時間＋イベント",
-        "registry_schedule": "launchd 2〜5分 / GHA stale 5分",
+        "registry_schedule": "launchd 300秒 / GHA stale 5分（JST 0–6時除外）",
         "primary_report": "report",
         "report_channels": [
           "report",
@@ -5048,22 +5057,22 @@
           },
           {
             "kind": "レーン",
-            "destination": "UI",
+            "destination": "担当（Slackに必ず書く）",
             "channels": []
           },
           {
             "kind": "S2",
-            "destination": "https://jarvis-trade-desk.vercel.app/realestate/vendors",
+            "destination": "地場の管理会社・仲介への紹介依頼",
             "channels": []
           },
           {
             "kind": "S4",
-            "destination": "https://jarvis-trade-desk.vercel.app/realestate/repair-vendors",
+            "destination": "修繕業者の開拓・見積依頼",
             "channels": []
           },
           {
             "kind": "S9",
-            "destination": "https://jarvis-trade-desk.vercel.app/realestate/mgmt-vendors",
+            "destination": "管理会社の事前確認・開拓",
             "channels": []
           },
           {
@@ -5556,6 +5565,7 @@
         "primary_report": "ops",
         "report_channels": [
           "ops",
+          "report",
           "consult"
         ],
         "reports": [
@@ -5564,6 +5574,13 @@
             "destination": "Slack `#ops`（失敗・残留 stale・学習衝突があるとき。ゼロ報告は連投しない）",
             "channels": [
               "ops"
+            ]
+          },
+          {
+            "kind": "費目直し・学習の確認",
+            "destination": "Slack `#report`（自動直し or 新規学習が1件以上のときだけ。直った前提で中身を確認用）",
+            "channels": [
+              "report"
             ]
           },
           {
@@ -5580,7 +5597,12 @@
           },
           {
             "kind": "Webhook",
-            "destination": "env キー名のみ: `SLACK_WEBHOOK_OPS` 系",
+            "destination": "env キー名のみ: `SLACK_WEBHOOK_AI_TEAM_REPORT` / `OPS` 系",
+            "channels": []
+          },
+          {
+            "kind": "報告オフ",
+            "destination": "`JARVIS_ZAIM_CATEGORY_SLACK_REPORT_DISABLE=1`",
             "channels": []
           },
           {
