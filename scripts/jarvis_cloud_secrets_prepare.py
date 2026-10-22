@@ -224,6 +224,16 @@ def main(argv: list[str] | None = None) -> int:
     # Slack Incoming Webhook（Cloud から #report/#consult/#ops 等へ Bot 投稿＝通知が出る）
     _append_slack_webhooks(lines, missing, required=False)
 
+    # 313／116／511 URL 署名（任意。無いと Cloud は TODOIST_API_TOKEN で署名）
+    for gate_k in (
+        "PROPERTY_GATE_ACTION_TOKEN",
+        "TODOIST_313_ACTION_TOKEN",
+        "MAIL_ACTION_TOKEN",
+    ):
+        gate_v = (os.environ.get(gate_k) or "").strip()
+        if gate_v:
+            lines.append(f"{gate_k}={gate_v}")
+
     if args.include_gmail_send:
         cred_b64 = (os.environ.get("GMAIL_CREDENTIALS_B64") or "").strip() or _file_b64(
             MANUAL / "credentials.json"

@@ -101,7 +101,8 @@
 - 本線: Bot `chat.postMessage` ＋ Block Kit（`action_id` → `/api/slack/consult-action`）
 - 予備: 署名付き URL（`/api/g/t313/close|reschedule/{task_id}`・開いただけでは実行せず確認画面）
 - Todoist タイトルリンクは **詳細確認のみ**（押しても完了／延期しない）
-- 秘密: `PROPERTY_GATE_ACTION_TOKEN`（署名）／`SLACK_BOT_TOKEN`（Bot投稿）／`TODOIST_API_TOKEN`（Vercel 実行）
+- 秘密: `PROPERTY_GATE_ACTION_TOKEN`（署名本線）／`SLACK_BOT_TOKEN`（Bot投稿）／`TODOIST_API_TOKEN`（Vercel 実行・Cloud署名フォールバック）
+- URL署名検証は候補キーをすべて照合（Cloud=TODOIST・Mac/Vercel=PROPERTY_GATE の食い違いでも通る）
 - ヘルパー: `scripts/jarvis_todoist_313_slack_blocks.py`
 
 `#consult` 末尾: `次: …` ＋ `担当メモ` ＋ `橋渡し`  

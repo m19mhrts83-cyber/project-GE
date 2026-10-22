@@ -16,14 +16,45 @@ export const T313_ACTION_IDS = {
   reschedule: "todoist_313_reschedule",
 } as const;
 
+/** 署名候補（優先順）。Cloud は TODOIST のみ、Vercel は PROPERTY_GATE 優先になりがち。 */
+function candidateSecrets(): string[] {
+  const raw = [
+    process.env.TODOIST_313_ACTION_TOKEN,
+    process.env.PROPERTY_GATE_ACTION_TOKEN,
+    process.env.MAIL_ACTION_TOKEN,
+    process.env.TODOIST_API_TOKEN,
+  ];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of raw) {
+    const s = (v || "").trim();
+    if (s && !seen.has(s)) {
+      seen.add(s);
+      out.push(s);
+    }
+  }
+  return out;
+}
+
 function actionSecret(): string {
   // 本線 PROPERTY_GATE（116/511と同系）。無いときは TODOIST_API_TOKEN で署名
-  return (
-    (process.env.TODOIST_313_ACTION_TOKEN || "").trim() ||
-    (process.env.PROPERTY_GATE_ACTION_TOKEN || "").trim() ||
-    (process.env.MAIL_ACTION_TOKEN || "").trim() ||
-    (process.env.TODOIST_API_TOKEN || "").trim()
-  );
+  return candidateSecrets()[0] || "";
+}
+
+function t313SigWithSecret(
+  secret: string,
+  taskId: string,
+  action: Todoist313Action,
+  due?: string,
+): string {
+  const payload =
+    action === "reschedule"
+      ? `t313:${taskId}:${action}:${due || ""}`
+      : `t313:${taskId}:${action}`;
+  return createHmac("sha256", secret)
+    .update(payload, "utf8")
+    .digest("hex")
+    .slice(0, 10);
 }
 
 export function isTodoistTaskId(id: string): boolean {
@@ -67,30 +98,37 @@ export function t313Sig(
   due?: string,
 ): string {
   const secret = actionSecret();
-  const payload =
-    action === "reschedule"
-      ? `t313:${taskId}:${action}:${due || ""}`
-      : `t313:${taskId}:${action}`;
-  return createHmac("sha256", secret)
-    .update(payload, "utf8")
-    .digest("hex")
-    .slice(0, 10);
+  if (!secret) return "";
+  return t313SigWithSecret(secret, taskId, action, due);
 }
 
+/**
+ * 検証は候補秘密をすべて試す。
+ * Cloud（TODOIST署名）と Vercel（PROPERTY_GATE優先）の食い違いで
+ * ボタンURLが「認証エラー」になるのを防ぐ。
+ */
 export function t313SigOk(
   taskId: string,
   action: Todoist313Action,
   sig: string | null | undefined,
   due?: string,
 ): boolean {
-  const expected = t313Sig(taskId, action, due);
   const got = (sig || "").trim().toLowerCase();
-  if (!got || got.length !== expected.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(got), Buffer.from(expected));
-  } catch {
-    return false;
+  if (!got || got.length !== 10) return false;
+  const secrets = candidateSecrets();
+  if (!secrets.length) return false;
+  for (const secret of secrets) {
+    const expected = t313SigWithSecret(secret, taskId, action, due);
+    if (got.length !== expected.length) continue;
+    try {
+      if (timingSafeEqual(Buffer.from(got), Buffer.from(expected))) {
+        return true;
+      }
+    } catch {
+      /* next */
+    }
   }
+  return false;
 }
 
 export function t313ActionUrl(
