@@ -27,10 +27,19 @@
   - **②③** AI同士・ホーク直入れ／116 Todoist追加済のラベル整理。**完了疑いはダイジェストに載せるまで**（close しない）
   - 定期は取りこぼし保険（横断ダイジェスト）
 - **やらないこと**
-  - 全件を個別ボタン化、L1一括 create
+  - L1一括 create（番号／ボタンは1件ずつ）
   - 了承なしの対外送信・秘密の再掲
   - **完了 close**（→ **313＋オーナー確認二段**）
   - 815 からの自動起票提案
+  - GAS 5分 poll（見送り確定 2026-10-22。Slack ボタン本線）
+
+### Slack ボタン（313 同型・2026-10-22）
+
+- digest 投稿: `scripts/jarvis_todoist_312_digest.py` → Block Kit（起票／見送り）
+- 署名URL: `/api/g/t312/create|dismiss/…`（`todoist312SlackAction.ts`）
+- Interactivity: `consult-action` → `handleT312BlockAction` → Todoist `create`
+- 番号返信（`起票して 1,3`）は互換で残す
+- GAS PR #118 はクローズ（ボタンで代替）
 
 ### 受け渡し
 
