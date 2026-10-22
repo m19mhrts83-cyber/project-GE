@@ -20,10 +20,11 @@
 | 完了相当 | 随時 | 会話で完了相当 → 即スキャン | 313_digest |
 | 312／hawk | 随時 | 完了疑い・`owner_confirm` を合流 | 同上 |
 
-- 20:00 の投稿は**見るだけ**。閉じるのは人の「閉じて ✅N」（①）か、確認のみの自動close（②）だけ
-- 期日は人の「**リスケ 📅3,📅5**」でだけ動く（自動リスケなし）
+- 20:00 の投稿は**見るだけ**。閉じるのは人の「閉じて ✅N」／**完了するボタン**（①）か、確認のみの自動close（②）だけ
+- 期日は人の「**リスケ 📅N**」／**→日付へ延期ボタン**でだけ動く（自動リスケなし）
 - 書き出し先頭: `【相談】313 完了候補確認`（Webhook表示名も `313 完了候補確認`）
 - Slack返信拾い: `scripts/jarvis_todoist_313_slack_ingest.py`（✅→close／📅→リスケ。記号でスレ混在を避ける）
+- **L2ボタン**: Block Kit → `consult-action`／予備 URL `/api/g/t313/…`（確認画面あり）。Todoistリンクは詳細のみ
 - 停止: `JARVIS_TODOIST_313_DIGEST_DISABLE=1`（Slack投稿のみ停止／`--apply` は可）
 - ログ: `~/Library/Logs/jarvis_todoist_313_digest/`
 
@@ -151,7 +152,7 @@ flowchart TD
 | B ソフト（相乗りdigest） | **2026-10-22〜** |
 | C 定時digest | 初回通し成功翌日 or **2026-10-28** |
 | D 分類強化 | C安定1週後 |
-| E L2ボタン | テキスト了承が痛いとき |
+| E L2ボタン | **実装済 2026-10-22**（完了／延期ボタン。番号返信も併用可） |
 
 **停止**: `JARVIS_TODOIST_313_DIGEST_DISABLE=1`（digest／Slackのみ。`--apply` は可）
 
@@ -167,7 +168,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select 1
 ```
 
-**未実装（後続）**: Slack 採用ボタン（L2）、分類ML。※定時ジョブは 2026-10-21 に実装（毎日20:00）。微修正は本 flow を見て人が直す。
+**未実装（後続）**: 分類ML。L2ボタンは 2026-10-22 実装。※定時ジョブは毎日20:00。微修正は本 flow を見て人が直す。
 
 ## FlowForge 作り込みメモ
 

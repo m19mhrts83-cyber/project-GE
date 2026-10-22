@@ -193,9 +193,11 @@ def _format(items: list[dict], total: int) -> str:
         lines.append("")
     lines.extend(
         [
-            f"*リスケしてよければ {ITEM_MARK}番号で返信*",
-            f"「リスケ {ITEM_MARK}3,{ITEM_MARK}5」または「{ITEM_MARK}3,5」→ その番号の期日を案へ",
+            f"*リスケしてよければ {ITEM_MARK}番号で返信（またはボタン）*",
+            f"「→MM-DD へ延期」ボタン → 提案日へ移動（確認画面／アプリ内）",
+            f"「リスケ {ITEM_MARK}3,{ITEM_MARK}5」または「{ITEM_MARK}3,5」→ 番号で延期",
             "「全部そのまま」→ 何もしない（次回また出ます）",
+            "タイトルリンク → Todoist 詳細（リンクだけでは延期しません）",
             "※完了候補は別投稿の ✅番号（このスレではリスケのみ）",
             "",
             f"次: 人判断（リスケ {ITEM_MARK}N）",
@@ -287,6 +289,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--refresh", action="store_true")
+    ap.add_argument(
+        "--url-buttons",
+        action="store_true",
+        help="延期を URL ボタンにする（Interactivity 不要・確認画面あり）",
+    )
+    ap.add_argument("--force-webhook", action="store_true")
+    ap.add_argument("--blocks-preview", action="store_true")
     args = ap.parse_args(argv)
 
     top_n = max(1, min(args.top, MAX_TOP))
@@ -328,13 +337,46 @@ def main(argv: list[str] | None = None) -> int:
     print(text)
     print()
     print(f"📎 313 overdue: total={total} top={len(items)} state={STATE_PATH.name}")
-    if args.dry_run:
-        print("（--dry-run: Slack 未投稿）")
-        return 0
     if not items:
         print("超過0件のため投稿スキップ")
         return 0
-    return _post(text)
+
+    try:
+        from jarvis_todoist_313_slack_blocks import (  # type: ignore
+            build_reschedule_blocks,
+            prefer_url_mode,
+            post_slack,
+        )
+    except ImportError:
+        sys.path.insert(0, str(REPO / "scripts"))
+        from jarvis_todoist_313_slack_blocks import (  # type: ignore
+            build_reschedule_blocks,
+            prefer_url_mode,
+            post_slack,
+        )
+
+    url_mode = prefer_url_mode(force_url=bool(getattr(args, "url_buttons", False)))
+    for it in items:
+        it["title_short"] = _short(it.get("title") or "")
+    payload = build_reschedule_blocks(
+        items,
+        header_text="313 期日超過の整理",
+        fallback_text=text,
+        url_mode=url_mode,
+        total=total,
+    )
+    if getattr(args, "blocks_preview", False):
+        print("# blocks preview url_mode=", url_mode)
+        print(json.dumps(payload, ensure_ascii=False, indent=2)[:4000])
+    if args.dry_run:
+        print("（--dry-run: Slack 未投稿）")
+        return 0
+    return post_slack(
+        payload,
+        dry_run=False,
+        force_webhook=bool(getattr(args, "force_webhook", False)),
+        force_url_buttons=url_mode,
+    )
 
 
 if __name__ == "__main__":

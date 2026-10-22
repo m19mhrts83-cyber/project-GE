@@ -240,10 +240,11 @@ def _format_slack(items: list[dict[str, Any]], *, note: str = "") -> str:
     lines.extend(
         [
             "",
-            f"*閉じてよければ {ITEM_MARK}番号で返信*",
-            f"「閉じて {ITEM_MARK}1,{ITEM_MARK}3」または「{ITEM_MARK}1,3」→ その番号だけ完了",
+            f"*閉じてよければ {ITEM_MARK}番号で返信（またはボタン）*",
+            f"「完了する」ボタン → 1件ずつ完了（確認画面／アプリ内）",
+            f"「閉じて {ITEM_MARK}1,{ITEM_MARK}3」または「{ITEM_MARK}1,3」→ 番号で完了",
             "「全部残す」→ 何もしない（次回また出ます）",
-            "タイトルをタップ → Todoist の詳細（説明・コメント）",
+            "タイトルリンク → Todoist 詳細（リンクだけでは完了しません）",
             "※期日超過は別投稿の 📅番号（このスレでは完了のみ）",
             "",
             f"次: 人判断（閉じて {ITEM_MARK}N）",
@@ -378,13 +379,46 @@ def cmd_digest(args: argparse.Namespace) -> int:
     print()
     print(f"📎 313 digest: candidates={len(items)} state={STATE_PATH.name}")
 
-    if args.dry_run:
-        print("（--dry-run: Slack 未投稿）")
-        return 0
     if not items and not args.post_empty:
         print("候補0件のため Slack 投稿をスキップ（--post-empty で強制可）")
         return 0
-    return _post_webhook(text, channel="consult")
+
+    # Block Kit（完了ボタン）— Bot 本線／無ければ URL ボタン＋Webhook
+    try:
+        from jarvis_todoist_313_slack_blocks import (  # type: ignore
+            build_close_blocks,
+            prefer_url_mode,
+            post_slack,
+        )
+    except ImportError:
+        sys.path.insert(0, str(REPO / "scripts"))
+        from jarvis_todoist_313_slack_blocks import (  # type: ignore
+            build_close_blocks,
+            prefer_url_mode,
+            post_slack,
+        )
+
+    url_mode = prefer_url_mode(force_url=bool(getattr(args, "url_buttons", False)))
+    for it in items:
+        it["title_short"] = _short_title(it.get("title"))
+    payload = build_close_blocks(
+        items,
+        header_text="313 完了候補確認",
+        fallback_text=text,
+        url_mode=url_mode,
+    )
+    if getattr(args, "blocks_preview", False):
+        print("# blocks preview url_mode=", url_mode)
+        print(json.dumps(payload, ensure_ascii=False, indent=2)[:4000])
+    if args.dry_run:
+        print("（--dry-run: Slack 未投稿）")
+        return 0
+    return post_slack(
+        payload,
+        dry_run=False,
+        force_webhook=bool(getattr(args, "force_webhook", False)),
+        force_url_buttons=url_mode,
+    )
 
 
 def cmd_apply(args: argparse.Namespace) -> int:
@@ -514,6 +548,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--refresh", action="store_true", help="apply前に lane を再収集")
     p.add_argument("--skip-report", action="store_true", help="auto-close 時の #report 省略")
+    p.add_argument(
+        "--url-buttons",
+        action="store_true",
+        help="完了を URL ボタンにする（Interactivity 不要・確認画面あり）",
+    )
+    p.add_argument(
+        "--force-webhook",
+        action="store_true",
+        help="Bot があっても Incoming Webhook で投稿",
+    )
+    p.add_argument(
+        "--blocks-preview",
+        action="store_true",
+        help="Block Kit JSON を表示（dry-run と併用可）",
+    )
     args = p.parse_args(argv)
 
     if not args.apply and os.environ.get("JARVIS_TODOIST_313_DIGEST_DISABLE", "").strip() in (
