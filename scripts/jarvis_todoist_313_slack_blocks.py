@@ -32,15 +32,25 @@ def _dashboard() -> str:
     )
 
 
+def _action_secret_name() -> str:
+    """どの env で署名するかを返す（値は出さない）。"""
+    for name in (
+        "TODOIST_313_ACTION_TOKEN",
+        "PROPERTY_GATE_ACTION_TOKEN",
+        "MAIL_ACTION_TOKEN",
+        "TODOIST_API_TOKEN",
+    ):
+        if (os.environ.get(name) or "").strip():
+            return name
+    return ""
+
+
 def _action_secret() -> str:
     # 本線は PROPERTY_GATE（116/511と同系）。未設定時は Todoist トークンで署名
     # （Cloud／Vercel の両方に TODOIST_API_TOKEN があるため URL ボタンを通せる）
-    return (
-        (os.environ.get("TODOIST_313_ACTION_TOKEN") or "").strip()
-        or (os.environ.get("PROPERTY_GATE_ACTION_TOKEN") or "").strip()
-        or (os.environ.get("MAIL_ACTION_TOKEN") or "").strip()
-        or (os.environ.get("TODOIST_API_TOKEN") or "").strip()
-    )
+    # 検証側（Vercel）は候補キーをすべて試すので、署名キーが異なっても通る。
+    name = _action_secret_name()
+    return (os.environ.get(name) or "").strip() if name else ""
 
 
 def _bot_token() -> str:
@@ -358,9 +368,16 @@ def post_slack(
     force_url_buttons: bool = False,
 ) -> int:
     """Bot 優先。Bot 無し／force_webhook なら Incoming Webhook。"""
-    if not _action_secret():
+    sec_name = _action_secret_name()
+    if not sec_name:
         print(
-            "⚠️ PROPERTY_GATE_ACTION_TOKEN 未設定（URLボタン署名なし）",
+            "⚠️ 署名トークン未設定（URLボタンなし・番号返信を使用）",
+            file=sys.stderr,
+        )
+    elif sec_name != "PROPERTY_GATE_ACTION_TOKEN":
+        print(
+            f"ℹ️ 313 URL署名: {sec_name}"
+            "（本線は PROPERTY_GATE。Vercel は候補キーを照合）",
             file=sys.stderr,
         )
     use_bot = bool(_bot_token()) and not force_webhook and not force_url_buttons
