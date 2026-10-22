@@ -101,6 +101,30 @@ def _vercel_status_key(s: dict[str, Any]) -> str:
     return f"{ctx}|{sha}"[:240]
 
 
+def _is_rate_limit_status(s: dict[str, Any]) -> bool:
+    """Hobby の Deployment rate limited。コード修正では直らない。"""
+    desc = str(s.get("description") or "").lower()
+    url = str(s.get("target_url") or "").lower()
+    return (
+        "rate limited" in desc
+        or "rate limit" in desc
+        or "build-rate-limit" in url
+        or "upgradeToPro=build-rate-limit" in url
+    )
+
+
+def _is_hobby_cron_status(s: dict[str, Any]) -> bool:
+    """Hobby Cron 制限でデプロイ拒否されたとき（*/5 等）。"""
+    desc = str(s.get("description") or "").lower()
+    blob = f"{desc} {s.get('target_url') or ''}".lower()
+    if "cron" not in blob and "crons" not in blob:
+        return False
+    return any(
+        k in blob
+        for k in ("hobby", "once per day", "once-per-day", "1x per day", "per day")
+    )
+
+
 def _gh_json(args: list[str], timeout: int = 60) -> Any:
     cmd = ["gh", *args]
     out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, timeout=timeout)
@@ -170,18 +194,58 @@ def check_vercel_main(*, resolved_keys: set[str] | None = None) -> dict[str, Any
                     resolved_keys=sorted(resolved_keys),
                 ),
             }
+        rate_only = all(_is_rate_limit_status(s) for s in unresolved)
+        if rate_only:
+            bits = [
+                f"{s.get('context')}: {s.get('description') or s.get('state')}"
+                for s in unresolved
+            ]
+            return {
+                "id": "vercel_deploy",
+                "title": "Vercelデプロイ制限（Hobby）",
+                "category": "ops",
+                "level": "info",
+                "summary": (
+                    "Hobby のデプロイ回数上限。コード失敗ではない。"
+                    " 約24時間待つ／不要な再デプロイを減らす。"
+                    " 本番は直近成功デプロイのまま。"
+                    " " + " / ".join(bits)
+                )[:400],
+                "detail": unresolved[0].get("target_url"),
+                "source": "ops_fail_watch",
+                "cursor_prompt": (
+                    "Deployment rate limited はコード修正では直らない。"
+                    " 本番URLの生存を確認し、24時間後に再pushするか待つ。"
+                    " autofix 不要。必要なら `--note` でお知らせだけ出す。"
+                ),
+                "status": "active",
+                "checked_at": now_iso(),
+                "payload": _ephemeral_payload(
+                    show_banner=True,
+                    rate_limit_only=True,
+                    statuses=unresolved,
+                    fail_keys=[_vercel_status_key(s) for s in unresolved],
+                ),
+            }
         bits = []
         for s in unresolved:
             bits.append(
                 f"{s.get('context')}: {s.get('description') or s.get('state')}"
             )
         url = unresolved[0].get("target_url")
+        hobby_cron = any(_is_hobby_cron_status(s) for s in unresolved)
+        cron_hint = (
+            " Hobby Cron 制限の疑い: vercel.json の `*/5` 等を外し、"
+            " GHA schedule か launchd へ（`scripts/check_vercel_hobby_crons.py`）。"
+            if hobby_cron
+            else ""
+        )
         return {
             "id": "vercel_deploy",
             "title": "Vercelデプロイ失敗",
             "category": "ops",
             "level": "attention",
-            "summary": " / ".join(bits)[:400],
+            "summary": (" / ".join(bits) + cron_hint)[:400],
             "detail": url,
             "source": "ops_fail_watch",
             "cursor_prompt": (
@@ -190,6 +254,7 @@ def check_vercel_main(*, resolved_keys: set[str] | None = None) -> dict[str, Any
                 " `npm run build` を確認し、修正→push。直したら"
                 " `python scripts/jarvis_ops_fail_watch.py --push --note '…直した内容…'` で"
                 " ホームお知らせを出して。"
+                + cron_hint
             ),
             "status": "active",
             "checked_at": now_iso(),
@@ -197,6 +262,7 @@ def check_vercel_main(*, resolved_keys: set[str] | None = None) -> dict[str, Any
                 show_banner=True,
                 statuses=unresolved,
                 fail_keys=[_vercel_status_key(s) for s in unresolved],
+                hobby_cron_suspected=hobby_cron,
             ),
         }
 
