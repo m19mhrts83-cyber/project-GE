@@ -26,8 +26,9 @@
 | 2 | bank_sync_check（遅れ・欠落の数値化） | CLI | AI | `jarvis_zaim_bank_sync_check.py` |
 | 3 | stale 更新（OTP 可口座のみ自動試行） | Playwright | AI／OTP失敗時は人 | `jarvis_zaim_bank_sync_manual.py` / `reconnect` |
 | 4 | CSV export | Playwright | AI | `zaim_csv_export.py`（Mac） |
-| 5 | learn（前回 snapshot × 今回 CSV） | CLI | AI | `jarvis_zaim_learn.py`（runner 内） |
-| 6 | 高確信度の集計・費目 apply | CLI＋Playwright | AI | `jarvis_zaim_watch_runner.py` |
+| 5 | learn（CSV前後・その他=店名／他=店+金額） | CLI | AI | `jarvis_zaim_learn.py`（runner 内） |
+| 6 | 高確信度の集計・費目 apply（その他＋店+金額不一致） | CLI＋Playwright | AI | `jarvis_zaim_watch_runner.py` |
+| 6b | 直し／学習あれば `#report` | Webhook | AI | runner 内（確認用短報） |
 | 7 | snapshot 保存・changelog・Supabase push | CLI | AI | runner 末尾 |
 | 8 | 人が `/zaim` で確認（違うときだけ「おかしい」） | Web | **人が確かめる** | `/zaim` |
 | 9 | 残留 stale／連続失敗 → `#ops` または Todoist | Webhook | AI→人 | `SLACK_WEBHOOK_OPS` / bank_notify |
