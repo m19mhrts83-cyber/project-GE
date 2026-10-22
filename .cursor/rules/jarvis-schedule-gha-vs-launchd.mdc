@@ -32,6 +32,19 @@ alwaysApply: false
 
 迷ったら **launchd**。GHA 実験は `workflow_dispatch` のみにし、成功が続くまで schedule を付けない。
 
+## Vercel Cron は使わない（Hobby · 必須）
+
+| 置き場 | 5分間隔など高頻度 |
+|---|---|
+| **`apps/*/vercel.json` の `crons`** | **禁止**（Hobby は **1日1回まで**。`*/5` を入れると **デプロイ自体が失敗**） |
+| **GitHub Actions `on.schedule`** | 可（問合せ failover ping・317 failover 等） |
+| **Mac launchd `StartInterval`** | 可（317 コメント起動 300秒 等） |
+
+教訓（2026-10-22）: PR #127 が `/api/inquiry-send-failover` に Vercel Cron `*/5` を載せ → Production/Preview 失敗。#128 で Cron 削除＋GHA ping に切替。  
+検査: `python scripts/check_vercel_hobby_crons.py`（workflow `vercel-hobby-cron-check.yml`）。
+
+**混同しない**: 317 コメント起動の launchd／GHA は Jarvis ダッシュボードの Vercel Cron ではない。ダッシュの `agentTeam.json` 更新はデプロイを誘発しうるが、Cron エラーの原因ではない。
+
 ## 最近の例
 
 | 定例 | 置き場 |
