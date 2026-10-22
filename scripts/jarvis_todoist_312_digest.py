@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""312 L1ダイジェスト → Slack #consult（見るだけ）→ 了承後 create.
+"""312 L1ダイジェスト → Slack #consult → ボタン／番号了承後 create.
 
-Phase 1: ボタンUIなし。投稿は Webhook。create は `--apply --select`。
+投稿は Block Kit（起票／見送り）。番号返信・`--apply --select` も可。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   export PATH="$HOME/.local/bin:$HOME/.genspark-tool-cli/bin:$PATH"
@@ -416,6 +416,36 @@ def cmd_digest(args: argparse.Namespace) -> int:
     if not merged and not args.post_empty:
         print("候補0件のため Slack 投稿をスキップ（--post-empty で強制可）")
         return 0
+
+    # Block Kit（313 同型）。失敗時は従来テキスト Webhook にフォールバック
+    try:
+        from jarvis_todoist_312_slack_blocks import (
+            build_create_blocks,
+            post_slack,
+            prefer_url_mode,
+        )
+
+        url_mode = prefer_url_mode(force_url=bool(getattr(args, "url_buttons", False)))
+        header = "【312】Todoist起票候補（L1）"
+        if note:
+            header = f"{header} · {note[:40]}"
+        payload = build_create_blocks(
+            merged,
+            header_text=header,
+            fallback_text=text,
+            url_mode=url_mode,
+        )
+        rc = post_slack(
+            payload,
+            dry_run=False,
+            force_webhook=bool(getattr(args, "force_webhook", False)),
+            force_url_buttons=bool(getattr(args, "url_buttons", False)),
+        )
+        if rc == 0:
+            return 0
+        print(f"# block kit post rc={rc} → text webhook fallback", file=sys.stderr)
+    except Exception as e:
+        print(f"# block kit skip: {e} → text webhook", file=sys.stderr)
     return _post_consult(text)
 
 
@@ -538,6 +568,16 @@ def main(argv: list[str] | None = None) -> int:
         "--i-confirm-all",
         action="store_true",
         help="--select all の明示了承（通常は番号指定）",
+    )
+    p.add_argument(
+        "--url-buttons",
+        action="store_true",
+        help="Interactivity ではなく署名URLボタンで投稿",
+    )
+    p.add_argument(
+        "--force-webhook",
+        action="store_true",
+        help="Bot ではなく Incoming Webhook で投稿",
     )
     args = p.parse_args(argv)
     # 停止: ノイズ時は digest／Slack投稿を止める（applyは了承済み番号の消化のため許可）

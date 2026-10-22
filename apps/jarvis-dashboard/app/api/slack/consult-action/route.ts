@@ -25,6 +25,8 @@ import {
 } from "@/lib/mailActionSlackInteract";
 import { parseT313ButtonValue } from "@/lib/todoist313SlackAction";
 import { handleT313BlockAction } from "@/lib/todoist313SlackInteract";
+import { parseT312ButtonValue } from "@/lib/todoist312SlackAction";
+import { handleT312BlockAction } from "@/lib/todoist312SlackInteract";
 
 export const runtime = "nodejs";
 
@@ -39,6 +41,7 @@ export const runtime = "nodejs";
  * 業者返信 URL 予備: /api/g/vr/{action}/{id}?s=…
  * メール要対応 URL: /api/g/ma/{reply|skip|todoist}/{id}?s=…
  * 313 URL: /api/g/t313/close|reschedule/{task_id}?s=…
+ * 312 URL: /api/g/t312/create|dismiss/{n}?p=&s=…
  */
 
 function verifySlackSignature(
@@ -229,7 +232,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ response_action: "clear" });
     }
 
-    // --- block_actions（業者返信 / メール要対応 / 313 / 物件ゲート）---
+    // --- block_actions（業者返信 / メール要対応 / 312 / 313 / 物件ゲート）---
     const actions = Array.isArray(payload.actions) ? payload.actions : [];
     const act = (actions[0] || {}) as Record<string, unknown>;
     const value = String(act.value || "");
@@ -245,6 +248,17 @@ export async function POST(request: NextRequest) {
 
     if (parseT313ButtonValue(value)) {
       const result = await handleT313BlockAction({
+        value,
+        responseUrl,
+      });
+      return NextResponse.json({
+        response_type: "ephemeral",
+        text: result.text,
+      });
+    }
+
+    if (parseT312ButtonValue(value)) {
+      const result = await handleT312BlockAction({
         value,
         responseUrl,
       });

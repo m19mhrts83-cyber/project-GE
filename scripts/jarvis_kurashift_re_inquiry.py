@@ -18,7 +18,9 @@ import base64
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.utils import parseaddr, parsedate_to_datetime
@@ -33,6 +35,7 @@ from googleapiclient.discovery import build
 REPO = Path(__file__).resolve().parents[1]
 MANUAL = REPO / "215_kamiooya" / "C1_cursor" / "1b_Cursorマニュアル"
 TEMPLATE_PATH = REPO / "config" / "kurashift_re_inquiry_template.yaml"
+GATE_311 = REPO / "scripts" / "jarvis_send_gate_311.py"
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.modify",
@@ -66,6 +69,101 @@ def sb_client() -> Any:
 
 def load_template() -> dict[str, Any]:
     return yaml.safe_load(TEMPLATE_PATH.read_text(encoding="utf-8")) or {}
+
+
+def _run_inquiry_311_gate(
+    *, to_email: str, subject: str, body: str
+) -> dict[str, Any]:
+    """311 ルールエンジン（LLMなし）。OK なら ok=True。無効化可。"""
+    if os.environ.get("JARVIS_INQUIRY_311_DISABLE", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return {"ok": True, "skipped": "disabled"}
+    if not GATE_311.is_file():
+        return {"ok": True, "skipped": "gate_script_missing"}
+    py = sys.executable
+    draft_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix="_inquiry_311.txt",
+            delete=False,
+        ) as fh:
+            fh.write(f"To: {to_email}\n")
+            fh.write(f"件名: {subject}\n\n")
+            fh.write(body or "")
+            fh.write("\n")
+            draft_path = fh.name
+        cmd = [
+            py,
+            str(GATE_311),
+            "--draft",
+            draft_path,
+            "--source",
+            "kurashift_inquiry",
+            "--resolved-to",
+            to_email,
+            "--dry-run",
+        ]
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, cwd=str(REPO), timeout=90
+        )
+        out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+        overall = "OK" if proc.returncode == 0 else "NG"
+        reason = ""
+        for line in out.splitlines():
+            if line.startswith("reason="):
+                reason = line[len("reason=") :].strip()
+            if line.startswith("overall="):
+                overall = line[len("overall=") :].strip() or overall
+        if proc.returncode == 0 and overall.upper() == "OK":
+            return {"ok": True, "overall": "OK"}
+        # Slack 通知（NG 時のみ・失敗しても送信は止める）
+        try:
+            subprocess.run(
+                [
+                    py,
+                    str(REPO / "scripts" / "jarvis_slack_webhook_post.py"),
+                    "--channel",
+                    "consult",
+                    "--username",
+                    "311 送信前品質",
+                    "--text",
+                    (
+                        "【相談】311 送信前品質｜物件問合せ NG\n"
+                        f"- To: {to_email}\n"
+                        f"- 件名: {subject[:80]}\n"
+                        f"- 理由: {reason or overall}\n"
+                        "- 次: 人判断のみ\n"
+                        "担当メモ: kurashift first_inquiry を止めた\n"
+                        "橋渡し: To／本文を直してから再 Yes"
+                    ),
+                ],
+                capture_output=True,
+                text=True,
+                cwd=str(REPO),
+                timeout=30,
+            )
+        except Exception:
+            pass
+        return {
+            "ok": False,
+            "overall": overall,
+            "reason": reason or f"exit={proc.returncode}",
+            "log_tail": out[-800:],
+        }
+    except Exception as e:
+        # ゲート自体の障害で送信を止めすぎない（誤送より到達性を優先したい場合は厳格化可）
+        return {"ok": True, "skipped": f"gate_error:{type(e).__name__}"}
+    finally:
+        if draft_path:
+            try:
+                Path(draft_path).unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 def _token_name_for_account(account: str) -> str:
@@ -441,6 +539,22 @@ def send_inquiry(
         return out
     if not confirm and not dry_run:
         return {"ok": False, "error": "need --i-confirm-send or --dry-run"}
+
+    # 311 送信前品質（誤送防止）。二重送信ロックではない。
+    if confirm and not dry_run and not handoff:
+        gate = _run_inquiry_311_gate(
+            to_email=to_email, subject=subject, body=body
+        )
+        if not gate.get("ok"):
+            out = {
+                "ok": False,
+                "error": f"gate_311_ng:{gate.get('reason') or 'NG'}",
+                "deal_id": deal_id,
+                "to": to_email,
+                "gate_311": gate,
+            }
+            print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
+            return out
 
     # at-most-once: 同種のみスキップ（grok_handoff 済でも仲介への first_inquiry は送る）
     target_kind = "grok_handoff" if handoff else "first_inquiry"
