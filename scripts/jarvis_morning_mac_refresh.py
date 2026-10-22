@@ -66,6 +66,7 @@ MEETING_MINUTES_CURATE = REPO / "scripts" / "jarvis_meeting_minutes_curate.py"
 VENDOR_REPLY_TRIAGE = REPO / "scripts" / "jarvis_kurashift_vendor_reply_triage.py"
 MAIL_ACTION_SLACK = REPO / "scripts" / "jarvis_mail_action_slack_post.py"
 SLACK_REPORT_FB_POLL = REPO / "scripts" / "jarvis_slack_report_fb_poll.py"
+COMMENT_DISPATCH = REPO / "scripts" / "jarvis_comment_dispatch.py"
 VENDOR_CATCHUP = REPO / "scripts" / "jarvis_triage_vendor_catchup.py"
 POC = REPO / "line_unofficial_poc"
 RUN_PATCH = POC / "run_patch.sh"
@@ -1143,6 +1144,28 @@ def main() -> int:
             print(f"# slack_report_fb_poll soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["slack_report_fb_poll"] = "skipped"
+
+    # 2c2d. 317 コメント起動（FB＋Todoist Webhook・soft-fail。専用 launchd 本線）
+    if COMMENT_DISPATCH.is_file() and not args.skip_fetch:
+        if os.environ.get("JARVIS_COMMENT_DISPATCH_DISABLE", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            results["steps"]["comment_dispatch_317"] = "skipped"
+        else:
+            rc = run_step(
+                "comment_dispatch_317",
+                [exe, str(COMMENT_DISPATCH), "--apply"],
+                timeout=180,
+                dry_run=args.dry_run,
+            )
+            results["steps"]["comment_dispatch_317"] = rc
+            if rc != 0:
+                print(f"# comment_dispatch_317 soft-fail rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["comment_dispatch_317"] = "skipped"
 
     if VENDOR_CATCHUP.is_file():
         rc = run_step(

@@ -18,7 +18,7 @@ builder_source:
   url: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
   previous_share_id: eHKHNixTpIF4G5WN
 updated: '2026-10-21'
-builder_sync_note: 2026-10-21 Jarvisが617資金移動係（J専）をregistry追加（42体・人が頼む／実行はJarvis専属）。Builder組織図反映は次（表示名に（J専））。
+builder_sync_note: 2026-10-22 Jarvisが317コメント起動係をregistry追加（設計中）。Builder組織図・FlowForge・ダッシュ/agent-team反映を同一着手で実施。
 mixup_doc: 16_GrokBot対応_ミックスアップ識別_20261010.md
 numbering: '3桁固定ID。百の位＝部門、十の位＝まとまり、一の位＝社員。
 
@@ -222,6 +222,19 @@ agents:
     tool_fit: B
     tool_notes: 日次／夜間データ点検。将来Claude
     schedule: 夜間ずらす
+  '317':
+    name: コメント起動係
+    path: 300_品質・タスク運用管理室/317_コメント起動係
+    flowforge_id: flow_8mwIkbI0S9kV2u5kSwl2I-Oi
+    flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi
+    status: 設計中
+    report: report
+    trigger: 時間＋イベント
+    tool_assigned: jarvis
+    tool_fit: B
+    tool_notes: Slack FB／Todoistコメント常駐。Mac本線＋GHA L1冗長＋Cloud L2（枠あり）。GAS不使用
+    schedule: launchd 2〜5分 / GHA stale 5分
+    note: 2026-10-22 新設。設計正本 44_コメント常駐起動_317。Phase A=Ack／Phase B=許可リストAI。Builder／FlowForge／share反映済
   '411':
     name: Grok材料取込係
     path: 400_ミックス・取捨判断室/411_Grok材料取込係
