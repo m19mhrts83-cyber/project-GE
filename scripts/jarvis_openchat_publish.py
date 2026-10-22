@@ -2,20 +2,22 @@
 """line_openchat_logs: staging → ready / excluded（ノイズのみ除外・漏れなく公開）
 
 方針:
-  - 既定はほぼ全件 ready（検索公開）
+  - 既定は **staging のみ** を評価（差分 sync と対）
   - NOISE_MARKERS（物件チラシ定型等）または空／非テキストのみ → excluded
   - 物件紹介ルート丸ごと除外はしない
+  - 更新は return=minimal（embedding をレスポンスに載せない）
+  - ノイズ規則の全面再適用は --reclassify-all
 
 使用例:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_openchat_publish.py --dry-run
   python scripts/jarvis_openchat_publish.py --apply
+  python scripts/jarvis_openchat_publish.py --apply --reclassify-all
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,8 +51,17 @@ def is_noise(content: str) -> bool:
     return False
 
 
-def fetch_all_staging_and_ready(sb: Any) -> list[dict[str, Any]]:
-    """staging / ready / excluded を再評価対象に含める（再 publish 可）。"""
+def fetch_publish_targets(
+    sb: Any,
+    *,
+    reclassify_all: bool,
+) -> list[dict[str, Any]]:
+    """既定は staging のみ。--reclassify-all で全ステータス再評価。"""
+    statuses = (
+        ["staging", "ready", "excluded", "active"]
+        if reclassify_all
+        else ["staging"]
+    )
     rows: list[dict[str, Any]] = []
     page = 1000
     offset = 0
@@ -58,7 +69,7 @@ def fetch_all_staging_and_ready(sb: Any) -> list[dict[str, Any]]:
         res = (
             sb.table("line_openchat_logs")
             .select("id,content,ingest_status")
-            .in_("ingest_status", ["staging", "ready", "excluded", "active"])
+            .in_("ingest_status", statuses)
             .range(offset, offset + page - 1)
             .execute()
         )
@@ -70,10 +81,49 @@ def fetch_all_staging_and_ready(sb: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def _update_status_minimal(sb: Any, ids: list[str], status: str, now: str) -> int:
+    if not ids:
+        return 0
+    n = 0
+    batch = 80
+    for i in range(0, len(ids), batch):
+        chunk = ids[i : i + batch]
+        try:
+            from postgrest.types import ReturnMethod  # type: ignore
+
+            sb.table("line_openchat_logs").update(
+                {"ingest_status": status, "updated_at": now},
+                returning=ReturnMethod.minimal,
+            ).in_("id", chunk).execute()
+            n += len(chunk)
+        except TypeError:
+            res = (
+                sb.table("line_openchat_logs")
+                .update({"ingest_status": status, "updated_at": now})
+                .in_("id", chunk)
+                .execute()
+            )
+            n += len(res.data or chunk)
+        except Exception:
+            res = (
+                sb.table("line_openchat_logs")
+                .update({"ingest_status": status, "updated_at": now})
+                .in_("id", chunk)
+                .execute()
+            )
+            n += len(res.data or chunk)
+    return n
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish LINE openchat logs to ready/excluded")
     parser.add_argument("--dry-run", action="store_true", help="件数だけ表示（既定）")
     parser.add_argument("--apply", action="store_true", help="DB を更新")
+    parser.add_argument(
+        "--reclassify-all",
+        action="store_true",
+        help="ready/excluded も含め全件を再分類（ノイズ規則変更時）",
+    )
     args = parser.parse_args()
     do_apply = bool(args.apply)
     if not do_apply and not args.dry_run:
@@ -83,21 +133,29 @@ def main() -> int:
         load_dotenv_file(p)
     sb = qa_sb()
 
-    rows = fetch_all_staging_and_ready(sb)
+    rows = fetch_publish_targets(sb, reclassify_all=bool(args.reclassify_all))
     ready_ids: list[str] = []
     excluded_ids: list[str] = []
+    skipped_same = 0
     for r in rows:
         rid = str(r.get("id") or "")
         if not rid:
             continue
-        if is_noise(str(r.get("content") or "")):
+        want = "excluded" if is_noise(str(r.get("content") or "")) else "ready"
+        cur = str(r.get("ingest_status") or "")
+        if cur == want:
+            skipped_same += 1
+            continue
+        if want == "excluded":
             excluded_ids.append(rid)
         else:
             ready_ids.append(rid)
 
+    scope = "reclassify-all" if args.reclassify_all else "staging-only"
     print(
-        f"📎 openchat publish — 対象 {len(rows)} 件"
-        f" / ready候補 {len(ready_ids)} / excluded候補 {len(excluded_ids)}"
+        f"📎 openchat publish — scope={scope} 読取 {len(rows)} 件"
+        f" / readyへ {len(ready_ids)} / excludedへ {len(excluded_ids)}"
+        f" / 同一スキップ {skipped_same}"
         f" / mode={'APPLY' if do_apply else 'DRY-RUN'}"
     )
     if not do_apply:
@@ -106,25 +164,11 @@ def main() -> int:
 
     now = datetime.now(timezone.utc).isoformat()
     upserted = 0
-    batch = 80
-
-    def bump(ids: list[str], status: str) -> int:
-        n = 0
-        for i in range(0, len(ids), batch):
-            chunk = ids[i : i + batch]
-            # upsert だと必須列が null になり失敗するため update のみ
-            res = (
-                sb.table("line_openchat_logs")
-                .update({"ingest_status": status, "updated_at": now})
-                .in_("id", chunk)
-                .execute()
-            )
-            n += len(res.data or [])
-        return n
-
-    upserted += bump(ready_ids, "ready")
-    upserted += bump(excluded_ids, "excluded")
-    print(f"✅ UPSERT 応答行数: {upserted}（ready={len(ready_ids)} excluded={len(excluded_ids)}）")
+    upserted += _update_status_minimal(sb, ready_ids, "ready", now)
+    upserted += _update_status_minimal(sb, excluded_ids, "excluded", now)
+    print(
+        f"✅ 更新行数: {upserted}（ready={len(ready_ids)} excluded={len(excluded_ids)}）"
+    )
     return 0
 
 
