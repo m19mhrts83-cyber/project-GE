@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Zaim 費目学習: 前回スナップショット × 今回 CSV の差分からルールを更新する。
+Zaim 費目学習: CSV 前後差分（＋旧 snapshot）からルールを更新する。
+
+学習キーは「店＋金額」（Amazon 等の店単独誤爆を避ける）。
+同一キーへ同費目の直しが count>=2 貯まると自動適用可。
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   python scripts/jarvis_zaim_learn.py
@@ -32,6 +35,7 @@ STATE = REPO / ".jarvis_state"
 CFG_PATH = REPO / "config" / "zaim_quality_watch.yaml"
 RULES_PATH = STATE / "zaim_learn_rules.json"
 SNAPSHOT_PATH = STATE / "zaim_learn_snapshot.json"
+CSV_INDEX_PATH = STATE / "zaim_learn_csv_index.json"
 LAST_PATH = STATE / "zaim_learn_last.json"
 CHANGELOG_PATH = STATE / "zaim_watch_changelog.json"
 AUTO_MIN_DEFAULT = 2
@@ -53,26 +57,35 @@ def shop_key(s: str) -> str:
     return s[:24]
 
 
-def yen_of(r: dict[str, str]) -> float:
+def yen_of(r: dict[str, str] | dict[str, Any]) -> float:
     try:
-        return float(r.get("支出") or 0) or 0.0
-    except ValueError:
+        return float(r.get("支出") or r.get("amount") or 0) or 0.0
+    except (TypeError, ValueError):
         return 0.0
 
 
-def learn_key(shop: str, item: str = "") -> str:
-    sk = shop_key(shop)
-    if sk:
-        return sk
-    return shop_key(item)
+def amount_int(amount: float | int | str | None) -> int:
+    try:
+        return int(round(float(amount or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def learn_key(
+    shop: str,
+    item: str = "",
+    amount: float | int | str | None = None,
+) -> str:
+    """店（なければ品目）＋金額。適用・学習の共通キー。"""
+    sk = shop_key(shop) or shop_key(item)
+    if not sk:
+        return ""
+    return f"{sk}|{amount_int(amount)}"
 
 
 def row_key(r: dict[str, str] | dict[str, Any]) -> str:
     date = str(r.get("日付") or r.get("date") or "")[:10].replace("/", "-")
-    try:
-        amt = int(round(float(r.get("支出") or r.get("amount") or 0)))
-    except (TypeError, ValueError):
-        amt = 0
+    amt = amount_int(yen_of(r))
     shop = str(r.get("お店") or r.get("shop") or "").strip()
     pay = str(r.get("支払元") or r.get("pay") or "").strip()
     method = str(r.get("方法") or r.get("method") or "payment").strip()
@@ -134,6 +147,57 @@ def save_snapshot(data: dict[str, Any]) -> None:
     SNAPSHOT_PATH.write_text(
         json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+
+
+def load_csv_index() -> dict[str, Any]:
+    if CSV_INDEX_PATH.is_file():
+        try:
+            data = json.loads(CSV_INDEX_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("rows"), dict):
+                return data
+        except Exception:
+            pass
+    return {"updated_at": None, "csv": None, "rows": {}}
+
+
+def save_csv_index(data: dict[str, Any]) -> None:
+    CSV_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    data["updated_at"] = now_iso()
+    CSV_INDEX_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def build_csv_index(
+    payments: list[dict[str, str]], *, csv_path: str = ""
+) -> dict[str, Any]:
+    rows: dict[str, dict[str, Any]] = {}
+    for r in payments:
+        if (r.get("方法") or "") != "payment":
+            continue
+        try:
+            if float(r.get("振替") or 0) != 0:
+                continue
+        except ValueError:
+            pass
+        amt = yen_of(r)
+        if amt <= 0:
+            continue
+        rk = row_key(r)
+        shop = (r.get("お店") or "").strip()
+        item = (r.get("品目") or "").strip()
+        rows[rk] = {
+            "row_key": rk,
+            "date": str(r.get("日付") or "")[:10],
+            "amount": amount_int(amt),
+            "shop": shop,
+            "item": item,
+            "pay": (r.get("支払元") or "").strip(),
+            "category": (r.get("カテゴリ") or "").strip(),
+            "genre": (r.get("カテゴリの内訳") or "").strip(),
+            "learn_key": learn_key(shop, item, amt),
+        }
+    return {"csv": csv_path, "rows": rows}
 
 
 def auto_min(rules: dict[str, Any] | None = None) -> int:
@@ -230,7 +294,14 @@ def apply_disputed_suppressions(rules: dict[str, Any]) -> int:
         ) in ("set_category", "category_review")
         if not is_cat:
             continue
-        key = str(e.get("learn_key") or learn_key(str(e.get("shop") or ""), str(e.get("item") or "")))
+        key = str(
+            e.get("learn_key")
+            or learn_key(
+                str(e.get("shop") or ""),
+                str(e.get("item") or ""),
+                e.get("amount"),
+            )
+        )
         if not key:
             continue
         disputed_keys.add(key)
@@ -281,12 +352,13 @@ def resolve_suggestion(
     shop: str,
     item: str,
     *,
+    amount: float | int | str | None = None,
     yaml_rules: list[dict[str, Any]] | None = None,
     rules: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """学習ルール優先。count>=2 なら high、それ以外の提案は low。"""
+    """学習ルール優先（店＋金額）。count>=2 なら high。YAML は店名キーワードのみ low。"""
     data = rules if rules is not None else load_rules()
-    key = learn_key(shop, item)
+    key = learn_key(shop, item, amount)
     learned = (data.get("rules") or {}).get(key) if key else None
     yaml_suggest = suggest_from_yaml(shop, item, yaml_rules or [])
     out: dict[str, Any] = {
@@ -357,7 +429,14 @@ def learn_from_snapshot(
         ).strip()
         if csv_cat == baseline:
             continue
-        key = str(row.get("learn_key") or learn_key(row.get("shop") or "", row.get("item") or ""))
+        key = str(
+            row.get("learn_key")
+            or learn_key(
+                row.get("shop") or "",
+                row.get("item") or "",
+                row.get("amount"),
+            )
+        )
         if not key:
             continue
         upsert_rule(
@@ -376,6 +455,59 @@ def learn_from_snapshot(
                 "to": csv_cat,
                 "genre": csv_gen,
                 "shop": row.get("shop"),
+                "amount": row.get("amount"),
+            }
+        )
+    return learned
+
+
+def learn_from_csv_diff(
+    prev_index: dict[str, Any],
+    csv_index: dict[str, dict[str, str]],
+    rules: dict[str, Any],
+    suspicious: list[str],
+) -> list[dict[str, Any]]:
+    """前回 CSV 索引 × 今回 CSV: 同一 row_key で費目が変わったら学習（店＋金額キー）。"""
+    learned: list[dict[str, Any]] = []
+    prev_rows = prev_index.get("rows") or {}
+    if not isinstance(prev_rows, dict) or not prev_rows:
+        return learned
+    for rk, prev in prev_rows.items():
+        if not isinstance(prev, dict):
+            continue
+        cur = csv_index.get(rk)
+        if not cur:
+            continue
+        prev_cat = str(prev.get("category") or "").strip()
+        csv_cat = (cur.get("カテゴリ") or "").strip()
+        csv_gen = (cur.get("カテゴリの内訳") or "").strip()
+        if not csv_cat or csv_cat == prev_cat:
+            continue
+        if is_suspicious(csv_cat, suspicious):
+            continue
+        shop = (cur.get("お店") or prev.get("shop") or "").strip()
+        item = (cur.get("品目") or prev.get("item") or "").strip()
+        amt = amount_int(yen_of(cur) or prev.get("amount"))
+        key = learn_key(shop, item, amt)
+        if not key:
+            continue
+        upsert_rule(
+            rules,
+            key,
+            csv_cat,
+            genre=csv_gen,
+            source="csv_before_after",
+            last_from=str(cur.get("日付") or prev.get("date") or "")[:10],
+        )
+        learned.append(
+            {
+                "learn_key": key,
+                "row_key": rk,
+                "from": prev_cat,
+                "to": csv_cat,
+                "genre": csv_gen,
+                "shop": shop,
+                "amount": amt,
             }
         )
     return learned
@@ -386,18 +518,19 @@ def bootstrap_from_csv(
     rules: dict[str, Any],
     suspicious: list[str],
 ) -> int:
-    """店ごとに非・その他カテゴリが2件以上で優勢なら seed（既存ルールは潰さない）。"""
+    """店＋金額ごとに非・その他カテゴリが2件以上で優勢なら seed（既存ルールは潰さない）。"""
     by_key: dict[str, Counter[str]] = defaultdict(Counter)
     genre_of: dict[tuple[str, str], Counter[str]] = defaultdict(Counter)
     for r in payments:
         if (r.get("方法") or "") != "payment":
             continue
-        if yen_of(r) <= 0:
+        amt = yen_of(r)
+        if amt <= 0:
             continue
         cat = (r.get("カテゴリ") or "").strip()
         if is_suspicious(cat, suspicious):
             continue
-        key = learn_key(r.get("お店") or "", r.get("品目") or "")
+        key = learn_key(r.get("お店") or "", r.get("品目") or "", amt)
         if not key:
             continue
         by_key[key][cat] += 1
@@ -458,7 +591,8 @@ def snapshot_from_reviews(
                 "item": c.get("item"),
                 "pay": c.get("pay"),
                 "method": c.get("method") or "payment",
-                "learn_key": c.get("learn_key") or learn_key(c.get("shop") or "", c.get("item") or ""),
+                "learn_key": c.get("learn_key")
+                or learn_key(c.get("shop") or "", c.get("item") or "", c.get("amount")),
                 "category_before": before,
                 "genre_before": c.get("genre") or "",
                 "category_after_auto": after,
@@ -489,6 +623,7 @@ def run(*, dry_run: bool = False, year: int | None = None) -> dict[str, Any]:
     suspicious = suspicious_substrings(cfg)
     suppressed_n = apply_disputed_suppressions(rules)
     snapshot = load_snapshot()
+    prev_csv_index = load_csv_index()
     payments: list[dict[str, str]] = []
     if csv_path and csv_path.is_file():
         payments = [
@@ -497,22 +632,43 @@ def run(*, dry_run: bool = False, year: int | None = None) -> dict[str, Any]:
             if r.get("方法") == "payment"
         ]
     csv_index = index_csv_rows(payments)
-    diffs = learn_from_snapshot(snapshot, csv_index, rules, suspicious)
+    # 本線: 前回CSV索引 × 今回CSV。snapshot は索引が無い移行期のフォールバック。
+    diffs_csv = learn_from_csv_diff(prev_csv_index, csv_index, rules, suspicious)
+    learned_rks = {str(d.get("row_key") or "") for d in diffs_csv if d.get("row_key")}
+    snap_for_learn = snapshot
+    if learned_rks:
+        snap_for_learn = {
+            **snapshot,
+            "rows": [
+                r
+                for r in (snapshot.get("rows") or [])
+                if str(r.get("row_key") or "") not in learned_rks
+            ],
+        }
+    diffs_snap = learn_from_snapshot(snap_for_learn, csv_index, rules, suspicious)
+    diffs = diffs_csv + diffs_snap
     boot_n = bootstrap_from_csv(payments, rules, suspicious)
     ready = [
         {"key": k, **v}
         for k, v in (rules.get("rules") or {}).items()
         if can_auto(v, min_count=auto_min(rules))
     ]
+    new_index = build_csv_index(
+        payments, csv_path=str(csv_path) if csv_path else ""
+    )
     report = {
         "updated_at": now_iso(),
         "csv": str(csv_path) if csv_path else None,
         "snapshot_rows": len(snapshot.get("rows") or []),
+        "csv_index_rows": len(prev_csv_index.get("rows") or {}),
         "learned_n": len(diffs),
+        "learned_csv_n": len(diffs_csv),
+        "learned_snapshot_n": len(diffs_snap),
         "bootstrap_n": boot_n,
         "suppressed_n": suppressed_n,
         "ready_auto_n": len(ready),
         "rule_count": len(rules.get("rules") or {}),
+        "learn_key_mode": "shop_amount",
         "examples": diffs[:8],
         "ready_examples": [
             {
@@ -527,6 +683,7 @@ def run(*, dry_run: bool = False, year: int | None = None) -> dict[str, Any]:
     }
     if not dry_run:
         save_rules(rules)
+        save_csv_index(new_index)
         LAST_PATH.write_text(
             json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
@@ -535,22 +692,29 @@ def run(*, dry_run: bool = False, year: int | None = None) -> dict[str, Any]:
 
 def _self_test() -> int:
     rules = empty_rules(2)
-    upsert_rule(rules, "アオキ", "β.2C.食費", source="user_csv_diff", last_from="2026-08-01")
-    r1 = resolve_suggestion("アオキ", "", yaml_rules=[], rules=rules)
+    k = learn_key("アオキ", "", 1234)
+    assert k == f"{shop_key('アオキ')}|1234", k
+    # 金額が違えば別キー（Amazon 誤爆防止）
+    assert learn_key("Amazon", "", 1000) != learn_key("Amazon", "", 2000)
+    upsert_rule(rules, k, "β.2C.食費", source="user_csv_diff", last_from="2026-08-01")
+    r1 = resolve_suggestion("アオキ", "", amount=1234, yaml_rules=[], rules=rules)
     assert r1["suggest"] == "β.2C.食費"
     assert r1["confidence"] == "low"
     assert r1["count"] == 1
-    upsert_rule(rules, "アオキ", "β.2C.食費", source="user_csv_diff", last_from="2026-08-08")
-    r2 = resolve_suggestion("アオキ", "", yaml_rules=[], rules=rules)
+    # 同店・別金額は未学習
+    r1b = resolve_suggestion("アオキ", "", amount=9999, yaml_rules=[], rules=rules)
+    assert r1b["suggest"] is None
+    upsert_rule(rules, k, "β.2C.食費", source="user_csv_diff", last_from="2026-08-08")
+    r2 = resolve_suggestion("アオキ", "", amount=1234, yaml_rules=[], rules=rules)
     assert r2["confidence"] == "high", r2
-    assert can_auto((rules["rules"]["アオキ"]))
-    upsert_rule(rules, "アオキ", "β.5C.日用雑貨", source="user_csv_diff", last_from="2026-08-15")
-    r3 = resolve_suggestion("アオキ", "", yaml_rules=[], rules=rules)
+    assert can_auto((rules["rules"][k]))
+    upsert_rule(rules, k, "β.5C.日用雑貨", source="user_csv_diff", last_from="2026-08-15")
+    r3 = resolve_suggestion("アオキ", "", amount=1234, yaml_rules=[], rules=rules)
     assert r3["confidence"] == "low"
-    assert rules["rules"]["アオキ"]["conflict"] is True
+    assert rules["rules"][k]["conflict"] is True
     yaml_rules = [{"suggest": "β.2C.食費", "keywords": ["アオキ"]}]
     empty = empty_rules()
-    r4 = resolve_suggestion("アオキ", "", yaml_rules=yaml_rules, rules=empty)
+    r4 = resolve_suggestion("アオキ", "", amount=1234, yaml_rules=yaml_rules, rules=empty)
     assert r4["source"] == "yaml" and r4["confidence"] == "low"
     snap = {
         "rows": [
@@ -558,10 +722,11 @@ def _self_test() -> int:
                 "row_key": "2026-08-10|500|ダイソー|Olive|payment",
                 "shop": "ダイソー",
                 "item": "",
+                "amount": 500,
                 "date": "2026-08-10",
                 "category_before": "β.12.C.その他/使途不明",
                 "category_after_auto": "β.12.C.その他/使途不明",
-                "learn_key": shop_key("ダイソー"),
+                "learn_key": learn_key("ダイソー", "", 500),
             }
         ]
     }
@@ -580,6 +745,37 @@ def _self_test() -> int:
         snap, {row_key(csv_row): csv_row}, empty_rules(), ["その他", "使途不明"]
     )
     assert len(learned) == 1
+    # CSV 前後差分
+    prev = {
+        "rows": {
+            "2026-09-01|160|コークオン|Olive|payment": {
+                "category": "β.2C.食費",
+                "shop": "コークオン",
+                "item": "",
+                "amount": 160,
+                "date": "2026-09-01",
+            }
+        }
+    }
+    cur_row = {
+        "日付": "2026-09-01",
+        "支出": "160",
+        "お店": "コークオン",
+        "支払元": "Olive",
+        "方法": "payment",
+        "カテゴリ": "A.C.会社費用",
+        "カテゴリの内訳": "",
+        "振替": "0",
+        "残高調整": "",
+    }
+    rules2 = empty_rules(2)
+    learned2 = learn_from_csv_diff(
+        prev, {row_key(cur_row): cur_row}, rules2, ["その他", "使途不明"]
+    )
+    assert len(learned2) == 1
+    assert learned2[0]["to"] == "A.C.会社費用"
+    ck = learn_key("コークオン", "", 160)
+    assert rules2["rules"][ck]["count"] == 1
     print("# self-test ok")
     return 0
 

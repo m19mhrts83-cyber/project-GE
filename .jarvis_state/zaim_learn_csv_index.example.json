@@ -1,0 +1,17 @@
+{
+  "updated_at": null,
+  "csv": "",
+  "rows": {
+    "2026-09-01|160|コークオン|Olive|payment": {
+      "row_key": "2026-09-01|160|コークオン|Olive|payment",
+      "date": "2026-09-01",
+      "amount": 160,
+      "shop": "コークオン",
+      "item": "",
+      "pay": "Olive",
+      "category": "β.2C.食費",
+      "genre": "",
+      "learn_key": "コークオン|160"
+    }
+  }
+}

@@ -127,7 +127,9 @@ def learn_from_apply(p: dict[str, Any], *, ok: bool) -> None:
     key = str(p.get("learn_key") or "").strip()
     if not key:
         key = zlearn.learn_key(
-            str(p.get("shop") or ""), str(p.get("item") or "")
+            str(p.get("shop") or ""),
+            str(p.get("item") or ""),
+            p.get("amount"),
         )
     cat = str(p.get("category") or "").strip()
     gen = str(p.get("genre") or "").strip()

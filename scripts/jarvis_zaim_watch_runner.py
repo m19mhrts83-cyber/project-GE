@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -28,6 +29,8 @@ STATE = REPO / ".jarvis_state"
 WATCH_PATH = STATE / "zaim_quality_watch.json"
 CHANGELOG_PATH = STATE / "zaim_watch_changelog.json"
 REVIEW_BATCH_PATH = STATE / "zaim_review_batch.json"
+LAST_LEARN_PATH = STATE / "zaim_learn_last.json"
+SLACK_POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 EXE = str(PY) if PY.is_file() else sys.executable
 
@@ -325,7 +328,11 @@ def apply_actions(actions: list[dict[str, Any]], *, dry_run: bool, limit: int) -
                 "pay": a.get("pay"),
                 "kind": a.get("action") or "set_aggregate",
                 "learn_key": a.get("learn_key")
-                or zlearn.learn_key(str(a.get("shop") or ""), str(a.get("item") or "")),
+                or zlearn.learn_key(
+                    str(a.get("shop") or ""),
+                    str(a.get("item") or ""),
+                    a.get("amount"),
+                ),
                 "row_key": a.get("row_key"),
                 "item": a.get("item"),
                 "batch_id": None,
@@ -471,6 +478,78 @@ def write_learn_snapshot(applied_ok_keys: set[str], batch_id: str) -> int:
     return len(snap.get("rows") or [])
 
 
+def _slack_report_disabled() -> bool:
+    return (os.environ.get("JARVIS_ZAIM_CATEGORY_SLACK_REPORT_DISABLE") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def build_category_slack_report(
+    *,
+    learned_n: int,
+    category_applied: int,
+    applied_entries: list[dict[str, Any]] | None = None,
+) -> str | None:
+    """直し／学習があったときだけ #report 用本文。0件なら None。"""
+    if learned_n <= 0 and category_applied <= 0:
+        return None
+    lines = [
+        "【報告】613 Zaim費目学習｜自動直し",
+        "",
+        "📌 要ボス: なし（違う行があれば /zaim で「おかしい」）",
+        "",
+        f"・自動直し {category_applied}件 / 新規学習 {learned_n}件",
+        "・キー: 店+金額（count≥2で自動）",
+    ]
+    for e in (applied_entries or [])[:8]:
+        if not e.get("ok"):
+            continue
+        shop = str(e.get("shop") or "—")[:24]
+        try:
+            amt = int(round(float(e.get("amount") or 0)))
+        except (TypeError, ValueError):
+            amt = 0
+        val = str(e.get("value") or e.get("suggest") or "")
+        lines.append(f"・{shop} {amt}円 → {val}")
+    if learned_n and LAST_LEARN_PATH.is_file():
+        try:
+            last = json.loads(LAST_LEARN_PATH.read_text(encoding="utf-8"))
+            for ex in (last.get("examples") or [])[:5]:
+                shop = str(ex.get("shop") or ex.get("learn_key") or "—")[:24]
+                amt = ex.get("amount")
+                amt_s = f" {amt}円" if amt is not None else ""
+                lines.append(
+                    f"・学習: {shop}{amt_s}: {ex.get('from') or '?'} → {ex.get('to') or '?'}"
+                )
+        except Exception:
+            pass
+    lines.extend(["", "参考: /zaim"])
+    return "\n".join(lines)
+
+
+def post_category_slack_report(text: str, *, dry_run: bool = False) -> int:
+    if _slack_report_disabled():
+        print("# slack category report skipped (DISABLE)", flush=True)
+        return 0
+    if dry_run:
+        print("--- slack #report dry-run ---", flush=True)
+        print(text, flush=True)
+        print("---", flush=True)
+        return 0
+    if not SLACK_POST.is_file():
+        print(f"# missing {SLACK_POST}", file=sys.stderr)
+        return 2
+    r = subprocess.run(
+        [EXE, str(SLACK_POST), "--channel", "report", "--text", text, "--username", "613 Zaim費目学習"],
+        cwd=str(REPO),
+        timeout=60,
+    )
+    print(f"# slack category report rc={r.returncode}", flush=True)
+    return int(r.returncode)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -521,6 +600,7 @@ def main(argv: list[str] | None = None) -> int:
     applied_ok = 0
     cat_applied = 0
     applied_row_keys: set[str] = set()
+    cat_entries_for_report: list[dict[str, Any]] = []
     if not args.skip_apply:
         actions = [
             a for a in safe_actions_from_watch() if not already_applied(cl, a)
@@ -549,6 +629,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
         elif cat_actions:
             cat_entries = apply_actions(cat_actions, dry_run=False, limit=args.limit)
+            cat_entries_for_report = list(cat_entries)
             cat_applied = merge_changelog_entries(cl, cat_entries)
             save_changelog(cl)
             for e, a in zip(cat_entries, cat_actions[: args.limit]):
@@ -590,6 +671,15 @@ def main(argv: list[str] | None = None) -> int:
             cl = load_changelog()
             if stamp_changelog_batch_id(cl, bid):
                 save_changelog(cl)
+
+    # 5b) Slack #report（直し／学習があったときだけ・確認用）
+    report_text = build_category_slack_report(
+        learned_n=learned_n,
+        category_applied=cat_applied,
+        applied_entries=cat_entries_for_report,
+    )
+    if report_text:
+        post_category_slack_report(report_text, dry_run=args.dry_run)
 
     # 6) push watch
     if not args.skip_push and not args.dry_run:
