@@ -30,6 +30,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jarvis_slack_report_fb_lib import (  # noqa: E402
+    REACTION_SEEN,
     build_ack_text,
     classify_fb_reply,
     is_ack_or_bot_reply,
@@ -159,6 +160,34 @@ def post_thread_ack(
         return "dry-run"
     out = _api_post("chat.postMessage", token, body)
     return str(out.get("ts") or "") or None
+
+
+def add_reaction(
+    channel_id: str,
+    timestamp: str,
+    name: str,
+    *,
+    token: str,
+    dry_run: bool,
+) -> bool:
+    """元コメントにリアクション（見た＝eyes／対応済＝white_check_mark）。"""
+    body = {
+        "channel": channel_id,
+        "timestamp": timestamp,
+        "name": name,
+    }
+    if dry_run:
+        print(f"# dry-run reactions.add name={name} ts={timestamp}")
+        return True
+    try:
+        _api_post("reactions.add", token, body)
+        return True
+    except RuntimeError as e:
+        # already_reacted は成功扱い
+        if "already_reacted" in str(e):
+            return True
+        print(f"# warn reactions.add {name}: {e}", file=sys.stderr)
+        return False
 
 
 def processed_key(channel_key: str, reply_ts: str) -> str:
@@ -303,16 +332,33 @@ def main() -> int:
                     print(f"❌ Ack 失敗 #{name} {pts}: {e}", file=sys.stderr)
                     continue
                 if args.apply and not args.dry_run:
+                    # 元コメントに👀＝「見た／受けた」（返信だけでは見落とす対策）
+                    add_reaction(
+                        cid,
+                        rts,
+                        REACTION_SEEN,
+                        token=token,
+                        dry_run=False,
+                    )
                     processed[key] = {
                         "at": now_iso(),
                         "kind": kind,
                         "channel": name,
                         "thread_ts": pts,
+                        "reply_ts": rts,
                         "ack_ts": ats,
+                        "seen_reaction": REACTION_SEEN,
                     }
                     acked += 1
                 elif args.dry_run:
                     print(f"# dry-run ack kind={kind_label_ja(kind)}")
+                    add_reaction(
+                        cid,
+                        rts,
+                        REACTION_SEEN,
+                        token=token,
+                        dry_run=True,
+                    )
 
     # processed 肥大防止（直近500）
     if len(processed) > 500:

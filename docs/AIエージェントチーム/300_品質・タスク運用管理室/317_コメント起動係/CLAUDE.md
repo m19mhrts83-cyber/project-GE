@@ -20,8 +20,9 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 - **やること**
   - L0: Todoist Webhook 受信済みイベントを読む（受信自体は Vercel）
   - L1: 未処理コメント／FB を拾い Ack・分類（Mac 本線／stale 時 GHA 冗長）
+  - L1 可視性: Slack は返信＋👀／Todoist は `【Jarvis】見たよ（受けた）`（`40_` 同コンセプト）
   - L2: 許可リスト内だけ Local Agent（Mac）。枠ありなら Cloud フォールバック
-  - 完了を Slack `#report`（または元スレ）に報告。冗長時は `(failover)` を付ける
+  - L2 完了を Slack `#report`「対応したよ」＋Todoist 同文。冗長時は `(failover)` を付ける
 - **やらないこと**
   - 対外送信・振込・解約・無確認 apply
   - 815 返信提案
@@ -88,3 +89,4 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 | 日付 | 変更 |
 |---|---|
 | 2026-10-22 | 新設。Mac本線＋GHA L1冗長＋Cloud L2フォールバック設計 |
+| 2026-10-22 | 対応可視性（L1 見たよ／👀・L2 対応したよ）を 40_ と揃える |
