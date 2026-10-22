@@ -34,7 +34,7 @@ export async function GET(
   if (!t313SigOk(taskId, action, sig, action === "reschedule" ? due : undefined)) {
     return htmlPage(
       "認証エラー",
-      "署名が無効です。PROPERTY_GATE_ACTION_TOKEN を確認してください。",
+      "署名が無効です。投稿側と Vercel の署名キー（PROPERTY_GATE_ACTION_TOKEN または TODOIST_API_TOKEN）を揃えてください。",
       false,
     );
   }

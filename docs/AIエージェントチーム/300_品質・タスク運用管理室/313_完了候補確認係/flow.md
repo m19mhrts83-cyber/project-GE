@@ -24,7 +24,7 @@
 - 期日は人の「**リスケ 📅N**」／**→日付へ延期ボタン**でだけ動く（自動リスケなし）
 - 書き出し先頭: `【相談】313 完了候補確認`（Webhook表示名も `313 完了候補確認`）
 - Slack返信拾い: `scripts/jarvis_todoist_313_slack_ingest.py`（✅→close／📅→リスケ。記号でスレ混在を避ける）
-- **L2ボタン**: Block Kit → `consult-action`／予備 URL `/api/g/t313/…`（確認画面あり）。Todoistリンクは詳細のみ
+- **L2ボタン**: Block Kit → `consult-action`／予備 URL `/api/g/t313/…`（確認画面あり）。Todoistリンクは詳細のみ。URL署名は PROPERTY_GATE 本線（Cloud は TODOIST 可／Vercel は候補キー照合）
 - 停止: `JARVIS_TODOIST_313_DIGEST_DISABLE=1`（Slack投稿のみ停止／`--apply` は可）
 - ログ: `~/Library/Logs/jarvis_todoist_313_digest/`
 
