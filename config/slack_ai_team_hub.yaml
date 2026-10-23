@@ -7,7 +7,7 @@ channels:
   hub:
     id: C0CA3M5SNNS
     slack_name: ai-hub
-    purpose: Hawk／FRIDAY／Jarvis 同士の共有・進捗手渡し（人の判断トレイではない）
+    purpose: Hawk／FRIDAY／Jarvis／Claude Code 同士の共有・進捗手渡し（人の判断トレイではない）
   consult:
     id: C0C7R0UF3MM
     purpose: 要判断・手渡し（次の担当）・松野の確認トレイ

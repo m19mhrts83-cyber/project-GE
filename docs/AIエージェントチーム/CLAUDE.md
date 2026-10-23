@@ -14,6 +14,8 @@ Claude Code / Cursor（Jarvis）/ Codex / GenCode / Grok Bot など、**どの�
 | [`05_機密とenv二層_20261009.md`](05_機密とenv二層_20261009.md) | 秘密は二層。MDに値を書かない |
 | [`30_共通Agentフォルダ規格_BCP`](30_共通Agentフォルダ規格_BCP_20261017.md) | TASK／input／output／tests（ツール切替BCP） |
 | [`31_作業ロック`](31_作業ロック_二重起動防止_20261017.md) | 二重起動防止。CLI `jarvis_agent_run_lock.py` |
+| [`43_Claude Code 受け渡し`](43_Claude_Code参加_受け渡し_20261023.md) | Claude Code 参加・三層受け渡し |
+| 家ルール例 | [`config/claude_code_home_CLAUDE.example.md`](../../config/claude_code_home_CLAUDE.example.md) → `~/.claude/CLAUDE.md` |
 
 ## 作業開始前（必須・短い）
 
@@ -94,7 +96,7 @@ Cursor／Jarvis の正本ルール: `.cursor/rules/jarvis-multi-agent-share.mdc`
 `#consult` 末尾型:
 
 ```
-次: Grokで続行 | Jarvisに依頼 | 人判断のみ
+次: Grokで続行 | Jarvisに依頼 | Claude Codeで続行 | 人判断のみ
 担当メモ: …
 橋渡し: 松野が了承したら、上記の担当へ一声（当面は人が橋）
 ```
