@@ -34,7 +34,7 @@ jobs:
           python-version: "3.11"
       - name: Install deps
         run: |
-          python3 -m pip install --quiet supabase google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          python3 -m pip install --quiet pyyaml supabase google-api-python-client google-auth-httplib2 google-auth-oauthlib
       - name: Expand Gmail admin token
         env:
           GMAIL_CREDENTIALS_B64: ${{ secrets.GMAIL_CREDENTIALS_B64 }}
