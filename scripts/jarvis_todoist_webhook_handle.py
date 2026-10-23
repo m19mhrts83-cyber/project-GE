@@ -347,9 +347,12 @@ def main() -> int:
         print("次: --reply で Todoist 返信＋processed／既対応なら --mark-only")
         return 0
 
+    # 1件の返信失敗でバッチ全体を止めない（未処理滞留→317 #report 連投の真因）
+    reply_fail = 0
     for s in items:
         rid = int(s["row_id"])
         tid = s["task_id"]
+        replied = False
         if args.reply and tid:
             try:
                 from jarvis_slack_report_fb_lib import build_todoist_seen_text
@@ -368,13 +371,26 @@ def main() -> int:
                 )
             try:
                 _todoist_comment(tid, body)
+                replied = True
             except urllib.error.HTTPError as e:
-                print(f"{LOG}: FAIL reply task={tid} HTTP {e.code}", file=sys.stderr)
-                return 1
+                reply_fail += 1
+                print(
+                    f"{LOG}: FAIL reply task={tid} HTTP {e.code} "
+                    f"— processed にして滞留させない",
+                    file=sys.stderr,
+                )
+            except Exception as exc:
+                reply_fail += 1
+                print(
+                    f"{LOG}: FAIL reply task={tid} {exc} "
+                    f"— processed にして滞留させない",
+                    file=sys.stderr,
+                )
         _mark_processed(rid)
-        print(f"- processed id={rid}" + (" +reply" if args.reply else ""))
+        tag = " +reply" if replied else (" +reply_fail" if args.reply and tid else "")
+        print(f"- processed id={rid}{tag}")
 
-    return 0
+    return 1 if reply_fail else 0
 
 
 if __name__ == "__main__":

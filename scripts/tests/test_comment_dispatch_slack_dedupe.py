@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""317 #report fingerprint dedupe（同一未処理バックログ連投防止）."""
+from __future__ import annotations
+
+import importlib.util
+import sys
+import unittest
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+SCRIPTS = REPO / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+
+
+def _load():
+    path = SCRIPTS / "jarvis_comment_dispatch.py"
+    spec = importlib.util.spec_from_file_location("jarvis_comment_dispatch", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+cd = _load()
+
+
+class TestSlackReportFingerprint(unittest.TestCase):
+    def test_stable_for_same_notes(self):
+        notes = [
+            {"row_id": 2, "kind": "要判断"},
+            {"row_id": 1, "kind": "確認のみ"},
+        ]
+        a = cd.slack_report_fingerprint(path="mac", notes=notes, phase_b=[])
+        b = cd.slack_report_fingerprint(
+            path="mac",
+            notes=list(reversed(notes)),
+            phase_b=[],
+        )
+        self.assertEqual(a, b)
+        self.assertIn("1:確認のみ", a)
+        self.assertIn("2:要判断", a)
+
+    def test_changes_when_note_added(self):
+        n1 = [{"row_id": 1, "kind": "要判断"}]
+        n2 = [{"row_id": 1, "kind": "要判断"}, {"row_id": 9, "kind": "要実装"}]
+        a = cd.slack_report_fingerprint(path="mac", notes=n1, phase_b=[])
+        b = cd.slack_report_fingerprint(path="mac", notes=n2, phase_b=[])
+        self.assertNotEqual(a, b)
+
+    def test_path_matters(self):
+        notes = [{"row_id": 1, "kind": "要判断"}]
+        a = cd.slack_report_fingerprint(path="mac", notes=notes, phase_b=[])
+        b = cd.slack_report_fingerprint(path="failover", notes=notes, phase_b=[])
+        self.assertNotEqual(a, b)
+
+
+class TestShouldPostSlackReport(unittest.TestCase):
+    def test_skip_identical_backlog(self):
+        notes = [{"row_id": 88, "kind": "要判断"}]
+        fp = cd.slack_report_fingerprint(path="mac", notes=notes, phase_b=[])
+        ok, out_fp, reason = cd.should_post_slack_report(
+            path="mac", notes=notes, phase_b=[], last_fp=fp
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "dedupe_same_fingerprint")
+        self.assertEqual(out_fp, fp)
+
+    def test_post_when_fingerprint_new(self):
+        notes = [{"row_id": 88, "kind": "要判断"}]
+        ok, _fp, reason = cd.should_post_slack_report(
+            path="mac", notes=notes, phase_b=[], last_fp=None
+        )
+        self.assertTrue(ok)
+        self.assertEqual(reason, "new_or_changed")
+
+    def test_noop_when_empty_mac(self):
+        ok, _fp, reason = cd.should_post_slack_report(
+            path="mac", notes=[], phase_b=[], last_fp=None
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "noop")
+
+    def test_failover_empty_still_interesting_once(self):
+        ok, fp, reason = cd.should_post_slack_report(
+            path="failover", notes=[], phase_b=[], last_fp=None
+        )
+        self.assertTrue(ok)
+        self.assertEqual(reason, "new_or_changed")
+        ok2, _fp2, reason2 = cd.should_post_slack_report(
+            path="failover", notes=[], phase_b=[], last_fp=fp
+        )
+        self.assertFalse(ok2)
+        self.assertEqual(reason2, "dedupe_same_fingerprint")
+
+
+if __name__ == "__main__":
+    unittest.main()

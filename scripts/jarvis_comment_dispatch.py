@@ -46,6 +46,8 @@ JST = timezone(timedelta(hours=9))
 LOG = "📎 317 コメント起動"
 HEARTBEAT_KEY = "comment_dispatch_heartbeat_at"
 META_KEY = "comment_dispatch_last"
+# #report 同一内容の連投防止（Mac／GHA 共有）
+SLACK_FP_META_KEY = "comment_dispatch_slack_fp"
 # 就寝帯（JST）: [start, end) — 既定 0:00 以上 6:00 未満
 QUIET_START_DEFAULT = 0
 QUIET_END_DEFAULT = 6
@@ -591,6 +593,98 @@ def build_report(
     return "\n".join(lines)
 
 
+def slack_report_fingerprint(
+    *,
+    path: str,
+    notes: list[dict[str, Any]],
+    phase_b: list[str],
+) -> str:
+    """同一バックログの #report 連投を止める鍵（rc は含めない）。"""
+    note_keys = sorted(
+        f"{n.get('row_id')}:{n.get('kind')}" for n in notes if n.get("row_id") is not None
+    )
+    pb = sorted(str(x) for x in phase_b)
+    return "|".join([str(path), *note_keys, *pb])
+
+
+def _load_slack_fp_meta() -> dict[str, Any]:
+    if not _sb_creds():
+        return {}
+    try:
+        rows = _sb_req(
+            "GET",
+            f"sync_meta?key=eq.{urllib.parse.quote(SLACK_FP_META_KEY)}&select=value",
+        )
+    except Exception as exc:
+        print(f"{LOG}: slack_fp load skip: {exc}", file=sys.stderr)
+        return {}
+    if not rows:
+        return {}
+    row = rows[0] if isinstance(rows, list) else rows
+    raw = row.get("value") if isinstance(row, dict) else None
+    if isinstance(raw, str) and raw.strip():
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+    elif isinstance(raw, dict):
+        obj = raw
+    else:
+        return {}
+    return obj if isinstance(obj, dict) else {}
+
+
+def _save_slack_fp_meta(state: dict[str, Any], *, dry_run: bool) -> None:
+    if dry_run:
+        print(f"# dry-run slack_fp save {state.get('fingerprint')}")
+        return
+    if not _sb_creds():
+        return
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        _sb_req(
+            "POST",
+            "sync_meta?on_conflict=key",
+            body=[
+                {
+                    "key": SLACK_FP_META_KEY,
+                    "value": json.dumps(state, ensure_ascii=False),
+                    "updated_at": ts,
+                }
+            ],
+        )
+    except Exception as exc:
+        print(f"{LOG}: slack_fp save FAIL: {exc}", file=sys.stderr)
+
+
+def should_post_slack_report(
+    *,
+    path: str,
+    notes: list[dict[str, Any]],
+    phase_b: list[str],
+    last_fp: str | None,
+    force: bool = False,
+) -> tuple[bool, str, str]:
+    """Return (should_post, fingerprint, reason).
+
+    未処理メモ／Phase B／failover のときだけ候補。同一 fingerprint は再掲しない。
+    """
+    interesting = bool(notes) or bool(phase_b) or path == "failover"
+    fp = slack_report_fingerprint(path=path, notes=notes, phase_b=phase_b)
+    if not interesting:
+        return False, fp, "noop"
+    if force or (os.environ.get("JARVIS_COMMENT_DISPATCH_SLACK_REPOST") or "").strip() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return True, fp, "force"
+    if last_fp and fp == last_fp:
+        return False, fp, "dedupe_same_fingerprint"
+    return True, fp, "new_or_changed"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true")
@@ -703,12 +797,36 @@ def main() -> int:
     )
     print(report)
 
-    # Slack: 何かあったとき／failover のときだけ
-    should_post = (len(notes) > 0 or phase_b_results or path == "failover") and (
-        fb_rc == 0 or wh_rc == 0 or len(notes) > 0
+    # Slack: 内容が変わったときだけ（同一未処理バックログの 5 分連投を止める）
+    fp_meta = _load_slack_fp_meta()
+    last_fp = str(
+        st.get("last_slack_fingerprint") or fp_meta.get("fingerprint") or ""
+    ).strip() or None
+    do_post, fp, post_reason = should_post_slack_report(
+        path=path,
+        notes=notes,
+        phase_b=phase_b_results,
+        last_fp=last_fp,
+        force=bool(args.force),
     )
-    if should_post and not args.no_slack:
+    if args.no_slack:
+        print(f"{LOG}: slack skip (--no-slack) fp_reason={post_reason}")
+    elif do_post:
         post_slack_report(report, dry_run=args.dry_run)
+        st["last_slack_fingerprint"] = fp
+        st["last_slack_at"] = _now_iso()
+        _save_slack_fp_meta(
+            {
+                "fingerprint": fp,
+                "at": datetime.now(timezone.utc).isoformat(),
+                "path": path,
+                "notes": len(notes),
+            },
+            dry_run=args.dry_run,
+        )
+        print(f"{LOG}: slack posted reason={post_reason}")
+    else:
+        print(f"{LOG}: slack skip ({post_reason})")
 
     st["last_run_at"] = _now_iso()
     st["last_path"] = path
