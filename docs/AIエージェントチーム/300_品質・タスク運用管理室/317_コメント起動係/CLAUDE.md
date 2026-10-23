@@ -68,13 +68,15 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 | 要判断 | Slack `#consult` |
 | 障害・heartbeat 途絶 | Slack `#ops` |
 
-書き出し: `【報告】317 コメント起動｜…`
+書き出し: `【報告】317 コメント起動｜…`  
+**同一未処理メモ集合は再掲しない**（fingerprint／`sync_meta.comment_dispatch_slack_fp`）。連投掃除は `jarvis_comment_dispatch_slack_cleanup.py`。
 
 ## 5. 成果物の置き場
 
 - 依頼: [`TASK.md`](./TASK.md)
 - state: `~/git-repos/.jarvis_state/comment_dispatch.json`
 - heartbeat: Supabase `sync_meta` キー `comment_dispatch_heartbeat_at`
+- Slack dedupe: `sync_meta.comment_dispatch_slack_fp`
 - 外部正本: Todoist コメント／Slack スレ
 
 ## 6. 作業手順
@@ -82,7 +84,8 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 1. `jarvis_comment_dispatch.py --apply`（Mac）または failover
 2. L1 で Ack／分類。確認のみは 313 候補化可（二段維持）
 3. Phase B・許可リスト命中時のみ L2
-4. Slack に完了1通。Todoist には `【Jarvis】` コメント
+4. Slack は **内容が変わったときだけ** 完了1通。Todoist には `【Jarvis】` コメント
+
 
 ## 7. 改善ログ
 
@@ -90,3 +93,4 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 |---|---|
 | 2026-10-22 | 新設。Mac本線＋GHA L1冗長＋Cloud L2フォールバック設計 |
 | 2026-10-22 | 対応可視性（L1 見たよ／👀・L2 対応したよ）を 40_ と揃える |
+| 2026-10-23 | #report 同一 fingerprint 連投防止。webhook 返信1件失敗でバッチ中断しない。滞留 `note:added` 消化＋cleanup CLI |
