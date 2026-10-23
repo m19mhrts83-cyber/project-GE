@@ -152,3 +152,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-21 | Phase1.5a: チャット残→L1候補ルール `jarvis-chat-open-tasks-312.mdc`（ノイズ抑制・無言create禁止） |
 | 2026-10-21 | Phase1＋1.5a **意図OK**（松野）。通しapplyは運用時任意 |
 | 2026-10-21 | 運用格上げ確定: A今／B 10-22ソフト／C 初回apply翌日or10-28／D 1.5bはC安定1週後（PROGRESS正本） |
+| 2026-10-22 | Phase2: Slack起票／見送りボタン（#127）。GAS #118 クローズ。問合せ Vercel failover（`45_`） |
