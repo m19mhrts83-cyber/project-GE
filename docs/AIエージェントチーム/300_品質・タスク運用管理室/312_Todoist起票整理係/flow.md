@@ -6,11 +6,11 @@
 - FlowForge（閲覧／編集）: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
-- 更新: 2026-10-21（運用格上げタイミング確定・PROGRESS正本）
+- 更新: 2026-10-22（Phase2 ボタン本線・GAS見送り）
 
 ## いまの結論（文字1行）
 
-材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult` → **採用時に Todoist へ create**。ホーク・AI同士の直入れは L0 で維持。**Todoist起票の本線は312**。close は 313。
+材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult`（**起票／見送りボタン**または番号）→ **採用時に Todoist へ create**。ホーク・AI同士の直入れは L0 で維持。**Todoist起票の本線は312**。close は 313。GAS 5分 poll は見送り。
 
 ## Todoistへの登録動線（出口・必読）
 
@@ -111,8 +111,8 @@ flowchart TD
 | 1c | **人**: 認定して／`/todoist` | 依頼 | AI | Cursor |
 | 2 | 二重起票・レーン／ラベル点検（properties＝物件＋PM） | CLI／API | AI | `jarvis_todoist_api.py` |
 | 3 | 塩梅仕分け L0／L1／L2 | ルール | AI | signals YAML |
-| 4 | L1 ダイジェスト or L2 カードを `#consult` | Slack | AI | Webhook／Bot（116同型を将来） |
-| 5 | **① Todoist登録**: L2 採用 → `create-task`＋コメント。見送り → 抑制 | ボタン／一言 | **人**＋AI | Todoist API |
+| 4 | L1 ダイジェストを `#consult`（Block Kit） | Slack | AI | `jarvis_todoist_312_digest.py` |
+| 5 | **① Todoist登録**: 起票ボタン／番号了承 → create。見送りボタン → 抑制 | ボタン／一言 | **人**＋Vercel | `/api/g/t312`・`consult-action` |
 | 5b | **②③**: L0整理／116 Todoist追加結果のラベル・二重 | CLI／Dashboard | AI／人 | 既に Todoist 上 |
 | 6 | 完了疑いは L1 ダイジェスト等に列挙のみ | CLI／Slack | AI | 312。**close はしない** |
 | 7 | 完了仕分け → オーナー確認 → 了承後 close | — | **313**＋人 | `/todoist-batch`・二段完了 |

@@ -44,6 +44,14 @@
 
 **停止**: `#consult` がノイズと感じたら `JARVIS_TODOIST_312_DIGEST_DISABLE=1`（digest／Slack投稿のみ停止。`--apply` は可）。ルール1.5aは残してよい。
 
+## 2026-10-22 — Phase 2（Slack ボタン）＋GAS 見送り
+
+- **GAS**（PR #118）: クローズ／見送り確定（Cloud 不可・ボタンで代替）
+- **本線**: 313 同型 Block Kit（起票／見送り）＋署名 URL `/api/g/t312/`＋`consult-action`
+- **実装**: PR [#127](https://github.com/m19mhrts83-cyber/project-GE/pull/127)（`jarvis_todoist_312_slack_blocks.py`／`todoist312SlackAction.ts`）
+- **番号返信**（`起票して N`）・CLI `--apply --select` は互換維持
+- 物件問合せ Mac スリープ耐性: Vercel failover（[`45_`](../../45_物件問合せ_Vercel送信冗長_20261022.md)）
+
 ## ロードマップ
 
 | Phase | 内容 | 状態 |
@@ -51,5 +59,5 @@
 | 1 | L1ダイジェストを #consult に出し、了承後 create | **意図OK**（2026-10-21） |
 | 1.5a | チャット残→L1候補ルール（ノイズ抑制） | **意図OK・運用A**（2026-10-21） |
 | 1.5b | transcripts差分→digest | 運用D（了承後） |
-| 2 | L2 採用／見送りボタン（116同型） | 運用E |
+| 2 | L2 採用／見送りボタン（313同型） | **済**（2026-10-22・#127） |
 | 3 | 材料即時トリガー＋定期取りこぼし | 運用E |
