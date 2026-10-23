@@ -121,8 +121,18 @@ UI 差替手順: Drive `30_shared_working/2026-09-21_Jarvis分身Gmail_フォー
 | 急ぎ Jarvis 依頼（任意） | estate 件名 `[Jarvis依頼] …` |
 | 天気 ch 直投のみ（本人DM・通知不要） | `outbox_to_teams/weather/` → 天気Bot → ch「天気お知らせ」。松野は ch を開いて確認 |
 
+## Claude Code との境界（2026-10-23）
+
+| 項目 | 正 |
+|---|---|
+| **Claude の本線** | git 社員フォルダ（`TASK.md`）＋ Slack `#ai-hub`／`#consult` |
+| **Drive JarvisBox** | **Grok↔Jarvis 専用のまま**。Claude 用ボックスは当面新設しない |
+| **Claude → Grok の長文** | Jarvis が `20_outbox_to_grok/` 等へ書く（Claude が inbox を直書きしない） |
+| **正本** | `docs/AIエージェントチーム/43_Claude_Code参加_受け渡し_20261023.md` |
+
 ## 関連
 
 - 索引: `config/grok_org_handoff_index.md`
 - ホーク L2: `config/grok_hawk_routine_Jarvisボックス.md`
 - Jarvis ルール: `.cursor/rules/jarvis-grok-jarvisbox-fork.mdc`
+- Claude 受け渡し: `docs/AIエージェントチーム/43_Claude_Code参加_受け渡し_20261023.md`

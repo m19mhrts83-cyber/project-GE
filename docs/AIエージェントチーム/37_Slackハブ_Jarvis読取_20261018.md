@@ -4,7 +4,7 @@
 
 | 層 | 正 | 理由 |
 |---|---|---|
-| **エージェント同士の共有** | Slack `#ai-hub` | Hawk／FRIDAY／Jarvis の進捗・手渡し。**Jarvisへの依頼・確認はここ**（2026-10-19 松野指示） |
+| **エージェント同士の共有** | Slack `#ai-hub` | Hawk／FRIDAY／Jarvis／**Claude Code** の進捗・手渡し。**Jarvisへの依頼・確認はここ**（2026-10-19 松野指示）。Claude 受け渡し: [`43_`](43_Claude_Code参加_受け渡し_20261023.md) |
 | **見える共有・残す報告（人向け）** | Slack `#report` / `#consult` / `#ops`（**投稿は Webhook**・通知） | `#report`=松野への情報共有のみ／`#consult`=要判断／`#ops`=障害・是正 |
 | **Mac 実行の手渡し** | Drive `【with Grok bot】` inbox／outbox | 秘密・長文・スクリプトキックは Drive のまま（フォーク維持） |
 | **Cursor 本題** | Jarvis がセッションで Slack を読んで気づく | 都度「Slack見て」と言わなくてよい |
@@ -39,6 +39,7 @@ state: `.jarvis_state/slack_hub_watch.json`
 | 誰 | Slack に載せるもの |
 |---|---|
 | **FRIDAY** | エージェント共有→`#ai-hub`。完了の人向け→`#report`。迷い→`#consult` |
+| **Claude Code** | エージェント共有→`#ai-hub`。作業本体は git `TASK.md`（Drive は Grok 専用）。迷い→`#consult`（`次: Claude Codeで続行`）。正本 [`43_`](43_Claude_Code参加_受け渡し_20261023.md) |
 | **Grok** | 横断共有→`#ai-hub`（`channel: hub`）。定型人向け→`#report`。要ボス→`#consult`（末尾は [`36_`](36_Slack_consult手渡し_次の担当_20261018.md)） |
 | **Jarvis** | 同上＋セッションで差分をチャットに相乗り |
 

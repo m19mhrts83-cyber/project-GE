@@ -71,7 +71,7 @@ Grok 定型報告の入口: [`17_Grok定型報告_Slack_20261010.md`](./17_Grok�
 自動実行ではない。松野が読んで橋渡しする。
 
 ```
-次: Grokで続行 | Jarvisに依頼 | 人判断のみ
+次: Grokで続行 | Jarvisに依頼 | Claude Codeで続行 | 人判断のみ
 担当メモ: （未配線・自動化できてない点があれば1行）
 橋渡し: 松野が了承したら、上記の担当へ一声（当面は人が橋）
 ```
@@ -80,6 +80,7 @@ Grok 定型報告の入口: [`17_Grok定型報告_Slack_20261010.md`](./17_Grok�
 |---|---|
 | `Grokで続行` | Grok メイン／部長へ一声 |
 | `Jarvisに依頼` | Cursor（Jarvis）。枠切れなら Claude Code 等 |
+| `Claude Codeで続行` | Claude Code（git `TASK.md`）。受け渡し [`43_`](43_Claude_Code参加_受け渡し_20261023.md) |
 | `人判断のみ` | 実行依頼を出さない |
 
 正本の読み方: [`36_Slack_consult手渡し_次の担当_20261018.md`](./36_Slack_consult手渡し_次の担当_20261018.md)
