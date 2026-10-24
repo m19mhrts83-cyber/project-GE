@@ -1,0 +1,57 @@
+# PR 時の自動チェック（AI 不使用）。2026-10-24 Miss Lemon 起案・初回は PR 上で動作確認する
+# - アプリ: npm ci → build（型チェック込み）。KURASHIFT は selftest も
+# - scripts/tests: unittest
+name: PR Checks
+
+on:
+  pull_request:
+    paths:
+      - "apps/jarvis-dashboard/**"
+      - "apps/trade-desk/**"
+      - "scripts/**"
+      - ".github/workflows/pr-checks.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [jarvis-dashboard, trade-desk]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+    env:
+      # ビルド用のダミー（実データには繋がない）
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_dummy
+      NEXT_PUBLIC_SITE_URL: http://localhost
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - if: matrix.app == 'trade-desk'
+        run: npm test
+
+  python-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests pyyaml
+      - run: python -m unittest discover -s scripts/tests -v
