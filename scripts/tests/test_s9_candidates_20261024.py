@@ -75,8 +75,15 @@ class ParseTests(unittest.TestCase):
         existing = [{"name": "ハウ住む緑店", "url": "https://www.fukushima-tochi.com/x", "status": "pending"}]
         self.assertEqual(s9.classify(self.rows[0], existing)[0], "dup")  # 同じドメイン
         self.assertEqual(s9.classify(self.rows[1], [])[0], "add")
-        self.assertEqual(s9.classify(self.rows[2], [])[0], "consult")  # 大手
-        self.assertEqual(s9.classify(self.rows[3], [])[0], "consult")  # 電話のみ
+        # 2026-10-24 松野指示: 大手／全国は自動登録、電話のみはレポートだけ
+        self.assertEqual(s9.classify(self.rows[2], [])[0], "add")  # 大手
+        self.assertEqual(s9.classify(self.rows[3], [])[0], "drop")  # 電話のみ
+
+    def test_related_and_sales_only(self):
+        related = {**self.rows[1], "_memo": "ハナイ不動産と関連あり"}
+        self.assertEqual(s9.classify(related, [])[0], "consult")
+        sales = {**self.rows[1], "_memo": "売買専門の会社"}
+        self.assertEqual(s9.classify(sales, [])[0], "drop")
 
     def test_consult_message_has_handoff_footer(self):
         msg = s9.build_consult([(self.rows[2], "メモに「大手」", "2026-10-22_s9_candidates.md")])
