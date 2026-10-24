@@ -1,3 +1,4 @@
+import badgePolicy from "@/config/watch_badge_policy.json";
 import { createClient } from "@/lib/supabase/server";
 import type { NavCounts } from "@/lib/navBadges";
 import {
@@ -12,19 +13,28 @@ export type { NavCounts };
 export async function fetchNavCounts(): Promise<NavCounts> {
   try {
     const supabase = await createClient();
+    // メールは Slack（116）で処理する。バッジは「優先度高・直近 N 日」だけ数える（全件は一覧で見る）
+    const mailPriority = String(badgePolicy.mail_badge?.priority || "high");
+    const mailSince = new Date(
+      Date.now() - Number(badgePolicy.mail_badge?.within_days || 7) * 86400_000,
+    ).toISOString();
     const [partner, other, watchRows, openchat] = await Promise.all([
       supabase
         .from("triage_items")
         .select("id", { count: "exact", head: true })
         .eq("lane", "partner")
         .eq("status", "pending")
-        .neq("kind", "activity"),
+        .neq("kind", "activity")
+        .eq("priority", mailPriority)
+        .gte("created_at", mailSince),
       supabase
         .from("triage_items")
         .select("id", { count: "exact", head: true })
         .neq("lane", "partner")
         .eq("status", "pending")
-        .eq("kind", "mail"),
+        .eq("kind", "mail")
+        .eq("priority", mailPriority)
+        .gte("created_at", mailSince),
       supabase
         .from("watch_status")
         .select("id,level,summary,status,payload")
@@ -52,7 +62,8 @@ export async function fetchNavCounts(): Promise<NavCounts> {
     ).length;
 
     let openchatAttention = 0;
-    if (openchat.data?.level === "attention") {
+    const openchatQuiet = (badgePolicy.quiet_watch_ids || []).includes("openchat_threads");
+    if (!openchatQuiet && openchat.data?.level === "attention") {
       const payload =
         openchat.data.payload && typeof openchat.data.payload === "object"
           ? (openchat.data.payload as Record<string, unknown>)

@@ -1,0 +1,19 @@
+{
+  "_note": "ダッシュボードの「要確認」（ナビのバッジ・ホーム要フォロー）に数える基準。方針（松野 2026-10-24）: お金・期限・仕組みの故障だけ。Slack で対処するものや情報は一覧には出すが数えない。新しい watch id は既定で数える（故障を見落とさないため）。",
+  "quiet_watch_ids": [
+    "card_annual_fee",
+    "rent_step",
+    "vpoint",
+    "zaim_quality",
+    "line_export",
+    "grok_bridge_inbox",
+    "hawk_weekly_summary",
+    "night_triage",
+    "openchat_threads",
+    "sbi_vpoint_up"
+  ],
+  "mail_badge": {
+    "priority": "high",
+    "within_days": 7
+  }
+}

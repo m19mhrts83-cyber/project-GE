@@ -1,5 +1,6 @@
 /** 状況ウォッチ／オプチャ健全性の汎用「確認した」→ バッジ抑制と再表示 */
 
+import badgePolicy from "@/config/watch_badge_policy.json";
 export const WATCH_ACK_QUIET_DAYS_DEFAULT = 7;
 
 /** 専用「確認しました」がある ID（汎用ボタンは出さない） */
@@ -132,9 +133,12 @@ export function formatQuietUntilLabel(quietUntil: string | undefined): string {
   return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** ナビ／ホーム要フォローに出すか */
+const QUIET_WATCH_IDS = new Set<string>(badgePolicy.quiet_watch_ids || []);
+
+/** ナビ／ホーム要フォローに出すか（お金・期限・故障だけ。情報系は config/watch_badge_policy.json で数えない） */
 export function shouldShowWatchBadge(row: WatchAckRow, now = new Date()): boolean {
   if (row.status && row.status !== "active") return false;
+  if (QUIET_WATCH_IDS.has(String(row.id || ""))) return false;
   const level = String(row.level || "");
   if (level !== "attention" && level !== "warn") return false;
   const fp = buildWatchAckFingerprint(row);
