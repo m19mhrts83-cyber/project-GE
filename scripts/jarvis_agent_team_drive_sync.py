@@ -11,6 +11,7 @@
 - ルール: Drive 直下 91_ルール/（家ルール例・Cursor ルール・チーム設定・運用コマンド一覧）
 - 内容が同じファイルは書かない。Drive にしか無いファイル（outbox/ など）は消さない
 - 秘密っぽい名前（env／secret／token／credential）と大きいファイル（20MB 超）は写さない
+- 同期衝突の「名前 2.md」等を見つけたら #ops に知らせる（消さない）
 
 repo は書き換えないので launchd の日次実行に使える（install_agent_team_drive_sync_launchd.sh）。
 状態マーカー・ボード・ハブ番号付き MD は jarvis_agent_team_status_sync.py 側が写す。
@@ -21,6 +22,7 @@ import argparse
 import filecmp
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -88,6 +90,40 @@ def agent_files(folder: Path) -> list[Path]:
     return files
 
 
+
+# Drive の同期衝突で生まれる「名前 2.md」「名前 7.yaml」など（2026-10-24 に 38 件たまっていた）
+CONFLICT_RE = re.compile(r" \d+\.(md|mdc|yaml|yml|json|txt)$")
+
+
+def find_conflicts(root: Path) -> list[Path]:
+    return sorted(p for p in root.rglob("*") if p.is_file() and CONFLICT_RE.search(p.name))
+
+
+def report_conflicts(conflicts: list[Path], *, dry: bool) -> None:
+    """競合ファイルがあれば一覧を出し、#ops へ短く知らせる（統合・削除はしない）。"""
+    if not conflicts:
+        return
+    rels = [str(p.relative_to(DRIVE_HUB)) for p in conflicts]
+    print(f"{LOG}: ⚠️ Drive 競合ファイル {len(rels)} 件", file=sys.stderr)
+    for r in rels[:20]:
+        print(f"  - {r}", file=sys.stderr)
+    if dry:
+        return
+    text = (
+        f"【ops】Drive ★AIエージェントチーム 競合ファイル {len(rels)} 件\n"
+        + "\n".join(f"・{r}" for r in rels[:8])
+        + ("\n…" if len(rels) > 8 else "")
+        + "\n正は git。重複側を消して統合を（Miss Lemon／Jarvis に依頼可）"
+    )
+    try:
+        subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "jarvis_slack_webhook_post.py"), "--channel", "ops", "--text", text],
+            check=False,
+            timeout=60,
+        )
+    except Exception as e:  # 通知失敗で同期自体は落とさない
+        print(f"{LOG}: #ops 通知失敗: {e}", file=sys.stderr)
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true")
@@ -132,6 +168,7 @@ def main() -> int:
         guide.write_text(text, encoding="utf-8")
 
     print(f"{LOG}: copied={stats['copied']} unchanged={stats['same']} → {DRIVE_HUB}")
+    report_conflicts(find_conflicts(DRIVE_HUB), dry=args.dry_run)
     return 0
 
 
