@@ -185,6 +185,39 @@ def _normalize(line: str) -> str:
     return s[:160]
 
 
+LINE_TS_RE = re.compile(r"(20\d\d)[-/](\d\d)[-/](\d\d)[T _](\d\d):(\d\d)")
+
+
+def _line_ts(line: str) -> datetime | None:
+    """行頭付近の日時（JST とみなす）。無ければ None。"""
+    m = LINE_TS_RE.search(line[:60])
+    if not m:
+        return None
+    try:
+        return datetime(*map(int, m.groups()), tzinfo=JST)
+    except ValueError:
+        return None
+
+
+def count_errors(text: str, since: datetime) -> Counter[str]:
+    """エラー行を数える。日時のある行が since より前なら、次の日時行までを数えない
+    （週内に更新された追記型ログの古い行を今週分に数えないため）。"""
+    counter: Counter[str] = Counter()
+    in_range = True  # 日時が一度も出ないログは判定できないので数える
+    for ln in text.splitlines():
+        ts = _line_ts(ln)
+        if ts is not None:
+            in_range = ts >= since
+        if not in_range:
+            continue
+        # Traceback／raise 行は本体のエラー行と重複するので数えない
+        if re.match(r"\s*(Traceback|raise |File \")", ln):
+            continue
+        if ERROR_RE.search(ZERO_COUNT_RE.sub("", ln)):
+            counter[_normalize(ln)] += 1
+    return counter
+
+
 def collect_launchd_logs(since: datetime) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     if not LOG_ROOT.is_dir():
@@ -205,12 +238,7 @@ def collect_launchd_logs(since: datetime) -> list[dict[str, Any]]:
                     text = fh.read().decode("utf-8", errors="replace")
             except OSError:
                 continue
-            for ln in text.splitlines():
-                # Traceback／raise 行は本体のエラー行と重複するので数えない
-                if re.match(r"\s*(Traceback|raise |File \")", ln):
-                    continue
-                if ERROR_RE.search(ZERO_COUNT_RE.sub("", ln)):
-                    counter[_normalize(ln)] += 1
+            counter.update(count_errors(text, since))
         top = [(msg, n) for msg, n in counter.most_common(3) if n >= REPEAT_FLAG]
         if top:
             rows.append({"dir": d.name, "repeated": [{"msg": m, "count": n} for m, n in top]})

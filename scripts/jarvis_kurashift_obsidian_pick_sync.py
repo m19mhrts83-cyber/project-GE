@@ -25,6 +25,8 @@ import shutil
 import subprocess
 import yaml
 
+_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
 REPO = Path(__file__).resolve().parents[1]
 OBSIDIAN_DIR = Path("/Users/matsunomasaharu2/Documents/500_Obsidian_r1/01_Journaling/☆Real_Estate_Pick")
 
@@ -146,6 +148,9 @@ def parse_s3_file(path: Path) -> dict[str, Any] | None:
     deal_id = fm.get("deal_id")
     if deal_id:
         deal_id = str(deal_id).strip()
+    # 「未取得」等の非 UUID は未設定扱い（そのまま eq すると 22P02 で同期全体が落ちる）
+    if deal_id and not _UUID_RE.match(deal_id):
+        deal_id = None
     s5_line = str(fm.get("s5_line") or "").strip()
     updated = str(fm.get("updated") or "").strip()
 

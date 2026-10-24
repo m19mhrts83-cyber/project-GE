@@ -46,5 +46,23 @@ class ErrorLineTests(unittest.TestCase):
         self.assertTrue(self._is_err("# cursor ask done=3 failed=2 scanned=10"))
 
 
+class CountErrorsTests(unittest.TestCase):
+    def test_old_section_is_skipped(self):
+        since = wr.datetime(2026, 10, 17, tzinfo=wr.JST)
+        text = "\n".join([
+            "[2026/10/12 21:13:43] ERROR    [MODEL][GATE] old",
+            "RuntimeError: 古い節の続き",
+            "======== 2026-10-24 08:03:11 ========",
+            "FileNotFoundError: 下書きがありません",
+        ])
+        c = wr.count_errors(text, since)
+        self.assertEqual(sum(c.values()), 1)
+
+    def test_no_timestamp_counts_all(self):
+        since = wr.datetime(2026, 10, 17, tzinfo=wr.JST)
+        c = wr.count_errors("RuntimeError: a\nRuntimeError: a\n", since)
+        self.assertEqual(sum(c.values()), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

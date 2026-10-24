@@ -779,7 +779,10 @@ def main() -> int:
             print(f"--- inbox: {md.name}")
             try:
                 draft, source = _parse_inbox_md(md)
-            except ValueError as e:
+                # 下書きが消えた依頼で毎 poll 落ち、後続の依頼まで止まるのを防ぐ
+                if not draft.is_file():
+                    raise FileNotFoundError(f"下書きがありません: {draft}")
+            except (ValueError, FileNotFoundError) as e:
                 print(f"❌ {e}", file=sys.stderr)
                 worst = max(worst, 2)
                 if not args.keep_inbox:
