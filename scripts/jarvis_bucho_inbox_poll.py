@@ -47,6 +47,7 @@ TODOIST_APPLY = REPO / "scripts" / "jarvis_hawk_todoist_tasks_apply.py"
 SLACK_REPORT_APPLY = REPO / "scripts" / "jarvis_grok_slack_report_apply.py"
 SEND_GATE_311_APPLY = REPO / "scripts" / "jarvis_hawk_send_gate_311_apply.py"
 APP_DEV_CARDS_APPLY = REPO / "scripts" / "jarvis_app_dev_cards_apply.py"
+S9_CANDIDATES_APPLY = REPO / "scripts" / "jarvis_s9_candidates_apply.py"
 VENDOR_OUTREACH_STALL = REPO / "scripts" / "jarvis_vendor_outreach_stall_runner.py"
 
 
@@ -532,6 +533,31 @@ def apply_slack_reports(*, dry_run: bool = False) -> dict[str, Any]:
     }
 
 
+def apply_s9_candidates() -> dict[str, Any]:
+    """inbox の action: s9_candidates を管理会社台帳へ（判断待ちは #consult）。soft-fail 用。"""
+    if not S9_CANDIDATES_APPLY.is_file():
+        return {"ok": False, "skipped": True, "reason": "script missing"}
+    cmd = [str(PY), str(S9_CANDIDATES_APPLY), "--apply", "--archive-done", "--post", "--json"]
+    try:
+        r = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True, timeout=180)
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+    out = (r.stdout or "").strip().splitlines()
+    parsed: dict[str, Any] = {}
+    try:
+        parsed = json.loads(out[-1]) if out and out[-1].startswith("{") else {}
+    except json.JSONDecodeError:
+        parsed = {}
+    return {
+        "ok": r.returncode == 0,
+        "returncode": r.returncode,
+        "files": len(parsed.get("files") or []),
+        "added": len(parsed.get("add") or []),
+        "consult": len(parsed.get("consult") or []),
+        "stderr_tail": (r.stderr or "")[-300:],
+    }
+
+
 def apply_app_dev_cards(*, dry_run: bool = False) -> dict[str, Any]:
     """inbox の action: app_dev_cards を Todoist へ（成功分 archive）。soft-fail 用。"""
     if not APP_DEV_CARDS_APPLY.is_file():
@@ -735,6 +761,16 @@ def main() -> int:
                         f"{(app_dev_cards_result.get('stderr_tail') or '')[:120]}",
                         file=sys.stderr,
                     )
+            s9 = apply_s9_candidates()
+            if s9.get("ok") and s9.get("files"):
+                print(
+                    f"📎 s9_candidates apply: files={s9['files']} added={s9['added']} consult={s9['consult']}"
+                )
+            elif not s9.get("ok") and not s9.get("skipped"):
+                print(
+                    f"📎 s9_candidates apply: FAIL rc={s9.get('returncode')} {(s9.get('stderr_tail') or s9.get('error') or '')[:120]}",
+                    file=sys.stderr,
+                )
             state = poll()
             # S2 再生成依頼の消化・キュー補給（soft-fail）
             if not args.skip_vendor_stall:
