@@ -1,0 +1,60 @@
+# 定時キックとの二重実行ガード（reusable）
+#
+# GHA の schedule は混雑で 2〜6 時間遅れる（46_週次レビュー）。時刻が要るジョブは
+# Mac launchd（scripts/jarvis_gha_precise_kick.py）が定刻に workflow_dispatch で起動する。
+# 遅れて来た schedule 実行は、直近 N 時間に dispatch 実行があれば skip=true を返す。
+# Mac が寝ていて定刻キックが無い日は schedule がそのまま走る（従来どおりの保険）。
+#
+# 使い方（呼び出し側）:
+#   jobs:
+#     guard:
+#       uses: ./.github/workflows/_kick-guard.yml
+#     main:
+#       needs: guard
+#       if: needs.guard.outputs.skip != 'true'
+name: _kick-guard
+
+on:
+  workflow_call:
+    inputs:
+      window_hours:
+        type: number
+        required: false
+        default: 8
+    outputs:
+      skip:
+        value: ${{ jobs.check.outputs.skip }}
+
+permissions:
+  actions: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      skip: ${{ steps.c.outputs.skip }}
+    steps:
+      - id: c
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          WINDOW_H: ${{ inputs.window_hours }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" != "schedule" ]]; then
+            echo "skip=false" >>"$GITHUB_OUTPUT"; exit 0
+          fi
+          wf_path="${GITHUB_WORKFLOW_REF%@*}"
+          wf_file="${wf_path##*/}"
+          since="$(date -u -d "-${WINDOW_H} hours" +%Y-%m-%dT%H:%M:%SZ)"
+          n="$(gh run list -R "$GITHUB_REPOSITORY" -w "$wf_file" -e workflow_dispatch -L 20 \
+                --json createdAt,conclusion \
+                --jq "[.[] | select(.createdAt >= \"$since\") | select(.conclusion != \"failure\" and .conclusion != \"cancelled\")] | length" \
+                || echo 0)"
+          if [[ "${n:-0}" -gt 0 ]]; then
+            echo "::notice::定刻キック済み（${WINDOW_H}h 以内に dispatch ${n} 件）→ 遅延 schedule は skip"
+            echo "skip=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >>"$GITHUB_OUTPUT"
+          fi

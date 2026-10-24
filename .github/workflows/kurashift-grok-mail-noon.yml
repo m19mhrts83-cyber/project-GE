@@ -21,7 +21,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 遅延 schedule と Mac 定刻キック（jarvis_gha_precise_kick.py）の二重実行ガード
+  guard:
+    uses: ./.github/workflows/_kick-guard.yml
+    permissions:
+      actions: read
+
   grok-mail-noon:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

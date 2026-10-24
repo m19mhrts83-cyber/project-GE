@@ -24,6 +24,19 @@
 
 **過渡**: GHA でパートナー Gmail／Chatwork→MD＋判定まで寄せ済み。LINE／iMessage／CHRLINE・MailGates 添付は Mac。Graph 書込には `Files.ReadWrite` 再同意が必要（`docs/Jarvis_OneDrive_Graph.md`）。
 
+### 時刻が要る GHA ジョブ（定刻キック・2026-10-24）
+
+GHA の `schedule` は混雑で **2〜6 時間遅れる**（実測は [`46_週次レビュー`](AIエージェントチーム/46_週次レビュー_20261023.md)）。昼便のように時刻に意味があるジョブは次の二段にする。
+
+| 層 | 役割 |
+|---|---|
+| Mac launchd（10 分おき）`scripts/jarvis_gha_precise_kick.py` | `config/gha_precise_kick.yaml` の定刻〜90 分の間に `gh workflow run` で 1 日 1 回起動（AI なし） |
+| workflow 側 `guard` ジョブ（`_kick-guard.yml`） | 遅れて来た `schedule` は、直近 8 時間に dispatch があれば skip |
+| Mac が寝ていた日 | キックなし → `schedule` が従来どおり走る（保険） |
+
+対象を足すとき: yaml に 1 行＋その workflow に `guard` ジョブと `needs: guard`／`if: needs.guard.outputs.skip != 'true'` を入れる（入れないと二重実行）。
+導入: `zsh scripts/install_gha_precise_kick_launchd.sh`／停止: `JARVIS_GHA_PRECISE_KICK_DISABLE=1`
+
 ---
 
 ## A. GHA 本線（定型化済み／寄せたい）

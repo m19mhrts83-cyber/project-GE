@@ -19,6 +19,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import yaml
+from jarvis_cloud_file import read_text_cloud
 
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
@@ -48,7 +49,9 @@ def card_id(lane: str, source: str, title: str) -> str:
 def parse_headings(path: Path, take: int) -> list[dict[str, str]]:
     if not path.is_file():
         return []
-    text = path.read_text(encoding="utf-8", errors="ignore")
+    text = read_text_cloud(path, errors="ignore")
+    if text is None:
+        return []
     lines = text.splitlines()
     items: list[dict[str, str]] = []
     i = 0

@@ -767,7 +767,16 @@ def main() -> int:
     # Also re-classify already-fetched for report even if handle marked some
     phase_b_results: list[str] = []
     if args.phase_b:
+        # AI 使用量ガード: 起動済み row は再起動しない（5分 poll で同じコメントに
+        # Cloud Agent を毎回立てない）＋1 回の実行で起動する件数に上限を置く。
+        done_pb = st.get("processed_phase_b") or {}
+        max_pb = int(os.environ.get("JARVIS_COMMENT_DISPATCH_PHASE_B_MAX") or "3")
         for n in notes:
+            if len(phase_b_results) >= max_pb:
+                print(f"# phase_b: 上限 {max_pb} 件に達したため残りは次回")
+                break
+            if str(n.get("row_id")) in done_pb:
+                continue
             if n.get("kind") == "要実装" or allowlisted(str(n.get("comment") or "")):
                 res = run_phase_b_hook(n, dry_run=args.dry_run, path=path)
                 phase_b_results.append(f"{n.get('row_id')}:{res}")
