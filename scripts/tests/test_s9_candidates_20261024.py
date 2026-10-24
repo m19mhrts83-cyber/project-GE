@@ -92,5 +92,30 @@ class AreaTests(unittest.TestCase):
         self.assertEqual(s9._area_of("〒470-1103 愛知県豊明市沓掛町"), "豊明市")
 
 
+class SendableFirstTests(unittest.TestCase):
+    def test_next_pending_puts_email_and_form_first(self):
+        import tempfile
+
+        import yaml
+
+        import jarvis_kurashift_mgmt_vendor_list as ml
+
+        vendors = [
+            {"id": "p1", "name": "電話A", "channel": "phone", "status": "pending", "property_lane": "midori_caramel"},
+            {"id": "p2", "name": "電話B", "channel": "phone", "status": "pending", "property_lane": "midori_caramel"},
+            {"id": "e1", "name": "メールC", "channel": "email", "status": "pending", "property_lane": "midori_caramel"},
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "list.yaml"
+            p.write_text(yaml.safe_dump({"settings": {}, "vendors": vendors}, allow_unicode=True), encoding="utf-8")
+            old = ml.LIST_PATH
+            ml.LIST_PATH = p
+            try:
+                got = [v["id"] for v in ml.next_pending(limit=3, lane="midori_caramel")]
+            finally:
+                ml.LIST_PATH = old
+        self.assertEqual(got, ["e1", "p1", "p2"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -565,6 +565,9 @@ def next_pending(
         if lane and not _lane_match(v, lane):
             continue
         pending.append(v)
+    # S9 はメール／フォームでしか送らない（自動電話は禁止）。台帳順のままだと緑区の先頭が
+    # 電話のみの会社で埋まり、--next に送れる相手が出ず止まっていた（2026-10-24）。送れる行を先に
+    pending.sort(key=lambda v: 0 if str(v.get("channel") or "") in ("email", "web_form") else 1)
 
     share = load_share_urls()
 
