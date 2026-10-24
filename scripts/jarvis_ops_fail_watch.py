@@ -618,7 +618,14 @@ def _existing_ops_status(sb, watch_id: str) -> str:
         return ""
 
 
-def _patch_ops_payload(sb, watch_id: str, ops_patch: dict[str, Any], *, keep_banner: bool = True) -> None:
+def _patch_ops_payload(
+    sb,
+    watch_id: str,
+    ops_patch: dict[str, Any],
+    *,
+    keep_banner: bool = True,
+    launched_ids: list[str] | None = None,
+) -> None:
     r = (
         sb.table("watch_status")
         .select("payload")
@@ -632,6 +639,8 @@ def _patch_ops_payload(sb, watch_id: str, ops_patch: dict[str, Any], *, keep_ban
     ops = dict(pl.get("cursor_ops_fix") or {}) if isinstance(pl.get("cursor_ops_fix"), dict) else {}
     ops.update(ops_patch)
     pl["cursor_ops_fix"] = ops
+    if launched_ids is not None:
+        pl["autofix_launched_ids"] = launched_ids
     if keep_banner:
         pl["show_banner"] = True
     pl["origin"] = pl.get("origin") or "ops_fail_watch"
@@ -642,10 +651,45 @@ def _patch_ops_payload(sb, watch_id: str, ops_patch: dict[str, Any], *, keep_ban
     ).eq("id", watch_id).execute()
 
 
-def run_autofix(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _fail_ids(it: dict[str, Any]) -> set[str]:
+    """この item が指している失敗（GHA run id／Vercel status key）。"""
+    pl = it.get("payload") if isinstance(it.get("payload"), dict) else {}
+    return _as_id_set(pl.get("fail_run_ids")) | _as_id_set(pl.get("fail_keys"))
+
+
+def _load_autofix_launched(sb: Any | None) -> dict[str, set[str]]:
+    """既に Cloud Agent を起動した失敗 id（push で payload が作り直されても引き継ぐ）。"""
+    out: dict[str, set[str]] = {w: set() for w in AUTOFIX_IDS}
+    if sb is None:
+        return out
+    try:
+        er = sb.table("watch_status").select("id,payload").in_("id", list(AUTOFIX_IDS)).execute()
+        for row in er.data or []:
+            pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+            out.setdefault(str(row.get("id") or ""), set()).update(
+                _as_id_set(pl.get("autofix_launched_ids"))
+            )
+    except Exception as e:
+        print(f"# autofix launched preload skip: {e}", file=sys.stderr)
+    return out
+
+
+def _carry_launched(items: list[dict[str, Any]], launched: dict[str, set[str]]) -> None:
+    for it in items:
+        ids = launched.get(str(it.get("id") or ""))
+        if ids:
+            pl = dict(it.get("payload") or {})
+            pl["autofix_launched_ids"] = sorted(ids)[-50:]
+            it["payload"] = pl
+
+
+def run_autofix(
+    items: list[dict[str, Any]], launched: dict[str, set[str]] | None = None
+) -> list[dict[str, Any]]:
     """要対応の Fail に対し Cloud 起動。失敗・上限ならローカル queued。"""
     from jarvis_cloud_agent_launch import launch_cloud_agent
 
+    launched = launched if launched is not None else {}
     sb = _sb_client()
     notices: list[str] = []
     for it in items:
@@ -657,6 +701,13 @@ def run_autofix(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         existing = _existing_ops_status(sb, wid)
         if existing in BUSY_STATUSES:
             print(f"# autofix skip {wid}: already {existing}", file=sys.stderr)
+            continue
+        # AI 使用量ガード: 同じ失敗には 1 回だけ起動する。前回の Agent が終わると
+        # status が busy でなくなり、週次 workflow の同じ失敗に毎朝起動し直していた（2026-10 に 3 回）。
+        ids = _fail_ids(it)
+        done = launched.get(wid) or set()
+        if ids and ids <= done:
+            print(f"# autofix skip {wid}: 同じ失敗で起動済み {sorted(ids)}", file=sys.stderr)
             continue
 
         prompt = _build_autofix_prompt(it)
@@ -678,6 +729,7 @@ def run_autofix(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "launched_at": datetime.now(timezone.utc).isoformat(),
                     "prompt": prompt[:1500],
                 },
+                launched_ids=sorted(done | ids)[-50:],
             )
             notices.append(
                 f"Cloud Agent で {wid} の修復を起動した → {launched.get('url')}"
@@ -818,10 +870,12 @@ def main(argv: list[str] | None = None) -> int:
 
     resolved_run_ids: set[str] = set()
     resolved_keys: set[str] = set()
+    launched: dict[str, set[str]] = {}
     if args.push or args.note:
         try:
             sb = _sb_client()
             resolved_run_ids, resolved_keys = _load_resolved_maps(sb)
+            launched = _load_autofix_launched(sb)
         except Exception as e:
             print(f"# resolved preload skip: {e}", file=sys.stderr)
 
@@ -833,6 +887,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps({"count": len(items), "items": items}, ensure_ascii=False, indent=2))
     if args.dry_run:
         return 0
+    _carry_launched(items, launched)
     rc = push_items(items)
     if rc != 0:
         return rc
@@ -844,7 +899,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             try:
-                extra = run_autofix(items)
+                extra = run_autofix(items, launched)
             except Exception as e:
                 print(f"# autofix error: {e}", file=sys.stderr)
                 extra = [

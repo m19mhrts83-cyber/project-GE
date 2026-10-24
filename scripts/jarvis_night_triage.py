@@ -35,6 +35,8 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from jarvis_cloud_file import read_text_cloud
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE_DIR = REPO / ".jarvis_state" / "night_triage"
@@ -501,7 +503,10 @@ def entry_id(folder: str, received_at: str, subject: str) -> str:
 
 
 def parse_yoritoori(md_path: Path, partner_folder: str, partner_name: str) -> list[dict[str, Any]]:
-    text = md_path.read_text(encoding="utf-8", errors="replace")
+    # OneDrive 未ダウンロードで EDEADLK のとき、1 社のために夜間トリアージ全体を落とさない
+    text = read_text_cloud(md_path)
+    if text is None:
+        return []
     return parse_yoritoori_text(text, partner_folder, partner_name)
 
 

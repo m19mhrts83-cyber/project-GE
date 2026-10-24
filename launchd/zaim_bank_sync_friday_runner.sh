@@ -20,9 +20,9 @@ trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
 
 if [[ -f "$ENV_FILE" ]]; then
   set +eu
-  set -a
-  emulate -R sh -c "source '${ENV_FILE}'" 2>>"${LOG_DIR}/env_source.err.log" || true
-  set +a
+  # emulate -R sh は allexport を無効化するため、set -a は emulate の内側で行う
+  # （外側だと変数が子プロセスへ export されず ZAIM_PASSWORD 未設定で落ちていた）
+  emulate -R sh -c "set -a; . '${ENV_FILE}'; set +a" 2>>"${LOG_DIR}/env_source.err.log" || true
   set -euo pipefail
 fi
 

@@ -25,6 +25,8 @@ import shutil
 import subprocess
 import yaml
 
+from jarvis_cloud_file import copy_cloud
+
 REPO = Path(__file__).resolve().parents[1]
 OBSIDIAN_DIR = Path("/Users/matsunomasaharu2/Documents/500_Obsidian_r1/01_Journaling/☆Real_Estate_Pick")
 
@@ -69,7 +71,9 @@ def import_from_google_drive() -> list[Path]:
                     reason = "newer"
 
             if should_copy:
-                shutil.copy2(src, dst)
+                # Drive 未ダウンロード（EDEADLK）は次回に回す。1 件で同期全体を落とさない
+                if not copy_cloud(src, dst):
+                    continue
                 imported.append(dst)
                 print(f"# Imported from Drive to Local ({reason}): {src.name}")
                 retag_py = REPO / "scripts" / "jarvis_obsidian_ogd_retag.py"
@@ -224,9 +228,14 @@ def parse_s3_file(path: Path) -> dict[str, Any] | None:
     }
 
 
+_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
 def find_matching_deal(sb: Any, s3_data: dict[str, Any]) -> dict[str, Any] | None:
     deal_id = s3_data.get("deal_id")
-    if deal_id:
+    # frontmatter に「未取得」等のプレースホルダが入ることがある。uuid 以外で照会すると
+    # 22P02 で同期全体が落ちる（毎回の inbox_poll で再発）ため、住所照合へ回す。
+    if deal_id and _UUID_RE.match(deal_id):
         res = sb.table("kurashift_re_deals").select("*").eq("id", deal_id).maybe_single().execute()
         if res.data:
             return res.data

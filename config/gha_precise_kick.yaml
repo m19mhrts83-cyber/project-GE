@@ -1,0 +1,19 @@
+# GHA 定刻キック（Mac launchd → workflow_dispatch）
+# GHA schedule は 2〜6 時間遅れる（docs/AIエージェントチーム/46_週次レビュー_20261023.md）。
+# 時刻が要るジョブだけここに載せる。遅れて来た schedule は _kick-guard.yml が skip する。
+# 対象 workflow には guard ジョブ（_kick-guard.yml）を必ず入れること（二重実行防止）。
+#
+# time: JST "HH:MM" / weekdays: 1=月 … 7=日（省略で毎日）/ grace_min: これを過ぎたら今日は諦めて schedule に任せる
+repo: m19mhrts83-cyber/project-GE
+jobs:
+  - workflow: kurashift-grok-mail-noon.yml
+    time: "11:00"
+  - workflow: jarvis-partner-day-report.yml
+    time: "11:50"
+  - workflow: jarvis-mail-action-noon.yml
+    time: "12:30"
+    weekdays: [1, 2, 3, 4, 5]
+  - workflow: kurashift-stock-watch-daily.yml
+    time: "16:05"
+    weekdays: [1, 2, 3, 4, 5]
+grace_min: 90
