@@ -519,6 +519,15 @@ export async function applyMailActionSlack(
   }
 
   if (action === "todoist") {
+    // 同じメールで起票済みなら作り直さない（ボタン再押下・別カードからの押下）
+    if (payload.todoist_task_id && payload.todoist_url) {
+      return {
+        ok: true,
+        message: `Todoist に登録済みです: ${String(payload.todoist_url)}`,
+        status: "todoist",
+        todoist_url: String(payload.todoist_url),
+      };
+    }
     const subject = String(row.subject || "").trim() || "(件名なし)";
     const partner = String(row.partner || "").trim();
     const fromEmail = String(row.from_email || "");
