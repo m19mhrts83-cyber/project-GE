@@ -117,7 +117,24 @@ def _find_and_open_row(page: Page, amount: float, shop: str) -> bool:
     if len(shop_frag) > 12:
         shop_frag = shop_frag[:12]
 
-    # list items / table rows
+    # 現行 UI（2026-10 確認）: 明細は div の仮想リスト。行の「編集」セルを押すとモーダルが開く
+    rows = page.locator("div[class*='SearchResult-module__body']").filter(
+        has_text=f"{amt_int:,}"
+    )
+    if rows.count() > 1 and shop_frag:
+        rows = rows.filter(has_text=shop_frag[:6])
+    if rows.count() == 1:
+        try:
+            rows.first.locator("div[class*='SearchResult-module__edit']").first.click(timeout=3000)
+            page.wait_for_timeout(1500)
+            return True
+        except Exception:
+            pass
+    elif rows.count() > 1:
+        # 同額が複数あるときは誤編集を避けて止める
+        return False
+
+    # 旧 UI のフォールバック（list items / table rows）
     candidates = page.locator("a, tr, li, div").filter(has_text=re.compile(str(amt_int)))
     n = min(candidates.count(), 40)
     for i in range(n):
@@ -160,7 +177,17 @@ def _set_aggregate_in_dialog(page: Page, value: str) -> bool:
     value: include | exclude
     """
     want_exclude = value == "exclude"
-    # checkbox labels
+    # 現行 UI（2026-10 確認）: 「常に含める（標準）=10／月ごと・年ごとのみ=6／年ごとのみ=3／常に含めない=0」の select
+    agg = page.locator("select").filter(has=page.locator("option", has_text="常に含めない"))
+    if agg.count() > 0:
+        try:
+            agg.first.select_option(value="0" if want_exclude else "10")
+            page.wait_for_timeout(300)
+            return True
+        except Exception:
+            return False
+
+    # 旧 UI のフォールバック（checkbox labels）
     labels = [
         "集計に含めない",
         "集計から除外",
@@ -207,7 +234,7 @@ def _set_aggregate_in_dialog(page: Page, value: str) -> bool:
 
 
 def _save_dialog(page: Page) -> bool:
-    for text in ("変更", "保存", "更新", "OK", "完了"):
+    for text in ("更新する", "変更", "保存", "更新", "OK", "完了"):
         btn = page.get_by_role("button", name=re.compile(text))
         if btn.count() > 0:
             try:
