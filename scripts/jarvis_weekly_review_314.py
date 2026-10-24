@@ -118,6 +118,8 @@ def collect_commits(since: datetime) -> dict[str, Any]:
         [
             "git", "log", "origin/main", f"--since={since.isoformat()}", "-p",
             "--pretty=COMMIT %h", "--", "*.py", "*.ts", "*.yml", "*.sh",
+            # 検出パターンを書いている自分自身は除く
+            ":!scripts/jarvis_weekly_review_314.py",
         ],
         timeout=180,
     )
