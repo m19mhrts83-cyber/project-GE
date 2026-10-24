@@ -27,6 +27,8 @@ import { parseT313ButtonValue } from "@/lib/todoist313SlackAction";
 import { handleT313BlockAction } from "@/lib/todoist313SlackInteract";
 import { parseT312ButtonValue } from "@/lib/todoist312SlackAction";
 import { handleT312BlockAction } from "@/lib/todoist312SlackInteract";
+import { parseS9ButtonValue } from "@/lib/s9SlackAction";
+import { handleS9BlockAction } from "@/lib/s9SlackInteract";
 
 export const runtime = "nodejs";
 
@@ -42,6 +44,7 @@ export const runtime = "nodejs";
  * メール要対応 URL: /api/g/ma/{reply|skip|todoist}/{id}?s=…
  * 313 URL: /api/g/t313/close|reschedule/{task_id}?s=…
  * 312 URL: /api/g/t312/create|dismiss/{n}?p=&s=…
+ * S9 URL:  /api/g/s9/adopt|skip/{n}?p=&s=…
  */
 
 function verifySlackSignature(
@@ -255,6 +258,40 @@ export async function POST(request: NextRequest) {
         response_type: "ephemeral",
         text: result.text,
       });
+    }
+
+    if (parseS9ButtonValue(value)) {
+      const userObj = (payload.user || {}) as Record<string, unknown>;
+      const result = await handleS9BlockAction({
+        value,
+        blocks: Array.isArray(messageObj.blocks)
+          ? (messageObj.blocks as Array<Record<string, unknown>>)
+          : [],
+        channelId,
+        messageTs,
+        userId: String(userObj.id || userObj.username || ""),
+      });
+      if (!result) {
+        return NextResponse.json(
+          { ok: false, error: "bad s9 action" },
+          { status: 400 },
+        );
+      }
+      if (result.kind === "error") {
+        return NextResponse.json({
+          response_type: "ephemeral",
+          text: result.text,
+        });
+      }
+      const body = {
+        replace_original: true,
+        text: result.text,
+        blocks: result.blocks,
+      };
+      if (responseUrl) {
+        await postResponseUrl(responseUrl, body);
+      }
+      return NextResponse.json(body);
     }
 
     if (parseT312ButtonValue(value)) {

@@ -6,8 +6,9 @@ Jarvis 側に取り込み口が無く、台帳（config/kurashift_mgmt_vendor_li
 18 社＝S9 が送れる相手 0 社のまま止まっていた（最終送信 8/27・2026-10-24 判明）。
 
   - はっきりした候補（メールかフォームあり・重複なし）→ 台帳へ status=pending で自動追加
-  - 判断が要る候補（連絡経路なし・重複の疑い・大手／売買専門の注記など）→ #consult に出す
-    （松野の判断。ダッシュボードの採用ボタンは作らない方針 2026-10-24）
+  - 判断が要る候補（連絡経路なし・重複の疑い・大手／売買専門の注記など）→ #consult に
+    候補カードを出し、松野が［採用］［見送り］ボタンで判断（2026-10-24 見直し。
+    ボタン → kurashift_jobs → jarvis_s9_decision_apply.py → 台帳）
   - 処理した MD は 90_archive/inbox_from_grok へ
 
     ~/selenium_env/venv/bin/python scripts/jarvis_s9_candidates_apply.py --dry-run
@@ -34,6 +35,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jarvis_bucho_bridge_lib import STATE_DIR, folder, list_queue_files  # noqa: E402
+import jarvis_s9_slack_blocks as s9blocks  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 JST = ZoneInfo("Asia/Tokyo")
@@ -178,21 +180,11 @@ def classify(row: dict[str, Any], vendors: list[dict[str, Any]]) -> tuple[str, s
 
 
 def build_consult(items: list[tuple[dict[str, Any], str, str]]) -> str:
-    lines = ["【相談】S9 管理会社開拓・候補の判断", ""]
-    for row, why, md in items:
-        lines.append(f"・{row['name']}（{row['property_area'] or '-'}）: {why}")
-        lines.append(f"　{row['contact_url'] or row['url'] or row['phone'] or '連絡先なし'}")
-    lines += [
-        "",
-        "採用／見送りをスレッドで返信してください（台帳には未追加）",
-        "",
-        "次: Jarvisに依頼",
-        "",
-        f"担当メモ: 採用分は jarvis_s9_candidates_apply.py で台帳へ（元 MD: {items[0][2]} ほか）",
-        "",
-        "橋渡し: 松野が了承したら、上記の担当へ一声（当面は人が橋）",
-    ]
-    return "\n".join(lines)
+    """プレーン本文（ログ・通知用）。Slack はボタン付きカードで投稿する。"""
+    rows = [{**row, "n": n, "why": why} for n, (row, why, _md) in enumerate(items, 1)]
+    return s9blocks.build_consult_text(
+        rows, md_note=items[0][2] if items else ""
+    )
 
 
 def build_report(added: list[dict[str, Any]], dups: int, consult: int) -> str:
@@ -272,7 +264,13 @@ def main() -> int:
             if clean or dups:
                 _post("report", build_report(clean, dups, len(consult)))
             if consult:
-                _post("consult", build_consult(consult))
+                items = [
+                    {**row, "n": n, "why": why, "source_md": md}
+                    for n, (row, why, md) in enumerate(consult, 1)
+                ]
+                s9blocks.post_decision_card(
+                    items, md_note=f"{consult[0][2]} ほか"
+                )
         if args.archive_done:
             arch = inbox.parent / "90_archive" / "inbox_from_grok"
             arch.mkdir(parents=True, exist_ok=True)

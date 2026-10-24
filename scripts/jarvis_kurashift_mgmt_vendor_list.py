@@ -716,8 +716,10 @@ def mark_vendor_alive(
     }
 
 
-def merge_append(vendors: list[Any], *, dry_run: bool) -> dict[str, Any]:
-    data = load_list()
+def merge_append(
+    vendors: list[Any], *, dry_run: bool, path: Path | None = None
+) -> dict[str, Any]:
+    data = load_list(path)
     by_id = vendor_index(data)
     added = 0
     for raw in vendors:
@@ -768,7 +770,7 @@ def merge_append(vendors: list[Any], *, dry_run: bool) -> dict[str, Any]:
         added += 1
     data["vendors"] = list(by_id.values())
     if not dry_run:
-        save_list(data)
+        save_list(data, path)
     return {"ok": True, "added": added, "total": len(data["vendors"]), "dry_run": dry_run}
 
 
