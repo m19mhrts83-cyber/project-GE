@@ -32,6 +32,23 @@ from jarvis_send_gate_311 import enqueue_request  # noqa: E402
 ACTION = "send_gate_311"
 
 
+def resolve_draft_path(draft: str) -> str:
+    """部長（Grok）は draft_path を「マイドライブ」からの相対（【with Grok bot】/…）で書く。
+
+    そのまま渡すと repo 相対として探され、毎回「下書きがありません」で FAIL していた
+    （2026-10-21〜24 の poll がすべて rc=1）。絶対パス・既存パスはそのまま返す。
+    """
+    p = Path(draft).expanduser()
+    if p.is_absolute() or p.exists():
+        return str(p)
+    roots = sorted(Path.home().glob("Library/CloudStorage/GoogleDrive-*/マイドライブ"))
+    for root in roots:
+        cand = root / draft
+        if cand.exists():
+            return str(cand)
+    return draft
+
+
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
     if not text.lstrip().startswith("---"):
         return {}, text
@@ -96,7 +113,7 @@ def apply_one(path: Path, *, dry_run: bool) -> dict[str, Any]:
         }
     try:
         written = enqueue_request(
-            draft,
+            resolve_draft_path(draft),
             source=source,
             partner_or_thread=partner,
             note=f"hawk inbox apply ({path.name})",

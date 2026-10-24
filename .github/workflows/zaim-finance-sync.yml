@@ -4,6 +4,8 @@ on:
   schedule:
     # 毎朝 06:00 JST（= 毎日 21:00 UTC）
     - cron: "0 21 * * *"
+    # 補欠: 09:30 JST。06:00 が成功していれば guard が skip（ログイン停滞で 12% 失敗）
+    - cron: "30 0 * * *"
   workflow_dispatch:
     inputs:
       year:
@@ -21,7 +23,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 補欠 cron の回は、直近 6h に成功があれば skip（_success-guard.yml）
+  guard:
+    uses: ./.github/workflows/_success-guard.yml
+    with:
+      window_hours: 6
+    permissions:
+      actions: read
+
   zaim-finance-sync:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
