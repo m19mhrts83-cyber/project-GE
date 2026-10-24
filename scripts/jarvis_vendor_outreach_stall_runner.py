@@ -312,13 +312,29 @@ def assess_s2() -> dict[str, Any]:
     }
 
 
+S9_SENDABLE_CHANNELS = frozenset({"email", "web_form"})
+
+
 def assess_s9() -> dict[str, Any]:
     data = load_s9()
     settings = data.get("settings") or {}
     daily = int(settings.get("daily_outreach_limit") or 1)
     if daily < 1:
         daily = 1
-    items = s9_next_pending(limit=max(daily * 3, daily), balanced=True)
+    # S9 はメール／フォームでしか送らない。電話のみの行を「送信可能」に数えると、緑区が
+    # 電話 18 社だけでも queue_ready>0＝正常と判定し、送れないまま止まっていた（2026-10-24）
+    items = [
+        v
+        for v in s9_next_pending(limit=max(daily * 10, 10), balanced=True)
+        if str(v.get("channel") or "") in S9_SENDABLE_CHANNELS
+    ][: max(daily * 3, daily)]
+    # 優先レーン（緑区＝ボス方針 2026-10-20「緑区 1 社/日」）で送れる相手が 0 なら補給が要る
+    focus_lane = os.environ.get("JARVIS_S9_FOCUS_LANE", "midori_caramel")
+    focus_ready = sum(
+        1
+        for v in s9_next_pending(limit=10, lane=focus_lane)
+        if str(v.get("channel") or "") in S9_SENDABLE_CHANNELS
+    )
     summ = s9_summary()
     by = summ.get("by_status") or {}
     vendors = list(data.get("vendors") or [])
@@ -328,8 +344,10 @@ def assess_s9() -> dict[str, Any]:
         "phase": None,
         "daily_limit": daily,
         "queue_ready": len(items),
+        "focus_lane": focus_lane,
+        "focus_ready": focus_ready,
         "pending_discovered": pending_n,
-        "needs_refill": len(items) < daily,
+        "needs_refill": len(items) < daily or focus_ready < daily,
         "followup": count_followup(vendors),
         "contacted_today": contacted_today(vendors),
         "last_contacted": (
