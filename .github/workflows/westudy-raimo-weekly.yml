@@ -9,6 +9,9 @@ on:
     # 毎週 日曜 08:00 JST（= 土曜 23:00 UTC）
     # 旧 06:30 は WeStudy ログイン/renderer timeout が続きやすかった
     - cron: "0 23 * * 6"
+    # 補欠: 日曜 14:00／月曜 08:00 JST。本番が成功していれば guard が skip（50% がログイン停滞で失敗していた）
+    - cron: "0 5 * * 0"
+    - cron: "0 23 * * 0"
   workflow_dispatch:
     inputs:
       force_scrape:
@@ -22,7 +25,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 補欠 cron の回は、直近 30h に成功があれば skip（_success-guard.yml）
+  guard:
+    uses: ./.github/workflows/_success-guard.yml
+    with:
+      window_hours: 30
+    permissions:
+      actions: read
+
   run-weekly:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:

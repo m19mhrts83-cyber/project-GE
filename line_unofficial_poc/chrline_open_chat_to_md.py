@@ -529,6 +529,49 @@ def _extract_thread_mids_from_event(ev: Any, square_chat_mid: str) -> set[str]:
     return out
 
 
+ACTIVE_THREADS_KEEP_DAYS = 3
+
+
+def _load_active_threads(path: Path) -> dict[str, set[str]]:
+    """{route_id: {threadMid: last_seen_iso}} → {route_id: {threadMid}}（直近 N 日分）。"""
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=ACTIVE_THREADS_KEEP_DAYS)).isoformat()
+    out: dict[str, set[str]] = {}
+    for rid, mids in (raw.get("routes") or {}).items():
+        if isinstance(mids, dict):
+            out[rid] = {m for m, at in mids.items() if str(at) >= cutoff}
+    return out
+
+
+def _save_active_threads(path: Path, seen: dict[str, set[str]]) -> int:
+    """今回見えた threadMid を last_seen 付きでマージ保存（古いものは落とす）。"""
+    path = Path(path)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raw = {}
+    routes = raw.get("routes") if isinstance(raw.get("routes"), dict) else {}
+    now = datetime.now(timezone.utc).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=ACTIVE_THREADS_KEEP_DAYS)).isoformat()
+    for rid, mids in seen.items():
+        cur = routes.setdefault(rid, {})
+        for m in mids:
+            cur[m] = now
+    for rid in list(routes):
+        routes[rid] = {m: at for m, at in routes[rid].items() if str(at) >= cutoff}
+        if not routes[rid]:
+            del routes[rid]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"updated_at": now, "routes": routes}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return sum(len(v) for v in seen.values())
+
+
 def _append_thread_mids_to_routes_yaml(
     routes_yaml: Path,
     route_id_to_new_mids: dict[str, list[str]],
@@ -990,6 +1033,7 @@ def _persist_route_thread_health(
     main_appended: dict[str, int],
     *,
     run_at: str | None = None,
+    keep_main_from_day: bool = False,
 ) -> Path | None:
     """route 別スレッド同期統計を .jarvis_state に日次追記（最大30日）。"""
     try:
@@ -1014,7 +1058,9 @@ def _persist_route_thread_health(
     for route in routes:
         rid = route.rid
         st = route_stats.get(rid) or ThreadSyncStats()
-        registered = len(route.thread_mids or [])
+        # --thread-mids-from で絞った回も「登録数」は YAML の本数で記録する
+        registered = int(getattr(route, "registered_total", len(route.thread_mids or [])))
+        prev = routes_day.get(rid, {}) if isinstance(routes_day.get(rid), dict) else {}
         entry = {
             "route_id": rid,
             "org_label": route.org_label,
@@ -1028,8 +1074,11 @@ def _persist_route_thread_health(
             "degraded": st.degraded,
             "join_denied": st.join_denied,
             "appended_threads": st.appended,
-            "appended_main": int(main_appended.get(rid) or 0),
-            "last_ok_at": now if st.ok > 0 else routes_day.get(rid, {}).get("last_ok_at"),
+            # スレッド専用の追い取り（--no-main）は同日のメイン実行の値を消さない
+            "appended_main": int(
+                (prev.get("appended_main") if keep_main_from_day else main_appended.get(rid)) or 0
+            ),
+            "last_ok_at": now if st.ok > 0 else prev.get("last_ok_at"),
             "run_at": now,
         }
         # 同日複数回は加算ではなく最新実行で上書き（日次スナップショット）
@@ -1398,6 +1447,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="未参加スレッドを確認なしで参加（bootstrap 用。通常運用では非推奨）",
     )
+    parser.add_argument(
+        "--active-threads-out",
+        type=Path,
+        default=None,
+        help="メイン同期中に「新着ありスレッド」通知（val_58 等）から threadMid を集めて JSON に書く（API 追加呼び出しなし）",
+    )
+    parser.add_argument(
+        "--thread-mids-from",
+        type=Path,
+        default=None,
+        help="--active-threads-out の JSON にある登録済みスレッドだけを同期する（--threads-only と併用）",
+    )
+    parser.add_argument(
+        "--register-active-threads",
+        action="store_true",
+        help="--thread-mids-from の未登録スレッドを open_chat_routes.yaml に追記して今回の対象に含める（参加済みなら取得できる。未参加は --join-threads* が別途必要）",
+    )
     return parser
 
 
@@ -1502,6 +1568,29 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
         return 1
 
     routes = _parse_routes(routes_yaml)
+    if args.thread_mids_from:
+        active = _load_active_threads(args.thread_mids_from)
+        n_keep = n_unreg = 0
+        new_by_route: dict[str, list[str]] = {}
+        for r in routes:
+            act = active.get(r.rid, set())
+            reg = set(r.thread_mids)
+            r.registered_total = len(reg)  # type: ignore[attr-defined]
+            new_mids = sorted(act - reg)
+            r.thread_mids = [m for m in r.thread_mids if m in act]
+            if args.register_active_threads and new_mids:
+                r.thread_mids.extend(new_mids)
+                new_by_route[r.rid] = new_mids
+            n_keep += len(r.thread_mids)
+            n_unreg += len(new_mids)
+        print(
+            f"# active threads: 同期対象 {n_keep} 本（未登録の新着スレッド {n_unreg} 本"
+            f"{'を登録して含める' if args.register_active_threads else 'は対象外'}）",
+            file=sys.stderr,
+        )
+        if new_by_route and not args.dry_run:
+            n_reg = _append_thread_mids_to_routes_yaml(routes_yaml, new_by_route)
+            print(f"# open_chat_routes.yaml thread_mids 追記（新着スレッド）: {n_reg} 件", file=sys.stderr)
     if args.route_ids:
         allowed = {str(x).strip() for x in args.route_ids if str(x).strip()}
         routes = [r for r in routes if r.rid in allowed]
@@ -1538,6 +1627,7 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
     seen_dedup = _load_dedup(dedup_path)
     new_dedup: set[str] = set()
     discover_counts: defaultdict[str, Counter[str]] = defaultdict(Counter)
+    active_seen: defaultdict[str, set[str]] = defaultdict(set)
 
     cl = client if client is not None else build_logged_in_client(
         save_root, allow_qr_login=bool(args.allow_qr_login)
@@ -1828,6 +1918,10 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
             before_appended = appended
             _prefetch_sender_names_for_events(cl, sender_resolver, events)
             for ev in events:
+                if args.active_threads_out and not st.thread_mid:
+                    for tmid in _extract_thread_mids_from_event(ev, st.square_chat_mid):
+                        if _is_thread_mid(tmid):
+                            active_seen[st.route.rid].add(tmid)
                 if args.discover_thread_mids and not st.thread_mid:
                     for tmid in _extract_thread_mids_from_event(ev, st.square_chat_mid):
                         discover_counts[st.route.rid][tmid] += 1
@@ -2027,7 +2121,12 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
             routes,
             dict(route_thread_stats),
             dict(route_main_appended),
+            keep_main_from_day=bool(args.no_main),
         )
+
+    if args.active_threads_out:  # dry-run でも記録だけは書く（MD/state は触らない）
+        n_active = _save_active_threads(args.active_threads_out, active_seen)
+        print(f"# active threads 記録: {n_active} 本 → {args.active_threads_out}", file=sys.stderr)
 
     print(f"# open-chat 追記: {appended} 件", file=sys.stderr)
     return 0

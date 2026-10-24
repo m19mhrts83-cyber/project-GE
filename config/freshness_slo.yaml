@@ -1,0 +1,84 @@
+# 315 鮮度監視（デッドマンスイッチ）— 「成功が○時間届いていない」を拾う
+#
+# エラー検知だけでは「止まって何も出ない」静かな失敗を見落とす
+# （例: オプチャのスレッドが 2026-09-30〜10-24 の 3 週間 0 件。健全性は毎日 attention を出していたが常時点灯で埋もれた）。
+# ここに載せた成果物が max_age_h を超えて古くなったら #ops に 1 回だけ出す（回復したら 1 回だけ回復報告）。
+#
+# kind:
+#   gha        … workflow の最後の success からの経過
+#   file_mtime … glob に一致する最新ファイルの更新時刻（~ 可）
+#   json_time  … JSON の時刻フィールド（path の * は配列／dict の全要素。最大値を採用）
+# owner: 担当社員（番号＋役割）／action: 古くなったとき最初にやること（1 行）
+products:
+  - id: openchat_threads
+    label: オプチャ【スレッド】取得
+    kind: json_time
+    file: .jarvis_state/openchat_thread_health.json
+    path: latest.routes.*.last_ok_at
+    max_age_h: 36
+    owner: 815 KURASHIFT更新
+    action: "zsh launchd/openchat_thread_backfill.sh（新スレッドの追い上げ）→ ログの thread sync 行を確認"
+  - id: openchat_main
+    label: オプチャ【メイン】受信
+    kind: json_time
+    file: line_unofficial_poc/.line_auth/.chrline_open_chat_watch_status.json
+    path: last_append_at
+    max_age_h: 24
+    owner: 815 KURASHIFT更新
+    action: "launchctl kickstart -k gui/$(id -u)/com.matsunoma.line.openchat.watch／QR 要なら Mac で再ログイン"
+  - id: openchat_batch
+    label: オプチャ朝夕バッチ
+    kind: file_mtime
+    glob: ~/Library/Logs/jarvis_openchat_sync/sync_*.log
+    max_age_h: 14
+    owner: 815 KURASHIFT更新
+    action: "launchctl list | grep openchat-md-db-sync で登録確認 → 最新 sync_*.log の末尾を見る"
+  - id: gha_gmail_triage
+    label: Gmail トリアージ（朝）
+    kind: gha
+    workflow: jarvis-dashboard-gmail-triage.yml
+    max_age_h: 30
+    owner: 116 メール要対応
+    action: "gh run list -w jarvis-dashboard-gmail-triage.yml で失敗ログ → Secrets 期限切れを疑う"
+  - id: gha_partner_day
+    label: 111 パートナー昼レポート
+    kind: gha
+    workflow: jarvis-partner-day-report.yml
+    max_age_h: 30
+    owner: 111 パートナー連絡整理
+    action: "gh run list -w jarvis-partner-day-report.yml → 失敗なら --log-failed"
+  - id: gha_reply_211
+    label: 211 返信案内・朝便
+    kind: gha
+    workflow: jarvis-reply-draft-211.yml
+    max_age_h: 30
+    owner: 211 返信案内下書き
+    action: "gh run list -w jarvis-reply-draft-211.yml → MS_GRAPH_* の期限を確認"
+  - id: gha_zaim
+    label: Zaim 日次同期
+    kind: gha
+    workflow: zaim-finance-sync.yml
+    max_age_h: 30
+    owner: 600 リソース・家計
+    action: "ZAIM_STORAGE_STATE_B64 の再発行（セッション切れ）を疑う"
+  - id: gha_re_inquiry
+    label: KURASHIFT 物件問合せ（Tier3）
+    kind: gha
+    workflow: kurashift-re-daily-inquiry.yml
+    max_age_h: 30
+    owner: 500 不動産パイプライン
+    action: "gh run list -w kurashift-re-daily-inquiry.yml"
+  - id: gha_westudy
+    label: WeStudy 週次取込
+    kind: gha
+    workflow: westudy-raimo-weekly.yml
+    max_age_h: 200
+    owner: 315 連携健全性点検
+    action: "gh workflow run westudy-raimo-weekly.yml（ログイン停滞なら時間を置いて再実行）"
+  - id: weekly_review_facts
+    label: 314 週次機械チェック
+    kind: file_mtime
+    glob: .jarvis_state/weekly_review_314/facts_*.md
+    max_age_h: 200
+    owner: 314 業務品質監査
+    action: "launchctl kickstart gui/$(id -u)/com.matsunoma.jarvis.weekly-review-314"
