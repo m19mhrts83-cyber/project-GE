@@ -3,7 +3,8 @@
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+# gh は ~/bin にある（launchd の PATH には入らない）
+export PATH="$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 set -a
 # shellcheck disable=SC1091
 source "$REPO_DIR/.env.jarvis_private"
