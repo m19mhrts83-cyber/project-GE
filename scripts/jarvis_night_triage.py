@@ -30,7 +30,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -1045,10 +1045,39 @@ def load_queue() -> dict[str, Any]:
     if len(order) != len(data["items"]):
         data["items"] = [by_id[i] for i in order]
         changed = True
+    if expire_stale_pending(data["items"]):
+        changed = True
     if changed:
         data["updated_at"] = now_iso()
         save_json(QUEUE_PATH, data)
     return data
+
+
+def expire_stale_pending(items: list[dict[str, Any]], *, now: datetime | None = None) -> int:
+    """受信から N 日（既定 21）を過ぎた pending を skipped（auto_expired）に落とす。
+
+    下書き生成は LLM オフが既定で pending は自然に減らず、6〜7 月分まで残って 283 件に膨らみ
+    「件数」が判断材料にならなくなっていた（2026-10-24）。0 で無効。
+    """
+    days = int(os.environ.get("JARVIS_TRIAGE_PENDING_EXPIRE_DAYS") or "21")
+    if days <= 0:
+        return 0
+    cutoff = (now or datetime.now(JST)) - timedelta(days=days)
+    n = 0
+    for it in items:
+        if it.get("status") != "pending":
+            continue
+        raw = str(it.get("received_at") or "").strip()
+        try:
+            rec = datetime.strptime(raw[:16], "%Y/%m/%d %H:%M").replace(tzinfo=JST)
+        except ValueError:
+            continue
+        if rec < cutoff:
+            it["status"] = "skipped"
+            it["skip_reason"] = f"auto_expired_{days}d"
+            it["updated_at"] = now_iso()
+            n += 1
+    return n
 
 
 def load_partner_emails() -> dict[str, list[str]]:

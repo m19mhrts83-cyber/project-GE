@@ -60,7 +60,17 @@ fi
 
   # メイン差分（スレは常時監視が本線。ここでは軽量にメイン中心）
   md_rc=0
-  ( cd "$POC" && ./run_patch.sh chrline_open_chat_to_md.py --no-threads ) || md_rc=$?
+  # メインだけ取る（全 1800 本超のスレッドを毎回回すのは重く 401 も増えるため）。
+  # 代わりにメインのイベントに乗る「新着ありスレッド」通知（val_58 等）から threadMid を記録し、
+  # 直後に新着スレッドだけを追い取りする。未登録（9/30 以降の新スレッド）は自動登録する
+  # （参加不要で読めることを 2026-10-24 に確認。9/30〜10/24 はスレッド 0 件だった是正）
+  ACTIVE_JSON="${POC}/.line_auth/active_thread_mids.json"
+  ( cd "$POC" && ./run_patch.sh chrline_open_chat_to_md.py --no-threads --active-threads-out "$ACTIVE_JSON" ) || md_rc=$?
+  if [[ "${JARVIS_OPENCHAT_ACTIVE_THREADS:-1}" != "0" && -f "$ACTIVE_JSON" ]]; then
+    th_rc=0
+    ( cd "$POC" && ./run_patch.sh chrline_open_chat_to_md.py --threads-only --register-active-threads --thread-mids-from "$ACTIVE_JSON" ) || th_rc=$?
+    echo "# active threads sync rc=${th_rc}"
+  fi
 
   # MD → kamiooya-qa.line_openchat_logs（staging）＋ Grok共有
   # 二次投影の失敗で本線（取込・監視）を止めない

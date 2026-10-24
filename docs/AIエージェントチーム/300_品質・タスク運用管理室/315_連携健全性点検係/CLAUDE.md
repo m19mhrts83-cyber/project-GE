@@ -48,6 +48,7 @@ WeStudy／GitHub Actions の失敗、LINE オープンチャット取込、**Gma
 - [x] **時間（本線）: 毎週日曜 21:00 JST — GitHub Actions `ops-health-315.yml`**
 - [x] **時間（Mac補完）: 毎週日曜 21:45 JST — launchd `--remediate-once`**
 - [x] 何かが届いたら（WeStudy 週次 GHA Fail 通知等 → 手動または次回定時）
+- [x] **時間（鮮度監視）: 毎日 08:20・18:20 — launchd `jarvis_freshness_watch.py --post`**（`config/freshness_slo.yaml` の成果物が上限より古くなった／回復したときだけ `#ops`。AI なし）
 
 旧: launchd 日曜 09:15 は廃止（21:45 に置換）。
 
@@ -127,3 +128,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-11 | 伴走再開: `PROGRESS.md`・GHA手動検証／Mac補完方針の docs。状態は運用確認のまま |
 | 2026-10-11 | **検知→1回トライ→結果**: `--remediate-once`＋launchd 日曜21:45。パートナー確認依存をやめる |
 | 2026-10-15 | **Gmail token モニター**を役割に追加（Mac 点検・`#ops`／欠落時 `#consult`。自動再同意なし） |
+| 2026-10-24 | **鮮度監視（デッドマンスイッチ）**を追加。エラー検知では拾えない「止まって何も出ない」失敗（オプチャ【スレッド】が 9/30〜10/24 の 3 週間 0 件）を、成果物の最終成功時刻で検知。通知は状態が変わったときだけ・担当と最初の一手つき |

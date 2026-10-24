@@ -308,10 +308,22 @@ def poll() -> dict[str, Any]:
         summary = f"部長ボックス未処理 {n}件: {names}{more}"
         detail = format_detail_md(pending)
 
+    # Google ドキュメント（*.gdoc）は Mac から本文を読めず list_queue_files に乗らない。
+    # 黙って放置されないよう件数だけ出す（部長に .md で出し直してもらう）
+    gdocs = sorted(
+        p.name for p in inbox.glob("*.gdoc") if p.name not in seen
+    ) if inbox.is_dir() else []
+    if gdocs:
+        summary += f" · Googleドキュメント形式で読めない {len(gdocs)}件（部長に .md で再提出を依頼）"
+        if level == "ok":
+            level = "warn"
+        detail += "\n\n読めない（.gdoc）:\n" + "\n".join(f"- {g}" for g in gdocs)
+
     state["level"] = level
     state["summary"] = summary
     state["detail"] = detail
     state["pending"] = pending
+    state["unreadable_gdocs"] = gdocs
     state["inbox_dir"] = str(inbox)
     save_state(state)
 
