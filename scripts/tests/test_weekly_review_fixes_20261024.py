@@ -4,6 +4,7 @@
 - CloudStorage の EDEADLK で 1 ファイル読めなくてもジョブを落とさない
 - KURASHIFT Obsidian 同期: deal_id「未取得」を uuid 照会しない
 - GHA 定刻キック: 定刻〜猶予の間に 1 日 1 回だけ・曜日指定を守る
+- Ops Fail autofix: 同じ失敗には Cloud Agent を 1 回だけ
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 import jarvis_cloud_file as cf  # noqa: E402
 import jarvis_gha_precise_kick as kick  # noqa: E402
 import jarvis_kurashift_obsidian_pick_sync as pick  # noqa: E402
+import jarvis_ops_fail_watch as ofw  # noqa: E402
 
 
 class CloudFileTests(unittest.TestCase):
@@ -121,6 +123,35 @@ class PreciseKickTests(unittest.TestCase):
     def test_once_per_day(self):
         got = kick.due_jobs(self.CFG, self.at(26, 12, 35), {"noon.yml": "2026-10-26", "daily.yml": "2026-10-26"})
         self.assertEqual(got, [])
+
+
+class OpsAutofixOnceTests(unittest.TestCase):
+    ITEM = {"id": "gha_workflow_fail", "level": "attention", "payload": {"fail_run_ids": ["39083633301"]}}
+
+    def run_autofix(self, launched):
+        calls = []
+        fake_mod = mock.MagicMock()
+        fake_mod.launch_cloud_agent = lambda **k: calls.append(k) or {"ok": True, "url": "u"}
+        with mock.patch.dict(sys.modules, {"jarvis_cloud_agent_launch": fake_mod}), \
+                mock.patch.object(ofw, "_sb_client", return_value=None), \
+                mock.patch.object(ofw, "_existing_ops_status", return_value="done"), \
+                mock.patch.object(ofw, "_patch_ops_payload") as patch:
+            ofw.run_autofix([dict(self.ITEM)], launched)
+        return calls, patch
+
+    def test_same_failure_not_relaunched(self):
+        calls, _ = self.run_autofix({"gha_workflow_fail": {"39083633301"}})
+        self.assertEqual(calls, [])
+
+    def test_new_failure_launches_and_records(self):
+        calls, patch = self.run_autofix({"gha_workflow_fail": {"111"}})
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(patch.call_args.kwargs["launched_ids"], ["111", "39083633301"])
+
+    def test_carry_forward(self):
+        items = [dict(self.ITEM)]
+        ofw._carry_launched(items, {"gha_workflow_fail": {"1", "2"}})
+        self.assertEqual(items[0]["payload"]["autofix_launched_ids"], ["1", "2"])
 
 
 if __name__ == "__main__":
