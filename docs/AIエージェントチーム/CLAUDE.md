@@ -15,6 +15,8 @@ Claude Code / Cursor（Jarvis）/ Codex / GenCode / Grok Bot など、**どの�
 | [`30_共通Agentフォルダ規格_BCP`](30_共通Agentフォルダ規格_BCP_20261017.md) | TASK／input／output／tests（ツール切替BCP） |
 | [`31_作業ロック`](31_作業ロック_二重起動防止_20261017.md) | 二重起動防止。CLI `jarvis_agent_run_lock.py` |
 | [`43_Claude Code 受け渡し`](43_Claude_Code参加_受け渡し_20261023.md) | Claude Code 参加・三層受け渡し |
+| [`49_共通ルール`](49_共通ルール_AI使用量と入力_20261024.md) | **音声入力（Typeless）の誤記前提・文字起こしはスクリプト・PDFの元MD・「聞く」は軽いモデルから・読む量を減らす** |
+| [`48_読まなくてよいMD一覧`](48_読まなくてよいMD一覧_20261024.md) | 名指し時だけ開く MD（AI 使用量の節約） |
 | 家ルール例 | [`config/claude_code_home_CLAUDE.example.md`](../../config/claude_code_home_CLAUDE.example.md) → `~/.claude/CLAUDE.md` |
 
 ## 作業開始前（必須・短い）
