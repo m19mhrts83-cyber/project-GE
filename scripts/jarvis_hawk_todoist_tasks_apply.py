@@ -51,6 +51,7 @@ source: hawk
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import re
 import subprocess
@@ -59,7 +60,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from jarvis_bucho_bridge_lib import folder, list_queue_files  # noqa: E402
+from jarvis_bucho_bridge_lib import STATE_DIR, folder, list_queue_files  # noqa: E402
 from jarvis_todoist_comment_links import (  # noqa: E402
     enrich_comment_output_links,
     format_outputs_block,
@@ -70,6 +71,11 @@ REPO = Path(__file__).resolve().parents[1]
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 API = REPO / "scripts" / "jarvis_todoist_api.py"
 ACTION = "todoist_tasks"
+# 同じ MD を二重に反映しない（2026-10-19 21:48 に同一タスクが約20秒おきに 5 件できた）:
+#  - ロック: 画面ロック解除・朝の更新・15分 poll が同時に走っても 1 本だけ
+#  - 台帳: 成功した項目を記録。部分失敗で MD が残っても成功分は再実行しない
+LOCK_PATH = STATE_DIR / "hawk_todoist_tasks_apply.lock"
+LEDGER_PATH = STATE_DIR / "hawk_todoist_tasks_applied.json"
 
 # Title / field → extra Todoist labels
 SIGNAL_LABELS = {
@@ -238,7 +244,29 @@ def _run_api(args: list[str], dry_run: bool) -> dict[str, Any]:
     return out
 
 
-def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
+def _item_key(op: str, item: dict[str, str]) -> str:
+    who = (item.get("task_id") or item.get("title") or "").strip()
+    return f"{op}|{(item.get('lane') or '').strip()}|{who}"
+
+
+def load_ledger() -> dict[str, dict[str, str]]:
+    try:
+        raw = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def save_ledger(ledger: dict[str, dict[str, str]]) -> None:
+    LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # 古い MD の記録は 200 件まで（新しい順）
+    keep = dict(sorted(ledger.items(), key=lambda kv: max(kv[1].values() or [""]), reverse=True)[:200])
+    LEDGER_PATH.write_text(json.dumps(keep, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def apply_file(
+    path: Path, *, dry_run: bool, ledger: dict[str, dict[str, str]] | None = None
+) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8", errors="replace")
     meta, body = _parse_frontmatter(text)
     if (meta.get("action") or "").strip() != ACTION:
@@ -246,12 +274,27 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
     sections = _split_sections(body)
     source = (meta.get("source") or "").strip()
     results: list[dict[str, Any]] = []
+    done = ledger.setdefault(path.name, {}) if ledger is not None else {}
+
+    def already(op: str, item: dict[str, str]) -> bool:
+        if _item_key(op, item) in done:
+            results.append({"op": op, "ok": True, "skipped": True, "reason": "applied", "key": _item_key(op, item)})
+            return True
+        return False
+
+    def mark(op: str, item: dict[str, str], ok: bool) -> None:
+        if ok and not dry_run and ledger is not None:
+            from datetime import datetime, timezone
+
+            done[_item_key(op, item)] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     for item in _parse_items(sections.get("create") or ""):
         lane = (item.get("lane") or "").strip() or "inbox"
         title = (item.get("title") or "").strip()
         if not title:
             results.append({"op": "create", "ok": False, "error": "title required", "item": item})
+            continue
+        if already("create", item):
             continue
         args = ["create-task", "--lane", lane, "--title", title, "--url", "--json"]
         if item.get("due"):
@@ -269,7 +312,9 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
         comment = _build_comment(item, kind="create", source=source, inbox_file=path.name)
         if comment:
             args += ["--comment", comment]
-        results.append({"op": "create", **_run_api(args, dry_run), "title": title, "lane": lane})
+        res = _run_api(args, dry_run)
+        mark("create", item, bool(res.get("ok")))
+        results.append({"op": "create", **res, "title": title, "lane": lane})
 
     for item in _parse_items(sections.get("owner_confirm") or ""):
         lane = (item.get("lane") or "").strip()
@@ -278,6 +323,8 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
             results.append(
                 {"op": "owner_confirm", "ok": False, "error": "lane/task_id required", "item": item}
             )
+            continue
+        if already("owner_confirm", item):
             continue
         move = _run_api(
             ["update-status", "--task-id", task_id, "--lane", lane, "--status", "オーナー確認"],
@@ -289,6 +336,7 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
         c_res: dict[str, Any] = {"ok": True, "skipped": True}
         if comment:
             c_res = _run_api(["comment", "--task-id", task_id, "--text", comment], dry_run)
+        mark("owner_confirm", item, bool(move.get("ok")) and bool(c_res.get("ok", True)))
         results.append(
             {
                 "op": "owner_confirm",
@@ -304,6 +352,8 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
         task_id = (item.get("task_id") or "").strip()
         if not lane or not task_id:
             results.append({"op": "done", "ok": False, "error": "lane/task_id required", "item": item})
+            continue
+        if already("done", item):
             continue
         reason = (item.get("reason") or "").strip()
         who = (item.get("who") or meta.get("source") or "ホーク").strip()
@@ -326,6 +376,7 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
         if reason:
             done_args += ["--comment", reason]
         done_res = _run_api(done_args, dry_run)
+        mark("done", item, bool(done_res.get("ok")) and bool(pre.get("ok", True)))
         results.append(
             {
                 "op": "done",
@@ -345,13 +396,11 @@ def apply_file(path: Path, *, dry_run: bool) -> dict[str, Any]:
         if not comment:
             results.append({"op": "comment", "ok": False, "error": "empty comment", "item": item})
             continue
-        results.append(
-            {
-                "op": "comment",
-                **_run_api(["comment", "--task-id", task_id, "--text", comment], dry_run),
-                "task_id": task_id,
-            }
-        )
+        if already("comment", item):
+            continue
+        res = _run_api(["comment", "--task-id", task_id, "--text", comment], dry_run)
+        mark("comment", item, bool(res.get("ok")))
+        results.append({"op": "comment", **res, "task_id": task_id})
 
     ok = all(r.get("ok", True) for r in results if not r.get("skipped"))
     if not results:
@@ -374,6 +423,16 @@ def main() -> int:
         print("ERROR: --dry-run または --apply を指定", file=sys.stderr)
         return 2
 
+    LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    lock_fh = open(LOCK_PATH, "w")
+    try:
+        fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock_fh.close()
+        print(json.dumps({"ok": True, "count": 0, "skipped": "another apply running"}, ensure_ascii=False))
+        return 0
+    ledger = load_ledger()
+
     inbox = folder("inbox_from_grok")
     files = list_queue_files(inbox)
     if args.file:
@@ -384,7 +443,9 @@ def main() -> int:
         meta, _ = _parse_frontmatter(text)
         if (meta.get("action") or "").strip() != ACTION:
             continue
-        report = apply_file(f, dry_run=args.dry_run)
+        report = apply_file(f, dry_run=args.dry_run, ledger=ledger)
+        if not args.dry_run:
+            save_ledger(ledger)
         reports.append(report)
         if args.apply and args.archive_done and report.get("ok") and not report.get("skipped"):
             arch = inbox.parent / "90_archive" / "inbox_from_grok"

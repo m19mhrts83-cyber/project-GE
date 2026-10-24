@@ -58,7 +58,10 @@ type TodoistTaskRow = {
   is_completed?: boolean;
 };
 
-async function fetchProjectTasks(projectId: string): Promise<TodoistTaskRow[]> {
+async function fetchProjectTasks(
+  projectId: string,
+  opts?: { fresh?: boolean },
+): Promise<TodoistTaskRow[]> {
   const out: TodoistTaskRow[] = [];
   let cursor: string | undefined;
   let pages = 0;
@@ -67,7 +70,7 @@ async function fetchProjectTasks(projectId: string): Promise<TodoistTaskRow[]> {
     if (cursor) qs.set("cursor", cursor);
     const res = await fetch(`${API}/tasks?${qs.toString()}`, {
       headers: headers(),
-      next: { revalidate: 60 },
+      ...(opts?.fresh ? { cache: "no-store" as const } : { next: { revalidate: 60 } }),
     });
     if (!res.ok) {
       const text = await res.text();
@@ -194,6 +197,24 @@ export async function queryTodoistLaneBoard(
   }
 }
 
+/** 同じタイトル・同じ期日（期日なし同士を含む）のオープンタスク。重複起票の防止用 */
+export function findOpenDuplicate(
+  tasks: { id?: string; content?: string; url?: string; due?: { date?: string } | null }[],
+  title: string,
+  due?: string | null,
+): { id: string; url: string } | null {
+  const want = title.slice(0, 500).trim();
+  const d = (due || "").trim().slice(0, 10);
+  for (const t of tasks) {
+    if (String(t.content || "").trim() !== want) continue;
+    const td = String(t.due?.date || "").slice(0, 10);
+    if (td !== d) continue;
+    const id = String(t.id || "");
+    return { id, url: t.url || `https://app.todoist.com/app/task/${encodeURIComponent(id)}` };
+  }
+  return null;
+}
+
 export async function createTodoistTask(
   lane: string,
   input: {
@@ -202,7 +223,9 @@ export async function createTodoistTask(
     due?: string | null;
     labels?: string[];
   },
-): Promise<{ ok: true; url: string; id: string } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; url: string; id: string; duplicate?: boolean } | { ok: false; error: string }
+> {
   const cfg = loadTodoistLaneConfig(lane);
   if (!cfg) return { ok: false, error: "Todoist レーン未登録" };
   if (!todoistTokenConfigured()) {
@@ -227,6 +250,16 @@ export async function createTodoistTask(
   }
   if (input.due?.trim()) {
     body.due_date = input.due.trim().slice(0, 10);
+  }
+
+  // Slack ボタンの再押下・同じメールの再投稿で同じタスクを量産しない
+  // （2026-10-20〜21 に [メール要対応] が 3〜4 件ずつ重複）。確認に失敗しても作成は止めない
+  try {
+    const open = await fetchProjectTasks(cfg.projectId, { fresh: true });
+    const dup = findOpenDuplicate(open, input.title, input.due);
+    if (dup) return { ok: true, id: dup.id, url: dup.url, duplicate: true };
+  } catch {
+    // noop
   }
 
   const res = await fetch(`${API}/tasks`, {

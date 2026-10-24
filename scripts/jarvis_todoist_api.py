@@ -661,6 +661,29 @@ def _validate_properties_labels(cfg: dict[str, Any], labels: list[str]) -> None:
         sys.exit(2)
 
 
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def find_open_duplicate(
+    tasks: list[dict[str, Any]], title: str, due: str | None
+) -> dict[str, Any] | None:
+    """同じタイトル（前後空白無視）かつ同じ期日のオープンタスク。
+
+    due が YYYY-MM-DD なら due.date と一致するものだけ。自然言語（tomorrow 等）や期日なしは
+    タイトル一致で重複とみなす（同じ依頼の再実行で「明日」が毎回ずれるのを防ぐ）。
+    """
+    want = (title or "").strip()
+    d = (due or "").strip()
+    for t in tasks:
+        if str(t.get("content") or "").strip() != want:
+            continue
+        tdue = ((t.get("due") or {}) or {}).get("date") or ""
+        if d and _ISO_DATE_RE.match(d) and str(tdue)[:10] != d:
+            continue
+        return t
+    return None
+
+
 def cmd_create_task(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     lane_id = (args.lane or "").strip()
@@ -708,6 +731,33 @@ def cmd_create_task(args: argparse.Namespace) -> int:
         body["due_string"] = args.due
     if args.note:
         body["description"] = args.note
+    # 同じ依頼の再実行（ポーリング重複・部分失敗の再試行）で同じタスクを量産しない（2026-10-19 に 5 件重複）
+    if not getattr(args, "allow_duplicate", False):
+        try:
+            open_tasks = _paginate_results(
+                f"/tasks?project_id={urllib.parse.quote(str(proj['project_id']))}", cfg=cfg
+            )
+        except Exception as e:  # 重複確認に失敗しても作成は止めない
+            print(f"# duplicate check skip: {e}", file=sys.stderr)
+            open_tasks = []
+        dup = find_open_duplicate(open_tasks, args.title, args.due)
+        if dup:
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "id": dup.get("id"),
+                            "lane": lane_label,
+                            "duplicate": True,
+                            "url": dup.get("url") or "",
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+            else:
+                print(f"skip duplicate id={dup.get('id')} lane={lane_label}")
+            return 0
     created = _req("POST", "/tasks", body, cfg=cfg)
     tid = created.get("id")
     url = created.get("url") or ""
@@ -1410,6 +1460,11 @@ def main() -> int:
         help="作成直後に付けるコメント（サマリ・アウトプットリンク用）",
     )
     c.add_argument("--json", action="store_true", help="1行 JSON で結果出力")
+    c.add_argument(
+        "--allow-duplicate",
+        action="store_true",
+        help="同じタイトル・同じ期日のオープンタスクがあっても作る（既定は既存を返して作らない）",
+    )
     c.add_argument(
         "--no-hold-stamp",
         action="store_true",
