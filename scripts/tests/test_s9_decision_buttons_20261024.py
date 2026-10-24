@@ -15,6 +15,7 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
+import jarvis_s9_candidates_apply as s9  # noqa: E402
 import jarvis_s9_decision_apply as dec  # noqa: E402
 import jarvis_s9_slack_blocks as blk  # noqa: E402
 
@@ -118,6 +119,153 @@ class DecisionApplyTests(unittest.TestCase):
     def test_bad_decision(self):
         with self.assertRaises(SystemExit):
             dec._row_from_payload({"decision": "maybe", "name": "X"})
+
+
+
+class DuplicateGuardTests(unittest.TestCase):
+    """同じ会社・同じ窓口に二重で送らない（S2 の系列重複ルールを S9 にも）。"""
+
+    def _list(self, d: str, vendors: list[dict]) -> Path:
+        p = Path(d) / "list.yaml"
+        p.write_text(
+            yaml.safe_dump({"settings": {}, "vendors": vendors}, allow_unicode=True),
+            encoding="utf-8",
+        )
+        return p
+
+    def test_classify_same_company_domain_goes_consult(self):
+        row = {
+            "name": "ケンライン緑支店",
+            "url": "https://midori.example.jp/",
+            "contact_url": "https://midori.example.jp/form",
+            "channel": "email",
+            "contact_email": "midori@kenline.jp",
+            "phone": "",
+            "_memo": "",
+        }
+        existing = [
+            {
+                "id": "x1",
+                "name": "センチュリー21ケンライン",
+                "url": "https://www.kenline.jp/",
+                "contact_url": "https://www.kenline.jp/form4",
+                "contact_email": "info@kenline.jp",
+                "status": "contacted",
+            }
+        ]
+        kind, why = s9.classify(row, existing)
+        self.assertEqual(kind, "consult")
+        self.assertIn("同一メールドメイン", why)
+
+    def test_free_mail_not_treated_as_group(self):
+        row = {
+            "name": "別会社",
+            "url": "https://other.example.jp/",
+            "contact_url": "https://other.example.jp/form",
+            "channel": "email",
+            "contact_email": "other@gmail.com",
+            "phone": "",
+            "_memo": "",
+        }
+        existing = [
+            {
+                "id": "x1",
+                "name": "既存",
+                "url": "https://existing.example.jp/",
+                "contact_email": "existing@gmail.com",
+                "status": "contacted",
+            }
+        ]
+        kind, _ = s9.classify(row, existing)
+        self.assertEqual(kind, "add")
+
+    def test_same_free_mail_address_goes_consult(self):
+        row = {
+            "name": "別屋号",
+            "url": "https://other.example.jp/",
+            "contact_url": "https://other.example.jp/form",
+            "channel": "email",
+            "contact_email": "same@gmail.com",
+            "phone": "",
+            "_memo": "",
+        }
+        existing = [
+            {
+                "id": "x1",
+                "name": "既存",
+                "url": "https://existing.example.jp/",
+                "contact_email": "same@gmail.com",
+                "status": "contacted",
+            }
+        ]
+        import jarvis_kurashift_mgmt_vendor_list as ml
+
+        why = ml.duplicate_contact_reason(row, existing)
+        self.assertIn("同一メールアドレス", why)
+        kind, _ = s9.classify(row, existing)
+        self.assertIn(kind, ("dup", "consult"))
+
+    def test_next_pending_skips_contacted_route(self):
+        import jarvis_kurashift_mgmt_vendor_list as ml
+
+        vendors = [
+            {
+                "id": "c1",
+                "name": "送信済み",
+                "url": "https://same.example.jp/",
+                "contact_url": "https://same.example.jp/form",
+                "channel": "web_form",
+                "status": "contacted",
+                "contacted_at": "2026-10-01",
+                "property_lane": "midori_caramel",
+            },
+            {
+                "id": "p1",
+                "name": "別名の同窓口",
+                "url": "https://same.example.jp/",
+                "contact_url": "https://same.example.jp/form",
+                "channel": "web_form",
+                "status": "pending",
+                "property_lane": "midori_caramel",
+            },
+            {
+                "id": "p2",
+                "name": "別会社",
+                "url": "https://other.example.jp/",
+                "contact_url": "https://other.example.jp/form",
+                "channel": "web_form",
+                "status": "pending",
+                "property_lane": "midori_caramel",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            p = self._list(d, vendors)
+            old = ml.LIST_PATH
+            ml.LIST_PATH = p
+            try:
+                stats: dict = {}
+                got = [v["id"] for v in ml.next_pending(limit=2, stats=stats)]
+            finally:
+                ml.LIST_PATH = old
+        self.assertEqual(got, ["p2"])
+        self.assertIn("p1", stats.get("skipped_duplicates", {}))
+
+    def test_next_pending_dedupes_same_batch(self):
+        import jarvis_kurashift_mgmt_vendor_list as ml
+
+        vendors = [
+            {"id": "a1", "name": "A店", "contact_url": "https://brand.example.jp/form", "channel": "web_form", "status": "pending", "property_lane": "midori_caramel"},
+            {"id": "a2", "name": "A店 支店", "contact_url": "https://brand.example.jp/form", "channel": "web_form", "status": "pending", "property_lane": "midori_caramel"},
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            p = self._list(d, vendors)
+            old = ml.LIST_PATH
+            ml.LIST_PATH = p
+            try:
+                got = [v["id"] for v in ml.next_pending(limit=2)]
+            finally:
+                ml.LIST_PATH = old
+        self.assertEqual(got, ["a1"])
 
 
 if __name__ == "__main__":

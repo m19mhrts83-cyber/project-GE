@@ -173,6 +173,12 @@ def classify(row: dict[str, Any], vendors: list[dict[str, Any]]) -> tuple[str, s
         return "dup", f"台帳に既存（{ex.get('name')}・{ex.get('status')}）"
     if row["channel"] == "phone":
         return "consult", "メール／フォームが見つからない"
+    # 同一問合せ先／同一会社ドメイン（グループ・支店違い）は自動で入れず判断を仰ぐ
+    import jarvis_kurashift_mgmt_vendor_list as ml
+
+    dup_why = ml.duplicate_contact_reason(row, vendors)
+    if dup_why:
+        return "consult", dup_why
     hit = next((h for h in CONSULT_HINTS if h in row["_memo"]), "")
     if hit:
         return "consult", f"メモに「{hit}」"
