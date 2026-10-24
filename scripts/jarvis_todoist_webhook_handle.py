@@ -373,12 +373,21 @@ def main() -> int:
                 _todoist_comment(tid, body)
                 replied = True
             except urllib.error.HTTPError as e:
-                reply_fail += 1
-                print(
-                    f"{LOG}: FAIL reply task={tid} HTTP {e.code} "
-                    f"— processed にして滞留させない",
-                    file=sys.stderr,
-                )
+                if e.code == 404:
+                    # Jarvis に共有されていない松野個人 PJ のタスク（owner トークンでは見える）。
+                    # 松野名義で返信はしない方針なので失敗扱いにせず見送る。
+                    print(
+                        f"{LOG}: skip reply task={tid} HTTP 404（Jarvis 未共有 PJ）"
+                        f"— processed にして滞留させない",
+                        file=sys.stderr,
+                    )
+                else:
+                    reply_fail += 1
+                    print(
+                        f"{LOG}: FAIL reply task={tid} HTTP {e.code} "
+                        f"— processed にして滞留させない",
+                        file=sys.stderr,
+                    )
             except Exception as exc:
                 reply_fail += 1
                 print(
