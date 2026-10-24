@@ -38,9 +38,11 @@ REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = Path(__file__).resolve().parent
 STATE = REPO / ".jarvis_state" / "comment_dispatch.json"
 EXAMPLE = REPO / ".jarvis_state" / "comment_dispatch.example.json"
+_MAC_PY = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
+# GHA 冗長では Mac の venv が無いので、いま動いている python で副次スクリプトを呼ぶ
 PY = Path(
     os.environ.get("JARVIS_PYTHON")
-    or "/Users/matsunomasaharu2/selenium_env/venv/bin/python"
+    or (str(_MAC_PY) if _MAC_PY.exists() else sys.executable)
 )
 JST = timezone(timedelta(hours=9))
 LOG = "📎 317 コメント起動"

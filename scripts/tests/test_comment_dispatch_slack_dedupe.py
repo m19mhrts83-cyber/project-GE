@@ -94,5 +94,22 @@ class TestShouldPostSlackReport(unittest.TestCase):
         self.assertEqual(reason2, "dedupe_same_fingerprint")
 
 
+class TestFailoverStateless(unittest.TestCase):
+    """GHA 冗長は Mac の .jarvis_state を持たない前提。"""
+
+    def test_python_falls_back_off_mac(self):
+        self.assertTrue(cd.PY.exists() or cd.PY == Path(sys.executable))
+
+    def test_reacted_reply_counts_as_handled(self):
+        from jarvis_slack_report_fb_lib import has_handled_reaction
+
+        self.assertTrue(has_handled_reaction({"reactions": [{"name": "eyes"}]}))
+        self.assertTrue(
+            has_handled_reaction({"reactions": [{"name": "white_check_mark"}]})
+        )
+        self.assertFalse(has_handled_reaction({"reactions": [{"name": "+1"}]}))
+        self.assertFalse(has_handled_reaction({"text": "見栄え: グラフにして"}))
+
+
 if __name__ == "__main__":
     unittest.main()

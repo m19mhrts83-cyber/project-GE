@@ -2,10 +2,13 @@ name: Comment dispatch failover (317)
 
 # Mac heartbeat が古いときだけ L1（Ack／分類）。Hobby Vercel Cron は使わない。
 # L2 AI は Mac／Cloud 枠側（本 workflow ではやらない）。
+# GHA の schedule は混雑で数時間単位に間引かれる（実測 10/22–23: 約4〜5時間おき）。
+# */5 にしても5分冗長にはならないため、毎正時を避けた15分刻み・JST 6–24時だけにする
+# （JST 0–6 時はスクリプト側でも quiet hours で skip）。
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "7,22,37,52 0-14,21-23 * * *"
   workflow_dispatch:
     inputs:
       force:
@@ -33,6 +36,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install deps
+        run: python3 -m pip install --quiet pyyaml
+
       - name: L1 failover when Mac stale
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
@@ -42,7 +48,8 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
           SLACK_WEBHOOK_AI_TEAM_CONSULT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_CONSULT }}
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          # Cloud L2 は手動 phase_b のときだけ鍵を渡す
+          CURSOR_API_KEY: ${{ inputs.phase_b == 'true' && secrets.CURSOR_API_KEY || '' }}
           JARVIS_COMMENT_DISPATCH_STALE_MIN: "10"
           FORCE: ${{ inputs.force || 'false' }}
           PHASE_B: ${{ inputs.phase_b || 'false' }}

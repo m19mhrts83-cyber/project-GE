@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-22T23:40:04+09:00",
+  "updated": "2026-10-24T09:14:51+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -12,9 +12,9 @@
     "share_id": "uksxiDIzE1AEckKH"
   },
   "counts": {
-    "候補": 25,
+    "候補": 24,
     "設計中": 8,
-    "運用確認": 10,
+    "運用確認": 11,
     "運用": 0,
     "停止": 0
   },
@@ -1874,7 +1874,7 @@
       "tool_notes": "認定入口・塩梅L0/L1/L2・材料即時・JarvisBox。closeは313",
       "note": "2026-10-21 Phase1+1.5a意図OK・運用確認。digest→#consult→了承後create。L2ボタン／定時は後続",
       "summary": "**Todoist起票本線**。登録動線①L2採用create／②L0直／③116追加。塩梅 L0/L1/L2",
-      "flow_summary": "材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult` → **採用時に Todoist へ create**。ホーク・AI同士の直入れは L0 で維持。**Todoist起票の本線は312**。close は 313。",
+      "flow_summary": "材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult`（**起票／見送りボタン**または番号）→ **採用時に Todoist へ create**。ホーク・AI同士の直入れは L0 で維持。**Todoist起票の本線は312**。close は 313。GAS 5分 poll は見送り。",
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
@@ -2268,16 +2268,16 @@
       "department_name": "品質・タスク運用管理室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
-      "status_icon": "⚪",
+      "status": "運用確認",
+      "status_icon": "🟡",
       "report": "ops",
       "trigger": "時間",
-      "schedule": "週次ずらす",
+      "schedule": "土曜 9:00／9:30",
       "tool_assigned": "claude_code",
       "tool_fit": "B",
-      "tool_notes": "週次品質監査。将来Claude Routines",
+      "tool_notes": "週次レビュー。launchd 機械チェック（土9:00）＋Miss Lemon 定期タスク（土9:30）→PR",
       "note": "",
-      "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
+      "summary": "今週作った仕組みを週1でレビューし、直して PR",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "",
@@ -2287,32 +2287,37 @@
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/48jyB5R23LwIF8rZ",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_AzrNV2o5gb9M2JMFxeX5aZSa",
       "permissions": {
-        "can_do": "業務品質の監査メモ（候補）",
+        "can_do": "週次レビュー（今週の仕組みを点検）・修正PR作成（マージ・Slack投稿・対外は人）",
         "methods": [
           {
-            "name": "チャット・検索",
+            "name": "ファイル読取・git・gh（読取）",
             "level": "○",
-            "detail": ""
+            "detail": "差分・GHA 履歴・ログ"
           },
           {
-            "name": "外部連携（API/MCP）",
+            "name": "コード修正",
+            "level": "○",
+            "detail": "**専用 worktree／ブランチ**で。main を直接触らない"
+          },
+          {
+            "name": "PR 作成",
+            "level": "○",
+            "detail": "1 週 1 PR。マージは人"
+          },
+          {
+            "name": "テスト・ビルド",
+            "level": "○",
+            "detail": "`scripts/tests`、該当アプリの `npm run build`"
+          },
+          {
+            "name": "外部 API（読取）",
             "level": "△",
-            "detail": ""
+            "detail": "Supabase／Slack／Todoist は**読むだけ**。書込みは修正対象のスクリプト経由のテストに限る"
           },
           {
-            "name": "CLI",
-            "level": "△",
-            "detail": ""
-          },
-          {
-            "name": "ブラウザ",
-            "level": "△",
-            "detail": ""
-          },
-          {
-            "name": "画面操作",
+            "name": "Slack 投稿・対外送信・削除・課金",
             "level": "×",
-            "detail": "送信・課金は人"
+            "detail": "人"
           }
         ],
         "methods_filled": true,
@@ -2320,7 +2325,7 @@
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "外に出す・金・削除。",
+        "human_gate": "お金・外に出す・消す",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -2329,33 +2334,27 @@
           {
             "id": "human",
             "on": false,
-            "detail": "人が頼む",
-            "raw": "人が頼む"
-          },
-          {
-            "id": "schedule",
-            "on": false,
-            "detail": "時間",
-            "raw": "時間"
+            "detail": "",
+            "raw": ""
           },
           {
             "id": "schedule",
             "on": true,
-            "detail": "週次ずらす",
+            "detail": "土曜 9:00／9:30",
             "raw": "",
             "from_registry": true
           },
           {
             "id": "event",
             "on": false,
-            "detail": "何かが届いたら",
-            "raw": "何かが届いたら"
+            "detail": "",
+            "raw": ""
           },
           {
             "id": "watch",
             "on": false,
-            "detail": "変化・失敗を見回ったら",
-            "raw": "変化・失敗を見回ったら"
+            "detail": "",
+            "raw": ""
           }
         ],
         "trigger_kinds_on": [
@@ -2363,47 +2362,31 @@
         ],
         "trigger_kinds_label": "時間",
         "triggers_filled": true,
-        "when": "週次ずらす",
+        "when": "土曜 9:00／9:30",
         "registry_trigger": "時間",
-        "registry_schedule": "週次ずらす",
+        "registry_schedule": "土曜 9:00／9:30",
         "primary_report": "ops",
         "report_channels": [
           "ops",
-          "consult"
+          "report"
         ],
         "reports": [
           {
-            "kind": "完了報告",
-            "destination": "Slack `#ops`",
+            "kind": "機械チェック結果",
+            "destination": "Slack `#ops`／`#report`（launchd が自動）",
             "channels": [
+              "report",
               "ops"
             ]
           },
           {
-            "kind": "要判断",
-            "destination": "Slack `#consult`",
-            "channels": [
-              "consult"
-            ]
-          },
-          {
-            "kind": "ch",
-            "destination": "いつ",
+            "kind": "レビュー本体",
+            "destination": "`output/YYYYMMDD_週次レビュー.md`＋PR 本文",
             "channels": []
           },
           {
-            "kind": "`#report`",
-            "destination": "完了・定型・生存確認",
-            "channels": []
-          },
-          {
-            "kind": "`#consult`",
-            "destination": "要判断。末尾「次の担当」3行必須",
-            "channels": []
-          },
-          {
-            "kind": "`#ops`",
-            "destination": "障害・失敗・枠切れ",
+            "kind": "人の対応が要るもの",
+            "destination": "レビュー MD の「人の対応待ち」に1行ずつ（次週も持ち越して消えるまで載せる）",
             "channels": []
           }
         ],
@@ -2838,7 +2821,7 @@
       "grok_counterpart": "",
       "flowforge_id": "flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
-      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
+      "flowforge_share_url": "",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_8mwIkbI0S9kV2u5kSwl2I-Oi",
       "permissions": {
         "can_do": "Slack FB／Todoistコメントの常駐拾い・Ack・許可リスト内AI処置（対外・金は人）。冗長はGHA L1／Cloud L2",
@@ -2970,7 +2953,7 @@
           {
             "title": "FlowForge（作業フロー）",
             "path": "",
-            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
             "kind": "flowforge"
           },
           {

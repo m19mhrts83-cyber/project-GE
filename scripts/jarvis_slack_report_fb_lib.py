@@ -178,3 +178,11 @@ def build_todoist_seen_text(*, comment_preview: str = "", source: str = "317") -
 # Slack リアクション名（reactions.add 用・: なし）
 REACTION_SEEN = "eyes"  # 見た／受けた
 REACTION_DONE = "white_check_mark"  # 対応した
+
+
+def has_handled_reaction(msg: dict[str, Any]) -> bool:
+    """👀／✅ が付いていれば受付済み。ローカル state が無い GHA 冗長でも二重 Ack しない。"""
+    for r in msg.get("reactions") or []:
+        if isinstance(r, dict) and r.get("name") in (REACTION_SEEN, REACTION_DONE):
+            return True
+    return False

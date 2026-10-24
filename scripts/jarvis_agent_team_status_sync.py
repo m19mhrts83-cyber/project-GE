@@ -14,6 +14,8 @@ Grok: config/grok_bots_registry.yaml（組織・社員・対応表）
 from __future__ import annotations
 
 import argparse
+import subprocess
+import sys
 import json
 import re
 import shutil
@@ -1517,6 +1519,11 @@ def main() -> int:
             encoding="utf-8",
         )
         print(f"  drive: {DRIVE_HUB}（ハブMD→90_ハブ文書／入口は直下）")
+        # 社員フォルダの文書・成果物と 91_ルール も続けて写す
+        subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "jarvis_agent_team_drive_sync.py")],
+            check=False,
+        )
     return 0
 
 

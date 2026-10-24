@@ -33,6 +33,7 @@ from jarvis_slack_report_fb_lib import (  # noqa: E402
     REACTION_SEEN,
     build_ack_text,
     classify_fb_reply,
+    has_handled_reaction,
     is_ack_or_bot_reply,
     kind_label_ja,
     poll_enabled,
@@ -287,6 +288,15 @@ def main() -> int:
                     processed[key] = {
                         "at": now_iso(),
                         "kind": "skip_bot",
+                        "channel": name,
+                        "thread_ts": pts,
+                    }
+                    marked += 1
+                    continue
+                if has_handled_reaction(rep):
+                    processed[key] = {
+                        "at": now_iso(),
+                        "kind": "skip_reacted",
                         "channel": name,
                         "thread_ts": pts,
                     }
