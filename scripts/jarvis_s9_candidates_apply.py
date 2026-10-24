@@ -6,9 +6,10 @@ Jarvis 側に取り込み口が無く、台帳（config/kurashift_mgmt_vendor_li
 18 社＝S9 が送れる相手 0 社のまま止まっていた（最終送信 8/27・2026-10-24 判明）。
 
   - はっきりした候補（メールかフォームあり・重複なし）→ 台帳へ status=pending で自動追加
-  - 判断が要る候補（連絡経路なし・重複の疑い・大手／売買専門の注記など）→ #consult に
-    候補カードを出し、松野が［採用］［見送り］ボタンで判断（2026-10-24 見直し。
-    ボタン → kurashift_jobs → jarvis_s9_decision_apply.py → 台帳）
+  - 判断が要る候補（関連／片方だけ／後回し／要確認）→ #consult に候補カードを出し、
+    松野が［採用］［見送り］ボタンで判断（ボタン → kurashift_jobs → jarvis_s9_decision_apply.py）
+  - 送らない候補（電話のみ・売買専門）→ 台帳に入れず #report に1行（consult しない）
+  - 大手／全国は自動で台帳へ（2026-10-24 松野指示。地場優先は送信順ではなく内容で見る）
   - 処理した MD は 90_archive/inbox_from_grok へ
 
     ~/selenium_env/venv/bin/python scripts/jarvis_s9_candidates_apply.py --dry-run
@@ -44,8 +45,11 @@ LANE = "midori_caramel"
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 URL_RE = re.compile(r"https?://[^\s）)（(、，,]+")
 TEL_RE = re.compile(r"0\d{1,4}-\d{1,4}-\d{3,4}")
-# この語がメモにあれば自動で入れず #consult で判断を仰ぐ
-CONSULT_HINTS = ("大手", "全国", "売買のみ", "売買専門", "関連", "片方だけ", "後回し", "電話のみ", "要確認")
+# メモの語で自動判定を変える（2026-10-24 松野指示で見直し）
+#   consult … 人が採否を決める（グループ・系列の重複疑い／先送り／要確認）
+#   drop    … 送らないので台帳に入れず #report だけ（電話のみ・売買専門）
+CONSULT_HINTS = ("関連", "片方だけ", "後回し", "要確認")
+DROP_HINTS = ("売買のみ", "売買専門")
 CORP_WORDS = ("株式会社", "有限会社", "合同会社", "（株）", "(株)", "（有）", "(有)")
 
 
@@ -167,12 +171,15 @@ def find_existing(row: dict[str, Any], vendors: list[dict[str, Any]]) -> dict[st
 
 
 def classify(row: dict[str, Any], vendors: list[dict[str, Any]]) -> tuple[str, str]:
-    """('add'|'dup'|'consult', 理由)。"""
+    """('add'|'dup'|'consult'|'drop', 理由)。"""
     ex = find_existing(row, vendors)
     if ex:
         return "dup", f"台帳に既存（{ex.get('name')}・{ex.get('status')}）"
     if row["channel"] == "phone":
-        return "consult", "メール／フォームが見つからない"
+        return "drop", "メール／フォームが見つからない（送れない）"
+    drop = next((h for h in DROP_HINTS if h in row["_memo"]), "")
+    if drop:
+        return "drop", f"メモに「{drop}」（送らない）"
     # 同一問合せ先／同一会社ドメイン（グループ・支店違い）は自動で入れず判断を仰ぐ
     import jarvis_kurashift_mgmt_vendor_list as ml
 
@@ -193,15 +200,22 @@ def build_consult(items: list[tuple[dict[str, Any], str, str]]) -> str:
     )
 
 
-def build_report(added: list[dict[str, Any]], dups: int, consult: int) -> str:
+def build_report(
+    added: list[dict[str, Any]],
+    dups: int,
+    consult: int,
+    dropped: list[tuple[dict[str, Any], str]] | None = None,
+) -> str:
     names = "・".join(r["name"] for r in added[:5]) or "なし"
-    return "\n".join(
-        [
-            "【報告】S9 管理会社開拓・候補取り込み",
-            f"台帳に追加 {len(added)}社: {names}",
-            f"重複で除外 {dups}／#consult で判断 {consult}",
-        ]
-    )
+    lines = [
+        "【報告】S9 管理会社開拓・候補取り込み",
+        f"台帳に追加 {len(added)}社: {names}",
+        f"重複で除外 {dups}／#consult で判断 {consult}",
+    ]
+    if dropped:
+        detail = "・".join(f"{r['name']}（{why}）" for r, why in dropped[:4])
+        lines.append(f"送らないので台帳に入れず {len(dropped)}: {detail}")
+    return "\n".join(lines)
 
 
 def _post(channel: str, text: str) -> int:
@@ -243,6 +257,7 @@ def main() -> int:
     inbox = folder("inbox_from_grok")
     to_add: list[dict[str, Any]] = []
     consult: list[tuple[dict[str, Any], str, str]] = []
+    dropped: list[tuple[dict[str, Any], str]] = []
     dups = 0
     files_done: list[Path] = []
     for p in list_queue_files(inbox):
@@ -257,18 +272,21 @@ def main() -> int:
                 to_add.append(row)
             elif kind == "dup":
                 dups += 1
+            elif kind == "drop":
+                dropped.append((row, why))
             else:
                 consult.append((row, why, p.name))
         files_done.append(p)
 
     clean = [{k: v for k, v in r.items() if not k.startswith("_")} for r in to_add]
     res: dict[str, Any] = {"files": [f.name for f in files_done], "add": [r["name"] for r in clean], "dups": dups,
-                           "consult": [(r["name"], why) for r, why, _ in consult]}
+                           "consult": [(r["name"], why) for r, why, _ in consult],
+                           "dropped": [(r["name"], why) for r, why in dropped]}
     if args.apply and files_done:
         res["merge"] = ml.merge_append(clean, dry_run=False)
         if args.post:
-            if clean or dups:
-                _post("report", build_report(clean, dups, len(consult)))
+            if clean or dups or dropped:
+                _post("report", build_report(clean, dups, len(consult), dropped))
             if consult:
                 items = [
                     {**row, "n": n, "why": why, "source_md": md}
