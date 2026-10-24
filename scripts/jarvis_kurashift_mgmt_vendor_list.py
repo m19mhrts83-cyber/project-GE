@@ -25,6 +25,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -60,6 +61,34 @@ AREA_PHRASE = {
     "midori_caramel": "名古屋市緑区（キャラメル）",
     "both": "名古屋市北区（志賀本通）および緑区",
 }
+
+
+# 同じ宛先に二重送信しないための判定（S2 の系列重複ルールを S9 にも適用）
+FREE_MAIL_DOMAINS = frozenset(
+    {
+        "gmail.com",
+        "googlemail.com",
+        "yahoo.co.jp",
+        "yahoo.ne.jp",
+        "outlook.com",
+        "outlook.jp",
+        "hotmail.com",
+        "icloud.com",
+        "me.com",
+        "docomo.ne.jp",
+        "au.com",
+        "ezweb.ne.jp",
+        "softbank.ne.jp",
+        "ocn.ne.jp",
+        "nifty.com",
+        "biglobe.ne.jp",
+        "so-net.ne.jp",
+        "plala.or.jp",
+        "infoseek.jp",
+        "excite.co.jp",
+    }
+)
+CONTACTED_STATUSES = frozenset({"contacted", "replied"})
 
 
 def now_iso() -> str:
@@ -540,6 +569,64 @@ def summary() -> dict[str, Any]:
     }
 
 
+def route_key(v: dict[str, Any]) -> str:
+    """問合せ経路の同一性（host + path）。S2 の系列重複ルールと同じ粒度。"""
+    cu = str(v.get("contact_url") or v.get("url") or "").strip()
+    if not cu:
+        return ""
+    try:
+        p = urlparse(cu)
+        host = p.netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        path = (p.path or "/").rstrip("/") or "/"
+        return f"route:{host}{path}"
+    except Exception:
+        return ""
+
+
+def email_domain(v: dict[str, Any]) -> str:
+    """会社ドメインのメールだけ返す（フリーメールは重複判定に使わない）。"""
+    addr = str(v.get("contact_email") or "").strip().lower()
+    if "@" not in addr:
+        return ""
+    dom = addr.rsplit("@", 1)[1]
+    return "" if dom in FREE_MAIL_DOMAINS else dom
+
+
+def is_contacted(v: dict[str, Any]) -> bool:
+    if str(v.get("status") or "") in CONTACTED_STATUSES:
+        return True
+    return bool(
+        str(v.get("contacted_at") or "").strip()
+        or str(v.get("precheck_sent_at") or "").strip()
+    )
+
+
+def duplicate_contact_reason(
+    v: dict[str, Any], vendors: list[dict[str, Any]], *, contacted_only: bool = False
+) -> str:
+    """同じ会社・同じ窓口に二重で送らないための理由（無ければ空）。"""
+    rk = route_key(v)
+    dom = email_domain(v)
+    addr = str(v.get("contact_email") or "").strip().lower()
+    if not rk and not dom and not addr:
+        return ""
+    for o in vendors:
+        if o is v:
+            continue
+        if contacted_only and not is_contacted(o):
+            continue
+        oname = str(o.get("name") or o.get("id") or "")
+        if rk and route_key(o) == rk:
+            return f"同一問合せ先（{oname}）"
+        if addr and addr == str(o.get("contact_email") or "").strip().lower():
+            return f"同一メールアドレス（{oname}）"
+        if dom and email_domain(o) == dom:
+            return f"同一メールドメイン（{oname}）"
+    return ""
+
+
 def _lane_match(v: dict[str, Any], lane: str) -> bool:
     pl = str(v.get("property_lane") or "kita_shiga")
     if lane == "both":
@@ -552,12 +639,12 @@ def next_pending(
     limit: int,
     balanced: bool = False,
     lane: str | None = None,
+    stats: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     data = load_list()
+    vendors = [v for v in (data.get("vendors") or []) if isinstance(v, dict)]
     pending: list[dict[str, Any]] = []
-    for v in data.get("vendors") or []:
-        if not isinstance(v, dict):
-            continue
+    for v in vendors:
         if str(v.get("status") or "pending") not in ("pending", "discovered"):
             continue
         ensure_alive_fields(v, kind="mgmt")
@@ -569,6 +656,39 @@ def next_pending(
     # 電話のみの会社で埋まり、--next に送れる相手が出ず止まっていた（2026-10-24）。送れる行を先に
     pending.sort(key=lambda v: 0 if str(v.get("channel") or "") in ("email", "web_form") else 1)
 
+    # 二重送信ガード: 送信済みの同一問合せ先／同一会社ドメインと、今回の同バッチ内の重複を除く
+    contacted = [v for v in vendors if is_contacted(v)]
+    skipped: dict[str, str] = {}
+    kept: list[dict[str, Any]] = []
+    seen_routes: set[str] = set()
+    seen_domains: set[str] = set()
+    seen_emails: set[str] = set()
+    for v in pending:
+        why = duplicate_contact_reason(v, contacted, contacted_only=True)
+        rk = route_key(v)
+        dom = email_domain(v)
+        addr = str(v.get("contact_email") or "").strip().lower()
+        if not why and rk and rk in seen_routes:
+            why = "同一問合せ先（今回の別候補）"
+        if not why and addr and addr in seen_emails:
+            why = "同一メールアドレス（今回の別候補）"
+        if not why and dom and dom in seen_domains:
+            why = "同一メールドメイン（今回の別候補）"
+        if why:
+            skipped[str(v.get("id") or v.get("name") or "")] = why
+            continue
+        if rk:
+            seen_routes.add(rk)
+        if dom:
+            seen_domains.add(dom)
+        if addr:
+            seen_emails.add(addr)
+        kept.append(v)
+    pending = kept
+    if stats is not None:
+        stats["skipped_duplicates"] = skipped
+        stats["skipped_count"] = len(skipped)
+
     share = load_share_urls()
 
     def enrich(v: dict[str, Any]) -> dict[str, Any]:
@@ -578,6 +698,7 @@ def next_pending(
             prop_url = share.get("kita_shiga") or share.get("midori_caramel") or ""
         return {
             **v,
+            "contact_route": route_key(v),
             "precheck": {
                 "area_phrase": AREA_PHRASE.get(pl, AREA_PHRASE["kita_shiga"]),
                 "property_folder_url": prop_url,
@@ -911,10 +1032,12 @@ def main() -> int:
         return 0 if out.get("ok") else 1
 
     if args.next > 0:
+        stats: dict[str, Any] = {}
         items = next_pending(
             limit=args.next,
             balanced=bool(args.balanced),
             lane=args.lane or None,
+            stats=stats,
         )
         print(
             json.dumps(
@@ -923,6 +1046,7 @@ def main() -> int:
                     "count": len(items),
                     "balanced": bool(args.balanced),
                     "lane": args.lane or None,
+                    "skipped_duplicates": stats.get("skipped_duplicates") or {},
                     "vendors": items,
                 },
                 ensure_ascii=False,
