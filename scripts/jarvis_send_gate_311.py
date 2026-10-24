@@ -779,6 +779,10 @@ def main() -> int:
             print(f"--- inbox: {md.name}")
             try:
                 draft, source = _parse_inbox_md(md)
+                # 下書きが消えた／移動済みの受付は error_ へ退避する。
+                # 例外のまま落とすと MD が inbox に残り、poll ごとに同じエラーが出続ける。
+                if not draft.is_file():
+                    raise ValueError(f"下書きがありません: {draft}")
             except ValueError as e:
                 print(f"❌ {e}", file=sys.stderr)
                 worst = max(worst, 2)

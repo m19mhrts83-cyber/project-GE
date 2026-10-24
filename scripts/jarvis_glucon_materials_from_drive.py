@@ -35,6 +35,7 @@ from typing import Any
 import urllib.error
 import urllib.request
 import yaml  # type: ignore
+from jarvis_cloud_file import read_text_cloud
 
 REPO = Path(__file__).resolve().parents[1]
 BRIDGE = REPO / "config" / "kurashift_grok_bridge_folders.yaml"
@@ -114,7 +115,9 @@ def main() -> int:
     )
     rows = []
     for f in files:
-        text = f.read_text(encoding="utf-8", errors="replace")
+        text = read_text_cloud(f)
+        if text is None:
+            continue
         meta, body = _parse_md(text)
         title = str(meta.get("title") or f.stem)
         kind = str(meta.get("kind") or "activity")
