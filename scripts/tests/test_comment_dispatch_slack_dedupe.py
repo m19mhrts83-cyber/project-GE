@@ -111,5 +111,42 @@ class TestFailoverStateless(unittest.TestCase):
         self.assertFalse(has_handled_reaction({"text": "見栄え: グラフにして"}))
 
 
+class TestSlackReportLayout(unittest.TestCase):
+    """#report 本文は iPhone 向け（41_）: rc・path を出さない／項目は空行で区切る。"""
+
+    def _notes(self):
+        return [
+            {"row_id": 1, "kind": "要判断", "task_title": "A案件の件", "comment": "方針どうする？"},
+            {"row_id": 2, "kind": "無関係", "task_title": "B案件の件", "comment": "了承済みのためクローズ。"},
+        ]
+
+    def test_empty_when_nothing_to_report(self):
+        self.assertEqual(cd.build_report(path="mac", fb_rc=0, wh_rc=0, notes=[], phase_b=[]), "")
+
+    def test_no_internal_codes(self):
+        text = cd.build_report(path="mac", fb_rc=0, wh_rc=1, notes=self._notes(), phase_b=[])
+        self.assertNotIn("rc=", text)
+        self.assertNotIn("path=", text)
+        self.assertNotIn("[要判断]", text)
+        self.assertTrue(text.startswith("【報告】317 コメント起動"))
+
+    def test_items_separated_by_blank_line(self):
+        text = cd.build_report(path="mac", fb_rc=0, wh_rc=0, notes=self._notes(), phase_b=[])
+        self.assertIn("\n\n1. A案件の件\n", text)
+        self.assertIn("\n\n2. B案件の件\n", text)
+        self.assertIn("判断待ち｜", text)
+        self.assertIn("メモ｜", text)
+
+    def test_failover_marker_and_next_line(self):
+        text = cd.build_report(path="failover", fb_rc=0, wh_rc=0, notes=self._notes(), phase_b=[])
+        self.assertIn("（Mac停止中・GHA）", text)
+        self.assertIn("次: 判断待ちはJarvisに一声", text)
+
+    def test_clip_cuts_on_boundary(self):
+        out = cd._clip("あいうえお。かきくけこさしすせそ", 9)
+        self.assertTrue(out.endswith("…"))
+        self.assertLessEqual(len(out), 10)
+
+
 if __name__ == "__main__":
     unittest.main()

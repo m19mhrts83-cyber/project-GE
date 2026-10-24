@@ -482,6 +482,15 @@ def post_slack_consult(text: str, *, dry_run: bool) -> int:
     return int(r.returncode)
 
 
+def _done_text(label: str, item: dict[str, Any]) -> str:
+    """対応完了の短報（41_: 先頭1行で分かる・項目は2行以内）。"""
+    title = _clip(str(item.get("task_title") or item.get("task_id") or ""), 22)
+    comment = _clip(str(item.get("comment") or ""), 36)
+    return "\n".join(
+        [f"【報告】317 {label}", "", f"・{title}", f"　{comment}"]
+    )
+
+
 def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
     """許可リスト命中時。Mac=Local Agent 本線／failover=Cloud L2。"""
     comment = item.get("comment") or ""
@@ -518,9 +527,7 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
                 f" kind={item.get('kind')}\nアウトプット:\n- 317 Local Agent",
             )
             post_slack_report(
-                f"【報告】317 コメント起動｜対応したよ（Local）\n"
-                f"- task: {item.get('task_title') or tid}\n"
-                f"- comment: {(comment or '')[:80]}",
+                _done_text("対応したよ（Local）", item),
                 dry_run=False,
             )
             return local_res
@@ -542,9 +549,7 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
             f" {cloud_res}\nアウトプット:\n- 317 Cloud Agent",
         )
         post_slack_report(
-            f"【報告】317 コメント起動｜対応したよ（failover/Cloud）\n"
-            f"- task: {item.get('task_title') or tid}\n"
-            f"- {cloud_res}",
+            _done_text("対応したよ（Cloud・冗長）", item),
             dry_run=False,
         )
         return cloud_res
@@ -570,6 +575,39 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
     return cloud_res
 
 
+def _clip(text: str, n: int) -> str:
+    """1行に収める。文の途中で切ったら「…」を付ける（41_: 意味の切れ目優先）。"""
+    t = " ".join((text or "").split())
+    if len(t) <= n:
+        return t
+    cut = t[:n]
+    for sep in ("。", "、", "／", " "):
+        i = cut.rfind(sep)
+        if i >= n // 2:
+            cut = cut[:i]
+            break
+    return cut.rstrip("、。／ ") + "…"
+
+
+_KIND_JA_REPORT = {
+    "要判断": "判断待ち",
+    "要実装": "実装依頼",
+    "確認のみ": "確認のみ",
+    "無関係": "メモ",
+}
+
+
+_CLOSURE_RE = re.compile(r"了承|クローズ|完了|対応済|確認済|見たよ|問題ありません")
+
+
+def _report_kind(n: dict[str, Any]) -> str:
+    """報告用の種別。分類器は「？」等で要判断に寄るため、締めのコメントはメモ扱いにする。"""
+    kind = str(n.get("kind") or "")
+    if kind in ("要判断", "確認のみ") and _CLOSURE_RE.search(str(n.get("comment") or "")):
+        return "無関係"
+    return kind
+
+
 def build_report(
     *,
     path: str,
@@ -578,20 +616,40 @@ def build_report(
     notes: list[dict[str, Any]],
     phase_b: list[str],
 ) -> str:
-    lines = [
-        f"【報告】317 コメント起動｜path={path}",
-        f"- FB poll rc={fb_rc}／webhook_handle rc={wh_rc}",
-        f"- Todoist未処理メモ分類: {len(notes)}件",
-    ]
-    for n in notes[:8]:
-        lines.append(
-            f"  · [{n.get('kind')}] {n.get('task_title') or n.get('task_id')}: "
-            f"{(n.get('comment') or '')[:60]}"
-        )
-    if phase_b:
-        lines.append("- Phase B: " + "; ".join(phase_b[:5]))
+    """#report 用（iPhone 向け・41_ 準拠）。rc や path は本文に出さない（ログのみ）。
+
+    先頭1行で内容が分かる → 項目ごとに2行以内＋空行 → 最後に次の一手。
+    """
+    if not notes and not phase_b and path != "failover":
+        return ""
+    head = f"【報告】317 コメント起動｜未処理 {len(notes)}件"
     if path == "failover":
-        lines.append("- 経路: (failover) L1 冗長")
+        head += "（Mac停止中・GHA）"
+    lines: list[str] = [head]
+
+    if notes:
+        kinds = {id(n): _report_kind(n) for n in notes}
+        must = [n for n in notes if kinds[id(n)] in ("要判断", "確認のみ")]
+        if must:
+            lines += ["", f"📌要ボス {len(must)}件（判断待ち）"]
+        for i, n in enumerate(notes[:5], 1):
+            title = _clip(str(n.get("task_title") or n.get("task_id") or ""), 22)
+            comment = _clip(str(n.get("comment") or ""), 36)
+            kind = _KIND_JA_REPORT.get(kinds[id(n)], "メモ")
+            lines += [
+                "",
+                f"{i}. {title}",
+                f"　{kind}｜{comment}",
+            ]
+        if len(notes) > 5:
+            lines += ["", f"他{len(notes) - 5}件はTodoistで確認"]
+        if must:
+            lines += ["", "次: 判断待ちはJarvisに一声（当面は人が橋）"]
+
+    if phase_b:
+        lines += ["", "対応済み（自動）"]
+        for item in phase_b[:3]:
+            lines.append(f"・{_clip(item, 34)}")
     return "\n".join(lines)
 
 
