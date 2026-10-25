@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Supabase comments / knowledge_chunks の embedding 欄を Gemini で埋める。
+Supabase comments / knowledge_chunks / line_openchat_logs の embedding 欄を Gemini で埋める。
 
 必須環境変数:
   SUPABASE_URL
@@ -12,6 +12,11 @@ Supabase comments / knowledge_chunks の embedding 欄を Gemini で埋める。
   python3 embed_to_supabase.py --table knowledge_chunks
   python3 embed_to_supabase.py --table comments --batch-size 50
   python3 embed_to_supabase.py --table comments --limit 200 --dry-run
+  python3 embed_to_supabase.py --table comments --table line_openchat_logs   # 週次 GHA
+
+line_openchat_logs は検索公開済み（ingest_status=ready）だけが対象。
+更新は return=minimal（768次元の embedding をレスポンスに載せない＝egress 抑制）。
+最後に `emb未付与: table=N` を1行ずつ出す（週次サマリ用）。
 """
 
 from __future__ import annotations
@@ -36,6 +41,7 @@ except ImportError as e:  # pragma: no cover
         file=sys.stderr,
     )
     raise SystemExit(2)
+from postgrest.types import CountMethod, ReturnMethod
 
 # text-embedding-004 は現行キーでは不可。gemini-embedding-001 + 768次元で schema と揃える。
 GEMINI_EMBED_MODEL = "gemini-embedding-001"
@@ -44,7 +50,19 @@ GEMINI_EMBED_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_EMBED_MODEL}:batchEmbedContents"
 )
-TABLES = ("comments", "knowledge_chunks")
+TABLES = ("comments", "knowledge_chunks", "line_openchat_logs")
+SELECT_COLS = {
+    "comments": "id,comment_id,content",
+    "knowledge_chunks": "id,chunk_key,content",
+    "line_openchat_logs": "id,content",
+}
+
+
+def pending_query(client: Client, table: str, select_cols: str, **kwargs: Any):
+    query = client.table(table).select(select_cols, **kwargs).is_("embedding", "null")
+    if table == "line_openchat_logs":
+        query = query.eq("ingest_status", "ready")
+    return query
 
 
 def load_env() -> None:
@@ -82,23 +100,19 @@ def get_client() -> Client:
 
 
 def fetch_pending_rows(
-    client: Client, table: str, batch_size: int, cursor_id: int | None
+    client: Client, table: str, batch_size: int, cursor_id: Any | None
 ) -> list[dict[str, Any]]:
-    if table == "comments":
-        select_cols = "id,comment_id,content"
-    else:
-        select_cols = "id,chunk_key,content"
-    query = (
-        client.table(table)
-        .select(select_cols)
-        .is_("embedding", "null")
-        .order("id")
-        .limit(batch_size)
-    )
+    query = pending_query(client, table, SELECT_COLS[table]).order("id").limit(batch_size)
     if cursor_id is not None:
         query = query.gt("id", cursor_id)
     result = query.execute()
     return list(result.data or [])
+
+
+def count_pending(client: Client, table: str) -> int:
+    """embedding が null の件数（行は返さない）。"""
+    result = pending_query(client, table, "id", count=CountMethod.exact, head=True).execute()
+    return int(result.count or 0)
 
 
 def batch_embed_texts(texts: list[str]) -> list[list[float]]:
@@ -154,7 +168,9 @@ def update_embeddings(client: Client, table: str, rows: list[dict[str, Any]], dr
         last_err: Exception | None = None
         for attempt in range(1, 6):
             try:
-                client.table(table).update({"embedding": embedding}).eq("id", row["id"]).execute()
+                client.table(table).update(
+                    {"embedding": embedding}, returning=ReturnMethod.minimal
+                ).eq("id", row["id"]).execute()
                 updated += 1
                 last_err = None
                 break
@@ -193,7 +209,7 @@ def run_table(
 ) -> tuple[int, int]:
     updated = 0
     scanned = 0
-    cursor_id: int | None = None
+    cursor_id: Any | None = None
     while True:
         remaining = limit - updated if limit > 0 else batch_size
         fetch_size = min(batch_size, remaining) if limit > 0 else batch_size
@@ -217,7 +233,8 @@ def run_table(
         if not rows:
             break
         scanned += len(rows)
-        cursor_id = int(rows[-1]["id"])
+        # line_openchat_logs の id は text。comments / knowledge_chunks は数値。
+        cursor_id = rows[-1]["id"]
         done = update_embeddings(client, table, rows, dry_run)
         # refresh client periodically to avoid long-lived HTTP/2 disconnects
         if scanned % 500 == 0:
@@ -256,6 +273,8 @@ def main() -> int:
     print(
         f"embedding total: updated={overall_updated} scanned={overall_scanned} dry_run={int(args.dry_run)}"
     )
+    for table in args.table:
+        print(f"emb未付与: {table}={count_pending(client, table)}")
     return 0
 
 
