@@ -6,6 +6,10 @@ import {
 } from "@/lib/cursor/cloudAsk";
 import { geminiReply } from "@/lib/geminiReply";
 import type { AskEngine, AskVia } from "@/lib/askEngineTypes";
+import { createHash } from "node:crypto";
+
+// 短命・プロセス内のみ。権限確認後の利用者/対象スコープがない呼出は再利用しない。
+const replyCache = new Map<string, { expires: number; result: AskResolveOk }>();
 
 export type { AskEngine, AskVia } from "@/lib/askEngineTypes";
 
@@ -38,9 +42,60 @@ function shortReason(err: string): string {
 export async function resolveAskReply(opts: {
   engine: AskEngine;
   prompt: string;
+  cacheScope?: string;
+}): Promise<AskResolveResult> {
+  const started = Date.now();
+  const cacheKey = opts.cacheScope ? createHash("sha256").update(JSON.stringify([
+    opts.cacheScope, opts.engine, opts.prompt, process.env.GEMINI_MODEL,
+    process.env.ASK_AUTO_ALLOW_GEMINI, process.env.ASK_AUTO_ALLOW_CLOUD,
+  ])).digest("hex") : null;
+  for (const [key, entry] of replyCache) if (entry.expires <= started) replyCache.delete(key);
+  const cached = cacheKey ? replyCache.get(cacheKey) : undefined;
+  let result: AskResolveResult;
+  try {
+    result = cached ? { ...cached.result, fallbackNotices: [...cached.result.fallbackNotices, "同じ入力への直近の回答を再利用しました"] } : await resolveAskReplyInternal(opts);
+    if (!cached && cacheKey && result.ok) {
+      if (replyCache.size >= 64) replyCache.delete(replyCache.keys().next().value!);
+      replyCache.set(cacheKey, { expires: started + 60_000, result });
+    }
+  } catch {
+    result = { ok: false, needLocal: true, error: "回答経路で予期しないエラーが発生しました", fallbackNotices: ["ローカルへ引き継いでください"] };
+  }
+  console.info(JSON.stringify({
+    event: "ask_usage", version: 1, at: new Date().toISOString(),
+    engine: opts.engine, via: result.ok ? result.via : "local_worker",
+    outcome: result.ok ? "answered" : "handoff", input_chars: opts.prompt.length,
+    cache_hit: Boolean(cached),
+    elapsed_ms: Date.now() - started, tokens: null, cost: null,
+    measurement: "tokens_and_cost_unavailable",
+  }));
+  return result;
+}
+
+async function resolveAskReplyInternal(opts: {
+  engine: AskEngine;
+  prompt: string;
 }): Promise<AskResolveResult> {
   const notices: string[] = [];
   const prompt = opts.prompt;
+
+  if (opts.engine === "auto") {
+    // APIキーの存在は課金許可を意味しない。無料枠の有無も推測しない。
+    if (process.env.ASK_AUTO_ALLOW_GEMINI === "1") {
+      const gem = await geminiReply(prompt, { maxAttempts: 1, timeoutMs: 20_000, maxOutputTokens: 2048 });
+      if (gem.ok) return { ok: true, text: gem.text, via: "gemini", fallbackNotices: ["自動: 許可済みの軽量APIで回答しました"] };
+      notices.push(`軽量APIで回答できませんでした（${shortReason(gem.error)}）`);
+    }
+    if (process.env.ASK_AUTO_ALLOW_CLOUD === "1") {
+      const apiKey = (process.env.CURSOR_API_KEY || "").trim();
+      if (apiKey) {
+        const cloud = await askWithCloudAgent({ apiKey, prompt, timeoutMs: CLOUD_ASK_TIMEOUT_MS });
+        if (cloud.ok) return { ok: true, text: cloud.text, via: "cloud", fallbackNotices: [...notices, "自動: 許可済みのCloud経路で回答しました"] };
+        notices.push(`Cloudで回答できませんでした（${shortReason(cloud.error)}）`);
+      }
+    }
+    return { ok: false, needLocal: true, error: "自動回答できる許可済みAPIがないか、回答に失敗しました", fallbackNotices: [...notices, "ローカルの担当ツールへ引き継いでください。API課金と定額プランの利用枠は別です"] };
+  }
 
   if (opts.engine === "cursor") {
     const apiKey = (process.env.CURSOR_API_KEY || "").trim();
@@ -68,7 +123,7 @@ export async function resolveAskReply(opts: {
       );
     }
 
-    const gem = await geminiReply(prompt);
+    const gem = await geminiReply(prompt, { maxAttempts: 2, timeoutMs: 20_000, maxOutputTokens: 2048 });
     if (gem.ok) {
       notices.push("Gemini で答えました");
       return {
@@ -90,7 +145,7 @@ export async function resolveAskReply(opts: {
     };
   }
 
-  const gem = await geminiReply(prompt);
+  const gem = await geminiReply(prompt, { maxAttempts: 2, timeoutMs: 20_000, maxOutputTokens: 2048 });
   if (gem.ok) {
     return {
       ok: true,

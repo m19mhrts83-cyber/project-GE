@@ -10,6 +10,13 @@
 #   json_time  … JSON の時刻フィールド（path の * は配列／dict の全要素。最大値を採用）
 # owner: 担当社員（番号＋役割）／action: 古くなったとき最初にやること（1 行）
 products:
+  - id: drive_team_rules
+    label: AIチーム正本のDrive写し
+    kind: mirror_content
+    source: docs/AIエージェントチーム/CLAUDE.md
+    mirror: ~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/★AIエージェントチーム/CLAUDE.md
+    owner: 315 連携健全性点検
+    action: "Git正本を確認し jarvis_agent_team_status_sync.py で同期。読取不能ならDrive同期状態を確認"
   - id: openchat_threads
     label: オプチャ【スレッド】取得
     kind: json_time
