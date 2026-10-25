@@ -87,7 +87,7 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 2. L1 で Ack／分類。確認のみは 313 候補化可（二段維持）
 3. Phase B・許可リスト命中時のみ L2
 4. Slack は **内容が変わったときだけ** 完了1通。Todoist には `【AIチーム】` コメント
-5. Slack FB スレの「受けた → 対応した」は毎日 8:00 の `slack-fb-daily`（Miss Lemon）。手順は [`40_`](../../40_Slack報告FB_スレ拾い_20261020.md) Phase 2
+5. Slack FB スレの「受けた → 対応した」は毎日 21:00 の `slack-fb-daily`（Miss Lemon）。手順は [`40_`](../../40_Slack報告FB_スレ拾い_20261020.md) Phase 2
 
 
 ## 7. 改善ログ
