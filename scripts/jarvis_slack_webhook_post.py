@@ -6,8 +6,8 @@ Secrets (`.env.jarvis_private`):
   / DEAL_ACTIVE（#deal-active）
 未設定チャンネルは REPORT にフォールバック（本文先頭に 【#consult】等を付ける）。
 
-report/consult は末尾に FB スレ案内を自動付与（Phase 0）。
-オフ: --no-fb-footer / JARVIS_SLACK_FB_FOOTER_DISABLE=1
+FB スレ案内フッタは既定オフ（2026-10-25）。付けるなら JARVIS_SLACK_FB_FOOTER_ENABLE=1。
+--no-fb-footer / JARVIS_SLACK_FB_FOOTER_DISABLE=1 は常にオフ。
 """
 from __future__ import annotations
 
