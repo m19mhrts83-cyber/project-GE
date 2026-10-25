@@ -9,7 +9,11 @@ import os
 import re
 from typing import Any
 
-# 本線に付ける短い案内（iPhone・1〜2行）
+# AI チーム共通の名乗り（Jarvis 以外も対応するため。旧 【Jarvis】 も自分の投稿として扱う）
+TEAM_PREFIX = "【AIチーム】"
+OWN_PREFIXES = (TEAM_PREFIX, "【Jarvis】")
+
+# 本線に付ける短い案内（iPhone・1〜2行）。既定オフ（2026-10-25 松野: 毎回は不要）
 FB_FOOTER_LINE = "FB: スレ返信で（先頭に 見栄え／内容／方針）"
 FB_FOOTER_MARKER = "FB: スレ返信で"
 FB_FOOTER_CHANNELS = frozenset({"report", "consult"})
@@ -38,12 +42,11 @@ _KIND_LABEL_JA = {
 
 
 def footer_enabled() -> bool:
-    return (os.environ.get("JARVIS_SLACK_FB_FOOTER_DISABLE") or "").strip().lower() not in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    """既定オフ。JARVIS_SLACK_FB_FOOTER_ENABLE=1 のときだけ付ける。"""
+    on = {"1", "true", "yes", "on"}
+    if (os.environ.get("JARVIS_SLACK_FB_FOOTER_DISABLE") or "").strip().lower() in on:
+        return False
+    return (os.environ.get("JARVIS_SLACK_FB_FOOTER_ENABLE") or "").strip().lower() in on
 
 
 def poll_enabled() -> bool:
@@ -102,30 +105,14 @@ def classify_fb_reply(text: str) -> str:
     return "unknown"
 
 
-def next_steps_for_kind(kind: str) -> str:
-    if kind == "layout":
-        return "次: 同スレに改訂案（Cursor／次回報告で反映）"
-    if kind == "content":
-        return "次: 追加調査ドラフトを同スレ or Cursor"
-    if kind == "policy":
-        return "次: Todoist／#consult（方針・頻度は人判断）"
-    return "次: 先頭に 見栄え／内容／方針 を付けて再送してほしい"
-
-
 def build_ack_text(kind: str, *, reply_preview: str = "") -> str:
+    """受けた（見た）の返信。ラベルの付け直しは頼まない（分類は毎日の FB 対応で読んで決める）。
+
+    reply_preview は互換のため受けるが本文には出さない（元コメントが直上にある）。
+    """
     label = kind_label_ja(kind)
-    prev = (reply_preview or "").replace("\n", " ").strip()
-    if len(prev) > 80:
-        prev = prev[:79] + "…"
-    lines = [
-        f"【Jarvis】受けた（{label}）",
-        next_steps_for_kind(kind),
-    ]
-    if prev:
-        lines.append(f"引用: {prev}")
-    if kind == "unknown":
-        lines.append("例: 「見栄え: グラフにして」「内容: ○○も調べて」")
-    return "\n".join(lines)
+    head = f"{TEAM_PREFIX}受けた" if kind == "unknown" else f"{TEAM_PREFIX}受けた（{label}）"
+    return f"{head}\n直したらこのスレで「対応したよ」と返します"
 
 
 def is_ack_or_bot_reply(msg: dict[str, Any]) -> bool:
@@ -134,7 +121,7 @@ def is_ack_or_bot_reply(msg: dict[str, Any]) -> bool:
         return True
     text = str(msg.get("text") or "")
     head = text[:60]
-    if text.startswith("【Jarvis】") and any(
+    if text.startswith(OWN_PREFIXES) and any(
         m in head
         for m in (
             "受けた",
@@ -154,7 +141,7 @@ def is_ack_or_bot_reply(msg: dict[str, Any]) -> bool:
 
 def build_done_text(*, summary: str, next_line: str = "") -> str:
     """実装・起票など処置完了時のスレ返信（受けただけと区別する）。"""
-    lines = ["【Jarvis】対応したよ", (summary or "").strip()]
+    lines = [f"{TEAM_PREFIX}対応したよ", (summary or "").strip()]
     if next_line.strip():
         lines.append(next_line.strip())
     return "\n".join(x for x in lines if x)
@@ -166,7 +153,7 @@ def build_todoist_seen_text(*, comment_preview: str = "", source: str = "317") -
     if len(prev) > 80:
         prev = prev[:79] + "…"
     lines = [
-        "【Jarvis】見たよ（受けた）",
+        f"{TEAM_PREFIX}見たよ（受けた）",
         f"経路: {source}",
     ]
     if prev:

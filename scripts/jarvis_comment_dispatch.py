@@ -395,7 +395,7 @@ def _build_phase_b_prompt(item: dict[str, Any]) -> str:
         f"title: {item.get('task_title')}\n"
         f"kind: {item.get('kind')}\n"
         f"comment: {item.get('comment')}\n"
-        "完了したら Todoist に【Jarvis】コメントと、可能なら Slack #report に"
+        "完了したら Todoist に【AIチーム】コメントと、可能なら Slack #report に"
         "『やりましたよ（317）』を残す。"
     )
 
@@ -522,7 +522,7 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
         if local_res == "local_ok":
             _todoist_phase_b_comment(
                 tid,
-                "【Jarvis】対応したよ\n"
+                "【AIチーム】対応したよ\n"
                 "サマリ: 317 Phase B（Local Agent）処置しました。"
                 f" kind={item.get('kind')}\nアウトプット:\n- 317 Local Agent",
             )
@@ -544,7 +544,7 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
     if cloud_res.startswith("cloud_ok"):
         _todoist_phase_b_comment(
             tid,
-            "【Jarvis】対応したよ\n"
+            "【AIチーム】対応したよ\n"
             "サマリ: 317 Phase B（Cloud Agent・failover）起動しました。"
             f" {cloud_res}\nアウトプット:\n- 317 Cloud Agent",
         )
