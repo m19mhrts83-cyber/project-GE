@@ -100,6 +100,34 @@ def last_time(p: dict[str, Any], *, repo: Path = REPO) -> tuple[datetime | None,
 def evaluate(cfg: dict[str, Any], now: datetime, getter=last_time) -> list[dict[str, Any]]:
     rows = []
     for p in cfg.get("products") or []:
+        if p.get("kind") == "connection_state":
+            try:
+                f = Path(str(p["file"])).expanduser()
+                if not f.is_absolute():
+                    f = REPO / f
+                data = json.loads(f.read_text(encoding="utf-8"))
+                matches = _walk(data, str(p["path"]).split("."))
+                item = matches[0] if matches and isinstance(matches[0], dict) else {}
+                t = _parse_ts(item.get("checked_at"))
+                age_h = (now - t).total_seconds() / 3600 if t else None
+                observed = str(item.get("status") or "unknown")
+                account = str(item.get("account") or "")
+                expected = str(p.get("expected_account") or "")
+                if not t or age_h is None or age_h > float(p["max_age_h"]):
+                    status, why = "unknown", "接続確認が期限切れまたは時刻なし"
+                elif observed == "disconnected":
+                    status, why = "stale", "未接続"
+                elif expected and account != expected:
+                    status, why = "stale", "接続アカウントが期待値と不一致"
+                elif observed == "ok":
+                    status, why = "ok", "接続確認済み"
+                else:
+                    status, why = "unknown", "接続状態を確認できない"
+            except (OSError, ValueError, KeyError) as exc:
+                t, age_h = None, None
+                status, why = "unknown", f"接続記録の読取不能: {type(exc).__name__}"
+            rows.append({**p, "last": t.isoformat() if t else None, "age_h": age_h, "stale": status != "ok", "status": status, "why": why})
+            continue
         if p.get("kind") == "mirror_content":
             def resolve(name):
                 path = Path(str(p[name])).expanduser()
@@ -126,8 +154,8 @@ def evaluate(cfg: dict[str, Any], now: datetime, getter=last_time) -> list[dict[
 
 def diff_state(rows: list[dict[str, Any]], prev_stale: set[str]) -> tuple[list[dict], list[dict]]:
     now_stale = {r["id"] for r in rows if r["stale"]}
-    newly = [r for r in rows if r["id"] in now_stale - prev_stale]
-    recovered = [r for r in rows if r["id"] in prev_stale - now_stale]
+    newly = [r for r in rows if r.get("notify", True) and r["id"] in now_stale - prev_stale]
+    recovered = [r for r in rows if r.get("notify", True) and r["id"] in prev_stale - now_stale]
     return newly, recovered
 
 

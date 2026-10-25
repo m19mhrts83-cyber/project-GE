@@ -29,14 +29,16 @@ https://jarvis-dashboard-amber.vercel.app/
 
 ### Jarvis Cloud / Gemini（見直し・聞く）
 
-UI で **Jarvis Cloud**（既定）／ **Gemini** を明示選択。
+UI の既定は **自動**。APIキーの存在だけでは外部APIを使わず、明示許可された経路だけを軽量順に試す。手動で **Jarvis Cloud**／**Gemini** も選べる。
 
 | 画面 | 本線 | フォールバック |
 |---|---|---|
 | パートナー下書き見直し | Cloud Agent | Mac `jarvis_triage_cursor_revise_worker.py`（通知付き） |
-| タスク／ウォッチ「聞く」 | Cloud →（失敗時）Gemini | ローカル用コピー ＋ Mac `jarvis_card_cursor_ask_worker.py` |
+| タスク／ウォッチ／メール要約「聞く」 | 自動: 許可済みGemini 1回 → 許可済みCloud 1回 | ローカル用コピー ＋ Mac `jarvis_card_cursor_ask_worker.py` |
 
-切替時はバナーで「Cloud が失敗したため Gemini に…」等を必ず表示。
+自動利用は `ASK_AUTO_ALLOW_GEMINI=1` / `ASK_AUTO_ALLOW_CLOUD=1` を個別設定した経路だけ。両方未設定または失敗時はローカル引き継ぎ。API料金と定額プランの利用枠は別として扱う。切替時はバナーで経路を表示する。
+
+Askは60秒の短期キャッシュ（認証利用者＋対象＋入力全文＋経路設定）を使い、資料や質問が変われば失効する。`ask_usage`ログは経路・結果・入力文字数・時間のみで本文を含めない。集計は `python3 scripts/jarvis_ask_usage_summary.py <server.log>`。
 
 ### 聞くの文脈ソース（注入型）
 
@@ -92,6 +94,10 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ```
 
 設定: `config/notebooklm_workbench.yaml`／任意 `NOTEBOOKLM_DRIVE_FOLDER_URL`。
+
+ブラウザのNotebookLMログイン、AIツールのNotebookLM MCP、Drive検索は別セッション。
+ブラウザでノートが開けてもMCP認証済みとは判定しない。315はそれぞれの接続アカウント、
+認証状態、最終確認時刻を別項目で記録する。
 
 ### アプリ・プロンプト集（`/apps`）
 
@@ -165,7 +171,7 @@ Site URL = `https://jarvis-dashboard-amber.vercel.app`、Redirect に `/auth/cal
 2. Environment Variables:
    - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`（**jarvis-dashboard**・`sb_publishable_…`）
    - `NEXT_PUBLIC_SITE_URL` = 本番 URL
-   - （送信・見直し・聞く）`CURSOR_API_KEY` / 任意 `GEMINI_API_KEY` / `GMAIL_*`
+   - （送信・見直し・聞く）`CURSOR_API_KEY` / 任意 `GEMINI_API_KEY` / `GMAIL_*`。自動利用する経路だけ `ASK_AUTO_ALLOW_GEMINI=1` / `ASK_AUTO_ALLOW_CLOUD=1`
    - （聞く・神大家注入）`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`（**kamiooya-qa 読取のみ**。JARVIS_SUPABASE_* とは別）
    - （聞く・OneDrive 注入）`MS_GRAPH_CLIENT_ID` / `MS_GRAPH_REFRESH_TOKEN` / `MS_GRAPH_AUTHORITY=consumers`
    - （聞く・Drive／NotebookLM）`GDRIVE_CLIENT_ID` / `GDRIVE_CLIENT_SECRET` / `GDRIVE_REFRESH_TOKEN` / `GDRIVE_NOTEBOOKLM_FOLDER_ID`

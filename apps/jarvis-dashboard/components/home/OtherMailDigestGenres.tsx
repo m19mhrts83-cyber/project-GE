@@ -51,7 +51,7 @@ export default function OtherMailDigestGenres({
         genreLabel: g.label,
         bullets: g.bullets || [],
         question: q,
-        engine: "cursor",
+        engine: "auto",
       });
       if (!r.ok) {
         toast.push(r.error, "err");
