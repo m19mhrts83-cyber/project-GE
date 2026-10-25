@@ -81,12 +81,12 @@ export default function OpenchatHealthRemediation({
       <h2>解消に走る</h2>
       {rem.hint ? <p className="meta">{rem.hint}</p> : null}
       <p className="sub" style={{ marginTop: 4 }}>
-        診断・方針は「聞く」（Cloud 本線）。CHRLINE／QR／バックフィルは Mac
+        診断・方針は下のプロンプトを、その時点で利用するAIツールへ渡します。CHRLINE／QR／バックフィルは Mac
         専用です。メイン全体が止まっているときはスレ bootstrap
         より取込経路を先に。
       </p>
       <div className="openchat-remediation-actions">
-        <CopyPathButton path={prompt} label="Cursorプロンプトをコピー" />
+        <CopyPathButton path={prompt} label="AIプロンプトをコピー" />
         {canQueue ? (
           <button
             type="button"
