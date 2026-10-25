@@ -29,6 +29,8 @@ PM_CODES = frozenset({"101", "102", "103", "104"})
 ESTIMATE_RE = re.compile(r"(退去|原状回復|修繕費|見積|請求|精算)")
 B_NAME_RE = re.compile(r"(提示用|見積B|見積_B|_B_|退去者提示)", re.I)
 JST = ZoneInfo("Asia/Tokyo")
+# 人がクローズした案件（folder＋この日以前の受信）は起案も相談も出さない（Slack FB 2026-10-23）
+CLOSED_PATH = REPO / "config" / "reply_draft_211_closed.json"
 
 
 def _partner_base() -> Path:
@@ -99,6 +101,33 @@ def _blob(it: dict) -> str:
     return "\n".join(parts)
 
 
+def _load_closed() -> dict[str, datetime]:
+    """folder → closed_through（その日の終わりまでの受信をクローズ扱い）。"""
+    try:
+        data = json.loads(CLOSED_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        print(f"# closed list load skip: {e}", file=sys.stderr)
+        return {}
+    out: dict[str, datetime] = {}
+    for row in data.get("closed") or []:
+        folder = str(row.get("folder") or "").strip()
+        through = _parse_received(str(row.get("through") or ""))
+        if folder and through:
+            out[folder] = through + timedelta(days=1)
+    return out
+
+
+def _is_closed(it: dict, closed: dict[str, datetime]) -> bool:
+    end = closed.get(str(it.get("folder") or "").strip())
+    if not end:
+        return False
+    received = _parse_received(str(it.get("received_at") or ""))
+    # 受信日が読めないものは安全側でクローズ扱い（同じ相談の再掲を防ぐ）
+    return received is None or received < end
+
+
 def _needs_estimate_b(it: dict) -> bool:
     return bool(ESTIMATE_RE.search(_blob(it)))
 
@@ -146,6 +175,10 @@ def _template_draft(it: dict) -> str:
     """heuristic キューは draft_text 空のため、管理会社向けの控えめテンプレを埋める。"""
     channel = (it.get("channel") or "Gmail").strip() or "Gmail"
     summary = (it.get("summary") or it.get("subject") or "").strip()
+    # LINE 取込の summary は <details><summary>本文</summary>… を含むので外す（Slack FB 2026-10-25）
+    summary = re.sub(r"<summary>\s*本文\s*</summary>|</?(details|summary)>", " ", summary)
+    summary = re.sub(r"^\s*\d{4}/\d{2}/\d{2} \d{2}:\d{2} \S+\s*", "", summary.strip())
+    summary = re.sub(r"\s+", " ", summary).strip()
     hint = summary[:80] if summary else "ご連絡の件"
     if channel == "LINE":
         return (
@@ -170,6 +203,7 @@ def _pm_candidates(items: list[dict], lookback_days: int) -> tuple[list[dict], l
     applyable: list[dict] = []
     b_waiting: list[dict] = []
     skipped_old: list[dict] = []
+    closed = _load_closed()
     for it in items:
         if (it.get("lane") or "partner") != "partner":
             continue
@@ -177,6 +211,8 @@ def _pm_candidates(items: list[dict], lookback_days: int) -> tuple[list[dict], l
             continue
         folder = str(it.get("folder") or "")
         if not _is_pm_folder(folder):
+            continue
+        if _is_closed(it, closed):
             continue
         received = _parse_received(str(it.get("received_at") or ""))
         if received and received < cutoff:
