@@ -206,7 +206,7 @@ export async function askJarvisOnCard(
   cardId: string,
   body: string,
   path: string,
-  engine: AskEngine = "cursor",
+  engine: AskEngine = "auto",
   opts?: {
     useKamiooyaKnowledge?: boolean;
     useOnedriveYoritoori?: boolean;
@@ -311,7 +311,8 @@ export async function askJarvisOnCard(
     .filter(Boolean)
     .join("\n\n");
 
-  const resolved = await resolveAskReply({ engine, prompt });
+  const { data: auth } = await supabase.auth.getUser();
+  const resolved = await resolveAskReply({ engine, prompt, cacheScope: auth.user ? `${auth.user.id}:card:${cardId}` : undefined });
   if (!resolved.ok) {
     revalidatePath(path);
     return {
