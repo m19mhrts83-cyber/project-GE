@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-16T01:34:54+09:00",
+  "updated": "2026-10-26T08:00:00+09:00",
   "course": "https://westudy.co.jp/course/kami-ooyasan-club",
   "total": 85,
   "vtt_ready": 63,
@@ -15,7 +15,8 @@
       "cue_count": 953,
       "bytes": 123513,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step1_1.md"
+      "jarvis_file": "基礎講座文字起こし_step1_1.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiooya-kiso-step2_1",
@@ -26,7 +27,8 @@
       "cue_count": 0,
       "bytes": 3492,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step2_1.md"
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step2_1.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "kamiooya-kiso-step2_2",
@@ -37,7 +39,8 @@
       "cue_count": 2045,
       "bytes": 225715,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step2_2.md"
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step2_2.md",
+      "category": "captioned"
     },
     {
       "slug": "step3_1",
@@ -48,7 +51,8 @@
       "cue_count": 469,
       "bytes": 85089,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step3_1.md"
+      "jarvis_file": "基礎講座文字起こし_step3_1.md",
+      "category": "captioned"
     },
     {
       "slug": "step3_2",
@@ -59,7 +63,8 @@
       "cue_count": 0,
       "bytes": 12652,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_step3_2.md"
+      "jarvis_file": "基礎講座文字起こし_step3_2.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "step3_plam_intarveiw",
@@ -70,7 +75,8 @@
       "cue_count": 1357,
       "bytes": 119549,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step3_plam_intarveiw.md"
+      "jarvis_file": "基礎講座文字起こし_step3_plam_intarveiw.md",
+      "category": "captioned"
     },
     {
       "slug": "step4_1",
@@ -81,7 +87,8 @@
       "cue_count": 325,
       "bytes": 61385,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step4_1.md"
+      "jarvis_file": "基礎講座文字起こし_step4_1.md",
+      "category": "captioned"
     },
     {
       "slug": "approach_enkakuchi",
@@ -92,7 +99,8 @@
       "cue_count": 346,
       "bytes": 37110,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_approach_enkakuchi.md"
+      "jarvis_file": "基礎講座文字起こし_approach_enkakuchi.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiooya-kiso-step5-1",
@@ -103,7 +111,8 @@
       "cue_count": 963,
       "bytes": 109892,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step5-1.md"
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step5-1.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiooya-kiso-step5-2",
@@ -114,7 +123,8 @@
       "cue_count": 1113,
       "bytes": 137900,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step5-2.md"
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step5-2.md",
+      "category": "captioned"
     },
     {
       "slug": "step5_3",
@@ -125,7 +135,8 @@
       "cue_count": 1288,
       "bytes": 144357,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step5_3.md"
+      "jarvis_file": "基礎講座文字起こし_step5_3.md",
+      "category": "captioned"
     },
     {
       "slug": "step5-5",
@@ -136,7 +147,8 @@
       "cue_count": 0,
       "bytes": 3120,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_step5-5.md"
+      "jarvis_file": "基礎講座文字起こし_step5-5.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "approach_chintaiheiyou",
@@ -147,7 +159,8 @@
       "cue_count": 0,
       "bytes": 2189,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_approach_chintaiheiyou.md"
+      "jarvis_file": "基礎講座文字起こし_approach_chintaiheiyou.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "step6_1",
@@ -158,7 +171,8 @@
       "cue_count": 1619,
       "bytes": 197168,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step6_1.md"
+      "jarvis_file": "基礎講座文字起こし_step6_1.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiooya-kiso-step7-1",
@@ -169,7 +183,8 @@
       "cue_count": 488,
       "bytes": 64104,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step7-1.md"
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step7-1.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiooya-kiso-step8",
@@ -180,7 +195,8 @@
       "cue_count": 869,
       "bytes": 101158,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step8.md"
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step8.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiooya-kiso-step9",
@@ -191,7 +207,8 @@
       "cue_count": 1190,
       "bytes": 134736,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step9.md"
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step9.md",
+      "category": "captioned"
     },
     {
       "slug": "step10_2",
@@ -202,7 +219,8 @@
       "cue_count": 1998,
       "bytes": 217863,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step10_2.md"
+      "jarvis_file": "基礎講座文字起こし_step10_2.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiooya-kiso-step11",
@@ -213,7 +231,8 @@
       "cue_count": 624,
       "bytes": 72253,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step11.md"
+      "jarvis_file": "基礎講座文字起こし_kamiooya-kiso-step11.md",
+      "category": "captioned"
     },
     {
       "slug": "step12_1",
@@ -224,7 +243,8 @@
       "cue_count": 764,
       "bytes": 88917,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step12_1.md"
+      "jarvis_file": "基礎講座文字起こし_step12_1.md",
+      "category": "captioned"
     },
     {
       "slug": "step12_2",
@@ -235,7 +255,8 @@
       "cue_count": 707,
       "bytes": 63575,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step12_2.md"
+      "jarvis_file": "基礎講座文字起こし_step12_2.md",
+      "category": "captioned"
     },
     {
       "slug": "bukkenkaenai_taisyo",
@@ -246,7 +267,8 @@
       "cue_count": 1932,
       "bytes": 194690,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_bukkenkaenai_taisyo.md"
+      "jarvis_file": "基礎講座文字起こし_bukkenkaenai_taisyo.md",
+      "category": "captioned"
     },
     {
       "slug": "kokoronokabe",
@@ -257,7 +279,9 @@
       "cue_count": 0,
       "bytes": 816,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_kokoronokabe.md"
+      "jarvis_file": "基礎講座文字起こし_kokoronokabe.md",
+      "category": "A_video_no_caption",
+      "desc_thin": true
     },
     {
       "slug": "handankijyun",
@@ -268,7 +292,8 @@
       "cue_count": 1140,
       "bytes": 115201,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_handankijyun.md"
+      "jarvis_file": "基礎講座文字起こし_handankijyun.md",
+      "category": "captioned"
     },
     {
       "slug": "simyu1",
@@ -279,7 +304,8 @@
       "cue_count": 2073,
       "bytes": 219734,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_simyu1.md"
+      "jarvis_file": "基礎講座文字起こし_simyu1.md",
+      "category": "captioned"
     },
     {
       "slug": "simyu2",
@@ -290,7 +316,8 @@
       "cue_count": 1412,
       "bytes": 141097,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_simyu2.md"
+      "jarvis_file": "基礎講座文字起こし_simyu2.md",
+      "category": "captioned"
     },
     {
       "slug": "simyu3",
@@ -301,7 +328,8 @@
       "cue_count": 1140,
       "bytes": 121862,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_simyu3.md"
+      "jarvis_file": "基礎講座文字起こし_simyu3.md",
+      "category": "captioned"
     },
     {
       "slug": "naphtha-shock",
@@ -312,7 +340,8 @@
       "cue_count": 361,
       "bytes": 38199,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_naphtha-shock.md"
+      "jarvis_file": "基礎講座文字起こし_naphtha-shock.md",
+      "category": "captioned"
     },
     {
       "slug": "bukkakoutou_kinrijousyou",
@@ -323,7 +352,8 @@
       "cue_count": 363,
       "bytes": 34635,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_bukkakoutou_kinrijousyou.md"
+      "jarvis_file": "基礎講座文字起こし_bukkakoutou_kinrijousyou.md",
+      "category": "captioned"
     },
     {
       "slug": "smartroom",
@@ -334,7 +364,8 @@
       "cue_count": 566,
       "bytes": 48130,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_smartroom.md"
+      "jarvis_file": "基礎講座文字起こし_smartroom.md",
+      "category": "captioned"
     },
     {
       "slug": "kenchikuclub",
@@ -345,7 +376,8 @@
       "cue_count": 113,
       "bytes": 14754,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kenchikuclub.md"
+      "jarvis_file": "基礎講座文字起こし_kenchikuclub.md",
+      "category": "captioned"
     },
     {
       "slug": "kodate_4pattern",
@@ -356,7 +388,8 @@
       "cue_count": 259,
       "bytes": 23338,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kodate_4pattern.md"
+      "jarvis_file": "基礎講座文字起こし_kodate_4pattern.md",
+      "category": "captioned"
     },
     {
       "slug": "0enkounyu-0enshuzen",
@@ -367,7 +400,8 @@
       "cue_count": 435,
       "bytes": 45270,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_0enkounyu-0enshuzen.md"
+      "jarvis_file": "基礎講座文字起こし_0enkounyu-0enshuzen.md",
+      "category": "captioned"
     },
     {
       "slug": "houtekikashi",
@@ -378,7 +412,8 @@
       "cue_count": 0,
       "bytes": 1595,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_houtekikashi.md"
+      "jarvis_file": "基礎講座文字起こし_houtekikashi.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "qa_kaikata",
@@ -389,7 +424,8 @@
       "cue_count": 0,
       "bytes": 2002,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_qa_kaikata.md"
+      "jarvis_file": "基礎講座文字起こし_qa_kaikata.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "_hosoku_trouble",
@@ -400,7 +436,8 @@
       "cue_count": 0,
       "bytes": 1662,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし__hosoku_trouble.md"
+      "jarvis_file": "基礎講座文字起こし__hosoku_trouble.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "yoheki_taisyo",
@@ -411,7 +448,8 @@
       "cue_count": 0,
       "bytes": 1061,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_yoheki_taisyo.md"
+      "jarvis_file": "基礎講座文字起こし_yoheki_taisyo.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "souzoku_kounyuu",
@@ -422,7 +460,8 @@
       "cue_count": 259,
       "bytes": 24713,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_souzoku_kounyuu.md"
+      "jarvis_file": "基礎講座文字起こし_souzoku_kounyuu.md",
+      "category": "captioned"
     },
     {
       "slug": "zenku_taisaku",
@@ -433,7 +472,9 @@
       "cue_count": 0,
       "bytes": 890,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_zenku_taisaku.md"
+      "jarvis_file": "基礎講座文字起こし_zenku_taisaku.md",
+      "category": "A_video_no_caption",
+      "desc_thin": true
     },
     {
       "slug": "kuusitu_keiyakuhenkou",
@@ -444,7 +485,8 @@
       "cue_count": 394,
       "bytes": 36315,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kuusitu_keiyakuhenkou.md"
+      "jarvis_file": "基礎講座文字起こし_kuusitu_keiyakuhenkou.md",
+      "category": "captioned"
     },
     {
       "slug": "satsueitekunikku",
@@ -455,7 +497,8 @@
       "cue_count": 1453,
       "bytes": 145359,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_satsueitekunikku.md"
+      "jarvis_file": "基礎講座文字起こし_satsueitekunikku.md",
+      "category": "captioned"
     },
     {
       "slug": "canva",
@@ -466,7 +509,8 @@
       "cue_count": 675,
       "bytes": 49786,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_canva.md"
+      "jarvis_file": "基礎講座文字起こし_canva.md",
+      "category": "captioned"
     },
     {
       "slug": "flower-arrangement",
@@ -477,7 +521,8 @@
       "cue_count": 1375,
       "bytes": 108108,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_flower-arrangement.md"
+      "jarvis_file": "基礎講座文字起こし_flower-arrangement.md",
+      "category": "captioned"
     },
     {
       "slug": "water_quality_test",
@@ -488,7 +533,8 @@
       "cue_count": 90,
       "bytes": 8949,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_water_quality_test.md"
+      "jarvis_file": "基礎講座文字起こし_water_quality_test.md",
+      "category": "captioned"
     },
     {
       "slug": "step8-youtube",
@@ -499,7 +545,8 @@
       "cue_count": 436,
       "bytes": 46082,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_step8-youtube.md"
+      "jarvis_file": "基礎講座文字起こし_step8-youtube.md",
+      "category": "captioned"
     },
     {
       "slug": "youtube2",
@@ -510,7 +557,9 @@
       "cue_count": 0,
       "bytes": 850,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_youtube2.md"
+      "jarvis_file": "基礎講座文字起こし_youtube2.md",
+      "category": "A_video_no_caption",
+      "desc_thin": true
     },
     {
       "slug": "pop_board",
@@ -521,7 +570,9 @@
       "cue_count": 0,
       "bytes": 1442,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_pop_board.md"
+      "jarvis_file": "基礎講座文字起こし_pop_board.md",
+      "category": "B_no_video",
+      "excluded": true
     },
     {
       "slug": "casa",
@@ -532,7 +583,8 @@
       "cue_count": 917,
       "bytes": 83596,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_casa.md"
+      "jarvis_file": "基礎講座文字起こし_casa.md",
+      "category": "captioned"
     },
     {
       "slug": "seminar_echoes",
@@ -543,7 +595,8 @@
       "cue_count": 827,
       "bytes": 86199,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_seminar_echoes.md"
+      "jarvis_file": "基礎講座文字起こし_seminar_echoes.md",
+      "category": "captioned"
     },
     {
       "slug": "seminar_aiconnect",
@@ -554,7 +607,8 @@
       "cue_count": 765,
       "bytes": 76816,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_seminar_aiconnect.md"
+      "jarvis_file": "基礎講座文字起こし_seminar_aiconnect.md",
+      "category": "captioned"
     },
     {
       "slug": "reformloan_riyoukachi",
@@ -565,7 +619,8 @@
       "cue_count": 142,
       "bytes": 17209,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_reformloan_riyoukachi.md"
+      "jarvis_file": "基礎講座文字起こし_reformloan_riyoukachi.md",
+      "category": "captioned"
     },
     {
       "slug": "gekiyasu-shuzengyousha",
@@ -576,7 +631,8 @@
       "cue_count": 269,
       "bytes": 32256,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_gekiyasu-shuzengyousha.md"
+      "jarvis_file": "基礎講座文字起こし_gekiyasu-shuzengyousha.md",
+      "category": "captioned"
     },
     {
       "slug": "accent-cross",
@@ -587,7 +643,8 @@
       "cue_count": 234,
       "bytes": 23238,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_accent-cross.md"
+      "jarvis_file": "基礎講座文字起こし_accent-cross.md",
+      "category": "captioned"
     },
     {
       "slug": "gas_horitsu_henkou240702",
@@ -598,7 +655,8 @@
       "cue_count": 247,
       "bytes": 23511,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_gas_horitsu_henkou240702.md"
+      "jarvis_file": "基礎講座文字起こし_gas_horitsu_henkou240702.md",
+      "category": "captioned"
     },
     {
       "slug": "shouene_kaisei",
@@ -609,7 +667,8 @@
       "cue_count": 425,
       "bytes": 42818,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_shouene_kaisei.md"
+      "jarvis_file": "基礎講座文字起こし_shouene_kaisei.md",
+      "category": "captioned"
     },
     {
       "slug": "broadenterprise",
@@ -620,7 +679,8 @@
       "cue_count": 457,
       "bytes": 39646,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_broadenterprise.md"
+      "jarvis_file": "基礎講座文字起こし_broadenterprise.md",
+      "category": "captioned"
     },
     {
       "slug": "kaniejapan_toshigasu_puropan",
@@ -631,7 +691,8 @@
       "cue_count": 979,
       "bytes": 69262,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kaniejapan_toshigasu_puropan.md"
+      "jarvis_file": "基礎講座文字起こし_kaniejapan_toshigasu_puropan.md",
+      "category": "captioned"
     },
     {
       "slug": "baikyaku",
@@ -642,7 +703,8 @@
       "cue_count": 0,
       "bytes": 1430,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_baikyaku.md"
+      "jarvis_file": "基礎講座文字起こし_baikyaku.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "sisannseiri",
@@ -653,7 +715,8 @@
       "cue_count": 0,
       "bytes": 6214,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_sisannseiri.md"
+      "jarvis_file": "基礎講座文字起こし_sisannseiri.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "qa_baikyaku",
@@ -664,7 +727,8 @@
       "cue_count": 0,
       "bytes": 853,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_qa_baikyaku.md"
+      "jarvis_file": "基礎講座文字起こし_qa_baikyaku.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "baikyaku_timing_urikata",
@@ -675,7 +739,8 @@
       "cue_count": 872,
       "bytes": 98414,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_baikyaku_timing_urikata.md"
+      "jarvis_file": "基礎講座文字起こし_baikyaku_timing_urikata.md",
+      "category": "captioned"
     },
     {
       "slug": "keiyakufutekigo_taisyo",
@@ -686,7 +751,8 @@
       "cue_count": 0,
       "bytes": 867,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_keiyakufutekigo_taisyo.md"
+      "jarvis_file": "基礎講座文字起こし_keiyakufutekigo_taisyo.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "kamiconcept_1_bukkenmei",
@@ -697,7 +763,8 @@
       "cue_count": 2628,
       "bytes": 265561,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiconcept_1_bukkenmei.md"
+      "jarvis_file": "基礎講座文字起こし_kamiconcept_1_bukkenmei.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiconcept_2_kamikanban",
@@ -708,7 +775,8 @@
       "cue_count": 1258,
       "bytes": 125708,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiconcept_2_kamikanban.md"
+      "jarvis_file": "基礎講座文字起こし_kamiconcept_2_kamikanban.md",
+      "category": "captioned"
     },
     {
       "slug": "kamiconcept_3_kamiconcept",
@@ -719,7 +787,8 @@
       "cue_count": 2165,
       "bytes": 243034,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kamiconcept_3_kamiconcept.md"
+      "jarvis_file": "基礎講座文字起こし_kamiconcept_3_kamiconcept.md",
+      "category": "captioned"
     },
     {
       "slug": "chatgpt_katuyou",
@@ -730,7 +799,8 @@
       "cue_count": 1263,
       "bytes": 116238,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_chatgpt_katuyou.md"
+      "jarvis_file": "基礎講座文字起こし_chatgpt_katuyou.md",
+      "category": "captioned"
     },
     {
       "slug": "kasaihoken_kisho",
@@ -741,7 +811,8 @@
       "cue_count": 0,
       "bytes": 912,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_kasaihoken_kisho.md"
+      "jarvis_file": "基礎講座文字起こし_kasaihoken_kisho.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "theme1_jishin_kanngaekata",
@@ -752,7 +823,8 @@
       "cue_count": 960,
       "bytes": 96202,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_theme1_jishin_kanngaekata.md"
+      "jarvis_file": "基礎講座文字起こし_theme1_jishin_kanngaekata.md",
+      "category": "captioned"
     },
     {
       "slug": "theme2_jishin_tsukaikata",
@@ -763,7 +835,8 @@
       "cue_count": 124,
       "bytes": 13025,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_theme2_jishin_tsukaikata.md"
+      "jarvis_file": "基礎講座文字起こし_theme2_jishin_tsukaikata.md",
+      "category": "captioned"
     },
     {
       "slug": "consultant",
@@ -774,7 +847,9 @@
       "cue_count": 0,
       "bytes": 1603,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_consultant.md"
+      "jarvis_file": "基礎講座文字起こし_consultant.md",
+      "category": "B_no_video",
+      "excluded": true
     },
     {
       "slug": "kasaihoken_henkou_youken",
@@ -785,7 +860,8 @@
       "cue_count": 0,
       "bytes": 836,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_kasaihoken_henkou_youken.md"
+      "jarvis_file": "基礎講座文字起こし_kasaihoken_henkou_youken.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "theme3_jishin_kasai_zenshou",
@@ -796,7 +872,8 @@
       "cue_count": 253,
       "bytes": 24758,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_theme3_jishin_kasai_zenshou.md"
+      "jarvis_file": "基礎講座文字起こし_theme3_jishin_kasai_zenshou.md",
+      "category": "captioned"
     },
     {
       "slug": "kasaihoken_kaitei2026",
@@ -807,7 +884,8 @@
       "cue_count": 783,
       "bytes": 60183,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kasaihoken_kaitei2026.md"
+      "jarvis_file": "基礎講座文字起こし_kasaihoken_kaitei2026.md",
+      "category": "captioned"
     },
     {
       "slug": "setuzeianken",
@@ -818,7 +896,8 @@
       "cue_count": 208,
       "bytes": 23200,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_setuzeianken.md"
+      "jarvis_file": "基礎講座文字起こし_setuzeianken.md",
+      "category": "captioned"
     },
     {
       "slug": "seikakaitori",
@@ -829,7 +908,8 @@
       "cue_count": 377,
       "bytes": 39321,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_seikakaitori.md"
+      "jarvis_file": "基礎講座文字起こし_seikakaitori.md",
+      "category": "captioned"
     },
     {
       "slug": "executive-lounge",
@@ -840,7 +920,8 @@
       "cue_count": 678,
       "bytes": 63269,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_executive-lounge.md"
+      "jarvis_file": "基礎講座文字起こし_executive-lounge.md",
+      "category": "captioned"
     },
     {
       "slug": "kami_agent",
@@ -851,7 +932,8 @@
       "cue_count": 1808,
       "bytes": 150455,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_kami_agent.md"
+      "jarvis_file": "基礎講座文字起こし_kami_agent.md",
+      "category": "captioned"
     },
     {
       "slug": "hellocycling",
@@ -862,7 +944,8 @@
       "cue_count": 160,
       "bytes": 14234,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_hellocycling.md"
+      "jarvis_file": "基礎講座文字起こし_hellocycling.md",
+      "category": "captioned"
     },
     {
       "slug": "service_form",
@@ -873,7 +956,8 @@
       "cue_count": 0,
       "bytes": 5513,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_service_form.md"
+      "jarvis_file": "基礎講座文字起こし_service_form.md",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "studysession-startguide",
@@ -884,7 +968,8 @@
       "cue_count": 1543,
       "bytes": 111092,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_studysession-startguide.md"
+      "jarvis_file": "基礎講座文字起こし_studysession-startguide.md",
+      "category": "captioned"
     },
     {
       "slug": "seminar-lf",
@@ -895,7 +980,9 @@
       "cue_count": 0,
       "bytes": 5408,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_seminar-lf.md"
+      "jarvis_file": "基礎講座文字起こし_seminar-lf.md",
+      "category": "B_no_video",
+      "excluded": true
     },
     {
       "slug": "seminar-orix",
@@ -906,7 +993,9 @@
       "cue_count": 0,
       "bytes": 5353,
       "mode": "page_description_fallback",
-      "jarvis_file": "基礎講座文字起こし_seminar-orix.md"
+      "jarvis_file": "基礎講座文字起こし_seminar-orix.md",
+      "category": "B_no_video",
+      "excluded": true
     },
     {
       "slug": "option_bukken_syoukai",
@@ -917,7 +1006,8 @@
       "cue_count": 129,
       "bytes": 13148,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_option_bukken_syoukai.md"
+      "jarvis_file": "基礎講座文字起こし_option_bukken_syoukai.md",
+      "category": "captioned"
     },
     {
       "slug": "option_hudousan_listup",
@@ -928,7 +1018,8 @@
       "cue_count": 42,
       "bytes": 5346,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_option_hudousan_listup.md"
+      "jarvis_file": "基礎講座文字起こし_option_hudousan_listup.md",
+      "category": "captioned"
     },
     {
       "slug": "option_shuuzen_listup",
@@ -939,7 +1030,12 @@
       "cue_count": 62,
       "bytes": 7763,
       "mode": "vimeo_auto_vtt",
-      "jarvis_file": "基礎講座文字起こし_option_shuuzen_listup.md"
+      "jarvis_file": "基礎講座文字起こし_option_shuuzen_listup.md",
+      "category": "captioned"
     }
-  ]
+  ],
+  "video_lessons": 81,
+  "no_video": 4,
+  "video_no_caption": 18,
+  "note": "母数は動画のあるレッスン81本（動画なし4本は対象外）。63本はVimeoに日本語の自動生成字幕が付いていたため取得。18本は動画はあるが字幕が付いていない。"
 }

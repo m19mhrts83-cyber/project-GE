@@ -1,7 +1,7 @@
 {
-  "updated": "2026-10-16T06:44:46+09:00",
-  "count": 22,
-  "purpose": "今村さんへ字幕（SRT等）依頼用。Vimeo自動字幕が取れなかったレッスン。",
+  "updated": "2026-10-26T08:00:00+09:00",
+  "count": 18,
+  "purpose": "今村さんへ字幕（SRT等）依頼用。動画はあるがVimeo自動字幕が付いていないレッスン（母数81本中18本）。",
   "handoff_hint": "特に P1（本編・判断）を優先でSRTいただけると助かります。置き場: OneDrive 基礎講座_文字起こし/imamura/inbox/",
   "bands": [
     {
@@ -17,7 +17,7 @@
     {
       "id": "P3",
       "label": "オプション／案内／セミナー",
-      "count": 6
+      "count": 2
     }
   ],
   "lessons": [
@@ -35,7 +35,9 @@
       "ask_band": "本編・判断",
       "ask_rank": 1,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼（説明文は薄いが動画あり）",
+      "category": "A_video_no_caption",
+      "desc_thin": true
     },
     {
       "slug": "kamiooya-kiso-step2_1",
@@ -51,7 +53,8 @@
       "ask_band": "本編・判断",
       "ask_rank": 2,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "step3_2",
@@ -67,7 +70,8 @@
       "ask_band": "本編・判断",
       "ask_rank": 3,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "houtekikashi",
@@ -83,7 +87,8 @@
       "ask_band": "本編・判断",
       "ask_rank": 4,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "qa_kaikata",
@@ -99,7 +104,8 @@
       "ask_band": "本編・判断",
       "ask_rank": 5,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "_hosoku_trouble",
@@ -115,7 +121,8 @@
       "ask_band": "本編・判断",
       "ask_rank": 6,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "yoheki_taisyo",
@@ -131,7 +138,8 @@
       "ask_band": "本編・判断",
       "ask_rank": 7,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "step5-5",
@@ -147,7 +155,8 @@
       "ask_band": "本編・判断",
       "ask_rank": 8,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "approach_chintaiheiyou",
@@ -163,7 +172,8 @@
       "ask_band": "本編・判断",
       "ask_rank": 9,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "zenku_taisaku",
@@ -179,7 +189,9 @@
       "ask_band": "空室・売却・保険",
       "ask_rank": 10,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼（説明文は薄いが動画あり）",
+      "category": "A_video_no_caption",
+      "desc_thin": true
     },
     {
       "slug": "baikyaku",
@@ -195,7 +207,8 @@
       "ask_band": "空室・売却・保険",
       "ask_rank": 11,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "sisannseiri",
@@ -211,7 +224,8 @@
       "ask_band": "空室・売却・保険",
       "ask_rank": 12,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "qa_baikyaku",
@@ -227,7 +241,8 @@
       "ask_band": "空室・売却・保険",
       "ask_rank": 13,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "keiyakufutekigo_taisyo",
@@ -243,7 +258,8 @@
       "ask_band": "空室・売却・保険",
       "ask_rank": 14,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "kasaihoken_kisho",
@@ -259,7 +275,8 @@
       "ask_band": "空室・売却・保険",
       "ask_rank": 15,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "kasaihoken_henkou_youken",
@@ -275,7 +292,8 @@
       "ask_band": "空室・売却・保険",
       "ask_rank": 16,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
     },
     {
       "slug": "youtube2",
@@ -291,7 +309,9 @@
       "ask_band": "オプション／案内／セミナー",
       "ask_rank": 17,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
+      "ask_note": "SRT等の字幕を優先依頼（説明文は薄いが動画あり）",
+      "category": "A_video_no_caption",
+      "desc_thin": true
     },
     {
       "slug": "service_form",
@@ -307,8 +327,11 @@
       "ask_band": "オプション／案内／セミナー",
       "ask_rank": 18,
       "gap_reason": "Vimeo自動字幕なし（track / text_tracks 空）",
-      "ask_note": "SRT等の字幕を優先依頼"
-    },
+      "ask_note": "SRT等の字幕を優先依頼",
+      "category": "A_video_no_caption"
+    }
+  ],
+  "excluded": [
     {
       "slug": "pop_board",
       "title": "センス抜群POP業者／看板業者紹介",
@@ -323,7 +346,9 @@
       "ask_band": "オプション／案内／セミナー",
       "ask_rank": 19,
       "gap_reason": "動画iframeなし（スライド／外部リンク中心）",
-      "ask_note": "字幕より資料PDF等の方が合う場合あり"
+      "ask_note": "字幕より資料PDF等の方が合う場合あり",
+      "category": "B_no_video",
+      "excluded_reason": "動画なし（スライド・外部リンク中心）→ 文字起こし対象外"
     },
     {
       "slug": "consultant",
@@ -339,7 +364,9 @@
       "ask_band": "オプション／案内／セミナー",
       "ask_rank": 20,
       "gap_reason": "動画iframeなし（スライド／外部リンク中心）",
-      "ask_note": "字幕より資料PDF等の方が合う場合あり"
+      "ask_note": "字幕より資料PDF等の方が合う場合あり",
+      "category": "B_no_video",
+      "excluded_reason": "動画なし（スライド・外部リンク中心）→ 文字起こし対象外"
     },
     {
       "slug": "seminar-lf",
@@ -355,7 +382,9 @@
       "ask_band": "オプション／案内／セミナー",
       "ask_rank": 21,
       "gap_reason": "動画iframeなし（スライド／外部リンク中心）",
-      "ask_note": "字幕より資料PDF等の方が合う場合あり"
+      "ask_note": "字幕より資料PDF等の方が合う場合あり",
+      "category": "B_no_video",
+      "excluded_reason": "動画なし（スライド・外部リンク中心）→ 文字起こし対象外"
     },
     {
       "slug": "seminar-orix",
@@ -371,7 +400,24 @@
       "ask_band": "オプション／案内／セミナー",
       "ask_rank": 22,
       "gap_reason": "動画iframeなし（スライド／外部リンク中心）",
-      "ask_note": "字幕より資料PDF等の方が合う場合あり"
+      "ask_note": "字幕より資料PDF等の方が合う場合あり",
+      "category": "B_no_video",
+      "excluded_reason": "動画なし（スライド・外部リンク中心）→ 文字起こし対象外"
     }
-  ]
+  ],
+  "categories": [
+    {
+      "id": "A",
+      "label": "動画あり・字幕なし",
+      "count": 18,
+      "action": "Notta／今村さん字幕で文字起こし"
+    },
+    {
+      "id": "B",
+      "label": "動画なし（スライド・外部リンク中心）",
+      "count": 4,
+      "action": "文字起こし対象外。必要なら資料PDFを別ソース化"
+    }
+  ],
+  "note": "旧「箱C（説明文もほぼ空）」3本は動画があるため A に統合（desc_thin=true）"
 }
