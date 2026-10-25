@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-24T09:14:51+09:00",
+  "updated": "2026-10-25T00:44:13+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -2388,6 +2388,11 @@
             "kind": "人の対応が要るもの",
             "destination": "レビュー MD の「人の対応待ち」に1行ずつ（次週も持ち越して消えるまで載せる）",
             "channels": []
+          },
+          {
+            "kind": "`#ai-hub` 用の下書き",
+            "destination": "定期タスクの最終メッセージに書く（投稿しない。松野が確認して `jarvis_slack_webhook_post.py --channel hub`）",
+            "channels": []
           }
         ],
         "procedures": [
@@ -2507,7 +2512,7 @@
           {
             "id": "schedule",
             "on": true,
-            "detail": "毎週日曜 21:00 JST — GitHub Actions `ops-health-315.yml`** / 毎週日曜 21:45 JST — launchd `--remediate-once`**",
+            "detail": "毎週日曜 21:00 JST — GitHub Actions `ops-health-315.yml`** / 毎週日曜 21:45 JST — launchd `--remediate-once`** / 毎日 08:20・18:20 — launchd `jarvis_freshness_watch.py --post`**（`config/freshness_slo.yaml` の成果物が上限より古くなった／回復したときだけ `#ops`。AI なし）",
             "raw": "**時間（本線）: 毎週日曜 21:00 JST — GitHub Actions `ops-health-315.yml`**"
           },
           {
@@ -2821,7 +2826,7 @@
       "grok_counterpart": "",
       "flowforge_id": "flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
-      "flowforge_share_url": "",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_8mwIkbI0S9kV2u5kSwl2I-Oi",
       "permissions": {
         "can_do": "Slack FB／Todoistコメントの常駐拾い・Ack・許可リスト内AI処置（対外・金は人）。冗長はGHA L1／Cloud L2",
@@ -2953,7 +2958,7 @@
           {
             "title": "FlowForge（作業フロー）",
             "path": "",
-            "url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
             "kind": "flowforge"
           },
           {

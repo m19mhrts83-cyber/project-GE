@@ -4,16 +4,16 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | （Todoist id または run_id） |
+| task_id | codex-quality-plan-20261025 |
 | agent_id | 315 |
-| executor | cursor / claude_code / gencode / launchd / gha / … |
-| status | queued |
+| executor | codex |
+| status | running |
 | started_at | |
 | finished_at | |
 
 ## 依頼
 
-（何をするか。入力は `input/` または外部パス）
+文書50の品質・効率改善計画を実施する。既存315を拡張し、4者の実行担当は固定しない。実際の1件の引き継ぎ検証は次回。
 
 ## 完了条件
 
