@@ -29,6 +29,7 @@ function geminiModels(): string[] {
 
 async function geminiGenerate(
   parts: Array<Record<string, unknown>>,
+  options: { maxAttempts?: number; timeoutMs?: number; maxOutputTokens?: number } = {},
 ): Promise<GeminiReplyResult> {
   const key = geminiApiKey();
   if (!key) {
@@ -39,25 +40,45 @@ async function geminiGenerate(
   }
 
   let lastErr = "";
-  for (const model of geminiModels()) {
+  const models = geminiModels().slice(0, options.maxAttempts ?? 5);
+  for (const model of models) {
     const url =
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=` +
       encodeURIComponent(key);
-    const res = await fetch(url, {
+    let res: Response;
+    try {
+      res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
+        ...(options.maxOutputTokens ? { generationConfig: { maxOutputTokens: options.maxOutputTokens } } : {}),
       }),
-    });
+      signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
+      });
+    } catch {
+      lastErr = `${model}: 通信失敗または時間切れ`;
+      break; // 同じ通信障害で別モデルを連続起動しない
+    }
     if (!res.ok) {
-      const t = await res.text();
-      lastErr = `${model} (${res.status}): ${t.slice(0, 160)}`;
+      // 外部エラー本文には入力や秘密が含まれうるため表示しない。
+      lastErr = `${model} (HTTP ${res.status})`;
+      if (res.status !== 404) break; // 認証・上限・サーバ障害はモデル変更で再試行しない
       continue;
     }
-    const data = (await res.json()) as {
+    let data: {
       candidates?: { content?: { parts?: { text?: string }[] } }[];
     };
+    try {
+      data = await res.json();
+    } catch {
+      lastErr = `${model}: 応答の読取失敗`;
+      break;
+    }
+    if (!data || !Array.isArray(data.candidates)) {
+      lastErr = `${model}: 応答形式が不正`;
+      break;
+    }
     const text =
       data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ||
       "";
@@ -76,8 +97,9 @@ async function geminiGenerate(
 
 export async function geminiReply(
   prompt: string,
+  options?: { maxAttempts?: number; timeoutMs?: number; maxOutputTokens?: number },
 ): Promise<GeminiReplyResult> {
-  return geminiGenerate([{ text: prompt }]);
+  return geminiGenerate([{ text: prompt }], options);
 }
 
 /** 画像＋プロンプト → JSON オブジェクト（markdown fence 除去） */
