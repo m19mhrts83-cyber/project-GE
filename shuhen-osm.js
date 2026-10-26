@@ -414,6 +414,7 @@ async function buildSheet() {
         $('sheetHost').hidden = false;
         $('btnPrint').disabled = false;
         $('btnHtml').disabled = false;
+        $('finishPanel').hidden = false;
         $('sheetHost').scrollIntoView({ behavior: 'smooth' });
         setStatus('叩き台ができました。下に表示しています。');
     } catch (e) {
@@ -427,8 +428,8 @@ function saveHtml() {
     const own = [...document.styleSheets].find(s => s.ownerNode && s.ownerNode.tagName === 'STYLE');
     const css = [...own.cssRules].map(r => r.cssText).filter(t => /^(:root|\.sheet|\*|body|@media print|@page)/.test(t)).join('\n');
     const doc = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${esc(property.name)} 周辺MAP 叩き台</title>
-<!-- AI仕上げ用: 地図画像・施設名・徒歩分・出典は変えず、見た目（配色・フォント・余白・吹き出しの形）だけを整えてください。 -->
-<style>${css}</style></head><body>${sheetHtml(sheetDataUrl)}</body></html>`;
+<!-- AI仕上げ用: 地図画像・施設名・徒歩分・出典は変えず、見た目（配色・フォント・余白・吹き出しの形）だけを整えてください。地図画像は src="map.png" のままにしてください（叩き台ページが差し込みます）。 -->
+<style>${css}</style></head><body>${sheetHtml(MAP_PLACEHOLDER)}</body></html>`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([doc], { type: 'text/html' }));
     const d = new Date(), z = n => String(n).padStart(2, '0');
@@ -436,7 +437,43 @@ function saveHtml() {
     a.click();
 }
 
+// ---------- AIの仕上げHTMLを取り込む ----------
+// 地図画像は数MBあり、チャットAIに渡すと返せない（途中で切れる）ので、仕上げ用HTMLでは
+// map.png という仮の名前にしておき、戻ってきたHTMLにここで差し込む。
+const MAP_PLACEHOLDER = 'map.png';
+
+function finishCheck(html) {
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, '');
+    const plain = s => s.replace(/\s+/g, '');
+    const lost = [];
+    for (const r of rows.filter(r => r.lat != null)) {
+        const min = `${r.kind === 'car' ? '車' : '徒歩'}${r.minutesApprox ? '約' : ''}${r.minutes}分`;
+        if (!text.includes(plain(r.name))) lost.push(`${r.no}. ${r.name} の名前`);
+        else if (!text.includes(min)) lost.push(`${r.no}. ${r.name} の「${min}」`);
+    }
+    if (!text.includes('OpenStreetMap')) lost.push('出典表記（© OpenStreetMap contributors）');
+    if (!html.includes(MAP_PLACEHOLDER)) lost.push('地図画像（src="map.png"）');
+    return lost;
+}
+
+function previewFinish() {
+    let html = $('finishIn').value.trim().replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '');
+    const start = html.search(/<!DOCTYPE|<html/i);
+    if (start < 0) { $('finishCheck').textContent = 'HTMLが見つかりません。<!DOCTYPE html> から </html> まで貼ってください。'; return; }
+    html = html.slice(start);
+    const lost = finishCheck(html);
+    $('finishCheck').innerHTML = lost.length
+        ? `<span class="warn">元の叩き台と違うところがあります。チャットに「情報は変えないで」と伝えて出し直してもらってください。\n・${lost.map(esc).join('\n・')}</span>`
+        : '施設名・徒歩分・出典は元の叩き台と同じです。';
+    const frame = $('finishFrame');
+    frame.srcdoc = html.split(`"${MAP_PLACEHOLDER}"`).join(`"${sheetDataUrl}"`).split(`'${MAP_PLACEHOLDER}'`).join(`'${sheetDataUrl}'`);
+    frame.style.display = 'block';
+    $('btnFinishPrint').disabled = false;
+}
+
 $('btnRun').addEventListener('click', run);
+$('btnFinish').addEventListener('click', previewFinish);
+$('btnFinishPrint').addEventListener('click', () => $('finishFrame').contentWindow.print());
 $('btnSample').addEventListener('click', () => {
     $('propName').value = SAMPLE.name;
     $('propAddr').value = SAMPLE.addr;
