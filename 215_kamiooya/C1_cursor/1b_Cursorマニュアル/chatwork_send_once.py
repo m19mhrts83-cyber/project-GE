@@ -21,7 +21,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from yoritoori_send import parse_draft, base_path, contact_path, trigger_editor_save_all  # noqa: E402
 from yoritoori_utils import YORITOORI_FILENAME, make_summary  # noqa: E402
 
-FOLDER_806 = "806_神大家AI推進"
+FOLDER_806 = "P806_神大家AI推進"
 ROOM_ALIASES = {
     "meguro": "422374412",
     "meeting": "422374412",
