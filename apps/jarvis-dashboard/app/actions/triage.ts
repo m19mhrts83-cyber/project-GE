@@ -19,6 +19,7 @@ import {
   skipPendingFromMutedSender,
 } from "@/lib/mailActionSkipMute";
 import { createServiceClient } from "@/lib/supabase/admin";
+import type { AskEngine } from "@/lib/askEngineTypes";
 
 export type TriageActionResult =
   | { ok: true; message?: string }
@@ -416,7 +417,7 @@ export async function askOtherMailDigestGenre(opts: {
   genreLabel: string;
   bullets: string[];
   question: string;
-  engine?: "cursor" | "gemini";
+  engine?: AskEngine;
 }): Promise<TriageActionResult & { answer?: string; via?: string }> {
   const q = (opts.question || "").trim();
   if (!q) return { ok: false, error: "質問が空です" };
@@ -431,9 +432,14 @@ export async function askOtherMailDigestGenre(opts: {
     "",
     `【質問】${q}`,
   ].join("\n");
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
   const r = await resolveAskReply({
-    engine: opts.engine || "cursor",
+    engine: opts.engine || "auto",
     prompt,
+    cacheScope: auth.user
+      ? `${auth.user.id}:other-mail:${opts.genreLabel}`
+      : undefined,
   });
   if (!r.ok) {
     return {

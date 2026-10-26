@@ -100,17 +100,62 @@ def last_time(p: dict[str, Any], *, repo: Path = REPO) -> tuple[datetime | None,
 def evaluate(cfg: dict[str, Any], now: datetime, getter=last_time) -> list[dict[str, Any]]:
     rows = []
     for p in cfg.get("products") or []:
-        t, why = getter(p)
+        if p.get("kind") == "connection_state":
+            try:
+                f = Path(str(p["file"])).expanduser()
+                if not f.is_absolute():
+                    f = REPO / f
+                data = json.loads(f.read_text(encoding="utf-8"))
+                matches = _walk(data, str(p["path"]).split("."))
+                item = matches[0] if matches and isinstance(matches[0], dict) else {}
+                t = _parse_ts(item.get("checked_at"))
+                age_h = (now - t).total_seconds() / 3600 if t else None
+                observed = str(item.get("status") or "unknown")
+                account = str(item.get("account") or "")
+                expected = str(p.get("expected_account") or "")
+                if not t or age_h is None or age_h > float(p["max_age_h"]):
+                    status, why = "unknown", "接続確認が期限切れまたは時刻なし"
+                elif observed == "disconnected":
+                    status, why = "stale", "未接続"
+                elif expected and account != expected:
+                    status, why = "stale", "接続アカウントが期待値と不一致"
+                elif observed == "ok":
+                    status, why = "ok", "接続確認済み"
+                else:
+                    status, why = "unknown", "接続状態を確認できない"
+            except (OSError, ValueError, KeyError) as exc:
+                t, age_h = None, None
+                status, why = "unknown", f"接続記録の読取不能: {type(exc).__name__}"
+            rows.append({**p, "last": t.isoformat() if t else None, "age_h": age_h, "stale": status != "ok", "status": status, "why": why})
+            continue
+        if p.get("kind") == "mirror_content":
+            def resolve(name):
+                path = Path(str(p[name])).expanduser()
+                return path if path.is_absolute() else REPO / path
+            try:
+                source, mirror = resolve("source"), resolve("mirror")
+                same = source.read_bytes() == mirror.read_bytes()
+                status, why = ("ok", "内容一致") if same else ("stale", "正本と写しの内容が不一致")
+            except OSError as exc:
+                status, why = "unknown", f"読取不能: {type(exc).__name__}"
+            rows.append({**p, "last": None, "age_h": None, "stale": status != "ok", "status": status, "why": why})
+            continue
+        try:
+            t, why = getter(p)
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            # 一つの取得失敗で他の監視を止めない。例外本文には秘密が混ざりうる。
+            t, why = None, f"確認不能: {type(exc).__name__}"
         age_h = (now - t).total_seconds() / 3600 if t else None
         stale = age_h is None or age_h > float(p["max_age_h"])
-        rows.append({**p, "last": t.isoformat() if t else None, "age_h": age_h, "stale": stale, "why": why})
+        status = "unknown" if age_h is None else ("stale" if stale else "ok")
+        rows.append({**p, "last": t.isoformat() if t else None, "age_h": age_h, "stale": stale, "status": status, "why": why})
     return rows
 
 
 def diff_state(rows: list[dict[str, Any]], prev_stale: set[str]) -> tuple[list[dict], list[dict]]:
     now_stale = {r["id"] for r in rows if r["stale"]}
-    newly = [r for r in rows if r["id"] in now_stale - prev_stale]
-    recovered = [r for r in rows if r["id"] in prev_stale - now_stale]
+    newly = [r for r in rows if r.get("notify", True) and r["id"] in now_stale - prev_stale]
+    recovered = [r for r in rows if r.get("notify", True) and r["id"] in prev_stale - now_stale]
     return newly, recovered
 
 
@@ -124,7 +169,12 @@ def _age(r: dict[str, Any]) -> str:
 def build_message(newly: list[dict], recovered: list[dict]) -> str:
     lines = ["【ops】315 連携健全性・鮮度監視"]
     for r in newly:
-        lines.append(f"🔴 {r['label']}: 最終成功 {_age(r)}（上限 {r['max_age_h']}h）")
+        if r.get("status") == "unknown":
+            lines.append(f"🟡 {r['label']}: 未確認（{_age(r)}）")
+        elif r.get("kind") == "mirror_content":
+            lines.append(f"🔴 {r['label']}: {r['why']}")
+        else:
+            lines.append(f"🔴 {r['label']}: 最終成功 {_age(r)}（上限 {r['max_age_h']}h）")
         lines.append(f"　担当 {r['owner']}／まず: {r['action']}")
     for r in recovered:
         lines.append(f"🟢 回復 {r['label']}: 最終成功 {_age(r)}")
@@ -152,8 +202,9 @@ def main() -> int:
     newly, recovered = diff_state(rows, set(prev.get("stale") or []))
 
     for r in rows:
-        mark = "STALE" if r["stale"] else "ok"
-        print(f"{mark:5} {r['id']:22} {_age(r):>10}  上限{r['max_age_h']}h")
+        mark = r["status"].upper()
+        limit = f"上限{r['max_age_h']}h" if "max_age_h" in r else "内容比較"
+        print(f"{mark:5} {r['id']:22} {_age(r):>10}  {limit}")
     if args.dry_run:
         if newly or recovered:
             print("--- 投稿予定 ---\n" + build_message(newly, recovered))
@@ -177,7 +228,7 @@ def main() -> int:
                     "checked_at": datetime.now(JST).isoformat(timespec="seconds"),
                     "stale": sorted(r["id"] for r in rows if r["stale"]),
                     "rows": [
-                        {k: r[k] for k in ("id", "label", "last", "age_h", "stale", "max_age_h")}
+                        {k: r.get(k) for k in ("id", "label", "last", "age_h", "stale", "max_age_h", "status", "why", "kind")}
                         for r in rows
                     ],
                 },

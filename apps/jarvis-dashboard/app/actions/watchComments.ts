@@ -51,7 +51,7 @@ export async function askJarvisOnWatch(
   watchId: string,
   body: string,
   path = "/situation",
-  engine: AskEngine = "cursor",
+  engine: AskEngine = "auto",
   opts?: {
     useKamiooyaKnowledge?: boolean;
     useOnedriveYoritoori?: boolean;
@@ -172,7 +172,8 @@ export async function askJarvisOnWatch(
     .filter(Boolean)
     .join("\n\n");
 
-  const resolved = await resolveAskReply({ engine, prompt });
+  const { data: auth } = await supabase.auth.getUser();
+  const resolved = await resolveAskReply({ engine, prompt, cacheScope: auth.user ? `${auth.user.id}:watch:${watchId}` : undefined });
   if (!resolved.ok) {
     revalidatePath(path);
     revalidatePath("/");

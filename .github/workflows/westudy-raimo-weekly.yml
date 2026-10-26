@@ -164,6 +164,27 @@ jobs:
             "${cmd[@]}"
           )
 
+      # 取込のあと、embedding が null の comments／公開済み openchat に emb を付ける。
+      # 失敗しても state のコミットは続ける（emb は次回の週次で取り返せる）。
+      - name: Embed new rows (comments + openchat)
+        continue-on-error: true
+        shell: bash
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_SERVICE_ROLE_KEY:-}" || -z "${GEMINI_API_KEY:-}" ]]; then
+            echo "::warning::SUPABASE or GEMINI secrets missing; skip embedding"
+            exit 0
+          fi
+          log="${RUNNER_TEMP}/embed.log"
+          python "$CHATBOT_DIR/scripts/embed_to_supabase.py" \
+            --table comments --table line_openchat_logs 2>&1 | tee "$log"
+          {
+            echo "### Embedding"
+            grep -E "^(embedding total|emb未付与):" "$log" | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # 失敗時もサマリーを残す（ログ Artifact と合わせて原因切り分け用）
       - name: Collect latest run info
         id: latest

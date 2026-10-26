@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-10-15",
+  "updated": "2026-10-25",
   "pages_base": "https://m19mhrts83-cyber.github.io/project-GE/docs",
   "lanes": [
     {
@@ -24,7 +24,7 @@
     {
       "id": "iketomo",
       "title": "いけともWS",
-      "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/いけとも_WS資料索引.md",
+      "hub_url": "https://m19mhrts83-cyber.github.io/project-GE/docs/iketomo-ws.html",
       "note": "受講済みワークショップ一覧。容量正本は admin Drive 240_いけとも"
     }
   ],
@@ -172,7 +172,7 @@
       "id": "iketomo-hub",
       "lane": "iketomo",
       "title": "いけともWS資料索引（一覧）",
-      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/いけとも_WS資料索引.md",
+      "url": "https://m19mhrts83-cyber.github.io/project-GE/docs/iketomo-ws.html",
       "note": "受講済み回＋Drive／Notion／動画リンクのハブ"
     },
     {

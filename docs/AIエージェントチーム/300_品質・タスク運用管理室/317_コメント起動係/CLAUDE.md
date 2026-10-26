@@ -74,7 +74,9 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 ## 5. 成果物の置き場
 
 - 依頼: [`TASK.md`](./TASK.md)
+- **Slack FB の毎日の対応記録**: `output/YYYYMMDD_FB対応.md`（Claude 定期タスク `slack-fb-daily` が PR で追加。Drive へ同期。他エージェントはここで経過を見る）
 - state: `~/git-repos/.jarvis_state/comment_dispatch.json`
+- Slack FB state: `~/git-repos/.jarvis_state/slack_report_fb.json`（`done_at` が付けば対応済み）
 - heartbeat: Supabase `sync_meta` キー `comment_dispatch_heartbeat_at`
 - Slack dedupe: `sync_meta.comment_dispatch_slack_fp`
 - 外部正本: Todoist コメント／Slack スレ
@@ -84,7 +86,8 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 1. `jarvis_comment_dispatch.py --apply`（Mac）または failover
 2. L1 で Ack／分類。確認のみは 313 候補化可（二段維持）
 3. Phase B・許可リスト命中時のみ L2
-4. Slack は **内容が変わったときだけ** 完了1通。Todoist には `【Jarvis】` コメント
+4. Slack は **内容が変わったときだけ** 完了1通。Todoist には `【AIチーム】` コメント
+5. Slack FB スレの「受けた → 対応した」は毎晩 19:45 起動の `slack-fb-daily`（20:10 ごろまでに返信）（Miss Lemon）。手順は [`40_`](../../40_Slack報告FB_スレ拾い_20261020.md) Phase 2
 
 
 ## 7. 改善ログ
@@ -94,6 +97,7 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 | 2026-10-22 | 新設。Mac本線＋GHA L1冗長＋Cloud L2フォールバック設計 |
 | 2026-10-22 | 対応可視性（L1 見たよ／👀・L2 対応したよ）を 40_ と揃える |
 | 2026-10-23 | #report 同一 fingerprint 連投防止。webhook 返信1件失敗でバッチ中断しない。滞留 `note:added` 消化＋cleanup CLI |
+| 2026-10-25 | 名乗りを `【AIチーム】` に。FB の「ラベルを付けて再送」依頼と投稿末尾の FB 案内をやめる。毎日の FB 対応（`slack-fb-daily`・`--pending`／`--done`）を追加。記録は `output/YYYYMMDD_FB対応.md` |
 
 ## 4. #report の形（2026-10-25 iPhone 見直し）
 

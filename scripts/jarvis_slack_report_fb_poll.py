@@ -5,9 +5,13 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_slack_report_fb_poll.py --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_slack_report_fb_poll.py --apply
   ~/selenium_env/venv/bin/python scripts/jarvis_slack_report_fb_poll.py --apply --mark-only
+  # 受けた → 対応した（毎日の FB 対応・Miss Lemon 定期タスク）
+  ~/selenium_env/venv/bin/python scripts/jarvis_slack_report_fb_poll.py --pending
+  ~/selenium_env/venv/bin/python scripts/jarvis_slack_report_fb_poll.py --done consult:1792616568.546519 \
+      --summary "211 のクローズ済み案件を送らないようにした（PR #NNN）"
 
 入口: #report / #consult の親投稿スレ
-確認: Ack のみ自動。見栄え改訂・追加調査の実装は Cursor／次回報告
+確認: Ack は自動。処置は毎日の FB 対応（Claude 定期タスク slack-fb-daily）が直して --done
 履歴: .jarvis_state/slack_report_fb.json
 停止: JARVIS_SLACK_FB_THREAD_DISABLE=1
 
@@ -30,8 +34,10 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jarvis_slack_report_fb_lib import (  # noqa: E402
+    REACTION_DONE,
     REACTION_SEEN,
     build_ack_text,
+    build_done_text,
     classify_fb_reply,
     has_handled_reaction,
     is_ack_or_bot_reply,
@@ -153,7 +159,7 @@ def post_thread_ack(
         "channel": channel_id,
         "thread_ts": thread_ts,
         "text": text,
-        "username": "Jarvis 報告FB",
+        "username": "AIチーム 報告FB",
     }
     if dry_run:
         print("# dry-run chat.postMessage (thread ack)")
@@ -195,6 +201,139 @@ def processed_key(channel_key: str, reply_ts: str) -> str:
     return f"{channel_key}:{reply_ts}"
 
 
+def is_pending(entry: dict[str, Any]) -> bool:
+    """受けた（Ack 済み／mark のみ）で、まだ「対応した」になっていない人のコメント。"""
+    if not isinstance(entry, dict):
+        return False
+    if str(entry.get("kind") or "").startswith("skip_"):
+        return False
+    if entry.get("done_at"):
+        return False
+    return bool(entry.get("ack_ts") or entry.get("mark_only"))
+
+
+def pending_entries(processed: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    rows = [(k, v) for k, v in processed.items() if is_pending(v)]
+    return sorted(rows, key=lambda kv: str(kv[1].get("at") or ""))
+
+
+def prune_processed(processed: dict[str, Any], keep: int = 500) -> dict[str, Any]:
+    """肥大防止。未対応（pending）は件数に関係なく残す。"""
+    if len(processed) <= keep:
+        return processed
+    pend = {k: v for k, v in processed.items() if is_pending(v)}
+    rest = sorted(
+        ((k, v) for k, v in processed.items() if k not in pend),
+        key=lambda kv: str((kv[1] or {}).get("at") or ""),
+    )
+    room = max(keep - len(pend), 0)
+    out = dict(rest[-room:]) if room else {}
+    out.update(pend)
+    return out
+
+
+def _channel_id(cfg: dict[str, Any], name: str) -> str:
+    return str(((cfg.get("channels") or {}).get(name) or {}).get("id") or "").strip()
+
+
+def _clip(text: str, n: int) -> str:
+    t = (text or "").strip()
+    return t if len(t) <= n else t[: n - 1] + "…"
+
+
+def cmd_pending(st: dict[str, Any], cfg: dict[str, Any], token: str) -> int:
+    """未対応 FB を JSON で出す。token があればスレ本文（親＋人の返信）も添える。"""
+    out: list[dict[str, Any]] = []
+    for key, v in pending_entries(dict(st.get("processed") or {})):
+        ch = str(v.get("channel") or key.split(":", 1)[0])
+        cid = _channel_id(cfg, ch)
+        thread_ts = str(v.get("thread_ts") or "")
+        reply_ts = str(v.get("reply_ts") or key.split(":", 1)[-1])
+        row: dict[str, Any] = {
+            "key": key,
+            "channel": ch,
+            "channel_id": cid,
+            "thread_ts": thread_ts,
+            "reply_ts": reply_ts,
+            "kind": v.get("kind"),
+            "acked_at": v.get("at"),
+        }
+        if token and cid and thread_ts:
+            try:
+                data = _api(
+                    "conversations.replies",
+                    token,
+                    {"channel": cid, "ts": thread_ts, "limit": "50"},
+                )
+                msgs = list(data.get("messages") or [])
+                if msgs:
+                    row["parent"] = _clip(str(msgs[0].get("text") or ""), 600)
+                row["comment"] = next(
+                    (str(m.get("text") or "") for m in msgs if str(m.get("ts")) == reply_ts),
+                    "",
+                )
+                # 元コメント以降のやり取り（追加の質問、他 AI がすでに直した報告など）
+                row["followups"] = [
+                    {
+                        "own": is_ack_or_bot_reply(m),
+                        "text": _clip(str(m.get("text") or ""), 400),
+                    }
+                    for m in msgs[1:]
+                    if float(m.get("ts") or 0) > float(reply_ts or 0)
+                ]
+            except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as e:
+                row["error"] = str(e)
+        out.append(row)
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    print(f"# pending={len(out)}", file=sys.stderr)
+    return 0
+
+
+def cmd_done(
+    st: dict[str, Any],
+    cfg: dict[str, Any],
+    token: str,
+    *,
+    key: str,
+    summary: str,
+    dry_run: bool,
+) -> int:
+    """スレに「対応したよ」＋元コメントに ✅、state に done を記録。"""
+    processed = dict(st.get("processed") or {})
+    v = processed.get(key)
+    if not isinstance(v, dict):
+        print(f"❌ state に {key} がありません（--pending の key を使う）", file=sys.stderr)
+        return 2
+    if v.get("done_at"):
+        print(f"# already done: {key}")
+        return 0
+    if not summary.strip():
+        print("❌ --summary が空です（何をしたか1〜5行）", file=sys.stderr)
+        return 2
+    ch = str(v.get("channel") or key.split(":", 1)[0])
+    cid = _channel_id(cfg, ch)
+    thread_ts = str(v.get("thread_ts") or "")
+    reply_ts = str(v.get("reply_ts") or key.split(":", 1)[-1])
+    if not cid or not thread_ts:
+        print(f"❌ channel_id/thread_ts 不明: {key}", file=sys.stderr)
+        return 2
+    text = build_done_text(summary=summary)
+    try:
+        dts = post_thread_ack(cid, thread_ts, text, token=token, dry_run=dry_run)
+    except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as e:
+        print(f"❌ 対応した投稿 失敗 {key}: {e}", file=sys.stderr)
+        return 1
+    add_reaction(cid, reply_ts, REACTION_DONE, token=token, dry_run=dry_run)
+    if dry_run:
+        return 0
+    v.update({"done_at": now_iso(), "done_ts": dts, "done_summary": _clip(summary, 300)})
+    processed[key] = v
+    st["processed"] = processed
+    save_state(st)
+    print(f"✅ done {key}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true", help="Ack を投稿せず分類結果だけ出す")
@@ -216,7 +355,27 @@ def main() -> int:
         default="report,consult",
         help="カンマ区切り（既定 report,consult）",
     )
+    ap.add_argument(
+        "--pending",
+        action="store_true",
+        help="受けたが未対応の FB を JSON で出す（スレ本文つき）",
+    )
+    ap.add_argument("--done", metavar="KEY", help="対応済みにする（--pending の key）")
+    ap.add_argument("--summary", default="", help="--done で返す「何をしたか」")
     args = ap.parse_args()
+
+    if args.pending or args.done:
+        st = load_state()
+        cfg = load_config()
+        token = slack_token()
+        if args.pending:
+            return cmd_pending(st, cfg, token)
+        if not token and not args.dry_run:
+            print("❌ SLACK_BOT_TOKEN がありません", file=sys.stderr)
+            return 3
+        return cmd_done(
+            st, cfg, token, key=args.done, summary=args.summary, dry_run=args.dry_run
+        )
 
     if not poll_enabled():
         print("disabled via JARVIS_SLACK_FB_THREAD_DISABLE")
@@ -370,10 +529,8 @@ def main() -> int:
                         dry_run=True,
                     )
 
-    # processed 肥大防止（直近500）
-    if len(processed) > 500:
-        items = sorted(processed.items(), key=lambda kv: str((kv[1] or {}).get("at") or ""))
-        processed = dict(items[-500:])
+    # processed 肥大防止（直近500。未対応は残す）
+    processed = prune_processed(processed)
 
     st["processed"] = processed
     st["last_run_at"] = now_iso()
@@ -389,7 +546,7 @@ def main() -> int:
         f"mode={'apply' if args.apply and not args.dry_run else ('mark' if args.mark_only else 'dry-run')}"
     )
     if found:
-        print("次: 見栄え／内容は Cursor で改訂・調査。方針は Todoist/#consult。312は後回し可。")
+        print("次: 毎日の FB 対応（slack-fb-daily）が直して --done で「対応したよ」を返す。")
     return 0
 
 

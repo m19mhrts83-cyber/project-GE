@@ -6,6 +6,7 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_drive_sync.py
 
 正本は git（docs/AIエージェントチーム/・.cursor/rules/・config/）。Drive は閲覧用の写し。
+- ハブ直下の入口4文書はDrive直下、番号付き設計MDは `90_ハブ文書/`
 - 社員フォルダ: 直下の文書（CLAUDE／AGENTS／README／TASK／PROGRESS／flow など）と
   docs/・output/・tests/・config/ の文書。input/・logs/・scripts/ は写さない
 - ルール: Drive 直下 91_ルール/（家ルール例・Cursor ルール・チーム設定・運用コマンド一覧）
@@ -14,7 +15,7 @@
 - 同期衝突の「名前 2.md」等を見つけたら #ops に知らせる（消さない）
 
 repo は書き換えないので launchd の日次実行に使える（install_agent_team_drive_sync_launchd.sh）。
-状態マーカー・ボード・ハブ番号付き MD は jarvis_agent_team_status_sync.py 側が写す。
+状態マーカー・ボードは jarvis_agent_team_status_sync.py 側が写す。
 """
 from __future__ import annotations
 
@@ -42,6 +43,7 @@ LOG = "📎 agent_team drive sync"
 
 DOC_EXT = {".md", ".html", ".csv", ".txt", ".pdf", ".png", ".jpg", ".jpeg", ".svg", ".mmd", ".yaml", ".yml"}
 AGENT_SUBDIRS = ("docs", "output", "tests", "config")
+HUB_ROOT_KEEP = {"00_このフォルダ.md", "00_チーム索引.md", "CLAUDE.md", "AGENTS.md"}
 SECRET_NAME_RE = re.compile(r"(^\.env|env\.|secret|token|credential|password)", re.I)
 MAX_BYTES = 20 * 1024 * 1024
 
@@ -142,6 +144,16 @@ def main() -> int:
             continue
         for src in agent_files(folder):
             copy_if_changed(src, DRIVE_HUB / src.relative_to(HUB), dry=args.dry_run, stats=stats)
+
+    # 状態同期を実行しない日でも、ハブの設計・運用文書の写しを更新する。
+    # 旧配置の削除は行わない（整理は status_sync 側の明示作業に任せる）。
+    for src in sorted(HUB.glob("*.md")):
+        dst = (
+            DRIVE_HUB / src.name
+            if src.name in HUB_ROOT_KEEP
+            else DRIVE_HUB / "90_ハブ文書" / src.name
+        )
+        copy_if_changed(src, dst, dry=args.dry_run, stats=stats)
 
     for src_rel, dst_rel in RULE_FILES.items():
         src = REPO / src_rel

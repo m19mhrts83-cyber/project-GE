@@ -110,7 +110,7 @@ gh workflow run jarvis-reply-draft-211.yml -f dry_run=true
 
 1. Graph で 101〜104 の `5.やり取り.md` を materialize
 2. `night_triage --lane partner`（heuristic・LLM off）→ 空下書きは 211 テンプレで補完
-3. 社ごと最新1件。21日超スキップ。見積B無し → `#consult`
+3. 社ごと最新1件。21日超スキップ。クローズ済み案件（`config/reply_draft_211_closed.json` の folder＋through 日以前）は起案も相談も出さない。見積B無し → `#consult`
 4. 起案あり → Graph PUT で正本 → Slack `#report`
 5. 送信は人が別フロー（LINEは貼付＋`record-only`）
 
@@ -121,6 +121,7 @@ Phase1 人向け: `docs/phase1-pilot.md`
 
 | 日付 | 変更 |
 |---|---|
+| 2026-10-25 | クローズ案件の除外設定（P103_Tcell 10/23 まで）・LINE 要約の `<details>` をテンプレ引用から除去（Slack FB） |
 | 2026-10-23 | 見積B待ち Slack の同一 folder／空件名の二重掲載を dedupe |
 | 2026-10-09 | ビルダー候補フォルダ作成 |
 | 2026-10-11 | 朝便伴走開始。既存 Jarvis スタック採用・Phase1=手動1社に決定 |
