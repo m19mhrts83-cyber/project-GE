@@ -1,5 +1,5 @@
 version: 1
-updated: '2026-10-25'
+updated: '2026-10-26'
 pages_base: https://m19mhrts83-cyber.github.io/project-GE/docs
 lanes:
 - id: self
@@ -40,13 +40,6 @@ items:
   url: https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/周辺MAP自動化ガイド.pdf
   note: 周辺MAP自動作成の理解用ガイド（PDF）
   onedrive_rel: N1_NotebookLM/jarvis-self/assets/周辺MAP自動化ガイド.pdf
-- id: member-list-proposal
-  lane: self
-  title: 会員名簿データ活用の提案
-  filename: 会員名簿データ活用の提案.png
-  url: https://m19mhrts83-cyber.github.io/project-GE/docs/jarvis-self/assets/会員名簿データ活用の提案.png
-  note: 提案サマリー（PNG）
-  onedrive_rel: N1_NotebookLM/jarvis-self/assets/会員名簿データ活用の提案.png
 - id: fudosan-automation
   lane: self
   title: 不動産業務自動化 説明資料
@@ -101,7 +94,30 @@ items:
   lane: kamiooya
   title: 神大家 AI推進相談 資料一覧
   url: https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai.html
-  note: 運営向け・回ごとの PDF/PNG
+  note: 入口（提案ストック／第1回／第2回／第3回）
+- id: kamiooya-r3
+  lane: kamiooya
+  title: 第3回（2026-10-28）資料一覧
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/kamiooya-ai-03.html
+  note: 当日資料・別添（周辺マップ）・会員名簿データ活用
+- id: kamiooya-r3-deck
+  lane: kamiooya
+  title: 第3回 当日資料（本編）
+  filename: 01-meeting-deck.pdf
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/assets/kamiooya-ai/2026-10/01-meeting-deck.pdf
+  note: 29枚。チャットボット・字幕・採点クローズ・周辺マップ・進め方
+- id: kamiooya-r3-shuhen
+  lane: kamiooya
+  title: 第3回 別添：周辺マップの作り方を見直す提案
+  filename: 02-shuhen-map-proposal.pdf
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/assets/kamiooya-ai/2026-10/02-shuhen-map-proposal.pdf
+  note: 地図の利用条件・2,800人規模・本多さん型・入力フォーマット・仕上げ2案・チャットツール所感
+- id: member-list-proposal
+  lane: kamiooya
+  title: 会員名簿データ活用の提案
+  filename: 03-member-list-proposal.png
+  url: https://m19mhrts83-cyber.github.io/project-GE/docs/assets/kamiooya-ai/2026-10/03-member-list-proposal.png
+  note: 第3回（2026-10-28）資料。名簿提供で登録承認を自動化／都道府県で地域分析（PNG）
 - id: kamiooya-school-ai-stock
   lane: kamiooya
   title: スクールAI活用・提案ストック
