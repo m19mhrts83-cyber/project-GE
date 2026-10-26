@@ -177,6 +177,77 @@ def _gate_open_b() -> tuple[int, int]:
     return open_b, deferred
 
 
+SLACK_WORKSPACE_URL = "https://aiwsnetwork.slack.com"
+_CONSULT_LOOKBACK_HOURS = 72
+_CONSULT_SHOW = 5
+_CONSULT_HEAD_RE = re.compile(r"^[*_]*【相談】\s*")
+_DONE_HEAD_RE = re.compile(r"^[*_]*【完了】\s*")
+# 見出しキー＝先頭の社員番号（211／315／S9 など）。同じ係の相談は最新1件だけ出す
+_KEY_RE = re.compile(r"^([0-9A-Za-z]{2,4})(?=\s|$|[｜|])")
+
+
+def _consult_key(title: str) -> str:
+    m = _KEY_RE.match(title.strip())
+    return m.group(1) if m else title.strip()[:20]
+
+
+def consult_open_links() -> list[dict]:
+    """第2段階: #consult の要判断で、まだ返信も ✅ も無いものをリンクで集める。
+
+    同じ見出しの相談が毎日出ていても最新1件だけにする。
+    トークンが無い・API 失敗時は空（日次は従来どおり出す）。
+    """
+    if (os.environ.get("JARVIS_DIGEST_CONSULT_LINKS_DISABLE") or "").strip() in ("1", "true", "yes"):
+        return []
+    try:
+        sys.path.insert(0, str(SCRIPTS))
+        import jarvis_slack_report_fb_poll as fb  # noqa: E402
+
+        token = fb.slack_token()
+        cid = fb._channel_id(fb.load_config(), "consult")
+        if not token or not cid:
+            return []
+        oldest = datetime.now(JST).timestamp() - _CONSULT_LOOKBACK_HOURS * 3600
+        msgs = fb.history(cid, token=token, limit=100, oldest=oldest)
+    except Exception as e:  # noqa: BLE001
+        print(f"# consult links skip: {e}", file=sys.stderr)
+        return []
+
+    def _first(m: dict) -> str:
+        t = str(m.get("text") or "").strip()
+        return t.splitlines()[0] if t else ""
+
+    seen: set[str] = set()
+    out: list[dict] = []
+    for m in msgs:  # 新しい順
+        first = _first(m)
+        if _DONE_HEAD_RE.match(first):
+            # これより古い同じ係の相談は閉じたもの（ボタン判断の【完了】など）
+            seen.add(_consult_key(_DONE_HEAD_RE.sub("", first).strip("* ")))
+            continue
+        if not _CONSULT_HEAD_RE.match(first):
+            continue
+        title = _CONSULT_HEAD_RE.sub("", first).strip("* ")
+        key = _consult_key(title)
+        if key in seen:
+            continue
+        seen.add(key)
+        done = any(
+            isinstance(r, dict) and r.get("name") == "white_check_mark"
+            for r in (m.get("reactions") or [])
+        )
+        if done or int(m.get("reply_count") or 0) > 0:
+            continue
+        ts = str(m.get("ts") or "")
+        out.append(
+            {
+                "title": re.split(r"\s*[｜|—]\s*|\s+:", title)[0],
+                "url": f"{SLACK_WORKSPACE_URL}/archives/{cid}/p{ts.replace('.', '')}",
+            }
+        )
+    return out
+
+
 def build_digest() -> tuple[str, dict]:
     """iPhone向け短文。件数の出所（Todoist PJ／列）を明示→優先最大5件。"""
     counts, owner_titles = _todoist_section_counts()
@@ -215,6 +286,14 @@ def build_digest() -> tuple[str, dict]:
         if open_b:
             lines.append(f"＋物件B {open_b}件はカードで判断(#consult)")
 
+    consult = consult_open_links()
+    if consult:
+        lines += ["", f"要判断（#consult・未返信 {len(consult)}件）"]
+        for i, c in enumerate(consult[:_CONSULT_SHOW], 1):
+            lines.append(f"{i}. <{c['url']}|{shorten_title(c['title'])}>")
+        if len(consult) > _CONSULT_SHOW:
+            lines.append(f"（他{len(consult) - _CONSULT_SHOW}件→#consult）")
+
     lines += [
         "",
         "障害→#ops（本通は件数のみ）",
@@ -231,7 +310,8 @@ def build_digest() -> tuple[str, dict]:
         "hold": hold_n,
         "consult_priority": consult_n,
         "priority_shown": min(_PRIORITY_SHOW, len(owner_titles)),
-        "layout": "iphone_v2",
+        "consult_open": len(consult),
+        "layout": "iphone_v3",
     }
     return "\n".join(lines), meta
 

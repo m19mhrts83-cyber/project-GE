@@ -650,6 +650,69 @@ def push_sync_meta(key: str, summary: dict[str, Any], *, dry_run: bool) -> None:
         print(f"# sync_meta upsert failed: {e}", file=sys.stderr)
 
 
+OPS_ALERT_META_KEY = "vendor_outreach_ops_alert"
+OPS_ALERT_COOLDOWN_HOURS = 20
+
+
+def _sb_client():
+    url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
+    skey = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    if not url or not skey:
+        return None
+    try:
+        from supabase import create_client
+
+        return create_client(url, skey)
+    except Exception as e:
+        print(f"# supabase client failed: {e}", file=sys.stderr)
+        return None
+
+
+def fetch_shared_ops_alerts() -> dict[str, str]:
+    """Mac と GHA で共有する ops 通知時刻（lane → ISO）。
+
+    GHA は毎回まっさらな state で動くため、ローカル state だけでは
+    同じ日に Mac と GHA が同じ #ops を2回出していた（2026-10-26 S9）。
+    """
+    sb = _sb_client()
+    if sb is None:
+        return {}
+    try:
+        res = (
+            sb.table("sync_meta")
+            .select("value")
+            .eq("key", OPS_ALERT_META_KEY)
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(res, "data", None) or []
+        if not rows:
+            return {}
+        val = rows[0].get("value")
+        data = json.loads(val) if isinstance(val, str) else (val or {})
+        return {str(k): str(v) for k, v in data.items() if v} if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f"# shared ops alert fetch failed: {e}", file=sys.stderr)
+        return {}
+
+
+def remember_shared_ops_alert(lane: str, at_iso: str, *, dry_run: bool) -> None:
+    if dry_run:
+        return
+    cur = fetch_shared_ops_alerts()
+    cur[lane] = at_iso
+    push_sync_meta(OPS_ALERT_META_KEY, cur, dry_run=False)
+
+
+def shared_ops_alert_recent(lane: str, shared: dict[str, str]) -> bool:
+    last = parse_iso(shared.get(lane))
+    return bool(
+        last
+        and (datetime.now(timezone.utc) - last)
+        < timedelta(hours=OPS_ALERT_COOLDOWN_HOURS)
+    )
+
+
 def stale_marks_reason(
     q: dict[str, Any], *, threshold_days: int | None = None
 ) -> str:
@@ -697,7 +760,9 @@ def should_ops_alert(
         reasons.append(stale)
 
     last_ops = parse_iso(lst.get("last_ops_alert_at"))
-    if last_ops and (datetime.now(timezone.utc) - last_ops) < timedelta(hours=20):
+    if last_ops and (datetime.now(timezone.utc) - last_ops) < timedelta(
+        hours=OPS_ALERT_COOLDOWN_HOURS
+    ):
         # Slack 連投は抑止するが、呼び出し側の stall_status 判定では stale を別途見る
         return False, ""
     if not reasons:
@@ -1129,44 +1194,45 @@ def build_multi_report(results: list[dict[str, Any]], *, state: dict[str, Any] |
     return build_support_weekly_report(results, state=state)
 
 
+def _short_date(d: Any) -> str:
+    t = str(d or "")
+    try:
+        x = date.fromisoformat(t[:10])
+        return f"{x.month}/{x.day}"
+    except ValueError:
+        return t or "—"
+
+
 def build_ops_alert(r: dict[str, Any]) -> str:
+    """#ops 要確認（iPhone: 先頭1行で係とレーン、本文4〜5行）。"""
     lane = r.get("lane") or "?"
     q = r.get("q") or {}
     stall = str(r.get("stall_status") or "")
     refill = r.get("refill") or {}
     if stall == "needs_refill" or q.get("needs_refill"):
-        remedy = f"`--apply --lane {lane} --force-refill`（キュー補給）"
+        what = "送信できる候補が足りません"
+        remedy = f"Macで `--apply --lane {lane} --force-refill`"
     elif stall == "stale_marks":
-        mode = refill.get("mode") or ""
-        if mode == "send_resume" and refill.get("ok") and not refill.get("skipped"):
-            remedy = (
-                f"本日送信再開キック済（outbox `{lane}_send_resume`）。"
-                "Grok が本日分を送信＋`--mark` すること"
-            )
+        what = f"送信が止まっています（最終 {_short_date(q.get('last_contacted'))}）"
+        if refill.get("mode") == "send_resume" and refill.get("ok") and not refill.get("skipped"):
+            remedy = "再開キック済。Grokが本日分を送信＋`--mark`"
         else:
-            remedy = (
-                f"キューは足りている。Grok が本日 `--next` 送信＋`--mark`。"
-                f"Mac: `--apply --lane {lane}`（send_resume 自動）"
-            )
+            remedy = "Grokが本日分を送信＋`--mark`"
     elif stall == "bridge_down":
-        remedy = "Mac／Drive ブリッジ復旧後に `--apply --lane all`"
+        what = "Mac／Drive につながっていません"
+        remedy = "復旧後に `--apply --lane all`"
     else:
+        what = str(r.get("ops_reason") or "要確認")
         remedy = f"`--apply --lane {lane}`"
-    role = str(r.get("role") or lane_role(str(lane))).strip()
     label = str(r.get("label") or lane).strip()
-    title = f"{label}（{role}）" if role else label
-    role_line = f"・担当: {role}\n" if role else ""
-    return (
-        f"[516 業者開拓フォロー] *Grokサポート見守り｜要確認*（{title}）\n"
-        "発信: 516 業者開拓フォロー（連携障害／送信停滞の見守り。開拓送信は Grok）。\n"
-        f"{role_line}"
-        f"・理由: {r.get('ops_reason') or '—'}\n"
-        f"・状態: {_stall_status_ja(stall)}\n"
-        f"・キュー残: {q.get('pending_discovered')} "
-        f"（送信可能 {q.get('queue_ready')}）\n"
-        f"・最終 contacted: {q.get('last_contacted') or '—'}\n"
-        f"・<{r.get('url')}|UIを開く>\n"
-        f"・処置: {remedy}"
+    return "\n".join(
+        [
+            f"【ops】516 業者開拓フォロー｜{label}",
+            what,
+            f"キュー {q.get('pending_discovered')}（送信可能 {q.get('queue_ready')}）",
+            f"次: {remedy}",
+            f"<{r.get('url')}|UIを開く>",
+        ]
     )
 
 
@@ -1209,6 +1275,7 @@ def run(*, args: argparse.Namespace) -> int:
         else (find_inbox_refill_requests() if "s2" in lanes else [])
     )
     results: list[dict[str, Any]] = []
+    shared_alerts: dict[str, str] | None = None
 
     for i, lane in enumerate(lanes):
         if not LANE_CFG[lane]["list_path"].is_file() and lane != "s2":
@@ -1232,10 +1299,18 @@ def run(*, args: argparse.Namespace) -> int:
         results.append(r)
 
         if r["ops_needed"] and (args.apply or args.dry_run or args.ops_alert):
+            if shared_alerts is None:
+                shared_alerts = fetch_shared_ops_alerts()
+            if shared_ops_alert_recent(lane, shared_alerts):
+                print(f"# {lane} ops alert skipped: 共有クールダウン {OPS_ALERT_COOLDOWN_HOURS}h")
+                r["ops_needed"] = False
+                continue
             ops_text = build_ops_alert(r)
             pr = post_slack(channel="ops", text=ops_text, dry_run=dry)
             if pr.get("ok") and not dry:
                 r["lst"]["last_ops_alert_at"] = now_iso()
+                remember_shared_ops_alert(lane, r["lst"]["last_ops_alert_at"], dry_run=dry)
+                shared_alerts[lane] = r["lst"]["last_ops_alert_at"]
                 if lane == "s2":
                     state["last_ops_alert_at"] = r["lst"]["last_ops_alert_at"]
 
