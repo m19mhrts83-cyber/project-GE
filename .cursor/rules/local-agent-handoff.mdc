@@ -1,0 +1,12 @@
+---
+description: Codexからの引き継ぎを確認し、既存チャットへ作業状況を反映する
+alwaysApply: true
+---
+
+# ローカル受け渡し
+
+- 起動・再開時に `/Users/matsunomasaharu2/git-repos/agent-handoff/to_Jarvis/` のpendingを確認する。
+- 現在の案件に一致するメモだけを読み、Codexの進捗・判断・検証・残作業を既存チャットへ反映して続行する。
+- 実際のworktree・差分・コミットを確認し、受領時accepted、対応後doneと記録する。
+- 詳細の正本は `/Users/matsunomasaharu2/git-repos/docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。
+- ローカル専用。通知・自動起動・権限拡大は含まない。

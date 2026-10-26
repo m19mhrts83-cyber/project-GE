@@ -9,6 +9,8 @@
 
 ## 起点
 
+- **ローカル引き継ぎ（2026-10-26）**: CodexはJARVIS/Claude Code由来の案件を引き継いだら、各ターンの最終報告前に元担当宛てメモを更新する。Claude Code→`to_MissLemon/`、JARVIS→`to_Jarvis/`。共通場所は `/Users/matsunomasaharu2/git-repos/agent-handoff/`。別worktreeでもこの絶対パスを使う。詳細は `/Users/matsunomasaharu2/git-repos/docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。通知・自動起動は含まない。
+
 - 運用の起点は **Jarvis（Cursor）**。ルールの正本更新も Jarvis 経由を優先する。
 - 秘密・トークン・パスワードはチャット／MD／Slack に書かない。正本は `~/git-repos/.env.jarvis_private`（社員は各 `.env` 二層）。
 - **Codex は必要なログイン・連携作業に限り** `.env.jarvis_private` を直接参照し、対象サービスへ入力してよい。値をチャット・ツール出力・ログ・MDへ表示しない。`.env.jarvis_private` や値を Git の add／commit／push、Drive／OneDrive等のクラウド同期へ載せない。利用は依頼範囲内に限定し、送金・OTP・銀行IBは従来どおりJarvis専属。
