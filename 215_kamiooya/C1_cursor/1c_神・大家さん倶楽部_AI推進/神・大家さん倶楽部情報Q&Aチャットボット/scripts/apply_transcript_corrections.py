@@ -26,7 +26,13 @@ CHUNK_COLS = "id,chunk_key,start_sec,end_sec,speaker,content,search_text"
 
 def fetch_targets(client) -> dict[int, list[dict]]:
     """補正したチャンクを動画ごとに返す。バックアップ表の id だけを読み、通信量を抑える。"""
-    ids = [r["chunk_id"] for r in client.table(BACKUP_TABLE).select("chunk_id").execute().data]
+    ids: list[int] = []
+    while True:
+        # PostgREST は1回1,000行までなので、ページを分けて全件読む
+        page = client.table(BACKUP_TABLE).select("chunk_id").order("chunk_id").range(len(ids), len(ids) + 999).execute().data
+        ids += [r["chunk_id"] for r in page]
+        if len(page) < 1000:
+            break
     chunks: list[dict] = []
     for i in range(0, len(ids), 200):
         chunks += client.table("knowledge_chunks").select(CHUNK_COLS + ",source_id").in_("id", ids[i:i+200]).execute().data
