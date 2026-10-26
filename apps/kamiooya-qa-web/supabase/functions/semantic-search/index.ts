@@ -220,6 +220,19 @@ async function embedQuery(query: string): Promise<number[]> {
   return values as number[];
 }
 
+/** 秒 → mm:ss（回答本文で「12:34頃」と書けるようにする） */
+function formatMmSs(value: number | null): string {
+  const total = Math.max(0, Math.floor(Number(value) || 0));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+/** 取込経路の識別ラベル（例: 【Vimeo自動字幕・暫定】）は回答に出さない */
+function displaySourceTitle(title: string): string {
+  return title.replace(/^\s*【[^】]*(?:暫定|自動字幕)[^】]*】\s*/, "").trim();
+}
+
 function buildAnswerContext(
   comments: CommentRow[],
   chunks: ChunkRow[],
@@ -238,12 +251,17 @@ function buildAnswerContext(
     const body = buildSnippet(row.content, ANSWER_SNIPPET_LIMIT);
     if (!body) return;
     const sourceId = row.source_id != null ? Number(row.source_id) : null;
-    const title =
+    const title = displaySourceTitle(
       sourceId != null
         ? asString(sourcesById.get(sourceId)?.title) || asString(row.source_key)
-        : asString(row.source_key);
+        : asString(row.source_key)
+    );
+    const range =
+      row.end_sec != null && row.end_sec > (row.start_sec ?? 0)
+        ? `${formatMmSs(row.start_sec)}〜${formatMmSs(row.end_sec)}`
+        : formatMmSs(row.start_sec);
     parts.push(
-      `[セミナー${index + 1}] chunk=${asString(row.chunk_key)} title=${title || "（無題）"} start=${asString(row.start_sec)} similarity=${Number(row.similarity || 0).toFixed(3)}\n${body}`
+      `[セミナー${index + 1}] chunk=${asString(row.chunk_key)} title=${title || "（無題）"} time=${range} similarity=${Number(row.similarity || 0).toFixed(3)}\n${body}`
     );
   });
   openchats.forEach((row, index) => {
@@ -268,7 +286,9 @@ function buildAnswerPrompt(query: string, answerContext: string): string {
     "3. 参考内に新しい具体事例・金額・期間・実務Tipsがあれば優先して含めること（古い一般論だけで終わらせない）。",
     "4. 足りない点だけ『参照内では触れられていない』と補足してよい。",
     "5. 参考情報テキストが本当に空のときだけ、確証が取れない旨を書いてよい。",
-    "6. 回答本文に出典一覧やコミュニティ／セミナーの列挙は書かない（画面UIが表示する）。",
+    "6. 回答本文の末尾に出典一覧やコミュニティ／セミナーの列挙は書かない（画面UIが表示する）。",
+    "7. セミナー動画（[セミナーN]）の内容を使った文には、その文末に（動画タイトル 12:34頃）の形で、該当する time の開始時刻を添える。どの動画の何分何秒あたりで何を話しているかが分かるようにすること。",
+    "8. セミナー動画の本文は自動文字起こしのため誤変換や句読点の欠落がある（例: 神王さんクラブ→神・大家さん倶楽部）。文脈から明らかな語は正しい表記に直して要約し、聞き取れない数値や固有名詞は断定しない。",
     "",
     "参考情報テキスト:",
     answerContext,
