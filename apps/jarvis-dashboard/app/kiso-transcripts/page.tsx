@@ -118,8 +118,9 @@ export default function KisoTranscriptsPage() {
     <Shell active="/kiso-transcripts">
       <h1>基礎講座・文字起こし</h1>
       <p className="sub">
-        チャットボットの正本は<strong>今村さん字幕</strong>。Jarvis の
-        Vimeo自動字幕は突き合わせ用。字幕が取れなかった分は下の「今村さん依頼」一覧から渡せます。
+        チャットボットの正本は<strong>今村さん字幕</strong>。正本の受領まで、
+        Vimeo自動字幕を「暫定」と明示して検索・参照に利用します（2026-10-27 松野了承）。
+        字幕が取れなかった分は下の「今村さん依頼」一覧から渡せます。
         コース:{" "}
         <a
           href="https://westudy.co.jp/course/kami-ooyasan-club"
@@ -136,7 +137,7 @@ export default function KisoTranscriptsPage() {
             <span className="lvl">方針</span>
             <strong>正本 = 今村</strong>
           </header>
-          <p className="sum">Jarvis = compare_only（ボットへ無確認投入しない）</p>
+          <p className="sum">Vimeo = provisional_search（暫定検索・運営正本を上書きしない）</p>
         </div>
         <div className="card watch-card">
           <header>
