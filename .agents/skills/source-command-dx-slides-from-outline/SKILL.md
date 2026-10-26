@@ -1,0 +1,163 @@
+---
+name: "source-command-dx-slides-from-outline"
+description: "Migrated source command `dx-slides-from-outline`"
+---
+
+# source-command-dx-slides-from-outline
+
+Use this skill when the user asks to run the migrated source command `dx-slides-from-outline`.
+
+## Command Template
+
+# DX互助会スライド（表 → NotebookLM → HTML 公開）
+
+## 方針（2026）
+
+- **ビジュアルは NotebookLM**（**Nano Banana / Nano Banana Pro** 等が使える出力）を主軸にする。
+- **Codex チャット**で **`slides_outline.md`・NotebookLM 用の貼り付け文・ソース一覧**までできるだけ固める。
+- **NotebookLM MCP** があれば、**ソースを入れたノート**に対して **`ask_question` で文案・プロンプト反復**がしやすい（下記「MCP 接続時」）。
+- **ソースの追加・Studio・スライド画像の保存**は引き続き **NotebookLM の Web 上での操作**が中心（MCP だけでは完結しない）。
+
+---
+
+## パス（project-GE / `docs/`）
+
+| 役割 | 例 |
+|------|-----|
+| 表（正本） | `docs/_drafts/slides_outline_<トピック>.md` |
+| NotebookLM に載せるソース | 上記＋補助 MD＋（任意）旧スライド PDF |
+| NB 由来の画像 | `docs/assets/<デッキID>/sN.png`（`slide_id` と対応） |
+| レイアウト CSS | `docs/css/slides-cute.css` |
+| 公開 HTML | `docs/<タイトル>_cute.html` 等 |
+| 一覧 | `docs/2kai.html` |
+| **NotebookLM 手順の詳細メモ** | **`@docs/N1_NotebookLM`**（MCP インストール・できること一覧・ソースの貼り方） |
+| **客先提出・編集可能 PPTX** | **`@docs/N1_NotebookLM/AI説明資料_後から直しやすい作り方.md`**（画像デッキではなく Plus AI 等。本コマンドの HTML 公開フローとは別） |
+
+---
+
+## 参照: `N1_NotebookLM` フォルダ
+
+- **ミラー 2 箇所（常に同一）**: `docs/N1_NotebookLM/` と `215_神・大家さん倶楽部/N1_NotebookLM/`。**手動コピー禁止**—ルール [`.cursor/rules/n1-notebooklm-mirror.mdc`](../.cursor/rules/n1-notebooklm-mirror.mdc) で `rsync` 双方向同期。
+
+---
+
+## NotebookLM MCP 接続時の整理（いまのツール範囲）
+
+`notebooklm-mcp` を Codex に入れている場合、**チャットから呼べるのは主に次の種類**です（ツール名は実装に依存）。
+
+| 区分 | MCP 経由でしやすいこと | まだブラウザで自分がやること |
+|------|------------------------|------------------------------|
+| **質問・調査** | **`ask_question`**: 登録済みノート（または URL 指定）の**ソースを前提に**回答を取得。スライドの**文案叩き台**、**図案の文言整理**、**Studio に渡す追いプロンプト案**などを Codex 上で繰り返し取りにいける | ノートに **ソースを入れる**（ファイルアップロード・貼り付け）は **NotebookLM の Web**。[手順は N1 の「ソースにする方法」](docs/N1_NotebookLM/CodexのまとめをNotebookLMのソースにする方法.md) |
+| **ライブラリ** | **`add_notebook`**（共有リンク登録）、**`list_notebooks` / `select_notebook` / `get_notebook` / `update_notebook` / `search_notebooks` / `remove_notebook`** | ノートの **共有設定**（リンクを知っている人）を Web でオンにする |
+| **セッション** | **`list_sessions`** など、会話コンテキストの確認・リセット系 | — |
+| **認証・接続** | **`setup_auth` / `re_auth` / `get_health` / `cleanup_data`** など | 初回ログイン用ブラウザ操作 |
+
+**MCP だけでは足りない部分（スライド画像まで一気通貫ではない理由）**
+
+- **Studio** の起動、**Nano Banana / Pro** の UI 選択、**スライド画像のダウンロード／高解像スクショ**は、現状の MCP ツールセットからは **自動化されていない**想定。
+- 実務フローは **「MCP で文案・プロンプトを磨く → Web の Studio でビジュアル生成 → PNG を `docs/assets/` に保存 → Codex で HTML 差し替え」** が現実的。
+
+**MCP を活かしたチャット例**
+
+- 「`select_notebook` で ○○ のノートをアクティブにしてから、`ask_question` で：アップロード済みソースだけを根拠に、slide_id ごとに見出し・箇条書き・図の説明文を Markdown で出して」
+- 「同じノートで、Studio 向けに Nano Banana Pro と水彩風を指定する短い指示文を日本語で3案」
+
+---
+
+## 全体の流れ（3 ブロック）— MCP ありのとき
+
+| ブロック | 主にどこで | あなたが触る？ |
+|----------|------------|----------------|
+| A. 下準備 | **Codex**（ファイル生成）± **MCP `ask_question`**（ノートソース前提の文案・プロンプト反復） | ソースを **Web の NotebookLM に追加**、共有リンクを **ライブラリに登録**（`add_notebook` はチャットから依頼可） |
+| B. ビジュアル確定 | **NotebookLM（ブラウザ）** | **Studio・保存**は自分（PNG を `docs/assets/` へ） |
+| C. 公開 | **Codex** ＋ **git** | PNG 配置後は HTML 差し替えをチャット依頼可。**push は自分**が基本 |
+
+---
+
+## A. Codex チャットでやること（コピペ用・指示例）
+
+チャットに **一度に貼るとよいもの**
+
+- `@` で **既存の下書き MD / 旧 HTML / `slides_outline` の前バージョン**
+- 次の一文をそのまま使ってもよい：
+
+```text
+次の条件で進めてください。
+1) docs/_drafts/slides_outline_<トピック>.md に、10〜20 行の Markdown 表を作成。
+   列: slide_id | 種別 | 見出し | 本文 | 図案 | 話す一言
+   図案は NotebookLM / 画像モデル向けの具体的なシーン指示（日本語OK、画像内に長文は書かない）。
+   イラスト付きは全体の8〜9割を目安。
+2) 同じ返答に「NotebookLM 用パック」を続けて出力:
+   - 「アップロードするソース一覧」（ファイル名と役割の箇条書き）
+   - 「貼り付けソース用: スタイル指示」… **cute（ゆるイラスト）デッキ**ならソース一覧に [`docs/N1_NotebookLM/NotebookLM_マスタースタイル_cute-illustration.md`](docs/N1_NotebookLM/NotebookLM_マスタースタイル_cute-illustration.md) を必ず含める（NotebookLM にそのままアップロード）。正本は [`.cursor/commands/cute-illustration.md`](cute-illustration.md)
+   - 「NotebookLM チャットに最初に送るプロンプト」… ソースに基づきスライド（またはビジュアル付き説明）を作らせる指示全文
+   - 「Studio を開いたあとに送る追いプロンプト」… Nano Banana Pro や水彩スタイルを指定する文（UIに合わせて調整する旨を1行で）
+3) 表の各行について「このスライド1枚分を強調したい場合の短い追い指示」があれば表の下に番号付きで。
+```
+
+**チャットだけで得られる成果物**
+
+- `slides_outline.md` の中身（ファイルに書き込み依頼すればリポジトリに保存される）
+- NotebookLM に **コピペする文章の一式**（上記パック）
+- 必要なら **補助用の短い MD**（用語集・FAQ）のドラフト生成
+
+**チャットだけでは完結しにくいこと（MCP ありでも）**
+
+- NotebookLM **Web 上でソースを追加**（アップロード・貼り付け）— 手元の `slides_outline.md` をドラッグ＆ドロップする等
+- **Studio** の操作と、**スライド画像のエクスポート／スクショ保存**
+- **git push**（認証は自分の環境）
+
+**MCP が増えるとチャットでできること**
+
+- ノート登録・選択の依頼、**`ask_question`** によるソース根拠の回答（上表参照）
+
+---
+
+## B. あなたが NotebookLM で必ずやること（チェックリスト）
+
+実務で迷わないように **順番固定**で進める。
+
+1. **ノートブックを新規**（1 デッキ＝1 ノートブック推奨）
+2. **ソースを追加**（チャットで出した「一覧」どおり）
+   - 必須: `slides_outline.md`（表が入ったファイル）
+   - 任意: 補助 MD、旧スライドの PDF、スタイル指示の貼り付けテキストを「メモ」ソースとして追加
+3. **インデックス／取り込み完了**を待つ
+4. **チャット**に、Codex が出してくれた **「最初に送るプロンプト」**を貼り付けて送信  
+   - 例の意図: 「アップロードしたソース**のみ**を根拠に、各 slide_id ごとにビジュアル付きスライド案を」「初心者向けに」など
+5. **Studio**（または当時の UI 名）を開き、**スライド／ビジュアル付き出力**を作成  
+   - **Nano Banana Pro** や **スタイル（水彩など）** が選べるなら、チャットの「追いプロンプト」に沿って指定
+6. **出力の画像を手元に保存**
+   - 公式の **スライド画像のダウンロード**があればそれを使う
+   - なければ **1 枚ずつ高解像度のスクリーンショット**でも可
+   - 保存名を **`s1.png` … `sN.png`**（表の `slide_id` と一致）にそろえる
+7. 保存先（ローカル）の例:  
+   `git-repos/docs/assets/<デッキID>/`  
+   フォルダがなければ作成
+
+**ここまで終わると「NotebookLM の出力結果」は手元の PNG ファイルとして揃っている状態になる。**
+
+---
+
+## C. 画像がフォルダに揃ったあと（Codex ＋ あなた）
+
+| 手順 | 誰が | 内容 |
+|------|------|------|
+| C1 | **Codex チャット** | `@slides_outline.md` `@Obsidian紹介_DX互助会向け_cute.html` `docs/assets/...` の PNG を添付し、「`img` の `src` を `.png` に差し替え。無い枚は従来 SVG のまま or プレースホルダ」と依頼 |
+| C2 | **あなた** | ブラウザでローカル HTML を開き、崩れがないか確認 |
+| C3 | **あなた** | `git add` → `commit` → `push`（[docs/README.md](docs/README.md)）。CI/権限は自分の環境に合わせる |
+
+**push だけは** 認証・リポジトリ権限があるため、基本 **あなたの操作**（または明示的にエージェントに任せる場合は `git_write` 付きで実行）。
+
+---
+
+## スタイル（cute-illustration）の位置づけ
+
+- **NotebookLM の「貼り付けソース」**に、cute-illustration コマンドの**要約 1 ブロック**を入れると、生成のトーンを寄せやすい。
+- **HTML/CSS** は見出し・本文の読みやすさ用（`slides-cute.css`）。画像内に長文日本語を詰め込まない。
+
+---
+
+## 注意
+
+- NotebookLM の **メニュー名・出力形式**はアップデートで変わる。迷ったら Google の NotebookLM ヘルプで「スライド」「Studio」「Nano Banana」を確認。
+- 既存 HTML を消さず、**別名 `_cute.html`** で併存してよい。

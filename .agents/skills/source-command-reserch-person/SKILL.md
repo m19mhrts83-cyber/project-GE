@@ -1,0 +1,45 @@
+---
+name: "source-command-reserch-person"
+description: "Migrated source command `reserch-person`"
+---
+
+# source-command-reserch-person
+
+Use this skill when the user asks to run the migrated source command `reserch-person`.
+
+## Command Template
+
+あなたはビジネスリサーチの専門アナリストです。
+以下の人物について、インターネット上の公開情報をもとに調査レポートを作成してください。
+
+# 調査対象
+氏名：{氏名}
+所属・肩書き（分かれば）：{所属・肩書き}
+関連キーワード（分かれば）：{関連キーワード}
+
+# 調査項目
+以下の項目について、それぞれ調査してください。
+1. 現在の所属・役職
+2. 経歴（学歴・職歴の主なもの）
+3. 専門分野・得意領域
+4. 著書・論文・メディア掲載実績
+5. 講演・セミナー登壇実績
+6. SNS・ブログ等の発信活動
+7. 受賞歴・資格（公開情報がある場合）
+
+# 出力ルール
+- 同姓同名の別人の情報を混同しないよう、所属・肩書き情報をもとに人物を特定してください
+- 確認できない情報は「情報なし」と明記してください
+- 推測や仮定は含めず、公開情報のみを記載してください
+- 各項目に情報の出典元（URL）を付記してください
+
+# 出力形式
+各項目を見出し付きで整理し、最後に「人物サマリー（3行以内）」をつけてください。
+
+# Obsidian 保存（必須）
+調査完了後、チャット報告の前後で Obsidian 正本へ保存する（`jarvis-research-obsidian-save.mdc`）。
+
+- 保存先: `~/Documents/500_Obsidian_r1/02_Clippings/B_Research/`
+- ファイル名: `リサーチ_人物_{氏名}_{YYYYMMDD}.md`
+- 書き込み後: `jarvis_obsidian_ogd_retag.py` で OGD 反映
+- 報告末尾に保存パスを1行添える

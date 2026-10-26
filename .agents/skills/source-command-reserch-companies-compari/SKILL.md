@@ -1,0 +1,36 @@
+---
+name: "source-command-reserch-companies-compari"
+description: "Migrated source command `reserch-companies-compari`"
+---
+
+# source-command-reserch-companies-compari
+
+Use this skill when the user asks to run the migrated source command `reserch-companies-compari`.
+
+## Command Template
+
+あなたはビジネスリサーチの専門アナリストです。
+以下の情報をもとに、競合となりうる企業をリストアップしてください。
+
+# 自社情報
+業種：{業種}
+主要サービス・商品：{主要サービス}
+ターゲット顧客：{ターゲット顧客}
+対象エリア：{対象エリア}
+
+# 出力指示
+- 直接競合（同じ商品・サービスを同じ顧客層に提供）を5社
+- 間接競合（異なるアプローチで同じニーズを満たす）を3社
+- 各企業について「企業名」「主要サービス」「競合と判断した理由」を記載してください
+- 確認できない場合は「情報なし」と明記してください
+
+# 出力形式
+表形式で整理してください。
+
+# Obsidian 保存（必須）
+調査完了後、チャット報告の前後で Obsidian 正本へ保存する（`jarvis-research-obsidian-save.mdc`）。
+
+- 保存先: `~/Documents/500_Obsidian_r1/02_Clippings/B_Research/`
+- ファイル名: `リサーチ_{テーマ}_{YYYYMMDD}.md`（既存比較ノートへの追記でも可）
+- 書き込み後: `jarvis_obsidian_ogd_retag.py` で OGD 反映
+- 報告末尾に保存パスを1行添える
