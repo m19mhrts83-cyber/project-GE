@@ -20,6 +20,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 from embed_to_supabase import load_env, get_client, batch_embed_texts
 from notta_to_knowledge import Cue, chunk_cues, parse_timestamp
 from mirror_knowledge_to_raimo import get_json, post_json
+from transcript_corrections import fix_text
 
 
 def retry(operation):
@@ -70,9 +71,11 @@ def build_records(lesson: dict, text: str, origin: str, course: str) -> list[tup
         }
         chunks = []
         for ch in chunk_cues(cues, max_sec=90, max_chars=1000):
+            # chunk_key は補正前の本文から作る（補正済みの既存チャンクと同じキーになり、重複登録しない）
             digest = hashlib.sha256(ch['content'].encode()).hexdigest()
-            chunks.append({**ch, "chunk_key": f"{key}:{ch['start_sec']}:{digest[:16]}",
-                           "content_hash": digest, "search_text": ch['content']})
+            fixed = fix_text(ch['content'])
+            chunks.append({**ch, "content": fixed, "chunk_key": f"{key}:{ch['start_sec']}:{digest[:16]}",
+                           "content_hash": hashlib.sha256(fixed.encode()).hexdigest(), "search_text": fixed})
         records.append((source, chunks))
     return records
 
