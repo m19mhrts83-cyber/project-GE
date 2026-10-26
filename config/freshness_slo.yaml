@@ -10,6 +10,45 @@
 #   json_time  … JSON の時刻フィールド（path の * は配列／dict の全要素。最大値を採用）
 # owner: 担当社員（番号＋役割）／action: 古くなったとき最初にやること（1 行）
 products:
+  # 接続記録はブラウザ／MCP／Driveを混同しない。初期は表示・記録のみで自動投稿しない。
+  # 実確認時に .jarvis_state/integration_connections.json の checked_at/status/account を更新する。
+  - id: drive_connector_admin
+    label: Google Driveコネクタ（admin）
+    kind: connection_state
+    file: .jarvis_state/integration_connections.json
+    path: google_drive_connector
+    expected_account: admin@livingsupport-matsu.co.jp
+    max_age_h: 168
+    notify: false
+    owner: 315 連携健全性点検
+    action: "コネクタのプロフィールと対象Driveの読取を再確認"
+  - id: notebooklm_browser_admin
+    label: NotebookLMブラウザ（admin）
+    kind: connection_state
+    file: .jarvis_state/integration_connections.json
+    path: notebooklm_browser
+    expected_account: admin@livingsupport-matsu.co.jp
+    max_age_h: 168
+    notify: false
+    owner: 315 連携健全性点検
+    action: "内蔵ブラウザでプロフィールとノート一覧を再確認"
+  - id: notebooklm_mcp
+    label: NotebookLM MCP（ブラウザとは別）
+    kind: connection_state
+    file: .jarvis_state/integration_connections.json
+    path: notebooklm_mcp
+    expected_account: admin@livingsupport-matsu.co.jp
+    max_age_h: 168
+    notify: false
+    owner: 315 連携健全性点検
+    action: "MCPのauthenticatedを確認。必要時のみログインを実施"
+  - id: drive_team_rules
+    label: AIチーム正本のDrive写し
+    kind: mirror_content
+    source: docs/AIエージェントチーム/CLAUDE.md
+    mirror: ~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/★AIエージェントチーム/CLAUDE.md
+    owner: 315 連携健全性点検
+    action: "Git正本を確認し jarvis_agent_team_status_sync.py で同期。読取不能ならDrive同期状態を確認"
   - id: openchat_threads
     label: オプチャ【スレッド】取得
     kind: json_time
@@ -60,7 +99,7 @@ products:
     workflow: zaim-finance-sync.yml
     max_age_h: 30
     owner: 600 リソース・家計
-    action: "ZAIM_STORAGE_STATE_B64 の再発行（セッション切れ）を疑う"
+    action: "失敗ログのHTTP状態を確認。402 exceed_egress_quotaならSupabase利用制限、認証失敗時のみZAIMセッションを確認"
   - id: gha_re_inquiry
     label: KURASHIFT 物件問合せ（Tier3）
     kind: gha
@@ -74,7 +113,7 @@ products:
     workflow: westudy-raimo-weekly.yml
     max_age_h: 200
     owner: 315 連携健全性点検
-    action: "gh workflow run westudy-raimo-weekly.yml（ログイン停滞なら時間を置いて再実行）"
+    action: "失敗ログを確認。402 exceed_egress_quotaならSupabase利用制限を解消後に再実行。ログイン停滞なら時間を置く"
   - id: weekly_review_facts
     label: 314 週次機械チェック
     kind: file_mtime

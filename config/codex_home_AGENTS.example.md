@@ -11,6 +11,7 @@
 
 - 運用の起点は **Jarvis（Cursor）**。ルールの正本更新も Jarvis 経由を優先する。
 - 秘密・トークン・パスワードはチャット／MD／Slack に書かない。正本は `~/git-repos/.env.jarvis_private`（社員は各 `.env` 二層）。
+- **Codex は必要なログイン・連携作業に限り** `.env.jarvis_private` を直接参照し、対象サービスへ入力してよい。値をチャット・ツール出力・ログ・MDへ表示しない。`.env.jarvis_private` や値を Git の add／commit／push、Drive／OneDrive等のクラウド同期へ載せない。利用は依頼範囲内に限定し、送金・OTP・銀行IBは従来どおりJarvis専属。
 
 ## リポを開いたら最初に読む
 
@@ -37,7 +38,7 @@
   `docs/AIエージェントチーム/38_…` と `41_Slackスマホレイアウト_草案_…`
 - 短い合図・進捗は Slack `#ai-hub`。作業本体は社員フォルダの `TASK.md`／`input`／`output`
 - Drive `【with Grok bot】` は **Grok↔Jarvis 専用**。Codex から日常キューに書かない（Grok へ渡す長文は Jarvis 経由）
-- **役割**: 非定型＝Miss Lemon（本線）／定型＝FRIDAY（GenCode）。詳細は `43_`。Todoist の名乗りは「コーデックス」
+- **4者運用**: 社員は業務の役割。実行ツールは社員ごとに固定せず、松野さんが利用枠・タイミングで選ぶ。Jarvis主担当・Codex代行可。最新方針は `50_4者共通運用と品質改善_20261025.md`。Todoist の名乗りは「コーデックス」
 - **週1レビュー**（小さく）: 直近 main 差分・CLAUDE／43_／ハブ食い違い・`#ops` 開きっぱなし
 - 定期実行の本線は **GHA または GAS**。特定エージェントのスケジューラにロックしない
 - 変更したら同じターンで社員 `CLAUDE.md` か docs を更新（チャットだけで終わらない）

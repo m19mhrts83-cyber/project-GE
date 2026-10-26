@@ -148,6 +148,15 @@ export default function NotebooklmWorkbench() {
         <code>127.0.0.1:8766</code>
       </p>
 
+      <div className="card" style={{ marginTop: 16, padding: "12px 14px" }}>
+        <strong>接続経路は別々です</strong>
+        <p className="meta" style={{ margin: "6px 0 0" }}>
+          この画面から開くブラウザのログイン、AIツールのNotebookLM MCP、Drive検索は
+          別セッションです。ブラウザで開けてもMCP接続済みとは限りません。315点検では
+          それぞれのアカウント・認証・最終確認を別項目として記録します。
+        </p>
+      </div>
+
       <h2>Studio 自動化（Mac）</h2>
       <p className="sub">
         Infographic／Slide Deck は MCP ではなく専用ランナー（別 Chrome プロファイル）。手順:{" "}

@@ -47,7 +47,7 @@ export default function WatchCommentThread({
   const [notices, setNotices] = useState<string[]>([]);
   const [localPrompt, setLocalPrompt] = useState("");
   const [needLocal, setNeedLocal] = useState(false);
-  const [engine, setEngine] = useState<AskEngine>("cursor");
+  const [engine, setEngine] = useState<AskEngine>("auto");
   const contextLane =
     typeof payload?.lane === "string" ? payload.lane : null;
   const [useKamiooya, setUseKamiooya] = useState(
@@ -232,6 +232,10 @@ export default function WatchCommentThread({
       <fieldset className="draft-engine" style={{ marginTop: 10 }}>
         <legend>聞くエンジン</legend>
         <label className="draft-engine-opt">
+          <input type="radio" name={`watch-ask-engine-${watchId}`} checked={engine === "auto"} onChange={() => setEngine("auto")} disabled={pending || macPolling} />
+          自動（許可済み経路・軽量優先）
+        </label>
+        <label className="draft-engine-opt">
           <input
             type="radio"
             name={`watch-ask-engine-${watchId}`}
@@ -254,7 +258,7 @@ export default function WatchCommentThread({
       </fieldset>
       {engine === "cursor" ? (
         <p className="meta" style={{ margin: "6px 0 0" }}>
-          既定は Jarvis Cloud。失敗時は Gemini に自動切替し、その旨を表示します。
+          Jarvis Cloudを指定します。失敗時はGeminiへ切り替えます。APIの利用料金が発生する場合があります。
         </p>
       ) : null}
       <label
@@ -322,7 +326,7 @@ export default function WatchCommentThread({
             ? "返答中…"
             : engine === "cursor"
               ? "Jarvis Cloud に聞く"
-              : "Gemini に聞く"}
+              : engine === "auto" ? "自動で聞く" : "Gemini に聞く"}
         </button>
       </div>
 

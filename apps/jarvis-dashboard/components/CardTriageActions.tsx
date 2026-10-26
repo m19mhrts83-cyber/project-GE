@@ -73,7 +73,7 @@ export default function CardTriageActions({
   const [notices, setNotices] = useState<string[]>([]);
   const [localPrompt, setLocalPrompt] = useState<string>("");
   const [needLocal, setNeedLocal] = useState(false);
-  const [engine, setEngine] = useState<AskEngine>("cursor");
+  const [engine, setEngine] = useState<AskEngine>("auto");
   const [useKamiooya, setUseKamiooya] = useState(
     () => defaultAskContextSources(lane).kamiooya,
   );
@@ -394,6 +394,10 @@ export default function CardTriageActions({
         <fieldset className="draft-engine" style={{ marginTop: 10 }}>
           <legend>聞くエンジン</legend>
           <label className="draft-engine-opt">
+            <input type="radio" name={`ask-engine-${card.id}`} checked={engine === "auto"} onChange={() => setEngine("auto")} disabled={pending || macPolling} />
+            自動（許可済み経路・軽量優先）
+          </label>
+          <label className="draft-engine-opt">
             <input
               type="radio"
               name={`ask-engine-${card.id}`}
@@ -416,7 +420,7 @@ export default function CardTriageActions({
         </fieldset>
         {engine === "cursor" ? (
           <p className="meta" style={{ margin: "6px 0 0" }}>
-            既定は Jarvis Cloud。失敗時は Gemini に自動切替し、その旨を表示します。
+            Jarvis Cloudを指定します。失敗時はGeminiへ切り替えます。APIの利用料金が発生する場合があります。
           </p>
         ) : null}
         <label
@@ -479,7 +483,7 @@ export default function CardTriageActions({
                 ? "返答中…"
                 : engine === "cursor"
                   ? "送って Jarvis Cloud に聞く"
-                  : "送って Gemini に聞く"}
+                  : engine === "auto" ? "送って自動で聞く" : "送って Gemini に聞く"}
             </button>
           ) : (
             <>
@@ -501,7 +505,7 @@ export default function CardTriageActions({
                   ? "返答中…"
                   : engine === "cursor"
                     ? "Jarvis Cloud に聞く"
-                    : "Gemini に聞く"}
+                    : engine === "auto" ? "自動で聞く" : "Gemini に聞く"}
               </button>
             </>
           )}

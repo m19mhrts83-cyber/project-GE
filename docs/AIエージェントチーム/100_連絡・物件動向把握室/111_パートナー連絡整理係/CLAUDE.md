@@ -24,6 +24,7 @@
 
 - [x] **時間（本線・昼）**: 11:50 JST（GitHub Actions）
 - [x] **時間＋起動（本線・夜）**: 20:30 以降に Mac を開いたとき（未実施なら）
+  - 自動は **1晩1回まで**（失敗しても再試行しない・同時実行はロックで弾く）。失敗後の再実行は `jarvis_partner_night_pipeline.py --apply --push --force`
 - [x] **人が頼む（副）**: 「パートナー確認して」
 - [ ] 何かが届いたら（将来）
 
@@ -95,6 +96,7 @@
 | 2026-10-10 | 人が見る場所: MD正本＋Slack受動＋Gmail能動。Notionワークログ不要 |
 | 2026-10-10 | FlowForge 一本合流・Notion削除確定。エージェント指示を最終フローに同期 |
 | 2026-10-11 | 定時実装クローズ: links/reports・夜ダッシュボード同梱・unlock/朝取りこぼし |
+| 2026-10-26 | 夜枠の重複起動を修正（朝取りこぼし回収が実行中・失敗中に2分おき再起動→ダッシュボード／LINE QR が多数出ていた）。ロック＋`last_attempt_date` で1晩1回 |
 | 2026-10-10 | Slack Incoming Webhook 3本（REPORT/CONSULT/OPS）設定・テストOK。`jarvis_partner_slack_report.py` 追加 |
 | 2026-10-10 | 昼パイプライン＋GHA 11:50（`jarvis_partner_day_pipeline` / `jarvis-partner-day-report.yml`） |
 | 2026-10-10 | GHA に Gmail credentials 展開を追加（dry_run 失敗の修正） |
