@@ -86,6 +86,9 @@ export default function KisoTranscriptsPage() {
     vtt_ready?: number;
     desc_only?: number;
     missing?: number;
+    video_lessons?: number;
+    no_video?: number;
+    video_no_caption?: number;
     updated?: string;
     lessons?: Array<{
       slug: string;
@@ -104,8 +107,10 @@ export default function KisoTranscriptsPage() {
     updated?: string;
     bands?: Array<{ id: string; label: string; count: number }>;
     lessons?: GapLesson[];
+    excluded?: Array<GapLesson & { excluded_reason?: string }>;
   };
   const gapLessons = (gaps.lessons || []) as GapLesson[];
+  const excluded = gaps.excluded || [];
   const gapByBand = (id: string) =>
     gapLessons.filter((g) => g.ask_priority === id);
 
@@ -137,11 +142,12 @@ export default function KisoTranscriptsPage() {
           <header>
             <span className={statusClass("ready")}>コース</span>
             <strong>
-              {cs.vtt_ready ?? "—"} / {cs.total ?? "—"} VTT
+              {cs.vtt_ready ?? "—"} / {cs.video_lessons ?? cs.total ?? "—"} 字幕取得
             </strong>
           </header>
           <p className="sum">
-            説明文のみ {cs.desc_only ?? "—"} · 未取得 {cs.missing ?? "—"} ·{" "}
+            動画あり・字幕なし {cs.video_no_caption ?? "—"} · 動画なし（対象外）{" "}
+            {cs.no_video ?? "—"} · 全 {cs.total ?? "—"} レッスン ·{" "}
             {cs.updated || catalog.updated || "—"}
           </p>
         </div>
@@ -236,6 +242,30 @@ export default function KisoTranscriptsPage() {
             </div>
           );
         })}
+        {excluded.length ? (
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ fontSize: "1rem", margin: "0 0 8px" }}>
+              対象外：動画なし（{excluded.length}）
+            </h3>
+            <ul className="mail-skim">
+              {excluded.map((g) => (
+                <li key={g.slug}>
+                  <div className="mail-row" style={{ cursor: "default" }}>
+                    <span className="mail-row-main">
+                      <span className="mail-subject">{g.title || g.slug}</span>
+                      <span className="mail-preview">
+                        {g.excluded_reason || g.gap_reason || ""}
+                        {" · "}
+                        <span className="meta">({g.slug})</span>
+                      </span>
+                    </span>
+                    <span className="lvl">対象外</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       <UnderstandingBlock text={understanding} />
