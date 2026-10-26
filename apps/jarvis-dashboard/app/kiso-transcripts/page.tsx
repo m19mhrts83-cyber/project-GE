@@ -118,9 +118,8 @@ export default function KisoTranscriptsPage() {
     <Shell active="/kiso-transcripts">
       <h1>基礎講座・文字起こし</h1>
       <p className="sub">
-        チャットボットの正本は<strong>今村さん字幕</strong>。正本の受領まで、
-        Vimeo自動字幕を「暫定」と明示して検索・参照に利用します（2026-10-27 松野了承）。
-        字幕が取れなかった分は下の「今村さん依頼」一覧から渡せます。
+        取得済みのVimeo自動字幕を上長に確認してもらい、問題なければそのまま検索・参照に利用します。
+        字幕が取れなかった分だけを下の「今村さん依頼」一覧から共有してもらいます（2026-10-27 松野方針）。
         コース:{" "}
         <a
           href="https://westudy.co.jp/course/kami-ooyasan-club"
@@ -137,7 +136,7 @@ export default function KisoTranscriptsPage() {
             <span className="lvl">方針</span>
             <strong>正本 = 今村</strong>
           </header>
-          <p className="sum">Vimeo = provisional_search（暫定検索・運営正本を上書きしない）</p>
+          <p className="sum">Vimeo字幕 = 検索ソース（運営字幕が届いた分は上書きしない）</p>
         </div>
         <div className="card watch-card">
           <header>

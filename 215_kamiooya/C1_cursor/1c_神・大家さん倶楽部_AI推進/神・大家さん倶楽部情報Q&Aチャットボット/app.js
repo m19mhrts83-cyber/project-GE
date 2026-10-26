@@ -1282,7 +1282,7 @@ const App = {
 
   screenLabel: (screenName) => {
     const labels = {
-      chat: 'チャット',
+      chat: 'Q&Aチャット',
       comments: 'コメント一覧',
       lessons: '動画ページ説明テキスト',
       knowledge: 'セミナー動画文字起こし',
@@ -1725,6 +1725,13 @@ const App = {
     App.renderKnowledgeTable();
   },
 
+  /** 取込経路の識別ラベル（例: 【Vimeo自動字幕・暫定】）は利用者に見せない */
+  displaySourceTitle: (title) => {
+    return String(title || '')
+      .replace(/^\s*【[^】]*(?:暫定|自動字幕)[^】]*】\s*/, '')
+      .trim();
+  },
+
   formatMmSs: (sec) => {
     const s = Math.max(0, Math.floor(Number(sec) || 0));
     const m = Math.floor(s / 60);
@@ -1734,7 +1741,11 @@ const App = {
 
   withVideoTimeUrl: (url, startSec) => {
     if (!url) return '';
-    if (/[?&]t=/.test(url)) return url;
+    if (/[?&#]t=/.test(url)) return url;
+    // Vimeo は ?t= では頭出しされないため #t=秒s を使う
+    if (/^https?:\/\/(?:www\.)?vimeo\.com\//.test(url)) {
+      return url.split('#')[0] + '#t=' + Math.floor(Number(startSec) || 0) + 's';
+    }
     const hashIdx = url.indexOf('#');
     const base = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
     const hash = hashIdx >= 0 ? url.slice(hashIdx) : '';
@@ -2172,7 +2183,7 @@ const App = {
       if (!groups[title]) {
         groups[title] = {
           title: title,
-          secs: [],
+          entries: [],
           videoUrl: '',
           searchKey: c.chunkKey || title
         };
@@ -2180,15 +2191,15 @@ const App = {
       }
       const g = groups[title];
       const sec = c.startSec != null ? Number(c.startSec) : NaN;
-      if (!isNaN(sec) && g.secs.indexOf(sec) === -1) {
-        g.secs.push(sec);
+      if (!isNaN(sec) && !g.entries.some(function (e) { return e.sec === sec; })) {
+        g.entries.push({ sec: sec, snippet: String(c.snippet || '').trim().slice(0, 120) });
       }
       if (!g.videoUrl && c.videoUrl) g.videoUrl = String(c.videoUrl);
       if (c.chunkKey && g.searchKey === title) g.searchKey = c.chunkKey;
     });
     groupOrder.forEach(function (t) {
-      groups[t].secs.sort(function (a, b) {
-        return a - b;
+      groups[t].entries.sort(function (a, b) {
+        return a.sec - b.sec;
       });
     });
 
@@ -2196,30 +2207,35 @@ const App = {
 
     const videoLis = groupOrder.map(function (t) {
       const g = groups[t];
-      const secLabel = g.secs.map(function (s) {
-        return String(s) + '秒';
-      }).join(' / ');
-      const earliest = g.secs.length ? g.secs[0] : 0;
       const baseUrl = String(g.videoUrl || '')
+        .replace(/#t=\d+s?$/, '')
         .replace(/[?&]t=\d+/g, '')
         .replace(/\?&/, '?')
         .replace(/[?&]$/, '');
-      const openUrl = baseUrl ? App.withVideoTimeUrl(baseUrl, earliest) : '';
       const openDb =
         '<button type="button" class="citation-db-link text-blue-700 underline ml-1" data-kind="video_chunk" data-key="' +
         App.escapeHtml(g.title) +
         '">DBで見る</button>';
-      const openVideo = openUrl
-        ? (' <a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
-          App.escapeHtml(openUrl) +
-          '">動画を開く</a>')
-        : '';
+      // 「何分何秒あたりで何を話しているか」を1行ずつ。時刻リンクでその位置から再生
+      const entryLis = g.entries.map(function (e) {
+        const label = App.formatMmSs(e.sec) + '〜';
+        const timeHtml = baseUrl
+          ? '<a class="text-blue-600 underline whitespace-nowrap" target="_blank" rel="noopener noreferrer" href="' +
+            App.escapeHtml(App.withVideoTimeUrl(baseUrl, e.sec)) +
+            '">' + App.escapeHtml(label) + '</a>'
+          : '<span class="whitespace-nowrap">' + App.escapeHtml(label) + '</span>';
+        return (
+          '<li class="mt-0.5">' +
+          timeHtml +
+          (e.snippet ? ' <span class="text-slate-600">「' + App.escapeHtml(e.snippet) + '…」</span>' : '') +
+          '</li>'
+        );
+      });
       return (
-        '<li class="mb-1">' +
-        App.escapeHtml(g.title) +
-        (secLabel ? ' — ' + App.escapeHtml(secLabel) : '') +
+        '<li class="mb-2">' +
+        '<span class="font-medium">' + App.escapeHtml(App.displaySourceTitle(g.title)) + '</span>' +
         openDb +
-        openVideo +
+        (entryLis.length ? '<ul class="ml-4 list-none text-xs">' + entryLis.join('') + '</ul>' : '') +
         '</li>'
       );
     });
@@ -2460,7 +2476,7 @@ const App = {
         App.escapeHtml(App.formatMmSs(start)) +
         '</td>' +
         '<td class="p-2">' +
-        App.escapeHtml(src.title || ch.source_key || '') +
+        App.escapeHtml(App.displaySourceTitle(src.title) || ch.source_key || '') +
         '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(String(ch.content || '').slice(0, 180)) +

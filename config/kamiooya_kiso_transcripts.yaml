@@ -1,12 +1,12 @@
 # 神大家・基礎講座 文字起こし（Jarvis照合用）
 # チャットボット正本 = 今村さん字幕（imamura/canonical → knowledge_*）
-# Vimeo自動字幕 = 正本受領までの暫定検索ソース（2026-10-27 松野了承）
+# Vimeo自動字幕 = 上長確認後そのまま利用する検索ソース。字幕が取れなかった分だけ運営から共有を受ける（2026-10-27 松野方針変更）
 version: 1
 updated: '2026-10-27'
 onedrive_root: >-
   C1_cursor/1c_神・大家さん倶楽部_AI推進/基礎講座_文字起こし
 paths:
-  jarvis: jarvis          # Vimeo 自動字幕 MD（暫定検索＋比較用）
+  jarvis: jarvis          # Vimeo 自動字幕 MD（検索ソース＋比較用）
   imamura_inbox: imamura/inbox
   imamura_canonical: imamura/canonical  # 今村正本。チャットボット投入はここから
   compare: compare
@@ -16,7 +16,7 @@ policy:
   jarvis_role: provisional_search
   note: >
     今村さん字幕を knowledge_sources / knowledge_chunks の正とする。
-    Vimeo取得分は暫定と明示して knowledge_* と Raimo へ接続する。
+    Vimeo取得分は利用者向けに「暫定」と区別せず knowledge_* と Raimo へ接続する（取込経路は meta_json で管理）。
     動画単位の安定キーで追加し、運営正本を上書きしない。字幕なしの説明文は動画本文に混ぜない。
 # 優先して Jarvis が VTT 取得する基礎 STEP（course 神大家1.基礎の中核）
 priority_slugs:
