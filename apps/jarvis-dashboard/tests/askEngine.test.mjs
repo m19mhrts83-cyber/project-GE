@@ -70,3 +70,24 @@ test('auto: failure escalates once only to authorized Cloud', async () => {
   assert.equal((await resolve({ engine: 'auto', prompt: 'question' })).needLocal, true);
   assert.deepEqual(calls, ['gemini', 'cloud']);
 });
+
+test('auto: flat-rate Cloud goes before metered Gemini (R4)', async () => {
+  const calls = [];
+  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', ASK_COST_CLOUD: 'flat', CURSOR_API_KEY: 'test' },
+    () => { throw new Error('Gemini must not be called'); },
+    async () => { calls.push('cloud'); return { ok: true, text: 'answer' }; });
+  const result = await resolve({ engine: 'auto', prompt: 'question' });
+  assert.equal(result.via, 'cloud');
+  assert.deepEqual(calls, ['cloud']);
+  assert.ok(result.fallbackNotices.some(n => n.includes('定額枠内')));
+});
+
+test('auto: escalation to metered route states the reason (R4)', async () => {
+  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', ASK_COST_GEMINI: 'free', CURSOR_API_KEY: 'test' },
+    async () => ({ ok: false, error: 'quota' }),
+    async () => ({ ok: true, text: 'answer' }));
+  const result = await resolve({ engine: 'auto', prompt: 'question' });
+  assert.equal(result.via, 'cloud');
+  assert.ok(result.fallbackNotices.some(n => n.includes('Geminiで回答できませんでした')));
+  assert.ok(result.fallbackNotices.some(n => n.includes('次の経路へ上げます: 従量')));
+});

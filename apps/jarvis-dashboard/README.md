@@ -36,7 +36,7 @@ UI の既定は **自動**。APIキーの存在だけでは外部APIを使わず
 | パートナー下書き見直し | Cloud Agent | Mac `jarvis_triage_cursor_revise_worker.py`（通知付き） |
 | タスク／ウォッチ／メール要約「聞く」 | 自動: 許可済みGemini 1回 → 許可済みCloud 1回 | ローカル用コピー ＋ Mac `jarvis_card_cursor_ask_worker.py` |
 
-自動利用は `ASK_AUTO_ALLOW_GEMINI=1` / `ASK_AUTO_ALLOW_CLOUD=1` を個別設定した経路だけ。両方未設定または失敗時はローカル引き継ぎ。API料金と定額プランの利用枠は別として扱う。切替時はバナーで経路を表示する。
+自動利用は `ASK_AUTO_ALLOW_GEMINI=1` / `ASK_AUTO_ALLOW_CLOUD=1` を個別設定した経路だけ。両方未設定または失敗時はローカル引き継ぎ。API料金と定額プランの利用枠は別として扱う。切替時はバナーで経路を表示する。試す順は R4（コスパ順）: `ASK_COST_GEMINI` / `ASK_COST_CLOUD` に `free`・`flat`・`metered` を入れ、追加費用ゼロ→軽い→重い→従量の順。未設定は従量扱い。
 
 Askは60秒の短期キャッシュ（認証利用者＋対象＋入力全文＋経路設定）を使い、資料や質問が変われば失効する。`ask_usage`ログは経路・結果・入力文字数・時間のみで本文を含めない。集計は `python3 scripts/jarvis_ask_usage_summary.py <server.log>`。
 
