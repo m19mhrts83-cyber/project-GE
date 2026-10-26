@@ -119,6 +119,18 @@
             <button id="btnHtml" class="secondary" disabled>叩き台HTMLを保存（AI仕上げ用）</button>
         </div>
     </div>
+
+    <div class="panel" id="finishPanel" hidden>
+        <strong>⑥ AIの仕上げHTMLを貼る</strong>
+        <small>　保存した叩き台HTMLをチャットAIに渡して見た目を整えてもらい、返ってきたHTMLをそのまま貼ります。地図画像はこのページが差し込みます。</small>
+        <textarea id="finishIn" rows="8" spellcheck="false" placeholder="<!DOCTYPE html> から </html> まで（```で囲まれていてもかまいません）"></textarea>
+        <div class="actions">
+            <button id="btnFinish">仕上げをプレビュー</button>
+            <button id="btnFinishPrint" class="secondary" disabled>仕上げを印刷・PDF保存</button>
+        </div>
+        <div id="finishCheck" style="margin-top:8px;font-size:13px;white-space:pre-line"></div>
+        <iframe id="finishFrame" title="仕上げのプレビュー" sandbox="allow-same-origin allow-modals" style="display:none;width:100%;height:1150px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:#fff"></iframe>
+    </div>
 </div>
 
 <div id="sheetHost" class="wrap" hidden></div>
