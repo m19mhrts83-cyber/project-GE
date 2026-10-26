@@ -1,3 +1,4 @@
+import hashlib
 import sys
 import unittest
 from pathlib import Path
@@ -6,6 +7,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from import_vimeo_transcripts import build_records, parse_videos, sync_raimo, sync_supabase
+from transcript_corrections import fix_text
 
 
 class VimeoImportTests(unittest.TestCase):
@@ -58,6 +60,21 @@ _字幕取得不可_
             with self.assertRaisesRegex(RuntimeError, '字幕変更'):
                 sync_raimo('https://example.com', source, [], cache)
             send.assert_not_called()
+
+    def test_corrections_prefer_longest_and_keep_correct_words(self):
+        self.assertEqual(
+            fix_text('金融機関と金融機、千人媒介と媒介、住田不動産、雰囲気と雰囲、紙コンセプトとコセプト'),
+            '金融機関と金融機関、専任媒介と媒介、住友不動産、雰囲気と雰囲気、神コンセプトとコンセプト')
+        self.assertEqual(fix_text('変更なし'), '変更なし')
+
+    def test_corrected_chunk_keeps_original_key(self):
+        text = '## 動画 1: Vimeo 123 — 日本語\n[00:01] 紙物件の作り方\n'
+        lesson = {'slug': 'test', 'title': 'テスト'}
+        chunk = build_records(lesson, text, 'origin.md', '基礎')[0][1][0]
+        self.assertEqual(chunk['content'], '神物件の作り方')
+        self.assertEqual(chunk['search_text'], '神物件の作り方')
+        original = hashlib.sha256('紙物件の作り方'.encode()).hexdigest()
+        self.assertEqual(chunk['chunk_key'], f'westudy:test:vimeo:123:1:{original[:16]}')
 
 
 if __name__ == '__main__':

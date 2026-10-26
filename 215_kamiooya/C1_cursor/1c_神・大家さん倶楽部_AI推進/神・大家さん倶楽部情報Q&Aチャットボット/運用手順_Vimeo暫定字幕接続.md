@@ -65,3 +65,21 @@
 - 新規テスト5件・既存Nottaテスト6件成功。ダッシュボード `npm run build` と型チェック成功。
 - 通常検索の回答生成E2Eはアプリ用ログイン資格情報が空のため未実施。Raimoの検索対象テーブルへの反映と公開フロントの引用描画までは確認済み。
 - データは既存公開アプリに即時反映。2026-10-27 松野依頼で変更をコミットし、最新mainと統合してorigin/mainへpush済み（実装コミット `aa0c3c1b`、統合 `64702a65`）。
+
+## 字幕の誤記補正（2026-10-26）
+
+コメント・LINEオプチャ・動画説明文に一度も出ない字幕の語を拾い、189件の補正表を作成。松野さんが全件承認（元表: Googleスプレッドシート「神大家 セミナー字幕 誤記候補リスト」、反映版は `config/kamiooya_transcript_corrections.tsv`）。
+
+- 補正は左から最長一致。正しい語も照合対象に含め、「金融機関」の「金融機」や「雰囲気」の「雰囲」は置換しない。
+- Supabase本番: 73動画・1,229チャンクの `content`・`search_text`・`content_hash` を更新。`chunk_key` は変えない。元の本文は `kc_typo_backup_20261026`（RLS有効）に保存。対象動画の `meta_json.typo_fix` に記録。
+- 今後の取込: `import_vimeo_transcripts.py` が同じ表で補正してから登録する。キーは補正前の本文から作るため、再実行しても二重登録しない。
+- Macで後から行う作業（Supabase無料枠内、補正したチャンクだけ読む）:
+
+```sh
+# プレビュー（件数だけ表示）
+~/selenium_env/venv/bin/python '215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/scripts/apply_transcript_corrections.py'
+# 埋め込みの作り直しとRaimo側の入れ替え
+~/selenium_env/venv/bin/python '215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/scripts/apply_transcript_corrections.py' --reembed --mirror-raimo --apply
+```
+
+戻す場合は `kc_typo_backup_20261026` の `content`・`search_text`・`content_hash` を `chunk_id` で書き戻す。
