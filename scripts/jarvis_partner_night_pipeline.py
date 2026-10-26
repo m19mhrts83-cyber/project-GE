@@ -16,6 +16,7 @@ LLM 不使用。公式エクスポートは 15分 poll が新鮮ならスキッ�
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -29,6 +30,7 @@ from zoneinfo import ZoneInfo
 REPO = Path(__file__).resolve().parents[1]
 PY = sys.executable
 STATE = REPO / ".jarvis_state" / "partner_111_night.json"
+LOCK = REPO / ".jarvis_state" / "partner_111_night.lock"
 EXPORT_REMINDER = REPO / ".jarvis_state" / "line_export_reminder.json"
 REPORT = REPO / "scripts" / "jarvis_partner_slack_report.py"
 POC = REPO / "line_unofficial_poc"
@@ -58,6 +60,18 @@ def _save_state(data: dict) -> None:
     STATE.write_text(
         json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+
+
+def _acquire_lock():
+    """同時実行防止。取れなければ None（別の夜枠が実行中）。"""
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    f = LOCK.open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return None
+    return f
 
 
 def _mac_line_running() -> bool:
@@ -186,6 +200,18 @@ def main() -> int:
         if state.get("last_ok_date") == today:
             print(f"⏭ 今夜は実施済み（{today}）")
             return 0
+        # 自動は1晩1回まで（失敗時に取りこぼし回収が2分おきに QR・ダッシュボードを出し続けないように）
+        if state.get("last_attempt_date") == today:
+            print(f"⏭ 今夜は試行済み（{today}・失敗）。再実行は --force")
+            return 0
+
+    lock = _acquire_lock()
+    if lock is None:
+        print("⏭ 別の夜枠が実行中のためスキップ")
+        return 0
+    if args.apply:
+        state.update({"last_attempt_date": today, "last_attempt_at": now.isoformat()})
+        _save_state(state)
 
     fails: list[str] = []
     line_n = 0
