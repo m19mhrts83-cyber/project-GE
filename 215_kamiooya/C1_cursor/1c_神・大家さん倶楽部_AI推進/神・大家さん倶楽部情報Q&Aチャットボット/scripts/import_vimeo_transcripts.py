@@ -60,7 +60,8 @@ def build_records(lesson: dict, text: str, origin: str, course: str) -> list[tup
         key = f"westudy:{lesson['slug']}:vimeo:{video_id}"
         source = {
             "source_key": key, "source_kind": "video", "content_channel": "seminar_video",
-            "title": f"【Vimeo自動字幕・暫定】{lesson.get('title') or lesson['slug']}（動画{video_id}）",
+            # 取込経路は meta_json で管理し、利用者に見えるタイトルには出さない
+            "title": f"{lesson.get('title') or lesson['slug']}（動画{video_id}）",
             "video_id": video_id, "video_url": f"https://vimeo.com/{video_id}",
             "origin_path": origin, "ingest_status": "ready",
             "meta_json": {"transcript_provider": "vimeo_auto", "provisional": True,
