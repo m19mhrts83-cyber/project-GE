@@ -259,6 +259,16 @@ def main() -> int:
             break
         last_err = raw.decode("utf-8", errors="replace")[:120] if raw else ""
         print(f"REST comments: HTTP {status or 'err'} ({i}/{args.retries}) {last_err}")
+        # 402 は Free 枠の利用上限超過（egress 等）による制限。待っても戻らないので即停止
+        if status == 402:
+            reason = "egress_quota" if "egress" in last_err else "quota"
+            print(
+                "::error::Supabase がプラン上限超過で制限中（HTTP 402）。"
+                "リトライでは復旧しない。Dashboard の Usage を確認し、"
+                "請求サイクル更新か使用量削減を待つ。"
+            )
+            print(f"SUMMARY: 疎通=NG 心拍=skipped reason={reason}")
+            return 6
         if i < args.retries:
             time.sleep(args.retry_wait)
     else:
