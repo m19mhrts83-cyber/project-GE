@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## ツール間の引き継ぎ（2026-10-26）
+
+JARVIS/Claude Code由来の案件をCodexが続行したら、各ターンの最終報告前に `/Users/matsunomasaharu2/git-repos/agent-handoff/` の元担当宛てメモを更新する（Claude Code→`to_MissLemon/`、Cursor→`to_Jarvis/`）。起点はユーザー指定・元会話で確認する。受取側は再開時に現在の案件のpendingを読み、実変更を確認して続行する。詳細の正本: `docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。別worktreeでも上記絶対パスを使う。
+
 ## Cursor Cloud specific instructions
 
 このリポジトリは個人自動化モノレポ（Jarvis）です。クラウドで実際に動かせる「アプリ」は次の4つです。Python スクリプト群（`scripts/`, `215_kamiooya/`, `line_unofficial_poc/` など）は Mac 専用（`/Users/matsunomasaharu2` 等のハードコードパス・launchd・Selenium 前提）で、クラウド環境では動かしません。

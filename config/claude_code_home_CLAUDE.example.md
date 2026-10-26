@@ -11,6 +11,8 @@
 
 ## 起点
 
+- **ローカル引き継ぎ（2026-10-26）**: 起動・再開時に `to_MissLemon/` のpendingから現在の案件のメモを読み、Codexの進捗を既存チャットへ反映して続行する。実変更を確認し、受領時accepted、対応後doneを記録する。共通場所は `/Users/matsunomasaharu2/git-repos/agent-handoff/`。別worktreeでもこの絶対パスを使う。詳細は `/Users/matsunomasaharu2/git-repos/docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。通知・自動起動は含まない。
+
 - 運用の起点は **Jarvis（Cursor）**。ルールの正本更新も Jarvis 経由を優先する。
 - 秘密・トークン・パスワードはチャット／MD／Slack に書かない。正本は `~/git-repos/.env.jarvis_private`（社員は各 `.env` 二層）。
 
