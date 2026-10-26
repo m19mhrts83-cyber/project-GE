@@ -457,7 +457,12 @@ def main() -> int:
         args.dry_run = True
 
     watches = _fetch_watches()
-    home_rows = [w for w in watches if visible_on_home(w)]
+    # ops 案件は Slack #ops の報告で見る。Todoist には起票しない（既存タスクにも触らない）
+    excluded = {str(x) for x in (sc.get("exclude_watch_ids") or [])}
+    home_rows = [
+        w for w in watches
+        if visible_on_home(w) and str(w.get("id") or "") not in excluded
+    ]
     state = _load_state()
     mappings: dict[str, Any] = dict(state.get("todoist_by_watch_id") or {})
     hints_state = _load_hints()
