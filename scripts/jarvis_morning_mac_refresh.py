@@ -544,7 +544,8 @@ def partner_111_night_needs_catchup() -> bool:
         data = json.loads(PARTNER_111_NIGHT_STATE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return True
-    return data.get("last_ok_date") != today
+    # 今夜すでに試行済み（失敗含む）なら回収しない（重複起動で QR・ダッシュボードが何度も出るため）
+    return today not in (data.get("last_ok_date"), data.get("last_attempt_date"))
 
 
 def spawn_partner_111_night(*, dry_run: bool) -> str:
