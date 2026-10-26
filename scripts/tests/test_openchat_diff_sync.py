@@ -12,6 +12,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 from jarvis_kurashift_openchat_sync import (  # noqa: E402
     partition_diff_rows,
+    partition_windowed_rows,
     row_fingerprint,
 )
 from jarvis_openchat_publish import is_noise  # noqa: E402
@@ -66,6 +67,31 @@ class DiffSyncTests(unittest.TestCase):
         a = row_fingerprint(_row(thread_title="", sender_name=None))
         b = row_fingerprint(_row(thread_title=None, sender_name=""))
         self.assertEqual(a, b)
+
+    def test_window_old_known_skipped_without_body(self):
+        # 窓より古く DB にある行は本文を照合せず変更なし扱い
+        parsed = [_row(id="oc_old", post_date="2026-09-01", content="本文が違っても")]
+        upsert, unchanged = partition_windowed_rows(parsed, {}, {"oc_old"}, "2026-10-12")
+        self.assertEqual(upsert, [])
+        self.assertEqual(unchanged, 1)
+
+    def test_window_old_but_missing_is_new(self):
+        # スレ追い取り等で古い日付の未登録行が来たら新規として入れる
+        parsed = [_row(id="oc_backfill", post_date="2026-09-01")]
+        upsert, unchanged = partition_windowed_rows(parsed, {}, set(), "2026-10-12")
+        self.assertEqual([r["id"] for r in upsert], ["oc_backfill"])
+        self.assertEqual(unchanged, 0)
+
+    def test_window_recent_compares_body(self):
+        existing = {"oc_r": _row(id="oc_r", post_date="2026-10-20", content="旧")}
+        same = _row(id="oc_s", post_date="2026-10-20")
+        existing["oc_s"] = dict(same)
+        parsed = [_row(id="oc_r", post_date="2026-10-20", content="新"), same]
+        upsert, unchanged = partition_windowed_rows(
+            parsed, existing, {"oc_r", "oc_s"}, "2026-10-12"
+        )
+        self.assertEqual([r["id"] for r in upsert], ["oc_r"])
+        self.assertEqual(unchanged, 1)
 
     def test_noise(self):
         self.assertTrue(is_noise(""))
