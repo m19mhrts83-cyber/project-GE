@@ -443,6 +443,19 @@ export async function fetchDealEvents(
   return (data || []) as DealEvent[];
 }
 
+/** Supabase の英語エラーを Slack 向けの日本語に直す（原文は末尾に短く残す） */
+export function toJapaneseDbError(msg: string | undefined | null): string {
+  const raw = (msg || "").trim();
+  if (!raw) return "データベースの応答がありません（問合せは送っていません）";
+  if (/exceed_egress_quota|restricted due to the following violations/i.test(raw)) {
+    return "Supabase の無料枠（通信量）を使い切り、一時停止中でした。\n問合せは送っていません。枠が戻ったらもう一度押してください。";
+  }
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|timeout/i.test(raw)) {
+    return `データベースにつながりませんでした（問合せは送っていません）。\n少し待ってもう一度押してください。\n原文: ${raw.slice(0, 80)}`;
+  }
+  return `データベースのエラーです（問合せは送っていません）。\n原文: ${raw.slice(0, 120)}`;
+}
+
 export async function applyGate(
   dealId: string,
   action: GateAction,
@@ -459,7 +472,10 @@ export async function applyGate(
     .eq("id", dealId)
     .maybeSingle();
   if (error || !row) {
-    return { ok: false, message: error?.message || "deal not found" };
+    return {
+      ok: false,
+      message: error ? toJapaneseDbError(error.message) : "対象の案件が見つかりません",
+    };
   }
 
   const sj =
@@ -586,7 +602,7 @@ export async function applyGate(
     .single();
 
   if (jobErr) {
-    return { ok: false, message: jobErr.message };
+    return { ok: false, message: toJapaneseDbError(jobErr.message) };
   }
   return {
     ok: true,
