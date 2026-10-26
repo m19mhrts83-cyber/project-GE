@@ -1794,6 +1794,23 @@ def main() -> int:
                 )
         except Exception as e:
             print(f"# mail_action_slack soft-fail: {e}")
+        # ops: pending が多い／queue が止まったときだけ #ops に1日1回（Todoist には起票しない）
+        try:
+            opsr = REPO / "scripts" / "jarvis_night_triage_ops_report.py"
+            if opsr.is_file():
+                o = subprocess.run(
+                    [sys.executable, str(opsr), "--post"],
+                    cwd=str(REPO),
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                print(
+                    f"# night_triage_ops_report: exit={o.returncode} "
+                    f"{(o.stderr or o.stdout or '')[-200:]}"
+                )
+        except Exception as e:
+            print(f"# night_triage_ops_report soft-fail: {e}")
         logf = LOG_DIR / f"run_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.log"
         logf.write_text(
             json.dumps(
