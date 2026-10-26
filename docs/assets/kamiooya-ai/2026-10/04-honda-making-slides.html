@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cursorで作った募集資料｜道具・必要情報・再現プロンプト</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #1e293b; --sub: #64748b; --line: #e2e8f0; --bg: #f8fafc;
+    --accent: #0f766e; --fax: #334155; --mai: #be185d; --map: #047857;
+    --prompt: #1e3a5f;
+  }
+  html, body {
+    background: #0f172a; color: var(--ink);
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .deck { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+  .slide {
+    display: none; width: 100vw; height: 100vh;
+    padding: 22px 34px 28px; background: var(--bg);
+    flex-direction: column; position: absolute; inset: 0;
+  }
+  .slide.on { display: flex; }
+  .top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 12px; flex: none;
+  }
+  .top h1 { font-size: 24px; font-weight: 900; }
+  .top .tag {
+    font-size: 12px; font-weight: 800; color: #fff; background: var(--accent);
+    padding: 4px 11px; border-radius: 999px;
+  }
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  .foot {
+    flex: none; display: flex; justify-content: space-between;
+    margin-top: 8px; font-size: 11px; color: var(--sub); font-weight: 700;
+  }
+  .title-slide {
+    background: linear-gradient(135deg, #0f172a 0%, #0f766e 60%, #14b8a6 100%);
+    color: #fff; justify-content: center; padding: 48px 56px;
+  }
+  .title-slide .eyebrow { font-size: 14px; font-weight: 800; letter-spacing: .16em; opacity: .9; margin-bottom: 12px; }
+  .title-slide h1 { font-size: 36px; font-weight: 900; line-height: 1.25; margin-bottom: 12px; }
+  .title-slide p { font-size: 17px; font-weight: 600; line-height: 1.55; max-width: 900px; opacity: .95; }
+  .chips { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+  .chips span {
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35);
+    padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: 13px;
+  }
+  .lead { font-size: 15px; color: var(--sub); font-weight: 700; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; min-height: 0; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; flex: 1; min-height: 0; }
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 11px;
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 5px; min-height: 0;
+  }
+  .card h3 { font-size: 15px; font-weight: 900; }
+  .card ul { padding-left: 1.1em; }
+  .card li { font-size: 13.5px; font-weight: 700; line-height: 1.4; margin: 2px 0; }
+  .who {
+    font-size: 11px; font-weight: 800; color: #fff; align-self: flex-start;
+    padding: 2px 9px; border-radius: 999px;
+  }
+  .fax .who { background: var(--fax); }
+  .mai .who { background: var(--mai); }
+  .map .who { background: var(--map); }
+  .fax h3 { color: var(--fax); }
+  .mai h3 { color: var(--mai); }
+  .map h3 { color: var(--map); }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+  th, td {
+    border: 1px solid var(--line); padding: 7px 9px; text-align: left;
+    font-size: 12.5px; font-weight: 700; vertical-align: top;
+  }
+  th { background: #e2e8f0; font-weight: 900; white-space: nowrap; }
+  .tool {
+    display: inline-block; background: #ccfbf1; color: #115e59;
+    border-radius: 5px; padding: 1px 6px; font-weight: 800; font-size: 11.5px; margin: 1px 1px 1px 0;
+  }
+  .ext {
+    display: inline-block; background: #ffedd5; color: #9a3412;
+    border-radius: 5px; padding: 1px 6px; font-weight: 800; font-size: 11.5px; margin: 1px 1px 1px 0;
+  }
+  .opus {
+    display: inline-block; background: #ede9fe; color: #5b21b6;
+    border-radius: 5px; padding: 1px 6px; font-weight: 800; font-size: 11.5px;
+  }
+  .note {
+    background: #ecfeff; border: 1px solid #99f6e4; border-radius: 9px;
+    padding: 8px 12px; font-size: 12.5px; font-weight: 700; color: #115e59;
+  }
+  .warn {
+    background: #faf5ff; border: 1px solid #d8b4fe; border-radius: 9px;
+    padding: 8px 12px; font-size: 12.5px; font-weight: 700; color: #5b21b6;
+  }
+  .prompt {
+    background: #0f172a; color: #e2e8f0; border-radius: 10px;
+    padding: 10px 12px; font-size: 11.5px; font-weight: 600; line-height: 1.45;
+    font-family: "SF Mono", Menlo, Consolas, monospace; white-space: pre-wrap; flex: 1; overflow: hidden;
+  }
+  .prompt b { color: #5eead4; font-weight: 800; }
+  .steps-h {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; flex: none;
+  }
+  .steps-h .s {
+    background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px;
+  }
+  .steps-h .s .n {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff;
+    font-size: 11px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center;
+    margin-right: 4px;
+  }
+  .steps-h .s b { font-size: 13px; font-weight: 900; }
+  .steps-h .s span { display: block; font-size: 11.5px; color: var(--sub); font-weight: 700; margin-top: 3px; line-height: 1.35; }
+  @media print {
+    html, body { background: #fff; }
+    .deck { width: auto; height: auto; overflow: visible; }
+    .slide {
+      display: flex !important; position: relative;
+      width: 297mm; height: 210mm; page-break-after: always; break-after: page;
+    }
+    .slide:last-child { page-break-after: auto; }
+    .nav-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- 1 -->
+  <section class="slide title-slide on">
+    <div class="eyebrow">DX勉強会 ／ Cursor実例</div>
+    <h1>募集資料をCursorで再現する<br>必要情報・道具・プロンプト</h1>
+    <p>サンプル資料はすでに共有済み、という前提です。<br>
+    「全体イメージ → 必要情報を1つずつ埋める → Autoで下ごしらえ → 最後の描写だけ Opus 5.5」の型を共有します。</p>
+    <div class="chips">
+      <span>FAX</span><span>マイソク</span><span>周辺マップ</span>
+      <span>再現プロンプト</span><span>Opus 5.5は描写だけ</span>
+    </div>
+    <div class="foot" style="color:rgba(255,255,255,.75); width:100%; margin-top:28px;">
+      <span>物件の住所・電話などは載せていません</span>
+      <span>1 / 11</span>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <div class="top"><h1>モデルの使い分け（コストを守る）</h1><span class="tag">重要</span></div>
+    <div class="body">
+      <div class="warn">
+        <span class="opus">Opus 5.5</span> は使用量がとても限られる。<br>
+        今回の実作業も、<b>下ごしらえ〜情報整理は Auto</b>、<b>最終の見た目（描写）だけ Opus 5.5</b> にした。
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>Auto（または通常モデル）でやる</h3>
+          <ul>
+            <li>必要情報の洗い出し・チェックリスト埋め</li>
+            <li>見本HTMLのコピー・数字の差し替え</li>
+            <li>写真の縮小、ファイル整理</li>
+            <li>地図データの取得・スクリプト実行</li>
+            <li>PDF書き出し・ページ数確認</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="opus">Opus 5.5</span> でやる（最後だけ）</h3>
+          <ul>
+            <li>レイアウトの最終調整（余白・階層・色）</li>
+            <li>見出し・チップ・写真枠など「見た目」</li>
+            <li>サンプル資料に寄せたタッチの仕上げ</li>
+            <li>1回で決め打ちできるよう、情報は先に全部埋める</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note">プロンプトの共通型：①全体イメージ確認 → ②必要情報を1項目ずつ確認して埋める → ③Autoで下書き → ④Opusで描写のみ。</div>
+    </div>
+    <div class="foot"><span class="nav-hint">← → またはスペースで進む</span><span>2 / 11</span></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide">
+    <div class="top"><h1>再現の進め方（3資料共通）</h1><span class="tag">型</span></div>
+    <div class="body">
+      <div class="steps-h">
+        <div class="s"><span class="n">1</span><b>全体イメージ</b><span>手元のサンプルを見せて「このタッチで」と伝える</span></div>
+        <div class="s"><span class="n">2</span><b>必要情報を埋める</b><span>チェックリストを1項目ずつ。空欄のまま進めない</span></div>
+        <div class="s"><span class="n">3</span><b>Autoで下書き</b><span>HTML・差し替え・PDFまで通す</span></div>
+        <div class="s"><span class="n">4</span><b>Opusで描写</b><span>見た目だけ。情報の追加はしない</span></div>
+      </div>
+      <table style="margin-top:4px;">
+        <tr><th></th><th>FAX</th><th>マイソク</th><th>周辺マップ</th></tr>
+        <tr>
+          <th>Cursor内</th>
+          <td><span class="tool">チャット</span><span class="tool">HTML</span><span class="tool">ターミナル</span></td>
+          <td><span class="tool">チャット</span><span class="tool">HTML</span><span class="tool">画像</span><span class="tool">Python</span></td>
+          <td><span class="tool">チャット</span><span class="tool">Python</span><span class="tool">HTML生成</span></td>
+        </tr>
+        <tr>
+          <th>外</th>
+          <td><span class="ext">Chrome PDF</span><span class="ext">間取り</span></td>
+          <td><span class="ext">写真</span><span class="ext">間取り</span><span class="ext">ペルソナ</span><span class="ext">Chrome</span></td>
+          <td><span class="ext">OSM</span><span class="ext">OSRM</span><span class="ext">Googleマップ</span><span class="ext">Chrome</span></td>
+        </tr>
+        <tr>
+          <th>出口</th>
+          <td>A4縦・白黒1枚</td>
+          <td>A4横・カラー1枚</td>
+          <td>A4縦・カラー1枚</td>
+        </tr>
+      </table>
+    </div>
+    <div class="foot"><span></span><span>3 / 11</span></div>
+  </section>
+
+  <!-- 4 FAX info -->
+  <section class="slide">
+    <div class="top"><h1>① FAX｜必要情報（1つずつ埋める）</h1><span class="tag" style="background:#334155;">FAX</span></div>
+    <div class="body">
+      <p class="lead">サンプルを見せたうえで、下の項目をチャットで1つずつ確認して埋める。</p>
+      <div class="grid2">
+        <div class="card fax">
+          <span class="who">全体イメージ・タッチ</span>
+          <ul>
+            <li>白黒FAXでも読める（黒帯＋太い線）</li>
+            <li>A4縦・必ず1ページ</li>
+            <li>サンプルの構成に寄せる</li>
+          </ul>
+          <h3 style="margin-top:6px;">必要情報チェック</h3>
+          <ul>
+            <li>□ 募集室・賃料・共益費</li>
+            <li>□ 初期費用の目安（手数料の扱い）</li>
+            <li>□ AD・特典・期限</li>
+            <li>□ 決めやすい理由（最大3）</li>
+            <li>□ 設備・駐車場・内見方法</li>
+            <li>□ 問い合わせ窓口</li>
+            <li>□ 間取り図ファイル</li>
+            <li>□ QR先（任意）</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>使った道具</h3>
+          <ul>
+            <li><span class="tool">チャット</span> 情報確認→HTML指示</li>
+            <li><span class="tool">HTML/CSS編集</span></li>
+            <li><span class="tool">ターミナル</span> ページ数確認</li>
+            <li><span class="ext">Chrome headless</span> PDF化</li>
+            <li>描写の最終調整：<span class="opus">Opus 5.5</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span></span><span>4 / 11</span></div>
+  </section>
+
+  <!-- 5 FAX prompt -->
+  <section class="slide">
+    <div class="top"><h1>① FAX｜再現プロンプト（コピー用）</h1><span class="tag" style="background:#334155;">FAX</span></div>
+    <div class="body">
+      <div class="prompt"><b>【Phase A｜Auto】情報を1つずつ埋める</b>
+手元にある仲介向けFAXのサンプルと同じ系統で作りたい。
+まだファイルは作らないで。
+次のチェック項目を、上から1つずつ聞いて。
+私が答えたら表に追記し、全部埋まるまで次の質問へ進んで。
+・募集室／賃料／共益費／初期費用（仲介手数料の扱い）
+・AD・特典・期限
+・決めやすい理由（最大3）
+・設備・駐車場・内見方法・問い合わせ窓口
+・間取り図のパス／QR先の有無
+全部埋まったら、差し替え表を見せて確認を取って。
+
+<b>【Phase B｜Auto】下書き</b>
+確認した表どおりに、サンプルHTMLを型にしてA4縦・白黒・1ページのFAXを作って。
+Chrome headlessでPDF化し、ページ数が1か確認して。
+見た目の作り込みはまだしないで。
+
+<b>【Phase C｜Opus 5.5】描写だけ</b>
+情報・文言・数字は変えないで。
+サンプルに近いタッチで、余白・黒帯・表の見やすさだけ最終調整してPDFを書き直して。
+Opusは描写だけ。情報追加や作り直しはしないで。</div>
+    </div>
+    <div class="foot"><span></span><span>5 / 11</span></div>
+  </section>
+
+  <!-- 6 マイソク info -->
+  <section class="slide">
+    <div class="top"><h1>② マイソク｜必要情報（1つずつ埋める）</h1><span class="tag" style="background:#be185d;">マイソク</span></div>
+    <div class="body">
+      <p class="lead">号室ごと1枚。写真枠の位置はサンプルどおり固定し、中身だけ差し替える。</p>
+      <div class="grid2">
+        <div class="card mai">
+          <span class="who">全体イメージ・タッチ</span>
+          <ul>
+            <li>A4横・カラー・1ページ</li>
+            <li>サンプルのピンク系タッチに寄せる</li>
+            <li>上：外観＋見出し／下：概要｜ペルソナ｜写真</li>
+          </ul>
+          <h3 style="margin-top:6px;">必要情報チェック</h3>
+          <ul>
+            <li>□ 号室・間取り・面積・賃料・管理費</li>
+            <li>□ 外観／メイン／サブ1〜3の写真パス</li>
+            <li>□ 間取り図・ペルソナ画像</li>
+            <li>□ キャッチ・写真コメント・吹き出し文</li>
+            <li>□ 概要項目・問い合わせ先</li>
+            <li>□ CG家具を使う場合の注記</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>使った道具</h3>
+          <ul>
+            <li><span class="tool">チャット</span> 文言合意・差し替え表</li>
+            <li><span class="tool">Markdown</span> 決定メモ</li>
+            <li><span class="tool">画像を開く</span> 写真選定</li>
+            <li><span class="tool">Python+Pillow</span> 縮小・加工</li>
+            <li><span class="tool">HTML/CSS</span> 配置</li>
+            <li><span class="ext">Chrome</span> PDF</li>
+            <li>描写の最終調整：<span class="opus">Opus 5.5</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span></span><span>6 / 11</span></div>
+  </section>
+
+  <!-- 7 マイソク prompt -->
+  <section class="slide">
+    <div class="top"><h1>② マイソク｜再現プロンプト（コピー用）</h1><span class="tag" style="background:#be185d;">マイソク</span></div>
+    <div class="body">
+      <div class="prompt"><b>【Phase A｜Auto】情報を1つずつ埋める</b>
+手元のマイソク・サンプルと同じレイアウト系統で、〇〇号室を作りたい。
+まだ本番ファイルは作らないで。
+次を1項目ずつ聞いて、答えを表に埋めて。全部埋まるまで進まないで。
+・全体タッチ（サンプルに寄せる／色の指定）
+・号室・間取り・面積・賃料・管理費・敷礼
+・写真パス（外観／メインLDK／サブ1居室／サブ2キッチン／サブ3トイレ）
+・間取り図・ペルソナ画像のパス
+・キャッチ／各写真コメント／吹き出し文（改行位置も）
+・概要に載せる項目・問い合わせ先・注記
+全部埋まったら表を見せて確認を取って。
+
+<b>【Phase B｜Auto】下書き</b>
+確認した内容でHTMLを組み、写真は枠サイズ固定のまま差し替えて。
+素材は縮小して素材フォルダへ。ChromeでPDF化し1ページか確認して。
+見た目の作り込みはまだしないで。
+
+<b>【Phase C｜Opus 5.5】描写だけ</b>
+数字・文言・写真の割り当ては変えないで。
+サンプルに近い上品なタッチで、余白・見出し・写真枠・吹き出しだけ最終調整してPDFを書き直して。
+Opusは描写のみ。情報の追加や構成の作り直しはしないで。</div>
+    </div>
+    <div class="foot"><span></span><span>7 / 11</span></div>
+  </section>
+
+  <!-- 8 マップ info -->
+  <section class="slide">
+    <div class="top"><h1>③ 周辺マップ｜必要情報（1つずつ埋める）</h1><span class="tag" style="background:#047857;">マップ</span></div>
+    <div class="body">
+      <p class="lead">号室なしの汎用1枚。場所データが多いので、埋め終わるまで本番に入らない。</p>
+      <div class="grid2">
+        <div class="card map">
+          <span class="who">全体イメージ・タッチ</span>
+          <ul>
+            <li>A4縦・カラー・1ページ</li>
+            <li>サンプル同様：ヘッダ＋地図＋徒歩／車一覧</li>
+            <li>吹き出しは増やしすぎない</li>
+          </ul>
+          <h3 style="margin-top:6px;">必要情報チェック</h3>
+          <ul>
+            <li>□ 地図の緯度経度範囲・物件座標</li>
+            <li>□ 徒歩施設（名前・カテゴリ・分数・座標）</li>
+            <li>□ 車施設（ジャンル・名前・分数）</li>
+            <li>□ 駅の起点（出口など）と掲示用分数</li>
+            <li>□ 外観・施設写真・ペルソナ</li>
+            <li>□ 吹き出し2本の文案</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>使った道具</h3>
+          <ul>
+            <li><span class="tool">Python prep.py</span> 地図素材生成</li>
+            <li><span class="ext">OpenStreetMap</span> タイル</li>
+            <li><span class="ext">OSRM</span> 徒歩ルート</li>
+            <li><span class="tool">Pillow</span> 薄色化・写真・顔</li>
+            <li><span class="tool">Python build.py</span> HTML生成</li>
+            <li><span class="ext">Googleマップ</span> 所要の確認</li>
+            <li><span class="ext">Chrome</span> PDF</li>
+            <li>描写の最終調整：<span class="opus">Opus 5.5</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span></span><span>8 / 11</span></div>
+  </section>
+
+  <!-- 9 マップ prompt -->
+  <section class="slide">
+    <div class="top"><h1>③ 周辺マップ｜再現プロンプト（コピー用）</h1><span class="tag" style="background:#047857;">マップ</span></div>
+    <div class="body">
+      <div class="prompt"><b>【Phase A｜Auto】情報を1つずつ埋める</b>
+手元の周辺マップ・サンプルと同じ系統で作りたい。号室・電話は入れない汎用1枚。
+まだ本番は作らないで。
+次を1項目ずつ聞いて表に埋めて。空欄のまま先に進まないで。
+・全体タッチ（サンプル準拠）
+・地図範囲（南北・東西の緯度経度）と物件座標
+・徒歩ピン一覧（番号・カテゴリ・名前・分数・座標・一言の有無）
+・車一覧（ジャンル・名前・分数）
+・駅の起点（出口など）と掲示する分数
+・写真カード（ファイル・所要・一言）と吹き出し2本の文案
+全部埋まったら表を見せて確認を取って。
+
+<b>【Phase B｜Auto】下書き</b>
+確認したデータで prep → build を回し、HTMLを生成して。
+ChromeでPDF化し1ページか確認して。ピンの重なりなど明らかな破綻だけ直して。
+見た目の作り込みはまだしないで。
+
+<b>【Phase C｜Opus 5.5】描写だけ</b>
+施設名・分数・座標データは変えないで。
+サンプルに近いタッチで、ヘッダ・吹き出し・写真カード・余白だけ最終調整してPDFを書き直して。
+Opusは描写のみ。施設の追加や地図範囲の作り直しはしないで。</div>
+    </div>
+    <div class="foot"><span></span><span>9 / 11</span></div>
+  </section>
+
+  <!-- 10 データの流れ -->
+  <section class="slide">
+    <div class="top"><h1>データの流れ（ざっくり）</h1><span class="tag">構造</span></div>
+    <div class="body">
+      <table>
+        <tr>
+          <th>資料</th>
+          <th>人が渡すもの</th>
+          <th>Autoが作るもの</th>
+          <th>Opus 5.5</th>
+          <th>最後</th>
+        </tr>
+        <tr>
+          <td><b>FAX</b></td>
+          <td>条件の数字・特典</td>
+          <td>HTML下書き</td>
+          <td>見た目の最終調整</td>
+          <td>Chrome→PDF</td>
+        </tr>
+        <tr>
+          <td><b>マイソク</b></td>
+          <td>写真・文言</td>
+          <td>素材縮小＋HTML下書き</td>
+          <td>見た目の最終調整</td>
+          <td>Chrome→PDF</td>
+        </tr>
+        <tr>
+          <td><b>周辺マップ</b></td>
+          <td>座標・施設・所要</td>
+          <td>prep/build→HTML</td>
+          <td>見た目の最終調整</td>
+          <td>Chrome→PDF</td>
+        </tr>
+      </table>
+      <div class="grid2" style="flex:0;">
+        <div class="card">
+          <h3>再現性を上げるコツ</h3>
+          <ul>
+            <li>サンプルPDF/HTMLをチャットに渡す（またはパスを示す）</li>
+            <li>Phase Aで表が埋まるまでファイルを作らせない</li>
+            <li>Opusには「情報は変えるな・描写だけ」と明記</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>残しておくと次回が速いもの</h3>
+          <ul>
+            <li>完成HTML（型）</li>
+            <li>マップ用 prep.py / build.py</li>
+            <li>今回のような「Phase A/B/C」プロンプト</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span></span><span>10 / 11</span></div>
+  </section>
+
+  <!-- 11 まとめ -->
+  <section class="slide">
+    <div class="top"><h1>ひとことで言うと</h1><span class="tag">まとめ</span></div>
+    <div class="body">
+      <div class="grid3">
+        <div class="card fax">
+          <span class="who">FAX</span>
+          <h3>表組みの文書</h3>
+          <ul>
+            <li>入力：条件の数字</li>
+            <li>道具：HTML＋Chrome</li>
+            <li>Opus：黒帯や余白の仕上げ</li>
+          </ul>
+        </div>
+        <div class="card mai">
+          <span class="who">マイソク</span>
+          <h3>写真付きチラシ</h3>
+          <ul>
+            <li>入力：写真と文言</li>
+            <li>道具：HTML＋Pillow＋Chrome</li>
+            <li>Opus：色と枠の仕上げ</li>
+          </ul>
+        </div>
+        <div class="card map">
+          <span class="who">周辺マップ</span>
+          <h3>地図データの組版</h3>
+          <ul>
+            <li>入力：座標と施設</li>
+            <li>道具：Python＋OSM/OSRM＋Chrome</li>
+            <li>Opus：ヘッダや吹き出しの仕上げ</li>
+          </ul>
+        </div>
+      </div>
+      <div class="warn" style="margin-top:4px;">
+        Cursorは「デザインソフトの代わり」ではなく、<b>情報を埋めて・ファイルを書いて・PDFまで通す作業机</b>。<br>
+        <span class="opus">Opus 5.5</span> は最後の描写だけ。その前は Auto で十分回せる。
+      </div>
+    </div>
+    <div class="foot"><span></span><span>11 / 11</span></div>
+  </section>
+
+</div>
+<script>
+(function () {
+  const slides = [...document.querySelectorAll('.slide')];
+  let i = 0;
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, idx) => s.classList.toggle('on', idx === i));
+  }
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowRight', 'ArrowDown', ' ', 'PageDown', 'Enter'].includes(e.key)) {
+      e.preventDefault(); show(i + 1);
+    } else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key)) {
+      e.preventDefault(); show(i - 1);
+    } else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+  });
+})();
+</script>
+</body>
+</html>
