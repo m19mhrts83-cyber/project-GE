@@ -234,6 +234,7 @@ def write_lane_logs(result: dict[str, Any]) -> None:
 
 
 def push_cards(cards: list[dict[str, Any]]) -> int:
+    from jarvis_supabase_errors import abort_on_quota
     from supabase import create_client
 
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
@@ -253,6 +254,7 @@ def push_cards(cards: list[dict[str, Any]]) -> int:
         )
         remote_locked = {x["id"] for x in (r.data or [])}
     except Exception as e:
+        abort_on_quota(e)
         print(f"# archive/promoted merge skipped: {e}", file=sys.stderr)
 
     rows = []
@@ -274,23 +276,27 @@ def push_cards(cards: list[dict[str, Any]]) -> int:
                 "updated_at": c.get("updated_at") or now_iso(),
             }
         )
-    n = 0
-    for i in range(0, len(rows), 40):
-        chunk = rows[i : i + 40]
-        sb.table("cards").upsert(chunk, on_conflict="id").execute()
-        n += len(chunk)
-    sb.table("sync_meta").upsert(
-        {
-            "key": "lane_digest",
-            "value": json.dumps(
-                {"updated_at": now_iso(), "card_ids": [c["id"] for c in rows]},
-                ensure_ascii=False,
-            ),
-            "updated_at": now_iso(),
-        },
-        on_conflict="key",
-    ).execute()
-    return n
+    try:
+        n = 0
+        for i in range(0, len(rows), 40):
+            chunk = rows[i : i + 40]
+            sb.table("cards").upsert(chunk, on_conflict="id").execute()
+            n += len(chunk)
+        sb.table("sync_meta").upsert(
+            {
+                "key": "lane_digest",
+                "value": json.dumps(
+                    {"updated_at": now_iso(), "card_ids": [c["id"] for c in rows]},
+                    ensure_ascii=False,
+                ),
+                "updated_at": now_iso(),
+            },
+            on_conflict="key",
+        ).execute()
+        return n
+    except Exception as e:
+        abort_on_quota(e)
+        raise
 
 
 def main(argv: list[str] | None = None) -> int:

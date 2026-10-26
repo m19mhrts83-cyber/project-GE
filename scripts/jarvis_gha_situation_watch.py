@@ -71,7 +71,13 @@ def format_days_ago(n: int) -> str:
 
 
 def fetch_sync_meta(sb) -> dict[str, str]:
-    r = sb.table("sync_meta").select("key,value").execute()
+    try:
+        r = sb.table("sync_meta").select("key,value").execute()
+    except Exception as e:
+        from jarvis_supabase_errors import abort_on_quota
+
+        abort_on_quota(e)
+        raise
     return {str(x["key"]): str(x.get("value") or "") for x in (r.data or [])}
 
 
@@ -269,65 +275,73 @@ def main(argv: list[str] | None = None) -> int:
         print("JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY が必要", file=sys.stderr)
         return 1
 
+    from jarvis_supabase_errors import abort_on_quota
     from supabase import create_client
 
     sb = create_client(url, key)
-    meta = fetch_sync_meta(sb)
-    items = check_collect_freshness(meta) + [check_westudy()]
-
-    # Vercel / GHA Fail 監視（ops_fail_watch）
     try:
-        sys.path.insert(0, str(__file__).rsplit("/", 1)[0])
-        from jarvis_ops_fail_watch import collect_items as collect_ops_fail
+        meta = fetch_sync_meta(sb)
+        items = check_collect_freshness(meta) + [check_westudy()]
 
-        items.extend(collect_ops_fail())
-    except Exception as e:
-        print(f"# ops_fail_watch skip: {e}", file=sys.stderr)
-        items.append(
-            {
-                "id": "vercel_deploy",
-                "title": "Vercelデプロイ",
-                "category": "ops",
-                "level": "attention",
-                "summary": f"ops_fail_watch 取込失敗: {e}",
-                "detail": None,
-                "source": "gha:ops_fail_watch",
-                "cursor_prompt": "Vercel / GHA の失敗監視スクリプトを確認して。",
-                "status": "active",
-                "checked_at": now_iso(),
-                "payload": {"show_banner": True, "origin": "gha"},
-            }
-        )
+        # Vercel / GHA Fail 監視（ops_fail_watch）
+        try:
+            sys.path.insert(0, str(__file__).rsplit("/", 1)[0])
+            from jarvis_ops_fail_watch import collect_items as collect_ops_fail
 
-    print(json.dumps({"count": len(items), "items": items}, ensure_ascii=False, indent=2))
-    if args.dry_run:
+            items.extend(collect_ops_fail())
+        except Exception as e:
+            print(f"# ops_fail_watch skip: {e}", file=sys.stderr)
+            items.append(
+                {
+                    "id": "vercel_deploy",
+                    "title": "Vercelデプロイ",
+                    "category": "ops",
+                    "level": "attention",
+                    "summary": f"ops_fail_watch 取込失敗: {e}",
+                    "detail": None,
+                    "source": "gha:ops_fail_watch",
+                    "cursor_prompt": "Vercel / GHA の失敗監視スクリプトを確認して。",
+                    "status": "active",
+                    "checked_at": now_iso(),
+                    "payload": {"show_banner": True, "origin": "gha"},
+                }
+            )
+
+        print(json.dumps({"count": len(items), "items": items}, ensure_ascii=False, indent=2))
+        if args.dry_run:
+            return 0
+
+        # リモートで archived のものは潰さない
+        remote_arch: set[str] = set()
+        try:
+            r = sb.table("watch_status").select("id").eq("status", "archived").execute()
+            remote_arch = {str(x["id"]) for x in (r.data or [])}
+        except Exception as e:
+            abort_on_quota(e)
+            print(f"# archive merge skip: {e}", file=sys.stderr)
+
+        rows = []
+        for it in items:
+            if it["id"] in remote_arch:
+                continue
+            rows.append(to_row(it))
+        if rows:
+            sb.table("watch_status").upsert(rows, on_conflict="id").execute()
+        meta_now = now_iso()
+        sb.table("sync_meta").upsert(
+            [
+                {"key": "gha_watch_pushed_at", "value": meta_now, "updated_at": meta_now},
+                {"key": "watch_source", "value": "gha", "updated_at": meta_now},
+            ],
+            on_conflict="key",
+        ).execute()
+        print(f"# watch upserted {len(rows)}", file=sys.stderr)
         return 0
-
-    # リモートで archived のものは潰さない
-    remote_arch: set[str] = set()
-    try:
-        r = sb.table("watch_status").select("id").eq("status", "archived").execute()
-        remote_arch = {str(x["id"]) for x in (r.data or [])}
+    except SystemExit:
+        raise
     except Exception as e:
-        print(f"# archive merge skip: {e}", file=sys.stderr)
-
-    rows = []
-    for it in items:
-        if it["id"] in remote_arch:
-            continue
-        rows.append(to_row(it))
-    if rows:
-        sb.table("watch_status").upsert(rows, on_conflict="id").execute()
-    meta_now = now_iso()
-    sb.table("sync_meta").upsert(
-        [
-            {"key": "gha_watch_pushed_at", "value": meta_now, "updated_at": meta_now},
-            {"key": "watch_source", "value": "gha", "updated_at": meta_now},
-        ],
-        on_conflict="key",
-    ).execute()
-    print(f"# watch upserted {len(rows)}", file=sys.stderr)
-    return 0
+        abort_on_quota(e)
+        raise
 
 
 if __name__ == "__main__":
