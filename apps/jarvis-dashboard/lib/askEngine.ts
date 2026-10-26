@@ -36,6 +36,24 @@ function shortReason(err: string): string {
   return `${t.slice(0, 77)}…`;
 }
 
+type AskCost = "free" | "flat" | "metered";
+const COST_LABEL: Record<AskCost, string> = { free: "無料枠", flat: "定額枠内", metered: "従量" };
+
+/** 契約で変わる費用区分は env で指定する。未設定・不明は従量扱い（安全側）。 */
+function askCost(name: string): AskCost {
+  const v = (process.env[name] || "").trim().toLowerCase();
+  return v === "free" || v === "flat" ? v : "metered";
+}
+
+/** 「自動」で試す許可済み経路を、費用ゼロ→軽い→重い→従量の順に並べる */
+export function autoRouteOrder(): { id: "gemini" | "cloud"; cost: AskCost; weight: number }[] {
+  const routes: { id: "gemini" | "cloud"; cost: AskCost; weight: number }[] = [];
+  if (process.env.ASK_AUTO_ALLOW_GEMINI === "1") routes.push({ id: "gemini", cost: askCost("ASK_COST_GEMINI"), weight: 0 });
+  if (process.env.ASK_AUTO_ALLOW_CLOUD === "1") routes.push({ id: "cloud", cost: askCost("ASK_COST_CLOUD"), weight: 1 });
+  const rank = (c: AskCost) => (c === "metered" ? 1 : 0);
+  return routes.sort((a, b) => rank(a.cost) - rank(b.cost) || a.weight - b.weight);
+}
+
 /**
  * 選択エンジンに従い返答を得る。Cloud 選択時のみ Gemini へ自動フォールバック。
  */
@@ -48,6 +66,7 @@ export async function resolveAskReply(opts: {
   const cacheKey = opts.cacheScope ? createHash("sha256").update(JSON.stringify([
     opts.cacheScope, opts.engine, opts.prompt, process.env.GEMINI_MODEL,
     process.env.ASK_AUTO_ALLOW_GEMINI, process.env.ASK_AUTO_ALLOW_CLOUD,
+    process.env.ASK_COST_GEMINI, process.env.ASK_COST_CLOUD,
   ])).digest("hex") : null;
   for (const [key, entry] of replyCache) if (entry.expires <= started) replyCache.delete(key);
   const cached = cacheKey ? replyCache.get(cacheKey) : undefined;
@@ -81,16 +100,19 @@ async function resolveAskReplyInternal(opts: {
 
   if (opts.engine === "auto") {
     // APIキーの存在は課金許可を意味しない。無料枠の有無も推測しない。
-    if (process.env.ASK_AUTO_ALLOW_GEMINI === "1") {
-      const gem = await geminiReply(prompt, { maxAttempts: 1, timeoutMs: 20_000, maxOutputTokens: 2048 });
-      if (gem.ok) return { ok: true, text: gem.text, via: "gemini", fallbackNotices: ["自動: 許可済みの軽量APIで回答しました"] };
-      notices.push(`軽量APIで回答できませんでした（${shortReason(gem.error)}）`);
-    }
-    if (process.env.ASK_AUTO_ALLOW_CLOUD === "1") {
-      const apiKey = (process.env.CURSOR_API_KEY || "").trim();
-      if (apiKey) {
+    // R4: 追加費用ゼロ（free/flat）→ 軽い順 → 重い → 従量 の順に試す（49_共通ルール）。
+    for (const route of autoRouteOrder()) {
+      const label = `${COST_LABEL[route.cost]}の${route.weight === 0 ? "軽量" : "高性能"}経路`;
+      if (notices.length) notices.push(`次の経路へ上げます: ${label}`);
+      if (route.id === "gemini") {
+        const gem = await geminiReply(prompt, { maxAttempts: 1, timeoutMs: 20_000, maxOutputTokens: 2048 });
+        if (gem.ok) return { ok: true, text: gem.text, via: "gemini", fallbackNotices: [...notices, `自動: 許可済みの${label}（Gemini）で回答しました`] };
+        notices.push(`Geminiで回答できませんでした（${shortReason(gem.error)}）`);
+      } else {
+        const apiKey = (process.env.CURSOR_API_KEY || "").trim();
+        if (!apiKey) continue;
         const cloud = await askWithCloudAgent({ apiKey, prompt, timeoutMs: CLOUD_ASK_TIMEOUT_MS });
-        if (cloud.ok) return { ok: true, text: cloud.text, via: "cloud", fallbackNotices: [...notices, "自動: 許可済みのCloud経路で回答しました"] };
+        if (cloud.ok) return { ok: true, text: cloud.text, via: "cloud", fallbackNotices: [...notices, `自動: 許可済みの${label}（Cloud）で回答しました`] };
         notices.push(`Cloudで回答できませんでした（${shortReason(cloud.error)}）`);
       }
     }
