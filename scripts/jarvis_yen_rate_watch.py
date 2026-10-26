@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import ssl
 import subprocess
 import sys
@@ -549,6 +550,51 @@ def _optional_news() -> str:
         return ""
 
 
+DASHBOARD_YEN_URL = "https://jarvis-dashboard-amber.vercel.app/yen"
+
+
+def build_short_view(*, st_all: dict[str, Any], compares: list[dict[str, Any]]) -> str:
+    """Slack 用の見立て1行（iPhone・売買指図なし）。長文は reports の MD 側。"""
+    parts: list[str] = []
+    mom = next((c for c in compares if c.get("label") == "約1ヶ月前"), None)
+    if mom and not mom.get("missing") and mom.get("change_pct") is not None:
+        pct = float(mom["change_pct"])
+        if abs(pct) >= 2.0:
+            parts.append("1ヶ月で" + ("円安" if pct > 0 else "円高") + "寄り")
+        else:
+            parts.append("1ヶ月の振れは小さめ")
+    last = float(st_all.get("last") or 0)
+    hi, lo = st_all.get("high"), st_all.get("low")
+    if hi is not None and lo is not None and last and float(hi) > float(lo):
+        pos = (last - float(lo)) / (float(hi) - float(lo))
+        if pos >= 0.75:
+            parts.append("レンジ高め帯")
+        elif pos <= 0.25:
+            parts.append("レンジ低め帯")
+        else:
+            parts.append("レンジの中ほど")
+    return "。".join(parts) + ("。" if parts else "")
+
+
+def _compare_line(c: dict[str, Any]) -> str:
+    label = {"前日比": "前日比", "約1ヶ月前": "1ヶ月前比", "約1年前": "1年前比"}.get(
+        c["label"], c["label"]
+    )
+    if c.get("missing"):
+        return f"{label} —"
+    return (
+        f"{label} {_fmt_signed(c['change'])}円"
+        f"（{_fmt_signed(c['change_pct'], suffix='%')}）"
+    )
+
+
+def _md(d: Any) -> str:
+    """2026-10-26 → 10/26（スマホで短く）。"""
+    t = str(d or "")
+    m = re.match(r"\d{4}-(\d{2})-(\d{2})", t)
+    return f"{int(m.group(1))}/{int(m.group(2))}" if m else (t or "—")
+
+
 def build_text(
     *,
     source: str,
@@ -559,29 +605,25 @@ def build_text(
     news: str,
     evaluation: str = "",
 ) -> str:
+    """Slack #report 短報（iPhone 前提: 等幅表・英語要約・定型注記は出さない）。
+
+    表・ニュース要約・長い見立ては reports の MD とダッシュ /yen に残す。
+    source / chart_rel / news / evaluation は互換のため受ける。
+    """
     last = st_all.get("last", 0) or 0
-    last_date = st_all.get("last_date") or "—"
     lines = [
         f"【{AGENT_ID} {AGENT_NAME}｜USDJPY】",
-        f"終値 {last:.2f} 円（{last_date}）／ソース: {source}",
+        f"{last:.2f}円（{_md(st_all.get('last_date'))}）",
         "",
-        "■ 比較（終値との差）",
-        *_table_ascii(compares),
+        *[_compare_line(c) for c in compares],
         "",
-        "■ レンジ",
-        f"取得期間  高 {_fmt_px(st_all.get('high'))}（{st_all.get('high_date')}）"
-        f"  /  安 {_fmt_px(st_all.get('low'))}（{st_all.get('low_date')}）",
-        f"直近31日  高 {_fmt_px(st_daily.get('high'))}  /  安 {_fmt_px(st_daily.get('low'))}"
-        f"  （n={st_daily.get('n', 0)}）",
-        "",
-        f"チャート: {chart_rel}",
-        "ダッシュ: /yen",
-        "注: 報告のみ。売買・ポジション指図はしない。",
+        f"直近31日 {_fmt_px(st_daily.get('low'))}〜{_fmt_px(st_daily.get('high'))}",
+        f"取得期間 {_fmt_px(st_all.get('low'))}〜{_fmt_px(st_all.get('high'))}",
     ]
-    if evaluation:
-        lines.extend(["", f"見立て: {evaluation}"])
-    elif news:
-        lines.extend(["", f"ニュース要約: {news}"])
+    view = build_short_view(st_all=st_all, compares=compares)
+    if view:
+        lines.extend(["", f"見立て: {view}"])
+    lines.extend(["", f"<{DASHBOARD_YEN_URL}|グラフを見る>"])
     return "\n".join(lines)
 
 

@@ -406,7 +406,7 @@ def try_remediate_once(
     return meta
 
 
-def build_message(
+def build_detail_message(
     westudy_line: str,
     westudy_block: str,
     oc_level: str,
@@ -458,11 +458,90 @@ def build_message(
         body.append("- 見てほしい点: なし（修正済）。異常時のみ対応")
     else:
         body.append("- 見てほしい点: なし（OK）。異常時のみ対応")
-    # keep Slack message readable; full westudy block in log
-    if westudy_block and len(westudy_block) < 900:
+    # ログ用の詳細版（Slack には build_message の短い版を出す）
+    if westudy_block:
         body.append("")
         body.append(westudy_block)
     return "\n".join(body)
+
+
+def _first_line_with(block: str, *needles: str) -> str:
+    for ln in (block or "").splitlines():
+        t = ln.strip().lstrip("-・· ").strip()
+        if any(n in t for n in needles):
+            return t
+    return ""
+
+
+def _westudy_next(westudy_block: str) -> str:
+    t = _first_line_with(westudy_block, "対処:")
+    if t:
+        return t.split("対処:", 1)[1].split("→")[0].strip()
+    return "`gh run list -w westudy-raimo-weekly.yml`"
+
+
+def _gmail_next(gmail_lines: list[str]) -> str:
+    for ln in gmail_lines or []:
+        if ln.startswith("是正:"):
+            if "reauth_estate_gmail_send" in ln:
+                return "Macで `reauth_estate_gmail_send.py`（送信の再同意）"
+            return "Macで `jarvis_gmail_token_health.py` → ブラウザ再同意"
+    return "Macで再同意"
+
+
+def _mark(bad: bool, skipped: bool = False) -> str:
+    if skipped:
+        return "⚪"
+    return "🔴" if bad else "🟢"
+
+
+def build_message(
+    westudy_line: str,
+    westudy_block: str,
+    oc_level: str,
+    oc_lines: list[str],
+    *,
+    gmail_level: str = "OK",
+    gmail_lines: list[str] | None = None,
+    cloud: bool = False,
+    remediate_meta: dict[str, str] | None = None,
+    overall_override: str | None = None,
+) -> str:
+    """#ops 用の短い版（iPhone: 先頭で判定、項目ごとに 状態1行＋次1行）。
+
+    時刻・起動元・報告先・トライ詳細は log（build_detail_message）に残す。
+    """
+    overall = overall_override or overall_status(westudy_line, oc_level, gmail_level)
+    ok = overall in ("OK", "修正済")
+    head = f"判定: {'🟢' if ok else '🔴'}{overall}"
+    res = str((remediate_meta or {}).get("result") or "")
+    if res and res != "不要" and not res.startswith(overall):
+        head += f"（{res}）"
+    elif res.startswith(overall) and res != overall:
+        head = f"判定: {'🟢' if ok else '🔴'}{res}"
+    src = "GHA" if cloud else "Mac"
+    lines = [f"【ops】315 連携健全性・点検（{src}）", head]
+
+    w_bad = _westudy_bad(westudy_line) or _westudy_unknown(westudy_line)
+    w_state = "確認不能" if _westudy_unknown(westudy_line) else ("失敗" if w_bad else "OK")
+    lines += ["", f"{_mark(w_bad)} WeStudy週次: {w_state}"]
+    if w_bad:
+        lines.append(f"次: {_westudy_next(westudy_block)}")
+
+    oc_skip = oc_level.startswith("スキップ")
+    oc_bad = _oc_bad(oc_level)
+    lines += ["", f"{_mark(oc_bad, oc_skip)} オプチャ: {oc_level}"]
+    if oc_bad and oc_lines:
+        lines.append(f"次: {oc_lines[0][:60]}")
+
+    g_skip = gmail_level.startswith("スキップ")
+    g_bad = _gmail_bad(gmail_level)
+    lines += ["", f"{_mark(g_bad, g_skip)} Gmail token: {gmail_level}"]
+    if g_bad:
+        lines.append(f"次: {_gmail_next(gmail_lines or [])}")
+
+    lines += ["", f"<{FLOW_URL}|フロー>"]
+    return "\n".join(lines)
 
 
 def post_slack(channel: str, text: str) -> int:
@@ -582,7 +661,18 @@ def main() -> int:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
     log_path = LOG_DIR / f"{stamp}_ops_health.md"
-    log_path.write_text(msg + "\n", encoding="utf-8")
+    detail = build_detail_message(
+        w_line,
+        w_block,
+        oc_level,
+        oc_lines,
+        gmail_level=g_level,
+        gmail_lines=g_lines,
+        cloud=args.cloud,
+        remediate_meta=remediate_meta,
+        overall_override=overall_override,
+    )
+    log_path.write_text(detail + "\n", encoding="utf-8")
     print(msg)
     print(f"\n📎 log: {log_path}")
 
@@ -598,11 +688,14 @@ def main() -> int:
         and (overall_override or "") in ("未解決", "要フォロー")
     ):
         consult = (
-            "【相談】315 連携健全性 — 1回トライ後も未解決\n"
-            f"- 判定: {overall_override}\n"
-            f"- トライ: {remediate_meta.get('detail', '')[:200]}\n"
-            "- 見てほしい点: QR／YAML大量／WeStudy再実行／Gmail再同意の要否\n"
-            f"- フロー: {FLOW_URL}"
+            "【相談】315 連携健全性\n"
+            "1回トライしても直りませんでした\n"
+            "\n"
+            "決めてほしいこと: QR再ログイン／WeStudy再実行／Gmail再同意をやるか\n"
+            "\n"
+            "次: 人判断のみ\n"
+            "\n"
+            "詳細: #ops の 315 点検"
         )
         crc = post_slack("consult", consult)
         if crc != 0 and rc == 0:
