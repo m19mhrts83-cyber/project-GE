@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from jarvis_supabase_errors import abort_on_quota
 from jarvis_trade_common import JST, REPO, sb_client, today_jst
 
 STATE_PATH = REPO / ".jarvis_state" / "portfolio_weekly.json"
@@ -1440,8 +1441,12 @@ def main() -> int:
     }
 
     if not args.dry_run:
-        write_review(sb, sources)
-        upsert_sync_meta(sb, payload)
+        try:
+            write_review(sb, sources)
+            upsert_sync_meta(sb, payload)
+        except Exception as exc:
+            abort_on_quota(exc)
+            raise
         save_state(payload)
 
     print(
@@ -1452,4 +1457,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception as exc:
+        abort_on_quota(exc)
+        raise
