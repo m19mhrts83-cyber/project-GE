@@ -56,10 +56,21 @@
         .sheet .bubbles { margin-top: 4mm; display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
         .sheet .bubble { background: #fff; border: 1.5px solid var(--ink); border-radius: 14px; padding: 8px 12px; font-size: 12.5px; line-height: 1.6; }
         .sheet .credit { margin-top: 5mm; font-size: 9.5px; color: var(--quiet); line-height: 1.5; }
+        /* 7件以上は詰めてA4に1枚で収める */
+        .sheet.dense .area { margin-bottom: 5px; }
+        .sheet.dense .lists { margin-top: 3mm; }
+        .sheet.dense li { font-size: 11px; padding: 2px 0; }
+        .sheet.dense li .note { font-size: 10px; }
+        .sheet.dense .bubbles { margin-top: 3mm; }
+        .sheet.dense .bubble { font-size: 11.5px; padding: 6px 10px; line-height: 1.5; }
+        .sheet.dense .credit { margin-top: 3mm; }
         @media print {
             body { background: #fff; }
             .noprint { display: none !important; }
             .sheet { box-shadow: none; margin: 0; width: auto; min-height: auto; padding: 0; background: #fff; }
+            .sheet .mapimg { max-height: 150mm; width: auto; max-width: 100%; margin: 0 auto; }
+            .sheet.dense .mapimg { max-height: 138mm; }
+            .sheet .lists, .sheet .bubbles, .sheet li { break-inside: avoid; }
             @page { size: A4 portrait; margin: 10mm; }
         }
         @media (max-width: 760px) {

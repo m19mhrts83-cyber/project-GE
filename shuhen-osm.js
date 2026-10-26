@@ -102,6 +102,16 @@ async function nominatim(q, box) {
     return data[0] ? { lat: Number(data[0].lat), lng: Number(data[0].lon), label: data[0].display_name } : null;
 }
 
+// OSMは「杉栄町二丁目」のように漢数字で持っていることが多い
+const KANJI_NUM = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+function chomeToKanji(s) {
+    return s.replace(/([0-9０-９]+)丁目/g, (m, d) => {
+        const n = Number(d.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)));
+        if (!n || n > 29) return m;
+        return (n >= 20 ? KANJI_NUM[Math.floor(n / 10)] + '十' : n >= 10 ? '十' : '') + KANJI_NUM[n % 10] + '丁目';
+    });
+}
+
 // 日本の住所は番地まで入れると見つからないことが多いので、後ろから削って探す
 function addressVariants(addr) {
     const a = addr.replace(/\s+/g, '');
@@ -112,7 +122,7 @@ function addressVariants(addr) {
         const next = cur.replace(re, '');
         if (next && next !== cur) { v.push(next); cur = next; }
     }
-    return [...new Set(v)];
+    return [...new Set(v.flatMap(x => [x, chomeToKanji(x)]))];
 }
 
 function boxAround(lat, lng, km) {
@@ -132,13 +142,15 @@ async function locateProperty(addr) {
 async function locateFacility(row) {
     const km = row.kind === 'car' ? 15 : 2.5;
     const box = boxAround(property.lat, property.lng, km);
+    const plain = row.name.split(/\s*[&＆・／/(（【]/)[0].trim();
     const tries = [[row.name, box], [`${row.name} ${row.hint}`, box], [row.name.replace(/\s+/g, ''), box]];
+    if (plain && plain !== row.name) tries.push([plain, box]);
     for (const [q, b] of tries) {
         const hit = await nominatim(q, b);
         if (hit) return { ...hit, approx: false };
     }
     if (row.hint) {
-        const hit = await nominatim(row.hint, box);
+        const hit = await nominatim(row.hint, box) || await nominatim(chomeToKanji(row.hint), box);
         if (hit) return { ...hit, approx: true };
     }
     return null;
@@ -172,6 +184,26 @@ async function measure(row) {
         row.meters = m;
         row.minutes = row.kind === 'car' ? Math.max(1, Math.ceil(m / 400)) : Math.ceil(m / CONFIG.metersPerMinute);
         row.minutesApprox = true;
+    }
+}
+
+// 目印からの推定などで同じ地点に複数のピンが落ちたら、まわりに円く並べ直す（約30m）
+function spreadDuplicates() {
+    const groups = new Map();
+    for (const r of rows) {
+        if (r.lat == null) continue;
+        const key = `${r.lat.toFixed(4)},${r.lng.toFixed(4)}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(r);
+    }
+    for (const g of groups.values()) {
+        if (g.length < 2) continue;
+        const dLat = 30 / 111000, dLng = 30 / (111000 * Math.cos(g[0].lat * Math.PI / 180));
+        g.forEach((r, i) => {
+            const a = (2 * Math.PI * i) / g.length;
+            r.lat += dLat * Math.sin(a); r.lng += dLng * Math.cos(a);
+            r.approx = true;
+        });
     }
 }
 
@@ -210,7 +242,10 @@ function drawEditMap() {
             .on('dragend', async e => { Object.assign(r, e.target.getLatLng()); r.approx = false; await measure(r); renumber(); drawEditMap(); drawRowTable(); })
             .bindTooltip(`${r.no}. ${r.name}`).addTo(markerLayer);
     }
-    const walkPts = rows.filter(r => r.kind === 'walk' && r.lat != null).map(r => [r.lat, r.lng]);
+    const walk = rows.filter(r => r.kind === 'walk' && r.lat != null);
+    const dists = walk.map(r => haversine(property, r)).sort((a, b) => a - b);
+    const limit = Math.max(700, (dists[Math.floor(dists.length / 2)] || 0) * 2.2);
+    const walkPts = walk.filter(r => haversine(property, r) <= limit).map(r => [r.lat, r.lng]);
     editMap.fitBounds(L.latLngBounds([[property.lat, property.lng], ...walkPts]).pad(0.12));
 }
 
@@ -250,6 +285,7 @@ async function run() {
             const hit = await locateFacility(r);
             if (hit) { r.lat = hit.lat; r.lng = hit.lng; r.approx = hit.approx; await measure(r); }
         }
+        spreadDuplicates();
         renumber();
         drawEditMap();
         drawRowTable();
@@ -323,22 +359,40 @@ async function renderMapImage() {
     const tw = ctx.measureText(property.name).width;
     ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillRect(px - tw / 2 - 6 * u, py + 21 * u, tw + 12 * u, 22 * u);
     ctx.fillStyle = '#c8553d'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(property.name, px, py + 32 * u);
-    // 施設ピンは物件ラベルより手前に描く
+    // 施設ピンは物件ラベルより手前に描く。近すぎるピンは描く位置だけ押し離す
+    const R = 13 * u;
+    const pins = [];
     for (const r of rows) {
         if (r.lat == null) continue;
         const [x, y] = xy(r.lat, r.lng);
-        if (x < 0 || y < 0 || x > W || y > H) continue;
-        dot(x, y, 13 * u, r.kind === 'car' ? '#7a6a3a' : '#2f6f8f', String(r.no), `700 ${14 * u}px sans-serif`);
+        r.offMap = x < R || y < R || x > W - R || y > H - R;
+        if (!r.offMap) pins.push({ r, x, y });
     }
+    for (let k = 0; k < 30; k++) {
+        let moved = false;
+        for (let i = 0; i < pins.length; i++) {
+            for (let j = i + 1; j < pins.length; j++) {
+                const a = pins[i], b = pins[j];
+                const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 0.01, need = R * 2.15;
+                if (d >= need) continue;
+                const push = (need - d) / 2, ux = d > 0.01 ? dx / d : 1, uy = d > 0.01 ? dy / d : 0;
+                a.x -= ux * push; a.y -= uy * push; b.x += ux * push; b.y += uy * push;
+                moved = true;
+            }
+        }
+        if (!moved) break;
+    }
+    for (const { r, x, y } of pins) dot(x, y, R, r.kind === 'car' ? '#7a6a3a' : '#2f6f8f', String(r.no), `700 ${14 * u}px sans-serif`);
     return canvas.toDataURL('image/png');
 }
 
 function sheetHtml(imgSrc) {
-    const li = r => `<li class="${r.kind}"><span class="no">${r.no}</span><span class="name">${esc(r.name)}</span><span class="min">${r.kind === 'car' ? '車' : '徒歩'}${r.minutesApprox ? '約' : ''}${r.minutes}分</span>${r.note ? `<span class="note">${esc(r.note)}</span>` : ''}</li>`;
+    const li = r => `<li class="${r.kind}"><span class="no">${r.no}</span><span class="name">${esc(r.name)}</span><span class="min">${r.kind === 'car' ? '車' : '徒歩'}${r.minutesApprox ? '約' : ''}${r.minutes}分${r.offMap ? '（地図外）' : ''}</span>${r.note ? `<span class="note">${esc(r.note)}</span>` : ''}</li>`;
     const walk = rows.filter(r => r.kind === 'walk' && r.lat != null);
     const car = rows.filter(r => r.kind === 'car' && r.lat != null);
     const approx = rows.some(r => r.minutesApprox && r.lat != null);
-    return `<div class="sheet">
+    const dense = walk.length + car.length > 6 ? ' dense' : '';
+    return `<div class="sheet${dense}">
 <h2>${esc(property.name)} 周辺MAP</h2>
 ${$('areaCopy').value.trim() ? `<p class="area">${esc($('areaCopy').value.trim())}</p>` : ''}
 <img class="mapimg" src="${imgSrc}" alt="${esc(property.name)}の周辺地図">
@@ -377,7 +431,8 @@ function saveHtml() {
 <style>${css}</style></head><body>${sheetHtml(sheetDataUrl)}</body></html>`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([doc], { type: 'text/html' }));
-    a.download = `${property.name}_周辺MAP_叩き台.html`;
+    const d = new Date(), z = n => String(n).padStart(2, '0');
+    a.download = `${property.name}_周辺MAP_叩き台_${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}.html`;
     a.click();
 }
 
