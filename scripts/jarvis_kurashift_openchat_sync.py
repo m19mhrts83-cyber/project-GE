@@ -10,6 +10,8 @@
 ※ jarvis-dashboard の kurashift_openchat_logs は廃止（二重管理しない）。
 ※ 見出し日時（YYYY/MM/DD HH:MM）→ post_date + posted_at を UPSERT。
 ※ 変更なし行は触らない（egress 抑制。embedding を毎回返さない）。
+※ 照合用の本文は直近 N 日分だけ取得（既定14日、JARVIS_OPENCHAT_DIFF_DAYS）。
+  それより古い行は id だけで既存判定する（毎回 2万行超の本文を読まない）。
 
 使用例:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -26,7 +28,7 @@ import os
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -339,18 +341,61 @@ def partition_diff_rows(
     return to_upsert, [], unchanged
 
 
-def fetch_existing_fingerprints(sb: Client, table: str = "line_openchat_logs") -> dict[str, dict[str, Any]]:
-    """embedding を除いた照合用マップをページング取得。"""
+def partition_windowed_rows(
+    parsed: list[dict[str, Any]],
+    existing_recent: dict[str, dict[str, Any]],
+    all_ids: set[str],
+    cutoff: str,
+) -> tuple[list[dict[str, Any]], int]:
+    """cutoff（YYYY-MM-DD）以降は本文まで照合、それより古い行は id の有無だけで判定。
+
+    Returns:
+        (to_upsert, unchanged_count)
+    """
+    recent: list[dict[str, Any]] = []
+    old_known: set[str] = set()
+    for e in parsed:
+        rid = str(e.get("id") or "")
+        if not rid:
+            continue
+        pd = str(e.get("post_date") or "")
+        if pd and pd < cutoff and rid in all_ids:
+            old_known.add(rid)
+            continue
+        # 直近分、または古い日付でも DB 未登録（スレ追い取り等）は通常の差分判定へ
+        recent.append(e)
+    to_upsert, _, unchanged = partition_diff_rows(recent, existing_recent)
+    upsert_ids = {r["id"] for r in to_upsert}
+    return to_upsert, unchanged + len(old_known - upsert_ids)
+
+
+def fetch_existing_ids(sb: Client, table: str = "line_openchat_logs") -> set[str]:
+    """id だけをページング取得（本文を読まないので軽い）。"""
+    out: set[str] = set()
+    page = 1000
+    offset = 0
+    while True:
+        res = sb.table(table).select("id").order("id").range(offset, offset + page - 1).execute()
+        chunk = list(res.data or [])
+        out.update(str(r.get("id")) for r in chunk if r.get("id"))
+        if len(chunk) < page:
+            break
+        offset += page
+    return out
+
+
+def fetch_existing_fingerprints(
+    sb: Client, table: str = "line_openchat_logs", *, since: str | None = None
+) -> dict[str, dict[str, Any]]:
+    """embedding を除いた照合用マップをページング取得。since 指定時は post_date >= since のみ。"""
     out: dict[str, dict[str, Any]] = {}
     page = 1000
     offset = 0
     while True:
-        res = (
-            sb.table(table)
-            .select(EXISTING_SELECT)
-            .range(offset, offset + page - 1)
-            .execute()
-        )
+        query = sb.table(table).select(EXISTING_SELECT)
+        if since:
+            query = query.gte("post_date", since)
+        res = query.order("id").range(offset, offset + page - 1).execute()
         chunk = list(res.data or [])
         for r in chunk:
             rid = str(r.get("id") or "")
@@ -537,6 +582,12 @@ def main() -> int:
         help="差分を無視して全件 staging upsert（復旧・再取込用）",
     )
     parser.add_argument(
+        "--diff-window-days",
+        type=int,
+        default=int(os.environ.get("JARVIS_OPENCHAT_DIFF_DAYS") or "14"),
+        help="本文まで照合する直近日数（既定14。0 で全件の本文を照合＝旧挙動）",
+    )
+    parser.add_argument(
         "--dry-run-diff",
         action="store_true",
         help="DB照合して新規/変更/変更なし件数だけ表示（書込なし）",
@@ -590,17 +641,26 @@ def main() -> int:
             changed_n = 0
             mode = "FULL"
         else:
-            existing = fetch_existing_fingerprints(sb)
-            existing_n = len(existing)
-            to_upsert, _, unchanged = partition_diff_rows(all_entries, existing)
-            existing_ids = set(existing.keys())
+            if args.diff_window_days > 0:
+                cutoff = (date.today() - timedelta(days=args.diff_window_days)).isoformat()
+                existing_ids = fetch_existing_ids(sb)
+                existing = fetch_existing_fingerprints(sb, since=cutoff)
+                to_upsert, unchanged = partition_windowed_rows(
+                    all_entries, existing, existing_ids, cutoff
+                )
+                mode = f"DIFF(since={cutoff})"
+            else:
+                existing = fetch_existing_fingerprints(sb)
+                existing_ids = set(existing.keys())
+                to_upsert, _, unchanged = partition_diff_rows(all_entries, existing)
+                mode = "DIFF"
+            existing_n = len(existing_ids)
             new_n = sum(1 for r in to_upsert if r["id"] not in existing_ids)
             changed_n = len(to_upsert) - new_n
-            mode = "DIFF"
         print(
             f"📎 openchat sync — mode={mode}"
             f" existing={existing_n if existing_n >= 0 else 'n/a'}"
-            f" new={new_n} changed={changed_n if mode == 'DIFF' else 'n/a(full)'}"
+            f" new={new_n} changed={changed_n if mode != 'FULL' else 'n/a(full)'}"
             f" unchanged={unchanged} upsert={len(to_upsert)}"
         )
         if args.dry_run_diff and not do_apply:
