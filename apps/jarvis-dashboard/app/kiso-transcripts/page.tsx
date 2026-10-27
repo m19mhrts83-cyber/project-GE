@@ -171,7 +171,7 @@ export default function KisoTranscriptsPage() {
             </span>
             <strong>{nottaReview.received} ファイル受領・全件紐付け済み</strong>
           </header>
-          <p className="sum">新規反映 {nottaReview.newly_imported}動画 · 既存字幕対応 {nottaReview.existing_video + nottaReview.existing_content}動画 · 取込待ち {nottaReview.pending.length}動画</p>
+          <p className="sum">新規反映 {nottaReview.newly_imported}動画 · 既存字幕対応 {nottaReview.existing_video + nottaReview.existing_content}動画 · 取込待ち {nottaReview.pending_count}動画</p>
         </div>
       </div>
 
@@ -283,14 +283,14 @@ export default function KisoTranscriptsPage() {
       <section className="home-section" id="notta-received">
         <h2 style={{ fontSize: "1.15rem" }}>A1動画名による受領ファイル照合</h2>
         <p>{nottaReview.note}</p>
-        <p className="meta">確認日 {nottaReview.updated} · 字幕未取得16レッスンとは別に、部分取得レッスン内の不足動画も管理します。受領済み15動画は今村さんへの再依頼不要です。</p>
+        <p className="meta">確認日 {nottaReview.updated} · 今回受領38ファイルはすべて対応済み。部分取得レッスン内の不足15動画も本番反映し、再依頼不要です。従来の字幕未取得16レッスンは引き続き受領待ちです。</p>
         <h3 style={{ fontSize: "1rem" }}>対応済み：既存字幕で参照可能</h3>
         <p>同一動画IDで既存字幕あり {nottaReview.existing_video}動画。加えて、以下の3動画は既存の別字幕に対応本文があります。</p>
         <ul>{nottaReview.covered_elsewhere.map((item) => <li key={item.file}>{item.title}（{item.file}） · {item.status}</li>)}</ul>
-        <h3 style={{ fontSize: "1rem" }}>受領・紐付け済み／本番取込待ち（{nottaReview.pending.length}動画）</h3>
-        <ul>{nottaReview.pending.map((item) => <li key={item.file}>
+        <h3 style={{ fontSize: "1rem" }}>対応済み：追加{nottaReview.additional_imported.length}動画・本番検索反映済み</h3>
+        <ul>{nottaReview.additional_imported.map((item) => <li key={item.file}>
           <a href={`https://westudy.co.jp/lesson/${item.slug}`} target="_blank" rel="noopener noreferrer">{item.title}</a>
-          {" "}（{item.file}） · 受領対応済み／本番取込待ち
+          {" "}（{item.file}） · 対応済み（今村さん提供・本番検索反映済み）
         </li>)}</ul>
       </section>
       <UnderstandingBlock text={understanding} />
