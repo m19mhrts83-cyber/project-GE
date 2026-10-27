@@ -1,12 +1,12 @@
 // 周辺MAP 叩き台（OpenStreetMap版・試作）
 // 構成案B: AI（ネタ出し・実在確認）は会員のチャット、ここは「表 → 地図・番号ピン・一覧・徒歩分 → A4」だけを担う。
-// サーバ不要。外部に出るのは地図タイル・住所検索・経路計算の3つだけで、本展開時は CONFIG を商用プランへ差し替える。
+// サーバ不要。外部に出るのは地図タイル・住所検索・経路計算（白地図を選んだときは Overpass も）だけで、本展開時は CONFIG を商用プランへ差し替える。
 
 const CONFIG = {
     // 試験公開（30〜50人）までは OSM 財団の無料配信。本展開時は商用プラン（Stadia Maps / MapTiler 等）の URL＋ドメイン制限キーへ。
     tileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    // 白地図（道路・建物の形だけで文字なし）。紙面の地図に AI が架空の地名を描き足さないよう、文字は吹き出しと番号ピンだけにしたいとき用
-    whiteTileUrl: 'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+    // 白地図（道路・線路・川・公園の形だけで文字なし）は、OSM の生データを Overpass で取ってこのページで描く。文字のないタイルはキーが要るため
+    overpassUrl: 'https://overpass-api.de/api/interpreter',
     geocodeUrl: 'https://nominatim.openstreetmap.org/search',
     walkRouteUrl: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/',
     carRouteUrl: 'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
@@ -14,7 +14,6 @@ const CONFIG = {
     walkMaxMinutes: 25, // これより遠い徒歩の施設は別の場所に当たったとみなす
     metersPerMinute: 80, // 不動産公取規約: 80m＝1分（端数切り上げ）
     credit: '地図データ © OpenStreetMap contributors（https://www.openstreetmap.org/copyright）',
-    whiteCredit: '地図データ © OpenStreetMap contributors（https://www.openstreetmap.org/copyright）、地図デザイン © CARTO',
 };
 
 const SAMPLE = {
@@ -360,8 +359,66 @@ function isWhiteMap() {
     return $('mapStyle').value === 'white';
 }
 
-function tileUrlForSheet() {
-    return isWhiteMap() ? CONFIG.whiteTileUrl : CONFIG.tileUrl;
+// 白地図: 表示範囲の道路・線路・川・公園を OSM から取り、線と面だけで描く（地名・店名は描かない）
+async function drawWhiteMap(ctx, W, H, xy, u) {
+    const b = editMap.getBounds();
+    const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(v => v.toFixed(6)).join(',');
+    const q = `[out:json][timeout:25];(
+way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|pedestrian|service)(_link)?$"](${bbox});
+way["railway"~"^(rail|subway|light_rail|narrow_gauge)$"](${bbox});
+way["waterway"~"^(river|canal|stream)$"](${bbox});
+way["natural"="water"](${bbox});
+way["leisure"="park"](${bbox});
+);out geom;`;
+    const res = await fetch(CONFIG.overpassUrl, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    if (!res.ok) throw new Error('白地図のデータを取得できませんでした（' + res.status + '）');
+    const ways = (await res.json()).elements.filter(e => e.geometry && e.geometry.length > 1);
+    const path = (w, close) => {
+        ctx.beginPath();
+        w.geometry.forEach((g, i) => { const [x, y] = xy(g.lat, g.lon); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+        if (close) ctx.closePath();
+    };
+    ctx.fillStyle = '#f6f4ef'; ctx.fillRect(0, 0, W, H);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const w of ways) {
+        const t = w.tags || {};
+        if (t.leisure === 'park') { path(w, true); ctx.fillStyle = '#e3eedb'; ctx.fill(); }
+        else if (t.natural === 'water') { path(w, true); ctx.fillStyle = '#d6e6f2'; ctx.fill(); }
+    }
+    for (const w of ways.filter(w => (w.tags || {}).waterway)) {
+        path(w); ctx.strokeStyle = '#d6e6f2'; ctx.lineWidth = (w.tags.waterway === 'stream' ? 3 : 8) * u; ctx.stroke();
+    }
+    const roadWidth = { motorway: 10, trunk: 10, primary: 9, secondary: 8, tertiary: 6.5, unclassified: 4.5, residential: 4.5, living_street: 4, pedestrian: 3.5, service: 2.5 };
+    const roads = ways.filter(w => (w.tags || {}).highway).map(w => ({ w, width: roadWidth[w.tags.highway.replace('_link', '')] || 3 })).sort((a, c) => a.width - c.width);
+    for (const pass of [0, 1]) { // 縁取り → 白い道
+        for (const { w, width } of roads) {
+            path(w);
+            ctx.strokeStyle = pass ? '#ffffff' : '#d9d4ca';
+            ctx.lineWidth = (pass ? width : width + 1.6) * u;
+            ctx.stroke();
+        }
+    }
+    for (const w of ways.filter(w => (w.tags || {}).railway)) {
+        const under = w.tags.railway === 'subway' || w.tags.tunnel === 'yes' || Number(w.tags.layer) < 0;
+        path(w);
+        ctx.strokeStyle = under ? '#b9b4ab' : '#8d8a84'; ctx.lineWidth = (under ? 2.2 : 3) * u;
+        ctx.setLineDash(under ? [6 * u, 5 * u] : []); ctx.stroke(); ctx.setLineDash([]);
+    }
+}
+
+async function drawTiles(ctx, W, H, origin, zoom) {
+    const t0x = Math.floor(origin.x / 256), t0y = Math.floor(origin.y / 256);
+    const t1x = Math.floor((origin.x + W) / 256), t1y = Math.floor((origin.y + H) / 256);
+    const jobs = [];
+    for (let tx = t0x; tx <= t1x; tx++) {
+        for (let ty = t0y; ty <= t1y; ty++) {
+            const url = CONFIG.tileUrl.replace('{z}', zoom).replace('{x}', tx).replace('{y}', ty);
+            jobs.push(loadImage(url).then(img => ctx.drawImage(img, tx * 256 - origin.x, ty * 256 - origin.y)).catch(() => {}));
+        }
+    }
+    await Promise.all(jobs);
+    // 紙面向けに少し淡く
+    ctx.fillStyle = 'rgba(251,248,242,0.28)'; ctx.fillRect(0, 0, W, H);
 }
 
 async function renderMapImage() {
@@ -374,20 +431,10 @@ async function renderMapImage() {
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#f2efe9'; ctx.fillRect(0, 0, W, H);
-    const t0x = Math.floor(origin.x / 256), t0y = Math.floor(origin.y / 256);
-    const t1x = Math.floor((origin.x + W) / 256), t1y = Math.floor((origin.y + H) / 256);
-    const jobs = [];
-    for (let tx = t0x; tx <= t1x; tx++) {
-        for (let ty = t0y; ty <= t1y; ty++) {
-            const url = tileUrlForSheet().replace('{z}', zoom).replace('{x}', tx).replace('{y}', ty);
-            jobs.push(loadImage(url).then(img => ctx.drawImage(img, tx * 256 - origin.x, ty * 256 - origin.y)).catch(() => {}));
-        }
-    }
-    await Promise.all(jobs);
-    // 紙面向けに少し淡く（白地図はもともと淡い）
-    if (!isWhiteMap()) { ctx.fillStyle = 'rgba(251,248,242,0.28)'; ctx.fillRect(0, 0, W, H); }
     const u = W / 760; // 紙面での見た目をそろえる基準
     const xy = (lat, lng) => { const p = editMap.project([lat, lng], zoom); return [p.x - origin.x, p.y - origin.y]; };
+    if (isWhiteMap()) await drawWhiteMap(ctx, W, H, xy, u);
+    else await drawTiles(ctx, W, H, origin, zoom);
 
     // 最寄り駅（徒歩・種類に「駅」）→物件の動線
     const station = rows.filter(r => r.kind === 'walk' && /駅/.test(r.type + r.name) && r.route && !r.tooFar).sort((a, b) => a.minutes - b.minutes)[0];
@@ -454,7 +501,7 @@ ${$('areaCopy').value.trim() ? `<p class="area">${esc($('areaCopy').value.trim()
 ${car.length ? `<div><h3>車で行ける</h3><ol>${car.map(li).join('')}</ol></div>` : ''}
 </div>
 ${bubbles.length ? `<div class="bubbles">${bubbles.slice(0, 2).map(b => `<div class="bubble">${esc(b)}</div>`).join('')}</div>` : ''}
-<p class="credit">徒歩分は道のりの距離から80m＝1分で計算（端数切り上げ）。${approx ? '一部は直線距離からの概算です。' : ''}掲載情報は作成時点のものです。<br>${esc(isWhiteMap() ? CONFIG.whiteCredit : CONFIG.credit)}</p>
+<p class="credit">徒歩分は道のりの距離から80m＝1分で計算（端数切り上げ）。${approx ? '一部は直線距離からの概算です。' : ''}掲載情報は作成時点のものです。<br>${esc(CONFIG.credit)}</p>
 </div>`;
 }
 
