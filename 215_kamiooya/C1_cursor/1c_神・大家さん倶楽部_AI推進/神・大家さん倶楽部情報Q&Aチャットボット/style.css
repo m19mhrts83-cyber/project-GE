@@ -6,6 +6,19 @@
   --muted: #6b7280;
 }
 
+/* 一覧・管理・分析・比較表共通: 表内スクロール中も列名を表示する。 */
+div:has(> table > thead) {
+  overflow: auto;
+  max-height: max(180px, calc(100dvh - 260px));
+}
+
+table > thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f1f5f9;
+}
+
 * {
   box-sizing: border-box;
   font-family: "Noto Sans JP", sans-serif;
