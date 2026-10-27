@@ -83,3 +83,17 @@
 ```
 
 戻す場合は `kc_typo_backup_20261026` の `content`・`search_text`・`content_hash` を `chunk_id` で書き戻す。
+
+## 神大家0・2・3・4コースへの拡張（2026-10-27）
+
+松野さん依頼「神大家0〜4の動画もできるだけ文字起こしして登録」。AI使用料がかからない順に2段で取る。
+
+1. **Vimeo自動字幕（無料）**: `scripts/jarvis_westudy_course_vtt_batch.py`。レッスン一覧は Supabase `comments` の `lesson_desc` 行から作り、取込済み・基礎と重複するレッスンは飛ばす。ログインは1回で全レッスンを回る。出力は OneDrive `C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/<コース>/jarvis/`、状態は `apps/jarvis-dashboard/data/course_transcripts/courseN_status.json`。
+2. **字幕なし動画はローカルWhisper（無料・外部送信なし）**: `scripts/jarvis_westudy_whisper_fallback.py`。yt-dlp で音声だけ取り、Mac 上の mlx-whisper（large-v3-turbo）で起こす。初期プロンプトに補正表の正しい語を入れて固有名詞の誤変換を減らす。元MDは書き換えず `<元名>__whisper.md` と `courseN_whisper.json` を作る。Gemini 無料枠は会員限定動画を外部に送ることになり、学習利用の懸念もあるため使わない。
+3. **登録**: どちらも既存の `import_vimeo_transcripts.py --manifest … --course … --input-dir … --graph-root … --apply --embed --mirror-raimo`（コマンドは 1 の実行後に表示）。差分だけ追加し、`config/kamiooya_transcript_corrections.tsv` の補正を適用してから登録する。Whisper 分は `meta_json.transcript_provider=local_whisper`。
+
+```sh
+# 前提（初回のみ）: ~/selenium_env/venv/bin/pip install yt-dlp mlx-whisper ／ brew install ffmpeg
+~/selenium_env/venv/bin/python scripts/jarvis_westudy_course_vtt_batch.py            # 0,2,3,4 の字幕取得
+~/selenium_env/venv/bin/python scripts/jarvis_westudy_whisper_fallback.py --manifest apps/jarvis-dashboard/data/course_transcripts/course2_status.json
+```

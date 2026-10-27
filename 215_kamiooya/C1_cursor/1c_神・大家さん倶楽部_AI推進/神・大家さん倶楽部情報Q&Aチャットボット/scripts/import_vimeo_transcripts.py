@@ -65,7 +65,8 @@ def build_records(lesson: dict, text: str, origin: str, course: str) -> list[tup
             "title": f"{lesson.get('title') or lesson['slug']}（動画{video_id}）",
             "video_id": video_id, "video_url": f"https://vimeo.com/{video_id}",
             "origin_path": origin, "ingest_status": "ready",
-            "meta_json": {"transcript_provider": "vimeo_auto", "provisional": True,
+            # Vimeo字幕がない動画はローカルWhisperで起こす（manifest側で provider を指定）
+            "meta_json": {"transcript_provider": lesson.get('transcript_provider') or "vimeo_auto", "provisional": True,
                           "course": course, "lesson_slug": lesson['slug'], "lesson_url": lesson.get('url'),
                           "content_sha256": hashlib.sha256(text.encode()).hexdigest()},
         }
@@ -171,6 +172,8 @@ def main() -> int:
     totals = {'lessons': 0, 'videos': 0, 'chunks': 0, 'no_subtitles': 0, 'supabase_added': 0, 'raimo_added': 0}
     raimo_cache = {}
     for lesson in lessons:
+        if lesson.get('status') == 'error':  # 取得失敗分は次回の字幕取得で埋める
+            continue
         name = lesson.get('jarvis_file') or f"基礎講座文字起こし_{lesson['slug']}.md"
         origin = args.graph_root.rstrip('/') + '/' + name
         text = ((args.input_dir/name).read_text() if args.input_dir else retry(lambda: read_file_graph(origin)).decode('utf-8-sig'))
