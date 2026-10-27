@@ -919,7 +919,12 @@ export default async function HomePage() {
                     <a href={`/themes/${t.id}`}>
                       <strong>{t.title}</strong>
                     </a>
-                    <div className="meta">{t.hypothesis}</div>
+                    <div className="meta">
+                      {t.hypothesis}
+                      {t.created_at
+                        ? `（数字は ${String(t.created_at).slice(0, 10)} 作成時点）`
+                        : ""}
+                    </div>
                   </td>
                   <td>
                     {t.amount_jpy != null ? fmtYen(Number(t.amount_jpy)) : "—"}

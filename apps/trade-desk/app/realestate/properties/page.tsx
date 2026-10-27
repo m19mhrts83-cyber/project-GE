@@ -81,6 +81,10 @@ export default async function RealEstatePropertiesPage() {
     const v = l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
     return s + (Number.isFinite(v) ? v : 0);
   }, 0);
+  const propertyLoanPayMonth = bRate4.reduce(
+    (s, r) => s + (r.monthlyPaymentJpy || 0),
+    0
+  );
 
   const byProp = new Map<
     string,
@@ -250,7 +254,9 @@ export default async function RealEstatePropertiesPage() {
         ) : (
           <>
             <p className="meta" style={{ marginTop: 8 }}>
-              ローン正本の月返済合計（参考）: {fmtYen(loanPayMonth)}／月 ·{" "}
+              借入残高トラッカーの月返済（参考）: 物件ローン{" "}
+              {fmtYen(propertyLoanPayMonth)}／月 · 全借入（自宅・車・教育・太陽光を含む）{" "}
+              {fmtYen(loanPayMonth)}／月 ·{" "}
               <a href="/realestate">不動産ハブの一覧 →</a>
             </p>
             <p className="meta" style={{ marginTop: 4 }}>

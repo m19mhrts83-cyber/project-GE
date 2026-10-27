@@ -1,3 +1,4 @@
+import TermGlossary from "@/components/TermGlossary";
 import { DASHBOARD_URL, LOAN_TRACKER_URL } from "@/lib/format";
 
 const NAV = [
@@ -48,6 +49,13 @@ function NavLinks({
   );
 }
 
+function activeLabel(active: string): string {
+  const hit = NAV.filter(
+    (n) => active === n.href || (n.href !== "/" && active.startsWith(`${n.href}/`))
+  ).sort((a, b) => b.href.length - a.href.length)[0];
+  return hit?.label ?? "メニュー";
+}
+
 export default function Shell({
   active,
   email,
@@ -82,6 +90,20 @@ export default function Shell({
           </div>
           <p className="side-tagline">暮らしを整え、資産を動かす</p>
         </div>
+
+        {/* スマホ幅ではメニューを畳む（JS 不要のチェックボックス開閉） */}
+        <input
+          type="checkbox"
+          id="side-nav-toggle"
+          className="side-nav-toggle"
+          aria-hidden
+        />
+        <label htmlFor="side-nav-toggle" className="side-nav-button">
+          <span className="side-nav-current">{activeLabel(active)}</span>
+          <span className="side-nav-button-text">メニュー ☰</span>
+        </label>
+
+        <nav className="side-nav" aria-label="メインメニュー">
 
         <div className="side-group-title">① 資産運用</div>
         <NavLinks
@@ -152,8 +174,12 @@ export default function Shell({
             </form>
           </div>
         </div>
+        </nav>
       </aside>
-      <main>{children}</main>
+      <main>
+        <TermGlossary />
+        {children}
+      </main>
     </div>
   );
 }

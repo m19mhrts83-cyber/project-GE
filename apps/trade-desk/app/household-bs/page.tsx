@@ -185,8 +185,12 @@ export default async function HouseholdBsPage({
       .limit(1000),
   ]);
 
+  // 当年は保存スナップが古くなりやすい（MQ月次更新の成功時しか保存されない）ため、
+  // 既定で live compose にする。スナップを見たいときは ?snap=1。
+  const preferSnap =
+    Number(year) < Number(currentYear()) || sp.snap === "1" || sp.snap === "true";
   const snapViewRaw =
-    !forceLive && snapshotRow?.payload
+    !forceLive && preferSnap && snapshotRow?.payload
       ? householdBsViewFromSnapshot(snapshotRow.payload)
       : null;
   const pastYear = Number(year) < Number(currentYear());
@@ -203,7 +207,7 @@ export default async function HouseholdBsPage({
       ? snapViewRaw
       : null;
 
-  // スナップ優先: 表示はスナップ、助言もスナップから。live compose は未登録時のみ。
+  // 過去年はスナップ優先（申告反映済みの確定値）。当年は最新の材料から組み立てる。
   const liveView = snapView ? null : await composeLive(supabase, year);
   const view: HouseholdBsView = snapView
     ? {
@@ -315,13 +319,20 @@ export default async function HouseholdBsPage({
         </div>
         {view.snapshotAsOf ? (
           <p className="meta" style={{ marginTop: 8 }}>
-            表示: {view.snapshotAsOf} スナップ（{view.snapshotSource ?? "jarvis"}
-            ）。最新を見る場合は{" "}
-            <a href={`/household-bs?year=${year}&live=1`}>live compose</a>。
+            表示: {view.snapshotAsOf} 時点の保存値（{view.snapshotSource ?? "jarvis"}
+            ）。最新の残高で見る場合は{" "}
+            <a href={`/household-bs?year=${year}&live=1`}>最新で組み立て</a>。
           </p>
         ) : (
           <p className="meta" style={{ marginTop: 8 }}>
-            表示: live compose（月次スナップ未登録）。MQ月次更新成功時に自動保存されます。
+            表示: 最新の残高・ローン・家賃から組み立てた値です（今日時点）。
+            {snapshotRow?.as_of_month ? (
+              <>
+                {" "}
+                {String(snapshotRow.as_of_month)} 時点の保存値は{" "}
+                <a href={`/household-bs?year=${year}&snap=1`}>こちら</a>。
+              </>
+            ) : null}
           </p>
         )}
       </div>
