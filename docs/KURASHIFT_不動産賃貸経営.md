@@ -98,6 +98,40 @@
 | **正本候補** | `config/kurashift_re_deal_fields.yaml`（未作成・追って） |
 | **取得後** | ③-A の計画・実績に組み込み → `/lifeplan?mode=re_purchase` |
 
+### ③-B 2次調査以降の段階（2026-10-27 実装）
+
+S5 ペルソナ（二次）→ S3 需給（三次・Obsidian `☆Real_Estate_Pick`）の**後**を、案件ドロワーと `/realestate/deals` で管理する。
+DB の `status`（info / viewing / offer / loan / purchased）はそのまま、細かい段階は `summary_json` に持つ（migration なし）。正本ロジック: `apps/trade-desk/lib/reDealStages.ts`。
+
+**内見**（`summary_json.viewing`）
+
+| 段階 | 意味 | status |
+|---|---|---|
+| 内見候補 | S3 判定 GO／HOLD・まだ動いていない | info |
+| 内見依頼中 | 仲介へ内見希望を連絡済（送信は本人） | viewing |
+| 内見日確定 | 日付入力で自動 | viewing |
+| 内見済 | 結果を記録: **買付へ進む**／保留／見送り（見送り→passed） | viewing |
+
+- 一覧: deals 上部の **内見ボード**（日程確定→結果待ち→依頼中→候補 GO→HOLD の順・「次にやること」1行）
+- ドロワー: 内見日時・仲介担当・内見チェック（9項目）・**S3 ヒアリング項目への回答欄**・内見メモ・S7 当たり依頼文コピー
+
+**買付〜引渡し**（`summary_json.acquisition`）
+
+| 段階 | status | 担当 |
+|---|---|---|
+| 買付準備 | offer | S6 買付交渉 |
+| 買付提出 | offer | 本人（仲介へ） |
+| 買付通過 | offer | 本人 |
+| 融資申込 | loan | S7 融資相談 |
+| 融資承認 | loan | S7 融資相談 |
+| 売買契約 | loan | 部長（契約リーガル） |
+| 決済 | loan | 本人＋司法書士（火災保険は部長） |
+| 引渡し・運営開始 | purchased | S8 ライフライン／S9 管理会社 → ③-C 登録 |
+
+- 各段階に日付・チェックリスト・Grok 依頼文コピー（S6／S7／部長／S8）。買付価格・融資額・金融機関・メモ
+- **送信はしない**（記録と依頼文コピーのみ）。仲介・銀行への送信は従来どおり本人／承認後
+- 未実装（次候補）: `[Grok買付]` `[Grok融資]` メールの案件取込、引渡し後の ③-C 自動登録
+
 ---
 
 ## テーマ連携（両レーン共通）

@@ -32,6 +32,12 @@ import {
   filterInProgressDeals,
 } from "@/lib/reDealPursue";
 import DetailedInvestigatedDealsSection from "@/components/DetailedInvestigatedDealsSection";
+import ViewingBoardSection from "@/components/ViewingBoardSection";
+import {
+  acquisitionNextStep,
+  filterViewingBoardDeals,
+  getAcquisition,
+} from "@/lib/reDealStages";
 import {
   formatMatchScore,
   scoreBand,
@@ -304,6 +310,9 @@ export default async function RealEstateDealsPage({
   const buyPushDeals = filterBuyPushDeals(
     dedupedDealsList
   );
+  const viewingBoardDeals = filterViewingBoardDeals(dedupedDealsList).map(
+    (d) => ({ ...d, href: openDealHref(d.id) })
+  );
 
   const counts: Record<string, number> = {};
   for (const s of Object.keys(DEAL_STATUS_LABEL)) counts[s] = 0;
@@ -561,6 +570,8 @@ export default async function RealEstateDealsPage({
         </div>
       </div>
 
+      <ViewingBoardSection deals={viewingBoardDeals} />
+
       {buyPushDeals.length > 0 ? (
         <div
           className="card"
@@ -575,7 +586,7 @@ export default async function RealEstateDealsPage({
             <strong>買い進め中・買付・融資（{buyPushDeals.length}）</strong>
           </header>
           <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
-            フェーズ5: 買付証明書〜融資の仮申請・打診・審査。長期プランは{" "}
+            買付準備 → 買付提出 → 買付通過 → 融資申込 → 融資承認 → 売買契約 → 決済 → 引渡し。各案件の「開く」で段階・日付・チェックを記録。長期プランは{" "}
             <Link href="/realestate/buy-plan">買い進めプラン</Link>。
             問合せ列で未問合せ／問合せ済を区別できます。
           </p>
@@ -618,6 +629,18 @@ export default async function RealEstateDealsPage({
                         <strong>
                           {DEAL_STATUS_LABEL[d.status] || d.status}
                         </strong>
+                        {(() => {
+                          const nx = acquisitionNextStep(d);
+                          const dates = getAcquisition(d).dates || {};
+                          const last = Object.values(dates).filter(Boolean).sort().pop();
+                          return (
+                            <div className="meta" style={{ fontSize: 11 }}>
+                              {nx.stageLabel}
+                              {last ? ` · ${last}` : ""}
+                              <br />▶ {nx.label}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>
                         <span style={inquiryChipStyle(inq)}>
