@@ -117,3 +117,17 @@
 `scripts/jarvis_westudy_typo_candidates.py`: 補正表を当てた後の字幕／Whisper の語（カタカナ3字以上・漢字2字以上の連続）のうち、会員コメント（exports の最新 full_*.csv）と LINE オプチャ本文に一度も出ない語を拾い、コメント側の「同じ読み（pykakasi）」か「字面が近い」語を修正案にする。LINE 本文は Supabase から1回だけ読み `~/.cache/kamiooya_typo/line_content.txt` に置く（約9MB）。
 
 2026-10-27: 候補 3,623 件（同じ読み351・字面が近い1,735・案なし1,537）。確認用に「同じ読み×3回以上」180件＋「字面が近い×5回以上」246件を `講座_文字起こし/誤記候補_神大家0234_優先_20261027.csv` に抜粋。承認分を補正表に追記し、登録済みチャンクへの反映は承認後に行う（基礎の `apply_transcript_corrections.py` はバックアップ表 `kc_typo_backup_20261026` 前提なので、0・2・3・4 用は別途）。
+
+### 誤記補正の反映（2026-10-28）
+
+松野さん「誤記OK」（10/27）。優先426件を文脈確認し、誤修正になる案を除いた288語を補正表に追加（計477語）。追加語はどれも会員コメント・LINEオプチャに一度も出ないことを確認。
+
+- `apply_transcript_corrections.py --course <コース名>`（複数可）: 現在の補正表で本文が変わるチャンクだけを抽出。`--apply` 前に `~/git-repos/.jarvis_state/kamiooya_typo_backups/` へ元本文を JSON 保存し、`content`・`search_text`・`content_hash` を更新、`--reembed` で埋め込みも作り直す（Gemini の1回100件上限に合わせ30件ずつ）。
+- 反映: 神大家0〜4の5コース（基礎も新語で319チャンク）230動画・1,723チャンク。Raimo は230動画・6,794チャンクを入れ替え。反映後の再プレビューで残り0件。
+- 戻す場合: バックアップ `kamiooya_transcript_typo_backup_20261028_071203.json`（全230動画分）の本文を `id` で書き戻し、該当動画の Raimo を入れ替える。
+
+```sh
+~/selenium_env/venv/bin/python '215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/scripts/apply_transcript_corrections.py' \
+  --course 神大家0.はじめに --course 神大家1.基礎 --course 神大家2.応用 --course 神大家3.継承 --course 神大家4.グルコン          # プレビュー
+# 問題なければ --reembed --mirror-raimo --apply を付ける
+```
