@@ -17,6 +17,7 @@ import {
   type ProgressBody,
   type ViewingStep,
 } from "@/lib/reDealStages";
+import { TARGET_YIELD, deskGate } from "@/lib/reViewingGate";
 
 type Deal = {
   id: string;
@@ -81,9 +82,10 @@ export default function DealProgressPanel({
 
   const s3 =
     sj.s3_investigation && typeof sj.s3_investigation === "object"
-      ? (sj.s3_investigation as { hearing_questions?: string[] })
+      ? (sj.s3_investigation as { hearing_questions?: string[]; viewing_checks?: string[] })
       : null;
   const questions = s3?.hearing_questions || [];
+  const viewingChecks = s3?.viewing_checks || [];
 
   async function save(body: ProgressBody, okMsg = "保存しました") {
     setBusy(true);
@@ -124,10 +126,78 @@ export default function DealProgressPanel({
     const step: ViewingStep = viewing.step || "candidate";
     const next = viewingNextStep(deal);
     const prog = checklistProgress(VIEWING_CHECKLIST, viewing.checklist);
+    const gate = deskGate(deal);
+    const rentSourceLabel =
+      gate.rentSource === "manual" ? "手入力" : gate.rentSource ? "S3" : "未設定";
     return (
       <div style={{ ...box, border: "2px solid #0ea5e9", background: "#f0f9ff" }}>
         <strong>🚶 内見（{VIEWING_STEP_LABEL[step]}）</strong>
         <NextLine {...next} />
+
+        <div
+          style={{
+            fontSize: 12,
+            background: "#fff",
+            border: `1px solid ${gate.verdict === "go" ? "#16a34a" : "#bae6fd"}`,
+            borderRadius: 6,
+            padding: "8px 10px",
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>
+            机上判定（内見に行くか）: {gate.label}
+          </div>
+          <div className="meta" style={{ marginTop: 2 }}>
+            指値ライン＝保守の想定家賃×12÷{Math.round(TARGET_YIELD * 100)}%−修繕概算。家賃の出どころ:{" "}
+            {rentSourceLabel}
+            {gate.rentMan != null ? `（${gate.rentMan}万円/月）` : ""}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+            <label className="meta">
+              保守の想定家賃（万円/月）{" "}
+              <input
+                type="number"
+                step="0.1"
+                style={{ ...input, width: 80 }}
+                defaultValue={viewing.desk_rent_man ?? ""}
+                key={`dr-${viewing.desk_rent_man ?? ""}`}
+                placeholder={gate.rentSource && gate.rentSource !== "manual" ? String(gate.rentMan) : ""}
+                onBlur={(e) => {
+                  const v = e.target.value === "" ? null : Number(e.target.value);
+                  if (v !== (viewing.desk_rent_man ?? null)) {
+                    void save({ kind: "viewing", patch: { desk_rent_man: v } });
+                  }
+                }}
+              />
+            </label>
+            <label className="meta">
+              修繕概算（万円）{" "}
+              <input
+                type="number"
+                style={{ ...input, width: 80 }}
+                defaultValue={viewing.repair_man ?? ""}
+                key={`rp-${viewing.repair_man ?? ""}`}
+                placeholder="内見後"
+                onBlur={(e) => {
+                  const v = e.target.value === "" ? null : Number(e.target.value);
+                  if (v !== (viewing.repair_man ?? null)) {
+                    void save({ kind: "viewing", patch: { repair_man: v } });
+                  }
+                }}
+              />
+            </label>
+          </div>
+          {viewingChecks.length > 0 ? (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontWeight: 600 }}>内見で確かめること（S3）</div>
+              <ol style={{ margin: "2px 0 0 18px", padding: 0 }}>
+                {viewingChecks.map((q, i) => (
+                  <li key={i}>{q}</li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+        </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {(Object.keys(VIEWING_STEP_LABEL) as ViewingStep[]).map((s) => (
