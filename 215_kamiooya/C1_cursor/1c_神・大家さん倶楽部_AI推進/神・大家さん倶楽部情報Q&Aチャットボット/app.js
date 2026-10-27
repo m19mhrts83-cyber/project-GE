@@ -15,6 +15,25 @@ const App = {
     lastCitations: [],
     citationsByMessageId: {},
     openchatLogs: [],
+    // 取得元正本 open_chat_routes.yaml の全37ルーム。直近200投稿から選択肢を作らない。
+    openchatRooms: [
+      '01運営より全体周知G【神大家】', '02初心者G【神大家】', '03 YouTube集中学習【神大家】',
+      '10-1関東信越_物件紹介G【神大家】', '10-2関東信越_相談G【神大家】',
+      '11-1関西_物件紹介G【神大家】', '11-2関西_相談G【神大家】',
+      '12-1東海北陸_物件紹介G【神大家】', '12-2東海北陸_相談G【神大家】',
+      '13-1九州沖縄_物件紹介G【神大家】', '13-2九州沖縄_相談G【神大家】',
+      '14-1北海道_物件紹介G【神大家】', '14-2北海道_相談G【神大家】',
+      '15-1東北_物件紹介G【神大家】', '15-2東北_相談G【神大家】',
+      '16-1中国/四国_物件紹介G【神大家】', '16-2中国/四国_相談G【神大家】',
+      '20戸建にチャレンジ!G【神大家】', '21中古APにチャレンジ!G【神大家】',
+      '22新築APにチャレンジ!G【神大家】', '23再生AP/MSにチャレンジ!!【神大家】',
+      '24DIYにチャレンジ!G【神大家】', '25神コンセプト物件にチャレンジ!【神大家】',
+      '26RC鉄骨など大規模物件G【神大家】', '30空室相談G【神大家】', '31修繕相談G【神大家】',
+      '32売却相談G【神大家】', '33融資相談G【神大家】', '34保険相談G【神大家】',
+      '35税金/確定申告G【神大家】', '39その他相談/共有G【神大家】', '50相続対策G【神大家】',
+      '51多法人スキーム情報共有【神大家】', '52障害者GH情報交換【神大家】',
+      '53海外不動産 情報交換【神大家】', '54太陽光 共有G【神大家】', '55自営業/事業者G【神大家】'
+    ].map(function (title) { return { chat_title: title }; }),
     forumCategoryLookup: null,
     pendingUsers: [],
     approvedUsers: [],
@@ -412,7 +431,9 @@ const App = {
     }
     if (App.elements.openchatTitleFilter) {
       App.elements.openchatTitleFilter.addEventListener('change', function () {
-        App.renderOpenchatTable();
+        App.loadOpenchatLogs().catch(function (err) {
+          App.showToast((err && err.message) || 'LINEオプチャの取得に失敗しました', 'error');
+        });
       });
     }
   },
@@ -1494,6 +1515,7 @@ const App = {
       );
     }
     App.state.openchatLogs = App.normalizeRelatedList(data.relatedOpenchat || []);
+    if (Array.isArray(data.openchatRooms)) App.state.openchatRooms = data.openchatRooms;
     App.state.openchatHighlightId = openchatId || '';
     App.renderOpenchatTitleFilterOptions();
     App.renderOpenchatTable({ exactOpenchatId: openchatId || undefined });
@@ -1505,7 +1527,7 @@ const App = {
     const current = select.value || '';
     const titles = Array.from(
       new Set(
-        (App.state.openchatLogs || [])
+        (App.state.openchatRooms.length ? App.state.openchatRooms : App.state.openchatLogs || [])
           .map(function (row) {
             return String(row.chat_title || row.chatTitle || '').trim();
           })
@@ -5128,4 +5150,3 @@ const App = {
 };
 
 document.addEventListener('DOMContentLoaded', App.init);
-

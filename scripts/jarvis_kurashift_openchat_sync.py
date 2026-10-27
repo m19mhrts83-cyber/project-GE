@@ -611,7 +611,7 @@ def main() -> int:
     print(f"🔍 対象ルート数: {len(routes)} 件")
     for r in routes:
         rid = r.get("id") or ""
-        title = str(r.get("title_substring") or rid)
+        title = str(r.get("org_label") or r.get("title_substring") or rid)
         out_md = Path(r.get("output_md") or "")
         if not out_md.exists():
             print(f"  · MISS {title}: {out_md}")
