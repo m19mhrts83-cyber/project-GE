@@ -80,7 +80,12 @@ export default async function ThemesPage() {
                     <a href={`/themes/${t.id}`}>
                       <strong>{t.title}</strong>
                     </a>
-                    <div className="meta">{t.hypothesis}</div>
+                    <div className="meta">
+                      {t.hypothesis}
+                      {t.created_at
+                        ? `（数字は ${String(t.created_at).slice(0, 10)} 作成時点）`
+                        : ""}
+                    </div>
                     {t.duration_note ? (
                       <div className="meta">期間: {t.duration_note}</div>
                     ) : null}

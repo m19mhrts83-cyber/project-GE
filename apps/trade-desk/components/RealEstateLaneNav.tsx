@@ -30,7 +30,7 @@ const LANES: {
     id: "b-funnel",
     href: "/realestate/deals",
     short: "B実",
-    label: "千三つ",
+    label: "物件探し（千三つ）",
   },
   {
     id: "b-vendors",
@@ -95,6 +95,8 @@ export default function RealEstateLaneNav({ active }: { active: ReLaneId }) {
             key={l.id}
             href={l.href}
             className={on ? "btn" : undefined}
+            title={`記号 ${l.short}`}
+            aria-current={on ? "page" : undefined}
             style={
               on
                 ? undefined
@@ -107,7 +109,7 @@ export default function RealEstateLaneNav({ active }: { active: ReLaneId }) {
                   }
             }
           >
-            <strong>{l.short}</strong> {l.label}
+            {l.label}
           </a>
         );
       })}

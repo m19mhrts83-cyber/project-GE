@@ -14,7 +14,7 @@ import {
   SPECIAL_LABEL,
   composeReSteadyBoard,
 } from "@/lib/reSteadyCf";
-import type { PropertyUnitRow } from "@/lib/roiAssets";
+import { unitBreakdown, type PropertyUnitRow } from "@/lib/roiAssets";
 import { buildBRate4Rows, fmtPct } from "@/lib/bRate4";
 import { dscrLabel, fmtDscr, simpleDscr } from "@/lib/reDscr";
 import { RE_PROPERTY_MASTER } from "@/lib/rePropertyMaster";
@@ -133,7 +133,10 @@ export default async function RealEstatePage({
       if (scope === "personal" && o !== "個人") continue;
       if (scope === "corporate" && o !== "法人") continue;
     }
-    rentByProp.set(pid, (rentByProp.get(pid) || 0) + (Number(u.rent) || 0));
+    // 保有マスタ（③-C）と同じく家賃＋共益費（グロス）で数える
+    const gross =
+      unitBreakdown(u as PropertyUnitRow).totalRent ?? (Number(u.rent) || 0);
+    rentByProp.set(pid, (rentByProp.get(pid) || 0) + gross);
   }
   const portfolioRent = [...rentByProp.values()].reduce((a, b) => a + b, 0);
   const portfolioPay = bRate4.reduce(
@@ -146,6 +149,12 @@ export default async function RealEstatePage({
     const v = l.monthly_payment_jpy == null ? 0 : Number(l.monthly_payment_jpy);
     return s + (Number.isFinite(v) ? v : 0);
   }, 0);
+  // トラッカーには自宅・車・教育・太陽光も入る。物件CFに使うのは物件ローンだけ
+  const propertyLoanPayMonth = bRate4All.reduce(
+    (s, r) => s + (r.monthlyPaymentJpy || 0),
+    0
+  );
+  const otherLoanPayMonth = Math.max(0, loanTrackerPayMonth - propertyLoanPayMonth);
 
   const ytdCf = aggregateReCfFromCategoryYear(
     (catYear || []) as FinanceCategoryYearRow[],
@@ -252,7 +261,7 @@ export default async function RealEstatePage({
         <table style={{ marginTop: 8 }}>
           <tbody>
             <tr>
-              <td>レントロール合計</td>
+              <td>月家賃合計（家賃＋共益費・満室）</td>
               <td>
                 <strong>{fmtYen(portfolioRent)}／月</strong>
               </td>
@@ -407,7 +416,7 @@ export default async function RealEstatePage({
           </strong>
         </header>
         <p className="meta" style={{ marginTop: 6 }}>
-          満室想定はレントロール年収−返済。実の定常はローン・管理・毎月経費だけ。
+          満室想定はいまの契約家賃（家賃＋共益費・全室入居の場合）−物件ローン返済。実の定常は入金した家賃からローン・管理・毎月経費を引いたもの。
           取得税・固都税・修繕・年払い保険は特別支出に分けます。
           {reBoard.liveTotal > 0
             ? ` 現況 ${reBoard.liveOccupied}/${reBoard.liveTotal}戸。`
@@ -423,6 +432,9 @@ export default async function RealEstatePage({
                   {" "}
                   · 家賃 {fmtYen(Math.round(reBoard.assumedRentMonth))} − 返済{" "}
                   {fmtYen(Math.round(reBoard.assumedPayMonth))}
+                  {reBoard.assumedRentSource === "rent_roll"
+                    ? `（家賃はいまの契約。購入時の図面満室は ${fmtYen(Math.round(reBoard.purchaseRentMonth))}）`
+                    : "（号室データが無いため購入時の図面満室で計算）"}
                 </span>
               </td>
             </tr>
@@ -485,9 +497,12 @@ export default async function RealEstatePage({
           </tbody>
         </table>
         <p className="meta" style={{ marginTop: 10 }}>
-          ローン正本の月返済合計（loan-tracker 投影）:{" "}
+          借入残高トラッカーの月返済: 物件ローン{" "}
+          {fmtYen(Math.round(propertyLoanPayMonth))}
+          ／月（上の「返済」はこれ） · 自宅・車・教育・太陽光など{" "}
+          {fmtYen(Math.round(otherLoanPayMonth))}／月 · 全借入合計{" "}
           {loanTrackerPayMonth > 0 ? fmtYen(Math.round(loanTrackerPayMonth)) : "—"}
-          ／月（想定返済 {fmtYen(Math.round(reBoard.assumedPayMonth))} と比較用）
+          ／月
         </p>
       </div>
 

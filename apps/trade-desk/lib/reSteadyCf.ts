@@ -44,6 +44,10 @@ export type ReSteadyBoard = {
   throughMonth: number;
   throughLabel: string;
   assumedRentMonth: number;
+  /** 想定家賃の出どころ。rent_roll=いまの契約（家賃＋共益費）、roi_purchase=購入時の図面満室 */
+  assumedRentSource: "rent_roll" | "roi_purchase";
+  /** 購入時の図面満室家賃（参考） */
+  purchaseRentMonth: number;
   assumedPayMonth: number;
   assumedCfMonth: number;
   liveOccupied: number;
@@ -172,16 +176,26 @@ export function composeReSteadyBoard(
   throughMonth: number,
   assets: RoiAsset[] = ROI_ASSETS
 ): ReSteadyBoard {
-  const assumed = assumedFromRoi(assets);
+  const roi = assumedFromRoi(assets);
   const liveMap = groupUnitsLive(unitRows);
   let liveOccupied = 0;
   let liveTotal = 0;
   let liveRentMonth = 0;
+  let rollFullRentMonth = 0;
   for (const g of liveMap.values()) {
     liveOccupied += g.occupied;
     liveTotal += g.total;
     liveRentMonth += g.occupiedRentMonth;
+    rollFullRentMonth += g.totalRentMonth;
   }
+  // 満室想定は保有マスタ（③-C）と同じ「いまの契約家賃＋共益費」を正にする。
+  // 号室データが無いときだけ購入時の図面満室（ROI）に戻す。
+  const useRoll = liveTotal > 0 && rollFullRentMonth > 0;
+  const assumed = {
+    rentMonth: useRoll ? rollFullRentMonth : roi.rentMonth,
+    payMonth: roi.payMonth,
+    cfMonth: (useRoll ? rollFullRentMonth : roi.rentMonth) - roi.payMonth,
+  };
 
   let rentYtd = 0;
   let loanYtd = 0;
@@ -261,6 +275,8 @@ export function composeReSteadyBoard(
     throughMonth,
     throughLabel: `1〜${throughMonth}月`,
     assumedRentMonth: assumed.rentMonth,
+    assumedRentSource: useRoll ? "rent_roll" : "roi_purchase",
+    purchaseRentMonth: roi.rentMonth,
     assumedPayMonth: assumed.payMonth,
     assumedCfMonth: assumed.cfMonth,
     liveOccupied,
