@@ -75,7 +75,8 @@ export default function EnqueueJobButton({
   }
 
   return (
-    <div style={{ display: "inline-block", marginRight: 8, marginBottom: 8 }}>
+    // span で包む: 呼び出し側が <p> の中に置くことが多く、<div> だとハイドレーションエラー（#418）になる
+    <span style={{ display: "inline-block", marginRight: 8, marginBottom: 8 }}>
       <button
         type="button"
         className={requireConfirm ? "btn primary" : "btn"}
@@ -85,20 +86,20 @@ export default function EnqueueJobButton({
         {busy ? "送信中…" : label || title}
       </button>
       {msg ? (
-        <div className="meta" style={{ marginTop: 6, maxWidth: 420 }}>
+        <span
+          className="meta"
+          style={{ display: "block", marginTop: 6, maxWidth: 420 }}
+        >
           {msg}
           {queued ? (
             <>
               <br />
-              結果は Cursor
-              のチャットには出ません。KURASHIFT の{" "}
-              <a href="/jobs">ジョブ</a> で queued → running →
-              succeeded / failed とログを確認してください（Mac
-              起動中。launchd は最大約15分間隔）。
+              結果は <a href="/jobs">ジョブ</a> 画面で「待ち → 実行中 →
+              完了／失敗」を確認できます（Mac が起きているときに実行）。
             </>
           ) : null}
-        </div>
+        </span>
       ) : null}
-    </div>
+    </span>
   );
 }
