@@ -315,6 +315,26 @@ def assess_s2() -> dict[str, Any]:
 S9_SENDABLE_CHANNELS = frozenset({"email", "web_form"})
 
 
+def s9_focus_lane() -> str:
+    """S9 の送信対象レーン（ボス方針 2026-10-20「緑区 1 社/日」）。空なら全レーン。"""
+    return (os.environ.get("JARVIS_S9_FOCUS_LANE", "midori_caramel") or "").strip()
+
+
+def s9_sendable_focus(limit: int) -> list[dict[str, Any]]:
+    """送信再開・補給で渡す S9 候補。優先レーンのメール／フォームだけ。
+
+    以前は balanced（北区と緑区の混在）で先頭を渡していたため、daily=1 だと台帳順の
+    北区（例: 名古屋駅の FC 店）が毎回選ばれ、方針外として送られず mark 停滞 →
+    6時間ごとの送信再開で同じ会社が再投入され続けた（2026-10-27 · 通算6回）。
+    """
+    lane = s9_focus_lane() or None
+    return [
+        v
+        for v in s9_next_pending(limit=max(limit * 10, 10), lane=lane)
+        if str(v.get("channel") or "") in S9_SENDABLE_CHANNELS
+    ][:limit]
+
+
 def assess_s9() -> dict[str, Any]:
     data = load_s9()
     settings = data.get("settings") or {}
@@ -329,12 +349,8 @@ def assess_s9() -> dict[str, Any]:
         if str(v.get("channel") or "") in S9_SENDABLE_CHANNELS
     ][: max(daily * 3, daily)]
     # 優先レーン（緑区＝ボス方針 2026-10-20「緑区 1 社/日」）で送れる相手が 0 なら補給が要る
-    focus_lane = os.environ.get("JARVIS_S9_FOCUS_LANE", "midori_caramel")
-    focus_ready = sum(
-        1
-        for v in s9_next_pending(limit=10, lane=focus_lane)
-        if str(v.get("channel") or "") in S9_SENDABLE_CHANNELS
-    )
+    focus_lane = s9_focus_lane() or "all"
+    focus_ready = len(s9_sendable_focus(10))
     summ = s9_summary()
     by = summ.get("by_status") or {}
     vendors = list(data.get("vendors") or [])
@@ -511,12 +527,18 @@ def write_s2_refill(*, dry_run: bool) -> dict[str, Any]:
 
 
 def write_s9_refill(*, dry_run: bool) -> dict[str, Any]:
-    items = s9_next_pending(limit=2, balanced=True)
+    items = s9_sendable_focus(2)
+    if not items:
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": f"s9_precheck: 優先レーン {s9_focus_lane() or 'all'} で送れる候補0件（探索・台帳追加が必要）",
+        }
     payload = {
         "ok": True,
         "mode": "s9_precheck",
         "count": len(items),
-        "balanced": True,
+        "focus_lane": s9_focus_lane() or "all",
         "vendors": items,
         "note": (
             "自律 refill。再依頼不要。"
@@ -525,7 +547,7 @@ def write_s9_refill(*, dry_run: bool) -> dict[str, Any]:
     }
     body = (
         "【S9 事前確認キュー · 自律 refill】\n"
-        "`--next 2 --balanced` 相当。キュー不足時の再依頼 MD は不要"
+        "優先レーン（既定: 緑区）のメール／フォーム候補のみ。キュー不足時の再依頼 MD は不要"
         "（516／stall runner が補給）。2営業日空いたら Slack #ops。\n\n"
         + json.dumps(payload, ensure_ascii=False, indent=2)
     )
@@ -811,10 +833,7 @@ def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
         daily = int(settings.get("daily_outreach_limit") or 2)
         if daily < 1:
             daily = 1
-        vendors = [
-            _slim_vendor_for_kick(v)
-            for v in s9_next_pending(limit=daily, balanced=True)
-        ]
+        vendors = [_slim_vendor_for_kick(v) for v in s9_sendable_focus(daily)]
         how = (
             f"本日分 **{daily}社** の事前確認メール（定型）を送信し、"
             "`--mark ID --status contacted` を報告。"
@@ -878,6 +897,20 @@ def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
     return out
 
 
+def s2_weekly_rollover_due(last_refill_at: str | None, now: datetime | None = None) -> bool:
+    """S2 週次バッチ（batch_id=ISO週）が今週分まだ出ていないか。
+
+    部長は batch_id の週単位でキューを持つため、前週バッチの残りが台帳上に残っていても
+    月曜以降は「今週のバッチ未着・送信先なし」になる（2026-10-27 W44 未着）。
+    キュー不足だけを補給条件にしていたので、週が替わってもバッチが出なかった。
+    """
+    last = parse_iso(last_refill_at)
+    if last is None:
+        return True
+    cur = (now or now_jst()).astimezone(JST).isocalendar()[:2]
+    return last.astimezone(JST).isocalendar()[:2] != cur
+
+
 def run_lane(
     lane: str,
     *,
@@ -908,8 +941,12 @@ def run_lane(
     thr = stale_marks_threshold_days(state)
     stale_reason = stale_marks_reason(q, threshold_days=thr)
     is_stale = bool(stale_reason)
+    weekly_due = lane == "s2" and s2_weekly_rollover_due(lst.get("last_refill_at"))
     needs_refill = bool(
-        force_refill or q["needs_refill"] or (archive_inbox and inbox_hits)
+        force_refill
+        or q["needs_refill"]
+        or weekly_due
+        or (archive_inbox and inbox_hits)
     )
     # キューは足りるが mark 停滞 → 本日送信再開キック（週次 refill とは別）
     needs_send_resume = bool(

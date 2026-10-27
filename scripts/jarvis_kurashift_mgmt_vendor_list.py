@@ -603,6 +603,15 @@ def is_contacted(v: dict[str, Any]) -> bool:
     )
 
 
+def name_area_key(v: dict[str, Any]) -> str:
+    """社名＋所在の同一性（空白・記号ゆれを除く）。経路が違っても同じ店舗なら同じキー。"""
+    name = re.sub(r"[\s　・･\-－ー（）()「」]", "", str(v.get("name") or "")).lower()
+    area = re.sub(r"[\s　]", "", str(v.get("area") or ""))
+    if not name or not area:
+        return ""
+    return f"name:{name}|{area}"
+
+
 def duplicate_contact_reason(
     v: dict[str, Any], vendors: list[dict[str, Any]], *, contacted_only: bool = False
 ) -> str:
@@ -610,7 +619,8 @@ def duplicate_contact_reason(
     rk = route_key(v)
     dom = email_domain(v)
     addr = str(v.get("contact_email") or "").strip().lower()
-    if not rk and not dom and not addr:
+    nk = name_area_key(v)
+    if not rk and not dom and not addr and not nk:
         return ""
     for o in vendors:
         if o is v:
@@ -618,6 +628,9 @@ def duplicate_contact_reason(
         if contacted_only and not is_contacted(o):
             continue
         oname = str(o.get("name") or o.get("id") or "")
+        # 台帳の重複行（電話・面談で接触済の同じ店が、フォーム行として別に残る）
+        if nk and name_area_key(o) == nk:
+            return f"同じ会社・同じ店舗に接触済（{oname}）"
         if rk and route_key(o) == rk:
             return f"同一問合せ先（{oname}）"
         if addr and addr == str(o.get("contact_email") or "").strip().lower():
