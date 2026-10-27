@@ -154,6 +154,20 @@ def parse_xlsx(path: Path) -> tuple[list[Cue], list[str]]:
         for n in norm
     )
     if not header_like:
+        # Notta 2026 export: title/date/AI Notes, then A=time B=speaker C=text.
+        timestamped = []
+        for row in rows:
+            if len(row) < 3 or row[0] is None or not row[2]:
+                continue
+            start = parse_timestamp(str(row[0]).strip())
+            if start is not None:
+                speaker = str(row[1] or '').strip() or None
+                timestamped.append(Cue(start, None, speaker, str(row[2]).strip()))
+        if timestamped:
+            if any(b.start_sec < a.start_sec for a, b in zip(timestamped, timestamped[1:])):
+                raise ValueError('Notta timestamps must be monotonic')
+            wb.close()
+            return timestamped, []
         # body-only: treat each non-empty cell in col B (or first non-empty) as a cue
         warnings.append("no_header_assumed_body_only")
         cues: list[Cue] = []

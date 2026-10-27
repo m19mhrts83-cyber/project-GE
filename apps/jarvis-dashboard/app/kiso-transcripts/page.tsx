@@ -4,6 +4,7 @@ import Shell from "@/components/Shell";
 import catalog from "@/data/kiso_transcripts.json";
 import courseStatus from "@/data/kiso_course_status.json";
 import courseGaps from "@/data/kiso_course_gaps.json";
+import nottaReceived from "@/data/kiso_notta_received.json";
 
 function loadUnderstanding(): string {
   try {
@@ -109,7 +110,8 @@ export default function KisoTranscriptsPage() {
     lessons?: GapLesson[];
     excluded?: Array<GapLesson & { excluded_reason?: string }>;
   };
-  const gapLessons = (gaps.lessons || []) as GapLesson[];
+  const receivedSlugs = new Set(nottaReceived.lessons.map((l) => l.slug));
+  const gapLessons = ((gaps.lessons || []) as GapLesson[]).filter((l) => !receivedSlugs.has(l.slug));
   const excluded = gaps.excluded || [];
   const gapByBand = (id: string) =>
     gapLessons.filter((g) => g.ask_priority === id);
@@ -142,11 +144,11 @@ export default function KisoTranscriptsPage() {
           <header>
             <span className={statusClass("ready")}>コース</span>
             <strong>
-              {cs.vtt_ready ?? "—"} / {cs.video_lessons ?? cs.total ?? "—"} 字幕取得
+              {(cs.vtt_ready || 0) + receivedSlugs.size} / {cs.video_lessons ?? cs.total ?? "—"} 字幕取得
             </strong>
           </header>
           <p className="sum">
-            動画あり・字幕なし {cs.video_no_caption ?? "—"} · 動画なし（対象外）{" "}
+            Vimeo {cs.vtt_ready ?? "—"} ＋ Notta補完 {receivedSlugs.size} · 未取得 {gapLessons.length} · 動画なし（対象外）{" "}
             {cs.no_video ?? "—"} · 全 {cs.total ?? "—"} レッスン ·{" "}
             {cs.updated || catalog.updated || "—"}
           </p>
@@ -154,7 +156,7 @@ export default function KisoTranscriptsPage() {
         <div className="card watch-card">
           <header>
             <span className="lvl warn">字幕依頼</span>
-            <strong>{gaps.count ?? gapLessons.length} 本</strong>
+            <strong>{gapLessons.length} レッスン</strong>
           </header>
           <p className="sum">
             Vimeo自動字幕なし → 今村さんへSRT依頼（下の一覧）
@@ -162,19 +164,19 @@ export default function KisoTranscriptsPage() {
         </div>
         <div className="card watch-card">
           <header>
-            <span className={statusClass(imamuraReady ? "ready" : "missing")}>
+            <span className={statusClass(nottaReceived.video_count ? "ready" : "missing")}>
               今村受領
             </span>
-            <strong>{imamuraReady} 本（inbox/正本）</strong>
+            <strong>{nottaReceived.video_count} 動画（検索反映済み）</strong>
           </header>
-          <p className="sum">受領待ちなら 0。inbox へ置けばここに出る</p>
+          <p className="sum">{nottaReceived.updated} · {receivedSlugs.size} レッスンを補完</p>
         </div>
       </div>
 
       <section className="home-section" id="imamura-ask">
         <div className="home-section-head">
           <h2 style={{ fontSize: "1.15rem", margin: 0 }}>
-            今村さん依頼：字幕未取得（{gaps.count ?? gapLessons.length}本）
+             今村さん依頼：字幕未取得（{gapLessons.length}レッスン）
           </h2>
         </div>
         <div
@@ -268,6 +270,14 @@ export default function KisoTranscriptsPage() {
         ) : null}
       </section>
 
+      <section className="home-section">
+        <h2 style={{ fontSize: "1.15rem" }}>今回のNotta受領・反映済み</h2>
+        <p>{nottaReceived.note}</p>
+        <ul>{nottaReceived.lessons.map((lesson) => <li key={lesson.slug}>
+          <a href={`https://westudy.co.jp/lesson/${lesson.slug}`} target="_blank" rel="noopener noreferrer">{lesson.title}</a>
+          {" · "}{lesson.videos}動画 · Supabase／通常検索へ反映済み
+        </li>)}</ul>
+      </section>
       <UnderstandingBlock text={understanding} />
 
       <section className="home-section">
@@ -284,8 +294,8 @@ export default function KisoTranscriptsPage() {
               section?: string;
               url?: string;
             };
-            const st = row.status || row.jarvis_status || "—";
-            const ok = st === "vtt_ready" || st === "ready";
+            const st = receivedSlugs.has(row.slug) ? "notta_ingested" : row.status || row.jarvis_status || "—";
+            const ok = st === "vtt_ready" || st === "ready" || st === "notta_ingested";
             const url =
               row.url || `https://westudy.co.jp/lesson/${row.slug}`;
             return (
