@@ -579,8 +579,14 @@ def send_inquiry(
     cur_status = fields.get("inquiry_status")
     # awaiting_first_inquiry = S1 handoff 後の送信待ち（送信してよい）
     # awaiting_grok = 自分宛 Grok 依頼済（再送しない。force 時のみ）
+    # 「sending」はキュー投入側（KURASHIFT 画面・Slack ゲート）も送信前に付ける。
+    # 本当に送信途中だったか（このスクリプトが Gmail 送信直前に印を付けたか）で判定する。
+    # 印なしの sending をスキップすると、送信予約だけ入って一度も送られない（2026-10 に25件発生）。
+    send_started = sj_of(deal).get("inquiry_send_started_at")
     if not force:
-        if cur_status in ("awaiting_reply", "has_reply", "sending"):
+        if cur_status in ("awaiting_reply", "has_reply") or (
+            cur_status == "sending" and send_started
+        ):
             out = {"ok": True, "skipped": "inquiry_already_active", "deal_id": deal_id}
             print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
             return out
@@ -603,8 +609,13 @@ def send_inquiry(
         print(f"KURASHIFT_RESULT:{json.dumps(result, ensure_ascii=False)}")
         return result
 
-    # 先に sending を書いてから送る（クラッシュ時の二重送信を抑止）
-    update_inquiry(sb, deal, inquiry_status="sending")
+    # 先に sending と送信開始の印を書いてから送る（クラッシュ時の二重送信を抑止）
+    update_inquiry(
+        sb,
+        deal,
+        inquiry_status="sending",
+        summary_json={"inquiry_send_started_at": now_iso()},
+    )
     deal = get_deal(sb, deal_id)
 
     try:
@@ -620,7 +631,12 @@ def send_inquiry(
             .execute()
         )
     except Exception as e:
-        update_inquiry(sb, deal, inquiry_status="draft")
+        update_inquiry(
+            sb,
+            deal,
+            inquiry_status="draft",
+            summary_json={"inquiry_send_started_at": None},
+        )
         out = {"ok": False, "error": f"send_failed:{type(e).__name__}:{e}", "deal_id": deal_id}
         print(f"KURASHIFT_RESULT:{json.dumps(out, ensure_ascii=False)}")
         return out

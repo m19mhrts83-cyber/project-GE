@@ -22,7 +22,7 @@ import {
   loadTaxYearMetricsFromCatalog,
   type HouseholdFiledRe,
 } from "@/lib/householdReFiled";
-import type { PropertyUnitRow } from "@/lib/roiAssets";
+import { ROI_ASSETS, type PropertyUnitRow } from "@/lib/roiAssets";
 import type { TaxYearMetricRow } from "@/lib/taxInsights";
 
 export type Quadrant = "income" | "expense" | "asset" | "liability";
@@ -661,14 +661,23 @@ export function composeHouseholdBs(args: {
   const usedLoanIds = new Set<string>();
   for (const prop of RE_PROPERTY_MASTER) {
     const propLoans = loansForProperty(prop.id, args.loanTracker);
+    // 物件ローンは負債に載るので、資産側にも物件を載せないと純資産が大きくマイナスに見える。
+    // 時価は持っていないため、取得価格（本体価格）を仮の評価額にする。
+    const acquired = ROI_ASSETS.find(
+      (a) => (a.unitPropertyId || a.id) === prop.id && a.status === "owned"
+    );
+    const bookJpy = acquired?.bodyPrice ?? null;
     rows.push({
       id: `re_asset_${prop.id}`,
       label: `${prop.name}（${prop.owner}）`,
       quadrant: "asset",
       band: "business_cf",
-      amountJpy: null,
-      countsTowardTotal: false,
-      hint: "評価額は③-C/MQ参照。ここは事業CFの枠",
+      amountJpy: bookJpy,
+      countsTowardTotal: bookJpy != null,
+      hint:
+        bookJpy != null
+          ? "取得価格（本体）で仮評価。時価・簿価ではない"
+          : "評価額は③-C/MQ参照。ここは事業CFの枠",
       entity: prop.owner === "法人" ? "corporate" : "personal",
     });
     for (const ln of propLoans) {
