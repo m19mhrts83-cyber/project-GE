@@ -77,5 +77,14 @@ _字幕取得不可_
         self.assertEqual(chunk['chunk_key'], f'westudy:test:vimeo:123:1:{original[:16]}')
 
 
+    def test_whisper_manifest_marks_provider(self):
+        text = '## 動画 1: Vimeo 123 — ローカルWhisper\n[00:00:01] 本文\n'
+        lesson = {'slug': 'test', 'title': 'テスト', 'transcript_provider': 'local_whisper'}
+        source = build_records(lesson, text, 'origin.md', '応用')[0][0]
+        self.assertEqual(source['meta_json']['transcript_provider'], 'local_whisper')
+        self.assertEqual(source['source_key'], 'westudy:test:vimeo:123')
+        self.assertEqual(build_records({'slug': 'test'}, text, 'o.md', '応用')[0][0]['meta_json']['transcript_provider'], 'vimeo_auto')
+
+
 if __name__ == '__main__':
     unittest.main()
