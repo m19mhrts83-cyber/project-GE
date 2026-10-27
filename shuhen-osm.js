@@ -5,6 +5,8 @@
 const CONFIG = {
     // 試験公開（30〜50人）までは OSM 財団の無料配信。本展開時は商用プラン（Stadia Maps / MapTiler 等）の URL＋ドメイン制限キーへ。
     tileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    // 白地図（道路・建物の形だけで文字なし）。紙面の地図に AI が架空の地名を描き足さないよう、文字は吹き出しと番号ピンだけにしたいとき用
+    whiteTileUrl: 'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
     geocodeUrl: 'https://nominatim.openstreetmap.org/search',
     walkRouteUrl: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/',
     carRouteUrl: 'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
@@ -12,6 +14,7 @@ const CONFIG = {
     walkMaxMinutes: 25, // これより遠い徒歩の施設は別の場所に当たったとみなす
     metersPerMinute: 80, // 不動産公取規約: 80m＝1分（端数切り上げ）
     credit: '地図データ © OpenStreetMap contributors（https://www.openstreetmap.org/copyright）',
+    whiteCredit: '地図データ © OpenStreetMap contributors（https://www.openstreetmap.org/copyright）、地図デザイン © CARTO',
 };
 
 const SAMPLE = {
@@ -353,6 +356,14 @@ function loadImage(src) {
     });
 }
 
+function isWhiteMap() {
+    return $('mapStyle').value === 'white';
+}
+
+function tileUrlForSheet() {
+    return isWhiteMap() ? CONFIG.whiteTileUrl : CONFIG.tileUrl;
+}
+
 async function renderMapImage() {
     const size = editMap.getSize();
     const zoom = editMap.getZoom() + 1; // 2倍解像度
@@ -368,13 +379,13 @@ async function renderMapImage() {
     const jobs = [];
     for (let tx = t0x; tx <= t1x; tx++) {
         for (let ty = t0y; ty <= t1y; ty++) {
-            const url = CONFIG.tileUrl.replace('{z}', zoom).replace('{x}', tx).replace('{y}', ty);
+            const url = tileUrlForSheet().replace('{z}', zoom).replace('{x}', tx).replace('{y}', ty);
             jobs.push(loadImage(url).then(img => ctx.drawImage(img, tx * 256 - origin.x, ty * 256 - origin.y)).catch(() => {}));
         }
     }
     await Promise.all(jobs);
-    // 紙面向けに少し淡く
-    ctx.fillStyle = 'rgba(251,248,242,0.28)'; ctx.fillRect(0, 0, W, H);
+    // 紙面向けに少し淡く（白地図はもともと淡い）
+    if (!isWhiteMap()) { ctx.fillStyle = 'rgba(251,248,242,0.28)'; ctx.fillRect(0, 0, W, H); }
     const u = W / 760; // 紙面での見た目をそろえる基準
     const xy = (lat, lng) => { const p = editMap.project([lat, lng], zoom); return [p.x - origin.x, p.y - origin.y]; };
 
@@ -443,7 +454,7 @@ ${$('areaCopy').value.trim() ? `<p class="area">${esc($('areaCopy').value.trim()
 ${car.length ? `<div><h3>車で行ける</h3><ol>${car.map(li).join('')}</ol></div>` : ''}
 </div>
 ${bubbles.length ? `<div class="bubbles">${bubbles.slice(0, 2).map(b => `<div class="bubble">${esc(b)}</div>`).join('')}</div>` : ''}
-<p class="credit">徒歩分は道のりの距離から80m＝1分で計算（端数切り上げ）。${approx ? '一部は直線距離からの概算です。' : ''}掲載情報は作成時点のものです。<br>${esc(CONFIG.credit)}</p>
+<p class="credit">徒歩分は道のりの距離から80m＝1分で計算（端数切り上げ）。${approx ? '一部は直線距離からの概算です。' : ''}掲載情報は作成時点のものです。<br>${esc(isWhiteMap() ? CONFIG.whiteCredit : CONFIG.credit)}</p>
 </div>`;
 }
 
