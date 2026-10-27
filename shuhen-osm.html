@@ -23,7 +23,7 @@
         .panel { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
         .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         label { display: block; font-size: 13px; font-weight: 600; margin: 8px 0 4px; }
-        input[type=text], textarea { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 14px; }
+        input[type=text], textarea, select { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 14px; }
         textarea { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
         small { color: var(--quiet); font-size: 12px; }
         .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -113,6 +113,11 @@
         <small>　ずれているピンはドラッグで直せます（徒歩分も計算し直します）。地図の表示範囲が、そのまま叩き台の地図範囲になります。</small>
         <div id="editMap" style="margin-top:8px"></div>
         <table class="rows" id="rowTable"></table>
+        <label for="mapStyle">紙面の地図</label>
+        <select id="mapStyle">
+            <option value="normal">ふつうの地図（地名・道路名あり）</option>
+            <option value="white">白地図（文字なし・番号ピンと吹き出しだけ）</option>
+        </select>
         <div class="actions">
             <button id="btnSheet">A4叩き台を作る</button>
             <button id="btnPrint" class="secondary" disabled>印刷・PDF保存</button>
