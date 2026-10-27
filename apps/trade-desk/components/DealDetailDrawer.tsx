@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import DealInquiryActions from "@/components/DealInquiryActions";
+import DealProgressPanel from "@/components/DealProgressPanel";
 import DealReviewActions from "@/components/DealReviewActions";
 import GrokInvestigateCopy from "@/components/GrokInvestigateCopy";
 import OpsFormDraftPanel, {
@@ -38,6 +39,7 @@ import {
   inquiryPhase,
 } from "@/lib/rePipelineUi";
 import { openInGoogleChrome } from "@/lib/openInChrome";
+import { getViewing, isViewingBoardDeal } from "@/lib/reDealStages";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
 
 type TimelineItem = {
@@ -75,6 +77,13 @@ type InquiryEval = {
   badges: string[];
   reasons: string[];
 };
+
+/** 内見〜引渡しパネルを出す案件（S3済・内見中・買付以降・内見記録あり） */
+function showProgressPanel(d: DealRow): boolean {
+  if (["viewing", "offer", "loan", "purchased"].includes(d.status)) return true;
+  if (isViewingBoardDeal(d)) return true;
+  return Boolean(getViewing(d).step);
+}
 
 export default function DealDetailDrawer({
   dealId,
@@ -410,6 +419,14 @@ export default function DealDetailDrawer({
             <p className="meta" style={{ marginTop: 2 }}>
               スコア根拠: {scoreReason}
             </p>
+            {showProgressPanel(deal) ? (
+              <DealProgressPanel
+                deal={deal}
+                onChanged={() => {
+                  void load({ quiet: true });
+                }}
+              />
+            ) : null}
             {(() => {
               const yi = getYieldDisplayInfo(deal);
               const li = getLandValueDisplayInfo(deal);
