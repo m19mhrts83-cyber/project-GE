@@ -1611,7 +1611,7 @@ const App = {
     tbody.innerHTML = rows
       .map(function (r) {
         const when = String(r.posted_at || r.postedAt || r.post_date || r.postDate || '').trim();
-        const snippet = String(r.content || '')
+        const snippet = App.cleanOpenchatDisplayText(r.content)
           .replace(/\s+/g, ' ')
           .trim()
           .slice(0, 180);
@@ -2406,7 +2406,7 @@ const App = {
           App.escapeHtml(c.openchatId || '') +
           '">DBで見る</button>' +
           '<div class="text-slate-600">' +
-          App.escapeHtml(c.snippet || '') +
+          App.escapeHtml(App.cleanOpenchatDisplayText(c.snippet)) +
           '</div></li>'
         );
       };
@@ -2422,6 +2422,13 @@ const App = {
     return (
       '<div class="citations-panel mt-3 border-t pt-2 text-xs">' + parts.join('') + '</div>'
     );
+  },
+
+  cleanOpenchatDisplayText: (value) => {
+    return String(value || '')
+      .replace(/\[relatedMessageId\][ \t]*\d+/gi, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   },
 
   formatOpenchatDateTime: (value) => {
