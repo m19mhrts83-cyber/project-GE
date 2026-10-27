@@ -1634,7 +1634,7 @@ const App = {
           App.escapeHtml(String(r.thread_title || r.threadTitle || '')) +
           '</td>' +
           '<td class="p-2 whitespace-nowrap text-xs">' +
-          App.escapeHtml(when) +
+          App.escapeHtml(App.formatOpenchatDateTime(when)) +
           '</td>' +
           '<td class="p-2 whitespace-nowrap text-xs">' +
           App.escapeHtml(String(r.sender_name || r.senderName || '')) +
@@ -2386,7 +2386,7 @@ const App = {
 
     if (openchatList.length) {
       const openchatItemHtml = function (c) {
-        const when = String(c.postedAt || '').trim();
+        const when = App.formatOpenchatDateTime(c.postedAt);
         const title = String(c.chatTitle || '').trim() || '（オプチャ名不明）';
         const stream = String(c.streamLabel || '').trim();
         const thread = String(c.threadTitle || '').trim();
@@ -2422,6 +2422,24 @@ const App = {
     return (
       '<div class="citations-panel mt-3 border-t pt-2 text-xs">' + parts.join('') + '</div>'
     );
+  },
+
+  formatOpenchatDateTime: (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(raw)) return raw.replace(/-/g, '/');
+    // タイムゾーンなしの既存日時は日本時間として扱い、UTC日時はJSTへ変換。
+    const local = raw.match(/^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/);
+    if (local) return local[1] + '/' + local[2] + '/' + local[3] + ' ' + local[4] + ':' + local[5];
+    const date = new Date(raw);
+    if (isNaN(date.getTime())) return raw;
+    const parts = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(date);
+    const fields = {};
+    parts.forEach(function (p) { fields[p.type] = p.value; });
+    return fields.year + '/' + fields.month + '/' + fields.day + ' ' + fields.hour + ':' + fields.minute;
   },
 
   parsePostedYear: (postedAt) => {
