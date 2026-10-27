@@ -1,0 +1,31 @@
+{
+  "updated": "2026-10-27",
+  "received": 38,
+  "mapped": 38,
+  "newly_imported": 10,
+  "existing_video": 10,
+  "existing_content": 3,
+  "note": "今村さん提供38ファイルのA1とVimeo実動画名を照合し全件紐付け済み。10動画は本番反映済み、10動画は既存の同一動画字幕あり、3動画は既存Notta／グルコン全編に対応本文あり。残り15動画は受領済み・本番取込待ちです。",
+  "covered_elsewhere": [
+    {"file":"3-3-4.xlsx","title":"三井住友トラストは三段活用を取り入れろ","status":"既存Notta字幕で対応済み"},
+    {"file":"3-5-7.xlsx","title":"育休中、育休明けの融資","status":"グルコン全編の字幕で対応済み（独立動画は未登録）"},
+    {"file":"3-int5.xlsx","title":"荻原さんの成功者インタビュー","status":"グルコン全編の字幕で対応済み（独立動画は未登録）"}
+  ],
+  "pending": [
+    {"file":"1-2.xlsx","title":"夢が叶う究極のマインド＆アウトプットの効果","slug":"step1_1"},
+    {"file":"2-4-3.xlsx","title":"路線価がない地域の路線価の調べ方","slug":"kamiooya-kiso-step2_2"},
+    {"file":"3-2-2.xlsx","title":"融資情報一覧 Part2","slug":"step3_1"},
+    {"file":"3-3-1.xlsx","title":"STEP3補足 自己資金融資","slug":"step3_1"},
+    {"file":"3-3-2.xlsx","title":"勝てるプランニングの作り方","slug":"step3_1"},
+    {"file":"3-3-3.xlsx","title":"静銀の評価の癖から購入プランを考える","slug":"step3_1"},
+    {"file":"3-3-5.xlsx","title":"資金作り ― 仕込みの概念 ―","slug":"step3_1"},
+    {"file":"3-4.xlsx","title":"経営者・自営業者・定年退職者のプランニング","slug":"step3_1"},
+    {"file":"3-5-1.xlsx","title":"55歳以上の不動産投資の進め方","slug":"step3_1"},
+    {"file":"3-5-2.xlsx","title":"STEP3例外パターン集","slug":"step3_1"},
+    {"file":"3-5-3.xlsx","title":"超高属性の方の進め方","slug":"step3_1"},
+    {"file":"3-5-4.xlsx","title":"節税不動産とファミリービジネスの活用と組み立て","slug":"step3_1"},
+    {"file":"3-5-5.xlsx","title":"法人化のベストなタイミング","slug":"step3_1"},
+    {"file":"3-5-6.xlsx","title":"宅建業と賃貸経営の両立のポイント","slug":"step3_1"},
+    {"file":"3-int4.xlsx","title":"湯浅さん 年CF840万円到達インタビュー＆公開コンサルティング","slug":"step3_plam_intarveiw"}
+  ]
+}
