@@ -97,3 +97,23 @@
 ~/selenium_env/venv/bin/python scripts/jarvis_westudy_course_vtt_batch.py            # 0,2,3,4 の字幕取得
 ~/selenium_env/venv/bin/python scripts/jarvis_westudy_whisper_fallback.py --manifest apps/jarvis-dashboard/data/course_transcripts/course2_status.json
 ```
+
+- brew が無い Mac では ffmpeg を `pip install imageio-ffmpeg` の同梱版で代用し、`ln -sf "$(python -c 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())')" ~/selenium_env/venv/bin/ffmpeg`。Whisper 実行時は `PATH=~/selenium_env/venv/bin:$PATH` を付ける。
+- worktree で動かすときは QAチャットボット `scripts/.env`（gitignore）を本体からシンボリックリンクする。
+
+### 実績（2026-10-27）
+
+| コース | レッスン | 動画 | 字幕あり | 字幕なし→Whisper | 登録チャンク |
+|---|---|---|---|---|---|
+| 0.はじめに | 5 | 16 | 3 | 13 | 17＋91 |
+| 2.応用 | 143 | 144 | 69 | 75 | 1,049＋927 |
+| 3.継承 | 25 | 25 | 4 | 21 | 88＋342 |
+| 4.グルコン | 15 | 16 | 14 | 2 | 1,617＋516 |
+
+計 4,647 チャンク（Supabase・Raimo 両方）。取得エラー・Whisper 失敗 0。
+
+### 誤記候補（基礎と同じ方式・AI使用料なし）
+
+`scripts/jarvis_westudy_typo_candidates.py`: 補正表を当てた後の字幕／Whisper の語（カタカナ3字以上・漢字2字以上の連続）のうち、会員コメント（exports の最新 full_*.csv）と LINE オプチャ本文に一度も出ない語を拾い、コメント側の「同じ読み（pykakasi）」か「字面が近い」語を修正案にする。LINE 本文は Supabase から1回だけ読み `~/.cache/kamiooya_typo/line_content.txt` に置く（約9MB）。
+
+2026-10-27: 候補 3,623 件（同じ読み351・字面が近い1,735・案なし1,537）。確認用に「同じ読み×3回以上」180件＋「字面が近い×5回以上」246件を `講座_文字起こし/誤記候補_神大家0234_優先_20261027.csv` に抜粋。承認分を補正表に追記し、登録済みチャンクへの反映は承認後に行う（基礎の `apply_transcript_corrections.py` はバックアップ表 `kc_typo_backup_20261026` 前提なので、0・2・3・4 用は別途）。

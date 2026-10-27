@@ -1,0 +1,72 @@
+{
+  "course": "神大家0.はじめに",
+  "transcript_dir": "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家0.はじめに/jarvis",
+  "graph_root": "215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家0.はじめに/jarvis",
+  "updated": "2026-10-27T14:31:57+09:00",
+  "lessons": [
+    {
+      "slug": "step0_1",
+      "title": "STEP0　学習ルール・講座の使い方／進め方",
+      "url": "https://westudy.co.jp/lesson/step0_1",
+      "section": "【神大家になる準備】まずはこちらをご覧下さい",
+      "jarvis_file": "文字起こし_step0_1__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706379961",
+          "cues": 220
+        },
+        {
+          "video_id": "1098931073",
+          "cues": 432
+        },
+        {
+          "video_id": "1125421933",
+          "cues": 480
+        },
+        {
+          "video_id": "706381384",
+          "cues": 529
+        },
+        {
+          "video_id": "995748048",
+          "cues": 41
+        },
+        {
+          "video_id": "995747890",
+          "cues": 235
+        },
+        {
+          "video_id": "706381442",
+          "cues": 60
+        },
+        {
+          "video_id": "1183595944",
+          "cues": 470
+        },
+        {
+          "video_id": "1046111168",
+          "cues": 61
+        },
+        {
+          "video_id": "1046111178",
+          "cues": 143
+        },
+        {
+          "video_id": "1214748878",
+          "cues": 53
+        },
+        {
+          "video_id": "1098931077",
+          "cues": 155
+        },
+        {
+          "video_id": "1046111193",
+          "cues": 104
+        }
+      ]
+    }
+  ],
+  "failed": []
+}
