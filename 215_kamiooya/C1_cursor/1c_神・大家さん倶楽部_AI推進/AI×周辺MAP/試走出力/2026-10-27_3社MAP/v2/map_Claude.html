@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>Grandole志賀本通 周辺MAP 叩き台</title>
+<!-- AI仕上げ用: 地図画像・施設名・徒歩分・出典は変えず、見た目（配色・フォント・余白・吹き出しの形）だけを整えてください。地図画像は src="map.png" のままにしてください（叩き台ページが差し込みます）。 -->
+<style>:root { --ink: #2b2b2b; --quiet: #6b6b6b; --line: #d9d4ca; --paper: #fbf8f2; --accent: #c8553d; --pin: #2f6f8f; --car: #7a6a3a; }
+* { box-sizing: border-box; }
+body { margin: 0px; font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif; color: var(--ink); background: rgb(241, 238, 232); }
+.sheet { width: 210mm; min-height: 297mm; margin: 0px auto; background: var(--paper); padding: 12mm 12mm 10mm; box-shadow: rgba(0, 0, 0, 0.12) 0px 2px 10px; }
+.sheet h2 { font-size: 26px; margin: 0px; letter-spacing: 0.04em; }
+.sheet .area { font-size: 13.5px; margin: 4px 0px 8px; line-height: 1.6; }
+.sheet .mapimg { width: 100%; display: block; border-radius: 6px; border: 1px solid var(--line); }
+.sheet .lists { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 8mm; margin-top: 5mm; }
+.sheet .lists h3 { font-size: 13px; margin: 0px 0px 4px; border-bottom: 2px solid var(--ink); padding-bottom: 2px; }
+.sheet ol { list-style: none; margin: 0px; padding: 0px; }
+.sheet .lists.single { grid-template-columns: 1fr; }
+.sheet .lists.single ol { columns: 2; column-gap: 8mm; }
+.sheet .lists.single li { break-inside: avoid; }
+.sheet li { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; font-size: 12px; padding: 3px 0px; border-bottom: 1px dotted var(--line); }
+.sheet li .no { width: 20px; height: 20px; border-radius: 50%; background: var(--pin); color: rgb(255, 255, 255); font-size: 11px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.sheet li.car .no { background: var(--car); }
+.sheet li .name { font-weight: 600; }
+.sheet li .note { grid-column: 2 / 4; color: var(--quiet); font-size: 11px; }
+.sheet li .min { white-space: nowrap; font-weight: 600; }
+.sheet .bubbles { margin-top: 4mm; display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+.sheet .bubble { background: rgb(255, 255, 255); border: 1.5px solid var(--ink); border-radius: 14px; padding: 8px 12px; font-size: 12.5px; line-height: 1.6; }
+.sheet .credit { margin-top: 5mm; font-size: 9.5px; color: var(--quiet); line-height: 1.5; }
+.sheet.dense .area { margin-bottom: 5px; }
+.sheet.dense .lists { margin-top: 3mm; }
+.sheet.dense li { font-size: 11px; padding: 2px 0px; }
+.sheet.dense li .note { font-size: 10px; }
+.sheet.dense .bubbles { margin-top: 3mm; }
+.sheet.dense .bubble { font-size: 11.5px; padding: 6px 10px; line-height: 1.5; }
+.sheet.dense .credit { margin-top: 3mm; }
+@media print {
+  body { background: rgb(255, 255, 255); }
+  .noprint { display: none !important; }
+  .sheet { box-shadow: none; margin: 0px; width: auto; min-height: auto; padding: 0px; background: rgb(255, 255, 255); }
+  .sheet .mapimg { max-height: 150mm; width: auto; max-width: 100%; margin: 0px auto; }
+  .sheet.dense .mapimg { max-height: 138mm; }
+  .sheet .lists, .sheet .bubbles, .sheet li { break-inside: avoid; }
+  @page { size: a4; margin: 10mm; }
+}</style></head><body><div class="sheet dense">
+<h2>Grandole志賀本通 周辺MAP</h2>
+
+<img class="mapimg" src="map.png" alt="Grandole志賀本通の周辺地図">
+<div class="lists single">
+<div><h3>歩いて行ける</h3><ol><li class="walk"><span class="no">1</span><span class="name">志賀本通駅</span><span class="min">徒歩8分</span><span class="note">名城線で都心へ。通勤の足に</span></li><li class="walk"><span class="no">2</span><span class="name">ファミリーマート 志賀本通駅前店</span><span class="min">徒歩8分</span><span class="note">帰りに寄れる、駅前のコンビニ</span></li><li class="walk"><span class="no">3</span><span class="name">フィール 黒川東店</span><span class="min">徒歩8分</span><span class="note">食材をそろえやすい近所のスーパー</span></li><li class="walk"><span class="no">4</span><span class="name">ツルハドラッグ 瑠璃光店</span><span class="min">徒歩11分</span><span class="note">日用品や薬がまとめて買える</span></li><li class="walk"><span class="no">5</span><span class="name">モントルイユ</span><span class="min">徒歩11分</span><span class="note">ケーキとモーニングでゆっくり</span></li><li class="walk"><span class="no">6</span><span class="name">マックスバリュ 若葉通店</span><span class="min">徒歩15分</span><span class="note">仕事帰りが遅くても買い物できる</span></li><li class="walk"><span class="no">7</span><span class="name">稚児宮CAFE</span><span class="min">徒歩17分</span><span class="note">テラス席で季節のパフェを楽しむ</span></li></ol></div>
+
+</div>
+<div class="bubbles"><div class="bubble">駅も買い物もカフェも近い、ひとり暮らしの拠点</div></div>
+<p class="credit">徒歩分は道のりの距離から80m＝1分で計算（端数切り上げ）。掲載情報は作成時点のものです。<br>地図データ © OpenStreetMap contributors（https://www.openstreetmap.org/copyright）</p>
+</div></body></html>
