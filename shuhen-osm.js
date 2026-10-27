@@ -370,8 +370,14 @@ way["waterway"~"^(river|canal|stream)$"](${bbox});
 way["natural"="water"](${bbox});
 way["leisure"="park"](${bbox});
 );out geom;`;
-    const res = await fetch(CONFIG.overpassUrl, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-    if (!res.ok) throw new Error('白地図のデータを取得できませんでした（' + res.status + '）');
+    let res;
+    for (let i = 0; i < 3; i++) { // Overpass は混んでいると 429/504 を返すので少し待って取り直す
+        res = await fetch(CONFIG.overpassUrl, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }).catch(() => null);
+        if (res && res.ok) break;
+        setStatus(`白地図のデータを取り直しています…（${i + 1}回目）`);
+        await new Promise(ok => setTimeout(ok, 4000 * (i + 1)));
+    }
+    if (!res || !res.ok) throw new Error('白地図のデータを取得できませんでした（' + (res ? res.status : '通信エラー') + '）。少し待ってもう一度押してください');
     const ways = (await res.json()).elements.filter(e => e.geometry && e.geometry.length > 1);
     const path = (w, close) => {
         ctx.beginPath();
@@ -480,7 +486,28 @@ async function renderMapImage() {
                 moved = true;
             }
         }
+        // 物件の★と物件名ラベルの上にも重ねない
+        const lx0 = px - tw / 2 - 6 * u - R, lx1 = px + tw / 2 + 6 * u + R, ly0 = py + 21 * u - R, ly1 = py + 43 * u + R;
+        for (const p of pins) {
+            const dx = p.x - px, dy = p.y - py, d = Math.hypot(dx, dy) || 0.01, need = 17 * u + R + 2 * u;
+            if (d < need) { p.x = px + dx / d * need; p.y = py + dy / d * need; moved = true; }
+            if (p.x > lx0 && p.x < lx1 && p.y > ly0 && p.y < ly1) {
+                if (p.y - ly0 < ly1 - p.y) p.y = ly0; else p.y = ly1;
+                moved = true;
+            }
+        }
         if (!moved) break;
+    }
+    // 白地図は地名が無いので、駅だけ名前を添える
+    if (isWhiteMap()) {
+        ctx.font = `700 ${12 * u}px sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        for (const { r, x, y } of pins.filter(p => /駅/.test(p.r.type + p.r.name))) {
+            const label = (r.name.match(/[^\s]+駅/) || [r.name])[0];
+            const lw = ctx.measureText(label).width;
+            const lx = x + R + 4 * u + lw > W ? x - R - 4 * u - lw : x + R + 4 * u;
+            ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(lx - 3 * u, y - 9 * u, lw + 6 * u, 18 * u);
+            ctx.fillStyle = '#4a4a4a'; ctx.fillText(label, lx, y + 1);
+        }
     }
     for (const { r, x, y } of pins) dot(x, y, R, r.kind === 'car' ? '#7a6a3a' : '#2f6f8f', String(r.no), `700 ${14 * u}px sans-serif`);
     return canvas.toDataURL('image/png');
