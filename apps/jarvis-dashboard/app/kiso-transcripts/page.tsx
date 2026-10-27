@@ -5,6 +5,7 @@ import catalog from "@/data/kiso_transcripts.json";
 import courseStatus from "@/data/kiso_course_status.json";
 import courseGaps from "@/data/kiso_course_gaps.json";
 import nottaReceived from "@/data/kiso_notta_received.json";
+import nottaReview from "@/data/kiso_notta_a1_review.json";
 
 function loadUnderstanding(): string {
   try {
@@ -144,7 +145,7 @@ export default function KisoTranscriptsPage() {
           <header>
             <span className={statusClass("ready")}>コース</span>
             <strong>
-              {(cs.vtt_ready || 0) + receivedSlugs.size} / {cs.video_lessons ?? cs.total ?? "—"} 字幕取得
+              {(cs.vtt_ready || 0) + receivedSlugs.size} / {cs.video_lessons ?? cs.total ?? "—"} レッスンに字幕あり
             </strong>
           </header>
           <p className="sum">
@@ -152,6 +153,7 @@ export default function KisoTranscriptsPage() {
             {cs.no_video ?? "—"} · 全 {cs.total ?? "—"} レッスン ·{" "}
             {cs.updated || catalog.updated || "—"}
           </p>
+          <p className="meta">一部の動画のみ取得したレッスンを含みます。全動画の網羅率ではありません。</p>
         </div>
         <div className="card watch-card">
           <header>
@@ -167,9 +169,9 @@ export default function KisoTranscriptsPage() {
             <span className={statusClass(nottaReceived.video_count ? "ready" : "missing")}>
               今村受領
             </span>
-            <strong>{nottaReceived.video_count} 動画（検索反映済み）</strong>
+            <strong>{nottaReview.received} ファイル受領・全件紐付け済み</strong>
           </header>
-          <p className="sum">{nottaReceived.updated} · {receivedSlugs.size} レッスンを補完</p>
+          <p className="sum">新規反映 {nottaReview.newly_imported}動画 · 既存字幕対応 {nottaReview.existing_video + nottaReview.existing_content}動画 · 取込待ち {nottaReview.pending.length}動画</p>
         </div>
       </div>
 
@@ -271,11 +273,24 @@ export default function KisoTranscriptsPage() {
       </section>
 
       <section className="home-section">
-        <h2 style={{ fontSize: "1.15rem" }}>今回のNotta受領・反映済み</h2>
+        <h2 style={{ fontSize: "1.15rem" }}>対応済み：今村さん提供により本番反映</h2>
         <p>{nottaReceived.note}</p>
         <ul>{nottaReceived.lessons.map((lesson) => <li key={lesson.slug}>
           <a href={`https://westudy.co.jp/lesson/${lesson.slug}`} target="_blank" rel="noopener noreferrer">{lesson.title}</a>
-          {" · "}{lesson.videos}動画 · Supabase／通常検索へ反映済み
+          {" · "}{lesson.videos}動画 · <strong>対応済み（今村さん提供・本番検索反映済み）</strong>
+        </li>)}</ul>
+      </section>
+      <section className="home-section" id="notta-received">
+        <h2 style={{ fontSize: "1.15rem" }}>A1動画名による受領ファイル照合</h2>
+        <p>{nottaReview.note}</p>
+        <p className="meta">確認日 {nottaReview.updated} · 字幕未取得16レッスンとは別に、部分取得レッスン内の不足動画も管理します。受領済み15動画は今村さんへの再依頼不要です。</p>
+        <h3 style={{ fontSize: "1rem" }}>対応済み：既存字幕で参照可能</h3>
+        <p>同一動画IDで既存字幕あり {nottaReview.existing_video}動画。加えて、以下の3動画は既存の別字幕に対応本文があります。</p>
+        <ul>{nottaReview.covered_elsewhere.map((item) => <li key={item.file}>{item.title}（{item.file}） · {item.status}</li>)}</ul>
+        <h3 style={{ fontSize: "1rem" }}>受領・紐付け済み／本番取込待ち（{nottaReview.pending.length}動画）</h3>
+        <ul>{nottaReview.pending.map((item) => <li key={item.file}>
+          <a href={`https://westudy.co.jp/lesson/${item.slug}`} target="_blank" rel="noopener noreferrer">{item.title}</a>
+          {" "}（{item.file}） · 受領対応済み／本番取込待ち
         </li>)}</ul>
       </section>
       <UnderstandingBlock text={understanding} />
@@ -294,8 +309,8 @@ export default function KisoTranscriptsPage() {
               section?: string;
               url?: string;
             };
-            const st = receivedSlugs.has(row.slug) ? "notta_ingested" : row.status || row.jarvis_status || "—";
-            const ok = st === "vtt_ready" || st === "ready" || st === "notta_ingested";
+            const st = receivedSlugs.has(row.slug) ? "対応済み（今村さん提供・本番反映済み）" : row.status || row.jarvis_status || "—";
+            const ok = st === "vtt_ready" || st === "ready" || receivedSlugs.has(row.slug);
             const url =
               row.url || `https://westudy.co.jp/lesson/${row.slug}`;
             return (
