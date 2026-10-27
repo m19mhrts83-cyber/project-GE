@@ -117,6 +117,9 @@ def main() -> int:
         js = lookup_js.read_text(encoding="utf-8") + "\n" + js
         print(f"forum_category_lookup: injected ({lookup_js.stat().st_size} bytes)")
     js = inject_js_placeholders(js)
+    catalog_js = CHATBOT / "course_catalog.js"
+    if catalog_js.exists():
+        js = catalog_js.read_text(encoding="utf-8") + "\n" + js
     html = prepare_html_for_raimo(html)
     api = (CHATBOT / "WeStudy_API_secret_admin_upgrade.yaml").read_text(encoding="utf-8")
     api = inject_runtime_placeholders(api)

@@ -372,8 +372,16 @@ const App = {
       App.elements.lessonSearchInput.addEventListener('input', App.renderLessonTable);
     }
     if (App.elements.lessonCourseTabFilter) {
-      App.elements.lessonCourseTabFilter.addEventListener('change', App.renderLessonTable);
+      App.elements.lessonCourseTabFilter.addEventListener('change', function () { App.changeReferenceFilter('lesson', 0); });
     }
+    ['lesson', 'knowledge'].forEach(function (prefix) {
+      ['CourseTab', 'Section', 'Title'].forEach(function (name, index) {
+        const select = document.getElementById(prefix + name + 'Filter');
+        if (select && !(prefix === 'lesson' && index === 0)) {
+          select.addEventListener('change', function () { App.changeReferenceFilter(prefix, index); });
+        }
+      });
+    });
     if (App.elements.knowledgeSearchInput) {
       App.elements.knowledgeSearchInput.addEventListener('input', App.renderKnowledgeTable);
     }
@@ -2495,6 +2503,78 @@ const App = {
     return meta && typeof meta === 'object' ? meta : {};
   },
 
+  referenceLabel: (value) => String(value || '').replace(/\s+/g, ' ').trim(),
+
+  referenceLessonInfo: (url) => {
+    const key = String(url || '').split('#')[0].replace(/\/$/, '');
+    return (window.WESTUDY_COURSE_CATALOG || {})[key] || {};
+  },
+
+  knowledgeReferenceInfo: (src) => {
+    const meta = App.knowledgeSourceMeta(src);
+    const lesson = App.referenceLessonInfo(App.knowledgeVideoPageUrl(src, meta));
+    return {
+      course: App.referenceLabel(meta.course || meta.course_tab || lesson.course || '未分類'),
+      section: App.referenceLabel(meta.section_name || meta.section || lesson.section || '目次未設定'),
+      title: App.displaySourceTitle(src.title) || src.source_key || '',
+      key: src.source_key || ''
+    };
+  },
+
+  referenceCompare: (a, b) => String(a || '').localeCompare(String(b || ''), 'ja', { numeric: true }),
+
+  referenceFilterRows: (prefix) => {
+    if (prefix === 'knowledge') return Object.values(App.state.knowledgeSources || {}).map(App.knowledgeReferenceInfo);
+    return App.lessonCommentRows().map(function (row) {
+      const url = App.commentField(row, 'lesson_url');
+      const catalog = App.referenceLessonInfo(url);
+      return {
+        course: App.referenceLabel(App.commentField(row, 'course_tab') || catalog.course || '未分類'),
+        section: App.referenceLabel(App.commentField(row, 'section_name') || catalog.section || '目次未設定'),
+        title: catalog.title || App.referenceLabel(App.commentField(row, 'lesson_title') || App.commentField(row, 'topic_title')),
+        key: String(url || App.commentField(row, 'comment_id') || '')
+      };
+    });
+  },
+
+  renderReferenceFilters: (prefix) => {
+    const rows = App.referenceFilterRows(prefix);
+    const names = ['CourseTab', 'Section', 'Title'];
+    const fields = ['course', 'section', 'key'];
+    const labels = ['全コースタブ', '全目次', prefix === 'knowledge' ? '全動画タイトル' : '全レッスン'];
+    let candidates = rows;
+    names.forEach(function (name, i) {
+      const select = document.getElementById(prefix + name + 'Filter');
+      if (!select) return;
+      const current = select.value;
+      const values = new Map();
+      candidates.forEach(function (r) { if (r[fields[i]]) values.set(r[fields[i]], i === 2 ? r.title : r[fields[i]]); });
+      select.innerHTML = '';
+      select.add(new Option(labels[i], ''));
+      Array.from(values.entries()).sort(function (a,b) { return App.referenceCompare(a[1], b[1]); }).forEach(function (entry) {
+        select.add(new Option(entry[1], entry[0]));
+      });
+      select.value = values.has(current) ? current : '';
+      if (select.value) candidates = candidates.filter(function (r) { return r[fields[i]] === select.value; });
+    });
+  },
+
+  changeReferenceFilter: (prefix, index) => {
+    ['CourseTab', 'Section', 'Title'].forEach(function (name, i) {
+      const select = document.getElementById(prefix + name + 'Filter');
+      if (select && i > index) select.value = '';
+    });
+    App.renderReferenceFilters(prefix);
+    if (prefix === 'knowledge') App.renderKnowledgeTable(); else App.renderLessonTable();
+  },
+
+  matchesReferenceFilters: (prefix, info) => {
+    return ['CourseTab', 'Section', 'Title'].every(function (name, i) {
+      const select = document.getElementById(prefix + name + 'Filter');
+      return !select || !select.value || info[['course', 'section', 'key'][i]] === select.value;
+    });
+  },
+
   knowledgeVideoPageUrl: (src, meta) => {
     const page = String(meta.lesson_url || src.lesson_url || '').trim();
     if (/^https:\/\/westudy\.co\.jp\/lesson\//.test(page)) return page;
@@ -2507,40 +2587,52 @@ const App = {
   renderKnowledgeTable: () => {
     const body = App.elements.knowledgeTableBody;
     if (!body) return;
+    App.renderReferenceFilters('knowledge');
     const keyword = String((App.elements.knowledgeSearchInput && App.elements.knowledgeSearchInput.value) || '')
       .trim()
       .toLowerCase();
     const rows = (App.state.knowledgeChunks || []).filter(function (ch) {
-      if (!keyword) return true;
       const src = App.state.knowledgeSources[ch.source_key] || {};
+      const info = App.knowledgeReferenceInfo(src);
+      if (!App.matchesReferenceFilters('knowledge', info)) return false;
+      if (!keyword) return true;
       const hay = [
         ch.chunk_key,
         ch.content,
         ch.search_text,
         ch.source_key,
         src.title,
+        info.course,
+        info.section,
         src.video_id
       ]
         .join(' ')
         .toLowerCase();
       return hay.indexOf(keyword) !== -1;
+    }).sort(function (a, b) {
+      const sa = App.knowledgeReferenceInfo(App.state.knowledgeSources[a.source_key] || {});
+      const sb = App.knowledgeReferenceInfo(App.state.knowledgeSources[b.source_key] || {});
+      return App.referenceCompare(sa.course, sb.course) || App.referenceCompare(sa.title, sb.title) ||
+        App.referenceCompare(a.source_key, b.source_key) || Number(a.start_sec || 0) - Number(b.start_sec || 0);
     });
     body.innerHTML = '';
     rows.slice(0, 500).forEach(function (ch) {
       const src = App.state.knowledgeSources[ch.source_key] || {};
       const start = ch.start_sec != null ? Number(ch.start_sec) : 0;
       const meta = App.knowledgeSourceMeta(src);
+      const info = App.knowledgeReferenceInfo(src);
       // Vimeoの限定公開は直URLだと再生できない。正規のWeStudy埋込ページを開く。
       const url = App.knowledgeVideoPageUrl(src, meta) || App.withVideoTimeUrl(src.video_url || '', start);
       const tr = document.createElement('tr');
       tr.className = 'border-t align-top';
       tr.innerHTML =
         '<td class="p-2 whitespace-nowrap">' +
-        App.escapeHtml(meta.course || meta.course_tab || '—') +
+        App.escapeHtml(info.course) +
         '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(App.displaySourceTitle(src.title) || ch.source_key || '') +
         '</td>' +
+        '<td class="p-2">' + App.escapeHtml(info.section) + '</td>' +
         '<td class="p-2 whitespace-nowrap">' + App.escapeHtml(App.formatMmSs(start)) + '</td>' +
         '<td class="p-2 whitespace-nowrap">' + (ch.end_sec != null ? App.escapeHtml(App.formatMmSs(ch.end_sec)) : '—') + '</td>' +
         '<td class="p-2">' +
@@ -2557,7 +2649,7 @@ const App = {
     });
     if (App.elements.knowledgeListMeta) {
       App.elements.knowledgeListMeta.textContent =
-        '表示 ' + Math.min(rows.length, 500) + ' / 全 ' + (App.state.knowledgeChunks || []).length + ' チャンク';
+        '表示 ' + Math.min(rows.length, 500) + ' / 該当 ' + rows.length + ' / 全 ' + (App.state.knowledgeChunks || []).length + ' 件（動画ごと・開始時刻順）';
     }
   },
 
@@ -3358,6 +3450,7 @@ const App = {
     opts = opts || {};
     const body = App.elements.lessonTableBody;
     if (!body) return;
+    App.renderReferenceFilters('lesson');
     const keywordRaw = String(
       (App.elements.lessonSearchInput && App.elements.lessonSearchInput.value) || ''
     ).trim();
@@ -3395,7 +3488,15 @@ const App = {
         hitKeyword = hay.indexOf(keyword) !== -1;
       }
       const hitTab = !tabFilter || courseTab === tabFilter;
-      return hitKeyword && hitTab;
+      const catalog = App.referenceLessonInfo(App.commentField(row, 'lesson_url'));
+      const info = { course: App.referenceLabel(courseTab || catalog.course || '未分類'),
+        section: App.referenceLabel(sectionName || catalog.section || '目次未設定'),
+        key: String(App.commentField(row, 'lesson_url') || cid) };
+      return hitKeyword && hitTab && App.matchesReferenceFilters('lesson', info);
+    }).sort(function (a,b) {
+      return App.referenceCompare(App.commentField(a, 'course_tab'), App.commentField(b, 'course_tab')) ||
+        App.referenceCompare(App.commentField(a, 'section_name'), App.commentField(b, 'section_name')) ||
+        App.referenceCompare(App.commentField(a, 'lesson_title'), App.commentField(b, 'lesson_title'));
     });
 
     if (App.elements.lessonListMeta) {
@@ -3414,9 +3515,9 @@ const App = {
       tr.className = 'border-t align-top';
       const courseTab = String(App.commentField(r, 'course_tab') || '').trim();
       const sectionName = String(App.commentField(r, 'section_name') || '').trim();
-      const lessonTitle = String(
+      const lessonTitle = App.referenceLessonInfo(App.commentField(r, 'lesson_url')).title || App.referenceLabel(
         App.commentField(r, 'lesson_title') || App.commentField(r, 'topic_title') || ''
-      ).trim();
+      );
       const url = String(App.commentField(r, 'lesson_url') || '').trim();
       const fullContent = String(App.commentField(r, 'content') || '');
       const previewLen = 160;
