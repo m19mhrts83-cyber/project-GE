@@ -19,6 +19,20 @@ table > thead {
   background: #f1f5f9;
 }
 
+#openchatScreen th.openchat-sender,
+#openchatScreen td:has(> .openchat-sender) {
+  width: 15rem;
+  max-width: 15rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#openchatScreen .openchat-sender {
+  display: inline-block;
+  max-width: 15rem;
+  white-space: normal;
+}
+
 * {
   box-sizing: border-box;
   font-family: "Noto Sans JP", sans-serif;

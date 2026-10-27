@@ -155,9 +155,9 @@
                 <i class="fa-solid fa-database mr-1"></i>参照データ（回答の根拠を一覧で見る）
               </p>
               <div class="ml-3 pl-2 border-l-2 border-slate-200 space-y-0.5 text-sm">
-                <button data-screen="comments" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">コメント一覧</button>
-                <button data-screen="lessons" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">動画ページ説明テキスト</button>
-                <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">セミナー動画文字起こし</button>
+                <button data-screen="comments" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy コミュニティコメント</button>
+                <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy 動画文字起こし</button>
+                <button data-screen="lessons" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy 講座ページ説明文</button>
                 <button data-screen="openchat" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">LINEオプチャ</button>
               </div>
             </div>
@@ -299,8 +299,10 @@
                 <table class="min-w-full text-sm">
                   <thead class="bg-slate-100">
                     <tr>
+                      <th class="p-2 text-left">コースタブ</th>
+                      <th class="p-2 text-left">動画タイトル</th>
                       <th class="p-2 text-left">開始</th>
-                      <th class="p-2 text-left">タイトル</th>
+                      <th class="p-2 text-left">終了</th>
                       <th class="p-2 text-left">本文</th>
                       <th class="p-2 text-left">動画</th>
                     </tr>
@@ -333,9 +335,8 @@
                     <tr>
                       <th class="p-2 text-left">取得元（オプチャ）</th>
                       <th class="p-2 text-left">種別</th>
-                      <th class="p-2 text-left">スレッド</th>
                       <th class="p-2 text-left">日時</th>
-                      <th class="p-2 text-left">投稿者</th>
+                      <th class="p-2 text-left openchat-sender">投稿者</th>
                       <th class="p-2 text-left">本文抜粋</th>
                     </tr>
                   </thead>
