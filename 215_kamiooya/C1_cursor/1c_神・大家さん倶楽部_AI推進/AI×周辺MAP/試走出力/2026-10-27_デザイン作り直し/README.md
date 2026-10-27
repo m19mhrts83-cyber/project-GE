@@ -54,3 +54,12 @@
 ## Gemini 版の画像を探した場所（見つからず）
 
 `mdfind`（ファイル名 DC2D600A を含むもの）、`~/Downloads`・`~/Desktop`・`~/Pictures`・iCloud Drive、`~/Library/Containers/com.google.GeminiMacOS.*`、`~/Library/Application Support|Caches|HTTPStorages/com.google.GeminiMacOS*`、`/private/var/folders`・`$TMPDIR`・`/tmp`。直近90分の png/jpg/webp も iCloud の redesign_ChatGPT.png 以外なし。Gemini アプリからファイルとして保存されていない可能性が高い。
+
+## 白地図を叩き台ページ側で出す（10/27 追加）
+
+画像AIでは白地図にならなかったので、shuhen-osm の「紙面の地図」に **白地図** を追加した（0d06cc5, 0d5f6d3）。
+- 文字なしタイル（CARTO light_nolabels）は API キー必須になっていて使えなかったため、Overpass から道路・線路・川・公園の形を取り、ページ側で線と面だけを描く方式にした。
+- 地図上の文字は物件名と駅名（駅のピンの横）だけ。道路・線路は実データなので位置は正確。ピン番号・徒歩分・駅への点線は表どおり。
+- 出力: `白地図_叩き台.png`（白地図）、`ふつう地図_叩き台.png`（従来のOSMタイル）。
+- 所要: 白地図 約30秒（Overpass が1回目 502 → 自動で取り直して成功）、ふつう地図 約3秒。Overpass は混雑で失敗しやすいので最大3回取り直す。本展開で人数が増えるなら有料のベクタータイル等に切り替えを検討。
+- 残り: 駅名ラベルが地下鉄の点線を少し隠す。道路名・「〇〇方面」のような案内文字は無いので、必要なら吹き出しやAI仕上げ（⑥）で足す。
