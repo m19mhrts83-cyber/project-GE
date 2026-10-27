@@ -8,6 +8,7 @@
  *
  * 安全境界: ここは記録と「次にやること」の表示だけ。仲介・銀行への送信はしない。
  */
+import { deskGate } from "./reViewingGate";
 
 export type ViewingStep = "candidate" | "requested" | "scheduled" | "done";
 export type ViewingVerdict = "go" | "hold" | "pass";
@@ -25,6 +26,10 @@ export type ViewingState = {
   checklist?: Record<string, boolean>;
   /** S3 ヒアリング項目の回答（index → 回答） */
   hearing_answers?: Record<string, string>;
+  /** 保守の想定家賃（万円/月）。S3 の値を手で上書きするとき */
+  desk_rent_man?: number | null;
+  /** 修繕概算（万円）。内見後に入れて指値ラインから引く */
+  repair_man?: number | null;
   updated_at?: string;
 };
 
@@ -208,6 +213,7 @@ export function acqStageIndex(stage: AcqStage | string | undefined | null) {
 
 type SjDeal = {
   status?: string | null;
+  price_man?: number | string | null;
   summary_json?: Record<string, unknown> | null;
 };
 
@@ -273,14 +279,18 @@ export function isViewingBoardDeal(d: SjDeal): boolean {
   return verdict === "go" || verdict === "hold";
 }
 
-/** 並び: 日程確定（日付順）→ 内見済・未判断 → 依頼中 → 候補（S3 go → hold） */
+/**
+ * 並び: 日程確定（日付順）→ 内見済・未判断 → 依頼中
+ * → 候補（机上GO → S3 go → 指値ライン超え・未計算 → hold）
+ */
 export function viewingBoardRank(d: SjDeal): [number, string] {
   const v = getViewing(d);
   if (v.step === "scheduled") return [0, v.date || "9999-99-99"];
   if (v.step === "done") return [1, v.date || ""];
   if (v.step === "requested") return [2, v.updated_at || ""];
+  if (deskGate(d).verdict === "go") return [3, ""];
   const verdict = s3Verdict(d);
-  return [verdict === "go" ? 3 : 4, ""];
+  return [verdict === "go" ? 4 : 5, ""];
 }
 
 export function filterViewingBoardDeals<T extends SjDeal>(deals: T[]): T[] {
@@ -299,7 +309,14 @@ export function viewingNextStep(d: SjDeal, today: string = todayJst()): NextStep
   const v = getViewing(d);
   const step = v.step || "candidate";
   if (step === "candidate") {
-    return { label: "内見に行くか決める → 行くなら仲介へ内見依頼", urgent: false };
+    const g = deskGate(d);
+    if (g.verdict === "go") {
+      return { label: `${g.label} → 仲介へ内見依頼`, urgent: true };
+    }
+    if (g.verdict === "over") {
+      return { label: `${g.label} → 指値が通りそうなら内見依頼、無理なら見送り`, urgent: false };
+    }
+    return { label: "保守の想定家賃を入れて指値ラインを出す → 内見に行くか決める", urgent: false };
   }
   if (step === "requested") {
     return { label: "仲介から日程の返事待ち → 決まったら内見日を入力", urgent: false };
@@ -422,6 +439,15 @@ export function applyProgress(
     if (p.contact !== undefined) next.contact = p.contact;
     if (p.memo !== undefined) next.memo = p.memo;
     if (p.verdict !== undefined) next.verdict = p.verdict;
+    for (const f of ["desk_rent_man", "repair_man"] as const) {
+      if (p[f] !== undefined) {
+        const n = p[f] == null || (p[f] as unknown) === "" ? null : Number(p[f]);
+        if (n != null && (!Number.isFinite(n) || n < 0)) {
+          return { ok: false, error: `${f} が数値ではありません` };
+        }
+        next[f] = n;
+      }
+    }
     next.checklist = mergeBoolMap(prev.checklist, p.checklist);
     if (p.hearing_answers) {
       next.hearing_answers = { ...(prev.hearing_answers || {}), ...p.hearing_answers };

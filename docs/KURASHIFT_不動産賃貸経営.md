@@ -100,6 +100,8 @@
 
 ### ③-B 2次調査以降の段階（2026-10-27 実装）
 
+> フェーズ全体の入口・出口・判断基準と「内見GO」の基準（指値ライン）は `docs/KURASHIFT_不動産フェーズ定義.md` を正本とする。
+
 S5 ペルソナ（二次）→ S3 需給（三次・Obsidian `☆Real_Estate_Pick`）の**後**を、案件ドロワーと `/realestate/deals` で管理する。
 DB の `status`（info / viewing / offer / loan / purchased）はそのまま、細かい段階は `summary_json` に持つ（migration なし）。正本ロジック: `apps/trade-desk/lib/reDealStages.ts`。
 
