@@ -9,6 +9,7 @@ const CONFIG = {
     walkRouteUrl: 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/',
     carRouteUrl: 'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
     geocodeIntervalMs: 1100, // Nominatim 利用規約: 1秒1件まで
+    walkMaxMinutes: 25, // これより遠い徒歩の施設は別の場所に当たったとみなす
     metersPerMinute: 80, // 不動産公取規約: 80m＝1分（端数切り上げ）
     credit: '地図データ © OpenStreetMap contributors（https://www.openstreetmap.org/copyright）',
 };
@@ -36,6 +37,7 @@ const SAMPLE = {
 let editMap = null;
 let markerLayer = null;
 let property = null; // {name, lat, lng}
+let propertyAddr = '';
 let rows = []; // {no, kind:'walk'|'car', name, type, hint, note, lat, lng, approx, minutes, minutesApprox, route}
 let bubbles = [];
 let sheetDataUrl = null;
@@ -139,18 +141,47 @@ async function locateProperty(addr) {
     return null;
 }
 
+// AIは「地下鉄名城線 志賀本通駅」のように路線名を前に付けがちだが、OSMの駅名は「志賀本通」だけ
+function stripLine(name) {
+    return name.replace(/^.*?線\s*[「『]?(?=\S+駅)/, '').replace(/[」』]/g, '').trim();
+}
+
+// 目印の「杉栄町2-48」「長田町4-66-2」は番地まで入っていてOSMで引けないので「杉栄町二丁目」にする。
+// 「若葉通沿い」「志賀本通駅の近く（瑠璃光町）」のような文は、括弧の中の町名や「〜沿い」の前を使う
+function hintVariants(hint) {
+    if (!hint) return [];
+    const h = hint.replace(/\s+/g, '');
+    const inParen = (h.match(/[（(]([^）)]+)[）)]/) || [])[1];
+    const parts = [inParen, h.replace(/[（(][^）)]*[）)]/g, '')].filter(Boolean).flatMap(x => x.split(/[・、,，／/]/));
+    const towns = [];
+    for (const part of parts) {
+        let t = part.replace(/^(.*?[^\d０-９\-－])([0-9０-９]+)[-－][0-9０-９]+([-－][0-9０-９]+)?.*$/, '$1$2丁目');
+        let prev;
+        do { prev = t; t = t.replace(/(交差点|付近|周辺|沿い|方面|の近く|近く|の駅前|駅前|エリア|出口|前)$/, ''); } while (t !== prev);
+        // 町名・通り名・駅名らしいものだけ使う（「24時間営業の情報あり」のような説明文は捨てる）
+        if (t.length >= 2 && /(町|通|丁目|駅|条|区|市|村)$/.test(t)) towns.push(chomeToKanji(t));
+    }
+    // 町名だけだと同じ名前の町がほかの市にもあるので、物件の「名古屋市北区」を前に付けた形から試す
+    const area = (propertyAddr.match(/^(.*?[都道府県])?(.*?市)?(.*?区)?/) || [''])[0].replace(/^.*?[都道府県]/, '');
+    return [...new Set(towns.flatMap(t => (area && !/[市区]/.test(t) ? [area + t, t] : [t])))];
+}
+
 async function locateFacility(row) {
     const km = row.kind === 'car' ? 15 : 2.5;
     const box = boxAround(property.lat, property.lng, km);
-    const plain = row.name.split(/\s*[&＆・／/(（【]/)[0].trim();
-    const tries = [[row.name, box], [`${row.name} ${row.hint}`, box], [row.name.replace(/\s+/g, ''), box]];
-    if (plain && plain !== row.name) tries.push([plain, box]);
+    const name = stripLine(row.name);
+    const plain = name.split(/\s*[&＆・／/(（【]/)[0].trim();
+    const tries = [[name, box], [`${name} ${row.hint}`, box], [name.replace(/\s+/g, ''), box]];
+    if (name !== row.name) tries.unshift([row.name, box]);
+    if (plain && plain !== name) tries.push([plain, box]);
+    // 駅は「志賀本通駅」より「志賀本通」で入っていることが多い
+    if (/駅$/.test(name)) tries.push([name.replace(/駅$/, ''), box]);
     for (const [q, b] of tries) {
         const hit = await nominatim(q, b);
         if (hit) return { ...hit, approx: false };
     }
-    if (row.hint) {
-        const hit = await nominatim(row.hint, box) || await nominatim(chomeToKanji(row.hint), box);
+    for (const q of hintVariants(row.hint).slice(0, 4)) {
+        const hit = await nominatim(q, box);
         if (hit) return { ...hit, approx: true };
     }
     return null;
@@ -185,6 +216,7 @@ async function measure(row) {
         row.minutes = row.kind === 'car' ? Math.max(1, Math.ceil(m / 400)) : Math.ceil(m / CONFIG.metersPerMinute);
         row.minutesApprox = true;
     }
+    markTooFar(row);
 }
 
 // 目印からの推定などで同じ地点に複数のピンが落ちたら、まわりに円く並べ直す（約30m）
@@ -207,11 +239,19 @@ function spreadDuplicates() {
     }
 }
 
+// 番号は紙面に載る施設だけに振る（見つからない・遠すぎる施設に番号を残すと①③⑨のように飛ぶ）
 function renumber() {
-    const walk = rows.filter(r => r.kind === 'walk').sort((a, b) => a.minutes - b.minutes);
-    const car = rows.filter(r => r.kind === 'car').sort((a, b) => a.minutes - b.minutes);
-    rows = [...walk, ...car];
-    rows.forEach((r, i) => { r.no = i + 1; });
+    const onSheet = r => r.lat != null && !r.tooFar;
+    const walk = rows.filter(r => r.kind === 'walk' && onSheet(r)).sort((a, b) => a.minutes - b.minutes);
+    const car = rows.filter(r => r.kind === 'car' && onSheet(r)).sort((a, b) => a.minutes - b.minutes);
+    const rest = rows.filter(r => !onSheet(r));
+    rows = [...walk, ...car, ...rest];
+    rows.forEach((r, i) => { r.no = onSheet(r) ? i + 1 : ''; });
+}
+
+// 徒歩25分（2km）を超えたら、同じ名前の別の場所に当たった可能性が高い。紙面から外し、ドラッグで直せるようにする
+function markTooFar(r) {
+    r.tooFar = r.kind === 'walk' && r.lat != null && r.minutes > CONFIG.walkMaxMinutes;
 }
 
 // ---------- 編集用地図 ----------
@@ -238,11 +278,11 @@ function drawEditMap() {
         .bindTooltip(property.name).addTo(markerLayer);
     for (const r of rows) {
         if (r.lat == null) continue;
-        L.marker([r.lat, r.lng], { icon: pinIcon(r.no, r.kind === 'car' ? '#7a6a3a' : '#2f6f8f'), draggable: true })
+        L.marker([r.lat, r.lng], { icon: pinIcon(r.tooFar ? '?' : r.no, r.tooFar ? '#999' : r.kind === 'car' ? '#7a6a3a' : '#2f6f8f'), draggable: true })
             .on('dragend', async e => { Object.assign(r, e.target.getLatLng()); r.approx = false; await measure(r); renumber(); drawEditMap(); drawRowTable(); })
-            .bindTooltip(`${r.no}. ${r.name}`).addTo(markerLayer);
+            .bindTooltip(r.tooFar ? `${r.name}（遠すぎるため紙面から外しています。正しい場所へドラッグしてください）` : `${r.no}. ${r.name}`).addTo(markerLayer);
     }
-    const walk = rows.filter(r => r.kind === 'walk' && r.lat != null);
+    const walk = rows.filter(r => r.kind === 'walk' && r.lat != null && !r.tooFar);
     const dists = walk.map(r => haversine(property, r)).sort((a, b) => a - b);
     const limit = Math.max(700, (dists[Math.floor(dists.length / 2)] || 0) * 2.2);
     const walkPts = walk.filter(r => haversine(property, r) <= limit).map(r => [r.lat, r.lng]);
@@ -259,7 +299,7 @@ async function remeasureAll() {
 }
 
 function drawRowTable() {
-    const tr = rows.map(r => `<tr><td>${r.no}</td><td>${esc(r.name)}${r.unchecked ? '<br><span class="warn">AIが実在を確かめきれていません</span>' : ''}</td><td>${esc(r.type)}</td><td>${r.lat == null ? '<span class="warn">見つからず（紙面に載りません）</span>' : (r.kind === 'car' ? '車' : '徒歩') + `約${r.minutes}分` + (r.minutesApprox ? '<span class="warn">（概算）</span>' : '') + (r.approx ? '<span class="warn">（位置は目印から推定・要確認）</span>' : '')}</td><td>${esc(r.note)}</td></tr>`).join('');
+    const tr = rows.map(r => `<tr><td>${r.no}</td><td>${esc(r.name)}${r.unchecked ? '<br><span class="warn">AIが実在を確かめきれていません</span>' : ''}</td><td>${esc(r.type)}</td><td>${r.lat == null ? '<span class="warn">見つからず（紙面に載りません）</span>' : (r.kind === 'car' ? '車' : '徒歩') + `約${r.minutes}分` + (r.tooFar ? '<span class="warn">（遠すぎます。別の場所に当たった可能性が高いので紙面から外しています。地図で灰色の？を正しい場所へドラッグしてください）</span>' : '') + (r.minutesApprox ? '<span class="warn">（概算）</span>' : '') + (r.approx ? '<span class="warn">（位置は目印から推定・要確認）</span>' : '')}</td><td>${esc(r.note)}</td></tr>`).join('');
     $('rowTable').innerHTML = `<tr><th>#</th><th>施設名</th><th>種類</th><th>所要</th><th>吹き出し</th></tr>${tr}`;
 }
 
@@ -274,6 +314,7 @@ async function run() {
         const parsed = parseTable($('tableIn').value);
         bubbles = parsed.bubbles;
         setStatus('物件の位置を探しています…');
+        propertyAddr = addr;
         const p = await locateProperty(addr);
         if (!p) throw new Error('物件の住所が見つかりませんでした。町名までに短くして試してください。');
         property = { name, lat: p.lat, lng: p.lng };
@@ -290,8 +331,9 @@ async function run() {
         drawEditMap();
         drawRowTable();
         const miss = rows.filter(r => r.lat == null).length;
+        const far = rows.filter(r => r.tooFar).length;
         const approx = rows.filter(r => r.approx).length;
-        setStatus(`ピンを立てました（${rows.length - miss}/${rows.length}件）。` + (p.approx ? '\n物件の位置は住所の一部から推定しています。★をドラッグして合わせてください。' : '') + (approx ? `\n${approx}件は目印から推定した位置です。` : '') + (miss ? `\n${miss}件は見つかりませんでした。住所・目印を足すか、紙面から外してください。` : ''));
+        setStatus(`ピンを立てました（${rows.length - miss - far}/${rows.length}件）。` + (p.approx ? '\n物件の位置は住所の一部から推定しています。★をドラッグして合わせてください。' : '') + (approx ? `\n${approx}件は目印から推定した位置です。` : '') + (miss ? `\n${miss}件は見つかりませんでした。住所・目印を足すか、紙面から外してください。` : '') + (far ? `\n${far}件は徒歩${CONFIG.walkMaxMinutes}分より遠く、別の場所に当たった可能性があるため紙面から外しました（地図の灰色の？）。` : ''));
     } catch (e) {
         setStatus(e.message);
     } finally {
@@ -337,7 +379,7 @@ async function renderMapImage() {
     const xy = (lat, lng) => { const p = editMap.project([lat, lng], zoom); return [p.x - origin.x, p.y - origin.y]; };
 
     // 最寄り駅（徒歩・種類に「駅」）→物件の動線
-    const station = rows.filter(r => r.kind === 'walk' && /駅/.test(r.type + r.name) && r.route).sort((a, b) => a.minutes - b.minutes)[0];
+    const station = rows.filter(r => r.kind === 'walk' && /駅/.test(r.type + r.name) && r.route && !r.tooFar).sort((a, b) => a.minutes - b.minutes)[0];
     if (station) {
         ctx.save();
         ctx.strokeStyle = '#c8553d'; ctx.lineWidth = 3.5 * u; ctx.setLineDash([8 * u, 6 * u]); ctx.lineCap = 'round';
@@ -363,7 +405,7 @@ async function renderMapImage() {
     const R = 13 * u;
     const pins = [];
     for (const r of rows) {
-        if (r.lat == null) continue;
+        if (r.lat == null || r.tooFar) continue;
         const [x, y] = xy(r.lat, r.lng);
         r.offMap = x < R || y < R || x > W - R || y > H - R;
         if (!r.offMap) pins.push({ r, x, y });
@@ -388,9 +430,9 @@ async function renderMapImage() {
 
 function sheetHtml(imgSrc) {
     const li = r => `<li class="${r.kind}"><span class="no">${r.no}</span><span class="name">${esc(r.name)}</span><span class="min">${r.kind === 'car' ? '車' : '徒歩'}${r.minutesApprox ? '約' : ''}${r.minutes}分${r.offMap ? '（地図外）' : ''}</span>${r.note ? `<span class="note">${esc(r.note)}</span>` : ''}</li>`;
-    const walk = rows.filter(r => r.kind === 'walk' && r.lat != null);
+    const walk = rows.filter(r => r.kind === 'walk' && r.lat != null && !r.tooFar);
     const car = rows.filter(r => r.kind === 'car' && r.lat != null);
-    const approx = rows.some(r => r.minutesApprox && r.lat != null);
+    const approx = rows.some(r => r.minutesApprox && r.lat != null && !r.tooFar);
     const dense = walk.length + car.length > 6 ? ' dense' : '';
     return `<div class="sheet${dense}">
 <h2>${esc(property.name)} 周辺MAP</h2>
@@ -446,7 +488,7 @@ function finishCheck(html) {
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, '');
     const plain = s => s.replace(/\s+/g, '');
     const lost = [];
-    for (const r of rows.filter(r => r.lat != null)) {
+    for (const r of rows.filter(r => r.lat != null && !r.tooFar)) {
         const min = `${r.kind === 'car' ? '車' : '徒歩'}${r.minutesApprox ? '約' : ''}${r.minutes}分`;
         if (!text.includes(plain(r.name))) lost.push(`${r.no}. ${r.name} の名前`);
         else if (!text.includes(min)) lost.push(`${r.no}. ${r.name} の「${min}」`);
