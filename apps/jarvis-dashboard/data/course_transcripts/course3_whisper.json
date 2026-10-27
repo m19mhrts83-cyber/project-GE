@@ -1,0 +1,324 @@
+{
+  "course": "神大家3.継承",
+  "transcript_dir": "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家3.継承/jarvis",
+  "graph_root": "215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家3.継承/jarvis",
+  "updated": "2026-10-27T20:01:28+09:00",
+  "lessons": [
+    {
+      "slug": "kabusikika",
+      "title": "【実践】合同会社を株式会社化する際の注意点",
+      "url": "https://westudy.co.jp/lesson/kabusikika",
+      "section": "オンライン実践動画【法人の活用】",
+      "jarvis_file": "文字起こし_kabusikika__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "652857966",
+          "cues": 109
+        }
+      ]
+    },
+    {
+      "slug": "hoken_mizumore",
+      "title": "【実践】排水水漏れ被害の保険申請",
+      "url": "https://westudy.co.jp/lesson/hoken_mizumore",
+      "section": "オンライン実践動画【保険活用事例】",
+      "jarvis_file": "文字起こし_hoken_mizumore__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706380190",
+          "cues": 88
+        }
+      ]
+    },
+    {
+      "slug": "sozoku_gaiyo",
+      "title": "【相続対策】 相続対策の全体概要",
+      "url": "https://westudy.co.jp/lesson/sozoku_gaiyo",
+      "section": "オンライン実践動画【相続編】",
+      "jarvis_file": "文字起こし_sozoku_gaiyo__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "746014068",
+          "cues": 705
+        }
+      ]
+    },
+    {
+      "slug": "sozoku_imasugu",
+      "title": "【相続対策】 相続「今すぐ対策」＆アイリックさん解説セミナー",
+      "url": "https://westudy.co.jp/lesson/sozoku_imasugu",
+      "section": "オンライン実践動画【相続編】",
+      "jarvis_file": "文字起こし_sozoku_imasugu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "746013857",
+          "cues": 1161
+        }
+      ]
+    },
+    {
+      "slug": "unki_hana",
+      "title": "【神運気】[風水] 花の力で金運を上げろ！",
+      "url": "https://westudy.co.jp/lesson/unki_hana",
+      "section": "運気・潜在意識の向上【運気UP編】",
+      "jarvis_file": "文字起こし_unki_hana__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706363865",
+          "cues": 163
+        }
+      ]
+    },
+    {
+      "slug": "unnki_hukurou",
+      "title": "【神運気】[風水] フクロウから金運をもらう",
+      "url": "https://westudy.co.jp/lesson/unnki_hukurou",
+      "section": "運気・潜在意識の向上【運気UP編】",
+      "jarvis_file": "文字起こし_unnki_hukurou__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706363761",
+          "cues": 38
+        }
+      ]
+    },
+    {
+      "slug": "unki_toire",
+      "title": "【神運気】[風水] トイレを黄色くして金運爆上げ",
+      "url": "https://westudy.co.jp/lesson/unki_toire",
+      "section": "運気・潜在意識の向上【運気UP編】",
+      "jarvis_file": "文字起こし_unki_toire__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706363779",
+          "cues": 47
+        }
+      ]
+    },
+    {
+      "slug": "child-education-01",
+      "title": "入会特典10-1 お子様の学力/運動神経劇的UP・人が成長する方法",
+      "url": "https://westudy.co.jp/lesson/child-education-01",
+      "section": "教育動画",
+      "jarvis_file": "文字起こし_child-education-01__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711102950",
+          "cues": 787
+        }
+      ]
+    },
+    {
+      "slug": "child-education-02",
+      "title": "入会特典10-2 お子様の学力/運動神経劇的UP・人が成長する方法",
+      "url": "https://westudy.co.jp/lesson/child-education-02",
+      "section": "教育動画",
+      "jarvis_file": "文字起こし_child-education-02__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711103017",
+          "cues": 1056
+        }
+      ]
+    },
+    {
+      "slug": "eiken4kyuu",
+      "title": "５歳０か月で英検４級合格した方法",
+      "url": "https://westudy.co.jp/lesson/eiken4kyuu",
+      "section": "教育動画",
+      "jarvis_file": "文字起こし_eiken4kyuu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706362804",
+          "cues": 224
+        }
+      ]
+    },
+    {
+      "slug": "juken",
+      "title": "【お受験】小学校／中学校受験のポイントと合格方法",
+      "url": "https://westudy.co.jp/lesson/juken",
+      "section": "教育動画",
+      "jarvis_file": "文字起こし_juken__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "732651724",
+          "cues": 2632
+        }
+      ]
+    },
+    {
+      "slug": "kifu",
+      "title": "【寄付】「寄付」を人生に導入しよう",
+      "url": "https://westudy.co.jp/lesson/kifu",
+      "section": "寄付動画",
+      "jarvis_file": "文字起こし_kifu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "850852370",
+          "cues": 825
+        }
+      ]
+    },
+    {
+      "slug": "futsukayoi",
+      "title": "【生活】二日酔いをシャットアウトしろ！",
+      "url": "https://westudy.co.jp/lesson/futsukayoi",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_futsukayoi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "709425829",
+          "cues": 294
+        }
+      ]
+    },
+    {
+      "slug": "futsukayoi_motto",
+      "title": "【生活】もっと！二日酔い対策",
+      "url": "https://westudy.co.jp/lesson/futsukayoi_motto",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_futsukayoi_motto__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "850851751",
+          "cues": 380
+        }
+      ]
+    },
+    {
+      "slug": "shampoo",
+      "title": "【生活】シャンプーの材料を見直そう！",
+      "url": "https://westudy.co.jp/lesson/shampoo",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_shampoo__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "765980280",
+          "cues": 105
+        }
+      ]
+    },
+    {
+      "slug": "seikatushuukan1",
+      "title": "【癌／生活習慣病対策１】重曹で抗酸化＝アルカリ化しろ！",
+      "url": "https://westudy.co.jp/lesson/seikatushuukan1",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_seikatushuukan1__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "709023026",
+          "cues": 275
+        }
+      ]
+    },
+    {
+      "slug": "seikatushuukan2",
+      "title": "【癌／生活習慣病対策２】アで始まる添加物を避けろ！",
+      "url": "https://westudy.co.jp/lesson/seikatushuukan2",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_seikatushuukan2__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711102252",
+          "cues": 263
+        }
+      ]
+    },
+    {
+      "slug": "seikatushuukan3",
+      "title": "【癌／生活習慣病対策３】砂糖と塩を変えなさい！",
+      "url": "https://westudy.co.jp/lesson/seikatushuukan3",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_seikatushuukan3__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711102285",
+          "cues": 378
+        }
+      ]
+    },
+    {
+      "slug": "seikatushuukan4",
+      "title": "【癌／生活習慣病対策４】醤油と味噌を変えなさい！",
+      "url": "https://westudy.co.jp/lesson/seikatushuukan4",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_seikatushuukan4__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711102314",
+          "cues": 269
+        }
+      ]
+    },
+    {
+      "slug": "seikatushuukan5",
+      "title": "【癌／生活習慣病対策５】幹細胞を安価に活性化させろ！",
+      "url": "https://westudy.co.jp/lesson/seikatushuukan5",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_seikatushuukan5__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706355975",
+          "cues": 123
+        }
+      ]
+    },
+    {
+      "slug": "margarine",
+      "title": "【癌／生活習慣病対策7】マーガリンを切り替えろ！",
+      "url": "https://westudy.co.jp/lesson/margarine",
+      "section": "健康動画",
+      "jarvis_file": "文字起こし_margarine__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "746012171",
+          "cues": 148
+        }
+      ]
+    }
+  ],
+  "failed": []
+}
