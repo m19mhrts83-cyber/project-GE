@@ -120,8 +120,9 @@ def sync_raimo(base: str, source: dict, chunks: list[dict], cache: dict) -> int:
         if isinstance(meta, str):
             meta = json.loads(meta)
         if not meta.get('provisional'):
-            return 0
-        if meta.get('content_sha256') != source['meta_json']['content_sha256']:
+            if not meta.get('file_sha256') or meta['file_sha256'] != source['meta_json'].get('file_sha256'):
+                return 0
+        elif meta.get('content_sha256') != source['meta_json']['content_sha256']:
             raise RuntimeError(f"Raimo字幕変更を検出: {source['source_key']}")
     else:
         row = {**source, 'meta_json': json.dumps(source['meta_json'], ensure_ascii=False)}
