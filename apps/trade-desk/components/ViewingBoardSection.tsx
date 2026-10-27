@@ -8,6 +8,7 @@ import {
   todayJst,
   viewingNextStep,
 } from "@/lib/reDealStages";
+import { VIEWING_PACE, deskGate, viewingPace } from "@/lib/reViewingGate";
 
 type BoardDeal = {
   id: string;
@@ -36,6 +37,7 @@ export default function ViewingBoardSection({ deals }: { deals: BoardDeal[] }) {
   const today = todayJst();
   const scheduled = deals.filter((d) => getViewing(d).step === "scheduled").length;
   const undecided = deals.filter((d) => getViewing(d).step === "done").length;
+  const pace = viewingPace(deals, today);
   return (
     <div
       className="card"
@@ -49,8 +51,20 @@ export default function ViewingBoardSection({ deals }: { deals: BoardDeal[] }) {
         </strong>
       </header>
       <p className="meta" style={{ marginTop: 6, marginBottom: 8 }}>
-        S3 判定が GO／HOLD の物件と、内見を進めている物件。「開く」で内見日・チェック・ヒアリング回答・結果（買付へ／保留／見送り）を記録できます。
+        S3 判定が GO／HOLD の物件と、内見を進めている物件。内見GOは「机上で否定材料がない」で出し、室内・傾き・駐車可否・成約家賃は内見で確かめます。指値ライン＝保守の想定家賃×12÷15%−修繕概算。
       </p>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          marginBottom: 8,
+          color: pace.candidatesShort || pace.monthShort ? "#92400e" : "#166534",
+        }}
+      >
+        ペース: 机上GOの内見候補 {pace.goCandidates}/{VIEWING_PACE.candidates}件 · 今月の内見{" "}
+        {pace.thisMonth}/{VIEWING_PACE.perMonth}件
+        {pace.monthShort > 0 ? `（あと${pace.monthShort}件、内見依頼を出す）` : ""}
+      </div>
       <div style={{ display: "grid", gap: 8 }}>
         {deals.map((d) => {
           const v = getViewing(d);
@@ -58,6 +72,7 @@ export default function ViewingBoardSection({ deals }: { deals: BoardDeal[] }) {
           const prog = checklistProgress(VIEWING_CHECKLIST, v.checklist);
           const verdict = verdictOf(d);
           const n = v.date ? daysUntil(v.date, today) : NaN;
+          const gate = deskGate(d);
           return (
             <div
               key={`vb-${d.id}`}
@@ -101,6 +116,10 @@ export default function ViewingBoardSection({ deals }: { deals: BoardDeal[] }) {
                 <div className="meta">
                   {d.area || "—"}
                   {d.price_man != null ? ` · ${d.price_man}万円` : ""}
+                  {gate.lineMan != null ? ` · 指値ライン ${gate.lineMan}万円` : ""}
+                  {gate.verdict === "go" ? (
+                    <span style={{ marginLeft: 6, color: "#166534", fontWeight: 600 }}>机上GO</span>
+                  ) : null}
                 </div>
                 <div
                   style={{
