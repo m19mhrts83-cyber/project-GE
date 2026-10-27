@@ -152,6 +152,14 @@ def parse_s3_file(path: Path) -> dict[str, Any] | None:
         deal_id = str(deal_id).strip()
     s5_line = str(fm.get("s5_line") or "").strip()
     updated = str(fm.get("updated") or "").strip()
+    # 保守の想定家賃（万円/月）。内見ボードの指値ライン計算に使う
+    rent_conservative_man: float | None = None
+    try:
+        rc = fm.get("rent_conservative_man")
+        if rc not in (None, ""):
+            rent_conservative_man = float(rc)
+    except (TypeError, ValueError):
+        rent_conservative_man = None
 
     # Verdict reason
     verdict_reason = ""
@@ -171,6 +179,14 @@ def parse_s3_file(path: Path) -> dict[str, Any] | None:
             q_clean = q.strip()
             if q_clean:
                 questions.append(q_clean)
+
+    # 内見で確かめること（現地・地場仲介でしか分からない点。hold 理由とは分ける）
+    viewing_checks: list[str] = []
+    vc_m = re.search(r"## 内見で確かめること\n+(.*?)(?=\n##|\Z)", body, re.DOTALL)
+    if vc_m:
+        for q in re.findall(r"^\d+\.\s*(.*?)$", vc_m.group(1), re.MULTILINE):
+            if q.strip():
+                viewing_checks.append(q.strip())
 
     # Key attributes from bullets
     expected_rent = ""
@@ -203,8 +219,8 @@ def parse_s3_file(path: Path) -> dict[str, Any] | None:
     persona = parse_s5_line(s5_line)
 
     verdict_labels = {
-        "go": "推進（買付・内見候補）",
-        "hold": "保留（内見・ヒアリング要確認）",
+        "go": "内見GO（机上の否定材料なし）",
+        "hold": "保留（机上の情報不足・仲介へ確認）",
         "pass": "見送り",
     }
 
@@ -223,6 +239,8 @@ def parse_s3_file(path: Path) -> dict[str, Any] | None:
         "key_risk": key_risk,
         "structure": structure,
         "hearing_questions": questions,
+        "viewing_checks": viewing_checks,
+        "rent_conservative_man": rent_conservative_man,
         "portal_url": portal_url,
         "updated_at": updated,
     }
