@@ -1304,9 +1304,9 @@ const App = {
   screenLabel: (screenName) => {
     const labels = {
       chat: 'Q&Aチャット',
-      comments: 'コメント一覧',
-      lessons: '動画ページ説明テキスト',
-      knowledge: 'セミナー動画文字起こし',
+      comments: 'westudy コミュニティコメント',
+      lessons: 'westudy 講座ページ説明文',
+      knowledge: 'westudy 動画文字起こし',
       openchat: 'LINEオプチャ',
       adminUsers: 'ユーザ承認',
       adminUserList: 'ユーザ一覧',
@@ -1630,14 +1630,11 @@ const App = {
           '<td class="p-2 whitespace-nowrap text-xs">' +
           App.escapeHtml(streamLabel(String(r.stream_type || r.streamType || ''))) +
           '</td>' +
-          '<td class="p-2 text-xs">' +
-          App.escapeHtml(String(r.thread_title || r.threadTitle || '')) +
-          '</td>' +
           '<td class="p-2 whitespace-nowrap text-xs">' +
           App.escapeHtml(App.formatOpenchatDateTime(when)) +
           '</td>' +
           '<td class="p-2 whitespace-nowrap text-xs">' +
-          App.escapeHtml(String(r.sender_name || r.senderName || '')) +
+          '<span class="openchat-sender">' + App.escapeHtml(String(r.sender_name || r.senderName || '')) + '</span>' +
           '</td>' +
           '<td class="p-2 text-xs text-slate-700">' +
           App.escapeHtml(snippet) +
@@ -2490,6 +2487,23 @@ const App = {
     );
   },
 
+  knowledgeSourceMeta: (src) => {
+    let meta = src.meta_json || {};
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch (e) { meta = {}; }
+    }
+    return meta && typeof meta === 'object' ? meta : {};
+  },
+
+  knowledgeVideoPageUrl: (src, meta) => {
+    const page = String(meta.lesson_url || src.lesson_url || '').trim();
+    if (/^https:\/\/westudy\.co\.jp\/lesson\//.test(page)) return page;
+    const slug = meta.lesson_slug || (String(src.source_key || '').match(/westudy:([^:]+):vimeo:/) || [])[1];
+    if (slug) return 'https://westudy.co.jp/lesson/' + encodeURIComponent(slug);
+    const existing = String(src.video_url || '');
+    return /^https:\/\/westudy\.co\.jp\/lesson\//.test(existing) ? existing : '';
+  },
+
   renderKnowledgeTable: () => {
     const body = App.elements.knowledgeTableBody;
     if (!body) return;
@@ -2515,16 +2529,20 @@ const App = {
     rows.slice(0, 500).forEach(function (ch) {
       const src = App.state.knowledgeSources[ch.source_key] || {};
       const start = ch.start_sec != null ? Number(ch.start_sec) : 0;
-      const url = App.withVideoTimeUrl(src.video_url || '', start);
+      const meta = App.knowledgeSourceMeta(src);
+      // Vimeoの限定公開は直URLだと再生できない。正規のWeStudy埋込ページを開く。
+      const url = App.knowledgeVideoPageUrl(src, meta) || App.withVideoTimeUrl(src.video_url || '', start);
       const tr = document.createElement('tr');
       tr.className = 'border-t align-top';
       tr.innerHTML =
         '<td class="p-2 whitespace-nowrap">' +
-        App.escapeHtml(App.formatMmSs(start)) +
+        App.escapeHtml(meta.course || meta.course_tab || '—') +
         '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(App.displaySourceTitle(src.title) || ch.source_key || '') +
         '</td>' +
+        '<td class="p-2 whitespace-nowrap">' + App.escapeHtml(App.formatMmSs(start)) + '</td>' +
+        '<td class="p-2 whitespace-nowrap">' + (ch.end_sec != null ? App.escapeHtml(App.formatMmSs(ch.end_sec)) : '—') + '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(String(ch.content || '').slice(0, 180)) +
         '</td>' +
@@ -2532,7 +2550,7 @@ const App = {
         (url
           ? '<a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
             App.escapeHtml(url) +
-            '">開く</a>'
+            '" title="WeStudyにログインして講座ページの動画を再生">開く</a>'
           : '') +
         '</td>';
       body.appendChild(tr);
@@ -3512,7 +3530,7 @@ const App = {
       const tr = document.createElement('tr');
       tr.className = 'border-t';
       const postedAt = String(App.commentField(r, 'posted_at') || '').trim();
-      const postedAtLabel = postedAt || '（日時なし）';
+      const postedAtLabel = App.formatOpenchatDateTime(postedAt) || '（日時なし）';
       const forumCategory =
         String(App.commentField(r, 'forum_category') || '').trim() || '未分類';
       const authorParsed = App.parseWeStudyAuthorName(App.commentField(r, 'author_name'));
@@ -3580,7 +3598,7 @@ const App = {
         '\n投稿者: ' +
         (authorParsed.authorName || authorParsed.raw || '—') +
         '\n日時: ' +
-        (postedAt || '—') +
+        (App.formatOpenchatDateTime(postedAt) || '—') +
         '\n分類: ' +
         category +
         '\n文字数: ' +
