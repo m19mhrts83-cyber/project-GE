@@ -2516,8 +2516,10 @@ const App = {
     return {
       course: App.referenceLabel(meta.course || meta.course_tab || lesson.course || '未分類'),
       section: App.referenceLabel(meta.section_name || meta.section || lesson.section || '目次未設定'),
-      title: App.displaySourceTitle(src.title) || src.source_key || '',
-      key: src.source_key || ''
+      title: lesson.title || App.referenceLabel(App.displaySourceTitle(src.title)).replace(/\s*[（(]動画\s*\d+[）)]\s*$/, '') || src.source_key || '',
+      // 選択肢は講座単位。個別動画IDは一覧行の順序・開始秒管理にのみ使う。
+      key: App.knowledgeVideoPageUrl(src, meta).split('#')[0] ||
+        App.referenceLabel(App.displaySourceTitle(src.title)).replace(/\s*[（(]動画\s*\d+[）)]\s*$/, '') || src.source_key || ''
     };
   },
 
