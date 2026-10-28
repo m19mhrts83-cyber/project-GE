@@ -48,6 +48,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 from yoritoori_utils import (
+    find_timeline_heading,
     DRAFT_FILENAME,
     YORITOORI_FILENAME,
     default_yoritoori_base_dir,
@@ -122,10 +123,10 @@ def _wrap_in_toggle(body: str) -> str:
 def insert_block_after_timeline_header(content: str, block: str) -> str:
     """yoritoori_send.append_sent_to_yoritoori と同様、時系列セクション先頭（新しい順）に挿入。"""
     marker = "## やり取り（時系列）"
-    if marker not in content:
+    if find_timeline_heading(content) < 0:
         return content + block
 
-    start = content.find(marker)
+    start = find_timeline_heading(content)
     after_marker = content[start:]
     m = re.search(r"\n\n### [12]\d{3}/\d{2}/\d{2}", after_marker)
     if m:

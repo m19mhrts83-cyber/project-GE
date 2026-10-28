@@ -33,6 +33,7 @@ import yaml
 # 設定
 SCRIPT_DIR = Path(__file__).resolve().parent
 from yoritoori_utils import (  # noqa: E402
+    find_timeline_heading,
     YORITOORI_FILENAME,
     default_yoritoori_base_dir,
     make_summary,
@@ -287,8 +288,8 @@ def append_to_yoritoori(
 ---
 """
     marker = "## やり取り（時系列）"
-    if marker in content:
-        pos = content.find(marker) + len(marker)
+    if find_timeline_heading(content) >= 0:
+        pos = find_timeline_heading(content) + len(marker)
         content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
     else:
         content += block

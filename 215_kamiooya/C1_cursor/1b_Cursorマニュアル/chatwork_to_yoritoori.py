@@ -33,6 +33,7 @@ import requests
 import yaml
 
 from yoritoori_utils import (
+    find_timeline_heading,
     YORITOORI_FILENAME,
     default_yoritoori_base_dir,
     make_summary,
@@ -492,8 +493,8 @@ def append_to_yoritoori(
 """
     content = md_path.read_text(encoding="utf-8")
     marker = "## やり取り（時系列）"
-    if marker in content:
-        pos = content.find(marker) + len(marker)
+    if find_timeline_heading(content) >= 0:
+        pos = find_timeline_heading(content) + len(marker)
         content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
     else:
         content += block
@@ -531,8 +532,8 @@ def append_sent_to_yoritoori(
 """
     content = md_path.read_text(encoding="utf-8")
     marker = "## やり取り（時系列）"
-    if marker in content:
-        pos = content.find(marker) + len(marker)
+    if find_timeline_heading(content) >= 0:
+        pos = find_timeline_heading(content) + len(marker)
         content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
     else:
         content += block

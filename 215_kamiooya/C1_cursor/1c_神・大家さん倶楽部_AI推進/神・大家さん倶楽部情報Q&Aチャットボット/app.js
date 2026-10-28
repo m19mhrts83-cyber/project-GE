@@ -1028,17 +1028,22 @@ const App = {
     const name = (document.getElementById('registerName').value || '').trim();
     const email = document.getElementById('registerEmail').value.trim().toLowerCase();
     const memberNo = (document.getElementById('registerMemberNo').value || '').trim();
+    const prefecture = (document.getElementById('registerPrefecture').value || '').trim();
     const password = document.getElementById('registerPassword').value;
-    if (!email || !password) {
-      App.showToast('メールアドレスとパスワードは必須です', 'error');
+    if (!memberNo) {
+      App.showToast('会員番号は必須です', 'error');
       return;
     }
     if (!name) {
       App.showToast('氏名は必須です', 'error');
       return;
     }
-    if (!memberNo) {
-      App.showToast('会員番号は必須です', 'error');
+    if (!prefecture) {
+      App.showToast('在住都道府県を選択してください', 'error');
+      return;
+    }
+    if (!email || !password) {
+      App.showToast('メールアドレスとパスワードは必須です', 'error');
       return;
     }
 
@@ -1049,7 +1054,8 @@ const App = {
         email: email,
         password_hash: password,
         member_no: memberNo,
-        name: name
+        name: name,
+        prefecture: prefecture
       };
       const isNotOnRoster = function (err) {
         const code = err && err.errorCode;
@@ -1092,7 +1098,7 @@ const App = {
             }
           }
           if (registered && !autoApproved) {
-            await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo, name);
+            await App.notifyRegistrationPending(email, '新規登録（アプリ）', memberNo, name, prefecture);
           }
         } else if (isReregisterCandidate(rosterErr)) {
           try {
@@ -1103,7 +1109,7 @@ const App = {
             if (isNotOnRoster(rrErr)) {
               await App.apiClient('POST', '/auth/reregister', payload);
               registered = true;
-              await App.notifyRegistrationPending(email, '再登録（アプリ）', memberNo, name);
+              await App.notifyRegistrationPending(email, '再登録（アプリ）', memberNo, name, prefecture);
             } else {
               throw rrErr;
             }
@@ -1129,13 +1135,16 @@ const App = {
   },
 
   /** Phase 2: 承認依頼メール。失敗しても throw しない。 */
-  notifyRegistrationPending: async (email, note, memberNo, name) => {
+  notifyRegistrationPending: async (email, note, memberNo, name, prefecture) => {
     try {
       const registeredAt =
         new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) + ' JST';
-      const noteWithName = name
+      let noteWithName = name
         ? (note || '') + (note ? ' / ' : '') + '氏名: ' + name
         : note || '';
+      if (prefecture) {
+        noteWithName += (noteWithName ? ' / ' : '') + '都道府県: ' + prefecture;
+      }
       await App.apiClient('POST', '/notify/registration', {
         email: email,
         member_no: memberNo || '',
@@ -2712,7 +2721,7 @@ const App = {
     if (!App.isStaffAdmin()) return;
     const list = App.generalUsers();
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="5" class="p-3 text-slate-500">一般ユーザはいません</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">一般ユーザはいません</td></tr>';
       return;
     }
     const isMaster = App.isMasterAdmin();
@@ -2754,6 +2763,9 @@ const App = {
         '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(u.member_no || '') +
+        '</td>' +
+        '<td class="p-2">' +
+        App.escapeHtml(u.prefecture || '') +
         '</td>' +
         '<td class="p-2"><div class="flex flex-wrap gap-2">' +
         actions +
@@ -3738,7 +3750,7 @@ const App = {
     }
 
     if (App.state.pendingUsers.length === 0) {
-      body.innerHTML = '<tr><td colspan="7" class="p-3 text-slate-500">承認待ちユーザはいません</td></tr>';
+      body.innerHTML = '<tr><td colspan="8" class="p-3 text-slate-500">承認待ちユーザはいません</td></tr>';
       App.updateBulkApproveButtonState();
       return;
     }
@@ -3758,6 +3770,7 @@ const App = {
         '<td class="p-2">' + App.escapeHtml(u.name || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.email || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.member_no || '') + '</td>' +
+        '<td class="p-2">' + App.escapeHtml(u.prefecture || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.status || '') + '</td>' +
         '<td class="p-2">' +
         '<div class="flex flex-wrap gap-2">' +

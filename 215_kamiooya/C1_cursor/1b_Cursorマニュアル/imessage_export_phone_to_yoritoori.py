@@ -23,7 +23,7 @@ from pathlib import Path
 
 import yaml
 
-from yoritoori_utils import YORITOORI_FILENAME, make_summary
+from yoritoori_utils import YORITOORI_FILENAME, make_summary, find_timeline_heading
 
 
 def normalize_phone(phone: str) -> str:
@@ -148,8 +148,8 @@ def append_block(md_path: Path, partner_name: str, date_str: str, direction: str
 """
     content = md_path.read_text(encoding="utf-8")
     marker = "## やり取り（時系列）"
-    if marker in content:
-        pos = content.find(marker) + len(marker)
+    if find_timeline_heading(content) >= 0:
+        pos = find_timeline_heading(content) + len(marker)
         content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
     else:
         content += block
@@ -160,10 +160,10 @@ def reset_md_after_marker(md_path: Path) -> None:
     """`## やり取り（時系列）` 以降を消して、ヘッダだけ残す。"""
     content = md_path.read_text(encoding="utf-8")
     marker = "## やり取り（時系列）"
-    if marker not in content:
+    if find_timeline_heading(content) < 0:
         md_path.write_text(content + "\n\n" + marker + "\n", encoding="utf-8")
         return
-    pos = content.find(marker)
+    pos = find_timeline_heading(content)
     keep = content[: pos + len(marker)]
     md_path.write_text(keep.rstrip() + "\n\n", encoding="utf-8")
 
