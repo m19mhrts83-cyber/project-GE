@@ -102,6 +102,8 @@ Chrome は 40 ページごとに作り直し、セッション切れ（InvalidSe
 - `westudy_html_backup_<日時>.summary.json` ページ数・アセット数・未巡回などの要約
 - `latest.json` 最新回の案内
 
+残すのは最新1回分（`destination.keep_last: 1`）。新しい zip を置き終えてから、前の回の zip と summary を消す。
+
 ### 運営さんのフォルダへ切り替える
 
 `config/westudy_html_backup.yaml` の `destination` だけ直す。

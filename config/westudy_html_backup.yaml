@@ -19,8 +19,9 @@ destination:
   # gdrive_api のとき使う（217 フォルダ。subfolder の下に自動作成）
   folder_id: "1lpkD9i6WITPr4h74doqT8QtKZk5g9cUf"
   subfolder: "02_バックアップデータ"
-  # 何回分残すか（毎週 約300MB。0 = すべて残す）。type: local のときだけ効く
-  keep_last: 0
+  # 何回分残すか（毎週 約300MB。0 = すべて残す）。type: local のときだけ効く。
+  # 消えたときの備えなので最新1回分で十分（2026-10-28 松野さん）。新しい zip を置き終えてから古い回を消す
+  keep_last: 1
   # gdrive_api の OAuth トークン（authorized_user 形式・drive スコープ）。
   # 置き先フォルダに書き込める Google アカウントのものを指定する。
   # 既存の token_google_workspace_estate.json は matsuno.estate@gmail.com・drive.file のため
