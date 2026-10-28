@@ -6,6 +6,8 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { sendGmailViaEnv } from "@/lib/gmail/sendFromEnv";
+import { downloadMaterialFiles } from "@/lib/materialFiles";
+import type { MailAttachment, MaterialSource } from "@/lib/materialFileSearch";
 import {
   recordMailSkipLearn,
   resetMailSkipStreak,
@@ -487,6 +489,8 @@ export async function applyMailActionSlack(
     to?: string;
     /** 送信元アカウント estate|admin|m19m（モーダルで選択） */
     account?: string;
+    /** 添付する資料（モーダルで選んだ OneDrive / Google Drive のファイル） */
+    attachments?: Array<{ s: MaterialSource; id: string }>;
   },
 ): Promise<MaApplyResult> {
   const row = await fetchMailActionTriage(id);
@@ -709,11 +713,24 @@ export async function applyMailActionSlack(
   const receivedAccount = normalizeMailAccount(row.account);
   const account = normalizeMailAccount(opts?.account) || receivedAccount || "estate";
 
+  let attachments: MailAttachment[] = [];
+  if (opts?.attachments?.length) {
+    try {
+      attachments = await downloadMaterialFiles(opts.attachments);
+    } catch (e) {
+      return {
+        ok: false,
+        message: `添付資料を取得できませんでした: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+  }
+
   try {
     const sent = await sendGmailViaEnv({
       to,
       subject,
       body,
+      attachments,
       // threadId は受信したメールボックスのものなので、送信元を変えたら付けない
       threadId: account === receivedAccount ? row.gmail_thread_id || null : null,
       account,
@@ -724,6 +741,7 @@ export async function applyMailActionSlack(
     payload.gmail_sent_from = sent.from;
     payload.gmail_sent_account = sent.account;
     payload.sent_to = to;
+    if (attachments.length) payload.sent_attachments = attachments.map((a) => a.filename);
     payload.slack_ma_action = { action: "reply", at: now, source };
     delete payload.last_send_error;
     const { error } = await sb
@@ -753,7 +771,7 @@ export async function applyMailActionSlack(
     revalidateMailActionPaths();
     return {
       ok: true,
-      message: `送信しました → ${to}（${row.partner || id}）`,
+      message: `送信しました → ${to}（${row.partner || id}）${attachments.length ? `／添付${attachments.length}件` : ""}`,
       status: "sent",
       ...digestSync,
     };

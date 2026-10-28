@@ -23,7 +23,9 @@ import {
   isMaModalAction,
   MA_MODAL_CALLBACK,
   maBodyBlockId,
+  maSelectedFiles,
   parseMaButtonValue,
+  prepareMaModalSubmitWithFiles,
   parseMaModalMeta,
 } from "@/lib/mailActionSlackInteract";
 import { parseT313ButtonValue } from "@/lib/todoist313SlackAction";
@@ -192,6 +194,18 @@ export async function POST(request: NextRequest) {
           });
         }
         const st = extractMaModalState(payload);
+        if (maSelectedFiles(st).length) {
+          // 添付の取得は 3 秒に収まらないので「送信中」に切り替えて応答後に送る
+          const prepared = await prepareMaModalSubmitWithFiles(payload);
+          if ("error" in prepared) {
+            return NextResponse.json({
+              response_action: "errors",
+              errors: { [bodyBlockId]: prepared.error.slice(0, 100) },
+            });
+          }
+          after(prepared.run);
+          return NextResponse.json({ response_action: "update", view: prepared.view });
+        }
         const result = await handleMaModalSubmit({
           triageId: meta.id,
           body: st.body,

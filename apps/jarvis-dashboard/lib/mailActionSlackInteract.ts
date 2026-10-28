@@ -14,6 +14,15 @@ import {
   type MailActionSlackAction,
 } from "@/lib/mailActionSlackAction";
 import { proofreadDraft, reviseDraft } from "@/lib/mailDraftCheck";
+import { searchMaterialFiles } from "@/lib/materialFiles";
+import {
+  candidateValue,
+  humanSize,
+  parseCandidateValue,
+  searchTermsFromItems,
+  type MaterialCandidate,
+} from "@/lib/materialFileSearch";
+import { extractMaterialRequests } from "@/lib/materialRequest";
 
 export const MA_ACTION_IDS = {
   reply: "mail_action_reply",
@@ -79,6 +88,7 @@ export function maDoneBlocks(title: string, detail: string, ok: boolean) {
 export const MA_MODAL_ACTION_IDS = {
   proofread: "mail_action_modal_proofread",
   revise: "mail_action_modal_revise",
+  findFiles: "mail_action_modal_find_files",
 } as const;
 
 type MaModalState = {
@@ -86,6 +96,14 @@ type MaModalState = {
   to: string;
   account: string;
   instruction: string;
+  /** 資料の検索語（任意） */
+  fileQuery: string;
+  /** 添付に選んだ候補（od:{id} / gd:{id}） */
+  files: string[];
+};
+
+const EMPTY_STATE: MaModalState = {
+  body: "", to: "", account: "", instruction: "", fileQuery: "", files: [],
 };
 
 type ReplyViewInput = {
@@ -97,7 +115,58 @@ type ReplyViewInput = {
   version: number;
   notice?: string;
   busy?: boolean;
+  /** 依頼された資料（本文から抽出） */
+  materials?: string[];
+  /** 探した添付候補（private_metadata に持ち回る） */
+  candidates?: MaterialCandidate[];
+  /** 依頼品目がなくても検索語欄を出す */
+  showFileQuery?: boolean;
 };
+
+const SOURCE_LABEL = { od: "OneDrive", gd: "Google Drive" } as const;
+
+function fileOption(c: MaterialCandidate) {
+  const size = humanSize(c.z);
+  return {
+    text: { type: "plain_text" as const, text: c.n.slice(0, 75) },
+    description: {
+      type: "plain_text" as const,
+      text: [SOURCE_LABEL[c.s], size, (c.m || "").slice(0, 10)].filter(Boolean).join("・"),
+    },
+    value: candidateValue(c),
+  };
+}
+
+/** private_metadata は 3000 字まで。候補名は短くして持つ */
+function packMeta(meta: MaModalMeta, version: number, cands: MaterialCandidate[]): string {
+  const c = cands.map((x) => ({ s: x.s, id: x.id, n: x.n.slice(0, 60), z: x.z, m: (x.m || "").slice(0, 10) }));
+  let raw = JSON.stringify({ ...meta, v: version, c });
+  while (raw.length > 2900 && c.length) {
+    c.pop();
+    raw = JSON.stringify({ ...meta, v: version, c });
+  }
+  return raw;
+}
+
+function metaCandidates(metaRaw: string): MaterialCandidate[] {
+  try {
+    const j = JSON.parse(metaRaw) as { c?: unknown };
+    if (!Array.isArray(j.c)) return [];
+    return j.c
+      .map((x) => x as MaterialCandidate)
+      .filter((x) => (x.s === "od" || x.s === "gd") && typeof x.id === "string" && typeof x.n === "string");
+  } catch {
+    return [];
+  }
+}
+
+function metaVersion(metaRaw: string): number {
+  try {
+    return Number((JSON.parse(metaRaw) as { v?: number }).v || 1) || 1;
+  } catch {
+    return 1;
+  }
+}
 
 function buildReplyView(input: ReplyViewInput) {
   const { meta, state, version } = input;
@@ -181,9 +250,58 @@ function buildReplyView(input: ReplyViewInput) {
           text: { type: "plain_text", text: "指示で見直し" },
           value: "revise",
         },
+        {
+          type: "button",
+          action_id: MA_MODAL_ACTION_IDS.findFiles,
+          text: { type: "plain_text", text: "📎 資料を探す" },
+          value: "find_files",
+        },
       ],
     },
   ];
+  const materials = input.materials || [];
+  const cands = input.candidates || [];
+  if (materials.length || cands.length || state.fileQuery || input.showFileQuery) {
+    if (materials.length) {
+      blocks.push({
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `📎 *依頼された資料:* ${materials.map((m) => m.slice(0, 40)).join(" ／ ")}`.slice(0, 2900),
+          },
+        ],
+      });
+    }
+    blocks.push({
+      type: "input",
+      block_id: "mail_reply_fquery_block",
+      optional: true,
+      label: { type: "plain_text", text: "資料の検索語（任意・空なら依頼品目で探す）" },
+      element: {
+        type: "plain_text_input",
+        action_id: "mail_reply_fquery",
+        ...(state.fileQuery ? { initial_value: state.fileQuery } : {}),
+        placeholder: { type: "plain_text", text: "例: 謄本 2025 試算表" },
+      },
+    });
+  }
+  if (cands.length) {
+    const options = cands.map(fileOption);
+    const initial = options.filter((o) => state.files.includes(o.value));
+    blocks.push({
+      type: "input",
+      block_id: `mail_reply_files_block_v${version}`,
+      optional: true,
+      label: { type: "plain_text", text: "添付する資料（チェックしたものを添付）" },
+      element: {
+        type: "checkboxes",
+        action_id: "mail_reply_files",
+        options,
+        ...(initial.length ? { initial_options: initial } : {}),
+      },
+    });
+  }
   if (input.notice) {
     blocks.push({
       type: "context",
@@ -193,7 +311,7 @@ function buildReplyView(input: ReplyViewInput) {
   return {
     type: "modal",
     callback_id: MA_MODAL_CALLBACK,
-    private_metadata: JSON.stringify({ ...meta, v: version }),
+    private_metadata: packMeta(meta, version, cands),
     title: { type: "plain_text", text: "メール返信" },
     submit: { type: "plain_text", text: input.busy ? "送信（点検中）" : "送信" },
     close: { type: "plain_text", text: "キャンセル" },
@@ -234,8 +352,9 @@ async function openReplyModal(opts: {
     meta: { id: opts.triageId, channel: opts.channelId, message_ts: opts.messageTs },
     who: opts.who,
     inbound: opts.inbound,
-    state: { body: opts.draft, to: opts.to, account: opts.account, instruction: "" },
+    state: { ...EMPTY_STATE, body: opts.draft, to: opts.to, account: opts.account },
     version: 1,
+    materials: extractMaterialRequests(opts.inbound),
   });
   return slackApi(opts.token, "views.open", { trigger_id: opts.triggerId, view });
 }
@@ -248,7 +367,7 @@ export function extractMaModalState(payload: Record<string, unknown>): MaModalSt
     string,
     Record<string, Record<string, unknown>>
   >;
-  const out: MaModalState = { body: "", to: "", account: "", instruction: "" };
+  const out: MaModalState = { ...EMPTY_STATE, files: [] };
   for (const [blockId, block] of Object.entries(values)) {
     for (const [actionId, el] of Object.entries(block || {})) {
       if (actionId === "mail_reply_body" && blockId.startsWith("mail_reply_body_block")) {
@@ -260,6 +379,11 @@ export function extractMaModalState(payload: Record<string, unknown>): MaModalSt
       } else if (actionId === "mail_reply_from") {
         const sel = (el.selected_option || {}) as Record<string, unknown>;
         out.account = String(sel.value || "").trim();
+      } else if (actionId === "mail_reply_fquery") {
+        out.fileQuery = String(el.value || "").trim();
+      } else if (actionId === "mail_reply_files") {
+        const sel = (el.selected_options || []) as Array<Record<string, unknown>>;
+        out.files = sel.map((o) => String(o.value || "")).filter(Boolean);
       }
     }
   }
@@ -288,53 +412,137 @@ export function maBodyBlockId(payload: Record<string, unknown>): string {
 export function isMaModalAction(actionId: string): boolean {
   return (
     actionId === MA_MODAL_ACTION_IDS.proofread ||
-    actionId === MA_MODAL_ACTION_IDS.revise
+    actionId === MA_MODAL_ACTION_IDS.revise ||
+    actionId === MA_MODAL_ACTION_IDS.findFiles
   );
+}
+
+type ModalCtx = {
+  bot: string;
+  viewId: string;
+  meta: MaModalMeta;
+  version: number;
+  who: string;
+  inbound: string;
+  materials: string[];
+  candidates: MaterialCandidate[];
+  state: MaModalState;
+};
+
+async function loadModalCtx(
+  payload: Record<string, unknown>,
+): Promise<ModalCtx | { error: string }> {
+  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
+  if (!bot) return { error: "SLACK_BOT_TOKEN 未設定" };
+  const view = (payload.view || {}) as Record<string, unknown>;
+  const viewId = String(view.id || "");
+  const metaRaw = String(view.private_metadata || "");
+  const meta = parseMaModalMeta(metaRaw);
+  if (!viewId || !meta) return { error: "モーダル情報が不正です" };
+  const row = await fetchMailActionTriage(meta.id);
+  if (!row) return { error: "対象のメール要対応が見つかりません" };
+  const inbound = String(row.original_body || "");
+  return {
+    bot,
+    viewId,
+    meta,
+    version: metaVersion(metaRaw),
+    who: String(row.partner || row.from_email || "相手"),
+    inbound,
+    materials: extractMaterialRequests(inbound),
+    candidates: metaCandidates(metaRaw),
+    state: extractMaModalState(payload),
+  };
+}
+
+function viewFrom(
+  ctx: ModalCtx,
+  patch: Partial<ReplyViewInput> & { version: number },
+) {
+  return buildReplyView({
+    meta: ctx.meta,
+    who: ctx.who,
+    inbound: ctx.inbound,
+    state: ctx.state,
+    materials: ctx.materials,
+    candidates: ctx.candidates,
+    ...patch,
+  });
 }
 
 export async function handleMaModalAction(opts: {
   actionId: string;
   payload: Record<string, unknown>;
 }): Promise<{ run: () => Promise<void> } | { error: string }> {
-  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
-  if (!bot) return { error: "SLACK_BOT_TOKEN 未設定" };
-  const view = (opts.payload.view || {}) as Record<string, unknown>;
-  const viewId = String(view.id || "");
-  const metaRaw = String(view.private_metadata || "");
-  const meta = parseMaModalMeta(metaRaw);
-  if (!viewId || !meta) return { error: "モーダル情報が不正です" };
-  let version = 1;
-  try {
-    version = Number((JSON.parse(metaRaw) as { v?: number }).v || 1) || 1;
-  } catch {
-    version = 1;
+  const ctx = await loadModalCtx(opts.payload);
+  if ("error" in ctx) return ctx;
+  const { bot, viewId, state, version } = ctx;
+  const update = (view: Record<string, unknown>) =>
+    slackApi(bot, "views.update", { view_id: viewId, view });
+
+  if (opts.actionId === MA_MODAL_ACTION_IDS.findFiles) {
+    const terms = searchTermsFromItems(state.fileQuery ? [] : ctx.materials, state.fileQuery);
+    if (!terms.length) {
+      // 検索語欄を出して入力を促す
+      await update(
+        viewFrom(ctx, {
+          version: version + 1,
+          showFileQuery: true,
+          notice: "⚠️ 依頼品目が見つかりませんでした。資料の検索語を入れて、もう一度「📎 資料を探す」",
+        }),
+      );
+      return { run: async () => {} };
+    }
+    const busyVersion = version + 1;
+    await update(
+      viewFrom(ctx, { version: busyVersion, busy: true, notice: `⏳ 資料を探しています（${terms.join("・")}）…` }),
+    );
+    return {
+      run: async () => {
+        const found = await searchMaterialFiles(terms);
+        // 既に選んだものは残し、新しい候補を後ろに足す（最大10件）
+        const kept = ctx.candidates.filter((c) => state.files.includes(candidateValue(c)));
+        const merged = [...kept];
+        for (const c of found.candidates) {
+          if (merged.length >= 10) break;
+          if (!merged.some((m) => m.s === c.s && m.id === c.id)) merged.push(c);
+        }
+        let notice = merged.length
+          ? `📎 候補 ${found.candidates.length} 件（検索語: ${terms.join("・")}）。添付するものにチェックして「送信」`
+          : `📎 見つかりませんでした（検索語: ${terms.join("・")}）。検索語を変えてもう一度どうぞ`;
+        if (found.notes.length) notice += `\n${found.notes.map((n) => `⚠️ ${n}`).join("\n")}`;
+        await update(
+          viewFrom(ctx, {
+            version: busyVersion + 1,
+            candidates: merged,
+            state: { ...state, fileQuery: state.fileQuery || terms.join(" ") },
+            notice,
+          }),
+        );
+      },
+    };
   }
-  const row = await fetchMailActionTriage(meta.id);
-  if (!row) return { error: "対象のメール要対応が見つかりません" };
-  const who = String(row.partner || row.from_email || "相手");
-  const inbound = String(row.original_body || "");
-  const state = extractMaModalState(opts.payload);
+
   const mode = opts.actionId === MA_MODAL_ACTION_IDS.proofread ? "proofread" : "revise";
 
   if (mode === "revise" && !state.instruction) {
-    await slackApi(bot, "views.update", {
-      view_id: viewId,
-      view: buildReplyView({
-        meta, who, inbound, state, version: version + 1,
+    await update(
+      viewFrom(ctx, {
+        version: version + 1,
         notice: "⚠️ 見直し指示を入力してから「指示で見直し」を押してください",
       }),
-    });
+    );
     return { run: async () => {} };
   }
 
   const busyVersion = version + 1;
-  await slackApi(bot, "views.update", {
-    view_id: viewId,
-    view: buildReplyView({
-      meta, who, inbound, state, version: busyVersion, busy: true,
+  await update(
+    viewFrom(ctx, {
+      version: busyVersion,
+      busy: true,
       notice: mode === "proofread" ? "⏳ 誤字脱字をチェック中…" : "⏳ 指示どおり見直し中…",
     }),
-  });
+  );
 
   return {
     run: async () => {
@@ -355,10 +563,71 @@ export async function handleMaModalAction(opts: {
           : `${label} — ${mode === "proofread" ? "直す箇所はありませんでした" : "本文を更新しました"}`;
         notice += "\n内容を確認して、必要なら直接直してから「送信」";
       }
-      await slackApi(bot, "views.update", {
-        view_id: viewId,
-        view: buildReplyView({ meta, who, inbound, state: next, version: busyVersion + 1, notice }),
+      await update(viewFrom(ctx, { version: busyVersion + 1, state: next, notice }));
+    },
+  };
+}
+
+/** 選んだ添付（od:/gd: 値）を参照に直す */
+export function maSelectedFiles(state: { files: string[] }) {
+  return state.files
+    .map(parseCandidateValue)
+    .filter((x): x is NonNullable<ReturnType<typeof parseCandidateValue>> => Boolean(x));
+}
+
+/**
+ * 添付ありの送信。ファイル取得に時間がかかるので、すぐ「送信中」に切り替えて後で送る。
+ * 失敗したら入力内容を保ったままフォームに戻す。
+ */
+export async function prepareMaModalSubmitWithFiles(
+  payload: Record<string, unknown>,
+): Promise<{ view: Record<string, unknown>; run: () => Promise<void> } | { error: string }> {
+  const ctx = await loadModalCtx(payload);
+  if ("error" in ctx) return ctx;
+  const refs = maSelectedFiles(ctx.state);
+  const names = ctx.candidates
+    .filter((c) => ctx.state.files.includes(candidateValue(c)))
+    .map((c) => `• ${c.n}`);
+  const sendingView = {
+    type: "modal",
+    callback_id: `${MA_MODAL_CALLBACK}_sending`,
+    title: { type: "plain_text", text: "メール返信" },
+    close: { type: "plain_text", text: "閉じる" },
+    blocks: [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `⏳ 添付 ${refs.length} 件を付けて送信しています…\n${names.join("\n")}`.slice(0, 2900),
+        },
+      },
+    ],
+  };
+  return {
+    view: sendingView,
+    run: async () => {
+      const result = await handleMaModalSubmit({
+        triageId: ctx.meta.id,
+        body: ctx.state.body,
+        to: ctx.state.to,
+        account: ctx.state.account,
+        attachments: refs,
+        channelId: ctx.meta.channel,
+        messageTs: ctx.meta.message_ts,
       });
+      const view = result.ok
+        ? {
+            type: "modal",
+            callback_id: `${MA_MODAL_CALLBACK}_done`,
+            title: { type: "plain_text", text: "メール返信" },
+            close: { type: "plain_text", text: "閉じる" },
+            blocks: maDoneBlocks("返信を送信しました", result.text, true),
+          }
+        : viewFrom(ctx, {
+            version: ctx.version + 1,
+            notice: `❌ 送信できませんでした: ${result.text}`,
+          });
+      await slackApi(ctx.bot, "views.update", { view_id: ctx.viewId, view });
     },
   };
 }
@@ -368,6 +637,7 @@ export async function handleMaModalSubmit(opts: {
   body: string;
   to?: string;
   account?: string;
+  attachments?: Array<{ s: "od" | "gd"; id: string }>;
   /** エラー表示先の本文ブロック（版付き） */
   bodyBlockId?: string;
   channelId?: string;
@@ -388,6 +658,7 @@ export async function handleMaModalSubmit(opts: {
     body: opts.body,
     to: opts.to,
     account: opts.account,
+    attachments: opts.attachments,
     source: "slack_modal",
   });
   if (!result.ok) {
