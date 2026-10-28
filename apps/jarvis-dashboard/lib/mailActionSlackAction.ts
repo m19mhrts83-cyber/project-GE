@@ -12,6 +12,7 @@ import {
   skipPendingFromMutedSender,
 } from "@/lib/mailActionSkipMute";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { isSelfEmail, parseEmailAddr } from "@/lib/selfEmails";
 import { closeTodoistTaskById, createTodoistTask } from "@/lib/todoistTasks";
 
 export type MailActionSlackAction = "reply" | "skip" | "todoist";
@@ -434,10 +435,53 @@ function mailReplyWaitDue(): string {
   return jst.toISOString().slice(0, 10);
 }
 
+const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+/** 返信に使える送信元（Vercel の Gmail トークンと対応） */
+export const MAIL_SEND_ACCOUNTS = [
+  { key: "estate", label: "estate（matsuno.estate@gmail.com）" },
+  { key: "admin", label: "admin（admin@livingsupport-matsu.co.jp）" },
+  { key: "m19m", label: "m19m（m19m.hrts83@gmail.com）" },
+] as const;
+
+export function normalizeMailAccount(raw: string | null | undefined): string {
+  const a = String(raw || "").trim().toLowerCase();
+  if (a === "livingsupport") return "admin";
+  return MAIL_SEND_ACCOUNTS.some((x) => x.key === a) ? a : "";
+}
+
+/**
+ * 返信の宛先候補。from_email が無い行（パートナーやり取り md 由来）は
+ * 本文の最初の他者アドレス（署名・引用ヘッダ）から推定する。
+ */
+export function guessMailReplyTo(row: {
+  from_email?: string | null;
+  original_body?: string | null;
+}): string {
+  const from = parseEmailAddr(row.from_email);
+  if (from && !isSelfEmail(from)) return from;
+  const found = String(row.original_body || "").match(
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+  );
+  for (const raw of found || []) {
+    const addr = raw.toLowerCase();
+    if (isSelfEmail(addr) || /no-?reply|mailer-daemon/.test(addr)) continue;
+    return addr;
+  }
+  return "";
+}
+
 export async function applyMailActionSlack(
   id: string,
   action: MailActionSlackAction,
-  opts?: { body?: string; source?: string },
+  opts?: {
+    body?: string;
+    source?: string;
+    /** 返信の宛先（モーダルで編集）。未指定は from_email → 本文からの推定 */
+    to?: string;
+    /** 送信元アカウント estate|admin|m19m（モーダルで選択） */
+    account?: string;
+  },
 ): Promise<MaApplyResult> {
   const row = await fetchMailActionTriage(id);
   if (!row) {
@@ -615,20 +659,25 @@ export async function applyMailActionSlack(
   if (!body) {
     return { ok: false, message: "返信本文が空です。編集してから送ってください" };
   }
-  const to = String(row.from_email || "").trim();
+  const to = (opts?.to || guessMailReplyTo(row)).trim();
   if (!to) {
-    return { ok: false, message: "宛先（from_email）がありません" };
+    return { ok: false, message: "宛先がありません。宛先欄に入力してください" };
+  }
+  if (!EMAIL_RE.test(to)) {
+    return { ok: false, message: `宛先の形式が正しくありません: ${to}` };
   }
   let subject = String(row.subject || "").trim() || "（件名なし）";
   if (!/^re:/i.test(subject)) subject = `Re: ${subject}`;
-  const account = String(row.account || "admin").trim() || "admin";
+  const receivedAccount = normalizeMailAccount(row.account);
+  const account = normalizeMailAccount(opts?.account) || receivedAccount || "estate";
 
   try {
     const sent = await sendGmailViaEnv({
       to,
       subject,
       body,
-      threadId: row.gmail_thread_id || null,
+      // threadId は受信したメールボックスのものなので、送信元を変えたら付けない
+      threadId: account === receivedAccount ? row.gmail_thread_id || null : null,
       account,
     });
     payload.sent_at = now;

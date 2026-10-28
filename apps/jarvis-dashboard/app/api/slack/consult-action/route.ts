@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import {
   applyGate,
   htmlPage,
@@ -16,10 +16,13 @@ import {
   VR_MODAL_CALLBACK,
 } from "@/lib/vendorReplySlackInteract";
 import {
-  extractMaModalBody,
+  extractMaModalState,
   handleMaBlockAction,
+  handleMaModalAction,
   handleMaModalSubmit,
+  isMaModalAction,
   MA_MODAL_CALLBACK,
+  maBodyBlockId,
   parseMaButtonValue,
   parseMaModalMeta,
 } from "@/lib/mailActionSlackInteract";
@@ -31,6 +34,8 @@ import { parseS9ButtonValue } from "@/lib/s9SlackAction";
 import { handleS9BlockAction } from "@/lib/s9SlackInteract";
 
 export const runtime = "nodejs";
+// 返信モーダルの誤字脱字チェック／見直し（Gemini）を応答後に走らせる
+export const maxDuration = 60;
 
 /**
  * Slack 物件進行ゲート Yes/No ＋ 業者返信 ＋ メール要対応 ＋ 313完了/延期
@@ -179,16 +184,20 @@ export async function POST(request: NextRequest) {
 
       if (callbackId === MA_MODAL_CALLBACK) {
         const meta = parseMaModalMeta(String(view.private_metadata || ""));
+        const bodyBlockId = maBodyBlockId(payload);
         if (!meta) {
           return NextResponse.json({
             response_action: "errors",
-            errors: { mail_reply_body: "対象 ID が不正です" },
+            errors: { [bodyBlockId]: "対象 ID が不正です" },
           });
         }
-        const body = extractMaModalBody(payload);
+        const st = extractMaModalState(payload);
         const result = await handleMaModalSubmit({
           triageId: meta.id,
-          body,
+          body: st.body,
+          to: st.to,
+          account: st.account,
+          bodyBlockId,
           channelId: meta.channel,
           messageTs: meta.message_ts,
         });
@@ -196,7 +205,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             response_action: "errors",
             errors: result.errors || {
-              mail_reply_body: result.text.slice(0, 100),
+              [bodyBlockId]: result.text.slice(0, 100),
             },
           });
         }
@@ -248,6 +257,14 @@ export async function POST(request: NextRequest) {
       String(channelObj.id || container.channel_id || "").trim() || undefined;
     const messageTs =
       String(messageObj.ts || container.message_ts || "").trim() || undefined;
+
+    // メール返信モーダル内の「誤字脱字チェック」「指示で見直し」
+    const actionId = String(act.action_id || "");
+    if (payload.view && isMaModalAction(actionId)) {
+      const handled = await handleMaModalAction({ actionId, payload });
+      if ("run" in handled) after(handled.run);
+      return new NextResponse("", { status: 200 });
+    }
 
     if (parseT313ButtonValue(value)) {
       const result = await handleT313BlockAction({
