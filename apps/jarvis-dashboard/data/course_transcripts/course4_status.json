@@ -1,0 +1,219 @@
+{
+  "course": "神大家4.グルコン",
+  "updated": "2026-10-27T14:59:38+09:00",
+  "transcript_dir": "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家4.グルコン/jarvis",
+  "graph_root": "215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家4.グルコン/jarvis",
+  "lessons": [
+    {
+      "slug": "firstgroupcon",
+      "title": "グルコンを初めて受ける方へ",
+      "url": "https://westudy.co.jp/lesson/firstgroupcon",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_firstgroupcon.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1163474450",
+          "cues": 137
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260726_groupconsulting",
+      "title": "2026年7月26日グルコン【新サービス第2弾『神大家　認定エージェント』、今月の融資情報とりまとめ等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260726_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260726_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1214748880",
+          "cues": 153
+        },
+        {
+          "video_id": "1214748879",
+          "cues": 158
+        },
+        {
+          "video_id": "1214748882",
+          "cues": 42
+        },
+        {
+          "video_id": "1214774177",
+          "cues": 35
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260628_groupconsulting",
+      "title": "2026年6月28日グルコン【新サービス『Executive Lounge』　、今月の融資情報とりまとめ等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260628_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260628_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1207251379",
+          "cues": 4629
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260531_groupconsulting",
+      "title": "2026年5月31日グルコン【経営革新等支援機関の新サービス開始（寺岡さん）、今月の融資情報とりまとめ等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260531_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260531_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1198606412",
+          "cues": 4707
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260426_groupconsulting",
+      "title": "2026年4月26日グルコン【イラン戦争ナフサショック影響と対策、canvaで看板製作、アクセントクロス選び効率化ツール、全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260426_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260426_groupconsulting.md",
+      "status": "no_subtitles",
+      "videos": [
+        {
+          "video_id": "1189951680",
+          "cues": 0
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260329_groupconsulting",
+      "title": "2026年3月29日グルコン【懇親会・現地会・勉強会ルール更新、滋賀銀行融資ロジック解析2026、auじぶん銀行融資ロジック解析2026、物件購入時の選定・判断基準公開、全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260329_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260329_groupconsulting.md",
+      "status": "no_subtitles",
+      "videos": [
+        {
+          "video_id": "1183641370",
+          "cues": 0
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260222_groupconsulting",
+      "title": "2026年2月22日グルコン【エコーズさん＆アイコネクトさんセミナー、公庫の基本を知る、公庫融資の現状と使い方2026～、全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260222_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260222_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1169780137",
+          "cues": 3916
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260125_groupconsulting",
+      "title": "2026年1月25日グルコン【保証会社（casaさん）のセミナー、各種オプションサービスのご案内、【エリア】 全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260125_groupconsulting",
+      "section": "過去のグルコン（良いノウハウ・コンテンツは会員サイトに動画切り出し済の為、会員サイトの動画を全て観た方は、過去グルコンは全部観ないでOKです）",
+      "jarvis_file": "文字起こし_lesson-20260125_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1161686700",
+          "cues": 3951
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20251228_groupconsulting",
+      "title": "2025年12月28日グルコン【神ホテル抽選 選抜総選挙、【新サービス】成果買取サービスのご説明、【エリア】 全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20251228_groupconsulting",
+      "section": "過去のグルコン（良いノウハウ・コンテンツは会員サイトに動画切り出し済の為、会員サイトの動画を全て観た方は、過去グルコンは全部観ないでOKです）",
+      "jarvis_file": "文字起こし_lesson-20251228_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1152463669",
+          "cues": 3234
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20251123_groupconsulting",
+      "title": "2025年11月23日グルコン【荻原さん成功者インタビュー、年間表彰者への商品と抽選会（金）、神ホテルの説明、法人口座開設手順・L＆F 初回利用時の注意点等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20251123_groupconsulting",
+      "section": "過去のグルコン（良いノウハウ・コンテンツは会員サイトに動画切り出し済の為、会員サイトの動画を全て観た方は、過去グルコンは全部観ないでOKです）",
+      "jarvis_file": "文字起こし_lesson-20251123_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1141359144",
+          "cues": 4154
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20251026_groupconsulting",
+      "title": "2025年10月26日グルコン【神大家年間表彰、全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20251026_groupconsulting",
+      "section": "過去のグルコン（良いノウハウ・コンテンツは会員サイトに動画切り出し済の為、会員サイトの動画を全て観た方は、過去グルコンは全部観ないでOKです）",
+      "jarvis_file": "文字起こし_lesson-20251026_groupconsulting.md",
+      "status": "no_video",
+      "videos": []
+    },
+    {
+      "slug": "lesson-20250928_groupconsulting",
+      "title": "2025年9月28日グルコン【基礎講座STEP1～12 の全20動画を最新化等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20250928_groupconsulting",
+      "section": "過去のグルコン（良いノウハウ・コンテンツは会員サイトに動画切り出し済の為、会員サイトの動画を全て観た方は、過去グルコンは全部観ないでOKです）",
+      "jarvis_file": "文字起こし_lesson-20250928_groupconsulting.md",
+      "status": "no_video",
+      "videos": []
+    },
+    {
+      "slug": "lesson-20250831_groupconsulting",
+      "title": "2025年8月31日グルコン【ブロードエンタープライズ社セミナー、広域のリフォームローンの利用価値を知る、全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20250831_groupconsulting",
+      "section": "過去のグルコン（良いノウハウ・コンテンツは会員サイトに動画切り出し済の為、会員サイトの動画を全て観た方は、過去グルコンは全部観ないでOKです）",
+      "jarvis_file": "文字起こし_lesson-20250831_groupconsulting.md",
+      "status": "no_video",
+      "videos": []
+    },
+    {
+      "slug": "lesson-20260830_groupconsulting",
+      "title": "2026年8月30日グルコン【災害についての考え方、[続報]認定エージェント制度、今月の融資情報とりまとめ等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260830_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260830_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1223886611",
+          "cues": 3631
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260927_groupconsulting",
+      "title": "2026年9月27日グルコン【成果買取サービス、YouTube塾生相談企画、認定エージェント制度説明会、今月の融資情報とりまとめ等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260927_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260927_groupconsulting.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "1231477403",
+          "cues": 2863
+        },
+        {
+          "video_id": "1231477402",
+          "cues": 1885
+        }
+      ]
+    }
+  ]
+}

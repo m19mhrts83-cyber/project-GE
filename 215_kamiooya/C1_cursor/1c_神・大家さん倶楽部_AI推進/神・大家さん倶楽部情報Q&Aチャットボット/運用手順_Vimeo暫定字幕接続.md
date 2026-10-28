@@ -83,3 +83,51 @@
 ```
 
 戻す場合は `kc_typo_backup_20261026` の `content`・`search_text`・`content_hash` を `chunk_id` で書き戻す。
+
+## 神大家0・2・3・4コースへの拡張（2026-10-27）
+
+松野さん依頼「神大家0〜4の動画もできるだけ文字起こしして登録」。AI使用料がかからない順に2段で取る。
+
+1. **Vimeo自動字幕（無料）**: `scripts/jarvis_westudy_course_vtt_batch.py`。レッスン一覧は Supabase `comments` の `lesson_desc` 行から作り、取込済み・基礎と重複するレッスンは飛ばす。ログインは1回で全レッスンを回る。出力は OneDrive `C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/<コース>/jarvis/`、状態は `apps/jarvis-dashboard/data/course_transcripts/courseN_status.json`。
+2. **字幕なし動画はローカルWhisper（無料・外部送信なし）**: `scripts/jarvis_westudy_whisper_fallback.py`。yt-dlp で音声だけ取り、Mac 上の mlx-whisper（large-v3-turbo）で起こす。初期プロンプトに補正表の正しい語を入れて固有名詞の誤変換を減らす。元MDは書き換えず `<元名>__whisper.md` と `courseN_whisper.json` を作る。Gemini 無料枠は会員限定動画を外部に送ることになり、学習利用の懸念もあるため使わない。
+3. **登録**: どちらも既存の `import_vimeo_transcripts.py --manifest … --course … --input-dir … --graph-root … --apply --embed --mirror-raimo`（コマンドは 1 の実行後に表示）。差分だけ追加し、`config/kamiooya_transcript_corrections.tsv` の補正を適用してから登録する。Whisper 分は `meta_json.transcript_provider=local_whisper`。
+
+```sh
+# 前提（初回のみ）: ~/selenium_env/venv/bin/pip install yt-dlp mlx-whisper ／ brew install ffmpeg
+~/selenium_env/venv/bin/python scripts/jarvis_westudy_course_vtt_batch.py            # 0,2,3,4 の字幕取得
+~/selenium_env/venv/bin/python scripts/jarvis_westudy_whisper_fallback.py --manifest apps/jarvis-dashboard/data/course_transcripts/course2_status.json
+```
+
+- brew が無い Mac では ffmpeg を `pip install imageio-ffmpeg` の同梱版で代用し、`ln -sf "$(python -c 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())')" ~/selenium_env/venv/bin/ffmpeg`。Whisper 実行時は `PATH=~/selenium_env/venv/bin:$PATH` を付ける。
+- worktree で動かすときは QAチャットボット `scripts/.env`（gitignore）を本体からシンボリックリンクする。
+
+### 実績（2026-10-27）
+
+| コース | レッスン | 動画 | 字幕あり | 字幕なし→Whisper | 登録チャンク |
+|---|---|---|---|---|---|
+| 0.はじめに | 5 | 16 | 3 | 13 | 17＋91 |
+| 2.応用 | 143 | 144 | 69 | 75 | 1,049＋927 |
+| 3.継承 | 25 | 25 | 4 | 21 | 88＋342 |
+| 4.グルコン | 15 | 16 | 14 | 2 | 1,617＋516 |
+
+計 4,647 チャンク（Supabase・Raimo 両方）。取得エラー・Whisper 失敗 0。
+
+### 誤記候補（基礎と同じ方式・AI使用料なし）
+
+`scripts/jarvis_westudy_typo_candidates.py`: 補正表を当てた後の字幕／Whisper の語（カタカナ3字以上・漢字2字以上の連続）のうち、会員コメント（exports の最新 full_*.csv）と LINE オプチャ本文に一度も出ない語を拾い、コメント側の「同じ読み（pykakasi）」か「字面が近い」語を修正案にする。LINE 本文は Supabase から1回だけ読み `~/.cache/kamiooya_typo/line_content.txt` に置く（約9MB）。
+
+2026-10-27: 候補 3,623 件（同じ読み351・字面が近い1,735・案なし1,537）。確認用に「同じ読み×3回以上」180件＋「字面が近い×5回以上」246件を `講座_文字起こし/誤記候補_神大家0234_優先_20261027.csv` に抜粋。承認分を補正表に追記し、登録済みチャンクへの反映は承認後に行う（基礎の `apply_transcript_corrections.py` はバックアップ表 `kc_typo_backup_20261026` 前提なので、0・2・3・4 用は別途）。
+
+### 誤記補正の反映（2026-10-28）
+
+松野さん「誤記OK」（10/27）。優先426件を文脈確認し、誤修正になる案を除いた288語を補正表に追加（計477語）。追加語はどれも会員コメント・LINEオプチャに一度も出ないことを確認。
+
+- `apply_transcript_corrections.py --course <コース名>`（複数可）: 現在の補正表で本文が変わるチャンクだけを抽出。`--apply` 前に `~/git-repos/.jarvis_state/kamiooya_typo_backups/` へ元本文を JSON 保存し、`content`・`search_text`・`content_hash` を更新、`--reembed` で埋め込みも作り直す（Gemini の1回100件上限に合わせ30件ずつ）。
+- 反映: 神大家0〜4の5コース（基礎も新語で319チャンク）230動画・1,723チャンク。Raimo は230動画・6,794チャンクを入れ替え。反映後の再プレビューで残り0件。
+- 戻す場合: バックアップ `kamiooya_transcript_typo_backup_20261028_071203.json`（全230動画分）の本文を `id` で書き戻し、該当動画の Raimo を入れ替える。
+
+```sh
+~/selenium_env/venv/bin/python '215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/scripts/apply_transcript_corrections.py' \
+  --course 神大家0.はじめに --course 神大家1.基礎 --course 神大家2.応用 --course 神大家3.継承 --course 神大家4.グルコン          # プレビュー
+# 問題なければ --reembed --mirror-raimo --apply を付ける
+```
