@@ -105,6 +105,29 @@ class TestParsing(unittest.TestCase):
         self.assertIn('href="mailto:x@y"', out)  # 解決できないものはそのまま
 
 
+class TestHelpers(unittest.TestCase):
+    def test_find_rest_nonce(self):
+        html = '<script>var wpApiSettings = {"root":"https://westudy.co.jp/wp-json/","nonce":"a1b2c3d4e5"};</script>'
+        self.assertEqual(b.find_rest_nonce(html), "a1b2c3d4e5")
+        self.assertIsNone(b.find_rest_nonce("<html></html>"))
+
+    def test_url_extension_and_host(self):
+        self.assertEqual(b.url_extension("https://westudy.co.jp/wp-content/uploads/a.PDF?x=1"), "pdf")
+        self.assertEqual(b.url_extension("https://westudy.co.jp/lesson/a"), "")
+        self.assertTrue(b.is_site_host("https://cdn.westudy.co.jp/x"))
+        self.assertFalse(b.is_site_host("https://drive.google.com/x.pdf"))
+
+
+class TestEscapedQuery(unittest.TestCase):
+    def test_rewrite_matches_entity_encoded_query(self):
+        # 実サイト: href="...style.css?v=1&amp;amp;ver=2"。抽出値は 1 回戻した "&amp;ver" になる
+        html = '<link rel="stylesheet" href="/t/style.css?v=1&amp;amp;ver=2">'
+        r = b.extract_refs(html, "https://westudy.co.jp/course/x")
+        self.assertEqual(r["assets"], ["https://westudy.co.jp/t/style.css?v=1&amp;ver=2"])
+        out = b.rewrite_refs(html, {"/t/style.css?v=1&amp;ver=2": "local.css"}.get)
+        self.assertIn('href="local.css"', out)
+
+
 class TestDestination(unittest.TestCase):
     def test_env_override_and_expand(self):
         cfg = {"destination": {"type": "local", "path": "/a"}}
@@ -124,7 +147,7 @@ class TestDestination(unittest.TestCase):
         cfg = b.load_config()
         d = b.resolve_destination(cfg, {})
         self.assertEqual(d["type"], "local")
-        self.assertIn("215_神大家_WeStudyスクレイプ", d["path"])
+        self.assertIn("217_westudyソースコードバックアップ", d["path"])
 
 
 # ---- ブラウザとネットワークを差し替えて、巡回 → zip → 保存先 までを通す
@@ -143,6 +166,11 @@ class FakeDriver:
     def execute_script(self, *_a):
         return False
 
+    def execute_cdp_cmd(self, cmd, _params):
+        if cmd == "Page.getLayoutMetrics":
+            return {"cssContentSize": {"width": 1280, "height": 2000}}
+        return {"data": "SlBH"}  # base64("JPG")
+
     def get_cookies(self):
         return [{"name": "wordpress_logged_in_x", "value": "v", "domain": "westudy.co.jp"}]
 
@@ -151,9 +179,13 @@ class FakeDriver:
 
 
 class FakeResp:
-    def __init__(self, body: bytes, ctype: str, status: int = 200) -> None:
+    def __init__(self, body: bytes, ctype: str, status: int = 200, headers: dict | None = None) -> None:
         self.body, self.status_code = body, status
-        self.headers = {"Content-Type": ctype}
+        self.content, self.text = body, body.decode("utf-8", "replace")
+        self.headers = {"Content-Type": ctype, **(headers or {})}
+
+    def json(self):
+        return json.loads(self.body)
 
     def iter_content(self, _n):
         yield self.body
@@ -167,8 +199,10 @@ class FakeSession:
         self.files = files
         self.cookies = SimpleNamespace(set=lambda *a, **k: None)
         self.headers: dict[str, str] = {}
+        self.calls: list[tuple[str, str | None]] = []
 
-    def get(self, url, **_k):
+    def get(self, url, **k):
+        self.calls.append((url, (k.get("headers") or {}).get("X-WP-Nonce")))
         if url in self.files:
             return FakeResp(*self.files[url])
         return FakeResp(b"", "text/html", 404)
@@ -183,7 +217,10 @@ class TestEndToEnd(unittest.TestCase):
             ),
             "https://westudy.co.jp/lesson/l1": (
                 '<html><head><title>L1</title><link rel="stylesheet" href="/s.css"></head>'
+                '<script>var wpApiSettings = {"nonce":"abcdef1234"};</script>'
                 '<body><img src="/i.png"><a href="/course/c1">戻る</a>'
+                '<a href="/wp-content/uploads/資料.pdf">資料</a>'
+                '<a href="https://drive.google.com/file/d/X/view.pdf">外部</a>'
                 '<iframe src="https://player.vimeo.com/video/9"></iframe>'
                 '<video poster="https://player.vimeo.com/p.jpg"></video></body></html>'
             ),
@@ -192,6 +229,18 @@ class TestEndToEnd(unittest.TestCase):
             "https://westudy.co.jp/s.css": (b"body{background:url(bg.png)}", "text/css"),
             "https://westudy.co.jp/bg.png": (b"PNG1", "image/png"),
             "https://westudy.co.jp/i.png": (b"PNG2", "image/png"),
+            "https://westudy.co.jp/wp-content/uploads/資料.pdf": (b"%PDF", "application/pdf"),
+            "https://westudy.co.jp/robots.txt": (b"User-agent: *", "text/plain"),
+            "https://westudy.co.jp/wp-json/wp/v2/types?context=view": (
+                json.dumps({"page": {"rest_base": "pages"}, "attachment": {"rest_base": "media"}}).encode(),
+                "application/json",
+            ),
+            "https://westudy.co.jp/wp-json/wp/v2/pages?per_page=100&page=1&context=view": (
+                json.dumps([{"id": 1, "content": {"rendered": "<p>本文</p>"}}]).encode(),
+                "application/json",
+                200,
+                {"X-WP-TotalPages": "1"},
+            ),
         }
         drv = FakeDriver(site)
         wlp = SimpleNamespace(
@@ -212,6 +261,10 @@ class TestEndToEnd(unittest.TestCase):
                 "page_delay_sec": 0,
             },
             "assets": {"skip_hosts": ["player.vimeo.com"], "asset_delay_sec": 0},
+            "attachments": {"extensions": ["pdf"], "max_mb": 1},
+            "wp_json": {"enabled": True, "max_pages_per_type": 3, "skip_types": ["attachment"],
+                        "extra_paths": ["/robots.txt", "/sitemap.xml"]},
+            "screenshots": {"enabled": True, "include": [r"/lesson/"]},
         }
         with tempfile.TemporaryDirectory() as td:
             td = Path(td)
@@ -220,16 +273,28 @@ class TestEndToEnd(unittest.TestCase):
             sb.wlp = wlp
             sb.session = FakeSession(files)
             sb._start_browser = lambda: None
+            sb._sync_cookies = lambda: None
             m = sb.run("RUN", max_pages=10)
 
             self.assertEqual(m["pages_by_status"], {"ok": 2})
-            self.assertEqual(m["assets_by_status"], {"ok": 3, "skip_host": 1})
+            self.assertEqual(m["assets_by_status"], {"ok": 4, "skip_host": 1})
+            self.assertEqual(m["attachments_ok"], 1)
+            self.assertEqual(m["external_documents"], ["https://drive.google.com/file/d/X/view.pdf"])
+            self.assertEqual(m["screenshots"], 1)
+            self.assertTrue((work / "screenshots/lesson/l1.jpg").is_file())
+            self.assertTrue(m["rest_nonce_found"])
+            self.assertTrue((work / "api/wp-json/pages/page-001.json").is_file())
+            self.assertFalse((work / "api/wp-json/media").exists())  # skip_types
+            self.assertTrue((work / "api/extra/robots.txt").is_file())
+            api_calls = [c for c in sb.session.calls if "/wp-json/" in c[0]]
+            self.assertTrue(all(n == "abcdef1234" for _, n in api_calls))
             self.assertEqual(m["external_embeds"], ["https://player.vimeo.com/video/9"])
 
             lesson = (work / "site/pages/lesson/l1.html").read_text(encoding="utf-8")
             self.assertIn('href="../../assets/westudy.co.jp/s.css"', lesson)
             self.assertIn('src="../../assets/westudy.co.jp/i.png"', lesson)
             self.assertIn('href="../course/c1.html"', lesson)
+            self.assertIn('href="../../assets/westudy.co.jp/wp-content/uploads/資料.pdf"', lesson)
             raw = (work / "raw/pages/lesson/l1.html").read_text(encoding="utf-8")
             self.assertIn('href="/s.css"', raw)  # 原本は書き換えない
             css = (work / "site/assets/westudy.co.jp/s.css").read_text(encoding="utf-8")

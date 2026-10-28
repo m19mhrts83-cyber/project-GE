@@ -9,6 +9,10 @@
   raw/assets/<host>/...    CSS の原本（site 側は参照先を書き換えるため）
   site/pages/...html       オフラインで開けるよう参照先を相対パスへ書き換えた HTML
   site/assets/<host>/...   CSS / JS / 画像 / フォント等
+  site/assets/.../*.pdf 等 レッスンからリンクされた配布資料（westudy.co.jp 内のもの）
+  screenshots/...          ページ全体の画面キャプチャ（見た目の答え合わせ用）
+  api/wp-json/...          WordPress REST API で取れた本文データ（別 WordPress への流し込み素材）
+  api/extra/...            robots.txt・サイトマップ
   structure.json           コースタブ → 目次セクション → レッスンの構成
   manifest.json            全ページ・全アセットの URL / 保存先 / sha256 / 取得結果
   index.html               バックアップの目次（ブラウザで開く入口）
@@ -25,6 +29,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -36,7 +41,7 @@ import time
 import zipfile
 from collections import deque
 from datetime import datetime, timezone
-from html import escape
+from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -157,6 +162,31 @@ def asset_local_path(url: str) -> str:
     return posixpath.join("assets", _safe_segment(parts.netloc.lower()), *segs, name)
 
 
+def url_extension(url: str) -> str:
+    name = urlsplit(url).path.rsplit("/", 1)[-1]
+    return name.rpartition(".")[2].lower() if "." in name else ""
+
+
+def is_site_host(url: str) -> bool:
+    host = urlsplit(url).netloc.lower()
+    return host == SITE_HOST or host.endswith("." + SITE_HOST)
+
+
+_NONCE_RES = (
+    re.compile(r"wpApiSettings\s*=\s*\{[^}]*?[\"']nonce[\"']\s*:\s*[\"']([0-9a-f]{8,12})[\"']"),
+    re.compile(r"[\"']rest_?nonce[\"']\s*:\s*[\"']([0-9a-f]{8,12})[\"']", re.I),
+)
+
+
+def find_rest_nonce(html: str) -> str | None:
+    """ページ内の wpApiSettings.nonce 等から REST API 用 nonce を拾う（cookie 認証に必要）。"""
+    for rx in _NONCE_RES:
+        m = rx.search(html)
+        if m:
+            return m.group(1)
+    return None
+
+
 def rel_from(from_file: str, to_file: str) -> str:
     return posixpath.relpath(to_file, posixpath.dirname(from_file) or ".")
 
@@ -272,7 +302,8 @@ def rewrite_refs(text: str, resolve: Callable[[str], str | None], *, css_only: b
     """属性値と CSS url() を resolve(raw) の結果で置き換える（None は元のまま）。"""
 
     def one(raw: str) -> str:
-        new = resolve(raw.strip())
+        # 属性値は HTML エスケープのまま（?a=1&amp;b=2）。抽出側は 1 回戻した値なので揃える
+        new = resolve(unescape(raw.strip()))
         return raw if new is None else new
 
     def css_sub(m: re.Match[str]) -> str:
@@ -319,6 +350,10 @@ class SiteBackup:
         self.assets: dict[str, dict[str, Any]] = {}
         self.embeds: set[str] = set()
         self.structure: list[dict[str, Any]] = []
+        self.external_docs: set[str] = set()
+        self.api: list[dict[str, Any]] = []
+        self.screenshots = 0
+        self.rest_nonce: str | None = None
         self.session = None
         self.wlp = None
 
@@ -397,16 +432,17 @@ class SiteBackup:
             return "skip_host"
         return None
 
-    def fetch_asset(self, url: str, depth: int = 0) -> dict[str, Any]:
+    def fetch_asset(self, url: str, depth: int = 0, *, kind: str = "asset") -> dict[str, Any]:
         if url in self.assets:
             return self.assets[url]
-        rec: dict[str, Any] = {"url": url, "local": asset_local_path(url)}
+        rec: dict[str, Any] = {"url": url, "local": asset_local_path(url), "kind": kind}
         self.assets[url] = rec
         reason = self._skip_asset(url)
         if reason:
             rec["status"] = reason
             return rec
-        max_bytes = int(float(self.acfg.get("max_asset_mb", 25)) * 1024 * 1024)
+        mb = (self.cfg.get("attachments") or {}).get("max_mb", 100) if kind == "attachment" else self.acfg.get("max_asset_mb", 25)
+        max_bytes = int(float(mb) * 1024 * 1024)
         try:
             r = self.session.get(url, timeout=60, stream=True)
             ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
@@ -416,7 +452,7 @@ class SiteBackup:
                 rec["status"] = "http_error"
                 r.close()
                 return rec
-            if any(ctype.startswith(p) for p in self.acfg.get("skip_content_types") or []):
+            if kind == "asset" and any(ctype.startswith(p) for p in self.acfg.get("skip_content_types") or []):
                 rec["status"] = "skip_content_type"
                 r.close()
                 return rec
@@ -475,6 +511,7 @@ class SiteBackup:
     def crawl_pages(self, extra_seeds: list[str], max_pages: int) -> None:
         include = self.crawl.get("include") or []
         exclude = self.crawl.get("exclude") or []
+        doc_exts = set((self.cfg.get("attachments") or {}).get("extensions") or [])
         queue: deque[str] = deque()
         seen: set[str] = set()
         for s in list(self.crawl.get("seeds") or []) + extra_seeds:
@@ -507,11 +544,20 @@ class SiteBackup:
                 fetched_at=datetime.now(timezone.utc).isoformat(),
             )
             self._write("raw/" + rec["local"], body)
+            if not self.rest_nonce:
+                self.rest_nonce = find_rest_nonce(html)
+            self._maybe_screenshot(rec)
             self.embeds.update(i for i in refs["iframes"] if urlsplit(i).netloc != SITE_HOST)
             for a in refs["assets"]:
                 self.fetch_asset(a)
             links: list[str] = []
             for link in refs["links"]:
+                if doc_exts and url_extension(link) in doc_exts:
+                    if is_site_host(link):
+                        self.fetch_asset(link, kind="attachment")
+                    else:
+                        self.external_docs.add(link)
+                    continue
                 u = normalize_page_url(link, keep_query_keys=self.keep_q)
                 if not u:
                     continue
@@ -525,6 +571,117 @@ class SiteBackup:
         if queue:
             log(f"⚠️ max_pages={max_pages} に達したため未巡回 {len(queue)} 件（manifest.unvisited に記録）")
         self.unvisited = list(queue)
+
+    def _maybe_screenshot(self, rec: dict[str, Any]) -> None:
+        sc = self.cfg.get("screenshots") or {}
+        if not sc.get("enabled") or not any(re.search(p, rec["url"]) for p in sc.get("include") or []):
+            return
+        d = self.wlp.driver
+        try:
+            metrics = d.execute_cdp_cmd("Page.getLayoutMetrics", {})
+            size = metrics.get("cssContentSize") or metrics.get("contentSize") or {}
+            w = int(min(max(size.get("width", 1280), 320), 1920))
+            h = int(min(max(size.get("height", 1024), 200), 20000))
+            res = d.execute_cdp_cmd(
+                "Page.captureScreenshot",
+                {"format": "jpeg", "quality": 80, "captureBeyondViewport": True,
+                 "clip": {"x": 0, "y": 0, "width": w, "height": h, "scale": 1}},
+            )
+            data, ext = base64.b64decode(res["data"]), "jpg"
+        except Exception:
+            try:
+                data, ext = d.get_screenshot_as_png(), "png"
+            except Exception as e:
+                rec["screenshot_error"] = f"{e.__class__.__name__}: {e}"[:200]
+                return
+        local = "screenshots/" + rec["local"][len("pages/"):].rsplit(".", 1)[0] + "." + ext
+        self._write(local, data)
+        rec["screenshot"] = local
+        self.screenshots += 1
+
+    def _api_get(self, path_or_url: str):
+        url = path_or_url if path_or_url.startswith("http") else f"https://{SITE_HOST}{path_or_url}"
+        headers = {"X-WP-Nonce": self.rest_nonce} if self.rest_nonce else {}
+        return self.session.get(url, timeout=60, headers=headers)
+
+    def _save_api(self, local: str, url: str, r) -> dict[str, Any]:
+        rec: dict[str, Any] = {"url": url, "local": local, "http_status": getattr(r, "status_code", None)}
+        if r is not None and r.status_code == 200:
+            self._write(local, r.content)
+            rec.update(status="ok", bytes=len(r.content))
+        else:
+            rec["status"] = "http_error"
+        self.api.append(rec)
+        return rec
+
+    def dump_wp_json(self) -> None:
+        """WordPress REST API の本文データと、robots.txt・サイトマップを保存する（取れた分だけ）。"""
+        wcfg = self.cfg.get("wp_json") or {}
+        if not wcfg.get("enabled"):
+            return
+        self._sync_cookies()
+        if not self.rest_nonce:
+            # ログイン中なら admin-ajax が REST 用 nonce を返す（WordPress 5.3+）
+            try:
+                r = self.session.get(f"https://{SITE_HOST}/wp-admin/admin-ajax.php?action=rest-nonce", timeout=30)
+                if r.status_code == 200 and re.fullmatch(r"[0-9a-f]{8,12}", r.text.strip()):
+                    self.rest_nonce = r.text.strip()
+            except Exception:
+                pass
+        log(f"WordPress API 取得（nonce={'あり' if self.rest_nonce else 'なし'}）")
+        for path in wcfg.get("extra_paths") or []:
+            try:
+                r = self.session.get(f"https://{SITE_HOST}{path}", timeout=30)
+            except Exception:
+                r = None
+            self._save_api("api/extra/" + _safe_segment(path.strip("/")), path, r)
+        try:
+            r = self._api_get("/wp-json/wp/v2/types?context=view")
+        except Exception as e:
+            self.api.append({"url": "/wp-json/wp/v2/types", "status": "error", "error": str(e)[:200]})
+            return
+        rec = self._save_api("api/wp-json/types.json", "/wp-json/wp/v2/types", r)
+        if rec["status"] != "ok":
+            log(f"  wp-json は使えませんでした（HTTP {rec['http_status']}）")
+            return
+        try:
+            types = r.json()
+        except ValueError:
+            return
+        skip = set(wcfg.get("skip_types") or [])
+        limit = int(wcfg.get("max_pages_per_type", 50))
+        for name, t in sorted(types.items()):
+            base = (t or {}).get("rest_base")
+            ns = (t or {}).get("rest_namespace") or "wp/v2"
+            if name in skip or not base:
+                continue
+            total = 0
+            for page in range(1, limit + 1):
+                path = f"/wp-json/{ns}/{base}?per_page=100&page={page}&context=view"
+                try:
+                    r = self._api_get(path)
+                except Exception:
+                    break
+                if r.status_code != 200:
+                    if page == 1:
+                        self._save_api(f"api/wp-json/{_safe_segment(base)}/page-001.json", path, r)
+                    break
+                try:
+                    items = r.json()
+                except ValueError:
+                    break
+                if not isinstance(items, list) or not items:
+                    break
+                self._save_api(f"api/wp-json/{_safe_segment(base)}/page-{page:03d}.json", path, r)
+                total += len(items)
+                try:
+                    if page >= int(r.headers.get("X-WP-TotalPages") or 0):
+                        break
+                except ValueError:
+                    pass
+                time.sleep(float(self.acfg.get("asset_delay_sec", 0.1)))
+            if total:
+                log(f"  {name}: {total} 件")
 
     def write_offline_pages(self) -> None:
         """全ページ取得後に、ページ間リンクとアセット参照を相対パスへ書き換えた site/ 版を作る。"""
@@ -554,7 +711,8 @@ class SiteBackup:
             if rec.get("status") == "ok":
                 rows.append(
                     f'<li><a href="site/{escape(rec["local"])}">{escape(rec.get("title") or url)}</a>'
-                    f' <small>{escape(url)}</small></li>'
+                    + (f' <a href="{escape(rec["screenshot"])}">[画面]</a>' if rec.get("screenshot") else "")
+                    + f' <small>{escape(url)}</small></li>'
                 )
         rows.append("</ul>")
         html = (
@@ -580,9 +738,15 @@ class SiteBackup:
             "assets_by_status": count(self.assets),
             "asset_bytes": sum(a.get("bytes", 0) for a in self.assets.values() if a.get("status") == "ok"),
             "external_embeds": sorted(self.embeds),
+            "external_documents": sorted(self.external_docs),
+            "attachments_ok": sum(1 for a in self.assets.values() if a.get("kind") == "attachment" and a.get("status") == "ok"),
+            "screenshots": self.screenshots,
+            "rest_nonce_found": bool(self.rest_nonce),
+            "api_by_status": count({str(i): a for i, a in enumerate(self.api)}),
             "unvisited": getattr(self, "unvisited", []),
             "pages": list(self.pages.values()),
             "assets": list(self.assets.values()),
+            "api": self.api,
         }
 
     def run(self, run_id: str, max_pages: int) -> dict[str, Any]:
@@ -591,6 +755,10 @@ class SiteBackup:
         try:
             seeds = self.collect_structure()
             self.crawl_pages(seeds, max_pages)
+            try:
+                self.dump_wp_json()
+            except Exception as e:  # API が取れなくても HTML のバックアップは残す
+                log(f"⚠️ WordPress API 取得で例外: {e}")
         finally:
             try:
                 self.wlp.driver.quit()
@@ -607,7 +775,9 @@ class SiteBackup:
             f"取得: {started}\n\n"
             "index.html をブラウザで開くと目次から各ページを見られます。\n"
             "raw/ はログイン後に表示された HTML の原本、site/ はオフライン閲覧用に参照先を書き換えた版です。\n"
+            "screenshots/ は各ページの画面キャプチャ、api/ は WordPress API で取れた本文データです。\n"
             "動画本体は含みません（埋め込み URL は manifest.json の external_embeds）。\n"
+            "外部（Google ドライブ等）の配布資料は URL のみ（manifest.json の external_documents）。\n"
             "会員限定の内容と会員名が含まれるため、共有範囲に注意してください。\n",
         )
         return m
@@ -617,7 +787,7 @@ class SiteBackup:
 
 
 def summary_of(m: dict[str, Any]) -> dict[str, Any]:
-    return {k: v for k, v in m.items() if k not in ("pages", "assets")}
+    return {k: v for k, v in m.items() if k not in ("pages", "assets", "api")}
 
 
 def make_zip(work: Path, zip_path: Path) -> None:

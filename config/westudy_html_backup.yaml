@@ -11,12 +11,12 @@
 destination:
   # local: 同期フォルダ等のローカルパスへ zip を置く / gdrive_api: Drive API で folder_id へアップロード
   type: local
-  # 仮の置き先: Drive「215_神大家_WeStudyスクレイプ」(admin@livingsupport-matsu.co.jp)
-  #   https://drive.google.com/drive/folders/1dTaafOqwQW36htiuq88y2FUnWJZM6y-a
-  path: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/html_backup"
-  # gdrive_api のとき使う（上と同じフォルダ。html_backup サブフォルダは自動作成）
-  folder_id: "1dTaafOqwQW36htiuq88y2FUnWJZM6y-a"
-  subfolder: "html_backup"
+  # 置き先: Drive「217_westudyソースコードバックアップ」(admin@livingsupport-matsu.co.jp)。2026-10-28 松野さん指定
+  #   https://drive.google.com/drive/folders/1lpkD9i6WITPr4h74doqT8QtKZk5g9cUf
+  path: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/217_westudyソースコードバックアップ"
+  # gdrive_api のとき使う（上と同じフォルダ。subfolder を書けばその下に自動作成）
+  folder_id: "1lpkD9i6WITPr4h74doqT8QtKZk5g9cUf"
+  subfolder: ""
   # gdrive_api の OAuth トークン（authorized_user 形式・drive スコープ）。
   # 置き先フォルダに書き込める Google アカウントのものを指定する。
   # 既存の token_google_workspace_estate.json は matsuno.estate@gmail.com・drive.file のため
@@ -68,3 +68,27 @@ assets:
   max_asset_mb: 25
   skip_content_types: ["video/", "audio/"]
   asset_delay_sec: 0.1
+
+# レッスン等からリンクされた配布資料（PDF・Excel 等）。westudy.co.jp 内のものだけ取得し、
+# 外部（Google ドライブ等）のリンクは manifest の external_documents に URL だけ残す
+attachments:
+  extensions: [pdf, xlsx, xls, xlsm, docx, doc, pptx, ppt, csv, txt, zip]
+  max_mb: 100
+
+# WordPress REST API（/wp-json）で取れる本文データ。別の WordPress へ流し込む際の素材になる。
+# 会員ログインで見える範囲のみ。WeStudy 側で閉じていれば manifest に status が残るだけ
+wp_json:
+  enabled: true
+  # 1種類あたりの最大ページ数（100件/ページ）
+  max_pages_per_type: 50
+  # 取らない種類（量が多い・再現に要らない）
+  skip_types: [attachment, wp_block, wp_template, wp_template_part, wp_navigation, wp_font_family, wp_font_face, wp_global_styles, nav_menu_item]
+  # 追加で保存する公開ファイル
+  extra_paths: [/robots.txt, /wp-sitemap.xml, /sitemap.xml, /sitemap_index.xml]
+
+# 画面キャプチャ（ページ全体の PNG）。見た目の答え合わせ用。フォーラムは量が多いので既定では撮らない
+screenshots:
+  enabled: true
+  include:
+    - '^https://westudy\.co\.jp/course/'
+    - '^https://westudy\.co\.jp/lesson/'

@@ -15,6 +15,10 @@ WeStudy（神大家 会員サイト）が使えなくなったり改ざんされ
 | ログイン後に表示された HTML の原本 | `raw/pages/...` |
 | オフラインで開ける版（参照先を相対パスに書き換え） | `site/pages/...` |
 | CSS / JS / 画像 / フォント | `site/assets/<ホスト>/...`（CSS の原本は `raw/assets/`） |
+| レッスンからリンクされた配布資料（PDF・Excel 等、westudy.co.jp 内） | `site/assets/<ホスト>/...` |
+| ページ全体の画面キャプチャ（コース・レッスン） | `screenshots/...` |
+| WordPress REST API で取れた本文データ（固定ページ・投稿・レッスン等） | `api/wp-json/<種類>/page-NNN.json` |
+| robots.txt・サイトマップ | `api/extra/` |
 | コースタブ → 目次 → レッスンの構成 | `structure.json` |
 | 全ページ・全アセットの URL / sha256 / 取得結果、動画の埋め込み URL | `manifest.json` |
 | 目次ページ | `index.html`（ブラウザで開く入口） |
@@ -24,7 +28,9 @@ WeStudy（神大家 会員サイト）が使えなくなったり改ざんされ
 
 ### 取れないもの
 
-- **動画本体**（Vimeo）。埋め込み URL だけ `manifest.json` の `external_embeds` に残す。文字起こしは別途 Supabase にある。
+- **動画本体**（Vimeo）。埋め込み URL だけ `manifest.json` の `external_embeds` に残す。動画は Vimeo 側にあるので WeStudy が落ちても消えない。文字起こしは別途 Supabase にある。
+- **外部の配布資料**（Google ドライブ等へのリンク）。URL だけ `external_documents` に残す。
+- **WordPress API が閉じている場合の本文データ**。そのときは `manifest.json` の `api` に HTTP ステータスだけ残る（HTML 側には本文がある）。
 - **サーバー側のソース**（WordPress の PHP・テーマ／プラグインの設定・データベース）。
   会員としてログインして見える「表示結果」までしか取れない。サイトを完全に建て直すには、
   WeStudy の運営元に DB と wp-content のバックアップを依頼する必要がある。
@@ -50,7 +56,7 @@ caffeinate -dimsu ~/selenium_env/venv/bin/python scripts/westudy_html_backup.py
 ## 保存先
 
 既定は Google ドライブ（パソコン版）で同期している
-「215_神大家_WeStudyスクレイプ」（admin@livingsupport-matsu.co.jp）の下の `html_backup/`。
+「マイドライブ/217_westudyソースコードバックアップ」（admin@livingsupport-matsu.co.jp、2026-10-28 松野さん指定）。
 置かれるのは次の 3 つ。
 
 - `westudy_html_backup_<日時>.zip` 本体
