@@ -40,6 +40,7 @@ from pathlib import Path
 import yaml
 
 from yoritoori_utils import (
+    find_timeline_heading,
     YORITOORI_FILENAME,
     default_yoritoori_base_dir,
     make_summary,
@@ -272,9 +273,9 @@ def bring_iphone_mirroring_front() -> str:
 
 def insert_block_after_timeline_header(content: str, block: str) -> str:
     marker = "## やり取り（時系列）"
-    if marker not in content:
+    if find_timeline_heading(content) < 0:
         return content.rstrip() + "\n\n" + block.strip() + "\n"
-    start = content.find(marker)
+    start = find_timeline_heading(content)
     after_marker = content[start:]
     m = re.search(r"\n\n### [12]\d{3}/\d{2}/\d{2}", after_marker)
     if m:

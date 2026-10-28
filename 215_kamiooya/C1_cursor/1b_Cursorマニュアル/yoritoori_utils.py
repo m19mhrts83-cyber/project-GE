@@ -13,14 +13,24 @@ DRAFT_FILENAME = "4.送信下書き.txt"
 TIMELINE_HEADING = "## やり取り（時系列）"
 
 
+def find_timeline_heading(content: str) -> int:
+    """行頭の `## やり取り（時系列）` 見出しの位置（無ければ -1）。
+
+    冒頭の説明文にも同じ文字列が出てくるため、単純な content.find では
+    説明文の途中に挿入してしまう。
+    """
+    m = re.search(r"(?m)^## やり取り（時系列）[ \t]*$", content)
+    if m:
+        return m.start()
+    return content.find(TIMELINE_HEADING)
+
+
 def insert_after_timeline_heading(content: str, block: str) -> str:
     """見出し行の直後に追記する。説明文中の同文字列には挿入しない。"""
-    m = re.search(r"(?m)^## やり取り（時系列）[ \t]*$", content)
-    if not m:
-        m = re.search(re.escape(TIMELINE_HEADING), content)
-    if not m:
+    start = find_timeline_heading(content)
+    if start < 0:
         return content.rstrip() + "\n" + block
-    pos = m.end()
+    pos = start + len(TIMELINE_HEADING)
     return content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
 
 

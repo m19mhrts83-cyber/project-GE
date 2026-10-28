@@ -64,6 +64,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from yoritoori_utils import (
+    find_timeline_heading,
     DRAFT_FILENAME,
     YORITOORI_FILENAME,
     make_summary,
@@ -665,14 +666,14 @@ def append_sent_to_yoritoori(folder_path, partner_name, subject, body, attachmen
 """
     content = md_path.read_text(encoding="utf-8")
     marker = "## やり取り（時系列）"
-    if marker in content:
-        after_marker = content[content.find(marker) :]
+    if find_timeline_heading(content) >= 0:
+        after_marker = content[find_timeline_heading(content) :]
         m = re.search(r"\n\n### [12]\d{3}/\d{2}/\d{2}", after_marker)
         if m:
-            pos = content.find(marker) + m.start() + 2
+            pos = find_timeline_heading(content) + m.start() + 2
             content = content[:pos] + block.strip() + "\n\n" + content[pos:]
         else:
-            pos = content.find(marker) + len(marker)
+            pos = find_timeline_heading(content) + len(marker)
             content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
     else:
         content += block
