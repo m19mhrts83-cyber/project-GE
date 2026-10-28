@@ -43,7 +43,9 @@ export function isSelfEmail(
 
 /** estate 送信の BCC 控えが「相手から返信」誤ラベルされたときの本文判定 */
 const SELF_OUTBOUND_VOICE =
-  /オーナーの松野です|Grandole志賀本通[ⅠI一二]*\s*オーナーの松野|リビングサポート\s*松|松野（0\d{1,4}-/;
+  /オーナーの松野です|Grandole志賀本通[ⅠI一二]*\s*オーナーの松野|リビングサポート\s*松|松野（0\d{1,4}-|(お世話になっております|お世話になります)[。、\s]*(株式会社)?(リビングサポート松\s*の?\s*)?(オーナーの)?松野(\s*真治)?です/;
+/** 相手が自分宛に書いた冒頭（宛名が「松野 様」）。行頭でなくても先頭付近なら相手の声 */
+const ADDRESSED_TO_SELF_HEAD = /松野\s*(真治\s*)?(様|さま)/;
 const PARTNER_VOICE_HEAD =
   /^(LEAFの|株式会社LEAFの|神野です|竹田です|松野\s*真治\s*様|松野様)/m;
 
@@ -54,7 +56,8 @@ export function looksLikeSelfOutboundBody(
   const text = String(body || "").trim();
   if (!text) return false;
   const head = text.slice(0, 400);
-  if (PARTNER_VOICE_HEAD.test(head)) return false;
+  if (PARTNER_VOICE_HEAD.test(head) || ADDRESSED_TO_SELF_HEAD.test(head.slice(0, 120)))
+    return false;
   return SELF_OUTBOUND_VOICE.test(head);
 }
 

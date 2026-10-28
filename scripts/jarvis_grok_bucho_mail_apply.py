@@ -8,6 +8,9 @@
   ~/selenium_env/venv/bin/python scripts/jarvis_grok_bucho_mail_apply.py --dry-run
   ~/selenium_env/venv/bin/python scripts/jarvis_grok_bucho_mail_apply.py --apply
 
+取込が済んだメールは受信トレイから外し、既読＋ラベル「Grok部長」にする（自分発信の機械連絡を
+要対応判断に出さないため）。残したいときは JARVIS_GROK_BUCHO_KEEP_INBOX=1。
+
 使用アカウント: estate / Gmail API（受信）
 """
 from __future__ import annotations
@@ -129,10 +132,52 @@ def fetch_bucho_messages(svc, *, days: int, max_results: int) -> list[dict[str, 
                 "id": mid,
                 "subject": hm.get("subject", ""),
                 "date": hm.get("date", ""),
+                "label_ids": list(msg.get("labelIds") or []),
                 "body": decode_body(msg.get("payload") or {}),
             }
         )
     return out
+
+
+BUCHO_LABEL = "Grok部長"
+
+
+def _keep_inbox() -> bool:
+    return os.environ.get("JARVIS_GROK_BUCHO_KEEP_INBOX", "").strip() in ("1", "true", "yes")
+
+
+def _bucho_label_id(svc) -> str | None:
+    labels = svc.users().labels().list(userId="me").execute().get("labels") or []
+    for lb in labels:
+        if lb.get("name") == BUCHO_LABEL:
+            return lb.get("id")
+    created = (
+        svc.users()
+        .labels()
+        .create(
+            userId="me",
+            body={
+                "name": BUCHO_LABEL,
+                "labelListVisibility": "labelShow",
+                "messageListVisibility": "show",
+            },
+        )
+        .execute()
+    )
+    return created.get("id")
+
+
+def archive_processed(svc, msg: dict[str, Any], label_id: str | None) -> bool:
+    """取込済みの [Grok部長] は自分発信の機械連絡なので受信トレイ・未読から外す（要対応判断に出さない）。"""
+    if "INBOX" not in (msg.get("label_ids") or []) and "UNREAD" not in (
+        msg.get("label_ids") or []
+    ):
+        return False
+    body: dict[str, Any] = {"removeLabelIds": ["INBOX", "UNREAD"]}
+    if label_id:
+        body["addLabelIds"] = [label_id]
+    svc.users().messages().modify(userId="me", id=msg["id"], body=body).execute()
+    return True
 
 
 def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, Any]:
@@ -157,9 +202,29 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
     total_discovery_parsed = 0
     total_discovery_added = 0
 
+    archived = 0
+    label_id: str | None = None
+    if not dry_run and not _keep_inbox():
+        try:
+            label_id = _bucho_label_id(svc)
+        except Exception as e:
+            print(f"# grok_bucho label soft-fail: {e}", file=sys.stderr)
+
+    def _archive(msg: dict[str, Any]) -> None:
+        nonlocal archived
+        if dry_run or _keep_inbox():
+            return
+        try:
+            if archive_processed(svc, msg, label_id):
+                archived += 1
+        except Exception as e:
+            print(f"# grok_bucho archive soft-fail id={msg.get('id')}: {e}", file=sys.stderr)
+
     for msg in messages:
         mid = msg["id"]
         if mid in processed and not reprocess:
+            # 以前の取込済みで受信トレイに残っているものも片付ける
+            _archive(msg)
             continue
         body = msg.get("body") or ""
         cmds = parse_mark_commands(body)
@@ -194,6 +259,8 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
         results.append(entry)
         if not dry_run:
             processed.add(mid)
+            if entry.get("ok"):
+                _archive(msg)
 
     if not dry_run and results:
         state["processed_ids"] = sorted(processed)[-500:]
@@ -208,6 +275,7 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
         "discovery_parsed": total_discovery_parsed,
         "discovery_added": total_discovery_added,
         "dry_run": dry_run,
+        "archived": archived,
         "results": results,
     }
 
@@ -218,6 +286,7 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
     print(
         f"- 探索追記: 解析 {total_discovery_parsed} 件 · 新規追加 {total_discovery_added} 件"
     )
+    print(f"- 受信トレイから整理: {archived} 通（ラベル「{BUCHO_LABEL}」・既読）")
     if dry_run:
         print("- モード: dry-run（YAML 未更新）")
     elif not results:
