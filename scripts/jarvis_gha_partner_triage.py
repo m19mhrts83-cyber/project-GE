@@ -172,6 +172,8 @@ def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[d
 
         mail_entries: list[dict[str, Any]] = []
         chat_entries: list[dict[str, Any]] = []
+        # 返信先: 連絡先一覧の emails 先頭（md 由来の行は From を持たないため）
+        reply_to_by_folder: dict[str, str] = {}
         n = 0
         for p in partners:
             folder = (p.get("folder") or "").strip()
@@ -185,6 +187,12 @@ def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[d
             n += 1
             if n > max_partners:
                 break
+            emails = p.get("emails") or []
+            if isinstance(emails, str):
+                emails = [emails]
+            first = next((str(e).strip() for e in emails if str(e).strip()), "")
+            if first:
+                reply_to_by_folder[folder] = first.lower()
             text = read_md(folder)
             if not text:
                 continue
@@ -199,6 +207,9 @@ def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[d
         for c in find_unreplied_chat(chat_entries, lookback_days):
             if (c.get("channel") or "") == "Chatwork":
                 cands.append(c)
+        for c in cands:
+            if (c.get("channel") or "Gmail") != "Chatwork":
+                c["reply_to"] = reply_to_by_folder.get(c.get("folder") or "", "")
         cands.sort(key=lambda x: x.get("received_at") or "", reverse=True)
         return cands
 
@@ -234,7 +245,7 @@ def row_from_candidate(c: dict[str, Any], judge: dict[str, Any]) -> dict[str, An
         else ("low" if (judge.get("priority") or "").startswith("l") else "med"),
         "channel": channel,
         "account": "admin",
-        "from_email": None,
+        "from_email": (c.get("reply_to") or None) if kind == "mail" else None,
         "payload": {
             "source": "gha_partner_triage",
             "reason": judge.get("reason"),
