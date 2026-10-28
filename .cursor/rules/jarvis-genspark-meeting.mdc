@@ -58,7 +58,7 @@ export PATH="$HOME/.local/bin:$HOME/.genspark-tool-cli/bin:$PATH"
 2. まず `--detail-level summary`。宿題・下書きに本文が必要なら `segments` または `full`
 3. チャットには **3行要約＋宿題リスト**（全文は再掲しない。id／`project_url` を1行）
 4. **発話者ラベルの手動修正は Genspark UI では不要**。`Speaker N` の誤り・固有名詞の誤変換は、ユーザーの一言指示（例:「スピーカー2はマサハル」「さあ→さわ」）で Jarvis が **Drive MD／Notion 要約を補正**する（`gsk` に update API はない）。家族会議は `jarvis-family-meeting-weekly.mdc` も参照
-5. **Notion に議事録を残すときは「議事録の型」で仕上げてから載せる**（Genspark 要約をそのまま貼らない。結論・決定・ToDo表を先頭、話者は実名、全文はリンク、A4 1枚目安）。正本: `docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/議事録の型.md`（2026-10-29 了承・Notion に残す議事録すべてが対象。家族会議週次の手順 `jarvis-family-meeting-weekly.mdc` は未変更で、適用するかは松野さんに確認中）。残す前の了承は従来どおり
+5. **Notion に議事録を残すときは、全エージェント共通の「議事録のまとめ方」で仕上げてから載せる**（Genspark 要約をそのまま貼らない）。正本: `docs/AIエージェントチーム/52_議事録のまとめ方_20261029.md`。残す前の了承は従来どおり
 6. 了承後に Action（下書き・Notion タスク）。重要件は Notion Inbox に `[SB] YYYY-MM-DD 相手`（Save to Notion 手動、または要約ページ作成）
 7. **Todoist 候補（Phase 3b）**: Action Items / タスク語 / 要確認フレーズは `jarvis_todoist_sb_propose.py` で提案 → 了承後 `--apply`（無言起票しない）
 8. Obsidian `録音メモ/` に1行索引（相手・日付・Notion URL または meeting id）

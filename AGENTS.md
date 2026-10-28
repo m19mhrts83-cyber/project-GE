@@ -4,6 +4,10 @@
 
 JARVIS/Claude Code由来の案件をCodexが続行したら、各ターンの最終報告前に `/Users/matsunomasaharu2/git-repos/agent-handoff/` の元担当宛てメモを更新する（Claude Code→`to_MissLemon/`、Cursor→`to_Jarvis/`）。起点はユーザー指定・元会話で確認する。受取側は再開時に現在の案件のpendingを読み、実変更を確認して続行する。詳細の正本: `docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。別worktreeでも上記絶対パスを使う。
 
+## 議事録のまとめ方（2026-10-29・全エージェント共通）
+
+Notion に議事録を残すときは、Genspark 等の要約をそのまま貼らず、`docs/AIエージェントチーム/52_議事録のまとめ方_20261029.md` の型で仕上げてから載せる。Notion に残す前の了承と、チャットでの「3行要約＋宿題」は従来どおり。
+
 ## Cursor Cloud specific instructions
 
 このリポジトリは個人自動化モノレポ（Jarvis）です。クラウドで実際に動かせる「アプリ」は次の4つです。Python スクリプト群（`scripts/`, `215_kamiooya/`, `line_unofficial_poc/` など）は Mac 専用（`/Users/matsunomasaharu2` 等のハードコードパス・launchd・Selenium 前提）で、クラウド環境では動かしません。
