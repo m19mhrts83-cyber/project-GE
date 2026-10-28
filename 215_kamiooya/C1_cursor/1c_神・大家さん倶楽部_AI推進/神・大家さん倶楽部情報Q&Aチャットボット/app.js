@@ -1030,20 +1030,20 @@ const App = {
     const memberNo = (document.getElementById('registerMemberNo').value || '').trim();
     const prefecture = (document.getElementById('registerPrefecture').value || '').trim();
     const password = document.getElementById('registerPassword').value;
-    if (!email || !password) {
-      App.showToast('メールアドレスとパスワードは必須です', 'error');
+    if (!memberNo) {
+      App.showToast('会員番号は必須です', 'error');
       return;
     }
     if (!name) {
       App.showToast('氏名は必須です', 'error');
       return;
     }
-    if (!memberNo) {
-      App.showToast('会員番号は必須です', 'error');
-      return;
-    }
     if (!prefecture) {
       App.showToast('在住都道府県を選択してください', 'error');
+      return;
+    }
+    if (!email || !password) {
+      App.showToast('メールアドレスとパスワードは必須です', 'error');
       return;
     }
 
