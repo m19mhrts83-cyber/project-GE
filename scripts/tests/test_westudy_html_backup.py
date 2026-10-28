@@ -147,7 +147,9 @@ class TestDestination(unittest.TestCase):
         cfg = b.load_config()
         d = b.resolve_destination(cfg, {})
         self.assertEqual(d["type"], "local")
-        self.assertIn("217_westudyソースコードバックアップ", d["path"])
+        self.assertTrue(d["path"].endswith("Dropbox/01_westudy/02_バックアップデータ"), d["path"])
+        # ソースコードはバックアップと同じ親フォルダの別フォルダへ
+        self.assertTrue(str(cfg["handover"]["source_dest"]).endswith("Dropbox/01_westudy/01_ソースコード"))
 
 
 # ---- ブラウザとネットワークを差し替えて、巡回 → zip → 保存先 までを通す
