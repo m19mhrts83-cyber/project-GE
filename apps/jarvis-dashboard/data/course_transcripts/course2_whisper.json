@@ -1,0 +1,1134 @@
+{
+  "course": "神大家2.応用",
+  "transcript_dir": "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家2.応用/jarvis",
+  "graph_root": "215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家2.応用/jarvis",
+  "updated": "2026-10-27T16:05:54+09:00",
+  "lessons": [
+    {
+      "slug": "mokuhyou_gohubi",
+      "title": "【実践】目標設定：ご褒美で自分と家族を幸せに！[SPG]",
+      "url": "https://westudy.co.jp/lesson/mokuhyou_gohubi",
+      "section": "オンライン実践動画 【プランニング＆目標設定 ★重要★】",
+      "jarvis_file": "文字起こし_mokuhyou_gohubi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706356321",
+          "cues": 248
+        }
+      ]
+    },
+    {
+      "slug": "hotel_joukyu",
+      "title": "【オプション】超絶!!「【会員制】神ホテル上級会員」とは？",
+      "url": "https://westudy.co.jp/lesson/hotel_joukyu",
+      "section": "オンライン実践動画 【プランニング＆目標設定 ★重要★】",
+      "jarvis_file": "文字起こし_hotel_joukyu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706380780",
+          "cues": 230
+        }
+      ]
+    },
+    {
+      "slug": "planning_simulation",
+      "title": "【実践】★重要★ プランニングシミュレーション",
+      "url": "https://westudy.co.jp/lesson/planning_simulation",
+      "section": "オンライン実践動画 【プランニング＆目標設定 ★重要★】",
+      "jarvis_file": "文字起こし_planning_simulation__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "726646639",
+          "cues": 1103
+        }
+      ]
+    },
+    {
+      "slug": "plan2",
+      "title": "【実践】★重要★ プランニングシミュレーション２ ステップアップ",
+      "url": "https://westudy.co.jp/lesson/plan2",
+      "section": "オンライン実践動画 【プランニング＆目標設定 ★重要★】",
+      "jarvis_file": "文字起こし_plan2__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706364214",
+          "cues": 509
+        }
+      ]
+    },
+    {
+      "slug": "tahojin_dakaisaku",
+      "title": "【プラン】多法人スキームからの打開策",
+      "url": "https://westudy.co.jp/lesson/tahojin_dakaisaku",
+      "section": "オンライン実践動画 【プランニング＆目標設定 ★重要★】",
+      "jarvis_file": "文字起こし_tahojin_dakaisaku__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "850852551",
+          "cues": 789
+        }
+      ]
+    },
+    {
+      "slug": "saisonhoshou_houjin",
+      "title": "【実践】★重要★法人可能セゾン保証融資の活用",
+      "url": "https://westudy.co.jp/lesson/saisonhoshou_houjin",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_saisonhoshou_houjin__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "765979746",
+          "cues": 790
+        }
+      ]
+    },
+    {
+      "slug": "kinnyuukikann_torihiki",
+      "title": "【実践】融資戦略：金融機関との取引実績を簡単に築く手順",
+      "url": "https://westudy.co.jp/lesson/kinnyuukikann_torihiki",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_kinnyuukikann_torihiki__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706371353",
+          "cues": 412
+        }
+      ]
+    },
+    {
+      "slug": "keirekisho",
+      "title": "【実践】融資戦略：融資の承認確率＆融資額を上げる【銀行が喜ぶ経歴書】",
+      "url": "https://westudy.co.jp/lesson/keirekisho",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_keirekisho__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706382767",
+          "cues": 404
+        }
+      ]
+    },
+    {
+      "slug": "kakikata_jigyoukeikakusyo",
+      "title": "【実践】融資戦略：経営者・自営業者の【事業計画書】の書き方",
+      "url": "https://westudy.co.jp/lesson/kakikata_jigyoukeikakusyo",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_kakikata_jigyoukeikakusyo__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "803689963",
+          "cues": 861
+        }
+      ]
+    },
+    {
+      "slug": "bspl",
+      "title": "【実践】融資戦略：法人決算書を綺麗にして融資を獲得する方法",
+      "url": "https://westudy.co.jp/lesson/bspl",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_bspl__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706379265",
+          "cues": 184
+        }
+      ]
+    },
+    {
+      "slug": "hoshoukyoukai_fullloan",
+      "title": "【実践】★重要★：保証協会を活用しフルローンを獲得する方法",
+      "url": "https://westudy.co.jp/lesson/hoshoukyoukai_fullloan",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_hoshoukyoukai_fullloan__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706379338",
+          "cues": 1199
+        }
+      ]
+    },
+    {
+      "slug": "kanteisi",
+      "title": "【実践】★重要★： 不動産鑑定士の協力でフルローンを獲得する方法",
+      "url": "https://westudy.co.jp/lesson/kanteisi",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_kanteisi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706380086",
+          "cues": 301
+        }
+      ]
+    },
+    {
+      "slug": "rinsetu",
+      "title": "【実践】★重要★：「隣接県開拓スキーム」でフルローンを獲得",
+      "url": "https://westudy.co.jp/lesson/rinsetu",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_rinsetu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706379383",
+          "cues": 878
+        }
+      ]
+    },
+    {
+      "slug": "fullloan3",
+      "title": "【実践】★重要★：フルローンを獲得する裏技【３種類】",
+      "url": "https://westudy.co.jp/lesson/fullloan3",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_fullloan3__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706379405",
+          "cues": 246
+        }
+      ]
+    },
+    {
+      "slug": "kansai_kaisusume",
+      "title": "【実践】★重要★：11種＋αのフルオーバーローンの活用(関西編)",
+      "url": "https://westudy.co.jp/lesson/kansai_kaisusume",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_kansai_kaisusume__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706380109",
+          "cues": 254
+        }
+      ]
+    },
+    {
+      "slug": "kyoiku_loan",
+      "title": "【実践】★重要★：教育ローン活用法＆地銀攻略法",
+      "url": "https://westudy.co.jp/lesson/kyoiku_loan",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_kyoiku_loan__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "705648898",
+          "cues": 467
+        }
+      ]
+    },
+    {
+      "slug": "kosodate_loan",
+      "title": "【実践】★重要★：子育てローン",
+      "url": "https://westudy.co.jp/lesson/kosodate_loan",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_kosodate_loan__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "832830454",
+          "cues": 146
+        }
+      ]
+    },
+    {
+      "slug": "minashi_apart_hudousanntanpo",
+      "title": "【実践】【みなしアパート化投資】＆【不動産担保ローン活用】",
+      "url": "https://westudy.co.jp/lesson/minashi_apart_hudousanntanpo",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_minashi_apart_hudousanntanpo__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "694255889",
+          "cues": 1133
+        }
+      ]
+    },
+    {
+      "slug": "akikatsu",
+      "title": "【実践】アキカツローンの解説/使い方",
+      "url": "https://westudy.co.jp/lesson/akikatsu",
+      "section": "オンライン実践動画【融資戦略編】",
+      "jarvis_file": "文字起こし_akikatsu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "840434386",
+          "cues": 227
+        }
+      ]
+    },
+    {
+      "slug": "kitakantou",
+      "title": "【実践】北関東の融資情報",
+      "url": "https://westudy.co.jp/lesson/kitakantou",
+      "section": "オンライン実践動画【融資戦略編】～各地域特集～",
+      "jarvis_file": "文字起こし_kitakantou__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "861614109",
+          "cues": 291
+        }
+      ]
+    },
+    {
+      "slug": "yuushi_kannsai",
+      "title": "【実践】関西 2府4県の融資情報",
+      "url": "https://westudy.co.jp/lesson/yuushi_kannsai",
+      "section": "オンライン実践動画【融資戦略編】～各地域特集～",
+      "jarvis_file": "文字起こし_yuushi_kannsai__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "870011868",
+          "cues": 353
+        }
+      ]
+    },
+    {
+      "slug": "option_researchservice_bank",
+      "title": "【オプション】金融機関リサーチ代行サービスについて",
+      "url": "https://westudy.co.jp/lesson/option_researchservice_bank",
+      "section": "オンライン実践動画【融資戦略編】～リサーチ効率化～",
+      "jarvis_file": "文字起こし_option_researchservice_bank__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "753665594",
+          "cues": 136
+        }
+      ]
+    },
+    {
+      "slug": "gekisenku",
+      "title": "【実践】空室対策：【激戦区エリア】を攻めて【１日】で埋めた手法",
+      "url": "https://westudy.co.jp/lesson/gekisenku",
+      "section": "オンライン実践動画 【運営編（空室対策）】",
+      "jarvis_file": "文字起こし_gekisenku__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101511",
+          "cues": 608
+        }
+      ]
+    },
+    {
+      "slug": "homestaging_daikou",
+      "title": "【オプション】空室対策：「ステージング現地設置代行」サービス",
+      "url": "https://westudy.co.jp/lesson/homestaging_daikou",
+      "section": "オンライン実践動画 【運営編（空室対策）】",
+      "jarvis_file": "文字起こし_homestaging_daikou__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706380132",
+          "cues": 107
+        }
+      ]
+    },
+    {
+      "slug": "option_tirashi",
+      "title": "【オプション】空室対策：「募集チラシ＆周辺MAP作成サービス」のご紹介",
+      "url": "https://westudy.co.jp/lesson/option_tirashi",
+      "section": "オンライン実践動画 【運営編（空室対策）】",
+      "jarvis_file": "文字起こし_option_tirashi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706380884",
+          "cues": 177
+        }
+      ]
+    },
+    {
+      "slug": "fax-tobidougu",
+      "title": "【実践】空室対策：FAX営業(飛び道具)を駆使し、遠隔で一括営業する手法",
+      "url": "https://westudy.co.jp/lesson/fax-tobidougu",
+      "section": "オンライン実践動画 【運営編（空室対策）】",
+      "jarvis_file": "文字起こし_fax-tobidougu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101344",
+          "cues": 706
+        }
+      ]
+    },
+    {
+      "slug": "kuushitu_site",
+      "title": "【実践】空室対策：ECHOES → ウチコミ → ゼロすむ",
+      "url": "https://westudy.co.jp/lesson/kuushitu_site",
+      "section": "オンライン実践動画 【運営編（空室対策）】",
+      "jarvis_file": "文字起こし_kuushitu_site__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706371390",
+          "cues": 422
+        }
+      ]
+    },
+    {
+      "slug": "ukeru_uchikomi",
+      "title": "【実践】空室対策：内見数UP！ウチコミ掲載の「ウケる書き方」",
+      "url": "https://westudy.co.jp/lesson/ukeru_uchikomi",
+      "section": "オンライン実践動画 【運営編（空室対策）】",
+      "jarvis_file": "文字起こし_ukeru_uchikomi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "777712805",
+          "cues": 394
+        }
+      ]
+    },
+    {
+      "slug": "photogrid",
+      "title": "【実践】空室対策：ウチコミの反響をUPさせるPhotoGridの活用",
+      "url": "https://westudy.co.jp/lesson/photogrid",
+      "section": "オンライン実践動画 【運営編（空室対策）】",
+      "jarvis_file": "文字起こし_photogrid__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706373586",
+          "cues": 112
+        }
+      ]
+    },
+    {
+      "slug": "shiroari",
+      "title": "【実践】最怖！「特殊シロアリ」の脅威と対処法",
+      "url": "https://westudy.co.jp/lesson/shiroari",
+      "section": "オンライン実践動画 【運営編（修繕）】",
+      "jarvis_file": "文字起こし_shiroari__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706378547",
+          "cues": 387
+        }
+      ]
+    },
+    {
+      "slug": "option_diy",
+      "title": "【オプション】修繕： 【DIY講座】,【全員参加可能DIYグループ】解説",
+      "url": "https://westudy.co.jp/lesson/option_diy",
+      "section": "オンライン実践動画 【運営編（修繕）】",
+      "jarvis_file": "文字起こし_option_diy__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706372719",
+          "cues": 95
+        }
+      ]
+    },
+    {
+      "slug": "shuzen_daikou",
+      "title": "【オプション】修繕：「修繕業者探し代行」サービス",
+      "url": "https://westudy.co.jp/lesson/shuzen_daikou",
+      "section": "オンライン実践動画 【運営編（修繕）】",
+      "jarvis_file": "文字起こし_shuzen_daikou__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706380159",
+          "cues": 270
+        }
+      ]
+    },
+    {
+      "slug": "rimawariup",
+      "title": "【実践】ボロアパートを利回り14％→19%にUPする方法",
+      "url": "https://westudy.co.jp/lesson/rimawariup",
+      "section": "オンライン実践動画【物件再生、利回りUP編】",
+      "jarvis_file": "文字起こし_rimawariup__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "765980325",
+          "cues": 458
+        }
+      ]
+    },
+    {
+      "slug": "color-cordinate_up",
+      "title": "【実践】【前段】カラー活用で利益６００～１９００万円を生む方法",
+      "url": "https://westudy.co.jp/lesson/color-cordinate_up",
+      "section": "【空室対策＆修繕おまけ】カラーコーディネートで利回り・売却益ＵＰ！",
+      "jarvis_file": "文字起こし_color-cordinate_up__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "621437670",
+          "cues": 203
+        }
+      ]
+    },
+    {
+      "slug": "color-cordinate1",
+      "title": "【実践】空室対策＆修繕：【活用集１】～ 部屋,キッチン,洗面,浴室等",
+      "url": "https://westudy.co.jp/lesson/color-cordinate1",
+      "section": "【空室対策＆修繕おまけ】カラーコーディネートで利回り・売却益ＵＰ！",
+      "jarvis_file": "文字起こし_color-cordinate1__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "621439082",
+          "cues": 238
+        }
+      ]
+    },
+    {
+      "slug": "color2",
+      "title": "【実践】空室対策＆修繕：【活用集２】～天井/洗面(関西スキーム事務所)",
+      "url": "https://westudy.co.jp/lesson/color2",
+      "section": "【空室対策＆修繕おまけ】カラーコーディネートで利回り・売却益ＵＰ！",
+      "jarvis_file": "文字起こし_color2__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "705962780",
+          "cues": 120
+        }
+      ]
+    },
+    {
+      "slug": "kurosu_fukakachi",
+      "title": "【実践】空室対策＆修繕：オススメ！「付加価値を生むクロス」",
+      "url": "https://westudy.co.jp/lesson/kurosu_fukakachi",
+      "section": "【空室対策＆修繕おまけ】カラーコーディネートで利回り・売却益ＵＰ！",
+      "jarvis_file": "文字起こし_kurosu_fukakachi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "777712530",
+          "cues": 84
+        }
+      ]
+    },
+    {
+      "slug": "baikyaku_maisoku",
+      "title": "【実践】物件売却：売却用マイソク（募集チラシ）の作り方",
+      "url": "https://westudy.co.jp/lesson/baikyaku_maisoku",
+      "section": "オンライン実践動画 【運営編（物件売却）】",
+      "jarvis_file": "文字起こし_baikyaku_maisoku__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706365043",
+          "cues": 299
+        }
+      ]
+    },
+    {
+      "slug": "sougyou_support",
+      "title": "【実践】創業サポート事業",
+      "url": "https://westudy.co.jp/lesson/sougyou_support",
+      "section": "オンライン実践動画【資金調達・個別解説編】",
+      "jarvis_file": "文字起こし_sougyou_support__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706383516",
+          "cues": 78
+        }
+      ]
+    },
+    {
+      "slug": "consul_fullloan11",
+      "title": "【実践】創業コンサルで1棟目から都内新築11%フルローン(Kさん事例)",
+      "url": "https://westudy.co.jp/lesson/consul_fullloan11",
+      "section": "オンライン実践動画【資金調達・個別解説編】",
+      "jarvis_file": "文字起こし_consul_fullloan11__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706373672",
+          "cues": 288
+        }
+      ]
+    },
+    {
+      "slug": "maedasan",
+      "title": "【実践】戸建：【前田さん】ぼろ戸建て ダクトレール照明＆枯山水",
+      "url": "https://westudy.co.jp/lesson/maedasan",
+      "section": "オンライン実践動画 【塾生事例紹介・成果インタビュー】",
+      "jarvis_file": "文字起こし_maedasan__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "715021879",
+          "cues": 512
+        }
+      ]
+    },
+    {
+      "slug": "bike64",
+      "title": "【実践】手法：【樋口さん】バイク駐車場で利回り64.8％！",
+      "url": "https://westudy.co.jp/lesson/bike64",
+      "section": "オンライン実践動画 【塾生事例紹介・成果インタビュー】",
+      "jarvis_file": "文字起こし_bike64__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "725690770",
+          "cues": 734
+        }
+      ]
+    },
+    {
+      "slug": "jyutakushienkikou_kouko",
+      "title": "【実践】融資：高橋 (康)さん [住宅金融支援機構＋公庫]",
+      "url": "https://westudy.co.jp/lesson/jyutakushienkikou_kouko",
+      "section": "オンライン実践動画 【塾生事例紹介・成果インタビュー】",
+      "jarvis_file": "文字起こし_jyutakushienkikou_kouko__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "870011653",
+          "cues": 713
+        }
+      ]
+    },
+    {
+      "slug": "ooami",
+      "title": "【実践】投資オススメエリア解説 [関東] 千葉県 大網市（大網白里）",
+      "url": "https://westudy.co.jp/lesson/ooami",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_ooami__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101266",
+          "cues": 148
+        }
+      ]
+    },
+    {
+      "slug": "iwatuki1",
+      "title": "【実践】投資オススメエリア解説 [関東] 埼玉県 さいたま市岩槻区",
+      "url": "https://westudy.co.jp/lesson/iwatuki1",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_iwatuki1__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101784",
+          "cues": 75
+        }
+      ]
+    },
+    {
+      "slug": "takayanagi",
+      "title": "【実践】投資オススメエリア解説 [関東] 千葉県 柏市（高柳駅）",
+      "url": "https://westudy.co.jp/lesson/takayanagi",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_takayanagi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101860",
+          "cues": 160
+        }
+      ]
+    },
+    {
+      "slug": "iwatsuki_hosoku",
+      "title": "【実践】投資オススメエリア解説 [関東] 埼玉県 さいたま市岩槻区【補足】",
+      "url": "https://westudy.co.jp/lesson/iwatsuki_hosoku",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_iwatsuki_hosoku__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "705583380",
+          "cues": 15
+        }
+      ]
+    },
+    {
+      "slug": "seya",
+      "title": "【実践】投資オススメエリア解説 [関東] 神奈川県 大和市、横浜市瀬谷区",
+      "url": "https://westudy.co.jp/lesson/seya",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_seya__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101808",
+          "cues": 164
+        }
+      ]
+    },
+    {
+      "slug": "odarawa_ashigara",
+      "title": "【実践】投資オススメエリア解説 [関東] 神奈川県 小田原市・足柄上群",
+      "url": "https://westudy.co.jp/lesson/odarawa_ashigara",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_odarawa_ashigara__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706381081",
+          "cues": 135
+        }
+      ]
+    },
+    {
+      "slug": "ashigara_hosoku-2",
+      "title": "【実践】投資オススメエリア解説 [関東] 神奈川県 足柄上群【補足】",
+      "url": "https://westudy.co.jp/lesson/ashigara_hosoku-2",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_ashigara_hosoku-2__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706381097",
+          "cues": 38
+        }
+      ]
+    },
+    {
+      "slug": "koga",
+      "title": "【実践】投資オススメエリア解説 [関東] 茨城県 古河市、埼玉県 久喜市栗橋町",
+      "url": "https://westudy.co.jp/lesson/koga",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_koga__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711102394",
+          "cues": 93
+        }
+      ]
+    },
+    {
+      "slug": "moriyashi",
+      "title": "【実践】投資オススメエリア解説 [関東] 茨城県 守谷市",
+      "url": "https://westudy.co.jp/lesson/moriyashi",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_moriyashi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706381149",
+          "cues": 93
+        }
+      ]
+    },
+    {
+      "slug": "area_tochigi_nasusiobara",
+      "title": "【実践】投資オススメエリア解説 [関東] 栃木県 那須塩原市 西那須野、黒磯",
+      "url": "https://westudy.co.jp/lesson/area_tochigi_nasusiobara",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_area_tochigi_nasusiobara__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706372814",
+          "cues": 225
+        }
+      ]
+    },
+    {
+      "slug": "area_adachi",
+      "title": "【実践】投資オススメエリア解説 [関東] 東京都 足立区 江北、西新井",
+      "url": "https://westudy.co.jp/lesson/area_adachi",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_area_adachi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706371432",
+          "cues": 129
+        }
+      ]
+    },
+    {
+      "slug": "eria",
+      "title": "【実践】投資オススメエリア解説 [関東][鉄道] 羽田空港アクセス線",
+      "url": "https://westudy.co.jp/lesson/eria",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_eria__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706381170",
+          "cues": 43
+        }
+      ]
+    },
+    {
+      "slug": "utsunomiya_lrt",
+      "title": "【実践】投資オススメエリア解説 [関東][鉄道] 宇都宮ライトレール",
+      "url": "https://westudy.co.jp/lesson/utsunomiya_lrt",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_utsunomiya_lrt__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706381193",
+          "cues": 20
+        }
+      ]
+    },
+    {
+      "slug": "aichiken",
+      "title": "【実践】投資オススメエリア解説 [中部] 愛知県 岡崎市",
+      "url": "https://westudy.co.jp/lesson/aichiken",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_aichiken__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706381208",
+          "cues": 69
+        }
+      ]
+    },
+    {
+      "slug": "eria_tokoname_handa",
+      "title": "【実践】投資エリア解説 [中部] 愛知県攻め方, 常滑,半田,碧南周辺",
+      "url": "https://westudy.co.jp/lesson/eria_tokoname_handa",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_eria_tokoname_handa__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706378602",
+          "cues": 159
+        }
+      ]
+    },
+    {
+      "slug": "gifu",
+      "title": "【実践】投資オススメエリア解説 [中部] 岐阜県 可児市・美濃加茂市",
+      "url": "https://westudy.co.jp/lesson/gifu",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_gifu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "821919204",
+          "cues": 401
+        }
+      ]
+    },
+    {
+      "slug": "gifu_ogaki",
+      "title": "【実践】投資オススメエリア解説 [中部] 岐阜県 岐阜市・大垣市",
+      "url": "https://westudy.co.jp/lesson/gifu_ogaki",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_gifu_ogaki__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "832830215",
+          "cues": 355
+        }
+      ]
+    },
+    {
+      "slug": "gifu_kagamihara",
+      "title": "【実践】投資オススメエリア解説 [中部] 岐阜県 各務原市",
+      "url": "https://westudy.co.jp/lesson/gifu_kagamihara",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_gifu_kagamihara__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "850851564",
+          "cues": 145
+        }
+      ]
+    },
+    {
+      "slug": "area_komatsu",
+      "title": "【実践】投資オススメエリア解説 [中部] 石川県 小松市",
+      "url": "https://westudy.co.jp/lesson/area_komatsu",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_area_komatsu__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706365063",
+          "cues": 119
+        }
+      ]
+    },
+    {
+      "slug": "oosaka_ibaraki",
+      "title": "【実践】投資オススメエリア解説 [関西] 大阪府 茨木市",
+      "url": "https://westudy.co.jp/lesson/oosaka_ibaraki",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_oosaka_ibaraki__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706381236",
+          "cues": 61
+        }
+      ]
+    },
+    {
+      "slug": "otsu_kusatsu_moriyama_nosu_hikone",
+      "title": "【実践】投資オススメエリア解説 [関西] 滋賀県 大津市、草津市、守山市、野洲市、彦根市",
+      "url": "https://westudy.co.jp/lesson/otsu_kusatsu_moriyama_nosu_hikone",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_otsu_kusatsu_moriyama_nosu_hikone__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "832830255",
+          "cues": 862
+        }
+      ]
+    },
+    {
+      "slug": "okayama",
+      "title": "【実践】投資オススメエリア解説 [中国] 岡山県 倉敷市",
+      "url": "https://westudy.co.jp/lesson/okayama",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_okayama__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "821919312",
+          "cues": 674
+        }
+      ]
+    },
+    {
+      "slug": "hirosima",
+      "title": "【実践】投資オススメエリア解説 [中国] 広島県 呉市、東広島市、廿日市市",
+      "url": "https://westudy.co.jp/lesson/hirosima",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_hirosima__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101738",
+          "cues": 89
+        }
+      ]
+    },
+    {
+      "slug": "hukuoka_line",
+      "title": "【実践】投資オススメエリア解説 [九州] 福岡県 春日,大野城,筑紫野,太宰府",
+      "url": "https://westudy.co.jp/lesson/hukuoka_line",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_hukuoka_line__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101688",
+          "cues": 96
+        }
+      ]
+    },
+    {
+      "slug": "kurume",
+      "title": "【実践】投資オススメエリア解説 [九州] 福岡県久留米市",
+      "url": "https://westudy.co.jp/lesson/kurume",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_kurume__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "832830326",
+          "cues": 231
+        }
+      ]
+    },
+    {
+      "slug": "kumamoto",
+      "title": "【実践】投資オススメエリア解説[九州] 熊本県熊本市",
+      "url": "https://westudy.co.jp/lesson/kumamoto",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_kumamoto__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "832830355",
+          "cues": 211
+        }
+      ]
+    },
+    {
+      "slug": "miyagi_sendai",
+      "title": "【実践】投資オススメエリア解説 [東北] 宮城県 仙台市 西側",
+      "url": "https://westudy.co.jp/lesson/miyagi_sendai",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_miyagi_sendai__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "821919236",
+          "cues": 348
+        }
+      ]
+    },
+    {
+      "slug": "sendai_higashi",
+      "title": "【実践】投資オススメエリア解説 [東北] 宮城県 仙台市 東側",
+      "url": "https://westudy.co.jp/lesson/sendai_higashi",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_sendai_higashi__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "832830466",
+          "cues": 334
+        }
+      ]
+    },
+    {
+      "slug": "niigata_nishiku",
+      "title": "【実践】投資オススメエリア解説 [中部・北陸] 新潟市 西区",
+      "url": "https://westudy.co.jp/lesson/niigata_nishiku",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_niigata_nishiku__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "706381255",
+          "cues": 163
+        }
+      ]
+    },
+    {
+      "slug": "hokkaido_sapporo",
+      "title": "【実践】投資オススメエリア解説 [北海道] 攻め方、札幌市、北広島市",
+      "url": "https://westudy.co.jp/lesson/hokkaido_sapporo",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_hokkaido_sapporo__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "711101888",
+          "cues": 179
+        }
+      ]
+    },
+    {
+      "slug": "hokkaido_chitose",
+      "title": "【実践】投資オススメエリア解説 [北海道] 攻め方、千歳市",
+      "url": "https://westudy.co.jp/lesson/hokkaido_chitose",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_hokkaido_chitose__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "850852724",
+          "cues": 245
+        }
+      ]
+    },
+    {
+      "slug": "hokkaido_semekata_yukitaisaku",
+      "title": "北海道の攻め方と【雪対策】をさらに学ぶ",
+      "url": "https://westudy.co.jp/lesson/hokkaido_semekata_yukitaisaku",
+      "section": "【購入編おまけ】投資エリア紹介（視聴は任意）",
+      "jarvis_file": "文字起こし_hokkaido_semekata_yukitaisaku__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "777712941",
+          "cues": 343
+        }
+      ]
+    }
+  ],
+  "failed": []
+}

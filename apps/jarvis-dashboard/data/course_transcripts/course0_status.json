@@ -1,0 +1,118 @@
+{
+  "course": "神大家0.はじめに",
+  "updated": "2026-10-27T14:23:24+09:00",
+  "transcript_dir": "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家0.はじめに/jarvis",
+  "graph_root": "215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家0.はじめに/jarvis",
+  "lessons": [
+    {
+      "slug": "kamiooya-otoiawase",
+      "title": "★★問い合わせフォーム★★１  STEP1～12 確認依頼、他各種相談",
+      "url": "https://westudy.co.jp/lesson/kamiooya-otoiawase",
+      "section": "【はじめに】各種リンク ／ お問合せフォーム",
+      "jarvis_file": "文字起こし_kamiooya-otoiawase.md",
+      "status": "no_video",
+      "videos": []
+    },
+    {
+      "slug": "link",
+      "title": "【ファイルの場所/リンク集】会員共通フォルダ、各種テンプレート",
+      "url": "https://westudy.co.jp/lesson/link",
+      "section": "【はじめに】各種リンク ／ お問合せフォーム",
+      "jarvis_file": "文字起こし_link.md",
+      "status": "no_video",
+      "videos": []
+    },
+    {
+      "slug": "toiawase_option",
+      "title": "★★問い合わせフォーム★★２ 各種オプション申込",
+      "url": "https://westudy.co.jp/lesson/toiawase_option",
+      "section": "【はじめに】各種リンク ／ お問合せフォーム",
+      "jarvis_file": "文字起こし_toiawase_option.md",
+      "status": "no_video",
+      "videos": []
+    },
+    {
+      "slug": "step0_1",
+      "title": "STEP0　学習ルール・講座の使い方／進め方",
+      "url": "https://westudy.co.jp/lesson/step0_1",
+      "section": "【神大家になる準備】まずはこちらをご覧下さい",
+      "jarvis_file": "文字起こし_step0_1.md",
+      "status": "vtt_ready",
+      "videos": [
+        {
+          "video_id": "706379961",
+          "cues": 0
+        },
+        {
+          "video_id": "1224528484",
+          "cues": 33
+        },
+        {
+          "video_id": "1164577245",
+          "cues": 157
+        },
+        {
+          "video_id": "1207251399",
+          "cues": 138
+        },
+        {
+          "video_id": "1098931073",
+          "cues": 0
+        },
+        {
+          "video_id": "1125421933",
+          "cues": 0
+        },
+        {
+          "video_id": "706381384",
+          "cues": 0
+        },
+        {
+          "video_id": "995748048",
+          "cues": 0
+        },
+        {
+          "video_id": "995747890",
+          "cues": 0
+        },
+        {
+          "video_id": "706381442",
+          "cues": 0
+        },
+        {
+          "video_id": "1183595944",
+          "cues": 0
+        },
+        {
+          "video_id": "1046111168",
+          "cues": 0
+        },
+        {
+          "video_id": "1046111178",
+          "cues": 0
+        },
+        {
+          "video_id": "1214748878",
+          "cues": 0
+        },
+        {
+          "video_id": "1098931077",
+          "cues": 0
+        },
+        {
+          "video_id": "1046111193",
+          "cues": 0
+        }
+      ]
+    },
+    {
+      "slug": "3658",
+      "title": "入会特典について",
+      "url": "https://westudy.co.jp/lesson/3658",
+      "section": "【入会特典】その他特典集",
+      "jarvis_file": "文字起こし_3658.md",
+      "status": "no_video",
+      "videos": []
+    }
+  ]
+}

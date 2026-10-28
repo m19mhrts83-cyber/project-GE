@@ -1,0 +1,39 @@
+{
+  "course": "神大家4.グルコン",
+  "transcript_dir": "/Users/matsunomasaharu2/Library/CloudStorage/OneDrive-個人用/215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家4.グルコン/jarvis",
+  "graph_root": "215_神・大家さん倶楽部/C1_cursor/1c_神・大家さん倶楽部_AI推進/講座_文字起こし/神大家4.グルコン/jarvis",
+  "updated": "2026-10-27T20:41:44+09:00",
+  "lessons": [
+    {
+      "slug": "lesson-20260426_groupconsulting",
+      "title": "2026年4月26日グルコン【イラン戦争ナフサショック影響と対策、canvaで看板製作、アクセントクロス選び効率化ツール、全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260426_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260426_groupconsulting__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "1189951680",
+          "cues": 8439
+        }
+      ]
+    },
+    {
+      "slug": "lesson-20260329_groupconsulting",
+      "title": "2026年3月29日グルコン【懇親会・現地会・勉強会ルール更新、滋賀銀行融資ロジック解析2026、auじぶん銀行融資ロジック解析2026、物件購入時の選定・判断基準公開、全国の狙い目エリア特集等】",
+      "url": "https://westudy.co.jp/lesson/lesson-20260329_groupconsulting",
+      "section": "月１グルコン [最新分]",
+      "jarvis_file": "文字起こし_lesson-20260329_groupconsulting__whisper.md",
+      "status": "vtt_ready",
+      "transcript_provider": "local_whisper",
+      "videos": [
+        {
+          "video_id": "1183641370",
+          "cues": 10263
+        }
+      ]
+    }
+  ],
+  "failed": []
+}
