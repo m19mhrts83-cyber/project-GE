@@ -55,6 +55,10 @@
 点検は Slack の 3 秒制限のため「⏳ 点検中」を先に出し、結果を `views.update` で本文欄へ戻す（`after()`・`maxDuration=60`）。`GEMINI_API_KEY`（Vercel）が必要。  
 GHA パートナートリアージは連絡先一覧の `emails` 先頭を `from_email` に入れる（返信先）。
 
+### チャット（LINE／Chatwork 等）のカード（2026-10-28）
+
+Gmail では返せないため、`kind=chat` のカードは **「返信済みにする」／見送り／Todoist追加**。下書きがあればコードブロックで表示（コピー用）、Chatwork はアプリへのリンク付き。返信はアプリで行い、Slack では記録だけ（`status=sent`・`payload.manual_reply`）。AI は使わない。
+
 ### 後回し（Todoist）の拾い直し（2026-10-28）
 
 | 項目 | 正 |

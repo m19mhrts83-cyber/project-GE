@@ -118,7 +118,10 @@ MA_ACTION_IDS = {
     "reply": "mail_action_reply",
     "skip": "mail_action_skip",
     "todoist": "mail_action_todoist",
+    "done": "mail_action_done",
 }
+CHAT_KINDS = {"chat"}
+CHAT_APP_URLS = {"Chatwork": "https://www.chatwork.com/"}
 
 
 def now_iso() -> str:
@@ -223,14 +226,20 @@ def is_muted(reg: dict[str, Any], from_email: str) -> bool:
     return bool(ent.get("muted"))
 
 
-def _button_elements(tid: str, *, url_mode: bool) -> list[dict[str, Any]]:
+def is_chat_row(row: dict[str, Any]) -> bool:
+    return str(row.get("kind") or "").lower() in CHAT_KINDS
+
+
+def _button_elements(tid: str, *, url_mode: bool, chat: bool = False) -> list[dict[str, Any]]:
+    # チャット（LINE／Chatwork 等）は Gmail で送れないので「アプリで返信 → 返信済みにする」
+    first_action, first_label = ("done", "返信済みにする") if chat else ("reply", "返信する")
     if url_mode:
         return [
             {
                 "type": "button",
-                "text": {"type": "plain_text", "text": "返信する", "emoji": True},
+                "text": {"type": "plain_text", "text": first_label, "emoji": True},
                 "style": "primary",
-                "url": ma_url(tid, "reply"),
+                "url": ma_url(tid, first_action),
             },
             {
                 "type": "button",
@@ -247,10 +256,10 @@ def _button_elements(tid: str, *, url_mode: bool) -> list[dict[str, Any]]:
     return [
         {
             "type": "button",
-            "text": {"type": "plain_text", "text": "返信する", "emoji": True},
+            "text": {"type": "plain_text", "text": first_label, "emoji": True},
             "style": "primary",
-            "action_id": MA_ACTION_IDS["reply"],
-            "value": f"ma:reply:{tid}",
+            "action_id": MA_ACTION_IDS[first_action],
+            "value": f"ma:{first_action}:{tid}",
         },
         {
             "type": "button",
@@ -698,7 +707,14 @@ def build_compact_payload(
         summary = summary[:279] + "…"
     draft = str(row.get("draft_text") or "").strip()
     score = int(row.get("_score") or 0)
-    draft_note = "下書きあり → 返信で編集" if draft else "下書きなし → 返信で作成"
+    chat = is_chat_row(row)
+    channel = str(row.get("channel") or "").strip() or "チャット"
+    if chat:
+        app_url = CHAT_APP_URLS.get(channel)
+        app_link = f"<{app_url}|{channel}を開く>" if app_url else f"{channel}アプリ"
+        draft_note = f"📱 {app_link}で返信 → 「返信済みにする」"
+    else:
+        draft_note = "下書きあり → 返信で編集" if draft else "下書きなし → 返信で作成"
     mode_note = "アプリ内ボタン" if not url_mode else "URLボタン"
     detail = mail_detail_url(tid)
     from_short = from_email
@@ -722,10 +738,24 @@ def build_compact_payload(
                 ),
             },
         },
+        *(
+            [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        # 長押しでコピーしやすいようコードブロックで下書きを出す（チャットのみ）
+                        "text": "*下書き（コピーして貼り付け）*\n```" + draft[:2500] + "```",
+                    },
+                }
+            ]
+            if chat and draft
+            else []
+        ),
         {
             "type": "actions",
             "block_id": f"ma_actions_{tid[:24]}",
-            "elements": _button_elements(tid, url_mode=url_mode),
+            "elements": _button_elements(tid, url_mode=url_mode, chat=chat),
         },
         {
             "type": "context",

@@ -19,6 +19,7 @@ export const MA_ACTION_IDS = {
   reply: "mail_action_reply",
   skip: "mail_action_skip",
   todoist: "mail_action_todoist",
+  done: "mail_action_done",
 } as const;
 
 export const MA_MODAL_CALLBACK = "mail_action_reply_modal";
@@ -29,13 +30,13 @@ export type MaModalMeta = {
   message_ts?: string;
 };
 
-/** value: ma:reply|skip|todoist:{triage_id} */
+/** value: ma:reply|skip|todoist|done:{triage_id} */
 export function parseMaButtonValue(
   value: string,
 ): { action: MailActionSlackAction; id: string } | null {
   const m = String(value || "")
     .trim()
-    .match(/^ma:(reply|skip|todoist):([a-zA-Z0-9_.:-]{6,80})$/i);
+    .match(/^ma:(reply|skip|todoist|done):([a-zA-Z0-9_.:-]{6,80})$/i);
   if (!m) return null;
   const action = parseMaAction(m[1]);
   const id = m[2];
@@ -482,7 +483,14 @@ export async function handleMaBlockAction(opts: {
     };
   }
 
-  const title = result.ok ? "Todoist 登録" : "Todoist 登録失敗";
+  const title =
+    action === "done"
+      ? result.ok
+        ? "返信済み"
+        : "返信済みの記録に失敗"
+      : result.ok
+        ? "Todoist 登録"
+        : "Todoist 登録失敗";
   return {
     kind: result.ok ? "replace" : "error",
     text: result.message,

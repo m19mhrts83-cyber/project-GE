@@ -15,7 +15,8 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { isSelfEmail, parseEmailAddr } from "@/lib/selfEmails";
 import { closeTodoistTaskById, createTodoistTask } from "@/lib/todoistTasks";
 
-export type MailActionSlackAction = "reply" | "skip" | "todoist";
+/** done = LINE／Chatwork などアプリ側で返信済み（送信はしない） */
+export type MailActionSlackAction = "reply" | "skip" | "todoist" | "done";
 
 export {
   isMailSenderMuted,
@@ -96,6 +97,7 @@ export function parseMaAction(
   if (a === "reply" || a === "send" || a === "r") return "reply";
   if (a === "skip" || a === "no" || a === "n" || a === "dismiss") return "skip";
   if (a === "todoist" || a === "task" || a === "t") return "todoist";
+  if (a === "done" || a === "replied") return "done";
   return null;
 }
 
@@ -650,6 +652,32 @@ export async function applyMailActionSlack(
       message: `Todoist に登録しました [${lane}]: ${created.url}`,
       status: "todoist",
       todoist_url: created.url,
+      ...digestSync,
+    };
+  }
+
+  if (action === "done") {
+    // チャット（LINE／Chatwork 等）はアプリで返信し、ここでは記録だけ
+    payload.slack_ma_action = { action: "done", at: now, source };
+    payload.manual_reply = { at: now, channel: String(row.lane || "") };
+    if (payload.todoist_task_id && !payload.todoist_closed_at) {
+      const closed = await closeTodoistTaskById(
+        String(payload.todoist_task_id),
+        "【Jarvis】アプリで返信済み（Slack で記録）",
+      );
+      if (closed.ok) payload.todoist_closed_at = now;
+    }
+    const { error } = await sb
+      .from("triage_items")
+      .update({ status: "sent", payload, updated_at: now })
+      .eq("id", id);
+    if (error) return { ok: false, message: error.message };
+    const digestSync = await syncDigestFromPayload(payload);
+    revalidateMailActionPaths();
+    return {
+      ok: true,
+      message: `返信済みにしました（${row.partner || id}）`,
+      status: "sent",
       ...digestSync,
     };
   }
