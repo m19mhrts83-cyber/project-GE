@@ -463,7 +463,8 @@ def digest_index_line(row: dict[str, Any], *, index: int) -> str:
     subject = str(row.get("subject") or "(件名なし)").strip()
     if len(subject) > 48:
         subject = subject[:47] + "…"
-    return f"{index}. *{partner}* — {subject}"
+    mark = "⏰後回し " if row.get("_reply_wait") else ""
+    return f"{index}. {mark}*{partner}* — {subject}"
 
 
 def digest_fingerprint(ranked: list[dict[str, Any]]) -> str:
@@ -1096,6 +1097,121 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
     return ranked, stats
 
 
+# ---- 後回し（Todoist）にした返信の拾い直し（2026-10-28） ----
+# Slack「Todoist追加」で後回しにした行（status=todoist）を、Todoist の期日が来たら
+# 毎朝のバッチに「⏰ 後回し」として再掲し、同じカードから返信できるようにする。
+REPLY_WAIT_LIMIT_DEFAULT = 3
+
+
+def _todoist_token() -> str:
+    return (os.environ.get("TODOIST_API_TOKEN") or "").strip()
+
+
+def todoist_task_state(task_id: str) -> dict[str, Any] | None:
+    """Todoist タスクの状態。取得不可（トークン無し・通信失敗）は None。"""
+    tok = _todoist_token()
+    if not tok or not task_id:
+        return None
+    req = urllib.request.Request(
+        f"https://api.todoist.com/api/v1/tasks/{task_id}",
+        headers={"Authorization": f"Bearer {tok}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            t = json.loads(r.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {"closed": True, "due": None}
+        return None
+    except Exception:
+        return None
+    closed = bool(t.get("checked") or t.get("is_completed") or t.get("is_deleted"))
+    due = ((t.get("due") or {}).get("date") or "")[:10] or None
+    return {"closed": closed, "due": due}
+
+
+def load_reply_wait_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """期日が来た後回し返信（status=todoist）を再掲候補にする。1日1回まで。"""
+    stats = {"wait_pool": 0, "wait_due": 0, "wait_closed": 0, "wait_later": 0}
+    if limit <= 0 or not _todoist_token():
+        return [], stats
+    from jarvis_kurashift_re_inquiry_channel import is_mail_action_excluded
+
+    sb = _sb()
+    r = (
+        sb.table("triage_items")
+        .select(
+            "id,status,subject,draft_text,original_body,from_email,partner,"
+            "account,lane,kind,summary,payload,received_at,priority,"
+            "gmail_message_id"
+        )
+        .eq("status", "todoist")
+        .order("updated_at", desc=True)
+        .limit(60)
+        .execute()
+    )
+    today = datetime.now(JST).strftime("%Y-%m-%d")
+    out: list[dict[str, Any]] = []
+    for row in r.data or []:
+        pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+        task_id = str(pl.get("todoist_task_id") or "")
+        if not task_id or pl.get("todoist_closed_at"):
+            continue
+        if pl.get("slack_ma_wait_posted_on") == today:
+            continue
+        if is_mail_action_excluded(
+            from_email=str(row.get("from_email") or ""),
+            body=str(row.get("original_body") or ""),
+        ):
+            continue
+        stats["wait_pool"] += 1
+        st = todoist_task_state(task_id)
+        if st is None:
+            continue
+        if st["closed"]:
+            # Todoist 側で完了済み → 以後は拾わない
+            stats["wait_closed"] += 1
+            pl = dict(pl)
+            pl["todoist_closed_at"] = now_iso()
+            try:
+                sb.table("triage_items").update({"payload": pl}).eq("id", row["id"]).execute()
+            except Exception as e:
+                print(f"# wait close stamp skip {row.get('id')}: {e}", file=sys.stderr)
+            continue
+        if st["due"] and st["due"] > today:
+            stats["wait_later"] += 1
+            continue
+        item = dict(row)
+        item["_reply_wait"] = True
+        item["_reply_wait_due"] = st["due"] or ""
+        item["_score"] = 0
+        item["_score_reasons"] = ["reply_wait"]
+        due_note = f"期日 {st['due']}" if st["due"] else "期日なし"
+        item["_extract_summary"] = f"⏰ 後回し中（Todoist {due_note}）— {extract_summary(row)}"
+        out.append(item)
+        if len(out) >= limit:
+            break
+    stats["wait_due"] = len(out)
+    return out, stats
+
+
+def mark_reply_wait_posted(sb: Any, tid: str, *, slack_channel: str | None, slack_ts: str | None) -> None:
+    try:
+        r = sb.table("triage_items").select("payload").eq("id", tid).limit(1).execute()
+        pl = (r.data or [{}])[0].get("payload") or {}
+        pl = dict(pl) if isinstance(pl, dict) else {}
+        pl["slack_ma_wait_posted_on"] = datetime.now(JST).strftime("%Y-%m-%d")
+        if slack_channel:
+            pl["slack_ma_channel"] = slack_channel
+        if slack_ts:
+            pl["slack_ma_ts"] = slack_ts
+        sb.table("triage_items").update({"payload": pl, "updated_at": now_iso()}).eq(
+            "id", tid
+        ).execute()
+    except Exception as e:
+        print(f"# mark wait posted skip {tid}: {e}", file=sys.stderr)
+
+
 def _stamp_posted_payload(
     pl: dict[str, Any],
     *,
@@ -1264,6 +1380,20 @@ def main() -> int:
         rows = rank_candidates([one], limit=1)
     elif args.from_triage:
         rows, stats = load_pending_from_supabase(limit=args.limit)
+        try:
+            wait_limit = int(
+                os.environ.get("JARVIS_MAIL_ACTION_WAIT_LIMIT") or REPLY_WAIT_LIMIT_DEFAULT
+            )
+        except ValueError:
+            wait_limit = REPLY_WAIT_LIMIT_DEFAULT
+        try:
+            wait_rows, wait_stats = load_reply_wait_from_supabase(limit=wait_limit)
+        except Exception as e:
+            print(f"# reply wait load soft-fail: {e}", file=sys.stderr)
+            wait_rows, wait_stats = [], {}
+        seen = {str(r.get("id")) for r in rows}
+        rows = rows + [w for w in wait_rows if str(w.get("id")) not in seen]
+        stats.update(wait_stats)
     else:
         ap.print_help()
         return 2
@@ -1338,7 +1468,9 @@ def main() -> int:
         if rc != 0:
             return rc
         posted += 1
-        if sb and not args.dry_run:
+        if sb and not args.dry_run and row.get("_reply_wait"):
+            mark_reply_wait_posted(sb, tid, slack_channel=ch, slack_ts=ts)
+        elif sb and not args.dry_run:
             mark_posted(
                 sb,
                 tid,

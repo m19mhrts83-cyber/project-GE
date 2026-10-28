@@ -12,7 +12,7 @@ import {
   skipPendingFromMutedSender,
 } from "@/lib/mailActionSkipMute";
 import { createServiceClient } from "@/lib/supabase/admin";
-import { createTodoistTask } from "@/lib/todoistTasks";
+import { closeTodoistTaskById, createTodoistTask } from "@/lib/todoistTasks";
 
 export type MailActionSlackAction = "reply" | "skip" | "todoist";
 
@@ -423,6 +423,17 @@ async function syncDigestFromPayload(
   };
 }
 
+/** 「Todoist追加」で後回しにした返信の目印（朝の再掲で拾い直す） */
+export const MAIL_REPLY_WAIT_LABEL = "返信待ち";
+/** 後回しの既定期日（JST で 2 日後） */
+const MAIL_REPLY_WAIT_DAYS = 2;
+
+function mailReplyWaitDue(): string {
+  const jst = new Date(Date.now() + 9 * 3600 * 1000);
+  jst.setUTCDate(jst.getUTCDate() + MAIL_REPLY_WAIT_DAYS);
+  return jst.toISOString().slice(0, 10);
+}
+
 export async function applyMailActionSlack(
   id: string,
   action: MailActionSlackAction,
@@ -476,6 +487,14 @@ export async function applyMailActionSlack(
     );
     payload.slack_ma_action = { action: "skip", at: now, source };
     payload.mail_skip_learn = learn;
+    // 後回し（Todoist）の再掲を見送ったらタスクも閉じる
+    if (payload.todoist_task_id && !payload.todoist_closed_at) {
+      const closed = await closeTodoistTaskById(
+        String(payload.todoist_task_id),
+        "【Jarvis】Slack で返信不要（見送り）にしました",
+      );
+      if (closed.ok) payload.todoist_closed_at = now;
+    }
     const { error } = await sb
       .from("triage_items")
       .update({
@@ -559,7 +578,9 @@ export async function applyMailActionSlack(
     const created = await createTodoistTask(lane, {
       title,
       summary: summaryBlock,
-      labels: ["quick"],
+      labels: ["quick", MAIL_REPLY_WAIT_LABEL],
+      // 期日なしだと 313 にも朝の再掲にも乗らず埋もれる
+      due: mailReplyWaitDue(),
     });
     if (!created.ok) {
       return { ok: false, message: `Todoist 起票失敗: ${created.error}` };
@@ -628,6 +649,18 @@ export async function applyMailActionSlack(
       })
       .eq("id", id);
     if (error) return { ok: false, message: error.message };
+    // 後回し（Todoist）から返信したらタスクも閉じる
+    const todoistTaskId = String(payload.todoist_task_id || "");
+    if (todoistTaskId && !payload.todoist_closed_at) {
+      const closed = await closeTodoistTaskById(
+        todoistTaskId,
+        `【Jarvis】Slack から返信送信済み → ${to}`,
+      );
+      if (closed.ok) {
+        payload.todoist_closed_at = now;
+        await sb.from("triage_items").update({ payload }).eq("id", id);
+      }
+    }
     await resetMailSkipStreak(to);
     const digestSync = await syncDigestFromPayload(payload);
     revalidateMailActionPaths();
