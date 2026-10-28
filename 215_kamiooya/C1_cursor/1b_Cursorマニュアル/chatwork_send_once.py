@@ -224,8 +224,10 @@ def main():
         sys.exit(1)
 
     append_chatwork_block(folder_path, partner_name, subject, body, room_name=room_name)
+    # 送った文はやり取り.mdに移したので、下書きは空にする（同じ文の二重送信も防ぐ）
+    draft_path.write_text("", encoding="utf-8")
     label = room_name or room_id
-    print(f"Chatwork へ送信しました（{label}）。5.やり取り.md に追記しました。")
+    print(f"Chatwork へ送信しました（{label}）。5.やり取り.md に追記し、送信下書きを空にしました。")
     print(r.json())
 
 
