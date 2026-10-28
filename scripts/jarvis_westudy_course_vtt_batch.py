@@ -193,7 +193,8 @@ def main() -> int:
     load_env()
     client = get_client()
     kiso = json.loads((REPO / "apps/jarvis-dashboard/data/kiso_course_status.json").read_text(encoding="utf-8"))
-    skip = imported_slugs(client) | {L["slug"] for L in kiso.get("lessons") or []}
+    # 基礎 manifest の desc_only（説明文だけで動画IDを取れていない）レッスンは取り直して Whisper の対象にする
+    skip = imported_slugs(client) | {L["slug"] for L in kiso.get("lessons") or [] if L.get("status") != "desc_only"}
     results = []
     for course in args.course or DEFAULT_COURSES:
         payload = run_course(client, course, skip=skip, headless=not args.show, force=args.force, limit=args.limit)
