@@ -1,0 +1,70 @@
+# WeStudy（神大家 会員サイト）HTML・アセットのバックアップ設定
+# スクリプト: scripts/westudy_html_backup.py（手順は scripts/README_westudy_html_backup.md）
+#
+# 保存先の切り替えは destination だけ直せばよい。
+# 運営さんのフォルダに移すときは:
+#   - 運営フォルダを Google ドライブ（パソコン版）で同期している → type: local の path を差し替え
+#   - 同期していない（共有フォルダIDだけ分かる）            → type: gdrive_api + folder_id
+# 一時的な上書きは環境変数 WESTUDY_BACKUP_DEST_TYPE / WESTUDY_BACKUP_DEST_PATH /
+# WESTUDY_BACKUP_DEST_FOLDER_ID でもできる（config を書き換えずに試す用）。
+
+destination:
+  # local: 同期フォルダ等のローカルパスへ zip を置く / gdrive_api: Drive API で folder_id へアップロード
+  type: local
+  # 仮の置き先: Drive「215_神大家_WeStudyスクレイプ」(admin@livingsupport-matsu.co.jp)
+  #   https://drive.google.com/drive/folders/1dTaafOqwQW36htiuq88y2FUnWJZM6y-a
+  path: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/html_backup"
+  # gdrive_api のとき使う（上と同じフォルダ。html_backup サブフォルダは自動作成）
+  folder_id: "1dTaafOqwQW36htiuq88y2FUnWJZM6y-a"
+  subfolder: "html_backup"
+  # gdrive_api の OAuth トークン（authorized_user 形式・drive スコープ）。
+  # 置き先フォルダに書き込める Google アカウントのものを指定する。
+  # 既存の token_google_workspace_estate.json は matsuno.estate@gmail.com・drive.file のため
+  # 他人所有フォルダには書けない点に注意（運営フォルダ用は別途トークンを作る）。
+  token_path: ""
+
+crawl:
+  # 巡回の起点（コースタブ5つ＋フォーラム一覧）
+  seeds:
+    - https://westudy.co.jp/course/kami-ooyasan-club-start
+    - https://westudy.co.jp/course/kami-ooyasan-club
+    - https://westudy.co.jp/course/level-up
+    - https://westudy.co.jp/course/keisho
+    - https://westudy.co.jp/course/group-consulting
+    - https://westudy.co.jp/course/kami-ooyasan-club?t=forums
+  # この正規表現のどれかに当たる westudy.co.jp 内リンクだけを辿る
+  include:
+    - '^https://westudy\.co\.jp/course/'
+    - '^https://westudy\.co\.jp/lesson/'
+    - '^https://westudy\.co\.jp/forum/'
+  # 当たったら辿らない（ログアウト・管理画面・フィード・返信フォーム等）
+  exclude:
+    - 'logout'
+    - '/wp-login\.php'
+    - '/wp-admin'
+    - '/wp-json'
+    - '/feed/?'
+    - '[?&]replytocom='
+    - '[?&](share|print)='
+    - '\.(zip|pdf|mp4|mov|m4a|mp3)(\?|$)'
+  # 残すクエリ（?t=forums 等のタブ切替）。それ以外のクエリは同一ページ扱いで落とす
+  keep_query_keys: [t, paged]
+  max_pages: 2000
+  # ページ間の待ち秒（WeStudy に負荷をかけない）
+  page_delay_sec: 1.0
+
+assets:
+  # 取得しないホスト（動画本体・解析タグ等）。iframe 埋め込みは manifest に URL だけ記録する
+  skip_hosts:
+    - player.vimeo.com
+    - vimeo.com
+    - i.vimeocdn.com
+    - www.youtube.com
+    - youtube.com
+    - www.googletagmanager.com
+    - www.google-analytics.com
+    - connect.facebook.net
+  # 1ファイルの上限（MB）。超えるものは manifest に記録のみ
+  max_asset_mb: 25
+  skip_content_types: ["video/", "audio/"]
+  asset_delay_sec: 0.1
