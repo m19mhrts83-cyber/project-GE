@@ -70,6 +70,16 @@ def glossary_prompt() -> str:
     return ("神大家さん倶楽部の不動産投資講座です。" + "、".join(words))[:400]
 
 
+def notta_video_ids() -> set[str]:
+    """Notta版が入っている動画（運営の文字起こしを優先し、Whisperで二重に起こさない）。"""
+    sys.path.insert(0, str(REPO / "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/scripts"))
+    from embed_to_supabase import load_env, get_client
+
+    load_env()
+    rows = get_client().table("knowledge_sources").select("video_id").like("source_key", "notta:%").execute().data
+    return {str(r["video_id"]) for r in rows if r.get("video_id")}
+
+
 class Transcriber:
     def __init__(self, engine: str):
         self.engine = engine
@@ -194,6 +204,7 @@ def main() -> int:
     ap.add_argument("--course", help="course 名（未指定は manifest の course）")
     ap.add_argument("--engine", choices=["auto", "mlx", "faster"], default="auto")
     ap.add_argument("--limit", type=int, help="動画N本で止める（動作確認用）")
+    ap.add_argument("--skip-notta", action="store_true", help="Notta版が登録済みの動画は起こさない（Supabaseを参照）")
     args = ap.parse_args()
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
@@ -203,12 +214,13 @@ def main() -> int:
     prev = json.loads(out_manifest.read_text(encoding="utf-8")) if out_manifest.exists() else {"lessons": []}
     done = {L["slug"]: L for L in prev.get("lessons") or []}
 
+    skip_vids = notta_video_ids() if args.skip_notta else set()
     targets = []
     for L in manifest.get("lessons") or []:
         name = L.get("jarvis_file")
         if not name or L["slug"] in done or not (src_dir / name).exists():
             continue
-        vids = missing_videos((src_dir / name).read_text(encoding="utf-8"))
+        vids = [v for v in missing_videos((src_dir / name).read_text(encoding="utf-8")) if v not in skip_vids]
         if vids:
             targets.append((L, vids))
     total = sum(len(v) for _, v in targets)

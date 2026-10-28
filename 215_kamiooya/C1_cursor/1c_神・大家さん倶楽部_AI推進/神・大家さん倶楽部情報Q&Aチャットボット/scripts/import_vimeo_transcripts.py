@@ -85,6 +85,9 @@ def sync_supabase(client, source: dict, chunks: list[dict], embed: bool) -> int:
     existing = client.table('knowledge_sources').select('id,meta_json').eq('source_key', source['source_key']).execute().data
     if existing:
         meta = existing[0].get('meta_json') or {}
+        if meta.get('replaced_by'):  # Notta版へ差し替え済み。Whisper版を戻さない
+            print(f"skip replaced: {source['source_key']} -> {meta['replaced_by']}")
+            return -1
         if not meta.get('provisional'):
             print(f"skip canonical: {source['source_key']}")
             return 0
@@ -170,7 +173,7 @@ def main() -> int:
     if args.mirror_raimo and not base:
         raise RuntimeError('RAIMO_APP_URL missing')
     from jarvis_onedrive_graph import read_file_graph
-    totals = {'lessons': 0, 'videos': 0, 'chunks': 0, 'no_subtitles': 0, 'supabase_added': 0, 'raimo_added': 0}
+    totals = {'lessons': 0, 'videos': 0, 'chunks': 0, 'no_subtitles': 0, 'supabase_added': 0, 'videos_added': 0, 'raimo_added': 0}
     raimo_cache = {}
     for lesson in lessons:
         if lesson.get('status') == 'error':  # 取得失敗分は次回の字幕取得で埋める
@@ -187,7 +190,11 @@ def main() -> int:
             totals['videos'] += 1
             totals['chunks'] += len(chunks)
             if args.apply:
-                totals['supabase_added'] += sync_supabase(client, source, chunks, args.embed)
+                added = sync_supabase(client, source, chunks, args.embed)
+                if added < 0:
+                    continue
+                totals['supabase_added'] += added
+                totals['videos_added'] += int(added > 0)
                 if args.mirror_raimo:
                     totals['raimo_added'] += sync_raimo(base, source, chunks, raimo_cache)
             print(json.dumps({'source': source['source_key'], 'chunks': len(chunks), 'applied': args.apply}, ensure_ascii=False), flush=True)
