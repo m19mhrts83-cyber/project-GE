@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from yoritoori_utils import format_line_heading
+from yoritoori_utils import format_line_heading, find_timeline_heading
 
 JST = ZoneInfo("Asia/Tokyo")
 PLACEHOLDER_MARKERS = ("[本文なし", "[メディア]")
@@ -129,7 +129,7 @@ def _parse_plain_lines(path: Path) -> list[ExportMessage]:
 
 def iter_md_blocks(content: str) -> list[MdBlock]:
     marker = "## やり取り（時系列）"
-    start_idx = content.find(marker)
+    start_idx = find_timeline_heading(content)
     search_in = content[start_idx:] if start_idx >= 0 else content
     base = start_idx if start_idx >= 0 else 0
 
