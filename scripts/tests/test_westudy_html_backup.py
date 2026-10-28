@@ -316,5 +316,85 @@ class TestEndToEnd(unittest.TestCase):
             self.assertFalse(list(dest.glob("*.partial")))
 
 
+class InvalidSessionIdException(Exception):
+    pass
+
+
+class TimeoutException(Exception):
+    pass
+
+
+class TestRecovery(unittest.TestCase):
+    def _backup(self, td: Path, site: dict[str, str], *, fail_first: str | None = None):
+        drivers: list[FakeDriver] = []
+        logins: list[int] = []
+
+        def create_driver(headless=True):
+            d = FakeDriver(site)
+            drivers.append(d)
+            return d
+
+        wlp = SimpleNamespace(
+            driver=create_driver(),
+            COURSE_TABS=[],
+            collect_sections_and_lessons=lambda tab: [],
+            create_driver=create_driver,
+            login_westudy=lambda: logins.append(1),
+        )
+        state = {"failed": False}
+
+        def safe_get(url, retries=3):
+            if url == fail_first and not state["failed"]:
+                state["failed"] = True
+                raise InvalidSessionIdException("invalid session id")
+            wlp.driver.get(url)
+
+        wlp._safe_get = safe_get
+        cfg = {
+            "crawl": {"seeds": list(site), "include": [r"/lesson/"], "exclude": [],
+                      "page_delay_sec": 0, "restart_browser_every": 0},
+            "assets": {"asset_delay_sec": 0},
+        }
+        sb = b.SiteBackup(cfg, td)
+        sb.wlp = wlp
+        sb.session = FakeSession({})
+        sb._start_browser = lambda: None
+        sb._sync_cookies = lambda: None
+        return sb, drivers, logins
+
+    def test_is_browser_dead(self):
+        self.assertTrue(b.is_browser_dead(InvalidSessionIdException("x")))
+        self.assertTrue(b.is_browser_dead(RuntimeError("Message: invalid session id")))
+        self.assertFalse(b.is_browser_dead(TimeoutException("slow")))
+        self.assertFalse(b.is_browser_dead(ValueError("x")))
+
+    def test_dead_session_restarts_browser_and_relogs_in(self):
+        site = {f"https://westudy.co.jp/lesson/{i}": f"<html><title>{i}</title></html>" for i in range(3)}
+        with tempfile.TemporaryDirectory() as td:
+            sb, drivers, logins = self._backup(Path(td), site, fail_first="https://westudy.co.jp/lesson/1")
+            m = sb.run("R", max_pages=10)
+            self.assertEqual(m["pages_by_status"], {"ok": 3})
+            self.assertEqual(len(drivers), 2)  # 初期 + 再起動 1 回
+            self.assertEqual(len(logins), 1)
+
+    def test_resume_from_checkpoint(self):
+        site = {f"https://westudy.co.jp/lesson/{i}": f"<html><title>{i}</title></html>" for i in range(4)}
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            sb, _, _ = self._backup(td, site)
+            sb.crawl_pages([], max_pages=2)  # 2 ページで止まった想定
+            sb.save_checkpoint()
+            self.assertTrue((td / b.SiteBackup.CHECKPOINT).is_file())
+
+            sb2, drivers, _ = self._backup(td, site)
+            fetched: list[str] = []
+            orig = sb2.wlp._safe_get
+            sb2.wlp._safe_get = lambda url, retries=3: (fetched.append(url), orig(url))
+            m = sb2.run("R", max_pages=10, resume=True)
+            self.assertEqual(m["pages_by_status"], {"ok": 4})
+            self.assertEqual(fetched, ["https://westudy.co.jp/lesson/2", "https://westudy.co.jp/lesson/3"])
+            self.assertFalse((td / b.SiteBackup.CHECKPOINT).exists())  # 完走したら消す
+
+
 if __name__ == "__main__":
     unittest.main()

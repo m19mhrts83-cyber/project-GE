@@ -52,6 +52,10 @@ crawl:
   max_pages: 2000
   # ページ間の待ち秒（WeStudy に負荷をかけない）
   page_delay_sec: 1.0
+  # 1ページの読み込み上限（秒）。長いと固まったページで十数分止まる
+  page_load_timeout_sec: 30
+  # Chrome を N ページごとに作り直す（長時間運転のメモリ肥大で InvalidSessionId になるため）。0 で無効
+  restart_browser_every: 40
 
 assets:
   # 取得しないホスト（動画本体・解析タグ等）。iframe 埋め込みは manifest に URL だけ記録する
@@ -89,6 +93,8 @@ wp_json:
 # 画面キャプチャ（ページ全体の PNG）。見た目の答え合わせ用。フォーラムは量が多いので既定では撮らない
 screenshots:
   enabled: true
+  # これより縦長は上側だけ撮る（全体を撮ると Chrome が落ちることがある）
+  max_height_px: 8000
   include:
     - '^https://westudy\.co\.jp/course/'
     - '^https://westudy\.co\.jp/lesson/'

@@ -53,6 +53,16 @@ caffeinate -dimsu ~/selenium_env/venv/bin/python scripts/westudy_html_backup.py
 
 作業フォルダは `.jarvis_state/westudy_html_backup/`（git 管理外）。完了すると zip を保存先へ置き、作業フォルダは消す。
 
+途中で止まったとき（Mac のスリープ・回線断など）は、10 ページごとに `_checkpoint.json` へ途中経過を保存しているので、
+作業フォルダ名（日時）を指定すると続きから再開できる。
+
+```bash
+~/selenium_env/venv/bin/python scripts/westudy_html_backup.py --resume 20261028-130012
+```
+
+Chrome は 40 ページごとに作り直し、セッション切れ（InvalidSessionId）のときもその場で作り直して再ログインする。
+1 ページの読み込みは 30 秒で打ち切る（`crawl.page_load_timeout_sec`）。
+
 ## 保存先
 
 既定は Google ドライブ（パソコン版）で同期している

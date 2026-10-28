@@ -187,6 +187,18 @@ def find_rest_nonce(html: str) -> str | None:
     return None
 
 
+_DEAD_BROWSER_ERRORS = ("InvalidSessionIdException", "NoSuchWindowException", "WebDriverException",
+                        "MaxRetryError", "ConnectionRefusedError", "RemoteDisconnected")
+
+
+def is_browser_dead(e: BaseException) -> bool:
+    """Chrome / ChromeDriver が落ちた例外か（selenium を import せず型名で判定）。"""
+    names = {c.__name__ for c in type(e).__mro__}
+    if "TimeoutException" in names:
+        return False
+    return bool(names & set(_DEAD_BROWSER_ERRORS)) or "invalid session id" in str(e).lower()
+
+
 def rel_from(from_file: str, to_file: str) -> str:
     return posixpath.relpath(to_file, posixpath.dirname(from_file) or ".")
 
@@ -356,6 +368,9 @@ class SiteBackup:
         self.rest_nonce: str | None = None
         self.session = None
         self.wlp = None
+        self.pages_since_restart = 0
+        self.queue: deque[str] = deque()
+        self.seen: set[str] = set()
 
     # --- ブラウザ（既存 lesson スクレイパーのログイン処理をそのまま使う）
     def _start_browser(self) -> None:
@@ -386,12 +401,42 @@ class SiteBackup:
         except Exception:
             return False
 
+    def _restart_browser(self, reason: str) -> None:
+        """Chrome を作り直して再ログインする（セッション切れ・長時間運転のメモリ肥大対策）。"""
+        log(f"  🔄 ブラウザ再起動: {reason}")
+        try:
+            self.wlp.driver.quit()
+        except Exception:
+            pass
+        self.wlp.driver = self.wlp.create_driver(headless=self.headless)
+        self.wlp.login_westudy()
+        self._sync_cookies()
+        self.pages_since_restart = 0
+
+    def _apply_page_timeout(self) -> None:
+        try:
+            self.wlp.driver.set_page_load_timeout(int(self.crawl.get("page_load_timeout_sec", 30)))
+        except Exception:
+            pass
+
     def _get_html(self, url: str) -> tuple[str, str]:
         wlp = self.wlp
+        every = int(self.crawl.get("restart_browser_every", 40) or 0)
+        if every and self.pages_since_restart >= every:
+            self._restart_browser(f"{every} ページごとの定期再起動")
         for attempt in (1, 2):
-            wlp._safe_get(url, retries=3)
+            self._apply_page_timeout()
+            try:
+                wlp._safe_get(url, retries=2)
+            except Exception as e:
+                # InvalidSessionIdException 等。死んだ Chrome のまま続けると 1 ページ十数分止まる
+                if attempt == 2 or not is_browser_dead(e):
+                    raise
+                self._restart_browser(e.__class__.__name__)
+                continue
             time.sleep(float(self.crawl.get("page_delay_sec", 1.0)))
             if not self._looks_logged_out():
+                self.pages_since_restart += 1
                 return wlp.driver.page_source, wlp.driver.current_url
             log(f"  ログイン切れ → 再ログイン ({attempt}/2)")
             wlp.login_westudy()
@@ -512,8 +557,7 @@ class SiteBackup:
         include = self.crawl.get("include") or []
         exclude = self.crawl.get("exclude") or []
         doc_exts = set((self.cfg.get("attachments") or {}).get("extensions") or [])
-        queue: deque[str] = deque()
-        seen: set[str] = set()
+        queue, seen = self.queue, self.seen
         for s in list(self.crawl.get("seeds") or []) + extra_seeds:
             u = normalize_page_url(s, keep_query_keys=self.keep_q)
             if u and u not in seen:
@@ -525,11 +569,13 @@ class SiteBackup:
             rec: dict[str, Any] = {"url": url, "local": page_local_path(url)}
             self.pages[url] = rec
             log(f"[{n}/{min(max_pages, n + len(queue))}] {url}")
+            t0 = time.monotonic()
             try:
                 html, final_url = self._get_html(url)
             except Exception as e:
                 rec.update(status="error", error=f"{e.__class__.__name__}: {e}"[:300])
                 log(f"  ⚠️ 取得失敗: {rec['error']}")
+                self.save_checkpoint()
                 continue
             refs = extract_refs(html, final_url)
             body = html.encode("utf-8")
@@ -566,6 +612,11 @@ class SiteBackup:
                     seen.add(u)
                     queue.append(u)
             rec["links"] = sorted(set(links))
+            rec["elapsed_sec"] = round(time.monotonic() - t0, 1)
+            if rec["elapsed_sec"] > 60:
+                log(f"  ⏱ {rec['elapsed_sec']} 秒かかった")
+            if n % 10 == 0:
+                self.save_checkpoint()
             if n % 200 == 0:
                 self._sync_cookies()
         if queue:
@@ -581,7 +632,8 @@ class SiteBackup:
             metrics = d.execute_cdp_cmd("Page.getLayoutMetrics", {})
             size = metrics.get("cssContentSize") or metrics.get("contentSize") or {}
             w = int(min(max(size.get("width", 1280), 320), 1920))
-            h = int(min(max(size.get("height", 1024), 200), 20000))
+            # 縦長すぎるページを丸ごと撮ると Chrome がメモリで落ちる（InvalidSessionId の一因）
+            h = int(min(max(size.get("height", 1024), 200), int(sc.get("max_height_px", 8000))))
             res = d.execute_cdp_cmd(
                 "Page.captureScreenshot",
                 {"format": "jpeg", "quality": 80, "captureBeyondViewport": True,
@@ -683,6 +735,39 @@ class SiteBackup:
             if total:
                 log(f"  {name}: {total} 件")
 
+    CHECKPOINT = "_checkpoint.json"
+
+    def save_checkpoint(self) -> None:
+        """途中経過を保存する（Mac のスリープ・回線断で止まっても --resume で続きから）。"""
+        data = {
+            "pages": self.pages, "assets": self.assets, "structure": self.structure,
+            "embeds": sorted(self.embeds), "external_docs": sorted(self.external_docs),
+            "screenshots": self.screenshots, "rest_nonce": self.rest_nonce,
+            "queue": list(self.queue), "seen": sorted(self.seen),
+        }
+        tmp = self.work / (self.CHECKPOINT + ".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(self.work / self.CHECKPOINT)
+
+    def load_checkpoint(self) -> bool:
+        p = self.work / self.CHECKPOINT
+        if not p.is_file():
+            return False
+        d = json.loads(p.read_text(encoding="utf-8"))
+        # 取得失敗だったページは取り直す
+        retry = [u for u, r in d["pages"].items() if r.get("status") != "ok"]
+        self.pages = {u: r for u, r in d["pages"].items() if r.get("status") == "ok"}
+        self.assets = d["assets"]
+        self.structure = d["structure"]
+        self.embeds = set(d["embeds"])
+        self.external_docs = set(d["external_docs"])
+        self.screenshots = d["screenshots"]
+        self.rest_nonce = d.get("rest_nonce")
+        self.queue = deque(retry + [u for u in d["queue"] if u not in retry])
+        self.seen = set(d["seen"])
+        log(f"途中から再開: 取得済み {len(self.pages)} ページ / 残り {len(self.queue)} ページ")
+        return True
+
     def write_offline_pages(self) -> None:
         """全ページ取得後に、ページ間リンクとアセット参照を相対パスへ書き換えた site/ 版を作る。"""
         for url, rec in self.pages.items():
@@ -749,12 +834,14 @@ class SiteBackup:
             "api": self.api,
         }
 
-    def run(self, run_id: str, max_pages: int) -> dict[str, Any]:
+    def run(self, run_id: str, max_pages: int, *, resume: bool = False) -> dict[str, Any]:
         started = datetime.now(timezone.utc).isoformat()
+        resumed = resume and self.load_checkpoint()
         self._start_browser()
         try:
-            seeds = self.collect_structure()
+            seeds = [] if resumed else self.collect_structure()
             self.crawl_pages(seeds, max_pages)
+            self.save_checkpoint()
             try:
                 self.dump_wp_json()
             except Exception as e:  # API が取れなくても HTML のバックアップは残す
@@ -769,6 +856,7 @@ class SiteBackup:
         self._write("structure.json", json.dumps(self.structure, ensure_ascii=False, indent=2))
         m = self.manifest(run_id, started)
         self._write("manifest.json", json.dumps(m, ensure_ascii=False, indent=2))
+        (self.work / self.CHECKPOINT).unlink(missing_ok=True)
         self._write(
             "README.txt",
             "WeStudy（神大家 会員サイト）バックアップ\n"
@@ -865,6 +953,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--work-root", type=Path, default=DEFAULT_WORK_ROOT)
     ap.add_argument("--no-upload", action="store_true", help="zip を作るだけで保存先へ置かない")
     ap.add_argument("--keep-work", action="store_true", help="展開済みの作業フォルダを残す")
+    ap.add_argument("--resume", metavar="RUN_ID",
+                    help="止まった回の続きから（作業フォルダ <work-root>/<RUN_ID> の _checkpoint.json を使う）")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -875,12 +965,14 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"保存先の親フォルダがありません（同期されていない？）: {parent}")
     max_pages = args.max_pages or int((cfg.get("crawl") or {}).get("max_pages", 2000))
 
-    run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_id = args.resume or datetime.now().strftime("%Y%m%d-%H%M%S")
     work = args.work_root / run_id
+    if args.resume and not (work / SiteBackup.CHECKPOINT).is_file():
+        raise SystemExit(f"再開用の _checkpoint.json がありません: {work}")
     work.mkdir(parents=True, exist_ok=True)
     log(f"作業フォルダ: {work}")
 
-    m = SiteBackup(cfg, work, headless=not args.show).run(run_id, max_pages)
+    m = SiteBackup(cfg, work, headless=not args.show).run(run_id, max_pages, resume=bool(args.resume))
     summary = summary_of(m)
     log(f"ページ: {summary['pages_by_status']} / アセット: {summary['assets_by_status']}")
     ok_pages = summary["pages_by_status"].get("ok", 0)
