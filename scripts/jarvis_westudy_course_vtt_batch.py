@@ -182,7 +182,11 @@ def main() -> int:
     ap.add_argument("--force", action="store_true", help="既存MDがあっても取り直す")
     ap.add_argument("--show", action="store_true", help="ブラウザを表示")
     ap.add_argument("--limit", type=int, help="各コース先頭N件だけ（動作確認用）")
+    ap.add_argument("--status-dir", type=Path, help="status JSON の置き場（週次はリポジトリ外に書く）")
     args = ap.parse_args()
+    global STATUS_DIR
+    if args.status_dir:
+        STATUS_DIR = args.status_dir.expanduser()
 
     from embed_to_supabase import load_env, get_client
 
