@@ -226,13 +226,25 @@ def is_muted(reg: dict[str, Any], from_email: str) -> bool:
     return bool(ent.get("muted"))
 
 
+def material_items(row: dict[str, Any]) -> list[str]:
+    from jarvis_material_request import extract_material_requests
+
+    if is_chat_row(row):
+        return []
+    return extract_material_requests(str(row.get("original_body") or ""))
+
+
 def is_chat_row(row: dict[str, Any]) -> bool:
     return str(row.get("kind") or "").lower() in CHAT_KINDS
 
 
-def _button_elements(tid: str, *, url_mode: bool, chat: bool = False) -> list[dict[str, Any]]:
+def _button_elements(
+    tid: str, *, url_mode: bool, chat: bool = False, materials: bool = False
+) -> list[dict[str, Any]]:
     # チャット（LINE／Chatwork 等）は Gmail で送れないので「アプリで返信 → 返信済みにする」
     first_action, first_label = ("done", "返信済みにする") if chat else ("reply", "返信する")
+    # 資料依頼は「集めてから返信」なので Todoist（資料待ち・品目リスト付き）へ
+    todoist_label = "資料待ちで後回し" if materials else "Todoist追加"
     if url_mode:
         return [
             {
@@ -249,7 +261,7 @@ def _button_elements(tid: str, *, url_mode: bool, chat: bool = False) -> list[di
             },
             {
                 "type": "button",
-                "text": {"type": "plain_text", "text": "Todoist追加", "emoji": True},
+                "text": {"type": "plain_text", "text": todoist_label, "emoji": True},
                 "url": ma_url(tid, "todoist"),
             },
         ]
@@ -270,7 +282,7 @@ def _button_elements(tid: str, *, url_mode: bool, chat: bool = False) -> list[di
         },
         {
             "type": "button",
-            "text": {"type": "plain_text", "text": "Todoist追加", "emoji": True},
+            "text": {"type": "plain_text", "text": todoist_label, "emoji": True},
             "action_id": MA_ACTION_IDS["todoist"],
             "value": f"ma:todoist:{tid}",
         },
@@ -715,6 +727,12 @@ def build_compact_payload(
         draft_note = f"📱 {app_link}で返信 → 「返信済みにする」"
     else:
         draft_note = "下書きあり → 返信で編集" if draft else "下書きなし → 返信で作成"
+    materials = material_items(row)
+    material_line = ""
+    if materials:
+        shown = " / ".join(m[:30] for m in materials[:4])
+        more = f" ほか{len(materials) - 4}件" if len(materials) > 4 else ""
+        material_line = f"📎 *資料依頼（{len(materials)}件）:* {shown}{more}\n"
     mode_note = "アプリ内ボタン" if not url_mode else "URLボタン"
     detail = mail_detail_url(tid)
     from_short = from_email
@@ -734,6 +752,7 @@ def build_compact_payload(
                     f"*件名:* {subject[:100]}\n"
                     f"*From:* `{from_short}` · score=`{score}`\n"
                     f"*要旨:* {summary}\n"
+                    f"{material_line}"
                     f"<{detail}|本文の詳細（Dashboard）> · {draft_note}"
                 ),
             },
@@ -755,7 +774,9 @@ def build_compact_payload(
         {
             "type": "actions",
             "block_id": f"ma_actions_{tid[:24]}",
-            "elements": _button_elements(tid, url_mode=url_mode, chat=chat),
+            "elements": _button_elements(
+                tid, url_mode=url_mode, chat=chat, materials=bool(materials)
+            ),
         },
         {
             "type": "context",

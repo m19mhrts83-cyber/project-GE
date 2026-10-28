@@ -13,6 +13,7 @@ import {
 } from "@/lib/mailActionSkipMute";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSelfEmail, parseEmailAddr } from "@/lib/selfEmails";
+import { extractMaterialRequests } from "@/lib/materialRequest";
 import { closeTodoistTaskById, createTodoistTask } from "@/lib/todoistTasks";
 
 /** done = LINE／Chatwork などアプリ側で返信済み（送信はしない） */
@@ -428,12 +429,15 @@ async function syncDigestFromPayload(
 
 /** 「Todoist追加」で後回しにした返信の目印（朝の再掲で拾い直す） */
 export const MAIL_REPLY_WAIT_LABEL = "返信待ち";
-/** 後回しの既定期日（JST で 2 日後） */
+/** 資料依頼の目印 */
+export const MATERIAL_WAIT_LABEL = "資料待ち";
+/** 後回しの既定期日（JST で 2 日後／資料集めは 3 日後） */
 const MAIL_REPLY_WAIT_DAYS = 2;
+const MATERIAL_WAIT_DAYS = 3;
 
-function mailReplyWaitDue(): string {
+function mailReplyWaitDue(days: number): string {
   const jst = new Date(Date.now() + 9 * 3600 * 1000);
-  jst.setUTCDate(jst.getUTCDate() + MAIL_REPLY_WAIT_DAYS);
+  jst.setUTCDate(jst.getUTCDate() + days);
   return jst.toISOString().slice(0, 10);
 }
 
@@ -602,9 +606,10 @@ export async function applyMailActionSlack(
       fromEmail,
       partner,
     );
-    const titleBase = partner
-      ? `[メール要対応][${partner}] ${subject}`
-      : `[メール要対応] ${subject}`;
+    // 「資料を送って」系は品目リスト付きで「資料待ち」にする（集めてから返信）
+    const materials = extractMaterialRequests(row.original_body);
+    const tag = materials.length ? "[資料待ち]" : "[メール要対応]";
+    const titleBase = partner ? `${tag}[${partner}] ${subject}` : `${tag} ${subject}`;
     const title = titleBase.slice(0, 200);
     const outLinks = [
       `triage_id=${id}`,
@@ -612,6 +617,9 @@ export async function applyMailActionSlack(
       row.gmail_message_id ? `gmail_message=${row.gmail_message_id}` : "",
     ].filter(Boolean);
     const summaryBlock = [
+      ...(materials.length
+        ? ["【依頼された資料】", ...materials.map((m) => `- [ ] ${m}`), ""]
+        : []),
       "【Jarvis】",
       `サマリ: ${(row.summary || subject).replace(/\s+/g, " ").slice(0, 280)}`,
       "アウトプット:",
@@ -624,9 +632,11 @@ export async function applyMailActionSlack(
     const created = await createTodoistTask(lane, {
       title,
       summary: summaryBlock,
-      labels: ["quick", MAIL_REPLY_WAIT_LABEL],
-      // 期日なしだと 313 にも朝の再掲にも乗らず埋もれる
-      due: mailReplyWaitDue(),
+      labels: materials.length
+        ? ["quick", MAIL_REPLY_WAIT_LABEL, MATERIAL_WAIT_LABEL]
+        : ["quick", MAIL_REPLY_WAIT_LABEL],
+      // 期日なしだと 313 にも朝の再掲にも乗らず埋もれる。資料集めは少し長めに取る
+      due: mailReplyWaitDue(materials.length ? MATERIAL_WAIT_DAYS : MAIL_REPLY_WAIT_DAYS),
     });
     if (!created.ok) {
       return { ok: false, message: `Todoist 起票失敗: ${created.error}` };
