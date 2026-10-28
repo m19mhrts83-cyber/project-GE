@@ -70,6 +70,8 @@ jobs:
           MAIL_ACTION_TOKEN: ${{ secrets.MAIL_ACTION_TOKEN }}
           JARVIS_DASHBOARD_URL: ${{ secrets.JARVIS_DASHBOARD_URL }}
           JARVIS_MAIL_ACTION_SLACK_DISABLE: ${{ secrets.JARVIS_MAIL_ACTION_SLACK_DISABLE }}
+          # 後回し（Todoist）返信の期日到来チェック。無ければ再掲だけスキップ
+          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
         run: |
           set -euo pipefail
           if [[ "${JARVIS_MAIL_ACTION_SLACK_DISABLE:-}" == "1" ]]; then
