@@ -2,21 +2,22 @@
 # スクリプト: scripts/westudy_html_backup.py（手順は scripts/README_westudy_html_backup.md）
 #
 # 保存先の切り替えは destination だけ直せばよい。
-# 運営さんのフォルダに移すときは:
-#   - 運営フォルダを Google ドライブ（パソコン版）で同期している → type: local の path を差し替え
-#   - 同期していない（共有フォルダIDだけ分かる）            → type: gdrive_api + folder_id
+# 別のフォルダに移すときは:
+#   - Mac の Dropbox / Google ドライブ等で同期している → type: local の path（と handover.source_dest）を差し替え
+#   - Google ドライブで同期していない（フォルダIDだけ分かる） → type: gdrive_api + folder_id
 # 一時的な上書きは環境変数 WESTUDY_BACKUP_DEST_TYPE / WESTUDY_BACKUP_DEST_PATH /
 # WESTUDY_BACKUP_DEST_FOLDER_ID でもできる（config を書き換えずに試す用）。
 
 destination:
   # local: 同期フォルダ等のローカルパスへ zip を置く / gdrive_api: Drive API で folder_id へアップロード
   type: local
-  # 置き先: Drive「217_westudyソースコードバックアップ」(admin@livingsupport-matsu.co.jp)。2026-10-28 松野さん指定
-  #   https://drive.google.com/drive/folders/1lpkD9i6WITPr4h74doqT8QtKZk5g9cUf
+  # 置き先: 運営さんの Dropbox 共有フォルダ「01_westudy」（目黒さんから matsuno.estate@gmail.com に共有、2026-10-28）。
+  #   Mac の Dropbox アプリ（matsuno.estate でサインイン）の同期フォルダに書けば、Dropbox へ上がる。
   #   01_ソースコード/     毎週バックアップを取る仕組み（このプログラム一式。毎回最新に上書き）
   #   02_バックアップデータ/ 毎週の取得結果（zip・summary.json・latest.json）
-  path: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/217_westudyソースコードバックアップ/02_バックアップデータ"
-  # gdrive_api のとき使う（217 フォルダ。subfolder の下に自動作成）
+  #   動作確認に使った Drive「217_westudyソースコードバックアップ」（admin@livingsupport-matsu.co.jp）は 2026-10-28 の回までで更新を止めた
+  path: "~/Library/CloudStorage/Dropbox/01_westudy/02_バックアップデータ"
+  # gdrive_api のとき使う（Drive の 217 フォルダ。subfolder の下に自動作成）
   folder_id: "1lpkD9i6WITPr4h74doqT8QtKZk5g9cUf"
   subfolder: "02_バックアップデータ"
   # 何回分残すか（毎週 約300MB。0 = すべて残す）。type: local のときだけ効く。
@@ -31,7 +32,7 @@ destination:
 # 運営さんへ渡すソースコード一式。--export-source で destination と同じ親の 01_ソースコード へ写す
 # （リポジトリ内と同じ相対パスで置くので、そのフォルダだけで動く）
 handover:
-  source_dest: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/217_westudyソースコードバックアップ/01_ソースコード"
+  source_dest: "~/Library/CloudStorage/Dropbox/01_westudy/01_ソースコード"
   files:
     - scripts/westudy_html_backup.py
     - config/westudy_html_backup.yaml

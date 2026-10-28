@@ -94,9 +94,17 @@ Chrome は 40 ページごとに作り直し、セッション切れ（InvalidSe
 
 ## 保存先
 
-既定は Google ドライブ（パソコン版）で同期している
-「マイドライブ/217_westudyソースコードバックアップ/02_バックアップデータ」（admin@livingsupport-matsu.co.jp、2026-10-28 松野さん指定）。
-置かれるのは次の 3 つ。
+運営さんの Dropbox 共有フォルダ「01_westudy」（目黒さんから matsuno.estate@gmail.com に共有）。
+Mac の Dropbox アプリ（matsuno.estate でサインイン）の同期フォルダ `~/Library/CloudStorage/Dropbox/01_westudy/` に書き、
+アプリが Dropbox へ上げる。
+
+- `01_ソースコード/` この仕組みのプログラム一式（毎回最新に上書き）
+- `02_バックアップデータ/` 毎週の取得結果
+
+動作確認は Google ドライブ「217_westudyソースコードバックアップ」（admin@livingsupport-matsu.co.jp）で行い、
+2026-10-28 に Dropbox へ切り替えた。
+
+`02_バックアップデータ/` に置かれるのは次の 3 つ。
 
 - `westudy_html_backup_<日時>.zip` 本体
 - `westudy_html_backup_<日時>.summary.json` ページ数・アセット数・未巡回などの要約
@@ -104,12 +112,12 @@ Chrome は 40 ページごとに作り直し、セッション切れ（InvalidSe
 
 残すのは最新1回分（`destination.keep_last: 1`）。新しい zip を置き終えてから、前の回の zip と summary を消す。
 
-### 運営さんのフォルダへ切り替える
+### 保存先を切り替える
 
 `config/westudy_html_backup.yaml` の `destination` だけ直す。
 
-- 運営フォルダを Mac の Google ドライブで同期できる → `type: local` のまま `path` を差し替え
-- フォルダ ID しか分からない → `type: gdrive_api`、`folder_id` と、そのフォルダに書ける Google アカウントの
+- Mac の Dropbox / Google ドライブで同期できる → `type: local` のまま `path` と `handover.source_dest` を差し替え
+- Google ドライブのフォルダ ID しか分からない → `type: gdrive_api`、`folder_id` と、そのフォルダに書ける Google アカウントの
   OAuth トークン（`token_path`）を指定
 
 config を変えずに試すときは環境変数 `WESTUDY_BACKUP_DEST_TYPE` / `WESTUDY_BACKUP_DEST_PATH` /
