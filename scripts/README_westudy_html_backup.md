@@ -63,10 +63,39 @@ caffeinate -dimsu ~/selenium_env/venv/bin/python scripts/westudy_html_backup.py
 Chrome は 40 ページごとに作り直し、セッション切れ（InvalidSessionId）のときもその場で作り直して再ログインする。
 1 ページの読み込みは 30 秒で打ち切る（`crawl.page_load_timeout_sec`）。
 
+## 毎週の自動実行（Mac）
+
+`launchd/install_westudy_html_backup_launchd.sh` を一度実行すると、毎週 日曜 12:00 に
+`launchd/westudy_html_backup_runner.sh` が動く（Mac が寝ていたら次に起きたとき）。runner は
+
+1. 途中で止まった回（`_checkpoint.json` が残っている作業フォルダ）があれば `--resume` で続きから
+2. 全ページを巡回して zip を `02_バックアップデータ/` に置く
+3. このプログラム一式を `01_ソースコード/` に書き出す（`--export-source`。毎回最新に上書き）
+
+ログは `~/Library/Logs/westudy_html_backup/`。止めるときは `WESTUDY_HTML_BACKUP_DISABLE=1` か
+`launchctl bootout gui/$(id -u)/com.matsunoma.westudy.html-backup`。今すぐ 1 回動かすときは
+`launchctl kickstart gui/$(id -u)/com.matsunoma.westudy.html-backup`。
+
+## 引き渡し用のソースコード
+
+`config/westudy_html_backup.yaml` の `handover.files` が引き渡し対象。リポジトリと同じ相対パスで
+`01_ソースコード/` に写すので、そのフォルダだけで動く（`VERSION.txt` に書き出し日時と元コミット）。
+
+| ファイル | 役割 |
+| --- | --- |
+| `scripts/westudy_html_backup.py` | 本体。ログイン → 巡回 → HTML・アセット・画面・配布資料の保存 → zip → 保存先へ配置 |
+| `config/westudy_html_backup.yaml` | 設定。保存先、巡回範囲、取らないもの、引き渡し対象 |
+| `ProgramCode/alfred_python/westudy_lesson_pages.py` | WeStudy へのログインと、コースタブ → 目次 → レッスンの一覧取得（週次取込と共通） |
+| `launchd/westudy_html_backup_runner.sh` | 毎週の実行役。途中再開・二重起動防止・ソースコード書き出し |
+| `launchd/install_westudy_html_backup_launchd.sh` | Mac に毎週の予定を登録する |
+| `scripts/tests/test_westudy_html_backup.py` | 動作確認のテスト（ブラウザ不要） |
+| `scripts/requirements_westudy_html_backup.txt` | 必要な Python パッケージ |
+| `scripts/README_westudy_html_backup.md` | この説明 |
+
 ## 保存先
 
 既定は Google ドライブ（パソコン版）で同期している
-「マイドライブ/217_westudyソースコードバックアップ」（admin@livingsupport-matsu.co.jp、2026-10-28 松野さん指定）。
+「マイドライブ/217_westudyソースコードバックアップ/02_バックアップデータ」（admin@livingsupport-matsu.co.jp、2026-10-28 松野さん指定）。
 置かれるのは次の 3 つ。
 
 - `westudy_html_backup_<日時>.zip` 本体

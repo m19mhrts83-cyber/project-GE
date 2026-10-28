@@ -13,15 +13,33 @@ destination:
   type: local
   # 置き先: Drive「217_westudyソースコードバックアップ」(admin@livingsupport-matsu.co.jp)。2026-10-28 松野さん指定
   #   https://drive.google.com/drive/folders/1lpkD9i6WITPr4h74doqT8QtKZk5g9cUf
-  path: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/217_westudyソースコードバックアップ"
-  # gdrive_api のとき使う（上と同じフォルダ。subfolder を書けばその下に自動作成）
+  #   01_ソースコード/     毎週バックアップを取る仕組み（このプログラム一式。毎回最新に上書き）
+  #   02_バックアップデータ/ 毎週の取得結果（zip・summary.json・latest.json）
+  path: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/217_westudyソースコードバックアップ/02_バックアップデータ"
+  # gdrive_api のとき使う（217 フォルダ。subfolder の下に自動作成）
   folder_id: "1lpkD9i6WITPr4h74doqT8QtKZk5g9cUf"
-  subfolder: ""
+  subfolder: "02_バックアップデータ"
+  # 何回分残すか（毎週 約300MB。0 = すべて残す）。type: local のときだけ効く
+  keep_last: 0
   # gdrive_api の OAuth トークン（authorized_user 形式・drive スコープ）。
   # 置き先フォルダに書き込める Google アカウントのものを指定する。
   # 既存の token_google_workspace_estate.json は matsuno.estate@gmail.com・drive.file のため
   # 他人所有フォルダには書けない点に注意（運営フォルダ用は別途トークンを作る）。
   token_path: ""
+
+# 運営さんへ渡すソースコード一式。--export-source で destination と同じ親の 01_ソースコード へ写す
+# （リポジトリ内と同じ相対パスで置くので、そのフォルダだけで動く）
+handover:
+  source_dest: "~/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/217_westudyソースコードバックアップ/01_ソースコード"
+  files:
+    - scripts/westudy_html_backup.py
+    - config/westudy_html_backup.yaml
+    - scripts/README_westudy_html_backup.md
+    - scripts/tests/test_westudy_html_backup.py
+    - ProgramCode/alfred_python/westudy_lesson_pages.py
+    - launchd/westudy_html_backup_runner.sh
+    - launchd/install_westudy_html_backup_launchd.sh
+    - scripts/requirements_westudy_html_backup.txt
 
 crawl:
   # 巡回の起点（コースタブ5つ＋フォーラム一覧）
@@ -73,10 +91,12 @@ assets:
   skip_content_types: ["video/", "audio/"]
   asset_delay_sec: 0.1
 
-# レッスン等からリンクされた配布資料（PDF・Excel 等）。westudy.co.jp 内のものだけ取得し、
-# 外部（Google ドライブ等）のリンクは manifest の external_documents に URL だけ残す
+# レッスン等からリンクされた配布資料（PDF・Excel 等）。westudy.co.jp と extra_hosts のものを取得し、
+# それ以外（自治体サイト等）のリンクは manifest の external_documents に URL だけ残す
 attachments:
   extensions: [pdf, xlsx, xls, xlsm, docx, doc, pptx, ppt, csv, txt, zip]
+  # westudy.co.jp 以外で取りに行くホスト（神大家さんの公式サイトに置かれた配布資料）
+  extra_hosts: [kamiooyasan.jp, www.kamiooyasan.jp]
   max_mb: 100
 
 # WordPress REST API（/wp-json）で取れる本文データ。別の WordPress へ流し込む際の素材になる。

@@ -1,0 +1,7 @@
+# WeStudy HTML バックアップ（scripts/westudy_html_backup.py）に必要なもの
+selenium>=4.10
+requests
+PyYAML
+# destination.type: gdrive_api を使うときだけ
+# google-api-python-client
+# google-auth

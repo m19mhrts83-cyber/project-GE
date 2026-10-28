@@ -557,6 +557,7 @@ class SiteBackup:
         include = self.crawl.get("include") or []
         exclude = self.crawl.get("exclude") or []
         doc_exts = set((self.cfg.get("attachments") or {}).get("extensions") or [])
+        doc_hosts = {h.lower() for h in (self.cfg.get("attachments") or {}).get("extra_hosts") or []}
         queue, seen = self.queue, self.seen
         for s in list(self.crawl.get("seeds") or []) + extra_seeds:
             u = normalize_page_url(s, keep_query_keys=self.keep_q)
@@ -599,7 +600,7 @@ class SiteBackup:
             links: list[str] = []
             for link in refs["links"]:
                 if doc_exts and url_extension(link) in doc_exts:
-                    if is_site_host(link):
+                    if is_site_host(link) or urlsplit(link).netloc.lower() in doc_hosts:
                         self.fetch_asset(link, kind="attachment")
                     else:
                         self.external_docs.add(link)
@@ -826,6 +827,9 @@ class SiteBackup:
             "external_documents": sorted(self.external_docs),
             "attachments_ok": sum(1 for a in self.assets.values() if a.get("kind") == "attachment" and a.get("status") == "ok"),
             "screenshots": self.screenshots,
+            "pages_by_kind": pages_by_kind(self.pages),
+            "assets_by_kind": assets_by_kind(self.assets),
+            "lessons_by_tab": {t["tab"]: sum(len(s["lessons"]) for s in t["sections"]) for t in self.structure},
             "rest_nonce_found": bool(self.rest_nonce),
             "api_by_status": count({str(i): a for i, a in enumerate(self.api)}),
             "unvisited": getattr(self, "unvisited", []),
@@ -874,6 +878,78 @@ class SiteBackup:
 # ---------------------------------------------------------------- 保存先
 
 
+_ASSET_KINDS = (
+    ("css", ("css",)),
+    ("js", ("js", "mjs")),
+    ("image", ("png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "avif", "bmp")),
+    ("font", ("woff", "woff2", "ttf", "otf", "eot")),
+)
+
+
+def pages_by_kind(pages: dict[str, dict[str, Any]]) -> dict[str, int]:
+    """取得できたページを /course/・/lesson/・/forum/ ごとに数える（資料の数字用）。"""
+    out: dict[str, int] = {}
+    for url, r in pages.items():
+        if r.get("status") != "ok":
+            continue
+        seg = (urlsplit(url).path.strip("/").split("/") or [""])[0] or "top"
+        out[seg] = out.get(seg, 0) + 1
+    return dict(sorted(out.items()))
+
+
+def assets_by_kind(assets: dict[str, dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """取得できたアセットを CSS / JS / 画像 / フォント / 配布資料 / その他 に分けて件数とバイト数を出す。"""
+    out: dict[str, dict[str, int]] = {}
+    for a in assets.values():
+        if a.get("status") != "ok":
+            continue
+        ext = url_extension(a["url"])
+        ctype = a.get("content_type") or ""
+        kind = "attachment" if a.get("kind") == "attachment" else "other"
+        if kind == "other":
+            for name, exts in _ASSET_KINDS:
+                if ext in exts or (name == "image" and ctype.startswith("image/")) or (name == "css" and ctype == "text/css"):
+                    kind = name
+                    break
+        slot = out.setdefault(kind, {"count": 0, "bytes": 0})
+        slot["count"] += 1
+        slot["bytes"] += int(a.get("bytes") or 0)
+    return dict(sorted(out.items()))
+
+
+def export_source(cfg: dict[str, Any], dest: Path | None = None) -> Path:
+    """引き渡し用のソースコード一式を、リポジトリと同じ相対パスで dest に写す（毎週上書き）。"""
+    hcfg = cfg.get("handover") or {}
+    dest = dest or Path(str(hcfg.get("source_dest") or "")).expanduser()
+    if not str(dest).strip() or str(dest) == ".":
+        raise ValueError("handover.source_dest が未設定です")
+    dest.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for rel in hcfg.get("files") or []:
+        src = REPO / rel
+        if not src.is_file():
+            raise FileNotFoundError(f"引き渡し対象がありません: {rel}")
+        out = dest / rel
+        out.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, out)
+        copied.append(rel)
+    try:
+        import subprocess
+
+        commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
+                                capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:
+        commit = ""
+    (dest / "VERSION.txt").write_text(
+        f"書き出し: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        f"元リポジトリのコミット: {commit or '不明'}\n"
+        "ファイル:\n" + "".join(f"  {c}\n" for c in copied),
+        encoding="utf-8",
+    )
+    log(f"ソースコード {len(copied)} ファイルを書き出し: {dest}")
+    return dest
+
+
 def summary_of(m: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in m.items() if k not in ("pages", "assets", "api")}
 
@@ -902,7 +978,25 @@ def deliver_local(dest: dict[str, Any], zip_path: Path, summary: dict[str, Any])
                    ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    prune_old_backups(out_dir, int(dest.get("keep_last") or 0))
     return str(final)
+
+
+def prune_old_backups(out_dir: Path, keep_last: int) -> list[str]:
+    """新しい順に keep_last 回分だけ残し、それより古い zip と summary.json を消す（0 なら何もしない）。"""
+    if keep_last <= 0:
+        return []
+    zips = sorted(out_dir.glob("westudy_html_backup_*.zip"), reverse=True)  # 名前が日時なので名前順＝新しい順
+    removed = []
+    for z in zips[keep_last:]:
+        run_id = z.stem.replace("westudy_html_backup_", "")
+        for p in (z, out_dir / f"westudy_html_backup_{run_id}.summary.json"):
+            if p.exists():
+                p.unlink()
+                removed.append(p.name)
+    if removed:
+        log(f"古いバックアップを整理（直近 {keep_last} 回を残す）: {', '.join(removed)}")
+    return removed
 
 
 def deliver_gdrive(dest: dict[str, Any], zip_path: Path, summary: dict[str, Any]) -> str:
@@ -953,11 +1047,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--work-root", type=Path, default=DEFAULT_WORK_ROOT)
     ap.add_argument("--no-upload", action="store_true", help="zip を作るだけで保存先へ置かない")
     ap.add_argument("--keep-work", action="store_true", help="展開済みの作業フォルダを残す")
+    ap.add_argument("--export-source", action="store_true",
+                    help="終了後、引き渡し用ソースコード一式を handover.source_dest に写す")
+    ap.add_argument("--export-source-only", action="store_true", help="巡回せずソースコードの書き出しだけ行う")
     ap.add_argument("--resume", metavar="RUN_ID",
                     help="止まった回の続きから（作業フォルダ <work-root>/<RUN_ID> の _checkpoint.json を使う）")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
+    if args.export_source_only:
+        export_source(cfg)
+        return 0
     dest = resolve_destination(cfg)  # 先に検証して、長い巡回の後で失敗しないようにする
     if dest["type"] == "local" and not args.no_upload:
         parent = Path(dest["path"]).parent
@@ -991,6 +1091,8 @@ def main(argv: list[str] | None = None) -> int:
     where = deliver_local(dest, zip_path, summary) if dest["type"] == "local" else deliver_gdrive(dest, zip_path, summary)
     log(f"✅ 保存先へ配置: {where}")
     zip_path.unlink(missing_ok=True)
+    if args.export_source:
+        export_source(cfg)
     return 0
 
 

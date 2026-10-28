@@ -396,5 +396,85 @@ class TestRecovery(unittest.TestCase):
             self.assertFalse((td / b.SiteBackup.CHECKPOINT).exists())  # 完走したら消す
 
 
+class TestStatsAndHandover(unittest.TestCase):
+    def test_pages_by_kind(self):
+        pages = {
+            "https://westudy.co.jp/course/a": {"status": "ok"},
+            "https://westudy.co.jp/lesson/b": {"status": "ok"},
+            "https://westudy.co.jp/lesson/c": {"status": "error"},
+            "https://westudy.co.jp/forum/d": {"status": "ok"},
+        }
+        self.assertEqual(b.pages_by_kind(pages), {"course": 1, "forum": 1, "lesson": 1})
+
+    def test_assets_by_kind(self):
+        assets = {
+            "1": {"url": "https://x/a.css?v=1", "status": "ok", "bytes": 10},
+            "2": {"url": "https://x/b.js", "status": "ok", "bytes": 5},
+            "3": {"url": "https://x/c.png", "status": "ok", "bytes": 7},
+            "4": {"url": "https://x/f.woff2", "status": "ok", "bytes": 3},
+            "5": {"url": "https://x/d.pdf", "status": "ok", "bytes": 9, "kind": "attachment"},
+            "6": {"url": "https://x/img", "status": "ok", "bytes": 2, "content_type": "image/jpeg"},
+            "7": {"url": "https://x/e.png", "status": "http_error"},
+        }
+        self.assertEqual(
+            b.assets_by_kind(assets),
+            {"attachment": {"count": 1, "bytes": 9}, "css": {"count": 1, "bytes": 10},
+             "font": {"count": 1, "bytes": 3}, "image": {"count": 2, "bytes": 9},
+             "js": {"count": 1, "bytes": 5}},
+        )
+
+    def test_export_source_copies_listed_files(self):
+        cfg = b.load_config()
+        with tempfile.TemporaryDirectory() as td:
+            out = b.export_source(cfg, Path(td) / "src")
+            for rel in cfg["handover"]["files"]:
+                self.assertTrue((out / rel).is_file(), rel)
+            self.assertIn("scripts/westudy_html_backup.py", (out / "VERSION.txt").read_text(encoding="utf-8"))
+
+    def test_config_folders_are_separated(self):
+        cfg = b.load_config()
+        dest = b.resolve_destination(cfg, {})
+        self.assertTrue(dest["path"].endswith("02_バックアップデータ"))
+        self.assertTrue(cfg["handover"]["source_dest"].endswith("01_ソースコード"))
+
+    def test_extra_host_attachment_is_downloaded(self):
+        site = {
+            "https://westudy.co.jp/lesson/a": (
+                '<html><a href="https://kamiooyasan.jp/wp-content/uploads/x.pdf">x</a>'
+                '<a href="https://www.city.example.jp/y.pdf">y</a></html>'
+            )
+        }
+        drv = FakeDriver(site)
+        wlp = SimpleNamespace(driver=drv, COURSE_TABS=[], collect_sections_and_lessons=lambda t: [],
+                              _safe_get=lambda url, retries=3: drv.get(url), login_westudy=lambda: None)
+        cfg = {"crawl": {"seeds": list(site), "include": [], "exclude": [], "page_delay_sec": 0},
+               "assets": {"asset_delay_sec": 0},
+               "attachments": {"extensions": ["pdf"], "extra_hosts": ["kamiooyasan.jp"]}}
+        with tempfile.TemporaryDirectory() as td:
+            sb = b.SiteBackup(cfg, Path(td))
+            sb.wlp = wlp
+            sb.session = FakeSession({"https://kamiooyasan.jp/wp-content/uploads/x.pdf": (b"%PDF", "application/pdf")})
+            sb._start_browser = lambda: None
+            sb._sync_cookies = lambda: None
+            m = sb.run("R", max_pages=5)
+            self.assertEqual(m["attachments_ok"], 1)
+            self.assertEqual(m["external_documents"], ["https://www.city.example.jp/y.pdf"])
+            self.assertEqual(m["assets_by_kind"], {"attachment": {"count": 1, "bytes": 4}})
+
+
+class TestPrune(unittest.TestCase):
+    def test_keep_last(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            for rid in ("20261028-130011", "20261101-120000", "20261108-120000"):
+                (d / f"westudy_html_backup_{rid}.zip").write_bytes(b"z")
+                (d / f"westudy_html_backup_{rid}.summary.json").write_text("{}")
+            self.assertEqual(b.prune_old_backups(d, 0), [])
+            removed = b.prune_old_backups(d, 2)
+            self.assertEqual(sorted(removed), ["westudy_html_backup_20261028-130011.summary.json",
+                                               "westudy_html_backup_20261028-130011.zip"])
+            self.assertEqual(len(list(d.glob("*.zip"))), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
