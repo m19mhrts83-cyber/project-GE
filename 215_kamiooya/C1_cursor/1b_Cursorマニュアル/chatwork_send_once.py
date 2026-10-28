@@ -19,7 +19,20 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from yoritoori_send import parse_draft, base_path, contact_path, trigger_editor_save_all  # noqa: E402
-from yoritoori_utils import YORITOORI_FILENAME, make_summary  # noqa: E402
+from yoritoori_utils import (  # noqa: E402
+    YORITOORI_FILENAME,
+    default_yoritoori_base_dir,
+    insert_after_timeline_heading,
+    make_summary,
+)
+
+# 正本は OneDrive（P806_ 等）。環境変数未指定時はリポ側（旧名 806_）ではなく OneDrive を見る。
+if not os.environ.get("YORITOORI_BASE_PATH"):
+    base_path = default_yoritoori_base_dir()
+    if not os.environ.get("CONTACT_LIST_PATH"):
+        _od_contact = base_path / "000_共通" / "連絡先一覧.yaml"
+        if _od_contact.exists():
+            contact_path = _od_contact
 
 FOLDER_806 = "P806_神大家AI推進"
 ROOM_ALIASES = {
@@ -154,18 +167,8 @@ def append_chatwork_block(
 ---
 """
     content = md_path.read_text(encoding="utf-8")
-    marker = "## やり取り（時系列）"
-    if marker in content:
-        after_marker = content[content.find(marker) :]
-        m = re.search(r"\n\n### [12]\d{3}/\d{2}/\d{2}", after_marker)
-        if m:
-            pos = content.find(marker) + m.start() + 2
-            content = content[:pos] + block.strip() + "\n\n" + content[pos:]
-        else:
-            pos = content.find(marker) + len(marker)
-            content = content[:pos].rstrip() + "\n\n" + block.strip() + "\n\n" + content[pos:].lstrip()
-    else:
-        content += block
+    # 説明文中の `## やり取り（時系列）` ではなく、行頭の見出しの直下に入れる
+    content = insert_after_timeline_heading(content, block)
     md_path.write_text(content, encoding="utf-8")
 
 

@@ -192,3 +192,5 @@ scripts/jarvis_sbi_internal_xfer.py
 .jarvis_state/*.lock
 # 314 週次機械チェックの事実ファイル（Claude 点検の入力。成果は 314 output/ に残す）
 .jarvis_state/weekly_review_314/
+# WeStudy HTML バックアップの作業フォルダ（会員限定コンテンツ。コミット禁止）
+.jarvis_state/westudy_html_backup/
