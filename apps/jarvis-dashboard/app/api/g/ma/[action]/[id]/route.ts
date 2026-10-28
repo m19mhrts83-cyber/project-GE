@@ -20,16 +20,20 @@ export const runtime = "nodejs";
  */
 
 function confirmActionHtml(
-  action: "skip" | "todoist",
+  action: "skip" | "todoist" | "done",
   id: string,
   sig: string,
 ): string {
-  const title = action === "skip" ? "見送りの確認" : "Todoist追加の確認";
-  const label = action === "skip" ? "見送りにする" : "Todoist に追加する";
+  const title =
+    action === "skip" ? "見送りの確認" : action === "done" ? "返信済みの確認" : "Todoist追加の確認";
+  const label =
+    action === "skip" ? "見送りにする" : action === "done" ? "返信済みにする" : "Todoist に追加する";
   const note =
     action === "skip"
       ? "見送りにすると Slack カードは削除されます。"
-      : "電話・ポータル等の手配用に Todoist へ起票します。";
+      : action === "done"
+        ? "LINE／Chatwork などアプリで返信した記録だけ残します（送信はしません）。"
+        : "電話・ポータル等の手配用に Todoist へ起票します。";
   const esc = (s: string) =>
     String(s || "")
       .replace(/&/g, "&amp;")
@@ -54,7 +58,7 @@ function confirmActionHtml(
 }
 
 function resultPageForAction(
-  action: "skip" | "todoist" | "reply",
+  action: "skip" | "todoist" | "reply" | "done",
   result: {
     ok: boolean;
     message: string;
