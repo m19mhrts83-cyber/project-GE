@@ -30,7 +30,8 @@
 
 スコアの上げ下げ（抜粋）: `priority=high`・`kind=mail`・partner・「ご確認／お願い／期限」等・下書きありを加点。物件紹介定例・skim・ノイズ件名を減点。  
 投稿前除外（下書きが無いとき）: OTP／請求通知／申込完了／Apple Pay完了／販促・メルマガ件名など（運用で徐々に追加）。  
-**自分発信除外（2026-10-21）**: From が estate／admin／m19m／法人ドメイン、または estate 送信の BCC 控えが「相手から返信」誤ラベルされた本文は、Slack 投稿・Dashboard 未読の両方から除外。取込側（`gmail_to_yoritoori`）も From 自己は受信追記しない（SENT＝自分から送信が正）。
+**自分発信除外（2026-10-21）**: From が estate／admin／m19m／法人ドメイン、または estate 送信の BCC 控えが「相手から返信」誤ラベルされた本文は、Slack 投稿・Dashboard 未読の両方から除外。取込側（`gmail_to_yoritoori`）も From 自己は受信追記しない（SENT＝自分から送信が正）。  
+**自分発信除外の強化（2026-10-28）**: GHA パートナー行（`gha-p-*`）は `from_email` が空のため本文で判定。冒頭が「〇〇様 お世話になっております。松野です。」型（`株式会社リビングサポート松の松野です` 含む）も自分発信として除外。先頭120字に「松野（真治）様／さま」があれば相手の声として除外しない（Python `looks_like_self_outbound_body` と TS `looksLikeSelfOutboundBody` を同期）。
 
 ## ボタン
 

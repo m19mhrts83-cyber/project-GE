@@ -96,8 +96,12 @@ def is_self_email(email: str, extra: list[str] | None = None) -> bool:
 # （引用内の自分文は頭400字に現れにくい／相手返信は先頭が相手の声）
 _SELF_OUTBOUND_VOICE = re.compile(
     r"オーナーの松野です|Grandole志賀本通[ⅠI一二]*\s*オーナーの松野|"
-    r"リビングサポート\s*松|松野（0\d{1,4}-",
+    r"リビングサポート\s*松|松野（0\d{1,4}-|"
+    # 「〇〇様 お世話になっております。松野です。」型（GHA パートナー行は from_email 無しのため本文で判定）
+    r"(お世話になっております|お世話になります)[。、\s]*(株式会社)?(リビングサポート松\s*の?\s*)?(オーナーの)?松野(\s*真治)?です",
 )
+# 相手が自分宛に書いた冒頭（宛名が「松野 様」）。行頭でなくても先頭付近なら相手の声
+_ADDRESSED_TO_SELF_HEAD = re.compile(r"松野\s*(真治\s*)?(様|さま)")
 _PARTNER_VOICE_HEAD = re.compile(
     r"^(LEAFの|株式会社LEAFの|神野です|竹田です|"
     r"松野\s*真治\s*様|松野様)",
@@ -111,7 +115,7 @@ def looks_like_self_outbound_body(body: str | None) -> bool:
     if not text:
         return False
     head = text[:400]
-    if _PARTNER_VOICE_HEAD.search(head):
+    if _PARTNER_VOICE_HEAD.search(head) or _ADDRESSED_TO_SELF_HEAD.search(head[:120]):
         return False
     return bool(_SELF_OUTBOUND_VOICE.search(head))
 
