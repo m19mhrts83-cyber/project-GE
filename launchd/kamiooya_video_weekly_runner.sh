@@ -7,8 +7,6 @@ cd "$REPO_DIR"
 export PATH="$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 emulate -R sh -c "set -a; . '${REPO_DIR}/.env.jarvis_private'; set +a" 2>/dev/null || true
 PY="${JARVIS_PYTHON:-/Users/matsunomasaharu2/selenium_env/venv/bin/python}"
-# ffmpeg は venv の imageio-ffmpeg を使う（Homebrew なし）
-FFDIR="$("$PY" -c 'import imageio_ffmpeg, os; print(os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe()))' 2>/dev/null || true)"
-[[ -n "$FFDIR" ]] && export PATH="$FFDIR:$PATH"
+# ffmpeg は jarvis_westudy_whisper_fallback.py が venv の imageio-ffmpeg から用意する（実体名が ffmpeg ではないため PATH 追加だけでは見つからない）
 # スリープで止まらないように caffeinate で包む
 exec caffeinate -i "$PY" "$REPO_DIR/scripts/kamiooya_video_weekly.py" --post

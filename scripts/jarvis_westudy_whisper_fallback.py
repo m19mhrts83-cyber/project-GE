@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -37,6 +38,22 @@ CACHE = Path.home() / ".cache" / "kamiooya_whisper"
 CORRECTIONS = REPO / "config" / "kamiooya_transcript_corrections.tsv"
 MLX_MODEL = "mlx-community/whisper-large-v3-turbo"
 FW_MODEL = "large-v3-turbo"
+
+
+def ensure_ffmpeg() -> None:
+    """Whisper は音声読込に ffmpeg を呼ぶ。PATH に無ければ venv の imageio-ffmpeg を使う（手動実行でも launchd と同じに）。"""
+    if shutil.which("ffmpeg"):
+        return
+    try:
+        import imageio_ffmpeg
+    except ImportError:
+        return
+    exe = Path(imageio_ffmpeg.get_ffmpeg_exe())
+    link = CACHE / "bin" / "ffmpeg"  # 名前が ffmpeg-macos-... なので ffmpeg として呼べるようにする
+    link.parent.mkdir(parents=True, exist_ok=True)
+    if not link.exists():
+        link.symlink_to(exe)
+    os.environ["PATH"] = f"{link.parent}{os.pathsep}{os.environ.get('PATH', '')}"
 
 
 def fmt_ts(sec: float) -> str:
@@ -226,6 +243,7 @@ def main() -> int:
     total = sum(len(v) for _, v in targets)
     print(f"# {course}: 字幕なし {len(targets)} レッスン / {total} 動画", flush=True)
 
+    ensure_ffmpeg()
     transcribe = Transcriber(args.engine)
     resolver = EmbedResolver()
     count, failed = 0, []
@@ -264,7 +282,7 @@ def main() -> int:
         resolver.close()
     print(json.dumps({"course": course, "lessons_done": len(done), "videos_tried": count, "failed": len(failed),
                       "manifest": str(out_manifest)}, ensure_ascii=False))
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
