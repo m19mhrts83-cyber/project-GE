@@ -301,7 +301,7 @@ async function remeasureAll() {
 }
 
 function drawRowTable() {
-    const tr = rows.map(r => `<tr><td>${r.no}</td><td>${esc(r.name)}${r.unchecked ? '<br><span class="warn">AIが実在を確かめきれていません</span>' : ''}</td><td>${esc(r.type)}</td><td>${r.lat == null ? '<span class="warn">見つからず（紙面に載りません）</span>' : (r.kind === 'car' ? '車' : '徒歩') + `約${r.minutes}分` + (r.tooFar ? '<span class="warn">（遠すぎます。別の場所に当たった可能性が高いので紙面から外しています。地図で灰色の？を正しい場所へドラッグしてください）</span>' : '') + (r.minutesApprox ? '<span class="warn">（概算）</span>' : '') + (r.approx ? '<span class="warn">（位置は目印から推定・要確認）</span>' : '')}</td><td>${esc(r.note)}</td></tr>`).join('');
+    const tr = rows.map(r => `<tr><td>${r.no}</td><td>${esc(r.name)}${r.unchecked ? '<br><span class="warn">AIが実在を確かめきれていません</span>' : ''}</td><td>${esc(r.type)}</td><td>${r.lat == null ? '<span class="warn">見つからず（紙面に載りません。そのままで大丈夫です）</span>' : (r.kind === 'car' ? '車' : '徒歩') + `約${r.minutes}分` + (r.tooFar ? '<span class="warn">（遠すぎます。別の場所に当たった可能性が高いので紙面から外しています。地図で灰色の？を正しい場所へドラッグしてください）</span>' : '') + (r.minutesApprox ? '<span class="warn">（概算）</span>' : '') + (r.approx ? '<span class="warn">（位置は目印から推定・要確認。違っていたら表の掲載を×にしてよい）</span>' : '')}</td><td>${esc(r.note)}</td></tr>`).join('');
     $('rowTable').innerHTML = `<tr><th>#</th><th>施設名</th><th>種類</th><th>所要</th><th>吹き出し</th></tr>${tr}`;
 }
 
@@ -335,7 +335,7 @@ async function run() {
         const miss = rows.filter(r => r.lat == null).length;
         const far = rows.filter(r => r.tooFar).length;
         const approx = rows.filter(r => r.approx).length;
-        setStatus(`ピンを立てました（${rows.length - miss - far}/${rows.length}件）。` + (p.approx ? '\n物件の位置は住所の一部から推定しています。★をドラッグして合わせてください。' : '') + (approx ? `\n${approx}件は目印から推定した位置です。` : '') + (miss ? `\n${miss}件は見つかりませんでした。住所・目印を足すか、紙面から外してください。` : '') + (far ? `\n${far}件は徒歩${CONFIG.walkMaxMinutes}分より遠く、別の場所に当たった可能性があるため紙面から外しました（地図の灰色の？）。` : ''));
+        setStatus(`ピンを立てました（${rows.length - miss - far}/${rows.length}件）。` + (p.approx ? '\n物件の位置は住所の一部から推定しています。★をドラッグして合わせてください。' : '') + (approx ? `\n${approx}件は目印から推定した位置です。` : '') + (miss ? `\n${miss}件は見つかりませんでした。住所・目印を足すか、紙面から外してください。` : '') + (far ? `\n${far}件は徒歩${CONFIG.walkMaxMinutes}分より遠く、別の場所に当たった可能性があるため紙面から外しました（地図の灰色の？）。` : '') + (miss || approx ? '\n見つからない店・位置が推定の店は、×にしてかまいません（表の「掲載」を×にして、もう一度「地図にピンを立てる」）。' : ''));
     } catch (e) {
         setStatus(e.message);
     } finally {
@@ -608,5 +608,17 @@ $('btnSample').addEventListener('click', () => {
     $('tableIn').value = SAMPLE.table;
 });
 $('btnSheet').addEventListener('click', buildSheet);
+
+// 初級モード（初期表示）と中級の機能の切り替え。選んだ表示はこの端末に覚えておく
+function setBeginner(on) {
+    document.body.classList.toggle('beginner', on);
+    $('modeLabel').textContent = on ? 'いまは「初級」の画面です。' : 'いまは中級の機能も表示しています。';
+    $('btnMode').textContent = on ? '中級の機能を表示' : '初級の画面に戻す';
+    try { localStorage.setItem('shuhenOsmMode', on ? 'beginner' : 'advanced'); } catch (e) { /* 保存できない環境では毎回初級 */ }
+}
+$('btnMode').addEventListener('click', () => setBeginner(!document.body.classList.contains('beginner')));
+let savedMode = null;
+try { savedMode = localStorage.getItem('shuhenOsmMode'); } catch (e) { /* noop */ }
+setBeginner(savedMode !== 'advanced');
 $('btnPrint').addEventListener('click', () => window.print());
 $('btnHtml').addEventListener('click', saveHtml);
