@@ -1,21 +1,27 @@
 # project-GE リポジトリ直下に置くこと（215_kamiooya/.github では GitHub に認識されない）
-name: WeStudy Delta Import Weekly
+name: WeStudy Comments Daily / Lessons Weekly
 
 permissions:
   contents: write
 
 on:
   schedule:
-    # 毎週 日曜 08:00 JST（= 土曜 23:00 UTC）
-    # 旧 06:30 は WeStudy ログイン/renderer timeout が続きやすかった
+    # コミュニティコメント: 毎日 08:00 JST。
+    # 月〜土（UTCでは日〜金）はコメントのみ。日曜はlesson説明も更新する。
+    - cron: "0 23 * * 0-5"
+    # 日曜 08:00 JST（= 土曜 23:00 UTC）はコメント＋lesson説明の週次フル実行。
     - cron: "0 23 * * 6"
-    # 補欠: 日曜 14:00／月曜 08:00 JST。本番が成功していれば guard が skip（50% がログイン停滞で失敗していた）
-    - cron: "0 5 * * 0"
-    - cron: "0 23 * * 0"
+    # 毎日 14:00 JSTの補欠。本番成功後は20h guardでskip。日曜だけ週次フルの補欠。
+    - cron: "0 5 * * *"
   workflow_dispatch:
     inputs:
       force_scrape:
         description: "完了済みトピックも再取得する（--force）"
+        required: false
+        type: boolean
+        default: false
+      comments_only:
+        description: "コメントだけ取得（lesson説明はスキップ）"
         required: false
         type: boolean
         default: false
@@ -25,17 +31,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # 補欠 cron の回は、直近 30h に成功があれば skip（_success-guard.yml）
+  # 08:00本番と14:00補欠は6h差。翌日の08:00は24h差なので、20h guardで
+  # 「同日成功後の補欠だけskip」「翌日は必ず実行」を両立する。
   guard:
     uses: ./.github/workflows/_success-guard.yml
     with:
-      window_hours: 30
+      window_hours: 20
     permissions:
       actions: read
 
   run-weekly:
     needs: guard
-    if: needs.guard.outputs.skip != 'true'
+    # guardを尊重するのは14:00補欠だけ。08:00本番は前日の補欠成功が20h以内でも必ず走らせる。
+    if: github.event_name != 'schedule' || github.event.schedule != '0 5 * * *' || needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -149,7 +157,7 @@ jobs:
         run: |
           set -euo pipefail
           cmd=( "./scripts/run_update_and_import.sh" )
-          # 週次 cron は全トピック再取得（完了フラグ付きトピックも新規コメントを拾う）
+          # schedule は全トピック再取得（完了フラグ付きトピックの新規コメントも拾う）。
           force_scrape="false"
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             force_scrape="true"
@@ -159,6 +167,24 @@ jobs:
           if [[ "$force_scrape" == "true" ]]; then
             cmd+=( "--force" )
           fi
+          # 月〜土はコメントのみ。日曜08:00と日曜14:00補欠、手動実行は
+          # 従来どおりlesson説明も更新する。動画文字起こしは別のMac週次処理。
+          sync_mode="weekly-full"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && \
+                "${{ github.event.inputs.comments_only || 'false' }}" == "true" ]]; then
+            sync_mode="daily-comments"
+            export WESTUDY_SKIP_LESSONS=1
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            schedule_expr="${{ github.event.schedule }}"
+            utc_weekday="$(date -u +%u)"
+            if [[ "$schedule_expr" == "0 23 * * 0-5" ]] || \
+               [[ "$schedule_expr" == "0 5 * * *" && "$utc_weekday" != "7" ]]; then
+              sync_mode="daily-comments"
+              export WESTUDY_SKIP_LESSONS=1
+            fi
+          fi
+          echo "WESTUDY_SYNC_MODE=$sync_mode" >> "$GITHUB_ENV"
+          echo "sync mode: $sync_mode"
           (
             cd "$CHATBOT_DIR"
             "${cmd[@]}"
@@ -244,7 +270,7 @@ jobs:
             fi
           fi
           {
-            echo "### WeStudy weekly result"
+            echo "### WeStudy ${WESTUDY_SYNC_MODE:-weekly-full} result"
             if [[ -z "$latest_delta" ]]; then
               echo "- delta: （ファイルなし・パイプライン未生成または失敗の可能性）"
               echo "- rows: n/a"
