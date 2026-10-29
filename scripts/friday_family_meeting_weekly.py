@@ -343,11 +343,58 @@ def build_minutes_md(
     return dest, md, used
 
 
+MINUTES_GUIDE = REPO / "docs" / "AIエージェントチーム" / "52_議事録のまとめ方_20261029.md"
+
+# 52_ の指示文に足す、家族会議だけの差分と、md_to_blocks が扱える書式の制約
+FAMILY_FORMAT_NOTES = """
+追加の条件（家族会議）:
+・家庭の話が本題なので、家庭の話題は除外しない（本筋から外れた雑談だけ省く）
+・ToDoの「誰が」は家族の呼び名で書く。不明なら「担当未定」
+・出力は Markdown の見出し（##）と箇条書き（- ）だけ。表・太字・トグルは使わない
+・ToDo は「- 誰が｜何を｜いつまでに」の形の箇条書きにする
+・見出しは「ひとことで」「決まったこと」「ToDo」「次回までに決めること・確認すること」「次回」「参考：議題ごとのメモ」
+・元の議事録の全文へのリンクは別に付くので、本文には書かない
+"""
+
+
+def _guide_prompt() -> str:
+    """52_ の「AI に仕上げを頼むときの指示文」をそのまま使う（型の重複を持たない）。"""
+    text = MINUTES_GUIDE.read_text(encoding="utf-8")
+    m = re.search(r"## AI に仕上げを頼むときの指示文\s*```text\n(.*?)```", text, re.S)
+    if not m:
+        raise RuntimeError("52_ の指示文が見つかりません")
+    return m.group(1).strip()
+
+
+def format_summary_with_template(summary: str) -> str:
+    """Genspark 要約を 52_ の型に仕上げる（Gemini）。失敗は呼び出し側で元の要約に戻す。"""
+    import jarvis_gemini_research as gemini  # noqa: E402
+
+    key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY なし")
+    model = os.environ.get("GEMINI_MODEL") or gemini.DEFAULT_MODEL
+    prompt = f"{_guide_prompt()}\n{FAMILY_FORMAT_NOTES}\n--- 自動議事録 ---\n{summary}"
+    out = gemini.generate(prompt, api_key=key, model=model).strip()
+    out = re.sub(r"^```(?:markdown)?\s*|\s*```$", "", out).strip()
+    if "決まったこと" not in out or "ToDo" not in out:
+        raise RuntimeError("型の見出しが出力にない")
+    return out.replace("**", "")
+
+
 def summary_for_notion(shaped: dict[str, Any], aliases: dict[str, str]) -> tuple[str, list[str]]:
     summary = shaped.get("summary") or ""
     if not isinstance(summary, str):
         summary = json.dumps(summary, ensure_ascii=False, indent=2)
     out, used = correct_text(summary.strip(), aliases)
+    # Notion 掲載分は 52_議事録のまとめ方 の型で仕上げる（Drive の MD は元の要約のまま）
+    if (os.environ.get("FRIDAY_FAMILY_MEETING_FORMAT_DISABLE") or "").strip() != "1":
+        try:
+            out = format_summary_with_template(out)
+            out, _ = correct_text(out, aliases)
+            used.append("52_の型で仕上げ（自動）")
+        except Exception as e:  # noqa: BLE001
+            used.append(f"型での仕上げに失敗し元の要約を掲載（{type(e).__name__}）")
     # 実名へ直せなかった話者ラベルは、勝手に推測せず要確認として残す（Jarvis回答 2026-10-19）
     if re.search(r"(?:Speaker|スピーカー)\s*\d+", out):
         used.append("Speaker N が残存（実名補正は要確認）")
@@ -640,7 +687,8 @@ def run(args: argparse.Namespace) -> int:
     md_path, _raw_md, corrections = build_minutes_md(
         shaped, target, s["aliases"], dry_run=args.dry_run
     )
-    summary_md, _ = summary_for_notion(shaped, s["aliases"])
+    summary_md, summary_notes = summary_for_notion(shaped, s["aliases"])
+    print(f"# summary: {summary_notes}", file=sys.stderr)
     print(f"# minutes: {md_path} corrections={corrections}", file=sys.stderr)
 
     ent.update(
@@ -650,6 +698,7 @@ def run(args: argparse.Namespace) -> int:
             "created_at": shaped.get("created_at"),
             "md_path": str(md_path),
             "corrections": corrections,
+            "summary_notes": summary_notes,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     )
@@ -670,6 +719,7 @@ def run(args: argparse.Namespace) -> int:
             "removed_old_blocks": removed,
             "summary_blocks": len(blocks),
             "summary_head": blocks[:6],
+            "summary_md": summary_md,
         }
         print(json.dumps(plan, ensure_ascii=False, indent=2))
         return 0
