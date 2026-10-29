@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Jarvis: WeStudy 週次取込（GitHub Actions）の直近結果を確認し、定型ブロックを出力。
+Jarvis: WeStudy コメント日次取込／lesson週次取込（GitHub Actions）の直近結果を確認し、定型ブロックを出力。
 
 使い方:
   python scripts/jarvis_westudy_weekly_check.py
@@ -147,7 +147,7 @@ def build_block(state: dict, runs: list[dict], *, force: bool) -> tuple[str, dic
     if not runs:
         note = "実行履歴なし（workflow 未実行または gh 権限不足）"
         lines = [
-            "📎 WeStudy週次",
+            "📎 WeStudy日次（lesson週次）",
             f"- 状態: 不明（{note}）",
             f"- 連続成功: {state.get('consecutive_successes', 0)}/{SUCCESS_NEEDED}",
             "- 確認: `gh run list --workflow=westudy-raimo-weekly.yml --limit 3`",
@@ -175,7 +175,7 @@ def build_block(state: dict, runs: list[dict], *, force: bool) -> tuple[str, dic
         ok = False
 
     lines = [
-        "📎 WeStudy週次",
+        "📎 WeStudy日次（lesson週次）",
         f"- 最新: {label} @ {when}",
         f"- run: {run_id}" + (f" — {url}" if url else ""),
     ]
@@ -207,7 +207,7 @@ def build_block(state: dict, runs: list[dict], *, force: bool) -> tuple[str, dic
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="WeStudy 週次 CI 結果チェック")
+    ap = argparse.ArgumentParser(description="WeStudy 日次コメント／週次lesson CI 結果チェック")
     ap.add_argument("--json", action="store_true", help="JSON 出力")
     ap.add_argument("--force", action="store_true", help="disabled でも出力")
     ap.add_argument(
@@ -232,7 +232,7 @@ def main() -> int:
         state["disabled"] = True
         state["last_checked_at"] = datetime.now(JST).isoformat(timespec="seconds")
         save_state(state)
-        print("📎 WeStudy週次: watch を disabled にしました")
+        print("📎 WeStudy日次（lesson週次）: watch を disabled にしました")
         return 0
 
     if state.get("disabled") and not args.force:
@@ -241,7 +241,7 @@ def main() -> int:
     try:
         runs = gh_run_list(limit=max(1, args.limit))
     except RuntimeError as e:
-        print(f"📎 WeStudy週次\n- 状態: 確認失敗（{e}）", file=sys.stderr)
+        print(f"📎 WeStudy日次（lesson週次）\n- 状態: 確認失敗（{e}）", file=sys.stderr)
         return 1
 
     block, preview = build_block(state, runs, force=args.force)
