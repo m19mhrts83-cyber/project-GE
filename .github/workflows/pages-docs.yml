@@ -12,6 +12,8 @@ on:
       - 'shuhen-map.js'
       - 'shuhen-auto.html'
       - 'shuhen-auto.js'
+      - 'shuhen-osm.html'
+      - 'shuhen-osm.js'
       - '.github/workflows/pages-docs.yml'
   workflow_dispatch:
 
@@ -57,6 +59,12 @@ jobs:
           fi
           if [ -f shuhen-auto.js ]; then
             cp shuhen-auto.js _site/shuhen-auto.js
+          fi
+          if [ -f shuhen-osm.html ]; then
+            cp shuhen-osm.html _site/shuhen-osm.html
+          fi
+          if [ -f shuhen-osm.js ]; then
+            cp shuhen-osm.js _site/shuhen-osm.js
           fi
           touch _site/.nojekyll _site/docs/.nojekyll
 
