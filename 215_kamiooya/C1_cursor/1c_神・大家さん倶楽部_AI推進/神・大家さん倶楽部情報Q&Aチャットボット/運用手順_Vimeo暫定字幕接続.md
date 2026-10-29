@@ -149,3 +149,11 @@
 - 状態: `~/git-repos/.jarvis_state/kamiooya_video_weekly/`（status・whisper manifest、Notta ledger、ログ）。リポジトリ内の manifest は書き換えない
 - Notta の受け取り方（運営・今村さんへのお願い）: ファイル名に Vimeo ID を入れる（例 `STEP2-1_803690477.xlsx`）。入れられないときは `inbox/notta/対応表.csv`（列 `file,vimeo_id,slug,title,course`）に1行書く。どちらも無いファイルはレポートの「Notta 要確認」に出て、登録されない
 - Vimeo 自動字幕しか無い動画に Notta版が来た場合は、二重登録を避けて「要確認」にとどめる（差し替えは承認された Whisper分のみ）
+
+### 現在地とDashboard表示（2026-10-29）
+
+- 基礎の字幕なし50動画・1,168チャンクと、漏れていた16レッスン・385チャンクをWhisperで追加登録。把握済みの字幕不足は0レッスン、登録失敗0。
+- PR #186・#191はmainへマージ済み。LaunchAgentは毎週日曜12:00で有効。初回スケジュール実行は2026-11-01 12:00で、結果確認待ち。
+- 週次誤記候補 `誤記候補_週次_20261029.csv` は230件。松野さんが確認・承認した語だけ補正表へ追加し、自動一括反映はしない。
+- Jarvis Dashboard `/kiso-transcripts` は `apps/jarvis-dashboard/data/kamiooya_transcription_status.json` を表示用スナップショットとして読む。10月27日時点の「今村さんへ16レッスン依頼」は完了表示へ置き換えた。
+- Dashboardの表示用スナップショットは本番DBやローカルstateの正本ではない。週次実行後に確認した結果を反映して更新・デプロイする。

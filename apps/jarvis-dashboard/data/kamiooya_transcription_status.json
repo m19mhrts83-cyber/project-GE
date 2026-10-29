@@ -1,0 +1,55 @@
+{
+  "updated": "2026-10-29T16:24:00+09:00",
+  "state": "initial_import_complete",
+  "summary": "Vimeo字幕・今村さん提供字幕・ローカルWhisperを組み合わせ、把握済みの字幕不足を解消しました。",
+  "whisper_import": {
+    "videos": 66,
+    "chunks": 1553,
+    "batches": [
+      {
+        "label": "基礎の字幕なし動画",
+        "videos": 50,
+        "chunks": 1168
+      },
+      {
+        "label": "漏れていた16レッスン",
+        "videos": 16,
+        "chunks": 385
+      }
+    ]
+  },
+  "resolved_gap_lessons": [
+    "step5-5",
+    "approach_chintaiheiyou",
+    "kokoronokabe",
+    "houtekikashi",
+    "qa_kaikata",
+    "_hosoku_trouble",
+    "yoheki_taisyo",
+    "zenku_taisaku",
+    "youtube2",
+    "baikyaku",
+    "sisannseiri",
+    "qa_baikyaku",
+    "keiyakufutekigo_taisyo",
+    "kasaihoken_kisho",
+    "kasaihoken_henkou_youken",
+    "service_form"
+  ],
+  "weekly_job": {
+    "enabled": true,
+    "schedule": "毎週日曜 12:00",
+    "first_scheduled_check": "2026-11-01T12:00:00+09:00",
+    "last_applied_run": "2026-10-29T13:03:39+09:00",
+    "last_run_videos": 16,
+    "last_run_chunks": 385,
+    "last_run_failed_steps": 0
+  },
+  "typo_review": {
+    "pending": true,
+    "candidates": 230,
+    "file": "週次レポート/誤記候補_週次_20261029.csv",
+    "policy": "確認・承認した語だけ補正表へ追加"
+  },
+  "merged_prs": [186, 191]
+}
