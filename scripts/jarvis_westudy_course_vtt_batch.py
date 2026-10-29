@@ -182,14 +182,19 @@ def main() -> int:
     ap.add_argument("--force", action="store_true", help="既存MDがあっても取り直す")
     ap.add_argument("--show", action="store_true", help="ブラウザを表示")
     ap.add_argument("--limit", type=int, help="各コース先頭N件だけ（動作確認用）")
+    ap.add_argument("--status-dir", type=Path, help="status JSON の置き場（週次はリポジトリ外に書く）")
     args = ap.parse_args()
+    global STATUS_DIR
+    if args.status_dir:
+        STATUS_DIR = args.status_dir.expanduser()
 
     from embed_to_supabase import load_env, get_client
 
     load_env()
     client = get_client()
     kiso = json.loads((REPO / "apps/jarvis-dashboard/data/kiso_course_status.json").read_text(encoding="utf-8"))
-    skip = imported_slugs(client) | {L["slug"] for L in kiso.get("lessons") or []}
+    # 基礎 manifest の desc_only（説明文だけで動画IDを取れていない）レッスンは取り直して Whisper の対象にする
+    skip = imported_slugs(client) | {L["slug"] for L in kiso.get("lessons") or [] if L.get("status") != "desc_only"}
     results = []
     for course in args.course or DEFAULT_COURSES:
         payload = run_course(client, course, skip=skip, headless=not args.show, force=args.force, limit=args.limit)
