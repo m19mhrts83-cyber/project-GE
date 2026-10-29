@@ -241,9 +241,11 @@ function spreadDuplicates() {
     }
 }
 
-// 番号は紙面に載る施設だけに振る（見つからない・遠すぎる施設に番号を残すと①③⑨のように飛ぶ）
+// 紙面に載る施設: 見つかった・遠すぎない・会員が「載せない」にしていない
+const onSheet = r => r.lat != null && !r.tooFar && !r.excluded;
+
+// 番号は紙面に載る施設だけに振る（見つからない・遠すぎる・載せない施設に番号を残すと①③⑨のように飛ぶ）
 function renumber() {
-    const onSheet = r => r.lat != null && !r.tooFar;
     const walk = rows.filter(r => r.kind === 'walk' && onSheet(r)).sort((a, b) => a.minutes - b.minutes);
     const car = rows.filter(r => r.kind === 'car' && onSheet(r)).sort((a, b) => a.minutes - b.minutes);
     const rest = rows.filter(r => !onSheet(r));
@@ -280,9 +282,9 @@ function drawEditMap() {
         .bindTooltip(property.name).addTo(markerLayer);
     for (const r of rows) {
         if (r.lat == null) continue;
-        L.marker([r.lat, r.lng], { icon: pinIcon(r.tooFar ? '?' : r.no, r.tooFar ? '#999' : r.kind === 'car' ? '#7a6a3a' : '#2f6f8f'), draggable: true })
+        L.marker([r.lat, r.lng], { icon: pinIcon(r.excluded ? '×' : r.tooFar ? '?' : r.no, r.excluded || r.tooFar ? '#999' : r.kind === 'car' ? '#7a6a3a' : '#2f6f8f'), draggable: true })
             .on('dragend', async e => { Object.assign(r, e.target.getLatLng()); r.approx = false; await measure(r); renumber(); drawEditMap(); drawRowTable(); })
-            .bindTooltip(r.tooFar ? `${r.name}（遠すぎるため紙面から外しています。正しい場所へドラッグしてください）` : `${r.no}. ${r.name}`).addTo(markerLayer);
+            .bindTooltip(r.excluded ? `${r.name}（載せない）` : r.tooFar ? `${r.name}（遠すぎるため紙面から外しています。正しい場所へドラッグしてください）` : `${r.no}. ${r.name}`).addTo(markerLayer);
     }
     const walk = rows.filter(r => r.kind === 'walk' && r.lat != null && !r.tooFar);
     const dists = walk.map(r => haversine(property, r)).sort((a, b) => a - b);
@@ -301,8 +303,28 @@ async function remeasureAll() {
 }
 
 function drawRowTable() {
-    const tr = rows.map(r => `<tr><td>${r.no}</td><td>${esc(r.name)}${r.unchecked ? '<br><span class="warn">AIが実在を確かめきれていません</span>' : ''}</td><td>${esc(r.type)}</td><td>${r.lat == null ? '<span class="warn">見つからず（紙面に載りません）</span>' : (r.kind === 'car' ? '車' : '徒歩') + `約${r.minutes}分` + (r.tooFar ? '<span class="warn">（遠すぎます。別の場所に当たった可能性が高いので紙面から外しています。地図で灰色の？を正しい場所へドラッグしてください）</span>' : '') + (r.minutesApprox ? '<span class="warn">（概算）</span>' : '') + (r.approx ? '<span class="warn">（位置は目印から推定・要確認）</span>' : '')}</td><td>${esc(r.note)}</td></tr>`).join('');
-    $('rowTable').innerHTML = `<tr><th>#</th><th>施設名</th><th>種類</th><th>所要</th><th>吹き出し</th></tr>${tr}`;
+    const btn = (r, i) => r.lat == null || r.tooFar ? '' : `<button type="button" class="toggleRow${r.excluded ? ' secondary' : ''}" data-i="${i}">${r.excluded ? '載せる' : '載せない'}</button>`;
+    const where = r => {
+        if (r.lat == null) return '<span class="warn">見つからず（紙面に載りません。そのままで大丈夫です）</span>';
+        if (r.excluded) return '<span class="warn">載せない（紙面から外しています）</span>';
+        return (r.kind === 'car' ? '車' : '徒歩') + `約${r.minutes}分`
+            + (r.tooFar ? '<span class="warn">（遠すぎます。別の場所に当たった可能性が高いので紙面から外しています。地図で灰色の？を正しい場所へドラッグしてください）</span>' : '')
+            + (r.minutesApprox ? '<span class="warn">（概算）</span>' : '')
+            + (r.approx ? '<span class="warn">（店名が地図データになく、目印から推定。だいたいの場所に出ています。違っていたら「載せない」でよい）</span>' : '');
+    };
+    const tr = rows.map((r, i) => `<tr${r.excluded ? ' style="opacity:.55"' : ''}><td>${r.no}</td><td>${esc(r.name)}${r.unchecked ? '<br><span class="warn">AIが実在を確かめきれていません</span>' : ''}</td><td>${esc(r.type)}</td><td>${where(r)}</td><td>${btn(r, i)}</td><td>${esc(r.note)}</td></tr>`).join('');
+    $('rowTable').innerHTML = `<tr><th>#</th><th>施設名</th><th>種類</th><th>所要</th><th>紙面</th><th>吹き出し</th></tr>${tr}`;
+    for (const b of $('rowTable').querySelectorAll('button.toggleRow')) b.addEventListener('click', () => toggleRow(rows[Number(b.dataset.i)]));
+}
+
+// 貼った表を書き換えずに、施設を紙面から外す／戻す（番号を詰め直し、A4 ができていれば作り直す）
+async function toggleRow(r) {
+    r.excluded = !r.excluded;
+    renumber();
+    drawEditMap();
+    drawRowTable();
+    setStatus(`${r.name} を${r.excluded ? '紙面から外しました' : '紙面に戻しました'}。`);
+    if (!$('sheetHost').hidden) await buildSheet();
 }
 
 // ---------- 実行 ----------
@@ -335,7 +357,7 @@ async function run() {
         const miss = rows.filter(r => r.lat == null).length;
         const far = rows.filter(r => r.tooFar).length;
         const approx = rows.filter(r => r.approx).length;
-        setStatus(`ピンを立てました（${rows.length - miss - far}/${rows.length}件）。` + (p.approx ? '\n物件の位置は住所の一部から推定しています。★をドラッグして合わせてください。' : '') + (approx ? `\n${approx}件は目印から推定した位置です。` : '') + (miss ? `\n${miss}件は見つかりませんでした。住所・目印を足すか、紙面から外してください。` : '') + (far ? `\n${far}件は徒歩${CONFIG.walkMaxMinutes}分より遠く、別の場所に当たった可能性があるため紙面から外しました（地図の灰色の？）。` : ''));
+        setStatus(`ピンを立てました（${rows.length - miss - far}/${rows.length}件）。` + (p.approx ? '\n物件の位置は住所の一部から推定しています。★をドラッグして合わせてください。' : '') + (approx ? `\n${approx}件は目印から推定した位置です。` : '') + (miss ? `\n${miss}件は見つかりませんでした。住所・目印を足すか、紙面から外してください。` : '') + (far ? `\n${far}件は徒歩${CONFIG.walkMaxMinutes}分より遠く、別の場所に当たった可能性があるため紙面から外しました（地図の灰色の？）。` : '') + (miss || approx ? '\n推定の店は、だいたいの場所に出ています。違っていたり載せたくない店は、下の一覧の「載せない」を押してください。' : ''));
     } catch (e) {
         setStatus(e.message);
     } finally {
@@ -443,7 +465,7 @@ async function renderMapImage() {
     else await drawTiles(ctx, W, H, origin, zoom);
 
     // 最寄り駅（徒歩・種類に「駅」）→物件の動線
-    const station = rows.filter(r => r.kind === 'walk' && /駅/.test(r.type + r.name) && r.route && !r.tooFar).sort((a, b) => a.minutes - b.minutes)[0];
+    const station = rows.filter(r => r.kind === 'walk' && /駅/.test(r.type + r.name) && r.route && onSheet(r)).sort((a, b) => a.minutes - b.minutes)[0];
     if (station) {
         ctx.save();
         ctx.strokeStyle = '#c8553d'; ctx.lineWidth = 3.5 * u; ctx.setLineDash([8 * u, 6 * u]); ctx.lineCap = 'round';
@@ -469,7 +491,7 @@ async function renderMapImage() {
     const R = 13 * u;
     const pins = [];
     for (const r of rows) {
-        if (r.lat == null || r.tooFar) continue;
+        if (!onSheet(r)) continue;
         const [x, y] = xy(r.lat, r.lng);
         r.offMap = x < R || y < R || x > W - R || y > H - R;
         if (!r.offMap) pins.push({ r, x, y });
@@ -515,9 +537,9 @@ async function renderMapImage() {
 
 function sheetHtml(imgSrc) {
     const li = r => `<li class="${r.kind}"><span class="no">${r.no}</span><span class="name">${esc(r.name)}</span><span class="min">${r.kind === 'car' ? '車' : '徒歩'}${r.minutesApprox ? '約' : ''}${r.minutes}分${r.offMap ? '（地図外）' : ''}</span>${r.note ? `<span class="note">${esc(r.note)}</span>` : ''}</li>`;
-    const walk = rows.filter(r => r.kind === 'walk' && r.lat != null && !r.tooFar);
-    const car = rows.filter(r => r.kind === 'car' && r.lat != null);
-    const approx = rows.some(r => r.minutesApprox && r.lat != null && !r.tooFar);
+    const walk = rows.filter(r => r.kind === 'walk' && onSheet(r));
+    const car = rows.filter(r => r.kind === 'car' && onSheet(r));
+    const approx = rows.some(r => r.minutesApprox && onSheet(r));
     const dense = walk.length + car.length > 6 ? ' dense' : '';
     return `<div class="sheet${dense}">
 <h2>${esc(property.name)} 周辺MAP</h2>
@@ -573,7 +595,7 @@ function finishCheck(html) {
     const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, '');
     const plain = s => s.replace(/\s+/g, '');
     const lost = [];
-    for (const r of rows.filter(r => r.lat != null && !r.tooFar)) {
+    for (const r of rows.filter(onSheet)) {
         const min = `${r.kind === 'car' ? '車' : '徒歩'}${r.minutesApprox ? '約' : ''}${r.minutes}分`;
         if (!text.includes(plain(r.name))) lost.push(`${r.no}. ${r.name} の名前`);
         else if (!text.includes(min)) lost.push(`${r.no}. ${r.name} の「${min}」`);
@@ -608,5 +630,17 @@ $('btnSample').addEventListener('click', () => {
     $('tableIn').value = SAMPLE.table;
 });
 $('btnSheet').addEventListener('click', buildSheet);
+
+// 初級モード（初期表示）と中級の機能の切り替え。選んだ表示はこの端末に覚えておく
+function setBeginner(on) {
+    document.body.classList.toggle('beginner', on);
+    $('modeLabel').textContent = on ? 'いまは「初級」の画面です。' : 'いまは中級の機能も表示しています。';
+    $('btnMode').textContent = on ? '中級の機能を表示' : '初級の画面に戻す';
+    try { localStorage.setItem('shuhenOsmMode', on ? 'beginner' : 'advanced'); } catch (e) { /* 保存できない環境では毎回初級 */ }
+}
+$('btnMode').addEventListener('click', () => setBeginner(!document.body.classList.contains('beginner')));
+let savedMode = null;
+try { savedMode = localStorage.getItem('shuhenOsmMode'); } catch (e) { /* noop */ }
+setBeginner(savedMode !== 'advanced');
 $('btnPrint').addEventListener('click', () => window.print());
 $('btnHtml').addEventListener('click', saveHtml);
