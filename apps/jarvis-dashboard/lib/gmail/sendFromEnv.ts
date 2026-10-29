@@ -8,6 +8,7 @@ import {
   gmailClientFromEnv,
   tokenEnvForAccount,
 } from "@/lib/gmail/clientFromEnv";
+import { buildMimeMessage, type MailAttachment } from "@/lib/materialFileSearch";
 
 /** いずれかの送信用トークンがあれば true（UI の送信ボタン表示用） */
 export function gmailSendConfigured(account?: string | null): boolean {
@@ -54,6 +55,8 @@ export async function sendGmailViaEnv(opts: {
   subject: string;
   body: string;
   threadId?: string | null;
+  /** 添付ファイル（資料依頼への返信など） */
+  attachments?: MailAttachment[];
   /** triage_items.account。未指定時は estate → m19m → admin の順 */
   account?: string | null;
 }): Promise<{ id: string; threadId?: string; from: string; account: string }> {
@@ -74,15 +77,13 @@ export async function sendGmailViaEnv(opts: {
       const profile = await gmail.users.getProfile({ userId: "me" });
       const from = profile.data.emailAddress || "";
 
-      const rawLines = [
-        `To: ${opts.to}`,
-        `Subject: ${encodeMimeHeader(opts.subject)}`,
-        "MIME-Version: 1.0",
-        "Content-Type: text/plain; charset=UTF-8",
-        "",
-        opts.body,
-      ];
-      const raw = Buffer.from(rawLines.join("\r\n"), "utf8")
+      const mime = buildMimeMessage({
+        to: opts.to,
+        subject: opts.subject,
+        body: opts.body,
+        attachments: opts.attachments,
+      });
+      const raw = Buffer.from(mime, "utf8")
         .toString("base64")
         .replace(/\+/g, "-")
         .replace(/\//g, "_")

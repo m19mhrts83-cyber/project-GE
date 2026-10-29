@@ -78,7 +78,7 @@ async function persistRefresh(token: string): Promise<void> {
   }
 }
 
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   const clientId = (process.env.MS_GRAPH_CLIENT_ID || "").trim();
   const authority = (process.env.MS_GRAPH_AUTHORITY || "consumers").trim();
   const envRefresh = (process.env.MS_GRAPH_REFRESH_TOKEN || "").trim();
