@@ -150,6 +150,22 @@ class EmbedResolver:
             vtt.close_driver()
 
 
+def ensure_ffmpeg() -> None:
+    """yt-dlp と Whisper は PATH 上の `ffmpeg` を探す。Homebrew が無い Mac では venv の imageio-ffmpeg を
+    `ffmpeg` という名前で PATH に足す（同梱バイナリは ffmpeg-macos-… という名前なので、そのままでは見つからない）。"""
+    if shutil.which("ffmpeg"):
+        return
+    import os
+    import imageio_ffmpeg
+
+    link_dir = CACHE / "bin"
+    link_dir.mkdir(parents=True, exist_ok=True)
+    link = link_dir / "ffmpeg"
+    if not link.exists():
+        link.symlink_to(imageio_ffmpeg.get_ffmpeg_exe())
+    os.environ["PATH"] = f"{link_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+
+
 def download_audio(url: str, referer: str, workdir: Path) -> Path:
     ytdlp = shutil.which("yt-dlp") or str(Path(sys.executable).with_name("yt-dlp"))
     cmd = [ytdlp, "-q", "--no-warnings", "-f", "bestaudio/best", "--referer", referer,
@@ -226,6 +242,8 @@ def main() -> int:
     total = sum(len(v) for _, v in targets)
     print(f"# {course}: 字幕なし {len(targets)} レッスン / {total} 動画", flush=True)
 
+    if targets:
+        ensure_ffmpeg()
     transcribe = Transcriber(args.engine)
     resolver = EmbedResolver()
     count, failed = 0, []
@@ -264,7 +282,7 @@ def main() -> int:
         resolver.close()
     print(json.dumps({"course": course, "lessons_done": len(done), "videos_tried": count, "failed": len(failed),
                       "manifest": str(out_manifest)}, ensure_ascii=False))
-    return 0
+    return 1 if failed else 0  # 失敗を週次レポートで ❌ にする
 
 
 if __name__ == "__main__":
