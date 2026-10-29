@@ -6,15 +6,20 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { sendGmailViaEnv } from "@/lib/gmail/sendFromEnv";
+import { downloadMaterialFiles } from "@/lib/materialFiles";
+import type { MailAttachment, MaterialSource } from "@/lib/materialFileSearch";
 import {
   recordMailSkipLearn,
   resetMailSkipStreak,
   skipPendingFromMutedSender,
 } from "@/lib/mailActionSkipMute";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { isSelfEmail, parseEmailAddr } from "@/lib/selfEmails";
+import { extractMaterialRequests } from "@/lib/materialRequest";
 import { closeTodoistTaskById, createTodoistTask } from "@/lib/todoistTasks";
 
-export type MailActionSlackAction = "reply" | "skip" | "todoist";
+/** done = LINE／Chatwork などアプリ側で返信済み（送信はしない） */
+export type MailActionSlackAction = "reply" | "skip" | "todoist" | "done";
 
 export {
   isMailSenderMuted,
@@ -95,6 +100,7 @@ export function parseMaAction(
   if (a === "reply" || a === "send" || a === "r") return "reply";
   if (a === "skip" || a === "no" || a === "n" || a === "dismiss") return "skip";
   if (a === "todoist" || a === "task" || a === "t") return "todoist";
+  if (a === "done" || a === "replied") return "done";
   return null;
 }
 
@@ -425,19 +431,67 @@ async function syncDigestFromPayload(
 
 /** 「Todoist追加」で後回しにした返信の目印（朝の再掲で拾い直す） */
 export const MAIL_REPLY_WAIT_LABEL = "返信待ち";
-/** 後回しの既定期日（JST で 2 日後） */
+/** 資料依頼の目印 */
+export const MATERIAL_WAIT_LABEL = "資料待ち";
+/** 後回しの既定期日（JST で 2 日後／資料集めは 3 日後） */
 const MAIL_REPLY_WAIT_DAYS = 2;
+const MATERIAL_WAIT_DAYS = 3;
 
-function mailReplyWaitDue(): string {
+function mailReplyWaitDue(days: number): string {
   const jst = new Date(Date.now() + 9 * 3600 * 1000);
-  jst.setUTCDate(jst.getUTCDate() + MAIL_REPLY_WAIT_DAYS);
+  jst.setUTCDate(jst.getUTCDate() + days);
   return jst.toISOString().slice(0, 10);
+}
+
+const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+/** 返信に使える送信元（Vercel の Gmail トークンと対応） */
+export const MAIL_SEND_ACCOUNTS = [
+  { key: "estate", label: "estate（matsuno.estate@gmail.com）" },
+  { key: "admin", label: "admin（admin@livingsupport-matsu.co.jp）" },
+  { key: "m19m", label: "m19m（m19m.hrts83@gmail.com）" },
+] as const;
+
+export function normalizeMailAccount(raw: string | null | undefined): string {
+  const a = String(raw || "").trim().toLowerCase();
+  if (a === "livingsupport") return "admin";
+  return MAIL_SEND_ACCOUNTS.some((x) => x.key === a) ? a : "";
+}
+
+/**
+ * 返信の宛先候補。from_email が無い行（パートナーやり取り md 由来）は
+ * 本文の最初の他者アドレス（署名・引用ヘッダ）から推定する。
+ */
+export function guessMailReplyTo(row: {
+  from_email?: string | null;
+  original_body?: string | null;
+}): string {
+  const from = parseEmailAddr(row.from_email);
+  if (from && !isSelfEmail(from)) return from;
+  const found = String(row.original_body || "").match(
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+  );
+  for (const raw of found || []) {
+    const addr = raw.toLowerCase();
+    if (isSelfEmail(addr) || /no-?reply|mailer-daemon/.test(addr)) continue;
+    return addr;
+  }
+  return "";
 }
 
 export async function applyMailActionSlack(
   id: string,
   action: MailActionSlackAction,
-  opts?: { body?: string; source?: string },
+  opts?: {
+    body?: string;
+    source?: string;
+    /** 返信の宛先（モーダルで編集）。未指定は from_email → 本文からの推定 */
+    to?: string;
+    /** 送信元アカウント estate|admin|m19m（モーダルで選択） */
+    account?: string;
+    /** 添付する資料（モーダルで選んだ OneDrive / Google Drive のファイル） */
+    attachments?: Array<{ s: MaterialSource; id: string }>;
+  },
 ): Promise<MaApplyResult> {
   const row = await fetchMailActionTriage(id);
   if (!row) {
@@ -556,9 +610,10 @@ export async function applyMailActionSlack(
       fromEmail,
       partner,
     );
-    const titleBase = partner
-      ? `[メール要対応][${partner}] ${subject}`
-      : `[メール要対応] ${subject}`;
+    // 「資料を送って」系は品目リスト付きで「資料待ち」にする（集めてから返信）
+    const materials = extractMaterialRequests(row.original_body);
+    const tag = materials.length ? "[資料待ち]" : "[メール要対応]";
+    const titleBase = partner ? `${tag}[${partner}] ${subject}` : `${tag} ${subject}`;
     const title = titleBase.slice(0, 200);
     const outLinks = [
       `triage_id=${id}`,
@@ -566,6 +621,9 @@ export async function applyMailActionSlack(
       row.gmail_message_id ? `gmail_message=${row.gmail_message_id}` : "",
     ].filter(Boolean);
     const summaryBlock = [
+      ...(materials.length
+        ? ["【依頼された資料】", ...materials.map((m) => `- [ ] ${m}`), ""]
+        : []),
       "【Jarvis】",
       `サマリ: ${(row.summary || subject).replace(/\s+/g, " ").slice(0, 280)}`,
       "アウトプット:",
@@ -578,9 +636,11 @@ export async function applyMailActionSlack(
     const created = await createTodoistTask(lane, {
       title,
       summary: summaryBlock,
-      labels: ["quick", MAIL_REPLY_WAIT_LABEL],
-      // 期日なしだと 313 にも朝の再掲にも乗らず埋もれる
-      due: mailReplyWaitDue(),
+      labels: materials.length
+        ? ["quick", MAIL_REPLY_WAIT_LABEL, MATERIAL_WAIT_LABEL]
+        : ["quick", MAIL_REPLY_WAIT_LABEL],
+      // 期日なしだと 313 にも朝の再掲にも乗らず埋もれる。資料集めは少し長めに取る
+      due: mailReplyWaitDue(materials.length ? MATERIAL_WAIT_DAYS : MAIL_REPLY_WAIT_DAYS),
     });
     if (!created.ok) {
       return { ok: false, message: `Todoist 起票失敗: ${created.error}` };
@@ -610,25 +670,69 @@ export async function applyMailActionSlack(
     };
   }
 
+  if (action === "done") {
+    // チャット（LINE／Chatwork 等）はアプリで返信し、ここでは記録だけ
+    payload.slack_ma_action = { action: "done", at: now, source };
+    payload.manual_reply = { at: now, channel: String(row.lane || "") };
+    if (payload.todoist_task_id && !payload.todoist_closed_at) {
+      const closed = await closeTodoistTaskById(
+        String(payload.todoist_task_id),
+        "【Jarvis】アプリで返信済み（Slack で記録）",
+      );
+      if (closed.ok) payload.todoist_closed_at = now;
+    }
+    const { error } = await sb
+      .from("triage_items")
+      .update({ status: "sent", payload, updated_at: now })
+      .eq("id", id);
+    if (error) return { ok: false, message: error.message };
+    const digestSync = await syncDigestFromPayload(payload);
+    revalidateMailActionPaths();
+    return {
+      ok: true,
+      message: `返信済みにしました（${row.partner || id}）`,
+      status: "sent",
+      ...digestSync,
+    };
+  }
+
   // reply（送信）
   const body = (opts?.body ?? row.draft_text ?? "").trim();
   if (!body) {
     return { ok: false, message: "返信本文が空です。編集してから送ってください" };
   }
-  const to = String(row.from_email || "").trim();
+  const to = (opts?.to || guessMailReplyTo(row)).trim();
   if (!to) {
-    return { ok: false, message: "宛先（from_email）がありません" };
+    return { ok: false, message: "宛先がありません。宛先欄に入力してください" };
+  }
+  if (!EMAIL_RE.test(to)) {
+    return { ok: false, message: `宛先の形式が正しくありません: ${to}` };
   }
   let subject = String(row.subject || "").trim() || "（件名なし）";
   if (!/^re:/i.test(subject)) subject = `Re: ${subject}`;
-  const account = String(row.account || "admin").trim() || "admin";
+  const receivedAccount = normalizeMailAccount(row.account);
+  const account = normalizeMailAccount(opts?.account) || receivedAccount || "estate";
+
+  let attachments: MailAttachment[] = [];
+  if (opts?.attachments?.length) {
+    try {
+      attachments = await downloadMaterialFiles(opts.attachments);
+    } catch (e) {
+      return {
+        ok: false,
+        message: `添付資料を取得できませんでした: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+  }
 
   try {
     const sent = await sendGmailViaEnv({
       to,
       subject,
       body,
-      threadId: row.gmail_thread_id || null,
+      attachments,
+      // threadId は受信したメールボックスのものなので、送信元を変えたら付けない
+      threadId: account === receivedAccount ? row.gmail_thread_id || null : null,
       account,
     });
     payload.sent_at = now;
@@ -637,6 +741,7 @@ export async function applyMailActionSlack(
     payload.gmail_sent_from = sent.from;
     payload.gmail_sent_account = sent.account;
     payload.sent_to = to;
+    if (attachments.length) payload.sent_attachments = attachments.map((a) => a.filename);
     payload.slack_ma_action = { action: "reply", at: now, source };
     delete payload.last_send_error;
     const { error } = await sb
@@ -666,7 +771,7 @@ export async function applyMailActionSlack(
     revalidateMailActionPaths();
     return {
       ok: true,
-      message: `送信しました → ${to}（${row.partner || id}）`,
+      message: `送信しました → ${to}（${row.partner || id}）${attachments.length ? `／添付${attachments.length}件` : ""}`,
       status: "sent",
       ...digestSync,
     };
