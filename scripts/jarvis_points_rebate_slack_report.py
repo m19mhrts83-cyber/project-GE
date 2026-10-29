@@ -177,7 +177,8 @@ def build_vpoint(*, outcome: str, reason: str, error: str, note: str, asks_n: in
     else:
         lines.append("・結果: 定例ウォッチ更新")
     if asks_n is not None:
-        lines.append(f"・要Jarvis確認: {asks_n}件")
+        # 「要Jarvis確認」「窓C」は伝わらない（FB 10/29）。人が見る項目数と一覧の場所を書く
+        lines.append(f"・手で確認する項目: {asks_n}件（一覧は下のページ）")
     if note:
         lines.append(f"・特記: {note}")
     lines.append(f"・見る: {DASH_VPOINT}")
