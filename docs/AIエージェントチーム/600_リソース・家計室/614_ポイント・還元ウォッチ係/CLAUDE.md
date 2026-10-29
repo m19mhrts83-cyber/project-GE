@@ -111,3 +111,4 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_statu
 | 2026-10-17 | 係新設（旧名・テイチャン単体）→ Slack #report |
 | 2026-10-17 | **ポイント・還元ウォッチ**に改名・拡大。ETC／Vポイント定例も `#report` 相乗り。612（払う側）と分離 |
 | 2026-10-17 | ビルダー組織図に追加（共有 `uksxiDIzE1AEckKH`）。`flow.md` 素案を613型で充填 |
+| 2026-10-29 | Vポイント Slack の文面を人の言葉に: 「要Jarvis確認」→「手で確認する項目: N件（一覧は下のページ）」、「窓C定例」→「月末の定例チェック（25日〜末日）」（松野FB） |
