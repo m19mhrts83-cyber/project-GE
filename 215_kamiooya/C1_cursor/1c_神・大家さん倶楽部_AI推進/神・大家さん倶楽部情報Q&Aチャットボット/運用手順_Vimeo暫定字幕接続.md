@@ -131,3 +131,21 @@
   --course 神大家0.はじめに --course 神大家1.基礎 --course 神大家2.応用 --course 神大家3.継承 --course 神大家4.グルコン          # プレビュー
 # 問題なければ --reembed --mirror-raimo --apply を付ける
 ```
+
+## 週次の動画差分取込（2026-10-28〜）
+
+松野さん決定（10/28）: コミュニティコメントと同じく週次で取り込む。日曜12:00（08:00 の GHA `westudy-raimo-weekly` でレッスン説明文が更新された後）。Notta版が届いた動画は Whisper版と差し替える。
+
+- 実行: Mac の launchd `com.matsunoma.jarvis.kamiooya-video-weekly` → `launchd/kamiooya_video_weekly_runner.sh` → `scripts/kamiooya_video_weekly.py --post`
+- 設置: `zsh scripts/install_kamiooya_video_weekly_launchd.sh`。今すぐ1回は `launchctl kickstart gui/$(id -u)/com.matsunoma.jarvis.kamiooya-video-weekly`。止めるときは `KAMIOOYA_VIDEO_WEEKLY_DISABLE=1`
+- 試し: `~/selenium_env/venv/bin/python scripts/kamiooya_video_weekly.py --dry-run`（字幕取得と Whisper までで、登録はしない）
+- 流れ:
+  1. 新しいレッスンの Vimeo 自動字幕を取得する（取込済みのレッスンは飛ばす）
+  2. 字幕のない動画をローカル Whisper で起こす（`--skip-notta`: Notta版がある動画は起こさない）。基礎の字幕なしの残りもここで埋まる
+  3. 補正表を当ててから、Supabase・Raimo へ差分だけ登録する
+  4. `notta_weekly_replace.py`: `inbox/notta` の xlsx/srt を登録する。同じ動画の Whisper版は、Notta版が入った後にチャンクを削除する（Supabase・Raimo）。元の source 行には `meta_json.replaced_by` を残し、次週の取込で Whisper版を戻さない。本文は `__whisper.md` に残る
+  5. 新しく入った分の誤記候補 CSV を `講座_文字起こし/週次レポート/` に出す。補正表への追加は松野さんの確認後
+  6. レポート `講座_文字起こし/週次レポート/動画取込_YYYYMMDD.md` を保存し、変化があったときだけ #ops に件数を通知する
+- 状態: `~/git-repos/.jarvis_state/kamiooya_video_weekly/`（status・whisper manifest、Notta ledger、ログ）。リポジトリ内の manifest は書き換えない
+- Notta の受け取り方（運営・今村さんへのお願い）: ファイル名に Vimeo ID を入れる（例 `STEP2-1_803690477.xlsx`）。入れられないときは `inbox/notta/対応表.csv`（列 `file,vimeo_id,slug,title,course`）に1行書く。どちらも無いファイルはレポートの「Notta 要確認」に出て、登録されない
+- Vimeo 自動字幕しか無い動画に Notta版が来た場合は、二重登録を避けて「要確認」にとどめる（差し替えは承認された Whisper分のみ）
