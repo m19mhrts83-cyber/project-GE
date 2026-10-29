@@ -134,7 +134,14 @@
 
 ## 週次の動画差分取込（2026-10-28〜）
 
-松野さん決定（10/28）: コミュニティコメントと同じく週次で取り込む。日曜12:00（08:00 の GHA `westudy-raimo-weekly` でレッスン説明文が更新された後）。Notta版が届いた動画は Whisper版と差し替える。
+松野さん決定（10/28）: 動画は月1回程度の追加頻度なので週次で取り込む。日曜12:00（08:00 の GHA `westudy-raimo-weekly` でレッスン説明文が更新された後）。Notta版が届いた動画は Whisper版と差し替える。
+
+### コミュニティコメントとの取得頻度の分離（2026-10-30〜）
+
+- コミュニティコメント: GitHub Actionsで毎日08:00取得、14:00補欠。08:00が成功していれば20時間ガードで同日の補欠をskipする
+- lesson説明: 日曜08:00（失敗時は同日14:00補欠）の週次更新
+- 動画文字起こし: Mac LaunchAgentで日曜12:00の週次更新（従来どおり）
+- 手動確認: workflow dispatchの `comments_only=true` でコメントだけを試行できる
 
 - 実行: Mac の launchd `com.matsunoma.jarvis.kamiooya-video-weekly` → `launchd/kamiooya_video_weekly_runner.sh` → `scripts/kamiooya_video_weekly.py --post`
 - 設置: `zsh scripts/install_kamiooya_video_weekly_launchd.sh`。今すぐ1回は `launchctl kickstart gui/$(id -u)/com.matsunoma.jarvis.kamiooya-video-weekly`。止めるときは `KAMIOOYA_VIDEO_WEEKLY_DISABLE=1`

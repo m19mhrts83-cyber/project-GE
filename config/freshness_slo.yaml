@@ -108,12 +108,12 @@ products:
     owner: 500 不動産パイプライン
     action: "gh run list -w kurashift-re-daily-inquiry.yml"
   - id: gha_westudy
-    label: WeStudy 週次取込
+    label: WeStudy コメント日次取込
     kind: gha
     workflow: westudy-raimo-weekly.yml
-    max_age_h: 200
+    max_age_h: 36
     owner: 315 連携健全性点検
-    action: "失敗ログを確認。402 exceed_egress_quotaならSupabase利用制限を解消後に再実行。ログイン停滞なら時間を置く"
+    action: "08:00本番と14:00補欠の失敗ログを確認。402 exceed_egress_quotaならSupabase利用制限を解消後に再実行。ログイン停滞なら時間を置く"
   - id: weekly_review_facts
     label: 314 週次機械チェック
     kind: file_mtime

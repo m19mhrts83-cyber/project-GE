@@ -70,6 +70,7 @@ usage() {
 必要な環境変数:
   WESTUDY_USER, WESTUDY_PASS
   CHATBOT_OUTPUT_ROOT（任意。未設定時は OneDrive 固定パス）
+  WESTUDY_SKIP_LESSONS=1（任意。コメントだけ取得し、lesson説明は週次まで維持）
   Supabase（任意・設定時は step2 実行）:
     SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY（推奨）
   Raimo（任意・設定時は step3 実行。RAIMO_* が正。LIMO_* も可）:
@@ -103,6 +104,7 @@ fi
 
 BUILD_DELTA_SCRIPT="$SCRIPT_DIR/build_delta_csv.py"
 STATE_DELTA="${CHATBOT_STATE_ROOT:-$OUTPUT_ROOT/state}/westudy_comment_ids.json"
+SKIP_LESSONS="${WESTUDY_SKIP_LESSONS:-0}"
 
 echo "==> step1: WeStudy更新パイプライン（フォーラム）"
 "$PIPELINE_SCRIPT" --defer-state-update "$@"
@@ -114,7 +116,9 @@ LESSON_STATE="${CHATBOT_STATE_ROOT:-$OUTPUT_ROOT/state}/westudy_lesson_ids.json"
 LESSON_OUTPUT_DIR="$OUTPUT_ROOT/exports/lessons"
 mkdir -p "$LESSON_OUTPUT_DIR"
 
-if [[ -f "$LESSON_SCRAPER" && -f "$LESSON_DELTA_SCRIPT" ]]; then
+if [[ "$SKIP_LESSONS" == "1" ]]; then
+  echo "==> step1b: 日次コメントモードのためlesson説明収集はスキップ（週次で更新）"
+elif [[ -f "$LESSON_SCRAPER" && -f "$LESSON_DELTA_SCRIPT" ]]; then
   echo "==> step1b: WeStudy lesson 説明テキスト収集"
   LESSON_FULL="$LESSON_OUTPUT_DIR/lesson_full_${RUN_ID}.csv"
   if "$PYTHON" "$LESSON_SCRAPER" --output-root "$LESSON_OUTPUT_DIR"; then
@@ -170,7 +174,11 @@ run_supabase_healthcheck_touch() {
     return 0
   fi
   echo "==> step1.5: Supabase 疎通確認 + 心拍 (--touch)"
-  if ! "$PYTHON" "$HEALTHCHECK_SCRIPT" --touch --note "westudy-weekly:${RUN_ID}"; then
+  local sync_note="westudy-weekly"
+  if [[ "$SKIP_LESSONS" == "1" ]]; then
+    sync_note="westudy-daily-comments"
+  fi
+  if ! "$PYTHON" "$HEALTHCHECK_SCRIPT" --touch --note "${sync_note}:${RUN_ID}"; then
     if [[ "${SUPABASE_FAIL_OPEN:-0}" == "1" ]]; then
       echo "警告: Supabase疎通/心拍に失敗しましたが、SUPABASE_FAIL_OPEN=1 のため継続します。" >&2
       return 0
@@ -295,9 +303,12 @@ fi
 commit_state_after_success
 
 # --- lesson delta の Supabase 取込（フォーラム取込成功後） ---
-LESSON_DELTA_FILE="${LESSON_DELTA:-}"
-if [[ -z "$LESSON_DELTA_FILE" ]]; then
-  LESSON_DELTA_FILE="$(ls -1t "$OUTPUT_ROOT"/exports/lessons/lesson_delta_*.csv 2>/dev/null | head -n 1 || true)"
+LESSON_DELTA_FILE=""
+if [[ "$SKIP_LESSONS" != "1" ]]; then
+  LESSON_DELTA_FILE="${LESSON_DELTA:-}"
+  if [[ -z "$LESSON_DELTA_FILE" ]]; then
+    LESSON_DELTA_FILE="$(ls -1t "$OUTPUT_ROOT"/exports/lessons/lesson_delta_*.csv 2>/dev/null | head -n 1 || true)"
+  fi
 fi
 if [[ -n "$LESSON_DELTA_FILE" && -f "$LESSON_DELTA_FILE" ]]; then
   LESSON_DELTA_ROWS="$("$PYTHON" - <<'PY' "$LESSON_DELTA_FILE"
