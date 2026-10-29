@@ -259,6 +259,27 @@ def is_chat_inbound(channel: str) -> bool:
     return False
 
 
+# LINE グループの書き出し行: "2026/10/28 20:12  松野真治  本文"
+_CHAT_SPEAKER_LINE_RE = re.compile(
+    r"^\s*\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}\s+(.+?)\s{2,}\S"
+)
+_SELF_SPEAKER_RE = re.compile(r"松野\s*(真治)?|リビングサポート松")
+
+
+def chat_last_speaker_is_self(body: str) -> bool:
+    """見出しは「受信」でも、本文の最後の発言者が自分なら返信不要。
+
+    LINE グループはブロックごとに「（…受信）」見出しで書き出され、自分の発言も混ざる。
+    最後の発言者が松野なら未返信候補にしない（2026-10-29: 自分の発言が pending に出ていた）。
+    """
+    last = ""
+    for line in str(body or "").splitlines():
+        m = _CHAT_SPEAKER_LINE_RE.match(line)
+        if m:
+            last = m.group(1).strip()
+    return bool(last and _SELF_SPEAKER_RE.search(last))
+
+
 def is_chat_noise(summary: str, body: str, subject: str = "") -> bool:
     blob = f"{summary or ''}\n{subject or ''}\n{(body or '')[:500]}"
     if CHAT_NOISE_RE.search(blob):
@@ -636,7 +657,7 @@ def find_unreplied_chat(entries: list[dict[str, Any]], lookback_days: int) -> li
             continue
         if NOISE_SUBJECT_RE.search(e.get("summary") or "") or NOISE_SUBJECT_RE.search(e.get("subject") or ""):
             continue
-        inbound = is_chat_inbound(ch_raw)
+        inbound = is_chat_inbound(ch_raw) and not chat_last_speaker_is_self(e.get("body") or "")
         folder = e.get("folder") or ""
         key = chat_thread_key(folder, ch_raw, kind)
         row = {
